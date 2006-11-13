@@ -3721,39 +3721,43 @@ sa_legacy_share(int flags, int argc, char *argv[])
 			    }
 			}
 		    } else {
+			char *type;
 			/*
 			 * may want to change persist state, but the
-			 * important thing is to change options unless
-			 * this is ZFS where we just want to do the
-			 * enable since everything is current.
+			 * important thing is to change options. We
+			 * need to change them regardless of the
+			 * source.
 			 */
-			if (!sa_zfs_is_shared(sharepath)) {
-			    char *type;
-			    remove_all_options(share, protocol);
-			    type = sa_get_share_attr(share, "type");
-			    if (type != NULL &&
-				strcmp(type, "transient") != 0) {
-				curtype = SA_SHARE_PERMANENT;
-			    }
-			    if (type != NULL)
-				sa_free_attr_string(type);
-			    if (curtype != persist) {
-				(void) sa_set_share_attr(share, "type",
+			if (sa_zfs_is_shared(sharepath)) {
+			    zfs = 1;
+			}
+			remove_all_options(share, protocol);
+			type = sa_get_share_attr(share, "type");
+			if (type != NULL &&
+			    strcmp(type, "transient") != 0) {
+			    curtype = SA_SHARE_PERMANENT;
+			}
+			if (type != NULL)
+			    sa_free_attr_string(type);
+			if (curtype != persist) {
+			    (void) sa_set_share_attr(share, "type",
 					persist == SA_SHARE_PERMANENT ?
 						"persist" : "transient");
-			    }
-			} else {
-			    zfs++;
 			}
 		    }
+		    /* have a group to hold this share path */
+		    if (ret == SA_OK && options != NULL &&
+			strlen(options) > 0) {
+			ret = sa_parse_legacy_options(share,
+							options,
+							protocol);
+		    }
 		    if (!zfs) {
-			/* have a group to hold this share path */
-			if (ret == SA_OK && options != NULL &&
-				strlen(options) > 0) {
-			    ret = sa_parse_legacy_options(share,
-							    options,
-							    protocol);
-			}
+			/*
+			 * zfs shares never have resource or
+			 * description and we can't store the values
+			 * so don't try.
+			 */
 			if (ret == SA_OK && description != NULL)
 			    ret = sa_set_share_description(share, description);
 			if (ret == SA_OK && resource != NULL)

@@ -152,8 +152,8 @@ sa_zfs_is_shared(char *path)
  * group. If the group doesn't exist, create it first, making sure it
  * is marked as a ZFS group.
  *
- * Not that all ZFS shares are in a subgroup of the top level group
- * "zfs".
+ * Note that all ZFS shares are in a subgroup of the top level group
+ * called "zfs".
  */
 
 static sa_group_t
@@ -172,6 +172,8 @@ find_or_create_group(char *groupname, char *proto, int *err)
 	group = sa_get_group(groupname);
 	if (group == NULL) {
 	    group = sa_create_group(groupname, &ret);
+
+	    /* make sure this is flagged as a ZFS group */
 	    if (group != NULL)
 		ret = sa_set_group_attr(group, "zfs", "true");
 	}
@@ -194,6 +196,64 @@ find_or_create_group(char *groupname, char *proto, int *err)
 	}
 	if (err != NULL)
 	    *err = ret;
+	return (group);
+}
+
+/*
+ * find_or_create_zfs_subgroup(groupname, optstring, *err)
+ *
+ * ZFS shares will be in a subgroup of the "zfs" master group.  This
+ * function looks to see if the groupname exists and returns it if it
+ * does or else creates a new one with the specified name and returns
+ * that.  The "zfs" group will exist before we get here, but we make
+ * sure just in case.
+ *
+ * err must be a valid pointer.
+ */
+
+static sa_group_t
+find_or_create_zfs_subgroup(char *groupname, char *optstring, int *err)
+{
+	sa_group_t group = NULL;
+	sa_group_t zfs;
+	char *name;
+	char *options;
+
+	/* start with the top-level "zfs" group */
+	zfs = sa_get_group("zfs");
+	*err = SA_OK;
+	if (zfs != NULL) {
+	    for (group = sa_get_sub_group(zfs); group != NULL;
+		group = sa_get_next_group(group)) {
+		name = sa_get_group_attr(group, "name");
+		if (name != NULL && strcmp(name, groupname) == 0) {
+		    /* have the group so break out of here */
+		    sa_free_attr_string(name);
+		    break;
+		}
+		if (name != NULL)
+		    sa_free_attr_string(name);
+	    }
+
+	    if (group == NULL) {
+		/* need to create the sub-group since it doesn't exist */
+		group = _sa_create_zfs_group(zfs, groupname);
+		if (group != NULL) {
+		    set_node_attr(group, "zfs", "true");
+		}
+		if (strcmp(optstring, "on") == 0)
+		    optstring = "rw";
+		if (group != NULL) {
+		    options = strdup(optstring);
+		    if (options != NULL) {
+			*err = sa_parse_legacy_options(group, options, "nfs");
+			free(options);
+		    } else {
+			*err = SA_NO_MEMORY;
+		    }
+		}
+	    }
+	}
 	return (group);
 }
 
@@ -223,6 +283,7 @@ sa_get_zfs_shares(char *groupname)
 	zfs_source_t source;
 	char sourcestr[ZFS_MAXPROPLEN];
 	libzfs_handle_t *libhandle;
+	char *options;
 
 	/*
 	 * if we can't access libzfs, don't bother doing anything.
@@ -269,10 +330,46 @@ sa_get_zfs_shares(char *groupname)
 			}
 			if (err == SA_OK) {
 			    if (source & ZFS_SRC_INHERITED) {
-				share = _sa_add_share(group, cur->mountp,
+				int doshopt = 0;
+				/*
+				 * Need to find the "real" parent
+				 * sub-group. It may not be mounted,
+				 * but it was identified in the
+				 * "sourcestr" variable. The real
+				 * parent not mounted can occur if
+				 * "canmount=off and sharenfs=on".
+				 */
+				group = find_or_create_zfs_subgroup(sourcestr,
+								    shareopts,
+								    &doshopt);
+				if (group != NULL) {
+				    share = _sa_add_share(group, cur->mountp,
 							SA_SHARE_TRANSIENT,
 							&err);
+					/*
+					 * some options may only be on
+					 * shares. If the opt string
+					 * contains one of those, we
+					 * put it just on the share.
+					 */
+				    if (share != NULL &&
+					doshopt == SA_PROP_SHARE_ONLY) {
+					options = strdup(shareopts);
+					if (options != NULL) {
+					    err = sa_parse_legacy_options(share,
+								options, "nfs");
+					    free(options);
+					}
+				    }
+				} else {
+				    err = SA_NO_MEMORY;
+				}
 			    } else {
+				/*
+				 * this is a sub-group that actually
+				 * contains the sharenfs property as
+				 * opposed to a share that inherited.
+				 */
 				group = _sa_create_zfs_group(zfsgroup,
 								cur->resource);
 				set_node_attr(group, "zfs", "true");
@@ -280,11 +377,30 @@ sa_get_zfs_shares(char *groupname)
 							SA_SHARE_TRANSIENT,
 							&err);
 				if (err == SA_OK) {
-				    char *options;
 				    if (strcmp(shareopts, "on") != 0) {
 					options = strdup(shareopts);
 					if (options != NULL) {
 					    err = sa_parse_legacy_options(group,
+									options,
+									"nfs");
+					    free(options);
+					}
+					if (err == SA_PROP_SHARE_ONLY) {
+					/*
+					 * Same as above, some
+					 * properties may only be on
+					 * shares, but due to the ZFS
+					 * sub-groups being
+					 * artificial, we sometimes
+					 * get this and have to deal
+					 * with it. We do it by
+					 * attempting to put it on the
+					 * share.
+					 */
+					    options = strdup(shareopts);
+					    if (options != NULL)
+						err = sa_parse_legacy_options(
+									share,
 									options,
 									"nfs");
 					    free(options);

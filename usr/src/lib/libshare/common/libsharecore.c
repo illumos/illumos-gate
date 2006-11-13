@@ -1180,9 +1180,16 @@ parse_sharetab(void)
 			share = _sa_add_share(group, tmplist->path,
 						SA_SHARE_TRANSIENT, &err);
 		    } else {
-			(void) printf(gettext("Group for temporary share"
-						"not found: %s\n"),
-					tmplist->path);
+			/*
+			 * While this case shouldn't occur very often,
+			 * it does occur out of a "zfs set
+			 * sharenfs=off" when the dataset is also set
+			 * to canmount=off. A warning will then cause
+			 * the zfs command to abort. Since we add it
+			 * to the default list, everything works
+			 * properly anyway and the library doesn't
+			 * need to give a warning.
+			 */
 			share = _sa_add_share(lgroup, tmplist->path,
 						SA_SHARE_TRANSIENT, &err);
 		    }
