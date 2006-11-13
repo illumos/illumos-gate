@@ -28,6 +28,7 @@
 #include <locale.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 #include "nscd_common.h"
 #include "nscd_config.h"
 #include "nscd_log.h"
@@ -35,6 +36,23 @@
 #include "nscd_frontend.h"
 
 static char	*cfgfile_save = NULL;
+static mutex_t	time_mutex = DEFAULTMUTEX;
+static time_t	start_time = 0;
+
+void
+_nscd_set_start_time(int reset)
+{
+	(void) mutex_lock(&time_mutex);
+	if (start_time == 0 || reset == 1)
+		start_time = time(NULL);
+	(void) mutex_unlock(&time_mutex);
+}
+
+time_t
+_nscd_get_start_time()
+{
+	return (start_time);
+}
 
 nscd_rc_t
 _nscd_init(
@@ -45,24 +63,27 @@ _nscd_init(
 	nscd_cfg_error_t	*err;
 
 	/*
+	 * remember when main or forker nscd starts.
+	 */
+	_nscd_set_start_time(0);
+
+	/*
 	 * allocate the space for tables
 	 */
-	rc = _nscd_alloc_nsw_config();
-	rc = _nscd_alloc_service_state_table();
-	rc = _nscd_alloc_nsw_state_base();
-	rc = _nscd_alloc_nsw_be_info_db();
-	rc = _nscd_alloc_getent_ctx_base();
-	if (rc != NSCD_SUCCESS)
+	if ((rc = _nscd_alloc_nsw_config()) != NSCD_SUCCESS ||
+	    (rc = _nscd_alloc_service_state_table()) != NSCD_SUCCESS ||
+	    (rc = _nscd_alloc_nsw_state_base()) != NSCD_SUCCESS ||
+	    (rc = _nscd_alloc_nsw_be_info_db()) != NSCD_SUCCESS ||
+	    (rc = _nscd_alloc_getent_ctx_base()) != NSCD_SUCCESS)
 		return (rc);
 
 	/*
 	 * allocate the space for local configuration
 	 * and statistics
 	 */
-	rc = _nscd_alloc_switch_cfg();
-	rc = _nscd_alloc_frontend_cfg();
-	rc = _nscd_alloc_switch_stats();
-	if (rc != NSCD_SUCCESS)
+	if ((rc = _nscd_alloc_switch_cfg()) != NSCD_SUCCESS ||
+	    (rc = _nscd_alloc_frontend_cfg()) != NSCD_SUCCESS ||
+	    (rc = _nscd_alloc_switch_stats()) != NSCD_SUCCESS)
 		return (rc);
 
 	/*
@@ -171,7 +192,7 @@ _nscd_init(
 	 */
 	if (cfgfile != NULL) {
 		cfgfile_save = strdup(cfgfile);
-		if (cfgfile == NULL)
+		if (cfgfile_save == NULL)
 			return (NSCD_NO_MEMORY);
 	}
 

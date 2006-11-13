@@ -510,14 +510,14 @@ _nscd_cfg_init_param()
 			if (gdesc->nfunc_name != NULL) {
 				rc = _nscd_cfg_get_funcp(gdesc->nfunc_name,
 					&gdesc->notify, NULL, NULL);
-				if (rc != NULL)
+				if (rc != NSCD_SUCCESS)
 					return (rc);
 				nfunc = (void *)gdesc->notify;
 			}
 			if (gdesc->vfunc_name != NULL) {
 				rc = _nscd_cfg_get_funcp(gdesc->vfunc_name,
 					&gdesc->verify, NULL, NULL);
-				if (rc != NULL)
+				if (rc != NSCD_SUCCESS)
 					return (rc);
 				vfunc = (void *)gdesc->verify;
 			}
@@ -548,13 +548,13 @@ _nscd_cfg_init_param()
 			if (desc->nfunc_name != NULL) {
 				rc = _nscd_cfg_get_funcp(desc->nfunc_name,
 					&desc->notify, &nfunc, NULL);
-				if (rc != NULL)
+				if (rc != NSCD_SUCCESS)
 					return (rc);
 			}
 			if (desc->vfunc_name != NULL) {
 				rc = _nscd_cfg_get_funcp(desc->vfunc_name,
 					&desc->verify, &vfunc, NULL);
-				if (rc != NULL)
+				if (rc != NSCD_SUCCESS)
 					return (rc);
 			}
 		}
@@ -653,7 +653,7 @@ _nscd_cfg_init_stat()
 			if (gdesc->gsfunc_name != NULL) {
 				rc = _nscd_cfg_get_funcp(gdesc->gsfunc_name,
 					&gdesc->get_stat, NULL, NULL);
-				if (rc != NULL)
+				if (rc != NSCD_SUCCESS)
 					return (rc);
 				gsfunc = (void *)gdesc->get_stat;
 			}
@@ -684,7 +684,7 @@ _nscd_cfg_init_stat()
 			if (desc->gsfunc_name != NULL) {
 				rc = _nscd_cfg_get_funcp(desc->gsfunc_name,
 					&desc->get_stat, &gsfunc, NULL);
-				if (rc != NULL)
+				if (rc != NSCD_SUCCESS)
 					return (rc);
 			}
 		}
@@ -1320,13 +1320,15 @@ _nscd_cfg_notify_init(
 					&skip, errorp);
 			} else { /* send data once for each nsw db */
 
-				for (j = 0; j < _nscd_cfg_num_nsw_db;
-					j++) {
+				for (j = 0; j < _nscd_cfg_num_nsw_db; j++) {
 
 					nswdb = &_nscd_cfg_nsw_db[j];
 
 					rc = _nscd_cfg_notify_i(desc,
 						nswdb, &skip, errorp);
+
+					if (rc != NSCD_SUCCESS)
+						break;
 				}
 			}
 		}
@@ -1497,7 +1499,7 @@ _nscd_cfg_init(
 
 	rc = _nscd_cfg_set_vlen_data_int(
 		&nscd_cfg_nsw_db_data_default,
-		&nscd_cfg_nsw_alldb_current, nscd_false);
+		nscd_cfg_nsw_alldb_current, nscd_false);
 	if (rc != NSCD_SUCCESS)
 		return (rc);
 
@@ -2802,6 +2804,8 @@ gettext("vaule of \'%s\' not changeable, change that of \'%s\' instead"),
 
 			rc = _nscd_cfg_get_handle(param_name, dbl,
 				&hl, errorp);
+			if (rc != NSCD_SUCCESS)
+				return (rc);
 			rc = _nscd_cfg_set(hl, data, errorp);
 			_nscd_cfg_free_handle(hl);
 			if (rc != NSCD_SUCCESS)

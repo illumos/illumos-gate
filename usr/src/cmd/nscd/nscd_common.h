@@ -95,6 +95,8 @@ typedef	uint8_t		nscd_bool_t;
 #define	nscd_false	0
 
 /* common functions */
+void _nscd_set_start_time(int reset);
+time_t _nscd_get_start_time();
 nscd_rc_t _nscd_init(char *cfgfile);
 nscd_rc_t _nscd_refresh();
 

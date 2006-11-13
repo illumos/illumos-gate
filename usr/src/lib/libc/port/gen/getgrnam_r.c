@@ -249,7 +249,7 @@ fgetgrent_r(FILE *f, struct group *result, char *buffer, int buflen)
  *   values in the array are unique.
  */
 
-static nss_status_t process_cstr(const char *, int, struct nss_groupsbymem *);
+extern nss_status_t process_cstr(const char *, int, struct nss_groupsbymem *);
 
 int
 _getgroupsbymember(const char *username, gid_t gid_array[],
@@ -422,7 +422,7 @@ str2group(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 	return (NSS_STR_PARSE_ERANGE);
 }
 
-static nss_status_t
+nss_status_t
 process_cstr(const char *instr, int instr_len, struct nss_groupsbymem *gbm)
 {
 	/*

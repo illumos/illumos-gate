@@ -27,10 +27,10 @@
 
 #include "nscd_db.h"
 
-static nscd_seq_num_t	acc_seq = 1;
-static mutex_t		seq_mutex = DEFAULTMUTEX;
-static nscd_cookie_t	cookie = 1234;
-static mutex_t		cookie_mutex = DEFAULTMUTEX;
+static nscd_seq_num_t		acc_seq = 1;
+static mutex_t			seq_mutex = DEFAULTMUTEX;
+static nscd_cookie_num_t	cookie_num = 1234;
+static mutex_t			cookie_mutex = DEFAULTMUTEX;
 
 nscd_seq_num_t
 _nscd_get_seq_num()
@@ -39,20 +39,20 @@ _nscd_get_seq_num()
 
 	(void) mutex_lock(&seq_mutex);
 	seq_num = acc_seq;
-	acc_seq += 1;
+	acc_seq++;
 	(void) mutex_unlock(&seq_mutex);
 
 	return (seq_num);
 }
 
-nscd_cookie_t
-_nscd_get_cookie()
+nscd_cookie_num_t
+_nscd_get_cookie_num()
 {
-	nscd_cookie_t	ret;
+	nscd_cookie_num_t	ret;
 
 	(void) mutex_lock(&cookie_mutex);
-	ret = cookie;
-	cookie += 1;
+	ret = cookie_num;
+	cookie_num++;
 	(void) mutex_unlock(&cookie_mutex);
 
 	return (ret);

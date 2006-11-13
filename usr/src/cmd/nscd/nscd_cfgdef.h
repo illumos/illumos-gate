@@ -750,8 +750,8 @@ static nscd_cfg_global_data_t nscd_cfg_global_default = {
 	{
 
 	NSCD_CFG_GROUP_INFO_GLOBAL_FRONTEND,
-	20,			/* common_worker_threads */
-	20,			/* cache_hit_threads */
+	100,			/* common_worker_threads */
+	100,			/* cache_hit_threads */
 
 	},
 
@@ -796,7 +796,7 @@ static nscd_cfg_nsw_db_data_t nscd_cfg_nsw_db_data_default = {
 	{
 
 	NSCD_CFG_GROUP_INFO_FRONTEND,
-	10, 			/* worker_thread_per_nsw_db */
+	50, 			/* worker_thread_per_nsw_db */
 
 	},
 

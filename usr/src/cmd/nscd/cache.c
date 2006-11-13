@@ -1214,7 +1214,7 @@ copy_result(void *rbuf, void *cbuf)
 		*(dst + rphdr->data_len) = '\0';
 
 		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "cache data (len = %lld): %s\n",
+		(me, "cache data (len = %lld): >>%s<<\n",
 		cphdr->data_len, (char *)cphdr + cphdr->data_off);
 
 		return (NSS_SUCCESS);
@@ -1753,7 +1753,7 @@ nsc_lookup(nsc_lookup_args_t *largs, int flag) {
 		break;
 
 	case NOSERVER:
-		NSCD_RETURN_STATUS(phdr, NSS_UNAVAIL, -1);
+		NSCD_RETURN_STATUS(phdr, NSS_TRYLOCAL, -1);
 		break;
 	}
 }

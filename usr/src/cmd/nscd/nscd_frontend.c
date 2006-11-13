@@ -326,46 +326,55 @@ N2N_check_priv(
 	NSCD_RETURN_STATUS_SUCCESS(phdr);
 }
 
-static void
-APP_check_cred(
+void
+_nscd_APP_check_cred(
 	void		*buf,
 	pid_t		*pidp,
-	char		*dc_str)
+	char		*dc_str,
+	int		log_comp,
+	int		log_level)
 {
 	nss_pheader_t	*phdr = (nss_pheader_t *)buf;
 	ucred_t		*uc = NULL;
 	uid_t		ruid;
 	uid_t		euid;
+	pid_t		pid;
 	int		errnum;
-	char		*me = "APP_check_cred";
+	char		*me = "_nscd_APP_check_cred";
 
 	if (door_ucred(&uc) != 0) {
 		errnum = errno;
-		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
+		_NSCD_LOG(log_comp, NSCD_LOG_LEVEL_ERROR)
 		(me, "door_ucred: %s\n", strerror(errno));
 
 		NSCD_RETURN_STATUS(phdr, NSS_ERROR, errnum);
 	}
 
+	NSCD_SET_STATUS_SUCCESS(phdr);
+	pid = ucred_getpid(uc);
 	if (NSS_PACKED_CRED_CHECK(buf, ruid = ucred_getruid(uc),
 		euid = ucred_geteuid(uc))) {
-		if (pidp != NULL)
-			*pidp = ucred_getpid(uc);
-		ucred_free(uc);
-
-		NSCD_RETURN_STATUS_SUCCESS(phdr);
+		if (pidp != NULL) {
+			if (*pidp == (pid_t)-1)
+				*pidp = pid;
+			else if (*pidp != pid) {
+				NSCD_SET_STATUS(phdr, NSS_ERROR, EACCES);
+			}
+		}
+	} else {
+		NSCD_SET_STATUS(phdr, NSS_ERROR, EACCES);
 	}
-
-	_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ALERT)
-	(me, "%s call failed: caller pid %d, ruid %d, "
-	"euid %d, header ruid %d, header euid %d\n", dc_str,
-	(pidp != NULL) ? *pidp : -1, ruid, euid,
-	((nss_pheader_t *)(buf))->p_ruid, ((nss_pheader_t *)(buf))->p_euid);
-
 
 	ucred_free(uc);
 
-	NSCD_RETURN_STATUS(phdr, NSS_ERROR, EACCES);
+	if (NSCD_STATUS_IS_NOT_OK(phdr)) {
+		_NSCD_LOG(log_comp, log_level)
+		(me, "%s call failed: caller pid %d (input pid = %d), ruid %d, "
+		"euid %d, header ruid %d, header euid %d\n", dc_str,
+		pid, (pidp != NULL) ? *pidp : -1, ruid, euid,
+		((nss_pheader_t *)(buf))->p_ruid,
+		((nss_pheader_t *)(buf))->p_euid);
+	}
 }
 
 static void
@@ -589,7 +598,8 @@ switcher(void *cookie, char *argp, size_t arg_size,
 
 		case NSCD_SETENT:
 
-		APP_check_cred(argp, &ent_pid, "NSCD_SETENT");
+		_nscd_APP_check_cred(argp, &ent_pid, "NSCD_SETENT",
+			NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ALERT);
 		if (NSCD_STATUS_IS_OK(phdr)) {
 			if_selfcred_return_per_user_door(argp, arg_size,
 				dp, _whoami);

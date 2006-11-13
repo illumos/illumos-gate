@@ -401,6 +401,8 @@ _nss_compat_setent(be, dummy)
 	else
 		be->state = GETENT_FILE;
 
+	be->return_string_data = 0;
+
 	/* ===> ??  netgroup stuff? */
 	return (NSS_SUCCESS);
 }
@@ -553,8 +555,10 @@ _attrdb_compat_XY_all(be, argp, netdb, check, op_num)
 		 */
 		argp->buf.result = be->workarea;
 		func = be->str2ent_alt;
-	} else
+	} else {
+		be->return_string_data = 0;
 		func = argp->str2ent;
+	}
 
 	/*CONSTCOND*/
 	while (1) {
@@ -718,7 +722,8 @@ _nss_compat_XY_all(be, args, check, op_num)
 
 		be->str2ent_save = args->str2ent;
 		args->str2ent = be->str2ent_alt;
-	}
+	} else
+		be->return_string_data = 0;
 
 	/*CONSTCOND*/
 	while (1) {
@@ -946,7 +951,8 @@ _nss_compat_getent(be, a)
 		 * as working area
 		 */
 		args->buf.result = be->workarea;
-	}
+	} else
+		be->return_string_data = 0;
 
 	/*CONSTCOND*/
 	while (1) {

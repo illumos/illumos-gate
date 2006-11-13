@@ -1259,6 +1259,7 @@ struct nss_getent_context {
 	struct nss_db_state	*s;
 	nssuint_t		cookie;
 	nssuint_t		seq_num;
+	nssuint_t		cookie_setent;
 	nss_db_params_t		param;
 };
 
@@ -1359,12 +1360,16 @@ nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 		s = 0;
 	} else {
 		s = contextp->s;
+		if (contextp->cookie != NSCD_LOCAL_COOKIE)
+			contextp->cookie = NSCD_NEW_COOKIE;
 	}
 
 	/* name service cache daemon divert */
-	status = _nsc_setent_u(rootp, initf, contextpp);
-	if (status != NSS_TRYLOCAL)
-		return;
+	if (contextp->cookie == NSCD_NEW_COOKIE) {
+		status = _nsc_setent_u(rootp, initf, contextpp);
+		if (status != NSS_TRYLOCAL)
+			return;
+	}
 
 	/* fall through - process locally */
 	if (s == 0) {
@@ -1632,7 +1637,6 @@ nss_pack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
 	const char		*dbn;
 	size_t			blen, len, off = 0;
 	char			*bptr;
-	nssuint_t		*uptr;
 	struct nss_groupsbymem	*gbm;
 
 	if (pbuf == NULL || in == NULL || initf == (nss_db_initf_t)NULL) {
@@ -1715,8 +1719,9 @@ nss_pack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
 	gbm = (struct nss_groupsbymem *)search_args;
 	if (search_fnum == NSS_DBOP_GROUP_BYMEMBER &&
 	    strcmp(dbn, NSS_DBNAM_GROUP) == 0 && gbm->numgids == 1) {
-		uptr = (nssuint_t *)((void *)((char *)buffer + off));
-		*uptr = (nssuint_t)gbm->gid_array[0];
+		gid_t	*gidp;
+		gidp = (gid_t *)((void *)((char *)buffer + off));
+		*gidp = gbm->gid_array[0];
 	}
 
 	errno = 0;				/* just in case ... */
@@ -1818,7 +1823,7 @@ nss_unpack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
 	int			i;
 	int			fmt_type;
 	gid_t			*gidp;
-	nssuint_t		*uptr;
+	gid_t			*gptr;
 	struct nss_groupsbymem	*arg;
 
 
@@ -1857,16 +1862,15 @@ nss_unpack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
 	if (fmt_type == 1) {
 		arg = (struct nss_groupsbymem *)in;
 		/* copy returned gid array from returned nscd buffer */
-		i = len / sizeof (nssuint_t);
+		i = len / sizeof (gid_t);
 		/* not enough buffer */
 		if (i > arg->maxgids) {
 			i = arg->maxgids;
 		}
 		arg->numgids = i;
 		gidp = arg->gid_array;
-		uptr = (nssuint_t *)((void *)buf);
-		while (--i >= 0)
-			*gidp++ = (gid_t)*uptr++;
+		gptr = (gid_t *)((void *)buf);
+		memcpy(gidp, gptr, len);
 		return (NSS_SUCCESS);
 	}
 	if (fmt_type == 2) {
@@ -1934,8 +1938,13 @@ nss_unpack_ent(void *buffer, size_t bufsize, nss_db_root_t *rootp,
 
 	nptr = (nssuint_t *)((void *)((char *)buffer + pbuf->key_off));
 	cookie = contextp->cookie;
-	if (cookie != NSCD_NEW_COOKIE && cookie != *nptr) {
-		/* Should either be new or a match, else error */
+	if (cookie != NSCD_NEW_COOKIE && cookie != contextp->cookie_setent &&
+		cookie != *nptr) {
+		/*
+		 * Should either be new, or the cookie returned by the last
+		 * setent (i.e., this is the first getent after the setent)
+		 * or a match, else error
+		 */
 		return (NSS_NOTFOUND);
 	}
 	/* save away for the next ent request */
@@ -2112,6 +2121,8 @@ _nsc_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 	/* unpack returned cookie stash it away */
 	status = nss_unpack_ent((void *)doorptr, bufsize, rootp,
 			initf, contextpp, NULL);
+	/* save the setent cookie for later use */
+	contextp->cookie_setent = contextp->cookie;
 	/*
 	 * check if doors reallocated the memory underneath us
 	 * if they did munmap it or suffer a memory leak
@@ -2165,8 +2176,14 @@ _nsc_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 
 	/* If fallback to standard nss logic (door failure) if possible */
 	if (status != NSS_SUCCESS) {
-		if (contextp->cookie == NSCD_NEW_COOKIE) {
+		if (status == NSS_TRYLOCAL ||
+				contextp->cookie == NSCD_NEW_COOKIE) {
 			contextp->cookie = NSCD_LOCAL_COOKIE;
+
+			/* init the local cookie */
+			nss_setent_u(rootp, initf, contextpp);
+			if (contextpp->ctx == 0)
+				return (NSS_UNAVAIL);
 			return (NSS_TRYLOCAL);
 		}
 		return (NSS_UNAVAIL);

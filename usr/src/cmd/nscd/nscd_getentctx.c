@@ -48,7 +48,7 @@ static nscd_db_t	*getent_ctxDB = NULL;
 typedef struct nscd_getent_ctx {
 	int			to_delete; /* this ctx no longer valid */
 	nscd_getent_context_t	*ptr;
-	nscd_cookie_t		cookie;
+	nscd_cookie_num_t	cookie_num;
 } nscd_getent_ctx_t;
 
 /*
@@ -99,17 +99,17 @@ _nscd_create_getent_ctxDB()
 static nscd_rc_t
 _nscd_add_getent_ctx(
 	nscd_getent_context_t	*ptr,
-	nscd_cookie_t		cookie)
+	nscd_cookie_num_t	cookie_num)
 {
 	int			size;
-	char			buf[2 * sizeof (cookie) + 1];
+	char			buf[2 * sizeof (cookie_num) + 1];
 	nscd_db_entry_t		*db_entry;
 	nscd_getent_ctx_t	*gnctx;
 
 	if (ptr == NULL)
 		return (NSCD_INVALID_ARGUMENT);
 
-	(void) snprintf(buf, sizeof (buf), "%lld", cookie);
+	(void) snprintf(buf, sizeof (buf), "%lld", cookie_num);
 
 	size = sizeof (*gnctx);
 
@@ -120,7 +120,7 @@ _nscd_add_getent_ctx(
 
 	gnctx = (nscd_getent_ctx_t *)*(db_entry->data_array);
 	gnctx->ptr = ptr;
-	gnctx->cookie = cookie;
+	gnctx->cookie_num = cookie_num;
 
 	(void) rw_wrlock(&getent_ctxDB_rwlock);
 	(void) _nscd_add_db_entry(getent_ctxDB, buf, db_entry,
@@ -138,13 +138,13 @@ _nscd_add_getent_ctx(
  */
 nscd_getent_context_t *
 _nscd_is_getent_ctx(
-	nscd_cookie_t		cookie)
+	nscd_cookie_num_t	cookie_num)
 {
-	char			ptrstr[1 + 2 * sizeof (cookie)];
+	char			ptrstr[1 + 2 * sizeof (cookie_num)];
 	const nscd_db_entry_t	*db_entry;
 	nscd_getent_context_t	*ret = NULL;
 
-	(void) snprintf(ptrstr, sizeof (ptrstr), "%lld", cookie);
+	(void) snprintf(ptrstr, sizeof (ptrstr), "%lld", cookie_num);
 
 	(void) rw_rdlock(&getent_ctxDB_rwlock);
 
@@ -161,7 +161,7 @@ _nscd_is_getent_ctx(
 		 * the cookie numbers match, return the ctx.
 		 * Otherwise return NULL.
 		 */
-		if (gnctx->to_delete == 0 && gnctx->cookie == cookie)
+		if (gnctx->to_delete == 0 && gnctx->cookie_num == cookie_num)
 			ret = gnctx->ptr;
 	}
 
@@ -178,16 +178,16 @@ _nscd_is_getent_ctx(
 static void
 _nscd_del_getent_ctx(
 	nscd_getent_context_t	*ptr,
-	nscd_cookie_t		cookie)
+	nscd_cookie_num_t	cookie_num)
 {
-	char			ptrstr[1 + 2 * sizeof (cookie)];
+	char			ptrstr[1 + 2 * sizeof (cookie_num)];
 	nscd_getent_ctx_t	*gnctx;
 	const nscd_db_entry_t	*db_entry;
 
 	if (ptr == NULL)
 		return;
 
-	(void) snprintf(ptrstr, sizeof (ptrstr), "%lld", cookie);
+	(void) snprintf(ptrstr, sizeof (ptrstr), "%lld", cookie_num);
 
 	(void) rw_rdlock(&getent_ctxDB_rwlock);
 	/*
@@ -201,7 +201,7 @@ _nscd_del_getent_ctx(
 		NSCD_GET_FIRST_DB_ENTRY, 0);
 	if (db_entry != NULL) {
 		gnctx = (nscd_getent_ctx_t *)*(db_entry->data_array);
-		if (gnctx->ptr == ptr && gnctx->cookie  == cookie) {
+		if (gnctx->ptr == ptr && gnctx->cookie_num  == cookie_num) {
 
 			(void) rw_unlock(&getent_ctxDB_rwlock);
 			(void) rw_wrlock(&getent_ctxDB_rwlock);
@@ -226,7 +226,7 @@ _nscd_free_getent_ctx(
 	(me, "getent context %p\n", gnctx);
 
 	_nscd_put_nsw_state(gnctx->nsw_state);
-	_nscd_del_getent_ctx(gnctx, gnctx->cookie);
+	_nscd_del_getent_ctx(gnctx, gnctx->cookie_num);
 	free(gnctx);
 }
 
@@ -294,7 +294,7 @@ _nscd_create_getent_ctx(
 	}
 
 	gnctx->dbi = params->dbi;
-	gnctx->cookie = _nscd_get_cookie();
+	gnctx->cookie_num = _nscd_get_cookie_num();
 	gnctx->pid = -1;
 
 	if (_nscd_get_nsw_state(&db_root, params) != NSCD_SUCCESS) {
@@ -390,9 +390,9 @@ _nscd_get_getent_ctx(
 	_nscd_mutex_unlock((nscd_acc_data_t *)base);
 
 	_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
-	(me, "adding new ctx %p, cookie = %lld\n", c, c->cookie);
+	(me, "adding new ctx %p, cookie # = %lld\n", c, c->cookie_num);
 
-	if ((rc = _nscd_add_getent_ctx(c, c->cookie)) != NSCD_SUCCESS) {
+	if ((rc = _nscd_add_getent_ctx(c, c->cookie_num)) != NSCD_SUCCESS) {
 		_nscd_put_getent_ctx(c);
 		return (rc);
 	}
@@ -444,11 +444,11 @@ _nscd_put_getent_ctx(
 	_nscd_put_nsw_state(gnctx->nsw_state);
 	gnctx->nsw_state = NULL;
 
-	_nscd_del_getent_ctx(gnctx, gnctx->cookie);
+	_nscd_del_getent_ctx(gnctx, gnctx->cookie_num);
 
 	_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
-	(me, "ctx (%p seq# = %lld) removed from getent ctx DB\n",
-		gnctx, gnctx->cookie);
+	(me, "ctx (%p, cookie # = %lld) removed from getent ctx DB\n",
+		gnctx, gnctx->cookie_num);
 
 	if (base->num_waiter > 0) {
 		_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
@@ -598,10 +598,10 @@ reclaim_getent_ctx(void *arg)
 					NSCD_LOG_LEVEL_DEBUG)
 				(me, "process  %d exited, "
 				"getent context = %p, "
-				"db index = %d, cookie = %lld, "
+				"db index = %d, cookie # = %lld, "
 				"sequence # = %lld\n",
 				gctx->pid, gctx, gctx->dbi,
-				gctx->cookie, gctx->seq_num);
+				gctx->cookie_num, gctx->seq_num);
 
 				if (first != NULL) {
 					last->next = gctx;

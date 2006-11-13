@@ -615,7 +615,7 @@ __nss_files_XY_hostbyname(be, args, filter, type)
 			 */
 			continue;
 		} else if (nhosts) {
-			break;
+			continue;
 		}
 	}
 

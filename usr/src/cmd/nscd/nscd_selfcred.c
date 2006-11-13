@@ -823,6 +823,12 @@ _nscd_proc_fork(
 	if ((cid = fork1()) == 0) {
 		_whoami = NSCD_CHILD;
 
+		/*
+		 * remember when this child nscd starts
+		 * (replace the forker start time)
+		 */
+		_nscd_set_start_time(1);
+
 		/* close all except the log file */
 		if (_logfd > 0) {
 			int i;

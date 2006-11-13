@@ -181,6 +181,8 @@ _nss_netdb_aliases(const char *instr, int lenstr, char *buffer, int buflen)
 }
 
 
+extern nss_status_t process_cstr(const char *, int, struct nss_groupsbymem *);
+
 /*
  * pack well known getXbyY keys to packed buffer prior to the door_call
  * to nscd.  Some consideration is given to ordering the tests based on
@@ -773,7 +775,7 @@ nss_packed_set_status(void *buffer, size_t length, nss_status_t status,
 			if (in->numgids >= 0) {
 				pbuf->p_status = NSS_SUCCESS;
 				pbuf->data_len = in->numgids *
-					sizeof (nssuint_t);
+					sizeof (gid_t);
 				pbuf->p_herrno = 0;
 			} else {
 				pbuf->p_status = status;
@@ -977,9 +979,9 @@ nss_upack_key2arg(void *buffer, size_t length, char **dbname,
 			gbm->numgids = (int)(*uptr++);
 			if (gbm->numgids == 1) {
 				/* insert initial group into data area */
-				((nssuint_t *)
-					((void *)gbm->gid_array))[0] = *uptr++;
-			}
+				gbm->gid_array[0] = (gid_t)(*uptr++);
+			} else
+				uptr++;
 			gbm->username = (const char *)uptr;
 			break;
 		case 't':
@@ -1110,82 +1112,6 @@ str2packent(
 }
 
 /*
- * getgroupsbymem format interposed cstr2X function
- * This are similar to the API in getgrnam_r EXCEPT, this API
- * store values in nssuint_t quantities in the buffer, not gid_t
- * quantities.  The unpacker in nss_common.c knows how to unpack
- * into gid_t quantities.
- */
-
-static nss_status_t
-pack_cstr(const char *instr, int instr_len, struct nss_groupsbymem *gbm)
-{
-	/*
-	 * It's possible to do a much less inefficient version of this by
-	 * selectively duplicating code from str2group().  For now,
-	 * however, we'll take the easy way out and implement this on
-	 * top of str2group().
-	 */
-
-	const char		*username = gbm->username;
-	nss_XbyY_buf_t		*buf;
-	struct group		*grp;
-	char			**memp;
-	char			*mem;
-	int	parsestat;
-
-	/* TODO FIX THIS - with getdoorbsize type call */
-	buf = _nss_XbyY_buf_alloc(sizeof (struct group), NSS_BUFLEN_GROUP);
-	if (buf == 0)
-		return (NSS_UNAVAIL);
-
-	grp = (struct group *)buf->result;
-
-	parsestat = (*gbm->str2ent)(instr, instr_len,
-				    grp, buf->buffer, buf->buflen);
-
-	if (parsestat != NSS_STR_PARSE_SUCCESS) {
-		_nss_XbyY_buf_free(buf);
-		return (NSS_NOTFOUND);	/* === ? */
-	}
-
-	if (grp->gr_mem) {
-		for (memp = grp->gr_mem; (memp) && ((mem = *memp) != 0);
-								memp++) {
-			if (strcmp(mem, username) == 0) {
-				gid_t	gid 	= grp->gr_gid;
-				nssuint_t *gidp;
-				int	numgids;
-				int	i;
-
-				gidp = (nssuint_t *)((void *)gbm->gid_array);
-				numgids	= gbm->numgids;
-
-				_nss_XbyY_buf_free(buf);
-
-				for (i = 0; i < numgids &&
-					    *gidp != (nssuint_t)gid;
-						i++, gidp++) {
-					;
-				}
-				if (i >= numgids) {
-					if (i >= gbm->maxgids) {
-					/* Filled the array;  stop searching */
-						return (NSS_SUCCESS);
-					}
-					*gidp = (nssuint_t)gid;
-					gbm->numgids = numgids + 1;
-				}
-				return (NSS_NOTFOUND);	/* Explained in   */
-							/* <nss_dbdefs.h> */
-			}
-		}
-	}
-	_nss_XbyY_buf_free(buf);
-	return (NSS_NOTFOUND);
-}
-
-/*
  * Initialize db_root, initf, dbop and arg from a packed buffer
  */
 
@@ -1237,7 +1163,7 @@ nss_packed_arg_init(void *buffer, size_t length, nss_db_root_t *db_root,
 		if (nss_pinit_funcs(index, initf, &real_s2e) != NSS_SUCCESS)
 			return (NSS_ERROR);
 		((struct nss_groupsbymem *)arg)->str2ent = real_s2e;
-		((struct nss_groupsbymem *)arg)->process_cstr = pack_cstr;
+		((struct nss_groupsbymem *)arg)->process_cstr = process_cstr;
 		return (NSS_SUCCESS);
 	}
 	if (pbuf->nss_dbop == NSS_DBOP_NETGROUP_IN &&

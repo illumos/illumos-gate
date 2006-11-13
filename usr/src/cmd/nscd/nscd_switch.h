@@ -137,7 +137,7 @@ typedef struct nscd_getent_ctx_base {
 typedef struct nscd_getent_context {
 	int				dbi;
 	nscd_seq_num_t			seq_num;
-	nscd_cookie_t			cookie;
+	nscd_cookie_num_t		cookie_num;
 	pid_t				pid;	/* door client's pid */
 	int				n_src;	/* >=max_src: end of sequence */
 	nscd_nsw_state_t		*nsw_state;
@@ -200,6 +200,25 @@ typedef struct {
 	int	noarg; /* if set, backend does not use the arg structure */
 	int	fallback; /* if set, may need to fall back to main nscd */
 } nscd_sw_return_t;
+
+/*
+ * nscd cookies used for setent/getent/endent
+ * - p0 cookie: returned by nscd to indicate
+ *              the start of the enumeration position
+ * - p1 cookie: returned/updated by nscd to indicate
+ *              the current enumeration position
+ */
+#define	NSCD_P0_COOKIE_SEQNUM	-1
+typedef struct {
+	pid_t		p0_pid;
+	time_t		p0_time;
+	nscd_seq_num_t	p0_seqnum;
+} nscd_getent_p0_cookie_t;
+
+typedef struct {
+	nscd_cookie_num_t	p1_cookie_num;
+	nscd_seq_num_t		p1_seqnum;
+} nscd_getent_p1_cookie_t;
 
 /*
  * static tables or global data defined in other files
@@ -316,7 +335,7 @@ _nscd_get_new_service_state(
 
 nscd_getent_context_t *
 _nscd_is_getent_ctx(
-	nscd_cookie_t		cookie);
+	nscd_cookie_num_t	cookie_num);
 
 nscd_rc_t
 _nscd_create_sw_struct(

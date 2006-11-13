@@ -87,7 +87,7 @@ typedef struct nscd_db_entry {
  * sequence number attached to nscd data
  */
 typedef	nssuint_t nscd_seq_num_t;
-typedef nssuint_t nscd_cookie_t;
+typedef nssuint_t nscd_cookie_num_t;
 
 /*
  * The nscd_access_s datatype represents a nscd
@@ -127,8 +127,8 @@ typedef struct nscd_db_s	nscd_db_t;
 nscd_seq_num_t
 _nscd_get_seq_num();
 
-nscd_cookie_t
-_nscd_get_cookie();
+nscd_cookie_num_t
+_nscd_get_cookie_num();
 
 nscd_acc_data_t *
 _nscd_get(

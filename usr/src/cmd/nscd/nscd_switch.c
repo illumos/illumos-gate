@@ -394,7 +394,7 @@ trace_result(
 
 	if (res == NSS_SUCCESS) {
 		_nscd_logit(me,
-"%s: database: %s, operation: %d, source: %s returned \"%s\", length = %d\n",
+"%s: database: %s, operation: %d, source: %s returned >>%s<<, length = %d\n",
 		res_str, db, op, src, arg->buf.buffer, arg->returnlen);
 
 		return;
@@ -691,7 +691,7 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 	}
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-	(me, "database = %s, config = [ %s ]\n", NSCD_NSW_DB_NAME(dbi),
+	(me, "database = %s, config = >>%s<<\n", NSCD_NSW_DB_NAME(dbi),
 	(*s->nsw_cfg_p)->nsw_cfg_str);
 
 	for (n_src = 0;  n_src < s->max_src;  n_src++) {
@@ -1333,62 +1333,69 @@ nss_psearch(void *buffer, size_t length)
 
 static void
 nscd_map_contextp(void *buffer, nss_getent_t *contextp,
-	nssuint_t **cookie_p, nssuint_t **seqnum_p, int setent)
+	nssuint_t **cookie_num_p, nssuint_t **seqnum_p, int setent)
 {
 	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
 	nssuint_t		off;
 	nscd_getent_context_t	*ctx;
 	char			*me = "nscd_map_contextp";
-
-	struct cookie_seqnum {
-		nssuint_t	cookie;
-		nssuint_t	seqnum;
-	} *csp;
+	nscd_getent_p1_cookie_t	*cookie;
 
 	if (buffer == NULL) {
 		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
 	}
 
 	off = pbuf->key_off;
-	csp = (struct cookie_seqnum *)((void *)((char *)buffer + off));
+	cookie = (nscd_getent_p1_cookie_t *)((void *)((char *)buffer + off));
 	if (seqnum_p != NULL)
-		*seqnum_p = &csp->seqnum;
+		*seqnum_p = &cookie->p1_seqnum;
 
 	/*
-	 * if called by nss_psetent, and the passed in cookie is
-	 * NSCD_NEW_COOKIE, then there is no cookie yet, return
-	 * a pointer pointing to where the cookie will be stored.
-	 * Also because there is no cookie to validate, just
-	 * return success.
+	 * if called by nss_psetent, and the passed in cookie number
+	 * is NSCD_NEW_COOKIE, then there is no cookie yet, return a
+	 * pointer pointing to where the cookie number will be stored.
+	 * Also because there is no cookie to validate, just return
+	 * success.
 	 *
-	 * On the other hand, if a cookie is passed in, we need
-	 * to validate the cookie before returning.
+	 * On the other hand, if a cookie number is passed in, we need
+	 * to validate the cookie number before returning.
 	 */
-	if (cookie_p != NULL)
-		*cookie_p = &csp->cookie;
-	if (setent == 1 && csp->cookie == NSCD_NEW_COOKIE) {
-		NSCD_RETURN_STATUS_SUCCESS(pbuf);
+	if (cookie_num_p != NULL)
+		*cookie_num_p = &cookie->p1_cookie_num;
+	if (setent == 1 && cookie->p1_cookie_num == NSCD_NEW_COOKIE) {
+			NSCD_RETURN_STATUS_SUCCESS(pbuf);
+	}
+
+	/*
+	 * If the sequence number and start time match nscd's p0 cookie,
+	 * then either setent was done twice in a row or this is the
+	 * first getent after the setent, return success as well.
+	 */
+	if (cookie->p1_seqnum == NSCD_P0_COOKIE_SEQNUM) {
+		nscd_getent_p0_cookie_t *p0c =
+			(nscd_getent_p0_cookie_t *)cookie;
+		if (p0c->p0_time == _nscd_get_start_time())
+			NSCD_RETURN_STATUS_SUCCESS(pbuf);
 	}
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-	(me, "cookie = %lld,  sequence number = %lld\n",
-		csp->cookie, csp->seqnum);
+	(me, "cookie # = %lld,  sequence # = %lld\n",
+		cookie->p1_cookie_num, cookie->p1_seqnum);
 
-	ctx = _nscd_is_getent_ctx(csp->cookie);
+	ctx = _nscd_is_getent_ctx(cookie->p1_cookie_num);
 
 	if (ctx == NULL) {
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "invalid cookie (%lld)\n", csp->cookie);
+		(me, "invalid cookie # (%lld)\n", cookie->p1_cookie_num);
 
 		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
 	}
 
-	if (setent == 1) {
-		/* if called by nss_psetent, reset the seq number */
-		ctx->seq_num = 1;
-	} else if (ctx->seq_num != (nscd_seq_num_t)csp->seqnum) {
+	/* if not called by nss_psetent, verify sequence number */
+	if (setent != 1 && ctx->seq_num !=
+			(nscd_seq_num_t)cookie->p1_seqnum) {
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "invalid sequence number (%lld)\n", csp->seqnum);
+		(me, "invalid sequence # (%lld)\n", cookie->p1_seqnum);
 
 		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
 	}
@@ -1401,17 +1408,12 @@ nscd_map_contextp(void *buffer, nss_getent_t *contextp,
 void
 nss_psetent(void *buffer, size_t length, pid_t pid)
 {
-	/* inputs */
-	nss_db_initf_t		initf;
 	nss_getent_t		context = { 0 };
 	nss_getent_t		*contextp = &context;
-	nss_status_t		status;
-	nssuint_t		*cookiep;
-	nssuint_t		*seqnump;
-	nscd_getent_context_t	*ctx;
-	int			rc;
+	nssuint_t		*cookie_num_p;
+	nssuint_t		*seqnum_p;
 	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
-	nscd_sw_return_t	swret = { 0 }, *swrp = &swret;
+	nscd_getent_p0_cookie_t *p0c;
 	char			*me = "nss_psetent";
 
 	if (buffer == NULL || length == 0) {
@@ -1442,68 +1444,97 @@ nss_psetent(void *buffer, size_t length, pid_t pid)
 		}
 	}
 
-	status = nss_packed_context_init(buffer, length,
-			NULL, &initf, &contextp, (nss_XbyY_args_t *)NULL);
-	if (status != NSS_SUCCESS) {
-		NSCD_RETURN_STATUS(pbuf, status, -1);
-	}
-
-	/*
-	 * use the generic nscd_initf for all the setent requests
-	 * (the TSD key is the pointer to the packed header)
-	 */
-	rc = set_initf_key(pbuf);
-	if (rc != 0) {
-		NSCD_RETURN_STATUS(pbuf, NSS_UNAVAIL, EINVAL);
-	}
-	initf = nscd_initf;
-
-	/* get address of cookie and seqnum for later updates */
-	nscd_map_contextp(buffer, contextp, &cookiep, &seqnump, 1);
+	/* check cookie number */
+	nscd_map_contextp(buffer, contextp, &cookie_num_p, &seqnum_p, 1);
 	if (NSCD_STATUS_IS_NOT_OK(pbuf))
 		return;
+
+	/* set cookie number and sequence number */
+	p0c = (nscd_getent_p0_cookie_t *)cookie_num_p;
+	if (contextp->ctx ==  NULL) {
+		/*
+		 * first setent (no existing getent context),
+		 * return a p0 cookie
+		 */
+		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
+		(me, "first setent, no getent context yet\n");
+	} else {
+		/*
+		 * doing setent on an existing getent context,
+		 * release resources allocated and return a
+		 * p0 cookie
+		 */
+		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
+		(me, "setent resetting sequence number = %lld\n",  *seqnum_p);
+
+		_nscd_put_getent_ctx((nscd_getent_context_t *)contextp->ctx);
+		contextp->ctx = NULL;
+	}
+
+	p0c->p0_pid = pid;
+	p0c->p0_time = _nscd_get_start_time();
+	p0c->p0_seqnum = NSCD_P0_COOKIE_SEQNUM;
+	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
+	(me, "returning a p0 cookie: pid = %ld, time = %ld, seq #= %llx\n",
+		p0c->p0_pid, p0c->p0_time, p0c->p0_seqnum);
+
+	NSCD_RETURN_STATUS(pbuf, NSS_SUCCESS, 0);
+}
+
+static void
+delayed_setent(nss_pheader_t *pbuf, nss_db_initf_t initf,
+	nss_getent_t *contextp, nssuint_t *cookie_num_p,
+	nssuint_t *seqnum_p, pid_t pid)
+{
+	nscd_getent_context_t	*ctx;
+	nscd_sw_return_t	swret = { 0 }, *swrp = &swret;
+	char			*me = "delayed_setent";
+
+	/*
+	 * check credential
+	 */
+	_nscd_APP_check_cred(pbuf, &pid, "NSCD_DELAYED_SETENT",
+		NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_ERROR);
+	if (NSCD_STATUS_IS_NOT_OK(pbuf)) {
+		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
+		(me, "invalid credential\n");
+		return;
+	}
+
 	/*
 	 * pass the packed header buffer pointer to nss_setent
 	 */
 	(void) memcpy(&pbuf->nscdpriv, &swrp, sizeof (swrp));
-	swret.pbuf = buffer;
+	swret.pbuf = pbuf;
 
 	/* Perform local setent and set context */
 	nss_setent(NULL, initf, contextp);
 
-	/* insert cookie info into buffer and return */
+	/* insert cookie info into packed buffer header */
 	ctx = (nscd_getent_context_t *)contextp->ctx;
 	if (ctx != NULL) {
-		*cookiep = ctx->cookie;
-		*seqnump = (nssuint_t)ctx->seq_num;
+		*cookie_num_p = ctx->cookie_num;
+		*seqnum_p = ctx->seq_num;
 		ctx->pid = pid;
 	} else {
 		/*
 		 * not able to allocate a getent context, the
 		 * client should try the enumeration locally
 		 */
-		*cookiep = NSCD_LOCAL_COOKIE;
-		*seqnump = 0;
+		*cookie_num_p = NSCD_LOCAL_COOKIE;
+		*seqnum_p = 0;
+
+		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
+		(me, "NSS_TRYLOCAL: cookie # = %lld,  sequence # = %lld\n",
+		*cookie_num_p, *seqnum_p);
+		NSCD_RETURN_STATUS(pbuf, NSS_TRYLOCAL, 0);
 	}
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-	(me, "cookie = %lld,  sequence number = %lld\n",
-		*cookiep, *seqnump);
+	(me, "NSS_SUCCESS: cookie # = %lld,  sequence # = %lld\n",
+	ctx->cookie_num, ctx->seq_num);
 
-	if (ctx != NULL) {
-		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "cookie = %lld,  sequence number = %lld\n",
-		ctx->cookie, ctx->seq_num);
-	}
-
-	/* clear the TSD key used by the generic initf */
-	clear_initf_key();
-
-	if (*cookiep == NSCD_LOCAL_COOKIE) {
-		NSCD_RETURN_STATUS(pbuf, NSS_TRYLOCAL, 0);
-	} else {
-		NSCD_RETURN_STATUS(pbuf, NSS_SUCCESS, 0);
-	}
+	NSCD_RETURN_STATUS(pbuf, NSS_SUCCESS, 0);
 }
 
 void
@@ -1511,12 +1542,12 @@ nss_pgetent(void *buffer, size_t length)
 {
 	/* inputs */
 	nss_db_initf_t		initf;
-	nss_getent_t		context;
+	nss_getent_t		context = { 0 };
 	nss_getent_t		*contextp = &context;
-	nss_XbyY_args_t		arg;
+	nss_XbyY_args_t		arg = { 0};
 	nss_status_t		status;
-	nssuint_t		*cookiep;
-	nssuint_t		*seqnump;
+	nssuint_t		*cookie_num_p;
+	nssuint_t		*seqnum_p;
 	nscd_getent_context_t	*ctx;
 	int			rc;
 	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
@@ -1526,12 +1557,10 @@ nss_pgetent(void *buffer, size_t length)
 		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
 	}
 
-	status = nss_packed_context_init(buffer, length,
-			NULL, &initf, &contextp, &arg);
-	if (status != NSS_SUCCESS) {
-		NSCD_RETURN_STATUS(pbuf, status, -1);
-	}
-
+	/* verify the cookie passed in */
+	nscd_map_contextp(buffer, contextp, &cookie_num_p, &seqnum_p, 0);
+	if (NSCD_STATUS_IS_NOT_OK(pbuf))
+		return;
 	/*
 	 * use the generic nscd_initf for all the getent requests
 	 * (the TSD key is the pointer to the packed header)
@@ -1542,11 +1571,24 @@ nss_pgetent(void *buffer, size_t length)
 	}
 	initf = nscd_initf;
 
+	/* if no context yet, get one */
+	if (contextp->ctx ==  NULL) {
+		nscd_getent_p0_cookie_t *p0c =
+			(nscd_getent_p0_cookie_t *)cookie_num_p;
 
-	/* verify the cookie passed in */
-	nscd_map_contextp(buffer, contextp, &cookiep, &seqnump, 0);
-	if (NSCD_STATUS_IS_NOT_OK(pbuf))
-		return;
+		delayed_setent(pbuf, initf, contextp, cookie_num_p,
+			seqnum_p, p0c->p0_pid);
+		if (NSCD_STATUS_IS_NOT_OK(pbuf)) {
+			clear_initf_key();
+			return;
+		}
+	}
+
+	status = nss_packed_context_init(buffer, length,
+			NULL, &initf, &contextp, &arg);
+	if (status != NSS_SUCCESS) {
+		NSCD_RETURN_STATUS(pbuf, status, -1);
+	}
 
 	/* Perform local search and pack results into return buffer */
 	status = nss_getent(NULL, initf, contextp, &arg);
@@ -1557,12 +1599,12 @@ nss_pgetent(void *buffer, size_t length)
 	if (status == NSS_SUCCESS) {
 		ctx = (nscd_getent_context_t *)contextp->ctx;
 		ctx->seq_num++;
-		*seqnump = ctx->seq_num;
-		*cookiep = ctx->cookie;
+		*seqnum_p = ctx->seq_num;
+		*cookie_num_p = ctx->cookie_num;
 
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "getent OK, new sequence number = %lld, len = %lld,"
-		" data = [ %s ]\n", *seqnump,
+		(me, "getent OK, new sequence # = %lld, len = %lld,"
+		" data = >>%s<<\n", *seqnum_p,
 		pbuf->data_len, (char *)buffer + pbuf->data_off);
 	} else {
 		/* release the resources used */
@@ -1572,8 +1614,8 @@ nss_pgetent(void *buffer, size_t length)
 			contextp->ctx = NULL;
 		}
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "getent failed, status = %d, sequence number = %lld\n",
-			status, *seqnump);
+		(me, "getent failed, status = %d, sequence # = %lld\n",
+			status, *seqnum_p);
 	}
 
 	/* clear the TSD key used by the generic initf */
@@ -1583,10 +1625,10 @@ nss_pgetent(void *buffer, size_t length)
 void
 nss_pendent(void *buffer, size_t length)
 {
-	nss_getent_t		context;
+	nss_getent_t		context = { 0 };
 	nss_getent_t		*contextp = &context;
-	nssuint_t		*seqnump;
-	nssuint_t		*cookiep;
+	nssuint_t		*seqnum_p;
+	nssuint_t		*cookie_num_p;
 	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
 	char			*me = "nss_pendent";
 
@@ -1595,13 +1637,16 @@ nss_pendent(void *buffer, size_t length)
 	}
 
 	/* map the contextp from the cookie information */
-	nscd_map_contextp(buffer, contextp, &cookiep, &seqnump, 0);
+	nscd_map_contextp(buffer, contextp, &cookie_num_p, &seqnum_p, 0);
 	if (NSCD_STATUS_IS_NOT_OK(pbuf))
 		return;
 
+	if (contextp->ctx == NULL)
+		return;
+
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-	(me, "endent, cookie = %lld, sequence number = %lld\n",
-		*cookiep, *seqnump);
+	(me, "endent, cookie = %lld, sequence # = %lld\n",
+		*cookie_num_p, *seqnum_p);
 
 	/* Perform local endent and reset context */
 	nss_endent(NULL, NULL, contextp);
