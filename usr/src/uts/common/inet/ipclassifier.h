@@ -295,8 +295,8 @@ struct connf_s {
 };
 
 #define	CONN_INC_REF(connp)	{				\
-	DTRACE_PROBE1(conn__inc__ref, conn_t *, connp);		\
 	mutex_enter(&(connp)->conn_lock);			\
+	DTRACE_PROBE1(conn__inc__ref, conn_t *, connp);		\
 	ASSERT(conn_trace_ref(connp));				\
 	(connp)->conn_ref++;					\
 	ASSERT((connp)->conn_ref != 0);				\
@@ -312,9 +312,16 @@ struct connf_s {
 }
 
 #define	CONN_DEC_REF(connp)	{					\
-	DTRACE_PROBE1(conn__dec__ref, conn_t *, connp);			\
 	mutex_enter(&(connp)->conn_lock);				\
-	if ((connp)->conn_ref <= 0)					\
+	DTRACE_PROBE1(conn__dec__ref, conn_t *, connp);			\
+	/*								\
+	 * The squeue framework always does a CONN_DEC_REF after return	\
+	 * from TCP. Hence the refcnt must be at least 2 if conn_on_sqp	\
+	 * is B_TRUE and conn_ref is being decremented. This is to	\
+	 * account for the mblk being currently processed.		\
+	 */								\
+	if ((connp)->conn_ref <= 0 ||					\
+	    ((connp)->conn_ref == 1 && (connp)->conn_on_sqp))		\
 		cmn_err(CE_PANIC, "CONN_DEC_REF: connp(%p) has ref "	\
 			"= %d\n", (void *)(connp), (connp)->conn_ref);	\
 	ASSERT(conn_untrace_ref(connp));				\

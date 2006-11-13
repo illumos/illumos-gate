@@ -4469,8 +4469,6 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 		sin = (sin_t *)ucp;
 		error = ip_bind_laddr(connp, mp, sin->sin_addr.s_addr,
 		    sin->sin_port, ire_requested, ipsec_policy_set, B_TRUE);
-		if (protocol == IPPROTO_TCP)
-			connp->conn_recv = tcp_conn_request;
 		break;
 
 	case sizeof (ipa_conn_t):
@@ -4482,8 +4480,6 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 		error = ip_bind_connected(connp, mp, &ac->ac_laddr,
 		    ac->ac_lport, ac->ac_faddr, ac->ac_fport, ire_requested,
 		    ipsec_policy_set, B_TRUE, B_TRUE);
-		if (protocol == IPPROTO_TCP)
-			connp->conn_recv = tcp_input;
 		break;
 
 	case sizeof (ipa_conn_x_t):
@@ -4496,8 +4492,6 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 		    acx->acx_conn.ac_lport, acx->acx_conn.ac_faddr,
 		    acx->acx_conn.ac_fport, ire_requested, ipsec_policy_set,
 		    B_TRUE, (acx->acx_flags & ACX_VERIFY_DST) != 0);
-		if (protocol == IPPROTO_TCP)
-			connp->conn_recv = tcp_input;
 		break;
 	}
 	if (error == EINPROGRESS)
@@ -4691,7 +4685,14 @@ ip_bind_laddr(conn_t *connp, mblk_t *mp, ipaddr_t src_addr, uint16_t lport,
 		connp->conn_fport = 0;
 		/*
 		 * Do we need to add a check to reject Multicast packets
+		 *
+		 * We need to make sure that the conn_recv is set to a non-null
+		 * value before we insert the conn into the classifier table.
+		 * This is to avoid a race with an incoming packet which does an
+		 * ipcl_classify().
 		 */
+		if (*mp->b_wptr == IPPROTO_TCP)
+			connp->conn_recv = tcp_conn_request;
 		error = ipcl_bind_insert(connp, *mp->b_wptr, src_addr, lport);
 	}
 
@@ -4707,6 +4708,8 @@ ip_bind_laddr(conn_t *connp, mblk_t *mp, ipaddr_t src_addr, uint16_t lport,
 				/* Falls through to bad_addr */
 			}
 		}
+	} else if (connp->conn_ulp == IPPROTO_TCP) {
+		connp->conn_recv = tcp_input;
 	}
 bad_addr:
 	if (error != 0) {
@@ -5139,7 +5142,12 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 		/*
 		 * The addresses have been verified. Time to insert in
 		 * the correct fanout list.
+		 * We need to make sure that the conn_recv is set to a non-null
+		 * value before we insert into the classifier table to avoid a
+		 * race with an incoming packet which does an ipcl_classify().
 		 */
+		if (protocol == IPPROTO_TCP)
+			connp->conn_recv = tcp_input;
 		error = ipcl_conn_insert(connp, protocol, src_addr,
 		    dst_addr, connp->conn_ports);
 	}

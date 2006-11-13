@@ -287,7 +287,8 @@ typedef struct tcp_s {
 
 		tcp_send_discon_ind : 1, /* TLI accept err, send discon ind */
 		tcp_cork : 1,		/* tcp_cork option */
-		tcp_pad_to_bit_31 : 18;
+		tcp_tconnind_started : 1, /* conn_ind message is being sent */
+		tcp_pad_to_bit_31 : 17;
 
 	uint32_t	tcp_if_mtu;	/* Outgoing interface MTU. */
 
@@ -553,7 +554,37 @@ typedef struct tcp_s {
 	kssl_ent_t		tcp_kssl_ent;	/* SSL table entry */
 	kssl_ctx_t		tcp_kssl_ctx;	/* SSL session */
 	uint_t	tcp_label_len;	/* length of cached label */
+
+	/*
+	 * tcp_closemp_used is protected by listener's tcp_eager_lock
+	 * when used for eagers. When used for a tcp in TIME_WAIT state
+	 * or in tcp_close(), it is not protected by any lock as we
+	 * do not expect any other thread to use it concurrently.
+	 * Since we do allow re-use of tcp_closemp at certain places,
+	 * tcp_closemp_used is declared as uint32_t instead of boolean_t
+	 * to record any attempt to re-use tcp_closemp while it is still
+	 * in use. This would facilitate debugging in non-debug kernels.
+	 */
+	uint32_t tcp_closemp_used;
+
+	/*
+	 * previous and next eagers in the list of droppable eagers. See
+	 * the comments before MAKE_DROPPABLE(). These pointers are
+	 * protected by listener's tcp_eager_lock.
+	 */
+	struct tcp_s	*tcp_eager_prev_drop_q0;
+	struct tcp_s	*tcp_eager_next_drop_q0;
+#ifdef DEBUG
+	pc_t			tcmp_stk[15];
+#endif
 } tcp_t;
+
+#ifdef DEBUG
+#define	TCP_DEBUG_GETPCSTACK(buffer, depth)	((void) getpcstack(buffer, \
+						    depth))
+#else
+#define	TCP_DEBUG_GETPCSTACK(buffer, depth)
+#endif
 
 extern void 	tcp_free(tcp_t *tcp);
 extern void	tcp_ddi_init(void);

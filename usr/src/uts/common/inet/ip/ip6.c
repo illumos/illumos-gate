@@ -2329,8 +2329,6 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 				goto bad_addr;
 			connp->conn_pkt_isv6 = B_TRUE;
 		}
-		if (protocol == IPPROTO_TCP)
-			connp->conn_recv = tcp_conn_request;
 	} else {
 		/*
 		 * Bind to local and remote address. Local might be
@@ -2377,8 +2375,6 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 				goto bad_addr;
 			connp->conn_pkt_isv6 = B_TRUE;
 		}
-		if (protocol == IPPROTO_TCP)
-			connp->conn_recv = tcp_input;
 	}
 	/* Update qinfo if v4/v6 changed */
 	if ((orig_pkt_isv6 != connp->conn_pkt_isv6) &&
@@ -2571,6 +2567,15 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
 		connp->conn_remv6 = ipv6_all_zeros;
 		connp->conn_lport = lport;
 		connp->conn_fport = 0;
+
+		/*
+		 * We need to make sure that the conn_recv is set to a non-null
+		 * value before we insert the conn_t into the classifier table.
+		 * This is to avoid a race with an incoming packet which does
+		 * an ipcl_classify().
+		 */
+		if (*mp->b_wptr == IPPROTO_TCP)
+			connp->conn_recv = tcp_conn_request;
 		error = ipcl_bind_insert_v6(connp, *mp->b_wptr, v6src, lport);
 	}
 	if (error == 0) {
@@ -2585,6 +2590,8 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
 				goto bad_addr;
 			}
 		}
+	} else if (connp->conn_ulp == IPPROTO_TCP) {
+		connp->conn_recv = tcp_input;
 	}
 bad_addr:
 	if (error != 0) {
@@ -3048,7 +3055,13 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 		/*
 		 * The addresses have been verified. Time to insert in
 		 * the correct fanout list.
+		 * We need to make sure that the conn_recv is set to a non-null
+		 * value before we insert the conn_t into the classifier table.
+		 * This is to avoid a race with an incoming packet which does
+		 * an ipcl_classify().
 		 */
+		if (protocol == IPPROTO_TCP)
+			connp->conn_recv = tcp_input;
 		error = ipcl_conn_insert_v6(connp, protocol, v6src, v6dst,
 		    connp->conn_ports,
 		    IPCL_IS_TCP(connp) ? connp->conn_tcp->tcp_bound_if : 0);

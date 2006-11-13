@@ -1155,6 +1155,9 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 			IPCL_HASH_REMOVE(connp);
 			mutex_enter(&connfp->connf_lock);
 		}
+
+		ASSERT(connp->conn_recv != NULL);
+
 		IPCL_HASH_INSERT_CONNECTED_LOCKED(connfp, connp);
 		mutex_exit(&connfp->connf_lock);
 		break;

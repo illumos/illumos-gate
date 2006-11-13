@@ -3513,6 +3513,7 @@ typedef void    (*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 #define	SQTAG_UDP_WPUT			34
 #define	SQTAG_UDP_OUTPUT		35
 #define	SQTAG_TCP_KSSL_INPUT		36
+#define	SQTAG_TCP_DROP_Q0		37
 
 #endif	/* _KERNEL */
 

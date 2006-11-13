@@ -995,6 +995,9 @@ static void	tcp_ire_ill_check(tcp_t *, ire_t *, ill_t *, boolean_t);
 
 extern void	tcp_kssl_input(tcp_t *, mblk_t *);
 
+void tcp_eager_kill(void *arg, mblk_t *mp, void *arg2);
+void tcp_clean_death_wrapper(void *arg, mblk_t *mp, void *arg2);
+
 /*
  * Routines related to the TCP_IOC_ABORT_CONN ioctl command.
  *
@@ -1415,6 +1418,43 @@ boolean_t tcp_static_maxpsz = B_FALSE;
 uint32_t tcp_random_anon_port = 1;
 
 /*
+ * To reach to an eager in Q0 which can be dropped due to an incoming
+ * new SYN request when Q0 is full, a new doubly linked list is
+ * introduced. This list allows to select an eager from Q0 in O(1) time.
+ * This is needed to avoid spending too much time walking through the
+ * long list of eagers in Q0 when tcp_drop_q0() is called. Each member of
+ * this new list has to be a member of Q0.
+ * This list is headed by listener's tcp_t. When the list is empty,
+ * both the pointers - tcp_eager_next_drop_q0 and tcp_eager_prev_drop_q0,
+ * of listener's tcp_t point to listener's tcp_t itself.
+ *
+ * Given an eager in Q0 and a listener, MAKE_DROPPABLE() puts the eager
+ * in the list. MAKE_UNDROPPABLE() takes the eager out of the list.
+ * These macros do not affect the eager's membership to Q0.
+ */
+
+
+#define	MAKE_DROPPABLE(listener, eager)					\
+	if ((eager)->tcp_eager_next_drop_q0 == NULL) {			\
+		(listener)->tcp_eager_next_drop_q0->tcp_eager_prev_drop_q0\
+		    = (eager);						\
+		(eager)->tcp_eager_prev_drop_q0 = (listener);		\
+		(eager)->tcp_eager_next_drop_q0 =			\
+		    (listener)->tcp_eager_next_drop_q0;			\
+		(listener)->tcp_eager_next_drop_q0 = (eager);		\
+	}
+
+#define	MAKE_UNDROPPABLE(eager)						\
+	if ((eager)->tcp_eager_next_drop_q0 != NULL) {			\
+		(eager)->tcp_eager_next_drop_q0->tcp_eager_prev_drop_q0	\
+		    = (eager)->tcp_eager_prev_drop_q0;			\
+		(eager)->tcp_eager_prev_drop_q0->tcp_eager_next_drop_q0	\
+		    = (eager)->tcp_eager_next_drop_q0;			\
+		(eager)->tcp_eager_prev_drop_q0 = NULL;			\
+		(eager)->tcp_eager_next_drop_q0 = NULL;			\
+	}
+
+/*
  * If tcp_drop_ack_unsent_cnt is greater than 0, when TCP receives more
  * than tcp_drop_ack_unsent_cnt number of ACKs which acknowledge unsent
  * data, TCP will not respond with an ACK.  RFC 793 requires that
@@ -1535,8 +1575,11 @@ tcp_set_ws_value(tcp_t *tcp)
 
 /*
  * Remove a connection from the list of detached TIME_WAIT connections.
+ * It returns B_FALSE if it can't remove the connection from the list
+ * as the connection has already been removed from the list due to an
+ * earlier call to tcp_time_wait_remove(); otherwise it returns B_TRUE.
  */
-static void
+static boolean_t
 tcp_time_wait_remove(tcp_t *tcp, tcp_squeue_priv_t *tcp_time_wait)
 {
 	boolean_t	locked = B_FALSE;
@@ -1553,7 +1596,7 @@ tcp_time_wait_remove(tcp_t *tcp, tcp_squeue_priv_t *tcp_time_wait)
 		ASSERT(tcp->tcp_time_wait_prev == NULL);
 		if (locked)
 			mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
-		return;
+		return (B_FALSE);
 	}
 	ASSERT(TCP_IS_DETACHED(tcp));
 	ASSERT(tcp->tcp_state == TCPS_TIME_WAIT);
@@ -1587,6 +1630,7 @@ tcp_time_wait_remove(tcp_t *tcp, tcp_squeue_priv_t *tcp_time_wait)
 
 	if (locked)
 		mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
+	return (B_TRUE);
 }
 
 /*
@@ -1770,6 +1814,7 @@ tcp_time_wait_collector(void *arg)
 	mblk_t *mp;
 	conn_t *connp;
 	kmutex_t *lock;
+	boolean_t removed;
 
 	squeue_t *sqp = (squeue_t *)arg;
 	tcp_squeue_priv_t *tcp_time_wait =
@@ -1803,7 +1848,8 @@ tcp_time_wait_collector(void *arg)
 			break;
 		}
 
-		tcp_time_wait_remove(tcp, tcp_time_wait);
+		removed = tcp_time_wait_remove(tcp, tcp_time_wait);
+		ASSERT(removed);
 
 		connp = tcp->tcp_connp;
 		ASSERT(connp->conn_fanout != NULL);
@@ -1875,8 +1921,21 @@ tcp_time_wait_collector(void *arg)
 				/*
 				 * We can reuse the closemp here since conn has
 				 * detached (otherwise we wouldn't even be in
-				 * time_wait list).
+				 * time_wait list). tcp_closemp_used can safely
+				 * be changed without taking a lock as no other
+				 * thread can concurrently access it at this
+				 * point in the connection lifecycle. We
+				 * increment tcp_closemp_used to record any
+				 * attempt to reuse tcp_closemp while it is
+				 * still in use.
 				 */
+
+				if (tcp->tcp_closemp.b_prev == NULL)
+					tcp->tcp_closemp_used = 1;
+				else
+					tcp->tcp_closemp_used++;
+
+				TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 				mp = &tcp->tcp_closemp;
 				squeue_fill(connp->conn_sqp, mp,
 				    tcp_timewait_output, connp,
@@ -1890,8 +1949,21 @@ tcp_time_wait_collector(void *arg)
 			/*
 			 * We can reuse the closemp here since conn has
 			 * detached (otherwise we wouldn't even be in
-			 * time_wait list).
+			 * time_wait list). tcp_closemp_used can safely
+			 * be changed without taking a lock as no other
+			 * thread can concurrently access it at this
+			 * point in the connection lifecycle. We
+			 * increment tcp_closemp_used to record any
+			 * attempt to reuse tcp_closemp while it is
+			 * still in use.
 			 */
+
+			if (tcp->tcp_closemp.b_prev == NULL)
+				tcp->tcp_closemp_used = 1;
+			else
+				tcp->tcp_closemp_used++;
+
+			TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 			mp = &tcp->tcp_closemp;
 			squeue_fill(connp->conn_sqp, mp,
 			    tcp_timewait_output, connp, 0);
@@ -2305,6 +2377,10 @@ tcp_accept(tcp_t *listener, mblk_t *mp)
 		tcp->tcp_eager_prev_q0 = NULL;
 		tcp->tcp_eager_next_q0 = NULL;
 		tcp->tcp_conn_def_q0 = B_FALSE;
+
+		/* Make sure the tcp isn't in the list of droppables */
+		ASSERT(tcp->tcp_eager_next_drop_q0 == NULL &&
+		    tcp->tcp_eager_prev_drop_q0 == NULL);
 
 		/*
 		 * Insert at end of the queue because sockfs sends
@@ -3407,6 +3483,8 @@ do_bind:
 			tcp->tcp_state = TCPS_LISTEN;
 			/* Initialize the chain. Don't need the eager_lock */
 			tcp->tcp_eager_next_q0 = tcp->tcp_eager_prev_q0 = tcp;
+			tcp->tcp_eager_next_drop_q0 = tcp;
+			tcp->tcp_eager_prev_drop_q0 = tcp;
 			tcp->tcp_second_ctimer_threshold =
 			    tcp_ip_abort_linterval;
 		}
@@ -3744,6 +3822,24 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 }
 
 /*
+ * tcp_clean_death / tcp_close_detached must not be called more than once
+ * on a tcp. Thus every function that potentially calls tcp_clean_death
+ * must check for the tcp state before calling tcp_clean_death.
+ * Eg. tcp_input, tcp_rput_data, tcp_eager_kill, tcp_clean_death_wrapper,
+ * tcp_timer_handler, all check for the tcp state.
+ */
+/* ARGSUSED */
+void
+tcp_clean_death_wrapper(void *arg, mblk_t *mp, void *arg2)
+{
+	tcp_t	*tcp = ((conn_t *)arg)->conn_tcp;
+
+	freemsg(mp);
+	if (tcp->tcp_state > TCPS_BOUND)
+	    (void) tcp_clean_death(((conn_t *)arg)->conn_tcp, ETIMEDOUT, 5);
+}
+
+/*
  * We are dying for some reason.  Try to do it gracefully.  (May be called
  * as writer.)
  *
@@ -3794,7 +3890,7 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 			 * RST and will send a DISCON_IND to the application.
 			 */
 			tcp_closei_local(tcp);
-			if (tcp->tcp_conn.tcp_eager_conn_ind != NULL) {
+			if (!tcp->tcp_tconnind_started) {
 				CONN_DEC_REF(tcp->tcp_connp);
 			} else {
 				tcp->tcp_state = TCPS_BOUND;
@@ -3974,6 +4070,23 @@ tcp_close(queue_t *q, int flags)
 	mutex_exit(&connp->conn_lock);
 	tcp->tcp_closeflags = (uint8_t)flags;
 	ASSERT(connp->conn_ref >= 3);
+
+	/*
+	 * tcp_closemp_used is used below without any protection of a lock
+	 * as we don't expect any one else to use it concurrently at this
+	 * point otherwise it would be a major defect, though we do
+	 * increment tcp_closemp_used to record any attempt to reuse
+	 * tcp_closemp while it is still in use. This would help debugging.
+	 */
+
+	if (mp->b_prev == NULL) {
+		tcp->tcp_closemp_used = 1;
+	} else {
+		tcp->tcp_closemp_used++;
+		ASSERT(mp->b_prev == NULL);
+	}
+
+	TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 
 	(*tcp_squeue_close_proc)(connp->conn_sqp, mp,
 	    tcp_close_output, connp, SQTAG_IP_TCP_CLOSE);
@@ -4401,16 +4514,16 @@ tcp_closei_local(tcp_t *tcp)
 		tcp_t	*listener = tcp->tcp_listener;
 		mutex_enter(&listener->tcp_eager_lock);
 		/*
-		 * tcp_eager_conn_ind == NULL means that the
+		 * tcp_tconnind_started == B_TRUE means that the
 		 * conn_ind has already gone to listener. At
 		 * this point, eager will be closed but we
 		 * leave it in listeners eager list so that
 		 * if listener decides to close without doing
 		 * accept, we can clean this up. In tcp_wput_accept
-		 * we take case of the case of accept on closed
+		 * we take care of the case of accept on closed
 		 * eager.
 		 */
-		if (tcp->tcp_conn.tcp_eager_conn_ind != NULL) {
+		if (!tcp->tcp_tconnind_started) {
 			tcp_eager_unlink(tcp);
 			mutex_exit(&listener->tcp_eager_lock);
 			/*
@@ -4449,7 +4562,7 @@ tcp_closei_local(tcp_t *tcp)
 	 * tcp_time_wait_remove for the refcnt checks to work correctly.
 	 */
 	if (tcp->tcp_state == TCPS_TIME_WAIT)
-		tcp_time_wait_remove(tcp, NULL);
+		(void) tcp_time_wait_remove(tcp, NULL);
 	CL_INET_DISCONNECT(tcp);
 	ipcl_hash_remove(connp);
 
@@ -4666,8 +4779,9 @@ tcp_conn_con(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph, mblk_t *idmp,
 
 /*
  * Defense for the SYN attack -
- * 1. When q0 is full, drop from the tail (tcp_eager_prev_q0) the oldest
- *    one that doesn't have the dontdrop bit set.
+ * 1. When q0 is full, drop from the tail (tcp_eager_prev_drop_q0) the oldest
+ *    one from the list of droppable eagers. This list is a subset of q0.
+ *    see comments before the definition of MAKE_DROPPABLE().
  * 2. Don't drop a SYN request before its first timeout. This gives every
  *    request at least til the first timeout to complete its 3-way handshake.
  * 3. Maintain tcp_syn_rcvd_timeout as an accurate count of how many
@@ -4682,25 +4796,28 @@ static boolean_t
 tcp_drop_q0(tcp_t *tcp)
 {
 	tcp_t	*eager;
+	mblk_t	*mp;
 
 	ASSERT(MUTEX_HELD(&tcp->tcp_eager_lock));
 	ASSERT(tcp->tcp_eager_next_q0 != tcp->tcp_eager_prev_q0);
-	/*
-	 * New one is added after next_q0 so prev_q0 points to the oldest
-	 * Also do not drop any established connections that are deferred on
-	 * q0 due to q being full
-	 */
 
-	eager = tcp->tcp_eager_prev_q0;
-	while (eager->tcp_dontdrop || eager->tcp_conn_def_q0) {
-		eager = eager->tcp_eager_prev_q0;
-		if (eager == tcp) {
-			eager = tcp->tcp_eager_prev_q0;
-			break;
-		}
-	}
-	if (eager->tcp_syn_rcvd_timeout == 0)
+	/* Pick oldest eager from the list of droppable eagers */
+	eager = tcp->tcp_eager_prev_drop_q0;
+
+	/* If list is empty. return B_FALSE */
+	if (eager == tcp) {
 		return (B_FALSE);
+	}
+
+	/* If allocated, the mp will be freed in tcp_clean_death_wrapper() */
+	if ((mp = allocb(0, BPRI_HI)) == NULL)
+		return (B_FALSE);
+
+	/*
+	 * Take this eager out from the list of droppable eagers since we are
+	 * going to drop it.
+	 */
+	MAKE_UNDROPPABLE(eager);
 
 	if (tcp->tcp_debug) {
 		(void) strlog(TCP_MOD_ID, 0, 3, SL_TRACE,
@@ -4712,19 +4829,14 @@ tcp_drop_q0(tcp_t *tcp)
 
 	BUMP_MIB(&tcp_mib, tcpHalfOpenDrop);
 
-	/*
-	 * need to do refhold here because the selected eager could
-	 * be removed by someone else if we release the eager lock.
-	 */
+	/* Put a reference on the conn as we are enqueueing it in the sqeue */
 	CONN_INC_REF(eager->tcp_connp);
-	mutex_exit(&tcp->tcp_eager_lock);
 
 	/* Mark the IRE created for this SYN request temporary */
 	tcp_ip_ire_mark_advice(eager);
-	(void) tcp_clean_death(eager, ETIMEDOUT, 5);
-	CONN_DEC_REF(eager->tcp_connp);
+	squeue_fill(eager->tcp_connp->conn_sqp, mp,
+	    tcp_clean_death_wrapper, eager->tcp_connp, SQTAG_TCP_DROP_Q0);
 
-	mutex_enter(&tcp->tcp_eager_lock);
 	return (B_TRUE);
 }
 
@@ -4976,6 +5088,7 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 	}
 
 	ASSERT(tcp->tcp_conn.tcp_eager_conn_ind == NULL);
+	ASSERT(!tcp->tcp_tconnind_started);
 	/*
 	 * If the SYN contains a credential, it's a loopback packet; attach
 	 * the credential to the TPI message.
@@ -5097,6 +5210,7 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 		tcp_opt_reverse(tcp, ipha);
 
 	ASSERT(tcp->tcp_conn.tcp_eager_conn_ind == NULL);
+	ASSERT(!tcp->tcp_tconnind_started);
 
 	/*
 	 * If the SYN contains a credential, it's a loopback packet; attach
@@ -5924,6 +6038,7 @@ error1:
 			 * treated as a new connection or dealth with
 			 * a TH_RST if a connection already exists.
 			 */
+			CONN_DEC_REF(econnp);
 			freemsg(mp);
 		} else {
 			squeue_fill(econnp->conn_sqp, mp, tcp_input,
@@ -5985,7 +6100,23 @@ tcp_conn_request_unbound(void *arg, mblk_t *mp, void *arg2)
 		 * can't execute. If they are processed after we have
 		 * changed the squeue, they are sent back to the
 		 * correct squeue down below.
+		 * But a listner close can race with processing of
+		 * incoming SYN. If incoming SYN processing changes
+		 * the squeue then the listener close which is waiting
+		 * to enter the squeue would operate on the wrong
+		 * squeue. Hence we don't change the squeue here unless
+		 * the refcount is exactly the minimum refcount. The
+		 * minimum refcount of 4 is counted as - 1 each for
+		 * TCP and IP, 1 for being in the classifier hash, and
+		 * 1 for the mblk being processed.
 		 */
+
+		if (connp->conn_ref != 4 ||
+		    connp->conn_tcp->tcp_state != TCPS_LISTEN) {
+			mutex_exit(&connp->conn_lock);
+			mutex_exit(&connp->conn_fanout->connf_lock);
+			goto done;
+		}
 		if (connp->conn_sqp != new_sqp) {
 			while (connp->conn_sqp != new_sqp)
 				(void) casptr(&connp->conn_sqp, sqp, new_sqp);
@@ -6961,7 +7092,7 @@ tcp_eager_kill(void *arg, mblk_t *mp, void *arg2)
 	if (listener != NULL) {
 		mutex_enter(&listener->tcp_eager_lock);
 		tcp_eager_unlink(eager);
-		if (eager->tcp_conn.tcp_eager_conn_ind == NULL) {
+		if (eager->tcp_tconnind_started) {
 			/*
 			 * The eager has sent a conn_ind up to the
 			 * listener but listener decides to close
@@ -6999,6 +7130,13 @@ tcp_eager_blowoff(tcp_t	*listener, t_scalar_t seqnum)
 			return (B_FALSE);
 		}
 	} while (eager->tcp_conn_req_seqnum != seqnum);
+
+	if (eager->tcp_closemp_used > 0) {
+		mutex_exit(&listener->tcp_eager_lock);
+		return (B_TRUE);
+	}
+	eager->tcp_closemp_used = 1;
+	TCP_DEBUG_GETPCSTACK(eager->tcmp_stk, 15);
 	CONN_INC_REF(eager->tcp_connp);
 	mutex_exit(&listener->tcp_eager_lock);
 	mp = &eager->tcp_closemp;
@@ -7024,11 +7162,15 @@ tcp_eager_cleanup(tcp_t *listener, boolean_t q0_only)
 		TCP_STAT(tcp_eager_blowoff_q);
 		eager = listener->tcp_eager_next_q;
 		while (eager != NULL) {
-			CONN_INC_REF(eager->tcp_connp);
-			mp = &eager->tcp_closemp;
-			squeue_fill(eager->tcp_connp->conn_sqp, mp,
-			    tcp_eager_kill, eager->tcp_connp,
-			    SQTAG_TCP_EAGER_CLEANUP);
+			if (eager->tcp_closemp_used == 0) {
+				eager->tcp_closemp_used = 1;
+				TCP_DEBUG_GETPCSTACK(eager->tcmp_stk, 15);
+				CONN_INC_REF(eager->tcp_connp);
+				mp = &eager->tcp_closemp;
+				squeue_fill(eager->tcp_connp->conn_sqp, mp,
+				    tcp_eager_kill, eager->tcp_connp,
+				    SQTAG_TCP_EAGER_CLEANUP);
+			}
 			eager = eager->tcp_eager_next_q;
 		}
 	}
@@ -7036,11 +7178,15 @@ tcp_eager_cleanup(tcp_t *listener, boolean_t q0_only)
 	TCP_STAT(tcp_eager_blowoff_q0);
 	eager = listener->tcp_eager_next_q0;
 	while (eager != listener) {
-		CONN_INC_REF(eager->tcp_connp);
-		mp = &eager->tcp_closemp;
-		squeue_fill(eager->tcp_connp->conn_sqp, mp,
-		    tcp_eager_kill, eager->tcp_connp,
-		    SQTAG_TCP_EAGER_CLEANUP_Q0);
+		if (eager->tcp_closemp_used == 0) {
+			eager->tcp_closemp_used = 1;
+			TCP_DEBUG_GETPCSTACK(eager->tcmp_stk, 15);
+			CONN_INC_REF(eager->tcp_connp);
+			mp = &eager->tcp_closemp;
+			squeue_fill(eager->tcp_connp->conn_sqp, mp,
+			    tcp_eager_kill, eager->tcp_connp,
+			    SQTAG_TCP_EAGER_CLEANUP_Q0);
+		}
 		eager = eager->tcp_eager_next_q0;
 	}
 }
@@ -7070,6 +7216,12 @@ tcp_eager_unlink(tcp_t *tcp)
 
 		tcp->tcp_eager_next_q0 = NULL;
 		tcp->tcp_eager_prev_q0 = NULL;
+
+		/*
+		 * Take the eager out, if it is in the list of droppable
+		 * eagers.
+		 */
+		MAKE_UNDROPPABLE(tcp);
 
 		if (tcp->tcp_syn_rcvd_timeout != 0) {
 			/* we have timed out before */
@@ -7637,6 +7789,8 @@ tcp_reinit(tcp_t *tcp)
 		 */
 		tcp->tcp_state = TCPS_LISTEN;
 		tcp->tcp_eager_next_q0 = tcp->tcp_eager_prev_q0 = tcp;
+		tcp->tcp_eager_next_drop_q0 = tcp;
+		tcp->tcp_eager_prev_drop_q0 = tcp;
 		tcp->tcp_connp->conn_recv = tcp_conn_request;
 		if (tcp->tcp_family == AF_INET6) {
 			ASSERT(tcp->tcp_connp->conn_af_isv6);
@@ -7883,6 +8037,10 @@ tcp_reinit_values(tcp)
 	    tcp->tcp_eager_next_q0 == tcp->tcp_eager_prev_q0);
 	ASSERT(tcp->tcp_conn.tcp_eager_conn_ind == NULL);
 
+	ASSERT((tcp->tcp_eager_next_drop_q0 == NULL &&
+	    tcp->tcp_eager_prev_drop_q0 == NULL) ||
+	    tcp->tcp_eager_next_drop_q0 == tcp->tcp_eager_prev_drop_q0);
+
 	tcp->tcp_client_errno = 0;
 
 	DONTCARE(tcp->tcp_sum);			/* Init in tcp_init_values */
@@ -7966,12 +8124,20 @@ tcp_reinit_values(tcp)
 
 	tcp->tcp_in_ack_unsent = 0;
 	tcp->tcp_cork = B_FALSE;
+	tcp->tcp_tconnind_started = B_FALSE;
 
 	PRESERVE(tcp->tcp_squeue_bytes);
 
 	ASSERT(tcp->tcp_kssl_ctx == NULL);
 	ASSERT(!tcp->tcp_kssl_pending);
 	PRESERVE(tcp->tcp_kssl_ent);
+
+	tcp->tcp_closemp_used = 0;
+
+#ifdef DEBUG
+	DONTCARE(tcp->tcmp_stk[0]);
+#endif
+
 
 #undef	DONTCARE
 #undef	PRESERVE
@@ -12237,6 +12403,13 @@ tcp_send_conn_ind(void *arg, mblk_t *mp, void *arg2)
 	 * processing
 	 */
 	mutex_enter(&listener->tcp_eager_lock);
+
+	/*
+	 * Take the eager out, if it is in the list of droppable eagers
+	 * as we are here because the 3W handshake is over.
+	 */
+	MAKE_UNDROPPABLE(tcp);
+
 	if (listener->tcp_conn_req_cnt_q < listener->tcp_conn_req_max) {
 		tcp_t *tail;
 
@@ -13656,6 +13829,7 @@ process_ack:
 			tcp_t	*listener = tcp->tcp_listener;
 			mblk_t	*mp = tcp->tcp_conn.tcp_eager_conn_ind;
 
+			tcp->tcp_tconnind_started = B_TRUE;
 			tcp->tcp_conn.tcp_eager_conn_ind = NULL;
 			/*
 			 * We are here means eager is fine but it can
@@ -16561,6 +16735,14 @@ tcp_timer(void *arg)
 			tcp->tcp_syn_rcvd_timeout = 1;
 			mutex_enter(&listener->tcp_eager_lock);
 			listener->tcp_syn_rcvd_timeout++;
+			if (!tcp->tcp_dontdrop && tcp->tcp_closemp_used == 0) {
+				/*
+				 * Make this eager available for drop if we
+				 * need to drop one to accomodate a new
+				 * incoming SYN request.
+				 */
+				MAKE_DROPPABLE(listener, tcp);
+			}
 			if (!listener->tcp_syn_defense &&
 			    (listener->tcp_syn_rcvd_timeout >
 			    (tcp_conn_req_max_q0 >> 2)) &&
@@ -16575,6 +16757,24 @@ tcp_timer(void *arg)
 				listener->tcp_ip_addr_cache = kmem_zalloc(
 				    IP_ADDR_CACHE_SIZE * sizeof (ipaddr_t),
 				    KM_NOSLEEP);
+			}
+			mutex_exit(&listener->tcp_eager_lock);
+		} else if (listener != NULL) {
+			mutex_enter(&listener->tcp_eager_lock);
+			tcp->tcp_syn_rcvd_timeout++;
+			if (tcp->tcp_syn_rcvd_timeout > 1 &&
+			    tcp->tcp_closemp_used == 0) {
+				/*
+				 * This is our second timeout. Put the tcp in
+				 * the list of droppable eagers to allow it to
+				 * be dropped, if needed. We don't check
+				 * whether tcp_dontdrop is set or not to
+				 * protect ourselve from a SYN attack where a
+				 * remote host can spoof itself as one of the
+				 * good IP source and continue to hold
+				 * resources too long.
+				 */
+				MAKE_DROPPABLE(listener, tcp);
 			}
 			mutex_exit(&listener->tcp_eager_lock);
 		}
@@ -17906,6 +18106,10 @@ tcp_wput_accept(queue_t *q, mblk_t *mp)
 			tcp->tcp_eager_prev_q0 = NULL;
 			tcp->tcp_eager_next_q0 = NULL;
 			tcp->tcp_conn_def_q0 = B_FALSE;
+
+			/* Make sure the tcp isn't in the list of droppables */
+			ASSERT(tcp->tcp_eager_next_drop_q0 == NULL &&
+			    tcp->tcp_eager_prev_drop_q0 == NULL);
 
 			/*
 			 * Insert at end of the queue because sockfs sends
@@ -24635,9 +24839,11 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 				 * just restart the timer.
 				 */
 				if (TCP_IS_DETACHED(tcp)) {
-					tcp_time_wait_remove(tcp, NULL);
-					tcp_time_wait_append(tcp);
-					TCP_DBGSTAT(tcp_rput_time_wait);
+					if (tcp_time_wait_remove(tcp, NULL) ==
+					    B_TRUE) {
+						tcp_time_wait_append(tcp);
+						TCP_DBGSTAT(tcp_rput_time_wait);
+					}
 				} else {
 					ASSERT(tcp != NULL);
 					TCP_TIMER_RESTART(tcp,

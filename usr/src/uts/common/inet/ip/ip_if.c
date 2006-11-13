@@ -7843,6 +7843,13 @@ ipsq_clean_ring(ill_t *ill, ill_rx_ring_t *rx_ring)
 	 * Use the preallocated ill_unbind_conn for this purpose
 	 */
 	connp = ill->ill_dls_capab->ill_unbind_conn;
+
+	ASSERT(!connp->conn_tcp->tcp_closemp.b_prev);
+	TCP_DEBUG_GETPCSTACK(connp->conn_tcp->tcmp_stk, 15);
+	if (connp->conn_tcp->tcp_closemp.b_prev == NULL)
+		connp->conn_tcp->tcp_closemp_used = 1;
+	else
+		connp->conn_tcp->tcp_closemp_used++;
 	mp = &connp->conn_tcp->tcp_closemp;
 	CONN_INC_REF(connp);
 	squeue_enter(sqp, mp, ip_squeue_clean, connp, NULL);

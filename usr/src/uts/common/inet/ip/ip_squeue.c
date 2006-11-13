@@ -785,15 +785,29 @@ ip_squeue_get(ill_rx_ring_t *ill_rx_ring)
 	    KM_NOSLEEP);
 
 	mutex_enter(&ill->ill_lock);
-	if (!interrupt || ill_rx_ring->rr_ring_state != ILL_RING_INUSE ||
-		taskq_arg == NULL) {
+	/*
+	 * Check sqp under the lock again for atomicity. Possible race with
+	 * a previously scheduled ip_squeue_get -> ip_squeue_extend.
+	 * Do the ring to squeue binding only if we are in interrupt context
+	 * AND the ring is not already bound AND there is no one else trying
+	 * the bind already.
+	 */
+	sqp = ill_rx_ring->rr_sqp;
+	if (sqp != NULL || !interrupt ||
+	    ill_rx_ring->rr_ring_state != ILL_RING_INUSE || taskq_arg == NULL) {
 		/*
-		 * Do the ring to squeue binding only if we are in interrupt
-		 * context and there is no one else trying the bind already.
+		 * Note that the ring might get bound once we drop the lock
+		 * below, if a previous request is in progress i.e. if the ring
+		 * state is ILL_RING_INPROC. The incoming connection on whose
+		 * behalf we are currently here might get a suboptimal squeue
+		 * via the call to IP_SQUEUE_GET below, but there is no
+		 * correctness issue.
 		 */
 		mutex_exit(&ill->ill_lock);
 		if (taskq_arg != NULL)
 			kmem_free(taskq_arg, sizeof (ip_taskq_arg_t));
+		if (sqp != NULL)
+			return (sqp);
 		return (IP_SQUEUE_GET(lbolt));
 	}
 
