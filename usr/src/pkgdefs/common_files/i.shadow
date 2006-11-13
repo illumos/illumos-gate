@@ -23,7 +23,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -91,6 +91,17 @@ do
 		else
 			printf '/^gdm:\*LK\*\na\n%s\n.\nw\nq\n' \
 				"$WEBSERVD_LINE" | ed -s $dest > /dev/null
+		fi
+
+		#
+		# Add the 'postgres' reserved user if it doesn't exist.
+		#
+		POSTGRES_LINE="postgres:NP:::::::"
+		if grep "^postgres:" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^webservd:\*LK\*\na\n%s\n.\nw\nq\n' \
+			    "$POSTGRES_LINE" | ed -s $dest > /dev/null
 		fi
 	fi
 done

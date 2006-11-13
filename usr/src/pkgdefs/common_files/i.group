@@ -23,7 +23,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -160,6 +160,25 @@ do
 		else
 			printf '/^gdm::50:\na\n%s\n.\nw\nq\n' \
 				"$WEBSERVDGROUP_LINE" | ed -s $dest > /dev/null
+		fi
+
+		#
+		# Add the 'postgres' group if it doesn't already exist.
+		#
+		POSTGRESGROUP_LINE="postgres::90:"
+		cur_name=`awk -F: '$3 == 90 {print $1}' $dest`
+		cur_id=`awk -F: '$1 == "postgres" {print $3}' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "postgres" ]; then
+			echo "ERROR: Reserved GID 90 already assigned" \
+			    "to '$cur_name'" >> /tmp/CLEANUP
+		elif [ ! -z "$cur_id" -a "$cur_id" != "90" ]; then
+			echo "NOTE: postgres group already assigned" \
+			    "to id '$cur_id'" >> /tmp/CLEANUP
+		elif grep "$POSTGRESGROUP_LINE" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^webservd::80:\na\n%s\n.\nw\nq\n' \
+			    "$POSTGRESGROUP_LINE" | ed -s $dest > /dev/null
 		fi
 	fi
 done
