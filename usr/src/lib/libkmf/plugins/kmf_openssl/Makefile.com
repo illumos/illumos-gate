@@ -33,26 +33,24 @@ VERS=		.1
 OBJECTS=	openssl_spi.o
 
 include	$(SRC)/lib/Makefile.lib
+include $(SRC)/lib/openssl/Makefile.openssl
 
 LIBLINKS=	$(DYNLIB:.so.1=.so)
-SFWDIR=		/usr/sfw
 KMFINC=		-I../../../include -I../../../ber_der/inc
 BERLIB=		-lkmf -lkmfberder
 BERLIB64=	$(BERLIB)
 
-OPENSSLLIBS=	$(BERLIB) -R$(SFWDIR)/lib -L$(ROOT)/$(SFWDIR)/lib -lcrypto -lcryptoutil -lc
-OPENSSLLIBS64=	$(BERLIB64) -R$(SFWDIR)/lib/$(MACH64) -L$(ROOT)/$(SFWDIR)/lib/$(MACH64) \
-		-lcrypto -lcryptoutil -lc
+OPENSSLLIBS=	$(BERLIB) $(OPENSSL_DYNFLAGS) $(OPENSSL_LDFLAGS) -lcrypto -lcryptoutil -lc
+OPENSSLLIBS64=	$(BERLIB64) $(OPENSSL_DYNFLAGS) $(OPENSSL_LDFLAGS) -lcrypto -lcryptoutil -lc
 
-LINTSSLLIBS	= $(BERLIB) -L$(ROOT)/$(SFWDIR)/lib -lcrypto -lcryptoutil -lc
-LINTSSLLIBS64=	$(BERLIB64) -L$(ROOT)/$(SFWDIR)/lib/$(MACH64) \
-		-lcrypto -lcryptoutil -lc
+LINTSSLLIBS	= $(BERLIB) $(OPENSSL_LDFLAGS) -lcrypto -lcryptoutil -lc
+LINTSSLLIBS64	= $(BERLIB64) $(OPENSSL_LDFLAGS) -lcrypto -lcryptoutil -lc
 
 SRCDIR=		../common
 INCDIR=		../../include
 
 CFLAGS		+=	$(CCVERBOSE) 
-CPPFLAGS	+=	-D_REENTRANT $(KMFINC) -I$(ROOT)/$(SFWDIR)/include \
+CPPFLAGS	+=	-D_REENTRANT $(KMFINC) $(OPENSSL_CPPFLAGS) \
 			-I$(INCDIR) -I/usr/include/libxml2
 
 PICS=	$(OBJECTS:%=pics/%)

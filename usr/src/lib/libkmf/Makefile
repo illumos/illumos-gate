@@ -42,13 +42,15 @@ install :=      TARGET= install
 lint :=         TARGET= lint
 install_h :=    TARGET= install_h
 
-all clean clobber install lint:	$(SUBDIRS)
+all install: install_h $(SUBDIRS)
+
+clean clobber lint:	$(SUBDIRS)
 
 install_h:	$(ROOTHDRDIR) $(ROOTHDRS)
 
 check: $(CHECKHDRS)
 
-$(SUBDIRS): install_h FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
