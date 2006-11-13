@@ -33,7 +33,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@ RCSID("$OpenBSD: log.c,v 1.24 2002/07/19 15:43:33 markus Exp $");
 #include "log.h"
 #include "xmalloc.h"
 
+#include <atomic.h>
 #include <syslog.h>
 
 static LogLevel log_level = SYSLOG_LEVEL_INFO;
@@ -262,16 +263,15 @@ fatal_remove_all_cleanups(void)
 	fatal_cleanups = NULL;
 }
 
-/* Cleanup and exit */
+/* Cleanup and exit. Make sure each cleanup is called only once. */
 void
 fatal_cleanup(void)
 {
 	struct fatal_cleanup *cu, *next_cu;
-	static int called = 0;
+	static volatile u_int called = 0;
 
-	if (called)
+	if (atomic_cas_uint(&called, 0, 1) == 1)
 		exit(255);
-	called = 1;
 	/* Call cleanup functions. */
 	for (cu = fatal_cleanups; cu; cu = next_cu) {
 		next_cu = cu->next;
