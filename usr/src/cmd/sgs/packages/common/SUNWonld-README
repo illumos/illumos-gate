@@ -1143,3 +1143,5 @@ Bugid   Risk Synopsis
 	segment
 6476734 crle(1m) "-l" as described fails system, crle cores trying to fix
 	/a/var/ld/ld.config in failsafe
+6487499 link_audit "make clobber" creates and populates proto area
+6488141 ld(1) should detect attempt to reference 0-length .bss section

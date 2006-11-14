@@ -1548,6 +1548,36 @@ compare(const void * sdpp1, const void * sdpp2)
 uintptr_t
 ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 {
+	/*
+	 * This macro tests the given symbol to see if it is out of
+	 * range relative to the section it references.
+	 *
+	 * entry:
+	 *	- ifl is a relative object (ET_REL)
+	 *	_sdp - Symbol descriptor
+	 *	_sym - Symbol
+	 *	_type - Symbol type
+	 *
+	 * The following are tested:
+	 *	- Symbol length is non-zero
+	 *	- Symbol type is a type that references code or data
+	 *	- Referenced section is not 0 (indicates an UNDEF symbol)
+	 *	  and is not in the range of special values above SHN_LORESERVE
+	 *	  (excluding SHN_XINDEX, which is OK).
+	 *	- We have a valid section header for the target section
+	 *
+	 * If the above are all true, and the symbol position is not
+	 * contained by the target section, this macro evaluates to
+	 * True (1). Otherwise, False(0).
+	 */
+#define	SYM_LOC_BADADDR(_sdp, _sym, _type) \
+	(_sym->st_size && dynaddr_symtype[_type] && \
+	(_sym->st_shndx != SHN_UNDEF) && \
+	((_sym->st_shndx < SHN_LORESERVE) || \
+		(_sym->st_shndx == SHN_XINDEX)) && \
+	_sdp->sd_isc && _sdp->sd_isc->is_shdr && \
+	((_sym->st_value + _sym->st_size) > _sdp->sd_isc->is_shdr->sh_size))
+
 	Sym		*sym = (Sym *)isc->is_indata->d_buf;
 	Word		*symshndx = 0;
 	Shdr		*shdr = isc->is_shdr;
@@ -1557,6 +1587,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	uchar_t		type, bind;
 	Word		ndx, hash, local, total;
 	Half		etype = ifl->ifl_ehdr->e_type;
+	int		etype_rel;
 	const char	*symsecname, *strsecname;
 	avl_index_t	where;
 
@@ -1628,7 +1659,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	if ((ifl->ifl_oldndx = libld_malloc((size_t)(total *
 	    sizeof (Sym_desc *)))) == 0)
 		return (S_ERROR);
-	if ((etype == ET_REL) && local) {
+	etype_rel = etype == ET_REL;
+	if (etype_rel && local) {
 		if ((ifl->ifl_locs =
 		    libld_calloc(sizeof (Sym_desc), local)) == 0)
 			return (S_ERROR);
@@ -1777,6 +1809,25 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 					    ifl->ifl_name,
 					    conv_sym_shndx(sym->st_shndx));
 				}
+				continue;
+			}
+
+			/*
+			 * For a relocatable object, if this symbol is defined
+			 * and has non-zero length and references an address
+			 * within an associated section, then check its extents
+			 * to make sure the section boundaries encompass it.
+			 * If they don't, the ELF file is corrupt.
+			 */
+			if (etype_rel && SYM_LOC_BADADDR(sdp, sym, type)) {
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_SYM_BADADDR),
+				    demangle(sdp->sd_name), ifl->ifl_name,
+				    shndx, sdp->sd_isc->is_name,
+				    EC_XWORD(sdp->sd_isc->is_shdr->sh_size),
+				    EC_XWORD(sym->st_value),
+				    EC_XWORD(sym->st_size));
+				ofl->ofl_flags |= FLG_OF_FATAL;
 				continue;
 			}
 
@@ -2006,6 +2057,34 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				    sdp->sd_name, ifl, ofl);
 			}
 		}
+
+		/*
+		 * For a relocatable object, if this symbol is defined
+		 * and has non-zero length and references an address
+		 * within an associated section, then check its extents
+		 * to make sure the section boundaries encompass it.
+		 * If they don't, the ELF file is corrupt. Note that this
+		 * global symbol may have come from another file to satisfy
+		 * an UNDEF symbol of the same name from this one. In that
+		 * case, we don't check it, because it was already checked
+		 * as part of its own file.
+		 */
+		if (etype_rel && (sdp->sd_file == ifl)) {
+			Sym *tsym = sdp->sd_sym;
+
+			if (SYM_LOC_BADADDR(sdp, tsym,
+			    ELF_ST_TYPE(tsym->st_info))) {
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_SYM_BADADDR),
+				    demangle(sdp->sd_name), ifl->ifl_name,
+				    tsym->st_shndx, sdp->sd_isc->is_name,
+				    EC_XWORD(sdp->sd_isc->is_shdr->sh_size),
+				    EC_XWORD(tsym->st_value),
+				    EC_XWORD(tsym->st_size));
+				ofl->ofl_flags |= FLG_OF_FATAL;
+				continue;
+			}
+		}
 	}
 
 	/*
@@ -2093,6 +2172,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		}
 	}
 	return (1);
+
+#undef SYM_LOC_BADADDR
 }
 
 /*

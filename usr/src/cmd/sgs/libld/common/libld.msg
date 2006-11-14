@@ -414,6 +414,9 @@
 			 section[%lld]"
 @ MSG_SYM_TLS		"symbol `%s' in file %s (STT_TLS), is defined \
 			 in a non-SHF_TLS section"
+@ MSG_SYM_BADADDR	"symbol `%s' in file %s: section [%d] %s: size %lld: \
+			 symbol (address %#llx, size %lld) lies outside \
+			 of containing section"
 @ MSG_SYM_MULDEF	"symbol `%s' is multiply-defined:"
 @ MSG_SYM_DIFFTYPE	"symbol `%s' has differing types:"
 @ MSG_SYM_DIFFATTR	"symbol `%s' has differing %s:\n\

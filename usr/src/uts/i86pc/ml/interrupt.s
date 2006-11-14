@@ -524,6 +524,7 @@ _dosoftint_actv_bit_not_set:
 	.string	"dosoftint(): cpu_intr_actv bit not set for PIL"
 
 	DGDEF(intr_thread_cnt)
+	.4byte	0
 
 #else
 #define	ASSERT_NOT_CPU_INTR_ACTV(pilreg, basereg, msg)

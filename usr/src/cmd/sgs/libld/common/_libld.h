@@ -189,6 +189,7 @@ extern List		lib_support;
 extern int		demangle_flag;
 extern const Msg	reject[];
 extern int		Verbose;
+extern const int	dynaddr_symtype[STT_NUM];
 
 /*
  * For backward compatibility provide a /dev/zero file descriptor.

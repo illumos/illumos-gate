@@ -1063,6 +1063,23 @@ void
 symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
     Cache *versymcache, const char *file, uint_t flags)
 {
+	/*
+	 * Symbol types for which we check that the specified
+	 * address/size land inside the target section.
+	 */
+	static const int dynaddr_symtype[STT_NUM] = {
+		0,			/* STT_NOTYPE */
+		1,			/* STT_OBJECT */
+		1,			/* STT_FUNC */
+		0,			/* STT_SECTION */
+		0,			/* STT_FILE */
+		1,			/* STT_COMMON */
+		0,			/* STT_TLS */
+	};
+#if STT_NUM != (STT_TLS + 1)
+#error "STT_NUM has grown. Update dynaddr_symtype[]"
+#endif
+
 	Word	seccnt;
 	char	is_core = (ehdr->e_type == ET_CORE);
 
@@ -1215,17 +1232,39 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
 			}
 
 			/*
-			 * If a symbol has size, then make sure the section it
-			 * references is appropriate.  Note, UNDEF symbols that
-			 * have a size, have been known to exist - ignore them.
+			 * If a symbol with non-zero size has a type that
+			 * specifies an address, then make sure the location
+			 * it references is actually contained within the
+			 * section.  UNDEF symbols don't count in this case,
+			 * so we ignore them.
+			 *
+			 * The meaning of the st_value field in a symbol
+			 * depends on the type of object. For a relocatable
+			 * object, it is the offset within the section.
+			 * For sharable objects, it is the offset relative to
+			 * the base of the object, and for other types, it is
+			 * the virtual address. To get an offset within the
+			 * section for non-ET_REL files, we subtract the
+			 * base address of the section.
 			 */
-			if (sym->st_size && shndx && tshdr &&
-			    (tshdr->sh_size < sym->st_size)) {
-				(void) fprintf(stderr,
-				    MSG_INTL(MSG_ERR_BADSYM6), file,
-				    secname, demangle(symname, flags),
-				    EC_WORD(shndx), EC_XWORD(tshdr->sh_size),
-				    EC_XWORD(sym->st_size));
+			if (dynaddr_symtype[type] && (sym->st_size > 0) &&
+			    (sym->st_shndx != SHN_UNDEF) &&
+			    ((sym->st_shndx < SHN_LORESERVE) || \
+			    (sym->st_shndx == SHN_XINDEX)) &&
+			    (tshdr != NULL)) {
+				Word v = sym->st_value;
+
+				if (ehdr->e_type != ET_REL)
+					v -= tshdr->sh_addr;
+				if (((v + sym->st_size) > tshdr->sh_size)) {
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_ERR_BADSYM6), file,
+					    secname, demangle(symname, flags),
+					    EC_WORD(shndx),
+					    EC_XWORD(tshdr->sh_size),
+					    EC_XWORD(sym->st_value),
+					    EC_XWORD(sym->st_size));
+				}
 			}
 
 			(void) snprintf(index, MAXNDXSIZE,

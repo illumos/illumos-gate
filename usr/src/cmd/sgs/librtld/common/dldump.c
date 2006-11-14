@@ -777,7 +777,8 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 		 * will be updated to their new fixed address.
 		 */
 		if ((shdr->sh_type == SHT_SYMTAB) ||
-		    (shdr->sh_type == SHT_DYNSYM)) {
+		    (shdr->sh_type == SHT_DYNSYM) ||
+		    (shdr->sh_type == SHT_SUNW_LDYNSYM)) {
 			update_sym(mcache, _mcache, edata, endx, addr);
 			continue;
 		}
