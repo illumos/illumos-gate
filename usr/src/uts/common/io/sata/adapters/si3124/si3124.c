@@ -1201,7 +1201,8 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 	}
 
 	if (si_portp->siport_reset_in_progress &&
-		! spkt->satapkt_cmd.satacmd_flags.sata_ignore_dev_reset) {
+		! spkt->satapkt_cmd.satacmd_flags.sata_ignore_dev_reset &&
+		! ddi_in_panic()) {
 
 		spkt->satapkt_reason = SATA_PKT_BUSY;
 		SIDBG1(SIDBG_ERRS, si_ctlp,

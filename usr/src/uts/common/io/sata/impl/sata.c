@@ -3413,8 +3413,9 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
 	 * If device is in reset condition, reject the packet with
 	 * TRAN_BUSY
 	 */
-	if (sdinfo->satadrv_event_flags &
-	    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET)) {
+	if ((sdinfo->satadrv_event_flags &
+	    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET)) &&
+	    !ddi_in_panic()) {
 		spx->txlt_scsi_pkt->pkt_reason = CMD_INCOMPLETE;
 		SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 		    "sata_scsi_start: rejecting command because "
@@ -5472,7 +5473,7 @@ sata_txlt_synchronize_cache(sata_pkt_txlate_t *spx)
 static int
 sata_hba_start(sata_pkt_txlate_t *spx, int *rval)
 {
-	int stat;
+	int stat, cport;
 	sata_hba_inst_t *sata_hba_inst = spx->txlt_sata_hba_inst;
 	sata_drive_info_t *sdinfo;
 	sata_device_t *sata_device;
@@ -5480,8 +5481,9 @@ sata_hba_start(sata_pkt_txlate_t *spx, int *rval)
 	struct sata_cmd_flags cmd_flags;
 
 	ASSERT(spx->txlt_sata_pkt != NULL);
-	ASSERT(mutex_owned(&SATA_CPORT_MUTEX(spx->txlt_sata_hba_inst,
-	    spx->txlt_sata_pkt->satapkt_device.satadev_addr.cport)));
+
+	cport = SATA_TXLT_CPORT(spx);
+	ASSERT(mutex_owned(&SATA_CPORT_MUTEX(sata_hba_inst, cport)));
 
 	sdinfo = sata_get_device_info(sata_hba_inst,
 	    &spx->txlt_sata_pkt->satapkt_device);
@@ -5499,8 +5501,7 @@ sata_hba_start(sata_pkt_txlate_t *spx, int *rval)
 	cmd_flags = spx->txlt_sata_pkt->satapkt_cmd.satacmd_flags;
 	sata_device = &spx->txlt_sata_pkt->satapkt_device;
 
-	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
-	    sdinfo->satadrv_addr.cport)));
+	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "Sata cmd 0x%2x\n", cmd);
@@ -5508,8 +5509,8 @@ sata_hba_start(sata_pkt_txlate_t *spx, int *rval)
 	stat = (*SATA_START_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst),
 	    spx->txlt_sata_pkt);
 
-	mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
-	    sdinfo->satadrv_addr.cport)));
+	mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
+	sdinfo = sata_get_device_info(sata_hba_inst, sata_device);
 	/*
 	 * If sata pkt was accepted and executed in asynchronous mode, i.e.
 	 * with the sata callback, the sata_pkt could be already destroyed
@@ -5579,16 +5580,15 @@ sata_hba_start(sata_pkt_txlate_t *spx, int *rval)
 		 * that rejected the command, command was not sent to
 		 * an attached device.
 		 */
-		mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
-		    sdinfo->satadrv_addr.cport)));
-		(void) sata_txlt_invalid_command(spx);
-		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
-		    sdinfo->satadrv_addr.cport)));
-
-		if (sdinfo->satadrv_state & SATA_DSTATE_RESET)
+		if ((sdinfo != NULL) &&
+		    (sdinfo->satadrv_state & SATA_DSTATE_RESET))
 			SATADBG1(SATA_DBG_EVENTS, sata_hba_inst,
 			    "sat_hba_start: cmd 0x%2x rejected "
 			    "with SATA_TRAN_CMD_UNSUPPORTED status\n", cmd);
+
+		mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
+		(void) sata_txlt_invalid_command(spx);
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
 
 		*rval = TRAN_ACCEPT;
 		break;
