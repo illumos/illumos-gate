@@ -55,6 +55,7 @@ static int adt_selected(struct adt_event_state *, au_event_t, int);
 static int adt_init(adt_internal_state_t *, int);
 static int adt_import(adt_internal_state_t *, const adt_export_data_t *);
 static m_label_t *adt_ucred_label(ucred_t *);
+static void adt_setto_unaudited(adt_internal_state_t *);
 
 #ifdef C2_DEBUG
 #define	DPRINTF(x) {printf x; }
@@ -1647,7 +1648,7 @@ adt_set_from_ucred(const adt_session_data_t *session_data, const ucred_t *uc,
 	assert(state->as_check == ADT_VALID);
 
 	if (ucred == NULL) {
-		ucred = ucred_get(getpid());
+		ucred = ucred_get(P_MYID);
 
 		if (ucred == NULL)
 			goto return_rc;
@@ -1663,11 +1664,11 @@ adt_set_from_ucred(const adt_session_data_t *session_data, const ucred_t *uc,
 		} else {
 			tid = NULL;
 		}
-		/* if unaudited, adt_newuser cleans up */
 		if (ucred_getauid(ucred) == AU_NOAUDITID) {
-			if ((rc = adt_newuser(state, ucred_getruid(ucred),
-			    tid)) != 0)
-				goto return_rc;
+			adt_setto_unaudited(state);
+			state->as_have_user_data = ADT_HAVE_ALL;
+			rc = 0;
+			goto return_rc;
 		} else {
 			state->as_info.ai_auid = ucred_getauid(ucred);
 			state->as_info.ai_asid = ucred_getasid(ucred);
