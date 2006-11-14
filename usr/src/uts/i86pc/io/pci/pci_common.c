@@ -296,6 +296,9 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			(void) (*psm_intr_ops)(rdip, hdlp,
 			    PSM_INTR_OP_ALLOC_VECTORS, result);
 
+			if (*(int *)result == 0)
+				return (DDI_INTR_NOTFOUND);
+
 			/* verify behavior flag and take appropriate action */
 			if ((behavior == DDI_INTR_ALLOC_STRICT) &&
 			    (*(int *)result < hdlp->ih_scratch1)) {
