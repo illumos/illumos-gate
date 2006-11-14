@@ -102,7 +102,7 @@ check_address(const char *prog,
 	boolean_t match_found = B_FALSE;
 
 	(void) memset(&hints, 0, sizeof (hints));
-	hints.ai_flags = AI_CANONNAME|AI_V4MAPPED|AI_ADDRCONFIG;
+	hints.ai_flags = AI_CANONNAME|AI_V4MAPPED|AI_ADDRCONFIG|AI_ALL;
 	hints.ai_family = fromp->ss_family;
 	if (getaddrinfo(hostname, NULL, &hints, &res) == 0) {
 		match_found = find_match(res, fromp, sin, sin6);
