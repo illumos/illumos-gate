@@ -341,12 +341,14 @@ i915_sun_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		if (softc->agp_master != NULL)
 			agpmaster_detach(&softc->agp_master);
 
-		/* free PCI config access handle */
-		pci_config_teardown(softc->pci_cfg_hdlp);
+		if (softc->pci_cfg_hdlp) {
+			/* free PCI config access handle */
+			pci_config_teardown(softc->pci_cfg_hdlp);
 
-		/* free PCI configuration handle */
-		kmem_free((void *)softc->pci_cfg_hdlp,
-		    (sizeof (ddi_acc_handle_t)));
+			/* free PCI configuration handle */
+			kmem_free((void *)softc->pci_cfg_hdlp,
+			    (sizeof (ddi_acc_handle_t)));
+		}
 
 		/* graphics misc module detach */
 		(void) gfxp_vgatext_detach(devi, DDI_DETACH, softc->ds_gfx);
