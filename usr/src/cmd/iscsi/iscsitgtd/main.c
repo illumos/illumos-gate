@@ -155,90 +155,6 @@ cmd_table_t cmd_table[] = {
 
 /*
  * []----
- * | scan_for_luns -- scan target for missing luns
- * |
- * | Checks to see if there are any LUs not in the target node which
- * | exist in the target directory and adds them. Also checks to see
- * | if there are LUs in the target node which are not present in the
- * | directory and removes them.
- * |
- * | NOTE: This routine expects that the targ_dir has already been
- * | verified to exist and is a directory
- * []----
- */
-static void
-scan_for_luns(xml_node_t *targ, char *targ_dir)
-{
-	xml_node_t	*lun_list	= NULL,
-			*lun		= NULL;
-	Boolean_t	changes_made	= False;
-	DIR		*dp;
-	struct dirent	*de;
-	fd_set		lu_bits;
-	int		l;
-
-	FD_ZERO(&lu_bits);
-
-	if ((lun_list = xml_node_next(targ, XML_ELEMENT_LUNLIST, NULL)) ==
-	    NULL) {
-		/*
-		 * Most likely have an older configuration file that
-		 * didn't list the LUs assocated with each target. No problem.
-		 * Create a node and add it to the target.
-		 */
-		lun_list = xml_alloc_node(XML_ELEMENT_LUNLIST, String, "");
-		(void) xml_add_child(targ, lun_list);
-		changes_made = True;
-	} else {
-		/*
-		 * Build up a bit mask of the current LU set. This will be
-		 * used to see if a LU already exists or not.
-		 * When a LU is found the bit will be checked. If it's
-		 * set then we know the current tree is correct for that
-		 * LU and the bit will be cleared. If it's not set we're
-		 * missing that LU and it will be added.
-		 * Once we've got through the list any bits that are still
-		 * set means that LU node in the tree should be removed.
-		 */
-		while ((lun = xml_node_next(lun_list, XML_ELEMENT_LUN, lun)) !=
-		    NULL) {
-			(void) xml_find_value_int(lun, XML_ELEMENT_LUN, &l);
-			FD_SET(l, &lu_bits);
-		}
-	}
-
-	dp = opendir(targ_dir);
-	assert(dp != NULL);
-	while ((de = readdir(dp)) != NULL) {
-		if ((strcmp(de->d_name, ".") == 0) ||
-		    (strcmp(de->d_name, "..") == 0))
-			continue;
-		/* ---- Look for the LU backing store files ---- */
-		if (strncmp(de->d_name, LUNBASE, sizeof (LUNBASE) - 1) != 0)
-			continue;
-
-		l = atoi(&de->d_name[sizeof (LUNBASE) - 1]);
-		if (FD_ISSET(l, &lu_bits) == 0) {
-			lun =  xml_alloc_node(XML_ELEMENT_LUN, Int, &l);
-			(void) xml_add_child(lun_list, lun);
-			changes_made = True;
-		} else
-			FD_CLR(l, &lu_bits);
-	}
-	closedir(dp);
-	for (l = 0; l < FD_SETSIZE; l++) {
-		if (FD_ISSET(l, &lu_bits)) {
-			lun = xml_alloc_node(XML_ELEMENT_LUN, Int, &l);
-			(void) xml_remove_child(lun_list, lun, MatchBoth);
-			xml_tree_free(lun);
-			changes_made = True;
-		}
-	}
-	if (changes_made == True)
-		(void) update_config_targets(NULL);
-}
-/*
- * []----
  * | process_target_config -- Load up the targets into memory
  * []----
  */
@@ -346,7 +262,6 @@ process_target_config()
 			if ((ss.st_mode & S_IFDIR) == 0) {
 				continue;
 			}
-			scan_for_luns(next, path);
 			free(target);
 		}
 		if (xml_fd != -1)
