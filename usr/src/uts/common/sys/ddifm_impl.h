@@ -64,7 +64,8 @@ struct i_ddi_fmc_entry {
 };
 
 struct i_ddi_fmc {
-	kmutex_t fc_lock;			/* exclusive cache access */
+	kmutex_t fc_lock;			/* cache active access */
+	kmutex_t fc_free_lock;			/* cache freelist access */
 	int fc_len;				/* length of FM cache array */
 	struct i_ddi_fmc_entry *fc_elems;	/* FM cache array */
 	struct i_ddi_fmc_entry *fc_free;	/* free list */

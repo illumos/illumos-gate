@@ -188,6 +188,7 @@ i_ndi_fmc_create(ndi_fmc_t **fcpp, int qlen, ddi_iblock_cookie_t ibc)
 
 	fcp = kmem_zalloc(sizeof (ndi_fmc_t), KM_SLEEP);
 	mutex_init(&fcp->fc_lock, NULL, MUTEX_DRIVER, ibc);
+	mutex_init(&fcp->fc_free_lock, NULL, MUTEX_DRIVER, NULL);
 
 	/* Preallocate and initialize entries for this fm cache */
 	fcp->fc_elems = kmem_zalloc(qlen * sizeof (ndi_fmcentry_t), KM_SLEEP);
@@ -230,7 +231,7 @@ fmc_grow(ndi_fmc_t *fcp, int flag, int grow_sz)
 	ndi_fmcentry_t *ncp, *oep, *nep, *nnep;
 
 	ASSERT(grow_sz);
-	ASSERT(MUTEX_HELD(&fcp->fc_lock));
+	ASSERT(MUTEX_HELD(&fcp->fc_free_lock));
 
 	/* Allocate a new cache */
 	nlen = grow_sz + fcp->fc_len;
@@ -335,7 +336,7 @@ ndi_fmc_insert(dev_info_t *dip, int flag, void *resource, void *bus_specific)
 	}
 	ASSERT(*fpp == NULL);
 
-	mutex_enter(&fcp->fc_lock);
+	mutex_enter(&fcp->fc_free_lock);
 
 	/* Get an entry from the free list */
 	fep = fcp->fc_free;
@@ -347,13 +348,14 @@ ndi_fmc_insert(dev_info_t *dip, int flag, void *resource, void *bus_specific)
 			/* Unable to get an entry or grow this cache */
 			atomic_add_64(
 			    &fmhdl->fh_kstat.fek_fmc_full.value.ui64, 1);
-			mutex_exit(&fcp->fc_lock);
+			mutex_exit(&fcp->fc_free_lock);
 			return;
 		}
 		atomic_add_64(&fmhdl->fh_kstat.fek_fmc_grew.value.ui64, 1);
 		fep = fcp->fc_free;
 	}
 	fcp->fc_free = fep->fce_prev;
+	mutex_exit(&fcp->fc_free_lock);
 
 	/*
 	 * Set-up the handle resource and bus_specific information.
@@ -365,6 +367,7 @@ ndi_fmc_insert(dev_info_t *dip, int flag, void *resource, void *bus_specific)
 	*fpp = fep;
 
 	/* Add entry to the end of the active list */
+	mutex_enter(&fcp->fc_lock);
 	fep->fce_prev = fcp->fc_tail;
 	fcp->fc_tail->fce_next = fep;
 	fcp->fc_tail = fep;
@@ -404,7 +407,6 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
 
 		ASSERT(fcp);
 
-		mutex_enter(&fcp->fc_lock);
 		fep = ((ddi_dma_impl_t *)resource)->dmai_error.err_fep;
 		((ddi_dma_impl_t *)resource)->dmai_error.err_fep = NULL;
 	} else if (flag == ACC_HANDLE) {
@@ -417,7 +419,6 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
 
 		ASSERT(fcp);
 
-		mutex_enter(&fcp->fc_lock);
 		fep = ((ddi_acc_impl_t *)resource)->ahi_err->err_fep;
 		((ddi_acc_impl_t *)resource)->ahi_err->err_fep = NULL;
 	}
@@ -425,21 +426,22 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
 	/*
 	 * Resource not in cache, return
 	 */
-	if (fep == NULL) {
-		mutex_exit(&fcp->fc_lock);
+	if (fep == NULL)
 		return;
-	}
 
+	mutex_enter(&fcp->fc_lock);
 	fep->fce_prev->fce_next = fep->fce_next;
 	if (fep == fcp->fc_tail)
 		fcp->fc_tail = fep->fce_prev;
 	else
 		fep->fce_next->fce_prev = fep->fce_prev;
+	mutex_exit(&fcp->fc_lock);
 
 	/* Add entry back to the free list */
+	mutex_enter(&fcp->fc_free_lock);
 	fep->fce_prev = fcp->fc_free;
 	fcp->fc_free = fep;
-	mutex_exit(&fcp->fc_lock);
+	mutex_exit(&fcp->fc_free_lock);
 }
 
 int
