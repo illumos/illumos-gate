@@ -1283,6 +1283,8 @@ extern int SAMESTR(queue_t *);
 #define	DB_CKSUMFLAGS(mp)	((mp)->b_datap->db_struioun.cksum.flags)
 #define	DB_CKSUM16(mp)		((mp)->b_datap->db_cksum16)
 #define	DB_CKSUM32(mp)		((mp)->b_datap->db_cksum32)
+#define	DB_LSOFLAGS(mp)		((mp)->b_datap->db_struioun.cksum.flags)
+#define	DB_LSOMSS(mp)		((mp)->b_datap->db_struioun.cksum.pad)
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

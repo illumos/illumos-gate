@@ -307,6 +307,10 @@ typedef struct tcp_stat {
 	kstat_named_t	tcp_fusion_rrw_plugged;
 	kstat_named_t	tcp_in_ack_unsent_drop;
 	kstat_named_t	tcp_sock_fallback;
+	kstat_named_t	tcp_lso_enabled;
+	kstat_named_t	tcp_lso_disabled;
+	kstat_named_t	tcp_lso_times;
+	kstat_named_t	tcp_lso_pkt_out;
 } tcp_stat_t;
 
 extern tcp_stat_t tcp_statistics;

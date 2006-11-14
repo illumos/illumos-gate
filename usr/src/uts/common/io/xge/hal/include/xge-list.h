@@ -17,23 +17,16 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xge-list.h
- *
- *  Description:  Generic bi-directional linked list implementation
- *
- *  Created:      14 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_LIST_H
 #define XGE_LIST_H
 
 #include "xge-debug.h"
+
+__EXTERN_BEGIN_DECLS
 
 /**
  * struct xge_list_t - List item.
@@ -73,6 +66,26 @@ static inline int xge_list_is_empty(xge_list_t *header)
     xge_assert(header != NULL);
 
     return header->next == header;
+}
+
+/**
+ * xge_list_first_get - Return the first item from the linked list.
+ * header: first element of the list (head)
+ *
+ * Returns the next item from the header.
+ * Returns NULL if the next item is header itself
+ * See also: xge_list_remove(), xge_list_insert(), xge_list_t{}.
+ */
+static inline xge_list_t *xge_list_first_get(xge_list_t *header)
+{
+	xge_assert(header != NULL);
+	xge_assert(header->next != NULL);
+	xge_assert(header->prev != NULL);
+
+	if(header->next == header)
+		return NULL;
+	else
+		return header->next;
 }
 
 /**
@@ -171,5 +184,7 @@ static inline void xge_list_insert_before (xge_list_t *new_item,
  * Return the offset of the member @m in the structure @t.
  */
 #define xge_offsetof(t, m) ((size_t) (&((t *)0)->m))
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_LIST_H */

@@ -17,10 +17,12 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
+ *
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef BUILD_VERSION_H
 #define BUILD_VERSION_H
 /* Do not edit! Automatically generated when released.*/
-#define GENERATED_BUILD_VERSION "4254"
+#define GENERATED_BUILD_VERSION "6765"
 #endif /* BUILD_VERSION_H */

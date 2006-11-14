@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-fifo.h
- *
- *  Description:  Tx fifo object functionality
- *
- *  Created:      19 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_HAL_FIFO_H
@@ -36,6 +27,8 @@
 #include "xgehal-channel.h"
 #include "xgehal-config.h"
 #include "xgehal-mm.h"
+
+__EXTERN_BEGIN_DECLS
 
 /* HW fifo configuration */
 #define	XGE_HAL_FIFO_INT_PER_LIST_THRESHOLD	65
@@ -106,7 +99,7 @@ typedef struct xge_hal_fifo_txd_t {
 #define XGE_HAL_TXD_LSO_COF_CTRL(val)   vBIT(val,30,2)
 #define XGE_HAL_TXD_TCP_LSO_MSS(val)    vBIT(val,34,14)
 #define XGE_HAL_TXD_BUFFER0_SIZE(val)   vBIT(val,48,16)
-
+#define XGE_HAL_TXD_GET_LSO_BYTES_SENT(val) ((val & vBIT(0xFFFF,16,16))>>32)
 	u64 control_2;
 #define XGE_HAL_TXD_TX_CKO_CONTROL      (BIT(5)|BIT(6)|BIT(7))
 #define XGE_HAL_TXD_TX_CKO_IPV4_EN      BIT(5)
@@ -162,6 +155,7 @@ typedef struct xge_hal_fifo_t {
 	int			txdl_size;
 	int			priv_size;
 	xge_hal_mempool_t	*mempool;
+	int			align_size;
 } __xge_os_attr_cacheline_aligned xge_hal_fifo_t;
 
 /**
@@ -225,6 +219,8 @@ typedef struct xge_hal_fifo_txdl_priv_t {
 	int					align_used_frags;
 	int					alloc_frags;
 	int					dang_frags;
+	unsigned int				bytes_sent;
+	int					unused;
 	xge_hal_fifo_txd_t			*dang_txdl;
 	struct xge_hal_fifo_txdl_priv_t		*next_txdl_priv;
 	xge_hal_fifo_txd_t			*first_txdp;
@@ -331,10 +327,15 @@ xge_hal_fifo_dtr_cksum_set_bits(xge_hal_dtr_h dtrh, u64 cksum_bits);
 __HAL_STATIC_FIFO __HAL_INLINE_FIFO void
 xge_hal_fifo_dtr_vlan_set(xge_hal_dtr_h	dtrh, u16 vlan_tag);
 
+__HAL_STATIC_FIFO __HAL_INLINE_FIFO xge_hal_status_e
+xge_hal_fifo_is_next_dtr_completed(xge_hal_channel_h channelh);
+
 #else /* XGE_FASTPATH_EXTERN */
 #define __HAL_STATIC_FIFO static
 #define __HAL_INLINE_FIFO inline
 #include "xgehal-fifo-fp.c"
 #endif /* XGE_FASTPATH_INLINE */
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_HAL_FIFO_H */

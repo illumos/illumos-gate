@@ -170,6 +170,12 @@ struct dld_str {
 	boolean_t		ds_soft_ring;
 
 	/*
+	 * LSO is enabled if ds_lso is set.
+	 */
+	boolean_t		ds_lso;
+	uint64_t		ds_lso_max;
+
+	/*
 	 * State of DLPI user: may be active (regular network layer),
 	 * passive (snoop-like monitoring), or unknown (not yet
 	 * determined).

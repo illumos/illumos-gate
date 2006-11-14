@@ -57,20 +57,23 @@
 extern "C" {
 #endif
 
+#ifdef DEBUG
+#define	XGE_DEBUG_ASSERT
+#endif
+
 /* ------------------------- includes and defines ------------------------- */
 
 #define	XGE_HAL_TX_MULTI_POST_IRQ	1
 #define	XGE_HAL_TX_MULTI_RESERVE_IRQ	1
 #define	XGE_HAL_TX_MULTI_FREE_IRQ	1
-#define	XGE_HAL_RX_MULTI_FREE		1
 #define	XGE_HAL_DMA_DTR_CONSISTENT	1
 #define	XGE_HAL_DMA_STATS_STREAMING	1
 
 #if defined(__sparc)
 #define	XGE_OS_DMA_REQUIRES_SYNC	1
-#define	XGELL_TX_NOMAP_COPY		1
-#define	XGE_HAL_ALIGN_XMIT		1
 #endif
+
+#define	XGE_HAL_ALIGN_XMIT		1
 
 #ifdef _BIG_ENDIAN
 #define	XGE_OS_HOST_BIG_ENDIAN		1
@@ -85,6 +88,10 @@ extern "C" {
 #endif
 
 #define	XGE_OS_HAS_SNPRINTF		1
+
+/* LRO defines */
+#define	XGE_HAL_CONFIG_LRO		0
+#define	XGE_LL_IP_FAST_CSUM(hdr, len)	0 /* ip_ocsum(hdr, len>>1, 0); */
 
 /* ---------------------- fixed size primitive types ----------------------- */
 
@@ -103,6 +110,12 @@ typedef ddi_iblock_cookie_t	pci_irq_h;
 typedef ddi_dma_handle_t	pci_dma_h;
 typedef ddi_acc_handle_t	pci_dma_acc_h;
 
+/* LRO types */
+#define	OS_NETSTACK_BUF		mblk_t *
+#define	OS_LL_HEADER		uint8_t *
+#define	OS_IP_HEADER		uint8_t *
+#define	OS_TL_HEADER		uint8_t *
+
 /* -------------------------- "libc" functionality ------------------------- */
 
 #define	xge_os_strcpy			(void) strcpy
@@ -111,6 +124,9 @@ typedef ddi_acc_handle_t	pci_dma_acc_h;
 #define	xge_os_memzero(addr, size)	bzero(addr, size)
 #define	xge_os_memcpy(dst, src, size)	bcopy(src, dst, size)
 #define	xge_os_memcmp(src1, src2, size)	bcmp(src1, src2, size)
+#define	xge_os_ntohl			ntohl
+#define	xge_os_htons			htons
+#define	xge_os_ntohs			ntohs
 
 #ifdef __GNUC__
 #define	xge_os_printf(fmt...)		cmn_err(CE_CONT, fmt)
@@ -250,8 +266,8 @@ static inline void *__xge_os_dma_malloc(pci_dev_h pdev, unsigned long size,
 
 	ret = ddi_dma_mem_alloc(*p_dmah, size, p_xge_dev_attr,
 	    (dma_flags & XGE_OS_DMA_CONSISTENT ?
-		DDI_DMA_CONSISTENT : DDI_DMA_STREAMING),
-	    DDI_DMA_DONTWAIT, 0, (caddr_t *)&vaddr, &real_size, p_dma_acch);
+	    DDI_DMA_CONSISTENT : DDI_DMA_STREAMING), DDI_DMA_DONTWAIT, 0,
+	    (caddr_t *)&vaddr, &real_size, p_dma_acch);
 	if (ret != DDI_SUCCESS) {
 		ddi_dma_free_handle(p_dmah);
 		return (NULL);

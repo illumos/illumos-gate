@@ -82,22 +82,13 @@ TRACE_CFLAGS 	= -DXGE_DEBUG_MODULE_MASK=0x00003010 \
 		-DXGE_DEBUG_TRACE_MASK=0x00000000  \
 		-DXGE_DEBUG_ERR_MASK=0x00003010
 
-#
-#	ASSERT/DEBUG SECTION: Disable/enable assert and debug mode
-#
-ASSERT_CFLAGS	= -DXGE_DEBUG_ASSERT
-
-#
-#	FAST PATH SECTION: Will activate usage of inlines as a regular functions
-#	on fast data path
-#FP_CFLAGS = -DXGE_DEBUG_FP=0xff
-
-CPPFLAGS	+= $(HAL_CFLAGS) $(TRACE_CFLAGS) $(ASSERT_CFLAGS) $(CCVERBOSE) \
+XGE_CFLAGS	= $(HAL_CFLAGS) $(TRACE_CFLAGS) $(CCVERBOSE) \
 		-I$(UTSBASE)/common/io/xge/hal/include \
 		-I$(UTSBASE)/common/io/xge/hal/xgehal \
 		-I$(UTSBASE)/common/io/xge/drv -DSOLARIS
 
-CFLAGS		+= $(CPPFLAGS) -xc99=%all
+CFLAGS		+= $(XGE_CFLAGS) -xO4 -xcrossfile -xc99=%all
+CFLAGS64	+= $(XGE_CFLAGS) -xO4 -xcrossfile -xc99=%all
 
 #
 #	Driver depends on MAC & IP
@@ -106,7 +97,7 @@ LDFLAGS		+=  -dy -N misc/mac -N drv/ip
 
 #	Lint flag
 #
-LINTFLAGS	+= $(CPPFLAGS) -Xc99=%all
+LINTFLAGS	+= $(XGE_CFLAGS) -Xc99=%all
 
 #
 # For now, disable these lint checks; maintainers should endeavor

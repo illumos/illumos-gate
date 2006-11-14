@@ -17,23 +17,16 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xge-debug.h
- *
- *  Description:  debug facilities
- *
- *  Created:      6 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_DEBUG_H
 #define XGE_DEBUG_H
 
 #include "xge-os-pal.h"
+
+__EXTERN_BEGIN_DECLS
 
 /* to make some gcc versions happier */
 #ifndef __func__
@@ -87,6 +80,13 @@ extern int *g_level;
  * @XGE_COMPONENT_HAL_RING: do debug for xge core ring module
  * @XGE_COMPONENT_HAL_CHANNEL: do debug for xge core channel module
  * @XGE_COMPONENT_HAL_DEVICE: do debug for xge core device module
+ * @XGE_COMPONENT_HAL_DMQ: do debug for xge core DMQ module
+ * @XGE_COMPONENT_HAL_UMQ: do debug for xge core UMQ module
+ * @XGE_COMPONENT_HAL_SQ: do debug for xge core SQ module
+ * @XGE_COMPONENT_HAL_SRQ: do debug for xge core SRQ module
+ * @XGE_COMPONENT_HAL_CRQ: do debug for xge core CRQ module
+ * @XGE_COMPONENT_HAL_LRQ: do debug for xge core LRQ module
+ * @XGE_COMPONENT_HAL_LCQ: do debug for xge core LCQ module
  * @XGE_COMPONENT_CORE: do debug for xge KMA core module
  * @XGE_COMPONENT_OSDEP: do debug for xge KMA os dependent parts
  * @XGE_COMPONENT_LL: do debug for xge link layer module
@@ -96,17 +96,28 @@ extern int *g_level;
  * or libraries during compilation and runtime.  Makefile must declare
  * XGE_DEBUG_MODULE_MASK macro and set it to proper value.
  */
-#define XGE_COMPONENT_HAL_CONFIG		0x1
-#define	XGE_COMPONENT_HAL_FIFO			0x2
-#define	XGE_COMPONENT_HAL_RING			0x4
-#define	XGE_COMPONENT_HAL_CHANNEL		0x8
-#define	XGE_COMPONENT_HAL_DEVICE		0x10
-#define	XGE_COMPONENT_HAL_MM			0x20
-#define	XGE_COMPONENT_HAL_QUEUE		        0x40
-#define	XGE_COMPONENT_HAL_STATS		        0x100
+#define XGE_COMPONENT_HAL_CONFIG		0x00000001
+#define	XGE_COMPONENT_HAL_FIFO			0x00000002
+#define	XGE_COMPONENT_HAL_RING			0x00000004
+#define	XGE_COMPONENT_HAL_CHANNEL		0x00000008
+#define	XGE_COMPONENT_HAL_DEVICE		0x00000010
+#define	XGE_COMPONENT_HAL_MM			0x00000020
+#define	XGE_COMPONENT_HAL_QUEUE		        0x00000040
+#define	XGE_COMPONENT_HAL_STATS		        0x00000100
+#ifdef XGEHAL_RNIC
+#define	XGE_COMPONENT_HAL_DMQ		        0x00000200
+#define	XGE_COMPONENT_HAL_UMQ		        0x00000400
+#define	XGE_COMPONENT_HAL_SQ		        0x00000800
+#define	XGE_COMPONENT_HAL_SRQ		        0x00001000
+#define	XGE_COMPONENT_HAL_CQRQ		        0x00002000
+#define	XGE_COMPONENT_HAL_LRQ		        0x00004000
+#define	XGE_COMPONENT_HAL_LCQ		        0x00008000
+#define	XGE_COMPONENT_HAL_POOL		        0x00010000
+#endif
+
 	/* space for CORE_XXX */
-#define	XGE_COMPONENT_OSDEP			0x1000
-#define	XGE_COMPONENT_LL			0x2000
+#define	XGE_COMPONENT_OSDEP			0x10000000
+#define	XGE_COMPONENT_LL			0x20000000
 #define	XGE_COMPONENT_ALL			0xffffffff
 
 #ifndef XGE_DEBUG_MODULE_MASK
@@ -303,6 +314,154 @@ static inline void xge_debug_device(xge_debug_level_e level, char *fmt, ...) {}
 #endif /* __GNUC__ */
 #endif
 
+#ifdef XGEHAL_RNIC
+
+#if (XGE_COMPONENT_HAL_DMQ & XGE_DEBUG_MODULE_MASK)
+#ifndef __GNUC__
+static inline void xge_debug_dmq(xge_debug_level_e level, char *fmt, ...) {
+	u32 module = XGE_COMPONENT_HAL_DMQ;
+	xge_debug(module, level, fmt);
+}
+#else /* __GNUC__ */
+#define xge_debug_dmq(level, fmt...) \
+	xge_debug(XGE_COMPONENT_HAL_DMQ, level, fmt)
+#endif /* __GNUC__ */
+#else
+#ifndef __GNUC__
+static inline void xge_debug_dmq(xge_debug_level_e level, char *fmt, ...) {}
+#else /* __GNUC__ */
+#define xge_debug_dmq(level, fmt...)
+#endif /* __GNUC__ */
+#endif
+
+#if (XGE_COMPONENT_HAL_UMQ & XGE_DEBUG_MODULE_MASK)
+#ifndef __GNUC__
+static inline void xge_debug_umq(xge_debug_level_e level, char *fmt, ...) {
+	u32 module = XGE_COMPONENT_HAL_UMQ;
+	xge_debug(module, level, fmt);
+}
+#else /* __GNUC__ */
+#define xge_debug_umq(level, fmt...) \
+	xge_debug(XGE_COMPONENT_HAL_UMQ, level, fmt)
+#endif /* __GNUC__ */
+#else
+#ifndef __GNUC__
+static inline void xge_debug_umq(xge_debug_level_e level, char *fmt, ...) {}
+#else /* __GNUC__ */
+#define xge_debug_umq(level, fmt...)
+#endif /* __GNUC__ */
+#endif
+
+#if (XGE_COMPONENT_HAL_SQ & XGE_DEBUG_MODULE_MASK)
+#ifndef __GNUC__
+static inline void xge_debug_sq(xge_debug_level_e level, char *fmt, ...) {
+	u32 module = XGE_COMPONENT_HAL_SQ;
+	xge_debug(module, level, fmt);
+}
+#else /* __GNUC__ */
+#define xge_debug_sq(level, fmt...) \
+	xge_debug(XGE_COMPONENT_HAL_SQ, level, fmt)
+#endif /* __GNUC__ */
+#else
+#ifndef __GNUC__
+static inline void xge_debug_sq(xge_debug_level_e level, char *fmt, ...) {}
+#else /* __GNUC__ */
+#define xge_debug_sq(level, fmt...)
+#endif /* __GNUC__ */
+#endif
+
+#if (XGE_COMPONENT_HAL_SRQ & XGE_DEBUG_MODULE_MASK)
+#ifndef __GNUC__
+static inline void xge_debug_srq(xge_debug_level_e level, char *fmt, ...) {
+	u32 module = XGE_COMPONENT_HAL_SRQ;
+	xge_debug(module, level, fmt);
+}
+#else /* __GNUC__ */
+#define xge_debug_srq(level, fmt...) \
+	xge_debug(XGE_COMPONENT_HAL_SRQ, level, fmt)
+#endif /* __GNUC__ */
+#else
+#ifndef __GNUC__
+static inline void xge_debug_srq(xge_debug_level_e level, char *fmt, ...) {}
+#else /* __GNUC__ */
+#define xge_debug_srq(level, fmt...)
+#endif /* __GNUC__ */
+#endif
+
+#if (XGE_COMPONENT_HAL_CQRQ & XGE_DEBUG_MODULE_MASK)
+#ifndef __GNUC__
+static inline void xge_debug_cqrq(xge_debug_level_e level, char *fmt, ...) {
+	u32 module = XGE_COMPONENT_HAL_CQRQ;
+	xge_debug(module, level, fmt);
+}
+#else /* __GNUC__ */
+#define xge_debug_cqrq(level, fmt...) \
+	xge_debug(XGE_COMPONENT_HAL_CQRQ, level, fmt)
+#endif /* __GNUC__ */
+#else
+#ifndef __GNUC__
+static inline void xge_debug_cqrq(xge_debug_level_e level, char *fmt, ...) {}
+#else /* __GNUC__ */
+#define xge_debug_cqrq(level, fmt...)
+#endif /* __GNUC__ */
+#endif
+
+#if (XGE_COMPONENT_HAL_LRQ & XGE_DEBUG_MODULE_MASK)
+#ifndef __GNUC__
+static inline void xge_debug_lrq(xge_debug_level_e level, char *fmt, ...) {
+	u32 module = XGE_COMPONENT_HAL_LRQ;
+	xge_debug(module, level, fmt);
+}
+#else /* __GNUC__ */
+#define xge_debug_lrq(level, fmt...) \
+	xge_debug(XGE_COMPONENT_HAL_LRQ, level, fmt)
+#endif /* __GNUC__ */
+#else
+#ifndef __GNUC__
+static inline void xge_debug_lrq(xge_debug_level_e level, char *fmt, ...) {}
+#else /* __GNUC__ */
+#define xge_debug_lrq(level, fmt...)
+#endif /* __GNUC__ */
+#endif
+
+#if (XGE_COMPONENT_HAL_LCQ & XGE_DEBUG_MODULE_MASK)
+#ifndef __GNUC__
+static inline void xge_debug_lcq(xge_debug_level_e level, char *fmt, ...) {
+	u32 module = XGE_COMPONENT_HAL_LCQ;
+	xge_debug(module, level, fmt);
+}
+#else /* __GNUC__ */
+#define xge_debug_lcq(level, fmt...) \
+	xge_debug(XGE_COMPONENT_HAL_LCQ, level, fmt)
+#endif /* __GNUC__ */
+#else
+#ifndef __GNUC__
+static inline void xge_debug_lcq(xge_debug_level_e level, char *fmt, ...) {}
+#else /* __GNUC__ */
+#define xge_debug_lcq(level, fmt...)
+#endif /* __GNUC__ */
+#endif
+
+#if (XGE_COMPONENT_HAL_POOL & XGE_DEBUG_MODULE_MASK)
+#ifndef __GNUC__
+static inline void xge_debug_pool(xge_debug_level_e level, char *fmt, ...) {
+	u32 module = XGE_COMPONENT_HAL_POOL;
+	xge_debug(module, level, fmt);
+}
+#else /* __GNUC__ */
+#define xge_debug_pool(level, fmt...) \
+	xge_debug(XGE_COMPONENT_HAL_POOL, level, fmt)
+#endif /* __GNUC__ */
+#else
+#ifndef __GNUC__
+static inline void xge_debug_pool(xge_debug_level_e level, char *fmt, ...) {}
+#else /* __GNUC__ */
+#define xge_debug_pool(level, fmt...)
+#endif /* __GNUC__ */
+#endif
+
+#endif
+
 #if (XGE_COMPONENT_OSDEP & XGE_DEBUG_MODULE_MASK)
 #ifndef __GNUC__
 static inline void xge_debug_osdep(xge_debug_level_e level, char *fmt, ...) {
@@ -350,6 +509,14 @@ static inline void xge_debug_fifo(xge_debug_level_e level, char *fmt, ...) {}
 static inline void xge_debug_ring(xge_debug_level_e level, char *fmt, ...) {}
 static inline void xge_debug_channel(xge_debug_level_e level, char *fmt, ...) {}
 static inline void xge_debug_device(xge_debug_level_e level, char *fmt, ...) {}
+static inline void xge_debug_dmq(xge_debug_level_e level, char *fmt, ...) {}
+static inline void xge_debug_umq(xge_debug_level_e level, char *fmt, ...) {}
+static inline void xge_debug_sq(xge_debug_level_e level, char *fmt, ...) {}
+static inline void xge_debug_srq(xge_debug_level_e level, char *fmt, ...) {}
+static inline void xge_debug_cqrq(xge_debug_level_e level, char *fmt, ...) {}
+static inline void xge_debug_lrq(xge_debug_level_e level, char *fmt, ...) {}
+static inline void xge_debug_lcq(xge_debug_level_e level, char *fmt, ...) {}
+static inline void xge_debug_pool(xge_debug_level_e level, char *fmt, ...) {}
 static inline void xge_debug_hal(xge_debug_level_e level, char *fmt, ...) {}
 static inline void xge_debug_osdep(xge_debug_level_e level, char *fmt, ...) {}
 static inline void xge_debug_ll(xge_debug_level_e level, char *fmt, ...) {}
@@ -374,5 +541,7 @@ static inline void xge_debug_ll(xge_debug_level_e level, char *fmt, ...) {}
 #else
 #define xge_assert(test)
 #endif /* end of XGE_DEBUG_ASSERT */
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_DEBUG_H */

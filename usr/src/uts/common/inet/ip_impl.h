@@ -359,11 +359,38 @@ typedef struct ip_mdt_info_s {
 	ill->ill_mdt_capab->ill_mdt_version == MDT_VERSION_2 &&		\
 	ill->ill_mdt_capab->ill_mdt_on != 0)
 
+#define	ILL_LSO_CAPABLE(ill)		\
+	(((ill)->ill_capabilities & ILL_CAPAB_LSO) != 0)
+
+/*
+ * ioctl identifier and structure for Large Segment Offload
+ * private M_CTL communication from IP to ULP.
+ */
+#define	LSO_IOC_INFO_UPDATE	(('L' << 24) + ('S' << 16) + ('O' << 8))
+
+typedef struct ip_lso_info_s {
+	uint_t	lso_info_id;	/* LSO_IOC_INFO_UPDATE */
+	ill_lso_capab_t	lso_capab; /* ILL LSO capabilities */
+} ip_lso_info_t;
+
+/*
+ * Macro that determines whether or not a given ILL is allowed for LSO.
+ */
+#define	ILL_LSO_USABLE(ill)						\
+	(ILL_LSO_CAPABLE(ill) &&					\
+	ill->ill_lso_capab != NULL &&					\
+	ill->ill_lso_capab->ill_lso_version == LSO_VERSION_1 &&		\
+	ill->ill_lso_capab->ill_lso_on != 0)
+
+#define	ILL_LSO_TCP_USABLE(ill)						\
+	(ILL_LSO_USABLE(ill) &&						\
+	ill->ill_lso_capab->ill_lso_flags & LSO_TX_BASIC_TCP_IPV4)
+
 /*
  * Macro that determines whether or not a given CONN may be considered
- * for fast path prior to proceeding further with Multidata.
+ * for fast path prior to proceeding further with LSO or Multidata.
  */
-#define	CONN_IS_MD_FASTPATH(connp)	\
+#define	CONN_IS_LSO_MD_FASTPATH(connp)	\
 	((connp)->conn_dontroute == 0 &&	/* SO_DONTROUTE */	\
 	!((connp)->conn_nexthop_set) &&		/* IP_NEXTHOP */	\
 	(connp)->conn_nofailover_ill == NULL &&	/* IPIF_NOFAILOVER */	\

@@ -17,23 +17,16 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-mgmtaux.h
- *
- *  Description:  management auxiliary API
- *
- *  Created:      1 September 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_HAL_MGMTAUX_H
 #define XGE_HAL_MGMTAUX_H
 
 #include "xgehal-mgmt.h"
+
+__EXTERN_BEGIN_DECLS
 
 #define XGE_HAL_AUX_SEPA		' '
 
@@ -83,4 +76,7 @@ xge_hal_status_e xge_hal_aux_driver_config_read(int bufsize, char *retbuf,
 
 xge_hal_status_e xge_hal_aux_device_config_read(xge_hal_device_h devh,
 			int bufsize, char *retbuf, int *retsize);
+
+__EXTERN_END_DECLS
+
 #endif /* XGE_HAL_MGMTAUX_H */

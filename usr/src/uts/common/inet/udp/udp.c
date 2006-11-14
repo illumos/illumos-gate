@@ -6603,12 +6603,12 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 	 * available yet) are sent down the legacy (slow) path
 	 */
 	if ((ire->ire_type & (IRE_BROADCAST|IRE_LOCAL|IRE_LOOPBACK)) ||
-	    (ire->ire_flags & RTF_MULTIRT) || ire->ire_stq == NULL ||
-	    ire->ire_max_frag < ntohs(ipha->ipha_length) ||
-	    (ire->ire_nce != NULL &&
-	    (ire_fp_mp = ire->ire_nce->nce_fp_mp) == NULL) ||
+	    (ire->ire_flags & RTF_MULTIRT) || (ire->ire_stq == NULL) ||
+	    (ire->ire_max_frag < ntohs(ipha->ipha_length)) ||
 	    (connp->conn_nexthop_set) ||
-	    (ire_fp_mp_len = MBLKL(ire_fp_mp)) > MBLKHEAD(mp)) {
+	    (ire->ire_nce == NULL) ||
+	    ((ire_fp_mp = ire->ire_nce->nce_fp_mp) == NULL) ||
+	    ((ire_fp_mp_len = MBLKL(ire_fp_mp)) > MBLKHEAD(mp))) {
 		if (ipif != NULL)
 			ipif_refrele(ipif);
 		UDP_STAT(udp_ip_ire_send);

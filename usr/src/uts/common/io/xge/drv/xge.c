@@ -79,7 +79,7 @@ xge_event(xge_queue_item_t *item)
 	switch (item->event_type) {
 	case XGELL_EVENT_RESCHED_NEEDED:
 		if (lldev->is_initialized) {
-			if (__hal_channel_dtr_count(lldev->fifo_channel)
+			if (xge_hal_channel_dtr_count(lldev->fifo_channel)
 			    >= XGELL_TX_LEVEL_HIGH) {
 				mac_tx_update(lldev->mh);
 				xge_debug_osdep(XGE_TRACE,
@@ -245,12 +245,6 @@ xge_configuration_init(dev_info_t *dev_info,
 	/*
 	 * Initialize common properties
 	 */
-
-	/*
-	 * We prefer HAL could provide all default values to these tunables,
-	 * so this level could care little the configurations need by HAL.
-	 * Leave a const here is definitely not good idea.
-	 */
 	device_config->mtu = ddi_prop_get_int(DDI_DEV_T_ANY,
 	    dev_info, DDI_PROP_DONTPASS, "default_mtu",
 	    XGE_HAL_DEFAULT_INITIAL_MTU);
@@ -275,13 +269,9 @@ xge_configuration_init(dev_info_t *dev_info,
 	device_config->device_poll_millis = ddi_prop_get_int(DDI_DEV_T_ANY,
 	    dev_info, DDI_PROP_DONTPASS, "device_poll_millis",
 	    XGE_HAL_DEFAULT_DEVICE_POLL_MILLIS);
-	/*
-	 * Query PCI bus freqency from parent nexus driver.
-	 * Note this property is only provided on SPARC platforms.
-	 */
 	device_config->pci_freq_mherz = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, 0, "clock-frequency",
-	    XGE_HAL_PCI_FREQ_MHERZ_DEFAULT * 1000000) / 1000000;
+	    dev_info, DDI_PROP_DONTPASS, "pci_freq_mherz",
+	    XGE_HAL_DEFAULT_USE_HARDCODE);
 
 	/*
 	 * Initialize ring properties
@@ -337,7 +327,7 @@ xge_configuration_init(dev_info_t *dev_info,
 	device_config->ring.queue[XGELL_RING_MAIN_QID].configured =
 	    ddi_prop_get_int(DDI_DEV_T_ANY,
 		dev_info, DDI_PROP_DONTPASS, "ring_main_configured",
-		1); /* HAL never provide a good named macro */
+		1);
 	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.urange_a =
 	    ddi_prop_get_int(DDI_DEV_T_ANY,
 		dev_info, DDI_PROP_DONTPASS, "ring_main_urange_a",
@@ -353,7 +343,9 @@ xge_configuration_init(dev_info_t *dev_info,
 	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.ufc_b =
 	    ddi_prop_get_int(DDI_DEV_T_ANY,
 		dev_info, DDI_PROP_DONTPASS, "ring_main_ufc_b",
-		XGE_HAL_DEFAULT_RX_UFC_B);
+		device_config->mtu > XGE_HAL_DEFAULT_MTU ?
+			XGE_HAL_DEFAULT_RX_UFC_B_J :
+			XGE_HAL_DEFAULT_RX_UFC_B_N);
 	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.urange_c =
 	    ddi_prop_get_int(DDI_DEV_T_ANY,
 		dev_info, DDI_PROP_DONTPASS, "ring_main_urange_c",
@@ -361,7 +353,9 @@ xge_configuration_init(dev_info_t *dev_info,
 	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.ufc_c =
 	    ddi_prop_get_int(DDI_DEV_T_ANY,
 		dev_info, DDI_PROP_DONTPASS, "ring_main_ufc_c",
-		XGE_HAL_DEFAULT_RX_UFC_C);
+		device_config->mtu > XGE_HAL_DEFAULT_MTU ?
+			XGE_HAL_DEFAULT_RX_UFC_C_J :
+			XGE_HAL_DEFAULT_RX_UFC_C_N);
 	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.ufc_d =
 	    ddi_prop_get_int(DDI_DEV_T_ANY,
 		dev_info, DDI_PROP_DONTPASS, "ring_main_ufc_d",
@@ -377,24 +371,9 @@ xge_configuration_init(dev_info_t *dev_info,
 	device_config->ring.queue[XGELL_RING_MAIN_QID].indicate_max_pkts =
 	    ddi_prop_get_int(DDI_DEV_T_ANY,
 		dev_info, DDI_PROP_DONTPASS, "ring_main_indicate_max_pkts",
-		XGE_HAL_DEFAULT_INDICATE_MAX_PKTS);
-
-	/* adaptive rx coalesing */
-	device_config->sched_timer_us = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "ring_main_ufc_a_timer",
-	    0);
-	device_config->rxufca_intr_thres = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "rxufca_intr_thres",
-	    35);
-	device_config->rxufca_lo_lim = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "rxufca_lo_lim",
-	    1);
-	device_config->rxufca_hi_lim = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "rxufca_hi_lim",
-	    16);
-	device_config->rxufca_lbolt_period = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "rxufca_lbolt_period",
-	    1);
+		(device_config->bimodal_interrupts ?
+			XGE_HAL_DEFAULT_INDICATE_MAX_PKTS_B :
+			XGE_HAL_DEFAULT_INDICATE_MAX_PKTS_N));
 
 	/*
 	 * Initialize mac properties
@@ -408,6 +387,12 @@ xge_configuration_init(dev_info_t *dev_info,
 	device_config->mac.rmac_bcast_en = ddi_prop_get_int(DDI_DEV_T_ANY,
 	    dev_info, DDI_PROP_DONTPASS, "mac_rmac_bcast_en",
 	    1); /* HAL never provide a good named macro */
+	device_config->mac.rmac_pause_gen_en = ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, "rmac_pause_gen_en",
+	    XGE_HAL_DEFAULT_RMAC_PAUSE_GEN_DIS);
+	device_config->mac.rmac_pause_rcv_en = ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, "rmac_pause_rcv_en",
+	    XGE_HAL_DEFAULT_RMAC_PAUSE_RCV_DIS);
 	device_config->mac.rmac_pause_time = ddi_prop_get_int(DDI_DEV_T_ANY,
 	    dev_info, DDI_PROP_DONTPASS, "mac_rmac_pause_time",
 	    XGE_HAL_DEFAULT_RMAC_HIGH_PTIME);
@@ -435,10 +420,12 @@ xge_configuration_init(dev_info_t *dev_info,
 	    dev_info, DDI_PROP_DONTPASS, "fifo_memblock_size",
 	    XGE_HAL_DEFAULT_FIFO_MEMBLOCK_SIZE);
 #ifdef XGE_HAL_ALIGN_XMIT
-	device_config->fifo.alignment_size =
-	    XGE_HAL_DEFAULT_FIFO_ALIGNMENT_SIZE;
-	device_config->fifo.max_aligned_frags =
-	    XGE_HAL_DEFAULT_FIFO_MAX_ALIGNED_FRAGS;
+	device_config->fifo.alignment_size = ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, "fifo_copied_frag_size",
+	    XGE_HAL_DEFAULT_FIFO_ALIGNMENT_SIZE);
+	device_config->fifo.max_aligned_frags = ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, "fifo_copied_max_frags",
+	    XGE_HAL_DEFAULT_FIFO_MAX_ALIGNED_FRAGS);
 #endif
 #if defined(__sparc)
 	device_config->fifo.queue[0].no_snoop_bits = 1;
@@ -469,40 +456,52 @@ xge_configuration_init(dev_info_t *dev_info,
 		"fifo0_configured", 1);
 
 	/*
-	 * Initialize tti properties
+	 * Bimodal Interrupts - TTI 56 configuration
 	 */
-	device_config->tti.enabled = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "tti_enabled",
-	    XGE_HAL_TTI_ENABLE);
-	device_config->tti.urange_a = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "tti_urange_a",
+	device_config->bimodal_interrupts = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "bimodal_interrupts",
+	    XGE_HAL_DEFAULT_BIMODAL_INTERRUPTS);
+	device_config->bimodal_timer_lo_us = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "bimodal_timer_lo_us",
+	    XGE_HAL_DEFAULT_BIMODAL_TIMER_LO_US);
+	device_config->bimodal_timer_hi_us = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "bimodal_timer_hi_us",
+	    XGE_HAL_DEFAULT_BIMODAL_TIMER_HI_US);
+
+	/*
+	 * TTI 0 configuration
+	 */
+	device_config->fifo.queue[0].tti[0].enabled = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_enable", 1);
+	device_config->fifo.queue[0].tti[0].urange_a = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_urange_a",
 	    XGE_HAL_DEFAULT_TX_URANGE_A);
-	device_config->tti.ufc_a = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "tti_ufc_a",
+	device_config->fifo.queue[0].tti[0].ufc_a = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_ufc_a",
 	    XGE_HAL_DEFAULT_TX_UFC_A);
-	device_config->tti.urange_b = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "tti_urange_b",
+	device_config->fifo.queue[0].tti[0].urange_b = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_urange_b",
 	    XGE_HAL_DEFAULT_TX_URANGE_B);
-	device_config->tti.ufc_b = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "tti_ufc_b",
+	device_config->fifo.queue[0].tti[0].ufc_b = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_ufc_b",
 	    XGE_HAL_DEFAULT_TX_UFC_B);
-	device_config->tti.urange_c = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "tti_urange_c",
+	device_config->fifo.queue[0].tti[0].urange_c = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_urange_c",
 	    XGE_HAL_DEFAULT_TX_URANGE_C);
-	device_config->tti.ufc_c = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "tti_ufc_c",
+	device_config->fifo.queue[0].tti[0].ufc_c = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_ufc_c",
 	    XGE_HAL_DEFAULT_TX_UFC_C);
-	device_config->tti.ufc_d = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "tti_ufc_d",
+	device_config->fifo.queue[0].tti[0].ufc_d = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_ufc_d",
 	    XGE_HAL_DEFAULT_TX_UFC_D);
-	device_config->tti.timer_val_us = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "tti_timer_ac_en",
+	device_config->fifo.queue[0].tti[0].timer_ac_en = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_timer_ac_en",
 	    XGE_HAL_DEFAULT_TX_TIMER_AC_EN);
-	device_config->tti.timer_val_us = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "tti_timer_val",
+	device_config->fifo.queue[0].tti[0].timer_val_us = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_timer_val",
 	    XGE_HAL_DEFAULT_TX_TIMER_VAL);
-	device_config->tti.timer_ci_en = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "tti_timer_ci_en",
+	device_config->fifo.queue[0].tti[0].timer_ci_en = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_timer_ci_en",
 	    XGE_HAL_DEFAULT_TX_TIMER_CI_EN);
 
 	/*
@@ -519,17 +518,37 @@ xge_configuration_init(dev_info_t *dev_info,
 	    0);
 
 	/*
+	 * LRO tunables
+	 */
+	device_config->lro_sg_size = ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, "lro_sg_size",
+	    XGE_HAL_DEFAULT_LRO_SG_SIZE);
+	device_config->lro_frm_len = ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, "lro_frm_len",
+	    XGE_HAL_DEFAULT_LRO_FRM_LEN);
+
+	/*
 	 * Initialize link layer configuration
 	 */
 	ll_config->rx_buffer_total = ddi_prop_get_int(DDI_DEV_T_ANY,
 	    dev_info, DDI_PROP_DONTPASS, "rx_buffer_total",
-	    XGELL_RX_BUFFER_TOTAL);
+	    device_config->ring.queue[XGELL_RING_MAIN_QID].initial *
+					XGELL_RX_BUFFER_TOTAL);
 	ll_config->rx_buffer_post_hiwat = ddi_prop_get_int(DDI_DEV_T_ANY,
 	    dev_info, DDI_PROP_DONTPASS, "rx_buffer_post_hiwat",
-	    XGELL_RX_BUFFER_POST_HIWAT);
-	ll_config->rx_buffer_recycle_hiwat = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "rx_buffer_recycle_hiwat",
-	    XGELL_RX_BUFFER_RECYCLE_HIWAT);
+	    device_config->ring.queue[XGELL_RING_MAIN_QID].initial *
+					XGELL_RX_BUFFER_POST_HIWAT);
+	ll_config->rx_pkt_burst = ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, "rx_pkt_burst",
+	    XGELL_RX_PKT_BURST);
+	ll_config->rx_dma_lowat = ddi_prop_get_int(DDI_DEV_T_ANY, dev_info,
+	    DDI_PROP_DONTPASS, "rx_dma_lowat", XGELL_RX_DMA_LOWAT);
+	ll_config->tx_dma_lowat = ddi_prop_get_int(DDI_DEV_T_ANY, dev_info,
+	    DDI_PROP_DONTPASS, "tx_dma_lowat", XGELL_TX_DMA_LOWAT);
+	ll_config->msi_enable = ddi_prop_get_int(DDI_DEV_T_ANY, dev_info,
+	    DDI_PROP_DONTPASS, "msi_enable", XGELL_CONF_ENABLE_BY_DEFAULT);
+	ll_config->lso_enable = ddi_prop_get_int(DDI_DEV_T_ANY, dev_info,
+	    DDI_PROP_DONTPASS, "lso_enable", XGELL_CONF_ENABLE_BY_DEFAULT);
 }
 
 /*

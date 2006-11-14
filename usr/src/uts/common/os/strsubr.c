@@ -8301,7 +8301,8 @@ hcksum_retrieve(mblk_t *mp, multidata_t *mmd, pdesc_t *pd,
 					*end = (uint32_t)DB_CKSUMEND(mp);
 				if (value != NULL)
 					*value = (uint32_t)DB_CKSUM16(mp);
-			}
+			} else if ((*flags & HW_LSO) && (value != NULL))
+				*value = (uint32_t)DB_LSOMSS(mp);
 		}
 	} else {
 		pattrinfo_t hck_attr = {PATTR_HCKSUM};

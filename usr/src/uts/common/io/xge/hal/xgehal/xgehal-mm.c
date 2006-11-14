@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    hal-mm.c
- *
- *  Description:  chipset memory pool object implementation
- *
- *  Created:      10 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #include "xge-os-pal.h"
@@ -197,8 +188,8 @@ __hal_mempool_grow(xge_hal_mempool_t *mempool, int num_allocate,
 		}
 
 		xge_debug_mm(XGE_TRACE,
-			"memblock%d: allocated %dk, vaddr 0x%llx, "
-			"dma_addr 0x%llx", i, mempool->memblock_size / 1024,
+			"memblock%d: allocated %dk, vaddr 0x"XGE_OS_LLXFMT", "
+			"dma_addr 0x"XGE_OS_LLXFMT, i, mempool->memblock_size / 1024,
 			(unsigned long long)(ulong_t)mempool->memblocks_arr[i],
 			(unsigned long long)dma_object->addr);
 
@@ -248,7 +239,8 @@ __hal_mempool_create(pci_dev_h pdev, int memblock_size, int item_size,
 		return NULL;
 	}
 
-	mempool = xge_os_malloc(pdev, sizeof(xge_hal_mempool_t));
+	mempool = (xge_hal_mempool_t *) \
+			xge_os_malloc(pdev, sizeof(xge_hal_mempool_t));
 	if (mempool == NULL) {
 		xge_debug_mm(XGE_ERR, "mempool allocation failure");
 		return NULL;
@@ -273,7 +265,7 @@ __hal_mempool_create(pci_dev_h pdev, int memblock_size, int item_size,
 					mempool->items_per_memblock;
 
 	/* allocate array of memblocks */
-	mempool->memblocks_arr = xge_os_malloc(mempool->pdev,
+	mempool->memblocks_arr = (void ** ) xge_os_malloc(mempool->pdev,
 					sizeof(void*) * mempool->memblocks_max);
 	if (mempool->memblocks_arr == NULL) {
 		xge_debug_mm(XGE_ERR, "memblocks_arr allocation failure");
@@ -284,7 +276,7 @@ __hal_mempool_create(pci_dev_h pdev, int memblock_size, int item_size,
 		    sizeof(void*) * mempool->memblocks_max);
 
 	/* allocate array of private parts of items per memblocks */
-	mempool->memblocks_priv_arr = xge_os_malloc(mempool->pdev,
+	mempool->memblocks_priv_arr = (void **) xge_os_malloc(mempool->pdev,
 					sizeof(void*) * mempool->memblocks_max);
 	if (mempool->memblocks_priv_arr == NULL) {
 		xge_debug_mm(XGE_ERR, "memblocks_priv_arr allocation failure");
@@ -295,8 +287,10 @@ __hal_mempool_create(pci_dev_h pdev, int memblock_size, int item_size,
 		    sizeof(void*) * mempool->memblocks_max);
 
 	/* allocate array of memblocks DMA objects */
-	mempool->memblocks_dma_arr = xge_os_malloc(mempool->pdev,
-			sizeof(xge_hal_mempool_dma_t) * mempool->memblocks_max);
+	mempool->memblocks_dma_arr =
+		(xge_hal_mempool_dma_t *) xge_os_malloc(mempool->pdev,
+		sizeof(xge_hal_mempool_dma_t) * mempool->memblocks_max);
+
 	if (mempool->memblocks_dma_arr == NULL) {
 		xge_debug_mm(XGE_ERR, "memblocks_dma_arr allocation failure");
 		__hal_mempool_destroy(mempool);
@@ -306,7 +300,7 @@ __hal_mempool_create(pci_dev_h pdev, int memblock_size, int item_size,
 		     sizeof(xge_hal_mempool_dma_t) * mempool->memblocks_max);
 
 	/* allocate hash array of items */
-	mempool->items_arr = xge_os_malloc(mempool->pdev,
+	mempool->items_arr = (void **) xge_os_malloc(mempool->pdev,
 				 sizeof(void*) * mempool->items_max);
 	if (mempool->items_arr == NULL) {
 		xge_debug_mm(XGE_ERR, "items_arr allocation failure");
@@ -315,8 +309,8 @@ __hal_mempool_create(pci_dev_h pdev, int memblock_size, int item_size,
 	}
 	xge_os_memzero(mempool->items_arr, sizeof(void *) * mempool->items_max);
 
-	mempool->shadow_items_arr = xge_os_malloc(mempool->pdev,sizeof(void*) *
-							    mempool->items_max);
+	mempool->shadow_items_arr = (void **) xge_os_malloc(mempool->pdev,
+                                sizeof(void*) *  mempool->items_max);
 	if (mempool->shadow_items_arr == NULL) {
 		xge_debug_mm(XGE_ERR, "shadow_items_arr allocation failure");
 		__hal_mempool_destroy(mempool);
@@ -427,3 +421,89 @@ __hal_mempool_destroy(xge_hal_mempool_t *mempool)
 
 	xge_os_free(mempool->pdev, mempool, sizeof(xge_hal_mempool_t));
 }
+
+#ifdef XGEHAL_RNIC
+
+/*
+ * __hal_allocate_dma_register
+ *
+ * Will allocate dmable memory for register.
+ */
+xge_hal_status_e
+__hal_allocate_dma_register(pci_dev_h pdev, int size,
+		void **dma_register, xge_hal_mempool_dma_t *dma_object)
+{
+	int dma_flags;
+
+	dma_flags = XGE_OS_DMA_CACHELINE_ALIGNED;
+#ifdef XGE_HAL_DMA_DTR_CONSISTENT
+	dma_flags |= XGE_OS_DMA_CONSISTENT;
+#else
+	dma_flags |= XGE_OS_DMA_STREAMING;
+#endif
+
+	xge_os_memzero(dma_object, sizeof(xge_hal_mempool_dma_t));
+
+	/* allocate DMA-capable memblock */
+	*dma_register = xge_os_dma_malloc(pdev,
+					  size,
+					  dma_flags,
+					  &dma_object->handle,
+					  &dma_object->acc_handle);
+	if (*dma_register == NULL) {
+		xge_debug_mm(XGE_ERR, "dma_register: out of DMA memory");
+		return XGE_HAL_ERR_OUT_OF_MEMORY;
+	}
+
+	xge_os_memzero(*dma_register, size);
+
+	/* map memblock to physical memory */
+	dma_object->addr = xge_os_dma_map(pdev,
+		                          dma_object->handle,
+					  *dma_register,
+					  size,
+					  XGE_OS_DMA_DIR_BIDIRECTIONAL,
+#ifdef XGE_HAL_DMA_DTR_CONSISTENT
+					  XGE_OS_DMA_CONSISTENT
+#else
+					  XGE_OS_DMA_STREAMING
+#endif
+                                          );
+	if (dma_object->addr == XGE_OS_INVALID_DMA_ADDR) {
+		xge_os_dma_free(pdev,
+				*dma_register,
+				size,
+				&dma_object->acc_handle,
+				&dma_object->handle);
+		return XGE_HAL_ERR_OUT_OF_MAPPING;
+	}
+
+	xge_debug_mm(XGE_TRACE,
+		"dmareg: allocated %dk, vaddr 0x"XGE_OS_LLXFMT", "
+		"dma_addr 0x"XGE_OS_LLXFMT, size / 1024,
+		(unsigned long long)(ulong_t)*dma_register,
+		(unsigned long long)dma_object->addr);
+
+
+	return XGE_HAL_OK;
+}
+
+/*
+ * __hal_free_dma_register
+ */
+void
+__hal_free_dma_register(pci_dev_h pdev, int size,
+			void *dma_register, xge_hal_mempool_dma_t *dma_object)
+
+{
+
+	xge_os_dma_unmap(pdev,
+		dma_object->handle, dma_object->addr,
+		size, XGE_OS_DMA_DIR_BIDIRECTIONAL);
+
+	xge_os_dma_free(pdev, dma_register, size,
+		&dma_object->acc_handle, &dma_object->handle);
+
+}
+
+#endif

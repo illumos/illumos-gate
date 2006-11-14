@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-driver.h
- *
- *  Description:  HAL driver object functionality
- *
- *  Created:      14 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_HAL_DRIVER_H
@@ -39,6 +30,8 @@
 #include "xgehal-types.h"
 #include "xgehal-config.h"
 #include "xgehal-event.h"
+
+__EXTERN_BEGIN_DECLS
 
 /* maximum number of events consumed in a syncle poll() cycle */
 #define XGE_HAL_DRIVER_QUEUE_CONSUME_MAX	5
@@ -176,6 +169,15 @@ typedef int (*xge_uld_before_device_poll_f) (xge_hal_device_h devh);
 typedef void (*xge_uld_after_device_poll_f) (xge_hal_device_h devh);
 
 /**
+ * function xge_uld_xpak_alarm_log_f - ULD "XPAK alarm log" callback.
+ * @devh: HAL device handle.
+ *
+ * Unless NULL is specified,
+ * HAL invokes the callback from inside __hal_chk_xpak_counter()
+ */
+typedef void (*xge_uld_xpak_alarm_log_f) (xge_hal_device_h devh, xge_hal_xpak_alarm_type_e type);
+
+/**
  * struct xge_hal_uld_cbs_t - Upper-layer driver "slow-path" callbacks.
  * @link_up: See xge_uld_link_up_f{}.
  * @link_down: See xge_uld_link_down_f{}.
@@ -207,6 +209,7 @@ typedef struct xge_hal_uld_cbs_t {
 	xge_uld_before_device_poll_f    before_device_poll;
 	xge_uld_after_device_poll_f	after_device_poll;
 	xge_uld_sched_timer_cb_f	sched_timer;
+	xge_uld_xpak_alarm_log_f	xpak_alarm_log;
 } xge_hal_uld_cbs_t;
 
 /**
@@ -306,5 +309,6 @@ void xge_hal_driver_tracebuf_dump(void);
 #define xge_hal_driver_tracebuf_dump()
 #endif
 
+__EXTERN_END_DECLS
 
 #endif /* XGE_HAL_DRIVER_H */

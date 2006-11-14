@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-config.c
- *
- *  Description:  configuration functionality
- *
- *  Created:      14 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #include "xgehal-config.h"
@@ -71,11 +62,6 @@ __hal_tti_config_check (xge_hal_tti_config_t *new_config)
 	if ((new_config->ufc_c < XGE_HAL_MIN_TX_UFC_C) ||
 		(new_config->ufc_c > XGE_HAL_MAX_TX_UFC_C)) {
 		return XGE_HAL_BADCFG_TX_UFC_C;
-	}
-
-	if ((new_config->urange_d < XGE_HAL_MIN_TX_URANGE_D) ||
-		(new_config->urange_d > XGE_HAL_MAX_TX_URANGE_D)) {
-		return XGE_HAL_BADCFG_TX_URANGE_D;
 	}
 
 	if ((new_config->ufc_d < XGE_HAL_MIN_TX_UFC_D) ||
@@ -168,26 +154,48 @@ __hal_rti_config_check (xge_hal_rti_config_t *new_config)
  * otherwise one of the xge_hal_status_e{} enumerated error codes.
  */
 static xge_hal_status_e
-__hal_fifo_queue_check (xge_hal_fifo_queue_t *new_config)
+__hal_fifo_queue_check (xge_hal_fifo_config_t *new_config,
+			xge_hal_fifo_queue_t *new_queue)
 {
-	if ((new_config->initial < XGE_HAL_MIN_FIFO_QUEUE_LENGTH) ||
-		(new_config->initial > XGE_HAL_MAX_FIFO_QUEUE_LENGTH)) {
+	int i;
+
+	if ((new_queue->initial < XGE_HAL_MIN_FIFO_QUEUE_LENGTH) ||
+		(new_queue->initial > XGE_HAL_MAX_FIFO_QUEUE_LENGTH)) {
 		return XGE_HAL_BADCFG_FIFO_QUEUE_INITIAL_LENGTH;
 	}
 
 	/* FIXME: queue "grow" feature is not supported.
 	 *        Use "initial" queue size as the "maximum";
 	 *        Remove the next line when fixed. */
-	new_config->max = new_config->initial;
+	new_queue->max = new_queue->initial;
 
-	if ((new_config->max < XGE_HAL_MIN_FIFO_QUEUE_LENGTH) ||
-		(new_config->max > XGE_HAL_MAX_FIFO_QUEUE_LENGTH)) {
+	if ((new_queue->max < XGE_HAL_MIN_FIFO_QUEUE_LENGTH) ||
+		(new_queue->max > XGE_HAL_MAX_FIFO_QUEUE_LENGTH)) {
 		return XGE_HAL_BADCFG_FIFO_QUEUE_MAX_LENGTH;
 	}
 
-	if ((new_config->intr < XGE_HAL_MIN_FIFO_QUEUE_INTR) ||
-		(new_config->intr > XGE_HAL_MAX_FIFO_QUEUE_INTR)) {
+	if (new_queue->max < new_config->reserve_threshold) {
+		return XGE_HAL_BADCFG_FIFO_RESERVE_THRESHOLD;
+	}
+
+	if ((new_queue->intr < XGE_HAL_MIN_FIFO_QUEUE_INTR) ||
+		(new_queue->intr > XGE_HAL_MAX_FIFO_QUEUE_INTR)) {
 		return XGE_HAL_BADCFG_FIFO_QUEUE_INTR;
+	}
+
+	for(i = 0;  i < XGE_HAL_MAX_FIFO_TTI_NUM; i++) {
+		/*
+		 * Validate the tti configuration parameters only if
+		 * the TTI feature is enabled.
+		 */
+		if (new_queue->tti[i].enabled) {
+			xge_hal_status_e status;
+
+			if ((status = __hal_tti_config_check(
+				     &new_queue->tti[i])) != XGE_HAL_OK) {
+				return status;
+			}
+		}
 	}
 
 	return XGE_HAL_OK;
@@ -374,8 +382,8 @@ __hal_fifo_config_check (xge_hal_fifo_config_t *new_config)
 		if (!new_config->queue[i].configured)
                         continue;
 
-		if ((status = __hal_fifo_queue_check(&new_config->queue[i]))
-					!= XGE_HAL_OK) {
+		if ((status = __hal_fifo_queue_check(new_config,
+				     &new_config->queue[i])) != XGE_HAL_OK) {
 			return status;
 		}
 	}
@@ -436,6 +444,23 @@ __hal_device_config_check_common (xge_hal_device_config_t *new_config)
 	if ((new_config->mtu < XGE_HAL_MIN_MTU) ||
 		(new_config->mtu > XGE_HAL_MAX_MTU)) {
 		return XGE_HAL_BADCFG_MAX_MTU;
+	}
+
+	if ((new_config->bimodal_interrupts < XGE_HAL_BIMODAL_INTR_MIN) ||
+		(new_config->bimodal_interrupts > XGE_HAL_BIMODAL_INTR_MAX)) {
+		return XGE_HAL_BADCFG_BIMODAL_INTR;
+	}
+
+	if (new_config->bimodal_interrupts &&
+	    ((new_config->bimodal_timer_lo_us < XGE_HAL_BIMODAL_TIMER_LO_US_MIN) ||
+		(new_config->bimodal_timer_lo_us > XGE_HAL_BIMODAL_TIMER_LO_US_MAX))) {
+		return XGE_HAL_BADCFG_BIMODAL_TIMER_LO_US;
+	}
+
+	if (new_config->bimodal_interrupts &&
+	    ((new_config->bimodal_timer_hi_us < XGE_HAL_BIMODAL_TIMER_HI_US_MIN) ||
+		(new_config->bimodal_timer_hi_us > XGE_HAL_BIMODAL_TIMER_HI_US_MAX))) {
+		return XGE_HAL_BADCFG_BIMODAL_TIMER_HI_US;
 	}
 
 	if ((new_config->no_isr_events < XGE_HAL_NO_ISR_EVENTS_MIN) ||
@@ -505,7 +530,17 @@ __hal_device_config_check_common (xge_hal_device_config_t *new_config)
 		return XGE_HAL_BADCFG_SCHED_TIMER_ON_SHOT;
 	}
 
-	if (new_config->sched_timer_us) {
+	/*
+	 * Check adaptive schema parameters. Note that there are two
+	 * configuration variables needs to be enabled in ULD:
+	 *
+	 *   a) sched_timer_us should not be zero;
+	 *   b) rxufca_hi_lim should not be equal to rxufca_lo_lim.
+	 *
+	 * The code bellow checking for those conditions.
+	 */
+	if (new_config->sched_timer_us &&
+	    new_config->rxufca_hi_lim != new_config->rxufca_lo_lim) {
 		if ((new_config->rxufca_intr_thres <
 					XGE_HAL_RXUFCA_INTR_THRES_MIN) ||
 		    (new_config->rxufca_intr_thres >
@@ -564,6 +599,29 @@ __hal_device_config_check_common (xge_hal_device_config_t *new_config)
 	        }
         }
 
+	if ((new_config->rts_qos_steering_config < XGE_HAL_RTS_QOS_STEERING_DISABLE) ||
+		(new_config->rts_qos_steering_config > XGE_HAL_RTS_QOS_STEERING_ENABLE)) {
+		return XGE_HAL_BADCFG_RTS_QOS_STEERING_CONFIG;
+	}
+
+#if defined(XGE_HAL_CONFIG_LRO)
+	if (new_config->lro_sg_size !=
+				XGE_HAL_DEFAULT_USE_HARDCODE)  {
+		if ((new_config->lro_sg_size < XGE_HAL_LRO_MIN_SG_SIZE) ||
+			(new_config->lro_sg_size > XGE_HAL_LRO_MAX_SG_SIZE)) {
+			return XGE_HAL_BADCFG_LRO_SG_SIZE;
+		}
+	}
+
+	if (new_config->lro_frm_len !=
+				XGE_HAL_DEFAULT_USE_HARDCODE)  {
+		if ((new_config->lro_frm_len < XGE_HAL_LRO_MIN_FRM_LEN) ||
+			(new_config->lro_frm_len > XGE_HAL_LRO_MAX_FRM_LEN)) {
+			return XGE_HAL_BADCFG_LRO_FRM_LEN;
+		}
+	}
+#endif
+
 	if ((status = __hal_ring_config_check(&new_config->ring))
 			!= XGE_HAL_OK) {
 		return status;
@@ -572,17 +630,6 @@ __hal_device_config_check_common (xge_hal_device_config_t *new_config)
 	if ((status = __hal_mac_config_check(&new_config->mac)) !=
 	    XGE_HAL_OK) {
 		return status;
-	}
-
-	/*
-	 * Validate the tti configuration parameters only if the TTI
-	 * feature is enabled.
-	 */
-	if (new_config->tti.enabled) {
-		if ((status = __hal_tti_config_check(&new_config->tti)) !=
-							XGE_HAL_OK) {
-			return status;
-		}
 	}
 
 	if ((status = __hal_fifo_config_check(&new_config->fifo)) !=
@@ -611,7 +658,8 @@ __hal_device_config_check_xena (xge_hal_device_config_t *new_config)
 		(new_config->pci_freq_mherz != XGE_HAL_PCI_FREQ_MHERZ_66) &&
 		(new_config->pci_freq_mherz != XGE_HAL_PCI_FREQ_MHERZ_100) &&
 		(new_config->pci_freq_mherz != XGE_HAL_PCI_FREQ_MHERZ_133) &&
-		(new_config->pci_freq_mherz != XGE_HAL_PCI_FREQ_MHERZ_266)) {
+		(new_config->pci_freq_mherz != XGE_HAL_PCI_FREQ_MHERZ_266) &&
+		(new_config->pci_freq_mherz != XGE_HAL_DEFAULT_USE_HARDCODE)) {
 		return XGE_HAL_BADCFG_PCI_FREQ_MHERZ;
 	}
 
@@ -636,7 +684,7 @@ __hal_device_config_check_herc (xge_hal_device_config_t *new_config)
 }
 
 
-/**
+/*
  * __hal_driver_config_check - Check HAL configuration
  * @new_config: Driver configuration information
  *

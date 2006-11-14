@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    version.h
- *
- *  Description:  versioning file
- *
- *  Created:      3 September 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef VERSION_H
@@ -36,7 +27,7 @@
 #include "build-version.h"
 
 #define XGE_HAL_VERSION_MAJOR	"2"
-#define XGE_HAL_VERSION_MINOR	"0"
+#define XGE_HAL_VERSION_MINOR	"5"
 #define XGE_HAL_VERSION_FIX	"0"
 #define XGE_HAL_VERSION_BUILD	GENERATED_BUILD_VERSION
 #define XGE_HAL_VERSION XGE_HAL_VERSION_MAJOR"."XGE_HAL_VERSION_MINOR"."\

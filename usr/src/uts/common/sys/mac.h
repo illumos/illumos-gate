@@ -162,6 +162,27 @@ typedef struct mac_info_s {
 } mac_info_t;
 
 /*
+ * LSO capability
+ */
+typedef struct lso_basic_tcp_ipv4_s {
+	t_uscalar_t	lso_max;		/* maximum payload */
+} lso_basic_tcp_ipv4_t;
+
+/*
+ * Future LSO capabilities can be added at the end of the mac_capab_lso_t.
+ * When such capability is added to the GLDv3 framework, the size of the
+ * mac_capab_lso_t it allocates and passes to the drivers increases. Older
+ * drivers wil access only the (upper) sections of that structure, that is the
+ * sections carrying the capabilities they understand. This ensures the
+ * interface can be safely extended in a binary compatible way.
+ */
+typedef	struct mac_capab_lso_s {
+	t_uscalar_t		lso_flags;
+	lso_basic_tcp_ipv4_t	lso_basic_tcp_ipv4;
+	/* Add future lso capabilities here */
+} mac_capab_lso_t;
+
+/*
  * MAC layer capabilities.  These capabilities are handled by the drivers'
  * mc_capab_get() callbacks.  Some capabilities require the driver to fill
  * in a given data structure, and others are simply boolean capabilities.
@@ -172,7 +193,8 @@ typedef struct mac_info_s {
 typedef enum {
 	MAC_CAPAB_HCKSUM	= 0x01,	/* data is a uint32_t for the txflags */
 	MAC_CAPAB_POLL		= 0x02,	/* boolean only, no data */
-	MAC_CAPAB_MULTIADDRESS	= 0x04	/* data is multiaddress_capab_t */
+	MAC_CAPAB_MULTIADDRESS	= 0x04,	/* data is multiaddress_capab_t */
+	MAC_CAPAB_LSO		= 0x08	/* data is mac_capab_lso_t */
 	/* add new capabilities here */
 } mac_capab_t;
 

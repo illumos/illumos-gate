@@ -607,6 +607,12 @@ proto_process_unbind_req(void *arg)
 	proto_poll_disable(dsp);
 
 	/*
+	 * Clear LSO flags.
+	 */
+	dsp->ds_lso = B_FALSE;
+	dsp->ds_lso_max = 0;
+
+	/*
 	 * Clear the receive callback.
 	 */
 	dls_rx_set(dsp->ds_dc, NULL, NULL);
@@ -1201,6 +1207,23 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		}
 
 		/*
+		 * Large segment offload. (LSO)
+		 */
+		case DL_CAPAB_LSO: {
+			dl_capab_lso_t *lsop;
+			dl_capab_lso_t lso;
+
+			lsop = (dl_capab_lso_t *)&sp[1];
+			/*
+			 * Copy for alignment.
+			 */
+			bcopy(lsop, &lso, sizeof (dl_capab_lso_t));
+			dlcapabsetqid(&(lso.lso_mid), dsp->ds_rq);
+			bcopy(&lso, lsop, sizeof (dl_capab_lso_t));
+			break;
+		}
+
+		/*
 		 * IP polling interface.
 		 */
 		case DL_CAPAB_POLL: {
@@ -1682,12 +1705,15 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	dl_capability_sub_t	*dlsp;
 	size_t			subsize;
 	dl_capab_dls_t		poll;
-	dl_capab_dls_t	soft_ring;
+	dl_capab_dls_t		soft_ring;
 	dl_capab_hcksum_t	hcksum;
+	dl_capab_lso_t		lso;
 	dl_capab_zerocopy_t	zcopy;
 	uint8_t			*ptr;
 	boolean_t		cksum_cap;
 	boolean_t		poll_cap;
+	boolean_t		lso_cap;
+	mac_capab_lso_t		mac_lso;
 	queue_t			*q = dsp->ds_wq;
 	mblk_t			*mp1;
 
@@ -1726,6 +1752,15 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	    &hcksum.hcksum_txflags)) {
 		subsize += sizeof (dl_capability_sub_t) +
 		    sizeof (dl_capab_hcksum_t);
+	}
+
+	/*
+	 * If LSO is usable for MAC, reserve space for the DL_CAPAB_LSO
+	 * capability.
+	 */
+	if (lso_cap = mac_capab_get(dsp->ds_mh, MAC_CAPAB_LSO, &mac_lso)) {
+		subsize += sizeof (dl_capability_sub_t) +
+		    sizeof (dl_capab_lso_t);
 	}
 
 	/*
@@ -1850,6 +1885,32 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 		dlcapabsetqid(&(hcksum.hcksum_mid), dsp->ds_rq);
 		bcopy(&hcksum, ptr, sizeof (dl_capab_hcksum_t));
 		ptr += sizeof (dl_capab_hcksum_t);
+	}
+
+	/*
+	 * Large segment offload. (LSO)
+	 */
+	if (lso_cap) {
+		dlsp = (dl_capability_sub_t *)ptr;
+
+		dlsp->dl_cap = DL_CAPAB_LSO;
+		dlsp->dl_length = sizeof (dl_capab_lso_t);
+		ptr += sizeof (dl_capability_sub_t);
+
+		lso.lso_version = LSO_VERSION_1;
+		lso.lso_flags = mac_lso.lso_flags;
+		lso.lso_max = mac_lso.lso_basic_tcp_ipv4.lso_max;
+
+		/* Simply enable LSO with DLD */
+		dsp->ds_lso = B_TRUE;
+		dsp->ds_lso_max = lso.lso_max;
+
+		dlcapabsetqid(&(lso.lso_mid), dsp->ds_rq);
+		bcopy(&lso, ptr, sizeof (dl_capab_lso_t));
+		ptr += sizeof (dl_capab_lso_t);
+	} else {
+		dsp->ds_lso = B_FALSE;
+		dsp->ds_lso_max = 0;
 	}
 
 	/*

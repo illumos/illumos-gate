@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-config.h
- *
- *  Description:  Xframe configuration.
- *
- *  Created:      14 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_HAL_CONFIG_H
@@ -36,8 +27,8 @@
 #include "xge-os-pal.h"
 #include "xgehal-types.h"
 
-/*
- */
+__EXTERN_BEGIN_DECLS
+
 #define	XGE_HAL_DEFAULT_USE_HARDCODE		-1
 
 
@@ -109,17 +100,13 @@ typedef struct xge_hal_tti_config_t {
 #define XGE_HAL_MIN_TX_UFC_C			0
 #define XGE_HAL_MAX_TX_UFC_C			65535
 
-	int				urange_d;
-#define XGE_HAL_MIN_TX_URANGE_D			0
-#define XGE_HAL_MAX_TX_URANGE_D			100
-
 	int				ufc_d;
 #define XGE_HAL_MIN_TX_UFC_D			0
 #define XGE_HAL_MAX_TX_UFC_D			65535
 
 	int				timer_val_us;
-#define XGE_HAL_MIN_TX_TIMER_VAL			0
-#define XGE_HAL_MAX_TX_TIMER_VAL			65535
+#define XGE_HAL_MIN_TX_TIMER_VAL		0
+#define XGE_HAL_MAX_TX_TIMER_VAL		65535
 
 	int				timer_ac_en;
 #define XGE_HAL_MIN_TX_TIMER_AC_EN		0
@@ -196,8 +183,8 @@ typedef struct xge_hal_rti_config_t {
 #define XGE_HAL_MAX_RX_TIMER_AC_EN		1
 
 	int				timer_val_us;
-#define XGE_HAL_MIN_RX_TIMER_VAL			0
-#define XGE_HAL_MAX_RX_TIMER_VAL			65535
+#define XGE_HAL_MIN_RX_TIMER_VAL		0
+#define XGE_HAL_MAX_RX_TIMER_VAL		65535
 
 } xge_hal_rti_config_t;
 
@@ -238,9 +225,17 @@ typedef struct xge_hal_fifo_queue_t {
 #define XGE_HAL_MAX_FIFO_QUEUE_NO_SNOOP_BUFFER	2
 #define XGE_HAL_MAX_FIFO_QUEUE_NO_SNOOP_ALL	3
 
+	int				priority;
+#define XGE_HAL_MIN_FIFO_PRIORITY		0
+#define XGE_HAL_MAX_FIFO_PRIORITY		63
+
 	int				configured;
 #define XGE_HAL_MIN_FIFO_CONFIGURED		0
 #define XGE_HAL_MAX_FIFO_CONFIGURED		1
+
+#define XGE_HAL_MAX_FIFO_TTI_NUM		7
+#define XGE_HAL_MAX_FIFO_TTI_RING_0		56
+	xge_hal_tti_config_t		tti[XGE_HAL_MAX_FIFO_TTI_NUM];
 
 } xge_hal_fifo_queue_t;
 
@@ -404,6 +399,7 @@ typedef struct xge_hal_fifo_config_t {
  *                 upper limit.
  * @scatter_mode: Xframe supports two receive scatter modes: A and B.
  *                For details please refer to Xframe User Guide.
+ * @strip_vlan_tag: TBD
  * @queue: Array of all Xframe ring configurations.
  *
  * Array of ring configurations.
@@ -431,6 +427,7 @@ typedef struct xge_hal_ring_config_t {
 
 /**
  * struct xge_hal_mac_config_t - MAC configuration.
+ * @media: Transponder type.
  * @tmac_util_period: The sampling period over which the transmit utilization
  *                    is calculated.
  * @rmac_util_period: The sampling period over which the receive utilization
@@ -439,6 +436,8 @@ typedef struct xge_hal_ring_config_t {
  *                  the MAC or sent to the host.
  * @rmac_bcast_en: Enable frames containing broadcast address to be
  *                 passed to the host.
+ * @rmac_pause_gen_en: Received pause generation enable. 
+ * @rmac_pause_rcv_en: Receive pause enable.
  * @rmac_pause_time: The value to be inserted in outgoing pause frames.
  *             Has units of pause quanta (one pause quanta = 512 bit times).
  * @mc_pause_threshold_q0q3: Contains thresholds for pause frame generation
@@ -574,18 +573,42 @@ typedef struct xge_hal_mac_config_t {
  * stable in order for the adapter to declare "LINK UP".
  * The enumerated settings (see Xframe-II UG) are:
  *      0 ........... instantaneous
- *      1 ........... 500 µs
+ *      1 ........... 500 ´s
  *      2 ........... 1 ms
  *      3 ........... 64 ms
  *      4 ........... 256 ms
  *      5 ........... 512 ms
  *      6 ........... 1 s
  *      7 ........... 2 s
- *
+ * @no_isr_events: TBD
  * @device_poll_millis: Specify the interval (in mulliseconds) between
  * successive xge_hal_device_poll() runs.
  * stable in order for the adapter to declare "LINK UP".
  * @rts_mac_en: Enable Receive Traffic Steering using MAC destination address
+ * @lro_sg_size: TBD
+ * @lro_frm_len: TBD
+ * @bimodal_interrupts: Enable bimodal interrupts in device
+ * @bitmap_intr_num: Interrupt Number associated with the bitmap
+ * @max_cqe_groups:  The maximum number of adapter CQE group blocks a CQRQ
+ * can own at any one time.
+ * @max_num_wqe_od_groups: The maximum number of WQE Headers/OD Groups that
+ * this S-RQ can own at any one time.
+ * @no_wqe_threshold: Maximum number of times adapter polls WQE Hdr blocks for
+ * WQEs before generating a message or interrupt.
+ * @max_cqrq_per_bit: Maximum number of CQRQs allowed to share a bitmap bit
+ * @max_sess_per_bit: Maximum number of sessions allowed to share a bitmap bit
+ * @refill_threshold_high:This field provides a hysteresis upper bound for
+ * automatic adapter refill operations.
+ * @refill_threshold_low:This field provides a hysteresis lower bound for
+ * automatic adapter refill operations.
+ * @eol_policy:This field sets the policy for handling the end of list condition.
+ * 2'b00 - When EOL is reached,poll until last block wrapper size is no longer 0.
+ * 2'b01 - Send UMQ message when EOL is reached.
+ * 2'b1x - Poll until the poll_count_max is reached and if still EOL,send UMQ message
+ * @eol_poll_count_max:sets the maximum number of times the queue manager will poll for
+ * a non-zero block wrapper before giving up and sending a UMQ message
+ * @ack_blk_limit: Limit on the maximum number of ACK list blocks that can be held
+ * by a session at any one time.
  *
  * Xframe configuration.
  * Contains per-device configuration parameters, including:
@@ -671,7 +694,6 @@ typedef struct xge_hal_device_config_t {
 
 	xge_hal_ring_config_t		ring;
 	xge_hal_mac_config_t		mac;
-	xge_hal_tti_config_t		tti;
 	xge_hal_fifo_config_t		fifo;
 
 	int				dump_on_serr;
@@ -743,6 +765,77 @@ typedef struct xge_hal_device_config_t {
 #define XGE_HAL_RTS_MAC_DISABLE			0
 #define XGE_HAL_RTS_MAC_ENABLE			1
 
+	int				lro_sg_size;
+#define XGE_HAL_LRO_DEFAULT_SG_SIZE		10
+#define XGE_HAL_LRO_MIN_SG_SIZE			1
+#define XGE_HAL_LRO_MAX_SG_SIZE			64
+
+	int				lro_frm_len;
+#define XGE_HAL_LRO_DEFAULT_FRM_LEN		65536
+#define XGE_HAL_LRO_MIN_FRM_LEN			4096
+#define XGE_HAL_LRO_MAX_FRM_LEN			65536
+
+	int				bimodal_interrupts;
+#define XGE_HAL_BIMODAL_INTR_MIN		-1
+#define XGE_HAL_BIMODAL_INTR_MAX		1
+
+	int				bimodal_timer_lo_us;
+#define XGE_HAL_BIMODAL_TIMER_LO_US_MIN		1
+#define XGE_HAL_BIMODAL_TIMER_LO_US_MAX		127
+
+	int				bimodal_timer_hi_us;
+#define XGE_HAL_BIMODAL_TIMER_HI_US_MIN		128
+#define XGE_HAL_BIMODAL_TIMER_HI_US_MAX		65535
+
+	int				rts_qos_steering_config;
+#define XGE_HAL_RTS_QOS_STEERING_DISABLE	0
+#define XGE_HAL_RTS_QOS_STEERING_ENABLE		1
+
+#ifdef XGEHAL_RNIC
+
+	int				bitmap_intr_num;
+#define XGE_HAL_BITMAP_INTR_NUM_MIN		1
+#define XGE_HAL_BITMAP_INTR_NUM_MAX		64
+
+	int				max_cqe_groups;
+#define XGE_HAL_MAX_CQE_GROUPS_MIN		1
+#define XGE_HAL_MAX_CQE_GROUPS_MAX		16
+
+	int				max_num_wqe_od_groups;
+#define XGE_HAL_MAX_NUM_OD_GROUPS_MIN		1
+#define XGE_HAL_MAX_NUM_OD_GROUPS_MAX		16
+
+	int				no_wqe_threshold;
+#define XGE_HAL_NO_WQE_THRESHOLD_MIN		1
+#define XGE_HAL_NO_WQE_THRESHOLD_MAX		16
+
+	int				max_cqrq_per_bit;
+#define XGE_HAL_MAX_CQRQ_PER_BIT_MIN		1
+#define XGE_HAL_MAX_CQRQ_PER_BIT_MAX		16
+
+	int				max_sess_per_bit;
+#define XGE_HAL_MAX_SESS_PER_BIT_MIN		1
+#define XGE_HAL_MAX_SESS_PER_BIT_MAX		16
+
+	int				refill_threshold_high;
+#define XGE_HAL_REFILL_THRESHOLD_HIGH_MIN	1
+#define XGE_HAL_REFILL_THRESHOLD_HIGH_MAX	16
+
+	int				refill_threshold_low;
+#define XGE_HAL_REFILL_THRESHOLD_LOW_MIN	1
+#define XGE_HAL_REFILL_THRESHOLD_LOW_MAX	16
+
+	int				ack_blk_limit;
+#define XGE_HAL_ACK_BLOCK_LIMIT_MIN		1
+#define XGE_HAL_ACK_BLOCK_LIMIT_MAX		16
+
+	int				poll_or_doorbell;
+#define XGE_HAL_POLL_OR_DOORBELL_POLL		1
+#define XGE_HAL_POLL_OR_DOORBELL_DOORBELL	0
+
+
+#endif
+
 } xge_hal_device_config_t;
 
 /**
@@ -799,5 +892,7 @@ __hal_device_config_check_herc (xge_hal_device_config_t *new_config);
 
 xge_hal_status_e
 __hal_driver_config_check (xge_hal_driver_config_t *new_config);
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_HAL_CONFIG_H */

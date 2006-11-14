@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xge-queue.h
- *
- *  Description:  serialized event queue
- *
- *  Created:      7 June 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_QUEUE_H
@@ -36,6 +27,9 @@
 #include "xge-os-pal.h"
 #include "xge-defs.h"
 #include "xge-list.h"
+#include "xgehal-event.h"
+
+__EXTERN_BEGIN_DECLS
 
 #define XGE_QUEUE_BUF_SIZE		0x1000
 #define XGE_DEFAULT_EVENT_MAX_DATA_SIZE	16
@@ -79,11 +73,11 @@ typedef void* xge_queue_h;
  * See also: xge_queue_t{}.
  */
 typedef struct xge_queue_item_t {
-	xge_list_t	item;
-	int		event_type;
-	int		data_size;
-	int		is_critical;
-	void		*context;
+	xge_list_t			item;
+	xge_hal_event_e		event_type;
+	int					data_size;
+	int					is_critical;
+	void				*context;
 } xge_queue_item_t;
 
 /**
@@ -172,5 +166,7 @@ void xge_queue_flush(xge_queue_h queueh);
 xge_queue_status_e __io_queue_grow(xge_queue_h qh);
 
 int __queue_get_reset_critical (xge_queue_h qh);
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_QUEUE_H */

@@ -173,7 +173,9 @@ struct conn_s {
 		conn_recvslla : 1,		/* IP_RECVSLLA option */
 		conn_mdt_ok : 1,		/* MDT is permitted */
 		conn_nexthop_set : 1,
-		conn_allzones : 1;		/* SO_ALLZONES */
+		conn_allzones : 1,		/* SO_ALLZONES */
+
+		conn_lso_ok : 1;		/* LSO is usable */
 
 	tcp_t		*conn_tcp;		/* Pointer to the tcp struct */
 	struct udp_s	*conn_udp;		/* Pointer to the udp struct */

@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-regs.h
- *
- *  Description:  Xframe mem-mapped register space
- *
- *  Created:      14 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_HAL_REGS_H
@@ -127,7 +118,16 @@ typedef struct {
 	u64	pci_info;
 #define XGE_HAL_PCI_INFO			vBIT(0xF,0,4)
 #define XGE_HAL_PCI_32_BIT			BIT(8)
-	u8 unused_0[0x800 - 0x128];
+
+	u8 unused0_1[0x160 - 0x128];
+ 
+	u64 ric_status;
+
+	u8  unused0_2[0x558 - 0x168];
+
+	u64 mbist_status;
+
+	u8  unused0_3[0x800 - 0x560];
 
 /* PCI-X Controller registers */
 	u64 pic_int_status;
@@ -190,7 +190,7 @@ typedef struct {
 #define XGE_HAL_IIC_INT_REG_ACK_ERR                    BIT(8)
 	u64 iic_alarms;
 
-	u8 unused4[0x08];
+	u64 msi_pending_reg;
 
 	u64 misc_int_reg;
 #define XGE_HAL_MISC_INT_REG_DP_ERR_INT			BIT(0)
@@ -199,7 +199,13 @@ typedef struct {
 	u64 misc_int_mask;
 	u64 misc_alarms;
 
-	u8 unused5[0x38];
+	u64 msi_triggered_reg;
+
+	u64 xfp_gpio_int_reg;
+	u64 xfp_gpio_int_mask;
+	u64 xfp_alarms;
+
+	u8  unused5[0x8E0 - 0x8C8];
 
 	u64 tx_traffic_int;
 #define XGE_HAL_TX_TRAFFIC_INT_n(n)                     BIT(n)
@@ -268,7 +274,7 @@ typedef struct {
 	u64 xmsi_control;
 #define XGE_HAL_XMSI_EN				BIT(0)
 #define XGE_HAL_XMSI_DIS_TINT_SERR		BIT(1)
-#define XGE_HAL_XMSI_BYTE_COUNT(val)		vBIT(val,13,2)
+#define XGE_HAL_XMSI_BYTE_COUNT(val)		vBIT(val,13,3)
 
 	u64 xmsi_access;
 #define XGE_HAL_XMSI_WR_RDN			BIT(7)
@@ -302,6 +308,34 @@ typedef struct {
 
 	/* General Configuration */
 	u64 mdio_control;
+#define XGE_HAL_MDIO_CONTROL_MMD_INDX_ADDR(n)	vBIT(n,0,16)
+#define XGE_HAL_MDIO_CONTROL_MMD_DEV_ADDR(n)	vBIT(n,19,5)
+#define XGE_HAL_MDIO_CONTROL_MMD_PRT_ADDR(n)	vBIT(n,27,5)
+#define XGE_HAL_MDIO_CONTROL_MMD_DATA(n)	vBIT(n,32,16)
+#define XGE_HAL_MDIO_CONTROL_MMD_CTRL(n)	vBIT(n,56,4)
+#define XGE_HAL_MDIO_CONTROL_MMD_OP(n)		vBIT(n,60,2)
+#define XGE_HAL_MDIO_CONTROL_MMD_DATA_GET(n)	((n>>16)&0xFFFF)
+#define XGE_HAL_MDIO_MMD_PMA_DEV_ADDR		0x01
+#define XGE_HAL_MDIO_DOM_REG_ADDR		0xA100
+#define XGE_HAL_MDIO_ALARM_FLAGS_ADDR		0xA070
+#define XGE_HAL_MDIO_WARN_FLAGS_ADDR		0xA074
+#define XGE_HAL_MDIO_CTRL_START			0xE
+#define XGE_HAL_MDIO_OP_ADDRESS			0x0
+#define XGE_HAL_MDIO_OP_WRITE			0x1
+#define XGE_HAL_MDIO_OP_READ			0x3
+#define XGE_HAL_MDIO_OP_READ_POST_INCREMENT	0x2
+#define XGE_HAL_MDIO_ALARM_TEMPHIGH		0x0080
+#define XGE_HAL_MDIO_ALARM_TEMPLOW		0x0040
+#define XGE_HAL_MDIO_ALARM_BIASHIGH		0x0008
+#define XGE_HAL_MDIO_ALARM_BIASLOW		0x0004
+#define XGE_HAL_MDIO_ALARM_POUTPUTHIGH		0x0002
+#define XGE_HAL_MDIO_ALARM_POUTPUTLOW		0x0001
+#define XGE_HAL_MDIO_WARN_TEMPHIGH		0x0080
+#define XGE_HAL_MDIO_WARN_TEMPLOW		0x0040
+#define XGE_HAL_MDIO_WARN_BIASHIGH		0x0008
+#define XGE_HAL_MDIO_WARN_BIASLOW		0x0004
+#define XGE_HAL_MDIO_WARN_POUTPUTHIGH		0x0002
+#define XGE_HAL_MDIO_WARN_POUTPUTLOW		0x0001
 
 	u64 dtx_control;
 
@@ -323,12 +357,13 @@ typedef struct {
 
 	u64 xfb_control;
 	u64 gpio_control;
-#define XGE_HAL_GPIO_CTRL_GPIO_0			BIT(8)
+#define XGE_HAL_GPIO_CTRL_GPIO_0           	BIT(8)
 
 	u64 txfifo_dw_mask;
 	u64 split_table_line_no;
 	u64 sc_timeout;
 	u64 pic_control_2;
+#define XGE_HAL_TXD_WRITE_BC(n)                 vBIT(n, 13, 3)
 	u64 ini_dperr_ctrl;
 	u64 wreq_split_mask;
 	u64 qw_per_rxd;
@@ -499,9 +534,17 @@ typedef struct {
 
 /* Recent add, used only debug purposes. */
 	u64 pcc_enable;
-
-	u8 unused10[0x700 - 0x178];
-
+	
+	u64 pfc_monitor_0;
+	u64 pfc_monitor_1;
+	u64 pfc_monitor_2;
+	u64 pfc_monitor_3;
+	u64 txd_ownership_ctrl;
+	u64 pfc_read_cntrl;
+	u64 pfc_read_data;
+	
+	u8  unused10[0x1700 - 0x11B0];
+	
 	u64 txdma_debug_ctrl;
 
 	u8 unused11[0x1800 - 0x1708];
@@ -578,8 +621,9 @@ typedef struct {
 #define XGE_HAL_PRC_CTRL_RING_MODE_5                   vBIT(2,14,2)
 #define XGE_HAL_PRC_CTRL_RING_MODE_x                   vBIT(3,14,2)
 #define XGE_HAL_PRC_CTRL_NO_SNOOP(n)                   vBIT(n,22,2)
-#define XGE_HAL_PRC_CTRL_RTH_DISABLE		       BIT(31)
-#define XGE_HAL_PRC_CTRL_GROUP_READS		       BIT(38)
+#define XGE_HAL_PRC_CTRL_RTH_DISABLE                   BIT(31)
+#define XGE_HAL_PRC_CTRL_BIMODAL_INTERRUPT             BIT(37)
+#define XGE_HAL_PRC_CTRL_GROUP_READS                   BIT(38)
 #define XGE_HAL_PRC_CTRL_RXD_BACKOFF_INTERVAL(val)     vBIT(val,40,24)
 
 	u64 prc_alarm_action;
@@ -699,9 +743,11 @@ typedef struct {
 	u64 rmac_cfg_key;
 #define XGE_HAL_RMAC_CFG_KEY(val)               vBIT(val,0,16)
 
-#define XGE_HAL_MAX_MAC_ADDRESSES           64
-#define XGE_HAL_MAC_MC_ALL_MC_ADDR_OFFSET   63	/* enables all multicast
-pkts */
+#define XGE_HAL_MAX_MAC_ADDRESSES               64
+#define XGE_HAL_MAC_MC_ALL_MC_ADDR_OFFSET       63
+#define XGE_HAL_MAX_MAC_ADDRESSES_HERC          256
+#define XGE_HAL_MAC_MC_ALL_MC_ADDR_OFFSET_HERC  255
+
 	u64 rmac_addr_cmd_mem;
 #define XGE_HAL_RMAC_ADDR_CMD_MEM_WE                    BIT(7)
 #define XGE_HAL_RMAC_ADDR_CMD_MEM_RD                    0
@@ -789,7 +835,14 @@ pkts */
 	u64 rts_ds_mem_data;
 #define XGE_HAL_RTS_DS_MEM_DATA(n)                 vBIT(n,0,8)
 
-	u8 unused16_0[0x338 - 0x220];
+	u8  unused16_1[0x308 - 0x220];
+	
+	u64 rts_vid_mem_ctrl;
+	u64 rts_vid_mem_data;
+	u64 rts_p0_p3_map;
+	u64 rts_p4_p7_map;
+	u64 rts_p8_p11_map;
+	u64 rts_p12_p15_map;
 
 	u64 rts_mac_cfg;
 #define XGE_HAL_RTS_MAC_SECT0_EN                    BIT(0)
@@ -801,7 +854,7 @@ pkts */
 #define XGE_HAL_RTS_MAC_SECT6_EN                    BIT(6)
 #define XGE_HAL_RTS_MAC_SECT7_EN                    BIT(7)
 
-	u8 unused16_1[0x380 - 0x340];
+	u8 unused16_2[0x380 - 0x340];
 
 	u64 rts_rth_cfg;
 #define XGE_HAL_RTS_RTH_EN                         BIT(3)
@@ -844,7 +897,50 @@ pkts */
 	u64 rts_rth_status;
 #define XGE_HAL_RTH_STATUS_SPDM_USE_L4             BIT(3)
 
-	u8 unused17[0x700 - 0x3e8];
+	u8  unused17[0x400 - 0x3E8];
+	
+	u64 rmac_red_fine_q0q3;
+	u64 rmac_red_fine_q4q7;    
+	u64 rmac_pthresh_cross;
+	u64 rmac_rthresh_cross;
+	u64 rmac_pnum_range[32];
+
+	u64 rmac_mp_crc_0;
+	u64 rmac_mp_mask_a_0;
+	u64 rmac_mp_mask_b_0;
+	
+	u64 rmac_mp_crc_1;
+	u64 rmac_mp_mask_a_1;
+	u64 rmac_mp_mask_b_1;
+	
+	u64 rmac_mp_crc_2;
+	u64 rmac_mp_mask_a_2;
+	u64 rmac_mp_mask_b_2;
+	
+	u64 rmac_mp_crc_3;
+	u64 rmac_mp_mask_a_3;
+	u64 rmac_mp_mask_b_3;
+	
+	u64 rmac_mp_crc_4;
+	u64 rmac_mp_mask_a_4;
+	u64 rmac_mp_mask_b_4;
+	
+	u64 rmac_mp_crc_5;
+	u64 rmac_mp_mask_a_5;
+	u64 rmac_mp_mask_b_5;
+	
+	u64 rmac_mp_crc_6;
+	u64 rmac_mp_mask_a_6;
+	u64 rmac_mp_mask_b_6;
+
+	u64 rmac_mp_crc_7;
+	u64 rmac_mp_mask_a_7;
+	u64 rmac_mp_mask_b_7;
+
+	u64 mac_ctrl;
+	u64 activity_control;
+	
+	u8  unused17_2[0x700 - 0x5F0];
 
 	u64 mac_debug_ctrl;
 #define XGE_HAL_MAC_DBG_ACTIVITY_VALUE		   0x411040400000000ULL
@@ -924,13 +1020,37 @@ pkts */
 	u64 mc_rldram_test_d1;
 	u8 unused25[0x300 - 0x288];
 	u64 mc_rldram_test_d2;
-	u8 unused26_1[0x640 - 0x308];
+	u8  unused26_1[0x2C00 - 0x2B08];
+	u64 mc_rldram_test_read_d0;
+	u8  unused26_2[0x20 - 0x8];
+	u64 mc_rldram_test_read_d1;
+	u8  unused26_3[0x40 - 0x28];
+	u64 mc_rldram_test_read_d2;
+	u8  unused26_4[0x60 - 0x48];
+	u64 mc_rldram_test_add_bkg;
+	u8  unused26_5[0x80 - 0x68];
+	u64 mc_rldram_test_d0_bkg;
+	u8  unused26_6[0xD00 - 0xC88];    
+	u64 mc_rldram_test_d1_bkg;
+	u8  unused26_7[0x20 - 0x8];
+	u64 mc_rldram_test_d2_bkg;
+	u8  unused26_8[0x40 - 0x28];
+	u64 mc_rldram_test_read_d0_bkg;
+	u8  unused26_9[0x60 - 0x48];
+	u64 mc_rldram_test_read_d1_bkg;
+	u8  unused26_10[0x80 - 0x68];
+	u64 mc_rldram_test_read_d2_bkg;
+	u8  unused26_11[0xE00 - 0xD88];
+	u64 mc_rldram_generation;
+	u8  unused26_12[0x20 - 0x8];
+	u64 mc_driver;
+	u8  unused26_13[0x40 - 0x28];
 	u64 mc_rldram_ref_per_herc;
 #define XGE_HAL_MC_RLDRAM_SET_REF_PERIOD(n)   vBIT(n, 0, 16)
-	u8 unused26_2[0x660 - 0x648];
+	u8 unused26_14[0x660 - 0x648];
 	u64 mc_rldram_mrs_herc;
 #define XGE_HAL_MC_RLDRAM_MRS(n)              vBIT(n, 14, 17)
-	u8 unused26_3[0x700 - 0x668];
+	u8 unused26_15[0x700 - 0x668];
 	u64 mc_debug_ctrl;
 
 	u8 unused27[0x3000 - 0x2f08];
@@ -955,14 +1075,26 @@ pkts */
 	u64 xgxs_rxgxs_err_alarm;
 
 	u8 unused28[0x100 - 0x40];
+	
+	u64 spi_err_reg;
+	u64 spi_err_mask;
+	u64 spi_err_alarm;
 
 	u64 xgxs_cfg;
 	u64 xgxs_status;
 
 	u64 xgxs_cfg_key;
-	u64 xgxs_efifo_cfg;	/* CHANGED */
-	u64 rxgxs_ber_0;	/* CHANGED */
-	u64 rxgxs_ber_1;	/* CHANGED */
+	u64 xgxs_efifo_cfg; /* CHANGED */
+	u64 rxgxs_ber_0;    /* CHANGED */
+	u64 rxgxs_ber_1;    /* CHANGED */
+	
+	u64 spi_control;
+	u64 spi_data;
+	u64 spi_write_protect;
+	
+	u8  unused29[0x80 - 0x48];
+	
+	u64 xgxs_cfg_1;
 } xge_hal_pci_bar0_t;
 
 /* Using this strcture to calculate offsets */

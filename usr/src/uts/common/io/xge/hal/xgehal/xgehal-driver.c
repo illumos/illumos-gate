@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-driver.c
- *
- *  Description:  HAL driver object functionality
- *
- *  Created:      10 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #include "xgehal-driver.h"
@@ -221,7 +212,7 @@ xge_hal_driver_terminate(void)
 		for (i=0; i<g_malloc_cnt; i++) {
 			if (g_malloc_arr[i].ptr != NULL) {
 				xge_os_printf("OSPAL: memory leak detected at "
-					"%s:%d:%llx:%d",
+					"%s:%d:"XGE_OS_LLXFMT":%d",
 					g_malloc_arr[i].file,
 					g_malloc_arr[i].line,
 					(unsigned long long)(ulong_t)

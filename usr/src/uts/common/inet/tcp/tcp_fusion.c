@@ -117,7 +117,7 @@
 
 #define	TCP_LOOPBACK_IP(tcp)						\
 	(TCP_IPOPT_POLICY_V4(tcp) || TCP_IPOPT_POLICY_V6(tcp) ||	\
-	!CONN_IS_MD_FASTPATH((tcp)->tcp_connp))
+	!CONN_IS_LSO_MD_FASTPATH((tcp)->tcp_connp))
 
 /*
  * Setting this to false means we disable fusion altogether and

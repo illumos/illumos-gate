@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-channel.h
- *
- *  Description:  HAL channel object functionality
- *
- *  Created:      19 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_HAL_CHANNEL_H
@@ -38,10 +29,19 @@
 #include "xgehal-types.h"
 #include "xgehal-stats.h"
 
+__EXTERN_BEGIN_DECLS
+
 /**
  * enum xge_hal_channel_type_e - Enumerated channel types.
  * @XGE_HAL_CHANNEL_TYPE_FIFO: fifo.
  * @XGE_HAL_CHANNEL_TYPE_RING: ring.
+ * @XGE_HAL_CHANNEL_TYPE_SEND_QUEUE: TBD.
+ * @XGE_HAL_CHANNEL_TYPE_HW_RECEIVE_QUEUE: TBD.
+ * @XGE_HAL_CHANNEL_TYPE_HW_COMPLETION_QUEUE: TBD.
+ * @XGE_HAL_CHANNEL_TYPE_LRO_RECEIVE_QUEUE: TBD.
+ * @XGE_HAL_CHANNEL_TYPE_LRO_COMPLETION_QUEUE: TBD.
+ * @XGE_HAL_CHANNEL_TYPE_UP_MESSAGE_QUEUE: TBD.
+ * @XGE_HAL_CHANNEL_TYPE_DOWN_MESSAGE_QUEUE: TBD.
  * @XGE_HAL_CHANNEL_TYPE_MAX: Maximum number of HAL-supported
  * (and recognized) channel types. Currently: two.
  *
@@ -51,6 +51,13 @@
 typedef enum xge_hal_channel_type_e {
 	XGE_HAL_CHANNEL_TYPE_FIFO,
 	XGE_HAL_CHANNEL_TYPE_RING,
+	XGE_HAL_CHANNEL_TYPE_SEND_QUEUE,
+	XGE_HAL_CHANNEL_TYPE_HW_RECEIVE_QUEUE,
+	XGE_HAL_CHANNEL_TYPE_HW_COMPLETION_QUEUE,
+	XGE_HAL_CHANNEL_TYPE_LRO_RECEIVE_QUEUE,
+	XGE_HAL_CHANNEL_TYPE_LRO_COMPLETION_QUEUE,
+	XGE_HAL_CHANNEL_TYPE_UP_MESSAGE_QUEUE,
+	XGE_HAL_CHANNEL_TYPE_DOWN_MESSAGE_QUEUE,
 	XGE_HAL_CHANNEL_TYPE_MAX
 } xge_hal_channel_type_e;
 
@@ -131,7 +138,7 @@ typedef enum xge_hal_channel_reopen_e {
  * Channel callback gets called by HAL if, and only if, there is at least
  * one new completion on a given ring or fifo channel. Upon processing the
  * first @dtrh ULD is _supposed_ to continue consuming completions
- * using one of the following HAL APIs:
+ * usingáone of the following HAL APIs:
  *    - xge_hal_fifo_dtr_next_completed()
  *      or
  *    - xge_hal_ring_dtr_next_completed().
@@ -228,6 +235,14 @@ typedef void (*xge_hal_channel_dtr_term_f) (xge_hal_channel_h channelh,
  *          See also xge_hal_channel_dtr_term_f{}.
  * @userdata: User-defined "context" of _that_ channel. Passed back to the
  *            user as one of the @callback, @dtr_init, and @dtr_term arguments.
+ * @sq_config:	Send queue config
+ * @hrq_config: HW receive queue config
+ * @hcq_config: HW completion queue config
+ * @lrq_config: LRO receive queue config
+ * @lcq_config: LRO completion queue config
+ * @dmq_config: Down Message queue config
+ * @umq_config: Up Message queue config
+ *	
  * @per_dtr_space: If specified (i.e., greater than zero): extra space
  *              reserved by HAL per each transmit or receive (depending on the
  *              channel type) descriptor. Can be used to store,
@@ -322,7 +337,6 @@ typedef struct xge_hal_channel_attr_t {
  * @is_open: True, if channel is open; false - otherwise.
  * @per_dtr_space: Per-descriptor space (in bytes) that channel user can utilize
  *                 to store per-operation control information.
- *
  * HAL channel object. HAL devices (see xge_hal_device_t{}) contains
  * zero or more channels. HAL channel contains zero or more descriptors. The
  * latter are used by ULD(s) to manage the device and/or send and receive data
@@ -338,8 +352,14 @@ typedef struct {
 	void				**free_arr;
 	int				length;
 	int				free_length;
+#if defined(XGE_HAL_RX_MULTI_FREE_IRQ) || defined(XGE_HAL_TX_MULTI_FREE_IRQ) || \
+    defined(XGE_HAL_RX_MULTI_FREE) || defined(XGE_HAL_TX_MULTI_FREE)
 	spinlock_t			free_lock;
+#endif
 	int				compl_index;
+	unsigned int			usage_cnt;
+	unsigned int			poll_bytes;
+	int				unused0;
 
 	/* reserve/post data path section */
 #ifdef __XGE_WIN__
@@ -386,13 +406,13 @@ typedef struct {
 	u8				rti;
 	u8				tti;
 	u16                             unused2;
-#endif 
+#endif
 #if defined(XGE_HAL_MSI_X)
 	u64				msix_address;
 	u32				msix_data;
 	int				msix_idx;
 #endif
-        int				magic;
+        unsigned int			magic;
 #ifdef __XGE_WIN__
 } __xge_os_attr_cacheline_aligned xge_hal_channel_t ;
 #else
@@ -422,8 +442,6 @@ __hal_channel_msix_idx(xge_hal_channel_h channelh)
 	return ((xge_hal_channel_t*)channelh)->msix_vect.idx;
 }
 
-int __hal_channel_dtr_count(xge_hal_channel_h channelh);
-
 #if defined(XGE_DEBUG_FP) && (XGE_DEBUG_FP & XGE_DEBUG_FP_CHANNEL)
 #define __HAL_STATIC_CHANNEL
 #define __HAL_INLINE_CHANNEL
@@ -452,6 +470,9 @@ __hal_channel_dtr_restore(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh,
 
 /* ========================== CHANNEL PUBLIC API ========================= */
 
+__HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL int
+xge_hal_channel_dtr_count(xge_hal_channel_h channelh);
+
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL void*
 xge_hal_channel_userdata(xge_hal_channel_h channelh);
 
@@ -478,5 +499,7 @@ void xge_hal_channel_close(xge_hal_channel_h channelh,
 
 void xge_hal_channel_abort(xge_hal_channel_h channelh,
                            xge_hal_channel_reopen_e reopen);
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_HAL_CHANNEL_H */

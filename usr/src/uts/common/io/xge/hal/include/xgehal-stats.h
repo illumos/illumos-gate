@@ -1,4 +1,5 @@
 /*
+	xge_hal_fifo_t            *fifo    = (xge_hal_fifo_t *)channelh;
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
@@ -17,17 +18,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-stats.h
- *
- *  Description:  HW statistics object
- *
- *  Created:      2 June 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_HAL_STATS_H
@@ -37,6 +29,8 @@
 #include "xge-debug.h"
 #include "xgehal-types.h"
 #include "xgehal-config.h"
+
+__EXTERN_BEGIN_DECLS
 
 /**
  * struct xge_hal_stats_hw_info_t - Xframe hardware statistics.
@@ -351,6 +345,58 @@
  * across multiple PCI transactions.
  * @rxf_wr_cnt: Count of receive frame write requests.
  *
+ * @tmac_frms_oflow: tbd
+ * @tmac_data_octets_oflow: tbd
+ * @tmac_mcst_frms_oflow: tbd
+ * @tmac_bcst_frms_oflow: tbd
+ * @tmac_ttl_octets_oflow: tbd
+ * @tmac_ucst_frms_oflow: tbd
+ * @tmac_nucst_frms_oflow: tbd
+ * @tmac_any_err_frms_oflow: tbd
+ * @tmac_vlan_frms: tbd
+ * @tmac_vld_ip_oflow: tbd
+ * @tmac_drop_ip_oflow: tbd
+ * @tmac_icmp_oflow: tbd
+ * @tmac_rst_tcp_oflow: tbd
+ * @tmac_udp_oflow: tbd
+ * @tpa_unknown_protocol: tbd
+ * @tpa_parse_failure: tbd
+ * @rmac_vld_frms_oflow: tbd
+ * @rmac_data_octets_oflow: tbd
+ * @rmac_vld_mcst_frms_oflow: tbd
+ * @rmac_vld_bcst_frms_oflow: tbd
+ * @rmac_ttl_octets_oflow: tbd
+ * @rmac_accepted_ucst_frms_oflow: tbd
+ * @rmac_accepted_nucst_frms_oflow: tbd
+ * @rmac_discarded_frms_oflow: tbd
+ * @rmac_drop_events_oflow: tbd
+ * @rmac_usized_frms_oflow: tbd
+ * @rmac_osized_frms_oflow: tbd
+ * @rmac_frag_frms_oflow: tbd
+ * @rmac_jabber_frms_oflow: tbd
+ * @rmac_ip_oflow: tbd
+ * @rmac_drop_ip_oflow: tbd
+ * @rmac_icmp_oflow: tbd
+ * @rmac_udp_oflow: tbd
+ * @rmac_err_drp_udp_oflow: tbd
+ * @rmac_pause_cnt_oflow: tbd
+ * @rmac_ttl_1519_4095_frms: tbd
+ * @rmac_ttl_4096_8191_frms: tbd
+ * @rmac_ttl_8192_max_frms: tbd
+ * @rmac_ttl_gt_max_frms: tbd
+ * @rmac_osized_alt_frms: tbd
+ * @rmac_jabber_alt_frms: tbd
+ * @rmac_gt_max_alt_frms: tbd
+ * @rmac_vlan_frms: tbd
+ * @rmac_fcs_discard: tbd
+ * @rmac_len_discard: tbd
+ * @rmac_da_discard: tbd
+ * @rmac_pf_discard: tbd
+ * @rmac_rts_discard: tbd
+ * @rmac_red_discard: tbd
+ * @rmac_ingm_full_discard: tbd
+ * @rmac_accepted_ip_oflow: tbd
+ * @link_fault_cnt: TBD
  * Xframe hardware statistics.
  */
 typedef struct xge_hal_stats_hw_info_t {
@@ -486,6 +532,7 @@ typedef struct xge_hal_stats_hw_info_t {
 	u32 tmac_udp_oflow;
 	u32 tpa_unknown_protocol;
 	u32 tpa_parse_failure;
+	u32 reserved_10;
 	u32 rmac_vld_frms_oflow;
 	u32 rmac_data_octets_oflow;
 	u32 rmac_vld_mcst_frms_oflow;
@@ -505,6 +552,7 @@ typedef struct xge_hal_stats_hw_info_t {
 	u32 rmac_udp_oflow;
 	u32 rmac_err_drp_udp_oflow;
 	u32 rmac_pause_cnt_oflow;
+	u32 reserved_11;
 	u64 rmac_ttl_1519_4095_frms;
 	u64 rmac_ttl_4096_8191_frms;
 	u64 rmac_ttl_8192_max_frms;
@@ -518,10 +566,13 @@ typedef struct xge_hal_stats_hw_info_t {
 	u32 rmac_da_discard;
 	u32 rmac_pf_discard;
 	u32 rmac_rts_discard;
+	u32 rmac_wol_discard;
 	u32 rmac_red_discard;
 	u32 rmac_ingm_full_discard;
 	u32 rmac_accepted_ip_oflow;
+	u32 reserved_12;
 	u32 link_fault_cnt;
+	u32 reserved_13;
 #else
 /* Tx MAC statistics counters. */
 	u32 tmac_data_octets;
@@ -653,26 +704,28 @@ typedef struct xge_hal_stats_hw_info_t {
 	u32 tmac_icmp_oflow;
 	u32 tpa_unknown_protocol;
 	u32 tmac_udp_oflow;
-	u32 rmac_vld_frms_oflow;
+	u32 reserved_10;
 	u32 tpa_parse_failure;
-	u32 rmac_vld_mcst_frms_oflow;
 	u32 rmac_data_octets_oflow;
-	u32 rmac_ttl_octets_oflow;
+	u32 rmac_vld_frms_oflow;
 	u32 rmac_vld_bcst_frms_oflow;
-	u32 rmac_accepted_nucst_frms_oflow;
+	u32 rmac_vld_mcst_frms_oflow;
 	u32 rmac_accepted_ucst_frms_oflow;
-	u32 rmac_drop_events_oflow;
+	u32 rmac_ttl_octets_oflow;
 	u32 rmac_discarded_frms_oflow;
-	u32 rmac_osized_frms_oflow;
+	u32 rmac_accepted_nucst_frms_oflow;
 	u32 rmac_usized_frms_oflow;
-	u32 rmac_jabber_frms_oflow;
+	u32 rmac_drop_events_oflow;
 	u32 rmac_frag_frms_oflow;
-	u32 rmac_drop_ip_oflow;
+	u32 rmac_osized_frms_oflow;
 	u32 rmac_ip_oflow;
-	u32 rmac_udp_oflow;
+	u32 rmac_jabber_frms_oflow;
 	u32 rmac_icmp_oflow;
-	u32 rmac_pause_cnt_oflow;
+	u32 rmac_drop_ip_oflow;
 	u32 rmac_err_drp_udp_oflow;
+	u32 rmac_udp_oflow;
+	u32 reserved_11;
+	u32 rmac_pause_cnt_oflow;
 	u64 rmac_ttl_1519_4095_frms;
 	u64 rmac_ttl_4096_8191_frms;
 	u64 rmac_ttl_8192_max_frms;
@@ -685,10 +738,13 @@ typedef struct xge_hal_stats_hw_info_t {
 	u32 rmac_fcs_discard;
 	u32 rmac_pf_discard;
 	u32 rmac_da_discard;
-	u32 rmac_red_discard;
+	u32 rmac_wol_discard;
 	u32 rmac_rts_discard;
-	u32 rmac_accepted_ip_oflow;
 	u32 rmac_ingm_full_discard;
+	u32 rmac_red_discard;
+	u32 reserved_12;
+	u32 rmac_accepted_ip_oflow;
+	u32 reserved_13;
 	u32 link_fault_cnt;
 #endif
 } xge_hal_stats_hw_info_t;
@@ -739,13 +795,16 @@ typedef struct xge_hal_stats_hw_info_t {
  * See also: xge_hal_stats_device_info_t{}.
  */
 typedef struct xge_hal_stats_channel_info_t {
-	u32	out_of_dtrs_cnt;
+	u32	full_cnt;
+	u32	usage_max;
 	u32	reserve_free_swaps_cnt;
 	u32	avg_compl_per_intr_cnt;
 	u32	total_compl_cnt;
 	u32	total_posts;
 	u32	total_posts_many;
 	u32	total_buffers;
+	u32	copied_frags;
+	u32	copied_buffers;
 	u32	avg_buffers_per_post;
 	u32	avg_buffer_size;
 	u32	avg_post_size;
@@ -756,9 +815,57 @@ typedef struct xge_hal_stats_channel_info_t {
 	u32	total_posts_dang_frags;
 } xge_hal_stats_channel_info_t;
 
+/**
+ * struct xge_hal_xpak_counter_t - HAL xpak error counters
+ * @excess_temp: excess transceiver_temperature count
+ * @excess_bias_current: excess laser_bias_current count
+ * @excess_laser_output: excess laser_output_power count
+ * @tick_period: tick count for each cycle
+ */
+typedef struct xge_hal_xpak_counter_t {
+        u32     excess_temp;
+        u32     excess_bias_current;
+        u32     excess_laser_output;
+        u32     tick_period;
+} xge_hal_xpak_counter_t;
+
+/**
+ * struct xge_hal_stats_xpak_t - HAL xpak stats
+ * @alarm_transceiver_temp_high: alarm_transceiver_temp_high count value
+ * @alarm_transceiver_temp_low : alarm_transceiver_temp_low count value
+ * @alarm_laser_bias_current_high: alarm_laser_bias_current_high count value
+ * @alarm_laser_bias_current_low: alarm_laser_bias_current_low count value
+ * @alarm_laser_output_power_high: alarm_laser_output_power_high count value
+ * @alarm_laser_output_power_low: alarm_laser_output_power_low count value
+ * @warn_transceiver_temp_high: warn_transceiver_temp_high count value
+ * @warn_transceiver_temp_low: warn_transceiver_temp_low count value
+ * @warn_laser_bias_current_high: warn_laser_bias_current_high count value
+ * @warn_laser_bias_current_low: warn_laser_bias_current_low count value
+ * @warn_laser_output_power_high: warn_laser_output_power_high count value
+ * @warn_laser_output_power_low: warn_laser_output_power_low count value
+ */
+typedef struct xge_hal_stats_xpak_t {
+        u16     alarm_transceiver_temp_high;
+        u16     alarm_transceiver_temp_low;
+        u16     alarm_laser_bias_current_high;
+        u16     alarm_laser_bias_current_low;
+        u16     alarm_laser_output_power_high;
+        u16     alarm_laser_output_power_low;
+        u16     warn_transceiver_temp_high;
+        u16     warn_transceiver_temp_low;
+        u16     warn_laser_bias_current_high;
+        u16     warn_laser_bias_current_low;
+        u16     warn_laser_output_power_high;
+        u16     warn_laser_output_power_low;
+} xge_hal_stats_xpak_t;
+
+
 
 /**
  * struct xge_hal_stats_sw_err_t - HAL device error statistics.
+ * @sm_err_cnt: TBD
+ * @single_ecc_err_cnt: TBD
+ * @double_ecc_err_cnt: TBD
  * @ecc_err_cnt: ECC error count.
  * @parity_err_cnt: Parity error count.
  * @serr_cnt: Number of exceptions indicated to the host via PCI SERR#.
@@ -783,10 +890,24 @@ typedef struct xge_hal_stats_sw_err_t {
 	u32     serr_cnt;
 	u32     rxd_t_code_err_cnt[16];
 	u32     txd_t_code_err_cnt[16];
+	xge_hal_stats_xpak_t    stats_xpak;
+	xge_hal_xpak_counter_t  xpak_counter;
 } xge_hal_stats_sw_err_t;
 
 /**
  * struct xge_hal_stats_device_info_t - HAL own per-device statistics.
+ * 
+ * @rx_traffic_intr_cnt: TBD
+ * @tx_traffic_intr_cnt: TBD
+ * @txpic_intr_cnt: TBD
+ * @txdma_intr_cnt: TBD
+ * @txmac_intr_cnt: TBD
+ * @txxgxs_intr_cnt: TBD
+ * @rxpic_intr_cnt: TBD
+ * @rxdma_intr_cnt: TBD
+ * @rxmac_intr_cnt: TBD
+ * @rxxgxs_intr_cnt: TBD
+ * @mc_intr_cnt: TBD
  * @not_traffic_intr_cnt: Number of times the host was interrupted
  *                        without new completions.
  *                        "Non-traffic interrupt counter".
@@ -797,6 +918,13 @@ typedef struct xge_hal_stats_sw_err_t {
  * @soft_reset_cnt: Number of times soft reset is done on this device.
  * @rxufca_hi_adjust_cnt: TODO
  * @rxufca_lo_adjust_cnt: TODO
+ * 
+ * @tot_frms_lroised: TBD
+ * @tot_lro_sessions: TBD
+ * @lro_frm_len_exceed_cnt: TBD
+ * @lro_sg_exceed_cnt: TBD
+ * @lro_out_of_seq_pkt_cnt: TBD
+ * @lro_dup_pkt_cnt: TBD
  *
  * HAL per-device statistics.
  * See also: xge_hal_stats_channel_info_t{}.
@@ -804,15 +932,30 @@ typedef struct xge_hal_stats_sw_err_t {
 typedef struct xge_hal_stats_device_info_t {
 	u32				rx_traffic_intr_cnt;
 	u32				tx_traffic_intr_cnt;
+	u32				txpic_intr_cnt;
+	u32				txdma_intr_cnt;
+	u32				txmac_intr_cnt;
+	u32				txxgxs_intr_cnt;
+	u32				rxpic_intr_cnt;
+	u32				rxdma_intr_cnt;
+	u32				rxmac_intr_cnt;
+	u32				rxxgxs_intr_cnt;
+	u32				mc_intr_cnt;
 	u32				not_traffic_intr_cnt;
 	u32				traffic_intr_cnt;
 	u32				total_intr_cnt;
 	u32				soft_reset_cnt;
 	u32				rxufca_hi_adjust_cnt;
 	u32				rxufca_lo_adjust_cnt;
+	u32				bimodal_hi_adjust_cnt;
+	u32				bimodal_lo_adjust_cnt;
 #ifdef XGE_HAL_CONFIG_LRO
 	u32				tot_frms_lroised;
 	u32				tot_lro_sessions;
+	u32				lro_frm_len_exceed_cnt;
+	u32				lro_sg_exceed_cnt;
+	u32				lro_out_of_seq_pkt_cnt;
+	u32				lro_dup_pkt_cnt;
 #endif
 } xge_hal_stats_device_info_t;
 
@@ -829,6 +972,8 @@ typedef struct xge_hal_stats_device_info_t {
  *                    corresponding value will be simply pointer to PCI device.
  *
  * @hw_info: Xframe statistics maintained by the hardware.
+ * @hw_info_saved: TBD
+ * @hw_info_latest: TBD
  * @sw_dev_info_stats: HAL's "soft" device informational statistics, e.g. number
  *                     of completions per interrupt.
  * @sw_dev_err_stats: HAL's "soft" device error statistics.
@@ -890,5 +1035,7 @@ xge_hal_status_e xge_hal_stats_channel(xge_hal_channel_h channelh,
 			xge_hal_stats_channel_info_t **channel_info);
 
 xge_hal_status_e xge_hal_stats_reset(xge_hal_device_h devh);
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_HAL_STATS_H */

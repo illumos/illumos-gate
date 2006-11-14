@@ -40,6 +40,7 @@
 
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <netinet/udp.h>
 
 #define	XGELL_MAX_FRAME_SIZE(hldev)	((hldev)->config.mtu +	\
     sizeof (struct ether_vlan_header))
@@ -62,7 +63,7 @@ static struct ddi_dma_attr tx_dma_attr = {
 	1,				/* dma_attr_minxfer */
 	0xFFFFFFFFULL,			/* dma_attr_maxxfer */
 	0xFFFFFFFFFFFFFFFFULL,		/* dma_attr_seg */
-	4,				/* dma_attr_sgllen */
+	18,				/* dma_attr_sgllen */
 	1,				/* dma_attr_granular */
 	0				/* dma_attr_flags */
 };
@@ -167,6 +168,11 @@ xge_device_poll(void *data)
 		xge_hal_device_poll(data);
 		lldev->timeout_id = timeout(xge_device_poll, data,
 		    XGE_DEV_POLL_TICKS);
+	} else if (lldev->in_reset == 1) {
+		lldev->timeout_id = timeout(xge_device_poll, data,
+		    XGE_DEV_POLL_TICKS);
+	} else {
+		lldev->timeout_id = 0;
 	}
 	mutex_exit(&lldev->genlock);
 }
@@ -182,10 +188,10 @@ xge_device_poll_now(void *data)
 	xgelldev_t *lldev = xge_hal_device_private(data);
 
 	mutex_enter(&lldev->genlock);
-	(void) untimeout(lldev->timeout_id);
-	lldev->timeout_id = timeout(xge_device_poll, data, 0);
+	if (lldev->is_initialized) {
+		xge_hal_device_poll(data);
+	}
 	mutex_exit(&lldev->genlock);
-
 }
 
 /*
@@ -234,6 +240,8 @@ xgell_rx_buffer_replenish_all(xgelldev_t *lldev)
 	xgell_rx_buffer_t *rx_buffer;
 	xgell_rxd_priv_t *rxd_priv;
 
+	xge_assert(mutex_owned(&lldev->bf_pool.pool_lock));
+
 	while ((lldev->bf_pool.free > 0) &&
 	    (xge_hal_ring_dtr_reserve(lldev->ring_main.channelh, &dtr) ==
 	    XGE_HAL_OK)) {
@@ -258,21 +266,20 @@ xgell_rx_buffer_replenish_all(xgelldev_t *lldev)
  * xgell_rx_buffer_release
  *
  * The only thing done here is to put the buffer back to the pool.
+ * Calling this function need be protected by mutex, bf_pool.pool_lock.
  */
 static void
 xgell_rx_buffer_release(xgell_rx_buffer_t *rx_buffer)
 {
 	xgelldev_t *lldev = rx_buffer->lldev;
 
-	mutex_enter(&lldev->bf_pool.pool_lock);
+	xge_assert(mutex_owned(&lldev->bf_pool.pool_lock));
 
 	/* Put the buffer back to pool */
 	rx_buffer->next = lldev->bf_pool.head;
 	lldev->bf_pool.head = rx_buffer;
 
 	lldev->bf_pool.free++;
-
-	mutex_exit(&lldev->bf_pool.pool_lock);
 }
 
 /*
@@ -287,9 +294,9 @@ xgell_rx_buffer_recycle(char *arg)
 	xgell_rx_buffer_t *rx_buffer = (xgell_rx_buffer_t *)arg;
 	xgelldev_t *lldev = rx_buffer->lldev;
 
-	xgell_rx_buffer_release(rx_buffer);
-
 	mutex_enter(&lldev->bf_pool.pool_lock);
+
+	xgell_rx_buffer_release(rx_buffer);
 	lldev->bf_pool.post--;
 
 	/*
@@ -323,7 +330,7 @@ xgell_rx_buffer_alloc(xgelldev_t *lldev)
 	extern ddi_device_acc_attr_t *p_xge_dev_attr;
 	xgell_rx_buffer_t *rx_buffer;
 
-	hldev = lldev->devh;
+	hldev = (xge_hal_device_t *)lldev->devh;
 
 	if (ddi_dma_alloc_handle(hldev->pdev, p_hal_dma_attr, DDI_DMA_SLEEP,
 	    0, &dma_handle) != DDI_SUCCESS) {
@@ -463,7 +470,6 @@ xgell_rx_create_buffer_pool(xgelldev_t *lldev)
 	lldev->bf_pool.free = 0;
 	lldev->bf_pool.post = 0;
 	lldev->bf_pool.post_hiwat = lldev->config.rx_buffer_post_hiwat;
-	lldev->bf_pool.recycle_hiwat = lldev->config.rx_buffer_recycle_hiwat;
 
 	mutex_init(&lldev->bf_pool.pool_lock, NULL, MUTEX_DRIVER,
 	    hldev->irqh);
@@ -576,9 +582,6 @@ xgell_rx_hcksum_assoc(mblk_t *mp, char *vaddr, int pkt_length,
     xge_hal_dtr_info_t *ext_info)
 {
 	int cksum_flags = 0;
-	int ip_off;
-
-	ip_off = xgell_get_ip_offset(ext_info);
 
 	if (!(ext_info->proto & XGE_HAL_FRAME_PROTO_IP_FRAGMENTED)) {
 		if (ext_info->proto & XGE_HAL_FRAME_PROTO_TCP_OR_UDP) {
@@ -599,6 +602,7 @@ xgell_rx_hcksum_assoc(mblk_t *mp, char *vaddr, int pkt_length,
 		/*
 		 * Just pass the partial cksum up to IP.
 		 */
+		int ip_off = xgell_get_ip_offset(ext_info);
 		int start, end = pkt_length - ip_off;
 
 		if (ext_info->proto & XGE_HAL_FRAME_PROTO_IPV4) {
@@ -621,12 +625,12 @@ xgell_rx_hcksum_assoc(mblk_t *mp, char *vaddr, int pkt_length,
  * Allocate message header for data buffer, and decide if copy the packet to
  * new data buffer to release big rx_buffer to save memory.
  *
- * If the pkt_length <= XGELL_DMA_BUFFER_SIZE_LOWAT, call allocb() to allocate
+ * If the pkt_length <= XGELL_RX_DMA_LOWAT, call allocb() to allocate
  * new message and copy the payload in.
  */
 static mblk_t *
-xgell_rx_1b_msg_alloc(xgell_rx_buffer_t *rx_buffer, int pkt_length,
-    xge_hal_dtr_info_t *ext_info, boolean_t *copyit)
+xgell_rx_1b_msg_alloc(xgelldev_t *lldev, xgell_rx_buffer_t *rx_buffer,
+    int pkt_length, xge_hal_dtr_info_t *ext_info, boolean_t *copyit)
 {
 	mblk_t *mp;
 	mblk_t *nmp = NULL;
@@ -634,13 +638,12 @@ xgell_rx_1b_msg_alloc(xgell_rx_buffer_t *rx_buffer, int pkt_length,
 	int hdr_length = 0;
 
 #ifdef XGELL_L3_ALIGNED
-	int doalign = 1;
+	boolean_t doalign = B_TRUE;
 	struct ip *ip;
 	struct tcphdr *tcp;
 	int tcp_off;
 	int mp_align_len;
 	int ip_off;
-
 #endif
 
 	vaddr = (char *)rx_buffer->vaddr + HEADROOM;
@@ -649,7 +652,7 @@ xgell_rx_1b_msg_alloc(xgell_rx_buffer_t *rx_buffer, int pkt_length,
 
 	/* Check ip_off with HEADROOM */
 	if ((ip_off & 3) == HEADROOM) {
-		doalign = 0;
+		doalign = B_FALSE;
 	}
 
 	/*
@@ -658,7 +661,7 @@ xgell_rx_1b_msg_alloc(xgell_rx_buffer_t *rx_buffer, int pkt_length,
 	/* Is IPv4 or IPv6? */
 	if (doalign && !(ext_info->proto & XGE_HAL_FRAME_PROTO_IPV4 ||
 	    ext_info->proto & XGE_HAL_FRAME_PROTO_IPV6)) {
-		doalign = 0;
+		doalign = B_FALSE;
 	}
 
 	/* Is TCP? */
@@ -672,15 +675,15 @@ xgell_rx_1b_msg_alloc(xgell_rx_buffer_t *rx_buffer, int pkt_length,
 			hdr_length = pkt_length;
 		}
 	} else {
-		doalign = 0;
+		doalign = B_FALSE;
 	}
 #endif
 
 	/*
 	 * Copy packet into new allocated message buffer, if pkt_length
-	 * is less than XGELL_DMA_BUFFER_LOWAT
+	 * is less than XGELL_RX_DMA_LOWAT
 	 */
-	if (*copyit || pkt_length <= XGELL_DMA_BUFFER_SIZE_LOWAT) {
+	if (*copyit || pkt_length <= lldev->config.rx_dma_lowat) {
 		/* Keep room for alignment */
 		if ((mp = allocb(pkt_length + HEADROOM + 4, 0)) == NULL) {
 			return (NULL);
@@ -766,13 +769,14 @@ xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 	xgell_rx_buffer_t *rx_buffer;
 	mblk_t *mp_head = NULL;
 	mblk_t *mp_end  = NULL;
+	int pkt_burst = 0;
+
+	mutex_enter(&lldev->bf_pool.pool_lock);
 
 	do {
-		int ret;
 		int pkt_length;
 		dma_addr_t dma_data;
 		mblk_t *mp;
-
 		boolean_t copyit = B_FALSE;
 
 		xgell_rxd_priv_t *rxd_priv = ((xgell_rxd_priv_t *)
@@ -801,9 +805,8 @@ xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 		/*
 		 * Sync the DMA memory
 		 */
-		ret = ddi_dma_sync(rx_buffer->dma_handle, 0, pkt_length,
-		    DDI_DMA_SYNC_FORKERNEL);
-		if (ret != DDI_SUCCESS) {
+		if (ddi_dma_sync(rx_buffer->dma_handle, 0, pkt_length,
+		    DDI_DMA_SYNC_FORKERNEL) != DDI_SUCCESS) {
 			xge_debug_ll(XGE_ERR, "%s%d: rx: can not do DMA sync",
 			    XGELL_IFNAME, lldev->instance);
 			xge_hal_ring_dtr_free(channelh, dtr); /* drop it */
@@ -820,8 +823,8 @@ xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 			copyit = B_FALSE;
 		}
 
-		mp = xgell_rx_1b_msg_alloc(rx_buffer, pkt_length, &ext_info,
-		    &copyit);
+		mp = xgell_rx_1b_msg_alloc(lldev, rx_buffer, pkt_length,
+		    &ext_info, &copyit);
 
 		xge_hal_ring_dtr_free(channelh, dtr);
 
@@ -834,19 +837,18 @@ xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 			/*
 			 * Count it since the buffer should be loaned up.
 			 */
-			mutex_enter(&lldev->bf_pool.pool_lock);
 			lldev->bf_pool.post++;
-			mutex_exit(&lldev->bf_pool.pool_lock);
 		}
 		if (mp == NULL) {
 			xge_debug_ll(XGE_ERR,
-			    "%s%d: rx: can not allocate mp mblk", XGELL_IFNAME,
-			    lldev->instance);
+			    "%s%d: rx: can not allocate mp mblk",
+			    XGELL_IFNAME, lldev->instance);
 			continue;
 		}
 
 		/*
-		 * Associate cksum_flags per packet type and h/w cksum flags.
+		 * Associate cksum_flags per packet type and h/w
+		 * cksum flags.
 		 */
 		xgell_rx_hcksum_assoc(mp, (char *)rx_buffer->vaddr +
 		    HEADROOM, pkt_length, &ext_info);
@@ -859,19 +861,34 @@ xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 			mp_end = mp;
 		}
 
+		if (++pkt_burst < lldev->config.rx_pkt_burst)
+			continue;
+
+		if (lldev->bf_pool.post > lldev->bf_pool.post_hiwat) {
+			/* Replenish rx buffers */
+			xgell_rx_buffer_replenish_all(lldev);
+		}
+		mutex_exit(&lldev->bf_pool.pool_lock);
+		if (mp_head != NULL) {
+			mac_rx(lldev->mh, ((xgell_ring_t *)userdata)->handle,
+			    mp_head);
+		}
+		mp_head = mp_end  = NULL;
+		pkt_burst = 0;
+		mutex_enter(&lldev->bf_pool.pool_lock);
+
 	} while (xge_hal_ring_dtr_next_completed(channelh, &dtr, &t_code) ==
 	    XGE_HAL_OK);
-
-	if (mp_head) {
-		mac_rx(lldev->mh, ((xgell_ring_t *)userdata)->handle, mp_head);
-	}
 
 	/*
 	 * Always call replenish_all to recycle rx_buffers.
 	 */
-	mutex_enter(&lldev->bf_pool.pool_lock);
 	xgell_rx_buffer_replenish_all(lldev);
 	mutex_exit(&lldev->bf_pool.pool_lock);
+
+	if (mp_head != NULL) {
+		mac_rx(lldev->mh, ((xgell_ring_t *)userdata)->handle, mp_head);
+	}
 
 	return (XGE_HAL_OK);
 }
@@ -894,9 +911,7 @@ xgell_xmit_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 		xgell_txd_priv_t *txd_priv = ((xgell_txd_priv_t *)
 		    xge_hal_fifo_dtr_private(dtr));
 		mblk_t *mp = txd_priv->mblk;
-#if !defined(XGELL_TX_NOMAP_COPY)
 		int i;
-#endif
 
 		if (t_code) {
 			xge_debug_ll(XGE_TRACE, "%s%d: tx: dtr 0x%"PRIx64
@@ -907,14 +922,12 @@ xgell_xmit_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 			    t_code);
 		}
 
-#if !defined(XGELL_TX_NOMAP_COPY)
 		for (i = 0; i < txd_priv->handle_cnt; i++) {
 			xge_assert(txd_priv->dma_handles[i]);
 			(void) ddi_dma_unbind_handle(txd_priv->dma_handles[i]);
 			ddi_dma_free_handle(&txd_priv->dma_handles[i]);
 			txd_priv->dma_handles[i] = 0;
 		}
-#endif
 
 		xge_hal_fifo_dtr_free(channelh, dtr);
 
@@ -939,7 +952,7 @@ xgell_xmit_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 
 /*
  * xgell_send
- * @hldev: pointer to s2hal_device_t strucutre
+ * @hldev: pointer to xge_hal_device_t strucutre
  * @mblk: pointer to network buffer, i.e. mblk_t structure
  *
  * Called by the xgell_m_tx to transmit the packet to the XFRAME firmware.
@@ -947,24 +960,22 @@ xgell_xmit_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
  * this routine.
  */
 static boolean_t
-xgell_send(xge_hal_device_t *hldev, mblk_t *mp)
+xgell_send(xgelldev_t *lldev, mblk_t *mp)
 {
 	mblk_t *bp;
-	int retry, repeat;
+	boolean_t retry;
+	xge_hal_device_t *hldev = lldev->devh;
 	xge_hal_status_e status;
 	xge_hal_dtr_h dtr;
-	xgelldev_t *lldev = xge_hal_device_private(hldev);
 	xgell_txd_priv_t *txd_priv;
-	uint32_t pflags;
-#ifndef XGELL_TX_NOMAP_COPY
-	int handle_cnt, frag_cnt, ret, i;
-#endif
+	uint32_t hckflags;
+	uint32_t mss;
+	int handle_cnt, frag_cnt, ret, i, copied;
+	boolean_t used_copy;
 
 _begin:
-	retry = repeat = 0;
-#ifndef XGELL_TX_NOMAP_COPY
+	retry = B_FALSE;
 	handle_cnt = frag_cnt = 0;
-#endif
 
 	if (!lldev->is_initialized || lldev->in_reset)
 		return (B_FALSE);
@@ -976,14 +987,14 @@ _begin:
 	 * gld through gld_sched call, when the free dtrs count exceeds
 	 * the higher threshold.
 	 */
-	if (__hal_channel_dtr_count(lldev->fifo_channel)
+	if (xge_hal_channel_dtr_count(lldev->fifo_channel)
 	    <= XGELL_TX_LEVEL_LOW) {
 		xge_debug_ll(XGE_TRACE, "%s%d: queue %d: err on xmit,"
 		    "free descriptors count at low threshold %d",
 		    XGELL_IFNAME, lldev->instance,
 		    ((xge_hal_channel_t *)lldev->fifo_channel)->post_qid,
 		    XGELL_TX_LEVEL_LOW);
-		retry = 1;
+		retry = B_TRUE;
 		goto _exit;
 	}
 
@@ -996,7 +1007,7 @@ _begin:
 			    lldev->instance,
 			    ((xge_hal_channel_t *)
 			    lldev->fifo_channel)->post_qid);
-			retry = 1;
+			retry = B_TRUE;
 			goto _exit;
 		case XGE_HAL_INF_OUT_OF_DESCRIPTORS:
 			xge_debug_ll(XGE_TRACE, "%s%d: queue %d: error in xmit,"
@@ -1004,7 +1015,7 @@ _begin:
 			    lldev->instance,
 			    ((xge_hal_channel_t *)
 			    lldev->fifo_channel)->post_qid);
-			retry = 1;
+			retry = B_TRUE;
 			goto _exit;
 		default:
 			return (B_FALSE);
@@ -1029,31 +1040,17 @@ _begin:
 	 *
 	 * evhp = (struct ether_vlan_header *)mp->b_rptr;
 	 * if (evhp->ether_tpid == htons(VLAN_TPID)) {
-	 * 	tci = ntohs(evhp->ether_tci);
-	 * 	(void) bcopy(mp->b_rptr, mp->b_rptr + VLAN_TAGSZ,
+	 *	tci = ntohs(evhp->ether_tci);
+	 *	(void) bcopy(mp->b_rptr, mp->b_rptr + VLAN_TAGSZ,
 	 *	    2 * ETHERADDRL);
-	 * 	mp->b_rptr += VLAN_TAGSZ;
+	 *	mp->b_rptr += VLAN_TAGSZ;
 	 *
-	 * 	xge_hal_fifo_dtr_vlan_set(dtr, tci);
+	 *	xge_hal_fifo_dtr_vlan_set(dtr, tci);
 	 * }
 	 */
 
-#ifdef XGELL_TX_NOMAP_COPY
-	for (bp = mp; bp != NULL; bp = bp->b_cont) {
-		int mblen;
-		xge_hal_status_e rc;
-
-		/* skip zero-length message blocks */
-		mblen = MBLKL(bp);
-		if (mblen == 0) {
-			continue;
-		}
-		rc = xge_hal_fifo_dtr_buffer_append(lldev->fifo_channel, dtr,
-			bp->b_rptr, mblen);
-		xge_assert(rc == XGE_HAL_OK);
-	}
-	xge_hal_fifo_dtr_buffer_finalize(lldev->fifo_channel, dtr, 0);
-#else
+	copied = 0;
+	used_copy = B_FALSE;
 	for (bp = mp; bp != NULL; bp = bp->b_cont) {
 		int mblen;
 		uint_t ncookies;
@@ -1066,12 +1063,36 @@ _begin:
 			continue;
 		}
 
+		/*
+		 * Check the message length to decide to DMA or bcopy() data
+		 * to tx descriptor(s).
+		 */
+		if (mblen < lldev->config.tx_dma_lowat &&
+		    (copied + mblen) < lldev->tx_copied_max) {
+			xge_hal_status_e rc;
+			rc = xge_hal_fifo_dtr_buffer_append(lldev->fifo_channel,
+			    dtr, bp->b_rptr, mblen);
+			if (rc == XGE_HAL_OK) {
+				used_copy = B_TRUE;
+				copied += mblen;
+				continue;
+			} else if (used_copy) {
+				xge_hal_fifo_dtr_buffer_finalize(
+					lldev->fifo_channel, dtr, frag_cnt++);
+				used_copy = B_FALSE;
+			}
+		} else if (used_copy) {
+			xge_hal_fifo_dtr_buffer_finalize(lldev->fifo_channel,
+			    dtr, frag_cnt++);
+			used_copy = B_FALSE;
+		}
+
 		ret = ddi_dma_alloc_handle(lldev->dev_info, &tx_dma_attr,
 		    DDI_DMA_DONTWAIT, 0, &dma_handle);
 		if (ret != DDI_SUCCESS) {
 			xge_debug_ll(XGE_ERR,
-			    "%s%d: can not allocate dma handle",
-			    XGELL_IFNAME, lldev->instance);
+			    "%s%d: can not allocate dma handle", XGELL_IFNAME,
+			    lldev->instance);
 			goto _exit_cleanup;
 		}
 
@@ -1104,7 +1125,7 @@ _begin:
 			goto _exit_cleanup;
 		}
 
-		if (ncookies + frag_cnt > XGE_HAL_DEFAULT_FIFO_FRAGS) {
+		if (ncookies + frag_cnt > hldev->config.fifo.max_frags) {
 			xge_debug_ll(XGE_ERR, "%s%d: too many fragments, "
 			    "requested c:%d+f:%d", XGELL_IFNAME,
 			    lldev->instance, ncookies, frag_cnt);
@@ -1128,7 +1149,7 @@ _begin:
 
 		if (bp->b_cont &&
 		    (frag_cnt + XGE_HAL_DEFAULT_FIFO_FRAGS_THRESHOLD >=
-		    XGE_HAL_DEFAULT_FIFO_FRAGS)) {
+			hldev->config.fifo.max_frags)) {
 			mblk_t *nmp;
 
 			xge_debug_ll(XGE_TRACE,
@@ -1146,15 +1167,28 @@ _begin:
 		}
 	}
 
-	txd_priv->handle_cnt = handle_cnt;
-#endif /* XGELL_TX_NOMAP_COPY */
+	/* finalize unfinished copies */
+	if (used_copy) {
+		xge_hal_fifo_dtr_buffer_finalize(lldev->fifo_channel, dtr,
+		    frag_cnt++);
+	}
 
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &pflags);
-	if (pflags & HCK_IPV4_HDRCKSUM) {
+	txd_priv->handle_cnt = handle_cnt;
+
+	/*
+	 * If LSO is required, just call xge_hal_fifo_dtr_mss_set(dtr, mss) to
+	 * do all necessary work.
+	 */
+	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, &mss, &hckflags);
+	if ((hckflags & HW_LSO) && (mss != 0)) {
+		xge_hal_fifo_dtr_mss_set(dtr, mss);
+	}
+
+	if (hckflags & HCK_IPV4_HDRCKSUM) {
 		xge_hal_fifo_dtr_cksum_set_bits(dtr,
 		    XGE_HAL_TXD_TX_CKO_IPV4_EN);
 	}
-	if (pflags & HCK_FULLCKSUM) {
+	if (hckflags & HCK_FULLCKSUM) {
 		xge_hal_fifo_dtr_cksum_set_bits(dtr, XGE_HAL_TXD_TX_CKO_TCP_EN |
 		    XGE_HAL_TXD_TX_CKO_UDP_EN);
 	}
@@ -1165,19 +1199,13 @@ _begin:
 
 _exit_cleanup:
 
-#if !defined(XGELL_TX_NOMAP_COPY)
 	for (i = 0; i < handle_cnt; i++) {
 		(void) ddi_dma_unbind_handle(txd_priv->dma_handles[i]);
 		ddi_dma_free_handle(&txd_priv->dma_handles[i]);
 		txd_priv->dma_handles[i] = 0;
 	}
-#endif
 
 	xge_hal_fifo_dtr_free(lldev->fifo_channel, dtr);
-
-	if (repeat) {
-		goto _begin;
-	}
 
 _exit:
 	if (retry) {
@@ -1197,7 +1225,7 @@ _exit:
 
 /*
  * xge_m_tx
- * @arg: pointer to the s2hal_device_t structure
+ * @arg: pointer to the xgelldev_t structure
  * @resid: resource id
  * @mp: pointer to the message buffer
  *
@@ -1206,14 +1234,14 @@ _exit:
 static mblk_t *
 xgell_m_tx(void *arg, mblk_t *mp)
 {
-	xge_hal_device_t *hldev = arg;
+	xgelldev_t *lldev = arg;
 	mblk_t *next;
 
 	while (mp != NULL) {
 		next = mp->b_next;
 		mp->b_next = NULL;
 
-		if (!xgell_send(hldev, mp)) {
+		if (!xgell_send(lldev, mp)) {
 			mp->b_next = next;
 			break;
 		}
@@ -1238,8 +1266,12 @@ xgell_rx_dtr_term(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh,
 	xgell_rx_buffer_t *rx_buffer = rxd_priv->rx_buffer;
 
 	if (state == XGE_HAL_DTR_STATE_POSTED) {
+		xgelldev_t *lldev = rx_buffer->lldev;
+
+		mutex_enter(&lldev->bf_pool.pool_lock);
 		xge_hal_ring_dtr_free(channelh, dtrh);
 		xgell_rx_buffer_release(rx_buffer);
+		mutex_exit(&lldev->bf_pool.pool_lock);
 	}
 }
 
@@ -1256,9 +1288,8 @@ xgell_tx_term(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh,
 	xgell_txd_priv_t *txd_priv =
 	    ((xgell_txd_priv_t *)xge_hal_fifo_dtr_private(dtrh));
 	mblk_t *mp = txd_priv->mblk;
-#if !defined(XGELL_TX_NOMAP_COPY)
 	int i;
-#endif
+
 	/*
 	 * for Tx we must clean up the DTR *only* if it has been
 	 * posted!
@@ -1267,14 +1298,12 @@ xgell_tx_term(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh,
 		return;
 	}
 
-#if !defined(XGELL_TX_NOMAP_COPY)
 	for (i = 0; i < txd_priv->handle_cnt; i++) {
 		xge_assert(txd_priv->dma_handles[i]);
 		(void) ddi_dma_unbind_handle(txd_priv->dma_handles[i]);
 		ddi_dma_free_handle(&txd_priv->dma_handles[i]);
 		txd_priv->dma_handles[i] = 0;
 	}
-#endif
 
 	xge_hal_fifo_dtr_free(channelh, dtrh);
 
@@ -1390,6 +1419,17 @@ xgell_initiate_start(xgelldev_t *lldev)
 		return (EIO);
 	}
 
+	/* tune jumbo/normal frame UFC counters */
+	hldev->config.ring.queue[XGELL_RING_MAIN_QID].rti.ufc_b = \
+		maxpkt > XGE_HAL_DEFAULT_MTU ?
+			XGE_HAL_DEFAULT_RX_UFC_B_J :
+			XGE_HAL_DEFAULT_RX_UFC_B_N;
+
+	hldev->config.ring.queue[XGELL_RING_MAIN_QID].rti.ufc_c = \
+		maxpkt > XGE_HAL_DEFAULT_MTU ?
+			XGE_HAL_DEFAULT_RX_UFC_C_J :
+			XGE_HAL_DEFAULT_RX_UFC_C_N;
+
 	/* now, enable the device */
 	status = xge_hal_device_enable(lldev->devh);
 	if (status != XGE_HAL_OK) {
@@ -1413,10 +1453,6 @@ xgell_initiate_start(xgelldev_t *lldev)
 		xge_os_mdelay(1500);
 		return (ENOMEM);
 	}
-
-#ifdef XGELL_TX_NOMAP_COPY
-	hldev->config.fifo.alignment_size = XGELL_MAX_FRAME_SIZE(hldev);
-#endif
 
 	if (!xgell_tx_open(lldev)) {
 		status = xge_hal_device_disable(lldev->devh);
@@ -1487,8 +1523,8 @@ xgell_initiate_stop(xgelldev_t *lldev)
 static int
 xgell_m_start(void *arg)
 {
-	xge_hal_device_t *hldev = arg;
-	xgelldev_t *lldev = xge_hal_device_private(hldev);
+	xgelldev_t *lldev = arg;
+	xge_hal_device_t *hldev = lldev->devh;
 	int ret;
 
 	xge_debug_ll(XGE_TRACE, "%s%d: M_START", XGELL_IFNAME,
@@ -1511,12 +1547,6 @@ xgell_m_start(void *arg)
 
 	lldev->timeout_id = timeout(xge_device_poll, hldev, XGE_DEV_POLL_TICKS);
 
-	if (!lldev->timeout_id) {
-		xgell_initiate_stop(lldev);
-		mutex_exit(&lldev->genlock);
-		return (EINVAL);
-	}
-
 	mutex_exit(&lldev->genlock);
 
 	return (0);
@@ -1534,16 +1564,10 @@ xgell_m_start(void *arg)
 static void
 xgell_m_stop(void *arg)
 {
-	xge_hal_device_t *hldev;
-	xgelldev_t *lldev;
+	xgelldev_t *lldev = arg;
+	xge_hal_device_t *hldev = lldev->devh;
 
 	xge_debug_ll(XGE_TRACE, "%s", "MAC_STOP");
-
-	hldev = arg;
-	xge_assert(hldev);
-
-	lldev = (xgelldev_t *)xge_hal_device_private(hldev);
-	xge_assert(lldev);
 
 	mutex_enter(&lldev->genlock);
 	if (!lldev->is_initialized) {
@@ -1560,7 +1584,9 @@ xgell_m_stop(void *arg)
 
 	mutex_exit(&lldev->genlock);
 
-	(void) untimeout(lldev->timeout_id);
+	if (lldev->timeout_id != 0) {
+		(void) untimeout(lldev->timeout_id);
+	}
 
 	xge_debug_ll(XGE_TRACE, "%s", "returning back to MAC Layer...");
 }
@@ -1608,8 +1634,8 @@ static int
 xgell_m_unicst(void *arg, const uint8_t *macaddr)
 {
 	xge_hal_status_e status;
-	xge_hal_device_t *hldev = arg;
-	xgelldev_t *lldev = (xgelldev_t *)xge_hal_device_private(hldev);
+	xgelldev_t *lldev = (xgelldev_t *)arg;
+	xge_hal_device_t *hldev = lldev->devh;
 	xge_debug_ll(XGE_TRACE, "%s", "MAC_UNICST");
 
 	xge_debug_ll(XGE_TRACE, "%s", "M_UNICAST");
@@ -1648,8 +1674,8 @@ static int
 xgell_m_multicst(void *arg, boolean_t add, const uint8_t *mc_addr)
 {
 	xge_hal_status_e status;
-	xge_hal_device_t *hldev = (xge_hal_device_t *)arg;
-	xgelldev_t *lldev = xge_hal_device_private(hldev);
+	xgelldev_t *lldev = (xgelldev_t *)arg;
+	xge_hal_device_t *hldev = lldev->devh;
 
 	xge_debug_ll(XGE_TRACE, "M_MULTICAST add %d", add);
 
@@ -1692,8 +1718,8 @@ xgell_m_multicst(void *arg, boolean_t add, const uint8_t *mc_addr)
 static int
 xgell_m_promisc(void *arg, boolean_t on)
 {
-	xge_hal_device_t *hldev = (xge_hal_device_t *)arg;
-	xgelldev_t *lldev = xge_hal_device_private(hldev);
+	xgelldev_t *lldev = (xgelldev_t *)arg;
+	xge_hal_device_t *hldev = lldev->devh;
 
 	mutex_enter(&lldev->genlock);
 
@@ -1728,8 +1754,8 @@ static int
 xgell_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	xge_hal_stats_hw_info_t *hw_info;
-	xge_hal_device_t *hldev = (xge_hal_device_t *)arg;
-	xgelldev_t *lldev = xge_hal_device_private(hldev);
+	xgelldev_t *lldev = (xgelldev_t *)arg;
+	xge_hal_device_t *hldev = lldev->devh;
 
 	xge_debug_ll(XGE_TRACE, "%s", "MAC_STATS_GET");
 
@@ -1752,23 +1778,28 @@ xgell_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case MAC_STAT_MULTIRCV:
-		*val = hw_info->rmac_vld_mcst_frms;
+		*val = ((u64) hw_info->rmac_vld_mcst_frms_oflow << 32) |
+		    hw_info->rmac_vld_mcst_frms;
 		break;
 
 	case MAC_STAT_BRDCSTRCV:
-		*val = hw_info->rmac_vld_bcst_frms;
+		*val = ((u64) hw_info->rmac_vld_bcst_frms_oflow << 32) |
+		    hw_info->rmac_vld_bcst_frms;
 		break;
 
 	case MAC_STAT_MULTIXMT:
-		*val = hw_info->tmac_mcst_frms;
+		*val = ((u64) hw_info->tmac_mcst_frms_oflow << 32) |
+		    hw_info->tmac_mcst_frms;
 		break;
 
 	case MAC_STAT_BRDCSTXMT:
-		*val = hw_info->tmac_bcst_frms;
+		*val = ((u64) hw_info->tmac_bcst_frms_oflow << 32) |
+		    hw_info->tmac_bcst_frms;
 		break;
 
 	case MAC_STAT_RBYTES:
-		*val = hw_info->rmac_ttl_octets;
+		*val = ((u64) hw_info->rmac_ttl_octets_oflow << 32) |
+		    hw_info->rmac_ttl_octets;
 		break;
 
 	case MAC_STAT_NORCVBUF:
@@ -1776,11 +1807,13 @@ xgell_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case MAC_STAT_IERRORS:
-		*val = hw_info->rmac_discarded_frms;
+		*val = ((u64) hw_info->rmac_discarded_frms_oflow << 32) |
+		    hw_info->rmac_discarded_frms;
 		break;
 
 	case MAC_STAT_OBYTES:
-		*val = hw_info->tmac_ttl_octets;
+		*val = ((u64) hw_info->tmac_ttl_octets_oflow << 32) |
+		    hw_info->tmac_ttl_octets;
 		break;
 
 	case MAC_STAT_NOXMTBUF:
@@ -1788,15 +1821,18 @@ xgell_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case MAC_STAT_OERRORS:
-		*val = hw_info->tmac_any_err_frms;
+		*val = ((u64) hw_info->tmac_any_err_frms_oflow << 32) |
+		    hw_info->tmac_any_err_frms;
 		break;
 
 	case MAC_STAT_IPACKETS:
-		*val = hw_info->rmac_vld_frms;
+		*val = ((u64) hw_info->rmac_vld_frms_oflow << 32) |
+		    hw_info->rmac_vld_frms;
 		break;
 
 	case MAC_STAT_OPACKETS:
-		*val = hw_info->tmac_frms;
+		*val = ((u64) hw_info->tmac_frms_oflow << 32) |
+		    hw_info->tmac_frms;
 		break;
 
 	case ETHER_STAT_FCS_ERRORS:
@@ -1839,7 +1875,6 @@ xgell_device_alloc(xge_hal_device_h devh,
 
 	lldev = kmem_zalloc(sizeof (xgelldev_t), KM_SLEEP);
 
-	/* allocate mac */
 	lldev->devh = hldev;
 	lldev->instance = instance;
 	lldev->dev_info = dev_info;
@@ -1869,8 +1904,7 @@ xgell_device_free(xgelldev_t *lldev)
 static void
 xgell_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 {
-	xge_hal_device_t *hldev = (xge_hal_device_t *)arg;
-	xgelldev_t *lldev = (xgelldev_t *)xge_hal_device_private(hldev);
+	xgelldev_t *lldev = arg;
 	struct iocblk *iocp;
 	int err = 0;
 	int cmd;
@@ -1945,6 +1979,8 @@ xgell_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 static boolean_t
 xgell_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
+	xgelldev_t *lldev = arg;
+
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM: {
 		uint32_t *hcksum_txflags = cap_data;
@@ -1952,13 +1988,17 @@ xgell_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		    HCKSUM_IPHDRCKSUM;
 		break;
 	}
-	case MAC_CAPAB_POLL:
-		/*
-		 * Fallthrough to default, as we don't support GLDv3
-		 * polling.  When blanking is implemented, we will need to
-		 * change this to return B_TRUE in addition to registering
-		 * an mc_resources callback.
-		 */
+	case MAC_CAPAB_LSO: {
+		mac_capab_lso_t *cap_lso = cap_data;
+
+		if (lldev->config.lso_enable) {
+			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+			cap_lso->lso_basic_tcp_ipv4.lso_max = XGELL_LSO_MAXLEN;
+			break;
+		} else {
+			return (B_FALSE);
+		}
+	}
 	default:
 		return (B_FALSE);
 	}
@@ -2242,10 +2282,8 @@ xgell_devconfig_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
 int
 xgell_device_register(xgelldev_t *lldev, xgell_config_t *config)
 {
-	mac_register_t *macp;
+	mac_register_t *macp = NULL;
 	xge_hal_device_t *hldev = (xge_hal_device_t *)lldev->devh;
-	int err;
-
 
 	if (nd_load(&lldev->ndp, "pciconf", xgell_pciconf_get, NULL,
 	    (caddr_t)lldev) == B_FALSE)
@@ -2289,7 +2327,7 @@ xgell_device_register(xgelldev_t *lldev, xgell_config_t *config)
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL)
 		goto xgell_register_fail;
 	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
-	macp->m_driver = hldev;
+	macp->m_driver = lldev;
 	macp->m_dip = lldev->dev_info;
 	macp->m_src_addr = hldev->macaddr[0];
 	macp->m_callbacks = &xgell_m_callbacks;
@@ -2299,10 +2337,14 @@ xgell_device_register(xgelldev_t *lldev, xgell_config_t *config)
 	 * Finally, we're ready to register ourselves with the Nemo
 	 * interface; if this succeeds, we're all ready to start()
 	 */
-	err = mac_register(macp, &lldev->mh);
-	mac_free(macp);
-	if (err != 0)
+
+	if (mac_register(macp, &lldev->mh) != 0)
 		goto xgell_register_fail;
+
+	/* Calculate tx_copied_max here ??? */
+	lldev->tx_copied_max = hldev->config.fifo.max_frags *
+		hldev->config.fifo.alignment_size *
+		hldev->config.fifo.max_aligned_frags;
 
 	xge_debug_ll(XGE_TRACE, "etherenet device %s%d registered",
 	    XGELL_IFNAME, lldev->instance);
@@ -2315,6 +2357,8 @@ xgell_ndd_fail:
 	return (DDI_FAILURE);
 
 xgell_register_fail:
+	if (macp != NULL)
+		mac_free(macp);
 	nd_free(&lldev->ndp);
 	mutex_destroy(&lldev->genlock);
 	/* Ignore return value, since RX not start */

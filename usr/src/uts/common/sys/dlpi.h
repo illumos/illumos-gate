@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -580,6 +579,8 @@ union	DL_qos_types {
 					/* dl_data is dl_capab_dls_t */
 #define	DL_CAPAB_SOFT_RING   	0x07	/* Soft ring capable */
 					/* dl_data is dl_capab_dls_t */
+#define	DL_CAPAB_LSO		0x08	/* Large Send Offload capability */
+					/* dl_data is dl_capab_lso_t */
 
 typedef struct {
 	t_uscalar_t	dl_cap;		/* capability type */
@@ -774,6 +775,30 @@ typedef struct {
 #define	DL_CAPAB_VMSAFE_MEM		0x01	/* Driver is zero-copy safe */
 						/* wrt VM named buffers on */
 						/* transmit */
+
+/*
+ * Large Send Offload sub-capability (follows dl_capability_sub_t)
+ */
+typedef struct {
+	t_uscalar_t	lso_version;		/* interface version */
+	t_uscalar_t	lso_flags;		/* capability flags */
+	t_uscalar_t	lso_max;		/* maximum payload */
+	t_uscalar_t	reserved[1];		/* reserved fields */
+	dl_mid_t	lso_mid;		/* module ID */
+} dl_capab_lso_t;
+
+/*
+ * Large Send Offload revision definition history
+ */
+#define	LSO_CURRENT_VERSION		0x01
+#define	LSO_VERSION_1			0x01
+
+/*
+ * Currently supported values of lso_flags
+ */
+#define	LSO_TX_ENABLE			0x01	/* to enable LSO */
+#define	LSO_TX_BASIC_TCP_IPV4		0x02	/* TCP LSO capability */
+
 /*
  * DLPI interface primitive definitions.
  *

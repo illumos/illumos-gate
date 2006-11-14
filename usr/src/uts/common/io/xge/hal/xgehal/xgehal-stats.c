@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-stats.c
- *
- *  Description:  statistics object implementation
- *
- *  Created:      2 June 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #include "xgehal-stats.h"
@@ -57,11 +48,12 @@ __hal_stats_initialize (xge_hal_stats_t *stats, xge_hal_device_h devh)
 	dma_flags |= XGE_OS_DMA_STREAMING;
 #endif
 
-	stats->hw_info = xge_os_dma_malloc(hldev->pdev,
-					 sizeof(xge_hal_stats_hw_info_t),
+	stats->hw_info = (xge_hal_stats_hw_info_t *) xge_os_dma_malloc(hldev->pdev,
+                     sizeof(xge_hal_stats_hw_info_t),
 					 dma_flags,
 					 &stats->hw_info_dmah,
-					 &stats->hw_info_dma_acch);
+                     &stats->hw_info_dma_acch);
+
 	if (stats->hw_info == NULL) {
 		xge_debug_stats(XGE_ERR, "%s", "can not DMA alloc");
 		return XGE_HAL_ERR_OUT_OF_MEMORY;
@@ -85,7 +77,7 @@ __hal_stats_initialize (xge_hal_stats_t *stats, xge_hal_device_h devh)
 #endif
                                        );
 	if (stats->dma_addr == XGE_OS_INVALID_DMA_ADDR) {
-		xge_debug_stats(XGE_ERR, "can not map vaddr 0x%llx to DMA",
+		xge_debug_stats(XGE_ERR, "can not map vaddr 0x"XGE_OS_LLXFMT" to DMA",
 				 (unsigned long long)(ulong_t)stats->hw_info);
 		xge_os_dma_free(hldev->pdev,
 			      stats->hw_info,
@@ -146,7 +138,7 @@ __hal_stats_disable (xge_hal_stats_t *stats)
 	(void)xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
 			&bar0->stat_cfg);
 
-	xge_debug_stats(XGE_TRACE, "stats disabled at 0x%llx",
+	xge_debug_stats(XGE_TRACE, "stats disabled at 0x"XGE_OS_LLXFMT,
 			 (unsigned long long)stats->dma_addr);
 
 	stats->is_enabled = 0;
@@ -220,12 +212,12 @@ __hal_stats_enable (xge_hal_stats_t *stats)
 
 #ifdef XGE_HAL_HERC_EMULATION
 	/*
-	 * The clocks in the emulator are running ~1000 times slower than real world, 
+	 * The clocks in the emulator are running ~1000 times slower than real world,
 		* so the stats transfer will occur ~1000 times less frequent.
-	 * STAT_CFG.STAT_TRSF_PERIOD should be set to 0x20C for Hercules emulation 
+	 * STAT_CFG.STAT_TRSF_PERIOD should be set to 0x20C for Hercules emulation
 		* (stats transferred every 0.5 sec).
-	 */ 
-	
+	 */
+
 	val64 = (0x20C | XGE_HAL_STAT_CFG_STAT_RO | XGE_HAL_STAT_CFG_STAT_EN);
 #else
 	val64 = XGE_HAL_SET_UPDT_PERIOD(refresh_time_pci_clocks) |
@@ -236,7 +228,7 @@ __hal_stats_enable (xge_hal_stats_t *stats)
 	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
 	                       &bar0->stat_cfg);
 
-	xge_debug_stats(XGE_TRACE, "stats enabled at 0x%llx",
+	xge_debug_stats(XGE_TRACE, "stats enabled at 0x"XGE_OS_LLXFMT,
 			 (unsigned long long)stats->dma_addr);
 
 	stats->is_enabled = 1;
@@ -555,9 +547,20 @@ xge_hal_stats_channel(xge_hal_channel_h channelh,
 			hldev->stats.sw_dev_info_stats.not_traffic_intr_cnt;
 
 	if (hldev->stats.sw_dev_info_stats.traffic_intr_cnt) {
-		channel->stats.avg_compl_per_intr_cnt =
-			channel->stats.total_compl_cnt /
-				hldev->stats.sw_dev_info_stats.traffic_intr_cnt;
+		int rxcnt = hldev->stats.sw_dev_info_stats.rx_traffic_intr_cnt;
+		int txcnt = hldev->stats.sw_dev_info_stats.tx_traffic_intr_cnt;
+		if (channel->type == XGE_HAL_CHANNEL_TYPE_FIFO) {
+			if (!txcnt)
+				txcnt = 1;
+			channel->stats.avg_compl_per_intr_cnt =
+				channel->stats.total_compl_cnt / txcnt;
+		} else if (channel->type == XGE_HAL_CHANNEL_TYPE_RING &&
+			   !hldev->config.bimodal_interrupts) {
+			if (!rxcnt)
+				rxcnt = 1;
+			channel->stats.avg_compl_per_intr_cnt =
+				channel->stats.total_compl_cnt / rxcnt;
+		}
 		if (channel->stats.avg_compl_per_intr_cnt == 0) {
 			/* to not confuse user */
 			channel->stats.avg_compl_per_intr_cnt = 1;

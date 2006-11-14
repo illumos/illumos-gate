@@ -1674,6 +1674,7 @@ extern ill_g_head_t	ill_g_heads[];	/* ILL List Head */
 #define	ILL_CAPAB_ZEROCOPY	0x10		/* Zero-copy */
 #define	ILL_CAPAB_POLL		0x20		/* Polling Toggle */
 #define	ILL_CAPAB_SOFT_RING	0x40		/* Soft_Ring capability */
+#define	ILL_CAPAB_LSO		0x80		/* Large Segment Offload */
 
 /*
  * Per-ill Multidata Transmit capabilities.
@@ -1704,6 +1705,11 @@ typedef struct ill_dls_capab_s ill_dls_capab_t;
  * Per-ill polling resource map.
  */
 typedef struct ill_rx_ring ill_rx_ring_t;
+
+/*
+ * Per-ill Large Segment Offload capabilities.
+ */
+typedef struct ill_lso_capab_s ill_lso_capab_t;
 
 /* The following are ill_state_flags */
 #define	ILL_LL_SUBNET_PENDING	0x01	/* Waiting for DL_INFO_ACK from drv */
@@ -1867,6 +1873,7 @@ typedef struct ill_s {
 	ill_hcksum_capab_t *ill_hcksum_capab; /* H/W cksumming capabilities */
 	ill_zerocopy_capab_t *ill_zerocopy_capab; /* Zero-copy capabilities */
 	ill_dls_capab_t *ill_dls_capab; /* Polling, soft ring capabilities */
+	ill_lso_capab_t *ill_lso_capab; /* Large Segment Offload capabilities */
 
 	/*
 	 * New fields for IPv6
@@ -2895,8 +2902,9 @@ extern vmem_t *ip_minor_arena;
 #define	ip_defend_interval		ip_param_arr[53].ip_param_value
 #define	ip_dup_recovery			ip_param_arr[54].ip_param_value
 #define	ip_restrict_interzone_loopback	ip_param_arr[55].ip_param_value
+#define	ip_lso_outbound			ip_param_arr[56].ip_param_value
 #ifdef DEBUG
-#define	ipv6_drop_inbound_icmpv6	ip_param_arr[56].ip_param_value
+#define	ipv6_drop_inbound_icmpv6	ip_param_arr[57].ip_param_value
 #else
 #define	ipv6_drop_inbound_icmpv6	0
 #endif
@@ -3264,6 +3272,9 @@ struct pdesc_s;
 
 extern mblk_t	*ip_mdinfo_alloc(ill_mdt_capab_t *);
 extern mblk_t	*ip_mdinfo_return(ire_t *, conn_t *, char *, ill_mdt_capab_t *);
+extern mblk_t	*ip_lsoinfo_alloc(ill_lso_capab_t *);
+extern mblk_t	*ip_lsoinfo_return(ire_t *, conn_t *, char *,
+    ill_lso_capab_t *);
 extern uint_t	ip_md_cksum(struct pdesc_s *, int, uint_t);
 extern boolean_t ip_md_addr_attr(struct multidata_s *, struct pdesc_s *,
 			const mblk_t *);
@@ -3366,6 +3377,13 @@ struct ill_hcksum_capab_s {
 struct ill_zerocopy_capab_s {
 	uint_t	ill_zerocopy_version;	/* interface version */
 	uint_t	ill_zerocopy_flags;	/* capabilities */
+};
+
+struct ill_lso_capab_s {
+	uint_t	ill_lso_version;	/* interface version */
+	uint_t	ill_lso_on;		/* on/off switch for LSO on this ILL */
+	uint_t	ill_lso_flags;		/* capabilities */
+	uint_t	ill_lso_max;		/* maximum size of payload */
 };
 
 /* Possible ill_states */

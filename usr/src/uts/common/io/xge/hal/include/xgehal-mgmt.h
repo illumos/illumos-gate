@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-mgmt.h
- *
- *  Description:  management API
- *
- *  Created:      1 September 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_HAL_MGMT_H
@@ -39,6 +30,9 @@
 #include "xgehal-config.h"
 #include "xgehal-stats.h"
 #include "xgehal-regs.h"
+#include "xgehal-device.h"
+
+__EXTERN_BEGIN_DECLS
 
 /**
  * struct xge_hal_mgmt_about_info_t - About info.
@@ -76,6 +70,7 @@ typedef struct xge_hal_mgmt_about_info_t {
 	char		ll_minor[4];
 	char		ll_fix[4];
 	char		ll_build[16];
+	u32		transponder_temperature;
 } xge_hal_mgmt_about_info_t;
 
 typedef xge_hal_stats_hw_info_t		xge_hal_mgmt_hw_stats_t;
@@ -133,6 +128,24 @@ xge_hal_status_e
 xge_hal_mgmt_pci_config(xge_hal_device_h devh,
 		xge_hal_mgmt_pci_config_t *pci_config, int size);
 
+xge_hal_status_e
+xge_hal_pma_loopback( xge_hal_device_h devh, int enable );
+
+xge_hal_status_e
+xge_hal_rldram_test(xge_hal_device_h devh, u64 * data);
+
+u16
+xge_hal_mdio_read( xge_hal_device_h devh, u32 mmd_type, u64 addr );
+
+xge_hal_status_e
+xge_hal_mdio_write( xge_hal_device_h devh, u32 mmd_type, u64 addr, u32 value );
+
+u32
+xge_hal_read_xfp_current_temp(xge_hal_device_h devh);
+
+void
+__hal_updt_stats_xpak(xge_hal_device_t *hldev);
+
 #ifdef XGE_TRACE_INTO_CIRCULAR_ARR
 xge_hal_status_e
 xge_hal_mgmt_trace_read(char *buffer, unsigned buf_size, unsigned *offset,
@@ -154,9 +167,12 @@ xge_hal_flick_link_led(xge_hal_device_h devh);
 #define CARDS_WITH_FAULTY_LINK_INDICATORS(subid) \
 		((((subid >= 0x600B) && (subid <= 0x600D)) || \
 		 ((subid >= 0x640B) && (subid <= 0x640D))) ? 1 : 0)
+#define CHECKBIT(value, nbit) (value & (1 << nbit))
 
 #ifdef XGE_HAL_USE_MGMT_AUX
 #include "xgehal-mgmtaux.h"
 #endif
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_HAL_MGMT_H */

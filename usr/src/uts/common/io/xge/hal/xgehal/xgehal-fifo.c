@@ -17,16 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-fifo.c
- *
- *  Description:  fifo object implementation
- *
- *  Created:      10 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #include "xgehal-fifo.h"
@@ -48,9 +40,11 @@ __hal_fifo_mempool_item_alloc(xge_hal_mempool_h mempoolh,
 	xge_hal_fifo_t *fifo = (xge_hal_fifo_t *)userdata;
 
 	xge_assert(item);
-	txdl_priv = __hal_mempool_item_priv(mempoolh, memblock_index,
-					    item, &memblock_item_idx);
-
+	txdl_priv = (xge_hal_fifo_txdl_priv_t *) \
+                __hal_mempool_item_priv((xge_hal_mempool_t *) mempoolh,
+                                        memblock_index,
+                                        item,
+                                        &memblock_item_idx);
 	xge_assert(txdl_priv);
 
 	/* pre-format HAL's TxDL's private */
@@ -82,8 +76,7 @@ __hal_fifo_mempool_item_alloc(xge_hal_mempool_h mempoolh,
 		        xge_debug_mm(XGE_ERR,
 		              "align buffer[%d] %d bytes, status %d",
 			      index,
-			      fifo->config->alignment_size *
-			          fifo->config->max_aligned_frags,
+			      fifo->align_size,
 			      status);
 		        return status;
 		}
@@ -119,8 +112,11 @@ __hal_fifo_mempool_item_free(xge_hal_mempool_h mempoolh,
 
 	xge_assert(item);
 
-	txdl_priv = __hal_mempool_item_priv(mempoolh, memblock_index,
-					    item, &memblock_item_idx);
+	txdl_priv = (xge_hal_fifo_txdl_priv_t *) \
+                __hal_mempool_item_priv((xge_hal_mempool_t *) mempoolh,
+                                        memblock_index,
+                                        item,
+                                        &memblock_item_idx);
 	xge_assert(txdl_priv);
 
 #ifdef XGE_HAL_ALIGN_XMIT
@@ -129,8 +125,7 @@ __hal_fifo_mempool_item_free(xge_hal_mempool_h mempoolh,
 			xge_os_dma_unmap(fifo->channel.pdev,
 			       txdl_priv->align_dma_handle,
 			       txdl_priv->align_dma_addr,
-			       fifo->config->alignment_size *
-					fifo->config->max_aligned_frags,
+			       fifo->align_size,
 			       XGE_OS_DMA_DIR_TODEVICE);
 
 			txdl_priv->align_dma_addr = 0;
@@ -139,8 +134,7 @@ __hal_fifo_mempool_item_free(xge_hal_mempool_h mempoolh,
 		if (txdl_priv->align_vaddr != NULL) {
 			xge_os_dma_free(fifo->channel.pdev,
 			      txdl_priv->align_vaddr,
-			      fifo->config->alignment_size *
-					fifo->config->max_aligned_frags,
+			      fifo->align_size,
 			      &txdl_priv->align_dma_acch,
 			      &txdl_priv->align_dma_handle);
 
@@ -187,6 +181,9 @@ __hal_fifo_open(xge_hal_channel_h channelh, xge_hal_channel_attr_t *attr)
                 fifo->post_lock_ptr = &fifo->channel.post_lock;
 	}
 #endif
+
+	fifo->align_size =
+		fifo->config->alignment_size * fifo->config->max_aligned_frags;
 
 	/* Initializing the BAR1 address as the start of
 	 * the FIFO queue pointer and as a location of FIFO control
@@ -266,7 +263,7 @@ __hal_fifo_open(xge_hal_channel_h channelh, xge_hal_channel_attr_t *attr)
 	}
 
 	status = __hal_channel_initialize(channelh, attr,
-					__hal_mempool_items_arr(fifo->mempool),
+					(void **) __hal_mempool_items_arr(fifo->mempool),
 					queue->initial, queue->max,
 					fifo->config->reserve_threshold);
 	if (status != XGE_HAL_OK) {
@@ -348,7 +345,6 @@ __hal_fifo_hw_initialize(xge_hal_device_h devh)
 	u64* tx_fifo_partitions[4];
 	u64* tx_fifo_wrr[5];
 	u64 val64, part0;
-	int priority = 0;
 	int i;
 
 	/*  Tx DMA Initialization */
@@ -385,9 +381,8 @@ __hal_fifo_hw_initialize(xge_hal_device_h devh)
 		int reg_half = i % 2;
 		int reg_num = i / 2;
 
-		priority = 0;
-
 		if (hldev->config.fifo.queue[i].configured) {
+			int priority = hldev->config.fifo.queue[i].priority;
 			val64 |=
 			    vBIT((hldev->config.fifo.queue[i].max-1),
 				(((reg_half) * 32) + 19),
@@ -407,9 +402,9 @@ __hal_fifo_hw_initialize(xge_hal_device_h devh)
 				     val64, tx_fifo_partitions[reg_num]);
 				xge_debug_fifo(XGE_TRACE,
 					"fifo partition_%d at: "
-					"0x%llx is: 0x%llx", reg_num,
-					(unsigned long long)(ulong_t)
-						tx_fifo_partitions[reg_num],
+					"0x"XGE_OS_LLXFMT" is: 0x"XGE_OS_LLXFMT,
+					reg_num, (unsigned long long)(ulong_t)
+					tx_fifo_partitions[reg_num],
 					(unsigned long long)val64);
 			}
 			val64 = 0;
@@ -423,7 +418,7 @@ __hal_fifo_hw_initialize(xge_hal_device_h devh)
 	__hal_pio_mem_write32_upper(hldev->pdev, hldev->regh0, (u32)(part0>>32),
 	                     tx_fifo_partitions[0]);
 	xge_debug_fifo(XGE_TRACE, "fifo partition_0 at: "
-			"0x%llx is: 0x%llx",
+			"0x"XGE_OS_LLXFMT" is: 0x"XGE_OS_LLXFMT,
 			(unsigned long long)(ulong_t)
 				tx_fifo_partitions[0],
 			(unsigned long long) part0);
@@ -457,8 +452,7 @@ __hal_fifo_dtr_align_free_unmap(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh)
 		xge_os_dma_unmap(fifo->channel.pdev,
 		       txdl_priv->align_dma_handle,
 		       txdl_priv->align_dma_addr,
-		       fifo->config->alignment_size *
-				fifo->config->max_aligned_frags,
+		       fifo->align_size,
 		       XGE_OS_DMA_DIR_TODEVICE);
 
                 txdl_priv->align_dma_addr = 0;
@@ -467,8 +461,7 @@ __hal_fifo_dtr_align_free_unmap(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh)
         if (txdl_priv->align_vaddr != NULL) {
 	        xge_os_dma_free(fifo->channel.pdev,
 	              txdl_priv->align_vaddr,
-	              fifo->config->alignment_size *
-		      fifo->config->max_aligned_frags,
+	              fifo->align_size,
 	              &txdl_priv->align_dma_acch,
 	              &txdl_priv->align_dma_handle);
 
@@ -490,8 +483,7 @@ __hal_fifo_dtr_align_alloc_map(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh)
 
 	/* allocate alignment DMA-buffer */
 	txdl_priv->align_vaddr = xge_os_dma_malloc(fifo->channel.pdev,
-				fifo->config->alignment_size *
-				   fifo->config->max_aligned_frags,
+				fifo->align_size,
 				XGE_OS_DMA_CACHELINE_ALIGNED |
 				XGE_OS_DMA_STREAMING,
 				&txdl_priv->align_dma_handle,
@@ -503,8 +495,7 @@ __hal_fifo_dtr_align_alloc_map(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh)
 	/* map it */
 	txdl_priv->align_dma_addr = xge_os_dma_map(fifo->channel.pdev,
 		txdl_priv->align_dma_handle, txdl_priv->align_vaddr,
-		fifo->config->alignment_size *
-			       fifo->config->max_aligned_frags,
+		fifo->align_size,
 		XGE_OS_DMA_DIR_TODEVICE, XGE_OS_DMA_STREAMING);
 
 	if (txdl_priv->align_dma_addr == XGE_OS_INVALID_DMA_ADDR) {

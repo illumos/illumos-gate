@@ -17,24 +17,16 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xge-os-pal.h
- *
- *  Description:  top-level header file. works just like switching between
- *                os-depndent parts
- *
- *  Created:      6st May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_OS_PAL_H
 #define XGE_OS_PAL_H
 
 #include "xge-defs.h"
+
+__EXTERN_BEGIN_DECLS
 
 /*--------------------------- platform switch ------------------------------*/
 
@@ -118,5 +110,7 @@ extern char *dmesg_start;
 #define xge_os_trace(tb, fmt...)
 #endif /* __GNUC__ */
 #endif
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_OS_PAL_H */

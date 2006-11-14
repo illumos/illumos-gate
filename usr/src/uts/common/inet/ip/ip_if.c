@@ -234,7 +234,8 @@ static void ill_capability_hcksum_reset(ill_t *, mblk_t **);
 static void ill_capability_zerocopy_ack(ill_t *, mblk_t *,
     dl_capability_sub_t *);
 static void ill_capability_zerocopy_reset(ill_t *, mblk_t **);
-
+static void ill_capability_lso_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
+static void ill_capability_lso_reset(ill_t *, mblk_t **);
 static void ill_capability_dls_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
 static mac_resource_handle_t ill_ring_add(void *, mac_resource_t *);
 static void ill_capability_dls_reset(ill_t *, mblk_t **);
@@ -872,6 +873,11 @@ ill_delete_tail(ill_t *ill)
 		kmem_free(ill->ill_zerocopy_capab,
 		    sizeof (ill_zerocopy_capab_t));
 		ill->ill_zerocopy_capab = NULL;
+	}
+
+	if (ill->ill_lso_capab != NULL) {
+		kmem_free(ill->ill_lso_capab, sizeof (ill_lso_capab_t));
+		ill->ill_lso_capab = NULL;
 	}
 
 	if (ill->ill_dls_capab != NULL) {
@@ -1853,6 +1859,7 @@ ill_capability_reset(ill_t *ill)
 	ill_capability_zerocopy_reset(ill, &sc_mp);
 	ill_capability_ipsec_reset(ill, &sc_mp);
 	ill_capability_dls_reset(ill, &sc_mp);
+	ill_capability_lso_reset(ill, &sc_mp);
 
 	/* Nothing to send down in order to disable the capabilities? */
 	if (sc_mp == NULL)
@@ -2685,6 +2692,9 @@ ill_capability_dispatch(ill_t *ill, mblk_t *mp, dl_capability_sub_t *subp,
 		if (SOFT_RINGS_ENABLED())
 			ill_capability_dls_ack(ill, mp, subp);
 		break;
+	case DL_CAPAB_LSO:
+		ill_capability_lso_ack(ill, mp, subp);
+		break;
 	default:
 		ip1dbg(("ill_capability_dispatch: unknown capab type %d\n",
 		    subp->dl_cap));
@@ -3429,6 +3439,168 @@ ill_capability_zerocopy_reset(ill_t *ill, mblk_t **sc_mp)
 	zerocopy_subcap->zerocopy_version =
 	    ill->ill_zerocopy_capab->ill_zerocopy_version;
 	zerocopy_subcap->zerocopy_flags = 0;
+
+	if (*sc_mp != NULL)
+		linkb(*sc_mp, mp);
+	else
+		*sc_mp = mp;
+}
+
+/*
+ * Process Large Segment Offload capability negotiation ack received from a
+ * DLS Provider.  isub must point to the sub-capability (DL_CAPAB_LSO) of a
+ * DL_CAPABILITY_ACK message.
+ */
+static void
+ill_capability_lso_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
+{
+	mblk_t *nmp = NULL;
+	dl_capability_req_t *oc;
+	dl_capab_lso_t *lso_ic, *lso_oc;
+	ill_lso_capab_t **ill_lso_capab;
+	uint_t sub_dl_cap = isub->dl_cap;
+	uint8_t *capend;
+
+	ASSERT(sub_dl_cap == DL_CAPAB_LSO);
+
+	ill_lso_capab = (ill_lso_capab_t **)&ill->ill_lso_capab;
+
+	/*
+	 * Note: range checks here are not absolutely sufficient to
+	 * make us robust against malformed messages sent by drivers;
+	 * this is in keeping with the rest of IP's dlpi handling.
+	 * (Remember, it's coming from something else in the kernel
+	 * address space)
+	 */
+	capend = (uint8_t *)(isub + 1) + isub->dl_length;
+	if (capend > mp->b_wptr) {
+		cmn_err(CE_WARN, "ill_capability_lso_ack: "
+		    "malformed sub-capability too long for mblk");
+		return;
+	}
+
+	lso_ic = (dl_capab_lso_t *)(isub + 1);
+
+	if (lso_ic->lso_version != LSO_VERSION_1) {
+		cmn_err(CE_CONT, "ill_capability_lso_ack: "
+		    "unsupported LSO sub-capability (version %d, expected %d)",
+		    lso_ic->lso_version, LSO_VERSION_1);
+		return;
+	}
+
+	if (!dlcapabcheckqid(&lso_ic->lso_mid, ill->ill_lmod_rq)) {
+		ip1dbg(("ill_capability_lso_ack: mid token for LSO "
+		    "capability isn't as expected; pass-thru module(s) "
+		    "detected, discarding capability\n"));
+		return;
+	}
+
+	if ((lso_ic->lso_flags & LSO_TX_ENABLE) &&
+	    (lso_ic->lso_flags & LSO_TX_BASIC_TCP_IPV4)) {
+		if (*ill_lso_capab == NULL) {
+			*ill_lso_capab = kmem_zalloc(sizeof (ill_lso_capab_t),
+			    KM_NOSLEEP);
+
+			if (*ill_lso_capab == NULL) {
+				cmn_err(CE_WARN, "ill_capability_lso_ack: "
+				    "could not enable LSO version %d "
+				    "for %s (ENOMEM)\n", LSO_VERSION_1,
+				    ill->ill_name);
+				return;
+			}
+		}
+
+		(*ill_lso_capab)->ill_lso_version = lso_ic->lso_version;
+		(*ill_lso_capab)->ill_lso_flags = lso_ic->lso_flags;
+		(*ill_lso_capab)->ill_lso_max = lso_ic->lso_max;
+		ill->ill_capabilities |= ILL_CAPAB_LSO;
+
+		ip1dbg(("ill_capability_lso_ack: interface %s "
+		    "has enabled LSO\n ", ill->ill_name));
+	} else if (lso_ic->lso_flags & LSO_TX_BASIC_TCP_IPV4) {
+		uint_t size;
+		uchar_t *rptr;
+
+		size = sizeof (dl_capability_req_t) +
+		    sizeof (dl_capability_sub_t) + sizeof (dl_capab_lso_t);
+
+		if ((nmp = ip_dlpi_alloc(size, DL_CAPABILITY_REQ)) == NULL) {
+			cmn_err(CE_WARN, "ill_capability_lso_ack: "
+			    "could not enable LSO for %s (ENOMEM)\n",
+			    ill->ill_name);
+			return;
+		}
+
+		rptr = nmp->b_rptr;
+		/* initialize dl_capability_req_t */
+		oc = (dl_capability_req_t *)nmp->b_rptr;
+		oc->dl_sub_offset = sizeof (dl_capability_req_t);
+		oc->dl_sub_length = sizeof (dl_capability_sub_t) +
+		    sizeof (dl_capab_lso_t);
+		nmp->b_rptr += sizeof (dl_capability_req_t);
+
+		/* initialize dl_capability_sub_t */
+		bcopy(isub, nmp->b_rptr, sizeof (*isub));
+		nmp->b_rptr += sizeof (*isub);
+
+		/* initialize dl_capab_lso_t */
+		lso_oc = (dl_capab_lso_t *)nmp->b_rptr;
+		bcopy(lso_ic, lso_oc, sizeof (*lso_ic));
+
+		nmp->b_rptr = rptr;
+		ASSERT(nmp->b_wptr == (nmp->b_rptr + size));
+
+		/* set ENABLE flag */
+		lso_oc->lso_flags |= LSO_TX_ENABLE;
+
+		/* nmp points to a DL_CAPABILITY_REQ message to enable LSO */
+		ill_dlpi_send(ill, nmp);
+	} else {
+		ip1dbg(("ill_capability_lso_ack: interface %s has "
+		    "advertised %x LSO capability flags\n",
+		    ill->ill_name, lso_ic->lso_flags));
+	}
+}
+
+
+static void
+ill_capability_lso_reset(ill_t *ill, mblk_t **sc_mp)
+{
+	mblk_t *mp;
+	dl_capab_lso_t *lso_subcap;
+	dl_capability_sub_t *dl_subcap;
+	int size;
+
+	if (!(ill->ill_capabilities & ILL_CAPAB_LSO))
+		return;
+
+	ASSERT(ill->ill_lso_capab != NULL);
+	/*
+	 * Clear the capability flag for LSO but retain the
+	 * ill_lso_capab structure since it's possible that another
+	 * thread is still referring to it.  The structure only gets
+	 * deallocated when we destroy the ill.
+	 */
+	ill->ill_capabilities &= ~ILL_CAPAB_LSO;
+
+	size = sizeof (*dl_subcap) + sizeof (*lso_subcap);
+
+	mp = allocb(size, BPRI_HI);
+	if (mp == NULL) {
+		ip1dbg(("ill_capability_lso_reset: unable to allocate "
+		    "request to disable LSO\n"));
+		return;
+	}
+
+	mp->b_wptr = mp->b_rptr + size;
+
+	dl_subcap = (dl_capability_sub_t *)mp->b_rptr;
+	dl_subcap->dl_cap = DL_CAPAB_LSO;
+	dl_subcap->dl_length = sizeof (*lso_subcap);
+
+	lso_subcap = (dl_capab_lso_t *)(dl_subcap + 1);
+	lso_subcap->lso_version = ill->ill_lso_capab->ill_lso_version;
+	lso_subcap->lso_flags = 0;
 
 	if (*sc_mp != NULL)
 		linkb(*sc_mp, mp);

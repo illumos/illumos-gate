@@ -80,18 +80,40 @@ extern "C" {
 #define	XGELL_L3_ALIGNED		1
 #endif
 
-/* Control driver to copy or DMA received packets */
-#define	XGELL_DMA_BUFFER_SIZE_LOWAT		256
+/*
+ * These default values can be overridden by vaules in xge.conf.
+ * In xge.conf user has to specify actual (not percentages) values.
+ */
+#define	XGELL_RX_BUFFER_TOTAL		XGE_HAL_RING_RXDS_PER_BLOCK(1) * 6
+#define	XGELL_RX_BUFFER_POST_HIWAT	XGE_HAL_RING_RXDS_PER_BLOCK(1) * 5
 
-/* There default values can be overrided by vaules in xge.conf */
-#define	XGELL_RX_BUFFER_TOTAL		(1024 * 6)	/* 6K */
-#define	XGELL_RX_BUFFER_POST_HIWAT	(1024 * 3)	/* 3K */
-#define	XGELL_RX_BUFFER_RECYCLE_HIWAT	64
+/* Control driver to copy or DMA received packets */
+#define	XGELL_RX_DMA_LOWAT		256
 
 #define	XGELL_RING_MAIN_QID		0
 
+#if defined(__x86)
+#define	XGELL_TX_DMA_LOWAT		128
+#else
+#define	XGELL_TX_DMA_LOWAT		1024
+#endif
+
+/*
+ * Try to collapse up to XGELL_RX_PKT_BURST packets into single mblk
+ * sequence before mac_rx() is called.
+ */
+#define	XGELL_RX_PKT_BURST		32
+
 /* About 1s */
 #define	XGE_DEV_POLL_TICKS drv_usectohz(1000000)
+
+#define	XGELL_LSO_MAXLEN			65535
+#define	XGELL_CONF_ENABLE_BY_DEFAULT		1
+#define	XGELL_CONF_DISABLE_BY_DEFAULT		0
+
+/* LRO configuration */
+#define	XGE_HAL_DEFAULT_LRO_SG_SIZE		8 /* <=2 LRO fix not required */
+#define	XGE_HAL_DEFAULT_LRO_FRM_LEN		65535
 
 /*
  * If HAL could provide defualt values to all tunables, we'll remove following
@@ -100,53 +122,35 @@ extern "C" {
  */
 #define	XGE_HAL_DEFAULT_USE_HARDCODE		-1
 
-/*
- * The reason to define different values for Link Utilization interrupts is
- * different performance numbers between SPARC and x86 platforms.
- */
-#if defined(__sparc)
-#define	XGE_HAL_DEFAULT_TX_URANGE_A		2
-#define	XGE_HAL_DEFAULT_TX_UFC_A		1
-#define	XGE_HAL_DEFAULT_TX_URANGE_B		5
-#define	XGE_HAL_DEFAULT_TX_UFC_B		10
-#define	XGE_HAL_DEFAULT_TX_URANGE_C		10
-#define	XGE_HAL_DEFAULT_TX_UFC_C		40
-#define	XGE_HAL_DEFAULT_TX_UFC_D		80
+/* bimodal adaptive schema defaults - ENABLED */
+#define	XGE_HAL_DEFAULT_BIMODAL_INTERRUPTS	-1
+#define	XGE_HAL_DEFAULT_BIMODAL_TIMER_LO_US	24
+#define	XGE_HAL_DEFAULT_BIMODAL_TIMER_HI_US	256
+
+/* interrupt moderation/utilization defaults */
+#define	XGE_HAL_DEFAULT_TX_URANGE_A		5
+#define	XGE_HAL_DEFAULT_TX_URANGE_B		15
+#define	XGE_HAL_DEFAULT_TX_URANGE_C		30
+#define	XGE_HAL_DEFAULT_TX_UFC_A		15
+#define	XGE_HAL_DEFAULT_TX_UFC_B		30
+#define	XGE_HAL_DEFAULT_TX_UFC_C		45
+#define	XGE_HAL_DEFAULT_TX_UFC_D		60
 #define	XGE_HAL_DEFAULT_TX_TIMER_CI_EN		1
 #define	XGE_HAL_DEFAULT_TX_TIMER_AC_EN		1
-#define	XGE_HAL_DEFAULT_TX_TIMER_VAL		4000
-#define	XGE_HAL_DEFAULT_INDICATE_MAX_PKTS	128
-#define	XGE_HAL_DEFAULT_RX_URANGE_A		2
-#define	XGE_HAL_DEFAULT_RX_UFC_A		1
-#define	XGE_HAL_DEFAULT_RX_URANGE_B		5
-#define	XGE_HAL_DEFAULT_RX_UFC_B		10
-#define	XGE_HAL_DEFAULT_RX_URANGE_C		10
-#define	XGE_HAL_DEFAULT_RX_UFC_C		40
-#define	XGE_HAL_DEFAULT_RX_UFC_D		80
-#define	XGE_HAL_DEFAULT_RX_TIMER_AC_EN		1
-#define	XGE_HAL_DEFAULT_RX_TIMER_VAL		24
-#else
-#define	XGE_HAL_DEFAULT_TX_URANGE_A		10
-#define	XGE_HAL_DEFAULT_TX_UFC_A		1
-#define	XGE_HAL_DEFAULT_TX_URANGE_B		20
-#define	XGE_HAL_DEFAULT_TX_UFC_B		10
-#define	XGE_HAL_DEFAULT_TX_URANGE_C		50
-#define	XGE_HAL_DEFAULT_TX_UFC_C		40
-#define	XGE_HAL_DEFAULT_TX_UFC_D		80
-#define	XGE_HAL_DEFAULT_TX_TIMER_CI_EN		1
-#define	XGE_HAL_DEFAULT_TX_TIMER_AC_EN		1
-#define	XGE_HAL_DEFAULT_TX_TIMER_VAL		4000
-#define	XGE_HAL_DEFAULT_INDICATE_MAX_PKTS	128
+#define	XGE_HAL_DEFAULT_TX_TIMER_VAL		10000
+#define	XGE_HAL_DEFAULT_INDICATE_MAX_PKTS_B	512 /* bimodal */
+#define	XGE_HAL_DEFAULT_INDICATE_MAX_PKTS_N	256 /* normal UFC */
 #define	XGE_HAL_DEFAULT_RX_URANGE_A		10
-#define	XGE_HAL_DEFAULT_RX_UFC_A		1
-#define	XGE_HAL_DEFAULT_RX_URANGE_B		20
-#define	XGE_HAL_DEFAULT_RX_UFC_B		10
+#define	XGE_HAL_DEFAULT_RX_URANGE_B		30
 #define	XGE_HAL_DEFAULT_RX_URANGE_C		50
-#define	XGE_HAL_DEFAULT_RX_UFC_C		40
-#define	XGE_HAL_DEFAULT_RX_UFC_D		80
+#define	XGE_HAL_DEFAULT_RX_UFC_A		1
+#define	XGE_HAL_DEFAULT_RX_UFC_B_J		2
+#define	XGE_HAL_DEFAULT_RX_UFC_B_N		8
+#define	XGE_HAL_DEFAULT_RX_UFC_C_J		4
+#define	XGE_HAL_DEFAULT_RX_UFC_C_N		16
+#define	XGE_HAL_DEFAULT_RX_UFC_D		32
 #define	XGE_HAL_DEFAULT_RX_TIMER_AC_EN		1
-#define	XGE_HAL_DEFAULT_RX_TIMER_VAL		24
-#endif
+#define	XGE_HAL_DEFAULT_RX_TIMER_VAL		384
 
 #define	XGE_HAL_DEFAULT_FIFO_QUEUE_LENGTH_J	2048
 #define	XGE_HAL_DEFAULT_FIFO_QUEUE_LENGTH_N	4096
@@ -154,31 +158,25 @@ extern "C" {
 #define	XGE_HAL_DEFAULT_FIFO_RESERVE_THRESHOLD	0
 #define	XGE_HAL_DEFAULT_FIFO_MEMBLOCK_SIZE	PAGESIZE
 
-#ifdef XGELL_TX_NOMAP_COPY
-
-#define	XGE_HAL_DEFAULT_FIFO_FRAGS		1
-#define	XGE_HAL_DEFAULT_FIFO_FRAGS_THRESHOLD	0
-#define	XGE_HAL_DEFAULT_FIFO_ALIGNMENT_SIZE	(XGE_HAL_MAC_HEADER_MAX_SIZE + \
-						XGE_HAL_DEFAULT_MTU)
+/*
+ * this will force HAL to allocate extra copied buffer per TXDL which
+ * size calculated by formula:
+ *
+ *      (ALIGNMENT_SIZE * ALIGNED_FRAGS)
+ */
+#define	XGE_HAL_DEFAULT_FIFO_ALIGNMENT_SIZE	4096
 #define	XGE_HAL_DEFAULT_FIFO_MAX_ALIGNED_FRAGS	1
-#else
-
 #if defined(__x86)
-#define	XGE_HAL_DEFAULT_FIFO_FRAGS		32
+#define	XGE_HAL_DEFAULT_FIFO_FRAGS		128
 #else
-#define	XGE_HAL_DEFAULT_FIFO_FRAGS		16
+#define	XGE_HAL_DEFAULT_FIFO_FRAGS		64
 #endif
-#define	XGE_HAL_DEFAULT_FIFO_FRAGS_THRESHOLD	4
-#define	XGE_HAL_DEFAULT_FIFO_ALIGNMENT_SIZE	sizeof (uint64_t)
-#define	XGE_HAL_DEFAULT_FIFO_MAX_ALIGNED_FRAGS	6
+#define	XGE_HAL_DEFAULT_FIFO_FRAGS_THRESHOLD	18
 
-#endif /* XGELL_TX_NOMAP_COPY */
-
-#define	XGE_HAL_DEFAULT_RING_QUEUE_BLOCKS_J	16
-#define	XGE_HAL_DEFAULT_RING_QUEUE_BLOCKS_N	32
+#define	XGE_HAL_DEFAULT_RING_QUEUE_BLOCKS_J	2
+#define	XGE_HAL_DEFAULT_RING_QUEUE_BLOCKS_N	2
 #define	XGE_HAL_RING_QUEUE_BUFFER_MODE_DEFAULT	1
-#define	XGE_HAL_DEFAULT_RING_QUEUE_SIZE		64
-#define	XGE_HAL_DEFAULT_BACKOFF_INTERVAL_US	35
+#define	XGE_HAL_DEFAULT_BACKOFF_INTERVAL_US	64
 #define	XGE_HAL_DEFAULT_RING_PRIORITY		0
 #define	XGE_HAL_DEFAULT_RING_MEMBLOCK_SIZE	PAGESIZE
 
@@ -188,15 +186,18 @@ extern "C" {
 #define	XGE_HAL_DEFAULT_RMAC_HIGH_PTIME		65535
 #define	XGE_HAL_DEFAULT_MC_PAUSE_THRESHOLD_Q0Q3	187
 #define	XGE_HAL_DEFAULT_MC_PAUSE_THRESHOLD_Q4Q7	187
+#define	XGE_HAL_DEFAULT_RMAC_PAUSE_GEN_EN	1
+#define	XGE_HAL_DEFAULT_RMAC_PAUSE_GEN_DIS	0
+#define	XGE_HAL_DEFAULT_RMAC_PAUSE_RCV_EN	1
+#define	XGE_HAL_DEFAULT_RMAC_PAUSE_RCV_DIS	0
 #define	XGE_HAL_DEFAULT_INITIAL_MTU		XGE_HAL_DEFAULT_MTU /* 1500 */
-#define	XGE_HAL_DEFAULT_ISR_POLLING_CNT		4
+#define	XGE_HAL_DEFAULT_ISR_POLLING_CNT		0
 #define	XGE_HAL_DEFAULT_LATENCY_TIMER		255
-#define	XGE_HAL_DEFAULT_SPLIT_TRANSACTION	1 /* 2 splits */
+#define	XGE_HAL_DEFAULT_SPLIT_TRANSACTION	XGE_HAL_TWO_SPLIT_TRANSACTION
 #define	XGE_HAL_DEFAULT_BIOS_MMRB_COUNT		-1
 #define	XGE_HAL_DEFAULT_MMRB_COUNT		1 /* 1k */
-#define	XGE_HAL_DEFAULT_SHARED_SPLITS		0
+#define	XGE_HAL_DEFAULT_SHARED_SPLITS		1
 #define	XGE_HAL_DEFAULT_STATS_REFRESH_TIME	1
-#define	XGE_HAL_PCI_FREQ_MHERZ_DEFAULT		133
 
 /*
  * default the size of buffers allocated for ndd interface functions
@@ -221,9 +222,13 @@ typedef enum xgell_event_e {
 } xgell_event_e;
 
 typedef struct {
+	int rx_pkt_burst;
 	int rx_buffer_total;
 	int rx_buffer_post_hiwat;
-	int rx_buffer_recycle_hiwat;
+	int rx_dma_lowat;
+	int tx_dma_lowat;
+	int msi_enable;
+	int lso_enable;
 } xgell_config_t;
 
 typedef struct xgell_rx_buffer_t {
@@ -245,7 +250,6 @@ typedef struct xgell_rx_buffer_pool_t {
 	uint_t			total;		/* total buffers */
 	uint_t			size;		/* buffer size */
 	xgell_rx_buffer_t	*head;		/* header pointer */
-	uint_t			recycle_hiwat;	/* hiwat to recycle */
 	uint_t			free;		/* free buffers */
 	uint_t			post;		/* posted buffers */
 	uint_t			post_hiwat;	/* hiwat to stop post */
@@ -271,6 +275,7 @@ struct xgelldev {
 	int			resched_avail;
 	int			resched_send;
 	int			resched_retry;
+	int			tx_copied_max;
 	xge_hal_channel_h	fifo_channel;
 	volatile int		is_initialized;
 	xgell_config_t		config;
@@ -281,10 +286,8 @@ struct xgelldev {
 
 typedef struct {
 	mblk_t			*mblk;
-#if !defined(XGELL_TX_NOMAP_COPY)
 	ddi_dma_handle_t	dma_handles[XGE_HAL_DEFAULT_FIFO_FRAGS];
 	int			handle_cnt;
-#endif
 } xgell_txd_priv_t;
 
 typedef struct {

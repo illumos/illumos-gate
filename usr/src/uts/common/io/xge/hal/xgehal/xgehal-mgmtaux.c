@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-mgmtaux.c
- *
- *  Description:  Xframe-family management auxiliary API implementation
- *
- *  Created:      1 September 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #include "xgehal-mgmt.h"
@@ -218,6 +209,9 @@ xge_hal_status_e xge_hal_aux_about_read(xge_hal_device_h devh, int bufsize,
 	__HAL_AUX_ENTRY("ll_minor", about_info.ll_minor, "%s");
 	__HAL_AUX_ENTRY("ll_fix", about_info.ll_fix, "%s");
 	__HAL_AUX_ENTRY("ll_build", about_info.ll_build, "%s");
+
+	__HAL_AUX_ENTRY("transponder_temperature",
+			about_info.transponder_temperature, "%d C");
 
 	__HAL_AUX_ENTRY_END(bufsize, retsize);
 
@@ -626,22 +620,54 @@ xge_hal_status_e xge_hal_aux_stats_hal_read(xge_hal_device_h devh,
 		return status;
 	}
 
-	__HAL_AUX_ENTRY("rx_traffic_intr_cnt", devstat.rx_traffic_intr_cnt, "%u");
+	if (!hldev->config.bimodal_interrupts) {
+		__HAL_AUX_ENTRY("rx_traffic_intr_cnt",
+				devstat.rx_traffic_intr_cnt, "%u");
+	}
 	__HAL_AUX_ENTRY("tx_traffic_intr_cnt", devstat.tx_traffic_intr_cnt, "%u");
+	__HAL_AUX_ENTRY("txpic_intr_cnt", devstat.txpic_intr_cnt, "%u");
+	__HAL_AUX_ENTRY("txdma_intr_cnt", devstat.txdma_intr_cnt, "%u");
+	__HAL_AUX_ENTRY("txmac_intr_cnt", devstat.txmac_intr_cnt, "%u");
+	__HAL_AUX_ENTRY("txxgxs_intr_cnt", devstat.txxgxs_intr_cnt, "%u");
+	__HAL_AUX_ENTRY("rxpic_intr_cnt", devstat.rxpic_intr_cnt, "%u");
+	__HAL_AUX_ENTRY("rxdma_intr_cnt", devstat.rxdma_intr_cnt, "%u");
+	__HAL_AUX_ENTRY("rxmac_intr_cnt", devstat.rxmac_intr_cnt, "%u");
+	__HAL_AUX_ENTRY("rxxgxs_intr_cnt", devstat.rxxgxs_intr_cnt, "%u");
+	__HAL_AUX_ENTRY("mc_intr_cnt", devstat.mc_intr_cnt, "%u");
 	__HAL_AUX_ENTRY("not_traffic_intr_cnt",
 			devstat.not_traffic_intr_cnt, "%u");
 	__HAL_AUX_ENTRY("traffic_intr_cnt", devstat.traffic_intr_cnt, "%u");
 	__HAL_AUX_ENTRY("total_intr_cnt", devstat.total_intr_cnt, "%u");
 	__HAL_AUX_ENTRY("soft_reset_cnt", devstat.soft_reset_cnt, "%u");
-	__HAL_AUX_ENTRY("rxufca_lo_adjust_cnt",
-			devstat.rxufca_lo_adjust_cnt, "%u");
-	__HAL_AUX_ENTRY("rxufca_hi_adjust_cnt",
-			devstat.rxufca_hi_adjust_cnt, "%u");
+
+	if (hldev->config.rxufca_hi_lim != hldev->config.rxufca_lo_lim &&
+	    hldev->config.rxufca_lo_lim != 0) {
+		__HAL_AUX_ENTRY("rxufca_lo_adjust_cnt",
+				devstat.rxufca_lo_adjust_cnt, "%u");
+		__HAL_AUX_ENTRY("rxufca_hi_adjust_cnt",
+				devstat.rxufca_hi_adjust_cnt, "%u");
+	}
+
+	if (hldev->config.bimodal_interrupts) {
+		__HAL_AUX_ENTRY("bimodal_lo_adjust_cnt",
+				devstat.bimodal_lo_adjust_cnt, "%u");
+		__HAL_AUX_ENTRY("bimodal_hi_adjust_cnt",
+				devstat.bimodal_hi_adjust_cnt, "%u");
+	}
+
 #if defined(XGE_HAL_CONFIG_LRO)
 	__HAL_AUX_ENTRY("tot_frms_lroised",
 			devstat.tot_frms_lroised, "%u");
 	__HAL_AUX_ENTRY("tot_lro_sessions",
 			devstat.tot_lro_sessions, "%u");
+	__HAL_AUX_ENTRY("lro_frm_len_exceed_cnt",
+			devstat.lro_frm_len_exceed_cnt, "%u");
+	__HAL_AUX_ENTRY("lro_sg_exceed_cnt",
+			devstat.lro_sg_exceed_cnt, "%u");
+	__HAL_AUX_ENTRY("lro_out_of_seq_pkt_cnt",
+			devstat.lro_out_of_seq_pkt_cnt, "%u");
+	__HAL_AUX_ENTRY("lro_dup_pkt_cnt",
+			devstat.lro_dup_pkt_cnt, "%u");
 #endif
 
 	/* for each opened rx channel */
@@ -658,11 +684,17 @@ xge_hal_status_e xge_hal_aux_stats_hal_read(xge_hal_device_h devh,
 		(void) xge_os_sprintf(key, "ring%d_", channel->post_qid);
 
 		xge_os_strcpy(key+6, "full_cnt");
-		__HAL_AUX_ENTRY(key, chstat.out_of_dtrs_cnt, "%u");
+		__HAL_AUX_ENTRY(key, chstat.full_cnt, "%u");
+		xge_os_strcpy(key+6, "usage_max");
+		__HAL_AUX_ENTRY(key, chstat.usage_max, "%u");
+		xge_os_strcpy(key+6, "usage_cnt");
+		__HAL_AUX_ENTRY(key, channel->usage_cnt, "%u");
 		xge_os_strcpy(key+6, "reserve_free_swaps_cnt");
 		__HAL_AUX_ENTRY(key, chstat.reserve_free_swaps_cnt, "%u");
-		xge_os_strcpy(key+6, "avg_compl_per_intr_cnt");
-		__HAL_AUX_ENTRY(key, chstat.avg_compl_per_intr_cnt, "%u");
+		if (!hldev->config.bimodal_interrupts) {
+			xge_os_strcpy(key+6, "avg_compl_per_intr_cnt");
+			__HAL_AUX_ENTRY(key, chstat.avg_compl_per_intr_cnt, "%u");
+		}
 		xge_os_strcpy(key+6, "total_compl_cnt");
 		__HAL_AUX_ENTRY(key, chstat.total_compl_cnt, "%u");
 		xge_os_strcpy(key+6, "bump_cnt");
@@ -683,7 +715,11 @@ xge_hal_status_e xge_hal_aux_stats_hal_read(xge_hal_device_h devh,
 		(void) xge_os_sprintf(key, "fifo%d_", channel->post_qid);
 
 		xge_os_strcpy(key+6, "full_cnt");
-		__HAL_AUX_ENTRY(key, chstat.out_of_dtrs_cnt, "%u");
+		__HAL_AUX_ENTRY(key, chstat.full_cnt, "%u");
+		xge_os_strcpy(key+6, "usage_max");
+		__HAL_AUX_ENTRY(key, chstat.usage_max, "%u");
+		xge_os_strcpy(key+6, "usage_cnt");
+		__HAL_AUX_ENTRY(key, channel->usage_cnt, "%u");
 		xge_os_strcpy(key+6, "reserve_free_swaps_cnt");
 		__HAL_AUX_ENTRY(key, chstat.reserve_free_swaps_cnt, "%u");
 		xge_os_strcpy(key+6, "avg_compl_per_intr_cnt");
@@ -694,6 +730,10 @@ xge_hal_status_e xge_hal_aux_stats_hal_read(xge_hal_device_h devh,
 		__HAL_AUX_ENTRY(key, chstat.total_posts, "%u");
 		xge_os_strcpy(key+6, "total_posts_many");
 		__HAL_AUX_ENTRY(key, chstat.total_posts_many, "%u");
+		xge_os_strcpy(key+6, "copied_frags");
+		__HAL_AUX_ENTRY(key, chstat.copied_frags, "%u");
+		xge_os_strcpy(key+6, "copied_buffers");
+		__HAL_AUX_ENTRY(key, chstat.copied_buffers, "%u");
 		xge_os_strcpy(key+6, "total_buffers");
 		__HAL_AUX_ENTRY(key, chstat.total_buffers, "%u");
 		xge_os_strcpy(key+6, "avg_buffers_per_post");
@@ -772,6 +812,30 @@ xge_hal_status_e xge_hal_aux_stats_sw_dev_read(xge_hal_device_h devh,
 			__HAL_AUX_ENTRY(buf, t_code_cnt, "%u");
 		}
 	}
+	__HAL_AUX_ENTRY("alarm_transceiver_temp_high",sw_dev_err_stats.
+			stats_xpak.alarm_transceiver_temp_high, "%u");
+	__HAL_AUX_ENTRY("alarm_transceiver_temp_low",sw_dev_err_stats.
+			stats_xpak.alarm_transceiver_temp_low, "%u");
+	__HAL_AUX_ENTRY("alarm_laser_bias_current_high",sw_dev_err_stats.
+			stats_xpak.alarm_laser_bias_current_high, "%u");
+	__HAL_AUX_ENTRY("alarm_laser_bias_current_low",sw_dev_err_stats.
+			stats_xpak.alarm_laser_bias_current_low, "%u");
+	__HAL_AUX_ENTRY("alarm_laser_output_power_high",sw_dev_err_stats.
+			stats_xpak.alarm_laser_output_power_high, "%u");
+	__HAL_AUX_ENTRY("alarm_laser_output_power_low",sw_dev_err_stats.
+			stats_xpak.alarm_laser_output_power_low, "%u");
+	__HAL_AUX_ENTRY("warn_transceiver_temp_high",sw_dev_err_stats.
+			stats_xpak.warn_transceiver_temp_high, "%u");
+	__HAL_AUX_ENTRY("warn_transceiver_temp_low",sw_dev_err_stats.
+			stats_xpak.warn_transceiver_temp_low, "%u");
+	__HAL_AUX_ENTRY("warn_laser_bias_current_high",sw_dev_err_stats.
+			stats_xpak.warn_laser_bias_current_high, "%u");
+	__HAL_AUX_ENTRY("warn_laser_bias_current_low",sw_dev_err_stats.
+			stats_xpak.warn_laser_bias_current_low, "%u");
+	__HAL_AUX_ENTRY("warn_laser_output_power_high",sw_dev_err_stats.
+			stats_xpak.warn_laser_output_power_high, "%u");
+	__HAL_AUX_ENTRY("warn_laser_output_power_low",sw_dev_err_stats.
+			stats_xpak.warn_laser_output_power_low, "%u");
 
 	__HAL_AUX_ENTRY_END(bufsize, retsize);
 
@@ -917,26 +981,28 @@ xge_hal_status_e xge_hal_aux_channel_read(xge_hal_device_h devh,
 		__HAL_AUX_ENTRY(key, channel->type, "%u");
 		xge_os_strcpy(key+6, "length");
 		__HAL_AUX_ENTRY(key, channel->length, "%u");
-		xge_os_strcpy(key+6, "is open");
+		xge_os_strcpy(key+6, "is_open");
 		__HAL_AUX_ENTRY(key, channel->is_open, "%u");
-		xge_os_strcpy(key+6, "reserve initial");
+		xge_os_strcpy(key+6, "reserve_initial");
 		__HAL_AUX_ENTRY(key, channel->reserve_initial, "%u");
-		xge_os_strcpy(key+6, "reserve max");
+		xge_os_strcpy(key+6, "reserve_max");
 		__HAL_AUX_ENTRY(key, channel->reserve_max, "%u");
-		xge_os_strcpy(key+6, "reserve length");
+		xge_os_strcpy(key+6, "reserve_length");
 		__HAL_AUX_ENTRY(key, channel->reserve_length, "%u");
-		xge_os_strcpy(key+6, "reserve top");
+		xge_os_strcpy(key+6, "reserve_top");
 		__HAL_AUX_ENTRY(key, channel->reserve_top, "%u");
-		xge_os_strcpy(key+6, "reserve threshold");
+		xge_os_strcpy(key+6, "reserve_threshold");
 		__HAL_AUX_ENTRY(key, channel->reserve_threshold, "%u");
-		xge_os_strcpy(key+6, "free length");
+		xge_os_strcpy(key+6, "free_length");
 		__HAL_AUX_ENTRY(key, channel->free_length, "%u");
-		xge_os_strcpy(key+6, "post index");
+		xge_os_strcpy(key+6, "post_index");
 		__HAL_AUX_ENTRY(key, channel->post_index, "%u");
-		xge_os_strcpy(key+6, "compl index");
+		xge_os_strcpy(key+6, "compl_index");
 		__HAL_AUX_ENTRY(key, channel->compl_index, "%u");
-		xge_os_strcpy(key+6, "per dtr space");
+		xge_os_strcpy(key+6, "per_dtr_space");
 		__HAL_AUX_ENTRY(key, channel->per_dtr_space, "%u");
+		xge_os_strcpy(key+6, "usage_cnt");
+		__HAL_AUX_ENTRY(key, channel->usage_cnt, "%u");
 	}
 
 	/* for each opened tx channel */
@@ -952,26 +1018,28 @@ xge_hal_status_e xge_hal_aux_channel_read(xge_hal_device_h devh,
 		__HAL_AUX_ENTRY(key, channel->type, "%u");
 		xge_os_strcpy(key+6, "length");
 		__HAL_AUX_ENTRY(key, channel->length, "%u");
-		xge_os_strcpy(key+6, "is open");
+		xge_os_strcpy(key+6, "is_open");
 		__HAL_AUX_ENTRY(key, channel->is_open, "%u");
-		xge_os_strcpy(key+6, "reserve initial");
+		xge_os_strcpy(key+6, "reserve_initial");
 		__HAL_AUX_ENTRY(key, channel->reserve_initial, "%u");
-		xge_os_strcpy(key+6, "reserve max");
+		xge_os_strcpy(key+6, "reserve_max");
 		__HAL_AUX_ENTRY(key, channel->reserve_max, "%u");
-		xge_os_strcpy(key+6, "reserve length");
+		xge_os_strcpy(key+6, "reserve_length");
 		__HAL_AUX_ENTRY(key, channel->reserve_length, "%u");
-		xge_os_strcpy(key+6, "reserve top");
+		xge_os_strcpy(key+6, "reserve_top");
 		__HAL_AUX_ENTRY(key, channel->reserve_top, "%u");
-		xge_os_strcpy(key+6, "reserve threshold");
+		xge_os_strcpy(key+6, "reserve_threshold");
 		__HAL_AUX_ENTRY(key, channel->reserve_threshold, "%u");
-		xge_os_strcpy(key+6, "free length");
+		xge_os_strcpy(key+6, "free_length");
 		__HAL_AUX_ENTRY(key, channel->free_length, "%u");
-		xge_os_strcpy(key+6, "post index");
+		xge_os_strcpy(key+6, "post_index");
 		__HAL_AUX_ENTRY(key, channel->post_index, "%u");
-		xge_os_strcpy(key+6, "compl index");
+		xge_os_strcpy(key+6, "compl_index");
 		__HAL_AUX_ENTRY(key, channel->compl_index, "%u");
-		xge_os_strcpy(key+6, "per dtr space");
+		xge_os_strcpy(key+6, "per_dtr_space");
 		__HAL_AUX_ENTRY(key, channel->per_dtr_space, "%u");
+		xge_os_strcpy(key+6, "usage_cnt");
+		__HAL_AUX_ENTRY(key, channel->usage_cnt, "%u");
 	}
 
 	__HAL_AUX_ENTRY_END(bufsize, retsize);
@@ -1167,21 +1235,26 @@ xge_hal_status_e xge_hal_aux_device_config_read(xge_hal_device_h devh,
 	}
 
 	__HAL_AUX_ENTRY("mtu", dev_config.mtu, "%u");
-	__HAL_AUX_ENTRY("isr polling count", dev_config.isr_polling_cnt, "%u");
-	__HAL_AUX_ENTRY("latency timer", dev_config.latency_timer, "%u");
-	__HAL_AUX_ENTRY("max split transactions",
+	__HAL_AUX_ENTRY("isr_polling_count", dev_config.isr_polling_cnt, "%u");
+	__HAL_AUX_ENTRY("latency_timer", dev_config.latency_timer, "%u");
+	__HAL_AUX_ENTRY("max_splits_trans",
 			dev_config.max_splits_trans, "%u");
-	__HAL_AUX_ENTRY("mmrb count", dev_config.mmrb_count, "%d");
-	__HAL_AUX_ENTRY("shared splits", dev_config.shared_splits, "%u");
-	__HAL_AUX_ENTRY("statistics refresh time(in sec)",
+	__HAL_AUX_ENTRY("mmrb_count", dev_config.mmrb_count, "%d");
+	__HAL_AUX_ENTRY("shared_splits", dev_config.shared_splits, "%u");
+	__HAL_AUX_ENTRY("stats_refresh_time_sec",
 			dev_config.stats_refresh_time_sec, "%u");
-	__HAL_AUX_ENTRY("pci freq(in mherz)", dev_config.pci_freq_mherz, "%u");
-	__HAL_AUX_ENTRY("intr mode", dev_config.intr_mode, "%u");
-	__HAL_AUX_ENTRY("sched timer(in us)", dev_config.sched_timer_us, "%u");
-	__HAL_AUX_ENTRY("sched timer one shot(flag)",
-			dev_config.sched_timer_one_shot,  "%u");
-	__HAL_AUX_ENTRY("ring memblock size",
+	__HAL_AUX_ENTRY("pci_freq_mherz", dev_config.pci_freq_mherz, "%u");
+	__HAL_AUX_ENTRY("intr_mode", dev_config.intr_mode, "%u");
+	__HAL_AUX_ENTRY("ring_memblock_size",
 			dev_config.ring.memblock_size,  "%u");
+
+	__HAL_AUX_ENTRY("sched_timer_us", dev_config.sched_timer_us, "%u");
+	__HAL_AUX_ENTRY("sched_timer_one_shot",
+			dev_config.sched_timer_one_shot,  "%u");
+	__HAL_AUX_ENTRY("rxufca_intr_thres", dev_config.rxufca_intr_thres,  "%u");
+	__HAL_AUX_ENTRY("rxufca_lo_lim", dev_config.rxufca_lo_lim,  "%u");
+	__HAL_AUX_ENTRY("rxufca_hi_lim", dev_config.rxufca_hi_lim,  "%u");
+	__HAL_AUX_ENTRY("rxufca_lbolt_period", dev_config.rxufca_lbolt_period,  "%u");
 
 	for(i = 0; i < XGE_HAL_MAX_RING_NUM;  i++)
 	{
@@ -1192,24 +1265,27 @@ xge_hal_status_e xge_hal_aux_device_config_read(xge_hal_device_h devh,
 			continue;
 
 		(void) xge_os_sprintf(key, "ring%d_", i);
-		xge_os_strcpy(key+6, "inital rxd blocks");
+		xge_os_strcpy(key+6, "inital");
 		__HAL_AUX_ENTRY(key, ring->initial, "%u");
-		xge_os_strcpy(key+6, "max rxd blocks");
+		xge_os_strcpy(key+6, "max");
 		__HAL_AUX_ENTRY(key, ring->max, "%u");
-		xge_os_strcpy(key+6, "buffer mode");
+		xge_os_strcpy(key+6, "buffer_mode");
 		__HAL_AUX_ENTRY(key, ring->buffer_mode, "%u");
-		xge_os_strcpy(key+6, "dram size(in mb)");
+		xge_os_strcpy(key+6, "dram_size_mb");
 		__HAL_AUX_ENTRY(key, ring->dram_size_mb, "%u");
-		xge_os_strcpy(key+6, "backoff interval(in us)");
+		xge_os_strcpy(key+6, "backoff_interval_us");
 		__HAL_AUX_ENTRY(key, ring->backoff_interval_us, "%u");
-		xge_os_strcpy(key+6, "max frame len");
+		xge_os_strcpy(key+6, "max_frame_len");
 		__HAL_AUX_ENTRY(key, ring->max_frm_len, "%d");
 		xge_os_strcpy(key+6, "priority");
 		__HAL_AUX_ENTRY(key, ring->priority,  "%u");
-		xge_os_strcpy(key+6, "rth en");
+		xge_os_strcpy(key+6, "rth_en");
 		__HAL_AUX_ENTRY(key, ring->rth_en,  "%u");
-		xge_os_strcpy(key+6, "no snoop bits");
+		xge_os_strcpy(key+6, "no_snoop_bits");
 		__HAL_AUX_ENTRY(key, ring->no_snoop_bits,  "%u");
+		xge_os_strcpy(key+6, "indicate_max_pkts");
+		__HAL_AUX_ENTRY(key, ring->indicate_max_pkts,  "%u");
+
 		xge_os_strcpy(key+6, "urange_a");
 		__HAL_AUX_ENTRY(key, rti->urange_a,  "%u");
 		xge_os_strcpy(key+6, "ufc_a");
@@ -1224,83 +1300,129 @@ xge_hal_status_e xge_hal_aux_device_config_read(xge_hal_device_h devh,
 		__HAL_AUX_ENTRY(key, rti->ufc_c,  "%u");
 		xge_os_strcpy(key+6, "ufc_d");
 		__HAL_AUX_ENTRY(key, rti->ufc_d,  "%u");
-		xge_os_strcpy(key+6, "timer val(in us)");
+		xge_os_strcpy(key+6, "timer_val_us");
 		__HAL_AUX_ENTRY(key, rti->timer_val_us,  "%u");
 	}
+
 
 	{
 		xge_hal_mac_config_t *mac= &dev_config.mac;
 
-		__HAL_AUX_ENTRY("tmac util period",
+		__HAL_AUX_ENTRY("tmac_util_period",
 				mac->tmac_util_period, "%u");
-		__HAL_AUX_ENTRY("rmac util period",
+		__HAL_AUX_ENTRY("rmac_util_period",
 				mac->rmac_util_period, "%u");
-		__HAL_AUX_ENTRY("rmac bcast enable(flag)",
+		__HAL_AUX_ENTRY("rmac_bcast_en",
 				mac->rmac_bcast_en, "%u");
-		__HAL_AUX_ENTRY("rmac pause generator enable(flag)",
+		__HAL_AUX_ENTRY("rmac_pause_gen_en",
 				mac->rmac_pause_gen_en, "%d");
-		__HAL_AUX_ENTRY("rmac pause receive enable(flag)",
+		__HAL_AUX_ENTRY("rmac_pause_rcv_en",
 				mac->rmac_pause_rcv_en, "%d");
-		__HAL_AUX_ENTRY("rmac pause time",
+		__HAL_AUX_ENTRY("rmac_pause_time",
 				mac->rmac_pause_time, "%u");
-		__HAL_AUX_ENTRY("mc pause threshold qoq3",
+		__HAL_AUX_ENTRY("mc_pause_threshold_q0q3",
 				mac->mc_pause_threshold_q0q3, "%u");
-		__HAL_AUX_ENTRY("mc pause threshold q4q7",
+		__HAL_AUX_ENTRY("mc_pause_threshold_q4q7",
 				mac->mc_pause_threshold_q4q7, "%u");
 	}
 
-	{
-		xge_hal_tti_config_t *tti = &dev_config.tti;
-		__HAL_AUX_ENTRY("tti enabled", tti->enabled, "%u");
-		__HAL_AUX_ENTRY("tti urange_a", tti->urange_a, "%u");
-		__HAL_AUX_ENTRY("tti ufc_a", tti->ufc_a, "%u");
-		__HAL_AUX_ENTRY("tti urange_b", tti->urange_b, "%u");
-		__HAL_AUX_ENTRY("tti ufc_b", tti->ufc_b, "%u");
-		__HAL_AUX_ENTRY("tti urange_c", tti->urange_c, "%u");
-		__HAL_AUX_ENTRY("tti ufc_c", tti->ufc_c, "%u");
-		__HAL_AUX_ENTRY("tti urange_d", tti->urange_d, "%u");
-		__HAL_AUX_ENTRY("tti ufc_d", tti->ufc_d, "%u");
-		__HAL_AUX_ENTRY("tti timer val(in us)",
-				tti->timer_val_us, "%u");
-		__HAL_AUX_ENTRY("tti timer ci en(flag)",
-				tti->timer_ci_en, "%u");
-	}
 
-
-	__HAL_AUX_ENTRY("fifo max frags", dev_config.fifo.max_frags, "%u");
-	__HAL_AUX_ENTRY("fifo reserve threshold",
+	__HAL_AUX_ENTRY("fifo_max_frags", dev_config.fifo.max_frags, "%u");
+	__HAL_AUX_ENTRY("fifo_reserve_threshold",
 			dev_config.fifo.reserve_threshold, "%u");
-	__HAL_AUX_ENTRY("fifo memblock size",
+	__HAL_AUX_ENTRY("fifo_memblock_size",
 			dev_config.fifo.memblock_size, "%u");
 #ifdef XGE_HAL_ALIGN_XMIT
-	__HAL_AUX_ENTRY("fifo alignment size",
+	__HAL_AUX_ENTRY("fifo_alignment_size",
 			dev_config.fifo.alignment_size, "%u");
 #endif
 
-	for(i = 0; i < XGE_HAL_MAX_FIFO_NUM;  i++)
-	{
+	for (i = 0; i < XGE_HAL_MAX_FIFO_NUM;  i++) {
+		int j;
 		xge_hal_fifo_queue_t *fifo = &dev_config.fifo.queue[i];
 
 		if (!fifo->configured)
 			continue;
 
 		(void) xge_os_sprintf(key, "fifo%d_", i);
-		xge_os_strcpy(key+6, "initial len");
+		xge_os_strcpy(key+6, "initial");
 		__HAL_AUX_ENTRY(key, fifo->initial, "%u");
-		xge_os_strcpy(key+6, "max len");
+		xge_os_strcpy(key+6, "max");
 		__HAL_AUX_ENTRY(key, fifo->max, "%u");
-		xge_os_strcpy(key+6, "intr mode");
+		xge_os_strcpy(key+6, "intr");
 		__HAL_AUX_ENTRY(key, fifo->intr, "%u");
-		xge_os_strcpy(key+6, "no snoop bits");
+		xge_os_strcpy(key+6, "no_snoop_bits");
 		__HAL_AUX_ENTRY(key, fifo->no_snoop_bits, "%u");
+
+		for (j = 0; j < XGE_HAL_MAX_FIFO_TTI_NUM; j++) {
+			xge_hal_tti_config_t *tti =
+				&dev_config.fifo.queue[i].tti[j];
+
+			if (!tti->enabled)
+				continue;
+
+			(void) xge_os_sprintf(key, "fifo%d_tti%02d_", i,
+				i * XGE_HAL_MAX_FIFO_TTI_NUM + j);
+			xge_os_strcpy(key+12, "urange_a");
+			__HAL_AUX_ENTRY(key, tti->urange_a, "%u");
+			xge_os_strcpy(key+12, "ufc_a");
+			__HAL_AUX_ENTRY(key, tti->ufc_a, "%u");
+			xge_os_strcpy(key+12, "urange_b");
+			__HAL_AUX_ENTRY(key, tti->urange_b, "%u");
+			xge_os_strcpy(key+12, "ufc_b");
+			__HAL_AUX_ENTRY(key, tti->ufc_b, "%u");
+			xge_os_strcpy(key+12, "urange_c");
+			__HAL_AUX_ENTRY(key, tti->urange_c, "%u");
+			xge_os_strcpy(key+12, "ufc_c");
+			__HAL_AUX_ENTRY(key, tti->ufc_c, "%u");
+			xge_os_strcpy(key+12, "ufc_d");
+			__HAL_AUX_ENTRY(key, tti->ufc_d, "%u");
+			xge_os_strcpy(key+12, "timer_val_us");
+			__HAL_AUX_ENTRY(key, tti->timer_val_us, "%u");
+			xge_os_strcpy(key+12, "timer_ci_en");
+			__HAL_AUX_ENTRY(key, tti->timer_ci_en, "%u");
+		}
 	}
-	__HAL_AUX_ENTRY("dump on serr(flag)", dev_config.dump_on_serr, "%u");
-	__HAL_AUX_ENTRY("dump on ecc err(flag)",
+
+	/* and bimodal TTIs */
+	for (i=0; i<XGE_HAL_MAX_RING_NUM; i++) {
+		xge_hal_device_t *hldev = (xge_hal_device_t*)devh;
+		xge_hal_tti_config_t *tti = &hldev->bimodal_tti[i];
+
+		if (!tti->enabled)
+			continue;
+
+		(void) xge_os_sprintf(key, "tti%02d_",
+			      XGE_HAL_MAX_FIFO_TTI_RING_0 + i);
+
+		xge_os_strcpy(key+6, "urange_a");
+		__HAL_AUX_ENTRY(key, tti->urange_a, "%u");
+		xge_os_strcpy(key+6, "ufc_a");
+		__HAL_AUX_ENTRY(key, tti->ufc_a, "%u");
+		xge_os_strcpy(key+6, "urange_b");
+		__HAL_AUX_ENTRY(key, tti->urange_b, "%u");
+		xge_os_strcpy(key+6, "ufc_b");
+		__HAL_AUX_ENTRY(key, tti->ufc_b, "%u");
+		xge_os_strcpy(key+6, "urange_c");
+		__HAL_AUX_ENTRY(key, tti->urange_c, "%u");
+		xge_os_strcpy(key+6, "ufc_c");
+		__HAL_AUX_ENTRY(key, tti->ufc_c, "%u");
+		xge_os_strcpy(key+6, "ufc_d");
+		__HAL_AUX_ENTRY(key, tti->ufc_d, "%u");
+		xge_os_strcpy(key+6, "timer_val_us");
+		__HAL_AUX_ENTRY(key, tti->timer_val_us, "%u");
+		xge_os_strcpy(key+6, "timer_ac_en");
+		__HAL_AUX_ENTRY(key, tti->timer_ac_en, "%u");
+		xge_os_strcpy(key+6, "timer_ci_en");
+		__HAL_AUX_ENTRY(key, tti->timer_ci_en, "%u");
+	}
+	__HAL_AUX_ENTRY("dump_on_serr", dev_config.dump_on_serr, "%u");
+	__HAL_AUX_ENTRY("dump_on_eccerr",
 			dev_config.dump_on_eccerr, "%u");
-	__HAL_AUX_ENTRY("dump on parity err(flag)",
+	__HAL_AUX_ENTRY("dump_on_parityerr",
 			dev_config.dump_on_parityerr, "%u");
-	__HAL_AUX_ENTRY("rth en(flag)", dev_config.rth_en, "%u");
-	__HAL_AUX_ENTRY("rth bucket size", dev_config.rth_bucket_size, "%u");
+	__HAL_AUX_ENTRY("rth_en", dev_config.rth_en, "%u");
+	__HAL_AUX_ENTRY("rth_bucket_size", dev_config.rth_bucket_size, "%u");
 
 	__HAL_AUX_ENTRY_END(bufsize, retsize);
 

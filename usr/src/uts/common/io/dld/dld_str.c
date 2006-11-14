@@ -973,7 +973,12 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 	if (dls_header_info(dsp->ds_dc, mp, &mhi) != 0)
 		goto discard;
 
-	if (size > dsp->ds_mip->mi_sdu_max + mhi.mhi_hdrsize)
+	/*
+	 * If LSO is enabled, check the size against lso_max. Otherwise,
+	 * compare the packet size with sdu_max.
+	 */
+	if (size > (dsp->ds_lso ? dsp->ds_lso_max : dsp->ds_mip->mi_sdu_max)
+	    + mhi.mhi_hdrsize)
 		goto discard;
 
 	if (is_ethernet) {
@@ -1102,6 +1107,12 @@ dld_str_detach(dld_str_t *dsp)
 	dsp->ds_polling = B_FALSE;
 	dsp->ds_soft_ring = B_FALSE;
 	dsp->ds_promisc = 0;
+
+	/*
+	 * Clear LSO flags.
+	 */
+	dsp->ds_lso = B_FALSE;
+	dsp->ds_lso_max = 0;
 
 	/*
 	 * Close the channel.

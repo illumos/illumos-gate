@@ -17,23 +17,16 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-types.h
- *
- *  Description:  HAL commonly used types and enumerations
- *
- *  Created:      19 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_HAL_TYPES_H
 #define XGE_HAL_TYPES_H
 
 #include "xge-os-pal.h"
+
+__EXTERN_BEGIN_DECLS
 
 /*
  * BIT(loc) - set bit at offset
@@ -45,6 +38,32 @@
  */
 #define vBIT(val, loc, sz)	(((u64)(val)) << (64-(loc)-(sz)))
 #define vBIT32(val, loc, sz)	(((u32)(val)) << (32-(loc)-(sz)))
+
+/*
+ * bVALx(bits, loc) - Get the value of x bits at location
+ */
+#define bVAL1(bits, loc)	((((u64)bits) >> (64-(loc+1))) & 0x1)
+#define bVAL2(bits, loc)	((((u64)bits) >> (64-(loc+2))) & 0x3)
+#define bVAL3(bits, loc)	((((u64)bits) >> (64-(loc+3))) & 0x7)
+#define bVAL4(bits, loc)	((((u64)bits) >> (64-(loc+4))) & 0xF)
+#define bVAL5(bits, loc)	((((u64)bits) >> (64-(loc+5))) & 0x1F)
+#define bVAL6(bits, loc)	((((u64)bits) >> (64-(loc+6))) & 0x3F)
+#define bVAL7(bits, loc)	((((u64)bits) >> (64-(loc+7))) & 0x7F)
+#define bVAL8(bits, loc)	((((u64)bits) >> (64-(loc+8))) & 0xFF)
+#define bVAL12(bits, loc)	((((u64)bits) >> (64-(loc+12))) & 0xFFF)
+#define bVAL16(bits, loc)	((((u64)bits) >> (64-(loc+16))) & 0xFFFF)
+#define bVAL20(bits, loc)	((((u64)bits) >> (64-(loc+20))) & 0xFFFFF)
+#define bVAL22(bits, loc)	((((u64)bits) >> (64-(loc+22))) & 0x3FFFFF)
+#define bVAL24(bits, loc)	((((u64)bits) >> (64-(loc+24))) & 0xFFFFFF)
+#define bVAL28(bits, loc)	((((u64)bits) >> (64-(loc+28))) & 0xFFFFFFF)
+#define bVAL32(bits, loc)	((((u64)bits) >> (64-(loc+32))) & 0xFFFFFFFF)
+#define bVAL36(bits, loc)	((((u64)bits) >> (64-(loc+36))) & 0xFFFFFFFFF)
+#define bVAL40(bits, loc)	((((u64)bits) >> (64-(loc+40))) & 0xFFFFFFFFFF)
+#define bVAL44(bits, loc)	((((u64)bits) >> (64-(loc+44))) & 0xFFFFFFFFFFF)
+#define bVAL48(bits, loc)	((((u64)bits) >> (64-(loc+48))) & 0xFFFFFFFFFFFF)
+#define bVAL52(bits, loc)	((((u64)bits) >> (64-(loc+52))) & 0xFFFFFFFFFFFFF)
+#define bVAL56(bits, loc)	((((u64)bits) >> (64-(loc+56))) & 0xFFFFFFFFFFFFFF)
+#define bVAL60(bits, loc)	((((u64)bits) >> (64-(loc+60))) & 0xFFFFFFFFFFFFFFF)
 
 #define XGE_HAL_BASE_INF		100
 #define XGE_HAL_BASE_ERR		200
@@ -94,8 +113,12 @@
  * @XGE_HAL_INF_LRO_END_2: Returned by ULD LRO module, when new
  * frame triggers LRO flush. Lro frame should be flushed first then
  * new frame should be flushed next.
+ * @XGE_HAL_INF_LRO_END_3: Returned by ULD LRO module, when new
+ * frame triggers close of current LRO session and opening of new LRO session
+ * with the frame.
  * @XGE_HAL_INF_LRO_SESSIONS_XCDED: Returned by ULD LRO module, when no
  * more LRO sessions can be added.
+ * @XGE_HAL_INF_NOT_ENOUGH_HW_CQES: TBD
  * @XGE_HAL_ERR_DRIVER_NOT_INITIALIZED: HAL is not initialized.
  * @XGE_HAL_ERR_OUT_OF_MEMORY: Out of memory (example, when and
  * allocating descriptors).
@@ -161,8 +184,6 @@
  * the structure  xge_hal_tti_config_t{} for valid values.
  * @XGE_HAL_BADCFG_TX_UFC_C: Invalid frame count for Tx link utilization
  * range C. See the structure xge_hal_tti_config_t{} for valid values.
- * @XGE_HAL_BADCFG_TX_URANGE_D: Invalid Tx link utilization range D. See
- * the structure xge_hal_tti_config_t{} for valid values.
  * @XGE_HAL_BADCFG_TX_UFC_D: Invalid frame count for Tx link utilization
  * range D. See the structure  xge_hal_tti_config_t{} for valid values.
  * @XGE_HAL_BADCFG_TX_TIMER_VAL: Invalid Tx timer value. See the
@@ -288,6 +309,10 @@
  * See also xge_hal_device_config_t{}.
  * @XGE_HAL_BADCFG_LINK_STABILITY_PERIOD: Invalid link stability period.
  * @XGE_HAL_BADCFG_DEVICE_POLL_MILLIS: Invalid device poll interval.
+ * @XGE_HAL_BADCFG_RMAC_PAUSE_GEN_EN: TBD
+ * @XGE_HAL_BADCFG_RMAC_PAUSE_RCV_EN: TBD
+ * @XGE_HAL_BADCFG_MEDIA: TBD
+ * @XGE_HAL_BADCFG_NO_ISR_EVENTS: TBD
  * See the structure xge_hal_device_config_t{} for valid values.
  * @XGE_HAL_EOF_TRACE_BUF: End of the circular (in memory) trace buffer.
  * Returned by xge_hal_mgmt_trace_read(), when user tries to read the trace
@@ -295,7 +320,12 @@
  * or more reads.
  * @XGE_HAL_BADCFG_RING_RTS_MAC_EN: Invalid value of RTS_MAC_EN enable. See
  * the structure xge_hal_ring_queue_t for valid values.
- *
+ * @XGE_HAL_BADCFG_LRO_SG_SIZE : Invalid value of LRO scatter gatter size.
+ * See the structure xge_hal_device_config_t for valid values.
+ * @XGE_HAL_BADCFG_LRO_FRM_LEN : Invalid value of LRO frame length.
+ * See the structure xge_hal_device_config_t for valid values.
+ * @XGE_HAL_BADCFG_WQE_NUM_ODS: TBD
+ * @XGE_HAL_BADCFG_BIMODAL_INTR: Invalid value to configure bimodal interrupts
  * Enumerates status and error codes returned by HAL public
  * API functions.
  */
@@ -316,8 +346,9 @@ typedef enum xge_hal_status_e {
 	XGE_HAL_INF_LRO_UNCAPABLE		= XGE_HAL_BASE_INF + 10,
 	XGE_HAL_INF_LRO_END_1			= XGE_HAL_BASE_INF + 11,
 	XGE_HAL_INF_LRO_END_2			= XGE_HAL_BASE_INF + 12,
-	XGE_HAL_INF_LRO_SESSIONS_XCDED		= XGE_HAL_BASE_INF + 13,
-
+	XGE_HAL_INF_LRO_END_3			= XGE_HAL_BASE_INF + 13,
+	XGE_HAL_INF_LRO_SESSIONS_XCDED		= XGE_HAL_BASE_INF + 14,
+	XGE_HAL_INF_NOT_ENOUGH_HW_CQES		= XGE_HAL_BASE_INF + 15,
 	XGE_HAL_ERR_DRIVER_NOT_INITIALIZED	= XGE_HAL_BASE_ERR + 1,
 	XGE_HAL_ERR_OUT_OF_MEMORY		= XGE_HAL_BASE_ERR + 4,
 	XGE_HAL_ERR_CHANNEL_NOT_FOUND		= XGE_HAL_BASE_ERR + 5,
@@ -346,6 +377,8 @@ typedef enum xge_hal_status_e {
 	XGE_HAL_ERR_INVALID_PCI_INFO		= XGE_HAL_BASE_ERR + 28,
 	XGE_HAL_ERR_CRITICAL		        = XGE_HAL_BASE_ERR + 29,
 	XGE_HAL_ERR_RESET_FAILED		= XGE_HAL_BASE_ERR + 30,
+	XGE_HAL_ERR_INVALID_WR			= XGE_HAL_BASE_ERR + 31,
+	XGE_HAL_ERR_TOO_MANY			= XGE_HAL_BASE_ERR + 32,
 
 	XGE_HAL_BADCFG_TX_URANGE_A		= XGE_HAL_BASE_BADCFG + 1,
 	XGE_HAL_BADCFG_TX_UFC_A			= XGE_HAL_BASE_BADCFG + 2,
@@ -353,7 +386,6 @@ typedef enum xge_hal_status_e {
 	XGE_HAL_BADCFG_TX_UFC_B			= XGE_HAL_BASE_BADCFG + 4,
 	XGE_HAL_BADCFG_TX_URANGE_C		= XGE_HAL_BASE_BADCFG + 5,
 	XGE_HAL_BADCFG_TX_UFC_C			= XGE_HAL_BASE_BADCFG + 6,
-	XGE_HAL_BADCFG_TX_URANGE_D		= XGE_HAL_BASE_BADCFG + 7,
 	XGE_HAL_BADCFG_TX_UFC_D			= XGE_HAL_BASE_BADCFG + 8,
 	XGE_HAL_BADCFG_TX_TIMER_VAL		= XGE_HAL_BASE_BADCFG + 9,
 	XGE_HAL_BADCFG_TX_TIMER_CI_EN		= XGE_HAL_BASE_BADCFG + 10,
@@ -417,7 +449,14 @@ typedef enum xge_hal_status_e {
 	XGE_HAL_BADCFG_MEDIA			= XGE_HAL_BASE_BADCFG + 69,
 	XGE_HAL_BADCFG_NO_ISR_EVENTS		= XGE_HAL_BASE_BADCFG + 70,
 	XGE_HAL_BADCFG_RING_RTS_MAC_EN		= XGE_HAL_BASE_BADCFG + 71,
-
+	XGE_HAL_BADCFG_LRO_SG_SIZE		= XGE_HAL_BASE_BADCFG + 72,
+	XGE_HAL_BADCFG_LRO_FRM_LEN		= XGE_HAL_BASE_BADCFG + 73,
+	XGE_HAL_BADCFG_WQE_NUM_ODS		= XGE_HAL_BASE_BADCFG + 74,
+	XGE_HAL_BADCFG_BIMODAL_INTR		= XGE_HAL_BASE_BADCFG + 75,
+	XGE_HAL_BADCFG_BIMODAL_TIMER_LO_US	= XGE_HAL_BASE_BADCFG + 76,
+	XGE_HAL_BADCFG_BIMODAL_TIMER_HI_US	= XGE_HAL_BASE_BADCFG + 77,
+	XGE_HAL_BADCFG_BIMODAL_XENA_NOT_ALLOWED	= XGE_HAL_BASE_BADCFG + 78,
+	XGE_HAL_BADCFG_RTS_QOS_STEERING_CONFIG	= XGE_HAL_BASE_BADCFG + 79,
 	XGE_HAL_EOF_TRACE_BUF			= -1
 } xge_hal_status_e;
 
@@ -540,11 +579,28 @@ full */
 typedef void* xge_hal_device_h;
 typedef void* xge_hal_dtr_h;
 typedef void* xge_hal_channel_h;
-
+#ifdef XGEHAL_RNIC
+typedef void* xge_hal_towi_h;
+typedef void* xge_hal_hw_wqe_h;
+typedef void* xge_hal_hw_cqe_h;
+typedef void* xge_hal_lro_wqe_h;
+typedef void* xge_hal_lro_cqe_h;
+typedef void* xge_hal_up_msg_h;
+typedef void* xge_hal_down_msg_h;
+#endif
 /*
  * I2C device id. Used in I2C control register for accessing EEPROM device
  * memory.
  */
 #define XGE_DEV_ID		5
+
+typedef enum xge_hal_xpak_alarm_type_e {
+	XGE_HAL_XPAK_ALARM_EXCESS_TEMP = 1,
+	XGE_HAL_XPAK_ALARM_EXCESS_BIAS_CURRENT = 2,
+	XGE_HAL_XPAK_ALARM_EXCESS_LASER_OUTPUT = 3,
+} xge_hal_xpak_alarm_type_e;
+
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_HAL_TYPES_H */

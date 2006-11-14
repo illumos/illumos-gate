@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    hal-ring.c
- *
- *  Description:  Rx ring object implementation
- *
- *  Created:      10 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #include "xgehal-ring.h"
@@ -61,14 +52,16 @@ __hal_ring_item_dma_addr(xge_hal_mempool_h mempoolh, void *item,
 	ptrdiff_t dma_item_offset;
 
 	/* get owner memblock index */
-	memblock_idx = __hal_ring_block_memblock_idx(item);
+	memblock_idx = __hal_ring_block_memblock_idx((xge_hal_ring_block_t *) item);
 
 	/* get owner memblock by memblock index */
-	memblock = __hal_mempool_memblock(mempoolh, memblock_idx);
+	memblock = __hal_mempool_memblock((xge_hal_mempool_t *) mempoolh,
+										memblock_idx);
 
 	/* get memblock DMA object by memblock index */
 	memblock_dma_object =
-		__hal_mempool_memblock_dma(mempoolh, memblock_idx);
+		__hal_mempool_memblock_dma((xge_hal_mempool_t *) mempoolh,
+									memblock_idx);
 
 	/* calculate offset in the memblock of this item */
 	dma_item_offset = (char*)item - (char*)memblock;
@@ -87,11 +80,13 @@ __hal_ring_rxdblock_link(xge_hal_mempool_h mempoolh,
 	pci_dma_h to_dma_handle, from_dma_handle;
 
 	/* get "from" RxD block */
-	from_item = __hal_mempool_item(mempoolh, from);
+	from_item = (xge_hal_ring_block_t *)
+				__hal_mempool_item((xge_hal_mempool_t *) mempoolh, from);
 	xge_assert(from_item);
 
 	/* get "to" RxD block */
-	to_item = __hal_mempool_item(mempoolh, to);
+	to_item = (xge_hal_ring_block_t *) 
+              __hal_mempool_item((xge_hal_mempool_t *) mempoolh, to);
 	xge_assert(to_item);
 
 	/* return address of the beginning of previous RxD block */
@@ -116,7 +111,7 @@ __hal_ring_rxdblock_link(xge_hal_mempool_h mempoolh,
 		      XGE_OS_DMA_DIR_TODEVICE);
 #endif
 
-	xge_debug_ring(XGE_TRACE, "block%d:0x%llx => block%d:0x%llx",
+	xge_debug_ring(XGE_TRACE, "block%d:0x"XGE_OS_LLXFMT" => block%d:0x"XGE_OS_LLXFMT,
 		from, (unsigned long long)from_dma, to,
 		(unsigned long long)to_dma);
 }
@@ -153,8 +148,9 @@ __hal_ring_mempool_item_alloc(xge_hal_mempool_h mempoolh,
 		 *       the memblock. For instance, in case of three RxD-blocks
 		 *       per memblock this value can be 0,1 or 2. */
 		rxdblock_priv =
-			__hal_mempool_item_priv(mempoolh, memblock_index, item,
-						&memblock_item_idx);
+			__hal_mempool_item_priv((xge_hal_mempool_t *) mempoolh,
+									memblock_index, item,
+									&memblock_item_idx);
 		rxdp = (xge_hal_ring_rxd_1_t *)
 			ring->reserved_rxds_arr[reserve_index];
 		rxd_priv = (xge_hal_ring_rxd_priv_t *) (void *)
@@ -194,7 +190,7 @@ __hal_ring_mempool_item_alloc(xge_hal_mempool_h mempoolh,
 #endif
 	}
 
-	__hal_ring_block_memblock_idx_set(item, memblock_index);
+	__hal_ring_block_memblock_idx_set((xge_hal_ring_block_t *) item, memblock_index);
 
 	if (is_last) {
 		/* link last one with first one */
@@ -215,7 +211,7 @@ __hal_ring_initial_replenish(xge_hal_channel_t *channel,
 {
 	xge_hal_dtr_h dtr;
 
-	while (__hal_channel_dtr_count(channel) > 0) {
+	while (xge_hal_channel_dtr_count(channel) > 0) {
 		xge_hal_status_e status;
 
 		status = xge_hal_ring_dtr_reserve(channel, &dtr);
@@ -282,8 +278,9 @@ __hal_ring_open(xge_hal_channel_h channelh, xge_hal_channel_attr_t *attr)
 	/* calculate actual RxD block private size */
 	ring->rxdblock_priv_size = ring->rxd_priv_size * ring->rxds_per_block;
 
-	ring->reserved_rxds_arr = xge_os_malloc(ring->channel.pdev,
+	ring->reserved_rxds_arr = (void **) xge_os_malloc(ring->channel.pdev,
 		      sizeof(void*) * queue->max * ring->rxds_per_block);
+
 	if (ring->reserved_rxds_arr == NULL) {
 		__hal_ring_close(channelh);
 		return XGE_HAL_ERR_OUT_OF_MEMORY;
@@ -327,13 +324,18 @@ __hal_ring_open(xge_hal_channel_h channelh, xge_hal_channel_attr_t *attr)
 	 * Currently we don't have a case when the 1) is done without the 2).
 	 */
 	if (ring->channel.dtr_init) {
-		if ((status = __hal_ring_initial_replenish(channelh,
-						XGE_HAL_CHANNEL_OC_NORMAL))
-							!= XGE_HAL_OK) {
+		if ((status = __hal_ring_initial_replenish (
+						(xge_hal_channel_t *) channelh,
+						XGE_HAL_CHANNEL_OC_NORMAL) )
+						!= XGE_HAL_OK) {
 			__hal_ring_close(channelh);
 			return status;
 		}
 	}
+
+	/* initial replenish will increment the counter in its post() routine,
+	 * we have to reset it */
+	ring->channel.usage_cnt = 0;
 
 	return XGE_HAL_OK;
 }
@@ -408,7 +410,7 @@ __hal_ring_prc_enable(xge_hal_channel_h channelh)
 	xge_os_pio_mem_write64(ring->channel.pdev, ring->channel.regh0,
 			val64, &bar0->prc_rxd0_n[ring->channel.post_qid]);
 
-	xge_debug_ring(XGE_TRACE, "ring%d PRC DMA addr 0x%llx initialized",
+	xge_debug_ring(XGE_TRACE, "ring%d PRC DMA addr 0x"XGE_OS_LLXFMT" initialized",
 			ring->channel.post_qid, (unsigned long long)val64);
 
 	val64 = xge_os_pio_mem_read64(ring->channel.pdev,
@@ -429,8 +431,12 @@ __hal_ring_prc_enable(xge_hal_channel_h channelh)
 
         /* Herc: always use group_reads */
 	if (xge_hal_device_check_id(hldev) == XGE_HAL_CARD_HERC)
-	        val64 |= XGE_HAL_PRC_CTRL_GROUP_READS;
+			val64 |= XGE_HAL_PRC_CTRL_GROUP_READS;
 
+	if (hldev->config.bimodal_interrupts)
+		if (xge_hal_device_check_id(hldev) == XGE_HAL_CARD_HERC)
+			val64 |= XGE_HAL_PRC_CTRL_BIMODAL_INTERRUPT;
+	
 	xge_os_pio_mem_write64(ring->channel.pdev, ring->channel.regh0,
 			val64, &bar0->prc_ctrl_n[ring->channel.post_qid]);
 
@@ -489,7 +495,7 @@ __hal_ring_hw_initialize(xge_hal_device_h devh)
 	}
 	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
 			&bar0->rx_queue_priority);
-	xge_debug_ring(XGE_TRACE, "Rings priority configured to 0x%llx",
+	xge_debug_ring(XGE_TRACE, "Rings priority configured to 0x"XGE_OS_LLXFMT,
 			(unsigned long long)val64);
 
 	/* Configuring ring queues according to per-ring configuration */
@@ -501,25 +507,30 @@ __hal_ring_hw_initialize(xge_hal_device_h devh)
 	}
 	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
 	                     &bar0->rx_queue_cfg);
-	xge_debug_ring(XGE_TRACE, "DRAM configured to 0x%llx",
+	xge_debug_ring(XGE_TRACE, "DRAM configured to 0x"XGE_OS_LLXFMT,
 			(unsigned long long)val64);
 
-	/* Activate Rx steering */
-	val64 = xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
-	                            &bar0->rts_qos_steering);
-	for (j = 0; j < 8 /* QoS max */; j++) {
-		for (i = 0; i < XGE_HAL_MAX_RING_NUM; i++) {
-			if (!hldev->config.ring.queue[i].configured)
-				continue;
-			if (!hldev->config.ring.queue[i].rth_en)
-				val64 |= (BIT(i) >> (j*8));
-		}
-	}
-	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
-	                     &bar0->rts_qos_steering);
-	xge_debug_ring(XGE_TRACE, "QoS steering configured to 0x%llx",
-			(unsigned long long)val64);
+    if (!hldev->config.rts_qos_steering_config) {
 
+        /* Activate Rx steering */
+        val64 = xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
+                                      &bar0->rts_qos_steering);
+        for (j = 0; j < 8 /* QoS max */; j++)
+        {
+            for (i = 0; i < XGE_HAL_MAX_RING_NUM; i++)
+            {
+                if (!hldev->config.ring.queue[i].configured)
+                    continue;
+                if (!hldev->config.ring.queue[i].rth_en)
+                    val64 |= (BIT(i) >> (j*8));
+            }
+        }
+        xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+                               &bar0->rts_qos_steering);
+        xge_debug_ring(XGE_TRACE, "QoS steering configured to 0x"XGE_OS_LLXFMT,
+                       (unsigned long long)val64);
+
+    }
 	/* Note: If a queue does not exist, it should be assigned a maximum
 	 *	 length of zero. Otherwise, packet loss could occur.
 	 *	 P. 4-4 User guide.
@@ -568,7 +579,7 @@ __hal_ring_hw_initialize(xge_hal_device_h devh)
 
 		val64 = xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
 	                            &bar0->mc_rldram_mrs_herc);
-		xge_debug_ring(XGE_TRACE, "default mc_rldram_mrs_herc 0x%llx",
+		xge_debug_ring(XGE_TRACE, "default mc_rldram_mrs_herc 0x"XGE_OS_LLXFMT,
 			       (unsigned long long)val64);
 
 		val64 = 0x0003570003010300ULL;

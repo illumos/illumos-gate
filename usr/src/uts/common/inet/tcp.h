@@ -112,6 +112,7 @@ typedef	struct tcphdr_s {
 #define	TCP_PORT_LEN			sizeof (in_port_t)
 #define	TCP_MAX_WINSHIFT		14
 #define	TCP_MAX_LARGEWIN		(TCP_MAXWIN << TCP_MAX_WINSHIFT)
+#define	TCP_MAX_LSO_LENGTH	(IP_MAXPACKET - TCP_MAX_COMBINED_HEADER_LENGTH)
 
 #define	TCPIP_HDR_LENGTH(mp, n)					\
 	(n) = IPH_HDR_LENGTH((mp)->b_rptr),			\
@@ -288,7 +289,8 @@ typedef struct tcp_s {
 		tcp_send_discon_ind : 1, /* TLI accept err, send discon ind */
 		tcp_cork : 1,		/* tcp_cork option */
 		tcp_tconnind_started : 1, /* conn_ind message is being sent */
-		tcp_pad_to_bit_31 : 17;
+		tcp_lso :1,		/* Lower layer is capable of LSO */
+		tcp_pad_to_bit_31 : 16;
 
 	uint32_t	tcp_if_mtu;	/* Outgoing interface MTU. */
 
@@ -491,6 +493,8 @@ typedef struct tcp_s {
 	uint_t	tcp_mdt_hdr_head; /* leading header fragment extra space */
 	uint_t	tcp_mdt_hdr_tail; /* trailing header fragment extra space */
 	int	tcp_mdt_max_pld;  /* maximum payload buffers per Multidata */
+
+	uint32_t	tcp_lso_max; /* maximum LSO payload */
 
 	uint32_t	tcp_ofo_fin_seq; /* Recv out of order FIN seq num */
 	uint32_t	tcp_cwr_snd_max;

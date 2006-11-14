@@ -17,34 +17,35 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xge-defs.h
- *
- *  Description:  global definitions
- *
- *  Created:      13 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_DEFS_H
 #define XGE_DEFS_H
 
-#define XGE_PCI_VENDOR_ID		0x17D5
+#define XGE_PCI_VENDOR_ID			0x17D5
 #define XGE_PCI_DEVICE_ID_XENA_1	0x5731
 #define XGE_PCI_DEVICE_ID_XENA_2	0x5831
 #define XGE_PCI_DEVICE_ID_HERC_1	0x5732
 #define XGE_PCI_DEVICE_ID_HERC_2	0x5832
 
-#define XGE_DRIVER_NAME		"Xge driver"
-#define XGE_DRIVER_VENDOR	"Neterion, Inc"
-#define XGE_CHIP_FAMILY		"Xframe"
-#define XGE_SUPPORTED_MEDIA_0	"Fiber"
+#define XGE_DRIVER_NAME				"Xge driver"
+#define XGE_DRIVER_VENDOR			"Neterion, Inc"
+#define XGE_CHIP_FAMILY				"Xframe"
+#define XGE_SUPPORTED_MEDIA_0		"Fiber"
 
 #include "version.h"
+
+#if defined(__cplusplus)
+#define __EXTERN_BEGIN_DECLS	extern "C" {
+#define __EXTERN_END_DECLS  	}
+#else
+#define __EXTERN_BEGIN_DECLS
+#define __EXTERN_END_DECLS
+#endif
+
+__EXTERN_BEGIN_DECLS
 
 /*---------------------------- DMA attributes ------------------------------*/
 /*           Used in xge_os_dma_malloc() and xge_os_dma_map() */
@@ -60,6 +61,8 @@
 #define XGE_OS_SPRINTF_STRLEN             64
 
 /*---------------------------- common stuffs -------------------------------*/
+
+#define XGE_OS_LLXFMT		"%llx"
 
 #ifdef XGE_OS_MEMORY_CHECK
 typedef struct {
@@ -105,7 +108,7 @@ extern int g_malloc_cnt;
 			g_malloc_arr[i].ptr = NULL; \
 			if(_check_size && g_malloc_arr[i].size!=_check_size) { \
 				xge_os_printf("OSPAL: freeing with wrong " \
-				      "size %d! allocated at %s:%d:%llx:%d", \
+				      "size %d! allocated at %s:%d:"XGE_OS_LLXFMT":%d", \
 					 (int)_check_size, \
 					 g_malloc_arr[i].file, \
 					 g_malloc_arr[i].line, \
@@ -117,7 +120,7 @@ extern int g_malloc_cnt;
 		} \
 	} \
 	if (i == XGE_OS_MALLOC_CNT_MAX) { \
-		xge_os_printf("OSPAL: ptr %llx not found!", \
+		xge_os_printf("OSPAL: ptr "XGE_OS_LLXFMT" not found!", \
 			    (unsigned long long)(ulong_t)_vaddr); \
 	} \
 }
@@ -125,5 +128,7 @@ extern int g_malloc_cnt;
 #define XGE_OS_MEMORY_CHECK_MALLOC(ptr, size, file, line)
 #define XGE_OS_MEMORY_CHECK_FREE(vaddr, check_size)
 #endif
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_DEFS_H */

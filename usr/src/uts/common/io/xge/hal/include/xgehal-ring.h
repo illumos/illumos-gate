@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-ring.h
- *
- *  Description:  HAL Rx ring object functionality
- *
- *  Created:      19 May 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_HAL_RING_H
@@ -36,6 +27,8 @@
 #include "xgehal-channel.h"
 #include "xgehal-config.h"
 #include "xgehal-mm.h"
+
+__EXTERN_BEGIN_DECLS
 
 /* HW ring configuration */
 #define XGE_HAL_RING_RXDBLOCK_SIZE	0x1000
@@ -450,11 +443,15 @@ xge_hal_ring_dtr_next_completed(xge_hal_channel_h channelh, xge_hal_dtr_h *dtrh,
 __HAL_STATIC_RING __HAL_INLINE_RING void
 xge_hal_ring_dtr_free(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh);
 
+__HAL_STATIC_RING __HAL_INLINE_RING	xge_hal_status_e
+xge_hal_ring_is_next_dtr_completed(xge_hal_channel_h channelh);
+
 #else /* XGE_FASTPATH_EXTERN */
 #define __HAL_STATIC_RING static
 #define __HAL_INLINE_RING inline
 #include "xgehal-ring-fp.c"
 #endif /* XGE_FASTPATH_INLINE */
 
+__EXTERN_END_DECLS
 
 #endif /* XGE_HAL_RING_H */

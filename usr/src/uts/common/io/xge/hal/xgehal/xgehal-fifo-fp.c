@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-fifo-fp.c
- *
- *  Description:  Tx fifo object functionality (fast path)
- *
- *  Created:      10 June 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifdef XGE_DEBUG_FP
@@ -116,18 +107,22 @@ __hal_fifo_dtr_post_single(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh,
 	xge_os_pio_mem_write64(fifo->channel.pdev, fifo->channel.regh1,
 			ctrl, &hw_pair->list_control);
 
-	xge_debug_fifo(XGE_TRACE, "posted txdl 0x%llx ctrl 0x%llx "
-		"into 0x%llx", (unsigned long long)txdl_priv->dma_addr,
+	xge_debug_fifo(XGE_TRACE, "posted txdl 0x"XGE_OS_LLXFMT" ctrl 0x"XGE_OS_LLXFMT" "
+		"into 0x"XGE_OS_LLXFMT"", (unsigned long long)txdl_priv->dma_addr,
 		(unsigned long long)ctrl,
 		(unsigned long long)(ulong_t)&hw_pair->txdl_pointer);
 
 #ifdef XGE_HAL_FIFO_DUMP_TXD
-	xge_os_printf("%llx:%llx:%llx:%llx dma %llx",
-	       txdp->control_1, txdp->control_2, txdp->buffer_pointer,
-	       txdp->host_control, txdl_priv->dma_addr);
+	xge_os_printf(""XGE_OS_LLXFMT":"XGE_OS_LLXFMT":"XGE_OS_LLXFMT":"
+		XGE_OS_LLXFMT" dma "XGE_OS_LLXFMT,
+		txdp->control_1, txdp->control_2, txdp->buffer_pointer,
+		txdp->host_control, txdl_priv->dma_addr);
 #endif
 
 	fifo->channel.stats.total_posts++;
+	fifo->channel.usage_cnt++;
+	if (fifo->channel.stats.usage_max < fifo->channel.usage_cnt)
+		fifo->channel.stats.usage_max = fifo->channel.usage_cnt;
 }
 
 __HAL_STATIC_FIFO __HAL_INLINE_FIFO void
@@ -282,7 +277,7 @@ xge_hal_fifo_dtr_reserve_many(xge_hal_channel_h channelh,
 #endif
 	while(alloc_frags < frags) {
 		status = __hal_channel_dtr_alloc(channelh,
-				(xge_hal_dtr_h *)&next_txdp);
+				(xge_hal_dtr_h *)(void*)&next_txdp);
 		if (status != XGE_HAL_OK){
 			xge_debug_fifo(XGE_ERR,
 				"failed to allocate linked fragments rc %d",
@@ -291,12 +286,12 @@ xge_hal_fifo_dtr_reserve_many(xge_hal_channel_h channelh,
 			if (*dtrh) {
 				xge_assert(alloc_frags/max_frags);
 				__hal_fifo_txdl_restore_many(channelh,
-					*dtrh, alloc_frags/max_frags);
+					(xge_hal_fifo_txd_t *) *dtrh, alloc_frags/max_frags);
 			}
 			if (dang_dtrh) {
 				xge_assert(dang_frags/max_frags);
 				__hal_fifo_txdl_restore_many(channelh,
-					dang_dtrh, dang_frags/max_frags);
+					(xge_hal_fifo_txd_t *) dang_dtrh, dang_frags/max_frags);
 			}
 			break;
 		}
@@ -336,7 +331,7 @@ xge_hal_fifo_dtr_reserve_many(xge_hal_channel_h channelh,
 			xge_debug_fifo(XGE_TRACE,
 				"dangling dtrh %p, linked with dtrh %p",
 				*dtrh, next_txdp);
-			next_txdl_priv->dang_txdl = *dtrh;
+			next_txdl_priv->dang_txdl = (xge_hal_fifo_txd_t *) *dtrh;
 			next_txdl_priv->dang_frags = alloc_frags;
 			alloc_frags = max_frags;
 			*dtrh  = next_txdp;
@@ -361,6 +356,7 @@ xge_hal_fifo_dtr_reserve_many(xge_hal_channel_h channelh,
 		txdl_priv->align_vaddr_start = txdl_priv->align_vaddr;
 		txdl_priv->align_used_frags = 0;
 		txdl_priv->frags = 0;
+		txdl_priv->bytes_sent = 0;
 		txdl_priv->alloc_frags = alloc_frags;
 		/* reset TxD0 */
 		txdp->control_1 = txdp->control_2 = 0;
@@ -442,6 +438,7 @@ xge_hal_fifo_dtr_reserve(xge_hal_channel_h channelh, xge_hal_dtr_h *dtrh)
 		txdl_priv->dang_txdl = NULL;
 		txdl_priv->dang_frags = 0;
 		txdl_priv->next_txdl_priv = NULL;
+		txdl_priv->bytes_sent = 0;
 
 		/* reset TxD0 */
 		txdp->control_1 = txdp->control_2 = 0;
@@ -651,8 +648,8 @@ xge_hal_fifo_dtr_next_completed(xge_hal_channel_h channelh,
 			xge_hal_dtr_h *dtrh, u8 *t_code)
 {
 	xge_hal_fifo_txd_t        *txdp;
-#if defined(XGE_OS_DMA_REQUIRES_SYNC) && defined(XGE_HAL_DMA_DTR_STREAMING)
 	xge_hal_fifo_t            *fifo    = (xge_hal_fifo_t *)channelh;
+#if defined(XGE_OS_DMA_REQUIRES_SYNC) && defined(XGE_HAL_DMA_DTR_STREAMING)
 	xge_hal_fifo_txdl_priv_t  *txdl_priv;
 #endif
 
@@ -687,6 +684,9 @@ xge_hal_fifo_dtr_next_completed(xge_hal_channel_h channelh,
 
                 /* see XGE_HAL_SET_TXD_T_CODE() above.. */
                 xge_assert(*t_code != XGE_HAL_TXD_T_CODE_UNUSED_5);
+
+		if (fifo->channel.usage_cnt > 0)
+			fifo->channel.usage_cnt--;
 
 		return XGE_HAL_OK;
 	}
@@ -769,6 +769,8 @@ xge_hal_fifo_dtr_free(xge_hal_channel_h channelh, xge_hal_dtr_h dtr)
 	else
 		__hal_channel_dtr_free(channelh, dtr);
 
+	((xge_hal_channel_t *)channelh)->poll_bytes += txdl_priv->bytes_sent;
+
 #if defined(XGE_DEBUG_ASSERT) && defined(XGE_OS_MEMORY_CHECK)
 	__hal_fifo_txdl_priv(dtr)->allocated = 0;
 #endif
@@ -787,7 +789,7 @@ xge_hal_fifo_dtr_free(xge_hal_channel_h channelh, xge_hal_dtr_h dtr)
  * in fifo descriptor.
  * @channelh: Channel handle.
  * @dtrh: Descriptor handle.
- * @frag_idx: Index of the data buffer in the caller's scatter-gather list 
+ * @frag_idx: Index of the data buffer in the caller's scatter-gather listá
  *            (of buffers).
  * @vaddr: Virtual address of the data buffer.
  * @dma_pointer: DMA address of the data buffer referenced by @frag_idx.
@@ -867,6 +869,7 @@ xge_hal_fifo_dtr_buffer_set_aligned(xge_hal_channel_h channelh,
 	prev_boff = txdl_priv->align_vaddr_start - txdl_priv->align_vaddr;
 	txdp->buffer_pointer = (u64)txdl_priv->align_dma_addr + prev_boff;
 	txdp->control_1 |= XGE_HAL_TXD_BUFFER0_SIZE(misaligned_size);
+	txdl_priv->bytes_sent += misaligned_size;
 	fifo->channel.stats.total_buffers++;
 	txdl_priv->frags++;
 	txdl_priv->align_used_frags++;
@@ -890,6 +893,7 @@ xge_hal_fifo_dtr_buffer_set_aligned(xge_hal_channel_h channelh,
 					misaligned_size;
 		txdp->control_1 =
 			XGE_HAL_TXD_BUFFER0_SIZE(remaining_size);
+		txdl_priv->bytes_sent += remaining_size;
 		txdp->control_2 = 0;
 		fifo->channel.stats.total_buffers++;
 		txdl_priv->frags++;
@@ -923,20 +927,21 @@ xge_hal_fifo_dtr_buffer_append(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh,
 {
 	xge_hal_fifo_t *fifo = (xge_hal_fifo_t *)channelh;
 	xge_hal_fifo_txdl_priv_t *txdl_priv;
+	ptrdiff_t used;
 
 	xge_assert(size > 0);
 
 	txdl_priv = __hal_fifo_txdl_priv(dtrh);
 
-	if (txdl_priv->align_dma_offset + (unsigned int)size > (unsigned int)fifo->config->alignment_size)
-	        return XGE_HAL_ERR_OUT_ALIGNED_FRAGS; /* FIXME */
-
-        if (txdl_priv->align_used_frags >= fifo->config->max_aligned_frags) {
+	used = txdl_priv->align_vaddr_start - txdl_priv->align_vaddr;
+	used += txdl_priv->align_dma_offset;
+	if (used + (unsigned int)size > (unsigned int)fifo->align_size)
 	        return XGE_HAL_ERR_OUT_ALIGNED_FRAGS;
-        }
 
 	xge_os_memcpy((char*)txdl_priv->align_vaddr_start +
 		txdl_priv->align_dma_offset, vaddr, size);
+
+	fifo->channel.stats.copied_frags++;
 
 	txdl_priv->align_dma_offset += size;
 	return XGE_HAL_OK;
@@ -966,10 +971,10 @@ xge_hal_fifo_dtr_buffer_finalize(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh,
 	xge_hal_fifo_txd_t *txdp;
 	ptrdiff_t prev_boff;
 
+	xge_assert(frag_idx < fifo->config->max_frags);
+
 	txdl_priv = __hal_fifo_txdl_priv(dtrh);
 	txdp = (xge_hal_fifo_txd_t *)dtrh + txdl_priv->frags;
-
-	xge_assert(frag_idx < fifo->config->max_frags);
 
 	if (frag_idx != 0) {
 		txdp->control_1 = txdp->control_2 = 0;
@@ -979,7 +984,9 @@ xge_hal_fifo_dtr_buffer_finalize(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh,
 	txdp->buffer_pointer = (u64)txdl_priv->align_dma_addr + prev_boff;
 	txdp->control_1 |=
                 XGE_HAL_TXD_BUFFER0_SIZE(txdl_priv->align_dma_offset);
+	txdl_priv->bytes_sent += (unsigned int)txdl_priv->align_dma_offset;
 	fifo->channel.stats.total_buffers++;
+	fifo->channel.stats.copied_buffers++;
 	txdl_priv->frags++;
 	txdl_priv->align_used_frags++;
 
@@ -1003,7 +1010,7 @@ xge_hal_fifo_dtr_buffer_finalize(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh,
  * descriptor.
  * @channelh: Channel handle.
  * @dtrh: Descriptor handle.
- * @frag_idx: Index of the data buffer in the caller's scatter-gather list 
+ * @frag_idx: Index of the data buffer in the caller's scatter-gather listá
  *            (of buffers).
  * @dma_pointer: DMA address of the data buffer referenced by @frag_idx.
  * @size: Size of the data buffer (in bytes).
@@ -1050,6 +1057,7 @@ xge_hal_fifo_dtr_buffer_set(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh,
 
 	txdp->buffer_pointer = (u64)dma_pointer;
 	txdp->control_1 |= XGE_HAL_TXD_BUFFER0_SIZE(size);
+	txdl_priv->bytes_sent += size;
 	fifo->channel.stats.total_buffers++;
 	txdl_priv->frags++;
 }
@@ -1127,4 +1135,28 @@ xge_hal_fifo_dtr_vlan_set(xge_hal_dtr_h dtrh, u16 vlan_tag)
 	txdp->control_2 |= XGE_HAL_TXD_VLAN_TAG(vlan_tag);
 }
 
+/**
+ * xge_hal_fifo_is_next_dtr_completed - Checks if the next dtr is completed
+ * @channelh: Channel handle.
+ */
+__HAL_STATIC_FIFO __HAL_INLINE_FIFO xge_hal_status_e
+xge_hal_fifo_is_next_dtr_completed(xge_hal_channel_h channelh)
+{
+	xge_hal_fifo_txd_t *txdp;
+	xge_hal_dtr_h dtrh;
 
+	__hal_channel_dtr_try_complete(channelh, &dtrh);
+	txdp = (xge_hal_fifo_txd_t *)dtrh;
+	if (txdp == NULL) {
+		return XGE_HAL_INF_NO_MORE_COMPLETED_DESCRIPTORS;
+	}
+
+	/* check whether host owns it */
+	if ( !(txdp->control_1 & XGE_HAL_TXD_LIST_OWN_XENA) ) {
+		xge_assert(txdp->host_control!=0);
+		return XGE_HAL_OK;
+	}
+
+	/* no more completions */
+	return XGE_HAL_INF_NO_MORE_COMPLETED_DESCRIPTORS;
+}

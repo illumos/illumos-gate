@@ -983,6 +983,7 @@ static ipparam_t	lcl_param_arr[] = {
 	{  0,	999999,	30,	"ip_defend_interval" },
 	{  0,	3600000, 300000, "ip_dup_recovery" },
 	{  0,	1,	1,	"ip_restrict_interzone_loopback" },
+	{  0,	1,	1,	"ip_lso_outbound" },
 #ifdef DEBUG
 	{  0,	1,	0,	"ip6_drop_inbound_icmpv6" },
 #endif
@@ -4763,7 +4764,8 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 	mblk_t		*policy_mp;
 	ire_t		*sire = NULL;
 	ire_t		*md_dst_ire = NULL;
-	ill_t		*md_ill = NULL;
+	ire_t		*lso_dst_ire = NULL;
+	ill_t		*ill = NULL;
 	zoneid_t	zoneid;
 	ipaddr_t	src_addr = *src_addrp;
 
@@ -4898,8 +4900,8 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 	}
 
 	/*
-	 * See if we should notify ULP about MDT; we do this whether or not
-	 * ire_requested is TRUE, in order to handle active connects; MDT
+	 * See if we should notify ULP about LSO/MDT; we do this whether or not
+	 * ire_requested is TRUE, in order to handle active connects; LSO/MDT
 	 * eligibility tests for passive connects are handled separately
 	 * through tcp_adapt_ire().  We do this before the source address
 	 * selection, because dst_ire may change after a call to
@@ -4907,14 +4909,19 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 	 * packet for this connection may not actually go through
 	 * dst_ire->ire_stq, and the exact IRE can only be known after
 	 * calling ip_newroute().  This is why we further check on the
-	 * IRE during Multidata packet transmission in tcp_multisend().
+	 * IRE during LSO/Multidata packet transmission in
+	 * tcp_lsosend()/tcp_multisend().
 	 */
-	if (ip_multidata_outbound && !ipsec_policy_set && dst_ire != NULL &&
+	if (!ipsec_policy_set && dst_ire != NULL &&
 	    !(dst_ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK | IRE_BROADCAST)) &&
-	    (md_ill = ire_to_ill(dst_ire), md_ill != NULL) &&
-	    ILL_MDT_CAPABLE(md_ill)) {
-		md_dst_ire = dst_ire;
-		IRE_REFHOLD(md_dst_ire);
+	    (ill = ire_to_ill(dst_ire), ill != NULL)) {
+		if (ip_lso_outbound && ILL_LSO_CAPABLE(ill)) {
+			lso_dst_ire = dst_ire;
+			IRE_REFHOLD(lso_dst_ire);
+		} else if (ip_multidata_outbound && ILL_MDT_CAPABLE(ill)) {
+			md_dst_ire = dst_ire;
+			IRE_REFHOLD(md_dst_ire);
+		}
 	}
 
 	if (dst_ire != NULL &&
@@ -5155,20 +5162,26 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 	if (error == 0) {
 		connp->conn_fully_bound = B_TRUE;
 		/*
-		 * Our initial checks for MDT have passed; the IRE is not
+		 * Our initial checks for LSO/MDT have passed; the IRE is not
 		 * LOCAL/LOOPBACK/BROADCAST, and the link layer seems to
-		 * be supporting MDT.  Pass the IRE, IPC and ILL into
-		 * ip_mdinfo_return(), which performs further checks
-		 * against them and upon success, returns the MDT info
+		 * be supporting LSO/MDT.  Pass the IRE, IPC and ILL into
+		 * ip_xxinfo_return(), which performs further checks
+		 * against them and upon success, returns the LSO/MDT info
 		 * mblk which we will attach to the bind acknowledgment.
 		 */
-		if (md_dst_ire != NULL) {
+		if (lso_dst_ire != NULL) {
+			mblk_t *lsoinfo_mp;
+
+			ASSERT(ill->ill_lso_capab != NULL);
+			if ((lsoinfo_mp = ip_lsoinfo_return(lso_dst_ire, connp,
+			    ill->ill_name, ill->ill_lso_capab)) != NULL)
+				linkb(mp, lsoinfo_mp);
+		} else if (md_dst_ire != NULL) {
 			mblk_t *mdinfo_mp;
 
-			ASSERT(md_ill != NULL);
-			ASSERT(md_ill->ill_mdt_capab != NULL);
+			ASSERT(ill->ill_mdt_capab != NULL);
 			if ((mdinfo_mp = ip_mdinfo_return(md_dst_ire, connp,
-			    md_ill->ill_name, md_ill->ill_mdt_capab)) != NULL)
+			    ill->ill_name, ill->ill_mdt_capab)) != NULL)
 				linkb(mp, mdinfo_mp);
 		}
 	}
@@ -5191,6 +5204,8 @@ bad_addr:
 		IRE_REFRELE(sire);
 	if (md_dst_ire != NULL)
 		IRE_REFRELE(md_dst_ire);
+	if (lso_dst_ire != NULL)
+		IRE_REFRELE(lso_dst_ire);
 	return (error);
 }
 
@@ -22874,7 +22889,7 @@ ip_mdinfo_return(ire_t *dst_ire, conn_t *connp, char *ill_name,
 		}
 
 		/* socket option(s) present? */
-		if (!CONN_IS_MD_FASTPATH(connp))
+		if (!CONN_IS_LSO_MD_FASTPATH(connp))
 			break;
 
 		rc = B_TRUE;
@@ -22903,6 +22918,94 @@ ip_mdinfo_return(ire_t *dst_ire, conn_t *connp, char *ill_name,
 		    "conn %p on %s (ENOMEM)\n", (void *)connp, ill_name));
 		return (NULL);
 	}
+	return (mp);
+}
+
+/*
+ * Routine to allocate a message that is used to notify the ULP about LSO.
+ * The caller may provide a pointer to the link-layer LSO capabilities,
+ * or NULL if LSO is to be disabled on the stream.
+ */
+mblk_t *
+ip_lsoinfo_alloc(ill_lso_capab_t *isrc)
+{
+	mblk_t *mp;
+	ip_lso_info_t *lsoi;
+	ill_lso_capab_t *idst;
+
+	if ((mp = allocb(sizeof (*lsoi), BPRI_HI)) != NULL) {
+		DB_TYPE(mp) = M_CTL;
+		mp->b_wptr = mp->b_rptr + sizeof (*lsoi);
+		lsoi = (ip_lso_info_t *)mp->b_rptr;
+		lsoi->lso_info_id = LSO_IOC_INFO_UPDATE;
+		idst = &(lsoi->lso_capab);
+
+		/*
+		 * If the caller provides us with the capability, copy
+		 * it over into our notification message; otherwise
+		 * we zero out the capability portion.
+		 */
+		if (isrc != NULL)
+			bcopy((caddr_t)isrc, (caddr_t)idst, sizeof (*idst));
+		else
+			bzero((caddr_t)idst, sizeof (*idst));
+	}
+	return (mp);
+}
+
+/*
+ * Routine which determines whether LSO can be enabled on the destination
+ * IRE and IPC combination, and if so, allocates and returns the LSO
+ * notification mblk that may be used by ULP.  We also check if we need to
+ * turn LSO back to 'on' when certain restrictions prohibiting us to allow
+ * LSO usage in the past have been lifted.  This gets called during IP
+ * and ULP binding.
+ */
+mblk_t *
+ip_lsoinfo_return(ire_t *dst_ire, conn_t *connp, char *ill_name,
+    ill_lso_capab_t *lso_cap)
+{
+	mblk_t *mp;
+
+	ASSERT(dst_ire != NULL);
+	ASSERT(connp != NULL);
+	ASSERT(lso_cap != NULL);
+
+	connp->conn_lso_ok = B_TRUE;
+
+	if ((connp->conn_ulp != IPPROTO_TCP) ||
+	    CONN_IPSEC_OUT_ENCAPSULATED(connp) ||
+	    (dst_ire->ire_flags & RTF_MULTIRT) ||
+	    !CONN_IS_LSO_MD_FASTPATH(connp) ||
+	    (IPP_ENABLED(IPP_LOCAL_OUT))) {
+		connp->conn_lso_ok = B_FALSE;
+		if (IPP_ENABLED(IPP_LOCAL_OUT)) {
+			/*
+			 * Disable LSO for this and all future connections going
+			 * over the interface.
+			 */
+			lso_cap->ill_lso_on = 0;
+		}
+	}
+
+	if (!connp->conn_lso_ok)
+		return (NULL);
+	else if (!lso_cap->ill_lso_on) {
+		/*
+		 * If LSO has been previously turned off in the past, and we
+		 * currently can do LSO (due to IPQoS policy removal, etc.)
+		 * then enable it for this interface.
+		 */
+		lso_cap->ill_lso_on = 1;
+		ip1dbg(("ip_mdinfo_return: reenabling LSO for interface %s\n",
+		    ill_name));
+	}
+
+	/* Allocate the LSO info mblk */
+	if ((mp = ip_lsoinfo_alloc(lso_cap)) == NULL)
+		ip0dbg(("ip_lsoinfo_return: can't enable LSO for "
+		    "conn %p on %s (ENOMEM)\n", (void *)connp, ill_name));
+
 	return (mp);
 }
 

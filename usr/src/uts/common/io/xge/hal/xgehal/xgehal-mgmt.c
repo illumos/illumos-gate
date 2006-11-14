@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-mgmt.c
- *
- *  Description:  Xframe-family management facility implementation
- *
- *  Created:      1 September 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #include "xgehal-mgmt.h"
@@ -98,6 +89,9 @@ xge_hal_mgmt_about(xge_hal_device_h devh, xge_hal_mgmt_about_info_t *about_info,
 	xge_os_strcpy(about_info->ll_minor, XGELL_VERSION_MINOR);
 	xge_os_strcpy(about_info->ll_fix,   XGELL_VERSION_FIX);
 	xge_os_strcpy(about_info->ll_build, XGELL_VERSION_BUILD);
+
+	about_info->transponder_temperature =
+		xge_hal_read_xfp_current_temp(devh);
 
 	return XGE_HAL_OK;
 }
@@ -246,7 +240,17 @@ xge_hal_mgmt_hw_stats(xge_hal_device_h devh, xge_hal_mgmt_hw_stats_t *hw_stats,
 }
 
 /**
- * FIXME: document
+ * xge_hal_mgmt_hw_stats_off - TBD.
+ * @devh: HAL device handle.
+ * @off: TBD
+ * @size: TBD
+ * @out: TBD
+ *
+ * Returns: XGE_HAL_OK - success.
+ * XGE_HAL_ERR_INVALID_DEVICE - Device is not valid.
+ * XGE_HAL_ERR_VERSION_CONFLICT - Version it not maching.
+ *
+ * See also: xge_hal_mgmt_sw_stats().
  */
 xge_hal_status_e
 xge_hal_mgmt_hw_stats_off(xge_hal_device_h devh, int off, int size, char *out)
@@ -307,6 +311,9 @@ xge_hal_mgmt_sw_stats(xge_hal_device_h devh, xge_hal_mgmt_sw_stats_t *sw_stats,
 	    !hldev->stats.is_enabled) {
 		return XGE_HAL_INF_STATS_IS_NOT_READY;
 	}
+
+	/* Updating xpak stats value */
+	__hal_updt_stats_xpak(hldev);
 
 	xge_os_memcpy(sw_stats, &hldev->stats.sw_dev_err_stats,
 	            sizeof(xge_hal_stats_sw_err_t));
@@ -409,7 +416,7 @@ xge_hal_mgmt_channel_stats(xge_hal_channel_h channelh,
 {
 	xge_hal_status_e status;
 	xge_hal_stats_channel_info_t *channel_info;
-	xge_hal_channel_t *channel = channelh;
+	xge_hal_channel_t *channel = (xge_hal_channel_t* ) channelh;
 
 	if (size != sizeof(xge_hal_stats_channel_info_t)) {
 		return XGE_HAL_ERR_VERSION_CONFLICT;
@@ -421,8 +428,7 @@ xge_hal_mgmt_channel_stats(xge_hal_channel_h channelh,
 	}
 
 	if (xge_hal_device_check_id(channel->devh) == XGE_HAL_CARD_HERC) {
-		__hal_update_ring_bump(channel->devh, channel->post_qid,
-			channel_info);
+        __hal_update_ring_bump( (xge_hal_device_t *) channel->devh, channel->post_qid, channel_info);
 	}
 
 	xge_os_memcpy(channel_stats, channel_info,
@@ -757,14 +763,13 @@ xge_hal_flick_link_led(xge_hal_device_h devh)
  * Returns: -1 on failure, 0 on success.
  */
 xge_hal_status_e
-xge_hal_read_eeprom(xge_hal_device_h devh, xge_hal_status_e off, u32* data)
+xge_hal_read_eeprom(xge_hal_device_h devh, int off, u32* data)
 {
 	xge_hal_device_t *hldev = (xge_hal_device_t*)devh;
-	int ret = XGE_HAL_FAIL;
+	xge_hal_status_e ret = XGE_HAL_FAIL;
 	u32 exit_cnt = 0;
 	u64 val64;
 	xge_hal_pci_bar0_t *bar0 = (xge_hal_pci_bar0_t *)hldev->bar0;
-
 
 	val64 = XGE_HAL_I2C_CONTROL_DEV_ID(XGE_DEV_ID) |
 		XGE_HAL_I2C_CONTROL_ADDR(off) |
@@ -810,7 +815,8 @@ xge_hal_status_e
 xge_hal_write_eeprom(xge_hal_device_h devh, int off, u32 data, int cnt)
 {
 	xge_hal_device_t *hldev = (xge_hal_device_t*)devh;
-	int exit_cnt = 0, ret = XGE_HAL_FAIL;
+	xge_hal_status_e ret = XGE_HAL_FAIL;
+	u32 exit_cnt = 0;
 	u64 val64;
 	xge_hal_pci_bar0_t *bar0 = (xge_hal_pci_bar0_t *)hldev->bar0;
 
@@ -924,7 +930,7 @@ xge_hal_register_test(xge_hal_device_h devh, u64 *data)
  * 0 on success.
  */
 xge_hal_status_e
-xge_hal_rldram_test(xge_hal_device_h devh, uint64_t * data)
+xge_hal_rldram_test(xge_hal_device_h devh, u64 *data)
 {
 	xge_hal_device_t *hldev = (xge_hal_device_t*)devh;
 	xge_hal_pci_bar0_t *bar0 = (xge_hal_pci_bar0_t *)hldev->bar0;
@@ -1042,6 +1048,246 @@ xge_hal_rldram_test(xge_hal_device_h devh, uint64_t * data)
 }
 
 /*
+ * xge_hal_pma_loopback - Enable or disable PMA loopback
+ * @devh: HAL device handle.
+ * @enable:Boolean set to 1 to enable and 0 to disable.
+ *
+ * Enable or disable PMA loopback.
+ * Return value:
+ * 0 on success.
+ */
+xge_hal_status_e
+xge_hal_pma_loopback( xge_hal_device_h devh, int enable )
+{
+	xge_hal_device_t *hldev = (xge_hal_device_t*)devh;
+	xge_hal_pci_bar0_t *bar0 = (xge_hal_pci_bar0_t *)hldev->bar0;
+	u64 val64;
+	u16 data;
+
+	/*
+	 * This code if for MAC loopbak
+	 * Should be enabled through another parameter
+	 */
+#if 0
+	val64 = xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
+	&bar0->mac_cfg);
+    if ( enable )
+    {
+        val64 |= ( XGE_HAL_MAC_CFG_TMAC_LOOPBACK | XGE_HAL_MAC_CFG_RMAC_PROM_ENABLE );
+    }
+	__hal_pio_mem_write32_upper(hldev->pdev, hldev->regh0,
+		    (u32)(val64 >> 32), (char*)&bar0->mac_cfg);
+	xge_os_mdelay(1);
+#endif
+
+	val64 = XGE_HAL_MDIO_CONTROL_MMD_INDX_ADDR(0)  |
+		XGE_HAL_MDIO_CONTROL_MMD_DEV_ADDR(1)   |
+		XGE_HAL_MDIO_CONTROL_MMD_PRT_ADDR(0)   |
+		XGE_HAL_MDIO_CONTROL_MMD_CTRL(0)       |
+		XGE_HAL_MDIO_CONTROL_MMD_OP(XGE_HAL_MDIO_OP_ADDRESS);
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			&bar0->mdio_control);
+	val64 |= XGE_HAL_MDIO_CONTROL_MMD_CTRL(XGE_HAL_MDIO_CTRL_START);
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			&bar0->mdio_control);
+	xge_os_mdelay(100);
+
+	val64 = XGE_HAL_MDIO_CONTROL_MMD_INDX_ADDR(0)  |
+		XGE_HAL_MDIO_CONTROL_MMD_DEV_ADDR(1)   |
+		XGE_HAL_MDIO_CONTROL_MMD_PRT_ADDR(0)   |
+		XGE_HAL_MDIO_CONTROL_MMD_CTRL(0)       |
+		XGE_HAL_MDIO_CONTROL_MMD_OP(XGE_HAL_MDIO_OP_READ);
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			&bar0->mdio_control);
+	val64 |= XGE_HAL_MDIO_CONTROL_MMD_CTRL(XGE_HAL_MDIO_CTRL_START);
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			&bar0->mdio_control);
+	xge_os_mdelay(100);
+
+	val64 = xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
+			&bar0->mdio_control);
+
+	data = (u16)XGE_HAL_MDIO_CONTROL_MMD_DATA_GET(val64);
+
+#define _HAL_LOOPBK_PMA         1
+
+	if( enable )
+		data |= 1;
+	else
+		data &= 0xfe;
+
+	val64 = XGE_HAL_MDIO_CONTROL_MMD_INDX_ADDR(0)  |
+		 XGE_HAL_MDIO_CONTROL_MMD_DEV_ADDR(1)   |
+		 XGE_HAL_MDIO_CONTROL_MMD_PRT_ADDR(0)   |
+		 XGE_HAL_MDIO_CONTROL_MMD_CTRL(0)       |
+		 XGE_HAL_MDIO_CONTROL_MMD_OP(XGE_HAL_MDIO_OP_ADDRESS);
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			&bar0->mdio_control);
+	val64 |= XGE_HAL_MDIO_CONTROL_MMD_CTRL(XGE_HAL_MDIO_CTRL_START);
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			&bar0->mdio_control);
+	xge_os_mdelay(100);
+
+	val64 = XGE_HAL_MDIO_CONTROL_MMD_INDX_ADDR(0)  |
+		XGE_HAL_MDIO_CONTROL_MMD_DEV_ADDR(1)   |
+		XGE_HAL_MDIO_CONTROL_MMD_PRT_ADDR(0)   |
+		XGE_HAL_MDIO_CONTROL_MMD_DATA(data)    |
+		XGE_HAL_MDIO_CONTROL_MMD_CTRL(0x0)     |
+		XGE_HAL_MDIO_CONTROL_MMD_OP(XGE_HAL_MDIO_OP_WRITE);
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			&bar0->mdio_control);
+	val64 |= XGE_HAL_MDIO_CONTROL_MMD_CTRL(XGE_HAL_MDIO_CTRL_START);
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			&bar0->mdio_control);
+	xge_os_mdelay(100);
+
+	val64 = XGE_HAL_MDIO_CONTROL_MMD_INDX_ADDR(0)  |
+		XGE_HAL_MDIO_CONTROL_MMD_DEV_ADDR(1)   |
+		XGE_HAL_MDIO_CONTROL_MMD_PRT_ADDR(0)   |
+		XGE_HAL_MDIO_CONTROL_MMD_CTRL(0x0)     |
+		XGE_HAL_MDIO_CONTROL_MMD_OP(XGE_HAL_MDIO_OP_READ);
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			&bar0->mdio_control);
+	val64 |= XGE_HAL_MDIO_CONTROL_MMD_CTRL(XGE_HAL_MDIO_CTRL_START);
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			&bar0->mdio_control);
+	xge_os_mdelay(100);
+
+    return XGE_HAL_OK;
+}
+
+u16
+xge_hal_mdio_read( xge_hal_device_h devh, u32 mmd_type, u64 addr )
+{
+	xge_hal_device_t *hldev = (xge_hal_device_t*)devh;
+	xge_hal_pci_bar0_t *bar0 = (xge_hal_pci_bar0_t *)hldev->bar0;
+	u64 val64 = 0x0;
+	u16 rval16 = 0x0;
+	u8  i = 0;
+
+	/* address transaction */
+	val64 = XGE_HAL_MDIO_CONTROL_MMD_INDX_ADDR(addr)  |
+		XGE_HAL_MDIO_CONTROL_MMD_DEV_ADDR(mmd_type)   |
+		XGE_HAL_MDIO_CONTROL_MMD_PRT_ADDR(0)   |
+		XGE_HAL_MDIO_CONTROL_MMD_OP(XGE_HAL_MDIO_OP_ADDRESS);
+
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			       &bar0->mdio_control);
+
+	val64 |= XGE_HAL_MDIO_CONTROL_MMD_CTRL(XGE_HAL_MDIO_CTRL_START);
+
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			       &bar0->mdio_control);
+	do
+	{
+		xge_os_mdelay(100);
+		val64 = xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
+					      &bar0->mdio_control);
+		if (i++ > 10)
+		{
+			break;
+		}
+	}while((val64 & XGE_HAL_MDIO_CONTROL_MMD_CTRL(0xF)) != XGE_HAL_MDIO_CONTROL_MMD_CTRL(1));
+
+	/* Data transaction */
+	val64 = XGE_HAL_MDIO_CONTROL_MMD_INDX_ADDR(addr)  |
+		XGE_HAL_MDIO_CONTROL_MMD_DEV_ADDR(mmd_type)   |
+		XGE_HAL_MDIO_CONTROL_MMD_PRT_ADDR(0)   |
+		XGE_HAL_MDIO_CONTROL_MMD_OP(XGE_HAL_MDIO_OP_READ);
+
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			       &bar0->mdio_control);
+
+	val64 |= XGE_HAL_MDIO_CONTROL_MMD_CTRL(XGE_HAL_MDIO_CTRL_START);
+
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			       &bar0->mdio_control);
+
+	i = 0;
+
+	do
+	{
+		xge_os_mdelay(100);
+		val64 = xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
+					      &bar0->mdio_control);
+		if (i++ > 10)
+		{
+			break;
+		}
+	}while((val64 & XGE_HAL_MDIO_CONTROL_MMD_CTRL(0xF)) != XGE_HAL_MDIO_CONTROL_MMD_CTRL(1));
+
+	rval16 = (u16)XGE_HAL_MDIO_CONTROL_MMD_DATA_GET(val64);
+
+	return rval16;
+}
+
+xge_hal_status_e
+xge_hal_mdio_write( xge_hal_device_h devh, u32 mmd_type, u64 addr, u32 value )
+{
+	u64 val64 = 0x0;
+	xge_hal_device_t *hldev = (xge_hal_device_t*)devh;
+	xge_hal_pci_bar0_t *bar0 = (xge_hal_pci_bar0_t *)hldev->bar0;
+	u8  i = 0;
+	/* address transaction */
+
+	val64 = XGE_HAL_MDIO_CONTROL_MMD_INDX_ADDR(addr)  |
+		XGE_HAL_MDIO_CONTROL_MMD_DEV_ADDR(mmd_type)   |
+		XGE_HAL_MDIO_CONTROL_MMD_PRT_ADDR(0)   |
+		XGE_HAL_MDIO_CONTROL_MMD_OP(XGE_HAL_MDIO_OP_ADDRESS);
+
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			       &bar0->mdio_control);
+
+	val64 |= XGE_HAL_MDIO_CONTROL_MMD_CTRL(XGE_HAL_MDIO_CTRL_START);
+
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			       &bar0->mdio_control);
+	do
+	{
+		xge_os_mdelay(100);
+		val64 = xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
+					      &bar0->mdio_control);
+		if (i++ > 10)
+		{
+			break;
+		}
+	} while((val64 & XGE_HAL_MDIO_CONTROL_MMD_CTRL(0xF)) !=
+		XGE_HAL_MDIO_CONTROL_MMD_CTRL(1));
+
+	/* Data transaction */
+
+	val64 = 0x0;
+
+	val64 = XGE_HAL_MDIO_CONTROL_MMD_INDX_ADDR(addr)    |
+		XGE_HAL_MDIO_CONTROL_MMD_DEV_ADDR(mmd_type) |
+		XGE_HAL_MDIO_CONTROL_MMD_PRT_ADDR(0)        |
+		XGE_HAL_MDIO_CONTROL_MMD_DATA(value)        |
+		XGE_HAL_MDIO_CONTROL_MMD_OP(XGE_HAL_MDIO_OP_WRITE);
+
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			       &bar0->mdio_control);
+
+	val64 |= XGE_HAL_MDIO_CONTROL_MMD_CTRL(XGE_HAL_MDIO_CTRL_START);
+
+	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+			       &bar0->mdio_control);
+	i = 0;
+
+	do
+	{
+		xge_os_mdelay(100);
+		val64 = xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
+					      &bar0->mdio_control);
+		if (i++ > 10)
+		{
+			break;
+		}
+	}while((val64 & XGE_HAL_MDIO_CONTROL_MMD_CTRL(0xF)) != XGE_HAL_MDIO_CONTROL_MMD_CTRL(1));
+
+	return XGE_HAL_OK;
+}
+
+/*
  * xge_hal_eeprom_test - to verify that EEprom in the xena can be
  programmed.
  * @devh: HAL device handle.
@@ -1130,7 +1376,8 @@ xge_hal_bist_test(xge_hal_device_h devh, u64 *data)
 {
 	xge_hal_device_t *hldev = (xge_hal_device_t*)devh;
 	u8 bist = 0;
-	int cnt = 0, ret = XGE_HAL_FAIL;
+	int cnt = 0;
+	xge_hal_status_e ret = XGE_HAL_FAIL;
 
 	xge_os_pci_read8(hldev->pdev, hldev->cfgh, 0x0f, &bist);
 	bist |= 0x40;
@@ -1236,3 +1483,232 @@ int xge_hal_setpause_data(xge_hal_device_h devh, int tx, int rx)
 	return 0;
 }
 
+/**
+ * xge_hal_read_xfp_current_temp -
+ * @hldev: HAL device handle.
+ *
+ * This routine only gets the temperature for XFP modules. Also, updating of the
+ * NVRAM can sometimes fail and so the reading we might get may not be uptodate.
+ */
+u32 xge_hal_read_xfp_current_temp(xge_hal_device_h hldev)
+{
+    u16 val_1, val_2, i = 0;
+    u32 actual;
+
+    /* First update the NVRAM table of XFP. */
+
+    (void) xge_hal_mdio_write(hldev, XGE_HAL_MDIO_MMD_PMA_DEV_ADDR, 0x8000, 0x3);
+
+
+    /* Now wait for the transfer to complete */
+    do
+    {
+        xge_os_mdelay( 50 ); // wait 50 milliseonds
+
+        val_1 =  xge_hal_mdio_read(hldev, XGE_HAL_MDIO_MMD_PMA_DEV_ADDR, 0x8000);
+
+        if ( i++ > 10 )
+        {
+            // waited 500 ms which should be plenty of time.
+            break;
+        }
+    }while (( val_1 & 0x000C ) != 0x0004);
+
+    /* Now NVRAM table of XFP should be updated, so read the temp */
+    val_1 =  (u8) xge_hal_mdio_read(hldev, XGE_HAL_MDIO_MMD_PMA_DEV_ADDR, 0x8067);
+    val_2 =  (u8) xge_hal_mdio_read(hldev, XGE_HAL_MDIO_MMD_PMA_DEV_ADDR, 0x8068);
+
+    actual = ((val_1 << 8) | val_2);
+
+    if (actual >= 32768)
+        actual = actual- 65536;
+    actual =  actual/256;
+
+    return actual;
+}
+
+/**
+ * __hal_chk_xpak_counter -  check the Xpak error count and log the msg.
+ * @hldev: pointer to xge_hal_device_t structure
+ * @type:  xpak stats error type
+ * @value: xpak stats value
+ *
+ * It is used to log the error message based on the xpak stats value
+ * Return value:
+ * None
+ */
+
+void __hal_chk_xpak_counter(xge_hal_device_t *hldev, int type, u32 value)
+{
+	/* 
+	 * If the value is high for three consecutive cylce,
+	 * log a error message
+	 */
+	if(value == 3)
+	{
+		switch(type)
+		{
+		case 1:
+			hldev->stats.sw_dev_err_stats.xpak_counter.
+				excess_temp = 0;
+
+			/*
+			 * Notify the ULD on Excess Xpak temperature alarm msg
+			 */
+			if (g_xge_hal_driver->uld_callbacks.xpak_alarm_log) {
+				g_xge_hal_driver->uld_callbacks.xpak_alarm_log(
+					hldev->upper_layer_info,
+					XGE_HAL_XPAK_ALARM_EXCESS_TEMP);
+			}
+			break;
+		case 2:
+			hldev->stats.sw_dev_err_stats.xpak_counter.
+				excess_bias_current = 0;
+
+			/*
+			 * Notify the ULD on Excess  xpak bias current alarm msg
+			 */
+			if (g_xge_hal_driver->uld_callbacks.xpak_alarm_log) {
+				g_xge_hal_driver->uld_callbacks.xpak_alarm_log(
+					hldev->upper_layer_info,
+					XGE_HAL_XPAK_ALARM_EXCESS_BIAS_CURRENT);
+			}
+			break;
+		case 3:
+			hldev->stats.sw_dev_err_stats.xpak_counter.
+				excess_laser_output = 0;
+
+			/*
+			 * Notify the ULD on Excess Xpak Laser o/p power 
+			 * alarm msg
+			 */
+			if (g_xge_hal_driver->uld_callbacks.xpak_alarm_log) {
+				g_xge_hal_driver->uld_callbacks.xpak_alarm_log(
+					hldev->upper_layer_info,
+					XGE_HAL_XPAK_ALARM_EXCESS_LASER_OUTPUT);
+			}
+			break;
+		default:
+			xge_debug_osdep(XGE_TRACE, "Incorrect XPAK Alarm "
+			"type \n");
+		}
+	} 
+
+}
+
+/**
+ * __hal_updt_stats_xpak -  update the Xpak error count.
+ * @hldev: pointer to xge_hal_device_t structure
+ *
+ * It is used to update the xpak stats value
+ * Return value:
+ * None
+ */
+void __hal_updt_stats_xpak(xge_hal_device_t *hldev)
+{
+	u16 val_1;
+	u64 addr;
+
+	/* Check the communication with the MDIO slave */
+	addr = 0x0000;
+	val_1 = 0x0;
+	val_1 = xge_hal_mdio_read(hldev, XGE_HAL_MDIO_MMD_PMA_DEV_ADDR, addr);
+	if((val_1 == 0xFFFF) || (val_1 == 0x0000))
+        {
+                xge_debug_osdep(XGE_TRACE, "ERR: MDIO slave access failed - "
+                          "Returned %x\n", val_1);
+                return;
+        }
+
+	/* Check for the expected value of 2040 at PMA address 0x0000 */
+	if(val_1 != 0x2040)
+        {
+                xge_debug_osdep(XGE_TRACE, "Incorrect value at PMA address 0x0000 - ");
+                xge_debug_osdep(XGE_TRACE, "Returned: %llx- Expected: 0x2040\n", val_1);
+                return;
+        }
+
+	/* Loading the DOM register to MDIO register */
+        addr = 0xA100;
+        (void) xge_hal_mdio_write(hldev, XGE_HAL_MDIO_MMD_PMA_DEV_ADDR, addr, 0x0);
+        val_1 = xge_hal_mdio_read(hldev, XGE_HAL_MDIO_MMD_PMA_DEV_ADDR, addr);
+
+	/*
+	 * Reading the Alarm flags
+	 */
+        addr = 0xA070;
+        val_1 = 0x0;
+        val_1 = xge_hal_mdio_read(hldev, XGE_HAL_MDIO_MMD_PMA_DEV_ADDR, addr);
+	if(CHECKBIT(val_1, 0x7))
+	{
+		hldev->stats.sw_dev_err_stats.stats_xpak.
+			alarm_transceiver_temp_high++;
+		hldev->stats.sw_dev_err_stats.xpak_counter.excess_temp++;
+		__hal_chk_xpak_counter(hldev, 0x1,
+			hldev->stats.sw_dev_err_stats.xpak_counter.excess_temp);
+	} else {
+		hldev->stats.sw_dev_err_stats.xpak_counter.excess_temp = 0;
+	}
+	if(CHECKBIT(val_1, 0x6))
+		hldev->stats.sw_dev_err_stats.stats_xpak.
+			alarm_transceiver_temp_low++;
+
+	if(CHECKBIT(val_1, 0x3))
+	{
+		hldev->stats.sw_dev_err_stats.stats_xpak.
+			alarm_laser_bias_current_high++;
+		hldev->stats.sw_dev_err_stats.xpak_counter.
+			excess_bias_current++;
+		__hal_chk_xpak_counter(hldev, 0x2,
+			hldev->stats.sw_dev_err_stats.xpak_counter.
+			excess_bias_current);
+	} else {
+		hldev->stats.sw_dev_err_stats.xpak_counter.
+			excess_bias_current = 0;
+	}
+	if(CHECKBIT(val_1, 0x2))
+		hldev->stats.sw_dev_err_stats.stats_xpak.
+			alarm_laser_bias_current_low++;
+
+	if(CHECKBIT(val_1, 0x1))
+	{
+		hldev->stats.sw_dev_err_stats.stats_xpak.
+			alarm_laser_output_power_high++;
+		hldev->stats.sw_dev_err_stats.xpak_counter.
+			excess_laser_output++;
+		__hal_chk_xpak_counter(hldev, 0x3,
+			hldev->stats.sw_dev_err_stats.xpak_counter.
+				excess_laser_output);
+	} else {
+		hldev->stats.sw_dev_err_stats.xpak_counter.
+				excess_laser_output = 0;
+	}
+	if(CHECKBIT(val_1, 0x0))
+		hldev->stats.sw_dev_err_stats.stats_xpak.
+				alarm_laser_output_power_low++;
+
+	/*
+	 * Reading the warning flags
+	 */
+        addr = 0xA074;
+        val_1 = 0x0;
+        val_1 = xge_hal_mdio_read(hldev, XGE_HAL_MDIO_MMD_PMA_DEV_ADDR, addr);
+	if(CHECKBIT(val_1, 0x7))
+		hldev->stats.sw_dev_err_stats.stats_xpak.
+			warn_transceiver_temp_high++;
+	if(CHECKBIT(val_1, 0x6))
+		hldev->stats.sw_dev_err_stats.stats_xpak.
+			warn_transceiver_temp_low++;
+	if(CHECKBIT(val_1, 0x3))
+		hldev->stats.sw_dev_err_stats.stats_xpak.
+			warn_laser_bias_current_high++;
+	if(CHECKBIT(val_1, 0x2))
+		hldev->stats.sw_dev_err_stats.stats_xpak.
+			warn_laser_bias_current_low++;
+	if(CHECKBIT(val_1, 0x1))
+		hldev->stats.sw_dev_err_stats.stats_xpak.
+			warn_laser_output_power_high++;
+	if(CHECKBIT(val_1, 0x0))
+		hldev->stats.sw_dev_err_stats.stats_xpak.
+			warn_laser_output_power_low++;
+}

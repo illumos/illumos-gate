@@ -17,17 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xge-queue.c
- *
- *  Description:  serialized event queue
- *
- *  Created:      7 June 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #include "xge-queue.h"
@@ -71,7 +62,8 @@ __queue_consume(xge_queue_t *queue, int data_max_size, xge_queue_item_t *item)
 		queue->head_ptr = (char *)queue->head_ptr + real_size;
 		xge_debug_queue(XGE_TRACE,
 			"event_type: %d removing from the head: "
-			"0x%llx:0x%llx:0x%llx:0x%llx elem 0x%llx length %d",
+			"0x"XGE_OS_LLXFMT":0x"XGE_OS_LLXFMT":0x"XGE_OS_LLXFMT
+			":0x"XGE_OS_LLXFMT" elem 0x"XGE_OS_LLXFMT" length %d",
 			elem->event_type,
 			(u64)(ulong_t)queue->start_ptr,
 			(u64)(ulong_t)queue->head_ptr,
@@ -83,7 +75,8 @@ __queue_consume(xge_queue_t *queue, int data_max_size, xge_queue_item_t *item)
 		queue->tail_ptr = (char *)queue->tail_ptr - real_size;
 		xge_debug_queue(XGE_TRACE,
 			"event_type: %d removing from the tail: "
-			"0x%llx:0x%llx:0x%llx:0x%llx elem 0x%llx length %d",
+			"0x"XGE_OS_LLXFMT":0x"XGE_OS_LLXFMT":0x"XGE_OS_LLXFMT
+			":0x"XGE_OS_LLXFMT" elem 0x"XGE_OS_LLXFMT" length %d",
 			elem->event_type,
 			(u64)(ulong_t)queue->start_ptr,
 			(u64)(ulong_t)queue->head_ptr,
@@ -94,7 +87,8 @@ __queue_consume(xge_queue_t *queue, int data_max_size, xge_queue_item_t *item)
 	} else {
 		xge_debug_queue(XGE_TRACE,
 			"event_type: %d removing from the list: "
-			"0x%llx:0x%llx:0x%llx:0x%llx elem 0x%llx length %d",
+			"0x"XGE_OS_LLXFMT":0x"XGE_OS_LLXFMT":0x"XGE_OS_LLXFMT
+			":0x"XGE_OS_LLXFMT" elem 0x"XGE_OS_LLXFMT" length %d",
 			elem->event_type,
 			(u64)(ulong_t)queue->start_ptr,
 			(u64)(ulong_t)queue->head_ptr,
@@ -167,11 +161,12 @@ xge_queue_produce(xge_queue_h queueh, int event_type, void *context,
 
 try_again:
 	if ((char *)queue->tail_ptr + real_size <= (char *)queue->end_ptr) {
-		elem = queue->tail_ptr;
+        elem = (xge_queue_item_t *) queue->tail_ptr;
 		queue->tail_ptr = (void *)((char *)queue->tail_ptr + real_size);
 		xge_debug_queue(XGE_TRACE,
 			"event_type: %d adding to the tail: "
-			"0x%llx:0x%llx:0x%llx:0x%llx elem 0x%llx length %d",
+			"0x"XGE_OS_LLXFMT":0x"XGE_OS_LLXFMT":0x"XGE_OS_LLXFMT
+			":0x"XGE_OS_LLXFMT" elem 0x"XGE_OS_LLXFMT" length %d",
 			event_type,
 			(u64)(ulong_t)queue->start_ptr,
 			(u64)(ulong_t)queue->head_ptr,
@@ -181,11 +176,12 @@ try_again:
 			real_size);
 	} else if ((char *)queue->head_ptr - real_size >=
 					(char *)queue->start_ptr) {
-		elem = (void *)((char *)queue->head_ptr - real_size);
+        elem = (xge_queue_item_t *) ((char *)queue->head_ptr - real_size);
 		queue->head_ptr = elem;
 		xge_debug_queue(XGE_TRACE,
 			"event_type: %d adding to the head: "
-			"0x%llx:0x%llx:0x%llx:0x%llx length %d",
+			"0x"XGE_OS_LLXFMT":0x"XGE_OS_LLXFMT":0x"XGE_OS_LLXFMT
+			":0x"XGE_OS_LLXFMT" length %d",
 			event_type,
 			(u64)(ulong_t)queue->start_ptr,
 			(u64)(ulong_t)queue->head_ptr,
@@ -218,7 +214,7 @@ try_again:
 	xge_assert(queue->head_ptr >= queue->start_ptr &&
 		    queue->head_ptr < queue->end_ptr);
 	elem->data_size = data_size;
-	elem->event_type = event_type;
+    elem->event_type = (xge_hal_event_e) event_type;
 	elem->is_critical = is_critical;
 	if (is_critical)
 	        queue->has_critical_event = 1;
@@ -258,7 +254,7 @@ xge_queue_create(pci_dev_h pdev, pci_irq_h irqh, int pages_initial,
 {
 	xge_queue_t *queue;
 
-	if ((queue = xge_os_malloc(pdev, sizeof(xge_queue_t))) == NULL)
+    if ((queue = (xge_queue_t *) xge_os_malloc(pdev, sizeof(xge_queue_t))) == NULL)
 		return NULL;
 
 	queue->queued_func = queued;
@@ -295,8 +291,8 @@ void xge_queue_destroy(xge_queue_h queueh)
 {
 	xge_queue_t *queue = (xge_queue_t *)queueh;
 	if (!xge_list_is_empty(&queue->list_head)) {
-		xge_debug_queue(XGE_ERR, "destroying non-empty queue 0x%llx",
-				 (u64)(ulong_t)queue);
+		xge_debug_queue(XGE_ERR, "destroying non-empty queue 0x"
+				XGE_OS_LLXFMT, (u64)(ulong_t)queue);
 	}
 	xge_os_free(queue->pdev, queue->start_ptr, queue->pages_current *
 	          XGE_QUEUE_BUF_SIZE);
@@ -324,7 +320,7 @@ __io_queue_grow(xge_queue_h queueh)
 	xge_list_t *item;
 	xge_queue_item_t *elem;
 
-	xge_debug_queue(XGE_TRACE, "queue 0x%llx:%d is growing",
+	xge_debug_queue(XGE_TRACE, "queue 0x"XGE_OS_LLXFMT":%d is growing",
 			 (u64)(ulong_t)queue, queue->pages_current);
 
 	newbuf = xge_os_malloc(queue->pdev,
@@ -420,7 +416,7 @@ void xge_queue_flush(xge_queue_h queueh)
 				    XGE_DEFAULT_EVENT_MAX_DATA_SIZE,
 				    item) != XGE_QUEUE_IS_EMPTY) {
 		/* do nothing */
-		xge_debug_queue(XGE_TRACE, "item %llx(%d) flushed",
+		xge_debug_queue(XGE_TRACE, "item "XGE_OS_LLXFMT"(%d) flushed",
 				 item, item->event_type);
 	}
 	(void) __queue_get_reset_critical (queueh);

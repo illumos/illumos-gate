@@ -17,23 +17,16 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- *  Copyright (c) 2002-2005 Neterion, Inc.
- *  All right Reserved.
  *
- *  FileName :    xgehal-event.h
- *
- *  Description:  event types
- *
- *  Created:      7 June 2004
+ * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
 #ifndef XGE_HAL_EVENT_H
 #define XGE_HAL_EVENT_H
 
 #include "xge-os-pal.h"
+
+__EXTERN_BEGIN_DECLS
 
 #define XGE_HAL_EVENT_BASE		0
 #define XGE_LL_EVENT_BASE		100
@@ -73,5 +66,7 @@ typedef enum xge_hal_event_e {
 	XGE_HAL_EVENT_TARGETABORT       = XGE_HAL_EVENT_BASE + 6,
 	XGE_HAL_EVENT_SLOT_FREEZE       = XGE_HAL_EVENT_BASE + 7,
 } xge_hal_event_e;
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_HAL_EVENT_H */

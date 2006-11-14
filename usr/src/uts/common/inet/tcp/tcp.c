@@ -418,6 +418,10 @@ tcp_stat_t tcp_statistics = {
 	{ "tcp_fusion_rrw_plugged",	KSTAT_DATA_UINT64 },
 	{ "tcp_in_ack_unsent_drop",	KSTAT_DATA_UINT64 },
 	{ "tcp_sock_fallback",		KSTAT_DATA_UINT64 },
+	{ "tcp_lso_enabled",		KSTAT_DATA_UINT64 },
+	{ "tcp_lso_disabled",		KSTAT_DATA_UINT64 },
+	{ "tcp_lso_times",		KSTAT_DATA_UINT64 },
+	{ "tcp_lso_pkt_out",		KSTAT_DATA_UINT64 },
 };
 
 static kstat_t *tcp_kstat;
@@ -962,6 +966,8 @@ static int	tcp_mdt_add_attrs(multidata_t *, const mblk_t *,
 		    const uint32_t, const uint32_t);
 static void	tcp_multisend_data(tcp_t *, ire_t *, const ill_t *, mblk_t *,
 		    const uint_t, const uint_t, boolean_t *);
+static mblk_t	*tcp_lso_info_mp(mblk_t *);
+static void	tcp_lso_update(tcp_t *, ill_lso_capab_t *);
 static void	tcp_send_data(tcp_t *, queue_t *, mblk_t *);
 extern mblk_t	*tcp_timermp_alloc(int);
 extern void	tcp_timermp_free(tcp_t *);
@@ -4240,6 +4246,9 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 
 	connp->conn_mdt_ok = B_FALSE;
 	tcp->tcp_mdt = B_FALSE;
+
+	connp->conn_lso_ok = B_FALSE;
+	tcp->tcp_lso = B_FALSE;
 
 	msg = NULL;
 	switch (tcp->tcp_state) {
@@ -8122,6 +8131,8 @@ tcp_reinit_values(tcp)
 	tcp->tcp_fuse_rcv_unread_hiwater = 0;
 	tcp->tcp_fuse_rcv_unread_cnt = 0;
 
+	tcp->tcp_lso = B_FALSE;
+
 	tcp->tcp_in_ack_unsent = 0;
 	tcp->tcp_cork = B_FALSE;
 	tcp->tcp_tconnind_started = B_FALSE;
@@ -9280,7 +9291,7 @@ tcp_maxpsz_set(tcp_t *tcp, boolean_t set_maxblk)
 	if (tcp->tcp_fused) {
 		maxpsz = tcp_fuse_maxpsz_set(tcp);
 		mss = INFPSZ;
-	} else if (tcp->tcp_mdt || tcp->tcp_maxpsz == 0) {
+	} else if (tcp->tcp_mdt || tcp->tcp_lso || tcp->tcp_maxpsz == 0) {
 		/*
 		 * Set the sd_qn_maxpsz according to the socket send buffer
 		 * size, and sd_maxblk to INFPSZ (-1).  This will essentially
@@ -11740,6 +11751,17 @@ tcp_rput_common(tcp_t *tcp, mblk_t *mp)
 				tcp_mdt_update(tcp,
 				    &((ip_mdt_info_t *)mp->b_rptr)->mdt_capab,
 				    B_FALSE);
+			}
+			freemsg(mp);
+			return;
+		case LSO_IOC_INFO_UPDATE:
+			/*
+			 * Handle LSO information update; the following
+			 * routine will free the message.
+			 */
+			if (tcp->tcp_connp->conn_lso_ok) {
+				tcp_lso_update(tcp,
+				    &((ip_lso_info_t *)mp->b_rptr)->lso_capab);
 			}
 			freemsg(mp);
 			return;
@@ -15436,6 +15458,7 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 	uint32_t mss;
 	mblk_t *syn_mp;
 	mblk_t *mdti;
+	mblk_t *lsoi;
 	int	retval;
 	mblk_t *ire_mp;
 
@@ -15457,6 +15480,16 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 				tcp_mdt_update(tcp, &((ip_mdt_info_t *)mdti->
 				    b_rptr)->mdt_capab, B_TRUE);
 				freemsg(mdti);
+			}
+
+			/*
+			 * Check to update LSO information with tcp, and
+			 * tcp_lso_update routine will free the message.
+			 */
+			if ((lsoi = tcp_lso_info_mp(mp)) != NULL) {
+				tcp_lso_update(tcp, &((ip_lso_info_t *)lsoi->
+				    b_rptr)->lso_capab);
+				freemsg(lsoi);
 			}
 
 			/* Get the IRE, if we had requested for it */
@@ -18473,61 +18506,26 @@ tcp_zcopy_notify(tcp_t *tcp)
 	mutex_exit(&stp->sd_lock);
 }
 
-static void
-tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
+static boolean_t
+tcp_send_find_ire(tcp_t *tcp, ipaddr_t *dst, ire_t **irep)
 {
-	ipha_t		*ipha;
-	ipaddr_t	src;
-	ipaddr_t	dst;
-	uint32_t	cksum;
-	ire_t		*ire;
-	uint16_t	*up;
-	ill_t		*ill;
-	conn_t		*connp = tcp->tcp_connp;
-	uint32_t	hcksum_txflags = 0;
-	mblk_t		*ire_fp_mp;
-	uint_t		ire_fp_mp_len;
+	ire_t *ire;
+	conn_t *connp = tcp->tcp_connp;
 
-	ASSERT(DB_TYPE(mp) == M_DATA);
-
-	if (DB_CRED(mp) == NULL)
-		mblk_setcred(mp, CONN_CRED(connp));
-
-	ipha = (ipha_t *)mp->b_rptr;
-	src = ipha->ipha_src;
-	dst = ipha->ipha_dst;
-
-	/*
-	 * Drop off fast path for IPv6 and also if options are present or
-	 * we need to resolve a TS label.
-	 */
-	if (tcp->tcp_ipversion != IPV4_VERSION ||
-	    !IPCL_IS_CONNECTED(connp) ||
-	    (connp->conn_flags & IPCL_CHECK_POLICY) != 0 ||
-	    connp->conn_dontroute ||
-	    connp->conn_nexthop_set ||
-	    connp->conn_xmit_if_ill != NULL ||
-	    connp->conn_nofailover_ill != NULL ||
-	    !connp->conn_ulp_labeled ||
-	    ipha->ipha_ident == IP_HDR_INCLUDED ||
-	    ipha->ipha_version_and_hdr_length != IP_SIMPLE_HDR_VERSION ||
-	    IPP_ENABLED(IPP_LOCAL_OUT)) {
-		if (tcp->tcp_snd_zcopy_aware)
-			mp = tcp_zcopy_disable(tcp, mp);
-		TCP_STAT(tcp_ip_send);
-		CALL_IP_WPUT(connp, q, mp);
-		return;
-	}
 
 	mutex_enter(&connp->conn_lock);
 	ire = connp->conn_ire_cache;
 	ASSERT(!(connp->conn_state_flags & CONN_INCIPIENT));
-	if (ire != NULL && ire->ire_addr == dst &&
+
+	if ((ire != NULL) &&
+	    (((dst != NULL) && (ire->ire_addr == *dst)) || ((dst == NULL) &&
+	    IN6_ARE_ADDR_EQUAL(&ire->ire_addr_v6, &tcp->tcp_ip6h->ip6_dst))) &&
 	    !(ire->ire_marks & IRE_MARK_CONDEMNED)) {
 		IRE_REFHOLD(ire);
 		mutex_exit(&connp->conn_lock);
 	} else {
 		boolean_t cached = B_FALSE;
+		ts_label_t *tsl;
 
 		/* force a recheck later on */
 		tcp->tcp_ire_ill_check_done = B_FALSE;
@@ -18535,17 +18533,20 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		TCP_DBGSTAT(tcp_ire_null1);
 		connp->conn_ire_cache = NULL;
 		mutex_exit(&connp->conn_lock);
+
 		if (ire != NULL)
 			IRE_REFRELE_NOTR(ire);
-		ire = ire_cache_lookup(dst, connp->conn_zoneid,
-		    MBLK_GETLABEL(mp));
+
+		tsl = crgetlabel(CONN_CRED(connp));
+		ire = (dst ? ire_cache_lookup(*dst, connp->conn_zoneid, tsl) :
+		    ire_cache_lookup_v6(&tcp->tcp_ip6h->ip6_dst,
+		    connp->conn_zoneid, tsl));
+
 		if (ire == NULL) {
-			if (tcp->tcp_snd_zcopy_aware)
-				mp = tcp_zcopy_backoff(tcp, mp, 0);
 			TCP_STAT(tcp_ire_null);
-			CALL_IP_WPUT(connp, q, mp);
-			return;
+			return (B_FALSE);
 		}
+
 		IRE_REFHOLD_NOTR(ire);
 		/*
 		 * Since we are inside the squeue, there cannot be another
@@ -18577,22 +18578,45 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		 */
 	}
 
-	/*
-	 * The following if case identifies whether or not
-	 * we are forced to take the slowpath.
-	 */
-	if (ire->ire_flags & RTF_MULTIRT ||
-	    ire->ire_stq == NULL ||
-	    ire->ire_max_frag < ntohs(ipha->ipha_length) ||
-	    (ire->ire_nce != NULL &&
-	    (ire_fp_mp = ire->ire_nce->nce_fp_mp) == NULL) ||
-	    (ire_fp_mp_len = MBLKL(ire_fp_mp)) > MBLKHEAD(mp)) {
-		if (tcp->tcp_snd_zcopy_aware)
-			mp = tcp_zcopy_disable(tcp, mp);
+	*irep = ire;
+
+	return (B_TRUE);
+}
+
+/*
+ * Called from tcp_send() or tcp_send_data() to find workable IRE.
+ *
+ * 0 = success;
+ * 1 = failed to find ire and ill.
+ */
+static boolean_t
+tcp_send_find_ire_ill(tcp_t *tcp, mblk_t *mp, ire_t **irep, ill_t **illp)
+{
+	ipha_t		*ipha;
+	ipaddr_t	dst;
+	ire_t		*ire;
+	ill_t		*ill;
+	conn_t		*connp = tcp->tcp_connp;
+	mblk_t		*ire_fp_mp;
+
+	if (mp != NULL)
+		ipha = (ipha_t *)mp->b_rptr;
+	else
+		ipha = tcp->tcp_ipha;
+	dst = ipha->ipha_dst;
+
+	if (!tcp_send_find_ire(tcp, &dst, &ire))
+		return (B_FALSE);
+
+	if ((ire->ire_flags & RTF_MULTIRT) ||
+	    (ire->ire_stq == NULL) ||
+	    (ire->ire_nce == NULL) ||
+	    ((ire_fp_mp = ire->ire_nce->nce_fp_mp) == NULL) ||
+	    ((mp != NULL) && (ire->ire_max_frag < ntohs(ipha->ipha_length) ||
+		MBLKL(ire_fp_mp) > MBLKHEAD(mp)))) {
 		TCP_STAT(tcp_ip_ire_send);
 		IRE_REFRELE(ire);
-		CALL_IP_WPUT(connp, q, mp);
-		return;
+		return (B_FALSE);
 	}
 
 	ill = ire_to_ill(ire);
@@ -18611,6 +18635,64 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		tcp->tcp_ire_ill_check_done = B_TRUE;
 	}
 
+	*irep = ire;
+	*illp = ill;
+
+	return (B_TRUE);
+}
+
+static void
+tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
+{
+	ipha_t		*ipha;
+	ipaddr_t	src;
+	ipaddr_t	dst;
+	uint32_t	cksum;
+	ire_t		*ire;
+	uint16_t	*up;
+	ill_t		*ill;
+	conn_t		*connp = tcp->tcp_connp;
+	uint32_t	hcksum_txflags = 0;
+	mblk_t		*ire_fp_mp;
+	uint_t		ire_fp_mp_len;
+
+	ASSERT(DB_TYPE(mp) == M_DATA);
+
+	if (DB_CRED(mp) == NULL)
+		mblk_setcred(mp, CONN_CRED(connp));
+
+	ipha = (ipha_t *)mp->b_rptr;
+	src = ipha->ipha_src;
+	dst = ipha->ipha_dst;
+
+	/*
+	 * Drop off fast path for IPv6 and also if options are present or
+	 * we need to resolve a TS label.
+	 */
+	if (tcp->tcp_ipversion != IPV4_VERSION ||
+	    !IPCL_IS_CONNECTED(connp) ||
+	    !CONN_IS_LSO_MD_FASTPATH(connp) ||
+	    (connp->conn_flags & IPCL_CHECK_POLICY) != 0 ||
+	    !connp->conn_ulp_labeled ||
+	    ipha->ipha_ident == IP_HDR_INCLUDED ||
+	    ipha->ipha_version_and_hdr_length != IP_SIMPLE_HDR_VERSION ||
+	    IPP_ENABLED(IPP_LOCAL_OUT)) {
+		if (tcp->tcp_snd_zcopy_aware)
+			mp = tcp_zcopy_disable(tcp, mp);
+		TCP_STAT(tcp_ip_send);
+		CALL_IP_WPUT(connp, q, mp);
+		return;
+	}
+
+	if (!tcp_send_find_ire_ill(tcp, mp, &ire, &ill)) {
+		if (tcp->tcp_snd_zcopy_aware)
+			mp = tcp_zcopy_backoff(tcp, mp, 0);
+		CALL_IP_WPUT(connp, q, mp);
+		return;
+	}
+	ire_fp_mp = ire->ire_nce->nce_fp_mp;
+	ire_fp_mp_len = MBLKL(ire_fp_mp);
+
 	ASSERT(ipha->ipha_ident == 0 || ipha->ipha_ident == IP_HDR_INCLUDED);
 	ipha->ipha_ident = (uint16_t)atomic_add_32_nv(&ire->ire_ident, 1);
 #ifndef _BIG_ENDIAN
@@ -18618,16 +18700,25 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 #endif
 
 	/*
-	 * Check to see if we need to re-enable MDT for this connection
+	 * Check to see if we need to re-enable LSO/MDT for this connection
 	 * because it was previously disabled due to changes in the ill;
 	 * note that by doing it here, this re-enabling only applies when
 	 * the packet is not dispatched through CALL_IP_WPUT().
 	 *
-	 * That means for IPv4, it is worth re-enabling MDT for the fastpath
+	 * That means for IPv4, it is worth re-enabling LSO/MDT for the fastpath
 	 * case, since that's how we ended up here.  For IPv6, we do the
 	 * re-enabling work in ip_xmit_v6(), albeit indirectly via squeue.
 	 */
-	if (connp->conn_mdt_ok && !tcp->tcp_mdt && ILL_MDT_USABLE(ill)) {
+	if (connp->conn_lso_ok && !tcp->tcp_lso && ILL_LSO_TCP_USABLE(ill)) {
+		/*
+		 * Restore LSO for this connection, so that next time around
+		 * it is eligible to go through tcp_lsosend() path again.
+		 */
+		TCP_STAT(tcp_lso_enabled);
+		tcp->tcp_lso = B_TRUE;
+		ip1dbg(("tcp_send_data: reenabling LSO for connp %p on "
+		    "interface %s\n", (void *)connp, ill->ill_name));
+	} else if (connp->conn_mdt_ok && !tcp->tcp_mdt && ILL_MDT_USABLE(ill)) {
 		/*
 		 * Restore MDT for this connection, so that next time around
 		 * it is eligible to go through tcp_multisend() path again.
@@ -19052,7 +19143,7 @@ data_null:
 	    tcp->tcp_tcph->th_win);
 
 	/*
-	 * Determine if it's worthwhile to attempt MDT, based on:
+	 * Determine if it's worthwhile to attempt LSO or MDT, based on:
 	 *
 	 * 1. Simple TCP/IP{v4,v6} (no options).
 	 * 2. IPSEC/IPQoS processing is not needed for the TCP connection.
@@ -19060,24 +19151,32 @@ data_null:
 	 * 4. The TCP is not detached.
 	 *
 	 * If any of the above conditions have changed during the
-	 * connection, stop using MDT and restore the stream head
+	 * connection, stop using LSO/MDT and restore the stream head
 	 * parameters accordingly.
 	 */
-	if (tcp->tcp_mdt &&
+	if ((tcp->tcp_lso || tcp->tcp_mdt) &&
 	    ((tcp->tcp_ipversion == IPV4_VERSION &&
 	    tcp->tcp_ip_hdr_len != IP_SIMPLE_HDR_LENGTH) ||
 	    (tcp->tcp_ipversion == IPV6_VERSION &&
 	    tcp->tcp_ip_hdr_len != IPV6_HDR_LEN) ||
 	    tcp->tcp_state != TCPS_ESTABLISHED ||
-	    TCP_IS_DETACHED(tcp) || !CONN_IS_MD_FASTPATH(tcp->tcp_connp) ||
+	    TCP_IS_DETACHED(tcp) || !CONN_IS_LSO_MD_FASTPATH(tcp->tcp_connp) ||
 	    CONN_IPSEC_OUT_ENCAPSULATED(tcp->tcp_connp) ||
 	    IPP_ENABLED(IPP_LOCAL_OUT))) {
-		tcp->tcp_connp->conn_mdt_ok = B_FALSE;
-		tcp->tcp_mdt = B_FALSE;
+		if (tcp->tcp_lso) {
+			tcp->tcp_connp->conn_lso_ok = B_FALSE;
+			tcp->tcp_lso = B_FALSE;
+		} else {
+			tcp->tcp_connp->conn_mdt_ok = B_FALSE;
+			tcp->tcp_mdt = B_FALSE;
+		}
 
 		/* Anything other than detached is considered pathological */
 		if (!TCP_IS_DETACHED(tcp)) {
-			TCP_STAT(tcp_mdt_conn_halted1);
+			if (tcp->tcp_lso)
+				TCP_STAT(tcp_lso_disabled);
+			else
+				TCP_STAT(tcp_mdt_conn_halted1);
 			(void) tcp_maxpsz_set(tcp, B_TRUE);
 		}
 	}
@@ -19322,7 +19421,7 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	boolean_t	done = B_FALSE;
 	uint32_t	cksum;
 	uint32_t	hwcksum_flags;
-	ire_t		*ire;
+	ire_t		*ire = NULL;
 	ill_t		*ill;
 	ipha_t		*ipha;
 	ip6_t		*ip6h;
@@ -19372,7 +19471,7 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 
 	connp = tcp->tcp_connp;
 	ASSERT(connp != NULL);
-	ASSERT(CONN_IS_MD_FASTPATH(connp));
+	ASSERT(CONN_IS_LSO_MD_FASTPATH(connp));
 	ASSERT(!CONN_IPSEC_OUT_ENCAPSULATED(connp));
 
 	/*
@@ -19404,65 +19503,8 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	 * in proceeding any further, and we should just hand everything
 	 * off to the legacy path.
 	 */
-	mutex_enter(&connp->conn_lock);
-	ire = connp->conn_ire_cache;
-	ASSERT(!(connp->conn_state_flags & CONN_INCIPIENT));
-	if (ire != NULL && ((af == AF_INET && ire->ire_addr == dst) ||
-	    (af == AF_INET6 && IN6_ARE_ADDR_EQUAL(&ire->ire_addr_v6,
-	    &tcp->tcp_ip6h->ip6_dst))) &&
-	    !(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-		IRE_REFHOLD(ire);
-		mutex_exit(&connp->conn_lock);
-	} else {
-		boolean_t cached = B_FALSE;
-		ts_label_t *tsl;
-
-		/* force a recheck later on */
-		tcp->tcp_ire_ill_check_done = B_FALSE;
-
-		TCP_DBGSTAT(tcp_ire_null1);
-		connp->conn_ire_cache = NULL;
-		mutex_exit(&connp->conn_lock);
-
-		/* Release the old ire */
-		if (ire != NULL)
-			IRE_REFRELE_NOTR(ire);
-
-		tsl = crgetlabel(CONN_CRED(connp));
-		ire = (af == AF_INET) ?
-		    ire_cache_lookup(dst, connp->conn_zoneid, tsl) :
-		    ire_cache_lookup_v6(&tcp->tcp_ip6h->ip6_dst,
-		    connp->conn_zoneid, tsl);
-
-		if (ire == NULL) {
-			TCP_STAT(tcp_ire_null);
-			goto legacy_send_no_md;
-		}
-
-		IRE_REFHOLD_NOTR(ire);
-		/*
-		 * Since we are inside the squeue, there cannot be another
-		 * thread in TCP trying to set the conn_ire_cache now. The
-		 * check for IRE_MARK_CONDEMNED ensures that an interface
-		 * unplumb thread has not yet started cleaning up the conns.
-		 * Hence we don't need to grab the conn lock.
-		 */
-		if (!(connp->conn_state_flags & CONN_CLOSING)) {
-			rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
-			if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-				connp->conn_ire_cache = ire;
-				cached = B_TRUE;
-			}
-			rw_exit(&ire->ire_bucket->irb_lock);
-		}
-
-		/*
-		 * We can continue to use the ire but since it was not
-		 * cached, we should drop the extra reference.
-		 */
-		if (!cached)
-			IRE_REFRELE_NOTR(ire);
-	}
+	if (!tcp_send_find_ire(tcp, (af == AF_INET) ? &dst : NULL, &ire))
+		goto legacy_send_no_md;
 
 	ASSERT(ire != NULL);
 	ASSERT(af != AF_INET || ire->ire_ipversion == IPV4_VERSION);
@@ -20578,6 +20620,103 @@ tcp_multisend_data(tcp_t *tcp, ire_t *ire, const ill_t *ill, mblk_t *md_mp_head,
 }
 
 /*
+ * Derived from tcp_send_data().
+ */
+static void
+tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
+    int num_lso_seg)
+{
+	ipha_t		*ipha;
+	mblk_t		*ire_fp_mp;
+	uint_t		ire_fp_mp_len;
+	uint32_t	hcksum_txflags = 0;
+	ipaddr_t	src;
+	ipaddr_t	dst;
+	uint32_t	cksum;
+	uint16_t	*up;
+
+	ASSERT(DB_TYPE(mp) == M_DATA);
+	ASSERT(tcp->tcp_state == TCPS_ESTABLISHED);
+	ASSERT(tcp->tcp_ipversion == IPV4_VERSION);
+	ASSERT(tcp->tcp_connp != NULL);
+	ASSERT(CONN_IS_LSO_MD_FASTPATH(tcp->tcp_connp));
+
+	ipha = (ipha_t *)mp->b_rptr;
+	src = ipha->ipha_src;
+	dst = ipha->ipha_dst;
+
+	ASSERT(ipha->ipha_ident == 0 || ipha->ipha_ident == IP_HDR_INCLUDED);
+	ipha->ipha_ident = (uint16_t)atomic_add_32_nv(&ire->ire_ident,
+	    num_lso_seg);
+#ifndef _BIG_ENDIAN
+	ipha->ipha_ident = (ipha->ipha_ident << 8) | (ipha->ipha_ident >> 8);
+#endif
+	if (tcp->tcp_snd_zcopy_aware) {
+		if ((ill->ill_capabilities & ILL_CAPAB_ZEROCOPY) == 0 ||
+		    (ill->ill_zerocopy_capab->ill_zerocopy_flags == 0))
+			mp = tcp_zcopy_disable(tcp, mp);
+	}
+
+	if (ILL_HCKSUM_CAPABLE(ill) && dohwcksum) {
+		ASSERT(ill->ill_hcksum_capab != NULL);
+		hcksum_txflags = ill->ill_hcksum_capab->ill_hcksum_txflags;
+	}
+
+	/*
+	 * Since the TCP checksum should be recalculated by h/w, we can just
+	 * zero the checksum field for HCK_FULLCKSUM, or calculate partial
+	 * pseudo-header checksum for HCK_PARTIALCKSUM.
+	 * The partial pseudo-header excludes TCP length, that was calculated
+	 * in tcp_send(), so to zero *up before further processing.
+	 */
+	cksum = (dst >> 16) + (dst & 0xFFFF) + (src >> 16) + (src & 0xFFFF);
+
+	up = IPH_TCPH_CHECKSUMP(ipha, IP_SIMPLE_HDR_LENGTH);
+	*up = 0;
+
+	IP_CKSUM_XMIT_FAST(ire->ire_ipversion, hcksum_txflags, mp, ipha, up,
+	    IPPROTO_TCP, IP_SIMPLE_HDR_LENGTH, ntohs(ipha->ipha_length), cksum);
+
+	/*
+	 * Append LSO flag to DB_LSOFLAGS(mp) and set the mss to DB_LSOMSS(mp).
+	 */
+	DB_LSOFLAGS(mp) |= HW_LSO;
+	DB_LSOMSS(mp) = mss;
+
+	ipha->ipha_fragment_offset_and_flags |=
+	    (uint32_t)htons(ire->ire_frag_flag);
+
+	ire_fp_mp = ire->ire_nce->nce_fp_mp;
+	ire_fp_mp_len = MBLKL(ire_fp_mp);
+	ASSERT(DB_TYPE(ire_fp_mp) == M_DATA);
+	mp->b_rptr = (uchar_t *)ipha - ire_fp_mp_len;
+	bcopy(ire_fp_mp->b_rptr, mp->b_rptr, ire_fp_mp_len);
+
+	UPDATE_OB_PKT_COUNT(ire);
+	ire->ire_last_used_time = lbolt;
+	BUMP_MIB(&ip_mib, ipOutRequests);
+
+	if (ILL_DLS_CAPABLE(ill)) {
+		/*
+		 * Send the packet directly to DLD, where it may be queued
+		 * depending on the availability of transmit resources at
+		 * the media layer.
+		 */
+		IP_DLS_ILL_TX(ill, ipha, mp);
+	} else {
+		ill_t *out_ill = (ill_t *)ire->ire_stq->q_ptr;
+		DTRACE_PROBE4(ip4__physical__out__start,
+		    ill_t *, NULL, ill_t *, out_ill,
+		    ipha_t *, ipha, mblk_t *, mp);
+		FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,
+		    NULL, out_ill, ipha, mp, mp);
+		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+		if (mp != NULL)
+			putnext(ire->ire_stq, mp);
+	}
+}
+
+/*
  * tcp_send() is called by tcp_wput_data() for non-Multidata transmission
  * scheme, and returns one of the following:
  *
@@ -20595,6 +20734,44 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
     const int mdt_thres)
 {
 	int num_burst_seg = tcp->tcp_snd_burst;
+	ire_t		*ire = NULL;
+	ill_t		*ill = NULL;
+	mblk_t		*ire_fp_mp = NULL;
+	uint_t		ire_fp_mp_len = 0;
+	int		num_lso_seg = 1;
+	uint_t		lso_usable;
+	boolean_t	do_lso_send = B_FALSE;
+
+	/*
+	 * Check LSO capability before any further work. And the similar check
+	 * need to be done in for(;;) loop.
+	 * LSO will be deployed when therer is more than one mss of available
+	 * data and a burst transmission is allowed.
+	 */
+	if (tcp->tcp_lso &&
+	    (tcp->tcp_valid_bits == 0 ||
+	    tcp->tcp_valid_bits == TCP_FSS_VALID) &&
+	    num_burst_seg >= 2 && (*usable - 1) / mss >= 1) {
+		/*
+		 * Try to find usable IRE/ILL and do basic check to the ILL.
+		 */
+		if (tcp_send_find_ire_ill(tcp, NULL, &ire, &ill)) {
+			/*
+			 * Enable LSO with this transmission.
+			 * Since IRE has been hold in
+			 * tcp_send_find_ire_ill(), IRE_REFRELE(ire)
+			 * should be called before return.
+			 */
+			do_lso_send = B_TRUE;
+			ire_fp_mp = ire->ire_nce->nce_fp_mp;
+			ire_fp_mp_len = MBLKL(ire_fp_mp);
+			/* Round up to multiple of 4 */
+			ire_fp_mp_len = ((ire_fp_mp_len + 3) / 4) * 4;
+		} else {
+			do_lso_send = B_FALSE;
+			ill = NULL;
+		}
+	}
 
 	for (;;) {
 		struct datab	*db;
@@ -20617,11 +20794,48 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			return (1);	/* success; do large send */
 		}
 
-		if (num_burst_seg-- == 0)
+		if (num_burst_seg == 0)
 			break;		/* success; burst count reached */
+
+		/*
+		 * Calculate the maximum payload length we can send in *one*
+		 * time.
+		 */
+		if (do_lso_send) {
+			/*
+			 * Check whether need to do LSO any more.
+			 */
+			if (num_burst_seg >= 2 && (*usable - 1) / mss >= 1) {
+				lso_usable = MIN(tcp->tcp_lso_max, *usable);
+				lso_usable = MIN(lso_usable,
+				    num_burst_seg * mss);
+
+				num_lso_seg = lso_usable / mss;
+				if (lso_usable % mss) {
+					num_lso_seg++;
+					tcp->tcp_last_sent_len = (ushort_t)
+					    (lso_usable % mss);
+				} else {
+					tcp->tcp_last_sent_len = (ushort_t)mss;
+				}
+			} else {
+				do_lso_send = B_FALSE;
+				num_lso_seg = 1;
+				lso_usable = mss;
+			}
+		}
+
+		ASSERT(num_lso_seg <= IP_MAXPACKET / mss + 1);
+
+		/*
+		 * Adjust num_burst_seg here.
+		 */
+		num_burst_seg -= num_lso_seg;
 
 		len = mss;
 		if (len > *usable) {
+			ASSERT(do_lso_send == B_FALSE);
+
 			len = *usable;
 			if (len <= 0) {
 				/* Terminate the loop */
@@ -20664,6 +20878,13 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 		}
 
 		tcph = tcp->tcp_tcph;
+
+		/*
+		 * The reason to adjust len here is that we need to set flags
+		 * and calculate checksum.
+		 */
+		if (do_lso_send)
+			len = lso_usable;
 
 		*usable -= len; /* Approximate - can be adjusted later */
 		if (*usable > 0)
@@ -20724,11 +20945,15 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			} else
 				(*xmit_tail)->b_rptr = prev_rptr;
 
-			if (mp == NULL)
+			if (mp == NULL) {
+				if (ire != NULL)
+					IRE_REFRELE(ire);
 				return (-1);
+			}
 			mp1 = mp->b_cont;
 
-			tcp->tcp_last_sent_len = (ushort_t)len;
+			if (len <= mss) /* LSO is unusable (!do_lso_send) */
+				tcp->tcp_last_sent_len = (ushort_t)len;
 			while (mp1->b_cont) {
 				*xmit_tail = (*xmit_tail)->b_cont;
 				(*xmit_tail)->b_prev = local_time;
@@ -20755,7 +20980,8 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			rptr = (*xmit_tail)->b_wptr - *tail_unsent;
 			if (rptr != (*xmit_tail)->b_rptr) {
 				*tail_unsent -= len;
-				tcp->tcp_last_sent_len = (ushort_t)len;
+				if (len <= mss) /* LSO is unusable */
+					tcp->tcp_last_sent_len = (ushort_t)len;
 				len += tcp_hdr_len;
 				if (tcp->tcp_ipversion == IPV4_VERSION)
 					tcp->tcp_ipha->ipha_length = htons(len);
@@ -20765,8 +20991,11 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 					    ((char *)&tcp->tcp_ip6h[1] -
 					    tcp->tcp_iphc));
 				mp = dupb(*xmit_tail);
-				if (!mp)
+				if (mp == NULL) {
+					if (ire != NULL)
+						IRE_REFRELE(ire);
 					return (-1);	/* out_of_mem */
+				}
 				mp->b_rptr = rptr;
 				/*
 				 * If the old timestamp is no longer in use,
@@ -20791,7 +21020,8 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 		(*xmit_tail)->b_next = (mblk_t *)(uintptr_t)(*snxt - len);
 
 		*tail_unsent -= len;
-		tcp->tcp_last_sent_len = (ushort_t)len;
+		if (len <= mss) /* LSO is unusable (!do_lso_send) */
+			tcp->tcp_last_sent_len = (ushort_t)len;
 
 		len += tcp_hdr_len;
 		if (tcp->tcp_ipversion == IPV4_VERSION)
@@ -20801,8 +21031,11 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			    ((char *)&tcp->tcp_ip6h[1] - tcp->tcp_iphc));
 
 		mp = dupb(*xmit_tail);
-		if (!mp)
+		if (mp == NULL) {
+			if (ire != NULL)
+				IRE_REFRELE(ire);
 			return (-1);	/* out_of_mem */
+		}
 
 		len = tcp_hdr_len;
 		/*
@@ -20815,21 +21048,23 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 		rptr = mp->b_rptr - len;
 		if (!OK_32PTR(rptr) ||
 		    ((db = mp->b_datap), db->db_ref != 2) ||
-		    rptr < db->db_base) {
+		    rptr < db->db_base + ire_fp_mp_len) {
 			/* NOTE: we assume allocb returns an OK_32PTR */
 
 		must_alloc:;
 			mp1 = allocb(tcp->tcp_ip_hdr_len + TCP_MAX_HDR_LENGTH +
-			    tcp_wroff_xtra, BPRI_MED);
-			if (!mp1) {
+			    tcp_wroff_xtra + ire_fp_mp_len, BPRI_MED);
+			if (mp1 == NULL) {
 				freemsg(mp);
+				if (ire != NULL)
+					IRE_REFRELE(ire);
 				return (-1);	/* out_of_mem */
 			}
 			mp1->b_cont = mp;
 			mp = mp1;
 			/* Leave room for Link Level header */
 			len = tcp_hdr_len;
-			rptr = &mp->b_rptr[tcp_wroff_xtra];
+			rptr = &mp->b_rptr[tcp_wroff_xtra + ire_fp_mp_len];
 			mp->b_wptr = &rptr[len];
 		}
 
@@ -20845,7 +21080,7 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			int spill = *tail_unsent;
 
 			mp1 = mp->b_cont;
-			if (!mp1)
+			if (mp1 == NULL)
 				mp1 = mp;
 
 			/*
@@ -20865,7 +21100,8 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 				 * keep on splitting as this is a transient
 				 * send path.
 				 */
-				if (!tcp->tcp_mdt && (spill + nmpsz > 0)) {
+				if (!do_lso_send && !tcp->tcp_mdt &&
+				    (spill + nmpsz > 0)) {
 					/*
 					 * Don't split if stream head was
 					 * told to break up larger writes
@@ -20899,6 +21135,8 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 				if (mp1 == NULL) {
 					*tail_unsent = spill;
 					freemsg(mp);
+					if (ire != NULL)
+						IRE_REFRELE(ire);
 					return (-1);	/* out_of_mem */
 				}
 			}
@@ -20946,10 +21184,21 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 		}
 
 		TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_SEND_PKT);
-		tcp_send_data(tcp, q, mp);
-		BUMP_LOCAL(tcp->tcp_obsegs);
+		if (do_lso_send) {
+			tcp_lsosend_data(tcp, mp, ire, ill, mss,
+			    num_lso_seg);
+			tcp->tcp_obsegs += num_lso_seg;
+
+			TCP_STAT(tcp_lso_times);
+			TCP_STAT_UPDATE(tcp_lso_pkt_out, num_lso_seg);
+		} else {
+			tcp_send_data(tcp, q, mp);
+			BUMP_LOCAL(tcp->tcp_obsegs);
+		}
 	}
 
+	if (ire != NULL)
+		IRE_REFRELE(ire);
 	return (0);
 }
 
@@ -21060,8 +21309,70 @@ tcp_mdt_update(tcp_t *tcp, ill_mdt_capab_t *mdt_capab, boolean_t first)
 	}
 }
 
+/* Unlink and return any mblk that looks like it contains a LSO info */
+static mblk_t *
+tcp_lso_info_mp(mblk_t *mp)
+{
+	mblk_t	*prev_mp;
+
+	for (;;) {
+		prev_mp = mp;
+		/* no more to process? */
+		if ((mp = mp->b_cont) == NULL)
+			break;
+
+		switch (DB_TYPE(mp)) {
+		case M_CTL:
+			if (*(uint32_t *)mp->b_rptr != LSO_IOC_INFO_UPDATE)
+				continue;
+			ASSERT(prev_mp != NULL);
+			prev_mp->b_cont = mp->b_cont;
+			mp->b_cont = NULL;
+			return (mp);
+		default:
+			break;
+		}
+	}
+
+	return (mp);
+}
+
+/* LSO info update routine, called when IP notifies us about LSO */
 static void
-tcp_ire_ill_check(tcp_t *tcp, ire_t *ire, ill_t *ill, boolean_t check_mdt)
+tcp_lso_update(tcp_t *tcp, ill_lso_capab_t *lso_capab)
+{
+	/*
+	 * IP is telling us to abort LSO on this connection?  We know
+	 * this because the capability is only turned off when IP
+	 * encounters some pathological cases, e.g. link-layer change
+	 * where the new NIC/driver doesn't support LSO, or in situation
+	 * where LSO usage on the link-layer has been switched off.
+	 * IP would not have sent us the initial LSO_IOC_INFO_UPDATE
+	 * if the link-layer doesn't support LSO, and if it does, it
+	 * will indicate that the feature is to be turned on.
+	 */
+	tcp->tcp_lso = (lso_capab->ill_lso_on != 0);
+	TCP_STAT(tcp_lso_enabled);
+
+	/*
+	 * We currently only support LSO on simple TCP/IPv4,
+	 * so disable LSO otherwise.  The checks are done here
+	 * and in tcp_wput_data().
+	 */
+	if (tcp->tcp_lso &&
+	    (tcp->tcp_ipversion == IPV4_VERSION &&
+	    tcp->tcp_ip_hdr_len != IP_SIMPLE_HDR_LENGTH) ||
+	    (tcp->tcp_ipversion == IPV6_VERSION)) {
+		tcp->tcp_lso = B_FALSE;
+		TCP_STAT(tcp_lso_disabled);
+	} else {
+		tcp->tcp_lso_max = MIN(TCP_MAX_LSO_LENGTH,
+		    lso_capab->ill_lso_max);
+	}
+}
+
+static void
+tcp_ire_ill_check(tcp_t *tcp, ire_t *ire, ill_t *ill, boolean_t check_lso_mdt)
 {
 	conn_t *connp = tcp->tcp_connp;
 
@@ -21069,33 +21380,42 @@ tcp_ire_ill_check(tcp_t *tcp, ire_t *ire, ill_t *ill, boolean_t check_mdt)
 
 	/*
 	 * We may be in the fastpath here, and although we essentially do
-	 * similar checks as in ip_bind_connected{_v6}/ip_mdinfo_return,
+	 * similar checks as in ip_bind_connected{_v6}/ip_xxinfo_return,
 	 * we try to keep things as brief as possible.  After all, these
 	 * are only best-effort checks, and we do more thorough ones prior
-	 * to calling tcp_multisend().
+	 * to calling tcp_send()/tcp_multisend().
 	 */
-	if (ip_multidata_outbound && check_mdt &&
+	if ((ip_lso_outbound || ip_multidata_outbound) && check_lso_mdt &&
 	    !(ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK)) &&
-	    ill != NULL && ILL_MDT_CAPABLE(ill) &&
-	    !CONN_IPSEC_OUT_ENCAPSULATED(connp) &&
+	    ill != NULL && !CONN_IPSEC_OUT_ENCAPSULATED(connp) &&
 	    !(ire->ire_flags & RTF_MULTIRT) &&
 	    !IPP_ENABLED(IPP_LOCAL_OUT) &&
-	    CONN_IS_MD_FASTPATH(connp)) {
-		/* Remember the result */
-		connp->conn_mdt_ok = B_TRUE;
+	    CONN_IS_LSO_MD_FASTPATH(connp)) {
+		if (ip_lso_outbound && ILL_LSO_CAPABLE(ill)) {
+			/* Cache the result */
+			connp->conn_lso_ok = B_TRUE;
 
-		ASSERT(ill->ill_mdt_capab != NULL);
-		if (!ill->ill_mdt_capab->ill_mdt_on) {
-			/*
-			 * If MDT has been previously turned off in the past,
-			 * and we currently can do MDT (due to IPQoS policy
-			 * removal, etc.) then enable it for this interface.
-			 */
-			ill->ill_mdt_capab->ill_mdt_on = 1;
-			ip1dbg(("tcp_ire_ill_check: connp %p enables MDT for "
-			    "interface %s\n", (void *)connp, ill->ill_name));
+			ASSERT(ill->ill_lso_capab != NULL);
+			if (!ill->ill_lso_capab->ill_lso_on) {
+				ill->ill_lso_capab->ill_lso_on = 1;
+				ip1dbg(("tcp_ire_ill_check: connp %p enables "
+				    "LSO for interface %s\n", (void *)connp,
+				    ill->ill_name));
+			}
+			tcp_lso_update(tcp, ill->ill_lso_capab);
+		} else if (ip_multidata_outbound && ILL_MDT_CAPABLE(ill)) {
+			/* Cache the result */
+			connp->conn_mdt_ok = B_TRUE;
+
+			ASSERT(ill->ill_mdt_capab != NULL);
+			if (!ill->ill_mdt_capab->ill_mdt_on) {
+				ill->ill_mdt_capab->ill_mdt_on = 1;
+				ip1dbg(("tcp_ire_ill_check: connp %p enables "
+				    "MDT for interface %s\n", (void *)connp,
+				    ill->ill_name));
+			}
+			tcp_mdt_update(tcp, ill->ill_mdt_capab, B_TRUE);
 		}
-		tcp_mdt_update(tcp, ill->ill_mdt_capab, B_TRUE);
 	}
 
 	/*
