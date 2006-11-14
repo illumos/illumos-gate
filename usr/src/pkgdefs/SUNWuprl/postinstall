@@ -46,18 +46,14 @@ EXIT=0
 
 # "usb67b,2303" Most adapters based on pl2303 chip set have this ID
 # "usb557,2008" Aten UC-232A USB serial adapter
+# "usb6189,2068" Sitecom CN-104 USB serial adapter
 USBSPRL_ALIASES="\
 	\"usb67b,2303\" \
 	\"usb557,2008\" \
+	\"usb6189,2068\" \
 	"
 
-if installed usbsprl ; then
-	echo "usbsprl already installed" || EXIT 1
-
-else
-	add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
-	    -i "${USBSPRL_ALIASES}" -n usbsprl || \
-	    EXIT=1
-fi
+installed usbsprl || add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
+	-i "${USBSPRL_ALIASES}" -n usbsprl || EXIT=1
 
 exit $EXIT
