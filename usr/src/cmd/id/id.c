@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,11 +83,7 @@ main(int argc, char *argv[])
 #define	TEXT_DOMAIN "SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-#ifdef XPG4
-	while ((c = getopt(argc, argv, "Ggunrp")) != EOF) {
-#else
-	while ((c = getopt(argc, argv, "ap")) != EOF) {
-#endif
+	while ((c = getopt(argc, argv, "Ggunarp")) != EOF) {
 		switch (c) {
 			case 'G':
 				if (mode != CURR)
@@ -102,11 +97,9 @@ main(int argc, char *argv[])
 				mode = GROUP;
 				break;
 
-#ifndef XPG4
 			case 'a':
 				aflag++;
 				break;
-#endif
 
 			case 'n':
 				nflag++;
@@ -138,10 +131,12 @@ main(int argc, char *argv[])
 
 	/* -n and -r must be combined with one of -[Ggu] */
 	/* -r cannot be combined with -G */
+	/* -a and -p cannot be combined with -[Ggu] */
 
 	if ((mode == CURR && (nflag || rflag)) ||
 		(mode == ALLGROUPS && rflag) ||
-		(argc != 1 && argc != 2))
+		(argc != 1 && argc != 2) ||
+		(mode != CURR && (project_flag || aflag)))
 		return (usage());
 	if (argc == 2) {
 		if ((pwp = getpwnam(argv[1])) == PWNULL) {
@@ -195,7 +190,7 @@ main(int argc, char *argv[])
 			prid(EUID, euid);
 		if (gid != egid)
 			prid(EGID, egid);
-#ifndef XPG4
+
 		if (aflag) {
 			if (user)
 				i = getusergroups(NGROUPS_UMAX, groupids, user,
@@ -216,23 +211,42 @@ main(int argc, char *argv[])
 				}
 			}
 		}
-#else
-		if (user)
-			i = getusergroups(NGROUPS_UMAX, groupids, user, prgid);
-		else
-			i = getgroups(NGROUPS_UMAX, groupids);
-		if (i == -1)
-			perror("getgroups");
-		else if (i > 1) {
-			(void) printf(" groups=");
-			for (idp = groupids; i--; idp++) {
-				if (*idp == egid)
-					continue;
-				(void) printf("%d", (int)*idp);
-				if (gr = getgrgid(*idp))
-					(void) printf("(%s)", gr->gr_name);
-				if (i)
-					(void) putchar(',');
+#ifdef XPG4
+		/*
+		 * POSIX requires us to show all supplementary groups
+		 * groups other than the effective group already listed.
+		 *
+		 * This differs from -a above, because -a always shows
+		 * all groups including the effective group in the group=
+		 * line.
+		 *
+		 * It would be simpler if SunOS could just adopt this
+		 * POSIX behavior, as it is so incredibly close to the
+		 * the norm already.
+		 *
+		 * Then the magic -a flag could just indicate whether or
+		 * not we are suppressing the effective group id.
+		 */
+		else {
+			if (user)
+				i = getusergroups(NGROUPS_UMAX, groupids, user,
+				    prgid);
+			else
+				i = getgroups(NGROUPS_UMAX, groupids);
+			if (i == -1)
+				perror("getgroups");
+			else if (i > 1) {
+				(void) printf(" groups=");
+				for (idp = groupids; i--; idp++) {
+					if (*idp == egid)
+						continue;
+					(void) printf("%d", (int)*idp);
+					if (gr = getgrgid(*idp))
+						(void) printf("(%s)",
+							gr->gr_name);
+					if (i)
+						(void) putchar(',');
+				}
 			}
 		}
 #endif
@@ -279,15 +293,11 @@ main(int argc, char *argv[])
 static int
 usage()
 {
-#ifdef XPG4
 	(void) fprintf(stderr, gettext(
-	    "Usage: id [-p] [user]\n"
+	    "Usage: id [-ap] [user]\n"
 	    "       id -G [-n] [user]\n"
 	    "       id -g [-nr] [user]\n"
 	    "       id -u [-nr] [user]\n"));
-#else
-	(void) fprintf(stderr, gettext("Usage: id [-ap] [user]\n"));
-#endif
 	return (2);
 }
 
