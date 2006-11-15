@@ -11,6 +11,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifdef HAVE_CONFIG_H
+#  include <config.h>
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -56,9 +60,11 @@ typedef struct devinfo_storage_minor {
 HalDevice *devinfo_ide_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type);
 static HalDevice *devinfo_ide_host_add(HalDevice *parent, di_node_t node, char *devfs_path);
 static HalDevice *devinfo_ide_device_add(HalDevice *parent, di_node_t node, char *devfs_path);
-static HalDevice *devinfo_ide_storage_add(HalDevice *grampa, HalDevice *parent, di_node_t node, char *devfs_path);
+static HalDevice *devinfo_ide_storage_add(HalDevice *parent, di_node_t node, char *devfs_path);
 HalDevice *devinfo_scsi_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type);
-static HalDevice *devinfo_scsi_storage_add(HalDevice *grampa, HalDevice *parent, di_node_t node, char *devfs_path);
+static HalDevice *devinfo_scsi_storage_add(HalDevice *parent, di_node_t node, char *devfs_path);
+HalDevice *devinfo_pcata_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type);
+static HalDevice *devinfo_pcata_storage_add(HalDevice *parent, di_node_t node, char *devfs_path);
 HalDevice *devinfo_floppy_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type);
 static void devinfo_floppy_add_volume(HalDevice *parent, di_node_t node);
 static HalDevice *devinfo_lofi_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type);
@@ -94,6 +100,14 @@ DevinfoDevHandler devinfo_ide_handler = {
 };
 DevinfoDevHandler devinfo_scsi_handler = {
         devinfo_scsi_add,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+        NULL
+};
+DevinfoDevHandler devinfo_pcata_handler = {
+        devinfo_pcata_add,
 	NULL,
 	NULL,
 	NULL,
@@ -184,11 +198,11 @@ devinfo_ide_device_add(HalDevice *parent, di_node_t node, char *devfs_path)
 
 	devinfo_add_enqueue (d, devfs_path, &devinfo_ide_handler);
 
-	return (devinfo_ide_storage_add (parent, d, node, devfs_path));
+	return (devinfo_ide_storage_add (d, node, devfs_path));
 }
 
 static HalDevice *
-devinfo_ide_storage_add(HalDevice *grampa, HalDevice *parent, di_node_t node, char *devfs_path)
+devinfo_ide_storage_add(HalDevice *parent, di_node_t node, char *devfs_path)
 {
 	HalDevice *d;
 	char	*s;
@@ -206,7 +220,7 @@ devinfo_ide_storage_add(HalDevice *grampa, HalDevice *parent, di_node_t node, ch
         hal_device_property_set_string (d, "info.category", "storage");
 
         hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
-                "%s/%s%d", parent->udi, driver_name, di_instance (node));
+                "%s/%s%d", hal_device_get_udi (parent), driver_name, di_instance (node));
         hal_device_set_udi (d, udi);
         hal_device_property_set_string (d, "info.udi", udi);
 	PROP_STR(d, node, s, "devid", "info.product");
@@ -252,7 +266,7 @@ devinfo_scsi_add(HalDevice *parent, di_node_t node, char *devfs_path, char *devi
 	hal_device_property_set_string (d, "info.bus", "scsi");
 
         hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
-                "%s/%s%d", parent->udi, di_node_name(node), di_instance (node));
+                "%s/%s%d", hal_device_get_udi (parent), di_node_name(node), di_instance (node));
         hal_device_set_udi (d, udi);
         hal_device_property_set_string (d, "info.udi", udi);
 
@@ -265,11 +279,11 @@ devinfo_scsi_add(HalDevice *parent, di_node_t node, char *devfs_path, char *devi
 
         devinfo_add_enqueue (d, devfs_path, &devinfo_scsi_handler);
 
-        return (devinfo_scsi_storage_add (parent, d, node, devfs_path));
+        return (devinfo_scsi_storage_add (d, node, devfs_path));
 }
 
 static HalDevice *
-devinfo_scsi_storage_add(HalDevice *grampa, HalDevice *parent, di_node_t node, char *devfs_path)
+devinfo_scsi_storage_add(HalDevice *parent, di_node_t node, char *devfs_path)
 {
 	HalDevice *d;
 	int	*i;
@@ -282,7 +296,7 @@ devinfo_scsi_storage_add(HalDevice *grampa, HalDevice *parent, di_node_t node, c
         hal_device_property_set_string (d, "info.category", "storage");
 
         hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
-		"%s/sd%d", parent->udi, di_instance (node));
+		"%s/sd%d", hal_device_get_udi (parent), di_instance (node));
         hal_device_set_udi (d, udi);
         hal_device_property_set_string (d, "info.udi", udi);
 	PROP_STR(d, node, s, "inquiry-product-id", "info.product");
@@ -327,7 +341,8 @@ devinfo_scsi_storage_add(HalDevice *grampa, HalDevice *parent, di_node_t node, c
 	return (d);
 }
 
-static char *devinfo_scsi_dtype2str(int dtype)
+static char *
+devinfo_scsi_dtype2str(int dtype)
 {
         char *dtype2str[] = {
                 "disk"	,         /* DTYPE_DIRECT         0x00 */
@@ -353,6 +368,73 @@ static char *devinfo_scsi_dtype2str(int dtype)
 		return ("scsi");
         }
 
+}
+
+/* PCMCIA */
+
+HalDevice *
+devinfo_pcata_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type)
+{
+	int	*i;
+	char	*driver_name;
+	HalDevice *d;
+	char	udi[HAL_PATH_MAX];
+
+	driver_name = di_driver_name (node);
+	if ((driver_name == NULL) || (strcmp (driver_name, "pcata") != 0)) {
+		return (NULL);
+	}
+
+	d = hal_device_new ();
+
+	devinfo_set_default_properties (d, parent, node, devfs_path);
+	hal_device_property_set_string (d, "info.bus", "pcmcia");
+
+        hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
+                "%s/%s%d", hal_device_get_udi (parent), di_node_name(node), di_instance (node));
+        hal_device_set_udi (d, udi);
+        hal_device_property_set_string (d, "info.udi", udi);
+        hal_device_property_set_string (d, "info.product", "PCMCIA Disk");
+
+        devinfo_add_enqueue (d, devfs_path, &devinfo_pcata_handler);
+
+        return (devinfo_pcata_storage_add (d, node, devfs_path));
+}
+
+static HalDevice *
+devinfo_pcata_storage_add(HalDevice *parent, di_node_t node, char *devfs_path)
+{
+	HalDevice *d;
+	char	*driver_name;
+	int	*i;
+	char	*s;
+	char	udi[HAL_PATH_MAX];
+
+	d = hal_device_new ();
+
+	devinfo_set_default_properties (d, parent, node, devfs_path);
+	hal_device_property_set_string (d, "info.category", "storage");
+
+	hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
+		"%s/sd%d", hal_device_get_udi (parent), di_instance (node));
+	hal_device_set_udi (d, udi);
+	hal_device_property_set_string (d, "info.udi", udi);
+
+	hal_device_add_capability (d, "storage");
+
+	hal_device_property_set_int (d, "storage.lun", 0);
+	hal_device_property_set_bool (d, "storage.hotpluggable", TRUE);
+	hal_device_property_set_bool (d, "storage.removable", FALSE);
+	hal_device_property_set_bool (d, "storage.requires_eject", FALSE);
+	hal_device_property_set_bool (d, "storage.media_check_enabled", TRUE);
+       	hal_device_property_set_string (d, "storage.drive_type", "disk");
+	hal_device_property_set_bool (d, "storage.requires_eject", FALSE);
+
+	hal_device_add_capability (d, "block");
+
+	devinfo_storage_minors (d, node, devfs_path, FALSE);
+
+	return (d);
 }
 
 /* floppy */
@@ -474,20 +556,20 @@ devinfo_floppy_rescan_probing_done (HalDevice *d, guint32 exit_type, gint return
 	HalDevice *v;
 
 	if (!hal_device_property_get_bool (d, "storage.removable.media_available")) {
-		HAL_INFO (("no floppy media", d->udi));
+		HAL_INFO (("no floppy media", hal_device_get_udi (d)));
 
 		/* remove child (can only be single volume) */
 		if (((v = hal_device_store_match_key_value_string (hald_get_gdl(),
-        	    "info.parent", d->udi)) != NULL) &&
+        	    "info.parent", hal_device_get_udi (d))) != NULL) &&
 		    ((devfs_path = hal_device_property_get_string (v,
 		    "solaris.devfs_path")) != NULL)) {
 			devinfo_remove_enqueue ((char *)devfs_path, NULL);
 		}
 	} else {
-		HAL_INFO (("floppy media found", d->udi));
+		HAL_INFO (("floppy media found", hal_device_get_udi (d)));
 
 		if ((devfs_path = hal_device_property_get_string(d, "solaris.devfs_path")) == NULL) {
-			HAL_INFO (("no devfs_path", d->udi));
+			HAL_INFO (("no devfs_path", hal_device_get_udi (d)));
 			hotplug_event_process_queue ();
 			return;
 		}
@@ -539,7 +621,7 @@ devinfo_lofi_add_major(HalDevice *parent, di_node_t node, char *devfs_path, char
 		hal_device_property_set_string (d, "info.bus", "pseudo");
 
         	hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
-                	"%s/%s%d", parent->udi, di_node_name(node), di_instance (node));
+                	"%s/%s%d", hal_device_get_udi (parent), di_node_name(node), di_instance (node));
         	hal_device_set_udi (d, udi);
         	hal_device_property_set_string (d, "info.udi", udi);
 
@@ -662,7 +744,7 @@ devinfo_lofi_remove_minor(char *parent_devfs_path, char *name)
 
 	if ((devfs_path = hal_device_property_get_string (d,
 	    "solaris.devfs_path")) == NULL) {
-		HAL_INFO (("devfs_path not found %s", d->udi));
+		HAL_INFO (("devfs_path not found %s", hal_device_get_udi (d)));
 		return;
 	}
 
@@ -936,7 +1018,7 @@ devinfo_volume_add(HalDevice *parent, di_node_t node, devinfo_storage_minor_t *m
         hal_device_property_set_string (d, "info.category", "volume");
 
        	hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
-		"%s/%s", parent->udi, slice);
+		"%s/%s", hal_device_get_udi (parent), slice);
         hal_device_set_udi (d, udi);
         hal_device_property_set_string (d, "info.udi", udi);
         hal_device_property_set_string (d, "info.product", slice);
@@ -952,7 +1034,7 @@ devinfo_volume_add(HalDevice *parent, di_node_t node, devinfo_storage_minor_t *m
 	hal_device_property_set_string (d, "block.solaris.slice", slice);
 	hal_device_property_set_bool (d, "block.is_volume", TRUE); /* XXX */
 
-	hal_device_property_set_string (d, "block.storage_device", parent->udi);
+	hal_device_property_set_string (d, "block.storage_device", hal_device_get_udi (parent));
 
 	/* set volume defaults */
 	hal_device_property_set_string (d, "volume.fstype", "");
@@ -996,7 +1078,7 @@ devinfo_volume_preprobing_done (HalDevice *d, gpointer userdata1, gpointer userd
 	int dos_num;
 
 	if (hal_device_property_get_bool (d, "info.ignore")) {
-		HAL_INFO (("Preprobing merged info.ignore==TRUE %s", d->udi));
+		HAL_INFO (("Preprobing merged info.ignore==TRUE %s", hal_device_get_udi (d)));
 		goto skip;
 	}
 
@@ -1008,12 +1090,12 @@ devinfo_volume_preprobing_done (HalDevice *d, gpointer userdata1, gpointer userd
 	slice = hal_device_property_get_string(d, "block.solaris.slice");
 	if ((block_device == NULL) || (storage_udi == NULL) ||
 	    (slice == NULL) || (strlen (slice) < 2)) {
-		HAL_INFO (("Malformed volume properties %s", d->udi));
+		HAL_INFO (("Malformed volume properties %s", hal_device_get_udi (d)));
 		goto skip;
 	}
 	storage_d = hal_device_store_match_key_value_string (hald_get_gdl (), "info.udi", storage_udi);
 	if (storage_d == NULL) {
-		HAL_INFO (("Storage device not found %s", d->udi));
+		HAL_INFO (("Storage device not found %s", hal_device_get_udi (d)));
 		goto skip;
 	}
 
@@ -1025,19 +1107,19 @@ devinfo_volume_preprobing_done (HalDevice *d, gpointer userdata1, gpointer userd
 		if ((hal_device_property_get_bool (storage_d, "storage.no_partitions_hint") ||
 		    (dos_num > hal_device_property_get_int (storage_d, "storage.solaris.num_dos_partitions")))) {
 			    HAL_INFO (("%d > %d %s", dos_num, hal_device_property_get_int (storage_d,
-				"storage.solaris.num_dos_partitions"), storage_d->udi));
+				"storage.solaris.num_dos_partitions"), hal_device_get_udi (storage_d)));
 			goto skip;
 		}
 	} else {
 		/* if no VTOC slices found, don't probe slices except s2 */
 		if ((slice[0] == 's') && (isdigit(slice[1])) && ((strcmp (slice, whole_disk)) != 0) &&
 		    !hal_device_property_get_bool (storage_d, "storage.solaris.vtoc_slices")) {
-			HAL_INFO (("Not probing slice %s", d->udi));
+			HAL_INFO (("Not probing slice %s", hal_device_get_udi (d)));
 			goto skip;
 		}
 	}
 
-	HAL_INFO(("Probing udi=%s", d->udi));
+	HAL_INFO(("Probing udi=%s", hal_device_get_udi (d)));
 	hald_runner_run (d,
 			"hald-probe-volume", NULL,
 			DEVINFO_PROBE_VOLUME_TIMEOUT,
@@ -1055,7 +1137,7 @@ skip:
 static void
 devinfo_volume_hotplug_begin_add (HalDevice *d, HalDevice *parent, DevinfoDevHandler *handler, void *end_token)
 {
-	HAL_INFO(("Preprobing volume udi=%s", d->udi));
+	HAL_INFO(("Preprobing volume udi=%s", hal_device_get_udi (d)));
 
 	if (hal_device_property_get_bool (parent, "info.ignore")) {
 		HAL_INFO (("Ignoring volume: parent's info.ignore is TRUE"));
@@ -1091,10 +1173,10 @@ devinfo_storage_hotplug_begin_add (HalDevice *d, HalDevice *parent, DevinfoDevHa
 					"pseudo" };
 	int i;
 
-	HAL_INFO (("Preprobing udi=%s", d->udi));
+	HAL_INFO (("Preprobing udi=%s", hal_device_get_udi (d)));
 
 	if (parent == NULL) {
-		HAL_INFO (("no parent %s", d->udi));
+		HAL_INFO (("no parent %s", hal_device_get_udi (d)));
 		goto error;
 	}
 
@@ -1126,11 +1208,11 @@ devinfo_storage_hotplug_begin_add (HalDevice *d, HalDevice *parent, DevinfoDevHa
 		p_d = hal_device_store_find (hald_get_gdl (), p_udi);
 	}
 	if (phys_d == NULL) {
-		HAL_INFO (("no physical device %s", d->udi));
-		goto error;
+		HAL_INFO (("no physical device %s", hal_device_get_udi (d)));
+	} else {
+		hal_device_property_set_string (d, "storage.physical_device", hal_device_get_udi (phys_d));
+		hal_device_property_set_string (d, "storage.bus", phys_bus);
 	}
-	hal_device_property_set_string (d, "storage.physical_device", phys_d->udi);
-	hal_device_property_set_string (d, "storage.bus", phys_bus);
 
 skip_bus:
 
@@ -1155,7 +1237,7 @@ devinfo_storage_probing_done (HalDevice *d, guint32 exit_type, gint return_code,
 {
         void *end_token = (void *) userdata1;
 
-	HAL_INFO (("devinfo_storage_probing_done %s", d->udi));
+	HAL_INFO (("devinfo_storage_probing_done %s", hal_device_get_udi (d)));
 
         /* Discard device if probing reports failure */
         if (exit_type != HALD_RUN_SUCCESS || return_code != 0) {
@@ -1201,7 +1283,7 @@ devinfo_storage_rescan_probing_done (HalDevice *d, guint32 exit_type, gint retur
 	char *p;
 	di_node_t node;
 
-	HAL_INFO (("devinfo_storage_rescan_probing_done %s", d->udi));
+	HAL_INFO (("devinfo_storage_rescan_probing_done %s", hal_device_get_udi (d)));
 
 	devfs_path_orig = hal_device_property_get_string (d, "solaris.devfs_path");
 	if (devfs_path_orig == NULL) {
@@ -1221,7 +1303,7 @@ devinfo_storage_rescan_probing_done (HalDevice *d, guint32 exit_type, gint retur
 	}
 
 	if ((node = di_init (devfs_path, DINFOCPYALL)) == DI_NODE_NIL) {
-		HAL_INFO (("di_init %s failed %d %s", devfs_path, errno, d->udi));
+		HAL_INFO (("di_init %s failed %d %s", devfs_path, errno, hal_device_get_udi (d)));
 		hotplug_event_process_queue ();
 		return;
 	} else {
@@ -1254,7 +1336,7 @@ devinfo_storage_device_rescan (HalDevice *d)
 	gboolean is_floppy;
 	gboolean media_available;
 
-	HAL_INFO (("devinfo_storage_device_rescan udi=%s", d->udi));
+	HAL_INFO (("devinfo_storage_device_rescan udi=%s", hal_device_get_udi (d)));
 
 	if (hal_device_property_get_bool (d, "block.is_volume")) {
 		HAL_INFO (("nothing to do for volume"));
@@ -1268,26 +1350,26 @@ devinfo_storage_device_rescan (HalDevice *d)
 	    hal_device_property_get_bool (d, "storage.removable.media_available");
 
 	if (!media_available && !is_floppy) {
-		HAL_INFO (("media gone %s", d->udi));
+		HAL_INFO (("media gone %s", hal_device_get_udi (d)));
 
 		volumes = hal_device_store_match_multiple_key_value_string (hald_get_gdl(),
-        	    "block.storage_device", d->udi);
+        	    "block.storage_device", hal_device_get_udi (d));
 		for (i = volumes; i != NULL; i = g_slist_next (i)) {
         		v = HAL_DEVICE (i->data);
 			v_devfs_path = (gchar *)hal_device_property_get_string (v, "solaris.devfs_path");
-			HAL_INFO (("child volume %s", v->udi));
+			HAL_INFO (("child volume %s", hal_device_get_udi (v)));
 			if ((v_devfs_path != NULL) && hal_device_has_capability (v, "volume")) {
-				HAL_INFO (("removing volume %s", v->udi));
+				HAL_INFO (("removing volume %s", hal_device_get_udi (v)));
 				devinfo_remove_enqueue (v_devfs_path, NULL);
 			} else {
-				HAL_INFO (("not a volume %s", v->udi));
+				HAL_INFO (("not a volume %s", hal_device_get_udi (v)));
 			}
 		}
 		g_slist_free (volumes);
 
 		hotplug_event_process_queue ();
 	} else if (is_floppy) {
-		HAL_INFO (("rescanning floppy %s", d->udi));
+		HAL_INFO (("rescanning floppy %s", hal_device_get_udi (d)));
 		
 		hald_runner_run (d,
 				 "hald-probe-storage --only-check-for-media", NULL,
@@ -1295,7 +1377,7 @@ devinfo_storage_device_rescan (HalDevice *d)
 				 devinfo_floppy_rescan_probing_done,
 				 NULL, NULL);
 	} else {
-		HAL_INFO (("media available %s", d->udi));
+		HAL_INFO (("media available %s", hal_device_get_udi (d)));
 
 		hald_runner_run (d,
 				 "hald-probe-storage --only-check-for-media", NULL,
@@ -1494,7 +1576,7 @@ devinfo_volume_force_unmount_cb (HalDevice *d, guint32 exit_type,
 {
 	void *end_token = (void *) data1;
 
-	HAL_INFO (("devinfo_volume_force_unmount_cb for udi='%s', exit_type=%d, return_code=%d", d->udi, exit_type, return_code));
+	HAL_INFO (("devinfo_volume_force_unmount_cb for udi='%s', exit_type=%d, return_code=%d", hal_device_get_udi (d), exit_type, return_code));
 
 	if (exit_type == HALD_RUN_SUCCESS && error != NULL && 
 	    error[0] != NULL && error[1] != NULL) {
@@ -1529,7 +1611,7 @@ devinfo_volume_force_unmount (HalDevice *d, void *end_token)
 		return;
 	}
 
-	HAL_INFO (("devinfo_volume_force_unmount for udi='%s'", d->udi));
+	HAL_INFO (("devinfo_volume_force_unmount for udi='%s'", hal_device_get_udi (d)));
 		
 	unmount_stdin = "\n";
 		

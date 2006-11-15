@@ -30,21 +30,23 @@
 # be it enabled or disabled.
 if [ -f $PKG_INSTALL_ROOT/var/tmp/smserver_installed.tmp ]; then
 	rm -f $PKG_INSTALL_ROOT/var/tmp/smserver_installed.tmp
-else
-	# enable only in global zone
-	if [ "$UPDATE" = yes ]; then
-		# upgrade
-		cat >> ${PKG_INSTALL_ROOT}/var/svc/profile/upgrade <<-EOF
-		if [ \`/sbin/zonename\` = global ]; then
-			/usr/sbin/svcadm enable svc:/network/rpc/smserver:default
-		fi
-EOF
-	elif [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
-		# live system
-		if [ -z "$SUNW_PKG_INSTALL_ZONENAME" -o "$SUNW_PKG_INSTALL_ZONENAME" = "global" ]; then
-			/usr/sbin/svcadm enable svc:/network/rpc/smserver:default
-		fi
+elif [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
+	# live system
+	if [ -z "$SUNW_PKG_INSTALL_ZONENAME" -o "$SUNW_PKG_INSTALL_ZONENAME" = "global" ]; then
+		/usr/sbin/svcadm enable svc:/network/rpc/smserver:default
 	fi
+else
+	# upgrade
+	cat >> ${PKG_INSTALL_ROOT}/var/svc/profile/upgrade <<-EOF
+	if [ \`/sbin/zonename\` = global ]; then
+		/usr/sbin/svcadm enable svc:/network/rpc/smserver:default
+	fi
+
+	# This works around the problem of legacy volfs service removal
+	# until r.manifest is fixed to work on alternate pkg root.
+	# SUNWsmediar was chosen because it replaces SUNWvolr in pkghistory.
+	/usr/sbin/svccfg delete -f svc:/system/filesystem/volfs
+	EOF
 fi
 
 exit 0

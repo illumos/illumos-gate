@@ -11,6 +11,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifdef HAVE_CONFIG_H
+#  include <config.h>
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <sys/utsname.h>
@@ -82,7 +86,7 @@ devinfo_computer_add(HalDevice *parent, di_node_t node, char *devfs_path, char *
 	/* all devinfo devices belong to the 'local' branch */
 	local_d = hal_device_new ();
 
-	hal_device_property_set_string (local_d, "info.parent", d->udi);
+	hal_device_property_set_string (local_d, "info.parent", hal_device_get_udi (d));
         hal_device_property_set_string (local_d, "info.bus", "unknown");
         hal_device_property_set_string (local_d, "info.product", "Local devices");
         hal_device_property_set_string (local_d, "info.udi", "/org/freedesktop/Hal/devices/local");

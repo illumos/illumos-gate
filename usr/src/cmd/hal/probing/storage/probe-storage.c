@@ -334,7 +334,6 @@ main (int argc, char *argv[])
 	char *raw_device_file;
 	LibHalContext *ctx = NULL;
 	DBusError error;
-	char *bus;
 	char *drive_type;
 	dbus_bool_t is_cdrom;
 	dbus_bool_t is_floppy;
@@ -358,8 +357,6 @@ main (int argc, char *argv[])
 	if ((device_file = getenv ("HAL_PROP_BLOCK_DEVICE")) == NULL)
 		goto out;
 	if ((raw_device_file = getenv ("HAL_PROP_BLOCK_SOLARIS_RAW_DEVICE")) == NULL)
-		goto out;
-	if ((bus = getenv ("HAL_PROP_STORAGE_BUS")) == NULL)
 		goto out;
 	if ((drive_type = getenv ("HAL_PROP_STORAGE_DRIVE_TYPE")) == NULL)
 		goto out;
@@ -385,8 +382,8 @@ main (int argc, char *argv[])
 		goto out;
 	}
 
-	HAL_DEBUG (("Doing probe-storage for %s (bus %s) (drive_type %s) (udi=%s) (--only-check-for-media==%d)", 
-	     device_file, bus, drive_type, udi, only_check_for_media));
+	HAL_DEBUG (("Doing probe-storage for %s (drive_type %s) (udi=%s) (--only-check-for-media==%d)", 
+	     device_file, drive_type, udi, only_check_for_media));
 
 	if ((rfd = open (raw_device_file, O_RDONLY | O_NONBLOCK)) < 0) {
 		HAL_DEBUG (("Cannot open %s: %s", raw_device_file, strerror (errno)));

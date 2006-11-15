@@ -18,6 +18,7 @@
 
 extern DevinfoDevHandler devinfo_ide_handler;
 extern DevinfoDevHandler devinfo_scsi_handler;
+extern DevinfoDevHandler devinfo_pcata_handler;
 extern DevinfoDevHandler devinfo_floppy_handler;
 extern DevinfoDevHandler devinfo_lofi_handler;
 

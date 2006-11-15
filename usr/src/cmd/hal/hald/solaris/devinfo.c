@@ -11,6 +11,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifdef HAVE_CONFIG_H
+#  include <config.h>
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <libdevinfo.h>
@@ -86,7 +90,7 @@ devinfo_set_default_properties (HalDevice *d, HalDevice *parent, di_node_t node,
 	char	udi[HAL_PATH_MAX];
 
 	if (parent != NULL) {
-		hal_device_property_set_string (d, "info.parent", parent->udi);
+		hal_device_property_set_string (d, "info.parent", hal_device_get_udi (parent));
 	} else {
 		hal_device_property_set_string (d, "info.parent", "/org/freedesktop/Hal/devices/local");
 	}
@@ -128,6 +132,7 @@ static DevinfoDevHandler *devinfo_handlers[] = {
 	&devinfo_cpu_handler,
 	&devinfo_ide_handler,
 	&devinfo_scsi_handler,
+	&devinfo_pcata_handler,
 	&devinfo_floppy_handler,
 	&devinfo_usb_handler,
 	&devinfo_ieee1394_handler,
@@ -158,7 +163,7 @@ devinfo_add_node(HalDevice *parent, di_node_t node)
 
 	di_devfs_path_free(devfs_path);
 
-	HAL_INFO (("add_node: %s", d ? d->udi : "none"));
+	HAL_INFO (("add_node: %s", d ? hal_device_get_udi (d) : "none"));
 	return (d);
 }
 
@@ -215,7 +220,7 @@ devinfo_callouts_probing_done (HalDevice *d, guint32 exit_type, gint return_code
 
         /* Discard device if probing reports failure */
         if (exit_type != HALD_RUN_SUCCESS || (return_code != 0)) {
-		HAL_INFO (("Probing for %s failed %d", d->udi, return_code));
+		HAL_INFO (("Probing for %s failed %d", hal_device_get_udi (d), return_code));
                 hal_device_store_remove (hald_get_tdl (), d);
                 g_object_unref (d);
                 hotplug_event_end (end_token);
@@ -266,7 +271,7 @@ devinfo_callouts_preprobing_done (HalDevice *d, gpointer userdata1, gpointer use
 
         if (prober != NULL) {
                 /* probe the device */
-		HAL_INFO(("Probing udi=%s", d->udi));
+		HAL_INFO(("Probing udi=%s", hal_device_get_udi (d)));
                 hald_runner_run (d,
 				prober, NULL,
 				prober_timeout,
@@ -281,7 +286,7 @@ devinfo_callouts_preprobing_done (HalDevice *d, gpointer userdata1, gpointer use
 void
 hotplug_event_begin_add_devinfo (HalDevice *d, HalDevice *parent, DevinfoDevHandler *handler, void *end_token)
 {
-	HAL_INFO(("Preprobing udi=%s", d->udi));
+	HAL_INFO(("Preprobing udi=%s", hal_device_get_udi (d)));
 
 	if (parent != NULL && hal_device_property_get_bool (parent, "info.ignore")) {
 		HAL_INFO (("Ignoring device since parent has info.ignore==TRUE"));
@@ -322,14 +327,14 @@ devinfo_remove_branch (gchar *devfs_path, HalDevice *d)
 			return;
 	}
 
-	HAL_INFO (("remove_branch: %s %s\n", devfs_path, d->udi));
+	HAL_INFO (("remove_branch: %s %s\n", devfs_path, hal_device_get_udi (d)));
 
 	/* first remove children */
 	children = hal_device_store_match_multiple_key_value_string (hald_get_gdl(),
-		"info.parent", d->udi);
+		"info.parent", hal_device_get_udi (d));
         for (i = children; i != NULL; i = g_slist_next (i)) {
                 child = HAL_DEVICE (i->data);
-		HAL_INFO (("remove_branch: child %s\n", child->udi));
+		HAL_INFO (("remove_branch: child %s\n", hal_device_get_udi (child)));
 		devinfo_remove_branch ((gchar *)hal_device_property_get_string (child, "solaris.devfs_path"), child);
 	}
 	g_slist_free (children);
@@ -345,7 +350,7 @@ devinfo_callouts_remove_done (HalDevice *d, gpointer userdata1, gpointer userdat
 {
         void *end_token = (void *) userdata1;
 
-        HAL_INFO (("Remove callouts completed udi=%s", d->udi));
+        HAL_INFO (("Remove callouts completed udi=%s", hal_device_get_udi (d)));
 
         if (!hal_device_store_remove (hald_get_gdl (), d)) {
                 HAL_WARNING (("Error removing device"));

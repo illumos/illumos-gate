@@ -11,6 +11,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifdef HAVE_CONFIG_H
+#  include <config.h>
+#endif
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -275,7 +279,7 @@ sysevent_lofi_add(gchar *devfs_path, gchar *name)
 		return;
 	}
 
-	HAL_INFO (("device %s parent %s", d->udi, parent_udi));
+	HAL_INFO (("device %s parent %s", hal_device_get_udi (d), parent_udi));
 	devinfo_lofi_add_major (parent, node, devfs_path, NULL, TRUE, d);
 
 	di_fini (node);

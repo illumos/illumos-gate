@@ -11,6 +11,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifdef HAVE_CONFIG_H
+#  include <config.h>
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <libdevinfo.h>
@@ -116,7 +120,7 @@ devinfo_usb_if_add(HalDevice *parent, di_node_t node, gchar *devfs_path, int ifn
         hal_device_property_set_string (d, "info.bus", "usb");
 
         hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
-		"%s_if%d", parent->udi, ifnum);
+		"%s_if%d", hal_device_get_udi (parent), ifnum);
         hal_device_set_udi (d, udi);
         hal_device_property_set_string (d, "info.udi", udi);
         hal_device_property_set_string (d, "info.product", "USB Device Interface");
@@ -206,7 +210,7 @@ devinfo_usb_scsa2usb_add(HalDevice *usbd, di_node_t node, gchar *devfs_path)
         hal_device_property_set_int (d, "scsi_host.host", 0);
 
         hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
-		"%s/scsi_host%d", usbd->udi,
+		"%s/scsi_host%d", hal_device_get_udi (usbd),
 		hal_device_property_get_int (d, "scsi_host.host"));
         hal_device_set_udi (d, udi);
         hal_device_property_set_string (d, "info.udi", udi);

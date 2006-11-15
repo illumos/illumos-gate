@@ -30,16 +30,14 @@
 # be it enabled or disabled.
 if [ -f $PKG_INSTALL_ROOT/var/tmp/rmvolmgr_installed.tmp ]; then
 	rm -f $PKG_INSTALL_ROOT/var/tmp/rmvolmgr_installed.tmp
+elif [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
+	# live system
+	/usr/sbin/svcadm enable svc:/system/filesystem/rmvolmgr:default
 else
-	if [ "$UPDATE" = yes ]; then
-		# upgrade
-		cat >> ${PKG_INSTALL_ROOT}/var/svc/profile/upgrade <<-EOF
-		/usr/sbin/svcadm enable svc:/system/filesystem/rmvolmgr:default
-EOF
-	elif [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
-		# live system
-		/usr/sbin/svcadm enable svc:/system/filesystem/rmvolmgr:default
-	fi
+	# upgrade
+	cat >> ${PKG_INSTALL_ROOT}/var/svc/profile/upgrade <<-EOF
+	/usr/sbin/svcadm enable svc:/system/filesystem/rmvolmgr:default
+	EOF
 fi
 
 exit 0

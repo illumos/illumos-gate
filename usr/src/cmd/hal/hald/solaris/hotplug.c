@@ -86,10 +86,10 @@ hotplug_event_begin_devfs_add (HotplugEvent *hotplug_event, HalDevice *d)
 	}
 
 	/* children of ignored parent should be ignored */
-	if (hal_device_property_get_bool (parent, "info.ignore")) {
+	if (parent != NULL && hal_device_property_get_bool (parent, "info.ignore")) {
 		HAL_INFO (("parent ignored %s", parent_udi));
-			hotplug_event_end ((void *) hotplug_event);
-			return;
+		hotplug_event_end ((void *) hotplug_event);
+		return;
 	}
 
 	/* custom or generic add function */
@@ -111,7 +111,7 @@ hotplug_event_begin_devfs_remove (HotplugEvent *hotplug_event, HalDevice *d)
 		hotplug_event_end ((void *) hotplug_event);
 		return;
 	}
-	HAL_INFO (("hotplug_event_begin_devfs_remove %s", d->udi));
+	HAL_INFO (("hotplug_event_begin_devfs_remove %s", hal_device_get_udi (d)));
 
 	hotplug_event_begin_remove_devinfo(d, 
 			 hotplug_event->un.devfs.devfs_path, 
