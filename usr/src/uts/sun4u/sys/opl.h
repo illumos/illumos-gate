@@ -80,12 +80,23 @@ extern "C" {
 #define	OPL_MAX_BOARDS_DC2	8
 #define	OPL_MAX_BOARDS_DC3	16
 
+/* OPL model type */
+typedef enum {
+	FF1 = 0, FF2, DC1, DC2, DC3
+} opl_type_t;
+
+/* OPL model specific cmds selection  */
+#define	STD_DISPATCH_TABLE	0x0
+#define	EXT_DISPATCH_TABLE	0x1
+
 /*
  * Structure to gather model-specific information at boot.
  */
 typedef struct opl_model_info {
-	char	model_name[MAXSYSNAME];
-	int	model_max_boards;
+	char		model_name[MAXSYSNAME];	/* OPL model name */
+	int		model_max_boards;	/* Maximum boards per model */
+	opl_type_t 	model_type;		/* Model type */
+	int		model_cmds;		/* Model specific cmds */
 } opl_model_info_t;
 
 extern int	plat_max_boards(void);

@@ -73,23 +73,20 @@ int opl_tsb_spares = (OPL_MAX_BOARDS) * (OPL_MAX_PCICH_UNITS_PER_BOARD) *
 pgcnt_t opl_startup_cage_size = 0;
 
 static opl_model_info_t opl_models[] = {
-	{ "FF1", OPL_MAX_BOARDS_FF1 },
-	{ "FF2", OPL_MAX_BOARDS_FF2 },
-	{ "DC1", OPL_MAX_BOARDS_DC1 },
-	{ "DC2", OPL_MAX_BOARDS_DC2 },
-	{ "DC3", OPL_MAX_BOARDS_DC3 },
+	{ "FF1", OPL_MAX_BOARDS_FF1, FF1, STD_DISPATCH_TABLE },
+	{ "FF2", OPL_MAX_BOARDS_FF2, FF2, STD_DISPATCH_TABLE },
+	{ "DC1", OPL_MAX_BOARDS_DC1, DC1, STD_DISPATCH_TABLE },
+	{ "DC2", OPL_MAX_BOARDS_DC2, DC2, EXT_DISPATCH_TABLE },
+	{ "DC3", OPL_MAX_BOARDS_DC3, DC3, EXT_DISPATCH_TABLE },
 };
 static	int	opl_num_models = sizeof (opl_models)/sizeof (opl_model_info_t);
 
-static	opl_model_info_t *opl_cur_model = NULL;
+/*
+ * opl_cur_model defaults to FF1.
+ */
+static	opl_model_info_t *opl_cur_model = &opl_models[0];
 
 static struct memlist *opl_memlist_per_board(struct memlist *ml);
-
-static enum {
-	MODEL_FF1 = 0,
-	MODEL_FF2 = 1,
-	MODEL_DC = 2
-} plat_model = -1;
 
 int
 set_platform_max_ncpus(void)
@@ -106,6 +103,7 @@ set_platform_tsb_spares(void)
 static void
 set_model_info()
 {
+	extern int ts_dispatch_extended;
 	char	name[MAXSYSNAME];
 	int	i;
 
@@ -123,9 +121,21 @@ set_model_info()
 			break;
 		}
 	}
+
 	if (i == opl_num_models)
-		cmn_err(CE_WARN, "No valid OPL model is found!"
-		    "Set max_mmu_ctxdoms to the default.");
+		halt("No valid OPL model is found!");
+
+	if ((opl_cur_model->model_cmds & EXT_DISPATCH_TABLE) &&
+				(ts_dispatch_extended == -1)) {
+		/*
+		 * Based on a platform model, select a dispatch table.
+		 * Only DC2 and DC3 systems uses the alternate/extended
+		 * TS dispatch table.
+		 * FF1, FF2 and DC1 systems used standard dispatch tables.
+		 */
+		ts_dispatch_extended = 1;
+	}
+
 }
 
 static void
@@ -157,7 +167,6 @@ set_platform_defaults(void)
 {
 	extern char *tod_module_name;
 	extern void cpu_sgn_update(ushort_t, uchar_t, uchar_t, int);
-	extern int ts_dispatch_extended;
 	extern void mmu_init_large_pages(size_t);
 
 	/* Set the CPU signature function pointer */
@@ -166,13 +175,6 @@ set_platform_defaults(void)
 	/* Set appropriate tod module for OPL platform */
 	ASSERT(tod_module_name == NULL);
 	tod_module_name = "todopl";
-
-	/*
-	 * Use the alternate TS dispatch table, which is better tuned
-	 * for large servers.
-	 */
-	if (ts_dispatch_extended == -1)
-		ts_dispatch_extended = 1;
 
 	if ((mmu_page_sizes == max_mmu_page_sizes) &&
 	    (mmu_ism_pagesize != DEFAULT_ISM_PAGESIZE)) {
@@ -815,46 +817,31 @@ plat_get_mem_unum(int synd_code, uint64_t flt_addr, int flt_bus_id,
 int
 plat_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp)
 {
-	int	plen;
 	int	ret = 0;
-	char	model[20];
 	uint_t	sb;
-	pnode_t	node;
-
-	/* determine the platform model once */
-	if (plat_model == -1) {
-		plat_model = MODEL_DC; /* Default model */
-		node = prom_rootnode();
-		plen = prom_getproplen(node, "model");
-		if (plen > 0 && plen < sizeof (model)) {
-			(void) prom_getprop(node, "model", model);
-			model[plen] = '\0';
-			if (strcmp(model, "FF1") == 0)
-				plat_model = MODEL_FF1;
-			else if (strcmp(model, "FF2") == 0)
-				plat_model = MODEL_FF2;
-			else if (strncmp(model, "DC", 2) == 0)
-				plat_model = MODEL_DC;
-		}
-	}
+	int	plen;
 
 	sb = opl_get_physical_board(LSB_ID(cpuid));
 	if (sb == -1) {
 		return (ENXIO);
 	}
 
-	switch (plat_model) {
-	case MODEL_FF1:
+	ASSERT((opl_cur_model - opl_models) == (opl_cur_model->model_type));
+
+	switch (opl_cur_model->model_type) {
+	case FF1:
 		plen = snprintf(buf, buflen, "/%s/CPUM%d", "MBU_A",
 		    CHIP_ID(cpuid) / 2);
 		break;
 
-	case MODEL_FF2:
+	case FF2:
 		plen = snprintf(buf, buflen, "/%s/CPUM%d", "MBU_B",
 		    (CHIP_ID(cpuid) / 2) + (sb * 2));
 		break;
 
-	case MODEL_DC:
+	case DC1:
+	case DC2:
+	case DC3:
 		plen = snprintf(buf, buflen, "/%s%02d/CPUM%d", "CMU", sb,
 		    CHIP_ID(cpuid));
 		break;
