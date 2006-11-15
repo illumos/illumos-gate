@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -67,11 +67,11 @@ if [ $start -ne $end ] ; then
 	exit 2
 fi
 
+# to preserve the gid
+cp -p $kcfconf $tmpfile || error=yes
 if [ $start -eq 1 ]
 then
 	sed -e "/$pkg_start/,/$pkg_end/d" $kcfconf > $tmpfile || error=yes
-else
-	cp $kcfconf $tmpfile || error=yes
 fi
 
 #
@@ -100,11 +100,35 @@ fi
 
 NAMEMAJOR="${BASEDIR}/etc/name_to_major"
 
+#
+# Is the hardware there?
+#
+check_hardware()
+{
+	for i in "pci14e4,5820" "pci14e4,5821" "pci14e4,5822" "pci14e4,5825" \
+		"pci108e,5454" "pci108e,5455" "pci108e,5456" "pci108e,5457"
+	do
+		prtconf -pv | egrep -s "$i"
+		if [ $? -eq 0 ]
+		then
+			return 1
+		fi
+	done
+	return 0
+}
+
+hw_opt=
+check_hardware
+if [ $? -eq 0 ]
+then
+	hw_opt="-n"
+fi
+
 if [ "${BASEDIR:=/}" = "/" ]
 then
-	ADD_DRV="/usr/sbin/add_drv"
+	ADD_DRV="/usr/sbin/add_drv $hw_opt"
 else
-	ADD_DRV="/usr/sbin/add_drv -b ${BASEDIR}"
+	ADD_DRV="/usr/sbin/add_drv $hw_opt -b ${BASEDIR}"
 fi
 
 grep -w dca ${NAMEMAJOR} > /dev/null 2>&1

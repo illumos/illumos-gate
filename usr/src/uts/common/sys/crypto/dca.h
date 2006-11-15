@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -352,6 +352,7 @@ struct dca_worklist {
 	char			dwl_name[16];
 	int			dwl_mcr;
 	kmutex_t		dwl_lock;
+	kmutex_t		dwl_freelock;
 	kmutex_t		dwl_freereqslock;
 	kcondvar_t		dwl_cv;
 	dca_listnode_t		dwl_freereqs;	/* available requests */
@@ -469,6 +470,7 @@ struct dca {
 	 * hardware model
 	 */
 	char			*dca_model;
+	ushort_t		dca_devid;
 
 	/*
 	 * Kstats.  There is no standard for what standards
@@ -585,6 +587,7 @@ typedef enum dca_sg_param {
 #define	DMACTL_RNG8		0x01000000U	/* 1 RNG bit per 8 cycles */
 #define	DMACTL_RNG16		0x01800000U	/* 1 RNG bit per 16 cycles */
 #define	DMACTL_MODNORM		0x00400000U	/* s/w modulus normalization */
+#define	DMACTL_RD256		0x00020000U	/* 256 byte read DMA size */
 #define	DMACTL_FRAGMASK		0x0000FFFFU	/* output fragment size */
 
 #define	DMASTAT_MAIP		0x80000000U	/* master access in progress */

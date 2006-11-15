@@ -695,6 +695,7 @@ dca_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (subvenid && (subvenid == dca_devices[i].dd_vendor_id) &&
 		    subsysid && (subsysid == dca_devices[i].dd_device_id)) {
 			dca->dca_model = dca_devices[i].dd_model;
+			dca->dca_devid = dca_devices[i].dd_device_id;
 			break;
 		}
 		/*
@@ -706,6 +707,7 @@ dca_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if ((venid == dca_devices[i].dd_vendor_id) &&
 		    (devid == dca_devices[i].dd_device_id)) {
 			dca->dca_model = dca_devices[i].dd_model;
+			dca->dca_devid = dca_devices[i].dd_device_id;
 		}
 	}
 	/* try and handle an unrecognized device */
@@ -790,7 +792,14 @@ dca_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * we always want to run in full-speed mode, this should be
 	 * harmless.
 	 */
-	SETBIT(dca, CSR_DMACTL, DMACTL_MCR1IE | DMACTL_MCR2IE | DMACTL_EIE);
+	if (dca->dca_devid == 0x5825) {
+		/* for 5825 - increase the DMA read size */
+		SETBIT(dca, CSR_DMACTL,
+		    DMACTL_MCR1IE | DMACTL_MCR2IE | DMACTL_EIE | DMACTL_RD256);
+	} else {
+		SETBIT(dca, CSR_DMACTL,
+		    DMACTL_MCR1IE | DMACTL_MCR2IE | DMACTL_EIE);
+	}
 	if (dca_check_acc_handle(dca, dca->dca_regs_handle,
 	    DCA_FM_ECLASS_NONE) != DDI_SUCCESS) {
 		goto failed;
@@ -1026,7 +1035,14 @@ dca_resume(dca_t *dca)
 		return (DDI_FAILURE);
 
 	/* restore interrupt enables */
-	SETBIT(dca, CSR_DMACTL, DMACTL_MCR1IE | DMACTL_MCR2IE | DMACTL_EIE);
+	if (dca->dca_devid == 0x5825) {
+		/* for 5825 set 256 byte read size to improve performance */
+		SETBIT(dca, CSR_DMACTL,
+		    DMACTL_MCR1IE | DMACTL_MCR2IE | DMACTL_EIE | DMACTL_RD256);
+	} else {
+		SETBIT(dca, CSR_DMACTL,
+		    DMACTL_MCR1IE | DMACTL_MCR2IE | DMACTL_EIE);
+	}
 	if (dca_check_acc_handle(dca, dca->dca_regs_handle,
 	    DCA_FM_ECLASS_NONE) != DDI_SUCCESS)
 		return (DDI_FAILURE);
@@ -1104,6 +1120,7 @@ dca_initworklist(dca_t *dca, dca_worklist_t *wlp)
 	mutex_init(&wlp->dwl_lock, NULL, MUTEX_DRIVER, dca->dca_icookie);
 	mutex_init(&wlp->dwl_freereqslock, NULL, MUTEX_DRIVER,
 	    dca->dca_icookie);
+	mutex_init(&wlp->dwl_freelock, NULL, MUTEX_DRIVER, dca->dca_icookie);
 	cv_init(&wlp->dwl_cv, NULL, CV_DRIVER, NULL);
 
 	mutex_enter(&wlp->dwl_lock);
@@ -1226,6 +1243,7 @@ dca_uninit(dca_t *dca)
 
 		mutex_destroy(&wlp->dwl_lock);
 		mutex_destroy(&wlp->dwl_freereqslock);
+		mutex_destroy(&wlp->dwl_freelock);
 		cv_destroy(&wlp->dwl_cv);
 		wlp->dwl_prov = NULL;
 	}
@@ -1806,8 +1824,9 @@ dca_getwork(dca_t *dca, int mcr)
 	dca_worklist_t	*wlp = WORKLIST(dca, mcr);
 	dca_work_t	*workp;
 
-	ASSERT(mutex_owned(&wlp->dwl_lock));
+	mutex_enter(&wlp->dwl_freelock);
 	workp = (dca_work_t *)dca_dequeue(&wlp->dwl_freework);
+	mutex_exit(&wlp->dwl_freelock);
 	if (workp) {
 		int	nreqs;
 		bzero(workp->dw_mcr_kaddr, 8);
@@ -1823,8 +1842,9 @@ dca_getwork(dca_t *dca, int mcr)
 void
 dca_freework(dca_work_t *workp)
 {
-	ASSERT(mutex_owned(&workp->dw_wlp->dwl_lock));
+	mutex_enter(&workp->dw_wlp->dwl_freelock);
 	dca_enqueue(&workp->dw_wlp->dwl_freework, (dca_listnode_t *)workp);
+	mutex_exit(&workp->dw_wlp->dwl_freelock);
 }
 
 dca_request_t *
@@ -2377,10 +2397,10 @@ dca_reclaim(dca_t *dca, int mcr)
 			nreclaimed++;
 		}
 
-		mutex_enter(&wlp->dwl_lock);
-
 		/* now we can release the work */
 		dca_freework(workp);
+
+		mutex_enter(&wlp->dwl_lock);
 	}
 	DBG(dca, DRECLAIM, "reclaimed %d cmds", nreclaimed);
 }

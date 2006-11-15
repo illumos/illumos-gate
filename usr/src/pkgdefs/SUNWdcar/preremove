@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -86,6 +86,8 @@ fi
 
 if [ $start -eq 1 ]
 then
+	# To preserve the gid
+	cp -p $kcfconf $tmpfile
 	sed -e "/$pkg_start/,/$pkg_end/d" $kcfconf > $tmpfile || error=yes
 	if [ "$error" = no ]
 	then 
