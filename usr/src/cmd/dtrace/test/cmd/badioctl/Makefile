@@ -33,6 +33,7 @@ ROOTOPTPKG = $(ROOT)/opt/SUNWdtrt
 ROOTBIN = $(ROOTOPTPKG)/bin
 
 LDFLAGS += -znodefs -ztextoff
+LDLIBS = $(LDLIBS.cmd)
 LDLIBS += -ldtrace
 
 SRCS = badioctl

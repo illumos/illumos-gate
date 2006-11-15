@@ -48,7 +48,7 @@ MANIFESTDIR=manifest
 MANIFEST=$(MANIFESTDIR)/jdtrace.jar-manifest
 JDTRACE_JAR=$(LIBDIR)/jdtrace.jar
 
-JAR=$(ROOTLIBJAVA)/jdtrace.jar
+PROTO_JDTRACE_JAR=$(ROOTLIBJAVA)/jdtrace.jar
 CMD = $(ROOTBIN)/jdtrace
 XLIST = $(ROOTBIN)/exception.lst
 
@@ -57,28 +57,28 @@ $(CMD) := FILEMODE = 0555
 default: $(JDTRACE_JAR) jdtrace.exe
 
 clean:
-	rm -f $(CLASSDIR)/*.class
+	$(RM) $(CLASSDIR)/*.class
 
 clobber: clean
-	rm -f $(JDTRACE_JAR)
-	rm -f jdtrace.exe
+	$(RM) $(JDTRACE_JAR)
+	$(RM) jdtrace.exe
 
 all: default
 
 lint:
 
-install: all $(JAR) $(CMD) $(XLIST)
+install: all $(PROTO_JDTRACE_JAR) $(CMD) $(XLIST)
 
 jdtrace.exe: $(SRCDIR)/jdtrace.c
-	cc -I/usr/include $(SRCDIR)/jdtrace.c -o jdtrace.exe
+	$(CC) -I/usr/include $(SRCDIR)/jdtrace.c -o jdtrace.exe
 
 $(JDTRACE_JAR): $(SRCDIR)/JDTrace.java $(SRCDIR)/Getopt.java
-	mkdir -p $(CLASSDIR)
-	mkdir -p $(LIBDIR)
-	javac -cp $(CLASSPATH) -d $(CLASSDIR) $(SRCDIR)/*.java
-	jar -cmf $(MANIFEST) $(JDTRACE_JAR) -C $(CLASSDIR) .
+	@mkdir -p $(CLASSDIR)
+	@mkdir -p $(LIBDIR)
+	$(JAVAC) -cp $(CLASSPATH) -d $(CLASSDIR) $(SRCDIR)/*.java
+	$(JAR) -cmf $(MANIFEST) $(JDTRACE_JAR) -C $(CLASSDIR) .
 
-$(JAR): $(ROOTLIBJAVA)
+$(PROTO_JDTRACE_JAR): $(ROOTLIBJAVA)
 
 $(CMD): $(ROOTBIN)
 

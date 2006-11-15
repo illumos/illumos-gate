@@ -29,8 +29,7 @@ include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/SUNWdtrt
 JAR_DSTDIR = $(ROOTOPTPKG)/tst/common/java_api
-DTEST_DIR=$(SRC)/cmd/dtrace/test
-JARDIR = $(DTEST_DIR)/tst/common/java_api
+JAR_SRCDIR = $(SRC)/cmd/dtrace/test/tst/common/java_api
 
 # Use the proto dtrace.jar if it exists, otherwise use whatever is
 # installed on the system. It should be possible to build
@@ -44,32 +43,32 @@ SRCDIR=src
 CLASSDIR=classes
 MANIFESTDIR=manifest
 MANIFEST=$(MANIFESTDIR)/test.jar-manifest
-JAR=$(JARDIR)/test.jar
-JAR_DST=$(JAR_DSTDIR)/test.jar
+TEST_JAR=$(JAR_SRCDIR)/test.jar
+PROTO_TEST_JAR=$(JAR_DSTDIR)/test.jar
 
-default: $(JAR)
+default: $(TEST_JAR)
 
 clean:
-	rm -f $(CLASSDIR)/*.class
+	$(RM) $(CLASSDIR)/*.class
 
 clobber: clean
-	rm -f $(JAR)
+	$(RM) $(TEST_JAR)
 
 all: default
 
 lint:
 
-install: all $(JAR_DST)
+install: all $(PROTO_TEST_JAR)
 
-$(JAR): $(SRCDIR)/*.java
-	mkdir -p $(CLASSDIR)
-	javac -cp $(CLASSPATH) -d $(CLASSDIR) $(SRCDIR)/*.java
-	jar -cmf $(MANIFEST) $(JAR) -C $(CLASSDIR) .
+$(TEST_JAR): $(SRCDIR)/*.java
+	@mkdir -p $(CLASSDIR)
+	$(JAVAC) -cp $(CLASSPATH) -d $(CLASSDIR) $(SRCDIR)/*.java
+	$(JAR) -cmf $(MANIFEST) $(TEST_JAR) -C $(CLASSDIR) .
 
-$(JAR_DST): $(JAR_DSTDIR)
+$(PROTO_TEST_JAR): $(JAR_DSTDIR)
 
 $(JAR_DSTDIR):
 	$(INS.dir)
 
-$(JAR_DSTDIR)/%: $(JARDIR)/%
+$(JAR_DSTDIR)/%: $(JAR_SRCDIR)/%
 	$(INS.file)

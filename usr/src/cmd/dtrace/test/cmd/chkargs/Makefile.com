@@ -32,6 +32,7 @@ ROOTBIN32 = $(ROOTBIN)/$(MACH32)
 ROOTBIN64 = $(ROOTBIN)/$(MACH64)
 
 PROG = chkargs
+LDLIBS = $(LDLIBS.cmd)
 LDLIBS += -ldtrace -lctf
 
 ROOTISAEXEC = $(ROOTBIN)/$(PROG)
