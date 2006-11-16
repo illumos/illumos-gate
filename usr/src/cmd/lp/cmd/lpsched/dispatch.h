@@ -43,8 +43,6 @@ void		s_enable_dest ( char * , MESG * );
 void		s_end_change_request ( char * , MESG * );
 void		s_inquire_class ( char * , MESG * );
 void		s_inquire_printer_status ( char * , MESG * );
-void		s_inquire_remote_printer ( char * , MESG * );
-void		s_inquire_request ( char * , MESG * );
 void		s_inquire_request_rank ( char * , MESG * );
 void		s_load_class ( char * , MESG * );
 void		s_load_filter_table ( char * , MESG * );

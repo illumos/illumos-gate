@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,13 +28,14 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "stdio.h"
 #include "string.h"
 #include "errno.h"
 #include "sys/types.h"
+#include <syslog.h>
 
 #include "lp.h"
 #include "class.h"
@@ -48,13 +49,14 @@ getclass(char *name)
 {
 	static long		lastdir		= -1;
 
-	static CLASS		clsbuf;
+	CLASS		*clsp;
 
 	char			*file,
 				buf[BUFSIZ];
 
 	int fd;
 
+	syslog(LOG_DEBUG, "getclass(%s)", name ? name : "");
 
 	if (!name || !*name) {
 		errno = EINVAL;
@@ -84,34 +86,39 @@ getclass(char *name)
 	}
 	Free (file);
 
-	if (!(clsbuf.name = Strdup(name))) {
+	clsp = (CLASS *)calloc(sizeof (*clsp), 1);
+
+	if (!(clsp->name = Strdup(name))) {
+		Free (clsp);
 		close(fd);
 		errno = ENOMEM;
 		return (0);
 	}
 
-	clsbuf.members = 0;
+	clsp->members = 0;
 	errno = 0;
 	while (fdgets(buf, BUFSIZ, fd)) {
 		buf[strlen(buf) - 1] = 0;
-		addlist (&clsbuf.members, buf);
+		addlist (&clsp->members, buf);
 	}
 	if (errno != 0) {
 		int			save_errno = errno;
 
-		freelist (clsbuf.members);
-		Free (clsbuf.name);
+		freelist (clsp->members);
+		Free (clsp->name);
+		Free (clsp);
 		close(fd);
 		errno = save_errno;
 		return (0);
 	}
 	close(fd);
 
-	if (!clsbuf.members) {
-		Free (clsbuf.name);
+	if (!clsp->members) {
+		Free (clsp->name);
+		Free (clsp);
 		errno = EBADF;
 		return (0);
 	}
 
-	return (&clsbuf);
+	return (clsp);
 }

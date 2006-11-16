@@ -56,6 +56,8 @@ extern papi_status_t jobSubmitSTDIN(papi_service_t svc, char *printer,
 
 extern char **interest_list(papi_service_t svc);
 extern char *localhostname();
+extern char *lp_type_to_mime_type(char *lp_type);
+extern int is_postscript(const char *file);
 
 extern int cli_auth_callback(papi_service_t svc, void *app_data);
 

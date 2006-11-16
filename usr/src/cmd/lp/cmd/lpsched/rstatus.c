@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,87 +28,11 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7.1.4	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lpsched.h"
 
 
-/**
- ** freerstatus()
- **/
-
-void
-freerstatus(register RSTATUS *r)
-{
-	if (r->exec) {
-		if (r->exec->pid > 0)
-			terminate (r->exec);
-		r->exec->ex.request = 0;
-	}
-
-	remover (r);
-
-	if (r->req_file)
-		Free (r->req_file);
-	if (r->slow)
-		Free (r->slow);
-	if (r->fast)
-		Free (r->fast);
-	if (r->pwheel_name)
-		Free (r->pwheel_name);
-	if (r->printer_type)
-		Free (r->printer_type);
-	if (r->output_type)
-		Free (r->output_type);
-	if (r->cpi)
-		Free (r->cpi);
-	if (r->lpi)
-		Free (r->lpi);
-	if (r->plen)
-		Free (r->plen);
-	if (r->pwid)
-		Free (r->pwid);
-
-	if (r->secure) {
-		freesecure(r->secure);
-		Free(r->secure);
-	}
-
-	if (r->request) {
-		freerequest (r->request);
-		Free(r->request);
-	}
-	Free(r);
-
-	return;
-}
-
-/**
- ** allocr()
- **/
-
-RSTATUS *
-allocr(void)
-{
-	register RSTATUS	*prs;
-	register REQUEST	*req;
-	register SECURE		*sec;
-	
-	prs = (RSTATUS *)Malloc(sizeof(RSTATUS));
-	req = (REQUEST *)Malloc(sizeof(REQUEST));
-	sec = (SECURE *)Malloc(sizeof(SECURE));
-
-	if (prs == NULL || req == NULL || sec == NULL) {
-		fail("allocr: Malloc failed");
-	}
-
-	memset ((char *)prs, 0, sizeof(RSTATUS));
-	memset ((char *)(prs->request = req), 0, sizeof(REQUEST));
-	memset ((char *)(prs->secure = sec), 0, sizeof(SECURE));
-	
-	return (prs);
-}
-			
 /**
  ** insertr()
  **/
@@ -186,14 +110,12 @@ request_by_id_num( long num )
 {
 	register RSTATUS        *prs;
 
-	for (prs = Request_List; prs; prs = prs->next)
-		if (STREQU(Local_System, prs->secure->system) &&
-		    strncmp(prs->secure->req_id, "(fake)", strlen("(fake)"))) {
-			char *tmp = strrchr(prs->secure->req_id, '-');
+	for (prs = Request_List; prs; prs = prs->next) {
+		char *tmp = strrchr(prs->secure->req_id, '-');
 
-			if (tmp && (num == atol(++tmp)))
-				return (prs);
-		}
+		if (tmp && (num == atol(++tmp)))
+			return (prs);
+	}
 	return(0);
 }
 

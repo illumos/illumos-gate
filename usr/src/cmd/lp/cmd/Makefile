@@ -20,20 +20,19 @@
 
 
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/lp/cmd/Makefile
+
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include 	../Makefile.lp
 
 OWNER = root
 
-SUBDIRS =	lptest lpadmin lpsched adaptor scripts
+SUBDIRS =	lptest lpadmin lpsched scripts
 
 LOCALPROG =	lpshut
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +75,6 @@
 #define	PS_FAULTED	0x004
 #define	PS_BUSY		0x008
 #define	PS_LATER	0x010	/* Printer is scheduled for service */
-#define	PS_REMOTE	0x020
 #define PS_SHOW_FAULT	0x100 /* set if exMess should be run when fault */
 #define PS_USE_AS_KEY	0x200 /* to insure that status used as key is non 0 */
 #define PS_FORM_FAULT	0x400 /* set a form fault rather a printer fault*/

@@ -53,17 +53,11 @@ s none usr/lib/libprint.so=./libprint.so.2
 s none usr/lib/lpadmin=../sbin/lpadmin
 s none usr/lib/lpsystem=../sbin/lpsystem
 d none usr/lib/print 0755 root lp
-d none usr/lib/print/bsd-adaptor 0755 root lp
-f none usr/lib/print/bsd-adaptor/bsd_cascade.so.1 0755 root lp
-s none usr/lib/print/bsd-adaptor/bsd_cascade.so=./bsd_cascade.so.1
-f none usr/lib/print/bsd-adaptor/bsd_test.so.1 0755 root lp
-s none usr/lib/print/bsd-adaptor/bsd_test.so=./bsd_test.so.1
 f none usr/lib/print/Makefile.yp 0444 root lp
 f none usr/lib/print/in.lpd 0555 root bin
 f none usr/lib/print/conv_fix 0555 root lp
 f none usr/lib/print/conv_lp 0555 root lp
 f none usr/lib/print/conv_lpd 0555 root lp
-f none usr/lib/print/printd 0555 root bin
 d none usr/sbin 0755 root bin
 f none usr/sbin/lpadmin 0555 root lp
 f none usr/sbin/lpsystem 0555 root lp

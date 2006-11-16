@@ -441,6 +441,8 @@ extern void split_and_copy_attributes(char **list,
 				papi_attribute_t ***in,
 				papi_attribute_t ***out);
 
+extern papi_attribute_t **getprinterbyname(char *name, char *ns);
+
 #ifdef __cplusplus
 }
 #endif

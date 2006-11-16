@@ -25,16 +25,20 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+include		../Makefile.sp
+
 UCBPROGS =	lpr lpq lprm lpc
 BINPROGS =	lp lpstat cancel enable disable $(UCBPROGS)
 
 SBINPROGS =	accept reject lpmove
+LIBPRINTPROGS =	in.lpd
 
 
-OBJS =	$(BINPROGS:=.o) $(SBINPROGS:=.o) common.o
+OBJS =	$(BINPROGS:=.o) $(SBINPROGS:=.o) $(LIBPRINTPROGS:=.o) common.o
 
 ROOTBINPROGS =		$(BINPROGS:%=$(ROOTBIN)/%)
 ROOTUSRSBINPROGS =	$(SBINPROGS:%=$(ROOTUSRSBIN)/%)
+ROOTLIBPRINTPROGS =	$(LIBPRINTPROGS:%=$(ROOTLIBPRINT)/%)
 
 
 FILEMODE =	0555
@@ -42,13 +46,20 @@ OWNER =		root
 
 include ../../Makefile.cmd
 
+MANIFEST=	rfc1179.xml
+ROOTMANIFESTDIR=	$(ROOTSVCAPPLICATIONPRINT)
+$(ROOTMANIFEST)		:= FILEMODE= 444
+
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I.
 CPPFLAGS +=	-I../../../lib/print/libpapi-common/common
+CPPFLAGS +=	-I$(ROOT)/usr/include
 LDLIBS +=	-lpapi -lc
+in.lpd:=	CFLAGS +=	-DSOLARIS_PRIVATE_POST_0_9
+in.lpd:=	LDLIBS +=	-lnsl -lsocket
 
 #	each program needs common.o as well
-$(BINPROGS) $(SBINPROGS):	$(BINPROGS:%=%.c) $(SBINPROGS:%=%.c) common.o
+$(BINPROGS) $(SBINPROGS) $(LIBPRINTPROGS):	$(BINPROGS:%=%.c) $(SBINPROGS:%=%.c)  $(LIBPRINTPROGS:%=%.c) common.o
 	$(LINK.c) -o $@ $@.c common.o $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -72,12 +83,15 @@ $(ROOTUSRLIBSYMLINKS):
 all:	$(BINPROGS) $(SBINPROGS)
 
 install:	$(BINPROGS) $(SBINPROGS) $(ROOTBINPROGS) $(ROOTUSRSBINPROGS) \
+		$(ROOTLIBPRINT) $(ROOTLIBPRINTPROGS) $(ROOTMANIFEST) \
 		$(ROOTUCBSYMLINKS) $(ROOTUSRLIBSYMLINKS)
+
+check:	$(CHKMANIFEST)
 
 clean:
 	$(RM) $(OBJS) 
 
-CLOBBERFILES += $(BINPROGS) $(SBINPROGS)
+CLOBBERFILES += $(BINPROGS) $(SBINPROGS) $(LIBPRINTPROGS)
 
 lint:
 

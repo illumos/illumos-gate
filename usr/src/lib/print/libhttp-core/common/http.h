@@ -420,6 +420,9 @@ extern char		*httpAddrLookup(const http_addr_t *addr,
 extern char		*httpAddrString(const http_addr_t *addr,
 			                char *s, int slen);
 
+#include <stdio.h>
+extern void httpDumpData(FILE *, const char *, const char *, int);
+
 
 /*
  * C++ magic...

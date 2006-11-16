@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -37,6 +36,7 @@
 #include "errno.h"
 #include "sys/types.h"
 #include "stdlib.h"
+#include <syslog.h>
 
 #include "lp.h"
 #include "printers.h"
@@ -56,7 +56,7 @@ getprinter(char *name)
 {
 	static long		lastdir		= -1;
 
-	static PRINTER		prbuf;
+	PRINTER		*prp;
 
 	char			buf[BUFSIZ];
 
@@ -81,6 +81,7 @@ getprinter(char *name)
 		return (0);
 	}
 
+	syslog(LOG_DEBUG, "getprinter(%s)", name ? name : "");
 	/*
 	 * Getting ``all''? If so, jump into the directory
 	 * wherever we left off.
@@ -136,14 +137,14 @@ getprinter(char *name)
 	 * after reading the file, because sometimes the file
 	 * contains an empty header to FORCE a null/empty value.
 	 */
-	(void)memset ((char *)&prbuf, 0, sizeof(prbuf));
-	prbuf.name = Strdup(name);
+	prp = calloc(sizeof (*prp), 1);
+	prp->name = Strdup(name);
 	if (isNameAll)
 		Free(name);
-	prbuf.printer_types = getlist(NAME_UNKNOWN, LP_WS, LP_SEP);
-	prbuf.input_types = getlist(NAME_SIMPLE, LP_WS, LP_SEP);
+	prp->printer_types = getlist(NAME_UNKNOWN, LP_WS, LP_SEP);
+	prp->input_types = getlist(NAME_SIMPLE, LP_WS, LP_SEP);
 #if	defined(CAN_DO_MODULES)
-	prbuf.modules = getlist(NAME_DEFAULT, LP_WS, LP_SEP);
+	prp->modules = getlist(NAME_DEFAULT, LP_WS, LP_SEP);
 #endif
 
 	/*
@@ -184,81 +185,81 @@ getprinter(char *name)
 			if ((pp = getlist(p, LP_WS, ":"))) {
 				if (pp[0] != NULL) {
 					if (strcmp(pp[0], NAME_OPTIONAL) == 0)
-						prbuf.banner = BAN_OPTIONAL;
+						prp->banner = BAN_OPTIONAL;
 					else if (strcmp(pp[0], NAME_OFF) == 0)
-						prbuf.banner = BAN_NEVER;
+						prp->banner = BAN_NEVER;
 					else if (strcmp(pp[0], NAME_ON) == 0)
-						prbuf.banner = BAN_ALWAYS;
+						prp->banner = BAN_ALWAYS;
 					else /* default to the LP default */
-						prbuf.banner = BAN_ALWAYS;
+						prp->banner = BAN_ALWAYS;
 				}
 				if (pp[1] && CS_STREQU(pp[1], NAME_ALWAYS))
-					prbuf.banner |= BAN_ALWAYS;
+					prp->banner |= BAN_ALWAYS;
 				freelist (pp);
 			}
 			break;
 
 		case PR_LOGIN:
-			prbuf.login = LOG_IN;
+			prp->login = LOG_IN;
 			break;
 
 		case PR_CPI:
-			prbuf.cpi = getcpi(p);
+			prp->cpi = getcpi(p);
 			break;
 
 		case PR_LPI:
-			prbuf.lpi = getsdn(p);
+			prp->lpi = getsdn(p);
 			break;
 
 		case PR_LEN:
-			prbuf.plen = getsdn(p);
+			prp->plen = getsdn(p);
 			break;
 
 		case PR_WIDTH:
-			prbuf.pwid = getsdn(p);
+			prp->pwid = getsdn(p);
 			break;
 
 		case PR_CS:
-			ppp = &(prbuf.char_sets);
+			ppp = &(prp->char_sets);
 			goto CharStarStar;
 
 		case PR_ITYPES:
-			ppp = &(prbuf.input_types);
+			ppp = &(prp->input_types);
 CharStarStar:		if (*ppp)
 				freelist (*ppp);
 			*ppp = getlist(p, LP_WS, LP_SEP);
 			break;
 
 		case PR_DEV:
-			pp = &(prbuf.device);
+			pp = &(prp->device);
 			goto CharStar;
 
 		case PR_DIAL:
-			pp = &(prbuf.dial_info);
+			pp = &(prp->dial_info);
 			goto CharStar;
 
 		case PR_RECOV:
-			pp = &(prbuf.fault_rec);
+			pp = &(prp->fault_rec);
 			goto CharStar;
 
 		case PR_INTFC:
-			pp = &(prbuf.interface);
+			pp = &(prp->interface);
 			goto CharStar;
 
 		case PR_PTYPE:
-			ppp = &(prbuf.printer_types);
+			ppp = &(prp->printer_types);
 			goto CharStarStar;
 
 		case PR_REMOTE:
-			pp = &(prbuf.remote);
+			pp = &(prp->remote);
 			goto CharStar;
 
 		case PR_SPEED:
-			pp = &(prbuf.speed);
+			pp = &(prp->speed);
 			goto CharStar;
 
 		case PR_STTY:
-			pp = &(prbuf.stty);
+			pp = &(prp->stty);
 CharStar:		if (*pp)
 				Free (*pp);
 			*pp = Strdup(p);
@@ -266,18 +267,18 @@ CharStar:		if (*pp)
 
 #if	defined(CAN_DO_MODULES)
 		case PR_MODULES:
-			ppp = &(prbuf.modules);
+			ppp = &(prp->modules);
 			goto CharStarStar;
 #endif
 
 		case PR_OPTIONS:
-			ppp = &(prbuf.options);
+			ppp = &(prp->options);
 			goto CharStarStar;
 			break;
 
 		case PR_PPD:
 		{
-			pp = &(prbuf.ppd);
+			pp = &(prp->ppd);
 			goto CharStar;
 		}
 		}
@@ -286,7 +287,7 @@ CharStar:		if (*pp)
 	if (errno != 0) {
 		int			save_errno = errno;
 
-		freeprinter (&prbuf);
+		freeprinter (prp);
 		close(fd);
 		errno = save_errno;
 		return (0);
@@ -296,11 +297,11 @@ CharStar:		if (*pp)
 	/*
 	 * Get the printer description (if it exists).
 	 */
-	if (!(path = getprinterfile(prbuf.name, COMMENTFILE)))
+	if (!(path = getprinterfile(prp->name, COMMENTFILE)))
 		return (0);
-	if (!(prbuf.description = loadstring(path)) && errno != ENOENT) {
+	if (!(prp->description = loadstring(path)) && errno != ENOENT) {
 		Free (path);
-		freeprinter (&prbuf);
+		freeprinter (prp);
 		return (0);
 	}
 	Free (path);
@@ -310,7 +311,7 @@ CharStar:		if (*pp)
 	 * read it because of access permission UNLESS we're "root"
 	 * or "lp"
 	 */
-	if (!(pa = getalert(Lp_A_Printers, prbuf.name))) {
+	if (!(pa = getalert(Lp_A_Printers, prp->name))) {
 		if (
 			errno != ENOENT
 		     && (
@@ -319,18 +320,18 @@ CharStar:		if (*pp)
 			     || STREQU(getname(), LPUSER) /* we be lp   */
 			)
 		) {
-			freeprinter (&prbuf);
+			freeprinter (prp);
 			return (0);
 		}
 	} else
-		prbuf.fault_alert = *pa;
+		prp->fault_alert = *pa;
 
 	/*
 	 * Now go through the structure and see if we have
 	 * anything strange.
 	 */
-	if (!okprinter(prbuf.name, &prbuf, 0)) {
-		freeprinter (&prbuf);
+	if (!okprinter(prp->name, prp, 0)) {
+		freeprinter (prp);
 		errno = EBADF;
 		return (0);
 	}
@@ -339,22 +340,22 @@ CharStar:		if (*pp)
 	 * Just in case somebody tried to pull a fast one
 	 * by giving a printer type header by itself....
 	 */
-	if (!prbuf.printer_types)
-		prbuf.printer_types = getlist(NAME_UNKNOWN, LP_WS, LP_SEP);
+	if (!prp->printer_types)
+		prp->printer_types = getlist(NAME_UNKNOWN, LP_WS, LP_SEP);
 
 	/*
 	 * If there are more than one printer type, then we can't
 	 * have any input types, except perhaps ``simple''.
 	 */
 	if (
-		lenlist(prbuf.printer_types) > 1
-	     && prbuf.input_types
+		lenlist(prp->printer_types) > 1
+	     && prp->input_types
 	     && (
-			lenlist(prbuf.input_types) > 1
-		     || !STREQU(NAME_SIMPLE, *prbuf.input_types)
+			lenlist(prp->input_types) > 1
+		     || !STREQU(NAME_SIMPLE, *prp->input_types)
 		)
 	) {
-		freeprinter (&prbuf);
+		freeprinter (prp);
 		badprinter = BAD_ITYPES;
 		errno = EBADF;
 		return (0);
@@ -365,10 +366,10 @@ CharStar:		if (*pp)
 	 * be ``unknown''.
 	 */
 	if (
-		lenlist(prbuf.printer_types) > 1
-	     && searchlist(NAME_UNKNOWN, prbuf.printer_types)
+		lenlist(prp->printer_types) > 1
+	     && searchlist(NAME_UNKNOWN, prp->printer_types)
 	) {
-		freeprinter (&prbuf);
+		freeprinter (prp);
 		badprinter = BAD_PTYPES;
 		errno = EBADF;
 		return (0);
@@ -378,15 +379,15 @@ CharStar:		if (*pp)
 	 * All the printer types had better agree on whether the
 	 * printer takes print wheels!
 	 */
-	prbuf.daisy = -1;
-	for (pp = prbuf.printer_types; *pp; pp++) {
+	prp->daisy = -1;
+	for (pp = prp->printer_types; *pp; pp++) {
 		tidbit (*pp, "daisy", &daisy);
 		if (daisy == -1)
 			daisy = 0;
-		if (prbuf.daisy == -1)
-			prbuf.daisy = daisy;
-		else if (prbuf.daisy != daisy) {
-			freeprinter (&prbuf);
+		if (prp->daisy == -1)
+			prp->daisy = daisy;
+		else if (prp->daisy != daisy) {
+			freeprinter (prp);
 			badprinter = BAD_DAISY;
 			errno = EBADF;
 			return (0);
@@ -397,7 +398,7 @@ CharStar:		if (*pp)
 	 * Help out those who are still using the obsolete
 	 * "printer_type" member.
 	 */
-	prbuf.printer_type = Strdup(*prbuf.printer_types);
+	prp->printer_type = Strdup(*prp->printer_types);
 
-	return (&prbuf);
+	return (prp);
 }

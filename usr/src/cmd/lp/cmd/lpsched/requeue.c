@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6.1.4	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "lpsched.h"
@@ -80,7 +85,7 @@ queue_attract(PSTATUS *pps, int (*qchk_p)(RSTATUS *), int attract_just_one)
 
 #define	SAMECLASS(PRS,PPS) \
 	( \
-		((pcs = search_ctable(PRS->request->destination)) != NULL) \
+		((pcs = search_cstatus(PRS->request->destination)) != NULL) \
 	     && searchlist(PPS->printer->name, pcs->class->members) \
 	)
 
@@ -137,7 +142,6 @@ queue_repel(PSTATUS *pps, int move_off, int (*qchk_p)(RSTATUS *))
 	register int		all_can		= 1;
 	register PSTATUS	*stop_pps	= (move_off? pps : 0);
 
-
 	/*
 	 * Reevaluate all requests that are assigned to this
 	 * printer, to see if there's another printer that
@@ -149,7 +153,9 @@ queue_repel(PSTATUS *pps, int move_off, int (*qchk_p)(RSTATUS *))
 	 * (Currently this is only used when deciding if a printer
 	 * can be deleted.)
 	 */
-	BEGIN_WALK_BY_PRINTER_LOOP (prs, pps)
+	for (prs = Request_List; prs != NULL; prs = prs->next) {
+		if (prs->printer != pps)
+			continue;
 
 		/*
 		 * "all_can" keeps track of whether all of the requests
@@ -191,7 +197,7 @@ queue_repel(PSTATUS *pps, int move_off, int (*qchk_p)(RSTATUS *))
 				else
 					prs->reason = MOK;
 			}
-	END_WALK_LOOP
+	}
 
 	return (all_can);
 }

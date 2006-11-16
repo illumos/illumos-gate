@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -124,7 +125,6 @@ lpsched_status_to_papi_status(int status)
 	case MNOOPEN:
 		return (PAPI_DOCUMENT_ACCESS_ERROR);
 	case MERRDEST:
-		return (PAPI_DEVICE_ERROR);
 	case MDENYDEST:
 		return (PAPI_NOT_ACCEPTING);
 	case MNOMEDIA:
@@ -161,7 +161,7 @@ lpsched_status_string(short status)
 	case MNOOPEN:
 		return (gettext("lpsched: could not open request"));
 	case MERRDEST:
-		return (gettext("An error occured in submission"));
+		return (gettext("queue disabled"));
 	case MDENYDEST:
 		return (gettext("destination denied request"));
 	case MNOMEDIA:
@@ -487,9 +487,11 @@ lpsched_remove_printer(papi_service_t handle, char *dest)
 			return (PAPI_SERVICE_UNAVAILABLE);
 
 		/* remove from any classes */
-		while ((cls = getclass(NAME_ALL)) != NULL)
+		while ((cls = getclass(NAME_ALL)) != NULL) {
 			if (searchlist(dest, cls->members) != 0)
 				remove_from_class(handle, dest, cls);
+			freeclass(cls);
+		}
 
 		/* reset the default if it needs to be done */
 		if (((dflt = getdefault()) != NULL) &&

@@ -40,6 +40,8 @@
 
 #include <config-site.h>
 
+#include <ipp.h>
+
 papi_status_t
 http_to_papi_status(http_status_t status)
 {

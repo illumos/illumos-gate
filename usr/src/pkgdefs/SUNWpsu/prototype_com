@@ -75,12 +75,8 @@ f none usr/sbin/lpfilter 555 root lp
 f none usr/sbin/lpforms 555 root lp
 f none usr/sbin/lpusers 555 root lp
 f none usr/sbin/lpshut 555 root lp
-#	protocol adaptor
-d none usr/lib/print 0755 root lp
-d none usr/lib/print/bsd-adaptor 0755 root lp
-f none usr/lib/print/bsd-adaptor/bsd_lpsched.so.1 0755 root lp
-s none usr/lib/print/bsd-adaptor/bsd_lpsched.so=./bsd_lpsched.so.1
 #	PAPI lpsched service module
+d none usr/lib/print 0755 root lp
 f none usr/lib/print/psm-lpsched.so.1 0755 root lp
 s none usr/lib/print/psm-lpsched.so=./psm-lpsched.so.1
 #	terminfo entries for printers

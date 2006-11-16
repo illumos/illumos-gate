@@ -27,7 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if	!defined(_LP_SECURE_H)
 #define _LP_SECURE_H
@@ -41,15 +41,14 @@
 /*
  * There are 8 fields in the secure request file.
  */
-#define	SC_MAX  8
+#define	SC_MAX  7
 # define SC_REQID	0	/* Original request id */
 # define SC_UID		1	/* Originator's user ID */
 # define SC_USER	2	/* Originator's real login name */
 # define SC_GID		3	/* Originator's group ID */
 # define SC_SIZE	4	/* Total size of the request data */
 # define SC_DATE	5	/* Date submitted (in seconds) */
-# define SC_SYSTEM	6	/* Originating system */
-# define SC_SLABEL	7	/* Sensitivity Label */
+# define SC_SLABEL	6	/* Sensitivity Label */
 
 /**
  ** The internal copy of a request as seen by the rest of the world:
@@ -60,7 +59,6 @@ typedef struct SECURE {
     gid_t	gid;
     off_t	size;
     time_t	date;
-    char	*system;
     char	*user;
     char	*req_id;
     char	*slabel;

@@ -37,13 +37,11 @@ PRINT_SUBDIRS  =		\
 		lpset		\
 		conv_fix	\
 		printer-info	\
-		gateway	\
 		bsd-sysv-commands
 
 SUBDIRS = $(PRINT_SUBDIRS) $(JAVA_SUBDIRS)
 
-ROOTDIRS = 	$(ROOTLIB)/print \
-		$(ROOTLIB)/print/bsd-adaptor
+ROOTDIRS = 	$(ROOTLIB)/print 
 
 all	:=	TARGET= all
 install :=	TARGET= install

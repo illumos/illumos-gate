@@ -139,6 +139,8 @@ SUNWprivate_1.0 {
 	list_remove  = FUNCTION FILTER libpapi-common.so ;
 	list_append  = FUNCTION FILTER libpapi-common.so ;
 	list_concatenate  = FUNCTION FILTER libpapi-common.so ;
+	#    NS
+	getprinterbyname  = FUNCTION FILTER libpapi-common.so ;
 
 	#    extra Attribute Calls
 	copy_attributes  = FUNCTION FILTER libpapi-common.so ;

@@ -30,7 +30,7 @@
 . /lib/svc/share/smf_include.sh
 
 # SERVICE = parent service name
-SERVICE=`echo $SMF_FMRI | /usr/sbin/cut -f1,2 -d":"`
+SERVICE=`echo $SMF_FMRI | /usr/bin/cut -f1,2 -d":"`
 
 case "$1" in
 'start')

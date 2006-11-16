@@ -82,6 +82,7 @@ _validate(RSTATUS *prs, PSTATUS *pps, PSTATUS *stop_pps, char **prefixp,
 				single;
 
 	size_t			n;
+	int i;
 
 	short			ret;
 
@@ -109,11 +110,9 @@ _validate(RSTATUS *prs, PSTATUS *pps, PSTATUS *stop_pps, char **prefixp,
 	}
 	lp_or_root = 0;
 
-	if (STREQU(prs->secure->system, Local_System))
-		if (bangequ(prs->secure->user, "root") ||
-					bangequ(prs->secure->user, "lp"))
+	if (bangequ(prs->secure->user, "root") ||
+	    bangequ(prs->secure->user, "lp"))
 			lp_or_root = 1;
-
 
 	if (prefixp)
 		*prefixp = prs->request->destination;
@@ -124,8 +123,8 @@ _validate(RSTATUS *prs, PSTATUS *pps, PSTATUS *stop_pps, char **prefixp,
 	 */
 	if (!pps && prs->request->destination &&
 	    !STREQU(prs->request->destination, NAME_ANY))
-		if (((pps = search_ptable(prs->request->destination)) != NULL) ||
-		    ((pcs = search_ctable(prs->request->destination)) != NULL) &&
+		if (((pps = search_pstatus(prs->request->destination)) != NULL) ||
+		    ((pcs = search_cstatus(prs->request->destination)) != NULL) &&
 		    pcs->class->members)
 			/*EMPTY*/;
 		else {
@@ -149,7 +148,7 @@ _validate(RSTATUS *prs, PSTATUS *pps, PSTATUS *stop_pps, char **prefixp,
 	 * form knowledge.
 	 */
 	if (prs && prs->request && prs->request->form && (pps || pcs)) {
-		if ((pfs = search_ftable(prs->request->form))) {
+		if ((pfs = search_fstatus(prs->request->form))) {
 			if (lp_or_root || allowed(prs->secure->user,
 				pfs->users_allowed, pfs->users_denied))
 				/*EMPTY*/;
@@ -400,9 +399,7 @@ _validate(RSTATUS *prs, PSTATUS *pps, PSTATUS *stop_pps, char **prefixp,
 	if (pcs)
 		n = lenlist(pcs->class->members);
 	else {
-		n = 0;
-		for (pps = walk_ptable(1); pps; pps = walk_ptable(0))
-			n++;
+		for (n = 0; PStatus != NULL && PStatus[n] != NULL; n++) ;
 	}
 	pcend = arena = (CANDIDATE *)Calloc(n, sizeof(CANDIDATE));
 
@@ -416,16 +413,19 @@ _validate(RSTATUS *prs, PSTATUS *pps, PSTATUS *stop_pps, char **prefixp,
 
 		for (pn = pcs->class->members; *pn; pn++)
 			if (
-				((pps = search_ptable(*pn)) != NULL)
+				((pps = search_pstatus(*pn)) != NULL)
 			     && pps != stop_pps
 			)
 				(pcend++)->pps = pps;
 
 
 	} else
-		for (pps = walk_ptable(1); pps; pps = walk_ptable(0))
+		for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++) {
+			pps = PStatus[i];
+
 			if (CHKACCEPT(prs, pps) && pps != stop_pps)
 				(pcend++)->pps = pps;
+		}
 
 	if (pcend == arena) {
 		ret = MERRDEST;
@@ -537,11 +537,6 @@ _validate(RSTATUS *prs, PSTATUS *pps, PSTATUS *stop_pps, char **prefixp,
 	 */
 #define CHKFREE(PPS)	 (!((PPS)->status & (PS_BUSY|PS_LATER)))
 
-	/*
-	 * Is the printer local?
-	 */
-#define CHKLOCAL(PPS)	 (!((PPS)->status & (PS_REMOTE)))
-
 	{
 		register CANDIDATE	*pcend2;
 
@@ -566,8 +561,6 @@ _validate(RSTATUS *prs, PSTATUS *pps, PSTATUS *stop_pps, char **prefixp,
 					pc->weight += WEIGHT_MOUNTED;
 				if (CHKCHSET(prs, pc->pps))
 					pc->weight += WEIGHT_SELECTS;
-				if (CHKLOCAL(pc->pps))
-					pc->weight += WEIGHT_LOCAL;
 
 #if	defined(FILTER_EARLY_OUT)
 				if (pc->weight == WEIGHT_MAX) {

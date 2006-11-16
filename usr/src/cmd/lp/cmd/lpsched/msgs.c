@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9.1.5	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 # include	<stdarg.h>
 # include	<limits.h>
@@ -64,7 +64,7 @@ MESG			*Net_md;
 void take_message(void)
 {
     int		bytes;
-    int		slot;
+    int		i;
     MESG *	md;
 
     for (EVER) {	/* not really forever...returns are in the loop */
@@ -100,13 +100,13 @@ void take_message(void)
 			 * notification, etc. Otherwise, it must be
 			 * a network child.
 			 */
-			for (slot = 0; slot < ET_Size; slot++)
-				if (Exec_Table[slot].md == md)
+			for (i = 0; Exec_Table[i] != NULL; i++)
+				if (Exec_Table[i]->md == md)
 					break;
 
-			if (slot < ET_Size) {
+			if (Exec_Table[i] != NULL) {
 				(void) putmessage(Message, S_CHILD_DONE,
-					Exec_Table[slot].key, slot, 0, 0);
+					Exec_Table[i]->key, 0, 0);
 			} else {
 				(void) putmessage(Message, S_SHUTDOWN, 1);
 			}
@@ -155,19 +155,6 @@ do_msg(MESG *md)
 {
     int			type = mtype(Message);
 
-#if	defined(DEBUG)
-	if (debug & DB_MESSAGES) {
-		int	size	= stoh(Message + MESG_SIZE);
-		int	ntype	= stoh(Message + MESG_TYPE);
-
-		syslog(LOG_DEBUG, "RECV: type %d size %d: %-.*s\n", ntype, size,
-			size, Message);
-	}
-# endif
-
-#if	defined(DEBUG)
-    syslog(LOG_DEBUG,"MESSAGE ACCEPTED: client %#0x", md);
-#endif
     if (type != S_GOODBYE) {
 	    md->wait = 0;
 	    dispatch (type, Message, md);
@@ -235,21 +222,8 @@ init_messages(void)
 
     calculate_nopen ();
 
-    if (cmd = makestr(RMCMD, " ", Lp_Public_FIFOs, "/*", (char *)0))
-    {
-	(void) system(cmd);
-	Free(cmd);
-    }
-    if (cmd = makestr(RMCMD, " ", Lp_Private_FIFOs, "/*", (char *)0))
-    {
-	(void) system(cmd);
-	Free(cmd);
-    }
-
     Message = (char *)Malloc(MSGMAX);
 
-    (void) Chmod(Lp_Public_FIFOs, 0773);
-    (void) Chmod(Lp_Private_FIFOs, 0771);
     (void) Chmod(Lp_Tmp, 0711);
     
     if ((md = mcreate(Lp_FIFO)) == NULL)
@@ -272,7 +246,6 @@ shutdown_messages(void)
 {
     MESG	*md;
     
-    (void) Chmod(Lp_Public_FIFOs, 0770);
     (void) Chmod(Lp_Tmp, 0700);
     (void) Chmod(Lp_FIFO, 0600);
     md = mlistenreset();

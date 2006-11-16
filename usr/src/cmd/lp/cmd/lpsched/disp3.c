@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,16 +37,12 @@
  ** remount_form() - MOUNT A FORM WHERE ANOTHER WAS MOUNTED
  **/
 
-extern char *LP_TRAY_UNMOUNT;
-
-
 void
 remount_form(register PSTATUS *pps, FSTATUS *pfs, short trayNum)
 {
 	trayNum--; /* make zero based */
 	if (pps->forms && (pps->forms[trayNum].form == pfs)) {
-		pps->forms[trayNum].isAvailable = ((pfs ||
-					 (!LP_TRAY_UNMOUNT)) ? 1 : 0);
+		pps->forms[trayNum].isAvailable = (pfs ? 1 : 0);
 					 /* force it */
 		return;	/* nothing to do */
 	} else if ((!pps->forms) && (!pfs)) {
@@ -60,7 +56,7 @@ remount_form(register PSTATUS *pps, FSTATUS *pfs, short trayNum)
 		register FSTATUS	*Opfs	= pps->forms[trayNum].form;
 
 		pps->forms[trayNum].form = 0;
-		pps->forms[trayNum].isAvailable = (LP_TRAY_UNMOUNT ? 0 : 1);
+		pps->forms[trayNum].isAvailable = 0;
 		Opfs->mounted--;
 
 		/*
@@ -182,7 +178,7 @@ remount_pwheel(register PSTATUS *pps, char *pwheel_name)
 	 */
 	if (pwheel_name) {
 		load_str (&pps->pwheel_name, pwheel_name);
-		if (ppws = search_pwtable(pwheel_name)) {
+		if (ppws = search_pwstatus(pwheel_name)) {
 			pps->pwheel = ppws;
 			ppws->mounted++;
 
@@ -252,7 +248,7 @@ s_max_trays(char *m, MESG *md)
 	       numTrays);
 
 	/* Have we seen this printer before? */
-	if (!*printer || !(pps = search_ptable(printer)))
+	if (!*printer || !(pps = search_pstatus(printer)))
 		status = MNODEST;
 
 	/* How about the tray? */
@@ -271,7 +267,7 @@ s_max_trays(char *m, MESG *md)
 
 			for (i = pps->numForms; i < numTrays; i++) {
 				ppfs[i].form = NULL;
-				ppfs[i].isAvailable = (LP_TRAY_UNMOUNT ? 0 : 1);
+				ppfs[i].isAvailable = 0;
 			}
 			pps->forms = ppfs;
 			pps->numForms = numTrays;
@@ -308,11 +304,11 @@ s_mount(char *m, MESG *md)
 		status = MNOMEDIA;
 
 	/* Have we seen this printer before? */
-	else if (!*printer || !(pps = search_ptable(printer)))
+	else if (!*printer || !(pps = search_pstatus(printer)))
 		status = MNODEST;
 
 	/* How about the form? */
-	else if (*form && !(pfs = search_ftable(form)))
+	else if (*form && !(pfs = search_fstatus(form)))
 		status = MNOMEDIA;
 
 	/* If the printer is currently printing, we can't disturb it. */
@@ -357,11 +353,11 @@ s_mount_tray(char *m, MESG *md)
 		status = MNOMEDIA;
 
 	/* Have we seen this printer before? */
-	else if (!*printer || !(pps = search_ptable(printer)))
+	else if (!*printer || !(pps = search_pstatus(printer)))
 		status = MNODEST;
 
 	/* How about the form? */
-	else if (*form && !(pfs = search_ftable(form)))
+	else if (*form && !(pfs = search_fstatus(form)))
 		status = MNOMEDIA;
 
 	/* How about the tray? */
@@ -411,7 +407,7 @@ s_unmount(char *m, MESG *md)
 	/*
 	 * Have we seen this printer before?
 	 */
-	else if (!*printer || !(pps = search_ptable(printer)))
+	else if (!*printer || !(pps = search_pstatus(printer)))
 		status = MNODEST;
 
 
@@ -463,7 +459,7 @@ s_unmount_tray(char *m, MESG *md)
 	if (!*form && !*pwheel_name)
 		status = MNOMEDIA;
 
-	else if (!*printer || !(pps = search_ptable(printer)))
+	else if (!*printer || !(pps = search_pstatus(printer)))
 		/* haven't seen this printer before */
 		status = MNODEST;
 	else if ((trayNum <=0) || (trayNum > pps->numForms))
@@ -516,7 +512,7 @@ s_load_form(char *m, MESG *md)
 			break;
 		}
 
-	} else if ((pfs = search_ftable(form))) {
+	} else if ((pfs = search_fstatus(form))) {
 		/* Have we seen this form before? */
 		unload_list (&pfs->users_allowed);
 		unload_list (&pfs->users_denied);
@@ -556,38 +552,17 @@ s_load_form(char *m, MESG *md)
 	/*
 	 * Room for a new form?
 	 */
-	} else if ((pfs = search_ftable((char *)0))) {
-
-		pfs->alert->active = 0;
-		pfs->requests = pfs->requests_last = 0;
-		pfs->mounted = 0;
-
+	} else if ((pfs = new_fstatus(pf))) {
 		/*
 		 * No alert is possible for a new form, of course,
 		 * but this routine does a bit more than just check
 		 * the alert.
 		 */
 		check_form_alert (pfs, pf);
-
-		unload_list (&pfs->users_allowed);
-		unload_list (&pfs->users_denied);
-		load_userform_access (
-			pf->name,
-			&pfs->users_allowed,
-			&pfs->users_denied
-		);
-
-		load_sdn (&pfs->cpi, pf->cpi);
-		load_sdn (&pfs->lpi, pf->lpi);
-		load_sdn (&pfs->plen, pf->plen);
-		load_sdn (&pfs->pwid, pf->pwid);
-
 		status = MOK;
-
 	} else {
 		free_form (pf);
 		status = MNOSPACE;
-
 	}
 
 	mputm (md, R_LOAD_FORM, status);
@@ -601,8 +576,6 @@ s_load_form(char *m, MESG *md)
 static void
 _unload_form(register FSTATUS *pfs)
 {
-	register PSTATUS	*pps	= &PStatus[0],
-				*ppsend	= &PStatus[PT_Size];
 	int i;
 	short numForms;
 	PFSTATUS *ppfs;
@@ -610,14 +583,13 @@ _unload_form(register FSTATUS *pfs)
 	/*
 	 * Unmount this form everywhere and get rid of it.
 	 */
-	for (; pps < ppsend; pps++)
-		if (((ppfs = pps->forms) != NULL) &&
-		    ((numForms = pps->numForms) > 0))
-			for ( i = 0 ; i < numForms ; i++ )
-				if (ppfs[i].form == pfs) ppfs[i].form= NULL;
-
-	free_form (pfs->form);
-	pfs->form->name = 0;
+	for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++)
+		if (((ppfs = PStatus[i]->forms) != NULL) &&
+		    ((numForms = PStatus[i]->numForms) > 0)) {
+			int j;
+			for ( j = 0 ; j < numForms ; j++ )
+				if (ppfs[j].form == pfs) ppfs[j].form= NULL;
+		}
 
 	return;
 }
@@ -634,30 +606,41 @@ s_unload_form(char *m, MESG *md)
 	syslog(LOG_DEBUG, "s_unload_form(%s)", (form ? form : "NULL"));
 
 	if (!*form || STREQU(form, NAME_ALL)) {
+		int i;
 		/* If we have a request queued for ANY form, we can't do it. */
 		status = MOK;
-		for (pfs = walk_ftable(1); pfs && status == MOK;
-		     pfs = walk_ftable(0))
-			BEGIN_WALK_BY_FORM_LOOP (prs, pfs)
-				status = MBUSY;
-				break;
-			END_WALK_LOOP
+		for (i = 0; FStatus != NULL && FStatus[i] != NULL &&
+			    status == MOK; i++) {
+			for (prs = Request_List; prs != NULL; prs = prs->next)
+				if (prs->form == FStatus[i]) {
+					status = MBUSY;
+					break;
+				}
+		}
 
-		if (status == MOK)
-			for (pfs = walk_ftable(1); pfs; pfs = walk_ftable(0))
-				_unload_form (pfs);
-	} else if (!*form || !(pfs = search_ftable(form)))
+		if (status == MOK) {
+			for (i = 0; FStatus != NULL && FStatus[i] != NULL; i++)
+				_unload_form (FStatus[i]);
+			free(FStatus);
+			FStatus = NULL;
+		}
+			
+	} else if (!*form || !(pfs = search_fstatus(form)))
 		/* Have we seen this form before? */
 		status = MNODEST;
 	else {
 		/* Is there even one request waiting for this form? */
 		status = MOK;
-		BEGIN_WALK_BY_FORM_LOOP (prs, pfs)
-			status = MBUSY;
-			break;
-		END_WALK_LOOP
-		if (status == MOK)
+		for (prs = Request_List; prs != NULL; prs = prs->next)
+			if (prs->form == pfs) {
+				status = MBUSY;
+				break;
+			}
+
+		if (status == MOK) {
 			_unload_form (pfs);
+			list_remove((void ***)&FStatus, (void *)pfs);
+		}
 	}
 
 	mputm (md, R_UNLOAD_FORM, status);
@@ -694,17 +677,13 @@ s_load_printwheel(char *m, MESG *md)
 			status = MNODEST;
 			break;
 		}
-	} else if ((ppws = search_pwtable(pwheel_name))) {
+	} else if ((ppws = search_pwstatus(pwheel_name))) {
 		/* Print wheel we already know about? */
 		check_pwheel_alert (ppws, ppw);
 		status = MOK;
-	} else if ((ppws = search_pwtable((char *)0))) {
+	} else if ((ppws = new_pwstatus(ppw))) {
 		/* Room for a new print wheel? */
-		register RSTATUS	*prs;
-
-		ppws->alert->active = 0;
-		ppws->requests = ppws->requests_last = 0;
-		ppws->mounted = 0;
+		register RSTATUS 	*prs;
 
 		/*
 		 * Because of the quirky nature of the print wheel
@@ -713,12 +692,12 @@ s_load_printwheel(char *m, MESG *md)
 		 * and see which ones are waiting for this print wheel,
 		 * so we can assign alerts and count pending requests.
 		 */
-		BEGIN_WALK_BY_PWHEEL_LOOP (prs, pwheel_name)
-			if (!one_printer_with_charsets(prs)) {
+		for (prs = Request_List; prs != NULL; prs = prs->next)
+			if ((prs->pwheel_name == pwheel_name) &&
+			    (!one_printer_with_charsets(prs))) {
 				prs->pwheel = ppws;
 				ppws->requests++;
 			}
-		END_WALK_LOOP
 		check_pwheel_alert (ppws, ppw);
 
 		status = MOK;
@@ -738,9 +717,9 @@ s_load_printwheel(char *m, MESG *md)
 static void
 _unload_pwheel(register PWSTATUS *ppws)
 {
-	register PSTATUS	*pps	= &PStatus[0],
-				*ppsend	= &PStatus[PT_Size];
-	register RSTATUS	*prs;
+	register PSTATUS		*pps;
+	register RSTATUS		*prs;
+	int i;
 
 
 	/*
@@ -748,9 +727,9 @@ _unload_pwheel(register PWSTATUS *ppws)
 	 * THIS IS NOT A COMPLETE UNMOUNT, JUST THE ALERT STRUCTURE
 	 * IS REMOVED.
 	 */
-	for (; pps < ppsend; pps++)
-		if (pps->pwheel == ppws)
-			pps->pwheel = 0;
+	for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++)
+		if (PStatus[i]->pwheel == ppws)
+			PStatus[i]->pwheel = 0;
 
 	/*
 	 * Remove the alert part from all requests.
@@ -773,8 +752,7 @@ _unload_pwheel(register PWSTATUS *ppws)
 	if (ppws->alert->active)
 		cancel_alert (A_PWHEEL, ppws);
 
-	freepwheel (ppws->pwheel);
-	ppws->pwheel->name = 0;		/* freeprinter() doesn't */
+	free_pwstatus(ppws);
 
 	return;
 }
@@ -803,18 +781,23 @@ s_unload_printwheel(char *m, MESG *md)
 	 * Remove all print wheel alerts?
 	 */
 	if (!*pwheel_name || STREQU(pwheel_name, NAME_ALL)) {
-		for (ppws = walk_pwtable(1); ppws; ppws = walk_pwtable(0))
-			_unload_pwheel (ppws);
+		int i;
+
+		for (i = 0; PWStatus != NULL && PWStatus[i] != NULL; i++)
+			_unload_pwheel (PWStatus[i]);
+		free(PWStatus);
+		PWStatus = NULL;
 		status = MOK;
 
 	/*
 	 * Have we seen this print wheel before?
 	 */
-	} else if (!(ppws = search_pwtable(pwheel_name)))
+	} else if (!(ppws = search_pwstatus(pwheel_name)))
 		status = MNODEST;
 
 	else {
 		_unload_pwheel (ppws);
+		list_remove((void ***)&PWStatus, (void *)ppws);
 		status = MOK;
 
 	}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2.1.3	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lpsched.h"
 
@@ -130,8 +129,8 @@ notify(register RSTATUS *prs, char *errbuf, int k, int e, int slow)
 			
 			GetRequestFiles(prs->request, file, sizeof(file));
 			fdprintf(fd, "\nThe job title was:\t%s\n", file);
-			fdprintf(fd, "   submitted from:\t%s\n",
-				prs->secure->system);
+			fdprintf(fd, "     submitted by:\t%s\n",
+				prs->request->user);
 			fdprintf(fd, "               at:\t%s\n",
 				ctime(&prs->secure->date));
 		}

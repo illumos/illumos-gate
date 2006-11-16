@@ -39,9 +39,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
+#include <sys/systeminfo.h>
 
 #include <papi.h>
 #include <ipp-listener.h>
+#include <uri.h>
 
 typedef papi_status_t (ipp_handler_t)(papi_service_t svc,
 					papi_attribute_t **request,
@@ -360,6 +363,61 @@ ipp_initialize_response(papi_attribute_t **request,
 	return (PAPI_OK);
 }
 
+/* simplistic check for cyclical service references */
+static int
+cyclical_service_check(char *svc_name, int port)
+{
+	papi_attribute_t **list;
+	char buf[BUFSIZ];
+	uri_t *uri = NULL;
+	char *s = NULL;
+
+	/* was there a service_uri? */
+	if (svc_name == NULL)
+		return (0);
+
+	if ((list = getprinterbyname(svc_name, NULL)) == NULL)
+		return (0);	/* if it doesnt' resolve, we will fail later */
+
+	papiAttributeListGetString(list, NULL, "printer-uri-supported", &s);
+	if ((s == NULL) || (strcasecmp(svc_name, s) != 0))
+		return (0); 	/* they don't match */
+
+	/* is it in uri form? */
+	if (uri_from_string(s, &uri) < 0)
+		return (0);
+
+	if ((uri == NULL) || (uri->scheme == NULL) || (uri->host == NULL)) {
+		uri_free(uri);
+		return (0);
+	}
+
+	/* is it ipp form */
+	if (strcasecmp(uri->scheme, "ipp") != 0) {
+		uri_free(uri);
+		return (0);
+	}
+
+	/* does the host match up */
+	sysinfo(SI_HOSTNAME, buf, sizeof (buf));
+	if ((strcasecmp(uri->host, "localhost") != 0) &&
+	     (strcasecmp(uri->host, buf) != 0)) {
+		uri_free(uri);
+		return (0);
+	}
+
+	/* does the port match our own */
+	if (((uri->port == NULL) && (port != 631)) ||
+	    ((uri->port != NULL) && (atoi(uri->port) != port))) {
+		uri_free(uri);
+		return (0);
+	}
+
+	uri_free(uri);
+
+	return (1);
+}
+
 static papi_status_t
 print_service_connect(papi_service_t *svc, papi_attribute_t **request,
 		papi_attribute_t ***response)
@@ -369,6 +427,7 @@ print_service_connect(papi_service_t *svc, papi_attribute_t **request,
 	char *printer_uri = NULL;
 	char *svc_name = NULL;
 	char *user = NULL;
+	int port = 631;
 
 	/* Get the operational attributes group from the request */
 	(void) papiAttributeListGetCollection(request, NULL,
@@ -383,6 +442,15 @@ print_service_connect(papi_service_t *svc, papi_attribute_t **request,
 	(void) papiAttributeListGetString(request, NULL,
 				"default-service", &svc_name);
 	get_printer_id(operational, &svc_name, NULL);
+
+	/* get the port that we are listening on */
+	(void) papiAttributeListGetInteger(request, NULL, "uri-port", &port);
+
+	if (cyclical_service_check(svc_name, port) != 0) {
+		status = PAPI_NOT_POSSIBLE;
+		ipp_set_status(response, status, "printer-uri is cyclical");
+		return (status);
+	}
 
 	status = papiServiceCreate(svc, svc_name, user, NULL, NULL,
 					PAPI_ENCRYPT_NEVER, NULL);

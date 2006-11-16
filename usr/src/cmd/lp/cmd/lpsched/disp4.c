@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,19 +27,12 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.13.1.8	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "time.h"
 #include "dispatch.h"
 #include <syslog.h>
 
-
-extern char *LP_KILL_NO_PAPER;
-
-#define PRINTER_ON_SYSTEM(PPS,PSS) \
-	(((PPS)->status & PS_REMOTE) && (PPS)->system == (PSS))
-
-extern PSTATUS * search_ptable_remote(char * printer);
 
 /**
  ** s_accept_dest()
@@ -61,7 +53,7 @@ s_accept_dest(char *m, MESG *md)
 	/*
 	 * Have we seen this destination as a printer?
 	 */
-	if ((pps = search_ptable(destination)))
+	if ((pps = search_pstatus(destination)))
 		if ((pps->status & PS_REJECTED) == 0)
 			status = MERRDEST;
 		else {
@@ -74,7 +66,7 @@ s_accept_dest(char *m, MESG *md)
 	/*
 	 * Have we seen this destination as a class?
 	 */
-	else if ((pcs = search_ctable(destination)))
+	else if ((pcs = search_cstatus(destination)))
 		if ((pcs->status & CS_REJECTED) == 0)
 			status = MERRDEST;
 		else {
@@ -113,7 +105,7 @@ s_reject_dest(char *m, MESG *md)
 	/*
 	 * Have we seen this destination as a printer?
 	 */
-	if ((pps = search_ptable(destination)))
+	if ((pps = search_pstatus(destination)))
 		if (pps->status & PS_REJECTED)
 			status = MERRDEST;
 		else {
@@ -127,7 +119,7 @@ s_reject_dest(char *m, MESG *md)
 	/*
 	 * Have we seen this destination as a class?
 	 */
-	else if ((pcs = search_ctable(destination)))
+	else if ((pcs = search_cstatus(destination)))
 		if (pcs->status & CS_REJECTED)
 			status = MERRDEST;
 		else {
@@ -163,7 +155,7 @@ s_enable_dest(char *m, MESG *md)
 	/*
 	 * Have we seen this printer before?
 	 */
-	if ((pps = search_ptable(printer)))
+	if ((pps = search_pstatus(printer)))
 		if (enable(pps) == -1)
 			status = MERRDEST;
 		else
@@ -198,7 +190,7 @@ s_disable_dest(char *m, MESG *md)
 	/*
 	 * Have we seen this printer before?
 	 */
-	if ((pps = search_ptable(destination))) {
+	if ((pps = search_pstatus(destination))) {
 
 		/*
 		 * If we are to cancel a currently printing request,
@@ -384,7 +376,7 @@ s_quiet_alert(char *m, MESG *md)
 
 	else switch (type) {
 	case QA_FORM:
-		if (!(pfs = search_ftable(name)))
+		if (!(pfs = search_fstatus(name)))
 			status = MNODEST;
 
 		else if (!pfs->alert->active)
@@ -398,7 +390,7 @@ s_quiet_alert(char *m, MESG *md)
 		break;
 		
 	case QA_PRINTER:
-		if (!(pps = search_ptable(name)))
+		if (!(pps = search_pstatus(name)))
 			status = MNODEST;
 
 		else if (!pps->alert->active)
@@ -412,7 +404,7 @@ s_quiet_alert(char *m, MESG *md)
 		break;
 		
 	case QA_PRINTWHEEL:
-		if (!(ppws = search_pwtable(name)))
+		if (!(ppws = search_pwstatus(name)))
 			status = MNODEST;
 
 		else if (!ppws->alert->active)
@@ -447,7 +439,7 @@ s_send_fault(char *m, MESG *md)
 	       (printerOrForm ? printerOrForm : "NULL"), key,
 	       (alert_text ? alert_text : "NULL"));
 
-	if (!(pps = search_ptable(printerOrForm)) || (!pps->exec) ||
+	if (!(pps = search_pstatus(printerOrForm)) || (!pps->exec) ||
 		pps->exec->key != key || !pps->request) {
 		status = MERRDEST;
 	} else {
@@ -475,7 +467,7 @@ s_clear_fault(char *m, MESG *md)
 	       (alert_text ? alert_text : "NULL"));
 
 
-	if (! (pps = search_ptable(printerOrForm)) || ((key > 0) &&
+	if (! (pps = search_pstatus(printerOrForm)) || ((key > 0) &&
 	    ((!pps->exec) || pps->exec->key != key || !pps->request ))) {
 		status = MERRDEST;
 	} else {
@@ -506,7 +498,7 @@ s_paper_changed(char *m, MESG *md)
 	       (printer ? printer : "NULL"), trayNum, (paper ? paper : "NULL"),
 	       mode, pagesPrinted);
 
-	if (!(pps = search_ptable(printer)))
+	if (!(pps = search_pstatus(printer)))
 		status = MNODEST;
 	else if ((trayNum <=0) || (trayNum > pps->numForms))
 		status = MNOTRAY;
@@ -523,8 +515,7 @@ s_paper_changed(char *m, MESG *md)
 		}
 		if ( status == MOK ) {
 			pps->forms[trayNum].isAvailable = mode;
-			if ((chgd || !mode) && (!pagesPrinted) &&
-			    LP_KILL_NO_PAPER && pps->exec) {
+			if ((chgd || !mode) && (!pagesPrinted) && pps->exec) {
 				if (pps->request)
 					pps->request->request->outcome |=
 						RS_STOPPED;

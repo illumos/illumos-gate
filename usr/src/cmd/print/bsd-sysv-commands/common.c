@@ -32,6 +32,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <alloca.h>
 #include <string.h>
 #include <libintl.h>
@@ -72,6 +75,41 @@ match_job(int id, char *user, int ac, char *av[])
 			return (0);	/* user match */
 
 	return (-1);
+}
+
+static struct {
+	char *mime_type;
+	char *lp_type;
+} type_map[] = {
+	{ "text/plain", "simple" },
+	{ "application/octet-stream", "raw" },
+	{ "application/octet-stream", "any" },
+	{ "application/postscript", "postscript" },
+	{ "application/postscript", "ps" },
+	{ "application/x-cif", "cif" },
+	{ "application/x-dvi", "dvi" },
+	{ "application/x-plot", "plot" },
+	{ "application/x-ditroff", "troff" },
+	{ "application/x-troff", "otroff" },
+	{ "application/x-pr", "pr" },
+	{ "application/x-fortran", "fortran" },
+	{ "application/x-raster", "raster" },
+	{ NULL, NULL}
+};
+
+char *
+lp_type_to_mime_type(char *lp_type)
+{
+	int i;
+
+	if (lp_type == NULL)
+		return ("application/octet-stream");
+
+	for (i = 0; type_map[i].lp_type != NULL; i++)
+		if (strcasecmp(type_map[i].lp_type, lp_type) == 0)
+			return (type_map[i].mime_type);
+
+	return (lp_type);
 }
 
 /*
@@ -157,6 +195,8 @@ print_job_line(FILE *fp, int count, papi_job_t job, int fmt, int ac, char *av[])
 					"job-id", &id);
 	(void) papiAttributeListGetString(list, NULL,
 					"job-originating-user-name", &user);
+	(void) papiAttributeListGetString(list, NULL,
+					"job-originating-host-name", &host);
 
 	/* if we are looking and it doesn't match, return early */
 	if ((ac > 0) && (match_job(id, user, ac, av) < 0))
@@ -226,9 +266,9 @@ berkeley_queue_report(papi_service_t svc, FILE *fp, char *dest, int fmt,
 	papi_job_t *jobs = NULL;
 	char *pattrs[] = { "printer-name", "printer-state",
 			"printer-state-reasons", NULL };
-	char *jattrs[] = {
-			"job-name", "job-octets", "job-k-octets",
-			"job-originating-user-name", "job-id",
+	char *jattrs[] = { "job-name", "job-octets", "job-k-octets", "job-id",
+			"job-originating-user-name",
+			"job-originating-host-name",
 			"number-of-intervening-jobs", NULL };
 	int num_jobs = 0;
 
@@ -369,6 +409,35 @@ jobSubmitSTDIN(papi_service_t svc, char *printer, papi_attribute_t **list,
 		status = papiJobStreamClose(svc, stream, job);
 
 	return (status);
+}
+
+/*
+ * is_postscript() will detect if the file passed in contains postscript
+ * data.  A one is returned if the file contains postscript, zero is returned
+ * if the file is not postscript, and -1 is returned if an error occurs
+ */
+#define	PS_MAGIC	"%!"
+#define	PC_PS_MAGIC	"^D%!"
+int
+is_postscript(const char *file)
+{
+	char buf[3];
+	int fd;
+
+	if ((fd = open(file, O_RDONLY)) < 0)
+		return (-1);
+
+	if (read(fd, buf, sizeof (buf)) < 0) {
+		close(fd);
+		return (-1);
+	}
+	close(fd);
+
+	if ((strncmp(buf, PS_MAGIC, sizeof (PS_MAGIC) - 1) == 0) ||
+	    (strncmp(buf, PC_PS_MAGIC, sizeof (PC_PS_MAGIC) - 1) == 0))
+		return (1);
+	else
+		return (0);
 }
 
 static char **

@@ -33,6 +33,7 @@ DATAFILES += depend
 ACTION=grep SUNWpcr depend > /dev/null || \
 	( chmod 666 depend; \
 	echo "P SUNWpcr       Solaris Print - Client, (root)" >> depend; \
+	echo "P SUNWpapi      Free Standards Group Open Printing API" >> depend; \
 	echo "I SUNWlpu       LP Print Service, (usr)" >> depend; \
 	chmod 444 depend );
 

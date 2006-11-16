@@ -27,7 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5.1.4	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 # include	"dispatch.h"
 #include <syslog.h>
@@ -49,7 +49,7 @@ static DISPATCH			dispatch_table[] = {
 /* R_END_CHANGE_REQUEST     */  0,			D_BADMSG,
 /* S_CANCEL_REQUEST         */  s_cancel_request,	0,
 /* R_CANCEL_REQUEST         */  0,			D_BADMSG,
-/* S_INQUIRE_REQUEST        */  s_inquire_request,	0,
+/* S_INQUIRE_REQUEST        */  0,			D_BADMSG,
 /* R_INQUIRE_REQUEST        */  0,                      D_BADMSG,
 /* S_LOAD_PRINTER           */  s_load_printer,		D_ADMIN,
 /* R_LOAD_PRINTER           */  r_H,                    D_BADMSG,
@@ -308,7 +308,8 @@ dispatch(int type, char *m, MESG *md)
 {
 	register DISPATCH	*pd	= &dispatch_table[type];
 
-	syslog(LOG_DEBUG, "dispatch %s\n", dispatchName(type));
+	syslog(LOG_DEBUG, "dispatch(%s, %s, 0x%8.8x)",
+			dispatchName(type), m, md);
 
 	if (type <= 0 || type > LAST_MESSAGE || pd->fncp == NULL)
 		mputm (md, R_BAD_MESSAGE);

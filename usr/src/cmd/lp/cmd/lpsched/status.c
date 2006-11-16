@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -38,8 +37,6 @@
 #include "lpsched.h"
 
 #define NCMP(X,Y)	(STRNEQU((X), (Y), sizeof(Y)-1))
-
-extern char *LP_TRAY_UNMOUNT;
 
 static void		load_pstatus ( void );
 static void		load_fault_status ( void );
@@ -192,7 +189,7 @@ load_pstatus(void)
 
 				case PST_PWHEEL:
 					if (*buf) {
-						ppws = search_pwtable(buf);
+						ppws = search_pwstatus(buf);
 						pwheel_name = Strdup(buf);
 					} else {
 						ppws = 0;
@@ -213,7 +210,7 @@ load_pstatus(void)
 			}
 
 			if ((tmp != NULL) && name &&
-			    (pps = search_ptable(name))) {
+			    (pps = search_pstatus(name))) {
 				pps->rej_date = rej_date;
 				pps->status |= status;
 				pps->forms = ppfs;
@@ -255,14 +252,14 @@ load_pstatus(void)
 		close(fd);
 	}
 
-	for (i = 0; i < PT_Size; i++)
-		if (PStatus[i].printer->name && !PStatus[i].rej_reason) {
-			PStatus[i].dis_reason = Strdup(CUZ_NEW_PRINTER);
-			PStatus[i].rej_reason = Strdup(CUZ_NEW_DEST);
-			PStatus[i].fault_reason = Strdup(CUZ_PRINTING_OK);
-			PStatus[i].dis_date = now;
-			PStatus[i].rej_date = now;
-			PStatus[i].status |= PS_DISABLED | PS_REJECTED;
+	for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++)
+		if (PStatus[i]->printer->name && !PStatus[i]->rej_reason) {
+			PStatus[i]->dis_reason = Strdup(CUZ_NEW_PRINTER);
+			PStatus[i]->rej_reason = Strdup(CUZ_NEW_DEST);
+			PStatus[i]->fault_reason = Strdup(CUZ_PRINTING_OK);
+			PStatus[i]->dis_date = now;
+			PStatus[i]->rej_date = now;
+			PStatus[i]->status |= PS_DISABLED | PS_REJECTED;
 		}
 
 	return;
@@ -275,8 +272,6 @@ load_pstatus(void)
 static void 
 load_fault_status(void)
 {
-	PSTATUS			*pps;
-
 	char			*fault_reason = NULL,
 				buf[BUFSIZ],
 				*fault_status,
@@ -290,8 +285,10 @@ load_fault_status(void)
 
 	int fd;
 
-	for (i = 0; i < PT_Size; i++) {
-		printerName = PStatus[i].printer->name;
+	for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++) {
+		PSTATUS *pps = PStatus[i];
+
+		printerName = pps->printer->name;
 		if (printerName) {
 			fault_status = makepath(Lp_A_Printers, printerName,
 				FAULT_MESSAGE_FILE , (char *) 0);
@@ -314,7 +311,7 @@ load_fault_status(void)
 				}
 
 				if (fault_reason &&
-				    (pps = search_ptable(printerName))) {
+				    (pps = search_pstatus(printerName))) {
 					p = fault_reason + strlen(fault_reason)
 						- 1;
 					if (*p == '\n')
@@ -421,7 +418,7 @@ load_cstatus(void)
 			}
 
 			if ((tmp != NULL) && name &&
-			    (pcs = search_ctable(name))) {
+			    (pcs = search_cstatus(name))) {
 				pcs->rej_reason = rej_reason;
 				pcs->rej_date = rej_date;
 				pcs->status |= status;
@@ -444,11 +441,11 @@ load_cstatus(void)
 		close(fd);
 	}
 
-	for (i = 0; i < CT_Size; i++)
-		if (CStatus[i].class->name && !CStatus[i].rej_reason) {
-			CStatus[i].status |= CS_REJECTED;
-			CStatus[i].rej_reason = Strdup(CUZ_NEW_DEST);
-			CStatus[i].rej_date = now;
+	for (i = 0; CStatus != NULL && CStatus[i] != NULL; i++)
+		if (CStatus[i]->class->name && !CStatus[i]->rej_reason) {
+			CStatus[i]->status |= CS_REJECTED;
+			CStatus[i]->rej_reason = Strdup(CUZ_NEW_DEST);
+			CStatus[i]->rej_date = now;
 		}
 
 	return;
@@ -473,7 +470,8 @@ showForms(PSTATUS  *pps)
 		for (i = 0; i < numForms; i++) {
 			pfs = ppfs[i].form;
 			snprintf(buf, sizeof (buf), "%s%c",
-				(pfs ? pfs->form->name : ""), *LP_SEP);
+				(pfs ? pfs->form->name : ""),
+				((i + 1 < numForms) ? *LP_SEP : '\0'));
 
 			if (addstring(&formList,buf)) { /* allocation failed */
 				if (formList) {  
@@ -542,9 +540,8 @@ parseFormList(char *formList, short *num)
 		ptr = formList;
 		for (i = 0; endPtr && (i < numForms); i++) {
 			*endPtr = 0;
-			ppfs[i].form = pfs = search_ftable(ptr);
-			ppfs[i].isAvailable =
-				((pfs || (!LP_TRAY_UNMOUNT)) ? 1 : 0);
+			ppfs[i].form = pfs = search_fstatus(ptr);
+			ppfs[i].isAvailable = (pfs ? 1 : 0);
 			ptr = endPtr+1;
 			endPtr = strchr(ptr,*LP_SEP);
 		}
@@ -567,7 +564,7 @@ dump_pstatus(void)
 	int fd;
 	register PSTATUS	*pps;
 	register int		f;
-
+	int i;
 
 	if (!pstatus)
 		pstatus = makepath(Lp_System, PSTATUSFILE, (char *)0);
@@ -576,7 +573,9 @@ dump_pstatus(void)
 		return;
 	}
 
-	for (pps = PStatus, ppsend = &PStatus[PT_Size]; pps < ppsend; pps++)
+	for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++) {
+		PSTATUS	*pps = PStatus[i];
+
 		if (pps->printer->name)
 			for (f = 0; f < PST_MAX; f++) switch (f) {
 			case PST_BRK:
@@ -616,7 +615,7 @@ dump_pstatus(void)
 				break;
 				}
 			}
-
+	}
 	close(fd);
 
 	return;
@@ -636,7 +635,7 @@ dump_fault_status(PSTATUS *pps)
 	fault_status = makepath(Lp_A_Printers, printerName, FAULT_MESSAGE_FILE,
 			(char *) 0);
 	if ((fd = open_locked(fault_status, "w", MODE_READ)) < 0) {
-		syslog(LOG_DEBUG, "Can't open file %s (%m)\n", fault_status);
+		syslog(LOG_DEBUG, "Can't open file %s (%m)", fault_status);
 	} else {
 		fdprintf(fd, "%s\n", pps->fault_reason);
 		close(fd);
@@ -654,20 +653,21 @@ dump_fault_status(PSTATUS *pps)
 void
 dump_cstatus(void)
 {
-	CSTATUS			*pcsend;
 	int fd;
-	register CSTATUS	*pcs;
 	register int		f;
+	int i;
 
 
 	if (!cstatus)
 		cstatus = makepath(Lp_System, CSTATUSFILE, (char *)0);
 	if ((fd = open_locked(cstatus, "w", MODE_READ)) < 0) {
-		syslog(LOG_DEBUG, "Can't open file %s (%m)\n", cstatus);
+		syslog(LOG_DEBUG, "Can't open file %s (%m)", cstatus);
 		return;
 	}
 
-	for (pcs = CStatus, pcsend = &CStatus[CT_Size]; pcs < pcsend; pcs++)
+	for (i = 0; CStatus != NULL && CStatus[i] != NULL; i++) {
+		CSTATUS	*pcs = CStatus[i];
+
 		if (pcs->class->name)
 			for (f = 0; f < CST_MAX; f++) switch (f) {
 			case CST_BRK:
@@ -690,7 +690,7 @@ dump_cstatus(void)
 				put_multi_line(fd, pcs->rej_reason);
 				break;
 			}
-
+	}
 	close(fd);
 
 	return;

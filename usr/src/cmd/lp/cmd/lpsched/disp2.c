@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,13 +28,11 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9.1.5	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"dispatch.h"
 #include <syslog.h>
 #include <time.h>
-
-extern char	*LP_ALL_NEW;
 
 char *showForms(PSTATUS *);
 
@@ -61,7 +59,6 @@ s_load_printer(char *m, MESG *md)
 {
 	char			*printer;
 	ushort			status;
-	PRINTER			op;
 	register PRINTER	*pp;
 	register PSTATUS	*pps;
 	char **paperDenied;
@@ -83,18 +80,18 @@ s_load_printer(char *m, MESG *md)
 			status = MNODEST;
 			break;
 		}
-	} else if ((pps = search_ptable(printer))) {
+	} else if ((pps = search_pstatus(printer))) {
 		/* Printer we know about already? */
+		PRINTER	*op = pps->printer;
 
-		op = *(pps->printer);
-		*(pps->printer) = *pp;
+		pps->printer = pp;
 
 		/*
 		 * Ensure that an old Terminfo type that's no longer
 		 * needed gets freed, and that an existing type gets
 		 * reloaded (in case it has been changed).
 		 */
-		untidbit_all (op.printer_types);
+		untidbit_all (op->printer_types);
 		untidbit_all (pp->printer_types);
 
 		/*
@@ -104,8 +101,8 @@ s_load_printer(char *m, MESG *md)
 		 */
 		if (pps->alert->active)
 			if (!SAME(pp->fault_alert.shcmd,
-				  op.fault_alert.shcmd) ||
-			    pp->fault_alert.W != op.fault_alert.W) {
+				  op->fault_alert.shcmd) ||
+			    pp->fault_alert.W != op->fault_alert.W) {
 				/*
 				 * We can't use "cancel_alert()" here
 				 * because it will remove the message.
@@ -121,7 +118,7 @@ s_load_printer(char *m, MESG *md)
 				else
 					Unlink (pps->alert->msgfile);
 			}
-		freeprinter (&op);
+		freeprinter (op);
 
 		unload_list (&pps->users_allowed);
 		unload_list (&pps->users_denied);
@@ -157,53 +154,17 @@ s_load_printer(char *m, MESG *md)
         } else if (pp->remote) {
 		/* don't really load a remote printer */
 		status = MOK;
-	} else if ((pps = search_ptable((char *)0))) {
-		/* Room for new printer? */
+	} else if ((pps = new_pstatus(pp))) {
 		pps->status = PS_DISABLED | PS_REJECTED;
-		pps->request = 0;
-		pps->alert->active = 0;
-
-		pps->forms = 0;
-		pps->numForms = 0;
-		pps->pwheel_name = 0;
-		pps->pwheel = 0;
-
 		load_str (&pps->dis_reason, CUZ_NEW_PRINTER);
 		load_str (&pps->rej_reason, CUZ_NEW_DEST);
 		load_str (&pps->fault_reason, CUZ_PRINTING_OK);
 		time (&pps->dis_date);
 		time (&pps->rej_date);
 
-		*(pps->printer) = *pp;
-
-		untidbit_all (pp->printer_types);
-
-		unload_list (&pps->users_allowed);
-		unload_list (&pps->users_denied);
-		unload_list (&pps->forms_allowed);
-		unload_list (&pps->forms_denied);
-		load_userprinter_access(pp->name, &pps->users_allowed,
-			&pps->users_denied);
-		load_formprinter_access(pp->name, &pps->forms_allowed,
-			&pps->forms_denied);
-
-		unload_list (&pps->paper_allowed);
-		load_paperprinter_access(pp->name, &pps->paper_allowed,
-			&paperDenied);
-		freelist(paperDenied);
-
-		load_sdn (&pps->cpi, pp->cpi);
-		load_sdn (&pps->lpi, pp->lpi);
-		load_sdn (&pps->plen, pp->plen);
-		load_sdn (&pps->pwid, pp->pwid);
-
-		pps->last_dial_rc = 0;
-		pps->nretry = 0;
-
 		dump_pstatus ();
 
 		status = MOK;
-
 	} else {
 		freeprinter (pp);
 		status = MNOSPACE;
@@ -221,7 +182,7 @@ s_load_printer(char *m, MESG *md)
 static void
 _unload_printer(PSTATUS *pps)
 {
-	register CSTATUS	*pcs;
+	int i;
 
 	if (pps->alert->active)
 		cancel_alert (A_PRINTER, pps);
@@ -239,17 +200,15 @@ _unload_printer(PSTATUS *pps)
 	 * we have deleted the printer but still have it in the
 	 * class, we may have trouble!
 	 */
-	for (pcs = walk_ctable(1); pcs; pcs = walk_ctable(0))
-		(void) dellist(&(pcs->class->members), pps->printer->name);
+	for (i = 0; CStatus != NULL && CStatus[i] != NULL; i++)
+		(void) dellist(&(CStatus[i]->class->members),
+				pps->printer->name);
 
-	untidbit_all (pps->printer->printer_types);
-	freeprinter (pps->printer);
-	pps->printer->name = 0;		/* freeprinter() doesn't */
-	if (pps->forms) {
-		Free(pps->forms);
-		}
-	pps->forms = NULL;
-	pps->numForms = 0;
+	free_pstatus(pps);
+	/*
+	 * this is removed from the PStatus table by the caller
+	 *   list_remove((void ***)&PStatus, (void *)pps);
+	 */
 
 	return;
 }
@@ -273,12 +232,15 @@ s_unload_printer(char *m, MESG *md)
 			status = MBUSY;
 
 		else {
-			for (pps = walk_ptable(1); pps; pps = walk_ptable(0))
-				_unload_printer (pps);
+			int i;
+			for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++)
+				_unload_printer (PStatus[i]);
+			free(PStatus);
+			PStatus = NULL;
 			status = MOK;
 		}
 
-	else if (!(pps = search_ptable(printer)))
+	else if (!(pps = search_pstatus(printer)))
 		/* Have we seen this printer before */
 		status = MNODEST;
 	else {
@@ -294,9 +256,10 @@ s_unload_printer(char *m, MESG *md)
 		else
 			status = MBUSY;
 
-		if (status == MOK)
+		if (status == MOK) {
 			_unload_printer (pps);
-
+			list_remove((void ***)&PStatus, (void *)pps);
+		}
 	}
 
 	if (status == MOK)
@@ -371,21 +334,23 @@ void
 s_inquire_printer_status(char *m, MESG *md)
 {
 	char			*printer;
-	register PSTATUS	*pps, *ppsnext;
+	register PSTATUS	*pps;
 
 	(void) getmessage(m, S_INQUIRE_PRINTER_STATUS, &printer);
-	syslog(LOG_DEBUG, "s_inquire_printer_status(%s)\n", printer);
+	syslog(LOG_DEBUG, "s_inquire_printer_status(%s)", printer);
 
 	if (!*printer || STREQU(printer, NAME_ALL)) {
 		/* inquire about all printers */
-		pps = walk_ptable(1);
-		while (ppsnext = walk_ptable(0)) {
-			local_printer_status(md, pps, MOKMORE);
-			pps = ppsnext;
+		int i;
+
+		for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++) {
+			pps = PStatus[i];
+			if (PStatus[i + 1] != NULL)
+				local_printer_status(md, pps, MOKMORE);
 		}
 	} else
 		/* inquire about a specific printer */
-		pps = search_ptable(printer);
+		pps = search_pstatus(printer);
 
 	if (pps)
 		local_printer_status(md, pps, MOK);
@@ -426,46 +391,45 @@ s_load_class(char *m, MESG *md)
 			break;
 		}
 
-	} else if ((pcs = search_ctable(class))) {
+	} else if ((pcs = search_cstatus(class))) {
 		/* Class we already know about */
 		register RSTATUS	*prs;
 
 		freeclass (pcs->class);
-		*(pcs->class) = *pc;
+		pcs->class = pc;
 
 		/*
 		 * Here we go through the list of requests
 		 * to see who gets affected.
 		 */
-		BEGIN_WALK_BY_DEST_LOOP (prs, class)
-			/*
-			 * If not still eligible for this class...
-			 */
-			switch (validate_request(prs, (char **)0, 1)) {
-			case MOK:
-			case MERRDEST:	/* rejecting (shouldn't happen) */
-				break;
-			case MDENYDEST:
-			case MNOMOUNT:
-			case MNOMEDIA:
-			case MNOFILTER:
-			default:
+		for (prs = Request_List; prs != NULL; prs = prs->next)
+			if (STREQU(prs->request->destination, class)) {
 				/*
-				 * ...then too bad!
-				 */
-				cancel (prs, 1);
-				break;
+			 	* If not still eligible for this class...
+			 	*/
+				switch (validate_request(prs, (char **)0, 1)) {
+				case MOK:
+				case MERRDEST:	/* rejecting (shouldn't happen) */
+					break;
+				case MDENYDEST:
+				case MNOMOUNT:
+				case MNOMEDIA:
+				case MNOFILTER:
+				default:
+					/*
+				 	* ...then too bad!
+				 	*/
+					cancel (prs, 1);
+					break;
+				}
 			}
-		END_WALK_LOOP
+
 		status = MOK;
-	} else if ((pcs = search_ctable((char *)0))) {
+	} else if ((pcs = new_cstatus(pc))) {
 		/* Room for new class? */
 		pcs->status = CS_REJECTED;
-
 		load_str (&pcs->rej_reason, CUZ_NEW_DEST);
 		time (&pcs->rej_date);
-
-		*(pcs->class) = *pc;
 
 		dump_cstatus ();
 
@@ -488,7 +452,9 @@ static void
 _unload_class(CSTATUS *pcs)
 {
 	freeclass (pcs->class);
-	pcs->class->name = 0;	/* freeclass() doesn't */
+	if (pcs->rej_reason != NULL)
+		Free (pcs->rej_reason);
+	Free(pcs);
 
 	return;
 }
@@ -498,7 +464,7 @@ s_unload_class(char *m, MESG *md)
 {
 	char			*class;
 	ushort			status;
-	RSTATUS			*prs;
+	RSTATUS 		*prs;
 	register CSTATUS	*pcs;
 
 	(void) getmessage(m, S_UNLOAD_CLASS, &class);
@@ -508,27 +474,32 @@ s_unload_class(char *m, MESG *md)
 	 * Unload ALL classes?
 	 */
 	if (!*class || STREQU(class, NAME_ALL)) {
-
+		int i;
 		/*
 		 * If we have a request queued for a member of ANY
 		 * class, we can't do it.
 		 */
 		status = MOK;
-		for (pcs = walk_ctable(1); pcs && status == MOK;
-		    pcs = walk_ctable(0))
-			BEGIN_WALK_BY_DEST_LOOP (prs, pcs->class->name)
-				status = MBUSY;
-				break;
-			END_WALK_LOOP
+		for (i = 0; ((CStatus[i] != NULL) && (status == MOK)); i++) {
+			for (prs = Request_List; prs != NULL; prs = prs->next)
+				if (STREQU(prs->request->destination,
+						CStatus[i]->class->name)) {
+					status = MBUSY;
+					break;
+				}
+		}
 
-		if (status == MOK)
-			for (pcs = walk_ctable(1); pcs; pcs = walk_ctable(0))
-				_unload_class (pcs);
+		if (status == MOK) {
+			for (i = 0; CStatus != NULL && CStatus[i] != NULL; i++)
+				_unload_class (CStatus[i]);
+			free(CStatus);
+			CStatus = NULL;
+		}
 
 	/*
 	 * Have we seen this class before?
 	 */
-	} else if (!(pcs = search_ctable(class)))
+	} else if (!(pcs = search_cstatus(class)))
 		status = MNODEST;
 
 	/*
@@ -537,12 +508,16 @@ s_unload_class(char *m, MESG *md)
 	 */
 	else {
 		status = MOK;
-		BEGIN_WALK_BY_DEST_LOOP (prs, class)
-			status = MBUSY;
-			break;
-		END_WALK_LOOP
-		if (status == MOK)
+		for (prs = Request_List; prs != NULL; prs = prs->next)
+			if (STREQU(prs->request->destination, class)) {
+				status = MBUSY;
+				break;
+			}
+
+		if (status == MOK) {
 			_unload_class (pcs);
+			list_remove((void ***)&CStatus, (void *)pcs);
+		}
 	}
 
 	if (status == MOK)
@@ -560,8 +535,7 @@ void
 s_inquire_class(char *m, MESG *md)
 {
 	char			*class;
-	register CSTATUS	*pcs,
-				*pcsnext;
+	register CSTATUS	*pcs;
 
 	(void) getmessage(m, S_INQUIRE_CLASS, &class);
 	syslog(LOG_DEBUG, "s_inquire_class(%s)", (class ? class : "NULL"));
@@ -570,16 +544,18 @@ s_inquire_class(char *m, MESG *md)
 
 	if (!*class || STREQU(class, NAME_ALL)) {
 		/* inquire about ALL classes */
-		pcs = walk_ctable(1);
-		while (pcsnext = walk_ctable(0)) {
-			send(md, R_INQUIRE_CLASS, MOKMORE,
-			     pcs->class->name, pcs->status,
-			     pcs->rej_reason, pcs->rej_date);
-			pcs = pcsnext;
+		int i;
+
+		for (i = 0; CStatus != NULL && CStatus[i] != NULL; i++) {
+			pcs = CStatus[i];
+			if (CStatus[i + 1] != NULL)
+				send(md, R_INQUIRE_CLASS, MOKMORE,
+			     		pcs->class->name, pcs->status,
+			     		pcs->rej_reason, pcs->rej_date);
 		}
 	} else
 		/* inquire about a single class */
-		pcs = search_ctable(class);
+		pcs = search_cstatus(class);
 
 	if (pcs)
 		send(md, R_INQUIRE_CLASS, MOK, pcs->class->name, pcs->status,
@@ -607,18 +583,22 @@ s_paper_allowed(char *m, MESG *md)
 
 	if (!*printer || STREQU(printer, NAME_ALL)) {
 		/* inquire about ALL printers */
-		pps = walk_ptable(1);
-		while (ppsnext = walk_ptable(0)) {
-			paperList = sprintlist(pps->paper_allowed);
-			send(md, R_PAPER_ALLOWED, MOKMORE, pps->printer->name,
-				(paperList ? paperList : ""));
-			if (paperList)
-				Free(paperList);
-			pps = ppsnext;
+		int i;
+
+		for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++) {
+			pps = PStatus[i];
+			if (PStatus[i + 1] != NULL) {
+				paperList = sprintlist(pps->paper_allowed);
+				send(md, R_PAPER_ALLOWED, MOKMORE,
+					pps->printer->name,
+					(paperList ? paperList : ""));
+				if (paperList)
+					Free(paperList);
+			}
 		}
 	} else
 		/* inquire about a specific printer */
-		pps = search_ptable(printer);
+		pps = search_pstatus(printer);
 
 	if (pps) {
 		paperList = sprintlist(pps->paper_allowed);

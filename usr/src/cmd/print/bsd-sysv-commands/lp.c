@@ -62,41 +62,6 @@ usage(char *program)
 	exit(1);
 }
 
-static struct {
-	char *mime_type;
-	char *lp_type;
-} type_map[] = {
-	{ "text/plain", "simple" },
-	{ "application/octet-stream", "raw" },
-	{ "application/octet-stream", "any" },
-	{ "application/postscript", "postscript" },
-	{ "application/postscript", "ps" },
-	{ "application/x-cif", "cif" },
-	{ "application/x-dvi", "dvi" },
-	{ "application/x-plot", "plot" },
-	{ "application/x-ditroff", "troff" },
-	{ "application/x-troff", "otroff" },
-	{ "application/x-pr", "pr" },
-	{ "application/x-fortran", "fortran" },
-	{ "application/x-raster", "raster" },
-	{ NULL, NULL}
-};
-
-static char *
-lp_type_to_mime_type(char *lp_type)
-{
-	int i;
-
-	if (lp_type == NULL)
-		return ("application/octet-stream");
-
-	for (i = 0; type_map[i].lp_type != NULL; i++)
-		if (strcasecmp(type_map[i].lp_type, lp_type) == 0)
-			return (type_map[i].mime_type);
-
-	return (lp_type);
-}
-
 int
 main(int ac, char *av[])
 {
@@ -161,7 +126,7 @@ main(int ac, char *av[])
 			break;
 		case 'f':	/* form */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"media", optarg);
+					"form", optarg);
 			break;
 		case 'i':	/* modify job */
 			if ((get_printer_id(optarg, &printer, &modify) < 0) ||
@@ -250,19 +215,22 @@ main(int ac, char *av[])
 		optind = ac;
 
 	if (modify == -1) {
-		char *document_format = "application/octet-stream";
+		char *document_format = "text/plain";
 
-#ifdef MAGIC_MIME
 		if (optind != ac) {
 			/* get the mime type of the file data */
+#ifdef MAGIC_MIME
 			magic_t ms = NULL;
 
 			if ((ms = magic_open(MAGIC_MIME)) != NULL) {
 				document_format = magic_file(ms, av[optind]);
 				magic_close(ms);
 			}
-		}
+#else
+			if (is_postscript(av[optind]) == 1)
+				document_format = "application/postscript";
 #endif
+		}
 
 		papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL, "copies", 1);
 		papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
@@ -278,6 +246,12 @@ main(int ac, char *av[])
 			"Failed to contact service for %s: %s\n"), printer,
 			verbose_papi_message(svc, status));
 		exit(1);
+	}
+
+	if (dump != 0) {
+		printf("requesting attributes:\n");
+		papiAttributeListPrint(stdout, list, "\t");
+		printf("\n");
 	}
 
 	if (modify != -1)

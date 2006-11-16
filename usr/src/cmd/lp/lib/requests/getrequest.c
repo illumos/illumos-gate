@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.14	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "stdio.h"
@@ -59,7 +59,7 @@ getrequest (file)
 	char			*file;
 #endif
 {
-	static REQUEST		reqbuf;
+	REQUEST		*reqp;
 
 	char			buf[BUFSIZ],
 				*path,
@@ -105,22 +105,9 @@ getrequest (file)
 	}
 	Free (path);
 
-	reqbuf.copies		= 1;
-	reqbuf.destination	= 0;
-	reqbuf.file_list	= 0;
-	reqbuf.form		= 0;
-	reqbuf.actions		= 0;
-	reqbuf.alert		= 0;
-	reqbuf.options		= 0;
-	reqbuf.priority		= -1;
-	reqbuf.pages		= 0;
-	reqbuf.charset		= 0;
-	reqbuf.modes		= 0;
-	reqbuf.title		= 0;
-	reqbuf.input_type	= 0;
-	reqbuf.user		= 0;
-	reqbuf.outcome		= 0;
-	reqbuf.version		= VERSION_OLD_LP;
+	reqp = calloc(sizeof (*reqp), 1);
+	reqp->copies		= 1;
+	reqp->priority		= -1;
 
 	errno = 0;
 	while (fdgets(buf, BUFSIZ, fd)) {
@@ -152,89 +139,85 @@ getrequest (file)
 		switch (fld) {
 
 		case RQ_COPIES:
-			reqbuf.copies = atoi(p);
+			reqp->copies = atoi(p);
 			break;
 
 		case RQ_DEST:
-			reqbuf.destination = Strdup(p);
+			reqp->destination = Strdup(p);
 			break;
 
 		case RQ_FILE:
-			appendlist (&reqbuf.file_list, p);
+			appendlist (&reqp->file_list, p);
 			break;
 
 		case RQ_FORM:
 			if (!STREQU(p, NAME_ANY))
-				reqbuf.form = Strdup(p);
+				reqp->form = Strdup(p);
 			break;
 
 		case RQ_HANDL:
 			if (STREQU(p, NAME_RESUME))
-				reqbuf.actions |= ACT_RESUME;
+				reqp->actions |= ACT_RESUME;
 			else if (STREQU(p, NAME_HOLD))
-				reqbuf.actions |= ACT_HOLD;
+				reqp->actions |= ACT_HOLD;
 			else if (STREQU(p, NAME_IMMEDIATE))
-				reqbuf.actions |= ACT_IMMEDIATE;
+				reqp->actions |= ACT_IMMEDIATE;
 			break;
 
 		case RQ_NOTIFY:
 			if (STREQU(p, "M"))
-				reqbuf.actions |= ACT_MAIL;
+				reqp->actions |= ACT_MAIL;
 			else if (STREQU(p, "W"))
-				reqbuf.actions |= ACT_WRITE;
+				reqp->actions |= ACT_WRITE;
 			else if (STREQU(p, "N"))
-				reqbuf.actions |= ACT_NOTIFY;
+				reqp->actions |= ACT_NOTIFY;
 			else
-				reqbuf.alert = Strdup(p);
+				reqp->alert = Strdup(p);
 			break;
 
 		case RQ_OPTS:
-			reqbuf.options = Strdup(p);
+			reqp->options = Strdup(p);
 			break;
 
 		case RQ_PRIOR:
-			reqbuf.priority = atoi(p);
+			reqp->priority = atoi(p);
 			break;
 
 		case RQ_PAGES:
-			reqbuf.pages = Strdup(p);
+			reqp->pages = Strdup(p);
 			break;
 
 		case RQ_CHARS:
 			if (!STREQU(p, NAME_ANY))
-				reqbuf.charset = Strdup(p);
+				reqp->charset = Strdup(p);
 			break;
 
 		case RQ_TITLE:
-			reqbuf.title = Strdup(p);
+			reqp->title = Strdup(p);
 			break;
 
 		case RQ_MODES:
-			reqbuf.modes = Strdup(p);
+			reqp->modes = Strdup(p);
 			break;
 
 		case RQ_TYPE:
-			reqbuf.input_type = Strdup(p);
+			reqp->input_type = Strdup(p);
 			break;
 
 		case RQ_USER:
-			reqbuf.user = Strdup(p);
+			reqp->user = Strdup(p);
 			break;
 
 		case RQ_RAW:
-			reqbuf.actions |= ACT_RAW;
+			reqp->actions |= ACT_RAW;
 			break;
 
 		case RQ_FAST:
-			reqbuf.actions |= ACT_FAST;
+			reqp->actions |= ACT_FAST;
 			break;
 
 		case RQ_STAT:
-			reqbuf.outcome = (ushort)strtol(p, (char **)0, 16);
-			break;
-
-		case RQ_VERSION:
-			reqbuf.version = atoi(p);
+			reqp->outcome = (ushort)strtol(p, (char **)0, 16);
 			break;
 
 		}
@@ -254,13 +237,13 @@ getrequest (file)
 	 * anything strange.
 	 */
 	if (
-		reqbuf.copies <= 0
-	     || !reqbuf.file_list || !*(reqbuf.file_list)
-	     || reqbuf.priority < -1 || 39 < reqbuf.priority
-	     || STREQU(reqbuf.input_type, NAME_ANY)
-	     || STREQU(reqbuf.input_type, NAME_TERMINFO)
+		reqp->copies <= 0
+	     || !reqp->file_list || !*(reqp->file_list)
+	     || reqp->priority < -1 || 39 < reqp->priority
+	     || STREQU(reqp->input_type, NAME_ANY)
+	     || STREQU(reqp->input_type, NAME_TERMINFO)
 	) {
-		freerequest (&reqbuf);
+		freerequest (reqp);
 		errno = EBADF;
 		return (0);
 	}
@@ -268,16 +251,16 @@ getrequest (file)
 	/*
 	 * Guarantee some return values won't be null or empty.
 	 */
-	if (!reqbuf.destination || !*reqbuf.destination) {
-		if (reqbuf.destination)
-			Free (reqbuf.destination);
-		reqbuf.destination = Strdup(NAME_ANY);
+	if (!reqp->destination || !*reqp->destination) {
+		if (reqp->destination)
+			Free (reqp->destination);
+		reqp->destination = Strdup(NAME_ANY);
 	}
-	if (!reqbuf.input_type || !*reqbuf.input_type) {
-		if (reqbuf.input_type)
-			Free (reqbuf.input_type);
-		reqbuf.input_type = Strdup(NAME_SIMPLE);
+	if (!reqp->input_type || !*reqp->input_type) {
+		if (reqp->input_type)
+			Free (reqp->input_type);
+		reqp->input_type = Strdup(NAME_SIMPLE);
 	}
 
-	return (&reqbuf);
+	return (reqp);
 }

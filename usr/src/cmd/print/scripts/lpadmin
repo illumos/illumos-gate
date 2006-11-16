@@ -32,6 +32,7 @@ export TEXTDOMAIN
 
 LPSET=/usr/bin/lpset
 LPGET=/usr/bin/lpget
+LPSTAT=/usr/bin/lpstat
 LPADMIN=/usr/lib/lp/local/lpadmin
 
 HOST=$(/bin/uname -n)
@@ -181,6 +182,7 @@ do
 		if [[ ! -n "${server}" ]] ; then
 			server=${HOST}
 		fi
+		local="true"
 	;;
 	x)
 		if [[ -n "${printer}" || -n "${server}" || \
@@ -269,17 +271,27 @@ case "${server}" in
 		;;
 esac
 
-# default URI form is "lpd" form
 if [[ -n "${server}" ]] ; then
-	uri=${uri:-"lpd://${server}/printers/${rem_printer}#Solaris"}
+	# if we need a uri, find the "best" one.
+	if [[ -z "${uri}" ]] ; then
+		uri="ipp://${server}/printers/${rem_printer}"
+		${LPSTAT} -p ${uri} >/dev/null 2>&1
+		if [[ $? -ne 0 ]] ; then
+			uri="lpd://${server}/printers/${rem_printer}#Solaris"
+		fi
+	fi
+	# set the bsdaddr
 	bsdaddr="${server},${rem_printer},Solaris"
 fi
 
+# if there is a "device" or LP configuration, it's local
+if [[ -n "${device}" || -f /etc/lp/printers/${printer}/configuration || \
+      -f /etc/lp/classes/${printer} ]] ; then
+	local="true"
+fi
 
 # Do the LP configuration for a local printer served by lpsched
-if [[ -x ${LPADMIN} && ( -n "${local}" || -n "${device}" || \
-                          -f /etc/lp/printers/${printer}/configuration || \
-      			          -f /etc/lp/classes/${printer} ) ]] ; then
+if [[ -x ${LPADMIN} && -n "${local}" ]] ; then
 	# enumerate LP configured printers before modification
 	PRE=$(/bin/ls /etc/lp/printers 2>/dev/null ; /bin/ls /etc/lp/classes \
 		2>/dev/null)
@@ -321,11 +333,11 @@ fi
 if [[ -n "${delete}" ]] ; then
 	if [[ "${delete}" = "all" ]] ; then
 		[[ $exit_code -eq 0 ]] && delete_all
-   	elif [[ -n "${local}" ]] ; then
+   	elif [[ -z "${local}" ]] ; then
    		${LPSET} -n system -x ${delete}
    		exit_code=$?
    	fi
-elif [[ -n "${local}" ]] ; then
+elif [[ -z "${local}" ]] ; then
 	if [[ -n "${printer}" ]] ; then
 		${LPSET} -n system \
 			-a "printer-uri-supported=${uri}" \

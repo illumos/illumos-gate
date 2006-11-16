@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -35,6 +34,7 @@
 #include "lpsched.h"
 #include "ctype.h"
 #include "sys/stat.h"
+#include <syslog.h>
 
 /*
  * Macro to test if we should notify the user.
@@ -64,16 +64,21 @@ dowait (void)
 	register PSTATUS	*pps;
 	register ALERT		*pas;
 
+	syslog(LOG_DEBUG, "dowait(%d)", DoneChildren);
 	while (DoneChildren > 0) {
 		DoneChildren--;
 
-		for (i = 0; i < ET_Size; i++)
-			if (Exec_Table[i].pid == -99)
+		for (i = 0; (ep = Exec_Table[i]) != NULL; i++)
+			if (ep->pid == -99)
 				break;
-		if (i >= ET_Size)
+
+		syslog(LOG_DEBUG, "dowait(): 0x%8.8x", ep);
+
+		if (Exec_Table[i] == NULL)	/* nothing to cleanup */
 			continue;
 
-		ep = Exec_Table + i;
+		syslog(LOG_DEBUG, "dowait(): cleaning up 0x%8.8x", ep);
+
 		ep->pid = 0;
 		ep->key = 0;	/* avoid subsequent sneaks */
 		if (ep->md)
@@ -81,6 +86,9 @@ dowait (void)
 
 		killed = KILLED(ep->status);
 		exited = EXITED(ep->status);
+
+		syslog(LOG_DEBUG, "dowait(): type %d, killed %d, exited %d",
+			ep->type, killed, exited);
 
 		switch (ep->type) {
 
@@ -556,11 +564,9 @@ check_request(RSTATUS *prs)
 		unqueue_form (prs);
 		unqueue_pwheel (prs);
 		putrequest (prs->req_file, prs->request);
-		if (!(prs->status & RSS_SENDREMOTE) &&
-		    !(prs->request->outcome &
-			(RS_ACTIVE | RS_NOTIFY | RS_SENDING))) {
+		if (!(prs->request->outcome & (RS_ACTIVE | RS_NOTIFY))) {
 			rmfiles (prs, 1);
-			freerstatus (prs);
+			free_rstatus (prs);
 		}
 	}
 	return;
@@ -575,10 +581,10 @@ check_children(void)
 {
 	register int		i;
     
-	for (i = 0; i < ET_Size; i++)
-		if (Exec_Table[i].pid > 0)
+	for (i = 0; Exec_Table[i] != NULL; i++)
+		if (Exec_Table[i]->pid > 0)
 			break;
 
-	if (i >= ET_Size)
+	if (Exec_Table[i] == NULL)
 		Shutdown = 2;
 }

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -27,7 +28,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.14	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "string.h"
@@ -45,7 +46,7 @@
 SECURE *
 getsecure(char *file)
 {
-	static SECURE		secbuf;
+	SECURE		*secp;
 
 	char			buf[BUFSIZ],
 				*path;
@@ -68,7 +69,9 @@ getsecure(char *file)
 	}
 	Free (path);
 
-	secbuf.user = 0;
+	secp = calloc(sizeof (*secp), 1);
+
+	secp->user = 0;
 	errno = 0;
 	for (
 		fld = 0;
@@ -79,42 +82,38 @@ getsecure(char *file)
 		switch (fld) {
 
 		case SC_REQID:
-			secbuf.req_id = Strdup(buf);
+			secp->req_id = Strdup(buf);
 			break;
 
 		case SC_UID:
-			secbuf.uid = (uid_t)atol(buf);
+			secp->uid = (uid_t)atol(buf);
 			break;
 
 		case SC_USER:
-			secbuf.user = Strdup(buf);
+			secp->user = Strdup(buf);
 			break;
 
 		case SC_GID:
-			secbuf.gid = (gid_t)atol(buf);
+			secp->gid = (gid_t)atol(buf);
 			break;
 
 		case SC_SIZE:
-			secbuf.size = (size_t)atol(buf);
+			secp->size = (size_t)atol(buf);
 			break;
 
 		case SC_DATE:
-			secbuf.date = (time_t)atol(buf);
-			break;
-
-		case SC_SYSTEM:
-			secbuf.system = Strdup(buf);
+			secp->date = (time_t)atol(buf);
 			break;
 
 		case SC_SLABEL:
-			secbuf.slabel = Strdup(buf);
+			secp->slabel = Strdup(buf);
 			break;
 		}
 	}
 	if (errno != 0 || fld != SC_MAX) {
 		int			save_errno = errno;
 
-		freesecure (&secbuf);
+		freesecure (secp);
 		close(fd);
 		errno = save_errno;
 		return (0);
@@ -126,18 +125,18 @@ getsecure(char *file)
 	 * anything strange.
 	 */
 	if (
-	        secbuf.uid > MAXUID || secbuf.uid < -1
-	     || !secbuf.user
-	     || secbuf.gid > MAXUID || secbuf.gid < -1
-	     || secbuf.size == 0
-	     || secbuf.date <= 0
+	        secp->uid > MAXUID || secp->uid < -1
+	     || !secp->user
+	     || secp->gid > MAXUID || secp->gid < -1
+	     || secp->size == 0
+	     || secp->date <= 0
 	) {
-		freesecure (&secbuf);
+		freesecure (secp);
 		errno = EBADF;
 		return (0);
 	}
 
-	return (&secbuf);
+	return (secp);
 }
 
 /**
@@ -198,10 +197,6 @@ putsecure(char *file, SECURE *secbufp)
 
 		case SC_DATE:
 			(void)fdprintf(fd, "%ld\n", secbufp->date);
-			break;
-
-		case SC_SYSTEM:
-			(void)fdprintf(fd, "%s\n", secbufp->system);
 			break;
 
 		case SC_SLABEL:
@@ -268,8 +263,8 @@ freesecure(SECURE *secbufp)
 		Free (secbufp->req_id);
 	if (secbufp->user)
 		Free (secbufp->user);
-	if (secbufp->system)
-		Free (secbufp->system);
+	Free (secbufp);
+
 	return;
 }
 

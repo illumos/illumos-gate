@@ -191,7 +191,7 @@ static const char * const months[12] =
 			};
 
 void
-httpDumpData(FILE *fp, char *tag, char *buffer, int bytes)
+httpDumpData(FILE *fp, const char *tag, const char *buffer, int bytes)
 {
         int i, j, ch;
 

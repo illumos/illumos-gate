@@ -214,7 +214,6 @@ typedef struct FALERT {
 #define CUZ_LOGIN_PRINTER	"disabled by Spooler: login terminal"
 #define CUZ_MOUNTING		"mounting a form"
 #define CUZ_NOFORK		"can't fork"
-#define CUZ_NOREMOTE		"remote system no longer defined"
 #define CUZ_PRINTING_OK		"ready and printing"
 
 #define TIMEOUT_FAULT \
@@ -356,8 +355,6 @@ extern char	Lp_Spooldir[],
 		Lp_Logs[],
 		Lp_ReqLog[],
 		Lp_Model[],
-		Lp_Private_FIFOs[],
-		Lp_Public_FIFOs[],
 		Lp_Requests[],
 		Lp_Secure[],
 		Lp_Schedlock[],

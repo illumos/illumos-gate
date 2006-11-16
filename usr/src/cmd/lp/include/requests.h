@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.13	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if	!defined(_LP_REQUESTS_H)
 #define	_LP_REQUESTS_H
@@ -58,7 +57,6 @@
 # define RQ_RAW		14
 # define RQ_FAST	15
 # define RQ_STAT	16
-# define RQ_VERSION	17 
 
 /**
  ** The internal copy of a request as seen by the rest of the world:
@@ -84,13 +82,8 @@ typedef struct REQUEST {
 	char   *input_type;   /* type of content */
 	char   *user;         /* user name of person submitting */
 	ushort outcome;       /* success/fauilure */
-	ushort  version;      /* version of system sending job*/
 }			REQUEST;
 
-#define BSD_FORM "=bsdForm=" /* form name given to jobs from bsd */
-#define VERSION_BSD 0
-#define VERSION_OLD_LP 1
-#define VERSION_NEW_LP 2
 
 /*
  * Bit flags for the "actions" member:
@@ -122,10 +115,8 @@ typedef struct REQUEST {
 #define RS_CANCELLED	0x0040	/* request was cancelled */
 #define RS_IMMEDIATE	0x0080	/* should be next to print */
 #define RS_FAILED	0x0100	/* slow filter or interface failed */
-#define RS_SENDING	0x0200	/* Request is in transit to a remote */
 #define RS_NOTIFY	0x0400	/* user is to be notified (alert) */
 #define RS_NOTIFYING	0x0800	/* notification (alert) is running */
-#define	RS_SENT		0x1000	/* Request accepted on remote system */
 #define RS_ADMINHELD	0x2000	/* administrator placed RS_HELD */
 #define RS_REFILTER	0x4000	/* had to change filters */
 #define RS_STOPPED	0x8000	/* temporarily stopped the request */
@@ -135,11 +126,9 @@ typedef struct REQUEST {
  *
  *	RS_DONE		request is finished printing or was cancelled
  *	RS_ACTIVE	request is being handled, can be skipped
- *	RS_GONEREMOTE	request is being or has been sent to remote
  */
 #define RS_DONE	       (RS_CANCELLED|RS_PRINTED|RS_FAILED)
 #define RS_ACTIVE      (RS_FILTERING|RS_PRINTING|RS_CHANGING|RS_NOTIFYING)
-#define RS_GONEREMOTE  (RS_SENT|RS_SENDING)
 
 /**
  ** Various routines.

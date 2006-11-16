@@ -75,7 +75,7 @@ main(int ac, char *av[])
 	int validate = 0;
 	int remove = 0;
 	int copy = 1;	/* default is to copy the data */
-	char *document_format = "application/octet-stream";
+	char *document_format = "text/plain";
 	int c;
 
 	(void) setlocale(LC_ALL, "");
@@ -210,17 +210,20 @@ main(int ac, char *av[])
 	if (((optind + 1) == ac) && (strcmp(av[optind], "-") == 0))
 		optind = ac;
 
-#ifdef MAGIC_MIME
 	if (optind != ac) {
 		/* get the mime type of the file data */
+#ifdef MAGIC_MIME
 		magic_t ms;
 
 		if ((ms = magic_open(MAGIC_MIME)) != NULL) {
 			document_format = magic_file(ms, av[optind]);
 			magic_close(ms);
 		}
-	}
+#else
+		if (is_postscript(av[optind]) == 1)
+			document_format = "application/postscript";
 #endif
+	}
 
 	papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL, "copies", 1);
 	papiAttributeListAddString(&list, PAPI_ATTR_EXCL,

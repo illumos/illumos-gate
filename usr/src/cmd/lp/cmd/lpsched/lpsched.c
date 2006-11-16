@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -53,10 +54,6 @@ int			Reserve_Fds	= 0;
 
 char			*Local_System	= 0;
 char			*SHELL		= 0;
-
-char *LP_TRAY_UNMOUNT = NULL;
-char *LP_KILL_NO_PAPER = NULL;
-char *LP_ALL_NEW = NULL;
 
 gid_t			Lp_Gid;
 uid_t			Lp_Uid;
@@ -105,56 +102,15 @@ main(int argc, char *argv[])
     openlog(cp, LOG_PID|LOG_NDELAY|LOG_NOWAIT, LOG_LPR);
 
 	SHELL = DEFAULT_SHELL;
-	LP_TRAY_UNMOUNT = getenv("LP_TRAY_UNMOUNT");
-	LP_KILL_NO_PAPER = getenv("LP_KILL_NO_PAPER");
-	LP_ALL_NEW = getenv("LP_ALL_NEW");
 
     opterr = 0;
-    while((c = getopt(argc, (char * const *)argv, "D:dsf:n:r:M:p:")) != EOF)
+    while((c = getopt(argc, (char * const *)argv, "dsf:n:r:M:p:")) != EOF)
         switch(c)
         {
 # if defined (DEBUG)
 	    case 'd':
 		debug = DB_ALL;
-		syslog(LOG_DEBUG, "debug = DB_ALL\n");
-		goto SkipD;
-	    case 'D':
-		if (*optarg == '?') {
-			note (
-"-D flag[,flag...]    (all logs \"foo\" are in /var/lp/logs,\n"
-"                      although \"lpsched\" goes to stdout if SDB)\n"
-"\n"
-"  EXEC               (log all exec's in \"exec\")\n"
-"  DONE               (log just exec finishes in \"exec\")\n"
-"  INIT               (log initialization info in \"lpsched\" or stdout)\n"
-"  ABORT              (issue abort(2) on fatal error)\n"
-"  SCHEDLOG           (log additional debugging info in \"lpsched\")\n"
-"  SDB                (don't start lpsched as background process)\n"
-"  MESSAGES           (log all message traffic in \"messages\")\n"
-			);
-			note ("\
-  ALL                (all of the above; equivalent to -d)\n"
-			);
-			exit (0);
-		}
-		while ((cp = strtok(optarg, ", "))) {
-#define IFSETDB(P,S,F)	if (STREQU(P, S)) debug |= F
-			IFSETDB (cp, "EXEC", DB_EXEC);
-			else IFSETDB (cp, "DONE", DB_DONE);
-			else IFSETDB (cp, "INIT", DB_INIT);
-			else IFSETDB (cp, "ABORT", DB_ABORT);
-			else IFSETDB (cp, "SCHEDLOG", DB_SCHEDLOG);
-			else IFSETDB (cp, "SDB", DB_SDB);
-			else IFSETDB (cp, "MESSAGES", DB_MESSAGES);
-			else IFSETDB (cp, "ALL", DB_ALL);
-			else {
-				note ("-D flag not recognized; try -D?\n");
-				exit (1);
-			}
-			optarg = 0;
-		}
-		syslog(LOG_DEBUG, "-D set\n");
-SkipD:
+		syslog(LOG_DEBUG, "debug = DB_ALL");
 		break;
 
 	    case 's':
@@ -165,25 +121,25 @@ SkipD:
 	    case 'f':
 		if ((ET_SlowSize = atoi(optarg)) < 1)
 		    ET_SlowSize = 1;
-		syslog(LOG_DEBUG, "-f option is %d\n", ET_SlowSize);
+		syslog(LOG_DEBUG, "-f option is %d", ET_SlowSize);
 		break;
 
 	    case 'n':
 		if ((ET_NotifySize = atoi(optarg)) < 1)
 		    ET_NotifySize = 1;
-		syslog(LOG_DEBUG, "-n option is %d\n", ET_NotifySize);
+		syslog(LOG_DEBUG, "-n option is %d", ET_NotifySize);
 		break;
 
 	    case 'r':
 		if ((Reserve_Fds = atoi(optarg)) < 0)
 			Reserve_Fds = 0;
-		syslog(LOG_DEBUG, "-r option is %d\n", Reserve_Fds);
+		syslog(LOG_DEBUG, "-r option is %d", Reserve_Fds);
 		break;
 
 	    case 'p':
 		if ((fd_limit = atoi(optarg)) < 16)
 			fd_limit = 4096;
-		syslog(LOG_DEBUG, "-p option is %d\n", fd_limit);
+		syslog(LOG_DEBUG, "-p option is %d", fd_limit);
 		break;
 
 	    case '?':
@@ -299,8 +255,8 @@ lpshut(int immediate)
 	 */
 	if (!Shutdown) {
 		mputm (Net_md, S_SHUTDOWN, 1);
-		for (i = 0; i < ET_Size; i++)
-			terminate (&Exec_Table[i]);
+		for (i = 0; Exec_Table != NULL && Exec_Table[i] != NULL; i++)
+			terminate (Exec_Table[i]);
 		alarm (0);
 		Shutdown = (immediate? 2 : 1);
 	}
@@ -335,8 +291,9 @@ lpshut(int immediate)
 static void
 process()
 {
-    register FSTATUS	*pfs;
-    register PWSTATUS	*ppws;
+    FSTATUS	*pfs;
+    PWSTATUS	*ppws;
+    int i;
 
 
     /*
@@ -346,12 +303,12 @@ process()
      * Calling them now will kick off any necessary alerts.
      */
     isStartingForms = 1;
-    for (pfs = walk_ftable(1); pfs; pfs = walk_ftable(0))
-	check_form_alert (pfs, (_FORM *)0);
+    for (i = 0; FStatus != NULL && FStatus[i] != NULL; i++)
+	check_form_alert (FStatus[i], (_FORM *)0);
     isStartingForms = 0;
 
-    for (ppws = walk_pwtable(1); ppws; ppws = walk_pwtable(0))
-	check_pwheel_alert (ppws, (PWHEEL *)0);
+    for (i = 0; PWStatus != NULL && PWStatus[i] != NULL; i++)
+	check_pwheel_alert (PWStatus[i], (PWHEEL *)0);
     
     /*
      * Clear the alarm, then schedule an EV_ALARM. This will clear
@@ -431,7 +388,6 @@ usage: lpsched [ options ]\n\
 
 #if	defined(DEBUG)
 	note ("\
-    [ -D flag[,flag...] ]   (debug modes; use -D? for usage info.)\n\
     [ -d ]                  (same as -D ALL)\n\
     [ -s ]                  (don't trap most signals)\n"
 	);

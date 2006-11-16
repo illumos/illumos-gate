@@ -93,8 +93,6 @@ proto (D, 1,  Lp_Tmp, Local_System, NULL,	    0775, Lp_Uid, Lp_Gid);
 	 * DIRECTORIES: not described in the packaging
 	 */
 proto (D, 0,  Lp_Spooldir, FIFOSDIR, NULL,	    0775, Lp_Uid, Lp_Gid);
-proto (D, 1,  Lp_Private_FIFOs, NULL,		    0771, Lp_Uid, Lp_Gid);
-proto (D, 1,  Lp_Public_FIFOs, NULL,		    0773, Lp_Uid, Lp_Gid);
 
 	/*
 	 * THE MAIN FIFO:

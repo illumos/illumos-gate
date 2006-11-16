@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -56,7 +57,6 @@ static MESG *		ChildMd;
 
 static int		ChildPid;
 static int		WaitedChildPid;
-static int		slot;
 static int		do_undial;
 
 static char		argbuf[ARG_MAX];
@@ -322,10 +322,6 @@ exec(int type, ...)
 
 	case EX_INTERF:
 		printer = va_arg(args, PSTATUS *);
-		if (printer->status & PS_REMOTE) {
-			errno = EINVAL;
-			return (-1);
-		}
 		request = printer->request;
 		ep = printer->exec;
 		break;
@@ -403,7 +399,6 @@ exec(int type, ...)
 	ep->flags = 0;
 
 	key = ep->key = getkey();
-	slot = ep - Exec_Table;
 
 	switch ((ep->pid = Fork1(ep))) {
 
@@ -443,10 +438,13 @@ exec(int type, ...)
 		(void)signal (i, SIG_DFL);
 	(void)signal (SIGALRM, SIG_IGN);
 	(void)signal (SIGTERM, sigtrap);
-	
+
+	closelog();
 	for (i = 0; i < OpenMax; i++)
 		if (i != ChildMd->writefd)
 			Close (i);
+	openlog("lpsched", LOG_PID|LOG_NDELAY|LOG_NOWAIT, LOG_LPR);
+
 	setpgrp();
 
 	/* Set a default path */
@@ -559,7 +557,7 @@ exec(int type, ...)
 
 		(void)Close (1);
 
-		if (strchr (request->secure->user, '!'))
+		if (strchr (request->request->user, '@'))
 		{
 			procuid = Lp_Uid;
 			procgid = Lp_Gid;
@@ -600,10 +598,7 @@ exec(int type, ...)
 			register char *		prefix;
 
 			prefix = makestr(
-				Lp_Tmp,
-				"/",
-				(request->secure && request->secure->system ?
-					request->secure->system : Local_System),
+				Lp_Temp,
 				"/F",
 				getreqno(request->secure->req_id),
 				"-",
@@ -640,14 +635,13 @@ exec(int type, ...)
 		 */
 		snprintf(tmpName, sizeof (tmpName), "%s-%s",
 			getreqno(request->secure->req_id), LP_PAPIATTRNAME);
-		path = makepath(SPOOLDIR, "temp", tmpName, (char *)0);
+		path = makepath(Lp_Temp, tmpName, (char *)0);
 		if ((path != NULL) && (stat(path, &tmpBuf) == 0))
 		{
 			/*
 			 * IPP job attribute file exists for this job so
 			 * set the environment variable
 			 */
-			syslog(LOG_DEBUG, "exec(): ATTRPATH='%s'", path);
 			addenv(&envp, "ATTRPATH", path);
 		}
 		Free(path);
@@ -666,8 +660,6 @@ exec(int type, ...)
 			path = makepath(ETCDIR, "ppd", tmpName, (char *)0);
 			if ((path != NULL) && (stat(path, &tmpBuf) == 0))
 			{
-				syslog(LOG_DEBUG,
-					"exec(): Printer PPD='%s'", path);
 				addenv(&envp, "PPD", path);
 			}
 			Free(path);
@@ -716,13 +708,6 @@ exec(int type, ...)
 			addenv(&envp, "FILTER", request->fast);
 
 		/*
-		*/
-		if (strcmp (request->secure->user, request->request->user))
-		{
-			addenv (&envp, "ALIAS_USERNAME",
-				request->request->user);
-		}
-		/*
 		 * Add the sensitivity label to the environment for
 		 * banner page and header/footer processing
 		 */
@@ -765,10 +750,7 @@ exec(int type, ...)
 		av[ac++] = arg_string(TRUSTED, "%s/%s", Lp_A_Interfaces,
 					printer->printer->name);
 		av[ac++] = arg_string(TRUSTED, "%s", request->secure->req_id);
-		av[ac++] = arg_string(UNTRUSTED, "%s%s%s",
-					request->secure->user,
-					(cp? "" : "@"),
-					(cp? "" : request->secure->system));
+		av[ac++] = arg_string(UNTRUSTED, "%s", request->request->user);
 		av[ac++] = arg_string(TRUSTED, "%s", clean_title);
 		av[ac++] = arg_string(TRUSTED, "%d", request->copies);
 
@@ -886,7 +868,7 @@ exec(int type, ...)
 		if (request->slow)
 			addenv(&envp, "FILTER", request->slow);
 
-		if (strchr (request->secure->user, '!'))
+		if (strchr (request->request->user, '@'))
 		{
 			procuid = Lp_Uid;
 			procgid = Lp_Gid;
@@ -899,17 +881,10 @@ exec(int type, ...)
 		cp = _alloc_files(
 			lenlist(request->request->file_list),
 			getreqno(request->secure->req_id),
-			procuid,
-			procgid,
-			(request->secure && request->secure->system ?
-				request->secure->system : NULL )
-		);
+			procuid, procgid);
 
 		av[ac++] = arg_string(TRUSTED, "%s", Lp_Slow_Filter);
-		av[ac++] = arg_string(TRUSTED, "%s/%s/%s", Lp_Tmp,
-				(request->secure && request->secure->system ?
-					request->secure->system : Local_System),
-				cp);
+		av[ac++] = arg_string(TRUSTED, "%s/%s/%s", Lp_Temp, cp);
 		for (listp = request->request->file_list; *listp; listp++)
 			av[ac++] = arg_string(TRUSTED, "%s", *listp);
 
@@ -924,14 +899,13 @@ exec(int type, ...)
 		 */
 		snprintf(tmpName, sizeof (tmpName), "%s-%s",
 			getreqno(request->secure->req_id), LP_PAPIATTRNAME);
-		path = makepath(SPOOLDIR, "temp", tmpName, (char *)0);
+		path = makepath(Lp_Temp, tmpName, (char *)0);
 		if ((path != NULL) && (stat(path, &tmpBuf) == 0))
 		{
 			/*
 			 * IPP job attribute file exists for this job so
 			 * set the environment variable
 			 */
-			syslog(LOG_DEBUG, "exec(): ATTRPATH='%s'", path);
 			addenv(&envp, "ATTRPATH", path);
 		}
 		Free(path);
@@ -951,8 +925,6 @@ exec(int type, ...)
 			path = makepath(ETCDIR, "ppd", tmpName, (char *)0);
 			if ((path != NULL) && (stat(path, &tmpBuf) == 0))
 			{
-				syslog(LOG_DEBUG,
-					"exec(): Printer PPD='%s'", path);
 				addenv(&envp, "PPD", path);
 			}
 			Free(path);
@@ -1019,7 +991,7 @@ exec(int type, ...)
 
 	case EX_NOTIFY:
 		if (request->request->alert) {
-			if (strchr(request->secure->user, '!')) {
+			if (strchr(request->request->user, '@')) {
 				procuid = Lp_Uid;
 				procgid = Lp_Gid;
 			} else {
@@ -1029,13 +1001,11 @@ exec(int type, ...)
 			av[ac++] = arg_string(TRUSTED, "%s",
 					request->request->alert);
 		} else {
-			char *user = strdup(request->secure->user);
+			char *user = strdup(request->request->user);
 			clean_string(user);
 			slabel = request->secure->slabel;
 
-			if ((request->request->actions & ACT_WRITE) &&
-			    (!request->secure->system ||
-			    STREQU(request->secure->system, Local_System))) {
+			if (request->request->actions & ACT_WRITE) {
 				av[ac++] = arg_string(TRUSTED, "%s", BINWRITE);
 				snprintf(argbuf, sizeof (argbuf),
 					"%s %s || %s %s",
@@ -1113,10 +1083,12 @@ exec(int type, ...)
 	 * turn off signals in the last child!
 	 */
 
+#ifdef DEBUG
 	for (i = 0; av[i] != NULL; i++)
-		syslog(LOG_DEBUG, "exec: av[%d] = %s", i, av[i]);
+		note("exec(%s): av[%d] = %s", _exec_name(type), i, av[i]);
 	for (i = 0; envp[i] != NULL; i++)
-		syslog(LOG_DEBUG, "exec: envp[%d] = %s", i, envp[i]);
+		note("exec(%s): envp[%d] = %s", _exec_name(type), i, envp[i]);
+#endif
 
 	execvpe(av[0], av, envp);
 	Done (EXEC_EXIT_NEXEC, errno);
@@ -1339,7 +1311,7 @@ done(int status, int err)
 	if (do_undial)
 		undial (1);
 
-	mputm (ChildMd, S_CHILD_DONE, key, slot, status, err);
+	mputm (ChildMd, S_CHILD_DONE, key, status, err);
 	mdisconnect (ChildMd);
 
 	exit (0);

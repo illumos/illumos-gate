@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,8 +23,8 @@
 
 
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,7 +39,7 @@ static int	max_requests_needing_pwheel_mounted ( char * );
  **/
 
 void
-queue_form(register RSTATUS *prs, FSTATUS *pfs)
+queue_form(RSTATUS *prs, FSTATUS *pfs)
 {
 	if ((prs->form = pfs) != NULL) {
 		prs->form->requests++;
@@ -55,7 +54,7 @@ queue_form(register RSTATUS *prs, FSTATUS *pfs)
  **/
 
 void
-unqueue_form(register RSTATUS *prs)
+unqueue_form(RSTATUS *prs)
 {
 	FSTATUS *		pfs	= prs->form;
 
@@ -73,7 +72,7 @@ unqueue_form(register RSTATUS *prs)
  **/
 
 void
-queue_pwheel(register RSTATUS *prs, char *name)
+queue_pwheel(RSTATUS *prs, char *name)
 {
 	if (name) {
 		prs->pwheel_name = Strdup(name);
@@ -85,7 +84,7 @@ queue_pwheel(register RSTATUS *prs, char *name)
 		 */
 		if (
 			!one_printer_with_charsets(prs)
-		     && (prs->pwheel = search_pwtable(name))
+		     && (prs->pwheel = search_pwstatus(name))
 		) {
 			prs->pwheel->requests++;
 			check_pwheel_alert (prs->pwheel, (PWHEEL *)0);
@@ -99,7 +98,7 @@ queue_pwheel(register RSTATUS *prs, char *name)
  **/
 
 void
-unqueue_pwheel(register RSTATUS *prs)
+unqueue_pwheel(RSTATUS *prs)
 {
 	PWSTATUS *		ppws	= prs->pwheel;
 
@@ -117,9 +116,9 @@ unqueue_pwheel(register RSTATUS *prs)
  **/
 
 void
-check_form_alert(register FSTATUS *pfs, register _FORM *pf)
+check_form_alert(FSTATUS *pfs, _FORM *pf)
 {
-	register short		trigger,
+	short			trigger,
 				fire_off_alert	= 0;
 
 	int			requests_waiting;
@@ -213,9 +212,9 @@ Return:	if (pf) {
  **/
 
 void
-check_pwheel_alert(register PWSTATUS *ppws, register PWHEEL *ppw)
+check_pwheel_alert(PWSTATUS *ppws, PWHEEL *ppw)
 {
-	register short		trigger,
+	short			trigger,
 				fire_off_alert	= 0;
 	int			requests_waiting;
 
@@ -382,6 +381,7 @@ max_requests_needing_form_mounted(FSTATUS *pfs)
 	PSTATUS *		pps;
 	RSTATUS *		prs;
 	int			max	= 0;
+	int			i;
 
 	/*
 	 * For each printer that doesn't have this form mounted,
@@ -393,14 +393,15 @@ max_requests_needing_form_mounted(FSTATUS *pfs)
 	 * through the printers would result in #printers x #requests
 	 * steps, whereas this entails #requests steps.)
 	 */
-	for (pps = walk_ptable(1); pps; pps = walk_ptable(0))
-		pps->nrequests = 0;
-	BEGIN_WALK_BY_FORM_LOOP (prs, pfs)
-		if (((pps = prs->printer) != NULL) &&
-		    (!isFormMountedOnPrinter(pps,pfs)))
-			if (++pps->nrequests >= max)
-				max = pps->nrequests;
-	END_WALK_LOOP
+	for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++)
+		PStatus[i]->nrequests = 0;
+
+	for (prs = Request_List; prs != NULL; prs = prs->next)
+		if ((prs->form == pfs) && ((pps = prs->printer) != NULL) &&
+	    	    (!isFormMountedOnPrinter(pps,pfs)) &&
+		    (++pps->nrequests >= max))
+			max = pps->nrequests;
+
 	if (NewRequest)
 		if (((pps = NewRequest->printer) != NULL) &&
 		    (!isFormMountedOnPrinter(pps,pfs)))
@@ -415,6 +416,7 @@ max_requests_needing_pwheel_mounted(char *pwheel_name)
 	PSTATUS *		pps;
 	RSTATUS *		prs;
 	int			max	= 0;
+	int			i;
 
 
 	/*
@@ -427,17 +429,17 @@ max_requests_needing_pwheel_mounted(char *pwheel_name)
 	 * through the printers would result in #printers x #requests
 	 * steps, whereas this entails #requests steps.)
 	 */
-	for (pps = walk_ptable(1); pps; pps = walk_ptable(0))
-		pps->nrequests = 0;
-	BEGIN_WALK_BY_PWHEEL_LOOP (prs, pwheel_name)
-		if (
-			((pps = prs->printer) != NULL)
-		     && pps->printer->daisy
-		     && !SAME(pps->pwheel_name, pwheel_name)
-		)
+	for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++)
+		PStatus[i]->nrequests = 0;
+
+	for (prs = Request_List; prs != NULL; prs = prs->next)
+		if ((prs->pwheel_name != NULL) &&
+		    (STREQU(prs->pwheel_name, pwheel_name)) &&
+		    ((pps = prs->printer) != NULL) && pps->printer->daisy &&
+		    (!SAME(pps->pwheel_name, pwheel_name)))
 			if (++pps->nrequests >= max)
 				max = pps->nrequests;
-	END_WALK_LOOP
+
 	if (NewRequest)
 		if (
 			((pps = NewRequest->printer) != NULL)
@@ -454,7 +456,7 @@ max_requests_needing_pwheel_mounted(char *pwheel_name)
  **/
 
 int
-one_printer_with_charsets(register RSTATUS *prs)
+one_printer_with_charsets(RSTATUS *prs)
 {
 	/*
 	 * This little function answers the question: Is a request

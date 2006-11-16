@@ -38,8 +38,6 @@
 char	Lp_Spooldir[]		= SPOOLDIR;
 char	Lp_Admins[]		= SPOOLDIR "/admins";
 char	Lp_FIFO[]		= SPOOLDIR "/fifos/FIFO";
-char	Lp_Private_FIFOs[]	= SPOOLDIR "/fifos/private";
-char	Lp_Public_FIFOs[]	= SPOOLDIR "/fifos/public";
 char	Lp_Requests[]		= SPOOLDIR "/requests";
 char	Lp_Schedlock[]		= SPOOLDIR "/SCHEDLOCK";
 char	Lp_System[]		= SPOOLDIR "/system";

@@ -27,7 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.18	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 # include	<sys/types.h>
 # include	<poll.h>
@@ -43,8 +43,8 @@
  * I.E R_... MESSAGE FOR A S_... MESSAGE IS (S_... + 1)
  */
 # define	R_BAD_MESSAGE			0
-# define	S_NEW_QUEUE			1
-# define	R_NEW_QUEUE			2
+/* # define	S_NEW_QUEUE			1	DEFUNCT */
+/* # define	R_NEW_QUEUE			2	DEFUNCT */
 # define	S_ALLOC_FILES			3
 # define	R_ALLOC_FILES			4
 # define	S_PRINT_REQUEST			5
@@ -55,8 +55,8 @@
 # define	R_END_CHANGE_REQUEST		10
 # define	S_CANCEL_REQUEST		11
 # define	R_CANCEL_REQUEST		12
-# define	S_INQUIRE_REQUEST		13
-# define	R_INQUIRE_REQUEST		14
+/* # define	S_INQUIRE_REQUEST		13	DEFUNCT */
+/* # define	R_INQUIRE_REQUEST		14	DEFUNCT */
 # define	S_LOAD_PRINTER			15
 # define	R_LOAD_PRINTER			16
 # define	S_UNLOAD_PRINTER		17
@@ -101,8 +101,8 @@
 # define	R_LOAD_FORM			56
 # define	S_UNLOAD_FORM			57
 # define	R_UNLOAD_FORM			58
-# define	S_GETSTATUS			59
-# define	R_GETSTATUS			60
+/* # define	S_GETSTATUS			59	DEFUNCT */
+/* # define	R_GETSTATUS			60	DEFUNCT */
 # define	S_QUIET_ALERT			61
 # define	R_QUIET_ALERT			62
 # define	S_SEND_FAULT			63
@@ -117,27 +117,27 @@
 */
 # define	I_GET_TYPE			69
 # define	I_QUEUE_CHK			70
-# define	R_CONNECT			71
+/* # define	R_CONNECT			71	DEFUNCT */
 
-# define	S_GET_STATUS			72
-# define	R_GET_STATUS			73
+/* # define	S_GET_STATUS			72	DEFUNCT */
+/* # define	R_GET_STATUS			73	DEFUNCT */
 # define	S_INQUIRE_REQUEST_RANK		74
 # define	R_INQUIRE_REQUEST_RANK		75
 # define	S_CANCEL			76
 # define	R_CANCEL			77
-# define	S_NEW_CHILD			78
-# define	R_NEW_CHILD			79
-# define	S_SEND_JOB			80
-# define	R_SEND_JOB			81
-# define	S_JOB_COMPLETED			82
-# define	R_JOB_COMPLETED			83
-# define	S_INQUIRE_REMOTE_PRINTER	84
-# define	R_INQUIRE_REMOTE_PRINTER	20
-# define	S_CHILD_SYNC			85
-# define	S_LOAD_SYSTEM			86
-# define	R_LOAD_SYSTEM			87
-# define	S_UNLOAD_SYSTEM			88
-# define	R_UNLOAD_SYSTEM			89
+/* # define	S_NEW_CHILD			78	DEFUNCT */
+/* # define	R_NEW_CHILD			79	DEFUNCT */
+/* # define	S_SEND_JOB			80	DEFUNCT */
+/* # define	R_SEND_JOB			81	DEFUNCT */
+/* # define	S_JOB_COMPLETED			82	DEFUNCT */
+/* # define	R_JOB_COMPLETED			83	DEFUNCT */
+/* # define	S_INQUIRE_REMOTE_PRINTER	84	DEFUNCT */
+/* # define	R_INQUIRE_REMOTE_PRINTER	20	DEFUNCT */
+/* # define	S_CHILD_SYNC			85	DEFUNCT */
+/* # define	S_LOAD_SYSTEM			86	DEFUNCT */
+/* # define	R_LOAD_SYSTEM			87	DEFUNCT */
+/* # define	S_UNLOAD_SYSTEM			88	DEFUNCT */
+/* # define	R_UNLOAD_SYSTEM			89	DEFUNCT */
 /* new messages */
 # define	S_CLEAR_FAULT			90
 # define	R_CLEAR_FAULT			91

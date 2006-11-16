@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.11.1.4	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lpsched.h"
 #include "stdarg.h"
@@ -77,20 +76,15 @@ static int		f_count(),
 void
 alert (int type, ...)
 {
-    PSTATUS	*pr;
-    RSTATUS	*rp;
-    FSTATUS	*fp;
-    PWSTATUS	*pp;
-    char	*text;
     va_list	args;
 
     va_start (args, type);
 
     switch (type) {
-	case A_PRINTER:
-	    pr = va_arg(args, PSTATUS *);
-	    rp = va_arg(args, RSTATUS *);
-	    text = va_arg(args, char *);
+	case A_PRINTER: {
+            PSTATUS	*pr = va_arg(args, PSTATUS *);
+            RSTATUS	*rp = va_arg(args, RSTATUS *);
+	    char *text = va_arg(args, char *);
 	    pformat(pr->alert->msgfile, text, pr, rp);
 	    if (!pr->alert->active)
 	    {
@@ -105,9 +99,9 @@ alert (int type, ...)
 		}
 	    }
 	    break;
-
-	case A_PWHEEL:
-	    pp = va_arg(args, PWSTATUS *);
+	    }
+	case A_PWHEEL: {
+            PWSTATUS	*pp = va_arg(args, PWSTATUS *);
 	    pwformat(pp->alert->msgfile, pp);
 	    if (!pp->alert->active) {
 		if (exec(EX_PALERT, pp) == 0)
@@ -120,12 +114,12 @@ alert (int type, ...)
 		}
 	    }
 	    break;
-
+	    }
 	case A_FORM: {
 		int isFormMessage;
 		char *formPath;
+    		FSTATUS	*fp = va_arg(args, FSTATUS *);
 
-		fp = va_arg(args, FSTATUS *);
 		isFormMessage = (STREQU(fp->form->alert.shcmd, "showfault"));
 		if (isFormMessage)
 			formPath = makepath(Lp_A_Forms, fp->form->name,
@@ -178,8 +172,7 @@ pformat(char *file, char *text, PSTATUS *pr, RSTATUS *rp)
 		fdprintf(fd, Pf_msg[3], rp->secure->req_id);
 	}
 	fdprintf(fd, Pf_msg[4]);
-	if (text)
-	{
+	if (text) {
 		while (*text == '\n' || *text == '\r')
 		    text++;
 		fdprintf(fd, "%s", text);
@@ -191,24 +184,22 @@ pformat(char *file, char *text, PSTATUS *pr, RSTATUS *rp)
 static void
 pwformat(char *file, PWSTATUS *pp)
 {
-	int fd;
-	PSTATUS	*p;
+	int fd, i;
 
 	if ((fd = open_locked(file, "w", MODE_READ)) < 0)
 	    return;
 	fdprintf(fd, Pa_msg[0], NB(pp->pwheel->name), NB(pp->pwheel->name));
-	for (p = walk_ptable(1); p; p = walk_ptable(0))
-	    if (
-		p->printer->daisy
-	     && !SAME(p->pwheel_name, pp->pwheel->name)
-	     && searchlist(pp->pwheel->name, p->printer->char_sets)
-	    )
-	    {
-		register int		n = p_count(pp, p->printer->name);
+	for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++) {
+	    PSTATUS	*p = PStatus[i];
+
+	    if (p->printer->daisy && !SAME(p->pwheel_name, pp->pwheel->name) &&
+	        searchlist(pp->pwheel->name, p->printer->char_sets)) {
+		int		n = p_count(pp, p->printer->name);
 
 		if (n)
 		  fdprintf(fd, Pa_msg[1], p->printer->name, n);
 	    }
+	}
 	fdprintf(fd, Pa_msg[2], pp->requests);
 	close(fd);
 	pp->requests_last = pp->requests;
@@ -217,8 +208,7 @@ pwformat(char *file, PWSTATUS *pp)
 static void
 fformat(char *file, FSTATUS *fp, int isFormMessage)
 {
-    int fd;
-    PSTATUS	*p;
+    int fd, i;
     int		numLines=0;
 
 	if ((fd = open_locked(file, "w", MODE_READ)) < 0)
@@ -233,18 +223,21 @@ fformat(char *file, FSTATUS *fp, int isFormMessage)
 	else
 		fdprintf(fd, Fa_msg[0], NB(fp->form->name), NB(fp->form->name));
 
-	for (p = walk_ptable(1); p; p = walk_ptable(0))
+	for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++) {
+	    	PSTATUS	*p = PStatus[i];
+
 		if ((! isFormMountedOnPrinter(p,fp)) &&
 		    allowed(fp->form->name, p->forms_allowed,
 		    p->forms_denied)) {
 
-			register int n = f_count(fp, p->printer->name);
+			int n = f_count(fp, p->printer->name);
 
 			if (n) {
 				fdprintf(fd, Fa_msg[1], p->printer->name, n);
 				numLines++;
 			}
 		}
+	}
 
 	if (numLines != 1) fdprintf(fd, Fa_msg[2], fp->requests);
 	if (!isFormMessage) {
@@ -307,50 +300,50 @@ dest_equivalent_printer(char *dest, char *printer)
 		STREQU(dest, printer)
 	     || STREQU(dest, NAME_ANY)
 	     || (
-			((pc = search_ctable(dest)) != NULL)
+			((pc = search_cstatus(dest)) != NULL)
 		     && searchlist(printer, pc->class->members)
 		)
 	);
 }
 
 static int
-f_count(fp, name)
-register FSTATUS 	*fp;
-register char		*name;
+f_count(FSTATUS *fp, char *name)
 {
-    register int		count = 0;
-    register RSTATUS		*rp;
+    int		count = 0;
+    RSTATUS		*rp;
 
-    BEGIN_WALK_BY_FORM_LOOP(rp, fp)
-	if (dest_equivalent_printer(rp->request->destination, name))
+    for (rp = Request_List; rp != NULL; rp = rp->next)
+	if ((rp->form == fp ) &&
+	    (dest_equivalent_printer(rp->request->destination, name)))
 	    count++;
-    END_WALK_LOOP
+
     if (
 	NewRequest
      && NewRequest->form == fp
      && dest_equivalent_printer(NewRequest->request->destination, name)
     )
 	count++;
+
     return(count);
 }
 
 static int
-p_count(pp, name)
-register PWSTATUS 	*pp;
-register char		*name;
+p_count(PWSTATUS *pp, char *name)
 {
-    register int		count = 0;
-    register RSTATUS		*rp;
+    int		count = 0;
+    RSTATUS		*rp;
 
-    BEGIN_WALK_LOOP(rp, rp->pwheel == pp)
-	if (dest_equivalent_printer(rp->request->destination, name))
+    for (rp = Request_List; rp != NULL; rp = rp->next)
+	if ((rp->pwheel == pp) &&
+	    (dest_equivalent_printer(rp->request->destination, name)))
 	    count++;
-    END_WALK_LOOP
+
     if (
 	NewRequest
      && NewRequest->pwheel == pp
      && dest_equivalent_printer(NewRequest->request->destination, name)
     )
 	count++;
+
     return(count);
 }

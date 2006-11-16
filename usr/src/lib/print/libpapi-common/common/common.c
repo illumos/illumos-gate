@@ -130,3 +130,6 @@ papiJobGetId(papi_job_t job)
 #pragma weak papiJobGetJobTicket = _unsupported_null_return
 #pragma weak papiJobFree = _unsupported_no_return
 #pragma weak papiJobListFree = _unsupported_no_return
+
+/* private functions */
+#pragma weak getprinterbyname = _unsupported_null_return

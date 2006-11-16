@@ -387,7 +387,7 @@ papiAttributeListDelete(papi_attribute_t ***list, char *name)
 	if ((attribute = papiAttributeListFind(*list, name)) == NULL)
 		return (PAPI_NOT_FOUND);
 
-	list_remove(*list, attribute);
+	list_remove(list, attribute);
 	papiAttributeFree(attribute);
 
 	return (PAPI_OK);

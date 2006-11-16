@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,132 +41,446 @@
 
 #include "lpsched.h"
 
-/**
- ** walk_ptable() - WALK PRINTER TABLE, RETURNING ACTIVE ENTRIES
- ** walk_ftable() - WALK FORMS TABLE, RETURNING ACTIVE ENTRIES
- ** walk_ctable() - WALK CLASS TABLE, RETURNING ACTIVE ENTRIES
- ** walk_pwtable() - WALK PRINT WHEEL TABLE, RETURNING ACTIVE ENTRIES
- **/
+static int __list_increment = 16;
 
-
-PSTATUS *
-walk_ptable(int start)
+int
+list_append(void ***list, void *item)
 {
-	static PSTATUS		*psend,
-				*ps = 0;
+        int count;
 
-	if (start || !ps) {
-		ps = PStatus;
-		psend = PStatus + PT_Size;
-	}
+        if ((list == NULL) || (item == NULL)) {
+                errno = EINVAL;
+                return (-1);
+        }
 
-	while (ps < psend && !ps->printer->name)
-		ps++;
+        if (item != NULL) {
+                if (*list == NULL)
+                        *list = (void **)calloc(__list_increment,
+                                                sizeof (void *));
 
-	if (ps >= psend)
-		return (ps = 0);
-	else
-		return (ps++);
+		if (*list == NULL)
+			return (-1);
+
+                for (count = 0; (*list)[count] != NULL; count++);
+
+                if ((count + 1) % __list_increment == 0) { /* expand the list */                        void **new_list = NULL;
+                        int new_size = (((count + 1) / __list_increment) + 1) *
+                                __list_increment;
+
+                        new_list = (void **)calloc(new_size, sizeof (void *));
+			if (new_list == NULL)
+				return (-1);
+
+                        for (count = 0; (*list)[count] != NULL; count++)
+                                new_list[count] = (*list)[count];
+                        free(*list);
+                        *list = new_list;
+                }
+
+                (*list)[count] = item;
+        }
+
+        return (0);
 }
 
-FSTATUS *
-walk_ftable(int start)
+void
+list_remove(void ***list, void *item)
 {
-	static FSTATUS		*psend,
-				*ps = 0;
+        int i, count;
+	void **tmp = NULL;
 
-	if (start || !ps) {
-		ps = FStatus;
-		psend = FStatus + FT_Size;
+        if ((list == NULL) || (*list == NULL) || (item == NULL))
+                return;
+
+        for (count = 0; (*list)[count] != NULL; count++)
+                ;
+
+	if (count > 0) {
+        	int new_size = (((count + 1) / __list_increment) + 1) *
+                                	__list_increment;
+
+        	if ((tmp = (void **)calloc(new_size, sizeof (void *))) == NULL)
+			tmp = *list;
+	
+		/* copy up to item */
+        	for (i = 0; (((*list)[i] != NULL) && ((*list)[i] != item)); i++)
+			tmp[i] = (*list)[i];
+		/* copy after item */
+		if ((*list)[i] == item)
+        		for (++i; ((*list)[i] != NULL); i++)
+				tmp[i-1] = (*list)[i];
 	}
 
-	while (ps < psend && !ps->form->name)
-		ps++;
+	/* replace the list */
+	if (tmp != *list) {
+		free(*list);
+		*list = tmp;
+	}
+}
 
-	if (ps >= psend)
-		return (ps = 0);
-	else
-		return (ps++);
+void
+free_exec(EXEC *ep)
+{
+	if (ep != NULL) {
+		free(ep);
+		list_remove((void ***)&Exec_Table, (void *)ep);
+	}
+}
+
+EXEC *
+new_exec(int type, void *ex)
+{
+	EXEC *result = calloc(1, sizeof (*result));
+
+	if (result != NULL) {
+		result->type = type;
+		switch (type) {
+		case EX_ALERT:
+		case EX_INTERF:
+		case EX_FAULT_MESSAGE:
+			result->ex.printer = ex;
+			break;
+		case EX_FALERT:
+			result->ex.form = ex;
+			break;
+		case EX_PALERT:
+			result->ex.pwheel = ex;
+			break;
+		case EX_SLOWF:
+		case EX_NOTIFY:
+			break;
+		}
+		list_append((void ***)&Exec_Table, (void *)result);
+	}
+
+	return (result);
+}
+
+void
+free_alert(ALERT *ap)
+{
+	if (ap != NULL) {
+		if (ap->msgfile != NULL)
+			free(ap->msgfile);
+		if (ap->exec != NULL)
+			free_exec(ap->exec);
+		free(ap);
+	}
+}
+
+ALERT *
+new_alert(char *fmt, int i)
+{
+	ALERT *result = calloc(1, sizeof (*result));
+
+	if (result != NULL) {
+		char	buf[15];
+
+		snprintf(buf, sizeof (buf), fmt, i);
+		result->msgfile = makepath(Lp_Temp, buf, (char *)0);
+		(void) Unlink(result->msgfile);
+	}
+
+	return (result);
+}
+
+void
+free_pstatus(PSTATUS *psp)
+{
+	if (psp != NULL) {
+		if (psp->alert != NULL)
+			free_alert(psp->alert);
+		if (psp->exec != NULL)
+			free_exec(psp->exec);
+		if (psp->fault_exec != NULL)
+			free_exec(psp->fault_exec);
+		if (psp->printer != NULL)
+			freeprinter(psp->printer);
+		if (psp->pwheel_name != NULL)
+			free(psp->pwheel_name);
+		if (psp->dis_reason != NULL)
+			free(psp->dis_reason);
+		if (psp->rej_reason != NULL)
+			free(psp->rej_reason);
+		if (psp->users_allowed != NULL)
+			unload_list(&psp->users_allowed);
+		if (psp->users_denied != NULL)
+			unload_list(&psp->users_denied);
+		if (psp->forms_allowed != NULL)
+			unload_list(&psp->forms_allowed);
+		if (psp->forms_denied != NULL)
+			unload_list(&psp->forms_denied);
+		if (psp->cpi != NULL)
+			free(psp->cpi);
+		if (psp->lpi != NULL)
+			free(psp->lpi);
+		if (psp->plen != NULL)
+			free(psp->plen);
+		if (psp->pwid != NULL)
+			free(psp->pwid);
+		if (psp->fault_reason != NULL)
+			free(psp->fault_reason);
+		if (psp->paper_allowed != NULL)
+			unload_list(&psp->paper_allowed);
+		free(psp);
+	}
+}
+
+void
+pstatus_add_printer(PSTATUS *ps, PRINTER *p)
+{
+	if ((ps != NULL) && (p != NULL)) {
+    		char	**paperDenied = NULL;
+
+		ps->printer = p;
+		load_userprinter_access(p->name, &(ps->users_allowed),
+				&(ps->users_denied));
+		load_formprinter_access(p->name, &(ps->forms_allowed),
+				&(ps->forms_denied));
+		load_paperprinter_access(p->name, &ps->paper_allowed,
+				&paperDenied);
+		freelist(paperDenied);
+		load_sdn(&(ps->cpi), p->cpi);
+		load_sdn(&(ps->lpi), p->lpi);
+		load_sdn(&(ps->plen), p->plen);
+		load_sdn(&(ps->pwid), p->pwid);
+	}
+}
+
+PSTATUS *
+new_pstatus(PRINTER *p)
+{
+	PSTATUS *result = calloc(1, sizeof (*result));
+	
+	if (result != NULL) {
+		static int i = 0;
+    		char	**paperDenied = NULL;
+
+		result->alert = new_alert("A-%d", i++);
+		result->alert->exec = new_exec(EX_ALERT, result);
+		result->exec = new_exec(EX_INTERF, result);
+		result->fault_exec = new_exec(EX_FAULT_MESSAGE, result);
+
+		if (p != NULL)
+			pstatus_add_printer(result, p);
+
+		list_append((void ***)&PStatus, (void *)result);
+	}
+
+	return (result);
+}
+
+void
+free_cstatus(CSTATUS *csp)
+{
+	if (csp != NULL) {
+		if (csp->rej_reason != NULL)
+			free(csp->rej_reason);
+		if (csp->class != NULL)
+			freeclass(csp->class);
+		free(csp);
+	}
 }
 
 CSTATUS *
-walk_ctable (int start)
+new_cstatus(CLASS *c)
 {
-	static CSTATUS		*psend,
-				*ps = 0;
+	CSTATUS *result = calloc(1, sizeof (*result));
+	
+	if (result != NULL) {
+		if (c != NULL)
+			result->class = c;
+		else
+			result->class = calloc(1, sizeof (CLASS));
 
-	if (start || !ps) {
-		ps = CStatus;
-		psend = CStatus + CT_Size;
+        	list_append((void ***)&CStatus, result);
 	}
 
-	while (ps < psend && !ps->class->name)
-		ps++;
+	return (result);
+}
 
-	if (ps >= psend)
-		return (ps = 0);
-	else
-		return (ps++);
+void
+free_fstatus(FSTATUS *fsp)
+{
+	if (fsp != NULL) {
+		if (fsp->form != NULL)
+			free_form(fsp->form);
+		if (fsp->alert != NULL)
+			free_alert(fsp->alert);
+		if (fsp->users_allowed != NULL)
+			unload_list(&fsp->users_allowed);
+		if (fsp->users_denied != NULL)
+			unload_list(&fsp->users_denied);
+		if (fsp->cpi != NULL)
+			free(fsp->cpi);
+		if (fsp->lpi != NULL)
+			free(fsp->lpi);
+		if (fsp->plen != NULL)
+			free(fsp->plen);
+		if (fsp->pwid != NULL)
+			free(fsp->pwid);
+		free(fsp);
+	}
+}
+
+FSTATUS *
+new_fstatus(_FORM *f)
+{
+	FSTATUS *result = calloc(1, sizeof (*result));
+	
+	if (result != NULL) {
+		static int i = 0;
+
+		if (f != NULL)
+			result->form = f;
+		else
+			result->form = calloc(1, sizeof (_FORM));
+
+		result->alert = new_alert("F-%d", i++);
+		result->alert->exec = new_exec(EX_FALERT, result);
+		result->trigger = result->form->alert.Q;
+
+		if (f != NULL) {	
+			load_userform_access(f->name, &(result->users_allowed),
+		    			&(result->users_denied));
+			load_sdn (&(result->cpi), f->cpi);
+			load_sdn (&(result->lpi), f->lpi);
+			load_sdn (&(result->plen), f->plen);
+			load_sdn (&(result->pwid), f->pwid);
+		}
+
+		list_append((void ***)&FStatus, (void *)result);
+	}
+
+	return (result);
+}
+
+void
+free_pwstatus(PWSTATUS *pwp)
+{
+	if (pwp != NULL) {
+		if (pwp->pwheel)
+			freepwheel(pwp->pwheel);
+		if (pwp->alert != NULL)
+			free_alert(pwp->alert);
+		free(pwp);
+	}
 }
 
 PWSTATUS *
-walk_pwtable(int start)
+new_pwstatus(PWHEEL *p)
 {
-	static PWSTATUS		*psend,
-				*ps = 0;
+	PWSTATUS *result = calloc(1, sizeof (*result));
 
-	if (start || !ps) {
-		ps = PWStatus;
-		psend = PWStatus + PWT_Size;
+	if (result != NULL) {
+		static int i = 0;
+
+		if (p != NULL)
+			result->pwheel = p;	
+		else
+			result->pwheel = calloc(1, sizeof (*result));
+			
+		result->alert = new_alert("P-%d", i++);
+		result->alert->exec = new_exec(EX_PALERT, result);
+		result->trigger = result->pwheel->alert.Q;
+
+		list_append((void ***)&PWStatus, (void *)result);
 	}
 
-	while (ps < psend && !ps->pwheel->name)
-		ps++;
-
-	if (ps >= psend)
-		return (ps = 0);
-	else
-		return (ps++);
+	return (result);
 }
 
+void
+free_rstatus(RSTATUS *rsp)
+{
+	if (rsp != NULL) {
+		remover(rsp);
+
+		if (rsp->request != NULL)
+			freerequest(rsp->request);
+		if (rsp->secure != NULL)
+			freesecure(rsp->secure);
+		if (rsp->req_file)
+			Free (rsp->req_file);
+		if (rsp->slow)
+			Free (rsp->slow);
+		if (rsp->fast)
+			Free (rsp->fast);
+		if (rsp->pwheel_name)
+			Free (rsp->pwheel_name);
+		if (rsp->printer_type)
+			Free (rsp->printer_type);
+		if (rsp->output_type)
+			Free (rsp->output_type);
+		if (rsp->cpi)
+			Free (rsp->cpi);
+		if (rsp->lpi)
+			Free (rsp->lpi);
+		if (rsp->plen)
+			Free (rsp->plen);
+		if (rsp->pwid)
+			Free (rsp->pwid);
+		free(rsp);
+	}
+}
+
+RSTATUS *
+new_rstatus(REQUEST *r, SECURE *s)
+{
+	RSTATUS *result = calloc(1, sizeof (*result));
+
+	if (result != NULL) {
+		if ((result->request = r) == NULL)
+			result->request = calloc(1, sizeof (REQUEST));
+		if ((result->secure = s) == NULL)
+			result->secure = calloc(1, sizeof (SECURE));
+	}
+
+	return (result);
+}
 
 /**
- ** search_ptable() - SEARCH PRINTER TABLE
- ** search_ftable() - SEARCH FORMS TABLE
- ** search_ctable() - SEARCH CLASS TABLE
- ** search_pwtable() - SEARCH PRINT WHEEL TABLE
+ ** search_pstatus() - SEARCH PRINTER TABLE
+ ** search_fstatus() - SEARCH FORMS TABLE
+ ** search_cstatus() - SEARCH CLASS TABLE
+ ** search_pwstatus() - SEARCH PRINT WHEEL TABLE
  **/
 
 PSTATUS *
-search_ptable(register char *name)
+search_pstatus(register char *name)
 { 
-	register PSTATUS	*ps,
-				*psend; 
+	PSTATUS	*ps = NULL;
 
-	for ( 
-		ps = & PStatus[0], psend = & PStatus[PT_Size]; 
-		ps < psend && !SAME(ps->printer->name, name); 
-		ps++ 
-	)
-		; 
+	if (name != NULL) {
+		if (PStatus != NULL) {
+			int i;
 
-	if (ps >= psend) 
-		ps = 0; 
+			for (i = 0; ((PStatus[i] != NULL) && (ps == NULL)); i++)
+				if (SAME(PStatus[i]->printer->name, name))
+					ps = PStatus[i];
+		}
+	} else
+		ps = new_pstatus(NULL);
 
 	return (ps); 
 }
 
 
 FSTATUS *
-search_ftable(register char *name)
+search_fstatus(register char *name)
 { 
-	register FSTATUS	*ps, *psend; 
+	FSTATUS	*ps = NULL;
 
-	for (ps = & FStatus[0], psend = & FStatus[FT_Size]; 
-	    ps < psend && !SAME(ps->form->name, name); ps++); 
+	if (name != NULL) {
+		if (FStatus != NULL) {
+			int i;
 
-	if (ps >= psend) 
-		ps = 0; 
+			for (i = 0; ((FStatus[i] != NULL) && (ps == NULL)); i++)
+				if (SAME(FStatus[i]->form->name, name))
+					ps = FStatus[i];
+		}
+	} else
+		ps = new_fstatus(NULL);
 
 	return (ps); 
 }
@@ -174,55 +488,54 @@ search_ftable(register char *name)
 FSTATUS *
 search_fptable(register char *paper)
 { 
-	register FSTATUS	*ps,*cand, *psend; 
+	FSTATUS	*ps = NULL;
+	int i;
 
-	cand = NULL;
-	for (ps = & FStatus[0], psend = & FStatus[FT_Size]; ps < psend; ps++)
-		if (SAME(ps->form->paper, paper)) {
-			if (ps->form->isDefault) {
-				cand = ps;
-				break;
-			} else if (!cand)
-				cand = ps;
-		}
+	if (FStatus != NULL) {
+		for (i = 0; ((FStatus[i] != NULL) && (ps == NULL)); i++)
+			if (SAME(FStatus[i]->form->paper, paper)) {
+				if (ps->form->isDefault)
+					ps = FStatus[i];
+			}
+	}
 
-	return (cand); 
+	return (ps); 
 }
 
 CSTATUS *
-search_ctable(register char *name)
+search_cstatus(register char *name)
 { 
-	register CSTATUS	*ps,
-				*psend; 
+	CSTATUS	*ps = NULL;
 
-	for ( 
-		ps = & CStatus[0], psend = & CStatus[CT_Size]; 
-		ps < psend && !SAME(ps->class->name, name); 
-		ps++ 
-	)
-		; 
+	if (name != NULL) {
+		if (CStatus != NULL) {
+			int i;
 
-	if (ps >= psend) 
-		ps = 0; 
+			for (i = 0; ((CStatus[i] != NULL) && (ps == NULL)); i++)
+				if (SAME(CStatus[i]->class->name, name))
+					ps = CStatus[i];
+		}
+	} else
+		ps = new_cstatus(NULL);
 
 	return (ps); 
 }
 
 PWSTATUS *
-search_pwtable(register char *name)
+search_pwstatus(register char *name)
 { 
-	register PWSTATUS	*ps,
-				*psend; 
+	PWSTATUS	*ps = NULL;
 
-	for ( 
-		ps = & PWStatus[0], psend = & PWStatus[PWT_Size]; 
-		ps < psend && !SAME(ps->pwheel->name, name); 
-		ps++ 
-	)
-		; 
+	if (name != NULL) {
+		if (PWStatus != NULL) {
+			int i;
 
-	if (ps >= psend) 
-		ps = 0; 
+			for (i = 0; ((PWStatus[i] != NULL) && (ps == NULL)); i++)
+				if (SAME(PWStatus[i]->pwheel->name, name))
+					ps = PWStatus[i];
+		}
+	} else
+		ps = new_pwstatus(NULL);
 
 	return (ps); 
 }
@@ -299,7 +612,7 @@ load_sdn(char **p, SCALED sdn)
 _FORM *
 Getform(char *form)
 {
-	static _FORM		_formbuf;
+	_FORM		*_form;
 
 	FORM			formbuf;
 
@@ -316,29 +629,30 @@ Getform(char *form)
 	if (ret == -1)
 		return (0);
 
-	_formbuf.plen = formbuf.plen;
-	_formbuf.pwid = formbuf.pwid;
-	_formbuf.lpi = formbuf.lpi;
-	_formbuf.cpi = formbuf.cpi;
-	_formbuf.np = formbuf.np;
-	_formbuf.chset = formbuf.chset;
-	_formbuf.mandatory = formbuf.mandatory;
-	_formbuf.rcolor = formbuf.rcolor;
-	_formbuf.comment = formbuf.comment;
-	_formbuf.conttype = formbuf.conttype;
-	_formbuf.name = formbuf.name;
-	_formbuf.paper = formbuf.paper;
-	_formbuf.isDefault = formbuf.isDefault;
+	_form = calloc(1, sizeof (*_form));
+	_form->plen = formbuf.plen;
+	_form->pwid = formbuf.pwid;
+	_form->lpi = formbuf.lpi;
+	_form->cpi = formbuf.cpi;
+	_form->np = formbuf.np;
+	_form->chset = formbuf.chset;
+	_form->mandatory = formbuf.mandatory;
+	_form->rcolor = formbuf.rcolor;
+	_form->comment = formbuf.comment;
+	_form->conttype = formbuf.conttype;
+	_form->name = formbuf.name;
+	_form->paper = formbuf.paper;
+	_form->isDefault = formbuf.isDefault;
 
-	if ((_formbuf.alert.shcmd = alertbuf.shcmd) != NULL) {
-		_formbuf.alert.Q = alertbuf.Q;
-		_formbuf.alert.W = alertbuf.W;
+	if ((_form->alert.shcmd = alertbuf.shcmd) != NULL) {
+		_form->alert.Q = alertbuf.Q;
+		_form->alert.W = alertbuf.W;
 	} else {
-		_formbuf.alert.Q = 0;
-		_formbuf.alert.W = 0;
+		_form->alert.Q = 0;
+		_form->alert.W = 0;
 	}
 
-	return (&_formbuf);
+	return (_form);
 }
 
 /**
@@ -348,7 +662,6 @@ Getform(char *form)
  ** Getclass()
  ** Getpwheel()
  ** Getsecure()
- ** Getsystem()
  ** Loadfilters()
  **/
 
@@ -516,7 +829,7 @@ Putsecure(char *file, SECURE *secbufp)
 		 * location to both structures making the following compare
 		 * meaningless.
 		 * Therefore test for this condition to prevent us from
-		 * calling freesecure which will destroy uid, system and
+		 * calling freesecure which will destroy uid and
 		 * req_id fields in the strucure
 		 */
 
@@ -558,11 +871,6 @@ Putsecure(char *file, SECURE *secbufp)
 				continue;
 			}
 
-			if (strcmp(pls->system, secbufp->system) != 0) {
-				rmsecure(file);
-				status = 9;
-				continue;
-			}
 			freesecure(pls);
 		}
 		break;

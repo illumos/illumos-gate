@@ -69,7 +69,8 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 			"job-sheets", "lp-charset", "lp-modes", "number-up",
 			"orienttation-requested", "page-ranges", "pr-filter",
 			"pr-indent", "pr-title", "pr-width", "priority",
-			"requesting-user-name", NULL };
+			"requesting-user-name", "job-originating-host-name",
+			NULL };
 
 	if (attributes == NULL)
 		return (PAPI_BAD_ARGUMENT);
@@ -146,6 +147,8 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 
 		if ((uid == 0) || (uid == 71)) { /* root/lp can forge this */
 			papiAttributeListGetString(attributes, NULL,
+					"job-originating-host-name", &host);
+			papiAttributeListGetString(attributes, NULL,
 					"job-host", &host);
 			papiAttributeListGetString(attributes, NULL,
 					"job-originating-user-name", &user);
@@ -207,7 +210,7 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 	/* add burst page information */
 	s = NULL;
 	papiAttributeListGetString(attributes, NULL, "job-sheets", &s);
-	if ((s != NULL) && (strcasecmp(s, "none") == 0)) {
+	if ((s != NULL) && (strcasecmp(s, "none") != 0)) {
 		char buf[128];
 		char *class = NULL;
 		char *job_name = NULL;
@@ -351,6 +354,28 @@ lpsched_request_outcome_to_attributes(papi_attribute_t ***attributes,
 }
 
 /*
+ * convert user[@host] to papi attributes
+ */
+static void
+lpsched_user_to_job_attributes(papi_attribute_t ***list, char *user)
+{
+	if ((list != NULL) && (user != NULL) && (user[0] != NULL)) {
+		char *host = strrchr(user, '@');
+
+		if (host != NULL) {
+			*host = NULL;
+			papiAttributeListAddString(list, PAPI_ATTR_REPLACE,
+					"job-originating-user-name", user);
+			papiAttributeListAddString(list, PAPI_ATTR_REPLACE,
+					"job-originating-host-name", host + 1);
+			*host = '@';
+		} else
+			papiAttributeListAddString(list, PAPI_ATTR_REPLACE,
+					"job-originating-user-name", user);
+	}
+}
+
+/*
  * Convert REQUEST structure to the equivalent PAPI attribute representation.
  */
 void
@@ -413,8 +438,7 @@ lpsched_request_to_job_attributes(REQUEST *r, job_t *j)
 	/* input_type */
 
 	/* user */
-	papiAttributeListAddLPString(&j->attributes, PAPI_ATTR_REPLACE,
-				"job-originating-user-name", r->user);
+	lpsched_user_to_job_attributes(&j->attributes, r->user);
 
 	/* outcome */
 	lpsched_request_outcome_to_attributes(&j->attributes, r->outcome);
@@ -439,8 +463,7 @@ job_status_to_attributes(job_t *job, char *req_id, char *user, char *slabel,
 	char buf[BUFSIZ];
 	char *p;
 
-	papiAttributeListAddLPString(&job->attributes, PAPI_ATTR_REPLACE,
-				"job-originating-user-name", user);
+	lpsched_user_to_job_attributes(&job->attributes, user);
 	papiAttributeListAddInteger(&job->attributes, PAPI_ATTR_REPLACE,
 				"job-k-octets", size/1024);
 	papiAttributeListAddInteger(&job->attributes, PAPI_ATTR_REPLACE,

@@ -27,7 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.18	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* LINTLIBRARY */
 
 char	*_lp_msg_fmts[] =
@@ -100,7 +100,7 @@ char	*_lp_msg_fmts[] =
     "H",          	/* 65 - S_SHUTDOWN */
     "H",          	/* 66 - R_SHUTDOWN */
     "",			/* 67 - S_GOODBYE */
-    "LHHH",		/* 68 - S_CHILD_DONE */
+    "LHH",		/* 68 - S_CHILD_DONE */
     "",           	/* 69 - I_GET_TYPE */
     "",			/* 70 - I_QUEUE_CHK */
     "SH",		/* 71 - R_CONNECT */

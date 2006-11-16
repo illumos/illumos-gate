@@ -60,6 +60,8 @@ list_append(void ***list, void *item)
 				__list_increment;
 
 			new_list = (void **)calloc(new_size, sizeof (void *));
+			if (new_list == NULL)
+				return (-1);
 
 			for (count = 0; (*list)[count] != NULL; count++)
 				new_list[count] = (*list)[count];
@@ -136,26 +138,36 @@ list_locate(void **list, int (*compare)(void *, void *), void *element)
 }
 
 void
-list_remove(void **list, void *item)
+list_remove(void ***list, void *item)
 {
-	int i, last;
+        int i, count;
+	void **tmp = NULL;
 
-	if ((list == NULL) || (*list == NULL) || (item == NULL))
-		return;
+        if ((list == NULL) || (*list == NULL) || (item == NULL))
+                return;
 
-	for (last = 0; list[last] != NULL; last++)
-		;
-	--last;
+        for (count = 0; (*list)[count] != NULL; count++)
+                ;
 
-	/*
-	 * This doesn't preserve order, and doesn't shrink the allocation if we
-	 * go below % __list_increment == 0.  <shrug>
-	 */
-	for (i = 0; list[i] != NULL; i++) {
-		if (list[i] == item) {
-			list[i] = list[last];
-			list[last] = NULL;
-			break;
-		}
+	if (count > 0) {
+        	int new_size = (((count + 1) / __list_increment) + 1) *
+                                	__list_increment;
+
+        	if ((tmp = (void **)calloc(new_size, sizeof (void *))) != NULL)
+			tmp = *list;
+	
+		/* copy up to item */
+        	for (i = 0; (((*list)[i] != NULL) && ((*list)[i] != item)); i++)
+			tmp[i] = (*list)[i];
+		/* copy after item */
+		if ((*list)[i] == item)
+        		for (++i; ((*list)[i] != NULL); i++)
+				tmp[i-1] = (*list)[i];
+	}
+
+	/* replace the list */
+	if (tmp != *list) {
+		free(*list);
+		*list = tmp;
 	}
 }

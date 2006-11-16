@@ -59,8 +59,7 @@ void s_alloc_files ( char * m, MESG * md )	/* funcdef */
     getmessage (m, S_ALLOC_FILES, &count);
     syslog(LOG_DEBUG, "s_alloc_files(%d)", count);
 
-    if ((file_prefix = _alloc_files(count, (char *)0, md->uid, md->gid, NULL)))
-    {
+    if ((file_prefix = _alloc_files(count, (char *)0, md->uid, md->gid))) {
 	mputm (md, R_ALLOC_FILES, MOK, file_prefix);
 	add_flt_act(md, FLT_FILES, file_prefix, count);
     }
@@ -109,7 +108,7 @@ void s_print_request ( char * m, MESG * md )
      * request list but is to be considered with the rest of the
      * requests (e.g. calculating # of requests awaiting a form).
      */
-    if ((rp = NewRequest = allocr()) == NULL)
+    if ((rp = NewRequest = new_rstatus(NULL, NULL)) == NULL)
 	status = MNOMEM;
 
     else
@@ -124,132 +123,93 @@ void s_print_request ( char * m, MESG * md )
 
 	else
 	{
-	    *(rp->request) = *r;
 	    rp->req_file = Strdup(req_file);
 
-	    /*
-	    **	Test for the presence of a secure file.
-	    **	If found skip sanity checks.
-	    **  The secure file will only exist if the request
-	    **  originated on a different system.  Since the
-	    **  request has not been validated on this side yet
-	    **  we remove the secure file until it is.
-	    **
-	    */
-	    if ((s = Getsecure(req_file)))
-	    {
-		(void)  rmsecure (req_file);
-		rp->request->outcome = 0;
-		*(rp->secure) = *s;
-		rp->secure->req_id = Strdup(s->req_id);
-		rp->secure->user = Strdup(s->user);
-		rp->secure->system = Strdup(s->system);
-		if (md->slabel != NULL)
-			rp->secure->slabel = Strdup(md->slabel);
-		freesecure(s);
-		/*
-		**  There are some anomallies associated w/
-		**  '-1', '-2', etc. files received from other systems
-		**  so even though the uid and gid will be 'lp'
-		**  the mode may be incorrect.  'chfiles()' will
-		**  fix this for us.
-		*/
-		(void)	chfiles (rp->request->file_list, Lp_Uid, Lp_Gid);
-	    }
-	    else
-	    {
-		rp->request->outcome = 0;
-		rp->secure->uid = md->uid;
-		rp->secure->gid = md->gid;
-		if (md->slabel != NULL)
-			rp->secure->slabel = Strdup(md->slabel);
+	    freerequest(rp->request);
+	    rp->request = r;
+
+	    rp->request->outcome = 0;
+	    rp->secure->uid = md->uid;
+	    rp->secure->gid = md->gid;
+	    if (md->slabel != NULL)
+		    rp->secure->slabel = Strdup(md->slabel);
     
-		pw = getpwuid(md->uid);
-		endpwent();
-		if (pw && pw->pw_name && *pw->pw_name)
-		    rp->secure->user = Strdup(pw->pw_name);
-		else
-		{
-		    rp->secure->user = Strdup(BIGGEST_NUMBER_S);
-		    (void) sprintf (rp->secure->user, "%ld", md->uid);
-		}
-	    
-		if ((rp->request->actions & ACT_SPECIAL) == ACT_HOLD)
-		    rp->request->outcome |= RS_HELD;
-		if ((rp->request->actions & ACT_SPECIAL) == ACT_RESUME)
-		    rp->request->outcome &= ~RS_HELD;
-		if((rp->request->actions & ACT_SPECIAL) == ACT_IMMEDIATE)
-		{
-		    if (!md->admin)
-		    {
-			status = MNOPERM;
-			goto Return;
-		    }
-		    rp->request->outcome |= RS_IMMEDIATE;
-		}
-
-		size = chfiles(rp->request->file_list, Lp_Uid, Lp_Gid);
-
-		if (size < 0)
-		{
-
-		/* at this point, chfiles() may have failed because the
-		 * the file may live on an NFS mounted filesystem, under
-		 * a directory of mode 700. such a directory isn't 
-		 * accessible even by root, according to the NFS protocol
-		 * (i.e. the Stat() in chfiles() failed). this most commonly 
-		 * happens via the automounter, and rlogin.
-		 *
-		 * thus we change our euid/egid to that of the user, and
-		 * try again. if *this* fails, then the file must really
-		 * be inaccessible.
-		 */
-		    org_uid = geteuid();
-		    org_gid = getegid();
-
-		    if (setegid(md->gid) != 0) {
-			    status = MUNKNOWN;
-			    goto Return;
-		    }
-
-		    if (seteuid(md->uid) != 0) {
-			    setgid(org_gid);
-			    status = MUNKNOWN;
-			    goto Return;
-		    }
-
-		    size = chfiles(rp->request->file_list, Lp_Uid, Lp_Gid);
-
-		    if (seteuid(org_uid) != 0) {
-			/* should never happen */
-			note("s_print_request(): ");
-			note("seteuid back to uid=%d failed!!\n", org_uid);
-			size = -1;
-		    } 
-
-		    if (setegid(org_gid) != 0) {
-			/* should never happen */
-			note("s_print_request(): ");
-			note("setegid back to uid=%d failed!!\n", org_uid);
-			size = -1;
-		    } 
-
-		    if (size < 0) {
-			    status = MUNKNOWN;
-			    goto Return;
-		    }
-		}
-		if (!(rp->request->outcome & RS_HELD) && size == 0)
-		{
-		    status = MNOPERM;
-		    goto Return;
-		}
-		rp->secure->size = size;
-
-		(void) time(&rp->secure->date);
-		rp->secure->req_id = NULL;
-		rp->secure->system = Strdup(Local_System);
+	    pw = getpwuid(md->uid);
+	    endpwent();
+	    if (pw && pw->pw_name && *pw->pw_name)
+		rp->secure->user = Strdup(pw->pw_name);
+	    else {
+		rp->secure->user = Strdup(BIGGEST_NUMBER_S);
+		(void) sprintf (rp->secure->user, "%ld", md->uid);
 	    }
+
+	    if ((rp->request->actions & ACT_SPECIAL) == ACT_HOLD)
+	        rp->request->outcome |= RS_HELD;
+	    if ((rp->request->actions & ACT_SPECIAL) == ACT_RESUME)
+	        rp->request->outcome &= ~RS_HELD;
+	    if((rp->request->actions & ACT_SPECIAL) == ACT_IMMEDIATE) {
+	        if (!md->admin) {
+	    		status = MNOPERM;
+	    		goto Return;
+	        }
+	        rp->request->outcome |= RS_IMMEDIATE;
+	    }
+
+	    size = chfiles(rp->request->file_list, Lp_Uid, Lp_Gid);
+
+	    if (size < 0) {
+	    /* at this point, chfiles() may have failed because the
+	     * the file may live on an NFS mounted filesystem, under
+	     * a directory of mode 700. such a directory isn't 
+	     * accessible even by root, according to the NFS protocol
+	     * (i.e. the Stat() in chfiles() failed). this most commonly 
+	     * happens via the automounter, and rlogin.
+	     *
+	     * thus we change our euid/egid to that of the user, and
+	     * try again. if *this* fails, then the file must really
+	     * be inaccessible.
+	     */
+	        org_uid = geteuid();
+	        org_gid = getegid();
+    
+	        if (setegid(md->gid) != 0) {
+	    	    status = MUNKNOWN;
+	    	    goto Return;
+	        }
+
+	        if (seteuid(md->uid) != 0) {
+	    	    setgid(org_gid);
+	    	    status = MUNKNOWN;
+	    	    goto Return;
+	        }
+
+	        size = chfiles(rp->request->file_list, Lp_Uid, Lp_Gid);
+
+	        if (seteuid(org_uid) != 0) { /* should never happen */
+	    		note("s_print_request(): ");
+	    		note("seteuid back to uid=%d failed!!\n", org_uid);
+	    		size = -1;
+	        } 
+
+	        if (setegid(org_gid) != 0) { /* should never happen */
+	    		note("s_print_request(): ");
+	    		note("setegid back to uid=%d failed!!\n", org_uid);
+	    		size = -1;
+	        } 
+
+	        if (size < 0) {
+	    	    	status = MUNKNOWN;
+	    	    	goto Return;
+	        }
+	    }
+	    if (!(rp->request->outcome & RS_HELD) && size == 0) {
+	        	status = MNOPERM;
+	        	goto Return;
+	    }
+	    rp->secure->size = size;
+
+	    (void) time(&rp->secure->date);
+	    rp->secure->req_id = NULL;
 
 	   if (!rp->request->title) {
 		if (strlen(*rp->request->file_list) < (size_t)24)
@@ -292,7 +252,7 @@ void s_print_request ( char * m, MESG * md )
 		 */
 		snprintf(tmpName, sizeof (tmpName),
 			"%s-%s", idno, LP_PAPIATTRNAME);
-		path = makepath(SPOOLDIR, "temp", tmpName, (char *)0);
+		path = makepath(Lp_Temp, tmpName, (char *)0);
 
 		if (stat(path, &tmpBuf) == 0)
 		{
@@ -318,7 +278,6 @@ void s_print_request ( char * m, MESG * md )
 		 || putrequest(req_file, rp->request) == -1
 		)
 		    status = MNOMEM;
-
 		else
 		{
 		    status = MOK;
@@ -343,7 +302,7 @@ Return:
     Free(idno);
     if (status != MOK && rp) {
 	rmfiles(rp, 0);
-	freerstatus(rp);
+	free_rstatus(rp);
     }
     mputm(md, R_PRINT_REQUEST, status, NB(req_id), chkprinter_result);
     return;
@@ -641,7 +600,7 @@ _cancel(MESG *md, char *dest, char *user, char *req_id)
 	crp->reason = MOK;
 	creq_id = Strdup(crp->secure->req_id);
 
-	syslog(LOG_DEBUG, "cancel reqid (%s) uid: %d, secureuid: %d\n",
+	syslog(LOG_DEBUG, "cancel reqid (%s) uid: %d, secureuid: %d",
 		creq_id, md->uid, crp->secure->uid);
 
 	if (cancel(crp, (md->uid != crp->secure->uid)))
@@ -716,99 +675,6 @@ void s_cancel(char *m, MESG *md)
     mputm(md, R_CANCEL, MOK, MUNKNOWN, "");
 }
 
-/**
- ** s_inquire_request()
- **/
-
-void s_inquire_request(char *m, MESG *md)
-{
-    char	*form;
-    char	*dest;
-    char	*pwheel;
-    char	*user;
-    char	*req_id;
-    RSTATUS	*rp;
-    RSTATUS	*found;
-    char files[BUFSIZ];
-
-    found = (RSTATUS *)0;
-
-    (void) getmessage(m, S_INQUIRE_REQUEST,&form,&dest,&req_id,&user,&pwheel);
-    syslog(LOG_DEBUG, "s_inquire_request(%s, %s, %s, %s, %s)",
-	   (form ? form : "NULL"), (dest ? dest : "NULL"),
-	   (req_id ? req_id : "NULL"), (user ? user : "NULL"),
-	   (pwheel ? pwheel : "NULL"));
-
-    for(rp = Request_List; rp != NULL; rp = rp->next) {
-	if (*form && !SAME(form, rp->request->form))
-	    continue;
-
-	if (*dest && !STREQU(dest, rp->request->destination)) {
-	    if (!rp->printer)
-		continue;
-	    if (!STREQU(dest, rp->printer->printer->name))
-		continue;
-	}
-	if (*req_id && !STREQU(req_id, rp->secure->req_id))
-	    continue;
-
-	if (*user && !bangequ(user, rp->secure->user))
-	    continue;
-
-	if (*pwheel && !SAME(pwheel, rp->pwheel_name))
-	    continue;
-
-	/*
-	 * For Trusted Extensions, we need to check the sensitivity label of the
-	 * connection and job before we return it to the client.
-	 */
-	if ((md->admin <= 0) && (is_system_labeled()) &&
-	    (md->slabel != NULL) && (rp->secure->slabel != NULL) &&
-	    (!STREQU(md->slabel, rp->secure->slabel)))
-	    continue;
-	
-	if (found) {
-	    GetRequestFiles(found->request, files, sizeof(files));
-	    mputm(md, R_INQUIRE_REQUEST,
-		 MOKMORE,
-		 found->secure->req_id,
-		 found->request->user, /* bgolden 091996, bug 1257405 */
-		 found->secure->slabel,
-		 found->secure->size,
-		 found->secure->date,
-		 found->request->outcome,
-		 found->printer->printer->name,
-		 (found->form? found->form->form->name : ""),
-		 NB(found->pwheel_name),
-		 files
-	    );
-	}
-	found = rp;
-    }
-
-    if (found) {
-	GetRequestFiles(found->request, files, sizeof(files));
-	mputm(md, R_INQUIRE_REQUEST,
-	     MOK,
-	     found->secure->req_id,
-	     found->request->user, /* bgolden 091996, bug 1257405 */
-	     found->secure->slabel,
-	     found->secure->size,
-	     found->secure->date,
-	     found->request->outcome,
-	     found->printer->printer->name,
-	     (found->form? found->form->form->name : ""),
-	     (NB(found->pwheel_name)), 
-	     files
-	);
-    } else
-	mputm(md, R_INQUIRE_REQUEST, MNOINFO, "", "", "", 0L, 0L, 0, "", "", "",
-	      "");
-
-    return;
-}
-
-
 /*
  * s_inquire_request_rank()
  */
@@ -822,10 +688,10 @@ void s_inquire_request_rank(char *m, MESG *md)
 	char		*req_id;
 	RSTATUS		*rp;
 	RSTATUS		*found = NULL;
-	PSTATUS		*pps;
 	int		found_rank = 0;
 	short		prop;
 	char		files[BUFSIZ];
+	int 		i;
 
 	(void) getmessage(m, S_INQUIRE_REQUEST_RANK, &prop, &form, &dest,
 		&req_id, &user, &pwheel);
@@ -834,8 +700,8 @@ void s_inquire_request_rank(char *m, MESG *md)
 	   (req_id ? req_id : "NULL"), (user ? user : "NULL"),
 	   (pwheel ? pwheel : "NULL"));
 
-	for (pps = walk_ptable(1); pps; pps = walk_ptable(0))
-		pps->nrequests = 0;
+	for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++)
+		PStatus[i]->nrequests = 0;
 
 	for (rp = Request_List; rp != NULL; rp = rp->next) {
 		if (rp->printer && !(rp->request->outcome & RS_DONE))
@@ -883,8 +749,7 @@ void s_inquire_request_rank(char *m, MESG *md)
 				found->printer->printer->name,
 				(found->form? found->form->form->name : ""),
 				NB(found->pwheel_name),
-				((found->status & RSS_RANK) ?
-				    found->rank : found_rank),
+				found_rank,
 				files
 			);
 		}
@@ -905,7 +770,7 @@ void s_inquire_request_rank(char *m, MESG *md)
 			found->printer->printer->name,
 			(found->form? found->form->form->name : ""),
 			NB(found->pwheel_name),
-			((found->status & RSS_RANK) ? found->rank : found_rank),
+			found_rank,
 			files
 		);
 	} else
@@ -939,8 +804,7 @@ mv_file(RSTATUS *rp, char *dest)
 			for (listp = rp->request->file_list; *listp; listp++) {
 				cnt++;
 				snprintf(tmp_nam, sizeof (tmp_nam),
-					"%s/%s/F%s-%d", Lp_Tmp,
-					rp->secure->system, reqno, cnt);
+					"%s/F%s-%d", Lp_Temp, reqno, cnt);
 				unlink(tmp_nam);
 
 			}
@@ -958,7 +822,7 @@ mv_file(RSTATUS *rp, char *dest)
 			reqno = strdup(getreqno(securep->req_id));
 			(void) free(securep->req_id);
 			if ((securep->req_id = calloc(strlen(dest) + 1 +
-				strlen(reqno) +1, sizeof (char))) == NULL) 
+				strlen(reqno) +1, sizeof (char))) == NULL)
 				return (MNOMEM);
 			(void) sprintf(securep->req_id, "%s-%s", dest, reqno);
 			/* remove the old request file; save new one */
@@ -1027,7 +891,7 @@ void s_move_request(char *m, MESG *md)
 	       (dest ? dest : "NULL"));
 
 
-	if (!(search_ptable(dest)) && !(search_ctable(dest))) {
+	if (!(search_pstatus(dest)) && !(search_cstatus(dest))) {
 		mputm(md, R_MOVE_REQUEST, MNODEST, 0L);
 		return;
 	}
@@ -1071,13 +935,13 @@ void s_move_dest(char *m, MESG *md)
     syslog(LOG_DEBUG, "s_move_dest(%s, %s)", (fromdest ? fromdest : "NULL"),
 	   (dest ? dest : "NULL"));
 
-    if (!search_ptable(fromdest) && !search_ctable(fromdest))
+    if (!search_pstatus(fromdest) && !search_cstatus(fromdest))
     {
 	mputm(md, R_MOVE_DEST, MNODEST, fromdest, 0);
 	return;
     }
 
-    if (!(search_ptable(dest)) && !(search_ctable(dest)))
+    if (!(search_pstatus(dest)) && !(search_cstatus(dest)))
     {
 	mputm(md, R_MOVE_DEST, MNODEST, dest, 0);
 	return;
@@ -1089,9 +953,9 @@ void s_move_dest(char *m, MESG *md)
 	return;
     }
 
-    BEGIN_WALK_BY_DEST_LOOP (rp, fromdest)
-	if (!(rp->request->outcome &
-	    (RS_DONE|RS_CHANGING|RS_NOTIFYING))) {
+    for (rp = Request_List; rp != NULL; rp = rp->next) {
+	if ((STREQU(rp->request->destination, fromdest)) &&
+	    (!(rp->request->outcome & (RS_DONE|RS_CHANGING|RS_NOTIFYING)))) {
 	    if (mv_file(rp, dest) == MOK) {
 		num_ok++;
 		continue;
@@ -1102,7 +966,7 @@ void s_move_dest(char *m, MESG *md)
 	    mputm(md, R_MOVE_DEST, MMORERR, found, 0);
 
 	found = rp->secure->req_id;
-    END_WALK_LOOP
+    }
 
     if (found)
 	mputm(md, R_MOVE_DEST, MERRDEST, found, num_ok);

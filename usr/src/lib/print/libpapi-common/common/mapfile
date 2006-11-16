@@ -134,10 +134,14 @@ SUNWprivate_1.0 { # Misc. semi-private supporting calls
         uri_from_string;
         uri_to_string;
         uri_free;
+
 	#    list
         list_remove;
         list_append;
         list_concatenate;
+
+	#	NS
+	getprinterbyname;
 
 	#    extra Attribute Calls
         copy_attributes;

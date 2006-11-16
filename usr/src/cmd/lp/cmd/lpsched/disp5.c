@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,32 +45,34 @@ void
 s_child_done(char *m, MESG *md)
 {
 	long			key;
-	short			slot;
 	short			status;
 	short			err;
+	int			i;
 
 
-	getmessage (m, S_CHILD_DONE, &key, &slot, &status, &err);
-	syslog(LOG_DEBUG, "s_child_done(%d, %d, %d, %d)", key, slot, status,
-	       err);
+	getmessage (m, S_CHILD_DONE, &key, &status, &err);
+	syslog(LOG_DEBUG, "s_child_done(%d, %d, %d)", key, status, err);
 
-	if ((0 <= slot) && (slot < ET_Size) && (Exec_Table[slot].key == key) &&
-	    (Exec_Table[slot].md == md)) {
-		/*
-		 * Remove the message descriptor from the listen
-		 * table, then forget about it; we don't want to
-		 * accidently match this exec-slot to a future,
-		 * unrelated child.
-		 */
-		DROP_MD (Exec_Table[slot].md);
-		Exec_Table[slot].md = 0;
+	for (i = 0; Exec_Table[i] != NULL; i++)
+		if ((Exec_Table[i]->key == key) && (Exec_Table[i]->md == md)) {
+			EXEC *ep = Exec_Table[i];
 
-		Exec_Table[slot].pid = -99;
-		Exec_Table[slot].status = status;
-		Exec_Table[slot].Errno = err;
-		DoneChildren++;
+			syslog(LOG_DEBUG,
+				"s_child_done(%d, 0x%8.8x): clearing 0x%8.8x",
+				key, md, ep);
+			/*
+		 	* Remove the message descriptor from the listen
+		 	* table, then forget about it; we don't want to
+		 	* accidently match this exec-slot to a future,
+		 	* unrelated child.
+		 	*/
+			DROP_MD (ep->md);
 
-	}
+			ep->pid = -99;
+			ep->status = status;
+			ep->Errno = err;
+			DoneChildren++;
+		}
 
 	return;
 }

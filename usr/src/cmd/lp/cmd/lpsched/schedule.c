@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.15.1.7	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "stdarg.h"
 #include "lpsched.h"
@@ -56,17 +56,15 @@ static void		ev_form_message(FSTATUS *);
 static int		ev_slowf(RSTATUS *);
 static int		ev_notify(RSTATUS *);
 
-static EXEC		*find_exec_slot(EXEC *, int);
+static EXEC		*find_exec_slot(EXEC **);
 
 static char *_event_name(int event)
 {
 	static char *_names[] = {
 	"", "EV_SLOWF", "EV_INTERF", "EV_NOTIFY", "EV_LATER", "EV_ALARM",
-	"EV_MESSAGE", "EV_CHECKCHILD"," EV_SYSTEM", "EV_ENABLE",
-	"EV_POLLBSDSYSTEMS", "EV_FORM_MESSAGE", "EV_STATUS",
-	NULL };
+	"EV_MESSAGE", "EV_ENABLE", "EV_FORM_MESSAGE", NULL };
 
-	if ((event < 0) || (event > EV_STATUS))
+	if ((event < 0) || (event > EV_FORM_MESSAGE))
 		return ("BAD_EVENT");
 	else
 		return (_names[event]);
@@ -90,6 +88,7 @@ schedule(int event, ...)
 	register RSTATUS *	prs;
 	register FSTATUS *	pfs;
 
+	int i;
 	/*
 	 * If we're in the process of shutting down, don't
 	 * schedule anything.
@@ -159,8 +158,8 @@ schedule(int event, ...)
 			ev_interf (pps);
 
 		else
-			for (pps = walk_ptable(1); pps; pps = walk_ptable(0))
-				ev_interf (pps);
+			for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++)
+				ev_interf (PStatus[i]);
 
 		break;
 
@@ -194,8 +193,8 @@ schedule(int event, ...)
 		if ((pps = va_arg(ap, PSTATUS *)) != NULL)
 			enable (pps);
 		else
-			for (pps = walk_ptable(1); pps; pps = walk_ptable(0))
-				enable (pps);
+			for (i = 0; PStatus != NULL && PStatus[i] != NULL; i++)
+				enable (PStatus[i]);
 		break;
 
 	case EV_SLOWF:
@@ -355,7 +354,6 @@ static void
 ev_message(PSTATUS *pps)
 {
 	register RSTATUS	*prs;
-	char			*systemName;
 	char			toSelf;
 
 	syslog(LOG_DEBUG, "ev_message(%s)",
@@ -363,33 +361,28 @@ ev_message(PSTATUS *pps)
 		pps->request->req_file : "NULL"));
 
 	toSelf = 0;
-	BEGIN_WALK_BY_PRINTER_LOOP (prs, pps)
-		note("prs (%d) pps (%d)\n", prs, pps);
-		systemName = (prs->secure ? prs->secure->system : NULL);
-		if ((!systemName) || STREQU(systemName, Local_System))
+	for (prs = Request_List; prs != NULL; prs = prs->next)
+		if (prs->printer == pps) {
+			note("prs (%d) pps (%d)\n", prs, pps);
 			if (!toSelf) {
 				toSelf = 1;
 				exec(EX_FAULT_MESSAGE, pps, prs);
 			}
-	END_WALK_LOOP
+		}
 }
 
 static void
 ev_form_message_body(FSTATUS *pfs, RSTATUS *prs, char *toSelf, char ***sysList)
 {
-	char *systemName;
-	systemName = (prs && prs->secure ? prs->secure->system : NULL);
-
-	syslog(LOG_DEBUG, "ev_form_message_body(%s, %s, %d, 0x%x)",
+	syslog(LOG_DEBUG, "ev_form_message_body(%s, %d, 0x%x)",
 	      (pfs && pfs->form && pfs->form->name ? pfs->form->name : "NULL"),
-	      (systemName ? systemName : "NULL"), (toSelf ? *toSelf : 0),
+	      (toSelf ? *toSelf : 0),
 		sysList);
 
-	if ((!systemName) || STREQU(systemName, Local_System))
-		if (!*toSelf) {
-			*toSelf = 1;
-			exec(EX_FORM_MESSAGE, pfs);
-		}
+	if (!*toSelf) {
+		*toSelf = 1;
+		exec(EX_FORM_MESSAGE, pfs);
+	}
 }
 
 static void
@@ -405,9 +398,11 @@ ev_form_message(FSTATUS *pfs)
 
 	toSelf = 0;
 	sysList = NULL;
-	BEGIN_WALK_BY_FORM_LOOP (prs, pfs)
-	ev_form_message_body(pfs, prs, &toSelf, &sysList);
-	END_WALK_LOOP
+
+	for (prs = Request_List; prs != NULL; prs = prs->next)
+		if (prs->form == pfs)
+			ev_form_message_body(pfs, prs, &toSelf, &sysList);
+
 	if (NewRequest && (NewRequest->form == pfs))
 		ev_form_message_body(pfs, NewRequest, &toSelf, &sysList);
 
@@ -462,27 +457,25 @@ ev_interf(PSTATUS *pps)
 	if (pps->request || pps->status & (PS_DISABLED|PS_LATER|PS_BUSY))
 		return;
 
-	BEGIN_WALK_BY_PRINTER_LOOP (prs, pps)
-	/*
-	 * Just because the printer isn't busy and the
-	 * request is assigned to this printer, don't get the
-	 * idea that the request can't be printing (RS_ACTIVE),
-	 * because another printer may still have the request
-	 * attached but we've not yet heard from the child
-	 * process controlling that printer.
-	 */
-	if (qchk_waiting(prs))
-
-		if (isFormUsableOnPrinter(pps, prs->form) && MATCH(prs, pps)) {
-			/*
-			 * We have the waiting request, we have
-			 * the ready (local) printer. If the exec fails
-			 * because the fork failed, schedule a
-			 * try later and claim we succeeded. The
-			 * later attempt will sort things out,
-			 * e.g. will re-schedule if the fork fails
-			 * again.
-			 */
+	for (prs = Request_List; prs != NULL; prs = prs->next) {
+		if ((prs->printer == pps) && (qchk_waiting(prs)) &&
+		    isFormUsableOnPrinter(pps, prs->form) && MATCH(prs, pps)) {
+		/*
+		 * Just because the printer isn't busy and the
+		 * request is assigned to this printer, don't get the
+		 * idea that the request can't be printing (RS_ACTIVE),
+		 * because another printer may still have the request
+		 * attached but we've not yet heard from the child
+		 * process controlling that printer.
+		 *
+		 * We have the waiting request, we have
+		 * the ready (local) printer. If the exec fails
+		 * because the fork failed, schedule a
+		 * try later and claim we succeeded. The
+		 * later attempt will sort things out,
+		 * e.g. will re-schedule if the fork fails
+		 * again.
+		 */
 			pps->request = prs;
 			if (exec(EX_INTERF, pps) == 0) {
 				pps->status |= PS_BUSY;
@@ -495,7 +488,7 @@ ev_interf(PSTATUS *pps)
 				return;
 			}
 		}
-	END_WALK_LOOP
+	}
 
 	return;
 }
@@ -517,8 +510,11 @@ ev_slowf(RSTATUS *prs)
 	 * or if it's unwise to execute any more (fork failed).
 	 */
 
-	if (!(ep = find_exec_slot(Exec_Slow, ET_SlowSize)))
+	if (!(ep = find_exec_slot(Exec_Slow))) {
+		syslog(LOG_DEBUG, "ev_slowf(%s): no slot",
+	       		(prs && prs->req_file ? prs->req_file : "NULL"));
 		return (-1);
+	}
 
 	if (!(prs->request->outcome & (RS_DONE|RS_HELD|RS_ACTIVE)) &&
 	    NEEDS_FILTERING(prs)) {
@@ -570,7 +566,7 @@ ev_notify(RSTATUS *prs)
 	 * to run at the same time, so we may not be able to
 	 * do it.
 	 */
-	} else if (!(ep = find_exec_slot(Exec_Notify, ET_NotifySize)))
+	} else if (!(ep = find_exec_slot(Exec_Notify)))
 		return (-1);
 
 	else if (prs->request->outcome & RS_NOTIFY &&
@@ -595,14 +591,15 @@ ev_notify(RSTATUS *prs)
  */
 
 static EXEC *
-find_exec_slot(EXEC *exec_table, int size)
+find_exec_slot(EXEC **exec_table)
 {
-	register EXEC *		ep;
-	register EXEC *		last_ep	= exec_table + size - 1;
+	int i;
 
-	for (ep = exec_table; ep <= last_ep; ep++)
-		if (ep->pid == 0)
-			return (ep);
+	for (i = 0; exec_table[i] != NULL; i++)
+		if (exec_table[i]->pid == 0)
+			return (exec_table[i]);
 
+	syslog(LOG_DEBUG, "find_exec_slot(0x%8.8x): after %d, no slots",
+			exec_table, i);
 	return (0);
 }

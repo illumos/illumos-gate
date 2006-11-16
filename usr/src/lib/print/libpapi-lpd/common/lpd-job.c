@@ -49,7 +49,7 @@ static char
 mime_type_to_rfc1179_type(char *mime)
 {
 	static struct { char *mime; char rfc; } cvt[] = {
-		{ "plain/text", 'f' },
+		{ "text/plain", 'f' },
 		{ "application/octet-stream", 'l' },
 		{ "application/postscript", 'f' }, /* rfc incorrectly has 'o' */
 		{ "application/x-pr", 'p' },
@@ -422,7 +422,7 @@ papi_status_t
 lpd_job_add_files(service_t *svc, papi_attribute_t **attributes,
 		char **files, char **metadata, papi_attribute_t ***used)
 {
-	char *format = "plain/text";
+	char *format = "text/plain";
 	char rfc_fmt = 'l';
 	int copies = 1;
 	char host[BUFSIZ];

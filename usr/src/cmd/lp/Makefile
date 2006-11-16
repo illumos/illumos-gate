@@ -38,7 +38,6 @@ ROOTDIRS =					\
 		$(ROOTLIBLP)/model		\
 		$(ROOTLIBLPLOCL)		\
 		$(ROOTLIB)/print		\
-		$(ROOTLIB)/print/bsd-adaptor	\
 		$(LPOWNSDIRS)
 LPOWNSDIRS =					\
 		$(ROOTETCLP)			\
@@ -85,7 +84,6 @@ $(ROOTVARSP)/lp/system :=	DIRMODE = 775
 $(LPOWNSDIRS) :=		OWNER = lp
 $(LPOWNSDIRS) :=		GROUP = lp
 $(ROOTLIB)/print :=		DIRMODE = 0755
-$(ROOTLIB)/print/bsd-adaptor :=	DIRMODE = 0755
 
 POFILE= lp.po
 POFILES= lp_*.po

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -144,11 +143,7 @@ void rmfiles ( RSTATUS * rp, int log_it )	/* funcdef */
 	     * Copy the request file to the log file, if asked,
 	     * or simply remove it.
 	     */
-#if	defined(TEMP_OR_TMP)
-	    path = makepath(Lp_Temp, rp->req_file, (char *)0);
-#else
 	    path = makepath(Lp_Tmp, rp->req_file, (char *)0);
-#endif
 	    if (log_it && rp->secure && rp->secure->req_id) {
 		if (fd == -1)
 		    fd = open_locked(Lp_ReqLog, "a", MODE_NOREAD);
@@ -165,7 +160,7 @@ void rmfiles ( RSTATUS * rp, int log_it )	/* funcdef */
 			fdprintf(fd, "x %s\n", rp->slow);
 		    if (rp->fast)
 			fdprintf(fd, "y %s\n", rp->fast);
-		    if (rp->printer && rp->printer->printer->name)
+		    if (rp->printer && rp->printer->printer)
 			fdprintf(fd, "z %s\n", rp->printer->printer->name);
 		    while ((n = Read(reqfd, buf, BUFSIZ)) > 0)
 			write (fd, buf, n);
@@ -232,8 +227,7 @@ void rmfiles ( RSTATUS * rp, int log_it )	/* funcdef */
 	    while(count > 0)
 	    {
 		sprintf(num, "%d", count--);
-		path = makestr(Lp_Tmp, "/",  rp->secure->system, "/F", p, "-",
-			num, (char *)0);
+		path = makestr(Lp_Temp, "/F", p, "-", num, (char *)0);
 		Unlink(path);
 		Free(path);
 	    }
@@ -345,8 +339,7 @@ _alloc_files (
 	int			num,
 	char *			prefix,
 	uid_t			uid,
-	gid_t			gid,
-	char *			host
+	gid_t			gid
 )
 {
 	static char		base[
@@ -381,10 +374,7 @@ _alloc_files (
 		plus = 1;
 	}
 
-	if (host != NULL)
-		file = makepath(Lp_Tmp, host, base, (char *)0);
-	else
-		file = makepath(Lp_Temp, base, (char *)0);
+	file = makepath(Lp_Temp, base, (char *)0);
         
 	cp = strrchr(file, '-') + 1;
 	while (num--) {

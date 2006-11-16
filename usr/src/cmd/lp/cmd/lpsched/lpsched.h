@@ -134,12 +134,8 @@
 #define EV_LATER	4
 #define EV_ALARM	5
 #define	EV_MESSAGE	6
-#define	EV_CHECKCHILD	7
-#define	EV_SYSTEM	8
-#define EV_ENABLE	9
-#define	EV_POLLBSDSYSTEMS	10
-#define	EV_FORM_MESSAGE	11
-#define	EV_STATUS	12
+#define EV_ENABLE	7
+#define	EV_FORM_MESSAGE	8
 
 /*
  * How long to wait before retrying an event:
@@ -186,16 +182,6 @@
 	((PRS)->slow && !((PRS)->request->outcome & RS_FILTERED))
 
 /*
- * Where requests are handled:
- */
-
-#define PRINTING_AT(PRS,PSS) \
-			((PRS)->printer->system == (PSS))
-
-#define ORIGINATING_AT(PRS,PSS) \
-			STREQU((PRS)->secure->system, (PSS)->system->name)
-
-/*
  * Misc:
  */
 
@@ -203,8 +189,7 @@
 
 #define makereqerr(PRS) \
 	makepath( \
-		Lp_Tmp, \
-		(PRS)->secure->system, \
+		Lp_Temp, \
 		getreqno((PRS)->secure->req_id), \
 		(char *)0 \
 	)
@@ -223,6 +208,7 @@
 #define DROP_MD(MD)	if (MD) { \
 			        mlistendel (MD); \
 			        mdisconnect (MD); \
+				MD = 0; \
 			} else /*EMPTY*/
 #else
 #define DROP_MD(MD)	if (MD) { \
@@ -230,6 +216,7 @@
 				if ((MD)->writefd == (MD)->readfd) \
 					(MD)->writefd = -1; \
 				(MD)->readfd = -1; \
+				MD = 0; \
 			} else /*EMPTY*/
 #endif
 
@@ -241,37 +228,19 @@ typedef int (*qchk_fnc_type)( RSTATUS * );
 
 CLASS *		Getclass ( char * );
 
-CSTATUS *	search_ctable ( char * );
-CSTATUS *	walk_ctable ( int );
-
-
-FSTATUS *	search_fptable(register char *);
-FSTATUS *	search_ftable ( char * );
-FSTATUS *	walk_ftable ( int );
-
 extern void GetRequestFiles(REQUEST *req, char *buffer, int length);
 
 
 PRINTER *	Getprinter ( char * );
 
-PSTATUS *	search_ptable ( char * );
-PSTATUS *	walk_ptable ( int );
-
 PWHEEL *	Getpwheel ( char * );
 
-PWSTATUS *	search_pwtable ( char * );
-PWSTATUS *	walk_pwtable ( int );
 
 REQUEST *	Getrequest ( char * );
 
-RSTATUS *	allocr ( void );
 RSTATUS *	request_by_id ( char * );
 RSTATUS *	request_by_id_num ( long );
 RSTATUS *	request_by_jobid ( char * , char * );
-RSTATUS *	walk_req_by_dest ( RSTATUS ** , char * );
-RSTATUS *	walk_req_by_form ( RSTATUS ** , FSTATUS * );
-RSTATUS *	walk_req_by_printer ( RSTATUS ** , PSTATUS * );
-RSTATUS *	walk_req_by_pwheel ( RSTATUS ** , char * );
 
 SECURE *	Getsecure ( char * );
 
@@ -279,7 +248,7 @@ USER *		Getuser ( char * );
 
 _FORM *		Getform ( char * );
 
-char *		_alloc_files ( int , char * , uid_t , gid_t, char * );
+char *		_alloc_files ( int , char * , uid_t , gid_t);
 char *		dispatchName(int);
 char *		statusName(int);
 char *		getreqno ( char * );
@@ -362,6 +331,32 @@ void		update_req ( char * , long );
 int		isFormMountedOnPrinter ( PSTATUS *, FSTATUS * );
 int		isFormUsableOnPrinter ( PSTATUS *, FSTATUS * );
 char		*allTraysWithForm ( PSTATUS *, FSTATUS * );
+extern int		list_append(void ***, void *);
+extern void		list_remove(void ***, void *);
+
+extern RSTATUS	*new_rstatus(REQUEST *, SECURE *);
+extern PSTATUS	*new_pstatus(PRINTER *);
+extern CSTATUS	*new_cstatus(CLASS *);
+extern FSTATUS	*new_fstatus(_FORM *f);
+extern PWSTATUS	*new_pwstatus(PWHEEL *p);
+extern ALERT	*new_alert(char *fmt, int i);
+extern EXEC	*new_exec(int type, void *ex);
+
+extern void	pstatus_add_printer(PSTATUS *, PRINTER *);
+
+extern void	free_exec(EXEC *);
+extern void	free_alert(ALERT *);
+extern void	free_pwstatus(PWSTATUS *);
+extern void	free_fstatus(FSTATUS *);
+extern void	free_cstatus(CSTATUS *);
+extern void	free_pstatus(PSTATUS *);
+extern void	free_rstatus(RSTATUS *);
+
+extern CSTATUS	*search_cstatus ( char * );
+extern FSTATUS	*search_fptable(register char *);
+extern FSTATUS	*search_fstatus ( char * );
+extern PSTATUS	*search_pstatus ( char * );
+extern PWSTATUS	*search_pwstatus ( char * );
 
 /*
  * Things that can't be passed as parameters:
@@ -375,42 +370,24 @@ extern char		*pwheel_in_question;
  ** External tables, lists:
  **/
 
-extern CSTATUS		*CStatus;	/* Status of classes       */
+extern CSTATUS		**CStatus;	/* Status of classes       */
+extern PSTATUS		**PStatus;	/* Status of printers      */
+extern FSTATUS		**FStatus;	/* Status of forms	   */
+extern PWSTATUS		**PWStatus;	/* Status of print wheels  */
 
-extern EXEC		*Exec_Table;	/* Running processes       */
-
-extern FSTATUS		*FStatus;	/* Status of forms	   */
-
-extern PSTATUS		*PStatus;	/* Status of printers      */
-
-extern PWSTATUS		*PWStatus;	/* Status of print wheels  */
+extern EXEC		**Exec_Table;	/* Running processes       */
+extern EXEC		**Exec_Slow,	/* First slow filter exec  */
+			**Exec_Notify;	/* First notification exec */
 
 extern RSTATUS		*Request_List;	/* Queue of print requests */
-extern RSTATUS		*Status_List;	/* Queue of fake requests */
 extern RSTATUS		*NewRequest;	/* Not in Request_List yet */
 
-extern EXEC		*Exec_Slow,	/* First slow filter exec  */
-			*Exec_Notify;	/* First notification exec */
-
-extern int		CT_Size,	/* Size of class table		*/
-			ET_Size,	/* Size of exec table		*/
-			ET_SlowSize,	/* Number of filter execs  	*/
-			ET_NotifySize,	/* Number of notify execs  	*/
-			FT_Size,	/* Size of form table		*/
-			PT_Size,	/* Size of printer table	*/
-			PWT_Size,	/* Size of print wheel table	*/
-			ST_Size,	/* Size of system status table	*/
-			ST_Count;	/* No. active entries in above	*/
+extern int		ET_SlowSize,	/* Number of filter execs  	*/
+			ET_NotifySize;	/* Number of notify execs  	*/
 
 #if	defined(DEBUG)
-#define DB_EXEC		0x00000001
-#define DB_DONE		0x00000002
-#define DB_INIT		0x00000004
 #define DB_ABORT	0x00000008
-#define DB_SCHEDLOG	0x00000010
 #define DB_SDB		0x00000020
-#define DB_MESSAGES	0x00000040
-#define DB_MALLOC	0x00000080
 #define DB_ALL		0xFFFFFFFF
 
 extern unsigned long	debug;
