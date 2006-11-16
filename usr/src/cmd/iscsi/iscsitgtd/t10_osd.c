@@ -72,16 +72,16 @@ static void osd_list(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len);
  */
 /*ARGSUSED*/
 Boolean_t
-osd_init_common(t10_lu_common_t *lu)
+osd_common_init(t10_lu_common_t *lu)
 {
 	osd_params_t	*o;
 	char		*str;
-	xml_node_t	*node	= lu->l_root;
+	tgt_node_t	*node	= lu->l_root;
 
 	if ((o = (osd_params_t *)calloc(1, sizeof (*o))) == NULL)
 		return (False);
 
-	if (xml_find_value_str(node, XML_ELEMENT_SIZE, &str) == True) {
+	if (tgt_find_value_str(node, XML_ELEMENT_SIZE, &str) == True) {
 		o->o_size = strtoll(str, NULL, 0);
 		free(str);
 	} else {
@@ -95,7 +95,7 @@ osd_init_common(t10_lu_common_t *lu)
 
 /*ARGSUSED*/
 void
-osd_fini_common(t10_lu_common_t *lu)
+osd_common_fini(t10_lu_common_t *lu)
 {
 	free(lu->l_dtype_params);
 }
@@ -107,7 +107,7 @@ osd_fini_common(t10_lu_common_t *lu)
  */
 /*ARGSUSED*/
 void
-osd_init_per(t10_lu_impl_t *itl)
+osd_per_init(t10_lu_impl_t *itl)
 {
 	itl->l_cmd	= osd_cmd;
 	itl->l_data	= osd_data;
@@ -124,7 +124,13 @@ osd_init_per(t10_lu_impl_t *itl)
 
 /*ARGSUSED*/
 void
-osd_fini_per(t10_lu_impl_t *itl)
+osd_per_fini(t10_lu_impl_t *itl)
+{
+}
+
+/*ARGSUSED*/
+void
+osd_task_mgmt(t10_lu_common_t *lu, TaskOp_t op)
 {
 }
 

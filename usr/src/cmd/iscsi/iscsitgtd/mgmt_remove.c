@@ -36,22 +36,24 @@
 #include <strings.h>
 #include <unistd.h>
 
+#include <iscsitgt_impl.h>
 #include "utility.h"
-#include "xml.h"
 #include "queue.h"
 #include "target.h"
 #include "iscsi_cmd.h"
 #include "errcode.h"
 
-static char *remove_target(xml_node_t *x);
-static char *remove_initiator(xml_node_t *x);
-static char *remove_tpgt(xml_node_t *x);
+static char *remove_target(tgt_node_t *x);
+static char *remove_initiator(tgt_node_t *x);
+static char *remove_tpgt(tgt_node_t *x);
+static char *remove_zfs(tgt_node_t *x);
+
 
 /*ARGSUSED*/
 void
-remove_func(xml_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
+remove_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 {
-	xml_node_t	*x;
+	tgt_node_t	*x;
 	char		msgbuf[80],
 			*reply_msg	= NULL;
 
@@ -68,6 +70,8 @@ remove_func(xml_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 			reply_msg = remove_initiator(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TPGT) == 0) {
 			reply_msg = remove_tpgt(x);
+		} else if (strcmp(x->x_name, XML_ELEMENT_ZFS) == 0) {
+			reply_msg = remove_zfs(x);
 		} else {
 			(void) snprintf(msgbuf, sizeof (msgbuf),
 			    "Unknown object '%s' for delete element",
@@ -79,22 +83,71 @@ remove_func(xml_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 }
 
 static char *
-remove_target(xml_node_t *x)
+remove_zfs(tgt_node_t *x)
+{
+	char		*prop,
+			*msg		= NULL;
+	tgt_node_t	*targ		= NULL;
+
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
+		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
+		return (msg);
+	}
+
+	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ))
+	    != NULL) {
+		if (strcmp(targ->x_value, prop) == 0)
+			break;
+	}
+	free(prop);
+	if (targ == NULL) {
+		/*
+		 * We're unsharing a target. If we don't have a reference
+		 * then there's no problem.
+		 */
+		xml_rtn_msg(&msg, ERR_SUCCESS);
+		return (msg);
+	}
+	if (tgt_find_value_str(targ, XML_ELEMENT_INAME, &prop) ==
+	    False) {
+		xml_rtn_msg(&msg, ERR_TARGCFG_MISSING_INAME);
+		return (msg);
+	}
+
+	tgt_node_remove(targets_config, targ, MatchBoth);
+
+	/*
+	 * Wait until here to issue a logout to any initiators that
+	 * might be logged into the target. Certain initiators are
+	 * sneaky in that if asked to logout they will, but turn right
+	 * around and log back into the target. By waiting until here
+	 * to issue the logout we'll have removed reference to the target
+	 * such that this can't happen.
+	 */
+	logout_targ(prop);
+	free(prop);
+
+	xml_rtn_msg(&msg, ERR_SUCCESS);
+	return (msg);
+}
+
+static char *
+remove_target(tgt_node_t *x)
 {
 	char		*msg			= NULL,
 			*prop			= NULL;
-	xml_node_t	*targ			= NULL,
+	tgt_node_t	*targ			= NULL,
 			*list,
 			*c			= NULL;
 	Boolean_t	change_made		= False;
 	int		lun_num;
 
-	if (xml_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
 	}
 
-	while ((targ = xml_node_next(targets_config, XML_ELEMENT_TARG, targ)) !=
+	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ)) !=
 	    NULL) {
 		if (strcmp(targ->x_value, prop) == 0)
 			break;
@@ -104,53 +157,53 @@ remove_target(xml_node_t *x)
 		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
 		return (msg);
 	}
-	if (xml_find_value_str(x, XML_ELEMENT_ACL, &prop) == True) {
+	if (tgt_find_value_str(x, XML_ELEMENT_ACL, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_ACL);
 			return (msg);
 		}
-		if ((list = xml_node_next(targ, XML_ELEMENT_ACLLIST, NULL)) ==
+		if ((list = tgt_node_next(targ, XML_ELEMENT_ACLLIST, NULL)) ==
 		    NULL) {
 			free(prop);
 			xml_rtn_msg(&msg, ERR_ACL_NOT_FOUND);
 			return (msg);
 		}
-		c = xml_alloc_node(XML_ELEMENT_INIT, String, prop);
-		if (xml_remove_child(list, c, MatchBoth) == False) {
+		c = tgt_node_alloc(XML_ELEMENT_INIT, String, prop);
+		if (tgt_node_remove(list, c, MatchBoth) == False) {
 			xml_rtn_msg(&msg, ERR_INIT_NOT_FOUND);
 			goto error;
 		}
-		xml_free_node(c);
+		tgt_node_free(c);
 		if (list->x_child == NULL)
-			(void) xml_remove_child(targ, list, MatchName);
+			(void) tgt_node_remove(targ, list, MatchName);
 		free(prop);
 		change_made = True;
 	}
-	if (xml_find_value_str(x, XML_ELEMENT_TPGT, &prop) == True) {
+	if (tgt_find_value_str(x, XML_ELEMENT_TPGT, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_TPGT);
 			return (msg);
 		}
-		if ((list = xml_node_next(targ, XML_ELEMENT_TPGTLIST, NULL)) ==
+		if ((list = tgt_node_next(targ, XML_ELEMENT_TPGTLIST, NULL)) ==
 		    NULL) {
 			free(prop);
 			xml_rtn_msg(&msg, ERR_ACL_NOT_FOUND);
 			return (msg);
 		}
-		c = xml_alloc_node(XML_ELEMENT_TPGT, String, prop);
-		if (xml_remove_child(list, c, MatchBoth) == False) {
+		c = tgt_node_alloc(XML_ELEMENT_TPGT, String, prop);
+		if (tgt_node_remove(list, c, MatchBoth) == False) {
 			xml_rtn_msg(&msg, ERR_TPGT_NOT_FOUND);
 			goto error;
 		}
-		xml_free_node(c);
+		tgt_node_free(c);
 		if (list->x_child == NULL)
-			(void) xml_remove_child(targ, list, MatchName);
+			(void) tgt_node_remove(targ, list, MatchName);
 		free(prop);
 		change_made = True;
 	}
-	if (xml_find_value_int(x, XML_ELEMENT_LUN, &lun_num) == True) {
+	if (tgt_find_value_int(x, XML_ELEMENT_LUN, &lun_num) == True) {
 
-		if (xml_find_value_intchk(x, XML_ELEMENT_LUN, &lun_num) ==
+		if (tgt_find_value_intchk(x, XML_ELEMENT_LUN, &lun_num) ==
 		    False) {
 			xml_rtn_msg(&msg, ERR_LUN_INVALID_RANGE);
 			return (msg);
@@ -159,7 +212,7 @@ remove_target(xml_node_t *x)
 		/*
 		 * Save the iscsi-name which we'll need to remove LUNs.
 		 */
-		if (xml_find_value_str(targ, XML_ELEMENT_INAME, &prop) ==
+		if (tgt_find_value_str(targ, XML_ELEMENT_INAME, &prop) ==
 		    False) {
 			xml_rtn_msg(&msg, ERR_TARGCFG_MISSING_INAME);
 			return (msg);
@@ -188,24 +241,24 @@ remove_target(xml_node_t *x)
 
 error:
 	if (c != NULL)
-		xml_free_node(c);
+		tgt_node_free(c);
 	if (prop != NULL)
 		free(prop);
 	return (msg);
 }
 
 static char *
-remove_initiator(xml_node_t *x)
+remove_initiator(tgt_node_t *x)
 {
 	char		*msg	= NULL,
 			*name;
-	xml_node_t	*node	= NULL;
+	tgt_node_t	*node	= NULL;
 
-	if (xml_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
 	}
-	while ((node = xml_node_next(main_config, XML_ELEMENT_INIT, node)) !=
+	while ((node = tgt_node_next(main_config, XML_ELEMENT_INIT, node)) !=
 	    NULL) {
 		if (strcmp(node->x_value, name) == 0)
 			break;
@@ -215,11 +268,11 @@ remove_initiator(xml_node_t *x)
 		xml_rtn_msg(&msg, ERR_INIT_NOT_FOUND);
 		return (msg);
 	}
-	if (xml_find_value_str(x, XML_ELEMENT_ALL, &name) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_ALL, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_ALL);
 		return (msg);
 	}
-	(void) xml_remove_child(main_config, node, MatchBoth);
+	(void) tgt_node_remove(main_config, node, MatchBoth);
 
 	if (update_config_main(&msg) == True)
 		xml_rtn_msg(&msg, ERR_SUCCESS);
@@ -228,19 +281,19 @@ remove_initiator(xml_node_t *x)
 }
 
 static char *
-remove_tpgt(xml_node_t *x)
+remove_tpgt(tgt_node_t *x)
 {
 	char		*msg		= NULL,
 			*prop		= NULL;
-	xml_node_t	*node		= NULL,
+	tgt_node_t	*node		= NULL,
 			*c		= NULL;
 	Boolean_t	change_made	= False;
 
-	if (xml_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
 	}
-	while ((node = xml_node_next(main_config, XML_ELEMENT_TPGT, node)) !=
+	while ((node = tgt_node_next(main_config, XML_ELEMENT_TPGT, node)) !=
 	    NULL) {
 		if (strcmp(node->x_value, prop) == 0)
 			break;
@@ -250,23 +303,23 @@ remove_tpgt(xml_node_t *x)
 		xml_rtn_msg(&msg, ERR_TPGT_NOT_FOUND);
 		return (msg);
 	}
-	if (xml_find_value_str(x, XML_ELEMENT_IPADDR, &prop) == True) {
+	if (tgt_find_value_str(x, XML_ELEMENT_IPADDR, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_IPADDR);
 			return (msg);
 		}
-		c = xml_alloc_node(XML_ELEMENT_IPADDR, String, prop);
-		if (xml_remove_child(node, c, MatchBoth) == False) {
+		c = tgt_node_alloc(XML_ELEMENT_IPADDR, String, prop);
+		if (tgt_node_remove(node, c, MatchBoth) == False) {
 			xml_rtn_msg(&msg, ERR_INVALID_IP);
 			goto error;
 		}
-		xml_free_node(c);
+		tgt_node_free(c);
 		free(prop);
 		change_made = True;
 	}
 	if ((change_made != True) &&
-	    (xml_find_value_str(x, XML_ELEMENT_ALL, &prop) == True)) {
-		xml_remove_child(main_config, node, MatchBoth);
+	    (tgt_find_value_str(x, XML_ELEMENT_ALL, &prop) == True)) {
+		tgt_node_remove(main_config, node, MatchBoth);
 		change_made = True;
 	}
 
@@ -281,7 +334,7 @@ remove_tpgt(xml_node_t *x)
 
 error:
 	if (c != NULL)
-		xml_free_node(c);
+		tgt_node_free(c);
 	if (prop != NULL)
 		free(prop);
 	return (msg);

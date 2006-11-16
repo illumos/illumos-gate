@@ -69,7 +69,7 @@ static char *sense_compression(ssc_params_t *s, char *data);
  * []----
  */
 Boolean_t
-ssc_init_common(t10_lu_common_t *lu)
+ssc_common_init(t10_lu_common_t *lu)
 {
 	ssc_params_t	*s;
 	ssc_obj_mark_t	mark;
@@ -102,7 +102,7 @@ ssc_init_common(t10_lu_common_t *lu)
  * []----
  */
 void
-ssc_fini_common(t10_lu_common_t *lu)
+ssc_common_fini(t10_lu_common_t *lu)
 {
 	free(lu->l_dtype_params);
 }
@@ -128,7 +128,7 @@ ssc_task_mgmt(t10_lu_common_t *lu, TaskOp_t op)
  * []----
  */
 void
-ssc_init_per(t10_lu_impl_t *itl)
+ssc_per_init(t10_lu_impl_t *itl)
 {
 	ssc_params_t	*s = (ssc_params_t *)itl->l_common->l_dtype_params;
 
@@ -147,7 +147,7 @@ ssc_init_per(t10_lu_impl_t *itl)
  */
 /*ARGSUSED*/
 void
-ssc_fini_per(t10_lu_impl_t *itl)
+ssc_per_fini(t10_lu_impl_t *itl)
 {
 }
 

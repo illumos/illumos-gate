@@ -29,6 +29,3 @@ CPPFLAGS +=	-D_FILE_OFFSET_BITS=64 -I/usr/include/libxml2
 
 ISCSISRC	= $(SRC)/cmd/iscsi
 ISCSICOMMONDIR	= $(ISCSISRC)/common
-
-COMMON_OBJS	= xml.o
-COMMON_SRCS	= $(COMMON_OBJS:%.o=$(ISCSICOMMONDIR)/%.c)

@@ -33,11 +33,11 @@
 #include <strings.h>
 #include <syslog.h>
 
+#include <iscsitgt_impl.h>
 #include "iscsi_conn.h"
 #include "iscsi_sess.h"
 #include "t10.h"
 #include "utility.h"
-#include "xml.h"
 #include "target.h"
 
 pthread_mutex_t	sess_mutex;
@@ -185,18 +185,18 @@ session_remove_connection(iscsi_sess_t *s, iscsi_conn_t *c)
 Boolean_t
 convert_i_local(char *ip, char **rtn)
 {
-	xml_node_t	*inode = NULL;
+	tgt_node_t	*inode = NULL;
 	char		*iname,
 			*name;
 
-	while ((inode = xml_node_next(main_config, XML_ELEMENT_INIT, inode)) !=
+	while ((inode = tgt_node_next(main_config, XML_ELEMENT_INIT, inode)) !=
 	    NULL) {
-		if (xml_find_value_str(inode, XML_ELEMENT_INAME, &iname) ==
+		if (tgt_find_value_str(inode, XML_ELEMENT_INAME, &iname) ==
 		    False) {
 			continue;
 		}
 		if (strcmp(iname, ip) == 0) {
-			if (xml_find_value_str(inode, XML_ELEMENT_INIT,
+			if (tgt_find_value_str(inode, XML_ELEMENT_INIT,
 			    &name) == False) {
 				free(iname);
 				return (False);
@@ -483,10 +483,11 @@ sess_process(void *v)
 			    (mgmt->m_request == mgmt_full_phase_statistics) &&
 			    (strcmp(s->s_t_name, mgmt->m_targ_name) == 0)) {
 
-				buf_add_tag(buf, XML_ELEMENT_CONN, Tag_Start);
-				buf_add_tag(buf, s->s_i_name, Tag_String);
+				tgt_buf_add_tag(buf, XML_ELEMENT_CONN,
+				    Tag_Start);
+				tgt_buf_add_tag(buf, s->s_i_name, Tag_String);
 				if (s->s_i_alias != NULL) {
-					xml_add_tag(buf, XML_ELEMENT_ALIAS,
+					tgt_buf_add(buf, XML_ELEMENT_ALIAS,
 					    s->s_i_alias);
 				}
 
@@ -499,15 +500,17 @@ sess_process(void *v)
 				(void) snprintf(local_buf, sizeof (local_buf),
 				    "%d",
 				    mgmt->m_time - s->s_conn_head->c_up_at);
-				xml_add_tag(buf, XML_ELEMENT_TIMECON,
+				tgt_buf_add(buf, XML_ELEMENT_TIMECON,
 				    local_buf);
 
-				buf_add_tag(buf, XML_ELEMENT_STATS, Tag_Start);
+				tgt_buf_add_tag(buf, XML_ELEMENT_STATS,
+				    Tag_Start);
 
 				t10_targ_stat(s->s_t10, buf);
 
-				buf_add_tag(buf, XML_ELEMENT_STATS, Tag_End);
-				buf_add_tag(buf, XML_ELEMENT_CONN, Tag_End);
+				tgt_buf_add_tag(buf, XML_ELEMENT_STATS,
+				    Tag_End);
+				tgt_buf_add_tag(buf, XML_ELEMENT_CONN, Tag_End);
 			}
 
 			(void) pthread_mutex_unlock(&mgmt->m_resp_mutex);
@@ -610,7 +613,7 @@ static void
 sess_set_auth(iscsi_sess_t *isp)
 {
 	IscsiAuthClient		*auth_client	= NULL;
-	xml_node_t		*node		= NULL;
+	tgt_node_t		*node		= NULL;
 
 	if (isp == (iscsi_sess_t *)NULL)
 		return;
@@ -620,13 +623,13 @@ sess_set_auth(iscsi_sess_t *isp)
 	isp->sess_auth.auth_enabled = B_TRUE;
 
 	/* Load CHAP name */
-	node = xml_node_next_child(main_config, XML_ELEMENT_CHAPNAME, NULL);
+	node = tgt_node_next_child(main_config, XML_ELEMENT_CHAPNAME, NULL);
 	if (node == NULL)
 		return;
 	(void) strcpy(isp->sess_auth.username, node->x_value);
 
 	/* Load CHAP secret */
-	node = xml_node_next_child(main_config, XML_ELEMENT_CHAPSECRET, NULL);
+	node = tgt_node_next_child(main_config, XML_ELEMENT_CHAPSECRET, NULL);
 	if (node == NULL)
 		return;
 	(void) strcpy((char *)isp->sess_auth.password, node->x_value);

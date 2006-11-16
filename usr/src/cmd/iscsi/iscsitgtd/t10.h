@@ -325,7 +325,8 @@ typedef struct t10_lu_common {
 	/*
 	 * Parameter information in XML format.
 	 */
-	xml_node_t		*l_root;
+	tgt_node_t		*l_root;
+	Boolean_t		l_root_okay_to_free;
 
 	/*
 	 * File descriptor for the open file which is the backing store
@@ -499,6 +500,15 @@ typedef struct scsi_cmd_table {
 	char	*cmd_name;
 } scsi_cmd_table_t;
 
+typedef struct sam_device_table {
+	Boolean_t	(*t_common_init)(t10_lu_common_t *);
+	void		(*t_common_fini)(t10_lu_common_t *);
+	void		(*t_per_init)(t10_lu_impl_t *);
+	void		(*t_per_fini)(t10_lu_impl_t *);
+	void		(*t_task_mgmt)(t10_lu_common_t *, TaskOp_t);
+	char		*t_type_name;
+} sam_device_table_t;
+
 /*
  * []----
  * | Interfaces
@@ -611,24 +621,26 @@ void *trans_params_area(t10_cmd_t *cmd);
  * | Declaration of emulation entry points				|
  * []------------------------------------------------------------------[]
  */
-Boolean_t sbc_init_common(t10_lu_common_t *lu);
-void sbc_fini_common(t10_lu_common_t *lu);
+Boolean_t sbc_common_init(t10_lu_common_t *lu);
+void sbc_common_fini(t10_lu_common_t *lu);
 void sbc_task_mgmt(t10_lu_common_t *lu, TaskOp_t op);
-void sbc_init_per(t10_lu_impl_t *itl);
-void sbc_fini_per(t10_lu_impl_t *itl);
-Boolean_t ssc_init_common(t10_lu_common_t *lu);
-void ssc_fini_common(t10_lu_common_t *lu);
+void sbc_per_init(t10_lu_impl_t *itl);
+void sbc_per_fini(t10_lu_impl_t *itl);
+Boolean_t ssc_common_init(t10_lu_common_t *lu);
+void ssc_common_fini(t10_lu_common_t *lu);
 void ssc_task_mgmt(t10_lu_common_t *lu, TaskOp_t op);
-void ssc_init_per(t10_lu_impl_t *itl);
-void ssc_fini_per(t10_lu_impl_t *itl);
-Boolean_t raw_init_common(t10_lu_common_t *lu);
-void raw_fini_common(t10_lu_common_t *lu);
-void raw_init_per(t10_lu_impl_t *itl);
-void raw_fini_per(t10_lu_impl_t *itl);
-Boolean_t osd_init_common(t10_lu_common_t *lu);
-void osd_fini_common(t10_lu_common_t *lu);
-void osd_init_per(t10_lu_impl_t *itl);
-void osd_fini_per(t10_lu_impl_t *itl);
+void ssc_per_init(t10_lu_impl_t *itl);
+void ssc_per_fini(t10_lu_impl_t *itl);
+Boolean_t raw_common_init(t10_lu_common_t *lu);
+void raw_common_fini(t10_lu_common_t *lu);
+void raw_per_init(t10_lu_impl_t *itl);
+void raw_per_fini(t10_lu_impl_t *itl);
+void raw_task_mgmt(t10_lu_common_t *lu, TaskOp_t op);
+Boolean_t osd_common_init(t10_lu_common_t *lu);
+void osd_common_fini(t10_lu_common_t *lu);
+void osd_per_init(t10_lu_impl_t *itl);
+void osd_per_fini(t10_lu_impl_t *itl);
+void osd_task_mgmt(t10_lu_common_t *lu, TaskOp_t op);
 
 #ifdef __cplusplus
 }

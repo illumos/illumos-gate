@@ -50,3 +50,5 @@ d none usr/sbin/amd64 755 root bin
 f none usr/sbin/amd64/iscsitgtd 555 root bin
 d none usr/sbin/i86 755 root bin
 f none usr/sbin/i86/iscsitgtd 555 root bin
+d none usr/lib/amd64 755 root bin
+s none usr/lib/amd64/libiscsitgt.so.1=../../../lib/amd64/libiscsitgt.so.1

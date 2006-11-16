@@ -40,7 +40,7 @@ include $(SRC)/cmd/iscsi/Makefile.iscsi
 SUFFIX_LINT	= .ln
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_LARGEFILE64_SOURCE=1 -I$(ISCSICOMMONDIR) -I/usr/include/libxml2
+CPPFLAGS +=	-D_LARGEFILE64_SOURCE=1 -I/usr/include/libxml2
 CFLAGS64 +=	$(CCVERBOSE)
 
 GROUP=sys
@@ -52,6 +52,8 @@ CLEANFILES += $(OBJS)
 all: $(PROG)
 
 LDLIBS	+=	-luuid -lxml2 -lsocket -lnsl -ldoor -lavl -lmd5 -ladm -lefi
+LDLIBS  +=	-liscsitgt -lzfs
+
 $(PROG): $(OBJS) $(COMMON_OBJS)
 	$(LINK.c) $(OBJS) $(COMMON_OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)

@@ -550,7 +550,7 @@ spc_report_luns(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			lun_idx,
 			lun_val;
 	char		*str;
-	xml_node_t	*targ,
+	tgt_node_t	*targ,
 			*lun_list,
 			*lun;
 
@@ -581,9 +581,9 @@ spc_report_luns(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	select = cdb[2];
 
 	targ = NULL;
-	while ((targ = xml_node_next(targets_config, XML_ELEMENT_TARG, targ)) !=
+	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ)) !=
 	    NULL) {
-		if (xml_find_value_str(targ, XML_ELEMENT_INAME, &str) ==
+		if (tgt_find_value_str(targ, XML_ELEMENT_INAME, &str) ==
 		    False) {
 			goto error;
 		}
@@ -595,11 +595,11 @@ spc_report_luns(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	}
 	if (!targ)
 		goto error;
-	if ((lun_list = xml_node_next(targ, XML_ELEMENT_LUNLIST, NULL)) == NULL)
+	if ((lun_list = tgt_node_next(targ, XML_ELEMENT_LUNLIST, NULL)) == NULL)
 		goto error;
 
 	lun = NULL;
-	while ((lun = xml_node_next(lun_list, XML_ELEMENT_LUN, lun)) != NULL)
+	while ((lun = tgt_node_next(lun_list, XML_ELEMENT_LUN, lun)) != NULL)
 		entries++;
 
 
@@ -616,9 +616,9 @@ spc_report_luns(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 		lun_idx = SCSI_REPORTLUNS_ADDRESS_SIZE;
 		lun	= NULL;
-		while ((lun = xml_node_next(lun_list, XML_ELEMENT_LUN, lun)) !=
+		while ((lun = tgt_node_next(lun_list, XML_ELEMENT_LUN, lun)) !=
 		    NULL) {
-			if (xml_find_value_int(lun, XML_ELEMENT_LUN,
+			if (tgt_find_value_int(lun, XML_ELEMENT_LUN,
 			    &lun_val) == False)
 				goto error;
 			if (spc_encode_lu_addr(&buf[lun_idx], select,

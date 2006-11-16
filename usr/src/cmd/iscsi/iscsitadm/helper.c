@@ -44,7 +44,6 @@
 #include <netinet/in.h>
 #include <sys/iscsi_protocol.h>
 #include <door.h>
-#include <iscsi_door.h>
 #include <sys/scsi/generic/inquiry.h>
 #include <sys/mman.h>
 #include <sys/filio.h>
@@ -52,63 +51,14 @@
 #include <libscf.h>
 #include <fcntl.h>
 
-#include "local_types.h"
+#include <iscsitgt_impl.h>
 #include "cmdparse.h"
 #include "utility.h"
-#include "xml.h"
 #include "helper.h"
 
 extern char *cmdName;
 
-#define	WAIT_FOR_SERVICE	15
-#define	WAIT_FOR_DOOR		15
-static char *service = "system/iscsitgt:default";
 static stat_delta_t *stat_head;
-
-static Boolean_t
-is_online()
-{
-	char		*s;
-	Boolean_t	rval = False;
-
-	if ((s = smf_get_state(service)) != NULL) {
-		if (strcmp(s, SCF_STATE_STRING_ONLINE) == 0)
-			rval = True;
-		free(s);
-	}
-
-	return (rval);
-}
-
-Boolean_t
-check_and_online()
-{
-	int		i,
-			fd;
-
-	if (is_online() == False) {
-		if (smf_enable_instance(service, 0) != 0) {
-			return (False);
-		}
-		for (i = 0; i < WAIT_FOR_SERVICE; i++) {
-			if (is_online() == True)
-				break;
-			(void) sleep(1);
-		}
-		if (i == WAIT_FOR_SERVICE) {
-			return (False);
-		}
-	}
-
-	for (i = 0; i < WAIT_FOR_DOOR; i++) {
-		if ((fd = open(ISCSI_TARGET_MGMT_DOOR, 0)) >= 0) {
-			(void) close(fd);
-			return (True);
-		}
-		(void) sleep(1);
-	}
-	return (False);
-}
 
 /*
  * []----
@@ -120,9 +70,9 @@ check_and_online()
  * []----
  */
 Boolean_t
-buffer_xml(char *s, char **storage, xml_node_t **np)
+buffer_xml(char *s, char **storage, tgt_node_t **np)
 {
-	xml_node_t		*node		= NULL;
+	tgt_node_t		*node		= NULL;
 	xmlTextReaderPtr	r;
 	char			*p,
 				*e,
@@ -201,7 +151,7 @@ buffer_xml(char *s, char **storage, xml_node_t **np)
 		return (False);
 
 	while (xmlTextReaderRead(r) == 1) {
-		if (xml_process_node(r, &node) == False)
+		if (tgt_node_process(r, &node) == False)
 			break;
 	}
 
@@ -218,118 +168,6 @@ buffer_xml(char *s, char **storage, xml_node_t **np)
 		*storage = NULL;
 	free(p);
 	return (True);
-}
-
-xml_node_t *
-send_data(char *hostname, char *first_str)
-{
-	struct sockaddr_in	sin;
-	struct hostent		*hp;
-	int			s,
-				min,
-				nmsgs,
-				nbytes,
-				error_num,
-				port		= 3269;
-	struct pollfd		fds[1];
-	nfds_t			nfds		= 1;
-	char			input[128],
-				*storage	= NULL;
-	xml_node_t		*node		= NULL;
-
-	if (hostname != NULL) {
-		if ((hp = getipnodebyname(hostname, AF_INET,
-		    AI_ALL | AI_ADDRCONFIG | AI_V4MAPPED,
-		    &error_num)) == NULL) {
-			(void) printf("Can't find IP addr for %s\n", hostname);
-			exit(1);
-		}
-
-		bzero(&sin, sizeof (sin));
-		sin.sin_family	= hp->h_addrtype;
-		sin.sin_port	= ntohs(port);
-		bcopy(hp->h_addr_list[0], &sin.sin_addr, hp->h_length);
-
-		if ((s = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-			(void) printf("Failed to open socket\n");
-			exit(1);
-		}
-
-		if (connect(s, (struct sockaddr *)&sin, sizeof (sin)) < 0) {
-			(void) printf("Failed to connect\n");
-			exit(1);
-		}
-
-		fds[0].fd	= s;
-		fds[0].events	= POLLIN;
-		fds[0].revents	= 0;
-
-		if (write(s, first_str, strlen(first_str)) !=
-		    strlen(first_str)) {
-			perror("Failed to send request");
-			exit(1);
-		}
-		while (poll(fds, nfds, -1) != -1) {
-			if ((nmsgs = ioctl(s, FIONREAD, &nbytes)) < 0)
-				exit(1);
-			if ((nmsgs == 0) && (nbytes == 0))
-				exit(1);
-			min = MIN(nbytes, sizeof (input) - 1);
-			if (read(s, input, min) != min)
-				exit(1);
-			input[min] = '\0';
-
-			if (buffer_xml(input, &storage, &node) == True) {
-				break;
-			}
-		}
-	} else {
-		door_arg_t		d;
-		xmlTextReaderPtr	r;
-
-		d.data_ptr	= first_str;
-		d.data_size	= strlen(first_str) + 1;
-		d.desc_ptr	= NULL;
-		d.desc_num	= 0;
-		d.rbuf		= NULL;
-		d.rsize		= 0;
-
-		if (((s = open(ISCSI_TARGET_MGMT_DOOR, 0)) < 0) ||
-		    (door_call(s, &d) < 0)) {
-			if (s != -1)
-				(void) close(s);
-
-			if (check_and_online() == False) {
-				(void) fprintf(stderr,
-				    "iscsitadm: SMF service unavailable\n");
-				exit(1);
-			}
-
-			if ((s = open(ISCSI_TARGET_MGMT_DOOR, 0)) < 0) {
-				(void) fprintf(stderr,
-				    "iscsitadm: Failed to open iSCSI target"
-				    " management door\n");
-				exit(1);
-			}
-			if (door_call(s, &d) < 0) {
-				perror("door_call");
-				exit(1);
-			}
-		}
-
-		if ((r = (xmlTextReaderPtr)xmlReaderForMemory(d.rbuf,
-		    strlen(d.rbuf), NULL, NULL, 0)) == NULL) {
-			perror("xmlReaderForMemory");
-			exit(1);
-		}
-		while (xmlTextReaderRead(r) == 1)
-			if (xml_process_node(r, &node) == False)
-				break;
-		xmlFreeTextReader(r);
-		(void) munmap(d.rbuf, d.rsize);
-	}
-	(void) close(s);
-	return (node);
 }
 
 /*
@@ -573,34 +411,34 @@ number_to_scaled_string(
 }
 
 void
-stats_load_counts(xml_node_t *n, stat_delta_t *d)
+stats_load_counts(tgt_node_t *n, stat_delta_t *d)
 {
-	xml_node_t	*conn	= NULL,
+	tgt_node_t	*conn	= NULL,
 			*lun;
 	char		*val;
 
 	bzero(d, sizeof (*d));
 	d->device = n->x_value;
 
-	while (conn = xml_node_next(n, XML_ELEMENT_CONN, conn)) {
+	while (conn = tgt_node_next(n, XML_ELEMENT_CONN, conn)) {
 		lun = NULL;
-		while (lun = xml_node_next(conn, XML_ELEMENT_LUN, lun)) {
-			if (xml_find_value_str(lun, XML_ELEMENT_READCMDS,
+		while (lun = tgt_node_next(conn, XML_ELEMENT_LUN, lun)) {
+			if (tgt_find_value_str(lun, XML_ELEMENT_READCMDS,
 			    &val) == True) {
 				d->read_cmds += strtoll(val, NULL, 0);
 				free(val);
 			}
-			if (xml_find_value_str(lun, XML_ELEMENT_WRITECMDS,
+			if (tgt_find_value_str(lun, XML_ELEMENT_WRITECMDS,
 			    &val) == True) {
 				d->write_cmds += strtoll(val, NULL, 0);
 				free(val);
 			}
-			if (xml_find_value_str(lun, XML_ELEMENT_READBLKS,
+			if (tgt_find_value_str(lun, XML_ELEMENT_READBLKS,
 			    &val) == True) {
 				d->read_blks += strtoll(val, NULL, 0);
 				free(val);
 			}
-			if (xml_find_value_str(lun, XML_ELEMENT_WRITEBLKS,
+			if (tgt_find_value_str(lun, XML_ELEMENT_WRITEBLKS,
 			    &val) == True) {
 				d->write_blks += strtoll(val, NULL, 0);
 				free(val);

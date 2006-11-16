@@ -27,13 +27,13 @@
 
 PROG = iscsitadm
 OBJS = main.o helper.o cmdparse.o
-SRCS =$(OBJS:%.o=%.c) $(COMMON_SRCS)
+SRCS =$(OBJS:%.o=%.c)
 POFILES= $(OBJS:%.o=%.po)
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/iscsi/Makefile.iscsi
 
-LDLIBS += -lxml2 -lsocket -lnsl -ldoor -lscf
+LDLIBS += -liscsitgt -lxml2
 CFLAGS += $(CCVERBOSE) -I${ISCSICOMMONDIR}
 FILEMODE= 0555
 GROUP= bin

@@ -678,7 +678,7 @@ zpool_do_create(int argc, char **argv)
 					    ZFS_PROP_MOUNTPOINT),
 					    mountpoint) == 0);
 				if (zfs_mount(pool, NULL, 0) == 0)
-					ret = zfs_share(pool);
+					ret = zfs_share_nfs(pool);
 				zfs_close(pool);
 			}
 			zpool_log_history(g_zfs, argc + optind, argv - optind,
@@ -749,7 +749,7 @@ zpool_do_destroy(int argc, char **argv)
 		return (1);
 	}
 
-	if (zpool_unmount_datasets(zhp, force) != 0) {
+	if (zpool_disable_datasets(zhp, force) != 0) {
 		(void) fprintf(stderr, gettext("could not destroy '%s': "
 		    "could not unmount datasets\n"), zpool_get_name(zhp));
 		return (1);
@@ -812,7 +812,7 @@ zpool_do_export(int argc, char **argv)
 			continue;
 		}
 
-		if (zpool_unmount_datasets(zhp, force) != 0) {
+		if (zpool_disable_datasets(zhp, force) != 0) {
 			ret = 1;
 			zpool_close(zhp);
 			continue;
@@ -1134,7 +1134,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 
 	verify((zhp = zpool_open(g_zfs, name)) != NULL);
 
-	if (zpool_mount_datasets(zhp, mntopts, 0) != 0) {
+	if (zpool_enable_datasets(zhp, mntopts, 0) != 0) {
 		zpool_close(zhp);
 		return (1);
 	}

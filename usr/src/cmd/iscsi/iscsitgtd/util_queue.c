@@ -424,7 +424,7 @@ sess_queue_data_remove(msg_t *m)
 	case msg_mgmt_rqst:
 		mq = (mgmt_request_t *)m->msg_data;
 		(void) pthread_mutex_lock(&mq->m_resp_mutex);
-		xml_add_tag(mq->m_u.m_resp, "queue_freed", NULL);
+		tgt_buf_add(mq->m_u.m_resp, "queue_freed", NULL);
 		(void) pthread_mutex_unlock(&mq->m_resp_mutex);
 		queue_message_set(mq->m_q, 0, msg_mgmt_rply, 0);
 		break;
@@ -432,8 +432,8 @@ sess_queue_data_remove(msg_t *m)
 	case msg_mgmt_rply:
 		mq	= (mgmt_request_t *)m->msg_data;
 		buf	= mq->m_u.m_resp;
-		buf_add_tag(buf, XML_ELEMENT_STATS, Tag_End);
-		buf_add_tag(buf, XML_ELEMENT_CONN, Tag_End);
+		tgt_buf_add_tag(buf, XML_ELEMENT_STATS, Tag_End);
+		tgt_buf_add_tag(buf, XML_ELEMENT_CONN, Tag_End);
 
 		(void) pthread_mutex_unlock(&mq->m_resp_mutex);
 		queue_message_set(mq->m_q, 0, msg_mgmt_rply, 0);
@@ -469,7 +469,7 @@ conn_queue_data_remove(msg_t *m)
 		mq = (mgmt_request_t *)m->msg_data;
 		(void) pthread_mutex_lock(&mq->m_resp_mutex);
 		if (mq->m_u.m_resp != NULL)
-			xml_add_tag(mq->m_u.m_resp, "queue_freed", NULL);
+			tgt_buf_add(mq->m_u.m_resp, "queue_freed", NULL);
 		(void) pthread_mutex_unlock(&mq->m_resp_mutex);
 		queue_message_set(mq->m_q, 0, msg_mgmt_rply, 0);
 		break;

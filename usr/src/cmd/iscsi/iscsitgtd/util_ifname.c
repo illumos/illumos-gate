@@ -45,7 +45,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include "local_types.h"
+#include <iscsitgt_impl.h>
 #include "target.h"
 #include "queue.h"
 #include "utility.h"

@@ -36,10 +36,9 @@ extern "C" {
 #include <pthread.h>
 #include <sys/time.h>
 #include <stdarg.h>
-#include <xml.h>
 #include <synch.h>
 
-#include "local_types.h"
+#include <iscsitgt_impl.h>
 
 #define	Q_CONN_ERRS	0x00001
 #define	Q_CONN_LOGIN	0x00002
@@ -243,7 +242,7 @@ typedef struct mgmt_request {
 	pthread_mutex_t	m_resp_mutex;
 	union {
 		char		**m_resp;
-		xml_node_t	*m_node;
+		tgt_node_t	*m_node;
 	} m_u;
 } mgmt_request_t;
 

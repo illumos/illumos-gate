@@ -26,15 +26,17 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <alloca.h>
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <devid.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <libintl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zio.h>
@@ -1231,26 +1233,126 @@ zpool_clear(zpool_handle_t *zhp, const char *path)
 	return (zpool_standard_error(hdl, errno, msg));
 }
 
-static int
-do_zvol(zfs_handle_t *zhp, void *data)
+/*
+ * Iterate over all zvols in a given pool by walking the /dev/zvol/dsk/<pool>
+ * hierarchy.
+ */
+int
+zpool_iter_zvol(zpool_handle_t *zhp, int (*cb)(const char *, void *),
+    void *data)
 {
-	int linktype = (int)(uintptr_t)data;
-	int ret;
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
+	char (*paths)[MAXPATHLEN];
+	size_t size = 4;
+	int curr, fd, base, ret = 0;
+	DIR *dirp;
+	struct dirent *dp;
+	struct stat st;
 
-	/*
-	 * We check for volblocksize intead of ZFS_TYPE_VOLUME so that we
-	 * correctly handle snapshots of volumes.
-	 */
-	if (ZFS_IS_VOLUME(zhp)) {
-		if (linktype)
-			ret = zvol_create_link(zhp->zfs_hdl, zhp->zfs_name);
-		else
-			ret = zvol_remove_link(zhp->zfs_hdl, zhp->zfs_name);
+	if ((base = open("/dev/zvol/dsk", O_RDONLY)) < 0)
+		return (errno == ENOENT ? 0 : -1);
+
+	if (fstatat(base, zhp->zpool_name, &st, 0) != 0) {
+		int err = errno;
+		(void) close(base);
+		return (err == ENOENT ? 0 : -1);
 	}
 
-	ret = zfs_iter_children(zhp, do_zvol, data);
+	/*
+	 * Oddly this wasn't a directory -- ignore that failure since we
+	 * know there are no links lower in the (non-existant) hierarchy.
+	 */
+	if (!S_ISDIR(st.st_mode)) {
+		(void) close(base);
+		return (0);
+	}
+
+	if ((paths = zfs_alloc(hdl, size * sizeof (paths[0]))) == NULL) {
+		(void) close(base);
+		return (-1);
+	}
+
+	(void) strlcpy(paths[0], zhp->zpool_name, sizeof (paths[0]));
+	curr = 0;
+
+	while (curr >= 0) {
+		if (fstatat(base, paths[curr], &st, AT_SYMLINK_NOFOLLOW) != 0)
+			goto err;
+
+		if (S_ISDIR(st.st_mode)) {
+			if ((fd = openat(base, paths[curr], O_RDONLY)) < 0)
+				goto err;
+
+			if ((dirp = fdopendir(fd)) == NULL) {
+				(void) close(fd);
+				goto err;
+			}
+
+			while ((dp = readdir(dirp)) != NULL) {
+				if (dp->d_name[0] == '.')
+					continue;
+
+				if (curr + 1 == size) {
+					paths = zfs_realloc(hdl, paths,
+					    size * sizeof (paths[0]),
+					    size * 2 * sizeof (paths[0]));
+					if (paths == NULL) {
+						(void) closedir(dirp);
+						(void) close(fd);
+						goto err;
+					}
+
+					size *= 2;
+				}
+
+				(void) strlcpy(paths[curr + 1], paths[curr],
+				    sizeof (paths[curr + 1]));
+				(void) strlcat(paths[curr], "/",
+				    sizeof (paths[curr]));
+				(void) strlcat(paths[curr], dp->d_name,
+				    sizeof (paths[curr]));
+				curr++;
+			}
+
+			(void) closedir(dirp);
+
+		} else {
+			if ((ret = cb(paths[curr], data)) != 0)
+				break;
+		}
+
+		curr--;
+	}
+
+	free(paths);
+	(void) close(base);
+
+	return (ret);
+
+err:
+	free(paths);
+	(void) close(base);
+	return (-1);
+}
+
+typedef struct zvol_cb {
+	zpool_handle_t *zcb_pool;
+	boolean_t zcb_create;
+} zvol_cb_t;
+
+/*ARGSUSED*/
+static int
+do_zvol_create(zfs_handle_t *zhp, void *data)
+{
+	int ret;
+
+	if (ZFS_IS_VOLUME(zhp))
+		(void) zvol_create_link(zhp->zfs_hdl, zhp->zfs_name);
+
+	ret = zfs_iter_children(zhp, do_zvol_create, NULL);
 
 	zfs_close(zhp);
+
 	return (ret);
 }
 
@@ -1270,32 +1372,29 @@ zpool_create_zvol_links(zpool_handle_t *zhp)
 	    zhp->zpool_name)) == NULL)
 		return (0);
 
-	ret = zfs_iter_children(zfp, do_zvol, (void *)B_TRUE);
+	ret = zfs_iter_children(zfp, do_zvol_create, NULL);
 
 	zfs_close(zfp);
 	return (ret);
 }
 
+static int
+do_zvol_remove(const char *dataset, void *data)
+{
+	zpool_handle_t *zhp = data;
+
+	return (zvol_remove_link(zhp->zpool_hdl, dataset));
+}
+
 /*
- * Iterate over all zvols in the poool and remove any minor nodes.
+ * Iterate over all zvols in the pool and remove any minor nodes.  We iterate
+ * by examining the /dev links so that a corrupted pool doesn't impede this
+ * operation.
  */
 int
 zpool_remove_zvol_links(zpool_handle_t *zhp)
 {
-	zfs_handle_t *zfp;
-	int ret;
-
-	/*
-	 * If the pool is unavailable, just return success.
-	 */
-	if ((zfp = make_dataset_handle(zhp->zpool_hdl,
-	    zhp->zpool_name)) == NULL)
-		return (0);
-
-	ret = zfs_iter_children(zfp, do_zvol, (void *)B_FALSE);
-
-	zfs_close(zfp);
-	return (ret);
+	return (zpool_iter_zvol(zhp, do_zvol_remove, zhp));
 }
 
 /*

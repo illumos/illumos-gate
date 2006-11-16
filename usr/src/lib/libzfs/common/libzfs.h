@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -80,8 +81,8 @@ enum {
 	EZFS_ZONED,		/* used improperly in local zone */
 	EZFS_MOUNTFAILED,	/* failed to mount dataset */
 	EZFS_UMOUNTFAILED,	/* failed to unmount dataset */
-	EZFS_UNSHAREFAILED,	/* unshare(1M) failed */
-	EZFS_SHAREFAILED,	/* share(1M) failed */
+	EZFS_UNSHARENFSFAILED,	/* unshare(1M) failed */
+	EZFS_SHARENFSFAILED,	/* share(1M) failed */
 	EZFS_DEVLINKS,		/* failed to create zvol links */
 	EZFS_PERM,		/* permission denied */
 	EZFS_NOSPC,		/* out of space */
@@ -91,6 +92,8 @@ enum {
 	EZFS_INVALCONFIG,	/* invalid vdev configuration */
 	EZFS_RECURSIVE,		/* recursive dependency */
 	EZFS_NOHISTORY,		/* no history object */
+	EZFS_UNSHAREISCSIFAILED, /* iscsitgtd failed request to unshare */
+	EZFS_SHAREISCSIFAILED,	/* iscsitgtd failed request to share */
 	EZFS_UNKNOWN		/* unknown error */
 };
 
@@ -312,6 +315,8 @@ extern int zfs_promote(zfs_handle_t *);
 extern const char *zfs_type_to_name(zfs_type_t);
 extern void zfs_refresh_properties(zfs_handle_t *);
 extern int zfs_name_valid(const char *, zfs_type_t);
+extern int zfs_disable(zfs_handle_t *);
+extern int zfs_enable(zfs_handle_t *);
 
 /*
  * Mount support functions.
@@ -324,10 +329,20 @@ extern int zfs_unmountall(zfs_handle_t *, int);
 /*
  * Share support functions.
  */
-extern boolean_t zfs_is_shared(zfs_handle_t *, char **);
+extern boolean_t zfs_is_shared(zfs_handle_t *);
 extern int zfs_share(zfs_handle_t *);
-extern int zfs_unshare(zfs_handle_t *, const char *);
-extern int zfs_unshareall(zfs_handle_t *);
+extern int zfs_unshare(zfs_handle_t *);
+
+/*
+ * Protocol-specifc share support functions.
+ */
+extern boolean_t zfs_is_shared_nfs(zfs_handle_t *, char **);
+extern int zfs_share_nfs(zfs_handle_t *);
+extern int zfs_unshare_nfs(zfs_handle_t *, const char *);
+extern int zfs_unshareall_nfs(zfs_handle_t *);
+extern boolean_t zfs_is_shared_iscsi(zfs_handle_t *);
+extern int zfs_share_iscsi(zfs_handle_t *);
+extern int zfs_unshare_iscsi(zfs_handle_t *);
 
 /*
  * When dealing with nvlists, verify() is extremely useful
@@ -362,16 +377,17 @@ extern int zpool_in_use(libzfs_handle_t *, int, pool_state_t *, char **,
 extern int zpool_read_label(int, nvlist_t **);
 
 /*
- * Create and remove zvol /dev links
+ * Create and remove zvol /dev links.
  */
 extern int zpool_create_zvol_links(zpool_handle_t *);
 extern int zpool_remove_zvol_links(zpool_handle_t *);
 
 /*
- * Mount and unmount datasets within a pool
+ * Enable and disable datasets within a pool by mounting/unmounting and
+ * sharing/unsharing them.
  */
-extern int zpool_mount_datasets(zpool_handle_t *, const char *, int);
-extern int zpool_unmount_datasets(zpool_handle_t *, boolean_t);
+extern int zpool_enable_datasets(zpool_handle_t *, const char *, int);
+extern int zpool_disable_datasets(zpool_handle_t *, boolean_t);
 
 #ifdef	__cplusplus
 }

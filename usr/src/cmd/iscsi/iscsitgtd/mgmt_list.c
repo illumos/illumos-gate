@@ -36,8 +36,8 @@
 #include <strings.h>
 #include <dirent.h>
 
+#include <iscsitgt_impl.h>
 #include "utility.h"
-#include <xml.h>
 #include "queue.h"
 #include "target.h"
 #include "iscsi_cmd.h"
@@ -45,18 +45,18 @@
 #include "port.h"
 #include "errcode.h"
 
-static char *list_targets(xml_node_t *x);
-static char *list_initiator(xml_node_t *x);
-static char *list_tpgt(xml_node_t *x);
-static char *list_admin(xml_node_t *x);
-static void target_info(char **msg, char *targ_name, xml_node_t *tnode);
+static char *list_targets(tgt_node_t *x);
+static char *list_initiator(tgt_node_t *x);
+static char *list_tpgt(tgt_node_t *x);
+static char *list_admin(tgt_node_t *x);
+static void target_info(char **msg, char *targ_name, tgt_node_t *tnode);
 static void target_stat(char **msg, char *iname, mgmt_type_t type);
 
 /*ARGSUSED*/
 void
-list_func(xml_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
+list_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 {
-	xml_node_t	*x;
+	tgt_node_t	*x;
 	char		msgbuf[80],
 			*reply_msg	= NULL;
 
@@ -86,12 +86,12 @@ list_func(xml_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 }
 
 static char *
-list_targets(xml_node_t *x)
+list_targets(tgt_node_t *x)
 {
 	char		*msg	= NULL,
 			*prop	= NULL,
 			*iname	= NULL;
-	xml_node_t	*targ	= NULL;
+	tgt_node_t	*targ	= NULL;
 	Boolean_t	luninfo	= False,
 			dostat	= False;
 
@@ -100,153 +100,156 @@ list_targets(xml_node_t *x)
 	 * administrator wants a complete list of targets. However if a
 	 * "name" is supplied then there must be a value for that element.
 	 */
-	if ((xml_find_value_str(x, XML_ELEMENT_NAME, &prop) == True) &&
+	if ((tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == True) &&
 	    (prop == NULL)) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
 	}
 
 	/* ---- optional arguments ---- */
-	(void) xml_find_value_boolean(x, XML_ELEMENT_LUNINFO, &luninfo);
-	(void) xml_find_value_boolean(x, XML_ELEMENT_IOSTAT, &dostat);
+	(void) tgt_find_value_boolean(x, XML_ELEMENT_LUNINFO, &luninfo);
+	(void) tgt_find_value_boolean(x, XML_ELEMENT_IOSTAT, &dostat);
 
-	buf_add_tag_and_attr(&msg, XML_ELEMENT_RESULT, "version='1.0'");
-	while ((targ = xml_node_next(targets_config, XML_ELEMENT_TARG,
+	tgt_buf_add_tag_and_attr(&msg, XML_ELEMENT_RESULT, "version='1.0'");
+	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG,
 	    targ)) != NULL) {
 		if (targ->x_value == NULL) {
-			xml_add_tag(&msg, XML_ELEMENT_TARG,
+			tgt_buf_add(&msg, XML_ELEMENT_TARG,
 				    "bogus entry");
 			continue;
 		}
-		if (xml_find_value_str(targ, XML_ELEMENT_INAME, &iname) ==
+		if (tgt_find_value_str(targ, XML_ELEMENT_INAME, &iname) ==
 		    False) {
-			xml_add_tag(&msg, XML_ELEMENT_TARG,
+			tgt_buf_add(&msg, XML_ELEMENT_TARG,
 				    "missing iscsi-name");
 			continue;
 		}
 		if (prop != NULL) {
 			if (strcmp(prop, targ->x_value) == 0) {
-				buf_add_tag(&msg, XML_ELEMENT_TARG, Tag_Start);
-				buf_add_tag(&msg, targ->x_value, Tag_String);
-				xml_add_tag(&msg, XML_ELEMENT_INAME, iname);
+				tgt_buf_add_tag(&msg, XML_ELEMENT_TARG,
+				    Tag_Start);
+				tgt_buf_add_tag(&msg, targ->x_value,
+				    Tag_String);
+				tgt_buf_add(&msg, XML_ELEMENT_INAME, iname);
 				if (luninfo == True)
 					target_info(&msg, iname, targ);
 				if (dostat == True)
 					target_stat(&msg, iname,
 					    mgmt_full_phase_statistics);
-				buf_add_tag(&msg, XML_ELEMENT_TARG, Tag_End);
+				tgt_buf_add_tag(&msg, XML_ELEMENT_TARG,
+				    Tag_End);
 			}
 		} else {
-			buf_add_tag(&msg, XML_ELEMENT_TARG, Tag_Start);
-			buf_add_tag(&msg, targ->x_value, Tag_String);
-			xml_add_tag(&msg, XML_ELEMENT_INAME, iname);
+			tgt_buf_add_tag(&msg, XML_ELEMENT_TARG, Tag_Start);
+			tgt_buf_add_tag(&msg, targ->x_value, Tag_String);
+			tgt_buf_add(&msg, XML_ELEMENT_INAME, iname);
 			if (dostat == True)
 				target_stat(&msg, iname,
 				    mgmt_full_phase_statistics);
 			if (luninfo == True)
 				target_info(&msg, iname, targ);
-			buf_add_tag(&msg, XML_ELEMENT_TARG, Tag_End);
+			tgt_buf_add_tag(&msg, XML_ELEMENT_TARG, Tag_End);
 		}
 		free(iname);
 	}
-	buf_add_tag(&msg, XML_ELEMENT_RESULT, Tag_End);
+	tgt_buf_add_tag(&msg, XML_ELEMENT_RESULT, Tag_End);
 	free(prop);
 
 	return (msg);
 }
 
 static char *
-list_initiator(xml_node_t *x)
+list_initiator(tgt_node_t *x)
 {
 	char		*msg	= NULL,
 			*attr,
 			*prop	= NULL;
 	Boolean_t	verbose	= False;
-	xml_node_t	*init	= NULL;
+	tgt_node_t	*init	= NULL;
 
 	/* ---- Optional arguments ---- */
-	if ((xml_find_value_str(x, XML_ELEMENT_NAME, &prop) == True) &&
+	if ((tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == True) &&
 	    (prop == NULL)) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
 	}
-	(void) xml_find_value_boolean(x, XML_ELEMENT_VERBOSE, &verbose);
+	(void) tgt_find_value_boolean(x, XML_ELEMENT_VERBOSE, &verbose);
 
-	buf_add_tag_and_attr(&msg, XML_ELEMENT_RESULT, "version='1.0'");
-	while ((init = xml_node_next(main_config, XML_ELEMENT_INIT, init)) !=
+	tgt_buf_add_tag_and_attr(&msg, XML_ELEMENT_RESULT, "version='1.0'");
+	while ((init = tgt_node_next(main_config, XML_ELEMENT_INIT, init)) !=
 	    NULL) {
 		if ((prop == NULL) ||
 		    ((prop != NULL) && (strcmp(prop, init->x_value) == 0))) {
 
-			buf_add_tag(&msg, XML_ELEMENT_INIT, Tag_Start);
-			buf_add_tag(&msg, init->x_value, Tag_String);
+			tgt_buf_add_tag(&msg, XML_ELEMENT_INIT, Tag_Start);
+			tgt_buf_add_tag(&msg, init->x_value, Tag_String);
 
-			if (xml_find_value_str(init, XML_ELEMENT_INAME,
+			if (tgt_find_value_str(init, XML_ELEMENT_INAME,
 			    &attr) == True) {
-				xml_add_tag(&msg, XML_ELEMENT_INAME, attr);
+				tgt_buf_add(&msg, XML_ELEMENT_INAME, attr);
 				free(attr);
 			}
 
-			if (xml_find_value_str(init, XML_ELEMENT_CHAPSECRET,
+			if (tgt_find_value_str(init, XML_ELEMENT_CHAPSECRET,
 			    &attr) == True) {
-				xml_add_tag(&msg, XML_ELEMENT_CHAPSECRET,
+				tgt_buf_add(&msg, XML_ELEMENT_CHAPSECRET,
 				    attr);
 				free(attr);
 			}
 
-			if (xml_find_value_str(init, XML_ELEMENT_CHAPNAME,
+			if (tgt_find_value_str(init, XML_ELEMENT_CHAPNAME,
 			    &attr) == True) {
-				xml_add_tag(&msg, XML_ELEMENT_CHAPNAME, attr);
+				tgt_buf_add(&msg, XML_ELEMENT_CHAPNAME, attr);
 				free(attr);
 			}
 
-			buf_add_tag(&msg, XML_ELEMENT_INIT, Tag_End);
+			tgt_buf_add_tag(&msg, XML_ELEMENT_INIT, Tag_End);
 		}
 	}
 
 	if (prop != NULL)
 		free(prop);
 
-	buf_add_tag(&msg, XML_ELEMENT_RESULT, Tag_End);
+	tgt_buf_add_tag(&msg, XML_ELEMENT_RESULT, Tag_End);
 
 	return (msg);
 }
 
 static char *
-list_tpgt(xml_node_t *x)
+list_tpgt(tgt_node_t *x)
 {
 	char		*msg	= NULL,
 			*prop	= NULL;
 	Boolean_t	verbose	= False;
-	xml_node_t	*tpgt	= NULL,
+	tgt_node_t	*tpgt	= NULL,
 			*ip	= NULL;
 
 	/* ---- Optional arguments ---- */
-	if ((xml_find_value_str(x, XML_ELEMENT_NAME, &prop) == True) &&
+	if ((tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == True) &&
 	    (prop == NULL)) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
 	}
-	(void) xml_find_value_boolean(x, XML_ELEMENT_VERBOSE, &verbose);
+	(void) tgt_find_value_boolean(x, XML_ELEMENT_VERBOSE, &verbose);
 
-	buf_add_tag_and_attr(&msg, XML_ELEMENT_RESULT, "version='1.0'");
-	while ((tpgt = xml_node_next(main_config, XML_ELEMENT_TPGT, tpgt)) !=
+	tgt_buf_add_tag_and_attr(&msg, XML_ELEMENT_RESULT, "version='1.0'");
+	while ((tpgt = tgt_node_next(main_config, XML_ELEMENT_TPGT, tpgt)) !=
 	    NULL) {
 		if ((prop == NULL) ||
 		    ((prop != NULL) && (strcmp(prop, tpgt->x_value) == 0))) {
 
-			buf_add_tag(&msg, XML_ELEMENT_TPGT, Tag_Start);
-			buf_add_tag(&msg, tpgt->x_value, Tag_String);
+			tgt_buf_add_tag(&msg, XML_ELEMENT_TPGT, Tag_Start);
+			tgt_buf_add_tag(&msg, tpgt->x_value, Tag_String);
 
-			while ((ip = xml_node_next(tpgt, XML_ELEMENT_IPADDR,
+			while ((ip = tgt_node_next(tpgt, XML_ELEMENT_IPADDR,
 			    ip)) != NULL) {
-				xml_add_tag(&msg, ip->x_name, ip->x_value);
+				tgt_buf_add(&msg, ip->x_name, ip->x_value);
 			}
 
-			buf_add_tag(&msg, XML_ELEMENT_TPGT, Tag_End);
+			tgt_buf_add_tag(&msg, XML_ELEMENT_TPGT, Tag_End);
 		}
 	}
-	buf_add_tag(&msg, XML_ELEMENT_RESULT, Tag_End);
+	tgt_buf_add_tag(&msg, XML_ELEMENT_RESULT, Tag_End);
 
 	if (prop != NULL)
 		free(prop);
@@ -255,25 +258,25 @@ list_tpgt(xml_node_t *x)
 
 /*ARGSUSED*/
 static char *
-list_admin(xml_node_t *x)
+list_admin(tgt_node_t *x)
 {
 	char		*msg	= NULL;
 	admin_table_t	*p;
-	xml_node_t	*node	= NULL;
+	tgt_node_t	*node	= NULL;
 
-	buf_add_tag_and_attr(&msg, XML_ELEMENT_RESULT, "version='1.0'");
-	buf_add_tag(&msg, XML_ELEMENT_ADMIN, Tag_Start);
+	tgt_buf_add_tag_and_attr(&msg, XML_ELEMENT_RESULT, "version='1.0'");
+	tgt_buf_add_tag(&msg, XML_ELEMENT_ADMIN, Tag_Start);
 
 	node = NULL;
 	for (p = admin_prop_list; p->name != NULL; p++) {
-		node = xml_node_next_child(main_config, p->name, NULL);
+		node = tgt_node_next_child(main_config, p->name, NULL);
 		if (node) {
-			xml_add_tag(&msg, p->name, node->x_value);
+			tgt_buf_add(&msg, p->name, node->x_value);
 		}
 	}
 
-	buf_add_tag(&msg, XML_ELEMENT_ADMIN, Tag_End);
-	buf_add_tag(&msg, XML_ELEMENT_RESULT, Tag_End);
+	tgt_buf_add_tag(&msg, XML_ELEMENT_ADMIN, Tag_End);
+	tgt_buf_add_tag(&msg, XML_ELEMENT_RESULT, Tag_End);
 
 	return (msg);
 }
@@ -335,113 +338,128 @@ target_stat(char **msg, char *targ_name, mgmt_type_t type)
 }
 
 static void
-target_info(char **msg, char *targ_name, xml_node_t *tnode)
+target_info(char **msg, char *targ_name, tgt_node_t *tnode)
 {
 	char			path[MAXPATHLEN],
 				lun_buf[16],
 				*prop;
 	xmlTextReaderPtr	r;
-	xml_node_t		*lnode,	/* list node */
+	tgt_node_t		*lnode,	/* list node */
 				*lnp, /* list node pointer */
 				*lun,
 				*params;
 	int			xml_fd,
 				lun_num;
+	Boolean_t		incore;
 
-	if ((lnode = xml_node_next(tnode, XML_ELEMENT_ACLLIST, NULL)) !=
+	if ((lnode = tgt_node_next(tnode, XML_ELEMENT_ACLLIST, NULL)) !=
 	    NULL) {
 		lnp = NULL;
-		buf_add_tag(msg, XML_ELEMENT_ACLLIST, Tag_Start);
-		while ((lnp = xml_node_next(lnode, XML_ELEMENT_INIT, lnp)) !=
+		tgt_buf_add_tag(msg, XML_ELEMENT_ACLLIST, Tag_Start);
+		while ((lnp = tgt_node_next(lnode, XML_ELEMENT_INIT, lnp)) !=
 		    NULL)
-			xml_add_tag(msg, XML_ELEMENT_INIT, lnp->x_value);
-		buf_add_tag(msg, XML_ELEMENT_ACLLIST, Tag_End);
+			tgt_buf_add(msg, XML_ELEMENT_INIT, lnp->x_value);
+		tgt_buf_add_tag(msg, XML_ELEMENT_ACLLIST, Tag_End);
 	}
 
-	if ((lnode = xml_node_next(tnode, XML_ELEMENT_TPGTLIST, NULL)) !=
+	if ((lnode = tgt_node_next(tnode, XML_ELEMENT_TPGTLIST, NULL)) !=
 	    NULL) {
 		lnp = NULL;
-		buf_add_tag(msg, XML_ELEMENT_TPGTLIST, Tag_Start);
-		while ((lnp = xml_node_next(lnode, XML_ELEMENT_TPGT, lnp)) !=
+		tgt_buf_add_tag(msg, XML_ELEMENT_TPGTLIST, Tag_Start);
+		while ((lnp = tgt_node_next(lnode, XML_ELEMENT_TPGT, lnp)) !=
 		    NULL)
-			xml_add_tag(msg, XML_ELEMENT_TPGT, lnp->x_value);
-		buf_add_tag(msg, XML_ELEMENT_TPGTLIST, Tag_End);
+			tgt_buf_add(msg, XML_ELEMENT_TPGT, lnp->x_value);
+		tgt_buf_add_tag(msg, XML_ELEMENT_TPGTLIST, Tag_End);
 	}
 
-	if ((lnode = xml_node_next(tnode, XML_ELEMENT_ALIAS, NULL)) != NULL)
-		xml_add_tag(msg, XML_ELEMENT_ALIAS, lnode->x_value);
+	if ((lnode = tgt_node_next(tnode, XML_ELEMENT_ALIAS, NULL)) != NULL)
+		tgt_buf_add(msg, XML_ELEMENT_ALIAS, lnode->x_value);
 
-	if ((lnode = xml_node_next(tnode, XML_ELEMENT_MAXRECV, NULL)) != NULL)
-		xml_add_tag(msg, XML_ELEMENT_MAXRECV, lnode->x_value);
+	if ((lnode = tgt_node_next(tnode, XML_ELEMENT_MAXRECV, NULL)) != NULL)
+		tgt_buf_add(msg, XML_ELEMENT_MAXRECV, lnode->x_value);
 
-	if ((lnode = xml_node_next(tnode, XML_ELEMENT_LUNLIST, NULL)) == NULL)
+	if ((lnode = tgt_node_next(tnode, XML_ELEMENT_LUNLIST, NULL)) == NULL)
 		return;
 
-	buf_add_tag(msg, XML_ELEMENT_LUNINFO, Tag_Start);
+	if (tgt_find_attr_str(tnode, XML_ELEMENT_INCORE, &prop) == True) {
+		if (strcmp(prop, "true") == 0)
+			incore = True;
+		else
+			incore = False;
+		free(prop);
+	} else
+		incore = False;
+
+	tgt_buf_add_tag(msg, XML_ELEMENT_LUNINFO, Tag_Start);
 	lun = NULL;
-	while ((lun = xml_node_next(lnode, XML_ELEMENT_LUN, lun)) != NULL) {
-		if ((xml_find_value_int(lun, XML_ELEMENT_LUN, &lun_num)) ==
+	while ((lun = tgt_node_next(lnode, XML_ELEMENT_LUN, lun)) != NULL) {
+		if ((tgt_find_value_int(lun, XML_ELEMENT_LUN, &lun_num)) ==
 		    False)
 			continue;
-		(void) snprintf(path, sizeof (path), "%s/%s/%s%d",
-		    target_basedir, targ_name, PARAMBASE, lun_num);
-		if ((xml_fd = open(path, O_RDONLY)) < 0)
-			continue;
-		if ((r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd,
-		    NULL, NULL, 0)) == NULL)
-			continue;
+		if (incore == False) {
+			(void) snprintf(path, sizeof (path), "%s/%s/%s%d",
+			    target_basedir, targ_name, PARAMBASE, lun_num);
+			if ((xml_fd = open(path, O_RDONLY)) < 0)
+				continue;
+			if ((r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd,
+			    NULL, NULL, 0)) == NULL)
+				continue;
 
-		params = NULL;
-		while (xmlTextReaderRead(r) == 1) {
-			if (xml_process_node(r, &params) == False)
-				break;
+			params = NULL;
+			while (xmlTextReaderRead(r) == 1) {
+				if (tgt_node_process(r, &params) == False)
+					break;
+			}
+			(void) close(xml_fd);
+			xmlTextReaderClose(r);
+			xmlFreeTextReader(r);
+		} else {
+			params = lun;
 		}
-		(void) close(xml_fd);
-		xmlTextReaderClose(r);
-		xmlFreeTextReader(r);
 
-		buf_add_tag(msg, XML_ELEMENT_LUN, Tag_Start);
+		tgt_buf_add_tag(msg, XML_ELEMENT_LUN, Tag_Start);
 		snprintf(lun_buf, sizeof (lun_buf), "%d", lun_num);
-		buf_add_tag(msg, lun_buf, Tag_String);
+		tgt_buf_add_tag(msg, lun_buf, Tag_String);
 
-		if (xml_find_value_str(params, XML_ELEMENT_GUID, &prop) ==
+		if (tgt_find_value_str(params, XML_ELEMENT_GUID, &prop) ==
 		    True) {
-			xml_add_tag(msg, XML_ELEMENT_GUID, prop);
+			tgt_buf_add(msg, XML_ELEMENT_GUID, prop);
 			free(prop);
 		}
-		if (xml_find_value_str(params, XML_ELEMENT_VID, &prop) ==
+		if (tgt_find_value_str(params, XML_ELEMENT_VID, &prop) ==
 		    True) {
-			xml_add_tag(msg, XML_ELEMENT_VID, prop);
+			tgt_buf_add(msg, XML_ELEMENT_VID, prop);
 			free(prop);
 		}
-		if (xml_find_value_str(params, XML_ELEMENT_PID, &prop) ==
+		if (tgt_find_value_str(params, XML_ELEMENT_PID, &prop) ==
 		    True) {
-			xml_add_tag(msg, XML_ELEMENT_PID, prop);
+			tgt_buf_add(msg, XML_ELEMENT_PID, prop);
 			free(prop);
 		}
-		if (xml_find_value_str(params, XML_ELEMENT_DTYPE, &prop) ==
+		if (tgt_find_value_str(params, XML_ELEMENT_DTYPE, &prop) ==
 		    True) {
-			xml_add_tag(msg, XML_ELEMENT_DTYPE, prop);
+			tgt_buf_add(msg, XML_ELEMENT_DTYPE, prop);
 			free(prop);
 		}
-		if (xml_find_value_str(params, XML_ELEMENT_SIZE, &prop) ==
+		if (tgt_find_value_str(params, XML_ELEMENT_SIZE, &prop) ==
 		    True) {
-			xml_add_tag(msg, XML_ELEMENT_SIZE, prop);
+			tgt_buf_add(msg, XML_ELEMENT_SIZE, prop);
 			free(prop);
 		}
-		if (xml_find_value_str(params, XML_ELEMENT_STATUS, &prop) ==
+		if (tgt_find_value_str(params, XML_ELEMENT_STATUS, &prop) ==
 		    True) {
-			xml_add_tag(msg, XML_ELEMENT_STATUS, prop);
+			tgt_buf_add(msg, XML_ELEMENT_STATUS, prop);
 			free(prop);
 		}
-		if (xml_find_value_str(params, XML_ELEMENT_BACK, &prop) ==
+		if (tgt_find_value_str(params, XML_ELEMENT_BACK, &prop) ==
 		    True) {
-			xml_add_tag(msg, XML_ELEMENT_BACK, prop);
+			tgt_buf_add(msg, XML_ELEMENT_BACK, prop);
 			free(prop);
 		}
-		buf_add_tag(msg, XML_ELEMENT_LUN, Tag_End);
+		tgt_buf_add_tag(msg, XML_ELEMENT_LUN, Tag_End);
 
-		xml_tree_free(params);
+		if (incore == False)
+			tgt_node_free(params);
 	}
-	buf_add_tag(msg, XML_ELEMENT_LUNINFO, Tag_End);
+	tgt_buf_add_tag(msg, XML_ELEMENT_LUNINFO, Tag_End);
 }

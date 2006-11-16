@@ -41,7 +41,7 @@
 #include <syslog.h>
 #include <sys/iscsi_protocol.h>
 
-#include "local_types.h"
+#include <iscsitgt_impl.h>
 #include "iscsi_conn.h"
 #include "iscsi_sess.h"
 #include "iscsi_login.h"
@@ -269,7 +269,7 @@ conn_process(void *v)
 				else {
 					(void) pthread_mutex_lock(
 						&mgmt->m_resp_mutex);
-					xml_add_tag(mgmt->m_u.m_resp,
+					tgt_buf_add(mgmt->m_u.m_resp,
 					    "connection", NULL);
 					(void) pthread_mutex_unlock(
 						&mgmt->m_resp_mutex);

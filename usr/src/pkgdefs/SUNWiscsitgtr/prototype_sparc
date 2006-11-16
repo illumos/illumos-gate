@@ -45,4 +45,5 @@
 #
 # SUNWiscsitgtr
 #
-
+d none lib/sparcv9 755 root bin
+f none lib/sparcv9/libiscsitgt.so.1 755 root bin

@@ -40,11 +40,11 @@
 #include <synch.h>
 #include <sys/stropts.h>
 #include <libxml/xmlreader.h>
+#include <iscsitgt_impl.h>
 
 #include "queue.h"
 #include "port.h"
 #include "utility.h"
-#include "xml.h"
 
 static void
 mgmt_monitor_queue(port_args_t *p)
@@ -65,7 +65,7 @@ mgmt_monitor_queue(port_args_t *p)
 		case msg_log:
 			data = (char *)m->msg_data;
 			output = NULL;
-			xml_add_tag(&output, "log", data);
+			tgt_buf_add(&output, "log", data);
 			(void) write(p->port_socket, output, strlen(output));
 			free(output);
 			break;
@@ -73,7 +73,7 @@ mgmt_monitor_queue(port_args_t *p)
 		case msg_mgmt_rply:
 			data = (char *)m->msg_data;
 			output = NULL;
-			xml_add_tag(&output, "mgmt", data);
+			tgt_buf_add(&output, "mgmt", data);
 			(void) write(p->port_socket, output, strlen(output));
 			free(output);
 			free(data);
@@ -103,7 +103,7 @@ mgmt_process(void *v)
 	nfds_t			nfds		= 1;
 	struct pollfd		fds[1];
 	xmlTextReaderPtr	r;
-	xml_node_t		*node		= NULL;
+	tgt_node_t		*node		= NULL;
 	mgmt_request_t		m;
 
 	fds[0].fd = p->port_socket;
@@ -143,7 +143,7 @@ mgmt_process(void *v)
 		if (r != NULL) {
 			ret = xmlTextReaderRead(r);
 			while (ret == 1) {
-				if (xml_process_node(r, &node) == False)
+				if (tgt_node_process(r, &node) == False)
 					break;
 				ret = xmlTextReaderRead(r);
 			}
@@ -153,6 +153,7 @@ mgmt_process(void *v)
 					msg_mgmt_rqst, &m);
 			}
 			xmlFreeTextReader(r);
+			tgt_node_free(node);
 			node = NULL;
 		}
 

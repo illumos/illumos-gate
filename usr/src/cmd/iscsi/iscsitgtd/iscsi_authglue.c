@@ -45,10 +45,10 @@
 #include <sys/iscsi_protocol.h>
 #include <sys/iscsi_authclient.h>
 #include <sys/types.h>
+#include <iscsitgt_impl.h>
 #include "radius.h"
 #include "queue.h"
 #include "iscsi_sess.h"
-#include "xml.h"
 #include "target.h"
 
 #define	DEFAULT_RADIUS_PORT 1812
@@ -67,7 +67,7 @@ persistent_radius_get(iscsi_radius_props_t *radius)
 	radius->r_radius_config_valid = B_FALSE;
 
 	/* Load RADIUS access option: enable/disable */
-	if (xml_find_value_boolean(main_config, XML_ELEMENT_RAD_ACCESS,
+	if (tgt_find_value_boolean(main_config, XML_ELEMENT_RAD_ACCESS,
 		&bRadiusAccess) == False) {
 		return (B_FALSE);
 	}
@@ -76,7 +76,7 @@ persistent_radius_get(iscsi_radius_props_t *radius)
 	}
 
 	/* Load RADIUS server: ipaddr[:port] */
-	if (xml_find_value_str(main_config, XML_ELEMENT_RAD_SERV,
+	if (tgt_find_value_str(main_config, XML_ELEMENT_RAD_SERV,
 		&szRadiusServer) == False) {
 		return (B_FALSE);
 	}
@@ -109,7 +109,7 @@ persistent_radius_get(iscsi_radius_props_t *radius)
 	 */
 
 	/* Load RADIUS shared secret */
-	if (xml_find_value_str(main_config, XML_ELEMENT_RAD_SECRET,
+	if (tgt_find_value_str(main_config, XML_ELEMENT_RAD_SECRET,
 		&szRadiusSecret) == False) {
 		freeaddrinfo(res);
 		return (B_FALSE);

@@ -42,7 +42,13 @@ i preremove
 #
 # SUNWiscsitgtu
 #
+d none lib 0755 root bin
+d none lib/svc 0755 root bin
+d none lib/svc/method 0755 root bin
+f none lib/svc/method/svc-iscsitgt 0555 root bin
 d none usr 0755 root sys
+d none usr/lib 755 root bin
+s none usr/lib/libiscsitgt.so.1=../../lib/libiscsitgt.so.1
 d none usr/sbin 0755 root bin
 f none usr/sbin/iscsitadm 0555 root bin
 l none usr/sbin/iscsitgtd=../../usr/lib/isaexec

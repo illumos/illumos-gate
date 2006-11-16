@@ -857,6 +857,8 @@ $(ROOT)/usr/lib/libinetutil.so.1:=	REALPATH=../../lib/libinetutil.so.1
 $(ROOT)/usr/lib/libinetutil.so:=	REALPATH=../../lib/libinetutil.so.1
 $(ROOT)/usr/lib/libintl.so.1:=		REALPATH=../../lib/libintl.so.1
 $(ROOT)/usr/lib/libintl.so:=		REALPATH=../../lib/libintl.so.1
+$(ROOT)/usr/lib/libiscsitgt.so.1:=	REALPATH=../../lib/libiscsitgt.so.1
+$(ROOT)/usr/lib/libiscsitgt.so:=	REALPATH=../../lib/libiscsitgt.so.1
 $(ROOT)/usr/lib/libkstat.so.1:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/libkstat.so:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/liblddbg.so.4:=		REALPATH=../../lib/liblddbg.so.4
@@ -1126,6 +1128,10 @@ $(ROOT)/usr/lib/$(MACH64)/libintl.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libintl.so.1
 $(ROOT)/usr/lib/$(MACH64)/libintl.so:= \
 	REALPATH=../../../lib/$(MACH64)/libintl.so.1
+$(ROOT)/usr/lib/$(MACH64)/libiscsitgt.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libiscsitgt.so.1
+$(ROOT)/usr/lib/$(MACH64)/libiscsitgt.so:= \
+	REALPATH=../../../lib/$(MACH64)/libiscsitgt.so.1
 $(ROOT)/usr/lib/$(MACH64)/libkstat.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libkstat.so.1
 $(ROOT)/usr/lib/$(MACH64)/libkstat.so:= \
@@ -1435,6 +1441,8 @@ SYM.USRLIB= \
 	/usr/lib/libinetutil.so.1 \
 	/usr/lib/libintl.so \
 	/usr/lib/libintl.so.1 \
+	/usr/lib/libiscsitgt.so \
+	/usr/lib/libiscsitgt.so.1 \
 	/usr/lib/libkstat.so \
 	/usr/lib/libkstat.so.1 \
 	/usr/lib/liblddbg.so.4 \
@@ -1669,6 +1677,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libinetutil.so.1 \
 	/usr/lib/$(MACH64)/libintl.so \
 	/usr/lib/$(MACH64)/libintl.so.1 \
+	/usr/lib/$(MACH64)/libiscsitgt.so \
+	/usr/lib/$(MACH64)/libiscsitgt.so.1 \
 	/usr/lib/$(MACH64)/libkstat.so \
 	/usr/lib/$(MACH64)/libkstat.so.1 \
 	/usr/lib/$(MACH64)/liblddbg.so.4 \

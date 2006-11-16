@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef _TARGET_XML_H
-#define	_TARGET_XML_H
+#ifndef _ISCSITGT_IMPL_H
+#define	_ISCSITGT_IMPL_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -39,8 +39,29 @@ extern "C" {
 
 #include <libxml/xmlreader.h>
 
-#include "local_types.h"
+#ifndef MIN
+#define	MIN(x, y)	((x) < (y) ? (x) : (y))
+#endif
+#ifndef MAX
+#define	MAX(x, y)	((x) > (y) ? (x) : (y))
+#endif
 
+/*
+ * Solaris typedefs boolean_t to be an enum with B_TRUE and B_FALSE.
+ * MacOS X typedefs boolean_t to be an int with #defines for TRUE & FALSE
+ * I like the use of enum's for return codes so that compilers can catch
+ * sloppy coding practices so I've defined a Boolean_t which is unique here.
+ */
+typedef enum {
+	False = 0,
+	True = 1
+} Boolean_t;
+
+#ifndef DTYPE_OSD
+#define	DTYPE_OSD	0x11
+#endif
+
+#define	ISCSI_TARGET_MGMT_DOOR	"/var/run/iscsi_tgt_door"
 /*
  * XML element defines.
  */
@@ -72,6 +93,7 @@ extern "C" {
 #define	XML_ELEMENT_DELETE_BACK	"delete-backing-store"
 #define	XML_ELEMENT_TARG	"target"
 #define	XML_ELEMENT_INIT	"initiator"
+#define	XML_ELEMENT_ZFS		"zfs"
 #define	XML_ELEMENT_ADMIN	"admin"
 #define	XML_ELEMENT_INAME	"iscsi-name"
 #define	XML_ELEMENT_MAXRECV	"maxrecv"
@@ -116,64 +138,65 @@ extern "C" {
 #define	XML_ELEMENT_STATUS	"status"
 #define	XML_ELEMENT_PROGRESS	"progress"
 #define	XML_ELEMENT_TIMESTAMPS	"time-stamps"
+#define	XML_ELEMENT_INCORE	"in-core"
+#define	XML_ELEMENT_VALIDATE	"validate"
+#define	XML_VALUE_TRUE		"true"
 
 typedef enum {
 	NodeFree,
 	NodeAlloc,
 	NodeName,
 	NodeValue
-} xml_node_state;
+} tgt_node_state;
 
 typedef enum { MatchName, MatchBoth } match_type_t;
 
-typedef struct xml_node {
-	struct xml_node	*x_parent,
+typedef struct tgt_node {
+	struct tgt_node	*x_parent,
 			*x_child,
 			*x_sibling,
 			*x_attr;
 	char		*x_name,
 			*x_value;
-	xml_node_state	x_state;
-} xml_node_t;
+	tgt_node_state	x_state;
+} tgt_node_t;
 
 typedef enum val_type { Tag_String, Tag_Start, Tag_End } val_type_t;
 typedef enum xml_val_type { String, Int, Uint64 } xml_val_type_t;
 
-void xml_tree_free(xml_node_t *x);
-void xml_walk(xml_node_t *x, int depth);
-void xml_walk_to_buf(xml_node_t *n, char **buf);
-void xml_update_config(xml_node_t *t, int depth, FILE *output);
-void buf_add_str(char **b, char *str);
-void buf_add_tag(char **b, char *str, val_type_t type);
-void buf_add_tag_and_attr(char **b, char *str, char *attr);
-void buf_add_node_attr(char **b, xml_node_t *x);
-void xml_add_tag(char **b, char *element, char *cdata);
-void xml_add_comment(char **b, char *comment);
-void xml_replace_child(xml_node_t *parent, xml_node_t *child, match_type_t m);
-Boolean_t xml_remove_child(xml_node_t *parent, xml_node_t *child,
+tgt_node_t *tgt_door_call(char *str, int smf_flags);
+Boolean_t tgt_dump2file(tgt_node_t *t, char *path);
+void tgt_dump2buf(tgt_node_t *t, char **buf);
+
+tgt_node_t *tgt_node_alloc(char *name, xml_val_type_t type, void *value);
+void tgt_node_free(tgt_node_t *x);
+void tgt_node_replace(tgt_node_t *parent, tgt_node_t *child, match_type_t m);
+Boolean_t tgt_node_remove(tgt_node_t *parent, tgt_node_t *child,
     match_type_t m);
-Boolean_t xml_encode_bytes(uint8_t *ip, size_t ip_size, char **buf,
+tgt_node_t *tgt_node_next(tgt_node_t *n, char *name, tgt_node_t *cur);
+tgt_node_t *tgt_node_next_child(tgt_node_t *n, char *name, tgt_node_t *cur);
+tgt_node_t *tgt_node_dup(tgt_node_t *n);
+tgt_node_t *tgt_node_find(tgt_node_t *n, char *name);
+void tgt_node_add(tgt_node_t *p, tgt_node_t *c);
+void tgt_node_add_attr(tgt_node_t *p, tgt_node_t *a);
+Boolean_t tgt_node_process(xmlTextReaderPtr r, tgt_node_t **node);
+
+void tgt_buf_add(char **b, char *element, const char *cdata);
+void tgt_buf_add_tag(char **b, const char *str, val_type_t type);
+void tgt_buf_add_tag_and_attr(char **b, char *str, char *attr);
+
+Boolean_t tgt_xml_encode(uint8_t *ip, size_t ip_size, char **buf,
     size_t *buf_size);
-Boolean_t xml_decode_bytes(char *buf, uint8_t **ip, size_t *ip_size);
-Boolean_t xml_find_value_str(xml_node_t *n, char *name, char **value);
-Boolean_t xml_find_value_int(xml_node_t *n, char *name, int *value);
-Boolean_t xml_find_value_intchk(xml_node_t *n, char *name, int *value);
-Boolean_t xml_update_value_ull(xml_node_t *root, char *name, uint64_t value);
-Boolean_t xml_dump2file(xml_node_t *root, char *path);
-Boolean_t xml_find_value_boolean(xml_node_t *n, char *name, Boolean_t *value);
-Boolean_t xml_find_attr_str(xml_node_t *n, char *attr, char **value);
-Boolean_t xml_process_node(xmlTextReaderPtr r, xml_node_t **node);
-Boolean_t xml_add_child(xml_node_t *p, xml_node_t *c);
-xml_node_t *xml_alloc_node(char *name, xml_val_type_t type, void *value);
-void xml_free_node(xml_node_t *node);
-xml_node_t *xml_node_next(xml_node_t *n, char *name, xml_node_t *cur);
-xml_node_t *xml_node_next_child(xml_node_t *n, char *name, xml_node_t *cur);
-xml_node_t *xml_node_dup(xml_node_t *n);
-xml_node_t *xml_find_child(xml_node_t *n, char *name);
-Boolean_t xml_update_value_str(xml_node_t *node, char *name, char *str);
+Boolean_t tgt_xml_decode(char *buf, uint8_t **ip, size_t *ip_size);
+Boolean_t tgt_find_value_str(tgt_node_t *n, char *name, char **value);
+Boolean_t tgt_find_value_int(tgt_node_t *n, char *name, int *value);
+Boolean_t tgt_find_value_intchk(tgt_node_t *n, char *name, int *value);
+Boolean_t tgt_find_value_boolean(tgt_node_t *n, char *name, Boolean_t *value);
+Boolean_t tgt_find_attr_str(tgt_node_t *n, char *attr, char **value);
+Boolean_t tgt_update_value_str(tgt_node_t *node, char *name, char *str);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _TARGET_XML_H */
+#endif /* _ISCSITGT_IMPL_H */

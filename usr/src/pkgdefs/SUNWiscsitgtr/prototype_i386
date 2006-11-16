@@ -46,3 +46,5 @@
 #
 # SUNWiscsitgtr
 #
+d none lib/amd64 755 root bin
+f none lib/amd64/libiscsitgt.so.1 755 root bin

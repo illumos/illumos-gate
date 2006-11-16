@@ -81,7 +81,7 @@ typedef struct sa_command {
 #define	SVC_SET		0x01 /* need value permissions */
 #define	SVC_ACTION	0x02 /* need action permissions */
 
-#define	ZFS_SHAREALL	"/usr/sbin/zfs share -a"
+#define	ZFS_SHAREALL	"/usr/sbin/zfs share -a nfs"
 
 /*
  * functions/values for manipulating options

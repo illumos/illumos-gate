@@ -868,3 +868,12 @@ usr/include/libdscp.h			sparc
 usr/include/sys/iscsi_protocol.h	sparc
 usr/include/sys/iscsi_authclient.h	sparc
 usr/include/sys/iscsi_authclientglue.h	sparc
+usr/include/libiscsitgt.h		sparc
+usr/include/iscsitgt_impl.h		sparc
+usr/lib/libiscsitgt.so			sparc
+usr/lib/sparcv9/libiscsitgt.so		sparc
+lib/libiscsitgt.so			sparc
+lib/llib-liscsitgt			sparc
+lib/llib-liscsitgt.ln			sparc
+lib/sparcv9/libiscsitgt.so		sparc
+lib/sparcv9/llib-liscsitgt.ln		sparc

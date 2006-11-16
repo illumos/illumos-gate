@@ -42,11 +42,10 @@
 #include <fcntl.h>
 #include <syslog.h>
 
-#include "local_types.h"
+#include <iscsitgt_impl.h>
 #include "target.h"
 #include "utility.h"
 #include "errcode.h"
-#include "xml.h"
 #include <sys/scsi/generic/commands.h>
 
 #define	CRC32_STR	"CRC32C"
@@ -73,9 +72,9 @@ util_init()
  * []----
  */
 Boolean_t
-check_access(xml_node_t *targ, char *initiator_name, Boolean_t req_chap)
+check_access(tgt_node_t *targ, char *initiator_name, Boolean_t req_chap)
 {
-	xml_node_t	*acl,
+	tgt_node_t	*acl,
 			*inode		= NULL,
 			*tgt_initiator	= NULL;
 	char		*dummy;
@@ -85,20 +84,20 @@ check_access(xml_node_t *targ, char *initiator_name, Boolean_t req_chap)
 	/*
 	 * If there's no ACL for this target everyone has access.
 	 */
-	if ((acl = xml_node_next(targ, XML_ELEMENT_ACLLIST, NULL)) == NULL)
+	if ((acl = tgt_node_next(targ, XML_ELEMENT_ACLLIST, NULL)) == NULL)
 		return (True);
 
 	/*
 	 * Find the local initiator name and also save the knowledge
 	 * if the initiator had a CHAP secret.
 	 */
-	while ((inode = xml_node_next(main_config, XML_ELEMENT_INIT,
+	while ((inode = tgt_node_next(main_config, XML_ELEMENT_INIT,
 	    inode)) != NULL) {
-		if (xml_find_value_str(inode, XML_ELEMENT_INAME, &dummy) ==
+		if (tgt_find_value_str(inode, XML_ELEMENT_INAME, &dummy) ==
 		    True) {
 			if (strcmp(dummy, initiator_name) == 0) {
 				free(dummy);
-				if (xml_find_value_str(inode,
+				if (tgt_find_value_str(inode,
 				    XML_ELEMENT_CHAPSECRET, &dummy) == True) {
 					free(dummy);
 					found_chap = True;
@@ -113,7 +112,7 @@ check_access(xml_node_t *targ, char *initiator_name, Boolean_t req_chap)
 	if ((acl != NULL) && (inode == NULL))
 		return (False);
 
-	while ((tgt_initiator = xml_node_next(acl, XML_ELEMENT_INIT,
+	while ((tgt_initiator = tgt_node_next(acl, XML_ELEMENT_INIT,
 	    tgt_initiator)) != NULL) {
 
 		if (strcmp(inode->x_value, tgt_initiator->x_value) == 0) {
@@ -154,12 +153,12 @@ check_access(xml_node_t *targ, char *initiator_name, Boolean_t req_chap)
 static Boolean_t
 convert_local_tpgt(char **text, int *text_length, char *local_tpgt)
 {
-	xml_node_t	*tpgt	= NULL,
+	tgt_node_t	*tpgt	= NULL,
 	*x;
 	char		buf[80];
 	char		ipaddr[4];
 
-	while ((tpgt = xml_node_next(main_config, XML_ELEMENT_TPGT,
+	while ((tpgt = tgt_node_next(main_config, XML_ELEMENT_TPGT,
 	    tpgt)) != NULL) {
 		if (strcmp(tpgt->x_value, local_tpgt) == 0) {
 
@@ -206,9 +205,9 @@ convert_local_tpgt(char **text, int *text_length, char *local_tpgt)
  */
 static void
 add_target_address(iscsi_conn_t *c, char **text, int *text_length,
-    xml_node_t *targ)
+    tgt_node_t *targ)
 {
-	xml_node_t	*tpgt_list,
+	tgt_node_t	*tpgt_list,
 			*tpgt		= NULL;
 	struct sockaddr_in	*sp4;
 	struct sockaddr_in6	*sp6;
@@ -218,14 +217,14 @@ add_target_address(iscsi_conn_t *c, char **text, int *text_length,
 	char	buf[INET6_ADDRSTRLEN + 7],
 		net_buf[INET6_ADDRSTRLEN];
 
-	if ((tpgt_list = xml_node_next(targ, XML_ELEMENT_TPGTLIST,
+	if ((tpgt_list = tgt_node_next(targ, XML_ELEMENT_TPGTLIST,
 	    NULL)) == NULL) {
 		if_target_address(text, text_length,
 		    (struct sockaddr *)&c->c_target_sockaddr);
 		return;
 	}
 
-	while ((tpgt = xml_node_next(tpgt_list, XML_ELEMENT_TPGT,
+	while ((tpgt = tgt_node_next(tpgt_list, XML_ELEMENT_TPGT,
 	    tpgt)) != NULL) {
 		if (convert_local_tpgt(text, text_length, tpgt->x_value) ==
 		    False) {
@@ -264,16 +263,16 @@ add_target_address(iscsi_conn_t *c, char **text, int *text_length,
 static Boolean_t
 add_targets(iscsi_conn_t *c, char **text, int *text_length)
 {
-	xml_node_t	*targ		= NULL;
+	tgt_node_t	*targ		= NULL;
 	Boolean_t	rval		= True;
 	char		*targ_name	= NULL;
 
-	while ((rval == True) && ((targ = xml_node_next(targets_config,
+	while ((rval == True) && ((targ = tgt_node_next(targets_config,
 	    XML_ELEMENT_TARG, targ)) != NULL)) {
 
 		if (check_access(targ, c->c_sess->s_i_name, False) == True) {
 
-			if (xml_find_value_str(targ, XML_ELEMENT_INAME,
+			if (tgt_find_value_str(targ, XML_ELEMENT_INAME,
 			    &targ_name) == False) {
 				rval = False;
 				break;
@@ -823,7 +822,7 @@ static int
 find_main_tpgt(struct sockaddr_storage *pst)
 {
 	char		ip_addr[16];
-	xml_node_t	*tpgt				= NULL,
+	tgt_node_t	*tpgt				= NULL,
 			*ip_node			= NULL;
 	struct in_addr	addr;
 	struct in6_addr	addr6;
@@ -835,11 +834,11 @@ find_main_tpgt(struct sockaddr_storage *pst)
 	addr = ((struct sockaddr_in *)pst)->sin_addr;
 	addr6 = ((struct sockaddr_in6 *)pst)->sin6_addr;
 
-	while ((tpgt = xml_node_next(main_config, XML_ELEMENT_TPGT,
+	while ((tpgt = tgt_node_next(main_config, XML_ELEMENT_TPGT,
 	    tpgt)) != NULL) {
 
 		ip_node = NULL;
-		while ((ip_node = xml_node_next(tpgt, XML_ELEMENT_IPADDR,
+		while ((ip_node = tgt_node_next(tpgt, XML_ELEMENT_IPADDR,
 		    ip_node)) != NULL) {
 
 			if (pst->ss_family == AF_INET) {
@@ -879,9 +878,9 @@ find_main_tpgt(struct sockaddr_storage *pst)
  * return zero which will break the connection.
  */
 static int
-convert_to_tpgt(iscsi_conn_t *c, xml_node_t *targ)
+convert_to_tpgt(iscsi_conn_t *c, tgt_node_t *targ)
 {
-	xml_node_t	*list,
+	tgt_node_t	*list,
 			*tpgt		= NULL;
 	int		addr_tpgt,
 			pos_tpgt;
@@ -890,7 +889,7 @@ convert_to_tpgt(iscsi_conn_t *c, xml_node_t *targ)
 	 * If this target doesn't have a list of target portal group tags
 	 * just return the default which is 1.
 	 */
-	list = xml_node_next(targ, XML_ELEMENT_TPGTLIST, NULL);
+	list = tgt_node_next(targ, XML_ELEMENT_TPGTLIST, NULL);
 	if (list == NULL)
 		return (1);
 
@@ -900,8 +899,8 @@ convert_to_tpgt(iscsi_conn_t *c, xml_node_t *targ)
 	 */
 	addr_tpgt = find_main_tpgt(&(c->c_target_sockaddr));
 
-	while ((tpgt = xml_node_next(list, XML_ELEMENT_TPGT, tpgt)) != NULL) {
-		(void) xml_find_value_int(tpgt, XML_ELEMENT_TPGT, &pos_tpgt);
+	while ((tpgt = tgt_node_next(list, XML_ELEMENT_TPGT, tpgt)) != NULL) {
+		(void) tgt_find_value_int(tpgt, XML_ELEMENT_TPGT, &pos_tpgt);
 		if (pos_tpgt == addr_tpgt) {
 			return (addr_tpgt);
 		}
@@ -915,15 +914,15 @@ convert_to_tpgt(iscsi_conn_t *c, xml_node_t *targ)
  * | find_target_node -- given a target IQN name, return the XML node
  * []----
  */
-xml_node_t *
+tgt_node_t *
 find_target_node(char *targ_name)
 {
-	xml_node_t	*tnode	= NULL;
+	tgt_node_t	*tnode	= NULL;
 	char		*iname;
 
-	while ((tnode = xml_node_next(targets_config, XML_ELEMENT_TARG,
+	while ((tnode = tgt_node_next(targets_config, XML_ELEMENT_TARG,
 	    tnode)) != NULL) {
-		if (xml_find_value_str(tnode, XML_ELEMENT_INAME, &iname) ==
+		if (tgt_find_value_str(tnode, XML_ELEMENT_INAME, &iname) ==
 		    True) {
 			if (strcmp(iname, targ_name) == 0) {
 				free(iname);
@@ -939,7 +938,7 @@ find_target_node(char *targ_name)
 static Boolean_t
 connection_parameters_get(iscsi_conn_t *c, char *targ_name)
 {
-	xml_node_t	*targ,
+	tgt_node_t	*targ,
 			*alias;
 	Boolean_t	rval	= False;
 
@@ -954,16 +953,16 @@ connection_parameters_get(iscsi_conn_t *c, char *targ_name)
 		 */
 		if ((c->c_tpgt = convert_to_tpgt(c, targ)) == 0)
 			return (False);
-		if ((alias = xml_node_next(targ, XML_ELEMENT_ALIAS, NULL)) ==
+		if ((alias = tgt_node_next(targ, XML_ELEMENT_ALIAS, NULL)) ==
 		    NULL) {
-			(void) xml_find_value_str(targ, XML_ELEMENT_TARG,
+			(void) tgt_find_value_str(targ, XML_ELEMENT_TARG,
 			    &c->c_targ_alias);
 		} else {
-			(void) xml_find_value_str(alias, XML_ELEMENT_ALIAS,
+			(void) tgt_find_value_str(alias, XML_ELEMENT_ALIAS,
 			    &c->c_targ_alias);
 		}
 
-		(void) xml_find_value_int(targ, XML_ELEMENT_MAXCMDS,
+		(void) tgt_find_value_int(targ, XML_ELEMENT_MAXCMDS,
 		    &c->c_maxcmdsn);
 		rval = True;
 	}
@@ -972,14 +971,14 @@ connection_parameters_get(iscsi_conn_t *c, char *targ_name)
 }
 
 Boolean_t
-validate_version(xml_node_t *node, int *maj_p, int *min_p)
+validate_version(tgt_node_t *node, int *maj_p, int *min_p)
 {
 	char	*vers_str	= NULL,
 		*minor_part;
 	int	maj,
 		min;
 
-	if ((xml_find_attr_str(node, XML_ELEMENT_VERS, &vers_str) == False) ||
+	if ((tgt_find_attr_str(node, XML_ELEMENT_VERS, &vers_str) == False) ||
 	    (vers_str == NULL))
 		return (False);
 
@@ -1026,7 +1025,7 @@ sna_lte(uint32_t n1, uint32_t n2)
 Boolean_t
 update_config_main(char **msg)
 {
-	if (xml_dump2file(main_config, config_file) == False) {
+	if (tgt_dump2file(main_config, config_file) == False) {
 		xml_rtn_msg(msg, ERR_UPDATE_MAINCFG_FAILED);
 		return (False);
 	} else
@@ -1039,7 +1038,7 @@ update_config_targets(char **msg)
 	char	path[MAXPATHLEN];
 
 	(void) snprintf(path, sizeof (path), "%s/config.xml", target_basedir);
-	if (xml_dump2file(targets_config, path) == False) {
+	if (tgt_dump2file(targets_config, path) == False) {
 		if (msg != NULL)
 			xml_rtn_msg(msg, ERR_UPDATE_TARGCFG_FAILED);
 		return (False);
@@ -1109,7 +1108,7 @@ util_create_guid(char **guid)
 		sleep(1);
 	}
 
-	if (xml_encode_bytes((uint8_t *)&eui, sizeof (eui), guid,
+	if (tgt_xml_encode((uint8_t *)&eui, sizeof (eui), guid,
 	    &guid_size) == False) {
 		return (False);
 	} else
@@ -1162,6 +1161,20 @@ create_geom(diskaddr_t size, int *cylinder, int *heads, int *spt)
 					return;
 				}
 		}
+
+	/*
+	 * At this point we've got a size which will not fit into
+	 * any values where C * H * S = size. So, set the heads and
+	 * sectors per track values to their largest which will make
+	 * a single cylinder 8GB. Then divide that into the size to
+	 * get the number of cylinders.
+	 */
+	h		= 0xff;
+	s		= 0xffff;
+	c		= sects / (h * s);
+	*heads		= (int)h;
+	*spt		= (int)s;
+	*cylinder	= (int)c;
 }
 
 /*
@@ -1274,11 +1287,11 @@ xml_rtn_msg(char **buf, err_code_t code)
 {
 	char	lbuf[16];
 
-	buf_add_tag_and_attr(buf, XML_ELEMENT_ERROR, "version='1.0'");
+	tgt_buf_add_tag_and_attr(buf, XML_ELEMENT_ERROR, "version='1.0'");
 	(void) snprintf(lbuf, sizeof (lbuf), "%d", code);
-	xml_add_tag(buf, XML_ELEMENT_CODE, lbuf);
-	xml_add_tag(buf, XML_ELEMENT_MESSAGE, errcode_to_str(code));
-	buf_add_tag(buf, XML_ELEMENT_ERROR, Tag_End);
+	tgt_buf_add(buf, XML_ELEMENT_CODE, lbuf);
+	tgt_buf_add(buf, XML_ELEMENT_MESSAGE, errcode_to_str(code));
+	tgt_buf_add_tag(buf, XML_ELEMENT_ERROR, Tag_End);
 }
 
 /*
@@ -1462,7 +1475,7 @@ thick_provo_chk_thr(char *targ, int lun)
 void
 remove_target_common(char *name, int lun_num, char **msg)
 {
-	xml_node_t	*targ			= NULL,
+	tgt_node_t	*targ			= NULL,
 			*list,
 			*lun,
 			*node,
@@ -1477,7 +1490,7 @@ remove_target_common(char *name, int lun_num, char **msg)
 	xmlTextReaderPtr	r;
 
 	(void) pthread_mutex_lock(&targ_config_mutex);
-	while ((targ = xml_node_next(targets_config, XML_ELEMENT_TARG, targ)) !=
+	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ)) !=
 	    NULL) {
 		/* ---- Look for a match on the friendly name ---- */
 		if (strcmp(targ->x_value, name) == 0) {
@@ -1486,7 +1499,7 @@ remove_target_common(char *name, int lun_num, char **msg)
 		}
 
 		/* ---- Check to see if they gave the IQN name instead ---- */
-		if ((xml_find_value_str(targ, XML_ELEMENT_INAME, &iname) ==
+		if ((tgt_find_value_str(targ, XML_ELEMENT_INAME, &iname) ==
 		    True) && (strcmp(iname, name) == 0))
 			break;
 		else {
@@ -1508,7 +1521,7 @@ remove_target_common(char *name, int lun_num, char **msg)
 	if (tname == NULL)
 		tname = targ->x_value;
 	if (iname == NULL) {
-		if (xml_find_value_str(targ, XML_ELEMENT_INAME, &iname) ==
+		if (tgt_find_value_str(targ, XML_ELEMENT_INAME, &iname) ==
 		    False) {
 			xml_rtn_msg(msg, ERR_INTERNAL_ERROR);
 			(void) pthread_mutex_unlock(&targ_config_mutex);
@@ -1516,7 +1529,7 @@ remove_target_common(char *name, int lun_num, char **msg)
 		}
 	}
 
-	if ((list = xml_node_next(targ, XML_ELEMENT_LUNLIST, NULL)) == NULL)
+	if ((list = tgt_node_next(targ, XML_ELEMENT_LUNLIST, NULL)) == NULL)
 		goto error;
 
 	if (lun_num == 0) {
@@ -1526,9 +1539,9 @@ remove_target_common(char *name, int lun_num, char **msg)
 		 * see if others are still present.
 		 */
 		lun = NULL;
-		while ((lun = xml_node_next(list, XML_ELEMENT_LUN, lun)) !=
+		while ((lun = tgt_node_next(list, XML_ELEMENT_LUN, lun)) !=
 		    NULL) {
-			if (xml_find_value_int(lun, XML_ELEMENT_LUN, &chk) ==
+			if (tgt_find_value_int(lun, XML_ELEMENT_LUN, &chk) ==
 			    False)
 				goto error;
 
@@ -1543,17 +1556,17 @@ remove_target_common(char *name, int lun_num, char **msg)
 		 * Make sure the LU exists that's being removed
 		 */
 		lun = NULL;
-		while ((lun = xml_node_next(list, XML_ELEMENT_LUN, lun)) !=
+		while ((lun = tgt_node_next(list, XML_ELEMENT_LUN, lun)) !=
 		    NULL) {
-			if (xml_find_value_int(lun, XML_ELEMENT_LUN, &chk) ==
+			if (tgt_find_value_int(lun, XML_ELEMENT_LUN, &chk) ==
 			    False)
 				goto error;
 
 			if (chk == lun_num) {
-				lun = xml_alloc_node(XML_ELEMENT_LUN, Int,
+				lun = tgt_node_alloc(XML_ELEMENT_LUN, Int,
 				    &lun_num);
-				(void) xml_remove_child(list, lun, MatchBoth);
-				xml_free_node(lun);
+				(void) tgt_node_remove(list, lun, MatchBoth);
+				tgt_node_free(lun);
 				break;
 			}
 		}
@@ -1580,20 +1593,20 @@ remove_target_common(char *name, int lun_num, char **msg)
 	    NULL) {
 		node = NULL;
 		while (xmlTextReaderRead(r) == 1)
-			if (xml_process_node(r, &node) == False)
+			if (tgt_node_process(r, &node) == False)
 				break;
 		close(xml_fd);
 		xmlTextReaderClose(r);
 		xmlFreeTextReader(r);
 		xmlCleanupParser();
 
-		(void) xml_find_value_str(node, XML_ELEMENT_BACK, &bs_path);
-		if ((xml_find_value_boolean(node, XML_ELEMENT_DELETE_BACK,
+		(void) tgt_find_value_str(node, XML_ELEMENT_BACK, &bs_path);
+		if ((tgt_find_value_boolean(node, XML_ELEMENT_DELETE_BACK,
 		    &bs_delete) == True) && (bs_delete == True))
 			unlink(bs_path);
 		if (bs_path != NULL)
 			free(bs_path);
-		xml_tree_free(node);
+		tgt_node_free(node);
 	}
 
 	(void) unlink(path);
@@ -1619,12 +1632,12 @@ remove_target_common(char *name, int lun_num, char **msg)
 
 		/*
 		 * 'tname' is just a reference to the memory within
-		 * the targets_config structure. So once the xml_remove_child
+		 * the targets_config structure. So once the tgt_node_remove()
 		 * is called 'tname' is no longer valid.
 		 */
-		c = xml_alloc_node(XML_ELEMENT_TARG, String, tname);
-		(void) xml_remove_child(targets_config, c, MatchBoth);
-		xml_free_node(c);
+		c = tgt_node_alloc(XML_ELEMENT_TARG, String, tname);
+		(void) tgt_node_remove(targets_config, c, MatchBoth);
+		tgt_node_free(c);
 	}
 
 	/*

@@ -26,6 +26,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <stdio.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <inttypes.h>
 #include <assert.h>
@@ -36,33 +38,36 @@
 #include <syslog.h>
 #include <sys/stat.h>
 
-#include "xml.h"
+#include "iscsitgt_impl.h"
 
 /*
  * Forward declarations
  */
 static char *strip_space(char *value);
-static xml_node_t *node_alloc();
-static void node_free(xml_node_t *x);
-static Boolean_t node_name(xml_node_t *x, const xmlChar *n);
-static Boolean_t node_value(xml_node_t *x, const xmlChar *n, Boolean_t s);
-static xml_node_t *node_parent(xml_node_t *x);
-static xml_node_t *node_child(xml_node_t *x);
-static xml_node_t *node_alloc_attr(xml_node_t *x);
+static tgt_node_t *node_alloc();
+static void node_free(tgt_node_t *x);
+static Boolean_t node_name(tgt_node_t *x, const xmlChar *n);
+static Boolean_t node_value(tgt_node_t *x, const xmlChar *n, Boolean_t s);
+static tgt_node_t *node_parent(tgt_node_t *x);
+static tgt_node_t *node_child(tgt_node_t *x);
+static tgt_node_t *node_alloc_attr(tgt_node_t *x);
+static void buf_add_node_attr(char **b, tgt_node_t *x);
+static void buf_add_comment(char **b, char *comment);
+static void buf_add_str(char **b, char *str);
 
 #define	XML_COMMENT_STR	"!--"
 #define	XML_COMMENT_END "--"
 
 void
-xml_tree_free(xml_node_t *n)
+tgt_node_free(tgt_node_t *n)
 {
-	xml_node_t	*c,
+	tgt_node_t	*c,
 			*c1;
 	if (n == NULL)
 		return;
 	for (c = n->x_child; c; ) {
 		c1 = c->x_sibling;
-		xml_tree_free(c);
+		tgt_node_free(c);
 		c = c1;
 	}
 	for (c = n->x_attr; c; ) {
@@ -74,66 +79,6 @@ xml_tree_free(xml_node_t *n)
 
 }
 
-void
-xml_walk(xml_node_t *n, int depth)
-{
-	int		i;
-	xml_node_t	*c;
-
-	if (n == NULL)
-		return;
-	for (i = 0; i < depth; i++)
-		(void) printf("    ");
-	if (n->x_name && n->x_value) {
-		if (strcmp(n->x_name, XML_COMMENT_STR) == 0) {
-			(void) printf("%s%s%s\n", XML_COMMENT_STR, n->x_value,
-			    XML_COMMENT_END);
-		} else if (n->x_attr != NULL) {
-			(void) printf("%s(", n->x_name);
-			for (c = n->x_attr; c; c = c->x_sibling)
-				(void) printf("%s='%s'%c", c->x_name,
-				    c->x_value,
-				    (c->x_sibling != NULL) ? ',' : '\0');
-			(void) printf(")=%s\n", n->x_value);
-		} else {
-			(void) printf("%s=%s\n", n->x_name, n->x_value);
-		}
-	} else if (n->x_name) {
-		if (n->x_attr != NULL) {
-			(void) printf("%s (", n->x_name);
-			for (c = n->x_attr; c; c = c->x_sibling) {
-				if (c != n->x_attr)
-					(void) printf(" ");
-				(void) printf("%s='%s'", c->x_name,
-				    c->x_value);
-			}
-			(void) printf(")...\n");
-		} else
-			(void) printf("%s...\n", n->x_name);
-	}
-	for (c = n->x_child; c; c = c->x_sibling)
-		xml_walk(c, depth + 1);
-}
-
-void
-xml_walk_to_buf(xml_node_t *n, char **buf)
-{
-	xml_node_t	*c;
-
-	if (n == NULL)
-		return;
-	if (strcmp(n->x_name, XML_COMMENT_STR) == 0) {
-		xml_add_comment(buf, n->x_value);
-		return;
-	}
-	buf_add_node_attr(buf, n);
-	if (n->x_value != NULL)
-		buf_add_tag(buf, n->x_value, Tag_String);
-	for (c = n->x_child; c; c = c->x_sibling)
-		xml_walk_to_buf(c, buf);
-	buf_add_tag(buf, n->x_name, Tag_End);
-}
-
 /*
  * []----
  * | xml_update_config -- dump out in core node tree to XML parsable file
@@ -143,14 +88,23 @@ xml_walk_to_buf(xml_node_t *n, char **buf)
  * | for humans.
  * []----
  */
-void
-xml_update_config(xml_node_t *t, int depth, FILE *output)
+static void
+xml_update_config(tgt_node_t *t, int depth, FILE *output)
 {
 	int		i;
-	xml_node_t	*c;
+	tgt_node_t	*c;
 
 	if (t == NULL)
 		return;
+
+	/*
+	 * If this node has an attribute which indicates it's incore only
+	 * we don't dump it out to a file.
+	 */
+	for (c = t->x_attr; c; c = c->x_sibling)
+		if ((strcmp(c->x_name, XML_ELEMENT_INCORE) == 0) &&
+		    (strcmp(c->x_value, XML_VALUE_TRUE) == 0))
+			return;
 
 	for (i = 0; i < depth; i++)
 		(void) fprintf(output, "    ");
@@ -187,7 +141,7 @@ xml_update_config(xml_node_t *t, int depth, FILE *output)
 }
 
 Boolean_t
-xml_dump2file(xml_node_t *root, char *path)
+tgt_dump2file(tgt_node_t *root, char *path)
 {
 	FILE	*output;
 
@@ -208,20 +162,45 @@ xml_dump2file(xml_node_t *root, char *path)
 	}
 }
 
+/*
+ * tgt_dump2buf -- dumps node tree to buffer, allocating memory as it goes
+ *
+ * It is up to the caller, when finished with 'buf', to call free()
+ */
+void
+tgt_dump2buf(tgt_node_t *n, char **buf)
+{
+	tgt_node_t	*c;
+
+	if (n == NULL)
+		return;
+	if (strcmp(n->x_name, XML_COMMENT_STR) == 0) {
+		buf_add_comment(buf, n->x_value);
+		return;
+	}
+	buf_add_node_attr(buf, n);
+	if (n->x_value != NULL)
+		tgt_buf_add_tag(buf, n->x_value, Tag_String);
+	for (c = n->x_child; c; c = c->x_sibling)
+		tgt_dump2buf(c, buf);
+	tgt_buf_add_tag(buf, n->x_name, Tag_End);
+}
+
 char *common_attr_list[] = {
-	"name",
-	"version",
+	XML_ELEMENT_NAME,
+	XML_ELEMENT_VERS,
+	XML_ELEMENT_INCORE,
 	0
 };
 
 Boolean_t
-xml_process_node(xmlTextReaderPtr r, xml_node_t **node)
+tgt_node_process(xmlTextReaderPtr r, tgt_node_t **node)
 {
 	const xmlChar	*name,
 			*value;
 	char		**ap;
 	xmlElementType	node_type;
-	xml_node_t	*n,
+	tgt_node_t	*n,
 			*an;
 
 	n = *node;
@@ -240,26 +219,6 @@ xml_process_node(xmlTextReaderPtr r, xml_node_t **node)
 
 	node_type = (xmlElementType)xmlTextReaderNodeType(r);
 
-	if (xmlTextReaderAttributeCount(r) > 0) {
-
-		for (ap = common_attr_list; *ap; ap++) {
-			value = xmlTextReaderGetAttribute(r, (xmlChar *)*ap);
-			if (value != NULL) {
-
-				if ((an = node_alloc_attr(n)) == NULL)
-					return (False);
-				if (node_name(an, (xmlChar *)*ap) == False) {
-					node_free(an);
-					return (False);
-				}
-				if (node_value(an, value, True) == False) {
-					node_free(an);
-					return (False);
-				}
-				free((char *)value);
-			}
-		}
-	}
 	value = (xmlChar *)xmlTextReaderConstValue(r);
 
 	if (node_type == XML_ELEMENT_NODE) {
@@ -269,6 +228,30 @@ xml_process_node(xmlTextReaderPtr r, xml_node_t **node)
 			if (n == NULL)
 				return (False);
 		}
+		if (xmlTextReaderAttributeCount(r) > 0) {
+
+			for (ap = common_attr_list; *ap; ap++) {
+				value = xmlTextReaderGetAttribute(r,
+				    (xmlChar *)*ap);
+
+				if (value != NULL) {
+					if ((an = node_alloc_attr(n)) == NULL)
+						return (False);
+					if (node_name(an, (xmlChar *)*ap) ==
+					    False) {
+						node_free(an);
+						return (False);
+					}
+					if (node_value(an, value, True) ==
+					    False) {
+						node_free(an);
+						return (False);
+					}
+					free((char *)value);
+				}
+			}
+		}
+
 		if (node_name(n, name) == False) {
 			node_free(n);
 			return (False);
@@ -301,9 +284,9 @@ xml_process_node(xmlTextReaderPtr r, xml_node_t **node)
 }
 
 Boolean_t
-xml_find_attr_str(xml_node_t *n, char *attr, char **value)
+tgt_find_attr_str(tgt_node_t *n, char *attr, char **value)
 {
-	xml_node_t	*a;
+	tgt_node_t	*a;
 
 	if ((n == NULL) || (n->x_attr == NULL))
 		return (False);
@@ -317,9 +300,9 @@ xml_find_attr_str(xml_node_t *n, char *attr, char **value)
 }
 
 Boolean_t
-xml_find_value_str(xml_node_t *n, char *name, char **value)
+tgt_find_value_str(tgt_node_t *n, char *name, char **value)
 {
-	xml_node_t	*c;
+	tgt_node_t	*c;
 
 	if ((n == NULL) || (n->x_name == NULL))
 		return (False);
@@ -329,16 +312,16 @@ xml_find_value_str(xml_node_t *n, char *name, char **value)
 		return (True);
 	}
 	for (c = n->x_child; c; c = c->x_sibling) {
-		if (xml_find_value_str(c, name, value) == True)
+		if (tgt_find_value_str(c, name, value) == True)
 			return (True);
 	}
 	return (False);
 }
 
 Boolean_t
-xml_find_value_int(xml_node_t *n, char *name, int *value)
+tgt_find_value_int(tgt_node_t *n, char *name, int *value)
 {
-	xml_node_t	*c;
+	tgt_node_t	*c;
 
 	if ((n == NULL) || (n->x_name == NULL))
 		return (False);
@@ -350,7 +333,7 @@ xml_find_value_int(xml_node_t *n, char *name, int *value)
 		return (True);
 	}
 	for (c = n->x_child; c; c = c->x_sibling) {
-		if (xml_find_value_int(c, name, value) == True)
+		if (tgt_find_value_int(c, name, value) == True)
 			return (True);
 	}
 	return (False);
@@ -362,13 +345,13 @@ xml_find_value_int(xml_node_t *n, char *name, int *value)
  * []----
  */
 Boolean_t
-xml_find_value_intchk(xml_node_t *n, char *name, int *value)
+tgt_find_value_intchk(tgt_node_t *n, char *name, int *value)
 {
 	char		*str,
 			chk[32];
 	Boolean_t	rval;
 
-	if (xml_find_value_str(n, name, &str) == True) {
+	if (tgt_find_value_str(n, name, &str) == True) {
 
 		*value = strtol(str, NULL, 0);
 		/*
@@ -381,13 +364,16 @@ xml_find_value_intchk(xml_node_t *n, char *name, int *value)
 		 */
 		if ((str[0] == '0') && (str[1] != '\0')) {
 			if (str[1] == 'x')
-				snprintf(chk, sizeof (chk), "0x%x", *value);
+				(void) snprintf(chk, sizeof (chk), "0x%x",
+				    *value);
 			else if (str[1] == 'X')
-				snprintf(chk, sizeof (chk), "0X%x", *value);
+				(void) snprintf(chk, sizeof (chk), "0X%x",
+				    *value);
 			else
-				snprintf(chk, sizeof (chk), "0%o", *value);
+				(void) snprintf(chk, sizeof (chk), "0%o",
+				    *value);
 		} else
-			snprintf(chk, sizeof (chk), "%d", *value);
+			(void) snprintf(chk, sizeof (chk), "%d", *value);
 		if (strcmp(chk, str) == 0)
 			rval = True;
 		else
@@ -399,9 +385,9 @@ xml_find_value_intchk(xml_node_t *n, char *name, int *value)
 }
 
 Boolean_t
-xml_find_value_boolean(xml_node_t *n, char *name, Boolean_t *value)
+tgt_find_value_boolean(tgt_node_t *n, char *name, Boolean_t *value)
 {
-	xml_node_t	*c;
+	tgt_node_t	*c;
 
 	if ((n == NULL) || (n->x_name == NULL))
 		return (False);
@@ -413,16 +399,16 @@ xml_find_value_boolean(xml_node_t *n, char *name, Boolean_t *value)
 		return (True);
 	}
 	for (c = n->x_child; c; c = c->x_sibling) {
-		if (xml_find_value_boolean(c, name, value) == True)
+		if (tgt_find_value_boolean(c, name, value) == True)
 			return (True);
 	}
 	return (False);
 }
 
-xml_node_t *
-xml_node_next(xml_node_t *n, char *name, xml_node_t *cur)
+tgt_node_t *
+tgt_node_next(tgt_node_t *n, char *name, tgt_node_t *cur)
 {
-	xml_node_t	*x,
+	tgt_node_t	*x,
 			*p;
 
 	if (n == NULL)
@@ -441,13 +427,13 @@ xml_node_next(xml_node_t *n, char *name, xml_node_t *cur)
 	if (strcmp(n->x_name, name) == 0)
 		return (n);
 	for (x = n->x_child; x; x = x->x_sibling)
-		if ((p = xml_node_next(x, name, 0)) != NULL)
+		if ((p = tgt_node_next(x, name, 0)) != NULL)
 			return (p);
 	return (NULL);
 }
 
-xml_node_t *
-xml_node_next_child(xml_node_t *n, char *name, xml_node_t *cur)
+tgt_node_t *
+tgt_node_next_child(tgt_node_t *n, char *name, tgt_node_t *cur)
 {
 	if (cur != NULL) {
 		n = cur->x_sibling;
@@ -465,35 +451,47 @@ xml_node_next_child(xml_node_t *n, char *name, xml_node_t *cur)
 	return (NULL);
 }
 
-Boolean_t
-xml_add_child(xml_node_t *p, xml_node_t *c)
+void
+tgt_node_add(tgt_node_t *p, tgt_node_t *c)
 {
-	xml_node_t	*s;
 	if ((p == NULL) || (c == NULL))
-		return (False);
+		return;
 
 	if (p->x_child == NULL)
 		p->x_child = c;
 	else {
-		for (s = p->x_child; s->x_sibling; s = s->x_sibling)
-			;
-		s->x_sibling = c;
+		c->x_sibling = p->x_child;
+		p->x_child = c;
 	}
-	return (True);
 }
 
-xml_node_t *
-xml_alloc_node(char *name, xml_val_type_t type, void *value)
+void
+tgt_node_add_attr(tgt_node_t *p, tgt_node_t *a)
 {
-	xml_node_t	*d = node_alloc();
-	int	value_len;
-	char	*value_str;
+	if ((p == NULL) || (a == NULL))
+		return;
+
+	if (p->x_attr == NULL)
+		p->x_attr = a;
+	else {
+		a->x_sibling = p->x_attr;
+		p->x_attr = a;
+	}
+}
+
+tgt_node_t *
+tgt_node_alloc(char *name, xml_val_type_t type, void *value)
+{
+	tgt_node_t	*d		= node_alloc();
+	int		value_len	= 0;
+	char		*value_str	= NULL;
 
 	if (d == NULL)
 		return (NULL);
 	switch (type) {
 	case String:
-		value_len = strlen((char *)value) + 1;
+		if (value)
+			value_len = strlen((char *)value) + 1;
 		break;
 	case Int:
 		value_len = sizeof (int) * 2 + 3;
@@ -502,23 +500,28 @@ xml_alloc_node(char *name, xml_val_type_t type, void *value)
 		value_len = sizeof (uint64_t) * 2 + 3;
 		break;
 	}
-	if ((value_str = (char *)calloc(sizeof (char), value_len)) == NULL)
+	if (value_len &&
+	    (value_str = (char *)calloc(sizeof (char), value_len)) == NULL)
 		return (NULL);
 	if (node_name(d, (xmlChar *)name) == False) {
 		free(value_str);
 		return (NULL);
 	}
-	switch (type) {
-	case String:
-		(void) snprintf(value_str, value_len, "%s", (char *)value);
-		break;
-	case Int:
-		(void) snprintf(value_str, value_len, "0x%x", *(int *)value);
-		break;
-	case Uint64:
-		(void) snprintf(value_str, value_len, "0x%llx",
-		    *(uint64_t *)value);
-		break;
+	if (value_str) {
+		switch (type) {
+		case String:
+			(void) snprintf(value_str, value_len, "%s",
+			    (char *)value);
+			break;
+		case Int:
+			(void) snprintf(value_str, value_len, "0x%x",
+			    *(int *)value);
+			break;
+		case Uint64:
+			(void) snprintf(value_str, value_len, "0x%llx",
+			    *(uint64_t *)value);
+			break;
+		}
 	}
 	(void) node_value(d, (xmlChar *)value_str, True);
 
@@ -526,7 +529,7 @@ xml_alloc_node(char *name, xml_val_type_t type, void *value)
 }
 
 Boolean_t
-xml_encode_bytes(uint8_t *ip, size_t ip_size, char **buf, size_t *buf_size)
+tgt_xml_encode(uint8_t *ip, size_t ip_size, char **buf, size_t *buf_size)
 {
 	char *bp;
 	*buf_size = (ip_size * 2) + 1;
@@ -546,7 +549,7 @@ xml_encode_bytes(uint8_t *ip, size_t ip_size, char **buf, size_t *buf_size)
 }
 
 Boolean_t
-xml_decode_bytes(char *buf, uint8_t **ip, size_t *ip_size)
+tgt_xml_decode(char *buf, uint8_t **ip, size_t *ip_size)
 {
 	uint8_t *i;
 	size_t buf_size = strlen(buf);
@@ -567,16 +570,10 @@ xml_decode_bytes(char *buf, uint8_t **ip, size_t *ip_size)
 	return (True);
 }
 
-void
-xml_free_node(xml_node_t *node)
-{
-	node_free(node);
-}
-
 Boolean_t
-xml_remove_child(xml_node_t *parent, xml_node_t *child, match_type_t m)
+tgt_node_remove(tgt_node_t *parent, tgt_node_t *child, match_type_t m)
 {
-	xml_node_t	*s,
+	tgt_node_t	*s,
 			*c	= NULL;
 
 	if ((parent == NULL) || (child == NULL))
@@ -597,7 +594,7 @@ xml_remove_child(xml_node_t *parent, xml_node_t *child, match_type_t m)
 			} else {
 				c->x_sibling = s->x_sibling;
 			}
-			xml_tree_free(s);
+			tgt_node_free(s);
 			break;
 		}
 	}
@@ -608,9 +605,9 @@ xml_remove_child(xml_node_t *parent, xml_node_t *child, match_type_t m)
 }
 
 void
-xml_replace_child(xml_node_t *parent, xml_node_t *child, match_type_t m)
+tgt_node_replace(tgt_node_t *parent, tgt_node_t *child, match_type_t m)
 {
-	xml_node_t	*s,
+	tgt_node_t	*s,
 			*c;
 
 	if ((parent == NULL) || (child == NULL))
@@ -635,11 +632,11 @@ xml_replace_child(xml_node_t *parent, xml_node_t *child, match_type_t m)
 			s->x_name	= strdup(child->x_name);
 			s->x_value	= strdup(child->x_value);
 			if (s->x_child) {
-				xml_tree_free(s->x_child);
+				tgt_node_free(s->x_child);
 				s->x_child = NULL;
 			}
 			for (c = child->x_child; c; c = c->x_sibling)
-				(void) xml_add_child(s, xml_node_dup(c));
+				(void) tgt_node_add(s, tgt_node_dup(c));
 			break;
 		}
 	}
@@ -648,29 +645,12 @@ xml_replace_child(xml_node_t *parent, xml_node_t *child, match_type_t m)
 		/*
 		 * Never found the child so add it
 		 */
-		(void) xml_add_child(parent, xml_node_dup(child));
+		(void) tgt_node_add(parent, tgt_node_dup(child));
 	}
 }
 
-#ifdef notused
-/*
- * Update node value when value type is usigned long long
- */
 Boolean_t
-xml_update_value_ull(xml_node_t *node, char *name, uint64_t value)
-{
-	if (node == NULL || strcmp(name, node->x_name))
-		return (False);
-
-	if (strtoll(node->x_value, NULL, 0) == value)
-		return (True);
-	(void) snprintf(node->x_value, 64, "0x%llx", value);
-	return (True);
-}
-#endif
-
-Boolean_t
-xml_update_value_str(xml_node_t *node, char *name, char *str)
+tgt_update_value_str(tgt_node_t *node, char *name, char *str)
 {
 	if ((node == NULL) || (strcmp(name, node->x_name) != 0))
 		return (False);
@@ -681,10 +661,10 @@ xml_update_value_str(xml_node_t *node, char *name, char *str)
 	return (True);
 }
 
-xml_node_t *
-xml_find_child(xml_node_t *n, char *name)
+tgt_node_t *
+tgt_node_find(tgt_node_t *n, char *name)
 {
-	xml_node_t	*rval;
+	tgt_node_t	*rval;
 
 	for (rval = n->x_child; rval; rval = rval->x_sibling)
 		if (strcmp(rval->x_name, name) == 0)
@@ -692,10 +672,10 @@ xml_find_child(xml_node_t *n, char *name)
 	return (rval);
 }
 
-xml_node_t *
-xml_node_dup(xml_node_t *n)
+tgt_node_t *
+tgt_node_dup(tgt_node_t *n)
 {
-	xml_node_t	*d = node_alloc(),
+	tgt_node_t	*d = node_alloc(),
 			*c;
 
 	if (d == NULL)
@@ -705,135 +685,22 @@ xml_node_dup(xml_node_t *n)
 	if (node_value(d, (xmlChar *)n->x_value, True) == False)
 		return (NULL);
 	for (c = n->x_child; c; c = c->x_sibling)
-		(void) xml_add_child(d, xml_node_dup(c));
+		(void) tgt_node_add(d, tgt_node_dup(c));
 	return (d);
 }
 
-/*
- * []----
- * | Utility functions
- * []----
- */
-static xml_node_t *
-node_alloc()
-{
-	xml_node_t	*x = (xml_node_t *)calloc(sizeof (xml_node_t), 1);
-
-	if (x == NULL)
-		return (NULL);
-
-	x->x_state = NodeAlloc;
-	return (x);
-}
-
-static void
-node_free(xml_node_t *x)
-{
-	x->x_state = NodeFree;
-	if (x->x_name)
-		free(x->x_name);
-	if (x->x_value)
-		free(x->x_value);
-	free(x);
-}
-
-static Boolean_t
-node_name(xml_node_t *x, const xmlChar *n)
-{
-	assert(x->x_state == NodeAlloc);
-	if ((n == NULL) || (strlen((char *)n) == 0))
-		return (False);
-
-	x->x_state = NodeName;
-	x->x_name = strip_space((char *)n);
-	return (True);
-}
-
-static Boolean_t
-node_value(xml_node_t *x, const xmlChar *n, Boolean_t do_strip)
-{
-	assert(x->x_state == NodeName);
-	if ((n == NULL) || (strlen((char *)n) == NULL))
-		return (False);
-
-	x->x_state = NodeValue;
-	x->x_value = (do_strip == True) ?
-	    strip_space((char *)n) : strdup((char *)n);
-	return (True);
-}
-
-static xml_node_t *
-node_parent(xml_node_t *x)
-{
-	return (x->x_parent);
-}
-
-static xml_node_t *
-node_child(xml_node_t *x)
-{
-	xml_node_t	*n,
-			*next;
-
-	n = node_alloc();
-	if (x->x_child == NULL) {
-		x->x_child = n;
-	} else {
-		for (next = x->x_child; next->x_sibling; next = next->x_sibling)
-			;
-		next->x_sibling = n;
-	}
-	if (n != NULL)
-		n->x_parent = x;
-	return (n);
-}
-
-static xml_node_t *
-node_alloc_attr(xml_node_t *x)
-{
-	xml_node_t	*n,
-			*next;
-
-	n = node_alloc();
-	if (x->x_attr == NULL) {
-		x->x_attr = n;
-	} else {
-		for (next = x->x_attr; next->x_sibling; next = next->x_sibling)
-			;
-		next->x_sibling = n;
-	}
-	if (n != NULL)
-		n->x_parent = x;
-	return (n);
-}
-
 void
-buf_add_str(char **b, char *str)
+tgt_buf_add(char **b, char *element, const char *cdata)
 {
-	int	len,
-		olen	= 0;
-	char	*p = *b;
-
-	/*
-	 * Make sure we have enough room for the string and tag characters
-	 * plus a NULL byte.
-	 */
-	if (str == NULL)
-		return;
-
-	len = strlen(str) + 1;
-	if (p == NULL) {
-		p = malloc(len);
-	} else {
-		olen = strlen(p);
-		p = realloc(p, olen + len);
-	}
-	(void) strcpy(p + olen, str);
-	*b = p;
+	tgt_buf_add_tag(b, element, Tag_Start);
+	if (cdata != NULL)
+		tgt_buf_add_tag(b, cdata, Tag_String);
+	tgt_buf_add_tag(b, element, Tag_End);
 }
 
 /*
  * []----
- * | buf_add_tag -- adds string to buffer allocating space, sets up tags too
+ * | tgt_buf_add_tag -- adds string to buffer allocating space, sets up tags too
  * |
  * | Helper function to build a string by allocating memory as we go.
  * | If the string argument 'str' is defined to be a start or end tag
@@ -841,7 +708,7 @@ buf_add_str(char **b, char *str)
  * []----
  */
 void
-buf_add_tag(char **b, char *str, val_type_t type)
+tgt_buf_add_tag(char **b, const char *str, val_type_t type)
 {
 	char	*buf;
 	int	len;
@@ -861,11 +728,12 @@ buf_add_tag(char **b, char *str, val_type_t type)
 
 /*
  * []----
- * | buf_add_tag_and_attr -- variant on buf_add_tag which also gives attr
+ * | tgt_buf_add_tag_and_attr -- variant on tgt_buf_add_tag which also gives
+ * |    attr
  * []----
  */
 void
-buf_add_tag_and_attr(char **b, char *str, char *attr)
+tgt_buf_add_tag_and_attr(char **b, char *str, char *attr)
 {
 	char	*buf;
 	int	len;
@@ -883,11 +751,133 @@ buf_add_tag_and_attr(char **b, char *str, char *attr)
 	free(buf);
 }
 
-void
-buf_add_node_attr(char **b, xml_node_t *x)
+/*
+ * []----
+ * | Utility functions
+ * []----
+ */
+static tgt_node_t *
+node_alloc()
+{
+	tgt_node_t	*x = (tgt_node_t *)calloc(sizeof (tgt_node_t), 1);
+
+	if (x == NULL)
+		return (NULL);
+
+	x->x_state = NodeAlloc;
+	return (x);
+}
+
+static void
+node_free(tgt_node_t *x)
+{
+	x->x_state = NodeFree;
+	if (x->x_name)
+		free(x->x_name);
+	if (x->x_value)
+		free(x->x_value);
+	free(x);
+}
+
+static Boolean_t
+node_name(tgt_node_t *x, const xmlChar *n)
+{
+	assert(x->x_state == NodeAlloc);
+	if ((n == NULL) || (strlen((char *)n) == 0))
+		return (False);
+
+	x->x_state = NodeName;
+	x->x_name = strip_space((char *)n);
+	return (True);
+}
+
+static Boolean_t
+node_value(tgt_node_t *x, const xmlChar *n, Boolean_t do_strip)
+{
+	assert(x->x_state == NodeName);
+	if ((n == NULL) || (strlen((char *)n) == NULL))
+		return (False);
+
+	x->x_state = NodeValue;
+	x->x_value = (do_strip == True) ?
+	    strip_space((char *)n) : strdup((char *)n);
+	return (True);
+}
+
+static tgt_node_t *
+node_parent(tgt_node_t *x)
+{
+	return (x->x_parent);
+}
+
+static tgt_node_t *
+node_child(tgt_node_t *x)
+{
+	tgt_node_t	*n;
+
+	if ((n = node_alloc()) == NULL)
+		return (NULL);
+
+	if (x->x_child == NULL) {
+		x->x_child = n;
+	} else {
+		n->x_sibling = x->x_child;
+		x->x_child = n;
+	}
+	n->x_parent = x;
+	return (n);
+}
+
+static tgt_node_t *
+node_alloc_attr(tgt_node_t *x)
+{
+	tgt_node_t	*n,
+			*next;
+
+	n = node_alloc();
+	if (x->x_attr == NULL) {
+		x->x_attr = n;
+	} else {
+		for (next = x->x_attr; next->x_sibling; next = next->x_sibling)
+			;
+		next->x_sibling = n;
+	}
+	if (n != NULL)
+		n->x_parent = x;
+	return (n);
+}
+
+static void
+buf_add_str(char **b, char *str)
+{
+	int	len,
+		olen	= 0;
+	char	*p = *b;
+
+	/*
+	 * Make sure we have enough room for the string and tag characters
+	 * plus a NULL byte.
+	 */
+	if (str == NULL)
+		return;
+
+	len = strlen(str) + 1;
+	if (p == NULL) {
+		if ((p = malloc(len)) == NULL)
+			return;
+	} else {
+		olen = strlen(p);
+		p = realloc(p, olen + len);
+	}
+	(void) strncpy(p + olen, str, len);
+	*b = p;
+}
+
+static void
+buf_add_node_attr(char **b, tgt_node_t *x)
 {
 	char		*buf;
-	xml_node_t	*n;
+	tgt_node_t	*n;
 	int		len;
 
 	/* ---- null byte and starting '<' character ---- */
@@ -909,8 +899,8 @@ buf_add_node_attr(char **b, xml_node_t *x)
 	buf_add_str(b, ">");
 }
 
-void
-xml_add_comment(char **b, char *comment)
+static void
+buf_add_comment(char **b, char *comment)
 {
 	char	*p	= *b;
 	int	len,
@@ -934,15 +924,6 @@ xml_add_comment(char **b, char *comment)
 	(void) snprintf(p + olen, len, "<%s%s%s>", XML_COMMENT_STR, comment,
 	    XML_COMMENT_END);
 	*b = p;
-}
-
-void
-xml_add_tag(char **b, char *element, char *cdata)
-{
-	buf_add_tag(b, element, Tag_Start);
-	if (cdata != NULL)
-		buf_add_tag(b, cdata, Tag_String);
-	buf_add_tag(b, element, Tag_End);
 }
 
 static char *

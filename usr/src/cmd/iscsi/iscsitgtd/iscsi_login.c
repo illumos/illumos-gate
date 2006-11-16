@@ -32,13 +32,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/iscsi_protocol.h>
-
+#include <iscsitgt_impl.h>
 #include "queue.h"
 #include "iscsi_conn.h"
 #include "iscsi_sess.h"
 #include "iscsi_login.h"
 #include "utility.h"
-#include "xml.h"
 #include "target.h"
 
 typedef enum auth_action {
@@ -144,7 +143,7 @@ iscsi_handle_login_pkt(iscsi_conn_t *c)
 				transit		= 0,
 				rc		= 0;
 	auth_action_t		auth_action	= LOGIN_DROP;
-	xml_node_t		*tnode		= NULL;
+	tgt_node_t		*tnode		= NULL;
 
 	if (read(c->c_fd, &lh, sizeof (lh)) != sizeof (lh)) {
 		queue_str(c->c_mgmtq, Q_CONN_ERRS, msg_log,
@@ -694,9 +693,9 @@ send_login_reject(iscsi_conn_t *c, iscsi_login_hdr_t *lhp, int err_code)
 static auth_action_t
 login_set_auth(iscsi_sess_t *s)
 {
-	xml_node_t *xnInitiator = NULL;
-	xml_node_t *xnTarget = NULL;
-	xml_node_t *xnAcl = NULL;
+	tgt_node_t *xnInitiator = NULL;
+	tgt_node_t *xnTarget = NULL;
+	tgt_node_t *xnAcl = NULL;
 	char *szIniAlias = NULL;
 	char *szIscsiName = NULL;
 	char *szChapName = NULL;
@@ -710,13 +709,13 @@ login_set_auth(iscsi_sess_t *s)
 	sess_auth->password_length_in = 0;
 
 	/* Load alias, iscsi-name, chap-name, chap-secret from config file */
-	while ((xnInitiator = xml_node_next(main_config, XML_ELEMENT_INIT,
+	while ((xnInitiator = tgt_node_next(main_config, XML_ELEMENT_INIT,
 	    xnInitiator)) != NULL) {
 
-		(void) xml_find_value_str(xnInitiator, XML_ELEMENT_INIT,
+		(void) tgt_find_value_str(xnInitiator, XML_ELEMENT_INIT,
 		    &szIniAlias);
 
-		if (xml_find_value_str(xnInitiator, XML_ELEMENT_INAME,
+		if (tgt_find_value_str(xnInitiator, XML_ELEMENT_INAME,
 			&szIscsiName) == True) {
 
 			comp = strcmp(s->s_i_name, szIscsiName);
@@ -725,7 +724,7 @@ login_set_auth(iscsi_sess_t *s)
 
 			if (comp == 0) {
 
-				if (xml_find_value_str(xnInitiator,
+				if (tgt_find_value_str(xnInitiator,
 					XML_ELEMENT_CHAPNAME,
 					&szChapName) == True) {
 					/*CSTYLED*/
@@ -734,7 +733,7 @@ login_set_auth(iscsi_sess_t *s)
 					free(szChapName);
 				}
 
-				if (xml_find_value_str(xnInitiator,
+				if (tgt_find_value_str(xnInitiator,
 					XML_ELEMENT_CHAPSECRET,
 					&szChapSecret) == True) {
 					/*CSTYLED*/
@@ -769,10 +768,10 @@ login_set_auth(iscsi_sess_t *s)
 	 * If a CHAP secret exists for the initiator, it must be authed.
 	 */
 
-	while ((xnTarget = xml_node_next(targets_config, XML_ELEMENT_TARG,
+	while ((xnTarget = tgt_node_next(targets_config, XML_ELEMENT_TARG,
 	    xnTarget)) != NULL) {
 
-		if ((xml_find_value_str(xnTarget, XML_ELEMENT_INAME,
+		if ((tgt_find_value_str(xnTarget, XML_ELEMENT_INAME,
 		    &szIscsiName) == False) || (szIscsiName == NULL)) {
 			return (LOGIN_DROP);
 		}
@@ -783,7 +782,7 @@ login_set_auth(iscsi_sess_t *s)
 
 		if (comp == 0) {
 
-			if ((xnAcl = xml_node_next(xnTarget,
+			if ((xnAcl = tgt_node_next(xnTarget,
 				XML_ELEMENT_ACLLIST, 0)) == NULL) {
 				/*
 				 * No acl_list found, return True for no auth
@@ -797,10 +796,10 @@ login_set_auth(iscsi_sess_t *s)
 			 * this session.
 			 */
 			xnInitiator = NULL;
-			while ((xnInitiator = xml_node_next(xnAcl,
+			while ((xnInitiator = tgt_node_next(xnAcl,
 				    XML_ELEMENT_INIT, xnInitiator)) != NULL) {
 
-				if ((xml_find_value_str(xnInitiator,
+				if ((tgt_find_value_str(xnInitiator,
 				    XML_ELEMENT_INIT, &possible) == False) ||
 				    (possible == NULL))
 					continue;

@@ -332,6 +332,7 @@ COMMON_SUBDIRS = \
 	lib/libipmp \
 	lib/libipp \
 	lib/libipsecutil \
+	lib/libiscsitgt \
 	lib/libkmf \
 	lib/libkstat \
 	lib/liblaadm \

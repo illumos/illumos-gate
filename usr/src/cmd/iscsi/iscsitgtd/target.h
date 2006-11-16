@@ -55,6 +55,7 @@ extern "C" {
 #define	TGT_TYPE_TAPE		"tape"
 #define	TGT_TYPE_OSD		"osd"
 #define	TGT_TYPE_RAW		"raw"
+#define	TGT_TYPE_INVALID	"invalid"
 
 /*
  * During the creation phase of a LU it starts out offline during block
@@ -166,13 +167,13 @@ typedef struct {
 } admin_table_t;
 
 #include <sys/socket.h>
-#include "xml.h"
+#include <iscsitgt_impl.h>
 #include "queue.h"
 
-void create_func(xml_node_t *, target_queue_t *, target_queue_t *);
-void modify_func(xml_node_t *, target_queue_t *, target_queue_t *);
-void remove_func(xml_node_t *, target_queue_t *, target_queue_t *);
-void list_func(xml_node_t *, target_queue_t *, target_queue_t *);
+void create_func(tgt_node_t *, target_queue_t *, target_queue_t *);
+void modify_func(tgt_node_t *, target_queue_t *, target_queue_t *);
+void remove_func(tgt_node_t *, target_queue_t *, target_queue_t *);
+void list_func(tgt_node_t *, target_queue_t *, target_queue_t *);
 void logout_targ(char *targ);
 char *update_basedir(char *, char *);
 char *valid_radius_srv(char *name, char *prop);
@@ -185,8 +186,8 @@ extern admin_table_t	admin_prop_list[];
 extern char 		*target_basedir;
 extern char 		*target_log;
 extern char		*config_file;
-extern xml_node_t	*targets_config;
-extern xml_node_t	*main_config;
+extern tgt_node_t	*targets_config;
+extern tgt_node_t	*main_config;
 extern uchar_t		*mac_addr;
 extern size_t		mac_len;
 extern int		main_vers_maj,

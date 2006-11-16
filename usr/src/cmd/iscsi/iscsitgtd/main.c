@@ -45,7 +45,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <door.h>
-#include <iscsi_door.h>
 #include <signal.h>
 #include <siginfo.h>
 #include <sys/ethernet.h>
@@ -56,12 +55,12 @@
 #include <sys/resource.h>
 #include <syslog.h>
 #include <sys/select.h>
+#include <iscsitgt_impl.h>
 
 #include "queue.h"
 #include "port.h"
 #include "iscsi_conn.h"
 #include "target.h"
-#include "xml.h"
 #include "utility.h"
 #include "iscsi_ffp.h"
 #include "errcode.h"
@@ -70,7 +69,7 @@
 #define	EMPTY_CONFIG "<config version='1.0'>\n</config>\n"
 
 /* ---- Forward declarations ---- */
-static void variable_handler(xml_node_t *, target_queue_t *, target_queue_t *);
+static void variable_handler(tgt_node_t *, target_queue_t *, target_queue_t *);
 
 
 /* ---- Global configuration data. ---- */
@@ -78,7 +77,7 @@ char *target_basedir			= NULL;
 char *target_log			= DEFAULT_TARGET_LOG;
 char *config_file			= DEFAULT_CONFIG_LOCATION;
 int iscsi_port				= 3260; /* defined by the spec */
-xml_node_t	*main_config,
+tgt_node_t	*main_config,
 		*targets_config;
 Boolean_t	enforce_strict_guid	= True,
 		thin_provisioning	= False,
@@ -114,7 +113,7 @@ typedef struct var_table {
 
 typedef struct cmd_table {
 	char	*c_name;
-	void	(*c_func)(xml_node_t *, target_queue_t *, target_queue_t *);
+	void	(*c_func)(tgt_node_t *, target_queue_t *, target_queue_t *);
 } cmd_table_t;
 
 admin_table_t admin_prop_list[] = {
@@ -165,7 +164,7 @@ process_target_config()
 	char			path[MAXPATHLEN],
 				*target			= NULL;
 	struct stat		ss;
-	xml_node_t		*node			= NULL,
+	tgt_node_t		*node			= NULL,
 				*next			= NULL;
 	int			xml_fd			= -1;
 
@@ -230,7 +229,7 @@ process_target_config()
 
 	if (r != NULL) {
 		while (xmlTextReaderRead(r) == 1) {
-			if (xml_process_node(r, &node) == False)
+			if (tgt_node_process(r, &node) == False)
 				break;
 		}
 
@@ -248,9 +247,9 @@ process_target_config()
 		}
 
 		targets_config = node;
-		while ((next = xml_node_next(node, XML_ELEMENT_TARG,
+		while ((next = tgt_node_next(node, XML_ELEMENT_TARG,
 		    next)) != NULL) {
-			if (xml_find_value_str(next, XML_ELEMENT_INAME,
+			if (tgt_find_value_str(next, XML_ELEMENT_INAME,
 			    &target) == False) {
 				continue;
 			}
@@ -297,7 +296,7 @@ process_config(char *file)
 	xmlTextReaderPtr	r;
 	int			ret,
 				xml_fd		= -1;
-	xml_node_t		*node = NULL;
+	tgt_node_t		*node = NULL;
 
 #ifndef lint
 	LIBXML_TEST_VERSION;
@@ -318,7 +317,7 @@ process_config(char *file)
 	if (r != NULL) {
 		ret = xmlTextReaderRead(r);
 		while (ret == 1) {
-			if (xml_process_node(r, &node) == False) {
+			if (tgt_node_process(r, &node) == False) {
 				break;
 			}
 			ret = xmlTextReaderRead(r);
@@ -341,7 +340,7 @@ process_config(char *file)
 		 * can start without it, but the daemon can't really do
 		 * anything until the administrator sets the value.
 		 */
-		(void) xml_find_value_str(node, XML_ELEMENT_BASEDIR,
+		(void) tgt_find_value_str(node, XML_ELEMENT_BASEDIR,
 		    &target_basedir);
 
 		/*
@@ -349,20 +348,20 @@ process_config(char *file)
 		 * these has a default value which can be overwritten in
 		 * the configuration file.
 		 */
-		(void) xml_find_value_str(node, XML_ELEMENT_TARGLOG,
+		(void) tgt_find_value_str(node, XML_ELEMENT_TARGLOG,
 		    &target_log);
-		(void) xml_find_value_int(node, XML_ELEMENT_ISCSIPORT,
+		(void) tgt_find_value_int(node, XML_ELEMENT_ISCSIPORT,
 		    &iscsi_port);
-		(void) xml_find_value_int(node, XML_ELEMENT_DBGLVL, &dbg_lvl);
-		(void) xml_find_value_boolean(node, XML_ELEMENT_ENFORCE,
+		(void) tgt_find_value_int(node, XML_ELEMENT_DBGLVL, &dbg_lvl);
+		(void) tgt_find_value_boolean(node, XML_ELEMENT_ENFORCE,
 		    &enforce_strict_guid);
-		(void) xml_find_value_boolean(node, XML_ELEMENT_THIN_PROVO,
+		(void) tgt_find_value_boolean(node, XML_ELEMENT_THIN_PROVO,
 		    &thin_provisioning);
-		(void) xml_find_value_boolean(node, XML_ELEMENT_DISABLE_TPGS,
+		(void) tgt_find_value_boolean(node, XML_ELEMENT_DISABLE_TPGS,
 		    &disable_tpgs);
-		(void) xml_find_value_boolean(node, XML_ELEMENT_TIMESTAMPS,
+		(void) tgt_find_value_boolean(node, XML_ELEMENT_TIMESTAMPS,
 		    &dbg_timestamps);
-		if (xml_find_value_int(node, XML_ELEMENT_LOGLVL,
+		if (tgt_find_value_int(node, XML_ELEMENT_LOGLVL,
 		    &qlog_lvl) == True)
 			queue_log(True);
 
@@ -488,11 +487,11 @@ logout_targ(char *targ)
  */
 /*ARGSUSED*/
 void
-variable_handler(xml_node_t *x, target_queue_t *reply, target_queue_t *mgmt)
+variable_handler(tgt_node_t *x, target_queue_t *reply, target_queue_t *mgmt)
 {
 	char		*reply_buf	= NULL;
 	var_table_t	*v;
-	xml_node_t	*c;
+	tgt_node_t	*c;
 
 	for (c = x->x_child; c; c = c->x_sibling) {
 
@@ -518,7 +517,7 @@ variable_handler(xml_node_t *x, target_queue_t *reply, target_queue_t *mgmt)
  * []----
  */
 static void
-parse_xml(xml_node_t *x, target_queue_t *reply, target_queue_t *mgmt)
+parse_xml(tgt_node_t *x, target_queue_t *reply, target_queue_t *mgmt)
 {
 	char		*reply_msg	= NULL;
 	cmd_table_t	*c;
@@ -589,7 +588,7 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	target_queue_t		*mgmtq		= (target_queue_t *)cookie;
 	mgmt_request_t		m;
 	msg_t			*msg		= NULL;
-	xml_node_t		*node		= NULL;
+	tgt_node_t		*node		= NULL;
 	xmlTextReaderPtr	r;
 	char			*err_rply	= NULL;
 
@@ -598,7 +597,7 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	if ((r = (xmlTextReaderPtr)xmlReaderForMemory(argp, strlen(argp),
 	    NULL, NULL, 0)) != NULL) {
 		while (xmlTextReaderRead(r)) {
-			if (xml_process_node(r, &node) == False)
+			if (tgt_node_process(r, &node) == False)
 				break;
 		}
 		if (node != NULL) {
@@ -643,7 +642,7 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	}
 
 	if (node != NULL)
-		xml_tree_free(node);
+		tgt_node_free(node);
 	if (err_rply != NULL) {
 		strcpy(argp, err_rply);
 		free(err_rply);
@@ -777,7 +776,7 @@ main(int argc, char **argv)
 	if (process_target_config() == False)
 		exit(SMF_EXIT_ERR_CONFIG);
 
-	(void) xml_find_value_boolean(main_config, XML_ELEMENT_DBGDAEMON,
+	(void) tgt_find_value_boolean(main_config, XML_ELEMENT_DBGDAEMON,
 	    &daemonize);
 	if (daemonize == True) {
 		switch (fork()) {
@@ -837,7 +836,7 @@ main(int argc, char **argv)
 	(void) pthread_create(&junk, NULL, port_watcher, &port1);
 
 	setup_door(q, door_name);
-	if ((xml_find_value_int(main_config, XML_ELEMENT_MGMTPORT,
+	if ((tgt_find_value_int(main_config, XML_ELEMENT_MGMTPORT,
 	    &port2.port_num) == True) && (port2.port_num != -1)) {
 		port2.port_mgmtq	= q;
 		port2.port_dataq	= queue_alloc();

@@ -56,7 +56,7 @@
 	<exec_method
 		type='method'
 		name='start'
-		exec='/usr/sbin/iscsitgtd'
+		exec='/lib/svc/method/svc-iscsitgt %m'
 		timeout_seconds='60'>
 		<method_context>
 			<method_credential
@@ -69,7 +69,7 @@
 	<exec_method
 		type='method'
 		name='stop'
-		exec=':kill'
+		exec='/lib/svc/method/svc-iscsitgt %m %{restarter/contract}'
 		timeout_seconds='60'>
 		<method_context>
 			<method_credential
@@ -79,11 +79,17 @@
 		</method_context>
 	</exec_method>
 
+	<property_group name='application' type='framework'>
+		<stability value='Unstable' />
+		<propval name='auto_enable' type='boolean' value='true' />
+	</property_group>
+
 	<stability value='Unstable' />
 
 	<template>
 		<common_name>
-			<loctext xml:lang='C'> Solaris iSCSI Target
+			<loctext xml:lang='C'>
+				iSCSI Target
 			</loctext>
 		</common_name>
 		<documentation>

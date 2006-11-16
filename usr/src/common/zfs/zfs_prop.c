@@ -118,6 +118,9 @@ static prop_desc_t zfs_prop_table[ZFS_NPROP_ALL] = {
 	{ "sharenfs",	prop_type_string,	0,	"off",	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
 	    "on | off | share(1M) options", "SHARENFS", B_FALSE },
+	{ "shareiscsi",	prop_type_string,	0,	"off",	prop_inherit,
+	    ZFS_TYPE_ANY,
+	    "on | off | type=<type>", "SHAREISCSI", B_FALSE },
 	{ "checksum",	prop_type_index,	ZIO_CHECKSUM_DEFAULT,	"on",
 	    prop_inherit,	ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "on | off | fletcher2 | fletcher4 | sha256", "CHECKSUM", B_TRUE },
@@ -159,6 +162,8 @@ static prop_desc_t zfs_prop_table[ZFS_NPROP_ALL] = {
 	    ZFS_TYPE_ANY, NULL, NULL, B_FALSE},
 	{ "name",	prop_type_string,	0,	NULL,	prop_readonly,
 	    ZFS_TYPE_ANY, NULL, "NAME", B_FALSE },
+	{ "iscsioptions", prop_type_string,	0,	NULL,	prop_inherit,
+	    ZFS_TYPE_VOLUME, NULL, "ISCSIOPTIONS", B_FALSE },
 };
 
 zfs_proptype_t

@@ -50,3 +50,5 @@ d none var/svc/manifest/system 755 root sys
 f manifest var/svc/manifest/system/iscsi_target.xml 0444 root sys
 d none etc 755 root sys
 d none etc/iscsi 0755 root sys
+d none lib 755 root bin
+f none lib/libiscsitgt.so.1 755 root bin

@@ -41,7 +41,7 @@ extern "C" {
 #include <sys/avl.h>
 #include <aio.h>
 
-#include "local_types.h"
+#include <iscsitgt_impl.h>
 #include "t10.h"
 
 #define	CMD_MAXOUTSTANDING 64

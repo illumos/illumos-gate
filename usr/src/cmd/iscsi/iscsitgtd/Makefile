@@ -18,13 +18,13 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/iscsi/iscsitgtd/Makefile
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 PROG= iscsitgtd
 OBJS	= main.o mgmt.o mgmt_create.o mgmt_list.o mgmt_modify.o mgmt_remove.o
@@ -42,6 +42,7 @@ $(64ONLY)SUBDIRS= $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 MANIFEST	= iscsi_target.xml
+SVCMETHOD	= svc-iscsitgt
 
 ROOTMANIFESTDIR	= $(ROOTSVCSYSTEM)
 $(ROOTSVCSYSTEM)/iscsi_target.xml	:= OWNER = root
@@ -62,7 +63,7 @@ all:	$(SUBDIRS)
 
 clean clobber lint:	$(SUBDIRS)
 
-install: $(SUBDIRS) $(ROOTMANIFEST)
+install: $(SUBDIRS) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 	-$(RM) $(ROOTUSRSBINPROG)
 	-$(LN) $(ISAEXEC) $(ROOTUSRSBINPROG)
 

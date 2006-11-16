@@ -108,6 +108,7 @@ SUBDIRS += \
 	libinetcfg	\
 	libinetutil	\
 	libipmp		\
+	libiscsitgt	\
 	libkmf		\
 	libkstat	\
 	libkvm		\
@@ -335,6 +336,7 @@ HDRSUBDIRS=		\
 	libinetutil	\
 	libipmp		\
 	libipp		\
+	libiscsitgt	\
 	libkstat	\
 	libkvm		\
         liblaadm        \
@@ -500,7 +502,7 @@ librestart:	libuutil libscf
 pkcs11:		libcryptoutil
 print:		libldap5
 udapl/udapl_tavor:	udapl/libdat
-libzfs:		libdevinfo libdevid libgen libnvpair libuutil
+libzfs:		libdevinfo libdevid libgen libnvpair libuutil libiscsitgt
 libzfs_jni:	libdiskmgt libnvpair libzfs
 libzpool:	libavl libumem libnvpair
 libsec:		libavl

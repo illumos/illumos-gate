@@ -39,8 +39,8 @@
 #include <sys/stat.h>
 #include <zone.h>
 
+#include <iscsitgt_impl.h>
 #include "cmdparse.h"
-#include "xml.h"
 #include "helper.h"
 
 #define	CREATE	SUBCOMMAND(0)
@@ -100,7 +100,6 @@ static int showStats(int, char *[], cmdOptions_t *);
 
 /* globals */
 char *cmdName;
-static char *hostname = NULL;
 
 /*
  * Add new options here
@@ -358,15 +357,15 @@ deleteFunc(int operandLen, char *operand[], int object, cmdOptions_t *options,
 }
 
 static int
-formatErrString(xml_node_t *node)
+formatErrString(tgt_node_t *node)
 {
 	int	code	= 0,
 		rtn	= 0;
 	char	*msg	= NULL;
 
 	if ((strcmp(node->x_name, XML_ELEMENT_ERROR) == 0) &&
-	    (xml_find_value_int(node, XML_ELEMENT_CODE, &code) == B_TRUE) &&
-	    (xml_find_value_str(node, XML_ELEMENT_MESSAGE, &msg) == B_TRUE)) {
+	    (tgt_find_value_int(node, XML_ELEMENT_CODE, &code) == B_TRUE) &&
+	    (tgt_find_value_str(node, XML_ELEMENT_MESSAGE, &msg) == B_TRUE)) {
 
 		/*
 		 * 1000 is the success code, so we don't need to display
@@ -392,15 +391,15 @@ static int
 createTarget(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node;
+	tgt_node_t	*node;
 	cmdOptions_t	*optionList = options;
 
 	if (operand == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "create", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_Start);
-	xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+	tgt_buf_add_tag(&first_str, "create", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_Start);
+	tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 
 	for (; optionList->optval; optionList++) {
 		switch (optionList->optval) {
@@ -415,25 +414,25 @@ createTarget(int operandLen, char *operand[], cmdOptions_t *options)
 					free(first_str);
 					return (1);
 				} else {
-					xml_add_tag(&first_str,
+					tgt_buf_add(&first_str,
 					    XML_ELEMENT_TYPE,
 					    optionList->optarg);
 				}
 				break;
 			case 'z': /* size */
-				xml_add_tag(&first_str, XML_ELEMENT_SIZE,
+				tgt_buf_add(&first_str, XML_ELEMENT_SIZE,
 				    optionList->optarg);
 				break;
 			case 'u': /* lun number */
-				xml_add_tag(&first_str, XML_ELEMENT_LUN,
+				tgt_buf_add(&first_str, XML_ELEMENT_LUN,
 				    optionList->optarg);
 				break;
 			case 'a': /* alias */
-				xml_add_tag(&first_str, XML_ELEMENT_ALIAS,
+				tgt_buf_add(&first_str, XML_ELEMENT_ALIAS,
 				    optionList->optarg);
 				break;
 			case 'b': /* backing store */
-				xml_add_tag(&first_str, XML_ELEMENT_BACK,
+				tgt_buf_add(&first_str, XML_ELEMENT_BACK,
 				    optionList->optarg);
 				break;
 			default:
@@ -445,10 +444,10 @@ createTarget(int operandLen, char *operand[], cmdOptions_t *options)
 		}
 	}
 
-	buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_End);
-	buf_add_tag(&first_str, "create", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_End);
+	tgt_buf_add_tag(&first_str, "create", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 	return (formatErrString(node));
 }
@@ -458,7 +457,7 @@ static int
 createInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node;
+	tgt_node_t	*node;
 	cmdOptions_t	*optionList	= options;
 
 	if (operand == NULL)
@@ -466,13 +465,13 @@ createInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 	if (options == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "create", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_Start);
-	xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+	tgt_buf_add_tag(&first_str, "create", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_Start);
+	tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 
 	switch (optionList->optval) {
 	case 'n': /* iqn */
-		xml_add_tag(&first_str, XML_ELEMENT_INAME, optionList->optarg);
+		tgt_buf_add(&first_str, XML_ELEMENT_INAME, optionList->optarg);
 		break;
 	default:
 		(void) fprintf(stderr, "%s: %c: %s\n",
@@ -482,10 +481,10 @@ createInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 		return (1);
 	}
 
-	buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_End);
-	buf_add_tag(&first_str, "create", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_End);
+	tgt_buf_add_tag(&first_str, "create", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 	return (formatErrString(node));
 }
@@ -495,18 +494,18 @@ static int
 createTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node;
+	tgt_node_t	*node;
 
 	if (operand == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "create", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_Start);
-	xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
-	buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_End);
-	buf_add_tag(&first_str, "create", Tag_End);
+	tgt_buf_add_tag(&first_str, "create", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_Start);
+	tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_End);
+	tgt_buf_add_tag(&first_str, "create", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 	return (formatErrString(node));
 }
@@ -516,40 +515,40 @@ static int
 modifyTarget(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node;
+	tgt_node_t	*node;
 	cmdOptions_t	*optionList	= options;
 
 	if (operand == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "modify", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_Start);
-	xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+	tgt_buf_add_tag(&first_str, "modify", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_Start);
+	tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 
 	for (; optionList->optval; optionList++) {
 		switch (optionList->optval) {
 			case 'p': /* tpgt number */
-				xml_add_tag(&first_str, XML_ELEMENT_TPGT,
+				tgt_buf_add(&first_str, XML_ELEMENT_TPGT,
 				    optionList->optarg);
 				break;
 			case 'l': /* acl */
-				xml_add_tag(&first_str, XML_ELEMENT_ACL,
+				tgt_buf_add(&first_str, XML_ELEMENT_ACL,
 				    optionList->optarg);
 				break;
 			case 'a': /* alias */
-				xml_add_tag(&first_str, XML_ELEMENT_ALIAS,
+				tgt_buf_add(&first_str, XML_ELEMENT_ALIAS,
 				    optionList->optarg);
 				break;
 			case 'm': /* max recv */
-				xml_add_tag(&first_str, XML_ELEMENT_MAXRECV,
+				tgt_buf_add(&first_str, XML_ELEMENT_MAXRECV,
 				    optionList->optarg);
 				break;
 			case 'z': /* grow lun size */
-				xml_add_tag(&first_str, XML_ELEMENT_SIZE,
+				tgt_buf_add(&first_str, XML_ELEMENT_SIZE,
 				    optionList->optarg);
 				break;
 			case 'u':
-				xml_add_tag(&first_str, XML_ELEMENT_LUN,
+				tgt_buf_add(&first_str, XML_ELEMENT_LUN,
 				    optionList->optarg);
 				break;
 			default:
@@ -561,10 +560,10 @@ modifyTarget(int operandLen, char *operand[], cmdOptions_t *options)
 		}
 	}
 
-	buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_End);
-	buf_add_tag(&first_str, "modify", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_End);
+	tgt_buf_add_tag(&first_str, "modify", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 	return (formatErrString(node));
 }
@@ -574,7 +573,7 @@ static int
 modifyInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node;
+	tgt_node_t	*node;
 	cmdOptions_t	*optionList	= options;
 	char		chapSecret[MAX_CHAP_SECRET_LEN];
 	int		secretLen	= 0;
@@ -585,14 +584,14 @@ modifyInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 	if (options == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "modify", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_Start);
-	xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+	tgt_buf_add_tag(&first_str, "modify", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_Start);
+	tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 
 	for (; optionList->optval; optionList++) {
 		switch (optionList->optval) {
 		case 'H': /* chap-name */
-			xml_add_tag(&first_str, XML_ELEMENT_CHAPNAME,
+			tgt_buf_add(&first_str, XML_ELEMENT_CHAPNAME,
 			    optionList->optarg);
 			break;
 		case 'C': /* chap-secret */
@@ -604,7 +603,7 @@ modifyInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 				return (ret);
 			}
 			chapSecret[secretLen] = '\0';
-			xml_add_tag(&first_str, XML_ELEMENT_CHAPSECRET,
+			tgt_buf_add(&first_str, XML_ELEMENT_CHAPSECRET,
 			    chapSecret);
 			break;
 		default:
@@ -615,10 +614,10 @@ modifyInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 			return (1);
 		}
 	}
-	buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_End);
-	buf_add_tag(&first_str, "modify", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_End);
+	tgt_buf_add_tag(&first_str, "modify", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 	return (formatErrString(node));
 }
@@ -628,7 +627,7 @@ static int
 modifyTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node;
+	tgt_node_t	*node;
 	cmdOptions_t	*optionList	= options;
 	boolean_t	isIpv6 = B_FALSE;
 	uint16_t	port;
@@ -639,9 +638,9 @@ modifyTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 	if (optionList == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "modify", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_Start);
-	xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+	tgt_buf_add_tag(&first_str, "modify", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_Start);
+	tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 
 	switch (optionList->optval) {
 	case 'i': /* ip address */
@@ -650,7 +649,7 @@ modifyTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 		    PARSE_ADDR_OK) {
 			return (1);
 		}
-		xml_add_tag(&first_str, XML_ELEMENT_IPADDR, IpAddress);
+		tgt_buf_add(&first_str, XML_ELEMENT_IPADDR, IpAddress);
 		break;
 	default:
 		(void) fprintf(stderr, "%s: %c: %s\n",
@@ -660,10 +659,10 @@ modifyTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 		return (1);
 	}
 
-	buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_End);
-	buf_add_tag(&first_str, "modify", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_End);
+	tgt_buf_add_tag(&first_str, "modify", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 	return (formatErrString(node));
 }
@@ -673,7 +672,7 @@ static int
 modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node;
+	tgt_node_t	*node;
 	cmdOptions_t	*optionList	= options;
 	char		chapSecret[MAX_CHAP_SECRET_LEN],
 			olddir[MAXPATHLEN],
@@ -686,9 +685,9 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 	if (options == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "modify", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_ADMIN, Tag_Start);
-	xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+	tgt_buf_add_tag(&first_str, "modify", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_ADMIN, Tag_Start);
+	tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 
 	for (; optionList->optval; optionList++) {
 		switch (optionList->optval) {
@@ -713,12 +712,12 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 					return (1);
 				}
 				(void) getcwd(newdir, sizeof (newdir));
-				xml_add_tag(&first_str, XML_ELEMENT_BASEDIR,
+				tgt_buf_add(&first_str, XML_ELEMENT_BASEDIR,
 				    newdir);
 				chdir(olddir);
 				break;
 			case 'H': /* chap name */
-				xml_add_tag(&first_str, XML_ELEMENT_CHAPNAME,
+				tgt_buf_add(&first_str, XML_ELEMENT_CHAPNAME,
 				    optionList->optarg);
 				break;
 			case 'C': /* chap secert */
@@ -734,18 +733,18 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 					return (ret);
 				}
 				chapSecret[secretLen] = '\0';
-				xml_add_tag(&first_str, XML_ELEMENT_CHAPSECRET,
+				tgt_buf_add(&first_str, XML_ELEMENT_CHAPSECRET,
 				    chapSecret);
 				break;
 			case 'R': /* radius access */
 				if (strcmp(optionList->optarg,
 					OPT_ENABLE) == 0) {
-					xml_add_tag(&first_str,
+					tgt_buf_add(&first_str,
 					    XML_ELEMENT_RAD_ACCESS, OPT_TRUE);
 				} else
 					if (strcmp(optionList->optarg,
 						OPT_DISABLE) == 0) {
-					xml_add_tag(&first_str,
+					tgt_buf_add(&first_str,
 					    XML_ELEMENT_RAD_ACCESS, OPT_FALSE);
 				} else {
 					(void) fprintf(stderr, "%s: %s\n",
@@ -757,7 +756,7 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 				}
 				break;
 			case 'r': /* radius server */
-				xml_add_tag(&first_str, XML_ELEMENT_RAD_SERV,
+				tgt_buf_add(&first_str, XML_ELEMENT_RAD_SERV,
 				    optionList->optarg);
 				break;
 			case 'P': /* radius secret */
@@ -773,18 +772,18 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 					return (ret);
 				}
 				chapSecret[secretLen] = '\0';
-				xml_add_tag(&first_str, XML_ELEMENT_RAD_SECRET,
+				tgt_buf_add(&first_str, XML_ELEMENT_RAD_SECRET,
 				    chapSecret);
 				break;
 			case 'S': /* iSNS access */
 				if (strcmp(optionList->optarg,
 					OPT_ENABLE) == 0) {
-					xml_add_tag(&first_str,
+					tgt_buf_add(&first_str,
 					    XML_ELEMENT_ISNS_ACCESS, OPT_TRUE);
 				} else
 					if (strcmp(optionList->optarg,
 						OPT_DISABLE) == 0) {
-					xml_add_tag(&first_str,
+					tgt_buf_add(&first_str,
 					    XML_ELEMENT_ISNS_ACCESS, OPT_FALSE);
 				} else {
 					(void) fprintf(stderr, "%s: %s\n",
@@ -798,12 +797,12 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 			case 'f': /* fast write back */
 				if (strcmp(optionList->optarg,
 					OPT_ENABLE) == 0) {
-					xml_add_tag(&first_str,
+					tgt_buf_add(&first_str,
 					    XML_ELEMENT_FAST, OPT_TRUE);
 				} else
 					if (strcmp(optionList->optarg,
 						OPT_DISABLE) == 0) {
-					xml_add_tag(&first_str,
+					tgt_buf_add(&first_str,
 					    XML_ELEMENT_FAST, OPT_FALSE);
 				} else {
 					(void) fprintf(stderr, "%s: %s\n",
@@ -823,10 +822,10 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 		}
 	}
 
-	buf_add_tag(&first_str, XML_ELEMENT_ADMIN, Tag_End);
-	buf_add_tag(&first_str, "modify", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_ADMIN, Tag_End);
+	tgt_buf_add_tag(&first_str, "modify", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 	return (formatErrString(node));
 }
@@ -836,7 +835,7 @@ static int
 deleteTarget(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node;
+	tgt_node_t	*node;
 	cmdOptions_t	*optionList = options;
 
 	if (operand == NULL)
@@ -844,19 +843,19 @@ deleteTarget(int operandLen, char *operand[], cmdOptions_t *options)
 	if (options == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "delete", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_Start);
-	xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+	tgt_buf_add_tag(&first_str, "delete", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_Start);
+	tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 
 	switch (optionList->optval) {
 	case 'u': /* all */
-		xml_add_tag(&first_str, XML_ELEMENT_LUN, optionList->optarg);
+		tgt_buf_add(&first_str, XML_ELEMENT_LUN, optionList->optarg);
 		break;
 	case 'l': /* acl */
-		xml_add_tag(&first_str, XML_ELEMENT_ACL, optionList->optarg);
+		tgt_buf_add(&first_str, XML_ELEMENT_ACL, optionList->optarg);
 		break;
 	case 'p': /* tpgt number */
-		xml_add_tag(&first_str, XML_ELEMENT_TPGT, optionList->optarg);
+		tgt_buf_add(&first_str, XML_ELEMENT_TPGT, optionList->optarg);
 		break;
 	default:
 		(void) fprintf(stderr, "%s: %c: %s\n",
@@ -866,10 +865,10 @@ deleteTarget(int operandLen, char *operand[], cmdOptions_t *options)
 		return (1);
 	}
 
-	buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_End);
-	buf_add_tag(&first_str, "delete", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_End);
+	tgt_buf_add_tag(&first_str, "delete", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 	return (formatErrString(node));
 }
@@ -879,7 +878,7 @@ static int
 deleteInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node;
+	tgt_node_t	*node;
 	cmdOptions_t	*optionList = options;
 
 	if (operand == NULL)
@@ -887,13 +886,13 @@ deleteInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 	if (options == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "delete", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_Start);
-	xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+	tgt_buf_add_tag(&first_str, "delete", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_Start);
+	tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 
 	switch (optionList->optval) {
 	case 'A': /* all */
-		xml_add_tag(&first_str, XML_ELEMENT_ALL, optionList->optarg);
+		tgt_buf_add(&first_str, XML_ELEMENT_ALL, optionList->optarg);
 		break;
 	default:
 		(void) fprintf(stderr, "%s: %c: %s\n",
@@ -903,10 +902,10 @@ deleteInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 		return (1);
 	}
 
-	buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_End);
-	buf_add_tag(&first_str, "delete", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_End);
+	tgt_buf_add_tag(&first_str, "delete", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 	return (formatErrString(node));
 }
@@ -916,7 +915,7 @@ static int
 deleteTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node;
+	tgt_node_t	*node;
 	cmdOptions_t	*optionList = options;
 	boolean_t	isIpv6 = B_FALSE;
 	uint16_t	port;
@@ -927,13 +926,13 @@ deleteTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 	if (options == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "delete", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_Start);
-	xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+	tgt_buf_add_tag(&first_str, "delete", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_Start);
+	tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 
 	switch (optionList->optval) {
 	case 'A': /* all */
-		xml_add_tag(&first_str, XML_ELEMENT_ALL, optionList->optarg);
+		tgt_buf_add(&first_str, XML_ELEMENT_ALL, optionList->optarg);
 		break;
 	case 'i': /* ip address */
 		if (parseAddress(optionList->optarg, 0,
@@ -941,7 +940,7 @@ deleteTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 		    PARSE_ADDR_OK) {
 			return (1);
 		}
-		xml_add_tag(&first_str, XML_ELEMENT_IPADDR, IpAddress);
+		tgt_buf_add(&first_str, XML_ELEMENT_IPADDR, IpAddress);
 		break;
 	default:
 		(void) fprintf(stderr, "%s: %c: %s\n",
@@ -951,10 +950,10 @@ deleteTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 		return (1);
 	}
 
-	buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_End);
-	buf_add_tag(&first_str, "delete", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_End);
+	tgt_buf_add_tag(&first_str, "delete", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 	return (formatErrString(node));
 }
@@ -963,11 +962,11 @@ static int
 listTarget(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node		= NULL;
-	xml_node_t	*n1		= NULL; /* pointer to node (depth=1) */
-	xml_node_t	*n2		= NULL; /* pointer to node (depth=2) */
-	xml_node_t	*n3		= NULL; /* pointer to node (depth=3) */
-	xml_node_t	*n4		= NULL; /* pointer to node (depth=4) */
+	tgt_node_t	*node		= NULL;
+	tgt_node_t	*n1		= NULL; /* pointer to node (depth=1) */
+	tgt_node_t	*n2		= NULL; /* pointer to node (depth=2) */
+	tgt_node_t	*n3		= NULL; /* pointer to node (depth=3) */
+	tgt_node_t	*n4		= NULL; /* pointer to node (depth=4) */
 	int		conns;
 	char		buf[32];
 	Boolean_t	verbose		= False;
@@ -975,25 +974,25 @@ listTarget(int operandLen, char *operand[], cmdOptions_t *options)
 	if (operand == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "list", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_Start);
+	tgt_buf_add_tag(&first_str, "list", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_Start);
 
 	if (operandLen)
-		xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+		tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 
 	/*
 	 * Always retrieve the iostats which will give us the
 	 * connection count information even if we're not doing
 	 * a verbose output.
 	 */
-	xml_add_tag(&first_str, XML_ELEMENT_IOSTAT, OPT_TRUE);
+	tgt_buf_add(&first_str, XML_ELEMENT_IOSTAT, OPT_TRUE);
 
 	if (options) {
 		switch (options->optval) {
 		case 0:
 			break;
 		case 'v':
-			xml_add_tag(&first_str, XML_ELEMENT_LUNINFO, OPT_TRUE);
+			tgt_buf_add(&first_str, XML_ELEMENT_LUNINFO, OPT_TRUE);
 			verbose = True;
 			break;
 		default:
@@ -1004,10 +1003,10 @@ listTarget(int operandLen, char *operand[], cmdOptions_t *options)
 		}
 	}
 
-	buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_End);
-	buf_add_tag(&first_str, "list", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_End);
+	tgt_buf_add_tag(&first_str, "list", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 
 	if (strcmp(node->x_name, XML_ELEMENT_RESULT)) {
@@ -1017,18 +1016,18 @@ listTarget(int operandLen, char *operand[], cmdOptions_t *options)
 	}
 
 	n1 = NULL;
-	while ((n1 = xml_node_next_child(node, XML_ELEMENT_TARG, n1)) != NULL) {
+	while ((n1 = tgt_node_next_child(node, XML_ELEMENT_TARG, n1)) != NULL) {
 		(void) printf("%s: %s\n", gettext("Target"), n1->x_value);
-		n2 = xml_node_next_child(n1, XML_ELEMENT_INAME, NULL);
+		n2 = tgt_node_next_child(n1, XML_ELEMENT_INAME, NULL);
 		(void) printf("%s%s: %s\n", dospace(1), gettext("iSCSI Name"),
 		    n2 ? n2->x_value : gettext("Not set"));
 
-		if ((n2 = xml_node_next_child(n1, XML_ELEMENT_ALIAS, NULL)) !=
+		if ((n2 = tgt_node_next_child(n1, XML_ELEMENT_ALIAS, NULL)) !=
 		    NULL)
 			(void) printf("%s%s: %s\n", dospace(1),
 			    gettext("Alias"), n2->x_value);
 
-		if ((n2 = xml_node_next_child(n1, XML_ELEMENT_MAXRECV, NULL)) !=
+		if ((n2 = tgt_node_next_child(n1, XML_ELEMENT_MAXRECV, NULL)) !=
 		    NULL)
 			(void) printf("%s%s: %s\n", dospace(1),
 			    gettext("MaxRecv"), n2->x_value);
@@ -1038,7 +1037,7 @@ listTarget(int operandLen, char *operand[], cmdOptions_t *options)
 		 */
 		n2 = NULL;
 		conns = 0;
-		while (n2 = xml_node_next_child(n1, XML_ELEMENT_CONN, n2))
+		while (n2 = tgt_node_next_child(n1, XML_ELEMENT_CONN, n2))
 			conns++;
 		(void) printf("%s%s: %d\n", dospace(1), gettext("Connections"),
 		    conns);
@@ -1053,30 +1052,30 @@ listTarget(int operandLen, char *operand[], cmdOptions_t *options)
 		 * indicating connections are coming next.
 		 */
 		n2 = NULL;
-		while (n2 = xml_node_next_child(n1, XML_ELEMENT_CONN, n2)) {
+		while (n2 = tgt_node_next_child(n1, XML_ELEMENT_CONN, n2)) {
 			(void) printf("%s%s:\n", dospace(2),
 			    gettext("Initiator"));
 			(void) printf("%s%s: %s\n", dospace(3),
 			    gettext("iSCSI Name"), n2->x_value);
-			n3 = xml_node_next_child(n2, XML_ELEMENT_ALIAS, NULL);
+			n3 = tgt_node_next_child(n2, XML_ELEMENT_ALIAS, NULL);
 			(void) printf("%s%s: %s\n", dospace(3),
 			    gettext("Alias"),
 			    n3 ? n3->x_value : gettext("unknown"));
 		}
 
 		(void) printf("%s%s:\n", dospace(1), gettext("ACL list"));
-		n2 = xml_node_next_child(n1, XML_ELEMENT_ACLLIST, NULL);
+		n2 = tgt_node_next_child(n1, XML_ELEMENT_ACLLIST, NULL);
 		n3 = NULL;
-		while (n3 = xml_node_next_child(n2, XML_ELEMENT_INIT, n3)) {
+		while (n3 = tgt_node_next_child(n2, XML_ELEMENT_INIT, n3)) {
 			(void) printf("%s%s: %s\n", dospace(2),
 			    gettext("Initiator"),
 			    n3->x_value);
 		}
 
 		(void) printf("%s%s:\n", dospace(1), gettext("TPGT list"));
-		n2 = xml_node_next_child(n1, XML_ELEMENT_TPGTLIST, NULL);
+		n2 = tgt_node_next_child(n1, XML_ELEMENT_TPGTLIST, NULL);
 		n3 = NULL;
-		while (n3 = xml_node_next_child(n2, XML_ELEMENT_TPGT, n3)) {
+		while (n3 = tgt_node_next_child(n2, XML_ELEMENT_TPGT, n3)) {
 			(void) printf("%s%s: %s\n", dospace(2),
 			    gettext("TPGT"),
 			    n3->x_value);
@@ -1084,29 +1083,29 @@ listTarget(int operandLen, char *operand[], cmdOptions_t *options)
 
 		(void) printf("%s%s:\n", dospace(1),
 		    gettext("LUN information"));
-		n2 = xml_node_next_child(n1, XML_ELEMENT_LUNINFO, NULL);
+		n2 = tgt_node_next_child(n1, XML_ELEMENT_LUNINFO, NULL);
 		n3 = NULL;
-		while (n3 = xml_node_next_child(n2, XML_ELEMENT_LUN, n3)) {
+		while (n3 = tgt_node_next_child(n2, XML_ELEMENT_LUN, n3)) {
 			(void) printf("%s%s: %s\n", dospace(2), gettext("LUN"),
 			    n3->x_value);
 
-			n4 = xml_node_next_child(n3, XML_ELEMENT_GUID, NULL);
+			n4 = tgt_node_next_child(n3, XML_ELEMENT_GUID, NULL);
 			(void) printf("%s%s: %s\n", dospace(3), gettext("GUID"),
 			    n4 ? n4->x_value : gettext("unknown"));
 
-			n4 = xml_node_next_child(n3, XML_ELEMENT_VID, NULL);
+			n4 = tgt_node_next_child(n3, XML_ELEMENT_VID, NULL);
 			(void) printf("%s%s: %s\n", dospace(3), gettext("VID"),
 			    n4 ? n4->x_value : gettext("unknown"));
 
-			n4 = xml_node_next_child(n3, XML_ELEMENT_PID, NULL);
+			n4 = tgt_node_next_child(n3, XML_ELEMENT_PID, NULL);
 			(void) printf("%s%s: %s\n", dospace(3), gettext("PID"),
 			    n4 ? n4->x_value : gettext("unknown"));
 
-			n4 = xml_node_next_child(n3, XML_ELEMENT_DTYPE, NULL);
+			n4 = tgt_node_next_child(n3, XML_ELEMENT_DTYPE, NULL);
 			(void) printf("%s%s: %s\n", dospace(3), gettext("Type"),
 			    n4 ? n4->x_value : gettext("unknown"));
 
-			n4 = xml_node_next_child(n3, XML_ELEMENT_SIZE, NULL);
+			n4 = tgt_node_next_child(n3, XML_ELEMENT_SIZE, NULL);
 			if (n4 && (strtol(n4->x_value, NULL, 0) != 0)) {
 				(void) printf("%s%s: %s\n", dospace(3),
 				    gettext("Size"),
@@ -1118,13 +1117,13 @@ listTarget(int operandLen, char *operand[], cmdOptions_t *options)
 				    gettext("Size"), gettext("unknown"));
 			}
 
-			n4 = xml_node_next_child(n3, XML_ELEMENT_BACK, NULL);
+			n4 = tgt_node_next_child(n3, XML_ELEMENT_BACK, NULL);
 			if (n4) {
 				(void) printf("%s%s: %s\n", dospace(3),
 				    gettext("Backing store"), n4->x_value);
 			}
 
-			n4 = xml_node_next_child(n3, XML_ELEMENT_STATUS, NULL);
+			n4 = tgt_node_next_child(n3, XML_ELEMENT_STATUS, NULL);
 			(void) printf("%s%s: %s\n", dospace(3),
 			    gettext("Status"),
 			    n4 ? n4->x_value : gettext("unknown"));
@@ -1138,20 +1137,20 @@ static int
 listInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node;
-	xml_node_t	*n1		= NULL; /* pointer to node (depth=1) */
-	xml_node_t	*n2		= NULL; /* pointer to node (depth=2) */
+	tgt_node_t	*node;
+	tgt_node_t	*n1		= NULL; /* pointer to node (depth=1) */
+	tgt_node_t	*n2		= NULL; /* pointer to node (depth=2) */
 	Boolean_t	verbose		= False;
 	cmdOptions_t	*optionList	= options;
 
 	if (operand == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "list", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_Start);
+	tgt_buf_add_tag(&first_str, "list", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_Start);
 
 	if (operandLen) {
-		xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+		tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 	}
 	if (optionList) {
 		switch (optionList->optval) {
@@ -1159,7 +1158,7 @@ listInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 			break;
 		case 'v':
 			verbose = True;
-			xml_add_tag(&first_str,
+			tgt_buf_add(&first_str,
 				    XML_ELEMENT_VERBOSE, OPT_TRUE);
 			break;
 
@@ -1172,10 +1171,10 @@ listInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 		}
 	}
 
-	buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_End);
-	buf_add_tag(&first_str, "list", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_End);
+	tgt_buf_add_tag(&first_str, "list", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 
 	if (strcmp(node->x_name, XML_ELEMENT_RESULT)) {
@@ -1185,19 +1184,19 @@ listInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 	}
 
 	n1 = NULL;
-	while (n1 = xml_node_next_child(node, XML_ELEMENT_INIT, n1)) {
+	while (n1 = tgt_node_next_child(node, XML_ELEMENT_INIT, n1)) {
 		(void) printf("%s: %s\n", gettext("Initiator"), n1->x_value);
 
-		n2 = xml_node_next_child(n1, XML_ELEMENT_INAME, NULL);
+		n2 = tgt_node_next_child(n1, XML_ELEMENT_INAME, NULL);
 		(void) printf("%s%s: %s\n", dospace(1), gettext("iSCSI Name"),
 		    n2 ? n2->x_value : gettext("Not set"));
 
-		n2 = xml_node_next_child(n1, XML_ELEMENT_CHAPNAME, NULL);
+		n2 = tgt_node_next_child(n1, XML_ELEMENT_CHAPNAME, NULL);
 		(void) printf("%s%s: %s\n", dospace(1), gettext("CHAP Name"),
 		    n2 ? n2->x_value : gettext("Not set"));
 
 		if (verbose == True) {
-			n2 = xml_node_next_child(n1, XML_ELEMENT_CHAPSECRET,
+			n2 = tgt_node_next_child(n1, XML_ELEMENT_CHAPSECRET,
 			    NULL);
 			(void) printf("%s%s: %s\n", dospace(1),
 			    gettext("CHAP Secret"),
@@ -1213,9 +1212,9 @@ static int
 listTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node		= NULL;
-	xml_node_t	*n1		= NULL; /* pointer to node (depth=1) */
-	xml_node_t	*n2		= NULL; /* pointer to node (depth=2) */
+	tgt_node_t	*node		= NULL;
+	tgt_node_t	*n1		= NULL; /* pointer to node (depth=1) */
+	tgt_node_t	*n2		= NULL; /* pointer to node (depth=2) */
 	cmdOptions_t	*optionList	= options;
 	Boolean_t	verbose		= False;
 	int		addrs;
@@ -1223,18 +1222,18 @@ listTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 	if (operand == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "list", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_Start);
+	tgt_buf_add_tag(&first_str, "list", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_Start);
 
 	if (operandLen)
-		xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+		tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 	if (optionList) {
 		switch (optionList->optval) {
 		case 0: /* no options, treat as --verbose */
 			break;
 		case 'v':
 			verbose = True;
-			xml_add_tag(&first_str,
+			tgt_buf_add(&first_str,
 				    XML_ELEMENT_VERBOSE, OPT_TRUE);
 			break;
 		default:
@@ -1246,10 +1245,10 @@ listTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 		}
 	}
 
-	buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_End);
-	buf_add_tag(&first_str, "list", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_End);
+	tgt_buf_add_tag(&first_str, "list", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 
 	if (strcmp(node->x_name, XML_ELEMENT_RESULT)) {
@@ -1259,11 +1258,11 @@ listTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 	}
 
 	n1 = NULL;
-	while (n1 = xml_node_next_child(node, XML_ELEMENT_TPGT, n1)) {
+	while (n1 = tgt_node_next_child(node, XML_ELEMENT_TPGT, n1)) {
 		(void) printf("%s: %s\n", gettext("TPGT"), n1->x_value);
 		n2 = NULL;
 		addrs = 0;
-		while (n2 = xml_node_next_child(n1, XML_ELEMENT_IPADDR, n2)) {
+		while (n2 = tgt_node_next_child(n1, XML_ELEMENT_IPADDR, n2)) {
 			if (verbose == True)
 				(void) printf("%s%s: %s\n", dospace(1),
 				    gettext("IP Address"),
@@ -1294,19 +1293,19 @@ static int
 showAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL;
-	xml_node_t	*node		= NULL;
-	xml_node_t	*n1		= NULL; /* pointer to node (depth=1) */
-	xml_node_t	*n2		= NULL; /* pointer to node (depth=2) */
+	tgt_node_t	*node		= NULL;
+	tgt_node_t	*n1		= NULL; /* pointer to node (depth=1) */
+	tgt_node_t	*n2		= NULL; /* pointer to node (depth=2) */
 
 	if (operand == NULL)
 		return (1);
 
-	buf_add_tag(&first_str, "list", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_ADMIN, Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_ADMIN, Tag_End);
-	buf_add_tag(&first_str, "list", Tag_End);
+	tgt_buf_add_tag(&first_str, "list", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_ADMIN, Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_ADMIN, Tag_End);
+	tgt_buf_add_tag(&first_str, "list", Tag_End);
 
-	node = send_data(hostname, first_str);
+	node = tgt_door_call(first_str, 0);
 	free(first_str);
 
 	if (strcmp(node->x_name, XML_ELEMENT_RESULT)) {
@@ -1317,22 +1316,22 @@ showAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 
 	(void) printf("%s:\n", cmdName);
 
-	n1 = xml_node_next_child(node, XML_ELEMENT_ADMIN, NULL);
+	n1 = tgt_node_next_child(node, XML_ELEMENT_ADMIN, NULL);
 	if (n1 == NULL) {
 		(void) fprintf(stderr, "%s: %s\n", cmdName,
 		    gettext("Bad XML response"));
 		return (1);
 	}
 
-	n2 = xml_node_next_child(n1, XML_ELEMENT_BASEDIR, NULL);
+	n2 = tgt_node_next_child(n1, XML_ELEMENT_BASEDIR, NULL);
 	(void) printf("%s%s: %s\n", dospace(1), gettext("Base Directory"),
 	    n2 ? n2->x_value : gettext("Not set"));
 
-	n2 = xml_node_next_child(n1, XML_ELEMENT_CHAPNAME, NULL);
+	n2 = tgt_node_next_child(n1, XML_ELEMENT_CHAPNAME, NULL);
 	(void) printf("%s%s: %s\n", dospace(1), gettext("CHAP Name"),
 	    n2 ? n2->x_value : gettext("Not set"));
 
-	n2 = xml_node_next_child(n1, XML_ELEMENT_RAD_ACCESS, NULL);
+	n2 = tgt_node_next_child(n1, XML_ELEMENT_RAD_ACCESS, NULL);
 	(void) printf("%s%s: ", dospace(1), gettext("RADIUS Access"));
 	if (n2) {
 		if (strcmp(n2->x_value, OPT_TRUE) == 0)
@@ -1342,11 +1341,11 @@ showAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 	} else
 		(void) printf("%s\n", gettext("Not set"));
 
-	n2 = xml_node_next_child(n1, XML_ELEMENT_RAD_SERV, NULL);
+	n2 = tgt_node_next_child(n1, XML_ELEMENT_RAD_SERV, NULL);
 	(void) printf("%s%s: %s\n", dospace(1), gettext("RADIUS Server"),
 	    n2 ? n2->x_value : gettext("Not set"));
 
-	n2 = xml_node_next_child(n1, XML_ELEMENT_ISNS_ACCESS, NULL);
+	n2 = tgt_node_next_child(n1, XML_ELEMENT_ISNS_ACCESS, NULL);
 	(void) printf("%s%s: ", dospace(1), gettext("iSNS Access"));
 	if (n2) {
 		if (strcmp(n2->x_value, OPT_TRUE) == 0)
@@ -1356,7 +1355,7 @@ showAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 	} else
 		(void) printf("%s\n", gettext("Not set"));
 
-	n2 = xml_node_next_child(n1, XML_ELEMENT_FAST, NULL);
+	n2 = tgt_node_next_child(n1, XML_ELEMENT_FAST, NULL);
 	(void) printf("%s%s: ", dospace(1), gettext("Fast Write ACK"));
 	if (n2) {
 		if (strcmp(n2->x_value, OPT_TRUE) == 0)
@@ -1374,7 +1373,7 @@ showStats(int operandLen, char *operand[], cmdOptions_t *options)
 {
 	char		*first_str	= NULL,
 			scale_buf[16];
-	xml_node_t	*node,
+	tgt_node_t	*node,
 			*n1;
 	int		interval	= -1,
 			count		= -1,
@@ -1382,12 +1381,12 @@ showStats(int operandLen, char *operand[], cmdOptions_t *options)
 	stat_delta_t	cur_data,
 			*pd;
 
-	buf_add_tag(&first_str, "list", Tag_Start);
-	buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_Start);
+	tgt_buf_add_tag(&first_str, "list", Tag_Start);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_Start);
 
-	xml_add_tag(&first_str, XML_ELEMENT_IOSTAT, OPT_TRUE);
+	tgt_buf_add(&first_str, XML_ELEMENT_IOSTAT, OPT_TRUE);
 	if (operandLen)
-		xml_add_tag(&first_str, XML_ELEMENT_NAME, operand[0]);
+		tgt_buf_add(&first_str, XML_ELEMENT_NAME, operand[0]);
 
 	for (; options->optval; options++) {
 		switch (options->optval) {
@@ -1419,8 +1418,8 @@ showStats(int operandLen, char *operand[], cmdOptions_t *options)
 		}
 	}
 
-	buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_End);
-	buf_add_tag(&first_str, "list", Tag_End);
+	tgt_buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_End);
+	tgt_buf_add_tag(&first_str, "list", Tag_End);
 
 	header = 1;
 	/*CONSTANTCONDITION*/
@@ -1437,23 +1436,23 @@ showStats(int operandLen, char *operand[], cmdOptions_t *options)
 			    "-----", "-----");
 			header = 20;
 		}
-		node = send_data(hostname, first_str);
+		node = tgt_door_call(first_str, 0);
 
 		if (strcmp(node->x_name, XML_ELEMENT_RESULT)) {
 			(void) fprintf(stderr, "%s: %s\n", cmdName,
 			    gettext("Bad XML response"));
 			free(first_str);
-			xml_tree_free(node);
+			tgt_node_free(node);
 			stats_free();
 			return (1);
 		}
 
 		n1 = NULL;
-		while (n1 = xml_node_next_child(node, XML_ELEMENT_TARG, n1)) {
+		while (n1 = tgt_node_next_child(node, XML_ELEMENT_TARG, n1)) {
 			stats_load_counts(n1, &cur_data);
 			if ((pd = stats_prev_counts(&cur_data)) == NULL) {
 				free(first_str);
-				xml_tree_free(node);
+				tgt_node_free(node);
 				return (1);
 			}
 			(void) printf("%-20s  ", pd->device);
@@ -1471,7 +1470,7 @@ showStats(int operandLen, char *operand[], cmdOptions_t *options)
 			    cur_data.write_blks - pd->write_blks, 512, 1024));
 			stats_update_counts(pd, &cur_data);
 		}
-		xml_tree_free(node);
+		tgt_node_free(node);
 
 		if (count == -1) {
 			if (interval == -1)

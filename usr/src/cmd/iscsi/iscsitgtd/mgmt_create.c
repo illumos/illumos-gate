@@ -43,8 +43,10 @@
 #include <sys/scsi/impl/uscsi.h>
 #include <sys/scsi/generic/commands.h>
 #include <sys/scsi/impl/commands.h>
+#include <libzfs.h>
+#include <syslog.h>
 
-#include "xml.h"
+#include <iscsitgt_impl.h>
 #include "queue.h"
 #include "target.h"
 #include "iscsi_cmd.h"
@@ -54,9 +56,10 @@
 
 extern char *getfullrawname();
 
-static char *create_target(xml_node_t *);
-static char *create_initiator(xml_node_t *);
-static char *create_tpgt(xml_node_t *);
+static char *create_target(tgt_node_t *);
+static char *create_initiator(tgt_node_t *);
+static char *create_tpgt(tgt_node_t *);
+static char *create_zfs(tgt_node_t *);
 static Boolean_t create_target_dir(char *targ_name, char *local_name);
 static char *create_node_name(char *local_nick, char *alias);
 static Boolean_t create_lun(char *targ_name, char *type, int lun,
@@ -67,7 +70,9 @@ static Boolean_t setup_disk_backing(err_code_t *code, char *path, char *backing,
     FILE *fp, uint64_t *size);
 static Boolean_t setup_raw_backing(err_code_t *code, char *path, char *backing,
     uint64_t *size);
+static void zfs_lun(tgt_node_t *l, uint64_t size, char *dataset);
 
+#define	ZVOL_PATH	"/dev/zvol/rdsk/"
 
 /*
  * []----
@@ -76,9 +81,9 @@ static Boolean_t setup_raw_backing(err_code_t *code, char *path, char *backing,
  */
 /*ARGSUSED*/
 void
-create_func(xml_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
+create_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 {
-	xml_node_t	*x;
+	tgt_node_t	*x;
 	char		msgbuf[80],
 			*reply_msg	= NULL;
 
@@ -95,6 +100,8 @@ create_func(xml_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 			reply_msg = create_initiator(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TPGT) == 0) {
 			reply_msg = create_tpgt(x);
+		} else if (strcmp(x->x_name, XML_ELEMENT_ZFS) == 0) {
+			reply_msg = create_zfs(x);
 		} else {
 			(void) snprintf(msgbuf, sizeof (msgbuf),
 			    "Unknown object '%s' for create element",
@@ -105,8 +112,11 @@ create_func(xml_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 	queue_message_set(reply, 0, msg_mgmt_rply, reply_msg);
 }
 
+/*
+ * create_target -- an administrative request to create a target
+ */
 static char *
-create_target(xml_node_t *x)
+create_target(tgt_node_t *x)
 {
 	char		*msg		= NULL,
 			*name		= NULL,
@@ -118,14 +128,14 @@ create_target(xml_node_t *x)
 			path[MAXPATHLEN];
 	int		lun		= 0, /* default to LUN 0 */
 			i;
-	xml_node_t	*n,
+	tgt_node_t	*n,
 			*c,
 			*l;
 	err_code_t	code;
 
-	(void) xml_find_value_str(x, XML_ELEMENT_BACK, &backing);
-	(void) xml_find_value_str(x, XML_ELEMENT_ALIAS, &alias);
-	if (xml_find_value_intchk(x, XML_ELEMENT_LUN, &lun) == False) {
+	(void) tgt_find_value_str(x, XML_ELEMENT_BACK, &backing);
+	(void) tgt_find_value_str(x, XML_ELEMENT_ALIAS, &alias);
+	if (tgt_find_value_intchk(x, XML_ELEMENT_LUN, &lun) == False) {
 		xml_rtn_msg(&msg, ERR_LUN_INVALID_RANGE);
 		goto error;
 	}
@@ -133,7 +143,7 @@ create_target(xml_node_t *x)
 	/*
 	 * We've got to have a name element or all bets are off.
 	 */
-	if (xml_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		goto error;
 	}
@@ -157,7 +167,7 @@ create_target(xml_node_t *x)
 			name[i] = tolower(name[i]);
 	}
 
-	if (xml_find_value_str(x, XML_ELEMENT_TYPE, &type) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_TYPE, &type) == False) {
 		/*
 		 * If a type hasn't been specified default to disk emulation.
 		 * We use strdup() since at the end of this routine the code
@@ -171,7 +181,7 @@ create_target(xml_node_t *x)
 		goto error;
 	}
 
-	if (xml_find_value_str(x, XML_ELEMENT_SIZE, &size) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_SIZE, &size) == False) {
 		if (backing != NULL) {
 
 			/*
@@ -218,31 +228,31 @@ create_target(xml_node_t *x)
 			xml_rtn_msg(&msg, ERR_CREATE_TARGET_DIR_FAILED);
 			goto error;
 		}
-		n = xml_alloc_node(XML_ELEMENT_TARG, String, name);
-		c = xml_alloc_node(XML_ELEMENT_INAME, String, node_name);
-		(void) xml_add_child(n, c);
-		c = xml_alloc_node(XML_ELEMENT_LUNLIST, String, "");
-		l = xml_alloc_node(XML_ELEMENT_LUN, Int, &lun);
-		(void) xml_add_child(c, l);
-		(void) xml_add_child(n, c);
+		n = tgt_node_alloc(XML_ELEMENT_TARG, String, name);
+		c = tgt_node_alloc(XML_ELEMENT_INAME, String, node_name);
+		tgt_node_add(n, c);
+		c = tgt_node_alloc(XML_ELEMENT_LUNLIST, String, "");
+		l = tgt_node_alloc(XML_ELEMENT_LUN, Int, &lun);
+		tgt_node_add(c, l);
+		tgt_node_add(n, c);
 		if (alias != NULL) {
-			c = xml_alloc_node(XML_ELEMENT_ALIAS, String, alias);
-			(void) xml_add_child(n, c);
+			c = tgt_node_alloc(XML_ELEMENT_ALIAS, String, alias);
+			tgt_node_add(n, c);
 		}
-		(void) xml_add_child(targets_config, n);
+		tgt_node_add(targets_config, n);
 
 	} else {
-		if (xml_find_value_str(n, XML_ELEMENT_INAME,
+		if (tgt_find_value_str(n, XML_ELEMENT_INAME,
 		    &node_name) == False) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_INAME);
 			goto error;
 		}
-		if ((c = xml_node_next(n, XML_ELEMENT_LUNLIST, NULL)) == NULL) {
+		if ((c = tgt_node_next(n, XML_ELEMENT_LUNLIST, NULL)) == NULL) {
 			xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
 			goto error;
 		}
-		l = xml_alloc_node(XML_ELEMENT_LUN, Int, &lun);
-		(void) xml_add_child(c, l);
+		l = tgt_node_alloc(XML_ELEMENT_LUN, Int, &lun);
+		tgt_node_add(c, l);
 	}
 
 	if (create_lun(node_name, type, lun, size, backing, &code) == True) {
@@ -262,9 +272,9 @@ create_target(xml_node_t *x)
 		(void) snprintf(path, sizeof (path), "%s/%s",
 		    target_basedir, name);
 		unlink(path);
-		xml_remove_child(targets_config, n, MatchBoth);
+		tgt_node_remove(targets_config, n, MatchBoth);
 	} else
-		xml_remove_child(c, l, MatchBoth);
+		tgt_node_remove(c, l, MatchBoth);
 
 	xml_rtn_msg(&msg, code);
 
@@ -286,20 +296,20 @@ error:
 }
 
 static char *
-create_initiator(xml_node_t *x)
+create_initiator(tgt_node_t *x)
 {
 	char		*msg		= NULL,
 			*name		= NULL,
 			*iscsi_name	= NULL;
-	xml_node_t	*inode		= NULL,
+	tgt_node_t	*inode		= NULL,
 			*n,
 			*c;
 
-	if (xml_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		goto error;
 	}
-	if (xml_find_value_str(x, XML_ELEMENT_INAME, &iscsi_name) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_INAME, &iscsi_name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_INAME);
 		goto error;
 	}
@@ -308,7 +318,7 @@ create_initiator(xml_node_t *x)
 		goto error;
 	}
 
-	while ((inode = xml_node_next(main_config, XML_ELEMENT_INIT,
+	while ((inode = tgt_node_next(main_config, XML_ELEMENT_INIT,
 	    inode)) != NULL) {
 		if (strcmp(inode->x_value, name) == 0) {
 			xml_rtn_msg(&msg, ERR_INIT_EXISTS);
@@ -316,10 +326,10 @@ create_initiator(xml_node_t *x)
 		}
 	}
 
-	n = xml_alloc_node(XML_ELEMENT_INIT, String, name);
-	c = xml_alloc_node(XML_ELEMENT_INAME, String, iscsi_name);
-	(void) xml_add_child(n, c);
-	(void) xml_add_child(main_config, n);
+	n = tgt_node_alloc(XML_ELEMENT_INIT, String, name);
+	c = tgt_node_alloc(XML_ELEMENT_INAME, String, iscsi_name);
+	tgt_node_add(n, c);
+	tgt_node_add(main_config, n);
 
 	if (update_config_main(&msg) == True)
 		xml_rtn_msg(&msg, ERR_SUCCESS);
@@ -334,16 +344,16 @@ error:
 }
 
 static char *
-create_tpgt(xml_node_t *x)
+create_tpgt(tgt_node_t *x)
 {
 	char		*msg	= NULL,
 			*tpgt	= NULL,
 			*extra	 = NULL;
-	xml_node_t	*tnode	= NULL,
+	tgt_node_t	*tnode	= NULL,
 			*n;
 	int		tpgt_val;
 
-	if (xml_find_value_str(x, XML_ELEMENT_NAME, &tpgt) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &tpgt) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		goto error;
 	}
@@ -356,7 +366,7 @@ create_tpgt(xml_node_t *x)
 		goto error;
 	}
 
-	while ((tnode = xml_node_next(main_config, XML_ELEMENT_TPGT,
+	while ((tnode = tgt_node_next(main_config, XML_ELEMENT_TPGT,
 	    tnode)) != NULL) {
 		if (strcmp(tnode->x_value, tpgt) == 0) {
 			xml_rtn_msg(&msg, ERR_TPGT_EXISTS);
@@ -364,8 +374,8 @@ create_tpgt(xml_node_t *x)
 		}
 	}
 
-	n = xml_alloc_node(XML_ELEMENT_TPGT, String, tpgt);
-	(void) xml_add_child(main_config, n);
+	n = tgt_node_alloc(XML_ELEMENT_TPGT, String, tpgt);
+	tgt_node_add(main_config, n);
 
 	if (update_config_main(&msg) == True)
 		xml_rtn_msg(&msg, ERR_SUCCESS);
@@ -374,6 +384,230 @@ error:
 	if (tpgt)
 		free(tpgt);
 
+	return (msg);
+}
+
+static char *
+create_zfs(tgt_node_t *x)
+{
+	char		*msg		= NULL,
+			*dataset	= NULL,
+			*node_name	= NULL,
+			*prop		= NULL,
+			path[MAXPATHLEN],
+			*cp,	/* current pair */
+			*np,	/* next pair */
+			*vp;	/* value pointer */
+	tgt_node_t	*dnode		= NULL,
+			*n,
+			*c,
+			*attr,
+			*ll,
+			*l;
+	libzfs_handle_t	*zh		= NULL;
+	zfs_handle_t	*zfsh		= NULL;
+	uint64_t	size;
+	size_t		prop_len;
+	int		lun		= 0;
+	xmlTextReaderPtr	r;
+
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &dataset) == False) {
+		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
+		goto error;
+	}
+
+	while ((dnode = tgt_node_next(targets_config, XML_ELEMENT_TARG,
+	    dnode)) != NULL) {
+		if (strcmp(dnode->x_value, dataset) == 0) {
+			xml_rtn_msg(&msg, ERR_LUN_EXISTS);
+			goto error;
+		}
+	}
+
+	if (((zh = libzfs_init()) == NULL) ||
+	    ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_ANY)) == NULL)) {
+		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+		goto error;
+	}
+
+	prop_len = 1024;
+	if ((prop = malloc(prop_len)) == NULL) {
+		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+		goto error;
+	}
+
+	/*
+	 * In case zfs_prop_get returns no contents.
+	 */
+	*prop = '\0';
+
+	/*
+	 * If we fail to get the shareiscsi property or the property is
+	 * set to "off" return an error.
+	 */
+	if (zfs_prop_get(zfsh, ZFS_PROP_SHAREISCSI, prop, prop_len, NULL,
+	    NULL, 0, B_TRUE)) {
+		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+		goto error;
+	}
+
+	/*
+	 * The options property is a string with name/value pairs separated
+	 * by comma characters. Stand alone values of 'on' and 'off' are
+	 * also permitted, but having the property set to off when share()
+	 * is called is an error.
+	 * Currently we only look for 'type=<value>' and ignore others.
+	 */
+	cp = prop;
+	while (cp) {
+		if (np = strchr(cp, ','))
+			*np++ = '\0';
+		if (strcmp(cp, "on") == 0) {
+			cp = np;
+			continue;
+		}
+		if (strcmp(cp, "off") == 0) {
+			xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+			goto error;
+		}
+		if (vp = strchr(cp, '='))
+			*vp++ = '\0';
+		/*
+		 * Only support 'disk' emulation at this point.
+		 */
+		if ((strcmp(cp, "type") == 0) && (strcmp(vp, "disk") != 0)) {
+			xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+			goto error;
+		}
+
+		cp = np;
+	}
+
+	/*
+	 * In case zfs_prop_get returns no contents.
+	 */
+	*prop = '\0';
+
+	if (zfs_prop_get(zfsh, ZFS_PROP_ISCSIOPTIONS, prop, prop_len, NULL,
+	    NULL, 0, B_TRUE)) {
+		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+		goto error;
+	}
+
+	/*
+	 * Pick up the current size of the volume.
+	 */
+	size = zfs_prop_get_int(zfsh, ZFS_PROP_VOLSIZE);
+	if (strlen(prop)) {
+		n = NULL;
+		if ((r = (xmlTextReaderPtr)xmlReaderForMemory(prop,
+		    strlen(prop), NULL, NULL, 0)) != NULL) {
+			while (xmlTextReaderRead(r)) {
+				if (tgt_node_process(r, &n) == False)
+					break;
+			}
+			xmlTextReaderClose(r);
+			xmlFreeTextReader(r);
+			xmlCleanupParser();
+
+			/*
+			 * Pick up the LU node from the LU List which hangs
+			 * off of the target node. If either is NULL there's
+			 * an internal error someplace.
+			 * 'l' will be used later.
+			 */
+			if (((ll = tgt_node_next(n, XML_ELEMENT_LUNLIST, NULL))
+			    == NULL) ||
+			    ((l = tgt_node_next(ll, XML_ELEMENT_LUN, NULL)) ==
+			    NULL)) {
+				xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+				goto error;
+			}
+
+		} else {
+			xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+			goto error;
+		}
+	} else {
+		if ((node_name = create_node_name(NULL, NULL)) == NULL) {
+			xml_rtn_msg(&msg, ERR_CREATE_NAME_TO_LONG);
+			goto error;
+		}
+
+		n = tgt_node_alloc(XML_ELEMENT_TARG, String, NULL);
+		attr = tgt_node_alloc(XML_ELEMENT_INCORE, String,
+		    XML_VALUE_TRUE);
+		tgt_node_add_attr(n, attr);
+		attr = tgt_node_alloc(XML_ELEMENT_VERS, String, "1.0");
+		tgt_node_add_attr(n, attr);
+
+		c = tgt_node_alloc(XML_ELEMENT_INAME, String, node_name);
+		tgt_node_add(n, c);
+
+		c = tgt_node_alloc(XML_ELEMENT_LUNLIST, String, "");
+		tgt_node_add(n, c);
+
+		l = tgt_node_alloc(XML_ELEMENT_LUN, Int, &lun);
+		tgt_node_add(c, l);
+		attr = tgt_node_alloc(XML_ELEMENT_VERS, String, "1.0");
+		tgt_node_add_attr(l, attr);
+
+		zfs_lun(l, size, dataset);
+
+		/*
+		 * Now store this information on the ZVOL property so that
+		 * next time we get a share request the same data will be
+		 * used.
+		 */
+		free(prop);
+		prop = NULL;
+		tgt_dump2buf(n, &prop);
+		if (zfs_prop_set(zfsh, zfs_prop_to_name(ZFS_PROP_ISCSIOPTIONS),
+		    prop)) {
+			xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+			goto error;
+		}
+	}
+
+	/*
+	 * NOTE: 'n' is expected to be the target node for this
+	 * ZVOL at this point.
+	 */
+
+	/*
+	 * Several elements can change everytime we share
+	 * the dataset. The TargetAlias and backing store
+	 * can change since these are based on the dataset
+	 * and the size of the volume. Therefore, these
+	 * pieces of information are not stored as part
+	 * of the iscsioptions properity.
+	 */
+	tgt_update_value_str(n, XML_ELEMENT_TARG, dataset);
+	c = tgt_node_alloc(XML_ELEMENT_ALIAS, String, dataset);
+	tgt_node_add(n, c);
+
+	(void) snprintf(path, sizeof (path), "%s%s", ZVOL_PATH, dataset);
+	c = tgt_node_alloc(XML_ELEMENT_BACK, String, path);
+	tgt_node_add(l, c);
+
+	size /= 512LL;
+	c = tgt_node_alloc(XML_ELEMENT_SIZE, Uint64, &size);
+	tgt_node_add(l, c);
+
+	tgt_node_add(targets_config, n);
+
+	xml_rtn_msg(&msg, ERR_SUCCESS);
+error:
+	if (zfsh)
+		zfs_close(zfsh);
+	if (zh)
+		libzfs_fini(zh);
+	if (dataset)
+		free(dataset);
+	if (node_name)
+		free(node_name);
+	if (prop)
+		free(prop);
 	return (msg);
 }
 
@@ -393,7 +627,8 @@ create_node_name(char *local_nick, char *alias)
 {
 	uuid_t	id;
 	char	id_str[37],
-		*p;
+		*p,
+		*anp;		/* alias or nick pointer */
 
 	if ((p = (char *)malloc(ISCSI_MAX_NAME_LEN)) == NULL)
 		return (NULL);
@@ -411,11 +646,25 @@ create_node_name(char *local_nick, char *alias)
 	 */
 	uuid_generate(id);
 	uuid_unparse(id, id_str);
-	if (snprintf(p, ISCSI_MAX_NAME_LEN, "iqn.1986-03.com.sun:%02d:%s.%s",
-	    TARGET_NAME_VERS, id_str, alias != NULL ? alias : local_nick) >
-	    ISCSI_MAX_NAME_LEN) {
+	if (snprintf(p, ISCSI_MAX_NAME_LEN, "iqn.1986-03.com.sun:%02d:%s",
+	    TARGET_NAME_VERS, id_str) > ISCSI_MAX_NAME_LEN) {
 		free(p);
 		return (NULL);
+	}
+	if (local_nick || alias) {
+		anp = (alias != NULL) ? alias : local_nick;
+
+		/*
+		 * Make sure we still have room to add the alias or
+		 * local nickname, a '.', and NULL character to the
+		 * buffer.
+		 */
+		if ((strlen(p) + strlen(anp) + 2) > ISCSI_MAX_NAME_LEN) {
+			free(p);
+			return (NULL);
+		}
+		(void) strcat(p, ".");
+		(void) strcat(p, anp);
 	}
 
 	return (p);
@@ -632,7 +881,7 @@ create_lun_common(char *targ_name, int lun, uint64_t size, err_code_t *code)
 	char			path[MAXPATHLEN],
 				buf[512];
 	struct statvfs		fs;
-	xml_node_t		*node			= NULL,
+	tgt_node_t		*node			= NULL,
 				*c;
 	xmlTextReaderPtr	r;
 
@@ -732,18 +981,18 @@ create_lun_common(char *targ_name, int lun, uint64_t size, err_code_t *code)
 		    target_basedir, targ_name, PARAMBASE, lun);
 		if (r = (xmlTextReaderPtr)xmlReaderForFile(path, NULL, 0)) {
 			while (xmlTextReaderRead(r) == 1)
-				if (xml_process_node(r, &node) == False)
+				if (tgt_node_process(r, &node) == False)
 					break;
-			c = xml_alloc_node(XML_ELEMENT_STATUS, String,
+			c = tgt_node_alloc(XML_ELEMENT_STATUS, String,
 			    TGT_STATUS_ONLINE);
-			xml_replace_child(node, c, MatchName);
-			xml_tree_free(c);
-			if (xml_dump2file(node, path) == False) {
+			tgt_node_replace(node, c, MatchName);
+			tgt_node_free(c);
+			if (tgt_dump2file(node, path) == False) {
 				queue_prt(mgmtq, Q_STE_ERRS,
 				    "GEN%d  failed to dump out params", lun);
 				goto error;
 			}
-			xml_tree_free(node);
+			tgt_node_free(node);
 			xmlTextReaderClose(r);
 			xmlFreeTextReader(r);
 			xmlCleanupParser();
@@ -998,4 +1247,53 @@ setup_raw_backing(err_code_t *code, char *path, char *backing,
 error:
 	(void) close(fd);
 	return (rval);
+}
+
+static void
+zfs_lun(tgt_node_t *l, uint64_t size, char *dataset)
+{
+	tgt_node_t	*c;
+	int		cylinders,
+			heads,
+			spt,
+			val,
+			guid;
+	create_geom(size, &cylinders, &heads, &spt);
+
+	guid = 0;
+	c = tgt_node_alloc(XML_ELEMENT_GUID, Int, &guid);
+	tgt_node_add(l, c);
+
+	c = tgt_node_alloc(XML_ELEMENT_PID, String, DEFAULT_PID);
+	tgt_node_add(l, c);
+
+	c = tgt_node_alloc(XML_ELEMENT_VID, String, DEFAULT_VID);
+	tgt_node_add(l, c);
+
+	c = tgt_node_alloc(XML_ELEMENT_DTYPE, String, TGT_TYPE_DISK);
+	tgt_node_add(l, c);
+
+	val = DEFAULT_RPM;
+	c = tgt_node_alloc(XML_ELEMENT_RPM, Int, &val);
+	tgt_node_add(l, c);
+
+	c = tgt_node_alloc(XML_ELEMENT_HEADS, Int, &heads);
+	tgt_node_add(l, c);
+
+	c = tgt_node_alloc(XML_ELEMENT_CYLINDERS, Int, &cylinders);
+	tgt_node_add(l, c);
+
+	c = tgt_node_alloc(XML_ELEMENT_SPT, Int, &spt);
+	tgt_node_add(l, c);
+
+	val = DEFAULT_BYTES_PER;
+	c = tgt_node_alloc(XML_ELEMENT_BPS, Int, &val);
+	tgt_node_add(l, c);
+
+	val = DEFAULT_INTERLEAVE;
+	c = tgt_node_alloc(XML_ELEMENT_INTERLEAVE, Int, &val);
+	tgt_node_add(l, c);
+
+	c = tgt_node_alloc(XML_ELEMENT_STATUS, String, TGT_STATUS_ONLINE);
+	tgt_node_add(l, c);
 }

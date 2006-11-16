@@ -96,16 +96,16 @@ static void raw_write_cmplt(emul_handle_t e);
  * []----
  */
 Boolean_t
-raw_init_common(t10_lu_common_t *lu)
+raw_common_init(t10_lu_common_t *lu)
 {
-	xml_node_t	*node	= lu->l_root;
+	tgt_node_t	*node	= lu->l_root;
 	char		*str;
 	raw_params_t	*r;
 
 	if ((r = (raw_params_t *)calloc(1, sizeof (*r))) == NULL)
 		return (False);
 
-	if (xml_find_value_str(node, XML_ELEMENT_SIZE, &str) == True) {
+	if (tgt_find_value_str(node, XML_ELEMENT_SIZE, &str) == True) {
 		r->r_size = strtoll(str, NULL, 0);
 		free(str);
 	}
@@ -114,7 +114,7 @@ raw_init_common(t10_lu_common_t *lu)
 }
 
 void
-raw_fini_common(t10_lu_common_t *lu)
+raw_common_fini(t10_lu_common_t *lu)
 {
 	free(lu->l_dtype_params);
 }
@@ -125,7 +125,7 @@ raw_fini_common(t10_lu_common_t *lu)
  * []----
  */
 void
-raw_init_per(t10_lu_impl_t *itl)
+raw_per_init(t10_lu_impl_t *itl)
 {
 	itl->l_cmd	= raw_cmd;
 	itl->l_data	= raw_data;
@@ -142,7 +142,13 @@ raw_init_per(t10_lu_impl_t *itl)
 
 /*ARGSUSED*/
 void
-raw_fini_per(t10_lu_impl_t *itl)
+raw_per_fini(t10_lu_impl_t *itl)
+{
+}
+
+/*ARGSUSED*/
+void
+raw_task_mgmt(t10_lu_common_t *t, TaskOp_t op)
 {
 }
 

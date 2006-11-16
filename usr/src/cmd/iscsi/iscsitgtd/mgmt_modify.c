@@ -38,19 +38,21 @@
 #include <assert.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <libzfs.h>
 
-#include "xml.h"
+#include <iscsitgt_impl.h>
 #include "queue.h"
 #include "utility.h"
 #include "iscsi_cmd.h"
 #include "target.h"
 #include "errcode.h"
 
-static char *modify_target(xml_node_t *x);
-static char *modify_initiator(xml_node_t *x);
-static char *modify_admin(xml_node_t *x);
-static char *modify_tpgt(xml_node_t *x);
-static Boolean_t modify_element(char *, char *, xml_node_t *, match_type_t);
+static char *modify_target(tgt_node_t *x);
+static char *modify_initiator(tgt_node_t *x);
+static char *modify_admin(tgt_node_t *x);
+static char *modify_tpgt(tgt_node_t *x);
+static char *modify_zfs(tgt_node_t *x);
+static Boolean_t modify_element(char *, char *, tgt_node_t *, match_type_t);
 
 /*
  * []----
@@ -59,9 +61,9 @@ static Boolean_t modify_element(char *, char *, xml_node_t *, match_type_t);
  */
 /*ARGSUSED*/
 void
-modify_func(xml_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
+modify_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 {
-	xml_node_t	*x;
+	tgt_node_t	*x;
 	char		*reply_msg	= NULL;
 
 	if (p->x_child == NULL) {
@@ -80,6 +82,8 @@ modify_func(xml_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 			reply_msg = modify_admin(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TPGT) == 0) {
 			reply_msg = modify_tpgt(x);
+		} else if (strcmp(x->x_name, XML_ELEMENT_ZFS) == 0) {
+			reply_msg = modify_zfs(x);
 		} else {
 			xml_rtn_msg(&reply_msg, ERR_INVALID_OBJECT);
 		}
@@ -93,7 +97,7 @@ modify_func(xml_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
  * []----
  */
 static char *
-modify_target(xml_node_t *x)
+modify_target(tgt_node_t *x)
 {
 	char		*msg		= NULL,
 			*name		= NULL,
@@ -103,7 +107,7 @@ modify_target(xml_node_t *x)
 			path[MAXPATHLEN],
 			*m,
 			buf[512];		/* one sector size block */
-	xml_node_t	*t		= NULL,
+	tgt_node_t	*t		= NULL,
 			*list		= NULL,
 			*c		= NULL,
 			*node;
@@ -117,12 +121,12 @@ modify_target(xml_node_t *x)
 	struct stat	st;
 	xmlTextReaderPtr	r;
 
-	if (xml_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
 	}
 
-	while ((t = xml_node_next(targets_config, XML_ELEMENT_TARG,
+	while ((t = tgt_node_next(targets_config, XML_ELEMENT_TARG,
 	    t)) != NULL) {
 		if (strcmp(t->x_value, name) == 0) {
 			break;
@@ -146,7 +150,7 @@ modify_target(xml_node_t *x)
 	 * layer so that the LU thread can remap the smaller size without
 	 * anyone accessing the data.
 	 */
-	if (xml_find_value_str(x, XML_ELEMENT_SIZE, &prop) == True) {
+	if (tgt_find_value_str(x, XML_ELEMENT_SIZE, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_TPGT);
 			return (msg);
@@ -163,13 +167,13 @@ modify_target(xml_node_t *x)
 		}
 		new_lu_size /= 512LL;
 
-		if (xml_find_value_str(x, XML_ELEMENT_INAME, &iscsi) == False) {
+		if (tgt_find_value_str(x, XML_ELEMENT_INAME, &iscsi) == False) {
 			xml_rtn_msg(&msg, ERR_TARGCFG_MISSING_INAME);
 			return (msg);
 		}
 
 		/* ---- default to LUN 0 ---- */
-		(void) xml_find_value_int(x, XML_ELEMENT_LUN, &lun);
+		(void) tgt_find_value_int(x, XML_ELEMENT_LUN, &lun);
 
 		/* ---- read in current paramaters ---- */
 		snprintf(path, sizeof (path), "%s/%s/%s%d", target_basedir,
@@ -182,7 +186,7 @@ modify_target(xml_node_t *x)
 		    0)) != NULL) {
 			node = NULL;
 			while (xmlTextReaderRead(r) == 1)
-				if (xml_process_node(r, &node) == False)
+				if (tgt_node_process(r, &node) == False)
 					break;
 		} else {
 			xml_rtn_msg(&msg, ERR_INIT_XML_READER_FAILED);
@@ -194,7 +198,7 @@ modify_target(xml_node_t *x)
 		xmlFreeTextReader(r);
 
 		/* ---- validate that we're indeed growing the LU ---- */
-		if (xml_find_value_str(node, XML_ELEMENT_SIZE, &prop) ==
+		if (tgt_find_value_str(node, XML_ELEMENT_SIZE, &prop) ==
 		    False) {
 			xml_rtn_msg(&msg, ERR_INIT_XML_READER_FAILED);
 			return (msg);
@@ -212,7 +216,7 @@ modify_target(xml_node_t *x)
 		}
 
 		/* ---- check that this LU is of type 'disk' or 'tape' ---- */
-		if (xml_find_value_str(node, XML_ELEMENT_DTYPE, &prop) ==
+		if (tgt_find_value_str(node, XML_ELEMENT_DTYPE, &prop) ==
 		    False) {
 			xml_rtn_msg(&msg, ERR_INIT_XML_READER_FAILED);
 			return (msg);
@@ -239,18 +243,18 @@ modify_target(xml_node_t *x)
 
 		/* ---- update the parameter node with new size ---- */
 		snprintf(size_str, sizeof (size_str), "0x%llx", new_lu_size);
-		if ((c = xml_alloc_node(XML_ELEMENT_SIZE, Uint64, size_str)) ==
+		if ((c = tgt_node_alloc(XML_ELEMENT_SIZE, Uint64, size_str)) ==
 		    False) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
 			return (msg);
 		}
-		xml_replace_child(node, c, MatchName);
-		xml_tree_free(c);
+		tgt_node_replace(node, c, MatchName);
+		tgt_node_free(c);
 
 		/* ---- now update params file ---- */
 		snprintf(path, sizeof (path), "%s/%s/%s%d", target_basedir,
 		    iscsi, PARAMBASE, lun);
-		if (xml_dump2file(node, path) == False) {
+		if (tgt_dump2file(node, path) == False) {
 			xml_rtn_msg(&msg, ERR_UPDATE_TARGCFG_FAILED);
 			return (msg);
 		}
@@ -275,10 +279,10 @@ modify_target(xml_node_t *x)
 
 		free(iscsi);
 		prop = NULL;
-		xml_tree_free(node);
+		tgt_node_free(node);
 	}
 
-	if (xml_find_value_str(x, XML_ELEMENT_TPGT, &prop) == True) {
+	if (tgt_find_value_str(x, XML_ELEMENT_TPGT, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_ACL);
 			return (msg);
@@ -295,68 +299,68 @@ modify_target(xml_node_t *x)
 			return (msg);
 		}
 
-		if ((c = xml_alloc_node(XML_ELEMENT_TPGT, String, prop)) ==
+		if ((c = tgt_node_alloc(XML_ELEMENT_TPGT, String, prop)) ==
 		    NULL) {
 			free(prop);
 			xml_rtn_msg(&msg, ERR_NO_MEM);
 			return (msg);
 		}
 
-		if ((list = xml_node_next(t, XML_ELEMENT_TPGTLIST,
+		if ((list = tgt_node_next(t, XML_ELEMENT_TPGTLIST,
 		    NULL)) != NULL) {
-			xml_replace_child(list, c, MatchBoth);
+			tgt_node_replace(list, c, MatchBoth);
 			/*
-			 * xml_replace_child will duplicate the child node
-			 * xml_add_child which is used below just links it
+			 * tgt_node_replace will duplicate the child node
+			 * tgt_node_add which is used below just links it
 			 * into the tree.
 			 */
-			xml_tree_free(c);
+			tgt_node_free(c);
 		} else {
-			list = xml_alloc_node(XML_ELEMENT_TPGTLIST, String, "");
+			list = tgt_node_alloc(XML_ELEMENT_TPGTLIST, String, "");
 			if (list == NULL) {
 				free(prop);
 				xml_rtn_msg(&msg, ERR_NO_MEM);
 				return (msg);
 			}
-			(void) xml_add_child(list, c);
-			(void) xml_add_child(t, list);
+			tgt_node_add(list, c);
+			tgt_node_add(t, list);
 		}
 		free(prop);
 		prop = NULL;
 		change_made = True;
 	}
 
-	if (xml_find_value_str(x, XML_ELEMENT_ACL, &prop) == True) {
+	if (tgt_find_value_str(x, XML_ELEMENT_ACL, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_ACL);
 			return (msg);
 		}
 
-		c = xml_alloc_node(XML_ELEMENT_INIT, String, prop);
+		c = tgt_node_alloc(XML_ELEMENT_INIT, String, prop);
 		if (c == NULL) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
 			return (msg);
 		}
-		if ((list = xml_node_next(t, XML_ELEMENT_ACLLIST,
+		if ((list = tgt_node_next(t, XML_ELEMENT_ACLLIST,
 		    NULL)) != NULL) {
-			xml_replace_child(list, c, MatchBoth);
+			tgt_node_replace(list, c, MatchBoth);
 			/* ---- See above usage ---- */
-			xml_tree_free(c);
+			tgt_node_free(c);
 		} else {
-			list = xml_alloc_node(XML_ELEMENT_ACLLIST, String, "");
+			list = tgt_node_alloc(XML_ELEMENT_ACLLIST, String, "");
 			if (list == NULL) {
 				xml_rtn_msg(&msg, ERR_NO_MEM);
 				return (msg);
 			}
-			(void) xml_add_child(list, c);
-			(void) xml_add_child(t, list);
+			tgt_node_add(list, c);
+			tgt_node_add(t, list);
 		}
 		free(prop);
 		prop = NULL;
 		change_made = True;
 	}
 
-	if (xml_find_value_str(x, XML_ELEMENT_ALIAS, &prop) == True) {
+	if (tgt_find_value_str(x, XML_ELEMENT_ALIAS, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_ALIAS);
 			return (msg);
@@ -372,7 +376,7 @@ modify_target(xml_node_t *x)
 		change_made = True;
 	}
 
-	if (xml_find_value_str(x, XML_ELEMENT_MAXRECV, &prop) == True) {
+	if (tgt_find_value_str(x, XML_ELEMENT_MAXRECV, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_MAXRECV);
 			return (msg);
@@ -418,20 +422,20 @@ modify_target(xml_node_t *x)
  * []----
  */
 static char *
-modify_initiator(xml_node_t *x)
+modify_initiator(tgt_node_t *x)
 {
 	char		*msg		= NULL,
 			*name		= NULL,
 			*prop		= NULL;
-	xml_node_t	*inode		= NULL;
+	tgt_node_t	*inode		= NULL;
 	Boolean_t	changes_made	= False;
 
-	if (xml_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
 	}
 
-	while ((inode = xml_node_next(main_config, XML_ELEMENT_INIT,
+	while ((inode = tgt_node_next(main_config, XML_ELEMENT_INIT,
 	    inode)) != NULL) {
 		if (strcmp(inode->x_value, name) == 0)
 			break;
@@ -449,7 +453,7 @@ modify_initiator(xml_node_t *x)
 		return (msg);
 	}
 
-	if (xml_find_value_str(x, XML_ELEMENT_CHAPSECRET, &prop) == True) {
+	if (tgt_find_value_str(x, XML_ELEMENT_CHAPSECRET, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_CHAPSECRET);
 			return (msg);
@@ -464,7 +468,7 @@ modify_initiator(xml_node_t *x)
 		changes_made = True;
 	}
 
-	if (xml_find_value_str(x, XML_ELEMENT_CHAPNAME, &prop) == True) {
+	if (tgt_find_value_str(x, XML_ELEMENT_CHAPNAME, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_CHAPNAME);
 			return (msg);
@@ -495,7 +499,7 @@ modify_initiator(xml_node_t *x)
  * []----
  */
 static char *
-modify_admin(xml_node_t *x)
+modify_admin(tgt_node_t *x)
 {
 	char		*msg	= NULL,
 			*prop;
@@ -503,7 +507,7 @@ modify_admin(xml_node_t *x)
 	admin_table_t	*ap;
 
 	for (ap = admin_prop_list; ap->name; ap++) {
-		if (xml_find_value_str(x, ap->name, &prop) == True) {
+		if (tgt_find_value_str(x, ap->name, &prop) == True) {
 
 			if ((prop == NULL) || (strlen(prop) == 0))
 				break;
@@ -542,19 +546,19 @@ modify_admin(xml_node_t *x)
  * []----
  */
 static char *
-modify_tpgt(xml_node_t *x)
+modify_tpgt(tgt_node_t *x)
 {
 	struct addrinfo	*res	= NULL;
 	char		*msg	= NULL,
 			*name	= NULL,
 			*ip_str	= NULL;
-	xml_node_t	*tnode	= NULL;
+	tgt_node_t	*tnode	= NULL;
 
-	if (xml_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		goto error;
 	}
-	if (xml_find_value_str(x, XML_ELEMENT_IPADDR, &ip_str) == False) {
+	if (tgt_find_value_str(x, XML_ELEMENT_IPADDR, &ip_str) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_IPADDR);
 		goto error;
 	}
@@ -562,7 +566,7 @@ modify_tpgt(xml_node_t *x)
 		xml_rtn_msg(&msg, ERR_INVALID_IP);
 		goto error;
 	}
-	while ((tnode = xml_node_next(main_config, XML_ELEMENT_TPGT,
+	while ((tnode = tgt_node_next(main_config, XML_ELEMENT_TPGT,
 	    tnode)) != NULL) {
 		if (strcmp(tnode->x_value, name) == 0)
 			break;
@@ -588,6 +592,52 @@ error:
 	return (msg);
 }
 
+static char *
+modify_zfs(tgt_node_t *x)
+{
+	char		*msg		= NULL,
+			*prop		= NULL,
+			*dataset	= NULL;
+	libzfs_handle_t	*zh		= NULL;
+	zfs_handle_t	*zfsh		= NULL;
+	tgt_node_t	*n		= NULL;
+
+	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &dataset) == False) {
+		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
+		return (msg);
+	}
+
+	if (((zh = libzfs_init()) == NULL) ||
+	    ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_ANY)) == NULL)) {
+		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
+		goto error;
+	}
+
+	while ((n = tgt_node_next(targets_config, XML_ELEMENT_TARG, n)) !=
+	    NULL) {
+		if (strcmp(n->x_value, dataset) == 0)
+			break;
+	}
+	if (n == NULL) {
+		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
+		goto error;
+	}
+
+	xml_rtn_msg(&msg, ERR_SUCCESS);
+
+error:
+	if (zfsh)
+		zfs_close(zfsh);
+	if (prop)
+		free(prop);
+	if (zh)
+		libzfs_fini(zh);
+	if (dataset)
+		free(dataset);
+
+	return (msg);
+}
+
 /*
  * []----
  * | modify_element -- helper function to create node and add it to parent
@@ -596,15 +646,15 @@ error:
  * []----
  */
 static Boolean_t
-modify_element(char *name, char *value, xml_node_t *p, match_type_t m)
+modify_element(char *name, char *value, tgt_node_t *p, match_type_t m)
 {
-	xml_node_t	*c;
+	tgt_node_t	*c;
 
-	if ((c = xml_alloc_node(name, String, value)) == NULL)
+	if ((c = tgt_node_alloc(name, String, value)) == NULL)
 		return (False);
 	else {
-		xml_replace_child(p, c, m);
-		xml_tree_free(c);
+		tgt_node_replace(p, c, m);
+		tgt_node_free(c);
 		return (True);
 	}
 }
@@ -625,7 +675,7 @@ modify_element(char *name, char *value, xml_node_t *p, match_type_t m)
 char *
 update_basedir(char *name, char *prop)
 {
-	xml_node_t	*targ	= NULL;
+	tgt_node_t	*targ	= NULL;
 	int		count	= 0;
 	char		*msg	= NULL;
 
@@ -634,7 +684,7 @@ update_basedir(char *name, char *prop)
 		return (msg);
 	}
 
-	while ((targ = xml_node_next(targets_config, XML_ELEMENT_TARG,
+	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG,
 	    targ)) != NULL) {
 		count++;
 	}

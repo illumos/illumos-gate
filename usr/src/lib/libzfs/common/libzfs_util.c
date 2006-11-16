@@ -127,9 +127,9 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "mount failed"));
 	case EZFS_UMOUNTFAILED:
 		return (dgettext(TEXT_DOMAIN, "umount failed"));
-	case EZFS_UNSHAREFAILED:
+	case EZFS_UNSHARENFSFAILED:
 		return (dgettext(TEXT_DOMAIN, "unshare(1M) failed"));
-	case EZFS_SHAREFAILED:
+	case EZFS_SHARENFSFAILED:
 		return (dgettext(TEXT_DOMAIN, "share(1M) failed"));
 	case EZFS_DEVLINKS:
 		return (dgettext(TEXT_DOMAIN, "failed to create /dev links"));
@@ -150,6 +150,12 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "recursive dataset dependency"));
 	case EZFS_NOHISTORY:
 		return (dgettext(TEXT_DOMAIN, "no history available"));
+	case EZFS_UNSHAREISCSIFAILED:
+		return (dgettext(TEXT_DOMAIN,
+		    "iscsitgtd failed request to unshare"));
+	case EZFS_SHAREISCSIFAILED:
+		return (dgettext(TEXT_DOMAIN,
+		    "iscsitgtd failed request to share"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:

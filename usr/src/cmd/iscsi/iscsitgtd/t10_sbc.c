@@ -81,25 +81,25 @@ static scsi_cmd_table_t lba_table[];
  * []----
  */
 Boolean_t
-sbc_init_common(t10_lu_common_t *lu)
+sbc_common_init(t10_lu_common_t *lu)
 {
 	disk_params_t	*d;
-	xml_node_t	*node	= lu->l_root;
+	tgt_node_t	*node	= lu->l_root;
 
 	if ((d = (disk_params_t *)calloc(1, sizeof (*d))) == NULL)
 		return (False);
 
-	(void) xml_find_value_int(node, XML_ELEMENT_BPS,
+	(void) tgt_find_value_int(node, XML_ELEMENT_BPS,
 	    (int *)&d->d_bytes_sect);
-	(void) xml_find_value_int(node, XML_ELEMENT_HEADS,
+	(void) tgt_find_value_int(node, XML_ELEMENT_HEADS,
 	    (int *)&d->d_heads);
-	(void) xml_find_value_int(node, XML_ELEMENT_SPT,
+	(void) tgt_find_value_int(node, XML_ELEMENT_SPT,
 	    (int *)&d->d_spt);
-	(void) xml_find_value_int(node, XML_ELEMENT_CYLINDERS,
+	(void) tgt_find_value_int(node, XML_ELEMENT_CYLINDERS,
 	    (int *)&d->d_cyl);
-	(void) xml_find_value_int(node, XML_ELEMENT_RPM,
+	(void) tgt_find_value_int(node, XML_ELEMENT_RPM,
 	    (int *)&d->d_rpm);
-	(void) xml_find_value_int(node, XML_ELEMENT_INTERLEAVE,
+	(void) tgt_find_value_int(node, XML_ELEMENT_INTERLEAVE,
 	    (int *)&d->d_interleave);
 	d->d_fast_write	= lu->l_fast_write_ack;
 	d->d_size	= lu->l_size / (uint64_t)d->d_bytes_sect;
@@ -121,7 +121,7 @@ sbc_init_common(t10_lu_common_t *lu)
 }
 
 void
-sbc_fini_common(t10_lu_common_t *lu)
+sbc_common_fini(t10_lu_common_t *lu)
 {
 	disk_params_t	*d = lu->l_dtype_params;
 
@@ -153,7 +153,7 @@ sbc_task_mgmt(t10_lu_common_t *lu, TaskOp_t op)
  * []----
  */
 void
-sbc_init_per(t10_lu_impl_t *itl)
+sbc_per_init(t10_lu_impl_t *itl)
 {
 	disk_params_t	*d = (disk_params_t *)itl->l_common->l_dtype_params;
 
@@ -166,7 +166,7 @@ sbc_init_per(t10_lu_impl_t *itl)
 }
 
 void
-sbc_fini_per(t10_lu_impl_t *itl)
+sbc_per_fini(t10_lu_impl_t *itl)
 {
 	disk_params_t	*d = (disk_params_t *)itl->l_common->l_dtype_params;
 	t10_lu_impl_t	*lu;

@@ -69,7 +69,7 @@ typedef struct stat_delta {
 
 /* helper functions */
 int getSecret(char *, int *, int, int);
-xml_node_t *send_data(char *hostname, char *first_str);
+tgt_node_t *send_data(char *hostname, char *first_str);
 int parseAddress(char *address_port_str, uint16_t defaultPort,
     char *address_str, size_t address_str_len,
     uint16_t *port, boolean_t *isIpv6);
@@ -78,7 +78,7 @@ char *number_to_scaled_string(
 	unsigned long long number,
 	int unit_from,
 	int scale);
-void stats_load_counts(xml_node_t *n, stat_delta_t *d);
+void stats_load_counts(tgt_node_t *n, stat_delta_t *d);
 stat_delta_t *stats_prev_counts(stat_delta_t *cp);
 void stats_update_counts(stat_delta_t *p, stat_delta_t *c);
 void stats_free();

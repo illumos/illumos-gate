@@ -74,11 +74,11 @@ void xml_rtn_msg(char **buf, err_code_t code);
 Boolean_t update_config_targets(char **msg);
 Boolean_t update_config_main(char **msg);
 Boolean_t add_target_alias(iscsi_conn_t *c, char **text, int *test_length);
-Boolean_t validate_version(xml_node_t *node, int *maj, int *min);
+Boolean_t validate_version(tgt_node_t *node, int *maj, int *min);
 char *create_tpgt_list(char *tname);
-Boolean_t check_access(xml_node_t *targ, char *initiator_name,
+Boolean_t check_access(tgt_node_t *targ, char *initiator_name,
     Boolean_t req_chap);
-xml_node_t *find_target_node(char *targ_name);
+tgt_node_t *find_target_node(char *targ_name);
 void util_title(target_queue_t *q, int type, int num, char *title);
 Boolean_t util_create_guid(char **guid);
 Boolean_t strtoll_multiplier(char *str, uint64_t *sp);

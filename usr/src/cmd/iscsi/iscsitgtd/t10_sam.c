@@ -29,6 +29,7 @@
 #include <aio.h>
 #include <sys/aio.h>
 #include <sys/asynch.h>
+#include <stdio.h>
 #include <stddef.h>
 #include <strings.h>
 #include <pthread.h>
@@ -44,6 +45,8 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/ucontext.h>
+#include <libzfs.h>
+#include <assert.h>
 
 #include <sys/scsi/generic/sense.h>
 #include <sys/scsi/generic/status.h>
@@ -89,6 +92,7 @@ static int find_lu_by_num(const void *v1, const void *v2);
 static int find_lu_by_guid(const void *v1, const void *v2);
 static int find_lu_by_targ(const void *v1, const void *v2);
 static int find_cmd_by_addr(const void *v1, const void *v2);
+static sam_device_table_t sam_emul_table[];
 
 /*
  * Global variables
@@ -765,18 +769,18 @@ t10_targ_stat(t10_targ_handle_t t1, char **buf)
 
 	itl = avl_first(&t->s_open_lu);
 	while (itl) {
-		buf_add_tag(buf, XML_ELEMENT_LUN, Tag_Start);
+		tgt_buf_add_tag(buf, XML_ELEMENT_LUN, Tag_Start);
 		(void) snprintf(lb, sizeof (lb), "%d", itl->l_common->l_num);
-		buf_add_tag(buf, lb, Tag_String);
+		tgt_buf_add_tag(buf, lb, Tag_String);
 
 		(void) snprintf(lb, sizeof (lb), "%lld", itl->l_cmds_read);
-		xml_add_tag(buf, XML_ELEMENT_READCMDS, lb);
+		tgt_buf_add(buf, XML_ELEMENT_READCMDS, lb);
 		(void) snprintf(lb, sizeof (lb), "%lld", itl->l_cmds_write);
-		xml_add_tag(buf, XML_ELEMENT_WRITECMDS, lb);
+		tgt_buf_add(buf, XML_ELEMENT_WRITECMDS, lb);
 		(void) snprintf(lb, sizeof (lb), "%lld", itl->l_sects_read);
-		xml_add_tag(buf, XML_ELEMENT_READBLKS, lb);
+		tgt_buf_add(buf, XML_ELEMENT_READBLKS, lb);
 		(void) snprintf(lb, sizeof (lb), "%lld", itl->l_sects_write);
-		xml_add_tag(buf, XML_ELEMENT_WRITEBLKS, lb);
+		tgt_buf_add(buf, XML_ELEMENT_WRITEBLKS, lb);
 
 		switch (itl->l_common->l_state) {
 		case lu_online:
@@ -789,9 +793,9 @@ t10_targ_stat(t10_targ_handle_t t1, char **buf)
 			p = TGT_STATUS_ERRORED;
 			break;
 		}
-		xml_add_tag(buf, XML_ELEMENT_STATUS, p);
+		tgt_buf_add(buf, XML_ELEMENT_STATUS, p);
 
-		buf_add_tag(buf, XML_ELEMENT_LUN, Tag_End);
+		tgt_buf_add_tag(buf, XML_ELEMENT_LUN, Tag_End);
 		itl = AVL_NEXT(&t->s_open_lu, itl);
 	}
 }
@@ -824,7 +828,7 @@ t10_thick_provision(char *target, int lun, target_queue_t *q)
 	msg_t			*m		= NULL;
 	target_queue_t		*rq		= NULL;
 	char			path[MAXPATHLEN];
-	xml_node_t		*n1;
+	tgt_node_t		*n1;
 	Boolean_t		rval		= False;
 	struct statvfs		fs;
 
@@ -935,21 +939,22 @@ t10_thick_provision(char *target, int lun, target_queue_t *q)
 		    target_basedir, cmd->c_lu->l_targ->s_targ_base, PARAMBASE,
 		    lun);
 
-		if ((n1 = xml_find_child(cmd->c_lu->l_common->l_root,
+		cmd->c_lu->l_common->l_state = lu_online;
+		if ((n1 = tgt_node_find(cmd->c_lu->l_common->l_root,
 		    XML_ELEMENT_STATUS)) == NULL) {
 			queue_prt(mgmtq, Q_STE_ERRS,
 			    "STE%x  couldn't find <status>\n", lun);
 			goto error;
 		}
 
-		if (xml_update_value_str(n1, XML_ELEMENT_STATUS,
+		if (tgt_update_value_str(n1, XML_ELEMENT_STATUS,
 		    TGT_STATUS_ONLINE) == False) {
 			queue_prt(mgmtq, Q_STE_ERRS,
 			    "STE%x  Could update <status> to online\n", lun);
 			goto error;
 		}
 
-		if (xml_dump2file(cmd->c_lu->l_common->l_root, path) ==
+		if (tgt_dump2file(cmd->c_lu->l_common->l_root, path) ==
 		    False) {
 			queue_prt(mgmtq, Q_STE_ERRS,
 			    "STE%x  failed to dump out params\n", lun);
@@ -1312,14 +1317,21 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 				search;
 	avl_index_t		wc		= 0, /* where common */
 				wt		= 0; /* where target */
-	char			*guid		= NULL;
+	char			*guid		= NULL,
+				*str,
+				*dataset	= NULL;
 	t10_lu_common_t		lc,
 				*common		= NULL;
-	xml_node_t		*n		= NULL,
-				*n1;
+	tgt_node_t		*n		= NULL,
+				*n1,
+				*targ,
+				*ll;
 	xmlTextReaderPtr	r		= NULL;
 	char			path[MAXPATHLEN];
 	int			xml_fd		= -1;
+	libzfs_handle_t		*zh;
+	zfs_handle_t		*zfsh;
+	Boolean_t		okay_to_free	= True;
 
 	bzero(&lc, sizeof (lc));
 
@@ -1365,76 +1377,138 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 	l->l_targ		= t;
 	l->l_targ_lun		= lun;
 
-	/*
-	 * To locate the common LUN structure we need to find the GUID
-	 * for this LUN. That's the only parsing this section of code will
-	 * do to the params file.
-	 */
-	(void) snprintf(path, sizeof (path), "%s/%s/%s%d",
-	    target_basedir, t->s_targ_base, PARAMBASE, lun);
-
-	(void) pthread_mutex_lock(&lu_list_mutex);
-	if ((xml_fd = open(path, O_RDONLY)) < 0) {
-		(void) pthread_mutex_unlock(&lu_list_mutex);
-		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
-		/* ---- ACCESS DENIED - INVALID LU IDENTIFIER ---- */
-		spc_sense_ascq(cmd, 0x20, 0x9);
-		goto error;
-	}
-	if ((r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd, NULL, NULL,
-	    0)) != NULL) {
-		while (xmlTextReaderRead(r) == 1)
-			if (xml_process_node(r, &n) == False)
-				break;
-	} else {
-		(void) pthread_mutex_unlock(&lu_list_mutex);
-		spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
-		goto error;
+	targ = NULL;
+	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ))
+	    != NULL) {
+		if ((tgt_find_value_str(targ, XML_ELEMENT_INAME, &str) ==
+		    True) && (strcmp(str, t->s_targ_base) == 0)) {
+			free(str);
+			break;
+		} else if (str) {
+			free(str);
+			str = NULL;
+		}
 	}
 
-	(void) close(xml_fd);
-	/*
-	 * Set xml_fd back to -1 so that if an error occurs later we don't
-	 * attempt to close a file descriptor that another thread might have
-	 * opened.
-	 */
-	xml_fd = -1;
-
-	xmlTextReaderClose(r);
-	xmlFreeTextReader(r);
-	r = NULL;
-
-	if (xml_find_value_str(n, XML_ELEMENT_GUID, &guid) == False) {
-		(void) pthread_mutex_unlock(&lu_list_mutex);
-		spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
+	if ((ll = tgt_node_next(targ, XML_ELEMENT_LUNLIST, NULL)) == NULL)
 		goto error;
-	}
+	if ((n = tgt_node_next(ll, XML_ELEMENT_LUN, NULL)) == NULL)
+		goto error;
+	if (tgt_find_value_str(n, XML_ELEMENT_GUID, &guid) == False) {
+		/*
+		 * Set the targ variable back to NULL to indicate that
+		 * we don't have an incore copy of the information.
+		 * If the guid is currently 0, we'll update that value
+		 * and update the ZFS property if targ is not NULL.
+		 * Otherwise will update parameter file.
+		 */
+		targ = NULL;
 
-	if (strcmp(guid, "0") == 0) {
+		/*
+		 * To locate the common LUN structure we need to find the GUID
+		 * for this LUN. That's the only parsing this section of code
+		 * will do to the params file.
+		 */
+		(void) snprintf(path, sizeof (path), "%s/%s/%s%d",
+		    target_basedir, t->s_targ_base, PARAMBASE, lun);
+
+		(void) pthread_mutex_lock(&lu_list_mutex);
+		if ((xml_fd = open(path, O_RDONLY)) < 0) {
+			(void) pthread_mutex_unlock(&lu_list_mutex);
+			spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
+			/* ---- ACCESS DENIED - INVALID LU IDENTIFIER ---- */
+			spc_sense_ascq(cmd, 0x20, 0x9);
+			goto error;
+		}
+		n = NULL;
+		if ((r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd, NULL, NULL,
+		    0)) != NULL) {
+			while (xmlTextReaderRead(r) == 1)
+				if (tgt_node_process(r, &n) == False)
+					break;
+		} else {
+			(void) pthread_mutex_unlock(&lu_list_mutex);
+			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
+			goto error;
+		}
+
+		(void) close(xml_fd);
+		/*
+		 * Set xml_fd back to -1 so that if an error occurs later we
+		 * don't attempt to close a file descriptor that another thread
+		 * might have opened.
+		 */
+		xml_fd = -1;
+
+		xmlTextReaderClose(r);
+		xmlFreeTextReader(r);
+		r = NULL;
+		okay_to_free = True;
+
+		if (tgt_find_value_str(n, XML_ELEMENT_GUID, &guid) == False) {
+			(void) pthread_mutex_unlock(&lu_list_mutex);
+			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
+			goto error;
+		}
+
+	} else
+		okay_to_free = False;
+
+	if ((strcmp(guid, "0") == 0) || (strcmp(guid, "0x0") == 0)) {
 		free(guid);
 		if (util_create_guid(&guid) == False) {
 			(void) pthread_mutex_unlock(&lu_list_mutex);
 			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			goto error;
 		}
-		if ((n1 = xml_find_child(n, XML_ELEMENT_GUID)) == NULL) {
+		if ((n1 = tgt_node_find(n, XML_ELEMENT_GUID)) == NULL) {
 			(void) pthread_mutex_unlock(&lu_list_mutex);
 			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			goto error;
 		}
-		if (xml_update_value_str(n1, XML_ELEMENT_GUID, guid) == False) {
+		if (tgt_update_value_str(n1, XML_ELEMENT_GUID, guid) == False) {
 			(void) pthread_mutex_unlock(&lu_list_mutex);
 			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			goto error;
 		}
-		if (xml_dump2file(n, path) == False) {
+		if (targ != NULL) {
+			str = NULL;
+			tgt_dump2buf(targ, &str);
+
+			if (tgt_find_value_str(targ, XML_ELEMENT_ALIAS,
+			    &dataset) == False ||
+			    (zh = libzfs_init()) == NULL)
+				goto error;
+
+			if ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_ANY)) ==
+			    NULL) {
+				libzfs_fini(zh);
+				goto error;
+			}
+
+			if (zfs_prop_set(zfsh,
+			    zfs_prop_to_name(ZFS_PROP_ISCSIOPTIONS),
+			    str) != 0) {
+				zfs_close(zfsh);
+				libzfs_fini(zh);
+				goto error;
+			}
+
+			zfs_close(zfsh);
+			libzfs_fini(zh);
+			free(dataset);
+			free(str);
+			dataset = NULL;
+			str = NULL;
+
+		} else if (tgt_dump2file(n, path) == False) {
 			(void) pthread_mutex_unlock(&lu_list_mutex);
 			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			goto error;
 		}
 	}
 
-	if (xml_decode_bytes(guid, &lc.l_guid, &lc.l_guid_len) == False) {
+	if (tgt_xml_decode(guid, &lc.l_guid, &lc.l_guid_len) == False) {
 		(void) pthread_mutex_unlock(&lu_list_mutex);
 		spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 		goto error;
@@ -1463,6 +1537,9 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 		common->l_guid_len	= lc.l_guid_len;
 		common->l_fd		= -1; /* not open yet */
 		common->l_mmap		= MAP_FAILED;
+		common->l_root		= n;
+		common->l_root_okay_to_free = okay_to_free;
+		n			= NULL;
 
 		(void) pthread_mutex_init(&common->l_common_mutex, NULL);
 
@@ -1499,6 +1576,18 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 		 * since the LU needs the information.
 		 */
 		free(lc.l_guid);
+
+		/*
+		 * A similar condition exists with the xml tree. If there's
+		 * already a common LU then this node *may* have been created
+		 * here if it's not a ZVOL. If it is a ZVOL tree then it will
+		 * have the same address as that found in l_root so don't
+		 * free it.
+		 */
+		if (okay_to_free == True) {
+			tgt_node_free(n);
+			n = NULL;
+		}
 		lc.l_guid = NULL;
 		queue_prt(mgmtq, Q_STE_NONIO,
 		    "SAM%x  Found existing LU[%d.%d]\n", t->s_targ_num,
@@ -1530,7 +1619,6 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 	queue_message_set(common->l_from_transports, 0, msg_lu_add, (void *)l);
 
 	free(guid);
-	xml_tree_free(n);
 
 	cmd->c_lu = l;
 	return (True);
@@ -1545,13 +1633,15 @@ error:
 		xmlFreeTextReader(r);
 	}
 	if (n)
-		xml_tree_free(n);
+		tgt_node_free(n);
 	if (l)
 		free(l);
 	if (lc.l_guid)
 		free(lc.l_guid);
 	if (common)
 		free(common);
+	if (dataset)
+		free(dataset);
 	return (False);
 }
 
@@ -1559,30 +1649,24 @@ static Boolean_t
 t10_lu_initialize(t10_lu_common_t *lu, char *basedir)
 {
 	char	*str	= NULL;
+	int	dtype;
 
 	if (load_params(lu, basedir) == False)
 		return (False);
 
-	if (xml_find_value_str(lu->l_root, XML_ELEMENT_DTYPE, &str) == True) {
-		if (strcmp(str, TGT_TYPE_DISK) == 0) {
-			lu->l_dtype = DTYPE_DIRECT;
-			if (sbc_init_common(lu) == False)
-				goto error;
-		} else if (strcmp(str, TGT_TYPE_RAW) == 0) {
-			lu->l_dtype = DTYPE_UNKNOWN;
-			if (raw_init_common(lu) == False)
-				goto error;
-		} else if (strcmp(str, TGT_TYPE_TAPE) == 0) {
-			lu->l_dtype = DTYPE_SEQUENTIAL;
-			if (ssc_init_common(lu) == False)
-				goto error;
-		} else if (strcmp(str, TGT_TYPE_OSD) == 0) {
-			lu->l_dtype = DTYPE_OSD;
-			if (osd_init_common(lu) == False)
-				goto error;
+	if (tgt_find_value_str(lu->l_root, XML_ELEMENT_DTYPE, &str) == True) {
+		for (dtype = 0; sam_emul_table[dtype].t_type_name != NULL;
+		    dtype++) {
+			if (strcmp(sam_emul_table[dtype].t_type_name,
+			    str) == 0) {
+				lu->l_dtype = dtype;
+				if ((*sam_emul_table[dtype].t_common_init)(lu)
+				    == False)
+					goto error;
+				else
+					break;
+			}
 		}
-		if (lu->l_dtype_params == NULL)
-			goto error;
 		free(str);
 	} else
 		goto error;
@@ -1680,23 +1764,7 @@ lu_runner(void *v)
 
 		case msg_lu_add:
 			itl = (t10_lu_impl_t *)m->msg_data;
-			switch (lu->l_dtype) {
-				case DTYPE_DIRECT:
-					sbc_init_per(itl);
-					break;
-
-				case DTYPE_SEQUENTIAL:
-					ssc_init_per(itl);
-					break;
-
-				case DTYPE_OSD:
-					osd_init_per(itl);
-					break;
-
-				case DTYPE_UNKNOWN:
-					raw_init_per(itl);
-					break;
-			}
+			(*sam_emul_table[lu->l_dtype].t_per_init)(itl);
 			break;
 
 		case msg_reset_lu:
@@ -1711,26 +1779,8 @@ lu_runner(void *v)
 				 * receive a CHECK_CONDITION on their next
 				 * command.
 				 */
-				switch (lu->l_dtype) {
-				case DTYPE_DIRECT:
-					sbc_fini_per(itl);
-					sbc_init_per(itl);
-					break;
-
-				case DTYPE_SEQUENTIAL:
-					ssc_fini_per(itl);
-					ssc_init_per(itl);
-					break;
-
-				case DTYPE_UNKNOWN:
-					raw_fini_per(itl);
-					raw_init_per(itl);
-					break;
-
-				case DTYPE_OSD:
-					osd_fini_per(itl);
-					osd_init_per(itl);
-				}
+				(*sam_emul_table[lu->l_dtype].t_per_fini)(itl);
+				(*sam_emul_table[lu->l_dtype].t_per_init)(itl);
 
 				itl = AVL_NEXT(&lu->l_all_open, itl);
 			} while (itl != NULL);
@@ -1749,23 +1799,8 @@ lu_runner(void *v)
 
 			queue_walker_free(lu->l_from_transports,
 			    lu_remove_cmds, (void *)itl);
-			switch (lu->l_dtype) {
-			case DTYPE_DIRECT:
-				sbc_fini_per(itl);
-				break;
+			(*sam_emul_table[lu->l_dtype].t_per_fini)(itl);
 
-			case DTYPE_SEQUENTIAL:
-				ssc_fini_per(itl);
-				break;
-
-			case DTYPE_OSD:
-				osd_fini_per(itl);
-				break;
-
-			case DTYPE_UNKNOWN:
-				raw_fini_per(itl);
-				break;
-			}
 			/*
 			 * Don't remove reference to l_common area until after
 			 * the emulation routines are finished since they
@@ -1789,19 +1824,9 @@ lu_runner(void *v)
 					    "LU_%x  Failed to close fd, "
 					    "errno=%d\n", lu->l_internal_num,
 					    errno);
-				switch (lu->l_dtype) {
-				case DTYPE_DIRECT:
-					sbc_fini_common(lu);
-					break;
+				/*CSTYLED*/
+				(*sam_emul_table[lu->l_dtype].t_common_fini)(lu);
 
-				case DTYPE_SEQUENTIAL:
-					ssc_fini_common(lu);
-					break;
-
-				case DTYPE_UNKNOWN:
-					raw_fini_common(lu);
-					break;
-				}
 				avl_remove(&lu_list, (void *)lu);
 				util_title(mgmtq, Q_STE_NONIO,
 				    lu->l_internal_num, "End LU");
@@ -1809,7 +1834,8 @@ lu_runner(void *v)
 				(void) pthread_mutex_unlock(
 				    &lu->l_common_mutex);
 				(void) pthread_mutex_unlock(&lu_list_mutex);
-				xml_tree_free(lu->l_root);
+				if (lu->l_root_okay_to_free == True)
+					tgt_node_free(lu->l_root);
 				free(lu->l_pid);
 				free(lu->l_vid);
 				free(lu->l_guid);
@@ -1903,15 +1929,8 @@ lu_runner(void *v)
 			    target_basedir, itl->l_targ->s_targ_base);
 			(void) load_params(lu, path);
 			free(path);
-			switch (lu->l_dtype) {
-			case DTYPE_DIRECT:
-				sbc_task_mgmt(lu, CapacityChange);
-				break;
-
-			case DTYPE_SEQUENTIAL:
-				ssc_task_mgmt(lu, CapacityChange);
-				break;
-			}
+			(*sam_emul_table[lu->l_dtype].t_task_mgmt)(lu,
+			    CapacityChange);
 			(void) pthread_mutex_lock(&lu->l_common_mutex);
 			itl = avl_first(&lu->l_all_open);
 			while (itl != NULL) {
@@ -1937,27 +1956,12 @@ lu_runner(void *v)
 			    target_basedir, itl->l_targ->s_targ_base);
 			(void) load_params(lu, path);
 			free(path);
-			switch (lu->l_dtype) {
-			case DTYPE_DIRECT:
-				sbc_task_mgmt(lu, DeviceOnline);
-				break;
-
-			case DTYPE_SEQUENTIAL:
-				ssc_task_mgmt(lu, DeviceOnline);
-				break;
-			}
+			(*sam_emul_table[lu->l_dtype].t_task_mgmt)(lu,
+			    DeviceOnline);
 			(void) pthread_mutex_lock(&lu->l_common_mutex);
 			itl = avl_first(&lu->l_all_open);
 			while (itl != NULL) {
-				switch (lu->l_dtype) {
-				case DTYPE_DIRECT:
-					sbc_init_per(itl);
-					break;
-
-				case DTYPE_SEQUENTIAL:
-					ssc_init_per(itl);
-					break;
-				}
+				(*sam_emul_table[lu->l_dtype].t_per_init)(itl);
 				itl = AVL_NEXT(&lu->l_all_open, itl);
 			}
 			(void) pthread_mutex_unlock(&lu->l_common_mutex);
@@ -2098,15 +2102,13 @@ lu_remove_cmds(msg_t *m, void *v)
 static Boolean_t
 load_params(t10_lu_common_t *lu, char *basedir)
 {
-	char			file[MAXPATHLEN],
-				*str;
-	int			oflags		= O_RDWR|O_LARGEFILE|O_NDELAY;
-	Boolean_t		mmap_lun	= True;
-	xml_node_t		*node		= NULL;
-	int			version_maj	= XML_VERS_LUN_MAJ,
-				version_min	= XML_VERS_LUN_MIN,
-				xml_fd;
-	xmlTextReaderPtr	r;
+	char		file[MAXPATHLEN],
+			*str;
+	int		oflags		= O_RDWR|O_LARGEFILE|O_NDELAY;
+	Boolean_t	mmap_lun	= True;
+	tgt_node_t	*node		= NULL;
+	int		version_maj	= XML_VERS_LUN_MAJ,
+			version_min	= XML_VERS_LUN_MIN;
 
 	/*
 	 * Clean up from previous call to this function. This occurs if
@@ -2114,38 +2116,18 @@ load_params(t10_lu_common_t *lu, char *basedir)
 	 */
 	if (lu->l_mmap != MAP_FAILED)
 		munmap(lu->l_mmap, lu->l_size);
-	if (lu->l_root != NULL) {
-		xml_tree_free(lu->l_root);
-		lu->l_root = NULL;
-	}
 	if (lu->l_fd != -1)
 		close(lu->l_fd);
 
-	(void) snprintf(file, sizeof (file), "%s/%s%d", basedir, PARAMBASE,
-			lu->l_num);
-
-	if ((xml_fd = open(file, O_RDONLY)) < 0)
-		return (False);
-	if ((r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd, NULL, NULL,
-	    0)) != NULL) {
-		while (xmlTextReaderRead(r) == 1)
-			if (xml_process_node(r, &node) == False)
-				break;
-		lu->l_root = node;
-	} else
-		return (False);
-
-	(void) close(xml_fd);
-	xmlTextReaderClose(r);
-	xmlFreeTextReader(r);
+	node = lu->l_root;
 
 	if (validate_version(node, &version_maj, &version_min) == False)
+		fprintf(stderr, "Failed version check\n");
+
+	if (tgt_find_value_str(node, XML_ELEMENT_PID, &lu->l_pid) == False)
 		goto error;
 
-	if (xml_find_value_str(node, XML_ELEMENT_PID, &lu->l_pid) == False)
-		goto error;
-
-	if (xml_find_value_str(node, XML_ELEMENT_VID, &lu->l_vid) == False)
+	if (tgt_find_value_str(node, XML_ELEMENT_VID, &lu->l_vid) == False)
 		goto error;
 
 	/*
@@ -2153,7 +2135,7 @@ load_params(t10_lu_common_t *lu, char *basedir)
 	 * file and there's no need to treat it as an error. Just mark
 	 * the device as online.
 	 */
-	if (xml_find_value_str(node, XML_ELEMENT_STATUS, &str) == True) {
+	if (tgt_find_value_str(node, XML_ELEMENT_STATUS, &str) == True) {
 		if (strcmp(str, TGT_STATUS_ONLINE) == 0)
 			lu->l_state = lu_online;
 		else if (strcmp(str, TGT_STATUS_OFFLINE) == 0)
@@ -2197,9 +2179,9 @@ load_params(t10_lu_common_t *lu, char *basedir)
 	 * The per LU bit is settable via a SCSI command.
 	 */
 	lu->l_fast_write_ack = False;
-	(void) xml_find_value_boolean(main_config, XML_ELEMENT_FAST,
+	(void) tgt_find_value_boolean(main_config, XML_ELEMENT_FAST,
 	    &lu->l_fast_write_ack);
-	(void) xml_find_value_boolean(node, XML_ELEMENT_FAST,
+	(void) tgt_find_value_boolean(node, XML_ELEMENT_FAST,
 	    &lu->l_fast_write_ack);
 	if (lu->l_fast_write_ack == False)
 		oflags |= O_SYNC;
@@ -2211,7 +2193,7 @@ load_params(t10_lu_common_t *lu, char *basedir)
 	 * not just a single file to be opened, but potentially thousands.
 	 * Therefore, stop here if we've got an OSD dtype.
 	 */
-	if (xml_find_value_str(node, XML_ELEMENT_DTYPE, &str) == False)
+	if (tgt_find_value_str(node, XML_ELEMENT_DTYPE, &str) == False)
 		goto error;
 	if (strcmp(str, TGT_TYPE_OSD) == 0) {
 		free(str);
@@ -2219,10 +2201,17 @@ load_params(t10_lu_common_t *lu, char *basedir)
 	} else
 		free(str);
 
-	(void) snprintf(file, sizeof (file), "%s/%s%d", basedir, LUNBASE,
-	    lu->l_num);
-	if ((lu->l_fd = open(file, oflags)) == -1)
-		goto error;
+	if (tgt_find_value_str(node, XML_ELEMENT_BACK, &str) == True) {
+		lu->l_fd = open(str, oflags);
+		free(str);
+		if (lu->l_fd == -1)
+			goto error;
+	} else {
+		(void) snprintf(file, sizeof (file), "%s/%s%d", basedir,
+		    LUNBASE, lu->l_num);
+		if ((lu->l_fd = open(file, oflags)) == -1)
+			goto error;
+	}
 
 #ifndef	_LP64
 	/*
@@ -2231,8 +2220,8 @@ load_params(t10_lu_common_t *lu, char *basedir)
 	 */
 	mmap_lun	= False;
 #endif
-	(void) xml_find_value_boolean(node, XML_ELEMENT_MMAP_LUN, &mmap_lun);
-	if (xml_find_value_str(node, XML_ELEMENT_SIZE, &str) == True) {
+	(void) tgt_find_value_boolean(node, XML_ELEMENT_MMAP_LUN, &mmap_lun);
+	if (tgt_find_value_str(node, XML_ELEMENT_SIZE, &str) == True) {
 		lu->l_size = strtoll(str, NULL, 0) * 512LL;
 		free(str);
 	} else
@@ -2257,14 +2246,18 @@ load_params(t10_lu_common_t *lu, char *basedir)
 	}
 	return (True);
 error:
-	if (lu->l_root)
-		xml_tree_free(lu->l_root);
-	if (lu->l_pid)
+	if (lu->l_pid) {
 		free(lu->l_pid);
-	if (lu->l_vid)
+		lu->l_pid = NULL;
+	}
+	if (lu->l_vid) {
 		free(lu->l_vid);
-	if (lu->l_fd != -1)
+		lu->l_vid = NULL;
+	}
+	if (lu->l_fd != -1) {
 		(void) close(lu->l_fd);
+		lu->l_fd = -1;
+	}
 	return (False);
 }
 
@@ -2440,6 +2433,21 @@ find_cmd_by_addr(const void *v1, const void *v2)
 		return (0);
 }
 
+/*ARGSUSED*/
+static Boolean_t
+sam_common_init(t10_lu_common_t *t)
+{
+	assert(0);
+	return (False);
+}
+
+/*ARGSUSED*/
+static void
+sam_common_fini(t10_lu_common_t *t)
+{
+	assert(0);
+}
+
 #ifdef FULL_DEBUG
 static char *
 state_to_str(t10_cmd_state_t s)
@@ -2470,3 +2478,97 @@ event_to_str(t10_cmd_event_t e)
 	}
 	return ("Invalid Event");
 }
+
+/*ARGSUSED*/
+static void
+sam_per_init(t10_lu_impl_t *t)
+{
+	assert(0);
+}
+
+/*ARGSUSED*/
+static void
+sam_per_fini(t10_lu_impl_t *t)
+{
+	assert(0);
+}
+
+/*ARGSUSED*/
+static void
+sam_task_mgmt(t10_lu_common_t *t, TaskOp_t op)
+{
+	assert(0);
+}
+
+static sam_device_table_t sam_emul_table[] = {
+	/* 0x00: DTYPE_DIRECT */
+	{ sbc_common_init, sbc_common_fini, sbc_per_init, sbc_per_fini,
+		sbc_task_mgmt, TGT_TYPE_DISK },
+	/* 0x01: DTYPE_SEQUENTIAL */
+	{ ssc_common_init, ssc_common_fini, ssc_per_init, ssc_per_fini,
+		ssc_task_mgmt, TGT_TYPE_TAPE },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	/* 0x11: DTYPE_OSD */
+	{ osd_common_init, osd_common_fini, osd_per_init, osd_per_fini,
+		osd_task_mgmt, TGT_TYPE_OSD },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	{ sam_common_init, sam_common_fini, sam_per_init, sam_per_fini,
+		sam_task_mgmt, TGT_TYPE_INVALID },
+	/* 0x1f: DTYPE_UNKNOWN */
+	{ raw_common_init, raw_common_fini, raw_per_init, raw_per_fini,
+		raw_task_mgmt, TGT_TYPE_RAW },
+	/* End-of-Table marker */
+	{ 0, 0, 0, 0, 0, NULL }
+};

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -855,6 +856,19 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 			}
 			break;
 
+		case ZFS_PROP_SHAREISCSI:
+			if (strcmp(strval, "off") != 0 &&
+			    strcmp(strval, "on") != 0 &&
+			    strcmp(strval, "type=disk") != 0) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "'%s' must be 'on', 'off', or 'type=disk'"),
+				    propname);
+				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
+				goto error;
+			}
+
+			break;
+
 		case ZFS_PROP_MOUNTPOINT:
 			if (strcmp(strval, ZFS_MOUNTPOINT_NONE) == 0 ||
 			    strcmp(strval, ZFS_MOUNTPOINT_LEGACY) == 0)
@@ -867,23 +881,22 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 				goto error;
 			}
-			break;
-		}
+			/*FALLTHRU*/
 
-		/*
-		 * For the mountpoint and sharenfs properties, check if it can
-		 * be set in a global/non-global zone based on the zoned
-		 * property value:
-		 *
-		 *		global zone	    non-global zone
-		 * -----------------------------------------------------
-		 * zoned=on	mountpoint (no)	    mountpoint (yes)
-		 *		sharenfs (no)	    sharenfs (no)
-		 *
-		 * zoned=off	mountpoint (yes)	N/A
-		 *		sharenfs (yes)
-		 */
-		if (prop == ZFS_PROP_MOUNTPOINT || prop == ZFS_PROP_SHARENFS) {
+		case ZFS_PROP_SHARENFS:
+			/*
+			 * For the mountpoint and sharenfs properties, check if
+			 * it can be set in a global/non-global zone based on
+			 * the zoned property value:
+			 *
+			 *		global zone	    non-global zone
+			 * --------------------------------------------------
+			 * zoned=on	mountpoint (no)	    mountpoint (yes)
+			 *		sharenfs (no)	    sharenfs (no)
+			 *
+			 * zoned=off	mountpoint (yes)	N/A
+			 *		sharenfs (yes)
+			 */
 			if (zoned) {
 				if (getzoneid() == GLOBAL_ZONEID) {
 					zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
@@ -912,6 +925,8 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 				(void) zfs_error(hdl, EZFS_ZONED, errbuf);
 				goto error;
 			}
+
+			break;
 		}
 
 		/*
@@ -958,6 +973,7 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 					    errbuf);
 					goto error;
 				}
+				break;
 			}
 		}
 	}
@@ -1591,6 +1607,8 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		break;
 
 	case ZFS_PROP_SHARENFS:
+	case ZFS_PROP_SHAREISCSI:
+	case ZFS_PROP_ISCSIOPTIONS:
 		(void) strlcpy(propbuf, getprop_string(zhp, prop, &source),
 		    proplen);
 		break;
@@ -2090,11 +2108,16 @@ int
 zfs_destroy(zfs_handle_t *zhp)
 {
 	zfs_cmd_t zc = { 0 };
-	int ret;
 
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 
 	if (ZFS_IS_VOLUME(zhp)) {
+		/*
+		 * Unconditionally unshare this zvol ignoring failure as it
+		 * indicates only that the volume wasn't shared initially.
+		 */
+		(void) zfs_unshare_iscsi(zhp);
+
 		if (zvol_remove_link(zhp->zfs_hdl, zhp->zfs_name) != 0)
 			return (-1);
 
@@ -2103,8 +2126,7 @@ zfs_destroy(zfs_handle_t *zhp)
 		zc.zc_objset_type = DMU_OST_ZFS;
 	}
 
-	ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_DESTROY, &zc);
-	if (ret != 0) {
+	if (ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_DESTROY, &zc) != 0) {
 		return (zfs_standard_error(zhp->zfs_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot destroy '%s'"),
 		    zhp->zfs_name));

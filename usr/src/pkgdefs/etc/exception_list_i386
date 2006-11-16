@@ -801,3 +801,12 @@ usr/include/sys/bmc_intf.h		i386
 usr/include/sys/iscsi_protocol.h	i386
 usr/include/sys/iscsi_authclient.h	i386
 usr/include/sys/iscsi_authclientglue.h	i386
+usr/include/libiscsitgt.h		i386
+usr/include/iscsitgt_impl.h		i386
+usr/lib/libiscsitgt.so			i386
+usr/lib/amd64/libiscsitgt.so		i386
+lib/libiscsitgt.so			i386
+lib/llib-liscsitgt			i386
+lib/llib-liscsitgt.ln			i386
+lib/amd64/libiscsitgt.so		i386
+lib/amd64/llib-liscsitgt.ln		i386
