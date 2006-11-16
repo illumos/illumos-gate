@@ -2677,14 +2677,28 @@ if_report(mib_item_t *item, char *matchname,
 				char    buf[LIFNAMSIZ + 1];
 				mib2_ipAddrEntry_t *ap;
 				struct ifstat   t;
-				struct iflist	*tlp;
+				struct iflist	*tlp = NULL;
 				struct iflist	**nextnew = &newlist;
 				struct iflist	*walkold;
 				struct iflist	*cleanlist;
+				boolean_t	found_if = B_FALSE;
 
 				alreadydone = B_TRUE; /* ignore other case */
+
 				/*
-				 * 'for' loop 2b: find the "right" entry
+				 * Check if there is anything to do.
+				 */
+				if (item->length <
+				    sizeof (mib2_ipAddrEntry_t)) {
+					fail(0, "No compatible interfaces");
+				}
+
+				/*
+				 * 'for' loop 2b: find the "right" entry:
+				 * If an interface name to match has been
+				 * supplied then try and find it, otherwise
+				 * match the first non-loopback interface found.
+				 * Use lo0 if all else fails.
 				 */
 				for (ap = (mib2_ipAddrEntry_t *)item->valp;
 				    (char *)ap < (char *)item->valp
@@ -2696,14 +2710,22 @@ if_report(mib_item_t *item, char *matchname,
 
 					if (matchname) {
 						if (strcmp(matchname,
-						    ifname) == 0)
+						    ifname) == 0) {
 							/* 'for' loop 2b */
+							found_if = B_TRUE;
 							break;
-					} else if (strcmp(ifname, "lo0") != 0) {
-						matchname = ifname;
+						}
+					} else if (strcmp(ifname, "lo0") != 0)
 						break; /* 'for' loop 2b */
-					}
 				} /* 'for' loop 2b ends */
+
+				if (matchname == NULL) {
+					matchname = ifname;
+				} else {
+					if (!found_if)
+						fail(0, "-I: %s no such "
+						    "interface.", matchname);
+				}
 
 				if (Iflag_only == 0 || !reentry) {
 					(void) printf("    input   %-6.6s    "
@@ -2731,6 +2753,23 @@ if_report(mib_item_t *item, char *matchname,
 					(void) octetstr(&ap->ipAdEntIfIndex,
 					    'a', buf, sizeof (buf));
 					(void) strtok(buf, ":");
+
+					/*
+					 * We have reduced the IP interface
+					 * name, which could have been a
+					 * logical, down to a name suitable
+					 * for use with kstats.
+					 * We treat this name as unique and
+					 * only collate statistics for it once
+					 * per pass. This is to avoid falsely
+					 * amplifying these statistics by the
+					 * the number of logical instances.
+					 */
+					if ((tlp != NULL) &&
+					    ((strcmp(buf, tlp->ifname) == 0))) {
+						continue;
+					}
+
 					ksp = kstat_lookup(kc, NULL, -1, buf);
 					if (ksp &&
 					    ksp->ks_type == KSTAT_TYPE_NAMED)
@@ -2932,14 +2971,28 @@ if_report(mib_item_t *item, char *matchname,
 				char    buf[IFNAMSIZ + 1];
 				mib2_ipv6AddrEntry_t *ap6;
 				struct ifstat   t;
-				struct iflist	*tlp;
+				struct iflist	*tlp = NULL;
 				struct iflist	**nextnew = &newlist6;
 				struct iflist	*walkold;
 				struct iflist	*cleanlist;
+				boolean_t	found_if = B_FALSE;
 
 				alreadydone = B_TRUE; /* ignore other case */
+
 				/*
-				 * 'for' loop 2e: find the "right" entry
+				 * Check if there is anything to do.
+				 */
+				if (item->length <
+				    sizeof (mib2_ipv6AddrEntry_t)) {
+					fail(0, "No compatible interfaces");
+				}
+
+				/*
+				 * 'for' loop 2e: find the "right" entry:
+				 * If an interface name to match has been
+				 * supplied then try and find it, otherwise
+				 * match the first non-loopback interface found.
+				 * Use lo0 if all else fails.
 				 */
 				for (ap6 = (mib2_ipv6AddrEntry_t *)item->valp;
 				    (char *)ap6 < (char *)item->valp
@@ -2950,15 +3003,23 @@ if_report(mib_item_t *item, char *matchname,
 					(void) strtok(ifname, ":");
 
 					if (matchname) {
-						if (strcmp(matchname, ifname) ==
-						    0)
+						if (strcmp(matchname,
+						    ifname) == 0) {
 							/* 'for' loop 2e */
+							found_if = B_TRUE;
 							break;
-					} else if (strcmp(ifname, "lo0") != 0) {
-						matchname = ifname;
+						}
+					} else if (strcmp(ifname, "lo0") != 0)
 						break; /* 'for' loop 2e */
-					}
 				} /* 'for' loop 2e ends */
+
+				if (matchname == NULL) {
+					matchname = ifname;
+				} else {
+					if (!found_if)
+						fail(0, "-I: %s no such "
+						    "interface.", matchname);
+				}
 
 				if (Iflag_only == 0 || !reentry) {
 					(void) printf(
@@ -2987,6 +3048,24 @@ if_report(mib_item_t *item, char *matchname,
 					(void) octetstr(&ap6->ipv6AddrIfIndex,
 					    'a', buf, sizeof (buf));
 					(void) strtok(buf, ":");
+
+					/*
+					 * We have reduced the IP interface
+					 * name, which could have been a
+					 * logical, down to a name suitable
+					 * for use with kstats.
+					 * We treat this name as unique and
+					 * only collate statistics for it once
+					 * per pass. This is to avoid falsely
+					 * amplifying these statistics by the
+					 * the number of logical instances.
+					 */
+
+					if ((tlp != NULL) &&
+					    ((strcmp(buf, tlp->ifname) == 0))) {
+						continue;
+					}
+
 					ksp = kstat_lookup(kc, NULL, -1, buf);
 					if (ksp && ksp->ks_type ==
 					    KSTAT_TYPE_NAMED)
@@ -4101,8 +4180,9 @@ static const char ire_hdr_v4_verbose[] =
 "----- --- --- ----- ------ %s\n";
 
 static const char ire_hdr_v4_normal[] =
-"  Destination           Gateway           Flags  Ref   Use   Interface %s\n"
-"-------------------- -------------------- ----- ----- ------ --------- %s\n";
+"  Destination           Gateway           Flags  Ref     Use     Interface"
+" %s\n-------------------- -------------------- ----- ----- ---------- "
+"--------- %s\n";
 
 static boolean_t
 ire_report_item_v4(const mib2_ipRouteEntry_t *rp, boolean_t first,
@@ -4145,7 +4225,7 @@ ire_report_item_v4(const mib2_ipRouteEntry_t *rp, boolean_t first,
 	}
 	if (Vflag) {
 		(void) printf("%-20s %-15s %-20s %-6s %5u%c %4u %3u "
-		    "%-4s%6u%6u %s\n",
+		    "%-4s%6u %6u %s\n",
 		    dstbuf,
 		    pr_mask(rp->ipRouteMask, maskbuf, sizeof (maskbuf)),
 		    pr_addrnz(rp->ipRouteNextHop, gwbuf, sizeof (gwbuf)),
@@ -4159,7 +4239,7 @@ ire_report_item_v4(const mib2_ipRouteEntry_t *rp, boolean_t first,
 		    rp->ipRouteInfo.re_ibpkt,
 		    pr_secattr(attrs));
 	} else {
-		(void) printf("%-20s %-20s %-5s  %4u%7u %-9s %s\n",
+		(void) printf("%-20s %-20s %-5s  %4u %10u %-9s %s\n",
 		    dstbuf,
 		    pr_addrnz(rp->ipRouteNextHop, gwbuf, sizeof (gwbuf)),
 		    flags,
@@ -4393,8 +4473,8 @@ static const char ire_hdr_v6_verbose[] =
 "--- ----- ------ ------ %s\n";
 static const char ire_hdr_v6_normal[] =
 "  Destination/Mask            Gateway                   Flags Ref   Use  "
-" If   %s\n"
-"--------------------------- --------------------------- ----- --- ------ "
+"  If   %s\n"
+"--------------------------- --------------------------- ----- --- ------- "
 "----- %s\n";
 
 static boolean_t
@@ -4479,7 +4559,7 @@ ire_report_item_v6(const mib2_ipv6RouteEntry_t *rp6, boolean_t first,
 		    rp6->ipv6RouteInfo.re_ibpkt,
 		    pr_secattr(attrs));
 	} else {
-		(void) printf("%-27s %-27s %-5s %3u %6u %-5s %s\n",
+		(void) printf("%-27s %-27s %-5s %3u %7u %-5s %s\n",
 		    pr_prefix6(&rp6->ipv6RouteDest,
 			rp6->ipv6RoutePfxLength, dstbuf, sizeof (dstbuf)),
 		    IN6_IS_ADDR_UNSPECIFIED(&rp6->ipv6RouteNextHop) ?
