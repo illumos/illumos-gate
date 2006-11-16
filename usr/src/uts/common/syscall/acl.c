@@ -316,7 +316,7 @@ cacl(int cmd, int nentries, void *aclbufp, vnode_t *vp, int *rv)
 		break;
 
 	case ACE_SETACL:
-		if (nentries > (MAX_ACL_ENTRIES))
+		if (nentries < 1 || nentries > MAX_ACL_ENTRIES)
 			return (EINVAL);
 
 		if (aclbufp == NULL)
