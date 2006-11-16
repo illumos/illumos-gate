@@ -218,14 +218,6 @@ sbmap(fileid_t *filep, daddr32_t bn)
 	daddr32_t *db;
 	devid_t	*devp;
 
-	/* These are the pools of buffers, etc. */
-	/* Compilers like to play with alignment, so force the issue here */
-	static union {
-		char		*blk[NIADDR + 1];
-		daddr32_t	*dummy;
-	} b;
-	daddr32_t blknos[NIADDR + 1];
-
 	devp = filep->fi_devp;
 	inodep = filep->fi_inode;
 	db = inodep->i_db;
@@ -266,16 +258,12 @@ sbmap(fileid_t *filep, daddr32_t bn)
 	 * fetch through the indirect blocks
 	 */
 	for (; j <= NIADDR; j++) {
-		if (blknos[j] != nb) {
-			filep->fi_blocknum = fsbtodb(&devp->un_fs.di_fs, nb);
-			filep->fi_count = devp->un_fs.di_fs.fs_bsize;
-			filep->fi_memp = 0;
-			if (diskread(filep) != 0)
-				return (0);
-			b.blk[j] = filep->fi_memp;
-			blknos[j] = nb;
-		}
-		bap = (daddr32_t *)b.blk[j];
+		filep->fi_blocknum = fsbtodb(&devp->un_fs.di_fs, nb);
+		filep->fi_count = devp->un_fs.di_fs.fs_bsize;
+		filep->fi_memp = 0;
+		if (diskread(filep) != 0)
+			return (0);
+		bap = (daddr32_t *)filep->fi_memp;
 		sh /= NINDIR(&devp->un_fs.di_fs);
 		i = (bn / sh) % NINDIR(&devp->un_fs.di_fs);
 		nb = bap[i];
