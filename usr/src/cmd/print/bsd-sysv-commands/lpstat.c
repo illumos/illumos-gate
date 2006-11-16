@@ -669,7 +669,7 @@ report_job(papi_job_t job, int show_rank, int verbose)
 		(void) papiAttributeListGetString(attrs, NULL,
 				"output-device-assigned", &destination);
 		printf("\n\t assigned %s", destination);
-		
+
 		(void) papiAttributeListGetString(attrs, NULL, "form", &form);
 		if (form != NULL)
 			printf(", form %s", form);

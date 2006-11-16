@@ -475,7 +475,7 @@ receive_data_file(FILE *ifp, FILE *ofp, int size)
 				if (wrc < 0) {
 					close(fd);
 					unlink(file);
-					return(NULL);
+					return (NULL);
 				}
 
 				ptr += wrc;
@@ -493,7 +493,7 @@ receive_data_file(FILE *ifp, FILE *ofp, int size)
 
 	return (strdup(file));
 }
-			
+
 static papi_status_t
 berkeley_receive_files(papi_service_t svc, FILE *ifp, FILE *ofp, char *printer)
 {
@@ -592,11 +592,11 @@ cyclical_service_check(char *svc_name)
 		return (0);
 
 	if ((list = getprinterbyname(svc_name, NULL)) == NULL)
-		return (0);     /* if it doesnt' resolve, we will fail later */
+		return (0);	/* if it doesnt' resolve, we will fail later */
 
 	papiAttributeListGetString(list, NULL, "printer-uri-supported", &s);
 	if ((s == NULL) || (strcasecmp(svc_name, s) != 0))
-		return (0);     /* they don't match */
+		return (0);	/* they don't match */
 
 	/* is it in uri form? */
 	if (uri_from_string(s, &uri) < 0)
@@ -616,7 +616,7 @@ cyclical_service_check(char *svc_name)
 	/* is it the local host? */
 	sysinfo(SI_HOSTNAME, buf, sizeof (buf));
 	if ((strcasecmp(uri->host, "localhost") != 0) &&
-	     (strcasecmp(uri->host, buf) != 0)) {
+	    (strcasecmp(uri->host, buf) != 0)) {
 		uri_free(uri);
 		return (0);
 	}
@@ -667,7 +667,7 @@ main(int ac, char *av[])
 
 	if (run_user != NULL)	/* get the requested user info */
 		pw = getpwnam(run_user);
-	
+
 	if (run_dir != NULL) {	/* setup the run_dir */
 		(void) mkdir(run_dir, 0700);
 		if (pw != NULL)
@@ -675,7 +675,7 @@ main(int ac, char *av[])
 	}
 
 	if (pw != NULL) {	/* run as the requested user */
-		syslog(LOG_DEBUG, "name: %s, uid: %d, gid: %d", 
+		syslog(LOG_DEBUG, "name: %s, uid: %d, gid: %d",
 				pw->pw_name, pw->pw_uid, pw->pw_gid);
 		initgroups(pw->pw_name, pw->pw_gid);
 		setgid(pw->pw_gid);

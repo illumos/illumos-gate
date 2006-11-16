@@ -140,28 +140,27 @@ list_locate(void **list, int (*compare)(void *, void *), void *element)
 void
 list_remove(void ***list, void *item)
 {
-        int i, count;
+	int i, count;
 	void **tmp = NULL;
 
-        if ((list == NULL) || (*list == NULL) || (item == NULL))
-                return;
+	if ((list == NULL) || (*list == NULL) || (item == NULL))
+		return;
 
-        for (count = 0; (*list)[count] != NULL; count++)
-                ;
+	for (count = 0; (*list)[count] != NULL; count++);
 
 	if (count > 0) {
-        	int new_size = (((count + 1) / __list_increment) + 1) *
-                                	__list_increment;
+		int new_size = (((count + 1) / __list_increment) + 1) *
+				__list_increment;
 
-        	if ((tmp = (void **)calloc(new_size, sizeof (void *))) != NULL)
+		if ((tmp = (void **)calloc(new_size, sizeof (void *))) != NULL)
 			tmp = *list;
-	
+
 		/* copy up to item */
-        	for (i = 0; (((*list)[i] != NULL) && ((*list)[i] != item)); i++)
+		for (i = 0; (((*list)[i] != NULL) && ((*list)[i] != item)); i++)
 			tmp[i] = (*list)[i];
 		/* copy after item */
 		if ((*list)[i] == item)
-        		for (++i; ((*list)[i] != NULL); i++)
+			for (++i; ((*list)[i] != NULL); i++)
 				tmp[i-1] = (*list)[i];
 	}
 
