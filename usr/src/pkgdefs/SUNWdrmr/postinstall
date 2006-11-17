@@ -30,10 +30,12 @@
 PATH=/usr/bin:/usr/sbin:${PATH}
 export PATH
 
+# the following ids are sorted in numeric order
 BRALIAS="\
 	\"pci8086,2562\" \
 	\"pci8086,2572\" \
 	\"pci8086,2582\" \
+	\"pci8086,2592\" \
 	\"pci8086,3582\" \
 	"
 DRVPERM='* 0644 root sys'
