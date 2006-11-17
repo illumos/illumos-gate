@@ -3140,8 +3140,15 @@ zfs_fillpage(vnode_t *vp, u_offset_t off, struct seg *seg,
 			klen = P2ROUNDUP((ulong_t)zp->z_blksz, PAGESIZE);
 			koff = 0;
 		} else {
+			/*
+			 * It would be ideal to align our offset to the
+			 * blocksize but doing so has resulted in some
+			 * strange application crashes. For now, we
+			 * leave the offset as is and only adjust the
+			 * length if we are off the end of the file.
+			 */
+			koff = off;
 			klen = plsz;
-			koff = P2ALIGN(off, (u_offset_t)klen);
 		}
 		ASSERT(koff <= filesz);
 		if (koff + klen > filesz)
