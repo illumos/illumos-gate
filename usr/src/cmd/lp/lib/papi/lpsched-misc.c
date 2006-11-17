@@ -142,7 +142,7 @@ static struct {
 	char *mime_type;
 	char *lp_type;
 } type_map[] = {
-	{ "plain/text", "simple" },
+	{ "text/plain", "simple" },
 	{ "application/octet-stream", "raw" },
 	{ "application/octet-stream", "any" },
 	{ "application/postscript", "postscript" },
@@ -179,7 +179,7 @@ lp_type_to_mime_type(char *lp_type)
 	int i;
 
 	if (lp_type == NULL)
-		return ("plain/text");
+		return ("text/plain");
 
 	for (i = 0; type_map[i].lp_type != NULL; i++)
 		if (strcasecmp(type_map[i].lp_type, lp_type) == 0)
