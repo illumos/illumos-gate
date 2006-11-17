@@ -75,8 +75,9 @@ kmutex_t sdev_lock; /* used for mount/unmount/rename synchronization */
 static major_t devmajor;	/* the fictitious major we live on */
 static major_t devminor;	/* the fictitious minor of this instance */
 static struct sdev_data *sdev_mntinfo = NULL;	/* linked list of instances */
+
+/* LINTED E_STATIC_UNUSED */		/* useful for debugging */
 static struct vnode *sdev_stale_attrvp; /* stale root attrvp after remount */
-static int sdev_mntinfo_cnt;	/* mntinfo reference count */
 
 static int sdev_mount(struct vfs *, struct vnode *, struct mounta *,
     struct cred *);

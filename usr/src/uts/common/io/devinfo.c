@@ -132,7 +132,7 @@ struct di_stack {
 	((stack)->depth)++; \
 }
 
-#define	DI_ALL_PTR(s)	((struct di_all *)di_mem_addr((s), 0))
+#define	DI_ALL_PTR(s)	((struct di_all *)(intptr_t)di_mem_addr((s), 0))
 
 /*
  * With devfs, the device tree has no global locks. The device tree is
@@ -269,7 +269,7 @@ static uint_t	di_chunk = 32;		/* I/O chunk size in pages */
 #define	CACHE_DEBUG(args)	\
 	{ if (di_cache_debug != DI_QUIET) di_cache_print args; }
 
-static struct phci_walk_arg {
+typedef struct phci_walk_arg {
 	di_off_t	off;
 	struct di_state	*st;
 } phci_walk_arg_t;
@@ -645,7 +645,8 @@ di_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		if (di_setstate(st, IOC_COPY) == -1)
 			return (EBUSY);
 
-		map_size = ((struct di_all *)di_mem_addr(st, 0))->map_size;
+		map_size = ((struct di_all *)
+		    (intptr_t)di_mem_addr(st, 0))->map_size;
 		if (map_size == 0) {
 			(void) di_setstate(st, IOC_DONE);
 			return (EFAULT);
@@ -717,7 +718,7 @@ di_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		size = PAGESIZE;
 	di_allocmem(st, size);
 
-	all = (struct di_all *)di_mem_addr(st, 0);
+	all = (struct di_all *)(intptr_t)di_mem_addr(st, 0);
 	all->devcnt = devcnt;
 	all->command = st->command;
 	all->version = DI_SNAPSHOT_VERSION;
@@ -976,7 +977,7 @@ di_cache2mem(struct di_cache *cache, struct di_state *st)
  *	- 0 on failure
  *	- size of copied data on success
  */
-static int
+static size_t
 di_mem2cache(struct di_state *st, struct di_cache *cache)
 {
 	size_t map_size;
@@ -1051,7 +1052,7 @@ di_copyformat(di_off_t off, struct di_state *st, intptr_t arg, int mode)
 {
 	di_off_t size;
 	struct di_priv_data *priv;
-	struct di_all *all = (struct di_all *)di_mem_addr(st, 0);
+	struct di_all *all = (struct di_all *)(intptr_t)di_mem_addr(st, 0);
 
 	dcmn_err2((CE_CONT, "di_copyformat: off=%x, arg=%p mode=%x\n",
 		off, (void *)arg, mode));
@@ -1196,7 +1197,7 @@ di_dkey_cmp(struct di_dkey *dk1, struct di_dkey *dk2)
 	if (dk1->dk_dip !=  dk2->dk_dip)
 		return (dk1->dk_dip > dk2->dk_dip ? 1 : -1);
 
-	if (dk1->dk_major != -1 && dk2->dk_major != -1) {
+	if (dk1->dk_major != (major_t)-1 && dk2->dk_major != (major_t)-1) {
 		if (dk1->dk_major !=  dk2->dk_major)
 			return (dk1->dk_major > dk2->dk_major ? 1 : -1);
 
@@ -1276,7 +1277,7 @@ di_snapshot(struct di_state *st)
 	char *path;
 	vnode_t *vp;
 
-	all = (struct di_all *)di_mem_addr(st, 0);
+	all = (struct di_all *)(intptr_t)di_mem_addr(st, 0);
 	dcmn_err((CE_CONT, "Taking a snapshot of devinfo tree...\n"));
 
 	/*
@@ -1369,6 +1370,8 @@ di_snapshot(struct di_state *st)
 	all->snapshot_time = ddi_get_time();
 	all->cache_checksum = 0;
 
+	ASSERT(all->snapshot_time != 0);
+
 	return (off);
 }
 
@@ -1408,7 +1411,7 @@ build_vhci_list(dev_info_t *vh_devinfo, void *arg)
 	struct di_node *me;
 	struct di_state *st;
 	di_off_t off;
-	struct phci_walk_arg pwa;
+	phci_walk_arg_t pwa;
 
 	dcmn_err3((CE_CONT, "build_vhci list\n"));
 
@@ -1425,14 +1428,16 @@ build_vhci_list(dev_info_t *vh_devinfo, void *arg)
 	dcmn_err3((CE_CONT, "st->mem_size: %d vh_devinfo off: 0x%x\n",
 		st->mem_size, off));
 
-	all = (struct di_all *)di_mem_addr(st, 0);
+	all = (struct di_all *)(intptr_t)di_mem_addr(st, 0);
 	if (all->top_vhci_devinfo == 0) {
 		all->top_vhci_devinfo = off;
 	} else {
-		me = (struct di_node *)di_mem_addr(st, all->top_vhci_devinfo);
+		me = (struct di_node *)
+		    (intptr_t)di_mem_addr(st, all->top_vhci_devinfo);
 
 		while (me->next_vhci != 0) {
-			me = (struct di_node *)di_mem_addr(st, me->next_vhci);
+			me = (struct di_node *)
+			    (intptr_t)di_mem_addr(st, me->next_vhci);
 		}
 
 		me->next_vhci = off;
@@ -1453,15 +1458,15 @@ build_phci_list(dev_info_t *ph_devinfo, void *arg)
 {
 	struct di_node *vh_di_node;
 	struct di_node *me;
-	struct phci_walk_arg *pwa;
+	phci_walk_arg_t *pwa;
 	di_off_t off;
 
-	pwa = (struct phci_walk_arg *)arg;
+	pwa = (phci_walk_arg_t *)arg;
 
 	dcmn_err3((CE_CONT, "build_phci list for vhci at offset: 0x%x\n",
 		pwa->off));
 
-	vh_di_node = (struct di_node *)di_mem_addr(pwa->st, pwa->off);
+	vh_di_node = (struct di_node *)(intptr_t)di_mem_addr(pwa->st, pwa->off);
 
 	if (di_dip_find(pwa->st, ph_devinfo, &off) != 0) {
 		dcmn_err((CE_WARN, "di_dip_find error for the given node\n"));
@@ -1477,10 +1482,12 @@ build_phci_list(dev_info_t *ph_devinfo, void *arg)
 		return (DDI_WALK_CONTINUE);
 	}
 
-	me = (struct di_node *)di_mem_addr(pwa->st, vh_di_node->top_phci);
+	me = (struct di_node *)
+	    (intptr_t)di_mem_addr(pwa->st, vh_di_node->top_phci);
 
 	while (me->next_phci != 0) {
-		me = (struct di_node *)di_mem_addr(pwa->st, me->next_phci);
+		me = (struct di_node *)
+		    (intptr_t)di_mem_addr(pwa->st, me->next_phci);
 	}
 	me->next_phci = off;
 
@@ -1505,7 +1512,7 @@ snap_driver_list(struct di_state *st, struct devnames *dnp, di_off_t *poff_p)
 			continue;
 
 		ASSERT(off > 0);
-		me = (struct di_node *)di_mem_addr(st, off);
+		me = (struct di_node *)(intptr_t)di_mem_addr(st, off);
 		ASSERT(me->next == 0 || me->next == -1);
 		/*
 		 * Only nodes which were BOUND when they were
@@ -1545,7 +1552,7 @@ di_copydevnm(di_off_t *off_p, struct di_state *st)
 	dcmn_err((CE_CONT, "Start copying devnamesp[%d] at offset 0x%x\n",
 		devcnt, off));
 
-	dnp = (struct di_devnm *)di_mem_addr(st, off);
+	dnp = (struct di_devnm *)(intptr_t)di_mem_addr(st, off);
 	off += size;
 
 	for (i = 0; i < devcnt; i++) {
@@ -2121,7 +2128,7 @@ di_ldi_callback(const ldi_usage_t *ldi_usage, void *arg)
 	 * operations - so it may already be in the hash.
 	 */
 	i_lnode = i_lnode_alloc(ldi_usage->src_modid);
-	i_lnode->di_node = (struct di_node *)di_mem_addr(st, soff);
+	i_lnode->di_node = (struct di_node *)(intptr_t)di_mem_addr(st, soff);
 	i_lnode->devt = ldi_usage->src_devt;
 
 	res = mod_hash_find(st->lnode_hash, i_lnode, &nodep);
@@ -2144,7 +2151,7 @@ di_ldi_callback(const ldi_usage_t *ldi_usage, void *arg)
 	 * allocate a tgt i_lnode and add it to the lnode hash
 	 */
 	i_lnode = i_lnode_alloc(ldi_usage->tgt_modid);
-	i_lnode->di_node = (struct di_node *)di_mem_addr(st, toff);
+	i_lnode->di_node = (struct di_node *)(intptr_t)di_mem_addr(st, toff);
 	i_lnode->devt = ldi_usage->tgt_devt;
 
 	res = mod_hash_find(st->lnode_hash, i_lnode, &nodep);
@@ -2234,7 +2241,7 @@ i_link_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 	ASSERT(data->link_count <= data->st->link_count);
 
 	/* fill in fields for the di_link snapshot */
-	me = (struct di_link *)di_mem_addr(data->st, i_link->self);
+	me = (struct di_link *)(intptr_t)di_mem_addr(data->st, i_link->self);
 	me->self = i_link->self;
 	me->spec_type = i_link->spec_type;
 
@@ -2252,14 +2259,16 @@ i_link_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 	 * Save this link's offset in the src_lnode snapshot's link_out
 	 * field
 	 */
-	melnode = (struct di_lnode *)di_mem_addr(data->st, me->src_lnode);
+	melnode = (struct di_lnode *)
+	    (intptr_t)di_mem_addr(data->st, me->src_lnode);
 	me->src_link_next = melnode->link_out;
 	melnode->link_out = me->self;
 
 	/*
 	 * Put this link on the tgt_lnode's link_in field
 	 */
-	melnode = (struct di_lnode *)di_mem_addr(data->st, me->tgt_lnode);
+	melnode = (struct di_lnode *)
+	    (intptr_t)di_mem_addr(data->st, me->tgt_lnode);
 	me->tgt_link_next = melnode->link_in;
 	melnode->link_in = me->self;
 
@@ -2305,7 +2314,7 @@ i_lnode_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 	ASSERT(data->lnode_count <= data->st->lnode_count);
 
 	/* fill in fields for the di_lnode snapshot */
-	me = (struct di_lnode *)di_mem_addr(data->st, i_lnode->self);
+	me = (struct di_lnode *)(intptr_t)di_mem_addr(data->st, i_lnode->self);
 	me->self = i_lnode->self;
 
 	if (i_lnode->devt == DDI_DEV_T_NONE) {
@@ -2427,7 +2436,7 @@ di_getmdata(struct ddi_minor_data *mnode, di_off_t *off_p, di_off_t node,
 	*off_p = off;
 
 	do {
-		me = (struct di_minor *)di_mem_addr(st, off);
+		me = (struct di_minor *)(intptr_t)di_mem_addr(st, off);
 		me->self = off;
 		me->type = mnode->type;
 		me->node = node;
@@ -2650,7 +2659,7 @@ di_path_getprop(mdi_pathinfo_t *pip, di_off_t off, di_off_t *off_p,
 	while (prop = mdi_pi_get_next_prop(pip, prop)) {
 		int delta = 0;
 
-		me = (struct di_path_prop *)di_mem_addr(st, off);
+		me = (struct di_path_prop *)(intptr_t)di_mem_addr(st, off);
 		me->self = off;
 		off += sizeof (struct di_path_prop);
 
@@ -2672,7 +2681,7 @@ di_path_getprop(mdi_pathinfo_t *pip, di_off_t off, di_off_t *off_p,
 			me->prop_type = DDI_PROP_TYPE_INT;
 			off = di_checkmem(st, off, delta);
 			(void) nvpair_value_int32(prop,
-			    (int32_t *)di_mem_addr(st, off));
+			    (int32_t *)(intptr_t)di_mem_addr(st, off));
 			break;
 
 		case DATA_TYPE_INT64:
@@ -2681,7 +2690,7 @@ di_path_getprop(mdi_pathinfo_t *pip, di_off_t off, di_off_t *off_p,
 			me->prop_type = DDI_PROP_TYPE_INT64;
 			off = di_checkmem(st, off, delta);
 			(void) nvpair_value_int64(prop,
-			    (int64_t *)di_mem_addr(st, off));
+			    (int64_t *)(intptr_t)di_mem_addr(st, off));
 			break;
 
 		case DATA_TYPE_STRING:
@@ -2803,7 +2812,8 @@ di_getpath_data(dev_info_t *dip, di_off_t *poff_p, di_off_t noff,
 			 * first snapshotted i.e. when the other endpoint dip
 			 * was snapshotted.
 			 */
-			me = (struct di_path *)di_mem_addr(st, stored_offset);
+			me = (struct di_path *)(intptr_t)
+			    di_mem_addr(st, stored_offset);
 
 			*poff_p = stored_offset;
 
@@ -2827,7 +2837,7 @@ di_getpath_data(dev_info_t *dip, di_off_t *poff_p, di_off_t noff,
 		 * Now that we need to snapshot this pip, check memory
 		 */
 		off = di_checkmem(st, off, sizeof (struct di_path));
-		me = (struct di_path *)di_mem_addr(st, off);
+		me = (struct di_path *)(intptr_t)di_mem_addr(st, off);
 		me->self = off;
 		*poff_p = off;
 		off += sizeof (struct di_path);
@@ -2960,7 +2970,7 @@ getprop:
 	 * Now copy properties
 	 */
 	do {
-		pp = (struct di_prop *)di_mem_addr(st, off);
+		pp = (struct di_prop *)(intptr_t)di_mem_addr(st, off);
 		pp->self = off;
 		/*
 		 * Split dev_t to major/minor, so it works for
@@ -3028,7 +3038,7 @@ getprop:
 
 
 	prop_op = ops->devo_cb_ops->cb_prop_op;
-	pp = (struct di_prop *)di_mem_addr(st, *off_p);
+	pp = (struct di_prop *)(intptr_t)di_mem_addr(st, *off_p);
 
 	mutex_exit(&dip->devi_lock);
 
@@ -3038,7 +3048,7 @@ getprop:
 
 		if (pp->next) {
 			tmp = (struct di_prop *)
-			    di_mem_addr(st, pp->next);
+			    (intptr_t)di_mem_addr(st, pp->next);
 		} else {
 			tmp = NULL;
 		}
@@ -3148,16 +3158,16 @@ di_match_drv_name(struct dev_info *node, struct di_state *st, int match)
 	}
 
 	/* Now get the di_priv_format array */
-	all = (struct di_all *)di_mem_addr(st, 0);
+	all = (struct di_all *)(intptr_t)di_mem_addr(st, 0);
 
 	if (match == DI_MATCH_PARENT) {
 		count = all->n_ppdata;
 		form = (struct di_priv_format *)
-			(di_mem_addr(st, 0) + all->ppdata_format);
+			(intptr_t)(di_mem_addr(st, 0) + all->ppdata_format);
 	} else {
 		count = all->n_dpdata;
 		form = (struct di_priv_format *)
-			((caddr_t)all + all->dpdata_format);
+			(intptr_t)((caddr_t)all + all->dpdata_format);
 	}
 
 	len = strlen(drv_name);
@@ -3209,7 +3219,7 @@ di_getprvdata(struct di_priv_format *pdp, struct dev_info *node,
 	 */
 	off = di_checkmem(st, *off_p, DI_MAX_PRIVDATA);
 
-	if ((pdp->bytes <= 0) || pdp->bytes > DI_MAX_PRIVDATA) {
+	if ((pdp->bytes == 0) || pdp->bytes > DI_MAX_PRIVDATA) {
 		goto failure;
 	}
 
@@ -3234,10 +3244,13 @@ di_getprvdata(struct di_priv_format *pdp, struct dev_info *node,
 				goto failure;	/* wrong offset */
 
 			pa = di_mem_addr(st, off + pdp->ptr[i].offset);
-			tmp = (di_off_t *)pa;	/* to store off_t later */
 
-			ptr = *((void **) pa);	/* get pointer value */
-			if (ptr == NULL) {	/* if NULL pointer, go on */
+			/* save a tmp ptr to store off_t later */
+			tmp = (di_off_t *)(intptr_t)pa;
+
+			/* get pointer value, if NULL continue */
+			ptr = *((void **) (intptr_t)pa);
+			if (ptr == NULL) {
 				continue;
 			}
 
@@ -3259,7 +3272,8 @@ di_getprvdata(struct di_priv_format *pdp, struct dev_info *node,
 			}
 
 			if (repeat >= 0) {
-				repeat = *((int *)((caddr_t)data + repeat));
+				repeat = *((int *)
+				    (intptr_t)((caddr_t)data + repeat));
 			} else {
 				repeat = -repeat;
 			}
@@ -3418,7 +3432,7 @@ header_plus_one_ok(struct di_all *all)
 		return (0);
 	}
 
-	if (all->snapshot_time <= 0) {
+	if (all->snapshot_time == 0) {
 		CACHE_DEBUG((DI_ERR, "bad timestamp: %ld", all->snapshot_time));
 		return (0);
 	}
@@ -3896,7 +3910,7 @@ di_cache_lookup(struct di_state *st)
 	 */
 	ASSERT(rval == 0 || strcmp(DI_ALL_PTR(st)->root_path, "/") == 0);
 
-	return (rval);
+	return ((int)rval);
 }
 
 /*

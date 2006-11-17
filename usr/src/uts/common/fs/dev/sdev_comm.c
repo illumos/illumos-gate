@@ -380,7 +380,7 @@ sdev_ki_call_devfsadmd(sdev_door_arg_t *argp, sdev_door_res_t *resultp)
 	}
 
 	if (!error) {
-		ASSERT((struct sdev_door_res *)darg.rbuf == resultp);
+		ASSERT((struct sdev_door_res *)(intptr_t)darg.rbuf == resultp);
 		if (resultp->devfsadm_error != 0) {
 			sdcmn_err6(("sdev_ki_call_devfsadmd: result %d\n",
 			    resultp->devfsadm_error));
@@ -711,7 +711,7 @@ devname_nsmap_lookup(devname_lkp_arg_t *args, devname_lkp_result_t **result)
 	struct sdev_door_arg *argp;
 	struct sdev_door_res resp;
 	char *link;
-	uint8_t spec;
+	devname_spec_t spec;
 
 	argp = kmem_zalloc(sizeof (sdev_door_arg_t), KM_SLEEP);
 	argp->devfsadm_cmd = DEVFSADMD_NS_LOOKUP;
@@ -734,7 +734,8 @@ devname_nsmap_lookup(devname_lkp_arg_t *args, devname_lkp_result_t **result)
 			goto done;
 		}
 		spec = resp.ns_lkp_hdl.devfsadm_spec;
-		sdcmn_err6(("devfsadm_link %s spec %d\n", link, spec));
+		sdcmn_err6(("devfsadm_link %s spec %d\n",
+		    link, (int)spec));
 
 
 		(*result)->devname_spec = (devname_spec_t)spec;

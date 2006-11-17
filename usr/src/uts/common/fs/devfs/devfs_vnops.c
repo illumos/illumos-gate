@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -894,7 +893,7 @@ devfs_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp)
 		rw_downgrade(&ddv->dv_contents);
 	}
 
-	soff = uiop->uio_offset;
+	soff = uiop->uio_loffset;
 	bufsz = uiop->uio_iov->iov_len;
 	de = bufp = kmem_alloc(bufsz, KM_SLEEP);
 	movesz = 0;
@@ -917,7 +916,7 @@ devfs_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp)
 
 		(void) strncpy(de->d_name, ".", DIRENT64_NAMELEN(reclen));
 		movesz += reclen;
-		de = (dirent64_t *)((char *)de + reclen);
+		de = (dirent64_t *)(intptr_t)((char *)de + reclen);
 		dcmn_err3(("devfs_readdir: A: diroff %lld, soff %lld: '%s' "
 		    "reclen %lu\n", diroff, soff, ".", reclen));
 	}
@@ -935,7 +934,7 @@ devfs_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp)
 
 		(void) strncpy(de->d_name, "..", DIRENT64_NAMELEN(reclen));
 		movesz += reclen;
-		de = (dirent64_t *)((char *)de + reclen);
+		de = (dirent64_t *)(intptr_t)((char *)de + reclen);
 		dcmn_err3(("devfs_readdir: B: diroff %lld, soff %lld: '%s' "
 		    "reclen %lu\n", diroff, soff, "..", reclen));
 	}
@@ -970,7 +969,7 @@ devfs_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp)
 		    DIRENT64_NAMELEN(reclen));
 
 		movesz += reclen;
-		de = (dirent64_t *)((char *)de + reclen);
+		de = (dirent64_t *)(intptr_t)((char *)de + reclen);
 		dcmn_err4(("devfs_readdir: D: diroff "
 		    "%lld, soff %lld: '%s' reclen %lu\n", diroff, soff,
 		    dv->dv_name, reclen));
@@ -988,7 +987,7 @@ full:	dcmn_err3(("devfs_readdir: moving %lu bytes: "
 		if (error == 0) {
 			if (eofp)
 				*eofp = dv ? 0 : 1;
-			uiop->uio_offset = diroff;
+			uiop->uio_loffset = diroff;
 		}
 
 		va.va_mask = AT_ATIME;

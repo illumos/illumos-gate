@@ -164,7 +164,6 @@ static int devname_nsmaps_invalidated = 0; /* "devfsadm -m" has run */
 static struct vnodeops *sdev_get_vop(struct sdev_node *);
 static void sdev_set_no_nocache(struct sdev_node *);
 static int sdev_get_moduleops(struct sdev_node *);
-static void sdev_handle_alloc(struct sdev_node *);
 static fs_operation_def_t *sdev_merge_vtab(const fs_operation_def_t []);
 static void sdev_free_vtab(fs_operation_def_t *);
 
@@ -2660,7 +2659,8 @@ sdev_copyin_mountargs(struct mounta *uap, struct sdev_mountargs *args)
 #ifdef nextdp
 #undef nextdp
 #endif
-#define	nextdp(dp)	((struct dirent64 *)((char *)(dp) + (dp)->d_reclen))
+#define	nextdp(dp)	((struct dirent64 *) \
+			    (intptr_t)((char *)(dp) + (dp)->d_reclen))
 
 /*
  * readdir helper func
@@ -2712,7 +2712,7 @@ devname_readdir_func(vnode_t *vp, uio_t *uiop, cred_t *cred, int *eofp,
 	if (eofp != NULL)
 		*eofp = 0;
 
-	soff = uiop->uio_offset;
+	soff = uiop->uio_loffset;
 	iovp = uiop->uio_iov;
 	alloc_count = iovp->iov_len;
 	dp = outbuf = kmem_alloc(alloc_count, KM_SLEEP);
@@ -2928,7 +2928,7 @@ full:
 		error = uiomove(outbuf, outcount, UIO_READ, uiop);
 
 	if (!error) {
-		uiop->uio_offset = diroff;
+		uiop->uio_loffset = diroff;
 		if (eofp)
 			*eofp = dv ? 0 : 1;
 	}
@@ -3462,15 +3462,6 @@ sdev_get_map(struct sdev_node *dv, int validate)
 	}
 	return (map);
 }
-
-void
-sdev_handle_alloc(struct sdev_node *dv)
-{
-	rw_enter(&dv->sdev_contents, RW_WRITER);
-	dv->sdev_handle.dh_data = dv;
-	rw_exit(&dv->sdev_contents);
-}
-
 
 extern int sdev_vnodeops_tbl_size;
 

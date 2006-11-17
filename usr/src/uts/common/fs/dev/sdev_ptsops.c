@@ -86,7 +86,7 @@ devpts_strtol(const char *nm, minor_t *mp)
 		return (EINVAL);
 	}
 
-	*mp = uminor;
+	*mp = (minor_t)uminor;
 	return (0);
 }
 

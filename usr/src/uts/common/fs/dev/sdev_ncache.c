@@ -124,7 +124,6 @@ int	sdev_cache_write_disable = 0;
 int	sdev_boot_state = SDEV_BOOT_STATE_INITIAL;
 int	sdev_reconfig_boot = 0;
 sdev_nc_list_t *sdev_ncache;
-static timeout_id_t sdev_timeout_id = 0;
 static nvf_handle_t sdevfd_handle;
 
 /* static prototypes */
@@ -133,8 +132,6 @@ static void sdev_ncache_write(void);
 static void sdev_ncache_process_store(void);
 static sdev_nc_list_t *sdev_nc_newlist(void);
 static void sdev_nc_free_unlinked_node(sdev_nc_node_t *);
-static void sdev_nc_free_all_nodes(sdev_nc_list_t *);
-static void sdev_nc_freelist(sdev_nc_list_t *);
 static sdev_nc_node_t *sdev_nc_findpath(sdev_nc_list_t *, char *);
 static void sdev_nc_insertnode(sdev_nc_list_t *, sdev_nc_node_t *);
 static void sdev_nc_free_bootonly(void);
@@ -567,7 +564,6 @@ sdev_state_boot_complete()
 static void
 sdev_state_timeout(void *arg)
 {
-	sdev_timeout_id = 0;
 	sdev_state_boot_complete();
 }
 
@@ -588,7 +584,7 @@ sdev_state_sysavail()
 	} else {
 		nticks = drv_usectohz(1000000 * nsecs);
 		sdcmn_err5(("timeout initiated %ld\n", nticks));
-		sdev_timeout_id = timeout(sdev_state_timeout, NULL, nticks);
+		(void) timeout(sdev_state_timeout, NULL, nticks);
 		sdev_nc_flush_boot_update();
 	}
 }
@@ -737,33 +733,6 @@ sdev_nc_free_unlinked_node(sdev_nc_node_t *lp)
 {
 	kmem_free(lp->ncn_name, strlen(lp->ncn_name) + 1);
 	kmem_free(lp, sizeof (sdev_nc_node_t));
-}
-
-static void
-sdev_nc_free_all_nodes(sdev_nc_list_t *ncl)
-{
-	sdev_nc_node_t *lp;
-
-	while ((lp = list_head(&ncl->ncl_list)) != NULL) {
-		list_remove(&ncl->ncl_list, lp);
-		sdev_nc_free_unlinked_node(lp);
-		ncl->ncl_nentries--;
-	}
-	ASSERT(ncl->ncl_nentries == 0);
-}
-
-static void
-sdev_nc_freelist(sdev_nc_list_t *ncl)
-{
-	if (!list_is_empty(&ncl->ncl_list))
-		sdev_nc_free_all_nodes(ncl);
-	ASSERT(list_is_empty(&ncl->ncl_list));
-	ASSERT(ncl->ncl_nentries == 0);
-
-	mutex_destroy(&ncl->ncl_mutex);
-	rw_destroy(&ncl->ncl_lock);
-	list_destroy(&ncl->ncl_list);
-	kmem_free(ncl, sizeof (sdev_nc_list_t));
 }
 
 static sdev_nc_node_t *
