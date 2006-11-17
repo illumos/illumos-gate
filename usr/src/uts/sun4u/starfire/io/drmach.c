@@ -1297,6 +1297,11 @@ drmach_prep_rename_script(drmach_device_t *s_mem, drmach_device_t *t_mem,
 		/*
 		 * Step 3:	Update PC MADR tables for CPUs.
 		 */
+		if (brd->devices == NULL) {
+			/* devices not initialized */
+			continue;
+		}
+
 		rv = drmach_array_first(brd->devices, &d_idx, &d_id);
 		if (rv) {
 			/* must mean no devices on this board */
