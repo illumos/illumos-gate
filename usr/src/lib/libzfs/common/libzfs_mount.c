@@ -60,10 +60,10 @@
  */
 
 #include <dirent.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <libgen.h>
 #include <libintl.h>
-#include <libiscsitgt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -77,6 +77,30 @@
 #include <libzfs.h>
 
 #include "libzfs_impl.h"
+
+static int (*iscsitgt_zfs_share)(const char *);
+static int (*iscsitgt_zfs_unshare)(const char *);
+static int (*iscsitgt_zfs_is_shared)(const char *);
+
+#pragma init(zfs_iscsi_init)
+static void
+zfs_iscsi_init(void)
+{
+	void *libiscsitgt;
+
+	if ((libiscsitgt = dlopen("/lib/libiscsitgt.so.1",
+	    RTLD_LAZY | RTLD_GLOBAL)) == NULL ||
+	    (iscsitgt_zfs_share = (int (*)(const char *))dlsym(libiscsitgt,
+	    "iscsitgt_zfs_share")) == NULL ||
+	    (iscsitgt_zfs_unshare = (int (*)(const char *))dlsym(libiscsitgt,
+	    "iscsitgt_zfs_unshare")) == NULL ||
+	    (iscsitgt_zfs_is_shared = (int (*)(const char *))dlsym(libiscsitgt,
+	    "iscsitgt_zfs_is_shared")) == NULL) {
+		iscsitgt_zfs_share = NULL;
+		iscsitgt_zfs_unshare = NULL;
+		iscsitgt_zfs_is_shared = NULL;
+	}
+}
 
 /*
  * Search the sharetab for the given mountpoint, returning true if it is found.
@@ -578,7 +602,8 @@ remove_mountpoint(zfs_handle_t *zhp)
 boolean_t
 zfs_is_shared_iscsi(zfs_handle_t *zhp)
 {
-	return (iscsitgt_zfs_is_shared(zhp->zfs_name) != 0);
+	return (iscsitgt_zfs_is_shared != NULL &&
+	    iscsitgt_zfs_is_shared(zhp->zfs_name) != 0);
 }
 
 int
@@ -596,7 +621,7 @@ zfs_share_iscsi(zfs_handle_t *zhp)
 	    strcmp(shareopts, "off") == 0)
 		return (0);
 
-	if (iscsitgt_zfs_share(dataset) != 0)
+	if (iscsitgt_zfs_share == NULL || iscsitgt_zfs_share(dataset) != 0)
 		return (zfs_error(hdl, EZFS_SHAREISCSIFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot share '%s'"), dataset));
 
@@ -613,7 +638,8 @@ zfs_unshare_iscsi(zfs_handle_t *zhp)
 	 * If this fails with ENODEV it indicates that zvol wasn't shared so
 	 * we should return success in that case.
 	 */
-	if (iscsitgt_zfs_unshare(dataset) != 0 && errno != ENODEV)
+	if (iscsitgt_zfs_unshare == NULL ||
+	    (iscsitgt_zfs_unshare(dataset) != 0 && errno != ENODEV))
 		return (zfs_error(hdl, EZFS_UNSHAREISCSIFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot unshare '%s'"), dataset));
 
