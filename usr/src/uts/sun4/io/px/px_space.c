@@ -213,8 +213,7 @@ uint16_t px_fabric_die_bdg_sts_gos = PCI_STAT_S_PERROR |
 
 /* Fabric Switch Sec. Error that should cause panics */
 uint16_t px_fabric_die_sw_sts = PCI_STAT_R_TARG_AB |
-    PCI_STAT_R_MAST_AB |
-    PCI_STAT_S_SYSERR;
+    PCI_STAT_R_MAST_AB;
 
 /*
  * Fabric Switch Sec. Error that should cause panics even under
