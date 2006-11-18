@@ -41,10 +41,11 @@ UTSBASE	= ../..
 MODULE		= ecpp
 OBJECTS		= $(ECPP_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(ECPP_OBJS:%.o=$(LINTS_DIR)/%.ln)
-WARLOCK_OUT	= $(ECPP_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io
+WARLOCK_OUT	= $(ECPP_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -84,11 +85,9 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-
-clean:		$(CLEAN_DEPS); \
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 modlintlib:	$(MODLINTLIB_DEPS) lint64
@@ -114,15 +113,13 @@ TEST		= test
 #
 #	lock_lint rules
 #
-ECPP_FILES	= $(MODULE).ll
-
-warlock: $(MODULE).ok
+warlock: $(WARLOCK_OK)
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-ecpp.ok: ecpp.ll ecpp.wlcmd warlock_ddi.files
-	$(WARLOCK) -c ecpp.wlcmd $(ECPP_FILES) \
+$(WARLOCK_OK): $(WARLOCK_OUT) ecpp.wlcmd warlock_ddi.files
+	$(WARLOCK) -c $(WLCMD_DIR)/ecpp.wlcmd $(WARLOCK_OUT) \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 

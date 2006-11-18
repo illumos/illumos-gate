@@ -44,6 +44,7 @@ LINTS		= $(FAS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 WARLOCK_OUT     = $(FAS_OBJS:%.o=%.ll)
 WARLOCK_OK      = $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -80,10 +81,10 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS); \
+clean:		$(CLEAN_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
@@ -113,14 +114,14 @@ TEST		= test
 #
 SCSI_FILES = $(SCSI_OBJS:%.o= -l ../scsi/%.ll)
 
-warlock: $(MODULE).ok
+warlock: $(WARLOCK_OK)
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-fas.ok: fas.ll fas_callbacks.ll fas.wlcmd warlock_ddi.files \
+$(WARLOCK_OK): $(WARLOCK_OUT) fas.wlcmd warlock_ddi.files \
 	scsi.files
-	$(WARLOCK) -c fas.wlcmd fas.ll fas_callbacks.ll \
+	$(WARLOCK) -c $(WLCMD_DIR)/fas.wlcmd $(WARLOCK_OUT) \
 	../warlock/scsi.ll \
 	-l ../warlock/ddi_dki_impl.ll \
 	$(SCSI_FILES)

@@ -77,11 +77,9 @@ all:		$(ALL_DEPS)
 def:		$(DEF_DEPS)
 
 clean:		$(CLEAN_DEPS)
-
-clean:		$(CLEAN_DEPS); \
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 modlintlib:	$(MODLINTLIB_DEPS) lint64
@@ -104,11 +102,9 @@ TOUCH		= touch
 #
 #	Warlock targets
 #
-WARLOCK_OBJECTS	= $(DADA_OBJS:%.o=%.ll)
+warlock: $(WARLOCK_OK)
 
-warlock: $(MODULE).ok $(WARLOCK_OBJECTS)
-
-%.ok: $(WARLOCK_OBJECTS)
+$(WARLOCK_OK): $(WARLOCK_OUT)
 	$(TOUCH) $@
 
 %.ll: $(UTSBASE)/sun/io/dada/impl/%.c

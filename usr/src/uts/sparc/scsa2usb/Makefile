@@ -45,6 +45,7 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/usb/scsa2usb
 WARLOCK_OUT	= $(SCSA2USB_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -84,10 +85,10 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
@@ -115,7 +116,6 @@ TEST		= test
 #
 #	lock_lint rules
 #
-WARLOCK_OBJECTS = $(SCSA2USB_OBJS:%.o=%.ll)
 USBA_FILES = $(USBA_OBJS:%.o=../usba/%.ll)
 UHCI_FILES = $(UHCI_OBJS:%.o=../uhci/%.ll)
 OHCI_FILES = $(OHCI_OBJS:%.o=../ohci/%.ll)
@@ -124,14 +124,14 @@ SD_FILES   = $(SD_OBJS:%.o=../sd/%.ll)
 ST_FILES   = $(ST_OBJS:%.o=../st/%.ll)
 SCSI_FILES = $(SCSI_OBJS:%.o= -l ../scsi/%.ll)
 
-warlock: $(MODULE).ok $(WARLOCK_OBJECTS) warlock_with_usba
+warlock: $(WARLOCK_OK) warlock_with_usba
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-scsa2usb.ok: $(WARLOCK_OBJECTS) scsa2usb.wlcmd warlock_ddi.files \
+$(WARLOCK_OK): $(WARLOCK_OUT) scsa2usb.wlcmd warlock_ddi.files \
 	scsi.files
-	$(WARLOCK) -c scsa2usb.wlcmd $(WARLOCK_OBJECTS)  \
+	$(WARLOCK) -c $(WLCMD_DIR)/scsa2usb.wlcmd $(WARLOCK_OUT)  \
 		../warlock/scsi.ll \
 		-l ../warlock/ddi_dki_impl.ll \
 		$(SCSI_FILES)
@@ -143,14 +143,15 @@ scsa2usb.ok: $(WARLOCK_OBJECTS) scsa2usb.wlcmd warlock_ddi.files \
 		$(UTSBASE)/common/sys/usb/scsa2usb/scsa2usb.h
 	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
 
-warlock_with_usba: scsa2usb.wlcmd  $(WARLOCK_OBJECTS) usba_files \
-	ohci_files ehci_files uhci_files warlock_ddi.files sd.files st.files
-	$(WARLOCK) -c ./scsa2usb_with_usba.wlcmd \
+warlock_with_usba: scsa2usb_with_usba.wlcmd  $(WARLOCK_OUT) usba_files \
+	ohci_files ehci_files uhci_files warlock_ddi.files sd.files st.files \
+	scsi.files
+	$(WARLOCK) -c $(WLCMD_DIR)/scsa2usb_with_usba.wlcmd \
 		$(USBA_FILES) $(OHCI_FILES) $(EHCI_FILES) $(UHCI_FILES) \
 		$(SD_FILES) \
 		$(ST_FILES) \
 		$(SCSI_FILES) \
-		$(WARLOCK_OBJECTS) \
+		$(WARLOCK_OUT) \
 		-l ../warlock/ddi_dki_impl.ll
 
 usba_files:

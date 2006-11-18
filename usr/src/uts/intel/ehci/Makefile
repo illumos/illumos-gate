@@ -40,6 +40,9 @@ OBJECTS		= $(EHCI_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(EHCI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/usb/hcd/ehci
+WARLOCK_OUT	= $(EHCI_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -55,6 +58,7 @@ LDFLAGS		+= -dy -Nmisc/usba
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
+ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
@@ -78,8 +82,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -93,3 +99,37 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+#
+#	Defines for local commands.
+#
+WARLOCK		= warlock
+WLCC		= wlcc
+TOUCH		= touch
+SCCS		= sccs
+TEST		= test
+
+#
+#	lock_lint rules
+#
+USBA_FILES = $(USBA_OBJS:%.o= -l ../usba/%.ll)
+
+warlock: $(WARLOCK_OK)
+
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+
+$(WARLOCK_OK): $(WARLOCK_OUT) ehci.wlcmd warlock_ddi.files usba.files
+	$(WARLOCK) -c $(WLCMD_DIR)/ehci.wlcmd  $(WARLOCK_OUT) \
+	$(USBA_FILES) \
+	-l ../warlock/ddi_dki_impl.ll
+	$(TOUCH) $@
+
+%.ll: $(UTSBASE)/common/io/usb/hcd/ehci/%.c
+	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
+
+warlock_ddi.files:
+	@cd ../warlock; pwd; $(MAKE) warlock
+
+usba.files:
+	@cd ../usba; pwd; $(MAKE) warlock

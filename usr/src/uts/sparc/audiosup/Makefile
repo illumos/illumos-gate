@@ -41,8 +41,9 @@ MODULE		= audiosup
 OBJECTS		= $(AUDIO_SUP_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AUDIO_SUP_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-WARLOCK_OBJECTS = $(AUDIO_SUP_OBJS:%.o=%.ll)
+WARLOCK_OUT = $(AUDIO_SUP_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 
 #
@@ -84,11 +85,11 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-		$(RM) $(WARLOCK_OBJECTS) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
-		$(RM) $(WARLOCK_OBJECTS) $(WARLOCK_OK)
+clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -122,12 +123,12 @@ mapfile:
 #	Warlock targets
 #
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
 warlock:	$(WARLOCK_OK)
 
-$(WARLOCK_OK):	$(WARLOCK_OBJECTS) warlock_ddi.files audiosup.wlcmd
-	$(WARLOCK) -c audiosup.wlcmd $(WARLOCK_OBJECTS) \
+$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files audiosup.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/audiosup.wlcmd $(WARLOCK_OUT) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $(WARLOCK_OK)
 

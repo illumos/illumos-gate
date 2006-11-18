@@ -18,15 +18,10 @@
 #
 # CDDL HEADER END
 #
-
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-
-#	This makefile drives the production of the fas driver kernel module.
 #
 #	sparc architecture dependent
 #
@@ -71,75 +66,78 @@ warlock.ok: ddi_dki_impl.ll scsi.ll
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
 warlock.usb:
-	@cd ../usba; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../ohci; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../uhci; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../ehci; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../hid; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../scsa2usb; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usb_ac; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usb_as; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usb_ah; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../ugen; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usb_mid; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usbprn; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usbser; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/usbser_edge; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usbsksp; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usbsprl; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usbskel; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd ../usba; make clean; $(MAKE) warlock
+	@cd ../ohci; make clean; $(MAKE) warlock
+	@cd ../uhci; make clean; $(MAKE) warlock
+	@cd ../ehci; make clean; $(MAKE) warlock
+	@cd ../hid; make clean; $(MAKE) warlock
+	@cd ../scsa2usb; make clean; $(MAKE) warlock
+	@cd ../usb_ac; make clean; $(MAKE) warlock
+	@cd ../usb_as; make clean; $(MAKE) warlock
+	@cd ../usb_ah; make clean; $(MAKE) warlock
+	@cd ../ugen; make clean; $(MAKE) warlock
+	@cd ../usb_mid; make clean; $(MAKE) warlock
+	@cd ../usbprn; make clean; $(MAKE) warlock
+	@cd ../usbser; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/usbser_edge; make clean; $(MAKE) warlock
+	@cd ../usbsksp; make clean; $(MAKE) warlock
+	@cd ../usbsprl; make clean; $(MAKE) warlock
+	@cd ../usbskel; make clean; $(MAKE) warlock
 
 warlock.scsi:
-	@cd $(CLOSED)/uts/sparc/dad; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../dada; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../esp; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../fas; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/glm; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/ifp; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/isp; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../sd; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../ses; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../st; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../ssd; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/uata; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/dad; make clean; $(MAKE) warlock
+	@cd ../dada; make clean; $(MAKE) warlock
+	@cd ../esp; make clean; $(MAKE) warlock
+	@cd ../fas; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/glm; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/mpt; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/ifp; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/isp; make clean; $(MAKE) warlock
+	@cd ../sd; make clean; $(MAKE) warlock
+	@cd ../ses; make clean; $(MAKE) warlock
+	@cd ../st; make clean; $(MAKE) warlock
+	@cd ../ssd; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/uata; make clean; $(MAKE) warlock
 
 warlock.1394:
-	@cd ../s1394; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../hci1394; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../scsa1394; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd ../s1394; make clean; $(MAKE) warlock
+	@cd ../hci1394; make clean; $(MAKE) warlock
+	@cd ../scsa1394; make clean; $(MAKE) warlock
+	@cd ../av1394; make clean; $(MAKE) warlock
 
 warlock.ecpp:
-	@cd ../ecpp; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd ../ecpp; make clean; $(MAKE) warlock
 
 warlock.audio:
-	@cd ../audiosup; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../mixer; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/amsrc1; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../amsrc2; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../audio1575; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../audio810; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../audiohd; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../audioixp; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/audiovia823x; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../audiocs; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/audioens; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../audiots; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usb_ac; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usb_as; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usb_ah; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd ../audiosup; make clean; $(MAKE) warlock
+	@cd ../mixer; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/amsrc1; make clean; $(MAKE) warlock
+	@cd ../amsrc2; make clean; $(MAKE) warlock
+	@cd ../audio1575; make clean; $(MAKE) warlock
+	@cd ../audio810; make clean; $(MAKE) warlock
+	@cd ../audiohd; make clean; $(MAKE) warlock
+	@cd ../audioixp; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/audiovia823x; make clean; $(MAKE) warlock
+	@cd ../audiocs; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/audioens; make clean; $(MAKE) warlock
+	@cd ../audiots; make clean; $(MAKE) warlock
+	@cd ../usb_ac; make clean; $(MAKE) warlock
+	@cd ../usb_as; make clean; $(MAKE) warlock
+	@cd ../usb_ah; make clean; $(MAKE) warlock
 
 warlock.smartcard:
-	@cd $(CLOSED)/uts/sun4u/scmi2c; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sun4u/scmi2c; make clean; $(MAKE) warlock
 
 warlock.ib:
-	@cd ../ibmf; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/tavor; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../ib; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../ibtl; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../ibcm; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../ibd; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd ../ibmf; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/tavor; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/daplt; make clean; $(MAKE) warlock
+	@cd ../ib; make clean; $(MAKE) warlock
+	@cd ../ibtl; make clean; $(MAKE) warlock
+	@cd ../ibcm; make clean; $(MAKE) warlock
+	@cd ../ibd; make clean; $(MAKE) warlock
 
 warlock.sata:
-	@cd ../sata; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../si3124; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/marvell88sx ; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd ../sata; make clean; $(MAKE) warlock
+	@cd ../si3124; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/marvell88sx ; make clean; $(MAKE) warlock

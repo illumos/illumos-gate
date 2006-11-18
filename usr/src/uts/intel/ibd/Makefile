@@ -39,6 +39,9 @@ OBJECTS		= $(IBD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(IBD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 LDFLAGS		+= -dy -Nmisc/gld -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf
+WARLOCK_OUT	= $(IBD_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 #
 #	Include common rules.
 #
@@ -71,8 +74,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -87,3 +92,28 @@ install:	$(INSTALL_DEPS)
 #
 include $(UTSBASE)/intel/Makefile.targ
 
+#
+#       Defines for local commands.
+#
+WARLOCK         = warlock
+WLCC            = wlcc
+TOUCH           = touch
+SCCS            = sccs
+TEST            = test
+
+warlock: $(WARLOCK_OK)
+
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+
+$(WARLOCK_OK): $(WARLOCK_OUT) ibd.wlcmd warlock_ddi.files
+	$(WARLOCK) -c $(WLCMD_DIR)/ibd.wlcmd $(WARLOCK_OUT) \
+		-l ../warlock/ddi_dki_impl.ll
+	$(TOUCH) $@
+
+%.ll: $(UTSBASE)/common/io/ib/clients/ibd/%.c \
+	$(UTSBASE)/common/sys/ib/clients/ibd/ibd.h
+	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
+        
+warlock_ddi.files:
+	@cd ../warlock; pwd; $(MAKE) warlock

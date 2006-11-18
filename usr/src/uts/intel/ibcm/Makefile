@@ -28,7 +28,7 @@
 #	module. SPARC architecture dependent
 #
 
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -42,6 +42,9 @@ MODULE		= ibcm
 OBJECTS		= $(IBCM_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(IBCM_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
+WARLOCK_OUT	= $(IBCM_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -90,8 +93,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -106,3 +111,27 @@ install:	$(INSTALL_DEPS)
 #
 include $(UTSBASE)/intel/Makefile.targ
 
+#
+#       Defines for local commands.
+#
+WARLOCK         = warlock
+WLCC            = wlcc
+TOUCH           = touch
+SCCS            = sccs
+TEST            = test
+
+warlock: $(WARLOCK_OK)
+
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+
+$(WARLOCK_OK): $(WARLOCK_OUT) ibcm.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/ibcm.wlcmd $(WARLOCK_OUT)
+	$(TOUCH) $@
+
+%.ll: $(UTSBASE)/common/io/ib/mgt/ibcm/%.c \
+	$(UTSBASE)/common/sys/ib/mgt/ibcm/ibcm_impl.h
+	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
+
+warlock_ddi.files:
+	@cd ../warlock; pwd; $(MAKE) warlock

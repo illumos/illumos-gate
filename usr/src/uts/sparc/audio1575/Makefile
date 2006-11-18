@@ -42,9 +42,9 @@ OBJECTS		= $(AUDIO1575_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AUDIO1575_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun/io/audio/sada/drv/audio1575
-
-WARLOCK_OBJECTS = $(AUDIO1575_OBJS:%.o=%.ll)
+WARLOCK_OUT 	= $(AUDIO1575_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -91,11 +91,11 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS) 
 	
-clean:		$(CLEAN_DEPS); \
-		$(RM) $(WARLOCK_OBJECTS) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
-		$(RM) $(WARLOCK_OBJECTS) $(WARLOCK_OK)
+clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -131,25 +131,28 @@ mapfile:
 # NOTE: there will be warnings about q_lock which is the simulated
 # rwlock of the taskq framework
 #
+MIXER_FILES = $(MIXER_OBJS:%.o=$(UTSBASE)/sparc/mixer/%.ll)
+AUDIO_SUP_FILES = $(AUDIO_SUP_OBJS:%.o=$(UTSBASE)/sparc/audiosup/%.ll)
+AMSRC2_FILES = $(AMSRC2_OBJS:%.o=$(UTSBASE)/sparc/amsrc2/%.ll)
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
 warlock:	$(WARLOCK_OK)
 
-$(WARLOCK_OK):	$(WARLOCK_OBJECTS) warlock_ddi.files \
-	warlock_audiosup.files warlock_mixer.files warlock_amsrc2.files
-	$(WARLOCK) -c audio1575_with_sada.wlcmd $(WARLOCK_OBJECTS) \
-	../audiosup/audio_support.ll ../amsrc2/am_src2.ll \
-	../mixer/am_main.ll ../mixer/am_ad.ll ../mixer/am_ioctl.ll \
+$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files warlock_standalone \
+	warlock_audiosup.files warlock_mixer.files warlock_amsrc2.files \
+	audio1575_with_sada.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/audio1575_with_sada.wlcmd $(WARLOCK_OUT) \
+	$(MIXER_FILES) $(AUDIO_SUP_FILES) $(AMSRC2_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $(WARLOCK_OK)
 
 %.ll: $(UTSBASE)/sun/io/audio/sada/drv/audio1575/%.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
-warlock_standalone: $(WARLOCK_OBJECTS) warlock_ddi.files audio1575.wlcmd
-	$(WARLOCK) -c audio1575.wlcmd $(WARLOCK_OBJECTS) \
+warlock_standalone: $(WARLOCK_OUT) warlock_ddi.files audio1575.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/audio1575.wlcmd $(WARLOCK_OUT) \
 	-l ../warlock/ddi_dki_impl.ll
 
 warlock_ddi.files:

@@ -42,11 +42,11 @@ UTSBASE	= ../..
 MODULE		= ehci 
 OBJECTS		= $(EHCI_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(EHCI_OBJS:%.o=$(LINTS_DIR)/%.ln)
-WARLOCK_OUT	= $(EHCI_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/usb/hcd/ehci
-	
+WARLOCK_OUT	= $(EHCI_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -86,10 +86,10 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
@@ -117,16 +117,15 @@ TEST		= test
 #
 #	lock_lint rules
 #
-WARLOCK_OBJECTS = $(EHCI_OBJS:%.o=%.ll)
 USBA_FILES = $(USBA_OBJS:%.o= -l ../usba/%.ll)
 
-warlock: $(MODULE).ok $(WARLOCK_OBJECTS)
+warlock: $(WARLOCK_OK)
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-ehci.ok: $(WARLOCK_OBJECTS) ehci.wlcmd warlock_ddi.files usba.files
-	$(WARLOCK) -c ehci.wlcmd  $(WARLOCK_OBJECTS) \
+$(WARLOCK_OK): $(WARLOCK_OUT) ehci.wlcmd warlock_ddi.files usba.files
+	$(WARLOCK) -c $(WLCMD_DIR)/ehci.wlcmd  $(WARLOCK_OUT) \
 	$(USBA_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@

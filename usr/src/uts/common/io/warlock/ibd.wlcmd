@@ -1,0 +1,64 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+one	ibd_state_s
+
+### Async thread start up routine
+root	ibd_async_work
+
+### GLD callback routines
+root	ibd_send
+root	ibd_reset
+root	ibd_intr
+root	ibd_get_stats
+root	ibd_set_promiscuous
+root	ibd_set_multicast
+root	ibd_set_mac_addr
+root	ibd_start
+root	ibd_stop
+root	ibd_mdt_txone
+root	ibd_mdt_pre
+root	ibd_mdt_post
+
+### IBTF callback routines
+root	ibd_rcq_handler
+root	ibd_scq_handler
+root	ibd_async_handler
+root	ibd_snet_notices_handler
+
+### Streams callback funtions
+root	ibd_freemsg_cb
+
+### Hash callback functions
+root	ibd_hash_by_id
+root	ibd_hash_key_cmp
+
+add     bus_ops::bus_add_eventcall 	targets warlock_dummy
+add     bus_ops::bus_get_eventcookie 	targets warlock_dummy
+add     bus_ops::bus_post_event 	targets warlock_dummy
+add     bus_ops::bus_remove_eventcall 	targets warlock_dummy
+add     bus_ops::bus_intr_ctl 		targets warlock_dummy
+add     bus_ops::bus_config             targets warlock_dummy
+add     bus_ops::bus_unconfig           targets warlock_dummy

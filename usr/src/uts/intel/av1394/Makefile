@@ -37,6 +37,9 @@ MODULE		= av1394
 OBJECTS		= $(AV1394_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AV1394_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+WARLOCK_OUT     = $(AV1394_OBJS:%.o=%.ll)
+WARLOCK_OK      = $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -85,8 +88,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -101,3 +106,30 @@ install:	$(INSTALL_DEPS)
 #
 include $(UTSBASE)/intel/Makefile.targ
 
+#
+#	Defines for local commands.
+#
+WARLOCK		= warlock
+WLCC		= wlcc
+TOUCH		= touch
+SCCS		= sccs
+TEST		= test
+
+#
+#	Warlock targets
+#
+warlock: $(WARLOCK_OK)
+
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+
+$(WARLOCK_OK): $(WARLOCK_OUT) warlock_ddi.files av1394.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/av1394.wlcmd $(WARLOCK_OUT) \
+		-l ../warlock/ddi_dki_impl.ll
+	$(TOUCH) $@
+
+%.ll: $(UTSBASE)/common/io/1394/targets/av1394/%.c
+	$(WLCC) $(CPPFLAGS) -DNPROBE -DDEBUG -o $@ $<
+
+warlock_ddi.files:
+	@cd ../warlock; pwd; $(MAKE) warlock

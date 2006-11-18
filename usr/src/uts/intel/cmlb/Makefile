@@ -23,6 +23,8 @@ UTSBASE	= ../..
 MODULE		= cmlb
 OBJECTS		= $(CMLB_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(CMLB_OBJS:%.o=$(LINTS_DIR)/%.ln)
+WARLOCK_OUT	= $(CMLB_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
@@ -63,8 +65,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -78,3 +82,22 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+#
+#	Defines for local commands.
+#
+WLCC		= wlcc
+TOUCH		= touch
+WARLOCK		= warlock
+SCCS		= sccs
+
+#
+#	Warlock targets
+#
+warlock: $(WARLOCK_OK) 
+
+$(WARLOCK_OK):	$(WARLOCK_OUT)
+	$(TOUCH) $@
+
+%.ll: $(UTSBASE)/common/io/%.c
+	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<

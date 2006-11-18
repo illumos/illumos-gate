@@ -23354,6 +23354,7 @@ sd_dkio_get_efi(dev_t dev, caddr_t arg, int flag)
 	return (rval);
 }
 
+#if defined(_SUNOS_VTOC_8)
 /*
  *    Function: sd_build_user_vtoc
  *
@@ -23417,6 +23418,7 @@ sd_build_user_vtoc(struct sd_lun *un, struct vtoc *user_vtoc)
 
 	bcopy(un->un_asciilabel, user_vtoc->v_asciilabel, LEN_DKL_ASCII);
 }
+#endif
 
 static int
 sd_dkio_partition(dev_t dev, caddr_t arg, int flag)

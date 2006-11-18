@@ -37,6 +37,9 @@ MODULE		= av1394
 OBJECTS		= $(AV1394_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AV1394_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+WARLOCK_OUT     = $(AV1394_OBJS:%.o=%.ll)
+WARLOCK_OK      = $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -90,8 +93,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -118,15 +123,13 @@ TEST		= test
 #
 #	Warlock targets
 #
-WARLOCK_OBJECTS	= $(AV1394_OBJS:%.o=%.ll)
-
-warlock: $(MODULE).ok
+warlock: $(WARLOCK_OK)
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-$(MODULE).ok: $(WARLOCK_OBJECTS) warlock_ddi.files av1394.wlcmd
-	$(WARLOCK) -c av1394.wlcmd $(WARLOCK_OBJECTS) \
+$(WARLOCK_OK): $(WARLOCK_OUT) warlock_ddi.files av1394.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/av1394.wlcmd $(WARLOCK_OUT) \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 

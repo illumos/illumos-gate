@@ -2920,10 +2920,6 @@ st_minphys(struct buf *bp)
 {
 	struct scsi_tape *un;
 
-#if !defined(lint)
-	_NOTE(SCHEME_PROTECTS_DATA("stable data", scsi_tape::un_sd));
-#endif
-
 	un = ddi_get_soft_state(st_state, MTUNIT(bp->b_edev));
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
@@ -2961,9 +2957,6 @@ st_minphys(struct buf *bp)
 		}
 	}
 
-#if !defined(lint)
-_NOTE(DATA_READABLE_WITHOUT_LOCK(scsi_tape::un_sbufp));
-#endif /* lint */
 	/*
 	 * For regular raw I/O and Fixed Block length devices, make sure
 	 * the adjusted block count is a whole multiple of the device
@@ -12462,8 +12455,10 @@ st_get_contig_mem(struct scsi_tape *un, size_t len, int alloc_flags)
 
 	/* cannot find/alloc a usable cp, when we get here */
 
+	mutex_enter(ST_MUTEX);
 	if ((un->un_max_contig_mem_len < len) ||
 	    (alloc_flags != KM_SLEEP)) {
+		mutex_exit(ST_MUTEX);
 		return (NULL);
 	}
 
@@ -12472,7 +12467,6 @@ st_get_contig_mem(struct scsi_tape *un, size_t len, int alloc_flags)
 	 * contig mem in the system, which is currently in use,
 	 * wait for it...
 	 */
-	mutex_enter(ST_MUTEX);
 	big_enough = 1;
 	do {
 		cv_wait(&un->un_contig_mem_cv, ST_MUTEX);
@@ -12519,7 +12513,9 @@ st_bigblk_xfer_done(struct buf *bp)
 
 	/* special handling for special I/O */
 	if (cp->cm_use_sbuf) {
+#ifndef __lock_lint
 		ASSERT(un->un_sbuf_busy);
+#endif
 		un->un_sbufp = orig_bp;
 		cp->cm_use_sbuf = 0;
 	}
@@ -12577,7 +12573,9 @@ st_get_bigblk_bp(struct buf *bp)
 
 	/* make sure that we "are" using un_sbufp for special I/O */
 	if (bp == un->un_sbufp) {
+#ifndef __lock_lint
 		ASSERT(un->un_sbuf_busy);
+#endif
 		un->un_sbufp = cont_bp;
 		cp->cm_use_sbuf = 1;
 	}
@@ -12616,4 +12614,12 @@ st_get_bigblk_bp(struct buf *bp)
 
 	return (cont_bp);
 }
+#else
+#ifdef __lock_lint
+static int
+st_bigblk_xfer_done(struct buf *bp)
+{
+	return (0);
+}
+#endif
 #endif

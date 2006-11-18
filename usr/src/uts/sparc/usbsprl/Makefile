@@ -39,8 +39,10 @@ UTSBASE	= ../..
 MODULE		= usbsprl
 OBJECTS		= $(USBSPRL_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(USBSPRL_OBJS:%.o=$(LINTS_DIR)/%.ln)
-WARLOCK_OK	= $(MODULE).ok
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+WARLOCK_OUT     = $(USBSPRL_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -74,11 +76,11 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
-                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -105,39 +107,38 @@ TEST		= test
 #
 #	warlock
 #
-WARLOCK_OUT	= usbser_pl2303.ll pl2303_dsd.ll
 WARLOCK_CMD	= $(MODULE).wlcmd
-
 USBSER_FILES = $(USBSER_OBJS:%.o=../usbser/%.ll)
 USBA_FILES = $(USBA_OBJS:%.o=../usba/%.ll)
 UHCI_FILES = $(UHCI_OBJS:%.o=../uhci/%.ll)
 OHCI_FILES = $(OHCI_OBJS:%.o=../ohci/%.ll)
 EHCI_FILES = $(EHCI_OBJS:%.o=../ehci/%.ll)
 
-warlock: $(WARLOCK_OK) warlock_with_usba
+warlock: $(WARLOCK_OK)
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-$(WARLOCK_OK): warlock_with_usbser
+$(WARLOCK_OK): warlock_with_usbser warlock_with_usba
 	$(TOUCH) $@
 
 %.ll: $(UTSBASE)/common/io/usb/clients/usbser/usbsprl/%.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
-warlock_with_usbser: $(WARLOCK_OUT) usbser_files warlock_ddi.files
-	$(WARLOCK) -c $(WARLOCK_CMD) $(WARLOCK_OUT) \
+warlock_with_usbser: $(WARLOCK_OUT) usbser_files warlock_ddi.files \
+	$(WARLOCK_CMD)
+	$(WARLOCK) -c $(WLCMD_DIR)/$(WARLOCK_CMD) $(WARLOCK_OUT) \
 		$(USBSER_FILES) -l ../warlock/ddi_dki_impl.ll
 
-usbser_files:
-	@cd ../usbser; pwd; $(MAKE) usbser.ll
-
-warlock_with_usba: $(WARLOCK_CMD) $(WARLOCK_OUT) usbser_files \
+warlock_with_usba: usbsprl_with_usba.wlcmd $(WARLOCK_OUT) usbser_files \
 	usba_files ohci_files uhci_files ehci_files warlock_ddi.files
-	$(WARLOCK) -c usbsprl_with_usba.wlcmd \
+	$(WARLOCK) -c $(WLCMD_DIR)/usbsprl_with_usba.wlcmd \
 		$(USBA_FILES) $(OHCI_FILES) $(EHCI_FILES) $(UHCI_FILES) \
 		$(USBSER_FILES) \
 		$(WARLOCK_OUT) -l ../warlock/ddi_dki_impl.ll
+
+usbser_files:
+	@cd ../usbser; pwd; $(MAKE) warlock
 
 usba_files:
 	@cd ../usba;pwd; $(MAKE) warlock

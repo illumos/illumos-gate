@@ -46,6 +46,7 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun/io/scsi/targets
 WARLOCK_OUT     = $(SD_OBJS:%.o=%.ll)
 WARLOCK_OK      = $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -83,10 +84,10 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS); \
+clean:		$(CLEAN_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
@@ -120,53 +121,60 @@ TEST		= test
 # and warlock can only handle one extern function by a given name;
 # any loaded after the first are ignored.
 
-SD_FILES = $(SD_OBJS:%.o=%.ll)
 SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 
 warlock: warlock_alone warlock_with_esp warlock_with_isp warlock_with_fas \
 	warlock_with_glm warlock_with_uata warlock_with_mpt
 
-warlock_alone: $(MODULE).ok $(SD_FILES)
+warlock_alone: $(WARLOCK_OK)
 
 %.wlcmd:
-	$(TEST) -f $@  || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-warlock_with_esp: sd_with_esp.wlcmd $(SD_FILES) scsi_files esp_files \
+$(WARLOCK_OK): sd.wlcmd $(WARLOCK_OUT) scsi_files warlock_ddi.files
+	$(WARLOCK) -c $(WLCMD_DIR)/sd.wlcmd $(WARLOCK_OUT) $(SCSI_FILES) \
+		-l ../warlock/ddi_dki_impl.ll
+	$(TOUCH) $@
+
+%.ll: $(UTSBASE)/common/io/scsi/targets/%.c
+	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
+
+warlock_with_esp: sd_with_esp.wlcmd $(WARLOCK_OUT) scsi_files esp_files \
 	warlock_ddi.files
-	$(WARLOCK) -c ./sd_with_esp.wlcmd \
-		$(SD_FILES) ../esp/esp $(SCSI_FILES) \
+	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_esp.wlcmd \
+		$(WARLOCK_OUT) ../esp/esp $(SCSI_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
-warlock_with_fas: sd_with_fas.wlcmd $(SD_FILES) scsi_files fas_files \
+warlock_with_fas: sd_with_fas.wlcmd $(WARLOCK_OUT) scsi_files fas_files \
 	warlock_ddi.files
-	$(WARLOCK) -c ./sd_with_fas.wlcmd \
-		$(SD_FILES) ../fas/fas \
+	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_fas.wlcmd \
+		$(WARLOCK_OUT) ../fas/fas \
 		../fas/fas_callbacks \
 		$(SCSI_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
-warlock_with_isp: sd_with_isp.wlcmd $(SD_FILES) scsi_files isp_files \
+warlock_with_isp: sd_with_isp.wlcmd $(WARLOCK_OUT) scsi_files isp_files \
 	warlock_ddi.files
-	$(WARLOCK) -c ./sd_with_isp.wlcmd \
-		$(SD_FILES) $(CLOSED)/uts/sparc/isp/isp $(SCSI_FILES) \
+	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_isp.wlcmd \
+		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/isp/isp $(SCSI_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
-warlock_with_glm: sd_with_glm.wlcmd $(SD_FILES) scsi_files glm_files \
+warlock_with_glm: sd_with_glm.wlcmd $(WARLOCK_OUT) scsi_files glm_files \
 	warlock_ddi.files
-	$(WARLOCK) -c ./sd_with_glm.wlcmd \
-		$(SD_FILES) $(CLOSED)/uts/sparc/glm/glm $(SCSI_FILES)  \
+	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_glm.wlcmd \
+		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/glm/glm $(SCSI_FILES)  \
 		-l ../warlock/ddi_dki_impl.ll
 
-warlock_with_uata: sd_with_uata.wlcmd $(SD_FILES) scsi_files uata_files \
+warlock_with_uata: sd_with_uata.wlcmd $(WARLOCK_OUT) scsi_files uata_files \
 	warlock_ddi.files
-	$(WARLOCK) -c ./sd_with_uata.wlcmd \
-		$(SD_FILES) $(CLOSED)/uts/sparc/uata/*.ll $(SCSI_FILES) \
+	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_uata.wlcmd \
+		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/uata/*.ll $(SCSI_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
-warlock_with_mpt: sd_with_mpt.wlcmd $(SD_FILES) scsi_files mpt_files \
+warlock_with_mpt: sd_with_mpt.wlcmd $(WARLOCK_OUT) scsi_files mpt_files \
 	warlock_ddi.files
-	$(WARLOCK) -c ./sd_with_mpt.wlcmd \
-		$(SD_FILES) $(CLOSED)/uts/sparc/mpt/*.ll $(SCSI_FILES)  \
+	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_mpt.wlcmd \
+		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/mpt/*.ll $(SCSI_FILES)  \
 		-l ../warlock/ddi_dki_impl.ll
 
 scsi_files:
@@ -192,11 +200,3 @@ mpt_files:
 
 warlock_ddi.files:
 	@cd ../warlock; pwd; $(MAKE) warlock
-
-sd.ok: sd.wlcmd $(SD_FILES) scsi_files
-	$(WARLOCK) -c ./sd.wlcmd $(SD_FILES) $(SCSI_FILES) \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/scsi/targets/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<

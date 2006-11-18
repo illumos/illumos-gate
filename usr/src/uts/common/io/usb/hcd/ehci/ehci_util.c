@@ -1420,8 +1420,9 @@ ehci_take_control(ehci_state_t *ehcip)
 	for (retry = 0; retry < EHCI_TAKEOVER_WAIT_COUNT; retry++) {
 
 		/* wait a special interval */
+#ifndef __lock_lint
 		delay(drv_usectohz(EHCI_TAKEOVER_DELAY));
-
+#endif
 		/* Check to see if the BIOS has released the ownership */
 		extended_cap = pci_config_get32(
 		    ehcip->ehci_config_handle, extended_cap_offset);

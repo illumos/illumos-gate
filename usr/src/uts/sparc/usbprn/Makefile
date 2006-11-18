@@ -40,9 +40,10 @@ UTSBASE	= ../..
 MODULE		= usbprn
 OBJECTS		= $(USBPRN_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(USBPRN_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 WARLOCK_OUT	= $(USBPRN_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -79,10 +80,10 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
@@ -110,19 +111,18 @@ TEST		= test
 #
 #	lock_lint rules
 #
-USBPRN_FILES	= $(MODULE).ll
 USBA_FILES = $(USBA_OBJS:%.o=../usba/%.ll)
 UHCI_FILES = $(UHCI_OBJS:%.o=../uhci/%.ll)
 OHCI_FILES = $(OHCI_OBJS:%.o=../ohci/%.ll)
 EHCI_FILES = $(EHCI_OBJS:%.o=../ehci/%.ll)
 
-warlock: $(MODULE).ok warlock_with_usba
+warlock: $(WARLOCK_OK) warlock_with_usba
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-usbprn.ok: usbprn.ll usbprn.wlcmd warlock_ddi.files
-	$(WARLOCK) -c usbprn.wlcmd $(USBPRN_FILES)  \
+$(WARLOCK_OK): $(WARLOCK_OUT)  usbprn.wlcmd warlock_ddi.files
+	$(WARLOCK) -c $(WLCMD_DIR)/usbprn.wlcmd $(WARLOCK_OUT)  \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 
@@ -130,11 +130,11 @@ usbprn.ok: usbprn.ll usbprn.wlcmd warlock_ddi.files
 		$(UTSBASE)/common/sys/usb/clients/printer/usbprn.h
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
-warlock_with_usba: usbprn.wlcmd  $(USBPRN_FILES) usba_files \
+warlock_with_usba: usbprn_with_usba.wlcmd  $(WARLOCK_OUT) usba_files \
 	ohci_files ehci_files uhci_files warlock_ddi.files
-	$(WARLOCK) -c ./usbprn_with_usba.wlcmd \
+	$(WARLOCK) -c $(WLCMD_DIR)/usbprn_with_usba.wlcmd \
 		$(USBA_FILES) $(OHCI_FILES) $(EHCI_FILES) $(UHCI_FILES) \
-		$(USBPRN_FILES) \
+		$(WARLOCK_OUT) \
 	-l ../warlock/ddi_dki_impl.ll
 
 usba_files:

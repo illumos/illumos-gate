@@ -91,12 +91,9 @@ WARLOCK		= warlock
 #
 #	Warlock targets
 #
+warlock: $(WARLOCK_OK)
 
-CMLB_FILES = $(CMLB_OBJS:%.o=%.ll)
-
-warlock: $(MODULE).ok 
-
-%.ok:	$(CMLB_FILES)
+$(WARLOCK_OK):	$(WARLOCK_OUT)
 	$(TOUCH) $@
 
 %.ll: $(UTSBASE)/common/io/%.c

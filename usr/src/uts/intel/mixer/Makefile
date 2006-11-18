@@ -41,6 +41,9 @@ MODULE		= mixer
 OBJECTS		= $(MIXER_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(MIXER_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
+WARLOCK_OUT	= $(MIXER_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -79,8 +82,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -100,3 +105,52 @@ include $(UTSBASE)/intel/Makefile.targ
 #
 SCCS		= sccs
 TEST		= test
+WLCC		= wlcc
+TOUCH		= touch
+WARLOCK 	= warlock
+
+#
+#	Warlock targets
+#
+AUDIO_SUP_FILES = $(AUDIO_SUP_OBJS:%.o=$(UTSBASE)/intel/audiosup/%.ll)
+AMSRC1_FILES = $(AMSRC1_OBJS:%.o=$(CLOSED)/uts/intel/amsrc1/%.ll)
+AMSRC2_FILES = $(AMSRC2_OBJS:%.o=$(UTSBASE)/intel/amsrc2/%.ll)
+
+
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+
+warlock:	$(WARLOCK_OK)
+
+$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files \
+	warlock_audiosup.files warlock_amsrc1.files \
+	warlock_amsrc2.files \
+	mixer_with_audiosup.wlcmd \
+	warlock_standalone mixer_with_audiosup.wlcmd 
+	$(WARLOCK) -c $(WLCMD_DIR)/mixer_with_audiosup.wlcmd $(WARLOCK_OUT) \
+	$(AUDIO_SUP_FILES) $(AMSRC1_FILES) \
+	-l ../warlock/ddi_dki_impl.ll
+	$(WARLOCK) -c $(WLCMD_DIR)/mixer_with_audiosup.wlcmd $(WARLOCK_OUT) \
+	$(AUDIO_SUP_FILES) $(AMSRC2_FILES) \
+	-l ../warlock/ddi_dki_impl.ll
+	$(TOUCH) $(WARLOCK_OK)
+
+%.ll: $(UTSBASE)/common/io/audio/sada/mixer/%.c
+	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
+
+warlock_standalone:  $(WARLOCK_OUT) warlock_ddi.files \
+	mixer.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/mixer.wlcmd $(WARLOCK_OUT) \
+	-l ../warlock/ddi_dki_impl.ll
+
+warlock_ddi.files:
+	@cd ../warlock; pwd; $(MAKE) warlock
+
+warlock_audiosup.files:
+	@cd ../audiosup; pwd; $(MAKE) warlock
+
+warlock_amsrc1.files:
+	@cd $(CLOSED)/uts/intel/amsrc1; pwd; $(MAKE) warlock
+
+warlock_amsrc2.files:
+	@cd ../amsrc2; pwd; $(MAKE) warlock

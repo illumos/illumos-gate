@@ -43,6 +43,7 @@ LINTS		= $(USBSER_OBJS:%.o=$(LINTS_DIR)/%.ln)
 WARLOCK_OUT	= $(USBSER_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -80,10 +81,10 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
@@ -103,22 +104,28 @@ include $(UTSBASE)/sparc/Makefile.targ
 #	Defines for local commands.
 #
 WLCC		= wlcc
+SCCS		= sccs
 TOUCH		= touch
 WARLOCK		= warlock
+TEST		= test
 
 #
 #	Warlock
 #
-
-USBSER_FILES	= $(USBSER_OBJS:%.o=%.ll)
 WARLOCK_CMD	= $(MODULE).wlcmd
 
-warlock: $(MODULE).ok 
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-%.ok:	$(USBSER_FILES)
-	$(WARLOCK) -c $(WARLOCK_CMD) $(USBSER_FILES) \
+warlock: $(WARLOCK_OK)
+
+$(WARLOCK_OK):	$(WARLOCK_OUT) $(WARLOCK_CMD) warlock_ddi.files
+	$(WARLOCK) -c $(WLCMD_DIR)/$(WARLOCK_CMD) $(WARLOCK_OUT) \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 
 %.ll: $(UTSBASE)/common/io/usb/clients/usbser/%.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
+
+warlock_ddi.files:
+	cd ../warlock; pwd; $(MAKE) warlock

@@ -46,6 +46,7 @@ WARLOCK_OUT	= $(OHCI_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/usb/hcd/openhci
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 	
 
 #
@@ -86,10 +87,10 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
@@ -117,16 +118,15 @@ TEST		= test
 #
 #	lock_lint rules
 #
-WARLOCK_OBJECTS = $(OHCI_OBJS:%.o=%.ll)
 USBA_FILES = $(USBA_OBJS:%.o= -l ../usba/%.ll)
 
-warlock: $(MODULE).ok $(WARLOCK_OBJECTS)
+warlock: $(WARLOCK_OK)
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-ohci.ok: $(WARLOCK_OBJECTS) ohci.wlcmd warlock_ddi.files usba.files
-	$(WARLOCK) -c ohci.wlcmd  $(WARLOCK_OBJECTS) \
+$(WARLOCK_OK): $(WARLOCK_OUT) ohci.wlcmd warlock_ddi.files usba.files
+	$(WARLOCK) -c $(WLCMD_DIR)/ohci.wlcmd  $(WARLOCK_OUT) \
 	$(USBA_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@

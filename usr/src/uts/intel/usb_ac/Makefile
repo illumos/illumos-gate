@@ -43,6 +43,9 @@ OBJECTS		= $(USB_AC_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(USB_AC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/usb/clients/audio/usb_ac
+WARLOCK_OUT	= $(USB_AC_OBJS:%.o=%.ll) usb_ac_dacf.ll
+WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -87,8 +90,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -103,3 +108,82 @@ install:	$(INSTALL_DEPS)
 #
 include $(UTSBASE)/intel/Makefile.targ
 
+#
+#	Defines for local commands.
+#
+WARLOCK		= warlock
+WLCC		= wlcc
+TOUCH		= touch
+SCCS		= sccs
+TEST		= test
+
+#
+#	lock_lint rules
+#
+USBA_FILES	= $(USBA_OBJS:%.o=../usba/%.ll)
+UHCI_FILES	= $(UHCI_OBJS:%.o=../uhci/%.ll)
+OHCI_FILES	= $(OHCI_OBJS:%.o=../ohci/%.ll)
+EHCI_FILES	= $(EHCI_OBJS:%.o=../ehci/%.ll)
+MIXER_FILES	= $(MIXER_OBJS:%.o=../mixer/%.ll)
+AUDIO_SUP_FILES	= $(AUDIO_SUP_OBJS:%.o=../audiosup/%.ll)
+AMSRC2_FILES = $(AMSRC2_OBJS:%.o=$(UTSBASE)/intel/amsrc2/%.ll)
+
+
+#
+#	Warlock targets
+#
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+
+warlock: $(WARLOCK_OK)
+
+$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files \
+	warlock_audiosup.files warlock_mixer.files \
+	warlock_standalone warlock_with_usba  warlock_with_sada
+	$(TOUCH) $(WARLOCK_OK)
+
+warlock_with_sada: usb_ac_with_sada.wlcmd \
+	$(WARLOCK_OUT) \
+	warlock_audiosup.files  warlock_mixer.files warlock_amsrc2.files 
+	$(WARLOCK) -c $(WLCMD_DIR)/usb_ac_with_sada.wlcmd $(WARLOCK_OUT) \
+	$(MIXER_FILES) $(AUDIO_SUP_FILES) $(AMSRC2_FILES) \
+	-l ../warlock/ddi_dki_impl.ll
+
+
+warlock_with_usba: usb_ac_with_usba.wlcmd  $(WARLOCK_OUT) \
+	warlock_ddi.files warlock_usba.files warlock_ohci.files \
+	warlock_ehci.files warlock_uhci.files
+	$(WARLOCK) -c $(WLCMD_DIR)/usb_ac_with_usba.wlcmd \
+	$(USBA_FILES) $(OHCI_FILES) $(EHCI_FILES) $(UHCI_FILES) \
+	$(WARLOCK_OUT)  -l ../warlock/ddi_dki_impl.ll
+
+warlock_standalone: $(WARLOCK_OUT) warlock_ddi.files usb_ac.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/usb_ac.wlcmd $(WARLOCK_OUT) \
+	-l ../warlock/ddi_dki_impl.ll
+
+%.ll: $(UTSBASE)/common/io/usb/clients/audio/usb_ac/%.c
+	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
+
+warlock_usba.files:
+	@cd ../usba;pwd; $(MAKE) warlock
+
+warlock_ohci.files:
+	@cd ../ohci;pwd; $(MAKE) warlock
+
+warlock_uhci.files:
+	@cd ../uhci;pwd; $(MAKE) warlock
+
+warlock_ehci.files:
+	@cd ../ehci;pwd; $(MAKE) warlock
+
+warlock_ddi.files:
+	@cd ../warlock; pwd; $(MAKE) warlock
+
+warlock_audiosup.files:
+	@cd ../audiosup; pwd; $(MAKE) warlock
+
+warlock_mixer.files:
+	@cd ../mixer; pwd; $(MAKE) warlock
+
+warlock_amsrc2.files:
+	@cd ../amsrc2; pwd; $(MAKE) warlock

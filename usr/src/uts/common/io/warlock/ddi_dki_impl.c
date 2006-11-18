@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,8 +42,13 @@
 #include <sys/epm.h>
 #include <sys/proc.h>
 
+int warlock_dummy(void);
+int _init(void);
+int _fini(void);
+int _info(void);
+int scsi_init(void);
 
-main() {
+int main(void) {
 
 	/*
 	 * The following call will cause warlock to know about
@@ -118,6 +122,16 @@ main() {
 
 	(*busops_p->bus_config)(0, 0, 0, 0, 0);
 	(*busops_p->bus_unconfig)(0, 0, 0, 0);
+
+#ifndef __lock_lint
+/* this causes warnings and it is unclear how to handle this */
+	(*busops_p->bus_fm_init)(0, 0, 0, 0);
+	(*busops_p->bus_fm_fini)(0, 0);
+	(*busops_p->bus_fm_access_enter)(0, 0);
+	(*busops_p->bus_fm_access_exit)(0, 0);
+	(*busops_p->bus_power)(0, 0, 0, 0, 0);
+	(*busops_p->bus_intr_op)(0, 0, 0, 0, 0);
+#endif
 
 	ndi_devi_offline(0, 0);
 	_NOTE(NO_COMPETING_THREADS_NOW)

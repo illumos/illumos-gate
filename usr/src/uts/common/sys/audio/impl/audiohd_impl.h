@@ -349,7 +349,7 @@ typedef struct {
 	size_t		ad_real_sz;	/* real size of memory */
 } audiohd_dma_t;
 
-typedef struct {
+struct audiohd_state {
 	audiohdl_t	hda_ahandle;
 	dev_info_t	*hda_dip;
 	kstat_t		*hda_ksp;
@@ -413,7 +413,9 @@ typedef struct {
 	uint_t		hda_in_ports;		/* active inputs */
 
 	audiohd_hda_codec_t	*hda_codec;
-} audiohd_state_t;
+};
+
+typedef struct audiohd_state audiohd_state_t;
 
 struct audiohd_codec_ops {
 	int (*ac_enable_play)(audiohd_state_t *);

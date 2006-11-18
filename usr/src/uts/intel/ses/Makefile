@@ -45,6 +45,9 @@ OBJECTS		= $(SES_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SES_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/intel/io/scsi/targets
+WARLOCK_OUT     = $(SES_OBJS:%.o=%.ll)
+WARLOCK_OK      = $(MODULE).ok
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -57,6 +60,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+CLEANFILES	+= $(WARLOCK_TARGETS)
 
 #
 # For now, disable these lint checks; maintainers should endeavor
@@ -76,8 +80,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -91,3 +97,58 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+
+#
+# Defines for local commands.
+#
+WARLOCK		= warlock
+WLCC		= wlcc
+TOUCH		= touch
+SCCS		= sccs
+TEST		= test
+
+#
+# Warlock targets
+#
+SCSI_FILES	= $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
+
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+
+WARLOCK_TARGETS	= $(WARLOCK_OK) warlock_with_glm
+
+warlock: $(WARLOCK_TARGETS)
+
+# XXX FIX ME: why only ses.ll?
+
+$(WARLOCK_OK): $(MODULE).wlcmd $(WARLOCK_OUT)
+	@cd ../warlock; $(MAKE) warlock
+	@cd ../scsi; $(MAKE) warlock
+	$(WARLOCK) -c $(WLCMD_DIR)/$(MODULE).wlcmd ses.ll \
+		../warlock/scsi.ll \
+	        -l ../warlock/ddi_dki_impl.ll  \
+	        $(SCSI_FILES)
+	@ $(TOUCH) $@
+
+%.ll: $(UTSBASE)/common/io/scsi/targets/%.c
+	$(WLCC) $(CPPFLAGS) -o $@ $<
+
+warlock_with_glm: ses_with_glm.wlcmd $(WARLOCK_OUT) glm_files
+	@cd ../warlock; $(MAKE) warlock
+	@cd ../scsi; $(MAKE) warlock
+	@cd $(CLOSED)/uts/intel/glm; $(MAKE) warlock;
+	$(WARLOCK) -c $(WLCMD_DIR)/ses_with_glm.wlcmd ses.ll \
+		$(CLOSED)/uts/intel/glm/*.ll \
+	        $(SCSI_FILES) \
+		../warlock/scsi.ll \
+		-l ../warlock/ddi_dki_impl.ll 
+	@ $(TOUCH) $@
+
+glm_files:
+	@cd $(CLOSED)/uts/intel/glm; pwd; $(MAKE) warlock
+
+warlock_ddi.files:
+	@cd ../warlock; pwd; $(MAKE) warlock
+
+

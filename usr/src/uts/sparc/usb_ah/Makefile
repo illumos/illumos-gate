@@ -44,6 +44,7 @@ LINTS		= $(USB_AH_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_STRMOD_DIR)/$(MODULE)
 WARLOCK_OUT	= $(USB_AH_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -82,8 +83,10 @@ all:		$(ALL_DEPS)
 def:		$(DEF_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -92,7 +95,6 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
-
 
 #
 #	Include common targets.
@@ -111,15 +113,13 @@ TEST		= test
 #
 #	lock_lint rules
 #
-USB_AH_FILES	= $(MODULE).ll
-
-warlock: $(MODULE).ok
+warlock: $(WARLOCK_OK)
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-usb_ah.ok: usb_ah.ll usb_ah.wlcmd warlock_ddi.files
-	$(WARLOCK) -c usb_ah.wlcmd $(USB_AH_FILES)  \
+$(WARLOCK_OK): $(WARLOCK_OUT) usb_ah.wlcmd warlock_ddi.files
+	$(WARLOCK) -c $(WLCMD_DIR)/usb_ah.wlcmd $(WARLOCK_OUT)  \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 

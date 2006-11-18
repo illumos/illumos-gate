@@ -41,6 +41,9 @@ MODULE		= audiosup
 OBJECTS		= $(AUDIO_SUP_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AUDIO_SUP_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
+WARLOCK_OUT	= $(AUDIO_SUP_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -72,8 +75,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -87,3 +92,37 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+#
+#	Defines for local commands.
+#
+SCCS		= sccs
+TEST		= test
+WLCC		= wlcc
+TOUCH		= touch
+WARLOCK 	= warlock
+
+#
+#	Mapfile target
+#
+mapfile:
+	$(TEST) -f $@ || $(SCCS) get $@
+
+#
+#	Warlock targets
+#
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+
+warlock:	$(WARLOCK_OK)
+
+$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files audiosup.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/audiosup.wlcmd $(WARLOCK_OUT) \
+	-l ../warlock/ddi_dki_impl.ll
+	$(TOUCH) $(WARLOCK_OK)
+
+%.ll: $(UTSBASE)/common/io/audio/sada/framework/%.c
+	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
+
+warlock_ddi.files:
+	@cd ../warlock; pwd; $(MAKE) warlock

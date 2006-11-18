@@ -44,9 +44,9 @@ OBJECTS		= $(SES_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SES_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun/io/scsi/targets
-
 WARLOCK_OUT     = $(SES_OBJS:%.o=%.ll)
 WARLOCK_OK      = $(MODULE).ok
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 # Include common rules.
@@ -80,11 +80,9 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-
-clean:		$(CLEAN_DEPS); \
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 modlintlib:	$(MODLINTLIB_DEPS) lint64
@@ -111,18 +109,24 @@ TEST		= test
 #
 # Warlock targets
 #
+# XXX FIX ME.  this can be improved quite a bit
+
 SES_FILES	= $(MODULE).ll
 SCSI_FILES	= $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 
-WARLOCK_TARGETS	= warlock.ok warlock_with_esp.ok warlock_with_fas.ok \
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+
+
+WARLOCK_TARGETS	= $(WARLOCK_OK) warlock_with_esp.ok warlock_with_fas.ok \
 		  warlock_with_isp.ok warlock_with_glm.ok
 
 warlock: $(WARLOCK_TARGETS)
 
-warlock.ok: $(MODULE).wlcmd $(SES_FILES)
+$(WARLOCK_OK): $(MODULE).wlcmd $(SES_FILES)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
-	$(WARLOCK) -c ./$(MODULE).wlcmd $(SES_FILES) ../warlock/scsi.ll \
+	$(WARLOCK) -c $(WLCMD_DIR)/$(MODULE).wlcmd $(SES_FILES) ../warlock/scsi.ll \
 	        -l ../warlock/ddi_dki_impl.ll  \
 	        $(SCSI_FILES)
 	@ $(TOUCH) $@
@@ -131,7 +135,7 @@ warlock_with_esp.ok: ses_with_esp.wlcmd $(SES_FILES)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
 	@cd ../esp; $(MAKE) warlock;
-	$(WARLOCK) -c ./ses_with_esp.wlcmd $(SES_FILES) ../esp/esp  \
+	$(WARLOCK) -c $(WLCMD_DIR)/ses_with_esp.wlcmd $(SES_FILES) ../esp/esp  \
 	        ../warlock/scsi.ll \
 	        -l ../warlock/ddi_dki_impl.ll \
 	        $(SCSI_FILES)
@@ -141,7 +145,7 @@ warlock_with_fas.ok: ses_with_fas.wlcmd $(SES_FILES)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
 	@cd ../fas; $(MAKE) warlock;
-	$(WARLOCK) -c ./ses_with_fas.wlcmd $(SES_FILES) \
+	$(WARLOCK) -c $(WLCMD_DIR)/ses_with_fas.wlcmd $(SES_FILES) \
 	        ../fas/fas ../fas/fas_callbacks \
 	        ../warlock/scsi.ll \
 	        -l ../warlock/ddi_dki_impl.ll \
@@ -152,7 +156,7 @@ warlock_with_isp.ok: ses_with_isp.wlcmd $(SES_FILES)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
 	@cd $(CLOSED)/uts/sparc/isp; $(MAKE) warlock;
-	$(WARLOCK) -c ./ses_with_isp.wlcmd $(SES_FILES) \
+	$(WARLOCK) -c $(WLCMD_DIR)/ses_with_isp.wlcmd $(SES_FILES) \
 		$(CLOSED)/uts/sparc/isp/isp \
 	        ../warlock/scsi.ll \
 	        -l ../warlock/ddi_dki_impl.ll \
@@ -163,7 +167,7 @@ warlock_with_glm.ok: ses_with_glm.wlcmd $(SES_FILES)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
 	@cd $(CLOSED)/uts/sparc/glm; $(MAKE) warlock;
-	$(WARLOCK) -c ./ses_with_glm.wlcmd $(SES_FILES) \
+	$(WARLOCK) -c $(WLCMD_DIR)/ses_with_glm.wlcmd $(SES_FILES) \
 		$(CLOSED)/uts/sparc/glm/glm \
 	        ../warlock/scsi.ll \
 	        -l ../warlock/ddi_dki_impl.ll \

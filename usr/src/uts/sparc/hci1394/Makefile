@@ -47,6 +47,7 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/1394/adapters
 LDFLAGS		+= -dy -Nmisc/s1394
 WARLOCK_OUT     = $(HCI1394_OBJS:%.o=%.ll)
 WARLOCK_OK      = $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -96,10 +97,10 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS); \
+clean:		$(CLEAN_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
@@ -127,16 +128,16 @@ TEST		= test
 #
 #	Warlock targets
 #
-WARLOCK_OBJECTS	= $(HCI1394_OBJS:%.o=%.ll)
 S1394_FILES = $(S1394_OBJS:%.o= -l ../s1394/%.ll)
 
-warlock: $(MODULE).ok
+warlock: $(WARLOCK_OK)
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-$(MODULE).ok: $(WARLOCK_OBJECTS) s1394.files warlock_ddi.files hci1394.wlcmd
-	$(WARLOCK) -c hci1394.wlcmd $(WARLOCK_OBJECTS) $(S1394_FILES) \
+$(WARLOCK_OK): $(WARLOCK_OUT) s1394.files warlock_ddi.files hci1394.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/hci1394.wlcmd \
+		$(WARLOCK_OUT) $(S1394_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 

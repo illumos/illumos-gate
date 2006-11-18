@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,10 @@
 #
 # CDDL HEADER END
 #
-#
+
 # uts/sparc/usb_mid/Makefile
 
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the usb_mid driver kernel module.
@@ -42,9 +41,10 @@ UTSBASE = ../..
 MODULE		= usb_mid
 OBJECTS		= $(USB_MID_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(USB_MID_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 WARLOCK_OUT	= $(USB_MID_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -74,10 +74,10 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
@@ -105,19 +105,18 @@ TEST		= test
 #
 #	lock_lint rules
 #
-USB_MID_FILES	= $(MODULE).ll
 USBA_FILES = $(USBA_OBJS:%.o=../usba/%.ll)
 UHCI_FILES = $(UHCI_OBJS:%.o=../uhci/%.ll)
 OHCI_FILES = $(OHCI_OBJS:%.o=../ohci/%.ll)
 EHCI_FILES = $(EHCI_OBJS:%.o=../ehci/%.ll)
 
-warlock: $(MODULE).ok warlock_with_usba
+warlock: $(WARLOCK_OK) warlock_with_usba
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-usb_mid.ok: usb_mid.ll usb_mid.wlcmd warlock_ddi.files
-	$(WARLOCK) -c usb_mid.wlcmd $(USB_MID_FILES)  \
+$(WARLOCK_OK): $(WARLOCK_OUT)  usb_mid.wlcmd warlock_ddi.files
+	$(WARLOCK) -c $(WLCMD_DIR)/usb_mid.wlcmd $(WARLOCK_OUT)  \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 
@@ -125,11 +124,11 @@ usb_mid.ok: usb_mid.ll usb_mid.wlcmd warlock_ddi.files
 		$(UTSBASE)/common/sys/usb/usb_mid/usb_midvar.h
 	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
 
-warlock_with_usba: usb_mid.wlcmd  $(USB_MID_FILES) usba_files \
+warlock_with_usba: usb_mid_with_usba.wlcmd  $(WARLOCK_OUT) usba_files \
 	ohci_files ehci_files uhci_files warlock_ddi.files
-	$(WARLOCK) -c ./usb_mid_with_usba.wlcmd \
+	$(WARLOCK) -c $(WLCMD_DIR)/usb_mid_with_usba.wlcmd \
 		$(USBA_FILES) $(OHCI_FILES) $(EHCI_FILES) $(UHCI_FILES) \
-		$(USB_MID_FILES) \
+		$(WARLOCK_OUT) \
 		-l ../warlock/ddi_dki_impl.ll
 
 usba_files:

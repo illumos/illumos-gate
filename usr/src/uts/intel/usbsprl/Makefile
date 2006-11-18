@@ -25,7 +25,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the PL2303 USB Serial
+#	This makefile drives the production of the Prolific USB Serial
 #	Adapter driver.
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -38,7 +38,10 @@ UTSBASE	= ../..
 MODULE		= usbsprl
 OBJECTS		= $(USBSPRL_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(USBSPRL_OBJS:%.o=$(LINTS_DIR)/%.ln)
+WARLOCK_OUT     = $(USBSPRL_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -68,8 +71,10 @@ all:		$(ALL_DEPS)
 def:		$(DEF_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -83,3 +88,62 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+#
+#	Defines for local commands.
+#
+WLCC		= wlcc
+TOUCH		= touch
+WARLOCK		= warlock
+SCCS		= sccs
+TEST		= test
+
+#
+#	warlock
+#
+WARLOCK_CMD	= $(MODULE).wlcmd
+USBSER_FILES = $(USBSER_OBJS:%.o=../usbser/%.ll)
+USBA_FILES = $(USBA_OBJS:%.o=../usba/%.ll)
+UHCI_FILES = $(UHCI_OBJS:%.o=../uhci/%.ll)
+OHCI_FILES = $(OHCI_OBJS:%.o=../ohci/%.ll)
+EHCI_FILES = $(EHCI_OBJS:%.o=../ehci/%.ll)
+
+warlock: $(WARLOCK_OK)
+
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+
+$(WARLOCK_OK): warlock_with_usba warlock_with_usbser
+	$(TOUCH) $@
+
+%.ll: $(UTSBASE)/common/io/usb/clients/usbser/usbsprl/%.c
+	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
+
+warlock_with_usbser: $(WARLOCK_OUT) usbser_files warlock_ddi.files $(WARLOCK_CMD)
+	$(WARLOCK) -c $(WLCMD_DIR)/$(WARLOCK_CMD) $(WARLOCK_OUT) \
+		$(USBSER_FILES) -l ../warlock/ddi_dki_impl.ll
+
+warlock_with_usba:  $(WARLOCK_OUT) usbser_files  usbsprl_with_usba.wlcmd \
+	usba_files ohci_files uhci_files ehci_files warlock_ddi.files
+	$(WARLOCK) -c $(WLCMD_DIR)/usbsprl_with_usba.wlcmd \
+		$(USBA_FILES) $(OHCI_FILES) $(EHCI_FILES) $(UHCI_FILES) \
+		$(USBSER_FILES) \
+		$(WARLOCK_OUT) -l ../warlock/ddi_dki_impl.ll
+
+usbser_files:
+	@cd ../usbser; pwd; $(MAKE) warlock
+
+usba_files:
+	@cd ../usba;pwd; $(MAKE) warlock
+
+uhci_files:
+	@cd ../uhci;pwd; $(MAKE) warlock
+
+ohci_files:
+	@cd ../ohci;pwd; $(MAKE) warlock
+
+ehci_files:
+	@cd ../ehci;pwd; $(MAKE) warlock
+
+warlock_ddi.files:
+	cd ../warlock; pwd; $(MAKE) warlock

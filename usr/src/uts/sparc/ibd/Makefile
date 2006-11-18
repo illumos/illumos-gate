@@ -41,6 +41,7 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 LDFLAGS		+= -dy -Nmisc/gld -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf
 WARLOCK_OUT     = $(IBD_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 #
 #	Include common rules.
 #
@@ -84,10 +85,10 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS);\
+clean:		$(CLEAN_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS);\
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
@@ -112,15 +113,13 @@ TOUCH           = touch
 SCCS            = sccs
 TEST            = test
 
-WARLOCK_OBJS    = $(IBD_OBJS:%.o=%.ll)
-
-warlock: $(MODULE).ok $(WARLOCK_OBJS)
+warlock: $(WARLOCK_OK) $(WARLOCK_OUT)
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-$(MODULE).ok: $(WARLOCK_OBJS) ibd.wlcmd warlock_ddi.files
-	$(WARLOCK) -c ibd.wlcmd $(WARLOCK_OBJS) \
+$(WARLOCK_OK): $(WARLOCK_OUT) ibd.wlcmd warlock_ddi.files
+	$(WARLOCK) -c $(WLCMD_DIR)/ibd.wlcmd $(WARLOCK_OUT) \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 

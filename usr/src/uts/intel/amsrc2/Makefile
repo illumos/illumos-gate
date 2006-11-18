@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,10 @@
 #
 # CDDL HEADER END
 #
-#
+
 # uts/intel/amsrc2/Makefile
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 #
@@ -43,6 +42,8 @@ MODULE		= amsrc2
 OBJECTS		= $(AMSRC2_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AMSRC2_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
+WARLOCK_OUT	= $(AMSRC2_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
 
 #
 #	Include common rules.
@@ -71,8 +72,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -86,3 +89,23 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+#
+#	Defines for local commands.
+#
+WARLOCK		= warlock
+WLCC		= wlcc
+TOUCH		= touch
+SCCS		= sccs
+TEST		= test
+
+#
+#	Warlock rules
+#
+warlock:	$(WARLOCK_OK)
+
+$(WARLOCK_OK):	$(WARLOCK_OUT)
+	$(TOUCH) $(WARLOCK_OK) 
+
+%.ll:	$(UTSBASE)/common/io/audio/sada/amsrc2/%.c
+	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<

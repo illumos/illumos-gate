@@ -45,9 +45,9 @@ OBJECTS		= $(SSD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SSD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun/io/scsi/targets
-
-WARLOCK_OUT     = $(SSD_OBJS:%.o=%.ll)
+WARLOCK_OUT     = ssd.ll 
 WARLOCK_OK      = $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -87,10 +87,10 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS); \
+clean:		$(CLEAN_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
@@ -122,21 +122,20 @@ TEST		= test
 #
 # Warlock targets
 
-SSD_FILES   = $(MODULE).ll
 SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 
 warlock: warlock_alone
 
-warlock_alone: $(MODULE).ok
+warlock_alone: $(WARLOCK_OK)
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
 scsi_files:
 	@cd ../scsi; pwd; $(MAKE) warlock
 
-ssd.ok: ssd.wlcmd $(SSD_FILES) scsi_files
-	$(WARLOCK) -c ./ssd.wlcmd $(SSD_FILES) \
+$(WARLOCK_OK): ssd.wlcmd $(WARLOCK_OUT) scsi.files
+	$(WARLOCK) -c $(WLCMD_DIR)/ssd.wlcmd $(WARLOCK_OUT) \
 	$(SCSI_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@

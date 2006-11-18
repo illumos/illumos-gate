@@ -41,6 +41,9 @@ MODULE		= usbser
 OBJECTS		= $(USBSER_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(USBSER_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
+WARLOCK_OUT	= $(USBSER_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -74,8 +77,10 @@ all:		$(ALL_DEPS)
 def:		$(DEF_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -89,3 +94,33 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+#
+#	Defines for local commands.
+#
+WLCC		= wlcc
+TOUCH		= touch
+WARLOCK		= warlock
+SCCS		= sccs
+TEST		= test
+
+#
+#	Warlock
+#
+WARLOCK_CMD	= $(MODULE).wlcmd
+
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+
+warlock: $(WARLOCK_OK)
+
+$(WARLOCK_OK):	$(WARLOCK_OUT) $(WARLOCK_CMD) warlock_ddi.files
+	$(WARLOCK) -c $(WLCMD_DIR)/$(WARLOCK_CMD) $(WARLOCK_OUT) \
+		-l ../warlock/ddi_dki_impl.ll
+	$(TOUCH) $@
+
+%.ll: $(UTSBASE)/common/io/usb/clients/usbser/%.c
+	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
+
+warlock_ddi.files:
+	cd ../warlock; pwd; $(MAKE) warlock

@@ -42,7 +42,7 @@ MODULE		= ibdm
 OBJECTS		= $(IBDM_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(IBDM_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-WARLOCK_OBJS	= $(IBDM_OBJS:%.o=%.ll)
+WARLOCK_OUT	= $(IBDM_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
 
 #
@@ -89,11 +89,11 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-		$(RM) $(WARLOCK_OBJS) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
-		$(RM) $(WARLOCK_OBJS) $(WARLOCK_OK)
+clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -117,10 +117,10 @@ TOUCH		= touch
 SCCS		= sccs
 TEST		= test
 
-warlock: $(MODULE).ok
+warlock: $(WARLOCK_OK)
 
 
-ibdm.ok: $(WARLOCK_OBJS) 
+$(WARLOCK_OK): $(WARLOCK_OUT) 
 	$(TOUCH) $@
 
 %.ll: $(UTSBASE)/common/io/ib/mgt/ibdm/%.c \

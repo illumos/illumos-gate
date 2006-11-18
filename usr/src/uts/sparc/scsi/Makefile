@@ -43,6 +43,8 @@ MODULE		= scsi
 OBJECTS		= $(SCSI_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SCSI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
+WARLOCK_OUT     = $(SCSI_OBJS:%.o=%.ll)
+WARLOCK_OK      = $(MODULE).ok
 
 #
 #	Include common rules.
@@ -80,8 +82,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -105,11 +109,9 @@ TOUCH		= touch
 #
 #	Warlock targets
 #
-WARLOCK_OBJECTS	= $(SCSI_OBJS:%.o=%.ll)
+warlock: $(WARLOCK_OK)
 
-warlock: $(MODULE).ok $(WARLOCK_OBJECTS)
-
-%.ok: $(WARLOCK_OBJECTS)
+$(WARLOCK_OK): $(WARLOCK_OUT)
 	$(TOUCH) $@
 
 %.ll: $(UTSBASE)/common/io/scsi/impl/%.c

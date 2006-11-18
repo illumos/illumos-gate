@@ -612,6 +612,7 @@ struct contig_mem {
 	struct buf *cm_bp;
 	int cm_use_sbuf;
 };
+
 #endif
 
 #endif /* _KERNEL */
@@ -749,7 +750,10 @@ struct scsi_tape {
 	size_t un_max_contig_mem_len;
 	kcondvar_t un_contig_mem_cv;
 #endif
+
 };
+
+
 /*
  * device error kstats
  */
@@ -842,6 +846,7 @@ _NOTE(MUTEX_PROTECTS_DATA(scsi_device::sd_mutex, scsi_tape))
 _NOTE(SCHEME_PROTECTS_DATA("stable data", scsi_tape::un_dp))
 _NOTE(SCHEME_PROTECTS_DATA("stable data", scsi_tape::un_sd))
 _NOTE(SCHEME_PROTECTS_DATA("not shared", scsi_tape::un_rqs))
+_NOTE(SCHEME_PROTECTS_DATA("protected by cv", scsi_tape::un_sbufp))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(scsi_tape::un_bsize))
 _NOTE(SCHEME_PROTECTS_DATA("not shared", scsi_arq_status))
 _NOTE(SCHEME_PROTECTS_DATA("save sharing",
@@ -849,6 +854,10 @@ _NOTE(SCHEME_PROTECTS_DATA("save sharing",
 	scsi_tape::un_maxbsize
 	scsi_tape::un_maxdma
 ))
+#if defined(__i386) || defined(__amd64)
+_NOTE(DATA_READABLE_WITHOUT_LOCK(scsi_tape::un_contig_mem_hdl))
+_NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
+#endif
 #endif
 
 

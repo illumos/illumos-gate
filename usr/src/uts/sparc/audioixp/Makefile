@@ -38,8 +38,9 @@ UTSBASE = ../..
 #	Define the module and object file sets.
 #
 MODULE		= audioixp 
-WARLOCK_OBJECTS = $(AUDIOIXP_OBJS:%.o=%.ll)
+WARLOCK_OUT 	= $(AUDIOIXP_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -60,11 +61,11 @@ LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 def:		warlock
 
-clean:		$(CLEAN_DEPS); \
-		$(RM) $(WARLOCK_OBJECTS) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
-		$(RM) $(WARLOCK_OBJECTS) $(WARLOCK_OK)
+clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 #
 #	Include common targets.
@@ -83,28 +84,28 @@ WARLOCK 	= warlock
 #
 #	Warlock targets
 #
-# NOTE: there will be warnings about q_lock which is the simulated
-# rwlock of the taskq framework
-#
+MIXER_FILES = $(MIXER_OBJS:%.o=$(UTSBASE)/sparc/mixer/%.ll)
+AUDIO_SUP_FILES = $(AUDIO_SUP_OBJS:%.o=$(UTSBASE)/sparc/audiosup/%.ll)
+AMSRC2_FILES = $(AMSRC2_OBJS:%.o=$(UTSBASE)/sparc/amsrc2/%.ll)
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
 warlock:	$(WARLOCK_OK)
 
-$(WARLOCK_OK):	$(WARLOCK_OBJECTS) warlock_ddi.files \
-	warlock_audiosup.files warlock_mixer.files warlock_amsrc2.files
-	$(WARLOCK) -c audioixp_with_sada.wlcmd $(WARLOCK_OBJECTS) \
-	../audiosup/audio_support.ll ../amsrc2/am_src2.ll \
-	../mixer/am_main.ll ../mixer/am_ad.ll ../mixer/am_ioctl.ll \
+$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files \
+	warlock_audiosup.files warlock_mixer.files warlock_amsrc2.files \
+	audioixp_with_sada.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/audioixp_with_sada.wlcmd $(WARLOCK_OUT) \
+	$(MIXER_FILES) $(AUDIO_SUP_FILES) $(AMSRC2_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $(WARLOCK_OK)
 
 %.ll: $(UTSBASE)/common/io/audio/sada/drv/audioixp/%.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
-warlock_standalone: $(WARLOCK_OBJECTS) warlock_ddi.files audioixp.wlcmd
-	$(WARLOCK) -c audioixp.wlcmd $(WARLOCK_OBJECTS) \
+warlock_standalone: $(WARLOCK_OUT) warlock_ddi.files audioixp.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/audioixp.wlcmd $(WARLOCK_OUT) \
 	-l ../warlock/ddi_dki_impl.ll
 
 warlock_ddi.files:

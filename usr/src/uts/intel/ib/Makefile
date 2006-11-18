@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #
 #
@@ -44,6 +44,9 @@ OBJECTS		= $(IB_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(IB_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/ibnex
+WARLOCK_OUT	= $(IB_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -91,8 +94,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -106,3 +111,35 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+#
+#	Defines for local commands.
+#
+WARLOCK		= warlock
+WLCC		= wlcc
+TOUCH		= touch
+SCCS		= sccs
+TEST		= test
+
+IBDM_FILES = $(IBDM_OBJS:%.o=../ibdm/%.ll)
+
+warlock: $(WARLOCK_OK)
+
+%.wlcmd:
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+
+$(WARLOCK_OK): $(WARLOCK_OUT) ib.wlcmd ibdm_files
+	$(WARLOCK) -c $(WLCMD_DIR)/ib.wlcmd $(WARLOCK_OUT)  \
+		-l $(IBDM_FILES) -l ../warlock/ddi_dki_impl.ll
+	$(TOUCH) $@
+
+%.ll: $(UTSBASE)/common/io/ib/ibnex/%.c \
+		$(UTSBASE)/common/sys/ib/ibnex/ibnex.h \
+		$(UTSBASE)/common/sys/ib/ibnex/ibnex_devctl.h
+	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
+
+ibdm_files :
+	@cd ../ibdm; pwd; $(MAKE) warlock
+
+warlock_ddi.files:
+	@cd ../warlock; pwd; $(MAKE) warlock

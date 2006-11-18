@@ -26,7 +26,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of hight definition audio
+#	This makefile drives the production of high definition audio
 #	driver (audiohd) kernel module.
 #
 #
@@ -42,9 +42,9 @@ OBJECTS		= $(AUDIOHD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AUDIOHD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/audio/sada/drv/audiohd
-
-WARLOCK_OBJECTS = $(AUDIOHD_OBJS:%.o=%.ll)
+WARLOCK_OUT = $(AUDIOHD_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -92,11 +92,11 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-		$(RM) $(WARLOCK_OBJECTS) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
-		$(RM) $(WARLOCK_OBJECTS) $(WARLOCK_OK)
+clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -123,28 +123,29 @@ WARLOCK 	= warlock
 #
 #	Warlock targets
 #
-# NOTE: there will be warnings about q_lock which is the simulated
-# rwlock of the taskq framework
-#
+MIXER_FILES = $(MIXER_OBJS:%.o=$(UTSBASE)/sparc/mixer/%.ll)
+AUDIO_SUP_FILES = $(AUDIO_SUP_OBJS:%.o=$(UTSBASE)/sparc/audiosup/%.ll)
+AMSRC2_FILES = $(AMSRC2_OBJS:%.o=$(UTSBASE)/sparc/amsrc2/%.ll)
+
 
 %.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
+	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
 warlock:	$(WARLOCK_OK)
 
-$(WARLOCK_OK):	$(WARLOCK_OBJECTS) warlock_ddi.files \
-	warlock_audiosup.files warlock_mixer.files warlock_amsrc2.files
-	$(WARLOCK) -c audiohd_with_sada.wlcmd $(WARLOCK_OBJECTS) \
-	../audiosup/audio_support.ll ../amsrc2/am_src2.ll \
-	../mixer/am_main.ll ../mixer/am_ad.ll ../mixer/am_ioctl.ll \
+$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files  \
+	warlock_audiosup.files warlock_mixer.files warlock_amsrc2.files \
+	audiohd_with_sada.wlcmd warlock_standalone
+	$(WARLOCK) -c $(WLCMD_DIR)/audiohd_with_sada.wlcmd $(WARLOCK_OUT) \
+	$(MIXER_FILES) $(AUDIO_SUP_FILES) $(AMSRC2_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $(WARLOCK_OK)
 
 %.ll: $(UTSBASE)/common/io/audio/sada/drv/audiohd/%.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
-warlock_standalone: $(WARLOCK_OBJECTS) warlock_ddi.files audiohd.wlcmd
-	$(WARLOCK) -c audiohd.wlcmd $(WARLOCK_OBJECTS) \
+warlock_standalone: $(WARLOCK_OUT) warlock_ddi.files audiohd.wlcmd
+	$(WARLOCK) -c $(WLCMD_DIR)/audiohd.wlcmd $(WARLOCK_OUT) \
 	-l ../warlock/ddi_dki_impl.ll
 
 warlock_ddi.files:

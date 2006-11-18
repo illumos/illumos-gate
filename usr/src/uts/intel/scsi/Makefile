@@ -26,8 +26,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the scsi "misc"
-#	kernel module.
+#	This makefile drives the production of the scsi kernel module.
 #
 #	intel architecture dependent
 #
@@ -44,6 +43,9 @@ MODULE		= scsi
 OBJECTS		= $(SCSI_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SCSI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
+WARLOCK_OUT     = $(SCSI_OBJS:%.o=%.ll)
+WARLOCK_OK      = $(MODULE).ok
+WLCMD_DIR       = $(UTSBASE)/sparc/$(MODULE)
 
 #
 #	Include common rules.
@@ -82,8 +84,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -97,3 +101,23 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+#
+#	Defines for local commands.
+#
+WLCC		= wlcc
+TOUCH		= touch
+
+#
+#	Warlock targets
+#
+warlock: $(MODULE).ok
+
+%.ok: $(WARLOCK_OUT)
+	$(TOUCH) $@
+
+%.ll: $(UTSBASE)/common/io/scsi/impl/%.c
+	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
+
+%.ll: $(UTSBASE)/common/io/scsi/conf/%.c
+	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<

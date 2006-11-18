@@ -94,10 +94,10 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS); \
+clean:		$(CLEAN_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS); \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
@@ -122,11 +122,9 @@ TOUCH		= touch
 #
 #	Warlock targets
 #
-WARLOCK_OBJECTS	= $(S1394_OBJS:%.o=%.ll)
-
 warlock: $(MODULE).ok
 
-$(MODULE).ok: $(WARLOCK_OBJECTS) warlock_ddi.files
+$(MODULE).ok: $(WARLOCK_OUT) warlock_ddi.files
 	$(TOUCH) $@
 
 %.ll: $(UTSBASE)/common/io/1394/%.c
