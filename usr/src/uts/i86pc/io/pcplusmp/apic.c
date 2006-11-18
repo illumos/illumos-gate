@@ -62,6 +62,9 @@
 #include <sys/cyclic.h>
 #include <sys/note.h>
 #include <sys/pci_intr_lib.h>
+#include <sys/sunndi.h>
+
+struct ioapic_reprogram_data;
 
 /*
  *	Local Function Prototypes
@@ -89,9 +92,8 @@ static void apic_free_vector(uchar_t vector);
 static void apic_reprogram_timeout_handler(void *arg);
 static int apic_check_stuck_interrupt(apic_irq_t *irq_ptr, int old_bind_cpu,
     int new_bind_cpu, volatile int32_t *ioapic, int intin_no, int which_irq,
-    int iflag, boolean_t *restore_intrp);
-static int apic_setup_io_intr(apic_irq_t *irqptr, int irq);
-static int apic_setup_io_intr_deferred(apic_irq_t *irqptr, int irq);
+    struct ioapic_reprogram_data *drep);
+static int apic_setup_io_intr(void *p, int irq, boolean_t deferred);
 static void apic_record_rdt_entry(apic_irq_t *irqptr, int irq);
 static struct apic_io_intr *apic_find_io_intr_w_busid(int irqno, int busid);
 static int apic_find_intin(uchar_t ioapic, uchar_t intin);
@@ -105,13 +107,17 @@ static int apic_setup_sci_irq_table(int irqno, uchar_t ipl,
 static void apic_nmi_intr(caddr_t arg);
 uchar_t apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid,
     uchar_t intin);
-static int apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock,
-    int when);
-int apic_rebind_all(apic_irq_t *irq_ptr, int bind_cpu, int safe);
+static int apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
+    struct ioapic_reprogram_data *drep);
+int apic_rebind_all(apic_irq_t *irq_ptr, int bind_cpu);
 static void apic_intr_redistribute();
 static void apic_cleanup_busy();
 static void apic_set_pwroff_method_from_mpcnfhdr(struct apic_mp_cnf_hdr *hdrp);
 int apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type);
+static void apic_try_deferred_reprogram(int ipl, int vect);
+static void delete_defer_repro_ent(int which_irq);
+static void apic_ioapic_wait_pending_clear(volatile int32_t *ioapic,
+    int intin_no);
 
 /* ACPI support routines */
 static int acpi_probe(void);
@@ -184,21 +190,11 @@ int apic_error_display_delay = 100;
 int apic_cpcovf_vect;
 int apic_enable_cpcovf_intr = 1;
 
-/* Max wait time (in microsecs) for flags to clear in an RDT entry. */
-static int apic_max_usecs_clear_pending = 1000;
+/* Max wait time (in repetitions) for flags to clear in an RDT entry. */
+static int apic_max_reps_clear_pending = 1000;
 
-/* Amt of usecs to wait before checking if RDT flags have reset. */
-#define	APIC_USECS_PER_WAIT_INTERVAL 100
-
-/* Maximum number of times to retry reprogramming via the timeout */
-#define	APIC_REPROGRAM_MAX_TIMEOUTS 10
-
-/* timeout delay for IOAPIC delayed reprogramming */
-#define	APIC_REPROGRAM_TIMEOUT_DELAY 5 /* microseconds */
-
-/* Parameter to apic_rebind(): Should reprogramming be done now or later? */
-#define	DEFERRED 1
-#define	IMMEDIATE 0
+/* Maximum number of times to retry reprogramming at apic_intr_exit time */
+#define	APIC_REPROGRAM_MAX_TRIES 10000
 
 /*
  * number of bits per byte, from <sys/param.h>
@@ -505,11 +501,29 @@ int apic_first_avail_irq  = APIC_FIRST_FREE_IRQ;
 lock_t	apic_ioapic_lock;
 
 /*
- * apic_ioapic_reprogram_lock prevents a CPU from exiting
- * apic_intr_exit before IOAPIC reprogramming information
- * is collected.
+ * apic_defer_reprogram_lock ensures that only one processor is handling
+ * deferred interrupt programming at apic_intr_exit time.
  */
-static	lock_t	apic_ioapic_reprogram_lock;
+static	lock_t	apic_defer_reprogram_lock;
+
+/*
+ * The current number of deferred reprogrammings outstanding
+ */
+uint_t	apic_reprogram_outstanding = 0;
+
+#ifdef DEBUG
+/*
+ * Counters that keep track of deferred reprogramming stats
+ */
+uint_t	apic_intr_deferrals = 0;
+uint_t	apic_intr_deliver_timeouts = 0;
+uint_t	apic_last_ditch_reprogram_failures = 0;
+uint_t	apic_deferred_setup_failures = 0;
+uint_t	apic_defer_repro_total_retries = 0;
+uint_t	apic_defer_repro_successes = 0;
+uint_t	apic_deferred_spurious_enters = 0;
+#endif
+
 static	int	apic_io_max = 0;	/* no. of i/o apics enabled */
 
 static	struct apic_io_intr *apic_io_intrp = 0;
@@ -566,19 +580,29 @@ static	int	apic_revector_pending = 0;
 static	uchar_t	*apic_oldvec_to_newvec;
 static	uchar_t	*apic_newvec_to_oldvec;
 
-/* Ensures that the IOAPIC-reprogramming timeout is not reentrant */
-static	kmutex_t	apic_reprogram_timeout_mutex;
-
 static	struct	ioapic_reprogram_data {
-	int		valid;	 /* This entry is valid */
-	int		bindcpu; /* The CPU to which the int will be bound */
-	unsigned	timeouts; /* # times the reprogram timeout was called */
-} apic_reprogram_info[APIC_MAX_VECTOR+1];
+	boolean_t			done;
+	apic_irq_t			*irqp;
+	/* The CPU to which the int will be bound */
+	int				bindcpu;
+	/* # times the reprogram timeout was called */
+	unsigned			tries;
+
+/* The irq # is implicit in the array index: */
+} apic_reprogram_info[APIC_MAX_VECTOR + 1];
+
 /*
  * APIC_MAX_VECTOR + 1 is the maximum # of IRQs as well. apic_reprogram_info
  * is indexed by IRQ number, NOT by vector number.
  */
 
+typedef struct prs_irq_list_ent {
+	int			list_prio;
+	int32_t			irq;
+	iflag_t			intrflags;
+	acpi_prs_private_t	prsprv;
+	struct prs_irq_list_ent	*next;
+} prs_irq_list_t;
 
 /*
  * The following added to identify a software poweroff method if available.
@@ -1520,9 +1544,12 @@ apic_init()
 		apic_level_intr[i] = 0;
 		*iptr++ = NULL;
 		apic_vector_to_irq[i] = APIC_RESV_IRQ;
-		apic_reprogram_info[i].valid = 0;
+
+		/* These *must* be initted to B_TRUE! */
+		apic_reprogram_info[i].done = B_TRUE;
+		apic_reprogram_info[i].irqp = NULL;
+		apic_reprogram_info[i].tries = 0;
 		apic_reprogram_info[i].bindcpu = 0;
-		apic_reprogram_info[i].timeouts = 0;
 	}
 
 	/*
@@ -1535,7 +1562,6 @@ apic_init()
 	    kmem_zalloc(sizeof (apic_irq_t), KM_NOSLEEP);
 
 	mutex_init(&airq_mutex, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&apic_reprogram_timeout_mutex, NULL, MUTEX_DEFAULT, NULL);
 #if defined(__amd64)
 	/*
 	 * Make cpu-specific interrupt info point to cr8pri vector
@@ -1724,7 +1750,7 @@ apic_disable_local_apic()
 static void
 apic_picinit(void)
 {
-	int i, j;
+	int i, j, iflag;
 	uint_t isr;
 	volatile int32_t *ioapic;
 	apic_irq_t	*irqptr;
@@ -1753,7 +1779,7 @@ apic_picinit(void)
 	LOCK_INIT_CLEAR(&apic_gethrtime_lock);
 	LOCK_INIT_CLEAR(&apic_ioapic_lock);
 	LOCK_INIT_CLEAR(&apic_revector_lock);
-	LOCK_INIT_CLEAR(&apic_ioapic_reprogram_lock);
+	LOCK_INIT_CLEAR(&apic_defer_reprogram_lock);
 	LOCK_INIT_CLEAR(&apic_error_lock);
 
 	picsetup();	 /* initialise the 8259 */
@@ -1806,8 +1832,14 @@ apic_picinit(void)
 		}
 		irqptr = apic_irq_table[apic_sci_vect];
 
+		iflag = intr_clear();
+		lock_set(&apic_ioapic_lock);
+
 		/* Program I/O APIC */
-		(void) apic_setup_io_intr(irqptr, apic_sci_vect);
+		(void) apic_setup_io_intr(irqptr, apic_sci_vect, B_FALSE);
+
+		lock_clear(&apic_ioapic_lock);
+		intr_restore(iflag);
 
 		irqptr->airq_share++;
 	}
@@ -2325,6 +2357,7 @@ apic_addspl(int irqno, int ipl, int min_ipl, int max_ipl)
 	if ((irqindex == -1) || (!apic_irq_table[irqindex]))
 		return (PSM_FAILURE);
 
+	mutex_enter(&airq_mutex);
 	irqptr = irqheadptr = apic_irq_table[irqindex];
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_addspl: dip=0x%p type=%d irqno=0x%x "
@@ -2337,6 +2370,8 @@ apic_addspl(int irqno, int ipl, int min_ipl, int max_ipl)
 		irqptr = irqptr->airq_next;
 	}
 	irqptr->airq_share++;
+
+	mutex_exit(&airq_mutex);
 
 	/* return if it is not hardware interrupt */
 	if (irqptr->airq_mps_intr_index == RESERVE_INDEX)
@@ -2354,8 +2389,6 @@ apic_addspl(int irqno, int ipl, int min_ipl, int max_ipl)
 	if (!apic_flag)
 		return (PSM_SUCCESS);
 
-	iflag = intr_clear();
-
 	/*
 	 * Upgrade vector if max_ipl is not earlier ipl. If we cannot allocate,
 	 * return failure. Not very elegant, but then we hope the
@@ -2364,7 +2397,6 @@ apic_addspl(int irqno, int ipl, int min_ipl, int max_ipl)
 	if (irqptr->airq_ipl != max_ipl) {
 		vector = apic_allocate_vector(max_ipl, irqindex, 1);
 		if (vector == 0) {
-			intr_restore(iflag);
 			irqptr->airq_share--;
 			return (PSM_FAILURE);
 		}
@@ -2380,17 +2412,31 @@ apic_addspl(int irqno, int ipl, int min_ipl, int max_ipl)
 			if ((VIRTIRQ(irqindex, irqptr->airq_share_id) ==
 			    irqno) || (irqptr->airq_temp_cpu != IRQ_UNINIT)) {
 				apic_record_rdt_entry(irqptr, irqindex);
-				(void) apic_setup_io_intr(irqptr, irqindex);
+
+				iflag = intr_clear();
+				lock_set(&apic_ioapic_lock);
+
+				(void) apic_setup_io_intr(irqptr, irqindex,
+				    B_FALSE);
+
+				lock_clear(&apic_ioapic_lock);
+				intr_restore(iflag);
 			}
 			irqptr = irqptr->airq_next;
 		}
-		intr_restore(iflag);
 		return (PSM_SUCCESS);
 	}
 
 	ASSERT(irqptr);
-	(void) apic_setup_io_intr(irqptr, irqindex);
+
+	iflag = intr_clear();
+	lock_set(&apic_ioapic_lock);
+
+	(void) apic_setup_io_intr(irqptr, irqindex, B_FALSE);
+
+	lock_clear(&apic_ioapic_lock);
 	intr_restore(iflag);
+
 	return (PSM_SUCCESS);
 }
 
@@ -2412,6 +2458,7 @@ apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 	volatile int32_t *ioapic;
 	apic_irq_t	*irqptr, *irqheadptr;
 
+	mutex_enter(&airq_mutex);
 	irqindex = IRQINDEX(irqno);
 	irqptr = irqheadptr = apic_irq_table[irqindex];
 
@@ -2427,6 +2474,8 @@ apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 	ASSERT(irqptr);
 
 	irqptr->airq_share--;
+
+	mutex_exit(&airq_mutex);
 
 	if (ipl < max_ipl)
 		return (PSM_SUCCESS);
@@ -2460,8 +2509,15 @@ apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 				irqp->airq_ipl = (uchar_t)max_ipl;
 				if (irqp->airq_temp_cpu != IRQ_UNINIT) {
 					apic_record_rdt_entry(irqp, irqindex);
+
+					iflag = intr_clear();
+					lock_set(&apic_ioapic_lock);
+
 					(void) apic_setup_io_intr(irqp,
-					    irqindex);
+					    irqindex, B_FALSE);
+
+					lock_clear(&apic_ioapic_lock);
+					intr_restore(iflag);
 				}
 				irqp = irqp->airq_next;
 			}
@@ -2509,10 +2565,10 @@ apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 			} else
 				apic_cpus[bind_cpu].aci_temp_bound--;
 		}
-		lock_clear(&apic_ioapic_lock);
-		intr_restore(iflag);
 		irqptr->airq_temp_cpu = IRQ_UNINIT;
 		irqptr->airq_mps_intr_index = FREE_INDEX;
+		lock_clear(&apic_ioapic_lock);
+		intr_restore(iflag);
 		apic_free_vector(irqptr->airq_vector);
 		return (PSM_SUCCESS);
 	}
@@ -2545,6 +2601,7 @@ apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 
 	irqptr->airq_temp_cpu = IRQ_UNINIT;
 	irqptr->airq_mps_intr_index = FREE_INDEX;
+
 	return (PSM_SUCCESS);
 }
 
@@ -2570,7 +2627,7 @@ apic_softlvl_to_irq(int ipl)
 static int
 apic_post_cpu_start()
 {
-	int i, cpun;
+	int i, cpun, iflag;
 	apic_irq_t *irq_ptr;
 
 	apic_init_intr();
@@ -2585,6 +2642,7 @@ apic_post_cpu_start()
 		apic_ret();
 
 	cpun = psm_get_cpu_id();
+
 	apic_cpus[cpun].aci_status = APIC_CPU_ONLINE | APIC_CPU_INTR_ENABLE;
 
 	for (i = apic_min_device_irq; i <= apic_max_device_irq; i++) {
@@ -2594,11 +2652,19 @@ apic_post_cpu_start()
 			continue;
 
 		while (irq_ptr) {
-			if (irq_ptr->airq_temp_cpu != IRQ_UNINIT)
-				(void) apic_rebind(irq_ptr, cpun, 1, IMMEDIATE);
+			if (irq_ptr->airq_temp_cpu != IRQ_UNINIT) {
+				iflag = intr_clear();
+				lock_set(&apic_ioapic_lock);
+
+				(void) apic_rebind(irq_ptr, cpun, NULL);
+
+				lock_clear(&apic_ioapic_lock);
+				intr_restore(iflag);
+			}
 			irq_ptr = irq_ptr->airq_next;
 		}
 	}
+
 
 	apicadr[APIC_DIVIDE_REG] = apic_divide_reg_init;
 	return (PSM_SUCCESS);
@@ -3016,10 +3082,25 @@ apic_disable_intr(processorid_t cpun)
 
 	iflag = intr_clear();
 	lock_set(&apic_ioapic_lock);
+
+	for (i = 0; i <= APIC_MAX_VECTOR; i++) {
+		if (apic_reprogram_info[i].done == B_FALSE) {
+			if (apic_reprogram_info[i].bindcpu == cpun) {
+				/*
+				 * CPU is busy -- it's the target of
+				 * a pending reprogramming attempt
+				 */
+				lock_clear(&apic_ioapic_lock);
+				intr_restore(iflag);
+				return (PSM_FAILURE);
+			}
+		}
+	}
+
 	apic_cpus[cpun].aci_status &= ~APIC_CPU_INTR_ENABLE;
-	lock_clear(&apic_ioapic_lock);
-	intr_restore(iflag);
+
 	apic_cpus[cpun].aci_curipl = 0;
+
 	i = apic_min_device_irq;
 	for (; i <= apic_max_device_irq; i++) {
 		/*
@@ -3046,10 +3127,14 @@ apic_disable_intr(processorid_t cpun)
 						bind_cpu = 0;
 
 					}
-				} while (apic_rebind_all(irq_ptr, bind_cpu, 1));
+				} while (apic_rebind_all(irq_ptr, bind_cpu));
 			}
 		}
 	}
+
+	lock_clear(&apic_ioapic_lock);
+	intr_restore(iflag);
+
 	if (hardbound) {
 		cmn_err(CE_WARN, "Could not disable interrupts on %d"
 		    "due to user bound interrupts", cpun);
@@ -3067,25 +3152,27 @@ apic_enable_intr(processorid_t cpun)
 
 	iflag = intr_clear();
 	lock_set(&apic_ioapic_lock);
+
 	apic_cpus[cpun].aci_status |= APIC_CPU_INTR_ENABLE;
-	lock_clear(&apic_ioapic_lock);
-	intr_restore(iflag);
 
 	i = apic_min_device_irq;
 	for (i = apic_min_device_irq; i <= apic_max_device_irq; i++) {
 		if ((irq_ptr = apic_irq_table[i]) != NULL) {
 			if ((irq_ptr->airq_cpu & ~IRQ_USER_BOUND) == cpun) {
 				(void) apic_rebind_all(irq_ptr,
-				    irq_ptr->airq_cpu, 1);
+				    irq_ptr->airq_cpu);
 			}
 		}
 	}
+
+	lock_clear(&apic_ioapic_lock);
+	intr_restore(iflag);
 }
 
 /*
  * apic_introp_xlate() replaces apic_translate_irq() and is
  * called only from apic_intr_ops().  With the new ADII framework,
- * the priority can no longer be retrived through i_ddi_get_intrspec().
+ * the priority can no longer be retrieved through i_ddi_get_intrspec().
  * It has to be passed in from the caller.
  */
 int
@@ -4199,55 +4286,86 @@ apic_record_rdt_entry(apic_irq_t *irqptr, int irq)
 	irqptr->airq_rdt_entry = level|io_po|vector;
 }
 
+static processorid_t
+apic_find_cpu(int flag)
+{
+	processorid_t acid = 0;
+	int i;
+
+	/* Find the first CPU with the passed-in flag set */
+	for (i = 0; i < apic_nproc; i++) {
+		if (apic_cpus[i].aci_status & flag) {
+			acid = i;
+			break;
+		}
+	}
+
+	ASSERT((apic_cpus[acid].aci_status & flag) != 0);
+	return (acid);
+}
+
 /*
  * Call rebind to do the actual programming.
+ * Must be called with interrupts disabled and apic_ioapic_lock held
+ * 'p' is polymorphic -- if this function is called to process a deferred
+ * reprogramming, p is of type 'struct ioapic_reprogram_data *', from which
+ * the irq pointer is retrieved.  If not doing deferred reprogramming,
+ * p is of the type 'apic_irq_t *'.
+ *
+ * apic_ioapic_lock must be held across this call, as it protects apic_rebind
+ * and it protects apic_find_cpu() from a race in which a CPU can be taken
+ * offline after a cpu is selected, but before apic_rebind is called to
+ * bind interrupts to it.
  */
 static int
-apic_setup_io_intr(apic_irq_t *irqptr, int irq)
+apic_setup_io_intr(void *p, int irq, boolean_t deferred)
 {
+	apic_irq_t *irqptr;
+	struct ioapic_reprogram_data *drep = NULL;
 	int rv;
 
-	if (rv = apic_rebind(irqptr, apic_irq_table[irq]->airq_cpu, 1,
-	    IMMEDIATE))
-		/* CPU is not up or interrupt is disabled. Fall back to 0 */
-		rv = apic_rebind(irqptr, 0, 1, IMMEDIATE);
+	if (deferred) {
+		drep = (struct ioapic_reprogram_data *)p;
+		ASSERT(drep != NULL);
+		irqptr = drep->irqp;
+	} else
+		irqptr = (apic_irq_t *)p;
+
+	ASSERT(irqptr != NULL);
+
+	rv = apic_rebind(irqptr, apic_irq_table[irq]->airq_cpu, drep);
+	if (rv) {
+		/*
+		 * CPU is not up or interrupts are disabled. Fall back to
+		 * the first available CPU
+		 */
+		rv = apic_rebind(irqptr, apic_find_cpu(APIC_CPU_INTR_ENABLE),
+		    drep);
+	}
 
 	return (rv);
 }
 
 /*
- * Deferred reprogramming: Call apic_rebind to do the real work.
+ * Bind interrupt corresponding to irq_ptr to bind_cpu.
+ * Must be called with interrupts disabled and apic_ioapic_lock held
  */
 static int
-apic_setup_io_intr_deferred(apic_irq_t *irqptr, int irq)
+apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
+    struct ioapic_reprogram_data *drep)
 {
-	int rv;
-
-	if (rv = apic_rebind(irqptr, apic_irq_table[irq]->airq_cpu, 1,
-	    DEFERRED))
-		/* CPU is not up or interrupt is disabled. Fall back to 0 */
-		rv = apic_rebind(irqptr, 0, 1, DEFERRED);
-
-	return (rv);
-}
-
-/*
- * Bind interrupt corresponding to irq_ptr to bind_cpu. acquire_lock
- * if false (0) means lock is already held (e.g: in rebind_all).
- */
-static int
-apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
-{
-	int			intin_no;
+	int			ioapicindex, intin_no;
 	volatile int32_t	*ioapic;
 	uchar_t			airq_temp_cpu;
 	apic_cpus_info_t	*cpu_infop;
-	int			iflag;
-	int		which_irq = apic_vector_to_irq[irq_ptr->airq_vector];
-	boolean_t		restore_iflag = B_TRUE;
+	uint32_t		rdt_entry;
+	int			which_irq;
+
+	which_irq = apic_vector_to_irq[irq_ptr->airq_vector];
 
 	intin_no = irq_ptr->airq_intin_no;
-	ioapic = apicioadr[irq_ptr->airq_ioapicindex];
+	ioapicindex = irq_ptr->airq_ioapicindex;
+	ioapic = apicioadr[ioapicindex];
 	airq_temp_cpu = irq_ptr->airq_temp_cpu;
 	if (airq_temp_cpu != IRQ_UNINIT && airq_temp_cpu != IRQ_UNBOUND) {
 		if (airq_temp_cpu & IRQ_USER_BOUND)
@@ -4257,52 +4375,29 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
 		ASSERT(airq_temp_cpu < apic_nproc);
 	}
 
-	iflag = intr_clear();
-
-	if (acquire_lock)
-		lock_set(&apic_ioapic_lock);
-
 	/*
-	 * Can't bind to a CPU that's not online:
+	 * Can't bind to a CPU that's not accepting interrupts:
 	 */
 	cpu_infop = &apic_cpus[bind_cpu & ~IRQ_USER_BOUND];
-	if (!(cpu_infop->aci_status & APIC_CPU_INTR_ENABLE)) {
-
-		if (acquire_lock)
-			lock_clear(&apic_ioapic_lock);
-
-		intr_restore(iflag);
+	if (!(cpu_infop->aci_status & APIC_CPU_INTR_ENABLE))
 		return (1);
-	}
 
 	/*
-	 * If this is a deferred reprogramming attempt, ensure we have
-	 * not been passed stale data:
+	 * If we are about to change the interrupt vector for this interrupt,
+	 * and this interrupt is level-triggered, attached to an IOAPIC,
+	 * has been delivered to a CPU and that CPU has not handled it
+	 * yet, we cannot reprogram the IOAPIC now.
 	 */
-	if ((when == DEFERRED) &&
-	    (apic_reprogram_info[which_irq].valid == 0)) {
-		/* stale info, so just return */
-		if (acquire_lock)
-			lock_clear(&apic_ioapic_lock);
+	if (!APIC_IS_MSI_OR_MSIX_INDEX(irq_ptr->airq_mps_intr_index)) {
 
-		intr_restore(iflag);
-		return (0);
-	}
+		rdt_entry = READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no);
 
-	/*
-	 * If this interrupt has been delivered to a CPU and that CPU
-	 * has not handled it yet, we cannot reprogram the IOAPIC now:
-	 */
-	if (!APIC_IS_MSI_OR_MSIX_INDEX(irq_ptr->airq_mps_intr_index) &&
-	    apic_check_stuck_interrupt(irq_ptr, airq_temp_cpu, bind_cpu,
-	    ioapic, intin_no, which_irq, iflag, &restore_iflag) != 0) {
+		if ((irq_ptr->airq_vector != RDT_VECTOR(rdt_entry)) &&
+		    apic_check_stuck_interrupt(irq_ptr, airq_temp_cpu,
+		    bind_cpu, ioapic, intin_no, which_irq, drep) != 0) {
 
-		if (acquire_lock)
-			lock_clear(&apic_ioapic_lock);
-
-		if (restore_iflag)
-			intr_restore(iflag);
-		return (0);
+			return (0);
+		}
 	}
 
 	/*
@@ -4313,6 +4408,9 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
 	 */
 
 	if ((uchar_t)bind_cpu == IRQ_UNBOUND) {
+
+		rdt_entry = AV_LDEST | AV_LOPRI | irq_ptr->airq_rdt_entry;
+
 		/* Write the RDT entry -- no specific CPU binding */
 		WRITE_IOAPIC_RDT_ENTRY_HIGH_DWORD(ioapic, intin_no, AV_TOALL);
 
@@ -4320,12 +4418,9 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
 			apic_cpus[airq_temp_cpu].aci_temp_bound--;
 
 		/* Write the vector, trigger, and polarity portion of the RDT */
-		WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no,
-		    AV_LDEST | AV_LOPRI | irq_ptr->airq_rdt_entry);
-		if (acquire_lock)
-			lock_clear(&apic_ioapic_lock);
+		WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no, rdt_entry);
+
 		irq_ptr->airq_temp_cpu = IRQ_UNBOUND;
-		intr_restore(iflag);
 		return (0);
 	}
 
@@ -4344,15 +4439,18 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
 		apic_cpus[airq_temp_cpu].aci_temp_bound--;
 	}
 	if (!APIC_IS_MSI_OR_MSIX_INDEX(irq_ptr->airq_mps_intr_index)) {
+
+		rdt_entry = AV_PDEST | AV_FIXED | irq_ptr->airq_rdt_entry;
+
 		/* Write the vector, trigger, and polarity portion of the RDT */
-		WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no,
-		    AV_PDEST | AV_FIXED | irq_ptr->airq_rdt_entry);
+		WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no, rdt_entry);
+
 	} else {
 		int type = (irq_ptr->airq_mps_intr_index == MSI_INDEX) ?
 		    DDI_INTR_TYPE_MSI : DDI_INTR_TYPE_MSIX;
 		(void) apic_pci_msi_disable_mode(irq_ptr->airq_dip, type,
-		    irq_ptr->airq_ioapicindex);
-		if (irq_ptr->airq_ioapicindex == irq_ptr->airq_origirq) {
+		    ioapicindex);
+		if (ioapicindex == irq_ptr->airq_origirq) {
 			/* first one */
 			DDI_INTR_IMPLDBG((CE_CONT, "apic_rebind: call "
 			    "apic_pci_msi_enable_vector\n"));
@@ -4365,7 +4463,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
 					"returned PSM_FAILURE");
 			}
 		}
-		if ((irq_ptr->airq_ioapicindex + irq_ptr->airq_intin_no - 1) ==
+		if ((ioapicindex + irq_ptr->airq_intin_no - 1) ==
 		    irq_ptr->airq_origirq) { /* last one */
 			DDI_INTR_IMPLDBG((CE_CONT, "apic_rebind: call "
 			    "pci_msi_enable_mode\n"));
@@ -4378,40 +4476,202 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
 			}
 		}
 	}
-	if (acquire_lock)
-		lock_clear(&apic_ioapic_lock);
 	irq_ptr->airq_temp_cpu = (uchar_t)bind_cpu;
 	apic_redist_cpu_skip &= ~(1 << (bind_cpu & ~IRQ_USER_BOUND));
-	intr_restore(iflag);
 	return (0);
 }
 
-/*
- * Checks to see if the IOAPIC interrupt entry specified has its Remote IRR
- * bit set.  Sets up a timeout to perform the reprogramming at a later time
- * if it cannot wait for the Remote IRR bit to clear (or if waiting did not
- * result in the bit's clearing).
- *
- * This function will mask the RDT entry if the Remote IRR bit is set.
- *
- * Returns non-zero if the caller should defer IOAPIC reprogramming.
- */
-static int
-apic_check_stuck_interrupt(apic_irq_t *irq_ptr, int old_bind_cpu,
-    int new_bind_cpu, volatile int32_t *ioapic, int intin_no, int which_irq,
-    int iflag, boolean_t *intr_restorep)
+static void
+apic_last_ditch_clear_remote_irr(volatile int32_t *ioapic, int intin_no)
 {
-	int32_t			rdt_entry;
-	int			waited;
+	if ((READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no)
+	    & AV_REMOTE_IRR) != 0) {
+		/*
+		 * Trying to clear the bit through normal
+		 * channels has failed.  So as a last-ditch
+		 * effort, try to set the trigger mode to
+		 * edge, then to level.  This has been
+		 * observed to work on many systems.
+		 */
+		WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
+		    intin_no,
+		    READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
+		    intin_no) & ~AV_LEVEL);
 
-	/* Mask the RDT entry, but only if it's a level-triggered interrupt */
-	rdt_entry = READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no);
-	if ((rdt_entry & (AV_LEVEL|AV_MASK)) == AV_LEVEL) {
+		WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
+		    intin_no,
+		    READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
+		    intin_no) | AV_LEVEL);
 
-		/* Mask it */
-		WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no,
-		    AV_MASK | rdt_entry);
+		/*
+		 * If the bit's STILL set, this interrupt may
+		 * be hosed.
+		 */
+		if ((READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
+		    intin_no) & AV_REMOTE_IRR) != 0) {
+
+			prom_printf("pcplusmp: Remote IRR still "
+			    "not clear for IOAPIC %p intin %d.\n"
+			    "\tInterrupts to this pin may cease "
+			    "functioning.\n", ioapic, intin_no);
+#ifdef DEBUG
+			apic_last_ditch_reprogram_failures++;
+#endif
+		}
 	}
+}
+
+/*
+ * This function is protected by apic_ioapic_lock coupled with the
+ * fact that interrupts are disabled.
+ */
+static void
+delete_defer_repro_ent(int which_irq)
+{
+	ASSERT(which_irq >= 0);
+	ASSERT(which_irq <= 255);
+
+	if (apic_reprogram_info[which_irq].done)
+		return;
+
+	apic_reprogram_info[which_irq].done = B_TRUE;
+
+#ifdef DEBUG
+	apic_defer_repro_total_retries +=
+	    apic_reprogram_info[which_irq].tries;
+
+	apic_defer_repro_successes++;
+#endif
+
+	if (--apic_reprogram_outstanding == 0) {
+
+		setlvlx = apic_intr_exit;
+	}
+}
+
+
+/*
+ * Interrupts must be disabled during this function to prevent
+ * self-deadlock.  Interrupts are disabled because this function
+ * is called from apic_check_stuck_interrupt(), which is called
+ * from apic_rebind(), which requires its caller to disable interrupts.
+ */
+static void
+add_defer_repro_ent(apic_irq_t *irq_ptr, int which_irq, int new_bind_cpu)
+{
+	ASSERT(which_irq >= 0);
+	ASSERT(which_irq <= 255);
+
+	/*
+	 * On the off-chance that there's already a deferred
+	 * reprogramming on this irq, check, and if so, just update the
+	 * CPU and irq pointer to which the interrupt is targeted, then return.
+	 */
+	if (!apic_reprogram_info[which_irq].done) {
+		apic_reprogram_info[which_irq].bindcpu = new_bind_cpu;
+		apic_reprogram_info[which_irq].irqp = irq_ptr;
+		return;
+	}
+
+	apic_reprogram_info[which_irq].irqp = irq_ptr;
+	apic_reprogram_info[which_irq].bindcpu = new_bind_cpu;
+	apic_reprogram_info[which_irq].tries = 0;
+	/*
+	 * This must be the last thing set, since we're not
+	 * grabbing any locks, apic_try_deferred_reprogram() will
+	 * make its decision about using this entry iff done
+	 * is false.
+	 */
+	apic_reprogram_info[which_irq].done = B_FALSE;
+
+	/*
+	 * If there were previously no deferred reprogrammings, change
+	 * setlvlx to call apic_try_deferred_reprogram()
+	 */
+	if (++apic_reprogram_outstanding == 1) {
+
+		setlvlx = apic_try_deferred_reprogram;
+	}
+}
+
+static void
+apic_try_deferred_reprogram(int prev_ipl, int irq)
+{
+	int reproirq, iflag;
+	struct ioapic_reprogram_data *drep;
+
+	apic_intr_exit(prev_ipl, irq);
+
+	if (!lock_try(&apic_defer_reprogram_lock)) {
+		return;
+	}
+
+	/*
+	 * Acquire the apic_ioapic_lock so that any other operations that
+	 * may affect the apic_reprogram_info state are serialized.
+	 * It's still possible for the last deferred reprogramming to clear
+	 * between the time we entered this function and the time we get to
+	 * the for loop below.  In that case, *setlvlx will have been set
+	 * back to apic_intr_exit and drep will be NULL. (There's no way to
+	 * stop that from happening -- we would need to grab a lock before
+	 * calling *setlvlx, which is neither realistic nor prudent).
+	 */
+	iflag = intr_clear();
+	lock_set(&apic_ioapic_lock);
+
+	/*
+	 * For each deferred RDT entry, try to reprogram it now.  Note that
+	 * there is no lock acquisition to read apic_reprogram_info because
+	 * '.done' is set only after the other fields in the structure are set.
+	 */
+
+	drep = NULL;
+	for (reproirq = 0; reproirq <= APIC_MAX_VECTOR; reproirq++) {
+		if (apic_reprogram_info[reproirq].done == B_FALSE) {
+			drep = &apic_reprogram_info[reproirq];
+			break;
+		}
+	}
+
+	/*
+	 * Either we found a deferred action to perform, or
+	 * we entered this function spuriously, after *setlvlx
+	 * was restored to point to apic_intr_enter.  Any other
+	 * permutation is invalid.
+	 */
+	ASSERT(drep != NULL || *setlvlx == apic_intr_exit);
+
+	/*
+	 * Though we can't really do anything about errors
+	 * at this point, keep track of them for reporting.
+	 * Note that it is very possible for apic_setup_io_intr
+	 * to re-register this very timeout if the Remote IRR bit
+	 * has not yet cleared.
+	 */
+
+#ifdef DEBUG
+	if (drep != NULL) {
+		if (apic_setup_io_intr(drep, reproirq, B_TRUE) != 0) {
+			apic_deferred_setup_failures++;
+		}
+	} else {
+		apic_deferred_spurious_enters++;
+	}
+#else
+	if (drep != NULL)
+		(void) apic_setup_io_intr(drep, reproirq, B_TRUE);
+#endif
+
+	lock_clear(&apic_ioapic_lock);
+	intr_restore(iflag);
+
+	lock_clear(&apic_defer_reprogram_lock);
+}
+
+static void
+apic_ioapic_wait_pending_clear(volatile int32_t *ioapic, int intin_no)
+{
+	int waited;
 
 	/*
 	 * Wait for the delivery pending bit to clear.
@@ -4425,24 +4685,81 @@ apic_check_stuck_interrupt(apic_irq_t *irq_ptr, int old_bind_cpu,
 		 * a very small amount of time, but include a timeout just in
 		 * case).
 		 */
-		for (waited = 0; waited < apic_max_usecs_clear_pending;
-		    waited += APIC_USECS_PER_WAIT_INTERVAL) {
+		for (waited = 0; waited < apic_max_reps_clear_pending;
+		    waited++) {
 			if ((READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no)
 			    & AV_PENDING) == 0) {
 				break;
 			}
-			drv_usecwait(APIC_USECS_PER_WAIT_INTERVAL);
-		}
-
-		if ((READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no) &
-		    AV_PENDING) != 0) {
-			cmn_err(CE_WARN, "!IOAPIC %d intin %d: Could not "
-			    "deliver interrupt to local APIC within "
-			    "%d usecs.", irq_ptr->airq_ioapicindex,
-			    irq_ptr->airq_intin_no,
-			    apic_max_usecs_clear_pending);
 		}
 	}
+}
+
+/*
+ * Checks to see if the IOAPIC interrupt entry specified has its Remote IRR
+ * bit set.  Calls functions that modify the function that setlvlx points to,
+ * so that the reprogramming can be retried very shortly.
+ *
+ * This function will mask the RDT entry if the interrupt is level-triggered.
+ * (The caller is responsible for unmasking the RDT entry.)
+ *
+ * Returns non-zero if the caller should defer IOAPIC reprogramming.
+ */
+static int
+apic_check_stuck_interrupt(apic_irq_t *irq_ptr, int old_bind_cpu,
+    int new_bind_cpu, volatile int32_t *ioapic, int intin_no, int which_irq,
+    struct ioapic_reprogram_data *drep)
+{
+	int32_t			rdt_entry;
+	int			waited;
+	int			reps = 0;
+
+	/*
+	 * Wait for the delivery pending bit to clear.
+	 */
+	do {
+		++reps;
+
+		apic_ioapic_wait_pending_clear(ioapic, intin_no);
+
+		/*
+		 * Mask the RDT entry, but only if it's a level-triggered
+		 * interrupt
+		 */
+		rdt_entry = READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no);
+		if ((rdt_entry & (AV_LEVEL|AV_MASK)) == AV_LEVEL) {
+
+			/* Mask it */
+			WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no,
+			    AV_MASK | rdt_entry);
+		}
+
+		if ((rdt_entry & AV_LEVEL) == AV_LEVEL) {
+			/*
+			 * If there was a race and an interrupt was injected
+			 * just before we masked, check for that case here.
+			 * Then, unmask the RDT entry and try again.  If we're
+			 * on our last try, don't unmask (because we want the
+			 * RDT entry to remain masked for the rest of the
+			 * function).
+			 */
+			rdt_entry = READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
+			    intin_no);
+			if ((rdt_entry & AV_PENDING) &&
+			    (reps < apic_max_reps_clear_pending)) {
+				/* Unmask it */
+				WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
+				    intin_no, rdt_entry & ~AV_MASK);
+			}
+		}
+
+	} while ((rdt_entry & AV_PENDING) &&
+	    (reps < apic_max_reps_clear_pending));
+
+#ifdef DEBUG
+		if (rdt_entry & AV_PENDING)
+			apic_intr_deliver_timeouts++;
+#endif
 
 	/*
 	 * If the remote IRR bit is set, then the interrupt has been sent
@@ -4461,188 +4778,79 @@ apic_check_stuck_interrupt(apic_irq_t *irq_ptr, int old_bind_cpu,
 		 * may have been delivered to the current CPU so handle that
 		 * case by deferring the reprogramming (below).
 		 */
-		kpreempt_disable();
 		if ((old_bind_cpu != IRQ_UNBOUND) &&
 		    (old_bind_cpu != IRQ_UNINIT) &&
 		    (old_bind_cpu != psm_get_cpu_id())) {
-			for (waited = 0; waited < apic_max_usecs_clear_pending;
-			    waited += APIC_USECS_PER_WAIT_INTERVAL) {
+			for (waited = 0; waited < apic_max_reps_clear_pending;
+			    waited++) {
 				if ((READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
 				    intin_no) & AV_REMOTE_IRR) == 0) {
 
-					/* Clear the reprogramming state: */
-					lock_set(&apic_ioapic_reprogram_lock);
-
-					apic_reprogram_info[which_irq].valid
-					    = 0;
-					apic_reprogram_info[which_irq].bindcpu
-					    = 0;
-					apic_reprogram_info[which_irq].timeouts
-					    = 0;
-
-					lock_clear(&apic_ioapic_reprogram_lock);
+					delete_defer_repro_ent(which_irq);
 
 					/* Remote IRR has cleared! */
-					kpreempt_enable();
 					return (0);
 				}
-				drv_usecwait(APIC_USECS_PER_WAIT_INTERVAL);
 			}
 		}
-		kpreempt_enable();
 
 		/*
 		 * If we waited and the Remote IRR bit is still not cleared,
 		 * AND if we've invoked the timeout APIC_REPROGRAM_MAX_TIMEOUTS
-		 * times for this interrupt, try the last-ditch workarounds:
+		 * times for this interrupt, try the last-ditch workaround:
 		 */
-		if (apic_reprogram_info[which_irq].timeouts >=
-		    APIC_REPROGRAM_MAX_TIMEOUTS) {
+		if (drep && drep->tries >= APIC_REPROGRAM_MAX_TRIES) {
 
-			if ((READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no)
-			    & AV_REMOTE_IRR) != 0) {
-				/*
-				 * Trying to clear the bit through normal
-				 * channels has failed.  So as a last-ditch
-				 * effort, try to set the trigger mode to
-				 * edge, then to level.  This has been
-				 * observed to work on many systems.
-				 */
-				WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
-				    intin_no,
-				    READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
-				    intin_no) & ~AV_LEVEL);
+			apic_last_ditch_clear_remote_irr(ioapic, intin_no);
 
-				WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
-				    intin_no,
-				    READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
-				    intin_no) | AV_LEVEL);
+			/* Mark this one as reprogrammed: */
+			delete_defer_repro_ent(which_irq);
 
-				/*
-				 * If the bit's STILL set, declare total and
-				 * utter failure
-				 */
-				if ((READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic,
-				    intin_no) & AV_REMOTE_IRR) != 0) {
-					cmn_err(CE_WARN, "!IOAPIC %d intin %d: "
-					    "Remote IRR failed to reset "
-					    "within %d usecs.  Interrupts to "
-					    "this pin may cease to function.",
-					    irq_ptr->airq_ioapicindex,
-					    irq_ptr->airq_intin_no,
-					    apic_max_usecs_clear_pending);
-				}
-			}
-			/* Clear the reprogramming state: */
-			lock_set(&apic_ioapic_reprogram_lock);
-
-			apic_reprogram_info[which_irq].valid = 0;
-			apic_reprogram_info[which_irq].bindcpu = 0;
-			apic_reprogram_info[which_irq].timeouts = 0;
-
-			lock_clear(&apic_ioapic_reprogram_lock);
+			return (0);
 		} else {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "Deferring reprogramming of irq %d",
-			    which_irq);
-#endif	/* DEBUG */
+			apic_intr_deferrals++;
+#endif
+
 			/*
 			 * If waiting for the Remote IRR bit (above) didn't
-			 * allow it to clear, defer the reprogramming:
+			 * allow it to clear, defer the reprogramming.
+			 * Add a new deferred-programming entry if the
+			 * caller passed a NULL one (and update the existing one
+			 * in case anything changed).
 			 */
-			lock_set(&apic_ioapic_reprogram_lock);
-
-			apic_reprogram_info[which_irq].valid = 1;
-			apic_reprogram_info[which_irq].bindcpu = new_bind_cpu;
-			apic_reprogram_info[which_irq].timeouts++;
-
-			lock_clear(&apic_ioapic_reprogram_lock);
-
-			*intr_restorep = B_FALSE;
-			intr_restore(iflag);
-
-			/* Fire up a timeout to handle this later */
-			(void) timeout(apic_reprogram_timeout_handler,
-			    (void *) 0,
-			    drv_usectohz(APIC_REPROGRAM_TIMEOUT_DELAY));
+			add_defer_repro_ent(irq_ptr, which_irq, new_bind_cpu);
+			if (drep)
+				drep->tries++;
 
 			/* Inform caller to defer IOAPIC programming: */
 			return (1);
 		}
+
 	}
+
+	/* Remote IRR is clear */
+	delete_defer_repro_ent(which_irq);
+
 	return (0);
 }
 
 /*
- * Timeout handler that performs the APIC reprogramming
- */
-/*ARGSUSED*/
-static void
-apic_reprogram_timeout_handler(void *arg)
-{
-	/*LINTED: set but not used in function*/
-	int i, result;
-
-	/* Serialize access to this function */
-	mutex_enter(&apic_reprogram_timeout_mutex);
-
-	/*
-	 * For each entry in the reprogramming state that's valid,
-	 * try the reprogramming again:
-	 */
-	for (i = 0; i < APIC_MAX_VECTOR; i++) {
-		if (apic_reprogram_info[i].valid == 0)
-			continue;
-		/*
-		 * Though we can't really do anything about errors
-		 * at this point, keep track of them for reporting.
-		 * Note that it is very possible for apic_setup_io_intr
-		 * to re-register this very timeout if the Remote IRR bit
-		 * has not yet cleared.
-		 */
-		result = apic_setup_io_intr_deferred(apic_irq_table[i], i);
-
-#ifdef DEBUG
-		if (result)
-			cmn_err(CE_WARN, "apic_reprogram_timeout: "
-			    "apic_setup_io_intr returned nonzero for "
-			    "irq=%d!", i);
-#endif	/* DEBUG */
-	}
-
-	mutex_exit(&apic_reprogram_timeout_mutex);
-}
-
-
-/*
- * Called to migrate all interrupts at an irq to another cpu. safe
- * if true means we are not being called from an interrupt
- * context and hence it is safe to do a lock_set. If false
- * do only a lock_try and return failure ( non 0 ) if we cannot get it
+ * Called to migrate all interrupts at an irq to another cpu.
+ * Must be called with interrupts disabled and apic_ioapic_lock held
  */
 int
-apic_rebind_all(apic_irq_t *irq_ptr, int bind_cpu, int safe)
+apic_rebind_all(apic_irq_t *irq_ptr, int bind_cpu)
 {
 	apic_irq_t	*irqptr = irq_ptr;
 	int		retval = 0;
-	int		iflag;
-
-	iflag = intr_clear();
-	if (!safe) {
-		if (lock_try(&apic_ioapic_lock) == 0) {
-			intr_restore(iflag);
-			return (1);
-		}
-	} else
-		lock_set(&apic_ioapic_lock);
 
 	while (irqptr) {
 		if (irqptr->airq_temp_cpu != IRQ_UNINIT)
-			retval |= apic_rebind(irqptr, bind_cpu, 0, IMMEDIATE);
+			retval |= apic_rebind(irqptr, bind_cpu, NULL);
 		irqptr = irqptr->airq_next;
 	}
-	lock_clear(&apic_ioapic_lock);
-	intr_restore(iflag);
+
 	return (retval);
 }
 
@@ -4666,8 +4874,8 @@ apic_intr_redistribute()
 	int busiest_cpu, most_free_cpu;
 	int cpu_free, cpu_busy, max_busy, min_busy;
 	int min_free, diff;
-	int	average_busy, cpus_online;
-	int i, busy;
+	int average_busy, cpus_online;
+	int i, busy, iflag;
 	apic_cpus_info_t *cpu_infop;
 	apic_irq_t *min_busy_irq = NULL;
 	apic_irq_t *max_busy_irq = NULL;
@@ -4792,10 +5000,18 @@ apic_intr_redistribute()
 				    max_busy_irq->airq_vector, most_free_cpu);
 			}
 #endif /* DEBUG */
-			if (apic_rebind_all(max_busy_irq, most_free_cpu, 0)
-			    == 0)
-				/* Make change permenant */
-				max_busy_irq->airq_cpu = (uchar_t)most_free_cpu;
+			iflag = intr_clear();
+			if (lock_try(&apic_ioapic_lock)) {
+				if (apic_rebind_all(max_busy_irq,
+				    most_free_cpu) == 0) {
+					/* Make change permenant */
+					max_busy_irq->airq_cpu =
+					    (uchar_t)most_free_cpu;
+				}
+				lock_clear(&apic_ioapic_lock);
+			}
+			intr_restore(iflag);
+
 		} else if (min_busy_irq != NULL) {
 #ifdef	DEBUG
 			if (apic_verbose & APIC_VERBOSE_IOAPIC_FLAG) {
@@ -4804,10 +5020,18 @@ apic_intr_redistribute()
 			}
 #endif /* DEBUG */
 
-			if (apic_rebind_all(min_busy_irq, most_free_cpu, 0) ==
-			    0)
-				/* Make change permenant */
-				min_busy_irq->airq_cpu = (uchar_t)most_free_cpu;
+			iflag = intr_clear();
+			if (lock_try(&apic_ioapic_lock)) {
+				if (apic_rebind_all(min_busy_irq,
+				    most_free_cpu) == 0) {
+					/* Make change permenant */
+					min_busy_irq->airq_cpu =
+					    (uchar_t)most_free_cpu;
+				}
+				lock_clear(&apic_ioapic_lock);
+			}
+			intr_restore(iflag);
+
 		} else {
 			if (cpu_busy != (1 << busiest_cpu)) {
 				apic_redist_cpu_skip |= 1 << busiest_cpu;
@@ -5088,6 +5312,190 @@ apic_acpi_translate_pci_irq(dev_info_t *dip, int busid, int devid,
 }
 
 /*
+ * Adds an entry to the irq list passed in, and returns the new list.
+ * Entries are added in priority order (lower numerical priorities are
+ * placed closer to the head of the list)
+ */
+static prs_irq_list_t *
+acpi_insert_prs_irq_ent(prs_irq_list_t *listp, int priority, int irq,
+    iflag_t *iflagp, acpi_prs_private_t *prsprvp)
+{
+	struct prs_irq_list_ent *newent, *prevp = NULL, *origlistp;
+
+	newent = kmem_zalloc(sizeof (struct prs_irq_list_ent), KM_SLEEP);
+
+	newent->list_prio = priority;
+	newent->irq = irq;
+	newent->intrflags = *iflagp;
+	newent->prsprv = *prsprvp;
+	/* ->next is NULL from kmem_zalloc */
+
+	/*
+	 * New list -- return the new entry as the list.
+	 */
+	if (listp == NULL)
+		return (newent);
+
+	/*
+	 * Save original list pointer for return (since we're not modifying
+	 * the head)
+	 */
+	origlistp = listp;
+
+	/*
+	 * Insertion sort, with entries with identical keys stored AFTER
+	 * existing entries (the less-than-or-equal test of priority does
+	 * this for us).
+	 */
+	while (listp != NULL && listp->list_prio <= priority) {
+		prevp = listp;
+		listp = listp->next;
+	}
+
+	newent->next = listp;
+
+	if (prevp == NULL) { /* Add at head of list (newent is the new head) */
+		return (newent);
+	} else {
+		prevp->next = newent;
+		return (origlistp);
+	}
+}
+
+/*
+ * Frees the list passed in, deallocating all memory and leaving *listpp
+ * set to NULL.
+ */
+static void
+acpi_destroy_prs_irq_list(prs_irq_list_t **listpp)
+{
+	struct prs_irq_list_ent *nextp;
+
+	ASSERT(listpp != NULL);
+
+	while (*listpp != NULL) {
+		nextp = (*listpp)->next;
+		kmem_free(*listpp, sizeof (struct prs_irq_list_ent));
+		*listpp = nextp;
+	}
+}
+
+/*
+ * apic_choose_irqs_from_prs returns a list of irqs selected from the list of
+ * irqs returned by the link device's _PRS method.  The irqs are chosen
+ * to minimize contention in situations where the interrupt link device
+ * can be programmed to steer interrupts to different interrupt controller
+ * inputs (some of which may already be in use).  The list is sorted in order
+ * of irqs to use, with the highest priority given to interrupt controller
+ * inputs that are not shared.   When an interrupt controller input
+ * must be shared, apic_choose_irqs_from_prs adds the possible irqs to the
+ * returned list in the order that minimizes sharing (thereby ensuring lowest
+ * possible latency from interrupt trigger time to ISR execution time).
+ */
+static prs_irq_list_t *
+apic_choose_irqs_from_prs(acpi_irqlist_t *irqlistent, dev_info_t *dip,
+    int crs_irq)
+{
+	int32_t irq;
+	int i;
+	prs_irq_list_t *prsirqlistp = NULL;
+	iflag_t iflags;
+
+	while (irqlistent != NULL) {
+		irqlistent->intr_flags.bustype = BUS_PCI;
+
+		for (i = 0; i < irqlistent->num_irqs; i++) {
+
+			irq = irqlistent->irqs[i];
+
+			if (irq <= 0) {
+				/* invalid irq number */
+				continue;
+			}
+
+			if ((irq < 16) && (apic_reserved_irqlist[irq]))
+				continue;
+
+			if ((apic_irq_table[irq] == NULL) ||
+			    (apic_irq_table[irq]->airq_dip == dip)) {
+
+				prsirqlistp = acpi_insert_prs_irq_ent(
+				    prsirqlistp, 0 /* Highest priority */, irq,
+				    &irqlistent->intr_flags,
+				    &irqlistent->acpi_prs_prv);
+
+				/*
+				 * If we do not prefer the current irq from _CRS
+				 * or if we do and this irq is the same as the
+				 * current irq from _CRS, this is the one
+				 * to pick.
+				 */
+				if (!(apic_prefer_crs) || (irq == crs_irq)) {
+					return (prsirqlistp);
+				}
+				continue;
+			}
+
+			/*
+			 * Edge-triggered interrupts cannot be shared
+			 */
+			if (irqlistent->intr_flags.intr_el == INTR_EL_EDGE)
+				continue;
+
+			/*
+			 * To work around BIOSes that contain incorrect
+			 * interrupt polarity information in interrupt
+			 * descriptors returned by _PRS, we assume that
+			 * the polarity of the other device sharing this
+			 * interrupt controller input is compatible.
+			 * If it's not, the caller will catch it when
+			 * the caller invokes the link device's _CRS method
+			 * (after invoking its _SRS method).
+			 */
+			iflags = irqlistent->intr_flags;
+			iflags.intr_po =
+			    apic_irq_table[irq]->airq_iflag.intr_po;
+
+			if (!acpi_intr_compatible(iflags,
+			    apic_irq_table[irq]->airq_iflag))
+				continue;
+
+			/*
+			 * If we prefer the irq from _CRS, no need
+			 * to search any further (and make sure
+			 * to add this irq with the highest priority
+			 * so it's tried first).
+			 */
+			if (crs_irq == irq && apic_prefer_crs) {
+
+				return (acpi_insert_prs_irq_ent(
+				    prsirqlistp,
+				    0 /* Highest priority */,
+				    irq, &iflags,
+				    &irqlistent->acpi_prs_prv));
+			}
+
+			/*
+			 * Priority is equal to the share count (lower
+			 * share count is higher priority). Note that
+			 * the intr flags passed in here are the ones we
+			 * changed above -- if incorrect, it will be
+			 * caught by the caller's _CRS flags comparison.
+			 */
+			prsirqlistp = acpi_insert_prs_irq_ent(
+			    prsirqlistp,
+			    apic_irq_table[irq]->airq_share, irq,
+			    &iflags, &irqlistent->acpi_prs_prv);
+		}
+
+		/* Go to the next irqlist entry */
+		irqlistent = irqlistent->next;
+	}
+
+	return (prsirqlistp);
+}
+
+/*
  * Configures the irq for the interrupt link device identified by
  * acpipsmlnkp.
  *
@@ -5123,13 +5531,13 @@ apic_acpi_irq_configure(acpi_psm_lnk_t *acpipsmlnkp, dev_info_t *dip,
     int *pci_irqp, iflag_t *dipintr_flagp)
 {
 
-	int i, min_share, foundnow, done = 0;
 	int32_t irq;
-	int32_t share_irq = -1;
-	int32_t chosen_irq = -1;
 	int cur_irq = -1;
 	acpi_irqlist_t *irqlistp;
-	acpi_irqlist_t *irqlistent;
+	prs_irq_list_t *prs_irq_listp, *prs_irq_entp;
+	boolean_t found_irq = B_FALSE;
+
+	dipintr_flagp->bustype = BUS_PCI;
 
 	if ((acpi_get_possible_irq_resources(acpipsmlnkp, &irqlistp))
 	    == ACPI_PSM_FAILURE) {
@@ -5153,9 +5561,9 @@ apic_acpi_irq_configure(acpi_psm_lnk_t *acpipsmlnkp, dev_info_t *dip,
 		if (acpi_irqlist_find_irq(irqlistp, cur_irq, NULL)
 		    == ACPI_PSM_SUCCESS) {
 
-			acpi_free_irqlist(irqlistp);
 			ASSERT(pci_irqp != NULL);
 			*pci_irqp = cur_irq;
+			acpi_free_irqlist(irqlistp);
 			return (ACPI_PSM_SUCCESS);
 		}
 
@@ -5166,127 +5574,90 @@ apic_acpi_irq_configure(acpi_psm_lnk_t *acpipsmlnkp, dev_info_t *dip,
 		    ddi_get_instance(dip)));
 	}
 
-	irqlistent = irqlistp;
-	min_share = 255;
+	if ((prs_irq_listp = apic_choose_irqs_from_prs(irqlistp, dip,
+	    cur_irq)) == NULL) {
 
-	while (irqlistent != NULL) {
-		irqlistent->intr_flags.bustype = BUS_PCI;
-
-		for (foundnow = 0, i = 0; i < irqlistent->num_irqs; i++) {
-
-			irq = irqlistent->irqs[i];
-
-			if ((irq < 16) && (apic_reserved_irqlist[irq]))
-				continue;
-
-			if (irq == 0) {
-				/* invalid irq number */
-				continue;
-			}
-
-			if ((apic_irq_table[irq] == NULL) ||
-			    (apic_irq_table[irq]->airq_dip == dip)) {
-				chosen_irq = irq;
-				foundnow = 1;
-				/*
-				 * If we do not prefer current irq from crs
-				 * or if we do and this irq is the same as
-				 * current irq from crs, this is the one
-				 * to pick.
-				 */
-				if (!(apic_prefer_crs) || (irq == cur_irq)) {
-					done = 1;
-					break;
-				}
-				continue;
-			}
-
-			if (irqlistent->intr_flags.intr_el == INTR_EL_EDGE)
-				continue;
-
-			if (!acpi_intr_compatible(irqlistent->intr_flags,
-			    apic_irq_table[irq]->airq_iflag))
-				continue;
-
-			if ((apic_irq_table[irq]->airq_share < min_share) ||
-			    ((apic_irq_table[irq]->airq_share == min_share) &&
-			    (cur_irq == irq) && (apic_prefer_crs))) {
-				min_share = apic_irq_table[irq]->airq_share;
-				share_irq = irq;
-				foundnow = 1;
-			}
-		}
-
-		/*
-		 * If we found an IRQ in the inner loop this time, save the
-		 * details from the irqlist for later use.
-		 */
-		if (foundnow && ((chosen_irq != -1) || (share_irq != -1))) {
-			/*
-			 * Copy the acpi_prs_private_t and flags from this
-			 * irq list entry, since we found an irq from this
-			 * entry.
-			 */
-			acpipsmlnkp->acpi_prs_prv = irqlistent->acpi_prs_prv;
-			*dipintr_flagp = irqlistent->intr_flags;
-		}
-
-		if (done)
-			break;
-
-		/* Go to the next irqlist entry */
-		irqlistent = irqlistent->next;
-	}
-
-
-	acpi_free_irqlist(irqlistp);
-	if (chosen_irq != -1)
-		irq = chosen_irq;
-	else if (share_irq != -1)
-		irq = share_irq;
-	else {
 		APIC_VERBOSE_IRQ((CE_WARN, "!pcplusmp: Could not find a "
 		    "suitable irq from the list of possible irqs for device "
 		    "%s, instance #%d in ACPI's list of possible irqs",
 		    ddi_get_name(dip), ddi_get_instance(dip)));
+
+		acpi_free_irqlist(irqlistp);
 		return (ACPI_PSM_FAILURE);
 	}
 
-	APIC_VERBOSE_IRQ((CE_CONT, "!pcplusmp: Setting irq %d for device %s "
-	    "instance #%d\n", irq, ddi_get_name(dip), ddi_get_instance(dip)));
+	acpi_free_irqlist(irqlistp);
 
-	if ((acpi_set_irq_resource(acpipsmlnkp, irq)) == ACPI_PSM_SUCCESS) {
-		/*
-		 * setting irq was successful, check to make sure CRS
-		 * reflects that. If CRS does not agree with what we
-		 * set, return the irq that was set.
-		 */
+	for (prs_irq_entp = prs_irq_listp;
+	    prs_irq_entp != NULL && found_irq == B_FALSE;
+	    prs_irq_entp = prs_irq_entp->next) {
 
-		if (acpi_get_current_irq_resource(acpipsmlnkp, &cur_irq,
-		    dipintr_flagp) == ACPI_PSM_SUCCESS) {
+		acpipsmlnkp->acpi_prs_prv = prs_irq_entp->prsprv;
+		irq = prs_irq_entp->irq;
 
-			if (cur_irq != irq)
-				APIC_VERBOSE_IRQ((CE_WARN, "!pcplusmp: "
-				    "IRQ resource set (irqno %d) for device %s "
-				    "instance #%d, differs from current "
-				    "setting irqno %d",
-				    irq, ddi_get_name(dip),
-				    ddi_get_instance(dip), cur_irq));
+		APIC_VERBOSE_IRQ((CE_CONT, "!pcplusmp: Setting irq %d for "
+		    "device %s instance #%d\n", irq, ddi_get_name(dip),
+		    ddi_get_instance(dip)));
+
+		if ((acpi_set_irq_resource(acpipsmlnkp, irq))
+		    == ACPI_PSM_SUCCESS) {
+			/*
+			 * setting irq was successful, check to make sure CRS
+			 * reflects that. If CRS does not agree with what we
+			 * set, return the irq that was set.
+			 */
+
+			if (acpi_get_current_irq_resource(acpipsmlnkp, &cur_irq,
+			    dipintr_flagp) == ACPI_PSM_SUCCESS) {
+
+				if (cur_irq != irq)
+					APIC_VERBOSE_IRQ((CE_WARN,
+					    "!pcplusmp: IRQ resource set "
+					    "(irqno %d) for device %s "
+					    "instance #%d, differs from "
+					    "current setting irqno %d",
+					    irq, ddi_get_name(dip),
+					    ddi_get_instance(dip), cur_irq));
+			} else {
+				/*
+				 * On at least one system, there was a bug in
+				 * a DSDT method called by _STA, causing _STA to
+				 * indicate that the link device was disabled
+				 * (when, in fact, it was enabled).  Since _SRS
+				 * succeeded, assume that _CRS is lying and use
+				 * the iflags from this _PRS interrupt choice.
+				 * If we're wrong about the flags, the polarity
+				 * will be incorrect and we may get an interrupt
+				 * storm, but there's not much else we can do
+				 * at this point.
+				 */
+				*dipintr_flagp = prs_irq_entp->intrflags;
+			}
+
+			/*
+			 * Return the irq that was set, and not what _CRS
+			 * reports, since _CRS has been seen to return
+			 * different IRQs than what was passed to _SRS on some
+			 * systems (and just not return successfully on others).
+			 */
+			cur_irq = irq;
+			found_irq = B_TRUE;
+		} else {
+			APIC_VERBOSE_IRQ((CE_WARN, "!pcplusmp: set resource "
+			    "irq %d failed for device %s instance #%d",
+			    irq, ddi_get_name(dip), ddi_get_instance(dip)));
+
+			if (cur_irq == -1) {
+				acpi_destroy_prs_irq_list(&prs_irq_listp);
+				return (ACPI_PSM_FAILURE);
+			}
 		}
-
-		/*
-		 * return the irq that was set, and not what CRS reports,
-		 * since CRS has been seen to be bogus on some systems
-		 */
-		cur_irq = irq;
-	} else {
-		APIC_VERBOSE_IRQ((CE_WARN, "!pcplusmp: set resource irq %d "
-		    "failed for device %s instance #%d",
-		    irq, ddi_get_name(dip), ddi_get_instance(dip)));
-
-		if (cur_irq == -1)
-			return (ACPI_PSM_FAILURE);
 	}
+
+	acpi_destroy_prs_irq_list(&prs_irq_listp);
+
+	if (!found_irq)
+		return (ACPI_PSM_FAILURE);
 
 	ASSERT(pci_irqp != NULL);
 	*pci_irqp = cur_irq;

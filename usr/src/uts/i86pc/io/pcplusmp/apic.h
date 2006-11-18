@@ -280,6 +280,7 @@ struct apic_io_intr {
 #define	AV_LDEST	0x800
 
 /* IO & Local APIC Bit Definitions */
+#define	RDT_VECTOR(x)	((uchar_t)((x) & 0xFF))
 #define	AV_PENDING	0x1000
 #define	AV_ACTIVE_LOW	0x2000		/* only for integrated APIC */
 #define	AV_REMOTE_IRR   0x4000		/* IOAPIC RDT-specific */
@@ -565,6 +566,12 @@ typedef struct {
 					apic_ticks_per_SFnsecs);
 #define	APIC_NSECS_TO_TICKS(nsecs)	(((int64_t)(nsecs) * \
 					apic_ticks_per_SFnsecs + (SF/2)) / SF)
+
+extern uchar_t	apic_bind_intr(dev_info_t *, int, uchar_t, uchar_t);
+extern int	apic_allocate_irq(int);
+extern int	apic_introp_xlate(dev_info_t *, struct intrspec *, int);
+extern int	apic_rebind_all(apic_irq_t *irq_ptr, int bind_cpu);
+extern boolean_t apic_cpu_in_range(int cpu);
 
 #ifdef	__cplusplus
 }

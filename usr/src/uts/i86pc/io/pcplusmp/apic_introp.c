@@ -61,11 +61,6 @@ int		apic_intr_ops(dev_info_t *, ddi_intr_handle_impl_t *,
 
 extern int	intr_clear(void);
 extern void	intr_restore(uint_t);
-extern uchar_t	apic_bind_intr(dev_info_t *, int, uchar_t, uchar_t);
-extern int	apic_allocate_irq(int);
-extern int	apic_introp_xlate(dev_info_t *, struct intrspec *, int);
-extern int	apic_rebind_all(apic_irq_t *irq_ptr, int bind_cpu, int safe);
-extern boolean_t apic_cpu_in_range(int cpu);
 
 /*
  * MSI support flag:
@@ -823,6 +818,7 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 	int		cpu;
 	int		old_priority;
 	int		new_priority;
+	int		iflag;
 	apic_irq_t	*irqp;
 	struct intrspec *ispec, intr_spec;
 
@@ -946,17 +942,25 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 			return (PSM_FAILURE);
 		}
 
-		mutex_enter(&airq_mutex);
 
 		/* Convert the vector to the irq using vector_to_irq table. */
+		mutex_enter(&airq_mutex);
 		irqp = apic_irq_table[apic_vector_to_irq[hdlp->ih_vector]];
+		mutex_exit(&airq_mutex);
+
 		if (irqp == NULL) {
-			mutex_exit(&airq_mutex);
 			*result = ENXIO;
 			return (PSM_FAILURE);
 		}
-		ret = apic_rebind_all(irqp, cpu, 1);
-		mutex_exit(&airq_mutex);
+
+		iflag = intr_clear();
+		lock_set(&apic_ioapic_lock);
+
+		ret = apic_rebind_all(irqp, cpu);
+
+		lock_clear(&apic_ioapic_lock);
+		intr_restore(iflag);
+
 		if (ret) {
 			*result = EIO;
 			return (PSM_FAILURE);
