@@ -301,7 +301,6 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	if (mp->b_cont != NULL) {
 		mp1 = dupmsg(mp->b_cont);
 		if (mp1 == NULL) {
-			freemsg(mp);
 			error  = ENOBUFS;
 			goto done;
 		}
@@ -1076,8 +1075,11 @@ done:
 	if (gcgrp_xtraref)
 		GCGRP_REFRELE(gcgrp);
 
-	if (error == EINPROGRESS)
+	if (error == EINPROGRESS) {
+		if (rtm != NULL)
+			freemsg(mp);
 		return (error);
+	}
 	if (rtm != NULL) {
 		ASSERT(mp->b_wptr <= mp->b_datap->db_lim);
 		if (error != 0) {
