@@ -3871,9 +3871,11 @@ ar_wput(queue_t *q, mblk_t *mp)
 		if (err != 0)
 			ioc->ioc_error = err;
 		if (ioc->ioc_error != 0) {
+			/*
+			 * Don't free b_cont as IP/IB needs
+			 * it to identify the request.
+			 */
 			DB_TYPE(mp) = M_IOCNAK;
-			freemsg(mp->b_cont);
-			mp->b_cont = NULL;
 		}
 		ioc->ioc_count = msgdsize(mp->b_cont);
 		qreply(q, mp);
