@@ -1083,11 +1083,13 @@ pci_dma_sync_unmap(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp)
 	}
 
 	if (pci_dvma_sync_before_unmap) {
-		pci_dma_sync(dip, rdip, (ddi_dma_handle_t)mp, 0, 0, 0);
+		pci_dma_sync(dip, rdip, (ddi_dma_handle_t)mp, 0, 0,
+		    DDI_DMA_SYNC_FORCPU);
 		iommu_unmap_window(iommu_p, mp);
 	} else {
 		iommu_unmap_window(iommu_p, mp);
-		pci_dma_sync(dip, rdip, (ddi_dma_handle_t)mp, 0, 0, 0);
+		pci_dma_sync(dip, rdip, (ddi_dma_handle_t)mp, 0, 0,
+		    DDI_DMA_SYNC_FORCPU);
 	}
 
 	if (fast_track)
