@@ -61,8 +61,11 @@ ushort_t pcie_command_default = PCI_COMM_SERR_ENABLE |
 ushort_t pcie_base_err_default = PCIE_DEVCTL_CE_REPORTING_EN |
 				PCIE_DEVCTL_NFE_REPORTING_EN |
 				PCIE_DEVCTL_FE_REPORTING_EN |
-				PCIE_DEVCTL_UR_REPORTING_EN |
-				PCIE_DEVCTL_RO_EN;
+				PCIE_DEVCTL_UR_REPORTING_EN;
+
+uint32_t pcie_devctl_default = PCIE_DEVCTL_RO_EN |
+				PCIE_DEVCTL_MAX_PAYLOAD_128 |
+				PCIE_DEVCTL_MAX_READ_REQ_512;
 uint32_t pcie_aer_uce_mask = 0;
 uint32_t pcie_aer_ce_mask = 0;
 uint32_t pcie_aer_suce_mask = 0;
@@ -292,11 +295,12 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	if ((device_ctl = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
 		PCIE_DEVCTL)) != PCI_CAP_EINVAL16) {
 		PCI_CAP_PUT16(config_handle, NULL, cap_ptr, PCIE_DEVCTL,
-			pcie_base_err_default & (~PCIE_DEVCTL_CE_REPORTING_EN));
-
-		PCIE_DBG("%s: device control=0x%x->0x%x\n",
-			ddi_driver_name(dip), device_ctl, PCI_CAP_GET16
-			(config_handle, NULL, cap_ptr, PCIE_DEVCTL));
+			pcie_devctl_default | (pcie_base_err_default &
+			(~PCIE_DEVCTL_CE_REPORTING_EN)));
+		PCIE_DBG("%s%d: devctl 0x%x -> 0x%x\n", ddi_node_name(dip),
+			ddi_get_instance(dip), device_ctl,
+			PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+			PCIE_DEVCTL));
 	}
 
 	/*
@@ -353,7 +357,7 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 int
 pcie_enable_ce(dev_info_t *dip, ddi_acc_handle_t config_handle)
 {
-	uint16_t	cap_ptr, aer_ptr, device_sts;
+	uint16_t	cap_ptr, aer_ptr, device_sts, device_ctl;
 	uint32_t	tmp_pcie_aer_ce_mask;
 
 	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
@@ -398,13 +402,12 @@ pcie_enable_ce(dev_info_t *dip, ddi_acc_handle_t config_handle)
 			PCIE_DEVSTS, device_sts & (~PCIE_DEVSTS_CE_DETECTED));
 
 	/* Enable CE reporting */
+	device_ctl = PCI_CAP_GET16(config_handle, NULL, cap_ptr, PCIE_DEVCTL);
 	PCI_CAP_PUT16(config_handle, NULL, cap_ptr, PCIE_DEVCTL,
-	    pcie_base_err_default);
-
-	PCIE_DBG("%s: device control set to 0x%x\n",
-	    ddi_driver_name(dip), PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-	    PCIE_DEVCTL));
-
+		(device_ctl & (~PCIE_DEVCTL_ERR_MASK)) | pcie_base_err_default);
+	PCIE_DBG("%s%d: devctl 0x%x -> 0x%x\n", ddi_node_name(dip),
+		ddi_get_instance(dip), device_ctl,
+		PCI_CAP_GET16(config_handle, NULL, cap_ptr, PCIE_DEVCTL));
 	return (DDI_SUCCESS);
 }
 
@@ -412,7 +415,7 @@ pcie_enable_ce(dev_info_t *dip, ddi_acc_handle_t config_handle)
 void
 pcie_disable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 {
-	uint16_t		cap_ptr, aer_ptr, dev_type;
+	uint16_t		cap_ptr, aer_ptr, dev_type, device_ctl;
 	uint32_t		aer_reg;
 	int			rval = DDI_FAILURE;
 
@@ -428,7 +431,9 @@ pcie_disable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	/*
 	 * Disable PCI-Express Baseline Error Handling
 	 */
-	PCI_CAP_PUT16(config_handle, NULL, cap_ptr, PCIE_DEVCTL, 0x0);
+	device_ctl = PCI_CAP_GET16(config_handle, NULL, cap_ptr, PCIE_DEVCTL);
+	device_ctl &= ~PCIE_DEVCTL_ERR_MASK;
+	PCI_CAP_PUT16(config_handle, NULL, cap_ptr, PCIE_DEVCTL, device_ctl);
 
 	/*
 	 * Disable PCI-Express Advanced Error Handling if Exists

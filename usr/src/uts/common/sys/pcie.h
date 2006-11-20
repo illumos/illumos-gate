@@ -137,6 +137,8 @@ extern "C" {
 #define	PCIE_DEVCTL_NFE_REPORTING_EN	0x2	/* Non-Fatal Error Enable */
 #define	PCIE_DEVCTL_FE_REPORTING_EN	0x4	/* Fatal Error Enable */
 #define	PCIE_DEVCTL_UR_REPORTING_EN	0x8	/* Unsupported Request Enable */
+#define	PCIE_DEVCTL_ERR_MASK		0xF	/* All of the above bits */
+
 #define	PCIE_DEVCTL_RO_EN		0x10	/* Enable Relaxed Ordering */
 
 #define	PCIE_DEVCTL_MAX_PAYLOAD_128	0x00
@@ -152,12 +154,12 @@ extern "C" {
 #define	PCIE_DEVCTL_AUX_POWER_PM_EN	0x400	/* Auxiliary Power PM Enable */
 #define	PCIE_DEVCTL_ENABLE_NO_SNOOP	0x800	/* Enable No Snoop */
 
-#define	PCIE_DEVCTL_MAX_READ_REQ_128	0x00
-#define	PCIE_DEVCTL_MAX_READ_REQ_256	0x10
-#define	PCIE_DEVCTL_MAX_READ_REQ_512	0x20
-#define	PCIE_DEVCTL_MAX_READ_REQ_1024	0x30
-#define	PCIE_DEVCTL_MAX_READ_REQ_2048	0x40
-#define	PCIE_DEVCTL_MAX_READ_REQ_4096	0x50
+#define	PCIE_DEVCTL_MAX_READ_REQ_128	0x0000
+#define	PCIE_DEVCTL_MAX_READ_REQ_256	0x1000
+#define	PCIE_DEVCTL_MAX_READ_REQ_512	0x2000
+#define	PCIE_DEVCTL_MAX_READ_REQ_1024	0x3000
+#define	PCIE_DEVCTL_MAX_READ_REQ_2048	0x4000
+#define	PCIE_DEVCTL_MAX_READ_REQ_4096	0x5000
 #define	PCIE_DEVCTL_MAX_READ_REQ_MASK	0x7000	/* Max_Read_Request_Size */
 
 /*
