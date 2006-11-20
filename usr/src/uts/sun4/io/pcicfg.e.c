@@ -44,7 +44,9 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
+#include <sys/pci_cap.h>
 #include <sys/hotplug/pci/pcicfg.h>
+#include <sys/hotplug/pci/pcishpc_regs.h>
 #include <sys/ndi_impldefs.h>
 
 #define	PCICFG_DEVICE_TYPE_PCI	1
@@ -100,7 +102,7 @@ static	int	pcicfg_start_devno = 0;	/* for Debug only */
 
 static int pcicfg_slot_busnums = 8;
 static int pcicfg_slot_memsize = 32 * PCICFG_MEMGRAN; /* 32MB per slot */
-static int pcicfg_slot_iosize = 64 * PCICFG_IOGRAN; /* 64K per slot */
+static int pcicfg_slot_iosize = 16 * PCICFG_IOGRAN; /* 64K per slot */
 static int pcicfg_chassis_per_tree = 1;
 static int pcicfg_sec_reset_delay = 1000000;
 
@@ -319,6 +321,7 @@ static int pcicfg_ntbridge_unconfigure(dev_info_t *);
 static int pcicfg_ntbridge_unconfigure_child(dev_info_t *, uint_t);
 static void pcicfg_free_hole(hole_t *);
 static uint64_t pcicfg_alloc_hole(hole_t *, uint64_t *, uint32_t);
+static int pcicfg_update_available_prop(dev_info_t *, pci_regspec_t *);
 
 #ifdef DEBUG
 static void pcicfg_dump_common_config(ddi_acc_handle_t config_handle);
@@ -596,24 +599,38 @@ pcicfg_get_cap(ddi_acc_handle_t config_handle, uint8_t cap_id)
 static uint8_t
 pcicfg_get_nslots(dev_info_t *dip, ddi_acc_handle_t handle)
 {
-	int cap_id_loc;
 	uint8_t num_slots = 0;
+	uint16_t cap_ptr;
 
-	/* just depend on the pcie_cap for now. */
-	if ((cap_id_loc = pcicfg_get_cap(handle, PCI_CAP_ID_PCI_E))
-							> 0) {
-		if (pci_config_get16(handle, cap_id_loc +
-					PCIE_PCIECAP) &
-					PCIE_PCIECAP_SLOT_IMPL)
-			num_slots = 1;
-	} else /* not a PCIe switch/bridge. Must be a PCI-PCI[-X] bridge */
-	if ((cap_id_loc = pcicfg_get_cap(handle, PCI_CAP_ID_SLOT_ID))
-								> 0) {
-		uint8_t esr_reg = pci_config_get8(handle, cap_id_loc +
-			PCI_CAP_ID_REGS_OFF);
+	if ((PCI_CAP_LOCATE(handle, PCI_CAP_ID_PCI_HOTPLUG,
+	    &cap_ptr)) == DDI_SUCCESS) {
+		uint32_t config;
+
+		PCI_CAP_PUT8(handle, NULL, cap_ptr, SHPC_DWORD_SELECT_OFF,
+		    SHPC_SLOT_CONFIGURATION_REG);
+		config = PCI_CAP_GET32(handle, NULL, cap_ptr,
+		    SHPC_DWORD_DATA_OFF);
+		num_slots = config & 0x1F;
+	} else if ((PCI_CAP_LOCATE(handle, PCI_CAP_ID_SLOT_ID, &cap_ptr))
+	    == DDI_SUCCESS) {
+		uint8_t esr_reg = PCI_CAP_GET8(handle, NULL,
+		    cap_ptr, PCI_CAP_ID_REGS_OFF);
+
 		num_slots = PCI_CAPSLOT_NSLOTS(esr_reg);
+	} else if ((PCI_CAP_LOCATE(handle, PCI_CAP_ID_PCI_E, &cap_ptr))
+	    == DDI_SUCCESS) {
+		int port_type = PCI_CAP_GET16(handle, NULL, cap_ptr,
+		    PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
+
+		if ((port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) &&
+		    (PCI_CAP_GET16(handle, NULL, cap_ptr, PCIE_PCIECAP)
+			& PCIE_PCIECAP_SLOT_IMPL))
+				num_slots = 1;
 	}
-	/* XXX - need to cover PCI-PCIe bridge with n slots */
+
+	DEBUG3("%s#%d has %d slots",
+	    ddi_get_name(dip), ddi_get_instance(dip), num_slots);
+
 	return (num_slots);
 }
 
@@ -2439,73 +2456,110 @@ pcicfg_sum_resources(dev_info_t *dip, void *hdl)
 static int
 pcicfg_find_resource_end(dev_info_t *dip, void *hdl)
 {
-	pcicfg_phdl_t *entry = (pcicfg_phdl_t *)hdl;
+	pcicfg_phdl_t *entry_p = (pcicfg_phdl_t *)hdl;
 	pci_regspec_t *pci_ap;
+	pcicfg_range_t *ranges;
 	int length;
 	int rcount;
 	int i;
 
-	entry->error = PCICFG_SUCCESS;
+	entry_p->error = PCICFG_SUCCESS;
 
-	if (dip == entry->dip) {
+	if (dip == entry_p->dip) {
 		DEBUG0("Don't include parent bridge node\n");
 		return (DDI_WALK_CONTINUE);
-	} else {
-		if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_DONTPASS, "assigned-addresses",
-		    (caddr_t)&pci_ap,  &length) != DDI_PROP_SUCCESS) {
-			DEBUG0("Node doesn't have assigned-addresses\n");
-			return (DDI_WALK_CONTINUE);
+	}
+
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "ranges",
+	    (caddr_t)&ranges,  &length) != DDI_PROP_SUCCESS) {
+		DEBUG0("Node doesn't have ranges\n");
+		goto ap;
+	}
+
+	rcount = length / sizeof (pcicfg_range_t);
+
+	for (i = 0; i < rcount; i++) {
+		uint64_t base;
+		uint64_t mid = ranges[i].child_mid;
+		uint64_t lo = ranges[i].child_lo;
+		uint64_t size = ranges[i].size_lo;
+
+		switch (PCI_REG_ADDR_G(ranges[i].child_hi)) {
+
+		case PCI_REG_ADDR_G(PCI_ADDR_MEM32):
+			base = entry_p->memory_base;
+			entry_p->memory_base = MAX(base, lo + size);
+			break;
+		case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
+			base = entry_p->memory_base;
+			entry_p->memory_base = MAX(base,
+			    PCICFG_LADDR(lo, mid) + size);
+			break;
+		case PCI_REG_ADDR_G(PCI_ADDR_IO):
+			base = entry_p->io_base;
+			entry_p->io_base = MAX(base, lo + size);
+			break;
 		}
+	}
 
-		rcount = length / sizeof (pci_regspec_t);
+	kmem_free(ranges, length);
+	return (DDI_WALK_CONTINUE);
 
-		for (i = 0; i < rcount; i++) {
-
-			switch (PCI_REG_ADDR_G(pci_ap[i].pci_phys_hi)) {
-
-			case PCI_REG_ADDR_G(PCI_ADDR_MEM32):
-				if ((pci_ap[i].pci_phys_low +
-				    pci_ap[i].pci_size_low) >
-				    entry->memory_base) {
-					entry->memory_base =
-					    pci_ap[i].pci_phys_low +
-					    pci_ap[i].pci_size_low;
-				}
-			break;
-			case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
-				if ((PCICFG_LADDR(pci_ap[i].pci_phys_low,
-				    pci_ap[i].pci_phys_mid) +
-				    pci_ap[i].pci_size_low) >
-				    entry->memory_base) {
-					entry->memory_base = PCICFG_LADDR(
-					    pci_ap[i].pci_phys_low,
-					    pci_ap[i].pci_phys_mid) +
-					    pci_ap[i].pci_size_low;
-				}
-			break;
-			case PCI_REG_ADDR_G(PCI_ADDR_IO):
-				if ((pci_ap[i].pci_phys_low +
-				    pci_ap[i].pci_size_low) >
-				    entry->io_base) {
-					entry->io_base =
-					    pci_ap[i].pci_phys_low +
-					    pci_ap[i].pci_size_low;
-				}
-			break;
-			}
-		}
-
-		/*
-		 * free the memory allocated by ddi_getlongprop
-		 */
-		kmem_free(pci_ap, length);
-
-		/*
-		 * continue the walk to the next sibling to sum memory
-		 */
+ap:	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "assigned-addresses",
+	    (caddr_t)&pci_ap,  &length) != DDI_PROP_SUCCESS) {
+		DEBUG0("Node doesn't have assigned-addresses\n");
 		return (DDI_WALK_CONTINUE);
 	}
+
+	rcount = length / sizeof (pci_regspec_t);
+
+	for (i = 0; i < rcount; i++) {
+
+		switch (PCI_REG_ADDR_G(pci_ap[i].pci_phys_hi)) {
+
+		case PCI_REG_ADDR_G(PCI_ADDR_MEM32):
+			if ((pci_ap[i].pci_phys_low +
+			    pci_ap[i].pci_size_low) >
+			    entry_p->memory_base) {
+				entry_p->memory_base =
+				    pci_ap[i].pci_phys_low +
+				    pci_ap[i].pci_size_low;
+			}
+		break;
+		case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
+			if ((PCICFG_LADDR(pci_ap[i].pci_phys_low,
+			    pci_ap[i].pci_phys_mid) +
+			    pci_ap[i].pci_size_low) >
+			    entry_p->memory_base) {
+				entry_p->memory_base = PCICFG_LADDR(
+				    pci_ap[i].pci_phys_low,
+				    pci_ap[i].pci_phys_mid) +
+				    pci_ap[i].pci_size_low;
+			}
+		break;
+		case PCI_REG_ADDR_G(PCI_ADDR_IO):
+			if ((pci_ap[i].pci_phys_low +
+			    pci_ap[i].pci_size_low) >
+			    entry_p->io_base) {
+				entry_p->io_base =
+				    pci_ap[i].pci_phys_low +
+				    pci_ap[i].pci_size_low;
+			}
+		break;
+		}
+	}
+
+	/*
+	 * free the memory allocated by ddi_getlongprop
+	 */
+	kmem_free(pci_ap, length);
+
+	/*
+	 * continue the walk to the next sibling to sum memory
+	 */
+	return (DDI_WALK_CONTINUE);
 }
 
 static int
@@ -2944,6 +2998,53 @@ pcicfg_update_reg_prop(dev_info_t *dip, uint32_t regvalue, uint_t reg_offset)
 
 	kmem_free((caddr_t)newreg, rlen+sizeof (pci_regspec_t));
 	kmem_free((caddr_t)reg, rlen);
+
+	return (PCICFG_SUCCESS);
+}
+static int
+pcicfg_update_available_prop(dev_info_t *dip, pci_regspec_t *newone)
+{
+	int		alen;
+	pci_regspec_t	*avail_p;
+	caddr_t		new_avail;
+	uint_t		status;
+
+	DEBUG2("pcicfg_update_available_prop() - Address %lx Size %x\n",
+	    newone->pci_phys_low, newone->pci_size_low);
+	status = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+		"available", (caddr_t)&avail_p, &alen);
+	switch (status) {
+		case DDI_PROP_SUCCESS:
+			break;
+		case DDI_PROP_NO_MEMORY:
+			DEBUG0("no memory for available property\n");
+			return (PCICFG_FAILURE);
+		default:
+			(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
+			    "available", (int *)newone,
+			    sizeof (*newone)/sizeof (int));
+
+			return (PCICFG_SUCCESS);
+	}
+
+	/*
+	 * Allocate memory for the existing available plus one and then
+	 * build it.
+	 */
+	new_avail = kmem_zalloc(alen+sizeof (*newone), KM_SLEEP);
+
+	bcopy(avail_p, new_avail, alen);
+	bcopy(newone, new_avail + alen, sizeof (*newone));
+
+	/* Write out the new "available" spec */
+	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
+		"available", (int *)new_avail,
+		(alen + sizeof (*newone))/sizeof (int));
+
+	kmem_free((caddr_t)new_avail, alen+sizeof (*newone));
+
+	/* Don't forget to free up memory from ddi_getlongprop */
+	kmem_free((caddr_t)avail_p, alen);
 
 	return (PCICFG_SUCCESS);
 }
@@ -4542,6 +4643,9 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	 * warning messages appropriately (perhaps some can be in debug mode).
 	 */
 	if (num_slots) {
+		pci_regspec_t reg;
+		uint64_t mem_assigned = mem_end;
+		uint64_t io_assigned = io_end;
 		uint64_t mem_reqd = mem_answer + (num_slots *
 						pcicfg_slot_memsize);
 		uint64_t io_reqd = io_answer + (num_slots *
@@ -4583,6 +4687,31 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 							*highest_bus);
 		DEBUG3("mem_end %lx, io_end %lx, highest_bus %x\n",
 				mem_end, io_end, *highest_bus);
+
+		mem_size = mem_end - mem_assigned;
+		io_size = io_end - io_assigned;
+
+		reg.pci_phys_mid = reg.pci_size_hi = 0;
+		if (io_size > 0) {
+			reg.pci_phys_hi = (PCI_REG_REL_M | PCI_ADDR_IO);
+			reg.pci_phys_low = io_assigned;
+			reg.pci_size_low = io_size;
+			if (pcicfg_update_available_prop(new_child, &reg)) {
+				DEBUG0("Failed to update available prop "
+				    "(io)\n");
+				return (PCICFG_FAILURE);
+			}
+		}
+		if (mem_size > 0) {
+			reg.pci_phys_hi = (PCI_REG_REL_M | PCI_ADDR_MEM32);
+			reg.pci_phys_low = mem_assigned;
+			reg.pci_size_low = mem_size;
+			if (pcicfg_update_available_prop(new_child, &reg)) {
+				DEBUG0("Failed to update available prop "
+				    "(memory)\n");
+				return (PCICFG_FAILURE);
+			}
+		}
 	}
 
 	/*

@@ -620,15 +620,31 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			}
 			return (DDI_SUCCESS);
 
-		case DDI_POST:
+		case DDI_POST: {
+			ddi_acc_handle_t	config_handle;
 			DBG(DBG_PWR, dip, "POST_ATTACH for %s@%d\n",
 			    ddi_driver_name(rdip), ddi_get_instance(rdip));
 			if (as->cmd == DDI_ATTACH && as->result != DDI_SUCCESS)
 				pcie_pm_release(dip);
 
-			(void) pcie_postattach_child(rdip);
+			/*
+			 * For hotplug-capable slots, we should explicitly
+			 * disable the errors, so that we won't panic upon
+			 * unsupported hotplug messages.
+			 */
+			if (!ddi_prop_exists(DDI_DEV_T_ANY, rdip,
+			    DDI_PROP_DONTPASS, "hotplug-capable")) {
+				(void) pcie_postattach_child(rdip);
+				return (DDI_SUCCESS);
+			}
+			if (pci_config_setup(rdip, &config_handle) ==
+			    DDI_SUCCESS) {
+				pcie_disable_errors(rdip, config_handle);
+				pci_config_teardown(&config_handle);
+			}
 
 			return (DDI_SUCCESS);
+		}
 		default:
 			break;
 		}
@@ -1251,6 +1267,10 @@ pxb_init_hotplug(pxb_devstate_t *pxb)
 	}
 
 	pxb->pxb_hotplug_capable = (pxb->pxb_hpc_type != HPC_NONE);
+
+	if (pxb->pxb_hotplug_capable == B_TRUE)
+		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, pxb->pxb_dip,
+		    "hotplug-capable");
 }
 
 static void

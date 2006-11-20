@@ -49,24 +49,8 @@
 #include <sys/sunndi.h>
 #include <sys/ndi_impldefs.h>
 #include <sys/hotplug/pci/pcishpc.h>
+#include <sys/hotplug/pci/pcishpc_regs.h>
 #include <sys/hotplug/hpcsvc.h>
-
-/*
- * SHPC controller registers accessed via the SHPC DWORD select and DATA
- * registers in PCI configuration space relative to the SHPC capibility
- * pointer.
- */
-#define	SHPC_BASE_OFFSET_REG		0x00
-#define	SHPC_SLOTS_AVAIL_I_REG		0x01
-#define	SHPC_SLOTS_AVAIL_II_REG		0x02
-#define	SHPC_SLOT_CONFIGURATION_REG	0x03
-#define	SHPC_PROF_IF_SBCR_REG		0x04
-#define	SHPC_COMMAND_STATUS_REG		0x05
-#define	SHPC_IRQ_LOCATOR_REG		0x06
-#define	SHPC_SERR_LOCATOR_REG		0x07
-#define	SHPC_CTRL_SERR_INT_REG		0x08
-#define	SHPC_LOGICAL_SLOT_REGS		0x09
-#define	SHPC_VENDOR_SPECIFIC		0x28
 
 
 /* General Register bit weights for the 32-bit SHPC registers */
