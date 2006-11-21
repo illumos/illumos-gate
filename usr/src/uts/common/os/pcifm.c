@@ -49,6 +49,14 @@
 uint32_t pcie_expected_ce_mask = PCIE_AER_CE_AD_NFE;
 uint32_t pcie_expected_ue_mask = 0x0;
 uint32_t pcie_expected_sue_mask = 0x0;
+#if defined(__sparc)
+uint32_t pcie_aer_uce_log_bits = PCIE_AER_UCE_LOG_BITS;
+uint32_t pcie_aer_suce_log_bits = PCIE_AER_SUCE_LOG_BITS;
+#else
+uint32_t pcie_aer_uce_log_bits = PCIE_AER_UCE_LOG_BITS & ~PCIE_AER_UCE_UR;
+uint32_t pcie_aer_suce_log_bits = \
+	    PCIE_AER_SUCE_LOG_BITS & ~PCIE_AER_SUCE_RCVD_MA;
+#endif
 
 errorq_t *pci_target_queue = NULL;
 
@@ -66,7 +74,11 @@ pci_fm_err_t pci_bdg_err_tbl[] = {
 	PCI_DET_PERR,	PCI_STAT_PERROR,	NULL,		DDI_FM_UNKNOWN,
 	PCI_MDPE,	PCI_STAT_S_PERROR,	PCI_TARG_MDPE,	DDI_FM_UNKNOWN,
 	PCI_REC_SERR,	PCI_STAT_S_SYSERR,	NULL,		DDI_FM_UNKNOWN,
+#if !defined(__sparc)
+	PCI_MA,		PCI_STAT_R_MAST_AB,	PCI_TARG_MA,	DDI_FM_OK,
+#else
 	PCI_MA,		PCI_STAT_R_MAST_AB,	PCI_TARG_MA,	DDI_FM_UNKNOWN,
+#endif
 	PCI_REC_TA,	PCI_STAT_R_TARG_AB,	PCI_TARG_REC_TA, DDI_FM_UNKNOWN,
 	PCI_SIG_TA,	PCI_STAT_S_TARG_AB,	NULL,		DDI_FM_UNKNOWN,
 	NULL, NULL, NULL, NULL,
@@ -93,7 +105,11 @@ static pci_fm_err_t pciex_ue_err_tbl[] = {
 	PCIEX_UC,	PCIE_AER_UCE_UC,		NULL,	DDI_FM_OK,
 	PCIEX_ECRC,	PCIE_AER_UCE_ECRC,		NULL,	DDI_FM_UNKNOWN,
 	PCIEX_CA,	PCIE_AER_UCE_CA,		NULL,	DDI_FM_UNKNOWN,
+#if !defined(__sparc)
+	PCIEX_UR,	PCIE_AER_UCE_UR,		NULL,	DDI_FM_OK,
+#else
 	PCIEX_UR,	PCIE_AER_UCE_UR,		NULL,	DDI_FM_UNKNOWN,
+#endif
 	PCIEX_POIS,	PCIE_AER_UCE_PTLP,		NULL,	DDI_FM_UNKNOWN,
 	NULL, NULL, NULL, NULL,
 };
@@ -102,7 +118,11 @@ static pci_fm_err_t pcie_sue_err_tbl[] = {
 	PCIEX_S_TA_SC,	PCIE_AER_SUCE_TA_ON_SC,		NULL,	DDI_FM_UNKNOWN,
 	PCIEX_S_MA_SC,	PCIE_AER_SUCE_MA_ON_SC,		NULL,	DDI_FM_UNKNOWN,
 	PCIEX_S_RTA,	PCIE_AER_SUCE_RCVD_TA,		NULL,	DDI_FM_UNKNOWN,
+#if !defined(__sparc)
+	PCIEX_S_RMA,	PCIE_AER_SUCE_RCVD_MA,		NULL,	DDI_FM_OK,
+#else
 	PCIEX_S_RMA,	PCIE_AER_SUCE_RCVD_MA,		NULL,	DDI_FM_UNKNOWN,
+#endif
 	PCIEX_S_USC,	PCIE_AER_SUCE_USC_ERR,		NULL,	DDI_FM_UNKNOWN,
 	PCIEX_S_USCMD,	PCIE_AER_SUCE_USC_MSG_DATA_ERR,	NULL,	DDI_FM_FATAL,
 	PCIEX_S_UDE,	PCIE_AER_SUCE_UC_DATA_ERR,	NULL,	DDI_FM_UNKNOWN,
@@ -1944,7 +1964,7 @@ pcie_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 
 			pcie_adv_regs->pcie_adv_bdf = 0;
 			if ((pcie_adv_regs->pcie_ue_status &
-			    PCIE_AER_UCE_LOG_BITS) !=
+			    pcie_aer_uce_log_bits) !=
 			    pciex_ue_err_tbl[i].reg_bit) {
 				PCI_FM_SEV_INC(pciex_ue_err_tbl[i].flags);
 				pcie_ereport_post(dip, derr, erpt_p, buf,
@@ -2006,7 +2026,7 @@ pcie_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 			    pcie_sue_err_tbl[i].err_class);
 
 			if ((pcie_bdg_regs->pcie_sue_status &
-			    PCIE_AER_SUCE_LOG_BITS) !=
+			    pcie_aer_suce_log_bits) !=
 			    pcie_sue_err_tbl[i].reg_bit) {
 				PCI_FM_SEV_INC(pcie_sue_err_tbl[i].flags);
 				ddi_fm_ereport_post(dip, buf, derr->fme_ena,

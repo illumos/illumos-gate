@@ -93,7 +93,7 @@ ushort_t	pcie_root_error_cmd_default = \
  */
 uint32_t	pcie_aer_uce_mask = 0;
 uint32_t	pcie_aer_ce_mask = PCIE_AER_CE_AD_NFE;
-uint32_t	pcie_aer_suce_mask = 0;
+uint32_t	pcie_aer_suce_mask = PCIE_AER_SUCE_RCVD_MA;
 
 /*
  * PCI-Express related severity (AER only)
