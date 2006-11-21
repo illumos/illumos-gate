@@ -428,6 +428,8 @@
 6232:AUE_remove:remove/eject device:ot
 6233:AUE_pool_import:import device into pool:ot
 6234:AUE_pool_export:export device from pool:ot
+6235:AUE_dladm_create_secobj:create network security object:as,cy
+6236:AUE_dladm_delete_secobj:delete network security object:as,cy
 #
 # Trusted Extensions events:
 #

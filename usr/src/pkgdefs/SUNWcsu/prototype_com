@@ -489,6 +489,7 @@ f none usr/lib/help/auths/locale/C/SysHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/SysShutdown.html 444 root bin
 f none usr/lib/help/auths/locale/C/WifiConfig.html 444 root bin
 f none usr/lib/help/auths/locale/C/WifiWep.html 444 root bin
+f none usr/lib/help/auths/locale/C/LinkSecurity.html 444 root bin
 d none usr/lib/help/profiles 755 root bin
 d none usr/lib/help/profiles/locale 755 root bin
 d none usr/lib/help/profiles/locale/C 755 root bin
@@ -520,6 +521,7 @@ f none usr/lib/help/profiles/locale/C/RtNetMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetWifiMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetWifiSecure.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtNetLinkSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtObAccessMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtPrntAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtProcManagement.html 444 root bin

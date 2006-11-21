@@ -134,7 +134,7 @@ aggr_port_create(const char *name, aggr_port_t **pp)
 		return (err);
 
 	mip = mac_info(mh);
-	if (mip->mi_media != DL_ETHER) {
+	if (mip->mi_media != DL_ETHER || mip->mi_nativemedia != DL_ETHER) {
 		mac_close(mh);
 		return (EINVAL);
 	}

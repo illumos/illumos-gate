@@ -104,6 +104,23 @@ lockstat:*		0600 root sys 0644 root sys /dev/dtrace/provider/lockstat
 profile:profile		0600 root sys 0644 root sys /dev/dtrace/provider/profile
 sdt:sdt			0600 root sys 0644 root sys /dev/dtrace/provider/sdt
 systrace:systrace	0600 root sys 0644 root sys /dev/dtrace/provider/systrace
+clone:bge		0600 root sys 0666 root sys	/dev/bge
+clone:rge		0600 root sys 0666 root sys	/dev/rge
+clone:xge		0600 root sys 0666 root sys	/dev/xge
+clone:nge		0600 root sys 0666 root sys	/dev/nge
+clone:chxge		0600 root sys 0666 root sys	/dev/chxge
+clone:pcn		0600 root sys 0666 root sys	/dev/pcn
+clone:rtls		0600 root sys 0666 root sys	/dev/rtls
+clone:ath		0600 root sys 0666 root sys	/dev/ath
+bge:*			0600 root sys 0666 root sys	/dev/bge*
+rge:*			0600 root sys 0666 root sys	/dev/rge*
+xge:*			0600 root sys 0666 root sys	/dev/xge*
+nge:*			0600 root sys 0666 root sys	/dev/nge*
+e1000g:*		0666 root root 0666 root sys	/dev/e1000g*
+chxge:*			0600 root sys 0666 root sys	/dev/chxge*
+pcn:*			0600 root sys 0666 root sys	/dev/pcn*
+rtls:*			0600 root sys 0666 root sys	/dev/rtls*
+ath:*			0600 root sys 0666 root sys	/dev/ath*
 EOF
 }
 
@@ -220,7 +237,23 @@ sctp6:*
 vni:*
 cpuid:self
 clone:bge
+clone:rge
+clone:xge
+clone:nge
+clone:e1000g
+clone:chxge
+clone:pcn
+clone:rtls
+clone:ath
 bge:*
+rge:*
+xge:*
+nge:*
+e1000g:*
+chxge:*
+pcn:*
+rtls:*
+ath:*
 bmc:bmc
 dld:*
 aggr:*

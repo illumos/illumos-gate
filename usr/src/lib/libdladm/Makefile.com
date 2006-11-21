@@ -27,7 +27,7 @@
 
 LIBRARY = libdladm.a
 VERS    = .1
-OBJECTS = libdladm.o
+OBJECTS = libdladm.o secobj.o linkprop.o
 
 include ../../Makefile.lib
 
@@ -35,8 +35,7 @@ include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-
-LDLIBS +=	-ldevinfo -ldlpi -lc
+LDLIBS +=	-ldevinfo -ldlpi -lc -lwladm -linetutil
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

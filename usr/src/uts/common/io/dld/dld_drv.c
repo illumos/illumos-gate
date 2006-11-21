@@ -55,6 +55,19 @@ static int	drv_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	drv_detach(dev_info_t *, ddi_detach_cmd_t);
 
 /*
+ * Secure objects declarations
+ */
+#define	SECOBJ_WEP_HASHSZ	67
+static krwlock_t	drv_secobj_lock;
+static kmem_cache_t	*drv_secobj_cachep;
+static mod_hash_t	*drv_secobj_hash;
+static void		drv_secobj_init(void);
+static void		drv_secobj_fini(void);
+static void		drv_ioc_secobj_set(dld_ctl_str_t *, mblk_t *);
+static void		drv_ioc_secobj_get(dld_ctl_str_t *, mblk_t *);
+static void		drv_ioc_secobj_unset(dld_ctl_str_t *, mblk_t *);
+
+/*
  * The following entry points are private to dld and are used for control
  * operations only. The entry points exported to mac drivers are defined
  * in dld_str.c. Refer to the comment on top of dld_str.c for details.
@@ -161,7 +174,6 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&drv_modlinkage, modinfop));
 }
 
-
 /*
  * Initialize component modules.
  */
@@ -170,6 +182,7 @@ drv_init(void)
 {
 	dld_ctl_vmem = vmem_create("dld_ctl", (void *)1, MAXMIN, 1,
 	    NULL, NULL, NULL, 1, VM_SLEEP | VMC_IDENTIFIER);
+	drv_secobj_init();
 	dld_str_init();
 }
 
@@ -181,6 +194,7 @@ drv_fini(void)
 	if ((err = dld_str_fini()) != 0)
 		return (err);
 
+	drv_secobj_fini();
 	vmem_destroy(dld_ctl_vmem);
 	return (0);
 }
@@ -489,6 +503,15 @@ drv_ioc(dld_ctl_str_t *ctls, mblk_t *mp)
 	case DLDIOCVLAN:
 		drv_ioc_vlan(ctls, mp);
 		return;
+	case DLDIOCSECOBJSET:
+		drv_ioc_secobj_set(ctls, mp);
+		return;
+	case DLDIOCSECOBJGET:
+		drv_ioc_secobj_get(ctls, mp);
+		return;
+	case DLDIOCSECOBJUNSET:
+		drv_ioc_secobj_unset(ctls, mp);
+		return;
 	default:
 		miocnak(ctls->cs_wq, mp, 0, ENOTSUP);
 		return;
@@ -523,4 +546,223 @@ drv_uw_srv(queue_t *q)
 
 	while (mp = getq(q))
 		drv_uw_put(q, mp);
+}
+
+/*
+ * Secure objects implementation
+ */
+
+/* ARGSUSED */
+static int
+drv_secobj_ctor(void *buf, void *arg, int kmflag)
+{
+	bzero(buf, sizeof (dld_secobj_t));
+	return (0);
+}
+
+static void
+drv_secobj_init(void)
+{
+	rw_init(&drv_secobj_lock, NULL, RW_DEFAULT, NULL);
+	drv_secobj_cachep = kmem_cache_create("drv_secobj_cache",
+	    sizeof (dld_secobj_t), 0, drv_secobj_ctor, NULL,
+	    NULL, NULL, NULL, 0);
+	drv_secobj_hash = mod_hash_create_extended("drv_secobj_hash",
+	    SECOBJ_WEP_HASHSZ, mod_hash_null_keydtor, mod_hash_null_valdtor,
+	    mod_hash_bystr, NULL, mod_hash_strkey_cmp, KM_SLEEP);
+}
+
+static void
+drv_secobj_fini(void)
+{
+	mod_hash_destroy_hash(drv_secobj_hash);
+	kmem_cache_destroy(drv_secobj_cachep);
+	rw_destroy(&drv_secobj_lock);
+}
+
+static void
+drv_ioc_secobj_set(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	dld_ioc_secobj_set_t	*ssp;
+	dld_secobj_t		*sobjp, *objp;
+	int			err = EINVAL;
+	queue_t			*q = ctls->cs_wq;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_secobj_set_t))) != 0)
+		goto failed;
+
+	ssp = (dld_ioc_secobj_set_t *)mp->b_cont->b_rptr;
+	sobjp = &ssp->ss_obj;
+
+	if (sobjp->so_class != DLD_SECOBJ_CLASS_WEP)
+		goto failed;
+
+	if (sobjp->so_name[DLD_SECOBJ_NAME_MAX - 1] != '\0' ||
+	    sobjp->so_len > DLD_SECOBJ_VAL_MAX)
+		goto failed;
+
+	rw_enter(&drv_secobj_lock, RW_WRITER);
+	err = mod_hash_find(drv_secobj_hash, (mod_hash_key_t)sobjp->so_name,
+	    (mod_hash_val_t *)&objp);
+	if (err == 0) {
+		if ((ssp->ss_flags & DLD_SECOBJ_OPT_CREATE) != 0) {
+			err = EEXIST;
+			rw_exit(&drv_secobj_lock);
+			goto failed;
+		}
+	} else {
+		ASSERT(err == MH_ERR_NOTFOUND);
+		if ((ssp->ss_flags & DLD_SECOBJ_OPT_CREATE) == 0) {
+			err = ENOENT;
+			rw_exit(&drv_secobj_lock);
+			goto failed;
+		}
+		objp = kmem_cache_alloc(drv_secobj_cachep, KM_SLEEP);
+		(void) strlcpy(objp->so_name, sobjp->so_name,
+		    DLD_SECOBJ_NAME_MAX);
+
+		err = mod_hash_insert(drv_secobj_hash,
+		    (mod_hash_key_t)objp->so_name, (mod_hash_val_t)objp);
+		ASSERT(err == 0);
+	}
+	bcopy(sobjp->so_val, objp->so_val, sobjp->so_len);
+	objp->so_len = sobjp->so_len;
+	objp->so_class = sobjp->so_class;
+	rw_exit(&drv_secobj_lock);
+	miocack(q, mp, 0, 0);
+	return;
+
+failed:
+	ASSERT(err != 0);
+	miocnak(q, mp, 0, err);
+
+}
+
+typedef struct dld_secobj_state {
+	uint_t		ss_free;
+	uint_t		ss_count;
+	int		ss_rc;
+	dld_secobj_t	*ss_objp;
+} dld_secobj_state_t;
+
+/* ARGSUSED */
+static uint_t
+drv_secobj_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
+{
+	dld_secobj_state_t	*statep = arg;
+	dld_secobj_t		*sobjp = (dld_secobj_t *)val;
+
+	if (statep->ss_free < sizeof (dld_secobj_t)) {
+		statep->ss_rc = ENOSPC;
+		return (MH_WALK_TERMINATE);
+	}
+	bcopy(sobjp, statep->ss_objp, sizeof (dld_secobj_t));
+	statep->ss_objp++;
+	statep->ss_free -= sizeof (dld_secobj_t);
+	statep->ss_count++;
+	return (MH_WALK_CONTINUE);
+}
+
+static void
+drv_ioc_secobj_get(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	dld_ioc_secobj_get_t	*sgp;
+	dld_secobj_t		*sobjp, *objp;
+	int			err = EINVAL;
+	uint_t			extra = 0;
+	queue_t			*q = ctls->cs_wq;
+	mblk_t			*bp;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_secobj_get_t))) != 0)
+		goto failed;
+
+	if ((bp = msgpullup(mp->b_cont, -1)) == NULL)
+		goto failed;
+
+	freemsg(mp->b_cont);
+	mp->b_cont = bp;
+	sgp = (dld_ioc_secobj_get_t *)bp->b_rptr;
+	sobjp = &sgp->sg_obj;
+
+	if (sobjp->so_name[DLD_SECOBJ_NAME_MAX - 1] != '\0')
+		goto failed;
+
+	rw_enter(&drv_secobj_lock, RW_READER);
+	if (sobjp->so_name[0] != '\0') {
+		err = mod_hash_find(drv_secobj_hash,
+		    (mod_hash_key_t)sobjp->so_name, (mod_hash_val_t *)&objp);
+		if (err != 0) {
+			ASSERT(err == MH_ERR_NOTFOUND);
+			err = ENOENT;
+			rw_exit(&drv_secobj_lock);
+			goto failed;
+		}
+		bcopy(objp->so_val, sobjp->so_val, objp->so_len);
+		sobjp->so_len = objp->so_len;
+		sobjp->so_class = objp->so_class;
+		sgp->sg_count = 1;
+	} else {
+		dld_secobj_state_t	state;
+
+		state.ss_free = MBLKL(bp) - sizeof (dld_ioc_secobj_get_t);
+		state.ss_count = 0;
+		state.ss_rc = 0;
+		state.ss_objp = (dld_secobj_t *)(sgp + 1);
+		mod_hash_walk(drv_secobj_hash, drv_secobj_walker, &state);
+		if (state.ss_rc != 0) {
+			err = state.ss_rc;
+			rw_exit(&drv_secobj_lock);
+			goto failed;
+		}
+		sgp->sg_count = state.ss_count;
+		extra = state.ss_count * sizeof (dld_secobj_t);
+	}
+	rw_exit(&drv_secobj_lock);
+	miocack(q, mp, sizeof (dld_ioc_secobj_get_t) + extra, 0);
+	return;
+
+failed:
+	ASSERT(err != 0);
+	miocnak(q, mp, 0, err);
+
+}
+
+static void
+drv_ioc_secobj_unset(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	dld_ioc_secobj_unset_t	*sup;
+	dld_secobj_t		*objp;
+	mod_hash_val_t		val;
+	int			err = EINVAL;
+	queue_t			*q = ctls->cs_wq;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_secobj_unset_t))) != 0)
+		goto failed;
+
+	sup = (dld_ioc_secobj_unset_t *)mp->b_cont->b_rptr;
+	if (sup->su_name[DLD_SECOBJ_NAME_MAX - 1] != '\0')
+		goto failed;
+
+	rw_enter(&drv_secobj_lock, RW_WRITER);
+	err = mod_hash_find(drv_secobj_hash, (mod_hash_key_t)sup->su_name,
+	    (mod_hash_val_t *)&objp);
+	if (err != 0) {
+		ASSERT(err == MH_ERR_NOTFOUND);
+		err = ENOENT;
+		rw_exit(&drv_secobj_lock);
+		goto failed;
+	}
+	err = mod_hash_remove(drv_secobj_hash, (mod_hash_key_t)sup->su_name,
+	    (mod_hash_val_t *)&val);
+	ASSERT(err == 0);
+	ASSERT(objp == (dld_secobj_t *)val);
+
+	kmem_cache_free(drv_secobj_cachep, objp);
+	rw_exit(&drv_secobj_lock);
+	miocack(q, mp, 0, 0);
+	return;
+
+failed:
+	ASSERT(err != 0);
+	miocnak(q, mp, 0, err);
 }

@@ -26,7 +26,9 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
+#include <ctype.h>
 #include <locale.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -38,11 +40,19 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <priv.h>
+#include <termios.h>
+#include <pwd.h>
+#include <auth_attr.h>
+#include <auth_list.h>
 #include <libintl.h>
 #include <libdlpi.h>
 #include <libdladm.h>
 #include <liblaadm.h>
 #include <libmacadm.h>
+#include <libwladm.h>
+#include <libinetutil.h>
+#include <bsm/adt.h>
+#include <bsm/adt_event.h>
 
 #define	AGGR_DRV	"aggr"
 #define	MAXPORT		256
@@ -95,16 +105,15 @@ static port_state_t port_states[] = {
 
 #define	NPORTSTATES	(sizeof (port_states) / sizeof (port_state_t))
 
-static void	do_show_link(int, char **);
-static void	do_create_aggr(int, char **);
-static void	do_delete_aggr(int, char **);
-static void	do_add_aggr(int, char **);
-static void	do_remove_aggr(int, char **);
-static void	do_modify_aggr(int, char **);
-static void	do_show_aggr(int, char **);
-static void	do_up_aggr(int, char **);
-static void	do_down_aggr(int, char **);
-static void	do_show_dev(int, char **);
+typedef	void cmdfunc_t(int, char **);
+
+static cmdfunc_t do_show_link, do_show_dev, do_show_wifi;
+static cmdfunc_t do_create_aggr, do_delete_aggr, do_add_aggr, do_remove_aggr;
+static cmdfunc_t do_modify_aggr, do_show_aggr, do_up_aggr, do_down_aggr;
+static cmdfunc_t do_scan_wifi, do_connect_wifi, do_disconnect_wifi;
+static cmdfunc_t do_show_linkprop, do_set_linkprop, do_reset_linkprop;
+static cmdfunc_t do_create_secobj, do_delete_secobj, do_show_secobj;
+static cmdfunc_t do_init_linkprop, do_init_secobj;
 
 static void	link_stats(const char *, uint32_t);
 static void	aggr_stats(uint16_t, uint32_t);
@@ -119,41 +128,81 @@ static void	stats_total(pktsum_t *, pktsum_t *, pktsum_t *);
 static void	stats_diff(pktsum_t *, pktsum_t *, pktsum_t *);
 
 typedef struct	cmd {
-	char	*c_name;
-	void	(*c_fn)(int, char **);
+	char		*c_name;
+	cmdfunc_t	*c_fn;
 } cmd_t;
 
 static cmd_t	cmds[] = {
-	{ "show-link", do_show_link },
-	{ "show-dev", do_show_dev },
-
-	{ "create-aggr", do_create_aggr },
-	{ "delete-aggr", do_delete_aggr },
-	{ "add-aggr", do_add_aggr },
-	{ "remove-aggr", do_remove_aggr },
-	{ "modify-aggr", do_modify_aggr },
-	{ "show-aggr", do_show_aggr },
-	{ "up-aggr", do_up_aggr },
-	{ "down-aggr", do_down_aggr }
+	{ "show-link",		do_show_link 		},
+	{ "show-dev",		do_show_dev 		},
+	{ "create-aggr",	do_create_aggr		},
+	{ "delete-aggr",	do_delete_aggr 		},
+	{ "add-aggr",		do_add_aggr 		},
+	{ "remove-aggr",	do_remove_aggr		},
+	{ "modify-aggr",	do_modify_aggr		},
+	{ "show-aggr",		do_show_aggr		},
+	{ "up-aggr",		do_up_aggr		},
+	{ "down-aggr",		do_down_aggr		},
+	{ "scan-wifi",		do_scan_wifi 		},
+	{ "connect-wifi",	do_connect_wifi 	},
+	{ "disconnect-wifi",	do_disconnect_wifi 	},
+	{ "show-wifi",		do_show_wifi		},
+	{ "show-linkprop",	do_show_linkprop 	},
+	{ "set-linkprop", 	do_set_linkprop 	},
+	{ "reset-linkprop",	do_reset_linkprop 	},
+	{ "create-secobj",	do_create_secobj 	},
+	{ "delete-secobj",	do_delete_secobj 	},
+	{ "show-secobj",	do_show_secobj 		},
+	{ "init-linkprop",	do_init_linkprop	},
+	{ "init-secobj",	do_init_secobj 		}
 };
 
 static const struct option longopts[] = {
-	{"vlan-id",	required_argument,	0, 'v'},
-	{"dev",		required_argument,	0, 'd'},
-	{"policy",	required_argument,	0, 'P'},
-	{"lacp-mode",	required_argument,	0, 'l'},
-	{"lacp-timer",	required_argument,	0, 'T'},
-	{"unicast",	required_argument,	0, 'u'},
-	{"statistics",	no_argument,		0, 's'},
-	{"interval",	required_argument,	0, 'i'},
-	{"lacp",	no_argument,		0, 'L'},
-	{"temporary",	no_argument,		0, 't'},
-	{"root-dir",	required_argument,	0, 'r'},
-	{"parseable",	no_argument,		0, 'p'},
+	{"vlan-id",	required_argument,	0, 'v'	},
+	{"dev",		required_argument,	0, 'd'	},
+	{"policy",	required_argument,	0, 'P'	},
+	{"lacp-mode",	required_argument,	0, 'l'	},
+	{"lacp-timer",	required_argument,	0, 'T'	},
+	{"unicast",	required_argument,	0, 'u'	},
+	{"statistics",	no_argument,		0, 's'	},
+	{"interval",	required_argument,	0, 'i'	},
+	{"lacp",	no_argument,		0, 'L'	},
+	{"temporary",	no_argument,		0, 't'	},
+	{"root-dir",	required_argument,	0, 'r'	},
+	{"parseable",	no_argument,		0, 'p'	},
+	{ 0, 0, 0, 0 }
+};
+
+static const struct option prop_longopts[] = {
+	{"temporary",	no_argument,		0, 't'	},
+	{"root-dir",	required_argument,	0, 'R'	},
+	{"prop",	required_argument,	0, 'p'	},
+	{"parseable",	no_argument,		0, 'c'	},
+	{"persistent",	no_argument,		0, 'P'	},
+	{ 0, 0, 0, 0 }
+};
+
+static const struct option wifi_longopts[] = {
+	{"parseable",	no_argument,		0, 'p'	},
+	{"output",	required_argument,	0, 'o'	},
+	{"essid",	required_argument,	0, 'e'	},
+	{"bsstype",	required_argument,	0, 'b'	},
+	{"mode",	required_argument,	0, 'm'	},
+	{"key",		required_argument,	0, 'k'	},
+	{"sec",		required_argument,	0, 's'	},
+	{"auth",	required_argument,	0, 'a'	},
+	{"create-ibss",	required_argument,	0, 'c'	},
+	{"timeout",	required_argument,	0, 'T'	},
+	{"all-links",	no_argument,		0, 'a'	},
+	{"temporary",	no_argument,		0, 't'	},
+	{"root-dir",	required_argument,	0, 'R'	},
+	{"persistent",	no_argument,		0, 'P'	},
+	{"file",	required_argument,	0, 'f'	},
 	{ 0, 0, 0, 0 }
 };
 
 static char *progname;
+static sig_atomic_t signalled;
 
 #define	PRINT_ERR_DIAG(s, diag, func) {					\
 	(void) fprintf(stderr, gettext(s), progname, strerror(errno));	\
@@ -165,18 +214,36 @@ static char *progname;
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext(
-	    "usage: dladm create-aggr [-t] [-R <root-dir>] [-P <policy>]\n"
-	    "                    [-l <mode>] [-T <time>]\n"
-	    "                    [-u <address>] -d <dev> ... <key>\n"
-	    "             delete-aggr [-t] [-R <root-dir>] <key>\n"
-	    "             add-aggr    [-t] [-R <root-dir>] -d <dev> ... <key>\n"
-	    "             remove-aggr [-t] [-R <root-dir>] -d <dev> ... <key>\n"
-	    "             modify-aggr [-t] [-R <root-dir>] [-P <policy>]\n"
-	    "                    [-l <mode>] [-T <time>] [-u <address>] <key>\n"
-	    "             show-aggr [-L] [-s] [-i <interval>] [-p] [<key>]\n"
-	    "             show-dev [-s] [-i <interval>] [-p] [<dev>]\n"
-	    "             show-link [-s] [-i <interval>] [-p] [<name>]\n"));
+	(void) fprintf(stderr, gettext("usage:  dladm <subcommand> <args> ...\n"
+	    "\tshow-link       [-p] [-s [-i <interval>]] [<name>]\n"
+	    "\tshow-dev        [-p] [-s [-i <interval>]] [<dev>]\n"
+	    "\n"
+	    "\tcreate-aggr     [-t] [-R <root-dir>] [-P <policy>] [-l <mode>]\n"
+	    "\t                [-T <time>] [-u <address>] -d <dev> ... <key>\n"
+	    "\tmodify-aggr     [-t] [-R <root-dir>] [-P <policy>] [-l <mode>]\n"
+	    "\t                [-T <time>] [-u <address>] <key>\n"
+	    "\tdelete-aggr     [-t] [-R <root-dir>] <key>\n"
+	    "\tadd-aggr        [-t] [-R <root-dir>] -d <dev> ... <key>\n"
+	    "\tremove-aggr     [-t] [-R <root-dir>] -d <dev> ... <key>\n"
+	    "\tshow-aggr       [-pL][-s [-i <interval>]] [<key>]\n"
+	    "\n"
+	    "\tscan-wifi       [-p] [-o <field>,...] [<name>]\n"
+	    "\tconnect-wifi    [-e <essid>] [-i <bssid>] [-k <key>,...]"
+	    " [-s wep]\n"
+	    "\t                [-a open|shared] [-b bss|ibss] [-c] [-m a|b|g]\n"
+	    "\t                [-T <time>] [<name>]\n"
+	    "\tdisconnect-wifi [-a] [<name>]\n"
+	    "\tshow-wifi       [-p] [-o <field>,...] [<name>]\n"
+	    "\n"
+	    "\tset-linkprop    [-t] [-R <root-dir>]  -p <prop>=<value>[,...]"
+	    " <name>\n"
+	    "\treset-linkprop  [-t] [-R <root-dir>] [-p <prop>,...] <name>\n"
+	    "\tshow-linkprop   [-cP][-p <prop>,...] <name>\n"
+	    "\n"
+	    "\tcreate-secobj   [-t] [-R <root-dir>] [-f <file>] -c <class>"
+	    " <secobj>\n"
+	    "\tdelete-secobj   [-t] [-R <root-dir>] <secobj>[,...]\n"
+	    "\tshow-secobj     [-pP][<secobj>,...]\n"));
 	exit(1);
 }
 
@@ -1929,4 +1996,1933 @@ mac_link_duplex(const char *dev)
 	}
 
 	return (duplex_str);
+}
+
+#define	WIFI_CMD_SCAN	0x00000001
+#define	WIFI_CMD_SHOW	0x00000002
+#define	WIFI_CMD_ALL	(WIFI_CMD_SCAN | WIFI_CMD_SHOW)
+typedef struct wifi_field {
+	const char	*wf_name;
+	const char	*wf_header;
+	uint_t		wf_width;
+	uint_t		wf_mask;
+	uint_t		wf_cmdtype;
+} wifi_field_t;
+
+static wifi_field_t wifi_fields[] = {
+{ "link",	"LINK",		10,	0, 			WIFI_CMD_ALL},
+{ "essid",	"ESSID",	19,	WLADM_WLAN_ATTR_ESSID,	WIFI_CMD_ALL},
+{ "bssid",	"BSSID/IBSSID", 17,	WLADM_WLAN_ATTR_BSSID, 	WIFI_CMD_ALL},
+{ "ibssid",	"BSSID/IBSSID", 17,	WLADM_WLAN_ATTR_BSSID,	WIFI_CMD_ALL},
+{ "mode",	"MODE",		6,	WLADM_WLAN_ATTR_MODE,	WIFI_CMD_ALL},
+{ "speed",	"SPEED",	6,	WLADM_WLAN_ATTR_SPEED,	WIFI_CMD_ALL},
+{ "auth",	"AUTH",		8,	WLADM_WLAN_ATTR_AUTH,	WIFI_CMD_ALL},
+{ "bsstype",	"BSSTYPE",	8,	WLADM_WLAN_ATTR_BSSTYPE, WIFI_CMD_ALL},
+{ "sec", 	"SEC",		6,	WLADM_WLAN_ATTR_SECMODE, WIFI_CMD_ALL},
+{ "status",	"STATUS",	17,	WLADM_LINK_ATTR_STATUS, WIFI_CMD_SHOW},
+{ "strength",	"STRENGTH",	10,	WLADM_WLAN_ATTR_STRENGTH, WIFI_CMD_ALL}}
+;
+
+static char *all_scan_wifi_fields =
+	"link,essid,bssid,sec,strength,mode,speed,auth,bsstype";
+static char *all_show_wifi_fields =
+	"link,status,essid,sec,strength,mode,speed,auth,bssid,bsstype";
+static char *def_scan_wifi_fields =
+	"link,essid,bssid,sec,strength,mode,speed";
+static char *def_show_wifi_fields =
+	"link,status,essid,sec,strength,mode,speed";
+
+#define	WIFI_MAX_FIELDS 	(sizeof (wifi_fields) / sizeof (wifi_field_t))
+#define	WIFI_MAX_FIELD_LEN	32
+
+typedef struct {
+	char	*s_buf;
+	char	**s_fields;	/* array of pointer to the fields in s_buf */
+	uint_t	s_nfields;	/* the number of fields in s_buf */
+} split_t;
+
+/*
+ * Free the split_t structure pointed to by `sp'.
+ */
+static void
+splitfree(split_t *sp)
+{
+	free(sp->s_buf);
+	free(sp->s_fields);
+	free(sp);
+}
+
+/*
+ * Split `str' into at most `maxfields' fields, each field at most `maxlen' in
+ * length.  Return a pointer to a split_t containing the split fields, or NULL
+ * on failure.
+ */
+static split_t *
+split(const char *str, uint_t maxfields, uint_t maxlen)
+{
+	char	*field, *token, *lasts = NULL;
+	split_t	*sp;
+
+	if (*str == '\0' || maxfields == 0 || maxlen == 0)
+		return (NULL);
+
+	sp = calloc(sizeof (split_t), 1);
+	if (sp == NULL)
+		return (NULL);
+
+	sp->s_buf = strdup(str);
+	sp->s_fields = malloc(sizeof (char *) * maxfields);
+	if (sp->s_buf == NULL || sp->s_fields == NULL)
+		goto fail;
+
+	token = sp->s_buf;
+	while ((field = strtok_r(token, ",", &lasts)) != NULL) {
+		if (sp->s_nfields == maxfields || strlen(field) > maxlen)
+			goto fail;
+		token = NULL;
+		sp->s_fields[sp->s_nfields++] = field;
+	}
+	return (sp);
+fail:
+	splitfree(sp);
+	return (NULL);
+}
+
+static int
+parse_wifi_fields(char *str, wifi_field_t ***fields, uint_t *countp,
+    uint_t cmdtype)
+{
+	uint_t		i, j;
+	wifi_field_t	**wf = NULL;
+	split_t		*sp;
+	boolean_t	good_match = B_FALSE;
+
+	if (cmdtype == WIFI_CMD_SCAN) {
+		if (str == NULL)
+			str = def_scan_wifi_fields;
+		if (strcasecmp(str, "all") == 0)
+			str = all_scan_wifi_fields;
+	} else if (cmdtype == WIFI_CMD_SHOW) {
+		if (str == NULL)
+			str = def_show_wifi_fields;
+		if (strcasecmp(str, "all") == 0)
+			str = all_show_wifi_fields;
+	} else {
+		return (-1);
+	}
+
+	sp = split(str, WIFI_MAX_FIELDS, WIFI_MAX_FIELD_LEN);
+	if (sp == NULL)
+		return (-1);
+
+	wf = malloc(sp->s_nfields * sizeof (wifi_field_t *));
+	if (wf == NULL)
+		goto fail;
+
+	for (i = 0; i < sp->s_nfields; i++) {
+		for (j = 0; j < WIFI_MAX_FIELDS; j++) {
+			if (strcasecmp(sp->s_fields[i],
+			    wifi_fields[j].wf_name) == 0) {
+				good_match = wifi_fields[i].
+				    wf_cmdtype & cmdtype;
+				break;
+			}
+		}
+		if (!good_match)
+			goto fail;
+
+		good_match = B_FALSE;
+		wf[i] = &wifi_fields[j];
+	}
+	*countp = i;
+	*fields = wf;
+	splitfree(sp);
+	return (0);
+fail:
+	free(wf);
+	splitfree(sp);
+	return (-1);
+}
+
+typedef struct print_wifi_state {
+	const char	*ws_link;
+	boolean_t	ws_parseable;
+	boolean_t	ws_header;
+	wifi_field_t	**ws_fields;
+	uint_t		ws_nfields;
+	boolean_t	ws_lastfield;
+	uint_t		ws_overflow;
+} print_wifi_state_t;
+
+static void
+print_wifi_head(print_wifi_state_t *statep)
+{
+	int		i;
+	wifi_field_t	*wfp;
+
+	for (i = 0; i < statep->ws_nfields; i++) {
+		wfp = statep->ws_fields[i];
+		if (i + 1 < statep->ws_nfields)
+			(void) printf("%-*s ", wfp->wf_width, wfp->wf_header);
+		else
+			(void) printf("%s", wfp->wf_header);
+	}
+	(void) printf("\n");
+}
+
+static void
+print_wifi_field(print_wifi_state_t *statep, wifi_field_t *wfp,
+    const char *value)
+{
+	uint_t	width = wfp->wf_width;
+	uint_t	valwidth = strlen(value);
+	uint_t	compress;
+
+	if (statep->ws_parseable) {
+		(void) printf("%s=\"%s\"", wfp->wf_header, value);
+	} else {
+		if (value[0] == '\0')
+			value = "--";
+		if (statep->ws_lastfield) {
+			(void) printf("%s", value);
+			return;
+		}
+
+		if (valwidth > width) {
+			statep->ws_overflow += valwidth - width;
+		} else if (valwidth < width && statep->ws_overflow > 0) {
+			compress = min(statep->ws_overflow, width - valwidth);
+			statep->ws_overflow -= compress;
+			width -= compress;
+		}
+		(void) printf("%-*s", width, value);
+	}
+
+	if (!statep->ws_lastfield)
+		(void) putchar(' ');
+}
+
+static void
+print_wlan_attr(print_wifi_state_t *statep, wifi_field_t *wfp,
+    wladm_wlan_attr_t *attrp)
+{
+	char		buf[WLADM_STRSIZE];
+	const char	*str = "";
+
+	if (wfp->wf_mask == 0) {
+		print_wifi_field(statep, wfp, statep->ws_link);
+		return;
+	}
+
+	if ((wfp->wf_mask & attrp->wa_valid) == 0) {
+		print_wifi_field(statep, wfp, "");
+		return;
+	}
+
+	switch (wfp->wf_mask) {
+	case WLADM_WLAN_ATTR_ESSID:
+		str = wladm_essid2str(&attrp->wa_essid, buf);
+		break;
+	case WLADM_WLAN_ATTR_BSSID:
+		str = wladm_bssid2str(&attrp->wa_bssid, buf);
+		break;
+	case WLADM_WLAN_ATTR_SECMODE:
+		str = wladm_secmode2str(&attrp->wa_secmode, buf);
+		break;
+	case WLADM_WLAN_ATTR_STRENGTH:
+		str = wladm_strength2str(&attrp->wa_strength, buf);
+		break;
+	case WLADM_WLAN_ATTR_MODE:
+		str = wladm_mode2str(&attrp->wa_mode, buf);
+		break;
+	case WLADM_WLAN_ATTR_SPEED:
+		str = wladm_speed2str(&attrp->wa_speed, buf);
+		(void) strlcat(buf, "Mb", sizeof (buf));
+		break;
+	case WLADM_WLAN_ATTR_AUTH:
+		str = wladm_auth2str(&attrp->wa_auth, buf);
+		break;
+	case WLADM_WLAN_ATTR_BSSTYPE:
+		str = wladm_bsstype2str(&attrp->wa_bsstype, buf);
+		break;
+	}
+
+	print_wifi_field(statep, wfp, str);
+}
+
+static boolean_t
+print_scan_results(void *arg, wladm_wlan_attr_t *attrp)
+{
+	print_wifi_state_t	*statep = arg;
+	int			i;
+
+	if (statep->ws_header) {
+		statep->ws_header = B_FALSE;
+		if (!statep->ws_parseable)
+			print_wifi_head(statep);
+	}
+
+	statep->ws_overflow = 0;
+	for (i = 0; i < statep->ws_nfields; i++) {
+		statep->ws_lastfield = (i + 1 == statep->ws_nfields);
+		print_wlan_attr(statep, statep->ws_fields[i], attrp);
+	}
+	(void) putchar('\n');
+	return (B_TRUE);
+}
+
+static boolean_t
+scan_wifi(void *arg, const char *link)
+{
+	char			errmsg[WLADM_STRSIZE];
+	print_wifi_state_t	*statep = arg;
+	wladm_status_t		status;
+
+	statep->ws_link = link;
+	status = wladm_scan(link, statep, print_scan_results);
+	if (status != WLADM_STATUS_OK) {
+		(void) fprintf(stderr, gettext(
+		    "%s: cannot scan link '%s': %s\n"),
+		    progname, link, wladm_status2str(status, errmsg));
+		exit(1);
+	}
+	return (B_TRUE);
+}
+
+static void
+print_link_attr(print_wifi_state_t *statep, wifi_field_t *wfp,
+    wladm_link_attr_t *attrp)
+{
+	char		buf[WLADM_STRSIZE];
+	const char	*str = "";
+
+	if (strcmp(wfp->wf_name, "status") == 0) {
+		if ((wfp->wf_mask & attrp->la_valid) != 0)
+			str = wladm_linkstatus2str(&attrp->la_status, buf);
+		print_wifi_field(statep, wfp, str);
+		return;
+	}
+	print_wlan_attr(statep, wfp, &attrp->la_wlan_attr);
+}
+
+static boolean_t
+show_wifi(void *arg, const char *link)
+{
+	int			i;
+	char 			buf[WLADM_STRSIZE];
+	print_wifi_state_t	*statep = arg;
+	wladm_link_attr_t	attr;
+	wladm_status_t		status;
+
+	status = wladm_get_link_attr(link, &attr);
+	if (status != WLADM_STATUS_OK) {
+		(void) fprintf(stderr, gettext("%s: cannot get link "
+		    "attributes for '%s': %s\n"), progname, link,
+		    wladm_status2str(status, buf));
+		exit(1);
+	}
+
+	if (statep->ws_header) {
+		statep->ws_header = B_FALSE;
+		if (!statep->ws_parseable)
+			print_wifi_head(statep);
+	}
+
+	statep->ws_link = link;
+	statep->ws_overflow = 0;
+	for (i = 0; i < statep->ws_nfields; i++) {
+		statep->ws_lastfield = (i + 1 == statep->ws_nfields);
+		print_link_attr(statep, statep->ws_fields[i], &attr);
+	}
+	(void) putchar('\n');
+	return (B_TRUE);
+}
+
+static void
+do_display_wifi(int argc, char **argv, int cmd)
+{
+	int			option;
+	char 			errmsg[WLADM_STRSIZE];
+	char			*fields_str = NULL;
+	wifi_field_t		**fields;
+	boolean_t		(*callback)(void *, const char *);
+	uint_t			nfields;
+	print_wifi_state_t	state;
+	wladm_status_t		status;
+
+	if (cmd == WIFI_CMD_SCAN)
+		callback = scan_wifi;
+	else if (cmd == WIFI_CMD_SHOW)
+		callback = show_wifi;
+	else
+		return;
+
+	state.ws_link = NULL;
+	state.ws_parseable = B_FALSE;
+	state.ws_header = B_TRUE;
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":o:p",
+	    wifi_longopts, NULL)) != -1) {
+		switch (option) {
+		case 'o':
+			fields_str = optarg;
+			break;
+		case 'p':
+			state.ws_parseable = B_TRUE;
+			if (fields_str == NULL)
+				fields_str = "all";
+			break;
+		case ':':
+			(void) fprintf(stderr,
+			    gettext("%s: option requires a value '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		case '?':
+		default:
+			(void) fprintf(stderr,
+			    gettext("%s: unrecognized option '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		}
+	}
+
+	if (optind == (argc - 1))
+		state.ws_link = argv[optind];
+	else if (optind != argc)
+		usage();
+
+	if (parse_wifi_fields(fields_str, &fields, &nfields, cmd) < 0) {
+		(void) fprintf(stderr,
+		    gettext("%s: invalid field(s) specified\n"),
+		    progname);
+		exit(1);
+	}
+	state.ws_fields = fields;
+	state.ws_nfields = nfields;
+
+	if (state.ws_link == NULL) {
+		status = wladm_walk(&state, callback);
+		if (status != WLADM_STATUS_OK) {
+			(void) fprintf(stderr, gettext("%s: %s\n"),
+			    progname, wladm_status2str(status, errmsg));
+			exit(1);
+		}
+	} else {
+		(void) (*callback)(&state, state.ws_link);
+	}
+	free(fields);
+}
+
+static void
+do_scan_wifi(int argc, char **argv)
+{
+	do_display_wifi(argc, argv, WIFI_CMD_SCAN);
+}
+
+static void
+do_show_wifi(int argc, char **argv)
+{
+	do_display_wifi(argc, argv, WIFI_CMD_SHOW);
+}
+
+typedef struct wlan_count_attr {
+	uint_t		wc_count;
+	const char	*wc_link;
+} wlan_count_attr_t;
+
+static boolean_t
+do_count_wlan(void *arg, const char *link)
+{
+	wlan_count_attr_t	*cp = (wlan_count_attr_t *)arg;
+
+	if (cp->wc_count == 0)
+		cp->wc_link = strdup(link);
+	cp->wc_count++;
+	return (B_TRUE);
+}
+
+static int
+parse_wep_keys(char *str, wladm_wep_key_t **keys, uint_t *key_countp)
+{
+	uint_t		i;
+	split_t		*sp;
+	wladm_wep_key_t	*wk;
+
+	sp = split(str, WLADM_MAX_WEPKEYS, WLADM_MAX_WEPKEYNAME_LEN);
+	if (sp == NULL)
+		return (-1);
+
+	wk = malloc(sp->s_nfields * sizeof (wladm_wep_key_t));
+	if (wk == NULL)
+		goto fail;
+
+	for (i = 0; i < sp->s_nfields; i++) {
+		char			*s;
+		dladm_secobj_class_t	class;
+		dladm_status_t		status;
+
+		(void) strlcpy(wk[i].wk_name, sp->s_fields[i],
+		    WLADM_MAX_WEPKEYNAME_LEN);
+
+		wk[i].wk_idx = 1;
+		if ((s = strrchr(wk[i].wk_name, ':')) != NULL) {
+			if (s[1] == '\0' || s[2] != '\0' || !isdigit(s[1]))
+				goto fail;
+
+			wk[i].wk_idx = (uint_t)(s[1] - '0');
+			*s = '\0';
+		}
+		wk[i].wk_len = WLADM_MAX_WEPKEY_LEN;
+
+		status = dladm_get_secobj(wk[i].wk_name, &class,
+		    wk[i].wk_val, &wk[i].wk_len, 0);
+		if (status != DLADM_STATUS_OK) {
+			if (status == DLADM_STATUS_NOTFOUND) {
+				status = dladm_get_secobj(wk[i].wk_name,
+				    &class, wk[i].wk_val, &wk[i].wk_len,
+				    DLADM_OPT_PERSIST);
+			}
+			if (status != DLADM_STATUS_OK)
+				goto fail;
+		}
+	}
+	*keys = wk;
+	*key_countp = i;
+	splitfree(sp);
+	return (0);
+fail:
+	free(wk);
+	splitfree(sp);
+	return (-1);
+}
+
+static void
+do_connect_wifi(int argc, char **argv)
+{
+	int			option;
+	wladm_wlan_attr_t	attr, *attrp;
+	wladm_status_t		status = WLADM_STATUS_OK;
+	int			timeout = WLADM_CONNECT_TIMEOUT_DEFAULT;
+	char			errmsg[WLADM_STRSIZE];
+	const char		*link = NULL;
+	char			*endp = NULL;
+	wladm_wep_key_t		*keys = NULL;
+	uint_t			key_count = 0;
+	uint_t			flags = 0;
+	wladm_secmode_t		keysecmode = WLADM_SECMODE_NONE;
+
+	opterr = 0;
+	(void) memset(&attr, 0, sizeof (attr));
+	while ((option = getopt_long(argc, argv, ":e:i:a:m:b:s:k:T:c",
+	    wifi_longopts, NULL)) != -1) {
+		switch (option) {
+		case 'e':
+			status = wladm_str2essid(optarg, &attr.wa_essid);
+			if (status != WLADM_STATUS_OK) {
+				(void) fprintf(stderr,
+				    gettext("%s: invalid ESSID '%s'\n"),
+				    progname, optarg);
+				exit(1);
+			}
+			attr.wa_valid |= WLADM_WLAN_ATTR_ESSID;
+			/*
+			 * Try to connect without doing a scan.
+			 */
+			flags |= WLADM_OPT_NOSCAN;
+			break;
+		case 'i':
+			status = wladm_str2bssid(optarg, &attr.wa_bssid);
+			if (status != WLADM_STATUS_OK) {
+				(void) fprintf(stderr,
+				    gettext("%s: invalid BSSID %s\n"),
+				    progname, optarg);
+				exit(1);
+			}
+			attr.wa_valid |= WLADM_WLAN_ATTR_BSSID;
+			break;
+		case 'a':
+			status = wladm_str2auth(optarg, &attr.wa_auth);
+			if (status != WLADM_STATUS_OK) {
+				(void) fprintf(stderr,
+				    gettext("%s: invalid authentication "
+					"mode '%s'\n"), progname, optarg);
+				exit(1);
+			}
+			attr.wa_valid |= WLADM_WLAN_ATTR_AUTH;
+			break;
+		case 'm':
+			status = wladm_str2mode(optarg, &attr.wa_mode);
+			if (status != WLADM_STATUS_OK) {
+				(void) fprintf(stderr,
+				    gettext("%s: invalid mode '%s'\n"),
+				    progname, optarg);
+				exit(1);
+			}
+			attr.wa_valid |= WLADM_WLAN_ATTR_MODE;
+			break;
+		case 'b':
+			status = wladm_str2bsstype(optarg, &attr.wa_bsstype);
+			if (status != WLADM_STATUS_OK) {
+				(void) fprintf(stderr,
+				    gettext("%s: invalid bsstype '%s'\n"),
+				    progname, optarg);
+				exit(1);
+			}
+			attr.wa_valid |= WLADM_WLAN_ATTR_BSSTYPE;
+			break;
+		case 's':
+			status = wladm_str2secmode(optarg, &attr.wa_secmode);
+			if (status != WLADM_STATUS_OK) {
+				(void) fprintf(stderr,
+				    gettext("%s: invalid security mode '%s'\n"),
+				    progname, optarg);
+				exit(1);
+			}
+			attr.wa_valid |= WLADM_WLAN_ATTR_SECMODE;
+			break;
+		case 'k':
+			if (parse_wep_keys(optarg, &keys, &key_count) < 0) {
+				(void) fprintf(stderr,
+				    gettext("%s: invalid key(s) '%s'\n"),
+				    progname, optarg);
+				exit(1);
+			}
+			keysecmode = WLADM_SECMODE_WEP;
+			break;
+		case 'T':
+			if (strcasecmp(optarg, "forever") == 0) {
+				timeout = -1;
+				break;
+			}
+			errno = 0;
+			timeout = (int)strtol(optarg, &endp, 10);
+			if (timeout < 0 || errno != 0 || *endp != '\0') {
+				(void) fprintf(stderr,
+				    gettext("%s: invalid timeout value '%s'\n"),
+				    progname, optarg);
+				exit(1);
+			}
+			break;
+		case 'c':
+			flags |= WLADM_OPT_CREATEIBSS;
+			break;
+		case ':':
+			(void) fprintf(stderr,
+			    gettext("%s: option requires a value '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		case '?':
+		default:
+			(void) fprintf(stderr,
+			    gettext("%s: unrecognized option '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		}
+	}
+
+	if (keysecmode == WLADM_SECMODE_NONE) {
+		if ((attr.wa_valid & WLADM_WLAN_ATTR_SECMODE) != 0 &&
+		    attr.wa_secmode == WLADM_SECMODE_WEP) {
+			(void) fprintf(stderr,
+			    gettext("%s: key required for security mode "
+				"'wep'\n"), progname);
+			exit(1);
+		}
+	} else {
+		if ((attr.wa_valid & WLADM_WLAN_ATTR_SECMODE) != 0 &&
+		    attr.wa_secmode != keysecmode) {
+			(void) fprintf(stderr,
+			    gettext("%s: incompatible -s and -k options\n"),
+			    progname);
+			exit(1);
+		}
+	}
+	attr.wa_secmode = keysecmode;
+	attr.wa_valid |= WLADM_WLAN_ATTR_SECMODE;
+
+	if (optind == (argc - 1))
+		link = argv[optind];
+	else if (optind != argc)
+		usage();
+
+	if (link == NULL) {
+		wlan_count_attr_t wcattr;
+
+		wcattr.wc_link = NULL;
+		wcattr.wc_count = 0;
+		(void) wladm_walk(&wcattr, do_count_wlan);
+		if (wcattr.wc_count == 0) {
+			(void) fprintf(stderr, gettext(
+			    "%s: no wifi links are available\n"), progname);
+			exit(1);
+		} else if (wcattr.wc_count > 1) {
+			(void) fprintf(stderr, gettext(
+			    "%s: link name is required when more than "
+			    "one link is available\n"), progname);
+			exit(1);
+		}
+		link = wcattr.wc_link;
+	}
+	attrp = (attr.wa_valid == 0) ? NULL : &attr;
+
+	status = wladm_connect(link, attrp, timeout, keys, key_count, flags);
+	if (status != WLADM_STATUS_OK) {
+		if ((flags & WLADM_OPT_NOSCAN) != 0) {
+			/*
+			 * Redo the connect. This time with scanning
+			 * and filtering.
+			 */
+			flags &= ~WLADM_OPT_NOSCAN;
+			status = wladm_connect(link, attrp, timeout, keys,
+			    key_count, flags);
+			if (status == WLADM_STATUS_OK) {
+				free(keys);
+				return;
+			}
+		}
+		if (status == WLADM_STATUS_NOTFOUND) {
+			if (attr.wa_valid == 0) {
+				(void) fprintf(stderr, gettext(
+				    "%s: no wifi networks are available\n"),
+				    progname);
+			} else {
+				(void) fprintf(stderr, gettext("%s: no wifi "
+				    "networks with the specified criteria "
+				    "are available\n"), progname);
+			}
+		} else {
+			(void) fprintf(stderr, gettext("%s: cannot connect: %s"
+			    "\n"), progname, wladm_status2str(status, errmsg));
+		}
+		exit(1);
+	}
+	free(keys);
+}
+
+/* ARGSUSED */
+static boolean_t
+do_all_disconnect_wifi(void *arg, const char *link)
+{
+	wladm_status_t	status;
+	char		errmsg[WLADM_STRSIZE];
+
+	status = wladm_disconnect(link);
+	if (status != WLADM_STATUS_OK) {
+		(void) fprintf(stderr,
+		    gettext("%s: cannot disconnect link '%s': %s\n"),
+		    progname, link, wladm_status2str(status, errmsg));
+	}
+	return (B_TRUE);
+}
+
+static void
+do_disconnect_wifi(int argc, char **argv)
+{
+	int			option;
+	const char		*link = NULL;
+	char 			errmsg[WLADM_STRSIZE];
+	boolean_t		all_links = B_FALSE;
+	wladm_status_t		status;
+	wlan_count_attr_t	wcattr;
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":a",
+	    wifi_longopts, NULL)) != -1) {
+		switch (option) {
+		case 'a':
+			all_links = B_TRUE;
+			break;
+		case ':':
+			(void) fprintf(stderr,
+			    gettext("%s: option requires a value '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		case '?':
+		default:
+			(void) fprintf(stderr,
+			    gettext("%s: unrecognized option '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		}
+	}
+
+	if (optind == (argc - 1))
+		link = argv[optind];
+	else if (optind != argc)
+		usage();
+
+	if (link == NULL) {
+		if (!all_links) {
+			wcattr.wc_link = NULL;
+			wcattr.wc_count = 0;
+			(void) wladm_walk(&wcattr, do_count_wlan);
+			if (wcattr.wc_count == 0) {
+				(void) fprintf(stderr, gettext(
+				    "%s: no wifi links are available\n"),
+				    progname);
+				exit(1);
+			} else if (wcattr.wc_count > 1) {
+				(void) fprintf(stderr, gettext(
+				    "%s: link name is required when more than "
+				    "one link is available\n"), progname);
+				exit(1);
+			}
+			link = wcattr.wc_link;
+		} else {
+			(void) wladm_walk(&all_links, do_all_disconnect_wifi);
+			return;
+		}
+	}
+	status = wladm_disconnect(link);
+	if (status != WLADM_STATUS_OK) {
+		(void) fprintf(stderr, gettext("%s: cannot disconnect: %s\n"),
+		    progname, wladm_status2str(status, errmsg));
+		exit(1);
+	}
+}
+
+#define	MAX_PROPS		32
+#define	MAX_PROP_VALS		32
+#define	MAX_PROP_LINE		512
+
+typedef struct prop_info {
+	char		*pi_name;
+	char		*pi_val[MAX_PROP_VALS];
+	uint_t		pi_count;
+} prop_info_t;
+
+typedef struct prop_list {
+	prop_info_t	pl_info[MAX_PROPS];
+	uint_t		pl_count;
+	char		*pl_buf;
+} prop_list_t;
+
+typedef struct show_linkprop_state {
+	const char	*ls_link;
+	char		*ls_line;
+	char		**ls_propvals;
+	boolean_t	ls_parseable;
+	boolean_t	ls_persist;
+	boolean_t	ls_header;
+} show_linkprop_state_t;
+
+static void
+free_props(prop_list_t *list)
+{
+	if (list != NULL) {
+		free(list->pl_buf);
+		free(list);
+	}
+}
+
+static int
+parse_props(char *str, prop_list_t **listp, boolean_t novalues)
+{
+	prop_list_t	*list;
+	prop_info_t	*pip;
+	char		*buf, *curr;
+	int		len, i;
+
+	list = malloc(sizeof (prop_list_t));
+	if (list == NULL)
+		return (-1);
+
+	list->pl_count = 0;
+	list->pl_buf = buf = strdup(str);
+	if (buf == NULL)
+		goto fail;
+
+	curr = buf;
+	len = strlen(buf);
+	pip = NULL;
+	for (i = 0; i < len; i++) {
+		char		c = buf[i];
+		boolean_t	match = (c == '=' || c == ',');
+
+		if (!match && i != len - 1)
+			continue;
+
+		if (match) {
+			buf[i] = '\0';
+			if (*curr == '\0')
+				goto fail;
+		}
+
+		if (pip != NULL && c != '=') {
+			if (pip->pi_count > MAX_PROP_VALS)
+				goto fail;
+
+			if (novalues)
+				goto fail;
+
+			pip->pi_val[pip->pi_count] = curr;
+			pip->pi_count++;
+		} else {
+			if (list->pl_count > MAX_PROPS)
+				goto fail;
+
+			pip = &list->pl_info[list->pl_count];
+			pip->pi_name = curr;
+			pip->pi_count = 0;
+			list->pl_count++;
+			if (c == ',')
+				pip = NULL;
+		}
+		curr = buf + i + 1;
+	}
+	*listp = list;
+	return (0);
+
+fail:
+	free_props(list);
+	return (-1);
+}
+
+static void
+print_linkprop_head(void)
+{
+	(void) printf("%-15s %-14s %-14s %-30s \n",
+	    "PROPERTY", "VALUE", "DEFAULT", "POSSIBLE");
+}
+
+static void
+print_linkprop(show_linkprop_state_t *statep, const char *propname,
+    dladm_prop_type_t type, const char *typename, const char *format,
+    char **pptr)
+{
+	int		i;
+	char		*ptr, *lim;
+	char		buf[DLADM_STRSIZE];
+	char		*unknown = "?", *notsup = "";
+	char		**propvals = statep->ls_propvals;
+	uint_t		valcnt = MAX_PROP_VALS;
+	dladm_status_t	status;
+
+	status = dladm_get_prop(statep->ls_link, type, propname,
+	    propvals, &valcnt);
+	if (status != DLADM_STATUS_OK) {
+		if (status == DLADM_STATUS_NOTSUP || statep->ls_persist) {
+			valcnt = 1;
+			if (type == DLADM_PROP_VAL_CURRENT)
+				propvals = &unknown;
+			else
+				propvals = &notsup;
+		} else {
+			(void) fprintf(stderr, gettext(
+			    "%s: cannot get link property '%s': %s\n"),
+			    progname, propname, dladm_status2str(status, buf));
+			exit(1);
+		}
+	}
+
+	ptr = buf;
+	lim = buf + DLADM_STRSIZE;
+	for (i = 0; i < valcnt; i++) {
+		if (propvals[i][0] == '\0' && !statep->ls_parseable)
+			ptr += snprintf(ptr, lim - ptr, "--,");
+		else
+			ptr += snprintf(ptr, lim - ptr, "%s,", propvals[i]);
+		if (ptr >= lim)
+			break;
+	}
+	if (valcnt > 0)
+		buf[strlen(buf) - 1] = '\0';
+
+	lim = statep->ls_line + MAX_PROP_LINE;
+	if (statep->ls_parseable) {
+		*pptr += snprintf(*pptr, lim - *pptr,
+		    "%s=\"%s\" ", typename, buf);
+	} else {
+		*pptr += snprintf(*pptr, lim - *pptr, format, buf);
+	}
+}
+
+static boolean_t
+show_linkprop(void *arg, const char *propname)
+{
+	show_linkprop_state_t	*statep = arg;
+	char			*ptr = statep->ls_line;
+	char			*lim = ptr + MAX_PROP_LINE;
+
+	if (statep->ls_parseable)
+		ptr += snprintf(ptr, lim - ptr, "PROPERTY=\"%s\" ", propname);
+	else
+		ptr += snprintf(ptr, lim - ptr, "%-15s ", propname);
+
+	print_linkprop(statep, propname,
+	    statep->ls_persist ? DLADM_PROP_VAL_PERSISTENT :
+	    DLADM_PROP_VAL_CURRENT, "VALUE", "%-14s ", &ptr);
+	print_linkprop(statep, propname, DLADM_PROP_VAL_DEFAULT,
+	    "DEFAULT", "%-14s ", &ptr);
+	print_linkprop(statep, propname, DLADM_PROP_VAL_MODIFIABLE,
+	    "POSSIBLE", "%-30s ", &ptr);
+
+	if (statep->ls_header) {
+		statep->ls_header = B_FALSE;
+		if (!statep->ls_parseable)
+			print_linkprop_head();
+	}
+	(void) printf("%s\n", statep->ls_line);
+	return (B_TRUE);
+}
+
+static void
+do_show_linkprop(int argc, char **argv)
+{
+	int			i, option, fd;
+	char			errmsg[DLADM_STRSIZE];
+	char			linkname[MAXPATHLEN];
+	prop_list_t		*proplist = NULL;
+	char			*buf;
+	dladm_status_t		status;
+	show_linkprop_state_t	state;
+
+	opterr = 0;
+	state.ls_link = NULL;
+	state.ls_propvals = NULL;
+	state.ls_line = NULL;
+	state.ls_parseable = B_FALSE;
+	state.ls_persist = B_FALSE;
+	state.ls_header = B_TRUE;
+	while ((option = getopt_long(argc, argv, ":p:cP",
+	    prop_longopts, NULL)) != -1) {
+		switch (option) {
+		case 'p':
+			if (parse_props(optarg, &proplist, B_TRUE) < 0) {
+				(void) fprintf(stderr,
+				    gettext("%s: invalid field(s) specified\n"),
+				    progname);
+				exit(1);
+			}
+			break;
+		case 'c':
+			state.ls_parseable = B_TRUE;
+			break;
+		case 'P':
+			state.ls_persist = B_TRUE;
+			break;
+		case ':':
+			(void) fprintf(stderr,
+			    gettext("%s: option requires a value '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		case '?':
+		default:
+			(void) fprintf(stderr,
+			    gettext("%s: unrecognized option '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		}
+	}
+
+	if (optind == (argc - 1))
+		state.ls_link = argv[optind];
+	else if (optind != argc)
+		usage();
+
+	if (state.ls_link == NULL) {
+		(void) fprintf(stderr,
+		    gettext("%s: link name must be specified\n"), progname);
+		exit(1);
+	}
+
+	/*
+	 * When some WiFi links are opened for the first time, their hardware
+	 * automatically scans for APs and does other slow operations.  Thus,
+	 * if there are no open links, the retrieval of link properties
+	 * (below) will proceed slowly unless we hold the link open.
+	 */
+	(void) snprintf(linkname, MAXPATHLEN, "/dev/%s", state.ls_link);
+	if ((fd = open(linkname, O_RDWR)) < 0) {
+		(void) fprintf(stderr,
+		    gettext("%s: cannot open %s\n"), progname, state.ls_link);
+		exit(1);
+	}
+
+	buf = malloc((sizeof (char *) + DLADM_PROP_VAL_MAX) * MAX_PROP_VALS +
+	    MAX_PROP_LINE);
+	if (buf == NULL) {
+		(void) fprintf(stderr,
+		    gettext("%s: insufficient memory\n"), progname);
+		exit(1);
+	}
+	state.ls_propvals = (char **)(void *)buf;
+	for (i = 0; i < MAX_PROP_VALS; i++) {
+		state.ls_propvals[i] = buf + sizeof (char *) * MAX_PROP_VALS +
+		    i * DLADM_PROP_VAL_MAX;
+	}
+	state.ls_line = buf +
+	    (sizeof (char *) + DLADM_PROP_VAL_MAX) * MAX_PROP_VALS;
+
+	if (proplist != NULL) {
+		for (i = 0; i < proplist->pl_count; i++) {
+			if (!show_linkprop(&state,
+			    proplist->pl_info[i].pi_name))
+				break;
+		}
+	} else {
+		status = dladm_walk_prop(state.ls_link, &state, show_linkprop);
+		if (status != DLADM_STATUS_OK) {
+			(void) fprintf(stderr,
+			    gettext("%s: show-linkprop: %s\n"), progname,
+			    dladm_status2str(status, errmsg));
+			exit(1);
+		}
+	}
+	(void) close(fd);
+	free(buf);
+	free_props(proplist);
+}
+
+static dladm_status_t
+set_linkprop_persist(const char *link, const char *prop_name, char **prop_val,
+    uint_t val_cnt, boolean_t reset)
+{
+	dladm_status_t	status;
+	char		errmsg[DLADM_STRSIZE];
+
+	status = dladm_set_prop(link, prop_name, prop_val, val_cnt,
+	    DLADM_OPT_PERSIST);
+
+	if (status != DLADM_STATUS_OK) {
+		if (reset) {
+			(void) fprintf(stderr, gettext("%s: warning: cannot "
+			    "persistently reset link property '%s' on '%s': "
+			    "%s\n"), progname, prop_name, link,
+			    dladm_status2str(status, errmsg));
+		} else {
+			(void) fprintf(stderr, gettext("%s: warning: cannot "
+			    "persistently set link property '%s' on '%s': "
+			    "%s\n"), progname, prop_name, link,
+			    dladm_status2str(status, errmsg));
+		}
+	}
+	return (status);
+}
+
+static void
+set_linkprop(int argc, char **argv, boolean_t reset)
+{
+	int		i, option;
+	char		errmsg[DLADM_STRSIZE];
+	const char	*link = NULL;
+	prop_list_t	*proplist = NULL;
+	boolean_t	temp = B_FALSE;
+	dladm_status_t	status = DLADM_STATUS_OK;
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":p:R:t",
+	    prop_longopts, NULL)) != -1) {
+		switch (option) {
+		case 'p':
+			if (parse_props(optarg, &proplist, reset) < 0) {
+				(void) fprintf(stderr, gettext(
+				    "%s: invalid link properties specified\n"),
+				    progname);
+				exit(1);
+			}
+			break;
+		case 't':
+			temp = B_TRUE;
+			break;
+		case 'R':
+			status = dladm_set_rootdir(optarg);
+			if (status != DLADM_STATUS_OK) {
+				(void) fprintf(stderr, gettext(
+				    "%s: invalid directory specified: %s\n"),
+				    progname, dladm_status2str(status, errmsg));
+				exit(1);
+			}
+			break;
+		case ':':
+			(void) fprintf(stderr,
+			    gettext("%s: option requires a value '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		case '?':
+		default:
+			(void) fprintf(stderr,
+			    gettext("%s: unrecognized option '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		}
+	}
+
+	if (optind == (argc - 1))
+		link = argv[optind];
+	else if (optind != argc)
+		usage();
+
+	if (link == NULL) {
+		(void) fprintf(stderr,
+		    gettext("%s: link name must be specified\n"),
+		    progname);
+		exit(1);
+	}
+
+	if (proplist == NULL) {
+		if (!reset) {
+			(void) fprintf(stderr,
+			    gettext("%s: link property must be specified\n"),
+			    progname);
+			exit(1);
+		}
+		status = dladm_set_prop(link, NULL, NULL, 0, DLADM_OPT_TEMP);
+		if (status != DLADM_STATUS_OK) {
+			(void) fprintf(stderr, gettext(
+			    "%s: warning: cannot reset link "
+			    "properties on '%s': %s\n"),
+			    progname, link, dladm_status2str(status, errmsg));
+		}
+		if (!temp) {
+			status = set_linkprop_persist(link, NULL, NULL, 0,
+			    reset);
+		}
+		goto done;
+	}
+
+	for (i = 0; i < proplist->pl_count; i++) {
+		prop_info_t	*pip = &proplist->pl_info[i];
+		char		**val;
+		uint_t		count;
+		dladm_status_t	s;
+
+		if (reset) {
+			val = NULL;
+			count = 0;
+		} else {
+			val = pip->pi_val;
+			count = pip->pi_count;
+			if (count == 0) {
+				(void) fprintf(stderr, gettext(
+				    "%s: value(s) for '%s' not specified\n"),
+				    progname, pip->pi_name);
+				status = DLADM_STATUS_BADARG;
+				continue;
+			}
+		}
+		s = dladm_set_prop(link, pip->pi_name, val, count,
+		    DLADM_OPT_TEMP);
+		if (s == DLADM_STATUS_OK) {
+			if (!temp) {
+				s = set_linkprop_persist(link,
+				    pip->pi_name, val, count, reset);
+				if (s != DLADM_STATUS_OK)
+					status = s;
+			}
+			continue;
+		}
+		status = s;
+		switch (s) {
+		case DLADM_STATUS_NOTFOUND:
+			(void) fprintf(stderr,
+			    gettext("%s: invalid link property '%s'\n"),
+			    progname, pip->pi_name);
+			break;
+		case DLADM_STATUS_BADVAL: {
+			int		j;
+			char		*ptr, *lim;
+			char		**propvals = NULL;
+			uint_t		valcnt = MAX_PROP_VALS;
+
+			ptr = malloc((sizeof (char *) +
+			    DLADM_PROP_VAL_MAX) * MAX_PROP_VALS +
+			    MAX_PROP_LINE);
+
+			propvals = (char **)(void *)ptr;
+			if (propvals == NULL) {
+				(void) fprintf(stderr, gettext(
+				    "%s: insufficient memory\n"), progname);
+				exit(1);
+			}
+			for (j = 0; j < MAX_PROP_VALS; j++) {
+				propvals[j] = ptr + sizeof (char *) *
+				    MAX_PROP_VALS +
+				    j * DLADM_PROP_VAL_MAX;
+			}
+			s = dladm_get_prop(link, DLADM_PROP_VAL_MODIFIABLE,
+			    pip->pi_name, propvals, &valcnt);
+
+			ptr = errmsg;
+			lim = ptr + DLADM_STRSIZE;
+			*ptr = '\0';
+			for (j = 0; j < valcnt && s == DLADM_STATUS_OK; j++) {
+				ptr += snprintf(ptr, lim - ptr, "%s,",
+				    propvals[j]);
+				if (ptr >= lim)
+					break;
+			}
+			if (ptr > errmsg)
+				*(ptr - 1) = '\0';
+			(void) fprintf(stderr, gettext(
+			    "%s: link property '%s' must be one of: %s\n"),
+			    progname, pip->pi_name, errmsg);
+			free(propvals);
+			break;
+		}
+		default:
+			if (reset) {
+				(void) fprintf(stderr, gettext(
+				    "%s: cannot reset link property '%s' on "
+				    "'%s': %s\n"), progname, pip->pi_name, link,
+				    dladm_status2str(s, errmsg));
+			} else {
+				(void) fprintf(stderr, gettext(
+				    "%s: cannot set link property '%s' on "
+				    "'%s': %s\n"), progname, pip->pi_name, link,
+				    dladm_status2str(s, errmsg));
+			}
+			break;
+		}
+	}
+done:
+	free_props(proplist);
+	if (status != DLADM_STATUS_OK)
+		exit(1);
+}
+
+static void
+do_set_linkprop(int argc, char **argv)
+{
+	set_linkprop(argc, argv, B_FALSE);
+}
+
+static void
+do_reset_linkprop(int argc, char **argv)
+{
+	set_linkprop(argc, argv, B_TRUE);
+}
+
+static int
+convert_secobj(char *buf, uint_t len, uint8_t *obj_val, uint_t *obj_lenp,
+    dladm_secobj_class_t class)
+{
+	int error = 0;
+
+	if (class != DLADM_SECOBJ_CLASS_WEP)
+		return (ENOENT);
+
+	switch (len) {
+	case 5:			/* ASCII key sizes */
+	case 13:
+		(void) memcpy(obj_val, buf, len);
+		*obj_lenp = len;
+		break;
+	case 10:		/* Hex key sizes, not preceded by 0x */
+	case 26:
+		error = hexascii_to_octet(buf, len, obj_val, obj_lenp);
+		break;
+	case 12:		/* Hex key sizes, preceded by 0x */
+	case 28:
+		if (strncmp(buf, "0x", 2) != 0)
+			return (EINVAL);
+		error = hexascii_to_octet(buf + 2, len - 2, obj_val, obj_lenp);
+		break;
+	default:
+		return (EINVAL);
+	}
+	return (error);
+}
+
+/* ARGSUSED */
+static void
+defersig(int sig)
+{
+	signalled = sig;
+}
+
+static int
+get_secobj_from_tty(uint_t try, const char *objname, char *buf)
+{
+	uint_t		len = 0;
+	int		c;
+	struct termios	stored, current;
+	void    	(*sigfunc)(int);
+
+	/*
+	 * Turn off echo -- but before we do so, defer SIGINT handling
+	 * so that a ^C doesn't leave the terminal corrupted.
+	 */
+	sigfunc = signal(SIGINT, defersig);
+	(void) fflush(stdin);
+	(void) tcgetattr(0, &stored);
+	current = stored;
+	current.c_lflag &= ~(ICANON|ECHO);
+	current.c_cc[VTIME] = 0;
+	current.c_cc[VMIN] = 1;
+	(void) tcsetattr(0, TCSANOW, &current);
+again:
+	if (try == 1)
+		(void) printf(gettext("provide value for '%s': "), objname);
+	else
+		(void) printf(gettext("confirm value for '%s': "), objname);
+
+	(void) fflush(stdout);
+	while (signalled == 0) {
+		c = getchar();
+		if (c == '\n' || c == '\r') {
+			if (len != 0)
+				break;
+			(void) putchar('\n');
+			goto again;
+		}
+
+		buf[len++] = c;
+		if (len >= DLADM_SECOBJ_VAL_MAX - 1)
+			break;
+		(void) putchar('*');
+	}
+
+	(void) putchar('\n');
+	(void) fflush(stdin);
+
+	/*
+	 * Restore terminal setting and handle deferred signals.
+	 */
+	(void) tcsetattr(0, TCSANOW, &stored);
+
+	(void) signal(SIGINT, sigfunc);
+	if (signalled != 0)
+		(void) kill(getpid(), signalled);
+
+	return (len);
+}
+
+static int
+get_secobj_val(char *obj_name, uint8_t *obj_val, uint_t *obj_lenp,
+    dladm_secobj_class_t class, FILE *filep)
+{
+	int		rval;
+	uint_t		len, len2;
+	char		buf[DLADM_SECOBJ_VAL_MAX], buf2[DLADM_SECOBJ_VAL_MAX];
+
+	if (filep == NULL) {
+		len = get_secobj_from_tty(1, obj_name, buf);
+		rval = convert_secobj(buf, len, obj_val, obj_lenp, class);
+		if (rval == 0) {
+			len2 = get_secobj_from_tty(2, obj_name, buf2);
+			if (len != len2 || memcmp(buf, buf2, len) != 0)
+				rval = ENOTSUP;
+		}
+		return (rval);
+	} else {
+		for (;;) {
+			if (fgets(buf, sizeof (buf), filep) == NULL)
+				break;
+			if (isspace(buf[0]))
+				continue;
+
+			len = strlen(buf);
+			if (buf[len - 1] == '\n') {
+				buf[len - 1] = '\0';
+				len--;
+			}
+			break;
+		}
+		(void) fclose(filep);
+	}
+	return (convert_secobj(buf, len, obj_val, obj_lenp, class));
+}
+
+static boolean_t
+check_auth(const char *auth)
+{
+	struct passwd	*pw;
+
+	if ((pw = getpwuid(getuid())) == NULL)
+		return (B_FALSE);
+
+	return (chkauthattr(auth, pw->pw_name) != 0);
+}
+
+static void
+audit_secobj(char *auth, char *class, char *obj,
+    boolean_t success, boolean_t create)
+{
+	adt_session_data_t	*ah;
+	adt_event_data_t	*event;
+	au_event_t		flag;
+	char			*errstr;
+
+	if (create) {
+		flag = ADT_dladm_create_secobj;
+		errstr = "ADT_dladm_create_secobj";
+	} else {
+		flag = ADT_dladm_delete_secobj;
+		errstr = "ADT_dladm_delete_secobj";
+	}
+
+	if (adt_start_session(&ah, NULL, ADT_USE_PROC_DATA) != 0) {
+		(void) fprintf(stderr, "%s: adt_start_session: %s\n",
+		    progname, strerror(errno));
+		exit(1);
+	}
+
+	if ((event = adt_alloc_event(ah, flag)) == NULL) {
+		(void) fprintf(stderr, "%s: adt_alloc_event"
+		    "(%s): %s\n", progname, errstr,
+		    strerror(errno));
+		exit(1);
+	}
+
+	/* fill in audit info */
+	if (create) {
+		event->adt_dladm_create_secobj.auth_used = auth;
+		event->adt_dladm_create_secobj.obj_class = class;
+		event->adt_dladm_create_secobj.obj_name = obj;
+	} else {
+		event->adt_dladm_delete_secobj.auth_used = auth;
+		event->adt_dladm_delete_secobj.obj_class = class;
+		event->adt_dladm_delete_secobj.obj_name = obj;
+	}
+
+	if (success) {
+		if (adt_put_event(event, ADT_SUCCESS, ADT_SUCCESS) != 0) {
+			(void) fprintf(stderr, "%s: adt_put_event"
+			    "(%s, success): %s\n",
+			    progname, errstr, strerror(errno));
+			exit(1);
+		}
+	} else {
+		if (adt_put_event(event, ADT_FAILURE,
+		    ADT_FAIL_VALUE_AUTH) != 0) {
+			(void) fprintf(stderr, "%s: adt_put_event"
+			    "(%s, failure): %s\n",
+			    progname, errstr, strerror(errno));
+			exit(1);
+		}
+	}
+
+	adt_free_event(event);
+	(void) adt_end_session(ah);
+}
+
+#define	MAX_SECOBJS		32
+#define	MAX_SECOBJ_NAMELEN	32
+static void
+do_create_secobj(int argc, char **argv)
+{
+	int			option, rval;
+	char			errmsg[DLADM_STRSIZE];
+	FILE			*filep = NULL;
+	char			*obj_name = NULL;
+	char			*class_name = NULL;
+	uint8_t			obj_val[DLADM_SECOBJ_VAL_MAX];
+	uint_t			obj_len;
+	boolean_t		success, temp = B_FALSE;
+	dladm_status_t		status;
+	dladm_secobj_class_t	class = -1;
+	uid_t			euid;
+
+	opterr = 0;
+	(void) memset(obj_val, 0, DLADM_SECOBJ_VAL_MAX);
+	while ((option = getopt_long(argc, argv, ":f:c:R:t",
+	    wifi_longopts, NULL)) != -1) {
+		switch (option) {
+		case 'f':
+			euid = geteuid();
+			(void) seteuid(getuid());
+			filep = fopen(optarg, "r");
+			if (filep == NULL) {
+				(void) fprintf(stderr,
+				    gettext("%s: cannot open %s: %s\n"),
+				    progname, optarg, strerror(errno));
+				exit(1);
+			}
+			(void) seteuid(euid);
+			break;
+		case 'c':
+			class_name = optarg;
+			status = dladm_str2secobjclass(optarg, &class);
+			if (status != DLADM_STATUS_OK) {
+				(void) fprintf(stderr, gettext(
+				    "%s: invalid secure object class '%s', "
+				    "valid values are: wep\n"),
+				    progname, optarg);
+				exit(1);
+			}
+			break;
+		case 't':
+			temp = B_TRUE;
+			break;
+		case 'R':
+			status = dladm_set_rootdir(optarg);
+			if (status != DLADM_STATUS_OK) {
+				(void) fprintf(stderr, gettext(
+				    "%s: invalid directory specified: %s\n"),
+				    progname, dladm_status2str(status, errmsg));
+				exit(1);
+			}
+			break;
+		case ':':
+			(void) fprintf(stderr,
+			    gettext("%s: option requires a value '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		case '?':
+		default:
+			(void) fprintf(stderr,
+			    gettext("%s: unrecognized option '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		}
+	}
+
+	if (optind == (argc - 1))
+		obj_name = argv[optind];
+	else if (optind != argc)
+		usage();
+
+	if (class == -1) {
+		(void) fprintf(stderr,
+		    gettext("%s: secure object class required\n"),
+		    progname);
+		exit(1);
+	}
+
+	if (obj_name == NULL) {
+		(void) fprintf(stderr,
+		    gettext("%s: secure object name required\n"),
+		    progname);
+		exit(1);
+	}
+
+	success = check_auth(LINK_SEC_AUTH);
+	audit_secobj(LINK_SEC_AUTH, class_name, obj_name, success, B_TRUE);
+	if (!success) {
+		(void) fprintf(stderr,
+		    gettext("%s: authorization '%s' is required\n"),
+		    progname, LINK_SEC_AUTH);
+		exit(1);
+	}
+
+	if ((rval = get_secobj_val(obj_name, obj_val, &obj_len,
+	    class, filep)) != 0) {
+		switch (rval) {
+		case ENOENT:
+			(void) fprintf(stderr,
+			    gettext("%s: invalid secure object class\n"),
+			    progname);
+			break;
+		case EINVAL:
+			(void) fprintf(stderr,
+			    gettext("%s: invalid secure object value\n"),
+			    progname);
+			break;
+		case ENOTSUP:
+			(void) fprintf(stderr, gettext(
+			    "%s: verification failed\n"), progname);
+			break;
+		default:
+			(void) fprintf(stderr, gettext(
+			    "%s: invalid secure object: %s\n"),
+			    progname, strerror(rval));
+			break;
+		}
+		exit(1);
+	}
+
+	status = dladm_set_secobj(obj_name, class, obj_val, obj_len,
+	    DLADM_OPT_CREATE | DLADM_OPT_TEMP);
+	if (status != DLADM_STATUS_OK) {
+		(void) fprintf(stderr,
+		    gettext("%s: could not create secure object '%s': %s\n"),
+		    progname, obj_name, dladm_status2str(status, errmsg));
+		exit(1);
+	}
+	if (temp)
+		return;
+
+	status = dladm_set_secobj(obj_name, class, obj_val, obj_len,
+	    DLADM_OPT_PERSIST);
+	if (status != DLADM_STATUS_OK) {
+		(void) fprintf(stderr,
+		    gettext("%s: warning: could not persistently create "
+		    "secure object '%s': %s\n"), progname, obj_name,
+		    dladm_status2str(status, errmsg));
+		exit(1);
+	}
+}
+
+static void
+do_delete_secobj(int argc, char **argv)
+{
+	int		i, option;
+	char		errmsg[DLADM_STRSIZE];
+	boolean_t	temp = B_FALSE;
+	split_t		*sp = NULL;
+	boolean_t	success;
+	dladm_status_t	status, pstatus;
+
+	opterr = 0;
+	status = pstatus = DLADM_STATUS_OK;
+	while ((option = getopt_long(argc, argv, "R:t",
+	    wifi_longopts, NULL)) != -1) {
+		switch (option) {
+		case 't':
+			temp = B_TRUE;
+			break;
+		case 'R':
+			status = dladm_set_rootdir(optarg);
+			if (status != DLADM_STATUS_OK) {
+				(void) fprintf(stderr, gettext(
+				    "%s: invalid directory specified: %s\n"),
+				    progname, dladm_status2str(status, errmsg));
+				exit(1);
+			}
+			break;
+		case ':':
+			(void) fprintf(stderr,
+			    gettext("%s: option requires a value '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		case '?':
+		default:
+			(void) fprintf(stderr,
+			    gettext("%s: unrecognized option '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		}
+	}
+
+	if (optind == (argc - 1)) {
+		sp = split(argv[optind], MAX_SECOBJS, MAX_SECOBJ_NAMELEN);
+		if (sp == NULL) {
+			(void) fprintf(stderr, gettext(
+			    "%s: invalid secure object name(s): '%s'\n"),
+			    progname, argv[optind]);
+			exit(1);
+		}
+	} else if (optind != argc)
+		usage();
+
+	if (sp == NULL || sp->s_nfields < 1) {
+		(void) fprintf(stderr,
+		    gettext("%s: secure object name required\n"),
+		    progname);
+		exit(1);
+	}
+
+	success = check_auth(LINK_SEC_AUTH);
+	audit_secobj(LINK_SEC_AUTH, "wep", argv[optind], success, B_FALSE);
+	if (!success) {
+		(void) fprintf(stderr,
+		    gettext("%s: authorization '%s' is required\n"),
+		    progname, LINK_SEC_AUTH);
+		exit(1);
+	}
+
+	for (i = 0; i < sp->s_nfields; i++) {
+		status = dladm_unset_secobj(sp->s_fields[i], DLADM_OPT_TEMP);
+		if (!temp) {
+			pstatus = dladm_unset_secobj(sp->s_fields[i],
+			    DLADM_OPT_PERSIST);
+		} else {
+			pstatus = DLADM_STATUS_OK;
+		}
+
+		if (status != DLADM_STATUS_OK) {
+			(void) fprintf(stderr, gettext(
+			    "%s: could not delete secure object '%s': %s\n"),
+			    progname, sp->s_fields[i],
+			    dladm_status2str(status, errmsg));
+		}
+		if (pstatus != DLADM_STATUS_OK) {
+			(void) fprintf(stderr, gettext("%s: warning: could not "
+			    "persistently delete secure object '%s': %s\n"),
+			    progname, sp->s_fields[i],
+			    dladm_status2str(pstatus, errmsg));
+		}
+	}
+	if (status != DLADM_STATUS_OK || pstatus != DLADM_STATUS_OK)
+		exit(1);
+}
+
+typedef struct show_secobj_state {
+	boolean_t	ss_persist;
+	boolean_t	ss_parseable;
+	boolean_t	ss_debug;
+	boolean_t	ss_header;
+} show_secobj_state_t;
+
+static void
+print_secobj_head(show_secobj_state_t *statep)
+{
+	(void) printf("%-20s %-20s ", "OBJECT", "CLASS");
+	if (statep->ss_debug)
+		(void) printf("%-30s", "VALUE");
+	(void) putchar('\n');
+}
+
+static boolean_t
+show_secobj(void *arg, const char *obj_name)
+{
+	uint_t			obj_len = DLADM_SECOBJ_VAL_MAX;
+	uint8_t			obj_val[DLADM_SECOBJ_VAL_MAX];
+	char			buf[DLADM_STRSIZE];
+	uint_t			flags = 0;
+	dladm_secobj_class_t	class;
+	show_secobj_state_t	*statep = arg;
+	dladm_status_t		status;
+
+	if (statep->ss_persist)
+		flags |= DLADM_OPT_PERSIST;
+
+	status = dladm_get_secobj(obj_name, &class, obj_val, &obj_len, flags);
+	if (status != DLADM_STATUS_OK) {
+		(void) fprintf(stderr, gettext(
+		    "%s: cannot get secure object '%s': %s\n"), progname,
+		    obj_name, dladm_status2str(status, buf));
+		exit(1);
+	}
+
+	if (statep->ss_header) {
+		statep->ss_header = B_FALSE;
+		if (!statep->ss_parseable)
+			print_secobj_head(statep);
+	}
+
+	if (statep->ss_parseable) {
+		(void) printf("OBJECT=\"%s\" CLASS=\"%s\" ", obj_name,
+		    dladm_secobjclass2str(class, buf));
+	} else {
+		(void) printf("%-20s %-20s ", obj_name,
+		    dladm_secobjclass2str(class, buf));
+	}
+
+	if (statep->ss_debug) {
+		char 	val[DLADM_SECOBJ_VAL_MAX * 2];
+		uint_t	len = sizeof (val);
+
+		if (octet_to_hexascii(obj_val, obj_len, val, &len) == 0) {
+			if (statep->ss_parseable)
+				(void) printf("VALUE=\"0x%s\"", val);
+			else
+				(void) printf("0x%-30s", val);
+		}
+	}
+	(void) putchar('\n');
+	return (B_TRUE);
+}
+
+static void
+do_show_secobj(int argc, char **argv)
+{
+	int			option;
+	show_secobj_state_t	state;
+	dladm_status_t		status;
+	uint_t			i;
+	char			errmsg[DLADM_STRSIZE];
+	split_t			*sp;
+	uint_t			flags;
+
+	opterr = 0;
+	state.ss_persist = B_FALSE;
+	state.ss_parseable = B_FALSE;
+	state.ss_debug = B_FALSE;
+	state.ss_header = B_TRUE;
+	while ((option = getopt_long(argc, argv, ":pPd",
+	    wifi_longopts, NULL)) != -1) {
+		switch (option) {
+		case 'p':
+			state.ss_parseable = B_TRUE;
+			break;
+		case 'P':
+			state.ss_persist = B_TRUE;
+			break;
+		case 'd':
+			if (getuid() != 0) {
+				(void) fprintf(stderr,
+				    gettext("%s: insufficient privileges\n"),
+				    progname);
+				exit(1);
+			}
+			state.ss_debug = B_TRUE;
+			break;
+		case ':':
+			(void) fprintf(stderr,
+			    gettext("%s: option requires a value '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		case '?':
+		default:
+			(void) fprintf(stderr,
+			    gettext("%s: unrecognized option '-%c'\n"),
+			    progname, optopt);
+			exit(1);
+			break;
+		}
+	}
+
+	if (optind == (argc - 1)) {
+		sp = split(argv[optind], MAX_SECOBJS, MAX_SECOBJ_NAMELEN);
+		if (sp == NULL) {
+			(void) fprintf(stderr, gettext(
+			    "%s: invalid secure object name(s): '%s'\n"),
+			    progname, argv[optind]);
+			exit(1);
+		}
+		for (i = 0; i < sp->s_nfields; i++) {
+			if (!show_secobj(&state, sp->s_fields[i]))
+				break;
+		}
+		splitfree(sp);
+		return;
+	} else if (optind != argc)
+		usage();
+
+	flags = state.ss_persist ? DLADM_OPT_PERSIST : 0;
+	status = dladm_walk_secobj(&state, show_secobj, flags);
+	if (status != DLADM_STATUS_OK) {
+		(void) fprintf(stderr, gettext("%s: show-secobj: %s\n"),
+		    progname, dladm_status2str(status, errmsg));
+		exit(1);
+	}
+}
+
+/* ARGSUSED */
+static void
+do_init_linkprop(int argc, char **argv)
+{
+	char		errmsg[DLADM_STRSIZE];
+	dladm_status_t	status;
+
+	status = dladm_init_linkprop();
+	if (status != DLADM_STATUS_OK) {
+		(void) fprintf(stderr,
+		    gettext("%s: link property initialization failed: %s\n"),
+		    progname, dladm_status2str(status, errmsg));
+		exit(1);
+	}
+}
+
+/* ARGSUSED */
+static void
+do_init_secobj(int argc, char **argv)
+{
+	char		errmsg[DLADM_STRSIZE];
+	dladm_status_t	status;
+
+	status = dladm_init_secobj();
+	if (status != DLADM_STATUS_OK) {
+		(void) fprintf(stderr,
+		    gettext("%s: secure object initialization failed: %s\n"),
+		    progname, dladm_status2str(status, errmsg));
+		exit(1);
+	}
 }

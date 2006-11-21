@@ -1083,8 +1083,8 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	mip->mi_driver = mregp->m_driver;
 
 	mip->mi_type = mtype;
-
 	mip->mi_info.mi_media = mtype->mt_type;
+	mip->mi_info.mi_nativemedia = mtype->mt_nativetype;
 	mip->mi_info.mi_sdu_min = mregp->m_min_sdu;
 	if (mregp->m_max_sdu <= mregp->m_min_sdu) {
 		err = EINVAL;
@@ -1814,6 +1814,7 @@ mactype_register(mactype_register_t *mtrp)
 	mtp->mt_ident = mtrp->mtr_ident;
 	mtp->mt_ops = *ops;
 	mtp->mt_type = mtrp->mtr_mactype;
+	mtp->mt_nativetype = mtrp->mtr_nativetype;
 	mtp->mt_addr_length = mtrp->mtr_addrlen;
 	if (mtrp->mtr_brdcst_addr != NULL) {
 		mtp->mt_brdcst_addr = kmem_alloc(mtrp->mtr_addrlen, KM_SLEEP);

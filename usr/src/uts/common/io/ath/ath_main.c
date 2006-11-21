@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,66 +41,57 @@
 /*
  * Driver for the Atheros Wireless LAN controller.
  *
- * The Atheros driver can be devided into 2 parts: H/W related(we called LLD:
- * Low Level Driver) and IEEE80211 protocol related(we called IEEE80211),
- * and each part has several sub modules.
+ * The Atheros driver calls into net80211 module for IEEE80211 protocol
+ * management functionalities. The driver includes a LLD(Low Level Driver)
+ * part to implement H/W related operations.
  * The following is the high level structure of ath driver.
  * (The arrows between modules indicate function call direction.)
  *
  *
- *                     ^                                |
- *                     |                                | GLD thread
- *                     |                                V
- *             ==================  =========================================
- *             |[1]             |  |[2]                                    |
- *             |                |  |    GLD Callback functions registered  |
- *             |   IEEE80211    |  =========================       by      |
- *             |                |          |               |   IEEE80211   |
- *             |   Internal     |          V               |               |
- * =========   |                |========================  |               |
- * |[3]    |   |   Functions                            |  |               |
- * |       |   |                                        |  |               |
- * |Multi- |   ==========================================  =================
- * |       |       ^           |                |                  |
- * |Func   |       |           V                V                  V
- * |       |   ======================   ------------------------------------
- * |Thread |   |[4]                 |   |[5]                               |
- * |       |-->| Functions exported |   |   IEEE80211 Callback functions   |
- * |       |   |    by IEEE80211    |   |      registered by LLD           |
- * =========   ======================   ------------------------------------
- *                       ^                                |
- *                       |                                V
- *             -------------------------------------------------------------
- *             |[6]                                                        |
- *             |                LLD Internal functions                     |
- *             |                                                           |
- *             -------------------------------------------------------------
- *                                        ^
- *                                        | Software interrupt thread
- *                                        |
+ *                                                  |
+ *                                                  | GLD thread
+ *                                                  V
+ *         ==================  =========================================
+ *         |                |  |[1]                                    |
+ *         |                |  |  GLDv3 Callback functions registered  |
+ *         |   Net80211     |  =========================       by      |
+ *         |    module      |          |               |     driver    |
+ *         |                |          V               |               |
+ *         |                |========================  |               |
+ *         |   Functions exported by net80211       |  |               |
+ *         |                                        |  |               |
+ *         ==========================================  =================
+ *                         |                                  |
+ *                         V                                  |
+ *         +----------------------------------+               |
+ *         |[2]                               |               |
+ *         |    Net80211 Callback functions   |               |
+ *         |      registered by LLD           |               |
+ *         +----------------------------------+               |
+ *                         |                                  |
+ *                         V                                  v
+ *         +-----------------------------------------------------------+
+ *         |[3]                                                        |
+ *         |                LLD Internal functions                     |
+ *         |                                                           |
+ *         +-----------------------------------------------------------+
+ *                                    ^
+ *                                    | Software interrupt thread
+ *                                    |
  *
- * Modules 1/2/3/4 constitute part IEEE80211, and modules 5/6 constitute LLD.
  * The short description of each module is as below:
- *      Module 1: IEEE80211 Internal functions, including ieee80211 state
- *                machine, convert functions between 802.3 frame and
- *                802.11 frame, and node maintain function, etc.
- *      Module 2: GLD callback functions, which are intercepting the calls from
- *                GLD to LLD, and adding IEEE80211's mutex protection.
- *      Module 3: Multi-func thread, which is responsible for scan timing,
- *                rate control timing and calibrate timing.
- *      Module 4: Functions exported by IEEE80211, which can be called from
- *                other modules.
- *      Module 5: IEEE80211 callback functions registered by LLD, which include
- *                GLD related callbacks and some other functions needed by
- *                IEEE80211.
- *      Module 6: LLD Internal functions, which are responsible for allocing
+ *      Module 1: GLD callback functions, which are intercepting the calls from
+ *                GLD to LLD.
+ *      Module 2: Net80211 callback functions registered by LLD, which
+ *                calls into LLD for H/W related functions needed by net80211.
+ *      Module 3: LLD Internal functions, which are responsible for allocing
  *                descriptor/buffer, handling interrupt and other H/W
  *                operations.
  *
  * All functions are running in 3 types of thread:
  * 1. GLD callbacks threads, such as ioctl, intr, etc.
- * 2. Multi-Func thread in IEEE80211 which is responsible for scan,
- *    rate control and calibrate.
+ * 2. Clock interruptt thread which is responsible for scan, rate control and
+ *    calibration.
  * 3. Software Interrupt thread originated in LLD.
  *
  * The lock strategy is as below:
@@ -117,40 +108,9 @@
  *      operational data in ath_softc struct and HAL accesses.
  *      It is acquired by the interupt handler and most "mode-ctrl" routines.
  *
- * In ieee80211com struct, isc_genlock is a general lock to protect
- *      necessary data and functions in ieee80211_com struct. Some data in
- *      ieee802.11_com don't need protection. For example, isc_dev is writen
- *      only in ath_attach(), but read in many other functions, so protection
- *      is not necessary.
- *
  * Any of the locks can be acquired singly, but where multiple
  * locks are acquired, they *must* be in the order:
- *
- *    isc_genlock >> asc_genlock >> asc_txqlock[i] >>
- *        asc_txbuflock >> asc_rxbuflock
- *
- * Note:
- * 1. All the IEEE80211 callback functions(except isc_gld_intr)
- *    registered by LLD in module [5] are protected by isc_genlock before
- *    calling from IEEE80211.
- * 2. Module [4] have 3 important functions ieee80211_input(),
- *    ieee80211_new_state() and _ieee80211_new_state().
- *    The functions in module [6] should avoid holding mutex or other locks
- *    during the call to ieee80211_input().
- *    In particular, the soft interrupt thread that calls ieee80211_input()
- *    may in some cases carry out processing that includes sending an outgoing
- *    packet, resulting in a call to the driver's ath_mgmt_send() routine.
- *    If the ath_mgmt_send() routine were to try to acquire a mutex being held
- *    by soft interrupt thread at the time it calls ieee80211_input(),
- *    this could result in a panic due to recursive mutex entry.
- *    ieee80211_new_state() and _ieee80211_new_state() are almost the same
- *    except that the latter function asserts isc_genlock is owned in its entry.
- *    so ieee80211_new_state() is only called by ath_bmiss_handler()
- *    from soft interrupt handler thread.
- *    As the same reason to ieee80211_input, we can't hold any other mutex.
- * 3. *None* of these locks may be held across calls out to the
- *    GLD routines gld_recv() in ieee80211_input().
- *
+ *    asc_genlock >> asc_txqlock[i] >> asc_txbuflock >> asc_rxbuflock
  */
 
 #include <sys/param.h>
@@ -174,7 +134,7 @@
 #include <sys/sunddi.h>
 #include <sys/pci.h>
 #include <sys/errno.h>
-#include <sys/gld.h>
+#include <sys/mac.h>
 #include <sys/dlpi.h>
 #include <sys/ethernet.h>
 #include <sys/list.h>
@@ -185,10 +145,13 @@
 #include <inet/nd.h>
 #include <inet/mi.h>
 #include <inet/wifi_ioctl.h>
+#include <sys/mac_wifi.h>
 #include "ath_hal.h"
 #include "ath_impl.h"
 #include "ath_aux.h"
 #include "ath_rate.h"
+
+#define	ATH_MAX_RSSI	63	/* max rssi */
 
 extern void ath_halfix_init(void);
 extern void ath_halfix_finit(void);
@@ -230,12 +193,31 @@ static ddi_dma_attr_t dma_attr = {
 	0				/* dma_attr_flags */
 };
 
-static uint8_t ath_broadcast_addr[] = {
-	0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-};
-
 static kmutex_t ath_loglock;
 static void *ath_soft_state_p = NULL;
+static int ath_dwelltime = 150;		/* scan interval, ms */
+
+static int	ath_m_stat(void *,  uint_t, uint64_t *);
+static int	ath_m_start(void *);
+static void	ath_m_stop(void *);
+static int	ath_m_promisc(void *, boolean_t);
+static int	ath_m_multicst(void *, boolean_t, const uint8_t *);
+static int	ath_m_unicst(void *, const uint8_t *);
+static mblk_t	*ath_m_tx(void *, mblk_t *);
+static void	ath_m_ioctl(void *, queue_t *, mblk_t *);
+static mac_callbacks_t ath_m_callbacks = {
+	MC_IOCTL,
+	ath_m_stat,
+	ath_m_start,
+	ath_m_stop,
+	ath_m_promisc,
+	ath_m_multicst,
+	ath_m_unicst,
+	ath_m_tx,
+	NULL,		/* mc_resources; */
+	ath_m_ioctl,
+	NULL		/* mc_getcapab */
+};
 
 /*
  * Available debug flags:
@@ -300,6 +282,7 @@ ath_setup_desc(ath_t *asc, struct ath_buf *bf)
 	ds = bf->bf_desc;
 	ds->ds_link = bf->bf_daddr;
 	ds->ds_data = bf->bf_dma.cookie.dmac_address;
+	ds->ds_vdata = bf->bf_dma.mem_va;
 	ATH_HAL_SETUPRXDESC(asc->asc_ah, ds,
 	    bf->bf_dma.alength,		/* buffer size */
 	    0);
@@ -434,7 +417,8 @@ ath_desc_alloc(dev_info_t *devinfo, ath_t *asc)
 		list_insert_tail(&asc->asc_txbuf_list, bf);
 
 		/* alloc DMA memory */
-		err = ath_alloc_dma_mem(devinfo, size, &ath_desc_accattr,
+		err = ath_alloc_dma_mem(devinfo, asc->asc_dmabuf_size,
+		    &ath_desc_accattr,
 		    DDI_DMA_STREAMING, DDI_DMA_STREAMING, &bf->bf_dma);
 		if (err != DDI_SUCCESS)
 			return (err);
@@ -490,16 +474,17 @@ ath_printrxbuf(struct ath_buf *bf, int32_t done)
 static void
 ath_rx_handler(ath_t *asc)
 {
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	struct ath_buf *bf;
 	struct ath_hal *ah = asc->asc_ah;
 	struct ath_desc *ds;
 	mblk_t *rx_mp;
-	struct ieee80211_frame *wh, whbuf;
+	struct ieee80211_frame *wh;
 	int32_t len, loop = 1;
 	uint8_t phyerr;
 	HAL_STATUS status;
 	HAL_NODE_STATS hal_node_stats;
+	struct ieee80211_node *in;
 
 	do {
 		mutex_enter(&asc->asc_rxbuflock);
@@ -564,7 +549,7 @@ ath_rx_handler(ath_t *asc)
 
 		rx_mp->b_wptr += len;
 		wh = (struct ieee80211_frame *)rx_mp->b_rptr;
-		if ((wh->ifrm_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
+		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
 		    IEEE80211_FC0_TYPE_CTL) {
 			/*
 			 * Ignore control frame received in promisc mode.
@@ -574,32 +559,25 @@ ath_rx_handler(ath_t *asc)
 		}
 		/* Remove the CRC at the end of IEEE80211 frame */
 		rx_mp->b_wptr -= IEEE80211_CRC_LEN;
-		if (wh->ifrm_fc[1] & IEEE80211_FC1_WEP) {
-			/*
-			 * WEP is decrypted by hardware. Clear WEP bit
-			 * and trim WEP header for ieee80211_input().
-			 */
-			wh->ifrm_fc[1] &= ~IEEE80211_FC1_WEP;
-			bcopy(wh, &whbuf, sizeof (whbuf));
-			/*
-			 * Remove WEP related fields between
-			 * header and payload.
-			 */
-			rx_mp->b_rptr += IEEE80211_WEP_IVLEN +
-			    IEEE80211_WEP_KIDLEN;
-			bcopy(&whbuf, rx_mp->b_rptr, sizeof (whbuf));
-			/*
-			 * Remove WEP CRC from the tail.
-			 */
-			rx_mp->b_wptr -= IEEE80211_WEP_CRCLEN;
-		}
 #ifdef DEBUG
 		ath_printrxbuf(bf, status == HAL_OK);
 #endif /* DEBUG */
-		ieee80211_input(isc, rx_mp,
+		/*
+		 * Locate the node for sender, track state, and then
+		 * pass the (referenced) node up to the 802.11 layer
+		 * for its use.
+		 */
+		in = ieee80211_find_rxnode(ic, wh);
+
+		/*
+		 * Send frame up for processing.
+		 */
+		(void) ieee80211_input(ic, rx_mp, in,
 		    ds->ds_rxstat.rs_rssi,
-		    ds->ds_rxstat.rs_tstamp,
-		    ds->ds_rxstat.rs_antenna);
+		    ds->ds_rxstat.rs_tstamp);
+
+		ieee80211_free_node(in);
+
 rx_next:
 		mutex_enter(&asc->asc_rxbuflock);
 		list_insert_tail(&asc->asc_rxbuf_list, bf);
@@ -608,8 +586,7 @@ rx_next:
 	} while (loop);
 
 	/* rx signal state monitoring */
-	ATH_HAL_RXMONITOR(ah, &hal_node_stats);
-	ATH_HAL_RXENA(ah);	/* in case of RXEOL */
+	ATH_HAL_RXMONITOR(ah, &hal_node_stats, &asc->asc_curchan);
 }
 
 static void
@@ -628,27 +605,28 @@ ath_printtxbuf(struct ath_buf *bf, int done)
 
 /*
  * The input parameter mp has following assumption:
- * the first mblk is for ieee80211 header, and there has enough space left
- * for WEP option at the end of this mblk.
- * The continue mblks are for payload.
+ * For data packets, GLDv3 mac_wifi plugin allocates and fills the
+ * ieee80211 header. For management packets, net80211 allocates and
+ * fills the ieee80211 header. In both cases, enough spaces in the
+ * header are left for encryption option.
  */
 static int32_t
-ath_xmit(ath_t *asc, struct ieee80211_node *in,
-    struct ath_buf *bf, mblk_t *mp, mblk_t *mp_header)
+ath_tx_start(ath_t *asc, struct ieee80211_node *in, struct ath_buf *bf,
+    mblk_t *mp)
 {
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	struct ieee80211_frame *wh;
 	struct ath_hal *ah = asc->asc_ah;
-	uint32_t subtype, flags, ctsduration, antenna;
+	uint32_t subtype, flags, ctsduration;
 	int32_t keyix, iswep, hdrlen, pktlen, mblen, mbslen, try0;
-	uint8_t rix, cix, txrate, ctsrate, *tmp_ptr;
+	uint8_t rix, cix, txrate, ctsrate;
 	struct ath_desc *ds;
 	struct ath_txq *txq;
 	HAL_PKT_TYPE atype;
 	const HAL_RATE_TABLE *rt;
 	HAL_BOOL shortPreamble;
-	mblk_t *mp0;
 	struct ath_node *an;
+	caddr_t dest;
 
 	/*
 	 * CRC are added by H/W, not encaped by driver,
@@ -656,62 +634,71 @@ ath_xmit(ath_t *asc, struct ieee80211_node *in,
 	 */
 	pktlen = IEEE80211_CRC_LEN;
 
-	wh = (struct ieee80211_frame *)mp_header->b_rptr;
-	iswep = wh->ifrm_fc[1] & IEEE80211_FC1_WEP;
+	wh = (struct ieee80211_frame *)mp->b_rptr;
+	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
 	keyix = HAL_TXKEYIX_INVALID;
 	hdrlen = sizeof (struct ieee80211_frame);
-	if (iswep) {
-		hdrlen += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN;
-		pktlen += IEEE80211_WEP_CRCLEN;
-		keyix = isc->isc_wep_txkey;
-	}
-	tmp_ptr = (uint8_t *)bf->bf_dma.mem_va;
+	if (iswep != 0) {
+		const struct ieee80211_cipher *cip;
+		struct ieee80211_key *k;
 
-	/* Copy 80211 header from mblk to DMA txbuf */
-	mblen = mp_header->b_wptr - mp_header->b_rptr;
-	bcopy(mp_header->b_rptr, tmp_ptr, mblen);
-	tmp_ptr += mblen;
-	pktlen += mblen;
-	mbslen = mblen;
-
-	/*
-	 * If mp==NULL, then it's a management frame,
-	 * else it's a data frame.
-	 */
-	if (mp != NULL) {
 		/*
-		 * Copy the first mblk to DMA txbuf
-		 * (this mblk includes ether header).
+		 * Construct the 802.11 header+trailer for an encrypted
+		 * frame. The only reason this can fail is because of an
+		 * unknown or unsupported cipher/key type.
 		 */
-		mblen = mp->b_wptr - mp->b_rptr - sizeof (struct ether_header);
-		bcopy(mp->b_rptr + sizeof (struct ether_header),
-			tmp_ptr, mblen);
-		tmp_ptr += mblen;
-		pktlen += mblen;
-		mbslen += mblen;
-
-		/* Copy subsequent mblks to DMA txbuf */
-		for (mp0 = mp->b_cont; mp0 != NULL; mp0 = mp0->b_cont) {
-			mblen = mp0->b_wptr - mp0->b_rptr;
-			bcopy(mp0->b_rptr, tmp_ptr, mblen);
-			tmp_ptr += mblen;
-			pktlen += mblen;
-			mbslen += mblen;
+		k = ieee80211_crypto_encap(ic, mp);
+		if (k == NULL) {
+			ATH_DEBUG((ATH_DBG_AUX, "crypto_encap failed\n"));
+			/*
+			 * This can happen when the key is yanked after the
+			 * frame was queued.  Just discard the frame; the
+			 * 802.11 layer counts failures and provides
+			 * debugging/diagnostics.
+			 */
+			return (EIO);
 		}
+		cip = k->wk_cipher;
+		/*
+		 * Adjust the packet + header lengths for the crypto
+		 * additions and calculate the h/w key index.  When
+		 * a s/w mic is done the frame will have had any mic
+		 * added to it prior to entry so m0->m_pkthdr.len above will
+		 * account for it. Otherwise we need to add it to the
+		 * packet length.
+		 */
+		hdrlen += cip->ic_header;
+		pktlen += cip->ic_header + cip->ic_trailer;
+		if ((k->wk_flags & IEEE80211_KEY_SWMIC) == 0)
+			pktlen += cip->ic_miclen;
+		keyix = k->wk_keyix;
+
+		/* packet header may have moved, reset our local pointer */
+		wh = (struct ieee80211_frame *)mp->b_rptr;
 	}
+
+	dest = bf->bf_dma.mem_va;
+	for (; mp != NULL; mp = mp->b_cont) {
+		mblen = MBLKL(mp);
+		bcopy(mp->b_rptr, dest, mblen);
+		dest += mblen;
+	}
+	mbslen = dest - bf->bf_dma.mem_va;
+	pktlen += mbslen;
 
 	bf->bf_in = in;
 
 	/* setup descriptors */
 	ds = bf->bf_desc;
 	rt = asc->asc_currates;
+	ASSERT(rt != NULL);
 
 	/*
 	 * The 802.11 layer marks whether or not we should
 	 * use short preamble based on the current mode and
 	 * negotiated parameters.
 	 */
-	if ((isc->isc_flags & IEEE80211_F_SHPREAMBLE) &&
+	if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) &&
 	    (in->in_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE)) {
 		shortPreamble = AH_TRUE;
 		asc->asc_stats.ast_tx_shortpre++;
@@ -725,9 +712,9 @@ ath_xmit(ath_t *asc, struct ieee80211_node *in,
 	 * Calculate Atheros packet type from IEEE80211 packet header
 	 * and setup for rate calculations.
 	 */
-	switch (wh->ifrm_fc[0] & IEEE80211_FC0_TYPE_MASK) {
+	switch (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) {
 	case IEEE80211_FC0_TYPE_MGT:
-		subtype = wh->ifrm_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+		subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
 		if (subtype == IEEE80211_FC0_SUBTYPE_BEACON)
 			atype = HAL_PKT_TYPE_BEACON;
 		else if (subtype == IEEE80211_FC0_SUBTYPE_PROBE_RESP)
@@ -747,7 +734,7 @@ ath_xmit(ath_t *asc, struct ieee80211_node *in,
 		break;
 	case IEEE80211_FC0_TYPE_CTL:
 		atype = HAL_PKT_TYPE_PSPOLL;
-		subtype = wh->ifrm_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+		subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
 		rix = 0;	/* lowest rate */
 		try0 = ATH_TXMAXTRY;
 		if (shortPreamble)
@@ -777,10 +764,10 @@ ath_xmit(ath_t *asc, struct ieee80211_node *in,
 	 * Calculate miscellaneous flags.
 	 */
 	flags = HAL_TXDESC_CLRDMASK;
-	if (IEEE80211_IS_MULTICAST(wh->ifrm_addr1)) {
+	if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
 		flags |= HAL_TXDESC_NOACK;	/* no ack on broad/multicast */
 		asc->asc_stats.ast_tx_noack++;
-	} else if (pktlen > isc->isc_rtsthreshold) {
+	} else if (pktlen > ic->ic_rtsthreshold) {
 		flags |= HAL_TXDESC_RTSENA;	/* RTS based on frame length */
 		asc->asc_stats.ast_tx_rts++;
 	}
@@ -790,12 +777,12 @@ ath_xmit(ath_t *asc, struct ieee80211_node *in,
 	 * layer but it lacks sufficient information to calculate it.
 	 */
 	if ((flags & HAL_TXDESC_NOACK) == 0 &&
-	    (wh->ifrm_fc[0] & IEEE80211_FC0_TYPE_MASK) !=
+	    (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) !=
 	    IEEE80211_FC0_TYPE_CTL) {
 		uint16_t dur;
 		dur = ath_hal_computetxtime(ah, rt, IEEE80211_ACK_SIZE,
 		    rix, shortPreamble);
-		*(uint16_t *)wh->ifrm_dur = LE_16(dur);
+		*(uint16_t *)wh->i_dur = LE_16(dur);
 	}
 
 	/*
@@ -832,17 +819,6 @@ ath_xmit(ath_t *asc, struct ieee80211_node *in,
 	} else
 		ctsrate = 0;
 
-	/*
-	 * For now use the antenna on which the last good
-	 * frame was received on.  We assume this field is
-	 * initialized to 0 which gives us ``auto'' or the
-	 * ``default'' antenna.
-	 */
-	if (an->an_tx_antenna)
-		antenna = an->an_tx_antenna;
-	else
-		antenna = in->in_recv_hist[in->in_hist_cur].irh_rantenna;
-
 	if (++txq->axq_intrcnt >= ATH_TXINTR_PERIOD) {
 		flags |= HAL_TXDESC_INTREQ;
 		txq->axq_intrcnt = 0;
@@ -857,18 +833,19 @@ ath_xmit(ath_t *asc, struct ieee80211_node *in,
 	    atype,			/* Atheros packet type */
 	    MIN(in->in_txpower, 60),	/* txpower */
 	    txrate, try0,		/* series 0 rate/tries */
-	    keyix,
-	    antenna,			/* antenna mode */
+	    keyix,			/* key cache index */
+	    an->an_tx_antenna,		/* antenna mode */
 	    flags,			/* flags */
 	    ctsrate,			/* rts/cts rate */
 	    ctsduration);		/* rts/cts duration */
+	bf->bf_flags = flags;
 
 	ATH_DEBUG((ATH_DBG_SEND, "ath: ath_xmit(): to %s totlen=%d "
 	    "an->an_tx_rate1sp=%d tx_rate2sp=%d tx_rate3sp=%d "
 	    "qnum=%d rix=%d sht=%d dur = %d\n",
-	    ieee80211_ether_sprintf(wh->ifrm_addr1), mbslen, an->an_tx_rate1sp,
+	    ieee80211_macaddr_sprintf(wh->i_addr1), mbslen, an->an_tx_rate1sp,
 	    an->an_tx_rate2sp, an->an_tx_rate3sp,
-	    txq->axq_qnum, rix, shortPreamble, *(uint16_t *)wh->ifrm_dur));
+	    txq->axq_qnum, rix, shortPreamble, *(uint16_t *)wh->i_dur));
 
 	/*
 	 * Setup the multi-rate retry state only when we're
@@ -905,94 +882,153 @@ ath_xmit(ath_t *asc, struct ieee80211_node *in,
 
 	ATH_HAL_TXSTART(ah, txq->axq_qnum);
 
+	ic->ic_stats.is_tx_frags++;
+	ic->ic_stats.is_tx_bytes += pktlen;
+
 	return (0);
 }
 
-
+/*
+ * Transmit a management frame.  On failure we reclaim the skbuff.
+ * Note that management frames come directly from the 802.11 layer
+ * and do not honor the send queue flow control.  Need to investigate
+ * using priority queueing so management frames can bypass data.
+ */
 static int
-ath_gld_send(gld_mac_info_t *gld_p, mblk_t *mp)
+ath_xmit(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 {
-	int err;
-	ath_t *asc = ATH_STATE(gld_p);
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
-	struct ieee80211_node *in;
-	mblk_t *mp_header;
+	ath_t *asc = (ath_t *)ic;
+	struct ath_hal *ah = asc->asc_ah;
+	struct ieee80211_node *in = NULL;
 	struct ath_buf *bf = NULL;
+	struct ieee80211_frame *wh;
+	int error = 0;
+
+	ASSERT(mp->b_next == NULL);
+
+	/* Grab a TX buffer */
+	mutex_enter(&asc->asc_txbuflock);
+	bf = list_head(&asc->asc_txbuf_list);
+	if (bf != NULL)
+		list_remove(&asc->asc_txbuf_list, bf);
+	if (list_empty(&asc->asc_txbuf_list)) {
+		ATH_DEBUG((ATH_DBG_SEND, "ath: ath_mgmt_send(): "
+		    "stop queue\n"));
+		asc->asc_stats.ast_tx_qstop++;
+	}
+	mutex_exit(&asc->asc_txbuflock);
+	if (bf == NULL) {
+		ATH_DEBUG((ATH_DBG_SEND, "ath: ath_mgmt_send(): discard, "
+		    "no xmit buf\n"));
+		ic->ic_stats.is_tx_nobuf++;
+		if ((type & IEEE80211_FC0_TYPE_MASK) ==
+		    IEEE80211_FC0_TYPE_DATA) {
+			asc->asc_stats.ast_tx_nobuf++;
+			mutex_enter(&asc->asc_resched_lock);
+			asc->asc_resched_needed = B_TRUE;
+			mutex_exit(&asc->asc_resched_lock);
+		} else {
+			asc->asc_stats.ast_tx_nobufmgt++;
+			freemsg(mp);
+		}
+		return (ENOMEM);
+	}
+
+	wh = (struct ieee80211_frame *)mp->b_rptr;
+
+	/* Locate node */
+	in = ieee80211_find_txnode(ic,  wh->i_addr1);
+	if (in == NULL) {
+		error = EIO;
+		goto bad;
+	}
+
+	in->in_inact = 0;
+	switch (type & IEEE80211_FC0_TYPE_MASK) {
+	case IEEE80211_FC0_TYPE_DATA:
+		(void) ieee80211_encap(ic, mp, in);
+		break;
+	default:
+		if ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==
+		    IEEE80211_FC0_SUBTYPE_PROBE_RESP) {
+			/* fill time stamp */
+			uint64_t tsf;
+			uint32_t *tstamp;
+
+			tsf = ATH_HAL_GETTSF64(ah);
+			/* adjust 100us delay to xmit */
+			tsf += 100;
+			tstamp = (uint32_t *)&wh[1];
+			tstamp[0] = LE_32(tsf & 0xffffffff);
+			tstamp[1] = LE_32(tsf >> 32);
+		}
+		asc->asc_stats.ast_tx_mgmt++;
+		break;
+	}
+
+	error = ath_tx_start(asc, in, bf, mp);
+	if (error != 0) {
+bad:
+		ic->ic_stats.is_tx_failed++;
+		if (bf != NULL) {
+			mutex_enter(&asc->asc_txbuflock);
+			list_insert_tail(&asc->asc_txbuf_list, bf);
+			mutex_exit(&asc->asc_txbuflock);
+		}
+	}
+	if (in != NULL)
+		ieee80211_free_node(in);
+	if ((type & IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_DATA ||
+	    error == 0) {
+		freemsg(mp);
+	}
+
+	return (error);
+}
+
+static mblk_t *
+ath_m_tx(void *arg, mblk_t *mp)
+{
+	ath_t *asc = arg;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
+	mblk_t *next;
 
 	/*
 	 * No data frames go out unless we're associated; this
 	 * should not happen as the 802.11 layer does not enable
 	 * the xmit queue until we enter the RUN state.
 	 */
-	if (isc->isc_state != IEEE80211_S_RUN) {
-		ATH_DEBUG((ATH_DBG_SEND, "ath: ath_gld_send(): "
-		    "discard, state %u\n", isc->isc_state));
-		asc->asc_stats.ast_tx_discard++;
-		return (GLD_NOLINK);
+	if (ic->ic_state != IEEE80211_S_RUN) {
+		ATH_DEBUG((ATH_DBG_SEND, "ath: ath_m_tx(): "
+		    "discard, state %u\n", ic->ic_state));
+		asc->asc_stats.ast_tx_discard ++;
+		return (mp);
 	}
 
-	/*
-	 * Only supports STA mode
-	 */
-	if (isc->isc_opmode != IEEE80211_M_STA)
-		return (GLD_NOLINK);
+	while (mp != NULL) {
+		next = mp->b_next;
+		mp->b_next = NULL;
 
-	/*
-	 * Locate AP information, so we can fill MAC address.
-	 */
-	in = isc->isc_bss;
-	in->in_inact = 0;
-
-	/*
-	 * Grab a TX buffer.
-	 */
-	mutex_enter(&asc->asc_txbuflock);
-	bf = list_head(&asc->asc_txbuf_list);
-
-	if (bf != NULL)
-		list_remove(&asc->asc_txbuf_list, bf);
-	mutex_exit(&asc->asc_txbuflock);
-
-	if (bf == NULL) {
-		ATH_DEBUG((ATH_DBG_SEND, "ath: ath_gld_send(): "
-		    "no TX DMA buffer available: 100 times\n"));
-		asc->asc_stats.ast_tx_nobuf++;
-
-		mutex_enter(&asc->asc_gld_sched_lock);
-		asc->asc_need_gld_sched = 1;
-		mutex_exit(&asc->asc_gld_sched_lock);
-		return (GLD_NORESOURCES);
+		if (ath_xmit(ic, mp, IEEE80211_FC0_TYPE_DATA) != 0) {
+			mp->b_next = next;
+			break;
+		}
+		mp = next;
 	}
 
-	mp_header = ieee80211_fill_header(isc, mp, isc->isc_wep_txkey, in);
-	if (mp_header == NULL) {
-		/* Push back the TX buf */
-		mutex_enter(&asc->asc_txbuflock);
-		list_insert_tail(&asc->asc_txbuf_list, bf);
-		mutex_exit(&asc->asc_txbuflock);
-		return (GLD_FAILURE);
-	}
+	return (mp);
 
-	err = ath_xmit(asc, in, bf, mp, mp_header);
-	freemsg(mp_header);
-
-	if (!err) {
-		freemsg(mp);
-		return (GLD_SUCCESS);
-	} else {
-		return (GLD_FAILURE);
-	}
 }
 
-static void
+static int
 ath_tx_processq(ath_t *asc, struct ath_txq *txq)
 {
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	struct ath_hal *ah = asc->asc_ah;
 	struct ath_buf *bf;
 	struct ath_desc *ds;
 	struct ieee80211_node *in;
-	int32_t sr, lr;
+	int32_t sr, lr, nacked = 0;
 	HAL_STATUS status;
 	struct ath_node *an;
 
@@ -1050,22 +1086,39 @@ ath_tx_processq(ath_t *asc, struct ath_txq *txq)
 			lr = ds->ds_txstat.ts_longretry;
 			asc->asc_stats.ast_tx_shortretry += sr;
 			asc->asc_stats.ast_tx_longretry += lr;
-			an->an_tx_retr += sr + lr;
+			/*
+			 * Hand the descriptor to the rate control algorithm.
+			 */
+			if ((ds->ds_txstat.ts_status & HAL_TXERR_FILT) == 0 &&
+			    (bf->bf_flags & HAL_TXDESC_NOACK) == 0) {
+				/*
+				 * If frame was ack'd update the last rx time
+				 * used to workaround phantom bmiss interrupts.
+				 */
+				if (ds->ds_txstat.ts_status == 0) {
+					nacked++;
+					an->an_tx_ok++;
+				} else {
+					an->an_tx_err++;
+				}
+				an->an_tx_retr += sr + lr;
+			}
 		}
 		bf->bf_in = NULL;
 		mutex_enter(&asc->asc_txbuflock);
 		list_insert_tail(&asc->asc_txbuf_list, bf);
 		mutex_exit(&asc->asc_txbuflock);
-		mutex_enter(&asc->asc_gld_sched_lock);
 		/*
 		 * Reschedule stalled outbound packets
 		 */
-		if (asc->asc_need_gld_sched) {
-			asc->asc_need_gld_sched = 0;
-			gld_sched(isc->isc_dev);
+		mutex_enter(&asc->asc_resched_lock);
+		if (asc->asc_resched_needed) {
+			asc->asc_resched_needed = B_FALSE;
+			mac_tx_update(ic->ic_mach);
 		}
-		mutex_exit(&asc->asc_gld_sched_lock);
+		mutex_exit(&asc->asc_resched_lock);
 	}
+	return (nacked);
 }
 
 
@@ -1079,16 +1132,16 @@ ath_tx_handler(ath_t *asc)
 	 */
 	for (i = 0; i < HAL_NUM_TX_QUEUES; i++) {
 		if (ATH_TXQ_SETUP(asc, i)) {
-			ath_tx_processq(asc, &asc->asc_txq[i]);
+			(void) ath_tx_processq(asc, &asc->asc_txq[i]);
 		}
 	}
 }
 
 static struct ieee80211_node *
-ath_node_alloc(ieee80211com_t *isc)
+ath_node_alloc(ieee80211com_t *ic)
 {
 	struct ath_node *an;
-	ath_t *asc = (ath_t *)isc;
+	ath_t *asc = (ath_t *)ic;
 
 	an = kmem_zalloc(sizeof (struct ath_node), KM_SLEEP);
 	ath_rate_update(asc, &an->an_node, 0);
@@ -1096,9 +1149,10 @@ ath_node_alloc(ieee80211com_t *isc)
 }
 
 static void
-ath_node_free(ieee80211com_t *isc, struct ieee80211_node *in)
+ath_node_free(struct ieee80211_node *in)
 {
-	ath_t *asc = (ath_t *)isc;
+	ieee80211com_t *ic = in->in_ic;
+	ath_t *asc = (ath_t *)ic;
 	struct ath_buf *bf;
 	struct ath_txq *txq;
 	int32_t i;
@@ -1117,93 +1171,40 @@ ath_node_free(ieee80211com_t *isc, struct ieee80211_node *in)
 			mutex_exit(&txq->axq_lock);
 		}
 	}
+	ic->ic_node_cleanup(in);
 	kmem_free(in, sizeof (struct ath_node));
 }
 
 static void
-ath_node_copy(struct ieee80211_node *dst, const struct ieee80211_node *src)
+ath_next_scan(void *arg)
 {
-	bcopy(src, dst, sizeof (struct ieee80211_node));
+	ieee80211com_t *ic = arg;
+	ath_t *asc = (ath_t *)ic;
+
+	asc->asc_scan_timer = 0;
+	if (ic->ic_state == IEEE80211_S_SCAN) {
+		asc->asc_scan_timer = timeout(ath_next_scan, (void *)asc,
+		    drv_usectohz(ath_dwelltime * 1000));
+		ieee80211_next_scan(ic);
+	}
 }
 
-/*
- * Transmit a management frame.  On failure we reclaim the skbuff.
- * Note that management frames come directly from the 802.11 layer
- * and do not honor the send queue flow control.  Need to investigate
- * using priority queueing so management frames can bypass data.
- */
-static int32_t
-ath_mgmt_send(ieee80211com_t *isc, mblk_t *mp)
+static void
+ath_stop_scantimer(ath_t *asc)
 {
-	ath_t *asc = (ath_t *)isc;
-	struct ath_hal *ah = asc->asc_ah;
-	struct ieee80211_node *in;
-	struct ath_buf *bf = NULL;
-	struct ieee80211_frame *wh;
-	int32_t error = 0;
+	timeout_id_t tmp_id = 0;
 
-	/* Grab a TX buffer */
-	mutex_enter(&asc->asc_txbuflock);
-	bf = list_head(&asc->asc_txbuf_list);
-	if (bf != NULL)
-		list_remove(&asc->asc_txbuf_list, bf);
-	if (list_empty(&asc->asc_txbuf_list)) {
-		ATH_DEBUG((ATH_DBG_SEND, "ath: ath_mgmt_send(): "
-		    "stop queue\n"));
-		asc->asc_stats.ast_tx_qstop++;
+	while ((asc->asc_scan_timer != 0) && (tmp_id != asc->asc_scan_timer)) {
+		tmp_id = asc->asc_scan_timer;
+		(void) untimeout(tmp_id);
 	}
-	mutex_exit(&asc->asc_txbuflock);
-	if (bf == NULL) {
-		ATH_DEBUG((ATH_DBG_SEND, "ath: ath_mgmt_send(): discard, "
-		    "no xmit buf\n"));
-		asc->asc_stats.ast_tx_nobufmgt++;
-		goto bad;
-	}
-	wh = (struct ieee80211_frame *)mp->b_rptr;
-	if ((wh->ifrm_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==
-	    IEEE80211_FC0_SUBTYPE_PROBE_RESP) {
-		/* fill time stamp */
-		uint64_t tsf;
-		uint32_t *tstamp;
-
-		tsf = ATH_HAL_GETTSF64(ah);
-		/* adjust 100us delay to xmit */
-		tsf += 100;
-		tstamp = (uint32_t *)&wh[1];
-		tstamp[0] = LE_32(tsf & 0xffffffff);
-		tstamp[1] = LE_32(tsf >> 32);
-	}
-	/*
-	 * Locate node state.  When operating
-	 * in station mode we always use ic_bss.
-	 */
-	if (isc->isc_opmode != IEEE80211_M_STA) {
-		in = ieee80211_find_node(isc, wh->ifrm_addr1);
-		if (in == NULL)
-			in = isc->isc_bss;
-	} else
-		in = isc->isc_bss;
-
-	error = ath_xmit(asc, in, bf, NULL, mp);
-	if (error == 0) {
-		asc->asc_stats.ast_tx_mgmt++;
-		freemsg(mp);
-		return (0);
-	}
-bad:
-	if (bf != NULL) {
-		mutex_enter(&asc->asc_txbuflock);
-		list_insert_tail(&asc->asc_txbuf_list, bf);
-		mutex_exit(&asc->asc_txbuflock);
-	}
-	freemsg(mp);
-	return (error);
+	asc->asc_scan_timer = 0;
 }
 
 static int32_t
-ath_new_state(ieee80211com_t *isc, enum ieee80211_state nstate)
+ath_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 {
-	ath_t *asc = (ath_t *)isc;
+	ath_t *asc = (ath_t *)ic;
 	struct ath_hal *ah = asc->asc_ah;
 	struct ieee80211_node *in;
 	int32_t i, error;
@@ -1218,36 +1219,44 @@ ath_new_state(ieee80211com_t *isc, enum ieee80211_state nstate)
 	    HAL_LED_ASSOC, 	/* IEEE80211_S_ASSOC */
 	    HAL_LED_RUN, 	/* IEEE80211_S_RUN */
 	};
-	if (asc->asc_invalid == 1)
+	if (!ATH_IS_RUNNING(asc))
 		return (0);
 
-	ostate = isc->isc_state;
+	ostate = ic->ic_state;
+	if (nstate != IEEE80211_S_SCAN)
+		ath_stop_scantimer(asc);
 
+	ATH_LOCK(asc);
 	ATH_HAL_SETLEDSTATE(ah, leds[nstate]);	/* set LED */
 
 	if (nstate == IEEE80211_S_INIT) {
 		asc->asc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
-		ATH_HAL_INTRSET(ah, asc->asc_imask);
-		error = 0;			/* cheat + use error return */
-		goto bad;
+		ATH_HAL_INTRSET(ah, asc->asc_imask &~ HAL_INT_GLOBAL);
+		ATH_UNLOCK(asc);
+		goto done;
 	}
-	in = isc->isc_bss;
-	error = ath_chan_set(asc, in->in_chan);
-	if (error != 0)
-		goto bad;
+	in = ic->ic_bss;
+	error = ath_chan_set(asc, ic->ic_curchan);
+	if (error != 0) {
+		if (nstate != IEEE80211_S_SCAN) {
+			ATH_UNLOCK(asc);
+			ieee80211_reset_chan(ic);
+			goto bad;
+		}
+	}
 
 	rfilt = ath_calcrxfilter(asc);
 	if (nstate == IEEE80211_S_SCAN)
-		bssid = isc->isc_macaddr;
+		bssid = ic->ic_macaddr;
 	else
 		bssid = in->in_bssid;
 	ATH_HAL_SETRXFILTER(ah, rfilt);
 
-	if (nstate == IEEE80211_S_RUN && isc->isc_opmode != IEEE80211_M_IBSS)
+	if (nstate == IEEE80211_S_RUN && ic->ic_opmode != IEEE80211_M_IBSS)
 		ATH_HAL_SETASSOCID(ah, bssid, in->in_associd);
 	else
 		ATH_HAL_SETASSOCID(ah, bssid, 0);
-	if (isc->isc_flags & IEEE80211_F_WEPON) {
+	if (ic->ic_flags & IEEE80211_F_PRIVACY) {
 		for (i = 0; i < IEEE80211_WEP_NKID; i++) {
 			if (ATH_HAL_KEYISVALID(ah, i))
 				ATH_HAL_KEYSETMAC(ah, i, bssid);
@@ -1267,7 +1276,7 @@ ath_new_state(ieee80211com_t *isc, enum ieee80211_state nstate)
 	 */
 	ath_rate_ctl_reset(asc, nstate);
 
-	if (nstate == IEEE80211_S_RUN) {
+	if (nstate == IEEE80211_S_RUN && (ostate != IEEE80211_S_RUN)) {
 		nvlist_t *attr_list = NULL;
 		sysevent_id_t eid;
 		int32_t err = 0;
@@ -1277,11 +1286,11 @@ ath_new_state(ieee80211com_t *isc, enum ieee80211_state nstate)
 		ATH_DEBUG((ATH_DBG_80211, "ath: ath new state(RUN): "
 		    "ic_flags=0x%08x iv=%d"
 		    " bssid=%s capinfo=0x%04x chan=%d\n",
-		    isc->isc_flags,
+		    ic->ic_flags,
 		    in->in_intval,
-		    ieee80211_ether_sprintf(in->in_bssid),
+		    ieee80211_macaddr_sprintf(in->in_bssid),
 		    in->in_capinfo,
-		    ieee80211_chan2ieee(isc, in->in_chan)));
+		    ieee80211_chan2ieee(ic, in->in_chan)));
 
 		(void) sprintf(str_value, "%s%s%d", "-i ",
 		    ddi_driver_name(asc->asc_dev),
@@ -1304,7 +1313,23 @@ ath_new_state(ieee80211com_t *isc, enum ieee80211_state nstate)
 		}
 	}
 
-	return (0);
+	ATH_UNLOCK(asc);
+done:
+	/*
+	 * Invoke the parent method to complete the work.
+	 */
+	error = asc->asc_newstate(ic, nstate, arg);
+	/*
+	 * Finally, start any timers.
+	 */
+	if (nstate == IEEE80211_S_RUN) {
+		ieee80211_start_watchdog(ic, 1);
+	} else if ((nstate == IEEE80211_S_SCAN) && (ostate != nstate)) {
+		/* start ap/neighbor scan timer */
+		ASSERT(asc->asc_scan_timer == 0);
+		asc->asc_scan_timer = timeout(ath_next_scan, (void *)asc,
+		    drv_usectohz(ath_dwelltime * 1000));
+	}
 bad:
 	return (error);
 }
@@ -1314,22 +1339,12 @@ bad:
  * for temperature/environment changes.
  */
 static void
-ath_calibrate(ieee80211com_t *isc)
+ath_calibrate(ath_t *asc)
 {
-	ath_t *asc = (ath_t *)isc;
 	struct ath_hal *ah = asc->asc_ah;
-	struct ieee80211channel *ch;
-	HAL_CHANNEL hchan;
+	HAL_BOOL iqcaldone;
 
 	asc->asc_stats.ast_per_cal++;
-
-	/*
-	 * Convert to a HAL channel description with the flags
-	 * constrained to reflect the current operating mode.
-	 */
-	ch = isc->isc_ibss_chan;
-	hchan.channel = ch->ich_freq;
-	hchan.channelFlags = ath_chan2flags(isc, ch);
 
 	if (ATH_HAL_GETRFGAIN(ah) == HAL_RFGAIN_NEED_CHANGE) {
 		/*
@@ -1339,29 +1354,77 @@ ath_calibrate(ieee80211com_t *isc)
 		ATH_DEBUG((ATH_DBG_HAL, "ath: ath_calibrate(): "
 		    "Need change RFgain\n"));
 		asc->asc_stats.ast_per_rfgain++;
-		ath_reset(asc);
+		(void) ath_reset(&asc->asc_isc);
 	}
-	if (!ATH_HAL_CALIBRATE(ah, &hchan)) {
+	if (!ATH_HAL_CALIBRATE(ah, &asc->asc_curchan, &iqcaldone)) {
 		ATH_DEBUG((ATH_DBG_HAL, "ath: ath_calibrate(): "
 		    "calibration of channel %u failed\n",
-		    ch->ich_freq));
+		    asc->asc_curchan.channel));
 		asc->asc_stats.ast_per_calfail++;
 	}
 }
 
-static uint_t
-ath_gld_intr(gld_mac_info_t *gld_p)
+static void
+ath_watchdog(void *arg)
 {
-	ath_t *asc = ATH_STATE(gld_p);
+	ath_t *asc = arg;
+	ieee80211com_t *ic = &asc->asc_isc;
+	int ntimer = 0;
+
+	ATH_LOCK(asc);
+	ic->ic_watchdog_timer = 0;
+	if (!ATH_IS_RUNNING(asc)) {
+		ATH_UNLOCK(asc);
+		return;
+	}
+
+	if (ic->ic_state == IEEE80211_S_RUN) {
+		/* periodic recalibration */
+		ath_calibrate(asc);
+
+		/*
+		 * Start the background rate control thread if we
+		 * are not configured to use a fixed xmit rate.
+		 */
+		if (ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) {
+			asc->asc_stats.ast_rate_calls ++;
+			if (ic->ic_opmode == IEEE80211_M_STA)
+				ath_rate_ctl(ic, ic->ic_bss);
+			else
+				ieee80211_iterate_nodes(&ic->ic_sta,
+				    ath_rate_cb, asc);
+		}
+
+		ntimer = 1;
+	}
+	ATH_UNLOCK(asc);
+
+	ieee80211_watchdog(ic);
+	if (ntimer != 0)
+		ieee80211_start_watchdog(ic, ntimer);
+}
+
+static uint_t
+ath_intr(caddr_t arg)
+{
+	ath_t *asc = (ath_t *)arg;
 	struct ath_hal *ah = asc->asc_ah;
 	HAL_INT status;
-	enum ieee80211_state isc_state;
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
 
-	mutex_enter(&asc->asc_genlock);
+	ATH_LOCK(asc);
+
+	if (!ATH_IS_RUNNING(asc)) {
+		/*
+		 * The hardware is not ready/present, don't touch anything.
+		 * Note this can happen early on if the IRQ is shared.
+		 */
+		ATH_UNLOCK(asc);
+		return (DDI_INTR_UNCLAIMED);
+	}
 
 	if (!ATH_HAL_INTRPEND(ah)) {	/* shared irq, not for us */
-		mutex_exit(&asc->asc_genlock);
+		ATH_UNLOCK(asc);
 		return (DDI_INTR_UNCLAIMED);
 	}
 
@@ -1369,11 +1432,9 @@ ath_gld_intr(gld_mac_info_t *gld_p)
 	status &= asc->asc_imask;
 	if (status & HAL_INT_FATAL) {
 		asc->asc_stats.ast_hardware++;
-		mutex_exit(&asc->asc_genlock);
 		goto reset;
 	} else if (status & HAL_INT_RXORN) {
 		asc->asc_stats.ast_rxorn++;
-		mutex_exit(&asc->asc_genlock);
 		goto reset;
 	} else {
 		if (status & HAL_INT_RXEOL) {
@@ -1384,6 +1445,7 @@ ath_gld_intr(gld_mac_info_t *gld_p)
 			asc->asc_stats.ast_txurn++;
 			ATH_HAL_UPDATETXTRIGLEVEL(ah, AH_TRUE);
 		}
+
 		if (status & HAL_INT_RX) {
 			asc->asc_rx_pend = 1;
 			ddi_trigger_softintr(asc->asc_softint_id);
@@ -1391,19 +1453,15 @@ ath_gld_intr(gld_mac_info_t *gld_p)
 		if (status & HAL_INT_TX) {
 			ath_tx_handler(asc);
 		}
-
-		mutex_exit(&asc->asc_genlock);
+		ATH_UNLOCK(asc);
 
 		if (status & HAL_INT_SWBA) {
 			/* This will occur only in Host-AP or Ad-Hoc mode */
 			return (DDI_INTR_CLAIMED);
 		}
 		if (status & HAL_INT_BMISS) {
-			mutex_enter(&isc->isc_genlock);
-			isc_state = isc->isc_state;
-			mutex_exit(&isc->isc_genlock);
-			if (isc_state == IEEE80211_S_RUN) {
-				(void) ieee80211_new_state(isc,
+			if (ic->ic_state == IEEE80211_S_RUN) {
+				(void) ieee80211_new_state(ic,
 				    IEEE80211_S_ASSOC, -1);
 			}
 		}
@@ -1411,9 +1469,8 @@ ath_gld_intr(gld_mac_info_t *gld_p)
 
 	return (DDI_INTR_CLAIMED);
 reset:
-	mutex_enter(&isc->isc_genlock);
-	ath_reset(asc);
-	mutex_exit(&isc->isc_genlock);
+	(void) ath_reset(ic);
+	ATH_UNLOCK(asc);
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -1426,14 +1483,14 @@ ath_softint_handler(caddr_t data)
 	 * Check if the soft interrupt is triggered by another
 	 * driver at the same level.
 	 */
-	mutex_enter(&asc->asc_genlock);
+	ATH_LOCK(asc);
 	if (asc->asc_rx_pend) { /* Soft interrupt for this driver */
 		asc->asc_rx_pend = 0;
-		mutex_exit(&asc->asc_genlock);
-		ath_rx_handler((ath_t *)data);
+		ATH_UNLOCK(asc);
+		ath_rx_handler(asc);
 		return (DDI_INTR_CLAIMED);
 	}
-	mutex_exit(&asc->asc_genlock);
+	ATH_UNLOCK(asc);
 	return (DDI_INTR_UNCLAIMED);
 }
 
@@ -1448,56 +1505,69 @@ ath_softint_handler(caddr_t data)
  * and to reset the hardware when rf gain settings must be reset.
  */
 
-static int
-ath_gld_reset(gld_mac_info_t *gld_p)
+static void
+ath_stop_locked(ath_t *asc)
 {
-	ath_t *asc = ATH_STATE(gld_p);
-
-	ath_reset(asc);
-	return (GLD_SUCCESS);
-}
-
-
-static int
-ath_gld_stop(gld_mac_info_t *gld_p)
-{
-	ath_t *asc = ATH_STATE(gld_p);
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	struct ath_hal *ah = asc->asc_ah;
 
-	(void) _ieee80211_new_state(isc, IEEE80211_S_INIT, -1);
+	ATH_LOCK_ASSERT(asc);
+	/*
+	 * Shutdown the hardware and driver:
+	 *    reset 802.11 state machine
+	 *    turn off timers
+	 *    disable interrupts
+	 *    turn off the radio
+	 *    clear transmit machinery
+	 *    clear receive machinery
+	 *    drain and release tx queues
+	 *    reclaim beacon resources
+	 *    power down hardware
+	 *
+	 * Note that some of this work is not possible if the
+	 * hardware is gone (invalid).
+	 */
+	ATH_UNLOCK(asc);
+	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+	ieee80211_stop_watchdog(ic);
+	ATH_LOCK(asc);
 	ATH_HAL_INTRSET(ah, 0);
 	ath_draintxq(asc);
-	if (! asc->asc_invalid)
+	if (ATH_IS_RUNNING(asc)) {
 		ath_stoprecv(asc);
-	else
+		ATH_HAL_PHYDISABLE(ah);
+	} else {
 		asc->asc_rxlink = NULL;
-	ATH_HAL_SETPOWER(ah, HAL_PM_FULL_SLEEP, 0);
+	}
+}
 
+static void
+ath_m_stop(void *arg)
+{
+	ath_t *asc = arg;
+	struct ath_hal *ah = asc->asc_ah;
+
+	ATH_LOCK(asc);
+	ath_stop_locked(asc);
+	ATH_HAL_SETPOWER(ah, HAL_PM_AWAKE);
 	asc->asc_invalid = 1;
-
-	return (GLD_SUCCESS);
+	ATH_UNLOCK(asc);
 }
 
 int
-ath_gld_start(gld_mac_info_t *gld_p)
+ath_m_start(void *arg)
 {
-	int ret;
-	ath_t *asc = ATH_STATE(gld_p);
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
-	struct ieee80211_node *in;
-	enum ieee80211_phymode mode;
+	ath_t *asc = arg;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	struct ath_hal *ah = asc->asc_ah;
 	HAL_STATUS status;
-	HAL_CHANNEL hchan;
 
+	ATH_LOCK(asc);
 	/*
 	 * Stop anything previously setup.  This is safe
 	 * whether this is the first time through or not.
 	 */
-	ret = ath_gld_stop(gld_p);
-	if (ret != GLD_SUCCESS)
-		return (ret);
+	ath_stop_locked(asc);
 
 	/*
 	 * The basic interface to setting the hardware in a good
@@ -1506,25 +1576,17 @@ ath_gld_start(gld_mac_info_t *gld_p)
 	 * be followed by initialization of the appropriate bits
 	 * and then setup of the interrupt mask.
 	 */
-	hchan.channel = isc->isc_ibss_chan->ich_freq;
-	hchan.channelFlags = ath_chan2flags(isc, isc->isc_ibss_chan);
-	if (!ATH_HAL_RESET(ah, (HAL_OPMODE)isc->isc_opmode,
-	    &hchan, AH_FALSE, &status)) {
-		ATH_DEBUG((ATH_DBG_HAL, "ath: ath_gld_start(): "
-		    "unable to reset hardware, hal status %u\n", status));
-		return (GLD_FAILURE);
+	asc->asc_curchan.channel = ic->ic_curchan->ich_freq;
+	asc->asc_curchan.channelFlags = ath_chan2flags(ic, ic->ic_curchan);
+	if (!ATH_HAL_RESET(ah, (HAL_OPMODE)ic->ic_opmode,
+	    &asc->asc_curchan, AH_FALSE, &status)) {
+		ATH_DEBUG((ATH_DBG_HAL, "ath: ath_m_start(): "
+		    "reset hardware failed, hal status %u\n", status));
+		ATH_UNLOCK(asc);
+		return (ENOTACTIVE);
 	}
-	/*
-	 * Setup the hardware after reset: the key cache
-	 * is filled as needed and the receive engine is
-	 * set going.  Frame transmit is handled entirely
-	 * in the frame output path; there's nothing to do
-	 * here except setup the interrupt mask.
-	 */
-	ath_initkeytable(asc);
 
-	if (ath_startrecv(asc))
-		return (GLD_FAILURE);
+	(void) ath_startrecv(asc);
 
 	/*
 	 * Enable interrupts.
@@ -1534,27 +1596,24 @@ ath_gld_start(gld_mac_info_t *gld_p)
 	    | HAL_INT_FATAL | HAL_INT_GLOBAL;
 	ATH_HAL_INTRSET(ah, asc->asc_imask);
 
-	isc->isc_state = IEEE80211_S_INIT;
+	ic->ic_state = IEEE80211_S_INIT;
 
 	/*
 	 * The hardware should be ready to go now so it's safe
 	 * to kick the 802.11 state machine as it's likely to
 	 * immediately call back to us to send mgmt frames.
 	 */
-	in = isc->isc_bss;
-	in->in_chan = isc->isc_ibss_chan;
-	mode = ieee80211_chan2mode(isc, in->in_chan);
-	if (mode != asc->asc_curmode)
-		ath_setcurmode(asc, mode);
+	ath_chan_change(asc, ic->ic_curchan);
 	asc->asc_invalid = 0;
-	return (GLD_SUCCESS);
+	ATH_UNLOCK(asc);
+	return (0);
 }
 
 
-static int32_t
-ath_gld_saddr(gld_mac_info_t *gld_p, unsigned char *macaddr)
+static int
+ath_m_unicst(void *arg, const uint8_t *macaddr)
 {
-	ath_t *asc = ATH_STATE(gld_p);
+	ath_t *asc = arg;
 	struct ath_hal *ah = asc->asc_ah;
 
 	ATH_DEBUG((ATH_DBG_GLD, "ath: ath_gld_saddr(): "
@@ -1562,54 +1621,50 @@ ath_gld_saddr(gld_mac_info_t *gld_p, unsigned char *macaddr)
 	    macaddr[0], macaddr[1], macaddr[2],
 	    macaddr[3], macaddr[4], macaddr[5]));
 
-	IEEE80211_ADDR_COPY(asc->asc_isc.isc_macaddr, macaddr);
-	ATH_HAL_SETMAC(ah, asc->asc_isc.isc_macaddr);
+	ATH_LOCK(asc);
+	IEEE80211_ADDR_COPY(asc->asc_isc.ic_macaddr, macaddr);
+	ATH_HAL_SETMAC(ah, asc->asc_isc.ic_macaddr);
 
-	ath_reset(asc);
-	return (GLD_SUCCESS);
+	(void) ath_reset(&asc->asc_isc);
+	ATH_UNLOCK(asc);
+	return (0);
 }
 
 static int
-ath_gld_set_promiscuous(gld_mac_info_t *macinfo, int mode)
+ath_m_promisc(void *arg, boolean_t on)
 {
-	ath_t *asc = ATH_STATE(macinfo);
+	ath_t *asc = arg;
 	struct ath_hal *ah = asc->asc_ah;
 	uint32_t rfilt;
 
+	ATH_LOCK(asc);
 	rfilt = ATH_HAL_GETRXFILTER(ah);
-	switch (mode) {
-	case GLD_MAC_PROMISC_PHYS:
-		ATH_HAL_SETRXFILTER(ah, rfilt | HAL_RX_FILTER_PROM);
-		break;
-	case GLD_MAC_PROMISC_MULTI:
-		rfilt |= HAL_RX_FILTER_MCAST;
+	if (on)
+		rfilt |= HAL_RX_FILTER_PROM;
+	else
 		rfilt &= ~HAL_RX_FILTER_PROM;
-		ATH_HAL_SETRXFILTER(ah, rfilt);
-		break;
-	case GLD_MAC_PROMISC_NONE:
-		ATH_HAL_SETRXFILTER(ah, rfilt & (~HAL_RX_FILTER_PROM));
-		break;
-	default:
-		break;
-	}
+	ATH_HAL_SETRXFILTER(ah, rfilt);
+	ATH_UNLOCK(asc);
 
-	return (GLD_SUCCESS);
+	return (0);
 }
 
 static int
-ath_gld_set_multicast(gld_mac_info_t *macinfo, uchar_t *mca, int flag)
+ath_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 {
+	ath_t *asc = arg;
+	struct ath_hal *ah = asc->asc_ah;
 	uint32_t mfilt[2], val, rfilt;
 	uint8_t pos;
-	ath_t *asc = ATH_STATE(macinfo);
-	struct ath_hal *ah = asc->asc_ah;
 
+	ATH_LOCK(asc);
 	rfilt = ATH_HAL_GETRXFILTER(ah);
 
 	/* disable multicast */
-	if (flag == GLD_MULTI_DISABLE) {
+	if (!add) {
 		ATH_HAL_SETRXFILTER(ah, rfilt & (~HAL_RX_FILTER_MCAST));
-		return (GLD_SUCCESS);
+		ATH_UNLOCK(asc);
+		return (0);
 	}
 
 	/* enable multicast */
@@ -1626,117 +1681,104 @@ ath_gld_set_multicast(gld_mac_info_t *macinfo, uchar_t *mca, int flag)
 	mfilt[pos / 32] |= (1 << (pos % 32));
 	ATH_HAL_SETMCASTFILTER(ah, mfilt[0], mfilt[1]);
 
-	return (GLD_SUCCESS);
+	ATH_UNLOCK(asc);
+	return (0);
 }
 
 static void
-ath_wlan_ioctl(ath_t *asc, queue_t *wq, mblk_t *mp, uint32_t cmd)
+ath_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 {
+	ath_t *asc = arg;
+	int32_t err;
 
-	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
-	uint32_t len, ret;
-	mblk_t *mp1;
-
-	/* sanity check */
-	if (iocp->ioc_count == 0 || !(mp1 = mp->b_cont)) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-
-	/* assuming single data block */
-	if (mp1->b_cont) {
-		freemsg(mp1->b_cont);
-		mp1->b_cont = NULL;
-	}
-
-	/* we will overwrite everything */
-	mp1->b_wptr = mp1->b_rptr;
-
-	ret = ath_getset(asc, mp1, cmd);
-
-	len = msgdsize(mp1);
-
-	miocack(wq, mp, len, ret);
-}
-
-static int
-ath_gld_ioctl(gld_mac_info_t *gld_p, queue_t *wq, mblk_t *mp)
-{
-	struct iocblk *iocp;
-	int32_t cmd, err;
-	ath_t *asc = ATH_STATE(gld_p);
-	boolean_t need_privilege;
-
-	/*
-	 * Validate the command before bothering with the mutexen ...
-	 */
-	iocp = (struct iocblk *)mp->b_rptr;
-	cmd = iocp->ioc_cmd;
-	need_privilege = B_TRUE;
-	switch (cmd) {
-	case WLAN_SET_PARAM:
-	case WLAN_COMMAND:
-		break;
-	case WLAN_GET_PARAM:
-		need_privilege = B_FALSE;
-		break;
-	default:
-		ATH_DEBUG((ATH_DBG_GLD, "ath: ath_gld_ioctl(): "
-		    "unknown cmd 0x%x", cmd));
-		miocnak(wq, mp, 0, EINVAL);
-		return (GLD_SUCCESS);
-	}
-
-	if (need_privilege) {
-		/*
-		 * Check for specific net_config privilege on Solaris 10+.
-		 * Otherwise just check for root access ...
-		 */
-		if (secpolicy_net_config != NULL)
-			err = secpolicy_net_config(iocp->ioc_cr, B_FALSE);
-		else
-			err = drv_priv(iocp->ioc_cr);
-		if (err != 0) {
-			miocnak(wq, mp, 0, err);
-			return (GLD_SUCCESS);
+	err = ieee80211_ioctl(&asc->asc_isc, wq, mp);
+	ATH_LOCK(asc);
+	if (err == ENETRESET) {
+		if (ATH_IS_RUNNING(asc)) {
+			ATH_UNLOCK(asc);
+			(void) ath_m_start(asc);
+			(void) ieee80211_new_state(&asc->asc_isc,
+			    IEEE80211_S_SCAN, -1);
+			ATH_LOCK(asc);
 		}
 	}
-
-	ath_wlan_ioctl(asc, wq, mp, cmd);
-	return (GLD_SUCCESS);
+	ATH_UNLOCK(asc);
 }
 
 static int
-ath_gld_gstat(gld_mac_info_t *gld_p, struct gld_stats *glds_p)
+ath_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
-	ath_t *asc = ATH_STATE(gld_p);
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
-	struct ieee80211_node *in = isc->isc_bss;
-	struct ath_node *an = ATH_NODE(in);
+	ath_t *asc = arg;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
+	struct ieee80211_node *in = ic->ic_bss;
 	struct ieee80211_rateset *rs = &in->in_rates;
 
-	glds_p->glds_crc	= asc->asc_stats.ast_rx_crcerr;
-	glds_p->glds_multircv	= 0;
-	glds_p->glds_multixmt	= 0;
-	glds_p->glds_excoll	= 0;
-	glds_p->glds_xmtretry	= an->an_tx_retr;
-	glds_p->glds_defer	= 0;
-	glds_p->glds_noxmtbuf	= asc->asc_stats.ast_tx_nobuf;
-	glds_p->glds_norcvbuf	= asc->asc_stats.ast_rx_fifoerr;
-	glds_p->glds_short	= asc->asc_stats.ast_rx_tooshort;
-	glds_p->glds_missed	= asc->asc_stats.ast_rx_badcrypt;
-	glds_p->glds_speed	= 1000000*(rs->ir_rates[in->in_txrate] &
-	    IEEE80211_RATE_VAL) / 2;
-	glds_p->glds_duplex	= GLD_DUPLEX_FULL;
+	ATH_LOCK(asc);
+	switch (stat) {
+	case MAC_STAT_IFSPEED:
+		*val = (rs->ir_rates[in->in_txrate] & IEEE80211_RATE_VAL) / 2 *
+		    1000000ull;
+		break;
+	case MAC_STAT_NOXMTBUF:
+		*val = asc->asc_stats.ast_tx_nobuf +
+		    asc->asc_stats.ast_tx_nobufmgt;
+		break;
+	case MAC_STAT_IERRORS:
+		*val = asc->asc_stats.ast_rx_tooshort;
+		break;
+	case MAC_STAT_OERRORS:
+		*val = asc->asc_stats.ast_tx_fifoerr +
+		    asc->asc_stats.ast_tx_xretries;
+		break;
+	case MAC_STAT_RBYTES:
+		*val = ic->ic_stats.is_rx_bytes;
+		break;
+	case MAC_STAT_IPACKETS:
+		*val = ic->ic_stats.is_rx_frags;
+		break;
+	case MAC_STAT_OBYTES:
+		*val = ic->ic_stats.is_tx_bytes;
+		break;
+	case MAC_STAT_OPACKETS:
+		*val = ic->ic_stats.is_tx_frags;
+		break;
+	case WIFI_STAT_TX_FAILED:
+		*val = asc->asc_stats.ast_tx_fifoerr +
+			asc->asc_stats.ast_tx_xretries;
+		break;
+	case WIFI_STAT_TX_RETRANS:
+		*val = asc->asc_stats.ast_tx_xretries;
+		break;
+	case WIFI_STAT_FCS_ERRORS:
+		*val = asc->asc_stats.ast_rx_crcerr;
+		break;
+	case WIFI_STAT_WEP_ERRORS:
+		*val = asc->asc_stats.ast_rx_badcrypt;
+		break;
+	case WIFI_STAT_TX_FRAGS:
+	case WIFI_STAT_MCAST_TX:
+	case WIFI_STAT_RTS_SUCCESS:
+	case WIFI_STAT_RTS_FAILURE:
+	case WIFI_STAT_ACK_FAILURE:
+	case WIFI_STAT_RX_FRAGS:
+	case WIFI_STAT_MCAST_RX:
+	case WIFI_STAT_RX_DUPS:
+		ATH_UNLOCK(asc);
+		return (ieee80211_stat(ic, stat, val));
+	default:
+		ATH_UNLOCK(asc);
+		return (ENOTSUP);
+	}
+	ATH_UNLOCK(asc);
 
-	return (GLD_SUCCESS);
+	return (0);
 }
 
 static int
 ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 {
 	ath_t *asc;
-	ieee80211com_t *isc;
+	ieee80211com_t *ic;
 	struct ath_hal *ah;
 	uint8_t csz;
 	HAL_STATUS status;
@@ -1747,33 +1789,28 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	int32_t ath_countrycode = CTRY_DEFAULT;	/* country code */
 	int32_t err, ath_regdomain = 0; /* regulatory domain */
 	char strbuf[32];
+	int instance;
+	wifi_data_t wd = { 0 };
+	mac_register_t *macp;
 
-	switch (cmd) {
-	case DDI_RESUME:
+	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
-	case DDI_ATTACH:
-		break;
-	default:
-		return (DDI_FAILURE);
-	}
 
-	if (ddi_soft_state_zalloc(ath_soft_state_p,
-	    ddi_get_instance(devinfo)) != DDI_SUCCESS) {
+	instance = ddi_get_instance(devinfo);
+	if (ddi_soft_state_zalloc(ath_soft_state_p, instance) != DDI_SUCCESS) {
 		ATH_DEBUG((ATH_DBG_ATTACH, "ath: ath_attach(): "
 		    "Unable to alloc softstate\n"));
 		return (DDI_FAILURE);
 	}
 
 	asc = ddi_get_soft_state(ath_soft_state_p, ddi_get_instance(devinfo));
-	isc = (ieee80211com_t *)asc;
+	ic = (ieee80211com_t *)asc;
 	asc->asc_dev = devinfo;
-
-	ath_halfix_init();
 
 	mutex_init(&asc->asc_genlock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&asc->asc_txbuflock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&asc->asc_rxbuflock, NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&asc->asc_gld_sched_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&asc->asc_resched_lock, NULL, MUTEX_DRIVER, NULL);
 
 	err = pci_config_setup(devinfo, &asc->asc_cfg_handle);
 	if (err != DDI_SUCCESS) {
@@ -1883,7 +1920,7 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ath_rate_setup(asc, IEEE80211_MODE_11A);
 	ath_rate_setup(asc, IEEE80211_MODE_11B);
 	ath_rate_setup(asc, IEEE80211_MODE_11G);
-	ath_rate_setup(asc, IEEE80211_MODE_TURBO);
+	ath_rate_setup(asc, IEEE80211_MODE_TURBO_A);
 
 	/* Setup here so ath_rate_update is happy */
 	ath_setcurmode(asc, IEEE80211_MODE_11A);
@@ -1899,55 +1936,56 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	if (ath_txq_setup(asc))
 		goto attach_fail4;
 
-	ATH_HAL_GETMAC(ah, asc->asc_isc.isc_macaddr);
+	ATH_HAL_GETMAC(ah, ic->ic_macaddr);
 
-	/* setup gld */
-	if ((isc->isc_dev = gld_mac_alloc(devinfo)) == NULL) {
-		ATH_DEBUG((ATH_DBG_ATTACH, "ath: ath_attach(): "
-		"gld_mac_alloc = %p\n", (void *)isc->isc_dev));
-		goto attach_fail4;
-	}
-
-	/* pre initialize some variables for isc */
-	isc->isc_dev->gldm_private	= (caddr_t)asc;
-
-	isc->isc_gld_reset		= ath_gld_reset;
-	isc->isc_gld_start		= ath_gld_start;
-	isc->isc_gld_stop		= ath_gld_stop;
-	isc->isc_gld_saddr		= ath_gld_saddr;
-	isc->isc_gld_send		= ath_gld_send;
-	isc->isc_gld_set_promiscuous	= ath_gld_set_promiscuous;
-	isc->isc_gld_gstat		= ath_gld_gstat;
-	isc->isc_gld_ioctl		= ath_gld_ioctl;
-	isc->isc_gld_set_multicast	= ath_gld_set_multicast;
-	isc->isc_gld_intr		= ath_gld_intr;
-
-	isc->isc_mgmt_send = ath_mgmt_send;
-	isc->isc_new_state = ath_new_state;
-	isc->isc_phytype = IEEE80211_T_OFDM;
-	isc->isc_opmode = IEEE80211_M_STA;
-	isc->isc_caps = IEEE80211_C_WEP | IEEE80211_C_IBSS |
-	    IEEE80211_C_HOSTAP;
+	/*
+	 * Initialize pointers to device specific functions which
+	 * will be used by the generic layer.
+	 */
 	/* 11g support is identified when we fetch the channel set */
 	if (asc->asc_have11g)
-		isc->isc_caps |= IEEE80211_C_SHPREAMBLE;
-	isc->isc_node_alloc = ath_node_alloc;
-	isc->isc_node_free = ath_node_free;
-	isc->isc_node_copy = ath_node_copy;
-	isc->isc_rate_ctl = ath_rate_ctl;
-	isc->isc_calibrate = ath_calibrate;
-	(void) ieee80211_ifattach(isc->isc_dev);
+		ic->ic_caps |= IEEE80211_C_SHPREAMBLE;
+	/*
+	 * Query the hal to figure out h/w crypto support.
+	 */
+	if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_WEP))
+		ic->ic_caps |= IEEE80211_C_WEP;
+	if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_AES_OCB))
+		ic->ic_caps |= IEEE80211_C_AES;
+	if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_AES_CCM))
+		ic->ic_caps |= IEEE80211_C_AES_CCM;
+	if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_CKIP)) {
+		ic->ic_caps |= IEEE80211_C_CKIP;
+		/*
+		 * Check if h/w does the MIC and/or whether the
+		 * separate key cache entries are required to
+		 * handle both tx+rx MIC keys.
+		 */
+		if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_MIC))
+			ic->ic_caps |= IEEE80211_C_TKIPMIC;
+		if (ATH_HAL_TKIPSPLIT(ah))
+			asc->asc_splitmic = 1;
+	}
+	asc->asc_hasclrkey = ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_CLR);
+	ic->ic_phytype = IEEE80211_T_OFDM;
+	ic->ic_opmode = IEEE80211_M_STA;
+	ic->ic_state = IEEE80211_S_INIT;
+	ic->ic_maxrssi = ATH_MAX_RSSI;
+	ic->ic_set_shortslot = ath_set_shortslot;
+	ic->ic_xmit = ath_xmit;
+	ieee80211_attach(ic);
 
-	isc->isc_dev->gldm_devinfo		= devinfo;
-	isc->isc_dev->gldm_vendor_addr		= asc->asc_isc.isc_macaddr;
-	isc->isc_dev->gldm_broadcast_addr	= ath_broadcast_addr;
-	isc->isc_dev->gldm_ident		= "Atheros driver";
-	isc->isc_dev->gldm_type			= DL_ETHER;
-	isc->isc_dev->gldm_minpkt		= 0;
-	isc->isc_dev->gldm_maxpkt		= 1500;
-	isc->isc_dev->gldm_addrlen		= ETHERADDRL;
-	isc->isc_dev->gldm_saplen		= -2;
-	isc->isc_dev->gldm_ppa			= ddi_get_instance(devinfo);
+	/* Override 80211 default routines */
+	ic->ic_reset = ath_reset;
+	asc->asc_newstate = ic->ic_newstate;
+	ic->ic_newstate = ath_newstate;
+	ic->ic_watchdog = ath_watchdog;
+	ic->ic_node_alloc = ath_node_alloc;
+	ic->ic_node_free = ath_node_free;
+	ic->ic_crypto.cs_key_alloc = ath_key_alloc;
+	ic->ic_crypto.cs_key_delete = ath_key_delete;
+	ic->ic_crypto.cs_key_set = ath_key_set;
+	ieee80211_media_init(ic);
 
 	asc->asc_rx_pend = 0;
 	ATH_HAL_INTRSET(ah, 0);
@@ -1955,7 +1993,7 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    &asc->asc_softint_id, NULL, 0, ath_softint_handler, (caddr_t)asc);
 	if (err != DDI_SUCCESS) {
 		ATH_DEBUG((ATH_DBG_ATTACH, "ath: ath_attach(): "
-		    "ddi_add_softintr() failed"));
+		    "ddi_add_softintr() failed\n"));
 		goto attach_fail5;
 	}
 
@@ -1966,29 +2004,55 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		goto attach_fail6;
 	}
 
-	if (ddi_add_intr(devinfo, 0, NULL, NULL, gld_intr,
-	    (caddr_t)asc->asc_isc.isc_dev) != DDI_SUCCESS) {
+	if (ddi_add_intr(devinfo, 0, NULL, NULL, ath_intr,
+	    (caddr_t)asc) != DDI_SUCCESS) {
 		ATH_DEBUG((ATH_DBG_ATTACH, "ath: ath_attach(): "
 		    "Can not set intr for ATH driver\n"));
 		goto attach_fail6;
 	}
-	isc->isc_dev->gldm_cookie = asc->asc_iblock;
 
-	if (err = gld_register(devinfo, "ath", isc->isc_dev)) {
+	/*
+	 * Provide initial settings for the WiFi plugin; whenever this
+	 * information changes, we need to call mac_plugindata_update()
+	 */
+	wd.wd_opmode = ic->ic_opmode;
+	wd.wd_secalloc = WIFI_SEC_NONE;
+	IEEE80211_ADDR_COPY(wd.wd_bssid, ic->ic_bss->in_bssid);
+
+	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
 		ATH_DEBUG((ATH_DBG_ATTACH, "ath: ath_attach(): "
-		    "gld_register err %x\n", err));
+		    "MAC version mismatch\n"));
+		goto attach_fail7;
+	}
+
+	macp->m_type_ident	= MAC_PLUGIN_IDENT_WIFI;
+	macp->m_driver		= asc;
+	macp->m_dip		= devinfo;
+	macp->m_src_addr	= ic->ic_macaddr;
+	macp->m_callbacks	= &ath_m_callbacks;
+	macp->m_min_sdu		= 0;
+	macp->m_max_sdu		= IEEE80211_MTU;
+	macp->m_pdata		= &wd;
+	macp->m_pdata_size	= sizeof (wd);
+
+	err = mac_register(macp, &ic->ic_mach);
+	mac_free(macp);
+	if (err != 0) {
+		ATH_DEBUG((ATH_DBG_ATTACH, "ath: ath_attach(): "
+		    "mac_register err %x\n", err));
 		goto attach_fail7;
 	}
 
 	/* Create minor node of type DDI_NT_NET_WIFI */
 	(void) snprintf(strbuf, sizeof (strbuf), "%s%d",
-	    ATH_NODENAME, isc->isc_dev->gldm_ppa);
+	    ATH_NODENAME, instance);
 	err = ddi_create_minor_node(devinfo, strbuf, S_IFCHR,
-	    isc->isc_dev->gldm_ppa + 1, DDI_NT_NET_WIFI, 0);
+	    instance + 1, DDI_NT_NET_WIFI, 0);
 	if (err != DDI_SUCCESS)
 		ATH_DEBUG((ATH_DBG_ATTACH, "WARN: ath: ath_attach(): "
 		    "Create minor node failed - %d\n", err));
 
+	mac_link_update(ic->ic_mach, LINK_STATE_DOWN);
 	asc->asc_invalid = 1;
 	return (DDI_SUCCESS);
 attach_fail7:
@@ -1996,7 +2060,7 @@ attach_fail7:
 attach_fail6:
 	ddi_remove_softintr(asc->asc_softint_id);
 attach_fail5:
-	gld_mac_free(isc->isc_dev);
+	(void) ieee80211_detach(ic);
 attach_fail4:
 	ath_desc_free(asc);
 attach_fail3:
@@ -2016,8 +2080,8 @@ attach_fail0:
 	}
 	mutex_destroy(&asc->asc_rxbuflock);
 	mutex_destroy(&asc->asc_genlock);
-	mutex_destroy(&asc->asc_gld_sched_lock);
-	ddi_soft_state_free(ath_soft_state_p, ddi_get_instance(devinfo));
+	mutex_destroy(&asc->asc_resched_lock);
+	ddi_soft_state_free(ath_soft_state_p, instance);
 
 	return (DDI_FAILURE);
 }
@@ -2026,57 +2090,52 @@ static int32_t
 ath_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 {
 	ath_t *asc;
-	int32_t i;
 
 	asc = ddi_get_soft_state(ath_soft_state_p, ddi_get_instance(devinfo));
 	ASSERT(asc != NULL);
 
-	switch (cmd) {
-	default:
+	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
-	case DDI_SUSPEND:
-		return (DDI_FAILURE);
-
-	case DDI_DETACH:
-		break;
-	}
-
-	ASSERT(asc->asc_isc.isc_mf_thread == NULL);
+	ath_stop_scantimer(asc);
 
 	/* disable interrupts */
 	ATH_HAL_INTRSET(asc->asc_ah, 0);
+
+	/*
+	 * Unregister from the MAC layer subsystem
+	 */
+	if (mac_unregister(asc->asc_isc.ic_mach) != 0)
+		return (DDI_FAILURE);
 
 	/* free intterrupt resources */
 	ddi_remove_intr(devinfo, 0, asc->asc_iblock);
 	ddi_remove_softintr(asc->asc_softint_id);
 
-	/* detach 802.11 and Atheros HAL */
-	ieee80211_ifdetach(asc->asc_isc.isc_dev);
+	/*
+	 * NB: the order of these is important:
+	 * o call the 802.11 layer before detaching the hal to
+	 *   insure callbacks into the driver to delete global
+	 *   key cache entries can be handled
+	 * o reclaim the tx queue data structures after calling
+	 *   the 802.11 layer as we'll get called back to reclaim
+	 *   node state and potentially want to use them
+	 * o to cleanup the tx queues the hal is called, so detach
+	 *   it last
+	 */
+	ieee80211_detach(&asc->asc_isc);
 	ath_desc_free(asc);
+	ath_txq_cleanup(asc);
 	asc->asc_ah->ah_detach(asc->asc_ah);
-	ath_halfix_finit();
-
-	/* detach gld */
-	if (gld_unregister(asc->asc_isc.isc_dev) != 0)
-		return (DDI_FAILURE);
-	gld_mac_free(asc->asc_isc.isc_dev);
 
 	/* free io handle */
 	ddi_regs_map_free(&asc->asc_io_handle);
 	pci_config_teardown(&asc->asc_cfg_handle);
 
 	/* destroy locks */
-	mutex_destroy(&asc->asc_txbuflock);
-	for (i = 0; i < HAL_NUM_TX_QUEUES; i++) {
-		if (ATH_TXQ_SETUP(asc, i)) {
-			struct ath_txq *txq = &asc->asc_txq[i];
-			mutex_destroy(&txq->axq_lock);
-		}
-	}
 	mutex_destroy(&asc->asc_rxbuflock);
 	mutex_destroy(&asc->asc_genlock);
-	mutex_destroy(&asc->asc_gld_sched_lock);
+	mutex_destroy(&asc->asc_resched_lock);
 
 	ddi_remove_minor_node(devinfo, NULL);
 	ddi_soft_state_free(ath_soft_state_p, ddi_get_instance(devinfo));
@@ -2084,80 +2143,12 @@ ath_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-static struct module_info ath_module_info = {
-	0,	/* ATH_IDNUM, */
-	"ath",	/* ATH_DRIVER_NAME, */
-	0,
-	INFPSZ,
-	4096,	/* ATH_HIWAT, */
-	128,	/* ATH_LOWAT */
-};
-
-static struct qinit ath_r_qinit = {	/* read queues */
-	NULL,
-	gld_rsrv,
-	gld_open,
-	gld_close,
-	NULL,
-	&ath_module_info,
-	NULL
-};
-
-static struct qinit ath_w_qinit = {	/* write queues */
-	gld_wput,
-	gld_wsrv,
-	NULL,
-	NULL,
-	NULL,
-	&ath_module_info,
-	NULL
-};
-
-static struct streamtab ath_streamtab = {
-	&ath_r_qinit,
-	&ath_w_qinit,
-	NULL,
-	NULL
-};
-
-static struct cb_ops ath_cb_ops = {
-	nulldev,		/* cb_open */
-	nulldev,		/* cb_close */
-	nodev,			/* cb_strategy */
-	nodev,			/* cb_print */
-	nodev,			/* cb_dump */
-	nodev,			/* cb_read */
-	nodev,			/* cb_write */
-	nodev,			/* cb_ioctl */
-	nodev,			/* cb_devmap */
-	nodev,			/* cb_mmap */
-	nodev,			/* cb_segmap */
-	nochpoll,		/* cb_chpoll */
-	ddi_prop_op,		/* cb_prop_op */
-	&ath_streamtab,		/* cb_stream */
-	D_MP,			/* cb_flag */
-	0,			/* cb_rev */
-	nodev,			/* cb_aread */
-	nodev			/* cb_awrite */
-};
-
-static struct dev_ops ath_dev_ops = {
-	DEVO_REV,		/* devo_rev */
-	0,			/* devo_refcnt */
-	gld_getinfo,		/* devo_getinfo */
-	nulldev,		/* devo_identify */
-	nulldev,		/* devo_probe */
-	ath_attach,		/* devo_attach */
-	ath_detach,		/* devo_detach */
-	nodev,			/* devo_reset */
-	&ath_cb_ops,		/* devo_cb_ops */
-	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	NULL			/* devo_power */
-};
+DDI_DEFINE_STREAM_OPS(ath_dev_ops, nulldev, nulldev, ath_attach, ath_detach,
+    nodev, NULL, D_MP, NULL);
 
 static struct modldrv ath_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"ath driver 1.1",	/* short description */
+	"ath driver 1.2/HAL 0.9.17.2",	/* short description */
 	&ath_dev_ops		/* driver specific ops */
 };
 
@@ -2182,10 +2173,14 @@ _init(void)
 		return (status);
 
 	mutex_init(&ath_loglock, NULL, MUTEX_DRIVER, NULL);
+	ath_halfix_init();
+	mac_init_ops(&ath_dev_ops, "ath");
 	status = mod_install(&modlinkage);
 	if (status != 0) {
-		ddi_soft_state_fini(&ath_soft_state_p);
+		mac_fini_ops(&ath_dev_ops);
+		ath_halfix_finit();
 		mutex_destroy(&ath_loglock);
+		ddi_soft_state_fini(&ath_soft_state_p);
 	}
 
 	return (status);
@@ -2198,8 +2193,10 @@ _fini(void)
 
 	status = mod_remove(&modlinkage);
 	if (status == 0) {
-		ddi_soft_state_fini(&ath_soft_state_p);
+		mac_fini_ops(&ath_dev_ops);
+		ath_halfix_finit();
 		mutex_destroy(&ath_loglock);
+		ddi_soft_state_fini(&ath_soft_state_p);
 	}
 	return (status);
 }

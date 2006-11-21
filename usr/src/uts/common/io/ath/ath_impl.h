@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,8 +56,9 @@ extern "C" {
  * Defintions for the Atheros Wireless LAN controller driver.
  */
 
+#include <sys/note.h>
 #include <sys/list.h>
-#include "ath_ieee80211.h"
+#include <sys/net80211.h>
 #include "ath_hal.h"
 
 /*
@@ -211,6 +212,7 @@ struct dma_area {
 typedef struct dma_area dma_area_t;
 
 struct ath_buf {
+	int			bf_flags;	/* tx descriptor flags */
 	struct ath_desc		*bf_desc;	/* virtual addr of desc */
 	uint32_t		bf_daddr;	/* physical addr of desc */
 	dma_area_t		bf_dma;		/* dma area for buf */
@@ -251,7 +253,8 @@ typedef struct ath {
 	uint32_t		asc_invalid : 1, /* being detached */
 				asc_mrretry : 1, /* multi-rate retry support */
 				asc_have11g : 1, /* have 11g support */
-				asc_splitmic : 1; /* Split TKIP mic keys */
+				asc_splitmic : 1, /* Split TKIP mic keys */
+				asc_hasclrkey: 1; /* CLR key supported */
 	const HAL_RATE_TABLE	*asc_rates[IEEE80211_MODE_MAX]; /* h/w rate */
 
 	ddi_acc_handle_t	asc_cfg_handle;	/* DDI I/O handle */
@@ -283,6 +286,7 @@ typedef struct ath {
 
 	const HAL_RATE_TABLE	*asc_currates;	/* current rate table */
 	enum ieee80211_phymode	asc_curmode;	/* current phy mode */
+	HAL_CHANNEL		asc_curchan;	/* current h/w channel */
 	uint8_t			asc_rixmap[256]; /* IEEE to h/w rate table ix */
 	HAL_INT			asc_imask;	/* interrupt mask copy */
 	struct ath_stats	asc_stats;	/* interface statistics */
@@ -291,11 +295,21 @@ typedef struct ath {
 	uint32_t		asc_mfilt[2];
 	kmutex_t		asc_genlock;
 
-	uint32_t		asc_need_gld_sched;
-	kmutex_t		asc_gld_sched_lock;
+	boolean_t		asc_resched_needed;
+	kmutex_t		asc_resched_lock;
+
+	timeout_id_t		asc_scan_timer;
+	int			(*asc_newstate)(ieee80211com_t *,
+					enum ieee80211_state, int);
 } ath_t;
 
 #define	ATH_STATE(macinfo)	((ath_t *)((macinfo)->gldm_private))
+
+#define	ATH_LOCK(_asc)		mutex_enter(&(_asc)->asc_genlock)
+#define	ATH_UNLOCK(_asc)	mutex_exit(&(_asc)->asc_genlock)
+#define	ATH_LOCK_ASSERT(_asc)	ASSERT(mutex_owned(&(_asc)->asc_genlock))
+
+#define	ATH_IS_RUNNING(_asc)	((_asc)->asc_invalid == 0)
 
 /* Debug and log functions */
 void ath_dbg(uint32_t dbg_flags, const char *fmt, ...);	/* debug function */

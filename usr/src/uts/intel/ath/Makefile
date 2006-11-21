@@ -41,11 +41,9 @@ UTSBASE	= ../..
 MODULE		= ath
 OBJECTS		= $(ATH_OBJS:%=$(OBJS_DIR)/%) $(OBJS_DIR)/hal.o
 LINTS		= $(LINTS_DIR)/ath_aux.ln \
-		$(LINTS_DIR)/ath_ieee80211.ln \
 		$(LINTS_DIR)/ath_main.ln \
 		$(LINTS_DIR)/ath_osdep.ln \
-		$(LINTS_DIR)/ath_rate.ln \
-		$(LINTS_DIR)/ath_wificonfig.ln
+		$(LINTS_DIR)/ath_rate.ln
 
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
@@ -62,9 +60,9 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-#	Driver depends on GLD & IP.
+#	Driver depends on GLDv3 & wifi kernel support module.
 #
-LDFLAGS		+= -dy -Nmisc/gld -Ndrv/ip
+LDFLAGS		+= -dy -Nmisc/mac -Nmisc/net80211
 
 #
 # For now, disable these lint checks; maintainers should endeavor

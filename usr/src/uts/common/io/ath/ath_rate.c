@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,6 @@
 #include <sys/sunddi.h>
 #include <sys/pci.h>
 #include <sys/errno.h>
-#include <sys/gld.h>
 #include <sys/dlpi.h>
 #include <sys/ethernet.h>
 #include <sys/list.h>
@@ -70,7 +69,7 @@
 #include <inet/wifi_ioctl.h>
 #include "ath_hal.h"
 #include "ath_impl.h"
-#include "ath_ieee80211.h"
+#include "ath_rate.h"
 
 void
 ath_rate_update(ath_t *asc, struct ieee80211_node *in, int32_t rate)
@@ -151,10 +150,10 @@ done:
 void
 ath_rate_ctl_start(ath_t *asc, struct ieee80211_node *in)
 {
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	int32_t srate;
 
-	if (isc->isc_fixed_rate == -1) {
+	if (ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) {
 		/*
 		 * No fixed rate is requested. For 11b start with
 		 * the highest negotiated rate; otherwise, for 11g
@@ -172,25 +171,25 @@ ath_rate_ctl_start(ath_t *asc, struct ieee80211_node *in)
 		}
 	} else {
 		/*
-		 * A fixed rate is to be used; ic_fixed_rate is an
-		 * index into the supported rate set.  Convert this
-		 * to the index into the negotiated rate set for
-		 * the node.  We know the rate is there because the
-		 * rate set is checked when the station associates.
+		 * A fixed rate is to be used; We know the rate is
+		 * there because the rate set is checked when the
+		 * station associates.
 		 */
-		const struct ieee80211_rateset *rs =
-		    &isc->isc_sup_rates[isc->isc_curmode];
-		int32_t r = rs->ir_rates[isc->isc_fixed_rate] &
-		    IEEE80211_RATE_VAL;
 		/* NB: the rate set is assumed sorted */
 		srate = in->in_rates.ir_nrates - 1;
-		for (; srate >= 0 && IEEE80211_RATE(srate) != r; srate--);
+		for (; srate >= 0 && IEEE80211_RATE(srate) != ic->ic_fixed_rate;
+		    srate--);
 	}
 	ATH_DEBUG((ATH_DBG_RATE, "ath: ath_rate_ctl_start(): "
 	    "srate=%d rate=%d\n", srate, IEEE80211_RATE(srate)));
 	ath_rate_update(asc, in, srate);
 }
 
+void
+ath_rate_cb(void *arg, struct ieee80211_node *in)
+{
+	ath_rate_update((ath_t *)arg, in, 0);
+}
 
 /*
  * Reset the rate control state for each 802.11 state transition.
@@ -198,15 +197,15 @@ ath_rate_ctl_start(ath_t *asc, struct ieee80211_node *in)
 void
 ath_rate_ctl_reset(ath_t *asc, enum ieee80211_state state)
 {
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	struct ieee80211_node *in;
 
-	if (isc->isc_opmode == IEEE80211_M_STA) {
+	if (ic->ic_opmode == IEEE80211_M_STA) {
 		/*
 		 * Reset local xmit state; this is really only
 		 * meaningful when operating in station mode.
 		 */
-		in = (struct ieee80211_node *)isc->isc_bss;
+		in = (struct ieee80211_node *)ic->ic_bss;
 		if (state == IEEE80211_S_RUN) {
 			ath_rate_ctl_start(asc, in);
 		} else {
@@ -219,12 +218,8 @@ ath_rate_ctl_reset(ath_t *asc, enum ieee80211_state state)
 		 * For any other operating mode we want to reset the
 		 * tx rate state of each node.
 		 */
-		in = list_head(&isc->isc_in_list);
-		while (in != NULL) {
-			ath_rate_update(asc, in, 0);
-			in = list_next(&isc->isc_in_list, in);
-		}
-		ath_rate_update(asc, isc->isc_bss, 0);
+		ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_cb, asc);
+		ath_rate_update(asc, ic->ic_bss, 0);
 	}
 }
 
@@ -305,7 +300,7 @@ ath_rate_setup(ath_t *asc, uint32_t mode)
 	int32_t i, maxrates;
 	struct ieee80211_rateset *rs;
 	struct ath_hal *ah = asc->asc_ah;
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	const HAL_RATE_TABLE *rt;
 
 	switch (mode) {
@@ -318,8 +313,11 @@ ath_rate_setup(ath_t *asc, uint32_t mode)
 	case IEEE80211_MODE_11G:
 		asc->asc_rates[mode] = ATH_HAL_GETRATETABLE(ah, HAL_MODE_11G);
 		break;
-	case IEEE80211_MODE_TURBO:
+	case IEEE80211_MODE_TURBO_A:
 		asc->asc_rates[mode] = ATH_HAL_GETRATETABLE(ah, HAL_MODE_TURBO);
+		break;
+	case IEEE80211_MODE_TURBO_G:
+		asc->asc_rates[mode] = ATH_HAL_GETRATETABLE(ah, HAL_MODE_108G);
 		break;
 	default:
 		ATH_DEBUG((ATH_DBG_RATE, "ath: ath_rate_setup(): "
@@ -337,7 +335,7 @@ ath_rate_setup(ath_t *asc, uint32_t mode)
 		maxrates = IEEE80211_RATE_MAXSIZE;
 	} else
 		maxrates = rt->rateCount;
-	rs = &isc->isc_sup_rates[mode];
+	rs = &ic->ic_sup_rates[mode];
 	for (i = 0; i < maxrates; i++)
 		rs->ir_rates[i] = rt->info[i].dot11Rate;
 	rs->ir_nrates = maxrates;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +70,6 @@
 #include <inet/wifi_ioctl.h>
 #include "ath_hal.h"
 #include "ath_impl.h"
-#include "ath_ieee80211.h"
 
 static const char *acnames[] = {
 	"WME_AC_BE",
@@ -85,20 +84,20 @@ extern void ath_setup_desc(ath_t *asc, struct ath_buf *bf);
 uint32_t
 ath_calcrxfilter(ath_t *asc)
 {
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	struct ath_hal *ah = asc->asc_ah;
 	uint32_t rfilt;
 
 	rfilt = (ATH_HAL_GETRXFILTER(ah) & HAL_RX_FILTER_PHYERR)
 	    | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST;
-	if (isc->isc_opmode != IEEE80211_M_STA)
+	if (ic->ic_opmode != IEEE80211_M_STA)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
-	if (isc->isc_opmode != IEEE80211_M_HOSTAP &&
+	if (ic->ic_opmode != IEEE80211_M_HOSTAP &&
 	    (asc->asc_promisc & GLD_MAC_PROMISC_PHYS))	/* promiscuous */
 		rfilt |= HAL_RX_FILTER_PROM;
-	if (isc->isc_opmode == IEEE80211_M_STA ||
-	    isc->isc_opmode == IEEE80211_M_IBSS ||
-	    isc->isc_state == IEEE80211_S_SCAN)
+	if (ic->ic_opmode == IEEE80211_M_STA ||
+	    ic->ic_opmode == IEEE80211_M_IBSS ||
+	    ic->ic_state == IEEE80211_S_SCAN)
 		rfilt |= HAL_RX_FILTER_BEACON;
 	return (rfilt);
 }
@@ -131,7 +130,7 @@ ath_set_data_queue(ath_t *asc, int ac, int haltype)
 	 * up in which case the top half of the kernel may backup
 	 * due to a lack of tx descriptors.
 	 */
-	qi.tqi_qflags = TXQ_FLAG_TXEOLINT_ENABLE | TXQ_FLAG_TXDESCINT_ENABLE;
+	qi.tqi_qflags = HAL_TXQ_TXEOLINT_ENABLE | HAL_TXQ_TXDESCINT_ENABLE;
 	qnum = ATH_HAL_SETUPTXQUEUE(ah, HAL_TX_QUEUE_DATA, &qi);
 	if (qnum == -1) {
 		ATH_DEBUG((ATH_DBG_AUX, "ath: ath_set_data_queue(): "
@@ -174,6 +173,23 @@ ath_txq_setup(ath_t *asc)
 }
 
 void
+ath_txq_cleanup(ath_t *asc)
+{
+	int i;
+
+	mutex_destroy(&asc->asc_txbuflock);
+	for (i = 0; i < HAL_NUM_TX_QUEUES; i++) {
+		if (ATH_TXQ_SETUP(asc, i)) {
+			struct ath_txq *txq = &asc->asc_txq[i];
+
+			ATH_HAL_RELEASETXQUEUE(asc->asc_ah, txq->axq_qnum);
+			mutex_destroy(&txq->axq_lock);
+			asc->asc_txqsetup &= ~(1 << txq->axq_qnum);
+		}
+	}
+}
+
+void
 ath_setcurmode(ath_t *asc, enum ieee80211_phymode mode)
 {
 	const HAL_RATE_TABLE *rt;
@@ -196,7 +212,7 @@ ath_setcurmode(ath_t *asc, enum ieee80211_phymode mode)
 void
 ath_mode_init(ath_t *asc)
 {
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	struct ath_hal *ah = asc->asc_ah;
 	uint32_t rfilt;
 
@@ -207,7 +223,7 @@ ath_mode_init(ath_t *asc)
 	ATH_HAL_SETMCASTFILTER(ah, asc->asc_mfilt[0], asc->asc_mfilt[1]);
 	ATH_DEBUG((ATH_DBG_AUX, "ath: ath_mode_init(): "
 	    "mode =%d RX filter 0x%x, MC filter %08x:%08x\n",
-	    isc->isc_opmode, rfilt,
+	    ic->ic_opmode, rfilt,
 	    asc->asc_mfilt[0], asc->asc_mfilt[1]));
 }
 
@@ -229,14 +245,16 @@ ath_stoprecv(ath_t *asc)
 }
 
 uint32_t
-ath_chan2flags(ieee80211com_t *isc, struct ieee80211channel *chan)
+ath_chan2flags(ieee80211com_t *isc, struct ieee80211_channel *chan)
 {
 	static const uint32_t modeflags[] = {
 	    0,				/* IEEE80211_MODE_AUTO */
 	    CHANNEL_A,			/* IEEE80211_MODE_11A */
 	    CHANNEL_B,			/* IEEE80211_MODE_11B */
 	    CHANNEL_PUREG,		/* IEEE80211_MODE_11G */
-	    CHANNEL_T			/* IEEE80211_MODE_TURBO */
+	    0,				/* IEEE80211_MODE_FH */
+	    CHANNEL_108A,		/* IEEE80211_MODE_TURBO_A */
+	    CHANNEL_108G		/* IEEE80211_MODE_TURBO_G */
 	};
 	return (modeflags[ieee80211_chan2mode(isc, chan)]);
 }
@@ -245,7 +263,7 @@ ath_chan2flags(ieee80211com_t *isc, struct ieee80211channel *chan)
 int
 ath_getchannels(ath_t *asc, uint32_t cc, HAL_BOOL outdoor, HAL_BOOL xchanmode)
 {
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	struct ath_hal *ah = asc->asc_ah;
 	HAL_CHANNEL *chans;
 	int i, ix;
@@ -255,7 +273,7 @@ ath_getchannels(ath_t *asc, uint32_t cc, HAL_BOOL outdoor, HAL_BOOL xchanmode)
 	    kmem_zalloc(IEEE80211_CHAN_MAX * sizeof (HAL_CHANNEL), KM_SLEEP);
 
 	if (!ath_hal_init_channels(ah, chans, IEEE80211_CHAN_MAX, &nchan,
-	    cc, HAL_MODE_ALL, outdoor, xchanmode)) {
+	    NULL, 0, NULL, cc, HAL_MODE_ALL, outdoor, xchanmode)) {
 		ATH_DEBUG((ATH_DBG_AUX, "ath: ath_getchannels(): "
 		    "unable to get channel list\n");
 		kmem_free(chans, IEEE80211_CHAN_MAX * sizeof (HAL_CHANNEL)));
@@ -268,20 +286,41 @@ ath_getchannels(ath_t *asc, uint32_t cc, HAL_BOOL outdoor, HAL_BOOL xchanmode)
 	 */
 	for (i = 0; i < nchan; i++) {
 		HAL_CHANNEL *c = &chans[i];
-		ix = ath_hal_mhz2ieee(c->channel, c->channelFlags);
+		uint16_t flags;
+		ix = ath_hal_mhz2ieee(ah, c->channel, c->channelFlags);
 		if (ix > IEEE80211_CHAN_MAX) {
 			ATH_DEBUG((ATH_DBG_AUX, "ath: ath_getchannels(): "
-			    "bad hal channel %u (%u/%x) ignored\n",
+			    "bad hal channel %d (%u/%x) ignored\n",
 			    ix, c->channel, c->channelFlags));
 			continue;
 		}
 		/* NB: flags are known to be compatible */
-		if (isc->isc_channels[ix].ich_freq == 0) {
-			isc->isc_channels[ix].ich_freq = c->channel;
-			isc->isc_channels[ix].ich_flags = c->channelFlags;
+		if (ix < 0) {
+			/*
+			 * can't handle frequency <2400MHz (negative
+			 * channels) right now
+			 */
+			ATH_DEBUG((ATH_DBG_AUX, "ath:ath_getchannels(): "
+			    "hal channel %d (%u/%x) "
+			    "cannot be handled, ignored\n",
+			    ix, c->channel, c->channelFlags));
+			continue;
+		}
+		/*
+		 * Calculate net80211 flags; most are compatible
+		 * but some need massaging.  Note the static turbo
+		 * conversion can be removed once net80211 is updated
+		 * to understand static vs. dynamic turbo.
+		 */
+		flags = c->channelFlags & CHANNEL_COMPAT;
+		if (c->channelFlags & CHANNEL_STURBO)
+			flags |= IEEE80211_CHAN_TURBO;
+		if (ic->ic_sup_channels[ix].ich_freq == 0) {
+			ic->ic_sup_channels[ix].ich_freq = c->channel;
+			ic->ic_sup_channels[ix].ich_flags = flags;
 		} else {
 			/* channels overlap; e.g. 11g and 11b */
-			isc->isc_channels[ix].ich_flags |= c->channelFlags;
+			ic->ic_sup_channels[ix].ich_flags |= flags;
 		}
 		if ((c->channelFlags & CHANNEL_G) == CHANNEL_G)
 			asc->asc_have11g = 1;
@@ -365,20 +404,37 @@ ath_startrecv(ath_t *asc)
 }
 
 /*
+ * Update internal state after a channel change.
+ */
+void
+ath_chan_change(ath_t *asc, struct ieee80211_channel *chan)
+{
+	struct ieee80211com *ic = &asc->asc_isc;
+	enum ieee80211_phymode mode;
+
+	/*
+	 * Change channels and update the h/w rate map
+	 * if we're switching; e.g. 11a to 11b/g.
+	 */
+	mode = ieee80211_chan2mode(ic, chan);
+	if (mode != asc->asc_curmode)
+		ath_setcurmode(asc, mode);
+}
+
+/*
  * Set/change channels.  If the channel is really being changed,
  * it's done by resetting the chip.  To accomplish this we must
  * first cleanup any pending DMA.
  */
 int
-ath_chan_set(ath_t *asc, struct ieee80211channel *chan)
+ath_chan_set(ath_t *asc, struct ieee80211_channel *chan)
 {
 	struct ath_hal *ah = asc->asc_ah;
-	ieee80211com_t *isc = &asc->asc_isc;
+	ieee80211com_t *ic = &asc->asc_isc;
 
-	if (chan != isc->isc_ibss_chan) {
+	if (chan != ic->ic_ibss_chan) {
 		HAL_STATUS status;
 		HAL_CHANNEL hchan;
-		enum ieee80211_phymode mode;
 
 		/*
 		 * To switch channels clear any pending DMA operations;
@@ -395,14 +451,15 @@ ath_chan_set(ath_t *asc, struct ieee80211channel *chan)
 		 * operating mode.
 		 */
 		hchan.channel = chan->ich_freq;
-		hchan.channelFlags = ath_chan2flags(isc, chan);
-		if (!ATH_HAL_RESET(ah, (HAL_OPMODE)isc->isc_opmode,
+		hchan.channelFlags = ath_chan2flags(ic, chan);
+		if (!ATH_HAL_RESET(ah, (HAL_OPMODE)ic->ic_opmode,
 		    &hchan, AH_TRUE, &status)) {
 			ATH_DEBUG((ATH_DBG_AUX, "ath: ath_chan_set():"
 			    "unable to reset channel %u (%uMhz)\n",
-			    ieee80211_chan2ieee(isc, chan), chan->ich_freq));
+			    ieee80211_chan2ieee(ic, chan), chan->ich_freq));
 			return (EIO);
 		}
+		asc->asc_curchan = hchan;
 
 		/*
 		 * Re-enable rx framework.
@@ -417,10 +474,8 @@ ath_chan_set(ath_t *asc, struct ieee80211channel *chan)
 		 * Change channels and update the h/w rate map
 		 * if we're switching; e.g. 11a to 11b/g.
 		 */
-		isc->isc_ibss_chan = chan;
-		mode = ieee80211_chan2mode(isc, chan);
-		if (mode != asc->asc_curmode)
-			ath_setcurmode(asc, mode);
+		ic->ic_ibss_chan = chan;
+		ath_chan_change(asc, chan);
 		/*
 		 * Re-enable interrupts.
 		 */
@@ -449,16 +504,15 @@ void
 ath_beacon_config(ath_t *asc)
 {
 	struct ath_hal *ah = asc->asc_ah;
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
-	struct ieee80211_node *in = isc->isc_bss;
+	ieee80211com_t *ic = (ieee80211com_t *)asc;
+	struct ieee80211_node *in = ic->ic_bss;
 	uint32_t nexttbtt;
 
-	nexttbtt = (ATH_LE_READ_4(in->in_tstamp + 4) << 22) |
-	    (ATH_LE_READ_4(in->in_tstamp) >> 10);
+	nexttbtt = (ATH_LE_READ_4(in->in_tstamp.data + 4) << 22) |
+	    (ATH_LE_READ_4(in->in_tstamp.data) >> 10);
 	nexttbtt += in->in_intval;
-	if (isc->isc_opmode != IEEE80211_M_HOSTAP) {
+	if (ic->ic_opmode != IEEE80211_M_HOSTAP) {
 		HAL_BEACON_STATE bs;
-		uint32_t bmisstime;
 
 		/* NB: no PCF support right now */
 		bzero(&bs, sizeof (bs));
@@ -468,14 +522,11 @@ ath_beacon_config(ath_t *asc)
 		bs.bs_nextdtim = nexttbtt;
 
 		/*
-		 * Calculate the number of consecutive beacons to miss
-		 * before taking a BMISS interrupt.  The configuration
-		 * is specified in ms, so we need to convert that to
-		 * TU's and then calculate based on the beacon interval.
+		 * Setup the number of consecutive beacons to miss
+		 * before taking a BMISS interrupt.
 		 * Note that we clamp the result to at most 10 beacons.
 		 */
-		bmisstime = (isc->isc_bmisstimeout * 1000) / 1024;
-		bs.bs_bmissthreshold = howmany(bmisstime, in->in_intval);
+		bs.bs_bmissthreshold = ic->ic_bmissthreshold;
 		if (bs.bs_bmissthreshold > 10)
 			bs.bs_bmissthreshold = 10;
 		else if (bs.bs_bmissthreshold <= 0)
@@ -521,52 +572,93 @@ ath_beacon_config(ath_t *asc)
 	}
 }
 
-
-
 /*
- * Fill the hardware key cache with key entries.
+ * Allocate one or more key cache slots for a unicast key.  The
+ * key itself is needed only to identify the cipher.  For hardware
+ * TKIP with split cipher+MIC keys we allocate two key cache slot
+ * pairs so that we can setup separate TX and RX MIC keys.  Note
+ * that the MIC key for a TKIP key at slot i is assumed by the
+ * hardware to be at slot i+64.  This limits TKIP keys to the first
+ * 64 entries.
  */
-void
-ath_initkeytable(ath_t *asc)
+/* ARGSUSED */
+int
+ath_key_alloc(ieee80211com_t *ic, const struct ieee80211_key *k,
+    ieee80211_keyix *keyix, ieee80211_keyix *rxkeyix)
 {
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
-	struct ath_hal *ah = asc->asc_ah;
-	int32_t i;
-
-	for (i = 0; i < IEEE80211_WEP_NKID; i++) {
-		struct ieee80211_wepkey *k = &isc->isc_nw_keys[i];
-		if (k->iwk_len == 0)
-			ATH_HAL_KEYRESET(ah, i);
-		else {
-			HAL_KEYVAL hk;
-
-#ifdef DEBUG
-			char tmp[200], stmp[10];
-			int j;
-			bzero(tmp, 200);
-			bzero(stmp, 10);
-			for (j = 0; j < k->iwk_len; j++) {
-				(void) sprintf(stmp, "0x%02x ", k->iwk_key[j]);
-				(void) strcat(tmp, stmp);
-			}
-			ATH_DEBUG((ATH_DBG_AUX, "ath: ath_initkeytable(): "
-			    "key%d val=%s\n", i, tmp));
-#endif /* DEBUG */
-			bzero(&hk, sizeof (hk));
-			hk.kv_type = HAL_CIPHER_WEP;
-			hk.kv_len = k->iwk_len;
-			bcopy(k->iwk_key, hk.kv_val, k->iwk_len);
-			ATH_HAL_KEYSET(ah, i, &hk);
-		}
-	}
+	*keyix = *rxkeyix = 0;
+	return (1);
 }
 
-void
-ath_reset(ath_t *asc)
+int
+ath_key_delete(ieee80211com_t *ic, const struct ieee80211_key *k)
 {
-	ieee80211com_t *isc = (ieee80211com_t *)asc;
+	struct ath_hal *ah = ((ath_t *)ic)->asc_ah;
+
+	ATH_HAL_KEYRESET(ah, k->wk_keyix);
+	return (1);
+}
+
+/*
+ * Set the key cache contents for the specified key.  Key cache
+ * slot(s) must already have been allocated by ath_key_alloc.
+ */
+int
+ath_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
+    const uint8_t mac[IEEE80211_ADDR_LEN])
+{
+	static const uint8_t ciphermap[] = {
+		HAL_CIPHER_WEP,		/* IEEE80211_CIPHER_WEP */
+		HAL_CIPHER_TKIP,	/* IEEE80211_CIPHER_TKIP */
+		HAL_CIPHER_AES_OCB,	/* IEEE80211_CIPHER_AES_OCB */
+		HAL_CIPHER_AES_CCM,	/* IEEE80211_CIPHER_AES_CCM */
+		(uint8_t)-1,		/* 4 is not allocated */
+		HAL_CIPHER_CKIP,	/* IEEE80211_CIPHER_CKIP */
+		HAL_CIPHER_CLR,		/* IEEE80211_CIPHER_NONE */
+	};
+	ath_t *asc = (ath_t *)ic;
 	struct ath_hal *ah = asc->asc_ah;
-	struct ieee80211channel *ch;
+	const struct ieee80211_cipher *cip = k->wk_cipher;
+	HAL_KEYVAL hk;
+
+	bzero(&hk, sizeof (hk));
+	/*
+	 * Software crypto uses a "clear key" so non-crypto
+	 * state kept in the key cache are maintainedd so that
+	 * rx frames have an entry to match.
+	 */
+	if ((k->wk_flags & IEEE80211_KEY_SWCRYPT) == 0) {
+		ASSERT(cip->ic_cipher < ATH_N(ciphermap));
+		hk.kv_type = ciphermap[cip->ic_cipher];
+		hk.kv_len = k->wk_keylen;
+		bcopy(k->wk_key, hk.kv_val, k->wk_keylen);
+	} else {
+		hk.kv_type = HAL_CIPHER_CLR;
+	}
+
+	return (ATH_HAL_KEYSET(ah, k->wk_keyix, &hk, mac));
+}
+
+/*
+ * Enable/Disable short slot timing
+ */
+void
+ath_set_shortslot(ieee80211com_t *ic, int onoff)
+{
+	struct ath_hal *ah = ((ath_t *)ic)->asc_ah;
+
+	if (onoff)
+		ATH_HAL_SETSLOTTIME(ah, HAL_SLOT_TIME_9);
+	else
+		ATH_HAL_SETSLOTTIME(ah, HAL_SLOT_TIME_20);
+}
+
+int
+ath_reset(ieee80211com_t *ic)
+{
+	ath_t *asc = (ath_t *)ic;
+	struct ath_hal *ah = asc->asc_ah;
+	struct ieee80211_channel *ch;
 	HAL_STATUS status;
 	HAL_CHANNEL hchan;
 
@@ -574,28 +666,31 @@ ath_reset(ath_t *asc)
 	 * Convert to a HAL channel description with the flags
 	 * constrained to reflect the current operating mode.
 	 */
-	ch = isc->isc_ibss_chan;
-	hchan.channel = ch->ich_freq;
-	hchan.channelFlags = ath_chan2flags(isc, ch);
+	ch = ic->ic_curchan;
+	asc->asc_curchan.channel = ch->ich_freq;
+	asc->asc_curchan.channelFlags = ath_chan2flags(ic, ch);
 
 	ATH_HAL_INTRSET(ah, 0);		/* disable interrupts */
 	ath_draintxq(asc);		/* stop xmit side */
-	if (asc->asc_invalid == 0)
+	if (ATH_IS_RUNNING(asc)) {
 		ath_stoprecv(asc);		/* stop recv side */
-	/* indicate channel change so we do a full reset */
-	if (!ATH_HAL_RESET(ah, (HAL_OPMODE)isc->isc_opmode, &hchan,
-	    AH_TRUE, &status)) {
-		ath_problem("ath: ath_reset(): "
-		    "reseting hardware failed, HAL status %u\n", status);
+		/* indicate channel change so we do a full reset */
+		if (!ATH_HAL_RESET(ah, (HAL_OPMODE)ic->ic_opmode, &hchan,
+		    AH_TRUE, &status)) {
+			ath_problem("ath: ath_reset(): "
+			    "resetting hardware failed, HAL status %u\n",
+			    status);
+		}
+		ath_chan_change(asc, ch);
 	}
-	if (asc->asc_invalid == 0) {
-		ath_initkeytable(asc);
+	if (ATH_IS_RUNNING(asc)) {
 		if (ath_startrecv(asc) != 0)	/* restart recv */
 			ath_problem("ath: ath_reset(): "
 			    "starting receiving logic failed\n");
-		if (isc->isc_state == IEEE80211_S_RUN) {
+		if (ic->ic_state == IEEE80211_S_RUN) {
 			ath_beacon_config(asc);	/* restart beacons */
 		}
 		ATH_HAL_INTRSET(ah, asc->asc_imask);
 	}
+	return (0);
 }

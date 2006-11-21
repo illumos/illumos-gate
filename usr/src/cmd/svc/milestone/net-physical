@@ -58,9 +58,13 @@ SUNW_NO_MPATHD=; export SUNW_NO_MPATHD
 smf_netstrategy
 
 #
-# Bring up link aggregations
+# Bring up link aggregations and initialize security objects.
+# Note that link property initialization is deferred until after
+# IP interfaces are plumbed to ensure that the links will not
+# be unloaded (and the property settings lost).
 #
 /sbin/dladm up-aggr
+/sbin/dladm init-secobj
 
 #
 # If the system was net booted by DHCP, hand DHCP management off to the
@@ -192,6 +196,14 @@ if [ -n "$inet6_list" ]; then
 	done
 	[ -n "$inet6_failed" ] && warn_failed_ifs "plumb IPv6" $inet6_failed
 fi
+
+#
+# Unfortunately, if a driver unloads and then is subsequently reloaded, no
+# mechanism currently exists to restore the properties of its associated
+# links.  Hence, we wait until after interfaces have been plumbed (above)
+# to initialize link properties.
+#
+/sbin/dladm init-linkprop
 
 #
 # Process the /etc/hostname.* files of plumbed IPv4 interfaces.  If an

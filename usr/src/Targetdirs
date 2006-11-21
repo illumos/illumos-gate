@@ -402,6 +402,7 @@ ROOT.SFW64+= \
 OTHERS=  \
 	/dev/term  \
 	/tmp  \
+	/etc/dladm \
 	/etc/mail  \
 	/etc/mail/cf  \
 	/etc/mail/cf/cf  \
@@ -537,6 +538,9 @@ $(ROOT)/etc/mail/cf/ostype \
 $(ROOT)/etc/mail/cf/sh \
 $(ROOT)/usr/mail \
 $(ROOT)/var/mail  :=	GROUP= mail
+
+$(ROOT)/etc/dladm :=		OWNER= dladm
+$(ROOT)/etc/dladm :=		GROUP= sys
 
 $(ROOT)/var/spool/lp:=		OWNER= lp
 $(ROOT)/var/spool/lp:=		GROUP= lp

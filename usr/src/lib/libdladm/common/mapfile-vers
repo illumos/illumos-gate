@@ -30,6 +30,20 @@ SUNWprivate_1.1 {
 	dladm_info;
 	dladm_walk;
 	dladm_walk_vlan;
+	dladm_get_prop;
+	dladm_set_prop;
+	dladm_walk_prop;
+	dladm_get_secobj;
+	dladm_set_secobj;
+	dladm_unset_secobj;
+	dladm_walk_secobj;
+	dladm_status2str;
+	dladm_secobjclass2str;
+	dladm_str2secobjclass;
+	dladm_init_linkprop;
+	dladm_init_secobj;
+	dladm_set_rootdir;
+
     local:
 	*;
 };

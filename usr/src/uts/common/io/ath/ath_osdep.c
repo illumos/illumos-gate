@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,17 +43,15 @@
 #include <sys/sunddi.h>
 #include <sys/varargs.h>
 #include "ath_hal.h"
-#include "ath_ieee80211.h"
 #include "ath_impl.h"
 
 struct ath_halfix {
 	void *p;
 	size_t size;
-	int malloced;
-	int freed;
 };
 
-static struct ath_halfix ath_halfix[32];
+#define	ATH_MAX_HALMEM	1024
+static struct ath_halfix ath_halfix[ATH_MAX_HALMEM];
 
 /* HAL layer needs these definitions */
 int ath_hal_dma_beacon_response_time = 2;	/* in TU's */
@@ -96,20 +94,17 @@ ath_hal_malloc(size_t size)
 	void *p;
 	int i;
 
-	/* support 16 devices(max leakage of one device is 8) */
-	for (i = 0; i < 32; i++) {
-		if (ath_halfix[i].malloced == 0)
+	for (i = 0; i < ATH_MAX_HALMEM; i++) {
+		if (ath_halfix[i].p == NULL)
 			break;
 	}
-	if (i >= 32) {
+	if (i >= ATH_MAX_HALMEM) {
 		ath_problem("ath: ath_hal_malloc(): too many malloc\n");
 		return (NULL);
 	}
 	p = kmem_zalloc(size, KM_SLEEP);
 	ath_halfix[i].p = p;
 	ath_halfix[i].size = size;
-	ath_halfix[i].malloced = 1;
-	ath_halfix[i].freed = 0;
 	ATH_DEBUG((ATH_DBG_OSDEP, "ath: ath_hal_malloc(): "
 	    "%d: p=%p, size=%d\n", i, p, size));
 	return (p);
@@ -119,17 +114,16 @@ void
 ath_hal_free(void* p)
 {
 	int i;
-	for (i = 0; i < 32; i++) {
+	for (i = 0; i < ATH_MAX_HALMEM; i++) {
 		if (ath_halfix[i].p == p)
 			break;
 	}
-	if (i >= 32) {
+	if (i >= ATH_MAX_HALMEM) {
 		ath_problem("ath: ath_hal_free(): no record for %p\n", p);
 		return;
 	}
 	kmem_free(p, ath_halfix[i].size);
-	ath_halfix[i].malloced = 0;
-	ath_halfix[i].freed = 1;
+	ath_halfix[i].p = NULL;
 	ATH_DEBUG((ATH_DBG_OSDEP, "ath: ath_hal_free(): %d: p=%p, size=%d\n",
 	    i, p, ath_halfix[i].size));
 }
@@ -147,24 +141,13 @@ ath_hal_memzero(void *dst, size_t n)
 	bzero(dst, n);
 }
 
-/*
- * So far as I know and test, hal.o has a bug that when attaching,
- * it calls ath_hal_malloc() four times while detaching it calls
- * ath_hal_free() only 3 times, so everytime when a pair of driver
- * load/unload is done, a memory leak occurs. The function
- * free_hal_leaked_mem() just help free the memory that alloced by
- * hal.o but not freed by it. In fact, when attaching, hal.o only
- * call ath_hal_alloc() four times, here assuming a maximum times of
- * 8 just considers some special cases, we have no source after all!
- */
 void
 ath_halfix_init(void)
 {
 	int i;
 
-	for (i = 0; i < 32; i++) {
-		ath_halfix[i].malloced = 0;
-	}
+	for (i = 0; i < ATH_MAX_HALMEM; i++)
+		ath_halfix[i].p = NULL;
 }
 
 void
@@ -172,10 +155,11 @@ ath_halfix_finit(void)
 {
 	int i;
 
-	for (i = 0; i < 32; i++) {
-		if ((ath_halfix[i].malloced == 1) &&
-		    (ath_halfix[i].freed == 0)) {
+	for (i = 0; i < ATH_MAX_HALMEM; i++)
+		if (ath_halfix[i].p != NULL) {
 			kmem_free(ath_halfix[i].p, ath_halfix[i].size);
+			ATH_DEBUG((ATH_DBG_OSDEP, "ath_halfix: "
+			    "Free %d: p=%x size=%d\n",
+			    i, ath_halfix[i].p, ath_halfix[i].size));
 		}
-	}
 }

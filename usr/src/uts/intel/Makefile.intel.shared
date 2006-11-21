@@ -493,6 +493,7 @@ MISC_KMODS	+= kmech_krb5
 MISC_KMODS	+= krtld
 MISC_KMODS	+= mac
 MISC_KMODS	+= mixer
+MISC_KMODS	+= net80211
 MISC_KMODS	+= nfs_dlboot
 MISC_KMODS	+= nfssrv
 MISC_KMODS	+= neti
@@ -589,6 +590,7 @@ PCBE_KMODS	+= p123_pcbe p4_pcbe opteron_pcbe
 #	MAC-Type Plugin Modules (/kernel/mac)
 #
 MAC_KMODS	+= mac_ether
+MAC_KMODS	+= mac_wifi
 
 #
 # 'Devname' Modules (kernel/devname)

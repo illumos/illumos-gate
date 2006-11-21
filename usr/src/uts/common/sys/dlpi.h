@@ -49,6 +49,7 @@ extern "C" {
  */
 #define	DLIOC		('D' << 8)
 #define	DLIOCRAW	(DLIOC|1)	/* M_DATA "raw" mode */
+#define	DLIOCNATIVE	(DLIOC|2)	/* Native traffic mode */
 #define	DLIOCHDRINFO	(DLIOC|10)	/* IP fast-path */
 
 #define	DL_IOC_HDR_INFO	DLIOCHDRINFO
@@ -261,6 +262,7 @@ extern "C" {
 #define	DL_IPV4		0x80000001ul	/* IPv4 Tunnel Link */
 #define	DL_IPV6		0x80000002ul	/* IPv6 Tunnel Link */
 #define	SUNW_DL_VNI	0x80000003ul	/* Virtual network interface */
+#define	DL_WIFI		0x80000004ul	/* IEEE 802.11 */
 
 /*
  * DLPI provider service supported.

@@ -80,6 +80,7 @@ typedef struct mactype_s {
 	const char	*mt_ident;
 	uint32_t	mt_ref;
 	uint_t		mt_type;
+	uint_t		mt_nativetype;
 	size_t		mt_addr_length;
 	uint8_t		*mt_brdcst_addr;
 	mactype_ops_t	mt_ops;

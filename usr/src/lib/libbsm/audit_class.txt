@@ -52,6 +52,7 @@
 0x00000400:na:non-attribute
 0x00001000:lo:login or logout
 0x00004000:ap:application
+0x00008000:cy:cryptographic
 0x00010000:ss:change system state
 0x00020000:as:system-wide administration
 0x00040000:ua:user administration

@@ -154,6 +154,7 @@ enum mac_driver_stat {
  */
 typedef struct mac_info_s {
 	uint_t		mi_media;
+	uint_t		mi_nativemedia;
 	uint_t		mi_sdu_min;
 	uint_t		mi_sdu_max;
 	uint_t		mi_addr_length;
@@ -462,6 +463,7 @@ typedef struct mactype_register_s {
 	const char	*mtr_ident;
 	mactype_ops_t	*mtr_ops;
 	uint_t		mtr_mactype;
+	uint_t		mtr_nativetype;
 	uint_t		mtr_addrlen;
 	uint8_t		*mtr_brdcst_addr;
 	mac_stat_info_t	*mtr_stats;

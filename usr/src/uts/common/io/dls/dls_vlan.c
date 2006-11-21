@@ -308,7 +308,9 @@ again:
 	 * dls_mac_hold() assigns the dl_mip of the dls_link_t we're
 	 * interested in.
 	 */
-	if (dvp->dv_id != VLAN_ID_NONE && dlp->dl_mip->mi_media != DL_ETHER) {
+	if (dvp->dv_id != VLAN_ID_NONE &&
+	    (dlp->dl_mip->mi_media != DL_ETHER ||
+	    dlp->dl_mip->mi_nativemedia != DL_ETHER)) {
 		dls_mac_rele(dlp);
 		err = EINVAL;
 		goto done;

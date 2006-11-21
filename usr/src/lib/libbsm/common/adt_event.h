@@ -95,6 +95,8 @@ enum	adt_login_text {
 #define	ADT_admin_authenticate	3
 #define	ADT_attach		42
 #define	ADT_detach		43
+#define	ADT_dladm_create_secobj	47
+#define	ADT_dladm_delete_secobj	48
 #define	ADT_filesystem_add	4
 #define	ADT_filesystem_delete	5
 #define	ADT_filesystem_modify	6
@@ -160,6 +162,20 @@ struct adt_detach {	/* ADT_detach */
 	char 	*options;	/* optional */
 };
 typedef struct adt_detach adt_detach_t;
+
+struct adt_dladm_create_secobj {	/* ADT_dladm_create_secobj */
+	char 	*auth_used;	/* required */
+	char 	*obj_class;	/* required */
+	char 	*obj_name;	/* required */
+};
+typedef struct adt_dladm_create_secobj adt_dladm_create_secobj_t;
+
+struct adt_dladm_delete_secobj {	/* ADT_dladm_delete_secobj */
+	char 	*auth_used;	/* required */
+	char 	*obj_class;	/* required */
+	char 	*obj_name;	/* required */
+};
+typedef struct adt_dladm_delete_secobj adt_dladm_delete_secobj_t;
 
 struct adt_filesystem_add {	/* ADT_filesystem_add */
 	char 	*object_name;	/* required */
@@ -483,6 +499,8 @@ union adt_event_data {
 		adt_admin_authenticate_t	adt_admin_authenticate;
 		adt_attach_t	adt_attach;
 		adt_detach_t	adt_detach;
+		adt_dladm_create_secobj_t	adt_dladm_create_secobj;
+		adt_dladm_delete_secobj_t	adt_dladm_delete_secobj;
 		adt_filesystem_add_t	adt_filesystem_add;
 		adt_filesystem_delete_t	adt_filesystem_delete;
 		adt_filesystem_modify_t	adt_filesystem_modify;

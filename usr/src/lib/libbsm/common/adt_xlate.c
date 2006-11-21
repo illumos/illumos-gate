@@ -117,6 +117,46 @@ static struct translation X_detach = {
 	&XX_detach[0],
 	&XX_detach[0]
 };
+static struct entry XX_dladm_create_secobj[5] = {
+	{AUT_SUBJECT,	1,	NULL,	&(XX_dladm_create_secobj[1]),
+		0,	0,	0,	NULL},
+	{AUT_UAUTH,	1,	&adr1[0],	&(XX_dladm_create_secobj[2]),
+		0,	1,	0,	NULL},
+	{AUT_TEXT,	1,	&adr1[0],	&(XX_dladm_create_secobj[3]),
+		0,	1,	0,	NULL},
+	{AUT_TEXT,	1,	&adr1[0],	&(XX_dladm_create_secobj[4]),
+		0,	1,	0,	NULL},
+	{AUT_RETURN,	1,	NULL,	NULL,
+		0,	0,	0,	NULL}
+};
+static struct translation X_dladm_create_secobj = {
+	0,
+	ADT_dladm_create_secobj,
+	AUE_dladm_create_secobj,
+	5,
+	&XX_dladm_create_secobj[0],
+	&XX_dladm_create_secobj[0]
+};
+static struct entry XX_dladm_delete_secobj[5] = {
+	{AUT_SUBJECT,	1,	NULL,	&(XX_dladm_delete_secobj[1]),
+		0,	0,	0,	NULL},
+	{AUT_UAUTH,	1,	&adr1[0],	&(XX_dladm_delete_secobj[2]),
+		0,	1,	0,	NULL},
+	{AUT_TEXT,	1,	&adr1[0],	&(XX_dladm_delete_secobj[3]),
+		0,	1,	0,	NULL},
+	{AUT_TEXT,	1,	&adr1[0],	&(XX_dladm_delete_secobj[4]),
+		0,	1,	0,	NULL},
+	{AUT_RETURN,	1,	NULL,	NULL,
+		0,	0,	0,	NULL}
+};
+static struct translation X_dladm_delete_secobj = {
+	0,
+	ADT_dladm_delete_secobj,
+	AUE_dladm_delete_secobj,
+	5,
+	&XX_dladm_delete_secobj[0],
+	&XX_dladm_delete_secobj[0]
+};
 static struct entry XX_filesystem_add[7] = {
 	{AUT_SUBJECT,	1,	NULL,	&(XX_filesystem_add[1]),
 		0,	0,	0,	NULL},
@@ -979,10 +1019,12 @@ static struct translation X_zone_state = {
 	&XX_zone_state[0],
 	&XX_zone_state[0]
 };
-struct translation *xlate_table[47] = {
+struct translation *xlate_table[49] = {
 	&X_admin_authenticate,
 	&X_attach,
 	&X_detach,
+	&X_dladm_create_secobj,
+	&X_dladm_delete_secobj,
 	&X_filesystem_add,
 	&X_filesystem_delete,
 	&X_filesystem_modify,

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,32 +19,47 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= dladm
+CFGFILES= aggregation.conf linkprop.conf secobj.conf
 
-ROOTFS_PROG= $(PROG)
-CONFIGFILES= aggregation.conf
-
-POFILE= $(PROG).po
+ROOTFS_PROG=	$(PROG)
+ROOTCFGDIR=	$(ROOTETC)/dladm
+ROOTCFGFILES=	$(CFGFILES:%=$(ROOTCFGDIR)/%)
 
 include ../Makefile.cmd
 
-LDLIBS += -ldladm -lmacadm -ldlpi -llaadm -lkstat
+LDLIBS += -ldladm -lmacadm -ldlpi -llaadm -lkstat -lwladm -lsecdb -lbsm \
+	  -linetutil
 
-ICONFIGFILES= $(CONFIGFILES:%=$(ROOTETC)/%)
+$(ROOTCFGFILES) := OWNER= dladm
+$(ROOTCFGFILES) := GROUP= sys
 
-$(ICONFIGFILES):= FILEMODE= 644
-$(ICONFIGFILES):= OWNER= root
-$(ICONFIGFILES):= GROUP= sys
+$(ROOTCFGDIR)/aggregation.conf $(ROOTCFGDIR)/linkprop.conf := FILEMODE= 644
+$(ROOTCFGDIR)/secobj.conf := FILEMODE= 600
 
 .KEEP_STATE:
 
 all: $(ROOTFS_PROG) 
+
+install: all $(ROOTSBINPROG) $(ROOTCFGDIR) $(ROOTCFGFILES)
+	$(RM) $(ROOTUSRSBINPROG)
+	-$(SYMLINK) ../../sbin/$(PROG) $(ROOTUSRSBINPROG)
+
+clean:
+
+lint:	lint_PROG
+
+$(ROOTCFGDIR):
+	$(INS.dir)
+
+$(ROOTCFGDIR)/%: $(ROOTCFGDIR) %
+	$(INS.file)
 
 #
 # Message catalog
@@ -58,13 +72,5 @@ $(POFILE): $(PROG).c
 	$(XGETTEXT) $(XGETFLAGS) $(POFILE).i
 	sed "/^domain/d" messages.po > $@
 	$(RM) messages.po $(POFILE).i
-
-install: all $(ROOTSBINPROG) $(ICONFIGFILES)
-	$(RM) $(ROOTUSRSBINPROG)
-	-$(SYMLINK) ../../sbin/$(PROG) $(ROOTUSRSBINPROG)
-
-clean:
-
-lint:	lint_PROG
 
 include ../Makefile.targ

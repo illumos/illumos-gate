@@ -52,31 +52,31 @@
  * <db-file>	::= <groups>*
  * <group>	::= <key> <sep> <policy> <sep> <nports> <sep> <ports> <sep>
  *		      <mac> <sep> <lacp-mode> <sep> <lacp-timer>
- * <sep>		::= ' ' | '\t'
- * <key>		::= <number>
+ * <sep>	::= ' ' | '\t'
+ * <key>	::= <number>
  * <nports>	::= <number>
  * <ports>	::= <port> <m-port>*
  * <m-port>	::= ',' <port>
- * <port>		::= <devname>
+ * <port>	::= <devname>
  * <devname>	::= <string>
  * <port-num>	::= <number>
  * <policy>	::= <pol-level> <m-pol>*
  * <m-pol>	::= ',' <pol-level>
  * <pol-level>	::= 'L2' | 'L3' | 'L4'
- * <mac>		::= 'auto' | <mac-addr>
+ * <mac>	::= 'auto' | <mac-addr>
  * <mac-addr>	::= <hex> ':' <hex> ':' <hex> ':' <hex> ':' <hex> ':' <hex>
  * <lacp-mode>	::= 'off' | 'active' | 'passive'
  * <lacp-timer>	::= 'short' | 'long'
  */
 
 #define	LAADM_DEV	"/devices/pseudo/aggr@0:" AGGR_DEVNAME_CTL
-#define	LAADM_DB	"/etc/aggregation.conf"
-#define	LAADM_DB_TMP	"/etc/aggregation.conf.new"
+#define	LAADM_DB	"/etc/dladm/aggregation.conf"
+#define	LAADM_DB_TMP	"/etc/dladm/aggregation.conf.new"
 #define	LAADM_DB_LOCK	"/tmp/aggregation.conf.lock"
 
 #define	LAADM_DB_PERMS	S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
-#define	LAADM_DB_OWNER	0
-#define	LAADM_DB_GROUP	1
+#define	LAADM_DB_OWNER	15	/* "dladm" UID */
+#define	LAADM_DB_GROUP	3	/* "sys" GID */
 
 /*
  * The largest configurable aggregation key.  Because by default the key is
@@ -866,11 +866,13 @@ i_laadm_walk_rw_db(int (*fn)(void *, laadm_grp_attr_db_t *),
 		attr.lt_ports = NULL;
 	}
 
-	if (fchmod(nfd, LAADM_DB_PERMS) == -1)
-		goto failed;
+	if (getuid() == 0 || geteuid() == 0) {
+		if (fchmod(nfd, LAADM_DB_PERMS) == -1)
+			goto failed;
 
-	if (fchown(nfd, LAADM_DB_OWNER, LAADM_DB_GROUP) == -1)
-		goto failed;
+		if (fchown(nfd, LAADM_DB_OWNER, LAADM_DB_GROUP) == -1)
+			goto failed;
+	}
 
 	if (fflush(nfp) == EOF)
 		goto failed;

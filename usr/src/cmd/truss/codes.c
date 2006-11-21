@@ -291,12 +291,12 @@ const struct ioc {
 	{ (uint_t)TIOCGSIZE,	"TIOCGSIZE",	"ttysize" },
 
 	/*
-	 * DLIOCRAW has the same ioctl number as LDCLOSE.  Since the LDIOC
+	 * Unfortunately, the DLIOC and LDIOC codes overlap.  Since the LDIOC
 	 * ioctls (for xenix compatibility) are far less likely to be used, we
-	 * give preference to DLIOCRAW, which is the only userland ioctl in the
-	 * DLIOC family.
+	 * give preference to DLIOC.
 	 */
 	{ (uint_t)DLIOCRAW,	"DLIOCRAW",	NULL },
+	{ (uint_t)DLIOCNATIVE,	"DLIOCNATIVE",	NULL },
 
 	{ (uint_t)LDOPEN,	"LDOPEN",	NULL },
 	{ (uint_t)LDCLOSE,	"LDCLOSE",	NULL },

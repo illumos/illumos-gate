@@ -48,6 +48,7 @@ extern "C" {
 #define	SET_DATE_AUTH		"solaris.system.date"
 #define	WIFI_CONFIG_AUTH	"solaris.network.wifi.config"
 #define	WIFI_WEP_AUTH		"solaris.network.wifi.wep"
+#define	LINK_SEC_AUTH		"solaris.network.link.security"
 
 /*
  * Authorizations used by Trusted Solaris.

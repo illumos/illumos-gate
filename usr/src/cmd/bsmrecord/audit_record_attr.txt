@@ -2600,10 +2600,28 @@ label=AUE_remove
   format=uauth1:[text2]:text3
   comment=authorization used:mount point:device
 label=AUE_pool_import
-   program=hald
-   format=uauth1:text2:text3
-   comment=authorization used:pool:device
+  program=hald
+  format=uauth1:text2:text3
+  comment=authorization used:pool:device
 label=AUE_pool_export
-   program=hald
-   format=uauth1:text2:text3
-   comment=authorization used:pool:device
+  program=hald
+  format=uauth1:text2:text3
+  comment=authorization used:pool:device
+
+label=AUE_dladm_create_secobj
+  program=/usr/sbin/dladm
+  title:create wifi security object
+  see=dladm(1M)
+  format=uauth1:text2:text3
+  comment=authorization used:
+  comment=object class name:
+  comment=object name
+
+label=AUE_dladm_delete_secobj
+  program=/usr/sbin/dladm
+  title:delete wifi security object
+  see=dladm(1M)
+  format=uauth1:text2:text3
+  comment=authorization used:
+  comment=object class name:
+  comment=object name

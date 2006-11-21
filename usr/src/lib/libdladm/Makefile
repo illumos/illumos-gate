@@ -27,7 +27,7 @@
 
 include $(SRC)/lib/Makefile.lib
 
-HDRS =		libdladm.h
+HDRS =		libdladm.h libdladm_impl.h
 HDRDIR =	common
 
 SUBDIRS =		$(MACH)

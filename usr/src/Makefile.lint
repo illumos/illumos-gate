@@ -375,6 +375,7 @@ COMMON_SUBDIRS = \
 	lib/libuutil \
 	lib/libwanboot \
 	lib/libwanbootutil \
+	lib/libwladm \
 	lib/libxnet \
 	lib/libzfs \
 	lib/libzfs_jni \

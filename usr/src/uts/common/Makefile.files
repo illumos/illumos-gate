@@ -530,8 +530,14 @@ MAC_OBJS +=     mac.o mac_mod.o mac_stat.o
 
 MAC_ETHER_OBJS +=	mac_ether.o
 
+MAC_WIFI_OBJS +=	mac_wifi.o
+
 AGGR_OBJS +=	aggr_dev.o aggr_ctl.o aggr_grp.o aggr_port.o \
 		aggr_send.o aggr_recv.o aggr_lacp.o
+
+NET80211_OBJS +=	net80211.o net80211_proto.o net80211_input.o net80211_output.o \
+			net80211_node.o net80211_crypto.o net80211_crypto_none.o \
+			net80211_crypto_wep.o net80211_ioctl.o
 
 IB_OBJS +=	ibnex.o ibnex_ioctl.o
 
@@ -1272,8 +1278,7 @@ IXGB_OBJS += ixgb.o ixgb_atomic.o ixgb_chip.o ixgb_gld.o ixgb_kstats.o \
 
 RGE_OBJS += rge_main.o rge_chip.o rge_ndd.o rge_kstats.o rge_log.o rge_rxtx.o
 
-ATH_OBJS += ath_aux.o ath_ieee80211.o ath_main.o ath_osdep.o \
-		ath_rate.o ath_wificonfig.o
+ATH_OBJS += ath_aux.o ath_main.o ath_osdep.o ath_rate.o
 
 #
 #	Build up defines and paths.

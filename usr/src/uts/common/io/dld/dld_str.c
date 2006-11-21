@@ -52,6 +52,7 @@ static void	str_notify_capab_reneg(dld_str_t *);
 static void	str_notify_speed(dld_str_t *, uint32_t);
 static void	str_notify(void *, mac_notify_type_t);
 
+static void	ioc_native(dld_str_t *,  mblk_t *);
 static void	ioc_raw(dld_str_t *, mblk_t *);
 static void	ioc_fast(dld_str_t *,  mblk_t *);
 static void	ioc(dld_str_t *, mblk_t *);
@@ -688,6 +689,7 @@ dld_str_destroy(dld_str_t *dsp)
 	dsp->ds_notifications = 0;
 	dsp->ds_passivestate = DLD_UNINITIALIZED;
 	dsp->ds_mode = DLD_UNITDATA;
+	dsp->ds_native = B_FALSE;
 
 	/*
 	 * Free the dummy mblk if exists.
@@ -945,16 +947,18 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * Certain MAC type plugins provide an illusion for raw DLPI
 	 * consumers.  They pretend that the MAC layer is something that
-	 * it's not for the benefit of observability tools.  For example, a
-	 * wifi plugin might pretend that it's Ethernet for such consumers.
-	 * Here, we call into the MAC layer so that this illusion can be
-	 * maintained.  The plugin will optionally transform the MAC header
-	 * here into something that can be passed down.  The header goes
-	 * from raw mode to "cooked" mode.
+	 * it's not for the benefit of observability tools.  For example,
+	 * mac_wifi pretends that it's Ethernet for such consumers.
+	 * Here, unless native mode is enabled, we call into the MAC layer so
+	 * that this illusion can be maintained.  The plugin will optionally
+	 * transform the MAC header here into something that can be passed
+	 * down.  The header goes from raw mode to "cooked" mode.
 	 */
-	if ((newmp = mac_header_cook(dsp->ds_mh, mp)) == NULL)
-		goto discard;
-	mp = newmp;
+	if (!dsp->ds_native) {
+		if ((newmp = mac_header_cook(dsp->ds_mh, mp)) == NULL)
+			goto discard;
+		mp = newmp;
+	}
 
 	size = MBLKL(mp);
 
@@ -1202,18 +1206,21 @@ dld_str_rx_raw(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		 * Certain MAC type plugins provide an illusion for raw
 		 * DLPI consumers.  They pretend that the MAC layer is
 		 * something that it's not for the benefit of observability
-		 * tools.  For example, a wifi plugin might pretend that
-		 * it's Ethernet for such consumers.  Here, we call into
-		 * the MAC layer so that this illusion can be maintained.
-		 * The plugin will optionally transform the MAC header here
-		 * into something that can be passed up to raw consumers.
-		 * The header goes from "cooked" mode to raw mode.
+		 * tools.  For example, mac_wifi pretends that it's Ethernet
+		 * for such consumers.	Here, unless native mode is enabled,
+		 * we call into the MAC layer so that this illusion can be
+		 * maintained.	The plugin will optionally transform the MAC
+		 * header here into something that can be passed up to raw
+		 * consumers.  The header goes from "cooked" mode to raw mode.
 		 */
-		if ((newmp = mac_header_uncook(dsp->ds_mh, mp)) == NULL) {
-			freemsg(mp);
-			goto next;
+		if (!dsp->ds_native) {
+			newmp = mac_header_uncook(dsp->ds_mh, mp);
+			if (newmp == NULL) {
+				freemsg(mp);
+				goto next;
+			}
+			mp = newmp;
 		}
-		mp = newmp;
 
 		/*
 		 * Strip the VLAN tag for VLAN streams.
@@ -1875,6 +1882,9 @@ dld_ioc(dld_str_t *dsp, mblk_t *mp)
 	ASSERT(dsp->ds_type == DLD_DLPI);
 
 	switch (cmd) {
+	case DLIOCNATIVE:
+		ioc_native(dsp, mp);
+		break;
 	case DLIOCRAW:
 		ioc_raw(dsp, mp);
 		break;
@@ -1884,6 +1894,32 @@ dld_ioc(dld_str_t *dsp, mblk_t *mp)
 	default:
 		ioc(dsp, mp);
 	}
+}
+
+/*
+ * DLIOCNATIVE
+ */
+static void
+ioc_native(dld_str_t *dsp, mblk_t *mp)
+{
+	queue_t *q = dsp->ds_wq;
+	const mac_info_t *mip = dsp->ds_mip;
+
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+
+	/*
+	 * Native mode can be enabled if it's disabled and if the
+	 * native media type is different.
+	 */
+	if (!dsp->ds_native && mip->mi_media != mip->mi_nativemedia)
+		dsp->ds_native = B_TRUE;
+
+	rw_exit(&dsp->ds_lock);
+
+	if (dsp->ds_native)
+		miocack(q, mp, 0, mip->mi_nativemedia);
+	else
+		miocnak(q, mp, 0, ENOTSUP);
 }
 
 /*

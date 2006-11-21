@@ -843,8 +843,39 @@ Use is subject to license terms.
 	</entry>
     </event>
 
+<!-- dladm security objected events -->
+    <event id="AUE_dladm_generic" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="obj_class">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="obj_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_dladm_create_secobj" instance_of="AUE_dladm_generic"
+	header="0" idNo="47" omit="JNI">
+    </event>
+    <event id="AUE_dladm_delete_secobj" instance_of="AUE_dladm_generic"
+	header="0" idNo="48" omit="JNI">
+    </event>
+
 <!-- add new everts here with the next higher idNo -->
-<!-- Highest idNo is 46, so next is 47, then fix this comment -->
+<!-- Highest idNo is 48, so next is 49, then fix this comment -->
 <!-- end of C Only events -->
 
 

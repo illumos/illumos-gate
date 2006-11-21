@@ -108,6 +108,40 @@ typedef struct dld_vlan_info {
 	char		dvi_name[IFNAMSIZ];
 } dld_vlan_info_t;
 
+/*
+ * Secure objects ioctls
+ */
+typedef enum {
+	DLD_SECOBJ_CLASS_WEP = 1
+} dld_secobj_class_t;
+
+#define	DLD_SECOBJ_OPT_CREATE	0x00000001
+#define	DLD_SECOBJ_NAME_MAX	32
+#define	DLD_SECOBJ_VAL_MAX	256
+typedef struct dld_secobj {
+	char			so_name[DLD_SECOBJ_NAME_MAX];
+	dld_secobj_class_t	so_class;
+	uint8_t			so_val[DLD_SECOBJ_VAL_MAX];
+	uint_t			so_len;
+} dld_secobj_t;
+
+#define	DLDIOCSECOBJSET		(DLDIOC | 0x05)
+typedef struct dld_ioc_secobj_set {
+	dld_secobj_t		ss_obj;
+	uint_t			ss_flags;
+} dld_ioc_secobj_set_t;
+
+#define	DLDIOCSECOBJGET		(DLDIOC | 0x06)
+typedef struct dld_ioc_secobj_get {
+	dld_secobj_t		sg_obj;
+	uint_t			sg_count;
+} dld_ioc_secobj_get_t;
+
+#define	DLDIOCSECOBJUNSET	(DLDIOC | 0x07)
+typedef struct dld_ioc_secobj_unset {
+	char			su_name[DLD_SECOBJ_NAME_MAX];
+} dld_ioc_secobj_unset_t;
+
 #ifdef _KERNEL
 int	dld_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 int	dld_open(queue_t *, dev_t *, int, int, cred_t *);

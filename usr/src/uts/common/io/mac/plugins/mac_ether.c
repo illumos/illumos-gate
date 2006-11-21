@@ -122,6 +122,7 @@ _init(void)
 	mtrp->mtr_ident = MAC_PLUGIN_IDENT_ETHER;
 	mtrp->mtr_ops = &mac_ether_type_ops;
 	mtrp->mtr_mactype = DL_ETHER;
+	mtrp->mtr_nativetype = DL_ETHER;
 	mtrp->mtr_addrlen = ETHERADDRL;
 	mtrp->mtr_brdcst_addr = ether_brdcst;
 	mtrp->mtr_stats = ether_stats;

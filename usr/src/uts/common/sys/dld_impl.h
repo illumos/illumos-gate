@@ -164,6 +164,11 @@ struct dld_str {
 	dld_str_mode_t		ds_mode;
 
 	/*
+	 * Native mode state.
+	 */
+	boolean_t		ds_native;
+
+	/*
 	 * IP polling is operational if this flag is set.
 	 */
 	boolean_t		ds_polling;

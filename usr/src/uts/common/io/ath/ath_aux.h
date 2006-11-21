@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,25 +45,31 @@ extern "C" {
 #endif
 
 #include "ath_hal.h"
-#include "ath_ieee80211.h"
 #include "ath_impl.h"
 
 uint32_t ath_calcrxfilter(ath_t *asc);
 void ath_beacon_config(ath_t *asc);
-void ath_reset(ath_t *asc);
+int ath_reset(ieee80211com_t *ic);
 int32_t ath_startrecv(ath_t *asc);
 void ath_stoprecv(ath_t *asc);
 uint32_t ath_chan2flags(ieee80211com_t *isc,
-    struct ieee80211channel *chan);
+    struct ieee80211_channel *chan);
 int32_t ath_getchannels(ath_t *asc, uint32_t cc,
     HAL_BOOL outdoor, HAL_BOOL xchanmode);
-int32_t ath_chan_set(ath_t *asc, struct ieee80211channel *chan);
+void ath_chan_change(ath_t *asc, struct ieee80211_channel *chan);
+int32_t ath_chan_set(ath_t *asc, struct ieee80211_channel *chan);
 int ath_txq_setup(ath_t *asc);
+void ath_txq_cleanup(ath_t *asc);
 void ath_rate_setup(ath_t *asc, uint32_t mode);
 void ath_setcurmode(ath_t *asc, enum ieee80211_phymode mode);
 void ath_mode_init(ath_t *asc);
 void ath_draintxq(ath_t *asc);
-void ath_initkeytable(ath_t *asc);
+int ath_key_alloc(ieee80211com_t *ic, const struct ieee80211_key *k,
+    ieee80211_keyix *keyix, ieee80211_keyix *rxkeyix);
+int ath_key_delete(ieee80211com_t *ic, const struct ieee80211_key *k);
+int ath_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
+    const uint8_t mac[IEEE80211_ADDR_LEN]);
+void ath_set_shortslot(ieee80211com_t *ic, int onoff);
 
 #ifdef __cplusplus
 }

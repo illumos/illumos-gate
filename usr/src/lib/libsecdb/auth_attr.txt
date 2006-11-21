@@ -62,6 +62,7 @@ solaris.mail.:::Mail::help=MailHeader.html
 solaris.mail.mailq:::Mail Queue::help=MailQueue.html
 #
 solaris.network.:::Network::help=NetworkHeader.html
+solaris.network.link.security:::Link Security::help=LinkSecurity.html
 solaris.network.wifi.config:::Wifi Config::help=WifiConfig.html
 solaris.network.wifi.wep:::Wifi Wep::help=WifiWep.html
 #

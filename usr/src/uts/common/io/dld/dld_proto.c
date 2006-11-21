@@ -274,7 +274,10 @@ proto_info_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	/*
 	 * Set the media type (properly this time).
 	 */
-	dlp->dl_mac_type = minfop->mi_media;
+	if (dsp->ds_native)
+		dlp->dl_mac_type = minfop->mi_nativemedia;
+	else
+		dlp->dl_mac_type = minfop->mi_media;
 
 	/*
 	 * Set the DLSAP length. We only support 16 bit values and they

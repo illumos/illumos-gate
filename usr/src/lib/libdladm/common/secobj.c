@@ -1,0 +1,634 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <unistd.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <errno.h>
+#include <ctype.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/dld.h>
+#include <libinetutil.h>
+#include <libdladm_impl.h>
+
+static dladm_status_t	i_dladm_set_secobj_db(const char *,
+			    dladm_secobj_class_t, uint8_t *, uint_t);
+static dladm_status_t	i_dladm_get_secobj_db(const char *,
+			    dladm_secobj_class_t *, uint8_t *, uint_t *);
+static dladm_status_t	i_dladm_unset_secobj_db(const char *);
+static dladm_status_t	i_dladm_walk_secobj_db(void *,
+			    boolean_t (*)(void *, const char *));
+
+typedef struct secobj_class_info {
+	const char		*sc_name;
+	dld_secobj_class_t	sc_dldclass;
+} secobj_class_info_t;
+
+static secobj_class_info_t secobj_class_table[] = {
+	{"wep",	DLD_SECOBJ_CLASS_WEP}
+};
+
+#define	NSECOBJCLASS \
+	(sizeof (secobj_class_table) / sizeof (secobj_class_info_t))
+
+static boolean_t
+dladm_check_secobjclass(dladm_secobj_class_t class)
+{
+	return (class >= 0 && class < NSECOBJCLASS);
+}
+
+dladm_status_t
+dladm_str2secobjclass(const char *str, dladm_secobj_class_t *class)
+{
+	int			i;
+	secobj_class_info_t	*sp;
+
+	for (i = 0; i < NSECOBJCLASS; i++) {
+		sp = &secobj_class_table[i];
+		if (strcasecmp(str, sp->sc_name) == 0) {
+			*class = i;
+			return (DLADM_STATUS_OK);
+		}
+	}
+	return (DLADM_STATUS_BADARG);
+}
+
+const char *
+dladm_secobjclass2str(dladm_secobj_class_t class, char *buf)
+{
+	const char		*s;
+
+	if (!dladm_check_secobjclass(class))
+		s = "";
+	else
+		s = secobj_class_table[class].sc_name;
+
+	(void) snprintf(buf, DLADM_STRSIZE, "%s", s);
+	return (buf);
+}
+
+static boolean_t
+dladm_convert_secobjclass(dladm_secobj_class_t class,
+    dld_secobj_class_t *dldclass)
+{
+	if (!dladm_check_secobjclass(class))
+		return (B_FALSE);
+
+	*dldclass = secobj_class_table[class].sc_dldclass;
+	return (B_TRUE);
+}
+
+static boolean_t
+dladm_convert_dldsecobjclass(dld_secobj_class_t dldclass,
+    dladm_secobj_class_t *class)
+{
+	int			i;
+	secobj_class_info_t	*sp;
+
+	for (i = 0; i < NSECOBJCLASS; i++) {
+		sp = &secobj_class_table[i];
+		if (dldclass == sp->sc_dldclass) {
+			*class = i;
+			return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
+}
+
+dladm_status_t
+dladm_set_secobj(const char *obj_name, dladm_secobj_class_t class,
+    uint8_t *obj_val, uint_t obj_len, uint_t flags)
+{
+	int			fd;
+	dladm_status_t		status = DLADM_STATUS_OK;
+	dld_ioc_secobj_set_t	secobj_set;
+	dld_secobj_t		*objp;
+
+	if (!dladm_check_secobjclass(class) || flags == 0 ||
+	    obj_name == NULL || strlen(obj_name) > DLD_SECOBJ_NAME_MAX ||
+	    obj_val == NULL || obj_len == 0 || obj_len > DLD_SECOBJ_VAL_MAX)
+		return (DLADM_STATUS_BADARG);
+
+	if ((flags & DLADM_OPT_TEMP) == 0)
+		goto persist;
+
+	bzero(&secobj_set, sizeof (secobj_set));
+	objp = &secobj_set.ss_obj;
+	if (!dladm_convert_secobjclass(class, &objp->so_class))
+		return (DLADM_STATUS_BADARG);
+
+	(void) strlcpy(objp->so_name, obj_name, DLD_SECOBJ_NAME_MAX);
+	bcopy(obj_val, objp->so_val, obj_len);
+	objp->so_len = obj_len;
+
+	if ((flags & DLADM_OPT_CREATE) != 0)
+		secobj_set.ss_flags = DLD_SECOBJ_OPT_CREATE;
+
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+		return (dladm_errno2status(errno));
+
+	if (i_dladm_ioctl(fd, DLDIOCSECOBJSET, &secobj_set,
+	    sizeof (secobj_set)) < 0)
+		status = dladm_errno2status(errno);
+
+	(void) close(fd);
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+persist:
+	if ((flags & DLADM_OPT_PERSIST) != 0) {
+		status = i_dladm_set_secobj_db(obj_name, class,
+		    obj_val, obj_len);
+	}
+	return (status);
+}
+
+dladm_status_t
+dladm_get_secobj(const char *obj_name, dladm_secobj_class_t *classp,
+    uint8_t *obj_val, uint_t *obj_lenp, uint_t flags)
+{
+	int			fd;
+	dladm_status_t		status = DLADM_STATUS_OK;
+	dld_ioc_secobj_get_t	secobj_get;
+	dld_secobj_t		*objp;
+
+	if (obj_name == NULL || strlen(obj_name) > DLD_SECOBJ_NAME_MAX ||
+	    obj_val == NULL || obj_lenp == NULL || *obj_lenp == 0 ||
+	    *obj_lenp > DLD_SECOBJ_VAL_MAX)
+		return (DLADM_STATUS_BADARG);
+
+	if ((flags & DLADM_OPT_PERSIST) != 0) {
+		return (i_dladm_get_secobj_db(obj_name, classp,
+		    obj_val, obj_lenp));
+	}
+
+	bzero(&secobj_get, sizeof (secobj_get));
+	objp = &secobj_get.sg_obj;
+	(void) strlcpy(objp->so_name, obj_name, DLD_SECOBJ_NAME_MAX);
+
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+		return (dladm_errno2status(errno));
+
+	if (i_dladm_ioctl(fd, DLDIOCSECOBJGET, &secobj_get,
+	    sizeof (secobj_get)) < 0)
+		status = dladm_errno2status(errno);
+
+	(void) close(fd);
+	if (objp->so_len > *obj_lenp)
+		return (DLADM_STATUS_TOOSMALL);
+
+	if (!dladm_convert_dldsecobjclass(objp->so_class, classp))
+		return (DLADM_STATUS_FAILED);
+
+	*obj_lenp = objp->so_len;
+	bcopy(objp->so_val, obj_val, *obj_lenp);
+	return (status);
+}
+
+dladm_status_t
+dladm_unset_secobj(const char *obj_name, uint_t flags)
+{
+	int			fd;
+	dladm_status_t		status = DLADM_STATUS_OK;
+	dld_ioc_secobj_unset_t	secobj_unset;
+
+	if (obj_name == NULL || strlen(obj_name) > DLD_SECOBJ_NAME_MAX ||
+	    flags == 0)
+		return (DLADM_STATUS_BADARG);
+
+	if ((flags & DLADM_OPT_TEMP) == 0)
+		goto persist;
+
+	bzero(&secobj_unset, sizeof (secobj_unset));
+	(void) strlcpy(secobj_unset.su_name, obj_name, DLD_SECOBJ_NAME_MAX);
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+		return (dladm_errno2status(errno));
+
+	if (i_dladm_ioctl(fd, DLDIOCSECOBJUNSET, &secobj_unset,
+	    sizeof (secobj_unset)) < 0)
+		status = dladm_errno2status(errno);
+
+	(void) close(fd);
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+persist:
+	if ((flags & DLADM_OPT_PERSIST) != 0)
+		status = i_dladm_unset_secobj_db(obj_name);
+
+	return (status);
+}
+
+#define	SECOBJ_BUFSZ	65536
+dladm_status_t
+dladm_walk_secobj(void *arg, boolean_t (*func)(void *, const char *),
+    uint_t flags)
+{
+	int			fd = -1;
+	dladm_status_t		status = DLADM_STATUS_OK;
+	dld_ioc_secobj_get_t	*secobj_getp;
+	dld_secobj_t		*objp;
+
+	if ((flags & DLADM_OPT_PERSIST) != 0)
+		return (i_dladm_walk_secobj_db(arg, func));
+
+	secobj_getp = calloc(1, SECOBJ_BUFSZ);
+	if (secobj_getp == NULL)
+		return (DLADM_STATUS_NOMEM);
+
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
+		status = dladm_errno2status(errno);
+		goto done;
+	}
+	if (i_dladm_ioctl(fd, DLDIOCSECOBJGET, secobj_getp,
+	    SECOBJ_BUFSZ) < 0) {
+		status = dladm_errno2status(errno);
+		goto done;
+	}
+
+	objp = (dld_secobj_t *)(secobj_getp + 1);
+	while (secobj_getp->sg_count > 0) {
+		if (!func(arg, objp->so_name))
+			goto done;
+		secobj_getp->sg_count--;
+		objp++;
+	}
+done:
+	(void) close(fd);
+	free(secobj_getp);
+	return (status);
+}
+
+/*
+ * Data structures used for implementing persistent secure objects
+ */
+typedef struct secobj_info {
+	const char		*si_name;
+	dladm_secobj_class_t	*si_classp;
+	uint8_t			*si_val;
+	uint_t			*si_lenp;
+} secobj_info_t;
+
+typedef struct secobj_name {
+	char			*sn_name;
+	struct secobj_name	*sn_next;
+} secobj_name_t;
+
+typedef struct secobj_db_state	secobj_db_state_t;
+
+typedef boolean_t (*secobj_db_op_t)(struct secobj_db_state *, char *,
+    secobj_info_t *, dladm_status_t *);
+
+struct secobj_db_state {
+	secobj_db_op_t		ss_op;
+	secobj_info_t		ss_info;
+	secobj_name_t		**ss_namelist;
+};
+
+/*
+ * Update or generate a secobj entry using the info in ssp->ss_info.
+ */
+/* ARGSUSED */
+static boolean_t
+process_secobj_set(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
+    dladm_status_t *statusp)
+{
+	char	tmpbuf[MAXLINELEN];
+	char	classbuf[DLADM_STRSIZE];
+	char	*ptr = tmpbuf, *lim = tmpbuf + MAXLINELEN;
+	int	i;
+
+	sip = &ssp->ss_info;
+
+	ptr += snprintf(ptr, BUFLEN(lim, ptr), "%s\t", sip->si_name);
+	ptr += snprintf(ptr, BUFLEN(lim, ptr), "%s\t",
+	    dladm_secobjclass2str(*sip->si_classp, classbuf));
+
+	ptr += snprintf(ptr, BUFLEN(lim, ptr), "0x");
+	for (i = 0; i < *sip->si_lenp; i++) {
+		ptr += snprintf(ptr, BUFLEN(lim, ptr), "%02x",
+		    sip->si_val[i] & 0xff);
+	}
+	if (ptr > lim) {
+		*statusp = DLADM_STATUS_TOOSMALL;
+		return (B_FALSE);
+	}
+	(void) snprintf(buf, MAXLINELEN, "%s\n", tmpbuf);
+	return (B_FALSE);
+}
+
+/* ARGSUSED */
+static boolean_t
+process_secobj_get(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
+    dladm_status_t *statusp)
+{
+	if (*sip->si_lenp > *ssp->ss_info.si_lenp) {
+		*statusp = DLADM_STATUS_TOOSMALL;
+		return (B_FALSE);
+	}
+	bcopy(sip->si_val, ssp->ss_info.si_val, *sip->si_lenp);
+	*ssp->ss_info.si_lenp = *sip->si_lenp;
+	*ssp->ss_info.si_classp = *sip->si_classp;
+	return (B_FALSE);
+}
+
+/* ARGSUSED */
+static boolean_t
+process_secobj_unset(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
+    dladm_status_t *statusp)
+{
+	/*
+	 * Delete line.
+	 */
+	buf[0] = '\0';
+	return (B_FALSE);
+}
+
+/* ARGSUSED */
+static boolean_t
+process_secobj_walk(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
+    dladm_status_t *statusp)
+{
+	secobj_name_t	*snp;
+
+	if ((snp = malloc(sizeof (*snp))) == NULL)
+		return (B_TRUE);
+
+	if ((snp->sn_name = strdup(sip->si_name)) == NULL) {
+		free(snp);
+		return (B_TRUE);
+	}
+
+	snp->sn_next = NULL;
+	*ssp->ss_namelist = snp;
+	ssp->ss_namelist = &snp->sn_next;
+	return (B_TRUE);
+}
+
+/* ARGSUSED */
+static boolean_t
+process_secobj_init(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
+    dladm_status_t *statusp)
+{
+	*statusp = dladm_set_secobj(sip->si_name, *sip->si_classp, sip->si_val,
+	    *sip->si_lenp, DLADM_OPT_TEMP | DLADM_OPT_CREATE);
+	return (B_TRUE);
+}
+
+static int
+parse_secobj_val(char *buf, secobj_info_t *sip)
+{
+	if (strncmp(buf, "0x", 2) != 0)
+		return (EINVAL);
+
+	return (hexascii_to_octet(buf + 2, strlen(buf) - 2,
+	    sip->si_val, sip->si_lenp));
+}
+
+static boolean_t
+process_secobj_line(secobj_db_state_t *ssp, char *buf,
+    dladm_status_t *statusp)
+{
+	secobj_info_t		sinfo;
+	dladm_secobj_class_t	class;
+	uint8_t			val[DLADM_SECOBJ_VAL_MAX];
+	uint_t			vlen;
+	int			i, len, nlen;
+	char			*str, *lasts;
+
+	/*
+	 * Skip leading spaces, blank lines, and comments.
+	 */
+	len = strlen(buf);
+	for (i = 0; i < len; i++) {
+		if (!isspace(buf[i]))
+			break;
+	}
+	if (i == len || buf[i] == '#')
+		return (B_TRUE);
+
+	str = buf + i;
+	if (ssp->ss_info.si_name != NULL) {
+		/*
+		 * Skip objects we're not interested in.
+		 */
+		nlen = strlen(ssp->ss_info.si_name);
+		if (strncmp(str, ssp->ss_info.si_name, nlen) != 0 ||
+		    !isspace(str[nlen]))
+			return (B_TRUE);
+
+		sinfo.si_name = ssp->ss_info.si_name;
+	} else {
+		/*
+		 * If an object is not specified, find the object name
+		 * and assign it to sinfo.si_name.
+		 */
+		if (strtok_r(str, " \n\t", &lasts) == NULL)
+			goto fail;
+
+		nlen = strlen(str);
+		sinfo.si_name = str;
+	}
+	str += nlen + 1;
+	if (str >= buf + len)
+		goto fail;
+
+	/*
+	 * Find the class name.
+	 */
+	if ((str = strtok_r(str, " \n\t", &lasts)) == NULL)
+		goto fail;
+
+	*statusp = dladm_str2secobjclass(str, &class);
+	if (*statusp != DLADM_STATUS_OK)
+		goto fail;
+
+	/*
+	 * Find the object value.
+	 */
+	if ((str = strtok_r(NULL, " \n\t", &lasts)) == NULL)
+		goto fail;
+
+	vlen = DLADM_SECOBJ_VAL_MAX;
+	sinfo.si_classp = &class;
+	sinfo.si_val = val;
+	sinfo.si_lenp = &vlen;
+	if (parse_secobj_val(str, &sinfo) != 0)
+		goto fail;
+
+	return ((*ssp->ss_op)(ssp, buf, &sinfo, statusp));
+
+fail:
+	/*
+	 * Delete corrupted line.
+	 */
+	buf[0] = '\0';
+	return (B_TRUE);
+}
+
+static dladm_status_t
+process_secobj_db(void *arg, FILE *fp, FILE *nfp)
+{
+	secobj_db_state_t	*ssp = arg;
+	dladm_status_t		status = DLADM_STATUS_OK;
+	char			buf[MAXLINELEN];
+	boolean_t		cont = B_TRUE;
+
+	/*
+	 * This loop processes each line of the configuration file.
+	 * buf can potentially be modified by process_secobj_line().
+	 * If this is a write operation and buf is not truncated, buf will
+	 * be written to disk. process_secobj_line() will no longer be
+	 * called after it returns B_FALSE; at which point the remainder
+	 * of the file will continue to be read and, if necessary, written
+	 * to disk as well.
+	 */
+	while (fgets(buf, MAXLINELEN, fp) != NULL) {
+		if (cont)
+			cont = process_secobj_line(ssp, buf, &status);
+
+		if (nfp != NULL && buf[0] != '\0' && fputs(buf, nfp) == EOF) {
+			status = dladm_errno2status(errno);
+			break;
+		}
+	}
+	if (status != DLADM_STATUS_OK || !cont)
+		return (status);
+
+	if (ssp->ss_op == process_secobj_set) {
+		/*
+		 * If the specified object is not found above, we add the
+		 * object to the configuration file.
+		 */
+		(void) (*ssp->ss_op)(ssp, buf, NULL, &status);
+		if (status == DLADM_STATUS_OK && fputs(buf, nfp) == EOF)
+			status = dladm_errno2status(errno);
+	}
+
+	if (ssp->ss_op == process_secobj_unset ||
+	    ssp->ss_op == process_secobj_get)
+		status = DLADM_STATUS_NOTFOUND;
+
+	return (status);
+}
+
+#define	SECOBJ_RW_DB(statep, writeop) \
+	(i_dladm_rw_db("/etc/dladm/secobj.conf", S_IRUSR | S_IWUSR, \
+	process_secobj_db, (statep), (writeop)))
+
+static dladm_status_t
+i_dladm_set_secobj_db(const char *obj_name, dladm_secobj_class_t class,
+    uint8_t *obj_val, uint_t obj_len)
+{
+	secobj_db_state_t	state;
+
+	state.ss_op = process_secobj_set;
+	state.ss_info.si_name = obj_name;
+	state.ss_info.si_classp = &class;
+	state.ss_info.si_val = obj_val;
+	state.ss_info.si_lenp = &obj_len;
+	state.ss_namelist = NULL;
+
+	return (SECOBJ_RW_DB(&state, B_TRUE));
+}
+
+static dladm_status_t
+i_dladm_get_secobj_db(const char *obj_name, dladm_secobj_class_t *classp,
+    uint8_t *obj_val, uint_t *obj_lenp)
+{
+	secobj_db_state_t	state;
+
+	state.ss_op = process_secobj_get;
+	state.ss_info.si_name = obj_name;
+	state.ss_info.si_classp = classp;
+	state.ss_info.si_val = obj_val;
+	state.ss_info.si_lenp = obj_lenp;
+	state.ss_namelist = NULL;
+
+	return (SECOBJ_RW_DB(&state, B_FALSE));
+}
+
+static dladm_status_t
+i_dladm_unset_secobj_db(const char *obj_name)
+{
+	secobj_db_state_t	state;
+
+	state.ss_op = process_secobj_unset;
+	state.ss_info.si_name = obj_name;
+	state.ss_info.si_classp = NULL;
+	state.ss_info.si_val = NULL;
+	state.ss_info.si_lenp = NULL;
+	state.ss_namelist = NULL;
+
+	return (SECOBJ_RW_DB(&state, B_TRUE));
+}
+
+static dladm_status_t
+i_dladm_walk_secobj_db(void *arg, boolean_t (*func)(void *, const char *))
+{
+	secobj_db_state_t	state;
+	secobj_name_t		*snp = NULL, *fsnp;
+	dladm_status_t		status;
+	boolean_t		cont = B_TRUE;
+
+	state.ss_op = process_secobj_walk;
+	state.ss_info.si_name = NULL;
+	state.ss_info.si_classp = NULL;
+	state.ss_info.si_val = NULL;
+	state.ss_info.si_lenp = NULL;
+	state.ss_namelist = &snp;
+
+	status = SECOBJ_RW_DB(&state, B_FALSE);
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	while (snp != NULL) {
+		fsnp = snp;
+		snp = snp->sn_next;
+		if (cont)
+			cont = func(arg, fsnp->sn_name);
+		free(fsnp->sn_name);
+		free(fsnp);
+	}
+	return (status);
+}
+
+dladm_status_t
+dladm_init_secobj(void)
+{
+	secobj_db_state_t	state;
+
+	state.ss_op = process_secobj_init;
+	state.ss_info.si_name = NULL;
+	state.ss_info.si_classp = NULL;
+	state.ss_info.si_val = NULL;
+	state.ss_info.si_lenp = NULL;
+	state.ss_namelist = NULL;
+
+	return (SECOBJ_RW_DB(&state, B_FALSE));
+}

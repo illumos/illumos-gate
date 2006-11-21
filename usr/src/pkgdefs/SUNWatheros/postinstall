@@ -29,7 +29,7 @@
 
 # Driver info
 DRV=ath
-DRVALIAS='"pci168c,13" "pci168c,1014"'
+DRVALIAS='"pci168c,13" "pci168c,1014" "pci168c,1a" "pci168c,1b"'
 
 BASEDIR=${BASEDIR:-/}
 

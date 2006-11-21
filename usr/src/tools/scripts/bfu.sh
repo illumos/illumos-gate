@@ -1909,6 +1909,7 @@ multiboot_archives=no
 dca_to_multi=no
 is_pcfs_boot=no
 need_datalink=no
+new_dladm=no
 
 test $# -ge 1 || usage
 
@@ -2128,6 +2129,15 @@ fi
 if $ZCAT $cpiodir/generic.root$ZFIX | cpio -it 2>/dev/null | \
     grep datalink.conf > /dev/null 2>&1 ; then
 	need_datalink=yes
+fi
+
+#
+# Check whether the archives have an etc/dladm directory; this is
+# later used to determine if aggregation.conf needs to be moved.
+#
+if $ZCAT $cpiodir/generic.root$ZFIX | cpio -it 2>/dev/null | \
+    grep etc/dladm > /dev/null 2>&1 ; then
+	new_dladm=yes
 fi
 
 time_ref=/tmp/bfu.time_ref.$$
@@ -6293,6 +6303,25 @@ mondo_loop() {
 	# Fix network datalink configuration
 	if [ $zone = global -a $need_datalink = yes ]; then
 		create_datalink_conf
+	fi
+
+	# Move existing /etc/aggregation.conf entries to
+	# /etc/dladm/aggregation.conf; or, if bfu'ing
+	# backwards, move aggregation.conf back to /etc
+	aggr_old=$rootprefix/etc/aggregation.conf
+	aggr_new=$rootprefix/etc/dladm/aggregation.conf
+	if [ $new_dladm = yes ]; then
+		if [ -f $aggr_old ]; then
+			# use cat instead of cp/mv to keep owner+group of dest
+			cat $aggr_old > $aggr_new
+			rm -f $aggr_old
+		fi
+	else
+		if [ -f $aggr_new ]; then
+			cp $aggr_new $aggr_old
+			chgrp sys $aggr_old
+			rm -rf $rootprefix/etc/dladm
+		fi
 	fi
 
 	print "\nRestoring configuration files.\n"

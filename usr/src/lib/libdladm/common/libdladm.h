@@ -36,18 +36,76 @@
 extern "C" {
 #endif
 
-typedef struct dladm_attr	dladm_attr_t;
-
-struct dladm_attr {
+typedef struct dladm_attr {
 	char		da_dev[MAXNAMELEN];
 	uint_t		da_max_sdu;
 	uint16_t	da_vid;
-};
+} dladm_attr_t;
 
-extern int	dladm_walk(void (*)(void *, const char *), void *);
-extern int	dladm_walk_vlan(void (*)(void *,
-			    const char *), void *, const char *);
+#define	DLADM_STRSIZE		256
+#define	DLADM_SECOBJ_VAL_MAX	256
+#define	DLADM_PROP_VAL_MAX	256
+#define	DLADM_OPT_TEMP		0x00000001
+#define	DLADM_OPT_CREATE	0x00000002
+#define	DLADM_OPT_PERSIST	0x00000004
+
+typedef enum {
+	DLADM_STATUS_OK = 0,
+	DLADM_STATUS_BADARG,
+	DLADM_STATUS_FAILED,
+	DLADM_STATUS_TOOSMALL,
+	DLADM_STATUS_NOTSUP,
+	DLADM_STATUS_NOTFOUND,
+	DLADM_STATUS_BADVAL,
+	DLADM_STATUS_NOMEM,
+	DLADM_STATUS_EXIST,
+	DLADM_STATUS_LINKINVAL,
+	DLADM_STATUS_PROPRDONLY,
+	DLADM_STATUS_BADVALCNT,
+	DLADM_STATUS_DBNOTFOUND,
+	DLADM_STATUS_DENIED,
+	DLADM_STATUS_IOERR
+} dladm_status_t;
+
+typedef enum {
+	DLADM_PROP_VAL_CURRENT = 1,
+	DLADM_PROP_VAL_DEFAULT,
+	DLADM_PROP_VAL_MODIFIABLE,
+	DLADM_PROP_VAL_PERSISTENT
+} dladm_prop_type_t;
+
+#define		DLADM_SECOBJ_CLASS_WEP	0
+typedef int	dladm_secobj_class_t;
+
+typedef void (dladm_walkcb_t)(void *, const char *);
+
+extern int	dladm_walk(dladm_walkcb_t *, void *);
+extern int	dladm_walk_vlan(dladm_walkcb_t *, void *, const char *);
 extern int	dladm_info(const char *, dladm_attr_t *);
+
+extern dladm_status_t	dladm_set_prop(const char *, const char *,
+			    char **, uint_t, uint_t);
+extern dladm_status_t	dladm_get_prop(const char *, dladm_prop_type_t,
+			    const char *, char **, uint_t *);
+extern dladm_status_t	dladm_walk_prop(const char *, void *,
+			    boolean_t (*)(void *, const char *));
+
+extern dladm_status_t	dladm_set_secobj(const char *, dladm_secobj_class_t,
+			    uint8_t *, uint_t, uint_t);
+extern dladm_status_t	dladm_get_secobj(const char *, dladm_secobj_class_t *,
+			    uint8_t *, uint_t *, uint_t);
+extern dladm_status_t	dladm_unset_secobj(const char *, uint_t);
+extern dladm_status_t	dladm_walk_secobj(void *,
+			    boolean_t (*)(void *, const char *), uint_t);
+
+extern const char	*dladm_status2str(dladm_status_t, char *);
+extern const char	*dladm_secobjclass2str(dladm_secobj_class_t, char *);
+extern dladm_status_t	dladm_str2secobjclass(const char *,
+			    dladm_secobj_class_t *);
+
+extern dladm_status_t	dladm_init_linkprop(void);
+extern dladm_status_t	dladm_init_secobj(void);
+extern dladm_status_t	dladm_set_rootdir(const char *rootdir);
 
 #ifdef	__cplusplus
 }

@@ -84,7 +84,8 @@ HTMLENTS = \
 	SmfValueRouting.html \
 	NetworkHeader.html \
 	WifiConfig.html \
-	WifiWep.html
+	WifiWep.html \
+	LinkSecurity.html
 
 HELPDIR=$(ROOT)/usr/lib/help
 AUTHDIR=$(HELPDIR)/auths

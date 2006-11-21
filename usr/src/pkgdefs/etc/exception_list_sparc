@@ -77,22 +77,27 @@ usr/include/sys/dls.h			sparc
 usr/include/sys/dls_impl.h		sparc
 usr/include/sys/mac.h			sparc
 usr/include/sys/mac_impl.h		sparc
-usr/include/libdladm.h			sparc
-usr/include/liblaadm.h			sparc
-usr/include/libmacadm.h			sparc
 #
-# These files are installed in the proto area for
-# Solaris MAC drivers and should not be shipped
+# Private GLDv3 userland libraries and headers
 #
-lib/libdladm.so				sparc
-lib/liblaadm.so				sparc
-lib/libmacadm.so			sparc
-lib/llib-ldladm.ln			sparc
-lib/llib-ldladm				sparc
-lib/llib-llaadm.ln			sparc
-lib/llib-llaadm				sparc
-lib/llib-lmacadm.ln			sparc
-lib/llib-lmacadm			sparc
+usr/include/libdladm.h		sparc
+usr/include/libdladm_impl.h	sparc
+usr/include/liblaadm.h		sparc
+usr/include/libmacadm.h		sparc
+usr/include/libwladm.h		sparc
+usr/include/libwladm_impl.h	sparc
+lib/libdladm.so			sparc
+lib/liblaadm.so			sparc
+lib/libmacadm.so		sparc
+lib/libwladm.so			sparc
+lib/llib-ldladm.ln		sparc
+lib/llib-ldladm			sparc
+lib/llib-llaadm.ln		sparc
+lib/llib-llaadm			sparc
+lib/llib-lmacadm.ln		sparc
+lib/llib-lmacadm		sparc
+lib/llib-lwladm.ln		sparc
+lib/llib-lwladm			sparc
 #
 # Installed in the proto area for building those things
 # that are dependent on it. No delivered as part of a pkg.

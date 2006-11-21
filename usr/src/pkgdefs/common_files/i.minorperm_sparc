@@ -96,7 +96,21 @@ clone:hme			0600 root sys 0666 root sys	/dev/hme
 clone:le			0600 root sys 0666 root sys	/dev/le
 clone:qfe			0600 root sys 0666 root sys	/dev/qfe
 clone:bge			0600 root sys 0666 root sys	/dev/bge
+clone:rge			0600 root sys 0666 root sys	/dev/rge
+clone:xge			0600 root sys 0666 root sys	/dev/xge
+clone:nge			0600 root sys 0666 root sys	/dev/nge
+clone:e1000g			0666 root root 0666 root sys	/dev/e1000g
+clone:chxge			0600 root sys 0666 root sys	/dev/chxge
+clone:vsw			0600 root sys 0666 root sys	/dev/vsw
+clone:vnet			0600 root sys 0666 root sys	/dev/vnet
 bge:*				0600 root sys 0666 root sys	/dev/bge*
+rge:*				0600 root sys 0666 root sys	/dev/rge*
+xge:*				0600 root sys 0666 root sys	/dev/xge*
+nge:*				0600 root sys 0666 root sys	/dev/nge*
+e1000g:*			0666 root root 0666 root sys	/dev/e1000g*
+chxge:*				0600 root sys 0666 root sys	/dev/chxge*
+vsw:*				0600 root sys 0666 root sys	/dev/vsw*
+vnet:*				0600 root sys 0666 root sys	/dev/vnet*
 clone:dmfe			0600 root sys 0666 root sys	/dev/dmfe
 dmfe:*				0600 root sys 0666 root sys	/dev/dmfe*
 clone:pcelx			0600 root sys 0666 root sys	/dev/pcelx
@@ -251,7 +265,21 @@ mm:allkmem
 ssm:*
 bscv:*
 clone:bge
+clone:rge
+clone:xge
+clone:nge
+clone:e1000g
+clone:chxge
+clone:vsw
+clone:vnet
 bge:*
+rge:*
+xge:*
+nge:*
+e1000g:*
+chxge:*
+vsw:*
+vnet:*
 clone:dmfe
 dmfe:*
 clone:pcelx

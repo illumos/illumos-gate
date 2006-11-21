@@ -245,6 +245,7 @@ f none usr/lib/help/auths/locale/SmfValueRouting.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkHeader.html 444 root bin
 f none usr/lib/help/auths/locale/WifiConfig.html 444 root bin
 f none usr/lib/help/auths/locale/WifiWep.html 444 root bin
+f none usr/lib/help/auths/locale/LinkSecurity.html 444 root bin
 d none usr/lib/help/profiles 755 root bin
 d none usr/lib/help/profiles/locale 755 root bin
 f none usr/lib/help/profiles/locale/RtAll.html 444 root bin
@@ -271,6 +272,7 @@ f none usr/lib/help/profiles/locale/RtNetMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetWifiMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetWifiSecure.html 444 root bin
+f none usr/lib/help/profiles/locale/RtNetLinkSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/RtObAccessMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtProcManagement.html 444 root bin
 f none usr/lib/help/profiles/locale/RtRightsDelegate.html 444 root bin

@@ -185,6 +185,7 @@ SUBDIRS += \
 	madv		\
 	mpss		\
 	libdisasm	\
+	libwladm	\
 	libwrap		\
 	libxcurses	\
 	libxcurses2	\
@@ -374,6 +375,7 @@ HDRSUBDIRS=		\
 	libvolmgt	\
 	libumem		\
 	libuutil	\
+	libwladm	\
 	libwrap		\
 	libxcurses2	\
 	libzfs		\
@@ -461,7 +463,7 @@ libdevinfo:	libnvpair libsec
 libdhcpagent:	libdhcputil libnsl libsocket
 libdhcpsvc:	libinetutil
 libdhcputil:	libinetutil
-libdladm:	libdlpi libdevinfo
+libdladm:	libdlpi libdevinfo libwladm libinetutil
 libdtrace:	libproc libgen libctf
 libdtrace_jni:	libuutil libdtrace
 libefi:		libuuid
@@ -493,6 +495,7 @@ libwrap:	libnsl libsocket
 libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
 		libdhcputil openssl
 libwanbootutil:	libnsl
+libwladm:	libdevinfo libsocket
 pam_modules:	libproject passwdutil $(SMARTCARD)
 libscf:		libuutil libmd
 libinetsvc:	libscf

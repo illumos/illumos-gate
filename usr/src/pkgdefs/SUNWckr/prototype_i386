@@ -149,6 +149,7 @@ f none kernel/ipp/ipgpc 755 root sys
 d none boot/acpi 755 root sys
 d none boot/acpi/tables 755 root sys
 f none kernel/mac/mac_ether 755 root sys
+f none kernel/mac/mac_wifi 755 root sys
 f none kernel/misc/acpica 755 root sys
 f none kernel/misc/busra 755 root sys
 f none kernel/misc/cardbus 755 root sys
@@ -169,6 +170,7 @@ f none kernel/misc/kmdbmod 755 root sys
 f none kernel/misc/krtld 755 root sys
 f none kernel/misc/mac 755 root sys
 l none kernel/misc/md5=../../kernel/crypto/md5
+f none kernel/misc/net80211 755 root sys
 f none kernel/misc/neti 755 root sys
 f none kernel/misc/pcicfg 755 root sys
 f none kernel/misc/pcihp 755 root sys
@@ -324,6 +326,7 @@ d none kernel/ipp/amd64 755 root sys
 f none kernel/ipp/amd64/ipgpc 755 root sys
 d none kernel/mac/amd64 755 root sys
 f none kernel/mac/amd64/mac_ether 755 root sys
+f none kernel/mac/amd64/mac_wifi 755 root sys
 d none kernel/misc/amd64 755 root sys
 f none kernel/misc/amd64/acpica 755 root sys
 f none kernel/misc/amd64/busra 755 root sys
@@ -344,6 +347,7 @@ f none kernel/misc/amd64/kmdbmod 755 root sys
 f none kernel/misc/amd64/krtld 755 root sys
 f none kernel/misc/amd64/mac 755 root sys
 l none kernel/misc/amd64/md5=../../../kernel/crypto/amd64/md5
+f none kernel/misc/amd64/net80211 755 root sys
 f none kernel/misc/amd64/neti 755 root sys
 f none kernel/misc/amd64/pcicfg 755 root sys
 f none kernel/misc/amd64/pcihp 755 root sys
