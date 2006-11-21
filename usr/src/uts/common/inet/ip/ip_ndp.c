@@ -219,8 +219,11 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 	if (ill->ill_net_type == IRE_IF_RESOLVER) {
 		template = nce_udreq_alloc(ill);
 	} else {
+		if (ill->ill_resolver_mp == NULL) {
+			freeb(mp);
+			return (EINVAL);
+		}
 		ASSERT((ill->ill_net_type == IRE_IF_NORESOLVER));
-		ASSERT((ill->ill_resolver_mp != NULL));
 		template = copyb(ill->ill_resolver_mp);
 	}
 	if (template == NULL) {
@@ -3736,6 +3739,10 @@ ndp_add_v4(ill_t *ill, uchar_t *hw_addr, const in_addr_t *addr,
 	if (res_mp != NULL) {
 		template = res_mp;
 	} else  {
+		if (ill->ill_resolver_mp == NULL) {
+			freeb(mp);
+			return (EINVAL);
+		}
 		template = copyb(ill->ill_resolver_mp);
 	}
 	if (template == NULL) {

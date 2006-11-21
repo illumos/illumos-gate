@@ -5054,6 +5054,12 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				    dst_ill->ill_sap,
 				    dst_ill->ill_sap_length);
 			} else {
+				/*
+				 * handle the Gated case, where we create
+				 * a NORESOLVER route for loopback.
+				 */
+				if (dst_ill->ill_net_type != IRE_IF_NORESOLVER)
+					break;
 				dlureq_mp = ill_dlur_gen(NULL,
 				    dst_ill->ill_phys_addr_length,
 				    dst_ill->ill_sap,
@@ -6006,6 +6012,12 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				    dst_ill->ill_sap,
 				    dst_ill->ill_sap_length);
 			} else {
+				/*
+				 * handle the Gated case, where we create
+				 * a NORESOLVER route for loopback.
+				 */
+				if (dst_ill->ill_net_type != IRE_IF_NORESOLVER)
+					break;
 				dlureq_mp = ill_dlur_gen(NULL,
 				    dst_ill->ill_phys_addr_length,
 				    dst_ill->ill_sap,

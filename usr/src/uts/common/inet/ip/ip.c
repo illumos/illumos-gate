@@ -8385,6 +8385,12 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 					ip1dbg(("ip_newroute: res_mp NULL\n"));
 					break;
 				}
+			} else if (dst_ill->ill_resolver_mp == NULL) {
+				ip1dbg(("ip_newroute: dst_ill %p "
+				    "for IF_NORESOLV ire %p has "
+				    "no ill_resolver_mp\n",
+				    (void *)dst_ill, (void *)ire));
+				break;
 			} else {
 				res_mp = NULL;
 			}
@@ -9149,6 +9155,12 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 				    dst_ill->ill_phys_addr_length,
 				    dst_ill->ill_sap,
 				    dst_ill->ill_sap_length);
+			} else if (dst_ill->ill_resolver_mp == NULL) {
+				ip1dbg(("ip_newroute: dst_ill %p "
+				    "for IF_NORESOLV ire %p has "
+				    "no ill_resolver_mp\n",
+				    (void *)dst_ill, (void *)ire));
+				break;
 			} else {
 				/* use the value set in ip_ll_subnet_defaults */
 				res_mp = ill_dlur_gen(NULL,
