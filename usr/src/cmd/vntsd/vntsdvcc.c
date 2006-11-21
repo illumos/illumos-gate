@@ -69,7 +69,21 @@ free_cons(vntsd_cons_t *consp)
 	assert(consp);
 	(void) mutex_destroy(&consp->lock);
 	(void) cond_destroy(&consp->cvp);
+	if (consp->vcc_fd != -1)
+		(void) close(consp->vcc_fd);
 	free(consp);
+}
+
+/* free group structure */
+static void
+free_group(vntsd_group_t *groupp)
+{
+	assert(groupp);
+	(void) mutex_destroy(&groupp->lock);
+	(void) cond_destroy(&groupp->cvp);
+	if (groupp->sockfd != -1)
+		(void) close(groupp->sockfd);
+	free(groupp);
 }
 
 /*
@@ -166,25 +180,28 @@ vntsd_delete_cons(vntsd_t *vntsdp)
 		for (; ; ) {
 			/* get the console to be deleted */
 			(void) mutex_lock(&groupp->lock);
-			assert(groupp->conspq);
-			consp = vntsd_que_walk(groupp->conspq,
-			    (el_func_t)find_clean_cons);
-			if (consp == NULL) {
-				/* no more cons to delete */
+
+			/* clean up any deleted console in the group */
+			if (groupp->conspq != NULL) {
+				consp = vntsd_que_walk(groupp->conspq,
+				    (el_func_t)find_clean_cons);
+				if (consp == NULL) {
+					/* no more cons to delete */
+					(void) mutex_unlock(&groupp->lock);
+					break;
+				}
+
+				/* remove console from the group */
+				(void) vntsd_que_rm(&groupp->conspq, consp);
 				(void) mutex_unlock(&groupp->lock);
-				break;
+
+				/* clean up the console */
+				cleanup_cons(consp);
 			}
 
-			/* remove console from the group */
-			(void) vntsd_que_rm(&groupp->conspq, consp);
-			(void) mutex_unlock(&groupp->lock);
-
-			/* clean up the console */
-			cleanup_cons(consp);
-
 			/* delete group? */
-			if (groupp->num_cons == 0) {
-				/* no more console delete it */
+			if (groupp->conspq == NULL) {
+				/* no more console in the group delete group */
 				assert(groupp->vntsd);
 
 				(void) mutex_lock(&groupp->vntsd->lock);
@@ -213,23 +230,21 @@ vntsd_clean_group(vntsd_group_t *groupp)
 	(void) mutex_lock(&groupp->lock);
 
 	/* prevent from reentry */
-	if (groupp->status & VNTSD_GROUP_CLEANUP) {
-		if (groupp->listen_tid == thr_self()) {
-			/* signal that the listen thread is exiting */
-			groupp->status &= ~VNTSD_GROUP_SIG_WAIT;
-			(void) cond_signal(&groupp->cvp);
-		}
+	if (groupp->status & VNTSD_GROUP_IN_CLEANUP) {
 		(void) mutex_unlock(&groupp->lock);
 		return;
 	}
-	groupp->status |= VNTSD_GROUP_CLEANUP;
+	groupp->status |= VNTSD_GROUP_IN_CLEANUP;
+
+	/* mark group waiting for listen thread to exits */
+	groupp->status |= VNTSD_GROUP_SIG_WAIT;
 	(void) mutex_unlock(&groupp->lock);
 
 	vntsd_free_que(&groupp->conspq, (clean_func_t)cleanup_cons);
 
+	(void) mutex_lock(&groupp->lock);
 	/* walk through no cons client queue */
 	while (groupp->no_cons_clientpq != NULL) {
-		groupp->status |= VNTSD_GROUP_SIG_WAIT;
 		(void) vntsd_que_walk(groupp->no_cons_clientpq,
 		    (el_func_t)vntsd_notify_client_cons_del);
 		to.tv_sec = VNTSD_CV_WAIT_DELTIME;
@@ -237,23 +252,9 @@ vntsd_clean_group(vntsd_group_t *groupp)
 		(void) cond_reltimedwait(&groupp->cvp, &groupp->lock, &to);
 	}
 
-	if (groupp->listen_tid == thr_self()) {
-		/* listen thread is exiting */
-		(void) mutex_lock(&(groupp->vntsd->lock));
-		(void) vntsd_que_rm(&groupp->vntsd->grouppq, groupp);
-		(void) mutex_unlock(&groupp->vntsd->lock);
-
-		(void) cond_destroy(&groupp->cvp);
-		(void) mutex_unlock(&groupp->lock);
-		(void) mutex_destroy(&groupp->lock);
-		free(groupp);
-		return;
-	}
-
-	/* signal listen thread to exit  */
-	groupp->status |= VNTSD_GROUP_SIG_WAIT;
-
+	/* waiting for listen thread to exit */
 	while (groupp->status & VNTSD_GROUP_SIG_WAIT) {
+		/* signal listen thread to exit  */
 		(void) thr_kill(groupp->listen_tid, SIGUSR1);
 		to.tv_sec = VNTSD_CV_WAIT_DELTIME;
 		to.tv_nsec = 0;
@@ -264,9 +265,7 @@ vntsd_clean_group(vntsd_group_t *groupp)
 	(void) mutex_unlock(&groupp->lock);
 	(void) thr_join(groupp->listen_tid, NULL, NULL);
 	/* free group */
-	(void) cond_destroy(&groupp->cvp);
-	(void) mutex_destroy(&groupp->lock);
-	free(groupp);
+	free_group(groupp);
 }
 
 /* allocate and initialize console structure */
@@ -293,7 +292,7 @@ alloc_cons(vntsd_group_t *groupp, vcc_console_t *consolep)
 	(void) strlcpy(consp->domain_name, consolep->domain_name, MAXPATHLEN);
 	(void) strlcpy(consp->dev_name, consolep->dev_name, MAXPATHLEN);
 	consp->wr_tid = (thread_t)-1;
-	consp->vcc_fd = (thread_t)-1;
+	consp->vcc_fd = -1;
 
 	/* join the group */
 	(void) mutex_lock(&groupp->lock);
@@ -350,13 +349,23 @@ alloc_group(vntsd_t *vntsdp, char *group_name, uint64_t tcp_port)
 
 	groupp->tcp_port = tcp_port;
 	groupp->listen_tid = (thread_t)-1;
-	groupp->sockfd = (thread_t)-1;
+	groupp->sockfd = -1;
 	groupp->vntsd = vntsdp;
 
 	D1(stderr, "t@%d alloc_group@%lld:%s\n", thr_self(), groupp->tcp_port,
 	    groupp->group_name);
 
 	return (groupp);
+}
+
+/* mark a deleted console */
+boolean_t
+vntsd_mark_deleted_cons(vntsd_cons_t *consp)
+{
+	(void) mutex_lock(&consp->lock);
+	consp->status |= VNTSD_CONS_DELETED;
+	(void) mutex_unlock(&consp->lock);
+	return (B_FALSE);
 }
 
 /*
@@ -378,19 +387,55 @@ alloc_cons_with_group(vntsd_t *vntsdp, vcc_console_t *consp,
 	(void) mutex_lock(&vntsdp->lock);
 	groupp = vntsd_que_find(vntsdp->grouppq,
 	    (compare_func_t)grp_by_tcp, (void *)&(consp->tcp_port));
+	if (groupp != NULL)
+		(void) mutex_lock(&groupp->lock);
+
 	(void) mutex_unlock(&vntsdp->lock);
 
 	if (groupp != NULL) {
-		/* group with same tcp port found */
+		/*
+		 *  group with same tcp port found.
+		 *  if there is no console in the group, the
+		 *  group should be removed and the tcp port can
+		 *  be used for tne new group.
+		 *  This is possible, when there is tight loop of
+		 *  creating/deleting domains. When a vcc port is
+		 *  removed, a read thread will have an I/O error because
+		 *  vcc has closed the port. The read thread then marks
+		 *  the console is removed and notify main thread to
+		 *  remove the console.
+		 *  Meanwhile, the same port and its group (with same
+		 *  tcp port and group name) is created. Vcc notify
+		 *  vntsd that new console is added.
+		 *  Main thread now have two events. If main thread polls
+		 *  out vcc notification first, it will find that there is
+		 *  a group has no console.
+		 */
 
-		if (strcmp(groupp->group_name, consp->group_name)) {
+		if (vntsd_chk_group_total_cons(groupp) == 0) {
+
+			/* all consoles in the group have been removed */
+			(void) vntsd_que_walk(groupp->conspq,
+			    (el_func_t)vntsd_mark_deleted_cons);
+			groupp->status |= VNTSD_GROUP_CLEAN_CONS;
+			(void) mutex_unlock(&groupp->lock);
+			groupp = NULL;
+
+		} else if (strcmp(groupp->group_name, consp->group_name)) {
 			/* conflict group name */
 			vntsd_log(VNTSD_ERR_VCC_GRP_NAME,
 			    "group name is different from existing group");
+			(void) mutex_unlock(&groupp->lock);
 			return (VNTSD_ERR_VCC_CTRL_DATA);
+
+		} else {
+			/* group already existed */
+			(void) mutex_unlock(&groupp->lock);
 		}
 
-	} else {
+	}
+
+	if (groupp == NULL) {
 		/* new group */
 		groupp = alloc_group(vntsdp, consp->group_name,
 		    consp->tcp_port);
@@ -416,9 +461,7 @@ alloc_cons_with_group(vntsd_t *vntsdp, vcc_console_t *consp,
 		/* no memory */
 		if (new_groupp != NULL) {
 			/* clean up new group */
-			(void) cond_destroy(&groupp->cvp);
-			(void) mutex_destroy(&groupp->lock);
-			free(groupp);
+			free_group(groupp);
 		}
 
 		return (VNTSD_ERR_NO_MEM);
@@ -463,17 +506,59 @@ create_listen_thread(vntsd_group_t *groupp)
 	return (rv != 0);
 }
 
+/* find deleted console by console no */
+static boolean_t
+deleted_cons_by_consno(vntsd_cons_t *consp, int *cons_no)
+{
+	vntsd_client_t *clientp;
+
+	assert(consp);
+
+	if (consp->cons_no != *cons_no)
+		return (B_FALSE);
+
+	/* has console marked as deleted? */
+	if ((consp->status & VNTSD_CONS_DELETED) == 0)
+		return (B_TRUE);
+
+	/* notify clients of console ? */
+	clientp = (vntsd_client_t *)consp->clientpq->handle;
+
+	if (clientp == NULL)
+		/* therre is no client for this console */
+		return (B_TRUE);
+
+	if (clientp->status & VNTSD_CLIENT_CONS_DELETED)
+		/* clients of console have notified */
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/* find group structure from console no */
+static boolean_t
+find_cons_group_by_cons_no(vntsd_group_t *groupp, uint_t *cons_no)
+{
+	vntsd_cons_t *consp;
+
+	consp = vntsd_que_find(groupp->conspq,
+	    (compare_func_t)deleted_cons_by_consno, cons_no);
+	return (consp != NULL);
+
+}
+
 /* delete a console if the console exists in the vntsd */
 static void
-delete_cons_before_add(vntsd_t *vntsdp, uint64_t tcp_port, uint_t cons_no)
+delete_cons_before_add(vntsd_t *vntsdp, uint_t cons_no)
 {
 	vntsd_group_t	    *groupp;
 	vntsd_cons_t	    *consp;
 
 	/* group exists? */
 	(void) mutex_lock(&vntsdp->lock);
-	groupp = vntsd_que_find(vntsdp->grouppq, (compare_func_t)grp_by_tcp,
-	    (void *)&(tcp_port));
+	groupp = vntsd_que_find(vntsdp->grouppq,
+	    (compare_func_t)find_cons_group_by_cons_no,
+	    &cons_no);
 	(void) mutex_unlock(&vntsdp->lock);
 
 	if (groupp == NULL) {
@@ -484,7 +569,7 @@ delete_cons_before_add(vntsd_t *vntsdp, uint64_t tcp_port, uint_t cons_no)
 	/* group exists, if console exists? */
 	(void) mutex_lock(&groupp->lock);
 	consp = vntsd_que_find(groupp->conspq,
-	    (compare_func_t)vntsd_cons_by_consno, &cons_no);
+	    (compare_func_t)deleted_cons_by_consno, &cons_no);
 
 	if (consp == NULL) {
 		/* no such console */
@@ -527,7 +612,7 @@ do_add_cons(vntsd_t *vntsdp, int cons_no)
 	}
 
 	/* clean up the console if console was deleted and added again */
-	delete_cons_before_add(vntsdp, console.tcp_port, console.cons_no);
+	delete_cons_before_add(vntsdp, console.cons_no);
 
 	/* initialize console */
 
@@ -543,9 +628,7 @@ do_add_cons(vntsd_t *vntsdp, int cons_no)
 		/* create listen thread for this console */
 		if (create_listen_thread(groupp)) {
 			vntsd_log(VNTSD_ERR_CREATE_LISTEN_THR, err_msg);
-			(void) cond_destroy(&groupp->cvp);
-			(void) mutex_destroy(&groupp->lock);
-			free(groupp);
+			free_group(groupp);
 		}
 
 	}

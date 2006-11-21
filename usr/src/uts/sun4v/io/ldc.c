@@ -185,6 +185,12 @@ uint64_t ldc_maptable_entries = LDC_MTBL_ENTRIES;
 int ldc_max_retries = LDC_MAX_RETRIES;
 clock_t ldc_delay = LDC_DELAY;
 
+/*
+ * delay between each retry of channel unregistration in
+ * ldc_close(), to wait for pending interrupts to complete.
+ */
+clock_t ldc_close_delay = LDC_CLOSE_DELAY;
+
 #ifdef DEBUG
 
 /*
@@ -1832,7 +1838,7 @@ i_ldc_tx_hdlr(caddr_t arg1, caddr_t arg2)
 	if (!ldcp->cb_enabled)
 		notify_client = B_FALSE;
 
-	/* Unlock channel */
+	i_ldc_clear_intr(ldcp, CNEX_TX_INTR);
 
 	if (notify_client) {
 		ldcp->cb_inprogress = B_TRUE;
@@ -1847,7 +1853,6 @@ i_ldc_tx_hdlr(caddr_t arg1, caddr_t arg2)
 		ldcp->cb_inprogress = B_FALSE;
 	}
 
-	i_ldc_clear_intr(ldcp, CNEX_TX_INTR);
 	mutex_exit(&ldcp->lock);
 
 	D1(ldcp->id, "i_ldc_tx_hdlr: (0x%llx) exiting handler", ldcp->id);
@@ -2108,16 +2113,21 @@ loop_exit:
 	} else
 		ldcp->rx_intr_state = LDC_INTR_PEND;
 
-	mutex_exit(&ldcp->lock);
 
 	if (notify_client) {
+		ldcp->cb_inprogress = B_TRUE;
+		mutex_exit(&ldcp->lock);
 		rv = ldcp->cb(notify_event, ldcp->cb_arg);
 		if (rv) {
 			DWARN(ldcp->id,
 			    "i_ldc_rx_hdlr: (0x%llx) callback failure",
 			    ldcp->id);
 		}
+		mutex_enter(&ldcp->lock);
+		ldcp->cb_inprogress = B_FALSE;
 	}
+
+	mutex_exit(&ldcp->lock);
 
 	D1(ldcp->id, "i_ldc_rx_hdlr: (0x%llx) exiting handler", ldcp->id);
 	return (DDI_INTR_CLAIMED);
@@ -2656,6 +2666,13 @@ ldc_close(ldc_handle_t handle)
 		return (EBUSY);
 	}
 
+	if (ldcp->cb_inprogress) {
+		DWARN(ldcp->id, "ldc_close: (0x%llx) callback active\n",
+		    ldcp->id);
+		mutex_exit(&ldcp->lock);
+		return (EWOULDBLOCK);
+	}
+
 	/* Obtain Tx lock */
 	mutex_enter(&ldcp->tx_lock);
 
@@ -2723,7 +2740,7 @@ ldc_close(ldc_handle_t handle)
 		 * As there could be pending interrupts we need
 		 * to wait and try again
 		 */
-		drv_usecwait(ldc_delay);
+		drv_usecwait(ldc_close_delay);
 		mutex_enter(&ldcp->lock);
 		mutex_enter(&ldcp->tx_lock);
 		retries++;

@@ -82,7 +82,12 @@ exit_sig_handler(int sig)
 
 	D1(stderr, "t@%d exit_sig_handler%d \n", thr_self(), sig);
 
-	exit(0);
+	if (thr_self() != vntsdp->tid) {
+		/* not main thread, pass to main thread */
+		(void) thr_kill(vntsdp->tid, sig);
+	} else {
+		exit(0);
+	}
 }
 
 /*
@@ -358,20 +363,18 @@ main(int argc, char ** argv)
 	(void) snprintf(path, sz-1, VCC_DEVICE_CTL_PATH, vntsdp->devinst,
 	    sizeof (vntsdp->devinst));
 	vntsdp->ctrl_fd = open(path, O_RDWR);
-	free(path);
 
 	if (vntsdp->ctrl_fd == -1) {
-		/*
-		 * do not print error if device is not present
-		 * the daemon is probably being started incorrectly
-		 */
-		if (errno != ENOENT) {
-			syslog(LOG_ERR,
-			    "Error opening VCC device control port: %s",
-			    strerror(errno));
-		}
-		exit(1);
+		/* print error if device is not present */
+		syslog(LOG_ERR,
+		    "Error opening VCC device control port: %s",
+		    path);
+		/* tell SMF no retry */
+		exit(2);
 	}
+
+	free(path);
+
 	if ((vntsdp->options & VNTSD_OPT_DAEMON_OFF) == 0) {
 		/* daemonize it */
 		pid = fork();
@@ -483,6 +486,11 @@ main(int argc, char ** argv)
 		    poll_drv[0].revents);
 
 		vntsd_daemon_wakeup(vntsdp);
+		/*
+		 * Main thread may miss a console-delete signal when it is
+		 * not polling vcc. check if any console is deleted.
+		 */
+		vntsd_delete_cons(vntsdp);
 
 	}
 
@@ -529,9 +537,8 @@ vntsd_vcc_ioctl(int ioctl_code, uint_t portno, void *buf)
 }
 
 /*
- * check if a vcc i/o error is caused by removal of a console. If so notify
- * all clients connected to the console and wake up main thread to cleanup
- * the console.
+ * check if a vcc i/o error is caused by removal of a console. If so
+ * wake up main thread to cleanup the console.
  */
 int
 vntsd_vcc_err(vntsd_cons_t *consp)
@@ -556,9 +563,10 @@ vntsd_vcc_err(vntsd_cons_t *consp)
 	(void) mutex_lock(&consp->lock);
 	consp->status |= VNTSD_CONS_DELETED;
 
-	/* signal all clients to disconnect from console */
-	(void) vntsd_que_walk(consp->clientpq,
-	    (el_func_t)vntsd_notify_client_cons_del);
+	/*
+	 * main thread will close all clients after receiving console
+	 * delete signal.
+	 */
 	(void) mutex_unlock(&consp->lock);
 
 	/* mark the group */

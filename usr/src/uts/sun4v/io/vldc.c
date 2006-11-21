@@ -161,12 +161,10 @@ uint32_t vldc_max_mtu = VLDC_MAX_MTU;
 uint64_t vldc_max_cookie = VLDC_MAX_COOKIE;
 
 /*
- * when calls to LDC return EWOULDBLOCK or EAGAIN the operation is retried
- * up to 'vldc_retries' times with a wait of 'vldc_delay' microseconds
- * between each retry.
+ * when ldc_close() returns EAGAIN, it is retried with a wait
+ * of 'vldc_close_delay' between each retry.
  */
-static clock_t	vldc_delay = 100;
-static int	vldc_retries = 3;
+static clock_t	vldc_close_delay = VLDC_CLOSE_DELAY;
 
 #ifdef DEBUG
 
@@ -270,6 +268,10 @@ i_vldc_cb(uint64_t event, caddr_t arg)
 	/* ensure the port can't be destroyed while we are handling the cb */
 	mutex_enter(&vport->minorp->lock);
 
+	if (vport->status == VLDC_PORT_CLOSED) {
+		return (LDC_SUCCESS);
+	}
+
 	old_status = vport->ldc_status;
 	rv = ldc_status(vport->ldc_handle, &vport->ldc_status);
 	if (rv != 0) {
@@ -290,7 +292,7 @@ i_vldc_cb(uint64_t event, caddr_t arg)
 		 * implies that the port cannot be used until it has
 		 * been closed and reopened.
 		 */
-		if (vport->status != VLDC_PORT_CLOSED && old_status == LDC_UP) {
+		if (old_status == LDC_UP) {
 			vport->status = VLDC_PORT_RESET;
 			vport->hanged_up = B_TRUE;
 			pollevents = POLLHUP;
@@ -759,16 +761,10 @@ i_vldc_remove_port(vldc_t *vldcp, uint_t portno)
 static int
 i_vldc_ldc_close(vldc_port_t *vport)
 {
-	int retries = 0;	/* count of number of retries attempted */
 	int err = 0;
 
 	ASSERT(MUTEX_HELD(&vport->minorp->lock));
 
-	while ((err = ldc_close(vport->ldc_handle)) == EAGAIN) {
-		drv_usecwait(vldc_delay);
-		if (++retries > vldc_retries)
-			break;
-	}
 	/*
 	 * If ldc_close() succeeded or if the channel was already closed[*]
 	 * (possibly by a previously unsuccessful call to this function)
@@ -777,6 +773,7 @@ i_vldc_ldc_close(vldc_port_t *vport)
 	 *
 	 * [*] indicated by ldc_close() returning a value of EFAULT
 	 */
+	err = ldc_close(vport->ldc_handle);
 	if ((err != 0) && (err != EFAULT))
 		return (err);
 
@@ -798,6 +795,7 @@ static int
 i_vldc_close_port(vldc_t *vldcp, uint_t portno)
 {
 	vldc_port_t	*vport;
+	vldc_minor_t	*vminor;
 	int		rv = DDI_SUCCESS;
 
 	vport = &(vldcp->port[portno]);
@@ -806,6 +804,8 @@ i_vldc_close_port(vldc_t *vldcp, uint_t portno)
 
 	D1("i_vldc_close_port: vldc@%d:%d: closing port\n",
 	    vport->inst, vport->minorp->portno);
+
+	vminor = vport->minorp;
 
 	switch (vport->status) {
 	case VLDC_PORT_CLOSED:
@@ -816,9 +816,27 @@ i_vldc_close_port(vldc_t *vldcp, uint_t portno)
 
 	case VLDC_PORT_READY:
 	case VLDC_PORT_RESET:
-		rv = i_vldc_ldc_close(vport);
-		if (rv != 0)
+		do {
+			rv = i_vldc_ldc_close(vport);
+			if (rv != EAGAIN)
+				break;
+
+			/*
+			 * EAGAIN indicates that ldc_close() failed because
+			 * ldc callback thread is active for the channel.
+			 * cv_timedwait() is used to release vminor->lock and
+			 * allow ldc callback thread to complete.
+			 * after waking up, check if the port has been closed
+			 * by another thread in the meantime.
+			 */
+			(void) cv_timedwait(&vminor->cv, &vminor->lock,
+			    ddi_get_lbolt() + drv_usectohz(vldc_close_delay));
+			rv = 0;
+		} while (vport->status != VLDC_PORT_CLOSED);
+
+		if ((rv != 0) || (vport->status == VLDC_PORT_CLOSED))
 			return (rv);
+
 		break;
 
 	case VLDC_PORT_OPEN:
@@ -837,7 +855,7 @@ i_vldc_close_port(vldc_t *vldcp, uint_t portno)
 	kmem_free(vport->send_buf, vport->mtu);
 	kmem_free(vport->recv_buf, vport->mtu);
 
-	if (strcmp(vport->minorp->sname, VLDC_HVCTL_SVCNAME) == 0)
+	if (strcmp(vminor->sname, VLDC_HVCTL_SVCNAME) == 0)
 		kmem_free(vport->cookie_buf, vldc_max_cookie);
 
 	vport->status = VLDC_PORT_CLOSED;

@@ -121,6 +121,9 @@ extern "C" {
 #define	LDC_MAX_RETRIES	1000
 #define	LDC_DELAY	1
 
+/* delay(usec) between channel unregister retries in ldc_close() */
+#define	LDC_CLOSE_DELAY	1
+
 /*
  * LDC Version information
  */

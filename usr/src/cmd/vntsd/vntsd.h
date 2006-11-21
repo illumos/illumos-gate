@@ -206,20 +206,41 @@ extern "C" {
 /* vntsd options */
 #define	    VNTSD_OPT_DAEMON_OFF	0x1
 
-/* group states */
+/*
+ * group states
+ * When a console is removed or vntsd is exiting, main thread
+ * notifies listen, read and write thread to exit.
+ * After those threads exit, main thread clears up group structurre.
+ *
+ * VNTSD_GROUP_SIG_WAIT
+ * The main thread is waiting for listen thread to exit.
+ * VNTSD_GROUP_CLEAN_CONS
+ * There are console(s) in the group that are being removed.
+ * This is a transition state where the corresponding vcc port has been
+ * removed, but vntsd has not done its clean up yet.
+ * VNTSD_GROUP_IN_CLEANUP
+ * vntsd main thread has started cleaning up the group.
+ */
 
-#define	    VNTSD_GROUP_SIG_WAIT	0x1	/*  waiting for signal */
-#define	    VNTSD_GROUP_CLEAN_CONS	0x2	/*  cons needs to be clean */
-#define	    VNTSD_GROUP_CLEANUP		0x4	/*  waiting for signal */
+#define	    VNTSD_GROUP_SIG_WAIT	0x1
+#define	    VNTSD_GROUP_CLEAN_CONS	0x2
+#define	    VNTSD_GROUP_IN_CLEANUP	0x4
 
 
 
 
 
-/* console status */
+/*
+ * console states
+ * There are two states when a console is removed
+ * VNTSD_CONS_DELETED
+ * the console is being deleted
+ * VNTSD_CONS_SIG_WAIT
+ * console is waiting for all clients to exit.
+ */
 
 #define	    VNTSD_CONS_DELETED		0x1	/* deleted */
-#define	    VNTSD_CONS_SIG_WAIT		0x2	/* waiting fro signal */
+#define	    VNTSD_CONS_SIG_WAIT		0x2	/* waiting for signal */
 
 
 #define	    VNTSD_CLIENT_IO_ERR		    0x1	    /* reader */
@@ -451,6 +472,7 @@ int		vntsd_cons_chk_intr(vntsd_client_t *clientp);
 boolean_t	vntsd_vcc_cons_alive(vntsd_cons_t *consp);
 boolean_t	vntsd_notify_client_cons_del(vntsd_client_t *clientp);
 int		vntsd_chk_group_total_cons(vntsd_group_t *groupp);
+boolean_t	vntsd_mark_deleted_cons(vntsd_cons_t *consp);
 
 
 #ifdef	DEBUG

@@ -55,7 +55,17 @@ if [ -n "$timeout" ]; then
 fi
 
 if [ -x /usr/lib/ldoms/vntsd ]; then
-    /usr/lib/ldoms/vntsd $args || exit $SMF_EXIT_ERR_CONFIG
+    /usr/lib/ldoms/vntsd $args
+    rc=$?
+    if [ $rc -ne 0 ]; then
+	# if vntsd exited in error with status 1, let SMF restart it
+	# otherwise we want it to go into maintenance.
+	if [ $rc -eq 1 ]; then
+	    exit $SMF_ERR_OTHER
+	else
+	    exit $SMF_ERR_FATAL
+	fi
+    fi
 else
     echo "WARNING: /usr/lib/ldoms/vntsd is missing or not executable" >& 2
     exit $SMF_EXIT_ERR_CONFIG

@@ -44,9 +44,11 @@
 #include <syslog.h>
 #include "vntsd.h"
 
+#define	    MAX_BIND_RETRIES		6
 /*
  * check the state of listen thread. exit if there is an fatal error
- * or the group is removed.
+ * or the group is removed. Main thread will call free_group
+ * to close group socket and free group structure.
  */
 static void
 listen_chk_status(vntsd_group_t *groupp, int status)
@@ -69,18 +71,15 @@ listen_chk_status(vntsd_group_t *groupp, int status)
 		return;
 
 	case VNTSD_STATUS_INTR:
+		/* signal for deleting group */
 		assert(groupp->status & VNTSD_GROUP_SIG_WAIT);
-		/* close listen socket */
-		(void) mutex_lock(&groupp->lock);
-		(void) close(groupp->sockfd);
-		groupp->sockfd = -1;
 
-		/* let group know */
+		/* let main thread know  */
+		(void) mutex_lock(&groupp->lock);
 		groupp->status &= ~VNTSD_GROUP_SIG_WAIT;
 		(void) cond_signal(&groupp->cvp);
-
 		(void) mutex_unlock(&groupp->lock);
-		/* exit thread */
+
 		thr_exit(0);
 		break;
 
@@ -89,16 +88,33 @@ listen_chk_status(vntsd_group_t *groupp, int status)
 
 	case VNTSD_STATUS_NO_CONS:
 	default:
-		/* fatal, exit thread */
+		/* fatal error or no console in the group, remove the group. */
 
 		(void) mutex_lock(&groupp->lock);
-		(void) close(groupp->sockfd);
-		groupp->sockfd = -1;
-		(void) mutex_unlock(&groupp->lock);
-		vntsd_log(status, err_msg);
-		vntsd_clean_group(groupp);
 
-		thr_exit(0);
+		if (groupp->status & VNTSD_GROUP_SIG_WAIT) {
+			/* group is already in deletion */
+			(void) mutex_unlock(&groupp->lock);
+			return;
+		}
+
+		/*
+		 * if there still is console(s) in the group,
+		 * the console(s) could not be connected any more because of
+		 * a fatal error. Therefore, mark the console and notify
+		 * main thread to delete console and group.
+		 */
+		(void) vntsd_que_walk(groupp->conspq,
+		    (el_func_t)vntsd_mark_deleted_cons);
+		groupp->status |= VNTSD_GROUP_CLEAN_CONS;
+
+		/* signal main thread to delete the group */
+		(void) thr_kill(groupp->vntsd->tid, SIGUSR1);
+		(void) mutex_unlock(&groupp->lock);
+
+		/* log error */
+		if (status != VNTSD_STATUS_NO_CONS)
+			vntsd_log(status, err_msg);
 		break;
 	}
 }
@@ -110,6 +126,7 @@ open_socket(int port_no, int *sockfd)
 
 	struct	    sockaddr_in addr;
 	int	    on;
+	int	    retries = 0;
 
 
 	/* allocate a socket */
@@ -134,11 +151,34 @@ open_socket(int port_no, int *sockfd)
 	addr.sin_port = htons(port_no);
 
 	/* bind socket */
-	if (bind(*sockfd, (struct sockaddr *)&addr, sizeof (addr)) < 0) {
-		if (errno == EINTR) {
-			return (VNTSD_STATUS_INTR);
+
+	for (; ; ) {
+
+		/*
+		 * After a socket is closed, the port
+		 * is transitioned to TIME_WAIT state.
+		 * It may take a few retries to bind
+		 * a just released port.
+		 */
+		if (bind(*sockfd, (struct sockaddr *)&addr,
+			    sizeof (addr)) < 0) {
+
+			if (errno == EINTR) {
+				return (VNTSD_STATUS_INTR);
+			}
+
+			if (errno == EADDRINUSE && retries < MAX_BIND_RETRIES) {
+				/* port may be in TIME_WAIT state, retry */
+				(void) sleep(5);
+				retries++;
+				continue;
+			}
+
+			return (VNTSD_ERR_LISTEN_BIND);
+
 		}
-		return (VNTSD_ERR_LISTEN_BIND);
+
+		break;
 
 	}
 
@@ -265,6 +305,7 @@ vntsd_listen_thread(vntsd_group_t *groupp)
 		if (num_cons == 0) {
 			(void) close(newsockfd);
 			listen_chk_status(groupp, VNTSD_STATUS_NO_CONS);
+			continue;
 		}
 
 		/* a connection is established */

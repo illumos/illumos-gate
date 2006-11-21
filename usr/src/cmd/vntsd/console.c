@@ -587,8 +587,11 @@ client_fini(vntsd_group_t *groupp, vntsd_client_t *clientp)
 
 	if ((groupp->no_cons_clientpq == NULL) &&
 	    (groupp->status & VNTSD_GROUP_SIG_WAIT)) {
-		/* group is waiting to be deleted */
-		groupp->status &= ~VNTSD_GROUP_SIG_WAIT;
+		/*
+		 * group is waiting to be deleted. - signal the group's
+		 * listen thread - the VNTSD_GROUP_SIG_WAIT state will
+		 * be cleared when the listen thread exits.
+		 */
 		(void) cond_signal(&groupp->cvp);
 	}
 	(void) mutex_unlock(&groupp->lock);
@@ -612,9 +615,17 @@ console_chk_status(vntsd_group_t *groupp, vntsd_client_t *clientp, int status)
 	(void) snprintf(err_msg, VNTSD_LINE_LEN, "console_chk_status client%d"
 	    " num_cos=%d", clientp->sockfd, groupp->num_cons);
 
+	/*
+	 * obtain group lock to protect groupp->num_cons.
+	 * When groupp->num_cons == 0, close client and exit the tread.
+	 */
+	(void) mutex_lock(&groupp->lock);
+
 	if (groupp->num_cons == 0) {
 		/* no more console in the group */
+		(void) mutex_unlock(&groupp->lock);
 		client_fini(groupp, clientp);
+		return;
 	}
 
 	if (status == VNTSD_STATUS_INTR) {
@@ -625,33 +636,53 @@ console_chk_status(vntsd_group_t *groupp, vntsd_client_t *clientp, int status)
 	switch (status) {
 
 	case VNTSD_STATUS_CLIENT_QUIT:
+		(void) mutex_unlock(&groupp->lock);
 		client_fini(groupp, clientp);
 		return;
 
 	case VNTSD_STATUS_RESELECT_CONS:
-		assert(clientp->cons);
+
+		if (clientp->cons == NULL) {
+			/*
+			 * domain was deleted before client connects to it
+			 * connect to other console in the same group
+			 */
+			(void) mutex_unlock(&groupp->lock);
+			client_init(clientp);
+			return;
+		}
+
 		if ((groupp->num_cons == 1) &&
-		    (groupp->conspq->handle == clientp->cons)) {
+		    ((clientp->status & VNTSD_CLIENT_CONS_DELETED) ||
+		    (groupp->conspq->handle == clientp->cons))) {
 			/* no other selection available */
+			(void) mutex_unlock(&groupp->lock);
 			client_fini(groupp, clientp);
 		} else {
+			(void) mutex_unlock(&groupp->lock);
 			client_init(clientp);
 		}
+
 		return;
 
 	case VNTSD_STATUS_VCC_IO_ERR:
 		if ((clientp->status & VNTSD_CLIENT_CONS_DELETED) == 0) {
 			/* check if console was deleted  */
+			(void) mutex_unlock(&groupp->lock);
 			status = vntsd_vcc_err(clientp->cons);
+			(void) mutex_lock(&groupp->lock);
 		}
 
 		if (status != VNTSD_STATUS_CONTINUE) {
 			/* console was deleted */
-			if (groupp->num_cons == 1) {
+			if (groupp->num_cons <= 1) {
+				(void) mutex_unlock(&groupp->lock);
 				client_fini(groupp, clientp);
+				return;
 			}
 		}
 
+		(void) mutex_unlock(&groupp->lock);
 		/* console is ok */
 		client_init(clientp);
 		return;
@@ -660,28 +691,31 @@ console_chk_status(vntsd_group_t *groupp, vntsd_client_t *clientp, int status)
 	case VNTSD_STATUS_MOV_CONS_BACKWARD:
 		if (groupp->num_cons == 1) {
 			/* same console */
+			(void) mutex_unlock(&groupp->lock);
 			return;
 		}
 
 		/* get selected console */
-		(void) mutex_lock(&(clientp->cons->group->lock));
-		clientp->cons = vntsd_que_pos(clientp->cons->group->conspq,
+		clientp->cons = vntsd_que_pos(groupp->conspq,
 		    clientp->cons,
 		    (status == VNTSD_STATUS_MOV_CONS_FORWARD)?(1):(-1));
-		(void) mutex_unlock(&(clientp->cons->group->lock));
+		(void) mutex_unlock(&groupp->lock);
 		return;
 
 	case VNTSD_SUCCESS:
 	case VNTSD_STATUS_CONTINUE:
 	case VNTSD_STATUS_NO_CONS:
+		(void) mutex_unlock(&groupp->lock);
 		client_init(clientp);
 		return;
 
 	case VNTSD_ERR_INVALID_INPUT:
+		(void) mutex_unlock(&groupp->lock);
 		return;
 
 	default:
 		/* fatal error */
+		(void) mutex_unlock(&groupp->lock);
 		vntsd_log(status, err_msg);
 		client_fini(groupp, clientp);
 		return;
@@ -743,6 +777,12 @@ vntsd_console_thread(vntsd_thr_arg_t *argp)
 			rv = read_cmd(clientp, prompt, &cmd);
 			/* check error and may exit */
 			console_chk_status(groupp, clientp, rv);
+
+			/* any console is removed from group? */
+			num_cons = vntsd_chk_group_total_cons(groupp);
+			if (num_cons <= 1) {
+				cmd = ' ';
+			}
 		}
 
 		switch (cmd) {
@@ -760,6 +800,10 @@ vntsd_console_thread(vntsd_thr_arg_t *argp)
 			break;
 
 		case ' ':
+
+			if (num_cons == 0)
+				/* no console in the group */
+				break;
 
 			if (clientp->cons == NULL) {
 				if (num_cons == 1) {

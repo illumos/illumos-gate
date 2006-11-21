@@ -415,8 +415,8 @@ i_vcc_ldc_init(vcc_t *vccp, vcc_port_t *vport)
 	attr.mode = LDC_MODE_RAW;
 
 	if ((rv = ldc_init(vport->ldc_id, &attr, &(vport->ldc_handle))) != 0) {
-		cmn_err(CE_CONT, "i_vcc_ldc_init: port %d inv channel 0x%lx\n",
-		    vport->number, vport->ldc_id);
+		cmn_err(CE_CONT, "i_vcc_ldc_init: port %d ldc channel %ld"
+		    " failed ldc_init %d \n", vport->number, vport->ldc_id, rv);
 		vport->ldc_id = VCC_INVALID_CHANNEL;
 		return (rv);
 	}
@@ -1133,6 +1133,12 @@ vcc_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 
 	mutex_enter(&vport->lock);
 
+	if ((vport->status & VCC_PORT_AVAIL) == 0) {
+		/* port may be removed */
+		mutex_exit(&vport->lock);
+		return (ENXIO);
+	}
+
 	if (vport->status & VCC_PORT_OPEN) {
 		/* only one open per port */
 		cmn_err(CE_CONT, "vcc_open: virtual-console-concentrator@%d:%d "
@@ -1482,7 +1488,7 @@ i_vcc_inquiry(vcc_t *vccp, caddr_t buf, int mode)
 		return (EINVAL);
 	}
 
-		/* an added port */
+	/* an added port */
 
 	D1("i_vcc_inquiry\n");
 
@@ -1628,6 +1634,8 @@ i_vcc_cons_status(vcc_t *vccp, caddr_t buf, int mode)
 		    MAXPATHLEN)) {
 		console.cons_no = -1;
 	} else if (console.tcp_port != vport->tcp_port) {
+		console.cons_no = -1;
+	} else if (vport->ldc_id == VCC_INVALID_CHANNEL) {
 		console.cons_no = -1;
 	}
 
@@ -2360,6 +2368,7 @@ vcc_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 		if (rv !=  MDEG_SUCCESS) {
 			return (rv);
 		}
+
 	}
 
 	/*
@@ -2367,7 +2376,6 @@ vcc_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 	 * ports. So, ignore the match_curr and match_prev arrays
 	 * for now.
 	 */
-
 
 	return (MDEG_SUCCESS);
 }

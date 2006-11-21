@@ -67,6 +67,9 @@ extern "C" {
 /* indicates an invalid port number */
 #define	VLDC_INVALID_PORTNO	((uint_t)-1)
 
+/* delay(in us) used to wait for pending callback to complete */
+#define	VLDC_CLOSE_DELAY	MICROSEC	/* 1sec */
+
 /*
  * Minor node number to port number mapping table.
  *
