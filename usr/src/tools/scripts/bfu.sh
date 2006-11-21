@@ -6164,6 +6164,9 @@ mondo_loop() {
 	rm -f $root/lib/amd64/llib-lcmd.ln
 	rm -f $root/lib/sparcv9/llib-lcmd.ln
 
+	# Remove audit_record_attr. Moved to /usr/lib/security
+	rm -f $root/etc/security/audit_record_attr
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then

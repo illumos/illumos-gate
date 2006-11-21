@@ -52,7 +52,7 @@ sub new {
 	my $filters = shift;	# options for filtering
 
 	my $dir = '/etc/security';
-	my $attrDir = $dir;
+	my $attrDir = '/usr/lib/audit';
         my $configDir = $dir;
 	$attrDir = shift if (@_);	# override for test
 	$configDir = shift if (@_);	# ditto

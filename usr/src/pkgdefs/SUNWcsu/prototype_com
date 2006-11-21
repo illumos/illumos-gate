@@ -329,6 +329,8 @@ d none usr/kernel/sys 755 root sys
 d none usr/kvm 755 root bin
 f none usr/kvm/README 644 root sys
 d none usr/lib 755 root bin
+d none usr/lib/audit 0755 root bin
+f none usr/lib/audit/audit_record_attr 444 root bin
 f none usr/lib/calprog 555 root bin
 d none usr/lib/class 755 root bin
 d none usr/lib/class/FX 755 root bin
