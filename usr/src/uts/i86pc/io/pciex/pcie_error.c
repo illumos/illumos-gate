@@ -271,7 +271,9 @@ pcie_error_enable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 			else
 				bcr |= PCI_BCNF_BCNTRL_SERR_ENABLE;
 		}
-		bcr |= PCI_BCNF_BCNTRL_MAST_AB_MODE;
+
+		/* Always clear Master Abort Mode bit */
+		bcr &= ~PCI_BCNF_BCNTRL_MAST_AB_MODE;
 		pci_config_put8(cfg_hdl, PCI_BCNF_BCNTRL, bcr);
 	}
 
@@ -288,6 +290,16 @@ pcie_error_enable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 	 * Enable PCI-Express Baseline Error Handling
 	 */
 	device_ctl = pci_config_get16(cfg_hdl, cap_ptr + PCIE_DEVCTL);
+	device_ctl |= pcie_device_ctrl_default;
+
+	/*
+	 * Disable UR for any non-RBER enabled leaf PCIe device
+	 */
+	if ((dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) &&
+	    ((pci_config_get16(cfg_hdl, cap_ptr + PCIE_DEVCAP) &
+	    PCIE_DEVCAP_ROLE_BASED_ERR_REP) !=
+	    PCIE_DEVCAP_ROLE_BASED_ERR_REP))
+		device_ctl &= ~PCIE_DEVCTL_UR_REPORTING_EN;
 
 	/*
 	 * For Nvidia chipset, call pcie_nvidia_error_init().
@@ -305,8 +317,7 @@ pcie_error_enable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 		device_ctl &= ~PCIE_DEVCTL_UR_REPORTING_EN;
 	}
 
-	pci_config_put16(cfg_hdl, cap_ptr + PCIE_DEVCTL,
-	    pcie_device_ctrl_default | device_ctl);
+	pci_config_put16(cfg_hdl, cap_ptr + PCIE_DEVCTL, device_ctl);
 
 	PCIE_ERROR_DBG("%s: device control=0x%x->0x%x\n",
 	    ddi_driver_name(cdip), device_ctl,
