@@ -677,6 +677,7 @@ SUNWprivate_1.1 {
 	open_admin;
 	open_mnttab;
 	own_set;
+	parse_device;
 	parse_interlace;
 	pathname_reload;
 	pick_good_disk;

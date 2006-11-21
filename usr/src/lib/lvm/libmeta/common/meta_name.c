@@ -141,7 +141,7 @@ blkname(
  *		If the set name is specified as part of uname then use that
  *		otherwise attempt to get the set name from sp.
  */
-static void
+void
 parse_device(
 	mdsetname_t	*sp,
 	char		*uname,

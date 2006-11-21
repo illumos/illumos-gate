@@ -124,48 +124,6 @@ get_major_from_n2m(char *modname, int *major)
 }
 
 /*
- * If the name contains a diskset name, it is parsed out and returned.
- * The dev_path can be either a md pathname /dev/md/rdsk/d0 or a path
- * name that contains a diskset /dev/md/red/rdsk/d0.
- */
-
-static char *
-parse_path(char *dev_path)
-{
-	char *cpdev;
-	char *cp, *cpp;
-	char *setname;
-	size_t size;
-
-	/*
-	 * paths are /dev/md/rdsk/dx or /dev/md/<setname>/rdsk/dx
-	 * cp points to /rdsk/dx. Scan back to the previous slash.
-	 * If this matches "dev", then path is a local set.
-	 *
-	 * The /rdsk/d pattern in strstr is used so that users with
-	 * a twisted mind can create a diskset called "rdsk" and
-	 * would still want everything to work!!
-	 */
-	cp = strstr(dev_path, "/rdsk/d");
-
-	for (cpdev = cp - 1; *cpdev != '/'; cpdev--);
-	cpdev = cpdev - 3; /* backspace 3 char */
-	if (strncmp(cpdev, "dev", strlen("dev")) == 0)
-		return (Strdup(MD_LOCAL_NAME));
-
-	/*
-	 * extract the setname from the path
-	 */
-	cpp = cp;
-	for (cp--; *cp != '/'; cp--);
-	size = (size_t)(cpp - cp);
-	setname = (char *)Malloc(size);
-	(void) strlcpy(setname, (const char *)(cp + 1), size);
-
-	return (setname);
-}
-
-/*
  * This routine is called from preenlib the first time. It is then
  * recursively called through preen_subdev.
  *
@@ -181,6 +139,7 @@ preen_build_devs(
 )
 {
 	char		*setname = NULL;
+	char		*tname = NULL;
 	mdsetname_t	*sp;
 	mdname_t	*namep;		/* metadevice name */
 	mdnamelist_t	*nlp = NULL;	/* list of real devices */
@@ -237,8 +196,8 @@ preen_build_devs(
 	/*
 	 * parse the path name to get the diskset name.
 	 */
-
-	setname = parse_path(uname);
+	parse_device(NULL, uname, &tname, &setname);
+	Free(tname);
 	if ((sp = metasetname(setname, ep)) == NULL) {
 		ep_valid = 1;
 		goto out;

@@ -1172,6 +1172,7 @@ extern	int		is_metaname(char *uname);
 extern	int		meta_is_none(char *uname);
 extern	int		is_hspname(char *uname);
 extern	int		parse_ctd(char *uname, uint_t *slice);
+extern	void		parse_device(mdsetname_t *, char *, char **, char **);
 extern	md_set_desc	*sr2setdesc(md_set_record *sr);
 extern	mdsetname_t	*metasetname(char *sname, md_error_t *ep);
 extern	mdsetname_t	*metasetnosetname(set_t setno, md_error_t *ep);
