@@ -593,7 +593,7 @@ pci_cfg_pcidev(di_node_t node, di_prom_handle_t ph)
 	if (rv < 1) {
 		dprint(("pci_cfg_pcidev: property %s not found "
 		    "for %s%d\n", PROP_REG, DRVINST(node)));
-		return (rv);
+		return (PCIDEV_NIL);
 	}
 
 	return (REG_PCIDEV(regp));
