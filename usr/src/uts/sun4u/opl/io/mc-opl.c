@@ -277,7 +277,7 @@ int mc_poll_priority = MINCLSYSPRI;
 
 
 /*
- * Mutex heierachy in mc-opl
+ * Mutex hierarchy in mc-opl
  * If both mcmutex and mc_lock must be held,
  * mcmutex must be acquired first, and then mc_lock.
  */
@@ -1060,7 +1060,7 @@ mc_err_drain(mc_aflt_t *mc_aflt)
 		mc_aflt->mflt_erpt_class);
 	/*
 	 * we come here only when we have:
-	 * In mirror mode: CMPE, MUE, SUE
+	 * In mirror mode: MUE, SUE
 	 * In normal mode: UE, Permanent CE
 	 */
 	for (i = 0; i < mc_aflt->mflt_nflts; i++) {
@@ -1151,7 +1151,7 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr_info)
 
 	if (!rsaddr_info->mi_injectrestart) {
 		/*
-		 * For non-errorinjection restart we need to
+		 * For non-error injection restart we need to
 		 * determine if the current restart pa/page is
 		 * a "good" page. A "good" page is a page that
 		 * has not been page retired. If the current
@@ -1502,7 +1502,7 @@ mc_read_mi_reg(mc_opl_t *mcp, int bank, mc_flt_stat_t *flt_stat)
  *
  * PTRL (The error address for both banks are same, since ptrl stops if it
  * detects error.)
- * - Compaire error  Report CMPE.
+ * - Compare error  log CMPE.
  *
  * - UE-UE           Report MUE.  No rewrite.
  *
@@ -1514,9 +1514,9 @@ mc_read_mi_reg(mc_opl_t *mcp, int bank, mc_flt_stat_t *flt_stat)
  *
  *
  * MI (The error addresses for each bank are the same or different.)
- * - Compair  error  If addresses are the same.  Just CMPE.
+ * - Compare  error  If addresses are the same.  Just CMPE, so log CMPE.
  *		     If addresses are different (this could happen
- *		     as a result of scrubbing.  Report each seperately.
+ *		     as a result of scrubbing.  Report each separately.
  *		     Only report error info on each side.
  *
  * - UE-UE           Addresses are the same.  Report MUE.
@@ -1581,12 +1581,17 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 			flt_stat[0].mf_type = FLT_TYPE_CMPE;
 			flt_stat[1].mf_type = FLT_TYPE_CMPE;
 			mc_aflt->mflt_erpt_class = MC_OPL_CMPE;
-			MC_LOG("cmpe error detected\n");
 			mc_aflt->mflt_nflts = 2;
 			mc_aflt->mflt_stat[0] = &flt_stat[0];
 			mc_aflt->mflt_stat[1] = &flt_stat[1];
 			mc_aflt->mflt_pr = PR_UE;
-			mc_err_drain(mc_aflt);
+			/*
+			 * Compare error is result of MAC internal error, so
+			 * simply log it instead of publishing an ereport. SCF
+			 * diagnoses all the MAC internal and its i/f error.
+			 * mc_err_drain(mc_aflt);
+			 */
+			MC_LOG("cmpe error detected\n");
 			return (1);
 		}
 
@@ -1640,11 +1645,16 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 		    if (IS_CMPE(flt_stat[i].mf_cntl, ptrl_error)) {
 			flt_stat[i].mf_type = FLT_TYPE_CMPE;
 			mc_aflt->mflt_erpt_class = MC_OPL_CMPE;
-			MC_LOG("cmpe error detected\n");
 			mc_aflt->mflt_nflts = 1;
 			mc_aflt->mflt_stat[0] = &flt_stat[i];
 			mc_aflt->mflt_pr = PR_UE;
-			mc_err_drain(mc_aflt);
+			/*
+			 * Compare error is result of MAC internal error, so
+			 * simply log it instead of publishing an ereport. SCF
+			 * diagnoses all the MAC internal and its i/f error.
+			 * mc_err_drain(mc_aflt);
+			 */
+			MC_LOG("cmpe error detected\n");
 			/* no more report on this bank */
 			flt_stat[i].mf_cntl = 0;
 			rv = 1;
@@ -1779,17 +1789,17 @@ mc_process_error(mc_opl_t *mcp, int bank, mc_aflt_t *mc_aflt,
 
 	mc_aflt->mflt_erpt_class = NULL;
 	if (IS_UE(flt_stat->mf_cntl, ptrl_error)) {
-		MC_LOG("UE deteceted\n");
+		MC_LOG("UE detected\n");
 		flt_stat->mf_type = FLT_TYPE_UE;
 		mc_aflt->mflt_erpt_class = MC_OPL_UE;
 		mc_aflt->mflt_pr = PR_UE;
 		MAC_SET_ERRLOG_INFO(flt_stat);
 		rv = 1;
 	} else if (IS_CE(flt_stat->mf_cntl, ptrl_error)) {
-		MC_LOG("CE deteceted\n");
+		MC_LOG("CE detected\n");
 		MAC_SET_ERRLOG_INFO(flt_stat);
 
-		/* Error type can change after scrubing */
+		/* Error type can change after scrubbing */
 		mc_scrub_ce(mcp, bank, flt_stat, ptrl_error);
 
 		if (flt_stat->mf_type == FLT_TYPE_PERMANENT_CE) {
@@ -1886,7 +1896,7 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
  *	    if memory bank is installed, read the status register
  *	    if any error bit is set,
  *	    -> mc_error_handler()
- *		-> read all error regsiters
+ *		-> read all error registers
  *	        -> mc_process_error()
  *	            determine error type
  *	            rewrite to clear error or scrub to determine CE type
@@ -2061,7 +2071,7 @@ mc_check_errors_func(mc_opl_t *mcp)
  * Once mc_tick_left becomes negative, the board becomes a candidate
  * for polling because it has waited for at least
  * mc_patrol_interval_sec's long.    If mc_timeout_period is calculated
- * differently, this has to beupdated accordingly.
+ * differently, this has to be updated accordingly.
  */
 
 static void
@@ -3253,6 +3263,10 @@ mc_get_mem_sid(char *unum, char *buf, int buflen, int *lenp)
 	}
 
 	mutex_enter(&mcmutex);
+	/*
+	 * return ENOENT if we can not find the matching board.
+	 */
+	ret = ENOENT;
 	for (i = 0; i < OPL_MAX_BOARDS; i++) {
 		if ((mcp = mc_instances[i]) == NULL)
 			continue;
@@ -3461,8 +3475,8 @@ mc_get_dimm_list(mc_opl_t *mcp)
 }
 
 /*
- * mc_prepare_dimmlist - Prepare the dimm list from the infomation
- * recieved from the SP.
+ * mc_prepare_dimmlist - Prepare the dimm list from the information
+ * received from the SP.
  */
 mc_dimm_info_t *
 mc_prepare_dimmlist(board_dimm_info_t *bd_dimmp)
