@@ -27,7 +27,7 @@
 
 include ../Makefile.com
 
-DATAFILES=	i.manifest \
+DATAFILES+=	i.manifest \
 		r.manifest \
 		depend
 

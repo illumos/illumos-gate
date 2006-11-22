@@ -1491,6 +1491,11 @@ ra_get_set_opt_common_cb(raopt_t *raopt, scf_walkinfo_t *wip,
 			(void) smf_refresh_instance(RA_INSTANCE_ROUTING_SETUP);
 		} else {
 			/*
+			 * Refresh here to get latest property values prior
+			 * to starting daemon.
+			 */
+			(void) smf_refresh_instance(inst_fmri);
+			/*
 			 * For current changes (result of -u), we
 			 * enable/disable depending on persistent value
 			 * stored in general/enabled.  Here we disable
@@ -1506,7 +1511,17 @@ ra_get_set_opt_common_cb(raopt_t *raopt, scf_walkinfo_t *wip,
 				    myname, scf_strerror(scf_error()));
 				return (-1);
 			}
-			(void) smf_refresh_instance(inst_fmri);
+			if (current_state_enabled && persistent_state_enabled) {
+				/*
+				 * Instance was already enabled, so we restart
+				 * to get latest property values.  This covers
+				 * the case where users update properties
+				 * via routeadm -m, and issue an update.  The
+				 * daemon should be running with the latest
+				 * property values.
+				 */
+				(void) smf_restart_instance(inst_fmri);
+			}
 		}
 	}
 	return (0);
