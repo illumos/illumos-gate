@@ -148,6 +148,7 @@ GENOBJS=			\
 	strlen.o		\
 	strncmp.o		\
 	strncpy.o		\
+	strnlen.o		\
 	swapctxt.o		\
 	sync_instruction_memory.o
 

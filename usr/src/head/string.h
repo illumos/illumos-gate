@@ -94,6 +94,7 @@ extern void *memccpy(void *_RESTRICT_KYWD, const void *_RESTRICT_KYWD,
 extern int uucopy(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
 extern int uucopystr(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
 extern char *strsignal(int);
+extern size_t strnlen(const char *, size_t);
 extern int ffs(int);
 extern int strcasecmp(const char *, const char *);
 extern int strncasecmp(const char *, const char *, size_t);
@@ -128,6 +129,7 @@ extern void *memccpy();
 extern int uucopy();
 extern int uucopystr();
 extern char *strsignal();
+extern size_t strnlen();
 extern int ffs();
 extern int strcasecmp();
 extern int strncasecmp();

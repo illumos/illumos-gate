@@ -101,6 +101,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	sigqueue;
 	sigtimedwait;
 	sigwaitinfo;
+	strnlen;
 	timer_create;
 	timer_delete;
 	timer_getoverrun;

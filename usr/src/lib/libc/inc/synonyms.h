@@ -987,6 +987,7 @@ extern "C" {
 #define	strerror		_strerror
 #define	strfmon			_strfmon
 #define	string_to_decimal	_string_to_decimal
+#define	strnlen			_strnlen
 #define	strptime		_strptime
 #define	strtok_r		_strtok_r
 #define	strtoll			_strtoll

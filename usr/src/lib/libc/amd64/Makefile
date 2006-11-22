@@ -125,6 +125,7 @@ GENOBJS=			\
 	strlen.o		\
 	strncmp.o		\
 	strncpy.o		\
+	strnlen.o		\
 	sync_instruction_memory.o
 
 # Preserved solely to ease maintenance of 32-bit and 64-bit library builds
