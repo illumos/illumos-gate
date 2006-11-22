@@ -146,7 +146,6 @@ static int		arc_grow_retry = 60;
  */
 static int		arc_min_prefetch_lifespan;
 
-static kmutex_t arc_reclaim_lock;
 static int arc_dead;
 
 /*
@@ -489,9 +488,6 @@ hdr_dest(void *vbuf, void *unused)
 	cv_destroy(&buf->b_cv);
 }
 
-static int arc_reclaim_needed(void);
-void arc_kmem_reclaim(void);
-
 /*
  * Reclaim callback -- invoked when memory is low.
  */
@@ -500,8 +496,12 @@ static void
 hdr_recl(void *unused)
 {
 	dprintf("hdr_recl called\n");
-	if (arc_reclaim_needed())
-		arc_kmem_reclaim();
+	/*
+	 * umem calls the reclaim func when we destroy the buf cache,
+	 * which is after we do arc_fini().
+	 */
+	if (!arc_dead)
+		cv_signal(&arc_reclaim_thr_cv);
 }
 
 static void
@@ -1219,53 +1219,35 @@ arc_flush(void)
 	ASSERT(arc_eviction_list == NULL);
 }
 
-int arc_kmem_reclaim_shift = 5;		/* log2(fraction of arc to reclaim) */
+int arc_shrink_shift = 5;		/* log2(fraction of arc to reclaim) */
 
 void
-arc_kmem_reclaim(void)
+arc_shrink(void)
 {
-	uint64_t to_free;
-
-	/*
-	 * We need arc_reclaim_lock because we don't want multiple
-	 * threads trying to reclaim concurrently.
-	 */
-
-	/*
-	 * umem calls the reclaim func when we destroy the buf cache,
-	 * which is after we do arc_fini().  So we set a flag to prevent
-	 * accessing the destroyed mutexes and lists.
-	 */
-	if (arc_dead)
-		return;
-
-	if (arc.c <= arc.c_min)
-		return;
-
-	mutex_enter(&arc_reclaim_lock);
+	if (arc.c > arc.c_min) {
+		uint64_t to_free;
 
 #ifdef _KERNEL
-	to_free = MAX(arc.c >> arc_kmem_reclaim_shift, ptob(needfree));
+		to_free = MAX(arc.c >> arc_shrink_shift, ptob(needfree));
 #else
-	to_free = arc.c >> arc_kmem_reclaim_shift;
+		to_free = arc.c >> arc_shrink_shift;
 #endif
-	if (arc.c > to_free)
-		atomic_add_64(&arc.c, -to_free);
-	else
-		arc.c = arc.c_min;
+		if (arc.c > arc.c_min + to_free)
+			atomic_add_64(&arc.c, -to_free);
+		else
+			arc.c = arc.c_min;
 
-	atomic_add_64(&arc.p, -(arc.p >> arc_kmem_reclaim_shift));
-	if (arc.c > arc.size)
-		arc.c = arc.size;
-	if (arc.c < arc.c_min)
-		arc.c = arc.c_min;
-	if (arc.p > arc.c)
-		arc.p = (arc.c >> 1);
-	ASSERT((int64_t)arc.p >= 0);
+		atomic_add_64(&arc.p, -(arc.p >> arc_shrink_shift));
+		if (arc.c > arc.size)
+			arc.c = MAX(arc.size, arc.c_min);
+		if (arc.p > arc.c)
+			arc.p = (arc.c >> 1);
+		ASSERT(arc.c >= arc.c_min);
+		ASSERT((int64_t)arc.p >= 0);
+	}
 
-	arc_adjust();
-
-	mutex_exit(&arc_reclaim_lock);
+	if (arc.size > arc.c)
+		arc_adjust();
 }
 
 static int
@@ -1354,7 +1336,7 @@ arc_kmem_reap_now(arc_reclaim_strategy_t strat)
 	 * reap free buffers from the arc kmem caches.
 	 */
 	if (strat == ARC_RECLAIM_AGGR)
-		arc_kmem_reclaim();
+		arc_shrink();
 
 	for (i = 0; i < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT; i++) {
 		if (zio_buf_cache[i] != prev_cache) {
@@ -2502,7 +2484,6 @@ arc_tempreserve_space(uint64_t tempreserve)
 void
 arc_init(void)
 {
-	mutex_init(&arc_reclaim_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&arc_reclaim_thr_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&arc_reclaim_thr_cv, NULL, CV_DEFAULT, NULL);
 
@@ -2584,6 +2565,8 @@ arc_init(void)
 
 	(void) thread_create(NULL, 0, arc_reclaim_thread, NULL, 0, &p0,
 	    TS_RUN, minclsyspri);
+
+	arc_dead = FALSE;
 }
 
 void
@@ -2600,7 +2583,6 @@ arc_fini(void)
 	arc_dead = TRUE;
 
 	mutex_destroy(&arc_eviction_mtx);
-	mutex_destroy(&arc_reclaim_lock);
 	mutex_destroy(&arc_reclaim_thr_lock);
 	cv_destroy(&arc_reclaim_thr_cv);
 

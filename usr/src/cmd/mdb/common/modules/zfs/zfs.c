@@ -339,7 +339,7 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"arc_reduce_dnlc_percent",
 		"zfs_arc_max",
 		"zfs_arc_min",
-		"arc_kmem_reclaim_shift",
+		"arc_shrink_shift",
 		"zfs_mdcomp_disable",
 		"zfs_prefetch_disable",
 		"zfetch_max_streams",
