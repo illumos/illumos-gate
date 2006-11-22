@@ -34,6 +34,7 @@ extern "C" {
 
 #include <sys/pcie.h>
 #include <sys/pcie_impl.h>
+#include <sys/pci_impl.h>
 #include <sys/fm/io/sun4_fire.h>
 #include <sys/pci_intr_lib.h>
 #include <sys/atomic.h>

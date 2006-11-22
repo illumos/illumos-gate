@@ -96,7 +96,8 @@ static struct vnex_pil_map vnex_name_to_pil[] = {
 	{"sunmc", 	PIL_3},
 	{"sunvts", 	PIL_3},
 	{"explorer", 	PIL_3},
-	{"ncp", 	PIL_8}
+	{"ncp", 	PIL_8},
+	{"crypto", 	PIL_8}
 };
 
 #define	VNEX_MAX_DEVS	(sizeof (vnex_name_to_pil) /	\

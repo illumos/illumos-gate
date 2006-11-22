@@ -64,6 +64,10 @@ extern "C" {
 #define	ERRH_ATTR_IRF		0x00000008	/* Integer register file */
 /* Floating-point register file */
 #define	ERRH_ATTR_FRF		0x00000010
+#define	ERRH_ATTR_SHUT		0x00000020	/* Shutdown request */
+#define	ERRH_ATTR_ASR		0x00000040	/* Sun4v ASR */
+#define	ERRH_ATTR_ASI		0x00000080	/* Sun4v ASI */
+#define	ERRH_ATTR_PREG		0x00000100	/* Sun4v Privileged Register */
 #define	ERRH_ATTR_RQF		0x80000000	/* Resumablee Queue Full */
 
 /*
@@ -74,6 +78,12 @@ extern "C" {
 #define	ERRH_MODE_UNKNOWN	0
 #define	ERRH_MODE_USER		1
 #define	ERRH_MODE_PRIV		2
+
+/*
+ * ASR register number
+ */
+#define	ASR_REG_VALID		0x8000	/* Valid bit for register field */
+#define	ASR_REG_TICK		0x17	/* Tick Compare Register */
 
 /*
  * For the second argument passed to process_nonresumable_error(), it is
@@ -112,6 +122,10 @@ typedef	struct {
 	uint64_t	ra;		/* Real address */
 	uint32_t	sz;		/* Size of affected mem region */
 	uint16_t	cpuid;		/* Virtual ID of the affected CPU */
+	uint16_t	secs;		/* Seconds */
+	uint8_t		asi;		/* ASI */
+	uint8_t		rsvd;		/* Padding for ASI */
+	uint16_t	reg;		/* Value of the ASR register number */
 } errh_er_t;
 
 typedef struct errh_async_flt {

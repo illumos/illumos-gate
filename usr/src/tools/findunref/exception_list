@@ -122,6 +122,8 @@
 #
 # Ignore files that get used during a EXPORT_SRC or CRYPT_SRC build only.
 #
+./closed/uts/sun4v/io/n2cp/Makefile
+./closed/uts/sun4v/io/ncp/Makefile
 ./src/common/crypto/aes/Makefile
 ./src/common/crypto/arcfour/Makefile
 ./src/common/crypto/blowfish/Makefile
@@ -139,7 +141,6 @@
 ./src/uts/common/gssapi/include/Makefile
 ./src/uts/common/gssapi/mechs/dummy/Makefile
 ./src/uts/common/gssapi/mechs/krb5/Makefile
-./closed/uts/sun4v/io/ncp/Makefile
 ./src/xmod
 
 #

@@ -89,8 +89,9 @@ px_fdvma_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 
 	attr = PX_GET_TTE_ATTR(mp->dmai_rflags, mp->dmai_attr.dma_attr_flags);
 
-	if (px_lib_iommu_map(dip, PCI_TSBID(0, pg_index), npages, attr,
-	    (void *)a, 0, MMU_MAP_BUF) != DDI_SUCCESS) {
+	if (px_lib_iommu_map(dip, PCI_TSBID(0, pg_index), npages,
+	    PX_ADD_ATTR_EXTNS(attr, mp->dmai_bdf), (void *)a, 0,
+	    MMU_MAP_BUF) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: kaddr_load can't get "
 		    "page frame for vaddr %lx", ddi_driver_name(dip),
 		    ddi_get_instance(dip), (uintptr_t)a);
@@ -197,7 +198,6 @@ px_fdvma_reserve(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 	 */
 	mp->dmai_rdip = rdip;
 	mp->dmai_rflags = DMP_BYPASSNEXUS | DDI_DMA_READ | DMP_NOSYNC;
-	mp->dmai_minxfer = dmareq->dmar_limits->dlim_minxfer;
 	mp->dmai_burstsizes = dmareq->dmar_limits->dlim_burstsizes;
 	mp->dmai_mapping = MMU_PTOB(dvma_pg);
 	mp->dmai_ndvmapages = npages;

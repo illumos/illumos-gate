@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,16 +40,16 @@
 extern "C" {
 #endif
 
-#if defined(NIAGARA_IMPL)
+#if defined(NIAGARA_IMPL) || defined(NIAGARA2_IMPL)
 
 /*
- * NIAGARA specific ASIs
+ * NIAGARA and NIAGARA2 specific ASIs
  */
 #define	ASI_BLK_INIT_QUAD_LDD_AIUS	0x23	/* block as if user secondary */
 #define	ASI_BLK_INIT_ST_QUAD_LDD_P	0xE2	/* block initializing primary */
 
 #else
-#error	"This file has ASIs which are specific to Niagara CPU"
+#error	"This file has ASIs which are specific to Niagara and Niagara2 CPUs"
 #endif	/* NIAGARA_IMPL */
 
 #ifdef __cplusplus

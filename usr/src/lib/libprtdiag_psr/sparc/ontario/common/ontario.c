@@ -55,6 +55,7 @@
 #include "erie.h"
 #include "pelton.h"
 #include "stpaul.h"
+#include "huron.h"
 
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN	"SYS_TEST"
@@ -331,6 +332,13 @@ sun4v_display_pci(picl_nodehdl_t plafh)
 		strlen(STPAUL_PLATFORM))) == 0) {
 		(void) picl_walk_tree_by_class(plafh, "pciex",
 		    "pciex", stpaul_pci_callback);
+	} else if ((strncmp(platbuf, HURON_1U_PLATFORM,
+		strlen(HURON_1U_PLATFORM)) == 0) || (strncmp(platbuf,
+		HURON_2U_PLATFORM, strlen(HURON_2U_PLATFORM)) == 0)) {
+			(void) picl_walk_tree_by_class(plafh, "siu",
+				"siu", huron_pci_callback);
+			(void) picl_walk_tree_by_class(plafh, "pciex",
+				"pciex", huron_pci_callback);
 	} else {
 		(void) picl_walk_tree_by_class(plafh, "pciex", "pciex",
 		    erie_pci_callback);
@@ -479,7 +487,7 @@ sun4v_display_hw_revisions(Prom_node *root, picl_nodehdl_t plafh)
 	Prom_node	*pnode;
 	char		*value;
 	char 		platbuf[MAXSTRLEN];
-	char	*fmt = "%-20s %-40s %-30s %-9s";
+	char	*fmt = "%-20s %-45s %-30s %-9s";
 
 	log_printf(dgettext(TEXT_DOMAIN, "\n"
 		"========================= HW Revisions "
@@ -500,7 +508,7 @@ sun4v_display_hw_revisions(Prom_node *root, picl_nodehdl_t plafh)
 			    "------------------\n"));
 	log_printf(fmt, "Location", "Path", "Device", "Revision\n", 0);
 	log_printf(fmt, "--------------------",
-	    "----------------------------------------",
+	    "---------------------------------------------",
 	    "------------------------------",
 	    "---------\n", 0);
 
@@ -542,6 +550,17 @@ sun4v_display_hw_revisions(Prom_node *root, picl_nodehdl_t plafh)
 		    "network", stpaul_hw_rev_callback);
 		(void) picl_walk_tree_by_class(plafh, "scsi-2", "scsi-2",
 		    stpaul_hw_rev_callback);
+	} else if ((strncmp(platbuf, HURON_1U_PLATFORM,
+		strlen(HURON_1U_PLATFORM)) == 0) || (strncmp(platbuf,
+		HURON_2U_PLATFORM, strlen(HURON_2U_PLATFORM)) == 0)) {
+		(void) picl_walk_tree_by_class(plafh, "pciex",
+			"pciex", huron_hw_rev_callback);
+		(void) picl_walk_tree_by_class(plafh, "siu",
+			"siu", huron_hw_rev_callback);
+		(void) picl_walk_tree_by_class(plafh, "network",
+			"network", huron_hw_rev_callback);
+		(void) picl_walk_tree_by_class(plafh, "scsi-2", "scsi-2",
+			huron_hw_rev_callback);
 	} else {
 		(void) picl_walk_tree_by_class(plafh, "pciex", "pciex",
 		    erie_hw_rev_callback);

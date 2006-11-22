@@ -100,16 +100,36 @@ typedef enum intr_valid_state {
  *		Attributes for iommu mappings. One or more of the
  *		following attribute bits stored in a 64-bit unsigned int.
  *
- *		PCI_MAP_ATTR_READ	0x01 - xfr direction is from memory
- *		PCI_MAP_ATTR_WRITE	0x02 - xfr direction is to memory
- *		PCI_MAP_ATTR_RO		0x04 - enable relaxed ordering
+ *	6				    3				      0
+ *	3				    1				      0
+ *	00000000 00000000 00000000 00000000 BBBBBBBB DDDDDFFF 00000000 00PP0LWR
  *
- *		Bits 63:3 are unused and must be set to zero for this
- *		version of the specification.
+ *		R: DMA data is transferred from main memory to device.
+ *		W: DMA data is transferred from device to main memory.
+ *		L: Requested DMA transaction can be relaxed ordered within RC.
+ *		P: Value of PCI Express and PCI-X phantom function
+ *		   configuration. Its encoding is identical to the
+ *		   "Phantom Function Supported" field of the
+ *		   "Device Capabilities Register (offset 0x4)"
+ *		   in the "PCI Express Capability Structure".
+ *		   The structure is part of a device's config space.
+ *	      BDF: Bus, device and function number of the device
+ *		   that is going to issue DMA transactions.
+ *		   The BDF values are used to guarantee the mapping
+ *		   only be accessed by the specified device.
+ *		   If the BDF is set to all 0, RID based protection
+ *		   will be turned off.
+ *
+ *		Relaxed Ordering (L) is advisory. Not all hardware implements a
+ *		relaxed ordering attribute. If L attribute is not implemented in
+ *		hardware, the implementation is permitted to ignore the L bit.
+ *
+ *		Bits 3, 15:6 and 63:32 are unused and must be set to zero for
+ *		this version of the specification.
  *
  *		Note: For compatibility with future versions of this
- *		specification, the caller must set 63:3 to zero.
- *		The implementation shall ignore bits 63:3
+ *		specification, the caller must set bits 3, 15:6 and 63:32 to
+ *		zero. The implementation shall ignore these bits.
  *
  * r_addr -	64-bit Real Address.
  *
@@ -195,10 +215,16 @@ typedef uint64_t pci_device_t;
 	((tsbid >> PCI_TSB_INDEX) & PCI_TSB_INDEX_MASK)
 
 typedef enum io_attributes {
-	PCI_MAP_ATTR_READ 	= (uint32_t)0x01,
-	PCI_MAP_ATTR_WRITE 	= (uint32_t)0x02,
-	PCI_MAP_ATTR_RO		= (uint32_t)0x04
+	PCI_MAP_ATTR_READ 	= 0x1ull,
+	PCI_MAP_ATTR_WRITE 	= 0x2ull,
+	PCI_MAP_ATTR_RO		= 0x4ull
 } io_attributes_t;
+
+#define	PCI_MAP_ATTR_PHFUN	4
+#define	PCI_MAP_ATTR_BDF	16
+
+#define	PX_ADD_ATTR_EXTNS(attr, bdf) \
+	(attr | (bdf << PCI_MAP_ATTR_BDF))
 
 typedef enum io_sync_direction {
 	IO_SYNC_DEVICE		= (uint32_t)0x01,

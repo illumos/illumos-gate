@@ -45,6 +45,7 @@
 #include <sys/callb.h>
 #include <sys/pcie.h>
 #include <sys/pcie_impl.h>
+#include <sys/pci_impl.h>
 #include <sys/ddi.h>
 #include <sys/sunndi.h>
 #include <sys/pci_cap.h>
@@ -71,10 +72,10 @@ static boolean_t pxb_enable_msi = B_TRUE; /* MSI enabled if TRUE, else INTX */
 
 static int pxb_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
 	off_t, off_t, caddr_t *);
-#ifdef	BCM_SW_WORKAROUNDS
 static int pxb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	ddi_dma_attr_t *attr_p, int (*waitfp)(caddr_t), caddr_t arg,
 	ddi_dma_handle_t *handlep);
+#ifdef	BCM_SW_WORKAROUNDS
 static int pxb_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 	ddi_dma_handle_t handle, enum ddi_dma_ctlops cmd, off_t *offp,
 	size_t *lenp, caddr_t *objp, uint_t cache_flags);
@@ -107,11 +108,7 @@ static struct bus_ops pxb_bus_ops = {
 	0,
 	i_ddi_map_fault,
 	ddi_dma_map,
-#ifdef	BCM_SW_WORKAROUNDS
 	pxb_dma_allochdl,
-#else
-	ddi_dma_allochdl,
-#endif	/* BCM_SW_WORKAROUNDS */
 	ddi_dma_freehdl,
 	ddi_dma_bindhdl,
 	ddi_dma_unbindhdl,
@@ -233,7 +230,6 @@ static int pxb_intr_attach(pxb_devstate_t *pxb);
 
 static void pxb_removechild(dev_info_t *);
 static int pxb_initchild(dev_info_t *child);
-static dev_info_t *get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip);
 static void pxb_create_ranges_prop(dev_info_t *, ddi_acc_handle_t);
 
 int
@@ -416,6 +412,22 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	/*
+	 * Create an integer property with PCIE2PCI bridge's secondary
+	 * PCI bus number. This property will be read and saved in all
+	 * PCI and PCI-X device driver's parent private data structure
+	 * as part of their init child function.
+	 */
+	if (pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCIE2PCI) {
+		if (ndi_prop_update_int(DDI_DEV_T_NONE, pxb->pxb_dip,
+		    "pcie2pci-sec-bus", pci_config_get8(config_handle,
+		    PCI_BCNF_SECBUS)) != DDI_PROP_SUCCESS) {
+			DBG(DBG_ATTACH, pxb->pxb_dip,
+			    "ndi_prop_update_int() failed\n");
+			goto fail;
+		}
+	}
+
+	/*
 	 * Initialize hotplug support on this bus. At minimum
 	 * (for non hotplug bus) this would create ":devctl" minor
 	 * node to support DEVCTL_DEVICE_* and DEVCTL_BUS_* ioctls
@@ -521,6 +533,9 @@ pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			pxb_intr_fini(pxb);
 		if (pxb->pxb_init_flags & PXB_INIT_FM)
 			pxb_fm_fini(pxb);
+
+		(void) ndi_prop_remove(DDI_DEV_T_NONE, pxb->pxb_dip,
+		    "pcie2pci-sec-bus");
 
 		if (pxb->pxb_init_flags & PXB_INIT_CONFIG_HANDLE)
 			pci_config_teardown(&pxb->pxb_config_handle);
@@ -695,18 +710,6 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 }
 
 
-static dev_info_t *
-get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip)
-{
-	dev_info_t *cdip = rdip;
-
-	for (; ddi_get_parent(cdip) != dip; cdip = ddi_get_parent(cdip))
-		;
-
-	return (cdip);
-}
-
-
 static int
 pxb_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
@@ -729,7 +732,7 @@ pxb_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	    "interrupt-map", &len) == DDI_PROP_SUCCESS)
 		goto done;
 
-	cdip = get_my_childs_dip(dip, rdip);
+	cdip = pcie_get_my_childs_dip(dip, rdip);
 
 	/*
 	 * Use the devices reg property to determine its
@@ -1884,8 +1887,6 @@ pxb_id_props(pxb_devstate_t *pxb)
 			"serialid#", serialid);
 }
 
-#ifdef	BCM_SW_WORKAROUNDS
-
 /*
  * Some PCI-X to PCI-E bridges do not support full 64-bit addressing on the
  * PCI-X side of the bridge.  We build a special version of this driver for
@@ -1900,8 +1901,9 @@ pxb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	ddi_dma_attr_t *attr_p, int (*waitfp)(caddr_t), caddr_t arg,
 	ddi_dma_handle_t *handlep)
 {
-	uint64_t	lim;
 	int		ret;
+#ifdef	BCM_SW_WORKAROUNDS
+	uint64_t	lim;
 
 	/*
 	 * If the leaf device's limits are outside than what the Broadcom
@@ -1912,6 +1914,8 @@ pxb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 
 	lim = attr_p->dma_attr_addr_hi;
 	attr_p->dma_attr_addr_hi = MIN(lim, PXB_ADDR_LIMIT_HI);
+
+#endif	/* BCM_SW_WORKAROUNDS */
 
 	/*
 	 * This is a software workaround to fix the Broadcom 5714/5715 PCIe-PCI
@@ -1924,12 +1928,23 @@ pxb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	if ((ret = ddi_dma_allochdl(dip, rdip, attr_p, waitfp, arg,
 	    handlep)) == DDI_SUCCESS) {
 		ddi_dma_impl_t	*mp = (ddi_dma_impl_t *)*handlep;
+		dev_info_t	*cdip = pcie_get_my_childs_dip(dip, rdip);
+#ifdef	BCM_SW_WORKAROUNDS
 		mp->dmai_inuse |= PX_DMAI_FLAGS_MAP_BUFZONE;
+#endif	/* BCM_SW_WORKAROUNDS */
+		/*
+		 * For a given rdip, update mp->dmai_bdf with the bdf value
+		 * of px_pci's immediate child or secondary bus-id of the
+		 * PCIe2PCI bridge.
+		 */
+		mp->dmai_minxfer = PCI_GET_SEC_BUS(cdip) ?
+		    PCI_GET_SEC_BUS(cdip) : PCI_GET_BDF(cdip);
 	}
 
 	return (ret);
 }
 
+#ifdef	BCM_SW_WORKAROUNDS
 /*
  * FDVMA feature is not supported for any child device of Broadcom 5714/5715
  * PCIe-PCI bridge due to prefetch bug. Return failure immediately, so that
@@ -1947,5 +1962,4 @@ pxb_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	return (ddi_dma_mctl(dip, rdip, handle, cmd, offp, lenp, objp,
 	    cache_flags));
 }
-
 #endif	/* BCM_SW_WORKAROUNDS */

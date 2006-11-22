@@ -34,6 +34,12 @@
 extern "C" {
 #endif
 
+/*
+ * NOTE: n2rng (Niagara2 RNG driver) accesses the state field of
+ * SHA1_CTX directly.  NEVER change this structure without verifying
+ * compatiblity with n2rng.  The important thing is that the state
+ * must be in a field declared as uint32_t state[5].
+ */
 /* SHA-1 context. */
 typedef struct 	{
 	uint32_t state[5];	/* state (ABCDE) */

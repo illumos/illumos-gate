@@ -93,6 +93,30 @@ CLOSED_HDRS=	\
 	memtestio_ni.h		\
 	memtestio_v.h
 
+NXGEHDRS=			\
+	nxge.h			\
+	nxge_common.h		\
+	nxge_common_impl.h	\
+	nxge_defs.h		\
+	nxge_hw.h		\
+	nxge_impl.h		\
+	nxge_ipp.h		\
+	nxge_ipp_hw.h		\
+	nxge_mac.h		\
+	nxge_mac_hw.h		\
+	nxge_fflp.h		\
+	nxge_fflp_hw.h		\
+	nxge_mii.h		\
+	nxge_rxdma.h		\
+	nxge_rxdma_hw.h		\
+	nxge_str_cfg.h		\
+	nxge_txc.h		\
+	nxge_txc_hw.h		\
+	nxge_txdma.h		\
+	nxge_txdma_hw.h		\
+	nxge_virtual.h		\
+	nxge_espc.h
+
 ROOTHDRS=		$(HDRS:%=$(USR_PSM_ISYS_DIR)/%)
 $(CLOSED_BUILD)ROOTHDRS += $(CLOSED_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
 
@@ -106,7 +130,9 @@ ROOTLINK=		$(ROOTDIR)/uts/$(PLATFORM)/sys
 LINKDEST=		../../../../platform/$(PLATFORM)/include/sys
 
 CHECKHDRS=		$(HDRS:%.h=%.check) \
-			$(SUN4_HDRS:%.h=%.cmncheck)
+			$(SUN4_HDRS:%.h=%.cmncheck)	\
+			$(NXGEHDRS:%.h=nxge/%.check)
+
 $(CLOSED_BUILD)CHECKHDRS +=			\
 	$(CLOSED_HDRS:%.h=%.check)		\
 	$(CLOSED_SUN4_HDRS:%.h=%.cmncheck)

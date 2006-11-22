@@ -94,6 +94,7 @@ struct px_dma_impl { /* forthdebug only, keep in sync with ddi_dma_impl_t */
 #define	dmai_winlst		dmai_minfo
 #define	dmai_pfn0		dmai_sbi
 #define	dmai_roffset		dmai_pool
+#define	dmai_bdf		dmai_minxfer
 #define	PX_MP_PFN0(mp)		((px_iopfn_t)(mp)->dmai_pfn0)
 #define	PX_WINLST(mp)		((px_dma_win_t *)(mp)->dmai_winlst)
 #define	PX_DEV_ATTR(mp)		((ddi_dma_attr_t *)(mp + 1))

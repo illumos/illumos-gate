@@ -38,6 +38,8 @@ echo_file usr/src/tools/abi/etc/ABI_sparc.db
 echo_file usr/src/tools/abi/etc/ABI_i386.db
 echo_file usr/src/tools/abi/etc/exceptions
 echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnet
+echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetLimited
 echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetSolaris
 echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnet
+echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnetLimited
 echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnetSolaris

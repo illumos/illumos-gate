@@ -118,6 +118,7 @@ ROOTNEX_OBJS	+= mach_rootnex.o
 PX_OBJS		+= px_lib4v.o px_err.o px_tools_4v.o px_hcall.o
 FPC_OBJS	+= fpc-impl-4v.o fpc-asm-4v.o
 TRAPSTAT_OBJS	+= trapstat.o
+NIUMX_OBJS	+= niumx.o
 
 #
 # 			CPU/Memory Error Injector (memtest) sun4v driver
@@ -157,6 +158,7 @@ PLATSVC_OBJS	= platsvc.o mdeg.o
 #			Performance Counter BackEnd (PCBE) Modules
 #
 NI_PCBE_OBJS	= niagara_pcbe.o
+N2_PCBE_OBJS	= niagara2_pcbe.o
 
 #
 #			cpu modules
@@ -166,6 +168,8 @@ CPU_OBJ		+= $(OBJS_DIR)/mach_cpu_module.o
 GENERIC_OBJS = generic.o generic_copy.o common_asm.o
 NIAGARACPU_OBJS = niagara.o niagara_copy.o common_asm.o niagara_perfctr.o
 NIAGARACPU_OBJS += niagara_asm.o
+NIAGARA2CPU_OBJS = niagara2.o niagara_copy.o common_asm.o niagara_perfctr.o
+NIAGARA2CPU_OBJS += niagara2_asm.o
 
 #
 #			platform module
@@ -176,7 +180,6 @@ PLATMOD_OBJS	= platmod.o
 #
 ALL_DEFS	+= -Dsun4u -Dsun4v
 INC_PATH	+= -I$(UTSBASE)/sun4v
-
 #
 # Since assym.h is a derived file, the dependency must be explicit for
 # all files including this file. (This is only actually required in the
@@ -187,7 +190,7 @@ INC_PATH	+= -I$(UTSBASE)/sun4v
 ASSYM_DEPS	+= mach_locore.o
 ASSYM_DEPS	+= module_sfmmu_asm.o
 ASSYM_DEPS	+= generic_asm.o generic_copy.o
-ASSYM_DEPS	+= niagara_copy.o niagara_asm.o
+ASSYM_DEPS	+= niagara_copy.o niagara_asm.o niagara2_asm.o
 ASSYM_DEPS	+= mach_subr_asm.o swtch.o
 ASSYM_DEPS	+= mach_interrupt.o mach_xc.o
 ASSYM_DEPS	+= trap_table.o wbuf.o
@@ -198,3 +201,21 @@ ASSYM_DEPS	+= mach_sfmmu_asm.o sfmmu_asm.o
 #
 
 ARCFOUR_OBJS	+= arcfour.o arcfour_crypt.o
+
+#
+#	N2/NIU 10G driver module
+#
+NXGE_OBJS =	nxge_mac.o nxge_ipp.o nxge_rxdma.o 		\
+		nxge_txdma.o nxge_txc.o	nxge_main.o		\
+		nxge_hw.o nxge_fzc.o nxge_virtual.o		\
+		nxge_send.o nxge_classify.o nxge_fflp.o		\
+		nxge_fflp_hash.o nxge_ndd.o nxge_kstats.o	\
+		nxge_zcp.o nxge_fm.o nxge_espc.o nxge_hcall.o
+
+NXGE_NPI_OBJS =	\
+		npi.o npi_mac.o	npi_ipp.o			\
+		npi_txdma.o npi_rxdma.o	npi_txc.o		\
+		npi_zcp.o npi_espc.o npi_fflp.o			\
+		npi_vir.o
+
+#

@@ -323,9 +323,9 @@ px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
 		pfns[i] = MMU_PTOB(PX_ADDR2PFN(addr, pfn_index, flags, i));
 
 	/*
-	 * If HV VPCI version is 1.1 and higher, pass the BDF, phantom
-	 * function, and relax ordering information. Otherwise, justp pass
-	 * read or write attribute information.
+	 * If HV VPCI version is 1.1 and higher, pass BDF, phantom function,
+	 * and relaxed ordering attributes. Otherwise, pass only read or write
+	 * attribute.
 	 */
 	if (px_vpci_min_ver == PX_VPCI_MINOR_VER_0)
 		attr = attr & (PCI_MAP_ATTR_READ | PCI_MAP_ATTR_WRITE);
@@ -1462,39 +1462,6 @@ int	px_peekfault_cnt = 0;
 int	px_pokefault_cnt = 0;
 #endif  /* DEBUG */
 
-static int
-px_lib_bdf_from_dip(dev_info_t *rdip, uint32_t *bdf)
-{
-	/* Start with an array of 8 reg spaces for now to cover most devices. */
-	pci_regspec_t regspec_array[8];
-	pci_regspec_t *regspec = regspec_array;
-	int buflen = sizeof (regspec_array);
-	boolean_t kmalloced = B_FALSE;
-	int status;
-
-	status = ddi_getlongprop_buf(DDI_DEV_T_ANY, rdip,
-	    DDI_PROP_DONTPASS, "reg", (caddr_t)regspec, &buflen);
-
-	/* If need more space, fallback to kmem_alloc. */
-	if (status == DDI_PROP_BUF_TOO_SMALL) {
-		regspec = kmem_alloc(buflen, KM_SLEEP);
-
-		status = ddi_getlongprop_buf(DDI_DEV_T_ANY, rdip,
-		    DDI_PROP_DONTPASS, "reg", (caddr_t)regspec, &buflen);
-
-		kmalloced = B_TRUE;
-	}
-
-	/* Get phys_hi from first element.  All have same bdf. */
-	if (status == DDI_PROP_SUCCESS)
-		*bdf = regspec->pci_phys_hi & (PCI_REG_BDFR_M ^ PCI_REG_REG_M);
-
-	if (kmalloced)
-		kmem_free(regspec, buflen);
-
-	return ((status == DDI_PROP_SUCCESS) ? DDI_SUCCESS : DDI_FAILURE);
-}
-
 /*
  * Do a safe write to a device.
  *
@@ -1522,7 +1489,6 @@ px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
 
 	int err	= DDI_SUCCESS;
 	uint64_t hvio_poke_status;
-	uint32_t bdf;
 	uint32_t wrt_stat;
 
 	r_addr_t ra;
@@ -1535,13 +1501,6 @@ px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
 	 * handler will occur in the window where otd is set.
 	 */
 	on_trap_data_t otd;
-
-	if (px_lib_bdf_from_dip(rdip, &bdf) != DDI_SUCCESS) {
-		DBG(DBG_LIB_DMA, px_p->px_dip,
-		    "poke: px_lib_bdf_from_dip failed\n");
-		err = DDI_FAILURE;
-		goto done;
-	}
 
 	ra = (r_addr_t)va_to_pa((void *)dev_addr);
 	for (; repcount; repcount--) {
@@ -1581,7 +1540,7 @@ px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
 		pec_p->pec_ontrap_data = &otd;
 
 		hvio_poke_status = hvio_poke(px_p->px_dev_hdl, ra, size,
-			    pokeval, bdf, &wrt_stat);
+		    pokeval, PCI_GET_BDF(rdip) << 8, &wrt_stat);
 
 		if (otd.ot_trap & OT_DATA_ACCESS)
 			err = DDI_FAILURE;

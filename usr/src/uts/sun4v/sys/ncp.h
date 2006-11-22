@@ -49,11 +49,27 @@ extern "C" {
 #define	FALSE		0
 #define	TRUE		1
 
-#define	NCP_MAX_NMAUS		8
-#define	NCP_MAX_CPUS_PER_MAU	4
-#define	NCP_CPUID2MAUID(c)	((c) / NCP_MAX_CPUS_PER_MAU)
+#define	N_MBLKL(mp)	((uint64_t)(mp)->b_wptr - (uint64_t)(mp)->b_rptr)
 
-#define	NCP_MAX_HELPERTHREADS	(NCP_MAX_NMAUS * NCP_MAX_CPUS_PER_MAU)
+#define	NCP_N1_MAX_NMAUS		8
+#define	NCP_N1_MAX_CPUS_PER_MAU		4
+#define	NCP_N2_MAX_NMAUS		8
+#define	NCP_N2_MAX_CPUS_PER_MAU		8
+#define	NCP_MAX_MAX_NMAUS		NCP_N2_MAX_NMAUS
+
+#define	NCP_CPUID2MAUID(n, c)		((c) / (n)->n_max_cpus_per_mau)
+
+#define	NCP_MAX_HELPERTHREADS(n)	((n)->n_max_nmaus * \
+						(n)->n_max_cpus_per_mau)
+
+#define	NCP_BINDNAME_N1		"SUNW,sun4v-ncp"
+#define	NCP_BINDNAME_N2		"SUNW,n2-mau"
+
+typedef enum {
+	NCP_CPU_UNKNOWN,
+	NCP_CPU_N1,
+	NCP_CPU_N2
+} ncp_binding_t;
 
 /*
  * These are constants.  Do not change them.
@@ -253,14 +269,8 @@ struct ncp_stat {
 		kstat_named_t	ns_nintr;
 		kstat_named_t	ns_nintr_err;
 		kstat_named_t	ns_nintr_jobs;
-	}			ns_mau[NCP_MAX_NMAUS];
+	}			ns_mau[NCP_MAX_MAX_NMAUS];
 };
-
-/*
- * Device flags (ncp_t.ncp_flags)
- */
-#define	NCP_FAILED		0x1
-#define	NCP_POWERMGMT		0x4
 
 /*
  * IMPORTANT:
@@ -299,6 +309,7 @@ struct ncp_desc {
 typedef struct ncp_descjob {
 	int			dj_id;
 	kcondvar_t		dj_cv;
+	boolean_t		dj_pending;	/* awaiting MAU */
 	ncp_desc_t		*dj_jobp;
 	struct ncp_descjob	*dj_prev;
 	struct ncp_descjob	*dj_next;
@@ -308,7 +319,7 @@ typedef struct ncp_descjob {
  * nmq_head, nmq_tail = indexes into nmq_desc[].
  */
 typedef struct {
-	uint64_t	nmq_mauhandle;
+	uint64_t	nmq_handle;
 	uint64_t	nmq_devino;
 	int		nmq_inum;
 	int		nmq_mauid;
@@ -395,24 +406,24 @@ typedef struct {
 struct ncp {
 	uint_t				n_hvapi_major_version;
 	uint_t				n_hvapi_minor_version;
+	ncp_binding_t			n_binding;
+	char				*n_binding_name;
 	kmutex_t			n_lock;
 	kmem_cache_t			*n_ds_cache;
 	kmem_cache_t			*n_mactl_cache;
 	kmem_cache_t			*n_mabuf_cache;
 	dev_info_t			*n_dip;
-	minor_t				n_minor;
 
 	ddi_taskq_t			*n_taskq;
 
-	unsigned			n_flags;	/* dev state flags */
+	int				n_max_nmaus;
+	int				n_max_cpus_per_mau;
 
 	kstat_t				*n_ksp;
-	kstat_t				*n_intrstats;
 	u_longlong_t			n_stats[DS_MAX];
 
 	ddi_intr_handle_t		*n_htable;
-	int				n_intr_mid[NCP_MAX_NMAUS];
-	int				n_intr_type;
+	int				n_intr_mid[NCP_MAX_MAX_NMAUS];
 	int				n_intr_cnt;
 	size_t				n_intr_size;
 	uint_t				n_intr_pri;

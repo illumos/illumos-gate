@@ -77,6 +77,14 @@ phys_install_has_changed(void)
 
 }
 
+#ifdef N2_IDLE_WORKAROUND
+/*
+ * Tuneable to control enabling of IDLE loop workaround on Niagara2 1.x parts.
+ * This workaround will be removed before the RR.
+ */
+int	n2_idle_workaround;
+#endif
+
 /*
  * Halt the present CPU until awoken via an interrupt
  */
@@ -87,6 +95,7 @@ cpu_halt(void)
 	processorid_t cpun = cpup->cpu_id;
 	cpupart_t *cp = cpup->cpu_part;
 	int hset_update = 1;
+	volatile int *p = &cpup->cpu_disp->disp_nrunnable;
 	uint_t s;
 
 	/*
@@ -129,8 +138,24 @@ cpu_halt(void)
 		return;
 	}
 
+#ifdef N2_IDLE_WORKAROUND
 	/*
-	 * We're on our way to being halted.
+	 * The following workaround for Niagara2, when enabled, forces the
+	 * IDLE CPU to wait in a tight loop until something becomes runnable
+	 * locally, minimizing the overall CPU usage on an IDLE CPU.
+	 */
+	if (n2_idle_workaround) {
+		while (cpup->cpu_disp->disp_nrunnable == 0) {
+			(void) hv_cpu_yield();
+		}
+	}
+#endif
+
+	/*
+	 * We're on our way to being halted.  Wait until something becomes
+	 * runnable locally or we are awaken (i.e. removed from the halt set).
+	 * Note that the call to hv_cpu_yield() can return even if we have
+	 * nothing to do.
 	 *
 	 * Disable interrupts now, so that we'll awaken immediately
 	 * after halting if someone tries to poke us between now and
@@ -144,34 +169,20 @@ cpu_halt(void)
 	 * is important.
 	 * cpu_wakeup() must clear, then poke.
 	 * cpu_halt() must disable interrupts, then check for the bit.
-	 */
-	s = disable_vec_intr();
-
-	if (hset_update && !CPU_IN_SET(cp->cp_mach->mc_haltset, cpun)) {
-		cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
-		enable_vec_intr(s);
-		return;
-	}
-
-	/*
+	 *
 	 * The check for anything locally runnable is here for performance
 	 * and isn't needed for correctness. disp_nrunnable ought to be
 	 * in our cache still, so it's inexpensive to check, and if there
 	 * is anything runnable we won't have to wait for the poke.
+	 *
 	 */
-	if (cpup->cpu_disp->disp_nrunnable != 0) {
-		if (hset_update) {
-			cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
-			CPUSET_ATOMIC_DEL(cp->cp_mach->mc_haltset, cpun);
-		}
+	s = disable_vec_intr();
+	while (*p == 0 &&
+	    (!hset_update || CPU_IN_SET(cp->cp_mach->mc_haltset, cpun))) {
+		(void) hv_cpu_yield();
 		enable_vec_intr(s);
-		return;
+		s = disable_vec_intr();
 	}
-
-	/*
-	 * Halt the strand
-	 */
-	(void) hv_cpu_yield();
 
 	/*
 	 * We're no longer halted

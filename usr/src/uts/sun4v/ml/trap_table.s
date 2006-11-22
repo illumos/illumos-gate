@@ -938,6 +938,8 @@ table_name/**/_dtlbmiss:						;\
 	MMU_FAULT_STATUS_AREA(%g7)					;\
 	ldx	[%g7 + MMFSA_D_ADDR], %g2	/* address */		;\
 	ldx	[%g7 + MMFSA_D_CTX], %g3	/* g3 = ctx */		;\
+	srlx	%g2, MMU_PAGESHIFT, %g2		/* align address */	;\
+	sllx	%g2, MMU_PAGESHIFT, %g2					;\
 	or	%g2, %g3, %g2			/* TAG_ACCESS */	;\
 	cmp	%g3, INVALID_CONTEXT					;\
 	ble,pn	%xcc, sfmmu_kdtlb_miss					;\
@@ -985,6 +987,8 @@ table_name/**/_itlbmiss:						;\
 	MMU_FAULT_STATUS_AREA(%g7)					;\
 	ldx	[%g7 + MMFSA_I_ADDR], %g2	/* g2 = address */	;\
 	ldx	[%g7 + MMFSA_I_CTX], %g3	/* g3 = ctx */		;\
+	srlx	%g2, MMU_PAGESHIFT, %g2		/* align address */	;\
+	sllx	%g2, MMU_PAGESHIFT, %g2					;\
 	or	%g2, %g3, %g2			/* TAG_ACCESS */	;\
 	cmp	%g3, INVALID_CONTEXT					;\
 	ble,pn	%xcc, sfmmu_kitlb_miss					;\
@@ -1017,6 +1021,8 @@ table_name/**/_itlbmiss:						;\
 	MMU_FAULT_STATUS_AREA(%g7)					;\
 	ldx	[%g7 + MMFSA_D_ADDR], %g2	/* address */		;\
 	ldx	[%g7 + MMFSA_D_CTX], %g3	/* %g3 = ctx */		;\
+	srlx	%g2, MMU_PAGESHIFT, %g2		/* align address */	;\
+	sllx	%g2, MMU_PAGESHIFT, %g2					;\
 	or	%g2, %g3, %g2			/* TAG_ACCESS */	;\
 	/*								;\
 	 *   g2 = tag access register					;\

@@ -92,13 +92,14 @@ extern "C" {
 /*
  * VPCI API versioning.
  *
- * Currently PX nexus driver supports VPCI API version 1.0
+ * Currently PX nexus driver supports VPCI API version 1.1
  */
 #define	PX_VPCI_MAJOR_VER_1	0x1ull
 #define	PX_VPCI_MAJOR_VER	PX_VPCI_MAJOR_VER_1
 
 #define	PX_VPCI_MINOR_VER_0	0x0ull
-#define	PX_VPCI_MINOR_VER	PX_VPCI_MINOR_VER_0
+#define	PX_VPCI_MINOR_VER_1	0x1ull
+#define	PX_VPCI_MINOR_VER	PX_VPCI_MINOR_VER_1
 
 extern uint64_t hvio_config_get(devhandle_t dev_hdl, pci_device_t bdf,
     pci_config_offset_t off, pci_config_size_t size, pci_cfg_data_t *data_p);

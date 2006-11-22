@@ -34,3 +34,9 @@
 WORKAROUND_DEFS =
 WORKAROUND_DEFS	+= -DQCN_POLLING		# XXXQ
 WORKAROUND_DEFS += -DDO_CORELEVEL_LOADBAL
+
+# The following is required to support Niagara2 1.0
+WORKAROUND_DEFS	+= -DN2_ERRATUM_49	# %stick_compare{6:0} ignored
+WORKAROUND_DEFS	+= -DN2_IDLE_WORKAROUND
+WORKAROUND_DEFS += -DN2_ERRATUM_112	# multiple traps for 1 event
+WORKAROUND_DEFS += -DN2_ERRATUM_134	# PMU doesn't set OV bit

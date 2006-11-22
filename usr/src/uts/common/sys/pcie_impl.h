@@ -50,6 +50,7 @@ extern void pcie_enable_errors(dev_info_t *dip,
     ddi_acc_handle_t config_handle);
 extern void pcie_disable_errors(dev_info_t *dip,
     ddi_acc_handle_t config_handle);
+extern dev_info_t *pcie_get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip);
 extern int pcie_enable_ce(dev_info_t *dip,
     ddi_acc_handle_t config_handle);
 

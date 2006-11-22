@@ -299,7 +299,7 @@ kdi_tlb_page_lock(caddr_t va, int do_dtlb)
 
 	if (ret != H_EOK) {
 		cmn_err(CE_PANIC, "cpu%d: cannot set permanent mapping for "
-		    "va=0x%p, hv error code 0x%lux",
+		    "va=0x%p, hv error code 0x%lx",
 		    getprocessorid(), (void *)va, ret);
 	}
 }

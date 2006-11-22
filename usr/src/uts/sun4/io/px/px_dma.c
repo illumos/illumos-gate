@@ -112,6 +112,13 @@ px_dma_allocmp(dev_info_t *dip, dev_info_t *rdip, int (*waitfp)(caddr_t),
 	mp->dmai_error.err_fep = NULL;
 	mp->dmai_error.err_cf = NULL;
 
+	/*
+	 * For a given rdip, set mp->dmai_bdf with the bdf value of px's
+	 * immediate child. As we move down the PCIe fabric, this field
+	 * may be modified by switch and bridge drivers.
+	 */
+	mp->dmai_bdf = PCI_GET_BDF(pcie_get_my_childs_dip(dip, rdip));
+
 	return (mp);
 }
 
@@ -204,7 +211,6 @@ px_dma_lmts2hdl(dev_info_t *dip, dev_info_t *rdip, px_mmu_t *mmu_p,
 		mp->dmai_flags |= PX_DMAI_FLAGS_NOCTX;
 
 	/* store augumented dev input to mp->dmai_attr */
-	mp->dmai_minxfer	= lim_p->dlim_minxfer;
 	mp->dmai_burstsizes	= lim_p->dlim_burstsizes;
 	attr_p = &mp->dmai_attr;
 	SET_DMAATTR(attr_p, lo, hi, -1, count_max);
@@ -343,7 +349,6 @@ px_dma_attr2hdl(px_t *px_p, ddi_dma_impl_t *mp)
 	if (PX_DMA_NOCTX(mp->dmai_rdip))
 		mp->dmai_flags |= PX_DMAI_FLAGS_NOCTX;
 
-	mp->dmai_minxfer	= attrp->dma_attr_minxfer;
 	mp->dmai_burstsizes	= attrp->dma_attr_burstsizes;
 	attrp = &mp->dmai_attr;
 	SET_DMAATTR(attrp, lo, hi, nocross, count_max);
@@ -718,11 +723,11 @@ px_dvma_map_fast(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 	i *= clustsz;
 	dvma_pg = mmu_p->dvma_base_pg + i;
 
-	if (px_lib_iommu_map(dip, PCI_TSBID(0, i), npages, attr,
-	    (void *)mp, 0, MMU_MAP_PFN) != DDI_SUCCESS) {
+	if (px_lib_iommu_map(dip, PCI_TSBID(0, i), npages,
+	    PX_ADD_ATTR_EXTNS(attr, mp->dmai_bdf), (void *)mp, 0,
+	    MMU_MAP_PFN) != DDI_SUCCESS) {
 		DBG(DBG_MAP_WIN, dip, "px_dvma_map_fast: "
 		    "px_lib_iommu_map failed\n");
-
 		return (DDI_FAILURE);
 	}
 
@@ -733,8 +738,9 @@ px_dvma_map_fast(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 
 	ASSERT(PX_HAS_REDZONE(mp));
 
-	if (px_lib_iommu_map(dip, PCI_TSBID(0, i + npages), 1, attr,
-	    (void *)mp, npages - 1, MMU_MAP_PFN) != DDI_SUCCESS) {
+	if (px_lib_iommu_map(dip, PCI_TSBID(0, i + npages), 1,
+	    PX_ADD_ATTR_EXTNS(attr, mp->dmai_bdf), (void *)mp, npages - 1,
+	    MMU_MAP_PFN) != DDI_SUCCESS) {
 		DBG(DBG_MAP_WIN, dip, "px_dvma_map_fast: "
 		    "mapping REDZONE page failed\n");
 

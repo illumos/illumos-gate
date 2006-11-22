@@ -37,7 +37,10 @@
 #include <sys/pcie.h>
 #include <sys/pci_cap.h>
 #include <sys/pcie_impl.h>
+#include <sys/pci_impl.h>
 
+static int pcie_get_bdf_from_dip(dev_info_t *dip, uint32_t *bdf);
+dev_info_t *pcie_get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip);
 
 #ifdef  DEBUG
 uint_t pcie_debug_flags = 0;
@@ -127,9 +130,23 @@ pcie_initchild(dev_info_t *cdip)
 	uint8_t			bcr;
 	uint16_t		command_reg, status_reg;
 	uint16_t		cap_ptr;
+	pci_parent_data_t	*pd_p;
 
 	if (pci_config_setup(cdip, &config_handle) != DDI_SUCCESS)
 		return (DDI_FAILURE);
+
+	/* Allocate memory for pci parent data */
+	pd_p = kmem_zalloc(sizeof (pci_parent_data_t), KM_SLEEP);
+
+	/*
+	 * Retrieve and save BDF and PCIE2PCI bridge's secondary bus
+	 * information in the parent private data structure.
+	 */
+	if (pcie_get_bdf_from_dip(cdip, &pd_p->pci_bdf) != DDI_SUCCESS)
+		goto fail;
+
+	pd_p->pci_sec_bus = ddi_prop_get_int(DDI_DEV_T_ANY, cdip, 0,
+	    "pcie2pci-sec-bus", 0);
 
 	/*
 	 * Determine the configuration header type.
@@ -168,14 +185,20 @@ pcie_initchild(dev_info_t *cdip)
 	}
 
 	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
-		!= DDI_FAILURE)
+		!= DDI_FAILURE) {
 		pcie_enable_errors(cdip, config_handle);
 
-	pci_config_teardown(&config_handle);
+		pd_p->pci_phfun = (pci_config_get8(config_handle,
+		    cap_ptr + PCIE_DEVCAP) & PCIE_DEVCAP_PHTM_FUNC_MASK) >> 3;
+	}
 
+	ddi_set_parent_data(cdip, (void *)pd_p);
+	pci_config_teardown(&config_handle);
 	return (DDI_SUCCESS);
 fail:
 	cmn_err(CE_WARN, "PCIE init child failed\n");
+	kmem_free(pd_p, sizeof (pci_parent_data_t));
+	pci_config_teardown(&config_handle);
 	return (DDI_FAILURE);
 }
 
@@ -208,6 +231,12 @@ void
 pcie_uninitchild(dev_info_t *cdip)
 {
 	ddi_acc_handle_t	config_handle;
+	pci_parent_data_t	*pd_p;
+
+	if (pd_p = ddi_get_parent_data(cdip)) {
+		ddi_set_parent_data(cdip, NULL);
+		kmem_free(pd_p, sizeof (pci_parent_data_t));
+	}
 
 	if (pci_config_setup(cdip, &config_handle) != DDI_SUCCESS)
 		return;
@@ -470,6 +499,39 @@ pcie_disable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	 */
 	PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_SUCE_MASK,
 		PCIE_AER_SUCE_BITS);
+}
+
+static int
+pcie_get_bdf_from_dip(dev_info_t *dip, uint32_t *bdf)
+{
+	pci_regspec_t	*regspec;
+	int		reglen;
+
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "reg", (int **)&regspec, (uint_t *)&reglen) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (reglen < (sizeof (pci_regspec_t) / sizeof (int))) {
+		ddi_prop_free(regspec);
+		return (DDI_FAILURE);
+	}
+
+	/* Get phys_hi from first element.  All have same bdf. */
+	*bdf = (regspec->pci_phys_hi & (PCI_REG_BDFR_M ^ PCI_REG_REG_M)) >> 8;
+
+	ddi_prop_free(regspec);
+	return (DDI_SUCCESS);
+}
+
+dev_info_t *
+pcie_get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip)
+{
+	dev_info_t *cdip = rdip;
+
+	for (; ddi_get_parent(cdip) != dip; cdip = ddi_get_parent(cdip))
+		;
+
+	return (cdip);
 }
 
 #ifdef	DEBUG

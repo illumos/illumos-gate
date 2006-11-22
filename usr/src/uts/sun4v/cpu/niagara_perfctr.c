@@ -31,11 +31,17 @@
 #include <sys/sunndi.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/machsystm.h>
-#include <sys/niagararegs.h>
 #include <sys/hypervisor_api.h>
 #include <sys/kstat.h>
+#if defined(NIAGARA_IMPL)
+#include <sys/niagararegs.h>
+#elif defined(NIAGARA2_IMPL)
+#include <sys/niagara2regs.h>
+#endif
 
 extern char cpu_module_name[];
+
+#define	NUM_OF_PICS	2
 
 /*
  * Data structure used to build array of event-names and pcr-mask values
@@ -71,7 +77,10 @@ typedef struct ni_ksinfo {
 } ni_ksinfo_t;
 
 static ni_ksinfo_t	*ni_dram_kstats[NIAGARA_DRAM_BANKS];
+
+#if defined(NIAGARA_IMPL)
 static ni_ksinfo_t	*ni_jbus_kstat;
+#endif
 
 typedef struct ni_perf_regs {
 	uint32_t	pcr_reg;
@@ -84,7 +93,6 @@ static ni_perf_regs_t dram_perf_regs[] = {
 	{HV_NIAGARA_DRAM_CTL2, HV_NIAGARA_DRAM_COUNT2},
 	{HV_NIAGARA_DRAM_CTL3, HV_NIAGARA_DRAM_COUNT3},
 };
-
 
 static void ni_create_name_kstat(char *, ni_ksinfo_t *, ni_kev_mask_t *);
 static void ni_delete_name_kstat(ni_ksinfo_t *);
@@ -102,7 +110,7 @@ static int	ni_perf_debug;
 #endif
 
 /*
- * Niagara DRAM Performance Events
+ * Niagara and Niagara2 DRAM Performance Events
  */
 static ni_kev_mask_t
 niagara_dram_events[] = {
@@ -118,6 +126,7 @@ niagara_dram_events[] = {
 };
 
 
+#if defined(NIAGARA_IMPL)
 /*
  * Niagara JBUS Performance Events
  */
@@ -136,6 +145,7 @@ niagara_jbus_events[] = {
 	{"dok_off_cycles",	0xe},
 	{"clear_pic",		0xf}
 };
+#endif
 
 /*
  * Create the picN kstats for DRAM and JBUS events
@@ -186,6 +196,7 @@ niagara_kstat_init()
 		    ni_cntr_kstat_update, ksinfop);
 	}
 
+#if defined(NIAGARA_IMPL)
 	/*
 	 * Create JBUS perf events kstat
 	 */
@@ -211,6 +222,7 @@ niagara_kstat_init()
 		ni_jbus_kstat->cntr_ksp = ni_create_cntr_kstat("jbus", 0,
 		    ni_cntr_kstat_update, ni_jbus_kstat);
 	}
+#endif
 }
 
 void
@@ -232,6 +244,7 @@ niagara_kstat_fini()
 		}
 	}
 
+#if defined(NIAGARA_IMPL)
 	if (ni_jbus_kstat != NULL) {
 		ni_delete_name_kstat(ni_jbus_kstat);
 		if (ni_jbus_kstat->cntr_ksp != NULL)
@@ -239,6 +252,7 @@ niagara_kstat_fini()
 		kmem_free(ni_jbus_kstat, sizeof (ni_ksinfo_t));
 		ni_jbus_kstat = NULL;
 	}
+#endif
 }
 
 static void

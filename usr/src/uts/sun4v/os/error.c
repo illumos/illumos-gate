@@ -39,6 +39,7 @@
 #include <sys/error.h>
 #include <sys/fm/util.h>
 #include <sys/ivintr.h>
+#include <sys/archsystm.h>
 
 #define	MAX_CE_FLTS		10
 #define	MAX_ASYNC_FLTS		6
@@ -91,6 +92,8 @@ static int errh_error_protected(struct regs *, struct async_flt *, int *);
 static void errh_rq_full(struct async_flt *);
 static void ue_drain(void *, struct async_flt *, errorq_elem_t *);
 static void ce_drain(void *, struct async_flt *, errorq_elem_t *);
+static void errh_handle_attr(errh_async_flt_t *);
+static void errh_handle_asr(errh_async_flt_t *);
 
 /*ARGSUSED*/
 void
@@ -123,6 +126,11 @@ process_resumable_error(struct regs *rp, uint32_t head_offset,
 
 		switch (errh_flt.errh_er.desc) {
 		case ERRH_DESC_UCOR_RE:
+			/*
+			 * Check error attribute, handle individual error
+			 * if it is needed.
+			 */
+			errh_handle_attr(&errh_flt);
 			break;
 
 		case ERRH_DESC_WARN_RE:
@@ -282,6 +290,12 @@ process_nonresumable_error(struct regs *rp, uint64_t flags,
 			    (aflt->flt_class != BUS_FAULT)) {
 				aflt->flt_panic = 1;
 			}
+
+			/*
+			 * Check error attribute, handle individual error
+			 * if it is needed.
+			 */
+			errh_handle_attr(&errh_flt);
 
 			/*
 			 * If PIO error, we need to query the bus nexus
@@ -745,4 +759,61 @@ void
 nrq_overflow(struct regs *rp)
 {
 	fm_panic("Nonresumable queue full");
+}
+
+/*
+ * This is the place for special error handling for individual errors.
+ */
+static void
+errh_handle_attr(errh_async_flt_t *errh_fltp)
+{
+	switch (errh_fltp->errh_er.attr & ~ERRH_MODE_MASK) {
+	case ERRH_ATTR_CPU:
+	case ERRH_ATTR_MEM:
+	case ERRH_ATTR_PIO:
+	case ERRH_ATTR_IRF:
+	case ERRH_ATTR_FRF:
+	case ERRH_ATTR_SHUT:
+		break;
+
+	case ERRH_ATTR_ASR:
+		errh_handle_asr(errh_fltp);
+		break;
+
+	case ERRH_ATTR_ASI:
+	case ERRH_ATTR_PREG:
+	case ERRH_ATTR_RQF:
+		break;
+
+	default:
+		break;
+	}
+}
+
+/*
+ * Handle ASR bit set in ATTR
+ */
+static void
+errh_handle_asr(errh_async_flt_t *errh_fltp)
+{
+	uint64_t current_tick;
+
+	switch (errh_fltp->errh_er.reg) {
+	case ASR_REG_VALID | ASR_REG_TICK:
+		/*
+		 * For Tick Compare Register error, it only happens when
+		 * the register is being read or compared with the %tick
+		 * register. Since we lost the contents of the register,
+		 * we set the %tick_compr in the future. An interrupt will
+		 * happen when %tick matches the value field of %tick_compr.
+		 */
+		current_tick = (uint64_t)gettick();
+		tickcmpr_set(current_tick);
+		/* Do not panic */
+		errh_fltp->cmn_asyncflt.flt_panic = 0;
+		break;
+
+	default:
+		break;
+	}
 }

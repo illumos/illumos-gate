@@ -34,6 +34,8 @@
 #
 PLATFORM	 = sun4v
 LINKED_PLATFORMS += SUNW,Sun-Fire-T1000
+LINKED_PLATFORMS += SUNW,SPARC-Enterprise-T5120
+LINKED_PLATFORMS += SUNW,SPARC-Enterprise-T5220
 LINKED_PLATFORMS += SUNW,SPARC-Enterprise-T1000
 LINKED_PLATFORMS += SUNW,Sun-Blade-T6300
 PROMIF		 = ieee1275
@@ -323,6 +325,8 @@ DRV_KMODS	+= ebus
 DRV_KMODS	+= fpc
 DRV_KMODS	+= glvc
 DRV_KMODS	+= mdesc
+DRV_KMODS	+= niumx
+DRV_KMODS	+= nxge
 DRV_KMODS	+= px
 DRV_KMODS	+= qcn
 DRV_KMODS	+= rootnex
@@ -338,6 +342,8 @@ DRV_KMODS	+= vsw
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= memtest
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ncp
+$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= n2cp
+$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= n2rng
 
 #
 #	Exec Class Modules (/kernel/exec):
@@ -406,9 +412,10 @@ XMODS		+=
 #
 #	cpu modules
 #
-CPU_KMODS	+= generic niagara
+CPU_KMODS	+= generic niagara niagara2
 
 #
 #	Performance Counter BackEnd Modules (/usr/kernel/pcbe):
 #
 PCBE_KMODS	+= niagara_pcbe
+PCBE_KMODS	+= niagara2_pcbe

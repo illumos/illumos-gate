@@ -37,6 +37,7 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_subrdefs.h>
 #include <sys/pci.h>
+#include <sys/pci_impl.h>
 #include <sys/pci_cap.h>
 #include <sys/pci/pci_nexus.h>
 #include <sys/pci/pci_regs.h>
@@ -139,6 +140,7 @@ static int ppb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 						cred_t *credp, int *rvalp);
 static int ppb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
     int flags, char *name, caddr_t valuep, int *lengthp);
+static int ppb_get_bdf_from_dip(dev_info_t *dip, uint32_t *bdf);
 
 static struct cb_ops ppb_cb_ops = {
 	ppb_open,			/* open */
@@ -748,6 +750,7 @@ ppb_initchild(dev_info_t *child)
 	uchar_t header_type;
 	uchar_t min_gnt, latency_timer;
 	ppb_devstate_t *ppb;
+	pci_parent_data_t *pd_p;
 
 	/*
 	 * Name the child
@@ -926,6 +929,23 @@ ppb_initchild(dev_info_t *child)
 		pcix_set_cmd_reg(child, n);
 	}
 
+	/* Allocate memory for pci parent data */
+	pd_p = kmem_zalloc(sizeof (pci_parent_data_t), KM_SLEEP);
+
+	/*
+	 * Retrieve and save BDF and PCIE2PCI bridge's secondary bus
+	 * information in the parent private data structure.
+	 */
+	if (ppb_get_bdf_from_dip(child, &pd_p->pci_bdf) != DDI_SUCCESS) {
+		kmem_free(pd_p, sizeof (pci_parent_data_t));
+		pci_config_teardown(&config_handle);
+		return (DDI_FAILURE);
+	}
+
+	pd_p->pci_sec_bus = ddi_prop_get_int(DDI_DEV_T_ANY, child, 0,
+	    "pcie2pci-sec-bus", 0);
+
+	ddi_set_parent_data(child, (void *)pd_p);
 	pci_config_teardown(&config_handle);
 
 	return (DDI_SUCCESS);
@@ -935,6 +955,12 @@ static void
 ppb_removechild(dev_info_t *dip)
 {
 	ppb_devstate_t *ppb;
+	pci_parent_data_t *pd_p;
+
+	if (pd_p = ddi_get_parent_data(dip)) {
+		ddi_set_parent_data(dip, NULL);
+		kmem_free(pd_p, sizeof (pci_parent_data_t));
+	}
 
 	ppb = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
 	    ddi_get_instance(ddi_get_parent(dip)));
@@ -1620,6 +1646,28 @@ static int ppb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 		    flags, name, valuep, lengthp));
 
 	return (ddi_prop_op(dev, dip, prop_op, flags, name, valuep, lengthp));
+}
+
+static int
+ppb_get_bdf_from_dip(dev_info_t *dip, uint32_t *bdf)
+{
+	pci_regspec_t	*regspec;
+	int		reglen;
+
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "reg", (int **)&regspec, (uint_t *)&reglen) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (reglen < (sizeof (pci_regspec_t) / sizeof (int))) {
+		ddi_prop_free(regspec);
+		return (DDI_FAILURE);
+	}
+
+	/* Get phys_hi from first element.  All have same bdf. */
+	*bdf = (regspec->pci_phys_hi & (PCI_REG_BDFR_M ^ PCI_REG_REG_M)) >> 8;
+
+	ddi_prop_free(regspec);
+	return (DDI_SUCCESS);
 }
 
 /*

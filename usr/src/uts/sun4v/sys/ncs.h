@@ -32,6 +32,10 @@
 extern "C" {
 #endif
 
+#ifndef _ASM
+#include <sys/mutex.h>
+#endif /* !_ASM */
+
 /*
  * NCS HV API v1.0
  */
@@ -59,17 +63,83 @@ typedef uint64_t		ma_np_t;
  */
 union ma_ctl {
 	uint64_t	value;
-	struct {
-		uint64_t	reserved1:50;
-		uint64_t	invert_parity:1;
-		uint64_t	thread:2;
-		uint64_t	busy:1;
-		uint64_t	interrupt:1;
-		uint64_t	operation:3;
-		uint64_t	length:6;
+	union {
+		struct {
+			uint64_t	reserved1:50;
+			uint64_t	invert_parity:1;
+			uint64_t	thread:2;
+			uint64_t	busy:1;
+			uint64_t	interrupt:1;
+			uint64_t	operation:3;
+			uint64_t	length:6;
+		} n1;
+		struct {
+			uint64_t	reserved0:38;
+			uint64_t	ptymask:2;
+			uint64_t	reserved1:1;
+			uint64_t	hwerror:1;
+			uint64_t	invalidop:1;
+			uint64_t	thread:3;
+			uint64_t	interrupt:1;
+			uint64_t	busy:1;
+			uint64_t	reserved3:3;
+			uint64_t	operation:5;
+			uint64_t	length:8;
+		} n2;
 	} bits;
 };
-#endif /* !_ASM */
+
+
+typedef struct {
+	union {
+		struct {
+			uint64_t	_cw_op		:8;
+			uint64_t	_cw_enc		:1;
+			uint64_t	_cw_sob		:1;
+			uint64_t	_cw_eob		:1;
+			uint64_t	_cw_resv1	:3;
+			uint64_t	_cw_sfas	:1;
+			uint64_t	_cw_intr	:1;
+			uint64_t	_cw_hlen	:8;
+			uint64_t	_cw_strand_id	:3;
+			uint64_t	_cw_auth_type	:5;
+			uint64_t	_cw_enc_type	:8;
+			uint64_t	_cw_hmac_keylen	:8;
+			uint64_t	_cw_length	:16;
+		} _s;
+		uint64_t	_cw_ctlbits;
+	} _u;
+	uint64_t	cw_src_addr;
+	uint64_t	cw_auth_key_addr;
+	uint64_t	cw_auth_iv_addr;
+	uint64_t	cw_final_auth_state_addr;
+	uint64_t	cw_enc_key_addr;
+	uint64_t	cw_enc_iv_addr;
+	union {
+		uint64_t	_cw_dst_addr;
+		uint64_t	_cw_csr;
+	} _ux;
+} cwq_cw_t;
+
+#define	cw_op		_u._s._cw_op
+#define	cw_enc		_u._s._cw_enc
+#define	cw_sob		_u._s._cw_sob
+#define	cw_eob		_u._s._cw_eob
+#define	cw_resv1	_u._s._cw_resv1
+#define	cw_sfas		_u._s._cw_sfas
+#define	cw_intr		_u._s._cw_intr
+#define	cw_hlen		_u._s._cw_hlen
+#define	cw_resv2	_u._s._cw_resv2
+#define	cw_strand_id	_u._s._cw_strand_id
+#define	cw_auth_type	_u._s._cw_auth_type
+#define	cw_enc_type	_u._s._cw_enc_type
+#define	cw_hmac_keylen	_u._s._cw_hmac_keylen
+#define	cw_length	_u._s._cw_length
+#define	cw_ctlbits	_u._cw_ctlbits
+#define	cw_dst_addr	_ux._cw_dst_addr
+#define	cw_csr		_ux._cw_csr
+
+#endif /* _ASM */
 
 /* Values for ma_ctl operation field */
 #define	MA_OP_LOAD		0x0
@@ -116,10 +186,6 @@ union ma_ma {
  * NCS API definitions
  */
 
-#ifndef _ASM
-#include <sys/mutex.h>
-#endif	/* !_ASM */
-
 /*
  * NCS HV API v1.0 definitions (PSARC/2005/125)
  */
@@ -132,14 +198,13 @@ union ma_ma {
 /*
  * The following are parameters to the NCS_QTAIL_UPDATE call:
  *
- *      NCS_SYNC	Perform MA operations synchronously,
+ *      NCS_SYNC	Perform MA/SPU operations synchronously,
  *			i.e. wait for each enqueued operation
  *			to complete before progressing to
  *			next one.
- *      NCS_ASYNC	Perform MA operations asynchronously,
- *			i.e. kick off the next MA operation
+ *      NCS_ASYNC	Perform MA/SPU operations asynchronously,
+ *			i.e. kick off the next MA/SPU operation
  *			without waiting for its completion.
- *			XXX - not supported yet.
  */
 #define	NCS_SYNC	0
 #define	NCS_ASYNC	1
@@ -248,7 +313,6 @@ extern uint64_t	hv_ncs_gettail(uint64_t, uint64_t *);
 extern uint64_t	hv_ncs_settail(uint64_t, uint64_t);
 extern uint64_t	hv_ncs_qhandle_to_devino(uint64_t, uint64_t *);
 extern uint64_t	hv_ncs_sethead_marker(uint64_t, uint64_t);
-extern uint64_t	hv_ncs_intr_clrstate(uint64_t);
 #endif /* !_ASM */
 
 #ifdef	__cplusplus

@@ -74,6 +74,10 @@ sparc_SUBDIRS= \
 	SUNWldomu.v  \
 	SUNWluxd.u \
 	SUNWluxl \
+	SUNWn2cp.v \
+	SUNWn2cpact.v \
+	SUNWniumx.v \
+	SUNWnxge.v \
 	SUNWonmtst.u \
 	SUNWonmtst.v \
 	SUNWiopc.u \
@@ -90,6 +94,7 @@ sparc_SUBDIRS= \
 	SUNWstc.u \
 	SUNWus.u \
 	SUNWust1.v \
+	SUNWust2.v \
 	SUNWwrsa.u \
 	SUNWwrsd.u \
 	SUNWwrsm.u \
