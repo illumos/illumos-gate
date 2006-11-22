@@ -1145,6 +1145,7 @@ pepb_err_msi_intr(caddr_t arg, caddr_t arg2)
 	ddi_fm_error_t derr;
 
 	bzero(&derr, sizeof (ddi_fm_error_t));
+	derr.fme_version = DDI_FME_VERSION;
 
 	if (!(pepb_p->soft_state & PEPB_SOFT_STATE_INIT_ENABLE))
 		return (DDI_INTR_UNCLAIMED);

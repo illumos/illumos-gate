@@ -68,6 +68,7 @@ extern int ndi_fmc_error(dev_info_t *, dev_info_t *, int, uint64_t,
     const void *);
 extern int ndi_fmc_entry_error(dev_info_t *, int, ddi_fm_error_t *,
     const void *);
+extern int ndi_fmc_entry_error_all(dev_info_t *, int, ddi_fm_error_t *);
 
 extern int ndi_fm_handler_dispatch(dev_info_t *, dev_info_t *,
     const ddi_fm_error_t *);

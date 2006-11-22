@@ -170,10 +170,25 @@ typedef struct pcie_error_regs {
 	uint16_t pcie_cap;		/* PCI Express capability register */
 	uint16_t pcie_err_status;	/* pcie device status register */
 	uint16_t pcie_err_ctl;		/* pcie error control register */
+	uint16_t pcie_dev_cap;		/* pcie device capabilities register */
 	pcix_bdg_error_regs_t *pcix_bdg_regs;	/* pcix bridge regs */
 	pcie_rc_error_regs_t *pcie_rc_regs;	/* pcie root complex regs */
 	pcie_adv_error_regs_t *pcie_adv_regs;	/* pcie advanced err regs */
 } pcie_error_regs_t;
+
+/*
+ * pcie bus specific structure
+ */
+
+typedef struct pci_fme_bus_specific {
+	int pci_bs_type;
+	uint64_t pci_bs_addr;
+	uint16_t pci_bs_bdf;
+	int pci_bs_flags;
+} pci_fme_bus_specific_t;
+
+#define	PCI_BS_ADDR_VALID		1
+#define	PCI_BS_BDF_VALID		2
 
 /*
  * target error queue defines

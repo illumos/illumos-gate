@@ -2315,6 +2315,7 @@ pci_peekpoke_check_fma(dev_info_t *dip, void *arg, ddi_ctl_enum_t ctlop)
 	 * io framework to see if there really was an error
 	 */
 	bzero(&de, sizeof (ddi_fm_error_t));
+	de.fme_version = DDI_FME_VERSION;
 	de.fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
 	if (hdlp->ah_acc.devacc_attr_access == DDI_CAUTIOUS_ACC) {
 		de.fme_flag = DDI_FM_ERR_EXPECTED;
@@ -2407,6 +2408,13 @@ pci_peekpoke_check(dev_info_t *dip, dev_info_t *rdip,
 	int rval;
 	peekpoke_ctlops_t *in_args = (peekpoke_ctlops_t *)arg;
 	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)in_args->handle;
+
+	/*
+	 * this function only supports cautious accesses, not peeks/pokes
+	 * which don't have a handle
+	 */
+	if (hp == NULL)
+		return (DDI_FAILURE);
 
 	if (hp->ahi_acc_attr & DDI_ACCATTR_CONFIG_SPACE) {
 		if (!mutex_tryenter(err_mutexp)) {

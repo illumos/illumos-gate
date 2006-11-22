@@ -844,9 +844,11 @@ prop error.io.pcix.scpe-d@pcibus/pcidev/pcifn (1)->
     error.io.pcix.spl-comp-ma-u@pcibus/pcidev/pcifn,
     error.io.pcix.spl-comp-ta-u@pcibus/pcidev/pcifn;
 
-prop error.io.pcix.spl-comp-ma-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
+prop error.io.pcix.spl-comp-ma-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (2)->
     ereport.io.pcix.sec-spl-dis@pcibus/pcidev/pcifn,
-    error.io.pci.serr-u@pcibus/pcidev/pcifn,
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pcix.spl-comp-ma-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
     ereport.io.pci.sec-ma@pcibus/pcidev/pcifn;
 
 prop error.io.pcix.spl-comp-ta-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->

@@ -91,8 +91,8 @@ ushort_t	pcie_root_error_cmd_default = \
  * Can be defined to mask off certain types of AER errors
  * By default all are set to 0; as no errors are masked
  */
-uint32_t	pcie_aer_uce_mask = 0;
-uint32_t	pcie_aer_ce_mask = PCIE_AER_CE_AD_NFE;
+uint32_t	pcie_aer_uce_mask = PCIE_AER_UCE_UC;
+uint32_t	pcie_aer_ce_mask = 0;
 uint32_t	pcie_aer_suce_mask = PCIE_AER_SUCE_RCVD_MA;
 
 /*
@@ -226,8 +226,7 @@ pcie_error_enable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 	status_reg = pci_config_get16(cfg_hdl, PCI_CONF_STAT);
 	pci_config_put16(cfg_hdl, PCI_CONF_STAT, status_reg);
 	command_reg = pci_config_get16(cfg_hdl, PCI_CONF_COMM);
-	if (pcie_serr_disable_flag && cap_ptr != PCI_CAP_NEXT_PTR_NULL &&
-	    dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT) {
+	if (pcie_serr_disable_flag && cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
 		pcie_command_default &= ~PCI_COMM_SERR_ENABLE;
 		/* shouldn't happen; just in case */
 		if (command_reg & PCI_COMM_SERR_ENABLE)
@@ -293,9 +292,10 @@ pcie_error_enable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 	device_ctl |= pcie_device_ctrl_default;
 
 	/*
-	 * Disable UR for any non-RBER enabled leaf PCIe device
+	 * Disable UR for any non-RBER enabled leaf PCIe device or bridge
 	 */
-	if ((dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) &&
+	if ((dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV ||
+	    dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) &&
 	    ((pci_config_get16(cfg_hdl, cap_ptr + PCIE_DEVCAP) &
 	    PCIE_DEVCAP_ROLE_BASED_ERR_REP) !=
 	    PCIE_DEVCAP_ROLE_BASED_ERR_REP))

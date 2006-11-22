@@ -1168,8 +1168,17 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 	case T_LIST:
 	case T_AND:
 		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, valuep))
-			return (0);
+				arrowp, try, valuep)) {
+			/*
+			 * if lhs is unknown, still check rhs. If that
+			 * is false we can return false irrespectice of lhs
+			 */
+			if (!eval_expr(np->u.expr.right, ex, epnames, globals,
+			    croot, arrowp, try, valuep))
+				return (0);
+			if (valuep->v != 0)
+				return (0);
+		}
 		if (valuep->v == 0) {
 			valuep->t = UINT64;
 			return (1);
@@ -1183,8 +1192,17 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 
 	case T_OR:
 		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, valuep))
-			return (0);
+				arrowp, try, valuep)) {
+			/*
+			 * if lhs is unknown, still check rhs. If that
+			 * is true we can return true irrespectice of lhs
+			 */
+			if (!eval_expr(np->u.expr.right, ex, epnames, globals,
+			    croot, arrowp, try, valuep))
+				return (0);
+			if (valuep->v == 0)
+				return (0);
+		}
 		if (valuep->v != 0) {
 			valuep->t = UINT64;
 			valuep->v = 1;

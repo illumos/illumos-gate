@@ -46,14 +46,17 @@
 /*
  * Expected PCI Express error mask values
  */
-uint32_t pcie_expected_ce_mask = PCIE_AER_CE_AD_NFE;
-uint32_t pcie_expected_ue_mask = 0x0;
-uint32_t pcie_expected_sue_mask = 0x0;
+uint32_t pcie_expected_ce_mask = 0x0;
+uint32_t pcie_expected_ue_mask = PCIE_AER_UCE_UC;
 #if defined(__sparc)
+uint32_t pcie_expected_sue_mask = 0x0;
+#else
+uint32_t pcie_expected_sue_mask = PCIE_AER_SUCE_RCVD_MA;
+#endif
 uint32_t pcie_aer_uce_log_bits = PCIE_AER_UCE_LOG_BITS;
+#if defined(__sparc)
 uint32_t pcie_aer_suce_log_bits = PCIE_AER_SUCE_LOG_BITS;
 #else
-uint32_t pcie_aer_uce_log_bits = PCIE_AER_UCE_LOG_BITS & ~PCIE_AER_UCE_UR;
 uint32_t pcie_aer_suce_log_bits = \
 	    PCIE_AER_SUCE_LOG_BITS & ~PCIE_AER_SUCE_RCVD_MA;
 #endif
@@ -74,9 +77,7 @@ pci_fm_err_t pci_bdg_err_tbl[] = {
 	PCI_DET_PERR,	PCI_STAT_PERROR,	NULL,		DDI_FM_UNKNOWN,
 	PCI_MDPE,	PCI_STAT_S_PERROR,	PCI_TARG_MDPE,	DDI_FM_UNKNOWN,
 	PCI_REC_SERR,	PCI_STAT_S_SYSERR,	NULL,		DDI_FM_UNKNOWN,
-#if !defined(__sparc)
-	PCI_MA,		PCI_STAT_R_MAST_AB,	PCI_TARG_MA,	DDI_FM_OK,
-#else
+#if defined(__sparc)
 	PCI_MA,		PCI_STAT_R_MAST_AB,	PCI_TARG_MA,	DDI_FM_UNKNOWN,
 #endif
 	PCI_REC_TA,	PCI_STAT_R_TARG_AB,	PCI_TARG_REC_TA, DDI_FM_UNKNOWN,
@@ -105,11 +106,7 @@ static pci_fm_err_t pciex_ue_err_tbl[] = {
 	PCIEX_UC,	PCIE_AER_UCE_UC,		NULL,	DDI_FM_OK,
 	PCIEX_ECRC,	PCIE_AER_UCE_ECRC,		NULL,	DDI_FM_UNKNOWN,
 	PCIEX_CA,	PCIE_AER_UCE_CA,		NULL,	DDI_FM_UNKNOWN,
-#if !defined(__sparc)
-	PCIEX_UR,	PCIE_AER_UCE_UR,		NULL,	DDI_FM_OK,
-#else
 	PCIEX_UR,	PCIE_AER_UCE_UR,		NULL,	DDI_FM_UNKNOWN,
-#endif
 	PCIEX_POIS,	PCIE_AER_UCE_PTLP,		NULL,	DDI_FM_UNKNOWN,
 	NULL, NULL, NULL, NULL,
 };
@@ -118,9 +115,7 @@ static pci_fm_err_t pcie_sue_err_tbl[] = {
 	PCIEX_S_TA_SC,	PCIE_AER_SUCE_TA_ON_SC,		NULL,	DDI_FM_UNKNOWN,
 	PCIEX_S_MA_SC,	PCIE_AER_SUCE_MA_ON_SC,		NULL,	DDI_FM_UNKNOWN,
 	PCIEX_S_RTA,	PCIE_AER_SUCE_RCVD_TA,		NULL,	DDI_FM_UNKNOWN,
-#if !defined(__sparc)
-	PCIEX_S_RMA,	PCIE_AER_SUCE_RCVD_MA,		NULL,	DDI_FM_OK,
-#else
+#if defined(__sparc)
 	PCIEX_S_RMA,	PCIE_AER_SUCE_RCVD_MA,		NULL,	DDI_FM_UNKNOWN,
 #endif
 	PCIEX_S_USC,	PCIE_AER_SUCE_USC_ERR,		NULL,	DDI_FM_UNKNOWN,
@@ -159,7 +154,7 @@ static pci_fm_err_t pciex_nadv_err_tbl[] = {
 };
 
 static int
-pci_config_check(ddi_acc_handle_t handle)
+pci_config_check(ddi_acc_handle_t handle, int fme_flag)
 {
 	ddi_acc_hdl_t *hp = impl_acc_hdl_get(handle);
 	ddi_fm_error_t de;
@@ -171,12 +166,14 @@ pci_config_check(ddi_acc_handle_t handle)
 
 	ddi_fm_acc_err_get(handle, &de, de.fme_version);
 	if (de.fme_status != DDI_FM_OK) {
-		char buf[FM_MAX_CLASS];
+		if (fme_flag == DDI_FM_ERR_UNEXPECTED) {
+			char buf[FM_MAX_CLASS];
 
-		(void) snprintf(buf, FM_MAX_CLASS, "%s.%s", PCI_ERROR_SUBCLASS,
-		    PCI_NR);
-		ddi_fm_ereport_post(hp->ah_dip, buf, de.fme_ena, DDI_NOSLEEP,
-		    FM_VERSION, DATA_TYPE_UINT8, 0, NULL);
+			(void) snprintf(buf, FM_MAX_CLASS, "%s.%s",
+			    PCI_ERROR_SUBCLASS, PCI_NR);
+			ddi_fm_ereport_post(hp->ah_dip, buf, de.fme_ena,
+			    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0, NULL);
+		}
 		ddi_fm_acc_err_clear(handle, de.fme_version);
 	}
 	return (de.fme_status);
@@ -184,14 +181,14 @@ pci_config_check(ddi_acc_handle_t handle)
 
 static void
 pcix_ecc_regs_gather(pci_erpt_t *erpt_p, pcix_ecc_regs_t *pcix_ecc_regs,
-    uint8_t pcix_cap_ptr)
+    uint8_t pcix_cap_ptr, int fme_flag)
 {
 	int bdg = erpt_p->pe_dflags & PCI_BRIDGE_DEV;
 
 	pcix_ecc_regs->pcix_ecc_ctlstat = pci_config_get32(erpt_p->pe_hdl,
 	    (pcix_cap_ptr + (bdg ? PCI_PCIX_BDG_ECC_STATUS :
 	    PCI_PCIX_ECC_STATUS)));
-	if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK)
+	if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK)
 		pcix_ecc_regs->pcix_ecc_vflags |= PCIX_ERR_ECC_STS_VALID;
 	else
 		return;
@@ -207,7 +204,7 @@ pcix_ecc_regs_gather(pci_erpt_t *erpt_p, pcix_ecc_regs_t *pcix_ecc_regs,
 }
 
 static void
-pcix_regs_gather(pci_erpt_t *erpt_p, void *pe_regs)
+pcix_regs_gather(pci_erpt_t *erpt_p, void *pe_regs, int fme_flag)
 {
 	if (erpt_p->pe_dflags & PCI_BRIDGE_DEV) {
 		pcix_bdg_error_regs_t *pcix_bdg_regs =
@@ -218,14 +215,14 @@ pcix_regs_gather(pci_erpt_t *erpt_p, void *pe_regs)
 		pcix_bdg_cap_ptr = pcix_bdg_regs->pcix_bdg_cap_ptr;
 		pcix_bdg_regs->pcix_bdg_sec_stat = pci_config_get16(
 		    erpt_p->pe_hdl, (pcix_bdg_cap_ptr + PCI_PCIX_SEC_STATUS));
-		if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK)
+		if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK)
 			pcix_bdg_regs->pcix_bdg_vflags |=
 			    PCIX_BDG_SEC_STATUS_VALID;
 		else
 			return;
 		pcix_bdg_regs->pcix_bdg_stat = pci_config_get32(erpt_p->pe_hdl,
 		    (pcix_bdg_cap_ptr + PCI_PCIX_BDG_STATUS));
-		if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK)
+		if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK)
 			pcix_bdg_regs->pcix_bdg_vflags |= PCIX_BDG_STATUS_VALID;
 		else
 			return;
@@ -240,7 +237,7 @@ pcix_regs_gather(pci_erpt_t *erpt_p, void *pe_regs)
 				pcix_bdg_ecc_regs =
 				    pcix_bdg_regs->pcix_bdg_ecc_regs[1];
 				pcix_ecc_regs_gather(erpt_p, pcix_bdg_ecc_regs,
-				    pcix_bdg_cap_ptr);
+				    pcix_bdg_cap_ptr, fme_flag);
 			} else {
 				for (i = 0; i < 2; i++) {
 					pcix_bdg_ecc_regs =
@@ -250,7 +247,7 @@ pcix_regs_gather(pci_erpt_t *erpt_p, void *pe_regs)
 					    PCI_PCIX_BDG_ECC_STATUS), i);
 					pcix_ecc_regs_gather(erpt_p,
 					    pcix_bdg_ecc_regs,
-					    pcix_bdg_cap_ptr);
+					    pcix_bdg_cap_ptr, fme_flag);
 				}
 			}
 		}
@@ -264,7 +261,7 @@ pcix_regs_gather(pci_erpt_t *erpt_p, void *pe_regs)
 		    (pcix_cap_ptr + PCI_PCIX_COMMAND));
 		pcix_regs->pcix_status = pci_config_get32(erpt_p->pe_hdl,
 		    (pcix_cap_ptr + PCI_PCIX_STATUS));
-		if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK)
+		if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK)
 			pcix_regs->pcix_vflags |= PCIX_ERR_STATUS_VALID;
 		else
 			return;
@@ -273,13 +270,13 @@ pcix_regs_gather(pci_erpt_t *erpt_p, void *pe_regs)
 			    pcix_regs->pcix_ecc_regs;
 
 			pcix_ecc_regs_gather(erpt_p, pcix_ecc_regs,
-			    pcix_cap_ptr);
+			    pcix_cap_ptr, fme_flag);
 		}
 	}
 }
 
 static void
-pcie_regs_gather(pci_erpt_t *erpt_p)
+pcie_regs_gather(pci_erpt_t *erpt_p, int fme_flag)
 {
 	pcie_error_regs_t *pcie_regs = (pcie_error_regs_t *)erpt_p->pe_regs;
 	uint8_t pcie_cap_ptr;
@@ -290,17 +287,19 @@ pcie_regs_gather(pci_erpt_t *erpt_p)
 
 	pcie_regs->pcie_err_status = pci_config_get16(erpt_p->pe_hdl,
 	    pcie_cap_ptr + PCIE_DEVSTS);
-	if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK)
+	if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK)
 		pcie_regs->pcie_vflags |= PCIE_ERR_STATUS_VALID;
 	else
 		return;
 
 	pcie_regs->pcie_err_ctl = pci_config_get16(erpt_p->pe_hdl,
 	    (pcie_cap_ptr + PCIE_DEVCTL));
+	pcie_regs->pcie_dev_cap = pci_config_get16(erpt_p->pe_hdl,
+	    (pcie_cap_ptr + PCIE_DEVCAP));
 
 	if ((erpt_p->pe_dflags & PCI_BRIDGE_DEV) && (erpt_p->pe_dflags &
 	    PCIX_DEV))
-		pcix_regs_gather(erpt_p, pcie_regs->pcix_bdg_regs);
+		pcix_regs_gather(erpt_p, pcie_regs->pcix_bdg_regs, fme_flag);
 
 	if (erpt_p->pe_dflags & PCIEX_RC_DEV) {
 		pcie_rc_error_regs_t *pcie_rc_regs = pcie_regs->pcie_rc_regs;
@@ -320,7 +319,7 @@ pcie_regs_gather(pci_erpt_t *erpt_p)
 
 	pcie_adv_regs->pcie_ue_status = pci_config_get32(erpt_p->pe_hdl,
 	    pcie_ecap_ptr + PCIE_AER_UCE_STS);
-	if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK)
+	if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK)
 		pcie_adv_regs->pcie_adv_vflags |= PCIE_UE_STATUS_VALID;
 
 	pcie_adv_regs->pcie_ue_mask = pci_config_get32(erpt_p->pe_hdl,
@@ -331,7 +330,7 @@ pcie_regs_gather(pci_erpt_t *erpt_p)
 	    pcie_ecap_ptr + PCIE_AER_CTL);
 	pcie_adv_regs->pcie_ue_hdr0 = pci_config_get32(erpt_p->pe_hdl,
 	    pcie_ecap_ptr + PCIE_AER_HDR_LOG);
-	if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK) {
+	if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK) {
 		int i;
 		pcie_adv_regs->pcie_adv_vflags |= PCIE_UE_HDR_VALID;
 
@@ -344,7 +343,7 @@ pcie_regs_gather(pci_erpt_t *erpt_p)
 
 	pcie_adv_regs->pcie_ce_status = pci_config_get32(erpt_p->pe_hdl,
 	    pcie_ecap_ptr + PCIE_AER_CE_STS);
-	if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK)
+	if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK)
 		pcie_adv_regs->pcie_adv_vflags |= PCIE_CE_STATUS_VALID;
 
 	pcie_adv_regs->pcie_ce_mask = pci_config_get32(erpt_p->pe_hdl,
@@ -361,12 +360,15 @@ pcie_regs_gather(pci_erpt_t *erpt_p)
 		pcie_bdg_regs->pcie_sue_status =
 		    pci_config_get32(erpt_p->pe_hdl,
 		    pcie_ecap_ptr + PCIE_AER_SUCE_STS);
-		if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK)
+		pcie_bdg_regs->pcie_sue_mask =
+		    pci_config_get32(erpt_p->pe_hdl,
+		    pcie_ecap_ptr + PCIE_AER_SUCE_MASK);
+		if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK)
 			pcie_adv_regs->pcie_adv_vflags |= PCIE_SUE_STATUS_VALID;
 		pcie_bdg_regs->pcie_sue_hdr0 = pci_config_get32(erpt_p->pe_hdl,
 		    (pcie_ecap_ptr + PCIE_AER_SHDR_LOG));
 
-		if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK) {
+		if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK) {
 			int i;
 
 			pcie_adv_regs->pcie_adv_vflags |= PCIE_SUE_HDR_VALID;
@@ -392,7 +394,7 @@ pcie_regs_gather(pci_erpt_t *erpt_p)
 		pcie_rc_regs->pcie_rc_err_status =
 		    pci_config_get32(erpt_p->pe_hdl,
 			(pcie_ecap_ptr + PCIE_AER_RE_STS));
-		if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK)
+		if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK)
 			pcie_adv_regs->pcie_adv_vflags |=
 			    PCIE_RC_ERR_STATUS_VALID;
 		pcie_rc_regs->pcie_rc_ce_src_id =
@@ -401,14 +403,14 @@ pcie_regs_gather(pci_erpt_t *erpt_p)
 		pcie_rc_regs->pcie_rc_ue_src_id =
 		    pci_config_get16(erpt_p->pe_hdl,
 			(pcie_ecap_ptr + PCIE_AER_ERR_SRC_ID));
-		if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK)
+		if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK)
 			pcie_adv_regs->pcie_adv_vflags |= PCIE_SRC_ID_VALID;
 	}
 }
 
 /*ARGSUSED*/
 static void
-pci_regs_gather(dev_info_t *dip, pci_erpt_t *erpt_p)
+pci_regs_gather(dev_info_t *dip, pci_erpt_t *erpt_p, int fme_flag)
 {
 	pci_error_regs_t *pci_regs = erpt_p->pe_pci_regs;
 
@@ -418,12 +420,12 @@ pci_regs_gather(dev_info_t *dip, pci_erpt_t *erpt_p)
 	 */
 	pci_regs->pci_err_status = pci_config_get16(erpt_p->pe_hdl,
 	    PCI_CONF_STAT);
-	if (pci_config_check(erpt_p->pe_hdl) != DDI_FM_OK)
+	if (pci_config_check(erpt_p->pe_hdl, fme_flag) != DDI_FM_OK)
 		return;
 	pci_regs->pci_vflags |= PCI_ERR_STATUS_VALID;
 	pci_regs->pci_cfg_comm = pci_config_get16(erpt_p->pe_hdl,
 	    PCI_CONF_COMM);
-	if (pci_config_check(erpt_p->pe_hdl) != DDI_FM_OK)
+	if (pci_config_check(erpt_p->pe_hdl, fme_flag) != DDI_FM_OK)
 		return;
 
 	/*
@@ -432,12 +434,12 @@ pci_regs_gather(dev_info_t *dip, pci_erpt_t *erpt_p)
 	if (erpt_p->pe_dflags & PCI_BRIDGE_DEV) {
 		pci_regs->pci_bdg_regs->pci_bdg_sec_stat =
 		    pci_config_get16(erpt_p->pe_hdl, PCI_BCNF_SEC_STATUS);
-		if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK)
+		if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK)
 			pci_regs->pci_bdg_regs->pci_bdg_vflags |=
 			    PCI_BDG_SEC_STAT_VALID;
 		pci_regs->pci_bdg_regs->pci_bdg_ctrl =
 		    pci_config_get16(erpt_p->pe_hdl, PCI_BCNF_BCNTRL);
-		if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK)
+		if (pci_config_check(erpt_p->pe_hdl, fme_flag) == DDI_FM_OK)
 			pci_regs->pci_bdg_regs->pci_bdg_vflags |=
 			    PCI_BDG_CTRL_VALID;
 	}
@@ -448,9 +450,9 @@ pci_regs_gather(dev_info_t *dip, pci_erpt_t *erpt_p)
 	 * available.
 	 */
 	if (erpt_p->pe_dflags & PCIEX_DEV)
-		pcie_regs_gather(erpt_p);
+		pcie_regs_gather(erpt_p, fme_flag);
 	else if (erpt_p->pe_dflags & PCIX_DEV)
-		pcix_regs_gather(erpt_p, erpt_p->pe_regs);
+		pcix_regs_gather(erpt_p, erpt_p->pe_regs, fme_flag);
 
 }
 
@@ -703,7 +705,6 @@ pcie_ereport_setup(dev_info_t *dip, pci_erpt_t *erpt_p)
 {
 	pcie_error_regs_t *pcie_regs;
 	pcie_adv_error_regs_t *pcie_adv_regs;
-	char buf[FM_MAX_CLASS];
 	uint8_t pcix_cap_ptr;
 	uint8_t pcie_cap_ptr;
 	uint16_t pcie_ecap_ptr;
@@ -724,7 +725,8 @@ pcie_ereport_setup(dev_info_t *dip, pci_erpt_t *erpt_p)
 	uint16_t aer_ptr = 0;
 
 	cap_ptr = pci_config_get8(erpt_p->pe_hdl, PCI_CONF_CAP_PTR);
-	if (pci_config_check(erpt_p->pe_hdl) == DDI_FM_OK) {
+	if (pci_config_check(erpt_p->pe_hdl, DDI_FM_ERR_UNEXPECTED) ==
+	    DDI_FM_OK) {
 		while ((cap_id = pci_config_get8(erpt_p->pe_hdl, cap_ptr)) !=
 		    0xff) {
 			if (cap_id == PCI_CAP_ID_PCIX) {
@@ -749,7 +751,8 @@ pcie_ereport_setup(dev_info_t *dip, pci_erpt_t *erpt_p)
 		}
 			if ((cap_ptr = pci_config_get8(erpt_p->pe_hdl,
 			    cap_ptr + 1)) == 0xff || cap_ptr == 0 ||
-			    (pci_config_check(erpt_p->pe_hdl) != DDI_FM_OK))
+			    (pci_config_check(erpt_p->pe_hdl,
+			    DDI_FM_ERR_UNEXPECTED) != DDI_FM_OK))
 				break;
 		}
 	}
@@ -854,10 +857,6 @@ pcie_ereport_setup(dev_info_t *dip, pci_erpt_t *erpt_p)
 	}
 
 	if (!(erpt_p->pe_dflags & PCIEX_ADV_DEV)) {
-		(void) snprintf(buf, FM_MAX_CLASS, "%s.%s",
-		    PCIEX_ERROR_SUBCLASS, PCIEX_NADV);
-		ddi_fm_ereport_post(dip, buf, NULL, DDI_NOSLEEP,
-		    FM_VERSION, DATA_TYPE_UINT8, 0, NULL);
 		return;
 	}
 
@@ -889,7 +888,7 @@ pcie_ereport_setup(dev_info_t *dip, pci_erpt_t *erpt_p)
 	 * Check that mask values are as expected, if not
 	 * change them to what we desire.
 	 */
-	pci_regs_gather(dip, erpt_p);
+	pci_regs_gather(dip, erpt_p, DDI_FM_ERR_UNEXPECTED);
 	pcie_regs = (pcie_error_regs_t *)erpt_p->pe_regs;
 	if (pcie_regs->pcie_adv_regs->pcie_ce_mask != pcie_expected_ce_mask) {
 		pci_config_put32(erpt_p->pe_hdl,
@@ -954,14 +953,16 @@ pci_ereport_setup(dev_info_t *dip)
 	erpt_p->pe_pci_regs = kmem_zalloc(sizeof (pci_error_regs_t), KM_SLEEP);
 
 	pci_status = pci_config_get16(erpt_p->pe_hdl, PCI_CONF_STAT);
-	if (pci_config_check(erpt_p->pe_hdl) != DDI_FM_OK)
+	if (pci_config_check(erpt_p->pe_hdl, DDI_FM_ERR_UNEXPECTED) !=
+	    DDI_FM_OK)
 		goto error;
 
 	/*
 	 * Get header type and record if device is a bridge.
 	 */
 	pci_hdr_type = pci_config_get8(erpt_p->pe_hdl, PCI_CONF_HEADER);
-	if (pci_config_check(erpt_p->pe_hdl) != DDI_FM_OK)
+	if (pci_config_check(erpt_p->pe_hdl, DDI_FM_ERR_UNEXPECTED) !=
+	    DDI_FM_OK)
 		goto error;
 
 	/*
@@ -1000,7 +1001,7 @@ pci_ereport_setup(dev_info_t *dip)
 	}
 
 done:
-	pci_regs_gather(dip, erpt_p);
+	pci_regs_gather(dip, erpt_p, DDI_FM_ERR_UNEXPECTED);
 	pci_regs_clear(erpt_p);
 
 	/*
@@ -1128,24 +1129,6 @@ pci_ereport_teardown(dev_info_t *dip)
 #endif
 }
 
-/*
- * Function used by PCI device and nexus error handlers to check if a
- * captured address resides in their DMA or ACC handle caches or the caches of
- * their children devices, respectively.
- */
-static int
-pci_dev_hdl_lookup(dev_info_t *dip, int type, ddi_fm_error_t *derr,
-    void *addr)
-{
-	struct i_ddi_fmhdl *fmhdl = DEVI(dip)->devi_fmhdl;
-	pci_erpt_t *erpt_p = (pci_erpt_t *)fmhdl->fh_bus_specific;
-
-	if (erpt_p->pe_dflags & PCI_BRIDGE_DEV)
-		return (ndi_fmc_error(dip, NULL, type, derr->fme_ena, addr));
-	else
-		return (ndi_fmc_entry_error(dip, type, derr, addr));
-}
-
 static void
 pcie_ereport_post(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p,
     char *buf, int errtype)
@@ -1228,21 +1211,30 @@ pcie_ereport_post(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p,
 	}
 }
 
+/*ARGSUSED*/
 static void
-pcie_check_addr(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *eprt_p)
+pcie_check_addr(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 {
-	pcie_error_regs_t *pcie_regs = (pcie_error_regs_t *)eprt_p->pe_regs;
+	pcie_error_regs_t *pcie_regs = (pcie_error_regs_t *)erpt_p->pe_regs;
 	pcie_adv_error_regs_t *pcie_adv_regs = pcie_regs->pcie_adv_regs;
 	pcie_tlp_hdr_t *ue_hdr0;
 	uint32_t *ue_hdr;
 	uint64_t addr = NULL;
+	int upstream = 0;
+	pci_fme_bus_specific_t *pci_fme_bsp =
+	    (pci_fme_bus_specific_t *)derr->fme_bus_specific;
 
-	if (!(pcie_adv_regs->pcie_adv_vflags & PCIE_UE_HDR_VALID)) {
-		derr->fme_status = DDI_FM_UNKNOWN;
+	if (!(pcie_adv_regs->pcie_adv_vflags & PCIE_UE_HDR_VALID))
 		return;
-	}
+
 	ue_hdr0 = (pcie_tlp_hdr_t *)&pcie_adv_regs->pcie_ue_hdr0;
 	ue_hdr = pcie_adv_regs->pcie_ue_hdr;
+
+	if ((pcie_regs->pcie_cap & PCIE_PCIECAP_DEV_TYPE_MASK) ==
+	    PCIE_PCIECAP_DEV_TYPE_ROOT ||
+	    (pcie_regs->pcie_cap & PCIE_PCIECAP_DEV_TYPE_MASK) ==
+	    PCIE_PCIECAP_DEV_TYPE_DOWN)
+		upstream = 1;
 
 	switch (ue_hdr0->type) {
 	    case PCIE_TLP_TYPE_MEM:
@@ -1259,16 +1251,17 @@ pcie_check_addr(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *eprt_p)
 			addr = (uint32_t)memio32_tlp->addr0 << 2;
 			pcie_adv_regs->pcie_adv_bdf = memio32_tlp->rid;
 		}
-
-		derr->fme_status = pci_dev_hdl_lookup(dip, DMA_HANDLE, derr,
-		    (void *) &addr);
-		/*
-		 * If DMA handle is not found error could have been a memory
-		 * mapped IO address so check in the access cache
-		 */
-		if (derr->fme_status == DDI_FM_UNKNOWN)
-			derr->fme_status = pci_dev_hdl_lookup(dip, ACC_HANDLE,
-			    derr, (void *) &addr);
+		if (upstream) {
+			pci_fme_bsp->pci_bs_bdf = pcie_adv_regs->pcie_adv_bdf;
+			pci_fme_bsp->pci_bs_flags |= PCI_BS_BDF_VALID;
+		} else if ((pcie_regs->pcie_cap & PCIE_PCIECAP_DEV_TYPE_MASK) ==
+		    PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
+			pci_fme_bsp->pci_bs_bdf = erpt_p->pe_bdf;
+			pci_fme_bsp->pci_bs_flags |= PCI_BS_BDF_VALID;
+		}
+		pci_fme_bsp->pci_bs_addr = addr;
+		pci_fme_bsp->pci_bs_flags |= PCI_BS_ADDR_VALID;
+		pci_fme_bsp->pci_bs_type = upstream ? DMA_HANDLE : ACC_HANDLE;
 		break;
 
 	    case PCIE_TLP_TYPE_IO:
@@ -1277,8 +1270,15 @@ pcie_check_addr(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *eprt_p)
 
 			addr = (uint32_t)memio32_tlp->addr0 << 2;
 			pcie_adv_regs->pcie_adv_bdf = memio32_tlp->rid;
-			derr->fme_status = pci_dev_hdl_lookup(dip, ACC_HANDLE,
-			    derr, (void *) &addr);
+			if ((pcie_regs->pcie_cap &
+			    PCIE_PCIECAP_DEV_TYPE_MASK) ==
+			    PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
+				pci_fme_bsp->pci_bs_bdf = erpt_p->pe_bdf;
+				pci_fme_bsp->pci_bs_flags |= PCI_BS_BDF_VALID;
+			}
+			pci_fme_bsp->pci_bs_addr = addr;
+			pci_fme_bsp->pci_bs_flags |= PCI_BS_ADDR_VALID;
+			pci_fme_bsp->pci_bs_type = ACC_HANDLE;
 			break;
 		}
 	    case PCIE_TLP_TYPE_CFG0:
@@ -1287,7 +1287,10 @@ pcie_check_addr(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *eprt_p)
 			pcie_cfg_t *cfg_tlp = (pcie_cfg_t *)ue_hdr;
 
 			pcie_adv_regs->pcie_adv_bdf = cfg_tlp->rid;
-			derr->fme_status = DDI_FM_UNKNOWN;
+			pci_fme_bsp->pci_bs_bdf = (uint16_t)cfg_tlp->bus << 8 |
+			    (uint16_t)cfg_tlp->dev << 3 | cfg_tlp->func;
+			pci_fme_bsp->pci_bs_flags |= PCI_BS_BDF_VALID;
+			pci_fme_bsp->pci_bs_type = ACC_HANDLE;
 			break;
 		}
 	    case PCIE_TLP_TYPE_MSG:
@@ -1295,7 +1298,6 @@ pcie_check_addr(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *eprt_p)
 			pcie_msg_t *msg_tlp = (pcie_msg_t *)ue_hdr;
 
 			pcie_adv_regs->pcie_adv_bdf = msg_tlp->rid;
-			derr->fme_status = DDI_FM_UNKNOWN;
 			break;
 		}
 	    case PCIE_TLP_TYPE_CPL:
@@ -1304,30 +1306,28 @@ pcie_check_addr(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *eprt_p)
 			pcie_cpl_t *cpl_tlp = (pcie_cpl_t *)ue_hdr;
 
 			pcie_adv_regs->pcie_adv_bdf = cpl_tlp->cid;
-			derr->fme_status = DDI_FM_UNKNOWN;
+			pci_fme_bsp->pci_bs_flags |= PCI_BS_BDF_VALID;
+			if (upstream) {
+				pci_fme_bsp->pci_bs_bdf = cpl_tlp->cid;
+				pci_fme_bsp->pci_bs_type = ACC_HANDLE;
+			} else {
+				pci_fme_bsp->pci_bs_bdf = cpl_tlp->rid;
+				pci_fme_bsp->pci_bs_type = DMA_HANDLE;
+			}
 			break;
 		}
 	    case PCIE_TLP_TYPE_MSI:
 	    default:
-		derr->fme_status = DDI_FM_UNKNOWN;
+		break;
 	}
-
-	/*
-	 * If no handle was found in the children caches and their is no
-	 * address infomation already stored and we have a captured address
-	 * then we need to store it away so that intermediate bridges can
-	 * check if the address exists in their handle caches.
-	 */
-	if (derr->fme_status == DDI_FM_UNKNOWN &&
-	    derr->fme_bus_specific == NULL &&
-	    addr != NULL)
-		derr->fme_bus_specific = (void *)(uintptr_t)addr;
 }
 
+/*ARGSUSED*/
 static void
-pcie_pci_check_addr(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *eprt_p)
+pcie_pci_check_addr(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p,
+    int type)
 {
-	pcie_error_regs_t *pcie_regs = (pcie_error_regs_t *)eprt_p->pe_regs;
+	pcie_error_regs_t *pcie_regs = (pcie_error_regs_t *)erpt_p->pe_regs;
 	pcie_adv_error_regs_t *pcie_adv_regs = pcie_regs->pcie_adv_regs;
 	pcie_adv_bdg_error_regs_t *pcie_bdg_regs =
 	    pcie_adv_regs->pcie_adv_bdg_regs;
@@ -1335,27 +1335,29 @@ pcie_pci_check_addr(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *eprt_p)
 	pcix_attr_t *pcie_pci_sue_attr;
 	int cmd;
 	int dual_addr = 0;
+	pci_fme_bus_specific_t *pci_fme_bsp =
+	    (pci_fme_bus_specific_t *)derr->fme_bus_specific;
 
-	if (!(pcie_adv_regs->pcie_adv_vflags & PCIE_SUE_HDR_VALID)) {
-		derr->fme_status = DDI_FM_UNKNOWN;
+	if (!(pcie_adv_regs->pcie_adv_vflags & PCIE_SUE_HDR_VALID))
 		return;
-	}
 
 	pcie_pci_sue_attr = (pcix_attr_t *)&pcie_bdg_regs->pcie_sue_hdr0;
 	cmd = (pcie_bdg_regs->pcie_sue_hdr[0] >>
 	    PCIE_AER_SUCE_HDR_CMD_LWR_SHIFT) & PCIE_AER_SUCE_HDR_CMD_LWR_MASK;
+
 cmd_switch:
+	addr = pcie_bdg_regs->pcie_sue_hdr[2];
+	addr = (addr << PCIE_AER_SUCE_HDR_ADDR_SHIFT) |
+	    pcie_bdg_regs->pcie_sue_hdr[1];
 	switch (cmd) {
 	    case PCI_PCIX_CMD_IORD:
 	    case PCI_PCIX_CMD_IOWR:
 		pcie_adv_regs->pcie_adv_bdf = pcie_pci_sue_attr->rid;
-
-		addr = pcie_bdg_regs->pcie_sue_hdr[2];
-		addr = (addr << PCIE_AER_SUCE_HDR_ADDR_SHIFT) |
-		    pcie_bdg_regs->pcie_sue_hdr[1];
-
-		derr->fme_status = pci_dev_hdl_lookup(dip, ACC_HANDLE,
-		    derr, (void *) &addr);
+		if (addr) {
+			pci_fme_bsp->pci_bs_addr = addr;
+			pci_fme_bsp->pci_bs_flags |= PCI_BS_ADDR_VALID;
+			pci_fme_bsp->pci_bs_type = ACC_HANDLE;
+		}
 		break;
 	    case PCI_PCIX_CMD_MEMRD_DW:
 	    case PCI_PCIX_CMD_MEMWR:
@@ -1364,22 +1366,31 @@ cmd_switch:
 	    case PCI_PCIX_CMD_MEMRDBL:
 	    case PCI_PCIX_CMD_MEMWRBL:
 		pcie_adv_regs->pcie_adv_bdf = pcie_pci_sue_attr->rid;
-
-		addr = pcie_bdg_regs->pcie_sue_hdr[2];
-		addr = (addr << PCIE_AER_SUCE_HDR_ADDR_SHIFT) |
-		    pcie_bdg_regs->pcie_sue_hdr[1];
-
-		derr->fme_status = pci_dev_hdl_lookup(dip, DMA_HANDLE,
-		    derr, (void *) &addr);
-		if (derr->fme_status == DDI_FM_UNKNOWN)
-			derr->fme_status = pci_dev_hdl_lookup(dip, ACC_HANDLE,
-			    derr, (void *) &addr);
+		if (addr) {
+			pci_fme_bsp->pci_bs_addr = addr;
+			pci_fme_bsp->pci_bs_flags |= PCI_BS_ADDR_VALID;
+			pci_fme_bsp->pci_bs_type = type;
+		}
 		break;
 	    case PCI_PCIX_CMD_CFRD:
 	    case PCI_PCIX_CMD_CFWR:
 		pcie_adv_regs->pcie_adv_bdf = pcie_pci_sue_attr->rid;
-
-		derr->fme_status = DDI_FM_UNKNOWN;
+		/*
+		 * for type 1 config transaction we can find bdf from address
+		 */
+		if ((addr & 3) == 1) {
+			pci_fme_bsp->pci_bs_bdf = (addr >> 8) & 0xffffffff;
+			pci_fme_bsp->pci_bs_flags |= PCI_BS_BDF_VALID;
+			pci_fme_bsp->pci_bs_type = ACC_HANDLE;
+		}
+		break;
+	    case PCI_PCIX_CMD_SPL:
+		pcie_adv_regs->pcie_adv_bdf = pcie_pci_sue_attr->rid;
+		if (type == ACC_HANDLE) {
+			pci_fme_bsp->pci_bs_bdf = pcie_adv_regs->pcie_adv_bdf;
+			pci_fme_bsp->pci_bs_flags |= PCI_BS_BDF_VALID;
+			pci_fme_bsp->pci_bs_type = type;
+		}
 		break;
 	    case PCI_PCIX_CMD_DADR:
 		cmd = (pcie_bdg_regs->pcie_sue_hdr[0] >>
@@ -1390,27 +1401,19 @@ cmd_switch:
 		++dual_addr;
 		goto cmd_switch;
 	    default:
-		derr->fme_status = DDI_FM_UNKNOWN;
+		break;
 	}
-
-	/*
-	 * If no handle was found in the children caches and their is no
-	 * address infomation already stored and we have a captured address
-	 * then we need to store it away so that intermediate bridges can
-	 * check if the address exists in their handle caches.
-	 */
-	if (derr->fme_status == DDI_FM_UNKNOWN &&
-	    derr->fme_bus_specific == NULL &&
-	    addr != NULL)
-		derr->fme_bus_specific = (void *)(uintptr_t)addr;
 }
 
+/*ARGSUSED*/
 static int
 pcix_check_addr(dev_info_t *dip, ddi_fm_error_t *derr,
-    pcix_ecc_regs_t *pcix_ecc_regs)
+    pcix_ecc_regs_t *pcix_ecc_regs, int type)
 {
 	int cmd = (pcix_ecc_regs->pcix_ecc_ctlstat >> 16) & 0xf;
 	uint64_t addr;
+	pci_fme_bus_specific_t *pci_fme_bsp =
+	    (pci_fme_bus_specific_t *)derr->fme_bus_specific;
 
 	addr = pcix_ecc_regs->pcix_ecc_secaddr;
 	addr = addr << 32;
@@ -1422,27 +1425,40 @@ pcix_check_addr(dev_info_t *dip, ddi_fm_error_t *derr,
 		return (DDI_FM_FATAL);
 	    case PCI_PCIX_CMD_IORD:
 	    case PCI_PCIX_CMD_IOWR:
-		return (pci_dev_hdl_lookup(dip, ACC_HANDLE, derr,
-		    (void *) &addr));
+		pci_fme_bsp->pci_bs_addr = addr;
+		pci_fme_bsp->pci_bs_flags |= PCI_BS_ADDR_VALID;
+		pci_fme_bsp->pci_bs_type = type;
+		return (DDI_FM_UNKNOWN);
 	    case PCI_PCIX_CMD_DEVID:
 		return (DDI_FM_FATAL);
 	    case PCI_PCIX_CMD_MEMRD_DW:
 	    case PCI_PCIX_CMD_MEMWR:
 	    case PCI_PCIX_CMD_MEMRD_BL:
 	    case PCI_PCIX_CMD_MEMWR_BL:
-		return (pci_dev_hdl_lookup(dip, DMA_HANDLE, derr,
-		    (void *) &addr));
+		pci_fme_bsp->pci_bs_addr = addr;
+		pci_fme_bsp->pci_bs_flags |= PCI_BS_ADDR_VALID;
+		pci_fme_bsp->pci_bs_type = type;
+		return (DDI_FM_UNKNOWN);
 	    case PCI_PCIX_CMD_CFRD:
 	    case PCI_PCIX_CMD_CFWR:
-		return (pci_dev_hdl_lookup(dip, ACC_HANDLE, derr,
-		    (void *) &addr));
+		/*
+		 * for type 1 config transaction we can find bdf from address
+		 */
+		if ((addr & 3) == 1) {
+			pci_fme_bsp->pci_bs_bdf = (addr >> 8) & 0xffffffff;
+			pci_fme_bsp->pci_bs_flags |= PCI_BS_BDF_VALID;
+			pci_fme_bsp->pci_bs_type = type;
+		}
+		return (DDI_FM_UNKNOWN);
 	    case PCI_PCIX_CMD_SPL:
 	    case PCI_PCIX_CMD_DADR:
-		return (DDI_FM_FATAL);
+		return (DDI_FM_UNKNOWN);
 	    case PCI_PCIX_CMD_MEMRDBL:
 	    case PCI_PCIX_CMD_MEMWRBL:
-		return (pci_dev_hdl_lookup(dip, DMA_HANDLE, derr,
-		    (void *) &addr));
+		pci_fme_bsp->pci_bs_addr = addr;
+		pci_fme_bsp->pci_bs_flags |= PCI_BS_ADDR_VALID;
+		pci_fme_bsp->pci_bs_type = type;
+		return (DDI_FM_UNKNOWN);
 	    default:
 		return (DDI_FM_FATAL);
 	}
@@ -1460,6 +1476,8 @@ pci_bdg_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 	int ret = DDI_FM_OK;
 	char buf[FM_MAX_CLASS];
 	int i;
+	pci_fme_bus_specific_t *pci_fme_bsp =
+	    (pci_fme_bus_specific_t *)derr->fme_bus_specific;
 
 	if (derr->fme_flag != DDI_FM_ERR_UNEXPECTED)
 		goto done;
@@ -1490,12 +1508,14 @@ pci_bdg_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 				    DATA_TYPE_UINT16,
 				    pci_bdg_regs->pci_bdg_ctrl, NULL);
 				PCI_FM_SEV_INC(pci_bdg_err_tbl[i].flags);
-				if (derr->fme_bus_specific &&
+				if (pci_fme_bsp && (pci_fme_bsp->pci_bs_flags &
+				    PCI_BS_ADDR_VALID) &&
+				    pci_fme_bsp->pci_bs_type == ACC_HANDLE &&
 				    pci_bdg_err_tbl[i].terr_class)
 					pci_target_enqueue(derr->fme_ena,
 					    pci_bdg_err_tbl[i].terr_class,
 					    PCI_ERROR_SUBCLASS,
-					    (uintptr_t)derr->fme_bus_specific);
+					    pci_fme_bsp->pci_bs_addr);
 			}
 		}
 #if !defined(__sparc)
@@ -1519,12 +1539,18 @@ pci_bdg_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 			    !(pcie_regs->pcie_err_status &
 			    PCIE_DEVSTS_NFE_DETECTED))
 				nonfatal++;
+			(void) snprintf(buf, FM_MAX_CLASS, "%s.%s-%s",
+			    PCI_ERROR_SUBCLASS, PCI_SEC_ERROR_SUBCLASS, PCI_MA);
+			ddi_fm_ereport_post(dip, buf, derr->fme_ena,
+			    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
+			    PCI_SEC_CONFIG_STATUS, DATA_TYPE_UINT16,
+			    pci_bdg_regs->pci_bdg_sec_stat, PCI_BCNTRL,
+			    DATA_TYPE_UINT16, pci_bdg_regs->pci_bdg_ctrl, NULL);
 		}
 #endif
 	}
 
 done:
-
 	/*
 	 * Need to check for poke and cautious put. We already know peek
 	 * and cautious get errors occurred (as we got a trap) and we know
@@ -1539,15 +1565,6 @@ done:
 		if (pci_bdg_regs->pci_bdg_sec_stat & (PCI_STAT_R_TARG_AB |
 		    PCI_STAT_R_MAST_AB | PCI_STAT_S_PERROR | PCI_STAT_S_SYSERR))
 			nonfatal++;
-
-		/*
-		 * for cautious accesses we already have the acc_handle. Just
-		 * need to call children to clear their error bits
-		 */
-		ret = ndi_fm_handler_dispatch(dip, NULL, derr);
-		PCI_FM_SEV_INC(ret);
-		return (fatal ? DDI_FM_FATAL : (nonfatal ? DDI_FM_NONFATAL :
-		    (unknown ? DDI_FM_UNKNOWN : DDI_FM_OK)));
 	}
 	if (derr->fme_flag == DDI_FM_ERR_POKE) {
 		/*
@@ -1566,29 +1583,10 @@ done:
 	}
 
 	/*
-	 * If errant address is passed in then attempt to find
-	 * ACC/DMA handle in caches.
+	 * now check children below the bridge
 	 */
-	if (derr->fme_bus_specific) {
-		int i;
-
-		for (i = 0; i < 2; i++) {
-			ret = ndi_fmc_error(dip, NULL, i ? ACC_HANDLE :
-			    DMA_HANDLE, derr->fme_ena,
-			    (void *)&derr->fme_bus_specific);
-			PCI_FM_SEV_INC(ret);
-		}
-	}
-
-	/*
-	 * now check children below the bridge, only if errant handle was not
-	 * found
-	 */
-	if (!derr->fme_acc_handle && !derr->fme_dma_handle) {
-		ret = ndi_fm_handler_dispatch(dip, NULL, derr);
-		PCI_FM_SEV_INC(ret);
-	}
-
+	ret = ndi_fm_handler_dispatch(dip, NULL, derr);
+	PCI_FM_SEV_INC(ret);
 	return (fatal ? DDI_FM_FATAL : (nonfatal ? DDI_FM_NONFATAL :
 	    (unknown ? DDI_FM_UNKNOWN : DDI_FM_OK)));
 }
@@ -1660,9 +1658,28 @@ pcix_ecc_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p,
 			    case PCI_PCIX_ECC_PHASE_DATA64:
 				if (ecc_corr)
 					ret = DDI_FM_OK;
-				else
+				else {
+					int type;
+					pci_error_regs_t *pci_regs =
+					    erpt_p->pe_pci_regs;
+
+					if (i) {
+						if (pci_regs->pci_bdg_regs->
+						    pci_bdg_sec_stat &
+						    PCI_STAT_S_PERROR)
+							type = ACC_HANDLE;
+						else
+							type = DMA_HANDLE;
+					} else {
+						if (pci_regs->pci_err_status &
+						    PCI_STAT_S_PERROR)
+							type = DMA_HANDLE;
+						else
+							type = ACC_HANDLE;
+					}
 					ret = pcix_check_addr(dip, derr,
-					    pcix_ecc_regs);
+					    pcix_ecc_regs, type);
+				}
 				PCI_FM_SEV_INC(ret);
 
 				(void) snprintf(buf, FM_MAX_CLASS,
@@ -1916,6 +1933,7 @@ pcie_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 	int nonfatal = 0;
 	int unknown = 0;
 	int ok = 0;
+	int type;
 	char buf[FM_MAX_CLASS];
 	int i;
 	pcie_error_regs_t *pcie_regs = (pcie_error_regs_t *)erpt_p->pe_regs;
@@ -1932,6 +1950,18 @@ pcie_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 	if (!(erpt_p->pe_dflags & PCIEX_ADV_DEV)) {
 		if (!(pcie_regs->pcie_vflags & PCIE_ERR_STATUS_VALID))
 			goto done;
+#if !defined(__sparc)
+		/*
+		 * On x86 ignore UR on non-RBER leaf devices and pciex-pci
+		 * bridges.
+		 */
+		if ((pcie_regs->pcie_err_status & PCIE_DEVSTS_UR_DETECTED) &&
+		    !(pcie_regs->pcie_err_status & PCIE_DEVSTS_FE_DETECTED) &&
+		    ((erpt_p->pe_dflags & PCIEX_2PCI_DEV) ||
+		    !(erpt_p->pe_dflags & PCI_BRIDGE_DEV)) &&
+		    !(pcie_regs->pcie_dev_cap & PCIE_DEVCAP_ROLE_BASED_ERR_REP))
+			goto done;
+#endif
 		for (i = 0; pciex_nadv_err_tbl[i].err_class != NULL; i++) {
 			if (!(pcie_regs->pcie_err_status &
 			    pciex_nadv_err_tbl[i].reg_bit))
@@ -1962,27 +1992,64 @@ pcie_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 			    "%s.%s", PCIEX_ERROR_SUBCLASS,
 			    pciex_ue_err_tbl[i].err_class);
 
-			pcie_adv_regs->pcie_adv_bdf = 0;
-			if ((pcie_adv_regs->pcie_ue_status &
-			    pcie_aer_uce_log_bits) !=
-			    pciex_ue_err_tbl[i].reg_bit) {
-				PCI_FM_SEV_INC(pciex_ue_err_tbl[i].flags);
+			/*
+			 * First check for advisary nonfatal conditions
+			 * - hardware endpoint successfully retrying a cto
+			 * - hardware endpoint receiving poisoned tlp and
+			 *   dealing with it itself (but not if root complex)
+			 * If the device has declared these as correctable
+			 * errors then treat them as such.
+			 */
+			if ((pciex_ue_err_tbl[i].reg_bit == PCIE_AER_UCE_TO ||
+			    (pciex_ue_err_tbl[i].reg_bit == PCIE_AER_UCE_PTLP &&
+			    !(erpt_p->pe_dflags & PCIEX_RC_DEV))) &&
+			    (pcie_regs->pcie_err_status &
+			    PCIE_DEVSTS_CE_DETECTED) &&
+			    !(pcie_regs->pcie_err_status &
+			    PCIE_DEVSTS_NFE_DETECTED)) {
 				pcie_ereport_post(dip, derr, erpt_p, buf,
 				    PCIEX_TYPE_UE);
-			} else {
-				pcie_check_addr(dip, derr, erpt_p);
-				/*
-				 * fatal/ok errors are fatal/ok
-				 * regardless of if we find a handle
-				 */
-				if (pciex_ue_err_tbl[i].flags == DDI_FM_FATAL)
-					derr->fme_status = DDI_FM_FATAL;
-				else if (pciex_ue_err_tbl[i].flags == DDI_FM_OK)
-					derr->fme_status = DDI_FM_OK;
-				pcie_ereport_post(dip, derr, erpt_p, buf,
-				    PCIEX_TYPE_UE);
-				PCI_FM_SEV_INC(derr->fme_status);
+				continue;
 			}
+
+#if !defined(__sparc)
+			/*
+			 * On x86 for leaf devices and pciex-pci bridges,
+			 * ignore UR on non-RBER devices or on RBER devices when
+			 * advisory nonfatal.
+			 */
+			if (pciex_ue_err_tbl[i].reg_bit == PCIE_AER_UCE_UR &&
+			    ((erpt_p->pe_dflags & PCIEX_2PCI_DEV) ||
+			    !(erpt_p->pe_dflags & PCI_BRIDGE_DEV))) {
+				if (!(pcie_regs->pcie_dev_cap &
+				    PCIE_DEVCAP_ROLE_BASED_ERR_REP))
+					continue;
+				if ((pcie_regs->pcie_err_status &
+				    PCIE_DEVSTS_CE_DETECTED) &&
+				    !(pcie_regs->pcie_err_status &
+				    PCIE_DEVSTS_NFE_DETECTED))
+					continue;
+			}
+#endif
+			pcie_adv_regs->pcie_adv_bdf = 0;
+			/*
+			 * Now try and look up handle if
+			 * - error bit is among PCIE_AER_UCE_LOG_BITS, and
+			 * - no other PCIE_AER_UCE_LOG_BITS are set, and
+			 * - error bit is not masked, and
+			 * - flag is DDI_FM_UNKNOWN
+			 */
+			if ((pcie_adv_regs->pcie_ue_status &
+			    pcie_aer_uce_log_bits) ==
+			    pciex_ue_err_tbl[i].reg_bit &&
+			    !(pciex_ue_err_tbl[i].reg_bit &
+			    pcie_adv_regs->pcie_ue_mask) &&
+			    pciex_ue_err_tbl[i].flags == DDI_FM_UNKNOWN)
+				pcie_check_addr(dip, derr, erpt_p);
+
+			PCI_FM_SEV_INC(pciex_ue_err_tbl[i].flags);
+			pcie_ereport_post(dip, derr, erpt_p, buf,
+			    PCIEX_TYPE_UE);
 		}
 	}
 
@@ -2027,8 +2094,8 @@ pcie_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 
 			if ((pcie_bdg_regs->pcie_sue_status &
 			    pcie_aer_suce_log_bits) !=
-			    pcie_sue_err_tbl[i].reg_bit) {
-				PCI_FM_SEV_INC(pcie_sue_err_tbl[i].flags);
+			    pcie_sue_err_tbl[i].reg_bit ||
+			    pcie_sue_err_tbl[i].flags != DDI_FM_UNKNOWN) {
 				ddi_fm_ereport_post(dip, buf, derr->fme_ena,
 				    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
 				    PCIEX_SEC_UE_STATUS, DATA_TYPE_UINT32,
@@ -2046,17 +2113,27 @@ pcie_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 				    NULL);
 			} else {
 				pcie_adv_regs->pcie_adv_bdf = 0;
-				pcie_pci_check_addr(dip, derr, erpt_p);
-				/*
-				 * fatal/nonfatal errors are fatal/nonfatal
-				 * regardless of if we find a handle
-				 */
-				if (pcie_sue_err_tbl[i].flags == DDI_FM_FATAL)
-					derr->fme_status = DDI_FM_FATAL;
-				else if (pcie_sue_err_tbl[i].flags ==
-				    DDI_FM_NONFATAL)
-					derr->fme_status = DDI_FM_NONFATAL;
-
+				switch (pcie_sue_err_tbl[i].reg_bit) {
+				case PCIE_AER_SUCE_RCVD_TA:
+				case PCIE_AER_SUCE_RCVD_MA:
+				case PCIE_AER_SUCE_USC_ERR:
+					type = ACC_HANDLE;
+					break;
+				case PCIE_AER_SUCE_TA_ON_SC:
+				case PCIE_AER_SUCE_MA_ON_SC:
+					type = DMA_HANDLE;
+					break;
+				case PCIE_AER_SUCE_UC_DATA_ERR:
+				case PCIE_AER_SUCE_PERR_ASSERT:
+					if (erpt_p->pe_pci_regs->pci_bdg_regs->
+					    pci_bdg_sec_stat &
+					    PCI_STAT_S_PERROR)
+						type = ACC_HANDLE;
+					else
+						type = DMA_HANDLE;
+					break;
+				}
+				pcie_pci_check_addr(dip, derr, erpt_p, type);
 				ddi_fm_ereport_post(dip, buf, derr->fme_ena,
 				    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
 				    PCIEX_SEC_UE_STATUS, DATA_TYPE_UINT32,
@@ -2077,8 +2154,8 @@ pcie_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 				    pcie_bdg_regs->pcie_sue_hdr[2],
 #endif
 				    NULL);
-				PCI_FM_SEV_INC(derr->fme_status);
 			}
+			PCI_FM_SEV_INC(pcie_sue_err_tbl[i].flags);
 		}
 	}
 done:
@@ -2150,6 +2227,34 @@ pci_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 		PCI_FM_SEV_INC(ret);
 	}
 
+	if (derr->fme_flag == DDI_FM_ERR_UNEXPECTED) {
+		pci_fme_bus_specific_t *pci_fme_bsp;
+		int ret = DDI_FM_UNKNOWN;
+
+		pci_fme_bsp = (pci_fme_bus_specific_t *)derr->fme_bus_specific;
+		if (pci_fme_bsp->pci_bs_flags & PCI_BS_ADDR_VALID) {
+			ret = ndi_fmc_entry_error(dip,
+			    pci_fme_bsp->pci_bs_type, derr,
+			    (void *)&pci_fme_bsp->pci_bs_addr);
+			PCI_FM_SEV_INC(ret);
+		}
+		/*
+		 * If we didn't find the handle using an addr, try using bdf.
+		 * Note we don't do this where the bdf is for a
+		 * device behind a pciex/pci bridge as the bridge may have
+		 * fabricated the bdf.
+		 */
+		if (ret == DDI_FM_UNKNOWN &&
+		    (pci_fme_bsp->pci_bs_flags & PCI_BS_BDF_VALID) &&
+		    pci_fme_bsp->pci_bs_bdf == erpt_p->pe_bdf &&
+		    (erpt_p->pe_dflags & PCIEX_DEV) &&
+		    !(erpt_p->pe_dflags & PCIEX_2PCI_DEV)) {
+			ret = ndi_fmc_entry_error_all(dip,
+			    pci_fme_bsp->pci_bs_type, derr);
+			PCI_FM_SEV_INC(ret);
+		}
+	}
+
 	derr->fme_status = (fatal ? DDI_FM_FATAL : (nonfatal ? DDI_FM_NONFATAL :
 	    (unknown ? DDI_FM_UNKNOWN : DDI_FM_OK)));
 }
@@ -2159,6 +2264,8 @@ pci_ereport_post(dev_info_t *dip, ddi_fm_error_t *derr, uint16_t *xx_status)
 {
 	struct i_ddi_fmhdl *fmhdl;
 	pci_erpt_t *erpt_p;
+	ddi_fm_error_t de;
+	pci_fme_bus_specific_t pci_fme_bs;
 
 	fmhdl = DEVI(dip)->devi_fmhdl;
 	if (!DDI_FM_EREPORT_CAP(ddi_fm_capable(dip)) &&
@@ -2167,19 +2274,56 @@ pci_ereport_post(dev_info_t *dip, ddi_fm_error_t *derr, uint16_t *xx_status)
 		return;
 	}
 
+	/*
+	 * copy in the ddi_fm_error_t structure in case it's VER0
+	 */
+	de.fme_version = derr->fme_version;
+	de.fme_status = derr->fme_status;
+	de.fme_flag = derr->fme_flag;
+	de.fme_ena = derr->fme_ena;
+	de.fme_acc_handle = derr->fme_acc_handle;
+	de.fme_dma_handle = derr->fme_dma_handle;
+	de.fme_bus_specific = derr->fme_bus_specific;
+	if (derr->fme_version >= DDI_FME_VER1)
+		de.fme_bus_type = derr->fme_bus_type;
+	else
+		de.fme_bus_type = DDI_FME_BUS_TYPE_DFLT;
+	if (de.fme_bus_type == DDI_FME_BUS_TYPE_DFLT) {
+		/*
+		 * if this is the first pci device we've found convert
+		 * fme_bus_specific to DDI_FME_BUS_TYPE_PCI
+		 */
+		bzero(&pci_fme_bs, sizeof (pci_fme_bs));
+		if (de.fme_bus_specific) {
+			/*
+			 * the cpu passed us an addr - this can be used to look
+			 * up an access handle
+			 */
+			pci_fme_bs.pci_bs_addr = (uintptr_t)de.fme_bus_specific;
+			pci_fme_bs.pci_bs_type = ACC_HANDLE;
+			pci_fme_bs.pci_bs_flags |= PCI_BS_ADDR_VALID;
+		}
+		de.fme_bus_specific = (void *)&pci_fme_bs;
+		de.fme_bus_type = DDI_FME_BUS_TYPE_PCI;
+	}
+
 	ASSERT(fmhdl);
 
-	if (derr->fme_ena == NULL)
-		derr->fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
+	if (de.fme_ena == NULL)
+		de.fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
 
 	erpt_p = (pci_erpt_t *)fmhdl->fh_bus_specific;
 	if (erpt_p == NULL)
 		return;
 
-	pci_regs_gather(dip, erpt_p);
-	pci_error_report(dip, derr, erpt_p);
+	pci_regs_gather(dip, erpt_p, de.fme_flag);
+	pci_error_report(dip, &de, erpt_p);
 	pci_regs_clear(erpt_p);
 
+	derr->fme_status = de.fme_status;
+	derr->fme_ena = de.fme_ena;
+	derr->fme_acc_handle = de.fme_acc_handle;
+	derr->fme_dma_handle = de.fme_dma_handle;
 	if (xx_status != NULL)
 		*xx_status = erpt_p->pe_pci_regs->pci_err_status;
 }

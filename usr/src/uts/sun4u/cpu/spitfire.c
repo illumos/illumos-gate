@@ -4085,6 +4085,7 @@ cpu_run_bus_error_handlers(struct async_flt *aflt, int expected)
 
 	bzero(&de, sizeof (ddi_fm_error_t));
 
+	de.fme_version = DDI_FME_VERSION;
 	de.fme_ena = fm_ena_generate_cpu(aflt->flt_id, aflt->flt_inst,
 	    FM_ENA_FMT1);
 	de.fme_flag = expected;

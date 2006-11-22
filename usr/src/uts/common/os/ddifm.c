@@ -824,7 +824,7 @@ ddi_fm_acc_err_get(ddi_acc_handle_t handle, ddi_fm_error_t *de, int version)
 	if (handle == NULL)
 		return;
 
-	if (version != DDI_FME_VER0) {
+	if (version != DDI_FME_VER0 && version != DDI_FME_VER1) {
 		ddi_acc_hdl_t *hp = impl_acc_hdl_get(handle);
 
 		i_ddi_drv_ereport_post(hp->ah_dip, DVR_EVER, NULL, DDI_NOSLEEP);
@@ -847,7 +847,7 @@ ddi_fm_dma_err_get(ddi_dma_handle_t handle, ddi_fm_error_t *de, int version)
 	if (handle == NULL)
 		return;
 
-	if (version != DDI_FME_VER0) {
+	if (version != DDI_FME_VER0 && version != DDI_FME_VER1) {
 		i_ddi_drv_ereport_post(((ddi_dma_impl_t *)handle)->dmai_rdip,
 		    DVR_EVER, NULL, DDI_NOSLEEP);
 		cmn_err(CE_PANIC, "ddi_fm_dma_err_get: "
@@ -870,7 +870,7 @@ ddi_fm_acc_err_clear(ddi_acc_handle_t handle, int version)
 	if (handle == NULL)
 		return;
 
-	if (version != DDI_FME_VER0) {
+	if (version != DDI_FME_VER0 && version != DDI_FME_VER1) {
 		ddi_acc_hdl_t *hp = impl_acc_hdl_get(handle);
 
 		i_ddi_drv_ereport_post(hp->ah_dip, DVR_EVER, NULL, DDI_NOSLEEP);
@@ -892,7 +892,7 @@ ddi_fm_dma_err_clear(ddi_dma_handle_t handle, int version)
 	if (handle == NULL)
 		return;
 
-	if (version != DDI_FME_VER0) {
+	if (version != DDI_FME_VER0 && version != DDI_FME_VER1) {
 		i_ddi_drv_ereport_post(((ddi_dma_impl_t *)handle)->dmai_rdip,
 		    DVR_EVER, NULL, DDI_NOSLEEP);
 		cmn_err(CE_PANIC, "ddi_fm_dma_err_clear: "

@@ -73,10 +73,15 @@ typedef struct ddi_fm_error {
 	ddi_acc_handle_t fme_acc_handle;	/* optional acc handle */
 	ddi_dma_handle_t fme_dma_handle;	/* optional dma handle */
 	void *fme_bus_specific;			/* optional bus specific err */
+	int fme_bus_type;			/* optional bus type */
 } ddi_fm_error_t;
 
 #define	DDI_FME_VER0	0
-#define	DDI_FME_VERSION	DDI_FME_VER0
+#define	DDI_FME_VER1	1
+#define	DDI_FME_VERSION	DDI_FME_VER1
+
+#define	DDI_FME_BUS_TYPE_DFLT	0		/* bus type = default */
+#define	DDI_FME_BUS_TYPE_PCI	1		/* bus type = pci/pcix/pcie */
 
 typedef int (*ddi_err_func_t)(dev_info_t *, ddi_fm_error_t *, const void *);
 

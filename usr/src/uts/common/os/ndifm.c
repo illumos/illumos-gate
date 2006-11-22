@@ -604,6 +604,57 @@ ndi_fmc_error(dev_info_t *dip, dev_info_t *tdip, int flag, uint64_t ena,
 	return (DDI_FM_UNKNOWN);
 }
 
+int
+ndi_fmc_entry_error_all(dev_info_t *dip, int flag, ddi_fm_error_t *derr)
+{
+	ndi_fmc_t *fcp = NULL;
+	ndi_fmcentry_t *fep;
+	struct i_ddi_fmhdl *fmhdl;
+	int nonfatal = 0;
+
+	ASSERT(flag == DMA_HANDLE || flag == ACC_HANDLE);
+
+	fmhdl = DEVI(dip)->devi_fmhdl;
+	ASSERT(fmhdl);
+
+	if (flag == DMA_HANDLE && DDI_FM_DMA_ERR_CAP(fmhdl->fh_cap)) {
+		fcp = fmhdl->fh_dma_cache;
+		ASSERT(fcp);
+	} else if (flag == ACC_HANDLE && DDI_FM_ACC_ERR_CAP(fmhdl->fh_cap)) {
+		fcp = fmhdl->fh_acc_cache;
+		ASSERT(fcp);
+	}
+
+	if (fcp != NULL) {
+		/*
+		 * Check active resource entries
+		 */
+		mutex_enter(&fcp->fc_lock);
+		for (fep = fcp->fc_active->fce_next; fep != NULL;
+		    fep = fep->fce_next) {
+			/* Set the error for this resource handle */
+			nonfatal++;
+			if (flag == ACC_HANDLE) {
+				ddi_acc_handle_t ap = fep->fce_resource;
+
+				i_ddi_fm_acc_err_set(ap, derr->fme_ena,
+				    DDI_FM_NONFATAL, DDI_FM_ERR_UNEXPECTED);
+				ddi_fm_acc_err_get(ap, derr, DDI_FME_VERSION);
+				derr->fme_acc_handle = ap;
+			} else {
+				ddi_dma_handle_t dp = fep->fce_resource;
+
+				i_ddi_fm_dma_err_set(dp, derr->fme_ena,
+				    DDI_FM_NONFATAL, DDI_FM_ERR_UNEXPECTED);
+				ddi_fm_dma_err_get(dp, derr, DDI_FME_VERSION);
+				derr->fme_dma_handle = dp;
+			}
+		}
+		mutex_exit(&fcp->fc_lock);
+	}
+	return (nonfatal ? DDI_FM_NONFATAL : DDI_FM_UNKNOWN);
+}
+
 /*
  * Dispatch registered error handlers for dip.  If tdip != NULL, only
  * the error handler (if available) for tdip is invoked.  Otherwise,
