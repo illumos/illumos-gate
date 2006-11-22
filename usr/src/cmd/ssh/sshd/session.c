@@ -1038,7 +1038,8 @@ deflt_do_setup_env(Session *s, const char *shell, char ***env, u_int *envsize)
 static char **
 do_setup_env(Session *s, const char *shell)
 {
-	char buf[256], *path_maildir = _PATH_MAILDIR;
+	char buf[256];
+	char path_maildir[] = _PATH_MAILDIR;
 	u_int i, envsize, pm_len;
 	char **env;
 	struct passwd *pw = s->pw;
@@ -1850,8 +1851,8 @@ session_subsystem_req(Session *s)
 static int
 session_x11_req(Session *s)
 {
-	int success;
-	char *xauthdir = "/tmp/ssh-xauth-XXXXXX";
+	int success, fd;
+	char xauthdir[] = "/tmp/ssh-xauth-XXXXXX";
 
 	s->single_connection = packet_get_char();
 	s->auth_proto = packet_get_string(NULL);
@@ -1872,23 +1873,47 @@ session_x11_req(Session *s)
 	 * don't contend for one common file. The reason for this is that
 	 * xauth(1) locking doesn't work too well over network filesystems.
 	 *
-	 * If mkdtemp() fails then s->auth_file remains NULL which means that
-	 * we won't set XAUTHORITY variable in child's environment and
-	 * xauth(1) will use the default location for the authority file.
+	 * If mkdtemp() or open() fails then s->auth_file remains NULL which
+	 * means that we won't set XAUTHORITY variable in child's environment
+	 * and xauth(1) will use the default location for the authority file.
 	 */
 	if (success && mkdtemp(xauthdir) != NULL) {
 		s->auth_file = xmalloc(MAXPATHLEN);
 		snprintf(s->auth_file, MAXPATHLEN, "%s/xauthfile",
 		    xauthdir);
 		/*
-		 * add a cleanup function to remove the temporary
-		 * xauth file in case we call fatal() (e.g., the
-		 * connection gets closed).
+		 * we don't want that "creating new authority file" message to
+		 * be printed by xauth(1) so we must create that file
+		 * beforehand.
 		 */
-		fatal_add_cleanup(session_xauthfile_cleanup, (void *)s);
-	} else {
-		error("failed to create the temporary authority file, "
-		    "will use the default one");
+		if ((fd = open(s->auth_file, O_CREAT | O_EXCL | O_RDONLY,
+		    S_IRUSR | S_IWUSR)) == -1) {
+			error("failed to create the temporary X authority "
+			    "file %s: %.100s; will use the default one",
+			    s->auth_file, strerror(errno));
+			xfree(s->auth_file);
+			s->auth_file = NULL;
+			if (rmdir(xauthdir) == -1) {
+				error("cannot remove xauth directory %s: %.100s",
+				    xauthdir, strerror(errno));
+			}
+		} else {
+			close(fd);
+			debug("temporary X authority file %s created",
+			    s->auth_file);
+
+			/*
+			 * add a cleanup function to remove the temporary
+			 * xauth file in case we call fatal() (e.g., the
+			 * connection gets closed).
+			 */
+			fatal_add_cleanup(session_xauthfile_cleanup, (void *)s);
+		}
+	}
+	else {
+		error("failed to create a directory for the temporary X "
+		    "authority file: %.100s; will use the default xauth file",
+		    strerror(errno));
 	}
 
 	return success;
