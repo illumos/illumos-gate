@@ -1657,7 +1657,7 @@ nfs_getfh(struct nfs_getfh_args *args, model_t model, cred_t *cr)
 			l = NFS_FHSIZE;
 			logptr = buf;
 		} else if (vers == NFS_V3) {
-			int i, sz;
+			int i, sz, pad;
 
 			error = makefh3(&fh, vp, exi);
 			l = fh.fh3_length;
@@ -1667,18 +1667,37 @@ nfs_getfh(struct nfs_getfh_args *args, model_t model, cred_t *cr)
 				sz = sizeof (fsid_t);
 				bcopy(&fh.fh3_fsid, &buf[i], sz);
 				i += sz;
+
+				/*
+				 * For backwards compatability, the
+				 * fid length may be less than
+				 * NFS_FHMAXDATA, but it was always
+				 * encoded as NFS_FHMAXDATA bytes.
+				 */
+
 				sz = sizeof (ushort_t);
 				bcopy(&fh.fh3_len, &buf[i], sz);
 				i += sz;
-				sz = fh.fh3_len;
-				bcopy(fh.fh3_data, &buf[i], sz);
-				i += sz;
+				bcopy(fh.fh3_data, &buf[i], fh.fh3_len);
+				i += fh.fh3_len;
+				pad = (NFS_FHMAXDATA - fh.fh3_len);
+				if (pad > 0) {
+					bzero(&buf[i], pad);
+					i += pad;
+					l += pad;
+				}
+
 				sz = sizeof (ushort_t);
 				bcopy(&fh.fh3_xlen, &buf[i], sz);
 				i += sz;
-				sz = fh.fh3_xlen;
-				bcopy(fh.fh3_xdata, &buf[i], sz);
-				i += sz;
+				bcopy(fh.fh3_xdata, &buf[i], fh.fh3_xlen);
+				i += fh.fh3_xlen;
+				pad = (NFS_FHMAXDATA - fh.fh3_xlen);
+				if (pad > 0) {
+					bzero(&buf[i], pad);
+					i += pad;
+					l += pad;
+				}
 			}
 			/*
 			 * If we need to do NFS logging, the filehandle
