@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -2218,6 +2217,49 @@ audio810_chip_init(audio810_state_t *statep, int restore)
 		/* 22h - set 3D control to NULL */
 		shadow[I810_CODEC_REG(AC97_THREE_D_CONTROL_REGISTER)] =
 		    TDCR_NULL;
+
+		/*
+		 * 26h - set EAPD to 1 for devices with ac97-invert-amp
+		 * property.
+		 *
+		 * According to AC'97 spec, EAPD (PR7) independently controls
+		 * an output pin that manages an optional external audio
+		 * amplifier. AC'97 compliance requires the implementation of
+		 * a dedicated output pin for external audio amplifier control.
+		 * The pin is controlled via the ¡°EAPD¡±(External Amplifier
+		 * Powerdown) bit in Powerdown Ctrl/Stat Register, bit 15
+		 * (formerly PR7). EAPD = 0 places a 0 on the output pin,
+		 * enabling an external audio amplifier, EAPD = 1 shuts it
+		 * down. Audio amplifier devices that operate with reverse
+		 * polarity may require an external inverter. By default,
+		 * EAPD = 0 is to enable external audio amplifier, but for
+		 * some Sony Vaio laptops, we need to revert polarity to
+		 * enable external amplifier.
+		 */
+		switch (ddi_prop_get_int(DDI_DEV_T_ANY, statep->dip,
+		    DDI_PROP_DONTPASS, "ac97-invert-amp", -1)) {
+		case -1:
+			/* not attempt to flip EAPD */
+			break;
+
+		case 0:
+			/* set EAPD to 0 */
+			shadow[I810_CODEC_REG(
+			    AC97_POWERDOWN_CTRL_STAT_REGISTER)] &= ~PCSR_EAPD;
+			break;
+
+		case 1:
+			/* set EAPD to 1 */
+			shadow[I810_CODEC_REG(
+			    AC97_POWERDOWN_CTRL_STAT_REGISTER)] |= PCSR_EAPD;
+			break;
+
+		default:
+			/* invalid */
+			audio_sup_log(statep->audio_handle, CE_WARN,
+			    "!Invalid value for ac97-invert-amp property");
+			break;
+		}
 
 		/*
 		 * The rest we ignore, most are reserved.

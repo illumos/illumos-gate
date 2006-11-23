@@ -43,9 +43,21 @@
 extern "C" {
 #endif
 
+/*
+ * vendor IDs and device IDs of supported devices
+ */
+#define	AUDIOHD_VID_ALC260	0x10ec0260
+#define	AUDIOHD_VID_ALC262	0x10ec0262
 #define	AUDIOHD_VID_ALC880	0x10ec0880
+#define	AUDIOHD_VID_ALC882	0x10ec0882
 #define	AUDIOHD_VID_ALC883	0x10ec0883
 #define	AUDIOHD_VID_ALC885	0x10ec0885
+#define	AUDIOHD_VID_ALC888	0x10ec0888
+#define	AUDIOHD_VID_STAC9200	0x83847690
+#define	AUDIOHD_VID_STAC9200D	0x83847691
+
+/* vendor-id and device-id for ATI SB450 */
+#define	AUDIOHD_ATI_SB450	0x437d1002
 
 #define	AUDIOHDC_NID(x)		x
 /*
@@ -228,7 +240,9 @@ extern "C" {
 #define	AUDIOHDC_VERB_GET_CONN_LIST_ENT		0xf02
 #define	AUDIOHDC_VERB_GET_PROCESS_STATE		0xf03
 #define	AUDIOHDC_VERB_GET_SDI_SEL		0xf04
+
 #define	AUDIOHDC_VERB_GET_POWER_STATE		0xf05
+#define	AUDIOHDC_VERB_SET_POWER_STATE		0x705
 
 #define	AUDIOHDC_VERB_GET_STREAM_CHANN		0xf06
 #define	AUDIOHDC_VERB_SET_STREAM_CHANN		0x706
@@ -285,6 +299,19 @@ extern "C" {
 #define	AUDIOHDC_GAIN_MAX			0x7f
 #define	AUDIOHDC_GAIN_BITS			7
 #define	AUDIOHDC_GAIN_DEFAULT			0x0f
+
+/* value used to set max volume for left output */
+#define	AUDIOHDC_AMP_LOUT_MAX	\
+	(AUDIOHDC_AMP_SET_OUTPUT | \
+	AUDIOHDC_AMP_SET_LEFT | \
+	AUDIOHDC_GAIN_MAX)
+
+/* value used to set max volume for right output */
+#define	AUDIOHDC_AMP_ROUT_MAX	\
+	(AUDIOHDC_AMP_SET_OUTPUT | \
+	AUDIOHDC_AMP_SET_RIGHT | \
+	AUDIOHDC_GAIN_MAX)
+
 
 /*
  * Bits for pin widget control verb
@@ -418,8 +445,7 @@ struct audiohd_state {
 typedef struct audiohd_state audiohd_state_t;
 
 struct audiohd_codec_ops {
-	int (*ac_enable_play)(audiohd_state_t *);
-	int (*ac_enable_record)(audiohd_state_t *);
+	int (*ac_init_codec)(audiohd_state_t *);
 	int (*ac_set_pcm_fmt)(audiohd_state_t *, int, uint_t);
 	int (*ac_set_gain)(audiohd_state_t *, int, int, int);
 	int (*ac_set_port)(audiohd_state_t *, int, int);
@@ -429,11 +455,8 @@ struct audiohd_codec_ops {
 		(audiohd_state_t *, uint_t *, uint_t *, uint_t *);
 };
 
-#define	AUDIOHD_CODEC_ENABLE_PLAY(x) \
-	x->hda_codec->hc_ops->ac_enable_play(x)
-
-#define	AUDIOHD_CODEC_ENABLE_RECORD(x) \
-	x->hda_codec->hc_ops->ac_enable_record(x)
+#define	AUDIOHD_CODEC_INIT_CODEC(x) \
+	x->hda_codec->hc_ops->ac_init_codec(x);
 
 #define	AUDIOHD_CODEC_SET_PCM_FORMAT(x, y, z) \
 	x->hda_codec->hc_ops->ac_set_pcm_fmt(x, y, z);
@@ -452,7 +475,6 @@ struct audiohd_codec_ops {
 
 #define	AUDIOHD_CODEC_MAX_GAIN(x, y, z, w) \
 	x->hda_codec->hc_ops->ac_get_max_gain(x, y, z, w)
-
 
 /*
  * Operation for high definition audio control system bus
@@ -490,6 +512,147 @@ struct audiohd_codec_ops {
 	ddi_put64(statep->hda_reg_handle, \
 	(void *)((char *)statep->hda_reg_base + (reg)), (val))
 
+
+/*
+ * This is used to initialize ADC node of CODEC
+ */
+#define	AUDIOHD_NODE_INIT_ADC(statep, caddr, nid) \
+{	\
+	/* for ADC node, set channel and stream tag */ \
+	if (audioha_codec_verb_get(statep, \
+	    caddr, nid, AUDIOHDC_VERB_SET_STREAM_CHANN, \
+	    statep->hda_record_stag << 4) == AUDIOHD_CODEC_FAILURE) \
+		return (AUDIO_FAILURE); \
+	\
+	/* set input amp of ADC node to max */ \
+	if (audioha_codec_4bit_verb_get(statep, \
+	    caddr, nid, AUDIOHDC_VERB_SET_AMP_MUTE, \
+	    AUDIOHDC_AMP_SET_LR_INPUT | AUDIOHDC_GAIN_MAX) == \
+	    AUDIOHD_CODEC_FAILURE) \
+		return (AUDIO_FAILURE); \
+}
+
+/*
+ * This is used to initialize DAC node of CODEC
+ */
+#define	AUDIOHD_NODE_INIT_DAC(statep, caddr, nid) \
+{	\
+	if (audioha_codec_verb_get(statep, \
+	    caddr, nid, AUDIOHDC_VERB_SET_STREAM_CHANN, \
+	    statep->hda_play_stag << 4) == AUDIOHD_CODEC_FAILURE) \
+		return (AUDIO_FAILURE); \
+	\
+	/* set output amp of DAC to max */ \
+	if (audioha_codec_4bit_verb_get(statep, \
+	    caddr, nid, AUDIOHDC_VERB_SET_AMP_MUTE, \
+	    AUDIOHDC_AMP_SET_LR_OUTPUT | AUDIOHDC_GAIN_MAX) == \
+	    AUDIOHD_CODEC_FAILURE) \
+		return (AUDIO_FAILURE); \
+}
+
+
+/*
+ * unmute specified one of a mixer's inputs, and set the
+ * left & right output volume of mixer to specified value
+ */
+#define	AUDIOHD_NODE_INIT_MIXER(statep, caddr, nid_m, in_num) \
+{ \
+	/* unmute input of mixer */ \
+	if (audioha_codec_4bit_verb_get(statep, caddr, nid_m, \
+	    AUDIOHDC_VERB_SET_AMP_MUTE, \
+	    AUDIOHDC_AMP_SET_LR_INPUT | AUDIOHDC_GAIN_MAX | \
+		(in_num << AUDIOHDC_AMP_SET_INDEX_OFFSET)) == \
+	    AUDIOHD_CODEC_FAILURE) \
+		return (AUDIO_FAILURE); \
+	\
+	/* output left amp of mixer */ \
+	(void) audioha_codec_4bit_verb_get(statep, caddr, nid_m, \
+	    AUDIOHDC_VERB_SET_AMP_MUTE, AUDIOHDC_AMP_SET_OUTPUT | \
+	    AUDIOHDC_AMP_SET_LEFT | statep->hda_play_lgain); \
+	\
+	/* output right amp of mixer */ \
+	(void) audioha_codec_4bit_verb_get(statep, caddr, nid_m, \
+	    AUDIOHDC_VERB_SET_AMP_MUTE, AUDIOHDC_AMP_SET_OUTPUT | \
+	    AUDIOHDC_AMP_SET_RIGHT | statep->hda_play_rgain); \
+}
+
+
+/*
+ * enable a pin widget to output
+ */
+#define	AUDIOHD_NODE_ENABLE_PIN_OUT(statep, caddr, nid) \
+{ \
+	uint32_t	lTmp; \
+\
+	lTmp = audioha_codec_verb_get(statep, caddr, nid, \
+	    AUDIOHDC_VERB_GET_PIN_CTRL, 0); \
+	if (lTmp == AUDIOHD_CODEC_FAILURE) \
+		return (AUDIO_FAILURE); \
+	lTmp = audioha_codec_verb_get(statep, caddr, nid, \
+	    AUDIOHDC_VERB_SET_PIN_CTRL, \
+	    (lTmp | AUDIOHDC_PIN_CONTROL_OUT_ENABLE | \
+	    AUDIOHDC_PIN_CONTROL_HP_ENABLE)); \
+	if (lTmp == AUDIOHD_CODEC_FAILURE) \
+		return (AUDIO_FAILURE); \
+}
+
+/*
+ * disable output pin
+ */
+#define	AUDIOHD_NODE_DISABLE_PIN_OUT(statep, caddr, nid) \
+{ \
+	uint32_t	lTmp; \
+\
+	lTmp = audioha_codec_verb_get(statep, caddr, nid, \
+	    AUDIOHDC_VERB_GET_PIN_CTRL, 0); \
+	if (lTmp == AUDIOHD_CODEC_FAILURE) \
+		return (AUDIO_FAILURE); \
+	lTmp = audioha_codec_verb_get(statep, caddr, nid, \
+	    AUDIOHDC_VERB_SET_PIN_CTRL, \
+	    (lTmp & ~AUDIOHDC_PIN_CONTROL_OUT_ENABLE)); \
+	if (lTmp == AUDIOHD_CODEC_FAILURE) \
+		return (AUDIO_FAILURE); \
+}
+
+/*
+ * enable a pin widget to input
+ */
+#define	AUDIOHD_NODE_ENABLE_PIN_IN(statep, caddr, nid) \
+{ \
+	(void) audioha_codec_verb_get(statep, caddr, nid, \
+	    AUDIOHDC_VERB_SET_PIN_CTRL, AUDIOHDC_PIN_CONTROL_IN_ENABLE | 4); \
+}
+
+
+/*
+ * disable input pin
+ */
+#define	AUDIOHD_NODE_DISABLE_PIN_IN(statep, caddr, nid) \
+{ \
+	uint32_t	lTmp; \
+\
+	lTmp = audioha_codec_verb_get(statep, caddr, nid, \
+	    AUDIOHDC_VERB_GET_PIN_CTRL, 0); \
+	if (lTmp == AUDIOHD_CODEC_FAILURE) \
+		return (AUDIO_FAILURE); \
+	lTmp = audioha_codec_verb_get(statep, caddr, nid, \
+	    AUDIOHDC_VERB_SET_PIN_CTRL, \
+	    (lTmp & ~AUDIOHDC_PIN_CONTROL_IN_ENABLE)); \
+	if (lTmp == AUDIOHD_CODEC_FAILURE) \
+		return (AUDIO_FAILURE); \
+}
+
+/*
+ * unmute an output pin
+ */
+#define	AUDIOHD_NODE_UNMUTE_OUT(statep, caddr, nid) \
+{ \
+	if (audioha_codec_4bit_verb_get(statep, \
+	    caddr, nid, AUDIOHDC_VERB_SET_AMP_MUTE, \
+	    AUDIOHDC_AMP_SET_LR_OUTPUT | AUDIOHDC_GAIN_MAX) == \
+	    AUDIOHD_CODEC_FAILURE) \
+		return (AUDIO_FAILURE); \
+}
 
 #ifdef __cplusplus
 }
