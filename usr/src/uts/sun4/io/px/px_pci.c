@@ -59,9 +59,6 @@
 #include "px_pci.h"
 #include "px_debug.h"
 
-/* 32-bit Shifts */
-#define	WDSHIFT 32
-
 /* Tunables. Beware: Some are for debug purpose only. */
 /*
  * PXB MSI tunable:
@@ -1869,14 +1866,14 @@ pxb_id_props(pxb_devstate_t *pxb)
 		}
 	}
 
-	if ((PCI_CAP_LOCATE(pxb->pxb_config_handle, PCIE_EXT_CAP_ID_SER,
-		&cap_ptr)) != DDI_FAILURE) {
-		/* serialid can be 0 thru a full 40b number */
-		serialid = PCI_XCAP_GET32(pxb->pxb_config_handle, NULL, cap_ptr,
-			4);
-		serialid <<= WDSHIFT;
+	if ((PCI_CAP_LOCATE(pxb->pxb_config_handle,
+	    PCI_CAP_XCFG_SPC(PCIE_EXT_CAP_ID_SER), &cap_ptr)) != DDI_FAILURE) {
+		/* Serialid can be 0 thru a full 40b number */
+		serialid = PCI_XCAP_GET32(pxb->pxb_config_handle, NULL,
+		    cap_ptr, PCIE_SER_SID_UPPER_DW);
+		serialid <<= 32;
 		serialid |= PCI_XCAP_GET32(pxb->pxb_config_handle, NULL,
-			cap_ptr, 8);
+		    cap_ptr, PCIE_SER_SID_LOWER_DW);
 	}
 
 	if (fic)

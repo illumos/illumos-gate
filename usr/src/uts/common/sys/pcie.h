@@ -538,6 +538,13 @@ extern "C" {
 #define	PCIE_AER_SHDR_LOG_ADDR_MASK	0xFFFFFFFFFFFFFFFF
 
 /*
+ * PCI-Express Device Serial Number Capability Offsets.
+ */
+#define	PCIE_SER_CAP		0x0	/* Enhanced Capability Header */
+#define	PCIE_SER_SID_LOWER_DW	0x4	/* Lower 32-bit Serial Number */
+#define	PCIE_SER_SID_UPPER_DW	0x8	/* Upper 32-bit Serial Number */
+
+/*
  * PCI-E Common TLP Header Fields
  */
 #define	PCIE_TLP_FMT_3DW	0x00

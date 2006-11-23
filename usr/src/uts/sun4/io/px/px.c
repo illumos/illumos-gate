@@ -627,6 +627,7 @@ px_pwr_teardown(dev_info_t *dip)
 	hdl.ih_ver = DDI_INTR_VERSION;
 	hdl.ih_state = DDI_IHDL_STATE_ALLOC;
 	hdl.ih_dip = dip;
+	hdl.ih_pri = px_pwr_pil;
 
 	px_lib_msg_setvalid(dip, PCIE_PME_ACK_MSG, PCIE_MSG_INVALID);
 	(void) px_rem_msiq_intr(dip, dip, &hdl, MSG_REC, PCIE_PME_ACK_MSG,

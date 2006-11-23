@@ -268,9 +268,11 @@ px_pec_msg_rem_intr(px_t *px_p)
 	hdl.ih_state = DDI_IHDL_STATE_ALLOC;
 	hdl.ih_dip = dip;
 
+	/* Remove correctable error message handler */
 	if (pec_p->pec_corr_msg_msiq_id >= 0) {
 		px_lib_msg_setvalid(dip, PCIE_CORR_MSG, PCIE_MSG_INVALID);
 
+		hdl.ih_pri = PX_ERR_LOW_PIL;
 		(void) px_rem_msiq_intr(dip, dip, &hdl, MSG_REC,
 		    PCIE_CORR_MSG, pec_p->pec_corr_msg_msiq_id);
 
@@ -282,10 +284,12 @@ px_pec_msg_rem_intr(px_t *px_p)
 		pec_p->pec_corr_msg_msiq_id = (msiqid_t)-1;
 	}
 
+	/* Remove non-fatal error message handler */
 	if (pec_p->pec_non_fatal_msg_msiq_id >= 0) {
 		px_lib_msg_setvalid(dip, PCIE_NONFATAL_MSG,
 		    PCIE_MSG_INVALID);
 
+		hdl.ih_pri = PX_ERR_PIL;
 		(void) px_rem_msiq_intr(dip, dip, &hdl, MSG_REC,
 		    PCIE_NONFATAL_MSG, pec_p->pec_non_fatal_msg_msiq_id);
 
@@ -297,9 +301,11 @@ px_pec_msg_rem_intr(px_t *px_p)
 		pec_p->pec_non_fatal_msg_msiq_id = (msiqid_t)-1;
 	}
 
+	/* Remove fatal error message handler */
 	if (pec_p->pec_fatal_msg_msiq_id >= 0) {
 		px_lib_msg_setvalid(dip, PCIE_FATAL_MSG, PCIE_MSG_INVALID);
 
+		hdl.ih_pri = PX_ERR_PIL;
 		(void) px_rem_msiq_intr(dip, dip, &hdl, MSG_REC,
 		    PCIE_FATAL_MSG, pec_p->pec_fatal_msg_msiq_id);
 
