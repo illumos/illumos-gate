@@ -592,17 +592,7 @@ dupb(mblk_t *mp)
 
 	STR_FTEVENT_MBLK(mp, caller(), FTEV_DUPB, dbp->db_ref);
 
-	/*
-	 * First-dup optimization.  The enabling assumption is that there
-	 * can can never be a race (in correct code) to dup the first copy
-	 * of a message.  Therefore we don't need to do it atomically.
-	 */
-	if (dbp->db_free != dblk_decref) {
-		dbp->db_free = dblk_decref;
-		dbp->db_ref++;
-		goto out;
-	}
-
+	dbp->db_free = dblk_decref;
 	do {
 		ASSERT(dbp->db_ref > 0);
 		oldrtfu = DBLK_RTFU_WORD(dbp);
