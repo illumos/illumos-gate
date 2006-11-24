@@ -130,11 +130,17 @@ static const ao_error_disp_t ao_disp_unknown = {
  */
 static const struct ao_smi_disable {
 	const char *asd_sys_vendor;	/* SMB_TYPE_SYSTEM vendor prefix */
+	const char *asd_sys_product;	/* SMB_TYPE_SYSTEM product prefix */
 	const char *asd_bios_vendor;	/* SMB_TYPE_BIOS vendor prefix */
 	uint8_t asd_code;		/* output code for SMI disable */
 } ao_smi_disable[] = {
-	{ "Sun Microsystems", "American Megatrends", 0x59 },
-	{ NULL, NULL, 0 }
+	{ "Sun Microsystems", "Galaxy12",
+	    "American Megatrends", 0x59 },
+	{ "Sun Microsystems", "Sun Fire X4100 Server",
+	    "American Megatrends", 0x59 },
+	{ "Sun Microsystems", "Sun Fire X4200 Server",
+	    "American Megatrends", 0x59 },
+	{ NULL, NULL, NULL, 0 }
 };
 
 static int
@@ -603,7 +609,7 @@ ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np, int skipnb,
 	/*
 	 * Iterate over the banks of machine-check registers, read the address
 	 * and status registers into the logout area, and clear status as we go.
-	 * Also read the MCi_MISC register is MCi_STATUS.MISCV indicates that
+	 * Also read the MCi_MISC register if MCi_STATUS.MISCV indicates that
 	 * there is valid info there (as it will in revisions F and G for
 	 * NorthBridge ECC errors).
 	 */
@@ -716,6 +722,9 @@ ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np, int skipnb,
 		if (rp != NULL && aed == &ao_disp_unknown)
 			fatal++;
 
+		abl->abl_addr_type = aed->aed_flags & AO_AED_FLAGS_ADDRTYPE;
+		abl->abl_addr_valid_hi = aed->aed_addrvalid_hi;
+		abl->abl_addr_valid_lo = aed->aed_addrvalid_lo;
 		n++;
 	}
 
@@ -855,14 +864,17 @@ ao_ereport_add_logout(ao_data_t *ao, nvlist_t *payload, nv_alloc_t *nva,
 
 	if (members & FM_EREPORT_PAYLOAD_FLAG_RESOURCE) {
 		mc_unum_t unum;
-		int addrvalid;
+		int addrvalid = 0;
 
-		addrvalid = (members & FM_EREPORT_PAYLOAD_FLAG_ADDR) &&
-		    (members & FM_EREPORT_PAYLOAD_FLAG_ADDR_VALID) &&
-		    (abl->abl_status & AMD_BANK_STAT_ADDRV);
+		if (abl->abl_addr_type & AO_AED_F_PHYSICAL) {
+			addrvalid = (members & FM_EREPORT_PAYLOAD_FLAG_ADDR) &&
+			    (members & FM_EREPORT_PAYLOAD_FLAG_ADDR_VALID) &&
+			    (abl->abl_status & AMD_BANK_STAT_ADDRV);
+		}
 
-		if (addrvalid && ao_mc_patounum(ao, abl->abl_addr, synd,
-		    syndtype, &unum))
+		if (addrvalid && ao_mc_patounum(ao, abl->abl_addr,
+		    abl->abl_addr_valid_hi, abl->abl_addr_valid_lo,
+		    synd, syndtype, &unum))
 			ao_ereport_add_resource(payload, nva, &unum);
 	}
 
@@ -1183,6 +1195,8 @@ ao_mca_post_init(void *data)
 		for (asd = ao_smi_disable; asd->asd_sys_vendor != NULL; asd++) {
 			if (strncmp(asd->asd_sys_vendor, si.smbi_manufacturer,
 			    strlen(asd->asd_sys_vendor)) != 0 ||
+			    strncmp(asd->asd_sys_product, si.smbi_product,
+			    strlen(asd->asd_sys_product)) != 0 ||
 			    strncmp(asd->asd_bios_vendor, sb.smbb_vendor,
 			    strlen(asd->asd_bios_vendor)) != 0)
 				continue;

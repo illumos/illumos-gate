@@ -36,6 +36,8 @@
 #include <mcamd_api.h>
 #include <mcamd_err.h>
 
+#define	MC_SYSADDR_MSB	39
+#define	MC_SYSADDR_LSB	3
 
 #define	CSDIMM1	0x1
 #define	CSDIMM2	0x2
@@ -342,7 +344,7 @@ unum_fill(struct mcamd_hdl *hdl, mcamd_node_t *cs, int which,
  */
 static int
 mc_whichdimm(struct mcamd_hdl *hdl, mcamd_node_t *cs, uint64_t pa,
-    uint32_t synd, int syndtype)
+    uint8_t valid_lo, uint32_t synd, int syndtype)
 {
 	int lobit, hibit, data, check;
 	uint64_t dimm1, dimm2;
@@ -379,14 +381,22 @@ mc_whichdimm(struct mcamd_hdl *hdl, mcamd_node_t *cs, uint64_t pa,
 	/*
 	 * 64/8 ECC is checked separately for the upper and lower
 	 * halves, so even an uncorrectable error is contained within
-	 * one of the two halves.  The error address is accurate to
-	 * 8 bytes, so bit 4 distinguises upper from lower.
+	 * one of the two halves.  If we have sufficient address resolution
+	 * then we can determine which DIMM.
 	 */
 	if (syndtype == AMD_SYNDTYPE_ECC) {
-		mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "mc_whichdimm: 64/8 ECC "
-		    "and PA 0x%llx is in %s half\n", pa,
-		    pa & 8 ? "lower" : "upper");
-		return (pa & 8 ? CSDIMM2 : CSDIMM1);
+		if (valid_lo <= MC_SYSADDR_LSB) {
+			mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "mc_whichdimm: 64/8 "
+			    "ECC in 128-bit mode, PA 0x%llx is in %s half\n",
+			    pa, pa & 0x8 ? "upper" : "lower");
+			return (pa & 0x8 ? CSDIMM2 : CSDIMM1);
+		} else {
+			mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "mc_whichdimm: "
+			    "64/8 ECC in 128-bit mode, PA 0x%llx with least "
+			    "significant valid bit %d cannot be resolved to "
+			    "a single DIMM\n", pa, valid_lo);
+			return (mcamd_set_errno(hdl, EMCAMD_INSUFF_RES));
+		}
 	}
 
 	/*
@@ -430,7 +440,8 @@ mc_whichdimm(struct mcamd_hdl *hdl, mcamd_node_t *cs, uint64_t pa,
  */
 static int
 mc_bkdg_patounum(struct mcamd_hdl *hdl, mcamd_node_t *mc, uint64_t pa,
-    uint32_t synd, int syndtype, mc_unum_t *unump)
+    uint8_t valid_lo, uint32_t synd, int syndtype,
+    mc_unum_t *unump)
 {
 	int which;
 	uint64_t mcnum, rev;
@@ -565,8 +576,8 @@ mc_bkdg_patounum(struct mcamd_hdl *hdl, mcamd_node_t *mc, uint64_t pa,
 			if ((sparecs = cs_sparedto(hdl, cs, mc)) != NULL)
 				cs = sparecs;
 
-			if ((which = mc_whichdimm(hdl, cs, pa, synd,
-			    syndtype)) < 0)
+			if ((which = mc_whichdimm(hdl, cs, pa, valid_lo,
+			    synd, syndtype)) < 0)
 				return (-1); /* errno is set for us */
 
 			/*
@@ -597,7 +608,7 @@ mc_bkdg_patounum(struct mcamd_hdl *hdl, mcamd_node_t *mc, uint64_t pa,
 /*ARGSUSED*/
 static int
 mc_patounum(struct mcamd_hdl *hdl, mcamd_node_t *mc, uint64_t pa,
-    uint32_t synd, int syndtype, mc_unum_t *unump)
+    uint8_t valid_lo, uint32_t synd, int syndtype, mc_unum_t *unump)
 {
 	uint64_t iaddr;
 	mcamd_node_t *cs, *sparecs;
@@ -612,7 +623,8 @@ mc_patounum(struct mcamd_hdl *hdl, mcamd_node_t *mc, uint64_t pa,
 	 * difficult to review against the BKDG approach.
 	 */
 	mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "BKDG brute-force method begins\n");
-	bkdgres = mc_bkdg_patounum(hdl, mc, pa, synd, syndtype, &bkdg_unum);
+	bkdgres = mc_bkdg_patounum(hdl, mc, pa, valid_lo, synd,
+	    syndtype, &bkdg_unum);
 	mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "BKDG brute-force method ends\n");
 #endif
 
@@ -639,7 +651,8 @@ mc_patounum(struct mcamd_hdl *hdl, mcamd_node_t *mc, uint64_t pa,
 		cs = sparecs;
 	}
 
-	if ((which = mc_whichdimm(hdl, cs, pa, synd, syndtype)) < 0)
+	if ((which = mc_whichdimm(hdl, cs, pa, valid_lo, synd,
+	    syndtype)) < 0)
 		return (-1); /* errno is set for us */
 
 	if (unum_fill(hdl, cs, which, iaddr, unump, 1) < 0)
@@ -676,24 +689,27 @@ mc_patounum(struct mcamd_hdl *hdl, mcamd_node_t *mc, uint64_t pa,
 
 int
 mcamd_patounum(struct mcamd_hdl *hdl, mcamd_node_t *root, uint64_t pa,
-    uint32_t synd, int syndtype, mc_unum_t *unump)
+    uint8_t valid_hi, uint8_t valid_lo, uint32_t synd, int syndtype,
+    mc_unum_t *unump)
 {
 	mcamd_node_t *mc;
 
 	mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "mcamd_patounum: pa=0x%llx, "
 	    "synd=0x%x, syndtype=%d\n", pa, synd, syndtype);
 
-	/*
-	 * Consider allowing syndrome 0 to act as a generic multibit
-	 * syndrome.  For example icache inf_sys_ecc1 captures an address
-	 * but no syndrome - we can still resolve this to a dimm or dimms.
-	 */
+	if (valid_hi < MC_SYSADDR_MSB) {
+		mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "mcamd_patounum: require "
+		    "pa<%d> to be valid\n", MC_SYSADDR_MSB);
+		return (mcamd_set_errno(hdl, EMCAMD_INSUFF_RES));
+	}
+
 	if (!mcamd_synd_validate(hdl, synd, syndtype))
 		return (mcamd_set_errno(hdl, EMCAMD_SYNDINVALID));
 
 	for (mc = mcamd_mc_next(hdl, root, NULL); mc != NULL;
 	    mc = mcamd_mc_next(hdl, root, mc)) {
-		if (mc_patounum(hdl, mc, pa, synd, syndtype, unump) == 0)
+		if (mc_patounum(hdl, mc, pa, valid_lo, synd,
+		    syndtype, unump) == 0)
 			return (0);
 
 		if (mcamd_errno(hdl) != EMCAMD_NOADDR)

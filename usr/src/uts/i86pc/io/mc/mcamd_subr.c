@@ -427,8 +427,8 @@ mcamd_mkhdl(mcamd_hdl_t *hdl)
 
 /*ARGSUSED*/
 static int
-mcamd_patounum_wrap(void *arg, uint64_t pa, uint32_t synd, int syndtype,
-    mc_unum_t *unump)
+mcamd_patounum_wrap(void *arg, uint64_t pa, uint8_t valid_hi, uint8_t valid_lo,
+    uint32_t synd, int syndtype, mc_unum_t *unump)
 {
 	mcamd_hdl_t mcamd;
 	int rc;
@@ -437,8 +437,8 @@ mcamd_patounum_wrap(void *arg, uint64_t pa, uint32_t synd, int syndtype,
 
 	rw_enter(&mc_lock, RW_READER);
 
-	rc = mcamd_patounum(&mcamd,
-	    (mcamd_node_t *)mc_list, pa, synd, syndtype, unump);
+	rc = mcamd_patounum(&mcamd, (mcamd_node_t *)mc_list, pa,
+	    valid_hi, valid_lo, synd, syndtype, unump);
 
 #ifdef DEBUG
 	/*

@@ -96,7 +96,7 @@ genassym unix $(KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 setup: FRC
-	@cd cpu/scripts; pwd; $(MAKE) setup
+	@cd cpu/scripts; pwd; $(MAKE) $(TARGET)
 
 $(XMODS):	FRC
 	@if [ -f $@/Makefile  ]; then \

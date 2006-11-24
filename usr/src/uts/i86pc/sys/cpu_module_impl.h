@@ -38,7 +38,8 @@ extern "C" {
 #endif
 
 typedef struct cmi_mc_ops {
-	int (*cmi_mc_patounum)(void *, uint64_t, uint32_t, int, mc_unum_t *);
+	int (*cmi_mc_patounum)(void *, uint64_t, uint8_t, uint8_t, uint32_t,
+	    int, mc_unum_t *);
 	int (*cmi_mc_unumtopa)(void *, mc_unum_t *, nvlist_t *, uint64_t *);
 } cmi_mc_ops_t;
 

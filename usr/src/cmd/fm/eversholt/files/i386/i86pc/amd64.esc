@@ -321,10 +321,11 @@ prop fault.memory.page_ck@chip/memory-controller/dimm/rank
     ereport.cpu.amd.nb.mem_ce@chip/cpu
 	{ CONTAINS_RANK && GET_ADDR && GET_OFFSET };
 
+/*
+ * Discard memory ereports that do not indicate a resource.
+ */
 prop upset.memory.discard1@chip/cpu (1)->
-    ereport.cpu.amd.ic.inf_sys_ecc1@chip/cpu; /* always discard - no resource */
-
-prop upset.memory.discard1@chip/cpu (1)->
+    ereport.cpu.amd.ic.inf_sys_ecc1@chip/cpu { !RESOURCE_EXISTS },
     ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu { !RESOURCE_EXISTS },
     ereport.cpu.amd.bu.s_ecc1@chip/cpu { !RESOURCE_EXISTS },
     ereport.cpu.amd.nb.mem_ce@chip/cpu { !RESOURCE_EXISTS };

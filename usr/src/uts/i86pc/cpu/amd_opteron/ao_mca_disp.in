@@ -31,12 +31,12 @@ error = ereport.cpu.amd.dc.inf_sys_ecc1
 mask on  = AMD_BANK_STAT_CECC
 mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	bus	src	0	drd		mem/io	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	bus	src	0	drd	<39:6>	mem/io	lg	-
 
 panic = never
-flags = correctable
+flags = correctable,physical
 
 # ---
 
@@ -46,12 +46,12 @@ error = ereport.cpu.amd.dc.inf_l2_ecc1
 mask on  = AMD_BANK_STAT_CECC
 mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	drd		-	l2	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	drd	<39:6>	-	l2	data
 
 panic = never
-flags = correctable
+flags = correctable,physical
 
 # ---
 
@@ -61,12 +61,12 @@ error =  ereport.cpu.amd.dc.inf_sys_eccm
 mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 mask off = AMD_BANK_STAT_CECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	bus	src	0	drd		mem/io	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	bus	src	0	drd	<39:6>	mem/io	lg	-
 
 panic = always
-flags =
+flags = physical
 
 # ---
 
@@ -76,12 +76,12 @@ error = ereport.cpu.amd.dc.inf_l2_eccm
 mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 mask off = AMD_BANK_STAT_CECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	drd		-	l2	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	drd	<39:6>	-	l2	data
 
 panic = always
-flags = correctable
+flags = physical
 
 # ---
 
@@ -91,12 +91,12 @@ error = ereport.cpu.amd.dc.data_ecc1
 mask on  = AMD_BANK_STAT_CECC, AMD_BANK_STAT_SCRUB
 mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	gen		-	l1	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	gen	<11:3>	-	l1	data
 
 panic = never
-flags = correctable
+flags = correctable,physical
 
 # ---
 
@@ -106,12 +106,13 @@ error = ereport.cpu.amd.dc.data_ecc1_uc
 mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_CECC
 mask off = AMD_BANK_STAT_SCRUB
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	drd/dwr/ev/snp	-	l1	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	drd/dwr	<39:3>	-	l1	data
+code =	0000	mem	-	-	ev/snp	<11:6>	-	l1	data
 
 panic = always
-flags =
+flags = physical
 
 # ---
 
@@ -121,12 +122,13 @@ error = ereport.cpu.amd.dc.data_eccm
 mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_SCRUB
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	drd/dwr/ev/snp	-	l1	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	drd/dwr	<39:3>	-	l1	data
+code =	0000	mem	-	-	ev/snp	<11:6>	-	l1	data
 
 panic = always
-flags =
+flags = physical
 
 # ---
 
@@ -136,12 +138,12 @@ error = ereport.cpu.amd.dc.data_eccm
 mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_SCRUB
 mask off = AMD_BANK_STAT_CECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	gen		-	l1	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	gen	<11:3>	-	l1	data
 
 panic = always
-flags =
+flags = physical
 
 # ---
 
@@ -151,12 +153,12 @@ error = ereport.cpu.amd.dc.tag_par
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	drd/dwr		-	l1	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	drd/dwr	<39:3>	-	l1	data
 
 panic = always
-flags =
+flags = physical
 
 # ---
 
@@ -166,12 +168,12 @@ error = ereport.cpu.amd.dc.stag_par
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	snp/ev		-	l1	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	snp/ev	<11:6>	-	l1	data
 
 panic = always
-flags =
+flags = physical
 
 # ---
 
@@ -181,12 +183,12 @@ error = ereport.cpu.amd.dc.l1tlb_par
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	tlb	-	-	-		-	l1	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	tlb	-	-	-	<47:12>	-	l1	data
 
 panic = always
-flags =
+flags = linear
 
 # ---
 
@@ -196,12 +198,12 @@ error = ereport.cpu.amd.dc.l1tlb_par
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0001	tlb	-	-	-		-	l1	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0001	tlb	-	-	-	<47:12>	-	l1	data
 
 panic = always
-flags = 
+flags =  linear
 
 # ---
 
@@ -211,12 +213,12 @@ error = ereport.cpu.amd.dc.l2tlb_par
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	tlb	-	-	-		-	l2	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	tlb	-	-	-	<47:12>	-	l2	data
 
 panic = always
-flags = 
+flags = linear
 
 # ---
 
@@ -226,12 +228,12 @@ error = ereport.cpu.amd.dc.l2tlb_par
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0001	tlb	-	-	-		-	l2	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0001	tlb	-	-	-	<47:12>	-	l2	data
 
 panic = always
-flags = 
+flags = linear
 
 #
 # Instruction Cache Functional Unit
@@ -245,12 +247,12 @@ error = ereport.cpu.amd.ic.inf_sys_ecc1
 mask on  = AMD_BANK_STAT_CECC
 mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	bus	src	0	ird		mem	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	bus	src	0	ird	<39:6>	mem	lg	-
 
 panic = never
-flags = correctable
+flags = correctable,physical
 
 # ----
 
@@ -260,12 +262,12 @@ error = ereport.cpu.amd.ic.inf_l2_ecc1
 mask on  = AMD_BANK_STAT_CECC
 mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	ird		-	l2	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	ird	<39:6>	-	l2	instr
 
 panic = never
-flags = correctable
+flags = correctable,physical
 
 # ----
 
@@ -275,12 +277,12 @@ error = ereport.cpu.amd.ic.inf_sys_eccm
 mask on  = AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	bus	src	0	ird		mem	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	bus	src	0	ird	<39:6>	mem	lg	-
 
 panic = always
-flags =
+flags = physical
 
 # ---
 
@@ -290,12 +292,12 @@ error = ereport.cpu.amd.ic.inf_l2_eccm
 mask on  = AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	ird		-	l2	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	ird	<39:6>	-	l2	instr
 
 panic = always
-flags =
+flags = physical
 
 # ---
 
@@ -305,12 +307,12 @@ error = ereport.cpu.amd.ic.data_par
 mask on  = 
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	ird		-	l1	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	ird	<47:4>	-	l1	instr
 
 panic = never
-flags = correctable
+flags = correctable,linear
 
 # ---
 
@@ -320,12 +322,13 @@ error = ereport.cpu.amd.ic.tag_par
 mask on  = 
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	ird/ev		-	l1	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	ird	<47:6>	-	l1	instr
+code =	0000	mem	-	-	ev	none	-	l1	instr
 
 panic = never
-flags = correctable
+flags = correctable,linear
 
 # ---
 
@@ -335,12 +338,13 @@ error = ereport.cpu.amd.ic.stag_par
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	snp/ev		-	l1	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	snp	<39:6>	-	l1	instr
+code =	0000	mem	-	-	ev	none	-	l1	instr
 
 panic = always
-flags =
+flags = physical
 
 # ---
 
@@ -350,12 +354,12 @@ error = ereport.cpu.amd.ic.l1tlb_par
 mask on  =
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	tlb	-	-	-		-	l1	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	tlb	-	-	-	<47:12>	-	l1	instr
 
 panic = never
-flags = correctable
+flags = correctable,linear,pagealigned
 
 # ---
 
@@ -365,12 +369,12 @@ error = ereport.cpu.amd.ic.l1tlb_par
 mask on  =
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0001	tlb	-	-	-		-	l1	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0001	tlb	-	-	-	<47:12>	-	l1	instr
 
 panic = never
-flags = correctable
+flags = correctable,linear,pagealigned
 
 # ---
 
@@ -380,12 +384,12 @@ error = ereport.cpu.amd.ic.l2tlb_par
 mask on  =
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	tlb	-	-	-		-	l2	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	tlb	-	-	-	<47:12>	-	l2	instr
 
 panic = never
-flags = correctable
+flags = correctable,linear
 
 # ---
 
@@ -395,12 +399,12 @@ error = ereport.cpu.amd.ic.l2tlb_par
 mask on  =
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0001	tlb	-	-	-		-	l2	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0001	tlb	-	-	-	<47:12>	-	l2	instr
 
 panic = never
-flags = correctable
+flags = correctable,linear
 
 # ---
 
@@ -410,9 +414,9 @@ error = ereport.cpu.amd.ic.rdde
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	bus	src	0	ird		mem	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	bus	src	0	ird	none	mem	lg	-
 
 panic = ifmce
 flags =
@@ -431,12 +435,12 @@ error = ereport.cpu.amd.bu.l2d_ecc1
 mask on  = AMD_BANK_STAT_CECC
 mask off = AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	rd/snp/ev	-	l2	gen
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	rd/snp/ev <39:6> -	l2	gen
 
 panic = never
-flags = correctable
+flags = correctable,physical
 
 # ---
 
@@ -446,12 +450,12 @@ error = ereport.cpu.amd.bu.l2d_eccm
 mask on  = AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	mem	-	-	rd/snp/ev	-	l2	gen
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	mem	-	-	rd/snp/ev <39:6> -	l2	gen
 
 panic = always
-flags =
+flags = physical
 
 # ---
 
@@ -461,12 +465,12 @@ error = ereport.cpu.amd.bu.l2t_ecc1
 mask on  = AMD_BANK_STAT_CECC, AMD_BANK_STAT_SCRUB
 mask off = AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0010	mem	-	-	gen		-	l2	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0010	mem	-	-	gen	<15:0>	-	l2	instr
 
 panic = never
-flags = correctable
+flags = correctable,physical,l2setway
 
 # ---
 
@@ -476,12 +480,12 @@ error = ereport.cpu.amd.bu.l2t_eccm
 mask on  = AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC, AMD_BANK_STAT_SCRUB
 mask off = AMD_BANK_STAT_CECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0010	mem	-	-	gen		-	l2	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0010	mem	-	-	gen	<15:0>	-	l2	instr
 
 panic = always
-flags =
+flags = physical,l2setway
 
 # ---
 
@@ -491,12 +495,12 @@ error = ereport.cpu.amd.bu.l2t_par
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0010	mem	-	-	ird		-	l2	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0010	mem	-	-	ird	<15:0>	-	l2	instr
 
 panic = always
-flags =
+flags = physical,l2setway
 
 # ---
 
@@ -506,12 +510,12 @@ error = ereport.cpu.amd.bu.l2t_par
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0010	mem	-	-	drd		-	l2	data
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0010	mem	-	-	drd	<15:0>	-	l2	data
 
 panic = always
-flags =
+flags = physical,l2setway
 
 # ---
 
@@ -521,12 +525,12 @@ error = ereport.cpu.amd.bu.l2t_par
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0010	mem	-	-	rd/snp/ev	-	l2	gen
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0010	mem	-	-	rd/snp/ev <15:0> -	l2	gen
 
 panic = always
-flags =
+flags = physical,l2setway
 
 # ---
 
@@ -536,12 +540,12 @@ error = ereport.cpu.amd.bu.l2t_par
 mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_SCRUB
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0010	mem	-	-	gen		-	l2	instr
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0010	mem	-	-	gen	<15:0>	-	l2	instr
 
 panic = always
-flags =
+flags = physical,l2setway
 
 # ---
 
@@ -551,12 +555,13 @@ error = ereport.cpu.amd.bu.s_ecc1
 mask on  = AMD_BANK_STAT_CECC
 mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	bus	src	0	rd/pf		mem/io	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	bus	src	0	rd	<39:6>	mem/io	lg	-
+code =	0000	bus	src	0	pf	none	mem/io	lg	-
 
 panic = never
-flags = correctable
+flags = correctable,physical
 
 # ---
 
@@ -566,12 +571,13 @@ error = ereport.cpu.amd.bu.s_eccm
 mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 mask off = AMD_BANK_STAT_CECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	bus	src	0	rd/pf		mem/io	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	bus	src	0	rd	<39:6>	mem/io	lg	-
+code =	0000	bus	src	0	pf	none	mem/io	lg	-
 
 panic = always
-flags =
+flags = physical
 
 # ---
 
@@ -581,12 +587,12 @@ error = ereport.cpu.amd.bu.s_rde
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	bus	src	0	rd/pf		mem/io	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	bus	src	0	rd/pf	<39:6>	mem/io	lg	-
 
 panic = ifmce
-flags =
+flags = physical
 
 #
 # ---
@@ -600,12 +606,12 @@ error = ereport.cpu.amd.ls.s_rde
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code =	0000	bus	src	0	rd/wr		mem/io	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code =	0000	bus	src	0	rd/wr	<39:6>	mem/io	lg	-
 
 panic = ifmce
-flags =
+flags = physical
 
 #
 # ---
@@ -619,12 +625,12 @@ error = ereport.cpu.amd.nb.mem_ce
 mask on  = AMD_BANK_STAT_CECC
 mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code  = 0000	bus	src/rsp	0	rd/wr		mem	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code  = 0000	bus	src/rsp	0	rd/wr	<39:3>	mem	lg	-
 
 panic = never
-flags = correctable
+flags = correctable,physical
 
 # ---
 
@@ -634,12 +640,12 @@ error = ereport.cpu.amd.nb.mem_ue
 mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 mask off = AMD_BANK_STAT_CECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code  = 0000	bus	src/rsp	0	rd/wr		mem	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code  = 0000	bus	src/rsp	0	rd/wr	<39:3>	mem	lg	-
 
 panic = always
-flags = 
+flags = physical
 
 # ---
 
@@ -649,12 +655,12 @@ error = ereport.cpu.amd.nb.mem_ce
 mask on  = AMD_BANK_STAT_CECC
 mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code  = 1000	bus	src/rsp	0	rd/wr		mem	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code  = 1000	bus	src/rsp	0	rd/wr	<39:3>	mem	lg	-
 
 panic = never
-flags = correctable
+flags = correctable,physical
 
 # ---
 
@@ -664,12 +670,12 @@ error = ereport.cpu.amd.nb.mem_ue
 mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
 mask off = AMD_BANK_STAT_CECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code  = 1000	bus	src/rsp	0	rd/wr		mem	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code  = 1000	bus	src/rsp	0	rd/wr	<39:3>	mem	lg	-
 
 panic = always
-flags = 
+flags = physical
 
 # ---
 
@@ -679,9 +685,9 @@ error = ereport.cpu.amd.nb.ht_crc
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code  = 0001	bus	obs	0	gen		gen	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code  = 0001	bus	obs	0	gen	none	gen	lg	-
 
 panic = always
 flags = 
@@ -694,9 +700,9 @@ error = ereport.cpu.amd.nb.ht_sync
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code  = 0010	bus	obs	0	gen		gen	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code  = 0010	bus	obs	0	gen	none	gen	lg	-
 
 panic = always
 flags = 
@@ -709,12 +715,12 @@ error = ereport.cpu.amd.nb.ma
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code  = 0011	bus	src/obs	0	rd/wr		mem/io	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code  = 0011	bus	src/obs	0	rd/wr	<39:3>	mem/io	lg	-
 
 panic = never
-flags = 
+flags = physical
 
 # ---
 
@@ -724,12 +730,12 @@ error = ereport.cpu.amd.nb.ta
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code  = 0100	bus	src/obs	0	rd/wr		mem/io	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code  = 0100	bus	src/obs	0	rd/wr	<39:3>	mem/io	lg	-
 
 panic = never
-flags = 
+flags = physical
 
 # ---
 
@@ -739,12 +745,12 @@ error = ereport.cpu.amd.nb.gart_walk
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code  = 0101	tlb	-	-	-		-	lg	gen
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code  = 0101	tlb	-	-	-	<39:3>	-	lg	gen
 
 panic = ifmce
-flags = 
+flags = physical
 
 # ---
 
@@ -754,12 +760,12 @@ error = ereport.cpu.amd.nb.rmw
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code  = 0110	bus	obs	0	gen		io	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code  = 0110	bus	obs	0	gen	<39:3>	io	lg	-
 
 panic = always
-flags = 
+flags = physical
 
 # ---
 
@@ -769,9 +775,9 @@ error = ereport.cpu.amd.nb.wdog
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code  = 0111	bus	gen	1	gen		gen	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code  = 0111	bus	gen	1	gen	<39:3>	gen	lg	-
 
 panic = always
 flags = 
@@ -784,9 +790,9 @@ error = ereport.cpu.amd.nb.dramaddr_par
 mask on  = AMD_BANK_STAT_UC
 mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
 
-#	ext	type	pp	t	rrrr		ii	ll	tt
-#       ------- -------	-------	-------	---------------	------- ------- -----
-code  = 1101	bus	obs	0	gen		mem	lg	-
+#	ext	type	pp	t	rrrr	addr	ii	ll	tt
+#       ------- -------	-------	-------	-------	-------	------- ------- -----
+code  = 1101	bus	obs	0	gen	none	mem	lg	-
 
 panic = always
 flags = 

@@ -34,7 +34,8 @@
  * The mc-amd driver exports an nvlist to userland, where the primary
  * consumer is the "chip" topology enumerator for this platform type which
  * builds a full topology subtree from this information.  Others can use
- * it, too, but don't depend on it not changing without an ARC contract.
+ * it, too, but don't depend on it not changing without an ARC contract
+ * (and the contract should probably concern the topology, not this nvlist).
  *
  * In the initial mc-amd implementation this nvlist was not versioned;
  * we'll think of that as version 0 and it may be recognised by the absence
@@ -313,7 +314,7 @@ union mcreg_csbase {
 	} _fmt_revFG;
 };
 
-#define	MC_CSBASE(up, rev) (MC_REV_MATCH(rev, MC_REV_F) ?	\
+#define	MC_CSBASE(up, rev) (MC_REV_MATCH(rev, MC_REVS_FG) ?	\
 	(uint64_t)MCREG_FIELD_revFG(up, BaseAddrHi) << 27 |		\
 	(uint64_t)MCREG_FIELD_revFG(up, BaseAddrLo) << 13 :		\
 	(uint64_t)MCREG_FIELD_preF(up, BaseAddrHi) << 25 |		\
@@ -347,15 +348,15 @@ union mcreg_csmask {
 	} _fmt_revFG;
 };
 
-#define	MC_CSMASKLO_LOBIT(rev) (MC_REV_MATCH(rev, MC_REV_F) ? 13 : 13)
-#define	MC_CSMASKLO_HIBIT(rev) (MC_REV_MATCH(rev, MC_REV_F) ? 21 : 19)
+#define	MC_CSMASKLO_LOBIT(rev) (MC_REV_MATCH(rev, MC_REVS_FG) ? 13 : 13)
+#define	MC_CSMASKLO_HIBIT(rev) (MC_REV_MATCH(rev, MC_REVS_FG) ? 21 : 19)
 
-#define	MC_CSMASKHI_LOBIT(rev) (MC_REV_MATCH(rev, MC_REV_F) ? 27 : 25)
-#define	MC_CSMASKHI_HIBIT(rev) (MC_REV_MATCH(rev, MC_REV_F) ? 36 : 33)
+#define	MC_CSMASKHI_LOBIT(rev) (MC_REV_MATCH(rev, MC_REVS_FG) ? 27 : 25)
+#define	MC_CSMASKHI_HIBIT(rev) (MC_REV_MATCH(rev, MC_REVS_FG) ? 36 : 33)
 
-#define	MC_CSMASK_UNMASKABLE(rev) (MC_REV_MATCH(rev, MC_REV_F) ? 0 : 2)
+#define	MC_CSMASK_UNMASKABLE(rev) (MC_REV_MATCH(rev, MC_REVS_FG) ? 0 : 2)
 
-#define	MC_CSMASK(up, rev) (MC_REV_MATCH(rev, MC_REV_F) ?		\
+#define	MC_CSMASK(up, rev) (MC_REV_MATCH(rev, MC_REVS_FG) ?		\
 	(uint64_t)MCREG_FIELD_revFG(up, AddrMaskHi) << 27 |		\
 	(uint64_t)MCREG_FIELD_revFG(up, AddrMaskLo) << 13 | 0x7c01fff :	\
 	(uint64_t)MCREG_FIELD_preF(up, AddrMaskHi) << 25 |		\

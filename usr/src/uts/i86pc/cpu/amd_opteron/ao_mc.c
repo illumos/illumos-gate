@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -51,14 +50,14 @@ ao_mc_getops(void *data)
 }
 
 int
-ao_mc_patounum(ao_data_t *ao, uint64_t pa, uint32_t synd, int syndtype,
-    mc_unum_t *unump)
+ao_mc_patounum(ao_data_t *ao, uint64_t pa, uint8_t valid_hi, uint8_t valid_lo,
+    uint32_t synd, int syndtype, mc_unum_t *unump)
 {
 	if (ao->ao_mc_ops == NULL)
 		return (0);	/* mc not registered, or failed to load */
 
-	return (ao->ao_mc_ops->cmi_mc_patounum(ao->ao_mc_data, pa, synd,
-	    syndtype, unump));
+	return (ao->ao_mc_ops->cmi_mc_patounum(ao->ao_mc_data, pa,
+	    valid_hi, valid_lo, synd, syndtype, unump));
 }
 
 int

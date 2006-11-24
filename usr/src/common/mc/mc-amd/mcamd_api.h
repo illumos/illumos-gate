@@ -197,7 +197,7 @@ union mcamd_dimm_offset_un {
 extern const char *mcamd_get_propname(mcamd_propcode_t);
 
 extern int mcamd_patounum(struct mcamd_hdl *, mcamd_node_t *, uint64_t,
-    uint32_t, int, mc_unum_t *);
+    uint8_t, uint8_t, uint32_t, int, mc_unum_t *);
 extern int mcamd_unumtopa(struct mcamd_hdl *, mcamd_node_t *, mc_unum_t *,
     uint64_t *);
 extern int mc_pa_to_offset(struct mcamd_hdl *, mcamd_node_t *, mcamd_node_t *,

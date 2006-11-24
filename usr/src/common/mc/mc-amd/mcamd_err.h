@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -38,7 +37,8 @@ enum {
 	EMCAMD_SYNDINVALID = EMCAMD_BASE,	/* invalid syndrome */
 	EMCAMD_TREEINVALID,			/* invalid configuration tree */
 	EMCAMD_NOADDR,				/* address not found */
-	EMCAMD_NOTSUP				/* operation not supported */
+	EMCAMD_NOTSUP,				/* operation not supported */
+	EMCAMD_INSUFF_RES			/* insufficient resolution */
 };
 
 extern const char *mcamd_errmsg(struct mcamd_hdl *);

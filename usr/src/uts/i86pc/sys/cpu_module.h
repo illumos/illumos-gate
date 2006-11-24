@@ -59,7 +59,8 @@ extern int cmi_mca_inject(cmi_mca_regs_t *, uint_t);
 extern void cmi_mca_poke(void);
 
 extern void cmi_mc_register(struct cpu *, const struct cmi_mc_ops *, void *);
-extern int cmi_mc_patounum(uint64_t, uint32_t, int, mc_unum_t *);
+extern int cmi_mc_patounum(uint64_t, uint8_t, uint8_t, uint32_t, int,
+    mc_unum_t *);
 extern int cmi_mc_unumtopa(mc_unum_t *, nvlist_t *, uint64_t *);
 
 #ifdef __cplusplus

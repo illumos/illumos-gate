@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/mc.h>
 #include <sys/mca_amd.h>
+#include <sys/mc_amd.h>
 #include <sys/cpu_module_impl.h>
 #include <sys/nvpair.h>
 #include <sys/cyclic.h>
@@ -77,6 +78,13 @@ extern ao_bank_regs_t ao_bank_regs[AMD_MCA_BANK_COUNT];
 
 #define	AO_AED_F_CORRECTABLE	0x01
 #define	AO_AED_F_LOFAULT_OK	0x02
+#define	AO_AED_F_LINEAR		0x04	/* MCi_ADDR is a linear address */
+#define	AO_AED_F_PHYSICAL	0x08	/* MCi_ADDR is a physical address */
+#define	AO_AED_F_PAGEALIGNED	0x10	/* MCi_ADDR aligns to page size */
+#define	AO_AED_F_L2SETWAY	0x20	/* 3:0 = way, 15/14/13/12:6 = set */
+
+#define	AO_AED_FLAGS_ADDRTYPE	(AO_AED_F_LINEAR | AO_AED_F_PHYSICAL | \
+    AO_AED_F_PAGEALIGNED | AO_AED_F_L2SETWAY)
 
 typedef struct ao_error_disp {
 	const char *aed_class;		/* ereport class for use if match */
@@ -88,6 +96,8 @@ typedef struct ao_error_disp {
 	uint8_t aed_stat_pp_bits:4;	/* AO_MCA_PP_BIT_* for pp matching */
 	uint8_t aed_stat_ii_bits:4;	/* AO_MCA_II_BIT_* for ii matching */
 	uint16_t aed_stat_r4_bits;	/* AO_MCA_R4_BIT_* for r4 matching */
+	uint8_t aed_addrvalid_hi;	/* most significant valid addr bit */
+	uint8_t aed_addrvalid_lo;	/* least significant valid addr bit */
 	uint8_t aed_panic_when;		/* extra conditions for panic */
 	uint8_t aed_flags;		/* AO_AED_F_* */
 } ao_error_disp_t;
@@ -141,6 +151,9 @@ typedef struct ao_bank_logout {
 	uint64_t abl_status;		/* Saved MCi_STATUS register */
 	uint64_t abl_addr;		/* Saved MCi_ADDR register */
 	uint64_t abl_misc;		/* Saved MCi_MISC register */
+	uint8_t abl_addr_type;		/* flags & AO_AED_FLAGS_ADDRTYPE */
+	uint8_t abl_addr_valid_hi;	/* most significant valid addr bit */
+	uint8_t abl_addr_valid_lo;	/* least significant valid addr bit */
 } ao_bank_logout_t;
 
 #define	AO_ACL_F_PRIV		0x1	/* #mc in kernel mode (else user) */
@@ -245,7 +258,8 @@ extern nvlist_t *ao_fmri_create(ao_data_t *, nv_alloc_t *);
 
 extern void ao_mc_register(void *, const cmi_mc_ops_t *, void *);
 extern const struct cmi_mc_ops *ao_mc_getops(void *);
-extern int ao_mc_patounum(ao_data_t *, uint64_t, uint32_t, int, mc_unum_t *);
+extern int ao_mc_patounum(ao_data_t *, uint64_t, uint8_t, uint8_t, uint32_t,
+    int, mc_unum_t *);
 extern int ao_mc_unumtopa(ao_data_t *, mc_unum_t *, nvlist_t *, uint64_t *);
 
 extern void ao_pcicfg_write(uint_t, uint_t, uint_t, uint32_t);

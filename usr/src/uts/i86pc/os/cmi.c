@@ -312,7 +312,8 @@ cmi_mc_register(cpu_t *cp, const cmi_mc_ops_t *mcops, void *mcdata)
 }
 
 int
-cmi_mc_patounum(uint64_t pa, uint32_t synd, int syndtype, mc_unum_t *up)
+cmi_mc_patounum(uint64_t pa, uint8_t valid_hi, uint8_t valid_lo, uint32_t synd,
+    int syndtype, mc_unum_t *up)
 {
 	const struct cmi_mc_ops *mcops;
 	cpu_t *cp = CPU;
@@ -321,7 +322,8 @@ cmi_mc_patounum(uint64_t pa, uint32_t synd, int syndtype, mc_unum_t *up)
 	    (mcops = CMI_OPS(cp)->cmi_mc_getops(CMI_DATA(cp))) == NULL)
 		return (-1);	/* not registered yet */
 
-	return (mcops->cmi_mc_patounum(CMI_DATA(cp), pa, synd, syndtype, up));
+	return (mcops->cmi_mc_patounum(CMI_DATA(cp), pa, valid_hi, valid_lo,
+	    synd, syndtype, up));
 }
 
 int
