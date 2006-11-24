@@ -55,7 +55,7 @@
 #define	VDS_MDEG		0x02
 
 /* Virtual disk server tunable parameters */
-#define	VDS_LDC_RETRIES		3
+#define	VDS_LDC_RETRIES		5
 #define	VDS_LDC_DELAY		1000 /* usec */
 #define	VDS_NCHAINS		32
 
@@ -871,79 +871,11 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 	return (status);
 }
 
-/*
- * Open any slices which have become non-empty as a result of performing a
- * set-VTOC operation for the client.
- *
- * When serving a full disk, vds attempts to exclusively open all of the
- * disk's slices to prevent another thread or process in the service domain
- * from "stealing" a slice or from performing I/O to a slice while a vds
- * client is accessing it.  Unfortunately, underlying drivers, such as sd(7d)
- * and cmdk(7d), return an error when attempting to open the device file for a
- * slice which is currently empty according to the VTOC.  This driver behavior
- * means that vds must skip opening empty slices when initializing a vdisk for
- * full-disk service and try to open slices that become non-empty (via a
- * set-VTOC operation) during use of the full disk in order to begin serving
- * such slices to the client.  This approach has an inherent (and therefore
- * unavoidable) race condition; it also means that failure to open a
- * newly-non-empty slice has different semantics than failure to open an
- * initially-non-empty slice:  Due to driver bahavior, opening a
- * newly-non-empty slice is a necessary side effect of vds performing a
- * (successful) set-VTOC operation for a client on an in-service (and in-use)
- * disk in order to begin serving the slice; failure of this side-effect
- * operation does not mean that the client's set-VTOC operation failed or that
- * operations on other slices must fail.  Therefore, this function prints an
- * error message on failure to open a slice, but does not return an error to
- * its caller--unlike failure to open a slice initially, which results in an
- * error that prevents serving the vdisk (and thereby requires an
- * administrator to resolve the problem).  Note that, apart from another
- * thread or process opening a new slice during the race-condition window,
- * failure to open a slice in this function will likely indicate an underlying
- * drive problem, which will also likely become evident in errors returned by
- * operations on other slices, and which will require administrative
- * intervention and possibly servicing the drive.
- */
-static void
-vd_open_new_slices(vd_t *vd)
-{
-	int		status;
-	struct vtoc	vtoc;
-
-	/* Get the (new) partitions for updated slice sizes */
-	if ((status = vd_read_vtoc(vd->ldi_handle[0], &vtoc,
-	    &vd->vdisk_label)) != 0) {
-		PR0("vd_read_vtoc returned error %d", status);
-		return;
-	}
-
-	/* Open any newly-non-empty slices */
-	for (int slice = 0; slice < vd->nslices; slice++) {
-		/* Skip zero-length slices */
-		if (vtoc.v_part[slice].p_size == 0) {
-			if (vd->ldi_handle[slice] != NULL)
-				PR0("Open slice %u now has zero length", slice);
-			continue;
-		}
-
-		/* Skip already-open slices */
-		if (vd->ldi_handle[slice] != NULL)
-			continue;
-
-		PR0("Opening newly-non-empty slice %u", slice);
-		if ((status = ldi_open_by_dev(&vd->dev[slice], OTYP_BLK,
-			    vd_open_flags, kcred, &vd->ldi_handle[slice],
-			    vd->vds->ldi_ident)) != 0) {
-			PR0("ldi_open_by_dev() returned errno %d "
-			    "for slice %u", status, slice);
-		}
-	}
-}
-
 #define	RNDSIZE(expr) P2ROUNDUP(sizeof (expr), sizeof (uint64_t))
 static int
 vd_ioctl(vd_task_t *task)
 {
-	int			i, status;
+	int			i, status, rc;
 	void			*buf = NULL;
 	struct dk_geom		dk_geom = {0};
 	struct vtoc		vtoc = {0};
@@ -1031,8 +963,13 @@ vd_ioctl(vd_task_t *task)
 		kmem_free(buf, request->nbytes);
 	if (vd->vdisk_type == VD_DISK_TYPE_DISK &&
 	    (request->operation == VD_OP_SET_VTOC ||
-	    request->operation == VD_OP_SET_EFI))
-		vd_open_new_slices(vd);
+	    request->operation == VD_OP_SET_EFI)) {
+		/* update disk information */
+		rc = vd_read_vtoc(vd->ldi_handle[0], &vd->vtoc,
+		    &vd->vdisk_label);
+		if (rc != 0)
+			PR0("vd_read_vtoc return error %d", rc);
+	}
 	PR0("Returning %d", status);
 	return (status);
 }
@@ -2125,14 +2062,13 @@ vd_handle_ldc_events(uint64_t event, caddr_t arg)
 	vd_t	*vd = (vd_t *)(void *)arg;
 	int	status;
 
-
 	ASSERT(vd != NULL);
 
 	if (!vd_enabled(vd))
 		return (LDC_SUCCESS);
 
 	if (event & LDC_EVT_DOWN) {
-		PRN("LDC_EVT_DOWN: LDC channel went down");
+		PR0("LDC_EVT_DOWN: LDC channel went down");
 
 		vd_need_reset(vd, B_TRUE);
 		status = ddi_taskq_dispatch(vd->startq, vd_recv_msg, vd,
@@ -2281,7 +2217,7 @@ vd_setup_full_disk(vd_t *vd)
 	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGMEDIAINFO,
 	    (intptr_t)&dk_minfo, (vd_open_flags | FKIOCTL),
 	    kcred, &rval)) != 0) {
-		PRN("ldi_ioctl(DKIOCGMEDIAINFO) returned errno %d",
+		PR0("ldi_ioctl(DKIOCGMEDIAINFO) returned errno %d",
 		    status);
 		return (status);
 	}
@@ -2314,32 +2250,25 @@ vd_setup_full_disk(vd_t *vd)
 		vd->dev[slice] = makedevice(major, (minor + slice));
 
 		/*
-		 * At least some underlying drivers refuse to open
-		 * devices for (currently) zero-length slices, so skip
-		 * them for now
-		 */
-		if (vd->vtoc.v_part[slice].p_size == 0) {
-			PR0("Skipping zero-length slice %u", slice);
-			continue;
-		}
-
-		/*
-		 * Open all non-empty slices of the disk to serve them to the
-		 * client.  Slices are opened exclusively to prevent other
-		 * threads or processes in the service domain from performing
-		 * I/O to slices being accessed by a client.  Failure to open
-		 * a slice results in vds not serving this disk, as the client
-		 * could attempt (and should be able) to access any non-empty
-		 * slice immediately.  Any slices successfully opened before a
-		 * failure will get closed by vds_destroy_vd() as a result of
-		 * the error returned by this function.
+		 * Open all slices of the disk to serve them to the client.
+		 * Slices are opened exclusively to prevent other threads or
+		 * processes in the service domain from performing I/O to
+		 * slices being accessed by a client.  Failure to open a slice
+		 * results in vds not serving this disk, as the client could
+		 * attempt (and should be able) to access any slice immediately.
+		 * Any slices successfully opened before a failure will get
+		 * closed by vds_destroy_vd() as a result of the error returned
+		 * by this function.
+		 *
+		 * We need to do the open with FNDELAY so that opening an empty
+		 * slice does not fail.
 		 */
 		PR0("Opening device major %u, minor %u = slice %u",
 		    major, minor, slice);
 		if ((status = ldi_open_by_dev(&vd->dev[slice], OTYP_BLK,
-			    vd_open_flags, kcred, &vd->ldi_handle[slice],
-			    vd->vds->ldi_ident)) != 0) {
-			PRN("ldi_open_by_dev() returned errno %d "
+		    vd_open_flags | FNDELAY, kcred, &vd->ldi_handle[slice],
+		    vd->vds->ldi_ident)) != 0) {
+			PR0("ldi_open_by_dev() returned errno %d "
 			    "for slice %u", status, slice);
 			/* vds_destroy_vd() will close any open slices */
 			return (status);
@@ -2603,13 +2532,13 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t ldc_id,
 	}
 
 	if ((status = ldc_up(vd->ldc_handle)) != 0) {
-		PRN("ldc_up() returned errno %d", status);
+		PR0("ldc_up() returned errno %d", status);
 	}
 
 	/* Allocate the inband task memory handle */
 	status = ldc_mem_alloc_handle(vd->ldc_handle, &(vd->inband_task.mhdl));
 	if (status) {
-		PRN("ldc_mem_alloc_handle() returned err %d ", status);
+		PR0("ldc_mem_alloc_handle() returned err %d ", status);
 		return (ENXIO);
 	}
 
@@ -2653,7 +2582,7 @@ static void
 vds_destroy_vd(void *arg)
 {
 	vd_t	*vd = (vd_t *)arg;
-
+	int	retry = 0, rv;
 
 	if (vd == NULL)
 		return;
@@ -2680,6 +2609,40 @@ vds_destroy_vd(void *arg)
 
 	vd_free_dring_task(vd);
 
+	/* Free the inband task memory handle */
+	(void) ldc_mem_free_handle(vd->inband_task.mhdl);
+
+	/* Shut down LDC */
+	if (vd->initialized & VD_LDC) {
+		/* unmap the dring */
+		if (vd->initialized & VD_DRING)
+			(void) ldc_mem_dring_unmap(vd->dring_handle);
+
+		/* close LDC channel - retry on EAGAIN */
+		while ((rv = ldc_close(vd->ldc_handle)) == EAGAIN) {
+			if (++retry > vds_ldc_retries) {
+				PR0("Timed out closing channel");
+				break;
+			}
+			drv_usecwait(vds_ldc_delay);
+		}
+		if (rv == 0) {
+			(void) ldc_unreg_callback(vd->ldc_handle);
+			(void) ldc_fini(vd->ldc_handle);
+		} else {
+			/*
+			 * Closing the LDC channel has failed. Ideally we should
+			 * fail here but there is no Zeus level infrastructure
+			 * to handle this. The MD has already been changed and
+			 * we have to do the close. So we try to do as much
+			 * clean up as we can.
+			 */
+			(void) ldc_set_cb_mode(vd->ldc_handle, LDC_CB_DISABLE);
+			while (ldc_unreg_callback(vd->ldc_handle) == EAGAIN)
+				drv_usecwait(vds_ldc_delay);
+		}
+	}
+
 	/* Free the staging buffer for msgs */
 	if (vd->vio_msgp != NULL) {
 		kmem_free(vd->vio_msgp, vd->max_msglen);
@@ -2690,18 +2653,6 @@ vds_destroy_vd(void *arg)
 	if (vd->inband_task.msg != NULL) {
 		kmem_free(vd->inband_task.msg, vd->max_msglen);
 		vd->inband_task.msg = NULL;
-	}
-
-	/* Free the inband task memory handle */
-	(void) ldc_mem_free_handle(vd->inband_task.mhdl);
-
-	/* Shut down LDC */
-	if (vd->initialized & VD_LDC) {
-		if (vd->initialized & VD_DRING)
-			(void) ldc_mem_dring_unmap(vd->dring_handle);
-		(void) ldc_unreg_callback(vd->ldc_handle);
-		(void) ldc_close(vd->ldc_handle);
-		(void) ldc_fini(vd->ldc_handle);
 	}
 
 	/* Close any open backing-device slices */

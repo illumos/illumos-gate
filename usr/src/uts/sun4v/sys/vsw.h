@@ -387,10 +387,16 @@ typedef struct vsw_ctrl_task {
 
 /*
  * Vsw queue -- largely modeled after squeue
+ *
+ * VSW_QUEUE_RUNNING, vqueue thread for queue is running.
+ * VSW_QUEUE_DRAINED, vqueue thread has drained current work and is exiting.
+ * VSW_QUEUE_STOP, request for the vqueue thread to stop.
+ * VSW_QUEUE_STOPPED, vqueue thread is not running.
  */
 #define	VSW_QUEUE_RUNNING	0x01
-#define	VSW_QUEUE_STOP		0x02
-#define	VSW_QUEUE_DRAINED	0x04
+#define	VSW_QUEUE_DRAINED	0x02
+#define	VSW_QUEUE_STOP		0x04
+#define	VSW_QUEUE_STOPPED	0x08
 
 typedef struct vsw_queue_s {
 	kmutex_t	vq_lock;	/* Lock, before using any member. */
@@ -482,8 +488,12 @@ typedef struct	vsw {
 	krwlock_t		mfdbrw;		/* rwlock for mFDB */
 
 	vio_mblk_pool_t		*rxh;		/* Receive pool handle */
+	void			(*vsw_switch_frame)
+					(struct vsw *, mblk_t *, int,
+					vsw_port_t *, mac_resource_handle_t);
 
 	/* mac layer */
+	kmutex_t		mac_lock;	/* protect fields below */
 	mac_handle_t		mh;
 	mac_rx_handle_t		mrh;
 	multiaddress_capab_t	maddr;		/* Multiple uni addr capable */
@@ -504,6 +514,7 @@ typedef struct	vsw {
 	/* Machine Description updates  */
 	mdeg_node_spec_t	*inst_spec;
 	mdeg_handle_t		mdeg_hdl;
+	mdeg_handle_t		mdeg_port_hdl;
 
 	/* if configured as an ethernet interface */
 	mac_handle_t		if_mh;		/* MAC handle */
