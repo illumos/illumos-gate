@@ -184,6 +184,12 @@
 	<append key="volume.mount.valid_options" type="strlist">iocharset=</append>
       </match>
 
+      <!-- pcfs -->
+      <match key="volume.fstype" string="pcfs">
+	<append key="volume.mount.valid_options" type="strlist">foldcase</append>
+	<append key="volume.mount.valid_options" type="strlist">nofoldcase</append>
+      </match>
+
       <!-- allow these unmount options -->
       <append key="volume.unmount.valid_options" type="strlist">lazy</append>
 

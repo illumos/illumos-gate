@@ -112,6 +112,7 @@ handle_start(DBusConnection *con, DBusMessage *msg)
 	DBusMessageIter iter;
 	run_request *r;
 	GPid pid;
+	dbus_int64_t pid64;
 
 	r = new_run_request();
 	g_assert(dbus_message_iter_init(msg, &iter));
@@ -120,9 +121,10 @@ handle_start(DBusConnection *con, DBusMessage *msg)
 		goto malformed;
 
 	if (run_request_run(r, con, NULL, &pid)) {
+		pid64 = pid;
 		reply = dbus_message_new_method_return(msg);
 		dbus_message_append_args (reply, 
-					  DBUS_TYPE_INT64, &pid,
+					  DBUS_TYPE_INT64, &pid64,
 					  DBUS_TYPE_INVALID);
 					  
 	} else {

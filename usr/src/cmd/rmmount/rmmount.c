@@ -82,6 +82,7 @@ rmmount(int argc, char **argv)
 	int		num_opts = 0;
 	char		*mountpoint = NULL;
 	char		**p;
+	int		print_mask;
 	int		ret = 0;
 
 	progname = basename(argv[0]);
@@ -157,7 +158,11 @@ rmmount(int argc, char **argv)
 		(void) printf(gettext("Default device is: %s\n"), default_name);
 	} else if (l_opt) {
 		/* -l: list volumes and exit */
-		rmm_print_volume_nicknames(hal_ctx, &error);
+		print_mask = RMM_PRINT_MOUNTABLE;
+		if (eject_opt) {
+			print_mask |= RMM_PRINT_EJECTABLE;
+		}
+		rmm_print_volume_nicknames(hal_ctx, &error, print_mask);
 	} else if (optind == argc) {
 		/* no name provided, use default */
 		if ((d = rmm_hal_volume_find_default(hal_ctx, &error,

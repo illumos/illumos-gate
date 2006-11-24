@@ -48,6 +48,8 @@
 
 #include "rmm_common.h"
 
+#define	RMM_PRINT_DEVICE_WIDTH	20
+
 extern int rmm_debug;
 
 static const char *action_strings[] = {
@@ -296,77 +298,120 @@ rmm_hal_volume_findby(LibHalContext *hal_ctx, const char *property,
 	return (drive);
 }
 
+static void
+rmm_print_nicknames_one(LibHalDrive *d, LibHalVolume *v,
+    const char *device, char **drive_nicknames)
+{
+	const char	*volume_label = NULL;
+	const char	*mount_point = NULL;
+	boolean_t	comma;
+	int		i;
+
+	(void) printf("%-*s ", RMM_PRINT_DEVICE_WIDTH, device);
+	comma = B_FALSE;
+
+	if (drive_nicknames != NULL) {
+		for (i = 0; drive_nicknames[i] != NULL; i++) {
+			(void) printf("%s%s", comma ? "," : "",
+			    drive_nicknames[i]);
+			comma = B_TRUE;
+		}
+	}
+
+	if ((v != NULL) &&
+	    ((volume_label = libhal_volume_get_label(v)) != NULL) &&
+	    (strlen(volume_label) > 0)) {
+		(void) printf("%s%s", comma ? "," : "", volume_label);
+		comma = B_TRUE;
+	}
+
+	if ((v != NULL) &&
+	    ((mount_point = libhal_volume_get_mount_point(v)) != NULL) &&
+	    (strlen(mount_point) > 0)) {
+		(void) printf("%s%s", comma ? "," : "", mount_point);
+		comma = B_TRUE;
+	}
+
+	(void) printf("\n");
+}
 
 /*
  * print nicknames for each available volume
+ *
+ * print_mask:
+ *   RMM_PRINT_MOUNTABLE	print only mountable volumes
+ *   RMM_PRINT_EJECTABLE	print volume-less ejectable drives
  */
 void
-rmm_print_volume_nicknames(LibHalContext *hal_ctx, DBusError *error)
+rmm_print_volume_nicknames(LibHalContext *hal_ctx, DBusError *error,
+    int print_mask)
 {
 	char		**udis;
 	int		num_udis;
-	char		*block_device;
-	char		*drive_udi;
-	char		*volume_label;
-	char		*mount_point;
-	boolean_t	comma;
+	GSList		*volumes = NULL;
+	LibHalDrive	*d, *d_tmp;
+	LibHalVolume	*v;
+	const char	*device;
 	char		**nicknames;
-	int		i, j;
+	int		i;
+	GSList		*j;
+	int		nprinted;
 
 	dbus_error_init(error);
 
-	if ((udis = libhal_find_device_by_capability(hal_ctx, "volume",
+	if ((udis = libhal_find_device_by_capability(hal_ctx, "storage",
 	    &num_udis, error)) == NULL) {
+		rmm_dbus_error_free(error);
 		return;
 	}
 
 	for (i = 0; i < num_udis; i++) {
-		if ((block_device = libhal_device_get_property_string(hal_ctx,
-		    udis[i], "block.device", NULL)) == NULL) {
+		if ((d = libhal_drive_from_udi(hal_ctx, udis[i])) == NULL) {
 			continue;
 		}
-		if ((drive_udi = libhal_device_get_property_string(hal_ctx,
-		    udis[i], "block.storage_device", NULL)) == NULL) {
-			libhal_free_string(block_device);
-			continue;
-		}
-		(void) printf("%s\t", block_device);
-		comma = B_FALSE;
 
-		if ((nicknames = libhal_device_get_property_strlist(hal_ctx,
-		    drive_udi, "storage.solaris.nicknames", NULL)) != NULL) {
-			for (j = 0; nicknames[j] != NULL; j++) {
-				(void) printf("%s%s", comma ? "," : "",
-				    nicknames[j]);
-				comma = B_TRUE;
+		/* find volumes belonging to this drive */
+		if ((d_tmp = rmm_hal_volume_findby(hal_ctx,
+		    "block.storage_device", udis[i], &volumes)) != NULL) {
+			libhal_drive_free(d_tmp);
+		}
+
+		nicknames = libhal_device_get_property_strlist(hal_ctx,
+		    udis[i], "storage.solaris.nicknames", NULL);
+
+		nprinted = 0;
+		for (j = volumes; j != NULL; j = g_slist_next(j)) {
+			v = (LibHalVolume *)(j->data);
+
+			if ((device = libhal_volume_get_device_file(v)) ==
+			    NULL) {
+				continue;
 			}
+			if ((print_mask & RMM_PRINT_MOUNTABLE) &&
+			    (libhal_volume_get_fsusage(v) !=
+			    LIBHAL_VOLUME_USAGE_MOUNTABLE_FILESYSTEM)) {
+				continue;
+			}
+
+			rmm_print_nicknames_one(d, v, device, nicknames);
+			nprinted++;
 		}
 
-		if (((volume_label = libhal_device_get_property_string(hal_ctx,
-		    udis[i], "volume.label", NULL)) != NULL) &&
-		    (strlen(volume_label) > 0)) {
-			(void) printf("%s%s", comma ? "," : "", volume_label);
-			comma = B_TRUE;
+		if ((nprinted == 0) &&
+		    (print_mask & RMM_PRINT_EJECTABLE) &&
+		    libhal_drive_requires_eject(d) &&
+		    ((device = libhal_drive_get_device_file(d)) != NULL)) {
+			rmm_print_nicknames_one(d, NULL, device, nicknames);
 		}
-
-		if (((mount_point = libhal_device_get_property_string(hal_ctx,
-		    udis[i], "volume.mount_point", NULL)) != NULL) &&
-		    (strlen(mount_point) > 0)) {
-			(void) printf("%s%s", comma ? "," : "", mount_point);
-			comma = B_TRUE;
-		}
-
-		(void) printf("\n");
 
 		libhal_free_string_array(nicknames);
-		libhal_free_string(drive_udi);
-		libhal_free_string(volume_label);
-		libhal_free_string(mount_point);
-		libhal_free_string(block_device);
+		libhal_drive_free(d);
+		rmm_volumes_free(volumes);
+		volumes = NULL;
 	}
+
 	libhal_free_string_array(udis);
 }
-
 
 /*
  * find volume by nickname

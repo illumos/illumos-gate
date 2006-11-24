@@ -48,6 +48,11 @@ typedef enum {
 	RMM_EHAL_CONNECT	/* cannot connect to HAL */
 } rmm_error_t;
 
+enum {
+	RMM_PRINT_MOUNTABLE	= 0x1,
+	RMM_PRINT_EJECTABLE	= 0x2
+};
+
 #define	HAL_BRANCH_LOCAL	"/org/freedesktop/Hal/devices/local"
 
 #define	NELEM(a)	(sizeof (a) / sizeof (*(a)))
@@ -66,7 +71,7 @@ LibHalDrive	*rmm_hal_volume_findby(LibHalContext *, const char *,
 		const char *, GSList **);
 LibHalDrive	*rmm_hal_volume_findby_nickname(LibHalContext *, const char *,
 		GSList **);
-void		rmm_print_volume_nicknames(LibHalContext *, DBusError *);
+void		rmm_print_volume_nicknames(LibHalContext *, DBusError *, int);
 void		rmm_volumes_free(GSList *);
 
 boolean_t	rmm_hal_mount(LibHalContext *, const char *,
