@@ -338,7 +338,7 @@ static int
 sr_hosts(md_set_record *sr)
 {
 	int		i,
-			nid,
+			nid = 0,
 			self_in_set = FALSE;
 	md_error_t	xep = mdnullerror;
 	md_mnnode_record	*nr;
@@ -371,40 +371,47 @@ sr_hosts(md_set_record *sr)
 	}
 
 	if ((self_in_set == FALSE) && (!(MD_MNSET_REC(sr)))) {
-	    if (_cladm(CL_CONFIG, CL_NODEID, &nid) == 0) {
-
 		/*
-		 * See if we've got a node which has been booted in
-		 * non-cluster mode. If true the nodeid will match
-		 * one of the sr_nodes values because the conversion
-		 * from nodeid to hostname failed to occur.
+		 * Under some circumstances (/etc/cluster/nodeid file is
+		 * missing) it is possible for the call to _cladm() to
+		 * return 0 and a nid of 0. In this instance do not remove
+		 * the set as it is Sun Cluster error that needs to be fixed.
 		 */
-		for (i = 0; i < MD_MAXSIDES; i++) {
-			if (sr->sr_nodes[i][0] == 0)
-				continue;
-			if (atoi(sr->sr_nodes[i]) == nid)
-				self_in_set = TRUE;
-		}
+		if (_cladm(CL_CONFIG, CL_NODEID, &nid) == 0 && nid > 0) {
 
-		/* If we aren't in the set, delete the set */
-		if (self_in_set == FALSE) {
+			/*
+			 * See if we've got a node which has been booted in
+			 * non-cluster mode. If true the nodeid will match
+			 * one of the sr_nodes values because the conversion
+			 * from nodeid to hostname failed to occur.
+			 */
+			for (i = 0; i < MD_MAXSIDES; i++) {
+				if (sr->sr_nodes[i][0] == 0)
+					continue;
+				if (atoi(sr->sr_nodes[i]) == nid)
+					self_in_set = TRUE;
+			}
+
+			/* If we aren't in the set, delete the set */
+			if (self_in_set == FALSE) {
+				syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+				    "Removing set %s from database\n"),
+				    sr->sr_setname);
+				s_delset(sr->sr_setname, &xep);
+				if (! mdisok(&xep))
+					mdclrerror(&xep);
+				return (1);
+			}
+		} else {
+			/*
+			 * Send a message to syslog and return without
+			 * deleting any sets
+			 */
 			syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
-			    "Removing set %s from database\n"), sr->sr_setname);
-			s_delset(sr->sr_setname, &xep);
-			if (! mdisok(&xep))
-				mdclrerror(&xep);
+			    "Call to _cladm failed for set %s nodeid %d\n"),
+			    sr->sr_setname, nid);
 			return (1);
 		}
-	    } else {
-		/*
-		 * Send a message to syslog and return without
-		 * deleting any sets
-		 */
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
-			"Call to _cladm failed for set %s\n"),
-			sr->sr_setname);
-		return (1);
-	    }
 	}
 	return (0);
 }
