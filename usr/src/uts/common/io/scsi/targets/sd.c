@@ -31421,6 +31421,11 @@ sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
 	un->un_f_default_vtoc_supported = TRUE;
 #endif
 
+	/*
+	 * Enable SYNC CACHE support for all devices.
+	 */
+	un->un_f_sync_cache_supported = TRUE;
+
 	if (un->un_sd->sd_inq->inq_rmb) {
 		/*
 		 * The media of this device is removable. And for this kind
@@ -31618,11 +31623,6 @@ sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
 		 */
 		un->un_f_mboot_supported = FALSE;
 #endif
-
-		/*
-		 * Fixed disk support SYNC CACHE
-		 */
-		un->un_f_sync_cache_supported = TRUE;
 
 		/*
 		 * For fixed disk, if its VTOC is not valid, we will write
