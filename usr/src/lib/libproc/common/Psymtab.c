@@ -2745,8 +2745,10 @@ object_name_to_map(struct ps_prochandle *P, Lmid_t lmid, const char *name)
 		mptr = P->map_exec;
 	else if (name == PR_OBJ_LDSO)
 		mptr = P->map_ldso;
-	else
+	else if (Prd_agent(P) != NULL || P->state == PS_IDLE)
 		mptr = object_to_map(P, lmid, name);
+	else
+		mptr = NULL;
 
 	return (mptr);
 }
