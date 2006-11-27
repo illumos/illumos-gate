@@ -336,13 +336,13 @@ _exec_nisplus_lookup(nisplus_backend_t *be,
 static nss_status_t
 get_wild(nisplus_backend_ptr_t be, nss_XbyY_args_t *argp, int getby_flag)
 {
-	char		*orig_id = NULL;
+	const char	*orig_id = NULL;
 	char		*old_id = NULL;
 	char		*wild_id = NULL;
 	nss_status_t	res = NSS_NOTFOUND;
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 
-	orig_id = strdup(_priv_exec->id);
+	orig_id = _priv_exec->id;
 	old_id = strdup(_priv_exec->id);
 	wild_id = old_id;
 	while ((wild_id = _exec_wild_id(wild_id, _priv_exec->type)) != NULL) {

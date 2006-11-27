@@ -282,9 +282,12 @@ _exec_nis_lookup(nis_backend_ptr_t be, nss_XbyY_args_t *argp, int getby_flag)
 				res = ypres;
 				break;
 			} else {
+				char *val_save = val;
+
 				massage_netdb((const char **)&val, &vallen);
 				res = _exec_nis_parse((const char *)val,
 				    vallen, argp, check_policy);
+				free(val_save);
 				break;
 			}
 		} while (res == NSS_SUCCESS);
@@ -339,13 +342,13 @@ _exec_nis_lookup(nis_backend_ptr_t be, nss_XbyY_args_t *argp, int getby_flag)
 static  nss_status_t
 get_wild(nis_backend_ptr_t be, nss_XbyY_args_t *argp, int getby_flag)
 {
-	char		*orig_id = NULL;
+	const char	*orig_id;
 	char		*old_id = NULL;
 	char		*wild_id = NULL;
 	nss_status_t	res = NSS_NOTFOUND;
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 
-	orig_id = strdup(_priv_exec->id);
+	orig_id = _priv_exec->id;
 	old_id = strdup(_priv_exec->id);
 	wild_id = old_id;
 	while ((wild_id = _exec_wild_id(wild_id, _priv_exec->type)) != NULL) {

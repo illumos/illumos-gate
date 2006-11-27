@@ -263,6 +263,18 @@ _nss_dns_constr(dns_backend_op_t ops[], int n_ops)
 	return ((nss_backend_t *)be);
 }
 
+/*
+ * __res_ndestroy is a simplified version of the non-public function
+ * res_ndestroy in libresolv.so.2. Before res_ndestroy can be made
+ * public, __res_ndestroy will be used to make sure the memory pointed
+ * by statp->_u._ext.ext is freed after res_nclose() is called.
+ */
+static void
+__res_ndestroy(res_state statp) {
+	res_nclose(statp);
+	if (statp->_u._ext.ext != NULL)
+		free(statp->_u._ext.ext);
+}
 
 /*
  * nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
@@ -343,14 +355,14 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	blen = 0;
 	sret = nss_packed_getkey(buffer, bufsize, &dbname, &dbop, &arg);
 	if (sret != NSS_SUCCESS) {
-		res_nclose(statp);
+		__res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
 
 	if (ipnode) {
 		/* initially only handle the simple cases */
 		if (arg.key.ipnode.flags != 0) {
-			res_nclose(statp);
+			__res_ndestroy(statp);
 			return (NSS_ERROR);
 		}
 		name = arg.key.ipnode.name;
@@ -368,11 +380,11 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 			pbuf->p_herrno = HOST_NOT_FOUND;
 			pbuf->p_status = NSS_NOTFOUND;
 			pbuf->data_len = 0;
-			res_nclose(statp);
+			__res_ndestroy(statp);
 			return (NSS_NOTFOUND);
 		}
 		/* else lookup error - handle in general code */
-		res_nclose(statp);
+		__res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
 
@@ -385,25 +397,25 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	qdcount = ntohs(hp->qdcount);
 	cp += HFIXEDSZ;
 	if (qdcount != 1) {
-		res_nclose(statp);
+		__res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
 	n = dn_expand(bom, eom, cp, host, MAXHOSTNAMELEN);
 	if (n < 0) {
-		res_nclose(statp);
+		__res_ndestroy(statp);
 		return (NSS_ERROR);
 	} else
 		hlen = strlen(host);
 	cp += n + QFIXEDSZ;
 	if (cp > eom) {
-		res_nclose(statp);
+		__res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
 	while (ancount-- > 0 && cp < eom && blen < bsize) {
 		n = dn_expand(bom, eom, cp, ans, MAXHOSTNAMELEN);
 		if (n > 0) {
 			if (strncasecmp(host, ans, hlen) != 0) {
-				res_nclose(statp);
+				__res_ndestroy(statp);
 				return (NSS_ERROR);	/* spoof? */
 			}
 		}
@@ -435,8 +447,10 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 					 * attempted buffer overflow exploit
 					 * generic code will do a syslog
 					 */
-					if (alen + len + 2 > NS_MAXMSG)
+					if (alen + len + 2 > NS_MAXMSG) {
+						__res_ndestroy(statp);
 						return (NSS_ERROR);
+					}
 					*apc++ = ' ';
 					alen++;
 					(void) strlcpy(apc, aname, len + 1);
@@ -460,7 +474,7 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 		af = (type == T_A ? AF_INET : AF_INET6);
 		np = inet_ntop(af, (void *)cp, nbuf, INET6_ADDRSTRLEN);
 		if (np == NULL) {
-			res_nclose(statp);
+			__res_ndestroy(statp);
 			return (NSS_ERROR);
 		}
 		cp += n;
@@ -470,8 +484,10 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 		len = iplen + 2 + hlen + alen;
 		if (alen > 0)
 			len++;
-		if (blen + len > bsize)
+		if (blen + len > bsize) {
+			__res_ndestroy(statp);
 			return (NSS_ERROR);
+		}
 		(void) strlcpy(bptr, np, bsize - blen);
 		blen += iplen;
 		bptr += iplen;
@@ -495,6 +511,7 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	/* still room? */
 	if (len + sizeof (nssuint_t) > pbuf->data_len) {
 		/* sigh, no, what happened? */
+		__res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
 	pbuf->ext_off = pbuf->data_off + len;
@@ -502,6 +519,6 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	pbuf->data_len = blen;
 	pttl = (nssuint_t *)((void *)((char *)pbuf + pbuf->ext_off));
 	*pttl = ttl;
-	res_nclose(statp);
+	__res_ndestroy(statp);
 	return (NSS_SUCCESS);
 }
