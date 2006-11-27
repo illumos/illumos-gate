@@ -4437,6 +4437,17 @@ dryrun_attach(char *manifest_path)
 		goto done;
 	}
 
+	/*
+	 * Retrieve remote handle brand type and determine whether it is
+	 * native or not.
+	 */
+	if (zonecfg_get_brand(rem_handle, target_brand, sizeof (target_brand))
+	    != Z_OK) {
+		zerror(gettext("missing or invalid brand"));
+		exit(Z_ERR);
+	}
+	is_native_zone = (strcmp(target_brand, NATIVE_BRAND_NAME) == 0);
+
 	res = verify_handle(CMD_ATTACH, local_handle);
 
 	/* Get the detach information for the locally defined zone. */
