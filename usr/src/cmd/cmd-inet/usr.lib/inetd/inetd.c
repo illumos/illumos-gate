@@ -1223,7 +1223,7 @@ add_method_ids(instance_t *ins, pid_t pid, ctid_t cid, instance_method_t mthd)
 	debug_msg("Entering add_method_ids");
 
 	if (cid != -1)
-		(void) add_remove_contract(ins->fmri, B_TRUE, cid);
+		(void) add_remove_contract(ins, B_TRUE, cid);
 
 	if (mthd == IM_START) {
 		if (add_rep_val(ins->start_pids, (int64_t)pid) == 0) {
@@ -1249,7 +1249,7 @@ remove_method_ids(instance_t *inst, pid_t pid, ctid_t cid,
 	debug_msg("Entering remove_method_ids");
 
 	if (cid != -1)
-		(void) add_remove_contract(inst->fmri, B_FALSE, cid);
+		(void) add_remove_contract(inst, B_FALSE, cid);
 
 	if (mthd == IM_START) {
 		remove_rep_val(inst->start_pids, (int64_t)pid);
@@ -1282,7 +1282,8 @@ create_instance(const char *fmri)
 	ret->bind_fail_count = 0;
 
 	if (((ret->non_start_pid = create_rep_val_list()) == NULL) ||
-	    ((ret->start_pids = create_rep_val_list()) == NULL))
+	    ((ret->start_pids = create_rep_val_list()) == NULL) ||
+	    ((ret->start_ctids = create_rep_val_list()) == NULL))
 		goto alloc_fail;
 
 	ret->cur_istate = IIS_NONE;
@@ -1329,6 +1330,7 @@ destroy_instance(instance_t *inst)
 
 	destroy_rep_val_list(inst->start_pids);
 	destroy_rep_val_list(inst->non_start_pid);
+	destroy_rep_val_list(inst->start_ctids);
 
 	free(inst->fmri);
 
@@ -2053,7 +2055,7 @@ process_restarter_event(void)
 			goto fail;
 		}
 
-		if (((err = iterate_repository_contracts(instance->fmri, 0))
+		if (((err = iterate_repository_contracts(instance, 0))
 		    != 0) && (err != ENOENT)) {
 			error_msg(gettext(
 			    "Failed to adopt contracts of instance %s: %s"),
@@ -2944,7 +2946,7 @@ run_method(instance_t *instance, instance_method_t method,
 
 		if ((sig = restarter_is_kill_method(mi->exec_path)) >= 0) {
 			/* Carry out contract assassination */
-			ret = iterate_repository_contracts(instance->fmri, sig);
+			ret = iterate_repository_contracts(instance, sig);
 			/* ENOENT means we didn't find any contracts */
 			if (ret != 0 && ret != ENOENT) {
 				error_msg(gettext("Failed to send signal %d "

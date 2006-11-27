@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,6 +131,12 @@ static struct pfmri_list *restarters = NULL;
 static int first_paragraph = 1;		/* For -l mode. */
 static char *common_name_buf;		/* Sized for maximal length value. */
 char *locale;				/* Current locale. */
+
+/*
+ * Pathname storage for path generated from the fmri.
+ * Used for reading the ctid and (start) pid files for an inetd service.
+ */
+static char genfmri_filename[MAXPATHLEN] = "";
 
 /* Options */
 static int *opt_columns = NULL;		/* Indices into columns to display. */
@@ -533,16 +538,58 @@ get_restarter_count_prop(scf_instance_t *inst, const char *pname, uint64_t *cp,
  * Generic functions
  */
 
+/*
+ * Return an array of pids associated with the given contract id.
+ * Returned pids are added to the end of the pidsp array.
+ */
+static void
+ctid_to_pids(uint64_t c, pid_t **pidsp, uint_t *np)
+{
+	ct_stathdl_t ctst;
+	uint_t m;
+	int fd;
+	int r, err;
+	pid_t *pids;
+
+	fd = contract_open(c, NULL, "status", O_RDONLY);
+	if (fd < 0)
+		return;
+
+	err = ct_status_read(fd, CTD_ALL, &ctst);
+	if (err != 0) {
+		uu_warn(gettext("Could not read status of contract "
+		    "%ld: %s.\n"), c, strerror(err));
+		(void) close(fd);
+		return;
+	}
+
+	(void) close(fd);
+
+	r = ct_pr_status_get_members(ctst, &pids, &m);
+	assert(r == 0);
+
+	if (m == 0) {
+		ct_status_free(ctst);
+		return;
+	}
+
+	*pidsp = realloc(*pidsp, (*np + m) * sizeof (*pidsp));
+	if (*pidsp == NULL)
+		uu_die(gettext("Out of memory"));
+
+	bcopy(pids, *pidsp + *np, m * sizeof (*pids));
+	*np += m;
+
+	ct_status_free(ctst);
+}
+
 static int
 propvals_to_pids(scf_propertygroup_t *pg, const char *pname, pid_t **pidsp,
     uint_t *np, scf_property_t *prop, scf_value_t *val, scf_iter_t *iter)
 {
 	scf_type_t ty;
-	int r, fd, err;
 	uint64_t c;
-	ct_stathdl_t ctst;
-	pid_t *pids;
-	uint_t m;
+	int r;
 
 	if (scf_pg_get_property(pg, pname, prop) != 0) {
 		if (scf_error() != SCF_ERROR_NOT_FOUND)
@@ -570,46 +617,267 @@ propvals_to_pids(scf_propertygroup_t *pg, const char *pname, pid_t **pidsp,
 		if (scf_value_get_count(val, &c) != 0)
 			scfdie();
 
-		fd = contract_open(c, NULL, "status", O_RDONLY);
-		if (fd < 0)
-			continue;
-
-		err = ct_status_read(fd, CTD_ALL, &ctst);
-		if (err != 0) {
-			uu_warn(gettext("Could not read status of contract "
-			    "%ld: %s.\n"), c, strerror(err));
-			(void) close(fd);
-			continue;
-		}
-
-		(void) close(fd);
-
-		r = ct_pr_status_get_members(ctst, &pids, &m);
-		assert(r == 0);
-
-		if (m == 0) {
-			ct_status_free(ctst);
-			continue;
-		}
-
-		*pidsp = realloc(*pidsp, (*np + m) * sizeof (*pidsp));
-		if (*pidsp == NULL)
-			uu_die(gettext("Out of memory"));
-
-		bcopy(pids, *pidsp + *np, m * sizeof (*pids));
-		*np += m;
-
-		ct_status_free(ctst);
+		ctid_to_pids(c, pidsp, np);
 	}
 
 	return (0);
 }
 
+/*
+ * Check if instance has general/restarter property that matches
+ * given string.  Restarter string must be in canonified form.
+ * Returns 0 for success; -1 otherwise.
+ */
 static int
-instance_processes(scf_instance_t *inst, pid_t **pids, uint_t *np)
+check_for_restarter(scf_instance_t *inst, const char *restarter)
+{
+	char	*fmri_buf;
+	char	*fmri_buf_canonified = NULL;
+	int	ret = -1;
+
+	if (inst == NULL)
+		return (-1);
+
+	/* Get restarter */
+	fmri_buf = safe_malloc(max_scf_fmri_length + 1);
+	if (inst_get_single_val(inst, SCF_PG_GENERAL,
+	    SCF_PROPERTY_RESTARTER, SCF_TYPE_ASTRING, fmri_buf,
+	    max_scf_fmri_length + 1, 0, 0, 1) != 0)
+		goto out;
+
+	fmri_buf_canonified = safe_malloc(max_scf_fmri_length + 1);
+	if (scf_canonify_fmri(fmri_buf, fmri_buf_canonified,
+	    (max_scf_fmri_length + 1)) < 0)
+		goto out;
+
+	if (strcmp(fmri_buf, restarter) == 0)
+		ret = 0;
+
+out:
+	free(fmri_buf);
+	if (fmri_buf_canonified)
+		free(fmri_buf_canonified);
+	return (ret);
+}
+
+/*
+ * Common code that is used by ctids_by_restarter and pids_by_restarter.
+ * Checks for a common restarter and if one is available, it generates
+ * the appropriate filename using wip->fmri and stores that in the
+ * global genfmri_filename.
+ *
+ * Restarters currently supported are: svc:/network/inetd:default
+ * If a restarter specific action is available, then restarter_spec
+ * is set to 1.  If a restarter specific action is not available, then
+ * restarter_spec is set to 0 and a -1 is returned.
+ *
+ * Returns:
+ * 0 if success: restarter specific action found and filename generated
+ * -1 if restarter specific action not found,
+ *    if restarter specific action found but an error was encountered
+ *    during the generation of the wip->fmri based filename
+ */
+static int
+common_by_restarter(scf_instance_t *inst, const char *fmri,
+    int *restarter_specp)
+{
+	int		ret = -1;
+	int		r;
+
+	/* Check for inetd specific restarter */
+	if (check_for_restarter(inst, "svc:/network/inetd:default") != 0) {
+		*restarter_specp = 0;
+		return (ret);
+	}
+
+	*restarter_specp = 1;
+
+	/* Get the ctid filename associated with this instance */
+	r = gen_filenms_from_fmri(fmri, "ctid", genfmri_filename, NULL);
+
+	switch (r) {
+	case 0:
+		break;
+
+	case -1:
+		/*
+		 * Unable to get filename from fmri.  Print warning
+		 * and return failure with no ctids.
+		 */
+		uu_warn(gettext("Unable to read contract ids for %s -- "
+		    "FMRI is too long\n"), fmri);
+		return (ret);
+
+	case -2:
+		/*
+		 * The directory didn't exist, so no contracts.
+		 * Return failure with no ctids.
+		 */
+		return (ret);
+
+	default:
+		uu_warn(gettext("%s:%d: gen_filenms_from_fmri() failed with "
+		    "unknown error %d\n"), __FILE__, __LINE__, r);
+		abort();
+	}
+
+	return (0);
+
+}
+
+/*
+ * Get or print a contract id using a restarter specific action.
+ *
+ * If the print_flag is not set, this routine gets the single contract
+ * id associated with this instance.
+ * If the print flag is set, then print each contract id found.
+ *
+ * Returns:
+ * 0 if success: restarter specific action found and used with no error
+ * -1 if restarter specific action not found
+ * -1 if restarter specific action found, but there was a failure
+ * -1 if print flag is not set and no contract id is found or multiple
+ *    contract ids were found
+ * E2BIG if print flag is not set, MULTI_OK bit in flag is set and multiple
+ *    contract ids were found
+ */
+static int
+ctids_by_restarter(scf_walkinfo_t *wip, uint64_t *cp, int print_flag,
+    uint_t flags, int *restarter_specp, void (*callback_header)(),
+    void (*callback_ctid)(uint64_t))
+{
+	FILE		*fp;
+	int		ret = -1;
+	int		fscanf_ret;
+	uint64_t	cp2;
+	int		rest_ret;
+
+	/* Check if callbacks are needed and were passed in */
+	if (print_flag) {
+		if ((callback_header == NULL) || (callback_ctid == NULL))
+			return (ret);
+	}
+
+	/* Check for restarter specific action and generation of filename */
+	rest_ret = common_by_restarter(wip->inst, wip->fmri, restarter_specp);
+	if (rest_ret != 0)
+		return (rest_ret);
+
+	/*
+	 * If fopen fails, then ctid file hasn't been created yet.
+	 * If print_flag is set, this is ok; otherwise fail.
+	 */
+	if ((fp = fopen(genfmri_filename, "r")) == NULL) {
+		if (print_flag)
+			return (0);
+		goto out;
+	}
+
+	if (print_flag) {
+		/*
+		 * Print all contract ids that are found.
+		 * First callback to print ctid header.
+		 */
+		callback_header();
+
+		/* fscanf may not set errno, so be sure to clear it first */
+		errno = 0;
+		while ((fscanf_ret = fscanf(fp, "%llu", cp)) == 1) {
+			/* Callback to print contract id */
+			callback_ctid(*cp);
+			errno = 0;
+		}
+		/* EOF is not a failure when no errno. */
+		if ((fscanf_ret != EOF) || (errno != 0)) {
+			uu_die(gettext("Unable to read ctid file for %s"),
+			    wip->fmri);
+		}
+		(void) putchar('\n');
+		ret = 0;
+	} else {
+		/* Must find 1 ctid or fail */
+		if (fscanf(fp, "%llu", cp) == 1) {
+			/* If 2nd ctid found - fail */
+			if (fscanf(fp, "%llu", &cp2) == 1) {
+				if (flags & MULTI_OK)
+					ret = E2BIG;
+			} else {
+				/* Success - found only 1 ctid */
+				ret = 0;
+			}
+		}
+	}
+	(void) fclose(fp);
+
+out:
+	return (ret);
+}
+
+/*
+ * Get the process ids associated with an instance using a restarter
+ * specific action.
+ *
+ * Returns:
+ *	0 if success: restarter specific action found and used with no error
+ *	-1 restarter specific action not found or if failure
+ */
+static int
+pids_by_restarter(scf_instance_t *inst, const char *fmri,
+    pid_t **pids, uint_t *np, int *restarter_specp)
+{
+	uint64_t	c;
+	FILE		*fp;
+	int		fscanf_ret;
+	int		rest_ret;
+
+	/* Check for restarter specific action and generation of filename */
+	rest_ret = common_by_restarter(inst, fmri, restarter_specp);
+	if (rest_ret != 0)
+		return (rest_ret);
+
+	/*
+	 * If fopen fails with ENOENT then the ctid file hasn't been
+	 * created yet so return success.
+	 * For all other errors - fail with uu_die.
+	 */
+	if ((fp = fopen(genfmri_filename, "r")) == NULL) {
+		if (errno == ENOENT)
+			return (0);
+		uu_die(gettext("Unable to open ctid file for %s"), fmri);
+	}
+
+	/* fscanf may not set errno, so be sure to clear it first */
+	errno = 0;
+	while ((fscanf_ret = fscanf(fp, "%llu", &c)) == 1) {
+		if (c == 0) {
+			(void) fclose(fp);
+			uu_die(gettext("ctid file for %s has corrupt data"),
+			    fmri);
+		}
+		ctid_to_pids(c, pids, np);
+		errno = 0;
+	}
+	/* EOF is not a failure when no errno. */
+	if ((fscanf_ret != EOF) || (errno != 0)) {
+		uu_die(gettext("Unable to read ctid file for %s"), fmri);
+	}
+
+	(void) fclose(fp);
+	return (0);
+}
+
+static int
+instance_processes(scf_instance_t *inst, const char *fmri,
+    pid_t **pids, uint_t *np)
 {
 	scf_iter_t *iter;
 	int ret;
+	int restarter_spec;
+
+	/* Use the restarter specific get pids routine, if available. */
+	ret = pids_by_restarter(inst, fmri, pids, np, &restarter_spec);
+	if (restarter_spec == 1)
+		return (ret);
 
 	if ((iter = scf_iter_create(h)) == NULL)
 		scfdie();
@@ -709,13 +977,24 @@ sprint_ctid(char **buf, scf_walkinfo_t *wip)
 	uint64_t c;
 	size_t newsize = (*buf ? strlen(*buf) : 0) + CTID_COLUMN_WIDTH + 2;
 	char *newbuf = safe_malloc(newsize);
+	int restarter_spec;
 
-	if (wip->pg != NULL)
+	/*
+	 * Use the restarter specific get pids routine, if available.
+	 * Only check for non-legacy services (wip->pg == 0).
+	 */
+	if (wip->pg != NULL) {
 		r = pg_get_single_val(wip->pg, scf_property_contract,
 		    SCF_TYPE_COUNT, &c, 0, EMPTY_OK | MULTI_OK);
-	else
-		r = get_restarter_count_prop(wip->inst, scf_property_contract,
-		    &c, EMPTY_OK | MULTI_OK);
+	} else {
+		r = ctids_by_restarter(wip, &c, 0, MULTI_OK, &restarter_spec,
+		    NULL, NULL);
+		if (restarter_spec == 0) {
+			/* No restarter specific routine */
+			r = get_restarter_count_prop(wip->inst,
+			    scf_property_contract, &c, EMPTY_OK | MULTI_OK);
+		}
+	}
 
 	if (r == 0)
 		(void) snprintf(newbuf, newsize, "%s%*lu ",
@@ -738,13 +1017,24 @@ sortkey_ctid(char *buf, int reverse, scf_walkinfo_t *wip)
 {
 	int r;
 	uint64_t c;
+	int restarter_spec;
 
-	if (wip->pg != NULL)
+	/*
+	 * Use the restarter specific get pids routine, if available.
+	 * Only check for non-legacy services (wip->pg == 0).
+	 */
+	if (wip->pg != NULL) {
 		r = pg_get_single_val(wip->pg, scf_property_contract,
 		    SCF_TYPE_COUNT, &c, 0, EMPTY_OK);
-	else
-		r = get_restarter_count_prop(wip->inst, scf_property_contract,
-		    &c, EMPTY_OK);
+	} else {
+		r = ctids_by_restarter(wip, &c, 0, MULTI_OK, &restarter_spec,
+		    NULL, NULL);
+		if (restarter_spec == 0) {
+			/* No restarter specific routine */
+			r = get_restarter_count_prop(wip->inst,
+			    scf_property_contract, &c, EMPTY_OK);
+		}
+	}
 
 	if (r == 0) {
 		/*
@@ -1628,19 +1918,39 @@ pidcmp(const void *l, const void *r)
  */
 #define	DETAILED_WIDTH	(11 + 2)
 
+/*
+ * Callback routine to print header for contract id.
+ * Called by ctids_by_restarter and print_detailed.
+ */
 static void
-detailed_list_processes(scf_instance_t *inst)
+print_ctid_header()
+{
+	(void) printf("%-*s", DETAILED_WIDTH, "contract_id");
+}
+
+/*
+ * Callback routine to print a contract id.
+ * Called by ctids_by_restarter and print_detailed.
+ */
+static void
+print_ctid_detailed(uint64_t c)
+{
+	(void) printf("%lu ", (ctid_t)c);
+}
+
+static void
+detailed_list_processes(scf_walkinfo_t *wip)
 {
 	uint64_t c;
 	pid_t *pids;
 	uint_t i, n;
 	psinfo_t psi;
 
-	if (get_restarter_count_prop(inst, scf_property_contract, &c,
+	if (get_restarter_count_prop(wip->inst, scf_property_contract, &c,
 	    EMPTY_OK) != 0)
 		return;
 
-	if (instance_processes(inst, &pids, &n) != 0)
+	if (instance_processes(wip->inst, wip->fmri, &pids, &n) != 0)
 		return;
 
 	qsort(pids, n, sizeof (*pids), pidcmp);
@@ -1887,6 +2197,8 @@ print_detailed(void *unused, scf_walkinfo_t *wip)
 	struct timeval tv;
 	time_t stime;
 	struct tm *tmp;
+	int restarter_spec;
+	int restarter_ret;
 
 	const char * const fmt = "%-*s%s\n";
 
@@ -2003,6 +2315,19 @@ print_detailed(void *unused, scf_walkinfo_t *wip)
 
 	free(buf);
 
+	/*
+	 * Use the restarter specific routine to print the ctids, if available.
+	 * If restarter specific action is available and it fails, then die.
+	 */
+	restarter_ret = ctids_by_restarter(wip, &c, 1, 0,
+	    &restarter_spec, print_ctid_header, print_ctid_detailed);
+	if (restarter_spec == 1) {
+		if (restarter_ret != 0)
+			uu_die(gettext("Unable to get restarter for %s"),
+			    wip->fmri);
+		goto restarter_common;
+	}
+
 	if (rpg) {
 		scf_iter_t *iter;
 
@@ -2012,8 +2337,9 @@ print_detailed(void *unused, scf_walkinfo_t *wip)
 		if (scf_pg_get_property(rpg, scf_property_contract, g_prop) ==
 		    0) {
 			if (scf_property_is_type(g_prop, SCF_TYPE_COUNT) == 0) {
-				(void) printf("%-*s", DETAILED_WIDTH,
-				    "contract_id");
+
+				/* Callback to print ctid header */
+				print_ctid_header();
 
 				if (scf_iter_property_values(iter, g_prop) != 0)
 					scfdie();
@@ -2027,7 +2353,9 @@ print_detailed(void *unused, scf_walkinfo_t *wip)
 
 					if (scf_value_get_count(g_val, &c) != 0)
 						scfdie();
-					(void) printf("%lu ", (ctid_t)c);
+
+					/* Callback to print contract id. */
+					print_ctid_detailed(c);
 				}
 
 				(void) putchar('\n');
@@ -2046,6 +2374,7 @@ print_detailed(void *unused, scf_walkinfo_t *wip)
 			scfdie();
 	}
 
+restarter_common:
 	scf_pg_destroy(rpg);
 
 	/* Dependencies. */
@@ -2067,7 +2396,7 @@ print_detailed(void *unused, scf_walkinfo_t *wip)
 	scf_iter_destroy(pg_iter);
 
 	if (opt_processes)
-		detailed_list_processes(wip->inst);
+		detailed_list_processes(wip);
 
 	return (0);
 }
@@ -2077,15 +2406,16 @@ print_detailed(void *unused, scf_walkinfo_t *wip)
  * return the augmented string.
  */
 static char *
-add_processes(char *line, scf_instance_t *inst, scf_propertygroup_t *lpg)
+add_processes(scf_walkinfo_t *wip, char *line, scf_propertygroup_t *lpg)
 {
 	pid_t *pids = NULL;
 	uint_t i, n = 0;
 
 	if (lpg == NULL) {
-		if (instance_processes(inst, &pids, &n) != 0)
+		if (instance_processes(wip->inst, wip->fmri, &pids, &n) != 0)
 			return (line);
 	} else {
+		/* Legacy services */
 		scf_iter_t *iter;
 
 		if ((iter = scf_iter_create(h)) == NULL)
@@ -2211,7 +2541,7 @@ list_instance(void *unused, scf_walkinfo_t *wip)
 
 	/* If we're supposed to list the processes, too, do that now. */
 	if (opt_processes)
-		lp->str = add_processes(lp->str, wip->inst, wip->pg);
+		lp->str = add_processes(wip, lp->str, wip->pg);
 
 	/* Create the sort key. */
 	cp = lp->key = safe_malloc(sortkey_sz);

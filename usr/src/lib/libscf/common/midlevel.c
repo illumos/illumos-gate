@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,8 +32,10 @@
 #include <strings.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/param.h>
+#include <errno.h>
+#include <libgen.h>
 #include "midlevel_impl.h"
-
 
 #ifndef NDEBUG
 #define	bad_error(func, err)	{					\
@@ -45,6 +46,9 @@
 #else
 #define	bad_error(func, err)	abort()
 #endif
+
+/* Path to speedy files area must end with a slash */
+#define	SMF_SPEEDY_FILES_PATH		"/etc/svc/volatile/"
 
 /*
  * Internal private function that creates and binds a handle.
@@ -2084,4 +2088,51 @@ scf_simple_prop_next_opaque(scf_simple_prop_t *prop, size_t *length)
 
 	*length = ret->pv_opaque.o_size;
 	return (ret->pv_opaque.o_value);
+}
+
+/*
+ * Generate a filename based on the fmri and the given name and return
+ * it in the buffer of MAXPATHLEN provided by the caller.
+ * If temp_filename is non-zero, also generate a temporary, unique filename
+ * and return it in the temp buffer of MAXPATHLEN provided by the caller.
+ * The path to the generated pathname is also created.
+ * Given fmri should begin with a scheme such as "svc:".
+ * Returns
+ *      0 on success
+ *      -1 if filename would exceed MAXPATHLEN or
+ *	-2 if unable to create directory to filename path
+ */
+int
+gen_filenms_from_fmri(const char *fmri, const char *name, char *filename,
+    char *temp_filename)
+{
+	int		len;
+
+	len = strlen(SMF_SPEEDY_FILES_PATH);
+	len += strlen(fmri);
+	len += 2;			/* for slash and null */
+	len += strlen(name);
+	len += 6;			/* For X's needed for mkstemp */
+
+	if (len > MAXPATHLEN)
+		return (-1);
+
+	/* Construct directory name first - speedy path ends in slash */
+	(void) strcpy(filename, SMF_SPEEDY_FILES_PATH);
+	(void) strcat(filename, fmri);
+	if (mkdirp(filename, 0755) == -1) {
+		/* errno is set */
+		if (errno != EEXIST)
+			return (-2);
+	}
+
+	(void) strcat(filename, "/");
+	(void) strcat(filename, name);
+
+	if (temp_filename) {
+		(void) strcpy(temp_filename, filename);
+		(void) strcat(temp_filename, "XXXXXX");
+	}
+
+	return (0);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 /*
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,8 +40,11 @@
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
+#include <sys/param.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <libscf_priv.h>
 #include "inetd_impl.h"
-
 
 /*
  * Number of consecutive repository bind retries performed by bind_to_rep()
@@ -69,6 +71,13 @@ static scf_instance_t		*inst = NULL;
 static scf_transaction_t	*trans = NULL;
 static scf_transaction_entry_t	*entry = NULL;
 static scf_property_t		*prop = NULL;
+
+/*
+ * Pathname storage for paths generated from the fmri.
+ * Used when updating the ctid and (start) pid files for an inetd service.
+ */
+static char genfmri_filename[MAXPATHLEN] = "";
+static char genfmri_temp_filename[MAXPATHLEN] = "";
 
 /*
  * Try and make the given handle bind be bound to the repository. If
@@ -468,39 +477,172 @@ _retrieve_rep_vals(uu_list_t *list, const char *fmri, const char *prop_name)
 }
 
 /*
- * A routine that loops trying to read/write repository values until
- * either success, an error other that a broken repository connection or
+ * Writes the repository values in the vals list to
+ * a file that is generated based on the passed in fmri and name.
+ * Returns 0 on success,
+ * ENAMETOOLONG if unable to generate filename from fmri (including
+ * the inability to create the directory for the generated filename) and
+ * ENOENT on all other failures.
+ */
+static int
+repvals_to_file(const char *fmri, const char *name, uu_list_t *vals)
+{
+	int		tfd;
+	FILE		*tfp;		/* temp fp */
+	rep_val_t	*spval;		/* Contains a start_pid or ctid */
+	int		ret = 0;
+
+	debug_msg("Entering repvals_to_file, fmri:%s, name=%s\n",
+	    fmri, name);
+
+	if (gen_filenms_from_fmri(fmri, name, genfmri_filename,
+	    genfmri_temp_filename) != 0) {
+		/* Failure either from fmri too long or mkdir failure */
+		return (ENAMETOOLONG);
+	}
+
+	if ((tfd = mkstemp(genfmri_temp_filename)) == -1) {
+		return (ENOENT);
+	}
+
+	if (fchmod(tfd, (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) {
+		(void) close(tfd);
+		ret = ENOENT;
+		goto unlink_out;
+	}
+
+	if ((tfp = fdopen(tfd, "w")) == NULL) {
+		(void) close(tfd);
+		ret = ENOENT;
+		goto unlink_out;
+	}
+
+	for (spval = uu_list_first(vals); spval != NULL;
+	    spval = uu_list_next(vals, spval)) {
+		if (fprintf(tfp, "%lld\n", spval->val) <= 0) {
+			(void) fclose(tfp);
+			ret = ENOENT;
+			goto unlink_out;
+		}
+	}
+	if (fclose(tfp) != 0) {
+		ret = ENOENT;
+		goto unlink_out;
+	}
+	if (rename(genfmri_temp_filename, genfmri_filename) != 0) {
+		ret = ENOENT;
+		goto unlink_out;
+	}
+	return (0);
+
+unlink_out:
+	if (unlink(genfmri_temp_filename) != 0) {
+		warn_msg(gettext("Removal of temp file "
+		    "%s failed. Please remove manually."),
+		    genfmri_temp_filename);
+	}
+	return (ret);
+}
+
+/*
+ * A routine that loops trying to read/write values until either success,
+ * an error other than a broken repository connection or
  * the number of retries reaches REP_OP_RETRIES.
+ * This action is used to read/write the values:
+ *   reads/writes to a file for the START_PIDS property due to scalability
+ *	problems with libscf
+ *   reads/writes to the repository for all other properties.
  * Returns 0 on success, else the error value from either _store_rep_vals or
- * retrieve_rep_vals (based on whether 'store' was set or not), or one of the
- * following if a rebind failed:
- * SCF_ERROR_NO_RESOURCES if the server doesn't have adequate resources.
+ * _retrieve_rep_vals (based on whether 'store' was set or not), or one of the
+ * following:
+ * SCF_ERROR_NO_RESOURCES if the server doesn't have adequate resources
+ * SCF_ERROR_NO_MEMORY if a memory allocation failure
  * SCF_ERROR_NO_SERVER if the server isn't running.
+ * SCF_ERROR_CONSTRAINT_VIOLATED if an error in dealing with the speedy files
  */
 static scf_error_t
 store_retrieve_rep_vals(uu_list_t *vals, const char *fmri,
     const char *prop, boolean_t store)
 {
-	scf_error_t	ret;
+	scf_error_t	ret = 0;
 	uint_t		retries;
+	FILE		*tfp;		/* temp fp */
+	int64_t		tval;		/* temp val holder */
+	int		fscanf_ret;
+	int		fopen_retry_cnt = 2;
 
 	debug_msg("Entering store_retrieve_rep_vals, store: %d", store);
 
+	/* inetd specific action for START_PIDS property */
+	if (strcmp(prop, PR_NAME_START_PIDS) == 0) {
+		/*
+		 * Storage performance of START_PIDS is important,
+		 * so each instance has its own file and all start_pids
+		 * in the list are written to a temp file and then
+		 * moved (renamed).
+		 */
+		if (store) {
+			/* Write all values in list to file */
+			if (repvals_to_file(fmri, "pid", vals)) {
+				return (SCF_ERROR_CONSTRAINT_VIOLATED);
+			}
+		} else {
+			/* no temp name needed */
+			if (gen_filenms_from_fmri(fmri, "pid", genfmri_filename,
+			    NULL) != 0)
+				return (SCF_ERROR_CONSTRAINT_VIOLATED);
 
-	for (retries = 0; retries <= REP_OP_RETRIES; retries++) {
-		if (make_handle_bound(rep_handle) == -1) {
-			ret = scf_error();
-			break;
+retry_fopen:
+			/* It's ok if no file, there are just no pids */
+			if ((tfp = fopen(genfmri_filename, "r")) == NULL) {
+				if ((errno == EINTR) && (fopen_retry_cnt > 0)) {
+					fopen_retry_cnt--;
+					goto retry_fopen;
+				}
+				return (0);
+			}
+			/* fscanf may not set errno, so clear it first */
+			errno = 0;
+			while ((fscanf_ret = fscanf(tfp, "%lld", &tval)) == 1) {
+				/* If tval isn't a valid pid, then fail. */
+				if ((tval > MAXPID) || (tval <= 0)) {
+					empty_rep_val_list(vals);
+					return (SCF_ERROR_CONSTRAINT_VIOLATED);
+				}
+				if (add_rep_val(vals, tval) == -1) {
+					empty_rep_val_list(vals);
+					return (SCF_ERROR_NO_MEMORY);
+				}
+				errno = 0;
+			}
+			/* EOF is ok when no errno */
+			if ((fscanf_ret != EOF) || (errno != 0)) {
+				empty_rep_val_list(vals);
+				return (SCF_ERROR_CONSTRAINT_VIOLATED);
+			}
+			if (fclose(tfp) != 0) {
+				/* for close failure just log a message */
+				warn_msg(gettext("Close of file %s failed."),
+				    genfmri_filename);
+			}
 		}
+	} else {
+		for (retries = 0; retries <= REP_OP_RETRIES; retries++) {
+			if (make_handle_bound(rep_handle) == -1) {
+				ret = scf_error();
+				break;
+			}
 
-		if ((ret = (store ? _store_rep_vals(vals, fmri, prop) :
-		    _retrieve_rep_vals(vals, fmri, prop))) !=
-		    SCF_ERROR_CONNECTION_BROKEN)
-			break;
+			if ((ret = (store ? _store_rep_vals(vals, fmri, prop) :
+			    _retrieve_rep_vals(vals, fmri, prop))) !=
+			    SCF_ERROR_CONNECTION_BROKEN)
+				break;
 
-		(void) scf_handle_unbind(rep_handle);
+			(void) scf_handle_unbind(rep_handle);
+		}
 	}
 
+out:
 	return (ret);
 }
 
@@ -517,304 +659,207 @@ retrieve_rep_vals(uu_list_t *vals, const char *fmri, const char *prop)
 }
 
 /*
- * Fails with ECONNABORTED, ENOENT, EACCES, EROFS, ENOMEM, or EPERM.
- */
-static int
-add_remove_contract_norebind(const char *fmri, boolean_t add, ctid_t ctid)
-{
-	int err;
-
-	if (scf_handle_decode_fmri(rep_handle, fmri, NULL, NULL, inst, NULL,
-	    NULL, SCF_DECODE_FMRI_EXACT) != 0) {
-		switch (scf_error()) {
-		case SCF_ERROR_CONNECTION_BROKEN:
-			return (ECONNABORTED);
-
-		case SCF_ERROR_NOT_FOUND:
-			return (ENOENT);
-
-		case SCF_ERROR_CONSTRAINT_VIOLATED:
-		case SCF_ERROR_INVALID_ARGUMENT:
-		case SCF_ERROR_HANDLE_MISMATCH:
-		default:
-			assert(0);
-			abort();
-		}
-	}
-
-redo:
-	if (add)
-		err = restarter_store_contract(inst, ctid,
-		    RESTARTER_CONTRACT_PRIMARY);
-	else
-		err = restarter_remove_contract(inst, ctid,
-		    RESTARTER_CONTRACT_PRIMARY);
-	switch (err) {
-	case 0:
-	case ENOMEM:
-	case ECONNABORTED:
-		return (err);
-
-	case ECANCELED:
-		return (ENOENT);
-
-	case EPERM:
-		assert(0);
-		return (err);
-
-	case EACCES:
-		error_msg(add ? gettext("Failed to write contract id %ld for "
-		    "instance %s to repository: backend access denied.") :
-		    gettext("Failed to remove contract id %ld for instance %s "
-		    "from repository: backend access denied."), ctid, fmri);
-		return (err);
-
-	case EROFS:
-		error_msg(add ? gettext("Failed to write contract id %ld for "
-		    "instance %s to repository: backend is read-only.") :
-		    gettext("Failed to remove contract id %ld for instance %s "
-		    "from repository: backend is read-only."), ctid, fmri);
-		return (err);
-
-	case EINVAL:
-	case EBADF:
-	default:
-		assert(0);
-		abort();
-		/* NOTREACHED */
-	}
-}
-
-/*
- * Tries to add/remove (dependent on the value of 'add') the specified
- * contract id to the specified instance until either success, an error
- * other that connection broken occurs, or the number of bind retries reaches
- * REP_OP_RETRIES.
- * Returns 0 on success else fails with one of ENOENT, EACCES, EROFS, EPERM,
- * ECONNABORTED or ENOMEM.
+ * Adds/removes a contract id to/from the cached list kept in the instance.
+ * Then the cached list is written to a file named "ctid" in a directory
+ * based on the fmri.  Cached list is written to a file due to scalability
+ * problems in libscf.  The file "ctid" is used when inetd is restarted
+ * so that inetd can adopt the contracts that it had previously.
+ * Returns:
+ *   0 on success
+ *   ENAMETOOLONG if unable to generate filename from fmri (including
+ *   the inability to create the directory for the generated filename)
+ *   ENOENT - failure accessing file
+ *   ENOMEM - memory allocation failure
  */
 int
-add_remove_contract(const char *fmri, boolean_t add, ctid_t ctid)
+add_remove_contract(instance_t *inst, boolean_t add, ctid_t ctid)
 {
-	uint_t	retries;
-	int	err;
-
-	for (retries = 0; retries <= REP_OP_RETRIES; retries++) {
-		if (make_handle_bound(rep_handle) == -1) {
-			err = ECONNABORTED;
-			break;
-		}
-
-		if ((err = add_remove_contract_norebind(fmri, add, ctid)) !=
-		    ECONNABORTED)
-			break;
-
-		(void) scf_handle_unbind(rep_handle);
-	}
-
-	return (err);
-}
-
-/*
- * Iterate over all contracts associated with the instance specified by
- * fmri; if sig !=0, we send each contract the specified signal, otherwise
- * we call adopt_contract() to take ownership.  This really ought to be
- * reworked to use a callback mechanism if more functionality is added.
- *
- * Returns 0 on success or ENOENT if the instance, its restarter property
- * group, or its contract property don't exist, or EINVAL if the property
- * is not of the correct type, ENOMEM if there was a memory allocation
- * failure, EPERM if there were permission problems accessing the repository,
- * or ECONNABORTED if the connection with the repository was broken.
- */
-int
-iterate_repository_contracts(const char *fmri, int sig)
-{
-	scf_iter_t	*iter;
-	scf_value_t	*val = NULL;
-	uint64_t	c;
-	int		err;
+	FILE		*tfp;		/* temp fp */
 	int		ret = 0;
-	uint_t		retries = 0;
+	int		repval_ret = 0;
+	int		fopen_retry_cnt = 2;
 
-	debug_msg("Entering iterate_repository_contracts");
+	debug_msg("Entering add_remove_contract, add: %d\n", add);
 
-	if (make_handle_bound(rep_handle) == -1)
-		return (ECONNABORTED);
+	/*
+	 * Storage performance of contract ids is important,
+	 * so each instance has its own file.  An add of a
+	 * ctid will be appended to the ctid file.
+	 * The removal of a ctid will result in the remaining
+	 * ctids in the list being written to a temp file and then
+	 * moved (renamed).
+	 */
+	if (add) {
+		if (gen_filenms_from_fmri(inst->fmri, "ctid", genfmri_filename,
+		    NULL) != 0) {
+			/* Failure either from fmri too long or mkdir failure */
+			return (ENAMETOOLONG);
+		}
 
-	if (((iter = scf_iter_create(rep_handle)) == NULL) ||
-	    ((val = scf_value_create(rep_handle)) == NULL)) {
-		ret = ENOMEM;
-		goto out;
-	}
-
-rep_retry:
-	if (scf_handle_decode_fmri(rep_handle, fmri, NULL, NULL, inst, NULL,
-	    NULL, SCF_DECODE_FMRI_EXACT) != 0) {
-		switch (scf_error()) {
-		case SCF_ERROR_CONNECTION_BROKEN:
-rebind:
-			(void) scf_handle_unbind(rep_handle);
-
-			if (retries++ == REP_OP_RETRIES) {
-				ret = ECONNABORTED;
-				goto out;
+retry_fopen:
+		if ((tfp = fopen(genfmri_filename, "a")) == NULL) {
+			if ((errno == EINTR) && (fopen_retry_cnt > 0)) {
+				fopen_retry_cnt--;
+				goto retry_fopen;
 			}
-
-			if (make_handle_bound(rep_handle) == -1) {
-				ret = ECONNABORTED;
-				goto out;
-			}
-
-			goto rep_retry;
-
-		case SCF_ERROR_NOT_FOUND:
 			ret = ENOENT;
 			goto out;
-
-		case SCF_ERROR_CONSTRAINT_VIOLATED:
-		case SCF_ERROR_INVALID_ARGUMENT:
-		case SCF_ERROR_HANDLE_MISMATCH:
-		default:
-			assert(0);
-			abort();
 		}
-	}
 
-	if (scf_instance_get_pg(inst, SCF_PG_RESTARTER, pg) != 0) {
-		switch (scf_error()) {
-		case SCF_ERROR_CONNECTION_BROKEN:
-			goto rebind;
-
-		case SCF_ERROR_NOT_SET:
-			ret = 0;
-			goto out;
-
-		case SCF_ERROR_NOT_FOUND:
+		/* Always store ctids as long long */
+		if (fprintf(tfp, "%llu\n", (uint64_t)ctid) <= 0) {
+			(void) fclose(tfp);
 			ret = ENOENT;
 			goto out;
-
-		case SCF_ERROR_INVALID_ARGUMENT:
-		case SCF_ERROR_HANDLE_MISMATCH:
-		default:
-			assert(0);
-			abort();
 		}
-	}
 
-	if (scf_pg_get_property(pg, SCF_PROPERTY_CONTRACT, prop) != 0) {
-		switch (scf_error()) {
-		case SCF_ERROR_CONNECTION_BROKEN:
-			goto rebind;
-
-		case SCF_ERROR_NOT_SET:
-			ret = 0;
-			goto out;
-
-		case SCF_ERROR_NOT_FOUND:
+		if (fclose(tfp) != 0) {
 			ret = ENOENT;
 			goto out;
-
-		case SCF_ERROR_INVALID_ARGUMENT:
-		case SCF_ERROR_HANDLE_MISMATCH:
-		default:
-			assert(0);
-			abort();
 		}
-	}
 
-	if (scf_property_is_type(prop, SCF_TYPE_COUNT) != 0) {
-		switch (scf_error()) {
-		case SCF_ERROR_CONNECTION_BROKEN:
-			goto rebind;
-
-		case SCF_ERROR_NOT_SET:
-			ret = ENOENT;
+		if (add_rep_val(inst->start_ctids, ctid) != 0) {
+			ret = ENOMEM;
 			goto out;
+		}
+	} else {
+		remove_rep_val(inst->start_ctids, ctid);
 
-		case SCF_ERROR_TYPE_MISMATCH:
-			ret = EINVAL;
+		/* Write all values in list to file */
+		if ((repval_ret = repvals_to_file(inst->fmri, "ctid",
+		    inst->start_ctids)) != 0) {
+			ret = repval_ret;
 			goto out;
-
-		default:
-			assert(0);
-			abort();
-		}
-	}
-
-	if (scf_iter_property_values(iter, prop) != 0) {
-		switch (scf_error()) {
-		case SCF_ERROR_CONNECTION_BROKEN:
-			goto rebind;
-
-		case SCF_ERROR_NOT_SET:
-			ret = ENOENT;
-			goto out;
-
-		case SCF_ERROR_HANDLE_MISMATCH:
-		default:
-			assert(0);
-			abort();
-		}
-	}
-
-	for (;;) {
-		err = scf_iter_next_value(iter, val);
-		if (err == 0) {
-			break;
-		} else if (err != 1) {
-			assert(scf_error() == SCF_ERROR_CONNECTION_BROKEN);
-			goto rebind;
-		}
-
-		err = scf_value_get_count(val, &c);
-		assert(err == 0);
-
-		if (sig == 0) {
-			/* Try to adopt the contract */
-			if (adopt_contract((ctid_t)c, fmri) != 0) {
-				/*
-				 * Adoption failed.  No reason to think it'll
-				 * work later, so remove the id from our list
-				 * in the repository.
-				 *
-				 * Beware: add_remove_contract_norebind() uses
-				 * the global scf_ handles.  Fortunately we're
-				 * done with them.  We need to be cognizant of
-				 * repository disconnection, though.
-				 */
-				switch (add_remove_contract_norebind(fmri,
-				    B_FALSE, (ctid_t)c)) {
-				case 0:
-				case ENOENT:
-				case EACCES:
-				case EROFS:
-					break;
-
-				case ECONNABORTED:
-					goto rebind;
-
-				default:
-					assert(0);
-					abort();
-				}
-			}
-		} else {
-			/*
-			 * Send a signal to all in the contract; ESRCH just
-			 * means they all exited before we could kill them
-			 */
-			if (sigsend(P_CTID, (ctid_t)c, sig) == -1 &&
-			    errno != ESRCH) {
-				warn_msg(gettext("Unable to signal all contract"
-				    "members of instance %s: %s"), fmri,
-				    strerror(errno));
-			}
 		}
 	}
 
 out:
-	scf_value_destroy(val);
-	scf_iter_destroy(iter);
+	return (ret);
+}
+
+/*
+ * If sig !=0, iterate over all contracts in the cached list of contract
+ * ids kept in the instance.  Send each contract the specified signal.
+ * If sig == 0, read in the contract ids that were last associated
+ * with this instance (reload the cache) and call adopt_contract()
+ * to take ownership.
+ *
+ * Returns 0 on success;
+ * ENAMETOOLONG if unable to generate filename from fmri (including
+ * the inability to create the directory for the generated filename) and
+ * ENXIO if a failure accessing the file
+ * ENOMEM if there was a memory allocation failure
+ * ENOENT if the instance, its restarter property group, or its
+ *   contract property don't exist
+ * EIO if invalid data read from the file
+ */
+int
+iterate_repository_contracts(instance_t *inst, int sig)
+{
+	int		ret = 0;
+	FILE		*fp;
+	rep_val_t	*spval = NULL;	/* Contains a start_pid */
+	uint64_t	tval;		/* temp val holder */
+	uu_list_t	*uup = NULL;
+	int		fscanf_ret;
+	int		fopen_retry_cnt = 2;
+
+	debug_msg("Entering iterate_repository_contracts, sig: %d", sig);
+
+	if (sig != 0) {
+		/*
+		 * Send a signal to all in the contract; ESRCH just
+		 * means they all exited before we could kill them
+		 */
+		for (spval = uu_list_first(inst->start_ctids); spval != NULL;
+		    spval = uu_list_next(inst->start_ctids, spval)) {
+			if (sigsend(P_CTID, (ctid_t)spval->val, sig) == -1 &&
+			    errno != ESRCH) {
+				warn_msg(gettext("Unable to signal all "
+				    "contract members of instance %s: %s"),
+				    inst->fmri, strerror(errno));
+			}
+		}
+		return (0);
+	}
+
+	/*
+	 * sig == 0 case.
+	 * Attempt to adopt the contract for each ctid.
+	 */
+	if (gen_filenms_from_fmri(inst->fmri, "ctid", genfmri_filename,
+	    NULL) != 0) {
+		/* Failure either from fmri too long or mkdir failure */
+		return (ENAMETOOLONG);
+	}
+
+retry_fopen:
+	/* It's ok if no file, there are no ctids to adopt */
+	if ((fp = fopen(genfmri_filename, "r")) == NULL) {
+		if ((errno == EINTR) && (fopen_retry_cnt > 0)) {
+			fopen_retry_cnt--;
+			goto retry_fopen;
+		}
+		return (0);
+	}
+
+	/*
+	 * Read ctids from file into 2 lists:
+	 * - temporary list to be traversed (uup)
+	 * - cached list that can be modified if adoption of
+	 *   contract fails (inst->start_ctids).
+	 * Always treat ctids as long longs.
+	 */
+	uup = create_rep_val_list();
+	/* fscanf may not set errno, so clear it first */
+	errno = 0;
+	while ((fscanf_ret = fscanf(fp, "%llu", &tval)) == 1) {
+		/* If tval isn't a valid ctid, then fail. */
+		if (tval == 0) {
+			(void) fclose(fp);
+			ret = EIO;
+			goto out;
+		}
+		if ((add_rep_val(uup, tval) == -1) ||
+		    (add_rep_val(inst->start_ctids, tval) == -1)) {
+			(void) fclose(fp);
+			ret = ENOMEM;
+			goto out;
+		}
+		errno = 0;
+	}
+	/* EOF is not a failure when no errno */
+	if ((fscanf_ret != EOF) || (errno != 0)) {
+		ret = EIO;
+		goto out;
+	}
+
+	if (fclose(fp) != 0) {
+		ret = ENXIO;
+		goto out;
+	}
+
+	for (spval = uu_list_first(uup); spval != NULL;
+	    spval = uu_list_next(uup, spval)) {
+		/* Try to adopt the contract */
+		if (adopt_contract((ctid_t)spval->val,
+		    inst->fmri) != 0) {
+			/*
+			 * Adoption failed.  No reason to think it'll
+			 * work later, so remove the id from our list
+			 * in the instance.
+			 */
+			remove_rep_val(inst->start_ctids, spval->val);
+		}
+	}
+out:
+	if (uup) {
+		empty_rep_val_list(uup);
+		destroy_rep_val_list(uup);
+	}
+
+	if (ret != 0)
+		empty_rep_val_list(inst->start_ctids);
+
 	return (ret);
 }

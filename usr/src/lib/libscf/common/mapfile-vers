@@ -225,6 +225,7 @@ SUNWprivate_1.1 {
 	scf_type_to_string;
 	scf_walk_fmri;
 	_smf_refresh_instance_i;
+	gen_filenms_from_fmri;
     local:
 	*;
 };

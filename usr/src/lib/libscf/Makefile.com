@@ -43,7 +43,7 @@ $(NOT_NATIVE)NATIVE_BUILD = $(POUND_SIGN)
 $(NATIVE_BUILD)VERS =
 $(NATIVE_BUILD)LIBS = $(DYNLIB)
 
-LDLIBS +=	-luutil -lc
+LDLIBS +=	-luutil -lc -lgen
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
@@ -61,7 +61,8 @@ LIBUUTIL =	$(SRC)/lib/libuutil
 MY_NATIVE_CPPFLAGS =\
 		-DNATIVE_BUILD $(DTEXTDOM) \
 		-I../inc -I$(COMDIR) -I$(LIBUUTIL)/common
-MY_NATIVE_LDLIBS = -L$(LIBUUTIL)/native -R$(LIBUUTIL)/native -luutil -ldoor -lc
+MY_NATIVE_LDLIBS = -L$(LIBUUTIL)/native -R$(LIBUUTIL)/native -luutil -ldoor -lc \
+		-lgen
 
 .KEEP_STATE:
 

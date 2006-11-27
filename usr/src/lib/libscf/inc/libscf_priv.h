@@ -293,6 +293,8 @@ typedef struct scf_pattern {
 
 int scf_cmp_pattern(char *, scf_pattern_t *);
 
+int gen_filenms_from_fmri(const char *, const char *, char *, char *);
+
 #ifdef	__cplusplus
 }
 #endif
