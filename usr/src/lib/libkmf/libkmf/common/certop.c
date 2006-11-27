@@ -1337,6 +1337,8 @@ cert_ku_check(KMF_HANDLE_T handle, KMF_DATA *cert)
 	KMF_POLICY_RECORD *policy;
 	KMF_X509EXT_KEY_USAGE keyusage;
 	KMF_RETURN ret = KMF_OK;
+	KMF_X509EXT_BASICCONSTRAINTS constraint;
+	KMF_BOOL	critical = B_FALSE;
 
 	if (handle == NULL || cert == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -1361,6 +1363,23 @@ cert_ku_check(KMF_HANDLE_T handle, KMF_DATA *cert)
 	}
 
 	/*
+	 * If KeyCertSign is set, then constraints.cA must be TRUE and
+	 * marked critical.
+	 */
+	if ((keyusage.KeyUsageBits & KMF_keyCertSign)) {
+		(void) memset(&constraint, 0, sizeof (constraint));
+		ret = KMF_GetCertBasicConstraintExt(cert,
+			&critical, &constraint);
+
+		if (ret != KMF_OK) {
+			/* real error */
+			return (ret);
+		}
+		if (!constraint.cA || !critical)
+			return (KMF_ERR_KEYUSAGE);
+	}
+
+	/*
 	 * Rule: if the KU bit is set in policy, the corresponding KU bit
 	 * must be set in the certificate (but not vice versa).
 	 */
@@ -1376,8 +1395,6 @@ static KMF_RETURN
 cert_eku_check(KMF_HANDLE_T handle, KMF_DATA *cert)
 {
 	KMF_POLICY_RECORD *policy;
-	KMF_X509EXT_BASICCONSTRAINTS constraint;
-	KMF_BOOL	critical = B_FALSE;
 	KMF_RETURN ret = KMF_OK;
 	KMF_X509EXT_EKU eku;
 	uint16_t cert_eku = 0, policy_eku = 0;
@@ -1386,20 +1403,13 @@ cert_eku_check(KMF_HANDLE_T handle, KMF_DATA *cert)
 	if (handle == NULL || cert == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 	policy = handle->policy;
-	(void) memset(&constraint, 0, sizeof (constraint));
 
-	ret = KMF_GetCertBasicConstraintExt(cert,
-	    &critical, &constraint);
-
-	if ((ret != KMF_ERR_EXTENSION_NOT_FOUND) && (ret != KMF_OK)) {
-		/* real error */
-		return (ret);
-	}
-
-	if (constraint.cA) {
-		/* EKU extension appears only in end entity certificates */
-		return (KMF_ERR_KEYUSAGE);
-	}
+	/*
+	 * If the policy does not have any EKU, then there is
+	 * nothing further to check.
+	 */
+	if (policy->eku_set.eku_count == 0)
+		return (KMF_OK);
 
 	ret = KMF_GetCertEKU(cert, &eku);
 	if ((ret != KMF_ERR_EXTENSION_NOT_FOUND) && (ret != KMF_OK)) {
@@ -1437,6 +1447,7 @@ cert_eku_check(KMF_HANDLE_T handle, KMF_DATA *cert)
 			}
 		} /* for */
 	}
+
 
 	/*
 	 * Build the EKU bitmap based on the policy
@@ -1708,9 +1719,14 @@ kmf_find_ta_cert(KMF_HANDLE_T handle,
 	if (ret != KMF_OK)
 		goto out;
 
-	ret = KMF_CompareRDNs(user_issuerDN, &ta_subjectDN);
+	if (KMF_CompareRDNs(user_issuerDN, &ta_subjectDN) != 0)
+		ret = KMF_ERR_CERT_NOT_FOUND;
+
 	KMF_FreeDN(&ta_subjectDN);
 
+	/* Make sure the TA cert has the correct extensions */
+	if (ret == KMF_OK)
+		ret = check_key_usage(handle, ta_cert, KMF_KU_SIGN_CERT);
 out:
 	if (ta_retrCert.certificate.Data)
 		KMF_FreeKMFCert(handle, &ta_retrCert);

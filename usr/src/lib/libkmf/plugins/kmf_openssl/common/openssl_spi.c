@@ -704,6 +704,9 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 				kmf_cert[n].kmf_private.flags =
 					KMF_FLAG_CERT_VALID;
 				kmf_cert[n].kmf_private.label = fname;
+
+				certdata.Data = NULL;
+				certdata.Length = 0;
 			} else {
 				free(fname);
 				KMF_FreeData(&certdata);
