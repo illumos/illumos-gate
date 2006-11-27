@@ -240,6 +240,10 @@ result_host2str:
 		free(first_host);
 	if (other_hosts)
 		free(other_hosts);
+	if (be->toglue) {
+		free(be->toglue);
+		be->toglue = NULL;
+	}
 	(void) __ns_ldap_freeResult(&be->result);
 	return (nss_result);
 }
