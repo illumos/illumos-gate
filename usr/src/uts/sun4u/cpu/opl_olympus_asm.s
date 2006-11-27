@@ -1327,6 +1327,8 @@ opl_cpu0_err_log:
 	 nop
 	RESET_WINREG(%g1)		! reset windows to prevent spills
 4:
+	RESET_USER_RTT_REGS(%g2, %g3, 5f)
+5:
 	mov	%g5, %g3		! pass SFSR to the 3rd arg
 	mov	%g6, %g2		! pass SFAR to the 2nd arg
 	set	opl_cpu_isync_tl1_error, %g1
@@ -1542,6 +1544,8 @@ opl_uger_panic1:
 	 * %g2 = arg #1 already set above
 	 */
 opl_uger_panic_cmn:
+	RESET_USER_RTT_REGS(%g4, %g5, 1f)
+1:
 	rdpr	%tl, %g3			! arg #2
 	set	opl_cpu_urgent_error, %g1	! pc
 	sethi	%hi(sys_trap), %g5
