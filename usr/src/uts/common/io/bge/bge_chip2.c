@@ -1824,6 +1824,7 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5704:
 	case DEVICE_ID_5705M:
 	case DEVICE_ID_5705C:
+	case DEVICE_ID_5705_2:
 	case DEVICE_ID_5706:
 	case DEVICE_ID_5782:
 	case DEVICE_ID_5788:
@@ -1836,6 +1837,7 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5714C:
 	case DEVICE_ID_5714S:
 	case DEVICE_ID_5715C:
+	case DEVICE_ID_5715S:
 		config1 = bge_reg_get32(bgep, NVM_CONFIG1_REG);
 		if (config1 & NVM_CFG1_FLASH_MODE)
 			if (config1 & NVM_CFG1_BUFFERED_MODE)
@@ -1999,6 +2001,7 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5705M:
 	case DEVICE_ID_5705MA3:
 	case DEVICE_ID_5705F:
+	case DEVICE_ID_5705_2:
 		cidp->chip_label = 5705;
 		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
 		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
@@ -2079,6 +2082,7 @@ bge_chip_id_init(bge_t *bgep)
 		break;
 
 	case DEVICE_ID_5715C:
+	case DEVICE_ID_5715S:
 		cidp->chip_label = 5715;
 		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
 		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
@@ -3189,7 +3193,7 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	if (sx0 != 0) {
 		BGE_REPORT((bgep, "SEND INDEX - device didn't RESET"));
 		bge_fm_ereport(bgep, DDI_FM_DEVICE_INVAL_STATE);
-		return (DDI_FAILURE);
+		retval = DDI_FAILURE;
 	}
 
 	/* Enable MSI code */

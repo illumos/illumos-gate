@@ -148,6 +148,7 @@ then
 	"pci14e4,16a8"
 	"pci14e4,1649"
 	"pci14e4,1653"
+	"pci14e4,1654"
 	"pci14e4,1659"
 	"pci14e4,165d"
 	"pci14e4,165e"
@@ -158,6 +159,7 @@ then
 	"pci14e4,169c"
 	"pci14e4,1677"
 	"pci14e4,1678"
+	"pci14e4,1679"
 	"pci14e4,167d"
 	"pciex14e4,169d"' \
 	-b "$BASEDIR" bge

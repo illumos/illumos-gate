@@ -532,12 +532,13 @@ bge_m_tx(void *arg, mblk_t *mp)
 	ASSERT(mp != NULL);
 	ASSERT(bgep->bge_mac_state == BGE_MAC_STARTED);
 
+	rw_enter(bgep->errlock, RW_READER);
 	if (bgep->bge_chip_state != BGE_CHIP_RUNNING) {
 		BGE_DEBUG(("bge_m_tx: chip not running"));
-		return (mp);
+		freemsgchain(mp);
+		mp = NULL;
 	}
 
-	rw_enter(bgep->errlock, RW_READER);
 	while (mp != NULL) {
 		next = mp->b_next;
 		mp->b_next = NULL;
