@@ -765,6 +765,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 			log_instance(inst, B_TRUE, "Restarting too quickly, "
 			    "changing state to maintenance");
 			result = ELOOP;
+			restarter_free_method_context(mcp);
 			goto out;
 		}
 	}
@@ -773,6 +774,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	if (pid == 0)
 		exec_method(inst, type, method, mcp, need_session);
 
+	restarter_free_method_context(mcp);
 	if (pid == -1) {
 		if (forkerr == EAGAIN)
 			result = EAGAIN;
@@ -786,7 +788,6 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		goto out;
 	}
 
-	restarter_free_method_context(mcp);
 
 	/*
 	 * Get the contract id, decide whether it is primary or transient, and

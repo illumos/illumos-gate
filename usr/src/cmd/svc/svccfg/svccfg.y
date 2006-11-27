@@ -3,9 +3,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,15 +131,17 @@ validate_cmd : SCC_VALIDATE SCV_WORD terminator
 		(void) internal_bundle_free(b);
 		free($2);
 	}
-	| SCC_VALIDATE error terminator		{ synerr(SCC_VALIDATE); }
+	| SCC_VALIDATE error terminator	{ synerr(SCC_VALIDATE); return(0); }
 
 import_cmd : SCC_IMPORT string_list terminator
 	{
 		string_list_t *slp;
 		void *cookie = NULL;
 
-		if (engine_import($2) == -2)
+		if (engine_import($2) == -2) {
 			synerr(SCC_IMPORT);
+			return(0);
+		}
 
 		while ((slp = uu_list_teardown($2, &cookie)) != NULL) {
 			free(slp->str);
@@ -149,7 +150,7 @@ import_cmd : SCC_IMPORT string_list terminator
 
 		uu_list_destroy($2);
 	}
-	| SCC_IMPORT error terminator		{ synerr(SCC_IMPORT); }
+	| SCC_IMPORT error terminator	{ synerr(SCC_IMPORT); return(0); }
 
 export_cmd : SCC_EXPORT SCV_WORD terminator
 	{
@@ -162,7 +163,7 @@ export_cmd : SCC_EXPORT SCV_WORD terminator
 		free($2);
 		free($4);
 	}
-	| SCC_EXPORT error terminator		{ synerr(SCC_EXPORT); }
+	| SCC_EXPORT error terminator	{ synerr(SCC_EXPORT); return(0); }
 
 archive_cmd : SCC_ARCHIVE terminator
 	{
@@ -173,11 +174,11 @@ archive_cmd : SCC_ARCHIVE terminator
 		lscf_archive($3);
 		free($3);
 	}
-	| SCC_ARCHIVE error terminator		{ synerr(SCC_ARCHIVE); }
+	| SCC_ARCHIVE error terminator	{ synerr(SCC_ARCHIVE); return(0); }
 
 apply_cmd : SCC_APPLY SCV_WORD terminator
 					{ (void) engine_apply($2); free($2); }
-	| SCC_APPLY error terminator	{ synerr(SCC_APPLY); }
+	| SCC_APPLY error terminator	{ synerr(SCC_APPLY); return(0); }
 
 extract_cmd: SCC_EXTRACT terminator	{ lscf_profile_extract(NULL); }
 	| SCC_EXTRACT SCS_REDIRECT SCV_WORD terminator
@@ -185,18 +186,18 @@ extract_cmd: SCC_EXTRACT terminator	{ lscf_profile_extract(NULL); }
 		lscf_profile_extract($3);
 		free($3);
 	}
-	| SCC_EXTRACT error terminator		{ synerr(SCC_EXTRACT); }
+	| SCC_EXTRACT error terminator	{ synerr(SCC_EXTRACT); return(0); }
 
 repository_cmd : SCC_REPOSITORY SCV_WORD terminator
 	{
 		lscf_set_repository($2);
 		free($2);
 	}
-	| SCC_REPOSITORY error terminator	{ synerr(SCC_REPOSITORY); }
+	| SCC_REPOSITORY error terminator   { synerr(SCC_REPOSITORY); return(0); }
 
 inventory_cmd : SCC_INVENTORY SCV_WORD terminator
 					{ lxml_inventory($2); free($2); }
-	| SCC_INVENTORY error terminator	{ synerr(SCC_INVENTORY); }
+	| SCC_INVENTORY error terminator	{ synerr(SCC_INVENTORY); return(0); }
 
 set_cmd : SCC_SET string_list terminator
 	{
@@ -212,20 +213,20 @@ set_cmd : SCC_SET string_list terminator
 
 		uu_list_destroy($2);
 	}
-	| SCC_SET error terminator		{ synerr(SCC_SET); }
+	| SCC_SET error terminator		{ synerr(SCC_SET); return(0); }
 
 end_cmd : SCC_END terminator			{ exit(0); }
-	| SCC_END error terminator		{ synerr (SCC_END); }
+	| SCC_END error terminator		{ synerr (SCC_END); return(0); }
 
 help_cmd : SCC_HELP terminator			{ help(0); }
 	| SCC_HELP command_token terminator	{ help($2); }
-	| SCC_HELP error terminator		{ synerr(SCC_HELP); }
+	| SCC_HELP error terminator		{ synerr(SCC_HELP); return(0); }
 
 list_cmd : SCC_LIST opt_word terminator	{ lscf_list($2); free($2); }
-	| SCC_LIST error terminator	{ synerr(SCC_LIST); }
+	| SCC_LIST error terminator	{ synerr(SCC_LIST); return(0); }
 
 add_cmd : SCC_ADD SCV_WORD terminator	{ lscf_add($2); free($2); }
-	| SCC_ADD error terminator	{ synerr(SCC_ADD); }
+	| SCC_ADD error terminator	{ synerr(SCC_ADD); return(0); }
 
 delete_cmd : SCC_DELETE SCV_WORD terminator
 					{ lscf_delete($2, 0); free($2); }
@@ -237,19 +238,20 @@ delete_cmd : SCC_DELETE SCV_WORD terminator
 			free($3);
 		} else {
 			synerr(SCC_DELETE);
+			return(0);
 		}
 	}
-	| SCC_DELETE error terminator	{ synerr(SCC_DELETE); }
+	| SCC_DELETE error terminator	{ synerr(SCC_DELETE); return(0); }
 
 select_cmd : SCC_SELECT SCV_WORD terminator	{ lscf_select($2); free($2); }
-	| SCC_SELECT error terminator		{ synerr(SCC_SELECT); }
+	| SCC_SELECT error terminator	{ synerr(SCC_SELECT); return(0) ;}
 
 unselect_cmd : SCC_UNSELECT terminator	{ lscf_unselect(); }
-	| SCC_UNSELECT error terminator	{ synerr(SCC_UNSELECT); }
+	| SCC_UNSELECT error terminator	{ synerr(SCC_UNSELECT); return(0); }
 
 listpg_cmd : SCC_LISTPG opt_word terminator
 					{ lscf_listpg($2); free($2); }
-	| SCC_LISTPG error terminator	{ synerr(SCC_LISTPG); }
+	| SCC_LISTPG error terminator	{ synerr(SCC_LISTPG); return(0); }
 
 addpg_cmd : SCC_ADDPG SCV_WORD SCV_WORD opt_word terminator
 	{
@@ -258,15 +260,15 @@ addpg_cmd : SCC_ADDPG SCV_WORD SCV_WORD opt_word terminator
 		free($3);
 		free($4);
 	}
-	| SCC_ADDPG error terminator	{ synerr(SCC_ADDPG); }
+	| SCC_ADDPG error terminator	{ synerr(SCC_ADDPG); return(0); }
 
 delpg_cmd : SCC_DELPG SCV_WORD terminator
 					{ lscf_delpg($2); free($2); }
-	| SCC_DELPG error terminator	{ synerr(SCC_DELPG); }
+	| SCC_DELPG error terminator	{ synerr(SCC_DELPG); return(0); }
 
 listprop_cmd : SCC_LISTPROP opt_word terminator
 					{ lscf_listprop($2); free($2); }
-	| SCC_LISTPROP error terminator	{ synerr(SCC_LISTPROP); }
+	| SCC_LISTPROP error terminator	{ synerr(SCC_LISTPROP); return(0); }
 
 setprop_cmd : SCC_SETPROP SCV_WORD SCS_EQUALS string terminator
 	{
@@ -299,15 +301,15 @@ setprop_cmd : SCC_SETPROP SCV_WORD SCS_EQUALS string terminator
 
 		uu_list_destroy($6);
 	}
-	| SCC_SETPROP error terminator	{ synerr(SCC_SETPROP); }
-	| SCC_SETPROP error		{ synerr(SCC_SETPROP); }
+	| SCC_SETPROP error terminator	{ synerr(SCC_SETPROP); return(0); }
+	| SCC_SETPROP error		{ synerr(SCC_SETPROP); return(0); }
 
 delprop_cmd : SCC_DELPROP SCV_WORD terminator
 					{ lscf_delprop($2); free($2); }
-	| SCC_DELPROP error terminator	{ synerr(SCC_DELPROP); }
+	| SCC_DELPROP error terminator	{ synerr(SCC_DELPROP); return(0); }
 
 editprop_cmd : SCC_EDITPROP terminator	{ lscf_editprop(); }
-	| SCC_EDITPROP error terminator	{ synerr(SCC_EDITPROP); }
+	| SCC_EDITPROP error terminator	{ synerr(SCC_EDITPROP); return(0); }
 
 addpropvalue_cmd : SCC_ADDPROPVALUE SCV_WORD string terminator
 	{
@@ -322,7 +324,7 @@ addpropvalue_cmd : SCC_ADDPROPVALUE SCV_WORD string terminator
 		free($3);
 		free($4);
 	}
-	| SCC_ADDPROPVALUE error terminator { synerr(SCC_ADDPROPVALUE); }
+	| SCC_ADDPROPVALUE error terminator { synerr(SCC_ADDPROPVALUE); return(0); }
 
 delpropvalue_cmd : SCC_DELPROPVALUE SCV_WORD string terminator
 	{
@@ -330,15 +332,17 @@ delpropvalue_cmd : SCC_DELPROPVALUE SCV_WORD string terminator
 		free($2);
 		free($3);
 	}
-	| SCC_DELPROPVALUE error terminator { synerr(SCC_DELPROPVALUE); }
+	| SCC_DELPROPVALUE error terminator { synerr(SCC_DELPROPVALUE); return(0); }
 
 setenv_cmd : SCC_SETENV string_list terminator
 	{
 		string_list_t *slp;
 		void *cookie = NULL;
 
-		if (lscf_setenv($2, 0) == -2)
+		if (lscf_setenv($2, 0) == -2) {
 			synerr(SCC_SETENV);
+			return(0);
+		}
 
 		while ((slp = uu_list_teardown($2, &cookie)) != NULL) {
 			free(slp->str);
@@ -347,15 +351,17 @@ setenv_cmd : SCC_SETENV string_list terminator
 
 		uu_list_destroy($2);
 	}
-	| SCC_SETENV error terminator		{ synerr(SCC_SETENV); }
+	| SCC_SETENV error terminator		{ synerr(SCC_SETENV); return(0); }
 
 unsetenv_cmd : SCC_UNSETENV string_list terminator
 	{
 		string_list_t *slp;
 		void *cookie = NULL;
 
-		if (lscf_setenv($2, 1) == -2)
+		if (lscf_setenv($2, 1) == -2) {
 			synerr(SCC_UNSETENV);
+			return(0);
+		}
 
 		while ((slp = uu_list_teardown($2, &cookie)) != NULL) {
 			free(slp->str);
@@ -364,18 +370,18 @@ unsetenv_cmd : SCC_UNSETENV string_list terminator
 
 		uu_list_destroy($2);
 	}
-	| SCC_UNSETENV error terminator		{ synerr(SCC_UNSETENV); }
+	| SCC_UNSETENV error terminator	{ synerr(SCC_UNSETENV); return(0); }
 
 listsnap_cmd : SCC_LISTSNAP terminator	{ lscf_listsnap(); }
-	| SCC_LISTSNAP error terminator	{ synerr(SCC_LISTSNAP); }
+	| SCC_LISTSNAP error terminator	{ synerr(SCC_LISTSNAP); return(0); }
 
 selectsnap_cmd : SCC_SELECTSNAP opt_word terminator
 					{ lscf_selectsnap($2); free($2); }
 	| SCC_SELECTSNAP error terminator
-					{ synerr(SCC_SELECTSNAP); }
+					{ synerr(SCC_SELECTSNAP); return(0); }
 
 revert_cmd: SCC_REVERT opt_word terminator	{ lscf_revert($2); free ($2); }
-	| SCC_REVERT error terminator		{ synerr(SCC_REVERT); }
+	| SCC_REVERT error terminator		{ synerr(SCC_REVERT); return(0); }
 
 
 terminator : SCS_NEWLINE

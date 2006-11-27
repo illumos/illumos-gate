@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -960,7 +959,7 @@ perm_granted(const permcheck_t *pcp)
 	int ret = 0;
 	uid_t uid;
 	userattr_t *uap;
-	char *authlist, *proflist, *def_prof = NULL;
+	char *authlist, *userattr_authlist, *proflist, *def_prof = NULL;
 
 	/*
 	 * Get generic authorizations from policy.conf
@@ -977,10 +976,9 @@ perm_granted(const permcheck_t *pcp)
 
 	if (authlist != NULL) {
 		ret = check_auth_list(pcp, authlist);
-		free(authlist);
 
 		if (ret) {
-			free(def_prof);
+			_free_auth_policy(authlist, def_prof);
 			return (ret);
 		}
 	}
@@ -992,7 +990,7 @@ perm_granted(const permcheck_t *pcp)
 
 	/* Get the uid */
 	if ((uc = get_ucred()) == NULL) {
-		free(def_prof);
+		_free_auth_policy(authlist, def_prof);
 
 		if (errno == EINVAL) {
 			/*
@@ -1019,9 +1017,9 @@ perm_granted(const permcheck_t *pcp)
 	uap = getuseruid(uid);
 	if (uap != NULL) {
 		/* Get the authorizations from user_attr. */
-		authlist = kva_match(uap->attr, USERATTR_AUTHS_KW);
-		if (authlist != NULL)
-			ret = check_auth_list(pcp, authlist);
+		userattr_authlist = kva_match(uap->attr, USERATTR_AUTHS_KW);
+		if (userattr_authlist != NULL)
+			ret = check_auth_list(pcp, userattr_authlist);
 	}
 
 	if (!ret && def_prof != NULL) {
@@ -1035,8 +1033,7 @@ perm_granted(const permcheck_t *pcp)
 			ret = check_prof_list(pcp, proflist);
 	}
 
-	if (def_prof != NULL)
-		free(def_prof);
+	_free_auth_policy(authlist, def_prof);
 	if (uap != NULL)
 		free_userattr(uap);
 

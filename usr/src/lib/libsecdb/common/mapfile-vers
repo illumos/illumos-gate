@@ -64,6 +64,7 @@ SUNWprivate_1.1 {
 	_csl_to_argv;
 	_do_unescape;
 	_free_argv;
+	_free_auth_policy;
 	_get_auth_policy;
 	_insert2kva;
 	_kva2str;
