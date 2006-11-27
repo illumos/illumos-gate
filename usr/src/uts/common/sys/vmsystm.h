@@ -149,6 +149,8 @@ extern	void	dcache_flushall(void);
 
 extern	void	*boot_virt_alloc(void *addr, size_t size);
 
+extern	size_t	exec_get_spslew(void);
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

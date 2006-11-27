@@ -1576,6 +1576,10 @@ stk_copyout(uarg_t *args, char *usrstack, void **auxvpp, user_t *up)
  *
  *	User Stack
  *	+---------------+ <--- curproc->p_usrstack
+ *	|		|
+ *	| slew		|
+ *	|		|
+ *	+---------------+
  *	| NULL		|
  *	+---------------+
  *	|		|
@@ -1622,9 +1626,9 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	user_t *up = PTOU(p);
 	char *usrstack;
 	rctl_entity_p_t e;
-
 	struct as *as;
 	extern int use_stk_lpg;
+	size_t sp_slew;
 
 	args->from_model = p->p_model;
 	if (p->p_model == DATAMODEL_NATIVE) {
@@ -1788,7 +1792,18 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	p->p_flag |= SAUTOLPG;	/* kernel controls page sizes */
 	mutex_exit(&p->p_lock);
 
-	exec_set_sp(size);
+	/*
+	 * Some platforms may choose to randomize real stack start by adding a
+	 * small slew (not more than a few hundred bytes) to the top of the
+	 * stack. This helps avoid cache thrashing when identical processes
+	 * simultaneously share caches that don't provide enough associativity
+	 * (e.g. sun4v systems). In this case stack slewing makes the same hot
+	 * stack variables in different processes to live in different cache
+	 * sets increasing effective associativity.
+	 */
+	sp_slew = exec_get_spslew();
+	ASSERT(P2PHASE(sp_slew, args->stk_align) == 0);
+	exec_set_sp(size + sp_slew);
 
 	as = as_alloc();
 	p->p_as = as;
@@ -1800,7 +1815,7 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	/*
 	 * Finally, write out the contents of the new stack.
 	 */
-	error = stk_copyout(args, usrstack, auxvpp, up);
+	error = stk_copyout(args, usrstack - sp_slew, auxvpp, up);
 	kmem_free(args->stk_base, args->stk_size);
 	return (error);
 }

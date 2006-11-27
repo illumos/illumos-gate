@@ -34,6 +34,7 @@
 #include <sys/elf_SPARC.h>
 #include <vm/hat_sfmmu.h>
 #include <vm/page.h>
+#include <vm/vm_dep.h>
 #include <sys/cpuvar.h>
 #include <sys/async.h>
 #include <sys/cmn_err.h>
@@ -124,6 +125,13 @@ cpu_setup(void)
 	 * Niagara2 has a performance counter overflow interrupt
 	 */
 	cpc_has_overflow_intr = 1;
+
+	/*
+	 * Enable 4M pages for OOB.
+	 */
+	max_uheap_lpsize = MMU_PAGESIZE4M;
+	max_ustack_lpsize = MMU_PAGESIZE4M;
+	max_privmap_lpsize = MMU_PAGESIZE4M;
 }
 
 /*
@@ -228,5 +236,215 @@ cpu_trapstat_data(void *buf, uint_t tstat_pgszs)
 		tstatp->tpgsz_kernel.tmode_dtlb.ttlb_tlb.tmiss_time = 0;
 		tstatp->tpgsz_user.tmode_dtlb.ttlb_tlb.tmiss_count = 0;
 		tstatp->tpgsz_user.tmode_dtlb.ttlb_tlb.tmiss_time = 0;
+	}
+}
+
+/* NI2 L2$ index is pa[32:28]^pa[17:13].pa[19:18]^pa[12:11].pa[10:6] */
+uint_t
+page_pfn_2_color_cpu(pfn_t pfn, uchar_t szc)
+{
+	uint_t color;
+
+	ASSERT(szc <= TTE256M);
+
+	pfn = PFN_BASE(pfn, szc);
+	color = ((pfn >> 15) ^ pfn) & 0x1f;
+	if (szc >= TTE4M)
+		return (color);
+
+	color = (color << 2) | ((pfn >> 5) & 0x3);
+
+	return (szc <= TTE64K ? color : (color >> 1));
+}
+
+#if TTE256M != 5
+#error TTE256M is not 5
+#endif
+
+uint_t
+page_get_nsz_color_mask_cpu(uchar_t szc, uint_t mask)
+{
+	static uint_t ni2_color_masks[5] = {0x63, 0x1e, 0x3e, 0x1f, 0x1f};
+	ASSERT(szc < TTE256M);
+
+	mask &= ni2_color_masks[szc];
+	return ((szc == TTE64K || szc == TTE512K) ? (mask >> 1) : mask);
+}
+
+uint_t
+page_get_nsz_color_cpu(uchar_t szc, uint_t color)
+{
+	ASSERT(szc < TTE256M);
+	return ((szc == TTE64K || szc == TTE512K) ? (color >> 1) : color);
+}
+
+uint_t
+page_get_color_shift_cpu(uchar_t szc, uchar_t nszc)
+{
+	ASSERT(nszc > szc);
+	ASSERT(nszc <= TTE256M);
+
+	if (szc <= TTE64K)
+		return ((nszc >= TTE4M) ? 2 : ((nszc >= TTE512K) ? 1 : 0));
+	if (szc == TTE512K)
+		return (1);
+
+	return (0);
+}
+
+/*ARGSUSED*/
+pfn_t
+page_next_pfn_for_color_cpu(pfn_t pfn, uchar_t szc, uint_t color,
+    uint_t ceq_mask, uint_t color_mask)
+{
+	pfn_t pstep = PNUM_SIZE(szc);
+	pfn_t npfn, pfn_ceq_mask, pfn_color;
+	pfn_t tmpmask, mask = (pfn_t)-1;
+
+	ASSERT((color & ~ceq_mask) == 0);
+
+	if (((page_pfn_2_color_cpu(pfn, szc) ^ color) & ceq_mask) == 0) {
+
+		/* we start from the page with correct color */
+		if (szc >= TTE512K) {
+			if (szc >= TTE4M) {
+				/* page color is PA[32:28] */
+				pfn_ceq_mask = ceq_mask << 15;
+			} else {
+				/* page color is PA[32:28].PA[19:19] */
+				pfn_ceq_mask = ((ceq_mask & 1) << 6) |
+				    ((ceq_mask >> 1) << 15);
+			}
+			pfn = ADD_MASKED(pfn, pstep, pfn_ceq_mask, mask);
+			return (pfn);
+		} else {
+			/*
+			 * We deal 64K or 8K page. Check if we could the
+			 * satisfy the request without changing PA[32:28]
+			 */
+			pfn_ceq_mask = ((ceq_mask & 3) << 5) | (ceq_mask >> 2);
+			npfn = ADD_MASKED(pfn, pstep, pfn_ceq_mask, mask);
+
+			if ((((npfn ^ pfn) >> 15) & 0x1f) == 0)
+				return (npfn);
+
+			/*
+			 * for next pfn we have to change bits PA[32:28]
+			 * set PA[63:28] and PA[19:18] of the next pfn
+			 */
+			npfn = (pfn >> 15) << 15;
+			npfn |= (ceq_mask & color & 3) << 5;
+			pfn_ceq_mask = (szc == TTE8K) ? 0 :
+			    (ceq_mask & 0x1c) << 13;
+			npfn = ADD_MASKED(npfn, (1 << 15), pfn_ceq_mask, mask);
+
+			/*
+			 * set bits PA[17:13] to match the color
+			 */
+			ceq_mask >>= 2;
+			color = (color >> 2) & ceq_mask;
+			npfn |= ((npfn >> 15) ^ color) & ceq_mask;
+			return (npfn);
+		}
+	}
+
+	/*
+	 * we start from the page with incorrect color - rare case
+	 */
+	if (szc >= TTE512K) {
+		if (szc >= TTE4M) {
+			/* page color is in bits PA[32:28] */
+			npfn = ((pfn >> 20) << 20) | (color << 15);
+			pfn_ceq_mask = (ceq_mask << 15) | 0x7fff;
+		} else {
+			/* try get the right color by changing bit PA[19:19] */
+			npfn = pfn + pstep;
+			if (((page_pfn_2_color_cpu(npfn, szc) ^ color) &
+			    ceq_mask) == 0)
+				return (npfn);
+
+			/* page color is PA[32:28].PA[19:19] */
+			pfn_ceq_mask = ((ceq_mask & 1) << 6) |
+			    ((ceq_mask >> 1) << 15) | (0xff << 7);
+			pfn_color = ((color & 1) << 6) | ((color >> 1) << 15);
+			npfn = ((pfn >> 20) << 20) | pfn_color;
+		}
+
+		while (npfn <= pfn) {
+			npfn = ADD_MASKED(npfn, pstep, pfn_ceq_mask, mask);
+		}
+		return (npfn);
+	}
+
+	/*
+	 * We deal 64K or 8K page of incorrect color.
+	 * Try correcting color without changing PA[32:28]
+	 */
+
+	pfn_ceq_mask = ((ceq_mask & 3) << 5) | (ceq_mask >> 2);
+	pfn_color = ((color & 3) << 5) | (color >> 2);
+	npfn = (pfn & ~(pfn_t)0x7f);
+	npfn |= (((pfn >> 15) & 0x1f) ^ pfn_color) & pfn_ceq_mask;
+	npfn = (szc == TTE64K) ? (npfn & ~(pfn_t)0x7) : npfn;
+
+	if (((page_pfn_2_color_cpu(npfn, szc) ^ color) & ceq_mask) == 0) {
+
+		/* the color is fixed - find the next page */
+		while (npfn <= pfn) {
+			npfn = ADD_MASKED(npfn, pstep, pfn_ceq_mask, mask);
+		}
+		if ((((npfn ^ pfn) >> 15) & 0x1f) == 0)
+			return (npfn);
+	}
+
+	/* to fix the color need to touch PA[32:28] */
+	npfn = (szc == TTE8K) ? ((pfn >> 15) << 15) :
+	    (((pfn >> 18) << 18) | ((color & 0x1c) << 13));
+	tmpmask = (szc == TTE8K) ? 0 : (ceq_mask & 0x1c) << 13;
+
+	while (npfn <= pfn) {
+		npfn = ADD_MASKED(npfn, (1 << 15), tmpmask, mask);
+	}
+
+	/* set bits PA[19:13] to match the color */
+	npfn |= (((npfn >> 15) & 0x1f) ^ pfn_color) & pfn_ceq_mask;
+	npfn = (szc == TTE64K) ? (npfn & ~(pfn_t)0x7) : npfn;
+
+	ASSERT(((page_pfn_2_color_cpu(npfn, szc) ^ color) & ceq_mask) == 0);
+
+	return (npfn);
+}
+
+/*
+ * init page coloring
+ */
+void
+page_coloring_init_cpu()
+{
+	int i;
+	uint_t colors;
+
+	hw_page_array[0].hp_colors = 1 << 7;
+	hw_page_array[1].hp_colors = 1 << 7;
+	hw_page_array[2].hp_colors = 1 << 6;
+
+	for (i = 3; i < mmu_page_sizes; i++) {
+		hw_page_array[i].hp_colors = 1 << 5;
+	}
+
+	if (colorequiv > 1) {
+		int a = lowbit(colorequiv) - 1;
+
+		if (a > 15)
+			a = 15;
+
+		for (i = 0; i < mmu_page_sizes; i++) {
+			if ((colors = hw_page_array[i].hp_colors) <= 1) {
+				continue;
+			}
+			while ((colors >> a) == 0)
+				a--;
+			colorequivszc[i] = (a << 4);
+		}
 	}
 }

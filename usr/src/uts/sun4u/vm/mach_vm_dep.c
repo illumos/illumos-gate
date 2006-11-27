@@ -326,3 +326,9 @@ contig_mem_init(void)
 {
 	/* not applicable to sun4u */
 }
+
+size_t
+exec_get_spslew(void)
+{
+	return (0);
+}

@@ -2140,3 +2140,9 @@ pageout_init(void (*procedure)(), proc_t *pp, pri_t pri)
 void
 dcache_flushall()
 {}
+
+size_t
+exec_get_spslew(void)
+{
+	return (0);
+}

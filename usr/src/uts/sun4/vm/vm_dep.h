@@ -361,7 +361,9 @@ extern plcnt_t	plcnt;
  */
 #define	MTYPE_START(mnode, mtype, flags) {				\
 	if (plcnt[mnode][mtype].plc_mt_pgmax == 0) {			\
-		ASSERT(MNODETYPE_PGCNT(mnode, mtype) == 0);		\
+		ASSERT(mtype == MTYPE_RELOC ||				\
+		    MNODETYPE_PGCNT(mnode, mtype) == 0 ||		\
+		    plcnt[mnode][mtype].plc_mt_pgmax != 0);		\
 		MTYPE_NEXT(mnode, mtype, flags);			\
 	}								\
 }
@@ -374,7 +376,8 @@ extern plcnt_t	plcnt;
 	if (!(flags & (PG_NORELOC | PGI_NOCAGE | PGI_RELOCONLY)) &&	\
 	    (kcage_freemem >= kcage_lotsfree)) {			\
 		if (plcnt[mnode][MTYPE_NORELOC].plc_mt_pgmax == 0) {	\
-			ASSERT(MNODETYPE_PGCNT(mnode, MTYPE_NORELOC) == 0); \
+			ASSERT(MNODETYPE_PGCNT(mnode, MTYPE_NORELOC) == 0 || \
+			    plcnt[mnode][MTYPE_NORELOC].plc_mt_pgmax != 0);  \
 			mtype = -1;					\
 		} else {						\
 			mtype = MTYPE_NORELOC;				\
@@ -389,7 +392,6 @@ extern plcnt_t	plcnt;
  * get the ecache setsize for the current cpu.
  */
 #define	CPUSETSIZE()	(cpunodes[CPU->cpu_id].ecache_setsize)
-#define	CPUASSOC()	(cpunodes[CPU->cpu_id].ecache_associativity)
 
 extern struct cpu	cpu0;
 #define	CPU0		&cpu0
@@ -475,9 +477,7 @@ switch (consistent_coloring) {						\
 		pfn = ((uintptr_t)addr >> MMU_PAGESHIFT) +		\
 			(((uintptr_t)addr >> page_coloring_shift) <<	\
 			(vac_shift - MMU_PAGESHIFT));			\
-		if ((szc) == 0 ||					\
-		    (szc == 1 && &page_pfn_2_color_cpu == NULL &&	\
-		    CPUASSOC() > PNUM_SIZE(1))) {			\
+		if ((szc) == 0 || &page_pfn_2_color_cpu == NULL) {	\
 			pfn += slew;					\
 			bin = PFN_2_COLOR(pfn, szc);			\
 		} else {						\

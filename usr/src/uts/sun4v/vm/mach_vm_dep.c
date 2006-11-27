@@ -51,6 +51,8 @@
 #include <sys/error.h>
 #include <sys/machsystm.h>
 #include <vm/seg_kmem.h>
+#include <sys/stack.h>
+#include <sys/atomic.h>
 
 uint_t page_colors = 0;
 uint_t page_colors_mask = 0;
@@ -506,4 +508,16 @@ contig_mem_init(void)
 	    QUANTUM_SIZE, contig_mem_span_alloc, contig_mem_span_free,
 	    contig_mem_slab_arena, 0, VM_SLEEP | VM_BESTFIT);
 
+}
+
+
+static uint_t sp_color_stride = 16;
+static uint_t sp_color_mask = 0x1f;
+static uint_t sp_current_color = (uint_t)-1;
+
+size_t
+exec_get_spslew(void)
+{
+	uint_t spcolor = atomic_inc_32_nv(&sp_current_color);
+	return ((size_t)((spcolor & sp_color_mask) * SA(sp_color_stride)));
 }

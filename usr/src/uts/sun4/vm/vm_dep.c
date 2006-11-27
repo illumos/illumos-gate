@@ -897,8 +897,10 @@ page_coloring_init()
 
 	if (do_pg_coloring == 0) {
 		page_colors = 1;
-		for (i = 0; i < mmu_page_sizes; i++)
+		for (i = 0; i < mmu_page_sizes; i++) {
+			colorequivszc[i] = 0;
 			hw_page_array[i].hp_colors = 1;
+		}
 		return;
 	}
 
@@ -925,6 +927,7 @@ page_coloring_init()
 		hw_page_array[i].hp_colors = (page_colors_mask >>
 		    (hw_page_array[i].hp_shift - hw_page_array[0].hp_shift))
 		    + 1;
+		colorequivszc[i] = 0;
 	}
 
 	/*
@@ -935,8 +938,8 @@ page_coloring_init()
 	 * The value of cpu_page_colors determines if additional color bins
 	 * need to be checked for a particular color in the page_get routines.
 	 */
-	if ((cpu_page_colors == 0) && (cpu_setsize < ecache_setsize)) {
-
+	if (cpu_setsize > 0 && cpu_page_colors == 0 &&
+	    cpu_setsize < ecache_setsize) {
 		cpu_page_colors = cpu_setsize / MMU_PAGESIZE;
 		a = lowbit(page_colors) - lowbit(cpu_page_colors);
 		ASSERT(a > 0);
@@ -944,7 +947,6 @@ page_coloring_init()
 
 		for (i = 0; i < mmu_page_sizes; i++) {
 			if ((colors = hw_page_array[i].hp_colors) <= 1) {
-				colorequivszc[i] = 0;
 				continue;
 			}
 			while ((colors >> a) == 0)
