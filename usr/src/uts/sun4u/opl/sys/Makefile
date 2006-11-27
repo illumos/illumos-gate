@@ -64,21 +64,9 @@ PCICMUHDRS=	pcicmu.h	\
 		pcmu_types.h	\
 		pcmu_util.h
 
-SCFDHDRS=	iomp_drv.h	\
-		opcio.h		\
-		scfdebug.h	\
-		scfdscp.h	\
+SCFDHDRS=	opcioif.h	\
 		scfdscpif.h	\
-		scfio32.h	\
-		scfkstat.h	\
-		scfostoescf.h	\
-		scfparam.h	\
-		scfreg.h	\
-		scfsnap.h	\
-		scfstate.h	\
-		scfsys.h	\
-		scftimer.h	\
-		scftrace.h
+		scfostoescf.h
 
 NGDRHDRS=	$(UTSBASE)/sun4u/ngdr/sys/dr.h \
 		$(UTSBASE)/sun4u/ngdr/sys/dr_util.h

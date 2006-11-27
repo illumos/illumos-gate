@@ -41,7 +41,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sysevent/dr.h>
-#include <sys/scfd/opcio.h>
+#include <sys/scfd/opcioif.h>
 
 
 /* Macros */

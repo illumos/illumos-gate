@@ -31,7 +31,7 @@
 #include <strings.h>
 #include <libgen.h>
 #include <cfga_scsi.h>
-#include <sys/scfd/opcio.h>
+#include <sys/scfd/opcioif.h>
 
 
 #define	SCF_DRV		"/devices/pseudo/scfd@200:rasctl"

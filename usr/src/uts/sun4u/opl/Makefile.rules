@@ -27,8 +27,6 @@
 #	This Makefile defines the build rules for the directory
 #	uts/sun4u/opl and its children.
 #
-# uts/sun4u/opl/Makefile.rules
-#
 
 #
 #	Section 1a: C object build rules
@@ -91,10 +89,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/opl/io/oplpanel/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/opl/io/scfd/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/opl/io/oplmsu/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -136,9 +130,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/opl/os/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/opl/io/oplpanel/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/opl/io/scfd/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/opl/io/oplmsu/%.c

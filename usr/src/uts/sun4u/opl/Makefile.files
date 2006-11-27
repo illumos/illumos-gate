@@ -37,10 +37,6 @@ OPLKM_OBJS	= oplkmdrv.o
 PCICMU_OBJS	= pcicmu.o pcmu_cb.o pcmu_counters.o pcmu_ecc.o	\
 		  pcmu_ib.o pcmu_intr.o pcmu_pbm.o pcmu_util.o
 OPL_PANEL_OBJS	= oplpanel.o
-SCFD_OBJS = scfconf.o scfdscp.o scfiomp.o scfostoescf.o \
-		  scfsnap.o scfhandler.o scfkstat.o scfparam.o \
-		  scftimer.o scfdebug.o scfinit.o scfops.o \
-		  scfreg.o scftrace.o scf_os_interface.o
 DRMACH_OBJS 	= drmach.o drmach_asm.o dr_util.o drmach_err.o
 DRMACH_DEPS	+= drmach_asm.o
 OPLMSU_OBJS	= oplmsu.o oplmsu_cmn_func.o oplmsu_ioctl_lrp.o oplmsu_ioctl_uwp.o

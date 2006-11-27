@@ -22,8 +22,8 @@
  * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2006
  */
 
-#ifndef _SCFIO32_H
-#define	_SCFIO32_H
+#ifndef	_SYS_OPCIOIF_H
+#define	_SYS_OPCIOIF_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -31,38 +31,40 @@
 extern "C" {
 #endif
 
-#include <sys/types32.h>
+#include <sys/ioccom.h>
 
-/* SCFIOCWRLCD 32bit */
-typedef struct scfwrlcd32 {
-	int		lcd_type;
-	int		length;
-	caddr32_t	string;
-} scfwrlcd32_t;
+/*
+ * ioctl
+ *
+ * Note:  The ioctl definitions are split between opcio.h (closed) and
+ * opcioif.h (open).  All definitions required for the exported scfd
+ * interface should be in opcioif.h (open).
+ */
+#define	SCFIOC			'p'<<8
 
+#define	SCFIOCGETDISKLED	(SCFIOC|101|0x80040000)
+#define	SCFIOCSETDISKLED	(SCFIOC|102|0x80040000)
+#define	SCFIOCSETPHPINFO	(SCFIOC|1|0xe0000000)
 
-/* SCFIOCGETREPORT 32bit */
-typedef struct scfreport32 {
-	int		flag;
-	unsigned int	rci_addr;
-	unsigned char	report_sense[4];
-	time32_t	timestamp;
-} scfreport32_t;
+#define	SCF_DISK_LED_PATH_MAX	512
 
+/* for led field */
+#define	SCF_DISK_LED_ON		0x01
+#define	SCF_DISK_LED_BLINK	0x02
+#define	SCF_DISK_LED_OFF	0x04
 
-/* SCFIOCGETEVENT 32bit */
-typedef struct scfevent32 {
-	int		flag;
-	unsigned int	rci_addr;
-	unsigned char	code;
-	unsigned char	size;
-	unsigned char	rsv[2];
-	unsigned char	event_sense[24];
-	time32_t	timestamp;
-} scfevent32_t;
+typedef struct scfiocgetdiskled {
+	unsigned char	path[SCF_DISK_LED_PATH_MAX];
+	unsigned char	led;
+} scfiocgetdiskled_t;
+
+typedef struct scfsetphpinfo {
+	unsigned char	buf[65536];
+	unsigned int	size;
+} scfsetphpinfo_t;
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif /* _SCFIO32_H */
+#endif /* _SYS_OPCIOIF_H */
