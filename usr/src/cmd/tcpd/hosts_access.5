@@ -66,6 +66,10 @@ List elements should be separated by blanks and/or commas.
 With the exception of NIS (YP) netgroup lookups, all access control
 checks are case insensitive.
 .ne 4
+.SH HOST ADDRESSES
+IPv4 client addresses can be denoted in their usual dotted notation, i.e.
+x.x.x.x, but IPv6 addresses require a square brace around them - e.g.
+[::1]. 
 .SH PATTERNS
 The access control language implements the following patterns:
 .IP \(bu
@@ -89,6 +93,8 @@ An expression of the form `n.n.n.n/m.m.m.m\' is interpreted as a
 bitwise AND of the address and the `mask\'. For example, the net/mask
 pattern `131.155.72.0/255.255.254.0\' matches every address in the
 range `131.155.72.0\' through `131.155.73.255\'.
+.IP \(bu
+Prefixes can be specified for IPv6 address, e.g. [fe80]::/10
 .SH WILDCARDS
 The access control language supports explicit wildcards:
 .IP ALL

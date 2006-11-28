@@ -73,76 +73,30 @@ succeed only if the client host runs an RFC 931-compliant daemon.
 Client user name lookups will not work for datagram-oriented
 connections, and may cause noticeable delays in the case of connections
 from PCs.
-.SH EXAMPLES
-The details of using \fItcpd\fR depend on pathname information that was
-compiled into the program.
-.SH EXAMPLE 1
-This example applies when \fItcpd\fR expects that the original network
-daemons will be moved to an "other" place.
-.PP
-In order to monitor access to the \fIfinger\fR service, move the
-original finger daemon to the "other" place and install tcpd in the
-place of the original finger daemon. No changes are required to
-configuration files.
-.nf
-.sp
-.in +5
-# mkdir /other/place
-# mv /usr/etc/in.fingerd /other/place
-# cp tcpd /usr/etc/in.fingerd
-.fi
-.PP
-The example assumes that the network daemons live in /usr/etc. On some
-systems, network daemons live in /usr/sbin or in /usr/libexec, or have
-no `in.\' prefix to their name.
-.SH EXAMPLE 2
-This example applies when \fItcpd\fR expects that the network daemons
-are left in their original place.
-.PP
-In order to monitor access to the \fIfinger\fR service, perform the
-following edits on the \fIinetd\fR configuration file (usually 
-\fI/etc/inetd.conf\fR or \fI/etc/inet/inetd.conf\fR):
+
+.SH EXAMPLE
+In order to monitor access to the \fIfinger\fR service, run the following
+command to enable the tcp_wrapper :
 .nf
 .sp
 .ti +5
-finger  stream  tcp  nowait  nobody  /usr/etc/in.fingerd  in.fingerd
-.sp
-becomes:
-.sp
-.ti +5
-finger  stream  tcp  nowait  nobody  /some/where/tcpd     in.fingerd
+inetadm -m network/finger tcp_wrapper=TRUE
 .sp
 .fi
 .PP
-The example assumes that the network daemons live in /usr/etc. On some
-systems, network daemons live in /usr/sbin or in /usr/libexec, the
-daemons have no `in.\' prefix to their name, or there is no userid
-field in the inetd configuration file.
+The example assumes that the network/finger service hasn't been removed from
+your system.
 .PP
 Similar changes will be needed for the other services that are to be
-covered by \fItcpd\fR.  Send a `kill -HUP\' to the \fIinetd\fR(8)
-process to make the changes effective. AIX users may also have to
-execute the `inetimp\' command.
-.SH EXAMPLE 3
-In the case of daemons that do not live in a common directory ("secret"
-or otherwise), edit the \fIinetd\fR configuration file so that it
-specifies an absolute path name for the process name field. For example:
-.nf
-.sp
-    ntalk  dgram  udp  wait  root  /some/where/tcpd  /usr/local/lib/ntalkd
-.sp
-.fi
-.PP
-Only the last component (ntalkd) of the pathname will be used for
-access control and logging.
+covered by \fItcpd\fR. In case a (non-standard) daemon does not exist as a
+service already, use \fIsmf(5)\fR to make it a service by creating a manifest,
+and then enable tcp_wrappers for that service as shown in the example.
+
 .SH BUGS
 Some UDP (and RPC) daemons linger around for a while after they have
-finished their work, in case another request comes in.  In the inetd
-configuration file these services are registered with the \fIwait\fR
-option. Only the request that started such a daemon will be logged.
+finished their work, in case another request comes in.
 .PP
-The program does not work with RPC services over TCP. These services
-are registered as \fIrpc/tcp\fR in the inetd configuration file. The
+The program does not work with RPC services over TCP. The
 only non-trivial service that is affected by this limitation is
 \fIrexd\fR, which is used by the \fIon(1)\fR command. This is no great
 loss.  On most systems, \fIrexd\fR is less secure than a wildcard in
@@ -166,7 +120,7 @@ The default locations of the host access control tables are:
 .nf
 hosts_access(5), format of the tcpd access control tables.
 syslog.conf(5), format of the syslogd control file.
-inetd.conf(5), format of the inetd control file.
+smf(5), service management facility.
 .SH AUTHORS
 .na
 .nf
