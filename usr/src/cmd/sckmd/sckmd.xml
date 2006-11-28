@@ -39,20 +39,30 @@
 
 	<single_instance />
 
+	<!-- Required for loading the IPsec algorithms -->
 	<dependency
-	    name='network'
-	    grouping='require_any'
-	    restart_on='error'
+	    name='net_init'
+	    grouping='require_all'
+	    restart_on='none'
 	    type='service'>
-		<service_fmri value='svc:/milestone/network' />
+		<service_fmri value='svc:/network/initial' />
 	</dependency>
 
+	<!-- Required as non-root local directories could be accessed -->
 	<dependency
 	    name='local-filesystems'
 	    type='service'
 	    grouping='require_all'
 	    restart_on='none'>
 	        <service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+
+	<!-- Required for loading the cryptographic services -->
+	<dependency name='cryptosvc'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/cryptosvc' />
 	</dependency>
 
 	<exec_method

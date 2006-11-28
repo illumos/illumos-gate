@@ -42,6 +42,7 @@
 
 	<single_instance />
 
+	<!-- Required for the basic networking to be up -->
 	<dependency
 	    name='network'
 	    grouping='require_any'
@@ -50,6 +51,7 @@
 		<service_fmri value='svc:/milestone/network' />
 	</dependency>
 
+	<!-- Required as non-root local directories could be accessed -->
 	<dependency
 	    name='local-filesystems'
 	    type='service'
@@ -58,6 +60,7 @@
 	        <service_fmri value='svc:/system/filesystem/local' />
 	</dependency>
 
+	<!-- Required for the DSCP IPsec keys to be installed -->
 	<dependency
 	    name='sckmd'
 	    type='service'
@@ -66,15 +69,17 @@
 	        <service_fmri value='svc:/platform/sun4u/sckmd:default' />
 	</dependency>
 
+	<!-- On OPL platform, the 'dcs' requires the DSCP to be up -->
 	<dependent
-	    name='dcs'
+	    name='dscp_dcs'
 	    grouping='optional_all'
 	    restart_on='none'>
 	        <service_fmri value='svc:/platform/sun4u/dcs:default' />
 	</dependent>
 
+	<!-- The FMA event-Transport module requires the DSCP to be up -->
 	<dependent
-	    name='fmd'
+	    name='dscp_fmd'
 	    grouping='optional_all'
 	    restart_on='none'>
 	        <service_fmri value='svc:/system/fmd:default' />
