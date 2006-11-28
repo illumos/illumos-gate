@@ -433,7 +433,7 @@ realmode_files="
 fail() {
 	print "$*" >& 2
 	print "bfu aborting" >& 2
-	rm -f $local_zone_info_file
+	rm -f "$local_zone_info_file"
 	prun 1
 	exit 1
 }
@@ -6634,8 +6634,8 @@ do
 	lastroot=$root
 done
 
-if [ -s $local_zone_info_file ]; then
-	cat $local_zone_info_file | while read zone zonepath; do
+if [ -s "$local_zone_info_file" ]; then
+	cat "$local_zone_info_file" | while read zone zonepath; do
 		#
 		# Ignore linux zones
 		#
