@@ -1692,6 +1692,7 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 	int error;
 	int unmap = 0;
 	struct proc *p = curproc;
+	struct segvn_crargs crargs;
 
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
@@ -1718,8 +1719,8 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 	}
 
 	if (AS_MAP_CHECK_VNODE_LPOOB(crfp, argsp)) {
-		error = as_map_vnsegs(as, raddr, rsize, crfp,
-		    (struct segvn_crargs *)argsp, &unmap);
+		crargs = *(struct segvn_crargs *)argsp;
+		error = as_map_vnsegs(as, raddr, rsize, crfp, &crargs, &unmap);
 		if (error != 0) {
 			AS_LOCK_EXIT(as, &as->a_lock);
 			if (unmap) {
@@ -1728,8 +1729,8 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 			return (error);
 		}
 	} else if (AS_MAP_CHECK_ANON_LPOOB(crfp, argsp)) {
-		error = as_map_ansegs(as, raddr, rsize, crfp,
-		    (struct segvn_crargs *)argsp, &unmap);
+		crargs = *(struct segvn_crargs *)argsp;
+		error = as_map_ansegs(as, raddr, rsize, crfp, &crargs, &unmap);
 		if (error != 0) {
 			AS_LOCK_EXIT(as, &as->a_lock);
 			if (unmap) {
