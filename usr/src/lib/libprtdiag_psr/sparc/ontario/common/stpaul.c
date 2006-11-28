@@ -58,6 +58,8 @@
 static void get_bus_type(char *path, struct io_card *card);
 static void get_slot_number(char *path, struct io_card *card);
 static int stpaul_get_network_instance(char *path);
+static int stpaul_get_usb_instance(char *path);
+static int stpaul_get_io_instance(char *path, char *type);
 static int stpaul_get_first_compatible_value(picl_nodehdl_t nodeh,
     char **outbuf);
 static int64_t stpaul_get_int_propval(picl_nodehdl_t modh, char *prop_name,
@@ -78,6 +80,7 @@ stpaul_pci_callback(picl_nodehdl_t pcih, void *args)
 	char		binding_name[MAXSTRLEN];
 	struct io_card	pci_card;
 	int32_t		instance;
+	char		pn_type;
 
 	err = picl_get_propval_by_name(pcih, PICL_PROP_DEVFS_PATH, parent_path,
 	    sizeof (parent_path));
@@ -95,7 +98,7 @@ stpaul_pci_callback(picl_nodehdl_t pcih, void *args)
 		if (err !=  PICL_SUCCESS)
 			return (err);
 
-		if (strcmp(piclclass, "pciex") == 0) {
+		if (strcmp(piclclass, PICL_CLASS_PCIEX) == 0) {
 			err = picl_get_propval_by_name(nodeh, PICL_PROP_PEER,
 			    &nodeh, sizeof (picl_nodehdl_t));
 			continue;
@@ -114,26 +117,32 @@ stpaul_pci_callback(picl_nodehdl_t pcih, void *args)
 
 		(void) strlcpy(pci_card.notes, path, sizeof (pci_card.notes));
 
-		get_bus_type(parent_path, &pci_card);
+		get_bus_type(path, &pci_card);
 
-		get_slot_number(parent_path, &pci_card);
+		get_slot_number(path, &pci_card);
 
 		err = picl_get_propval_by_name(nodeh, PICL_PROP_NAME, &name,
 		    sizeof (name));
 		if (err == PICL_PROPNOTFOUND)
-			(void) strcpy(name, "");
+			(void) strlcpy(name, "", sizeof (name));
 		else if (err != PICL_SUCCESS)
 			return (err);
-
 
 		/* Figure NAC name */
 		if ((strcmp(name, NETWORK) == 0) &&
 		    (strcmp(pci_card.slot_str, MOTHERBOARD) == 0)) {
 			instance = stpaul_get_network_instance(path);
-
 			(void) snprintf(pci_card.status,
-			    sizeof (pci_card.status), "%s/%s%d", MOTHERBOARD,
-			    "NET", instance);
+			    sizeof (pci_card.status), "%s/%s%d",
+			    MOTHERBOARD, "NET", instance);
+
+
+		} else if ((strcmp(name, SCSI) == 0) &&
+		    (strcmp(pci_card.slot_str, MOTHERBOARD) == 0)) {
+			(void) snprintf(pci_card.status,
+			    sizeof (pci_card.status), "%s/%s",
+			    MOTHERBOARD, SPL_SCSI_TAG);
+
 		} else {
 			if (pci_card.slot != -1) {
 				(void) snprintf(pci_card.status,
@@ -147,6 +156,26 @@ stpaul_pci_callback(picl_nodehdl_t pcih, void *args)
 			}
 		}
 
+		/* Special case for USB */
+		if (strncmp(name, USB, strlen(USB)) == 0) {
+			instance = stpaul_get_usb_instance(path);
+			if (instance != -1)
+				(void) snprintf(pci_card.status,
+				    sizeof (pci_card.status), "%s/%s%d",
+				    MOTHERBOARD, "USB", instance);
+		}
+
+		/* PEM/NEM case is handled here */
+		if ((instance = stpaul_get_io_instance(path, &pn_type)) != -1) {
+			if (pn_type == SPL_PEM_TYPE)
+				(void) snprintf(pci_card.status,
+				    sizeof (pci_card.status), "%s/%s%d",
+				    MOTHERBOARD, "PEM", instance);
+			else if (pn_type == SPL_NEM_TYPE)
+				(void) snprintf(pci_card.status,
+				    sizeof (pci_card.status), "%s/%s%d",
+				    MOTHERBOARD, "NEM", instance);
+		}
 		/*
 		 * Get the name of this card. If binding_name is found,
 		 * name will be <nodename>-<binding_name>
@@ -181,7 +210,7 @@ stpaul_pci_callback(picl_nodehdl_t pcih, void *args)
 		err = picl_get_propval_by_name(nodeh, OBP_PROP_MODEL,
 		    &model, sizeof (model));
 		if (err == PICL_PROPNOTFOUND)
-			(void) strcpy(model, "");
+			(void) strlcpy(model, "", sizeof (model));
 		else if (err != PICL_SUCCESS)
 			return (err);
 		(void) strlcpy(pci_card.model, model, sizeof (pci_card.model));
@@ -219,17 +248,36 @@ int
 stpaul_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 {
 	int		err = PICL_SUCCESS;
-	char		path[MAXSTRLEN] = "";
+	char		path[MAXSTRLEN];
 	char		device_path[MAXSTRLEN];
 	char		NAC[MAXSTRLEN];
 	char		*compatible;
 	int32_t		revision;
 	int		device_found = 0;
+	char		name[MAXSTRLEN];
+	picl_nodehdl_t	nodeh;
 
 	err = picl_get_propval_by_name(pcih, PICL_PROP_DEVFS_PATH, path,
 	    sizeof (path));
 	if (err != PICL_SUCCESS)
 		return (err);
+
+	/* usb is special as a child of PCIE2PCI bridge */
+	if (strcmp(path, SPL_PCIE2PCI) == 0) {
+		err = picl_get_propval_by_name(pcih, PICL_PROP_CHILD, &nodeh,
+		    sizeof (picl_nodehdl_t));
+		if (err != PICL_SUCCESS)
+			return (err);
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_NAME, &name,
+		    sizeof (name));
+		if (err != PICL_SUCCESS)
+			return (err);
+		if (strcmp(name, USB) == 0) {
+			err = stpaul_hw_rev_callback(nodeh, &nodeh);
+			if (err != PICL_SUCCESS)
+				return (err);
+		}
+	}
 
 	if ((strcmp(path, SPL_NETWORK_0_PATH) == 0) ||
 	    (strcmp(path, SPL_NETWORK_1_PATH) == 0)) {
@@ -240,13 +288,12 @@ stpaul_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 		    &err);
 	}
 
-	if ((strcmp(path, SPL_NSC_USB0_PATH) == 0) ||
-	    (strcmp(path, SPL_NSC_USB1_PATH) == 0) ||
-	    (strcmp(path, SPL_NSC_USB2_PATH) == 0) ||
-	    (strcmp(path, SPL_NSC_USB3_PATH) == 0)) {
+	if ((strcmp(path, SPL_USB0_PATH) == 0) ||
+	    (strcmp(path, SPL_USB1_PATH) == 0) ||
+	    (strcmp(path, SPL_USB2_PATH) == 0)) {
 		device_found = 1;
 		(void) snprintf(NAC, sizeof (NAC), "%s/%s%d", MOTHERBOARD,
-		    USB, 0);
+		    USB_TAG, 0);
 		revision = stpaul_get_int_propval(pcih, OBP_PROP_REVISION_ID,
 		    &err);
 	}
@@ -257,17 +304,6 @@ stpaul_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 		(void) snprintf(NAC, sizeof (NAC), "%s/%s", MOTHERBOARD,
 		    "IO-BRIDGE");
 		revision = stpaul_get_int_propval(pcih, OBP_PROP_VERSION_NUM,
-		    &err);
-	}
-
-	if ((strcmp(path, SPL_PCIE_SLOT0) == 0) ||
-	    (strcmp(path, SPL_PCIE_SLOT1) == 0) ||
-	    (strcmp(path, SPL_PCIE_SLOT2) == 0) ||
-	    (strcmp(path, SPL_PCIE_SLOT3) == 0)) {
-		device_found = 1;
-		(void) snprintf(NAC, sizeof (NAC), "%s/%s", MOTHERBOARD,
-		    PCI_BRIDGE);
-		revision = stpaul_get_int_propval(pcih, OBP_PROP_REVISION_ID,
 		    &err);
 	}
 
@@ -305,7 +341,7 @@ stpaul_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 
 	if (device_found == 1) {
 
-		(void) strcpy(device_path, path);
+		(void) strlcpy(device_path, path, sizeof (device_path));
 		err = stpaul_get_first_compatible_value(pcih, &compatible);
 
 		/* Print NAC name */
@@ -329,40 +365,41 @@ stpaul_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 static void
 get_bus_type(char *path, struct io_card *card)
 {
-	if (strncmp(path, SPL_PCIE_SLOT0, strlen(SPL_PCIE_SLOT0)) == 0) {
-		(void) strcpy(card->bus_type, "PCIE");
-	} else if (strncmp(path, SPL_PCIE_SLOT1, strlen(SPL_PCIE_SLOT1)) == 0) {
-		(void) strcpy(card->bus_type, "PCIE");
-	} else if (strncmp(path, SPL_PCIE_SLOT2, strlen(SPL_PCIE_SLOT2)) == 0) {
-		(void) strcpy(card->bus_type, "PCIE");
-	} else if (strncmp(path, SPL_PCIE_SLOT3, strlen(SPL_PCIE_SLOT3)) == 0) {
-		(void) strcpy(card->bus_type, "PCIE");
+	if (strncmp(path, SPL_PCIE_PEM0, strlen(SPL_PCIE_PEM0)) == 0) {
+		(void) strlcpy(card->bus_type, "PCIE", sizeof (card->bus_type));
+	} else if (strncmp(path, SPL_PCIE_PEM1, strlen(SPL_PCIE_PEM1)) == 0) {
+		(void) strlcpy(card->bus_type, "PCIE", sizeof (card->bus_type));
+	} else if (strncmp(path, SPL_PCIE_NEM0, strlen(SPL_PCIE_NEM0)) == 0) {
+		(void) strlcpy(card->bus_type, "PCIE", sizeof (card->bus_type));
+	} else if (strncmp(path, SPL_PCIE_NEM1, strlen(SPL_PCIE_NEM1)) == 0) {
+		(void) strlcpy(card->bus_type, "PCIE", sizeof (card->bus_type));
 	} else if (strncmp(path, SWITCH_A_PATH, strlen(SWITCH_A_PATH)) == 0) {
-		(void) strcpy(card->bus_type, "PCIE");
+		(void) strlcpy(card->bus_type, "PCIE", sizeof (card->bus_type));
 	} else if (strncmp(path, SWITCH_B_PATH, strlen(SWITCH_B_PATH)) == 0) {
-		(void) strcpy(card->bus_type, "PCIE");
+		(void) strlcpy(card->bus_type, "PCIE", sizeof (card->bus_type));
 	} else {
-		(void) strcpy(card->bus_type, "NONE");
+		(void) strlcpy(card->bus_type, "NONE", sizeof (card->bus_type));
 	}
 }
 
 static void
 get_slot_number(char *path, struct io_card *card)
 {
-	if (strncmp(path, SPL_PCIE_SLOT0, strlen(SPL_PCIE_SLOT0)) == 0) {
-		(void) strcpy(card->slot_str, "0");
+	if (strncmp(path, SPL_PCIE_PEM0, strlen(SPL_PCIE_PEM0)) == 0) {
+		(void) strlcpy(card->slot_str, "0", sizeof (card->slot_str));
 		card->slot = 0;
-	} else if (strncmp(path, SPL_PCIE_SLOT1, strlen(SPL_PCIE_SLOT1)) == 0) {
-		(void) strcpy(card->slot_str, "1");
+	} else if (strncmp(path, SPL_PCIE_NEM0, strlen(SPL_PCIE_NEM0)) == 0) {
+		(void) strlcpy(card->slot_str, "0", sizeof (card->slot_str));
+		card->slot = 0;
+	} else if (strncmp(path, SPL_PCIE_PEM1, strlen(SPL_PCIE_PEM1)) == 0) {
+		(void) strlcpy(card->slot_str, "1", sizeof (card->slot_str));
 		card->slot = 1;
-	} else if (strncmp(path, SPL_PCIE_SLOT2, strlen(SPL_PCIE_SLOT2)) == 0) {
-		(void) strcpy(card->slot_str, "2");
-		card->slot = 2;
-	} else if (strncmp(path, SPL_PCIE_SLOT3, strlen(SPL_PCIE_SLOT3)) == 0) {
-		(void) strcpy(card->slot_str, "3");
-		card->slot = 3;
+	} else if (strncmp(path, SPL_PCIE_NEM1, strlen(SPL_PCIE_NEM1)) == 0) {
+		(void) strlcpy(card->slot_str, "1", sizeof (card->slot_str));
+		card->slot = 1;
 	} else {
-		(void) strcpy(card->slot_str, MOTHERBOARD);
+		(void) strlcpy(card->slot_str, MOTHERBOARD,
+		    sizeof (card->slot_str));
 		card->slot = -1;
 	}
 }
@@ -374,12 +411,43 @@ stpaul_get_network_instance(char *path)
 		strlen(SPL_NETWORK_1_PATH)) == 0)
 		return (1);
 	else if (strncmp(path, SPL_NETWORK_0_PATH,
-		strlen(SPL_NETWORK_0_PATH)) == 0)
+		    strlen(SPL_NETWORK_0_PATH)) == 0)
 		return (0);
 	else
 		return (-1);
 }
 
+static int
+stpaul_get_usb_instance(char *path)
+{
+	if (strncmp(path, SPL_USB2_PATH, strlen(SPL_USB2_PATH)) == 0)
+		return (2);
+	else if (strncmp(path, SPL_USB1_PATH, strlen(SPL_USB1_PATH)) == 0)
+		return (1);
+	else if (strncmp(path, SPL_USB0_PATH, strlen(path)) == 0)
+		return (0);
+	else
+		return (-1);
+}
+
+static int
+stpaul_get_io_instance(char *path, char *type)
+{
+	if (strncmp(path, SPL_PCIE_PEM1, strlen(SPL_PCIE_PEM1)) == 0) {
+		*type = SPL_PEM_TYPE;
+		return (1);
+	} else if (strncmp(path, SPL_PCIE_PEM0, strlen(SPL_PCIE_PEM0)) == 0) {
+		*type = SPL_PEM_TYPE;
+		return (0);
+	} else if (strncmp(path, SPL_PCIE_NEM1, strlen(SPL_PCIE_NEM1)) == 0) {
+		*type = SPL_NEM_TYPE;
+		return (1);
+	} else if (strncmp(path, SPL_PCIE_NEM0, strlen(SPL_PCIE_NEM0)) == 0) {
+		*type = SPL_NEM_TYPE;
+		return (0);
+	} else
+		return (-1);
+}
 /*
  * return the first compatible value
  */

@@ -47,7 +47,9 @@ extern "C" {
 #define	SWITCH_B			"PCI-SWITCH1"
 #define	PCI_BRIDGE			"PCI-BRIDGE"
 #define	OPHIR				"GBE"
-#define	USB				"USB"
+#define	USB_TAG				"USB"
+#define	USB				"usb"
+#define	SCSI				"scsi"
 #define	NETWORK				"network"
 #define	PCIE				"/PCIE"
 #define	PCIX				"/PCIX"
@@ -57,18 +59,20 @@ extern "C" {
 #define	SWITCH_B_PATH			"/pci@7c0/pci@0"
 #define	SPL_NETWORK_0_PATH		"/pci@780/pci@0/pci@1/network@0"
 #define	SPL_NETWORK_1_PATH		"/pci@780/pci@0/pci@1/network@0,1"
-#define	SPL_PCIE_SLOT0			"/pci@7c0/pci@0/pci@9"
-#define	SPL_PCIE_SLOT1			"/pci@780/pci@0/pci@9"
-#define	SPL_PCIE_SLOT2			"/pci@7c0/pci@0/pci@8"
-#define	SPL_PCIE_SLOT3			"/pci@780/pci@0/pci@8"
+#define	SPL_PCIE_PEM1			"/pci@7c0/pci@0/pci@9/"
+#define	SPL_PCIE_PEM0			"/pci@780/pci@0/pci@9/"
+#define	SPL_PCIE_NEM1			"/pci@7c0/pci@0/pci@8/"
+#define	SPL_PCIE_NEM0			"/pci@780/pci@0/pci@8/"
 #define	SPL_PCIE2PCI			"/pci@7c0/pci@0/pci@1/pci@0"
-#define	SPL_NSC_USB0_PATH		"/pci@7c0/pci@0/pci@1/pci@0/usb@1"
-#define	SPL_NSC_USB1_PATH		"/pci@7c0/pci@0/pci@1/pci@0/usb@1,1"
-#define	SPL_NSC_USB2_PATH		"/pci@7c0/pci@0/pci@1/pci@0/usb@1,2"
-#define	SPL_NSC_USB3_PATH		"/pci@7c0/pci@0/pci@1/pci@0/usb@1,3"
+#define	SPL_USB0_PATH			"/pci@7c0/pci@0/pci@1/pci@0/usb@0"
+#define	SPL_USB1_PATH			"/pci@7c0/pci@0/pci@1/pci@0/usb@0,1"
+#define	SPL_USB2_PATH			"/pci@7c0/pci@0/pci@1/pci@0/usb@0,2"
 
 #define	SPL_LSI_PATH			"/pci@7c0/pci@0/pci@2/scsi@0"
 #define	SPL_SAS_HBA			"SAS-SATA-HBA"
+#define	SPL_SCSI_TAG			"SAS-SATA"
+#define	SPL_PEM_TYPE			'P'
+#define	SPL_NEM_TYPE			'N'
 
 /*
  * Property names

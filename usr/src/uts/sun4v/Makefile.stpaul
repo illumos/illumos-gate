@@ -19,11 +19,11 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4v/stpaul/Makefile
+#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	Global definitions for sun4v stpaul implementation specific modules.
 #
