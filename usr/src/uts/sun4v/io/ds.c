@@ -83,6 +83,30 @@ static struct ds_svcs {
 #define	DS_MAXSVCS_INIT		32
 
 /*
+ * Lock Usage
+ *
+ * ds_svcs.rwlock
+ *
+ *	See comment just above definition of ds_svcs structure above.
+ *
+ * ds_port mutex
+ *
+ *	Protects the elements of each port structure.  Must be acquired for
+ *	access to any of the elements.
+ *
+ * ds_log mutex
+ *
+ *	See comment above definition of ds_log structure.
+ *
+ * Multiple lock requirements:
+ *
+ *	Some code will need to access both a ds_svc_t structure and
+ *	a ds_port_t.  In that case, the acquisition order must be:
+ *
+ *	ds_svcs.rwlock -> port lock
+ */
+
+/*
  * Taskq for internal task processing
  */
 static taskq_t *ds_taskq;
@@ -663,16 +687,10 @@ ds_ldc_cb(uint64_t event, caddr_t arg)
 	/*
 	 * Check the LDC event.
 	 */
-
-	mutex_enter(&port->lock);
-
-	if (event & LDC_EVT_WRITE) {
-		DS_DBG("ds@%lx: LDC write event received, not supported\n",
-		    port->id);
-		goto done;
-	}
-
 	if (event & (LDC_EVT_DOWN | LDC_EVT_RESET)) {
+
+		rw_enter(&ds_svcs.rwlock, RW_WRITER);
+		mutex_enter(&port->lock);
 
 		/* reset the port state */
 		ds_port_reset(port);
@@ -682,6 +700,7 @@ ds_ldc_cb(uint64_t event, caddr_t arg)
 		if ((rv = ldc_status(ldc_hdl, &ldc_state)) != 0) {
 			cmn_err(CE_NOTE, "ds@%lx: ldc_status error (%d)\n",
 			    port->id, rv);
+			rw_exit(&ds_svcs.rwlock);
 			goto done;
 		}
 		port->ldc.state = ldc_state;
@@ -695,8 +714,11 @@ ds_ldc_cb(uint64_t event, caddr_t arg)
 
 		ASSERT((event & (LDC_EVT_UP | LDC_EVT_READ)) == 0);
 
+		rw_exit(&ds_svcs.rwlock);
 		goto done;
 	}
+
+	mutex_enter(&port->lock);
 
 	if (event & LDC_EVT_UP) {
 		if ((rv = ldc_status(ldc_hdl, &ldc_state)) != 0) {
@@ -715,6 +737,12 @@ ds_ldc_cb(uint64_t event, caddr_t arg)
 		if (DS_DISPATCH(ds_handle_recv, port) == NULL) {
 			cmn_err(CE_WARN, "error initiating event handler");
 		}
+	}
+
+	if (event & LDC_EVT_WRITE) {
+		DS_DBG("ds@%lx: LDC write event received, not supported\n",
+		    port->id);
+		goto done;
 	}
 
 	/* report any unknown LDC events */
@@ -1131,7 +1159,7 @@ ds_handle_reg_ack(ds_port_t *port, caddr_t buf, size_t len)
 
 	ack = (ds_reg_ack_t *)(buf + DS_HDR_SZ);
 
-	rw_enter(&ds_svcs.rwlock, RW_READER);
+	rw_enter(&ds_svcs.rwlock, RW_WRITER);
 
 	/* lookup appropriate client */
 	if ((svc = ds_get_svc(ack->svc_handle)) == NULL) {
@@ -1210,7 +1238,7 @@ ds_handle_reg_nack(ds_port_t *port, caddr_t buf, size_t len)
 
 	nack = (ds_reg_nack_t *)(buf + DS_HDR_SZ);
 
-	rw_enter(&ds_svcs.rwlock, RW_READER);
+	rw_enter(&ds_svcs.rwlock, RW_WRITER);
 
 	/* lookup appropriate client */
 	if ((svc = ds_get_svc(nack->svc_handle)) == NULL) {
@@ -1301,7 +1329,7 @@ ds_handle_unreg_req(ds_port_t *port, caddr_t buf, size_t len)
 	/* the request information */
 	req = (ds_unreg_req_t *)(buf + DS_HDR_SZ);
 
-	rw_enter(&ds_svcs.rwlock, RW_READER);
+	rw_enter(&ds_svcs.rwlock, RW_WRITER);
 
 	/* lookup appropriate client */
 	if ((svc = ds_get_svc(req->svc_handle)) == NULL) {
@@ -1352,7 +1380,7 @@ ds_handle_unreg_ack(ds_port_t *port, caddr_t buf, size_t len)
 
 	DS_DBG("ds@%lx: <unreg_ack: hdl=0x%09lx\n", port->id, ack->svc_handle);
 
-	rw_enter(&ds_svcs.rwlock, RW_READER);
+	rw_enter(&ds_svcs.rwlock, RW_WRITER);
 
 	/*
 	 * Since the unregister request was initiated locally,
@@ -1386,7 +1414,7 @@ ds_handle_unreg_nack(ds_port_t *port, caddr_t buf, size_t len)
 	DS_DBG("ds@%lx: <unreg_nack: hdl=0x%09lx\n", port->id,
 	    nack->svc_handle);
 
-	rw_enter(&ds_svcs.rwlock, RW_READER);
+	rw_enter(&ds_svcs.rwlock, RW_WRITER);
 
 	/*
 	 * Since the unregister request was initiated locally,
@@ -1467,7 +1495,7 @@ ds_handle_nack(ds_port_t *port, caddr_t buf, size_t len)
 
 	if (nack->result == DS_INV_HDL) {
 
-		rw_enter(&ds_svcs.rwlock, RW_READER);
+		rw_enter(&ds_svcs.rwlock, RW_WRITER);
 
 		if ((svc = ds_get_svc(nack->svc_handle)) == NULL) {
 			rw_exit(&ds_svcs.rwlock);
@@ -1877,7 +1905,7 @@ ds_walk_svcs(svc_cb_t svc_cb, void *arg)
 	int		idx;
 	ds_svc_t	*svc;
 
-	ASSERT(RW_LOCK_HELD(&ds_svcs.rwlock));
+	ASSERT(RW_WRITE_HELD(&ds_svcs.rwlock));
 
 	/* walk every table entry */
 	for (idx = 0; idx < ds_svcs.maxsvcs; idx++) {
@@ -1958,6 +1986,8 @@ ds_svc_register(ds_svc_t *svc, void *arg)
 
 	int	idx;
 
+	ASSERT(RW_WRITE_HELD(&ds_svcs.rwlock));
+
 	/* check the state of the service */
 	if (DS_SVC_ISFREE(svc) || (svc->state != DS_SVC_INACTIVE))
 		return (0);
@@ -1998,6 +2028,8 @@ static int
 ds_svc_unregister(ds_svc_t *svc, void *arg)
 {
 	ds_port_t *port = (ds_port_t *)arg;
+
+	ASSERT(RW_WRITE_HELD(&ds_svcs.rwlock));
 
 	if (DS_SVC_ISFREE(svc)) {
 		return (0);
@@ -2098,6 +2130,8 @@ found:
 static void
 ds_reset_svc(ds_svc_t *svc, ds_port_t *port)
 {
+	ASSERT(RW_WRITE_HELD(&ds_svcs.rwlock));
+
 	svc->state = DS_SVC_INACTIVE;
 	svc->ver_idx = 0;
 	svc->ver.major = 0;
@@ -2192,14 +2226,11 @@ ds_port_add(md_t *mdp, mde_cookie_t port, mde_cookie_t chan)
 static void
 ds_port_reset(ds_port_t *port)
 {
+	ASSERT(RW_WRITE_HELD(&ds_svcs.rwlock));
 	ASSERT(MUTEX_HELD(&port->lock));
 
 	/* connection went down, mark everything inactive */
-	rw_enter(&ds_svcs.rwlock, RW_WRITER);
-
 	(void) ds_walk_svcs(ds_svc_unregister, port);
-
-	rw_exit(&ds_svcs.rwlock);
 
 	port->ver_idx = 0;
 	port->ver.major = 0;
@@ -2417,8 +2448,6 @@ ds_log_remove(void)
 	ds_log.size -= DS_LOG_ENTRY_SZ(head);
 	ds_log.nentry--;
 
-	ASSERT((ds_log.size >= 0) && (ds_log.nentry >= 0));
-
 	ds_log_entry_free(head);
 
 	return (0);
@@ -2443,8 +2472,6 @@ ds_log_replace(uint8_t *msg, size_t sz)
 	    sz, sz + sizeof (ds_log_entry_t));
 
 	ds_log.size -= DS_LOG_ENTRY_SZ(head);
-
-	ASSERT((ds_log.size >= 0) && (ds_log.nentry >= 0));
 
 	kmem_free(head->data, head->datasz);
 	head->data = msg;
@@ -2604,10 +2631,10 @@ ds_cap_init(ds_capability_t *cap, ds_clnt_ops_t *ops)
 
 	ds_svcs.nsvcs++;
 
-	rw_exit(&ds_svcs.rwlock);
-
 	/* attempt to register the service */
 	(void) ds_svc_register(svc, NULL);
+
+	rw_exit(&ds_svcs.rwlock);
 
 	DS_DBG("ds_cap_init: service '%s' assigned handle 0x%09lx\n",
 	    svc->cap.svc_id, svc->hdl);

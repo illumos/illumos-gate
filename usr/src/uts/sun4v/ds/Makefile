@@ -25,7 +25,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# This makefile drives the production of the zp kernel module.
+# This makefile drives the production of the ds kernel module.
 #
 # sun4v implementation architecture dependent
 #
@@ -76,7 +76,6 @@ LDFLAGS		+= -dy -Nmisc/ldc
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 
 #
 # Default build targets.
