@@ -117,14 +117,17 @@ rootlibs: sgs
 	@cd lib; pwd; $(MAKE) install
 
 closedbins: FRC $(ROOTDIRS)
-	@if [ "$$CLOSED_IS_PRESENT" = no ]; then \
-		if [ ! -d "$$ON_CLOSED_BINS/root_$(MACH)" ]; then \
+	@CLOSED_ROOT="$$ON_CLOSED_BINS/root_$(MACH)$${RELEASE_BUILD+-nd}"; \
+	if [ "$$CLOSED_IS_PRESENT" = no ]; then \
+		if [ ! -d "$$CLOSED_ROOT" ]; then \
 			$(ECHO) "Error: if closed sources are not present," \
 			    "ON_CLOSED_BINS must point to closed binaries."; \
+			$(ECHO) "root_$(MACH)$${RELEASE_BUILD+-nd} is not" \
+			    "present in $$ON_CLOSED_BINS."; \
 			exit 1; \
 		fi; \
-		$(ECHO) "Copying closed binaries from $$ON_CLOSED_BINS"; \
-		(cd $$ON_CLOSED_BINS/root_$(MACH); tar cf - .) | \
+		$(ECHO) "Copying closed binaries from $$CLOSED_ROOT"; \
+		(cd $$CLOSED_ROOT; tar cf - .) | \
 		    (cd $(ROOT); tar xBpf -); \
 	fi
 
