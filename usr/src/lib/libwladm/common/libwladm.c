@@ -25,6 +25,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <libintl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -1297,8 +1298,12 @@ wladm_linkstatus2str(wladm_linkstatus_t *linkstatus, char *buf)
 const char *
 wladm_status2str(wladm_status_t status, char *buf)
 {
-	return (wladm_val2str((uint_t)status, status_vals,
-	    VALCNT(status_vals), buf));
+	const char *s;
+
+	s = wladm_val2str((uint_t)status, status_vals,
+	    VALCNT(status_vals), buf);
+	(void) snprintf(buf, WLADM_STRSIZE, "%s", dgettext(TEXT_DOMAIN, s));
+	return (buf);
 }
 
 wladm_status_t

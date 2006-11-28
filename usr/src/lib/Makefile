@@ -269,6 +269,7 @@ MSGSUBDIRS=		\
 	libcurses	\
 	libdhcpsvc 	\
 	libdhcputil	\
+	libdladm	\
 	libgss		\
 	libinetcfg	\
 	libipmp		\
@@ -288,6 +289,7 @@ MSGSUBDIRS=		\
 	libuutil	\
 	libwanboot	\
 	libwanbootutil	\
+	libwladm	\
 	libzonecfg	\
 	lvm		\
 	madv		\

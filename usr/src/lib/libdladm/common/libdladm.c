@@ -37,6 +37,7 @@
 #include <libdlpi.h>
 #include <libdevinfo.h>
 #include <libdladm_impl.h>
+#include <libintl.h>
 
 typedef struct dladm_dev {
 	char			dd_name[IFNAMSIZ];
@@ -304,9 +305,10 @@ dladm_status2str(dladm_status_t status, char *buf)
 		s = "I/O error";
 		break;
 	default:
-		s = "";
+		s = "<unknown error>";
+		break;
 	}
-	(void) snprintf(buf, DLADM_STRSIZE, "%s", s);
+	(void) snprintf(buf, DLADM_STRSIZE, "%s", dgettext(TEXT_DOMAIN, s));
 	return (buf);
 }
 

@@ -22,44 +22,31 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-
-PROG= dladm
-CFGFILES= aggregation.conf linkprop.conf secobj.conf
-
-ROOTFS_PROG=	$(PROG)
-ROOTCFGDIR=	$(ROOTETC)/dladm
-ROOTCFGFILES=	$(CFGFILES:%=$(ROOTCFGDIR)/%)
-
-include ../Makefile.cmd
-
-XGETFLAGS += -a -x $(PROG).xcl
-LDLIBS += -ldladm -lmacadm -ldlpi -llaadm -lkstat -lwladm -lsecdb -lbsm \
-	  -linetutil
-
-$(ROOTCFGFILES) := OWNER= dladm
-$(ROOTCFGFILES) := GROUP= sys
-
-$(ROOTCFGDIR)/aggregation.conf $(ROOTCFGDIR)/linkprop.conf := FILEMODE= 644
-$(ROOTCFGDIR)/secobj.conf := FILEMODE= 600
-
-.KEEP_STATE:
-
-all: $(ROOTFS_PROG) 
-
-install: all $(ROOTSBINPROG) $(ROOTCFGDIR) $(ROOTCFGFILES)
-	$(RM) $(ROOTUSRSBINPROG)
-	-$(SYMLINK) ../../sbin/$(PROG) $(ROOTUSRSBINPROG)
-
-clean:
-
-lint:	lint_PROG
-
-$(ROOTCFGDIR):
-	$(INS.dir)
-
-$(ROOTCFGDIR)/%: $(ROOTCFGDIR) %
-	$(INS.file)
-
-include ../Makefile.targ
+msgid  "a"
+msgid  "b"
+msgid  "g"
+msgid  "channel"
+msgid  "powermode"
+msgid  "radio"
+msgid  "speed"
+msgid  ""
+msgid  "%.*f"
+msgid  "%d"
+msgid  "%s"
+msgid  "%s%d"
+msgid  "%u"
+msgid  "/"
+msgid  "/dev/%s"
+msgid  "open"
+msgid  "shared"
+msgid  "bss"
+msgid  "ibss"
+msgid  "any"
+msgid  "on"
+msgid  "off"
+msgid  "fast"
+msgid  "max"
+msgid  "wep"
+msgid  "none"

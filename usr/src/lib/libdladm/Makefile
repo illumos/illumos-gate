@@ -30,10 +30,11 @@ include $(SRC)/lib/Makefile.lib
 HDRS =		libdladm.h libdladm_impl.h
 HDRDIR =	common
 
-SUBDIRS =		$(MACH)
+SUBDIRS =	$(MACH)
 
 POFILE =	libdladm.po
-MSGFILES =	common/libdladm.c
+MSGFILES =	common/libdladm.c common/linkprop.c common/secobj.c
+XGETFLAGS =     -a -x libdladm.xcl
 
 all :=		TARGET = all
 clean :=	TARGET = clean

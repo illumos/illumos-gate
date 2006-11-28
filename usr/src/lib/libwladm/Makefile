@@ -34,6 +34,7 @@ SUBDIRS =	$(MACH)
 
 POFILE =	libwladm.po
 MSGFILES =	common/libwladm.c
+XGETFLAGS =	-a -x libwladm.xcl
 
 all :=		TARGET = all
 clean :=	TARGET = clean

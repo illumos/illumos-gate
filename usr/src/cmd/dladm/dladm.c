@@ -32,6 +32,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <string.h>
 #include <stropts.h>
 #include <errno.h>
@@ -115,8 +116,8 @@ static cmdfunc_t do_show_linkprop, do_set_linkprop, do_reset_linkprop;
 static cmdfunc_t do_create_secobj, do_delete_secobj, do_show_secobj;
 static cmdfunc_t do_init_linkprop, do_init_secobj;
 
-static void	link_stats(const char *, uint32_t);
-static void	aggr_stats(uint16_t, uint32_t);
+static void	link_stats(const char *, uint_t);
+static void	aggr_stats(uint32_t, uint_t);
 static void	dev_stats(const char *dev, uint32_t);
 
 static void	get_mac_stats(const char *, pktsum_t *);
@@ -127,34 +128,45 @@ static char	*mac_link_duplex(const char *);
 static void	stats_total(pktsum_t *, pktsum_t *, pktsum_t *);
 static void	stats_diff(pktsum_t *, pktsum_t *, pktsum_t *);
 
+static boolean_t str2int(const char *, int *);
+static void	die(const char *, ...);
+static void	die_optdup(int);
+static void	die_opterr(int, int);
+static void	die_laerr(laadm_diag_t, const char *, ...);
+static void	die_wlerr(wladm_status_t, const char *, ...);
+static void	die_dlerr(dladm_status_t, const char *, ...);
+static void	warn(const char *, ...);
+static void	warn_wlerr(wladm_status_t, const char *, ...);
+static void	warn_dlerr(dladm_status_t, const char *, ...);
+
 typedef struct	cmd {
 	char		*c_name;
 	cmdfunc_t	*c_fn;
 } cmd_t;
 
 static cmd_t	cmds[] = {
-	{ "show-link",		do_show_link 		},
-	{ "show-dev",		do_show_dev 		},
+	{ "show-link",		do_show_link		},
+	{ "show-dev",		do_show_dev		},
 	{ "create-aggr",	do_create_aggr		},
-	{ "delete-aggr",	do_delete_aggr 		},
-	{ "add-aggr",		do_add_aggr 		},
+	{ "delete-aggr",	do_delete_aggr		},
+	{ "add-aggr",		do_add_aggr		},
 	{ "remove-aggr",	do_remove_aggr		},
 	{ "modify-aggr",	do_modify_aggr		},
 	{ "show-aggr",		do_show_aggr		},
 	{ "up-aggr",		do_up_aggr		},
 	{ "down-aggr",		do_down_aggr		},
-	{ "scan-wifi",		do_scan_wifi 		},
-	{ "connect-wifi",	do_connect_wifi 	},
-	{ "disconnect-wifi",	do_disconnect_wifi 	},
+	{ "scan-wifi",		do_scan_wifi		},
+	{ "connect-wifi",	do_connect_wifi		},
+	{ "disconnect-wifi",	do_disconnect_wifi	},
 	{ "show-wifi",		do_show_wifi		},
-	{ "show-linkprop",	do_show_linkprop 	},
-	{ "set-linkprop", 	do_set_linkprop 	},
-	{ "reset-linkprop",	do_reset_linkprop 	},
-	{ "create-secobj",	do_create_secobj 	},
-	{ "delete-secobj",	do_delete_secobj 	},
-	{ "show-secobj",	do_show_secobj 		},
+	{ "show-linkprop",	do_show_linkprop	},
+	{ "set-linkprop",	do_set_linkprop		},
+	{ "reset-linkprop",	do_reset_linkprop	},
+	{ "create-secobj",	do_create_secobj	},
+	{ "delete-secobj",	do_delete_secobj	},
+	{ "show-secobj",	do_show_secobj		},
 	{ "init-linkprop",	do_init_linkprop	},
-	{ "init-secobj",	do_init_secobj 		}
+	{ "init-secobj",	do_init_secobj		}
 };
 
 static const struct option longopts[] = {
@@ -204,17 +216,10 @@ static const struct option wifi_longopts[] = {
 static char *progname;
 static sig_atomic_t signalled;
 
-#define	PRINT_ERR_DIAG(s, diag, func) {					\
-	(void) fprintf(stderr, gettext(s), progname, strerror(errno));	\
-	if (diag != 0)							\
-		(void) fprintf(stderr, " (%s)", func(diag));		\
-	(void) fprintf(stderr, "\n");					\
-}
-
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext("usage:  dladm <subcommand> <args> ...\n"
+	(void) fprintf(stderr, gettext("usage:	dladm <subcommand> <args> ...\n"
 	    "\tshow-link       [-p] [-s [-i <interval>]] [<name>]\n"
 	    "\tshow-dev        [-p] [-s [-i <interval>]] [<dev>]\n"
 	    "\n"
@@ -265,11 +270,8 @@ main(int argc, char *argv[])
 		usage();
 
 	if (!priv_ineffect(PRIV_SYS_NET_CONFIG) ||
-	    !priv_ineffect(PRIV_NET_RAWACCESS)) {
-		(void) fprintf(stderr,
-		    gettext("%s: insufficient privileges\n"), progname);
-		exit(1);
-	}
+	    !priv_ineffect(PRIV_NET_RAWACCESS))
+		die("insufficient privileges");
 
 	for (i = 0; i < sizeof (cmds) / sizeof (cmds[0]); i++) {
 		cmdp = &cmds[i];
@@ -286,12 +288,11 @@ main(int argc, char *argv[])
 	return (0);
 }
 
-
 static void
 do_create_aggr(int argc, char *argv[])
 {
 	char			option;
-	uint16_t		key;
+	int			key;
 	uint32_t		policy = AGGR_POLICY_L4;
 	aggr_lacp_mode_t	lacp_mode = AGGR_LACP_OFF;
 	aggr_lacp_timer_t	lacp_timer = AGGR_LACP_TIMER_SHORT;
@@ -305,7 +306,6 @@ do_create_aggr(int argc, char *argv[])
 	boolean_t		u_arg = B_FALSE;
 	boolean_t		T_arg = B_FALSE;
 	char			*altroot = NULL;
-	char			*endp = NULL;
 	laadm_diag_t		diag = 0;
 
 	opterr = 0;
@@ -313,95 +313,47 @@ do_create_aggr(int argc, char *argv[])
 	    longopts, NULL)) != -1) {
 		switch (option) {
 		case 'd':
-			if (nport >= MAXPORT) {
-				(void) fprintf(stderr,
-				    gettext("%s: too many <dev> arguments\n"),
-				    progname);
-				exit(1);
-			}
+			if (nport >= MAXPORT)
+				die("too many <dev> arguments");
 
 			if (strlcpy(port[nport].lp_devname, optarg,
-			    MAXNAMELEN) >= MAXNAMELEN) {
-				(void) fprintf(stderr,
-				    gettext("%s: device name too long\n"),
-				    progname);
-				exit(1);
-			}
+			    MAXNAMELEN) >= MAXNAMELEN)
+				die("device name too long");
 
 			nport++;
 			break;
 		case 'P':
-			if (P_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -P cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (P_arg)
+				die_optdup(option);
 
 			P_arg = B_TRUE;
-
-			if (!laadm_str_to_policy(optarg, &policy)) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid policy '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
+			if (!laadm_str_to_policy(optarg, &policy))
+				die("invalid policy '%s'", optarg);
 			break;
 		case 'u':
-			if (u_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -u cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (u_arg)
+				die_optdup(option);
 
 			u_arg = B_TRUE;
-
 			if (!laadm_str_to_mac_addr(optarg, &mac_addr_fixed,
-			    mac_addr)) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid MAC address '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
-
+			    mac_addr))
+				die("invalid MAC address '%s'", optarg);
 			break;
 		case 'l':
-			if (l_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -l cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (l_arg)
+				die_optdup(option);
 
 			l_arg = B_TRUE;
-
-			if (!laadm_str_to_lacp_mode(optarg, &lacp_mode)) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid LACP mode '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
-
+			if (!laadm_str_to_lacp_mode(optarg, &lacp_mode))
+				die("invalid LACP mode '%s'", optarg);
 			break;
 		case 'T':
-			if (T_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -T cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (T_arg)
+				die_optdup(option);
 
 			T_arg = B_TRUE;
-
-			if (!laadm_str_to_lacp_timer(optarg, &lacp_timer)) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid LACP timer value"
-				    " '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
-
+			if (!laadm_str_to_lacp_timer(optarg, &lacp_timer))
+				die("invalid LACP timer value '%s'", optarg);
 			break;
 		case 't':
 			t_arg = B_TRUE;
@@ -409,18 +361,9 @@ do_create_aggr(int argc, char *argv[])
 		case 'R':
 			altroot = optarg;
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			/*NOTREACHED*/
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
+			break;
 		}
 	}
 
@@ -431,56 +374,35 @@ do_create_aggr(int argc, char *argv[])
 	if (optind != (argc-1))
 		usage();
 
-	errno = 0;
-	key = (int)strtol(argv[optind], &endp, 10);
-	if (errno != 0 || key < 1 || *endp != '\0') {
-		(void) fprintf(stderr,
-		    gettext("%s: illegal key value '%d'\n"),
-		    progname, key);
-		exit(1);
-	}
+	if (!str2int(argv[optind], &key) || key < 1)
+		die("invalid key value '%s'", argv[optind]);
 
 	if (laadm_create(key, nport, port, policy, mac_addr_fixed,
-	    mac_addr, lacp_mode, lacp_timer, t_arg, altroot, &diag) < 0) {
-		PRINT_ERR_DIAG("%s: create operation failed: %s", diag,
-		    laadm_diag);
-		exit(1);
-	}
+	    mac_addr, lacp_mode, lacp_timer, t_arg, altroot, &diag) < 0)
+		die_laerr(diag, "create operation failed");
 }
 
 static void
 do_delete_aggr(int argc, char *argv[])
 {
-	uint16_t		key;
+	int			key;
 	char			option;
 	boolean_t		t_arg = B_FALSE;
 	char			*altroot = NULL;
-	char			*endp = NULL;
 	laadm_diag_t		diag = 0;
 
 	opterr = 0;
 	while ((option = getopt_long(argc, argv, ":R:t", longopts,
 	    NULL)) != -1) {
 		switch (option) {
-
 		case 't':
 			t_arg = B_TRUE;
 			break;
 		case 'R':
 			altroot = optarg;
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
 			break;
 		}
 	}
@@ -489,32 +411,22 @@ do_delete_aggr(int argc, char *argv[])
 	if (optind != (argc-1))
 		usage();
 
-	errno = 0;
-	key = (int)strtol(argv[optind], &endp, 10);
-	if (errno != 0 || key < 1 || *endp != '\0') {
-		(void) fprintf(stderr,
-		    gettext("%s: illegal key value '%d'\n"),
-		    progname, key);
-		exit(1);
-	}
+	if (!str2int(argv[optind], &key) || key < 1)
+		die("invalid key value '%s'", argv[optind]);
 
-	if (laadm_delete(key, t_arg, altroot, &diag) < 0) {
-		PRINT_ERR_DIAG("%s: delete operation failed: %s", diag,
-		    laadm_diag);
-		exit(1);
-	}
+	if (laadm_delete(key, t_arg, altroot, &diag) < 0)
+		die_laerr(diag, "delete operation failed");
 }
 
 static void
 do_add_aggr(int argc, char *argv[])
 {
 	char			option;
-	uint16_t		key;
+	int			key;
 	laadm_port_attr_db_t	port[MAXPORT];
 	uint_t			nport = 0;
 	boolean_t		t_arg = B_FALSE;
 	char			*altroot = NULL;
-	char			*endp = NULL;
 	laadm_diag_t		diag = 0;
 
 	opterr = 0;
@@ -522,20 +434,13 @@ do_add_aggr(int argc, char *argv[])
 	    NULL)) != -1) {
 		switch (option) {
 		case 'd':
-			if (nport >= MAXPORT) {
-				(void) fprintf(stderr,
-				    gettext("%s: too many <dev> arguments\n"),
-				    progname);
-				exit(1);
-			}
+			if (nport >= MAXPORT)
+				die("too many <dev> arguments");
 
 			if (strlcpy(port[nport].lp_devname, optarg,
-			    MAXNAMELEN) >= MAXNAMELEN) {
-				(void) fprintf(stderr,
-				    gettext("%s: device name too long\n"),
-				    progname);
-				exit(1);
-			}
+			    MAXNAMELEN) >= MAXNAMELEN)
+				die("device name too long");
+
 			nport++;
 			break;
 		case 't':
@@ -544,18 +449,9 @@ do_add_aggr(int argc, char *argv[])
 		case 'R':
 			altroot = optarg;
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			/*NOTREACHED*/
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
+			break;
 		}
 	}
 
@@ -566,14 +462,8 @@ do_add_aggr(int argc, char *argv[])
 	if (optind != (argc-1))
 		usage();
 
-	errno = 0;
-	key = (int)strtol(argv[optind], &endp, 10);
-	if (errno != 0 || key < 1 || *endp != '\0') {
-		(void) fprintf(stderr,
-		    gettext("%s: illegal key value '%d'\n"),
-		    progname, key);
-		exit(1);
-	}
+	if (!str2int(argv[optind], &key) || key < 1)
+		die("invalid key value '%s'", argv[optind]);
 
 	if (laadm_add(key, nport, port, t_arg, altroot, &diag) < 0) {
 		/*
@@ -587,9 +477,7 @@ do_add_aggr(int argc, char *argv[])
 			    gettext("device capabilities don't match"));
 			exit(ENOTSUP);
 		}
-		PRINT_ERR_DIAG("%s: add operation failed: %s", diag,
-		    laadm_diag);
-		exit(1);
+		die_laerr(diag, "add operation failed");
 	}
 }
 
@@ -597,12 +485,11 @@ static void
 do_remove_aggr(int argc, char *argv[])
 {
 	char			option;
-	uint16_t		key;
+	int			key;
 	laadm_port_attr_db_t	port[MAXPORT];
 	uint_t			nport = 0;
 	boolean_t		t_arg = B_FALSE;
 	char			*altroot = NULL;
-	char			*endp = NULL;
 	laadm_diag_t		diag = 0;
 
 	opterr = 0;
@@ -610,20 +497,13 @@ do_remove_aggr(int argc, char *argv[])
 	    longopts, NULL)) != -1) {
 		switch (option) {
 		case 'd':
-			if (nport >= MAXPORT) {
-				(void) fprintf(stderr,
-				    gettext("%s: too many <dev> arguments\n"),
-				    progname);
-				exit(1);
-			}
+			if (nport >= MAXPORT)
+				die("too many <dev> arguments");
 
 			if (strlcpy(port[nport].lp_devname, optarg,
-			    MAXNAMELEN) >= MAXNAMELEN) {
-				(void) fprintf(stderr,
-				    gettext("%s: device name too long\n"),
-				    progname);
-				exit(1);
-			}
+			    MAXNAMELEN) >= MAXNAMELEN)
+				die("device name too long");
+
 			nport++;
 			break;
 		case 't':
@@ -632,18 +512,9 @@ do_remove_aggr(int argc, char *argv[])
 		case 'R':
 			altroot = optarg;
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			/*NOTREACHED*/
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
+			break;
 		}
 	}
 
@@ -654,27 +525,18 @@ do_remove_aggr(int argc, char *argv[])
 	if (optind != (argc-1))
 		usage();
 
-	errno = 0;
-	key = (int)strtol(argv[optind], &endp, 10);
-	if (errno != 0 || key < 1 || *endp != '\0') {
-		(void) fprintf(stderr,
-		    gettext("%s: illegal key value '%d'\n"),
-		    progname, key);
-		exit(1);
-	}
+	if (!str2int(argv[optind], &key) || key < 1)
+		die("invalid key value '%s'", argv[optind]);
 
-	if (laadm_remove(key, nport, port, t_arg, altroot, &diag) < 0) {
-		PRINT_ERR_DIAG("%s: remove operation failed: %s", diag,
-		    laadm_diag);
-		exit(1);
-	}
+	if (laadm_remove(key, nport, port, t_arg, altroot, &diag) < 0)
+		die_laerr(diag, "remove operation failed");
 }
 
 static void
 do_modify_aggr(int argc, char *argv[])
 {
 	char			option;
-	uint16_t		key;
+	int			key;
 	uint32_t		policy = AGGR_POLICY_L4;
 	aggr_lacp_mode_t	lacp_mode = AGGR_LACP_OFF;
 	aggr_lacp_timer_t	lacp_timer = AGGR_LACP_TIMER_SHORT;
@@ -683,7 +545,6 @@ do_modify_aggr(int argc, char *argv[])
 	uint8_t			modify_mask = 0;
 	boolean_t		t_arg = B_FALSE;
 	char			*altroot = NULL;
-	char			*endp = NULL;
 	laadm_diag_t		diag = 0;
 
 	opterr = 0;
@@ -691,77 +552,41 @@ do_modify_aggr(int argc, char *argv[])
 	    NULL)) != -1) {
 		switch (option) {
 		case 'P':
-			if (modify_mask & LAADM_MODIFY_POLICY) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -P cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (modify_mask & LAADM_MODIFY_POLICY)
+				die_optdup(option);
 
 			modify_mask |= LAADM_MODIFY_POLICY;
 
-			if (!laadm_str_to_policy(optarg, &policy)) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid policy '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
+			if (!laadm_str_to_policy(optarg, &policy))
+				die("invalid policy '%s'", optarg);
 			break;
 		case 'u':
-			if (modify_mask & LAADM_MODIFY_MAC) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -u cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (modify_mask & LAADM_MODIFY_MAC)
+				die_optdup(option);
 
 			modify_mask |= LAADM_MODIFY_MAC;
 
 			if (!laadm_str_to_mac_addr(optarg, &mac_addr_fixed,
-			    mac_addr)) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid MAC address '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
-
+			    mac_addr))
+				die("invalid MAC address '%s'", optarg);
 			break;
 		case 'l':
-			if (modify_mask & LAADM_MODIFY_LACP_MODE) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -l cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (modify_mask & LAADM_MODIFY_LACP_MODE)
+				die_optdup(option);
 
 			modify_mask |= LAADM_MODIFY_LACP_MODE;
 
-			if (!laadm_str_to_lacp_mode(optarg, &lacp_mode)) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid LACP mode '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
-
+			if (!laadm_str_to_lacp_mode(optarg, &lacp_mode))
+				die("invalid LACP mode '%s'", optarg);
 			break;
 		case 'T':
-			if (modify_mask & LAADM_MODIFY_LACP_TIMER) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -T cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (modify_mask & LAADM_MODIFY_LACP_TIMER)
+				die_optdup(option);
 
 			modify_mask |= LAADM_MODIFY_LACP_TIMER;
 
-			if (!laadm_str_to_lacp_timer(optarg, &lacp_timer)) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid LACP timer value"
-				    " '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
-
+			if (!laadm_str_to_lacp_timer(optarg, &lacp_timer))
+				die("invalid LACP timer value '%s'", optarg);
 			break;
 		case 't':
 			t_arg = B_TRUE;
@@ -769,121 +594,72 @@ do_modify_aggr(int argc, char *argv[])
 		case 'R':
 			altroot = optarg;
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			/*NOTREACHED*/
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
+			break;
 		}
 	}
 
-	if (modify_mask == 0) {
-		(void) fprintf(stderr, gettext("%s: at least one of the "
-		    "-PulT options must be specified\n"), progname);
-		usage();
-	}
+	if (modify_mask == 0)
+		die("at least one of the -PulT options must be specified");
 
 	/* get key value (required last argument) */
 	if (optind != (argc-1))
 		usage();
 
-	errno = 0;
-	key = (int)strtol(argv[optind], &endp, 10);
-	if (errno != 0 || key < 1 || *endp != '\0') {
-		(void) fprintf(stderr,
-		    gettext("%s: illegal key value '%d'\n"),
-		    progname, key);
-		exit(1);
-	}
-
+	if (!str2int(argv[optind], &key) || key < 1)
+		die("invalid key value '%s'", argv[optind]);
 
 	if (laadm_modify(key, modify_mask, policy, mac_addr_fixed, mac_addr,
-	    lacp_mode, lacp_timer, t_arg, altroot, &diag) < 0) {
-		PRINT_ERR_DIAG("%s: modify operation failed: %s", diag,
-		    laadm_diag);
-		exit(1);
-	}
+	    lacp_mode, lacp_timer, t_arg, altroot, &diag) < 0)
+		die_laerr(diag, "modify operation failed");
 }
 
 static void
 do_up_aggr(int argc, char *argv[])
 {
-	uint16_t	key = 0;
-	char		*endp = NULL;
+	int		key = 0;
 	laadm_diag_t	diag = 0;
 
 	/* get aggregation key (optional last argument) */
 	if (argc == 2) {
-		errno = 0;
-		key = (int)strtol(argv[1], &endp, 10);
-		if (errno != 0 || key < 1 || *endp != '\0') {
-			(void) fprintf(stderr,
-			    gettext("%s: illegal key value '%d'\n"),
-			    progname, key);
-			exit(1);
-		}
+		if (!str2int(argv[1], &key) || key < 1)
+			die("invalid key value '%s'", argv[1]);
 	} else if (argc > 2) {
 		usage();
 	}
 
 	if (laadm_up(key, NULL, &diag) < 0) {
 		if (key != 0) {
-			(void) fprintf(stderr,
-			    gettext("%s: could not bring up aggregation"
-			    " '%u' : %s"), progname, key, strerror(errno));
-			if (diag != 0)
-				(void) fprintf(stderr, " (%s)",
-				    laadm_diag(diag));
-			(void) fprintf(stderr, "\n");
+			die_laerr(diag, "could not bring up aggregation '%u'",
+			    key);
 		} else {
-			PRINT_ERR_DIAG(
-			    "%s: could not bring aggregations up: %s",
-			    diag, laadm_diag);
+			die_laerr(diag, "could not bring aggregations up");
 		}
-		exit(1);
 	}
 }
 
 static void
 do_down_aggr(int argc, char *argv[])
 {
-	uint16_t	key = 0;
-	char		*endp = NULL;
+	int	key = 0;
 
 	/* get aggregation key (optional last argument) */
 	if (argc == 2) {
-		errno = 0;
-		key = (int)strtol(argv[1], &endp, 10);
-		if (errno != 0 || key < 1 || *endp != '\0') {
-			(void) fprintf(stderr,
-			    gettext("%s: illegal key value '%d'\n"),
-			    progname, key);
-			exit(1);
-		}
+		if (!str2int(argv[1], &key) || key < 1)
+			die("invalid key value '%s'", argv[1]);
 	} else if (argc > 2) {
 		usage();
 	}
 
 	if (laadm_down(key) < 0) {
 		if (key != 0) {
-			(void) fprintf(stderr,
-			    gettext("%s: could not bring aggregation"
-			    " down '%u' : %s"),
-			    progname, key, strerror(errno));
-			(void) fprintf(stderr, "\n");
+			die("could not bring down aggregation '%u': %s",
+			    key, strerror(errno));
 		} else {
-			(void) fprintf(stderr,
-			    gettext("%s: could not bring aggregations"
-			    " down: %s"), progname, strerror(errno));
+			die("could not bring down aggregations: %s",
+			    strerror(errno));
 		}
-		exit(1);
 	}
 }
 
@@ -999,11 +775,8 @@ show_link(void *arg, const char *name)
 	boolean_t	legacy = B_TRUE;
 	show_link_state_t *state = (show_link_state_t *)arg;
 
-	if (get_if_info(name, &dlattr, &legacy) < 0) {
-		(void) fprintf(stderr, gettext("%s: invalid device '%s'\n"),
-		    progname, name);
-		exit(1);
-	}
+	if (get_if_info(name, &dlattr, &legacy) < 0)
+		die("invalid link '%s'", name);
 
 	if (state->ls_parseable) {
 		print_link_parseable(name, &dlattr, legacy);
@@ -1134,7 +907,7 @@ dump_port(laadm_port_attr_sys_t *port, boolean_t parseable)
 	if (!parseable) {
 		(void) printf("	   %-9s\t%s", dev, laadm_mac_addr_to_str(
 		    port->lp_mac, buf));
-		(void) printf("\t  %-5u Mbps", (int)(mac_ifspeed(dev) /
+		(void) printf("\t %5uMb", (int)(mac_ifspeed(dev) /
 		    1000000ull));
 		(void) printf("\t%s", mac_link_duplex(dev));
 		(void) printf("\t%s", mac_link_state(dev));
@@ -1297,7 +1070,7 @@ show_dev(void *arg, const char *dev)
 	if (!state->ms_parseable) {
 		(void) printf(gettext("\t\tlink: %s"),
 		    mac_link_state(dev));
-		(void) printf(gettext("\tspeed: %-5u Mbps"),
+		(void) printf(gettext("\tspeed: %5uMb"),
 		    (unsigned int)(mac_ifspeed(dev) / 1000000ull));
 		(void) printf(gettext("\tduplex: %s\n"),
 		    mac_link_duplex(dev));
@@ -1345,9 +1118,8 @@ do_show_link(int argc, char *argv[])
 	int		option;
 	boolean_t	s_arg = B_FALSE;
 	boolean_t	i_arg = B_FALSE;
-	uint32_t	interval = 0;
+	int		interval = 0;
 	show_link_state_t state;
-	char		*endp = NULL;
 
 	state.ls_stats = B_FALSE;
 	state.ls_parseable = B_FALSE;
@@ -1360,56 +1132,27 @@ do_show_link(int argc, char *argv[])
 			state.ls_parseable = B_TRUE;
 			break;
 		case 's':
-			if (s_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -s cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (s_arg)
+				die_optdup(option);
 
 			s_arg = B_TRUE;
 			break;
 		case 'i':
-			if (i_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -i cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (i_arg)
+				die_optdup(option);
 
 			i_arg = B_TRUE;
-
-			errno = 0;
-			interval = (int)strtol(optarg, &endp, 10);
-			if (errno != 0 || interval == 0 || *endp != '\0') {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid interval value"
-				    " '%d'\n"),
-				    progname, interval);
-				exit(1);
-			}
+			if (!str2int(optarg, &interval) || interval == 0)
+				die("invalid interval value '%s'", optarg);
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			/*NOTREACHED*/
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
+			break;
 		}
 	}
 
-	if (i_arg && !s_arg) {
-		(void) fprintf(stderr, gettext("%s: the option -i "
-		    "can be used only with -s\n"), progname);
-		usage();
-	}
-
+	if (i_arg && !s_arg)
+		die("the option -i can be used only with -s");
 
 	/* get link name (optional last argument) */
 	if (optind == (argc-1))
@@ -1433,13 +1176,12 @@ static void
 do_show_aggr(int argc, char *argv[])
 {
 	int			option;
-	uint16_t		key = 0;
+	int			key = 0;
 	boolean_t		L_arg = B_FALSE;
 	boolean_t		s_arg = B_FALSE;
 	boolean_t		i_arg = B_FALSE;
 	show_grp_state_t	state;
-	uint32_t		interval = 0;
-	char			*endp = NULL;
+	int			interval = 0;
 
 	state.gs_stats = B_FALSE;
 	state.gs_lacp = B_FALSE;
@@ -1450,102 +1192,53 @@ do_show_aggr(int argc, char *argv[])
 	    longopts, NULL)) != -1) {
 		switch (option) {
 		case 'L':
-			if (L_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -L cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (L_arg)
+				die_optdup(option);
 
 			if (s_arg || i_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -L cannot be used with "
-				    "any of -is\n"), progname);
-				usage();
+				die("the option -L cannot be used with -i "
+				    "or -s");
 			}
 
 			L_arg = B_TRUE;
-
 			state.gs_lacp = B_TRUE;
 			break;
 		case 'p':
 			state.gs_parseable = B_TRUE;
 			break;
 		case 's':
-			if (s_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -s cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (s_arg)
+				die_optdup(option);
 
-			if (L_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -L cannot be used "
-				    "with -k\n"), progname);
-				usage();
-			}
+			if (L_arg)
+				die("the option -L cannot be used with -k");
 
 			s_arg = B_TRUE;
 			break;
 		case 'i':
-			if (i_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -i cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (i_arg)
+				die_optdup(option);
 
-			if (L_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -i cannot be used "
-				    "with -L\n"), progname);
-				usage();
-			}
+			if (L_arg)
+				die("the option -i cannot be used with -L");
 
 			i_arg = B_TRUE;
-
-			errno = 0;
-			interval = (int)strtol(optarg, &endp, 10);
-			if (errno != 0 || interval == 0 || *endp != '\0') {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid interval value"
-				    " '%d'\n"),
-				    progname, interval);
-				exit(1);
-			}
+			if (!str2int(optarg, &interval) || interval == 0)
+				die("invalid interval value '%s'", optarg);
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			/*NOTREACHED*/
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
+			break;
 		}
 	}
 
-	if (i_arg && !s_arg) {
-		(void) fprintf(stderr, gettext("%s: the option -i "
-		    "can be used only with -s\n"), progname);
-		usage();
-	}
+	if (i_arg && !s_arg)
+		die("the option -i can be used only with -s");
 
 	/* get aggregation key (optional last argument) */
 	if (optind == (argc-1)) {
-		errno = 0;
-		key = (int)strtol(argv[optind], &endp, 10);
-		if (errno != 0 || key < 1 || *endp != '\0') {
-			(void) fprintf(stderr,
-			    gettext("%s: illegal key value '%d'\n"),
-			    progname, key);
-			exit(1);
-		}
+		if (!str2int(argv[optind], &key) || key < 1)
+			die("invalid key value '%s'", argv[optind]);
 	} else if (optind != argc) {
 		usage();
 	}
@@ -1560,12 +1253,8 @@ do_show_aggr(int argc, char *argv[])
 
 	(void) laadm_walk_sys(show_key, &state);
 
-	if (key != 0 && !state.gs_found) {
-		(void) fprintf(stderr,
-		    gettext("%s: non-existent aggregation key '%u'\n"),
-		    progname, key);
-		exit(1);
-	}
+	if (key != 0 && !state.gs_found)
+		die("non-existent aggregation key '%u'", key);
 }
 
 static void
@@ -1575,9 +1264,8 @@ do_show_dev(int argc, char *argv[])
 	char		*dev = NULL;
 	boolean_t	s_arg = B_FALSE;
 	boolean_t	i_arg = B_FALSE;
-	uint32_t	interval = 0;
+	int		interval = 0;
 	show_mac_state_t state;
-	char		*endp = NULL;
 
 	state.ms_parseable = B_FALSE;
 
@@ -1589,55 +1277,27 @@ do_show_dev(int argc, char *argv[])
 			state.ms_parseable = B_TRUE;
 			break;
 		case 's':
-			if (s_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -s cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (s_arg)
+				die_optdup(option);
 
 			s_arg = B_TRUE;
 			break;
 		case 'i':
-			if (i_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -i cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
+			if (i_arg)
+				die_optdup(option);
 
 			i_arg = B_TRUE;
-
-			errno = 0;
-			interval = (int)strtol(optarg, &endp, 10);
-			if (errno != 0 || interval == 0 || *endp != '\0') {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid interval value"
-				    " '%d'\n"),
-				    progname, interval);
-				exit(1);
-			}
+			if (!str2int(optarg, &interval) || interval == 0)
+				die("invalid interval value '%s'", optarg);
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			/*NOTREACHED*/
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
+			break;
 		}
 	}
 
-	if (i_arg && !s_arg) {
-		(void) fprintf(stderr, gettext("%s: the option -i "
-		    "can be used only with -s\n"), progname);
-		usage();
-	}
+	if (i_arg && !s_arg)
+		die("the option -i can be used only with -s");
 
 	/* get dev name (optional last argument) */
 	if (optind == (argc-1))
@@ -1657,13 +1317,8 @@ do_show_dev(int argc, char *argv[])
 		 */
 		if (strncmp(dev, "aggr", 4) == 0 ||
 		    dlpi_if_parse(dev, drv, &index) < 0 ||
-		    index >= 1000 ||
-		    get_if_info(dev, &dlattr, &legacy) < 0) {
-			(void) fprintf(stderr,
-			    gettext("%s: invalid device '%s'\n"),
-			    progname, dev);
-			exit(1);
-		}
+		    index >= 1000 || get_if_info(dev, &dlattr, &legacy) < 0)
+			die("invalid device '%s'", dev);
 	}
 
 	if (s_arg) {
@@ -1679,17 +1334,15 @@ do_show_dev(int argc, char *argv[])
 
 /* ARGSUSED */
 static void
-link_stats(const char *link, uint32_t interval)
+link_stats(const char *link, uint_t interval)
 {
 	dladm_attr_t		dlattr;
 	boolean_t		legacy;
 	show_link_state_t	state;
 
-	if (link != NULL && get_if_info(link, &dlattr, &legacy) < 0) {
-		(void) fprintf(stderr, gettext("%s: invalid device '%s'\n"),
-		    progname, link);
-		exit(1);
-	}
+	if (link != NULL && get_if_info(link, &dlattr, &legacy) < 0)
+		die("invalid link '%s'", link);
+
 	bzero(&state, sizeof (state));
 
 	/*
@@ -1717,7 +1370,7 @@ link_stats(const char *link, uint32_t interval)
 
 /* ARGSUSED */
 static void
-aggr_stats(uint16_t key, uint32_t interval)
+aggr_stats(uint32_t key, uint_t interval)
 {
 	show_grp_state_t state;
 
@@ -1734,12 +1387,8 @@ aggr_stats(uint16_t key, uint32_t interval)
 	for (;;) {
 		state.gs_found = B_FALSE;
 		(void) laadm_walk_sys(show_key, &state);
-		if (state.gs_key != 0 && !state.gs_found) {
-			(void) fprintf(stderr,
-			    gettext("%s: non-existent aggregation key '%u'\n"),
-			    progname, key);
-			exit(1);
-		}
+		if (state.gs_key != 0 && !state.gs_found)
+			die("non-existent aggregation key '%u'", key);
 
 		if (interval == 0)
 			break;
@@ -1819,9 +1468,7 @@ get_stats(char *module, int instance, char *name, pktsum_t *stats)
 	kstat_t		*ksp;
 
 	if ((kcp = kstat_open()) == NULL) {
-		(void) fprintf(stderr,
-		    gettext("%s: kstat open operation failed\n"),
-		    progname);
+		warn("kstat open operation failed");
 		return;
 	}
 
@@ -1903,9 +1550,7 @@ get_single_mac_stat(const char *dev, const char *name, uint8_t type,
 	kstat_t		*ksp;
 
 	if ((kcp = kstat_open()) == NULL) {
-		(void) fprintf(stderr,
-		    gettext("%s: kstat open operation failed\n"),
-		    progname);
+		warn("kstat open operation failed");
 		return (-1);
 	}
 
@@ -1921,9 +1566,7 @@ get_single_mac_stat(const char *dev, const char *name, uint8_t type,
 	}
 
 	if (kstat_read(kcp, ksp, NULL) == -1) {
-		(void) fprintf(stderr,
-		    gettext("%s: kstat read failed\n"),
-		    progname);
+		warn("kstat read failed");
 		goto bail;
 	}
 
@@ -2010,15 +1653,15 @@ typedef struct wifi_field {
 } wifi_field_t;
 
 static wifi_field_t wifi_fields[] = {
-{ "link",	"LINK",		10,	0, 			WIFI_CMD_ALL},
+{ "link",	"LINK",		10,	0,			WIFI_CMD_ALL},
 { "essid",	"ESSID",	19,	WLADM_WLAN_ATTR_ESSID,	WIFI_CMD_ALL},
-{ "bssid",	"BSSID/IBSSID", 17,	WLADM_WLAN_ATTR_BSSID, 	WIFI_CMD_ALL},
+{ "bssid",	"BSSID/IBSSID", 17,	WLADM_WLAN_ATTR_BSSID,	WIFI_CMD_ALL},
 { "ibssid",	"BSSID/IBSSID", 17,	WLADM_WLAN_ATTR_BSSID,	WIFI_CMD_ALL},
 { "mode",	"MODE",		6,	WLADM_WLAN_ATTR_MODE,	WIFI_CMD_ALL},
 { "speed",	"SPEED",	6,	WLADM_WLAN_ATTR_SPEED,	WIFI_CMD_ALL},
 { "auth",	"AUTH",		8,	WLADM_WLAN_ATTR_AUTH,	WIFI_CMD_ALL},
 { "bsstype",	"BSSTYPE",	8,	WLADM_WLAN_ATTR_BSSTYPE, WIFI_CMD_ALL},
-{ "sec", 	"SEC",		6,	WLADM_WLAN_ATTR_SECMODE, WIFI_CMD_ALL},
+{ "sec",	"SEC",		6,	WLADM_WLAN_ATTR_SECMODE, WIFI_CMD_ALL},
 { "status",	"STATUS",	17,	WLADM_LINK_ATTR_STATUS, WIFI_CMD_SHOW},
 { "strength",	"STRENGTH",	10,	WLADM_WLAN_ATTR_STRENGTH, WIFI_CMD_ALL}}
 ;
@@ -2032,7 +1675,7 @@ static char *def_scan_wifi_fields =
 static char *def_show_wifi_fields =
 	"link,status,essid,sec,strength,mode,speed";
 
-#define	WIFI_MAX_FIELDS 	(sizeof (wifi_fields) / sizeof (wifi_field_t))
+#define	WIFI_MAX_FIELDS		(sizeof (wifi_fields) / sizeof (wifi_field_t))
 #define	WIFI_MAX_FIELD_LEN	32
 
 typedef struct {
@@ -2274,18 +1917,14 @@ print_scan_results(void *arg, wladm_wlan_attr_t *attrp)
 static boolean_t
 scan_wifi(void *arg, const char *link)
 {
-	char			errmsg[WLADM_STRSIZE];
 	print_wifi_state_t	*statep = arg;
 	wladm_status_t		status;
 
 	statep->ws_link = link;
 	status = wladm_scan(link, statep, print_scan_results);
-	if (status != WLADM_STATUS_OK) {
-		(void) fprintf(stderr, gettext(
-		    "%s: cannot scan link '%s': %s\n"),
-		    progname, link, wladm_status2str(status, errmsg));
-		exit(1);
-	}
+	if (status != WLADM_STATUS_OK)
+		die_wlerr(status, "cannot scan link '%s'", link);
+
 	return (B_TRUE);
 }
 
@@ -2309,18 +1948,13 @@ static boolean_t
 show_wifi(void *arg, const char *link)
 {
 	int			i;
-	char 			buf[WLADM_STRSIZE];
 	print_wifi_state_t	*statep = arg;
 	wladm_link_attr_t	attr;
 	wladm_status_t		status;
 
 	status = wladm_get_link_attr(link, &attr);
-	if (status != WLADM_STATUS_OK) {
-		(void) fprintf(stderr, gettext("%s: cannot get link "
-		    "attributes for '%s': %s\n"), progname, link,
-		    wladm_status2str(status, buf));
-		exit(1);
-	}
+	if (status != WLADM_STATUS_OK)
+		die_wlerr(status, "cannot get link attributes for '%s'", link);
 
 	if (statep->ws_header) {
 		statep->ws_header = B_FALSE;
@@ -2342,7 +1976,6 @@ static void
 do_display_wifi(int argc, char **argv, int cmd)
 {
 	int			option;
-	char 			errmsg[WLADM_STRSIZE];
 	char			*fields_str = NULL;
 	wifi_field_t		**fields;
 	boolean_t		(*callback)(void *, const char *);
@@ -2372,18 +2005,8 @@ do_display_wifi(int argc, char **argv, int cmd)
 			if (fields_str == NULL)
 				fields_str = "all";
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
 			break;
 		}
 	}
@@ -2393,22 +2016,16 @@ do_display_wifi(int argc, char **argv, int cmd)
 	else if (optind != argc)
 		usage();
 
-	if (parse_wifi_fields(fields_str, &fields, &nfields, cmd) < 0) {
-		(void) fprintf(stderr,
-		    gettext("%s: invalid field(s) specified\n"),
-		    progname);
-		exit(1);
-	}
+	if (parse_wifi_fields(fields_str, &fields, &nfields, cmd) < 0)
+		die("invalid field(s) specified");
+
 	state.ws_fields = fields;
 	state.ws_nfields = nfields;
 
 	if (state.ws_link == NULL) {
 		status = wladm_walk(&state, callback);
-		if (status != WLADM_STATUS_OK) {
-			(void) fprintf(stderr, gettext("%s: %s\n"),
-			    progname, wladm_status2str(status, errmsg));
-			exit(1);
-		}
+		if (status != WLADM_STATUS_OK)
+			die_wlerr(status, "cannot walk wifi links");
 	} else {
 		(void) (*callback)(&state, state.ws_link);
 	}
@@ -2435,7 +2052,7 @@ typedef struct wlan_count_attr {
 static boolean_t
 do_count_wlan(void *arg, const char *link)
 {
-	wlan_count_attr_t	*cp = (wlan_count_attr_t *)arg;
+	wlan_count_attr_t *cp = arg;
 
 	if (cp->wc_count == 0)
 		cp->wc_link = strdup(link);
@@ -2505,9 +2122,7 @@ do_connect_wifi(int argc, char **argv)
 	wladm_wlan_attr_t	attr, *attrp;
 	wladm_status_t		status = WLADM_STATUS_OK;
 	int			timeout = WLADM_CONNECT_TIMEOUT_DEFAULT;
-	char			errmsg[WLADM_STRSIZE];
 	const char		*link = NULL;
-	char			*endp = NULL;
 	wladm_wep_key_t		*keys = NULL;
 	uint_t			key_count = 0;
 	uint_t			flags = 0;
@@ -2520,12 +2135,9 @@ do_connect_wifi(int argc, char **argv)
 		switch (option) {
 		case 'e':
 			status = wladm_str2essid(optarg, &attr.wa_essid);
-			if (status != WLADM_STATUS_OK) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid ESSID '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
+			if (status != WLADM_STATUS_OK)
+				die("invalid ESSID '%s'", optarg);
+
 			attr.wa_valid |= WLADM_WLAN_ATTR_ESSID;
 			/*
 			 * Try to connect without doing a scan.
@@ -2534,61 +2146,43 @@ do_connect_wifi(int argc, char **argv)
 			break;
 		case 'i':
 			status = wladm_str2bssid(optarg, &attr.wa_bssid);
-			if (status != WLADM_STATUS_OK) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid BSSID %s\n"),
-				    progname, optarg);
-				exit(1);
-			}
+			if (status != WLADM_STATUS_OK)
+				die("invalid BSSID %s", optarg);
+
 			attr.wa_valid |= WLADM_WLAN_ATTR_BSSID;
 			break;
 		case 'a':
 			status = wladm_str2auth(optarg, &attr.wa_auth);
-			if (status != WLADM_STATUS_OK) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid authentication "
-					"mode '%s'\n"), progname, optarg);
-				exit(1);
-			}
+			if (status != WLADM_STATUS_OK)
+				die("invalid authentication mode '%s'", optarg);
+
 			attr.wa_valid |= WLADM_WLAN_ATTR_AUTH;
 			break;
 		case 'm':
 			status = wladm_str2mode(optarg, &attr.wa_mode);
-			if (status != WLADM_STATUS_OK) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid mode '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
+			if (status != WLADM_STATUS_OK)
+				die("invalid mode '%s'", optarg);
+
 			attr.wa_valid |= WLADM_WLAN_ATTR_MODE;
 			break;
 		case 'b':
 			status = wladm_str2bsstype(optarg, &attr.wa_bsstype);
-			if (status != WLADM_STATUS_OK) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid bsstype '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
+			if (status != WLADM_STATUS_OK)
+				die("invalid bsstype '%s'", optarg);
+
 			attr.wa_valid |= WLADM_WLAN_ATTR_BSSTYPE;
 			break;
 		case 's':
 			status = wladm_str2secmode(optarg, &attr.wa_secmode);
-			if (status != WLADM_STATUS_OK) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid security mode '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
+			if (status != WLADM_STATUS_OK)
+				die("invalid security mode '%s'", optarg);
+
 			attr.wa_valid |= WLADM_WLAN_ATTR_SECMODE;
 			break;
 		case 'k':
-			if (parse_wep_keys(optarg, &keys, &key_count) < 0) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid key(s) '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
+			if (parse_wep_keys(optarg, &keys, &key_count) < 0)
+				die("invalid key(s) '%s'", optarg);
+
 			keysecmode = WLADM_SECMODE_WEP;
 			break;
 		case 'T':
@@ -2596,50 +2190,26 @@ do_connect_wifi(int argc, char **argv)
 				timeout = -1;
 				break;
 			}
-			errno = 0;
-			timeout = (int)strtol(optarg, &endp, 10);
-			if (timeout < 0 || errno != 0 || *endp != '\0') {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid timeout value '%s'\n"),
-				    progname, optarg);
-				exit(1);
-			}
+			if (!str2int(optarg, &timeout) || timeout < 0)
+				die("invalid timeout value '%s'", optarg);
 			break;
 		case 'c':
 			flags |= WLADM_OPT_CREATEIBSS;
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
 			break;
 		}
 	}
 
 	if (keysecmode == WLADM_SECMODE_NONE) {
 		if ((attr.wa_valid & WLADM_WLAN_ATTR_SECMODE) != 0 &&
-		    attr.wa_secmode == WLADM_SECMODE_WEP) {
-			(void) fprintf(stderr,
-			    gettext("%s: key required for security mode "
-				"'wep'\n"), progname);
-			exit(1);
-		}
+		    attr.wa_secmode == WLADM_SECMODE_WEP)
+			die("key required for security mode 'wep'");
 	} else {
 		if ((attr.wa_valid & WLADM_WLAN_ATTR_SECMODE) != 0 &&
-		    attr.wa_secmode != keysecmode) {
-			(void) fprintf(stderr,
-			    gettext("%s: incompatible -s and -k options\n"),
-			    progname);
-			exit(1);
-		}
+		    attr.wa_secmode != keysecmode)
+			die("incompatible -s and -k options");
 	}
 	attr.wa_secmode = keysecmode;
 	attr.wa_valid |= WLADM_WLAN_ATTR_SECMODE;
@@ -2656,49 +2226,34 @@ do_connect_wifi(int argc, char **argv)
 		wcattr.wc_count = 0;
 		(void) wladm_walk(&wcattr, do_count_wlan);
 		if (wcattr.wc_count == 0) {
-			(void) fprintf(stderr, gettext(
-			    "%s: no wifi links are available\n"), progname);
-			exit(1);
+			die("no wifi links are available");
 		} else if (wcattr.wc_count > 1) {
-			(void) fprintf(stderr, gettext(
-			    "%s: link name is required when more than "
-			    "one link is available\n"), progname);
-			exit(1);
+			die("link name is required when more than one wifi "
+			    "link is available");
 		}
 		link = wcattr.wc_link;
 	}
 	attrp = (attr.wa_valid == 0) ? NULL : &attr;
-
+again:
 	status = wladm_connect(link, attrp, timeout, keys, key_count, flags);
 	if (status != WLADM_STATUS_OK) {
 		if ((flags & WLADM_OPT_NOSCAN) != 0) {
 			/*
-			 * Redo the connect. This time with scanning
-			 * and filtering.
+			 * Try again with scanning and filtering.
 			 */
 			flags &= ~WLADM_OPT_NOSCAN;
-			status = wladm_connect(link, attrp, timeout, keys,
-			    key_count, flags);
-			if (status == WLADM_STATUS_OK) {
-				free(keys);
-				return;
-			}
+			goto again;
 		}
+
 		if (status == WLADM_STATUS_NOTFOUND) {
 			if (attr.wa_valid == 0) {
-				(void) fprintf(stderr, gettext(
-				    "%s: no wifi networks are available\n"),
-				    progname);
+				die("no wifi networks are available");
 			} else {
-				(void) fprintf(stderr, gettext("%s: no wifi "
-				    "networks with the specified criteria "
-				    "are available\n"), progname);
+				die("no wifi networks with the specified"
+				    "criteria are available");
 			}
-		} else {
-			(void) fprintf(stderr, gettext("%s: cannot connect: %s"
-			    "\n"), progname, wladm_status2str(status, errmsg));
 		}
-		exit(1);
+		die_wlerr(status, "cannot connect");
 	}
 	free(keys);
 }
@@ -2708,14 +2263,11 @@ static boolean_t
 do_all_disconnect_wifi(void *arg, const char *link)
 {
 	wladm_status_t	status;
-	char		errmsg[WLADM_STRSIZE];
 
 	status = wladm_disconnect(link);
-	if (status != WLADM_STATUS_OK) {
-		(void) fprintf(stderr,
-		    gettext("%s: cannot disconnect link '%s': %s\n"),
-		    progname, link, wladm_status2str(status, errmsg));
-	}
+	if (status != WLADM_STATUS_OK)
+		warn_wlerr(status, "cannot disconnect link '%s'", link);
+
 	return (B_TRUE);
 }
 
@@ -2724,7 +2276,6 @@ do_disconnect_wifi(int argc, char **argv)
 {
 	int			option;
 	const char		*link = NULL;
-	char 			errmsg[WLADM_STRSIZE];
 	boolean_t		all_links = B_FALSE;
 	wladm_status_t		status;
 	wlan_count_attr_t	wcattr;
@@ -2736,18 +2287,8 @@ do_disconnect_wifi(int argc, char **argv)
 		case 'a':
 			all_links = B_TRUE;
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
 			break;
 		}
 	}
@@ -2763,15 +2304,10 @@ do_disconnect_wifi(int argc, char **argv)
 			wcattr.wc_count = 0;
 			(void) wladm_walk(&wcattr, do_count_wlan);
 			if (wcattr.wc_count == 0) {
-				(void) fprintf(stderr, gettext(
-				    "%s: no wifi links are available\n"),
-				    progname);
-				exit(1);
+				die("no wifi links are available");
 			} else if (wcattr.wc_count > 1) {
-				(void) fprintf(stderr, gettext(
-				    "%s: link name is required when more than "
-				    "one link is available\n"), progname);
-				exit(1);
+				die("link name is required when more than "
+				    "one wifi link is available");
 			}
 			link = wcattr.wc_link;
 		} else {
@@ -2780,11 +2316,8 @@ do_disconnect_wifi(int argc, char **argv)
 		}
 	}
 	status = wladm_disconnect(link);
-	if (status != WLADM_STATUS_OK) {
-		(void) fprintf(stderr, gettext("%s: cannot disconnect: %s\n"),
-		    progname, wladm_status2str(status, errmsg));
-		exit(1);
-	}
+	if (status != WLADM_STATUS_OK)
+		die_wlerr(status, "cannot disconnect link '%s'", link);
 }
 
 #define	MAX_PROPS		32
@@ -2914,10 +2447,8 @@ print_linkprop(show_linkprop_state_t *statep, const char *propname,
 			else
 				propvals = &notsup;
 		} else {
-			(void) fprintf(stderr, gettext(
-			    "%s: cannot get link property '%s': %s\n"),
-			    progname, propname, dladm_status2str(status, buf));
-			exit(1);
+			die_dlerr(status, "cannot get link property '%s'",
+			    propname);
 		}
 	}
 
@@ -2976,7 +2507,6 @@ static void
 do_show_linkprop(int argc, char **argv)
 {
 	int			i, option, fd;
-	char			errmsg[DLADM_STRSIZE];
 	char			linkname[MAXPATHLEN];
 	prop_list_t		*proplist = NULL;
 	char			*buf;
@@ -2994,12 +2524,8 @@ do_show_linkprop(int argc, char **argv)
 	    prop_longopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
-			if (parse_props(optarg, &proplist, B_TRUE) < 0) {
-				(void) fprintf(stderr,
-				    gettext("%s: invalid field(s) specified\n"),
-				    progname);
-				exit(1);
-			}
+			if (parse_props(optarg, &proplist, B_TRUE) < 0)
+				die("invalid field(s) specified");
 			break;
 		case 'c':
 			state.ls_parseable = B_TRUE;
@@ -3007,18 +2533,8 @@ do_show_linkprop(int argc, char **argv)
 		case 'P':
 			state.ls_persist = B_TRUE;
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
 			break;
 		}
 	}
@@ -3028,32 +2544,24 @@ do_show_linkprop(int argc, char **argv)
 	else if (optind != argc)
 		usage();
 
-	if (state.ls_link == NULL) {
-		(void) fprintf(stderr,
-		    gettext("%s: link name must be specified\n"), progname);
-		exit(1);
-	}
+	if (state.ls_link == NULL)
+		die("link name must be specified");
 
 	/*
 	 * When some WiFi links are opened for the first time, their hardware
-	 * automatically scans for APs and does other slow operations.  Thus,
+	 * automatically scans for APs and does other slow operations.	Thus,
 	 * if there are no open links, the retrieval of link properties
 	 * (below) will proceed slowly unless we hold the link open.
 	 */
 	(void) snprintf(linkname, MAXPATHLEN, "/dev/%s", state.ls_link);
-	if ((fd = open(linkname, O_RDWR)) < 0) {
-		(void) fprintf(stderr,
-		    gettext("%s: cannot open %s\n"), progname, state.ls_link);
-		exit(1);
-	}
+	if ((fd = open(linkname, O_RDWR)) < 0)
+		die("cannot open %s: %s", state.ls_link, strerror(errno));
 
 	buf = malloc((sizeof (char *) + DLADM_PROP_VAL_MAX) * MAX_PROP_VALS +
 	    MAX_PROP_LINE);
-	if (buf == NULL) {
-		(void) fprintf(stderr,
-		    gettext("%s: insufficient memory\n"), progname);
-		exit(1);
-	}
+	if (buf == NULL)
+		die("insufficient memory");
+
 	state.ls_propvals = (char **)(void *)buf;
 	for (i = 0; i < MAX_PROP_VALS; i++) {
 		state.ls_propvals[i] = buf + sizeof (char *) * MAX_PROP_VALS +
@@ -3070,12 +2578,8 @@ do_show_linkprop(int argc, char **argv)
 		}
 	} else {
 		status = dladm_walk_prop(state.ls_link, &state, show_linkprop);
-		if (status != DLADM_STATUS_OK) {
-			(void) fprintf(stderr,
-			    gettext("%s: show-linkprop: %s\n"), progname,
-			    dladm_status2str(status, errmsg));
-			exit(1);
-		}
+		if (status != DLADM_STATUS_OK)
+			die_dlerr(status, "show-linkprop");
 	}
 	(void) close(fd);
 	free(buf);
@@ -3087,22 +2591,17 @@ set_linkprop_persist(const char *link, const char *prop_name, char **prop_val,
     uint_t val_cnt, boolean_t reset)
 {
 	dladm_status_t	status;
-	char		errmsg[DLADM_STRSIZE];
 
 	status = dladm_set_prop(link, prop_name, prop_val, val_cnt,
 	    DLADM_OPT_PERSIST);
 
 	if (status != DLADM_STATUS_OK) {
 		if (reset) {
-			(void) fprintf(stderr, gettext("%s: warning: cannot "
-			    "persistently reset link property '%s' on '%s': "
-			    "%s\n"), progname, prop_name, link,
-			    dladm_status2str(status, errmsg));
+			warn_dlerr(status, "cannot persistently reset link "
+			    "property '%s' on '%s'", prop_name, link);
 		} else {
-			(void) fprintf(stderr, gettext("%s: warning: cannot "
-			    "persistently set link property '%s' on '%s': "
-			    "%s\n"), progname, prop_name, link,
-			    dladm_status2str(status, errmsg));
+			warn_dlerr(status, "cannot persistently set link "
+			    "property '%s' on '%s'", prop_name, link);
 		}
 	}
 	return (status);
@@ -3123,12 +2622,8 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 	    prop_longopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
-			if (parse_props(optarg, &proplist, reset) < 0) {
-				(void) fprintf(stderr, gettext(
-				    "%s: invalid link properties specified\n"),
-				    progname);
-				exit(1);
-			}
+			if (parse_props(optarg, &proplist, reset) < 0)
+				die("invalid link properties specified");
 			break;
 		case 't':
 			temp = B_TRUE;
@@ -3136,24 +2631,12 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 		case 'R':
 			status = dladm_set_rootdir(optarg);
 			if (status != DLADM_STATUS_OK) {
-				(void) fprintf(stderr, gettext(
-				    "%s: invalid directory specified: %s\n"),
-				    progname, dladm_status2str(status, errmsg));
-				exit(1);
+				die_dlerr(status, "invalid directory "
+				    "specified");
 			}
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
 			break;
 		}
 	}
@@ -3163,26 +2646,17 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 	else if (optind != argc)
 		usage();
 
-	if (link == NULL) {
-		(void) fprintf(stderr,
-		    gettext("%s: link name must be specified\n"),
-		    progname);
-		exit(1);
-	}
+	if (link == NULL)
+		die("link name must be specified");
 
-	if (proplist == NULL) {
+	if (proplist == NULL)
 		if (!reset) {
-			(void) fprintf(stderr,
-			    gettext("%s: link property must be specified\n"),
-			    progname);
-			exit(1);
-		}
+			die("link property must be specified");
+
 		status = dladm_set_prop(link, NULL, NULL, 0, DLADM_OPT_TEMP);
 		if (status != DLADM_STATUS_OK) {
-			(void) fprintf(stderr, gettext(
-			    "%s: warning: cannot reset link "
-			    "properties on '%s': %s\n"),
-			    progname, link, dladm_status2str(status, errmsg));
+			warn_dlerr(status, "cannot reset link properties "
+			    "on '%s'", link);
 		}
 		if (!temp) {
 			status = set_linkprop_persist(link, NULL, NULL, 0,
@@ -3204,9 +2678,8 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 			val = pip->pi_val;
 			count = pip->pi_count;
 			if (count == 0) {
-				(void) fprintf(stderr, gettext(
-				    "%s: value(s) for '%s' not specified\n"),
-				    progname, pip->pi_name);
+				warn("no value specified for '%s'",
+				    pip->pi_name);
 				status = DLADM_STATUS_BADARG;
 				continue;
 			}
@@ -3225,9 +2698,7 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 		status = s;
 		switch (s) {
 		case DLADM_STATUS_NOTFOUND:
-			(void) fprintf(stderr,
-			    gettext("%s: invalid link property '%s'\n"),
-			    progname, pip->pi_name);
+			warn("invalid link property '%s'", pip->pi_name);
 			break;
 		case DLADM_STATUS_BADVAL: {
 			int		j;
@@ -3240,11 +2711,9 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 			    MAX_PROP_LINE);
 
 			propvals = (char **)(void *)ptr;
-			if (propvals == NULL) {
-				(void) fprintf(stderr, gettext(
-				    "%s: insufficient memory\n"), progname);
-				exit(1);
-			}
+			if (propvals == NULL)
+				die("insufficient memory");
+
 			for (j = 0; j < MAX_PROP_VALS; j++) {
 				propvals[j] = ptr + sizeof (char *) *
 				    MAX_PROP_VALS +
@@ -3264,23 +2733,18 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 			}
 			if (ptr > errmsg)
 				*(ptr - 1) = '\0';
-			(void) fprintf(stderr, gettext(
-			    "%s: link property '%s' must be one of: %s\n"),
-			    progname, pip->pi_name, errmsg);
+			warn("link property '%s' must be one of: %s",
+			    pip->pi_name, errmsg);
 			free(propvals);
 			break;
 		}
 		default:
 			if (reset) {
-				(void) fprintf(stderr, gettext(
-				    "%s: cannot reset link property '%s' on "
-				    "'%s': %s\n"), progname, pip->pi_name, link,
-				    dladm_status2str(s, errmsg));
+				warn_dlerr(status, "cannot reset link property "
+				    "'%s' on '%s'", pip->pi_name, link);
 			} else {
-				(void) fprintf(stderr, gettext(
-				    "%s: cannot set link property '%s' on "
-				    "'%s': %s\n"), progname, pip->pi_name, link,
-				    dladm_status2str(s, errmsg));
+				warn_dlerr(status, "cannot set link property "
+				    "'%s' on '%s'", pip->pi_name, link);
 			}
 			break;
 		}
@@ -3347,7 +2811,7 @@ get_secobj_from_tty(uint_t try, const char *objname, char *buf)
 	uint_t		len = 0;
 	int		c;
 	struct termios	stored, current;
-	void    	(*sigfunc)(int);
+	void		(*sigfunc)(int);
 
 	/*
 	 * Turn off echo -- but before we do so, defer SIGINT handling
@@ -3462,18 +2926,11 @@ audit_secobj(char *auth, char *class, char *obj,
 		errstr = "ADT_dladm_delete_secobj";
 	}
 
-	if (adt_start_session(&ah, NULL, ADT_USE_PROC_DATA) != 0) {
-		(void) fprintf(stderr, "%s: adt_start_session: %s\n",
-		    progname, strerror(errno));
-		exit(1);
-	}
+	if (adt_start_session(&ah, NULL, ADT_USE_PROC_DATA) != 0)
+		die("adt_start_session: %s", strerror(errno));
 
-	if ((event = adt_alloc_event(ah, flag)) == NULL) {
-		(void) fprintf(stderr, "%s: adt_alloc_event"
-		    "(%s): %s\n", progname, errstr,
-		    strerror(errno));
-		exit(1);
-	}
+	if ((event = adt_alloc_event(ah, flag)) == NULL)
+		die("adt_alloc_event (%s): %s", errstr, strerror(errno));
 
 	/* fill in audit info */
 	if (create) {
@@ -3488,18 +2945,14 @@ audit_secobj(char *auth, char *class, char *obj,
 
 	if (success) {
 		if (adt_put_event(event, ADT_SUCCESS, ADT_SUCCESS) != 0) {
-			(void) fprintf(stderr, "%s: adt_put_event"
-			    "(%s, success): %s\n",
-			    progname, errstr, strerror(errno));
-			exit(1);
+			die("adt_put_event (%s, success): %s", errstr,
+			    strerror(errno));
 		}
 	} else {
 		if (adt_put_event(event, ADT_FAILURE,
 		    ADT_FAIL_VALUE_AUTH) != 0) {
-			(void) fprintf(stderr, "%s: adt_put_event"
-			    "(%s, failure): %s\n",
-			    progname, errstr, strerror(errno));
-			exit(1);
+			die("adt_put_event: (%s, failure): %s", errstr,
+			    strerror(errno));
 		}
 	}
 
@@ -3513,7 +2966,6 @@ static void
 do_create_secobj(int argc, char **argv)
 {
 	int			option, rval;
-	char			errmsg[DLADM_STRSIZE];
 	FILE			*filep = NULL;
 	char			*obj_name = NULL;
 	char			*class_name = NULL;
@@ -3534,10 +2986,8 @@ do_create_secobj(int argc, char **argv)
 			(void) seteuid(getuid());
 			filep = fopen(optarg, "r");
 			if (filep == NULL) {
-				(void) fprintf(stderr,
-				    gettext("%s: cannot open %s: %s\n"),
-				    progname, optarg, strerror(errno));
-				exit(1);
+				die("cannot open %s: %s", optarg,
+				    strerror(errno));
 			}
 			(void) seteuid(euid);
 			break;
@@ -3545,11 +2995,8 @@ do_create_secobj(int argc, char **argv)
 			class_name = optarg;
 			status = dladm_str2secobjclass(optarg, &class);
 			if (status != DLADM_STATUS_OK) {
-				(void) fprintf(stderr, gettext(
-				    "%s: invalid secure object class '%s', "
-				    "valid values are: wep\n"),
-				    progname, optarg);
-				exit(1);
+				die("invalid secure object class '%s', "
+				    "valid values are: wep", optarg);
 			}
 			break;
 		case 't':
@@ -3558,24 +3005,12 @@ do_create_secobj(int argc, char **argv)
 		case 'R':
 			status = dladm_set_rootdir(optarg);
 			if (status != DLADM_STATUS_OK) {
-				(void) fprintf(stderr, gettext(
-				    "%s: invalid directory specified: %s\n"),
-				    progname, dladm_status2str(status, errmsg));
-				exit(1);
+				die_dlerr(status, "invalid directory "
+				    "specified");
 			}
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
 			break;
 		}
 	}
@@ -3585,62 +3020,40 @@ do_create_secobj(int argc, char **argv)
 	else if (optind != argc)
 		usage();
 
-	if (class == -1) {
-		(void) fprintf(stderr,
-		    gettext("%s: secure object class required\n"),
-		    progname);
-		exit(1);
-	}
+	if (class == -1)
+		die("secure object class required");
 
-	if (obj_name == NULL) {
-		(void) fprintf(stderr,
-		    gettext("%s: secure object name required\n"),
-		    progname);
-		exit(1);
-	}
+	if (obj_name == NULL)
+		die("secure object name required");
 
 	success = check_auth(LINK_SEC_AUTH);
 	audit_secobj(LINK_SEC_AUTH, class_name, obj_name, success, B_TRUE);
-	if (!success) {
-		(void) fprintf(stderr,
-		    gettext("%s: authorization '%s' is required\n"),
-		    progname, LINK_SEC_AUTH);
-		exit(1);
-	}
+	if (!success)
+		die("authorization '%s' is required", LINK_SEC_AUTH);
 
-	if ((rval = get_secobj_val(obj_name, obj_val, &obj_len,
-	    class, filep)) != 0) {
+	rval = get_secobj_val(obj_name, obj_val, &obj_len, class, filep);
+	if (rval != 0) {
 		switch (rval) {
 		case ENOENT:
-			(void) fprintf(stderr,
-			    gettext("%s: invalid secure object class\n"),
-			    progname);
+			die("invalid secure object class");
 			break;
 		case EINVAL:
-			(void) fprintf(stderr,
-			    gettext("%s: invalid secure object value\n"),
-			    progname);
+			die("invalid secure object value");
 			break;
 		case ENOTSUP:
-			(void) fprintf(stderr, gettext(
-			    "%s: verification failed\n"), progname);
+			die("verification failed");
 			break;
 		default:
-			(void) fprintf(stderr, gettext(
-			    "%s: invalid secure object: %s\n"),
-			    progname, strerror(rval));
+			die("invalid secure object: %s", strerror(rval));
 			break;
 		}
-		exit(1);
 	}
 
 	status = dladm_set_secobj(obj_name, class, obj_val, obj_len,
 	    DLADM_OPT_CREATE | DLADM_OPT_TEMP);
 	if (status != DLADM_STATUS_OK) {
-		(void) fprintf(stderr,
-		    gettext("%s: could not create secure object '%s': %s\n"),
-		    progname, obj_name, dladm_status2str(status, errmsg));
-		exit(1);
+		die_dlerr(status, "could not create secure object '%s'",
+		    obj_name);
 	}
 	if (temp)
 		return;
@@ -3648,11 +3061,8 @@ do_create_secobj(int argc, char **argv)
 	status = dladm_set_secobj(obj_name, class, obj_val, obj_len,
 	    DLADM_OPT_PERSIST);
 	if (status != DLADM_STATUS_OK) {
-		(void) fprintf(stderr,
-		    gettext("%s: warning: could not persistently create "
-		    "secure object '%s': %s\n"), progname, obj_name,
-		    dladm_status2str(status, errmsg));
-		exit(1);
+		warn_dlerr(status, "could not persistently create secure "
+		    "object '%s'", obj_name);
 	}
 }
 
@@ -3660,7 +3070,6 @@ static void
 do_delete_secobj(int argc, char **argv)
 {
 	int		i, option;
-	char		errmsg[DLADM_STRSIZE];
 	boolean_t	temp = B_FALSE;
 	split_t		*sp = NULL;
 	boolean_t	success;
@@ -3668,7 +3077,7 @@ do_delete_secobj(int argc, char **argv)
 
 	opterr = 0;
 	status = pstatus = DLADM_STATUS_OK;
-	while ((option = getopt_long(argc, argv, "R:t",
+	while ((option = getopt_long(argc, argv, ":R:t",
 	    wifi_longopts, NULL)) != -1) {
 		switch (option) {
 		case 't':
@@ -3677,24 +3086,12 @@ do_delete_secobj(int argc, char **argv)
 		case 'R':
 			status = dladm_set_rootdir(optarg);
 			if (status != DLADM_STATUS_OK) {
-				(void) fprintf(stderr, gettext(
-				    "%s: invalid directory specified: %s\n"),
-				    progname, dladm_status2str(status, errmsg));
-				exit(1);
+				die_dlerr(status, "invalid directory "
+				    "specified");
 			}
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
 			break;
 		}
 	}
@@ -3702,29 +3099,19 @@ do_delete_secobj(int argc, char **argv)
 	if (optind == (argc - 1)) {
 		sp = split(argv[optind], MAX_SECOBJS, MAX_SECOBJ_NAMELEN);
 		if (sp == NULL) {
-			(void) fprintf(stderr, gettext(
-			    "%s: invalid secure object name(s): '%s'\n"),
-			    progname, argv[optind]);
-			exit(1);
+			die("invalid secure object name(s): '%s'",
+			    argv[optind]);
 		}
 	} else if (optind != argc)
 		usage();
 
-	if (sp == NULL || sp->s_nfields < 1) {
-		(void) fprintf(stderr,
-		    gettext("%s: secure object name required\n"),
-		    progname);
-		exit(1);
-	}
+	if (sp == NULL || sp->s_nfields < 1)
+		die("secure object name required");
 
 	success = check_auth(LINK_SEC_AUTH);
 	audit_secobj(LINK_SEC_AUTH, "wep", argv[optind], success, B_FALSE);
-	if (!success) {
-		(void) fprintf(stderr,
-		    gettext("%s: authorization '%s' is required\n"),
-		    progname, LINK_SEC_AUTH);
-		exit(1);
-	}
+	if (!success)
+		die("authorization '%s' is required", LINK_SEC_AUTH);
 
 	for (i = 0; i < sp->s_nfields; i++) {
 		status = dladm_unset_secobj(sp->s_fields[i], DLADM_OPT_TEMP);
@@ -3736,16 +3123,12 @@ do_delete_secobj(int argc, char **argv)
 		}
 
 		if (status != DLADM_STATUS_OK) {
-			(void) fprintf(stderr, gettext(
-			    "%s: could not delete secure object '%s': %s\n"),
-			    progname, sp->s_fields[i],
-			    dladm_status2str(status, errmsg));
+			warn_dlerr(status, "could not delete secure object "
+			    "'%s'", sp->s_fields[i]);
 		}
 		if (pstatus != DLADM_STATUS_OK) {
-			(void) fprintf(stderr, gettext("%s: warning: could not "
-			    "persistently delete secure object '%s': %s\n"),
-			    progname, sp->s_fields[i],
-			    dladm_status2str(pstatus, errmsg));
+			warn_dlerr(pstatus, "could not persistently delete "
+			    "secure object '%s'", sp->s_fields[i]);
 		}
 	}
 	if (status != DLADM_STATUS_OK || pstatus != DLADM_STATUS_OK)
@@ -3783,12 +3166,8 @@ show_secobj(void *arg, const char *obj_name)
 		flags |= DLADM_OPT_PERSIST;
 
 	status = dladm_get_secobj(obj_name, &class, obj_val, &obj_len, flags);
-	if (status != DLADM_STATUS_OK) {
-		(void) fprintf(stderr, gettext(
-		    "%s: cannot get secure object '%s': %s\n"), progname,
-		    obj_name, dladm_status2str(status, buf));
-		exit(1);
-	}
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "cannot get secure object '%s'", obj_name);
 
 	if (statep->ss_header) {
 		statep->ss_header = B_FALSE;
@@ -3805,7 +3184,7 @@ show_secobj(void *arg, const char *obj_name)
 	}
 
 	if (statep->ss_debug) {
-		char 	val[DLADM_SECOBJ_VAL_MAX * 2];
+		char	val[DLADM_SECOBJ_VAL_MAX * 2];
 		uint_t	len = sizeof (val);
 
 		if (octet_to_hexascii(obj_val, obj_len, val, &len) == 0) {
@@ -3826,7 +3205,6 @@ do_show_secobj(int argc, char **argv)
 	show_secobj_state_t	state;
 	dladm_status_t		status;
 	uint_t			i;
-	char			errmsg[DLADM_STRSIZE];
 	split_t			*sp;
 	uint_t			flags;
 
@@ -3845,26 +3223,12 @@ do_show_secobj(int argc, char **argv)
 			state.ss_persist = B_TRUE;
 			break;
 		case 'd':
-			if (getuid() != 0) {
-				(void) fprintf(stderr,
-				    gettext("%s: insufficient privileges\n"),
-				    progname);
-				exit(1);
-			}
+			if (getuid() != 0)
+				die("insufficient privileges");
 			state.ss_debug = B_TRUE;
 			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		case '?':
 		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
+			die_opterr(optopt, option);
 			break;
 		}
 	}
@@ -3872,10 +3236,8 @@ do_show_secobj(int argc, char **argv)
 	if (optind == (argc - 1)) {
 		sp = split(argv[optind], MAX_SECOBJS, MAX_SECOBJ_NAMELEN);
 		if (sp == NULL) {
-			(void) fprintf(stderr, gettext(
-			    "%s: invalid secure object name(s): '%s'\n"),
-			    progname, argv[optind]);
-			exit(1);
+			die("invalid secure object name(s): '%s'",
+			    argv[optind]);
 		}
 		for (i = 0; i < sp->s_nfields; i++) {
 			if (!show_secobj(&state, sp->s_fields[i]))
@@ -3888,41 +3250,186 @@ do_show_secobj(int argc, char **argv)
 
 	flags = state.ss_persist ? DLADM_OPT_PERSIST : 0;
 	status = dladm_walk_secobj(&state, show_secobj, flags);
-	if (status != DLADM_STATUS_OK) {
-		(void) fprintf(stderr, gettext("%s: show-secobj: %s\n"),
-		    progname, dladm_status2str(status, errmsg));
-		exit(1);
-	}
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "show-secobj");
 }
 
 /* ARGSUSED */
 static void
 do_init_linkprop(int argc, char **argv)
 {
-	char		errmsg[DLADM_STRSIZE];
-	dladm_status_t	status;
+	dladm_status_t status;
 
 	status = dladm_init_linkprop();
-	if (status != DLADM_STATUS_OK) {
-		(void) fprintf(stderr,
-		    gettext("%s: link property initialization failed: %s\n"),
-		    progname, dladm_status2str(status, errmsg));
-		exit(1);
-	}
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "link property initialization failed");
 }
 
 /* ARGSUSED */
 static void
 do_init_secobj(int argc, char **argv)
 {
-	char		errmsg[DLADM_STRSIZE];
-	dladm_status_t	status;
+	dladm_status_t status;
 
 	status = dladm_init_secobj();
-	if (status != DLADM_STATUS_OK) {
-		(void) fprintf(stderr,
-		    gettext("%s: secure object initialization failed: %s\n"),
-		    progname, dladm_status2str(status, errmsg));
-		exit(1);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "secure object initialization failed");
+}
+
+static boolean_t
+str2int(const char *str, int *valp)
+{
+	int	val;
+	char	*endp = NULL;
+
+	errno = 0;
+	val = strtol(str, &endp, 10);
+	if (errno != 0 || *endp != '\0')
+		return (B_FALSE);
+
+	*valp = val;
+	return (B_TRUE);
+}
+
+/* PRINTFLIKE1 */
+static void
+warn(const char *format, ...)
+{
+	va_list alist;
+
+	format = gettext(format);
+	(void) fprintf(stderr, "%s: warning: ", progname);
+
+	va_start(alist, format);
+	(void) vfprintf(stderr, format, alist);
+	va_end(alist);
+
+	(void) putchar('\n');
+}
+
+/* PRINTFLIKE2 */
+static void
+warn_wlerr(wladm_status_t err, const char *format, ...)
+{
+	va_list alist;
+	char	errmsg[WLADM_STRSIZE];
+
+	format = gettext(format);
+	(void) fprintf(stderr, gettext("%s: warning: "), progname);
+
+	va_start(alist, format);
+	(void) vfprintf(stderr, format, alist);
+	va_end(alist);
+	(void) fprintf(stderr, ": %s\n", wladm_status2str(err, errmsg));
+}
+
+/* PRINTFLIKE2 */
+static void
+warn_dlerr(dladm_status_t err, const char *format, ...)
+{
+	va_list alist;
+	char	errmsg[DLADM_STRSIZE];
+
+	format = gettext(format);
+	(void) fprintf(stderr, gettext("%s: warning: "), progname);
+
+	va_start(alist, format);
+	(void) vfprintf(stderr, format, alist);
+	va_end(alist);
+	(void) fprintf(stderr, ": %s\n", dladm_status2str(err, errmsg));
+}
+
+/* PRINTFLIKE2 */
+static void
+die_laerr(laadm_diag_t diag, const char *format, ...)
+{
+	va_list alist;
+	char	*errstr = strerror(errno);
+
+	format = gettext(format);
+	(void) fprintf(stderr, "%s: ", progname);
+
+	va_start(alist, format);
+	(void) vfprintf(stderr, format, alist);
+	va_end(alist);
+
+	if (diag == 0)
+		(void) fprintf(stderr, ": %s\n", errstr);
+	else
+		(void) fprintf(stderr, ": %s (%s)\n", errstr, laadm_diag(diag));
+
+	exit(EXIT_FAILURE);
+}
+
+/* PRINTFLIKE2 */
+static void
+die_wlerr(wladm_status_t err, const char *format, ...)
+{
+	va_list alist;
+	char	errmsg[WLADM_STRSIZE];
+
+	format = gettext(format);
+	(void) fprintf(stderr, "%s: ", progname);
+
+	va_start(alist, format);
+	(void) vfprintf(stderr, format, alist);
+	va_end(alist);
+	(void) fprintf(stderr, ": %s\n", wladm_status2str(err, errmsg));
+
+	exit(EXIT_FAILURE);
+}
+
+/* PRINTFLIKE2 */
+static void
+die_dlerr(dladm_status_t err, const char *format, ...)
+{
+	va_list alist;
+	char	errmsg[DLADM_STRSIZE];
+
+	format = gettext(format);
+	(void) fprintf(stderr, "%s: ", progname);
+
+	va_start(alist, format);
+	(void) vfprintf(stderr, format, alist);
+	va_end(alist);
+	(void) fprintf(stderr, ": %s\n", dladm_status2str(err, errmsg));
+
+	exit(EXIT_FAILURE);
+}
+
+/* PRINTFLIKE1 */
+static void
+die(const char *format, ...)
+{
+	va_list alist;
+
+	format = gettext(format);
+	(void) fprintf(stderr, "%s: ", progname);
+
+	va_start(alist, format);
+	(void) vfprintf(stderr, format, alist);
+	va_end(alist);
+
+	(void) putchar('\n');
+	exit(EXIT_FAILURE);
+}
+
+static void
+die_optdup(int opt)
+{
+	die("the option -%c cannot be specified more than once", opt);
+}
+
+static void
+die_opterr(int opt, int opterr)
+{
+	switch (opterr) {
+	case ':':
+		die("option '-%c' requires a value", opt);
+		break;
+	case '?':
+	default:
+		die("unrecognized option '-%c'", opt);
+		break;
 	}
 }
