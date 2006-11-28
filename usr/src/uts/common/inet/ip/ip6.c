@@ -10593,6 +10593,18 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 		mctl_present = B_FALSE;
 	}
 
+	DTRACE_PROBE4(ip6__loopback__in__start,
+	    ill_t *, ill, ill_t *, NULL,
+	    ip6_t *, ip6h, mblk_t *, first_mp);
+
+	FW_HOOKS6(ip6_loopback_in_event, ipv6firewall_loopback_in,
+	    ill, NULL, ip6h, first_mp, mp);
+
+	DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, first_mp);
+
+	if (first_mp == NULL)
+		return;
+
 	nexthdr = ip6h->ip6_nxt;
 	mibptr = ill->ill_ip6_mib;
 
@@ -10621,21 +10633,6 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 		break;
 	}
 	}
-
-
-	DTRACE_PROBE4(ip6__loopback__in__start,
-	    ill_t *, ill, ill_t *, NULL,
-	    ip6_t *, ip6h, mblk_t *, first_mp);
-
-	FW_HOOKS6(ip6_loopback_in_event, ipv6firewall_loopback_in,
-	    ill, NULL, ip6h, first_mp, mp);
-
-	DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, first_mp);
-
-	if (first_mp == NULL)
-		return;
-
-	nexthdr = ip6h->ip6_nxt;
 
 	UPDATE_OB_PKT_COUNT(ire);
 	ire->ire_last_used_time = lbolt;

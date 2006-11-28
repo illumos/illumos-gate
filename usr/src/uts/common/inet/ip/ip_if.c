@@ -11151,7 +11151,9 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	ill_t	*ill = ipif->ipif_ill;
 	boolean_t need_dl_down;
 	boolean_t need_arp_down;
-	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
+	struct iocblk *iocp;
+
+	iocp = (mp != NULL) ? (struct iocblk *)mp->b_rptr : NULL;
 
 	ip1dbg(("ip_sioctl_addr_tail(%s:%u %p)\n",
 	    ill->ill_name, ipif->ipif_id, (void *)ipif));
@@ -11235,7 +11237,7 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 *
 	 * Don't attach nic event message for SIOCLIFADDIF ioctl.
 	 */
-	if (iocp->ioc_cmd != SIOCLIFADDIF) {
+	if (iocp != NULL && iocp->ioc_cmd != SIOCLIFADDIF) {
 		hook_nic_event_t *info;
 		if ((info = ipif->ipif_ill->ill_nic_event_info) != NULL) {
 			ip2dbg(("ip_sioctl_addr_tail: unexpected nic event %d "

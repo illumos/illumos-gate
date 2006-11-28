@@ -2744,7 +2744,7 @@ char *name;
 /* Returns:     Nil                                                         */
 /* Parameters:  is(I)  - pointer to state structure to delete               */
 /*              why(I) - if not 0, log reason why it was deleted            */
-/* Write Locks: ipf_state                                                   */
+/* Write Locks: ipf_state/ipf_global                                        */
 /*                                                                          */
 /* Deletes a state entry from the enumerated list as well as the hash table */
 /* and timeout queue lists.  Make adjustments to hash table statistics and  */
@@ -2755,7 +2755,8 @@ ipstate_t *is;
 int why;
 {
 
-	ASSERT(rw_read_locked(&ipf_state.ipf_lk) == 0);
+	ASSERT(rw_write_held(&ipf_global.ipf_lk) == 0 ||
+		rw_write_held(&ipf_state.ipf_lk) == 0);
 
 	/*
 	 * Since we want to delete this, remove it from the state table,

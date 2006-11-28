@@ -61,7 +61,7 @@ load_ipf() {
 	if [ -r ${IP6FILCONF} ]; then
 		ipf -6IFa -f ${IP6FILCONF} >/dev/null
 		if [ $? != 0 ]; then
-			echo "$0: load of ${IPFILCONF} into alternate set failed"
+			echo "$0: load of ${IP6FILCONF} into alternate set failed"
 			bad=1
 		fi
 	fi

@@ -1239,11 +1239,9 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		 * We dont have support for V6 yet. It will be provided
 		 * once RFE  6399103  has been delivered.
 		 * Until then, for V6 dsts, IP Filter will not call
-		 * this function. Instead, IP Filter will continue to do what
-		 * has been done since S10, namely it will use
-		 * ip_nexthop(),ip_nexthop_route() to obtain the
-		 * link-layer address of a V6 dst and then process the
-		 * packet and send it out on the wire on its own.
+		 * this function. Instead the netinfo framework provides
+		 * its own code path, in ip_inject_impl(), to achieve
+		 * what it needs to do, for the time being.
 		 */
 		ip1dbg(("ipfil_sendpkt: no V6 support \n"));
 		value = ECOMM;
