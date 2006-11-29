@@ -281,6 +281,7 @@
 @ MSG_TKN_HWCAP		"HWCAP"
 @ MSG_TKN_BINDINGS	"bindings"
 @ MSG_TKN_POSIX		"POSIX"
+@ MSG_TKN_DOTDOT	".."
 
 @ MSG_FMT_PATH		"%s/%s"
 @ MSG_FMT_CWD		"."

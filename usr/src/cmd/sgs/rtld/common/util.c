@@ -2315,12 +2315,19 @@ readenv_user(const char ** envp, Word *lmflags, Word *lmtflags, int aout)
 
 	/*
 	 * If we have a locale setting make sure its worth processing further.
-	 * Duplicate the string so that new locale setting can generically
-	 * cleanup any previous locales.
+	 * C and POSIX locales don't need any processing.  In addition, to
+	 * ensure no one escapes the /usr/lib/locale hierarchy, don't allow
+	 * the locale to contain a segment that leads upward in the file system
+	 * hierarchy (i.e. no '..' segments).   Given that we'll be confined to
+	 * the /usr/lib/locale hierarchy, there is no need to extensively
+	 * validate the mode or ownership of any message file (as libc's
+	 * generic handling of message files does).  Duplicate the string so
+	 * that new locale setting can generically cleanup any previous locales.
 	 */
 	if ((locale = glcs[CI_LCMESSAGES].lc_un.lc_ptr) != 0) {
 		if (((*locale == 'C') && (*(locale + 1) == '\0')) ||
-		    (strcmp(locale, MSG_ORIG(MSG_TKN_POSIX)) == 0))
+		    (strcmp(locale, MSG_ORIG(MSG_TKN_POSIX)) == 0) ||
+		    (strstr(locale, MSG_ORIG(MSG_TKN_DOTDOT)) != NULL))
 			glcs[CI_LCMESSAGES].lc_un.lc_ptr = 0;
 		else
 			glcs[CI_LCMESSAGES].lc_un.lc_ptr = strdup(locale);
@@ -2408,10 +2415,10 @@ dowrite(Prfbuf * prf)
  *		disable protection from overflows in the output buffer.
  *  pr_fd	a pointer to the file-descriptor the buffer will eventually be
  *		output to.  If pr_fd is set to '-1' then it's assumed there is
- *		no output buffer and doprf() will return with an error if the
- *		output buffer is overflowed.  If pr_fd is > -1 then when the
- *		output buffer is filled it will be flushed to pr_fd and then
- *		the available for additional data.
+ *		no output buffer, and doprf() will return with an error to
+ *		indicate an output buffer overflow.  If pr_fd is > -1 then when
+ *		the output buffer is filled it will be flushed to pr_fd and will
+ *		then be	available for additional data.
  */
 #define	FLG_UT_MINUS	0x0001	/* - */
 #define	FLG_UT_SHARP	0x0002	/* # */
@@ -2434,6 +2441,12 @@ dowrite(Prfbuf * prf)
 		} \
 		*bp++ = tmpc; \
 	}
+
+/*
+ * Define a local buffer size for building a numeric value - large enough to
+ * hold a 64-bit value.
+ */
+#define	NUM_SIZE	20
 
 size_t
 doprf(const char *format, va_list args, Prfbuf *prf)
@@ -2546,10 +2559,10 @@ again:
 			 * Numeric processing
 			 */
 			if (base) {
-				char		local[20];
+				char		local[NUM_SIZE];
+				size_t		ssize = 0, psize = 0;
 				const char	*string =
 						    MSG_ORIG(MSG_STR_HEXNUM);
-				size_t		ssize = 0, psize = 0;
 				const char	*prefix =
 						    MSG_ORIG(MSG_STR_EMPTY);
 				u_longlong_t	num;
@@ -2594,13 +2607,16 @@ again:
 					ssize++;
 				} while (num);
 
+				ASSERT(ssize < sizeof (local));
+
 				/*
 				 * Provide any precision or width padding.
 				 */
 				if (prec) {
 					/* LINTED */
 					_n = (int)(prec - ssize);
-					while (_n-- > 0) {
+					while ((_n-- > 0) &&
+					    (ssize < sizeof (local))) {
 						*_s++ = '0';
 						ssize++;
 					}

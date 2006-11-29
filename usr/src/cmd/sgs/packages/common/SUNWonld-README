@@ -1145,3 +1145,6 @@ Bugid   Risk Synopsis
 	/a/var/ld/ld.config in failsafe
 6487499 link_audit "make clobber" creates and populates proto area
 6488141 ld(1) should detect attempt to reference 0-length .bss section
+6487273 ld.so.1 may open arbitrary locale files when relative path is built
+	from locale environment vars
+6487284 ld.so.1: buffer overflow in doprf() function
