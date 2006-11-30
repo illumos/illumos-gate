@@ -651,8 +651,7 @@ extern mblk_t *ipsec_check_inbound_policy(mblk_t *, conn_t *, ipha_t *, ip6_t *,
     boolean_t);
 
 extern boolean_t ipsec_in_to_out(mblk_t *, ipha_t *, ip6_t *);
-extern void ipsec_log_policy_failure(queue_t *, int, char *, ipha_t *,
-		    ip6_t *, boolean_t);
+extern void ipsec_log_policy_failure(int, char *, ipha_t *, ip6_t *, boolean_t);
 extern boolean_t ipsec_inbound_accept_clear(mblk_t *, ipha_t *, ip6_t *);
 extern int ipsec_conn_cache_policy(conn_t *, boolean_t);
 extern mblk_t *ipsec_alloc_ipsec_out(void);

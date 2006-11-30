@@ -63,6 +63,9 @@
 #include <inet/ipsec_info.h>
 #include <inet/sadb.h>
 #include <inet/ipsec_impl.h>
+
+#include <inet/ip_impl.h>	/* For IP_MOD_ID */
+
 #include <inet/ipsecah.h>
 #include <inet/ipsecesp.h>
 #include <inet/ipdrop.h>
@@ -77,8 +80,8 @@ static mblk_t *ipsec_attach_global_policy(mblk_t *, conn_t *,
     ipsec_selector_t *);
 static mblk_t *ipsec_apply_global_policy(mblk_t *, conn_t *,
     ipsec_selector_t *);
-static mblk_t *ipsec_check_ipsecin_policy(queue_t *, mblk_t *,
-    ipsec_policy_t *, ipha_t *, ip6_t *, uint64_t);
+static mblk_t *ipsec_check_ipsecin_policy(mblk_t *, ipsec_policy_t *,
+    ipha_t *, ip6_t *, uint64_t);
 static void ipsec_in_release_refs(ipsec_in_t *);
 static void ipsec_out_release_refs(ipsec_out_t *);
 static void ipsec_action_reclaim(void *);
@@ -952,14 +955,13 @@ iph_ipvN(ipsec_policy_head_t *iph, boolean_t v6)
  *
  */
 void
-ipsec_log_policy_failure(queue_t *q, int type, char *func_name, ipha_t *ipha,
-    ip6_t *ip6h, boolean_t secure)
+ipsec_log_policy_failure(int type, char *func_name, ipha_t *ipha, ip6_t *ip6h,
+    boolean_t secure)
 {
 	char	sbuf[INET6_ADDRSTRLEN];
 	char	dbuf[INET6_ADDRSTRLEN];
 	char	*s;
 	char	*d;
-	short mid = 0;
 
 	ASSERT((ipha == NULL && ip6h != NULL) ||
 	    (ip6h == NULL && ipha != NULL));
@@ -976,13 +978,9 @@ ipsec_log_policy_failure(queue_t *q, int type, char *func_name, ipha_t *ipha,
 	/* Always bump the policy failure counter. */
 	ipsec_policy_failure_count[type]++;
 
-	if (q != NULL) {
-		mid = q->q_qinfo->qi_minfo->mi_idnum;
-	}
-	ipsec_rl_strlog(mid, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
-		ipsec_policy_failure_msgs[type],
-		func_name,
-		(secure ? "secure" : "not secure"), s, d);
+	ipsec_rl_strlog(IP_MOD_ID, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
+	    ipsec_policy_failure_msgs[type], func_name,
+	    (secure ? "secure" : "not secure"), s, d);
 }
 
 /*
@@ -1446,13 +1444,12 @@ ipsec_apply_global_policy(mblk_t *ipsec_mp, conn_t *connp,
 }
 
 
-/* ARGSUSED */
 /*
  * Consumes a reference to ipsp.
  */
 static mblk_t *
-ipsec_check_loopback_policy(queue_t *q, mblk_t *first_mp,
-    boolean_t mctl_present, ipsec_policy_t *ipsp)
+ipsec_check_loopback_policy(mblk_t *first_mp, boolean_t mctl_present,
+    ipsec_policy_t *ipsp)
 {
 	mblk_t *ipsec_mp;
 	ipsec_in_t *ii;
@@ -1468,7 +1465,8 @@ ipsec_check_loopback_policy(queue_t *q, mblk_t *first_mp,
 
 	/*
 	 * We should do an actual policy check here.  Revisit this
-	 * when we revisit the IPsec API.
+	 * when we revisit the IPsec API.  (And pass a conn_t in when we
+	 * get there.)
 	 */
 
 	return (first_mp);
@@ -1798,14 +1796,13 @@ ipsec_check_ipsecin_latch(ipsec_in_t *ii, mblk_t *mp, ipsec_latch_t *ipl,
  * Consumes a reference to ipsp.
  */
 static mblk_t *
-ipsec_check_ipsecin_policy(queue_t *q, mblk_t *first_mp, ipsec_policy_t *ipsp,
+ipsec_check_ipsecin_policy(mblk_t *first_mp, ipsec_policy_t *ipsp,
     ipha_t *ipha, ip6_t *ip6h, uint64_t pkt_unique)
 {
 	ipsec_in_t *ii;
 	ipsec_action_t *ap;
 	const char *reason = "no policy actions found";
 	mblk_t *data_mp, *ipsec_mp;
-	short mid = 0;
 	kstat_named_t *counter = &ipdrops_spd_got_secure;
 
 	data_mp = first_mp->b_cont;
@@ -1819,7 +1816,7 @@ ipsec_check_ipsecin_policy(queue_t *q, mblk_t *first_mp, ipsec_policy_t *ipsp,
 	ii = (ipsec_in_t *)ipsec_mp->b_rptr;
 
 	if (ii->ipsec_in_loopback)
-		return (ipsec_check_loopback_policy(q, first_mp, B_TRUE, ipsp));
+		return (ipsec_check_loopback_policy(first_mp, B_TRUE, ipsp));
 	ASSERT(ii->ipsec_in_type == IPSEC_IN);
 	ASSERT(ii->ipsec_in_secure);
 
@@ -1855,10 +1852,7 @@ ipsec_check_ipsecin_policy(queue_t *q, mblk_t *first_mp, ipsec_policy_t *ipsp,
 		}
 	}
 drop:
-	if (q != NULL) {
-		mid = q->q_qinfo->qi_minfo->mi_idnum;
-	}
-	ipsec_rl_strlog(mid, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
+	ipsec_rl_strlog(IP_MOD_ID, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
 	    "ipsec inbound policy mismatch: %s, packet dropped\n",
 	    reason);
 	IPPOL_REFRELE(ipsp);
@@ -2068,7 +2062,6 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 {
 	ipsec_policy_t *p;
 	ipsec_selector_t sel;
-	queue_t *q = NULL;
 	mblk_t *data_mp, *ipsec_mp;
 	boolean_t policy_present;
 	kstat_named_t *counter;
@@ -2095,9 +2088,6 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 		 */
 		return (first_mp);
 	}
-
-	if (connp != NULL)
-		q = CONNP_TO_WQ(connp);
 
 	if (ipsec_mp != NULL) {
 		ASSERT(ipsec_mp->b_datap->db_type == M_CTL);
@@ -2126,7 +2116,7 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 			 * Technically not a policy mismatch, but it is
 			 * an internal failure.
 			 */
-			ipsec_log_policy_failure(q, IPSEC_POLICY_MISMATCH,
+			ipsec_log_policy_failure(IPSEC_POLICY_MISMATCH,
 			    "ipsec_init_inbound_sel", ipha, ip6h, B_FALSE);
 			counter = &ipdrops_spd_nomem;
 			goto fail;
@@ -2158,14 +2148,15 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 			return (first_mp);
 		} else {
 			counter = &ipdrops_spd_got_secure;
-			ipsec_log_policy_failure(q, IPSEC_POLICY_NOT_NEEDED,
+			ipsec_log_policy_failure(IPSEC_POLICY_NOT_NEEDED,
 			    "ipsec_check_global_policy", ipha, ip6h, B_TRUE);
 			goto fail;
 		}
 	}
-	if ((ii != NULL) && (ii->ipsec_in_secure))
-		return (ipsec_check_ipsecin_policy(q, ipsec_mp, p, ipha, ip6h,
-			    pkt_unique));
+	if ((ii != NULL) && (ii->ipsec_in_secure)) {
+		return (ipsec_check_ipsecin_policy(ipsec_mp, p, ipha, ip6h,
+		    pkt_unique));
+	}
 	if (p->ipsp_act->ipa_allow_clear) {
 		BUMP_MIB(&ip_mib, ipsecInSucceeded);
 		IPPOL_REFRELE(p);
@@ -2177,7 +2168,7 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 	 * global policy check because the packet was cleartext, and it
 	 * should not have been.
 	 */
-	ipsec_log_policy_failure(q, IPSEC_POLICY_MISMATCH,
+	ipsec_log_policy_failure(IPSEC_POLICY_MISMATCH,
 	    "ipsec_check_global_policy", ipha, ip6h, B_FALSE);
 	counter = &ipdrops_spd_got_clear;
 
@@ -2400,8 +2391,6 @@ ipsec_check_inbound_policy(mblk_t *first_mp, conn_t *connp,
 {
 	ipsec_in_t *ii;
 	boolean_t ret;
-	queue_t *q;
-	short mid = 0;
 	mblk_t *mp = mctl_present ? first_mp->b_cont : first_mp;
 	mblk_t *ipsec_mp = mctl_present ? first_mp : NULL;
 	ipsec_latch_t *ipl;
@@ -2433,7 +2422,6 @@ clear:
 					return (first_mp);
 				} else {
 					ipsec_log_policy_failure(
-					    CONNP_TO_WQ(connp),
 					    IPSEC_POLICY_MISMATCH,
 					    "ipsec_check_inbound_policy", ipha,
 					    ip6h, B_FALSE);
@@ -2507,11 +2495,7 @@ clear:
 			BUMP_MIB(&ip_mib, ipsecInSucceeded);
 			return (first_mp);
 		}
-		q = CONNP_TO_WQ(connp);
-		if (q != NULL) {
-			mid = q->q_qinfo->qi_minfo->mi_idnum;
-		}
-		ipsec_rl_strlog(mid, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
+		ipsec_rl_strlog(IP_MOD_ID, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
 		    "ipsec inbound policy mismatch: %s, packet dropped\n",
 		    reason);
 		ip_drop_packet(first_mp, B_TRUE, NULL, NULL, counter,
@@ -2525,8 +2509,8 @@ clear:
 
 	unique_id = conn_to_unique(connp, mp, ipha, ip6h);
 	IPPOL_REFHOLD(ipl->ipl_in_policy);
-	first_mp = ipsec_check_ipsecin_policy(CONNP_TO_WQ(connp), first_mp,
-	    ipl->ipl_in_policy, ipha, ip6h, unique_id);
+	first_mp = ipsec_check_ipsecin_policy(first_mp, ipl->ipl_in_policy,
+	    ipha, ip6h, unique_id);
 	/*
 	 * NOTE: ipsecIn{Failed,Succeeeded} bumped by
 	 * ipsec_check_ipsecin_policy().
@@ -4010,18 +3994,12 @@ ipsec_attach_ipsec_out(mblk_t *mp, conn_t *connp, ipsec_policy_t *pol,
     uint8_t proto)
 {
 	mblk_t *ipsec_mp;
-	queue_t *q;
-	short mid = 0;
 
 	ASSERT((pol != NULL) || (connp != NULL));
 
 	ipsec_mp = ipsec_alloc_ipsec_out();
 	if (ipsec_mp == NULL) {
-		q = CONNP_TO_WQ(connp);
-		if (q != NULL) {
-			mid = q->q_qinfo->qi_minfo->mi_idnum;
-		}
-		ipsec_rl_strlog(mid, 0, 0, SL_ERROR|SL_NOTE,
+		ipsec_rl_strlog(IP_MOD_ID, 0, 0, SL_ERROR|SL_NOTE,
 		    "ipsec_attach_ipsec_out: Allocation failure\n");
 		BUMP_MIB(&ip_mib, ipOutDiscards);
 		ip_drop_packet(mp, B_FALSE, NULL, NULL, &ipdrops_spd_nomem,
@@ -5444,8 +5422,8 @@ ipsec_check_ipsecin_policy_reasm(mblk_t *ipsec_mp, ipsec_policy_t *pol,
 		 */
 		IPPOL_REFHOLD(pol);
 
-		if (ipsec_check_ipsecin_policy(NULL, ipsec_mp, pol,
-		    inner_ipv4, inner_ipv6, pkt_unique) != NULL) {
+		if (ipsec_check_ipsecin_policy(ipsec_mp, pol, inner_ipv4,
+		    inner_ipv6, pkt_unique) != NULL) {
 			if (data_tail == NULL) {
 				/* First one */
 				data_chain = data_tail = ipsec_mp->b_cont;
@@ -5504,14 +5482,22 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 	ipsec_policy_t *pol;
 	uint16_t tmpport;
 	selret_t rc;
-	boolean_t retval, port_policy_present, is_icmp;
+	boolean_t retval, port_policy_present, is_icmp, global_present;
 	in6_addr_t tmpaddr;
-	uint8_t flags;
+	uint8_t flags, *holder, *outer_hdr;
 
 	sel.ips_is_icmp_inv_acq = 0;
 
-	ASSERT(outer_ipv4 != NULL && outer_ipv6 == NULL ||
-	    outer_ipv4 == NULL && outer_ipv6 != NULL);
+	if (outer_ipv4 != NULL) {
+		ASSERT(outer_ipv6 == NULL);
+		outer_hdr = (uint8_t *)outer_ipv4;
+		global_present = ipsec_inbound_v4_policy_present;
+	} else {
+		outer_hdr = (uint8_t *)outer_ipv6;
+		global_present = ipsec_inbound_v6_policy_present;
+	}
+	ASSERT(outer_hdr != NULL);
+
 	ASSERT(inner_ipv4 != NULL && inner_ipv6 == NULL ||
 	    inner_ipv4 == NULL && inner_ipv6 != NULL);
 	ASSERT(message == *data_mp || message->b_cont == *data_mp);
@@ -5709,9 +5695,7 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 	 */
 
 	/* If no per-tunnel security, check global policy now. */
-	if (ipsec_mp != NULL &&
-	    (((outer_ipv4 != NULL) && !ipsec_inbound_v4_policy_present) ||
-		((outer_ipv6 != NULL) && !ipsec_inbound_v6_policy_present))) {
+	if (ipsec_mp != NULL && !global_present) {
 		if (((ipsec_in_t *)(ipsec_mp->b_rptr))->
 		    ipsec_in_icmp_loopback) {
 			/*
@@ -5728,11 +5712,23 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 		return (B_FALSE);
 	}
 
+	/*
+	 * The following assertion is valid because only the tun module alters
+	 * the mblk chain - stripping the outer header by advancing mp->b_rptr.
+	 */
+	ASSERT(is_icmp ||
+	    ((*data_mp)->b_datap->db_base <= outer_hdr &&
+		outer_hdr < (*data_mp)->b_rptr));
+	holder = (*data_mp)->b_rptr;
+	(*data_mp)->b_rptr = outer_hdr;
+
 	/* NOTE:  Frees message if it returns NULL. */
 	if (ipsec_check_global_policy(message, NULL, outer_ipv4, outer_ipv6,
 		(ipsec_mp != NULL)) == NULL) {
 		return (B_FALSE);
 	}
+
+	(*data_mp)->b_rptr = holder;
 
 	if (ipsec_mp != NULL)
 		freeb(ipsec_mp);

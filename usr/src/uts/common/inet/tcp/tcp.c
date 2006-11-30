@@ -12082,7 +12082,7 @@ tcp_check_policy(tcp_t *tcp, mblk_t *first_mp, ipha_t *ipha, ip6_t *ip6h,
 		if (act == NULL || act->ipa_act.ipa_type == IPSEC_ACT_BYPASS ||
 		    act->ipa_act.ipa_type == IPSEC_ACT_CLEAR)
 			return (B_TRUE);
-		ipsec_log_policy_failure(tcp->tcp_wq, IPSEC_POLICY_MISMATCH,
+		ipsec_log_policy_failure(IPSEC_POLICY_MISMATCH,
 		    "tcp_check_policy", ipha, ip6h, secure);
 		ip_drop_packet(first_mp, B_TRUE, NULL, NULL,
 		    &ipdrops_tcp_clear, &tcp_dropper);
@@ -12093,9 +12093,8 @@ tcp_check_policy(tcp_t *tcp, mblk_t *first_mp, ipha_t *ipha, ip6_t *ip6h,
 	 * We have a secure packet.
 	 */
 	if (act == NULL) {
-		ipsec_log_policy_failure(tcp->tcp_wq,
-		    IPSEC_POLICY_NOT_NEEDED, "tcp_check_policy", ipha, ip6h,
-		    secure);
+		ipsec_log_policy_failure(IPSEC_POLICY_NOT_NEEDED,
+		    "tcp_check_policy", ipha, ip6h, secure);
 		ip_drop_packet(first_mp, B_TRUE, NULL, NULL,
 		    &ipdrops_tcp_secure, &tcp_dropper);
 		return (B_FALSE);

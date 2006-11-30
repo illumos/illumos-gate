@@ -763,7 +763,7 @@ esp_fix_natt_checksums(mblk_t *data_mp, ipsa_t *assoc)
 
 
 /*
- * Strip ESP header and fix IP header
+ * Strip ESP header, check padding, and fix IP header.
  * Returns B_TRUE on success, B_FALSE if an error occured.
  */
 static boolean_t
@@ -776,6 +776,7 @@ esp_strip_header(mblk_t *data_mp, boolean_t isv4, uint32_t ivlen,
 	mblk_t *scratch;
 	uint8_t nexthdr, padlen;
 	uint8_t lastpad;
+	uint8_t *lastbyte;
 
 	/*
 	 * Strip ESP data and fix IP header.
@@ -807,9 +808,9 @@ esp_strip_header(mblk_t *data_mp, boolean_t isv4, uint32_t ivlen,
 	 * lastpad is the last byte of the padding, which can be used for
 	 * a quick check to see if the padding is correct.
 	 */
-	nexthdr = *(scratch->b_wptr - 1);
-	padlen = *(scratch->b_wptr - 2);
-	lastpad = *(scratch->b_wptr - 3);
+	lastbyte = scratch->b_wptr - 1;
+	nexthdr = *lastbyte--;
+	padlen = *lastbyte--;
 
 	if (isv4) {
 		/* Fix part of the IP header. */
@@ -822,7 +823,7 @@ esp_strip_header(mblk_t *data_mp, boolean_t isv4, uint32_t ivlen,
 		    sizeof (esph_t) - ivlen) {
 			ESP_BUMP_STAT(bad_decrypt);
 			ipsec_rl_strlog(info.mi_idnum, 0, 0, SL_ERROR | SL_WARN,
-			    "Possibly corrupt ESP packet.");
+			    "Corrupt ESP packet (padlen too big).\n");
 			esp1dbg(("padlen (%d) is greater than:\n", padlen));
 			esp1dbg(("pkt len(%d) - ip hdr - esp hdr - ivlen(%d) "
 			    "= %d.\n", ntohs(ipha->ipha_length), ivlen,
@@ -867,7 +868,7 @@ esp_strip_header(mblk_t *data_mp, boolean_t isv4, uint32_t ivlen,
 		    ivlen) {
 			ESP_BUMP_STAT(bad_decrypt);
 			ipsec_rl_strlog(info.mi_idnum, 0, 0, SL_ERROR | SL_WARN,
-			    "Possibly corrupt ESP packet.");
+			    "Corrupt ESP packet (v6 padlen too big).\n");
 			esp1dbg(("padlen (%d) is greater than:\n", padlen));
 			esp1dbg(("pkt len(%u) - ip hdr - esp hdr - ivlen(%d)"
 			    " = %u.\n", (unsigned)(ntohs(ip6h->ip6_plen)
@@ -888,41 +889,57 @@ esp_strip_header(mblk_t *data_mp, boolean_t isv4, uint32_t ivlen,
 		    2 - sizeof (esph_t) - ivlen);
 	}
 
-	if (ipsecesp_padding_check > 0 &&
-		padlen != lastpad && padlen != 0) {
-		ipsec_rl_strlog(info.mi_idnum, 0, 0, SL_ERROR | SL_WARN,
-		    "Possibly corrupt ESP packet.");
-		esp1dbg(("lastpad (%d) not equal to padlen (%d):\n",
-		    lastpad, padlen));
-		ESP_BUMP_STAT(bad_padding);
-		*counter = &ipdrops_esp_bad_padding;
-		return (B_FALSE);
-	}
+	if (ipsecesp_padding_check > 0 && padlen > 0) {
+		/*
+		 * Weak padding check: compare last-byte to length, they
+		 * should be equal.
+		 */
+		lastpad = *lastbyte--;
 
-	if (ipsecesp_padding_check > 1) {
-		uint8_t *last = (uint8_t *)(scratch->b_wptr - 3);
-		uint8_t lastval = *last;
+		if (padlen != lastpad) {
+			ipsec_rl_strlog(info.mi_idnum, 0, 0, SL_ERROR | SL_WARN,
+			    "Corrupt ESP packet (lastpad != padlen).\n");
+			esp1dbg(("lastpad (%d) not equal to padlen (%d):\n",
+				    lastpad, padlen));
+			ESP_BUMP_STAT(bad_padding);
+			*counter = &ipdrops_esp_bad_padding;
+			return (B_FALSE);
+		}
 
 		/*
-		 * this assert may have to become an if
-		 * and a pullup if we start accepting
-		 * multi-dblk mblks. Any packet here will
-		 * have been pulled up in esp_inbound.
+		 * Strong padding check: Check all pad bytes to see that
+		 * they're ascending.  Go backwards using a descending counter
+		 * to verify.  padlen == 1 is checked by previous block, so
+		 * only bother if we've more than 1 byte of padding.
+		 * Consequently, start the check one byte before the location
+		 * of "lastpad".
 		 */
-		ASSERT(MBLKL(scratch) >= lastval + 3);
+		if (ipsecesp_padding_check > 1) {
+			/*
+			 * This assert may have to become an if and a pullup
+			 * if we start accepting multi-dblk mblks. For now,
+			 * though, any packet here will have been pulled up in
+			 * esp_inbound.
+			 */
+			ASSERT(MBLKL(scratch) >= lastpad + 3);
 
-		while (lastval != 0) {
-			if (lastval != *last) {
-				ipsec_rl_strlog(info.mi_idnum, 0, 0,
-				    SL_ERROR | SL_WARN,
-				    "Possibly corrupt ESP packet.");
-				esp1dbg(("padding not in correct"
-				    " format:\n"));
-				ESP_BUMP_STAT(bad_padding);
-				*counter = &ipdrops_esp_bad_padding;
-				return (B_FALSE);
+			/*
+			 * Use "--lastpad" because we already checked the very
+			 * last pad byte previously.
+			 */
+			while (--lastpad != 0) {
+				if (lastpad != *lastbyte) {
+					ipsec_rl_strlog(info.mi_idnum, 0, 0,
+					    SL_ERROR | SL_WARN, "Corrupt ESP "
+					    "packet (bad padding).\n");
+					esp1dbg(("padding not in correct"
+						    " format:\n"));
+					ESP_BUMP_STAT(bad_padding);
+					*counter = &ipdrops_esp_bad_padding;
+					return (B_FALSE);
+				}
+				lastbyte--;
 			}
-			lastval--; last--;
 		}
 	}
 
@@ -2051,7 +2068,7 @@ esp_outbound(mblk_t *mp)
 	uintptr_t esplen = sizeof (esph_t);
 	uint8_t protocol;
 	ipsa_t *assoc;
-	uint_t iv_len = 0, mac_len = 0;
+	uint_t iv_len, mac_len = 0;
 	uchar_t *icv_buf;
 	udpha_t *udpha;
 	boolean_t is_natt = B_FALSE;
@@ -2148,26 +2165,25 @@ esp_outbound(mblk_t *mp)
 		esplen += UDPH_SIZE;
 	}
 
-	if (assoc->ipsa_encr_alg != SADB_EALG_NULL)
-		iv_len = assoc->ipsa_iv_len;
-
 	/*
 	 * Set up ESP header and encryption padding for ENCR PI request.
 	 */
 
-	/*
-	 * Determine the padding length.   Pad to 4-bytes.
-	 *
-	 * Include the two additional bytes (hence the - 2) for the padding
-	 * length and the next header.  Take this into account when
-	 * calculating the actual length of the padding.
-	 */
-
+	/* Determine the padding length.  Pad to 4-bytes for no-encryption. */
 	if (assoc->ipsa_encr_alg != SADB_EALG_NULL) {
-		padlen = ((unsigned)(iv_len - datalen - 2)) % iv_len;
+		iv_len = assoc->ipsa_iv_len;
+
+		/*
+		 * Include the two additional bytes (hence the - 2) for the
+		 * padding length and the next header.  Take this into account
+		 * when calculating the actual length of the padding.
+		 */
+		ASSERT(ISP2(iv_len));
+		padlen = ((unsigned)(iv_len - datalen - 2)) & (iv_len - 1);
 	} else {
-		padlen = ((unsigned)(sizeof (uint32_t) - datalen - 2)) %
-		    sizeof (uint32_t);
+		iv_len = 0;
+		padlen = ((unsigned)(sizeof (uint32_t) - datalen - 2)) &
+		    (sizeof (uint32_t) - 1);
 	}
 
 	/* Allocate ESP header and IV. */

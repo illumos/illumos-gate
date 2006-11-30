@@ -35,6 +35,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/kmem.h>
+#include <sys/sysmacros.h>
 #include <sys/cmn_err.h>
 #include <sys/vtrace.h>
 #include <sys/debug.h>
@@ -3726,14 +3727,14 @@ ah_auth_in_done(mblk_t *ipsec_in)
 	ipha_t *ipha;
 	uint_t ah_offset = 0;
 	mblk_t *mp;
-	int align_len;
+	int align_len, newpos;
 	ah_t *ah;
-	ipha_t *nipha;
 	uint32_t length;
+	uint32_t *dest32;
+	uint8_t *dest;
 	ipsec_in_t *ii;
 	boolean_t isv4;
 	ip6_t *ip6h;
-	ip6_t *nip6h;
 	uint_t icv_len;
 	ipsa_t *assoc;
 	kstat_named_t *counter;
@@ -3774,6 +3775,7 @@ ah_auth_in_done(mblk_t *ipsec_in)
 	}
 
 	ah = (ah_t *)(mp->b_rptr + ah_offset);
+	newpos = sizeof (ah_t) + align_len;
 
 	/*
 	 * We get here only when authentication passed.
@@ -3812,22 +3814,18 @@ ah_auth_in_done(mblk_t *ipsec_in)
 
 	/*
 	 * We need to remove the AH header from the original
-	 * datagram. Easy way to do this is to use phdr_mp
-	 * to hold the IP header and the orginal mp to hold
-	 * the rest of it. So, we copy the IP header on to
-	 * phdr_mp, and set the b_rptr in mp past AH header.
+	 * datagram. Best way to do this is to move the pre-AH headers
+	 * forward in the (relatively simple) IPv4 case.  In IPv6, it's
+	 * a bit more complicated because of IPv6's next-header chaining,
+	 * but it's doable.
 	 */
 	if (isv4) {
-		bcopy(mp->b_rptr, phdr_mp->b_rptr, ah_offset);
-		phdr_mp->b_wptr = phdr_mp->b_rptr + ah_offset;
-		nipha = (ipha_t *)phdr_mp->b_rptr;
 		/*
 		 * Assign the right protocol, adjust the length as we
 		 * are removing the AH header and adjust the checksum to
 		 * account for the protocol and length.
 		 */
-		nipha->ipha_protocol = ah->ah_nexthdr;
-		length = ntohs(nipha->ipha_length);
+		length = ntohs(ipha->ipha_length);
 		if (!ah_age_bytes(assoc, length, B_TRUE)) {
 			/* The ipsa has hit hard expiration, LOG and AUDIT. */
 			ipsec_assocfailure(info.mi_idnum, 0, 0,
@@ -3839,16 +3837,12 @@ ah_auth_in_done(mblk_t *ipsec_in)
 			counter = &ipdrops_ah_bytes_expire;
 			goto ah_in_discard;
 		}
-		length -= (sizeof (ah_t) + align_len);
+		ipha->ipha_protocol = ah->ah_nexthdr;
+		length -= newpos;
 
-		nipha->ipha_length = htons((uint16_t)length);
-		nipha->ipha_hdr_checksum = 0;
-		nipha->ipha_hdr_checksum = (uint16_t)ip_csum_hdr(nipha);
-		/*
-		 * Skip IP,AH and the authentication data in the
-		 * original datagram.
-		 */
-		mp->b_rptr += (ah_offset + sizeof (ah_t) + align_len);
+		ipha->ipha_length = htons((uint16_t)length);
+		ipha->ipha_hdr_checksum = 0;
+		ipha->ipha_hdr_checksum = (uint16_t)ip_csum_hdr(ipha);
 	} else {
 		uchar_t *whereptr;
 		int hdrlen;
@@ -3857,13 +3851,11 @@ ah_auth_in_done(mblk_t *ipsec_in)
 		ip6_dest_t *dsthdr;
 		ip6_rthdr0_t *rthdr;
 
-		nip6h = (ip6_t *)phdr_mp->b_rptr;
-
 		/*
 		 * Make phdr_mp hold until the AH header and make
 		 * mp hold everything past AH header.
 		 */
-		length = ntohs(nip6h->ip6_plen);
+		length = ntohs(ip6h->ip6_plen);
 		if (!ah_age_bytes(assoc, length + sizeof (ip6_t), B_TRUE)) {
 			/* The ipsa has hit hard expiration, LOG and AUDIT. */
 			ipsec_assocfailure(info.mi_idnum, 0, 0,
@@ -3875,9 +3867,6 @@ ah_auth_in_done(mblk_t *ipsec_in)
 			counter = &ipdrops_ah_bytes_expire;
 			goto ah_in_discard;
 		}
-		bcopy(ip6h, nip6h, ah_offset);
-		phdr_mp->b_wptr = phdr_mp->b_rptr + ah_offset;
-		mp->b_rptr += (ah_offset + sizeof (ah_t) + align_len);
 
 		/*
 		 * Update the next header field of the header preceding
@@ -3885,8 +3874,8 @@ ah_auth_in_done(mblk_t *ipsec_in)
 		 * IPv6 header and proceed with the extension headers
 		 * until we find what we're looking for.
 		 */
-		nexthdr = &nip6h->ip6_nxt;
-		whereptr =  (uchar_t *)nip6h;
+		nexthdr = &ip6h->ip6_nxt;
+		whereptr =  (uchar_t *)ip6h;
 		hdrlen = sizeof (ip6_t);
 
 		while (*nexthdr != IPPROTO_AH) {
@@ -3913,16 +3902,29 @@ ah_auth_in_done(mblk_t *ipsec_in)
 			}
 		}
 		*nexthdr = ah->ah_nexthdr;
-
-		length -= (sizeof (ah_t) + align_len);
-		nip6h->ip6_plen = htons((uint16_t)length);
+		length -= newpos;
+		ip6h->ip6_plen = htons((uint16_t)length);
 	}
+
+	/* Now that we've fixed the IP header, move it forward. */
+	mp->b_rptr += newpos;
+	if (IS_P2ALIGNED(mp->b_rptr, sizeof (uint32_t))) {
+		dest32 = (uint32_t *)(mp->b_rptr + ah_offset);
+		while (--dest32 >= (uint32_t *)mp->b_rptr)
+			*dest32 = *(dest32 - (newpos >> 2));
+	} else {
+		dest = mp->b_rptr + ah_offset;
+		while (--dest >= mp->b_rptr)
+			*dest = *(dest - newpos);
+	}
+	freeb(phdr_mp);
+	ipsec_in->b_cont = mp;
 
 	if (is_system_labeled()) {
 		/*
 		 * inherit the label by setting it in the new ip header
 		 */
-		mblk_setcred(phdr_mp, DB_CRED(mp));
+		mblk_setcred(mp, DB_CRED(mp));
 	}
 	return (IPSEC_STATUS_SUCCESS);
 
