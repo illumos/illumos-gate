@@ -126,7 +126,4 @@ check_add_drv()
 	
 }
 
-check_add_drv -b "${BASEDIR}" -i \
-'"SUNW,niumx"
-'\
--m '* 0666 root sys' niumx
+check_add_drv -b "${BASEDIR}" -i '"SUNW,niumx"' -m '* 0666 root sys' niumx
