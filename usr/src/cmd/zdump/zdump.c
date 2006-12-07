@@ -314,10 +314,11 @@ char	*argv[];
 		for (;;) {
 			if (t >= cuthitime)
 				break;
+			/* check if newt will overrun maximum time_t value */
+			if (t > LONG_MAX - (SECSPERHOUR * 12))
+				break;
 			newt = t + SECSPERHOUR * 12;
 			if (newt >= cuthitime)
-				break;
-			if (newt <= t)
 				break;
 			newtmp = localtime(&newt);
 			if (newtmp != NULL)
