@@ -279,7 +279,7 @@ void
 sync_data_memory(caddr_t va, size_t len)
 {
 	/* Call memory sync function */
-	mem_sync(va, len);
+	(void) mem_sync(va, len);
 }
 
 size_t

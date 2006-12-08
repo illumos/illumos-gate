@@ -27,6 +27,7 @@
 
 #include <sys/types.h>
 #include <sys/machsystm.h>
+#include <sys/sysmacros.h>
 #include <sys/cpuvar.h>
 #include <sys/async.h>
 #include <sys/ontrap.h>
@@ -586,31 +587,42 @@ mem_scrub(uint64_t paddr, uint64_t len)
 }
 
 /*
- * Call hypervisor to flush the memory region. The memory region
- * must be within the same page frame.
+ * Call hypervisor to flush the memory region.
+ * Both va and len must be MMU_PAGESIZE aligned.
+ * Returns the total number of bytes flushed.
  */
-void
+uint64_t
 mem_sync(caddr_t va, size_t len)
 {
 	uint64_t pa, length, flushed;
+	uint64_t chunk_len = MMU_PAGESIZE;
+	uint64_t total_flushed = 0;
 
-	pa = va_to_pa((caddr_t)va);
+	if (((uint64_t)va | (uint64_t)len) & MMU_PAGEOFFSET)
+		return (total_flushed);
 
-	if (pa == (uint64_t)-1)
-		return;
+	while (len > 0) {
+		pa = va_to_pa((caddr_t)va);
+		if (pa == (uint64_t)-1)
+			return (total_flushed);
 
-	ASSERT((pa >> MMU_PAGESHIFT) == ((pa + len - 1) >> MMU_PAGESHIFT));
+		length = chunk_len;
+		flushed = 0;
 
-	length = len;
-	flushed = 0;
+		while (length > 0) {
+			if (hv_mem_sync(pa, length, &flushed) != H_EOK)
+				return (total_flushed);
 
-	while (length > 0) {
-		if (hv_mem_sync(pa, length, &flushed) != H_EOK)
-			break;
+			pa += flushed;
+			length -= flushed;
+			total_flushed += flushed;
+		}
 
-		pa += flushed;
-		length -= flushed;
+		va += chunk_len;
+		len -= chunk_len;
 	}
+
+	return (total_flushed);
 }
 
 /*

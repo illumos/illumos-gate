@@ -142,7 +142,7 @@ void error_init(void);
 void cpu_async_log_err(void *);
 void cpu_ce_log_err(struct async_flt *);
 void cpu_ue_log_err(struct async_flt *);
-void mem_sync(caddr_t, size_t);
+uint64_t mem_sync(caddr_t, size_t);
 
 #endif	/* _ASM */
 

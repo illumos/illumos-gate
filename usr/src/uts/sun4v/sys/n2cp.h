@@ -693,6 +693,40 @@ int	n2cp_map_cpu_to_cwq(n2cp_t *, int);
 int	n2cp_map_nextcwq(n2cp_t *);
 cwq_entry_t	*n2cp_map_findcwq(n2cp_t *, int);
 
+#ifdef N2_ERRATUM_175
+
+typedef struct noncache_info {
+	int		n_workaround_enabled;
+	/*
+	 * Stats to track how many (4M) slabs get allocated.
+	 * Intended for debugging problems or performance analysis.
+	 */
+	uint64_t	n_alloc;	/* # contig slabs alloc'd */
+	uint64_t	n_free;		/* # contig slabs free'd */
+	uint64_t	n_alloc_fail;	/* contig_mem_alloc failures */
+	uint64_t	n_hat_fail;	/* hat_getattr failures */
+	uint64_t	n_sync_fail;	/* mem_sync failures */
+	/*
+	 * The following are function pointers to switch between
+	 * standard contig_mem_alloc/free and bcopy, and our special
+	 * noncache_contig_mem_alloc/free and noncache_bcopy.
+	 * Set up at driver attach time.
+	 */
+	void		*(*n_contig_alloc)(size_t);
+	void		(*n_contig_free)(void *, size_t);
+	void		(*n_bcopy)(const void *, void *, size_t);
+} noncache_info_t;
+
+extern noncache_info_t	n2cp_nc;
+
+#define	BCOPY	n2cp_nc.n_bcopy
+
+#else /* N2_ERRATUM_175 */
+
+#define	BCOPY	bcopy
+
+#endif /* N2_ERRATUM_175 */
+
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus
