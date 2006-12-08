@@ -328,6 +328,7 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 		break;
 	case INTEL_BR_910:
 	case INTEL_BR_910M:
+	case INTEL_BR_945:
 		memval = pci_config_get8(softstate->tsoft_pcihdl, I8XX_CONF_GC);
 		switch (memval & I8XX_GC_MODE_MASK) {
 		case I8XX_GC_MODE1:

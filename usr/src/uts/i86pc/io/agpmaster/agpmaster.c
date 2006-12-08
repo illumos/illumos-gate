@@ -63,6 +63,11 @@ int agpm_debug = 0;
 #define	IS_IGD(agpmaster) ((agpmaster->agpm_dev_type == DEVICE_IS_I810) || \
 		    (agpmaster->agpm_dev_type == DEVICE_IS_I830))
 
+
+#define	IS_INTEL_9XX(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_910) || \
+		    (agpmaster->agpm_id == INTEL_IGD_910M) || \
+		    (agpmaster->agpm_id == INTEL_IGD_945))
+
 static struct modlmisc modlmisc = {
 	&mod_miscops, "AGP master interfaces v%I%"
 };
@@ -167,8 +172,7 @@ agpmaster_attach(dev_info_t *devi, agp_master_softc_t **master_softcp,
 
 	if (!detect_i8xx_device(agpmaster)) {
 		/* map mmio register set */
-		if ((agpmaster->agpm_id == INTEL_IGD_910) ||
-		    (agpmaster->agpm_id == INTEL_IGD_910M)) {
+		if (IS_INTEL_9XX(agpmaster)) {
 			status = ddi_regs_map_setup(devi, I915_GTTADDR_BAR,
 			    &agpmaster->agpm_data.agpm_gtt.gtt_mmio_base,
 			    0, 0, &i8xx_dev_access,
@@ -186,8 +190,7 @@ agpmaster_attach(dev_info_t *devi, agp_master_softc_t **master_softcp,
 			goto fail;
 		}
 		/* get GTT range base offset */
-		if ((agpmaster->agpm_id == INTEL_IGD_910) ||
-		    (agpmaster->agpm_id == INTEL_IGD_910M)) {
+		if (IS_INTEL_9XX(agpmaster)) {
 			agpmaster->agpm_data.agpm_gtt.gtt_addr =
 			    agpmaster->agpm_data.agpm_gtt.gtt_mmio_base;
 		} else
@@ -196,8 +199,7 @@ agpmaster_attach(dev_info_t *devi, agp_master_softc_t **master_softcp,
 			I8XX_PTE_OFFSET;
 
 		/* get graphics memory size */
-		if ((agpmaster->agpm_id == INTEL_IGD_910) ||
-		    (agpmaster->agpm_id == INTEL_IGD_910M)) {
+		if (IS_INTEL_9XX(agpmaster)) {
 			status = ddi_dev_regsize(devi, I915_FB_REGSET,
 			    &reg_size);
 		} else
@@ -216,8 +218,7 @@ agpmaster_attach(dev_info_t *devi, agp_master_softc_t **master_softcp,
 
 		agpmaster->agpm_data.agpm_gtt.gtt_info.igd_apersize =
 		    BYTES2MB(reg_size);
-		if ((agpmaster->agpm_id == INTEL_IGD_910) ||
-		    (agpmaster->agpm_id == INTEL_IGD_910M)) {
+		if (IS_INTEL_9XX(agpmaster)) {
 			value = pci_config_get32(pci_acc_hdl,
 			    I915_CONF_GMADR);
 		} else
@@ -466,6 +467,7 @@ detect_i8xx_device(agp_master_softc_t *master_softc)
 	case INTEL_IGD_865G:
 	case INTEL_IGD_910:
 	case INTEL_IGD_910M:
+	case INTEL_IGD_945:
 		master_softc->agpm_dev_type = DEVICE_IS_I830;
 		break;
 	default:		/* unknown id */

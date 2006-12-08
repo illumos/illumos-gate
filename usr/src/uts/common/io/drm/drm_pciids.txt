@@ -226,6 +226,7 @@
 0x8086 0x2572 0 "Intel i865G GMCH"
 0x8086 0x2582 0 "Intel i915G"
 0x8086 0x2592 0 "Intel i915GM"
+0x8086 0x2772 0 "Intel i945G"
 
 [imagine]
 0x105d 0x2309 IMAGINE_128 "Imagine 128"

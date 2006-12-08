@@ -20,6 +20,7 @@ BRALIAS="\
 	\"pci8086,2570\" \
 	\"pci8086,2580\" \
 	\"pci8086,2590\" \
+	\"pci8086,2770\" \
 	"
 CPUGART='"pci1022,1103"'
 DRVPERM='* 0644 root sys'
