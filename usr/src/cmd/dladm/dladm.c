@@ -2649,8 +2649,8 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 	if (link == NULL)
 		die("link name must be specified");
 
-	if (proplist == NULL)
-		if (!reset) {
+	if (proplist == NULL) {
+		if (!reset)
 			die("link property must be specified");
 
 		status = dladm_set_prop(link, NULL, NULL, 0, DLADM_OPT_TEMP);
