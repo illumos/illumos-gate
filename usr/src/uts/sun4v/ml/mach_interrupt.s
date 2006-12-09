@@ -213,6 +213,16 @@ dev_mondo(void)
 						!       in the intr_vec_table
 	add	%g1, %g7, %g7			! %g7 = &intr_vec_table[inum]
 	ldn	[%g7], %g1			! %g1 = ptr to intr_vec_t (iv)
+
+	!
+	! Verify the pointer to first intr_vec_t for a given inum and
+	! it should not be NULL. If this pointer is NULL, then it is a
+	! spurious interrupt. In this case, just call setvecint_tl1 and
+	! it will handle this spurious interrupt.
+	!
+	brz,a,pn	%g1, 1f			! if %g1 is NULL
+	ldx	[%g2 + MCPU_DEV_Q_SIZE], %g4	! queue size - delay slot
+
 	ldx	[%g1 + IV_PAYLOAD_BUF], %g1	! %g1 = iv->iv_payload_buf
 	brz,a,pt	%g1, 1f			! if it is NULL
 	ldx	[%g2 + MCPU_DEV_Q_SIZE], %g4	! queue size - delay slot
@@ -271,12 +281,10 @@ dev_mondo(void)
 	mov	DEV_MONDO_Q_HD, %g6	
 	ldxa	[%g6]ASI_QUEUE, %g6		! New head offset 
 	stna	%g6, [%g4 + TRAP_ENT_F1]%asi
-#ifdef __sparcv9
 	ldx	[%g2 + MCPU_DEV_Q_SIZE], %g6
 	stna	%g6, [%g4 + TRAP_ENT_F2]%asi	! Q Size	
 	stna	%g7, [%g4 + TRAP_ENT_F3]%asi	! tail offset
 	stna	%g0, [%g4 + TRAP_ENT_F4]%asi
-#endif
 	TRACE_NEXT(%g4, %g6, %g3)
 #endif /* TRAPTRACE */
 
