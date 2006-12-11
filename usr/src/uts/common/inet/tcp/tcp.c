@@ -8396,8 +8396,8 @@ tcp_header_init_ipv6(tcp_t *tcp)
 	return (0);
 }
 
-/* At minimum we need 4 bytes in the TCP header for the lookup */
-#define	ICMP_MIN_TCP_HDR	12
+/* At minimum we need 8 bytes in the TCP header for the lookup */
+#define	ICMP_MIN_TCP_HDR	8
 
 /*
  * tcp_icmp_error is called by tcp_rput_other to process ICMP error messages
@@ -8417,7 +8417,6 @@ tcp_icmp_error(tcp_t *tcp, mblk_t *mp)
 	uint32_t new_mss;
 	uint32_t ratio;
 	size_t mp_size = MBLKL(mp);
-	uint32_t seg_ack;
 	uint32_t seg_seq;
 
 	/* Assume IP provides aligned packets - otherwise toss */
@@ -8526,16 +8525,13 @@ noticmpv4:
 		ipsec_mctl = B_FALSE;
 	}
 
-	seg_ack = ABE32_TO_U32(tcph->th_ack);
 	seg_seq = ABE32_TO_U32(tcph->th_seq);
 	/*
 	 * TCP SHOULD check that the TCP sequence number contained in
 	 * payload of the ICMP error message is within the range
-	 * SND.UNA <= SEG.SEQ < SND.NXT. and also SEG.ACK <= RECV.NXT
+	 * SND.UNA <= SEG.SEQ < SND.NXT.
 	 */
-	if (SEQ_LT(seg_seq, tcp->tcp_suna) ||
-		SEQ_GEQ(seg_seq, tcp->tcp_snxt) ||
-		SEQ_GT(seg_ack, tcp->tcp_rnxt)) {
+	if (SEQ_LT(seg_seq, tcp->tcp_suna) || SEQ_GEQ(seg_seq, tcp->tcp_snxt)) {
 		/*
 		 * If the ICMP message is bogus, should we kill the
 		 * connection, or should we just drop the bogus ICMP
@@ -8709,7 +8705,6 @@ tcp_icmp_error_ipv6(tcp_t *tcp, mblk_t *mp, boolean_t ipsec_mctl)
 	boolean_t secure;
 	mblk_t *first_mp = mp;
 	size_t mp_size;
-	uint32_t seg_ack;
 	uint32_t seg_seq;
 
 	/*
@@ -8803,15 +8798,13 @@ noticmpv6:
 		ipsec_mctl = B_FALSE;
 	}
 
-	seg_ack = ntohl(tcpha->tha_ack);
 	seg_seq = ntohl(tcpha->tha_seq);
 	/*
 	 * TCP SHOULD check that the TCP sequence number contained in
 	 * payload of the ICMP error message is within the range
-	 * SND.UNA <= SEG.SEQ < SND.NXT. and also SEG.ACK <= RECV.NXT
+	 * SND.UNA <= SEG.SEQ < SND.NXT.
 	 */
-	if (SEQ_LT(seg_seq, tcp->tcp_suna) || SEQ_GEQ(seg_seq, tcp->tcp_snxt) ||
-	    SEQ_GT(seg_ack, tcp->tcp_rnxt)) {
+	if (SEQ_LT(seg_seq, tcp->tcp_suna) || SEQ_GEQ(seg_seq, tcp->tcp_snxt)) {
 		/*
 		 * If the ICMP message is bogus, should we kill the
 		 * connection, or should we just drop the bogus ICMP
