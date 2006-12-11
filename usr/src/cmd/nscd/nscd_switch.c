@@ -240,6 +240,7 @@ getparams(
 	int		j;
 	char		*dbn;
 	const char	*n;
+	char		*me = "getparams";
 
 	p = &params->p;
 	(void) memset(p, 0, sizeof (*p));
@@ -307,7 +308,15 @@ getparams(
 		}
 	}
 
-	assert(params->dbi != -1);
+	/*
+	 * if unsupported database, let caller determine what to do next
+	 */
+	if (params->dbi == -1) {
+		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
+		(me, "unsupported database: %s\n", p->name);
+		return (NSCD_CFG_UNSUPPORTED_SWITCH_DB);
+	}
+
 	return (rc);
 }
 
@@ -617,7 +626,16 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 	NSCD_SW_STATS_G.lookup_request_queued_g++;
 
 	/* determine db index, cfg db index, etc */
-	(void) getparams(search_fnum, initf, &params);
+	if (getparams(search_fnum, initf, &params) ==
+			NSCD_CFG_UNSUPPORTED_SWITCH_DB) {
+		/*
+		 * if unsupported database and the request is from the
+		 * the door, tell the door client to try it locally
+		 */
+		if (initf == nscd_initf)
+			res = NSS_TRYLOCAL;
+		goto error_exit;
+	}
 	dbi = params.dbi;
 
 	/* get address of the switch engine return data area */
@@ -1001,8 +1019,12 @@ nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 	(me, "rootp = %p, initf = %p, contextpp = %p \n",
 		rootp, initf, contextpp);
 
-	/* get the nsw db index via the initf function */
-	(void) getparams(-1, initf, &params);
+	/*
+	 * Get the nsw db index via the initf function. If unsupported
+	 * database, no need to continue
+	 */
+	if (getparams(-1, initf, &params) == NSCD_CFG_UNSUPPORTED_SWITCH_DB)
+		return;
 
 	/* get address of the switch engine return data area */
 	if (initf == nscd_initf)

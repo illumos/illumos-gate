@@ -838,10 +838,6 @@ findConnection(int flags, const char *serverAddr,
 		return (-1);
 	*conp = NULL;
 
-	/* no need to find connection if anonymous */
-	if (auth->auth.type == NS_LDAP_AUTH_NONE)
-		return (-1);
-
 	/* if a new connection is requested, no need to continue */
 	if (flags & NS_LDAP_NEW_CONN)
 		return (-1);
