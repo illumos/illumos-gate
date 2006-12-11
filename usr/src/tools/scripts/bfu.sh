@@ -178,6 +178,7 @@ global_zone_only_files="
 	boot/solaris/devicedb/master
 	boot/solaris/filelist.ramdisk
 	etc/aggregation.conf
+	etc/dladm/*
 	etc/bootrc
 	etc/crypto/kcf.conf
 	etc/datalink.conf
@@ -6308,25 +6309,6 @@ mondo_loop() {
 		create_datalink_conf
 	fi
 
-	# Move existing /etc/aggregation.conf entries to
-	# /etc/dladm/aggregation.conf; or, if bfu'ing
-	# backwards, move aggregation.conf back to /etc
-	aggr_old=$rootprefix/etc/aggregation.conf
-	aggr_new=$rootprefix/etc/dladm/aggregation.conf
-	if [ $new_dladm = yes ]; then
-		if [ -f $aggr_old ]; then
-			# use cat instead of cp/mv to keep owner+group of dest
-			cat $aggr_old > $aggr_new
-			rm -f $aggr_old
-		fi
-	else
-		if [ -f $aggr_new ]; then
-			cp $aggr_new $aggr_old
-			chgrp sys $aggr_old
-			rm -rf $rootprefix/etc/dladm
-		fi
-	fi
-
 	print "\nRestoring configuration files.\n"
 
 	cd $root
@@ -6540,8 +6522,27 @@ mondo_loop() {
 				rm -f ${rzi}.bfu.$$
 			fi
 		fi
-	fi
 
+		# Move existing /etc/aggregation.conf entries to
+		# /etc/dladm/aggregation.conf; or, if bfu'ing
+		# backwards, move aggregation.conf back to /etc
+		aggr_old=$rootprefix/etc/aggregation.conf
+		aggr_new=$rootprefix/etc/dladm/aggregation.conf
+		if [ $new_dladm = yes ]; then
+			if [ -f $aggr_old ]; then
+				# use cat instead of cp/mv to keep
+				# owner+group of dest
+				cat $aggr_old > $aggr_new
+				rm -f $aggr_old
+			fi
+		else
+			if [ -f $aggr_new ]; then
+				cp $aggr_new $aggr_old
+				chgrp sys $aggr_old
+				rm -rf $rootprefix/etc/dladm
+			fi
+		fi
+	fi
 
 	print "\nFor each file in conflict, your version has been restored."
 	print "The new versions are under $rootprefix/bfu.conflicts."
