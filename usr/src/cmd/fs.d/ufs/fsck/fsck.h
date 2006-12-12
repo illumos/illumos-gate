@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -530,7 +530,7 @@ void		cacheacl(struct dinode *, fsck_ino_t);
 void		cacheino(struct dinode *, fsck_ino_t);
 void		catch(int);
 void		catchquit(int);
-caddr_t		cg_sanity(struct cg *, int, int *);
+caddr_t		cg_sanity(struct cg *, int);
 void		cgflush(void);
 int		cgisdirty(void);
 int		changeino(fsck_ino_t, caddr_t, fsck_ino_t);

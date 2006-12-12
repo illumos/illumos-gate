@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1131,7 +1131,7 @@ allocino(fsck_ino_t request, int type)
 	fsck_ino_t ino;
 	struct dinode *dp;
 	struct cg *cgp = &cgrp;
-	int cg, cg_fatal;
+	int cg;
 	time_t t;
 	caddr_t err;
 
@@ -1176,13 +1176,10 @@ allocino(fsck_ino_t request, int type)
 	 */
 	cg = itog(&sblock, ino);
 	(void) getblk(&cgblk, cgtod(&sblock, cg), (size_t)sblock.fs_cgsize);
-	err = cg_sanity(cgp, cg, &cg_fatal);
+	err = cg_sanity(cgp, cg);
 	if (err != NULL) {
 		pfatal("CG %d: %s\n", cg, err);
 		free((void *)err);
-		if (cg_fatal)
-			errexit(
-	    "Irreparable cylinder group header problem.  Program terminated.");
 		if (reply("REPAIR") == 0)
 			errexit("Program terminated.");
 		fix_cg(cgp, cg);

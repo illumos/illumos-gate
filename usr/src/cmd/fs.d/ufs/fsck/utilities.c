@@ -1906,7 +1906,7 @@ rawname(caddr_t name)
 	}
 
 caddr_t
-cg_sanity(struct cg *cgp, int cgno, int *is_fatal)
+cg_sanity(struct cg *cgp, int cgno)
 {
 	caddr_t full_err;
 	caddr_t this_err = NULL;
@@ -1920,14 +1920,12 @@ cg_sanity(struct cg *cgp, int cgno, int *is_fatal)
 
 	full_err = NULL;
 	full_len = 0;
-	*is_fatal = 0;
 
 	if (!cg_chkmagic(cgp)) {
 		this_len = fsck_asprintf(&this_err,
 		    "BAD CG MAGIC NUMBER (0x%x should be 0x%x)\n",
 		    cgp->cg_magic, CG_MAGIC);
 		Append_Error(full_err, full_len, this_err, this_len);
-		*is_fatal = 1;
 	}
 
 	if (cgp->cg_cgx != cgno) {
@@ -2156,6 +2154,13 @@ fix_cg(struct cg *cgp, int cgno)
 	if (cgp->cg_nextfreeoff != exp_nextfreeoff) {
 		cgp->cg_nextfreeoff = exp_nextfreeoff;
 	}
+
+	/*
+	 * Reset the magic, as we've recreated this cg, also
+	 * update the cg_time, as we're writing out the cg
+	 */
+	cgp->cg_magic = CG_MAGIC;
+	cgp->cg_time = time(NULL);
 
 	/*
 	 * We know there was at least one correctable problem,

@@ -45,11 +45,10 @@ pass5(void)
 {
 	caddr_t err;
 	int32_t c, blk, frags;
-	int cg_fatal;
 	size_t	basesize, sumsize, mapsize;
 	int excessdirs;
 	int inomapsize, blkmapsize;
-	int update_csums, bad_csum, update_bitmaps;
+	int update_csums, bad_csum_sb, bad_csum_cg, update_bitmaps;
 	struct fs *fs = &sblock;
 	struct cg *cg = &cgrp;
 	diskaddr_t dbase, dmax;
@@ -143,13 +142,10 @@ pass5(void)
 		 */
 		(void) getblk(&cgblk, (diskaddr_t)cgtod(fs, c),
 		    (size_t)fs->fs_cgsize);
-		err = cg_sanity(cg, c, &cg_fatal);
+		err = cg_sanity(cg, c);
 		if (err != NULL) {
 			pfatal("CG %d: %s\n", c, err);
 			free((void *)err);
-			if (cg_fatal)
-				errexit(
-	    "Irreparable cylinder group header problem.  Program terminated.");
 			if (reply("REPAIR") == 0)
 				errexit("Program terminated.");
 			fix_cg(cg, c);
@@ -273,37 +269,52 @@ pass5(void)
 		 * field.  This means that the fs_u field contains a
 		 * random value when the disk version is examined, but
 		 * fs_cs() gives us a valid pointer nonetheless.
+		 * We need to compare the recalculated summaries to
+		 * both the superblock version and the on disk version.
+		 * If either is bad, copy the calculated version over
+		 * the corrupt values.
 		 */
+
 		cs = &fs->fs_cs(fs, c);
-		bad_csum = (memcmp((void *)cs, (void *)&newcg->cg_cs,
+		bad_csum_sb = (memcmp((void *)cs, (void *)&newcg->cg_cs,
 		    sizeof (*cs)) != 0);
+
+		bad_csum_cg = (memcmp((void *)&cg->cg_cs, (void *)&newcg->cg_cs,
+		    sizeof (struct csum)) != 0);
 
 		/*
 		 * Has the user told us what to do yet?  If not, find out.
 		 */
-		if (bad_csum && (update_csums == -1)) {
+		if ((bad_csum_sb || bad_csum_cg) && (update_csums == -1)) {
 			if (preen) {
 				update_csums = 1;
-				(void) printf("CORRECTING BAD CG SUMMARIES\n");
+				(void) printf("CORRECTING BAD CG SUMMARIES"
+					" FOR CG %d\n", c);
 			} else if (update_csums == -1) {
 				update_csums = (reply(
-				    "CORRECT BAD CG SUMMARIES") == 1);
+				    "CORRECT BAD CG SUMMARIES FOR CG %d",
+				    c) == 1);
 			}
 		}
 
-		if (bad_csum && (update_csums == 1)) {
+		if (bad_csum_sb && (update_csums == 1)) {
 			(void) memmove((void *)cs, (void *)&newcg->cg_cs,
 			    sizeof (*cs));
 			sbdirty();
+			(void) printf("CORRECTED SUPERBLOCK SUMMARIES FOR"
+				    " CG %d\n", c);
+		}
 
-			(void) memmove((void *)cg, (void *)newcg,
-			    (size_t)basesize);
+		if (bad_csum_cg && (update_csums == 1)) {
+			(void) memmove((void *)&cg->cg_cs,
+				    (void *)&newcg->cg_cs,
+				    sizeof (struct csum));
 			/* LINTED per cg_sanity() */
 			(void) memmove((void *)&cg_blktot(cg)[0],
 			    /* LINTED macro aligned as above */
 			    (void *)&cg_blktot(newcg)[0], sumsize);
 			cgdirty();
-			(void) printf("CORRECTED SUMMARY FOR CG %d\n", c);
+			(void) printf("CORRECTED SUMMARIES FOR CG %d\n", c);
 		}
 
 		excessdirs = cg->cg_cs.cs_ndir - newcg->cg_cs.cs_ndir;

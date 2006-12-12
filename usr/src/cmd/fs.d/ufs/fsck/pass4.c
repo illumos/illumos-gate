@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -163,7 +163,6 @@ pass4check(struct inodesc *idesc)
 	int cylno;
 	struct cg *cgp = &cgrp;
 	caddr_t err;
-	int cg_fatal;
 
 	if ((idesc->id_truncto >= 0) && (idesc->id_lbn < idesc->id_truncto)) {
 		if (debug)
@@ -210,13 +209,10 @@ pass4check(struct inodesc *idesc)
 				cylno = dtog(&sblock, cg_frag);
 				(void) getblk(&cgblk, cgtod(&sblock, cylno),
 				    (size_t)sblock.fs_cgsize);
-				err = cg_sanity(cgp, cylno, &cg_fatal);
+				err = cg_sanity(cgp, cylno);
 				if (err != NULL) {
 					pfatal("CG %d: %s\n", cylno, err);
 					free((void *)err);
-					if (cg_fatal)
-						errexit(
-	    "Irreparable cylinder group header problem.  Program terminated.");
 					if (reply("REPAIR") == 0)
 						errexit("Program terminated.");
 					fix_cg(cgp, cylno);
