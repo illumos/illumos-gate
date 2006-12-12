@@ -1,7 +1,4 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -20,6 +17,9 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -73,7 +73,7 @@ XRINCS	= $(XRINCDIRS:%=-I%) $(HDRDIR:%=-I%) $(CPPFLAGS)
 
 include $(XRMAKEFILE)
 
-XRADDDEF	= *.[Ccshlxy] Makefile* *.il* *.cc llib-* *.xml *.dtd.*
+XRADDDEF	= *.[Ccdshlxy] Makefile* *.il* *.cc llib-* *.xml *.dtd.*
 XRDELDEF	= *.ln
 XRFINDADD	= $(XRADDDEF:%=-o -name '%') $(XRADD:%=-o -name '%')
 XRFINDDEL	= $(XRDELDEF:%=-a ! -name '%') $(XRDEL:%=-a ! -name '%')
