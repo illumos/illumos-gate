@@ -5484,6 +5484,7 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 	selret_t rc;
 	boolean_t retval, port_policy_present, is_icmp, global_present;
 	in6_addr_t tmpaddr;
+	ipaddr_t tmp4;
 	uint8_t flags, *holder, *outer_hdr;
 
 	sel.ips_is_icmp_inv_acq = 0;
@@ -5722,10 +5723,47 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 	holder = (*data_mp)->b_rptr;
 	(*data_mp)->b_rptr = outer_hdr;
 
+	if (is_icmp) {
+		/*
+		 * For ICMP packets, "outer_ipvN" is set to the outer header
+		 * that is *INSIDE* the ICMP payload.  For global policy
+		 * checking, we need to reverse src/dst on the payload in
+		 * order to construct selectors appropriately.  See "ripha"
+		 * constructions in ip.c.  To avoid a bug like 6478464 (see
+		 * earlier in this file), we will actually exchange src/dst
+		 * in the packet, and reverse if after the call to
+		 * ipsec_check_global_policy().
+		 */
+		if (outer_ipv4 != NULL) {
+			tmp4 = outer_ipv4->ipha_src;
+			outer_ipv4->ipha_src = outer_ipv4->ipha_dst;
+			outer_ipv4->ipha_dst = tmp4;
+		} else {
+			ASSERT(outer_ipv6 != NULL);
+			tmpaddr = outer_ipv6->ip6_src;
+			outer_ipv6->ip6_src = outer_ipv6->ip6_dst;
+			outer_ipv6->ip6_dst = tmpaddr;
+		}
+	}
+
 	/* NOTE:  Frees message if it returns NULL. */
 	if (ipsec_check_global_policy(message, NULL, outer_ipv4, outer_ipv6,
 		(ipsec_mp != NULL)) == NULL) {
 		return (B_FALSE);
+	}
+
+	if (is_icmp) {
+		/* Set things back to normal. */
+		if (outer_ipv4 != NULL) {
+			tmp4 = outer_ipv4->ipha_src;
+			outer_ipv4->ipha_src = outer_ipv4->ipha_dst;
+			outer_ipv4->ipha_dst = tmp4;
+		} else {
+			/* No need for ASSERT()s now. */
+			tmpaddr = outer_ipv6->ip6_src;
+			outer_ipv6->ip6_src = outer_ipv6->ip6_dst;
+			outer_ipv6->ip6_dst = tmpaddr;
+		}
 	}
 
 	(*data_mp)->b_rptr = holder;
