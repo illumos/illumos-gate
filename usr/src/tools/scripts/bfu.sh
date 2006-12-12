@@ -3209,6 +3209,15 @@ mpxiodisableno='^[ 	]*mpxio-disable[ 	]*=[ 	]*"no"[ 	]*;'
 mpxiodisableyes='^[ 	]*mpxio-disable[ 	]*=[ 	]*"yes"[ 	]*;'
 
 #
+# fix up audit permissions
+#
+fix_up_audit()
+{
+	chmod 644 $root/etc/security/audit_control
+	chmod 644 $root/etc/security/audit_user
+}
+
+#
 # disable mpxio on fp(7D) ports using fp.conf
 #
 disable_mpxio_using_fpconf()
@@ -6543,6 +6552,9 @@ mondo_loop() {
 			fi
 		fi
 	fi
+
+	# Fix up audit permissions
+	fix_up_audit
 
 	print "\nFor each file in conflict, your version has been restored."
 	print "The new versions are under $rootprefix/bfu.conflicts."
