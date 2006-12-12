@@ -3300,12 +3300,13 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		 */
 		MDI_PI_UNLOCK(pip);
 		/*
-		 * Do not offline if path will become last path and path
-		 * is busy for user initiated events.
+		 * Don't offline the client dev_info node unless we have
+		 * no available paths left at all.
 		 */
 		cdip = ct->ct_dip;
 		if ((flag & NDI_DEVI_REMOVE) &&
-		    (MDI_CLIENT_STATE(ct) == MDI_CLIENT_STATE_DEGRADED)) {
+		    (MDI_CLIENT_STATE(ct) == MDI_CLIENT_STATE_DEGRADED) &&
+		    (ct->ct_path_count == 1)) {
 			i_mdi_client_unlock(ct);
 			rv = ndi_devi_offline(cdip, 0);
 			if (rv != NDI_SUCCESS) {
