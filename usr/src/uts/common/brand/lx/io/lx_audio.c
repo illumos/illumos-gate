@@ -509,12 +509,12 @@ lxa_dev_open(lxa_state_t *lxa_state)
 		rv = ldi_open_by_name(odev, lxa_state->lxas_odev_flags,
 		    kcred, &lh, li);
 		if (rv != 0) {
-			/* if we opened an input device, close it now */
-			if (lxa_state->lxas_idev_lh != NULL) {
-				(void) ldi_close(lxa_state->lxas_idev_lh,
-				    lxa_state->lxas_idev_flags, kcred);
-			}
-
+			/*
+			 * If this open failed and we previously opened an
+			 * input device, it is the responsibility of the
+			 * caller to close that device after we return
+			 * failure here.
+			 */
 			zcmn_err(getzoneid(), CE_WARN, "lxa_open_dev: "
 			    "unable to open audio device: %s", odev);
 			zcmn_err(getzoneid(), CE_WARN, "lxa_open_dev: "

@@ -390,20 +390,42 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int fd)
 
 	case LXPR_PID_CURDIR:
 		ASSERT(p != NULL);
-		up = PTOU(p);
-		lxpnp->lxpr_realvp = up->u_cdir;
-		ASSERT(lxpnp->lxpr_realvp != NULL);
-		VN_HOLD(lxpnp->lxpr_realvp);
+
+		/*
+		 * Zombie check.  p_stat is officially protected by pidlock,
+		 * but we can't grab pidlock here because we already hold
+		 * p_lock.  Luckily if we look at the process exit code
+		 * we see that p_stat only transisions from SRUN to SZOMB
+		 * while p_lock is held.  Aside from this, the only other
+		 * p_stat transition that we need to be aware about is
+		 * SIDL to SRUN, but that's not a problem since lxpr_lock()
+		 * ignores nodes in the SIDL state so we'll never get a node
+		 * that isn't already in the SRUN state.
+		 */
+		if (p->p_stat == SZOMB) {
+			lxpnp->lxpr_realvp = NULL;
+		} else {
+			up = PTOU(p);
+			lxpnp->lxpr_realvp = up->u_cdir;
+			ASSERT(lxpnp->lxpr_realvp != NULL);
+			VN_HOLD(lxpnp->lxpr_realvp);
+		}
 		vp->v_type = VLNK;
 		lxpnp->lxpr_mode = 0777;	/* anyone does anything ! */
 		break;
 
 	case LXPR_PID_ROOTDIR:
 		ASSERT(p != NULL);
-		up = PTOU(p);
-		lxpnp->lxpr_realvp = up->u_rdir != NULL ? up->u_rdir : rootdir;
-		ASSERT(lxpnp->lxpr_realvp != NULL);
-		VN_HOLD(lxpnp->lxpr_realvp);
+		/* Zombie check.  see locking comment above */
+		if (p->p_stat == SZOMB) {
+			lxpnp->lxpr_realvp = NULL;
+		} else {
+			up = PTOU(p);
+			lxpnp->lxpr_realvp =
+			    up->u_rdir != NULL ? up->u_rdir : rootdir;
+			ASSERT(lxpnp->lxpr_realvp != NULL);
+			VN_HOLD(lxpnp->lxpr_realvp);
+		}
 		vp->v_type = VLNK;
 		lxpnp->lxpr_mode = 0777;	/* anyone does anything ! */
 		break;

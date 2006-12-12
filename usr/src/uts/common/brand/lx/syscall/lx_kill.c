@@ -185,22 +185,26 @@ lx_kill(pid_t lx_pid, int lx_sig)
 		s_pid = initpid;
 	} else if (lx_pid == 0) {
 		s_pid = 0;
+	} else if (lx_pid > 0) {
+		if (lx_lpid_to_spair(lx_pid, &s_pid, NULL) != 0) {
+			/*
+			 * If we didn't find this pid that means it doesn't
+			 * exist in this zone.
+			 */
+			return (set_errno(ESRCH));
+		}
 	} else {
-		if (lx_pid < 0)
-			err = lx_lpid_to_spair(-lx_pid, &s_pid, NULL);
-		else
-			err = lx_lpid_to_spair(lx_pid, &s_pid, NULL);
-
-		/*
-		 * If we didn't find this pid in our hash table, it either
-		 * means that the process doesn't exist, that it exists but
-		 * isn't a Linux process, or that it is a zombie process.
-		 * In each of these cases, assuming that the Linux pid is
-		 * the same as the Solaris pid will get us the correct
-		 * behavior.
-		 */
-		if (err < 0)
-			s_pid = lx_pid;
+		ASSERT(lx_pid < 0);
+		if (lx_lpid_to_spair(-lx_pid, &s_pid, NULL) != 0) {
+			/*
+			 * If we didn't find this pid it means that the
+			 * process group leader doesn't exist in this zone.
+			 * In this case assuming that the Linux pid is
+			 * the same as the Solaris pid will get us the
+			 * correct behavior.
+			 */
+			s_pid = -lx_pid;
+		}
 	}
 
 	if ((s_pid == initpid) && ((err = init_sig_check(sig, s_pid)) != 0))

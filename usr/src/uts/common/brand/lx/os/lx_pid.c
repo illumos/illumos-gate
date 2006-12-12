@@ -214,7 +214,7 @@ lx_lpid_to_spair(pid_t l_pid, pid_t *s_pid, id_t *s_tid)
 	struct lx_pid *hp;
 
 	mutex_enter(&hash_lock);
-	for (hp = ltos_pid_hash[LTOS_HASH(l_pid)]; hp; hp = hp->ltos_next)
+	for (hp = ltos_pid_hash[LTOS_HASH(l_pid)]; hp; hp = hp->ltos_next) {
 		if (l_pid == hp->l_pid) {
 			if (s_pid)
 				*s_pid = hp->s_pid;
@@ -222,9 +222,30 @@ lx_lpid_to_spair(pid_t l_pid, pid_t *s_pid, id_t *s_tid)
 				*s_tid = hp->s_tid;
 			break;
 		}
+	}
 	mutex_exit(&hash_lock);
+	if (hp != NULL)
+		return (0);
 
-	return (hp ? 0 : -1);
+	/*
+	 * We didn't find this pid in our translation table.
+	 * But this still could be the pid of a native process
+	 * running in the current zone so check for that here.
+	 *
+	 * Note that prfind() only searches for processes in the current zone.
+	 */
+	mutex_enter(&pidlock);
+	if (prfind(l_pid) != NULL) {
+		mutex_exit(&pidlock);
+		if (s_pid)
+			*s_pid = l_pid;
+		if (s_tid)
+			*s_tid = 0;
+		return (0);
+	}
+	mutex_exit(&pidlock);
+
+	return (-1);
 }
 
 /*

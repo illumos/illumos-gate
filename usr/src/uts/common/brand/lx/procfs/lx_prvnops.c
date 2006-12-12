@@ -2614,12 +2614,11 @@ lxpr_readdir_procdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 
 		/*
 		 * Skip indices for which there is no pid_entry, PIDs for
-		 * which there is no corresponding process, the zched process,
-		 * a PID of 0, and anything the security policy doesn't allow
+		 * which there is no corresponding process, a PID of 0,
+		 * and anything the security policy doesn't allow
 		 * us to look at.
 		 */
 		if ((p = pid_entry(i)) == NULL || p->p_stat == SIDL ||
-		    p->p_pid == curproc->p_zone->zone_zsched->p_pid ||
 		    p->p_pid == 0 ||
 		    secpolicy_basic_procinfo(CRED(), p, curproc) != 0) {
 			mutex_exit(&pidlock);
@@ -2834,6 +2833,7 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop)
 	char bp[MAXPATHLEN + 1];
 	size_t buflen = sizeof (bp);
 	lxpr_node_t *lxpnp = VTOLXP(vp);
+	vnode_t *rvp = lxpnp->lxpr_realvp;
 	pid_t pid;
 	int error = 0;
 
@@ -2845,13 +2845,10 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop)
 	 * Try to produce a symlink name for anything that's really a regular
 	 * file or directory (but not for anything else)
 	 */
-	if (lxpnp->lxpr_realvp != NULL && (lxpnp->lxpr_realvp->v_type == VDIR ||
-	    lxpnp->lxpr_realvp->v_type == VREG)) {
+	if (rvp != NULL && (rvp->v_type == VDIR || rvp->v_type == VREG)) {
 		if ((error = lxpr_access(vp, VREAD, 0, CRED())) != 0)
 			return (error);
-		error = vnodetopath(NULL, lxpnp->lxpr_realvp, bp, buflen,
-		    CRED());
-		if (error != 0)
+		if ((error = vnodetopath(NULL, rvp, bp, buflen, CRED())) != 0)
 			return (error);
 	} else {
 		switch (lxpnp->lxpr_type) {
@@ -2871,6 +2868,10 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop)
 
 			(void) snprintf(bp, buflen, "%d", pid);
 			break;
+		case LXPR_PID_CURDIR:
+		case LXPR_PID_ROOTDIR:
+		case LXPR_PID_EXE:
+			return (EACCES);
 		default:
 			/*
 			 * Need to return error so that nothing thinks
