@@ -134,6 +134,10 @@ void clean_string(char *ptr)
 }
 
 enum trust {TRUSTED, UNTRUSTED};
+
+static char *arg_string(enum trust type, char *fmt, ...) __PRINTFLIKE(2);
+
+/* PRINTFLIKE2 */
 static char *
 arg_string(enum trust type, char *fmt, ...)
 {
@@ -884,7 +888,7 @@ exec(int type, ...)
 			procuid, procgid);
 
 		av[ac++] = arg_string(TRUSTED, "%s", Lp_Slow_Filter);
-		av[ac++] = arg_string(TRUSTED, "%s/%s/%s", Lp_Temp, cp);
+		av[ac++] = arg_string(TRUSTED, "%s/%s", Lp_Temp, cp);
 		for (listp = request->request->file_list; *listp; listp++)
 			av[ac++] = arg_string(TRUSTED, "%s", *listp);
 
