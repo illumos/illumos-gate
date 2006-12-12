@@ -430,6 +430,14 @@ static int in_64bit_mode(void);
 static int validate_size(int fd, diskaddr_t size);
 static void dump_sblock(void);
 
+/*
+ * Workaround for mkfs to function properly on disks attached to XMIT 2.X
+ * controller. If the address is not aligned at 8 byte boundary, mkfs on
+ * disks attached to XMIT 2.X controller exhibts un-predictable behaviour.
+ */
+#define	XMIT_2_X_ALIGN	8
+#pragma	align XMIT_2_X_ALIGN(fsun, altfsun, cgun)
+
 union {
 	struct fs fs;
 	char pad[SBSIZE];
