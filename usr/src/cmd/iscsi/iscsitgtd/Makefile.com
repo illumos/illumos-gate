@@ -51,7 +51,7 @@ CLEANFILES += $(OBJS)
 
 all: $(PROG)
 
-LDLIBS	+=	-luuid -lxml2 -lsocket -lnsl -ldoor -lavl -lmd5 -ladm -lefi
+LDLIBS	+= -lumem -luuid -lxml2 -lsocket -lnsl -ldoor -lavl -lmd5 -ladm -lefi
 LDLIBS  +=	-liscsitgt -lzfs
 
 $(PROG): $(OBJS) $(COMMON_OBJS)

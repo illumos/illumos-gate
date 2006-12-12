@@ -41,7 +41,10 @@
 #include "target.h"
 
 pthread_mutex_t	sess_mutex;
-int		sess_num;
+/*
+ * This value is used as the TSIH which must be non-zero.
+ */
+int		sess_num	= 1;
 iscsi_sess_t	*sess_head;
 
 static void session_free(struct iscsi_sess *s);
@@ -58,8 +61,6 @@ void
 session_init()
 {
 	(void) pthread_mutex_init(&sess_mutex, NULL);
-	sess_num	= 0;
-	sess_head	= 0;
 }
 
 /*

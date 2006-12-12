@@ -157,8 +157,6 @@ conn_poller(void *v)
 					goto error;
 
 			} else if (c->c_sess->s_type == SessionNormal) {
-				queue_prt(c->c_mgmtq, Q_CONN_NONIO,
-				    "CON%x  Send a NOP request\n", c->c_num);
 				queue_noop_in(c);
 			}
 			break;
@@ -390,14 +388,35 @@ conn_process(void *v)
 			    sizeof (debug) - strlen(debug),
 			    "0x%x ", cmd->c_ttt);
 		}
-		free(cmd);
+
+		/*
+		 * Make sure to free the resources that the T10
+		 * layer still has allocated. These are commands which
+		 * the T10 layer couldn't release directly during it's
+		 * shutdown because the state had been changed to
+		 * indicate the commands was now "owned" by the
+		 * transport.
+		 */
+		if (cmd->c_t10_cmd)
+			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T6);
+
+		/*
+		 * Perform the final clean up which is done during
+		 * cmd_remove().
+		 */
+		if (cmd->c_scb_extended)
+			free(cmd->c_scb_extended);
+		if (cmd->c_data_alloc == True)
+			free(cmd->c_data);
+
+		umem_cache_free(iscsi_cmd_cache, cmd);
 		cmd = n;
 	}
 	(void) pthread_mutex_unlock(&c->c_mutex);
 
 	if (i) {
 		/*
-		 * If there where any found send a message indicating
+		 * If there where lost commands found send a message indicating
 		 * which ones. This message is purely for information
 		 * and is not indicative of an error.
 		 */
@@ -511,6 +530,7 @@ iscsi_conn_data_rqst(t10_cmd_t *t)
 	rtt.ttt		= cmd->c_ttt;
 	rtt.data_offset = htonl(T10_DATA_OFFSET(t));
 	rtt.data_length = htonl(T10_DATA_LEN(t));
+	rtt.rttsn	= htonl(cmd->c_datasn++);
 
 	(void) pthread_mutex_lock(&c->c_sess->s_mutex);
 	rtt.maxcmdsn = htonl(iscsi_cmd_window(c) + c->c_sess->s_seencmdsn);
@@ -519,7 +539,7 @@ iscsi_conn_data_rqst(t10_cmd_t *t)
 
 #ifdef FULL_DEBUG
 	queue_prt(c->c_mgmtq, Q_CONN_IO,
-	    "CON%x  TTT 0x%x R2T offset 0x%x, len 0x%x\n",
+	    "CON%x  R2T TTT 0x%x offset 0x%x, len 0x%x\n",
 	    c->c_num, cmd->c_ttt, T10_DATA_OFFSET(t), T10_DATA_LEN(t));
 #endif
 
@@ -579,7 +599,6 @@ iscsi_conn_data_in(t10_cmd_t *t)
 			send_datain_pdu(c, t, 0);
 		}
 		t10_cmd_shoot_event(t, T10_Cmd_T5);
-		cmd->c_t10_cmd = NULL;
 
 		if (cmd->c_t10_delayed &&
 		    (cmd->c_t10_delayed->id_offset == cmd->c_offset_in)) {
@@ -639,7 +658,6 @@ iscsi_conn_cmdcmplt(t10_cmd_t *t)
 	}
 
 	t10_cmd_shoot_event(t, T10_Cmd_T5);
-	cmd->c_t10_cmd = NULL;
 
 	if (cmd->c_scb_extended != NULL)
 		free(cmd->c_scb_extended);
@@ -689,7 +707,7 @@ send_datain_pdu(iscsi_conn_t *c, t10_cmd_t *t, uint8_t final_flag)
 
 	(void) pthread_mutex_lock(&c->c_sess->s_mutex);
 	rsp.maxcmdsn = htonl(iscsi_cmd_window(c) + c->c_sess->s_seencmdsn);
-	rsp.expcmdsn = htonl(c->c_sess->s_seencmdsn);
+	rsp.expcmdsn = htonl(c->c_sess->s_seencmdsn + 1);
 	(void) pthread_mutex_unlock(&c->c_sess->s_mutex);
 
 	send_iscsi_pkt(c, (iscsi_hdr_t *)&rsp, T10_DATA(t));
@@ -739,8 +757,8 @@ send_scsi_rsp(iscsi_conn_t *c, t10_cmd_t *t)
 			hton24(rsp.dlength, T10_SENSE_LEN(t));
 		}
 		queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-		    "CON%x  LUN%d SCSI Error Status: %d\n",
-		    c->c_num, t->c_lu->l_common->l_num, rsp.cmd_status);
+		    "CON%x  SCSI Error Status: %d\n",
+		    c->c_num, rsp.cmd_status);
 	} else {
 		rsp.response	= ISCSI_STATUS_CMD_COMPLETED;
 		rsp.expdatasn	= htonl(cmd->c_datasn);
@@ -1008,7 +1026,7 @@ conn_state(iscsi_conn_t *c, iscsi_transition_t t)
 			break;
 
 		case T4:
-			c->c_statsn = 1;
+			c->c_statsn = 0;
 			c->c_state = S4_IN_LOGIN;
 			break;
 
@@ -1133,6 +1151,44 @@ send_iscsi_pkt(iscsi_conn_t *c, iscsi_hdr_t *h, char *opt_text)
 			pad_len;
 	uint32_t	crc;
 
+#ifdef ETHEREAL_DEBUG
+	uint32_t	alen;
+	char		*abuf;
+
+	/*
+	 * For ethereal to correctly show the entire PDU and data everything
+	 * must be written once else the Solaris TCP stack will send this
+	 * out in multiple packets. Normally this isn't a problem, but when
+	 * attempting to debug certain interactions between an initiator
+	 * and this target is extremely benefical to have ethereal correctly
+	 * decode the SCSI payload for non I/O type packets.
+	 */
+	if (dlen < 512) {
+		/*
+		 * Find out how many pad bytes we need to send out.
+		 */
+		pad_len = (ISCSI_PAD_WORD_LEN -
+		    (dlen & (ISCSI_PAD_WORD_LEN - 1))) &
+		    (ISCSI_PAD_WORD_LEN - 1);
+		alen = sizeof (*h) + dlen + pad_len;
+		if ((abuf = malloc(alen)) == NULL) {
+			conn_state(c, T8);
+			return;
+		}
+		bzero(abuf, alen);
+		bcopy(h, abuf, sizeof (*h));
+		if (opt_text)
+			bcopy(opt_text, abuf + sizeof (*h), dlen);
+		if (write(c->c_fd, abuf, alen) != alen) {
+			conn_state(c, T8);
+			free(abuf);
+			return;
+		}
+		free(abuf);
+		return;
+	}
+#endif
+
 	/*
 	 * Sanity check. If there's a length in the header we must
 	 * have text to send or if the length is zero there better not
@@ -1225,7 +1281,7 @@ send_iscsi_pkt(iscsi_conn_t *c, iscsi_hdr_t *h, char *opt_text)
 #ifdef FULL_DEBUG
 	if (dlen != 0) {
 		queue_prt(c->c_mgmtq, Q_CONN_IO,
-		    "CON%x  Response(0x%x), Data: len=%d addr=0x%llx\n",
+		    "CON%x  Response(0x%x), Data: len=0x%x addr=0x%llx\n",
 		    c->c_num, h->opcode, dlen, opt_text);
 	}
 #endif

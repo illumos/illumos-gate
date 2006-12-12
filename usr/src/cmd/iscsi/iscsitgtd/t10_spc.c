@@ -147,6 +147,7 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	t10_lu_common_t		*lu = cmd->c_lu->l_common;
 	void			*v;
 	uint16_t		*vdv;
+	extended_inq_data_t	*eid;
 
 	/*
 	 * Information obtained from:
@@ -195,6 +196,7 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	 */
 	len = sizeof (struct vpd_hdr) + page83_len;
 	len = max(rqst_len, max(sizeof (*inq), len));
+	len = max(len, sizeof (*eid));
 
 	/*
 	 * Allocate space with an alignment that will work for any casting.
@@ -289,16 +291,12 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 	} else {
 
-		/*
-		 * Return the smallest amount of data between the requested
-		 * amount and the size of the Page83 data.
-		 */
-		rtn_len = min(rqst_len, sizeof (struct vpd_hdr) + page83_len);
-
 		/* ---- Common information returned with all page types ---- */
 		rsp_buf[0] = lu->l_dtype;
 		rsp_buf[1] = cdb[2];
 
+		queue_prt(mgmtq, Q_STE_NONIO, "SPC%d  INQUIRY Page%x request\n",
+		    lu->l_num, cdb[2]);
 		switch (cdb[2]) {
 		default:
 			spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
@@ -315,12 +313,41 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			 * page length as defined by (n - 3) where 'n' is
 			 * the last valid byte. In this case 5.
 			 */
-			rsp_buf[3]	= 2;
+			rsp_buf[3]	= 4;
 			rsp_buf[4]	= SPC_INQ_PAGE0;
-			rsp_buf[5]	= SPC_INQ_PAGE83;
+			rsp_buf[5]	= SPC_INQ_PAGE80;
+			rsp_buf[6]	= SPC_INQ_PAGE83;
+			rsp_buf[7]	= SPC_INQ_PAGE86;
+
+			/*
+			 * Return the smallest amount of data between the
+			 * requested amount and the size of the Page83 data.
+			 */
+			rtn_len = min(rqst_len, sizeof (struct vpd_hdr) +
+			    rsp_buf[3]);
+			break;
+
+		case SPC_INQ_PAGE80:
+			/*
+			 * Return the smallest amount of data between the
+			 * requested amount and the size of the Page80 data.
+			 */
+			rtn_len = min(rqst_len, sizeof (struct vpd_hdr) + 4);
+			rsp_buf[3]	= 4;
+			rsp_buf[4]	= 0x20;
+			rsp_buf[5]	= 0x20;
+			rsp_buf[6]	= 0x20;
+			rsp_buf[7]	= 0x20;
 			break;
 
 		case SPC_INQ_PAGE83:
+			/*
+			 * Return the smallest amount of data between the
+			 * requested amount and the size of the Page83 data.
+			 */
+			rtn_len = min(rqst_len, sizeof (struct vpd_hdr) +
+			    page83_len);
+
 			/*
 			 * Information obtained from:
 			 *    SPC-3 Revision 21c
@@ -448,6 +475,24 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			rbp		+= lu->l_guid_len;
 
 			break;
+
+		case SPC_INQ_PAGE86:
+			/*
+			 * Return the smallest amount of data between the
+			 * requested amount and the size of the Page86 data.
+			 */
+			rtn_len = min(rqst_len, sizeof (*eid));
+			eid = (extended_inq_data_t *)v;
+			eid->ei_hdr.device_type = lu->l_dtype;
+			eid->ei_hdr.page_code = cdb[2];
+			eid->ei_hdr.page_len[1] = 60; /* defined by spec */
+
+			/*
+			 * At this point in time we don't support any of the
+			 * extended data attributes. We should support
+			 * the task management bits though.
+			 */
+			break;
 		}
 	}
 
@@ -486,7 +531,8 @@ spc_mselect(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	}
 
 	if (((buf = (char *)calloc(1, cdb[4])) == NULL) ||
-	    (trans_rqst_dataout(cmd, buf, cdb[4], 0, 0) == False)) {
+	    (trans_rqst_dataout(cmd, buf, cdb[4], 0, buf,
+	    spc_free) == False)) {
 		trans_send_complete(cmd, STATUS_BUSY);
 	}
 }
@@ -528,7 +574,6 @@ spc_mselect_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 		trans_send_complete(cmd, STATUS_CHECK);
 		break;
 	}
-	free(data);
 	trans_send_complete(cmd, STATUS_GOOD);
 }
 

@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <syslog.h>
 #include <synch.h>
+#include <umem.h>
 
 #include "queue.h"
 #include "iscsi_conn.h"
@@ -96,13 +97,13 @@ queue_message_set(target_queue_t *q, uint32_t lvl, msg_type_t type,
 {
 	msg_t	*msg;
 
-	if ((msg = (msg_t *)calloc(sizeof (msg_t), 1)) == NULL)
+	if ((msg = umem_cache_alloc(queue_cache, 0)) == NULL)
 		return;
 
+	bzero(msg, sizeof (*msg));
 	msg->msg_pri_level	= lvl;
 	msg->msg_type		= type;
 	msg->msg_data		= data;
-	msg->msg_next		= NULL;
 
 	(void) pthread_mutex_lock(&q->q_mutex);
 
@@ -252,7 +253,7 @@ queue_reset(target_queue_t *q)
 					m->msg_next->msg_prev = m->msg_prev;
 			}
 			n = m->msg_next;
-			free(m);
+			queue_message_free(m);
 			m = n;
 			sema_wait(&q->q_sema);
 			break;
@@ -283,7 +284,7 @@ queue_reset(target_queue_t *q)
 void
 queue_message_free(msg_t *m)
 {
-	free(m);
+	umem_cache_free(queue_cache, m);
 }
 
 /*
@@ -303,7 +304,7 @@ queue_free(target_queue_t *q, void (*free_func)(msg_t *))
 		if (free_func != NULL)
 			(*free_func)(m);
 		n = m->msg_next;
-		free(m);
+		queue_message_free(m);
 		m = n;
 	}
 	(void) pthread_mutex_unlock(&q->q_mutex);

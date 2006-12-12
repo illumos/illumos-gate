@@ -34,9 +34,12 @@
 #include <synch.h>
 #include <sys/time.h>
 #include <sys/asynch.h>
+#include <umem.h>
+#include <strings.h>
 
 #include "iscsi_conn.h"
 #include "iscsi_cmd.h"
+#include "target.h"
 #include "utility.h"
 
 static pthread_mutex_t	cmd_mutex;
@@ -62,11 +65,14 @@ iscsi_cmd_init()
 iscsi_cmd_t *
 iscsi_cmd_alloc(iscsi_conn_t *c, int op)
 {
-	iscsi_cmd_t *cmd = (iscsi_cmd_t *)calloc(sizeof (iscsi_cmd_t), 1);
+	iscsi_cmd_t *cmd = umem_cache_alloc(iscsi_cmd_cache, UMEM_DEFAULT);
 
-	if (cmd == NULL)
+	if (cmd == NULL) {
+		queue_prt(mgmtq, Q_CONN_ERRS, "Failed to get command buf\n");
 		return (NULL);
+	}
 
+	bzero(cmd, sizeof (*cmd));
 	(void) pthread_mutex_lock(&cmd_mutex);
 	cmd->c_ttt = cmd_ttt++;
 	(void) pthread_mutex_unlock(&cmd_mutex);
@@ -156,8 +162,10 @@ iscsi_cmd_cancel(iscsi_conn_t *c, iscsi_cmd_t *cmd)
 	(void) pthread_mutex_lock(&c->c_mutex);
 	if (cmd->c_state == CmdAlloc) {
 		cmd->c_state = CmdCanceled;
-		if (cmd->c_t10_cmd != NULL)
+		if (cmd->c_t10_cmd != NULL) {
 			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T6);
+			cmd->c_t10_cmd = NULL;
+		}
 	}
 	(void) pthread_mutex_unlock(&c->c_mutex);
 }
@@ -218,7 +226,7 @@ iscsi_cmd_remove(iscsi_conn_t *c, uint32_t statsn)
 				cmd->c_data = NULL;
 			}
 			c->c_cmds_active--;
-			free(cmd);
+			umem_cache_free(iscsi_cmd_cache, cmd);
 			cmd = n;
 		} else if (sna_lte(statsn, cmd->c_statsn)) {
 			break;

@@ -47,6 +47,7 @@
 #include <sys/ucontext.h>
 #include <libzfs.h>
 #include <assert.h>
+#include <umem.h>
 
 #include <sys/scsi/generic/sense.h>
 #include <sys/scsi/generic/status.h>
@@ -83,6 +84,8 @@ static void cmd_common_free(t10_cmd_t *cmd);
 static Boolean_t load_params(t10_lu_common_t *lu, char *basedir);
 static Boolean_t fallocate(int fd, off64_t len);
 static t10_cmd_state_t t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e);
+static void clear_transport(transport_t t);
+
 #ifdef FULL_DEBUG
 static char *state_to_str(t10_cmd_state_t s);
 #endif
@@ -365,9 +368,10 @@ t10_cmd_create(t10_targ_handle_t t, int lun_number, uint8_t *cdb,
 	if (t == NULL)
 		goto error;
 
-	if ((cmd = calloc(1, sizeof (t10_cmd_t))) == NULL)
+	if ((cmd = umem_cache_alloc(t10_cmd_cache, UMEM_DEFAULT)) == NULL)
 		goto error;
 
+	bzero(cmd, sizeof (*cmd));
 	if ((cmd->c_cdb = malloc(cdb_len)) == NULL)
 		goto error;
 
@@ -396,7 +400,7 @@ error:
 	 * that had been allocated to the command.
 	 */
 	if (*cmdp == NULL)
-		free(cmd);
+		umem_cache_free(t10_cmd_cache, cmd);
 	return (False);
 }
 
@@ -430,6 +434,8 @@ Boolean_t
 t10_cmd_data(t10_targ_handle_t t, t10_cmd_t *cmd, size_t offset, char *data,
     size_t data_len)
 {
+	if (cmd == NULL)
+		return (False);
 	cmd->c_data	= data;
 	cmd->c_data_len	= data_len;
 	cmd->c_offset	= offset;
@@ -676,7 +682,30 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 void
 t10_cmd_shoot_event(t10_cmd_t *c, t10_cmd_event_t e)
 {
-	t10_lu_impl_t	*lu = c->c_lu;
+	t10_lu_impl_t	*lu;
+
+	/*
+	 * Since the transport may or may not have called into the T10 layer
+	 * to allocate a command it's possible that this will be NULL. Instead
+	 * of requiring every caller of this function to first check if the
+	 * command pointer is null we'll do the check here.
+	 */
+	if (c == NULL)
+		return;
+
+	lu = c->c_lu;
+
+	/*
+	 * If t10_cmd_create() fails for some reason other than lack
+	 * of memory the extended status will be set for the transport
+	 * to send out. There will not be any LU associated with this
+	 * command, but the transport will still try to free it.
+	 */
+	if (!lu) {
+		assert(e == T10_Cmd_T5);
+		cmd_common_free(c);
+		return;
+	}
 
 	(void) pthread_mutex_lock(&lu->l_cmd_mutex);
 	(void) t10_cmd_state_machine(c, e);
@@ -1014,7 +1043,7 @@ trans_cmd_dup(t10_cmd_t *cmd)
 {
 	t10_cmd_t	*c;
 
-	if ((c = calloc(1, sizeof (*c))) == NULL)
+	if ((c = umem_cache_alloc(t10_cmd_cache, UMEM_DEFAULT)) == NULL)
 		return (False);
 	bcopy(cmd, c, sizeof (*c));
 	if ((c->c_cdb = (uint8_t *)malloc(c->c_cdb_len)) == NULL) {
@@ -1054,7 +1083,7 @@ trans_send_datain(t10_cmd_t *c, char *data, size_t data_len, size_t offset,
 {
 #ifdef FULL_DEBUG
 	queue_prt(mgmtq, Q_STE_IO,
-	    "SAM%x  LUN%d DataIn %d, offset %d, Last %s\n",
+	    "SAM%x  LUN%d DataIn 0x%x, offset 0x%x, Last %s\n",
 	    c->c_lu->l_targ->s_targ_num, c->c_lu->l_common->l_num,
 	    data_len, offset, last == True ? "true" : "false");
 #endif
@@ -1082,11 +1111,13 @@ trans_send_datain(t10_cmd_t *c, char *data, size_t data_len, size_t offset,
  */
 Boolean_t
 trans_rqst_dataout(t10_cmd_t *cmd, char *data, size_t data_len, size_t offset,
-    emul_cmd_t emul_id)
+    emul_cmd_t emul_id, void (*callback)(emul_handle_t e))
 {
 	size_t	max_xfer;
 
-	cmd->c_emul_id = emul_id;
+	cmd->c_emul_complete	= callback;
+	cmd->c_emul_id		= emul_id;
+
 	/*
 	 * Transport supports immediate data on writes. Currently
 	 * on the iSCSI protocol has this feature.
@@ -1095,7 +1126,7 @@ trans_rqst_dataout(t10_cmd_t *cmd, char *data, size_t data_len, size_t offset,
 	if (cmd->c_data_len) {
 #ifdef FULL_DEBUG
 		queue_prt(mgmtq, Q_STE_IO,
-		    "SAM%x  LUN%d DataOut rqst w/ immed, data_len %d\n",
+		    "SAM%x  LUN%d DataOut rqst w/ immed, data_len 0x%x\n",
 		    cmd->c_lu->l_targ->s_targ_num,
 		    cmd->c_lu->l_common->l_num, data_len);
 #endif
@@ -1140,7 +1171,7 @@ trans_rqst_dataout(t10_cmd_t *cmd, char *data, size_t data_len, size_t offset,
 
 #ifdef FULL_DEBUG
 	queue_prt(mgmtq, Q_STE_IO,
-	    "SAM%x  LUN%d DataOut Rqst data_len %d\n",
+	    "SAM%x  LUN%d DataOut Rqst data_len 0x%x\n",
 	    cmd->c_lu->l_targ->s_targ_num,
 	    cmd->c_lu->l_common->l_num, data_len);
 #endif
@@ -1358,6 +1389,7 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 	 * First access for this I_T_L so we need to allocate space for it.
 	 */
 	if ((l = calloc(1, sizeof (*l))) == NULL) {
+		cmd->c_cmd_status = STATUS_CHECK;
 		spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 		return (False);
 	}
@@ -1624,6 +1656,7 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 	return (True);
 
 error:
+	cmd->c_cmd_status = STATUS_CHECK;
 	if (guid)
 		free(guid);
 	if (xml_fd != -1)
@@ -1703,11 +1736,13 @@ lu_runner(void *v)
 	t10_aio_t	*a;
 
 	util_title(mgmtq, Q_STE_NONIO, lu->l_internal_num, "Start LU");
+
 	while ((m = queue_message_get(lu->l_from_transports)) != NULL) {
 
 		switch (m->msg_type) {
 		case msg_cmd_send:
 			cmd = (t10_cmd_t *)m->msg_data;
+
 			if (cmd->c_lu->l_status) {
 				spc_sense_create(cmd, cmd->c_lu->l_status, 0);
 				spc_sense_ascq(cmd, cmd->c_lu->l_asc,
@@ -2007,7 +2042,6 @@ lu_buserr_handler(int sig, siginfo_t *sip, void *v)
 
 	if (pthread_mutex_trylock(&lu_list_mutex) != 0) {
 		assert(0);
-		return;
 	}
 	lu = avl_first(&lu_list);
 	while (lu != NULL) {
@@ -2022,14 +2056,18 @@ lu_buserr_handler(int sig, siginfo_t *sip, void *v)
 		    "SAM%x  BUS ERROR and couldn't find logical unit\n",
 		    lu->l_num);
 		assert(0);
+#ifdef NDEBUG
 		return;
+#endif
 	}
 
 	if (lu->l_mmap == MAP_FAILED) {
 		queue_prt(mgmtq, Q_STE_ERRS,
 		    "SAM%x  BUS ERROR and device not mmap'd\n", lu->l_num);
 		assert(0);
+#ifdef NDEBUG
 		return;
+#endif
 	}
 
 	fa = (char *)sip->__data.__fault.__addr;
@@ -2039,7 +2077,9 @@ lu_buserr_handler(int sig, siginfo_t *sip, void *v)
 		    "SAM%x  BUS ERROR occurred outsize of mmap bounds\n",
 		    lu->l_num);
 		assert(0);
+#ifdef NDEBUG
 		return;
+#endif
 	}
 
 	if (lu->l_curr_provo == True) {
@@ -2266,7 +2306,7 @@ error:
  * | cmd_common_free -- frees data stored in the cmd
  * |
  * | NOTE: The mutex which protects c_state must be held when this routine
- * | is called.
+ * | is called if there's a LU associated with this command.
  * []----
  */
 static void
@@ -2274,13 +2314,16 @@ cmd_common_free(t10_cmd_t *c)
 {
 	t10_lu_impl_t	*lu	= c->c_lu;
 
-	assert(pthread_mutex_trylock(&lu->l_cmd_mutex) != 0);
-
-	avl_remove(&lu->l_cmds, c);
+	if (lu) {
+		assert(pthread_mutex_trylock(&lu->l_cmd_mutex) != 0);
+		avl_remove(&lu->l_cmds, c);
+	}
 
 	c->c_state	= T10_Cmd_S1_Free;
 	c->c_data	= 0;
 	c->c_data_len	= 0;
+
+	clear_transport(c->c_trans_id);
 
 	if (c->c_emul_complete != NULL) {
 		(*c->c_emul_complete)(c->c_emul_id);
@@ -2294,12 +2337,35 @@ cmd_common_free(t10_cmd_t *c)
 		free(c->c_cmd_sense);
 		c->c_cmd_sense = NULL;
 	}
-	if ((lu->l_wait_for_drain == True) &&
+	if (lu && (lu->l_wait_for_drain == True) &&
 	    (avl_numnodes(&lu->l_cmds) == 0)) {
 		lu->l_wait_for_drain = False;
 		(void) pthread_cond_signal(&lu->l_cmd_cond);
 	}
-	free(c);
+	umem_cache_free(t10_cmd_cache, c);
+}
+
+/*
+ * clear_transport -- Remove the transports reference to the T10 command
+ *
+ * This should be a function pointer stored in the t10_lu_impl structure.
+ * The only reason it's not, is I wish to wait until we know a little more
+ * about the FC transport. There may be some other callbacks required for that
+ * transport and if so, I'll need to define a new method for passing in
+ * the callbacks to the t10_create_handle. The easiest way would probably
+ * have a structure. I'm concerned about supporting different versions, so
+ * wish to think about it some more before implementing.
+ *
+ * This function can be called on either the transport thread or the t10
+ * thread.
+ */
+static void
+clear_transport(transport_t t)
+{
+	iscsi_cmd_t	*c = (iscsi_cmd_t *)t;
+
+	if (c)
+		c->c_t10_cmd = NULL;
 }
 
 /*

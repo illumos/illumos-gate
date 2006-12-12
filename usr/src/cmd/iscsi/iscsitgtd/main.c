@@ -56,6 +56,7 @@
 #include <syslog.h>
 #include <sys/select.h>
 #include <iscsitgt_impl.h>
+#include <umem.h>
 
 #include "queue.h"
 #include "port.h"
@@ -88,6 +89,9 @@ int	targets_vers_maj,
 	main_vers_maj,
 	main_vers_min;
 pthread_mutex_t	targ_config_mutex;
+umem_cache_t	*iscsi_cmd_cache,
+		*t10_cmd_cache,
+		*queue_cache;
 
 int dbg_lvl = 0;
 
@@ -764,6 +768,26 @@ main(int argc, char **argv)
 	bzero(&act, sizeof (act));
 	act.sa_sigaction	= lu_buserr_handler;
 	act.sa_flags		= SA_SIGINFO;
+
+	/*
+	 * Setup memory caches
+	 */
+	if ((iscsi_cmd_cache = umem_cache_create("iSCSI conn cmds",
+	    sizeof (iscsi_cmd_t), 8, NULL, NULL, NULL, NULL, NULL, 0)) ==
+	    NULL) {
+		perror("cache create");
+		exit(SMF_EXIT_ERR_CONFIG);
+	}
+	if ((t10_cmd_cache = umem_cache_create("T10 cmds",
+	    sizeof (t10_cmd_t), 8, NULL, NULL, NULL, NULL, NULL, 0)) == NULL) {
+		perror("cache create");
+		exit(SMF_EXIT_ERR_CONFIG);
+	}
+	if ((queue_cache = umem_cache_create("Queue messages",
+	    sizeof (msg_t), 8, NULL, NULL, NULL, NULL, NULL, 0)) == NULL) {
+		perror("cache create");
+		exit(SMF_EXIT_ERR_CONFIG);
+	}
 
 	if (sigaction(SIGBUS, &act, NULL) == -1) {
 		perror("sigaction");

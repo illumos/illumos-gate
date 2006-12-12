@@ -519,7 +519,8 @@ raw_write_tape(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	io->r_cmd		= cmd;
 
 	xfer = min(T10_MAX_OUT(cmd), request_len);
-	(void) trans_rqst_dataout(cmd, io->r_data, xfer, io->r_offset, io);
+	(void) trans_rqst_dataout(cmd, io->r_data, xfer, io->r_offset, io,
+	    raw_free_io);
 }
 
 /*ARGSUSED*/
@@ -534,7 +535,7 @@ raw_write_tape_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 		io->r_offset += data_len;
 		xfer = min(T10_MAX_OUT(cmd), io->r_data_len - io->r_offset);
 		(void) trans_rqst_dataout(cmd, io->r_data + io->r_offset, xfer,
-		    io->r_offset, io);
+		    io->r_offset, io, raw_free_io);
 		return;
 	} else {
 		trans_send_complete(cmd, do_uscsi(cmd, io, RawDataToDevice));
@@ -737,7 +738,7 @@ raw_write(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 	}
 	if (trans_rqst_dataout(cmd, io->r_data, io->r_data_len, io->r_offset,
-	    io) == False) {
+	    io, raw_free_io) == False) {
 		spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 		trans_send_complete(cmd, STATUS_CHECK);
 	}
@@ -1152,7 +1153,8 @@ do_dataout(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len, size_t opt_data_len)
 	io->r_cdb_len	= cdb_len;
 	io->r_data	= opt_data;
 	io->r_data_len	= opt_data_len;
-	if (trans_rqst_dataout(cmd, opt_data, opt_data_len, 0, io) == False) {
+	if (trans_rqst_dataout(cmd, opt_data, opt_data_len, 0, io,
+	    raw_free_io) == False) {
 		spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 		trans_send_complete(cmd, STATUS_CHECK);
 	}

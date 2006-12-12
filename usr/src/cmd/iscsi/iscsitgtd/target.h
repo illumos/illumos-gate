@@ -167,6 +167,7 @@ typedef struct {
 } admin_table_t;
 
 #include <sys/socket.h>
+#include <umem.h>
 #include <iscsitgt_impl.h>
 #include "queue.h"
 
@@ -199,6 +200,9 @@ extern Boolean_t	enforce_strict_guid,
 			disable_tpgs,
 			dbg_timestamps;
 extern pthread_mutex_t	targ_config_mutex;
+extern umem_cache_t	*iscsi_cmd_cache,
+			*t10_cmd_cache,
+			*queue_cache;
 
 #ifdef __cplusplus
 }

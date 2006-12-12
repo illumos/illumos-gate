@@ -42,6 +42,7 @@
 #define	FIXED_SENSE_ADDL_INFO_LEN 0xFFFFFFFF
 #define	INFORMATION_SENSE_DESCR sizeof (struct scsi_information_sense_descr)
 
+#include <sys/scsi/generic/inquiry.h>
 #include <sys/scsi/generic/mode.h>
 
 /*
@@ -190,7 +191,9 @@ Boolean_t spc_encode_lu_addr(uint8_t *buf, int select_field, uint32_t lun);
 #define	SPC_INQ_VD_OSD		0x0355
 
 #define	SPC_INQ_PAGE0		0x00
+#define	SPC_INQ_PAGE80		0x80
 #define	SPC_INQ_PAGE83		0x83
+#define	SPC_INQ_PAGE86		0x86
 
 /* ---- REPORT LUNS select report has valid values of 0, 1, or 2 ---- */
 #define	SPC_RPT_LUNS_SELECT_MASK	0x03
@@ -227,6 +230,49 @@ Boolean_t spc_encode_lu_addr(uint8_t *buf, int select_field, uint32_t lun);
 #define	SPC_INQUIRY_PROTOCOL_ATA	8
 
 #define	SPC_DEFAULT_TPG	1
+
+/*
+ * SPC-3, revision 21c, section 7.6.5
+ * Extended INQUIRY Data VPD page
+ */
+typedef struct extended_inq_data {
+	struct vpd_hdr	ei_hdr;
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t		ei_ref_chk	: 1,
+			ei_app_chk	: 1,
+			ei_grd_chk	: 1,
+			ei_rto		: 1,
+			ei_rsvd1	: 4;
+	uchar_t		ei_simpsup	: 1,
+			ei_ordsup	: 1,
+			ei_headsup	: 1,
+			ei_prior_sup	: 1,
+			ei_group_sup	: 1,
+			ei_rsvd2	: 3;
+	uchar_t		ei_v_sup	: 1,
+			ei_nv_sup	: 1,
+			ei_rsvd3	: 6;
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t		ei_ref_rsvd1	: 4,
+			ei_rto		: 1,
+			ei_grd_chk	: 1,
+			ei_app_chk	: 1,
+			ei_ref_chk	: 1;
+	uchar_t		ei_rsvd2	: 2,
+			ei_group_sup	: 1,
+			ei_prior_sup	: 1,
+			ei_headsup	: 1,
+			ei_ordsup	: 1,
+			ei_simpsup	: 1;
+	uchar_t		ei_rsvd3	: 6,
+			ei_nv_sup	: 1,
+			ei_v_sup	: 1;
+#else
+#error One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif
+	uchar_t		ei_rsv4[57];
+} extended_inq_data_t;
+
 
 /*
  * []------------------------------------------------------------------[]
@@ -335,6 +381,10 @@ typedef struct spc_log_supported_pages {
  * | Structures and defines						|
  * []------------------------------------------------------------------[]
  */
+/* ---- Section 7.4.6, Table 241: Queue Algorithm Modifer field ---- */
+#define	SPC_QUEUE_RESTRICTED		0x00
+#define	SPC_QUEUE_UNRESTRICTED		0x01
+
 /* ---- Section 7.4.11, Table 250: Information Controller Page ---- */
 struct mode_info_ctrl {
 	struct mode_page	mode_page;

@@ -524,6 +524,7 @@ tgt_node_alloc(char *name, xml_val_type_t type, void *value)
 		}
 	}
 	(void) node_value(d, (xmlChar *)value_str, True);
+	free(value_str);
 
 	return (d);
 }

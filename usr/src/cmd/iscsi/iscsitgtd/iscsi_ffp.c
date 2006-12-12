@@ -279,16 +279,8 @@ handle_task_mgt(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 				if (cmd->c_state == CmdAlloc) {
 					cmd->c_state = CmdCanceled;
 
-					/*
-					 * It's possible that the session
-					 * queue hasn't had a chance to run
-					 * yet and get a T10 command structure.
-					 */
-					if (cmd->c_t10_cmd != NULL) {
-						t10_cmd_shoot_event(
-						    cmd->c_t10_cmd,
-						    T10_Cmd_T6);
-					}
+					t10_cmd_shoot_event(cmd->c_t10_cmd,
+					    T10_Cmd_T6);
 				}
 
 			}
@@ -347,11 +339,8 @@ handle_noop_cmd(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	/*
 	 * Just an answer to our ping
 	 */
-	if (hp->ttt != ISCSI_RSVD_TASK_TAG) {
-		queue_prt(c->c_mgmtq, Q_CONN_NONIO,
-		    "CON%x  NopIn -- answer to our call\n", c->c_num);
+	if (hp->ttt != ISCSI_RSVD_TASK_TAG)
 		return (True);
-	}
 
 	in->opcode = ISCSI_OP_NOOP_IN;
 	in->flags = ISCSI_FLAG_FINAL;
@@ -414,8 +403,9 @@ handle_scsi_data(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	(void) pthread_mutex_lock(&c->c_mutex);
 	(void) pthread_mutex_lock(&c->c_state_mutex);
 	if (c->c_state == S5_LOGGED_IN) {
-		if (cmd->c_state != CmdCanceled)
+		if (cmd->c_state != CmdCanceled) {
 			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T4);
+		}
 	}
 	(void) pthread_mutex_unlock(&c->c_state_mutex);
 	(void) pthread_mutex_unlock(&c->c_mutex);
@@ -535,10 +525,12 @@ handle_scsi_cmd(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 
 #ifdef FULL_DEBUG
 	queue_prt(c->c_mgmtq, Q_CONN_IO,
-	    "CON%x  PDU(SCSI Cmd) CmdSN 0x%x ITT 0x%x TTT 0x%x LUN[%02x] "
-	    "SCSI Op\n", c->c_num, cmd->c_cmdsn, cmd->c_itt, cmd->c_ttt,
-	    cmd->c_lun);
+	    "CON%x  PDU(SCSI Cmd, TA=%d) CmdSN 0x%x ITT 0x%x TTT 0x%x "
+	    "LUN[%02x] id=%p\n", c->c_num,
+	    hp->flags & ISCSI_FLAG_CMD_ATTR_MASK, cmd->c_cmdsn, cmd->c_itt,
+	    cmd->c_ttt, cmd->c_lun, cmd);
 #endif
+
 	if (dlen && (hp->flags & ISCSI_FLAG_CMD_WRITE)) {
 		/*
 		 * NOTE: This should only occur if ImmediateData==Yes.
@@ -770,12 +762,8 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 	if (cmd->c_data == NULL) {
 		if ((cmd->c_data = (char *)malloc(dlen)) == NULL) {
 			(void) pthread_mutex_lock(&c->c_mutex);
+			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T5);
 			iscsi_cmd_free(c, cmd);
-			if (cmd->c_t10_cmd) {
-				t10_cmd_shoot_event(cmd->c_t10_cmd,
-				    T10_Cmd_T5);
-				cmd->c_t10_cmd = NULL;
-			}
 			(void) pthread_mutex_unlock(&c->c_mutex);
 			return (False);
 		}
@@ -794,11 +782,8 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 		}
 
 		(void) pthread_mutex_lock(&c->c_mutex);
+		t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T5);
 		iscsi_cmd_free(c, cmd);
-		if (cmd->c_t10_cmd) {
-			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T5);
-			cmd->c_t10_cmd = NULL;
-		}
 		(void) pthread_mutex_unlock(&c->c_mutex);
 		conn_state(c, T8);
 		return (True);
@@ -820,12 +805,8 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 			}
 
 			(void) pthread_mutex_lock(&c->c_mutex);
+			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T5);
 			iscsi_cmd_free(c, cmd);
-			if (cmd->c_t10_cmd) {
-				t10_cmd_shoot_event(cmd->c_t10_cmd,
-				    T10_Cmd_T5);
-				cmd->c_t10_cmd = NULL;
-			}
 			(void) pthread_mutex_unlock(&c->c_mutex);
 			conn_state(c, T8);
 			return (True);
@@ -846,12 +827,8 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 			}
 
 			(void) pthread_mutex_lock(&c->c_mutex);
+			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T5);
 			iscsi_cmd_free(c, cmd);
-			if (cmd->c_t10_cmd) {
-				t10_cmd_shoot_event(cmd->c_t10_cmd,
-				    T10_Cmd_T5);
-				cmd->c_t10_cmd = NULL;
-			}
 			(void) pthread_mutex_unlock(&c->c_mutex);
 			conn_state(c, T8);
 			return (True);
@@ -871,12 +848,8 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 			 * error recovery for this issue.
 			 */
 			(void) pthread_mutex_lock(&c->c_mutex);
+			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T5);
 			iscsi_cmd_free(c, cmd);
-			if (cmd->c_t10_cmd) {
-				t10_cmd_shoot_event(cmd->c_t10_cmd,
-				    T10_Cmd_T5);
-				cmd->c_t10_cmd = NULL;
-			}
 			(void) pthread_mutex_unlock(&c->c_mutex);
 			conn_state(c, T8);
 			return (True);
@@ -887,14 +860,12 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 	(void) pthread_mutex_lock(&c->c_state_mutex);
 	if (c->c_state == S5_LOGGED_IN) {
 		if ((cmd->c_state == CmdCanceled) &&
-		    (type == msg_cmd_data_out)) {
+		    (type == msg_cmd_data_out))
 			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T5);
-			cmd->c_t10_cmd = NULL;
-		} else
+		else
 			queue_message_set(c->c_sessq, 0, type, (void *)cmd);
 	} else if (cmd->c_state == CmdCanceled) {
 		t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T5);
-		cmd->c_t10_cmd = NULL;
 	}
 	(void) pthread_mutex_unlock(&c->c_state_mutex);
 	(void) pthread_mutex_unlock(&c->c_mutex);

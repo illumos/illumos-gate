@@ -200,9 +200,9 @@ sbc_cmd(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 	e = &cmd->c_lu->l_cmd_table[cdb[0]];
 #ifdef FULL_DEBUG
-	queue_prt(mgmtq, Q_STE_IO, "SBC%x  LUN%d Cmd %s\n",
+	queue_prt(mgmtq, Q_STE_IO, "SBC%x  LUN%d Cmd %s id=%p\n",
 	    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
-	    e->cmd_name == NULL ? "(no name)" : e->cmd_name);
+	    e->cmd_name == NULL ? "(no name)" : e->cmd_name, cmd->c_trans_id);
 #endif
 	(*e->cmd_start)(cmd, cdb, cdb_len);
 }
@@ -263,9 +263,9 @@ sbc_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 
 	e = &cmd->c_lu->l_cmd_table[cmd->c_cdb[0]];
 #ifdef FULL_DEBUG
-	queue_prt(mgmtq, Q_STE_IO, "SBC%x  LUN%d Data %s\n",
+	queue_prt(mgmtq, Q_STE_IO, "SBC%x  LUN%d Data %s id=%p\n",
 	    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
-	    e->cmd_name);
+	    e->cmd_name, cmd->c_trans_id);
 #endif
 	(*e->cmd_data)(cmd, id, offset, data, data_len);
 }
@@ -628,14 +628,14 @@ sbc_write(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		 */
 		cmd->c_lu->l_cmds_write++;
 		cmd->c_lu->l_sects_write += cnt;
-	}
 
 #ifdef FULL_DEBUG
-	queue_prt(mgmtq, Q_STE_IO,
-	    "SBC%x  LUN%d blk 0x%llx, cnt %d, offset 0x%llx, size %d\n",
-	    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num, addr,
-	    cnt, io->da_offset, io->da_data_len);
+		queue_prt(mgmtq, Q_STE_IO,
+		    "SBC%x  LUN%d blk 0x%llx, cnt 0x%x\n",
+		    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
+		    addr, cnt);
 #endif
+	}
 
 	/*
 	 * If a transport sets the maximum output value to zero we'll
@@ -664,7 +664,7 @@ sbc_write(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		io->da_data_alloc	= True;
 	}
 	if (trans_rqst_dataout(cmd, io->da_data, io->da_data_len,
-	    io->da_offset, io) == False) {
+	    io->da_offset, io, sbc_io_free) == False) {
 		trans_send_complete(cmd, STATUS_BUSY);
 	}
 }
@@ -741,7 +741,6 @@ sbc_write_cmplt(emul_handle_t e)
 		sbc_write(cmd, cmd->c_cdb, cmd->c_cdb_len);
 		return;
 	}
-	sbc_io_free(io);
 	trans_send_complete(cmd, STATUS_GOOD);
 }
 
@@ -1072,7 +1071,7 @@ sbc_synccache(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	 * SBC-2 revision 16, section 5.18
 	 * Reserve bit checks
 	 */
-	if ((cdb[1] & ~SBC_SYNC_CACHE_IMMED) || cdb[6] ||
+	if ((cdb[1] & ~(SBC_SYNC_CACHE_IMMED|SBC_SYNC_CACHE_NV)) || cdb[6] ||
 	    SAM_CONTROL_BYTE_RESERVED(cdb[9])) {
 		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
 		spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
@@ -1469,7 +1468,7 @@ sbc_verify(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		}
 
 		if (trans_rqst_dataout(cmd, io->da_data, io->da_data_len,
-		    io->da_offset, io) == False)
+		    io->da_offset, io, sbc_io_free) == False)
 			trans_send_complete(cmd, STATUS_BUSY);
 	}
 }
@@ -1483,7 +1482,6 @@ sbc_verify_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 	char		*on_disk_buf;
 
 	if ((on_disk_buf = malloc(io->da_data_len)) == NULL) {
-		sbc_io_free(io);
 		trans_send_complete(cmd, STATUS_BUSY);
 	}
 
@@ -1512,7 +1510,6 @@ sbc_verify_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 		sbc_verify(cmd, cmd->c_cdb, cmd->c_cdb_len);
 		return;
 	}
-	sbc_io_free(io);
 	trans_send_complete(cmd, STATUS_GOOD);
 }
 
@@ -1581,6 +1578,9 @@ sense_cache(disk_params_t *d, char *buf)
 
 	bzero(&mode_cache, sizeof (mode_cache));
 
+	mode_cache.mode_page.code	= MODE_SENSE_CACHE;
+	mode_cache.mode_page.length	= sizeof (mode_cache) -
+	    sizeof (struct mode_page);
 	mode_cache.wce = d->d_fast_write == True ? 1 : 0;
 	bcopy(&mode_cache, buf, sizeof (mode_cache));
 
@@ -1600,8 +1600,9 @@ sense_mode_control(t10_lu_impl_t *lu, char *buf)
 	bzero(&m, sizeof (m));
 	m.mode_page.code	= MODE_SENSE_CONTROL;
 	m.mode_page.length	= sizeof (struct mode_control_scsi3) -
-		sizeof (struct mode_page);
+	    sizeof (struct mode_page);
 	m.d_sense		= (lu->l_dsense_enabled == True) ? 1 : 0;
+	m.que_mod		= SPC_QUEUE_UNRESTRICTED;
 	bcopy(&m, buf, sizeof (m));
 
 	return (buf + sizeof (m));
@@ -1618,7 +1619,7 @@ sense_info_ctrl(char *buf)
 	struct mode_info_ctrl	info;
 
 	bzero(&info, sizeof (info));
-	info.mode_page.code	= 0x1c;
+	info.mode_page.code	= MODE_SENSE_INFO_CTRL;
 	info.mode_page.length	= sizeof (struct mode_info_ctrl) -
 	    sizeof (struct mode_page);
 	bcopy(&info, buf, sizeof (info));

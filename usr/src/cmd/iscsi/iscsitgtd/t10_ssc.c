@@ -457,7 +457,7 @@ ssc_write(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	    s->s_cur_fm +  s->s_cur_rec + sizeof (mark) + io->sio_offset;
 
 	if (trans_rqst_dataout(cmd, io->sio_data, io->sio_data_len,
-	    io->sio_offset, io) == False) {
+	    io->sio_offset, io, ssc_free) == False) {
 		trans_send_complete(cmd, STATUS_BUSY);
 	}
 }

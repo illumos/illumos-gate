@@ -592,7 +592,7 @@ Boolean_t trans_send_datain(t10_cmd_t *cmd, char *data, size_t data_len,
  * trans_rqst_dataout -- Emulation needs more data to complete request
  */
 Boolean_t trans_rqst_dataout(t10_cmd_t *cmd, char *data, size_t data_len,
-    size_t offset, emul_cmd_t emul_id);
+    size_t offset, emul_cmd_t emul_id, void (*callback)(emul_handle_t e));
 
 /*
  * trans_send_complete -- Emulation has completed request w/ opt. sense data
