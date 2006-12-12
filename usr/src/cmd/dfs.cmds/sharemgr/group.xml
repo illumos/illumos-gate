@@ -49,6 +49,13 @@
 	    type='service'>
 	    	<service_fmri value='svc:/system/filesystem/local' />
 	</dependency>
+	<!-- Also want to have some form of networking up -->
+	<dependency name='network'
+	    grouping='require_any'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/milestone/network' />
+	</dependency>
 
 	<!--
 	  The start method will cause each share group to be

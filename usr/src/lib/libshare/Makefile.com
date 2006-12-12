@@ -50,7 +50,7 @@ ROOTHDRS= $(HDRS:%=$(ROOTDIRS)/%)
 CHECKHDRS= $(HDRS:%.h=%.check)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lnsl -lscf -lzfs -luuid -lfsmgt
+LDLIBS +=	-lc -lnsl -lscf -lzfs -luuid
 all install := LDLIBS += -lxml2
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
@@ -60,8 +60,7 @@ SPECMAPFILE =	$(MAPDIR)/mapfile
 
 #add nfs/lib directory as part of the include path
 CFLAGS +=	$(CCVERBOSE) -g
-CPPFLAGS +=	-D_REENTRANT -I$(SRC)/lib/libfsmgt/common \
-		-I$(SRC)/cmd/fs.d/nfs/lib -I/usr/include/libxml2 \
+CPPFLAGS +=	-D_REENTRANT -I$(SRC)/cmd/fs.d/nfs/lib -I/usr/include/libxml2 \
 		-I../common
 
 .KEEP_STATE:

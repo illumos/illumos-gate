@@ -72,6 +72,8 @@ extern int sa_path_is_zfs(char *);
 extern int sa_zfs_set_sharenfs(sa_group_t, char *, int);
 extern void update_legacy_config(void);
 extern int issubdir(char *, char *);
+extern void sa_zfs_init(void);
+extern void sa_zfs_fini(void);
 
 static int sa_initialized = 0;
 
@@ -531,6 +533,11 @@ sa_init(int init_service)
 	    (void) proto_plugin_init();
 	    if (init_service & SA_INIT_SHARE_API) {
 		/*
+		 * initialize access into libzfs. We use this when
+		 * collecting info about ZFS datasets and shares.
+		 */
+		sa_zfs_init();
+		/*
 		 * since we want to use SMF, initialize an svc handle
 		 * and find out what is there.
 		 */
@@ -570,7 +577,7 @@ sa_init(int init_service)
 /*
  * sa_fini()
  *	Uninitialize the API structures including the configuration
- *	data structures
+ *	data structures and ZFS related data.
  */
 
 void
@@ -584,6 +591,7 @@ sa_fini()
 		sa_config_tree = NULL;
 		sa_config_doc = NULL;
 		sa_scf_fini(scf_handle);
+		sa_zfs_fini();
 		(void) proto_plugin_init();
 	}
 }

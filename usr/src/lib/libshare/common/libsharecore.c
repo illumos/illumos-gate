@@ -44,7 +44,6 @@
 #include <libxml/tree.h>
 #include "libshare.h"
 #include "libshare_impl.h"
-#include "libfsmgt.h"
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <grp.h>
@@ -1136,18 +1135,91 @@ getlegacyconfig(char *path, xmlNodePtr *root)
 }
 
 /*
+ * get_share_list(&err)
+ *
+ * Get a linked list of all the shares on the system from
+ * /etc/dfs/sharetab. This is partially copied from libfsmgt which we
+ * can't use due to package dependencies.
+ */
+static xfs_sharelist_t *
+get_share_list(int *errp)
+{
+	xfs_sharelist_t	*newp;
+	xfs_sharelist_t	*headp;
+	xfs_sharelist_t	*tailp;
+	FILE		*fp;
+
+	headp = NULL;
+	tailp = NULL;
+
+	if ((fp = fopen(SHARETAB, "r")) != NULL) {
+		struct share	*sharetab_entry;
+
+		while (getshare(fp, &sharetab_entry) > 0) {
+		    newp = alloc_sharelist();
+		    if (newp == NULL) {
+			goto err;
+		    }
+
+			/*
+			 * link into the list here so we don't leak
+			 * memory on a failure from strdup().
+			 */
+		    if (headp == NULL) {
+			headp = newp;
+			tailp = newp;
+		    } else {
+			tailp->next = newp;
+			tailp = newp;
+		    }
+
+		    newp->path = strdup(sharetab_entry->sh_path);
+		    if (newp->path == NULL)
+			goto err;
+		    newp->resource = strdup(sharetab_entry->sh_res);
+		    if (newp->resource == NULL)
+			goto err;
+		    newp->fstype = strdup(sharetab_entry->sh_fstype);
+		    if (newp->fstype == NULL)
+			goto err;
+		    newp->options = strdup(sharetab_entry->sh_opts);
+		    if (newp->options == NULL)
+			goto err;
+		    newp->description = strdup(sharetab_entry->sh_descr);
+		    if (newp->description == NULL)
+			goto err;
+		}
+		(void) fclose(fp);
+	} else {
+	    *errp = errno;
+	}
+
+	/*
+	 * Caller must free the mount list
+	 */
+	return (headp);
+err:
+	/*
+	 * Out of memory so cleanup and leave.
+	 */
+	dfs_free_list(headp);
+	(void) fclose(fp);
+	return (NULL);
+}
+
+/*
  * parse_sharetab(void)
  *
- * Read the /etc/dfs/sharetab file via libfsmgt and see which entries
- * don't exist in the repository. These shares are marked transient.
- * We also need to see if they are ZFS shares since ZFS bypasses the
- * SMF repository.
+ * Read the /etc/dfs/sharetab file and see which entries don't exist
+ * in the repository. These shares are marked transient.  We also need
+ * to see if they are ZFS shares since ZFS bypasses the SMF
+ * repository.
  */
 
 int
 parse_sharetab(void)
 {
-	fs_sharelist_t *list, *tmplist;
+	xfs_sharelist_t *list, *tmplist;
 	int err = 0;
 	sa_share_t share;
 	sa_group_t group;
@@ -1155,7 +1227,7 @@ parse_sharetab(void)
 	char *groupname;
 	int legacy = 0;
 
-	list = fs_get_share_list(&err);
+	list = get_share_list(&err);
 	if (list == NULL)
 	    return (legacy);
 
@@ -1249,7 +1321,7 @@ parse_sharetab(void)
 		set_node_attr(share, "shared", "true");
 	    }
 	}
-	fs_free_share_list(list);
+	dfs_free_list(list);
 	return (legacy);
 }
 
