@@ -327,6 +327,15 @@ typedef struct snoop_handler {
  */
 extern int snoop_alarm(int s_sec, void (*s_handler)());
 
+/*
+ * The next two definitions do not take into account the length
+ * of the underlying link header.  In order to use them, you must
+ * add link_header_len to them.  The reason it is not done here is
+ * that later these macros are used to initialize a table.
+ */
+#define	IPV4_TYPE_HEADER_OFFSET 9
+#define	IPV6_TYPE_HEADER_OFFSET 6
+
 #ifdef __cplusplus
 }
 #endif

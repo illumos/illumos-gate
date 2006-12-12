@@ -99,8 +99,6 @@ static int link_addr_len = 6;
 #define	IPV4_DSTADDR_OFFSET	(link_header_len + 16)
 #define	IPV6_SRCADDR_OFFSET	(link_header_len + 8)
 #define	IPV6_DSTADDR_OFFSET	(link_header_len + 24)
-#define	IPV4_TYPE_HEADER_OFFSET	(9)
-#define	IPV6_TYPE_HEADER_OFFSET	(6)
 
 static int inBrace = 0, inBraceOR = 0;
 static int foundOR = 0;
@@ -1211,7 +1209,9 @@ pf_primary()
 			if (tokentype != NUMBER)
 				pr_err("IP proto type expected");
 			pf_check_vlan_tag(ENCAP_ETHERTYPE_OFF/2);
-			pf_compare_value(IPV4_TYPE_HEADER_OFFSET, 1, tokenval);
+			pf_compare_value(
+			    IPV4_TYPE_HEADER_OFFSET + link_header_len, 1,
+			    tokenval);
 			opstack++;
 			next();
 			break;

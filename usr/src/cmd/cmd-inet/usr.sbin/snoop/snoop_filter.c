@@ -2094,7 +2094,14 @@ primary()
 			continue;
 		}
 
-		if (EQ("proto")) { /* ignore */
+		if (EQ("proto")) {
+			next();
+			if (tokentype != NUMBER)
+				pr_err("IP proto type expected");
+			emitop(OP_OFFSET_LINK);
+			compare_value(IPV4_TYPE_HEADER_OFFSET, 1, tokenval);
+			emitop(OP_OFFSET_POP);
+			opstack++;
 			next();
 			continue;
 		}
