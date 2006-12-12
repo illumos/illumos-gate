@@ -158,9 +158,13 @@ sad_apc_verify(struct apcommon *apc)
 	switch (apc->apc_cmd) {
 	case SAP_ALL:
 	case SAP_ONE:
-		/* lastminor should not have been specified */
-		if (apc->apc_lastminor != 0)
-			return (EINVAL);
+		/*
+		 * Really, we'd like to be strict here and make sure that
+		 * apc_lastminor is 0 (since setting apc_lastminor for
+		 * SAP_ALL and SAP_ONE commands doesn't make any sense),
+		 * but we can't since historically apc_lastminor has been
+		 * silently ignored for non-SAP_RANGE commands.
+		 */
 		break;
 	case SAP_RANGE:
 		if (apc->apc_lastminor <= apc->apc_minor)
