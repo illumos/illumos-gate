@@ -1549,6 +1549,11 @@ main(int argc, char *argv[])
 	int funcRet;
 	void *subcommandArgs = NULL;
 
+	if (geteuid() != 0) {
+		fprintf(stderr, gettext("permission denied\n"));
+		exit(1);
+	}
+
 	/* set global command name */
 	cmdName = getExecBasename(argv[0]);
 
