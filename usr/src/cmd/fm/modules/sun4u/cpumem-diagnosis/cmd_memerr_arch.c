@@ -303,9 +303,9 @@ cmd_rxefrx_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
  * This fire IOxE must be matched with an FRx before UE/CE processing
  * is possible.
  *
- * Note that for fire ereports we don't receive AFSR, AFAR, AFAR-Status,
- * SYND and TYPNM values but we can derive the AFAR from the payload
- * value FIRE_JBC_JITEL1
+ * Note that for fire ereports we don't receive AFSR, AFAR, AFAR-Status
+ * and SYND values but we can derive the AFAR from the payload value
+ * FIRE_JBC_JITEL1.  We may receive a TYPNM value.
  */
 static cmd_evdisp_t
 cmd_ioxefrx_fire(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
@@ -317,8 +317,10 @@ cmd_ioxefrx_fire(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	int isce = CMD_ERRCL_MATCH(errcl, CMD_ERRCL_IOCE);
 	char *portid_str;
 	char *path = NULL;
+	char *typenm = NULL;
 	nvlist_t *det = NULL;
 	int rc;
+	int minorvers = 1;
 
 	rferr = fmd_hdl_zalloc(hdl, sizeof (cmd_iorxefrx_t), FMD_SLEEP);
 
@@ -348,6 +350,9 @@ cmd_ioxefrx_fire(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	rferr->rf_afsr = NULL;
 	rferr->rf_synd = NULL;
 
+	if (nvlist_lookup_string(nvl, FM_EREPORT_PAYLOAD_NAME_ERR_TYPE,
+	    &typenm) == 0)
+	    rferr->rf_type = cmd_mem_name2type(typenm, minorvers);
 
 	/*
 	 * Need to send in the io_jpid that we get from the device path above
