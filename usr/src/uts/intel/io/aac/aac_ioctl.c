@@ -82,8 +82,6 @@ aac_do_ioctl(struct aac_softstate *softs, int cmd, intptr_t arg, int mode)
 {
 	int status;
 
-	rw_enter(&softs->errlock, RW_READER);
-
 	switch (cmd) {
 	case FSACTL_MINIPORT_REV_CHECK:
 		status = aac_check_revision(arg, mode);
@@ -118,11 +116,10 @@ aac_do_ioctl(struct aac_softstate *softs, int cmd, intptr_t arg, int mode)
 		break;
 	default:
 		status = ENOTTY;
-		cmn_err(CE_WARN, "!IOCTL cmd 0x%x not supported", cmd);
+		AACDB_PRINT((CE_WARN, "!IOCTL cmd 0x%x not supported", cmd));
 		break;
 	}
 
-	rw_exit(&softs->errlock);
 	return (status);
 }
 
@@ -157,6 +154,10 @@ aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 
 	DBCALLED(1);
 
+	if (softs->state == AAC_STATE_DEAD)
+		return (ENXIO);
+
+	/* Copy in the FIB */
 	hbalen = sizeof (struct aac_cmd) - sizeof (struct aac_fib) +
 		softs->aac_max_fib_size;
 	if ((acp = kmem_zalloc(hbalen, KM_NOSLEEP)) == NULL)
@@ -182,6 +183,7 @@ aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 
 	AACDB_PRINT_FIB(fibp);
 
+	/* Process FIB */
 	if (fibp->Header.Command == TakeABreakPt) {
 		(void) aac_sync_mbcommand(softs, AAC_BREAKPOINT_REQ,
 			0, 0, 0, 0, NULL);
@@ -194,11 +196,18 @@ aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 
 		acp->flags = AAC_CMD_HARD_INTR;
 		acp->state = AAC_CMD_INCMPLT;
+
+		/* Send FIB */
+		rw_enter(&softs->errlock, RW_READER);
 		if (aac_do_async_io(softs, acp) != AACOK) {
 			AACDB_PRINT((CE_CONT, "User SendFib failed"));
 			rval = ENXIO;
-			goto finish;
 		}
+		rw_exit(&softs->errlock);
+		if (rval != 0)
+			goto finish;
+
+		/* Wait FIB to complete */
 		mutex_enter(&softs->event_mutex);
 		while (acp->state == AAC_CMD_INCMPLT)
 			cv_wait(&softs->event, &softs->event_mutex);
@@ -206,6 +215,7 @@ aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 			rval = EBUSY;
 		mutex_exit(&softs->event_mutex);
 	}
+
 	if (rval == 0) {
 		if (ddi_copyout(fibp, (void *)arg,
 			fibp->Header.Size, mode) != 0) {
@@ -354,6 +364,9 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 	ddi_dma_cookie_t *cookiep = NULL;
 
 	DBCALLED(1);
+
+	if (softs->state == AAC_STATE_DEAD)
+		return (ENXIO);
 
 	hbalen = sizeof (struct aac_cmd) - sizeof (struct aac_fib) +
 		softs->aac_max_fib_size;
@@ -512,11 +525,16 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 	/* Send command */
 	acp->flags = AAC_CMD_HARD_INTR;
 	acp->state = AAC_CMD_INCMPLT;
+
+	rw_enter(&softs->errlock, RW_READER);
 	if (aac_do_async_io(softs, acp) != AACOK) {
 		AACDB_PRINT((CE_CONT, "User SendFib failed"));
 		rval = ENXIO;
-		goto finish;
 	}
+	rw_exit(&softs->errlock);
+	if (rval != 0)
+		goto finish;
+
 	mutex_enter(&softs->event_mutex);
 	while (acp->state == AAC_CMD_INCMPLT)
 		cv_wait(&softs->event, &softs->event_mutex);
@@ -524,10 +542,8 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 		rval = EBUSY;
 	mutex_exit(&softs->event_mutex);
 
-	if (rval != 0) {
-		rval = ENXIO;
+	if (rval != 0)
 		goto finish;
-	}
 
 	if ((srbcmd->sg.SgCount == 1) && (srbcmd->flags & SRB_DataIn)) {
 		if (ddi_copyout(acp->abp,
