@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,28 +28,25 @@
 
 /* mincore.c  SMI 12/14/90  */
 #include <errno.h>
-#include <syscall.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#define INCORE 1;	/* return only the incore status bit */
+#define	INCORE	1;	/* return only the incore status bit */
 
-extern int errno;
-
-int mincore(addr, len, vec)
-caddr_t	addr;
-int	len;
-char	*vec;
+int
+mincore(caddr_t addr, int len, char *vec)
 {
 	int i;
 
-	if (len <0) {
+	if (len < 0) {
 		errno = EINVAL;
-		return(-1);
+		return (-1);
 	}
-		
-	if(_syscall(SYS_mincore, addr, len, vec) == 0) {
-		for (i=0; i< len/getpagesize(); i++) {
+
+	if (_syscall(SYS_mincore, addr, len, vec) == 0) {
+		len /= getpagesize();
+		for (i = 0; i < len; i++) {
 			vec[i] &= INCORE;
 		}
 	}

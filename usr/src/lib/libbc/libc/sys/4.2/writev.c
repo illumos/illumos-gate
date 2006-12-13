@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,7 +54,7 @@ bc_writev(int fd, struct iovec *iov, int iovcnt)
 	int nsize, total = 0;
 	char *nbuf;
 	int i;
-	
+
 	if (fd_get(fd) != -1) { /* writing utmp (utmpx, actually) */
 		for (i = 0; i < iovcnt; i++) {
 			nsize = getmodsize(iov[i].iov_len,
@@ -65,7 +65,7 @@ bc_writev(int fd, struct iovec *iov, int iovcnt)
 				fprintf(stderr, "writev: malloc failed\n");
 				exit(-1);
 			}
-		
+
 			(void) memset(nbuf, 0, nsize);
 
 			ret = conv2utmpx(nbuf, iov[i].iov_base, iov[i].iov_len);
@@ -77,16 +77,12 @@ bc_writev(int fd, struct iovec *iov, int iovcnt)
 				return (-1);
 			}
 
-			total += ret;
-
 			free(nbuf);
-	
-			ret = getmodsize(ret, sizeof (struct utmpx), 
-			    sizeof (struct compat_utmp));
 
+			ret = getmodsize(ret, sizeof (struct utmpx),
+			    sizeof (struct compat_utmp));
+			total += ret;
 		}
-		total = getmodsize(total, sizeof (struct utmpx), 
-		    sizeof (struct compat_utmp));
 		return (total);
 	}
 
@@ -94,6 +90,6 @@ bc_writev(int fd, struct iovec *iov, int iovcnt)
 		if (errno == EAGAIN)
 			errno = EWOULDBLOCK;
 	}
-	
+
 	return (ret);
 }

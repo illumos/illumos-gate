@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,21 +18,22 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/*      Copyright (c) 1984 AT&T */
-/*        All Rights Reserved   */
+/*	Copyright (c) 1984 AT&T */
+/*	  All Rights Reserved   */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include	<syscall.h>
-#include 	<stdarg.h>
-#include	<sys/types.h>
-#include	<sys/ipc.h>
-#include	<sys/msg.h>
+#include <sys/syscall.h>
+#include <stdarg.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 
 
 /* msgsys dispatch argument */
@@ -57,13 +57,15 @@ msgctl(int msqid, int cmd, struct msqid_ds *buf)
 int
 msgrcv(int msqid, struct msgbuf *msgp, int msgsz, long msgtyp, int msgflg)
 {
-	return (_syscall(SYS_msgsys, MSGRCV, msqid, msgp, msgsz, msgtyp, msgflg));
+	return (_syscall(SYS_msgsys, MSGRCV,
+	    msqid, msgp, msgsz, msgtyp, msgflg));
 }
 
 int
 msgsnd(int msqid, struct msgbuf *msgp, int msgsz, int msgflg)
 {
-	return (_syscall(SYS_msgsys, MSGSND, msqid, msgp, msgsz, msgflg));
+	return (_syscall(SYS_msgsys, MSGSND,
+	    msqid, msgp, msgsz, msgflg));
 }
 
 int
@@ -79,33 +81,32 @@ msgsys(int sysnum, ...)
 	int msgsz;
 	long msgtyp;
 
-
 	va_start(ap, sysnum);
 	switch (sysnum) {
 	case MSGGET:
-		key=va_arg(ap, key_t);
-		msgflag=va_arg(ap, int);
+		key = va_arg(ap, key_t);
+		msgflag = va_arg(ap, int);
 		va_end(ap);
 		return (msgget(key, msgflag));
 	case MSGCTL:
-		msqid=va_arg(ap, int);
-		cmd=va_arg(ap, int);
-		buf=va_arg(ap, struct msqid_ds *);
+		msqid = va_arg(ap, int);
+		cmd = va_arg(ap, int);
+		buf = va_arg(ap, struct msqid_ds *);
 		va_end(ap);
 		return (msgctl(msqid, cmd, buf));
 	case MSGRCV:
-		msqid=va_arg(ap, int);
-		msgp=va_arg(ap, struct msgbuf *);
-		msgsz=va_arg(ap, int);
-		msgtyp=va_arg(ap, long);
-		msgflg=va_arg(ap, int);
+		msqid = va_arg(ap, int);
+		msgp = va_arg(ap, struct msgbuf *);
+		msgsz = va_arg(ap, int);
+		msgtyp = va_arg(ap, long);
+		msgflg = va_arg(ap, int);
 		va_end(ap);
 		return (msgrcv(msqid, msgp, msgsz, msgtyp, msgflg));
 	case MSGSND:
-		msqid=va_arg(ap, int);
-		msgp=va_arg(ap, struct msgbuf *);
-		msgsz=va_arg(ap, int);
-		msgflg=va_arg(ap, int);
+		msqid = va_arg(ap, int);
+		msgp = va_arg(ap, struct msgbuf *);
+		msgsz = va_arg(ap, int);
+		msgflg = va_arg(ap, int);
 		va_end(ap);
 		return (msgsnd(msqid, msgp, msgsz, msgflg));
 	}

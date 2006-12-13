@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,7 +60,7 @@ struct n_stat {
         long            st_blocks;
         char            st_fstype[ST_FSTYPSZ];
         long            st_pad4[8];     /* expansion area */
- 
+
 };
 
 static void cpstatbuf(struct stat *, struct n_stat *);
@@ -76,19 +76,19 @@ bc_fstat(int fd, struct stat *buf)
 {
 	int ret;
 	struct n_stat nb;
-	extern int errno;	
+	extern int errno;
 
 	if (buf == 0) {
 		errno = EFAULT;
 		return (-1);
 	}
-		
+
 	if ((ret = _syscall(SYS_fstat, fd, &nb)) == -1)
 		return (ret);
 
 	cpstatbuf(buf, &nb);
 	if (fd_get(fd) != -1) {
-		buf->st_size = getmodsize(buf->st_size, 
+		buf->st_size = getmodsize(buf->st_size,
 			sizeof (struct utmpx), sizeof(struct compat_utmp));
 	}
 
@@ -117,39 +117,48 @@ stat_com(int sysnum, char *path, struct stat *buf)
  */
 		ret = stat_com(sysnum, "/etc/mnttab", buf);
 		return(ret);
-	} else if (strcmp(path, "/etc/fstab") == 0) {
+	}
+	if (strcmp(path, "/etc/fstab") == 0) {
 		fd = open_mnt("/etc/vfstab", "fstab", O_RDONLY);
-		ret = fstat(fd, buf);
-		close(fd);
-		return(ret);
-	} else if (strcmp(path, "/var/adm/utmp") == 0 ||
-	    strcmp(path, "/var/adm/wtmp") == 0 ||
-	    strcmp(path, "/etc/utmp") == 0) {
-		char pathx[MAXPATHLEN+100];
-		if (strcmp(path, "/etc/utmp") == 0)
-			strcpy(pathx, "/var/adm/utmpx");
+		if (fd < 0)
+			ret = -1;
 		else {
-			strcpy(pathx, path);
-			strcat(pathx, "x");
+			ret = fstat(fd, buf);
+			close(fd);
 		}
-		if ((ret = _syscall(sysnum, pathx, &nb)) == -1)
-			return(-1);
-		else {
-			buf->st_size = getmodsize(buf->st_size, 
-		       	    sizeof(struct compat_utmp), sizeof(struct utmpx));
-			cpstatbuf(buf, &nb);
-			return(ret);
-		}
-	} else if (_strstr(path, "/lib/locale/") != 0) {
-		fd = open(path, O_RDONLY);
-		ret = fstat(fd, buf);
-		close(fd);
-		return(ret);
-	} else {
-		if ((ret = _syscall(sysnum, path, &nb)) != -1)
-			cpstatbuf(buf, &nb);
 		return(ret);
 	}
+	if (strcmp(path, "/etc/utmp") == 0 ||
+	    strcmp(path, "/var/adm/utmp") == 0) {
+		if ((ret = _syscall(sysnum, "/var/adm/utmpx", &nb)) != -1) {
+			cpstatbuf(buf, &nb);
+			buf->st_size = getmodsize(buf->st_size,
+		       	    sizeof(struct utmpx), sizeof(struct compat_utmp));
+		}
+		return(ret);
+	}
+	if (strcmp(path, "/var/adm/wtmp") == 0) {
+		if ((ret = _syscall(sysnum, "/var/adm/wtmpx", &nb)) != -1) {
+			cpstatbuf(buf, &nb);
+			buf->st_size = getmodsize(buf->st_size,
+		       	    sizeof(struct utmpx), sizeof(struct compat_utmp));
+		}
+		return(ret);
+	}
+	if (_strstr(path, "/lib/locale/") != 0) {
+		fd = open(path, O_RDONLY);
+		if (fd < 0)
+			ret = -1;
+		else {
+			ret = fstat(fd, buf);
+			close(fd);
+		}
+		return(ret);
+	}
+
+	if ((ret = _syscall(sysnum, path, &nb)) != -1)
+		cpstatbuf(buf, &nb);
+	return(ret);
 }
 
 

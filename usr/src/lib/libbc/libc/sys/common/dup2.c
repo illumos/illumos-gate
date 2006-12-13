@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,52 +28,51 @@
 
 #include <fcntl.h>
 #include <unistd.h>
-#include <syscall.h>
-#include <sys/errno.h>
+#include <sys/syscall.h>
+#include <errno.h>
 
-#define OPEN_MAX 20		/* Taken from SVR4 limits.h */
+#define	OPEN_MAX	20		/* Taken from SVR4 limits.h */
 
-int dup2(fildes, fildes2)
-int fildes,		/* file descriptor to be duplicated */
-    fildes2;		/* desired file descriptor */
+int
+dup2(
+	int fildes,		/* file descriptor to be duplicated */
+	int fildes2)		/* desired file descriptor */
 {
-      int     tmperrno;       /* local work area */
-      register int open_max;  /* max open files */
-      extern  int     errno;  /* system error indicator */
-      int     ret;	      /* return value */
-      int     fds;	      /* duplicate files descriptor */
+	int	tmperrno;	/* local work area */
+	int	open_max;	/* max open files */
+	int	ret;		/* return value */
+	int	fds;		/* duplicate files descriptor */
 
-      if ((open_max = ulimit(4, 0)) < 0)
-              open_max = OPEN_MAX;    /* take a guess */
+	if ((open_max = ulimit(4, 0)) < 0)
+		open_max = OPEN_MAX;	/* take a guess */
 
-      /* Be sure fildes is valid and open */
-      if (fcntl(fildes, F_GETFL, 0) == -1) {
-              errno = EBADF;
-              return (-1);
-      }
+	/* Be sure fildes is valid and open */
+	if (fcntl(fildes, F_GETFL, 0) == -1) {
+		errno = EBADF;
+		return (-1);
+	}
 
-      /* Be sure fildes2 is in valid range */
-      if (fildes2 < 0 || fildes2 >= open_max) {
-              errno = EBADF;
-              return (-1);
-      }
+	/* Be sure fildes2 is in valid range */
+	if (fildes2 < 0 || fildes2 >= open_max) {
+		errno = EBADF;
+		return (-1);
+	}
 
-      /* Check if file descriptors are equal */
-      if (fildes == fildes2) {
-              /* open and equal so no dup necessary */
-              return (fildes2);
-      }
-      /* Close in case it was open for another file */
-      /* Must save and restore errno in case file was not open */
-      tmperrno = errno;
-      close(fildes2);
-      errno = tmperrno;
+	/* Check if file descriptors are equal */
+	if (fildes == fildes2) {
+		/* open and equal so no dup necessary */
+		return (fildes2);
+	}
+	/* Close in case it was open for another file */
+	/* Must save and restore errno in case file was not open */
+	tmperrno = errno;
+	close(fildes2);
+	errno = tmperrno;
 
-      /* Do the dup */
-      if ((ret = fcntl(fildes, F_DUPFD, fildes2)) != -1) {
-          if ((fds = fd_get(fildes)) != -1)
-                fd_add(fildes2, fds);
-      }
-      return(ret);
-
+	/* Do the dup */
+	if ((ret = fcntl(fildes, F_DUPFD, fildes2)) != -1) {
+		if ((fds = fd_get(fildes)) != -1)
+			fd_add(fildes2, fds);
+	}
+	return (ret);
 }

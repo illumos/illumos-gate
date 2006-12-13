@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,29 +18,30 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/*      Copyright (c) 1984 AT&T */
-/*        All Rights Reserved   */
+/*	Copyright (c) 1984 AT&T */
+/*	  All Rights Reserved   */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include	<syscall.h>
-#include	<stdarg.h>
-#include	<sys/types.h>
-#include	<sys/ipc.h>
-#include	<sys/shm.h>
-#include	<errno.h>
+#include <sys/syscall.h>
+#include <stdarg.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <errno.h>
 
 
 /* shmsys dispatch argument */
 #define	SHMAT	0
 #define	SHMCTL	1
 #define	SHMDT	2
-#define SHMGET	3
+#define	SHMGET	3
 
 struct shmid_sv {
 	struct ipc_perm shm_perm;
@@ -57,7 +57,7 @@ struct shmid_sv {
 	time_t		shm_dtime;
 	time_t		shm_ctime;
 };
-	
+
 
 char *
 shmat(int shmid, char *shmaddr, int shmflg)
@@ -110,7 +110,6 @@ shmctl(int shmid, int cmd, struct shmid_ds *buf)
 int
 shmdt(char *shmaddr)
 {
-
 	return (_syscall(SYS_shmsys, SHMDT, shmaddr));
 }
 
@@ -123,7 +122,7 @@ shmget(key_t key, int size, int shmflg)
 int
 shmsys(int sysnum, ...)
 {
-        va_list ap;
+	va_list ap;
 	int shmid, shmflg, cmd, size;
 	char *shmaddr;
 	struct shmid_ds *buf;
@@ -132,27 +131,27 @@ shmsys(int sysnum, ...)
 	va_start(ap, sysnum);
 	switch (sysnum) {
 	case SHMAT:
-			shmid=va_arg(ap, int);
-			shmaddr=va_arg(ap, char *);
-			shmflg=va_arg(ap, int);
-			va_end(ap);
-			return ((int)shmat(shmid, shmaddr, shmflg));
+		shmid = va_arg(ap, int);
+		shmaddr = va_arg(ap, char *);
+		shmflg = va_arg(ap, int);
+		va_end(ap);
+		return ((int)shmat(shmid, shmaddr, shmflg));
 	case SHMCTL:
-			shmid=va_arg(ap, int);
-			cmd=va_arg(ap, int);
-			buf=va_arg(ap, struct shmid_ds *);
-			va_end(ap);
-			return (shmctl(shmid, cmd, buf));
+		shmid = va_arg(ap, int);
+		cmd = va_arg(ap, int);
+		buf = va_arg(ap, struct shmid_ds *);
+		va_end(ap);
+		return (shmctl(shmid, cmd, buf));
 	case SHMDT:
-			shmaddr=va_arg(ap, char *);
-			va_end(ap);
-			return (shmdt(shmaddr));
+		shmaddr = va_arg(ap, char *);
+		va_end(ap);
+		return (shmdt(shmaddr));
 	case SHMGET:
-			key=va_arg(ap, key_t);
-			size=va_arg(ap, int);
-			shmflg=va_arg(ap, int);
-			va_end(ap);
-			return (shmget(key, size, shmflg));
+		key = va_arg(ap, key_t);
+		size = va_arg(ap, int);
+		shmflg = va_arg(ap, int);
+		va_end(ap);
+		return (shmget(key, size, shmflg));
 	}
 	va_end(ap);
 	return (-1);

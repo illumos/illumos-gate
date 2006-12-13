@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,48 +18,40 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <syscall.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/param.h>
 #include "compat.h"	/* for UTMPX_MAGIC_FLAG */
 
-extern int errno;
-
-int creat_com(char *path, int mode)
+int
+creat_com(char *path, int mode)
 {
-	int ret=0;
-	int fd, fd2;
-	char buf[MAXPATHLEN+100];
+	int fd;
 
 	if (strcmp(path, "/etc/mtab") == 0 ||
 	    strcmp(path, "/etc/fstab") == 0) {
 		errno = ENOENT;
-		return(-1);
+		return (-1);
 	}
-	if (strcmp(path, "/var/adm/utmp") == 0 ||
-	    strcmp(path, "/var/adm/wtmp") == 0) {
-                        strcpy(buf, path);
-			strcat(buf, "x");
-			if ((fd = _syscall(SYS_creat, buf, mode)) >= 0) {
-				fd2 = UTMPX_MAGIC_FLAG;
-				fd_add(fd, fd2);
-			}
-			return(fd);
-	} else if (strcmp(path, "/etc/utmp") == 0) {
-		strcpy(buf, "/var/adm/utmpx");
-		if ((fd = _syscall(SYS_creat, buf, mode)) >= 0) {
-			fd2 = UTMPX_MAGIC_FLAG;
-			fd_add(fd, fd2);
-		}
-		return(fd);
-	} else
-		return(_syscall(SYS_creat, path, mode));
+	if (strcmp(path, "/var/adm/wtmp") == 0) {
+		if ((fd = _syscall(SYS_creat, "/var/adm/wtmpx", mode)) >= 0)
+			fd_add(fd, UTMPX_MAGIC_FLAG);
+		return (fd);
+	}
+	if (strcmp(path, "/etc/utmp") == 0 ||
+	    strcmp(path, "/var/adm/utmp") == 0) {
+		if ((fd = _syscall(SYS_creat, "/var/adm/utmpx", mode)) >= 0)
+			fd_add(fd, UTMPX_MAGIC_FLAG);
+		return (fd);
+	}
+	return (_syscall(SYS_creat, path, mode));
 }

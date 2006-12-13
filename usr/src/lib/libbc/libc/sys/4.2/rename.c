@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,21 +18,20 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "chkpath.h"
-#include <syscall.h>
+#include <sys/syscall.h>
 
-int rename(path1, path2)
-char *path1, *path2;
+int
+rename(char *path1, char *path2)
 {
-	int ret;
-	char buf1[256];
 	char buf2[256];
 
 	CHKNULL(path1);
@@ -44,19 +42,18 @@ char *path1, *path2;
 	 * to map the utmp or wtmp rename operation into
 	 * a rename of utmpx or wtmpx
 	 */
-	if (strcmp(path1, "/var/adm/utmp") == 0 ||
-		strcmp(path1, "/var/adm/wtmp") == 0 ||
-		strcmp(path1, "/etc/utmp") == 0) {
-		if (strcmp(path1, "/etc/utmp") == 0 ||
-		    strcmp(path1,"/var/adm/utmp") == 0)
-			strcpy(buf1, "/var/adm/utmpx");
-		else
-			strcpy(buf1, "/var/adm/wtmpx");
+	if (strcmp(path1, "/etc/utmp") == 0 ||
+	    strcmp(path1, "/var/adm/utmp") == 0) {
+		path1 = "/var/adm/utmpx";
 		strcpy(buf2, path2);
 		strcat(buf2, "x");
-		ret = _syscall(SYS_rename, buf1, buf2);		    
-	} else
-		ret = _syscall(SYS_rename, path1, path2);
+		path2 = buf2;
+	} else if (strcmp(path1, "/var/adm/wtmp") == 0) {
+		path1 = "/var/adm/wtmpx";
+		strcpy(buf2, path2);
+		strcat(buf2, "x");
+		path2 = buf2;
+	}
 
-	return(ret);
-}	
+	return (_syscall(SYS_rename, path1, path2));
+}

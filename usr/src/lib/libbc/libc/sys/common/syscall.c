@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,19 +32,19 @@
 #include <sys/syscall.h>
 #include "xsyscall.h"
 
-/* 
+/*
  * Array of SVR4 system call numbers. The 4.1 numbers are mapped
  * to their SVR4/5.0 equivalents before trapping into the kernel.
  */
 
-int syscallnum[190] = {	SYS_syscall,	SYS_exit,	SYS_fork, 
+int syscallnum[190] = {	SYS_syscall,	SYS_exit,	SYS_fork1,
 	SYS_read,	SYS_write,	SYS_open,	SYS_close,
         -1,		SYS_creat,	SYS_link,	SYS_unlink,
 	-1,		SYS_chdir,	0,		SYS_mknod,
         SYS_chmod,	SYS_lchown,	0,		0,
         SYS_lseek,	SYS_getpid,	0,		0,
-	0,		SYS_getuid,	0,		SYS_ptrace,
-	0,		0,		0,		0, 
+	0,		SYS_getuid,	0,		0,
+	0,		0,		0,		0,
 	0,		0,		SYS_access, 	0,
 	0,		SYS_sync,	SYS_kill,	SYS_stat,
 	0,		SYS_lstat,	SYS_dup,	SYS_pipe,
@@ -52,7 +52,7 @@ int syscallnum[190] = {	SYS_syscall,	SYS_exit,	SYS_fork,
 	SYS_getgid,	0,		0,		0,
 	SYS_acct,	0,		-1,		SYS_ioctl,
 	-1 /*reboot*/,	0,		SYS_symlink,	SYS_readlink,
-	SYS_execve,	SYS_umask,	SYS_chroot,	SYS_fstat,     
+	SYS_execve,	SYS_umask,	SYS_chroot,	SYS_fstat,
 	0,		-1/*getpagesize*/,-1,		0,
 	0,		0,		-1,		-1,
 	SYS_mmap,	-1,		SYS_munmap,	SYS_mprotect,
@@ -61,9 +61,9 @@ int syscallnum[190] = {	SYS_syscall,	SYS_exit,	SYS_fork,
 	SYS_setitimer,	0,		-1 /*swapon*/,	SYS_getitimer,
 	-1/*gethostname*/,-1/*sethostname*/,-1/*getdtablesize*/,-1/*dup2*/,
 	-1/*getdopt*/,	SYS_fcntl,	-1 /*select*/,	-1 /*setdopt*/,
-	SYS_fsync,	-1 /*setprio*/,	-1 /*socket*/,	-1 /*connect*/,
+	SYS_fdsync,	-1 /*setprio*/,	-1 /*socket*/,	-1 /*connect*/,
 	-1 /*accept*/,	-1 /*getprio*/,	-1 /*send*/,	-1 /*recv*/,
-	0,		-1 /*bind*/,	-1 /*setsockopt*/,-1 /*listen*/, 
+	0,		-1 /*bind*/,	-1 /*setsockopt*/,-1 /*listen*/,
 	0,		-1 /*sigvec*/,	-1 /*sigblock*/, -1 /*sigsetmask*/,
 	-1 /*sigpause*/, -1 /*sigstack*/, -1 /*recvmsg*/, -1 /*sendmsg*/,
 	-1 /*vtrace*/,	SYS_gettimeofday, -1 /*getrusage*/, -1 /*getsockopt*/,
@@ -72,7 +72,7 @@ int syscallnum[190] = {	SYS_syscall,	SYS_exit,	SYS_fork,
 	-1 /*getregid*/, SYS_rename,	-1 /*truncate*/, -1 /*ftruncate*/,
 	-1 /*flock*/,	0,		-1 /*sendto*/,	-1 /*shutdown*/,
 	-1 /*socketpair*/,SYS_mkdir,	SYS_rmdir,	SYS_utimes,
-	0,		SYS_adjtime,	-1 /*getpeername*/,-1 /*gethostid*/, 
+	0,		SYS_adjtime,	-1 /*getpeername*/,-1 /*gethostid*/,
 	0,		SYS_getrlimit,	SYS_setrlimit,	-1 /*killpg*/,
 	0,		0,		0,		-1/*getsockname*/,
 	SYS_getmsg,	SYS_putmsg,	SYS_poll,	0,
@@ -82,9 +82,9 @@ int syscallnum[190] = {	SYS_syscall,	SYS_exit,	SYS_fork,
 	SYS_mount,	-1/*ustat*/,	SYS_semsys,	SYS_msgsys,
 	SYS_shmsys,	-1 /*auditsys*/, -1 /*rfsys*/,	SYS_getdents,
 	-1 /*setsid*/,	SYS_fchdir,	SYS_fchroot,	-1 /*vpixsys*/,
-	-1 /*aioread*/,	-1 /*aiowrite*/, -1 /*aiocancel*/, SYS_sigpending,   
+	-1 /*aioread*/,	-1 /*aiowrite*/, -1 /*aiocancel*/, SYS_sigpending,
 	0,		-1 /*setpgid*/, SYS_pathconf,	SYS_uname,
-}; 
+};
 
 int
 syscall(int sysnum, ...)
@@ -96,7 +96,7 @@ syscall(int sysnum, ...)
 
 	va_start(ap, sysnum);
 	switch(sysnum) {
-		case XSYS_read: 
+		case XSYS_read:
 			i1 = va_arg(ap, int);
 			c1 = va_arg(ap, char *);
 			i2 = va_arg(ap, int);
@@ -108,7 +108,7 @@ syscall(int sysnum, ...)
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (bc_write(i1, c1, i2));
-		case XSYS_readv:         
+		case XSYS_readv:
 			i1 = va_arg(ap, int);
 			c1 = va_arg(ap, char *);
 			i2 = va_arg(ap, int);
@@ -120,7 +120,7 @@ syscall(int sysnum, ...)
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (bc_writev(i1, c1, i2));
-		case XSYS_open:         
+		case XSYS_open:
 			c1 = va_arg(ap, char *);
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
@@ -129,7 +129,7 @@ syscall(int sysnum, ...)
 				return (bc_open(c1, i1, i2));
 			else
 				return (bc_open(c1, i1));
-		case XSYS_close:        
+		case XSYS_close:
 			i1 = va_arg(ap, int);
 			va_end(ap);
 			return (bc_close(i1));
@@ -147,13 +147,13 @@ syscall(int sysnum, ...)
 			c4 = va_arg(ap, char *);
 			va_end(ap);
 			return (_select(i1, c1, c2, c3, c4));
-		case XSYS_ioctl :	        
+		case XSYS_ioctl :
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
 			c1 = va_arg(ap, char *);
 			va_end(ap);
 			return (bc_ioctl(i1, i2, c1));
-		case XSYS_stat:          
+		case XSYS_stat:
 			c1 = va_arg(ap, char *);
 			c2 = va_arg(ap, char *);
 			va_end(ap);
@@ -163,23 +163,23 @@ syscall(int sysnum, ...)
 			c2 = va_arg(ap, char *);
 			va_end(ap);
 			return (bc_lstat(c1, c2));
-		case XSYS_fstat:     
+		case XSYS_fstat:
 			i1 = va_arg(ap, int);
 			c1 = va_arg(ap, char *);
 			va_end(ap);
 			return (bc_fstat(i1, c1));
-        	case XSYS_getdents:     
+        	case XSYS_getdents:
 			i1 = va_arg(ap, int);
 			c1 = va_arg(ap, char *);
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (bc_getdents(i1, c1, i2));
-		case XSYS_kill:         
+		case XSYS_kill:
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (bc_kill(i1, i2));
-		case XSYS_mount:        
+		case XSYS_mount:
 			c1 = va_arg(ap, char *);
 			c2 = va_arg(ap, char *);
 			i1 = va_arg(ap, int);
@@ -191,7 +191,7 @@ syscall(int sysnum, ...)
 			c1 = va_arg(ap, char *);
 			va_end(ap);
 			return (bc_getrlimit(i1, c1));
-		case XSYS_setrlimit:    
+		case XSYS_setrlimit:
 			i1 = va_arg(ap, int);
 			c1 = va_arg(ap, char *);
 			va_end(ap);
@@ -200,21 +200,21 @@ syscall(int sysnum, ...)
 			c1 = va_arg(ap, char *);
 			va_end(ap);
 			return (bc_uname(c1));
-		case XSYS_creat:     
+		case XSYS_creat:
 			c1 = va_arg(ap, char *);
 			i1 = va_arg(ap, int);
 			va_end(ap);
 			return (creat(c1, i1));
-		case XSYS_unmount:        
+		case XSYS_unmount:
 			c1 = va_arg(ap, char *);
 			va_end(ap);
 			return (umount(c1));
-		case XSYS_link:         
+		case XSYS_link:
 			c1 = va_arg(ap, char *);
 			c2 = va_arg(ap, char *);
 			va_end(ap);
 			return (link(c1, c2));
-		case XSYS_unlink:       
+		case XSYS_unlink:
 			c1 = va_arg(ap, char *);
 			va_end(ap);
 			return (unlink(c1));
@@ -222,35 +222,35 @@ syscall(int sysnum, ...)
 			c1 = va_arg(ap, char *);
 			va_end(ap);
 			return (chdir(c1));
-		case XSYS_mknod:        
+		case XSYS_mknod:
 			c1 = va_arg(ap, char *);
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (mknod(c1, i1, i2));
-		case XSYS_chmod:        
+		case XSYS_chmod:
 			c1 = va_arg(ap, char *);
 			i1 = va_arg(ap, int);
 			va_end(ap);
 			return (chmod(c1, i1));
-		case XSYS_chown: 
+		case XSYS_chown:
 			c1 = va_arg(ap, char *);
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (chown(c1, i1, i2));
-		case XSYS_lseek:  
+		case XSYS_lseek:
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
 			i3 = va_arg(ap, int);
 			va_end(ap);
 			return (lseek(i1, i2, i3));
-		case XSYS_access: 
+		case XSYS_access:
 			c1 = va_arg(ap, char *);
 			i1 = va_arg(ap, int);
 			va_end(ap);
 			return (access(c1, i1));
-        	case XSYS_dup:          
+        	case XSYS_dup:
 			i1 = va_arg(ap, int);
 			va_end(ap);
 			return (dup(i1));
@@ -259,42 +259,42 @@ syscall(int sysnum, ...)
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (dup(i1, i2));
-		case XSYS_pipe:         
+		case XSYS_pipe:
 			c1 = (char *)va_arg(ap, int *);
 			va_end(ap);
 			return (pipe(c1));
-		case XSYS_symlink:      
+		case XSYS_symlink:
 			c1 = va_arg(ap, char *);
 			c2 = va_arg(ap, char *);
 			va_end(ap);
 			return (symlink(c1, c2));
-		case XSYS_readlink:     
+		case XSYS_readlink:
 			c1 = va_arg(ap, char *);
 			c2 = va_arg(ap, char *);
 			i1 = va_arg(ap, int);
 			va_end(ap);
 			return (readlink(c1, c2, i1));
-		case XSYS_execve:        
+		case XSYS_execve:
 			c1 = va_arg(ap, char *);
 			c2 = (char *)va_arg(ap, char **);
 			c3 = (char *)va_arg(ap, char **);
 			va_end(ap);
 			return (execve(c1, c2, c3));
-		case XSYS_chroot:       
+		case XSYS_chroot:
 			c1 = va_arg(ap, char *);
 			va_end(ap);
 			return (chroot(c1));
-		case XSYS_getgroups:    
+		case XSYS_getgroups:
 			i1 = va_arg(ap, int);
 			c1 = (char *)va_arg(ap, int *);
 			va_end(ap);
 			return (getgroups(i1, c1));
-		case XSYS_setgroups:     
+		case XSYS_setgroups:
 			i1 = va_arg(ap, int);
 			c1 = (char *)va_arg(ap, int *);
 			va_end(ap);
 			return (setgroups(i1, c1));
-		case XSYS_fsync:        
+		case XSYS_fsync:
 			i1 = va_arg(ap, int);
 			va_end(ap);
 			return (fsync(i1));
@@ -308,26 +308,26 @@ syscall(int sysnum, ...)
 			c2 = va_arg(ap, char *);
 			va_end(ap);
 			return (settimeofday(c1, c2));
-		case XSYS_rename:        
+		case XSYS_rename:
 			c1 = va_arg(ap, char *);
 			c2 = va_arg(ap, char *);
 			va_end(ap);
 			return (rename(c1, c2));
-		case XSYS_mkdir:        
+		case XSYS_mkdir:
 			c1 = va_arg(ap, char *);
 			i1 = va_arg(ap, int);
 			va_end(ap);
 			return (mkdir(c1, i1));
-		case XSYS_rmdir:         
+		case XSYS_rmdir:
 			c1 = va_arg(ap, char *);
 			va_end(ap);
 			return (rmdir(c1));
-        	case XSYS_statfs:       
+        	case XSYS_statfs:
 			c1 = va_arg(ap, char *);
 			c2 = va_arg(ap, char *);
 			va_end(ap);
 			return (statfs(c1, c2));
-		case XSYS_fstatfs:      
+		case XSYS_fstatfs:
 			i1 = va_arg(ap, int);
 			c1 = va_arg(ap, char *);
 			va_end(ap);
@@ -341,7 +341,7 @@ syscall(int sysnum, ...)
 		case XSYS_getdtablesize:
 			va_end(ap);
 			return (getdtablesize());
-		case XSYS_pathconf:      
+		case XSYS_pathconf:
 			c1 = va_arg(ap, char *);
 			i1 = va_arg(ap, int);
 			va_end(ap);
@@ -356,22 +356,22 @@ syscall(int sysnum, ...)
 			i1 = va_arg(ap, int);
 			va_end(ap);
 			return (sethostname(c1, i1));
-		case XSYS_setreuid:  
+		case XSYS_setreuid:
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (setreuid(i1, i2));
-		case XSYS_setregid:  
+		case XSYS_setregid:
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (setregid(i1, i2));
-		case XSYS_getpriority:  
+		case XSYS_getpriority:
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (getpriority(i1, i2));
-		case XSYS_setpriority:  
+		case XSYS_setpriority:
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
 			i3 = va_arg(ap, int);
@@ -424,7 +424,7 @@ syscall(int sysnum, ...)
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (setpgid(i1, i2));
-		case XSYS_ptrace:       
+		case XSYS_ptrace:
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
 			i3 = va_arg(ap, int);
@@ -432,7 +432,7 @@ syscall(int sysnum, ...)
 			i4 = va_arg(ap, int);
 			c2 = va_arg(ap, char *);
 			va_end(ap);
-			return (ptrace(i1, i2, i3, c1, i4, c2));	
+			return (ptrace(i1, i2, i3, c1, i4, c2));
 #ifdef S5EMUL
 		case XSYS_getpgrp:
 			va_end(ap);
@@ -465,7 +465,7 @@ syscall(int sysnum, ...)
 			i2 = va_arg(ap, int);
 			va_end(ap);
 			return (flock(i1, i2));
-	
+
 		/* the following system calls are now implemented in
 		 * libsocket */
 		case XSYS_accept:
@@ -595,32 +595,32 @@ syscall(int sysnum, ...)
 
 		/* The following can directly go through syscall */
 		case XSYS_acct:
-		case XSYS_adjtime:      
-		case XSYS_exit: 
-		case XSYS_fchdir:        
-		case XSYS_fchmod:        
-		case XSYS_fchown:    
+		case XSYS_adjtime:
+		case XSYS_exit:
+		case XSYS_fchdir:
+		case XSYS_fchmod:
+		case XSYS_fchown:
 		case XSYS_fchroot:
-		case XSYS_fork: 
-		case XSYS_getgid:    
+		case XSYS_fork:
+		case XSYS_getgid:
 		case XSYS_getitimer:
 		case XSYS_getmsg:
-		case XSYS_getpid:       
-		case XSYS_getuid:       
-		case XSYS_mincore:      
-		case XSYS_mprotect:     
-		case XSYS_munmap:       
-		case XSYS_putmsg:       
-		case XSYS_poll: 
-		case XSYS_profil:       
+		case XSYS_getpid:
+		case XSYS_getuid:
+		case XSYS_mincore:
+		case XSYS_mprotect:
+		case XSYS_munmap:
+		case XSYS_putmsg:
+		case XSYS_poll:
+		case XSYS_profil:
 		case XSYS_setitimer:
-		case XSYS_sync:         
-		case XSYS_umask: 
+		case XSYS_sync:
+		case XSYS_umask:
 		case XSYS_utimes:
 		case XSYS_semsys:
-		case XSYS_msgsys:       
-		case XSYS_shmsys:       
-		case XSYS_mmap:          
+		case XSYS_msgsys:
+		case XSYS_shmsys:
+		case XSYS_mmap:
 		case XSYS_vhangup:
 			ret_val = _syscall(syscallnum[sysnum], ap);
 			va_end(ap);
@@ -631,13 +631,13 @@ syscall(int sysnum, ...)
 		case XSYS_aiocancel:
 		case XSYS_swapon:
 		case XSYS_async_daemon:
-		case XSYS_getfh:     
+		case XSYS_getfh:
 		case XSYS_nfssvc:
-		case XSYS_exportfs:  
-		case XSYS_auditsys:   
-        	case XSYS_vpixsys:   
+		case XSYS_exportfs:
+		case XSYS_auditsys:
+        	case XSYS_vpixsys:
 		case XSYS_quotactl:
-		case XSYS_getdopt:    
+		case XSYS_getdopt:
 		case XSYS_setdopt:
 		case XSYS_ustat:
 		case XSYS_vtrace:

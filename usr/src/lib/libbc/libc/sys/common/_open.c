@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <mntent.h>
-#include <syscall.h>
+#include <sys/syscall.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
@@ -107,30 +107,34 @@ open_com(char *path, int flags, int mode)
 		return (_syscall(SYS_open, locbuf, nflags, mode));
 	}
 
-	if (strcmp(path, "/etc/mtab") == 0) {
+	if (strcmp(path, "/etc/mtab") == 0)
 		return (open_mnt("/etc/mnttab", "mtab", nflags, mode));
-	} else if (strcmp(path, "/etc/fstab") == 0) {
+
+	if (strcmp(path, "/etc/fstab") == 0)
 		return (open_mnt("/etc/vfstab", "fstab", nflags, mode));
-	} else if (strcmp(path, "/etc/printcap") == 0) {
-			if ((fd = _syscall(SYS_open, path,
-			    nflags, mode)) != -1)
-				return (fd);
-		return (open_printcap());
-	} else if (strcmp(path, "/etc/utmp") == 0 ||
-		    strcmp(path, "/var/adm/wtmp") == 0) {
-			char buf[MAXPATHLEN+100];
-			if (strcmp(path, "/etc/utmp") == 0)
-				strcpy(buf, "/var/adm/utmpx");
-			else
-				strcpy(buf, "/var/adm/wtmpx");
-			if ((fd = _syscall(SYS_open, buf,
-			    nflags, mode)) == -1)
-				return (-1);
-			fd2 = UTMPX_MAGIC_FLAG;
-			fd_add(fd, fd2);
+
+	if (strcmp(path, "/etc/printcap") == 0) {
+		if ((fd = _syscall(SYS_open, path, nflags, mode)) >= 0)
 			return (fd);
-	} else
-		return (_syscall(SYS_open, path, nflags, mode));
+		return (open_printcap());
+	}
+
+	if (strcmp(path, "/etc/utmp") == 0 ||
+	    strcmp(path, "/var/adm/utmp") == 0) {
+		fd = _syscall(SYS_open, "/var/adm/utmpx", nflags, mode);
+		if (fd >= 0)
+			fd_add(fd, UTMPX_MAGIC_FLAG);
+		return (fd);
+	}
+
+	if (strcmp(path, "/var/adm/wtmp") == 0) {
+		fd = _syscall(SYS_open, "/var/adm/wtmpx", nflags, mode);
+		if (fd >= 0)
+			fd_add(fd, UTMPX_MAGIC_FLAG);
+		return (fd);
+	}
+
+	return (_syscall(SYS_open, path, nflags, mode));
 }
 
 int
@@ -160,12 +164,13 @@ open_mnt(char *fname, char *tname, int flags, int mode)
 				fclose(fd_out);
 				return (-1);
 			}
-		} else	/* processing vfstab */
+		} else {	/* processing vfstab */
 			if (putfline(line, fd_out) == -1) {
 				fclose(fd_in);
 				fclose(fd_out);
 				return (-1);
 			}
+		}
 	}
 
 	if (feof(fd_in)) {
@@ -184,7 +189,6 @@ open_mnt(char *fname, char *tname, int flags, int mode)
 		return (-1);
 	}
 }
-
 
 int
 getmntline(char *lp, FILE *fp)
@@ -237,8 +241,8 @@ putmline(char *line, FILE *fp)
 	if (!devnumstr) {
 		/* no device number on this line */
 		fprintf(fp, "%s %s %s %s %d %d\n",
-			mnt.mnt_fsname, mnt.mnt_dir, mnt.mnt_type,
-			mnt.mnt_opts, mnt.mnt_freq, mnt.mnt_passno);
+		    mnt.mnt_fsname, mnt.mnt_dir, mnt.mnt_type,
+		    mnt.mnt_opts, mnt.mnt_freq, mnt.mnt_passno);
 	} else {
 		/* found the device number, convert it to 4.x format */
 		devnum = strtol(&devnumstr[1], (char **)NULL, 16);
@@ -247,9 +251,9 @@ putmline(char *line, FILE *fp)
 		devnum = cmpdev(devnum);
 
 		fprintf(fp, "%s %s %s %s%4x%s %d %d\n",
-			mnt.mnt_fsname, mnt.mnt_dir, mnt.mnt_type,
-			mnt.mnt_opts, devnum, remainder ? remainder : "",
-			mnt.mnt_freq, mnt.mnt_passno);
+		    mnt.mnt_fsname, mnt.mnt_dir, mnt.mnt_type,
+		    mnt.mnt_opts, devnum, remainder ? remainder : "",
+		    mnt.mnt_freq, mnt.mnt_passno);
 	}
 
 	return (0);
@@ -282,12 +286,11 @@ putfline(char *line, FILE *fp)
 	}
 
 	fprintf(fp, "%s %s %s %s %d %d\n",
-		mnt.mnt_fsname, mnt.mnt_dir, mnt.mnt_type,
-		mnt.mnt_opts, mnt.mnt_freq, mnt.mnt_passno);
+	    mnt.mnt_fsname, mnt.mnt_dir, mnt.mnt_type,
+	    mnt.mnt_opts, mnt.mnt_freq, mnt.mnt_passno);
 
 	return (0);
 }
-
 
 FILE *
 _fopen(char *file, char *mode)
@@ -360,7 +363,6 @@ open_printcap(void)
 
 	return (tmp_file);
 }
-
 
 static void
 getPrinterInfo(char *printerName, FILE *fd)

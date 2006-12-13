@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,20 +18,21 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <syscall.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 
 /* The following are from SVR4 sys/fcntl.h */
 
-#define F_FREESP 11	/* Free file space */
-#define F_WRLCK	 02	/* Write Lock */
+#define	F_FREESP	11	/* Free file space */
+#define	F_WRLCK		02	/* Write Lock */
 
 /* lock structure from SVR4. */
 struct fl {
@@ -45,18 +45,19 @@ struct fl {
 	long  pad[4];
 };
 
-int ftruncate(int fd, off_t length)
+int
+ftruncate(int fd, off_t length)
 {
 
 	struct fl lck;
 
 	lck.l_whence = 0;	/* offset l_start from beginning of file */
-	lck.l_start = length;	
+	lck.l_start = length;
 	lck.l_type = F_WRLCK;	/* setting a write lock */
 	lck.l_len = 0L;
 
 	if (_syscall(SYS_fcntl, fd, F_FREESP, (int)&lck) == -1)
 		return (-1);
-	else 
+	else
 		return (0);
-}	
+}
