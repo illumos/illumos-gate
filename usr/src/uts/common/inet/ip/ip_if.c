@@ -787,6 +787,28 @@ ipif_non_duplicate(ipif_t *ipif)
 }
 
 /*
+ * Send all deferred messages without waiting for their ACKs.
+ */
+void
+ill_send_all_deferred_mp(ill_t *ill)
+{
+	mblk_t *mp, *next;
+
+	/*
+	 * Clear ill_dlpi_pending so that the message is not queued in
+	 * ill_dlpi_send().
+	 */
+	ill->ill_dlpi_pending = DL_PRIM_INVAL;
+
+	for (mp = ill->ill_dlpi_deferred; mp != NULL; mp = next) {
+		next = mp->b_next;
+		mp->b_next = NULL;
+		ill_dlpi_send(ill, mp);
+	}
+	ill->ill_dlpi_deferred = NULL;
+}
+
+/*
  * ill_delete_tail is called from ip_modclose after all references
  * to the closing ill are gone. The wait is done in ip_modclose
  */
@@ -18129,7 +18151,17 @@ ill_dlpi_dispatch(ill_t *ill, mblk_t *mp)
 		break;
 	}
 
-	ill->ill_dlpi_pending = prim;
+	/*
+	 * Except for the ACKs for the M_PCPROTO messages, all other ACKs
+	 * are dropped by ip_rput() if ILL_CONDEMNED is set. Therefore
+	 * we only wait for the ACK of the DL_UNBIND_REQ.
+	 */
+	mutex_enter(&ill->ill_lock);
+	if (!(ill->ill_state_flags & ILL_CONDEMNED) ||
+	    (prim == DL_UNBIND_REQ)) {
+		ill->ill_dlpi_pending = prim;
+	}
+	mutex_exit(&ill->ill_lock);
 
 	/*
 	 * Some drivers send M_FLUSH up to IP as part of unbind
@@ -18213,7 +18245,10 @@ ill_dlpi_done(ill_t *ill, t_uscalar_t prim)
 	    dlpi_prim_str(ill->ill_dlpi_pending), ill->ill_dlpi_pending));
 
 	if ((mp = ill->ill_dlpi_deferred) == NULL) {
+		mutex_enter(&ill->ill_lock);
 		ill->ill_dlpi_pending = DL_PRIM_INVAL;
+		cv_signal(&ill->ill_cv);
+		mutex_exit(&ill->ill_lock);
 		return;
 	}
 

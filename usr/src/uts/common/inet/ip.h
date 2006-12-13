@@ -2019,6 +2019,7 @@ extern	void	ill_delete_glist(ill_t *);
  * ill_resolver_mp		ipsq			only when ill is up
  * ill_down_mp			ipsq			ipsq
  * ill_dlpi_deferred		ipsq			ipsq
+ * ill_dlpi_pending		ipsq and ill_lock	ipsq or ill_lock
  * ill_phys_addr_mp		ipsq			ipsq
  * ill_phys_addr		ipsq			up ill
  * ill_ick			ipsq + down ill		only when ill is up

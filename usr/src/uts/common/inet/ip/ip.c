@@ -251,6 +251,7 @@ major_t SCTP6_MAJ;
 
 int ip_poll_normal_ms = 100;
 int ip_poll_normal_ticks = 0;
+int ip_modclose_ackwait_ms = 3000;
 
 /*
  * Structure to represent a linked list of msgblks. Used by ip_snmp_ functions.
@@ -5368,6 +5369,25 @@ ip_modclose(ill_t *ill)
 	ipif_t	*ipif;
 	queue_t	*q = ill->ill_rq;
 	hook_nic_event_t *info;
+	clock_t timeout;
+
+	/*
+	 * Wait for the ACKs of all deferred control messages to be processed.
+	 * In particular, we wait for a potential capability reset initiated
+	 * in ip_sioctl_plink() to complete before proceeding.
+	 *
+	 * Note: we wait for at most ip_modclose_ackwait_ms (by default 3000 ms)
+	 * in case the driver never replies.
+	 */
+	timeout = lbolt + MSEC_TO_TICK(ip_modclose_ackwait_ms);
+	mutex_enter(&ill->ill_lock);
+	while (ill->ill_dlpi_pending != DL_PRIM_INVAL) {
+		if (cv_timedwait(&ill->ill_cv, &ill->ill_lock, timeout) < 0) {
+			/* Timeout */
+			break;
+		}
+	}
+	mutex_exit(&ill->ill_lock);
 
 	/*
 	 * Forcibly enter the ipsq after some delay. This is to take
@@ -5406,6 +5426,14 @@ ip_modclose(ill_t *ill)
 	 */
 	cv_broadcast(&ill->ill_cv);
 	mutex_exit(&ill->ill_lock);
+
+	/*
+	 * Send all the deferred control messages downstream which came in
+	 * during the small window right before ipsq_enter(). We do this
+	 * without waiting for the ACKs because all the ACKs for M_PROTO
+	 * messages are ignored in ip_rput() when ILL_CONDEMNED is set.
+	 */
+	ill_send_all_deferred_mp(ill);
 
 	/*
 	 * Shut down fragmentation reassembly.

@@ -168,6 +168,7 @@ extern uint_t	ill_get_next_ifindex(uint_t, boolean_t);
 extern uint_t	ill_get_ifindex_by_name(char *);
 extern ill_t	*ill_get_first(boolean_t isv6);
 extern	void	ill_ipif_cache_delete(ire_t *, char *);
+extern	void	ill_send_all_deferred_mp(ill_t *);
 extern	void	ill_delete(ill_t *);
 extern	void	ill_delete_tail(ill_t *);
 extern	int	ill_dl_phys(ill_t *, ipif_t *, mblk_t *, queue_t *);
