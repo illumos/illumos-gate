@@ -18,37 +18,44 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# This required package information file contains a list of package contents.
-# The 'pkgmk' command uses this file to identify the contents of a package
-# and their location on the development machine when building the package.
-# Can be created via a text editor or through use of the 'pkgproto' command.
+#
+# cmd/sa/sparcv9/Makefile
 
-#!search <pathname pathname ...>	# where to find pkg objects
-#!include <filename>			# include another 'prototype' file
-#!default <mode> <owner> <group>	# default used if not specified on entry
-#!<param>=<value>			# puts parameter in pkg environment
+PROG=	timex
+OBJS=	timex.o
 
-#
-# Include ISA independent files (prototype_com)
-#
-!include prototype_com
-#
-#
-#
-# List files which are I386 specific here
-#
-# source locations relative to the prototype file
-#
-#
-# SUNWaccu
-#
-d none usr/bin/i86 755 root bin
-f none usr/bin/i86/timex 555 root sys
-d none usr/bin/amd64 755 root bin
-f none usr/bin/amd64/timex  555 root sys
+
+SRCS=	$(OBJS:%.o=../%.c)
+
+include ../../Makefile.cmd
+include ../../Makefile.cmd.64
+
+CERRWARN = -errtags=yes
+CERRWARN += -erroff=E_EMPTY_TRANSLATION_UNIT
+CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
+
+.KEEP_STATE:
+
+%.o:	../%.c
+	$(COMPILE.c) $<
+
+all: $(PROG)
+
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTPROG64)
+
+clean:
+	$(RM) $(OBJS)
+
+lint:
+	$(LINT.c) $(SRCS) $(LDLIBS)
+
+include	../../Makefile.targ

@@ -18,37 +18,14 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# This required package information file contains a list of package contents.
-# The 'pkgmk' command uses this file to identify the contents of a package
-# and their location on the development machine when building the package.
-# Can be created via a text editor or through use of the 'pkgproto' command.
+#
+# cmd/sa/sparc/Makefile
+include ../Makefile.com
 
-#!search <pathname pathname ...>	# where to find pkg objects
-#!include <filename>			# include another 'prototype' file
-#!default <mode> <owner> <group>	# default used if not specified on entry
-#!<param>=<value>			# puts parameter in pkg environment
+install: all $(ROOTPROG32)
 
-#
-# Include ISA independent files (prototype_com)
-#
-!include prototype_com
-#
-#
-#
-# List files which are I386 specific here
-#
-# source locations relative to the prototype file
-#
-#
-# SUNWaccu
-#
-d none usr/bin/i86 755 root bin
-f none usr/bin/i86/timex 555 root sys
-d none usr/bin/amd64 755 root bin
-f none usr/bin/amd64/timex  555 root sys

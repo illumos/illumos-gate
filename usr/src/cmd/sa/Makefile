@@ -27,122 +27,34 @@
 # cmd/sa/Makefile
 #
 
-MANIFEST =	sar.xml
-SVCMETHOD =	svc-sar
+PROG= timex
 
 include ../Makefile.cmd
 
-ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
+SUBDIRS=	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
-GREP=		grep
-
-SADC= 		sadc
-SADP= 		sadp
-SAR= 		sar
-TIMEX=		timex
-SAG=		sag
-SA1=		sa1
-SA2=		sa2
-
-sadc :=		LDLIBS += -lkstat
-
-# Executables produced
-BINPROG=	$(TIMEX)
-SBINPROG=	$(SAR) $(SAG)
-LIBPROG=	$(SADC)
-LIBSHELL=	$(SA1) $(SA2)
-INITSHELL=	$(PERF)
-
-PROGS=		$(BINPROG) $(SBINPROG) $(LIBPROG)
-SHELLS=		$(LIBSHELL)
-TXTS= 		$(SADP).c README
-ALL=		$(PROGS) $(SHELLS)
-
-# Source files
-SAG_OBJECTS=	$(SAG)a.o $(SAG)b.o
-SADC_OBJECTS=	$(SADC).o
-srcs=		$(TIMEX) $(SAR) $(SADC)
-SRCS=		$(srcs:%=%.c) $(SAG_OBJECTS:%.o=%.c)
-SHSRCS=		$(SHELLS:%=%.sh)
-
-# Set of target install directories
-LIBSAD=		$(ROOT)/usr/lib/sa
-CROND=		$(ROOT)/var/spool/cron
-CRONTABSD=	$(CROND)/crontabs
-
-# Set of target install files
-SYSCRONTAB=	$(CRONTABSD)/sys
-ROOTPROG=	$(BINPROG:%=$(ROOTBIN)/%)
-ROOTUSBINPROG=	$(SBINPROG:%=$(ROOTUSRSBIN)/%)
-ROOTLIBPROG=	$(LIBPROG:%=$(LIBSAD)/%)
-ROOTLIBSHELL=	$(LIBSHELL:%=$(LIBSAD)/%)
-ROOTSYMLINKS=	$(SBINPROG:%=$(ROOTBIN)/%)
-
-# Performance monitoring should not be enabled by default. Hence, these
-# entries are comments. Note the difficulty of inserting a literal #
-# in a makefile.... Wonderful parser here....
-COMMENT_CHAR:sh=          echo \\043
-ENTRY1=		'$(COMMENT_CHAR) 0 * * * 0-6 /usr/lib/sa/sa1'
-ENTRY2=		'$(COMMENT_CHAR) 20,40 8-17 * * 1-5 /usr/lib/sa/sa1'
-ENTRY3=		'$(COMMENT_CHAR) 5 18 * * 1-5 /usr/lib/sa/sa2 -s 8:00 -e 18:01 -i 1200 -A'
-
-CLOBBERFILES=	$(PROGS) $(SHELLS)
-
-# Conditionals
-$(SYSCRONTAB)		:= OWNER = root
-$(SYSCRONTAB)     	:= GROUP = sys
-$(ROOTBIN)/$(TIMEX)	:= GROUP = sys
-# $(ROOTUSRSBIN)/$(SADP) 	:= FILEMODE = 2555
-# $(ROOTUSRSBIN)/$(SADP) 	:= GROUP = sys
-$(LIBSAD)/$(SADC) 	:= FILEMODE = 0555
-$(LIBSAD)/$(SADC) 	:= GROUP = bin
+all	:=	TARGET = all
+install	:=	TARGET = install
+clean	:=	TARGET = clean
+clobber	:= 	TARGET = clobber
+lint	:=	TARGET = lint
 
 .KEEP_STATE:
 
-all: 		$(ALL) $(TXTS)
+all:    $(SUBDIRS)
 
-$(SAG):		$(SAG_OBJECTS)
-	$(LINK.c) -o $@ $(SAG_OBJECTS) $(LDLIBS)
-	$(POST_PROCESS)
+clean clobber lint:     $(SUBDIRS)
 
-$(SADC):	$(SADC_OBJECTS)
-	$(LINK.c) -o $@ $(SADC_OBJECTS) $(LDLIBS)
-	$(POST_PROCESS)
+install:        $(SUBDIRS)
+# Don't install isaexec yet
+	-$(RM) $(ROOTPROG)
+	-$(LN) $(ISAEXEC) $(ROOTPROG)
 
-# The edit of SYSCRONTAB must be done unconditionally because of the
-# creation of this file by a different component (Adm) and the possible
-# backdating.
-install:	all $(ROOTPROG) $(ROOTUSBINPROG)     \
-		$(ROOTINITSHELL)  $(ROOTLIBSHELL) $(ROOTSYMLINKS) \
-		$(ROOTMANIFEST) $(ROOTSVCMETHOD) $(ROOTLIBPROG)
-	@if [ -f $(SYSCRONTAB) ]; \
-	then \
-		if $(GREP) "sa1" $(SYSCRONTAB) >/dev/null 2>&1 ; then :; \
-		else \
-			echo $(ENTRY1) >> $(SYSCRONTAB); \
-			echo $(ENTRY2) >> $(SYSCRONTAB); \
-			echo "$(SYSCRONTAB) modified"; \
-		fi; \
-		if $(GREP) "sa2" $(SYSCRONTAB) >/dev/null 2>&1 ; then :; \
-		else \
-			echo $(ENTRY3) >> $(SYSCRONTAB); \
-		fi; \
-	fi
+$(SUBDIRS):     FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+	
 
-$(LIBSAD)/%: %
-	$(INS.file)
-
-$(ROOTSYMLINKS):
-	-$(RM) $@; $(SYMLINK) ../sbin/`basename $@` $@
-
-$(ETCINITD)/%: %
-	$(INS.file)
-
-check:	$(CHKMANIFEST)
-
-clean:
-	$(RM) $(SAG_OBJECTS) $(SADC_OBJECTS) $(PROGS) $(SHELLS) $(SADP)
-
-lint:	lint_SRCS
+FRC:
 
 include ../Makefile.targ
