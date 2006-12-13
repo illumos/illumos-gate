@@ -105,7 +105,8 @@ enum datatype {ADT_UNDEFINED = 0,
     ADT_CHAR2STAR,	/* char **			*/
     ADT_PID,
     ADT_PRIVSTAR,
-    ADT_TERMIDSTAR
+    ADT_TERMIDSTAR,
+    ADT_MLABELSTAR
 };
 typedef enum datatype datatype_t;
 
@@ -132,6 +133,7 @@ union convert {
     char		**tchar2star;
     au_tid_addr_t 	*ttermid;
     priv_set_t		*tprivstar;
+    m_label_t		*tm_label;
 };
 
 struct adt_event_state {

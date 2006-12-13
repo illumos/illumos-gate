@@ -109,8 +109,6 @@ Use is subject to license terms.
 			  with the <entry id="dataName">.  The following
 			  data types are representative:
 
-			Need to add label token and m_label_t * type here
-			and in auditxml, adt_token.c, adt_xlate.h.
 				au_asid_t (uint32_t)
 				char
 				char * (blank is optional)
@@ -118,6 +116,7 @@ Use is subject to license terms.
 				uint_t, int, int32_t, uid_t, gid_t
 				uid_t *, gid_t *
 				long, ulong_t
+				m_label_t *
 				pid_t
 				priv_set_t *
 				uint16_t, unit32_t, uint64_t
@@ -466,6 +465,31 @@ Use is subject to license terms.
 	header="0" idNo="23">
     </event>
 <!-- end of Java needed for SMC events -->
+<!--
+    while not used by SMC logout is used by Lockhart
+-->
+    <event id="AUE_logout" header="0" idNo="1"> 
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+<!-- 
+    not used by C code, used by Lockhart,
+    get them to change and remove
+    event.user_name("logout " + session.getUserName());
+    from /ws/lockhart-nv-gate/src/bundled/app/webmgt/lib/services/
+    com/sun/management/services/audit/SolarisAuditEvent_Logout.java
+-->
+	<entry id="user_name">
+	    <internal token="text" format="logout %s"/>
+	    <external opt="optional" type="char *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
 
 <!-- C Only events -->
     <event id="AUE_init_solaris" header="0" idNo="32" omit="JNI">
@@ -537,21 +561,6 @@ Use is subject to license terms.
 	</entry>
 	<entry id="username">
 	    <internal token="text"/>
-	    <external opt="optional" type="char *"/>
-	</entry>
-	<entry id="return">
-	    <internal token="return"/>
-	    <external opt="none"/>
-	</entry>
-    </event>
-
-    <event id="AUE_logout" header="0" idNo="1" omit="JNI"> 
-	<entry id="subject">
-	    <internal token="subject"/>
-	    <external opt="none"/>
-	</entry>
-	<entry id="user_name">
-	    <internal token="text" format="logout %s"/>
 	    <external opt="optional" type="char *"/>
 	</entry>
 	<entry id="return">
@@ -916,6 +925,8 @@ Use is subject to license terms.
     <token id="ipc">
     </token>
     <token id="ipc_perm">
+    </token>
+    <token id="label">
     </token>
     <token id="newgroups">
     </token>
