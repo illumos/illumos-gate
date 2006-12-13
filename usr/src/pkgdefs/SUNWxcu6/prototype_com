@@ -62,4 +62,4 @@ f none usr/xpg6/bin/tr 555 root bin
 l none usr/xpg6/bin/vedit=../../../usr/xpg6/bin/edit
 l none usr/xpg6/bin/vi=../../../usr/xpg6/bin/edit
 l none usr/xpg6/bin/view=../../../usr/xpg6/bin/edit
-f none usr/xpg6/bin/xargs 555 root bin
+s none usr/xpg6/bin/xargs=../../bin/xargs

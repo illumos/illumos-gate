@@ -203,26 +203,17 @@ main(int argc, char **argv)
 		case 'E':
 			/*
 			 * -E eofstr: change end-of-file string.
-			 * eofstr *is* required here:
+			 * eofstr *is* required here, but can be empty:
 			 */
 			LEOF = optarg;
-#ifdef XPG6
-			if (LEOF == NULL) {
-#else
-			if ((LEOF == NULL) || (*LEOF == NULL)) {
-#endif
-				ermsg(gettext(
-				    "Option requires an argument: -%c\n"), c);
-			}
 			break;
 
 		case 'I':
 			/* -I replstr: Insert mode. replstr *is* required. */
 			INSERT = PER_LINE = LEGAL = TRUE;
 			N_ARGS = 0;
-			if ((optarg != NULL) && (*optarg != '\0')) {
-				INSPAT = optarg;
-			} else {
+			INSPAT = optarg;
+			if (*optarg == '\0') {
 				ermsg(gettext(
 				    "Option requires an argument: -%c\n"), c);
 			}
@@ -265,10 +256,7 @@ main(int argc, char **argv)
 			PER_LINE = TRUE;
 			N_ARGS = 0;
 			INSERT = FALSE;
-			if ((optarg == NULL) || (*optarg == '\0')) {
-				ermsg(gettext(
-				    "Option requires an argument: -%c\n"), c);
-			} else if ((PER_LINE = atoi(optarg)) <= 0) {
+			if ((PER_LINE = atoi(optarg)) <= 0) {
 				ermsg(gettext("#lines must be positive "
 				    "int: %s\n"), optarg);
 			}
@@ -298,10 +286,7 @@ main(int argc, char **argv)
 			 * -n number: # stdin args.
 			 * number *is* required here:
 			 */
-			if ((optarg == NULL) || (*optarg == '\0')) {
-				ermsg(gettext(
-				    "Option requires an argument: -%c\n"), c);
-			} else if ((N_ARGS = atoi(optarg)) <= 0) {
+			if ((N_ARGS = atoi(optarg)) <= 0) {
 				ermsg(gettext("#args must be positive "
 				    "int: %s\n"), optarg);
 			} else {
@@ -311,16 +296,11 @@ main(int argc, char **argv)
 			break;
 
 		case 's':	/* -s size: set max size of each arg list */
-			if ((optarg == NULL) || (*optarg == '\0')) {
+			BUFLIM = atoi(optarg);
+			if (BUFLIM > BUFSIZE || BUFLIM <= 0) {
 				ermsg(gettext(
-				    "Option requires an argument: -%c\n"), c);
-			} else {
-				BUFLIM = atoi(optarg);
-				if (BUFLIM > BUFSIZE || BUFLIM <= 0) {
-					ermsg(gettext(
-					    "0 < max-cmd-line-size <= %d: "
-					    "%s\n"), BUFSIZE, optarg);
-				}
+				    "0 < max-cmd-line-size <= %d: "
+				    "%s\n"), BUFSIZE, optarg);
 			}
 			break;
 
@@ -1298,22 +1278,8 @@ process_special:
 				}
 				i++;
 				mac++;
-#ifdef XPG6
-				if (av[i] != NULL) {
-					if ((mav[mac] = strdup(av[i]))
-					    == NULL) {
-						perror(gettext("xargs: Memory"
-						    " allocation failure"));
-						exit(1);
-					}
-				}
-#else
+
 				if (av[i] == NULL) {
-					if ((mav[mac++] = strdup("")) == NULL) {
-						perror(gettext("xargs: Memory "
-						    " allocation failure"));
-						exit(1);
-					}
 					mav[mac] = NULL;
 					return;
 				}
@@ -1322,8 +1288,6 @@ process_special:
 					    " allocation failure"));
 					exit(1);
 				}
-
-#endif
 				break;
 
 			/* flags */
