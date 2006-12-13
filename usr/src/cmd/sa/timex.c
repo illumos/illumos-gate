@@ -198,7 +198,7 @@ main(int argc, char **argv)
 		system(cmd);
 		unlink(fname);
 	}
-	exit(status>>8);
+	return (status>>8);
 }
 
 void

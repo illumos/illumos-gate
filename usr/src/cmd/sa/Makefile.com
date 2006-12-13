@@ -42,8 +42,6 @@ clean	:=	TARGET = clean
 clobber	:= 	TARGET = clobber
 lint	:=	TARGET = lint
 
-LDLIBS += -lkstat
-
 VPATH=		..
 
 ROOTMANIFESTDIR	= $(ROOTSVCSYSTEM)
@@ -57,6 +55,8 @@ TIMEX=		timex
 SAG=		sag
 SA1=		sa1
 SA2=		sa2
+
+sadc :=		LDLIBS += -lkstat
 
 # Executables produced
 BINPROG=	$(TIMEX)

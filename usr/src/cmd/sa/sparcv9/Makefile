@@ -35,10 +35,6 @@ SRCS=	$(OBJS:%.o=../%.c)
 include ../../Makefile.cmd
 include ../../Makefile.cmd.64
 
-CERRWARN = -errtags=yes
-CERRWARN += -erroff=E_EMPTY_TRANSLATION_UNIT
-CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
-
 .KEEP_STATE:
 
 %.o:	../%.c
