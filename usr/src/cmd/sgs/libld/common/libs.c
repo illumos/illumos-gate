@@ -38,19 +38,31 @@
 #include	"_libld.h"
 
 /*
- * Because a tentative symbol may cause the extraction of an archive member,
- * make sure that the potential member is really required.  If the archive
- * member has a strong defined symbol it will be extracted.  If it simply
- * contains another tentative definition, or a defined function symbol, then it
- * will not be used.
+ * Archive members are typically extracted to resolve an existing undefined
+ * reference.  However, other symbol definitions can cause archive members to
+ * be processed to determine if the archive member provides a more appropriate
+ * definition.  This routine processes the archive member to determine if the
+ * member is really required.
+ *
+ *  i.	Tentative symbols may cause the extraction of an archive member.
+ *	If the archive member has a strong defined symbol it will be used.
+ *	If the archive member simply contains another tentative definition,
+ *	or a defined function symbol, then it will not be used.
+ *
+ *  ii.	A symbol reference may define a hidden or protected visibility.  The
+ *	reference can only be bound to a definition within a relocatable object
+ *	for this restricted visibility to be satisfied.  If the archive member
+ * 	provides a definition of the same symbol type, this definition is
+ *	taken.  The visibility of the defined symbol is irrelevant, as the most
+ *	restrictive visibility of the reference and the definition will be
+ *	applied to the final symbol.
  */
 static int
-process_member(Ar_mem *amp, const char *name, unsigned char obind,
-    Ofl_desc *ofl)
+process_member(Ar_mem *amp, const char *name, Sym_desc *sdp, Ofl_desc *ofl)
 {
-	Sym *		syms;
-	Xword		symn, cnt;
-	char 		*strs;
+	Sym	*syms, *osym = sdp->sd_sym;
+	Xword	symn, cnt;
+	char 	*strs;
 
 	/*
 	 * Find the first symbol table in the archive member, obtain its
@@ -60,9 +72,9 @@ process_member(Ar_mem *amp, const char *name, unsigned char obind,
 	 * member).
 	 */
 	if (amp->am_syms == 0) {
-		Elf_Scn *	scn = NULL;
-		Shdr *		shdr;
-		Elf_Data *	data;
+		Elf_Scn		*scn = NULL;
+		Shdr		*shdr;
+		Elf_Data	*data;
 
 		while (scn = elf_nextscn(amp->am_elf, scn)) {
 			if ((shdr = elf_getshdr(scn)) == NULL) {
@@ -119,24 +131,46 @@ process_member(Ar_mem *amp, const char *name, unsigned char obind,
 
 	/*
 	 * Loop through the symbol table entries looking for a match for the
-	 * original symbol.  The archive member will be used if	the new symbol
-	 * is a definition of an object (not a function).  Note however that a
-	 * weak definition within the archive will not override a strong
-	 * tentative symbol (see sym_realtent() resolution and ABI symbol
-	 * binding description - page 4-27).
+	 * original symbol.
 	 */
 	for (cnt = 0; cnt < symn; syms++, cnt++) {
-		Word		shndx = syms->st_shndx;
-		unsigned char	info;
+		Word	shndx;
 
-		if ((shndx == SHN_ABS) || (shndx == SHN_COMMON) ||
-		    (shndx == SHN_UNDEF))
+		if ((shndx = syms->st_shndx) == SHN_UNDEF)
 			continue;
 
-		info = syms->st_info;
-		if ((ELF_ST_TYPE(info) == STT_FUNC) ||
-		    ((ELF_ST_BIND(info) == STB_WEAK) && (obind != STB_WEAK)))
-			continue;
+		if (osym->st_shndx == SHN_COMMON) {
+			/*
+			 * Determine whether a tentative symbol definition
+			 * should be overridden.
+			 */
+			if ((shndx == SHN_ABS) || (shndx == SHN_COMMON) ||
+			    (ELF_ST_TYPE(syms->st_info) == STT_FUNC))
+				continue;
+
+			/*
+			 * A historic detail requires that a weak definition
+			 * within an archive will not override a strong
+			 * definition (see sym_realtent() resolution and ABI
+			 * symbol binding description - page 4-27).
+			 */
+			if ((ELF_ST_BIND(syms->st_info) == STB_WEAK) &&
+			    (ELF_ST_BIND(osym->st_info) != STB_WEAK))
+				continue;
+		} else {
+			/*
+			 * Determine whether a restricted visibility reference
+			 * should be overridden.  Don't worry about the
+			 * visibility of the archive member definition, nor
+			 * whether it is weak or global.  Any definition is
+			 * better than a binding to an external shared object
+			 * (which is the only event that must presently exist
+			 * for us to be here looking for a better alternative).
+			 */
+			if (ELF_ST_TYPE(syms->st_info) !=
+			    ELF_ST_TYPE(osym->st_info))
+				continue;
+		}
 
 		if (strcmp(strs + syms->st_name, name) == NULL)
 			return (1);
@@ -256,11 +290,12 @@ ld_ar_member(Ar_desc * adp, Elf_Arsym * arsym, Ar_aux * aup, Ar_mem * amp)
 }
 
 /*
- * Read in the archive's symbol table; for each symbol in the table check
- * whether that symbol satisfies an unresolved, or tentative reference in
- * ld's internal symbol table; if so, the corresponding object from the
- * archive is processed.  The archive symbol table is searched until we go
- * through a complete pass without satisfying any unresolved symbols
+ * Read the archive symbol table.  For each symbol in the table, determine
+ * whether that symbol satisfies an unresolved reference, tentative reference,
+ * or a reference that expects hidden or protected visibility.  If so, the
+ * corresponding object from the archive is processed.  The archive symbol
+ * table is searched until we go through a complete pass without satisfying any
+ * unresolved symbols
  */
 uintptr_t
 ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
@@ -312,8 +347,9 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 		for (arsym = adp->ad_start, aup = adp->ad_aux; arsym->as_name;
 		    ++arsym, ++aup, ndx++) {
 			Rej_desc	_rej = { 0 };
-			Ar_mem *	amp;
-			Sym *		sym;
+			Ar_mem		*amp;
+			Sym		*sym;
+			Boolean		vis = TRUE;
 
 			/*
 			 * If the auxiliary members value indicates that this
@@ -345,32 +381,53 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			 * With '-z allextract', all members will be extracted.
 			 *
 			 * This archive member is a candidate for extraction if
-			 * the internal symbol originates from an explicit file
-			 * and is undefined or tentative.  By default weak
-			 * references do not cause archive extraction, however
-			 * the -zweakextract flag overrides this default.
-			 * If this symbol has been bound to a versioned shared
-			 * object make sure it is available for linking.
+			 * the internal symbol originates from an explicit file,
+			 * and represents an undefined or tentative symbol.
+			 *
+			 * By default, weak references do not cause archive
+			 * extraction, however the -zweakextract flag overrides
+			 * this default.
+			 *
+			 * If this symbol has already been bound to a versioned
+			 * shared object, but the shared objects version is not
+			 * available, then a definition of this symbol from
+			 * within the archive is a better candidate.  Similarly,
+			 * if this symbol has been bound to a shared object, but
+			 * the original reference expected hidden or protected
+			 * visibility, then a definition of this symbol from
+			 * within the archive is a better candidate.
 			 */
 			if (allexrt == 0) {
 				Boolean		vers = TRUE;
-				Ifl_desc *	file = sdp->sd_file;
-
-				if ((sdp->sd_ref == REF_DYN_NEED) &&
-				    (file->ifl_vercnt)) {
-					Word		vndx;
-					Ver_index *	vip;
-
-					vndx = sdp->sd_aux->sa_dverndx;
-					vip = &file->ifl_verndx[vndx];
-					if (!(vip->vi_flags & FLG_VER_AVAIL))
-						vers = FALSE;
-				}
+				Ifl_desc	*ifl = sdp->sd_file;
 
 				sym = sdp->sd_sym;
-				if ((!(file->ifl_flags & FLG_IF_NEEDED)) ||
-				    ((sym->st_shndx != SHN_UNDEF) &&
-				    (sym->st_shndx != SHN_COMMON) && vers) ||
+
+				if (sdp->sd_ref == REF_DYN_NEED) {
+					uchar_t	oth;
+
+					if (ifl->ifl_vercnt) {
+						Word		vndx;
+						Ver_index	*vip;
+
+						vndx = sdp->sd_aux->sa_dverndx;
+						vip = &ifl->ifl_verndx[vndx];
+						if ((vip->vi_flags &
+						    FLG_VER_AVAIL) == 0)
+							vers = FALSE;
+					}
+
+					oth = ELF_ST_VISIBILITY(sym->st_other);
+					if ((oth == STV_HIDDEN) ||
+					    (oth == STV_PROTECTED)) {
+						vis = FALSE;
+					}
+				}
+
+				if (((ifl->ifl_flags & FLG_IF_NEEDED) == 0) ||
+				    (vis && vers &&
+				    (sym->st_shndx != SHN_UNDEF) &&
+				    (sym->st_shndx != SHN_COMMON)) ||
 				    ((ELF_ST_BIND(sym->st_info) == STB_WEAK) &&
 				    (!(ofl->ofl_flags1 & FLG_OF1_WEAKEXT)))) {
 					DBG_CALL(Dbg_syms_ar_entry(ofl->ofl_lml,
@@ -445,15 +502,21 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			}
 
 			/*
-			 * If the symbol for which this archive member is
-			 * being processed is a tentative symbol, then this
-			 * member must be verified to insure that it is
-			 * going to provided a symbol definition that will
-			 * override the tentative symbol.
+			 * The symbol for which this archive member is being
+			 * processed may provide a better alternative to the
+			 * symbol that is presently known.  Two cases are
+			 * covered:
+			 *
+			 *  i.	The present symbol represents tentative data.
+			 *	The archive member may provide a data
+			 *	definition symbol.
+			 *  ii.	The present symbol represents a reference that
+			 *	has seen a definition within a shared object
+			 *	dependency, but the reference expects to be
+			 *	reduced to hidden or protected visibility.
 			 */
-			if ((allexrt == 0) && (sym->st_shndx == SHN_COMMON)) {
-				/* LINTED */
-				Byte bind = (Byte)ELF_ST_BIND(sym->st_info);
+			if ((allexrt == 0) &&
+			    ((sym->st_shndx == SHN_COMMON) || (vis == FALSE))) {
 
 				/*
 				 * If we don't already have a member structure
@@ -470,7 +533,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				DBG_CALL(Dbg_syms_ar_checking(ofl->ofl_lml,
 				    ndx, arsym, arname));
 				if ((err = process_member(amp, arsym->as_name,
-				    bind, ofl)) == S_ERROR)
+				    sdp, ofl)) == S_ERROR)
 					return (S_ERROR);
 
 				/*

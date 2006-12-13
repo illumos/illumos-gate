@@ -591,7 +591,8 @@
 # Symbol strings
 @ MSG_SYM_AR_FILE	"symbol table processing; input file=%s  [ archive ] %s"
 @ MSG_SYM_AR_ENTRY	"archive[%lld]=%s"
-@ MSG_SYM_AR_CHECK	"archive[%lld]=%s  (%s) checking for tentative override"
+@ MSG_SYM_AR_CHECK	"archive[%lld]=%s  (%s) checking for tentative or \
+			 restricted visibility override"
 @ MSG_SYM_AR_RESOLVE	"archive[%lld]=%s  (%s) resolves undefined or tentative \
 			 symbol"
 @ MSG_SYM_AR_FORCEDEXRT	"archive[%lld]=%s  (%s) forced extraction"
