@@ -38,6 +38,7 @@ case "$MACH" in
 	wc	0	0	ldterm ttcompat
 	asy	-1	0	ldterm ttcompat
 	ptsl	0	47	ldterm ttcompat
+	usbsacm -1	0	ldterm ttcompat
 	rts	-1	0	rts [anchor]
 	ipsecesp -1	0	ipsecesp
 	ipsecah	-1	0	ipsecah
@@ -65,6 +66,7 @@ case "$MACH" in
 	su	16385	0	ldterm ttcompat
 	su	131072	131073	ldterm ttcompat
 	usbser_edge -1	0	ldterm ttcompat
+	usbsacm -1	0	ldterm ttcompat
 	rts	-1	0	rts [anchor]
 	ttymux	-1	0	ldterm ttcompat
 	ipsecesp -1	0	ipsecesp

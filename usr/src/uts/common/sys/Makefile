@@ -842,6 +842,9 @@ USBMSHDRS=		\
 USBPRNHDRS=           \
 	usb_printer.h
 
+USBCDCHDRS=		\
+	usbcdc.h
+
 UGENHDRS=           \
 	usb_ugen.h
 
@@ -964,6 +967,7 @@ CHECKHDRS=						\
 	$(USBHIDHDRS:%.h=usb/clients/hid/%.check)	\
 	$(USBMSHDRS:%.h=usb/clients/mass_storage/%.check)	\
 	$(USBPRNHDRS:%.h=usb/clients/printer/%.check)   \
+	$(USBCDCHDRS:%.h=usb/clients/usbcdc/%.check)	\
 	$(UGENHDRS:%.h=usb/clients/ugen/%.check)   \
 	$(USBHDRS:%.h=usb/%.check)                      \
 	$(I1394HDRS:%.h=1394/%.check)			\
@@ -1008,6 +1012,7 @@ CHECKHDRS=						\
 	$(ROOTUSBHIDHDRS)	\
 	$(ROOTUSBMSHDRS)	\
 	$(ROOTUSBPRNHDRS)       \
+	$(ROOTUSBCDCHDRS)       \
 	$(ROOTUGENHDRS)		\
 	$(ROOT1394HDRS)         \
 	$(ROOTHOTPLUGHDRS)	\
@@ -1054,6 +1059,7 @@ install_h:			\
 	$(ROOTUSBHIDHDRS)	\
 	$(ROOTUSBMSHDRS)	\
 	$(ROOTUSBPRNHDRS)       \
+	$(ROOTUSBCDCHDRS)       \
 	$(ROOTUGENHDRS)		\
 	$(ROOT1394HDRS)         \
 	$(ROOTHOTPLUGHDRS)	\

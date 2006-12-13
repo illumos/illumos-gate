@@ -608,6 +608,8 @@ UGEN_OBJS += ugen.o
 
 USBSER_OBJS += usbser.o usbser_rseq.o
 
+USBSACM_OBJS += usbsacm.o
+
 USBSER_KEYSPAN_OBJS += usbser_keyspan.o keyspan_dsd.o keyspan_pipe.o
 
 USBS49_FW_OBJS += keyspan_49fw.o

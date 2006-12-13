@@ -105,6 +105,9 @@ usb/clients/hid/%.check:	usb/clients/hid/%.h
 usb/clients/printer/%.check:  usb/clients/printer/%.h
 	$(DOT_H_CHECK)
 
+usb/clients/usbcdc/%.check:	usb/clients/usbcdc/%.h
+	$(DOT_H_CHECK)
+
 1394/%.check:         1394/%.h
 	$(DOT_H_CHECK)
 
@@ -162,6 +165,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/usb/clients/hid \
 	$(ROOTDIR)/usb/clients/mass_storage	\
 	$(ROOTDIR)/usb/clients/printer  \
+	$(ROOTDIR)/usb/clients/usbcdc  \
 	$(ROOTDIR)/usb/clients/ugen  \
 	$(ROOTDIR)/1394         \
 	$(ROOTDIR)/rsm		\
@@ -225,6 +229,7 @@ ROOTUSBHUBDHDRS= $(USBHUBDHDRS:%=$(ROOTDIR)/usb/hubd/%)
 ROOTUSBHIDHDRS = $(USBHIDHDRS:%=$(ROOTDIR)/usb/clients/hid/%)
 ROOTUSBMSHDRS= $(USBMSHDRS:%=$(ROOTDIR)/usb/clients/mass_storage/%)
 ROOTUSBPRNHDRS= $(USBPRNHDRS:%=$(ROOTDIR)/usb/clients/printer/%)
+ROOTUSBCDCHDRS= $(USBCDCHDRS:%=$(ROOTDIR)/usb/clients/usbcdc/%)
 ROOTUGENHDRS= $(UGENHDRS:%=$(ROOTDIR)/usb/clients/ugen/%)
 
 ROOT1394HDRS= $(I1394HDRS:%=$(ROOTDIR)/1394/%)

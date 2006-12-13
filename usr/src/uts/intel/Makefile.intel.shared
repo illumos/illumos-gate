@@ -375,6 +375,7 @@ DRV_KMODS	+= scsa2usb
 DRV_KMODS	+= usbprn
 DRV_KMODS	+= ugen
 DRV_KMODS	+= usbser
+DRV_KMODS	+= usbsacm
 DRV_KMODS	+= usbsksp
 DRV_KMODS	+= usbsprl
 DRV_KMODS	+= usb_ac

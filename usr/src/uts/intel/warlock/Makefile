@@ -82,6 +82,7 @@ warlock.usb:
 	@cd $(CLOSED)/uts/intel/usbser_edge; make clean; $(MAKE) warlock
 	@cd ../usbsksp; make clean; $(MAKE) warlock
 	@cd ../usbsprl; make clean; $(MAKE) warlock
+	@cd ../usbsacm; make clean; $(MAKE) warlock
 	@cd ../usbskel; make clean; $(MAKE) warlock
 
 warlock.scsi:

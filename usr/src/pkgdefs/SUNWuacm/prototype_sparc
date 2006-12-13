@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # This required package information file contains a list of package contents.
@@ -36,33 +36,17 @@
 #!default <mode> <owner> <group>	# default used if not specified on entry
 #!<param>=<value>			# puts parameter in pkg environment
 
-# packaging files
-i pkginfo
-i copyright
-i depend
+#
+# Include ISA independent files (prototype_com)
+#
+!include prototype_com
+#
+#
+# List files which are SPARC specific here
 #
 # source locations relative to the prototype file
 #
-# SUNWusbu
 #
-#
-d none usr 755 root sys
-d none usr/include 755 root bin
-d none usr/include/sys 755 root bin
-d none usr/include/sys/usb 755 root bin
-d none usr/include/sys/usb/hubd 755 root bin
-d none usr/include/sys/usb/clients 755 root bin
-d none usr/include/sys/usb/clients/audio 755 root bin
-d none usr/include/sys/usb/clients/hid 755 root bin
-d none usr/include/sys/usb/clients/mass_storage 755 root bin
-d none usr/include/sys/usb/clients/printer 755 root bin
-d none usr/include/sys/usb/clients/usbcdc 755 root bin
-f none usr/include/sys/usb/usbai.h 644 root bin
-f none usr/include/sys/usb/usba.h 644 root bin
-f none usr/include/sys/usb/hubd/hub.h 644 root bin
-f none usr/include/sys/usb/clients/audio/usb_audio.h 644 root bin
-f none usr/include/sys/usb/clients/hid/hid.h 644 root bin
-f none usr/include/sys/usb/clients/mass_storage/usb_bulkonly.h 644 root bin
-f none usr/include/sys/usb/clients/mass_storage/usb_cbi.h 644 root bin
-f none usr/include/sys/usb/clients/printer/usb_printer.h 644 root bin
-f none usr/include/sys/usb/clients/usbcdc/usbcdc.h 644 root bin
+# SUNWuacm
+d none kernel/drv/sparcv9 0755 root sys
+f none kernel/drv/sparcv9/usbsacm 0755 root sys
