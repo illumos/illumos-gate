@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -384,6 +384,15 @@ char remotehost[MAXHOSTNAMELEN];
 char remoteaddr[MAXHOSTNAMELEN];
 char *remoteident = "[nowhere yet]";
 int rhlookup = TRUE;		/* when TRUE lookup the remote hosts name */
+
+#if defined(SOLARIS_2) && !defined(NAME_SERVICE_DOOR)
+#define NAME_SERVICE_DOOR "/var/run/name_service_door"
+#endif
+
+#if defined(SOLARIS_2)
+int close_nsdoor(void *cb_data, int fd);
+void cleanup_nscd();
+#endif
 
 /* log failures         27-apr-93 ehk/bm */
 #define MAXUSERNAMELEN	256
@@ -3214,6 +3223,9 @@ pwd_validation_done:
 		if (pw->pw_dir)
 		    free(pw->pw_dir);
 		pw->pw_dir = sgetsave(chroot_path);
+#if defined(SOLARIS_2)
+		cleanup_nscd();
+#endif
 		if (chroot(root_path) < 0 || chdir("/") < 0) {
 #ifdef VERBOSE_ERROR_LOGING
 		    syslog(LOG_NOTICE, "FTP LOGIN FAILED (cannot set guest privileges) for %s, %s",
@@ -3252,6 +3264,9 @@ pwd_validation_done:
 		goto bad;
 	    }
 #endif
+#if defined(SOLARIS_2)
+	    cleanup_nscd();
+#endif
 	    if (chroot(pw->pw_dir) < 0 || chdir("/") < 0) {
 #ifdef VERBOSE_ERROR_LOGING
 		syslog(LOG_NOTICE, "FTP LOGIN FAILED (cannot set guest privileges) for %s, %s",
@@ -3278,6 +3293,9 @@ pwd_validation_done:
 		}
 		goto bad;
 	    }
+#endif
+#if defined(SOLARIS_2)
+	    cleanup_nscd();
 #endif
 	    if (chroot(pw->pw_dir) < 0 || chdir(++sp) < 0) {
 #ifdef VERBOSE_ERROR_LOGING
@@ -7963,3 +7981,42 @@ void fixpath(char *path)
     }
     *out = '\0';
 }
+
+#if defined(SOLARIS_2)
+
+/* Callback function to cleanup_nscd()'s fdwalk().
+ * If "fd" has the same inode, device as nscd door
+ * it returns 1 otherwise it returns 0.
+ */
+int close_nsdoor(void *cb_data, int fd)
+{
+    struct stat fd_buf;
+    struct stat *nsdoor_buf = (struct stat *) cb_data;
+
+    if (fstat(fd, &fd_buf) != 0) {
+	return (0);
+    }
+
+    if ((nsdoor_buf->st_dev == fd_buf.st_dev) && 
+	(nsdoor_buf->st_ino == fd_buf.st_ino)) {
+	close(fd);
+	return (1);
+    }
+
+    return (0);
+}
+
+/* Walk through the list of open file descriptors
+ * of the ftp dameon and find the nscd door fd and
+ * close it.
+ */
+void cleanup_nscd()
+{
+    struct stat nsdoor_buf;
+
+    if (stat(NAME_SERVICE_DOOR, &nsdoor_buf) == 0) {
+	fdwalk(close_nsdoor, &nsdoor_buf);
+    }
+}
+
+#endif
