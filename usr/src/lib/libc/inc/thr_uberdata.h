@@ -1188,11 +1188,8 @@ extern	void	_thrp_unwind(void *);
 /*
  * Prototypes for the strong versions of the interface functions
  */
-extern	pid_t	_fork(void);
-extern	pid_t	_fork1(void);
-extern	pid_t	__fork1(void);
-extern	pid_t	_forkall(void);
-extern	pid_t	__forkall(void);
+extern	pid_t	__forkx(int);
+extern	pid_t	__forkallx(int);
 extern	pid_t	_private_getpid(void);
 extern	uid_t	_private_geteuid(void);
 extern	int	_kill(pid_t, int);

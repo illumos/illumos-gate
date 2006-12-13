@@ -1800,7 +1800,8 @@ ptrace_catch_fork(pid_t pid, int monitor)
 	sysp = (sysset_t *)ctlp;
 	ctlp += sizeof (sysset_t) / sizeof (long);
 	premptyset(sysp);
-	praddset(sysp, SYS_fork1);
+	praddset(sysp, SYS_fork1);	/* for old libc */
+	praddset(sysp, SYS_forksys);	/* new libc: fork1() is forksys(0, 0) */
 	*ctlp++ = PCRUN;
 	*ctlp++ = 0;
 	*ctlp++ = PCWSTOP;

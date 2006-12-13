@@ -1600,14 +1600,15 @@ setsigact(int sig, void (*disp)(), k_sigset_t mask, int flags)
 		else
 			p->p_flag |= SJCTL;
 
-		if (p->p_flag & SNOWAIT || disp == SIG_IGN) {
+		if ((p->p_flag & SNOWAIT) || disp == SIG_IGN) {
 			proc_t *cp, *tp;
 
 			mutex_exit(&p->p_lock);
 			mutex_enter(&pidlock);
 			for (cp = p->p_child; cp != NULL; cp = tp) {
 				tp = cp->p_sibling;
-				if (cp->p_stat == SZOMB)
+				if (cp->p_stat == SZOMB &&
+				    !(cp->p_pidflag & CLDWAITPID))
 					freeproc(cp);
 			}
 			mutex_exit(&pidlock);
@@ -1679,9 +1680,10 @@ sigcld(proc_t *cp, sigqueue_t *sqp)
 
 		cv_broadcast(&pp->p_cv);
 		if ((pp->p_flag & SNOWAIT) ||
-		    (PTOU(pp)->u_signal[SIGCLD - 1] == SIG_IGN))
-			freeproc(cp);
-		else {
+		    PTOU(pp)->u_signal[SIGCLD - 1] == SIG_IGN) {
+			if (!(cp->p_pidflag & CLDWAITPID))
+				freeproc(cp);
+		} else if (!(cp->p_pidflag & CLDNOSIGCHLD)) {
 			post_sigcld(cp, sqp);
 			sqp = NULL;
 		}

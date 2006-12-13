@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -91,7 +90,8 @@
 #include <dt_impl.h>
 
 #define	IS_SYS_EXEC(w)	(w == SYS_exec || w == SYS_execve)
-#define	IS_SYS_FORK(w)	(w == SYS_vfork || w == SYS_fork1 || w == SYS_forkall)
+#define	IS_SYS_FORK(w)	(w == SYS_vfork || w == SYS_fork1 ||	\
+			w == SYS_forkall || w == SYS_forksys)
 
 static dt_bkpt_t *
 dt_proc_bpcreate(dt_proc_t *dpr, uintptr_t addr, dt_bkpt_f *func, void *data)
@@ -504,6 +504,8 @@ dt_proc_control(void *arg)
 	(void) Psysexit(P, SYS_fork1, B_TRUE);
 	(void) Psysentry(P, SYS_forkall, B_TRUE);
 	(void) Psysexit(P, SYS_forkall, B_TRUE);
+	(void) Psysentry(P, SYS_forksys, B_TRUE);
+	(void) Psysexit(P, SYS_forksys, B_TRUE);
 
 	Psync(P);				/* enable all /proc changes */
 	dt_proc_attach(dpr, B_FALSE);		/* enable rtld breakpoints */

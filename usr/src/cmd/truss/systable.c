@@ -365,7 +365,7 @@ const struct systable systable[] = {
 {"sysinfo",	3, DEC, NOV, INF, RST, DEC},			/* 139 */
 { NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"seteuid",	1, DEC, NOV, DEC},				/* 141 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"forksys",	2, DEC, NOV, DEC, HHX},				/* 142 */
 {"fork1",	0, DEC, NOV},					/* 143 */
 {"sigtimedwait", 3, DEC, NOV, HEX, HEX, HEX},			/* 144 */
 {"lwp_info",	1, DEC, NOV, HEX},				/* 145 */
@@ -792,27 +792,42 @@ static const struct systable zonetable[] = {
 {"zone_enter",	2, DEC, NOV, HID, DEC},				/* 3 */
 {"zone_list",	3, DEC, NOV, HID, HEX, HEX},			/* 4 */
 {"zone_shutdown", 2, DEC, NOV, HID, DEC},			/* 5 */
-{"zone_lookup", 2, DEC, NOV, HID, STG},				/* 6 */
-{"zone_boot", 2, DEC, NOV, HID, DEC},				/* 7 */
+{"zone_lookup",	2, DEC, NOV, HID, STG},				/* 6 */
+{"zone_boot",	2, DEC, NOV, HID, DEC},				/* 7 */
 {"zone_version", 2, HEX, NOV, HID, DEC},			/* 8 */
 {"zone_setattr", 5, DEC, NOV, HID, DEC, ZGA, HEX, DEC},		/* 9 */
 };
 #define	NZONECODE	(sizeof (zonetable) / sizeof (struct systable))
 
 static const struct systable labeltable[] = {
-{"labelsys", 3, DEC, NOV, HID, HEX, HEX},			/* 0 */
+{"labelsys",	3, DEC, NOV, HID, HEX, HEX},			/* 0 */
 {"is_system_labeled", 1, DEC, NOV, HID},			/* 1 */
-{"tnrh", 3, DEC, NOV, HID, TND, HEX},				/* 2 */
-{"tnrhtp", 3, DEC, NOV, HID, TND, HEX},				/* 3 */
-{"tnmlp", 3, DEC, NOV, HID, TND, HEX},				/* 4 */
-{"getlabel", 3, DEC, NOV, HID, STG, HEX},			/* 5 */
-{"fgetlabel", 3, DEC, NOV, HID, DEC, HEX},			/* 6 */
+{"tnrh",	3, DEC, NOV, HID, TND, HEX},			/* 2 */
+{"tnrhtp",	3, DEC, NOV, HID, TND, HEX},			/* 3 */
+{"tnmlp",	3, DEC, NOV, HID, TND, HEX},			/* 4 */
+{"getlabel",	3, DEC, NOV, HID, STG, HEX},			/* 5 */
+{"fgetlabel",	3, DEC, NOV, HID, DEC, HEX},			/* 6 */
 };
 #define	NLABELCODE	(sizeof (labeltable) / sizeof (struct systable))
 
+const	struct systable forktable[] = {
+/* parent codes */
+{"forkx",	2, DEC, NOV, HID, FXF},				/* 0 */
+{"forkallx",	2, DEC, NOV, HID, FXF},				/* 1 */
+{"vforkx",	2, DEC, NOV, HID, FXF},				/* 2 */
+/* child codes */
+{"forkx",	0, DEC, NOV},					/* 3 */
+{"forkallx",	0, DEC, NOV},					/* 4 */
+{"vforkx",	0, DEC, NOV},					/* 5 */
+};
+#define	NFORKCODE	(sizeof (forktable) / sizeof (struct systable))
+
 const	struct sysalias sysalias[] = {
 	{ "exit",	SYS_exit	},
-	{ "fork",	SYS_fork1	},
+	{ "fork",	SYS_forksys	},
+	{ "forkx",	SYS_forksys	},
+	{ "forkallx",	SYS_forksys	},
+	{ "vforkx",	SYS_forksys	},
 	{ "sbrk",	SYS_brk		},
 	{ "getppid",	SYS_getpid	},
 	{ "geteuid",	SYS_getuid	},
@@ -1096,6 +1111,10 @@ subsys(int syscall, int subcode)
 			if ((unsigned)subcode < NRCTLCODE)
 				stp = &rctltable[subcode];
 			break;
+		case SYS_forksys:	/* fork family */
+			if ((unsigned)subcode < NFORKCODE)
+				stp = &forktable[subcode];
+			break;
 		}
 	}
 
@@ -1225,6 +1244,12 @@ getsubcode(private_t *pri)
 			    (Lsp->pr_why == PR_SYSEXIT && Lsp->pr_errno == 0 &&
 			    Lsp->pr_rval1 == 0);
 			break;
+		case SYS_forksys:	/* forksys */
+			subcode = arg0;
+			if (Lsp->pr_why == PR_SYSEXIT && Lsp->pr_errno == 0 &&
+			    pri->Rval2 != 0)	/* this is the child */
+				subcode += 3;
+			break;
 		case SYS_msgsys:	/* msgsys() */
 		case SYS_semsys:	/* semsys() */
 		case SYS_shmsys:	/* shmsys() */
@@ -1308,7 +1333,8 @@ maxsyscalls()
 	    + NPORTCODE - 1
 	    + NZONECODE - 1
 	    + NLABELCODE - 1
-	    + NRCTLCODE - 1);
+	    + NRCTLCODE - 1
+	    + NFORKCODE - 1);
 }
 
 /*
@@ -1382,6 +1408,8 @@ nsubcodes(int syscall)
 		return (NLABELCODE);
 	case SYS_rctlsys:
 		return (NRCTLCODE);
+	case SYS_forksys:
+		return (NFORKCODE);
 	default:
 		return (1);
 	}

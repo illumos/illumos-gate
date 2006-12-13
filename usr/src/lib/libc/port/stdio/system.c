@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -30,7 +29,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #include "synonyms.h"
 #include "mtlib.h"
 #include <sys/types.h>
@@ -41,6 +39,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <memory.h>
+#include <thread.h>
 #include <pthread.h>
 #include <errno.h>
 #include <synch.h>
@@ -50,50 +49,82 @@
 extern const char **environ;
 
 extern int __xpg4;	/* defined in _xpg4.c; 0 if not xpg4-compiled program */
+extern const sigset_t maskset;		/* all maskable signals */
 
 static mutex_t sys_lock = DEFAULTMUTEX;	/* protects the following */
 static uint_t sys_count = 0;		/* number of threads in system() */
-static struct sigaction sys_ibuf;	/* SIGINT */
-static struct sigaction sys_qbuf;	/* SIGQUIT */
-static struct sigaction sys_cbuf;	/* SIGCHLD */
+static struct sigaction sys_ibuf;	/* saved SIGINT sigaction */
+static struct sigaction sys_qbuf;	/* saved SIGQUIT sigaction */
+static struct sigaction ignore = {0, {SIG_IGN}, {0}};
+
+/*
+ * Things needed by the cancellation cleanup handler.
+ */
+typedef struct {
+	sigset_t	savemask;	/* saved signal mask */
+	pid_t		pid;		/* if nonzero, the child's pid */
+} cleanup_t;
+
+/*
+ * Daemon thread whose sole function is to reap an abandoned child.
+ * Also invoked from pclose() (see port/stdio/popen.c).
+ */
+void *
+reapchild(void *arg)
+{
+	pid_t pid = (pid_t)(uintptr_t)arg;
+
+	while (waitpid(pid, NULL, 0) == -1) {
+		if (errno != EINTR)
+			break;
+	}
+	return (NULL);
+}
 
 /*
  * Cancellation cleanup handler.
+ * If we were cancelled in waitpid(), create a daemon thread to
+ * reap our abandoned child.  No other thread can do this for us.
+ * It would be better if there were a system call to disinherit
+ * a child process (give it to init, just as though we exited).
  */
 static void
 cleanup(void *arg)
 {
-	sigset_t *savemaskp = arg;
+	cleanup_t *cup = arg;
+
+	if (cup->pid != 0) {	/* we were cancelled; abandoning our pid */
+		(void) thr_sigsetmask(SIG_SETMASK, &maskset, NULL);
+		(void) thr_create(NULL, 0,
+		    reapchild, (void *)(uintptr_t)cup->pid,
+		    THR_DAEMON, NULL);
+	}
 
 	lmutex_lock(&sys_lock);
 	if (--sys_count == 0) {		/* leaving system() */
 		/*
-		 * There are no remaining threads in system(),
-		 * so restore the several signal actions.
+		 * There are no remaining threads in system(), so
+		 * restore the SIGINT and SIGQUIT signal actions.
 		 */
 		(void) sigaction(SIGINT, &sys_ibuf, NULL);
 		(void) sigaction(SIGQUIT, &sys_qbuf, NULL);
-		if (sys_cbuf.sa_handler == SIG_IGN ||
-		    (sys_cbuf.sa_flags & SA_NOCLDWAIT))
-			(void) sigaction(SIGCHLD, &sys_cbuf, NULL);
 	}
 	lmutex_unlock(&sys_lock);
-	(void) sigprocmask(SIG_SETMASK, savemaskp, NULL);
+
+	(void) thr_sigsetmask(SIG_SETMASK, &cup->savemask, NULL);
 }
 
 int
 system(const char *cmd)
 {
-	pid_t pid;
+	cleanup_t cu;
 	pid_t w;
 	int status;
 	int error;
-	struct sigaction action;
 	sigset_t mask;
-	sigset_t savemask;
 	struct stat64 buf;
 	const char *shpath;
-	char *argvec[4];
+	char *argv[4];
 	posix_spawnattr_t attr;
 	static const char *sun_path = "/bin/sh";
 	static const char *xpg4_path = "/usr/xpg4/bin/sh";
@@ -120,28 +151,40 @@ system(const char *cmd)
 
 	/*
 	 * Initialize the posix_spawn() attributes structure.
+	 * The setting of POSIX_SPAWN_WAITPID_NP ensures that no
+	 * wait-for-multiple wait() operation will reap our child
+	 * and that the child will not be automatically reaped due
+	 * to the disposition of SIGCHLD being set to be ignored.
+	 * Only a specific wait for the specific pid will be able
+	 * to reap the child.  Since no other thread knows the pid
+	 * of our child, this should be safe enough.
 	 */
-	if ((error = posix_spawnattr_init(&attr)) != 0) {
-		errno = error;
-		return (-1);
-	}
-	error = posix_spawnattr_setflags(&attr,
-	    POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
+	error = posix_spawnattr_init(&attr);
+	if (error == 0)
+		error = posix_spawnattr_setflags(&attr,
+		    POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF |
+		    POSIX_SPAWN_NOSIGCHLD_NP | POSIX_SPAWN_WAITPID_NP);
 
 	/*
-	 * We are required to block SIGCHLD so that we don't cause
-	 * the process's signal handler, if any, to be called.
-	 * This doesn't really work for a multithreaded process
-	 * because some other thread may receive the SIGCHLD.
+	 * The POSIX spec for system() requires us to block SIGCHLD,
+	 * the rationale being that the process's signal handler for
+	 * SIGCHLD, if any, should not be called when our child exits.
+	 * This doesn't work for a multithreaded process because some
+	 * other thread could receive the SIGCHLD.
+	 *
+	 * The above setting of POSIX_SPAWN_NOSIGCHLD_NP ensures that no
+	 * SIGCHLD signal will be posted for our child when it exits, so
+	 * we don't have to block SIGCHLD to meet the intent of the spec.
+	 * We block SIGCHLD anyway, just because the spec requires it.
 	 */
 	(void) sigemptyset(&mask);
 	(void) sigaddset(&mask, SIGCHLD);
-	(void) sigprocmask(SIG_BLOCK, &mask, &savemask);
+	(void) thr_sigsetmask(SIG_BLOCK, &mask, &cu.savemask);
 	/*
 	 * Tell posix_spawn() to restore the signal mask in the child.
 	 */
 	if (error == 0)
-		error = posix_spawnattr_setsigmask(&attr, &savemask);
+		error = posix_spawnattr_setsigmask(&attr, &cu.savemask);
 
 	/*
 	 * We are required to set the disposition of SIGINT and SIGQUIT
@@ -158,33 +201,8 @@ system(const char *cmd)
 	 */
 	lmutex_lock(&sys_lock);
 	if (sys_count++ == 0) {
-		(void) memset(&action, 0, sizeof (action));
-		action.sa_handler = SIG_IGN;
-		(void) sigaction(SIGINT, &action, &sys_ibuf);
-		(void) sigaction(SIGQUIT, &action, &sys_qbuf);
-		/*
-		 * If the action for SIGCHLD is SIG_IGN, then set it to SIG_DFL
-		 * so we can retrieve the status of the spawned-off shell.
-		 * The execve() performed in posix_spawn() will set the action
-		 * for SIGCHLD in the child process to SIG_DFL regardless,
-		 * so this has no negative consequencies for the child.
-		 *
-		 * Note that this is not required by the SUSv3 standard.
-		 * The standard permits this error:
-		 *	ECHILD	The status of the child process created
-		 *		by system() is no longer available.
-		 * So we could leave the action for SIGCHLD alone and
-		 * still be standards-conforming, but this is the way
-		 * the SunOS system() has always behaved (in fact it
-		 * used to set the action to SIG_DFL unconditinally),
-		 * so we retain this behavior here.
-		 */
-		(void) sigaction(SIGCHLD, NULL, &sys_cbuf);
-		if (sys_cbuf.sa_handler == SIG_IGN ||
-		    (sys_cbuf.sa_flags & SA_NOCLDWAIT)) {
-			action.sa_handler = SIG_DFL;
-			(void) sigaction(SIGCHLD, &action, NULL);
-		}
+		(void) sigaction(SIGINT, &ignore, &sys_ibuf);
+		(void) sigaction(SIGQUIT, &ignore, &sys_qbuf);
 	}
 	lmutex_unlock(&sys_lock);
 
@@ -201,13 +219,13 @@ system(const char *cmd)
 	if (error == 0)
 		error = posix_spawnattr_setsigdefault(&attr, &mask);
 
-	argvec[0] = (char *)shell;
-	argvec[1] = "-c";
-	argvec[2] = (char *)cmd;
-	argvec[3] = NULL;
+	argv[0] = (char *)shell;
+	argv[1] = "-c";
+	argv[2] = (char *)cmd;
+	argv[3] = NULL;
 	if (error == 0)
-		error = posix_spawn(&pid, shpath, NULL, &attr,
-			(char *const *)argvec, (char *const *)environ);
+		error = posix_spawn(&cu.pid, shpath, NULL, &attr,
+			(char *const *)argv, (char *const *)environ);
 
 	(void) posix_spawnattr_destroy(&attr);
 
@@ -220,15 +238,18 @@ system(const char *cmd)
 		 * Call waitpid_cancel() rather than _waitpid() to make
 		 * sure that we actually perform the cancellation logic.
 		 */
-		pthread_cleanup_push(cleanup, &savemask);
+		pthread_cleanup_push(cleanup, &cu);
 		do {
-			w = waitpid_cancel(pid, &status, 0);
+			w = waitpid_cancel(cu.pid, &status, 0);
 		} while (w == -1 && errno == EINTR);
 		pthread_cleanup_pop(0);
 		if (w == -1)
 			status = -1;
 	}
-	cleanup(&savemask);
+	error = errno;
+	cu.pid = 0;
+	cleanup(&cu);
+	errno = error;
 
 	return (status);
 }

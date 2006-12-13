@@ -202,10 +202,13 @@ typedef struct pstatus {
 #define	PR_AGENT   0x00000080	/* this lwp is the /proc agent lwp */
 #define	PR_DETACH  0x00000100	/* this is a detached lwp */
 #define	PR_DAEMON  0x00000200	/* this is a daemon lwp */
+#define	PR_IDLE    0x00000400	/* lwp is a cpu's idle thread */
 /* The following flags apply to the process, not to an individual lwp */
 #define	PR_ISSYS   0x00001000	/* this is a system process */
 #define	PR_VFORKP  0x00002000	/* process is the parent of a vfork()d child */
 #define	PR_ORPHAN  0x00004000	/* process's process group is orphaned */
+#define	PR_NOSIGCHLD 0x00008000	/* process will not generate SIGCHLD on exit */
+#define	PR_WAITPID 0x00010000	/* only waitid(P_PID, pid) can reap the child */
 /* The following process flags are modes settable by PCSET/PCUNSET */
 #define	PR_FORK	   0x00100000	/* inherit-on-fork is in effect */
 #define	PR_RLC	   0x00200000	/* run-on-last-close is in effect */
@@ -215,7 +218,6 @@ typedef struct pstatus {
 #define	PR_BPTADJ  0x02000000	/* breakpoint trap pc adjustment is in effect */
 #define	PR_PTRACE  0x04000000	/* ptrace-compatibility mode is in effect */
 #define	PR_MSFORK  0x08000000	/* micro-state accounting inherited on fork */
-#define	PR_IDLE    0x10000000	/* lwp is a cpu's idle thread */
 
 /*
  * See <sys/procfs_isa.h> for possible values of pr_dmodel.

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -25,7 +26,6 @@
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #ifndef	_SYS_SYSCALL_H
 #define	_SYS_SYSCALL_H
@@ -52,7 +52,6 @@ extern "C" {
 #define	SYS_syscall	0
 #define	SYS_exit	1
 #define	SYS_forkall	2
-#define	SYS_fork	SYS_forkall	/* historical */
 #define	SYS_read	3
 #define	SYS_write	4
 #define	SYS_open	5
@@ -321,6 +320,13 @@ extern "C" {
 #define	SYS_adjtime	138
 #define	SYS_systeminfo	139
 #define	SYS_seteuid	141
+#define	SYS_forksys	142
+	/*
+	 * subcodes:
+	 *	forkx(flags)    :: forksys(0, flags)
+	 *	forkallx(flags) :: forksys(1, flags)
+	 *	vforkx(flags)   :: forksys(2, flags)
+	 */
 #define	SYS_fork1	143
 #define	SYS_sigtimedwait	144
 #define	SYS_lwp_info	145

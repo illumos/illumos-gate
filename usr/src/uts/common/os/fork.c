@@ -27,7 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
@@ -81,8 +80,9 @@
 #include <sys/class.h>
 #include <sys/corectl.h>
 #include <sys/brand.h>
+#include <sys/fork.h>
 
-static int64_t cfork(int, int);
+static int64_t cfork(int, int, int);
 static int getproc(proc_t **, int);
 static void fork_fail(proc_t *);
 static void forklwp_fail(proc_t *);
@@ -97,7 +97,7 @@ extern struct kmem_cache *process_cache;
 int64_t
 forkall(void)
 {
-	return (cfork(0, 0));
+	return (cfork(0, 0, 0));
 }
 
 /*
@@ -107,21 +107,48 @@ int64_t
 vfork(void)
 {
 	curthread->t_post_sys = 1;	/* so vfwait() will be called */
-	return (cfork(1, 1));
+	return (cfork(1, 1, 0));
 }
 
 /*
- * fork1 system call
+ * fork system call, aka fork1.
  */
 int64_t
 fork1(void)
 {
-	return (cfork(0, 1));
+	return (cfork(0, 1, 0));
+}
+
+/*
+ * The forkall(), vfork(), and fork1() system calls are no longer
+ * invoked by libc.  They are retained only for the benefit of
+ * old statically-linked applications.  They should be eliminated
+ * when we no longer care about such old and broken applications.
+ */
+
+/*
+ * forksys system call - forkx, forkallx, vforkx.
+ * This is the interface now invoked by libc.
+ */
+int64_t
+forksys(int subcode, int flags)
+{
+	switch (subcode) {
+	case 0:
+		return (cfork(0, 1, flags));	/* forkx(flags) */
+	case 1:
+		return (cfork(0, 0, flags));	/* forkallx(flags) */
+	case 2:
+		curthread->t_post_sys = 1;	/* so vfwait() will be called */
+		return (cfork(1, 1, flags));	/* vforkx(flags) */
+	default:
+		return ((int64_t)set_errno(EINVAL));
+	}
 }
 
 /* ARGSUSED */
 static int64_t
-cfork(int isvfork, int isfork1)
+cfork(int isvfork, int isfork1, int flags)
 {
 	proc_t *p = ttoproc(curthread);
 	struct as *as;
@@ -138,6 +165,14 @@ cfork(int isvfork, int isfork1)
 	lwpdir_t *ldp;
 	lwpent_t *lep;
 	lwpent_t *clep;
+
+	/*
+	 * Allow only these two flags.
+	 */
+	if ((flags & ~(FORK_NOSIGCHLD | FORK_WAITPID)) != 0) {
+		error = EINVAL;
+		goto forkerr;
+	}
 
 	/*
 	 * fork is not supported for the /proc agent lwp.
@@ -487,6 +522,14 @@ cfork(int isvfork, int isfork1)
 	mutex_enter(&cp->p_lock);
 
 	/*
+	 * Set flags telling the child what (not) to do on exit.
+	 */
+	if (flags & FORK_NOSIGCHLD)
+		cp->p_pidflag |= CLDNOSIGCHLD;
+	if (flags & FORK_WAITPID)
+		cp->p_pidflag |= CLDWAITPID;
+
+	/*
 	 * Now that there are lwps and threads attached, add the new
 	 * process to the process group.
 	 */
@@ -517,7 +560,7 @@ cfork(int isvfork, int isfork1)
 	if (isvfork) {
 		CPU_STATS_ADDQ(CPU, sys, sysvfork, 1);
 		mutex_enter(&p->p_lock);
-		p->p_flag |= SVFWAIT;
+		p->p_flag |= (SVFPARENT | SVFWAIT);
 		DTRACE_PROC1(create, proc_t *, cp);
 		cv_broadcast(&pr_pid_cv[p->p_slot]);	/* inform /proc */
 		mutex_exit(&p->p_lock);
@@ -1309,6 +1352,7 @@ vfwait(pid_t pid)
 
 	mutex_enter(&pp->p_lock);
 	prbarrier(pp);	/* barrier against /proc locking */
+	pp->p_flag &= ~SVFPARENT;
 	continuelwps(pp);
 	mutex_exit(&pp->p_lock);
 }

@@ -27,7 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #ifndef _LIBC_SYNONYMS_H
 #define	_LIBC_SYNONYMS_H
 
@@ -351,7 +350,9 @@ extern "C" {
 #define	fnmatch			_fnmatch
 #define	fork1			_fork1
 #define	forkall			_forkall
+#define	forkallx		_forkallx
 #define	fork			_fork
+#define	forkx			_forkx
 #define	fpathconf		_fpathconf
 #define	fpclass			_fpclass
 #define	fpgetmask		_fpgetmask
@@ -1121,6 +1122,7 @@ extern "C" {
 #define	uucopy			_uucopy
 #define	uucopystr		_uucopystr
 #define	vfork			_vfork
+#define	vforkx			_vforkx
 #define	vfscanf			_vfscanf
 #define	vhangup			_vhangup
 #define	vlfmt			_vlfmt

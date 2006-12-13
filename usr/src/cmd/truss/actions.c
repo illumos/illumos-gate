@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -470,7 +469,7 @@ sysentry(private_t *pri, int dotrace)
 		int argprinted = FALSE;
 		const char *name;
 
-		name = sysname(pri, what, raw ? -1 : subcode);
+		name = sysname(pri, what, raw? -1 : subcode);
 		grow(pri, strlen(name) + 1);
 		pri->sys_leng = snprintf(pri->sys_string, pri->sys_ssize,
 			"%s(", name);
@@ -587,7 +586,9 @@ sysexit(private_t *pri, int dotrace)
 	if (cflag && istraced) {
 		(void) mutex_lock(&count_lock);
 		scp = Cp->syscount[what];
-		if (subcode != -1 &&
+		if (what == SYS_forksys && subcode >= 3)
+			scp += subcode - 3;
+		else if (subcode != -1 &&
 		    (what != SYS_open && what != SYS_open64 &&
 		    what != SYS_lwp_create))
 			scp += subcode;
@@ -599,18 +600,21 @@ sysexit(private_t *pri, int dotrace)
 		(void) mutex_unlock(&count_lock);
 	}
 
+	raw = prismember(&rawout, what);
+
 	if (!cflag && istraced) {
 		if ((what == SYS_forkall ||
 		    what == SYS_vfork ||
-		    what == SYS_fork1) &&
+		    what == SYS_fork1 ||
+		    what == SYS_forksys) &&
 		    pri->Errno == 0 && pri->Rval2 != 0) {
 			pri->length &= ~07;
-			if (what == SYS_forkall)
-				pri->length -= 8;
-			else
+			if (strlen(sysname(pri, what, raw? -1 : subcode)) < 6) {
 				(void) fputc('\t', stdout);
+				pri->length += 8;
+			}
 			pri->length +=
-				15 + printf("\t(returning as child ...)");
+				7 + printf("\t(returning as child ...)");
 		}
 		if (what == SYS_lwp_create &&
 		    pri->Errno == 0 && pri->Rval1 == 0) {
@@ -629,8 +633,6 @@ sysexit(private_t *pri, int dotrace)
 		}
 	}
 	pri->length = 0;
-
-	raw = prismember(&rawout, what);
 
 	if (pri->Errno != 0) {		/* error in syscall */
 		if (istraced) {
@@ -816,7 +818,8 @@ sysexit(private_t *pri, int dotrace)
 
 		if (what == SYS_forkall ||
 		    what == SYS_vfork ||
-		    what == SYS_fork1) {
+		    what == SYS_fork1 ||
+		    what == SYS_forksys) {
 			if (pri->Rval2 == 0)		/* child was created */
 				pri->child = pri->Rval1;
 			else if (cflag && istraced)	/* this is the child */

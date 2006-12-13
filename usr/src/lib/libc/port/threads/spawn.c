@@ -32,6 +32,7 @@
 #include <sys/procset.h>
 #include <sys/rtpriocntl.h>
 #include <sys/tspriocntl.h>
+#include <sys/fork.h>
 #include <sys/rt.h>
 #include <sys/ts.h>
 #include <alloca.h>
@@ -44,7 +45,9 @@
 		POSIX_SPAWN_SETSIGDEF |		\
 		POSIX_SPAWN_SETSIGMASK |	\
 		POSIX_SPAWN_SETSCHEDPARAM |	\
-		POSIX_SPAWN_SETSCHEDULER)
+		POSIX_SPAWN_SETSCHEDULER |	\
+		POSIX_SPAWN_NOSIGCHLD_NP |	\
+		POSIX_SPAWN_WAITPID_NP)
 
 typedef struct {
 	short		sa_psflags;	/* POSIX_SPAWN_* flags */
@@ -69,8 +72,8 @@ typedef struct file_attr {
 
 extern struct pcclass ts_class, rt_class;
 
-extern	pid_t	_vfork(void);
-#pragma unknown_control_flow(_vfork)
+extern	pid_t	_vforkx(int);
+#pragma unknown_control_flow(_vforkx)
 extern	void	*_private_memset(void *, int, size_t);
 extern	int	__lwp_sigmask(int, const sigset_t *, sigset_t *);
 extern	int	__open(const char *, int, mode_t);
@@ -262,6 +265,21 @@ perform_file_actions(file_attr_t *fap)
 	return (0);
 }
 
+static int
+forkflags(spawn_attr_t *sap)
+{
+	int flags = 0;
+
+	if (sap != NULL) {
+		if (sap->sa_psflags & POSIX_SPAWN_NOSIGCHLD_NP)
+			flags |= FORK_NOSIGCHLD;
+		if (sap->sa_psflags & POSIX_SPAWN_WAITPID_NP)
+			flags |= FORK_WAITPID;
+	}
+
+	return (flags);
+}
+
 /*
  * set_error() / get_error() are used to guarantee that the local variable
  * 'error' is set correctly in memory on return from vfork() in the parent.
@@ -286,7 +304,7 @@ get_error(int *errp)
  * (with a defunct owner) and we would deadlock ourself if we invoked it.
  *
  * Therefore, all of the functions we call here after returning from
- * _vfork() in the child are not and must never be exported from libc
+ * _vforkx() in the child are not and must never be exported from libc
  * as global symbols.  To do so would risk invoking the dynamic linker.
  */
 
@@ -308,7 +326,7 @@ _posix_spawn(
 	if (attrp != NULL && sap == NULL)
 		return (EINVAL);
 
-	switch (pid = _vfork()) {
+	switch (pid = _vforkx(forkflags(sap))) {
 	case 0:			/* child */
 		break;
 	case -1:		/* parent, failure */
@@ -410,7 +428,7 @@ _posix_spawnp(
 		continue;
 	newargs = alloca((argc + 2) * sizeof (char *));
 
-	switch (pid = _vfork()) {
+	switch (pid = _vforkx(forkflags(sap))) {
 	case 0:			/* child */
 		break;
 	case -1:		/* parent, failure */
@@ -624,15 +642,11 @@ int
 _posix_spawnattr_init(
 	posix_spawnattr_t *attr)
 {
-	spawn_attr_t *sap;
-
-	if ((sap = lmalloc(sizeof (*sap))) == NULL)
+	if ((attr->__spawn_attrp = lmalloc(sizeof (posix_spawnattr_t))) == NULL)
 		return (ENOMEM);
-
 	/*
 	 * Add default stuff here?
 	 */
-	attr->__spawn_attrp = sap;
 	return (0);
 }
 

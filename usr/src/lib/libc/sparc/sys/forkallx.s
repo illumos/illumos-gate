@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,12 +31,13 @@
 
 	.file	"%M%"
 
-/*
- * C library -- fork1
- * pid_t fork1(void)
- */
+#include "SYS.h"
 
 /*
+ * pid = __forkallx(flags);
+ *
+ * syscall trap: forksys(1, flags)
+ *
  * From the syscall:
  * %o1 == 0 in parent process, %o1 == 1 in child process.
  * %o0 == pid of child in parent, %o0 == pid of parent in child.
@@ -46,11 +46,11 @@
  * The parent gets the pid of the child.
  */
 
-#include "SYS.h"
-
-	ENTRY(__fork1);
-	SYSTRAP_2RVALS(fork1);
+	ENTRY(__forkallx)
+	mov	%o0, %o1
+	mov	1, %o0
+	SYSTRAP_2RVALS(forksys)
 	SYSCERROR
 	movrnz	%o1, 0, %o0
 	RET
-	SET_SIZE(__fork1)
+	SET_SIZE(__forkallx)

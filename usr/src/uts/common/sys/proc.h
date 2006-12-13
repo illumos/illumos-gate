@@ -27,7 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #ifndef _SYS_PROC_H
 #define	_SYS_PROC_H
 
@@ -432,8 +431,10 @@ extern struct pid pid0;		/* p0's pid */
 #define	SONPROC	6		/* process is being run on a processor */
 
 /* p_pidflag codes */
-#define	CLDPEND	0x0001		/* have yet to post a SIGCLD to the parent */
-#define	CLDCONT	0x0002		/* child has notified parent of CLD_CONTINUED */
+#define	CLDPEND		0x0001	/* have yet to post a SIGCHLD to the parent */
+#define	CLDCONT		0x0002	/* child has notified parent of CLD_CONTINUED */
+#define	CLDNOSIGCHLD	0x0004	/* do not post SIGCHLD when child terminates */
+#define	CLDWAITPID	0x0008	/* only waitid(P_PID, pid) can reap the child */
 
 /* p_proc_flag codes -- these flags are mostly private to /proc */
 #define	P_PR_TRACE	0x0001	/* signal, fault or syscall tracing via /proc */
@@ -466,12 +467,13 @@ extern struct pid pid0;		/* p0's pid */
 #define	SEXTKILLED 0x00000800	/* SKILLED is from another contract */
 #define	SUGID	   0x00002000	/* process was result of set[ug]id exec */
 #define	SEXECED	   0x00004000	/* this process has execed */
-#define	SJCTL	   0x00010000	/* SIGCLD sent when children stop/continue */
+#define	SJCTL	   0x00010000	/* SIGCHLD sent when children stop/continue */
 #define	SNOWAIT    0x00020000	/* children never become zombies */
 #define	SVFORK	   0x00040000	/* child of vfork that has not yet exec'd */
 #define	SVFWAIT	   0x00080000	/* parent of vfork waiting for child to exec */
 #define	SEXITLWPS  0x00100000	/* have lwps exit within the process */
 #define	SHOLDFORK  0x00200000	/* hold lwps where they're cloneable */
+#define	SVFPARENT  0x00400000	/* parent of vfork, must call vfwait() */
 #define	SHOLDFORK1 0x00800000	/* hold lwps in place (not cloning) */
 #define	SCOREDUMP  0x01000000	/* process is dumping core */
 #define	SMSACCT    0x02000000	/* process is keeping micro-state accounting */

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -96,6 +97,7 @@ static au_event_t	aui_modctl(au_event_t);
 static au_event_t	aui_acl(au_event_t);
 static au_event_t	aui_doorfs(au_event_t);
 static au_event_t	aui_privsys(au_event_t);
+static au_event_t	aui_forksys(au_event_t);
 
 static void	aus_null(struct t_audit_data *);
 static void	aus_open(struct t_audit_data *);
@@ -492,7 +494,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 140 reserved */
 		auf_null,	0,
 aui_null,	AUE_SETEUID,	aus_seteuid,	/* 141 seteuid */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 142 (loadable reserved) */
+aui_forksys,	AUE_NULL,	aus_null,	/* 142 forksys */
 		auf_null,	0,
 aui_null,	AUE_FORK1,	aus_null,	/* 143 fork1 */
 		auf_null,	0,
@@ -5576,4 +5578,30 @@ auf_send(tad, error, rval)
 	au_uwrite(au_to_arg32(1, "so", (uint32_t)fd));
 
 	au_uwrite(au_to_socket_ex(so_family, so_type, so_laddr, so_faddr));
+}
+
+static au_event_t
+aui_forksys(au_event_t e)
+{
+	struct a {
+		long	subcode;
+		long	flags;
+	} *uap = (struct a *)ttolwp(curthread)->lwp_ap;
+
+	switch ((uint_t)uap->subcode) {
+	case 0:
+		e = AUE_FORK1;
+		break;
+	case 1:
+		e = AUE_FORKALL;
+		break;
+	case 2:
+		e = AUE_VFORK;
+		break;
+	default:
+		e = AUE_NULL;
+		break;
+	}
+
+	return (e);
 }

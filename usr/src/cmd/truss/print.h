@@ -132,7 +132,8 @@ extern "C" {
 #define	RGF	90		/* print rctlsys_get flags */
 #define	RSF	91		/* print rctlsys_set flags */
 #define	RCF	92		/* print rctlsys_ctl flags */
-#define	HID	93		/* hidden argument, don't print */
+#define	FXF	93		/* print forkx flags */
+#define	HID	94		/* hidden argument, don't print */
 				/* make sure HID is always the last member */
 
 /*

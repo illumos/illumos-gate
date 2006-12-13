@@ -29,7 +29,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-
 #pragma weak pclose = _pclose
 #pragma weak popen = _popen
 
@@ -45,6 +44,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <thread.h>
+#include <pthread.h>
 #include <synch.h>
 #include <spawn.h>
 #include "stdiom.h"
@@ -54,8 +54,6 @@
 #define	tst(a, b) (*mode == 'r'? (b) : (a))
 #define	RDR	0
 #define	WTR	1
-
-static int _insert_nolock(pid_t, int);
 
 extern	int __xpg4;	/* defined in _xpg4.c; 0 if not xpg4-compiled program */
 extern const char **environ;
@@ -69,19 +67,38 @@ typedef struct node {
 } node_t;
 
 static	node_t  *head = NULL;
+static	void	_insert_nolock(pid_t, int, node_t *);
 
+/*
+ * Cancellation cleanup handler.
+ * If we were cancelled in waitpid(), create a daemon thread to
+ * reap our abandoned child.  No other thread can do this for us.
+ */
+static void
+cleanup(void *arg)
+{
+	extern const sigset_t maskset;
+	extern void *reapchild(void *);		/* see port/stdio/system.c */
+
+	(void) thr_sigsetmask(SIG_SETMASK, &maskset, NULL);
+	(void) thr_create(NULL, 0, reapchild, arg, THR_DAEMON, NULL);
+}
 
 FILE *
 popen(const char *cmd, const char *mode)
 {
 	int	p[2];
 	pid_t	pid;
-	int	myside, yourside;
+	int	myside;
+	int	yourside;
+	int	fd;
 	const char *shpath;
 	FILE	*iop;
 	int	stdio;
 	node_t	*curr;
 	char	*argvec[4];
+	node_t	*node;
+	posix_spawnattr_t attr;
 	posix_spawn_file_actions_t fact;
 	int	error;
 	static const char *sun_path = "/bin/sh";
@@ -89,8 +106,27 @@ popen(const char *cmd, const char *mode)
 	static const char *shell = "sh";
 	static const char *sh_flg = "-c";
 
-	if (pipe(p) < 0)
+	if ((node = lmalloc(sizeof (node_t))) == NULL)
 		return (NULL);
+	if ((error = posix_spawnattr_init(&attr)) != 0) {
+		lfree(node, sizeof (node_t));
+		errno = error;
+		return (NULL);
+	}
+	if ((error = posix_spawn_file_actions_init(&fact)) != 0) {
+		lfree(node, sizeof (node_t));
+		(void) posix_spawnattr_destroy(&attr);
+		errno = error;
+		return (NULL);
+	}
+	if (pipe(p) < 0) {
+		error = errno;
+		lfree(node, sizeof (node_t));
+		(void) posix_spawnattr_destroy(&attr);
+		(void) posix_spawn_file_actions_destroy(&fact);
+		errno = error;
+		return (NULL);
+	}
 
 	shpath = __xpg4? xpg4_path : sun_path;
 	if (access(shpath, X_OK))	/* XPG4 Requirement: */
@@ -103,23 +139,30 @@ popen(const char *cmd, const char *mode)
 
 	/* This will fail more quickly if we run out of fds */
 	if ((iop = fdopen(myside, mode)) == NULL) {
+		error = errno;
+		lfree(node, sizeof (node_t));
+		(void) posix_spawnattr_destroy(&attr);
+		(void) posix_spawn_file_actions_destroy(&fact);
 		(void) close(yourside);
 		(void) close(myside);
+		errno = error;
 		return (NULL);
 	}
 
 	lmutex_lock(&popen_lock);
 
 	/* in the child, close all pipes from other popen's */
-	if ((error = posix_spawn_file_actions_init(&fact)) != 0) {
-		lmutex_unlock(&popen_lock);
-		(void) fclose(iop);
-		(void) close(yourside);
-		errno = error;
-		return (NULL);
+	for (curr = head; curr != NULL && error == 0; curr = curr->next) {
+		/*
+		 * These conditions may apply if a previous iob returned
+		 * by popen() was closed with fclose() rather than pclose(),
+		 * or if close(fileno(iob)) was called.
+		 * Accommodate these programming error.
+		 */
+		if ((fd = curr->fd) != myside && fd != yourside &&
+		    fcntl(fd, F_GETFD) >= 0)
+			error = posix_spawn_file_actions_addclose(&fact, fd);
 	}
-	for (curr = head; curr != NULL && error == 0; curr = curr->next)
-		error = posix_spawn_file_actions_addclose(&fact, curr->fd);
 	if (error == 0)
 		error =  posix_spawn_file_actions_addclose(&fact, myside);
 	if (yourside != stdio) {
@@ -130,8 +173,13 @@ popen(const char *cmd, const char *mode)
 			error = posix_spawn_file_actions_addclose(&fact,
 				yourside);
 	}
+	if (error == 0)
+		error = posix_spawnattr_setflags(&attr,
+		    POSIX_SPAWN_NOSIGCHLD_NP | POSIX_SPAWN_WAITPID_NP);
 	if (error) {
 		lmutex_unlock(&popen_lock);
+		lfree(node, sizeof (node_t));
+		(void) posix_spawnattr_destroy(&attr);
 		(void) posix_spawn_file_actions_destroy(&fact);
 		(void) fclose(iop);
 		(void) close(yourside);
@@ -142,16 +190,19 @@ popen(const char *cmd, const char *mode)
 	argvec[1] = (char *)sh_flg;
 	argvec[2] = (char *)cmd;
 	argvec[3] = NULL;
-	error = posix_spawn(&pid, shpath, &fact, NULL,
+	error = posix_spawn(&pid, shpath, &fact, &attr,
 		(char *const *)argvec, (char *const *)environ);
+	(void) posix_spawnattr_destroy(&attr);
 	(void) posix_spawn_file_actions_destroy(&fact);
-
 	(void) close(yourside);
-	if ((errno = error) != 0 || _insert_nolock(pid, myside) == -1) {
+	if (error) {
 		lmutex_unlock(&popen_lock);
+		lfree(node, sizeof (node_t));
 		(void) fclose(iop);
+		errno = error;
 		return (NULL);
 	}
+	_insert_nolock(pid, myside, node);
 
 	lmutex_unlock(&popen_lock);
 
@@ -171,33 +222,63 @@ pclose(FILE *ptr)
 	/* mark this pipe closed */
 	(void) fclose(ptr);
 
-	if (pid == -1)
+	if (pid <= 0) {
+		errno = ECHILD;
 		return (-1);
+	}
 
-	while (waitpid(pid, &status, 0) < 0) {
-		/* If waitpid fails with EINTR, restart the waitpid call */
+	/*
+	 * pclose() is a cancellation point.
+	 * Call waitpid_cancel() rather than _waitpid() to make
+	 * sure that we actually perform the cancellation logic.
+	 *
+	 * If we have already been cancelled (pclose() was called from
+	 * a cancellation cleanup handler), attempt to reap the process
+	 * w/o waiting, and if that fails just call cleanup(pid).
+	 */
+
+	if (_thrp_cancelled()) {
+		if (waitpid(pid, &status, WNOHANG) == pid)
+			return (status);
+		cleanup((void *)(uintptr_t)pid);
+		errno = ECHILD;
+		return (-1);
+	}
+
+	pthread_cleanup_push(cleanup, (void *)(uintptr_t)pid);
+	while (waitpid_cancel(pid, &status, 0) < 0) {
 		if (errno != EINTR) {
 			status = -1;
 			break;
 		}
 	}
+	pthread_cleanup_pop(0);
 
 	return (status);
 }
 
 
-static int
-_insert_nolock(pid_t pid, int fd)
+static void
+_insert_nolock(pid_t pid, int fd, node_t *new)
 {
 	node_t	*prev;
 	node_t	*curr;
-	node_t	*new;
 
-	for (prev = curr = head; curr != NULL; curr = curr->next)
+	for (prev = curr = head; curr != NULL; curr = curr->next) {
+		/*
+		 * curr->fd can equal fd if a previous iob returned by
+		 * popen() was closed with fclose() rather than pclose(),
+		 * or if close(fileno(iob)) was called.
+		 * Accommodate this programming error.
+		 */
+		if (curr->fd == fd) {
+			(void) waitpid(curr->pid, NULL, WNOHANG);
+			curr->pid = pid;
+			lfree(new, sizeof (node_t));
+			return;
+		}
 		prev = curr;
-
-	if ((new = lmalloc(sizeof (node_t))) == NULL)
-		return (-1);
+	}
 
 	new->pid = pid;
 	new->fd = fd;
@@ -207,8 +288,6 @@ _insert_nolock(pid_t pid, int fd)
 		head = new;
 	else
 		prev->next = new;
-
-	return (0);
 }
 
 /*
@@ -217,13 +296,16 @@ _insert_nolock(pid_t pid, int fd)
 int
 _insert(pid_t pid, int fd)
 {
-	int rc;
+	node_t *node;
+
+	if ((node = lmalloc(sizeof (node_t))) == NULL)
+		return (-1);
 
 	lmutex_lock(&popen_lock);
-	rc = _insert_nolock(pid, fd);
+	_insert_nolock(pid, fd, node);
 	lmutex_unlock(&popen_lock);
 
-	return (rc);
+	return (0);
 }
 
 
@@ -242,10 +324,9 @@ _delete(int fd)
 				head = curr->next;
 			else
 				prev->next = curr->next;
-
+			lmutex_unlock(&popen_lock);
 			pid = curr->pid;
 			lfree(curr, sizeof (node_t));
-			lmutex_unlock(&popen_lock);
 			return (pid);
 		}
 		prev = curr;

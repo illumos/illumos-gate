@@ -27,7 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
@@ -1192,6 +1191,10 @@ prgetlwpstatus(kthread_t *t, lwpstatus_t *sp, zone_t *zp)
 		flags |= PR_VFORKP;
 	if (p->p_pgidp->pid_pgorphaned)
 		flags |= PR_ORPHAN;
+	if (p->p_pidflag & CLDNOSIGCHLD)
+		flags |= PR_NOSIGCHLD;
+	if (p->p_pidflag & CLDWAITPID)
+		flags |= PR_WAITPID;
 	sp->pr_flags = flags;
 	if (VSTOPPED(t)) {
 		sp->pr_why   = PR_REQUESTED;

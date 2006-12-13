@@ -316,8 +316,8 @@ SYSOBJS=			\
 	_lwp_mutex_unlock.o	\
 	_stack_grow.o		\
 	door.o			\
-	fork1.o			\
-	forkall.o		\
+	forkx.o			\
+	forkallx.o		\
 	gettimeofday.o		\
 	pipe.o			\
 	sparc_utrap_install.o	\
@@ -327,7 +327,7 @@ SYSOBJS=			\
 	uadmin.o		\
 	umount.o		\
 	uname.o			\
-	vfork.o
+	vforkx.o
 
 # Preserved solely to ease maintenance of 32-bit and 64-bit library builds
 # This macro should ALWAYS be empty; native APIs are already 'large file'.
@@ -1150,7 +1150,7 @@ ASSYMDEP_OBJS=			\
 	asm_subr.o		\
 	tls_get_addr.o		\
 	unwind_frame.o		\
-	vfork.o
+	vforkx.o
 
 $(ASSYMDEP_OBJS:%=pics/%)	:=	CPPFLAGS += -I.
 

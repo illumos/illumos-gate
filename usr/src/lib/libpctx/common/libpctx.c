@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -318,12 +319,14 @@ pctx_set_events(pctx_t *pctx, ...)
 		(void) Psysexit(pctx->Pr, SYS_forkall, 1);
 		(void) Psysexit(pctx->Pr, SYS_vfork, 1);
 		(void) Psysexit(pctx->Pr, SYS_fork1, 1);
+		(void) Psysexit(pctx->Pr, SYS_forksys, 1);
 		if (Psetflags(pctx->Pr, PR_FORK) == -1)
 			error = -1;
 	} else {
 		(void) Psysexit(pctx->Pr, SYS_forkall, 0);
 		(void) Psysexit(pctx->Pr, SYS_vfork, 0);
 		(void) Psysexit(pctx->Pr, SYS_fork1, 0);
+		(void) Psysexit(pctx->Pr, SYS_forksys, 0);
 		if (Punsetflags(pctx->Pr, PR_FORK) == -1)
 			error = -1;
 	}
@@ -758,6 +761,7 @@ checkstate:
 			case SYS_forkall:
 			case SYS_vfork:
 			case SYS_fork1:
+			case SYS_forksys:
 				if (pstatus->pr_lwp.pr_errno)
 					break;
 				(void) fflush(NULL);

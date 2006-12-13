@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1994,2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -253,6 +253,7 @@ again:
 		    case SYS_forkall:
 		    case SYS_vfork:
 		    case SYS_fork1:
+		    case SYS_forksys:
 			*evt = TNFCTL_EVENT_FORK;
 			break;
 		    default:
@@ -306,6 +307,11 @@ enable_target_state(tnfctl_handle_t *hndl, boolean_t watch_forks)
 		prbstat = prb_proc_exit(proc_p, SYS_fork1, PRB_SYS_ADD);
 		if (prbstat)
 			return (_tnfctl_map_to_errcode(prbstat));
+
+		prbstat = prb_proc_exit(proc_p, SYS_forksys, PRB_SYS_ADD);
+		if (prbstat)
+			return (_tnfctl_map_to_errcode(prbstat));
+
 		prbstat = prb_proc_setfork(proc_p, B_TRUE);
 		if (prbstat)
 			return (_tnfctl_map_to_errcode(prbstat));
@@ -353,6 +359,9 @@ disable_target_state(tnfctl_handle_t *hndl)
 	if (prbstat)
 	    return (_tnfctl_map_to_errcode(prbstat));
 	prbstat = prb_proc_exit(proc_p, SYS_fork1, PRB_SYS_DEL);
+	if (prbstat)
+	    return (_tnfctl_map_to_errcode(prbstat));
+	prbstat = prb_proc_exit(proc_p, SYS_forksys, PRB_SYS_DEL);
 	if (prbstat)
 	    return (_tnfctl_map_to_errcode(prbstat));
 	prbstat = prb_proc_setfork(proc_p, B_FALSE);

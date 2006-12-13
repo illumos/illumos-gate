@@ -708,8 +708,11 @@ post_syscall(long rval1, long rval2)
 	 * This code must be here and not in the bowels of the system
 	 * so that /proc can intercept exit from vfork in a timely way.
 	 */
-	if (code == SYS_vfork && rp->r_o1 == 0 && error == 0)
+	if (p->p_flag & SVFPARENT) {
+		ASSERT(code == SYS_vfork || code == SYS_forksys);
+		ASSERT(rp->r_o1 == 0 && error == 0);
 		vfwait((pid_t)rval1);
+	}
 
 	/*
 	 * If profiling is active, bill the current PC in user-land

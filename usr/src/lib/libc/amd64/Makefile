@@ -293,8 +293,8 @@ SYSOBJS=			\
 	_lwp_mutex_unlock.o	\
 	_stack_grow.o		\
 	door.o			\
-	fork1.o			\
-	forkall.o		\
+	forkx.o			\
+	forkallx.o		\
 	fxstat.o		\
 	getcontext.o		\
 	gettimeofday.o		\
@@ -308,7 +308,7 @@ SYSOBJS=			\
 	uadmin.o		\
 	umount.o		\
 	uname.o			\
-	vfork.o			\
+	vforkx.o		\
 	xmknod.o		\
 	xstat.o
 
@@ -1094,7 +1094,7 @@ ASSYMDEP_OBJS=			\
 	asm_subr.o		\
 	getcontext.o		\
 	tls_get_addr.o		\
-	vfork.o
+	vforkx.o
 
 $(ASSYMDEP_OBJS:%=pics/%): assym.h
 

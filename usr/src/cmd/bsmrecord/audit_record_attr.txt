@@ -810,10 +810,10 @@ label=AUE_FCNTL
 label=AUE_FLOCK
   skip=Not used.
 
-label=AUE_FORK
+label=AUE_FORKALL
   format=[arg]1
     comment=0, pid, "child PID"
-  note=The fork(2) return values are undefined because the audit record 
+  note=The forkall(2) return values are undefined because the audit record 
   note=is produced at the point that the child process is spawned.
 # see audit.c
 

@@ -301,7 +301,9 @@ extern "C" {
 #define	fmtmsg				_fmtmsg
 #define	fork1				_fork1
 #define	forkall				_forkall
+#define	forkallx			_forkallx
 #define	fork				_fork
+#define	forkx				_forkx
 #define	fpathconf			_fpathconf
 #define	fpclass				_fpclass
 #define	fpgetmask			_fpgetmask
@@ -977,6 +979,7 @@ extern "C" {
 #define	utmpxname			_utmpxname
 #define	utssys				_utssys
 #define	vfork				_vfork
+#define	vforkx				_vforkx
 #define	vfscanf				_vfscanf
 #define	vhangup				_vhangup
 #define	vscanf				_vscanf

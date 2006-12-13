@@ -444,6 +444,7 @@ pt_post_attach(mdb_tgt_t *t)
 	(void) mdb_tgt_add_sysexit(t, SYS_forkall, hflag, pt_fork, NULL);
 	(void) mdb_tgt_add_sysexit(t, SYS_fork1, hflag, pt_fork, NULL);
 	(void) mdb_tgt_add_sysexit(t, SYS_vfork, hflag, pt_fork, NULL);
+	(void) mdb_tgt_add_sysexit(t, SYS_forksys, hflag, pt_fork, NULL);
 	(void) mdb_tgt_add_sysexit(t, SYS_exec, hflag, pt_exec, NULL);
 	(void) mdb_tgt_add_sysexit(t, SYS_execve, hflag, pt_exec, NULL);
 
@@ -604,7 +605,8 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 	mdb_sespec_t *sep;
 
 	int follow_parent = mdb.m_forkmode != MDB_FM_CHILD;
-	int is_vfork = psp->pr_what == SYS_vfork;
+	int is_vfork = (psp->pr_what == SYS_vfork ||
+	    (psp->pr_what == SYS_forksys && psp->pr_sysarg[0] == 2));
 
 	struct ps_prochandle *C;
 	const lwpstatus_t *csp;
@@ -662,8 +664,11 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 
 	csp = &Pstatus(C)->pr_lwp;
 
-	if (csp->pr_why != PR_SYSEXIT || (csp->pr_what != SYS_forkall &&
-	    csp->pr_what != SYS_fork1 && csp->pr_what != SYS_vfork)) {
+	if (csp->pr_why != PR_SYSEXIT ||
+	    (csp->pr_what != SYS_forkall &&
+	    csp->pr_what != SYS_fork1 &&
+	    csp->pr_what != SYS_vfork &&
+	    csp->pr_what != SYS_forksys)) {
 		warn("forked child process %ld did not stop on exit from "
 		    "fork as expected\n", psp->pr_rval1);
 	}

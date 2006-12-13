@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -69,12 +70,18 @@ inline int PR_DETACH = @PR_DETACH@;
 #pragma D binding "1.0" PR_DETACH
 inline int PR_DAEMON = @PR_DAEMON@;
 #pragma D binding "1.0" PR_DAEMON
+inline int PR_IDLE = @PR_IDLE@;
+#pragma D binding "1.4" PR_IDLE
 inline int PR_ISSYS = @PR_ISSYS@;
 #pragma D binding "1.0" PR_ISSYS
 inline int PR_VFORKP = @PR_VFORKP@;
 #pragma D binding "1.0" PR_VFORKP
 inline int PR_ORPHAN = @PR_ORPHAN@;
 #pragma D binding "1.0" PR_ORPHAN
+inline int PR_NOSIGCHLD = @PR_NOSIGCHLD@;
+#pragma D binding "1.4" PR_NOSIGCHLD
+inline int PR_WAITPID = @PR_WAITPID@;
+#pragma D binding "1.4" PR_WAITPID
 inline int PR_FORK = @PR_FORK@;
 #pragma D binding "1.0" PR_FORK
 inline int PR_RLC = @PR_RLC@;
@@ -91,8 +98,6 @@ inline int PR_PTRACE = @PR_PTRACE@;
 #pragma D binding "1.0" PR_PTRACE
 inline int PR_MSFORK = @PR_MSFORK@;
 #pragma D binding "1.0" PR_MSFORK
-inline int PR_IDLE = @PR_IDLE@;
-#pragma D binding "1.0" PR_IDLE
 
 inline char PR_MODEL_ILP32 = @PR_MODEL_ILP32@;
 #pragma D binding "1.0" PR_MODEL_ILP32
@@ -292,6 +297,8 @@ translator lwpsinfo_t < kthread_t *T > {
 	    ((T == T->t_procp->p_agenttp) ? PR_AGENT : 0) |
 	    ((!(T->t_proc_flag & @TP_TWAIT@)) ? PR_DETACH : 0) |
 	    ((T->t_proc_flag & @TP_DAEMON@) ? PR_DAEMON : 0) |
+	    ((T->t_procp->p_pidflag & @CLDNOSIGCHLD@) ? PR_NOSIGCHLD : 0) |
+	    ((T->t_procp->p_pidflag & @CLDWAITPID@) ? PR_WAITPID : 0) |
 	    ((T->t_procp->p_proc_flag & @P_PR_FORK@) ? PR_FORK : 0) |
 	    ((T->t_procp->p_proc_flag & @P_PR_RUNLCL@) ? PR_RLC : 0) |
 	    ((T->t_procp->p_proc_flag & @P_PR_KILLCL@) ? PR_KLC : 0) |

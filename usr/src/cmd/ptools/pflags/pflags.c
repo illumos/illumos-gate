@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -62,11 +63,11 @@ static	int	rflag;	/* Show registers? */
 
 #define	LWPFLAGS	\
 	(PR_STOPPED|PR_ISTOP|PR_DSTOP|PR_ASLEEP|PR_PCINVAL|PR_STEP \
-	|PR_ASLWP|PR_AGENT|PR_DETACH|PR_DAEMON)
+	|PR_AGENT|PR_DETACH|PR_DAEMON)
 
 #define	PROCFLAGS	\
-	(PR_ISSYS|PR_VFORKP|PR_ORPHAN|PR_FORK|PR_RLC|PR_KLC|PR_ASYNC \
-	|PR_BPTADJ|PR_MSACCT|PR_MSFORK|PR_PTRACE)
+	(PR_ISSYS|PR_VFORKP|PR_ORPHAN|PR_NOSIGCHLD|PR_WAITPID \
+	|PR_FORK|PR_RLC|PR_KLC|PR_ASYNC|PR_BPTADJ|PR_MSACCT|PR_MSFORK|PR_PTRACE)
 
 #define	ALLFLAGS	(LWPFLAGS|PROCFLAGS)
 
@@ -394,6 +395,10 @@ prflags(int arg)
 		(void) strcat(str, "|VFORKP");
 	if (arg & PR_ORPHAN)
 		(void) strcat(str, "|ORPHAN");
+	if (arg & PR_NOSIGCHLD)
+		(void) strcat(str, "|NOSIGCHLD");
+	if (arg & PR_WAITPID)
+		(void) strcat(str, "|WAITPID");
 	if (arg & PR_FORK)
 		(void) strcat(str, "|FORK");
 	if (arg & PR_RLC)

@@ -627,7 +627,7 @@ main(int argc, char *argv[])
 			proc_set_t *set = &grab[i++];
 
 			(void) mutex_lock(&truss_lock);
-			switch (fork1()) {
+			switch (fork()) {
 			case -1:
 				(void) fprintf(stderr,
 			"%s: cannot fork to control process, pid# %d\n",
@@ -687,6 +687,7 @@ main(int argc, char *argv[])
 	praddset(&traceeven, SYS_forkall);
 	praddset(&traceeven, SYS_vfork);
 	praddset(&traceeven, SYS_fork1);
+	praddset(&traceeven, SYS_forksys);
 
 	/* for I/O buffer dumps, force tracing of read()s and write()s */
 	if (!isemptyset(&readfd)) {
@@ -789,7 +790,7 @@ main(int argc, char *argv[])
 }
 
 /*
- * Called from main() and from control() after fork1().
+ * Called from main() and from control() after fork().
  */
 void
 main_thread(int first)
@@ -1292,8 +1293,12 @@ worker_thread(void *arg)
 		if (pri->child) {	/* controlled process fork()ed */
 			if (fflag || Dynpat != NULL)  {
 				if (Lsp->pr_why == PR_SYSEXIT &&
-				    Lsp->pr_what == SYS_vfork)
+				    (Lsp->pr_what == SYS_vfork ||
+				    (Lsp->pr_what == SYS_forksys &&
+				    Lsp->pr_sysarg[0] == 2))) {
 					is_vfork_child = TRUE;
+					(void) Pstop(Proc, 0);
+				}
 				if (control(pri, pri->child)) {
 					(void) mutex_unlock(&truss_lock);
 					pri->child = 0;
@@ -1314,7 +1319,7 @@ worker_thread(void *arg)
 
 				/*
 				 * Here, we are still the parent truss.
-				 * If the child messed with the breakpoints and
+				 * If the child messes with the breakpoints and
 				 * this is vfork(), we have to set them again.
 				 */
 				if (Dynpat != NULL && is_vfork_child)
@@ -1334,16 +1339,15 @@ worker_thread(void *arg)
 			 * To recover from vfork, we must catch the lwp
 			 * that issued the vfork() when it returns to user
 			 * level, with all other lwps remaining stopped.
-			 * For this purpose, we direct all lwps to stop
-			 * and set the vfork()ing lwp running with the
-			 * PRSTEP flag.  We expect to capture it when
-			 * it stops again showing PR_FAULTED/FLTTRACE.
+			 * For this purpose, we have directed all lwps to
+			 * stop and we now set the vfork()ing lwp running
+			 * with the PRSTEP flag.  We expect to capture it
+			 * when it stops again showing PR_FAULTED/FLTTRACE.
 			 * We are holding truss_lock, so no other threads
 			 * in truss will set any other lwps in the victim
 			 * process running.
 			 */
 			reset_traps = FALSE;
-			(void) Pstop(Proc, 0);
 			(void) Lsetrun(Lwp, 0, PRSTEP);
 			do {
 				(void) Lwait(Lwp, 0);
@@ -1518,6 +1522,7 @@ out:
 			(void) Psysexit(Proc, SYS_forkall, FALSE);
 			(void) Psysexit(Proc, SYS_vfork, FALSE);
 			(void) Psysexit(Proc, SYS_fork1, FALSE);
+			(void) Psysexit(Proc, SYS_forksys, FALSE);
 			(void) Punsetflags(Proc, PR_FORK);
 			Psync(Proc);
 			fflag = 0;
@@ -2366,7 +2371,7 @@ control(private_t *pri, pid_t pid)
 	while (gps->fork_pid != 0)
 		(void) cond_wait(&gps->fork_cv, &gps->fork_lock);
 	gps->fork_pid = getpid();	/* parent pid */
-	if ((childpid = fork1()) == -1) {
+	if ((childpid = fork()) == -1) {
 		(void) printf("%s\t*** Cannot fork() to control process #%d\n",
 			pri->pname, (int)pid);
 		Flush();
@@ -2438,13 +2443,6 @@ control(private_t *pri, pid_t pid)
 	data_model = Psp->pr_dmodel;
 
 	make_pname(pri, 0);
-
-	if (Lsp->pr_why != PR_SYSEXIT ||
-	    (Lsp->pr_what != SYS_forkall &&
-	    Lsp->pr_what != SYS_vfork &&
-	    Lsp->pr_what != SYS_fork1))
-		(void) printf("%s\t*** Expected SYSEXIT, fork1,forkall,vfork\n",
-			pri->pname);
 
 	pri->syslast = Psp->pr_stime;
 	pri->usrlast = Psp->pr_utime;

@@ -113,16 +113,10 @@ fork_lock_exit(void)
 	sigon(self);
 }
 
-/*
- * fork() is fork1() for both Posix threads and Solaris threads.
- * The forkall() interface exists for applications that require
- * the semantics of replicating all threads.
- */
-#pragma weak fork = _fork1
-#pragma weak _fork = _fork1
-#pragma weak fork1 = _fork1
-pid_t
-_fork1(void)
+#pragma weak forkx = _private_forkx
+#pragma weak _forkx = _private_forkx
+static pid_t
+_private_forkx(int flags)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -140,7 +134,7 @@ _fork1(void)
 			errno = ENOTSUP;
 			return (-1);
 		}
-		pid = __fork1();
+		pid = __forkx(flags);
 		if (pid == 0) {		/* child */
 			udp->pid = _private_getpid();
 			self->ul_vfork = 0;
@@ -177,7 +171,7 @@ _fork1(void)
 	 * Block all signals.
 	 * Just deferring them via sigon() is not enough.
 	 * We have to avoid taking a deferred signal in the child
-	 * that was actually sent to the parent before __fork1().
+	 * that was actually sent to the parent before __forkx().
 	 */
 	block_all_signals(self);
 
@@ -185,19 +179,19 @@ _fork1(void)
 	 * This suspends all threads but this one, leaving them
 	 * suspended outside of any critical regions in the library.
 	 * Thus, we are assured that no library locks are held
-	 * while we invoke fork1() from the current thread.
+	 * while we invoke fork() from the current thread.
 	 */
 	(void) _private_mutex_lock(&udp->fork_lock);
 	suspend_fork();
 	(void) _private_mutex_unlock(&udp->fork_lock);
 
-	pid = __fork1();
+	pid = __forkx(flags);
 
 	if (pid == 0) {		/* child */
 		/*
 		 * Clear our schedctl pointer.
 		 * Discard any deferred signal that was sent to the parent.
-		 * Because we blocked all signals before __fork1(), a
+		 * Because we blocked all signals before __forkx(), a
 		 * deferred signal cannot have been taken by the child.
 		 */
 		self->ul_schedctl_called = NULL;
@@ -210,7 +204,7 @@ _fork1(void)
 		restore_signals(self);
 		_postfork_child_handler();
 	} else {
-		/* restart all threads that were suspended for fork1() */
+		/* restart all threads that were suspended for fork() */
 		continue_fork(0);
 		restore_signals(self);
 		_postfork_parent_handler();
@@ -223,12 +217,27 @@ _fork1(void)
 }
 
 /*
- * Much of the logic here is the same as in fork1().
- * See the comments in fork1(), above.
+ * fork() is fork1() for both Posix threads and Solaris threads.
+ * The forkall() interface exists for applications that require
+ * the semantics of replicating all threads.
  */
-#pragma weak forkall = _forkall
+#pragma weak fork1 = _fork
+#pragma weak _fork1 = _fork
+#pragma weak fork = _fork
 pid_t
-_forkall(void)
+_fork(void)
+{
+	return (_private_forkx(0));
+}
+
+/*
+ * Much of the logic here is the same as in forkx().
+ * See the comments in forkx(), above.
+ */
+#pragma weak forkallx = _private_forkallx
+#pragma weak _forkallx = _private_forkallx
+static pid_t
+_private_forkallx(int flags)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -240,7 +249,7 @@ _forkall(void)
 			errno = ENOTSUP;
 			return (-1);
 		}
-		pid = __forkall();
+		pid = __forkallx(flags);
 		if (pid == 0) {		/* child */
 			udp->pid = _private_getpid();
 			self->ul_vfork = 0;
@@ -257,7 +266,7 @@ _forkall(void)
 	block_all_signals(self);
 	suspend_fork();
 
-	pid = __forkall();
+	pid = __forkallx(flags);
 
 	if (pid == 0) {
 		self->ul_schedctl_called = NULL;
@@ -274,6 +283,13 @@ _forkall(void)
 	fork_lock_exit();
 
 	return (pid);
+}
+
+#pragma weak forkall = _forkall
+pid_t
+_forkall(void)
+{
+	return (_private_forkallx(0));
 }
 
 /*

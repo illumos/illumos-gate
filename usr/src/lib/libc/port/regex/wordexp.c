@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -58,6 +59,7 @@
 #include <unistd.h>
 #include <wordexp.h>
 #include <stdio.h>
+#include <spawn.h>
 #include <errno.h>
 
 #define	INITIAL	8		/* initial pathv allocation */
@@ -68,6 +70,12 @@ static int	append(wordexp_t *, char *);
 extern	int __xpg4;	/* defined in _xpg4.c; 0 if not xpg4-compiled program */
 
 /*
+ * Needs no locking if fetched only once.
+ * See getenv()/putenv()/setenv().
+ */
+extern	const char **environ;
+
+/*
  * Do word expansion.
  * We just pass our arguments to shell with -E option.  Note that the
  * underlying shell must recognize the -E option, and do the right thing
@@ -76,8 +84,9 @@ extern	int __xpg4;	/* defined in _xpg4.c; 0 if not xpg4-compiled program */
 int
 wordexp(const char *word, wordexp_t *wp, int flags)
 {
-	static char options[9] = "-";
-	static char *args[4];
+	char options[9];
+	char *optendp = options;
+	char *argv[4];
 	const char *path;
 	wordexp_t wptmp;
 	size_t si;
@@ -88,9 +97,15 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	int status;
 	int pv[2];			/* pipe from shell stdout */
 	FILE *fp;			/* pipe read stream */
-	char *optendp = options+1;
-	int serrno, tmpalloc;
+	int tmpalloc;
 	char *wd = NULL;
+	const char **env = NULL;
+	const char **envp;
+	const char *ev;
+	int n;
+	posix_spawnattr_t attr;
+	posix_spawn_file_actions_t fact;
+	int error;
 
 	static const char *sun_path = "/bin/ksh";
 	static const char *xpg4_path = "/usr/xpg4/bin/sh";
@@ -114,7 +129,7 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 
 	/*
 	 * Man page says:
-	 * 2. All of the calls must set WRDE_DOOFFS, or  all  must  not
+	 * 2. All of the calls must set WRDE_DOOFFS, or all must not
 	 *    set it.
 	 * Therefore, if it's not set, we_offs will always be reset.
 	 */
@@ -129,8 +144,7 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	if ((flags & WRDE_APPEND) == 0 || (flags & WRDE_REUSE)) {
 		wptmp.we_wordc = 0;
 		wptmp.we_wordn = wptmp.we_offs + INITIAL;
-		wptmp.we_wordv = (char **)malloc(
-					sizeof (char *) * wptmp.we_wordn);
+		wptmp.we_wordv = malloc(sizeof (char *) * wptmp.we_wordn);
 		if (wptmp.we_wordv == NULL)
 			return (WRDE_NOSPACE);
 		wptmp.we_wordp = wptmp.we_wordv + wptmp.we_offs;
@@ -142,6 +156,7 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	/*
 	 * Turn flags into shell options
 	 */
+	*optendp++ = '-';
 	*optendp++ = (char)0x05;		/* ksh -^E */
 	if (flags & WRDE_UNDEF)
 		*optendp++ = 'u';
@@ -149,69 +164,89 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 		*optendp++ = 'N';
 	*optendp = '\0';
 
-	if (getenv("PWD") == NULL) {
-		if ((wd = malloc(PATH_MAX + 4)) == NULL)
+	/*
+	 * Make sure PWD is in the environment.
+	 */
+	if ((envp = environ) == NULL) {		/* can't happen? */
+		ev = NULL;
+		n = 0;
+	} else {
+		for (n = 0; (ev = envp[n]) != NULL; n++) {
+			if (*ev == 'P' && strncmp(ev, "PWD=", 4) == 0)
+				break;
+		}
+	}
+	if (ev == NULL) {	/* PWD missing from the environment */
+		/* allocate a new environment */
+		if ((env = malloc((n + 2) * sizeof (char *))) == NULL ||
+		    (wd = malloc(PATH_MAX + 4)) == NULL)
 			goto cleanup;
+		for (i = 0; i < n; i++)
+			env[i] = envp[i];
 		(void) strcpy(wd, "PWD=");
 		if (getcwd(&wd[4], PATH_MAX) == NULL)
 			(void) strcpy(&wd[4], "/");
+		env[i] = wd;
+		env[i + 1] = NULL;
+		envp = env;
+	}
+
+	if ((error = posix_spawnattr_init(&attr)) != 0) {
+		errno = error;
+		goto cleanup;
+	}
+	if ((error = posix_spawn_file_actions_init(&fact)) != 0) {
+		(void) posix_spawnattr_destroy(&attr);
+		errno = error;
+		goto cleanup;
 	}
 
 	/*
 	 * Set up pipe from shell stdout to "fp" for us
 	 */
-	if (pipe(pv) < 0)
+	if (pipe(pv) < 0) {
+		error = errno;
+		(void) posix_spawnattr_destroy(&attr);
+		(void) posix_spawn_file_actions_destroy(&fact);
+		errno = error;
 		goto cleanup;
+	}
 
 	/*
-	 * Fork/exec shell with -E word
+	 * Spawn shell with -E word
 	 */
-
-	if ((pid = fork1()) == -1) {
-		serrno = errno;
+	error = posix_spawnattr_setflags(&attr,
+	    POSIX_SPAWN_NOSIGCHLD_NP | POSIX_SPAWN_WAITPID_NP);
+	if (error == 0)
+		error = posix_spawn_file_actions_adddup2(&fact, pv[1], 1);
+	if (error == 0 && pv[0] != 1)
+		error = posix_spawn_file_actions_addclose(&fact, pv[0]);
+	if (error == 0 && pv[1] != 1)
+		error = posix_spawn_file_actions_addclose(&fact, pv[1]);
+	if (error == 0 && !(flags & WRDE_SHOWERR))
+		error = posix_spawn_file_actions_addopen(&fact, 2,
+		    "/dev/null", O_WRONLY, 0);
+	path = __xpg4 ? xpg4_path : sun_path;
+	argv[0] = strrchr(path, '/') + 1;
+	argv[1] = options;
+	argv[2] = (char *)word;
+	argv[3] = NULL;
+	if (error == 0)
+		error = posix_spawn(&pid, path, &fact, &attr,
+		    (char *const *)argv, (char *const *)envp);
+	(void) posix_spawnattr_destroy(&attr);
+	(void) posix_spawn_file_actions_destroy(&fact);
+	(void) close(pv[1]);
+	if (error) {
 		(void) close(pv[0]);
-		(void) close(pv[1]);
-		errno = serrno;
+		errno = error;
 		goto cleanup;
 	}
 
-	if (pid == 0) { 	/* child */
-		if (wd != NULL) {
-			/*
-			 * fork1 handler takes care of __environ_lock.
-			 * Thus we can safely call putenv().
-			 */
-			(void) putenv(wd);
-		}
-
-		(void) dup2(pv[1], 1);
-		(void) close(pv[0]);
-		(void) close(pv[1]);
-
-		if ((flags & WRDE_SHOWERR) == 0) {
-			int devnull;
-			devnull = open("/dev/null", O_WRONLY);
-			(void) dup2(devnull, 2);
-			if (devnull != 2)
-				(void) close(devnull);
-		}
-
-		path = __xpg4 ? xpg4_path : sun_path;
-		args[0] = strrchr(path, '/') + 1;
-		args[1] = options;
-		args[2] = (char *)word;
-		args[3] = NULL;
-
-		(void) execv(path, args);
-		_exit(127);
-	}
-
-	(void) close(pv[1]);
-
 	if ((fp = fdopen(pv[0], "rF")) == NULL) {
-		serrno = errno;
+		error = errno;
 		(void) close(pv[0]);
-		errno = serrno;
+		errno = error;
 		goto wait_cleanup;
 	}
 
@@ -222,8 +257,9 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	 */
 	cp = line = malloc(BUFSZ);
 	if (line == NULL) {
+		error = errno;
 		(void) fclose(fp);
-		rv = WRDE_NOSPACE;
+		errno = error;
 		goto wait_cleanup;
 	}
 	eob = line + BUFSZ;
@@ -257,19 +293,24 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	(void) fclose(fp);	/* kill shell if still writing */
 
 wait_cleanup:
-	if (waitpid(pid, &status, 0) == -1)
-		rv = WRDE_ERRNO;
-	else if (rv == 0)
+	while (waitpid(pid, &status, 0) == -1) {
+		if (errno != EINTR) {
+			if (rv == 0)
+				rv = WRDE_ERRNO;
+			break;
+		}
+	}
+	if (rv == 0)
 		rv = WEXITSTATUS(status); /* shell WRDE_* status */
 
 cleanup:
 	if (rv == 0)
 		*wp = wptmp;
-	else {
-		if (tmpalloc)
-			wordfree(&wptmp);
-	}
+	else if (tmpalloc)
+		wordfree(&wptmp);
 
+	if (env)
+		free(env);
 	if (wd)
 		free(wd);
 	/*

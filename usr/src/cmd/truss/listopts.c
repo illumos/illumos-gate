@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
 
@@ -89,6 +88,7 @@ syslist(char *str,			/* string of syscall names */
 	for (; name; name = strtok_r(NULL, sepr, &lasts)) {
 		int sys;
 		int sysx;
+		int sysxx;
 		int sys64;
 		char *next;
 
@@ -101,7 +101,7 @@ syslist(char *str,			/* string of syscall names */
 		}
 
 		sys = strtol(name, &next, 0);
-		sysx = sys64 = 0;
+		sysx = sysxx = sys64 = 0;
 		if (sys < 0 || sys > PRMAXSYS || *next != '\0')
 			sys = 0;
 		if (sys == 0) {
@@ -211,9 +211,11 @@ syslist(char *str,			/* string of syscall names */
 			case SYS_forkall:	/* set all if any */
 			case SYS_fork1:
 			case SYS_vfork:
+			case SYS_forksys:
 				sys = SYS_forkall;
 				sysx = SYS_fork1;
 				sys64 = SYS_vfork;
+				sysxx = SYS_forksys;
 				goto def;
 
 			case SYS_exec:		/* set both if either */
@@ -264,12 +266,16 @@ syslist(char *str,			/* string of syscall names */
 					prdelset(setp, sys);
 					if (sysx)
 						prdelset(setp, sysx);
+					if (sysxx)
+						prdelset(setp, sysxx);
 					if (sys64)
 						prdelset(setp, sys64);
 				} else {
 					praddset(setp, sys);
 					if (sysx)
 						praddset(setp, sysx);
+					if (sysxx)
+						praddset(setp, sysxx);
 					if (sys64)
 						praddset(setp, sys64);
 				}

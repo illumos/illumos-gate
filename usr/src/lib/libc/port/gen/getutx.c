@@ -506,6 +506,7 @@ invoke_utmp_update(const struct utmpx *entryx)
 {
 	extern char **environ;
 
+	posix_spawnattr_t attr;
 	int status;
 	pid_t child;
 	pid_t w;
@@ -517,7 +518,6 @@ invoke_utmp_update(const struct utmpx *entryx)
 	char host[sizeof (entryx->ut_host) + 1];
 	struct utmpx *curx = NULL;
 	char bin2hex[] = "0123456789ABCDEF";
-	sigset_t mask, omask;
 	unsigned char *cp;
 	char *argvec[15];
 	int error;
@@ -566,14 +566,22 @@ invoke_utmp_update(const struct utmpx *entryx)
 	argvec[14] = NULL;
 
 	/*
-	 * Block SIGCLD while we do this.
-	 * This avoids having an unexpected SIGCLD sent to the process.
+	 * No SIGCHLD, please, and let no one else reap our child.
 	 */
-	(void) sigemptyset(&mask);
-	(void) sigaddset(&mask, SIGCLD);
-	(void) sigprocmask(SIG_BLOCK, &mask, &omask);
-
-	error = posix_spawn(&child, UTMP_UPDATE, NULL, NULL, argvec, environ);
+	error = posix_spawnattr_init(&attr);
+	if (error) {
+		errno = error;
+		goto out;
+	}
+	error = posix_spawnattr_setflags(&attr,
+	    POSIX_SPAWN_NOSIGCHLD_NP | POSIX_SPAWN_WAITPID_NP);
+	if (error) {
+		(void) posix_spawnattr_destroy(&attr);
+		errno = error;
+		goto out;
+	}
+	error = posix_spawn(&child, UTMP_UPDATE, NULL, &attr, argvec, environ);
+	(void) posix_spawnattr_destroy(&attr);
 	if (error) {
 		errno = error;
 		goto out;
@@ -610,7 +618,6 @@ invoke_utmp_update(const struct utmpx *entryx)
 	}
 
 out:
-	(void) sigprocmask(SIG_SETMASK, &omask, NULL);
 	return (curx);
 }
 

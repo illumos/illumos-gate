@@ -124,6 +124,7 @@ sysconfig		137
 adjtime			138
 systeminfo		139
 seteuid			141
+forksys			142
 fork1			143
 sigwait			144
 lwp_info		145

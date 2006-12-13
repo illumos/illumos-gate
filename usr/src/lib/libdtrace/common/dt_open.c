@@ -99,8 +99,9 @@
 #define	DT_VERS_1_2_1	DT_VERSION_NUMBER(1, 2, 1)
 #define	DT_VERS_1_2_2	DT_VERSION_NUMBER(1, 2, 2)
 #define	DT_VERS_1_3	DT_VERSION_NUMBER(1, 3, 0)
-#define	DT_VERS_LATEST	DT_VERS_1_3
-#define	DT_VERS_STRING	"Sun D 1.3"
+#define	DT_VERS_1_4	DT_VERSION_NUMBER(1, 4, 0)
+#define	DT_VERS_LATEST	DT_VERS_1_4
+#define	DT_VERS_STRING	"Sun D 1.4"
 
 const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_0,	/* D API 1.0.0 (PSARC 2001/466) Solaris 10 FCS */
@@ -109,6 +110,7 @@ const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_2_1,	/* D API 1.2.1 Solaris Express 4/06 */
 	DT_VERS_1_2_2,	/* D API 1.2.2 Solaris Express 6/06 */
 	DT_VERS_1_3,	/* D API 1.3 Solaris Express 10/06 */
+	DT_VERS_1_4,	/* D API 1.4 Solaris Express 2/07 */
 	0
 };
 

@@ -97,6 +97,7 @@ extern	int	_rw_unlock(rwlock_t *);
 
 extern	int	_thr_main(void);
 extern	thread_t _thr_self(void);
+extern	int	_thrp_cancelled(void);
 extern	void	_thr_exit(void *);
 extern	size_t	_thr_min_stack(void);
 extern	int	_thr_kill(thread_t, int);

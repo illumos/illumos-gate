@@ -1588,7 +1588,7 @@ finish_init()
 }
 
 /*
- * Used only by _postfork1_child(), below.
+ * Used only by postfork1_child(), below.
  */
 static void
 mark_dead_and_buried(ulwp_t *ulwp)
@@ -1742,6 +1742,12 @@ _thr_main()
 	ulwp_t *self = __curthread();
 
 	return ((self == NULL)? -1 : self->ul_main);
+}
+
+int
+_thrp_cancelled(void)
+{
+	return (curthread->ul_rval == PTHREAD_CANCELED);
 }
 
 int

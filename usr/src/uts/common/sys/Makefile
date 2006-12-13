@@ -233,6 +233,7 @@ CHKHDRS=			\
 	filio.h			\
 	flock.h			\
 	flock_impl.h		\
+	fork.h			\
 	fss.h			\
 	fsspriocntl.h		\
 	fsid.h			\

@@ -79,6 +79,7 @@
 #include <sys/tsol/tndb.h>
 #include <sys/rctl.h>
 #include <sys/rctl_impl.h>
+#include <sys/fork.h>
 #include "ramdata.h"
 #include "print.h"
 #include "proto.h"
@@ -2537,6 +2538,30 @@ prt_rcf(private_t *pri, int raw, long val)
 		prt_hex(pri, 0, val);
 }
 
+/*
+ * Print forkx() flags
+ */
+void
+prt_fxf(private_t *pri, int raw, long val)
+{
+	char *str;
+
+	if (val == 0)
+		outstring(pri, "0");
+	else if (raw || (val & ~(FORK_NOSIGCHLD | FORK_WAITPID)))
+		prt_hhx(pri, 0, val);
+	else {
+		str = pri->code_buf;
+		*str = '\0';
+		if (val & FORK_NOSIGCHLD)
+			(void) strlcat(str, "|FORK_NOSIGCHLD",
+			    sizeof (pri->code_buf));
+		if (val & FORK_WAITPID)
+			(void) strlcat(str, "|FORK_WAITPID",
+			    sizeof (pri->code_buf));
+		outstring(pri, str + 1);
+	}
+}
 
 /*
  * Array of pointers to print functions, one for each format.
@@ -2635,5 +2660,6 @@ void (* const Print[])() = {
 	prt_rgf,	/* RGF -- print getrctl() flags */
 	prt_rsf,	/* RSF -- print setrctl() flags */
 	prt_rcf,	/* RCF -- print rctlsys_ctl() flags */
+	prt_fxf,	/* FXF -- print forkx() flags */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

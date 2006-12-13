@@ -643,6 +643,7 @@ proc_exit(int why, int what)
 			delete_ns(q->p_parent, q);
 
 			q->p_ppid = 1;
+			q->p_pidflag &= ~(CLDNOSIGCHLD | CLDWAITPID);
 			if (setzonetop) {
 				mutex_enter(&q->p_lock);
 				q->p_flag |= SZONETOP;
@@ -783,9 +784,10 @@ proc_exit(int why, int what)
 	t->t_procp = &p0;
 
 	mutex_exit(&p->p_lock);
-	if (!evaporate)
+	if (!evaporate) {
+		p->p_pidflag &= ~CLDPEND;
 		sigcld(p, sqp);
-	else {
+	} else {
 		/*
 		 * Do what sigcld() would do if the disposition
 		 * of the SIGCHLD signal were set to be ignored.
@@ -853,7 +855,6 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 {
 	int found;
 	proc_t *cp, *pp;
-	proc_t **nsp;
 	int proc_gone;
 	int waitflag = !(options & WNOWAIT);
 
@@ -892,9 +893,8 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 	 * is empty no reason to look at all children.
 	 */
 	if (idtype == P_ALL &&
-	    (options & (WOPTMASK & ~WNOWAIT)) == (WNOHANG | WEXITED) &&
+	    (options & ~WNOWAIT) == (WNOHANG | WEXITED) &&
 	    pp->p_child_ns == NULL) {
-
 		if (pp->p_child) {
 			mutex_exit(&pidlock);
 			bzero(ip, sizeof (k_siginfo_t));
@@ -904,26 +904,26 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 		return (ECHILD);
 	}
 
-	while ((cp = pp->p_child) != NULL) {
+	while (pp->p_child != NULL) {
 
 		proc_gone = 0;
 
-		for (nsp = &pp->p_child_ns; *nsp; nsp = &(*nsp)->p_sibling_ns) {
-			if (idtype == P_PID && id != (*nsp)->p_pid) {
+		for (cp = pp->p_child_ns; cp != NULL; cp = cp->p_sibling_ns) {
+			if (idtype != P_PID && (cp->p_pidflag & CLDWAITPID))
 				continue;
-			}
-			if (idtype == P_PGID && id != (*nsp)->p_pgrp) {
+			if (idtype == P_PID && id != cp->p_pid)
 				continue;
-			}
+			if (idtype == P_PGID && id != cp->p_pgrp)
+				continue;
 
-			switch ((*nsp)->p_wcode) {
+			switch (cp->p_wcode) {
 
 			case CLD_TRAPPED:
 			case CLD_STOPPED:
 			case CLD_CONTINUED:
 				cmn_err(CE_PANIC,
 				    "waitid: wrong state %d on the p_newstate"
-				    " list", (*nsp)->p_wcode);
+				    " list", cp->p_wcode);
 				break;
 
 			case CLD_EXITED:
@@ -938,11 +938,10 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 					break;
 				}
 				if (!waitflag) {
-					winfo((*nsp), ip, 0);
+					winfo(cp, ip, 0);
 				} else {
-					proc_t *xp = *nsp;
-					winfo(xp, ip, 1);
-					freeproc(xp);
+					winfo(cp, ip, 1);
+					freeproc(cp);
 				}
 				mutex_exit(&pidlock);
 				if (waitflag) {		/* accept SIGCLD */
@@ -961,16 +960,11 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 		 * interesting threads. Check all the kids!
 		 */
 		found = 0;
-		cp = pp->p_child;
-		do {
-			if (idtype == P_PID && id != cp->p_pid) {
+		for (cp = pp->p_child; cp != NULL; cp = cp->p_sibling) {
+			if (idtype == P_PID && id != cp->p_pid)
 				continue;
-			}
-			if (idtype == P_PGID && id != cp->p_pgrp) {
+			if (idtype == P_PGID && id != cp->p_pgrp)
 				continue;
-			}
-
-			found++;
 
 			switch (cp->p_wcode) {
 			case CLD_TRAPPED:
@@ -1016,6 +1010,9 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 			case CLD_EXITED:
 			case CLD_DUMPED:
 			case CLD_KILLED:
+				if (idtype != P_PID &&
+				    (cp->p_pidflag & CLDWAITPID))
+					continue;
 				/*
 				 * Don't complain if a process was found in
 				 * the first loop but we broke out of the loop
@@ -1030,9 +1027,11 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 				}
 			}
 
+			found++;
+
 			if (idtype == P_PID)
 				break;
-		} while ((cp = cp->p_sibling) != NULL);
+		}
 
 		/*
 		 * If we found no interesting processes at all,
@@ -1042,13 +1041,13 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 			break;
 
 		if (options & WNOHANG) {
+			mutex_exit(&pidlock);
 			bzero(ip, sizeof (k_siginfo_t));
 			/*
 			 * We should set ip->si_signo = SIGCLD,
 			 * but there is an SVVS test that expects
 			 * ip->si_signo to be zero in this case.
 			 */
-			mutex_exit(&pidlock);
 			return (0);
 		}
 
@@ -1070,9 +1069,9 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 }
 
 /*
- * For implementations that don't require binary compatibility,
- * the wait system call may be made into a library call to the
- * waitid system call.
+ * The wait() system call trap is no longer invoked by libc.
+ * It is retained only for the benefit of statically linked applications.
+ * Delete this when we no longer care about these old and broken applications.
  */
 int64_t
 wait(void)

@@ -65,6 +65,8 @@ int	exec();
 int	exece();
 int	fcntl();
 int64_t	forkall();
+int64_t	vfork();
+int64_t	forksys();
 int64_t	fork1();
 int	fstat();
 int	fsat32();
@@ -179,7 +181,6 @@ caddr_t smmap32();
 int	smmaplf32();
 int	mprotect();
 int	munmap();
-int64_t	vfork();
 #if (defined(__i386) && !defined(__amd64)) || defined(__i386_COMPAT)
 int	xstat();
 int	lxstat();
@@ -478,14 +479,14 @@ struct sysent sysent[NSYSCALL] =
 	/* 39 */ SYSENT_CI("setpgrp",		setpgrp,	3),
 	/* 40 */ SYSENT_CI("uucopystr",		uucopystr,	3),
 	/* 41 */ SYSENT_CI("dup",		dup,		1),
-	/* 42 */ SYSENT_LOADABLE(),			/* (was pipe ) */
+	/* 42 */ SYSENT_LOADABLE(),			/* pipe */
 	/* 43 */ SYSENT_CL("times",		times,		1),
 	/* 44 */ SYSENT_CI("prof",		profil,		4),
 	/* 45 */ SYSENT_LOADABLE(),			/* (was proc lock) */
 	/* 46 */ SYSENT_CI("setgid",		setgid,		1),
 	/* 47 */ SYSENT_2CI("getgid",		getgid,		0),
 	/* 48 */ SYSENT_CI("sig",		ssig,		2),
-	/* 49 */ SYSENT_LOADABLE(),			/* (was msgsys) */
+	/* 49 */ SYSENT_LOADABLE(),			/* msgsys */
 	/* 50 */ IF_x86(
 			SYSENT_CI("sysi86",	sysi86,		4),
 			SYSENT_LOADABLE()),		/* (was sys3b) */
@@ -618,7 +619,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 139 */ SYSENT_CL("systeminfo",	systeminfo,	3),
 	/* 140 */ SYSENT_LOADABLE(),		/* reserved */
 	/* 141 */ SYSENT_CI("seteuid",		seteuid,	1),
-	/* 142 */ SYSENT_LOADABLE(),		/* reserved */
+	/* 142 */ SYSENT_2CI("forksys",		forksys,	2),
 	/* 143 */ SYSENT_2CI("fork1",		fork1,		0),
 	/* 144 */ SYSENT_CI("sigtimedwait",	sigtimedwait,	3),
 	/* 145 */ SYSENT_CI("lwp_info",		lwp_info,	1),
@@ -881,14 +882,14 @@ struct sysent sysent32[NSYSCALL] =
 	/* 39 */ SYSENT_CI("setpgrp",		setpgrp,	3),
 	/* 40 */ SYSENT_CI("uucopystr",		uucopystr,	3),
 	/* 41 */ SYSENT_CI("dup",		dup,		1),
-	/* 42 */ SYSENT_LOADABLE32(),			/* (was pipe ) */
+	/* 42 */ SYSENT_LOADABLE32(),			/* pipe */
 	/* 43 */ SYSENT_CI("times",		times32,	1),
 	/* 44 */ SYSENT_CI("prof",		profil,		4),
 	/* 45 */ SYSENT_LOADABLE32(),			/* (was proc lock) */
 	/* 46 */ SYSENT_CI("setgid",		setgid,		1),
 	/* 47 */ SYSENT_2CI("getgid",		getgid,		0),
 	/* 48 */ SYSENT_CI("sig",		ssig,		2),
-	/* 49 */ SYSENT_LOADABLE32(),			/* (was msgsys) */
+	/* 49 */ SYSENT_LOADABLE32(),			/* msgsys */
 	/* 50 */ IF_386_ABI(
 			SYSENT_CI("sysi86",	sysi86,		4),
 			SYSENT_LOADABLE()),		/* (was sys3b) */
@@ -1002,7 +1003,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 139 */ SYSENT_CI("systeminfo",	systeminfo,	3),
 	/* 140 */ SYSENT_LOADABLE32(),		/* reserved */
 	/* 141 */ SYSENT_CI("seteuid",		seteuid,	1),
-	/* 142 */ SYSENT_LOADABLE32(),		/* reserved */
+	/* 142 */ SYSENT_2CI("forksys",		forksys,	2),
 	/* 143 */ SYSENT_2CI("fork1",		fork1,		0),
 	/* 144 */ SYSENT_CI("sigtimedwait",	sigtimedwait,	3),
 	/* 145 */ SYSENT_CI("lwp_info",		lwp_info,	1),

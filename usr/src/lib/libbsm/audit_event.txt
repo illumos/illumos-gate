@@ -67,7 +67,7 @@
 #
 0:AUE_NULL:indir system call:no
 1:AUE_EXIT:exit(2):ps
-2:AUE_FORK:fork(2):ps
+2:AUE_FORKALL:forkall(2):ps
 # AUE_OPEN is a placeholder and will not be generated
 3:AUE_OPEN:open(2) - place holder:no
 4:AUE_CREAT:creat(2):fc

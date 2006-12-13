@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,6 +83,7 @@
 #include <sys/door.h>
 #include <sys/stat.h>
 #include <stropts.h>
+#include <sys/fork.h>
 #include <sys/wait.h>
 #include "libc.h"
 
@@ -183,8 +184,6 @@ vsyslog(int pri, const char *fmt, va_list ap)
 	struct log_ctl hdr;
 	struct strbuf dat;
 	struct strbuf ctl;
-	sigset_t sigs;
-	sigset_t osigs;
 	char timestr[26];	/* hardwired value 26 due to Posix */
 	size_t taglen;
 	int olderrno = errno;
@@ -195,6 +194,7 @@ vsyslog(int pri, const char *fmt, va_list ap)
 	int showpid;
 	uint32_t msgid;
 	char *msgid_start, *msgid_end;
+	int nowait;
 
 /*
  * Maximum tag length is 256 (the pad in outline) minus the size of the
@@ -358,21 +358,19 @@ vsyslog(int pri, const char *fmt, va_list ap)
 
 	clen = strlen(outline) + 1;
 
-	(void) sigemptyset(&sigs);
-	(void) sigaddset(&sigs, SIGCHLD);
-	(void) sigprocmask(SIG_BLOCK, &sigs, &osigs);
-	pid = fork1();
-	if (pid == -1) {
-		(void) sigprocmask(SIG_SETMASK, &osigs, NULL);
+	nowait = (LogStat & LOG_NOWAIT);
+	pid = forkx(nowait? 0 : (FORK_NOSIGCHLD | FORK_WAITPID));
+	if (pid == -1)
 		return;
-	}
+
 	if (pid == 0) {
+		sigset_t sigs;
 		int fd;
 
-		(void) signal(SIGALRM, SIG_DFL);
-		(void) sigprocmask(SIG_BLOCK, NULL, &sigs);
-		(void) sigdelset(&sigs, SIGALRM);
-		(void) sigprocmask(SIG_SETMASK, &sigs, NULL);
+		(void) sigset(SIGALRM, SIG_DFL);
+		(void) sigemptyset(&sigs);
+		(void) sigaddset(&sigs, SIGALRM);
+		(void) sigprocmask(SIG_UNBLOCK, &sigs, NULL);
 		(void) alarm(5);
 		if (((fd = open(sysmsg, O_WRONLY)) >= 0) ||
 		    (fd = open(ctty, O_WRONLY)) >= 0) {
@@ -383,9 +381,9 @@ vsyslog(int pri, const char *fmt, va_list ap)
 		}
 		_exit(0);
 	}
-	if (!(LogStat & LOG_NOWAIT))
-		(void) waitpid(pid, NULL, 0);
-	(void) sigprocmask(SIG_SETMASK, &osigs, NULL);
+	if (!nowait)
+		while (waitpid(pid, NULL, 0) == -1 && errno == EINTR)
+			continue;
 }
 
 /*

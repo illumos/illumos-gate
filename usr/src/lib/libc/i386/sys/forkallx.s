@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,9 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,25 +28,32 @@
 
 	.file	"%M%"
 
-/*
- * C library -- forkall
- * pid_t forkall(void)
- */
+#include "SYS.h"
 
 /*
+ * pid = __forkallx(flags);
+ *
+ * syscall trap: forksys(1, flags)
+ *
  * From the syscall:
- * %o1 == 0 in parent process, %o1 == 1 in child process.
- * %o0 == pid of child in parent, %o0 == pid of parent in child.
+ * %edx == 0 in parent process, %edx = 1 in child process.
+ * %eax == pid of child in parent, %eax == pid of parent in child.
  *
  * The child gets a zero return value.
  * The parent gets the pid of the child.
  */
 
-#include "SYS.h"
-
-	ENTRY(__forkall)
-	SYSTRAP_2RVALS(forkall)
+	ENTRY(__forkallx)
+	popl	%ecx
+	pushl	$1
+	pushl	%ecx
+	SYSTRAP_2RVALS(forksys)
+	popl	%ecx
+	movl	%ecx, 0(%esp)
 	SYSCERROR
-	movrnz	%o1, 0, %o0
+	testl	%edx, %edx
+	jz	1f		/* jump if parent */
+	xorl	%eax, %eax	/* child, return (0) */
+1:
 	RET
-	SET_SIZE(__forkall)
+	SET_SIZE(__forkallx)
