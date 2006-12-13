@@ -843,7 +843,7 @@ USBPRNHDRS=           \
 	usb_printer.h
 
 USBCDCHDRS=		\
-	usbcdc.h
+	usb_cdc.h
 
 UGENHDRS=           \
 	usb_ugen.h
