@@ -242,7 +242,7 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 		if (mkdirp(mountpoint, 0755) != 0) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "failed to create mountpoint"));
-			return (zfs_error(hdl, EZFS_MOUNTFAILED,
+			return (zfs_error_fmt(hdl, EZFS_MOUNTFAILED,
 			    dgettext(TEXT_DOMAIN, "cannot mount '%s'"),
 			    mountpoint));
 		}
@@ -259,7 +259,7 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 	    !dir_is_empty(mountpoint)) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "directory is not empty"));
-		return (zfs_error(hdl, EZFS_MOUNTFAILED,
+		return (zfs_error_fmt(hdl, EZFS_MOUNTFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot mount '%s'"), mountpoint));
 	}
 
@@ -277,7 +277,7 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 		else
 			zfs_error_aux(hdl, strerror(errno));
 
-		return (zfs_error(hdl, EZFS_MOUNTFAILED,
+		return (zfs_error_fmt(hdl, EZFS_MOUNTFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot mount '%s'"),
 		    zhp->zfs_name));
 	}
@@ -293,7 +293,7 @@ unmount_one(libzfs_handle_t *hdl, const char *mountpoint, int flags)
 {
 	if (umount2(mountpoint, flags) != 0) {
 		zfs_error_aux(hdl, strerror(errno));
-		return (zfs_error(hdl, EZFS_UMOUNTFAILED,
+		return (zfs_error_fmt(hdl, EZFS_UMOUNTFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot unmount '%s'"),
 		    mountpoint));
 	}
@@ -446,7 +446,7 @@ zfs_share_nfs(zfs_handle_t *zhp)
 		    mountpoint);
 
 	if ((fp = popen(buf, "r")) == NULL)
-		return (zfs_error(hdl, EZFS_SHARENFSFAILED,
+		return (zfs_error_fmt(hdl, EZFS_SHARENFSFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot share '%s'"),
 		    zfs_get_name(zhp)));
 
@@ -464,7 +464,7 @@ zfs_share_nfs(zfs_handle_t *zhp)
 		if (colon != NULL)
 			zfs_error_aux(hdl, colon + 2);
 
-		(void) zfs_error(hdl, EZFS_SHARENFSFAILED,
+		(void) zfs_error_fmt(hdl, EZFS_SHARENFSFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot share '%s'"),
 		    zfs_get_name(zhp));
 
@@ -491,7 +491,7 @@ unshare_one(libzfs_handle_t *hdl, const char *name, const char *mountpoint)
 	    mountpoint);
 
 	if ((fp = popen(buf, "r")) == NULL)
-		return (zfs_error(hdl, EZFS_UNSHARENFSFAILED,
+		return (zfs_error_fmt(hdl, EZFS_UNSHARENFSFAILED,
 		    dgettext(TEXT_DOMAIN,
 		    "cannot unshare '%s'"), name));
 
@@ -511,7 +511,7 @@ unshare_one(libzfs_handle_t *hdl, const char *name, const char *mountpoint)
 
 		verify(pclose(fp) != 0);
 
-		return (zfs_error(hdl, EZFS_UNSHARENFSFAILED,
+		return (zfs_error_fmt(hdl, EZFS_UNSHARENFSFAILED,
 		    dgettext(TEXT_DOMAIN,
 		    "cannot unshare '%s'"), name));
 	}
@@ -622,7 +622,7 @@ zfs_share_iscsi(zfs_handle_t *zhp)
 		return (0);
 
 	if (iscsitgt_zfs_share == NULL || iscsitgt_zfs_share(dataset) != 0)
-		return (zfs_error(hdl, EZFS_SHAREISCSIFAILED,
+		return (zfs_error_fmt(hdl, EZFS_SHAREISCSIFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot share '%s'"), dataset));
 
 	return (0);
@@ -640,7 +640,7 @@ zfs_unshare_iscsi(zfs_handle_t *zhp)
 	 */
 	if (iscsitgt_zfs_unshare == NULL ||
 	    (iscsitgt_zfs_unshare(dataset) != 0 && errno != ENODEV))
-		return (zfs_error(hdl, EZFS_UNSHAREISCSIFAILED,
+		return (zfs_error_fmt(hdl, EZFS_UNSHAREISCSIFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot unshare '%s'"), dataset));
 
 	return (0);

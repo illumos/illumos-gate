@@ -404,7 +404,7 @@ zfs_open(libzfs_handle_t *hdl, const char *path, int types)
 	 */
 	errno = 0;
 	if ((zhp = make_dataset_handle(hdl, path)) == NULL) {
-		(void) zfs_standard_error(hdl, errno, errbuf, path);
+		(void) zfs_standard_error(hdl, errno, errbuf);
 		return (NULL);
 	}
 
@@ -1753,7 +1753,7 @@ zfs_prop_get_numeric(zfs_handle_t *zhp, zfs_prop_t prop, uint64_t *value,
 	 * Check to see if this property applies to our object
 	 */
 	if (!zfs_prop_valid_for_type(prop, zhp->zfs_type))
-		return (zfs_error(zhp->zfs_hdl, EZFS_PROPTYPE,
+		return (zfs_error_fmt(zhp->zfs_hdl, EZFS_PROPTYPE,
 		    dgettext(TEXT_DOMAIN, "cannot get property '%s'"),
 		    zfs_prop_to_name(prop)));
 
@@ -2143,7 +2143,7 @@ zfs_destroy(zfs_handle_t *zhp)
 	}
 
 	if (ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_DESTROY, &zc) != 0) {
-		return (zfs_standard_error(zhp->zfs_hdl, errno,
+		return (zfs_standard_error_fmt(zhp->zfs_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot destroy '%s'"),
 		    zhp->zfs_name));
 	}
@@ -2201,7 +2201,7 @@ zfs_destroy_snaps(zfs_handle_t *zhp, char *snapname)
 	(void) zfs_remove_link_cb(zhp, &dd);
 
 	if (!dd.gotone) {
-		return (zfs_standard_error(zhp->zfs_hdl, ENOENT,
+		return (zfs_standard_error_fmt(zhp->zfs_hdl, ENOENT,
 		    dgettext(TEXT_DOMAIN, "cannot destroy '%s@%s'"),
 		    zhp->zfs_name, snapname));
 	}
@@ -2870,8 +2870,9 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 			}
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "destination already exists"));
-			(void) zfs_error(hdl, EZFS_EXISTS, dgettext(TEXT_DOMAIN,
-			    "cannot restore to %s"), zc.zc_value);
+			(void) zfs_error_fmt(hdl, EZFS_EXISTS,
+			    dgettext(TEXT_DOMAIN, "cannot restore to %s"),
+			    zc.zc_value);
 			break;
 		case EINVAL:
 			(void) zfs_error(hdl, EZFS_BADSTREAM, errbuf);
@@ -3018,7 +3019,7 @@ do_rollback(zfs_handle_t *zhp)
 	 */
 	if ((ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_ROLLBACK,
 	    &zc)) != 0) {
-		(void) zfs_standard_error(zhp->zfs_hdl, errno,
+		(void) zfs_standard_error_fmt(zhp->zfs_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot rollback '%s'"),
 		    zhp->zfs_name);
 	} else if (zhp->zfs_type == ZFS_TYPE_VOLUME) {
@@ -3287,7 +3288,7 @@ zvol_create_link(libzfs_handle_t *hdl, const char *dataset)
 			return (0);
 
 		default:
-			return (zfs_standard_error(hdl, errno,
+			return (zfs_standard_error_fmt(hdl, errno,
 			    dgettext(TEXT_DOMAIN, "cannot create device links "
 			    "for '%s'"), dataset));
 		}
@@ -3298,7 +3299,7 @@ zvol_create_link(libzfs_handle_t *hdl, const char *dataset)
 	 */
 	if ((dhdl = di_devlink_init(ZFS_DRIVER, DI_MAKE_LINK)) == NULL) {
 		zfs_error_aux(hdl, strerror(errno));
-		(void) zfs_error(hdl, EZFS_DEVLINKS,
+		(void) zfs_error_fmt(hdl, EZFS_DEVLINKS,
 		    dgettext(TEXT_DOMAIN, "cannot create device links "
 		    "for '%s'"), dataset);
 		(void) ioctl(hdl->libzfs_fd, ZFS_IOC_REMOVE_MINOR, &zc);
@@ -3331,7 +3332,7 @@ zvol_remove_link(libzfs_handle_t *hdl, const char *dataset)
 			return (0);
 
 		default:
-			return (zfs_standard_error(hdl, errno,
+			return (zfs_standard_error_fmt(hdl, errno,
 			    dgettext(TEXT_DOMAIN, "cannot remove device "
 			    "links for '%s'"), dataset));
 		}

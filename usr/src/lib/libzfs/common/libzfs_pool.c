@@ -184,7 +184,7 @@ zpool_open_canfail(libzfs_handle_t *hdl, const char *pool)
 	 * Make sure the pool name is valid.
 	 */
 	if (!zpool_name_valid(hdl, B_TRUE, pool)) {
-		(void) zfs_error(hdl, EZFS_INVALIDNAME,
+		(void) zfs_error_fmt(hdl, EZFS_INVALIDNAME,
 		    dgettext(TEXT_DOMAIN, "cannot open '%s'"),
 		    pool);
 		return (NULL);
@@ -204,7 +204,7 @@ zpool_open_canfail(libzfs_handle_t *hdl, const char *pool)
 	if (missing) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "no such pool"));
-		(void) zfs_error(hdl, EZFS_NOENT,
+		(void) zfs_error_fmt(hdl, EZFS_NOENT,
 		    dgettext(TEXT_DOMAIN, "cannot open '%s'"),
 		    pool);
 		zpool_close(zhp);
@@ -258,7 +258,7 @@ zpool_open(libzfs_handle_t *hdl, const char *pool)
 		return (NULL);
 
 	if (zhp->zpool_state == POOL_STATE_UNAVAIL) {
-		(void) zfs_error(hdl, EZFS_POOLUNAVAIL,
+		(void) zfs_error_fmt(hdl, EZFS_POOLUNAVAIL,
 		    dgettext(TEXT_DOMAIN, "cannot open '%s'"), zhp->zpool_name);
 		zpool_close(zhp);
 		return (NULL);
@@ -404,7 +404,7 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 		return (zfs_error(hdl, EZFS_INVALIDNAME, msg));
 
 	if (altroot != NULL && altroot[0] != '/')
-		return (zfs_error(hdl, EZFS_BADPATH,
+		return (zfs_error_fmt(hdl, EZFS_BADPATH,
 		    dgettext(TEXT_DOMAIN, "bad alternate root '%s'"), altroot));
 
 	if (zcmd_write_src_nvlist(hdl, &zc, nvroot, NULL) != 0)
@@ -621,7 +621,7 @@ zpool_export(zpool_handle_t *zhp)
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 
 	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_POOL_EXPORT, &zc) != 0)
-		return (zpool_standard_error(zhp->zpool_hdl, errno,
+		return (zpool_standard_error_fmt(zhp->zpool_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot export '%s'"),
 		    zhp->zpool_name));
 
@@ -648,7 +648,7 @@ zpool_import(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 
 	if (newname != NULL) {
 		if (!zpool_name_valid(hdl, B_FALSE, newname))
-			return (zfs_error(hdl, EZFS_INVALIDNAME,
+			return (zfs_error_fmt(hdl, EZFS_INVALIDNAME,
 			    dgettext(TEXT_DOMAIN, "cannot import '%s'"),
 			    newname));
 		thename = (char *)newname;
@@ -657,7 +657,7 @@ zpool_import(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 	}
 
 	if (altroot != NULL && altroot[0] != '/')
-		return (zfs_error(hdl, EZFS_BADPATH,
+		return (zfs_error_fmt(hdl, EZFS_BADPATH,
 		    dgettext(TEXT_DOMAIN, "bad alternate root '%s'"),
 		    altroot));
 
@@ -1758,7 +1758,7 @@ zpool_upgrade(zpool_handle_t *zhp)
 
 	(void) strcpy(zc.zc_name, zhp->zpool_name);
 	if (ioctl(hdl->libzfs_fd, ZFS_IOC_POOL_UPGRADE, &zc) != 0)
-		return (zpool_standard_error(hdl, errno,
+		return (zpool_standard_error_fmt(hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot upgrade '%s'"),
 		    zhp->zpool_name));
 
@@ -1833,15 +1833,16 @@ get_history(zpool_handle_t *zhp, char *buf, uint64_t *off, uint64_t *len)
 	if (ioctl(hdl->libzfs_fd, ZFS_IOC_POOL_GET_HISTORY, &zc) != 0) {
 		switch (errno) {
 		case EPERM:
-			return (zfs_error(hdl, EZFS_PERM, dgettext(TEXT_DOMAIN,
+			return (zfs_error_fmt(hdl, EZFS_PERM,
+			    dgettext(TEXT_DOMAIN,
 			    "cannot show history for pool '%s'"),
 			    zhp->zpool_name));
 		case ENOENT:
-			return (zfs_error(hdl, EZFS_NOHISTORY,
+			return (zfs_error_fmt(hdl, EZFS_NOHISTORY,
 			    dgettext(TEXT_DOMAIN, "cannot get history for pool "
 			    "'%s'"), zhp->zpool_name));
 		default:
-			return (zpool_standard_error(hdl, errno,
+			return (zpool_standard_error_fmt(hdl, errno,
 			    dgettext(TEXT_DOMAIN,
 			    "cannot get history for '%s'"), zhp->zpool_name));
 		}

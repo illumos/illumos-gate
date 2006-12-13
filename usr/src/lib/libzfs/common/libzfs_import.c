@@ -746,7 +746,7 @@ zpool_find_import(libzfs_handle_t *hdl, int argc, char **argv)
 	 */
 	for (i = 0; i < argc; i++) {
 		if (argv[i][0] != '/') {
-			(void) zfs_error(hdl, EZFS_BADPATH,
+			(void) zfs_error_fmt(hdl, EZFS_BADPATH,
 			    dgettext(TEXT_DOMAIN, "cannot open '%s'"),
 			    argv[i]);
 			goto error;
@@ -754,7 +754,7 @@ zpool_find_import(libzfs_handle_t *hdl, int argc, char **argv)
 
 		if ((dirp = opendir(argv[i])) == NULL) {
 			zfs_error_aux(hdl, strerror(errno));
-			(void) zfs_error(hdl, EZFS_BADPATH,
+			(void) zfs_error_fmt(hdl, EZFS_BADPATH,
 			    dgettext(TEXT_DOMAIN, "cannot open '%s'"),
 			    argv[i]);
 			goto error;
