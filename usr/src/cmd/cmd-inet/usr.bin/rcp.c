@@ -1957,12 +1957,15 @@ recvacl(int f, int exists, int preserve)
 			if (aclerror != 0) {
 				error("rcp: failed to parse acl : %s\n",
 				    acl_strerror(aclerror));
+				free(acltext);
 				return (ACL_FAIL);
 			}
 
 			if (f != -1) {
 				if (facl_set(f, aclp) < 0) {
 					error("rcp: failed to set acl\n");
+					acl_free(aclp);
+					free(acltext);
 					return (ACL_FAIL);
 				}
 			}
