@@ -1316,7 +1316,8 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 	    prop == ZFS_PROP_EXEC ||
 	    prop == ZFS_PROP_READONLY ||
 	    prop == ZFS_PROP_SETUID ||
-	    prop == ZFS_PROP_MOUNTED)) {
+	    prop == ZFS_PROP_MOUNTED ||
+	    prop == ZFS_PROP_XATTR)) {
 		struct mnttab search = { 0 }, entry;
 
 		search.mnt_special = (char *)zhp->zfs_name;
@@ -1439,6 +1440,20 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 		*val = getprop_uint64(zhp, prop, source);
 		break;
 
+	case ZFS_PROP_XATTR:
+		*val = getprop_uint64(zhp, prop, source);
+
+		if (hasmntopt(&mnt, MNTOPT_XATTR) && !*val) {
+			*val = B_TRUE;
+			if (src)
+				*src = ZFS_SRC_TEMPORARY;
+		} else if (hasmntopt(&mnt, MNTOPT_NOXATTR) && *val) {
+			*val = B_FALSE;
+			if (src)
+				*src = ZFS_SRC_TEMPORARY;
+		}
+		break;
+
 	default:
 		zfs_error_aux(zhp->zfs_hdl, dgettext(TEXT_DOMAIN,
 		    "cannot get non-numeric property"));
@@ -1508,6 +1523,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 	case ZFS_PROP_DEVICES:
 	case ZFS_PROP_EXEC:
 	case ZFS_PROP_CANMOUNT:
+	case ZFS_PROP_XATTR:
 		/*
 		 * Basic boolean values are built on top of
 		 * get_numeric_property().

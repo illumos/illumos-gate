@@ -1001,6 +1001,14 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 
 	if (flags & LOOKUP_XATTR) {
 		/*
+		 * If the xattr property is off, refuse the lookup request.
+		 */
+		if (!(zfsvfs->z_vfs->vfs_flag & VFS_XATTR)) {
+			ZFS_EXIT(zfsvfs);
+			return (EINVAL);
+		}
+
+		/*
 		 * We don't allow recursive attributes..
 		 * Maybe someday we will.
 		 */

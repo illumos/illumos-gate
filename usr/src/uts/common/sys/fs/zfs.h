@@ -86,6 +86,7 @@ typedef enum {
 	ZFS_PROP_ACLMODE,
 	ZFS_PROP_ACLINHERIT,
 	ZFS_PROP_CANMOUNT,
+	ZFS_PROP_XATTR,
 	/*
 	 * The following properties are not exposed to the user, but are
 	 * accessible by libzfs clients.

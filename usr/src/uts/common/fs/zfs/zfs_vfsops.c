@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)zfs_vfsops.c	1.14	06/11/15 SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -99,9 +99,16 @@ static uint32_t	zfs_active_fs_count = 0;
 
 static char *noatime_cancel[] = { MNTOPT_ATIME, NULL };
 static char *atime_cancel[] = { MNTOPT_NOATIME, NULL };
+static char *noxattr_cancel[] = { MNTOPT_XATTR, NULL };
+static char *xattr_cancel[] = { MNTOPT_NOXATTR, NULL };
 
+/*
+ * MNTOPT_DEFAULT was removed from MNTOPT_XATTR, since the
+ * default value is now determined by the xattr property.
+ */
 static mntopt_t mntopts[] = {
-	{ MNTOPT_XATTR, NULL, NULL, MO_NODISPLAY|MO_DEFAULT, NULL },
+	{ MNTOPT_NOXATTR, noxattr_cancel, NULL, 0, NULL },
+	{ MNTOPT_XATTR, xattr_cancel, NULL, 0, NULL },
 	{ MNTOPT_NOATIME, noatime_cancel, NULL, MO_DEFAULT, NULL },
 	{ MNTOPT_ATIME, atime_cancel, NULL, 0, NULL }
 };
@@ -220,6 +227,24 @@ atime_changed_cb(void *arg, uint64_t newval)
 		zfsvfs->z_atime = FALSE;
 		vfs_clearmntopt(zfsvfs->z_vfs, MNTOPT_ATIME);
 		vfs_setmntopt(zfsvfs->z_vfs, MNTOPT_NOATIME, NULL, 0);
+	}
+}
+
+static void
+xattr_changed_cb(void *arg, uint64_t newval)
+{
+	zfsvfs_t *zfsvfs = arg;
+
+	if (newval == TRUE) {
+		/* XXX locking on vfs_flag? */
+		zfsvfs->z_vfs->vfs_flag |= VFS_XATTR;
+		vfs_clearmntopt(zfsvfs->z_vfs, MNTOPT_NOXATTR);
+		vfs_setmntopt(zfsvfs->z_vfs, MNTOPT_XATTR, NULL, 0);
+	} else {
+		/* XXX locking on vfs_flag? */
+		zfsvfs->z_vfs->vfs_flag &= ~VFS_XATTR;
+		vfs_clearmntopt(zfsvfs->z_vfs, MNTOPT_XATTR);
+		vfs_setmntopt(zfsvfs->z_vfs, MNTOPT_NOXATTR, NULL, 0);
 	}
 }
 
@@ -371,6 +396,11 @@ zfs_refresh_properties(vfs_t *vfsp)
 	else if (vfs_optionisset(vfsp, MNTOPT_NOATIME, NULL))
 		atime_changed_cb(zfsvfs, B_FALSE);
 
+	if (vfs_optionisset(vfsp, MNTOPT_XATTR, NULL))
+		xattr_changed_cb(zfsvfs, B_TRUE);
+	else if (vfs_optionisset(vfsp, MNTOPT_NOXATTR, NULL))
+		xattr_changed_cb(zfsvfs, B_FALSE);
+
 	return (0);
 }
 
@@ -384,6 +414,7 @@ zfs_register_callbacks(vfs_t *vfsp)
 	int do_setuid = FALSE, setuid;
 	int do_exec = FALSE, exec;
 	int do_devices = FALSE, devices;
+	int do_xattr = FALSE, xattr;
 	int error = 0;
 
 	ASSERT(vfsp);
@@ -394,7 +425,7 @@ zfs_register_callbacks(vfs_t *vfsp)
 	/*
 	 * The act of registering our callbacks will destroy any mount
 	 * options we may have.  In order to enable temporary overrides
-	 * of mount options, we stash away the current values and restore
+	 * of mount options, we stash away the current values and
 	 * restore them after we register the callbacks.
 	 */
 	if (vfs_optionisset(vfsp, MNTOPT_RO, NULL)) {
@@ -434,6 +465,13 @@ zfs_register_callbacks(vfs_t *vfsp)
 		exec = B_TRUE;
 		do_exec = B_TRUE;
 	}
+	if (vfs_optionisset(vfsp, MNTOPT_NOXATTR, NULL)) {
+		xattr = B_FALSE;
+		do_xattr = B_TRUE;
+	} else if (vfs_optionisset(vfsp, MNTOPT_XATTR, NULL)) {
+		xattr = B_TRUE;
+		do_xattr = B_TRUE;
+	}
 
 	/*
 	 * Register property callbacks.
@@ -444,6 +482,8 @@ zfs_register_callbacks(vfs_t *vfsp)
 	 */
 	ds = dmu_objset_ds(os);
 	error = dsl_prop_register(ds, "atime", atime_changed_cb, zfsvfs);
+	error = error ? error : dsl_prop_register(ds,
+	    "xattr", xattr_changed_cb, zfsvfs);
 	error = error ? error : dsl_prop_register(ds,
 	    "recordsize", blksz_changed_cb, zfsvfs);
 	error = error ? error : dsl_prop_register(ds,
@@ -474,6 +514,8 @@ zfs_register_callbacks(vfs_t *vfsp)
 		exec_changed_cb(zfsvfs, exec);
 	if (do_devices)
 		devices_changed_cb(zfsvfs, devices);
+	if (do_xattr)
+		xattr_changed_cb(zfsvfs, xattr);
 
 	return (0);
 
@@ -484,6 +526,7 @@ unregister:
 	 * which we will ignore.
 	 */
 	(void) dsl_prop_unregister(ds, "atime", atime_changed_cb, zfsvfs);
+	(void) dsl_prop_unregister(ds, "xattr", xattr_changed_cb, zfsvfs);
 	(void) dsl_prop_unregister(ds, "recordsize", blksz_changed_cb, zfsvfs);
 	(void) dsl_prop_unregister(ds, "readonly", readonly_changed_cb, zfsvfs);
 	(void) dsl_prop_unregister(ds, "devices", devices_changed_cb, zfsvfs);
@@ -572,9 +615,14 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 	VN_RELE(ZTOV(zp));
 
 	if (dmu_objset_is_snapshot(zfsvfs->z_os)) {
+		uint64_t xattr;
+
 		ASSERT(mode & DS_MODE_READONLY);
 		atime_changed_cb(zfsvfs, B_FALSE);
 		readonly_changed_cb(zfsvfs, B_TRUE);
+		if (error = dsl_prop_get_integer(osname, "xattr", &xattr, NULL))
+			goto out;
+		xattr_changed_cb(zfsvfs, xattr);
 		zfsvfs->z_issnap = B_TRUE;
 	} else {
 		error = zfs_register_callbacks(vfsp);
@@ -623,6 +671,9 @@ zfs_unregister_callbacks(zfsvfs_t *zfsvfs)
 	if (!dmu_objset_is_snapshot(os)) {
 		ds = dmu_objset_ds(os);
 		VERIFY(dsl_prop_unregister(ds, "atime", atime_changed_cb,
+		    zfsvfs) == 0);
+
+		VERIFY(dsl_prop_unregister(ds, "xattr", xattr_changed_cb,
 		    zfsvfs) == 0);
 
 		VERIFY(dsl_prop_unregister(ds, "recordsize", blksz_changed_cb,
