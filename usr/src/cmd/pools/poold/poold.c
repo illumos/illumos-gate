@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -130,7 +129,7 @@ check_thread_attached(JNIEnv **env)
 			exit(E_ERROR);
 		}
 		if ((*jvm)->AttachCurrentThreadAsDaemon(jvm, (void **)env,
-			NULL) != 0) {
+		    NULL) != 0) {
 			/*
 			 * Avoid recursively calling
 			 * check_thread_attached()
@@ -346,6 +345,8 @@ handle_sig(void *arg)
 				err_desc = pool_strerror(pool_error());
 				goto destroy;
 			}
+			(void) pool_conf_close(conf);
+			pool_conf_free(conf);
 			break;
 destroy:
 			if (conf) {
