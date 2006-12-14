@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +39,9 @@ extern	int	ibmf_taskq_max_tasks;
 static int
 ibmf_saa_impl_new_smlid_retry(saa_port_t *saa_portp, ibmf_msg_t *msgp,
     ibmf_msg_cb_t ibmf_callback, void *ibmf_callback_arg, int transport_flags);
+static int
+ibmf_saa_impl_revert_to_qp1(saa_port_t *saa_portp, ibmf_msg_t *msgp,
+    ibmf_msg_cb_t ibmf_callback, void *ibmf_callback_args, int transport_flags);
 static int
 ibmf_saa_check_sa_and_retry(saa_port_t *saa_portp, ibmf_msg_t *msgp,
     ibmf_msg_cb_t ibmf_callback, void *ibmf_callback_arg,
@@ -68,6 +70,8 @@ static int ibmf_saa_impl_get_port_guid(ibt_hca_portinfo_t *ibt_portinfop,
     ib_guid_t *guid_ret);
 static void ibmf_saa_impl_set_transaction_params(saa_port_t *saa_portp,
     ibt_hca_portinfo_t *portinfop);
+static void ibmf_saa_impl_update_sa_address_info(saa_port_t *saa_portp,
+    ibmf_msg_t *msgp);
 static void ibmf_saa_impl_ibmf_unreg(saa_port_t *saa_portp);
 
 int	ibmf_saa_max_wait_time = IBMF_SAA_MAX_WAIT_TIME_IN_SECS;
@@ -625,6 +629,8 @@ ibmf_saa_impl_create_port(ib_guid_t pt_guid, saa_port_t **saa_portpp)
 	saa_portp->saa_pt_port_guid = pt_guid;
 	saa_portp->saa_pt_reference_count = 1;
 	saa_portp->saa_pt_current_tid = pt_guid << 32;
+
+	saa_portp->saa_pt_redirect_active = B_FALSE;
 
 	/* set sa_uptime now in case we never receive anything from SA */
 	saa_portp->saa_pt_sa_uptime = gethrtime();
@@ -1229,9 +1235,9 @@ ibmf_saa_impl_get_cpi_cb(void *arg, size_t length, char *buffer, int status)
 
 		classportinfo = (ib_mad_classportinfo_t *)buffer;
 
-		resp_time_value = b2h32(classportinfo->RespTimeValue) & 0x1f;
+		resp_time_value = classportinfo->RespTimeValue & 0x1f;
 
-		sa_cap_mask = b2h16(classportinfo->CapabilityMask);
+		sa_cap_mask = classportinfo->CapabilityMask;
 
 		IBMF_TRACE_3(IBMF_TNF_DEBUG, DPRINT_L3,
 		    ibmf_saa_impl_get_cpi_cb, IBMF_TNF_TRACE, "",
@@ -1308,6 +1314,7 @@ ibmf_saa_impl_send_request(saa_impl_trans_info_t *trans_info)
 	int			ibmf_status = IBMF_SUCCESS;
 	int			retry_count;
 	uint16_t		mad_status;
+	boolean_t		sa_is_redirected = B_FALSE;
 
 	IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4,
 	    ibmf_saa_impl_send_request_start,
@@ -1346,6 +1353,7 @@ ibmf_saa_impl_send_request(saa_impl_trans_info_t *trans_info)
 	mutex_enter(&saa_portp->saa_pt_mutex);
 
 	sa_cap_mask = saa_portp->saa_pt_sa_cap_mask;
+	sa_is_redirected = saa_portp->saa_pt_redirect_active;
 
 	mutex_exit(&saa_portp->saa_pt_mutex);
 
@@ -1442,13 +1450,21 @@ ibmf_saa_impl_send_request(saa_impl_trans_info_t *trans_info)
 		/*
 		 * if the transaction timed out and this was a synchronous
 		 * request there's a possiblity we were talking to the wrong
-		 * master smlid.  Check this and retry if necessary.
+		 * master smlid or that the SA has stopped responding on the
+		 * redirected desination (if redirect is active).
+		 * Check this and retry if necessary.
 		 */
 		if ((ibmf_status == IBMF_TRANS_TIMEOUT) &&
 		    (sleep_flag == B_TRUE)) {
-			ibmf_status = ibmf_saa_impl_new_smlid_retry(saa_portp,
-			    msgp, ibmf_callback, ibmf_callback_arg,
-			    transport_flags);
+			if (sa_is_redirected == B_TRUE) {
+				ibmf_status = ibmf_saa_impl_revert_to_qp1(
+					saa_portp, msgp, ibmf_callback,
+					    ibmf_callback_arg, transport_flags);
+			} else {
+				ibmf_status = ibmf_saa_impl_new_smlid_retry(
+					saa_portp, msgp, ibmf_callback,
+					    ibmf_callback_arg, transport_flags);
+			}
 		}
 
 		/*
@@ -1477,22 +1493,38 @@ ibmf_saa_impl_send_request(saa_impl_trans_info_t *trans_info)
 		mad_status = b2h16(msgp->im_msgbufs_recv.
 		    im_bufs_mad_hdr->Status);
 
-		if (mad_status != MAD_STATUS_BUSY)
+		if ((mad_status != MAD_STATUS_BUSY) &&
+		    (mad_status != MAD_STATUS_REDIRECT_REQUIRED))
 			break;
 
-		IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L2,
-		    ibmf_saa_impl_send_request, IBMF_TNF_TRACE, "",
-		    "ibmf_saa_impl_send_request: %s, retry_count = %d\n",
-		    tnf_string, msg, "response returned busy status",
-		    tnf_int, retry_count, retry_count);
+		if (mad_status == MAD_STATUS_REDIRECT_REQUIRED) {
+
+			IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L2,
+			    ibmf_saa_impl_send_request, IBMF_TNF_TRACE, "",
+			    "ibmf_saa_impl_send_request: %s, retry_count %d\n",
+			    tnf_string, msg,
+			    "response returned redirect status",
+			    tnf_int, retry_count, retry_count);
+
+			/* update address info and copy it into msgp */
+			ibmf_saa_impl_update_sa_address_info(saa_portp, msgp);
+		} else {
+			IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L2,
+			    ibmf_saa_impl_send_request, IBMF_TNF_TRACE, "",
+			    "ibmf_saa_impl_send_request: %s, retry_count %d\n",
+			    tnf_string, msg, "response returned busy status",
+			    tnf_int, retry_count, retry_count);
+		}
 
 		retry_count++;
 
 		/*
 		 * since this is a blocking call, sleep for some time
-		 * to allow SA to transition from busy state
+		 * to allow SA to transition from busy state (if busy)
 		 */
-		delay(drv_usectohz(IBMF_SAA_BUSY_RETRY_SLEEP_SECS * 1000000));
+		if (mad_status == MAD_STATUS_BUSY)
+			delay(drv_usectohz(
+				IBMF_SAA_BUSY_RETRY_SLEEP_SECS * 1000000));
 	}
 
 	if (ibmf_status != IBMF_SUCCESS) {
@@ -1849,6 +1881,18 @@ ibmf_saa_impl_init_msg(saa_impl_trans_info_t *trans_info, boolean_t sleep_flag,
 	bcopy(&saa_portp->saa_pt_ibmf_addr_info, &ibmf_msg->im_local_addr,
 	    sizeof (ibmf_addr_info_t));
 
+	/* copy global addressing information to message if in use */
+	if (saa_portp->saa_pt_ibmf_msg_flags & IBMF_MSG_FLAGS_GLOBAL_ADDRESS) {
+
+		ibmf_msg->im_msg_flags = IBMF_MSG_FLAGS_GLOBAL_ADDRESS;
+
+		bcopy(&saa_portp->saa_pt_ibmf_global_addr,
+		    &ibmf_msg->im_global_addr,
+		    sizeof (ibmf_global_addr_info_t));
+	} else {
+		ibmf_msg->im_msg_flags = 0;
+	}
+
 	mutex_exit(&saa_portp->saa_pt_mutex);
 
 	*msgp = ibmf_msg;
@@ -2009,6 +2053,141 @@ bail:
 	IBMF_TRACE_1(IBMF_TNF_DEBUG, DPRINT_L3,
 	    ibmf_saa_impl_new_smlid_retry_end,
 	    IBMF_TNF_TRACE, "", "ibmf_saa_impl_new_smlid_retry() exiting"
+	    " ibmf_status = %d\n", tnf_int, result, ibmf_status);
+
+	return (ibmf_status);
+}
+
+/*
+ * ibmf_saa_impl_revert_to_qp1()
+ *
+ * The SA that we had contact with via redirect may fail to respond. If this
+ * occurs SA should revert back to qp1 and the SMLID set in the port.
+ * msg_transport for the message that timed out will be retried with
+ * these new parameters.
+ *
+ * msgp, ibmf_callback, ibmf_callback_arg, and transport flags should be the
+ * same values passed to the original ibmf_msg_transport that timedout.  The
+ * ibmf_retrans parameter will be re-retrieved from the saa_portp structure.
+ *
+ * Input Arguments
+ * saa_portp		pointer to saa_port structure
+ * msgp			ibmf message that timedout
+ * ibmf_callback	callback that should be called by msg_transport
+ * ibmf_callback_arg	args for ibmf_callback
+ * transport_flags	flags for ibmf_msg_transport
+ *
+ * Output Arguments
+ * none
+ *
+ * Returns
+ * none
+ */
+static int
+ibmf_saa_impl_revert_to_qp1(saa_port_t *saa_portp, ibmf_msg_t *msgp,
+    ibmf_msg_cb_t ibmf_callback, void *ibmf_callback_args, int transport_flags)
+{
+	ibt_hca_portinfo_t	*ibt_portinfop;
+	ib_lid_t		master_sm_lid, base_lid;
+	uint8_t			sm_sl;
+	int			subnet_timeout;
+	uint_t			nports, size;
+	ibmf_retrans_t		ibmf_retrans;
+	int			ibmf_status;
+	ibt_status_t		ibt_status;
+
+	IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4,
+	    ibmf_saa_impl_revert_to_qp1_start,
+	    IBMF_TNF_TRACE, "", "ibmf_saa_impl_revert_to_qp1() enter\n");
+
+	_NOTE(ASSUMING_PROTECTED(*msgp))
+	_NOTE(ASSUMING_PROTECTED(*msgp->im_msgbufs_send.im_bufs_mad_hdr))
+
+	/* first query the portinfo to see if the lid changed */
+	ibt_status = ibt_query_hca_ports_byguid(saa_portp->saa_pt_node_guid,
+	    saa_portp->saa_pt_port_num, &ibt_portinfop, &nports, &size);
+
+	if (ibt_status != IBT_SUCCESS)  {
+
+		IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
+		    ibmf_saa_impl_revert_to_qp1_err, IBMF_TNF_ERROR, "",
+		    "ibmf_saa_impl_revert_to_qp1: %s, ibmf_status ="
+		    " %d\n", tnf_string, msg,
+		    "ibt_query_hca_ports_byguid() failed",
+		    tnf_int, ibt_status, ibt_status);
+
+		ibmf_status = IBMF_TRANSPORT_FAILURE;
+
+		goto bail;
+	}
+
+	master_sm_lid = ibt_portinfop->p_sm_lid;
+	base_lid = ibt_portinfop->p_base_lid;
+	sm_sl = ibt_portinfop->p_sm_sl;
+	subnet_timeout = ibt_portinfop->p_subnet_timeout;
+
+	ibt_free_portinfo(ibt_portinfop, size);
+
+
+	mutex_enter(&saa_portp->saa_pt_mutex);
+
+	saa_portp->saa_pt_redirect_active = B_FALSE;
+
+	/* update the address info in ibmf_saa */
+	saa_portp->saa_pt_ibmf_addr_info.ia_local_lid = base_lid;
+	saa_portp->saa_pt_ibmf_addr_info.ia_remote_lid = master_sm_lid;
+	saa_portp->saa_pt_ibmf_addr_info.ia_service_level = sm_sl;
+	saa_portp->saa_pt_ibmf_addr_info.ia_remote_qno = 1;
+	saa_portp->saa_pt_ibmf_addr_info.ia_p_key = IB_PKEY_DEFAULT_LIMITED;
+	saa_portp->saa_pt_ibmf_addr_info.ia_q_key = IB_GSI_QKEY;
+	saa_portp->saa_pt_ibmf_msg_flags = 0;
+
+	/* new tid needed */
+	msgp->im_msgbufs_send.im_bufs_mad_hdr->TransactionID =
+	    h2b64(saa_portp->saa_pt_current_tid++);
+
+	bcopy(&saa_portp->saa_pt_ibmf_retrans, &ibmf_retrans,
+	    sizeof (ibmf_retrans_t));
+
+	/* update the subnet timeout since this may be a new sm/sa */
+	saa_portp->saa_pt_timeout = subnet_timeout;
+
+	/* place upper bound on subnet timeout in case of faulty SM */
+	if (saa_portp->saa_pt_timeout > IBMF_SAA_MAX_SUBNET_TIMEOUT)
+		saa_portp->saa_pt_timeout = IBMF_SAA_MAX_SUBNET_TIMEOUT;
+
+	/* increment the reference count to account for the cpi call */
+	saa_portp->saa_pt_reference_count++;
+
+	mutex_exit(&saa_portp->saa_pt_mutex);
+
+	/* update the address info for this particular message */
+	bcopy(&saa_portp->saa_pt_ibmf_addr_info, &msgp->im_local_addr,
+	    sizeof (ibmf_addr_info_t));
+	msgp->im_msg_flags = 0; /* No GRH */
+
+	/* get the classportinfo again since this may be a new sm/sa */
+	ibmf_saa_impl_get_classportinfo(saa_portp);
+
+	ibmf_status = ibmf_msg_transport(saa_portp->saa_pt_ibmf_handle,
+	    saa_portp->saa_pt_qp_handle, msgp, &ibmf_retrans,
+	    ibmf_callback, ibmf_callback_args, transport_flags);
+
+	if (ibmf_status != IBMF_SUCCESS) {
+
+		IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L2,
+		    ibmf_saa_impl_revert_to_qp1, IBMF_TNF_TRACE, "",
+		    "ibmf_saa_impl_revert_to_qp1: %s, ibmf_status = "
+		    "%d\n", tnf_string, msg,
+		    "ibmf_msg_transport() failed",
+		    tnf_int, ibmf_status, ibmf_status);
+	}
+
+bail:
+
+	IBMF_TRACE_1(IBMF_TNF_DEBUG, DPRINT_L3,
+	    ibmf_saa_impl_revert_to_qp1_end,
+	    IBMF_TNF_TRACE, "", "ibmf_saa_impl_revert_to_qp1() exiting"
 	    " ibmf_status = %d\n", tnf_int, result, ibmf_status);
 
 	return (ibmf_status);
@@ -2371,6 +2550,7 @@ ibmf_saa_async_cb(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp, void *args)
 	int			ibmf_status;
 	boolean_t		ignore_data;
 	ibmf_retrans_t		ibmf_retrans;
+	boolean_t		sa_is_redirected = B_FALSE;
 
 	IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4, ibmf_saa_async_cb_start,
 	    IBMF_TNF_TRACE, "", "ibmf_saa_async_cb() enter\n");
@@ -2380,7 +2560,30 @@ ibmf_saa_async_cb(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp, void *args)
 	client_data = trans_info->si_trans_client_data;
 	saa_portp   = trans_info->si_trans_port;
 
-	if (msgp->im_msg_status == IBMF_TRANS_TIMEOUT) {
+	mutex_enter(&saa_portp->saa_pt_mutex);
+	sa_is_redirected = saa_portp->saa_pt_redirect_active;
+	mutex_exit(&saa_portp->saa_pt_mutex);
+
+	if ((msgp->im_msg_status == IBMF_TRANS_TIMEOUT) &&
+	    (sa_is_redirected == B_TRUE)) {
+
+		/*
+		 * We should retry the request using SM_LID and QP1 if we
+		 * have been using redirect up until now
+		 */
+		ibmf_status = ibmf_saa_impl_revert_to_qp1(
+		    saa_portp, msgp, ibmf_saa_async_cb, args,
+		    trans_info->si_trans_transport_flags);
+
+		/*
+		 * If revert_to_qp1 returns success msg was resent.
+		 * Otherwise msg could not be resent. Continue normally
+		 */
+		if (ibmf_status == IBMF_SUCCESS)
+			goto bail;
+
+	} else if (msgp->im_msg_status == IBMF_TRANS_TIMEOUT) {
+
 
 		ibmf_status = ibmf_saa_impl_new_smlid_retry(saa_portp, msgp,
 		    ibmf_saa_async_cb, args,
@@ -2409,7 +2612,11 @@ ibmf_saa_async_cb(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp, void *args)
 			goto bail;
 	}
 
-	/* if SA returned success but mad status is busy, retry a few times */
+	/*
+	 * If SA returned success but mad status is busy, retry a few times.
+	 * If SA returned success but mad status says redirect is required,
+	 * update the address info and retry the request to the new SA address
+	 */
 	if (msgp->im_msg_status == IBMF_SUCCESS) {
 
 		ASSERT(msgp->im_msgbufs_recv.im_bufs_mad_hdr != NULL);
@@ -2429,6 +2636,34 @@ ibmf_saa_async_cb(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp, void *args)
 
 			trans_info->si_trans_retry_busy_count++;
 
+			bcopy(&saa_portp->saa_pt_ibmf_retrans, &ibmf_retrans,
+			    sizeof (ibmf_retrans_t));
+
+			ibmf_status = ibmf_msg_transport(
+			    saa_portp->saa_pt_ibmf_handle,
+			    saa_portp->saa_pt_qp_handle, msgp, &ibmf_retrans,
+			    ibmf_saa_async_cb, args,
+			    trans_info->si_trans_transport_flags);
+
+			/*
+			 * if retry is successful, quit here since async_cb will
+			 * get called again; otherwise, let this function call
+			 * handle the cleanup
+			 */
+			if (ibmf_status == IBMF_SUCCESS)
+				goto bail;
+		} else if (b2h16(msgp->im_msgbufs_recv.im_bufs_mad_hdr->Status)
+		    == MAD_STATUS_REDIRECT_REQUIRED) {
+
+			IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L2,
+			    ibmf_saa_async_cb, IBMF_TNF_TRACE, "",
+			    "ibmf_saa_async_cb: "
+			    "async response returned redirect status\n");
+
+			/* update address info and copy it into msgp */
+			ibmf_saa_impl_update_sa_address_info(saa_portp, msgp);
+
+			/* retry with new address info */
 			bcopy(&saa_portp->saa_pt_ibmf_retrans, &ibmf_retrans,
 			    sizeof (ibmf_retrans_t));
 
@@ -3221,6 +3456,7 @@ ibmf_saa_impl_set_transaction_params(saa_port_t *saa_portp,
 	 */
 	saa_portp->saa_pt_sa_cap_mask = 0xFFFF;
 
+	saa_portp->saa_pt_ibmf_msg_flags = 0;
 	saa_portp->saa_pt_ibmf_addr_info.ia_remote_qno 	= 1;
 	saa_portp->saa_pt_ibmf_addr_info.ia_p_key 	=
 	    IB_PKEY_DEFAULT_LIMITED;
@@ -3256,6 +3492,154 @@ ibmf_saa_impl_set_transaction_params(saa_port_t *saa_portp,
 	    ibmf_saa_impl_set_transaction_params_end,
 	    IBMF_TNF_TRACE, "",
 	    "ibmf_saa_impl_set_transaction_params() exit\n");
+}
+
+
+/*
+ * ibmf_saa_impl_update_sa_address_info
+ */
+static void
+ibmf_saa_impl_update_sa_address_info(saa_port_t *saa_portp, ibmf_msg_t *msgp)
+{
+	void			*result;
+	ib_sa_hdr_t		*sa_hdr;
+	int			rv;
+	size_t			length;
+	uint16_t		attr_id;
+	ib_mad_classportinfo_t	*cpi;
+	ibmf_global_addr_info_t	*gaddrp = &saa_portp->saa_pt_ibmf_global_addr;
+	ibt_hca_portinfo_t	*ibt_pinfo;
+	uint_t			nports, size;
+	ibt_status_t		ibt_status;
+
+	IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4,
+	    ibmf_saa_impl_update_sa_address_info,
+	    IBMF_TNF_TRACE, "",
+	    "ibmf_saa_impl_update_sa_address_info() enter\n");
+
+	/*
+	 * decode the respons of msgp as a classportinfo attribute
+	 */
+	rv = ibmf_saa_utils_unpack_sa_hdr(msgp->im_msgbufs_recv.im_bufs_cl_hdr,
+	    msgp->im_msgbufs_recv.im_bufs_cl_hdr_len, &sa_hdr, KM_NOSLEEP);
+	if (rv != IBMF_SUCCESS) {
+
+		IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L1,
+		    ibmf_saa_impl_update_sa_address_err,
+		    IBMF_TNF_TRACE, "", "ibmf_saa_impl_update_sa_address_info: "
+		    "%s, ibmf_status = %d\n", tnf_string, msg,
+		    "Could not unpack sa hdr", tnf_int, ibmf_status, rv);
+
+		return;
+	}
+
+	attr_id = b2h16(msgp->im_msgbufs_recv.im_bufs_mad_hdr->AttributeID);
+	if (attr_id != MAD_ATTR_ID_CLASSPORTINFO) {
+		IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L1,
+		    ibmf_saa_impl_update_sa_address_info_err,
+		    IBMF_TNF_TRACE, "", "ibmf_saa_impl_update_sa_address_info: "
+		    "%s, attrID = %x\n", tnf_string, msg,
+		    "Wrong attribute ID", tnf_int, ibmf_status, attr_id);
+
+		kmem_free(sa_hdr, sizeof (ib_sa_hdr_t));
+		return;
+	}
+	rv = ibmf_saa_utils_unpack_payload(
+		msgp->im_msgbufs_recv.im_bufs_cl_data,
+		    msgp->im_msgbufs_recv.im_bufs_cl_data_len, attr_id, &result,
+		    &length, sa_hdr->AttributeOffset, B_TRUE, KM_NOSLEEP);
+	if (rv != IBMF_SUCCESS) {
+
+		IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L1,
+		    ibmf_saa_impl_update_sa_address_err,
+		    IBMF_TNF_TRACE, "", "ibmf_saa_impl_update_sa_address_info: "
+		    "%s, ibmf_status = %d\n", tnf_string, msg,
+		    "Could not unpack payload", tnf_int, ibmf_status, rv);
+
+		kmem_free(sa_hdr, sizeof (ib_sa_hdr_t));
+		return;
+	}
+
+	kmem_free(sa_hdr, sizeof (ib_sa_hdr_t));
+
+	/*
+	 * Use the classportinfo contents to update the SA address info
+	 */
+	cpi = (ib_mad_classportinfo_t *)result;
+	mutex_enter(&saa_portp->saa_pt_mutex);
+	saa_portp->saa_pt_ibmf_addr_info.ia_remote_lid	= cpi->RedirectLID;
+	saa_portp->saa_pt_ibmf_addr_info.ia_remote_qno 	= cpi->RedirectQP;
+	saa_portp->saa_pt_ibmf_addr_info.ia_p_key 	= cpi->RedirectP_Key;
+	saa_portp->saa_pt_ibmf_addr_info.ia_q_key 	= cpi->RedirectQ_Key;
+	saa_portp->saa_pt_ibmf_addr_info.ia_service_level = cpi->RedirectSL;
+
+	saa_portp->saa_pt_redirect_active = B_TRUE;
+
+	if ((cpi->RedirectGID_hi != 0) || (cpi->RedirectGID_lo != 0)) {
+
+		mutex_exit(&saa_portp->saa_pt_mutex);
+		ibt_status = ibt_query_hca_ports_byguid(
+			saa_portp->saa_pt_node_guid, saa_portp->saa_pt_port_num,
+			    &ibt_pinfo, &nports, &size);
+		if (ibt_status != IBT_SUCCESS) {
+
+			IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L1,
+			    ibmf_saa_impl_update_sa_address_err, IBMF_TNF_TRACE,
+			    "", "ibmf_saa_impl_update_sa_address_info: "
+			    "%s, ibt_status = %d\n", tnf_string, msg,
+			    "Could not query hca port",
+			    tnf_int, ibt_status, ibt_status);
+
+			kmem_free(result, length);
+			return;
+		}
+
+		mutex_enter(&saa_portp->saa_pt_mutex);
+		/*
+		 * Fill in global address info parameters
+		 *
+		 * NOTE: The HopLimit value is not specified through the
+		 * contents of ClassPortInfo. It may be possible to find
+		 * out the proper value to use even for SA beeing redirected
+		 * to another subnet. But we do only support redirect within
+		 * our local subnet
+		 */
+		gaddrp->ig_sender_gid.gid_prefix =
+		    ibt_pinfo->p_sgid_tbl[0].gid_prefix;
+		gaddrp->ig_sender_gid.gid_guid = saa_portp->saa_pt_port_guid;
+		gaddrp->ig_recver_gid.gid_prefix = cpi->RedirectGID_hi;
+		gaddrp->ig_recver_gid.gid_guid = cpi->RedirectGID_lo;
+		gaddrp->ig_flow_label = cpi->RedirectFL;
+		gaddrp->ig_tclass = cpi->RedirectTC;
+		gaddrp->ig_hop_limit = 0;
+
+		saa_portp->saa_pt_ibmf_msg_flags =
+		    IBMF_MSG_FLAGS_GLOBAL_ADDRESS;
+
+		mutex_exit(&saa_portp->saa_pt_mutex);
+		ibt_free_portinfo(ibt_pinfo, size);
+	} else {
+		saa_portp->saa_pt_ibmf_msg_flags = 0;
+		mutex_exit(&saa_portp->saa_pt_mutex);
+	}
+	kmem_free(result, length);
+
+	/*
+	 * Update the address info of msgp with the new address parameters
+	 */
+	mutex_enter(&saa_portp->saa_pt_mutex);
+	bcopy(&saa_portp->saa_pt_ibmf_addr_info, &msgp->im_local_addr,
+	    sizeof (ibmf_addr_info_t));
+	if (saa_portp->saa_pt_ibmf_msg_flags & IBMF_MSG_FLAGS_GLOBAL_ADDRESS) {
+
+		msgp->im_msg_flags = IBMF_MSG_FLAGS_GLOBAL_ADDRESS;
+
+		bcopy(&saa_portp->saa_pt_ibmf_global_addr,
+		    &msgp->im_global_addr, sizeof (ibmf_global_addr_info_t));
+	} else {
+		msgp->im_msg_flags = 0;
+	}
+	mutex_exit(&saa_portp->saa_pt_mutex);
 }
 
 /*

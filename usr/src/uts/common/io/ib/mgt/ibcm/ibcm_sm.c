@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -471,6 +470,14 @@ static void		ibcm_return_open_data(ibcm_state_data_t *statep,
 int ibcm_recv_tasks = 0;
 int ibcm_max_recv_tasks = 24;
 int ibcm_recv_timeouts = 0;
+
+/*
+ * Tunable MAX MRA Service Timeout value in MicroSECONDS.
+ *	0 - Tunable parameter not used.
+ *
+ *	Ex:   60000000 - Max MRA Service Delay is 60 Seconds.
+ */
+clock_t ibcm_mra_service_timeout_max = 0;
 
 #ifdef	DEBUG
 
@@ -1018,6 +1025,22 @@ new_req:
 			IBCM_REF_CNT_DECR(statep);
 			statep->state = IBCM_STATE_DELETE;
 			mutex_exit(&statep->state_mutex);
+			/* HCA res cnt decremented via ibcm_delete_state_data */
+			ibcm_inc_hca_res_cnt(hcap);
+			ibcm_delete_state_data(statep);
+			return;
+		}
+
+		/* Allocate dreq_msg buf to be used during teardown. */
+		if (ibcm_alloc_out_msg(cm_mad_addr->ibmf_hdl,
+		    &statep->dreq_msg, MAD_METHOD_SEND) != IBT_SUCCESS) {
+
+			IBCM_REF_CNT_DECR(statep);
+			statep->state = IBCM_STATE_DELETE;
+			mutex_exit(&statep->state_mutex);
+			IBTF_DPRINTF_L2(cmlog, "ibcm_process_req_msg: "
+			    "statep 0x%p: Failed to allocate dreq_msg", statep);
+
 			/* HCA res cnt decremented via ibcm_delete_state_data */
 			ibcm_inc_hca_res_cnt(hcap);
 			ibcm_delete_state_data(statep);
@@ -1919,6 +1942,7 @@ ibcm_process_mra_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 	    ((statep->state == IBCM_STATE_ESTABLISHED) &&
 	    (statep->ap_state == IBCM_AP_STATE_LAP_SENT))) {
 		timeout_id_t	timer_val = statep->timerid;
+		clock_t		service_timeout;
 
 		if (statep->state == IBCM_STATE_REQ_SENT) {
 			mra_msg = IBT_CM_MRA_TYPE_REQ;
@@ -1937,6 +1961,23 @@ ibcm_process_mra_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 
 		(void) untimeout(timer_val);
 
+		service_timeout =
+		    ibt_ib2usec(mra_msgp->mra_service_timeout_plus >> 3);
+
+		/*
+		 * If tunable MAX MRA Service Timeout parameter is set, then
+		 * verify whether the requested timer value exceeds the MAX
+		 * value and reset the timer value to the MAX value.
+		 */
+		if (ibcm_mra_service_timeout_max &&
+		    ibcm_mra_service_timeout_max < service_timeout) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_process_mra_msg: "
+			    "Unexpected MRA Service Timeout value (%ld), Max "
+			    "allowed is (%ld)", service_timeout,
+			    ibcm_mra_service_timeout_max);
+			service_timeout = ibcm_mra_service_timeout_max;
+		}
+
 		/*
 		 * Invoke client handler to pass the MRA private data
 		 */
@@ -1953,8 +1994,7 @@ ibcm_process_mra_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 
 			event.cm_event.mra.mra_msg_type = mra_msg;
 
-			event.cm_event.mra.mra_service_time = ibt_ib2usec(
-			    mra_msgp->mra_service_timeout_plus >> 3);
+			event.cm_event.mra.mra_service_time = service_timeout;
 
 			/* Client cannot return private data */
 			(void) statep->cm_handler(statep->state_cm_private,
@@ -1979,8 +2019,7 @@ ibcm_process_mra_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 			 */
 			statep->timer_stored_state = statep->state;
 			statep->timer_value = statep->pkt_life_time +
-			    ibt_ib2usec(mra_msgp->mra_service_timeout_plus
-			    >> 3);
+			    service_timeout;
 			statep->timerid = IBCM_TIMEOUT(statep,
 			    statep->timer_value);
 		}
@@ -2783,12 +2822,12 @@ ibcm_process_drep_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 		}
 
 		/* copy the private to close channel, if specified */
-		if ((statep->close_priv_data != NULL) &&
-		    (statep->close_priv_data_len != NULL) &&
-		    (*statep->close_priv_data_len > 0)) {
+		if ((statep->close_ret_priv_data != NULL) &&
+		    (statep->close_ret_priv_data_len != NULL) &&
+		    (*statep->close_ret_priv_data_len > 0)) {
 			bcopy(drep_msgp->drep_private_data,
-			    statep->close_priv_data,
-			    min(*statep->close_priv_data_len,
+			    statep->close_ret_priv_data,
+			    min(*statep->close_ret_priv_data_len,
 				IBT_DREP_PRIV_DATA_SZ));
 		}
 
@@ -4058,8 +4097,8 @@ ibcm_process_dreq_timeout(ibcm_state_data_t *statep)
 
 	/* signal waiting CVs - blocking in ibt_close_channel() */
 	statep->close_done = B_TRUE;
-	if (statep->close_priv_data_len != NULL)
-		*statep->close_priv_data_len = 0;
+	if (statep->close_ret_priv_data_len != NULL)
+		*statep->close_ret_priv_data_len = 0;
 
 	/* unblock any close channel with no callbacks option */
 	statep->close_nocb_state = IBCM_FAIL;
@@ -4168,6 +4207,7 @@ ibcm_process_tlist()
 		}
 		mutex_exit(&ibcm_timeout_list_lock);
 		ibcm_check_for_opens();
+		ibcm_check_for_async_close();
 		mutex_enter(&ibcm_timeout_list_lock);
 
 		/* First, handle pending RC statep's, followed by UD's */

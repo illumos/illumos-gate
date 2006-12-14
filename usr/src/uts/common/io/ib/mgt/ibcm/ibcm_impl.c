@@ -220,6 +220,13 @@ ibcm_flow_t ibcm_saa_flow;
 ibcm_flow_t ibcm_close_flow;
 ibcm_flow_t ibcm_lapr_flow;
 
+/* NONBLOCKING close requests are queued */
+struct ibcm_close_s {
+	kmutex_t		mutex;
+	ibcm_state_data_t	*tail;
+	ibcm_state_data_t	head;
+} ibcm_close;
+
 static ibt_clnt_modinfo_t ibcm_ibt_modinfo = {	/* Client's modinfop */
 	IBTI_V2,
 	IBT_CM,
@@ -846,6 +853,8 @@ ibcm_hca_attach(ib_guid_t hcaguid)
 
 	/* Store the static hca attribute data */
 	hcap->hca_caps = hca_attrs.hca_flags;
+	hcap->hca_vendor_id = hca_attrs.hca_vendor_id;
+	hcap->hca_device_id = hca_attrs.hca_device_id;
 	hcap->hca_ack_delay = hca_attrs.hca_local_ack_delay;
 	hcap->hca_max_rdma_in_qp = hca_attrs.hca_max_rdma_in_qp;
 	hcap->hca_max_rdma_out_qp = hca_attrs.hca_max_rdma_out_qp;
@@ -1568,12 +1577,19 @@ ibcm_rc_flow_control_init(void)
 	ibcm_open.tail 			= &ibcm_open.head;
 	ibcm_open.head.open_link 	= NULL;
 	mutex_exit(&ibcm_open.mutex);
+
+	mutex_init(&ibcm_close.mutex, NULL, MUTEX_DEFAULT, NULL);
+	mutex_enter(&ibcm_close.mutex);
+	ibcm_close.tail			= &ibcm_close.head;
+	ibcm_close.head.close_link 	= NULL;
+	mutex_exit(&ibcm_close.mutex);
 }
 
 static void
 ibcm_rc_flow_control_fini(void)
 {
 	mutex_destroy(&ibcm_open.mutex);
+	mutex_destroy(&ibcm_close.mutex);
 }
 
 static ibcm_flow1_t *
@@ -1700,6 +1716,37 @@ ibcm_flow_dec(hrtime_t time, char *mad_type)
 		ibcm_flow_exit(&ibcm_close_flow);
 	if (run)
 		ibcm_run_tlist_thread();
+}
+
+void
+ibcm_close_enqueue(ibcm_state_data_t *statep)
+{
+	mutex_enter(&ibcm_close.mutex);
+	statep->close_link = NULL;
+	ibcm_close.tail->close_link = statep;
+	ibcm_close.tail = statep;
+	mutex_exit(&ibcm_close.mutex);
+	ibcm_run_tlist_thread();
+}
+
+void
+ibcm_check_for_async_close()
+{
+	ibcm_state_data_t 	*statep;
+
+	mutex_enter(&ibcm_close.mutex);
+
+	while (ibcm_close.head.close_link) {
+		statep = ibcm_close.head.close_link;
+		ibcm_close.head.close_link = statep->close_link;
+		statep->close_link = NULL;
+		if (ibcm_close.tail == statep)
+			ibcm_close.tail = &ibcm_close.head;
+		mutex_exit(&ibcm_close.mutex);
+		ibcm_close_start(statep);
+		mutex_enter(&ibcm_close.mutex);
+	}
+	mutex_exit(&ibcm_close.mutex);
 }
 
 void

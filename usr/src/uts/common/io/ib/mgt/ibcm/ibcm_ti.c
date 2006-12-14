@@ -55,12 +55,25 @@ static void		ibcm_process_async_join_mcg(void *tq_arg);
 static ibt_status_t ibcm_get_node_rec(ibmf_saa_handle_t, sa_node_record_t *,
     uint64_t c_mask, void *, size_t *);
 
+static ibt_status_t ibcm_close_rc_channel(ibt_channel_hdl_t channel,
+    ibcm_state_data_t *statep, ibt_execution_mode_t mode);
+
 /* Address Record management definitions */
 #define	IBCM_DAPL_ATS_NAME	"DAPL Address Translation Service"
 #define	IBCM_DAPL_ATS_SID	0x10000CE100415453ULL
 #define	IBCM_DAPL_ATS_NBYTES	16
 ibcm_svc_info_t *ibcm_ar_svcinfop;
 ibcm_ar_t	*ibcm_ar_list;
+
+/*
+ * Tunable parameter to turnoff the overriding of pi_path_mtu value.
+ *	1 	By default override the path record's pi_path_mtu value to
+ *		IB_MTU_1K for all RC channels. This is done only for the
+ *		channels established on Tavor HCA and the path's pi_path_mtu
+ *		is greater than IB_MTU_1K.
+ *	0	Do not override, use pi_path_mtu by default.
+ */
+int	ibcm_override_path_mtu = 1;
 
 #ifdef DEBUG
 static void	ibcm_print_reply_addr(ibt_channel_hdl_t channel,
@@ -112,7 +125,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	boolean_t		alternate_grh = B_FALSE;
 	ib_lid_t		base_lid;
 	ib_com_id_t		local_comid;
-	ibmf_msg_t		*ibmf_msg;
+	ibmf_msg_t		*ibmf_msg, *ibmf_msg_dreq;
 	ibcm_req_msg_t		*req_msgp;
 
 	uint8_t			rdma_in, rdma_out;
@@ -486,11 +499,23 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		return (IBT_INSUFF_KERNEL_RESOURCE);
 	}
 
-	/* allocate an IBMF mad buffer */
+	/* allocate an IBMF mad buffer (REQ) */
 	if ((status = ibcm_alloc_out_msg(ibmf_hdl, &ibmf_msg,
 	    MAD_METHOD_SEND)) != IBT_SUCCESS) {
 		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: "
 		    "chan 0x%p ibcm_alloc_out_msg failed", channel);
+		ibcm_release_qp(cm_qp_entry);
+		ibcm_free_comid(hcap, local_comid);
+		ibcm_dec_hca_acc_cnt(hcap);
+		return (status);
+	}
+
+	/* allocate an IBMF mad buffer (DREQ) */
+	if ((status = ibcm_alloc_out_msg(ibmf_hdl, &ibmf_msg_dreq,
+	    MAD_METHOD_SEND)) != IBT_SUCCESS) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: "
+		    "chan 0x%p ibcm_alloc_out_msg failed", channel);
+		(void) ibcm_free_out_msg(ibmf_hdl, &ibmf_msg);
 		ibcm_release_qp(cm_qp_entry);
 		ibcm_free_comid(hcap, local_comid);
 		ibcm_dec_hca_acc_cnt(hcap);
@@ -530,6 +555,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 			ibcm_free_comid(hcap, local_comid);
 			ibcm_dec_hca_acc_cnt(hcap);
 			(void) ibcm_free_out_msg(ibmf_hdl, &ibmf_msg);
+			(void) ibcm_free_out_msg(ibmf_hdl, &ibmf_msg_dreq);
 			return (status);
 		} else
 			IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: "
@@ -567,6 +593,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	IBCM_SET_CHAN_PRIVATE(statep->channel, statep);
 
 	statep->stored_msg = ibmf_msg;
+	statep->dreq_msg = ibmf_msg_dreq;
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*req_msgp))
 
@@ -652,8 +679,20 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		req_msgp->req_max_cm_retries_plus |= (1 << 3);
 	}
 
-	req_msgp->req_mtu_plus = chan_args->oc_path->pi_path_mtu << 4 |
-	    chan_args->oc_path_rnr_retry_cnt;
+	/*
+	 * By default on Tavor, we override the PathMTU to 1K.
+	 * To turn this off, set ibcm_override_path_mtu = 0.
+	 */
+	if (ibcm_override_path_mtu && IBCM_IS_HCA_TAVOR(hcap) &&
+	    (chan_args->oc_path->pi_path_mtu > IB_MTU_1K)) {
+		req_msgp->req_mtu_plus = IB_MTU_1K << 4 |
+		    chan_args->oc_path_rnr_retry_cnt;
+		IBTF_DPRINTF_L3(cmlog, "ibt_open_rc_channel: chan 0x%p PathMTU"
+		    " overidden to IB_MTU_1K(%d) from %d", channel, IB_MTU_1K,
+		    chan_args->oc_path->pi_path_mtu);
+	} else
+		req_msgp->req_mtu_plus = chan_args->oc_path->pi_path_mtu << 4 |
+		    chan_args->oc_path_rnr_retry_cnt;
 
 	IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p CM retry cnt %d"
 	    " staring PSN %x", channel, cm_retries, starting_psn);
@@ -1159,9 +1198,7 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
     void *priv_data, ibt_priv_data_len_t priv_data_len, uint8_t *ret_status,
     void *ret_priv_data, ibt_priv_data_len_t *ret_priv_data_len_p)
 {
-	ibcm_hca_info_t		*hcap;
 	ibcm_state_data_t	*statep;
-	ibt_status_t		status;
 
 	IBTF_DPRINTF_L3(cmlog, "ibt_close_rc_channel(%p, %x, %p, %d, %p)",
 	    channel, mode, priv_data, priv_data_len,
@@ -1196,41 +1233,94 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 		return (IBT_INVALID_PARAM);
 	}
 
+	if (ibtl_cm_is_chan_closing(channel) ||
+	    ibtl_cm_is_chan_closed(channel)) {
+		if (ret_status)
+			*ret_status = IBT_CM_CLOSED_ALREADY;
+
+		/* No private data to return to the client */
+		if (ret_priv_data_len_p != NULL)
+			*ret_priv_data_len_p = 0;
+
+		IBTF_DPRINTF_L3(cmlog, "ibt_close_rc_channel: chan 0x%p "
+		    "already marked for closing", channel);
+
+		return (IBT_SUCCESS);
+	}
+
 	/* get the statep */
 	IBCM_GET_CHAN_PRIVATE(channel, statep);
-
 	if (statep == NULL) {
-
 		IBTF_DPRINTF_L2(cmlog, "ibt_close_rc_channel: chan 0x%p "
 		    "statep NULL", channel);
-		if (ibtl_cm_is_chan_closing(channel) ||
-		    ibtl_cm_is_chan_closed(channel)) {
-			if (ret_status)
-				*ret_status = IBT_CM_CLOSED_ALREADY;
-
-			/* No private data to return to the client */
-			if (ret_priv_data_len_p != NULL)
-				*ret_priv_data_len_p = 0;
-
-			return (IBT_SUCCESS);
-		}
 		return (IBT_CHAN_STATE_INVALID);
 	}
 
 	mutex_enter(&statep->state_mutex);
+
+	if (statep->dreq_msg == NULL) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_close_rc_channel: chan 0x%p "
+		    "Fatal Error: dreq_msg is NULL", channel);
+		IBCM_RELEASE_CHAN_PRIVATE(channel);
+		mutex_exit(&statep->state_mutex);
+		return (IBT_CHAN_STATE_INVALID);
+	}
+
+	if ((ret_priv_data == NULL) || (ret_priv_data_len_p == NULL)) {
+		statep->close_ret_priv_data = NULL;
+		statep->close_ret_priv_data_len = NULL;
+	} else {
+		statep->close_ret_priv_data = ret_priv_data;
+		statep->close_ret_priv_data_len = ret_priv_data_len_p;
+	}
+
+	priv_data_len = min(priv_data_len, IBT_DREQ_PRIV_DATA_SZ);
+	if ((priv_data != NULL) && (priv_data_len > 0)) {
+		bcopy(priv_data, ((ibcm_dreq_msg_t *)
+		    IBCM_OUT_MSGP(statep->dreq_msg))->dreq_private_data,
+		    priv_data_len);
+	}
+	statep->close_ret_status = ret_status;
+
 	IBCM_RELEASE_CHAN_PRIVATE(channel);
 	IBCM_REF_CNT_INCR(statep);
+
+	if (mode != IBT_NONBLOCKING) {
+		return (ibcm_close_rc_channel(channel, statep, mode));
+	}
+
+	/* IBT_NONBLOCKING */
+	ibcm_close_enqueue(statep);
 	mutex_exit(&statep->state_mutex);
 
-	IBTF_DPRINTF_L3(cmlog, "ibt_close_rc_channel: chan 0x%p statep %p",
+	return (IBT_SUCCESS);
+}
+
+void
+ibcm_close_start(ibcm_state_data_t *statep)
+{
+	mutex_enter(&statep->state_mutex);
+	(void) ibcm_close_rc_channel(statep->channel, statep, IBT_NONBLOCKING);
+}
+
+static
+ibt_status_t
+ibcm_close_rc_channel(ibt_channel_hdl_t channel, ibcm_state_data_t *statep,
+    ibt_execution_mode_t mode)
+{
+	ibcm_hca_info_t		*hcap;
+
+	_NOTE(LOCK_RELEASED_AS_SIDE_EFFECT(&statep->state_mutex));
+	ASSERT(MUTEX_HELD(&statep->state_mutex));
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_close_rc_channel: chan 0x%p statep %p",
 	    channel, statep);
 
-	mutex_enter(&statep->state_mutex);
 	hcap = statep->hcap;
 
 	/* HCA must have been in active state. If not, it's a client bug */
 	if (!IBCM_ACCESS_HCA_OK(hcap)) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_close_rc_channel: chan 0x%p "
+		IBTF_DPRINTF_L2(cmlog, "ibcm_close_rc_channel: chan 0x%p "
 		    "hcap 0x%p not active", channel, hcap);
 		IBCM_REF_CNT_DECR(statep);
 		mutex_exit(&statep->state_mutex);
@@ -1246,18 +1336,16 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 	while (statep->state == IBCM_STATE_TRANSIENT_DREQ_SENT)
 		cv_wait(&statep->block_mad_cv, &statep->state_mutex);
 
-	IBTF_DPRINTF_L4(cmlog, "ibt_close_rc_channel: chan 0x%p "
+	IBTF_DPRINTF_L4(cmlog, "ibcm_close_rc_channel: chan 0x%p "
 	    "connection state is %x", channel, statep->state);
-
-	statep->close_ret_status = ret_status;
 
 	/* If state is in pre-established states, abort the connection est */
 	if (statep->state != IBCM_STATE_ESTABLISHED) {
 		statep->cm_retries++;	/* ensure connection trace is dumped */
 
 		/* No DREP private data possible */
-		if (ret_priv_data_len_p != NULL)
-			*ret_priv_data_len_p = 0;
+		if (statep->close_ret_priv_data_len != NULL)
+			*statep->close_ret_priv_data_len = 0;
 
 		/*
 		 * If waiting for a response mad, then cancel the timer,
@@ -1270,7 +1358,7 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 			timeout_id_t		timer_val = statep->timerid;
 			ibcm_conn_state_t	old_state;
 
-			IBTF_DPRINTF_L4(cmlog, "ibt_close_rc_channel: "
+			IBTF_DPRINTF_L4(cmlog, "ibcm_close_rc_channel: "
 			    "chan 0x%p connection aborted in state %x", channel,
 			    statep->state);
 
@@ -1304,17 +1392,17 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 				(void) untimeout(timer_val);
 
 			/* wait until cm handler returns for BLOCKING cases */
+			mutex_enter(&statep->state_mutex);
 			if ((mode == IBT_BLOCKING) ||
 			    (mode == IBT_NOCALLBACKS)) {
-				mutex_enter(&statep->state_mutex);
 				while (statep->close_done != B_TRUE)
 					cv_wait(&statep->block_client_cv,
 					    &statep->state_mutex);
-				mutex_exit(&statep->state_mutex);
 			}
 
-			if (ret_status)
-				*ret_status = IBT_CM_CLOSED_ABORT;
+			if (statep->close_ret_status)
+				*statep->close_ret_status = IBT_CM_CLOSED_ABORT;
+			mutex_exit(&statep->state_mutex);
 
 			/*
 			 * It would ideal to post a REJ MAD, but that would
@@ -1336,7 +1424,7 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 			/* take control of statep */
 			statep->abort_flag |= IBCM_ABORT_CLIENT;
 
-			IBTF_DPRINTF_L4(cmlog, "ibt_close_rc_channel: "
+			IBTF_DPRINTF_L4(cmlog, "ibcm_close_rc_channel: "
 			    "chan 0x%p connection aborted in state = %x",
 			    channel, statep->state);
 
@@ -1353,15 +1441,15 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 			if (mode == IBT_NOCALLBACKS)
 				statep->cm_handler = NULL;
 			IBCM_REF_CNT_DECR(statep);
-			mutex_exit(&statep->state_mutex);
 
 			/*
 			 * In rare situations, connection attempt could be
 			 * terminated for some other reason, before abort is
 			 * processed, but CM still returns ret_status as abort
 			 */
-			if (ret_status)
-				*ret_status = IBT_CM_CLOSED_ABORT;
+			if (statep->close_ret_status)
+				*statep->close_ret_status = IBT_CM_CLOSED_ABORT;
+			mutex_exit(&statep->state_mutex);
 
 			/*
 			 * REJ MAD is posted by the CM state machine for this
@@ -1375,11 +1463,12 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 
 			/* State already in timewait, so no return priv data */
 			IBCM_REF_CNT_DECR(statep);
-			mutex_exit(&statep->state_mutex);
 
 			/* The teardown has already been done */
-			if (ret_status)
-				*ret_status = IBT_CM_CLOSED_ALREADY;
+			if (statep->close_ret_status)
+				*statep->close_ret_status =
+				    IBT_CM_CLOSED_ALREADY;
+			mutex_exit(&statep->state_mutex);
 
 			return (IBT_SUCCESS);
 
@@ -1406,8 +1495,9 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 					cv_wait(&statep->block_client_cv,
 					    &statep->state_mutex);
 				statep->cm_handler = NULL; /* sanity setting */
-				if (ret_status)
-					*ret_status = IBT_CM_CLOSED_ALREADY;
+				if (statep->close_ret_status)
+					*statep->close_ret_status =
+					    IBT_CM_CLOSED_ALREADY;
 			} else if (mode == IBT_BLOCKING) {
 				/* wait until state is moved to timewait */
 				while (statep->close_done != B_TRUE)
@@ -1436,8 +1526,8 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 					    &statep->state_mutex);
 			}
 
-			if (ret_status)
-				*ret_status = IBT_CM_CLOSED_ABORT;
+			if (statep->close_ret_status)
+				*statep->close_ret_status = IBT_CM_CLOSED_ABORT;
 			IBCM_REF_CNT_DECR(statep);
 			mutex_exit(&statep->state_mutex);
 
@@ -1456,7 +1546,7 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 		statep->close_nocb_state = IBCM_FAIL;
 		statep->cm_handler = NULL;
 		ibtl_cm_chan_is_closing(statep->channel);
-		IBTF_DPRINTF_L4(cmlog, "ibt_close_rc_channel: "
+		IBTF_DPRINTF_L4(cmlog, "ibcm_close_rc_channel: "
 		    "NOCALLBACKS on in statep = %p", statep);
 	}
 	mutex_exit(&statep->state_mutex);
@@ -1486,40 +1576,6 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 	statep->close_flow = 1;
 	mutex_exit(&statep->state_mutex);
 
-	if (statep->dreq_msg == NULL) {
-		if ((status = ibcm_alloc_out_msg(
-		    statep->stored_reply_addr.ibmf_hdl, &statep->dreq_msg,
-		    MAD_METHOD_SEND)) != IBT_SUCCESS) {
-
-			IBTF_DPRINTF_L2(cmlog, "ibt_close_rc_channel: "
-			    "chan 0x%p ibcm_alloc_out_msg failed ", channel);
-			mutex_enter(&statep->state_mutex);
-			ibcm_close_exit();
-			statep->state = IBCM_STATE_ESTABLISHED;
-			IBCM_REF_CNT_DECR(statep);
-			cv_broadcast(&statep->block_mad_cv);
-			statep->close_flow = 0;
-			mutex_exit(&statep->state_mutex);
-			return (status);
-		}
-	} else
-		IBTF_DPRINTF_L3(cmlog, "ibt_close_rc_channel: "
-		    "DREQ MAD already allocated in statep %p", statep);
-
-	if ((ret_priv_data == NULL) || (ret_priv_data_len_p == NULL)) {
-		statep->close_priv_data = NULL;
-		statep->close_priv_data_len = NULL;
-	} else {
-		statep->close_priv_data = ret_priv_data;
-		statep->close_priv_data_len = ret_priv_data_len_p;
-	}
-
-	priv_data_len = min(priv_data_len, IBT_DREQ_PRIV_DATA_SZ);
-	if ((priv_data != NULL) && (priv_data_len > 0))
-		bcopy(priv_data, ((ibcm_dreq_msg_t *)
-		    IBCM_OUT_MSGP(statep->dreq_msg))->dreq_private_data,
-		    priv_data_len);
-
 	ibcm_post_dreq_mad(statep);
 
 	mutex_enter(&statep->state_mutex);
@@ -1532,7 +1588,7 @@ lost_race:
 			cv_wait(&statep->block_client_cv,
 			    &statep->state_mutex);
 
-		IBTF_DPRINTF_L4(cmlog, "ibt_close_rc_channel: chan 0x%p "
+		IBTF_DPRINTF_L4(cmlog, "ibcm_close_rc_channel: chan 0x%p "
 		    "done blocking", channel);
 	}
 
@@ -1540,7 +1596,7 @@ lost_race:
 	mutex_exit(&statep->state_mutex);
 
 	/* If this message isn't seen then ibt_close_rc_channel failed */
-	IBTF_DPRINTF_L5(cmlog, "ibt_close_rc_channel: chan 0x%p done",
+	IBTF_DPRINTF_L5(cmlog, "ibcm_close_rc_channel: chan 0x%p done",
 	    channel);
 
 	return (IBT_SUCCESS);
@@ -4029,7 +4085,7 @@ ibt_cm_ud_proceed(void *session_id, ibt_channel_hdl_t ud_channel,
 	/* the state machine processing is done in a separate thread */
 
 	/* proceed_targs is freed in ibcm_proceed_via_taskq */
-	proceed_targs = kmem_alloc(sizeof (ibcm_proceed_targs_t),
+	proceed_targs = kmem_zalloc(sizeof (ibcm_proceed_targs_t),
 	    KM_SLEEP);
 
 	proceed_targs->status = status;

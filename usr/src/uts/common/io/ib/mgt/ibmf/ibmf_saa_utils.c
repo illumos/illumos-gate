@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,6 +77,7 @@
 extern	int	ibmf_trace_level;
 
 /* These functions have only been tested on a big-endian system */
+static void ibmf_saa_classportinfo_parse_buffer(uchar_t *buffer, void *record);
 static void ibmf_saa_notice_parse_buffer(uchar_t *buffer, void *record);
 static void ibmf_saa_informinfo_parse_buffer(uchar_t *buffer, void *record);
 static void ibmf_saa_node_record_parse_buffer(uchar_t *buffer, void *record);
@@ -112,6 +112,7 @@ static void ibmf_saa_multipath_record_parse_buffer(uchar_t *buffer,
 static void ibmf_saa_service_assn_record_parse_buffer(uchar_t *buffer,
     void *record);
 
+static void ibmf_saa_classportinfo_to_buf(void *record, uchar_t *buffer);
 static void ibmf_saa_notice_to_buf(void *record, uchar_t *buffer);
 static void ibmf_saa_informinfo_to_buf(void *record, uchar_t *buffer);
 static void ibmf_saa_node_record_to_buf(void *record, uchar_t *buffer);
@@ -155,9 +156,17 @@ static void ibmf_saa_service_assn_record_to_buf(void *record, uchar_t *buffer);
  */
 
 static void
+ibmf_saa_classportinfo_parse_buffer(uchar_t *buffer, void *record)
+{
+	ib_mad_classportinfo_t	*cpi = (ib_mad_classportinfo_t *)record;
+
+	ibmf_utils_unpack_data("2csl2Ll2s2l2Ll2s2l", buffer,
+	    IB_MAD_CLASSPORTINFO_SIZE, cpi, sizeof (ib_mad_classportinfo_t));
+}
+
+static void
 ibmf_saa_notice_parse_buffer(uchar_t *buffer, void *record)
 {
-
 	ib_mad_notice_t		*notice = (ib_mad_notice_t *)record;
 
 	ibmf_utils_unpack_data("4c3s54c2L", buffer, IB_MAD_NOTICE_SIZE,
@@ -553,9 +562,18 @@ ibmf_saa_sysimg_guid_chg_trap_parse_buffer(uchar_t *buffer,
  */
 
 static void
+ibmf_saa_classportinfo_to_buf(void *record, uchar_t *buffer)
+{
+	ib_mad_classportinfo_t	*cpi = (ib_mad_classportinfo_t *)record;
+
+	ibmf_utils_pack_data("2csl2Ll2s2l2Ll2s2l",
+	    cpi, sizeof (ib_mad_classportinfo_t),
+	    buffer, IB_MAD_CLASSPORTINFO_SIZE);
+}
+
+static void
 ibmf_saa_notice_to_buf(void *record, uchar_t *buffer)
 {
-
 	ib_mad_notice_t		*notice = (ib_mad_notice_t *)record;
 
 	ibmf_utils_pack_data("4c3s54c2L", notice, sizeof (ib_mad_notice_t),
@@ -968,6 +986,11 @@ ibmf_saa_utils_pack_payload(uchar_t *structs_payload, size_t
 	ASSERT(attr_id != SA_TRACERECORD_ATTRID);
 
 	switch (attr_id) {
+		case SA_CLASSPORTINFO_ATTRID:
+			struct_size = sizeof (ib_mad_classportinfo_t);
+			buf_size = IB_MAD_CLASSPORTINFO_SIZE;
+			pack_data_fn = ibmf_saa_classportinfo_to_buf;
+			break;
 		case SA_NOTICE_ATTRID:
 			struct_size = sizeof (ib_mad_notice_t);
 			buf_size = IB_MAD_NOTICE_SIZE;
@@ -1151,6 +1174,11 @@ ibmf_saa_utils_unpack_payload(uchar_t *buf_payload, size_t buf_payload_length,
 	}
 
 	switch (attr_id) {
+		case SA_CLASSPORTINFO_ATTRID:
+			struct_size = sizeof (ib_mad_classportinfo_t);
+			buf_size = IB_MAD_CLASSPORTINFO_SIZE;
+			unpack_data_fn = ibmf_saa_classportinfo_parse_buffer;
+			break;
 		case SA_NOTICE_ATTRID:
 			struct_size = sizeof (ib_mad_notice_t);
 			buf_size = IB_MAD_NOTICE_SIZE;

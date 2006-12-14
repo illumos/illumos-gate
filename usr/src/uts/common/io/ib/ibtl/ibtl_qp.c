@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -186,7 +185,7 @@ ibt_alloc_qp(ibt_hca_hdl_t hca_hdl, ibt_qp_type_t type,
 	hca_hdl->ha_qp_cnt++;
 	mutex_exit(&hca_hdl->ha_mutex);
 
-	IBTF_DPRINTF_L2(ibtf_qp, "ibt_alloc_qp: SUCCESS: qp %p owned by '%s'",
+	IBTF_DPRINTF_L3(ibtf_qp, "ibt_alloc_qp: SUCCESS: qp %p owned by '%s'",
 	    chanp, hca_hdl->ha_clnt_devp->clnt_name);
 
 	*ibt_qp_p = chanp;
@@ -572,7 +571,7 @@ ibtl_cm_chan_is_closed(ibt_channel_hdl_t chan)
 		/* decrement ha_qpn_cnt and check for close in progress */
 		ibtl_close_hca_check(ibtl_hca);
 	} else
-		IBTF_DPRINTF_L1(ibtf_qp, "ibtl_cm_chan_is_closed: "
+		IBTF_DPRINTF_L2(ibtf_qp, "ibtl_cm_chan_is_closed: "
 		    "ibc_release_qpn failed: status = %d\n", status);
 	ibtl_qp_flow_control_exit();
 }
@@ -593,7 +592,7 @@ ibtl_cm_chan_is_reused(ibt_channel_hdl_t chan)
 	    IBTL_RC_QP_CONNECTED));
 
 	/* channel is no longer in closed state, shall be re-used */
-	chan->ch_transport.rc.rc_free_flags &= ~IBTL_RC_QP_CLOSED;
+	chan->ch_transport.rc.rc_free_flags = 0;
 
 	mutex_exit(&ibtl_free_qp_mutex);
 
@@ -650,7 +649,7 @@ ibt_free_qp(ibt_qp_hdl_t ibt_qp)
 				mutex_enter(&ibtl_hca->ha_mutex);
 				ibtl_hca->ha_qp_cnt--;
 				mutex_exit(&ibtl_hca->ha_mutex);
-				IBTF_DPRINTF_L2(ibtf_qp, "ibt_free_qp(%p) - "
+				IBTF_DPRINTF_L3(ibtf_qp, "ibt_free_qp(%p) - "
 				    "SUCCESS", ibt_qp);
 			} else
 				IBTF_DPRINTF_L2(ibtf_qp, "ibt_free_qp: "
@@ -673,7 +672,7 @@ ibt_free_qp(ibt_qp_hdl_t ibt_qp)
 		mutex_enter(&ibtl_hca->ha_mutex);
 		ibtl_hca->ha_qp_cnt--;
 		mutex_exit(&ibtl_hca->ha_mutex);
-		IBTF_DPRINTF_L2(ibtf_qp, "ibt_free_qp(%p) - SUCCESS", ibt_qp);
+		IBTF_DPRINTF_L3(ibtf_qp, "ibt_free_qp(%p) - SUCCESS", ibt_qp);
 	} else {
 		IBTF_DPRINTF_L2(ibtf_qp, "ibt_free_qp: "
 		    "ibc_free_qp failed with error %d", status);
@@ -848,7 +847,7 @@ ibt_migrate_path(ibt_channel_hdl_t rc_chan)
 	ibt_cep_modify_flags_t	cep_flags;
 	int			retries = 1;
 
-	IBTF_DPRINTF_L2(ibtf_qp, "ibt_migrate_path: channel %p", rc_chan);
+	IBTF_DPRINTF_L3(ibtf_qp, "ibt_migrate_path: channel %p", rc_chan);
 
 	if (rc_chan->ch_qp.qp_type != IBT_RC_SRV) {
 		IBTF_DPRINTF_L2(ibtf_qp, "ibt_migrate_path: "

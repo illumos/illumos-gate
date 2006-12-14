@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -455,12 +454,14 @@ typedef struct ibcm_state_data_s {
 	/* Return data pointers in various cm api calls */
 	ibt_rc_returns_t	*open_return_data;
 	ibt_ap_returns_t	*ap_return_data;
-	uint8_t			*close_priv_data;
-	ibt_priv_data_len_t	*close_priv_data_len;
+	uint8_t			*close_ret_priv_data;
+	ibt_priv_data_len_t	*close_ret_priv_data_len;
 	uint8_t			*close_ret_status;
 
 	/* for queuing of open_rc_channel requests */
 	struct ibcm_state_data_s	*open_link;
+	/* for queuing of non-blocking close_rc_channel requests */
+	struct ibcm_state_data_s	*close_link;
 
 	struct ibcm_conn_trace_s	*conn_trace;
 
@@ -481,8 +482,8 @@ _NOTE(READ_ONLY_DATA(ibcm_state_data_s::{mode channel svcid hcap
     conn_trace}))
 
 _NOTE(SCHEME_PROTECTS_DATA("Serailized access by block_client_cv",
-    ibcm_state_data_s::{open_return_data ap_return_data close_priv_data
-    close_priv_data_len close_ret_status}))
+    ibcm_state_data_s::{open_return_data ap_return_data close_ret_priv_data
+    close_ret_priv_data_len close_ret_status}))
 
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ibcm_state_data_s::{timedout_state
     cm_handler mra_msg abort_flag}))
@@ -549,12 +550,15 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(ibcm_state_data_s::{timedout_state
 
 extern void ibcm_open_enqueue(ibcm_state_data_t *statep);
 extern void ibcm_open_done(ibcm_state_data_t *statep);
+extern void ibcm_close_enqueue(ibcm_state_data_t *statep);
 extern void ibcm_close_done(ibcm_state_data_t *statep, int send_done);
 extern void ibcm_close_enter(void);
 extern void ibcm_close_exit(void);
 extern void ibcm_lapr_enter(void);
 extern void ibcm_lapr_exit(void);
 extern void ibcm_check_for_opens(void);
+extern void ibcm_check_for_async_close(void);
+extern void ibcm_close_start(ibcm_state_data_t *statep);
 extern void ibcm_run_tlist_thread(void);
 
 /*
@@ -954,6 +958,8 @@ typedef struct ibcm_hca_info_s {
 	ibcm_hca_state_t	hca_state;		/* Is HCA attached? */
 	ib_guid_t		hca_guid;		/* HCA's guid value */
 	ibt_hca_flags_t		hca_caps;		/* HCA capabilities */
+	uint32_t		hca_vendor_id:24;
+	uint16_t		hca_device_id;
 	ib_time_t		hca_ack_delay;		/* HCA ack delay */
 	uint8_t			hca_max_rdma_in_qp;	/* Max RDMA in Reads */
 	uint8_t			hca_max_rdma_out_qp;	/* Max RDMA out Reads */
@@ -986,6 +992,9 @@ _NOTE(READ_ONLY_DATA(ibcm_hca_info_s::{hca_guid hca_caps hca_ack_delay
     hca_max_rdma_in_qp hca_max_rdma_out_qp hca_comid_arena hca_reqid_arena
     hca_passive_tree hca_active_tree hca_passive_comid_tree hca_num_ports }))
 
+/* Are we on Tavor HCA */
+#define	IBCM_IS_HCA_TAVOR(hcap)	\
+	(((hcap)->hca_device_id == 0x5a44) && ((hcap)->hca_vendor_id == 0x15b3))
 
 /*
  * called to ensure that HCA is in "attached" state and is willing to
