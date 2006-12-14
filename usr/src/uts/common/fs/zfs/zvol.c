@@ -1068,6 +1068,12 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		}
 		return (error);
 
+	case DKIOCGGEOM:
+	case DKIOCGVTOC:
+		/* commands using these (like prtvtoc) expect ENOTSUP */
+		error = ENOTSUP;
+		break;
+
 	default:
 		error = ENOTTY;
 		break;

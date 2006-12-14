@@ -545,11 +545,15 @@ dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, char *name)
 			return;
 		}
 
+		/*
+		 * Use max block size here, since we don't know how much
+		 * the size will change between now and the dbuf dirty call.
+		 */
 		if (dsl_dataset_block_freeable(dn->dn_objset->os_dsl_dataset,
 		    dn->dn_phys->dn_blkptr[0].blk_birth))
-			txh->txh_space_tooverwrite += dn->dn_datablksz;
+			txh->txh_space_tooverwrite += SPA_MAXBLOCKSIZE;
 		else
-			txh->txh_space_towrite += dn->dn_datablksz;
+			txh->txh_space_towrite += SPA_MAXBLOCKSIZE;
 		return;
 	}
 
