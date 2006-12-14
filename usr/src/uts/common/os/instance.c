@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +70,7 @@ static void in_endrv(in_node_t *np, in_drv_t *dp);
 static void in_dq_drv(in_drv_t *np);
 static void in_removedrv(struct devnames *dnp, in_drv_t *mp);
 static int in_pathin(char *cp, int instance, char *bname, struct bind **args);
+static int in_next_instance_block(major_t, int);
 static int in_next_instance(major_t);
 
 /* external functions */
@@ -314,6 +314,192 @@ in_set_instance(dev_info_t *dip, in_drv_t *dp, major_t major)
 }
 
 /*
+ * Return 1 if instance block was assigned for the path.
+ *
+ * For multi-port NIC cards, sequential instance assignment across all
+ * ports on a card is highly deseriable since the ppa is typically the
+ * same as the instance number, and the ppa is used in the NIC's public
+ * /dev name. This sequential assignment typically occurs as a result
+ * of in_preassign_instance() after initial install, or by
+ * i_ndi_init_hw_children() for NIC ports that share a common parent.
+ *
+ * Some NIC cards however use multi-function bridge chips, and to
+ * support sequential instance assignment accross all ports, without
+ * disabling multi-threaded attach, we have a (currently) undocumented
+ * hack to allocate instance numbers in contiguous blocks based on
+ * driver.conf properties.
+ *
+ *                       ^
+ *           /----------   ------------\
+ *        pci@0                      pci@0,1	MULTI-FUNCTION BRIDGE CHIP
+ *       /     \                    /       \
+ * FJSV,e4ta@4  FJSV,e4ta@4,1   FJSV,e4ta@6 FJSV,e4ta@6,1	NIC PORTS
+ *      n            n+2             n+2         n+3		INSTANCE
+ *
+ * For the above example, the following driver.conf properties would be
+ * used to guarantee sequential instance number assignment.
+ *
+ * ddi-instance-blocks ="ib-FJSVe4ca", "ib-FJSVe4ta", "ib-generic";
+ * ib-FJSVe4ca =	"/pci@0/FJSV,e4ca@4", "/pci@0/FJSV,e4ca@4,1",
+ *			"/pci@0,1/FJSV,e4ca@6", "/pci@0,1/FJSV,e4ca@6,1";
+ * ib-FJSVe4ta =	"/pci@0/FJSV,e4ta@4", "/pci@0/FJSV,e4ta@4,1",
+ *			"/pci@0,1/FJSV,e4ta@6", "/pci@0,1/FJSV,e4ta@6,1";
+ * ib-generic =		"/pci@0/network@4", "/pci@0/network@4,1",
+ *			"/pci@0,1/network@6", "/pci@0,1/network@6,1";
+ *
+ * The value of the 'ddi-instance-blocks' property references a series
+ * of card specific properties, like 'ib-FJSV-e4ta', who's value
+ * defines a single 'instance block'.  The 'instance block' describes
+ * all the paths below a multi-function bridge, where each path is
+ * called an 'instance path'.  The 'instance block' property value is a
+ * series of 'instance paths'.  The number of 'instance paths' in an
+ * 'instance block' defines the size of the instance block, and the
+ * ordering of the 'instance paths' defines the instance number
+ * assignment order for paths going through the 'instance block'.
+ *
+ * In the instance assignment code below, if a (path, driver) that
+ * currently has no instance number has a path that goes through an
+ * 'instance block', then block instance number allocation occurs.  The
+ * block allocation code will find a sequential set of unused instance
+ * numbers, and assign instance numbers for all the paths in the
+ * 'instance block'.  Each path is assigned a persistent instance
+ * number, even paths that don't exist in the device tree or fail
+ * probe(9E).
+ */
+static int
+in_assign_instance_block(dev_info_t *dip)
+{
+	char		**ibn;		/* instance block names */
+	uint_t		nibn;		/* number of instance block names */
+	uint_t		ibni;		/* ibn index */
+	char		*driver;
+	major_t		major;
+	char		*path;
+	char		*addr;
+	int		plen;
+	char		**ibp;		/* instance block paths */
+	uint_t		nibp;		/* number of paths in instance block */
+	uint_t		ibpi;		/* ibp index */
+	int		ibplen;		/* length of instance block path */
+	char		*ipath;
+	int		instance_base;
+	int		splice;
+	int		i;
+
+	/* check for fresh install case (in miniroot) */
+	if (DEVI(dip)->devi_instance != -1)
+		return (0);			/* already assigned */
+
+	/*
+	 * Check to see if we need to allocate a block of contiguous instance
+	 * numbers by looking for the 'ddi-instance-blocks' property.
+	 */
+	if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "ddi-instance-blocks", &ibn, &nibn) != DDI_SUCCESS)
+		return (0);			/* no instance block needed */
+
+	/*
+	 * Get information out about node we are processing.
+	 *
+	 * NOTE: Since the node is not yet at DS_INITIALIZED, ddi_pathname()
+	 * will not return the unit-address of the final path component even
+	 * though the node has an established devi_addr unit-address - so we
+	 * need to add the unit-address by hand.
+	 */
+	driver = (char *)ddi_driver_name(dip);
+	major = ddi_driver_major(dip);
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(dip, path);
+	if ((addr =  ddi_get_name_addr(dip)) != NULL) {
+		(void) strcat(path, "@");
+		(void) strcat(path, addr);
+	}
+	plen = strlen(path);
+
+	/* loop through instance block names */
+	for (ibni = 0; ibni < nibn; ibni++) {
+		if (ibn[ibni] == NULL)
+			continue;
+
+		/* lookup instance block */
+		if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS, ibn[ibni],
+		    &ibp, &nibp) != DDI_SUCCESS) {
+			cmn_err(CE_WARN,
+			    "no devinition for instance block '%s' in %s.conf",
+			    ibn[ibni], driver);
+			continue;
+		}
+
+		/* Does 'path' go through this instance block? */
+		for (ibpi = 0; ibpi < nibp; ibpi++) {
+			if (ibp[ibpi] == NULL)
+				continue;
+			ibplen = strlen(ibp[ibpi]);
+			if ((ibplen <= plen) &&
+			    (strcmp(ibp[ibpi], path + plen - ibplen) == 0))
+				break;
+
+		}
+		if (ibpi >= nibp) {
+			ddi_prop_free(ibp);
+			continue;		/* no try next instance block */
+		}
+
+		/* yes, allocate and assign instances for all paths in block */
+
+		/*
+		 * determine where we splice in instance paths and verify
+		 * that none of the paths are too long.
+		 */
+		splice = plen - ibplen;
+		for (i = 0; i < nibp; i++) {
+			if ((splice + strlen(ibp[i])+ 1) >= MAXPATHLEN) {
+				cmn_err(CE_WARN,
+				    "path %d through instance block '%s' from "
+				    "%s.conf too long", i, ibn[ibni], driver);
+				break;
+			}
+		}
+		if (i < nibp) {
+			ddi_prop_free(ibp);
+			continue;		/* too long */
+		}
+
+		/* allocate the instance block - no more failures */
+		instance_base = in_next_instance_block(major, nibp);
+
+		ipath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		for (ibpi = 0; ibpi < nibp; ibpi++) {
+			if (ibp[ibpi] == NULL)
+				continue;
+			(void) strcpy(ipath, path);
+			(void) strcpy(ipath + splice, ibp[ibpi]);
+			(void) in_pathin(ipath,
+			    instance_base + ibpi, driver, NULL);
+		}
+
+		/* free allocations */
+		kmem_free(ipath, MAXPATHLEN);
+		ddi_prop_free(ibp);
+		kmem_free(path, MAXPATHLEN);
+		ddi_prop_free(ibn);
+
+		/* notify devfsadmd to sync of path_to_inst file */
+		mutex_enter(&e_ddi_inst_state.ins_serial);
+		i_log_devfs_instance_mod();
+		e_ddi_inst_state.ins_dirty = 1;
+		mutex_exit(&e_ddi_inst_state.ins_serial);
+		return (1);
+	}
+
+	/* our path did not go through any of of the instance blocks */
+	kmem_free(path, MAXPATHLEN);
+	ddi_prop_free(ibn);
+	return (0);
+}
+
+/*
  * Look up an instance number for a dev_info node, and assign one if it does
  * not have one (the dev_info node has devi_name and devi_addr already set).
  */
@@ -353,10 +539,14 @@ e_ddi_assign_instance(dev_info_t *dip)
 	 */
 	np = in_devwalk(dip, &ap, NULL);
 	if (np == NULL) {
-		name = ddi_node_name(dip);
-		np = in_alloc_node(name, ddi_get_name_addr(dip));
-		ASSERT(np != NULL);
-		in_enlist(ap, np);	/* insert into tree */
+		if (in_assign_instance_block(dip)) {
+			np = in_devwalk(dip, &ap, NULL);
+		} else {
+			name = ddi_node_name(dip);
+			np = in_alloc_node(name, ddi_get_name_addr(dip));
+			ASSERT(np != NULL);
+			in_enlist(ap, np);	/* insert into tree */
+		}
 	}
 	ASSERT(np == in_devwalk(dip, &ap, NULL));
 
@@ -446,46 +636,69 @@ e_ddi_instance_majorinstance_to_path(major_t major, uint_t inst, char *path)
 }
 
 /*
- * This depends on the list being sorted in ascending instance number
- * sequence.  dn_instance contains the next available instance no.
- * or IN_SEARCHME, indicating (a) hole(s) in the sequence.
+ * Allocate a sequential block of instance numbers for the specified driver,
+ * and return the base instance number of the block.  The implementation
+ * depends on the list being sorted in ascending instance number sequence.
+ * When there are no 'holes' in the allocation sequence, dn_instance is the
+ * next available instance number. When dn_instance is IN_SEARCHME, hole(s)
+ * exists and a slower code path executes which tries to fill holes.
  */
 static int
-in_next_instance(major_t major)
+in_next_instance_block(major_t major, int block_size)
 {
-	unsigned int prev;
-	struct devnames *dnp;
-	in_drv_t *dp;
+	unsigned int	prev;
+	struct devnames	*dnp;
+	in_drv_t	*dp;
+	int		base;
+	int		hole;
 
 	dnp = &devnamesp[major];
-
 	ASSERT(major != (major_t)-1);
 	ASSERT(e_ddi_inst_state.ins_busy);
-	if (dnp->dn_instance != IN_SEARCHME)
-		return (dnp->dn_instance++);
+	ASSERT(block_size);
+
+	/* check to see if we can do a quick allocation */
+	if (dnp->dn_instance != IN_SEARCHME) {
+		base = dnp->dn_instance;
+		dnp->dn_instance += block_size;
+		return (base);
+	}
 	dp = dnp->dn_inlist;
 
-	/* no existing entries, assign instance 0 */
+	/* no existing entries, allocate block at 0 */
 	if (dp == NULL) {
-		dnp->dn_instance = 1;
+		dnp->dn_instance = block_size;
 		return (0);
 	}
 
 	prev = dp->ind_instance;
-	if (prev != 0)	/* hole at beginning of list */
-		return (0);
-	/* search the list for a hole in the sequence */
-	for (dp = dp->ind_next; dp; dp = dp->ind_next) {
-		if (dp->ind_instance != prev + 1)
-			return (prev + 1);
-		prev++;
-	}
-	/*
-	 * If we got here, then the hole has been patched
-	 */
-	dnp->dn_instance = ++prev + 1;
+	if (prev >= block_size)
+		return (0);		/* we fit in hole at beginning */
 
-	return (prev);
+	/* search the list for a large enough hole */
+	for (dp = dp->ind_next, hole = 0; dp; dp = dp->ind_next) {
+		if (dp->ind_instance != (prev + 1))
+			hole++;			/* we have a hole */
+		if (dp->ind_instance >= (prev + block_size + 1))
+			break;			/* we fit in hole */
+		prev = dp->ind_instance;
+	}
+
+	/*
+	 * If hole is zero then all holes are patched and we can resume
+	 * quick allocations.
+	 */
+	if (hole == 0)
+		dnp->dn_instance = prev + 1 + block_size;
+
+	return (prev + 1);
+}
+
+/* assign instance block of size 1 */
+static int
+in_next_instance(major_t major)
+{
+	return (in_next_instance_block(major, 1));
 }
 
 /*
@@ -1135,14 +1348,15 @@ in_drvwalk(in_node_t *np, char *binding_name)
 static void
 i_log_devfs_instance_mod(void)
 {
-	sysevent_t *ev;
-	sysevent_id_t eid;
+	sysevent_t	*ev;
+	sysevent_id_t	eid;
+	static int	sent_one = 0;
 
 	/*
-	 * Prevent unnecessary event generation.  Do not need to generate
-	 * events during boot.
+	 * Prevent unnecessary event generation.  Do not generate more than
+	 * one event during boot.
 	 */
-	if (!i_ddi_io_initialized())
+	if (sent_one && !i_ddi_io_initialized())
 		return;
 
 	ev = sysevent_alloc(EC_DEVFS, ESC_DEVFS_INSTANCE_MOD, EP_DDI,
@@ -1153,6 +1367,8 @@ i_log_devfs_instance_mod(void)
 	if (log_sysevent(ev, SE_NOSLEEP, &eid) != 0) {
 		cmn_err(CE_WARN, "i_log_devfs_instance_mod: failed to post "
 			"event");
+	} else {
+		sent_one = 1;
 	}
 	sysevent_free(ev);
 }
