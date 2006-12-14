@@ -1768,9 +1768,15 @@ unconfigure_network_interfaces(zlog_t *zlogp, zoneid_t zone_id)
 		(void) strncpy(lifrl.lifr_name, lifrp->lifr_name,
 		    sizeof (lifrl.lifr_name));
 		if (ioctl(s, SIOCGLIFZONE, (caddr_t)&lifrl) < 0) {
+			if (errno == ENXIO)
+				/*
+				 * Interface may have been removed by admin or
+				 * another zone halting.
+				 */
+				continue;
 			zerror(zlogp, B_TRUE,
-			    "%s: could not determine zone interface belongs to",
-			    lifrl.lifr_name);
+			    "%s: could not determine the zone to which this "
+			    "interface is bound", lifrl.lifr_name);
 			ret_code = -1;
 			continue;
 		}

@@ -44,7 +44,7 @@ include ../../Makefile.lib
 DYNFLAGS +=	-lxml2
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lnvpair -lexacct -lc
+LDLIBS +=	-lscf -lnvpair -lexacct -lc
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

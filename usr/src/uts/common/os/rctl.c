@@ -1693,6 +1693,17 @@ rctl_local_replace_cb(rctl_hndl_t hndl, struct proc *p, rctl_entity_p_t *e,
     rctl_t *rctl, rctl_val_t *oval, rctl_val_t *nval)
 {
 	int ret;
+	rctl_val_t *tmp;
+
+	/* Verify that old will be delete-able */
+	tmp = rctl_val_list_find(&rctl->rc_values, oval);
+	if (tmp == NULL)
+		return (ESRCH);
+	/*
+	 * Caller should verify that value being deleted is not the
+	 * system value.
+	 */
+	ASSERT(tmp->rcv_privilege != RCPRIV_SYSTEM);
 
 	/*
 	 * rctl_local_insert_cb() does the job of flagging an error
@@ -1706,7 +1717,9 @@ rctl_local_replace_cb(rctl_hndl_t hndl, struct proc *p, rctl_entity_p_t *e,
 	if (ret = rctl_local_insert_cb(hndl, p, e, rctl, NULL, nval))
 		return (ret);
 
-	return (rctl_local_delete_cb(hndl, p, e, rctl, NULL, oval));
+	ret = rctl_local_delete_cb(hndl, p, e, rctl, NULL, oval);
+	ASSERT(ret == 0);
+	return (0);
 }
 
 /*

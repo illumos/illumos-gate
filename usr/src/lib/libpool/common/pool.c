@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <libintl.h>
+#include <libscf.h>
 #include <pool.h>
 #include <signal.h>
 
@@ -721,6 +722,7 @@ pool_set_status(int state)
 	if (old_state != state) {
 		int fd;
 		pool_status_t status;
+		char *fmri;
 
 		/*
 		 * Changing the status of pools is performed by enabling
@@ -732,11 +734,12 @@ pool_set_status(int state)
 		 * synchronous using the library API as yet, so we use
 		 * the -s option provided by svcadm.
 		 */
-		if (getenv("SMF_FMRI") == NULL) {
+		fmri = getenv("SMF_FMRI");
+		if (fmri == NULL) {
 			FILE *p;
 			char *cmd;
 
-			if (state) {
+			if (state != 0) {
 				cmd = "/usr/sbin/svcadm enable -s " \
 				    SMF_SVC_INSTANCE;
 			} else {
@@ -755,6 +758,26 @@ pool_set_status(int state)
 			return (PO_FAIL);
 		}
 
+		/*
+		 * If pools are being enabled/disabled by another smf service,
+		 * enable the smf service instance.  This must be done
+		 * asynchronously as one service cannot synchronously
+		 * enable/disable another.
+		 */
+		if (strcmp(fmri, SMF_SVC_INSTANCE) != 0) {
+			int res;
+
+			if (state != 0)
+				res = smf_enable_instance(SMF_SVC_INSTANCE, 0);
+			else
+				res = smf_disable_instance(SMF_SVC_INSTANCE, 0);
+
+			if (res != 0) {
+				(void) close(fd);
+				pool_seterror(POE_SYSTEM);
+				return (PO_FAIL);
+			}
+		}
 		status.ps_io_state = state;
 
 		if (ioctl(fd, POOL_STATUS, &status) < 0) {
