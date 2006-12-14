@@ -475,14 +475,14 @@ pci_class_to_pil(dev_info_t *rdip)
 {
 	uint32_t pil;
 
-	/* default pil is 0 (uninitialized) */
+	/* Default pil is 1 */
 	pil = pci_class_to_val(rdip,
 	    "pci-class-priorities", pci_default_pil,
-	    sizeof (pci_default_pil) / sizeof (pci_class_val_t), 0);
+	    sizeof (pci_default_pil) / sizeof (pci_class_val_t), 1);
 
-	/* range check the result */
+	/* Range check the result */
 	if (pil >= 0xf)
-		pil = 0;
+		pil = 1;
 
 	return (pil);
 }

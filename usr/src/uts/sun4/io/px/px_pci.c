@@ -92,7 +92,9 @@ static int pxb_fm_init_child(dev_info_t *dip, dev_info_t *cdip, int cap,
 static int pxb_fm_err_callback(dev_info_t *dip, ddi_fm_error_t *derr,
     const void *impl_data);
 
-static int ppb_pcie_device_type(pxb_devstate_t *pxb_p);
+static int pxb_pcie_device_type(pxb_devstate_t *pxb_p);
+static void pxb_set_pci_perf_parameters(dev_info_t *dip,
+	ddi_acc_handle_t config_handle);
 #ifdef	PRINT_PLX_SEEPROM_CRC
 static void pxb_print_plx_seeprom_crc_data(pxb_devstate_t *pxb_p);
 #endif
@@ -391,7 +393,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	/*
 	 * Make sure the "device_type" property exists.
 	 */
-	if (ppb_pcie_device_type(pxb) == DDI_SUCCESS)
+	if (pxb_pcie_device_type(pxb) == DDI_SUCCESS)
 		(void) strcpy(device_type, "pciex");
 	else
 		(void) strcpy(device_type, "pci");
@@ -422,6 +424,8 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			    "ndi_prop_update_int() failed\n");
 			goto fail;
 		}
+
+		pxb_set_pci_perf_parameters(devi, config_handle);
 	}
 
 	/*
@@ -947,6 +951,9 @@ pxb_initchild(dev_info_t *child)
 
 	for (i = 0; i < pxb_tlp_count; i += 1)
 		reg |= pci_config_get16(config_handle, PCI_CONF_VENID);
+
+	if (pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCIE2PCI)
+		pxb_set_pci_perf_parameters(child, config_handle);
 
 	pci_config_teardown(&config_handle);
 #endif /* PX_PLX */
@@ -1781,7 +1788,7 @@ static int pxb_pcishpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle)
 
 /* check if this device has PCIe link underneath. */
 static int
-ppb_pcie_device_type(pxb_devstate_t *pxb_p)
+pxb_pcie_device_type(pxb_devstate_t *pxb_p)
 {
 	int port_type = pxb_p->pxb_port_type;
 
@@ -1796,6 +1803,55 @@ ppb_pcie_device_type(pxb_devstate_t *pxb_p)
 		return (DDI_SUCCESS);
 
 	return (DDI_FAILURE);
+}
+
+/*
+ * For PCI and PCI-X devices including PCIe2PCI bridge, initialize
+ * cache-line-size and latency timer configuration registers.
+ */
+static void
+pxb_set_pci_perf_parameters(dev_info_t *dip, ddi_acc_handle_t cfg_hdl)
+{
+	uint_t	n;
+
+	/* Initialize cache-line-size configuration register if needed */
+	if (ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "cache-line-size", 0) == 0) {
+		pci_config_put8(cfg_hdl, PCI_CONF_CACHE_LINESZ,
+		    PXB_CACHE_LINE_SIZE);
+		n = pci_config_get8(cfg_hdl, PCI_CONF_CACHE_LINESZ);
+		if (n != 0) {
+			(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+			    "cache-line-size", n);
+		}
+	}
+
+	/* Initialize latency timer configuration registers if needed */
+	if (ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "latency-timer", 0) == 0) {
+		uchar_t	min_gnt, latency_timer;
+		uchar_t header_type;
+
+		/* Determine the configuration header type */
+		header_type = pci_config_get8(cfg_hdl, PCI_CONF_HEADER);
+
+		if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
+			latency_timer = PXB_LATENCY_TIMER;
+			pci_config_put8(cfg_hdl, PCI_BCNF_LATENCY_TIMER,
+			    latency_timer);
+		} else {
+			min_gnt = pci_config_get8(cfg_hdl, PCI_CONF_MIN_G);
+			latency_timer = min_gnt * 8;
+		}
+
+		pci_config_put8(cfg_hdl, PCI_CONF_LATENCY_TIMER,
+		    latency_timer);
+		n = pci_config_get8(cfg_hdl, PCI_CONF_LATENCY_TIMER);
+		if (n != 0) {
+			(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+			    "latency-timer", n);
+		}
+	}
 }
 
 #ifdef	PRINT_PLX_SEEPROM_CRC
@@ -1925,7 +1981,6 @@ pxb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	if ((ret = ddi_dma_allochdl(dip, rdip, attr_p, waitfp, arg,
 	    handlep)) == DDI_SUCCESS) {
 		ddi_dma_impl_t	*mp = (ddi_dma_impl_t *)*handlep;
-		dev_info_t	*cdip = pcie_get_my_childs_dip(dip, rdip);
 #ifdef	BCM_SW_WORKAROUNDS
 		mp->dmai_inuse |= PX_DMAI_FLAGS_MAP_BUFZONE;
 #endif	/* BCM_SW_WORKAROUNDS */
@@ -1934,8 +1989,7 @@ pxb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 		 * of px_pci's immediate child or secondary bus-id of the
 		 * PCIe2PCI bridge.
 		 */
-		mp->dmai_minxfer = PCI_GET_SEC_BUS(cdip) ?
-		    PCI_GET_SEC_BUS(cdip) : PCI_GET_BDF(cdip);
+		mp->dmai_minxfer = pcie_get_bdf_for_dma_xfer(dip, rdip);
 	}
 
 	return (ret);

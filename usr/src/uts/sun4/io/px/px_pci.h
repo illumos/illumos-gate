@@ -199,6 +199,13 @@ extern void *pxb_state;
 
 #endif	/* BCM_SW_WORKAROUNDS */
 
+/*
+ * The following values are used to initialize the cache line size
+ * and latency timer registers for PCI, PCI-X and PCIe2PCI devices.
+ */
+#define	PXB_CACHE_LINE_SIZE	0x10	/* 64 bytes in # of DWORDs */
+#define	PXB_LATENCY_TIMER	0x40	/* 64 PCI cycles */
+
 #ifdef	__cplusplus
 }
 #endif

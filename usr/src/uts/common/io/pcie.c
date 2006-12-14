@@ -41,6 +41,7 @@
 
 static int pcie_get_bdf_from_dip(dev_info_t *dip, uint32_t *bdf);
 dev_info_t *pcie_get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip);
+uint32_t pcie_get_bdf_for_dma_xfer(dev_info_t *dip, dev_info_t *rdip);
 
 #ifdef  DEBUG
 uint_t pcie_debug_flags = 0;
@@ -532,6 +533,31 @@ pcie_get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip)
 		;
 
 	return (cdip);
+}
+
+uint32_t
+pcie_get_bdf_for_dma_xfer(dev_info_t *dip, dev_info_t *rdip)
+{
+	dev_info_t *cdip;
+
+	/*
+	 * As part of the probing, the PCI fcode interpreter may setup a DMA
+	 * request if a given card has a fcode on it using dip and rdip of the
+	 * AP (attachment point) i.e, dip and rdip of px/px_pci driver. In this
+	 * case, return zero for the bdf since we cannot get to the bdf value
+	 * of the actual device which will be initiating this DMA.
+	 */
+	if (rdip == dip)
+		return (0);
+
+	cdip = pcie_get_my_childs_dip(dip, rdip);
+
+	/*
+	 * For a given rdip, return the bdf value of dip's (px or px_pci)
+	 * immediate child or secondary bus-id if dip is a PCIe2PCI bridge.
+	 */
+	return (PCI_GET_SEC_BUS(cdip) ?
+	    PCI_GET_SEC_BUS(cdip) : PCI_GET_BDF(cdip));
 }
 
 #ifdef	DEBUG

@@ -117,7 +117,7 @@ px_dma_allocmp(dev_info_t *dip, dev_info_t *rdip, int (*waitfp)(caddr_t),
 	 * immediate child. As we move down the PCIe fabric, this field
 	 * may be modified by switch and bridge drivers.
 	 */
-	mp->dmai_bdf = PCI_GET_BDF(pcie_get_my_childs_dip(dip, rdip));
+	mp->dmai_bdf = pcie_get_bdf_for_dma_xfer(dip, rdip);
 
 	return (mp);
 }

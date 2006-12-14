@@ -557,14 +557,14 @@ px_class_to_pil(dev_info_t *rdip)
 {
 	uint32_t pil;
 
-	/* default pil is 0 (uninitialized) */
+	/* Default pil is 1 */
 	pil = px_class_to_val(rdip,
 	    "pci-class-priorities", px_default_pil,
-	    sizeof (px_default_pil) / sizeof (px_class_val_t), 0);
+	    sizeof (px_default_pil) / sizeof (px_class_val_t), 1);
 
-	/* range check the result */
+	/* Range check the result */
 	if (pil >= 0xf)
-		pil = 0;
+		pil = 1;
 
 	return (pil);
 }

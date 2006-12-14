@@ -32,8 +32,6 @@
 extern "C" {
 #endif
 
-#include <sys/hotplug/pci/pcihp_impl.h>
-
 #ifdef	_KERNEL
 /*
  * Interfaces exported by PCI Nexus extension module, kernel/misc/pcihp.

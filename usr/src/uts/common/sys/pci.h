@@ -1018,6 +1018,21 @@ typedef struct pci_phys_spec pci_regspec_t;
 #define	PCI_PDS_CODE_TYPE_PCAT		0x0	/* Intel x86/PC-AT Type */
 #define	PCI_PDS_CODE_TYPE_OPEN_FW	0x1	/* Open Firmware */
 
+/*
+ * we recognize the non transparent bridge child nodes with the
+ * following property. This is specific to an implementation only.
+ * This property is specific to AP nodes only.
+ */
+#define	PCI_DEV_CONF_MAP_PROP	"pci-parent-indirect"
+
+/*
+ * If a bridge device provides its own config space access services,
+ * and supports a hotplug/hotswap bus below at any level, then
+ * the following property must be defined for the node either by
+ * the driver or the OBP.
+ */
+#define	PCI_BUS_CONF_MAP_PROP	"pci-conf-indirect"
+
 #ifdef	__cplusplus
 }
 #endif
