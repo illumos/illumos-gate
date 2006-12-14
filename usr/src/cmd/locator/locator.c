@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,7 +168,7 @@ locator_walker_func(picl_nodehdl_t nodeh, void *arg)
 	if (err == PICL_SUCCESS) {
 		locator_info->on = locator_on;
 	} else if (err == PICL_PROPNOTFOUND) {
-		locator_info->on = "on";
+		locator_info->on = "ON";
 	} else {
 		return (err);
 	}
@@ -179,7 +179,7 @@ locator_walker_func(picl_nodehdl_t nodeh, void *arg)
 	if (err == PICL_SUCCESS) {
 		locator_info->off = locator_off;
 	} else if (err == PICL_PROPNOTFOUND) {
-		locator_info->off = "off";
+		locator_info->off = "OFF";
 	} else {
 		return (err);
 	}
