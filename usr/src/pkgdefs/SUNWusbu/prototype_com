@@ -65,4 +65,4 @@ f none usr/include/sys/usb/clients/hid/hid.h 644 root bin
 f none usr/include/sys/usb/clients/mass_storage/usb_bulkonly.h 644 root bin
 f none usr/include/sys/usb/clients/mass_storage/usb_cbi.h 644 root bin
 f none usr/include/sys/usb/clients/printer/usb_printer.h 644 root bin
-f none usr/include/sys/usb/clients/usbcdc/usbcdc.h 644 root bin
+f none usr/include/sys/usb/clients/usbcdc/usb_cdc.h 644 root bin
