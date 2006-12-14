@@ -54,31 +54,64 @@
  *	  on channel B provides data [127:64].  The two dimms must be
  *	  identical in size and organisation (number of ranks etc).
  *
- * For our dimm numbering purposes we need go no further than deriving
- * the logical DIMM number for a given csbase/csmask pair and presence
- * of quadrank support and mismatched dimms.  For logical DIMM number N
- * (N = 0, 1, 2, or 3):
- *
- *	- the lodimm, if present, is numbered N * 2
- *	- the updimm, if present, is numbered N * 2 + 1
- *
- * Presence is deduced by observed configuration, as above.  This numbering
- * scheme, however, often bears little or no resemblance to how the dimm slots
- * are physically labelled/silkscreened (which in turn often bears little
- * resemblance to how SMBIOS data, if available, describes the slot).  To
- * determine slot labels we will map chip-select *line* to slot name in
- * some hand-crafted tables (which live in the libtopo enumerator and are
- * built after consulting the board schematics for a platform).  To provide
- * the chip-select line name we will perform some additional gymnastics here
- * to derive the chip-select line or lines (in 128 bit mode) associated
- * with a chip-select rank.  This is achieved via matching against the
+ * The following tables are derived from the corresponding
  * "DRAM CS Base and DRAM CS Mask Registers" with and without mismatched
  * dimm support tables of the BKDG (tables 5 and 6 of BKDG 3.31 for rev E
- * and earlier; tables 8 and 9 of BKDG 3.01 for rev F and G).
+ * and earlier; tables 8 and 9 of BKDG 3.01 for rev F and G).  They could
+ * be implemented programatically, but are more readily reviewed for correctness
+ * presented as tables.
  *
- * The following tables could be implemented programtically, but are more
- * readily reviewed for correctness presented as tables.
+ * When we observe a given chip-select base/mask pair to be enabled in a
+ * system configuration we lookup in the following tables to match on
+ * all of base register pair number, processor revision, socket type
+ * and dram configuration (e.g., quadrank registered or not); the remainder
+ * of the matched line provides the corresponding logical dimm (ldimm)
+ * number that the chip-select is to be associated with and details of
+ * which chip-select line is used to operate that chip-select (specified
+ * as a (channel, slot-number, rank-number) triple.  With this
+ * information we determine the topology instance number of each physical
+ * DIMM.  There are three distinct cases to consider:
+ *
+ * 128-bit MC mode:
+ *
+ *	The lodimm (channel A) and updimm (channel B) dimm in a pair
+ *	have instance numbers 2 * ldimm and 2 * ldimm + 1, i.e.
+ *	0/1, 2/3, 4/5, 5/6 for ldimm = 0, 1, 2, 3 (ldimms 2 and 3
+ *	are only supported for socket 940 and socket F(1207).
+ *
+ * 64-bit MC mode, no mismatched dimm support:
+ *
+ *	All dimms reside on channel A.  If there is a channel B
+ *	(anything other than socket 754) then any DIMMs on it will
+ *	not be configured into the system.  We number as for
+ *	128-bit mode but omiting the channel B DIMMs, i.e.
+ *	0, 2, 4, 6 for ldimm = 0, 1, 2, 3.
+ *
+ * 64-bit MC mode, mismatched dimm support enabled:
+ *
+ *	Each rank of every DIMM is treated as a separate logical
+ *	dimm, so while the package (939 or AM2) only supports two
+ *	DIMMS per channel and normally logical dimms 2 and 3
+ *	would not be supported they do spring into existence in this
+ *	special mode.
+ *
+ * Because of the mismatched DIMM support case we cannot derive
+ * instance number from logical dimm number alone.  For that case we use the
+ * slot number on the channel - that tracks the ldimm except in the
+ * mismatched case.  This provides consistent instance numbering
+ * even for a system cycled through each of the above configurations -
+ * the instance dimm remains the same for a given channel and slot
+ * number.
+ *
+ * When quadrank DIMMs - quadrank registered or quadrank SODIMM - are in
+ * use we must always base the instance number off of the ldimm regardless
+ * of mismatched DIMM support.
  */
+
+#define	MCAMD_TOPONUM(ldimm, cslp, quadrank, mod64mux) \
+	(((quadrank) || !(mod64mux)) ? \
+	2 * (ldimm) + ((cslp)->csl_chan == CH_B) : \
+	2 * (cslp)->csl_slot + ((cslp)->csl_chan == CH_B))
 
 /* BEGIN CSTYLED */
 
@@ -107,21 +140,25 @@ static const struct mcdcfg_csmapline csmap_nomod64mux_preF[] = {
     /*
      * Base reg 4 (mask 4)
      */
+    { SKT_754,	4, DCFG_N,		2, { { CH_A, 2, 0 } } },
     { SKT_940,	4, DCFG_N,		2, { { CH_A, 2, 0 }, { CH_B, 2, 0 } } },
     { SKT_940,	4, DCFG_R4,		0, { { CH_A, 2, 0 }, { CH_B, 2, 0 } } },
     /*
      * Base reg 5 (mask 5)
      */
+    { SKT_754,	5, DCFG_N,		2, { { CH_A, 2, 1 } } },
     { SKT_940,	5, DCFG_N,		2, { { CH_A, 2, 1 }, { CH_B, 2, 1 } } },
     { SKT_940,	5, DCFG_R4,		0, { { CH_A, 2, 1 }, { CH_B, 2, 1 } } },
     /*
      * Base reg 6 (mask 6)
      */
+    { SKT_754,	6, DCFG_N,		3, { { CH_A, 3, 0 } } },
     { SKT_940,	6, DCFG_N,		3, { { CH_A, 3, 0 }, { CH_B, 3, 0 } } },
     { SKT_940,	6, DCFG_R4,		1, { { CH_A, 3, 0 }, { CH_B, 3, 0 } } },
     /*
      * Base reg 7 (mask 7)
      */
+    { SKT_754,	7, DCFG_N,		3, { { CH_A, 3, 1 } } },
     { SKT_940,	7, DCFG_N,		3, { { CH_A, 3, 1 }, { CH_B, 3, 1 } } },
     { SKT_940,	7, DCFG_R4,		1, { { CH_A, 3, 1 }, { CH_B, 3, 1 } } }
 };
@@ -154,19 +191,19 @@ static const struct mcdcfg_csmapline csmap_mod64mux_preF[] = {
     /*
      * Base reg 4 (mask 4)
      */
-    { SKT_939,	4, DCFG_N,		0, { { CH_B, 0, 0 } } },
+    { SKT_939,	4, DCFG_N,		2, { { CH_B, 0, 0 } } },
     /*
      * Base reg 5 (mask 5)
      */
-    { SKT_939,	5, DCFG_N,		0, { { CH_B, 0, 1 } } },
+    { SKT_939,	5, DCFG_N,		2, { { CH_B, 0, 1 } } },
     /*
      * Base reg 6 (mask 6)
      */
-    { SKT_939,	6, DCFG_N,		1, { { CH_B, 1, 0 } } },
+    { SKT_939,	6, DCFG_N,		3, { { CH_B, 1, 0 } } },
     /*
      * Base reg 7 (mask 7)
      */
-    { SKT_939,	7, DCFG_N,		1, { { CH_B, 1, 1 } } }
+    { SKT_939,	7, DCFG_N,		3, { { CH_B, 1, 1 } } }
 };
 
 /*
@@ -207,8 +244,8 @@ static const struct mcdcfg_csmapline csmap_nomod64mux_fg[] = {
      * Base reg 3 (mask 1)
      */
     { AM2F1207,	3, DCFG_N | DCFG_R4,	1, { { CH_A, 1, 1 }, { CH_B, 1, 1 } } },
-    { AM2,	3, DCFG_S4,		0, { { CH_A, 0, 3 }, { CH_B, 0, 3 } } },
-    { S1g1,	3, DCFG_N,		1, { { CH_A, 1, 1 }, { CH_B, 1, 1 } } },
+    { AM2,	3, DCFG_S4,		0, { { CH_A, 1, 1 }, { CH_B, 1, 1 } } },
+    { S1g1,	3, DCFG_N,		1, { { CH_A, 0, 3 }, { CH_B, 0, 3 } } },
     { S1g1,	3, DCFG_S4,		0, { { CH_A, 0, 3 }, { CH_B, 0, 3 } } },
     /*
      * Base reg 4 (mask 2)
@@ -355,22 +392,15 @@ mcdcfg_lookup(uint32_t rev, int mod64mux, int accwidth, int basenum,
 	/*
 	 * We return the dimm instance number here for the topology, based
 	 * on the AMD Motherboard Design Guide.
-	 *
-	 * The lodimm/updimm (channel A/B) dimms in a pair are numbered
-	 * 0/1, 2/3, 4/5, 6/7 - ie 2 * pairnum and 2 * pairnum + 1 for
-	 * pairnum = 0, 1, 2, 3.  But we can't use logical dimm number
-	 * for pairnum in that calculation, since in the presence of
-	 * mismtached dimms logicial dimms 2 and 3 are used for those
-	 * dimm modules on the B channel.  Instead we number using the
-	 * slot number on that dram channel, offsetting those on the B
-	 * channel by 1.
 	 */
 	rsltp->ldimm = csm->csm_ldimm;
 	rsltp->ndimm = ndimm;
 	for (i = 0; i < ndimm; i++) {
-		rsltp->dimm[i].toponum = 2 * csm->csm_cs[i].csl_slot +
-		    (csm->csm_cs[i].csl_chan == CH_B);
-		rsltp->dimm[i].cslp = &csm->csm_cs[i];
+		const struct mcdcfg_csl *cslp = &csm->csm_cs[i];
+
+		rsltp->dimm[i].toponum =
+		    MCAMD_TOPONUM(rsltp->ldimm, cslp, r4 || s4, ismux);
+		rsltp->dimm[i].cslp = cslp;
 	}
 
 	return (0);
@@ -387,6 +417,13 @@ mcdcfg_csname(uint32_t pkg, const mcdcfg_csl_t *cslp, char *buf, int buflen)
 
 	switch (pkg) {
 	case X86_SOCKET_754:
+		/*
+		 * Format is: MEMCS_L[{0..7}].  There is only channel A.
+		 */
+		csnum = 2 * cslp->csl_slot + cslp->csl_rank;
+		(void) snprintf(buf, buflen, "MEMCS_L%d", csnum);
+		break;
+
 	case X86_SOCKET_940:
 		/*
 		 * Format is: MEMCS_L[{0..7}].  That does not identify
@@ -396,7 +433,7 @@ mcdcfg_csname(uint32_t pkg, const mcdcfg_csl_t *cslp, char *buf, int buflen)
 		 */
 		csnum = 2 * cslp->csl_slot + cslp->csl_rank;
 		(void) snprintf(buf, buflen, "MEMCS_L%d (channel %s)", csnum,
-		    cslp->csl_chan == 0 ? "A" : "B");
+		    cslp->csl_chan == CH_A ? "A" : "B");
 
 		break;
 
@@ -409,7 +446,7 @@ mcdcfg_csname(uint32_t pkg, const mcdcfg_csl_t *cslp, char *buf, int buflen)
 		 */
 		(void) snprintf(buf, buflen, "MEMCS_%d%s_L[%d]",
 		    cslp->csl_slot + 1,
-		    cslp->csl_chan == 0 ? "A" : "B",
+		    cslp->csl_chan == CH_A ? "A" : "B",
 		    cslp->csl_rank);
 		break;
 
@@ -423,7 +460,7 @@ mcdcfg_csname(uint32_t pkg, const mcdcfg_csl_t *cslp, char *buf, int buflen)
 		 *		{0,1,2,3} - rank
 		 */
 		(void) snprintf(buf, buflen, "M%s%d_CS_L[%d]",
-		    cslp->csl_chan == 0 ? "A" : "B",
+		    cslp->csl_chan == CH_A ? "A" : "B",
 		    cslp->csl_slot,
 		    cslp->csl_rank);
 		break;

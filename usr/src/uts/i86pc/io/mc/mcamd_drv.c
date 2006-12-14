@@ -269,19 +269,26 @@ mc_nvl_create(mc_t *mc)
 		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_MASK, 0);
 		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_SIZE, 0);
 
-		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_CSDIMM1, 0);
-		mcdcfg_csname(mc->mc_socket, mccs->mccs_csl[0], csname,
-		    sizeof (csname));
-		(void) nvlist_add_string(*csp, "dimm1-csname", csname);
+		/*
+		 * It is possible for an mc_cs_t not to have associated
+		 * DIMM info if mcdcfg_lookup failed.
+		 */
+		if (mccs->mccs_csl[0] != NULL) {
+			mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_CSDIMM1, 1);
+			mcdcfg_csname(mc->mc_socket, mccs->mccs_csl[0], csname,
+			    sizeof (csname));
+			(void) nvlist_add_string(*csp, "dimm1-csname", csname);
+		}
 
-		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_CSDIMM2, 1);
 		if (mccs->mccs_csl[1] != NULL) {
+			mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_CSDIMM2, 1);
 			mcdcfg_csname(mc->mc_socket, mccs->mccs_csl[1], csname,
 			    sizeof (csname));
 			(void) nvlist_add_string(*csp, "dimm2-csname", csname);
 		}
 	}
 
+	/* Add cslist nvlist array even if zero members */
 	(void) nvlist_add_nvlist_array(mcnvl, "cslist", cslist, nelem);
 	for (i = 0; i < nelem; i++)
 		nvlist_free(cslist[i]);
@@ -314,6 +321,7 @@ mc_nvl_create(mc_t *mc)
 		(void) nvlist_add_string_array(*dimmp, "csnames", csnamep, ncs);
 	}
 
+	/* Add dimmlist nvlist array even if zero members */
 	(void) nvlist_add_nvlist_array(mcnvl, "dimmlist", dimmlist, nelem);
 	for (i = 0; i < nelem; i++)
 		nvlist_free(dimmlist[i]);
@@ -466,6 +474,13 @@ mc_dimmlist_create(mc_t *mc)
 	for (mccs = mc->mc_cslist; mccs != NULL; mccs = mccs->mccs_next) {
 		mcdcfg_rslt_t rslt;
 
+		/*
+		 * If lookup fails we will not create dimm structures for
+		 * this chip-select.  In the mc_cs_t we will have both
+		 * csp_dimmnum members set to MC_INVALNUM and patounum
+		 * code will see from those that we do not have dimm info
+		 * for this chip-select.
+		 */
 		if (mcdcfg_lookup(rev, mcp->mcp_mod64mux, mcp->mcp_accwidth,
 		    mccs->mccs_props.csp_num, mc->mc_socket,
 		    r4, s4, &rslt) < 0)
