@@ -987,7 +987,9 @@ label/**/1:
 /*
  * In case of urgent errors some MMU registers may be
  * corrupted, so we set here some reasonable values for
- * them.
+ * them. Note that resetting MMU registers also reset the context
+ * info, we will need to reset the window registers to prevent
+ * spill/fill that depends on context info for correct behaviour
  */
 
 #if !defined(lint)
@@ -1001,7 +1003,8 @@ label/**/1:
 	mov	MMU_TSB, tmp3					;\
 	stxa	tmp2, [tmp3]ASI_IMMU				;\
 	stxa	tmp2, [tmp3]ASI_DMMU				;\
-	membar	#Sync
+	membar	#Sync						;\
+	RESET_WINREG(tmp1)
 
 #define	RESET_TSB_TAGPTR(tmp)					\
 	set	MMU_TAG_ACCESS, tmp				;\
@@ -1054,7 +1057,6 @@ label/**/1:
  *
  */
 #define	RESET_TO_PRIV(tmp, tmp1, tmp2, local)			\
-	RESET_WINREG(tmp)					;\
 	RESET_MMU_REGS(tmp, tmp1, tmp2)				;\
 	CPU_ADDR(tmp, tmp1)					;\
 	ldx	[tmp + CPU_THREAD], local			;\
@@ -1489,6 +1491,12 @@ opl_uger_tsbp:
 	bz,pt	%xcc, opl_uger_pstate
 	 nop
 	RESET_TSB_TAGPTR(%g2)
+
+	/*
+	 * IUG_TSBP error may corrupt MMU registers
+	 * Reset them here.
+	 */
+	RESET_MMU_REGS(%g2, %g3, %g4)
 	ba	%xcc, opl_uger_panic
 	 nop
 
@@ -1704,6 +1712,7 @@ dtrace_blksuword32(uintptr_t addr, uint32_t *data, int tryagain)
 	stn	%l5, [THREAD_REG + T_LOFAULT]	! set up the lofault handler
 	stda	%d0, [%i0]ASI_BLK_COMMIT_S	! store the modified block
 	membar	#Sync
+	flush	%i0				! flush instruction pipeline
 	stn	%g0, [THREAD_REG + T_LOFAULT]	! remove the lofault handler
 
 	bz,a,pt	%xcc, 1f
