@@ -77,7 +77,7 @@
 #include <vm/pvn.h>
 #include <vm/seg_kmem.h>
 #include <vm/vm_dep.h>
-
+#include <sys/vm_usage.h>
 #include <fs/fs_subr.h>
 
 static int nopageage = 0;
@@ -343,6 +343,7 @@ vm_init(void)
 	(void) callb_add(callb_vm_cpr, 0, CB_CL_CPR_VM, "vm");
 	page_init_mem_config();
 	page_retire_init();
+	vm_usage_init();
 }
 
 /*

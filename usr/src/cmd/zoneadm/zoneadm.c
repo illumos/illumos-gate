@@ -74,9 +74,12 @@
 #include <fnmatch.h>
 #include <sys/modctl.h>
 #include <libbrand.h>
+#include <libscf.h>
 
 #include <pool.h>
 #include <sys/pool.h>
+#include <sys/priocntl.h>
+#include <sys/fsspriocntl.h>
 
 #include "zoneadm.h"
 
@@ -154,6 +157,7 @@ static int move_func(int argc, char *argv[]);
 static int detach_func(int argc, char *argv[]);
 static int attach_func(int argc, char *argv[]);
 static int mark_func(int argc, char *argv[]);
+static int apply_func(int argc, char *argv[]);
 static int sanity_check(char *zone, int cmd_num, boolean_t running,
     boolean_t unsafe_when_running, boolean_t force);
 static int cmd_match(char *cmd);
@@ -177,7 +181,8 @@ static struct cmd cmdtab[] = {
 	{ CMD_MOVE,		"move",		SHELP_MOVE,	move_func },
 	{ CMD_DETACH,		"detach",	SHELP_DETACH,	detach_func },
 	{ CMD_ATTACH,		"attach",	SHELP_ATTACH,	attach_func },
-	{ CMD_MARK,		"mark",		SHELP_MARK,	mark_func }
+	{ CMD_MARK,		"mark",		SHELP_MARK,	mark_func },
+	{ CMD_APPLY,		"apply",	NULL,		apply_func }
 };
 
 /* global variables */
@@ -1501,6 +1506,7 @@ boot_func(int argc, char *argv[])
 		zerror(gettext("call to %s failed"), "zoneadmd");
 		return (Z_ERR);
 	}
+
 	return (Z_OK);
 }
 
@@ -4355,14 +4361,21 @@ dev_fix(zone_dochandle_t handle)
 	zarg.cmd = Z_READY;
 	if (call_zoneadmd(target_zone, &zarg) != 0) {
 		zerror(gettext("call to %s failed"), "zoneadmd");
+		/* attempt to restore zone to configured state */
+		(void) zone_set_state(target_zone, ZONE_STATE_CONFIGURED);
 		return (Z_ERR);
 	}
 
 	zarg.cmd = Z_HALT;
 	if (call_zoneadmd(target_zone, &zarg) != 0) {
 		zerror(gettext("call to %s failed"), "zoneadmd");
+		/* attempt to restore zone to configured state */
+		(void) zone_set_state(target_zone, ZONE_STATE_CONFIGURED);
 		return (Z_ERR);
 	}
+
+	/* attempt to restore zone to configured state */
+	(void) zone_set_state(target_zone, ZONE_STATE_CONFIGURED);
 
 	if (zonecfg_setdevperment(handle) != Z_OK) {
 		(void) fprintf(stderr,
@@ -4843,6 +4856,177 @@ mark_func(int argc, char *argv[])
 	release_lock_file(lockfd);
 
 	return (err);
+}
+
+/*
+ * Check what scheduling class we're running under and print a warning if
+ * we're not using FSS.
+ */
+static int
+check_sched_fss(zone_dochandle_t handle)
+{
+	char class_name[PC_CLNMSZ];
+
+	if (zonecfg_get_dflt_sched_class(handle, class_name,
+	    sizeof (class_name)) != Z_OK) {
+		zerror(gettext("WARNING: unable to determine the zone's "
+		    "scheduling class"));
+	} else if (strcmp("FSS", class_name) != 0) {
+		zerror(gettext("WARNING: The zone.cpu-shares rctl is set but\n"
+		    "FSS is not the default scheduling class for this zone.  "
+		    "FSS will be\nused for processes in the zone but to get "
+		    "the full benefit of FSS,\nit should be the default "
+		    "scheduling class.  See dispadmin(1M) for\nmore details."));
+		return (Z_SYSTEM);
+	}
+
+	return (Z_OK);
+}
+
+static int
+check_cpu_shares_sched(zone_dochandle_t handle)
+{
+	int err;
+	int res = Z_OK;
+	struct zone_rctltab rctl;
+
+	if ((err = zonecfg_setrctlent(handle)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(CMD_APPLY), B_TRUE);
+		return (err);
+	}
+
+	while (zonecfg_getrctlent(handle, &rctl) == Z_OK) {
+		if (strcmp(rctl.zone_rctl_name, "zone.cpu-shares") == 0) {
+			if (check_sched_fss(handle) != Z_OK)
+				res = Z_SYSTEM;
+			break;
+		}
+	}
+
+	(void) zonecfg_endrctlent(handle);
+
+	return (res);
+}
+
+/*
+ * This is an undocumented interface which is currently only used to apply
+ * the global zone resource management settings when the system boots.
+ * This function does not yet properly handle updating a running system so
+ * any projects running in the zone would be trashed if this function
+ * were to run after the zone had booted.  It also does not reset any
+ * rctl settings that were removed from zonecfg.  There is still work to be
+ * done before we can properly support dynamically updating the resource
+ * management settings for a running zone (global or non-global).  Thus, this
+ * functionality is undocumented for now.
+ */
+/* ARGSUSED */
+static int
+apply_func(int argc, char *argv[])
+{
+	int err;
+	int res = Z_OK;
+	priv_set_t *privset;
+	zoneid_t zoneid;
+	zone_dochandle_t handle;
+	struct zone_mcaptab mcap;
+	char pool_err[128];
+
+	zoneid = getzoneid();
+
+	if (zonecfg_in_alt_root() || zoneid != GLOBAL_ZONEID ||
+	    target_zone == NULL || strcmp(target_zone, GLOBAL_ZONENAME) != 0)
+		return (usage(B_FALSE));
+
+	if ((privset = priv_allocset()) == NULL) {
+		zerror(gettext("%s failed"), "priv_allocset");
+		return (Z_ERR);
+	}
+
+	if (getppriv(PRIV_EFFECTIVE, privset) != 0) {
+		zerror(gettext("%s failed"), "getppriv");
+		priv_freeset(privset);
+		return (Z_ERR);
+	}
+
+	if (priv_isfullset(privset) == B_FALSE) {
+		(void) usage(B_FALSE);
+		priv_freeset(privset);
+		return (Z_ERR);
+	}
+	priv_freeset(privset);
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(CMD_APPLY), B_TRUE);
+		return (Z_ERR);
+	}
+
+	if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(CMD_APPLY), B_TRUE);
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+
+	/* specific error msgs are printed within apply_rctls */
+	if ((err = zonecfg_apply_rctls(target_zone, handle)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(CMD_APPLY), B_TRUE);
+		res = Z_ERR;
+	}
+
+	if ((err = check_cpu_shares_sched(handle)) != Z_OK)
+		res = Z_ERR;
+
+	/*
+	 * The next two blocks of code attempt to set up temporary pools as
+	 * well as persistent pools.  In both cases we call the functions
+	 * unconditionally.  Within each funtion the code will check if the
+	 * zone is actually configured for a temporary pool or persistent pool
+	 * and just return if there is nothing to do.
+	 */
+	if ((err = zonecfg_bind_tmp_pool(handle, zoneid, pool_err,
+	    sizeof (pool_err))) != Z_OK) {
+		if (err == Z_POOL || err == Z_POOL_CREATE || err == Z_POOL_BIND)
+			zerror("%s: %s", zonecfg_strerror(err), pool_err);
+		else
+			zerror(gettext("could not bind zone to temporary "
+			    "pool: %s"), zonecfg_strerror(err));
+		res = Z_ERR;
+	}
+
+	if ((err = zonecfg_bind_pool(handle, zoneid, pool_err,
+	    sizeof (pool_err))) != Z_OK) {
+		if (err == Z_POOL || err == Z_POOL_BIND)
+			zerror("%s: %s", zonecfg_strerror(err), pool_err);
+		else
+			zerror("%s", zonecfg_strerror(err));
+	}
+
+	/*
+	 * If a memory cap is configured, set the cap in the kernel using
+	 * zone_setattr() and make sure the rcapd SMF service is enabled.
+	 */
+	if (zonecfg_getmcapent(handle, &mcap) == Z_OK) {
+		uint64_t num;
+		char smf_err[128];
+
+		num = (uint64_t)strtoll(mcap.zone_physmem_cap, NULL, 10);
+		if (zone_setattr(zoneid, ZONE_ATTR_PHYS_MCAP, &num, 0) == -1) {
+			zerror(gettext("could not set zone memory cap"));
+			res = Z_ERR;
+		}
+
+		if (zonecfg_enable_rcapd(smf_err, sizeof (smf_err)) != Z_OK) {
+			zerror(gettext("enabling system/rcap service failed: "
+			    "%s"), smf_err);
+			res = Z_ERR;
+		}
+	}
+
+	zonecfg_fini_handle(handle);
+
+	return (res);
 }
 
 static int

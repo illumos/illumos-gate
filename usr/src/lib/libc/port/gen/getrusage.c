@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +48,7 @@
 #include <sys/param.h>
 #include <errno.h>
 #include <sys/resource.h>
+#include <sys/vm_usage.h>
 #include <fcntl.h>
 #include <sys/fcntl.h>
 #include <procfs.h>
@@ -75,4 +75,11 @@ getrusage(int who, struct rusage *rusage)
 		errno = EINVAL;
 		return (-1);
 	}
+}
+
+int
+getvmusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres)
+{
+	return (syscall(SYS_rusagesys, _RUSAGESYS_GETVMUSAGE, flags, age,
+	    buf, nres));
 }

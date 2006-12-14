@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -542,13 +541,13 @@ schedctl_getpage(struct anon_map **newamp, caddr_t *newaddr)
 	 * Set up anonymous memory struct.  No swap reservation is
 	 * needed since the page will be locked into memory.
 	 */
-	amp = anonmap_alloc(PAGESIZE, PAGESIZE);
+	amp = anonmap_alloc(PAGESIZE, 0);
 
 	/*
 	 * Allocate the page.
 	 */
-	kaddr = segkp_get_withanonmap(segkp, PAGESIZE, KPD_LOCKED | KPD_ZERO,
-	    amp);
+	kaddr = segkp_get_withanonmap(segkp, PAGESIZE,
+	    KPD_NO_ANON | KPD_LOCKED | KPD_ZERO, amp);
 	if (kaddr == NULL) {
 		amp->refcnt--;
 		anonmap_free(amp);

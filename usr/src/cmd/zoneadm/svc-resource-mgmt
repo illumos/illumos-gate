@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -17,57 +18,37 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-
-
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
+
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG= zoneadmd
+. /lib/svc/share/smf_include.sh
 
-include ../Makefile.cmd
+[ ! -f /etc/zones/global.xml ] && exit $SMF_EXIT_OK	# No global zone
+							# resource mgmt.
+							# configuration
 
-ROOTCMDDIR=	$(ROOTLIB)/zones
+[ ! -x /usr/sbin/zoneadm ] && exit $SMF_EXIT_OK # SUNWzoneu not installed
 
-OBJS= zoneadmd.o zcons.o vplat.o
-SRCS = $(OBJS:.o=.c)
-POFILE=zoneadmd_all.po
-POFILES= $(OBJS:%.o=%.po)
+# Make sure working directory is / to prevent unmounting problems.
+cd /
+PATH=/usr/sbin:/usr/bin; export PATH
 
-CFLAGS += $(CCVERBOSE)
-LAZYLIBS = $(ZLAZYLOAD) -ltsnet -ltsol $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -ltsnet -ltsol
-LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
-	-lgen -lbsm -lcontract -lzfs -luuid -lbrand $(LAZYLIBS)
-XGETFLAGS += -a -x zoneadmd.xcl
+case "$1" in
+'start')
+	zoneadm -z global apply
+	if [ $? -ne 0 ]; then
+                exit $SMF_EXIT_ERR_FATAL
+        fi
+	;;
 
-.KEEP_STATE:
-
-.PARALLEL:
-
-all: $(PROG)
-
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
-
-install: all $(ROOTCMD)
-
-$(POFILE): $(POFILES)
-	$(RM) $@
-	$(CAT) $(POFILES) > $@
-
-clean:
-	$(RM) $(OBJS)
-
-lint:	lint_SRCS
-
-check:
-	$(CSTYLE) -p -P $(SRCS:%=%)
-
-include ../Makefile.targ
+*)
+	echo "Usage: $0 start"
+	exit $SMF_EXIT_ERR_FATAL
+	;;
+esac
+exit $SMF_EXIT_OK

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -259,4 +258,78 @@ xatoi(char *p)
 	} else {
 		return (i);
 	}
+}
+
+/*
+ * get_running_zones() calls zone_list(2) to find out how many zones are
+ * running.  It then calls zone_list(2) again to fetch the list of running
+ * zones (stored in *zents).
+ */
+int
+get_running_zones(uint_t *nzents, zone_entry_t **zents)
+{
+	zoneid_t *zids;
+	uint_t nzents_saved;
+	int i;
+	zone_entry_t *zentp;
+	zone_state_t zstate;
+
+	*zents = NULL;
+	if (zone_list(NULL, nzents) != 0) {
+		warn(gettext("could not get zoneid list\n"));
+		return (E_ERROR);
+	}
+
+again:
+	if (*nzents == 0)
+		return (E_SUCCESS);
+
+	if ((zids = (zoneid_t *)calloc(*nzents, sizeof (zoneid_t))) == NULL) {
+		warn(gettext("out of memory: zones will not be capped\n"));
+		return (E_ERROR);
+	}
+
+	nzents_saved = *nzents;
+
+	if (zone_list(zids, nzents) != 0) {
+		warn(gettext("could not get zone list\n"));
+		free(zids);
+		return (E_ERROR);
+	}
+	if (*nzents != nzents_saved) {
+		/* list changed, try again */
+		free(zids);
+		goto again;
+	}
+
+	*zents = calloc(*nzents, sizeof (zone_entry_t));
+	if (*zents == NULL) {
+		warn(gettext("out of memory: zones will not be capped\n"));
+		free(zids);
+		return (E_ERROR);
+	}
+
+	zentp = *zents;
+	for (i = 0; i < *nzents; i++) {
+		char name[ZONENAME_MAX];
+
+		if (getzonenamebyid(zids[i], name, sizeof (name)) < 0) {
+			warn(gettext("could not get name for "
+			    "zoneid %d\n"), zids[i]);
+			continue;
+		}
+
+		(void) strlcpy(zentp->zname, name, sizeof (zentp->zname));
+		zentp->zid = zids[i];
+		if (zone_get_state(name, &zstate) != Z_OK ||
+		    zstate != ZONE_STATE_RUNNING)
+			continue;
+
+
+		zentp++;
+	}
+	*nzents = zentp - *zents;
+
+	free(zids);
+	return (E_SUCCESS);
 }

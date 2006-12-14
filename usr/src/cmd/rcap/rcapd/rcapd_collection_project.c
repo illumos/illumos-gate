@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,24 +37,17 @@
 				/* round up to next y = 2^n */
 #define	ROUNDUP(x, y)		(((x) + ((y) - 1)) & ~((y) - 1))
 
-static rcid_t rc_proj_getidbypsinfo(psinfo_t *);
-
-void
-lcollection_set_type_project(void)
-{
-	rc_getidbypsinfo = rc_proj_getidbypsinfo;
-}
-
 static int
 lcollection_update_project_cb(const struct project *proj, void *walk_data)
 {
-	void(*update_notification_cb)(char *, int, uint64_t, int) =
-	    (void(*)(char *, int, uint64_t, int))walk_data;
+	void(*update_notification_cb)(char *, char *, int, uint64_t, int) =
+	    (void(*)(char *, char *, int, uint64_t, int))walk_data;
 	char *capattr_abs;
 	char *end;
 	int changes;
 	int64_t max_rss;
 	lcollection_t *lcol;
+	rcid_t colid;
 
 	capattr_abs = strstr(proj->pj_attr, PJ_ABS_ATTR_NAME "=");
 	if (capattr_abs != NULL) {
@@ -70,17 +62,19 @@ lcollection_update_project_cb(const struct project *proj, void *walk_data)
 		capattr_abs += strlen(PJ_ABS_ATTR_NAME "=");
 		max_rss = ROUNDUP(strtoll(capattr_abs, &end, 10), 1024) / 1024;
 		if (end == capattr_abs || *end != ';' && *end != 0)
-			warn(gettext("%s %s: malformed %s value "
-			    "'%s'\n"), rcfg.rcfg_mode_name, proj->pj_name,
-			    PJ_ABS_ATTR_NAME, capattr_abs);
+			warn(gettext("project %s: malformed %s value '%s'\n"),
+			    proj->pj_name, PJ_ABS_ATTR_NAME, capattr_abs);
 	} else
 		max_rss = 0;
 
-	lcol = lcollection_insert_update(proj->pj_projid, max_rss,
-	    proj->pj_name, &changes);
+	colid.rcid_type = RCIDT_PROJECT;
+	colid.rcid_val = proj->pj_projid;
+
+	lcol = lcollection_insert_update(&colid, max_rss, proj->pj_name,
+	    &changes);
 	if (update_notification_cb != NULL)
-		update_notification_cb(proj->pj_name, changes, max_rss, (lcol !=
-		    NULL) ? lcol->lcol_mark : 0);
+		update_notification_cb("project", proj->pj_name, changes,
+		    max_rss, (lcol != NULL) ? lcol->lcol_mark : 0);
 
 	return (0);
 }
@@ -101,10 +95,13 @@ lcollection_update_project_byid_cb(const projid_t id, void *walk_data)
 static int
 lcollection_update_onceactive_cb(lcollection_t *lcol, void *walk_data)
 {
-	void(*update_notification_cb)(char *, int, uint64_t, int) =
-	    (void(*)(char *, int, uint64_t, int))walk_data;
+	void(*update_notification_cb)(char *, char *, int, uint64_t, int) =
+	    (void(*)(char *, char *, int, uint64_t, int))walk_data;
 
-	return (lcollection_update_project_byid_cb(lcol->lcol_id,
+	if (lcol->lcol_id.rcid_type != RCIDT_PROJECT)
+		return (0);
+
+	return (lcollection_update_project_byid_cb(lcol->lcol_id.rcid_val,
 	    (void *)update_notification_cb));
 }
 
@@ -125,7 +122,7 @@ project_walk_all(int(*cb)(const struct project *, void *), void *walk_data)
 
 void
 lcollection_update_project(lcollection_update_type_t ut,
-    void(*update_notification_cb)(char *, int, uint64_t, int))
+    void(*update_notification_cb)(char *, char *, int, uint64_t, int))
 {
 	switch (ut) {
 	case LCU_ACTIVE_ONLY:
@@ -153,10 +150,4 @@ lcollection_update_project(lcollection_update_type_t ut,
 		(void) project_walk_all(lcollection_update_project_cb,
 		    (void *)update_notification_cb);
 	}
-}
-
-static rcid_t
-rc_proj_getidbypsinfo(psinfo_t *psinfo)
-{
-	return (psinfo->pr_projid);
 }

@@ -42,6 +42,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cred.h>
+#include <sys/zone.h>
 #include <vm/seg.h>
 #include <vm/vpage.h>
 
@@ -387,8 +388,8 @@ extern int	anon_map_demotepages(struct anon_map *, ulong_t,
 		    struct seg *, caddr_t, uint_t,
 		    struct vpage [], struct cred *);
 extern void	anon_shmap_free_pages(struct anon_map *, ulong_t, size_t);
-extern int	anon_resvmem(size_t, uint_t);
-extern void	anon_unresv(size_t);
+extern int	anon_resvmem(size_t, boolean_t, zone_t *);
+extern void	anon_unresvmem(size_t, zone_t *);
 extern struct	anon_map *anonmap_alloc(size_t, size_t);
 extern void	anonmap_free(struct anon_map *);
 extern void	anon_decref(struct anon *);
@@ -416,9 +417,16 @@ extern void	anon_array_exit(anon_sync_obj_t *);
  * request and if so, reserves the appropriate anonymous memory resources.
  * anon_checkspace just checks to see if there is space to fulfill the request,
  * without taking any resources.  Both return 1 if successful and 0 if not.
+ *
+ * Macros are provided as anon reservation is usually charged to the zone of
+ * the current process.  In some cases (such as anon reserved by tmpfs), a
+ * zone pointer is needed to charge the appropriate zone.
  */
-#define	anon_resv(size)		anon_resvmem((size), 1)
-#define	anon_checkspace(size)	anon_resvmem((size), 0)
+#define	anon_unresv(size)		anon_unresvmem(size, curproc->p_zone)
+#define	anon_unresv_zone(size, zone)	anon_unresvmem(size, zone)
+#define	anon_resv(size)			anon_resvmem((size), 1, curproc->p_zone)
+#define	anon_resv_zone(size, zone)	anon_resvmem((size), 1, zone)
+#define	anon_checkspace(size, zone)	anon_resvmem((size), 0, zone)
 
 /*
  * Flags to anon_private

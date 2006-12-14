@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +66,7 @@ tmp_resv(
 	int pagecreate)		/* call anon_resv if set */
 {
 	pgcnt_t pages = btopr(delta);
+	zone_t *zone;
 
 	ASSERT(RW_WRITE_HELD(&tp->tn_rwlock));
 	ASSERT(tp->tn_type == VREG);
@@ -79,9 +79,10 @@ tmp_resv(
 	 *
 	 * Deny if trying to reserve more than tmpfs can allocate
 	 */
+	zone = tm->tm_vfsp->vfs_zone;
 	if (pagecreate && ((tm->tm_anonmem + pages > tm->tm_anonmax) ||
-	    (!anon_checkspace(ptob(pages + tmpfs_minfree))) ||
-	    (anon_resv(delta) == 0))) {
+	    (!anon_checkspace(ptob(pages + tmpfs_minfree), zone)) ||
+	    (anon_resv_zone(delta, zone) == 0))) {
 		return (1);
 	}
 
@@ -114,7 +115,7 @@ tmp_unresv(
 	ASSERT(RW_WRITE_HELD(&tp->tn_rwlock));
 	ASSERT(tp->tn_type == VREG);
 
-	anon_unresv(delta);
+	anon_unresv_zone(delta, tm->tm_vfsp->vfs_zone);
 
 	mutex_enter(&tm->tm_contents);
 	tm->tm_anonmem -= btopr(delta);

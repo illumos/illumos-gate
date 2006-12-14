@@ -106,6 +106,7 @@
 
 #include <pool.h>
 #include <sys/pool.h>
+#include <sys/priocntl.h>
 
 #include <libbrand.h>
 #include <sys/brand.h>
@@ -2661,27 +2662,6 @@ out:
 }
 
 static int
-get_zone_pool(zlog_t *zlogp, char *poolbuf, size_t bufsz)
-{
-	zone_dochandle_t handle;
-	int error;
-
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (Z_NOMEM);
-	}
-	error = zonecfg_get_snapshot_handle(zone_name, handle);
-	if (error != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
-		return (error);
-	}
-	error = zonecfg_get_pool(handle, poolbuf, bufsz);
-	zonecfg_fini_handle(handle);
-	return (error);
-}
-
-static int
 get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 {
 	zone_dochandle_t handle;
@@ -2815,75 +2795,6 @@ validate_datasets(zlog_t *zlogp)
 	zonecfg_fini_handle(handle);
 	libzfs_fini(hdl);
 
-	return (0);
-}
-
-static int
-bind_to_pool(zlog_t *zlogp, zoneid_t zoneid)
-{
-	pool_conf_t *poolconf;
-	pool_t *pool;
-	char poolname[MAXPATHLEN];
-	int status;
-	int error;
-
-	/*
-	 * Find the pool mentioned in the zone configuration, and bind to it.
-	 */
-	error = get_zone_pool(zlogp, poolname, sizeof (poolname));
-	if (error == Z_NO_ENTRY || (error == Z_OK && strlen(poolname) == 0)) {
-		/*
-		 * The property is not set on the zone, so the pool
-		 * should be bound to the default pool.  But that's
-		 * already done by the kernel, so we can just return.
-		 */
-		return (0);
-	}
-	if (error != Z_OK) {
-		/*
-		 * Not an error, even though it shouldn't be happening.
-		 */
-		zerror(zlogp, B_FALSE,
-		    "WARNING: unable to retrieve default pool.");
-		return (0);
-	}
-	/*
-	 * Don't do anything if pools aren't enabled.
-	 */
-	if (pool_get_status(&status) != PO_SUCCESS || status != POOL_ENABLED) {
-		zerror(zlogp, B_FALSE, "WARNING: pools facility not active; "
-		    "zone will not be bound to pool '%s'.", poolname);
-		return (0);
-	}
-	/*
-	 * Try to provide a sane error message if the requested pool doesn't
-	 * exist.
-	 */
-	if ((poolconf = pool_conf_alloc()) == NULL) {
-		zerror(zlogp, B_FALSE, "%s failed", "pool_conf_alloc");
-		return (-1);
-	}
-	if (pool_conf_open(poolconf, pool_dynamic_location(), PO_RDONLY) !=
-	    PO_SUCCESS) {
-		zerror(zlogp, B_FALSE, "%s failed", "pool_conf_open");
-		pool_conf_free(poolconf);
-		return (-1);
-	}
-	pool = pool_get_pool(poolconf, poolname);
-	(void) pool_conf_close(poolconf);
-	pool_conf_free(poolconf);
-	if (pool == NULL) {
-		zerror(zlogp, B_FALSE, "WARNING: pool '%s' not found; "
-		    "using default pool.", poolname);
-		return (0);
-	}
-	/*
-	 * Bind the zone to the pool.
-	 */
-	if (pool_set_binding(poolname, P_ZONEID, zoneid) != PO_SUCCESS) {
-		zerror(zlogp, B_FALSE, "WARNING: unable to bind to pool '%s'; "
-		    "using default pool.", poolname);
-	}
 	return (0);
 }
 
@@ -3482,6 +3393,149 @@ duplicate_reachable_path(zlog_t *zlogp, const char *rootpath)
 	return (B_FALSE);
 }
 
+/*
+ * Set memory cap and pool info for the zone's resource management
+ * configuration.
+ */
+static int
+setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
+{
+	int res;
+	uint64_t tmp;
+	struct zone_mcaptab mcap;
+	char sched[MAXNAMELEN];
+	zone_dochandle_t handle = NULL;
+	char pool_err[128];
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zerror(zlogp, B_TRUE, "getting zone configuration handle");
+		return (Z_BAD_HANDLE);
+	}
+
+	if ((res = zonecfg_get_snapshot_handle(zone_name, handle)) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration");
+		zonecfg_fini_handle(handle);
+		return (res);
+	}
+
+	/*
+	 * If a memory cap is configured, set the cap in the kernel using
+	 * zone_setattr() and make sure the rcapd SMF service is enabled.
+	 */
+	if (zonecfg_getmcapent(handle, &mcap) == Z_OK) {
+		uint64_t num;
+		char smf_err[128];
+
+		num = (uint64_t)strtoull(mcap.zone_physmem_cap, NULL, 10);
+		if (zone_setattr(zoneid, ZONE_ATTR_PHYS_MCAP, &num, 0) == -1) {
+			zerror(zlogp, B_TRUE, "could not set zone memory cap");
+			zonecfg_fini_handle(handle);
+			return (Z_INVAL);
+		}
+
+		if (zonecfg_enable_rcapd(smf_err, sizeof (smf_err)) != Z_OK) {
+			zerror(zlogp, B_FALSE, "enabling system/rcap service "
+			    "failed: %s", smf_err);
+			zonecfg_fini_handle(handle);
+			return (Z_INVAL);
+		}
+	}
+
+	/* Get the scheduling class set in the zone configuration. */
+	if (zonecfg_get_sched_class(handle, sched, sizeof (sched)) == Z_OK &&
+	    strlen(sched) > 0) {
+		if (zone_setattr(zoneid, ZONE_ATTR_SCHED_CLASS, sched,
+		    strlen(sched)) == -1)
+			zerror(zlogp, B_TRUE, "WARNING: unable to set the "
+			    "default scheduling class");
+
+	} else if (zonecfg_get_aliased_rctl(handle, ALIAS_SHARES, &tmp)
+	    == Z_OK) {
+		/*
+		 * If the zone has the zone.cpu-shares rctl set then we want to
+		 * use the Fair Share Scheduler (FSS) for processes in the
+		 * zone.  Check what scheduling class the zone would be running
+		 * in by default so we can print a warning and modify the class
+		 * if we wouldn't be using FSS.
+		 */
+		char class_name[PC_CLNMSZ];
+
+		if (zonecfg_get_dflt_sched_class(handle, class_name,
+		    sizeof (class_name)) != Z_OK) {
+			zerror(zlogp, B_FALSE, "WARNING: unable to determine "
+			    "the zone's scheduling class");
+
+		} else if (strcmp("FSS", class_name) != 0) {
+			zerror(zlogp, B_FALSE, "WARNING: The zone.cpu-shares "
+			    "rctl is set but\nFSS is not the default "
+			    "scheduling class for\nthis zone.  FSS will be "
+			    "used for processes\nin the zone but to get the "
+			    "full benefit of FSS,\nit should be the default "
+			    "scheduling class.\nSee dispadmin(1M) for more "
+			    "details.");
+
+			if (zone_setattr(zoneid, ZONE_ATTR_SCHED_CLASS, "FSS",
+			    strlen("FSS")) == -1)
+				zerror(zlogp, B_TRUE, "WARNING: unable to set "
+				    "zone scheduling class to FSS");
+		}
+	}
+
+	/*
+	 * The next few blocks of code attempt to set up temporary pools as
+	 * well as persistent pools.  In all cases we call the functions
+	 * unconditionally.  Within each funtion the code will check if the
+	 * zone is actually configured for a temporary pool or persistent pool
+	 * and just return if there is nothing to do.
+	 *
+	 * If we are rebooting we want to attempt to reuse any temporary pool
+	 * that was previously set up.  zonecfg_bind_tmp_pool() will do the
+	 * right thing in all cases (reuse or create) based on the current
+	 * zonecfg.
+	 */
+	if ((res = zonecfg_bind_tmp_pool(handle, zoneid, pool_err,
+	    sizeof (pool_err))) != Z_OK) {
+		if (res == Z_POOL || res == Z_POOL_CREATE || res == Z_POOL_BIND)
+			zerror(zlogp, B_FALSE, "%s: %s\ndedicated-cpu setting "
+			    "cannot be instantiated", zonecfg_strerror(res),
+			    pool_err);
+		else
+			zerror(zlogp, B_FALSE, "could not bind zone to "
+			    "temporary pool: %s", zonecfg_strerror(res));
+		zonecfg_fini_handle(handle);
+		return (Z_POOL_BIND);
+	}
+
+	/*
+	 * Check if we need to warn about poold not being enabled.
+	 */
+	if (zonecfg_warn_poold(handle)) {
+		zerror(zlogp, B_FALSE, "WARNING: A range of dedicated-cpus has "
+		    "been specified\nbut the dynamic pool service is not "
+		    "enabled.\nThe system will not dynamically adjust the\n"
+		    "processor allocation within the specified range\n"
+		    "until svc:/system/pools/dynamic is enabled.\n"
+		    "See poold(1M).");
+	}
+
+	/* The following is a warning, not an error. */
+	if ((res = zonecfg_bind_pool(handle, zoneid, pool_err,
+	    sizeof (pool_err))) != Z_OK) {
+		if (res == Z_POOL_BIND)
+			zerror(zlogp, B_FALSE, "WARNING: unable to bind to "
+			    "pool '%s'; using default pool.", pool_err);
+		else if (res == Z_POOL)
+			zerror(zlogp, B_FALSE, "WARNING: %s: %s",
+			    zonecfg_strerror(res), pool_err);
+		else
+			zerror(zlogp, B_FALSE, "WARNING: %s",
+			    zonecfg_strerror(res));
+	}
+
+	zonecfg_fini_handle(handle);
+	return (Z_OK);
+}
+
 zoneid_t
 vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 {
@@ -3668,14 +3722,18 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	}
 
 	/*
-	 * The following is a warning, not an error, and is not performed when
-	 * merely mounting a zone for administrative use.
+	 * The following actions are not performed when merely mounting a zone
+	 * for administrative use.
 	 */
-	if (!mount_cmd && bind_to_pool(zlogp, zoneid) != 0)
-		zerror(zlogp, B_FALSE, "WARNING: unable to bind zone to "
-		    "requested pool; using default pool.");
-	if (!mount_cmd)
+	if (!mount_cmd) {
+		if (setup_zone_rm(zlogp, zone_name, zoneid) != Z_OK) {
+			(void) zone_shutdown(zoneid);
+			goto error;
+		}
+
 		set_mlps(zlogp, zoneid, zcent);
+	}
+
 	rval = zoneid;
 	zoneid = -1;
 
@@ -3878,10 +3936,12 @@ unmounted:
 }
 
 int
-vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
+vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 {
 	char *kzone;
 	zoneid_t zoneid;
+	int res;
+	char pool_err[128];
 	char zroot[MAXPATHLEN];
 	char cmdbuf[MAXPATHLEN];
 	char brand[MAXNAMELEN];
@@ -3970,6 +4030,19 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
 		zerror(zlogp, B_FALSE,
 		    "unable to unmount file systems in zone");
 		goto error;
+	}
+
+	/*
+	 * If we are rebooting then we don't want to destroy an existing
+	 * temporary pool at this point so that we can just reuse it when the
+	 * zone boots back up.
+	 */
+	if (!unmount_cmd && !rebooting) {
+		if ((res = zonecfg_destroy_tmp_pool(zone_name, pool_err,
+		    sizeof (pool_err))) != Z_OK) {
+			if (res == Z_POOL)
+				zerror(zlogp, B_FALSE, pool_err);
+		}
 	}
 
 	remove_mlps(zlogp, zoneid);

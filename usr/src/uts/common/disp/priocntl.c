@@ -136,6 +136,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 	struct pcmpargs		pcmpargs;
 	pc_vaparms_t		vaparms;
 	char			clname[PC_CLNMSZ];
+	char			*outstr;
 	int			count;
 	kthread_id_t		retthreadp;
 	proc_t			*initpp;
@@ -145,6 +146,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 	int			rv = 0;
 	pid_t			saved_pid;
 	id_t			classid;
+	int			size;
 	int (*copyinfn)(const void *, void *, size_t);
 	int (*copyoutfn)(const void *, void *, size_t);
 
@@ -690,6 +692,21 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 			return (set_errno(EINVAL));
 		defaultcid = classid;
 		ASSERT(defaultcid > 0 && defaultcid < loaded_classes);
+		break;
+
+	case PC_GETDFLCL:
+		mutex_enter(&class_lock);
+
+		if (defaultcid >= loaded_classes)
+			outstr = "";
+		else
+			outstr = sclass[defaultcid].cl_name;
+		size = strlen(outstr) + 1;
+		if (arg != NULL)
+			if ((*copyoutfn)(outstr, arg, size) != 0)
+				error = EFAULT;
+
+		mutex_exit(&class_lock);
 		break;
 
 	default:

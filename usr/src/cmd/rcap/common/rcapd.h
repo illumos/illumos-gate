@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +57,21 @@ extern "C" {
 #define	LCST_CAP_REMOVED		(1<<1)
 #define	LCST_CAP_ZERO			(1<<2)
 
-typedef int64_t rcid_t;
+typedef enum {
+	RCIDT_PROJECT,
+	RCIDT_ZONE
+} rcid_type_t;
+
+typedef struct {
+	/*
+	 * The following field could just be a rcid_type_t but it gets
+	 * written out to a file as binary data for communication between
+	 * 64-bit rcapd & 32-bit rcapstat, so we need to force a standard size
+	 * and alignment here.
+	 */
+	uint64_t	rcid_type;
+	int64_t		rcid_val;
+} rcid_t;
 
 typedef enum {
 	LCU_COMPLETE,	/* an enumeration of all possible collections */
@@ -138,7 +151,6 @@ typedef struct lcollection {
 	uint64_t lcol_rss;		/* RSS of all processes (kB) */
 	uint64_t lcol_image_size;	/* image size of all processes (kB) */
 	uint64_t lcol_rss_cap;		/* RSS cap (kB) */
-	int lcol_stat_invalidate;	/* flag to reset interval statistics */
 	lcollection_stat_t lcol_stat;	/* statistics */
 	lcollection_stat_t lcol_stat_old; /* previous interval's statistics */
 	lprocess_t *lcol_lprocess;	/* member processes */
@@ -162,12 +174,11 @@ typedef struct lcollection_report {
 
 extern int get_psinfo(pid_t, struct psinfo *, int, int(*)(void *, int), void *,
     lprocess_t *);
-extern lcollection_t *lcollection_find(id_t);
+extern lcollection_t *lcollection_find(rcid_t *);
 extern void lcollection_freq_move(lprocess_t *);
-extern lcollection_t *lcollection_insert_update(rcid_t, uint64_t, char *,
+extern lcollection_t *lcollection_insert_update(rcid_t *, uint64_t, char *,
     int *changes);
 extern int lcollection_member(lcollection_t *, lprocess_t *);
-extern void lcollection_set_type(rctype_t);
 extern void lcollection_free(lcollection_t *);
 extern void lcollection_update(lcollection_update_type_t);
 extern void list_walk_collection(int (*)(lcollection_t *, void *), void *);
@@ -176,12 +187,6 @@ extern void lprocess_free(lprocess_t *);
 extern void scan(lcollection_t *, int64_t);
 extern void scan_abort(void);
 extern void check_update_statistics(void);
-
-/*
- * The collection-specific function determining the collection ID from a
- * process' psinfo.
- */
-extern rcid_t(*rc_getidbypsinfo)(struct psinfo *);
 
 /*
  * Global (in rcapd only) variables.

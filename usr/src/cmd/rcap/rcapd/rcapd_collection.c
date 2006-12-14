@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,14 +40,16 @@
 #define	MAX(x, y) (((x) > (y)) ? (x) : (y))
 
 typedef struct {
-	rcid_t		lfa_colid;
+	rcid_t		*lfa_colidp;
 	lcollection_t	*lfa_found;
 } lcollection_find_arg_t;
 
 extern void lcollection_update_project(lcollection_update_type_t,
-    void(*)(char *, int, uint64_t, int));
-extern void lcollection_set_type_project();
-static void lcollection_update_notification_cb(char *, int, uint64_t, int);
+    void(*)(char *, char *, int, uint64_t, int));
+extern void lcollection_update_zone(lcollection_update_type_t,
+    void(*)(char *, char *, int, uint64_t, int));
+static void lcollection_update_notification_cb(char *, char *, int, uint64_t,
+    int);
 
 rcid_t(*rc_getidbypsinfo)(psinfo_t *);
 uint64_t phys_total = 0;
@@ -57,28 +58,8 @@ static lcollection_t *lcollection_head = NULL;
 void
 lcollection_update(lcollection_update_type_t ut)
 {
-	if (rcfg.rcfg_mode == rctype_project)
-		lcollection_update_project(ut,
-		    lcollection_update_notification_cb);
-	else
-		die(gettext("unknown mode %s\n"), rcfg.rcfg_mode_name);
-}
-
-/*
- * Configure which collection type will be used.
- */
-void
-lcollection_set_type(rctype_t type)
-{
-	switch (type) {
-	case rctype_project:
-		lcollection_set_type_project();
-		break;
-	default:
-		/* can't happen */
-		die(gettext("unknown mode %d\n"), type);
-		/*NOTREACHED*/
-	}
+	lcollection_update_zone(ut, lcollection_update_notification_cb);
+	lcollection_update_project(ut, lcollection_update_notification_cb);
 }
 
 /*
@@ -93,7 +74,7 @@ lcollection_set_type(rctype_t type)
  *	LCSS_CAP_ZERO
  */
 lcollection_t *
-lcollection_insert_update(rcid_t colid, uint64_t rss_cap, char *name,
+lcollection_insert_update(rcid_t *colidp, uint64_t rss_cap, char *name,
     int *changes)
 {
 	lcollection_t *lcol;
@@ -103,7 +84,7 @@ lcollection_insert_update(rcid_t colid, uint64_t rss_cap, char *name,
 	if (rss_cap == 0)
 		*changes |= LCST_CAP_ZERO;
 
-	lcol = lcollection_find(colid);
+	lcol = lcollection_find(colidp);
 
 	/*
 	 * If the specified collection is capped, add it to lcollection.
@@ -120,12 +101,13 @@ lcollection_insert_update(rcid_t colid, uint64_t rss_cap, char *name,
 		lcol = malloc(sizeof (*lcol));
 		if (lcol == NULL) {
 			debug("not enough memory to monitor %s %s",
-			    rcfg.rcfg_mode_name, name);
+			    (colidp->rcid_type == RCIDT_PROJECT ?
+			    "project" : "zone"), name);
 			return (NULL);
 		}
 		(void) bzero(lcol, sizeof (*lcol));
 
-		lcol->lcol_id = colid;
+		lcol->lcol_id = *colidp;
 		debug("added collection %s\n", name);
 		lcol->lcol_prev = NULL;
 		lcol->lcol_next = lcollection_head;
@@ -157,8 +139,8 @@ lcollection_insert_update(rcid_t colid, uint64_t rss_cap, char *name,
 }
 
 static void
-lcollection_update_notification_cb(char *name, int changes, uint64_t rss_cap,
-    int mark)
+lcollection_update_notification_cb(char *col_type, char *name, int changes,
+    uint64_t rss_cap, int mark)
 {
 	/*
 	 * Assume the collection has been updated redundantly if its mark count
@@ -168,10 +150,10 @@ lcollection_update_notification_cb(char *name, int changes, uint64_t rss_cap,
 		return;
 
 	if (changes & LCST_CAP_ZERO)
-		debug("%s %s: %s\n", rcfg.rcfg_mode_name, name,
+		debug("%s %s: %s\n", col_type, name,
 		    (changes & LCST_CAP_REMOVED) ? "cap removed" : "uncapped");
 	else
-		debug("%s %s: cap: %llukB\n", rcfg.rcfg_mode_name, name,
+		debug("%s %s: cap: %llukB\n", col_type, name,
 		    (unsigned long long)rss_cap);
 }
 
@@ -215,19 +197,23 @@ lcollection_member(lcollection_t *lcol, lprocess_t *lpc)
 static int
 lcollection_find_cb(lcollection_t *lcol, void *arg)
 {
-	if (lcol->lcol_id == ((lcollection_find_arg_t *)arg)->lfa_colid) {
+	rcid_t *colidp = ((lcollection_find_arg_t *)arg)->lfa_colidp;
+
+	if (lcol->lcol_id.rcid_type == colidp->rcid_type &&
+	    lcol->lcol_id.rcid_val == colidp->rcid_val) {
 		((lcollection_find_arg_t *)arg)->lfa_found = lcol;
 		return (1);
-	} else
-		return (0);
+	}
+
+	return (0);
 }
 
 lcollection_t *
-lcollection_find(id_t colid)
+lcollection_find(rcid_t *colidp)
 {
 	lcollection_find_arg_t lfa;
 
-	lfa.lfa_colid = colid;
+	lfa.lfa_colidp = colidp;
 	lfa.lfa_found = NULL;
 	list_walk_collection(lcollection_find_cb, &lfa);
 

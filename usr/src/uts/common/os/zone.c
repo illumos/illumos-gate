@@ -154,6 +154,10 @@
  *   zone_lock: This is a per-zone lock used to protect several fields of
  *       the zone_t (see <sys/zone.h> for details).  In addition, holding
  *       this lock means that the zone cannot go away.
+ *   zone_nlwps_lock: This is a per-zone lock used to protect the fields
+ *	 related to the zone.max-lwps rctl.
+ *   zone_mem_lock: This is a per-zone lock used to protect the fields
+ *	 related to the zone.max-locked-memory and zone.max-swap rctls.
  *   zsd_key_lock: This is a global lock protecting the key state for ZSD.
  *   zone_deathrow_lock: This is a global lock protecting the "deathrow"
  *       list (a list of zones in the ZONE_IS_DEAD state).
@@ -161,6 +165,10 @@
  *   Ordering requirements:
  *       pool_lock --> cpu_lock --> zonehash_lock --> zone_status_lock -->
  *       	zone_lock --> zsd_key_lock --> pidlock --> p_lock
+ *
+ *   When taking zone_mem_lock or zone_nlwps_lock, the lock ordering is:
+ *	zonehash_lock --> a_lock --> pidlock --> p_lock --> zone_mem_lock
+ *	zonehash_lock --> a_lock --> pidlock --> p_lock --> zone_mem_lock
  *
  *   Blocking memory allocations are permitted while holding any of the
  *   zone locks.
@@ -190,6 +198,7 @@
 #include <sys/debug.h>
 #include <sys/file.h>
 #include <sys/kmem.h>
+#include <sys/kstat.h>
 #include <sys/mutex.h>
 #include <sys/note.h>
 #include <sys/pathname.h>
@@ -231,6 +240,8 @@
 #include <sys/brand.h>
 #include <sys/zone.h>
 #include <sys/tsol/label.h>
+
+#include <vm/seg.h>
 
 /*
  * cv used to signal that all references to the zone have been released.  This
@@ -317,6 +328,7 @@ const char  *zone_status_table[] = {
  */
 rctl_hndl_t rc_zone_cpu_shares;
 rctl_hndl_t rc_zone_locked_mem;
+rctl_hndl_t rc_zone_max_swap;
 rctl_hndl_t rc_zone_nlwps;
 rctl_hndl_t rc_zone_shmmax;
 rctl_hndl_t rc_zone_shmmni;
@@ -1011,9 +1023,9 @@ zone_locked_mem_usage(rctl_t *rctl, struct proc *p)
 {
 	rctl_qty_t q;
 	ASSERT(MUTEX_HELD(&p->p_lock));
-	mutex_enter(&p->p_zone->zone_rctl_lock);
+	mutex_enter(&p->p_zone->zone_mem_lock);
 	q = p->p_zone->zone_locked_mem;
-	mutex_exit(&p->p_zone->zone_rctl_lock);
+	mutex_exit(&p->p_zone->zone_mem_lock);
 	return (q);
 }
 
@@ -1023,9 +1035,12 @@ zone_locked_mem_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e,
     rctl_val_t *rcntl, rctl_qty_t incr, uint_t flags)
 {
 	rctl_qty_t q;
+	zone_t *z;
+
+	z = e->rcep_p.zone;
 	ASSERT(MUTEX_HELD(&p->p_lock));
-	ASSERT(MUTEX_HELD(&p->p_zone->zone_rctl_lock));
-	q = p->p_zone->zone_locked_mem;
+	ASSERT(MUTEX_HELD(&z->zone_mem_lock));
+	q = z->zone_locked_mem;
 	if (q + incr > rcntl->rcv_value)
 		return (1);
 	return (0);
@@ -1049,6 +1064,57 @@ static rctl_ops_t zone_locked_mem_ops = {
 	zone_locked_mem_usage,
 	zone_locked_mem_set,
 	zone_locked_mem_test
+};
+
+/*ARGSUSED*/
+static rctl_qty_t
+zone_max_swap_usage(rctl_t *rctl, struct proc *p)
+{
+	rctl_qty_t q;
+	zone_t *z = p->p_zone;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	mutex_enter(&z->zone_mem_lock);
+	q = z->zone_max_swap;
+	mutex_exit(&z->zone_mem_lock);
+	return (q);
+}
+
+/*ARGSUSED*/
+static int
+zone_max_swap_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e,
+    rctl_val_t *rcntl, rctl_qty_t incr, uint_t flags)
+{
+	rctl_qty_t q;
+	zone_t *z;
+
+	z = e->rcep_p.zone;
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(MUTEX_HELD(&z->zone_mem_lock));
+	q = z->zone_max_swap;
+	if (q + incr > rcntl->rcv_value)
+		return (1);
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+zone_max_swap_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
+    rctl_qty_t nv)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+	if (e->rcep_p.zone == NULL)
+		return (0);
+	e->rcep_p.zone->zone_max_swap_ctl = nv;
+	return (0);
+}
+
+static rctl_ops_t zone_max_swap_ops = {
+	rcop_no_action,
+	zone_max_swap_usage,
+	zone_max_swap_set,
+	zone_max_swap_test
 };
 
 /*
@@ -1080,6 +1146,96 @@ zone_get_kcred(zoneid_t zoneid)
 	return (cr);
 }
 
+static int
+zone_lockedmem_kstat_update(kstat_t *ksp, int rw)
+{
+	zone_t *zone = ksp->ks_private;
+	zone_kstat_t *zk = ksp->ks_data;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	zk->zk_usage.value.ui64 = zone->zone_locked_mem;
+	zk->zk_value.value.ui64 = zone->zone_locked_mem_ctl;
+	return (0);
+}
+
+static int
+zone_swapresv_kstat_update(kstat_t *ksp, int rw)
+{
+	zone_t *zone = ksp->ks_private;
+	zone_kstat_t *zk = ksp->ks_data;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	zk->zk_usage.value.ui64 = zone->zone_max_swap;
+	zk->zk_value.value.ui64 = zone->zone_max_swap_ctl;
+	return (0);
+}
+
+static void
+zone_kstat_create(zone_t *zone)
+{
+	kstat_t *ksp;
+	zone_kstat_t *zk;
+
+	ksp = rctl_kstat_create_zone(zone, "lockedmem", KSTAT_TYPE_NAMED,
+	    sizeof (zone_kstat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL);
+
+	if (ksp == NULL)
+		return;
+
+	zk = ksp->ks_data = kmem_alloc(sizeof (zone_kstat_t), KM_SLEEP);
+	ksp->ks_data_size += strlen(zone->zone_name) + 1;
+	kstat_named_init(&zk->zk_zonename, "zonename", KSTAT_DATA_STRING);
+	kstat_named_setstr(&zk->zk_zonename, zone->zone_name);
+	kstat_named_init(&zk->zk_usage, "usage", KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_value, "value", KSTAT_DATA_UINT64);
+	ksp->ks_update = zone_lockedmem_kstat_update;
+	ksp->ks_private = zone;
+	kstat_install(ksp);
+
+	zone->zone_lockedmem_kstat = ksp;
+
+	ksp = rctl_kstat_create_zone(zone, "swapresv", KSTAT_TYPE_NAMED,
+	    sizeof (zone_kstat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL);
+
+	if (ksp == NULL)
+		return;
+
+	zk = ksp->ks_data = kmem_alloc(sizeof (zone_kstat_t), KM_SLEEP);
+	ksp->ks_data_size += strlen(zone->zone_name) + 1;
+	kstat_named_init(&zk->zk_zonename, "zonename", KSTAT_DATA_STRING);
+	kstat_named_setstr(&zk->zk_zonename, zone->zone_name);
+	kstat_named_init(&zk->zk_usage, "usage", KSTAT_DATA_UINT64);
+	kstat_named_init(&zk->zk_value, "value", KSTAT_DATA_UINT64);
+	ksp->ks_update = zone_swapresv_kstat_update;
+	ksp->ks_private = zone;
+	kstat_install(ksp);
+
+	zone->zone_swapresv_kstat = ksp;
+}
+
+static void
+zone_kstat_delete(zone_t *zone)
+{
+	void *data;
+
+	if (zone->zone_lockedmem_kstat != NULL) {
+		data = zone->zone_lockedmem_kstat->ks_data;
+		kstat_delete(zone->zone_lockedmem_kstat);
+		kmem_free(data, sizeof (zone_kstat_t));
+	}
+	if (zone->zone_swapresv_kstat != NULL) {
+		data = zone->zone_swapresv_kstat->ks_data;
+		kstat_delete(zone->zone_swapresv_kstat);
+		kmem_free(data, sizeof (zone_kstat_t));
+	}
+}
+
 /*
  * Called very early on in boot to initialize the ZSD list so that
  * zone_key_create() can be called before zone_init().  It also initializes
@@ -1101,8 +1257,14 @@ zone_zsd_init(void)
 
 	mutex_init(&zone0.zone_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&zone0.zone_nlwps_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&zone0.zone_mem_lock, NULL, MUTEX_DEFAULT, NULL);
 	zone0.zone_shares = 1;
+	zone0.zone_nlwps = 0;
 	zone0.zone_nlwps_ctl = INT_MAX;
+	zone0.zone_locked_mem = 0;
+	zone0.zone_locked_mem_ctl = UINT64_MAX;
+	ASSERT(zone0.zone_max_swap == 0);
+	zone0.zone_max_swap_ctl = UINT64_MAX;
 	zone0.zone_shmmax = 0;
 	zone0.zone_ipc.ipcq_shmmni = 0;
 	zone0.zone_ipc.ipcq_semmni = 0;
@@ -1120,6 +1282,8 @@ zone_zsd_init(void)
 	zone0.zone_ncpus_online = 0;
 	zone0.zone_proc_initpid = 1;
 	zone0.zone_initname = initname;
+	zone0.zone_lockedmem_kstat = NULL;
+	zone0.zone_swapresv_kstat = NULL;
 	list_create(&zone0.zone_zsd, sizeof (struct zsd_entry),
 	    offsetof(struct zsd_entry, zsd_linkage));
 	list_insert_head(&zone_active, &zone0);
@@ -1259,6 +1423,12 @@ zone_init(void)
 	    RCENTITY_ZONE, RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_BYTES |
 	    RCTL_GLOBAL_DENY_ALWAYS, UINT64_MAX, UINT64_MAX,
 	    &zone_locked_mem_ops);
+
+	rc_zone_max_swap = rctl_register("zone.max-swap",
+	    RCENTITY_ZONE, RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_BYTES |
+	    RCTL_GLOBAL_DENY_ALWAYS, UINT64_MAX, UINT64_MAX,
+	    &zone_max_swap_ops);
+
 	/*
 	 * Initialize the ``global zone''.
 	 */
@@ -1277,9 +1447,14 @@ zone_init(void)
 	zone0.zone_brand = &native_brand;
 	rctl_prealloc_destroy(gp);
 	/*
-	 * pool_default hasn't been initialized yet, so we let pool_init() take
-	 * care of making the global zone is in the default pool.
+	 * pool_default hasn't been initialized yet, so we let pool_init()
+	 * take care of making sure the global zone is in the default pool.
 	 */
+
+	/*
+	 * Initialize global zone kstats
+	 */
+	zone_kstat_create(&zone0);
 
 	/*
 	 * Initialize zone label.
@@ -1337,6 +1512,7 @@ zone_init(void)
 
 	if (res)
 		panic("Sysevent_evc_bind failed during zone setup.\n");
+
 }
 
 static void
@@ -1473,6 +1649,38 @@ zone_set_initname(zone_t *zone, const char *zone_initname)
 
 	zone->zone_initname = kmem_alloc(strlen(initname) + 1, KM_SLEEP);
 	(void) strcpy(zone->zone_initname, initname);
+	return (0);
+}
+
+static int
+zone_set_phys_mcap(zone_t *zone, const uint64_t *zone_mcap)
+{
+	uint64_t mcap;
+	int err = 0;
+
+	if ((err = copyin(zone_mcap, &mcap, sizeof (uint64_t))) == 0)
+		zone->zone_phys_mcap = mcap;
+
+	return (err);
+}
+
+static int
+zone_set_sched_class(zone_t *zone, const char *new_class)
+{
+	char sched_class[PC_CLNMSZ];
+	id_t classid;
+	int err;
+
+	ASSERT(zone != global_zone);
+	if ((err = copyinstr(new_class, sched_class, PC_CLNMSZ, NULL)) != 0)
+		return (err);	/* EFAULT or ENAMETOOLONG */
+
+	if (getcid(sched_class, &classid) != 0 || classid == syscid)
+		return (set_errno(EINVAL));
+	zone->zone_defaultcid = classid;
+	ASSERT(zone->zone_defaultcid > 0 &&
+	    zone->zone_defaultcid < loaded_classes);
+
 	return (0);
 }
 
@@ -2510,10 +2718,10 @@ zsched(void *arg)
 	/*
 	 * Decrement locked memory counts on old zone and project.
 	 */
-	mutex_enter(&global_zone->zone_rctl_lock);
+	mutex_enter(&global_zone->zone_mem_lock);
 	global_zone->zone_locked_mem -= pp->p_locked_mem;
 	pj->kpj_data.kpd_locked_mem -= pp->p_locked_mem;
-	mutex_exit(&global_zone->zone_rctl_lock);
+	mutex_exit(&global_zone->zone_mem_lock);
 
 	/*
 	 * Create and join a new task in project '0' of this zone.
@@ -2529,10 +2737,10 @@ zsched(void *arg)
 
 	pj = pp->p_task->tk_proj;
 
-	mutex_enter(&zone->zone_rctl_lock);
+	mutex_enter(&zone->zone_mem_lock);
 	zone->zone_locked_mem += pp->p_locked_mem;
 	pj->kpj_data.kpd_locked_mem += pp->p_locked_mem;
-	mutex_exit(&zone->zone_rctl_lock);
+	mutex_exit(&zone->zone_mem_lock);
 
 	/*
 	 * add lwp counts to zsched's zone, and increment project's task count
@@ -2689,7 +2897,10 @@ zsched(void *arg)
 		 * classid 'cid'.
 		 */
 		pool_lock();
-		cid = pool_get_class(zone->zone_pool);
+		if (zone->zone_defaultcid > 0)
+			cid = zone->zone_defaultcid;
+		else
+			cid = pool_get_class(zone->zone_pool);
 		if (cid == -1)
 			cid = defaultcid;
 
@@ -3019,7 +3230,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_initname = NULL;
 	mutex_init(&zone->zone_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&zone->zone_nlwps_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&zone->zone_rctl_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&zone->zone_mem_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&zone->zone_cv, NULL, CV_DEFAULT, NULL);
 	list_create(&zone->zone_zsd, sizeof (struct zsd_entry),
 	    offsetof(struct zsd_entry, zsd_linkage));
@@ -3057,8 +3268,14 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_initname =
 	    kmem_alloc(strlen(zone_default_initname) + 1, KM_SLEEP);
 	(void) strcpy(zone->zone_initname, zone_default_initname);
+	zone->zone_nlwps = 0;
+	zone->zone_nlwps_ctl = INT_MAX;
 	zone->zone_locked_mem = 0;
 	zone->zone_locked_mem_ctl = UINT64_MAX;
+	zone->zone_max_swap = 0;
+	zone->zone_max_swap_ctl = UINT64_MAX;
+	zone0.zone_lockedmem_kstat = NULL;
+	zone0.zone_swapresv_kstat = NULL;
 
 	/*
 	 * Zsched initializes the rctls.
@@ -3231,6 +3448,11 @@ zone_create(const char *zone_name, const char *zone_root,
 	/*
 	 * Zone creation can't fail from now on.
 	 */
+
+	/*
+	 * Create zone kstats
+	 */
+	zone_kstat_create(zone);
 
 	/*
 	 * Let the other lwps continue.
@@ -3643,6 +3865,9 @@ zone_destroy(zoneid_t zoneid)
 
 	}
 
+	/* Get rid of the zone's kstats */
+	zone_kstat_delete(zone);
+
 	/*
 	 * It is now safe to let the zone be recreated; remove it from the
 	 * lists.  The memory will not be freed until the last cred
@@ -3892,6 +4117,32 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 				error = EFAULT;
 		}
 		break;
+	case ZONE_ATTR_PHYS_MCAP:
+		size = sizeof (zone->zone_phys_mcap);
+		if (bufsize > size)
+			bufsize = size;
+		if (buf != NULL &&
+		    copyout(&zone->zone_phys_mcap, buf, bufsize) != 0)
+			error = EFAULT;
+		break;
+	case ZONE_ATTR_SCHED_CLASS:
+		mutex_enter(&class_lock);
+
+		if (zone->zone_defaultcid >= loaded_classes)
+			outstr = "";
+		else
+			outstr = sclass[zone->zone_defaultcid].cl_name;
+		size = strlen(outstr) + 1;
+		if (bufsize > size)
+			bufsize = size;
+		if (buf != NULL) {
+			err = copyoutstr(outstr, buf, bufsize, NULL);
+			if (err != 0 && err != ENAMETOOLONG)
+				error = EFAULT;
+		}
+
+		mutex_exit(&class_lock);
+		break;
 	default:
 		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone)) {
 			size = bufsize;
@@ -3923,10 +4174,10 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		return (set_errno(EPERM));
 
 	/*
-	 * At present, attributes can only be set on non-running,
-	 * non-global zones.
+	 * Only the ZONE_ATTR_PHYS_MCAP attribute can be set on the
+	 * global zone.
 	 */
-	if (zoneid == GLOBAL_ZONEID) {
+	if (zoneid == GLOBAL_ZONEID && attr != ZONE_ATTR_PHYS_MCAP) {
 		return (set_errno(EINVAL));
 	}
 
@@ -3938,8 +4189,12 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	zone_hold(zone);
 	mutex_exit(&zonehash_lock);
 
+	/*
+	 * At present most attributes can only be set on non-running,
+	 * non-global zones.
+	 */
 	zone_status = zone_status_get(zone);
-	if (zone_status > ZONE_IS_READY)
+	if (attr != ZONE_ATTR_PHYS_MCAP && zone_status > ZONE_IS_READY)
 		goto done;
 
 	switch (attr) {
@@ -3971,6 +4226,12 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		if (zone->zone_brand == NULL)
 			err = EINVAL;
 		break;
+	case ZONE_ATTR_PHYS_MCAP:
+		err = zone_set_phys_mcap(zone, (const uint64_t *)buf);
+		break;
+	case ZONE_ATTR_SCHED_CLASS:
+		err = zone_set_sched_class(zone, (const char *)buf);
+		break;
 	default:
 		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone))
 			err = ZBROP(zone)->b_setattr(zone, attr, buf, bufsize);
@@ -3986,6 +4247,11 @@ done:
 /*
  * Return zero if the process has at least one vnode mapped in to its
  * address space which shouldn't be allowed to change zones.
+ *
+ * Also return zero if the process has any shared mappings which reserve
+ * swap.  This is because the counting for zone.max-swap does not allow swap
+ * revervation to be shared between zones.  zone swap reservation is counted
+ * on zone->zone_max_swap.
  */
 static int
 as_can_change_zones(void)
@@ -3997,8 +4263,17 @@ as_can_change_zones(void)
 	int allow = 1;
 
 	ASSERT(pp->p_as != &kas);
-	AS_LOCK_ENTER(&as, &as->a_lock, RW_READER);
+	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
 	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg)) {
+
+		/*
+		 * Cannot enter zone with shared anon memory which
+		 * reserves swap.  See comment above.
+		 */
+		if (seg_can_change_zones(seg) == B_FALSE) {
+			allow = 0;
+			break;
+		}
 		/*
 		 * if we can't get a backing vnode for this segment then skip
 		 * it.
@@ -4011,8 +4286,27 @@ as_can_change_zones(void)
 			break;
 		}
 	}
-	AS_LOCK_EXIT(&as, &as->a_lock);
+	AS_LOCK_EXIT(as, &as->a_lock);
 	return (allow);
+}
+
+/*
+ * Count swap reserved by curproc's address space
+ */
+static size_t
+as_swresv(void)
+{
+	proc_t *pp = curproc;
+	struct seg *seg;
+	struct as *as = pp->p_as;
+	size_t swap = 0;
+
+	ASSERT(pp->p_as != &kas);
+	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg))
+		swap += seg_swresv(seg);
+
+	return (swap);
 }
 
 /*
@@ -4043,6 +4337,7 @@ zone_enter(zoneid_t zoneid)
 	zone_status_t status;
 	int err = 0;
 	rctl_entity_p_t e;
+	size_t swap;
 
 	if (secpolicy_zone_config(CRED()) != 0)
 		return (set_errno(EPERM));
@@ -4205,6 +4500,15 @@ zone_enter(zoneid_t zoneid)
 		goto out;
 	}
 
+	/*
+	 * a_lock must be held while transfering locked memory and swap
+	 * reservation from the global zone to the non global zone because
+	 * asynchronous faults on the processes' address space can lock
+	 * memory and reserve swap via MCL_FUTURE and MAP_NORESERVE
+	 * segments respectively.
+	 */
+	AS_LOCK_ENTER(pp->as, &pp->p_as->a_lock, RW_WRITER);
+	swap = as_swresv();
 	mutex_enter(&pp->p_lock);
 	zone_proj0 = zone->zone_zsched->p_task->tk_proj;
 	/* verify that we do not exceed and task or lwp limits */
@@ -4216,10 +4520,11 @@ zone_enter(zoneid_t zoneid)
 	zone_proj0->kpj_ntasks += 1;
 	mutex_exit(&zone->zone_nlwps_lock);
 
-	mutex_enter(&zone->zone_rctl_lock);
+	mutex_enter(&zone->zone_mem_lock);
 	zone->zone_locked_mem += pp->p_locked_mem;
 	zone_proj0->kpj_data.kpd_locked_mem += pp->p_locked_mem;
-	mutex_exit(&zone->zone_rctl_lock);
+	zone->zone_max_swap += swap;
+	mutex_exit(&zone->zone_mem_lock);
 
 	/* remove lwps from proc's old zone and old project */
 	mutex_enter(&pp->p_zone->zone_nlwps_lock);
@@ -4227,12 +4532,14 @@ zone_enter(zoneid_t zoneid)
 	pp->p_task->tk_proj->kpj_nlwps -= pp->p_lwpcnt;
 	mutex_exit(&pp->p_zone->zone_nlwps_lock);
 
-	mutex_enter(&pp->p_zone->zone_rctl_lock);
+	mutex_enter(&pp->p_zone->zone_mem_lock);
 	pp->p_zone->zone_locked_mem -= pp->p_locked_mem;
 	pp->p_task->tk_proj->kpj_data.kpd_locked_mem -= pp->p_locked_mem;
-	mutex_exit(&pp->p_zone->zone_rctl_lock);
+	pp->p_zone->zone_max_swap -= swap;
+	mutex_exit(&pp->p_zone->zone_mem_lock);
 
 	mutex_exit(&pp->p_lock);
+	AS_LOCK_EXIT(pp->p_as, &pp->p_as->a_lock);
 
 	/*
 	 * Joining the zone cannot fail from now on.
@@ -4289,6 +4596,31 @@ zone_enter(zoneid_t zoneid)
 	sess_rele(pp->p_sessp, B_TRUE);
 	pp->p_sessp = sp;
 	pgjoin(pp, zone->zone_zsched->p_pidp);
+
+	/*
+	 * If there is a default scheduling class for the zone and it is not
+	 * the class we are currently in, change all of the threads in the
+	 * process to the new class.  We need to be holding pidlock & p_lock
+	 * when we call parmsset so this is a good place to do it.
+	 */
+	if (zone->zone_defaultcid > 0 &&
+	    zone->zone_defaultcid != curthread->t_cid) {
+		pcparms_t pcparms;
+		kthread_id_t t;
+
+		pcparms.pc_cid = zone->zone_defaultcid;
+		pcparms.pc_clparms[0] = 0;
+
+		/*
+		 * If setting the class fails, we still want to enter the zone.
+		 */
+		if ((t = pp->p_tlist) != NULL) {
+			do {
+				(void) parmsset(&pcparms, t);
+			} while ((t = t->t_forw) != pp->p_tlist);
+		}
+	}
+
 	mutex_exit(&pp->p_lock);
 	mutex_exit(&pidlock);
 

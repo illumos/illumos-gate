@@ -88,6 +88,8 @@ extern "C" {
 #define	ZONE_ATTR_INITNAME	9
 #define	ZONE_ATTR_BOOTARGS	10
 #define	ZONE_ATTR_BRAND		11
+#define	ZONE_ATTR_PHYS_MCAP	12
+#define	ZONE_ATTR_SCHED_CLASS	13
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -280,6 +282,15 @@ typedef struct zone_dataset {
 	list_node_t	zd_linkage;
 } zone_dataset_t;
 
+/*
+ * structure for zone kstats
+ */
+typedef struct zone_kstat {
+	kstat_named_t zk_zonename;
+	kstat_named_t zk_usage;
+	kstat_named_t zk_value;
+} zone_kstat_t;
+
 typedef struct zone {
 	/*
 	 * zone_name is never modified once set.
@@ -326,13 +337,19 @@ typedef struct zone {
 	uint_t		zone_rootpathlen; /* strlen(zone_rootpath) + 1 */
 	uint32_t	zone_shares;	/* FSS shares allocated to zone */
 	rctl_set_t	*zone_rctls;	/* zone-wide (zone.*) rctls */
-	kmutex_t	zone_rctl_lock; /* protects zone_locked_mem and */
+	kmutex_t	zone_mem_lock;	/* protects zone_locked_mem and */
 					/* kpd_locked_mem for all */
-					/* projects in zone */
+					/* projects in zone. */
+					/* Also protects zone_max_swap */
 					/* grab after p_lock, before rcs_lock */
-	rctl_qty_t	zone_locked_mem; /* bytes of locked memory in zone */
-	rctl_qty_t	zone_locked_mem_ctl;	/* current locked memory */
+	rctl_qty_t	zone_locked_mem;	/* bytes of locked memory in */
+						/* zone */
+	rctl_qty_t	zone_locked_mem_ctl;	/* Current locked memory */
 						/* limit.  Protected by */
+						/* zone_rctls->rcs_lock */
+	rctl_qty_t	zone_max_swap; /* bytes of swap reserved by zone */
+	rctl_qty_t	zone_max_swap_ctl;	/* current swap limit. */
+						/* Protected by */
 						/* zone_rctls->rcs_lock */
 	list_t		zone_zsd;	/* list of Zone-Specific Data values */
 	kcondvar_t	zone_cv;	/* used to signal state changes */
@@ -341,6 +358,7 @@ typedef struct zone {
 	char		*zone_initname;	/* fs path to 'init' */
 	int		zone_boot_err;  /* for zone_boot() if boot fails */
 	char		*zone_bootargs;	/* arguments passed via zone_boot() */
+	uint64_t	zone_phys_mcap;	/* physical memory cap */
 	/*
 	 * zone_kthreads is protected by zone_status_lock.
 	 */
@@ -376,6 +394,9 @@ typedef struct zone {
 
 	boolean_t	zone_restart_init;	/* Restart init if it dies? */
 	struct brand	*zone_brand;		/* zone's brand */
+	id_t		zone_defaultcid;	/* dflt scheduling class id */
+	kstat_t		*zone_swapresv_kstat;
+	kstat_t		*zone_lockedmem_kstat;
 } zone_t;
 
 /*
@@ -553,6 +574,7 @@ extern void mount_completed(void);
 extern int zone_walk(int (*)(zone_t *, void *), void *);
 
 extern rctl_hndl_t rc_zone_locked_mem;
+extern rctl_hndl_t rc_zone_max_swap;
 
 #endif	/* _KERNEL */
 

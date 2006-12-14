@@ -1178,6 +1178,7 @@ f none usr/include/sys/varargs.h 644 root bin
 f none usr/include/sys/vfs.h 644 root bin
 f none usr/include/sys/vfstab.h 644 root bin
 f none usr/include/sys/vm.h 644 root bin
+f none usr/include/sys/vm_usage.h 644 root bin
 f none usr/include/sys/vmem.h 644 root bin
 f none usr/include/sys/vmem_impl.h 644 root bin
 f none usr/include/sys/vmem_impl_user.h 644 root bin

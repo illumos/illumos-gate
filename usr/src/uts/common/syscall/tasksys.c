@@ -25,6 +25,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+
 /*
  * System calls for creating and inquiring about tasks and projects
  */
@@ -102,7 +103,7 @@ tasksys_settaskid(projid_t projid, uint_t flags)
 	 * Put a hold on our new project and make sure that nobody is
 	 * trying to bind it to a pool while we're joining.
 	 */
-	kpj = project_hold_by_id(projid, getzoneid(), PROJECT_HOLD_INSERT);
+	kpj = project_hold_by_id(projid, p->p_zone, PROJECT_HOLD_INSERT);
 	e.rcep_p.proj = kpj;
 	e.rcep_t = RCENTITY_PROJECT;
 
@@ -111,7 +112,7 @@ tasksys_settaskid(projid_t projid, uint_t flags)
 	zone = p->p_zone;
 
 	mutex_enter(&zone->zone_nlwps_lock);
-	mutex_enter(&zone->zone_rctl_lock);
+	mutex_enter(&zone->zone_mem_lock);
 
 	if (kpj->kpj_nlwps + p->p_lwpcnt > kpj->kpj_nlwps_ctl)
 		if (rctl_test_entity(rc_project_nlwps, kpj->kpj_rctls, p, &e,
@@ -130,7 +131,7 @@ tasksys_settaskid(projid_t projid, uint_t flags)
 			rctlfail = 1;
 
 	if (rctlfail) {
-		mutex_exit(&zone->zone_rctl_lock);
+		mutex_exit(&zone->zone_mem_lock);
 		mutex_exit(&zone->zone_nlwps_lock);
 		if (curthread != p->p_agenttp)
 			continuelwps(p);
@@ -144,7 +145,7 @@ tasksys_settaskid(projid_t projid, uint_t flags)
 	oldpj->kpj_data.kpd_locked_mem -= p->p_locked_mem;
 	oldpj->kpj_nlwps -= p->p_lwpcnt;
 
-	mutex_exit(&zone->zone_rctl_lock);
+	mutex_exit(&zone->zone_mem_lock);
 	mutex_exit(&zone->zone_nlwps_lock);
 	mutex_exit(&p->p_lock);
 

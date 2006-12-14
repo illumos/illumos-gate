@@ -463,7 +463,7 @@ zone_ready(zlog_t *zlogp, boolean_t mount_cmd)
 	}
 	if (vplat_bringup(zlogp, mount_cmd, zone_id) != 0) {
 		bringup_failure_recovery = B_TRUE;
-		(void) vplat_teardown(NULL, mount_cmd);
+		(void) vplat_teardown(NULL, mount_cmd, B_FALSE);
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
 			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
 			    zonecfg_strerror(err));
@@ -738,11 +738,11 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 }
 
 static int
-zone_halt(zlog_t *zlogp, boolean_t unmount_cmd)
+zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 {
 	int err;
 
-	if (vplat_teardown(zlogp, unmount_cmd) != 0) {
+	if (vplat_teardown(zlogp, unmount_cmd, rebooting) != 0) {
 		if (!bringup_failure_recovery)
 			zerror(zlogp, B_FALSE, "unable to destroy zone");
 		return (-1);
@@ -985,7 +985,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			audit_put_record(zlogp, uc, rval, "boot");
 			if (rval != 0) {
 				bringup_failure_recovery = B_TRUE;
-				(void) zone_halt(zlogp, B_FALSE);
+				(void) zone_halt(zlogp, B_FALSE, B_FALSE);
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 			}
 			break;
@@ -1094,7 +1094,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			audit_put_record(zlogp, uc, rval, "boot");
 			if (rval != 0) {
 				bringup_failure_recovery = B_TRUE;
-				(void) zone_halt(zlogp, B_FALSE);
+				(void) zone_halt(zlogp, B_FALSE, B_TRUE);
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 			}
 			boot_args[0] = '\0';
@@ -1102,7 +1102,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		case Z_HALT:
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
-			if ((rval = zone_halt(zlogp, B_FALSE)) != 0)
+			if ((rval = zone_halt(zlogp, B_FALSE, B_FALSE)) != 0)
 				break;
 			eventstream_write(Z_EVT_ZONE_HALTED);
 			break;
@@ -1125,7 +1125,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		case Z_UNMOUNT:
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
-			rval = zone_halt(zlogp, B_TRUE);
+			rval = zone_halt(zlogp, B_TRUE, B_FALSE);
 			if (rval == 0) {
 				eventstream_write(Z_EVT_ZONE_HALTED);
 				(void) sema_post(&scratch_sem);
@@ -1147,7 +1147,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	case ZONE_STATE_DOWN:
 		switch (cmd) {
 		case Z_READY:
-			if ((rval = zone_halt(zlogp, B_FALSE)) != 0)
+			if ((rval = zone_halt(zlogp, B_FALSE, B_TRUE)) != 0)
 				break;
 			if ((rval = zone_ready(zlogp, B_FALSE)) == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
@@ -1165,7 +1165,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			rval = 0;
 			break;
 		case Z_HALT:
-			if ((rval = zone_halt(zlogp, B_FALSE)) != 0)
+			if ((rval = zone_halt(zlogp, B_FALSE, B_FALSE)) != 0)
 				break;
 			eventstream_write(Z_EVT_ZONE_HALTED);
 			break;
@@ -1173,7 +1173,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			(void) strlcpy(boot_args, zargp->bootbuf,
 			    sizeof (boot_args));
 			eventstream_write(Z_EVT_ZONE_REBOOTING);
-			if ((rval = zone_halt(zlogp, B_FALSE)) != 0) {
+			if ((rval = zone_halt(zlogp, B_FALSE, B_TRUE)) != 0) {
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 				boot_args[0] = '\0';
 				break;
@@ -1186,7 +1186,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			rval = zone_bootup(zlogp, zargp->bootbuf);
 			audit_put_record(zlogp, uc, rval, "reboot");
 			if (rval != 0) {
-				(void) zone_halt(zlogp, B_FALSE);
+				(void) zone_halt(zlogp, B_FALSE, B_TRUE);
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 			}
 			boot_args[0] = '\0';

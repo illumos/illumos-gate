@@ -293,6 +293,8 @@ pool_enable(void)
 	(void) nvlist_add_string(pool_sys_prop, "system.comment", "");
 	(void) nvlist_add_int64(pool_sys_prop, "system.version", 1);
 	(void) nvlist_add_byte(pool_sys_prop, "system.bind-default", 1);
+	(void) nvlist_add_string(pool_sys_prop, "system.poold.objectives",
+	    "wt-load");
 
 	(void) nvlist_alloc(&pool_default->pool_props,
 	    NV_UNIQUE_NAME, KM_SLEEP);
@@ -1309,7 +1311,7 @@ pool_do_bind(pool_t *pool, idtype_t idtype, id_t id, int flags)
 	}
 
 	if (idtype == P_PROJID) {
-		kpj = project_hold_by_id(id, GLOBAL_ZONEID, PROJECT_HOLD_FIND);
+		kpj = project_hold_by_id(id, global_zone, PROJECT_HOLD_FIND);
 		if (kpj == NULL)
 			return (ESRCH);
 		mutex_enter(&kpj->kpj_poolbind);

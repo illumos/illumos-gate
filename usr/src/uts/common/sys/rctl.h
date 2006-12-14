@@ -168,6 +168,7 @@ struct proc;
 struct task;
 struct kproject;
 struct zone;
+struct kstat;
 
 typedef struct rctl_entity_p_struct {
 	rctl_entity_t rcep_t;
@@ -324,6 +325,14 @@ int rctl_incr_locked_mem(struct proc *, struct kproject *, rctl_qty_t,
     int);
 void rctl_decr_locked_mem(struct proc *, struct kproject *, rctl_qty_t,
     int);
+int rctl_incr_swap(struct proc *, struct zone *, size_t);
+void rctl_decr_swap(struct zone *, size_t);
+
+struct kstat *rctl_kstat_create_zone(struct zone *, char *, uchar_t, uint_t,
+    uchar_t);
+
+struct kstat *rctl_kstat_create_project(struct kproject *, char *, uchar_t,
+    uint_t, uchar_t);
 
 #endif /* _KERNEL */
 

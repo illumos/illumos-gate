@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,15 +163,6 @@
  * 	Call the key comparator for the given hash keys.
  */
 #define	MH_KEYCMP(hash, key1, key2) ((hash->mh_keycmp)(key1, key2))
-
-static void i_mod_hash_clear_nosync(mod_hash_t *);
-static int i_mod_hash_find_nosync(mod_hash_t *, mod_hash_key_t,
-    mod_hash_val_t *);
-static int i_mod_hash_insert_nosync(mod_hash_t *, mod_hash_key_t,
-    mod_hash_val_t, mod_hash_hndl_t);
-static int i_mod_hash_remove_nosync(mod_hash_t *, mod_hash_key_t,
-    mod_hash_val_t *);
-static uint_t i_mod_hash(mod_hash_t *, mod_hash_key_t);
 
 /*
  * Cache for struct mod_hash_entry
@@ -522,7 +512,7 @@ mod_hash_destroy_hash(mod_hash_t *hash)
  * i_mod_hash()
  * 	Call the hashing algorithm for this hash table, with the given key.
  */
-static uint_t
+uint_t
 i_mod_hash(mod_hash_t *hash, mod_hash_key_t key)
 {
 	uint_t h;
@@ -778,7 +768,7 @@ mod_hash_destroy(mod_hash_t *hash, mod_hash_key_t key)
  * mod_hash_find()
  * 	Find a value in the hash table corresponding to the given key.
  */
-static int
+int
 i_mod_hash_find_nosync(mod_hash_t *hash, mod_hash_key_t key,
     mod_hash_val_t *val)
 {
@@ -826,7 +816,7 @@ mod_hash_find_cb(mod_hash_t *hash, mod_hash_key_t key, mod_hash_val_t *val,
 	return (res);
 }
 
-static void
+void
 i_mod_hash_walk_nosync(mod_hash_t *hash,
     uint_t (*callback)(mod_hash_key_t, mod_hash_val_t *, void *), void *arg)
 {
@@ -870,7 +860,7 @@ mod_hash_walk(mod_hash_t *hash,
  *	Clears the given hash table by calling the destructor of every hash
  *	element and freeing up all mod_hash_entry's.
  */
-static void
+void
 i_mod_hash_clear_nosync(mod_hash_t *hash)
 {
 	int i;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,7 +76,8 @@ col_find(rcid_t id)
 {
 	col_t *col;
 	for (col = col_head; col != NULL; col = col->col_next)
-		if (col->col_id == id)
+		if (col->col_id.rcid_type == id.rcid_type &&
+		    col->col_id.rcid_val == id.rcid_val)
 			return (col);
 	return (NULL);
 }
@@ -119,7 +119,7 @@ static void
 usage()
 {
 	(void) fprintf(stderr,
-	    gettext("usage: rcapstat [-g] [interval [count]]\n"));
+	    gettext("usage: rcapstat [-g] [-p | -z] [interval [count]]\n"));
 	exit(E_USAGE);
 }
 
@@ -139,12 +139,12 @@ format_size(char *str, uint64_t size, int length)
 }
 
 static int
-read_stats()
+read_stats(rcid_type_t stat_type)
 {
 	int fd;
 	int proc_fd;
 	char procfile[20];
-	pid_t pid;
+	uint64_t pid;
 	col_t *col, *col_next;
 	lcollection_report_t report;
 	struct stat st;
@@ -169,7 +169,7 @@ read_stats()
 	 * Check if rcapd is running
 	 */
 	pid = hdr.rs_pid;
-	(void) snprintf(procfile, 20, "/proc/%ld/psinfo", pid);
+	(void) snprintf(procfile, 20, "/proc/%lld/psinfo", pid);
 	if ((proc_fd = open(procfile, O_RDONLY)) < 0) {
 		warn(gettext("rcapd is not active\n"));
 		(void) close(fd);
@@ -185,6 +185,9 @@ read_stats()
 	}
 
 	while (read(fd, &report, sizeof (report)) == sizeof (report)) {
+		if (report.lcol_id.rcid_type != stat_type)
+			continue;
+
 		col = col_find(report.lcol_id);
 		if (col == NULL) {
 			col = col_insert(report.lcol_id);
@@ -291,12 +294,13 @@ print_unformatted_stats(void)
 }
 
 static void
-print_stats()
+print_stats(rcid_type_t stat_type)
 {
 	col_t *col;
 	char size[6];
 	char limit[6];
 	char rss[6];
+	char nproc[6];
 	char paged_att[6];
 	char paged_eff[6];
 	char paged_att_avg[6];
@@ -310,12 +314,21 @@ print_stats()
 	 */
 	if (count == 0 || ncol != 1)
 		(void) printf("%6s %-15s %5s %5s %5s %5s %5s %5s %5s %5s\n",
-		    "id", mode, "nproc", "vm", "rss", "cap",
+		    "id", (stat_type == RCIDT_PROJECT ?  "project" : "zone"),
+		    "nproc", "vm", "rss", "cap",
 		    "at", "avgat", "pg", "avgpg");
 	if (++count >= 20 || (count >= 10 && global != 0) || ncol != 1)
 		count = 0;
 
 	for (col = col_head; col != NULL; col = col->col_next) {
+		if (col->col_id.rcid_type != stat_type)
+			continue;
+
+		if (col->col_paged_att == 0)
+			strlcpy(nproc, "-", sizeof (nproc));
+		else
+			(void) snprintf(nproc, sizeof (nproc), "%lld",
+			    col->col_nproc);
 		format_size(size, col->col_vmsize, 6);
 		format_size(rss, col->col_rsssize, 6);
 		format_size(limit, col->col_rsslimit, 6);
@@ -323,8 +336,9 @@ print_stats()
 		format_size(paged_eff, col->col_paged_eff, 6);
 		format_size(paged_att_avg, col->col_paged_att_avg, 6);
 		format_size(paged_eff_avg, col->col_paged_eff_avg, 6);
-		(void) printf("%6lld %-15s %5lld %5s %5s %5s %5s %5s %5s %5s\n",
-		    (long long)col->col_id, col->col_name, col->col_nproc,
+		(void) printf("%6lld %-15s %5s %5s %5s %5s %5s %5s %5s %5s\n",
+		    col->col_id.rcid_val, col->col_name,
+		    nproc,
 		    size, rss, limit,
 		    paged_att, paged_att_avg,
 		    paged_eff, paged_eff_avg);
@@ -342,19 +356,31 @@ main(int argc, char *argv[])
 	int count;
 	int always = 1;
 	int opt;
+	int projects = 0;
+	int zones = 0;
+	/* project reporting is the default if no option is specified */
+	rcid_type_t stat_type = RCIDT_PROJECT;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 	(void) setprogname("rcapstat");
 
 	global = unformatted = 0;
-	while ((opt = getopt(argc, argv, "gu")) != (int)EOF) {
+	while ((opt = getopt(argc, argv, "gpuz")) != (int)EOF) {
 		switch (opt) {
 		case 'g':
 			global = 1;
 			break;
+		case 'p':
+			projects = 1;
+			stat_type = RCIDT_PROJECT;
+			break;
 		case 'u':
 			unformatted = 1;
+			break;
+		case 'z':
+			stat_type = RCIDT_ZONE;
+			zones = 1;
 			break;
 		default:
 			usage();
@@ -369,22 +395,22 @@ main(int argc, char *argv[])
 			die(gettext("invalid count specified\n"));
 		always = 0;
 	}
-	if (argc > optind)
+	if (argc > optind || (projects > 0 && zones > 0))
 		usage();
 
 	while (always || count-- > 0) {
-		if (read_stats() != E_SUCCESS)
+		if (read_stats(stat_type) != E_SUCCESS)
 			return (E_ERROR);
 		if (!unformatted) {
-			print_stats();
-			fflush(stdout);
+			print_stats(stat_type);
+			(void) fflush(stdout);
 			if (count || always)
 				(void) sleep(interval);
 		} else {
 			struct stat st;
 
 			print_unformatted_stats();
-			fflush(stdout);
+			(void) fflush(stdout);
 			while (stat(STAT_FILE_DEFAULT, &st) == 0 &&
 			    st.st_mtime == stat_mod)
 				usleep((useconds_t)(0.2 * MICROSEC));

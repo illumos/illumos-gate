@@ -65,6 +65,7 @@ extern long	priocntl(), priocntlset();
 #define	PC_SETXPARMS	7	/* Set extended scheduling parameters */
 #define	PC_GETXPARMS	8	/* Get extended scheduling parameters */
 #define	PC_SETDFLCL	9	/* Set default class, not for general use */
+#define	PC_GETDFLCL	10	/* Get default class, not for general use */
 
 #define	PC_CLNULL	-1
 

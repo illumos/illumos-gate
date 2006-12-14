@@ -542,9 +542,10 @@ pset_bind(psetid_t pset, idtype_t idtype, id_t id, psetid_t *opset)
 		break;
 
 	case P_PROJID:
+		pp = curproc;
 		if (id == P_MYID)
 			id = curprojid();
-		if ((kpj = project_hold_by_id(id, getzoneid(),
+		if ((kpj = project_hold_by_id(id, pp->p_zone,
 		    PROJECT_HOLD_FIND)) == NULL) {
 			error = ESRCH;
 			break;

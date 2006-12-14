@@ -666,7 +666,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 178 */ SYSENT_LOADABLE(),		/* kaio */
 	/* 179 */ SYSENT_LOADABLE(),		/* cpc */
 	/* 180 */ SYSENT_CI("lgrpsys",		lgrpsys,	3),
-	/* 181 */ SYSENT_CI("rusagesys",	rusagesys, 	2),
+	/* 181 */ SYSENT_CI("rusagesys",	rusagesys, 	5),
 	/* 182 */ SYSENT_LOADABLE(),		/* portfs */
 	/* 183 */ SYSENT_CI("pollsys",		pollsys,	4),
 	/* 184 */ SYSENT_CI("labelsys",		labelsys,	5),
@@ -1044,7 +1044,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 178 */ SYSENT_LOADABLE32(),		/* kaio */
 	/* 179 */ SYSENT_LOADABLE32(),		/* cpc */
 	/* 180 */ SYSENT_CI("lgrpsys",		lgrpsys,	3),
-	/* 181 */ SYSENT_CI("rusagesys",	rusagesys,	2),
+	/* 181 */ SYSENT_CI("rusagesys",	rusagesys,	5),
 	/* 182 */ SYSENT_LOADABLE32(),		/* portfs */
 	/* 183 */ SYSENT_CI("pollsys",		pollsys,	4),
 	/* 184 */ SYSENT_CI("labelsys",		labelsys,	5),

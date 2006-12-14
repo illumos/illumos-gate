@@ -111,7 +111,27 @@
 			mode		CDATA #REQUIRED
 			acl		CDATA #REQUIRED>
 
-<!ELEMENT zone		(filesystem | inherited-pkg-dir | network | device | deleted-device | rctl | attr | dataset | package | patch | dev-perm)*>
+<!--
+	The tmp_pool element is separate from the pset element so that
+	we can track the importance value at the pool level, where it
+	belongs, instead of at the pset level.  Once we have msets this
+	will be important since tmp psets and tmp msets will share a common
+	pool-level importance.
+-->
+<!ELEMENT tmp_pool	EMPTY>
+
+<!ATTLIST tmp_pool	importance	CDATA #REQUIRED>
+
+<!ELEMENT pset		EMPTY>
+
+<!ATTLIST pset		ncpu_min	CDATA #REQUIRED
+			ncpu_max	CDATA #REQUIRED>
+
+<!ELEMENT mcap		EMPTY>
+
+<!ATTLIST mcap		physcap		CDATA #REQUIRED>
+
+<!ELEMENT zone		(filesystem | inherited-pkg-dir | network | device | deleted-device | rctl | attr | dataset | package | patch | dev-perm | tmp_pool | pset | mcap)*>
 
 <!ATTLIST zone		name		CDATA #REQUIRED
 			zonepath	CDATA #REQUIRED
@@ -120,4 +140,5 @@
 			limitpriv	CDATA ""
 			bootargs	CDATA ""
 			brand		CDATA ""
+			scheduling-class	CDATA ""
 			version		NMTOKEN #FIXED '1'>

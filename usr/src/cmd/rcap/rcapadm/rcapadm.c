@@ -39,6 +39,8 @@
 #include <libscf_priv.h>
 #include <libintl.h>
 #include <locale.h>
+#include <zone.h>
+#include <libzonecfg.h>
 
 #include "utils.h"
 #include "rcapd.h"
@@ -61,7 +63,9 @@ usage()
 	    "               [-c <percent>]                         "
 	    "# set memory cap\n"
 	    "                                                      "
-	    "# enforcement threshold\n"));
+	    "# enforcement threshold\n"
+	    "               [-z <zonename> -m <max-rss>]               "
+	    "# update zone memory cap\n"));
 	exit(E_USAGE);
 }
 
@@ -135,18 +139,54 @@ out:
 	scf_handle_destroy(h);
 }
 
+/*
+ * Update the in-kernel memory cap for the specified zone.
+ */
+static int
+update_zone_mcap(char *zonename, char *maxrss)
+{
+	zoneid_t zone_id;
+	uint64_t num;
+
+	if (getzoneid() != GLOBAL_ZONEID || zonecfg_in_alt_root())
+		return (E_SUCCESS);
+
+	/* get the running zone from the kernel */
+	if ((zone_id = getzoneidbyname(zonename)) == -1) {
+		(void) fprintf(stderr, gettext("zone '%s' must be running\n"),
+		    zonename);
+		return (E_ERROR);
+	}
+
+	if (zonecfg_str_to_bytes(maxrss, &num) == -1) {
+		(void) fprintf(stderr, gettext("invalid max-rss value\n"));
+		return (E_ERROR);
+	}
+
+	if (zone_setattr(zone_id, ZONE_ATTR_PHYS_MCAP, &num, 0) == -1) {
+		(void) fprintf(stderr, gettext("could not set memory "
+		    "cap for zone '%s'\n"), zonename);
+		return (E_ERROR);
+	}
+
+	return (E_SUCCESS);
+}
+
 int
 main(int argc, char *argv[])
 {
 	char *subopts, *optval;
 	int modified = 0;
+	boolean_t refresh = B_FALSE;
 	int opt;
+	char *zonename;
+	char *maxrss = NULL;
 
 	(void) setprogname("rcapadm");
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((opt = getopt(argc, argv, "DEc:i:n")) != EOF) {
+	while ((opt = getopt(argc, argv, "DEc:i:m:nz:")) != EOF) {
 		switch (opt) {
 		case 'n':
 			no_starting_stopping = 1;
@@ -203,12 +243,24 @@ main(int argc, char *argv[])
 			}
 			modified++;
 			break;
+		case 'm':
+			maxrss = optarg;
+			break;
+		case 'z':
+			refresh = B_TRUE;
+			zonename = optarg;
+			break;
 		default:
 			usage();
 		}
 	}
 
-	if (argc > optind)
+	/* the -z & -m options must be used together */
+	if (argc > optind || (refresh && maxrss == NULL) ||
+	    (!refresh && maxrss != NULL))
+		usage();
+
+	if (refresh && (no_starting_stopping > 0 || modified))
 		usage();
 
 	if (rcfg_read(fname, -1, &conf, NULL) < 0) {
@@ -231,6 +283,9 @@ main(int argc, char *argv[])
 			conf.rcfg_mode = rctype_project;
 		}
 	}
+
+	if (refresh)
+		return (update_zone_mcap(zonename, maxrss));
 
 	if (modified) {
 		if (pressure >= 0)

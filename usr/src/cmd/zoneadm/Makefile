@@ -27,8 +27,8 @@
 #
 
 PROG=		zoneadm
-MANIFEST=	zones.xml
-SVCMETHOD=	svc-zones
+MANIFEST=	zones.xml resource-mgmt.xml
+SVCMETHOD=	svc-zones svc-resource-mgmt
 
 include ../Makefile.cmd
 

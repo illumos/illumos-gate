@@ -101,6 +101,8 @@ extern int lex_lineno;
 #define	MAX_CMD_HIST	1024
 #define	MAX_CMD_LEN	1024
 
+#define	ONE_MB		1048576
+
 /*
  * Each SHELP_ should be a simple string.
  */
@@ -108,6 +110,7 @@ extern int lex_lineno;
 #define	SHELP_ADD	"add <resource-type>\n\t(global scope)\n" \
 	"add <property-name> <property-value>\n\t(resource scope)"
 #define	SHELP_CANCEL	"cancel"
+#define	SHELP_CLEAR	"clear <property-name>"
 #define	SHELP_COMMIT	"commit"
 #define	SHELP_CREATE	"create [-F] [ -a <path> | -b | -t <template> ]"
 #define	SHELP_DELETE	"delete [-F]"
@@ -116,9 +119,11 @@ extern int lex_lineno;
 #define	SHELP_EXPORT	"export [-f output-file]"
 #define	SHELP_HELP	"help [commands] [syntax] [usage] [<command-name>]"
 #define	SHELP_INFO	"info [<resource-type> [property-name=property-value]*]"
-#define	SHELP_REMOVE	"remove <resource-type> { <property-name>=<property-" \
-	"value> }\n\t(global scope)\nremove <property-name> <property-value>" \
-	"\n\t(resource scope)"
+#define	SHELP_REMOVE	"remove [-F] <resource-type> " \
+	"[ <property-name>=<property-value> ]*\n" \
+	"\t(global scope)\n" \
+	"remove <property-name> <property-value>\n" \
+	"\t(resource scope)"
 #define	SHELP_REVERT	"revert [-F]"
 #define	SHELP_SELECT	"select <resource-type> { <property-name>=" \
 	"<property-value> }"
@@ -128,6 +133,7 @@ extern int lex_lineno;
 static struct help helptab[] = {
 	{ CMD_ADD,	"add",		HELP_RES_PROPS,	SHELP_ADD, },
 	{ CMD_CANCEL,	"cancel",	0,		SHELP_CANCEL, },
+	{ CMD_CLEAR,	"clear",	HELP_PROPS,	SHELP_CLEAR, },
 	{ CMD_COMMIT,	"commit",	0,		SHELP_COMMIT, },
 	{ CMD_CREATE,	"create",	0,		SHELP_CREATE, },
 	{ CMD_DELETE,	"delete",	0,		SHELP_DELETE, },
@@ -163,6 +169,15 @@ static char *res_types[] = {
 	"limitpriv",
 	"bootargs",
 	"brand",
+	"dedicated-cpu",
+	"capped-memory",
+	ALIAS_MAXLWPS,
+	ALIAS_MAXSHMMEM,
+	ALIAS_MAXSHMIDS,
+	ALIAS_MAXMSGIDS,
+	ALIAS_MAXSEMIDS,
+	ALIAS_SHARES,
+	"scheduling-class",
 	NULL
 };
 
@@ -189,6 +204,19 @@ static char *prop_types[] = {
 	"limitpriv",
 	"bootargs",
 	"brand",
+	"ncpus",
+	"importance",
+	"swap",
+	"locked",
+	ALIAS_SHARES,
+	ALIAS_MAXLWPS,
+	ALIAS_MAXSHMMEM,
+	ALIAS_MAXSHMIDS,
+	ALIAS_MAXMSGIDS,
+	ALIAS_MAXSEMIDS,
+	ALIAS_MAXLOCKEDMEM,
+	ALIAS_MAXSWAP,
+	"scheduling-class",
 	NULL
 };
 
@@ -205,11 +233,12 @@ static char *prop_val_types[] = {
 
 /*
  * remove has a space afterwards because it has qualifiers; the other commands
- * that have qualifiers (add, select and set) don't need a space here because
+ * that have qualifiers (add, select, etc.) don't need a space here because
  * they have their own _cmds[] lists below.
  */
 static const char *global_scope_cmds[] = {
 	"add",
+	"clear",
 	"commit",
 	"create",
 	"delete",
@@ -233,6 +262,23 @@ static const char *add_cmds[] = {
 	"add rctl",
 	"add attr",
 	"add dataset",
+	"add dedicated-cpu",
+	"add capped-memory",
+	NULL
+};
+
+static const char *clear_cmds[] = {
+	"clear autoboot",
+	"clear pool",
+	"clear limitpriv",
+	"clear bootargs",
+	"clear scheduling-class",
+	"clear " ALIAS_MAXLWPS,
+	"clear " ALIAS_MAXSHMMEM,
+	"clear " ALIAS_MAXSHMIDS,
+	"clear " ALIAS_MAXMSGIDS,
+	"clear " ALIAS_MAXSEMIDS,
+	"clear " ALIAS_SHARES,
 	NULL
 };
 
@@ -244,6 +290,8 @@ static const char *remove_cmds[] = {
 	"remove rctl ",
 	"remove attr ",
 	"remove dataset ",
+	"remove dedicated-cpu ",
+	"remove capped-memory ",
 	NULL
 };
 
@@ -255,6 +303,8 @@ static const char *select_cmds[] = {
 	"select rctl ",
 	"select attr ",
 	"select dataset ",
+	"select dedicated-cpu",
+	"select capped-memory",
 	NULL
 };
 
@@ -266,6 +316,13 @@ static const char *set_cmds[] = {
 	"set pool=",
 	"set limitpriv=",
 	"set bootargs=",
+	"set scheduling-class=",
+	"set " ALIAS_MAXLWPS "=",
+	"set " ALIAS_MAXSHMMEM "=",
+	"set " ALIAS_MAXSHMIDS "=",
+	"set " ALIAS_MAXMSGIDS "=",
+	"set " ALIAS_MAXSEMIDS "=",
+	"set " ALIAS_SHARES "=",
 	NULL
 };
 
@@ -277,12 +334,22 @@ static const char *info_cmds[] = {
 	"info rctl ",
 	"info attr ",
 	"info dataset ",
+	"info capped-memory",
+	"info dedicated-cpu",
 	"info zonename",
 	"info zonepath",
 	"info autoboot",
 	"info pool",
 	"info limitpriv",
 	"info bootargs",
+	"info brand",
+	"info scheduling-class",
+	"info max-lwps",
+	"info max-shm-memory",
+	"info max-shm-ids",
+	"info max-msg-ids",
+	"info max-sem-ids",
+	"info cpu-shares",
 	NULL
 };
 
@@ -298,6 +365,7 @@ static const char *fs_res_scope_cmds[] = {
 	"set raw=",
 	"set special=",
 	"set type=",
+	"clear raw",
 	NULL
 };
 
@@ -366,6 +434,33 @@ static const char *dataset_res_scope_cmds[] = {
 	NULL
 };
 
+static const char *pset_res_scope_cmds[] = {
+	"cancel",
+	"end",
+	"exit",
+	"help",
+	"info",
+	"set ncpus=",
+	"set importance=",
+	"clear importance",
+	NULL
+};
+
+static const char *mcap_res_scope_cmds[] = {
+	"cancel",
+	"end",
+	"exit",
+	"help",
+	"info",
+	"set physical=",
+	"set swap=",
+	"set locked=",
+	"clear physical",
+	"clear swap",
+	"clear locked",
+	NULL
+};
+
 /* Global variables */
 
 /* set early in main(), never modified thereafter, used all over the place */
@@ -406,6 +501,9 @@ static bool got_handle = FALSE;
 /* initialized in do_interactive(), checked in initialize() */
 static bool interactive_mode;
 
+/* set if configuring the global zone */
+static bool global_zone = FALSE;
+
 /* set in main(), checked in multiple places */
 static bool read_only_mode;
 
@@ -427,8 +525,12 @@ static struct zone_devtab	old_devtab, in_progress_devtab;
 static struct zone_rctltab	old_rctltab, in_progress_rctltab;
 static struct zone_attrtab	old_attrtab, in_progress_attrtab;
 static struct zone_dstab	old_dstab, in_progress_dstab;
+static struct zone_psettab	old_psettab, in_progress_psettab;
+static struct zone_mcaptab	old_mcaptab, in_progress_mcaptab;
 
 static GetLine *gl;	/* The gl_get_line() resource object */
+
+static void bytes_to_units(char *str, char *buf, int bufsize);
 
 /* Functions begin here */
 
@@ -469,6 +571,8 @@ CPL_MATCH_FN(cmd_cpl_fn)
 		 */
 		if (strncmp(line, "add ", MAX(MIN(word_end, 4), 1)) == 0)
 			return (add_stuff(cpl, line, add_cmds, word_end));
+		if (strncmp(line, "clear ", MAX(MIN(word_end, 6), 2)) == 0)
+			return (add_stuff(cpl, line, clear_cmds, word_end));
 		if (strncmp(line, "select ", MAX(MIN(word_end, 7), 3)) == 0)
 			return (add_stuff(cpl, line, select_cmds, word_end));
 		if (strncmp(line, "set ", MAX(MIN(word_end, 4), 3)) == 0)
@@ -494,6 +598,10 @@ CPL_MATCH_FN(cmd_cpl_fn)
 		return (add_stuff(cpl, line, attr_res_scope_cmds, word_end));
 	case RT_DATASET:
 		return (add_stuff(cpl, line, dataset_res_scope_cmds, word_end));
+	case RT_DCPU:
+		return (add_stuff(cpl, line, pset_res_scope_cmds, word_end));
+	case RT_MCAP:
+		return (add_stuff(cpl, line, mcap_res_scope_cmds, word_end));
 	}
 	return (0);
 }
@@ -669,9 +777,8 @@ long_help(int cmd_num)
 			    "flag can be used to force the\n\taction."));
 		case CMD_REMOVE:
 			return (gettext("Remove specified resource from "
-			    "configuration.  Note that the curly\n\tbraces "
-			    "('{', '}') mean one or more of whatever "
-			    "is between them."));
+			    "configuration.  The -F flag can be used\n\tto "
+			    "force the action."));
 		case CMD_SELECT:
 			(void) snprintf(line, sizeof (line),
 			    gettext("Selects a resource to modify.  "
@@ -684,6 +791,8 @@ long_help(int cmd_num)
 			return (line);
 		case CMD_SET:
 			return (gettext("Sets property values."));
+		case CMD_CLEAR:
+			return (gettext("Clears property values."));
 		case CMD_INFO:
 			return (gettext("Displays information about the "
 			    "current configuration.  If resource\n\ttype is "
@@ -870,6 +979,37 @@ usage(bool verbose, uint_t flags)
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_NAME), gettext("<name>"));
 			break;
+		case RT_DCPU:
+			(void) fprintf(fp, gettext("The '%s' resource scope "
+			    "configures the 'pools' facility to dedicate\na "
+			    "subset of the system's processors to this zone "
+			    "while it is running.\n"),
+			    rt_to_str(resource_scope));
+			(void) fprintf(fp, gettext("Valid commands:\n"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_NCPUS),
+			    gettext("<unsigned integer | range>"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_IMPORTANCE),
+			    gettext("<unsigned integer>"));
+			break;
+		case RT_MCAP:
+			(void) fprintf(fp, gettext("The '%s' resource scope is "
+			    "used to set an upper limit (a cap) on the\n"
+			    "amount of physical memory, swap space and locked "
+			    "memory that can be used by\nthis zone.\n"),
+			    rt_to_str(resource_scope));
+			(void) fprintf(fp, gettext("Valid commands:\n"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_PHYSICAL),
+			    gettext("<qualified unsigned decimal>"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_SWAP),
+			    gettext("<qualified unsigned decimal>"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_LOCKED),
+			    gettext("<qualified unsigned decimal>"));
+			break;
 		}
 		(void) fprintf(fp, gettext("And from any resource scope, you "
 		    "can:\n"));
@@ -928,11 +1068,12 @@ usage(bool verbose, uint_t flags)
 	}
 	if (flags & HELP_RESOURCES) {
 		(void) fprintf(fp, "<%s> := %s | %s | %s | %s | %s | %s |\n\t"
-		    "%s\n\n",
+		    "%s | %s | %s\n\n",
 		    gettext("resource type"), rt_to_str(RT_FS),
 		    rt_to_str(RT_IPD), rt_to_str(RT_NET), rt_to_str(RT_DEVICE),
 		    rt_to_str(RT_RCTL), rt_to_str(RT_ATTR),
-		    rt_to_str(RT_DATASET));
+		    rt_to_str(RT_DATASET), rt_to_str(RT_DCPU),
+		    rt_to_str(RT_MCAP));
 	}
 	if (flags & HELP_PROPS) {
 		(void) fprintf(fp, gettext("For resource type ... there are "
@@ -951,6 +1092,20 @@ usage(bool verbose, uint_t flags)
 		    pt_to_str(PT_POOL));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_LIMITPRIV));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_SCHED));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_MAXLWPS));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_MAXSHMMEM));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_MAXSHMIDS));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_MAXMSGIDS));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_MAXSEMIDS));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_SHARES));
 		(void) fprintf(fp, "\t%s\t\t%s, %s, %s, %s\n", rt_to_str(RT_FS),
 		    pt_to_str(PT_DIR), pt_to_str(PT_SPECIAL),
 		    pt_to_str(PT_RAW), pt_to_str(PT_TYPE),
@@ -968,6 +1123,11 @@ usage(bool verbose, uint_t flags)
 		    pt_to_str(PT_VALUE));
 		(void) fprintf(fp, "\t%s\t\t%s\n", rt_to_str(RT_DATASET),
 		    pt_to_str(PT_NAME));
+		(void) fprintf(fp, "\t%s\t%s, %s\n", rt_to_str(RT_DCPU),
+		    pt_to_str(PT_NCPUS), pt_to_str(PT_IMPORTANCE));
+		(void) fprintf(fp, "\t%s\t%s, %s, %s\n", rt_to_str(RT_MCAP),
+		    pt_to_str(PT_PHYSICAL), pt_to_str(PT_SWAP),
+		    pt_to_str(PT_LOCKED));
 	}
 	if (need_to_close)
 		(void) pclose(fp);
@@ -1040,6 +1200,33 @@ initialize(bool handle_expected)
 				    "  Unable to continue", zone, brandname);
 				exit(Z_ERR);
 			}
+		} else if (global_zone && err == Z_NO_ZONE && !got_handle &&
+		    !read_only_mode) {
+			/*
+			 * We implicitly create the global zone config if it
+			 * doesn't exist.
+			 */
+			zone_dochandle_t tmphandle;
+
+			if ((tmphandle = zonecfg_init_handle()) == NULL) {
+				zone_perror(execname, Z_NOMEM, TRUE);
+				exit(Z_ERR);
+			}
+
+			err = zonecfg_get_template_handle("SUNWblank", zone,
+			    tmphandle);
+
+			if (err != Z_OK) {
+				zonecfg_fini_handle(tmphandle);
+				zone_perror("SUNWblank", err, TRUE);
+				return (err);
+			}
+
+			need_to_commit = TRUE;
+			zonecfg_fini_handle(handle);
+			handle = tmphandle;
+			got_handle = TRUE;
+
 		} else {
 			zone_perror(zone, err, handle_expected || got_handle);
 			if (err == Z_NO_ZONE && !got_handle &&
@@ -1373,10 +1560,13 @@ export_func(cmd_t *cmd)
 	struct zone_attrtab attrtab;
 	struct zone_rctltab rctltab;
 	struct zone_dstab dstab;
+	struct zone_psettab psettab;
+	struct zone_mcaptab mcaptab;
 	struct zone_rctlvaltab *valptr;
 	int err, arg;
 	char zonepath[MAXPATHLEN], outfile[MAXPATHLEN], pool[MAXNAMELEN];
 	char bootargs[BOOTARGS_MAX];
+	char sched[MAXNAMELEN];
 	char brand[MAXNAMELEN];
 	char *limitpriv;
 	FILE *of;
@@ -1456,6 +1646,10 @@ export_func(cmd_t *cmd)
 		free(limitpriv);
 	}
 
+	if (zonecfg_get_sched_class(handle, sched, sizeof (sched)) == Z_OK &&
+	    strlen(sched) > 0)
+		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+		    pt_to_str(PT_SCHED), sched);
 
 	if ((err = zonecfg_setipdent(handle)) != Z_OK) {
 		zone_perror(zone, err, FALSE);
@@ -1576,6 +1770,33 @@ export_func(cmd_t *cmd)
 	}
 	(void) zonecfg_enddsent(handle);
 
+	if (zonecfg_getpsetent(handle, &psettab) == Z_OK) {
+		(void) fprintf(of, "%s %s\n", cmd_to_str(CMD_ADD),
+		    rt_to_str(RT_DCPU));
+		if (strcmp(psettab.zone_ncpu_min, psettab.zone_ncpu_max) == 0)
+			(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_NCPUS), psettab.zone_ncpu_max);
+		else
+			(void) fprintf(of, "%s %s=%s-%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_NCPUS), psettab.zone_ncpu_min,
+			    psettab.zone_ncpu_max);
+		if (psettab.zone_importance[0] != '\0')
+			(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_IMPORTANCE), psettab.zone_importance);
+		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
+	}
+
+	if (zonecfg_getmcapent(handle, &mcaptab) == Z_OK) {
+		char buf[128];
+
+		(void) fprintf(of, "%s %s\n", cmd_to_str(CMD_ADD),
+		    rt_to_str(RT_MCAP));
+		bytes_to_units(mcaptab.zone_physmem_cap, buf, sizeof (buf));
+		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+		    pt_to_str(PT_PHYSICAL), buf);
+		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
+	}
+
 done:
 	if (need_to_close)
 		(void) fclose(of);
@@ -1641,6 +1862,10 @@ static void
 add_resource(cmd_t *cmd)
 {
 	int type;
+	struct zone_psettab tmp_psettab;
+	struct zone_mcaptab tmp_mcaptab;
+	uint64_t tmp_mcap;
+	char pool[MAXNAMELEN];
 
 	if ((type = cmd->cmd_res_type) == RT_UNKNOWN) {
 		long_usage(CMD_ADD, TRUE);
@@ -1667,6 +1892,12 @@ add_resource(cmd_t *cmd)
 		bzero(&in_progress_devtab, sizeof (in_progress_devtab));
 		return;
 	case RT_RCTL:
+		if (global_zone)
+			zerr(gettext("WARNING: Setting a global zone resource "
+			    "control too low could deny\nservice "
+			    "to even the root user; "
+			    "this could render the system impossible\n"
+			    "to administer.  Please use caution."));
 		bzero(&in_progress_rctltab, sizeof (in_progress_rctltab));
 		return;
 	case RT_ATTR:
@@ -1674,6 +1905,48 @@ add_resource(cmd_t *cmd)
 		return;
 	case RT_DATASET:
 		bzero(&in_progress_dstab, sizeof (in_progress_dstab));
+		return;
+	case RT_DCPU:
+		/* Make sure there isn't already a cpu-set entry. */
+		if (zonecfg_lookup_pset(handle, &tmp_psettab) == Z_OK) {
+			zerr(gettext("The %s resource already exists."),
+			    rt_to_str(RT_DCPU));
+			goto bad;
+		}
+
+		/* Make sure the pool property isn't set. */
+		if (zonecfg_get_pool(handle, pool, sizeof (pool)) == Z_OK &&
+		    strlen(pool) > 0) {
+			zerr(gettext("The %s property is already set.  "
+			    "A persistent pool is incompatible with\nthe %s "
+			    "resource."),
+			    pt_to_str(PT_POOL), rt_to_str(RT_DCPU));
+			goto bad;
+		}
+
+		bzero(&in_progress_psettab, sizeof (in_progress_psettab));
+		return;
+	case RT_MCAP:
+		/*
+		 * Make sure there isn't already a mem-cap entry or max-swap
+		 * or max-locked rctl.
+		 */
+		if (zonecfg_lookup_mcap(handle, &tmp_mcaptab) == Z_OK ||
+		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP, &tmp_mcap)
+		    == Z_OK ||
+		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM,
+		    &tmp_mcap) == Z_OK) {
+			zerr(gettext("The %s resource or a related resource "
+			    "control already exists."), rt_to_str(RT_MCAP));
+			goto bad;
+		}
+		if (global_zone)
+			zerr(gettext("WARNING: Setting a global zone memory "
+			    "cap too low could deny\nservice "
+			    "to even the root user; "
+			    "this could render the system impossible\n"
+			    "to administer.  Please use caution."));
+		bzero(&in_progress_mcaptab, sizeof (in_progress_mcaptab));
 		return;
 	default:
 		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, TRUE);
@@ -1871,6 +2144,30 @@ add_property(cmd_t *cmd)
 	}
 }
 
+static boolean_t
+gz_invalid_resource(int type)
+{
+	return (global_zone && (type == RT_FS || type == RT_IPD ||
+	    type == RT_NET || type == RT_DEVICE || type == RT_ATTR ||
+	    type == RT_DATASET));
+}
+
+static boolean_t
+gz_invalid_rt_property(int type)
+{
+	return (global_zone && (type == RT_ZONENAME || type == RT_ZONEPATH ||
+	    type == RT_AUTOBOOT || type == RT_LIMITPRIV ||
+	    type == RT_BOOTARGS || type == RT_BRAND || type == RT_SCHED));
+}
+
+static boolean_t
+gz_invalid_property(int type)
+{
+	return (global_zone && (type == PT_ZONENAME || type == PT_ZONEPATH ||
+	    type == PT_AUTOBOOT || type == PT_LIMITPRIV ||
+	    type == PT_BOOTARGS || type == PT_BRAND || type == PT_SCHED));
+}
+
 void
 add_func(cmd_t *cmd)
 {
@@ -1900,6 +2197,13 @@ add_func(cmd_t *cmd)
 	if (initialize(TRUE) != Z_OK)
 		return;
 	if (global_scope) {
+		if (gz_invalid_resource(cmd->cmd_res_type)) {
+			zerr(gettext("Cannot add a %s resource to the "
+			    "global zone."), rt_to_str(cmd->cmd_res_type));
+			saw_error = TRUE;
+			return;
+		}
+
 		global_scope = FALSE;
 		resource_scope = cmd->cmd_res_type;
 		end_op = CMD_ADD;
@@ -2273,26 +2577,85 @@ fill_in_dstab(cmd_t *cmd, struct zone_dstab *dstab, bool fill_in_only)
 }
 
 static void
-remove_resource(cmd_t *cmd)
+remove_aliased_rctl(int type, char *name)
 {
-	int err, type;
-	struct zone_fstab fstab;
-	struct zone_nwiftab nwiftab;
-	struct zone_devtab devtab;
-	struct zone_attrtab attrtab;
-	struct zone_rctltab rctltab;
-	struct zone_dstab dstab;
+	int err;
+	uint64_t tmp;
 
-	if ((type = cmd->cmd_res_type) == RT_UNKNOWN) {
-		long_usage(CMD_REMOVE, TRUE);
+	if ((err = zonecfg_get_aliased_rctl(handle, name, &tmp)) != Z_OK) {
+		zerr("%s %s: %s", cmd_to_str(CMD_CLEAR), pt_to_str(type),
+		    zonecfg_strerror(err));
+		saw_error = TRUE;
 		return;
 	}
+	if ((err = zonecfg_rm_aliased_rctl(handle, name)) != Z_OK) {
+		zerr("%s %s: %s", cmd_to_str(CMD_CLEAR), pt_to_str(type),
+		    zonecfg_strerror(err));
+		saw_error = TRUE;
+	} else {
+		need_to_commit = TRUE;
+	}
+}
 
-	if (initialize(TRUE) != Z_OK)
-		return;
+static boolean_t
+prompt_remove_resource(cmd_t *cmd, char *rsrc)
+{
+	int num;
+	int answer;
+	int arg;
+	boolean_t force = B_FALSE;
+	char prompt[128];
 
-	switch (type) {
-	case RT_FS:
+	optind = 0;
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "F")) != EOF) {
+		switch (arg) {
+		case 'F':
+			force = B_TRUE;
+			break;
+		default:
+			return (B_FALSE);
+		}
+	}
+
+	num = zonecfg_num_resources(handle, rsrc);
+
+	if (num == 0) {
+		z_cmd_rt_perror(CMD_REMOVE, cmd->cmd_res_type, Z_NO_ENTRY,
+		    TRUE);
+		return (B_FALSE);
+	}
+	if (num > 1 && !force) {
+		if (!interactive_mode) {
+			zerr(gettext("There are multiple instances of this "
+			    "resource.  Either qualify the resource to\n"
+			    "remove a single instance or use the -F option to "
+			    "remove all instances."));
+			saw_error = TRUE;
+			return (B_FALSE);
+		}
+		(void) snprintf(prompt, sizeof (prompt), gettext(
+		    "Are you sure you want to remove ALL '%s' resources"),
+		    rsrc);
+		answer = ask_yesno(FALSE, prompt);
+		if (answer == -1) {
+			zerr(gettext("Resource incomplete."));
+			return (B_FALSE);
+		}
+		if (answer != 1)
+			return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+static void
+remove_fs(cmd_t *cmd)
+{
+	int err;
+
+	/* traditional, qualified fs removal */
+	if (cmd->cmd_prop_nv_pairs > 0) {
+		struct zone_fstab fstab;
+
 		if ((err = fill_in_fstab(cmd, &fstab, FALSE)) != Z_OK) {
 			z_cmd_rt_perror(CMD_REMOVE, RT_FS, err, TRUE);
 			return;
@@ -2303,13 +2666,36 @@ remove_resource(cmd_t *cmd)
 			need_to_commit = TRUE;
 		zonecfg_free_fs_option_list(fstab.zone_fs_options);
 		return;
-	case RT_IPD:
-		if (state_atleast(ZONE_STATE_INSTALLED)) {
-			zerr(gettext("Zone %s already installed; %s %s not "
-			    "allowed."), zone, cmd_to_str(CMD_REMOVE),
-			    rt_to_str(RT_IPD));
-			return;
-		}
+	}
+
+	/*
+	 * unqualified fs removal.  remove all fs's but prompt if more
+	 * than one.
+	 */
+	if (!prompt_remove_resource(cmd, "fs"))
+		return;
+
+	if ((err = zonecfg_del_all_resources(handle, "fs")) != Z_OK)
+		z_cmd_rt_perror(CMD_REMOVE, RT_FS, err, TRUE);
+	else
+		need_to_commit = TRUE;
+}
+
+static void
+remove_ipd(cmd_t *cmd)
+{
+	int err;
+
+	if (state_atleast(ZONE_STATE_INSTALLED)) {
+		zerr(gettext("Zone %s already installed; %s %s not allowed."),
+		    zone, cmd_to_str(CMD_REMOVE), rt_to_str(RT_IPD));
+		return;
+	}
+
+	/* traditional, qualified ipd removal */
+	if (cmd->cmd_prop_nv_pairs > 0) {
+		struct zone_fstab fstab;
+
 		if ((err = fill_in_ipdtab(cmd, &fstab, FALSE)) != Z_OK) {
 			z_cmd_rt_perror(CMD_REMOVE, RT_IPD, err, TRUE);
 			return;
@@ -2319,7 +2705,31 @@ remove_resource(cmd_t *cmd)
 		else
 			need_to_commit = TRUE;
 		return;
-	case RT_NET:
+	}
+
+	/*
+	 * unqualified ipd removal.  remove all ipds but prompt if more
+	 * than one.
+	 */
+	if (!prompt_remove_resource(cmd, "inherit-pkg-dir"))
+		return;
+
+	if ((err = zonecfg_del_all_resources(handle, "inherit-pkg-dir"))
+	    != Z_OK)
+		z_cmd_rt_perror(CMD_REMOVE, RT_IPD, err, TRUE);
+	else
+		need_to_commit = TRUE;
+}
+
+static void
+remove_net(cmd_t *cmd)
+{
+	int err;
+
+	/* traditional, qualified net removal */
+	if (cmd->cmd_prop_nv_pairs > 0) {
+		struct zone_nwiftab nwiftab;
+
 		if ((err = fill_in_nwiftab(cmd, &nwiftab, FALSE)) != Z_OK) {
 			z_cmd_rt_perror(CMD_REMOVE, RT_NET, err, TRUE);
 			return;
@@ -2329,7 +2739,30 @@ remove_resource(cmd_t *cmd)
 		else
 			need_to_commit = TRUE;
 		return;
-	case RT_DEVICE:
+	}
+
+	/*
+	 * unqualified net removal.  remove all nets but prompt if more
+	 * than one.
+	 */
+	if (!prompt_remove_resource(cmd, "net"))
+		return;
+
+	if ((err = zonecfg_del_all_resources(handle, "net")) != Z_OK)
+		z_cmd_rt_perror(CMD_REMOVE, RT_NET, err, TRUE);
+	else
+		need_to_commit = TRUE;
+}
+
+static void
+remove_device(cmd_t *cmd)
+{
+	int err;
+
+	/* traditional, qualified device removal */
+	if (cmd->cmd_prop_nv_pairs > 0) {
+		struct zone_devtab devtab;
+
 		if ((err = fill_in_devtab(cmd, &devtab, FALSE)) != Z_OK) {
 			z_cmd_rt_perror(CMD_REMOVE, RT_DEVICE, err, TRUE);
 			return;
@@ -2339,7 +2772,96 @@ remove_resource(cmd_t *cmd)
 		else
 			need_to_commit = TRUE;
 		return;
-	case RT_RCTL:
+	}
+
+	/*
+	 * unqualified device removal.  remove all devices but prompt if more
+	 * than one.
+	 */
+	if (!prompt_remove_resource(cmd, "device"))
+		return;
+
+	if ((err = zonecfg_del_all_resources(handle, "device")) != Z_OK)
+		z_cmd_rt_perror(CMD_REMOVE, RT_DEVICE, err, TRUE);
+	else
+		need_to_commit = TRUE;
+}
+
+static void
+remove_attr(cmd_t *cmd)
+{
+	int err;
+
+	/* traditional, qualified attr removal */
+	if (cmd->cmd_prop_nv_pairs > 0) {
+		struct zone_attrtab attrtab;
+
+		if ((err = fill_in_attrtab(cmd, &attrtab, FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_ATTR, err, TRUE);
+			return;
+		}
+		if ((err = zonecfg_delete_attr(handle, &attrtab)) != Z_OK)
+			z_cmd_rt_perror(CMD_REMOVE, RT_ATTR, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	}
+
+	/*
+	 * unqualified attr removal.  remove all attrs but prompt if more
+	 * than one.
+	 */
+	if (!prompt_remove_resource(cmd, "attr"))
+		return;
+
+	if ((err = zonecfg_del_all_resources(handle, "attr")) != Z_OK)
+		z_cmd_rt_perror(CMD_REMOVE, RT_ATTR, err, TRUE);
+	else
+		need_to_commit = TRUE;
+}
+
+static void
+remove_dataset(cmd_t *cmd)
+{
+	int err;
+
+	/* traditional, qualified dataset removal */
+	if (cmd->cmd_prop_nv_pairs > 0) {
+		struct zone_dstab dstab;
+
+		if ((err = fill_in_dstab(cmd, &dstab, FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, TRUE);
+			return;
+		}
+		if ((err = zonecfg_delete_ds(handle, &dstab)) != Z_OK)
+			z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	}
+
+	/*
+	 * unqualified dataset removal.  remove all datasets but prompt if more
+	 * than one.
+	 */
+	if (!prompt_remove_resource(cmd, "dataset"))
+		return;
+
+	if ((err = zonecfg_del_all_resources(handle, "dataset")) != Z_OK)
+		z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, TRUE);
+	else
+		need_to_commit = TRUE;
+}
+
+static void
+remove_rctl(cmd_t *cmd)
+{
+	int err;
+
+	/* traditional, qualified rctl removal */
+	if (cmd->cmd_prop_nv_pairs > 0) {
+		struct zone_rctltab rctltab;
+
 		if ((err = fill_in_rctltab(cmd, &rctltab, FALSE)) != Z_OK) {
 			z_cmd_rt_perror(CMD_REMOVE, RT_RCTL, err, TRUE);
 			return;
@@ -2350,25 +2872,142 @@ remove_resource(cmd_t *cmd)
 			need_to_commit = TRUE;
 		zonecfg_free_rctl_value_list(rctltab.zone_rctl_valptr);
 		return;
-	case RT_ATTR:
-		if ((err = fill_in_attrtab(cmd, &attrtab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_ATTR, err, TRUE);
+	}
+
+	/*
+	 * unqualified rctl removal.  remove all rctls but prompt if more
+	 * than one.
+	 */
+	if (!prompt_remove_resource(cmd, "rctl"))
+		return;
+
+	if ((err = zonecfg_del_all_resources(handle, "rctl")) != Z_OK)
+		z_cmd_rt_perror(CMD_REMOVE, RT_RCTL, err, TRUE);
+	else
+		need_to_commit = TRUE;
+}
+
+static void
+remove_pset()
+{
+	int err;
+	struct zone_psettab psettab;
+
+	if ((err = zonecfg_lookup_pset(handle, &psettab)) != Z_OK) {
+		z_cmd_rt_perror(CMD_REMOVE, RT_DCPU, err, TRUE);
+		return;
+	}
+	if ((err = zonecfg_delete_pset(handle)) != Z_OK)
+		z_cmd_rt_perror(CMD_REMOVE, RT_DCPU, err, TRUE);
+	else
+		need_to_commit = TRUE;
+}
+
+static void
+remove_mcap()
+{
+	int err, res1, res2, res3;
+	uint64_t tmp;
+	struct zone_mcaptab mcaptab;
+	boolean_t revert = B_FALSE;
+
+	res1 = zonecfg_lookup_mcap(handle, &mcaptab);
+	res2 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP, &tmp);
+	res3 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM, &tmp);
+
+	/* if none of these exist, there is no resource to remove */
+	if (res1 != Z_OK && res2 != Z_OK && res3 != Z_OK) {
+		zerr("%s %s: %s", cmd_to_str(CMD_REMOVE), rt_to_str(RT_MCAP),
+		    zonecfg_strerror(Z_NO_RESOURCE_TYPE));
+		saw_error = TRUE;
+		return;
+	}
+	if (res1 == Z_OK) {
+		if ((err = zonecfg_delete_mcap(handle)) != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_MCAP, err, TRUE);
+			revert = B_TRUE;
+		} else {
+			need_to_commit = TRUE;
+		}
+	}
+	if (res2 == Z_OK) {
+		if ((err = zonecfg_rm_aliased_rctl(handle, ALIAS_MAXSWAP))
+		    != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_MCAP, err, TRUE);
+			revert = B_TRUE;
+		} else {
+			need_to_commit = TRUE;
+		}
+	}
+	if (res3 == Z_OK) {
+		if ((err = zonecfg_rm_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM))
+		    != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_MCAP, err, TRUE);
+			revert = B_TRUE;
+		} else {
+			need_to_commit = TRUE;
+		}
+	}
+
+	if (revert)
+		need_to_commit = FALSE;
+}
+
+static void
+remove_resource(cmd_t *cmd)
+{
+	int type;
+	int arg;
+
+	if ((type = cmd->cmd_res_type) == RT_UNKNOWN) {
+		long_usage(CMD_REMOVE, TRUE);
+		return;
+	}
+
+	optind = 0;
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?F")) != EOF) {
+		switch (arg) {
+		case '?':
+			longer_usage(CMD_REMOVE);
+			return;
+		case 'F':
+			break;
+		default:
+			short_usage(CMD_REMOVE);
 			return;
 		}
-		if ((err = zonecfg_delete_attr(handle, &attrtab)) != Z_OK)
-			z_cmd_rt_perror(CMD_REMOVE, RT_ATTR, err, TRUE);
-		else
-			need_to_commit = TRUE;
+	}
+
+	if (initialize(TRUE) != Z_OK)
+		return;
+
+	switch (type) {
+	case RT_FS:
+		remove_fs(cmd);
+		return;
+	case RT_IPD:
+		remove_ipd(cmd);
+		return;
+	case RT_NET:
+		remove_net(cmd);
+		return;
+	case RT_DEVICE:
+		remove_device(cmd);
+		return;
+	case RT_RCTL:
+		remove_rctl(cmd);
+		return;
+	case RT_ATTR:
+		remove_attr(cmd);
 		return;
 	case RT_DATASET:
-		if ((err = fill_in_dstab(cmd, &dstab, FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, TRUE);
-			return;
-		}
-		if ((err = zonecfg_delete_ds(handle, &dstab)) != Z_OK)
-			z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, TRUE);
-		else
-			need_to_commit = TRUE;
+		remove_dataset(cmd);
+		return;
+	case RT_DCPU:
+		remove_pset();
+		return;
+	case RT_MCAP:
+		remove_mcap();
 		return;
 	default:
 		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, TRUE);
@@ -2513,16 +3152,175 @@ remove_func(cmd_t *cmd)
 
 	assert(cmd != NULL);
 
-	if (global_scope)
+	if (global_scope) {
+		if (gz_invalid_resource(cmd->cmd_res_type)) {
+			zerr(gettext("%s is not a valid resource for the "
+			    "global zone."), rt_to_str(cmd->cmd_res_type));
+			saw_error = TRUE;
+			return;
+		}
 		remove_resource(cmd);
-	else
+	} else {
 		remove_property(cmd);
+	}
+}
+
+static void
+clear_property(cmd_t *cmd)
+{
+	int res_type, prop_type;
+
+	res_type = resource_scope;
+	prop_type = cmd->cmd_res_type;
+	if (res_type == RT_UNKNOWN || prop_type == PT_UNKNOWN) {
+		long_usage(CMD_CLEAR, TRUE);
+		return;
+	}
+
+	if (initialize(TRUE) != Z_OK)
+		return;
+
+	switch (res_type) {
+	case RT_FS:
+		if (prop_type == PT_RAW) {
+			in_progress_fstab.zone_fs_raw[0] = '\0';
+			need_to_commit = TRUE;
+			return;
+		}
+		break;
+	case RT_DCPU:
+		if (prop_type == PT_IMPORTANCE) {
+			in_progress_psettab.zone_importance[0] = '\0';
+			need_to_commit = TRUE;
+			return;
+		}
+		break;
+	case RT_MCAP:
+		switch (prop_type) {
+		case PT_PHYSICAL:
+			in_progress_mcaptab.zone_physmem_cap[0] = '\0';
+			need_to_commit = TRUE;
+			return;
+		case PT_SWAP:
+			remove_aliased_rctl(PT_SWAP, ALIAS_MAXSWAP);
+			return;
+		case PT_LOCKED:
+			remove_aliased_rctl(PT_LOCKED, ALIAS_MAXLOCKEDMEM);
+			return;
+		}
+		break;
+	default:
+		break;
+	}
+
+	zone_perror(pt_to_str(prop_type), Z_CLEAR_DISALLOW, TRUE);
+}
+
+static void
+clear_global(cmd_t *cmd)
+{
+	int err, type;
+
+	if ((type = cmd->cmd_res_type) == RT_UNKNOWN) {
+		long_usage(CMD_CLEAR, TRUE);
+		return;
+	}
+
+	if (initialize(TRUE) != Z_OK)
+		return;
+
+	switch (type) {
+	case PT_ZONENAME:
+		/* FALLTHRU */
+	case PT_ZONEPATH:
+		/* FALLTHRU */
+	case PT_BRAND:
+		zone_perror(pt_to_str(type), Z_CLEAR_DISALLOW, TRUE);
+		return;
+	case PT_AUTOBOOT:
+		/* false is default; we'll treat as equivalent to clearing */
+		if ((err = zonecfg_set_autoboot(handle, B_FALSE)) != Z_OK)
+			z_cmd_rt_perror(CMD_CLEAR, RT_AUTOBOOT, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	case PT_POOL:
+		if ((err = zonecfg_set_pool(handle, NULL)) != Z_OK)
+			z_cmd_rt_perror(CMD_CLEAR, RT_POOL, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	case PT_LIMITPRIV:
+		if ((err = zonecfg_set_limitpriv(handle, NULL)) != Z_OK)
+			z_cmd_rt_perror(CMD_CLEAR, RT_LIMITPRIV, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	case PT_BOOTARGS:
+		if ((err = zonecfg_set_bootargs(handle, NULL)) != Z_OK)
+			z_cmd_rt_perror(CMD_CLEAR, RT_BOOTARGS, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	case PT_SCHED:
+		if ((err = zonecfg_set_sched(handle, NULL)) != Z_OK)
+			z_cmd_rt_perror(CMD_CLEAR, RT_SCHED, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	case PT_MAXLWPS:
+		remove_aliased_rctl(PT_MAXLWPS, ALIAS_MAXLWPS);
+		return;
+	case PT_MAXSHMMEM:
+		remove_aliased_rctl(PT_MAXSHMMEM, ALIAS_MAXSHMMEM);
+		return;
+	case PT_MAXSHMIDS:
+		remove_aliased_rctl(PT_MAXSHMIDS, ALIAS_MAXSHMIDS);
+		return;
+	case PT_MAXMSGIDS:
+		remove_aliased_rctl(PT_MAXMSGIDS, ALIAS_MAXMSGIDS);
+		return;
+	case PT_MAXSEMIDS:
+		remove_aliased_rctl(PT_MAXSEMIDS, ALIAS_MAXSEMIDS);
+		return;
+	case PT_SHARES:
+		remove_aliased_rctl(PT_SHARES, ALIAS_SHARES);
+		return;
+	default:
+		zone_perror(pt_to_str(type), Z_NO_PROPERTY_TYPE, TRUE);
+		long_usage(CMD_CLEAR, TRUE);
+		usage(FALSE, HELP_PROPS);
+		return;
+	}
+}
+
+void
+clear_func(cmd_t *cmd)
+{
+	if (zone_is_read_only(CMD_CLEAR))
+		return;
+
+	assert(cmd != NULL);
+
+	if (global_scope) {
+		if (gz_invalid_property(cmd->cmd_res_type)) {
+			zerr(gettext("%s is not a valid property for the "
+			    "global zone."), pt_to_str(cmd->cmd_res_type));
+			saw_error = TRUE;
+			return;
+		}
+
+		clear_global(cmd);
+	} else {
+		clear_property(cmd);
+	}
 }
 
 void
 select_func(cmd_t *cmd)
 {
-	int type, err;
+	int type, err, res;
+	uint64_t limit;
 
 	if (zone_is_read_only(CMD_SELECT))
 		return;
@@ -2611,6 +3409,32 @@ select_func(cmd_t *cmd)
 		}
 		bcopy(&old_dstab, &in_progress_dstab,
 		    sizeof (struct zone_dstab));
+		return;
+	case RT_DCPU:
+		if ((err = zonecfg_lookup_pset(handle, &old_psettab)) != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_DCPU, err, TRUE);
+			global_scope = TRUE;
+		}
+		bcopy(&old_psettab, &in_progress_psettab,
+		    sizeof (struct zone_psettab));
+		return;
+	case RT_MCAP:
+		/* if none of these exist, there is no resource to select */
+		if ((res = zonecfg_lookup_mcap(handle, &old_mcaptab)) != Z_OK &&
+		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP, &limit)
+		    != Z_OK &&
+		    zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM, &limit)
+		    != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_MCAP, Z_NO_RESOURCE_TYPE,
+			    TRUE);
+			global_scope = TRUE;
+		}
+		if (res == Z_OK)
+			bcopy(&old_mcaptab, &in_progress_mcaptab,
+			    sizeof (struct zone_mcaptab));
+		else
+			bzero(&in_progress_mcaptab,
+			    sizeof (in_progress_mcaptab));
 		return;
 	default:
 		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, TRUE);
@@ -2731,6 +3555,49 @@ valid_fs_type(const char *type)
 	return (B_TRUE);
 }
 
+static void
+set_aliased_rctl(char *alias, int prop_type, char *s)
+{
+	uint64_t limit;
+	int err;
+	char tmp[128];
+
+	if (global_zone && strcmp(alias, ALIAS_SHARES) != 0)
+		zerr(gettext("WARNING: Setting a global zone resource "
+		    "control too low could deny\nservice "
+		    "to even the root user; "
+		    "this could render the system impossible\n"
+		    "to administer.  Please use caution."));
+
+	/* convert memory based properties */
+	if (prop_type == PT_MAXSHMMEM) {
+		if (!zonecfg_valid_memlimit(s, &limit)) {
+			zerr(gettext("A non-negative number with a required "
+			    "scale suffix (K, M, G or T) was expected\nhere."));
+			saw_error = TRUE;
+			return;
+		}
+
+		(void) snprintf(tmp, sizeof (tmp), "%llu", limit);
+		s = tmp;
+	}
+
+	if (!zonecfg_aliased_rctl_ok(handle, alias)) {
+		zone_perror(pt_to_str(prop_type), Z_ALIAS_DISALLOW, FALSE);
+		saw_error = TRUE;
+	} else if (!zonecfg_valid_alias_limit(alias, s, &limit)) {
+		zerr(gettext("%s property is out of range."),
+		    pt_to_str(prop_type));
+		saw_error = TRUE;
+	} else if ((err = zonecfg_set_aliased_rctl(handle, alias, limit))
+	    != Z_OK) {
+		zone_perror(zone, err, TRUE);
+		saw_error = TRUE;
+	} else {
+		need_to_commit = TRUE;
+	}
+}
+
 void
 set_func(cmd_t *cmd)
 {
@@ -2739,6 +3606,9 @@ set_func(cmd_t *cmd)
 	property_value_ptr_t pp;
 	boolean_t autoboot;
 	boolean_t force_set = FALSE;
+	size_t physmem_size = sizeof (in_progress_mcaptab.zone_physmem_cap);
+	uint64_t mem_cap, mem_limit;
+	struct zone_psettab tmp_psettab;
 
 	if (zone_is_read_only(CMD_SET))
 		return;
@@ -2762,6 +3632,13 @@ set_func(cmd_t *cmd)
 
 	prop_type = cmd->cmd_prop_name[0];
 	if (global_scope) {
+		if (gz_invalid_property(prop_type)) {
+			zerr(gettext("%s is not a valid property for the "
+			    "global zone."), pt_to_str(prop_type));
+			saw_error = TRUE;
+			return;
+		}
+
 		if (prop_type == PT_ZONENAME) {
 			res_type = RT_ZONENAME;
 		} else if (prop_type == PT_ZONEPATH) {
@@ -2776,6 +3653,20 @@ set_func(cmd_t *cmd)
 			res_type = RT_LIMITPRIV;
 		} else if (prop_type == PT_BOOTARGS) {
 			res_type = RT_BOOTARGS;
+		} else if (prop_type == PT_SCHED) {
+			res_type = RT_SCHED;
+		} else if (prop_type == PT_MAXLWPS) {
+			res_type = RT_MAXLWPS;
+		} else if (prop_type == PT_MAXSHMMEM) {
+			res_type = RT_MAXSHMMEM;
+		} else if (prop_type == PT_MAXSHMIDS) {
+			res_type = RT_MAXSHMIDS;
+		} else if (prop_type == PT_MAXMSGIDS) {
+			res_type = RT_MAXMSGIDS;
+		} else if (prop_type == PT_MAXSEMIDS) {
+			res_type = RT_MAXSEMIDS;
+		} else if (prop_type == PT_SHARES) {
+			res_type = RT_SHARES;
 		} else {
 			zerr(gettext("Cannot set a resource-specific property "
 			    "from the global scope."));
@@ -2899,6 +3790,24 @@ set_func(cmd_t *cmd)
 			need_to_commit = TRUE;
 		return;
 	case RT_POOL:
+		/* don't allow use of the reserved temporary pool names */
+		if (strncmp("SUNW", prop_id, 4) == 0) {
+			zerr(gettext("pool names starting with SUNW are "
+			    "reserved."));
+			saw_error = TRUE;
+			return;
+		}
+
+		/* can't set pool if dedicated-cpu exists */
+		if (zonecfg_lookup_pset(handle, &tmp_psettab) == Z_OK) {
+			zerr(gettext("The %s resource already exists.  "
+			    "A persistent pool is incompatible\nwith the %s "
+			    "resource."), rt_to_str(RT_DCPU),
+			    rt_to_str(RT_DCPU));
+			saw_error = TRUE;
+			return;
+		}
+
 		if ((err = zonecfg_set_pool(handle, prop_id)) != Z_OK)
 			zone_perror(zone, err, TRUE);
 		else
@@ -2915,6 +3824,30 @@ set_func(cmd_t *cmd)
 			zone_perror(zone, err, TRUE);
 		else
 			need_to_commit = TRUE;
+		return;
+	case RT_SCHED:
+		if ((err = zonecfg_set_sched(handle, prop_id)) != Z_OK)
+			zone_perror(zone, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	case RT_MAXLWPS:
+		set_aliased_rctl(ALIAS_MAXLWPS, prop_type, prop_id);
+		return;
+	case RT_MAXSHMMEM:
+		set_aliased_rctl(ALIAS_MAXSHMMEM, prop_type, prop_id);
+		return;
+	case RT_MAXSHMIDS:
+		set_aliased_rctl(ALIAS_MAXSHMIDS, prop_type, prop_id);
+		return;
+	case RT_MAXMSGIDS:
+		set_aliased_rctl(ALIAS_MAXMSGIDS, prop_type, prop_id);
+		return;
+	case RT_MAXSEMIDS:
+		set_aliased_rctl(ALIAS_MAXSEMIDS, prop_type, prop_id);
+		return;
+	case RT_SHARES:
+		set_aliased_rctl(ALIAS_SHARES, prop_type, prop_id);
 		return;
 	case RT_FS:
 		switch (prop_type) {
@@ -3095,6 +4028,146 @@ set_func(cmd_t *cmd)
 		long_usage(CMD_SET, TRUE);
 		usage(FALSE, HELP_PROPS);
 		return;
+	case RT_DCPU:
+		switch (prop_type) {
+		char *lowp, *highp;
+
+		case PT_NCPUS:
+			lowp = prop_id;
+			if ((highp = strchr(prop_id, '-')) != NULL)
+				*highp++ = '\0';
+			else
+				highp = lowp;
+
+			/* Make sure the input makes sense. */
+			if (!zonecfg_valid_ncpus(lowp, highp)) {
+				zerr(gettext("%s property is out of range."),
+				    pt_to_str(PT_NCPUS));
+				saw_error = TRUE;
+				return;
+			}
+
+			(void) strlcpy(
+			    in_progress_psettab.zone_ncpu_min, lowp,
+			    sizeof (in_progress_psettab.zone_ncpu_min));
+			(void) strlcpy(
+			    in_progress_psettab.zone_ncpu_max, highp,
+			    sizeof (in_progress_psettab.zone_ncpu_max));
+			return;
+		case PT_IMPORTANCE:
+			/* Make sure the value makes sense. */
+			if (!zonecfg_valid_importance(prop_id)) {
+				zerr(gettext("%s property is out of range."),
+				    pt_to_str(PT_IMPORTANCE));
+				saw_error = TRUE;
+				return;
+			}
+
+			(void) strlcpy(in_progress_psettab.zone_importance,
+			    prop_id,
+			    sizeof (in_progress_psettab.zone_importance));
+			return;
+		default:
+			break;
+		}
+		zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE, TRUE);
+		long_usage(CMD_SET, TRUE);
+		usage(FALSE, HELP_PROPS);
+		return;
+	case RT_MCAP:
+		switch (prop_type) {
+		case PT_PHYSICAL:
+			if (!zonecfg_valid_memlimit(prop_id, &mem_cap)) {
+				zerr(gettext("A positive number with a "
+				    "required scale suffix (K, M, G or T) was "
+				    "expected here."));
+				saw_error = TRUE;
+			} else if (mem_cap < ONE_MB) {
+				zerr(gettext("%s value is too small.  It must "
+				    "be at least 1M."), pt_to_str(PT_PHYSICAL));
+				saw_error = TRUE;
+			} else {
+				snprintf(in_progress_mcaptab.zone_physmem_cap,
+				    physmem_size, "%llu", mem_cap);
+			}
+			break;
+		case PT_SWAP:
+			/*
+			 * We have to check if an rctl is allowed here since
+			 * there might already be a rctl defined that blocks
+			 * the alias.
+			 */
+			if (!zonecfg_aliased_rctl_ok(handle, ALIAS_MAXSWAP)) {
+				zone_perror(pt_to_str(PT_MAXSWAP),
+				    Z_ALIAS_DISALLOW, FALSE);
+				saw_error = TRUE;
+				return;
+			}
+
+			if (global_zone)
+				mem_limit = ONE_MB * 100;
+			else
+				mem_limit = ONE_MB * 50;
+
+			if (!zonecfg_valid_memlimit(prop_id, &mem_cap)) {
+				zerr(gettext("A positive number with a "
+				    "required scale suffix (K, M, G or T) was "
+				    "expected here."));
+				saw_error = TRUE;
+			} else if (mem_cap < mem_limit) {
+				char buf[128];
+
+				(void) snprintf(buf, sizeof (buf), "%llu",
+				    mem_limit);
+				bytes_to_units(buf, buf, sizeof (buf));
+				zerr(gettext("%s value is too small.  It must "
+				    "be at least %s."), pt_to_str(PT_SWAP),
+				    buf);
+				saw_error = TRUE;
+			} else {
+				if ((err = zonecfg_set_aliased_rctl(handle,
+				    ALIAS_MAXSWAP, mem_cap)) != Z_OK)
+					zone_perror(zone, err, TRUE);
+				else
+					need_to_commit = TRUE;
+			}
+			break;
+		case PT_LOCKED:
+			/*
+			 * We have to check if an rctl is allowed here since
+			 * there might already be a rctl defined that blocks
+			 * the alias.
+			 */
+			if (!zonecfg_aliased_rctl_ok(handle,
+			    ALIAS_MAXLOCKEDMEM)) {
+				zone_perror(pt_to_str(PT_LOCKED),
+				    Z_ALIAS_DISALLOW, FALSE);
+				saw_error = TRUE;
+				return;
+			}
+
+			if (!zonecfg_valid_memlimit(prop_id, &mem_cap)) {
+				zerr(gettext("A non-negative number with a "
+				    "required scale suffix (K, M, G or T) was "
+				    "expected\nhere."));
+				saw_error = TRUE;
+			} else {
+				if ((err = zonecfg_set_aliased_rctl(handle,
+				    ALIAS_MAXLOCKEDMEM, mem_cap)) != Z_OK)
+					zone_perror(zone, err, TRUE);
+				else
+					need_to_commit = TRUE;
+			}
+			break;
+		default:
+			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
+			    TRUE);
+			long_usage(CMD_SET, TRUE);
+			usage(FALSE, HELP_PROPS);
+			return;
+		}
+
+		return;
 	default:
 		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, TRUE);
 		long_usage(CMD_SET, TRUE);
@@ -3110,7 +4183,11 @@ output_prop(FILE *fp, int pnum, char *pval, bool print_notspec)
 
 	if (*pval != '\0') {
 		qstr = quoteit(pval);
-		(void) fprintf(fp, "\t%s: %s\n", pt_to_str(pnum), qstr);
+		if (pnum == PT_SWAP || pnum == PT_LOCKED)
+			(void) fprintf(fp, "\t[%s: %s]\n", pt_to_str(pnum),
+			    qstr);
+		else
+			(void) fprintf(fp, "\t%s: %s\n", pt_to_str(pnum), qstr);
 		free(qstr);
 	} else if (print_notspec)
 		(void) fprintf(fp, gettext("\t%s not specified\n"),
@@ -3207,6 +4284,20 @@ info_bootargs(zone_dochandle_t handle, FILE *fp)
 	    sizeof (bootargs))) == Z_OK) {
 		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_BOOTARGS),
 		    bootargs);
+	} else {
+		zone_perror(zone, err, TRUE);
+	}
+}
+
+static void
+info_sched(zone_dochandle_t handle, FILE *fp)
+{
+	char sched[MAXNAMELEN];
+	int err;
+
+	if ((err = zonecfg_get_sched_class(handle, sched, sizeof (sched)))
+	    == Z_OK) {
+		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_SCHED), sched);
 	} else {
 		zone_perror(zone, err, TRUE);
 	}
@@ -3499,7 +4590,7 @@ info_ds(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 	struct zone_dstab lookup, user;
 	bool output = FALSE;
 
-	if (zonecfg_setdevent(handle) != Z_OK)
+	if (zonecfg_setdsent(handle) != Z_OK)
 		return;
 	while (zonecfg_getdsent(handle, &lookup) == Z_OK) {
 		if (cmd->cmd_prop_nv_pairs == 0) {
@@ -3525,12 +4616,132 @@ info_ds(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 		    rt_to_str(RT_DATASET));
 }
 
+static void
+output_pset(FILE *fp, struct zone_psettab *psettab)
+{
+	(void) fprintf(fp, "%s:\n", rt_to_str(RT_DCPU));
+	if (strcmp(psettab->zone_ncpu_min, psettab->zone_ncpu_max) == 0)
+		(void) fprintf(fp, "\t%s: %s\n", pt_to_str(PT_NCPUS),
+		    psettab->zone_ncpu_max);
+	else
+		(void) fprintf(fp, "\t%s: %s-%s\n", pt_to_str(PT_NCPUS),
+		    psettab->zone_ncpu_min, psettab->zone_ncpu_max);
+	if (psettab->zone_importance[0] != '\0')
+		(void) fprintf(fp, "\t%s: %s\n", pt_to_str(PT_IMPORTANCE),
+		    psettab->zone_importance);
+}
+
+static void
+info_pset(zone_dochandle_t handle, FILE *fp)
+{
+	struct zone_psettab lookup;
+
+	if (zonecfg_getpsetent(handle, &lookup) == Z_OK)
+		output_pset(fp, &lookup);
+}
+
+static void
+info_aliased_rctl(zone_dochandle_t handle, FILE *fp, char *alias)
+{
+	uint64_t limit;
+
+	if (zonecfg_get_aliased_rctl(handle, alias, &limit) == Z_OK) {
+		/* convert memory based properties */
+		if (strcmp(alias, ALIAS_MAXSHMMEM) == 0) {
+			char buf[128];
+
+			(void) snprintf(buf, sizeof (buf), "%llu", limit);
+			bytes_to_units(buf, buf, sizeof (buf));
+			(void) fprintf(fp, "[%s: %s]\n", alias, buf);
+			return;
+		}
+
+		(void) fprintf(fp, "[%s: %llu]\n", alias, limit);
+	}
+}
+
+static void
+bytes_to_units(char *str, char *buf, int bufsize)
+{
+	unsigned long long num;
+	unsigned long long save = 0;
+	char *units = "BKMGT";
+	char *up = units;
+
+	num = strtoll(str, NULL, 10);
+
+	if (num < 1024) {
+		(void) snprintf(buf, bufsize, "%llu", num);
+		return;
+	}
+
+	while ((num >= 1024) && (*up != 'T')) {
+		up++; /* next unit of measurement */
+		save = num;
+		num = (num + 512) >> 10;
+	}
+
+	/* check if we should output a fraction.  snprintf will round for us */
+	if (save % 1024 != 0 && ((save >> 10) < 10))
+		(void) snprintf(buf, bufsize, "%2.1f%c", ((float)save / 1024),
+		    *up);
+	else
+		(void) snprintf(buf, bufsize, "%llu%c", num, *up);
+}
+
+static void
+output_mcap(FILE *fp, struct zone_mcaptab *mcaptab, int showswap,
+    uint64_t maxswap, int showlocked, uint64_t maxlocked)
+{
+	char buf[128];
+
+	(void) fprintf(fp, "%s:\n", rt_to_str(RT_MCAP));
+	if (mcaptab->zone_physmem_cap[0] != '\0') {
+		bytes_to_units(mcaptab->zone_physmem_cap, buf, sizeof (buf));
+		output_prop(fp, PT_PHYSICAL, buf, B_TRUE);
+	}
+
+	if (showswap == Z_OK) {
+		(void) snprintf(buf, sizeof (buf), "%llu", maxswap);
+		bytes_to_units(buf, buf, sizeof (buf));
+		output_prop(fp, PT_SWAP, buf, B_TRUE);
+	}
+
+	if (showlocked == Z_OK) {
+		(void) snprintf(buf, sizeof (buf), "%llu", maxlocked);
+		bytes_to_units(buf, buf, sizeof (buf));
+		output_prop(fp, PT_LOCKED, buf, B_TRUE);
+	}
+}
+
+static void
+info_mcap(zone_dochandle_t handle, FILE *fp)
+{
+	int res1, res2, res3;
+	uint64_t swap_limit;
+	uint64_t locked_limit;
+	struct zone_mcaptab lookup;
+
+	bzero(&lookup, sizeof (lookup));
+	res1 = zonecfg_getmcapent(handle, &lookup);
+	res2 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP, &swap_limit);
+	res3 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM,
+	    &locked_limit);
+
+	if (res1 == Z_OK || res2 == Z_OK || res3 == Z_OK)
+		output_mcap(fp, &lookup, res2, swap_limit, res3, locked_limit);
+}
+
 void
 info_func(cmd_t *cmd)
 {
 	FILE *fp = stdout;
 	bool need_to_close = FALSE;
 	char *pager;
+	int type;
+	int res1, res2;
+	uint64_t swap_limit;
+	uint64_t locked_limit;
 
 	assert(cmd != NULL);
 
@@ -3569,26 +4780,68 @@ info_func(cmd_t *cmd)
 		case RT_DATASET:
 			output_ds(fp, &in_progress_dstab);
 			break;
+		case RT_DCPU:
+			output_pset(fp, &in_progress_psettab);
+			break;
+		case RT_MCAP:
+			res1 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP,
+			    &swap_limit);
+			res2 = zonecfg_get_aliased_rctl(handle,
+			    ALIAS_MAXLOCKEDMEM, &locked_limit);
+			output_mcap(fp, &in_progress_mcaptab, res1, swap_limit,
+			    res2, locked_limit);
+			break;
 		}
+		goto cleanup;
+	}
+
+	type = cmd->cmd_res_type;
+
+	if (gz_invalid_rt_property(type)) {
+		zerr(gettext("%s is not a valid property for the global zone."),
+		    rt_to_str(type));
+		goto cleanup;
+	}
+
+	if (gz_invalid_resource(type)) {
+		zerr(gettext("%s is not a valid resource for the global zone."),
+		    rt_to_str(type));
 		goto cleanup;
 	}
 
 	switch (cmd->cmd_res_type) {
 	case RT_UNKNOWN:
 		info_zonename(handle, fp);
-		info_zonepath(handle, fp);
-		info_brand(handle, fp);
-		info_autoboot(handle, fp);
-		info_bootargs(handle, fp);
+		if (!global_zone) {
+			info_zonepath(handle, fp);
+			info_brand(handle, fp);
+			info_autoboot(handle, fp);
+			info_bootargs(handle, fp);
+		}
 		info_pool(handle, fp);
-		info_limitpriv(handle, fp);
-		info_ipd(handle, fp, cmd);
-		info_fs(handle, fp, cmd);
-		info_net(handle, fp, cmd);
-		info_dev(handle, fp, cmd);
+		if (!global_zone) {
+			info_limitpriv(handle, fp);
+			info_sched(handle, fp);
+		}
+		info_aliased_rctl(handle, fp, ALIAS_MAXLWPS);
+		info_aliased_rctl(handle, fp, ALIAS_MAXSHMMEM);
+		info_aliased_rctl(handle, fp, ALIAS_MAXSHMIDS);
+		info_aliased_rctl(handle, fp, ALIAS_MAXMSGIDS);
+		info_aliased_rctl(handle, fp, ALIAS_MAXSEMIDS);
+		info_aliased_rctl(handle, fp, ALIAS_SHARES);
+		if (!global_zone) {
+			info_ipd(handle, fp, cmd);
+			info_fs(handle, fp, cmd);
+			info_net(handle, fp, cmd);
+			info_dev(handle, fp, cmd);
+		}
+		info_pset(handle, fp);
+		info_mcap(handle, fp);
+		if (!global_zone) {
+			info_attr(handle, fp, cmd);
+			info_ds(handle, fp, cmd);
+		}
 		info_rctl(handle, fp, cmd);
-		info_attr(handle, fp, cmd);
-		info_ds(handle, fp, cmd);
 		break;
 	case RT_ZONENAME:
 		info_zonename(handle, fp);
@@ -3611,6 +4864,27 @@ info_func(cmd_t *cmd)
 	case RT_BOOTARGS:
 		info_bootargs(handle, fp);
 		break;
+	case RT_SCHED:
+		info_sched(handle, fp);
+		break;
+	case RT_MAXLWPS:
+		info_aliased_rctl(handle, fp, ALIAS_MAXLWPS);
+		break;
+	case RT_MAXSHMMEM:
+		info_aliased_rctl(handle, fp, ALIAS_MAXSHMMEM);
+		break;
+	case RT_MAXSHMIDS:
+		info_aliased_rctl(handle, fp, ALIAS_MAXSHMIDS);
+		break;
+	case RT_MAXMSGIDS:
+		info_aliased_rctl(handle, fp, ALIAS_MAXMSGIDS);
+		break;
+	case RT_MAXSEMIDS:
+		info_aliased_rctl(handle, fp, ALIAS_MAXSEMIDS);
+		break;
+	case RT_SHARES:
+		info_aliased_rctl(handle, fp, ALIAS_SHARES);
+		break;
 	case RT_FS:
 		info_fs(handle, fp, cmd);
 		break;
@@ -3631,6 +4905,12 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_DATASET:
 		info_ds(handle, fp, cmd);
+		break;
+	case RT_DCPU:
+		info_pset(handle, fp);
+		break;
+	case RT_MCAP:
+		info_mcap(handle, fp);
 		break;
 	default:
 		zone_perror(rt_to_str(cmd->cmd_res_type), Z_NO_RESOURCE_TYPE,
@@ -3765,10 +5045,13 @@ verify_func(cmd_t *cmd)
 	struct zone_attrtab attrtab;
 	struct zone_rctltab rctltab;
 	struct zone_dstab dstab;
+	struct zone_psettab psettab;
 	char zonepath[MAXPATHLEN];
+	char sched[MAXNAMELEN];
 	char brand[MAXNAMELEN];
 	int err, ret_val = Z_OK, arg;
 	bool save = FALSE;
+	boolean_t has_cpu_shares = B_FALSE;
 
 	optind = 0;
 	if ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
@@ -3796,12 +5079,13 @@ verify_func(cmd_t *cmd)
 	if (initialize(TRUE) != Z_OK)
 		return;
 
-	if (zonecfg_get_zonepath(handle, zonepath, sizeof (zonepath)) != Z_OK) {
+	if (zonecfg_get_zonepath(handle, zonepath, sizeof (zonepath)) != Z_OK &&
+	    !global_zone) {
 		zerr(gettext("%s not specified"), pt_to_str(PT_ZONEPATH));
 		ret_val = Z_REQD_RESOURCE_MISSING;
 		saw_error = TRUE;
 	}
-	if (strlen(zonepath) == 0) {
+	if (strlen(zonepath) == 0 && !global_zone) {
 		zerr(gettext("%s cannot be empty."), pt_to_str(PT_ZONEPATH));
 		ret_val = Z_REQD_RESOURCE_MISSING;
 		saw_error = TRUE;
@@ -3861,6 +5145,9 @@ verify_func(cmd_t *cmd)
 		check_reqd_prop(rctltab.zone_rctl_name, RT_RCTL, PT_NAME,
 		    &ret_val);
 
+		if (strcmp(rctltab.zone_rctl_name, "zone.cpu-shares") == 0)
+			has_cpu_shares = B_TRUE;
+
 		if (rctltab.zone_rctl_valptr == NULL) {
 			zerr(gettext("%s: no %s specified"),
 			    rt_to_str(RT_RCTL), pt_to_str(PT_VALUE));
@@ -3872,6 +5159,25 @@ verify_func(cmd_t *cmd)
 		}
 	}
 	(void) zonecfg_endrctlent(handle);
+
+	if (zonecfg_lookup_pset(handle, &psettab) == Z_OK && has_cpu_shares) {
+		zerr(gettext("%s zone.cpu-shares and %s are incompatible."),
+		    rt_to_str(RT_RCTL), rt_to_str(RT_DCPU));
+		saw_error = TRUE;
+		if (ret_val == Z_OK)
+			ret_val = Z_INCOMPATIBLE;
+	}
+
+	if (has_cpu_shares && zonecfg_get_sched_class(handle, sched,
+	    sizeof (sched)) == Z_OK && strlen(sched) > 0 &&
+	    strcmp(sched, "FSS") != 0) {
+		zerr(gettext("WARNING: %s zone.cpu-shares and %s=%s are "
+		    "incompatible"),
+		    rt_to_str(RT_RCTL), rt_to_str(RT_SCHED), sched);
+		saw_error = TRUE;
+		if (ret_val == Z_OK)
+			ret_val = Z_INCOMPATIBLE;
+	}
 
 	if ((err = zonecfg_setattrent(handle)) != Z_OK) {
 		zone_perror(zone, err, TRUE);
@@ -4061,7 +5367,9 @@ end_func(cmd_t *cmd)
 	struct zone_rctltab tmp_rctltab;
 	struct zone_attrtab tmp_attrtab;
 	struct zone_dstab tmp_dstab;
-	int err, arg;
+	int err, arg, res1, res2, res3;
+	uint64_t swap_limit;
+	uint64_t locked_limit;
 
 	assert(cmd != NULL);
 
@@ -4359,6 +5667,73 @@ end_func(cmd_t *cmd)
 		} else {
 			err = zonecfg_modify_ds(handle, &old_dstab,
 			    &in_progress_dstab);
+		}
+		break;
+	case RT_DCPU:
+		/* Make sure everything was filled in. */
+		if (end_check_reqd(in_progress_psettab.zone_ncpu_min,
+		    PT_NCPUS, &validation_failed) != Z_OK) {
+			saw_error = TRUE;
+			return;
+		}
+
+		if (end_op == CMD_ADD) {
+			err = zonecfg_add_pset(handle, &in_progress_psettab);
+		} else {
+			err = zonecfg_modify_pset(handle, &in_progress_psettab);
+		}
+		break;
+	case RT_MCAP:
+		/* Make sure everything was filled in. */
+		res1 = strlen(in_progress_mcaptab.zone_physmem_cap) == 0 ?
+		    Z_ERR : Z_OK;
+		res2 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP,
+		    &swap_limit);
+		res3 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXLOCKEDMEM,
+		    &locked_limit);
+
+		if (res1 != Z_OK && res2 != Z_OK && res3 != Z_OK) {
+			zerr(gettext("No property was specified.  One of %s, "
+			    "%s or %s is required."), pt_to_str(PT_PHYSICAL),
+			    pt_to_str(PT_SWAP), pt_to_str(PT_LOCKED));
+			saw_error = TRUE;
+			return;
+		}
+
+		/* if phys & locked are both set, verify locked <= phys */
+		if (res1 == Z_OK && res3 == Z_OK) {
+			uint64_t phys_limit;
+			char *endp;
+
+			phys_limit = strtoull(
+			    in_progress_mcaptab.zone_physmem_cap, &endp, 10);
+			if (phys_limit < locked_limit) {
+				zerr(gettext("The %s cap must be less than or "
+				    "equal to the %s cap."),
+				    pt_to_str(PT_LOCKED),
+				    pt_to_str(PT_PHYSICAL));
+				saw_error = TRUE;
+				return;
+			}
+		}
+
+		err = Z_OK;
+		if (res1 == Z_OK) {
+			/*
+			 * We could be ending from either an add operation
+			 * or a select operation.  Since all of the properties
+			 * within this resource are optional, we always use
+			 * modify on the mcap entry.  zonecfg_modify_mcap()
+			 * will handle both adding and modifying a memory cap.
+			 */
+			err = zonecfg_modify_mcap(handle, &in_progress_mcaptab);
+		} else if (end_op == CMD_SELECT) {
+			/*
+			 * If we're ending from a select and the physical
+			 * memory cap is empty then the user could have cleared
+			 * the physical cap value, so try to delete the entry.
+			 */
+			(void) zonecfg_delete_mcap(handle);
 		}
 		break;
 	default:
@@ -4885,7 +6260,9 @@ main(int argc, char *argv[])
 			zonecfg_set_root(optarg);
 			break;
 		case 'z':
-			if (zonecfg_validate_zonename(optarg) != Z_OK) {
+			if (strcmp(optarg, GLOBAL_ZONENAME) == 0) {
+				global_zone = TRUE;
+			} else if (zonecfg_validate_zonename(optarg) != Z_OK) {
 				zone_perror(optarg, Z_BOGUS_ZONE_NAME, TRUE);
 				usage(FALSE, HELP_SYNTAX);
 				exit(Z_USAGE);

@@ -35,6 +35,7 @@
 SRCS =	rcapd_main.c \
 	rcapd_collection.c \
 	rcapd_collection_project.c \
+	rcapd_collection_zone.c \
 	rcapd_mapping.c \
 	rcapd_rfd.c \
 	rcapd_scanner.c \
@@ -44,6 +45,7 @@ SRCS =	rcapd_main.c \
 LINTSRCS = ../rcapd_main.c \
 	../rcapd_collection.c \
 	../rcapd_collection_project.c \
+	../rcapd_collection_zone.c \
 	../rcapd_mapping.c \
 	../rcapd_rfd.c \
 	../rcapd_scanner.c \
@@ -53,7 +55,7 @@ LINTSRCS = ../rcapd_main.c \
 $(NOT_RELEASE_BUILD)CPPFLAGS 	+= -DDEBUG
 CPPFLAGS			+= -DDEBUG_MSG
 CPPFLAGS 			+= -I$(COMMON_DIR)
-LDLIBS 				+= -lkstat -ll -lproc -lproject -lumem
+LDLIBS 				+= -lkstat -ll -lproc -lproject -lzonecfg -lumem
 LDLIBS				+= $(EXTRA_LDLIBS)
 
 LINTFLAGS			+= -u

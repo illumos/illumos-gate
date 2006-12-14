@@ -61,6 +61,7 @@
 #include <unistd.h>
 #include <zone.h>
 #include <assert.h>
+#include <sys/vm_usage.h>
 #include "rcapd.h"
 #include "rcapd_mapping.h"
 #include "rcapd_rfd.h"
@@ -80,30 +81,42 @@
 #define	STAT_TEMPLATE_SUFFIX	".XXXXXX"	/* suffix of mkstemp() arg */
 #define	DAEMON_UID		1		/* uid to use */
 
+#define	CAPPED_PROJECT	0x01
+#define	CAPPED_ZONE	0x02
+
 typedef struct soft_scan_arg {
 	uint64_t ssa_sum_excess;
 	int64_t ssa_scan_goal;
+	boolean_t ssa_project_over_cap;
 } soft_scan_arg_t;
+
+typedef struct sample_col_arg {
+	boolean_t sca_any_over_cap;
+	boolean_t sca_project_over_cap;
+} sample_col_arg_t;
+
 
 static int debug_mode = 0;		/* debug mode flag */
 static pid_t rcapd_pid;			/* rcapd's pid to ensure it's not */
 					/* scanned */
 static kstat_ctl_t *kctl;		/* kstat chain */
-static uint64_t new_sp = 0, old_sp = 0;	/* measure delta in page scan count */
-static int enforce_caps = 0;		/* cap enforcement flag, dependent on */
-					/* enforce_soft_caps and */
-					/* global_scanner_running */
-static int enforce_soft_caps = 0;	/* soft cap enforcement flag, */
-					/* depending on memory pressure */
 static int memory_pressure = 0;		/* physical memory utilization (%) */
 static int memory_pressure_sample = 0;	/* count of samples */
-static int global_scanner_running = 0;	/* global scanning flag, to avoid */
-					/* interference with kernel's page */
-					/* scanner */
+static long page_size_kb = 0;		/* system page size in KB */
+static size_t nvmu_vals = 0;		/* # of kernel RSS/swap vals in array */
+static size_t vmu_vals_len = 0;		/* size of RSS/swap vals array */
+static vmusage_t *vmu_vals = NULL;	/* snapshot of kernel RSS/swap values */
 static hrtime_t next_report;		/* time of next report */
 static int termination_signal = 0;	/* terminating signal */
+static zoneid_t my_zoneid = (zoneid_t)-1;
+static lcollection_t *gz_col;		/* global zone collection */
 
 rcfg_t rcfg;
+/*
+ * Updated when we re-read the collection configurations if this rcapd instance
+ * is running in the global zone and the global zone is capped.
+ */
+boolean_t gz_capped = B_FALSE;
 
 /*
  * Flags.
@@ -116,9 +129,9 @@ static int verify_statistics(void);
 static int update_statistics(void);
 
 /*
- * Checks if a process is marked 'system'.  Returns zero only when it is not.
+ * Checks if a process is marked 'system'.  Returns FALSE only when it is not.
  */
-static int
+static boolean_t
 proc_issystem(pid_t pid)
 {
 	char pc_clname[PC_CLNMSZ];
@@ -128,22 +141,43 @@ proc_issystem(pid_t pid)
 		return (strcmp(pc_clname, "SYS") == 0);
 	} else {
 		debug("cannot get class-specific scheduling parameters; "
-		    "assuming system process");
-		return (-1);
+		    "assuming system process\n");
+		return (B_TRUE);
 	}
 }
 
-/*
- * fname is the process name, for debugging messages, and unscannable is a flag
- * indicating whether the process should be scanned.
- */
 static void
-lprocess_insert_mark(pid_t pid, id_t colid, char *fname, int unscannable)
+lprocess_insert_mark(psinfo_t *psinfop)
 {
+	pid_t pid = psinfop->pr_pid;
+	/* flag indicating whether the process should be scanned. */
+	int unscannable = psinfop->pr_nlwp == 0;
+	rcid_t colid;
 	lcollection_t *lcol;
 	lprocess_t *lproc;
 
-	if ((lcol = lcollection_find(colid)) == NULL)
+	/*
+	 * Determine which collection to put this process into.  We only have
+	 * to worry about tracking both zone and project capped processes if
+	 * this rcapd instance is running in the global zone, since we'll only
+	 * see processes in our own projects in a non-global zone.  In the
+	 * global zone, if the process belongs to a non-global zone, we only
+	 * need to track it for the capped non-global zone collection.  For
+	 * global zone processes, we first attempt to put the process into a
+	 * capped project collection.  On the second pass into this function
+	 * the projid will be cleared so we will just track the process for the
+	 * global zone collection as a whole.
+	 */
+	if (psinfop->pr_zoneid == my_zoneid && psinfop->pr_projid != -1) {
+		colid.rcid_type = RCIDT_PROJECT;
+		colid.rcid_val = psinfop->pr_projid;
+	} else {
+		/* try to add to zone collection */
+		colid.rcid_type = RCIDT_ZONE;
+		colid.rcid_val = psinfop->pr_zoneid;
+	}
+
+	if ((lcol = lcollection_find(&colid)) == NULL)
 		return;
 
 	/*
@@ -193,7 +227,8 @@ lprocess_insert_mark(pid_t pid, id_t colid, char *fname, int unscannable)
 		if (lcollection_member(lcol, lproc)) {
 			lprocess_t *cur = lcol->lcol_lprocess;
 			debug("The collection %lld already has these members, "
-			    "including me, %d!\n", (long long)lcol->lcol_id,
+			    "including me, %d!\n",
+			    (long long)lcol->lcol_id.rcid_val,
 			    (int)lproc->lpc_pid);
 			while (cur != NULL) {
 				debug("\t%d\n", (int)cur->lpc_pid);
@@ -209,7 +244,10 @@ lprocess_insert_mark(pid_t pid, id_t colid, char *fname, int unscannable)
 		lproc->lpc_prev = NULL;
 		lcol->lcol_lprocess = lproc;
 
-		debug("tracking %d %d %s%s\n", (int)colid, (int)pid, fname,
+		debug("tracking %s %ld %d %s%s\n",
+		    (colid.rcid_type == RCIDT_PROJECT ? "project" : "zone"),
+		    (long)colid.rcid_val,
+		    (int)pid, psinfop->pr_psargs,
 		    (lproc->lpc_unscannable != 0) ? " (not scannable)" : "");
 		lcol->lcol_stat.lcols_proc_in++;
 	}
@@ -328,22 +366,28 @@ get_psinfo(pid_t pid, psinfo_t *psinfo, int cached_fd,
 }
 
 /*
- * Retrieve the collection membership of all processes in our zone, and update
- * the psinfo of those non-system, non-zombie ones in collections.
+ * Retrieve the collection membership of all processes and update the psinfo of
+ * those non-system, non-zombie ones in collections.  For global zone processes,
+ * we first attempt to put the process into a capped project collection.  We
+ * also want to track the process for the global zone collection as a whole.
  */
 static void
 proc_cb(const pid_t pid)
 {
-	static zoneid_t ours = (zoneid_t)-1;
 	psinfo_t psinfo;
 
-	if (ours == (zoneid_t)-1)
-		ours = getzoneid();
-
-	if (get_psinfo(pid, &psinfo, -1, NULL, NULL, NULL) == 0 &&
-	    psinfo.pr_zoneid == ours)
-		lprocess_insert_mark(psinfo.pr_pid, rc_getidbypsinfo(&psinfo),
-		    psinfo.pr_psargs, psinfo.pr_nlwp == 0);
+	if (get_psinfo(pid, &psinfo, -1, NULL, NULL, NULL) == 0) {
+		lprocess_insert_mark(&psinfo);
+		if (gz_capped && psinfo.pr_zoneid == GLOBAL_ZONEID) {
+			/*
+			 * We also want to track this process for the global
+			 * zone as a whole so add it to the global zone
+			 * collection as well.
+			 */
+			psinfo.pr_projid = -1;
+			lprocess_insert_mark(&psinfo);
+		}
+	}
 }
 
 /*
@@ -359,63 +403,179 @@ lprocess_update_psinfo_fd_cb(void *arg, int fd)
 }
 
 /*
- * Update the RSS of processes in monitored collections.
+ * Get the system pagesize.
  */
-/*ARGSUSED*/
-static int
-mem_sample_cb(lcollection_t *lcol, lprocess_t *lpc)
+static void
+get_page_size(void)
 {
-	psinfo_t psinfo;
+	page_size_kb = sysconf(_SC_PAGESIZE) / 1024;
+	debug("physical page size: %luKB\n", page_size_kb);
+}
 
-	if (get_psinfo(lpc->lpc_pid, &psinfo, lpc->lpc_psinfo_fd,
-	    lprocess_update_psinfo_fd_cb, lpc, lpc) == 0) {
-		lpc->lpc_rss = psinfo.pr_rssize;
-		lpc->lpc_size = psinfo.pr_size;
+static void
+tm_fmt(char *msg, hrtime_t t1, hrtime_t t2)
+{
+	hrtime_t diff = t2 - t1;
+
+	if (diff < MILLISEC)
+		debug("%s: %lld nanoseconds\n", msg, diff);
+	else if (diff < MICROSEC)
+		debug("%s: %.2f microseconds\n", msg, (float)diff / MILLISEC);
+	else if (diff < NANOSEC)
+		debug("%s: %.2f milliseconds\n", msg, (float)diff / MICROSEC);
+	else
+		debug("%s: %.2f seconds\n", msg, (float)diff / NANOSEC);
+}
+
+/*
+ * Get the zone's & project's RSS from the kernel.
+ */
+static void
+rss_sample(boolean_t my_zone_only, uint_t col_types)
+{
+	size_t nres;
+	size_t i;
+	uint_t flags;
+	hrtime_t t1, t2;
+
+	if (my_zone_only) {
+		flags = VMUSAGE_ZONE;
 	} else {
-		if (errno == ENOENT)
-			debug("process %d finished\n", (int)lpc->lpc_pid);
-		else
-			debug("process %d: cannot read psinfo",
-			    (int)lpc->lpc_pid);
-		lprocess_free(lpc);
+		flags = 0;
+		if (col_types & CAPPED_PROJECT)
+			flags |= VMUSAGE_PROJECTS;
+		if (col_types & CAPPED_ZONE && my_zoneid == GLOBAL_ZONEID)
+			flags |= VMUSAGE_ALL_ZONES;
 	}
 
-	return (0);
+	debug("vmusage sample flags 0x%x\n", flags);
+	if (flags == 0)
+		return;
+
+again:
+	/* try the current buffer to see if the list will fit */
+	nres = vmu_vals_len;
+	t1 = gethrtime();
+	if (getvmusage(flags, my_zone_only ? 0 : rcfg.rcfg_rss_sample_interval,
+	    vmu_vals, &nres) != 0) {
+		if (errno != EOVERFLOW) {
+			warn(gettext("can't read RSS from kernel\n"));
+			return;
+		}
+	}
+	t2 = gethrtime();
+	tm_fmt("getvmusage time", t1, t2);
+
+	debug("kernel nres %lu\n", (ulong_t)nres);
+
+	if (nres > vmu_vals_len) {
+		/* array size is now too small, increase it and try again */
+		free(vmu_vals);
+
+		if ((vmu_vals = (vmusage_t *)calloc(nres,
+		    sizeof (vmusage_t))) == NULL) {
+			warn(gettext("out of memory: could not read RSS from "
+			    "kernel\n"));
+			vmu_vals_len = nvmu_vals = 0;
+			return;
+		}
+		vmu_vals_len = nres;
+		goto again;
+	}
+
+	nvmu_vals = nres;
+
+	debug("vmusage_sample\n");
+	for (i = 0; i < nvmu_vals; i++) {
+		debug("%d: id: %d, type: 0x%x, rss_all: %llu (%lluKB), "
+		    "swap: %llu\n", (int)i, (int)vmu_vals[i].vmu_id,
+		    vmu_vals[i].vmu_type,
+		    (unsigned long long)vmu_vals[i].vmu_rss_all,
+		    (unsigned long long)vmu_vals[i].vmu_rss_all / 1024,
+		    (unsigned long long)vmu_vals[i].vmu_swap_all);
+	}
+}
+
+static void
+update_col_rss(lcollection_t *lcol)
+{
+	int i;
+
+	lcol->lcol_rss = 0;
+	lcol->lcol_image_size = 0;
+
+	for (i = 0; i < nvmu_vals; i++) {
+		if (vmu_vals[i].vmu_id != lcol->lcol_id.rcid_val)
+			continue;
+
+		if (vmu_vals[i].vmu_type == VMUSAGE_ZONE &&
+		    lcol->lcol_id.rcid_type != RCIDT_ZONE)
+			continue;
+
+		if (vmu_vals[i].vmu_type == VMUSAGE_PROJECTS &&
+		    lcol->lcol_id.rcid_type != RCIDT_PROJECT)
+			continue;
+
+		/* we found the right RSS entry, update the collection vals */
+		lcol->lcol_rss = vmu_vals[i].vmu_rss_all / 1024;
+		lcol->lcol_image_size = vmu_vals[i].vmu_swap_all / 1024;
+		break;
+	}
 }
 
 /*
  * Sample the collection RSS, updating the collection's statistics with the
- * results.
+ * results.  Also, sum the rss of all capped projects & return true if
+ * the collection is over cap.
  */
-/*ARGSUSED*/
 static int
 rss_sample_col_cb(lcollection_t *lcol, void *arg)
 {
 	int64_t excess;
 	uint64_t rss;
+	sample_col_arg_t *col_argp = (sample_col_arg_t *)arg;
 
-	/*
-	 * If updating statistics for a new interval, reset the affected
-	 * counters.
-	 */
-	if (lcol->lcol_stat_invalidate != 0) {
-		lcol->lcol_stat_old = lcol->lcol_stat;
-		lcol->lcol_stat.lcols_min_rss = (int64_t)-1;
-		lcol->lcol_stat.lcols_max_rss = 0;
-		lcol->lcol_stat_invalidate = 0;
-	}
+	update_col_rss(lcol);
 
 	lcol->lcol_stat.lcols_rss_sample++;
-	excess = lcol->lcol_rss - lcol->lcol_rss_cap;
 	rss = lcol->lcol_rss;
-	if (excess > 0)
+	excess = rss - lcol->lcol_rss_cap;
+	if (excess > 0) {
 		lcol->lcol_stat.lcols_rss_act_sum += rss;
+		col_argp->sca_any_over_cap = B_TRUE;
+		if (lcol->lcol_id.rcid_type == RCIDT_PROJECT)
+			col_argp->sca_project_over_cap = B_TRUE;
+	}
 	lcol->lcol_stat.lcols_rss_sum += rss;
 
 	if (lcol->lcol_stat.lcols_min_rss > rss)
 		lcol->lcol_stat.lcols_min_rss = rss;
 	if (lcol->lcol_stat.lcols_max_rss < rss)
 		lcol->lcol_stat.lcols_max_rss = rss;
+
+	return (0);
+}
+
+/*
+ * Determine if we have capped projects, capped zones or both.
+ */
+static int
+col_type_cb(lcollection_t *lcol, void *arg)
+{
+	uint_t *col_type = (uint_t *)arg;
+
+	/* skip uncapped collections */
+	if (lcol->lcol_rss_cap == 0)
+		return (1);
+
+	if (lcol->lcol_id.rcid_type == RCIDT_PROJECT)
+		*col_type |= CAPPED_PROJECT;
+	else
+		*col_type |= CAPPED_ZONE;
+
+	/* once we know everything is capped, we can stop looking */
+	if ((*col_type & CAPPED_ZONE) && (*col_type & CAPPED_PROJECT))
+		return (1);
 
 	return (0);
 }
@@ -449,23 +609,6 @@ proc_walk_all(void (*cb)(const pid_t))
 }
 
 /*
- * Memory update callback.
- */
-static int
-memory_all_cb(lcollection_t *lcol, lprocess_t *lpc)
-{
-	debug_high("%s %s, pid %d: rss += %llu/%llu\n", rcfg.rcfg_mode_name,
-	    lcol->lcol_name, (int)lpc->lpc_pid,
-	    (unsigned long long)lpc->lpc_rss,
-	    (unsigned long long)lpc->lpc_size);
-	ASSERT(lpc->lpc_rss <= lpc->lpc_size);
-	lcol->lcol_rss += lpc->lpc_rss;
-	lcol->lcol_image_size += lpc->lpc_size;
-
-	return (0);
-}
-
-/*
  * Clear unmarked callback.
  */
 /*ARGSUSED*/
@@ -483,19 +626,6 @@ sweep_process_cb(lcollection_t *lcol, lprocess_t *lpc)
 }
 
 /*
- * Memory clear callback.
- */
-/*ARGSUSED*/
-static int
-collection_zero_mem_cb(lcollection_t *lcol, void *arg)
-{
-	lcol->lcol_rss = 0;
-	lcol->lcol_image_size = 0;
-
-	return (0);
-}
-
-/*
  * Print, for debugging purposes, a collection's recently-sampled RSS and
  * excess.
  */
@@ -506,7 +636,8 @@ excess_print_cb(lcollection_t *lcol, void *arg)
 	int64_t excess = lcol->lcol_rss - lcol->lcol_rss_cap;
 
 	debug("%s %s rss/cap: %llu/%llu, excess = %lld kB\n",
-	    rcfg.rcfg_mode_name, lcol->lcol_name,
+	    (lcol->lcol_id.rcid_type == RCIDT_PROJECT ? "project" : "zone"),
+	    lcol->lcol_name,
 	    (unsigned long long)lcol->lcol_rss,
 	    (unsigned long long)lcol->lcol_rss_cap,
 	    (long long)excess);
@@ -516,6 +647,10 @@ excess_print_cb(lcollection_t *lcol, void *arg)
 
 /*
  * Scan those collections which have exceeded their caps.
+ *
+ * If we're running in the global zone it might have a cap.  We don't want to
+ * do any capping for the global zone yet since we might get under the cap by
+ * just capping the projects in the global zone.
  */
 /*ARGSUSED*/
 static int
@@ -523,12 +658,50 @@ scan_cb(lcollection_t *lcol, void *arg)
 {
 	int64_t excess;
 
+	/* skip over global zone collection for now but keep track for later */
+	if (lcol->lcol_id.rcid_type == RCIDT_ZONE &&
+	    lcol->lcol_id.rcid_val == GLOBAL_ZONEID) {
+		gz_col = lcol;
+		return (0);
+	}
+
 	if ((excess = lcol->lcol_rss - lcol->lcol_rss_cap) > 0) {
 		scan(lcol, excess);
 		lcol->lcol_stat.lcols_scan++;
 	}
 
 	return (0);
+}
+
+/*
+ * Scan the global zone collection and see if it still exceeds its cap.
+ * We take into account the effects of capping any global zone projects here.
+ */
+static void
+scan_gz(lcollection_t *lcol, boolean_t project_over_cap)
+{
+	int64_t excess;
+
+	/*
+	 * If we had projects over their cap and the global zone was also over
+	 * its cap then we need to get the up-to-date global zone rss to
+	 * determine if we are still over the global zone cap.  We might have
+	 * gone under while we scanned the capped projects.  If there were no
+	 * projects over cap then we can use the rss value we already have for
+	 * the global zone.
+	 */
+	excess = lcol->lcol_rss - lcol->lcol_rss_cap;
+	if (project_over_cap && excess > 0) {
+		rss_sample(B_TRUE, CAPPED_ZONE);
+		update_col_rss(lcol);
+		excess = lcol->lcol_rss - lcol->lcol_rss_cap;
+	}
+
+	if (excess > 0) {
+		debug("global zone excess %lldKB\n", (long long)excess);
+		scan(lcol, excess);
+		lcol->lcol_stat.lcols_scan++;
+	}
 }
 
 /*
@@ -544,20 +717,70 @@ soft_scan_cb(lcollection_t *lcol, void *a)
 	int64_t excess;
 	soft_scan_arg_t *arg = a;
 
+	/* skip over global zone collection for now but keep track for later */
+	if (lcol->lcol_id.rcid_type == RCIDT_ZONE &&
+	    lcol->lcol_id.rcid_val == GLOBAL_ZONEID) {
+		gz_col = lcol;
+		return (0);
+	}
+
 	if ((excess = lcol->lcol_rss - lcol->lcol_rss_cap) > 0) {
-		debug("col %lld excess %lld scan_goal %lld sum_excess %llu, "
-		    "scanning %lld\n", (long long)lcol->lcol_id,
+		int64_t adjusted_excess =
+		    excess * arg->ssa_scan_goal / arg->ssa_sum_excess;
+
+		debug("%s %ld excess %lld scan_goal %lld sum_excess %llu, "
+		    "scanning %lld\n",
+		    (lcol->lcol_id.rcid_type == RCIDT_PROJECT ?
+		    "project" : "zone"),
+		    (long)lcol->lcol_id.rcid_val,
 		    (long long)excess, (long long)arg->ssa_scan_goal,
 		    (unsigned long long)arg->ssa_sum_excess,
-		    (long long)(excess * arg->ssa_scan_goal /
-		    arg->ssa_sum_excess));
+		    (long long)adjusted_excess);
 
-		scan(lcol, (int64_t)(excess * arg->ssa_scan_goal /
-		    arg->ssa_sum_excess));
+		scan(lcol, adjusted_excess);
 		lcol->lcol_stat.lcols_scan++;
 	}
 
 	return (0);
+}
+
+static void
+soft_scan_gz(lcollection_t *lcol, void *a)
+{
+	int64_t excess;
+	soft_scan_arg_t *arg = a;
+
+	/*
+	 * If we had projects over their cap and the global zone was also over
+	 * its cap then we need to get the up-to-date global zone rss to
+	 * determine if we are still over the global zone cap.  We might have
+	 * gone under while we scanned the capped projects.  If there were no
+	 * projects over cap then we can use the rss value we already have for
+	 * the global zone.
+	 */
+	excess = lcol->lcol_rss - lcol->lcol_rss_cap;
+	if (arg->ssa_project_over_cap && excess > 0) {
+		rss_sample(B_TRUE, CAPPED_ZONE);
+		update_col_rss(lcol);
+		excess = lcol->lcol_rss - lcol->lcol_rss_cap;
+	}
+
+	if (excess > 0) {
+		int64_t adjusted_excess =
+		    excess * arg->ssa_scan_goal / arg->ssa_sum_excess;
+
+		debug("%s %ld excess %lld scan_goal %lld sum_excess %llu, "
+		    "scanning %lld\n",
+		    (lcol->lcol_id.rcid_type == RCIDT_PROJECT ?
+		    "project" : "zone"),
+		    (long)lcol->lcol_id.rcid_val,
+		    (long long)excess, (long long)arg->ssa_scan_goal,
+		    (unsigned long long)arg->ssa_sum_excess,
+		    (long long)adjusted_excess);
+
+		scan(lcol, adjusted_excess);
+		lcol->lcol_stat.lcols_scan++;
+	}
 }
 
 /*
@@ -582,8 +805,7 @@ update_phys_total(void)
 	uint64_t old_phys_total;
 
 	old_phys_total = phys_total;
-	phys_total = (uint64_t)sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGESIZE)
-	    / 1024;
+	phys_total = (uint64_t)sysconf(_SC_PHYS_PAGES) * page_size_kb;
 	if (phys_total != old_phys_total)
 		debug("physical memory%s: %lluM\n", (old_phys_total == 0 ?
 		    "" : " adjusted"), (unsigned long long)(phys_total / 1024));
@@ -687,7 +909,9 @@ static int
 collection_sweep_cb(lcollection_t *lcol, void *arg)
 {
 	if (lcol->lcol_mark == 0) {
-		debug("freeing %s %s\n", rcfg.rcfg_mode_name, lcol->lcol_name);
+		debug("freeing %s %s\n",
+		    (lcol->lcol_id.rcid_type == RCIDT_PROJECT ?
+		    "project" : "zone"), lcol->lcol_name);
 		lcollection_free(lcol);
 	}
 
@@ -710,8 +934,6 @@ finish_configuration(void)
 		rcfg.rcfg_mode_name = "project";
 		rcfg.rcfg_mode = rctype_project;
 	}
-
-	lcollection_set_type(rcfg.rcfg_mode);
 }
 
 /*
@@ -754,7 +976,8 @@ reread_configuration_file(void)
  * deletions to cap definitions.
  */
 static void
-reconfigure(void)
+reconfigure(hrtime_t now, hrtime_t *next_configuration,
+    hrtime_t *next_proc_walk, hrtime_t *next_rss_sample)
 {
 	debug("reconfigure...\n");
 
@@ -770,6 +993,31 @@ reconfigure(void)
 	list_walk_collection(collection_clear_cb, NULL);
 	lcollection_update(LCU_ACTIVE_ONLY); /* mark */
 	list_walk_collection(collection_sweep_cb, NULL);
+
+	*next_configuration = NEXT_EVENT_TIME(now,
+	    rcfg.rcfg_reconfiguration_interval);
+
+	/*
+	 * Reset each event time to the shorter of the previous and new
+	 * intervals.
+	 */
+	if (next_report == 0 && rcfg.rcfg_report_interval > 0)
+		next_report = now;
+	else
+		next_report = POSITIVE_MIN(next_report,
+		    NEXT_REPORT_EVENT_TIME(now, rcfg.rcfg_report_interval));
+
+	if (*next_proc_walk == 0 && rcfg.rcfg_proc_walk_interval > 0)
+		*next_proc_walk = now;
+	else
+		*next_proc_walk = POSITIVE_MIN(*next_proc_walk,
+		    NEXT_EVENT_TIME(now, rcfg.rcfg_proc_walk_interval));
+
+	if (*next_rss_sample == 0 && rcfg.rcfg_rss_sample_interval > 0)
+		*next_rss_sample = now;
+	else
+		*next_rss_sample = POSITIVE_MIN(*next_rss_sample,
+		    NEXT_EVENT_TIME(now, rcfg.rcfg_rss_sample_interval));
 }
 
 /*
@@ -791,20 +1039,20 @@ static int
 simple_report_collection_cb(lcollection_t *lcol, void *arg)
 {
 #define	DELTA(field) \
-	(unsigned long long)(lcol->lcol_stat_invalidate ? 0 : \
+	(unsigned long long)( \
 	    (lcol->lcol_stat.field - lcol->lcol_stat_old.field))
-#define	VALID(field) \
-	(unsigned long long)(lcol->lcol_stat_invalidate ? 0 : \
-	    lcol->lcol_stat.field)
 
 	debug("%s %s status: succeeded/attempted (k): %llu/%llu, "
 	    "ineffective/scans/unenforced/samplings:  %llu/%llu/%llu/%llu, RSS "
 	    "min/max (k): %llu/%llu, cap %llu kB, processes/thpt: %llu/%llu, "
-	    "%llu scans over %llu ms\n", rcfg.rcfg_mode_name, lcol->lcol_name,
+	    "%llu scans over %llu ms\n",
+	    (lcol->lcol_id.rcid_type == RCIDT_PROJECT ? "project" : "zone"),
+	    lcol->lcol_name,
 	    DELTA(lcols_pg_eff), DELTA(lcols_pg_att),
 	    DELTA(lcols_scan_ineffective), DELTA(lcols_scan),
 	    DELTA(lcols_unenforced_cap), DELTA(lcols_rss_sample),
-	    VALID(lcols_min_rss), VALID(lcols_max_rss),
+	    (unsigned long long)lcol->lcol_stat.lcols_min_rss,
+	    (unsigned long long)lcol->lcol_stat.lcols_max_rss,
 	    (unsigned long long)lcol->lcol_rss_cap,
 	    (unsigned long long)(lcol->lcol_stat.lcols_proc_in -
 	    lcol->lcol_stat.lcols_proc_out), DELTA(lcols_proc_out),
@@ -812,7 +1060,6 @@ simple_report_collection_cb(lcollection_t *lcol, void *arg)
 	    / MILLISEC));
 
 #undef DELTA
-#undef VALID
 
 	return (0);
 }
@@ -838,13 +1085,11 @@ report_collection_cb(lcollection_t *lcol, void *arg)
 	dc.lcol_stat = lcol->lcol_stat;
 
 	if (write(fd, &dc, sizeof (dc)) == sizeof (dc)) {
-		/*
-		 * Set a flag to indicate that the exported interval snapshot
-		 * values should be reset at the next sample.
-		 */
-		lcol->lcol_stat_invalidate = 1;
+		lcol->lcol_stat_old = lcol->lcol_stat;
 	} else {
-		debug("can't write %s %s statistics", rcfg.rcfg_mode_name,
+		debug("can't write %s %s statistics",
+		    (lcol->lcol_id.rcid_type == RCIDT_PROJECT ?
+		    "project" : "zone"),
 		    lcol->lcol_name);
 	}
 
@@ -871,13 +1116,67 @@ get_globally_scanned_pages(uint64_t *scannedp)
 			if (kstat_read(kctl, ksp, NULL) != -1) {
 				scanned += ((cpu_stat_t *)
 				    ksp->ks_data)->cpu_vminfo.scan;
-			} else
+			} else {
 				return (-1);
+			}
 		}
 	}
 
 	*scannedp = scanned;
 	return (0);
+}
+
+/*
+ * Determine if the global page scanner is running, during which no memory
+ * caps should be enforced, to prevent interference with the global page
+ * scanner.
+ */
+static boolean_t
+is_global_scanner_running()
+{
+	/* measure delta in page scan count */
+	static uint64_t new_sp = 0;
+	static uint64_t old_sp = 0;
+	boolean_t res = B_FALSE;
+
+	if (get_globally_scanned_pages(&new_sp) == 0) {
+		if (old_sp != 0 && (new_sp - old_sp) > 0) {
+			debug("global memory pressure detected (%llu "
+			    "pages scanned since last interval)\n",
+			    (unsigned long long)(new_sp - old_sp));
+			res = B_TRUE;
+		}
+		old_sp = new_sp;
+	} else {
+		warn(gettext("unable to read cpu statistics"));
+		new_sp = old_sp;
+	}
+
+	return (res);
+}
+
+/*
+ * If soft caps are in use, determine if global memory pressure exceeds the
+ * configured maximum above which soft caps are enforced.
+ */
+static boolean_t
+must_enforce_soft_caps()
+{
+	/*
+	 * Check for changes to the amount of installed physical memory, to
+	 * compute the current memory pressure.
+	 */
+	update_phys_total();
+
+	memory_pressure = 100 - (int)((sysconf(_SC_AVPHYS_PAGES) * page_size_kb)
+	    * 100.0 / phys_total);
+	memory_pressure_sample++;
+	if (rcfg.rcfg_memory_cap_enforcement_pressure > 0 &&
+	    memory_pressure > rcfg.rcfg_memory_cap_enforcement_pressure) {
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
 }
 
 /*
@@ -973,6 +1272,26 @@ sum_excess_cb(lcollection_t *lcol, void *arg)
 	return (0);
 }
 
+/*
+ * Compute the quantity of memory (in kilobytes) above the cap enforcement
+ * pressure.  Set the scan goal to that quantity (or at most the excess).
+ */
+static void
+compute_soft_scan_goal(soft_scan_arg_t *argp)
+{
+	/*
+	 * Compute the sum of the collections' excesses, which will be the
+	 * denominator.
+	 */
+	argp->ssa_sum_excess = 0;
+	list_walk_collection(sum_excess_cb, &(argp->ssa_sum_excess));
+
+	argp->ssa_scan_goal = MIN((sysconf(_SC_PHYS_PAGES) *
+	    (100 - rcfg.rcfg_memory_cap_enforcement_pressure) / 100 -
+	    sysconf(_SC_AVPHYS_PAGES)) * page_size_kb,
+	    argp->ssa_sum_excess);
+}
+
 static void
 rcapd_usage(void)
 {
@@ -1017,6 +1336,112 @@ verify_and_set_privileges(void)
 	priv_freeset(required);
 }
 
+/*
+ * This function does the top-level work to determine if we should do any
+ * memory capping, and if so, it invokes the right call-backs to do the work.
+ */
+static void
+do_capping(hrtime_t now, hrtime_t *next_proc_walk)
+{
+	boolean_t enforce_caps;
+	/* soft cap enforcement flag, depending on memory pressure */
+	boolean_t enforce_soft_caps;
+	/* avoid interference with kernel's page scanner */
+	boolean_t global_scanner_running;
+	sample_col_arg_t col_arg;
+	soft_scan_arg_t arg;
+	uint_t col_types = 0;
+
+	/* check what kind of collections (project/zone) are capped */
+	list_walk_collection(col_type_cb, &col_types);
+	debug("collection types: 0x%x\n", col_types);
+
+	/* no capped collections, skip checking rss */
+	if (col_types == 0)
+		return;
+
+	/* Determine if soft caps are enforced. */
+	enforce_soft_caps = must_enforce_soft_caps();
+
+	/* Determine if the global page scanner is running. */
+	global_scanner_running = is_global_scanner_running();
+
+	/*
+	 * Sample collections' member processes RSSes and recompute
+	 * collections' excess.
+	 */
+	rss_sample(B_FALSE, col_types);
+
+	col_arg.sca_any_over_cap = B_FALSE;
+	col_arg.sca_project_over_cap = B_FALSE;
+	list_walk_collection(rss_sample_col_cb, &col_arg);
+	list_walk_collection(excess_print_cb, NULL);
+	debug("any collection/project over cap = %d, %d\n",
+	    col_arg.sca_any_over_cap, col_arg.sca_project_over_cap);
+
+	if (enforce_soft_caps)
+		debug("memory pressure %d%%\n", memory_pressure);
+
+	/*
+	 * Cap enforcement is determined by the previous conditions.
+	 */
+	enforce_caps = !global_scanner_running && col_arg.sca_any_over_cap &&
+	    (rcfg.rcfg_memory_cap_enforcement_pressure == 0 ||
+	    enforce_soft_caps);
+
+	debug("%senforcing caps\n", enforce_caps ? "" : "not ");
+
+	/*
+	 * If soft caps are in use, determine the size of the portion from each
+	 * collection to scan for.
+	 */
+	if (enforce_caps && enforce_soft_caps)
+		compute_soft_scan_goal(&arg);
+
+	/*
+	 * Victimize offending collections.
+	 */
+	if (enforce_caps && (!enforce_soft_caps ||
+	    (arg.ssa_scan_goal > 0 && arg.ssa_sum_excess > 0))) {
+
+		/*
+		 * Since at least one collection is over its cap & needs
+		 * enforcing, check if it is at least time for a process walk
+		 * (we could be well past time since we only walk /proc when
+		 * we need to) and if so, update each collections process list
+		 * in a single pass through /proc.
+		 */
+		if (EVENT_TIME(now, *next_proc_walk)) {
+			debug("scanning process list...\n");
+			proc_walk_all(proc_cb);		 /* insert & mark */
+			list_walk_all(sweep_process_cb); /* free dead procs */
+			*next_proc_walk = NEXT_EVENT_TIME(now,
+			    rcfg.rcfg_proc_walk_interval);
+		}
+
+		gz_col = NULL;
+		if (enforce_soft_caps) {
+			debug("scan goal is %lldKB\n",
+			    (long long)arg.ssa_scan_goal);
+			list_walk_collection(soft_scan_cb, &arg);
+			if (gz_capped && gz_col != NULL) {
+				/* process global zone */
+				arg.ssa_project_over_cap =
+				    col_arg.sca_project_over_cap;
+				soft_scan_gz(gz_col, &arg);
+			}
+		} else {
+			list_walk_collection(scan_cb, NULL);
+			if (gz_capped && gz_col != NULL) {
+				/* process global zone */
+				scan_gz(gz_col, col_arg.sca_project_over_cap);
+			}
+		}
+	} else if (col_arg.sca_any_over_cap) {
+		list_walk_collection(unenforced_cap_cb, NULL);
+	}
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -1029,9 +1454,6 @@ main(int argc, char *argv[])
 	hrtime_t next_proc_walk;	/* time of next /proc scan */
 	hrtime_t next_configuration;	/* time of next configuration */
 	hrtime_t next_rss_sample;	/* (latest) time of next RSS sample */
-	int old_enforce_caps;		/* track changes in enforcement */
-					/* conditions */
-	soft_scan_arg_t arg;
 
 	(void) set_message_priority(RCM_INFO);
 	(void) setprogname("rcapd");
@@ -1125,13 +1547,6 @@ main(int argc, char *argv[])
 	next_configuration = NEXT_EVENT_TIME(gethrtime(),
 	    rcfg.rcfg_reconfiguration_interval);
 
-	if (rcfg.rcfg_memory_cap_enforcement_pressure == 0) {
-		/*
-		 * Always enforce caps when strict caps are used.
-		 */
-		enforce_caps = 1;
-	}
-
 	/*
 	 * Open the kstat chain.
 	 */
@@ -1157,6 +1572,9 @@ main(int argc, char *argv[])
 		debug("fd limit: %lu\n", rl.rlim_cur);
 	else
 		debug("fd limit: unknown\n");
+
+	get_page_size();
+	my_zoneid = getzoneid();
 
 	/*
 	 * Handle those signals whose (default) exit disposition
@@ -1194,9 +1612,9 @@ main(int argc, char *argv[])
 
 	/*
 	 * Loop forever, monitoring collections' resident set sizes and
-	 * enforcing their caps.  Look for changes in caps and process
-	 * membership, as well as responding to requests to reread the
-	 * configuration.  Update per-collection statistics periodically.
+	 * enforcing their caps.  Look for changes in caps as well as
+	 * responding to requests to reread the configuration.  Update
+	 * per-collection statistics periodically.
 	 */
 	while (should_run != 0) {
 		struct timespec ts;
@@ -1210,9 +1628,10 @@ main(int argc, char *argv[])
 		}
 
 		/*
-		 * Update the process list once every proc_walk_interval.  The
-		 * condition of global memory pressure is also checked at the
-		 * same frequency, if strict caps are in use.
+		 * Check the configuration at every next_configuration interval.
+		 * Update the rss data once every next_rss_sample interval.
+		 * The condition of global memory pressure is also checked at
+		 * the same frequency, if strict caps are in use.
 		 */
 		now = gethrtime();
 
@@ -1222,178 +1641,16 @@ main(int argc, char *argv[])
 		 */
 		if (EVENT_TIME(now, next_configuration) ||
 		    should_reconfigure == 1) {
-			reconfigure();
-			next_configuration = NEXT_EVENT_TIME(now,
-			    rcfg.rcfg_reconfiguration_interval);
-
-			/*
-			 * Reset each event time to the shorter of the
-			 * previous and new intervals.
-			 */
-			if (next_report == 0 &&
-			    rcfg.rcfg_report_interval > 0)
-				next_report = now;
-			else
-				next_report = POSITIVE_MIN(next_report,
-				    NEXT_REPORT_EVENT_TIME(now,
-				    rcfg.rcfg_report_interval));
-			if (next_proc_walk == 0 &&
-			    rcfg.rcfg_proc_walk_interval > 0)
-				next_proc_walk = now;
-			else
-				next_proc_walk = POSITIVE_MIN(next_proc_walk,
-				    NEXT_EVENT_TIME(now,
-				    rcfg.rcfg_proc_walk_interval));
-			if (next_rss_sample == 0 &&
-			    rcfg.rcfg_rss_sample_interval > 0)
-				next_rss_sample = now;
-			else
-				next_rss_sample = POSITIVE_MIN(next_rss_sample,
-				    NEXT_EVENT_TIME(now,
-				    rcfg.rcfg_rss_sample_interval));
-
+			reconfigure(now, &next_configuration, &next_proc_walk,
+			    &next_rss_sample);
 			should_reconfigure = 0;
-			continue;
 		}
 
-		if (EVENT_TIME(now, next_proc_walk)) {
-			debug("scanning process list...\n");
-			proc_walk_all(proc_cb); /* mark */
-			list_walk_all(sweep_process_cb);
-			next_proc_walk = NEXT_EVENT_TIME(now,
-			    rcfg.rcfg_proc_walk_interval);
-		}
-
+		/*
+		 * Do the main work for enforcing caps.
+		 */
 		if (EVENT_TIME(now, next_rss_sample)) {
-			/*
-			 * Check for changes to the amount of installed
-			 * physical memory, to compute the current memory
-			 * pressure.
-			 */
-			update_phys_total();
-
-			/*
-			 * If soft caps are in use, determine if global memory
-			 * pressure exceeds the configured maximum above which
-			 * soft caps are enforced.
-			 */
-			memory_pressure = 100 -
-			    (int)((sysconf(_SC_AVPHYS_PAGES) *
-			    (sysconf(_SC_PAGESIZE) / 1024)) * 100.0 /
-			    phys_total);
-			memory_pressure_sample++;
-			if (rcfg.rcfg_memory_cap_enforcement_pressure > 0) {
-				if (memory_pressure >
-				    rcfg.rcfg_memory_cap_enforcement_pressure) {
-					if (enforce_soft_caps == 0) {
-						debug("memory pressure %d%%\n",
-						    memory_pressure);
-						enforce_soft_caps = 1;
-					}
-				} else {
-					if (enforce_soft_caps == 1)
-						enforce_soft_caps = 0;
-				}
-			}
-
-			/*
-			 * Determine if the global page scanner is running,
-			 * while which no memory caps should be enforced, to
-			 * prevent interference with the global page scanner.
-			 */
-			if (get_globally_scanned_pages(&new_sp) == 0) {
-				if (old_sp == 0)
-					/*EMPTY*/
-					;
-				else if ((new_sp - old_sp) > 0) {
-					if (global_scanner_running == 0) {
-						debug("global memory pressure "
-						    "detected (%llu pages "
-						    "scanned since last "
-						    "interval)\n",
-						    (unsigned long long)
-						    (new_sp - old_sp));
-						global_scanner_running = 1;
-					}
-				} else if (global_scanner_running == 1) {
-					debug("global memory pressure "
-					    "relieved\n");
-					global_scanner_running = 0;
-				}
-				old_sp = new_sp;
-			} else {
-				warn(gettext("kstat_read() failed"));
-				new_sp = old_sp;
-			}
-
-			/*
-			 * Cap enforcement is determined by the previous two
-			 * conditions.
-			 */
-			old_enforce_caps = enforce_caps;
-			enforce_caps =
-			    (rcfg.rcfg_memory_cap_enforcement_pressure ==
-			    0 || enforce_soft_caps == 1) &&
-			    !global_scanner_running;
-			if (old_enforce_caps != enforce_caps)
-				debug("%senforcing caps\n", enforce_caps == 0 ?
-				    "not " : "");
-
-			/*
-			 * Sample collections' member processes' RSSes and
-			 * recompute collections' excess.
-			 */
-			list_walk_all(mem_sample_cb);
-			list_walk_collection(collection_zero_mem_cb, NULL);
-			list_walk_all(memory_all_cb);
-			list_walk_collection(rss_sample_col_cb, NULL);
-			if (rcfg.rcfg_memory_cap_enforcement_pressure > 0)
-				debug("memory pressure %d%%\n",
-				    memory_pressure);
-			list_walk_collection(excess_print_cb, NULL);
-
-			/*
-			 * If soft caps are in use, determine the size of the
-			 * portion from each collection to scan for.
-			 */
-			if (enforce_soft_caps == 1) {
-				/*
-				 * Compute the sum of the collections'
-				 * excesses, which will be the denominator.
-				 */
-				arg.ssa_sum_excess = 0;
-				list_walk_collection(sum_excess_cb,
-				    &arg.ssa_sum_excess);
-
-				/*
-				 * Compute the quantity of memory (in
-				 * kilobytes) above the cap enforcement
-				 * pressure.  Set the scan goal to that
-				 * quantity (or at most the excess).
-				 */
-				arg.ssa_scan_goal = MIN((
-				    sysconf(_SC_PHYS_PAGES) * (100 -
-				    rcfg.rcfg_memory_cap_enforcement_pressure)
-				    / 100 - sysconf(_SC_AVPHYS_PAGES)) *
-				    (sysconf(_SC_PAGESIZE) / 1024),
-				    arg.ssa_sum_excess);
-			}
-
-			/*
-			 * Victimize offending collections.
-			 */
-			if (enforce_caps == 1 && ((enforce_soft_caps == 1 &&
-			    arg.ssa_scan_goal > 0 && arg.ssa_sum_excess > 0) ||
-			    (enforce_soft_caps == 0)))
-				if (enforce_soft_caps == 1) {
-					debug("scan goal is %lldKB\n",
-					    (long long)arg.ssa_scan_goal);
-					list_walk_collection(soft_scan_cb,
-					    &arg);
-				} else
-					list_walk_collection(scan_cb, NULL);
-			else
-				list_walk_collection(unenforced_cap_cb, NULL);
+			do_capping(now, &next_proc_walk);
 
 			next_rss_sample = NEXT_EVENT_TIME(now,
 			    rcfg.rcfg_rss_sample_interval);
@@ -1409,7 +1666,6 @@ main(int argc, char *argv[])
 		 */
 		now = gethrtime();
 		next = next_configuration;
-		next = POSITIVE_MIN(next, next_proc_walk);
 		next = POSITIVE_MIN(next, next_report);
 		next = POSITIVE_MIN(next, next_rss_sample);
 		if (next > now && should_run != 0) {

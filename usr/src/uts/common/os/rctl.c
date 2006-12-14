@@ -29,6 +29,7 @@
 #include <sys/cmn_err.h>
 #include <sys/id_space.h>
 #include <sys/kmem.h>
+#include <sys/kstat.h>
 #include <sys/log.h>
 #include <sys/modctl.h>
 #include <sys/modhash.h>
@@ -2599,7 +2600,7 @@ rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 		zonep = p->p_zone;
 	}
 
-	mutex_enter(&zonep->zone_rctl_lock);
+	mutex_enter(&zonep->zone_mem_lock);
 
 	e.rcep_p.proj = projp;
 	e.rcep_t = RCENTITY_PROJECT;
@@ -2627,7 +2628,7 @@ rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 		p->p_locked_mem += inc;
 	}
 out:
-	mutex_exit(&zonep->zone_rctl_lock);
+	mutex_exit(&zonep->zone_mem_lock);
 	if (proj != NULL)
 		zone_rele(zonep);
 	return (ret);
@@ -2661,7 +2662,7 @@ rctl_decr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 		zonep = p->p_zone;
 	}
 
-	mutex_enter(&zonep->zone_rctl_lock);
+	mutex_enter(&zonep->zone_mem_lock);
 	zonep->zone_locked_mem -= inc;
 	projp->kpj_data.kpd_locked_mem -= inc;
 	if (creditproc != 0) {
@@ -2669,7 +2670,120 @@ rctl_decr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 		ASSERT(MUTEX_HELD(&p->p_lock));
 		p->p_locked_mem -= inc;
 	}
-	mutex_exit(&zonep->zone_rctl_lock);
+	mutex_exit(&zonep->zone_mem_lock);
 	if (proj != NULL)
 		zone_rele(zonep);
+}
+
+/*
+ * rctl_incr_swap(proc_t *, zone_t *, size_t)
+ *
+ * Overview
+ *   Increments the swap charge on the specified zone.
+ *
+ * Return values
+ *   0 on success.  EAGAIN if swap increment fails due an rctl value
+ *   on the zone.
+ *
+ * Callers context
+ *   p_lock held on specified proc.
+ *   swap must be even multiple of PAGESIZE
+ */
+int
+rctl_incr_swap(proc_t *proc, zone_t *zone, size_t swap)
+{
+	rctl_entity_p_t e;
+
+	ASSERT(MUTEX_HELD(&proc->p_lock));
+	ASSERT((swap & PAGEOFFSET) == 0);
+	e.rcep_p.zone = zone;
+	e.rcep_t = RCENTITY_ZONE;
+
+	mutex_enter(&zone->zone_mem_lock);
+
+	if ((zone->zone_max_swap + swap) >
+	    zone->zone_max_swap_ctl) {
+
+		if (rctl_test_entity(rc_zone_max_swap, zone->zone_rctls,
+		    proc, &e, swap, 0) & RCT_DENY) {
+			mutex_exit(&zone->zone_mem_lock);
+			return (EAGAIN);
+		}
+	}
+	zone->zone_max_swap += swap;
+	mutex_exit(&zone->zone_mem_lock);
+	return (0);
+}
+
+/*
+ * rctl_decr_swap(zone_t *, size_t)
+ *
+ * Overview
+ *   Decrements the swap charge on the specified zone.
+ *
+ * Return values
+ *   None
+ *
+ * Callers context
+ *   swap must be even multiple of PAGESIZE
+ */
+void
+rctl_decr_swap(zone_t *zone, size_t swap)
+{
+	ASSERT((swap & PAGEOFFSET) == 0);
+	mutex_enter(&zone->zone_mem_lock);
+	ASSERT(zone->zone_max_swap >= swap);
+	zone->zone_max_swap -= swap;
+	mutex_exit(&zone->zone_mem_lock);
+}
+
+/*
+ * Create resource kstat
+ */
+static kstat_t *
+rctl_kstat_create_common(char *ks_name, int ks_instance, char *ks_class,
+    uchar_t ks_type, uint_t ks_ndata, uchar_t ks_flags, int ks_zoneid)
+{
+	kstat_t *ksp = NULL;
+	char name[KSTAT_STRLEN];
+
+	(void) snprintf(name, KSTAT_STRLEN, "%s_%d", ks_name, ks_instance);
+
+	if ((ksp = kstat_create_zone("caps", ks_zoneid,
+		name, ks_class, ks_type,
+		ks_ndata, ks_flags, ks_zoneid)) != NULL) {
+		if (ks_zoneid != GLOBAL_ZONEID)
+			kstat_zone_add(ksp, GLOBAL_ZONEID);
+	}
+	return (ksp);
+}
+
+/*
+ * Create zone-specific resource kstat
+ */
+kstat_t *
+rctl_kstat_create_zone(zone_t *zone, char *ks_name, uchar_t ks_type,
+    uint_t ks_ndata, uchar_t ks_flags)
+{
+	char name[KSTAT_STRLEN];
+
+	(void) snprintf(name, KSTAT_STRLEN, "%s_zone", ks_name);
+
+	return (rctl_kstat_create_common(name, zone->zone_id, "zone_caps",
+	    ks_type, ks_ndata, ks_flags, zone->zone_id));
+}
+
+/*
+ * Create project-specific resource kstat
+ */
+kstat_t *
+rctl_kstat_create_project(kproject_t *kpj, char *ks_name, uchar_t ks_type,
+    uint_t ks_ndata, uchar_t ks_flags)
+{
+	char name[KSTAT_STRLEN];
+
+	(void) snprintf(name, KSTAT_STRLEN, "%s_project", ks_name);
+
+	return (rctl_kstat_create_common(name, kpj->kpj_id, "project_caps",
+	    ks_type, ks_ndata, ks_flags, kpj->kpj_zoneid));
 }

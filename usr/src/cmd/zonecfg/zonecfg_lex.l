@@ -40,7 +40,10 @@ extern void yyerror(char *s);
 char *safe_strdup(char *s);
 %}
 
-%a 4000
+%a 6000
+%p 4000
+%e 2000
+%n 1000
 
 %{
 /*
@@ -139,6 +142,12 @@ char *safe_strdup(char *s);
 			return SET;
 		}
 
+<INITIAL>clear {
+			BEGIN TSTATE;
+			state = TSTATE;
+			return CLEAR;
+		}
+
 <INITIAL>verify	{
 			BEGIN TSTATE;
 			state = TSTATE;
@@ -161,6 +170,10 @@ char *safe_strdup(char *s);
 <CSTATE>zonename	{ return ZONENAME; }
 
 <TSTATE>dataset	{ return DATASET; }
+
+<TSTATE>dedicated-cpu	{ return PSET; }
+
+<TSTATE>capped-memory	{ return MCAP; }
 
 <TSTATE>zonepath	{ return ZONEPATH; }
 <CSTATE>zonepath	{ return ZONEPATH; }
@@ -218,6 +231,39 @@ char *safe_strdup(char *s);
 
 <TSTATE>action	{ return ACTION; }
 <CSTATE>action	{ return ACTION; }
+
+<TSTATE>ncpus	{ return NCPUS; }
+<CSTATE>ncpus	{ return NCPUS; }
+
+<TSTATE>locked	{ return LOCKED; }
+<CSTATE>locked	{ return LOCKED; }
+
+<TSTATE>swap	{ return SWAP; }
+<CSTATE>swap	{ return SWAP; }
+
+<TSTATE>importance	{ return IMPORTANCE; }
+<CSTATE>importance	{ return IMPORTANCE; }
+
+<TSTATE>cpu-shares	{ return SHARES; }
+<CSTATE>cpu-shares	{ return SHARES; }
+
+<TSTATE>max-lwps	{ return MAXLWPS; }
+<CSTATE>max-lwps	{ return MAXLWPS; }
+
+<TSTATE>max-shm-memory	{ return MAXSHMMEM; }
+<CSTATE>max-shm-memory	{ return MAXSHMMEM; }
+
+<TSTATE>max-shm-ids	{ return MAXSHMIDS; }
+<CSTATE>max-shm-ids	{ return MAXSHMIDS; }
+
+<TSTATE>max-msg-ids	{ return MAXMSGIDS; }
+<CSTATE>max-msg-ids	{ return MAXMSGIDS; }
+
+<TSTATE>max-sem-ids	{ return MAXSEMIDS; }
+<CSTATE>max-sem-ids	{ return MAXSEMIDS; }
+
+<TSTATE>scheduling-class	{ return SCHED; }
+<CSTATE>scheduling-class	{ return SCHED; }
 
 <TSTATE>=	{ return EQUAL; }
 <LSTATE>=	{ return EQUAL; }

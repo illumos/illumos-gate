@@ -384,7 +384,8 @@ extern "C" {
 #define	SYS_rusagesys		181
 	/*
 	 * subcodes:
-	 *	getrusage(...) :: rusagesys(RUSAGESYS_GETRUSAGE,...)
+	 *	getrusage(...) :: rusagesys(RUSAGESYS_GETRUSAGE, ...)
+	 *	getvmusage(...)    :: rusagesys(RUSAGESYS_GETVMUSAGE, ...)
 	 */
 #define	SYS_port		182
 	/*

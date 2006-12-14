@@ -46,6 +46,10 @@
 #include <sys/nvpair.h>
 #include <sys/types.h>
 #include <ftw.h>
+#include <pool.h>
+#include <libscf.h>
+#include <libproc.h>
+#include <sys/priocntl.h>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -79,6 +83,9 @@
 #define	DTD_ELEM_RCTLVALUE	(const xmlChar *) "rctl-value"
 #define	DTD_ELEM_ZONE		(const xmlChar *) "zone"
 #define	DTD_ELEM_DATASET	(const xmlChar *) "dataset"
+#define	DTD_ELEM_TMPPOOL	(const xmlChar *) "tmp_pool"
+#define	DTD_ELEM_PSET		(const xmlChar *) "pset"
+#define	DTD_ELEM_MCAP		(const xmlChar *) "mcap"
 #define	DTD_ELEM_PACKAGE	(const xmlChar *) "package"
 #define	DTD_ELEM_PATCH		(const xmlChar *) "patch"
 #define	DTD_ELEM_OBSOLETES	(const xmlChar *) "obsoletes"
@@ -92,6 +99,7 @@
 #define	DTD_ATTR_LIMIT		(const xmlChar *) "limit"
 #define	DTD_ATTR_LIMITPRIV	(const xmlChar *) "limitpriv"
 #define	DTD_ATTR_BOOTARGS	(const xmlChar *) "bootargs"
+#define	DTD_ATTR_SCHED		(const xmlChar *) "scheduling-class"
 #define	DTD_ATTR_MATCH		(const xmlChar *) "match"
 #define	DTD_ATTR_NAME		(const xmlChar *) "name"
 #define	DTD_ATTR_PHYSICAL	(const xmlChar *) "physical"
@@ -102,6 +110,10 @@
 #define	DTD_ATTR_TYPE		(const xmlChar *) "type"
 #define	DTD_ATTR_VALUE		(const xmlChar *) "value"
 #define	DTD_ATTR_ZONEPATH	(const xmlChar *) "zonepath"
+#define	DTD_ATTR_NCPU_MIN	(const xmlChar *) "ncpu_min"
+#define	DTD_ATTR_NCPU_MAX	(const xmlChar *) "ncpu_max"
+#define	DTD_ATTR_IMPORTANCE	(const xmlChar *) "importance"
+#define	DTD_ATTR_PHYSCAP	(const xmlChar *) "physcap"
 #define	DTD_ATTR_VERSION	(const xmlChar *) "version"
 #define	DTD_ATTR_ID		(const xmlChar *) "id"
 #define	DTD_ATTR_UID		(const xmlChar *) "uid"
@@ -132,6 +144,46 @@
 #define	PATCHLIST	"PATCHLIST="
 #define	PATCHINFO	"PATCH_INFO_"
 #define	PKGINFO_RD_LEN	128
+
+#define	TMP_POOL_NAME	"SUNWtmp_%s"
+#define	MAX_TMP_POOL_NAME	(ZONENAME_MAX + 9)
+#define	RCAP_SERVICE	"system/rcap:default"
+#define	POOLD_SERVICE	"system/pools/dynamic:default"
+
+/*
+ * rctl alias definitions
+ *
+ * This holds the alias, the full rctl name, the default priv value, action
+ * and lower limit.  The functions that handle rctl aliases step through
+ * this table, matching on the alias, and using the full values for setting
+ * the rctl entry as well the limit for validation.
+ */
+static struct alias {
+	char *shortname;
+	char *realname;
+	char *priv;
+	char *action;
+	uint64_t low_limit;
+} aliases[] = {
+	{ALIAS_MAXLWPS, "zone.max-lwps", "privileged", "deny", 100},
+	{ALIAS_MAXSHMMEM, "zone.max-shm-memory", "privileged", "deny", 0},
+	{ALIAS_MAXSHMIDS, "zone.max-shm-ids", "privileged", "deny", 0},
+	{ALIAS_MAXMSGIDS, "zone.max-msg-ids", "privileged", "deny", 0},
+	{ALIAS_MAXSEMIDS, "zone.max-sem-ids", "privileged", "deny", 0},
+	{ALIAS_MAXLOCKEDMEM, "zone.max-locked-memory", "privileged", "deny", 0},
+	{ALIAS_MAXSWAP, "zone.max-swap", "privileged", "deny", 0},
+	{ALIAS_SHARES, "zone.cpu-shares", "privileged", "none", 0},
+	{NULL, NULL, NULL, NULL, 0}
+};
+
+/*
+ * Structure for applying rctls to a running zone.  It allows important
+ * process values to be passed together easily.
+ */
+typedef struct pr_info_handle {
+	struct ps_prochandle *pr;
+	pid_t pid;
+} pr_info_handle_t;
 
 struct zone_dochandle {
 	char		*zone_dh_rootdir;
@@ -446,14 +498,20 @@ setrootattr(zone_dochandle_t handle, const xmlChar *propname,
 	int err;
 	xmlNodePtr root;
 
-	if (propval == NULL)
-		return (Z_INVAL);
-
 	if ((err = getroot(handle, &root)) != Z_OK)
 		return (err);
 
-	if (xmlSetProp(root, propname, (const xmlChar *) propval) == NULL)
-		return (Z_INVAL);
+	/*
+	 * If we get a null propval remove the property (ignore return since it
+	 * may not be set to begin with).
+	 */
+	if (propval == NULL) {
+		(void) xmlUnsetProp(root, propname);
+	} else {
+		if (xmlSetProp(root, propname, (const xmlChar *) propval)
+		    == NULL)
+			return (Z_INVAL);
+	}
 	return (Z_OK);
 }
 
@@ -945,6 +1003,18 @@ int
 zonecfg_set_bootargs(zone_dochandle_t handle, char *bargs)
 {
 	return (setrootattr(handle, DTD_ATTR_BOOTARGS, bargs));
+}
+
+int
+zonecfg_get_sched_class(zone_dochandle_t handle, char *sched, size_t schedsize)
+{
+	return (getrootattr(handle, DTD_ATTR_SCHED, sched, schedsize));
+}
+
+int
+zonecfg_set_sched(zone_dochandle_t handle, char *sched)
+{
+	return (setrootattr(handle, DTD_ATTR_SCHED, sched));
 }
 
 /*
@@ -3047,6 +3117,30 @@ zonecfg_strerror(int errnum)
 	case Z_BRAND_ERROR:
 		return (dgettext(TEXT_DOMAIN,
 		    "Brand-specific error"));
+	case Z_INCOMPATIBLE:
+		return (dgettext(TEXT_DOMAIN, "Incompatible settings"));
+	case Z_ALIAS_DISALLOW:
+		return (dgettext(TEXT_DOMAIN,
+		    "An incompatible rctl already exists for this property"));
+	case Z_CLEAR_DISALLOW:
+		return (dgettext(TEXT_DOMAIN,
+		    "Clearing this property is not allowed"));
+	case Z_POOL:
+		return (dgettext(TEXT_DOMAIN, "libpool(3LIB) error"));
+	case Z_POOLS_NOT_ACTIVE:
+		return (dgettext(TEXT_DOMAIN, "Pools facility not active; "
+		    "zone will not be bound to pool"));
+	case Z_POOL_ENABLE:
+		return (dgettext(TEXT_DOMAIN,
+		    "Could not enable pools facility"));
+	case Z_NO_POOL:
+		return (dgettext(TEXT_DOMAIN,
+		    "Pool not found; using default pool"));
+	case Z_POOL_CREATE:
+		return (dgettext(TEXT_DOMAIN,
+		    "Could not create a temporary pool"));
+	case Z_POOL_BIND:
+		return (dgettext(TEXT_DOMAIN, "Could not bind zone to pool"));
 	default:
 		return (dgettext(TEXT_DOMAIN, "Unknown error"));
 	}
@@ -3083,6 +3177,951 @@ zonecfg_endent(zone_dochandle_t handle)
 		return (Z_INVAL);
 
 	handle->zone_dh_cur = handle->zone_dh_top;
+	return (Z_OK);
+}
+
+/*
+ * Do the work required to manipulate a process through libproc.
+ * If grab_process() returns no errors (0), then release_process()
+ * must eventually be called.
+ *
+ * Return values:
+ *      0 Successful creation of agent thread
+ *      1 Error grabbing
+ *      2 Error creating agent
+ */
+static int
+grab_process(pr_info_handle_t *p)
+{
+	int ret;
+
+	if ((p->pr = Pgrab(p->pid, 0, &ret)) != NULL) {
+
+		if (Psetflags(p->pr, PR_RLC) != 0) {
+			Prelease(p->pr, 0);
+			return (1);
+		}
+		if (Pcreate_agent(p->pr) == 0) {
+			return (0);
+
+		} else {
+			Prelease(p->pr, 0);
+			return (2);
+		}
+	} else {
+		return (1);
+	}
+}
+
+/*
+ * Release the specified process. This destroys the agent
+ * and releases the process. If the process is NULL, nothing
+ * is done. This function should only be called if grab_process()
+ * has previously been called and returned success.
+ *
+ * This function is Pgrab-safe.
+ */
+static void
+release_process(struct ps_prochandle *Pr)
+{
+	if (Pr == NULL)
+		return;
+
+	Pdestroy_agent(Pr);
+	Prelease(Pr, 0);
+}
+
+static boolean_t
+grab_zone_proc(char *zonename, pr_info_handle_t *p)
+{
+	DIR *dirp;
+	struct dirent *dentp;
+	zoneid_t zoneid;
+	int pid_self;
+	psinfo_t psinfo;
+
+	if (zone_get_id(zonename, &zoneid) != 0)
+		return (B_FALSE);
+
+	pid_self = getpid();
+
+	if ((dirp = opendir("/proc")) == NULL)
+		return (B_FALSE);
+
+	while (dentp = readdir(dirp)) {
+		p->pid = atoi(dentp->d_name);
+
+		/* Skip self */
+		if (p->pid == pid_self)
+			continue;
+
+		if (proc_get_psinfo(p->pid, &psinfo) != 0)
+			continue;
+
+		if (psinfo.pr_zoneid != zoneid)
+			continue;
+
+		/* attempt to grab process */
+		if (grab_process(p) != 0)
+			continue;
+
+		if (pr_getzoneid(p->pr) != zoneid) {
+			release_process(p->pr);
+			continue;
+		}
+
+		(void) closedir(dirp);
+		return (B_TRUE);
+	}
+
+	(void) closedir(dirp);
+	return (B_FALSE);
+}
+
+static boolean_t
+get_priv_rctl(struct ps_prochandle *pr, char *name, rctlblk_t *rblk)
+{
+	if (pr_getrctl(pr, name, NULL, rblk, RCTL_FIRST))
+		return (B_FALSE);
+
+	if (rctlblk_get_privilege(rblk) == RCPRIV_PRIVILEGED)
+		return (B_TRUE);
+
+	while (pr_getrctl(pr, name, rblk, rblk, RCTL_NEXT) == 0) {
+		if (rctlblk_get_privilege(rblk) == RCPRIV_PRIVILEGED)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+/*
+ * Apply the current rctl settings to the specified, running zone.
+ */
+int
+zonecfg_apply_rctls(char *zone_name, zone_dochandle_t handle)
+{
+	int err;
+	int res = Z_OK;
+	rctlblk_t *rblk;
+	pr_info_handle_t p;
+	struct zone_rctltab rctl;
+
+	if ((err = zonecfg_setrctlent(handle)) != Z_OK)
+		return (err);
+
+	if ((rblk = (rctlblk_t *)malloc(rctlblk_size())) == NULL) {
+		(void) zonecfg_endrctlent(handle);
+		return (Z_NOMEM);
+	}
+
+	if (!grab_zone_proc(zone_name, &p)) {
+		(void) zonecfg_endrctlent(handle);
+		free(rblk);
+		return (Z_SYSTEM);
+	}
+
+	while (zonecfg_getrctlent(handle, &rctl) == Z_OK) {
+		char *rname;
+		struct zone_rctlvaltab *valptr;
+
+		rname = rctl.zone_rctl_name;
+
+		/* first delete all current privileged settings for this rctl */
+		while (get_priv_rctl(p.pr, rname, rblk)) {
+			if (pr_setrctl(p.pr, rname, NULL, rblk, RCTL_DELETE) !=
+			    0) {
+				res = Z_SYSTEM;
+				goto done;
+			}
+		}
+
+		/* now set each new value for the rctl */
+		for (valptr = rctl.zone_rctl_valptr; valptr != NULL;
+		    valptr = valptr->zone_rctlval_next) {
+			if ((err = zonecfg_construct_rctlblk(valptr, rblk))
+			    != Z_OK) {
+				res = errno = err;
+				goto done;
+			}
+
+			if (pr_setrctl(p.pr, rname, NULL, rblk, RCTL_INSERT)) {
+				res = Z_SYSTEM;
+				goto done;
+			}
+		}
+	}
+
+done:
+	release_process(p.pr);
+	free(rblk);
+	(void) zonecfg_endrctlent(handle);
+
+	return (res);
+}
+
+static const xmlChar *
+nm_to_dtd(char *nm)
+{
+	if (strcmp(nm, "device") == 0)
+		return (DTD_ELEM_DEVICE);
+	if (strcmp(nm, "fs") == 0)
+		return (DTD_ELEM_FS);
+	if (strcmp(nm, "inherit-pkg-dir") == 0)
+		return (DTD_ELEM_IPD);
+	if (strcmp(nm, "net") == 0)
+		return (DTD_ELEM_NET);
+	if (strcmp(nm, "attr") == 0)
+		return (DTD_ELEM_ATTR);
+	if (strcmp(nm, "rctl") == 0)
+		return (DTD_ELEM_RCTL);
+	if (strcmp(nm, "dataset") == 0)
+		return (DTD_ELEM_DATASET);
+
+	return (NULL);
+}
+
+int
+zonecfg_num_resources(zone_dochandle_t handle, char *rsrc)
+{
+	int num = 0;
+	const xmlChar *dtd;
+	xmlNodePtr cur;
+
+	if ((dtd = nm_to_dtd(rsrc)) == NULL)
+		return (num);
+
+	if (zonecfg_setent(handle) != Z_OK)
+		return (num);
+
+	for (cur = handle->zone_dh_cur; cur != NULL; cur = cur->next)
+		if (xmlStrcmp(cur->name, dtd) == 0)
+			num++;
+
+	(void) zonecfg_endent(handle);
+
+	return (num);
+}
+
+int
+zonecfg_del_all_resources(zone_dochandle_t handle, char *rsrc)
+{
+	int err;
+	const xmlChar *dtd;
+	xmlNodePtr cur;
+
+	if ((dtd = nm_to_dtd(rsrc)) == NULL)
+		return (Z_NO_RESOURCE_TYPE);
+
+	if ((err = zonecfg_setent(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	while (cur != NULL) {
+		xmlNodePtr tmp;
+
+		if (xmlStrcmp(cur->name, dtd)) {
+			cur = cur->next;
+			continue;
+		}
+
+		tmp = cur->next;
+		xmlUnlinkNode(cur);
+		xmlFreeNode(cur);
+		cur = tmp;
+	}
+
+	(void) zonecfg_endent(handle);
+	return (Z_OK);
+}
+
+static boolean_t
+valid_uint(char *s, uint64_t *n)
+{
+	char *endp;
+
+	/* strtoull accepts '-'?! so we want to flag that as an error */
+	if (strchr(s, '-') != NULL)
+		return (B_FALSE);
+
+	errno = 0;
+	*n = strtoull(s, &endp, 10);
+
+	if (errno != 0 || *endp != '\0')
+		return (B_FALSE);
+	return (B_TRUE);
+}
+
+/*
+ * Convert a string representing a number (possibly a fraction) into an integer.
+ * The string can have a modifier (K, M, G or T).   The modifiers are treated
+ * as powers of two (not 10).
+ */
+int
+zonecfg_str_to_bytes(char *str, uint64_t *bytes)
+{
+	long double val;
+	char *unitp;
+	uint64_t scale;
+
+	if ((val = strtold(str, &unitp)) < 0)
+		return (-1);
+
+	/* remove any leading white space from units string */
+	while (isspace(*unitp) != 0)
+		++unitp;
+
+	/* if no units explicitly set, error */
+	if (unitp == NULL || *unitp == '\0') {
+		scale = 1;
+	} else {
+		int i;
+		char *units[] = {"K", "M", "G", "T", NULL};
+
+		scale = 1024;
+
+		/* update scale based on units */
+		for (i = 0; units[i] != NULL; i++) {
+			if (strcasecmp(unitp, units[i]) == 0)
+				break;
+			scale <<= 10;
+		}
+
+		if (units[i] == NULL)
+			return (-1);
+	}
+
+	*bytes = (uint64_t)(val * scale);
+	return (0);
+}
+
+boolean_t
+zonecfg_valid_ncpus(char *lowstr, char *highstr)
+{
+	uint64_t low, high;
+
+	if (!valid_uint(lowstr, &low) || !valid_uint(highstr, &high) ||
+	    low < 1 || low > high)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+boolean_t
+zonecfg_valid_importance(char *impstr)
+{
+	uint64_t num;
+
+	if (!valid_uint(impstr, &num))
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+boolean_t
+zonecfg_valid_alias_limit(char *name, char *limitstr, uint64_t *limit)
+{
+	int i;
+
+	for (i = 0; aliases[i].shortname != NULL; i++)
+		if (strcmp(name, aliases[i].shortname) == 0)
+			break;
+
+	if (aliases[i].shortname == NULL)
+		return (B_FALSE);
+
+	if (!valid_uint(limitstr, limit) || *limit < aliases[i].low_limit)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+boolean_t
+zonecfg_valid_memlimit(char *memstr, uint64_t *mem_val)
+{
+	if (zonecfg_str_to_bytes(memstr, mem_val) != 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+static int
+zerr_pool(char *pool_err, int err_size, int res)
+{
+	(void) strlcpy(pool_err, pool_strerror(pool_error()), err_size);
+	return (res);
+}
+
+static int
+create_tmp_pset(char *pool_err, int err_size, pool_conf_t *pconf, pool_t *pool,
+    char *name, int min, int max)
+{
+	pool_resource_t *res;
+	pool_elem_t *elem;
+	pool_value_t *val;
+
+	if ((res = pool_resource_create(pconf, "pset", name)) == NULL)
+		return (zerr_pool(pool_err, err_size, Z_POOL));
+
+	if (pool_associate(pconf, pool, res) != PO_SUCCESS)
+		return (zerr_pool(pool_err, err_size, Z_POOL));
+
+	if ((elem = pool_resource_to_elem(pconf, res)) == NULL)
+		return (zerr_pool(pool_err, err_size, Z_POOL));
+
+	if ((val = pool_value_alloc()) == NULL)
+		return (zerr_pool(pool_err, err_size, Z_POOL));
+
+	/* set the maximum number of cpus for the pset */
+	pool_value_set_uint64(val, (uint64_t)max);
+
+	if (pool_put_property(pconf, elem, "pset.max", val) != PO_SUCCESS) {
+		pool_value_free(val);
+		return (zerr_pool(pool_err, err_size, Z_POOL));
+	}
+
+	/* set the minimum number of cpus for the pset */
+	pool_value_set_uint64(val, (uint64_t)min);
+
+	if (pool_put_property(pconf, elem, "pset.min", val) != PO_SUCCESS) {
+		pool_value_free(val);
+		return (zerr_pool(pool_err, err_size, Z_POOL));
+	}
+
+	pool_value_free(val);
+
+	return (Z_OK);
+}
+
+static int
+create_tmp_pool(char *pool_err, int err_size, pool_conf_t *pconf, char *name,
+    struct zone_psettab *pset_tab)
+{
+	pool_t *pool;
+	int res = Z_OK;
+
+	/* create a temporary pool configuration */
+	if (pool_conf_open(pconf, NULL, PO_TEMP) != PO_SUCCESS) {
+		res = zerr_pool(pool_err, err_size, Z_POOL);
+		return (res);
+	}
+
+	if ((pool = pool_create(pconf, name)) == NULL) {
+		res = zerr_pool(pool_err, err_size, Z_POOL_CREATE);
+		goto done;
+	}
+
+	/* set pool importance */
+	if (pset_tab->zone_importance[0] != '\0') {
+		pool_elem_t *elem;
+		pool_value_t *val;
+
+		if ((elem = pool_to_elem(pconf, pool)) == NULL) {
+			res = zerr_pool(pool_err, err_size, Z_POOL);
+			goto done;
+		}
+
+		if ((val = pool_value_alloc()) == NULL) {
+			res = zerr_pool(pool_err, err_size, Z_POOL);
+			goto done;
+		}
+
+		pool_value_set_int64(val,
+		    (int64_t)atoi(pset_tab->zone_importance));
+
+		if (pool_put_property(pconf, elem, "pool.importance", val)
+		    != PO_SUCCESS) {
+			res = zerr_pool(pool_err, err_size, Z_POOL);
+			pool_value_free(val);
+			goto done;
+		}
+
+		pool_value_free(val);
+	}
+
+	if ((res = create_tmp_pset(pool_err, err_size, pconf, pool, name,
+	    atoi(pset_tab->zone_ncpu_min),
+	    atoi(pset_tab->zone_ncpu_max))) != Z_OK)
+		goto done;
+
+	/* validation */
+	if (pool_conf_status(pconf) == POF_INVALID) {
+		res = zerr_pool(pool_err, err_size, Z_POOL);
+		goto done;
+	}
+
+	/*
+	 * This validation is the one we expect to fail if the user specified
+	 * an invalid configuration (too many cpus) for this system.
+	 */
+	if (pool_conf_validate(pconf, POV_RUNTIME) != PO_SUCCESS) {
+		res = zerr_pool(pool_err, err_size, Z_POOL_CREATE);
+		goto done;
+	}
+
+	/*
+	 * Commit the dynamic configuration but not the pool configuration
+	 * file.
+	 */
+	if (pool_conf_commit(pconf, 1) != PO_SUCCESS)
+		res = zerr_pool(pool_err, err_size, Z_POOL);
+
+done:
+	(void) pool_conf_close(pconf);
+	return (res);
+}
+
+static int
+get_running_tmp_pset(pool_conf_t *pconf, pool_t *pool, pool_resource_t *pset,
+    struct zone_psettab *pset_tab)
+{
+	int nfound = 0;
+	pool_elem_t *pe;
+	pool_value_t *pv = pool_value_alloc();
+	uint64_t val_uint;
+
+	if (pool != NULL) {
+		pe = pool_to_elem(pconf, pool);
+		if (pool_get_property(pconf, pe, "pool.importance", pv)
+		    != POC_INVAL) {
+			int64_t val_int;
+
+			(void) pool_value_get_int64(pv, &val_int);
+			(void) snprintf(pset_tab->zone_importance,
+			    sizeof (pset_tab->zone_importance), "%d", val_int);
+			nfound++;
+		}
+	}
+
+	if (pset != NULL) {
+		pe = pool_resource_to_elem(pconf, pset);
+		if (pool_get_property(pconf, pe, "pset.min", pv) != POC_INVAL) {
+			(void) pool_value_get_uint64(pv, &val_uint);
+			(void) snprintf(pset_tab->zone_ncpu_min,
+			    sizeof (pset_tab->zone_ncpu_min), "%u", val_uint);
+			nfound++;
+		}
+
+		if (pool_get_property(pconf, pe, "pset.max", pv) != POC_INVAL) {
+			(void) pool_value_get_uint64(pv, &val_uint);
+			(void) snprintf(pset_tab->zone_ncpu_max,
+			    sizeof (pset_tab->zone_ncpu_max), "%u", val_uint);
+			nfound++;
+		}
+	}
+
+	pool_value_free(pv);
+
+	if (nfound == 3)
+		return (PO_SUCCESS);
+
+	return (PO_FAIL);
+}
+
+/*
+ * Determine if a tmp pool is configured and if so, if the configuration is
+ * still valid or if it has been changed since the tmp pool was created.
+ * If the tmp pool configuration is no longer valid, delete the tmp pool.
+ *
+ * Set *valid=B_TRUE if there is an existing, valid tmp pool configuration.
+ */
+static int
+verify_del_tmp_pool(pool_conf_t *pconf, char *tmp_name, char *pool_err,
+    int err_size, struct zone_psettab *pset_tab, boolean_t *exists)
+{
+	int res = Z_OK;
+	pool_t *pool;
+	pool_resource_t *pset;
+	struct zone_psettab pset_current;
+
+	*exists = B_FALSE;
+
+	if (pool_conf_open(pconf, pool_dynamic_location(), PO_RDWR)
+	    != PO_SUCCESS) {
+		res = zerr_pool(pool_err, err_size, Z_POOL);
+		return (res);
+	}
+
+	pool = pool_get_pool(pconf, tmp_name);
+	pset = pool_get_resource(pconf, "pset", tmp_name);
+
+	if (pool == NULL && pset == NULL) {
+		/* no tmp pool configured */
+		goto done;
+	}
+
+	/*
+	 * If an existing tmp pool for this zone is configured with the proper
+	 * settings, then the tmp pool is valid.
+	 */
+	if (get_running_tmp_pset(pconf, pool, pset, &pset_current)
+	    == PO_SUCCESS &&
+	    strcmp(pset_tab->zone_ncpu_min,
+	    pset_current.zone_ncpu_min) == 0 &&
+	    strcmp(pset_tab->zone_ncpu_max,
+	    pset_current.zone_ncpu_max) == 0 &&
+	    strcmp(pset_tab->zone_importance,
+	    pset_current.zone_importance) == 0) {
+		*exists = B_TRUE;
+
+	} else {
+		/*
+		 * An out-of-date tmp pool configuration exists.  Delete it
+		 * so that we can create the correct tmp pool config.
+		 */
+		if (pset != NULL &&
+		    pool_resource_destroy(pconf, pset) != PO_SUCCESS) {
+			res = zerr_pool(pool_err, err_size, Z_POOL);
+			goto done;
+		}
+
+		if (pool != NULL &&
+		    pool_destroy(pconf, pool) != PO_SUCCESS) {
+			res = zerr_pool(pool_err, err_size, Z_POOL);
+			goto done;
+		}
+
+		/* commit dynamic config */
+		if (pool_conf_commit(pconf, 0) != PO_SUCCESS)
+			res = zerr_pool(pool_err, err_size, Z_POOL);
+	}
+
+done:
+	(void) pool_conf_close(pconf);
+
+	return (res);
+}
+
+/*
+ * Destroy any existing tmp pool.
+ */
+int
+zonecfg_destroy_tmp_pool(char *zone_name, char *pool_err, int err_size)
+{
+	int status;
+	int res = Z_OK;
+	pool_conf_t *pconf;
+	pool_t *pool;
+	pool_resource_t *pset;
+	char tmp_name[MAX_TMP_POOL_NAME];
+
+	/* if pools not enabled then nothing to do */
+	if (pool_get_status(&status) != PO_SUCCESS || status != POOL_ENABLED)
+		return (Z_OK);
+
+	if ((pconf = pool_conf_alloc()) == NULL)
+		return (zerr_pool(pool_err, err_size, Z_POOL));
+
+	(void) snprintf(tmp_name, sizeof (tmp_name), TMP_POOL_NAME, zone_name);
+
+	if (pool_conf_open(pconf, pool_dynamic_location(), PO_RDWR)
+	    != PO_SUCCESS) {
+		res = zerr_pool(pool_err, err_size, Z_POOL);
+		pool_conf_free(pconf);
+		return (res);
+	}
+
+	pool = pool_get_pool(pconf, tmp_name);
+	pset = pool_get_resource(pconf, "pset", tmp_name);
+
+	if (pool == NULL && pset == NULL) {
+		/* nothing to destroy, we're done */
+		goto done;
+	}
+
+	if (pset != NULL && pool_resource_destroy(pconf, pset) != PO_SUCCESS) {
+		res = zerr_pool(pool_err, err_size, Z_POOL);
+		goto done;
+	}
+
+	if (pool != NULL && pool_destroy(pconf, pool) != PO_SUCCESS) {
+		res = zerr_pool(pool_err, err_size, Z_POOL);
+		goto done;
+	}
+
+	/* commit dynamic config */
+	if (pool_conf_commit(pconf, 0) != PO_SUCCESS)
+		res = zerr_pool(pool_err, err_size, Z_POOL);
+
+done:
+	(void) pool_conf_close(pconf);
+	pool_conf_free(pconf);
+
+	return (res);
+}
+
+/*
+ * Attempt to bind to a tmp pool for this zone.  If there is no tmp pool
+ * configured, we just return Z_OK.
+ *
+ * We either attempt to create the tmp pool for this zone or rebind to an
+ * existing tmp pool for this zone.
+ *
+ * Rebinding is used when a zone with a tmp pool reboots so that we don't have
+ * to recreate the tmp pool.  To do this we need to be sure we work correctly
+ * for the following cases:
+ *
+ *	- there is an existing, properly configured tmp pool.
+ *	- zonecfg added tmp pool after zone was booted, must now create.
+ *	- zonecfg updated tmp pool config after zone was booted, in this case
+ *	  we destroy the old tmp pool and create a new one.
+ */
+int
+zonecfg_bind_tmp_pool(zone_dochandle_t handle, zoneid_t zoneid, char *pool_err,
+    int err_size)
+{
+	struct zone_psettab pset_tab;
+	int err;
+	int status;
+	pool_conf_t *pconf;
+	boolean_t exists;
+	char zone_name[ZONENAME_MAX];
+	char tmp_name[MAX_TMP_POOL_NAME];
+
+	(void) getzonenamebyid(zoneid, zone_name, sizeof (zone_name));
+
+	err = zonecfg_lookup_pset(handle, &pset_tab);
+
+	/* if no temporary pool configured, we're done */
+	if (err == Z_NO_ENTRY)
+		return (Z_OK);
+
+	/*
+	 * importance might not have a value but we need to validate it here,
+	 * so set the default.
+	 */
+	if (pset_tab.zone_importance[0] == '\0')
+		(void) strlcpy(pset_tab.zone_importance, "1",
+		    sizeof (pset_tab.zone_importance));
+
+	/* if pools not enabled, enable them now */
+	if (pool_get_status(&status) != PO_SUCCESS || status != POOL_ENABLED) {
+		if (pool_set_status(POOL_ENABLED) != PO_SUCCESS)
+			return (Z_POOL_ENABLE);
+	}
+
+	if ((pconf = pool_conf_alloc()) == NULL)
+		return (zerr_pool(pool_err, err_size, Z_POOL));
+
+	(void) snprintf(tmp_name, sizeof (tmp_name), TMP_POOL_NAME, zone_name);
+
+	/*
+	 * Check if a valid tmp pool/pset already exists.  If so, we just
+	 * reuse it.
+	 */
+	if ((err = verify_del_tmp_pool(pconf, tmp_name, pool_err, err_size,
+	    &pset_tab, &exists)) != Z_OK) {
+		pool_conf_free(pconf);
+		return (err);
+	}
+
+	if (!exists)
+		err = create_tmp_pool(pool_err, err_size, pconf, tmp_name,
+		    &pset_tab);
+
+	pool_conf_free(pconf);
+
+	if (err != Z_OK)
+		return (err);
+
+	/* Bind the zone to the pool. */
+	if (pool_set_binding(tmp_name, P_ZONEID, zoneid) != PO_SUCCESS)
+		return (zerr_pool(pool_err, err_size, Z_POOL_BIND));
+
+	return (Z_OK);
+}
+
+/*
+ * Attempt to bind to a permanent pool for this zone.  If there is no
+ * permanent pool configured, we just return Z_OK.
+ */
+int
+zonecfg_bind_pool(zone_dochandle_t handle, zoneid_t zoneid, char *pool_err,
+    int err_size)
+{
+	pool_conf_t *poolconf;
+	pool_t *pool;
+	char poolname[MAXPATHLEN];
+	int status;
+	int error;
+
+	/*
+	 * Find the pool mentioned in the zone configuration, and bind to it.
+	 */
+	error = zonecfg_get_pool(handle, poolname, sizeof (poolname));
+	if (error == Z_NO_ENTRY || (error == Z_OK && strlen(poolname) == 0)) {
+		/*
+		 * The property is not set on the zone, so the pool
+		 * should be bound to the default pool.  But that's
+		 * already done by the kernel, so we can just return.
+		 */
+		return (Z_OK);
+	}
+	if (error != Z_OK) {
+		/*
+		 * Not an error, even though it shouldn't be happening.
+		 */
+		return (Z_OK);
+	}
+	/*
+	 * Don't do anything if pools aren't enabled.
+	 */
+	if (pool_get_status(&status) != PO_SUCCESS || status != POOL_ENABLED)
+		return (Z_POOLS_NOT_ACTIVE);
+
+	/*
+	 * Try to provide a sane error message if the requested pool doesn't
+	 * exist.
+	 */
+	if ((poolconf = pool_conf_alloc()) == NULL)
+		return (zerr_pool(pool_err, err_size, Z_POOL));
+
+	if (pool_conf_open(poolconf, pool_dynamic_location(), PO_RDONLY) !=
+	    PO_SUCCESS) {
+		pool_conf_free(poolconf);
+		return (zerr_pool(pool_err, err_size, Z_POOL));
+	}
+	pool = pool_get_pool(poolconf, poolname);
+	(void) pool_conf_close(poolconf);
+	pool_conf_free(poolconf);
+	if (pool == NULL)
+		return (Z_NO_POOL);
+
+	/*
+	 * Bind the zone to the pool.
+	 */
+	if (pool_set_binding(poolname, P_ZONEID, zoneid) != PO_SUCCESS) {
+		/* if bind fails, return poolname for the error msg */
+		(void) strlcpy(pool_err, poolname, err_size);
+		return (Z_POOL_BIND);
+	}
+
+	return (Z_OK);
+}
+
+
+static boolean_t
+svc_enabled(char *svc_name)
+{
+	scf_simple_prop_t	*prop;
+	boolean_t		found = B_FALSE;
+
+	prop = scf_simple_prop_get(NULL, svc_name, SCF_PG_GENERAL,
+	    SCF_PROPERTY_ENABLED);
+
+	if (scf_simple_prop_numvalues(prop) == 1 &&
+	    *scf_simple_prop_next_boolean(prop) != 0)
+		found = B_TRUE;
+
+	scf_simple_prop_free(prop);
+
+	return (found);
+}
+
+/*
+ * If the zone has capped-memory, make sure the rcap service is enabled.
+ */
+int
+zonecfg_enable_rcapd(char *err, int size)
+{
+	if (!svc_enabled(RCAP_SERVICE) &&
+	    smf_enable_instance(RCAP_SERVICE, 0) == -1) {
+		(void) strlcpy(err, scf_strerror(scf_error()), size);
+		return (Z_SYSTEM);
+	}
+
+	return (Z_OK);
+}
+
+/*
+ * Return true if pset has cpu range specified and poold is not enabled.
+ */
+boolean_t
+zonecfg_warn_poold(zone_dochandle_t handle)
+{
+	struct zone_psettab pset_tab;
+	int min, max;
+	int err;
+
+	err = zonecfg_lookup_pset(handle, &pset_tab);
+
+	/* if no temporary pool configured, we're done */
+	if (err == Z_NO_ENTRY)
+		return (B_FALSE);
+
+	min = atoi(pset_tab.zone_ncpu_min);
+	max = atoi(pset_tab.zone_ncpu_max);
+
+	/* range not specified, no need for poold */
+	if (min == max)
+		return (B_FALSE);
+
+	/* we have a range, check if poold service is enabled */
+	if (svc_enabled(POOLD_SERVICE))
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+static int
+get_pool_sched_class(char *poolname, char *class, int clsize)
+{
+	int status;
+	pool_conf_t *poolconf;
+	pool_t *pool;
+	pool_elem_t *pe;
+	pool_value_t *pv = pool_value_alloc();
+	const char *sched_str;
+
+	if (pool_get_status(&status) != PO_SUCCESS || status != POOL_ENABLED)
+		return (Z_NO_POOL);
+
+	if ((poolconf = pool_conf_alloc()) == NULL)
+		return (Z_NO_POOL);
+
+	if (pool_conf_open(poolconf, pool_dynamic_location(), PO_RDONLY) !=
+	    PO_SUCCESS) {
+		pool_conf_free(poolconf);
+		return (Z_NO_POOL);
+	}
+
+	if ((pool = pool_get_pool(poolconf, poolname)) == NULL) {
+		(void) pool_conf_close(poolconf);
+		pool_conf_free(poolconf);
+		return (Z_NO_POOL);
+	}
+
+	pe = pool_to_elem(poolconf, pool);
+	if (pool_get_property(poolconf, pe, "pool.scheduler", pv)
+	    != POC_INVAL) {
+		(void) pool_value_get_string(pv, &sched_str);
+		if (strlcpy(class, sched_str, clsize) >= clsize)
+			return (Z_TOO_BIG);
+	}
+
+	(void) pool_conf_close(poolconf);
+	pool_conf_free(poolconf);
+	return (Z_OK);
+}
+
+/*
+ * Get the default scheduling class for the zone.  This will either be the
+ * class set on the zone's pool or the system default scheduling class.
+ */
+int
+zonecfg_get_dflt_sched_class(zone_dochandle_t handle, char *class, int clsize)
+{
+	char poolname[MAXPATHLEN];
+
+	if (zonecfg_get_pool(handle, poolname, sizeof (poolname)) == Z_OK) {
+		/* check if the zone's pool specified a sched class */
+		if (get_pool_sched_class(poolname, class, clsize) == Z_OK)
+			return (Z_OK);
+	}
+
+	if (priocntl(0, 0, PC_GETDFLCL, class, (uint64_t)clsize) == -1)
+		return (Z_TOO_BIG);
+
 	return (Z_OK);
 }
 
@@ -4823,6 +5862,509 @@ int
 zonecfg_enddsent(zone_dochandle_t handle)
 {
 	return (zonecfg_endent(handle));
+}
+
+/*
+ * Support for aliased rctls; that is, rctls that have simplified names in
+ * zonecfg.  For example, max-lwps is an alias for a well defined zone.max-lwps
+ * rctl.  If there are multiple existing values for one of these rctls or if
+ * there is a single value that does not match the well defined template (i.e.
+ * it has a different action) then we cannot treat the rctl as having an alias
+ * so we return Z_ALIAS_DISALLOW.  That means that the rctl cannot be
+ * managed in zonecfg via an alias and that the standard rctl syntax must be
+ * used.
+ *
+ * The possible return values are:
+ *	Z_NO_PROPERTY_ID - invalid alias name
+ *	Z_ALIAS_DISALLOW - pre-existing, incompatible rctl definition
+ *	Z_NO_ENTRY - no rctl is configured for this alias
+ *	Z_OK - we got a valid rctl for the specified alias
+ */
+int
+zonecfg_get_aliased_rctl(zone_dochandle_t handle, char *name, uint64_t *rval)
+{
+	boolean_t found = B_FALSE;
+	boolean_t found_val = B_FALSE;
+	xmlNodePtr cur, val;
+	char savedname[MAXNAMELEN];
+	struct zone_rctlvaltab rctl;
+	int i;
+	int err;
+
+	for (i = 0; aliases[i].shortname != NULL; i++)
+		if (strcmp(name, aliases[i].shortname) == 0)
+			break;
+
+	if (aliases[i].shortname == NULL)
+		return (Z_NO_PROPERTY_ID);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_RCTL) != 0)
+			continue;
+		if ((fetchprop(cur, DTD_ATTR_NAME, savedname,
+		    sizeof (savedname)) == Z_OK) &&
+		    (strcmp(savedname, aliases[i].realname) == 0)) {
+
+			/*
+			 * If we already saw one of these, we can't have an
+			 * alias since we just found another.
+			 */
+			if (found)
+				return (Z_ALIAS_DISALLOW);
+			found = B_TRUE;
+
+			for (val = cur->xmlChildrenNode; val != NULL;
+			    val = val->next) {
+				/*
+				 * If we already have one value, we can't have
+				 * an alias since we just found another.
+				 */
+				if (found_val)
+					return (Z_ALIAS_DISALLOW);
+				found_val = B_TRUE;
+
+				if ((fetchprop(val, DTD_ATTR_PRIV,
+				    rctl.zone_rctlval_priv,
+				    sizeof (rctl.zone_rctlval_priv)) != Z_OK))
+					break;
+				if ((fetchprop(val, DTD_ATTR_LIMIT,
+				    rctl.zone_rctlval_limit,
+				    sizeof (rctl.zone_rctlval_limit)) != Z_OK))
+					break;
+				if ((fetchprop(val, DTD_ATTR_ACTION,
+				    rctl.zone_rctlval_action,
+				    sizeof (rctl.zone_rctlval_action)) != Z_OK))
+					break;
+			}
+
+			/* check priv and action match the expected vals */
+			if (strcmp(rctl.zone_rctlval_priv,
+			    aliases[i].priv) != 0 ||
+			    strcmp(rctl.zone_rctlval_action,
+			    aliases[i].action) != 0)
+				return (Z_ALIAS_DISALLOW);
+		}
+	}
+
+	if (found) {
+		*rval = strtoull(rctl.zone_rctlval_limit, NULL, 10);
+		return (Z_OK);
+	}
+
+	return (Z_NO_ENTRY);
+}
+
+int
+zonecfg_rm_aliased_rctl(zone_dochandle_t handle, char *name)
+{
+	int i;
+	uint64_t val;
+	struct zone_rctltab rctltab;
+
+	/*
+	 * First check that we have a valid aliased rctl to remove.
+	 * This will catch an rctl entry with non-standard values or
+	 * multiple rctl values for this name.  We need to ignore those
+	 * rctl entries.
+	 */
+	if (zonecfg_get_aliased_rctl(handle, name, &val) != Z_OK)
+		return (Z_OK);
+
+	for (i = 0; aliases[i].shortname != NULL; i++)
+		if (strcmp(name, aliases[i].shortname) == 0)
+			break;
+
+	if (aliases[i].shortname == NULL)
+		return (Z_NO_RESOURCE_ID);
+
+	(void) strlcpy(rctltab.zone_rctl_name, aliases[i].realname,
+	    sizeof (rctltab.zone_rctl_name));
+
+	return (zonecfg_delete_rctl(handle, &rctltab));
+}
+
+boolean_t
+zonecfg_aliased_rctl_ok(zone_dochandle_t handle, char *name)
+{
+	uint64_t tmp_val;
+
+	switch (zonecfg_get_aliased_rctl(handle, name, &tmp_val)) {
+	case Z_OK:
+		/*FALLTHRU*/
+	case Z_NO_ENTRY:
+		return (B_TRUE);
+	default:
+		return (B_FALSE);
+	}
+}
+
+int
+zonecfg_set_aliased_rctl(zone_dochandle_t handle, char *name, uint64_t val)
+{
+	int i;
+	int err;
+	struct zone_rctltab rctltab;
+	struct zone_rctlvaltab *rctlvaltab;
+	char buf[128];
+
+	if (!zonecfg_aliased_rctl_ok(handle, name))
+		return (Z_ALIAS_DISALLOW);
+
+	for (i = 0; aliases[i].shortname != NULL; i++)
+		if (strcmp(name, aliases[i].shortname) == 0)
+			break;
+
+	if (aliases[i].shortname == NULL)
+		return (Z_NO_RESOURCE_ID);
+
+	/* remove any pre-existing definition for this rctl */
+	(void) zonecfg_rm_aliased_rctl(handle, name);
+
+	(void) strlcpy(rctltab.zone_rctl_name, aliases[i].realname,
+	    sizeof (rctltab.zone_rctl_name));
+
+	rctltab.zone_rctl_valptr = NULL;
+
+	if ((rctlvaltab = calloc(1, sizeof (struct zone_rctlvaltab))) == NULL)
+		return (Z_NOMEM);
+
+	(void) snprintf(buf, sizeof (buf), "%llu", (long long)val);
+
+	(void) strlcpy(rctlvaltab->zone_rctlval_priv, aliases[i].priv,
+	    sizeof (rctlvaltab->zone_rctlval_priv));
+	(void) strlcpy(rctlvaltab->zone_rctlval_limit, buf,
+	    sizeof (rctlvaltab->zone_rctlval_limit));
+	(void) strlcpy(rctlvaltab->zone_rctlval_action, aliases[i].action,
+	    sizeof (rctlvaltab->zone_rctlval_action));
+
+	rctlvaltab->zone_rctlval_next = NULL;
+
+	if ((err = zonecfg_add_rctl_value(&rctltab, rctlvaltab)) != Z_OK)
+		return (err);
+
+	return (zonecfg_add_rctl(handle, &rctltab));
+}
+
+static int
+delete_tmp_pool(zone_dochandle_t handle)
+{
+	int err;
+	xmlNodePtr cur = handle->zone_dh_cur;
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_TMPPOOL) == 0) {
+			xmlUnlinkNode(cur);
+			xmlFreeNode(cur);
+			return (Z_OK);
+		}
+	}
+
+	return (Z_NO_RESOURCE_ID);
+}
+
+static int
+modify_tmp_pool(zone_dochandle_t handle, char *pool_importance)
+{
+	int err;
+	xmlNodePtr cur = handle->zone_dh_cur;
+	xmlNodePtr newnode;
+
+	err = delete_tmp_pool(handle);
+	if (err != Z_OK && err != Z_NO_RESOURCE_ID)
+		return (err);
+
+	if (*pool_importance != '\0') {
+		if ((err = operation_prep(handle)) != Z_OK)
+			return (err);
+
+		newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_TMPPOOL, NULL);
+		if ((err = newprop(newnode, DTD_ATTR_IMPORTANCE,
+		    pool_importance)) != Z_OK)
+			return (err);
+	}
+
+	return (Z_OK);
+}
+
+static int
+add_pset_core(zone_dochandle_t handle, struct zone_psettab *tabptr)
+{
+	xmlNodePtr newnode, cur = handle->zone_dh_cur;
+	int err;
+
+	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_PSET, NULL);
+	if ((err = newprop(newnode, DTD_ATTR_NCPU_MIN,
+	    tabptr->zone_ncpu_min)) != Z_OK)
+		return (err);
+	if ((err = newprop(newnode, DTD_ATTR_NCPU_MAX,
+	    tabptr->zone_ncpu_max)) != Z_OK)
+		return (err);
+
+	if ((err = modify_tmp_pool(handle, tabptr->zone_importance)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_add_pset(zone_dochandle_t handle, struct zone_psettab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = add_pset_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_delete_pset(zone_dochandle_t handle)
+{
+	int err;
+	int res = Z_NO_RESOURCE_ID;
+	xmlNodePtr cur = handle->zone_dh_cur;
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_PSET) == 0) {
+			xmlUnlinkNode(cur);
+			xmlFreeNode(cur);
+			res = Z_OK;
+			break;
+		}
+	}
+
+	/*
+	 * Once we have msets, we should check that a mset
+	 * do not exist before we delete the tmp_pool data.
+	 */
+	err = delete_tmp_pool(handle);
+	if (err != Z_OK && err != Z_NO_RESOURCE_ID)
+		return (err);
+
+	return (res);
+}
+
+int
+zonecfg_modify_pset(zone_dochandle_t handle, struct zone_psettab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = zonecfg_delete_pset(handle)) != Z_OK)
+		return (err);
+
+	if ((err = add_pset_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_lookup_pset(zone_dochandle_t handle, struct zone_psettab *tabptr)
+{
+	xmlNodePtr cur;
+	int err;
+	int res = Z_NO_ENTRY;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	/* this is an optional component */
+	tabptr->zone_importance[0] = '\0';
+
+	cur = handle->zone_dh_cur;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_PSET) == 0) {
+			if ((err = fetchprop(cur, DTD_ATTR_NCPU_MIN,
+			    tabptr->zone_ncpu_min,
+			    sizeof (tabptr->zone_ncpu_min))) != Z_OK) {
+				handle->zone_dh_cur = handle->zone_dh_top;
+				return (err);
+			}
+
+			if ((err = fetchprop(cur, DTD_ATTR_NCPU_MAX,
+			    tabptr->zone_ncpu_max,
+			    sizeof (tabptr->zone_ncpu_max))) != Z_OK) {
+				handle->zone_dh_cur = handle->zone_dh_top;
+				return (err);
+			}
+
+			res = Z_OK;
+
+		} else if (xmlStrcmp(cur->name, DTD_ELEM_TMPPOOL) == 0) {
+			if ((err = fetchprop(cur, DTD_ATTR_IMPORTANCE,
+			    tabptr->zone_importance,
+			    sizeof (tabptr->zone_importance))) != Z_OK) {
+				handle->zone_dh_cur = handle->zone_dh_top;
+				return (err);
+			}
+		}
+	}
+
+	return (res);
+}
+
+int
+zonecfg_getpsetent(zone_dochandle_t handle, struct zone_psettab *tabptr)
+{
+	int err;
+
+	if ((err = zonecfg_setent(handle)) != Z_OK)
+		return (err);
+
+	err = zonecfg_lookup_pset(handle, tabptr);
+
+	(void) zonecfg_endent(handle);
+
+	return (err);
+}
+
+static int
+add_mcap(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
+{
+	xmlNodePtr newnode, cur = handle->zone_dh_cur;
+	int err;
+
+	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_MCAP, NULL);
+	if ((err = newprop(newnode, DTD_ATTR_PHYSCAP, tabptr->zone_physmem_cap))
+	    != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_delete_mcap(zone_dochandle_t handle)
+{
+	int err;
+	xmlNodePtr cur = handle->zone_dh_cur;
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_MCAP) != 0)
+			continue;
+
+		xmlUnlinkNode(cur);
+		xmlFreeNode(cur);
+		return (Z_OK);
+	}
+	return (Z_NO_RESOURCE_ID);
+}
+
+int
+zonecfg_modify_mcap(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	err = zonecfg_delete_mcap(handle);
+	/* it is ok if there is no mcap entry */
+	if (err != Z_OK && err != Z_NO_RESOURCE_ID)
+		return (err);
+
+	if ((err = add_mcap(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_lookup_mcap(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_MCAP) != 0)
+			continue;
+		if ((err = fetchprop(cur, DTD_ATTR_PHYSCAP,
+		    tabptr->zone_physmem_cap,
+		    sizeof (tabptr->zone_physmem_cap))) != Z_OK) {
+			handle->zone_dh_cur = handle->zone_dh_top;
+			return (err);
+		}
+
+		return (Z_OK);
+	}
+
+	return (Z_NO_ENTRY);
+}
+
+static int
+getmcapent_core(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((cur = handle->zone_dh_cur) == NULL)
+		return (Z_NO_ENTRY);
+
+	for (; cur != NULL; cur = cur->next)
+		if (xmlStrcmp(cur->name, DTD_ELEM_MCAP) == 0)
+			break;
+	if (cur == NULL) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (Z_NO_ENTRY);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_PHYSCAP, tabptr->zone_physmem_cap,
+	    sizeof (tabptr->zone_physmem_cap))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	handle->zone_dh_cur = cur->next;
+	return (Z_OK);
+}
+
+int
+zonecfg_getmcapent(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
+{
+	int err;
+
+	if ((err = zonecfg_setent(handle)) != Z_OK)
+		return (err);
+
+	err = getmcapent_core(handle, tabptr);
+
+	(void) zonecfg_endent(handle);
+
+	return (err);
 }
 
 int

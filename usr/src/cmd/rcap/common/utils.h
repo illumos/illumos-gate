@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,7 @@
 #include <libintl.h>
 #include <stdarg.h>
 #include <time.h>
+#include <libzonecfg.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -62,6 +62,11 @@ typedef enum rcm_dst {
 					/* on level */
 	RCD_SYSLOG			/* syslog() daemon facility */
 } rcm_dst_t;
+
+typedef struct zone_entry {
+	zoneid_t	zid;
+	char		zname[ZONENAME_MAX];
+} zone_entry_t;
 
 #define	LINELEN		256		/* max. message length */
 
@@ -95,6 +100,7 @@ extern void vdprintfe(int, char *, va_list);
 extern void dprintfe(int, char *, ...);
 extern void hrt2ts(hrtime_t, timestruc_t *);
 extern int xatoi(char *);
+extern int get_running_zones(uint_t *, zone_entry_t **);
 
 #ifdef	__cplusplus
 }

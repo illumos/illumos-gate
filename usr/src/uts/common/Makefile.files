@@ -334,6 +334,7 @@ GENUNIX_OBJS +=	\
 		vm_seg.o	\
 		vm_subr.o	\
 		vm_swap.o	\
+		vm_usage.o	\
 		vnode.o		\
 		vuid_queue.o	\
 		vuid_store.o	\

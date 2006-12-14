@@ -122,6 +122,7 @@ typedef struct id_info {
 	zoneid_t	id_zoneid;	/* zone id */
 	int		id_lgroup;	/* lgroup id */
 	uint_t		id_nproc;	/* number of processes */
+	boolean_t	id_sizematch;	/* size/rssize from getvmusage() */
 	size_t		id_size;	/* memory usage */
 	size_t		id_rssize;	/* resident set size */
 	ulong_t		id_time;	/* cpu time (in secs) */

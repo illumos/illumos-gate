@@ -31,6 +31,7 @@
 #include <sys/loadavg.h>
 #include <sys/time.h>
 #include <sys/pset.h>
+#include <sys/vm_usage.h>
 #include <zone.h>
 #include <libzonecfg.h>
 
@@ -86,21 +87,21 @@
 #define	USAGE_HEADER_LWP \
 "   PID USERNAME USR SYS TRP TFL DFL LCK SLP LAT VCX ICX SCL SIG PROCESS/LWPID "
 #define	USER_HEADER_PROC \
-" NPROC USERNAME  SIZE   RSS MEMORY      TIME  CPU                             "
+" NPROC USERNAME  SWAP   RSS MEMORY      TIME  CPU                             "
 #define	USER_HEADER_LWP \
-"  NLWP USERNAME  SIZE   RSS MEMORY      TIME  CPU                             "
+"  NLWP USERNAME  SWAP   RSS MEMORY      TIME  CPU                             "
 #define	TASK_HEADER_PROC \
-"TASKID    NPROC  SIZE   RSS MEMORY      TIME  CPU PROJECT                     "
+"TASKID    NPROC  SWAP   RSS MEMORY      TIME  CPU PROJECT                     "
 #define	TASK_HEADER_LWP \
-"TASKID     NLWP  SIZE   RSS MEMORY      TIME  CPU PROJECT                     "
+"TASKID     NLWP  SWAP   RSS MEMORY      TIME  CPU PROJECT                     "
 #define	PROJECT_HEADER_PROC \
-"PROJID    NPROC  SIZE   RSS MEMORY      TIME  CPU PROJECT                     "
+"PROJID    NPROC  SWAP   RSS MEMORY      TIME  CPU PROJECT                     "
 #define	PROJECT_HEADER_LWP \
-"PROJID     NLWP  SIZE   RSS MEMORY      TIME  CPU PROJECT                     "
+"PROJID     NLWP  SWAP   RSS MEMORY      TIME  CPU PROJECT                     "
 #define	ZONE_HEADER_PROC \
-"ZONEID    NPROC  SIZE   RSS MEMORY      TIME  CPU ZONE                        "
+"ZONEID    NPROC  SWAP   RSS MEMORY      TIME  CPU ZONE                        "
 #define	ZONE_HEADER_LWP \
-"ZONEID     NLWP  SIZE   RSS MEMORY      TIME  CPU ZONE                        "
+"ZONEID     NLWP  SWAP   RSS MEMORY      TIME  CPU ZONE                        "
 #define	PSINFO_LINE \
 "%6d %-8s %5s %5s %-6s %3s  %3s %9s %3.3s%% %-.16s/%d"
 #define	PSINFO_LINE_LGRP \
@@ -160,6 +161,8 @@ static volatile uint_t sigwinch = 0;
 static volatile uint_t sigtstp = 0;
 static volatile uint_t sigterm = 0;
 
+static long pagesize;
+
 /* default settings */
 
 static optdesc_t opts = {
@@ -181,6 +184,129 @@ psetloadavg(long psetid, void *ptr)
 		*loadavg++ += psetloadavg[0];
 		*loadavg++ += psetloadavg[1];
 		*loadavg += psetloadavg[2];
+	}
+}
+
+/*
+ * Queries the memory virtual and rss size for each member of a list.
+ * This will override the values computed by /proc aggregation.
+ */
+static void
+list_getsize(list_t *list)
+{
+	id_info_t *id;
+	vmusage_t *results, *next;
+	vmusage_t *match;
+	size_t nres = 0;
+	size_t i;
+	uint_t flags = 0;
+	int ret;
+	size_t physmem = sysconf(_SC_PHYS_PAGES) * pagesize;
+
+	/*
+	 * Determine what swap/rss results to calculate.  getvmusage() will
+	 * prune results returned to non-global zones automatically, so
+	 * there is no need to pass different flags when calling from a
+	 * non-global zone.
+	 *
+	 * Currently list_getsize() is only called with a single flag.  This
+	 * is because -Z, -J, -T, and -a are mutually exclusive.  Regardless
+	 * of this, we handle multiple flags.
+	 */
+	if (opts.o_outpmode & OPT_USERS) {
+		/*
+		 * Gather rss for all users in all zones.  Treat the same
+		 * uid in different zones as the same user.
+		 */
+		flags |= VMUSAGE_COL_RUSERS;
+
+	} else if (opts.o_outpmode & OPT_TASKS) {
+		/* Gather rss for all tasks in all zones */
+		flags |= VMUSAGE_ALL_TASKS;
+
+	} else if (opts.o_outpmode & OPT_PROJECTS) {
+		/*
+		 * Gather rss for all projects in all zones.  Treat the same
+		 * projid in diffrent zones as the same project.
+		 */
+		flags |= VMUSAGE_COL_PROJECTS;
+
+	} else if (opts.o_outpmode & OPT_ZONES) {
+		/* Gather rss for all zones */
+		flags |= VMUSAGE_ALL_ZONES;
+
+	} else {
+		Die(gettext(
+		    "Cannot determine rss flags for output options %x\n"),
+		    opts.o_outpmode);
+	}
+
+	/*
+	 * getvmusage() returns an array of result structures.  One for
+	 * each zone, project, task, or user on the system, depending on
+	 * flags.
+	 *
+	 * If getvmusage() fails, prstat will use the size already gathered
+	 * from psinfo
+	 */
+	if (getvmusage(flags, opts.o_interval, NULL, &nres) != 0)
+		return;
+
+	results = (vmusage_t *)Malloc(sizeof (vmusage_t) * nres);
+	for (;;) {
+		ret = getvmusage(flags, opts.o_interval, results, &nres);
+		if (ret == 0)
+			break;
+		if (errno == EOVERFLOW) {
+			results = (vmusage_t *)Realloc(results,
+			    sizeof (vmusage_t) * nres);
+			continue;
+		}
+		/*
+		 * Failure for some other reason.  Prstat will use the size
+		 * already gathered from psinfo.
+		 */
+		return;
+	}
+	for (id = list->l_head; id != NULL; id = id->id_next) {
+
+		match = NULL;
+		next = results;
+		for (i = 0; i < nres; i++, next++) {
+			switch (flags) {
+			case VMUSAGE_COL_RUSERS:
+				if (next->vmu_id == id->id_uid)
+					match = next;
+				break;
+			case VMUSAGE_ALL_TASKS:
+				if (next->vmu_id == id->id_taskid)
+					match = next;
+				break;
+			case VMUSAGE_COL_PROJECTS:
+				if (next->vmu_id == id->id_projid)
+					match = next;
+				break;
+			case VMUSAGE_ALL_ZONES:
+				if (next->vmu_id == id->id_zoneid)
+					match = next;
+				break;
+			default:
+				Die(gettext(
+				    "Unknown vmusage flags %d\n"), flags);
+			}
+		}
+		if (match != NULL) {
+			id->id_size = match->vmu_swap_all / 1024;
+			id->id_rssize = match->vmu_rss_all / 1024;
+			id->id_pctmem = (100.0 * (float)match->vmu_rss_all) /
+			    (float)physmem;
+			/* Output using data from getvmusage() */
+			id->id_sizematch = B_TRUE;
+		}
+		/*
+		 * If no match is found, prstat will use the size already
+		 * gathered from psinfo.
+		 */
 	}
 }
 
@@ -282,7 +408,7 @@ list_print(list_t *list)
 				cpu = (100 * id->id_pctcpu) / total_cpu;
 			else
 				cpu = id->id_pctcpu;
-			if (total_mem >= 100)
+			if (id->id_sizematch == B_FALSE && total_mem >= 100)
 				mem = (100 * id->id_pctmem) / total_mem;
 			else
 				mem = id->id_pctmem;
@@ -566,6 +692,7 @@ update:
 	id->id_zoneid	= lwp->li_info.pr_zoneid;
 	id->id_lgroup	= lwp->li_info.pr_lwp.pr_lgrp;
 	id->id_nproc++;
+	id->id_sizematch = B_FALSE;
 	if (lwp->li_flags & LWP_REPRESENT) {
 		id->id_size	= lwp->li_info.pr_size;
 		id->id_rssize	= lwp->li_info.pr_rssize;
@@ -1175,6 +1302,7 @@ Exit()
 	fd_exit();
 }
 
+
 int
 main(int argc, char **argv)
 {
@@ -1191,6 +1319,8 @@ main(int argc, char **argv)
 	Progname(argv[0]);
 	lwpid_init();
 	fd_init(Setrlimit());
+
+	pagesize = sysconf(_SC_PAGESIZE);
 
 	while ((opt = getopt(argc, argv, "vcHmaRLtu:U:n:p:C:P:h:s:S:j:k:TJz:Z"))
 	    != (int)EOF) {
@@ -1419,21 +1549,25 @@ main(int argc, char **argv)
 			list_print(&lwps);
 		}
 		if (opts.o_outpmode & OPT_USERS) {
+			list_getsize(&users);
 			list_sort(&users);
 			list_print(&users);
 			list_clear(&users);
 		}
 		if (opts.o_outpmode & OPT_TASKS) {
+			list_getsize(&tasks);
 			list_sort(&tasks);
 			list_print(&tasks);
 			list_clear(&tasks);
 		}
 		if (opts.o_outpmode & OPT_PROJECTS) {
+			list_getsize(&projects);
 			list_sort(&projects);
 			list_print(&projects);
 			list_clear(&projects);
 		}
 		if (opts.o_outpmode & OPT_ZONES) {
+			list_getsize(&zones);
 			list_sort(&zones);
 			list_print(&zones);
 			list_clear(&zones);

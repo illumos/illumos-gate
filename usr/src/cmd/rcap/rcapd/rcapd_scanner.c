@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +103,8 @@ st_debug(st_debug_level_t level, lcollection_t *lcol, char *msg, ...)
 	buf = malloc(len);
 	if (buf == NULL)
 		return;
-	(void) snprintf(buf, len, "%s %s scanner %s", rcfg.rcfg_mode_name,
+	(void) snprintf(buf, len, "%s %s scanner %s",
+	    (lcol->lcol_id.rcid_type == RCIDT_PROJECT ? "project" : "zone"),
 	    lcol->lcol_name, msg);
 
 	va_start(alist, msg);
@@ -471,6 +471,7 @@ merge_current_pagedata(lprocess_t *lpc,
 {
 	prpageheader_t *pghp;
 	int mappings_changed = 0;
+	uint64_t cnt;
 
 	if (lpc->lpc_pgdata_fd < 0 || get_pagedata(&pghp, lpc->lpc_pgdata_fd) !=
 	    0) {
@@ -485,9 +486,12 @@ merge_current_pagedata(lprocess_t *lpc,
 		debug("starting/resuming pagedata collection for %d\n",
 		    (int)lpc->lpc_pid);
 	}
-	debug("process %d: %llu/%llukB r/m'd since last read\n",
-	    (int)lpc->lpc_pid, (unsigned long long)count_pages(pghp, 0,
-	    PG_MODIFIED | PG_REFERENCED, 0), (unsigned long long)lpc->lpc_rss);
+
+	cnt = count_pages(pghp, 0, PG_MODIFIED | PG_REFERENCED, 0);
+	if (cnt != 0 || lpc->lpc_rss != 0)
+		debug("process %d: %llu/%llukB rfd/mdfd since last read\n",
+		    (int)lpc->lpc_pid, (unsigned long long)cnt,
+		    (unsigned long long)lpc->lpc_rss);
 	if (lpc->lpc_prpageheader != NULL) {
 		/*
 		 * OR the two snapshots.
@@ -519,10 +523,12 @@ merge_current_pagedata(lprocess_t *lpc,
 	} else
 		mappings_changed = 1;
 	lpc->lpc_prpageheader = pghp;
-	debug("process %d: %llu/%llukB r/m'd since hand swept\n",
-	    (int)lpc->lpc_pid, (unsigned long long)count_pages(pghp, 0,
-	    PG_MODIFIED | PG_REFERENCED, 0),
-	    (unsigned long long)lpc->lpc_rss);
+
+	cnt = count_pages(pghp, 0, PG_MODIFIED | PG_REFERENCED, 0);
+	if (cnt != 0 || lpc->lpc_rss != 0)
+		debug("process %d: %llu/%llukB rfd/mdfd since hand swept\n",
+		    (int)lpc->lpc_pid, (unsigned long long)cnt,
+		    (unsigned long long)lpc->lpc_rss);
 	if (mappings_changed != 0) {
 		debug("process %d: mappings changed\n", (int)lpc->lpc_pid);
 		if (mappings_changed_cb != NULL)
@@ -589,7 +595,6 @@ rss_delta(psinfo_t *new_psinfo, psinfo_t *old_psinfo, lprocess_t *vic)
 static void
 unignore_mappings(lprocess_t *lpc)
 {
-	debug("clearing ignored set\n");
 	lmapping_free(&lpc->lpc_ignore);
 }
 

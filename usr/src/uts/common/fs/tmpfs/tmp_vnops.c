@@ -215,9 +215,26 @@ wrtmp(
 		if (delta > 0) {
 			pagecreate = 1;
 			if (tmp_resv(tm, tp, delta, pagecreate)) {
-				cmn_err(CE_WARN,
-	"%s: File system full, swap space limit exceeded",
+				/*
+				 * Log file system full in the zone that owns
+				 * the tmpfs mount, as well as in the global
+				 * zone if necessary.
+				 */
+				zcmn_err(tm->tm_vfsp->vfs_zone->zone_id,
+				    CE_WARN, "%s: File system full, "
+				    "swap space limit exceeded",
 				    tm->tm_mntpath);
+
+				if (tm->tm_vfsp->vfs_zone->zone_id !=
+				    GLOBAL_ZONEID) {
+
+					vfs_t *vfs = tm->tm_vfsp;
+
+					zcmn_err(GLOBAL_ZONEID,
+					    CE_WARN, "%s: File system full, "
+					    "swap space limit exceeded",
+					    vfs->vfs_vnodecovered->v_path);
+				}
 				error = ENOSPC;
 				break;
 			}

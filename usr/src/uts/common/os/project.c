@@ -29,6 +29,7 @@
 #include <sys/modhash.h>
 #include <sys/modctl.h>
 #include <sys/kmem.h>
+#include <sys/kstat.h>
 #include <sys/atomic.h>
 #include <sys/cmn_err.h>
 #include <sys/proc.h>
@@ -103,6 +104,8 @@ struct project_zone {
  *   acquired, the hash lock is to be acquired first.
  */
 
+static kstat_t *project_kstat_create(kproject_t *pj, zone_t *zone);
+static void project_kstat_delete(kproject_t *pj);
 
 static void
 project_data_init(kproject_data_t *data)
@@ -118,6 +121,7 @@ project_data_init(kproject_data_t *data)
 	data->kpd_locked_mem_ctl = UINT64_MAX;
 	data->kpd_contract = 0;
 	data->kpd_crypto_mem = 0;
+	data->kpd_lockedmem_kstat = NULL;
 }
 
 /*ARGSUSED*/
@@ -179,11 +183,11 @@ project_hold(kproject_t *p)
 }
 
 /*
- * kproject_t *project_hold_by_id(projid_t, zoneid_t, int)
+ * kproject_t *project_hold_by_id(projid_t, zone_t *, int)
  *
  * Overview
  *   project_hold_by_id() performs a look-up in the dictionary of projects
- *   active on the system by specified project ID + zone ID and puts a hold on
+ *   active on the system by specified project ID + zone and puts a hold on
  *   it.  The third argument defines the desired behavior in the case when
  *   project with given project ID cannot be found:
  *
@@ -202,7 +206,7 @@ project_hold(kproject_t *p)
  *   Caller must be in a context suitable for KM_SLEEP allocations.
  */
 kproject_t *
-project_hold_by_id(projid_t id, zoneid_t zoneid, int flag)
+project_hold_by_id(projid_t id, zone_t *zone, int flag)
 {
 	kproject_t *spare_p;
 	kproject_t *p;
@@ -211,9 +215,11 @@ project_hold_by_id(projid_t id, zoneid_t zoneid, int flag)
 	rctl_alloc_gp_t *gp;
 	rctl_entity_p_t e;
 	struct project_zone pz;
+	boolean_t create = B_FALSE;
+	kstat_t *ksp;
 
 	pz.kpj_id = id;
-	pz.kpj_zoneid = zoneid;
+	pz.kpj_zoneid = zone->zone_id;
 
 	if (flag == PROJECT_HOLD_FIND) {
 		mutex_enter(&project_hash_lock);
@@ -241,9 +247,10 @@ project_hold_by_id(projid_t id, zoneid_t zoneid, int flag)
 	mutex_enter(&project_hash_lock);
 	if (mod_hash_find(projects_hash, (mod_hash_key_t)&pz,
 	    (mod_hash_val_t *)&p) == MH_ERR_NOTFOUND) {
+
 		p = spare_p;
 		p->kpj_id = id;
-		p->kpj_zoneid = zoneid;
+		p->kpj_zoneid = zone->zone_id;
 		p->kpj_count = 0;
 		p->kpj_shares = 1;
 		p->kpj_nlwps = 0;
@@ -265,7 +272,7 @@ project_hold_by_id(projid_t id, zoneid_t zoneid, int flag)
 		 * Insert project into global project list.
 		 */
 		mutex_enter(&projects_list_lock);
-		if (id != 0 || zoneid != GLOBAL_ZONEID) {
+		if (id != 0 || zone != &zone0) {
 			p->kpj_next = projects_list;
 			p->kpj_prev = projects_list->kpj_prev;
 			p->kpj_prev->kpj_next = p;
@@ -279,6 +286,7 @@ project_hold_by_id(projid_t id, zoneid_t zoneid, int flag)
 			projects_list = p;
 		}
 		mutex_exit(&projects_list_lock);
+		create = B_TRUE;
 	} else {
 		mutex_exit(&curproc->p_lock);
 		mod_hash_cancel(projects_hash, &hndl);
@@ -290,9 +298,19 @@ project_hold_by_id(projid_t id, zoneid_t zoneid, int flag)
 	p->kpj_count++;
 	mutex_exit(&project_hash_lock);
 
+	/*
+	 * The kstat stores the project's zone name, as zoneid's may change
+	 * across reboots.
+	 */
+	if (create == B_TRUE) {
+		ksp = project_kstat_create(p, zone);
+		mutex_enter(&project_hash_lock);
+		ASSERT(p->kpj_data.kpd_lockedmem_kstat == NULL);
+		p->kpj_data.kpd_lockedmem_kstat = ksp;
+		mutex_exit(&project_hash_lock);
+	}
 	return (p);
 }
-
 
 /*
  * void project_rele(kproject_t *)
@@ -325,6 +343,7 @@ project_rele(kproject_t *p)
 		mutex_exit(&projects_list_lock);
 
 		rctl_set_free(p->kpj_rctls);
+		project_kstat_delete(p);
 
 		if (mod_hash_destroy(projects_hash, (mod_hash_key_t)p))
 			panic("unable to delete project %d zone %d", p->kpj_id,
@@ -636,9 +655,9 @@ project_locked_mem_usage(rctl_t *rctl, struct proc *p)
 {
 	rctl_qty_t q;
 	ASSERT(MUTEX_HELD(&p->p_lock));
-	mutex_enter(&p->p_zone->zone_rctl_lock);
+	mutex_enter(&p->p_zone->zone_mem_lock);
 	q = p->p_task->tk_proj->kpj_data.kpd_locked_mem;
-	mutex_exit(&p->p_zone->zone_rctl_lock);
+	mutex_exit(&p->p_zone->zone_mem_lock);
 	return (q);
 }
 
@@ -649,7 +668,7 @@ project_locked_mem_test(struct rctl *rctl, struct proc *p, rctl_entity_p_t *e,
 {
 	rctl_qty_t q;
 	ASSERT(MUTEX_HELD(&p->p_lock));
-	ASSERT(MUTEX_HELD(&p->p_zone->zone_rctl_lock));
+	ASSERT(MUTEX_HELD(&p->p_zone->zone_mem_lock));
 	q = p->p_task->tk_proj->kpj_data.kpd_locked_mem;
 	if (q + inc > rval->rcv_value)
 		return (1);
@@ -868,11 +887,65 @@ project_init(void)
 	rctl_add_default_limit("project.max-contracts", 10000,
 	    RCPRIV_PRIVILEGED, RCTL_LOCAL_DENY);
 
-	t0.t_proj = proj0p = project_hold_by_id(0, GLOBAL_ZONEID,
+	t0.t_proj = proj0p = project_hold_by_id(0, &zone0,
 	    PROJECT_HOLD_INSERT);
 
 	mutex_enter(&p0.p_lock);
 	proj0p->kpj_nlwps = p0.p_lwpcnt;
 	mutex_exit(&p0.p_lock);
 	proj0p->kpj_ntasks = 1;
+}
+
+static int
+project_lockedmem_kstat_update(kstat_t *ksp, int rw)
+{
+	kproject_t *pj = ksp->ks_private;
+	kproject_kstat_t *kpk = ksp->ks_data;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	kpk->kpk_usage.value.ui64 = pj->kpj_data.kpd_locked_mem;
+	kpk->kpk_value.value.ui64 = pj->kpj_data.kpd_locked_mem_ctl;
+	return (0);
+}
+
+static kstat_t *
+project_kstat_create(kproject_t *pj, zone_t *zone)
+{
+	kstat_t *ksp;
+	kproject_kstat_t *kpk;
+	char *zonename = zone->zone_name;
+
+	ksp = rctl_kstat_create_project(pj, "lockedmem", KSTAT_TYPE_NAMED,
+	    sizeof (kproject_kstat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL);
+
+	if (ksp == NULL)
+		return (NULL);
+
+	kpk = ksp->ks_data = kmem_alloc(sizeof (kproject_kstat_t), KM_SLEEP);
+	ksp->ks_data_size += strlen(zonename) + 1;
+	kstat_named_init(&kpk->kpk_zonename, "zonename", KSTAT_DATA_STRING);
+	kstat_named_setstr(&kpk->kpk_zonename, zonename);
+	kstat_named_init(&kpk->kpk_usage, "usage", KSTAT_DATA_UINT64);
+	kstat_named_init(&kpk->kpk_value, "value", KSTAT_DATA_UINT64);
+	ksp->ks_update = project_lockedmem_kstat_update;
+	ksp->ks_private = pj;
+	kstat_install(ksp);
+
+	return (ksp);
+}
+
+static void
+project_kstat_delete(kproject_t *pj)
+{
+	void *data;
+
+	if (pj->kpj_data.kpd_lockedmem_kstat != NULL) {
+		data = pj->kpj_data.kpd_lockedmem_kstat->ks_data;
+		kstat_delete(pj->kpj_data.kpd_lockedmem_kstat);
+		kmem_free(data, sizeof (zone_kstat_t));
+	}
+	pj->kpj_data.kpd_lockedmem_kstat = NULL;
 }

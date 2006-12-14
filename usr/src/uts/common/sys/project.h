@@ -28,14 +28,23 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+
+#include <sys/kstat.h>
 #include <sys/types.h>
 #include <sys/mutex.h>
 #include <sys/rctl.h>
 #include <sys/ipc_rctl.h>
+
+typedef struct kproject_kstat {
+	kstat_named_t kpk_zonename;
+	kstat_named_t kpk_usage;
+	kstat_named_t kpk_value;
+} kproject_kstat_t;
 
 typedef struct kproject_data {		/* Datum protected by: */
 	rctl_qty_t	kpd_shmmax;	/* shm's ipcs_lock */
@@ -44,6 +53,7 @@ typedef struct kproject_data {		/* Datum protected by: */
 	rctl_qty_t	kpd_locked_mem_ctl; /* kpj_rctls->rcs_lock */
 	rctl_qty_t	kpd_contract;	/* contract_lock */
 	rctl_qty_t	kpd_crypto_mem;	/* crypto_rctl_lock */
+	kstat_t		*kpd_lockedmem_kstat; /* locked memory kstat */
 
 } kproject_data_t;
 
@@ -76,9 +86,11 @@ typedef struct kproject {
 #define	PROJECT_HOLD_FIND	1
 #define	PROJECT_HOLD_INSERT	2
 
+struct zone;
+
 void project_init(void);
 kproject_t *project_hold(kproject_t *);
-kproject_t *project_hold_by_id(projid_t, zoneid_t, int);
+kproject_t *project_hold_by_id(projid_t, struct zone *, int);
 void project_rele(kproject_t *);
 int project_walk_all(zoneid_t, int (*)(kproject_t *, void *), void *);
 projid_t curprojid(void);

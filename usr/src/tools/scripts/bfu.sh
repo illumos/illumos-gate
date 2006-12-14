@@ -332,6 +332,7 @@ superfluous_local_zone_files="
 	lib/svc/method/svc-poold
 	lib/svc/method/svc-pools
 	lib/svc/method/svc-power
+	lib/svc/method/svc-resource-mgmt
 	lib/svc/method/svc-rmvolmgr
 	lib/svc/method/svc-scheduler
 	lib/svc/method/svc-sckmd
@@ -401,6 +402,7 @@ superfluous_local_zone_files="
 	var/svc/manifest/system/poold.xml
 	var/svc/manifest/system/pools.xml
 	var/svc/manifest/system/power.xml
+	var/svc/manifest/system/resource-mgmt.xml
 	var/svc/manifest/system/scheduler.xml
 	var/svc/manifest/system/sysevent.xml
 	var/svc/manifest/system/zones.xml

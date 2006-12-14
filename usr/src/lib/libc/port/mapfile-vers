@@ -59,6 +59,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	fdatasync;
 	forkallx;
 	forkx;
+	getvmusage;
 	lio_listio;
 	mkdtemp;
 	_mkdtemp;

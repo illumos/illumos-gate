@@ -50,19 +50,20 @@ typedef int bool;
 
 #define	CMD_ADD		0
 #define	CMD_CANCEL	1
-#define	CMD_COMMIT	2
-#define	CMD_CREATE	3
-#define	CMD_DELETE	4
-#define	CMD_END		5
-#define	CMD_EXIT	6
-#define	CMD_EXPORT	7
-#define	CMD_HELP	8
-#define	CMD_INFO	9
-#define	CMD_REMOVE	10
-#define	CMD_REVERT	11
-#define	CMD_SELECT	12
-#define	CMD_SET		13
-#define	CMD_VERIFY	14
+#define	CMD_CLEAR	2
+#define	CMD_COMMIT	3
+#define	CMD_CREATE	4
+#define	CMD_DELETE	5
+#define	CMD_END		6
+#define	CMD_EXIT	7
+#define	CMD_EXPORT	8
+#define	CMD_HELP	9
+#define	CMD_INFO	10
+#define	CMD_REMOVE	11
+#define	CMD_REVERT	12
+#define	CMD_SELECT	13
+#define	CMD_SET		14
+#define	CMD_VERIFY	15
 
 #define	CMD_MIN		CMD_ADD
 #define	CMD_MAX		CMD_VERIFY
@@ -83,9 +84,18 @@ typedef int bool;
 #define	RT_LIMITPRIV	12	/* really a property, but for info ... */
 #define	RT_BOOTARGS	13	/* really a property, but for info ... */
 #define	RT_BRAND	14	/* really a property, but for info ... */
+#define	RT_DCPU		15
+#define	RT_MCAP		16
+#define	RT_MAXLWPS	17	/* really a rctl alias property, but for info */
+#define	RT_MAXSHMMEM	18	/* really a rctl alias property, but for info */
+#define	RT_MAXSHMIDS	19	/* really a rctl alias property, but for info */
+#define	RT_MAXMSGIDS	20	/* really a rctl alias property, but for info */
+#define	RT_MAXSEMIDS	21	/* really a rctl alias property, but for info */
+#define	RT_SHARES	22	/* really a rctl alias property, but for info */
+#define	RT_SCHED	23	/* really a property, but for info ... */
 
 #define	RT_MIN		RT_UNKNOWN
-#define	RT_MAX		RT_BRAND
+#define	RT_MAX		RT_SCHED
 
 /* property types: increment PT_MAX when expanding this list */
 #define	PT_UNKNOWN	0
@@ -109,9 +119,22 @@ typedef int bool;
 #define	PT_LIMITPRIV	18
 #define	PT_BOOTARGS	19
 #define	PT_BRAND	20
+#define	PT_NCPUS	21
+#define	PT_IMPORTANCE	22
+#define	PT_SWAP		23
+#define	PT_LOCKED	24
+#define	PT_SHARES	25
+#define	PT_MAXLWPS	26
+#define	PT_MAXSHMMEM	27
+#define	PT_MAXSHMIDS	28
+#define	PT_MAXMSGIDS	29
+#define	PT_MAXSEMIDS	30
+#define	PT_MAXLOCKEDMEM	31
+#define	PT_MAXSWAP	32
+#define	PT_SCHED	33
 
 #define	PT_MIN		PT_UNKNOWN
-#define	PT_MAX		PT_BRAND
+#define	PT_MAX		PT_SCHED
 
 #define	MAX_EQ_PROP_PAIRS	3
 
@@ -184,6 +207,7 @@ extern void revert_func(cmd_t *);
 extern void select_func(cmd_t *);
 extern void set_func(cmd_t *);
 extern void verify_func(cmd_t *);
+extern void clear_func(cmd_t *);
 
 extern cmd_t *alloc_cmd(void);
 extern complex_property_ptr_t alloc_complex(void);

@@ -544,6 +544,7 @@ CHKHDRS=			\
 	visual_io.h		\
 	vlan.h			\
 	vm.h			\
+	vm_usage.h		\
 	vmem.h			\
 	vmem_impl.h		\
 	vmmeter.h		\

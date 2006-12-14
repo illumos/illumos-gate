@@ -245,6 +245,9 @@ commit_delete(pool_elem_t *pe)
 	pool_t *pool;
 	int ret = 0;
 
+	if (elem_is_tmp(pe))
+		return (PO_SUCCESS);
+
 	switch (pool_elem_class(pe)) {
 	case PEC_SYSTEM:	/* NO-OP */
 		break;
@@ -1306,7 +1309,14 @@ clone_element(pool_conf_t *conf, pool_elem_t *pe, const char *name,
 	if ((prop = provider_get_prop(pe, name)) != NULL &&
 	    prop_is_readonly(prop) == PO_TRUE)
 		return (PO_SUCCESS);
-	return (pool_put_property(TO_CONF(tgt), tgt, name, pv) == PO_FAIL);
+
+	/* The temporary property needs special handling */
+	if (strstr(name, ".temporary") != NULL)
+		return (pool_set_temporary(TO_CONF(tgt), tgt) ==
+		    PO_FAIL ?  PO_FAIL : PO_SUCCESS);
+	else
+		return (pool_put_property(TO_CONF(tgt), tgt, name, pv) ==
+		    PO_FAIL ? PO_FAIL : PO_SUCCESS);
 }
 
 /*
@@ -1322,8 +1332,9 @@ clean_element(pool_conf_t *conf, pool_elem_t *pe, const char *name,
 	/*
 	 * Some properties should be ignored
 	 */
-	if ((prop = provider_get_prop(pe, name)) != NULL &&
-	    prop_is_optional(prop) == PO_FALSE)
+	if (strstr(name, ".temporary") != NULL ||
+	    ((prop = provider_get_prop(pe, name)) != NULL &&
+	    prop_is_optional(prop) == PO_FALSE))
 		return (PO_SUCCESS);
 	return (pool_rm_property(conf, (pool_elem_t *)pe, name) == PO_FAIL);
 }

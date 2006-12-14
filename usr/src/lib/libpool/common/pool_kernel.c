@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -646,10 +645,14 @@ pool_knl_close(pool_conf_t *conf)
 	}
 	/*
 	 * Rollback any pending changes before freeing the prov. This
-	 * ensures there are no memory leaks from pending
-	 * transactions.
+	 * ensures there are no memory leaks from pending transactions.
+	 * However, don't rollback when we've done a temporary pool since the
+	 * pool/resources haven't really been committed in this case.
+	 * They will all be freed in pool_knl_connection_free and we don't
+	 * want to double free them.
 	 */
-	(void) pool_knl_rollback(conf);
+	if (!(conf->pc_prov->pc_oflags & PO_TEMP))
+		(void) pool_knl_rollback(conf);
 	pool_knl_connection_free(prov);
 	return (PO_SUCCESS);
 }
@@ -997,6 +1000,9 @@ pool_knl_export(const pool_conf_t *conf, const char *location,
 				const char *sep = "";
 				int j;
 
+				if (elem_is_tmp(elem))
+					continue;
+
 				if ((info.ktx_node = node_create(system,
 				    BAD_CAST element_class_tags
 				    [pool_elem_class(elem)])) == NULL) {
@@ -1071,6 +1077,9 @@ pool_knl_export(const pool_conf_t *conf, const char *location,
 				pool_component_t **cs = NULL;
 				uint_t ncompelem;
 				int j;
+
+				if (elem_is_tmp(elem))
+					continue;
 
 				if ((info.ktx_node = node_create(system,
 				    BAD_CAST element_class_tags

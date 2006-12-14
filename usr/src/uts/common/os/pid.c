@@ -385,6 +385,56 @@ pgfind(pid_t pgid)
 }
 
 /*
+ * Sets P_PR_LOCK on a non-system process.  Process must be fully created
+ * and not exiting to succeed.
+ *
+ * Returns 0 on success.
+ * Returns 1 if P_PR_LOCK is set.
+ * Returns -1 if proc is in invalid state.
+ */
+int
+sprtrylock_proc(proc_t *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	/* skip system and incomplete processes */
+	if (p->p_stat == SIDL || p->p_stat == SZOMB ||
+	    (p->p_flag & (SSYS | SEXITING | SEXITLWPS))) {
+		return (-1);
+	}
+
+	if (p->p_proc_flag & P_PR_LOCK)
+		return (1);
+
+	p->p_proc_flag |= P_PR_LOCK;
+	THREAD_KPRI_REQUEST();
+
+	return (0);
+}
+
+/*
+ * Wait for P_PR_LOCK to become clear.  Returns with p_lock dropped,
+ * and the proc pointer no longer valid, as the proc may have exited.
+ */
+void
+sprwaitlock_proc(proc_t *p)
+{
+	kmutex_t *mp;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(p->p_proc_flag & P_PR_LOCK);
+
+	/*
+	 * p_lock is persistent, but p itself is not -- it could
+	 * vanish during cv_wait().  Load p->p_lock now so we can
+	 * drop it after cv_wait() without referencing p.
+	 */
+	mp = &p->p_lock;
+	cv_wait(&pr_pid_cv[p->p_slot], mp);
+	mutex_exit(mp);
+}
+
+/*
  * If pid exists, find its proc, acquire its p_lock and mark it P_PR_LOCK.
  * Returns the proc pointer on success, NULL on failure.  sprlock() is
  * really just a stripped-down version of pr_p_lock() to allow practive
@@ -394,7 +444,7 @@ proc_t *
 sprlock_zone(pid_t pid, zoneid_t zoneid)
 {
 	proc_t *p;
-	kmutex_t *mp;
+	int ret;
 
 	for (;;) {
 		mutex_enter(&pidlock);
@@ -402,31 +452,21 @@ sprlock_zone(pid_t pid, zoneid_t zoneid)
 			mutex_exit(&pidlock);
 			return (NULL);
 		}
-		/*
-		 * p_lock is persistent, but p itself is not -- it could
-		 * vanish during cv_wait().  Load p->p_lock now so we can
-		 * drop it after cv_wait() without referencing p.
-		 */
-		mp = &p->p_lock;
-		mutex_enter(mp);
+		mutex_enter(&p->p_lock);
 		mutex_exit(&pidlock);
-		/*
-		 * If the process is in some half-baked state, fail.
-		 */
-		if (p->p_stat == SZOMB || p->p_stat == SIDL ||
-		    (p->p_flag & (SEXITING | SEXITLWPS))) {
-			mutex_exit(mp);
-			return (NULL);
-		}
+
 		if (panicstr)
 			return (p);
-		if (!(p->p_proc_flag & P_PR_LOCK))
+
+		ret = sprtrylock_proc(p);
+		if (ret == -1) {
+			mutex_exit(&p->p_lock);
+			return (NULL);
+		} else if (ret == 0) {
 			break;
-		cv_wait(&pr_pid_cv[p->p_slot], mp);
-		mutex_exit(mp);
+		}
+		sprwaitlock_proc(p);
 	}
-	p->p_proc_flag |= P_PR_LOCK;
-	THREAD_KPRI_REQUEST();
 	return (p);
 }
 

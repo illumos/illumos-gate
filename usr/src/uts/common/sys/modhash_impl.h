@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,6 +91,18 @@ struct mod_hash {
  * Module initialization; called once.
  */
 void mod_hash_init(void);
+
+/*
+ * Internal routines.  Use directly with care.
+ */
+uint_t i_mod_hash(mod_hash_t *, mod_hash_key_t);
+int i_mod_hash_insert_nosync(mod_hash_t *, mod_hash_key_t, mod_hash_val_t,
+    mod_hash_hndl_t);
+int i_mod_hash_remove_nosync(mod_hash_t *, mod_hash_key_t, mod_hash_val_t *);
+int i_mod_hash_find_nosync(mod_hash_t *, mod_hash_key_t, mod_hash_val_t *);
+void i_mod_hash_walk_nosync(mod_hash_t *, uint_t (*)(mod_hash_key_t,
+    mod_hash_val_t *, void *), void *);
+void i_mod_hash_clear_nosync(mod_hash_t *hash);
 
 #endif /* _KERNEL */
 

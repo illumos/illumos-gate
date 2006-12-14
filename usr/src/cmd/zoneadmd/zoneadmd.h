@@ -106,7 +106,7 @@ extern void eventstream_write(zone_evt_t evt);
  */
 extern zoneid_t vplat_create(zlog_t *, boolean_t);
 extern int vplat_bringup(zlog_t *, boolean_t, zoneid_t);
-extern int vplat_teardown(zlog_t *, boolean_t);
+extern int vplat_teardown(zlog_t *, boolean_t, boolean_t);
 
 /*
  * Console subsystem routines.

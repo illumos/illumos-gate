@@ -113,6 +113,7 @@
 #include <sys/policy.h>
 #include <sys/condvar_impl.h>
 #include <sys/mutex_impl.h>
+#include <sys/rctl.h>
 
 #include <vm/as.h>
 #include <vm/hat.h>
@@ -729,12 +730,22 @@ set_anoninfo(void)
  * Return non-zero on success.
  */
 int
-anon_resvmem(size_t size, uint_t takemem)
+anon_resvmem(size_t size, boolean_t takemem, zone_t *zone)
 {
 	pgcnt_t npages = btopr(size);
 	pgcnt_t mswap_pages = 0;
 	pgcnt_t pswap_pages = 0;
+	proc_t *p = curproc;
 
+	if (zone != NULL && takemem) {
+		/* test zone.max-swap resource control */
+		mutex_enter(&p->p_lock);
+		if (rctl_incr_swap(p, zone, ptob(npages)) != 0) {
+			mutex_exit(&p->p_lock);
+			return (0);
+		}
+		mutex_exit(&p->p_lock);
+	}
 	mutex_enter(&anoninfo_lock);
 
 	/*
@@ -834,16 +845,17 @@ anon_resvmem(size_t size, uint_t takemem)
 		mutex_exit(&anoninfo_lock);
 		ANON_PRINT(A_RESV,
 			("anon_resvmem: not enough space from swapfs\n"));
+		if (zone != NULL && takemem)
+			rctl_decr_swap(zone, ptob(npages));
 		return (0);
 	}
 }
-
 
 /*
  * Give back an anon reservation.
  */
 void
-anon_unresv(size_t size)
+anon_unresvmem(size_t size, zone_t *zone)
 {
 	pgcnt_t npages = btopr(size);
 	spgcnt_t mem_free_pages = 0;
@@ -851,6 +863,8 @@ anon_unresv(size_t size)
 #ifdef	ANON_DEBUG
 	pgcnt_t mem_resv;
 #endif
+	if (zone != NULL)
+		rctl_decr_swap(zone, size);
 
 	mutex_enter(&anoninfo_lock);
 

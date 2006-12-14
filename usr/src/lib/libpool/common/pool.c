@@ -914,10 +914,34 @@ pool_put_property(pool_conf_t *conf, pool_elem_t *pe, const char *name,
 		return (NULL);
 	}
 
-	if (!is_valid_prop_name(name)) {
+	/* Don't allow (re)setting of the "temporary" property */
+	if (!is_valid_prop_name(name) || strstr(name, ".temporary") != NULL) {
 		pool_seterror(POE_BADPARAM);
 		return (PO_FAIL);
 	}
+
+	/* Don't allow rename of temporary pools/resources */
+	if (strstr(name, ".name") != NULL && elem_is_tmp(pe)) {
+		boolean_t rename = B_TRUE;
+		pool_value_t *pv = pool_value_alloc();
+
+		if (pe->pe_get_prop(pe, name, pv) != POC_INVAL) {
+			const char *s1 = NULL;
+			const char *s2 = NULL;
+
+			(void) pool_value_get_string(pv, &s1);
+			(void) pool_value_get_string(val, &s2);
+			if (s1 != NULL && s2 != NULL && strcmp(s1, s2) == 0)
+				rename = B_FALSE;
+		}
+		pool_value_free(pv);
+
+		if (rename) {
+			pool_seterror(POE_BADPARAM);
+			return (PO_FAIL);
+		}
+	}
+
 	/*
 	 * Check to see if this is a property we are managing. If it is,
 	 * ensure that we are happy with what the user is doing.
@@ -933,6 +957,46 @@ pool_put_property(pool_conf_t *conf, pool_elem_t *pe, const char *name,
 	}
 
 	return (pe->pe_put_prop(pe, name, val));
+}
+
+/*
+ * Set temporary property to flag as a temporary element.
+ *
+ * PO_FAIL is returned if an error is detected and the error code is updated
+ * to indicate the cause of the error.
+ */
+int
+pool_set_temporary(pool_conf_t *conf, pool_elem_t *pe)
+{
+	int res;
+	char name[128];
+	pool_value_t *val;
+
+	if (pool_conf_check(conf) != PO_SUCCESS)
+		return (PO_FAIL);
+
+	if (TO_CONF(pe) != conf) {
+		pool_seterror(POE_BADPARAM);
+		return (PO_FAIL);
+	}
+
+	/* create property name based on element type */
+	if (snprintf(name, sizeof (name), "%s.temporary",
+	    pool_elem_class_string(pe)) > sizeof (name)) {
+		pool_seterror(POE_SYSTEM);
+		return (PO_FAIL);
+	}
+
+	if ((val = pool_value_alloc()) == NULL)
+		return (PO_FAIL);
+
+	pool_value_set_bool(val, (uchar_t)1);
+
+	res = pe->pe_put_prop(pe, name, val);
+
+	pool_value_free(val);
+
+	return (res);
 }
 
 /*
@@ -1030,6 +1094,12 @@ pool_rm_property(pool_conf_t *conf, pool_elem_t *pe, const char *name)
 		return (NULL);
 	}
 
+	/* Don't allow removal of the "temporary" property */
+	if (strstr(name, ".temporary") != NULL) {
+		pool_seterror(POE_BADPARAM);
+		return (PO_FAIL);
+	}
+
 	/*
 	 * Check to see if this is a property we are managing. If it is,
 	 * ensure that we are happy with what the user is doing.
@@ -1122,6 +1192,17 @@ pool_create(pool_conf_t *conf, const char *name)
 		pool_seterror(POE_PUTPROP);
 		return (NULL);
 	}
+
+	/*
+	 * If we are creating a temporary pool configuration, flag the pool.
+	 */
+	if (conf->pc_prov->pc_oflags & PO_TEMP) {
+		if (pool_set_temporary(conf, pe) == PO_FAIL) {
+			(void) pool_destroy(conf, pool_elem_pool(pe));
+			return (NULL);
+		}
+	}
+
 	return (pool_elem_pool(pe));
 }
 
@@ -1227,6 +1308,17 @@ pool_resource_create(pool_conf_t *conf, const char *sz_type, const char *name)
 			return (NULL);
 		}
 	}
+
+	/*
+	 * If we are creating a temporary pool configuration, flag the resource.
+	 */
+	if (conf->pc_prov->pc_oflags & PO_TEMP) {
+		if (pool_set_temporary(conf, pe) != PO_SUCCESS) {
+			(void) pool_resource_destroy(conf, pool_elem_res(pe));
+			return (NULL);
+		}
+	}
+
 	return (pool_elem_res(pe));
 }
 
@@ -1396,7 +1488,8 @@ pool_conf_open(pool_conf_t *conf, const char *location, int oflags)
 		pool_seterror(POE_BADPARAM);
 		return (PO_FAIL);
 	}
-	if (oflags & ~(PO_RDONLY | PO_RDWR | PO_CREAT | PO_DISCO | PO_UPDATE)) {
+	if (oflags & ~(PO_RDONLY | PO_RDWR | PO_CREAT | PO_DISCO | PO_UPDATE |
+	    PO_TEMP)) {
 		pool_seterror(POE_BADPARAM);
 		return (PO_FAIL);
 	}
@@ -1408,6 +1501,10 @@ pool_conf_open(pool_conf_t *conf, const char *location, int oflags)
 	if (oflags & PO_CREAT)
 		oflags |= PO_RDWR;
 
+	/* location is ignored when creating a temporary configuration */
+	if (oflags & PO_TEMP)
+		location = "";
+
 	if ((conf->pc_location = strdup(location)) == NULL) {
 		pool_seterror(POE_SYSTEM);
 		return (PO_FAIL);
@@ -1415,14 +1512,25 @@ pool_conf_open(pool_conf_t *conf, const char *location, int oflags)
 	/*
 	 * This is the crossover point into the actual data provider
 	 * implementation, allocate a data provider of the appropriate
-	 * type for your data storage medium. In this case it's a kernel
-	 * data provider. To use a different data provider, write some
-	 * code to implement all the required interfaces and then
-	 * change the next line to allocate a data provider which uses your
-	 * new code. All data provider routines can be static, apart from
-	 * the allocation routine.
+	 * type for your data storage medium. In this case it's either a kernel
+	 * or xml data provider. To use a different data provider, write some
+	 * code to implement all the required interfaces and then change the
+	 * following code to allocate a data provider which uses your new code.
+	 * All data provider routines can be static, apart from the allocation
+	 * routine.
+	 *
+	 * For temporary pools (PO_TEMP) we start with a copy of the current
+	 * dynamic configuration and do all of the updates in-memory.
 	 */
-	if (strcmp(location, pool_dynamic_location()) == 0) {
+	if (oflags & PO_TEMP) {
+		if (pool_knl_connection_alloc(conf, PO_TEMP) != PO_SUCCESS) {
+			conf->pc_state = POF_INVALID;
+			return (PO_FAIL);
+		}
+		/* set rdwr flag so we can updated the in-memory config. */
+		conf->pc_prov->pc_oflags |= PO_RDWR;
+
+	} else if (strcmp(location, pool_dynamic_location()) == 0) {
 		if (pool_knl_connection_alloc(conf, oflags) != PO_SUCCESS) {
 			conf->pc_state = POF_INVALID;
 			return (PO_FAIL);

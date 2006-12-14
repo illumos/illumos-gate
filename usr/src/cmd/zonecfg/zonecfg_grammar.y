@@ -60,15 +60,17 @@ extern void yyerror(char *s);
 %token COMMIT REVERT EXIT SEMICOLON TOKEN ZONENAME ZONEPATH AUTOBOOT POOL NET
 %token FS IPD ATTR DEVICE RCTL SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL
 %token NAME MATCH PRIV LIMIT ACTION VALUE EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
-%token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS BRAND
+%token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS BRAND PSET
+%token MCAP NCPUS IMPORTANCE SHARES MAXLWPS MAXSHMMEM MAXSHMIDS MAXMSGIDS
+%token MAXSEMIDS LOCKED SWAP SCHED CLEAR
 
 %type <strval> TOKEN EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
     property_value OPEN_PAREN CLOSE_PAREN COMMA simple_prop_val
 %type <complex> complex_piece complex_prop_val
-%type <ival> resource_type NET FS IPD DEVICE RCTL ATTR
+%type <ival> resource_type NET FS IPD DEVICE RCTL ATTR DATASET PSET MCAP
 %type <ival> property_name SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL NAME
     MATCH ZONENAME ZONEPATH AUTOBOOT POOL LIMITPRIV BOOTARGS VALUE PRIV LIMIT
-    ACTION BRAND
+    ACTION BRAND SCHED
 %type <cmd> command
 %type <cmd> add_command ADD
 %type <cmd> cancel_command CANCEL
@@ -84,6 +86,7 @@ extern void yyerror(char *s);
 %type <cmd> revert_command REVERT
 %type <cmd> select_command SELECT
 %type <cmd> set_command SET
+%type <cmd> clear_command CLEAR
 %type <cmd> verify_command VERIFY
 %type <cmd> terminator
 
@@ -126,6 +129,7 @@ commands: command terminator
 
 command: add_command
 	| cancel_command
+	| clear_command
 	| create_command
 	| commit_command
 	| delete_command
@@ -465,6 +469,69 @@ info_command:	INFO
 		$$->cmd_res_type = RT_BOOTARGS;
 		$$->cmd_prop_nv_pairs = 0;
 	}
+	|	INFO SCHED
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_SCHED;
+		$$->cmd_prop_nv_pairs = 0;
+	}
+	|	INFO SHARES
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_SHARES;
+		$$->cmd_prop_nv_pairs = 0;
+	}
+	|	INFO MAXLWPS
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_MAXLWPS;
+		$$->cmd_prop_nv_pairs = 0;
+	}
+	|	INFO MAXSHMMEM
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_MAXSHMMEM;
+		$$->cmd_prop_nv_pairs = 0;
+	}
+	|	INFO MAXSHMIDS
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_MAXSHMIDS;
+		$$->cmd_prop_nv_pairs = 0;
+	}
+	|	INFO MAXMSGIDS
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_MAXMSGIDS;
+		$$->cmd_prop_nv_pairs = 0;
+	}
+	|	INFO MAXSEMIDS
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_MAXSEMIDS;
+		$$->cmd_prop_nv_pairs = 0;
+	}
 	|	INFO resource_type property_name EQUAL property_value
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -512,10 +579,31 @@ remove_command: REMOVE
 		usage(FALSE, HELP_RES_PROPS);
 		YYERROR;
 	}
-	| REMOVE resource_type
+	| REMOVE TOKEN
 	{
 		short_usage(CMD_REMOVE);
+		(void) fputs("\n", stderr);
+		usage(FALSE, HELP_RES_PROPS);
 		YYERROR;
+	}
+	| REMOVE resource_type
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &remove_func;
+		$$->cmd_res_type = $2;
+	}
+	| REMOVE TOKEN resource_type
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &remove_func;
+		$$->cmd_res_type = $3;
+		$$->cmd_argc = 1;
+		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[1] = NULL;
 	}
 	| REMOVE property_name property_value
 	{
@@ -593,6 +681,22 @@ select_command: SELECT
 		(void) fputs("\n", stderr);
 		usage(FALSE, HELP_RES_PROPS);
 		YYERROR;
+	}
+	| SELECT PSET
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &select_func;
+		$$->cmd_res_type = RT_DCPU;
+	}
+	| SELECT MCAP
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &select_func;
+		$$->cmd_res_type = RT_MCAP;
 	}
 	| SELECT resource_type
 	{
@@ -682,6 +786,22 @@ set_command: SET
 		$$->cmd_property_ptr[0] = &property[0];
 	}
 
+clear_command: CLEAR
+	{
+		short_usage(CMD_CLEAR);
+		(void) fputs("\n", stderr);
+		usage(FALSE, HELP_PROPS);
+		YYERROR;
+	}
+	| CLEAR property_name
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &clear_func;
+		$$->cmd_res_type = $2;
+	}
+
 verify_command: VERIFY
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -709,6 +829,8 @@ resource_type: NET	{ $$ = RT_NET; }
 	| RCTL		{ $$ = RT_RCTL; }
 	| ATTR		{ $$ = RT_ATTR; }
 	| DATASET	{ $$ = RT_DATASET; }
+	| PSET		{ $$ = RT_DCPU; }
+	| MCAP		{ $$ = RT_MCAP; }
 
 property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| RAW		{ $$ = PT_RAW; }
@@ -730,6 +852,17 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| LIMIT		{ $$ = PT_LIMIT; }
 	| ACTION	{ $$ = PT_ACTION; }
 	| BRAND		{ $$ = PT_BRAND; }
+	| NCPUS		{ $$ = PT_NCPUS; }
+	| LOCKED	{ $$ = PT_LOCKED; }
+	| SWAP		{ $$ = PT_SWAP; }
+	| IMPORTANCE	{ $$ = PT_IMPORTANCE; }
+	| SHARES	{ $$ = PT_SHARES; }
+	| MAXLWPS	{ $$ = PT_MAXLWPS; }
+	| MAXSHMMEM	{ $$ = PT_MAXSHMMEM; }
+	| MAXSHMIDS	{ $$ = PT_MAXSHMIDS; }
+	| MAXMSGIDS	{ $$ = PT_MAXMSGIDS; }
+	| MAXSEMIDS	{ $$ = PT_MAXSEMIDS; }
+	| SCHED		{ $$ = PT_SCHED; }
 
 /*
  * The grammar builds data structures from the bottom up.  Thus various

@@ -90,6 +90,15 @@ extern "C" {
 #define	Z_PRIV_REQUIRED		38	/* required privilege is missing */
 #define	Z_PRIV_UNKNOWN		39	/* specified privilege is unknown */
 #define	Z_BRAND_ERROR		40	/* brand-specific error */
+#define	Z_INCOMPATIBLE		41	/* incompatible settings */
+#define	Z_ALIAS_DISALLOW	42	/* rctl alias disallowed */
+#define	Z_CLEAR_DISALLOW	43	/* clear property disallowed */
+#define	Z_POOL			44	/* generic libpool error */
+#define	Z_POOLS_NOT_ACTIVE	45	/* pool service not enabled */
+#define	Z_POOL_ENABLE		46	/* pools enable failed */
+#define	Z_NO_POOL		47	/* no such pool configured */
+#define	Z_POOL_CREATE		48	/* pool create failed */
+#define	Z_POOL_BIND		49	/* pool bind failed */
 
 /*
  * Warning: these are shared with the admin/install consolidation.
@@ -124,6 +133,18 @@ extern "C" {
 
 /* The maximum length of the VERSION string in the pkginfo(4) file. */
 #define	ZONE_PKG_VERSMAX	256
+
+/*
+ * Shortened alias names for the zones rctls.
+ */
+#define	ALIAS_MAXLWPS		"max-lwps"
+#define	ALIAS_MAXSHMMEM		"max-shm-memory"
+#define	ALIAS_MAXSHMIDS		"max-shm-ids"
+#define	ALIAS_MAXMSGIDS		"max-msg-ids"
+#define	ALIAS_MAXSEMIDS		"max-sem-ids"
+#define	ALIAS_MAXLOCKEDMEM	"locked"
+#define	ALIAS_MAXSWAP		"swap"
+#define	ALIAS_SHARES		"cpu-shares"
 
 /*
  * Bit flag definitions for passing into libzonecfg functions.
@@ -190,6 +211,16 @@ struct zone_dstab {
 	char	zone_dataset_name[MAXNAMELEN];
 };
 
+struct zone_psettab {
+	char	zone_ncpu_min[MAXNAMELEN];
+	char	zone_ncpu_max[MAXNAMELEN];
+	char	zone_importance[MAXNAMELEN];
+};
+
+struct zone_mcaptab {
+	char	zone_physmem_cap[MAXNAMELEN];
+};
+
 struct zone_pkgtab {
 	char	zone_pkg_name[MAXNAMELEN];
 	char	zone_pkg_version[ZONE_PKG_VERSMAX];
@@ -227,10 +258,17 @@ extern	int	zonecfg_access(const char *, int);
 extern	void	zonecfg_set_root(const char *);
 extern	const char *zonecfg_get_root(void);
 extern	boolean_t zonecfg_in_alt_root(void);
+extern	int	zonecfg_num_resources(zone_dochandle_t, char *);
+extern	int	zonecfg_del_all_resources(zone_dochandle_t, char *);
+extern	boolean_t zonecfg_valid_ncpus(char *, char *);
+extern	boolean_t zonecfg_valid_importance(char *);
+extern	int	zonecfg_str_to_bytes(char *, uint64_t *);
+extern	boolean_t zonecfg_valid_memlimit(char *, uint64_t *);
+extern	boolean_t zonecfg_valid_alias_limit(char *, char *, uint64_t *);
 
 /*
- * Zone name, path to zone directory, autoboot setting, pool and boot
- * arguments.
+ * Zone name, path to zone directory, autoboot setting, pool, boot
+ * arguments, and scheduling-class.
  */
 extern	int	zonecfg_validate_zonename(const char *);
 extern	int	zonecfg_get_name(zone_dochandle_t, char *, size_t);
@@ -243,6 +281,9 @@ extern	int	zonecfg_get_pool(zone_dochandle_t, char *, size_t);
 extern	int	zonecfg_set_pool(zone_dochandle_t, char *);
 extern	int	zonecfg_get_bootargs(zone_dochandle_t, char *, size_t);
 extern	int	zonecfg_set_bootargs(zone_dochandle_t, char *);
+extern	int	zonecfg_get_sched_class(zone_dochandle_t, char *, size_t);
+extern	int	zonecfg_set_sched(zone_dochandle_t, char *);
+extern	int	zonecfg_get_dflt_sched_class(zone_dochandle_t, char *, int);
 
 /*
  * Set/retrieve the brand for the zone
@@ -302,6 +343,11 @@ extern	int	zonecfg_add_rctl_value(struct zone_rctltab *,
 extern	int	zonecfg_remove_rctl_value(struct zone_rctltab *,
     struct zone_rctlvaltab *);
 extern	void	zonecfg_free_rctl_value_list(struct zone_rctlvaltab *);
+extern	boolean_t zonecfg_aliased_rctl_ok(zone_dochandle_t, char *);
+extern	int	zonecfg_set_aliased_rctl(zone_dochandle_t, char *, uint64_t);
+extern	int	zonecfg_get_aliased_rctl(zone_dochandle_t, char *, uint64_t *);
+extern	int	zonecfg_rm_aliased_rctl(zone_dochandle_t, char *);
+extern	int	zonecfg_apply_rctls(char *, zone_dochandle_t);
 
 /*
  * Generic attribute configuration and type/value extraction.
@@ -326,6 +372,34 @@ extern	int	zonecfg_delete_ds(zone_dochandle_t, struct zone_dstab *);
 extern	int	zonecfg_modify_ds(zone_dochandle_t, struct zone_dstab *,
     struct zone_dstab *);
 extern	int	zonecfg_lookup_ds(zone_dochandle_t, struct zone_dstab *);
+
+/*
+ * cpu-set configuration.
+ */
+extern	int	zonecfg_add_pset(zone_dochandle_t, struct zone_psettab *);
+extern	int	zonecfg_delete_pset(zone_dochandle_t);
+extern	int	zonecfg_modify_pset(zone_dochandle_t, struct zone_psettab *);
+extern	int	zonecfg_lookup_pset(zone_dochandle_t, struct zone_psettab *);
+
+/*
+ * mem-cap configuration.
+ */
+extern	int	zonecfg_delete_mcap(zone_dochandle_t);
+extern	int	zonecfg_modify_mcap(zone_dochandle_t, struct zone_mcaptab *);
+extern	int	zonecfg_lookup_mcap(zone_dochandle_t, struct zone_mcaptab *);
+
+/*
+ * Temporary pool support functions.
+ */
+extern	int	zonecfg_destroy_tmp_pool(char *, char *, int);
+extern	int	zonecfg_bind_tmp_pool(zone_dochandle_t, zoneid_t, char *, int);
+extern	int	zonecfg_bind_pool(zone_dochandle_t, zoneid_t, char *, int);
+extern	boolean_t zonecfg_warn_poold(zone_dochandle_t);
+
+/*
+ * Miscellaneous utility functions.
+ */
+extern	int	zonecfg_enable_rcapd(char *, int);
 
 /*
  * attach/detach support.
@@ -373,6 +447,8 @@ extern	int	zonecfg_endrctlent(zone_dochandle_t);
 extern	int	zonecfg_setdsent(zone_dochandle_t);
 extern	int	zonecfg_getdsent(zone_dochandle_t, struct zone_dstab *);
 extern	int	zonecfg_enddsent(zone_dochandle_t);
+extern	int	zonecfg_getpsetent(zone_dochandle_t, struct zone_psettab *);
+extern	int	zonecfg_getmcapent(zone_dochandle_t, struct zone_mcaptab *);
 extern	int	zonecfg_setpkgent(zone_dochandle_t);
 extern	int	zonecfg_getpkgent(zone_dochandle_t, struct zone_pkgtab *);
 extern	int	zonecfg_endpkgent(zone_dochandle_t);

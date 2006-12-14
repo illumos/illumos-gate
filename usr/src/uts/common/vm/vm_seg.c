@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,12 +53,14 @@
 #include <sys/cmn_err.h>
 #include <sys/callb.h>
 #include <sys/mem_config.h>
+#include <sys/mman.h>
 
 #include <vm/hat.h>
 #include <vm/as.h>
 #include <vm/seg.h>
 #include <vm/seg_kmem.h>
-
+#include <vm/seg_spt.h>
+#include <vm/seg_vn.h>
 /*
  * kstats for segment advise
  */
@@ -949,4 +950,49 @@ seg_pinit_mem_config(void)
 	 * it more likely that the pages can be collected.
 	 */
 	ASSERT(ret == 0);
+}
+
+extern struct seg_ops segvn_ops;
+extern struct seg_ops segspt_shmops;
+
+/*
+ * Verify that segment is not a shared anonymous segment which reserves
+ * swap.  zone.max-swap accounting (zone->zone_max_swap) cannot be transfered
+ * from one zone to another if any segments are shared.  This is because the
+ * last process to exit will credit the swap reservation.  This could lead
+ * to the swap being reserved by one zone, and credited to another.
+ */
+boolean_t
+seg_can_change_zones(struct seg *seg)
+{
+	struct segvn_data *svd;
+
+	if (seg->s_ops == &segspt_shmops)
+		return (B_FALSE);
+
+	if (seg->s_ops == &segvn_ops) {
+		svd = (struct segvn_data *)seg->s_data;
+		if (svd->type == MAP_SHARED &&
+		    svd->amp != NULL &&
+		    svd->amp->swresv > 0)
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+/*
+ * Return swap reserved by a segment backing a private mapping.
+ */
+size_t
+seg_swresv(struct seg *seg)
+{
+	struct segvn_data *svd;
+	size_t swap = 0;
+
+	if (seg->s_ops == &segvn_ops) {
+		svd = (struct segvn_data *)seg->s_data;
+		if (svd->type == MAP_PRIVATE && svd->swresv > 0)
+			swap = svd->swresv;
+	}
+	return (swap);
 }

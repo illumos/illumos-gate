@@ -404,7 +404,7 @@ const struct systable systable[] = {
 {"kaio",	7, DEC, NOV, AIO, HEX, HEX, HEX, HEX, HEX, HEX}, /* 178 */
 {"cpc",		5, DEC, NOV, CPC, DEC, HEX, HEX, HEX},		/* 179 */
 {"lgrpsys",	3, DEC, NOV, DEC, DEC, HEX},			/* 180 */
-{"rusagesys",	2, DEC, NOV, DEC, HEX},				/* 181 */
+{"rusagesys",	5, DEC, NOV, DEC, HEX, DEC, HEX, HEX},		/* 181 */
 {"portfs",	6, HEX, HEX, DEC, HEX, HEX, HEX, HEX, HEX},	/* 182 */
 {"pollsys",	4, DEC, NOV, HEX, DEC, HEX, HEX},		/* 183 */
 {"labelsys",	2, DEC, NOV, DEC, HEX},				/* 184 */
@@ -761,6 +761,7 @@ static	const	struct systable rusagesystable[] = {
 {"getrusage",		2, DEC, NOV, HID, HEX},			/* 0 */
 {"getrusage_chld",	2, DEC, NOV, HID, HEX},			/* 1 */
 {"getrusage_lwp",	2, DEC, NOV, HID, HEX},			/* 2 */
+{"getvmusage",		5, DEC, NOV, HID, HEX, DEC, HEX, HEX},	/* 3 */
 };
 #define	NRUSAGESYSCODE \
 		(sizeof (rusagesystable) / sizeof (struct systable))
@@ -942,6 +943,7 @@ const	struct sysalias sysalias[] = {
 	{ "getrusage",		SYS_rusagesys	},
 	{ "getrusage_chld",	SYS_rusagesys	},
 	{ "getrusage_lwp",	SYS_rusagesys	},
+	{ "getvmusage",		SYS_rusagesys	},
 	{ "getpeerucred",	SYS_ucredsys	},
 	{ "ucred_get",		SYS_ucredsys	},
 	{ "port_create",	SYS_port	},
@@ -956,6 +958,7 @@ const	struct sysalias sysalias[] = {
 	{ "zone_create",	SYS_zone	},
 	{ "zone_destroy",	SYS_zone	},
 	{ "zone_getattr",	SYS_zone	},
+	{ "zone_setattr",	SYS_zone	},
 	{ "zone_enter",		SYS_zone	},
 	{ "getzoneid",		SYS_zone	},
 	{ "zone_list",		SYS_zone	},

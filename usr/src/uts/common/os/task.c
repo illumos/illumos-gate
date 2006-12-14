@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -389,7 +388,7 @@ task_create(projid_t projid, zone_t *zone)
 	tk->tk_nlwps = 0;
 	tk->tk_nlwps_ctl = INT_MAX;
 	tk->tk_usage = tu;
-	tk->tk_proj = project_hold_by_id(projid, zone->zone_id,
+	tk->tk_proj = project_hold_by_id(projid, zone,
 	    PROJECT_HOLD_INSERT);
 	tk->tk_flags = TASK_NORMAL;
 
@@ -848,7 +847,7 @@ task_init(void)
 
 	task0p->tk_tkid = id_alloc(taskid_space);
 	task0p->tk_usage = kmem_zalloc(sizeof (task_usage_t), KM_SLEEP);
-	task0p->tk_proj = project_hold_by_id(0, GLOBAL_ZONEID,
+	task0p->tk_proj = project_hold_by_id(0, &zone0,
 	    PROJECT_HOLD_INSERT);
 	task0p->tk_flags = TASK_NORMAL;
 	task0p->tk_nlwps = p->p_lwpcnt;

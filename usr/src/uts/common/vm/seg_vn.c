@@ -2323,8 +2323,9 @@ segvn_faultpage(
 			 * zeroes. If no advance reservations, reserve now.
 			 */
 			if (svd->flags & MAP_NORESERVE) {
-				if (anon_resv(ptob(1))) {
-					svd->swresv += ptob(1);
+				if (anon_resv_zone(ptob(1),
+				    seg->s_as->a_proc->p_zone)) {
+					atomic_add_long(&svd->swresv, ptob(1));
 				} else {
 					err = ENOMEM;
 					goto out;

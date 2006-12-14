@@ -56,9 +56,11 @@ f none etc/zones/SUNWblank.xml 444 root bin
 d none lib 755 root bin
 d none lib/svc 0755 root bin
 d none lib/svc/method 0755 root bin
+f none lib/svc/method/svc-resource-mgmt 0555 root bin
 f none lib/svc/method/svc-zones 0555 root bin
 d none var 755 root sys
 d none var/svc 755 root sys
 d none var/svc/manifest 755 root sys
 d none var/svc/manifest/system 755 root sys
+f manifest var/svc/manifest/system/resource-mgmt.xml 0444 root sys
 f manifest var/svc/manifest/system/zones.xml 0444 root sys
