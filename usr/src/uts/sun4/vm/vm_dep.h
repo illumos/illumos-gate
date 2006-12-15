@@ -630,6 +630,7 @@ struct vmm_vmstats_str {
 	ulong_t ppr_relocnolock[MMU_PAGE_SIZES];
 	ulong_t ppr_relocnomem[MMU_PAGE_SIZES];
 	ulong_t ppr_krelocfail[MMU_PAGE_SIZES];
+	ulong_t ppr_copyfail;
 	/* page coalesce counter */
 	ulong_t	page_ctrs_coalesce[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
 	/* candidates useful */

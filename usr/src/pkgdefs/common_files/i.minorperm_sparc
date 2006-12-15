@@ -312,6 +312,7 @@ fbt:fbt
 profile:profile
 sdt:sdt
 systrace:systrace
+physmem:*
 EOF
 }
 

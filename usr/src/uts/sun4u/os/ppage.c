@@ -366,6 +366,8 @@ ppcopy_common(page_t *fm_pp, page_t *to_pp)
 	caddr_t fm_va, to_va;
 	caddr_t	*fm_slot, *to_slot;
 	processorid_t cpu;
+	label_t ljb;
+	int ret = 1;
 
 	ASSERT(PAGE_LOCKED(fm_pp));
 	ASSERT(PAGE_LOCKED(to_pp));
@@ -391,12 +393,18 @@ ppcopy_common(page_t *fm_pp, page_t *to_pp)
 		kpreempt_enable();
 		return (0);
 	}
+	if (on_fault(&ljb)) {
+		ret = 0;
+		goto faulted;
+	}
 	hwblkpagecopy(fm_va, to_va);
+	no_fault();
+faulted:
 	ASSERT(CPU->cpu_id == cpu);
 	pp_unload_tlb(fm_slot, fm_va);
 	pp_unload_tlb(to_slot, to_va);
 	kpreempt_enable();
-	return (1);
+	return (ret);
 }
 
 /*
@@ -425,22 +433,33 @@ ppcopy_kernel__relocatable(page_t *fm_pp, page_t *to_pp)
  *
  * Try to use per cpu mapping first, if that fails then call pp_mapin
  * to load it.
+ *
+ * Returns one on success or zero on some sort of fault while doing the copy.
  */
-void
+int
 ppcopy(page_t *fm_pp, page_t *to_pp)
 {
 	caddr_t fm_va, to_va;
+	label_t ljb;
+	int ret = 1;
 
 	/* Try the fast path first */
 	if (ppcopy_common(fm_pp, to_pp))
-		return;
+		return (1);
 
 	/* Fast path failed, so we need to do the slow path. */
 	fm_va = ppmapin(fm_pp, PROT_READ, (caddr_t)-1);
 	to_va = ppmapin(to_pp, PROT_READ | PROT_WRITE, fm_va);
+	if (on_fault(&ljb)) {
+		ret = 0;
+		goto faulted;
+	}
 	bcopy(fm_va, to_va, PAGESIZE);
+	no_fault();
+faulted:
 	ppmapout(fm_va);
 	ppmapout(to_va);
+	return (ret);
 }
 
 /*

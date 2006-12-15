@@ -262,6 +262,11 @@ pgcnt_t	kcage_pagets;
 #define	KCAGEPAGETS_INC()
 #endif
 
+/* kstats to export what pages are currently caged */
+kmutex_t kcage_kstat_lock;
+static int kcage_kstat_update(kstat_t *ksp, int rw);
+static int kcage_kstat_snapshot(kstat_t *ksp, void *buf, int rw);
+
 /*
  * Startup and Dynamic Reconfiguration interfaces.
  * kcage_range_lock()
@@ -873,6 +878,8 @@ kcage_init(pgcnt_t preferred_size)
 	pgcnt_t wanted;
 	pfn_t pfn;
 	page_t *pp;
+	kstat_t *ksp;
+
 	extern struct vnode kvp;
 	extern void page_list_noreloc_startup(page_t *);
 
@@ -981,6 +988,83 @@ kcage_init(pgcnt_t preferred_size)
 			page_freelist_coalesce_all(mnode);
 		}
 	}
+
+	ksp = kstat_create("kcage", 0, "kcage_page_list", "misc",
+	    KSTAT_TYPE_RAW, 0, KSTAT_FLAG_VAR_SIZE | KSTAT_FLAG_VIRTUAL);
+	if (ksp != NULL) {
+		ksp->ks_update = kcage_kstat_update;
+		ksp->ks_snapshot = kcage_kstat_snapshot;
+		ksp->ks_lock = &kcage_kstat_lock; /* XXX - not really needed */
+		kstat_install(ksp);
+	}
+
+}
+
+static int
+kcage_kstat_update(kstat_t *ksp, int rw)
+{
+	struct kcage_glist *lp;
+	uint_t count;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	count = 0;
+	kcage_range_lock();
+	for (lp = kcage_glist; lp != NULL; lp = lp->next) {
+		if (lp->decr) {
+			if (lp->curr != lp->lim) {
+				count++;
+			}
+		} else {
+			if (lp->curr != lp->base) {
+				count++;
+			}
+		}
+	}
+	kcage_range_unlock();
+
+	ksp->ks_ndata = count;
+	ksp->ks_data_size = count * 2 * sizeof (uint64_t);
+
+	return (0);
+}
+
+static int
+kcage_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
+{
+	struct kcage_glist *lp;
+	struct memunit {
+		uint64_t address;
+		uint64_t size;
+	} *kspmem;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	ksp->ks_snaptime = gethrtime();
+
+	kspmem = (struct memunit *)buf;
+	kcage_range_lock();
+	for (lp = kcage_glist; lp != NULL; lp = lp->next, kspmem++) {
+		if ((caddr_t)kspmem >= (caddr_t)buf + ksp->ks_data_size)
+			break;
+
+		if (lp->decr) {
+			if (lp->curr != lp->lim) {
+				kspmem->address = ptob(lp->curr);
+				kspmem->size = ptob(lp->lim - lp->curr);
+			}
+		} else {
+			if (lp->curr != lp->base) {
+				kspmem->address = ptob(lp->base);
+				kspmem->size = ptob(lp->curr - lp->base);
+			}
+		}
+	}
+	kcage_range_unlock();
+
+	return (0);
 }
 
 void

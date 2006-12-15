@@ -97,6 +97,7 @@ f none kernel/drv/openeepr 755 root sys
 f none kernel/drv/options 755 root sys
 f none kernel/drv/pci_to_i2o 755 root sys
 f none kernel/drv/pci_to_i2o.conf 644 root sys
+f none kernel/drv/physmem 755 root sys
 f none kernel/drv/poll 755 root sys
 f none kernel/drv/pseudo 755 root sys
 f none kernel/drv/ptc 755 root sys
@@ -274,6 +275,7 @@ f none kernel/drv/amd64/mpt 755 root sys
 f none kernel/drv/amd64/mouse8042 755 root sys
 f none kernel/drv/amd64/openeepr 755 root sys
 f none kernel/drv/amd64/options 755 root sys
+f none kernel/drv/amd64/physmem 755 root sys
 f none kernel/drv/amd64/poll 755 root sys
 f none kernel/drv/amd64/pseudo 755 root sys
 f none kernel/drv/amd64/ptc 755 root sys

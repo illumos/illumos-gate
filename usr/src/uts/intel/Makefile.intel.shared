@@ -258,6 +258,7 @@ DRV_KMODS	+= mm
 DRV_KMODS	+= mouse8042
 DRV_KMODS	+= nca
 DRV_KMODS	+= openeepr
+DRV_KMODS	+= physmem
 DRV_KMODS	+= pm
 DRV_KMODS	+= poll
 DRV_KMODS	+= pool

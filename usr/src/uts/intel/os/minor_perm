@@ -139,3 +139,4 @@ chxge:* 0666 root sys
 pcn:* 0666 root sys
 rtls:* 0666 root sys
 ath:* 0666 root sys
+physmem:* 0600 root sys

@@ -933,6 +933,7 @@ f none usr/include/sys/pcmcia/pcser_var.h 644 root bin
 f none usr/include/sys/pcmcia.h 644 root bin
 f none usr/include/sys/pctypes.h 644 root bin
 f none usr/include/sys/pem.h 644 root bin
+f none usr/include/sys/physmem.h 644 root bin
 f none usr/include/sys/serializer.h 644 root bin
 f none usr/include/sys/pfmod.h 644 root bin
 f none usr/include/sys/pm.h 0644 root bin

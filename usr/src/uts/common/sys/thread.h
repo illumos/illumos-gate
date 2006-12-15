@@ -359,6 +359,7 @@ typedef struct _kthread {
 #define	T_WATCHPT	0x0400	/* thread undergoing a watchpoint emulation */
 #define	T_PANIC		0x0800	/* thread initiated a system panic */
 #define	T_DFLTSTK	0x1000	/* stack is default size */
+#define	T_CAPTURING	0x2000	/* thread is in page capture logic */
 
 /*
  * Flags in t_proc_flag.

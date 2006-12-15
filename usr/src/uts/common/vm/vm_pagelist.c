@@ -1487,7 +1487,7 @@ page_list_add_pages(page_t *pp, int flags)
 			kcage_freemem_add(pgcnt);
 #endif
 		for (i = 0; i < pgcnt; i++, pp++)
-			page_unlock_noretire(pp);
+			page_unlock_nocapture(pp);
 	}
 }
 
@@ -1935,7 +1935,7 @@ page_promote(int mnode, pfn_t pfnum, uchar_t new_szc, int flags, int mtype)
 			index = PAGE_HASH_FUNC(pp->p_vnode, pp->p_offset);
 			phm = PAGE_HASH_MUTEX(index);
 			if (!mutex_tryenter(phm)) {
-				page_unlock_noretire(pp);
+				page_unlock_nocapture(pp);
 				goto fail_promote;
 			}
 
@@ -1943,7 +1943,7 @@ page_promote(int mnode, pfn_t pfnum, uchar_t new_szc, int flags, int mtype)
 			page_hashout(pp, phm);
 			mutex_exit(phm);
 			PP_SETAGED(pp);
-			page_unlock_noretire(pp);
+			page_unlock_nocapture(pp);
 			which_list = PG_CACHE_LIST;
 		}
 		page_ctr_sub(mnode, mtype, pp, which_list);
@@ -2496,7 +2496,6 @@ page_freelist_split(uchar_t szc, uint_t color, int mnode, int mtype,
 	return (ret_pp);
 }
 
-
 /*
  * Helper routine used only by the freelist code to lock
  * a page. If the page is a large page then it succeeds in
@@ -2529,11 +2528,13 @@ page_trylock_cons(page_t *pp, se_t se)
 	while (tpp != pp) {
 		if (!page_trylock(tpp, se)) {
 			/*
-			 * On failure unlock what we
-			 * have locked so far.
+			 * On failure unlock what we have locked so far.
+			 * We want to avoid attempting to capture these
+			 * pages as the pcm mutex may be held which could
+			 * lead to a recursive mutex panic.
 			 */
 			while (first_pp != tpp) {
-				page_unlock_noretire(first_pp);
+				page_unlock_nocapture(first_pp);
 				first_pp = first_pp->p_next;
 			}
 			return (0);
@@ -2976,7 +2977,7 @@ skipptcpcheck:
 			while (--i != (pgcnt_t)-1) {
 				pp = &spp[i];
 				ASSERT(PAGE_EXCL(pp));
-				page_unlock_noretire(pp);
+				page_unlock_nocapture(pp);
 			}
 			return (0);
 		}
@@ -2985,7 +2986,7 @@ skipptcpcheck:
 		    !PP_ISFREE(pp)) {
 			VM_STAT_ADD(vmm_vmstats.ptcpfailszc[szc]);
 			ASSERT(i == 0);
-			page_unlock_noretire(pp);
+			page_unlock_nocapture(pp);
 			return (0);
 		}
 		if (PP_ISNORELOC(pp)) {
@@ -2993,7 +2994,7 @@ skipptcpcheck:
 			while (i != (pgcnt_t)-1) {
 				pp = &spp[i];
 				ASSERT(PAGE_EXCL(pp));
-				page_unlock_noretire(pp);
+				page_unlock_nocapture(pp);
 				i--;
 			}
 			return (0);
@@ -3088,7 +3089,7 @@ page_claim_contig_pages(page_t *pp, uchar_t szc, int flags)
 			 */
 			while (pgcnt--) {
 				ASSERT(PAGE_EXCL(pp));
-				page_unlock_noretire(pp);
+				page_unlock_nocapture(pp);
 				pp++;
 			}
 			/*
@@ -3103,7 +3104,7 @@ page_claim_contig_pages(page_t *pp, uchar_t szc, int flags)
 				ASSERT(PP_ISAGED(pp));
 				pp->p_szc = 0;
 				page_list_add(pp, PG_FREE_LIST | PG_LIST_TAIL);
-				page_unlock_noretire(pp);
+				page_unlock_nocapture(pp);
 			}
 
 			if (replpp != NULL)
@@ -3135,7 +3136,7 @@ page_claim_contig_pages(page_t *pp, uchar_t szc, int flags)
 			page_sub(&replpp, rpp);
 			ASSERT(PAGE_EXCL(rpp));
 			ASSERT(!PP_ISFREE(rpp));
-			page_unlock_noretire(rpp);
+			page_unlock_nocapture(rpp);
 		}
 		ASSERT(targpp == hpp);
 		ASSERT(replpp == NULL);
@@ -3149,7 +3150,6 @@ page_claim_contig_pages(page_t *pp, uchar_t szc, int flags)
  * Trim kernel cage from pfnlo-pfnhi and store result in lo-hi. Return code
  * of 0 means nothing left after trim.
  */
-
 int
 trimkcage(struct memseg *mseg, pfn_t *lo, pfn_t *hi, pfn_t pfnlo, pfn_t pfnhi)
 {

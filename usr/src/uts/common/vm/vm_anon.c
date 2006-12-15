@@ -2314,7 +2314,16 @@ anon_private(
 	 * which is locked and loaded in the MMU by
 	 * the caller to prevent yet another page fault.
 	 */
-	ppcopy(opp, pp);		/* XXX - should set mod bit in here */
+	/* XXX - should set mod bit in here */
+	if (ppcopy(opp, pp) == 0) {
+		/*
+		 * Before ppcopy could hanlde UE or other faults, we
+		 * would have panicked here, and still have no option
+		 * but to do so now.
+		 */
+		panic("anon_private, ppcopy failed, opp = 0x%p, pp = 0x%p",
+		    opp, pp);
+	}
 
 	hat_setrefmod(pp);		/* mark as modified */
 
@@ -2557,7 +2566,14 @@ anon_map_privatepages(
 		/*
 		 * Now copy the contents from the original page.
 		 */
-		ppcopy(ppa[pg_idx], pp);
+		if (ppcopy(ppa[pg_idx], pp) == 0) {
+			/*
+			 * Before ppcopy could hanlde UE or other faults, we
+			 * would have panicked here, and still have no option
+			 * but to do so now.
+			 */
+			panic("anon_map_privatepages, ppcopy failed");
+		}
 
 		hat_setrefmod(pp);		/* mark as modified */
 

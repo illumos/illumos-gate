@@ -329,6 +329,8 @@ struct memseg *memsegs;		/* list of memory segments */
 static void page_init_mem_config(void);
 static int page_do_hashin(page_t *, vnode_t *, u_offset_t);
 static void page_do_hashout(page_t *);
+static void page_capture_init();
+int page_capture_take_action(page_t *, uint_t, void *);
 
 static void page_demote_vp_pages(page_t *);
 
@@ -344,6 +346,7 @@ vm_init(void)
 	page_init_mem_config();
 	page_retire_init();
 	vm_usage_init();
+	page_capture_init();
 }
 
 /*
@@ -4439,7 +4442,7 @@ page_invalidate_pages()
 
 top:
 	/*
-	 * Flush dirty pages and destory the clean ones.
+	 * Flush dirty pages and destroy the clean ones.
 	 */
 	nbusypages = 0;
 
@@ -4778,6 +4781,7 @@ group_page_unlock(page_t *pp)
  * EBUSY	: failure to get locks on the page/pages
  * ENOMEM	: failure to obtain replacement pages
  * EAGAIN	: OBP has not yet completed its boot-time handoff to the kernel
+ * EIO		: An error occurred while trying to copy the page data
  *
  * Return with all constituent members of target and replacement
  * SE_EXCL locked. It is the callers responsibility to drop the
@@ -4791,9 +4795,7 @@ do_page_relocate(
 	spgcnt_t *nrelocp,
 	lgrp_t *lgrp)
 {
-#ifdef DEBUG
 	page_t *first_repl;
-#endif /* DEBUG */
 	page_t *repl;
 	page_t *targ;
 	page_t *pl = NULL;
@@ -4921,9 +4923,7 @@ do_page_relocate(
 #endif
 #endif
 
-#ifdef DEBUG
 	first_repl = repl;
-#endif /* DEBUG */
 
 	for (i = 0; i < npgs; i++) {
 		ASSERT(PAGE_EXCL(targ));
@@ -4942,7 +4942,33 @@ do_page_relocate(
 		 * Copy the page contents and attributes then
 		 * relocate the page in the page hash.
 		 */
-		ppcopy(targ, repl);
+		if (ppcopy(targ, repl) == 0) {
+			targ = *target;
+			repl = first_repl;
+			VM_STAT_ADD(vmm_vmstats.ppr_copyfail);
+			if (grouplock != 0) {
+				group_page_unlock(targ);
+			}
+			if (dofree) {
+				*replacement = NULL;
+				page_free_replacement_page(repl);
+				page_create_putback(dofree);
+			}
+			return (EIO);
+		}
+
+		targ++;
+		if (repl_contig != 0) {
+			repl++;
+		} else {
+			repl = repl->p_next;
+		}
+	}
+
+	repl = first_repl;
+	targ = *target;
+
+	for (i = 0; i < npgs; i++) {
 		ppattr = hat_page_getattr(targ, (P_MOD | P_REF | P_RO));
 		page_clr_all_props(repl);
 		page_set_props(repl, ppattr);
@@ -6181,4 +6207,1278 @@ int
 page_ismod(page_t *pp)
 {
 	return (hat_page_getattr(pp, P_MOD));
+}
+
+/*
+ * Reclaim the given constituent page from the freelist, regardless of it's
+ * size.  The page will be demoted as required.
+ * Returns 1 on success or 0 on failure.
+ *
+ * The page is unlocked if it can't be reclaimed (when freemem == 0).
+ * If `lock' is non-null, it will be dropped and re-acquired if
+ * the routine must wait while freemem is 0.
+ */
+int
+page_reclaim_page(page_t *pp, kmutex_t *lock)
+{
+	struct pcf	*p;
+	uint_t		pcf_index;
+	struct cpu	*cpup;
+	uint_t		i;
+	pgcnt_t		collected = 0;
+
+	ASSERT(lock != NULL ? MUTEX_HELD(lock) : 1);
+	ASSERT(PAGE_EXCL(pp) && PP_ISFREE(pp));
+
+	/*
+	 * If `freemem' is 0, we cannot reclaim this page from the
+	 * freelist, so release every lock we might hold: the page,
+	 * and the `lock' before blocking.
+	 *
+	 * The only way `freemem' can become 0 while there are pages
+	 * marked free (have their p->p_free bit set) is when the
+	 * system is low on memory and doing a page_create().  In
+	 * order to guarantee that once page_create() starts acquiring
+	 * pages it will be able to get all that it needs since `freemem'
+	 * was decreased by the requested amount.  So, we need to release
+	 * this page, and let page_create() have it.
+	 *
+	 * Since `freemem' being zero is not supposed to happen, just
+	 * use the usual hash stuff as a starting point.  If that bucket
+	 * is empty, then assume the worst, and start at the beginning
+	 * of the pcf array.  If we always start at the beginning
+	 * when acquiring more than one pcf lock, there won't be any
+	 * deadlock problems.
+	 */
+
+	/* TODO: Do we need to test kcage_freemem if PG_NORELOC(pp)? */
+
+	if (freemem <= throttlefree && !page_create_throttle(1, 0)) {
+		pcf_acquire_all();
+		goto page_reclaim_nomem;
+	}
+
+	pcf_index = PCF_INDEX();
+	p = &pcf[pcf_index];
+	mutex_enter(&p->pcf_lock);
+	if (p->pcf_count > 0) {
+		collected = 1;
+		p->pcf_count -= 1;
+	}
+	mutex_exit(&p->pcf_lock);
+
+	if (!collected) {
+		VM_STAT_ADD(page_reclaim_zero);
+		/*
+		 * Check again. Its possible that some other thread
+		 * could have been right behind us, and added one
+		 * to a list somewhere.  Acquire each of the pcf locks
+		 * until we find a page.
+		 */
+		p = pcf;
+		for (i = 0; i < PCF_FANOUT; i++) {
+			mutex_enter(&p->pcf_lock);
+			if (p->pcf_count) {
+				if (p->pcf_count > 0) {
+					p->pcf_count -= 1;
+					collected = 1;
+					break;
+				}
+			}
+			p++;
+		}
+
+		if (!collected) {
+page_reclaim_nomem:
+			/*
+			 * We really can't have page `pp'.
+			 * Time for the no-memory dance with
+			 * page_free().  This is just like
+			 * page_create_wait().  Plus the added
+			 * attraction of releasing whatever mutex
+			 * we held when we were called with in `lock'.
+			 * Page_unlock() will wakeup any thread
+			 * waiting around for this page.
+			 */
+			if (lock) {
+				VM_STAT_ADD(page_reclaim_zero_locked);
+				mutex_exit(lock);
+			}
+			page_unlock(pp);
+
+			/*
+			 * get this before we drop all the pcf locks.
+			 */
+			mutex_enter(&new_freemem_lock);
+
+			p = pcf;
+			for (i = 0; i < PCF_FANOUT; i++) {
+				p->pcf_wait++;
+				mutex_exit(&p->pcf_lock);
+				p++;
+			}
+
+			freemem_wait++;
+			cv_wait(&freemem_cv, &new_freemem_lock);
+			freemem_wait--;
+
+			mutex_exit(&new_freemem_lock);
+
+			if (lock) {
+				mutex_enter(lock);
+			}
+			return (0);
+		}
+
+		/*
+		 * We beat the PCF bins over the head until
+		 * we got the memory that we wanted.
+		 * The pcf accounting has been done,
+		 * though none of the pcf_wait flags have been set,
+		 * drop the locks and continue on.
+		 */
+		ASSERT(collected == 1);
+		while (p >= pcf) {
+			mutex_exit(&p->pcf_lock);
+			p--;
+		}
+	}
+
+	/*
+	 * freemem is not protected by any lock. Thus, we cannot
+	 * have any assertion containing freemem here.
+	 */
+	freemem -= 1;
+
+	VM_STAT_ADD(pagecnt.pc_reclaim);
+	if (PP_ISAGED(pp)) {
+		page_list_sub(pp, PG_FREE_LIST);
+		TRACE_1(TR_FAC_VM, TR_PAGE_UNFREE_FREE,
+		    "page_reclaim_page_free:pp %p", pp);
+	} else {
+		page_list_sub(pp, PG_CACHE_LIST);
+		TRACE_1(TR_FAC_VM, TR_PAGE_UNFREE_CACHE,
+		    "page_reclaim_page_cache:pp %p", pp);
+	}
+
+	/*
+	 * The page we took off the freelist must be szc 0 as
+	 * we used page_list_sub which will demote the page if needed.
+	 */
+	ASSERT(pp->p_szc == 0);
+
+	/*
+	 * clear the p_free & p_age bits since this page is no longer
+	 * on the free list.  Notice that there was a brief time where
+	 * a page is marked as free, but is not on the list.
+	 *
+	 * Set the reference bit to protect against immediate pageout.
+	 */
+	PP_CLRFREE(pp);
+	PP_CLRAGED(pp);
+	page_set_props(pp, P_REF);
+
+	CPU_STATS_ENTER_K();
+	cpup = CPU;	/* get cpup now that CPU cannot change */
+	CPU_STATS_ADDQ(cpup, vm, pgrec, 1);
+	CPU_STATS_ADDQ(cpup, vm, pgfrec, 1);
+	CPU_STATS_EXIT_K();
+
+	return (1);
+}
+
+/*
+ * The following code all currently relates to the page capture logic:
+ *
+ * This logic is used for cases where there is a desire to claim a certain
+ * physical page in the system for the caller.  As it may not be possible
+ * to capture the page immediately, the p_toxic bits are used in the page
+ * structure to indicate that someone wants to capture this page.  When the
+ * page gets unlocked, the toxic flag will be noted and an attempt to capture
+ * the page will be made.  If it is successful, the original callers callback
+ * will be called with the page to do with it what they please.
+ *
+ * There is also an async thread which wakes up to attempt to capture
+ * pages occasionally which have the capture bit set.  All of the pages which
+ * need to be captured asynchronously have been inserted into the
+ * page_capture_hash and thus this thread walks that hash list.  Items in the
+ * hash have an expiration time so this thread handles that as well by removing
+ * the item from the hash if it has expired.
+ *
+ * Some important things to note are:
+ * - if the PR_CAPTURE bit is set on a page, then the page is in the
+ *   page_capture_hash.  The page_capture_hash_head.pchh_mutex is needed
+ *   to set and clear this bit, and while the lock is held is the only time
+ *   you can add or remove an entry from the hash.
+ * - the PR_CAPTURE bit can only be set and cleared while holding the
+ *   page_capture_hash_head.pchh_mutex
+ * - the t_flag field of the thread struct is used with the T_CAPTURING
+ *   flag to prevent recursion while dealing with large pages.
+ * - pages which need to be retired never expire on the page_capture_hash.
+ */
+
+static void page_capture_thread(void);
+static kthread_t *pc_thread_id;
+kcondvar_t pc_cv;
+static kmutex_t pc_thread_mutex;
+static clock_t pc_thread_shortwait;
+static clock_t pc_thread_longwait;
+
+struct page_capture_callback pc_cb[PC_NUM_CALLBACKS];
+
+/* Note that this is a circular linked list */
+typedef struct page_capture_hash_bucket {
+	page_t *pp;
+	uint_t szc;
+	uint_t flags;
+	clock_t expires;	/* lbolt at which this request expires. */
+	void *datap;		/* Cached data passed in for callback */
+	struct page_capture_hash_bucket *next;
+	struct page_capture_hash_bucket *prev;
+} page_capture_hash_bucket_t;
+
+/*
+ * Each hash bucket will have it's own mutex and two lists which are:
+ * active (0):	represents requests which have not been processed by
+ *		the page_capture async thread yet.
+ * walked (1):	represents requests which have been processed by the
+ *		page_capture async thread within it's given walk of this bucket.
+ *
+ * These are all needed so that we can synchronize all async page_capture
+ * events.  When the async thread moves to a new bucket, it will append the
+ * walked list to the active list and walk each item one at a time, moving it
+ * from the active list to the walked list.  Thus if there is an async request
+ * outstanding for a given page, it will always be in one of the two lists.
+ * New requests will always be added to the active list.
+ * If we were not able to capture a page before the request expired, we'd free
+ * up the request structure which would indicate to page_capture that there is
+ * no longer a need for the given page, and clear the PR_CAPTURE flag if
+ * possible.
+ */
+typedef struct page_capture_hash_head {
+	kmutex_t pchh_mutex;
+	uint_t num_pages;
+	page_capture_hash_bucket_t lists[2]; /* sentinel nodes */
+} page_capture_hash_head_t;
+
+#ifdef DEBUG
+#define	NUM_PAGE_CAPTURE_BUCKETS 4
+#else
+#define	NUM_PAGE_CAPTURE_BUCKETS 64
+#endif
+
+page_capture_hash_head_t page_capture_hash[NUM_PAGE_CAPTURE_BUCKETS];
+
+/* for now use a very simple hash based upon the size of a page struct */
+#define	PAGE_CAPTURE_HASH(pp)	\
+	((int)(((uintptr_t)pp >> 7) & (NUM_PAGE_CAPTURE_BUCKETS - 1)))
+
+extern pgcnt_t swapfs_minfree;
+
+int page_trycapture(page_t *pp, uint_t szc, uint_t flags, void *datap);
+
+/*
+ * a callback function is required for page capture requests.
+ */
+void
+page_capture_register_callback(uint_t index, clock_t duration,
+    int (*cb_func)(page_t *, void *, uint_t))
+{
+	ASSERT(pc_cb[index].cb_active == 0);
+	ASSERT(cb_func != NULL);
+	rw_enter(&pc_cb[index].cb_rwlock, RW_WRITER);
+	pc_cb[index].duration = duration;
+	pc_cb[index].cb_func = cb_func;
+	pc_cb[index].cb_active = 1;
+	rw_exit(&pc_cb[index].cb_rwlock);
+}
+
+void
+page_capture_unregister_callback(uint_t index)
+{
+	int i, j;
+	struct page_capture_hash_bucket *bp1;
+	struct page_capture_hash_bucket *bp2;
+	struct page_capture_hash_bucket *head = NULL;
+	uint_t flags = (1 << index);
+
+	rw_enter(&pc_cb[index].cb_rwlock, RW_WRITER);
+	ASSERT(pc_cb[index].cb_active == 1);
+	pc_cb[index].duration = 0;	/* Paranoia */
+	pc_cb[index].cb_func = NULL;	/* Paranoia */
+	pc_cb[index].cb_active = 0;
+	rw_exit(&pc_cb[index].cb_rwlock);
+
+	/*
+	 * Just move all the entries to a private list which we can walk
+	 * through without the need to hold any locks.
+	 * No more requests can get added to the hash lists for this consumer
+	 * as the cb_active field for the callback has been cleared.
+	 */
+	for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++) {
+		mutex_enter(&page_capture_hash[i].pchh_mutex);
+		for (j = 0; j < 2; j++) {
+			bp1 = page_capture_hash[i].lists[j].next;
+			/* walk through all but first (sentinel) element */
+			while (bp1 != &page_capture_hash[i].lists[j]) {
+				bp2 = bp1;
+				if (bp2->flags & flags) {
+					bp1 = bp2->next;
+					bp1->prev = bp2->prev;
+					bp2->prev->next = bp1;
+					bp2->next = head;
+					head = bp2;
+					/*
+					 * Clear the PR_CAPTURE bit as we
+					 * hold appropriate locks here.
+					 */
+					page_clrtoxic(head->pp, PR_CAPTURE);
+					page_capture_hash[i].num_pages--;
+					continue;
+				}
+				bp1 = bp1->next;
+			}
+		}
+		mutex_exit(&page_capture_hash[i].pchh_mutex);
+	}
+
+	while (head != NULL) {
+		bp1 = head;
+		head = head->next;
+		kmem_free(bp1, sizeof (*bp1));
+	}
+}
+
+
+/*
+ * Find pp in the active list and move it to the walked list if it
+ * exists.
+ * Note that most often pp should be at the front of the active list
+ * as it is currently used and thus there is no other sort of optimization
+ * being done here as this is a linked list data structure.
+ * Returns 1 on successful move or 0 if page could not be found.
+ */
+static int
+page_capture_move_to_walked(page_t *pp)
+{
+	page_capture_hash_bucket_t *bp;
+	int index;
+
+	index = PAGE_CAPTURE_HASH(pp);
+
+	mutex_enter(&page_capture_hash[index].pchh_mutex);
+	bp = page_capture_hash[index].lists[0].next;
+	while (bp != &page_capture_hash[index].lists[0]) {
+		if (bp->pp == pp) {
+			/* Remove from old list */
+			bp->next->prev = bp->prev;
+			bp->prev->next = bp->next;
+
+			/* Add to new list */
+			bp->next = page_capture_hash[index].lists[1].next;
+			bp->prev = &page_capture_hash[index].lists[1];
+			page_capture_hash[index].lists[1].next = bp;
+			bp->next->prev = bp;
+			mutex_exit(&page_capture_hash[index].pchh_mutex);
+
+			return (1);
+		}
+		bp = bp->next;
+	}
+	mutex_exit(&page_capture_hash[index].pchh_mutex);
+	return (0);
+}
+
+/*
+ * Add a new entry to the page capture hash.  The only case where a new
+ * entry is not added is when the page capture consumer is no longer registered.
+ * In this case, we'll silently not add the page to the hash.  We know that
+ * page retire will always be registered for the case where we are currently
+ * unretiring a page and thus there are no conflicts.
+ */
+static void
+page_capture_add_hash(page_t *pp, uint_t szc, uint_t flags, void *datap)
+{
+	page_capture_hash_bucket_t *bp1;
+	page_capture_hash_bucket_t *bp2;
+	int index;
+	int cb_index;
+	int i;
+#ifdef DEBUG
+	page_capture_hash_bucket_t *tp1;
+	int l;
+#endif
+
+	ASSERT(!(flags & CAPTURE_ASYNC));
+
+	bp1 = kmem_alloc(sizeof (struct page_capture_hash_bucket), KM_SLEEP);
+
+	bp1->pp = pp;
+	bp1->szc = szc;
+	bp1->flags = flags;
+	bp1->datap = datap;
+
+	for (cb_index = 0; cb_index < PC_NUM_CALLBACKS; cb_index++) {
+		if ((flags >> cb_index) & 1) {
+			break;
+		}
+	}
+
+	ASSERT(cb_index != PC_NUM_CALLBACKS);
+
+	rw_enter(&pc_cb[cb_index].cb_rwlock, RW_READER);
+	if (pc_cb[cb_index].cb_active) {
+		if (pc_cb[cb_index].duration == -1) {
+			bp1->expires = (clock_t)-1;
+		} else {
+			bp1->expires = lbolt + pc_cb[cb_index].duration;
+		}
+	} else {
+		/* There's no callback registered so don't add to the hash */
+		rw_exit(&pc_cb[cb_index].cb_rwlock);
+		kmem_free(bp1, sizeof (*bp1));
+		return;
+	}
+
+	index = PAGE_CAPTURE_HASH(pp);
+
+	/*
+	 * Only allow capture flag to be modified under this mutex.
+	 * Prevents multiple entries for same page getting added.
+	 */
+	mutex_enter(&page_capture_hash[index].pchh_mutex);
+
+	/*
+	 * if not already on the hash, set capture bit and add to the hash
+	 */
+	if (!(pp->p_toxic & PR_CAPTURE)) {
+#ifdef DEBUG
+		/* Check for duplicate entries */
+		for (l = 0; l < 2; l++) {
+			tp1 = page_capture_hash[index].lists[l].next;
+			while (tp1 != &page_capture_hash[index].lists[l]) {
+				if (tp1->pp == pp) {
+					panic("page pp 0x%p already on hash "
+					    "at 0x%p\n", pp, tp1);
+				}
+				tp1 = tp1->next;
+			}
+		}
+
+#endif
+		page_settoxic(pp, PR_CAPTURE);
+		bp1->next = page_capture_hash[index].lists[0].next;
+		bp1->prev = &page_capture_hash[index].lists[0];
+		bp1->next->prev = bp1;
+		page_capture_hash[index].lists[0].next = bp1;
+		page_capture_hash[index].num_pages++;
+		mutex_exit(&page_capture_hash[index].pchh_mutex);
+		rw_exit(&pc_cb[cb_index].cb_rwlock);
+		cv_signal(&pc_cv);
+		return;
+	}
+
+	/*
+	 * A page retire request will replace any other request.
+	 * A second physmem request which is for a different process than
+	 * the currently registered one will be dropped as there is
+	 * no way to hold the private data for both calls.
+	 * In the future, once there are more callers, this will have to
+	 * be worked out better as there needs to be private storage for
+	 * at least each type of caller (maybe have datap be an array of
+	 * *void's so that we can index based upon callers index).
+	 */
+
+	/* walk hash list to update expire time */
+	for (i = 0; i < 2; i++) {
+		bp2 = page_capture_hash[index].lists[i].next;
+		while (bp2 != &page_capture_hash[index].lists[i]) {
+			if (bp2->pp == pp) {
+				if (flags & CAPTURE_RETIRE) {
+					if (!(bp2->flags & CAPTURE_RETIRE)) {
+						bp2->flags = flags;
+						bp2->expires = bp1->expires;
+						bp2->datap = datap;
+					}
+				} else {
+					ASSERT(flags & CAPTURE_PHYSMEM);
+					if (!(bp2->flags & CAPTURE_RETIRE) &&
+					    (datap == bp2->datap)) {
+						bp2->expires = bp1->expires;
+					}
+				}
+				mutex_exit(&page_capture_hash[index].
+				    pchh_mutex);
+				rw_exit(&pc_cb[cb_index].cb_rwlock);
+				kmem_free(bp1, sizeof (*bp1));
+				return;
+			}
+			bp2 = bp2->next;
+		}
+	}
+
+	/*
+	 * the PR_CAPTURE flag is protected by the page_capture_hash mutexes
+	 * and thus it either has to be set or not set and can't change
+	 * while holding the mutex above.
+	 */
+	panic("page_capture_add_hash, PR_CAPTURE flag set on pp %p\n", pp);
+}
+
+/*
+ * We have a page in our hands, lets try and make it ours by turning
+ * it into a clean page like it had just come off the freelists.
+ *
+ * Returns 0 on success, with the page still EXCL locked.
+ * On failure, the page will be unlocked, and returns EAGAIN
+ */
+static int
+page_capture_clean_page(page_t *pp)
+{
+	page_t *newpp;
+	int skip_unlock = 0;
+	spgcnt_t count;
+	page_t *tpp;
+	int ret = 0;
+	int extra;
+
+	ASSERT(PAGE_EXCL(pp));
+	ASSERT(!PP_RETIRED(pp));
+	ASSERT(curthread->t_flag & T_CAPTURING);
+
+	if (PP_ISFREE(pp)) {
+		if (!page_reclaim_page(pp, NULL)) {
+			skip_unlock = 1;
+			ret = EAGAIN;
+			goto cleanup;
+		}
+		if (pp->p_vnode != NULL) {
+			/*
+			 * Since this page came from the
+			 * cachelist, we must destroy the
+			 * old vnode association.
+			 */
+			page_hashout(pp, NULL);
+		}
+		goto cleanup;
+	}
+
+	/*
+	 * If we know page_relocate will fail, skip it
+	 * It could still fail due to a UE on another page but we
+	 * can't do anything about that.
+	 */
+	if (pp->p_toxic & PR_UE) {
+		goto skip_relocate;
+	}
+
+	/*
+	 * It's possible that pages can not have a vnode as fsflush comes
+	 * through and cleans up these pages.  It's ugly but that's how it is.
+	 */
+	if (pp->p_vnode == NULL) {
+		goto skip_relocate;
+	}
+
+	/*
+	 * Page was not free, so lets try to relocate it.
+	 * page_relocate only works with root pages, so if this is not a root
+	 * page, we need to demote it to try and relocate it.
+	 * Unfortunately this is the best we can do right now.
+	 */
+	newpp = NULL;
+	if ((pp->p_szc > 0) && (pp != PP_PAGEROOT(pp))) {
+		if (page_try_demote_pages(pp) == 0) {
+			ret = EAGAIN;
+			goto cleanup;
+		}
+	}
+	ret = page_relocate(&pp, &newpp, 1, 0, &count, NULL);
+	if (ret == 0) {
+		page_t *npp;
+		/* unlock the new page(s) */
+		while (count-- > 0) {
+			ASSERT(newpp != NULL);
+			npp = newpp;
+			page_sub(&newpp, npp);
+			page_unlock(npp);
+		}
+		ASSERT(newpp == NULL);
+		/*
+		 * Check to see if the page we have is too large.
+		 * If so, demote it freeing up the extra pages.
+		 */
+		if (pp->p_szc > 0) {
+			/* For now demote extra pages to szc == 0 */
+			extra = page_get_pagecnt(pp->p_szc) - 1;
+			while (extra > 0) {
+				tpp = pp->p_next;
+				page_sub(&pp, tpp);
+				tpp->p_szc = 0;
+				page_free(tpp, 1);
+				extra--;
+			}
+			/* Make sure to set our page to szc 0 as well */
+			ASSERT(pp->p_next == pp && pp->p_prev == pp);
+			pp->p_szc = 0;
+		}
+		goto cleanup;
+	} else if (ret == EIO) {
+		ret = EAGAIN;
+		goto cleanup;
+	} else {
+		/*
+		 * Need to reset return type as we failed to relocate the page
+		 * but that does not mean that some of the next steps will not
+		 * work.
+		 */
+		ret = 0;
+	}
+
+skip_relocate:
+
+	if (pp->p_szc > 0) {
+		if (page_try_demote_pages(pp) == 0) {
+			ret = EAGAIN;
+			goto cleanup;
+		}
+	}
+
+	ASSERT(pp->p_szc == 0);
+
+	if (hat_ismod(pp)) {
+		ret = EAGAIN;
+		goto cleanup;
+	}
+	if (PP_ISKVP(pp)) {
+		ret = EAGAIN;
+		goto cleanup;
+	}
+	if (pp->p_lckcnt || pp->p_cowcnt) {
+		ret = EAGAIN;
+		goto cleanup;
+	}
+
+	(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
+	ASSERT(!hat_page_is_mapped(pp));
+
+	if (hat_ismod(pp)) {
+		/*
+		 * This is a semi-odd case as the page is now modified but not
+		 * mapped as we just unloaded the mappings above.
+		 */
+		ret = EAGAIN;
+		goto cleanup;
+	}
+	if (pp->p_vnode != NULL) {
+		page_hashout(pp, NULL);
+	}
+
+	/*
+	 * At this point, the page should be in a clean state and
+	 * we can do whatever we want with it.
+	 */
+
+cleanup:
+	if (ret != 0) {
+		if (!skip_unlock) {
+			page_unlock(pp);
+		}
+	} else {
+		ASSERT(pp->p_szc == 0);
+		ASSERT(PAGE_EXCL(pp));
+
+		pp->p_next = pp;
+		pp->p_prev = pp;
+	}
+	return (ret);
+}
+
+/*
+ * Various callers of page_trycapture() can have different restrictions upon
+ * what memory they have access to.
+ * Returns 0 on success, with the following error codes on failure:
+ *      EPERM - The requested page is long term locked, and thus repeated
+ *              requests to capture this page will likely fail.
+ *      ENOMEM - There was not enough free memory in the system to safely
+ *              map the requested page.
+ *      ENOENT - The requested page was inside the kernel cage, and the
+ *              PHYSMEM_CAGE flag was not set.
+ */
+int
+page_capture_pre_checks(page_t *pp, uint_t flags)
+{
+#if defined(__sparc)
+	extern struct vnode prom_ppages;
+#endif /* __sparc */
+
+	ASSERT(pp != NULL);
+
+	/* only physmem currently has restrictions */
+	if (!(flags & CAPTURE_PHYSMEM)) {
+		return (0);
+	}
+
+#if defined(__sparc)
+	if (pp->p_vnode == &prom_ppages) {
+		return (EPERM);
+	}
+
+	if (PP_ISNORELOC(pp) && !(flags & CAPTURE_GET_CAGE)) {
+		return (ENOENT);
+	}
+
+	if (PP_ISNORELOCKERNEL(pp)) {
+		return (EPERM);
+	}
+#else
+	if (PP_ISKVP(pp)) {
+		return (EPERM);
+	}
+#endif /* __sparc */
+
+	if (availrmem < swapfs_minfree) {
+		/*
+		 * We won't try to capture this page as we are
+		 * running low on memory.
+		 */
+		return (ENOMEM);
+	}
+	return (0);
+}
+
+/*
+ * Once we have a page in our mits, go ahead and complete the capture
+ * operation.
+ * Returns 1 on failure where page is no longer needed
+ * Returns 0 on success
+ * Returns -1 if there was a transient failure.
+ * Failure cases must release the SE_EXCL lock on pp (usually via page_free).
+ */
+int
+page_capture_take_action(page_t *pp, uint_t flags, void *datap)
+{
+	int cb_index;
+	int ret = 0;
+	page_capture_hash_bucket_t *bp1;
+	page_capture_hash_bucket_t *bp2;
+	int index;
+	int found = 0;
+	int i;
+
+	ASSERT(PAGE_EXCL(pp));
+	ASSERT(curthread->t_flag & T_CAPTURING);
+
+	for (cb_index = 0; cb_index < PC_NUM_CALLBACKS; cb_index++) {
+		if ((flags >> cb_index) & 1) {
+			break;
+		}
+	}
+	ASSERT(cb_index < PC_NUM_CALLBACKS);
+
+	/*
+	 * Remove the entry from the page_capture hash, but don't free it yet
+	 * as we may need to put it back.
+	 * Since we own the page at this point in time, we should find it
+	 * in the hash if this is an ASYNC call.  If we don't it's likely
+	 * that the page_capture_async() thread decided that this request
+	 * had expired, in which case we just continue on.
+	 */
+	if (flags & CAPTURE_ASYNC) {
+
+		index = PAGE_CAPTURE_HASH(pp);
+
+		mutex_enter(&page_capture_hash[index].pchh_mutex);
+		for (i = 0; i < 2 && !found; i++) {
+			bp1 = page_capture_hash[index].lists[i].next;
+			while (bp1 != &page_capture_hash[index].lists[i]) {
+				if (bp1->pp == pp) {
+					bp1->next->prev = bp1->prev;
+					bp1->prev->next = bp1->next;
+					page_capture_hash[index].num_pages--;
+					page_clrtoxic(pp, PR_CAPTURE);
+					found = 1;
+					break;
+				}
+				bp1 = bp1->next;
+			}
+		}
+		mutex_exit(&page_capture_hash[index].pchh_mutex);
+	}
+
+	/* Synchronize with the unregister func. */
+	rw_enter(&pc_cb[cb_index].cb_rwlock, RW_READER);
+	if (!pc_cb[cb_index].cb_active) {
+		page_free(pp, 1);
+		rw_exit(&pc_cb[cb_index].cb_rwlock);
+		if (found) {
+			kmem_free(bp1, sizeof (*bp1));
+		}
+		return (1);
+	}
+
+	/*
+	 * We need to remove the entry from the page capture hash and turn off
+	 * the PR_CAPTURE bit before calling the callback.  We'll need to cache
+	 * the entry here, and then based upon the return value, cleanup
+	 * appropriately or re-add it to the hash, making sure that someone else
+	 * hasn't already done so.
+	 * It should be rare for the callback to fail and thus it's ok for
+	 * the failure path to be a bit complicated as the success path is
+	 * cleaner and the locking rules are easier to follow.
+	 */
+
+	ret = pc_cb[cb_index].cb_func(pp, datap, flags);
+
+	rw_exit(&pc_cb[cb_index].cb_rwlock);
+
+	/*
+	 * If this was an ASYNC request, we need to cleanup the hash if the
+	 * callback was successful or if the request was no longer valid.
+	 * For non-ASYNC requests, we return failure to map and the caller
+	 * will take care of adding the request to the hash.
+	 * Note also that the callback itself is responsible for the page
+	 * at this point in time in terms of locking ...  The most common
+	 * case for the failure path should just be a page_free.
+	 */
+	if (ret >= 0) {
+		if (found) {
+			kmem_free(bp1, sizeof (*bp1));
+		}
+		return (ret);
+	}
+	if (!found) {
+		return (ret);
+	}
+
+	ASSERT(flags & CAPTURE_ASYNC);
+
+	/*
+	 * Check for expiration time first as we can just free it up if it's
+	 * expired.
+	 */
+	if (lbolt > bp1->expires && bp1->expires != -1) {
+		kmem_free(bp1, sizeof (*bp1));
+		return (ret);
+	}
+
+	/*
+	 * The callback failed and there used to be an entry in the hash for
+	 * this page, so we need to add it back to the hash.
+	 */
+	mutex_enter(&page_capture_hash[index].pchh_mutex);
+	if (!(pp->p_toxic & PR_CAPTURE)) {
+		/* just add bp1 back to head of walked list */
+		page_settoxic(pp, PR_CAPTURE);
+		bp1->next = page_capture_hash[index].lists[1].next;
+		bp1->prev = &page_capture_hash[index].lists[1];
+		bp1->next->prev = bp1;
+		page_capture_hash[index].lists[1].next = bp1;
+		page_capture_hash[index].num_pages++;
+		mutex_exit(&page_capture_hash[index].pchh_mutex);
+		return (ret);
+	}
+
+	/*
+	 * Otherwise there was a new capture request added to list
+	 * Need to make sure that our original data is represented if
+	 * appropriate.
+	 */
+	for (i = 0; i < 2; i++) {
+		bp2 = page_capture_hash[index].lists[i].next;
+		while (bp2 != &page_capture_hash[index].lists[i]) {
+			if (bp2->pp == pp) {
+				if (bp1->flags & CAPTURE_RETIRE) {
+					if (!(bp2->flags & CAPTURE_RETIRE)) {
+						bp2->szc = bp1->szc;
+						bp2->flags = bp1->flags;
+						bp2->expires = bp1->expires;
+						bp2->datap = bp1->datap;
+					}
+				} else {
+					ASSERT(bp1->flags & CAPTURE_PHYSMEM);
+					if (!(bp2->flags & CAPTURE_RETIRE)) {
+						bp2->szc = bp1->szc;
+						bp2->flags = bp1->flags;
+						bp2->expires = bp1->expires;
+						bp2->datap = bp1->datap;
+					}
+				}
+				mutex_exit(&page_capture_hash[index].
+				    pchh_mutex);
+				kmem_free(bp1, sizeof (*bp1));
+				return (ret);
+			}
+			bp2 = bp2->next;
+		}
+	}
+	panic("PR_CAPTURE set but not on hash for pp 0x%p\n", pp);
+	/*NOTREACHED*/
+}
+
+/*
+ * Try to capture the given page for the caller specified in the flags
+ * parameter.  The page will either be captured and handed over to the
+ * appropriate callback, or will be queued up in the page capture hash
+ * to be captured asynchronously.
+ * If the current request is due to an async capture, the page must be
+ * exclusively locked before calling this function.
+ * Currently szc must be 0 but in the future this should be expandable to
+ * other page sizes.
+ * Returns 0 on success, with the following error codes on failure:
+ *      EPERM - The requested page is long term locked, and thus repeated
+ *              requests to capture this page will likely fail.
+ *      ENOMEM - There was not enough free memory in the system to safely
+ *              map the requested page.
+ *      ENOENT - The requested page was inside the kernel cage, and the
+ *              CAPTURE_GET_CAGE flag was not set.
+ *	EAGAIN - The requested page could not be capturead at this point in
+ *		time but future requests will likely work.
+ *	EBUSY - The requested page is retired and the CAPTURE_GET_RETIRED flag
+ *		was not set.
+ */
+int
+page_itrycapture(page_t *pp, uint_t szc, uint_t flags, void *datap)
+{
+	int ret;
+	int cb_index;
+
+	if (flags & CAPTURE_ASYNC) {
+		ASSERT(PAGE_EXCL(pp));
+		goto async;
+	}
+
+	/* Make sure there's enough availrmem ... */
+	ret = page_capture_pre_checks(pp, flags);
+	if (ret != 0) {
+		return (ret);
+	}
+
+	if (!page_trylock(pp, SE_EXCL)) {
+		for (cb_index = 0; cb_index < PC_NUM_CALLBACKS; cb_index++) {
+			if ((flags >> cb_index) & 1) {
+				break;
+			}
+		}
+		ASSERT(cb_index < PC_NUM_CALLBACKS);
+		ret = EAGAIN;
+		/* Special case for retired pages */
+		if (PP_RETIRED(pp)) {
+			if (flags & CAPTURE_GET_RETIRED) {
+				if (!page_unretire_pp(pp, PR_UNR_TEMP)) {
+					/*
+					 * Need to set capture bit and add to
+					 * hash so that the page will be
+					 * retired when freed.
+					 */
+					page_capture_add_hash(pp, szc,
+					    CAPTURE_RETIRE, NULL);
+					ret = 0;
+					goto own_page;
+				}
+			} else {
+				return (EBUSY);
+			}
+		}
+		page_capture_add_hash(pp, szc, flags, datap);
+		return (ret);
+	}
+
+async:
+	ASSERT(PAGE_EXCL(pp));
+
+	/* Need to check for physmem async requests that availrmem is sane */
+	if ((flags & (CAPTURE_ASYNC | CAPTURE_PHYSMEM)) ==
+	    (CAPTURE_ASYNC | CAPTURE_PHYSMEM) &&
+	    (availrmem < swapfs_minfree)) {
+		page_unlock(pp);
+		return (ENOMEM);
+	}
+
+	ret = page_capture_clean_page(pp);
+
+	if (ret != 0) {
+		/* We failed to get the page, so lets add it to the hash */
+		if (!(flags & CAPTURE_ASYNC)) {
+			page_capture_add_hash(pp, szc, flags, datap);
+		}
+		return (ret);
+	}
+
+own_page:
+	ASSERT(PAGE_EXCL(pp));
+	ASSERT(pp->p_szc == 0);
+
+	/* Call the callback */
+	ret = page_capture_take_action(pp, flags, datap);
+
+	if (ret == 0) {
+		return (0);
+	}
+
+	/*
+	 * Note that in the failure cases from page_capture_take_action, the
+	 * EXCL lock will have already been dropped.
+	 */
+	if ((ret == -1) && (!(flags & CAPTURE_ASYNC))) {
+		page_capture_add_hash(pp, szc, flags, datap);
+	}
+	return (EAGAIN);
+}
+
+int
+page_trycapture(page_t *pp, uint_t szc, uint_t flags, void *datap)
+{
+	int ret;
+
+	curthread->t_flag |= T_CAPTURING;
+	ret = page_itrycapture(pp, szc, flags, datap);
+	curthread->t_flag &= ~T_CAPTURING; /* xor works as we know its set */
+	return (ret);
+}
+
+/*
+ * When unlocking a page which has the PR_CAPTURE bit set, this routine
+ * gets called to try and capture the page.
+ */
+void
+page_unlock_capture(page_t *pp)
+{
+	page_capture_hash_bucket_t *bp;
+	int index;
+	int i;
+	uint_t szc;
+	uint_t flags = 0;
+	void *datap;
+	kmutex_t *mp;
+	extern vnode_t retired_pages;
+
+	/*
+	 * We need to protect against a possible deadlock here where we own
+	 * the vnode page hash mutex and want to acquire it again as there
+	 * are locations in the code, where we unlock a page while holding
+	 * the mutex which can lead to the page being captured and eventually
+	 * end up here.  As we may be hashing out the old page and hashing into
+	 * the retire vnode, we need to make sure we don't own them.
+	 * Other callbacks who do hash operations also need to make sure that
+	 * before they hashin to a vnode that they do not currently own the
+	 * vphm mutex otherwise there will be a panic.
+	 */
+	if (mutex_owned(page_vnode_mutex(&retired_pages))) {
+		page_unlock(pp);
+		return;
+	}
+	if (pp->p_vnode != NULL && mutex_owned(page_vnode_mutex(pp->p_vnode))) {
+		page_unlock(pp);
+		return;
+	}
+
+	index = PAGE_CAPTURE_HASH(pp);
+
+	mp = &page_capture_hash[index].pchh_mutex;
+	mutex_enter(mp);
+	for (i = 0; i < 2; i++) {
+		bp = page_capture_hash[index].lists[i].next;
+		while (bp != &page_capture_hash[index].lists[i]) {
+			if (bp->pp == pp) {
+				szc = bp->szc;
+				flags = bp->flags | CAPTURE_ASYNC;
+				datap = bp->datap;
+				mutex_exit(mp);
+				(void) page_trycapture(pp, szc, flags, datap);
+				return;
+			}
+			bp = bp->next;
+		}
+	}
+
+	/* Failed to find page in hash so clear flags and unlock it. */
+	page_clrtoxic(pp, PR_CAPTURE);
+	page_unlock(pp);
+
+	mutex_exit(mp);
+}
+
+void
+page_capture_init()
+{
+	int i;
+	for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++) {
+		page_capture_hash[i].lists[0].next =
+		    &page_capture_hash[i].lists[0];
+		page_capture_hash[i].lists[0].prev =
+		    &page_capture_hash[i].lists[0];
+		page_capture_hash[i].lists[1].next =
+		    &page_capture_hash[i].lists[1];
+		page_capture_hash[i].lists[1].prev =
+		    &page_capture_hash[i].lists[1];
+	}
+
+	pc_thread_shortwait = 23 * hz;
+	pc_thread_longwait = 1201 * hz;
+	mutex_init(&pc_thread_mutex, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&pc_cv, NULL, CV_DEFAULT, NULL);
+	pc_thread_id = thread_create(NULL, 0, page_capture_thread, NULL, 0, &p0,
+	    TS_RUN, minclsyspri);
+}
+
+/*
+ * It is necessary to scrub any failing pages prior to reboot in order to
+ * prevent a latent error trap from occurring on the next boot.
+ */
+void
+page_retire_mdboot()
+{
+	page_t *pp;
+	int i, j;
+	page_capture_hash_bucket_t *bp;
+
+	/* walk lists looking for pages to scrub */
+	for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++) {
+		if (page_capture_hash[i].num_pages == 0)
+			continue;
+
+		mutex_enter(&page_capture_hash[i].pchh_mutex);
+
+		for (j = 0; j < 2; j++) {
+			bp = page_capture_hash[i].lists[j].next;
+			while (bp != &page_capture_hash[i].lists[j]) {
+				pp = bp->pp;
+				if (!PP_ISKVP(pp) && PP_TOXIC(pp)) {
+					pp->p_selock = -1;  /* pacify ASSERTs */
+					PP_CLRFREE(pp);
+					pagescrub(pp, 0, PAGESIZE);
+					pp->p_selock = 0;
+				}
+				bp = bp->next;
+			}
+		}
+		mutex_exit(&page_capture_hash[i].pchh_mutex);
+	}
+}
+
+/*
+ * Walk the page_capture_hash trying to capture pages and also cleanup old
+ * entries which have expired.
+ */
+void
+page_capture_async()
+{
+	page_t *pp;
+	int i;
+	int ret;
+	page_capture_hash_bucket_t *bp1, *bp2;
+	uint_t szc;
+	uint_t flags;
+	void *datap;
+
+	/* If there are outstanding pages to be captured, get to work */
+	for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++) {
+		if (page_capture_hash[i].num_pages == 0)
+			continue;
+		/* Append list 1 to list 0 and then walk through list 0 */
+		mutex_enter(&page_capture_hash[i].pchh_mutex);
+		bp1 = &page_capture_hash[i].lists[1];
+		bp2 = bp1->next;
+		if (bp1 != bp2) {
+			bp1->prev->next = page_capture_hash[i].lists[0].next;
+			bp2->prev = &page_capture_hash[i].lists[0];
+			page_capture_hash[i].lists[0].next->prev = bp1->prev;
+			page_capture_hash[i].lists[0].next = bp2;
+			bp1->next = bp1;
+			bp1->prev = bp1;
+		}
+
+		/* list[1] will be empty now */
+
+		bp1 = page_capture_hash[i].lists[0].next;
+		while (bp1 != &page_capture_hash[i].lists[0]) {
+			/* Check expiration time */
+			if ((lbolt > bp1->expires && bp1->expires != -1) ||
+			    page_deleted(bp1->pp)) {
+				page_capture_hash[i].lists[0].next = bp1->next;
+				bp1->next->prev =
+				    &page_capture_hash[i].lists[0];
+				page_capture_hash[i].num_pages--;
+
+				/*
+				 * We can safely remove the PR_CAPTURE bit
+				 * without holding the EXCL lock on the page
+				 * as the PR_CAPTURE bit requres that the
+				 * page_capture_hash[].pchh_mutex be held
+				 * to modify it.
+				 */
+				page_clrtoxic(bp1->pp, PR_CAPTURE);
+				mutex_exit(&page_capture_hash[i].pchh_mutex);
+				kmem_free(bp1, sizeof (*bp1));
+				mutex_enter(&page_capture_hash[i].pchh_mutex);
+				bp1 = page_capture_hash[i].lists[0].next;
+				continue;
+			}
+			pp = bp1->pp;
+			szc = bp1->szc;
+			flags = bp1->flags;
+			datap = bp1->datap;
+			mutex_exit(&page_capture_hash[i].pchh_mutex);
+			if (page_trylock(pp, SE_EXCL)) {
+				ret = page_trycapture(pp, szc,
+				    flags | CAPTURE_ASYNC, datap);
+			} else {
+				ret = 1;	/* move to walked hash */
+			}
+
+			if (ret != 0) {
+				/* Move to walked hash */
+				(void) page_capture_move_to_walked(pp);
+			}
+			mutex_enter(&page_capture_hash[i].pchh_mutex);
+			bp1 = page_capture_hash[i].lists[0].next;
+		}
+
+		mutex_exit(&page_capture_hash[i].pchh_mutex);
+	}
+}
+
+/*
+ * The page_capture_thread loops forever, looking to see if there are
+ * pages still waiting to be captured.
+ */
+static void
+page_capture_thread(void)
+{
+	callb_cpr_t c;
+	int outstanding;
+	int i;
+
+	CALLB_CPR_INIT(&c, &pc_thread_mutex, callb_generic_cpr, "page_capture");
+
+	mutex_enter(&pc_thread_mutex);
+	for (;;) {
+		outstanding = 0;
+		for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++)
+			outstanding += page_capture_hash[i].num_pages;
+		if (outstanding) {
+			/*
+			 * Do we really want to be this aggressive for things
+			 * other than page_retire?
+			 * Maybe have a counter for each callback type to
+			 * guide how aggressive we should be here.
+			 * Thus if there's at least one page for page_retire
+			 * we go ahead and reap like this.
+			 */
+			kmem_reap();
+			seg_preap();
+			page_capture_async();
+			CALLB_CPR_SAFE_BEGIN(&c);
+			(void) cv_timedwait(&pc_cv, &pc_thread_mutex,
+			    lbolt + pc_thread_shortwait);
+			CALLB_CPR_SAFE_END(&c, &pc_thread_mutex);
+		} else {
+			CALLB_CPR_SAFE_BEGIN(&c);
+			(void) cv_timedwait(&pc_cv, &pc_thread_mutex,
+			    lbolt + pc_thread_longwait);
+			CALLB_CPR_SAFE_END(&c, &pc_thread_mutex);
+		}
+	}
+	/*NOTREACHED*/
 }

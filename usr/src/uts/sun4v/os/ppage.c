@@ -253,13 +253,16 @@ ppcopy_kernel__relocatable(page_t *fm_pp, page_t *to_pp)
  *
  * Try to use per cpu mapping first, if that fails then call pp_mapin
  * to load it.
+ * Returns one on success or zero on some sort of fault while doing the copy.
  */
-void
+int
 ppcopy(page_t *fm_pp, page_t *to_pp)
 {
 	caddr_t fm_va;
 	caddr_t to_va;
 	boolean_t fast;
+	label_t ljb;
+	int ret = 1;
 
 	ASSERT(PAGE_LOCKED(fm_pp));
 	ASSERT(PAGE_LOCKED(to_pp));
@@ -278,7 +281,13 @@ ppcopy(page_t *fm_pp, page_t *to_pp)
 	} else
 		fast = B_TRUE;
 
+	if (on_fault(&ljb)) {
+		ret = 0;
+		goto faulted;
+	}
 	bcopy(fm_va, to_va, PAGESIZE);
+	no_fault();
+faulted:
 
 	/* Unmap */
 	if (fast) {
@@ -288,6 +297,7 @@ ppcopy(page_t *fm_pp, page_t *to_pp)
 		ppmapout(fm_va);
 		ppmapout(to_va);
 	}
+	return (ret);
 }
 
 /*

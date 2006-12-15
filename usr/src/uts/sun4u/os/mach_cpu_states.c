@@ -104,8 +104,7 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 	/*
 	 * Clear any unresolved UEs from memory.
 	 */
-	if (memsegs != NULL)
-		page_retire_hunt(page_retire_mdboot_cb);
+	page_retire_mdboot();
 
 	/*
 	 * stop other cpus which also raise our priority. since there is only

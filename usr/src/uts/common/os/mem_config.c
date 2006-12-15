@@ -2250,7 +2250,8 @@ delete_memory_thread(caddr_t amhp)
 					 */
 					mhp->mh_hold_todo++;
 				} else {
-					(void) page_unretire_pp(pp, 0);
+					(void) page_unretire_pp(pp,
+					    PR_UNR_CLEAN);
 				}
 			}
 		}

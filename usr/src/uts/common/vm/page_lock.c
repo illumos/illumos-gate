@@ -585,7 +585,7 @@ page_trylock(page_t *pp, se_t se)
  * freelist manager; please don't call it.
  */
 void
-page_unlock_noretire(page_t *pp)
+page_unlock_nocapture(page_t *pp)
 {
 	kmutex_t *pse = PAGE_SE_MUTEX(pp);
 	selock_t old;
@@ -598,7 +598,7 @@ page_unlock_noretire(page_t *pp)
 		if (CV_HAS_WAITERS(&pp->p_cv))
 			cv_broadcast(&pp->p_cv);
 	} else if ((old & ~SE_EWANTED) == SE_DELETED) {
-		panic("page_unlock_noretire: page %p is deleted", pp);
+		panic("page_unlock_nocapture: page %p is deleted", pp);
 	} else if (old < 0) {
 		THREAD_KPRI_RELEASE();
 		pp->p_selock &= SE_EWANTED;
@@ -607,7 +607,7 @@ page_unlock_noretire(page_t *pp)
 	} else if ((old & ~SE_EWANTED) > SE_READER) {
 		pp->p_selock = old - SE_READER;
 	} else {
-		panic("page_unlock_noretire: page %p is not locked", pp);
+		panic("page_unlock_nocapture: page %p is not locked", pp);
 	}
 
 	mutex_exit(pse);
@@ -643,23 +643,21 @@ page_unlock(page_t *pp)
 		panic("page_unlock: page %p is not locked", pp);
 	}
 
-	if (pp->p_selock == 0 && PP_PR_REQ(pp)) {
+	if (pp->p_selock == 0) {
 		/*
-		 * Try to retire the page. If it retires, great.
-		 * If not, oh well, we'll get it in the next unlock
-		 * request, and repeat the cycle.  Regardless,
-		 * page_tryretire() will drop the page lock.
+		 * If the T_CAPTURING bit is set, that means that we should
+		 * not try and capture the page again as we could recurse
+		 * which could lead to a stack overflow panic or spending a
+		 * relatively long time in the kernel making no progress.
 		 */
-		if ((pp->p_toxic & PR_BUSY) == 0) {
+		if ((pp->p_toxic & PR_CAPTURE) &&
+		    !(curthread->t_flag & T_CAPTURING) &&
+		    !PP_RETIRED(pp)) {
 			THREAD_KPRI_REQUEST();
 			pp->p_selock = SE_WRITER;
-			page_settoxic(pp, PR_BUSY);
 			mutex_exit(pse);
-			page_tryretire(pp);
+			page_unlock_capture(pp);
 		} else {
-			pp->p_selock = SE_WRITER;
-			page_clrtoxic(pp, PR_BUSY);
-			pp->p_selock = 0;
 			mutex_exit(pse);
 		}
 	} else {
@@ -734,6 +732,12 @@ page_lock_delete(page_t *pp)
 	if (CV_HAS_WAITERS(&pp->p_cv))
 		cv_broadcast(&pp->p_cv);
 	mutex_exit(pse);
+}
+
+int
+page_deleted(page_t *pp)
+{
+	return (pp->p_selock == SE_DELETED);
 }
 
 /*

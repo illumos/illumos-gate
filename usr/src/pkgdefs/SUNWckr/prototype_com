@@ -93,6 +93,7 @@ e preserve kernel/drv/log.conf 644 root sys
 f none kernel/drv/mm.conf 644 root sys
 f none kernel/drv/openeepr.conf 644 root sys
 f none kernel/drv/options.conf 644 root sys
+f none kernel/drv/physmem.conf 644 root sys
 f none kernel/drv/poll.conf 644 root sys
 f none kernel/drv/pseudo.conf 644 root sys
 f none kernel/drv/ptc.conf 644 root sys

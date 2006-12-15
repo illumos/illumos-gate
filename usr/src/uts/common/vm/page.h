@@ -667,6 +667,7 @@ void	page_free_at_startup(page_t *);
 void	page_free_pages(page_t *);
 void	free_vp_pages(struct vnode *, u_offset_t, size_t);
 int	page_reclaim(page_t *, kmutex_t *);
+int	page_reclaim_pages(page_t *, kmutex_t *, uint_t);
 void	page_destroy(page_t *, int);
 void	page_destroy_pages(page_t *);
 void	page_destroy_free(page_t *);
@@ -702,8 +703,9 @@ int	page_try_reclaim_lock(page_t *, se_t, int);
 int	page_tryupgrade(page_t *);
 void	page_downgrade(page_t *);
 void	page_unlock(page_t *);
-void	page_unlock_noretire(page_t *);
+void	page_unlock_nocapture(page_t *);
 void	page_lock_delete(page_t *);
+int	page_deleted(page_t *);
 int	page_pp_lock(page_t *, int, int);
 void	page_pp_unlock(page_t *, int, int);
 int	page_resv(pgcnt_t, uint_t);
@@ -725,7 +727,7 @@ page_t	*page_nextn(page_t *, ulong_t);
 page_t	*page_next_scan_init(void **);
 page_t	*page_next_scan_large(page_t *, ulong_t *, void **);
 void    prefetch_page_r(void *);
-void	ppcopy(page_t *, page_t *);
+int	ppcopy(page_t *, page_t *);
 void	page_relocate_hash(page_t *, page_t *);
 void	pagezero(page_t *, uint_t, uint_t);
 void	pagescrub(page_t *, uint_t, uint_t);
@@ -750,8 +752,7 @@ int	page_retire_check(uint64_t, uint64_t *);
 int	page_unretire(uint64_t);
 int	page_unretire_pp(page_t *, int);
 void	page_tryretire(page_t *);
-void	page_retire_hunt(void (*)(page_t *));
-void	page_retire_mdboot_cb(page_t *);
+void	page_retire_mdboot();
 void	page_clrtoxic(page_t *, uchar_t);
 void	page_settoxic(page_t *, uchar_t);
 
@@ -910,6 +911,15 @@ int	page_szc_user_filtered(size_t);
  *
  * Note that, while p_toxic bits can be set without holding any locks, they
  * should only be cleared while holding the page exclusively locked.
+ * There is one exception to this, the PR_CAPTURE bit is protected by a mutex
+ * within the page capture logic and thus to set or clear the bit, that mutex
+ * needs to be held.  The page does not need to be locked but the page_clrtoxic
+ * function must be used as we need an atomic operation.
+ * Also note that there is what amounts to a hack to prevent recursion with
+ * large pages such that if we are unlocking a page and the PR_CAPTURE bit is
+ * set, we will only try to capture the page if the current threads T_CAPTURING
+ * flag is not set.  If the flag is set, the unlock will not try to capture
+ * the page even though the PR_CAPTURE bit is set.
  *
  * Pages with PR_UE or PR_FMA flags are retired unconditionally, while pages
  * with PR_MCE are retired if the system has not retired too many of them.
@@ -931,15 +941,15 @@ int	page_szc_user_filtered(size_t);
 #define	PR_UE		0x02	/* page has an unhandled UE */
 #define	PR_UE_SCRUBBED	0x04	/* page has seen a UE but was cleaned */
 #define	PR_FMA		0x08	/* A DE wants this page retired */
-#define	PR_RESV		0x10	/* Reserved for future use */
-#define	PR_BUSY		0x20	/* Page retire is in progress */
+#define	PR_CAPTURE	0x10	/* Generic page capture flag */
+#define	PR_RESV		0x20	/* Reserved for future use */
 #define	PR_MSG		0x40	/* message(s) already printed for this page */
 #define	PR_RETIRED	0x80	/* This page has been retired */
 
 #define	PR_REASONS	(PR_UE | PR_MCE | PR_FMA)
 #define	PR_TOXIC	(PR_UE)
 #define	PR_ERRMASK	(PR_UE | PR_UE_SCRUBBED | PR_MCE | PR_FMA)
-#define	PR_ALLFLAGS	(0xFF)
+#define	PR_TOXICFLAGS	(0xCF)
 
 #define	PP_RETIRED(pp)	((pp)->p_toxic & PR_RETIRED)
 #define	PP_TOXIC(pp)	((pp)->p_toxic & PR_TOXIC)
@@ -947,6 +957,13 @@ int	page_szc_user_filtered(size_t);
 #define	PP_PR_NOSHARE(pp)						\
 	((((pp)->p_toxic & (PR_RETIRED | PR_FMA | PR_UE)) == PR_FMA) &&	\
 	!PP_ISKVP(pp))
+
+/*
+ * Flags for page_unretire_pp
+ */
+#define	PR_UNR_FREE	0x1
+#define	PR_UNR_CLEAN	0x2
+#define	PR_UNR_TEMP	0x4
 
 /*
  * kpm large page description.
@@ -1063,6 +1080,57 @@ extern uint64_t memsegspa;		/* memsegs as physical address */
 
 void build_pfn_hash();
 extern struct memseg *page_numtomemseg_nolock(pfn_t pfnum);
+
+/*
+ * page capture related info:
+ * The page capture routines allow us to asynchronously capture given pages
+ * for the explicit use of the requestor.  New requestors can be added by
+ * explicitly adding themselves to the PC_* flags below and incrementing
+ * PC_NUM_CALLBACKS as necessary.
+ *
+ * Subsystems using page capture must register a callback before attempting
+ * to capture a page.  A duration of -1 will indicate that we will never give
+ * up while trying to capture a page and will only stop trying to capture the
+ * given page once we have successfully captured it.  Thus the user needs to be
+ * aware of the behavior of all callers who have a duration of -1.
+ *
+ * For now, only /dev/physmem and page retire use the page capture interface
+ * and only a single request can be outstanding for a given page.  Thus, if
+ * /dev/phsymem wants a page and page retire also wants the same page, only
+ * the page retire request will be honored until the point in time that the
+ * page is actually retired, at which point in time, subsequent requests by
+ * /dev/physmem will succeed if the CAPTURE_GET_RETIRED flag was set.
+ */
+
+#define	PC_RETIRE		(0)
+#define	PC_PHYSMEM		(1)
+#define	PC_NUM_CALLBACKS	(2)
+#define	PC_MASK			((1 << PC_NUM_CALLBACKS) - 1)
+
+#define	CAPTURE_RETIRE		(1 << PC_RETIRE)
+#define	CAPTURE_PHYSMEM		(1 << PC_PHYSMEM)
+
+#define	CAPTURE_ASYNC		(0x0200)
+
+#define	CAPTURE_GET_RETIRED	(0x1000)
+#define	CAPTURE_GET_CAGE	(0x2000)
+
+struct page_capture_callback {
+	int cb_active;		/* 1 means active, 0 means inactive */
+	clock_t duration;	/* the length in time that we'll attempt to */
+				/* capture this page asynchronously. (in HZ) */
+	krwlock_t cb_rwlock;
+	int (*cb_func)(page_t *, void *, uint_t); /* callback function */
+};
+
+extern kcondvar_t pc_cv;
+
+void page_capture_register_callback(uint_t index, clock_t duration,
+    int (*cb_func)(page_t *, void *, uint_t));
+void page_capture_unregister_callback(uint_t index);
+int page_trycapture(page_t *pp, uint_t szc, uint_t flags, void *datap);
+void page_unlock_capture(page_t *pp);
+int page_capture_unretire_pp(page_t *);
 
 #ifdef	__cplusplus
 }

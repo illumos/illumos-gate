@@ -1992,7 +1992,7 @@ fail:
  * Note that the ref/mod bits in the page_t's are not affected by
  * this operation, hence it is up to the caller to update them appropriately.
  */
-void
+int
 ppcopy(page_t *frompp, page_t *topp)
 {
 	caddr_t		pp_addr1;
@@ -2000,6 +2000,8 @@ ppcopy(page_t *frompp, page_t *topp)
 	void		*pte1;
 	void		*pte2;
 	kmutex_t	*ppaddr_mutex;
+	label_t		ljb;
+	int		ret = 1;
 
 	ASSERT_STACK_ALIGNED();
 	ASSERT(PAGE_LOCKED(frompp));
@@ -2030,14 +2032,21 @@ ppcopy(page_t *frompp, page_t *topp)
 		    HAT_LOAD_NOCONSIST);
 	}
 
+	if (on_fault(&ljb)) {
+		ret = 0;
+		goto faulted;
+	}
 	if (use_sse_pagecopy)
 		hwblkpagecopy(pp_addr1, pp_addr2);
 	else
 		bcopy(pp_addr1, pp_addr2, PAGESIZE);
 
+	no_fault();
+faulted:
 	if (!kpm_enable)
 		mutex_exit(ppaddr_mutex);
 	kpreempt_enable();
+	return (ret);
 }
 
 /*

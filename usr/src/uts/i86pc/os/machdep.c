@@ -200,7 +200,10 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	if (invoke_cb)
 		(void) callb_execute_class(CB_CL_MDBOOT, NULL);
 
-	page_retire_hunt(page_retire_mdboot_cb);
+	/*
+	 * Clear any unresolved UEs from memory.
+	 */
+	page_retire_mdboot();
 
 	/*
 	 * stop other cpus and raise our priority.  since there is only

@@ -102,6 +102,7 @@ f none kernel/drv/sparcv9/mouse8042 755 root sys
 f none kernel/drv/sparcv9/openeepr 755 root sys
 f none kernel/drv/sparcv9/options 755 root sys
 f none kernel/drv/sparcv9/pci_pci 755 root sys
+f none kernel/drv/sparcv9/physmem 755 root sys
 f none kernel/drv/sparcv9/poll 755 root sys
 f none kernel/drv/sparcv9/pseudo 755 root sys
 f none kernel/drv/sparcv9/ptc 755 root sys

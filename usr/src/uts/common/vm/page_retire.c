@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -85,28 +84,24 @@
 /*
  * Things to fix:
  *
- * 	1. Cleanup SE_EWANTED.  Since we're aggressive about trying to retire
- *	pages, we can use page_retire_pp() to replace SE_EWANTED and all
- *	the special delete_memory_thread() code just goes away.
- *
- * 	2. Trying to retire non-relocatable kvp pages may result in a
+ * 	1. Trying to retire non-relocatable kvp pages may result in a
  *      quagmire. This is because seg_kmem() no longer keeps its pages locked,
  *      and calls page_lookup() in the free path; since kvp pages are modified
  *      and don't have a usable backing store, page_retire() can't do anything
  *      with them, and we'll keep denying the lock to seg_kmem_free() in a
  *      vicious cycle. To prevent that, we don't deny locks to kvp pages, and
- *      hence only call page_retire_pp() from page_unlock() in the free path.
+ *      hence only try to retire a page from page_unlock() in the free path.
  *      Since most kernel pages are indefinitely held anyway, and don't
  *      participate in I/O, this is of little consequence.
  *
- *      3. Low memory situations will be interesting. If we don't have
+ *      2. Low memory situations will be interesting. If we don't have
  *      enough memory for page_relocate() to succeed, we won't be able to
  *      retire dirty pages; nobody will be able to push them out to disk
  *      either, since we aggressively deny the page lock. We could change
  *      fsflush so it can recognize this situation, grab the lock, and push
  *      the page out, where we'll catch it in the free path and retire it.
  *
- *	4. Beware of places that have code like this in them:
+ *	3. Beware of places that have code like this in them:
  *
  *		if (! page_tryupgrade(pp)) {
  *			page_unlock(pp);
@@ -125,7 +120,7 @@
  *	page, and then unlock the page. Page_free() will then go castors
  *	up. So if anybody is doing this, it's already a bug.
  *
- *      5. mdboot()'s call into page_retire_hunt() should probably be
+ *      4. mdboot()'s call into page_retire_mdboot() should probably be
  *      moved lower. Where the call is made now, we can get into trouble
  *      by scrubbing a kernel page that is then accessed later.
  */
@@ -154,18 +149,7 @@
  */
 vnode_t *retired_pages;
 
-/*
- * Background thread that wakes up periodically to try to retire pending
- * pages. This prevents threads from becoming blocked indefinitely in
- * page_lookup() or some other routine should the page(s) they are waiting
- * on become eligible for social security.
- */
-static void page_retire_thread(void);
-static kthread_t *pr_thread_id;
-static kcondvar_t pr_cv;
-static kmutex_t pr_thread_mutex;
-static clock_t pr_thread_shortwait;
-static clock_t pr_thread_longwait;
+static int page_retire_pp_finish(page_t *, void *, uint_t);
 
 /*
  * Make a list of all of the pages that have been marked for retirement
@@ -241,6 +225,13 @@ static kstat_t  *page_retire_ksp = NULL;
 #define	PR_KSTAT_PENDING	(page_retire_kstat.pr_pending.value.ui64)
 #define	PR_KSTAT_EQFAIL		(page_retire_kstat.pr_enqueue_fail.value.ui64)
 #define	PR_KSTAT_DQFAIL		(page_retire_kstat.pr_dequeue_fail.value.ui64)
+
+/*
+ * page retire kstats to list all retired pages
+ */
+static int pr_list_kstat_update(kstat_t *ksp, int rw);
+static int pr_list_kstat_snapshot(kstat_t *ksp, void *buf, int rw);
+kmutex_t pr_list_kstat_mutex;
 
 /*
  * Limit the number of multiple CE page retires.
@@ -473,11 +464,13 @@ page_settoxic(page_t *pp, uchar_t bits)
  * Note that multiple bits may cleared in a single clrtoxic operation.
  * Must be called with the page exclusively locked to prevent races which
  * may attempt to retire a page without any toxic bits set.
+ * Note that the PR_CAPTURE bit can be cleared without the exclusive lock
+ * being held as there is a separate mutex which protects that bit.
  */
 void
 page_clrtoxic(page_t *pp, uchar_t bits)
 {
-	ASSERT(PAGE_EXCL(pp));
+	ASSERT((bits & PR_CAPTURE) || PAGE_EXCL(pp));
 	atomic_and_8(&pp->p_toxic, ~bits);
 }
 
@@ -523,82 +516,6 @@ page_retire_done(page_t *pp, int code)
 }
 
 /*
- * On a reboot, our friend mdboot() wants to clear up any PP_PR_REQ() pages
- * that we were not able to retire. On large machines, walking the complete
- * page_t array and looking at every page_t takes too long. So, as a page is
- * marked toxic, we track it using a list that can be processed at reboot
- * time.  page_retire_enqueue() will do its best to try to avoid duplicate
- * entries, but if we get too many errors at once the queue can overflow,
- * in which case we will end up walking every page_t as a last resort.
- * The background thread also makes use of this queue to find which pages
- * are pending retirement.
- */
-static void
-page_retire_enqueue(page_t *pp)
-{
-	int	nslot = -1;
-	int	i;
-
-	mutex_enter(&pr_q_mutex);
-
-	/*
-	 * Check to make sure retire hasn't already dequeued it.
-	 * In the meantime if the page was cleaned up, no need
-	 * to enqueue it.
-	 */
-	if (PP_RETIRED(pp) || pp->p_toxic == 0) {
-		mutex_exit(&pr_q_mutex);
-		PR_DEBUG(prd_noaction);
-		return;
-	}
-
-	for (i = 0; i < PR_PENDING_QMAX; i++) {
-		if (pr_pending_q[i] == pp) {
-			mutex_exit(&pr_q_mutex);
-			PR_DEBUG(prd_qdup);
-			return;
-		} else if (nslot == -1 && pr_pending_q[i] == NULL) {
-			nslot = i;
-		}
-	}
-
-	PR_INCR_KSTAT(pr_pending);
-
-	if (nslot != -1) {
-		pr_pending_q[nslot] = pp;
-		PR_DEBUG(prd_queued);
-	} else {
-		PR_INCR_KSTAT(pr_enqueue_fail);
-		PR_DEBUG(prd_notqueued);
-	}
-	mutex_exit(&pr_q_mutex);
-}
-
-static void
-page_retire_dequeue(page_t *pp)
-{
-	int i;
-
-	mutex_enter(&pr_q_mutex);
-
-	for (i = 0; i < PR_PENDING_QMAX; i++) {
-		if (pr_pending_q[i] == pp) {
-			pr_pending_q[i] = NULL;
-			break;
-		}
-	}
-
-	if (i == PR_PENDING_QMAX) {
-		PR_INCR_KSTAT(pr_dequeue_fail);
-	}
-
-	PR_DECR_KSTAT(pr_pending);
-	PR_DEBUG(prd_dequeue);
-
-	mutex_exit(&pr_q_mutex);
-}
-
-/*
  * Act like page_destroy(), but instead of freeing the page, hash it onto
  * the retired_pages vnode, and mark it retired.
  *
@@ -626,8 +543,6 @@ page_retire_destroy(page_t *pp)
 	}
 
 	page_settoxic(pp, PR_RETIRED);
-	page_clrtoxic(pp, PR_BUSY);
-	page_retire_dequeue(pp);
 	PR_INCR_KSTAT(pr_retired);
 
 	if (pp->p_toxic & PR_FMA) {
@@ -784,8 +699,7 @@ page_retire_transient_ue(page_t *pp)
 		} else {
 			PR_INCR_KSTAT(pr_ue_cleared_free);
 
-			page_clrtoxic(pp, PR_UE | PR_MCE | PR_MSG | PR_BUSY);
-			page_retire_dequeue(pp);
+			page_clrtoxic(pp, PR_UE | PR_MCE | PR_MSG);
 
 			/* LINTED: CONSTCOND */
 			VN_DISPOSE(pp, B_FREE, 1, kcred);
@@ -825,6 +739,83 @@ page_retire_kstat_update(kstat_t *ksp, int rw)
 	/*NOTREACHED*/
 }
 
+static int
+pr_list_kstat_update(kstat_t *ksp, int rw)
+{
+	uint_t count;
+	page_t *pp;
+	kmutex_t *vphm;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	vphm = page_vnode_mutex(retired_pages);
+	mutex_enter(vphm);
+	/* Needs to be under a lock so that for loop will work right */
+	if (retired_pages->v_pages == NULL) {
+		mutex_exit(vphm);
+		ksp->ks_ndata = 0;
+		ksp->ks_data_size = 0;
+		return (0);
+	}
+
+	count = 1;
+	for (pp = retired_pages->v_pages->p_vpnext;
+	    pp != retired_pages->v_pages; pp = pp->p_vpnext) {
+		count++;
+	}
+	mutex_exit(vphm);
+
+	ksp->ks_ndata = count;
+	ksp->ks_data_size = count * 2 * sizeof (uint64_t);
+
+	return (0);
+}
+
+/*
+ * all spans will be pagesize and no coalescing will be done with the
+ * list produced.
+ */
+static int
+pr_list_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
+{
+	kmutex_t *vphm;
+	page_t *pp;
+	struct memunit {
+		uint64_t address;
+		uint64_t size;
+	} *kspmem;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	ksp->ks_snaptime = gethrtime();
+
+	kspmem = (struct memunit *)buf;
+
+	vphm = page_vnode_mutex(retired_pages);
+	mutex_enter(vphm);
+	pp = retired_pages->v_pages;
+	if (((caddr_t)kspmem >= (caddr_t)buf + ksp->ks_data_size) ||
+	    (pp == NULL)) {
+		mutex_exit(vphm);
+		return (0);
+	}
+	kspmem->address = ptob(pp->p_pagenum);
+	kspmem->size = PAGESIZE;
+	kspmem++;
+	for (pp = pp->p_vpnext; pp != retired_pages->v_pages;
+	    pp = pp->p_vpnext, kspmem++) {
+		if ((caddr_t)kspmem >= (caddr_t)buf + ksp->ks_data_size)
+			break;
+		kspmem->address = ptob(pp->p_pagenum);
+		kspmem->size = PAGESIZE;
+	}
+	mutex_exit(vphm);
+
+	return (0);
+}
+
 /*
  * Initialize the page retire mechanism:
  *
@@ -833,13 +824,14 @@ page_retire_kstat_update(kstat_t *ksp, int rw)
  *   - Build the retired_pages vnode.
  *   - Set up the kstats.
  *   - Fire off the background thread.
- *   - Tell page_tryretire() it's OK to start retiring pages.
+ *   - Tell page_retire() it's OK to start retiring pages.
  */
 void
 page_retire_init(void)
 {
 	const fs_operation_def_t retired_vnodeops_template[] = {NULL, NULL};
 	struct vnodeops *vops;
+	kstat_t *ksp;
 
 	const uint_t page_retire_ndata =
 	    sizeof (page_retire_kstat) / sizeof (kstat_named_t);
@@ -869,13 +861,17 @@ page_retire_init(void)
 		kstat_install(page_retire_ksp);
 	}
 
-	pr_thread_shortwait = 23 * hz;
-	pr_thread_longwait = 1201 * hz;
-	mutex_init(&pr_thread_mutex, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&pr_cv, NULL, CV_DEFAULT, NULL);
-	pr_thread_id = thread_create(NULL, 0, page_retire_thread, NULL, 0, &p0,
-	    TS_RUN, minclsyspri);
+	mutex_init(&pr_list_kstat_mutex, NULL, MUTEX_DEFAULT, NULL);
+	ksp = kstat_create("unix", 0, "page_retire_list", "misc",
+	    KSTAT_TYPE_RAW, 0, KSTAT_FLAG_VAR_SIZE | KSTAT_FLAG_VIRTUAL);
+	if (ksp != NULL) {
+		ksp->ks_update = pr_list_kstat_update;
+		ksp->ks_snapshot = pr_list_kstat_snapshot;
+		ksp->ks_lock = &pr_list_kstat_mutex;
+		kstat_install(ksp);
+	}
 
+	page_capture_register_callback(PC_RETIRE, -1, page_retire_pp_finish);
 	pr_enable = 1;
 }
 
@@ -914,122 +910,17 @@ page_retire_mdboot_cb(page_t *pp)
 	pp->p_toxic = 0;
 }
 
-/*
- * Hunt down any pages in the system that have not yet been retired, invoking
- * the provided callback function on each of them.
- */
-void
-page_retire_hunt(void (*callback)(page_t *))
-{
-	page_t *pp;
-	page_t *first;
-	uint64_t tbr, found;
-	int i;
-
-	PR_DEBUG(prd_hunt);
-
-	if (PR_KSTAT_PENDING == 0) {
-		return;
-	}
-
-	PR_DEBUG(prd_dohunt);
-
-	found = 0;
-	mutex_enter(&pr_q_mutex);
-
-	tbr = PR_KSTAT_PENDING;
-
-	for (i = 0; i < PR_PENDING_QMAX; i++) {
-		if ((pp = pr_pending_q[i]) != NULL) {
-			mutex_exit(&pr_q_mutex);
-			callback(pp);
-			mutex_enter(&pr_q_mutex);
-			found++;
-		}
-	}
-
-	if (PR_KSTAT_EQFAIL == PR_KSTAT_DQFAIL && found == tbr) {
-		mutex_exit(&pr_q_mutex);
-		PR_DEBUG(prd_earlyhunt);
-		return;
-	}
-	mutex_exit(&pr_q_mutex);
-
-	PR_DEBUG(prd_latehunt);
-
-	/*
-	 * We've lost track of a page somewhere. Hunt it down.
-	 */
-	memsegs_lock(0);
-	pp = first = page_first();
-	do {
-		if (PP_PR_REQ(pp)) {
-			callback(pp);
-			if (++found == tbr) {
-				break;	/* got 'em all */
-			}
-		}
-	} while ((pp = page_next(pp)) != first);
-	memsegs_unlock(0);
-}
 
 /*
- * The page_retire_thread loops forever, looking to see if there are
- * pages still waiting to be retired.
+ * Callback used by page_trycapture() to finish off retiring a page.
+ * The page has already been cleaned and we've been given sole access to
+ * it.
+ * Always returns 0 to indicate that callback succeded as the callback never
+ * fails to finish retiring the given page.
  */
-static void
-page_retire_thread(void)
-{
-	callb_cpr_t c;
-
-	CALLB_CPR_INIT(&c, &pr_thread_mutex, callb_generic_cpr, "page_retire");
-
-	mutex_enter(&pr_thread_mutex);
-	for (;;) {
-		if (pr_enable && PR_KSTAT_PENDING) {
-			/*
-			 * Sigh. It's SO broken how we have to try to shake
-			 * loose the holder of the page. Since we have no
-			 * idea who or what has it locked, we go bang on
-			 * every door in the city to try to locate it.
-			 */
-			kmem_reap();
-			seg_preap();
-			page_retire_hunt(page_retire_thread_cb);
-			CALLB_CPR_SAFE_BEGIN(&c);
-			(void) cv_timedwait(&pr_cv, &pr_thread_mutex,
-			    lbolt + pr_thread_shortwait);
-			CALLB_CPR_SAFE_END(&c, &pr_thread_mutex);
-		} else {
-			CALLB_CPR_SAFE_BEGIN(&c);
-			(void) cv_timedwait(&pr_cv, &pr_thread_mutex,
-			    lbolt + pr_thread_longwait);
-			CALLB_CPR_SAFE_END(&c, &pr_thread_mutex);
-		}
-	}
-	/*NOTREACHED*/
-}
-
-/*
- * page_retire_pp() decides what to do with a failing page.
- *
- * When we get a free page (e.g. the scrubber or in the free path) life is
- * nice because the page is clean and marked free -- those always retire
- * nicely. From there we go by order of difficulty. If the page has data,
- * we attempt to relocate its contents to a suitable replacement page. If
- * that does not succeed, we look to see if it is clean. If after all of
- * this we have a clean, unmapped page (which we usually do!), we retire it.
- * If the page is not clean, we still process it regardless on a UE; for
- * CEs or FMA requests, we fail leaving the page in service. The page will
- * eventually be tried again later. We always return with the page unlocked
- * since we are called from page_unlock().
- *
- * We don't call panic or do anything fancy down in here. Our boss the DE
- * gets paid handsomely to do his job of figuring out what to do when errors
- * occur. We just do what he tells us to do.
- */
+/*ARGSUSED*/
 static int
-page_retire_pp(page_t *pp)
+page_retire_pp_finish(page_t *pp, void *notused, uint_t flags)
 {
 	int		toxic;
 
@@ -1037,102 +928,7 @@ page_retire_pp(page_t *pp)
 	ASSERT(pp->p_iolock_state == 0);
 	ASSERT(pp->p_szc == 0);
 
-	PR_DEBUG(prd_top);
-	PR_TYPES(pp);
-
 	toxic = pp->p_toxic;
-	ASSERT(toxic & PR_REASONS);
-
-	if ((toxic & (PR_FMA | PR_MCE)) && !(toxic & PR_UE) &&
-	    page_retire_limit()) {
-		page_clrtoxic(pp, PR_FMA | PR_MCE | PR_MSG | PR_BUSY);
-		page_retire_dequeue(pp);
-		page_unlock(pp);
-		return (page_retire_done(pp, PRD_LIMIT));
-	}
-
-	if (PP_ISFREE(pp)) {
-		int dbgnoreclaim = MTBF(recl_calls, recl_mtbf) == 0;
-
-		PR_DEBUG(prd_free);
-
-		if (dbgnoreclaim || !page_reclaim(pp, NULL)) {
-			PR_DEBUG(prd_noreclaim);
-			PR_INCR_KSTAT(pr_failed);
-			/*
-			 * page_reclaim() returns with `pp' unlocked when
-			 * it fails.
-			 */
-			if (dbgnoreclaim)
-				page_unlock(pp);
-			return (page_retire_done(pp, PRD_FAILED));
-		}
-	}
-	ASSERT(!PP_ISFREE(pp));
-
-	if ((toxic & PR_UE) == 0 && pp->p_vnode && !PP_ISNORELOCKERNEL(pp) &&
-	    MTBF(reloc_calls, reloc_mtbf)) {
-		page_t *newpp;
-		spgcnt_t count;
-
-		/*
-		 * If we can relocate the page, great! newpp will go
-		 * on without us, and everything is fine.  Regardless
-		 * of whether the relocation succeeds, we are still
-		 * going to take `pp' around back and shoot it.
-		 */
-		newpp = NULL;
-		if (page_relocate(&pp, &newpp, 0, 0, &count, NULL) == 0) {
-			PR_DEBUG(prd_reloc);
-			page_unlock(newpp);
-			ASSERT(hat_page_getattr(pp, P_MOD) == 0);
-		} else {
-			PR_DEBUG(prd_relocfail);
-		}
-	}
-
-	if (hat_ismod(pp)) {
-		PR_DEBUG(prd_mod);
-		PR_INCR_KSTAT(pr_failed);
-		page_unlock(pp);
-		return (page_retire_done(pp, PRD_FAILED));
-	}
-
-	if (PP_ISKVP(pp)) {
-		PR_DEBUG(prd_kern);
-		PR_INCR_KSTAT(pr_failed_kernel);
-		page_unlock(pp);
-		return (page_retire_done(pp, PRD_FAILED));
-	}
-
-	if (pp->p_lckcnt || pp->p_cowcnt) {
-		PR_DEBUG(prd_locked);
-		PR_INCR_KSTAT(pr_failed);
-		page_unlock(pp);
-		return (page_retire_done(pp, PRD_FAILED));
-	}
-
-	(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
-	ASSERT(!hat_page_is_mapped(pp));
-
-	/*
-	 * If the page is modified, and was not relocated; we can't
-	 * retire it without dropping data on the floor. We have to
-	 * recheck after unloading since the dirty bit could have been
-	 * set since we last checked.
-	 */
-	if (hat_ismod(pp)) {
-		PR_DEBUG(prd_mod_late);
-		PR_INCR_KSTAT(pr_failed);
-		page_unlock(pp);
-		return (page_retire_done(pp, PRD_FAILED));
-	}
-
-	if (pp->p_vnode) {
-		PR_DEBUG(prd_hashout);
-		page_hashout(pp, NULL);
-	}
-	ASSERT(!pp->p_vnode);
 
 	/*
 	 * The problem page is locked, demoted, unmapped, not free,
@@ -1141,62 +937,45 @@ page_retire_pp(page_t *pp)
 	 * Now we select our ammunition, take it around back, and shoot it.
 	 */
 	if (toxic & PR_UE) {
+ue_error:
 		if (page_retire_transient_ue(pp)) {
 			PR_DEBUG(prd_uescrubbed);
-			return (page_retire_done(pp, PRD_UE_SCRUBBED));
+			(void) page_retire_done(pp, PRD_UE_SCRUBBED);
 		} else {
 			PR_DEBUG(prd_uenotscrubbed);
 			page_retire_destroy(pp);
-			return (page_retire_done(pp, PRD_SUCCESS));
+			(void) page_retire_done(pp, PRD_SUCCESS);
 		}
+		return (0);
 	} else if (toxic & PR_FMA) {
 		PR_DEBUG(prd_fma);
 		page_retire_destroy(pp);
-		return (page_retire_done(pp, PRD_SUCCESS));
+		(void) page_retire_done(pp, PRD_SUCCESS);
+		return (0);
 	} else if (toxic & PR_MCE) {
 		PR_DEBUG(prd_mce);
 		page_retire_destroy(pp);
-		return (page_retire_done(pp, PRD_SUCCESS));
-	}
-	panic("page_retire_pp: bad toxic flags %d", toxic);
-	/*NOTREACHED*/
-}
-
-/*
- * Try to retire a page when we stumble onto it in the page lock routines.
- */
-void
-page_tryretire(page_t *pp)
-{
-	ASSERT(PAGE_EXCL(pp));
-
-	if (!pr_enable) {
-		page_unlock(pp);
-		return;
+		(void) page_retire_done(pp, PRD_SUCCESS);
+		return (0);
 	}
 
 	/*
-	 * If the page is a big page, try to break it up.
-	 *
-	 * If there are other bad pages besides `pp', they will be
-	 * recursively retired for us thanks to a bit of magic.
-	 * If the page is a small page with errors, try to retire it.
+	 * When page_retire_first_ue is set to zero and a UE occurs which is
+	 * transient, it's possible that we clear some flags set by a second
+	 * UE error on the page which occurs while the first is currently being
+	 * handled and thus we need to handle the case where none of the above
+	 * are set.  In this instance, PR_UE_SCRUBBED should be set and thus
+	 * we should execute the UE code above.
 	 */
-	if (pp->p_szc > 0) {
-		if (PP_ISFREE(pp) && !page_try_demote_free_pages(pp)) {
-			page_unlock(pp);
-			PR_DEBUG(prd_nofreedemote);
-			return;
-		} else if (!page_try_demote_pages(pp)) {
-			page_unlock(pp);
-			PR_DEBUG(prd_nodemote);
-			return;
-		}
-		PR_DEBUG(prd_demoted);
-		page_unlock(pp);
-	} else {
-		(void) page_retire_pp(pp);
+	if (toxic & PR_UE_SCRUBBED) {
+		goto ue_error;
 	}
+
+	/*
+	 * It's impossible to get here.
+	 */
+	panic("bad toxic flags 0x%x in page_retire_pp_finish\n", toxic);
+	return (0);
 }
 
 /*
@@ -1204,12 +983,10 @@ page_tryretire(page_t *pp)
  *
  * Ideally, page_retire() would instantly retire the requested page.
  * Unfortunately, some pages are locked or otherwise tied up and cannot be
- * retired right away. To deal with that, bits are set in p_toxic of the
- * page_t. An attempt is made to lock the page; if the attempt is successful,
- * we instantly unlock the page counting on page_unlock() to notice p_toxic
- * is nonzero and to call back into page_retire_pp(). Success is determined
- * by looking to see whether the page has been retired once it has been
- * unlocked.
+ * retired right away.  We use the page capture logic to deal with this
+ * situation as it will continuously try to retire the page in the background
+ * if the first attempt fails.  Success is determined by looking to see whether
+ * the page has been retired after the page_trycapture() attempt.
  *
  * Returns:
  *
@@ -1247,22 +1024,20 @@ page_retire(uint64_t pa, uchar_t reason)
 		PR_MESSAGE(CE_NOTE, 1, "Scheduling removal of"
 		    " page 0x%08x.%08x", pa);
 	}
-	page_settoxic(pp, reason);
-	page_retire_enqueue(pp);
 
-	/*
-	 * And now for some magic.
-	 *
-	 * We marked this page toxic up above.  All there is left to do is
-	 * to try to lock the page and then unlock it.  The page lock routines
-	 * will intercept the page and retire it if they can.  If the page
-	 * cannot be locked, 's okay -- page_unlock() will eventually get it,
-	 * or the background thread, until then the lock routines will deny
-	 * further locks on it.
-	 */
-	if (MTBF(pr_calls, pr_mtbf) && page_trylock(pp, SE_EXCL)) {
-		PR_DEBUG(prd_prlocked);
-		page_unlock(pp);
+	/* Avoid setting toxic bits in the first place */
+	if ((reason & (PR_FMA | PR_MCE)) && !(reason & PR_UE) &&
+	    page_retire_limit()) {
+		return (page_retire_done(pp, PRD_LIMIT));
+	}
+
+	if (MTBF(pr_calls, pr_mtbf)) {
+		page_settoxic(pp, reason);
+		if (page_trycapture(pp, 0, CAPTURE_RETIRE, NULL) == 0) {
+			PR_DEBUG(prd_prlocked);
+		} else {
+			PR_DEBUG(prd_prnotlocked);
+		}
 	} else {
 		PR_DEBUG(prd_prnotlocked);
 	}
@@ -1271,7 +1046,7 @@ page_retire(uint64_t pa, uchar_t reason)
 		PR_DEBUG(prd_prretired);
 		return (0);
 	} else {
-		cv_signal(&pr_cv);
+		cv_signal(&pc_cv);
 		PR_INCR_KSTAT(pr_failed);
 
 		if (pp->p_toxic & PR_MSG) {
@@ -1291,15 +1066,24 @@ page_retire(uint64_t pa, uchar_t reason)
  * Any unretire messages are printed from this routine.
  *
  * Returns 0 if page pp was unretired; else an error code.
+ *
+ * If flags is:
+ *	PR_UNR_FREE - lock the page, clear the toxic flags and free it
+ *	    to the freelist.
+ *	PR_UNR_TEMP - lock the page, unretire it, leave the toxic
+ *	    bits set as is and return it to the caller.
+ *	PR_UNR_CLEAN - page is SE_EXCL locked, unretire it, clear the
+ *	    toxic flags and return it to caller as is.
  */
 int
-page_unretire_pp(page_t *pp, int free)
+page_unretire_pp(page_t *pp, int flags)
 {
 	/*
 	 * To be retired, a page has to be hashed onto the retired_pages vnode
 	 * and have PR_RETIRED set in p_toxic.
 	 */
-	if (free == 0 || page_try_reclaim_lock(pp, SE_EXCL, SE_RETIRED)) {
+	if (flags == PR_UNR_CLEAN ||
+	    page_try_reclaim_lock(pp, SE_EXCL, SE_RETIRED)) {
 		ASSERT(PAGE_EXCL(pp));
 		PR_DEBUG(prd_ulocked);
 		if (!PP_RETIRED(pp)) {
@@ -1317,9 +1101,13 @@ page_unretire_pp(page_t *pp, int free)
 		} else {
 			PR_DECR_KSTAT(pr_mce);
 		}
-		page_clrtoxic(pp, PR_ALLFLAGS);
 
-		if (free) {
+		if (flags == PR_UNR_TEMP)
+			page_clrtoxic(pp, PR_RETIRED);
+		else
+			page_clrtoxic(pp, PR_TOXICFLAGS);
+
+		if (flags == PR_UNR_FREE) {
 			PR_DEBUG(prd_udestroy);
 			page_destroy(pp, 0);
 		} else {
@@ -1363,7 +1151,7 @@ page_unretire(uint64_t pa)
 		return (page_retire_done(pp, PRD_INVALID_PA));
 	}
 
-	return (page_unretire_pp(pp, 1));
+	return (page_unretire_pp(pp, PR_UNR_FREE));
 }
 
 /*
@@ -1462,12 +1250,14 @@ page_retire_test(void)
 				page_unlock(lpp);
 				continue;
 			}
-			page_settoxic(cpp, PR_FMA | PR_BUSY);
-			page_settoxic(cpp2, PR_FMA);
-			page_tryretire(cpp);	/* will fail */
+
+			/* fails */
+			(void) page_retire(ptob(cpp->p_pagenum), PR_FMA);
+
 			page_unlock(lpp);
-			(void) page_retire(cpp->p_pagenum, PR_FMA);
-			(void) page_retire(cpp2->p_pagenum, PR_FMA);
+			page_unlock(cpp);
+			(void) page_retire(ptob(cpp->p_pagenum), PR_FMA);
+			(void) page_retire(ptob(cpp2->p_pagenum), PR_FMA);
 		}
 	} while ((pp = page_next(pp)) != first);
 	memsegs_unlock(0);

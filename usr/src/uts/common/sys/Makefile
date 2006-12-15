@@ -370,6 +370,7 @@ CHKHDRS=			\
 	pctypes.h		\
 	pem.h			\
 	pfmod.h			\
+	physmem.h		\
 	pm.h			\
 	policy.h		\
 	poll.h			\
