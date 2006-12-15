@@ -32,11 +32,14 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
+#include <errno.h>
 #include <syslog.h>
 
 #include "drd.h"
 
 #define	DRD_MAX_MSG_LEN		512
+#define	DRD_MAX_TIME_LEN	32
 
 static char *log_prio_str[] = {
 	"EMERG: ",	/* LOG_EMERG */
@@ -49,19 +52,66 @@ static char *log_prio_str[] = {
 	""		/* LOG_DEBUG */
 };
 
+/*
+ * Generate a timestamp string in the provided buffer.
+ * If any errors are encountered, the function returns
+ * with the buffer containing an empty string.
+ */
 static void
-drd_log_msg(int priority, char *fmt, va_list vap)
+drd_timestamp(char *buf, size_t buflen)
 {
-	char	msg_str[DRD_MAX_MSG_LEN];
+	struct tm	ltime;
+	struct timeval	now;
 
-	(void) vsnprintf(msg_str, DRD_MAX_MSG_LEN, fmt, vap);
+	if ((buf == NULL) || (buflen == 0))
+		return;
 
-	if (!drd_daemonized) {
-		fprintf(stderr, "%s%s\n", log_prio_str[priority], msg_str);
+	buf[0] = '\0';
+
+	if (gettimeofday(&now, NULL) != 0) {
+		(void) fprintf(stderr, "gettimeofday failed: %s\n",
+		    strerror(errno));
 		return;
 	}
 
-	syslog(priority, msg_str);
+	if (localtime_r(&now.tv_sec, &ltime) == NULL) {
+		(void) fprintf(stderr, "localtime_r failed: %s\n",
+		    strerror(errno));
+		return;
+	}
+
+	if (strftime(buf, buflen, "%b %e %T ", &ltime) == 0) {
+		(void) fprintf(stderr, "strftime failed: buffer[%d] too "
+		    "small\n", buflen);
+		/*
+		 * On failure, the contents of the buffer
+		 * are indeterminate. Restore it to a known
+		 * state before returning.
+		 */
+		buf[0] = '\0';
+	}
+}
+
+static void
+drd_log_msg(int prio, char *fmt, va_list vap)
+{
+	char msgbuf[DRD_MAX_MSG_LEN];
+	char timebuf[DRD_MAX_TIME_LEN] = "";
+
+	/* generate a timestamp for the SMF log */
+	drd_timestamp(timebuf, sizeof (timebuf));
+
+	(void) vsnprintf(msgbuf, DRD_MAX_MSG_LEN, fmt, vap);
+
+	/*
+	 * Print the message to stderr. In daemon mode, it
+	 * will be sent to the SMF log. In standalone mode,
+	 * it will be sent to the controlling terminal.
+	 */
+	(void) fprintf(stderr, "%s%s%s\n", timebuf, log_prio_str[prio], msgbuf);
+
+	if (drd_daemonized)
+		syslog(prio, msgbuf);
 }
 
 void

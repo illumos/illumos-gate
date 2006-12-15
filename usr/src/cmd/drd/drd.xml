@@ -45,11 +45,11 @@
 	<single_instance />
 
 	<dependency
-	    name='syslog'
-	    type='service'
+	    name='filesystem-minimal'
 	    grouping='require_all'
-	    restart_on='none'>
-	    <service_fmri value='svc:/system/system-log' />
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/system/filesystem/minimal' />
 	</dependency>
 
 	<!--

@@ -360,7 +360,7 @@ drctl_config_common(int cmd, int flags, drctl_rsrc_t *res,
 	 * generate a response message, but mark all proposed
 	 * changes as 'denied'.
 	 */
-	if (rv != 0) {
+	if (rv != 0 && rbuf != NULL) {
 		*rbuf = drctl_generate_resp(res, count, &size,
 		    DRCTL_STATUS_DENY);
 		*rsize = size;

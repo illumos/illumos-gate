@@ -74,7 +74,7 @@ int
 main(int argc, char **argv)
 {
 	int		opt;
-	boolean_t	standalone = 0;
+	boolean_t	standalone = B_FALSE;
 
 	cmdname = basename(argv[0]);
 
@@ -160,14 +160,15 @@ drd_daemonize(void)
 	(void) umask(0);
 
 	/*
-	 * Initialize file descriptors
+	 * Initialize file descriptors. Do not touch stderr
+	 * which is initialized by SMF to point to the drd
+	 * specific log file.
 	 */
 	assert(drctl_fd == (STDERR_FILENO + 1));
 
 	(void) close(STDIN_FILENO);
 	(void) open("/dev/null", O_RDWR);
 	(void) dup2(STDIN_FILENO, STDOUT_FILENO);
-	(void) dup2(STDIN_FILENO, STDERR_FILENO);
 
 	closefrom(drctl_fd + 1);
 

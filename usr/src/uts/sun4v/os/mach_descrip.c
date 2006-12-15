@@ -377,8 +377,6 @@ mach_descrip_update(void)
 				goto done;
 			}
 #endif
-			cmn_err(CE_WARN, "machine_descrip_update: new MD has "
-			    "the same generation (%ld) as the old MD", tgen);
 			ret = 0;
 			goto done;
 		}

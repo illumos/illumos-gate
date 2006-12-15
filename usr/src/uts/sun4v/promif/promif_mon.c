@@ -131,7 +131,19 @@ promif_mon(int mode)
 		switch (cmd) {
 
 		case 'r':
-			prom_reboot("");
+			/*
+			 * Ideally, we would store the boot command string
+			 * as we do in promif_reboot().  However, at this
+			 * point the kernel is single-threaded and running
+			 * at a high PIL.  This environment precludes
+			 * setting ldom variables.
+			 */
+			prom_printf("Resetting...\n");
+
+			(void) hv_mach_sir();
+
+			/* should not return */
+			ASSERT(0);
 			break;
 
 		case 'h':
