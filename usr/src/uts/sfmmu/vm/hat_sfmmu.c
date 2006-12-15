@@ -1203,6 +1203,15 @@ hat_init(void)
 	 */
 	mutex_init(&kpr_mutex, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&kpr_suspendlock, NULL, MUTEX_SPIN, (void *)PIL_MAX);
+
+	/*
+	 * Pre-allocate hrm_hashtab before enabling the collection of
+	 * refmod statistics.  Allocating on the fly would mean us
+	 * running the risk of suffering recursive mutex enters or
+	 * deadlocks.
+	 */
+	hrm_hashtab = kmem_zalloc(HRM_HASHSIZE * sizeof (struct hrmstat *),
+	    KM_SLEEP);
 }
 
 /*

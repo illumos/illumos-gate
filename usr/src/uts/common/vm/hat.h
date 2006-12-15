@@ -579,6 +579,8 @@ struct hrmstat {
 	uchar_t		hrm_bits[HRM_BYTES]; /* the ref and mod bits */
 };
 
+extern struct hrmstat **hrm_hashtab;
+
 /*
  * For global monitoring of the reference and modified bits
  * of all address spaces we reserve one id bit.

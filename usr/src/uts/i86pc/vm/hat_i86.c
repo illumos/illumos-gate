@@ -715,6 +715,15 @@ hat_init()
 	 */
 	kas.a_hat->hat_ht_cached = NULL;
 	kas.a_hat->hat_htable = NULL;
+
+	/*
+	 * Pre-allocate hrm_hashtab before enabling the collection of
+	 * refmod statistics.  Allocating on the fly would mean us
+	 * running the risk of suffering recursive mutex enters or
+	 * deadlocks.
+	 */
+	hrm_hashtab = kmem_zalloc(HRM_HASHSIZE * sizeof (struct hrmstat *),
+	    KM_SLEEP);
 }
 
 /*

@@ -57,7 +57,6 @@ int hrm_allocfailmsg = 0;	/* print a message when allocations fail */
 int hrm_allocfail = 0;
 
 static struct hrmstat	*hrm_balloc(void);
-static void	hrm_init(void);
 static void	hrm_link(struct hrmstat *);
 static void	hrm_setbits(struct hrmstat *, caddr_t, uint_t);
 static void	hrm_hashout(struct hrmstat *);
@@ -101,10 +100,6 @@ hat_startstat(struct as *as)
 	uint_t id;		/* new vbit, identifier */
 	uint_t vbits;		/* used vbits of address space */
 	size_t chunk;		/* mapped size for stats */
-	/*
-	 * Initialize global data, if needed.
-	 */
-	hrm_init();
 
 	/*
 	 * If the refmod saving memory allocator runs out, print
@@ -170,22 +165,7 @@ hat_setstat(struct as *as, caddr_t addr, size_t len, uint_t rmbits)
 	if (rmbits == 0)
 		return;
 
-	/*
-	 * Initialize global data, if needed.
-	 */
-	hrm_init();
-
 	mutex_enter(&hat_statlock);
-
-	/*
-	 * The previous owner of hat_statlock could have been
-	 * hat_freestat(). Check whether hrm_hashtab is NULL, if it is,
-	 * we bail out.
-	 */
-	if (hrm_hashtab == NULL) {
-		mutex_exit(&hat_statlock);
-		return;
-	}
 
 	/*
 	 * Search the hash list for the as and addr we are looking for
@@ -206,7 +186,7 @@ hat_setstat(struct as *as, caddr_t addr, size_t len, uint_t rmbits)
 	 * for each bit that was not found.
 	 */
 	if (vbits != as->a_vbits) {
-		newbits = vbits ^ as->a_vbits;
+		newbits = (vbits ^ as->a_vbits) & as->a_vbits;
 		while (newbits) {
 			if (ffs(newbits))
 				nb = 1 << (ffs(newbits)-1);
@@ -236,8 +216,10 @@ hat_setstat(struct as *as, caddr_t addr, size_t len, uint_t rmbits)
 void
 hat_freestat(struct as *as, int id)
 {
-	struct hrmstat *hrm, *prev_ahrm;
-	struct hrmstat **hashtab;
+	struct hrmstat *hrm;
+	struct hrmstat *prev_ahrm;
+	struct hrmstat *hrm_tmplist;
+	struct hrmstat *hrm_next;
 
 	hat_stats_disable(as->a_hat);	/* tell the hat layer to stop */
 	hat_enter(as->a_hat);
@@ -253,11 +235,7 @@ hat_freestat(struct as *as, int id)
 	hat_exit(as->a_hat);
 
 	mutex_enter(&hat_statlock);
-	if (hrm_hashtab == NULL) {
-		/* can't happen? */
-		mutex_exit(&hat_statlock);
-		return;
-	}
+
 	for (prev_ahrm = NULL; hrm; hrm = hrm->hrm_anext) {
 		if ((id == hrm->hrm_id) || (id == NULL)) {
 
@@ -284,44 +262,23 @@ hat_freestat(struct as *as, int id)
 		hrm_blist = NULL;
 		hrm_blist_num = 0;
 		hrm_blist_total = 0;
-		hrm = hrm_memlist;
+		hrm_tmplist = hrm_memlist;
 		hrm_memlist = NULL;
-		hashtab = hrm_hashtab;
-		hrm_hashtab = NULL;
 	} else {
-		hashtab = NULL;
+		hrm_tmplist = NULL;
 	}
 
 	mutex_exit(&hat_statlock);
 
-	if (hashtab != NULL) {
-		struct hrmstat *next;
-
-		kmem_free(hashtab, HRM_HASHSIZE * sizeof (char *));
-		while (hrm != NULL) {
-			next = hrm->hrm_hnext;
-			kmem_free(hrm, hrm->hrm_base);
-			hrm = next;
-		}
-	}
-}
-
-/*
- * Initialize any global state for the statistics handling.
- * Hrm_lock protects the globally allocted memory:
- *	hrm_memlist and hrm_hashtab.
- */
-static void
-hrm_init(void)
-{
 	/*
-	 * Alloacte the hashtable if it doesn't exist yet.
+	 * If there are any hrmstat structures to be freed, this must only
+	 * be done after we've released hat_statlock.
 	 */
-	mutex_enter(&hat_statlock);
-	if (hrm_hashtab == NULL)
-		hrm_hashtab =
-			kmem_zalloc(HRM_HASHSIZE * sizeof (char *), KM_SLEEP);
-	mutex_exit(&hat_statlock);
+	while (hrm_tmplist != NULL) {
+		hrm_next = hrm_tmplist->hrm_hnext;
+		kmem_free(hrm_tmplist, hrm_tmplist->hrm_base);
+		hrm_tmplist = hrm_next;
+	}
 }
 
 /*
