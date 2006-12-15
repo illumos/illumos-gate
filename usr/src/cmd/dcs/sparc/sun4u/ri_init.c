@@ -149,7 +149,7 @@ static int io_rcm_qpass(cfga_list_data_t *, rcmd_t *);
 static int (*cm_info_func(cfga_type_t))(ri_ap_t *, cfga_list_data_t *, int,
     rcmd_t *);
 static int cpu_cm_info(ri_ap_t *, cfga_list_data_t *, int, rcmd_t *);
-static int i_cpu_cm_info(processorid_t, int, ri_ap_t *, rcmd_t *);
+static int i_cpu_cm_info(processorid_t, int, int, ri_ap_t *, rcmd_t *);
 static int mem_cm_info(ri_ap_t *, cfga_list_data_t *, int, rcmd_t *);
 static int io_cm_info(ri_ap_t *, cfga_list_data_t *, int, rcmd_t *);
 static int ident_leaf(di_node_t);
@@ -943,7 +943,7 @@ cpu_cm_info(ri_ap_t *ap, cfga_list_data_t *cfga, int flags, rcmd_t *rcm)
 	    cpustr != NULL;
 	    cpustr = (char *)strtok_r(NULL, CPUID_SEP, &lasts)) {
 		cpuid = atoi(cpustr);
-		if ((rv = i_cpu_cm_info(cpuid, speed, ap, rcm)) != 0) {
+		if ((rv = i_cpu_cm_info(cpuid, speed, ecache, ap, rcm)) != 0) {
 			break;
 		}
 	}
@@ -952,7 +952,8 @@ cpu_cm_info(ri_ap_t *ap, cfga_list_data_t *cfga, int flags, rcmd_t *rcm)
 }
 
 static int
-i_cpu_cm_info(processorid_t cpuid, int speed, ri_ap_t *ap, rcmd_t *rcm)
+i_cpu_cm_info(processorid_t cpuid, int speed, int ecache_cfga, ri_ap_t *ap,
+    rcmd_t *rcm)
 {
 	int		ecache = 0;
 	char		*state, buf[32];
@@ -972,10 +973,17 @@ i_cpu_cm_info(processorid_t cpuid, int speed, ri_ap_t *ap, rcmd_t *rcm)
 		return (-1);
 	}
 
+	/*
+	 * Assume the ecache_info table has the right e-cache size for
+	 * this CPU.  Use the value found in cfgadm (ecache_cfga) if not.
+	 */
 	if (rcm->ecache_info.ecache_sizes != NULL) {
 		assert(rcm->ecache_info.cpuid_max != 0 &&
 		    cpuid <= rcm->ecache_info.cpuid_max);
 		ecache = rcm->ecache_info.ecache_sizes[cpuid] / MBYTE;
+	}
+	if (ecache == 0) {
+		ecache = ecache_cfga;
 	}
 
 	dprintf((stderr, "i_cpu_cm_info: cpu(%d) ecache=%d MB\n",
