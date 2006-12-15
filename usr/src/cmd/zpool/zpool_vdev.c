@@ -1001,7 +1001,7 @@ is_spare(nvlist_t *config, const char *path)
 {
 	int fd;
 	pool_state_t state;
-	char *name;
+	char *name = NULL;
 	nvlist_t *label;
 	uint64_t guid, spareguid;
 	nvlist_t *nvroot;
@@ -1016,9 +1016,11 @@ is_spare(nvlist_t *config, const char *path)
 	    !inuse ||
 	    state != POOL_STATE_SPARE ||
 	    zpool_read_label(fd, &label) != 0) {
+		free(name);
 		(void) close(fd);
 		return (B_FALSE);
 	}
+	free(name);
 
 	(void) close(fd);
 	verify(nvlist_lookup_uint64(label, ZPOOL_CONFIG_GUID, &guid) == 0);

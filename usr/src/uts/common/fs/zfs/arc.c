@@ -554,7 +554,8 @@ arc_cksum_verify(arc_buf_t *buf)
 		return;
 
 	mutex_enter(&buf->b_hdr->b_freeze_lock);
-	if (buf->b_hdr->b_freeze_cksum == NULL) {
+	if (buf->b_hdr->b_freeze_cksum == NULL ||
+	    (buf->b_hdr->b_flags & ARC_IO_ERROR)) {
 		mutex_exit(&buf->b_hdr->b_freeze_lock);
 		return;
 	}

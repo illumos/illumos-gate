@@ -1733,12 +1733,11 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t ***list, size_t *nelem)
 
 	*list = zhp->zpool_error_log;
 	*nelem = zhp->zpool_error_count;
-	free(zb);
+	free((void *)(uintptr_t)zc.zc_nvlist_dst);
 
 	return (0);
 
 nomem:
-	free(zb);
 	free((void *)(uintptr_t)zc.zc_nvlist_dst);
 	for (i = 0; i < zhp->zpool_error_count; i++)
 		nvlist_free(zhp->zpool_error_log[i]);

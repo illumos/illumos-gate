@@ -410,11 +410,11 @@ zfs_register_callbacks(vfs_t *vfsp)
 	struct dsl_dataset *ds = NULL;
 	objset_t *os = NULL;
 	zfsvfs_t *zfsvfs = NULL;
-	int do_readonly = FALSE, readonly;
-	int do_setuid = FALSE, setuid;
-	int do_exec = FALSE, exec;
-	int do_devices = FALSE, devices;
-	int do_xattr = FALSE, xattr;
+	int readonly, do_readonly = FALSE;
+	int setuid, do_setuid = FALSE;
+	int exec, do_exec = FALSE;
+	int devices, do_devices = FALSE;
+	int xattr, do_xattr = FALSE;
 	int error = 0;
 
 	ASSERT(vfsp);

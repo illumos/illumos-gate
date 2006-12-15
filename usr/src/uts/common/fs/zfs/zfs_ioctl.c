@@ -1226,6 +1226,10 @@ zfs_ioc_recvbackup(zfs_cmd_t *zc)
 	int error, fd;
 	offset_t new_off;
 
+	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
+	    strchr(zc->zc_value, '@') == NULL)
+		return (EINVAL);
+
 	fd = zc->zc_cookie;
 	fp = getf(fd);
 	if (fp == NULL)

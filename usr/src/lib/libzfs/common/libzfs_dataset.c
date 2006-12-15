@@ -1302,8 +1302,42 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
     char **source, uint64_t *val)
 {
 	struct mnttab mnt;
+	char *mntopt_on = NULL;
+	char *mntopt_off = NULL;
 
 	*source = NULL;
+
+	switch (prop) {
+	case ZFS_PROP_ATIME:
+		mntopt_on = MNTOPT_ATIME;
+		mntopt_off = MNTOPT_NOATIME;
+		break;
+
+	case ZFS_PROP_DEVICES:
+		mntopt_on = MNTOPT_DEVICES;
+		mntopt_off = MNTOPT_NODEVICES;
+		break;
+
+	case ZFS_PROP_EXEC:
+		mntopt_on = MNTOPT_EXEC;
+		mntopt_off = MNTOPT_NOEXEC;
+		break;
+
+	case ZFS_PROP_READONLY:
+		mntopt_on = MNTOPT_RO;
+		mntopt_off = MNTOPT_RW;
+		break;
+
+	case ZFS_PROP_SETUID:
+		mntopt_on = MNTOPT_SETUID;
+		mntopt_off = MNTOPT_NOSETUID;
+		break;
+
+	case ZFS_PROP_XATTR:
+		mntopt_on = MNTOPT_XATTR;
+		mntopt_off = MNTOPT_NOXATTR;
+		break;
+	}
 
 	/*
 	 * Because looking up the mount options is potentially expensive
@@ -1311,24 +1345,20 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 	 * we're looking up a property which requires its presence.
 	 */
 	if (!zhp->zfs_mntcheck &&
-	    (prop == ZFS_PROP_ATIME ||
-	    prop == ZFS_PROP_DEVICES ||
-	    prop == ZFS_PROP_EXEC ||
-	    prop == ZFS_PROP_READONLY ||
-	    prop == ZFS_PROP_SETUID ||
-	    prop == ZFS_PROP_MOUNTED ||
-	    prop == ZFS_PROP_XATTR)) {
-		struct mnttab search = { 0 }, entry;
+	    (mntopt_on != NULL || prop == ZFS_PROP_MOUNTED)) {
+		struct mnttab entry, search = { 0 };
+		FILE *mnttab = zhp->zfs_hdl->libzfs_mnttab;
 
 		search.mnt_special = (char *)zhp->zfs_name;
 		search.mnt_fstype = MNTTYPE_ZFS;
-		rewind(zhp->zfs_hdl->libzfs_mnttab);
+		rewind(mnttab);
 
-		if (getmntany(zhp->zfs_hdl->libzfs_mnttab, &entry,
-		    &search) == 0 && (zhp->zfs_mntopts =
-		    zfs_strdup(zhp->zfs_hdl,
-		    entry.mnt_mntopts)) == NULL)
-			return (-1);
+		if (getmntany(mnttab, &entry, &search) == 0) {
+			zhp->zfs_mntopts = zfs_strdup(zhp->zfs_hdl,
+			    entry.mnt_mntopts);
+			if (zhp->zfs_mntopts == NULL)
+				return (-1);
+		}
 
 		zhp->zfs_mntcheck = B_TRUE;
 	}
@@ -1340,41 +1370,18 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 
 	switch (prop) {
 	case ZFS_PROP_ATIME:
-		*val = getprop_uint64(zhp, prop, source);
-
-		if (hasmntopt(&mnt, MNTOPT_ATIME) && !*val) {
-			*val = B_TRUE;
-			if (src)
-				*src = ZFS_SRC_TEMPORARY;
-		} else if (hasmntopt(&mnt, MNTOPT_NOATIME) && *val) {
-			*val = B_FALSE;
-			if (src)
-				*src = ZFS_SRC_TEMPORARY;
-		}
-		break;
-
 	case ZFS_PROP_DEVICES:
-		*val = getprop_uint64(zhp, prop, source);
-
-		if (hasmntopt(&mnt, MNTOPT_DEVICES) && !*val) {
-			*val = B_TRUE;
-			if (src)
-				*src = ZFS_SRC_TEMPORARY;
-		} else if (hasmntopt(&mnt, MNTOPT_NODEVICES) && *val) {
-			*val = B_FALSE;
-			if (src)
-				*src = ZFS_SRC_TEMPORARY;
-		}
-		break;
-
 	case ZFS_PROP_EXEC:
+	case ZFS_PROP_READONLY:
+	case ZFS_PROP_SETUID:
+	case ZFS_PROP_XATTR:
 		*val = getprop_uint64(zhp, prop, source);
 
-		if (hasmntopt(&mnt, MNTOPT_EXEC) && !*val) {
+		if (hasmntopt(&mnt, mntopt_on) && !*val) {
 			*val = B_TRUE;
 			if (src)
 				*src = ZFS_SRC_TEMPORARY;
-		} else if (hasmntopt(&mnt, MNTOPT_NOEXEC) && *val) {
+		} else if (hasmntopt(&mnt, mntopt_off) && *val) {
 			*val = B_FALSE;
 			if (src)
 				*src = ZFS_SRC_TEMPORARY;
@@ -1392,21 +1399,8 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 	case ZFS_PROP_AVAILABLE:
 	case ZFS_PROP_VOLSIZE:
 	case ZFS_PROP_VOLBLOCKSIZE:
+	case ZFS_PROP_CANMOUNT:
 		*val = getprop_uint64(zhp, prop, source);
-		break;
-
-	case ZFS_PROP_READONLY:
-		*val = getprop_uint64(zhp, prop, source);
-
-		if (hasmntopt(&mnt, MNTOPT_RO) && !*val) {
-			*val = B_TRUE;
-			if (src)
-				*src = ZFS_SRC_TEMPORARY;
-		} else if (hasmntopt(&mnt, MNTOPT_RW) && *val) {
-			*val = B_FALSE;
-			if (src)
-				*src = ZFS_SRC_TEMPORARY;
-		}
 		break;
 
 	case ZFS_PROP_QUOTA:
@@ -1418,40 +1412,8 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 			*source = zhp->zfs_name;
 		break;
 
-	case ZFS_PROP_SETUID:
-		*val = getprop_uint64(zhp, prop, source);
-
-		if (hasmntopt(&mnt, MNTOPT_SETUID) && !*val) {
-			*val = B_TRUE;
-			if (src)
-				*src = ZFS_SRC_TEMPORARY;
-		} else if (hasmntopt(&mnt, MNTOPT_NOSETUID) && *val) {
-			*val = B_FALSE;
-			if (src)
-				*src = ZFS_SRC_TEMPORARY;
-		}
-		break;
-
 	case ZFS_PROP_MOUNTED:
 		*val = (zhp->zfs_mntopts != NULL);
-		break;
-
-	case ZFS_PROP_CANMOUNT:
-		*val = getprop_uint64(zhp, prop, source);
-		break;
-
-	case ZFS_PROP_XATTR:
-		*val = getprop_uint64(zhp, prop, source);
-
-		if (hasmntopt(&mnt, MNTOPT_XATTR) && !*val) {
-			*val = B_TRUE;
-			if (src)
-				*src = ZFS_SRC_TEMPORARY;
-		} else if (hasmntopt(&mnt, MNTOPT_NOXATTR) && *val) {
-			*val = B_FALSE;
-			if (src)
-				*src = ZFS_SRC_TEMPORARY;
-		}
 		break;
 
 	default:
@@ -2156,6 +2118,7 @@ zfs_destroy(zfs_handle_t *zhp)
 struct destroydata {
 	char *snapname;
 	boolean_t gotone;
+	boolean_t closezhp;
 };
 
 static int
@@ -2164,6 +2127,8 @@ zfs_remove_link_cb(zfs_handle_t *zhp, void *arg)
 	struct destroydata *dd = arg;
 	zfs_handle_t *szhp;
 	char name[ZFS_MAXNAMELEN];
+	boolean_t closezhp = dd->closezhp;
+	int rv;
 
 	(void) strlcpy(name, zhp->zfs_name, sizeof (name));
 	(void) strlcat(name, "@", sizeof (name));
@@ -2184,7 +2149,11 @@ zfs_remove_link_cb(zfs_handle_t *zhp, void *arg)
 		 */
 	}
 
-	return (zfs_iter_filesystems(zhp, zfs_remove_link_cb, arg));
+	dd->closezhp = B_TRUE;
+	rv = zfs_iter_filesystems(zhp, zfs_remove_link_cb, arg);
+	if (closezhp)
+		zfs_close(zhp);
+	return (rv);
 }
 
 /*
@@ -2335,10 +2304,13 @@ promote_snap_cb(zfs_handle_t *zhp, void *data)
 	promote_data_t *pd = data;
 	zfs_handle_t *szhp;
 	char snapname[MAXPATHLEN];
+	int rv = 0;
 
 	/* We don't care about snapshots after the pivot point */
-	if (zfs_prop_get_int(zhp, ZFS_PROP_CREATETXG) > pd->cb_pivot_txg)
+	if (zfs_prop_get_int(zhp, ZFS_PROP_CREATETXG) > pd->cb_pivot_txg) {
+		zfs_close(zhp);
 		return (0);
+	}
 
 	/* Remove the device link if it's a zvol. */
 	if (ZFS_IS_VOLUME(zhp))
@@ -2354,9 +2326,10 @@ promote_snap_cb(zfs_handle_t *zhp, void *data)
 		    "snapshot name '%s' from origin \n"
 		    "conflicts with '%s' from target"),
 		    zhp->zfs_name, snapname);
-		return (zfs_error(zhp->zfs_hdl, EZFS_EXISTS, pd->cb_errbuf));
+		rv = zfs_error(zhp->zfs_hdl, EZFS_EXISTS, pd->cb_errbuf);
 	}
-	return (0);
+	zfs_close(zhp);
+	return (rv);
 }
 
 static int
@@ -2365,13 +2338,13 @@ promote_snap_done_cb(zfs_handle_t *zhp, void *data)
 	promote_data_t *pd = data;
 
 	/* We don't care about snapshots after the pivot point */
-	if (zfs_prop_get_int(zhp, ZFS_PROP_CREATETXG) > pd->cb_pivot_txg)
-		return (0);
+	if (zfs_prop_get_int(zhp, ZFS_PROP_CREATETXG) <= pd->cb_pivot_txg) {
+		/* Create the device link if it's a zvol. */
+		if (ZFS_IS_VOLUME(zhp))
+			(void) zvol_create_link(zhp->zfs_hdl, zhp->zfs_name);
+	}
 
-	/* Create the device link if it's a zvol. */
-	if (ZFS_IS_VOLUME(zhp))
-		(void) zvol_create_link(zhp->zfs_hdl, zhp->zfs_name);
-
+	zfs_close(zhp);
 	return (0);
 }
 
@@ -2771,6 +2744,8 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 	(void) strcpy(zc.zc_value, tosnap);
 	(void) strncat(zc.zc_value, drr.drr_u.drr_begin.drr_toname+choplen,
 	    sizeof (zc.zc_value));
+	if (!zfs_validate_name(hdl, zc.zc_value, ZFS_TYPE_SNAPSHOT))
+		return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 
 	(void) strcpy(zc.zc_name, zc.zc_value);
 	if (drrb->drr_fromguid) {

@@ -586,6 +586,7 @@ typedef struct destroy_cbdata {
 	int		cb_error;
 	int		cb_needforce;
 	int		cb_doclones;
+	boolean_t	cb_closezhp;
 	zfs_handle_t	*cb_target;
 	char		*cb_snapname;
 } destroy_cbdata_t;
@@ -683,6 +684,8 @@ destroy_snap_clones(zfs_handle_t *zhp, void *arg)
 	destroy_cbdata_t *cbp = arg;
 	char thissnap[MAXPATHLEN];
 	zfs_handle_t *szhp;
+	boolean_t closezhp = cbp->cb_closezhp;
+	int rv;
 
 	(void) snprintf(thissnap, sizeof (thissnap),
 	    "%s@%s", zfs_get_name(zhp), cbp->cb_snapname);
@@ -697,12 +700,18 @@ destroy_snap_clones(zfs_handle_t *zhp, void *arg)
 		if (zfs_iter_dependents(szhp, B_FALSE, destroy_callback,
 		    cbp) != 0) {
 			zfs_close(szhp);
+			if (closezhp)
+				zfs_close(zhp);
 			return (-1);
 		}
 		zfs_close(szhp);
 	}
 
-	return (zfs_iter_filesystems(zhp, destroy_snap_clones, arg));
+	cbp->cb_closezhp = B_TRUE;
+	rv = zfs_iter_filesystems(zhp, destroy_snap_clones, arg);
+	if (closezhp)
+		zfs_close(zhp);
+	return (rv);
 }
 
 static int
@@ -2205,6 +2214,7 @@ get_one_dataset(zfs_handle_t *zhp, void *data)
 	 */
 	if (type == ZFS_TYPE_FILESYSTEM &&
 	    zfs_iter_filesystems(zhp, get_one_dataset, data) != 0) {
+		zfs_close(zhp);
 		return (1);
 	}
 

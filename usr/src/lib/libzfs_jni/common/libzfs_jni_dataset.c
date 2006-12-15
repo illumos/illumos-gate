@@ -660,6 +660,8 @@ zjni_create_add_Dataset(zfs_handle_t *zhp, void *data)
 		/* Add Dataset to zjni_ArrayList */
 		(*env)->CallBooleanMethod(env, ((zjni_Object_t *)list)->object,
 		    ((zjni_Collection_t *)list)->method_add, bean);
+	} else {
+		zfs_close(zhp);
 	}
 
 	return (0);
@@ -759,10 +761,11 @@ zjni_get_Datasets_dependents(JNIEnv *env, jobjectArray paths)
 
 				/* Add this Dataset to list (and close zhp) */
 				(void) zjni_create_add_Dataset(zhp, &data);
-			} else
-
-			/* Path is not a dataset - see if it's a faulted pool */
-			if (is_pool_name(path)) {
+			} else if (is_pool_name(path)) {
+				/*
+				 * Path is not a dataset -
+				 * see if it's a faulted pool
+				 */
 				zpool_handle_t *zphp = zpool_open_canfail(g_zfs,
 				    path);
 
