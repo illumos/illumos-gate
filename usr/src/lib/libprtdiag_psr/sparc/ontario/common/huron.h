@@ -54,7 +54,7 @@ extern "C" {
 #define	OPHIR			"GBE"
 #define	NETWORK			"network"
 #define	PCIE			"/PCIE"
-#define	HURON_SIU		"/siu@80"
+#define	HURON_NIU		"/niu@80"
 #define	HURON_SWITCH_A_PATH	"/pci@0/pci@0"
 #define	HURON_SWITCH_B_PATH	"/pci@0/pci@0/pci@1/pci@0"
 #define	HURON_SWITCH_C_PATH	"/pci@0/pci@0/pci@8/pci@0"
@@ -74,8 +74,8 @@ extern "C" {
 #define	HURON_PCIE_SLOT5	"/pci@0/pci@0/pci@8/pci@0/pci@a"
 #define	HURON_PCIE_SLOT6	"/pci@0/pci@0/pci@8/pci@0/pci@9"
 #define	HURON_LSI_PATH		"/pci@0/pci@0/pci@2/scsi@0"
-#define	HURON_N2_XAUI0		"/siu@80/network@0"
-#define	HURON_N2_XAUI1		"/siu@80/network@1"
+#define	HURON_N2_XAUI0		"/niu@80/network@0"
+#define	HURON_N2_XAUI1		"/niu@80/network@1"
 #define	SAS_SATA_HBA		"SAS-SATA-HBA"
 
 

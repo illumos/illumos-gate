@@ -335,8 +335,8 @@ sun4v_display_pci(picl_nodehdl_t plafh)
 	} else if ((strncmp(platbuf, HURON_1U_PLATFORM,
 		strlen(HURON_1U_PLATFORM)) == 0) || (strncmp(platbuf,
 		HURON_2U_PLATFORM, strlen(HURON_2U_PLATFORM)) == 0)) {
-			(void) picl_walk_tree_by_class(plafh, "siu",
-				"siu", huron_pci_callback);
+			(void) picl_walk_tree_by_class(plafh, "sun4v",
+				"niu", huron_pci_callback);
 			(void) picl_walk_tree_by_class(plafh, "pciex",
 				"pciex", huron_pci_callback);
 	} else {
@@ -555,8 +555,8 @@ sun4v_display_hw_revisions(Prom_node *root, picl_nodehdl_t plafh)
 		HURON_2U_PLATFORM, strlen(HURON_2U_PLATFORM)) == 0)) {
 		(void) picl_walk_tree_by_class(plafh, "pciex",
 			"pciex", huron_hw_rev_callback);
-		(void) picl_walk_tree_by_class(plafh, "siu",
-			"siu", huron_hw_rev_callback);
+		(void) picl_walk_tree_by_class(plafh, "sun4v",
+			"niu", huron_hw_rev_callback);
 		(void) picl_walk_tree_by_class(plafh, "network",
 			"network", huron_hw_rev_callback);
 		(void) picl_walk_tree_by_class(plafh, "scsi-2", "scsi-2",

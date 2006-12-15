@@ -60,9 +60,8 @@
 static void
 huron_get_bus_type(char *path, struct io_card *card)
 {
-	if ((strcmp(path, HURON_N2_XAUI0) == 0) ||
-		(strcmp(path, HURON_N2_XAUI1) == 0)) {
-		(void) strcpy(card->bus_type, "SIU");
+	if (strcmp(path, HURON_NIU) == 0) {
+		(void) strcpy(card->bus_type, "NIU");
 	} else {
 		(void) strcpy(card->bus_type, "PCIE");
 	}
@@ -152,7 +151,6 @@ huron_pci_callback(picl_nodehdl_t pcih, void *args)
 	}
 
 	/* Walk through the children */
-
 	err = picl_get_propval_by_name(pcih, PICL_PROP_CHILD, &nodeh,
 	    sizeof (picl_nodehdl_t));
 
@@ -168,7 +166,7 @@ huron_pci_callback(picl_nodehdl_t pcih, void *args)
 			continue;
 		}
 
-		if (strcmp(piclclass, "siu") == 0) {
+		if (strcmp(piclclass, "sun4v") == 0) {
 			err = picl_get_propval_by_name(nodeh, PICL_PROP_CHILD,
 			    &nodeh, sizeof (picl_nodehdl_t));
 			continue;
@@ -184,8 +182,6 @@ huron_pci_callback(picl_nodehdl_t pcih, void *args)
 
 		huron_get_bus_type(parent_path, &pci_card);
 
-		huron_get_slot_number(parent_path, &pci_card);
-
 		err = picl_get_propval_by_name(nodeh, PICL_PROP_NAME, &name,
 		    sizeof (name));
 		if (err == PICL_PROPNOTFOUND)
@@ -193,6 +189,10 @@ huron_pci_callback(picl_nodehdl_t pcih, void *args)
 		else if (err != PICL_SUCCESS)
 			return (err);
 
+		if (strcmp(parent_path, HURON_NIU) == 0)
+			huron_get_slot_number(path, &pci_card);
+		else
+			huron_get_slot_number(parent_path, &pci_card);
 
 		/* Figure NAC name */
 		if ((strcmp(name, NETWORK) == 0) &&
