@@ -5499,6 +5499,7 @@ ohci_allocate_isoc_resources(
 	ushort_t		isoc_pkt_count;
 	size_t 			count, td_count;
 	size_t			tw_length;
+	size_t			isoc_pkts_length;
 	ohci_trans_wrapper_t	*tw;
 
 
@@ -5526,12 +5527,16 @@ ohci_allocate_isoc_resources(
 	if (isoc_reqp) {
 		isoc_pkt_descr = isoc_reqp->isoc_pkt_descr;
 		isoc_pkt_count = isoc_reqp->isoc_pkts_count;
+		isoc_pkts_length = isoc_reqp->isoc_pkts_length;
 	} else {
 		isoc_pkt_descr = ((usb_isoc_req_t *)
 		    pp->pp_client_periodic_in_reqp)->isoc_pkt_descr;
 
 		isoc_pkt_count = ((usb_isoc_req_t *)
 		    pp->pp_client_periodic_in_reqp)->isoc_pkts_count;
+
+		isoc_pkts_length = ((usb_isoc_req_t *)
+		    pp->pp_client_periodic_in_reqp)->isoc_pkts_length;
 	}
 
 	start_isoc_pkt_descr = isoc_pkt_descr;
@@ -5546,6 +5551,18 @@ ohci_allocate_isoc_resources(
 			tw_length += isoc_pkt_descr->isoc_pkt_length;
 			isoc_pkt_descr++;
 		}
+
+		if ((isoc_pkts_length) && (isoc_pkts_length != tw_length)) {
+
+			USB_DPRINTF_L2(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
+			    "ohci_allocate_isoc_resources: "
+			    "isoc_pkts_length 0x%x is not equal to the sum of "
+			    "all pkt lengths 0x%x in an isoc request",
+			    isoc_pkts_length, tw_length);
+
+			return (NULL);
+		}
+
 	} else {
 		ASSERT(isoc_reqp != NULL);
 		tw_length = isoc_reqp->isoc_data->b_wptr -
@@ -6126,7 +6143,7 @@ ohci_init_itd(
 	/* The offsets are actually offsets into the page */
 	for (i = 0; i <= fc; i++) {
 		offset_addr = (uint32_t)((buf &
-		    HC_ITD_OFFSET_ADDR) | (HC_TD_CC_NA >> HC_ITD_CC_SHIFT));
+		    HC_ITD_OFFSET_ADDR) | (HC_ITD_OFFSET_CC));
 
 		flag =	((start_addr &
 		    HC_ITD_PAGE_MASK) ^ (buf & HC_ITD_PAGE_MASK));
@@ -8412,6 +8429,7 @@ ohci_parse_isoc_error(
 	 */
 	isoc_reqp = (usb_isoc_req_t *)tw->tw_curr_xfer_reqp;
 	isoc_pkt_descr = isoc_reqp->isoc_pkt_descr;
+	isoc_pkt_descr += tw->tw_pkt_idx;
 
 	for (i = 0; i <= fc; i++) {
 
@@ -8445,6 +8463,11 @@ ohci_parse_isoc_error(
 		 */
 		isoc_pkt_descr++;
 	}
+	tw->tw_pkt_idx = tw->tw_pkt_idx + fc + 1;
+
+	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
+	    "ohci_parse_isoc_error: tw_pkt_idx %d", tw->tw_pkt_idx);
+
 }
 
 
@@ -9494,6 +9517,7 @@ ohci_sendup_td_message(
 				    DDI_DEV_AUTOINCR);
 				p += tw->tw_isoc_bufs[i].length;
 			}
+			tw->tw_pkt_idx = 0;
 		} else {
 			/* Sync IO buffer */
 			Sync_IO_Buffer(tw->tw_dmahandle, (skip_len + length));
@@ -10036,7 +10060,6 @@ ohci_allocate_periodic_in_resource(
 		tw->tw_curr_xfer_reqp =
 		    (usb_opaque_t)pp->pp_client_periodic_in_reqp;
 		pp->pp_client_periodic_in_reqp = (usb_opaque_t)curr_isoc_reqp;
-		tw->tw_length = curr_isoc_reqp->isoc_pkts_length;
 	}
 
 	mutex_enter(&ph->p_mutex);

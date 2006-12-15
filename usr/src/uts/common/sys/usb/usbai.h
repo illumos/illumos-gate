@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -18,8 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2097,12 +2097,19 @@ typedef struct usb_isoc_req {
 	usb_frame_number_t	isoc_frame_no;
 
 	/*
-	 * Number and length of isochronous data packets.
+	 * Number of isochronous data packets.
 	 * The first field is set by client  driver and may not exceed
 	 * the maximum number of entries in the usb isochronous packet
 	 * descriptors.
 	 */
 	ushort_t		isoc_pkts_count;
+
+	/*
+	 * The sum of all pkt lengths in the isoc request. Recommend to
+	 * set it to zero, so the sum of isoc_pkt_length in the
+	 * isoc_pkt_descr list will be used automatically and no check
+	 * will be apply to this element.
+	 */
 	ushort_t		isoc_pkts_length;
 
 	/*

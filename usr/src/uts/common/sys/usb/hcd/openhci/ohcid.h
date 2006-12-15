@@ -599,6 +599,7 @@ typedef struct ohci_trans_wrapper {
 	ohci_td_t			*tw_hctd_head;	/* Head TD */
 	ohci_td_t			*tw_hctd_tail;	/* Tail TD */
 	uint_t				tw_direction;	/* Direction of TD */
+	uint_t				tw_pkt_idx;	/* packet index */
 
 	/* We preallocate all the td's for each tw and place them here */
 	ohci_td_t			*tw_hctd_free_list;

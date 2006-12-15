@@ -285,11 +285,6 @@ _usba_check_req(usba_pipe_handle_data_t *ph_data, usb_opaque_t req,
 
 				return (USB_INVALID_REQUEST);
 			}
-
-			if (isoc_req->isoc_pkts_length == 0) {
-
-				return (USB_INVALID_REQUEST);
-			}
 		}
 
 		if (data == NULL) {

@@ -895,6 +895,15 @@ _NOTE(MUTEX_PROTECTS_DATA(ehci_state_t::ehci_int_mutex, ehci_isoc_xwrapper_t))
 					    ((uint32_t *)&ptr->itd_body[addr]),\
 					    ((int32_t)(val)))
 
+#define	Get_ITD_INDEX(ptr, pos)		ddi_get32( \
+					    ehcip->ehci_itd_pool_mem_handle, \
+					    (uint32_t *)&ptr->itd_index[pos])
+
+#define	Set_ITD_INDEX(ptr, pos, val)	ddi_put32( \
+					    ehcip->ehci_itd_pool_mem_handle, \
+					    ((uint32_t *)&ptr->itd_index[pos]),\
+					    ((uint32_t)(val)))
+
 #define	Get_ITD_FRAME(addr)		ddi_get64( \
 					    ehcip->ehci_itd_pool_mem_handle, \
 					    (uint64_t *)&addr)
@@ -926,6 +935,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ehci_state_t::ehci_int_mutex, ehci_isoc_xwrapper_t))
 #define	Set_OpReg(addr, val)	ddi_put32(ehcip->ehci_caps_handle, \
 				((uint32_t *)&ehcip->ehci_regsp->addr), \
 					((int32_t)(val)))
+
+#define	CalculateITDMultiField(pkgSize)		(1 + (((pkgSize)>>11) & 0x03))
 
 #define	EHCI_MAX_RETRY		10
 

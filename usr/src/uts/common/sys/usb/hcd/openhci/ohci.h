@@ -401,7 +401,7 @@ typedef	volatile struct ohci_td {
 #define	HC_ITD_ODD_OFFSET	0xFFFF0000	/* Odd offset */
 #define	HC_ITD_EVEN_OFFSET	0x0000FFFF	/* Even offset */
 #define	HC_ITD_OFFSET_SHIFT	16
-#define	HC_ITD_OFFSET_CC	0x0000F000	/* CC of offset or PSW N */
+#define	HC_ITD_OFFSET_CC	0x0000E000	/* CC of offset or PSW N */
 #define	HC_ITD_OFFSET_ADDR	0x00000FFF	/* Offset N */
 #define	HC_ITD_4KBOUNDARY_CROSS	0x00001000	/* Set bit 12 for 4k crossing */
 

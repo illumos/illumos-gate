@@ -4446,7 +4446,7 @@ uhci_start_isoc_receive_polling(
 	usb_flags_t		usb_flags)
 {
 	int			ii, error;
-	size_t			max_isoc_xfer_size, length;
+	size_t			max_isoc_xfer_size, length, isoc_pkts_length;
 	ushort_t		isoc_pkt_count;
 	uhci_pipe_private_t	*pp = (uhci_pipe_private_t *)ph->p_hcd_private;
 	usb_isoc_pkt_descr_t	*isoc_pkt_descr;
@@ -4461,16 +4461,29 @@ uhci_start_isoc_receive_polling(
 	if (isoc_req) {
 		isoc_pkt_descr = isoc_req->isoc_pkt_descr;
 		isoc_pkt_count = isoc_req->isoc_pkts_count;
+		isoc_pkts_length = isoc_req->isoc_pkts_length;
 	} else {
 		isoc_pkt_descr = ((usb_isoc_req_t *)
 			pp->pp_client_periodic_in_reqp)->isoc_pkt_descr;
 		isoc_pkt_count = ((usb_isoc_req_t *)
 			pp->pp_client_periodic_in_reqp)->isoc_pkts_count;
+		isoc_pkts_length = ((usb_isoc_req_t *)
+			pp->pp_client_periodic_in_reqp)->isoc_pkts_length;
 	}
 
 	for (ii = 0, length = 0; ii < isoc_pkt_count; ii++) {
 		length += isoc_pkt_descr->isoc_pkt_length;
 		isoc_pkt_descr++;
+	}
+
+	if ((isoc_pkts_length) && (isoc_pkts_length != length)) {
+
+		USB_DPRINTF_L2(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
+		    "uhci_start_isoc_receive_polling: isoc_pkts_length 0x%x "
+		    "is not equal to the sum of all pkt lengths 0x%x in "
+		    "an isoc request", isoc_pkts_length, length);
+
+		return (USB_FAILURE);
 	}
 
 	/* Check the size of isochronous request */
@@ -4847,7 +4860,6 @@ uhci_allocate_periodic_in_resource(
 		tw->tw_curr_xfer_reqp =
 				(usb_opaque_t)pp->pp_client_periodic_in_reqp;
 		pp->pp_client_periodic_in_reqp = (usb_opaque_t)curr_isoc_reqp;
-		tw->tw_length = curr_isoc_reqp->isoc_pkts_length;
 	}
 
 	mutex_enter(&ph->p_mutex);

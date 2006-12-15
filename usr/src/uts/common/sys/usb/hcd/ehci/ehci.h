@@ -576,15 +576,17 @@ typedef	volatile struct ehci_qtd {
 typedef	volatile struct ehci_itd {
 	uint32_t	itd_link_ptr;		/* Next TD */
 	uint32_t	itd_body[15];		/* iTD and siTD body */
+	uint32_t	itd_body_high[7];	/* For 64 bit addressing */
 
 	/* Padding required */
-	uint32_t	itd_pad[8];
+	uint32_t	itd_pad;
 
 	/* HCD private fields */
 	uint32_t	itd_trans_wrapper;	/* Transfer wrapper */
 	uint32_t	itd_itw_next_itd;	/* Next iTD on TW */
 	uint32_t	itd_next_active_itd;	/* Next iTD in active list */
 	uint32_t	itd_state;		/* iTD state */
+	uint32_t	itd_index[8];		/* iTD index */
 	uint64_t	itd_frame_number;	/* Frame iTD exists */
 	uint64_t	itd_reclaim_number;	/* Frame iTD is reclaimed */
 } ehci_itd_t;
@@ -603,6 +605,8 @@ typedef	volatile struct ehci_itd {
 #define	EHCI_ITD_LINK_REF_FSTN		0x00000006	/* FSTN pointer */
 #define	EHCI_ITD_LINK_PTR_INVALID	0x00000001	/* Link ptr validity */
 
+#define	EHCI_ITD_CTRL_LIST_SIZE		8
+#define	EHCI_ITD_BUFFER_LIST_SIZE	7
 #define	EHCI_ITD_CTRL0			0	/* Status and Ctrl List */
 #define	EHCI_ITD_CTRL1			1
 #define	EHCI_ITD_CTRL2			2
@@ -618,6 +622,40 @@ typedef	volatile struct ehci_itd {
 #define	EHCI_ITD_BUFFER4		12
 #define	EHCI_ITD_BUFFER5		13
 #define	EHCI_ITD_BUFFER6		14
+
+/*
+ * iTD Transaction Status and Control bits
+ */
+#define	EHCI_ITD_XFER_STATUS_MASK	0xF0000000
+#define	EHCI_ITD_XFER_STATUS_SHIFT	28
+#define	EHCI_ITD_XFER_ACTIVE		0x80000000
+#define	EHCI_ITD_XFER_DATA_BUFFER_ERR	0x40000000
+#define	EHCI_ITD_XFER_BABBLE		0x20000000
+#define	EHCI_ITD_XFER_ERROR		0x10000000
+#define	EHCI_ITD_XFER_LENGTH		0x0FFF0000
+#define	EHCI_ITD_XFER_IOC		0x00008000
+#define	EHCI_ITD_XFER_IOC_ON		0x00008000
+#define	EHCI_ITD_XFER_IOC_OFF		0x00000000
+#define	EHCI_ITD_XFER_PAGE_SELECT	0x00007000
+#define	EHCI_ITD_XFER_OFFSET		0x00000FFF
+
+/*
+ * iTD Buffer Page Pointer bits
+ */
+#define	EHCI_ITD_CTRL_BUFFER_MASK	0xFFFFF000
+#define	EHCI_ITD_CTRL_ENDPT_MASK	0x00000F00
+#define	EHCI_ITD_CTRL_DEVICE_MASK	0x0000007F
+#define	EHCI_ITD_CTRL_DIR		0x00000800
+#define	EHCI_ITD_CTRL_DIR_IN		0x00000800
+#define	EHCI_ITD_CTRL_DIR_OUT		0x00000000
+#define	EHCI_ITD_CTRL_MAX_PACKET_MASK	0x000007FF
+#define	EHCI_ITD_CTRL_MULTI_MASK	0x00000003
+#define	EHCI_ITD_CTRL_ONE_XACT		0x00000001
+#define	EHCI_ITD_CTRL_TWO_XACT		0x00000002
+#define	EHCI_ITD_CTRL_THREE_XACT	0x00000003
+
+/* Unused iTD index */
+#define	EHCI_ITD_UNUSED_INDEX		0xFFFFFFFF
 
 #define	EHCI_SITD_CTRL			0
 #define	EHCI_SITD_UFRAME_SCHED		1

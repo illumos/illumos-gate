@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,6 +157,9 @@ static usb_cr_t ehci_parse_sitd_error(
 void ehci_print_itd(
 	ehci_state_t		*ehcip,
 	ehci_itd_t		*itd);
+void ehci_print_sitd(
+	ehci_state_t		*ehcip,
+	ehci_itd_t		*itd);
 
 
 /*
@@ -277,7 +279,7 @@ ehci_get_itd_pool_size()
  * Isochronous Transfer Wrapper Functions
  */
 /*
- * ehci_allocate_itw:
+ * ehci_allocate_itw_resources:
  *
  * Allocate an iTW and n iTD from the iTD buffer pool and places it into the
  * ITW.  It does an all or nothing transaction.
@@ -307,6 +309,8 @@ ehci_allocate_itw_resources(
 		    "ehci_allocate_itw_resources: Unable to allocate ITW");
 	} else {
 		itd_count = ehci_calc_num_itds(itw, pkt_count);
+		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+		    "ehci_allocate_itw_resources: itd_count = 0x%d", itd_count);
 
 		if (ehci_allocate_itds_for_itw(ehcip, itw, itd_count) ==
 		    USB_SUCCESS) {
@@ -486,8 +490,9 @@ ehci_allocate_itw(
 	itw->itw_id = EHCI_GET_ID((void *)itw);
 	ASSERT(itw->itw_id != NULL);
 
-	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
-	    "ehci_create_itw: itw = 0x%p", itw);
+	USB_DPRINTF_L3(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
+	    "ehci_create_itw: itw = 0x%p real_length = 0x%x",
+	    itw, real_length);
 
 	return (itw);
 }
@@ -737,7 +742,7 @@ ehci_calc_num_itds(
 		itd_count = pkt_count;
 	}
 
-	return (pkt_count);
+	return (itd_count);
 }
 
 /*
@@ -775,6 +780,14 @@ ehci_allocate_itds_for_itw(
 			    itw->itw_itd_free_list);
 			Set_ITD(itd->itd_link_ptr, itd_addr);
 		}
+		Set_ITD_INDEX(itd, 0, EHCI_ITD_UNUSED_INDEX);
+		Set_ITD_INDEX(itd, 1, EHCI_ITD_UNUSED_INDEX);
+		Set_ITD_INDEX(itd, 2, EHCI_ITD_UNUSED_INDEX);
+		Set_ITD_INDEX(itd, 3, EHCI_ITD_UNUSED_INDEX);
+		Set_ITD_INDEX(itd, 4, EHCI_ITD_UNUSED_INDEX);
+		Set_ITD_INDEX(itd, 5, EHCI_ITD_UNUSED_INDEX);
+		Set_ITD_INDEX(itd, 6, EHCI_ITD_UNUSED_INDEX);
+		Set_ITD_INDEX(itd, 7, EHCI_ITD_UNUSED_INDEX);
 		itw->itw_itd_free_list = itd;
 	}
 
@@ -883,6 +896,11 @@ ehci_remove_itd_from_active_list(
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 	ASSERT(itd != NULL);
+
+	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "ehci_remove_itd_from_active_list: "
+	    "ehci_active_itd_list = 0x%p itd = 0x%p",
+	    ehcip->ehci_active_itd_list, itd);
 
 	curr_itd = ehcip->ehci_active_itd_list;
 
@@ -1012,7 +1030,8 @@ ehci_insert_isoc_to_pfl(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_insert_isoc_to_pfl: "
-	    "isoc flags 0x%x", isoc_reqp->isoc_attributes);
+	    "isoc flags 0x%x itw = 0x%p",
+	    isoc_reqp->isoc_attributes, itw);
 
 	/*
 	 * Enter critical, while programming the usb frame number
@@ -1094,7 +1113,7 @@ ehci_insert_isoc_to_pfl(
 	}
 
 	if (itw->itw_port_status == USBA_HIGH_SPEED_DEV) {
-		port_status = 0;
+		port_status = EHCI_ITD_LINK_REF_ITD;
 	} else {
 		port_status = EHCI_ITD_LINK_REF_SITD;
 	}
@@ -1131,7 +1150,7 @@ ehci_insert_isoc_to_pfl(
 	ddi_exit_critical(ddic);
 
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-	    "ehci_isoc_to_pfl: "
+	    "ehci_insert_isoc_to_pfl: "
 	    "current frame number 0x%llx start frame number 0x%llx num itds %d",
 	    current_frame_number, start_frame_number, itw->itw_num_itds);
 
@@ -1285,7 +1304,7 @@ ehci_allocate_isoc_in_resource(
 	 * The dup'ed request is saved in pp_client_periodic_in_reqp
 	 */
 	itw->itw_curr_xfer_reqp = orig_isoc_reqp;
-	itw->itw_length = clone_isoc_reqp->isoc_pkts_length;
+
 	pp->pp_client_periodic_in_reqp = (usb_opaque_t)clone_isoc_reqp;
 
 	mutex_enter(&ph->p_mutex);
@@ -1415,25 +1434,20 @@ ehci_itd_iommu_to_cpu(
 void ehci_parse_isoc_error(
 	ehci_state_t		*ehcip,
 	ehci_isoc_xwrapper_t	*itw,
-	ehci_itd_t		*itd) {
-
+	ehci_itd_t		*itd)
+{
 	usb_isoc_req_t		*isoc_reqp;
-	usb_isoc_pkt_descr_t	*isoc_pkt_descr;
 	usb_cr_t 		error;
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
 	isoc_reqp = itw->itw_curr_xfer_reqp;
-	isoc_pkt_descr = itw->itw_curr_isoc_pktp;
 
 	if (itw->itw_port_status == USBA_HIGH_SPEED_DEV) {
 		error = ehci_parse_itd_error(ehcip, itw, itd);
 	} else {
 		error = ehci_parse_sitd_error(ehcip, itw, itd);
 	}
-
-	/* Write the status of isoc data packet */
-	isoc_pkt_descr->isoc_pkt_status = error;
 
 	if (error != USB_CR_OK) {
 		isoc_reqp->isoc_error_count++;
@@ -1443,8 +1457,6 @@ void ehci_parse_isoc_error(
 		    "Endpoint number %d", error, itw->itw_device_addr,
 		    itw->itw_endpoint_num);
 	}
-
-	itw->itw_curr_isoc_pktp++;
 }
 
 
@@ -1452,16 +1464,74 @@ void ehci_parse_isoc_error(
 static usb_cr_t ehci_parse_itd_error(
 	ehci_state_t		*ehcip,
 	ehci_isoc_xwrapper_t	*itw,
-	ehci_itd_t		*itd) {
+	ehci_itd_t		*itd)
+{
+	uint32_t		status, index;
+	usb_cr_t 		error = USB_CR_OK;
+	uint32_t		i;
 
-	return (USB_NOT_SUPPORTED);
+	for (i = 0; i < EHCI_ITD_CTRL_LIST_SIZE; i++) {
+		index = Get_ITD_INDEX(itd, i);
+		if (index == 0xffffffff) {
+
+			continue;
+		}
+
+		status = Get_ITD_BODY(itd, EHCI_ITD_CTRL0 + i) &
+		    EHCI_ITD_XFER_STATUS_MASK;
+
+		if (status & EHCI_ITD_XFER_DATA_BUFFER_ERR) {
+			if (itw->itw_direction == USB_EP_DIR_OUT) {
+			    USB_DPRINTF_L3(PRINT_MASK_INTR,
+				ehcip->ehci_log_hdl,
+				"ehci_parse_itd_error: BUFFER Underrun");
+
+			    error = USB_CR_BUFFER_UNDERRUN;
+			} else {
+			    USB_DPRINTF_L3(PRINT_MASK_INTR,
+				ehcip->ehci_log_hdl,
+				"ehci_parse_itd_error: BUFFER Overrun");
+
+			    error = USB_CR_BUFFER_OVERRUN;
+			}
+		}
+
+		if (status & EHCI_ITD_XFER_BABBLE) {
+			USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+			    "ehci_parse_itd_error: BABBLE DETECTED");
+
+			error = USB_CR_DATA_OVERRUN;
+		}
+
+		if (status & EHCI_ITD_XFER_ERROR) {
+			USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+			    "ehci_parse_itd_error: XACT ERROR");
+
+			error = USB_CR_DEV_NOT_RESP;
+		}
+
+		if (status & EHCI_ITD_XFER_ACTIVE) {
+			USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+			    "ehci_parse_itd_error: NOT ACCESSED");
+
+			error = USB_CR_NOT_ACCESSED;
+		}
+
+		itw->itw_curr_isoc_pktp->isoc_pkt_actual_length = 0;
+
+		/* Write the status of isoc data packet */
+		itw->itw_curr_isoc_pktp->isoc_pkt_status = error;
+
+		itw->itw_curr_isoc_pktp++;
+	}
+	return (error);
 }
 
 static usb_cr_t ehci_parse_sitd_error(
 	ehci_state_t		*ehcip,
 	ehci_isoc_xwrapper_t	*itw,
-	ehci_itd_t		*itd) {
-
+	ehci_itd_t		*itd)
+{
 	uint32_t		status;
 	usb_cr_t 		error;
 	usb_isoc_pkt_descr_t	*isoc_pkt_descr;
@@ -1536,6 +1606,11 @@ static usb_cr_t ehci_parse_sitd_error(
 	 */
 	isoc_pkt_descr->isoc_pkt_actual_length -= residue;
 
+	/* Write the status of isoc data packet */
+	isoc_pkt_descr->isoc_pkt_status = error;
+
+	itw->itw_curr_isoc_pktp++;
+
 	return (error);
 }
 
@@ -1554,73 +1629,109 @@ ehci_print_itd(
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "\titd_link_ptr: 0x%x ", Get_ITD(itd->itd_link_ptr));
 
-	if ((Get_ITD(itd->itd_link_ptr) & EHCI_ITD_LINK_REF) ==
-	    EHCI_ITD_LINK_REF_ITD) {
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_ctrl0: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_CTRL0]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_ctrl1: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_CTRL1]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_ctrl2: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_CTRL2]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_ctrl3: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_CTRL3]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_ctrl4: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_CTRL4]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_ctrl5: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_CTRL5]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_ctrl6: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_CTRL6]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_ctrl7: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_CTRL7]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_buffer0: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER0]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_buffer1: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER1]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_buffer2: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER2]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_buffer3: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER3]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_buffer4: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER4]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_buffer5: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER5]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\titd_buffer6: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER6]));
-	} else {
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\tsitd_ctrl: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_SITD_CTRL]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\tsitd_uframe_sched: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_SITD_UFRAME_SCHED]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\tsitd_xfer_state: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_SITD_XFER_STATE]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\tsitd_buffer0: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_SITD_BUFFER0]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\tsitd_buffer1: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_SITD_BUFFER1]));
-		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "\tsitd_prev_sitd: 0x%x ",
-		    Get_ITD(itd->itd_body[EHCI_SITD_PREV_SITD]));
-	}
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_ctrl0: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_CTRL0]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_ctrl1: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_CTRL1]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_ctrl2: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_CTRL2]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_ctrl3: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_CTRL3]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_ctrl4: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_CTRL4]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_ctrl5: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_CTRL5]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_ctrl6: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_CTRL6]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_ctrl7: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_CTRL7]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_buffer0: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER0]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_buffer1: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER1]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_buffer2: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER2]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_buffer3: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER3]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_buffer4: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER4]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_buffer5: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER5]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_buffer6: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_ITD_BUFFER6]));
+
+	/* HCD private fields */
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_trans_wrapper: 0x%x ",
+	    Get_ITD(itd->itd_trans_wrapper));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_itw_next_itd: 0x%x ",
+	    Get_ITD(itd->itd_itw_next_itd));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_state: 0x%x ",
+	    Get_ITD(itd->itd_state));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_index: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x ",
+	    Get_ITD_INDEX(itd, 0), Get_ITD_INDEX(itd, 1),
+	    Get_ITD_INDEX(itd, 2), Get_ITD_INDEX(itd, 3),
+	    Get_ITD_INDEX(itd, 4), Get_ITD_INDEX(itd, 5),
+	    Get_ITD_INDEX(itd, 6), Get_ITD_INDEX(itd, 7));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_frame_number: 0x%x ",
+	    Get_ITD(itd->itd_frame_number));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_reclaim_number: 0x%x ",
+	    Get_ITD(itd->itd_reclaim_number));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_next_active_itd: 0x%x ",
+	    Get_ITD(itd->itd_next_active_itd));
+}
+
+
+void
+ehci_print_sitd(
+	ehci_state_t	*ehcip,
+	ehci_itd_t	*itd)
+{
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "ehci_print_itd: itd = 0x%p", (void *)itd);
+
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\titd_link_ptr: 0x%x ", Get_ITD(itd->itd_link_ptr));
+
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\tsitd_ctrl: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_SITD_CTRL]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\tsitd_uframe_sched: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_SITD_UFRAME_SCHED]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\tsitd_xfer_state: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_SITD_XFER_STATE]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\tsitd_buffer0: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_SITD_BUFFER0]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\tsitd_buffer1: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_SITD_BUFFER1]));
+	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+	    "\tsitd_prev_sitd: 0x%x ",
+	    Get_ITD(itd->itd_body[EHCI_SITD_PREV_SITD]));
 
 	/* HCD private fields */
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,

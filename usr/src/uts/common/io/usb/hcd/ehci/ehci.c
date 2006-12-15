@@ -38,9 +38,6 @@
  *
  * Currently EHCI driver does not support the following features
  *
- * - usb 2.0 or high speed usb isochronous devices.
- * - usb 1.1 or full speed usb isochronous devices behind usb 2.0
- *   or high speed hub.
  * - Alternate QTD for short xfer condition is only used in Bulk xfers.
  * - Frame Span Traversal Nodes (FSTN).
  * - Bandwidth allocation scheme needs to be updated for FSTN and USB2.0
@@ -585,7 +582,7 @@ ehci_intr(caddr_t arg1, caddr_t arg2)
 	uint_t			intr;
 	ehci_state_t		*ehcip = (ehci_state_t *)arg1;
 
-	USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 	    "ehci_intr: Interrupt occurred, arg1 0x%p arg2 0x%p", arg1, arg2);
 
 	/* Get the ehci global mutex */
@@ -714,7 +711,7 @@ ehci_intr(caddr_t arg1, caddr_t arg2)
 	/* Release the ehci global mutex */
 	mutex_exit(&ehcip->ehci_int_mutex);
 
-	USB_DPRINTF_L3(PRINT_MASK_INTR,  ehcip->ehci_log_hdl,
+	USB_DPRINTF_L4(PRINT_MASK_INTR,  ehcip->ehci_log_hdl,
 	    "Interrupt handling completed");
 
 	return (DDI_INTR_CLAIMED);

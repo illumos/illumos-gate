@@ -2169,9 +2169,16 @@ ehci_allocate_high_speed_bandwidth(
 	}
 
 	if (port_status == USBA_HIGH_SPEED_DEV) {
-		/* Allocate bandwidth for high speed devices, except ITD */
-		error = ehci_find_bestfit_hs_mask(ehcip, smask, pnode,
-		    endpoint, sbandwidth, interval);
+		/* Allocate bandwidth for high speed devices */
+		if ((endpoint->bmAttributes & USB_EP_ATTR_MASK) ==
+		    USB_EP_ATTR_ISOCH) {
+			error = USB_SUCCESS;
+		} else {
+
+			error = ehci_find_bestfit_hs_mask(ehcip, smask, pnode,
+			    endpoint, sbandwidth, interval);
+		}
+
 		*cmask = 0x00;
 
 	} else {
