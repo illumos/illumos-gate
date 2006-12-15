@@ -3668,32 +3668,6 @@ am_get_samples(audio_ch_t *chptr, int samples, void *buf, int mode)
 				continue;
 			}
 
-			/* make sure the sample rate converter is ready */
-			if (chpptr->acp_flags & AM_CHNL_PLAY_UPDATE) {
-				audio_apm_info_t	*apm_infop =
-							    chptr->ch_apm_infop;
-
-				ATRACE_32("am_get_samples() need to update src",
-				    chpptr->acp_flags);
-				if (ad_infop->ad_play.ad_conv->ad_src_update(
-				    AM_SRC_CHPTR2HDL(chptr), &info->play,
-				    &((audio_info_t *)
-				    apm_infop->apm_ad_state)->play,
-				    ad_infop->ad_play.ad_sr_info, AUDIO_PLAY) ==
-				    AUDIO_FAILURE) {
-					audio_sup_log(AUDIO_STATE2HDL(statep),
-					    CE_NOTE, "get_samples() "
-					    "couldn't update SRC, data lost");
-					audio_sup_free_audio_data(data);
-				} else {
-					chpptr->acp_flags &=
-					    ~AM_CHNL_PLAY_UPDATE;
-					ATRACE_32(
-					    "am_get_samples() update src good",
-					    chpptr->acp_flags);
-				}
-			}
-
 			/* process the original data into src data */
 			if (am_reprocess(chptr, data) == AUDIO_FAILURE) {
 				audio_sup_log(AUDIO_STATE2HDL(statep),
@@ -4782,27 +4756,6 @@ am_send_audio_trad_mixer(audio_state_t *statep, audio_apm_info_t *apm_infop,
 			(int *)((char *)chpptr->acp_ch_rconv1 +
 			chpptr->acp_ch_rbuf_size), &tmp_samples, hw_channels,
 			channels);
-
-		/* make sure the sample rate converter is ready */
-		if (chpptr->acp_flags & AM_CHNL_REC_UPDATE) {
-			ATRACE_32(
-			    "am_send_audio_trad_mixer() need to update src",
-			    chpptr->acp_flags);
-			if (ad_infop->ad_play.ad_conv->ad_src_update(
-			    AM_SRC_CHPTR2HDL(chptr), &info->record,
-			    &hw_info->record, ad_infop->ad_record.ad_sr_info,
-			    AUDIO_RECORD) == AUDIO_FAILURE) {
-				mutex_exit(&stpptr->am_mode_lock);
-				mutex_exit(&chptr->ch_lock);
-				audio_sup_log(AUDIO_STATE2HDL(statep),
-				    CE_NOTE, "am_send_audio_trad_mixer() "
-				    "couldn't update SRC, data lost");
-				continue;
-			}
-			chpptr->acp_flags &= ~AM_CHNL_REC_UPDATE;
-			ATRACE_32("am_send_audio_trad_mixer() update src good",
-			    chpptr->acp_flags);
-		}
 
 		/*
 		 * Make sure we have the buffers to perform sample rate

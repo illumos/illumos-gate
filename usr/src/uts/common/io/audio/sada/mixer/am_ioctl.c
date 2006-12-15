@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,7 +118,7 @@
 static int am_ck_bits_set32(uint_t);
 static void am_exit_task(audio_ch_t *);
 static void am_fix_info(audio_ch_t *, audio_info_t *);
-static int am_fix_play_pause(audio_ch_t *, audio_apm_info_t *);
+static void am_fix_play_pause(audio_ch_t *);
 static void am_mixer_task_acknack(audio_i_state_t *, audio_ch_t *,
 	queue_t *, mblk_t *, am_ioctl_args_t *, int);
 static void am_restart(audio_state_t *, audio_info_t *);
@@ -2424,29 +2424,18 @@ am_fix_info(audio_ch_t *chptr, audio_info_t *info)
  *
  * Arguments:
  *	audio_ch_t		*chptr		Ptr to the channel
- *	audio_apm_info_t	*apm_infop	Ptr to mixer's APM info struct
  *
  * Returns:
- *	AUDIO_SUCCESS			Fix successful
- *	AUDIO_FAILURE			Fix failed
+ *	void
  */
-static int
-am_fix_play_pause(audio_ch_t *chptr, audio_apm_info_t *apm_infop)
+static void
+am_fix_play_pause(audio_ch_t *chptr)
 {
 	audio_state_t		*statep = chptr->ch_statep;
-	am_ad_info_t		*ad_infop = apm_infop->apm_ad_infop;
 	audio_info_t		*info = chptr->ch_info.info;
 	audio_data_t		*data;
 
 	ATRACE("in am_fix_play_pause()", chptr);
-
-	/* first we update the sample rate converter */
-	if (ad_infop->ad_play.ad_conv->ad_src_update(AM_SRC_CHPTR2HDL(chptr),
-	    &info->play, &((audio_info_t *)apm_infop->apm_ad_state)->play,
-	    ad_infop->ad_play.ad_sr_info, AUDIO_PLAY) == AUDIO_FAILURE) {
-		ATRACE("am_fix_play_pause() update failed", chptr);
-		return (AUDIO_FAILURE);
-	}
 
 	/*
 	 * It is possible that the channel was paused and then the mode
@@ -2462,14 +2451,14 @@ am_fix_play_pause(audio_ch_t *chptr, audio_apm_info_t *apm_infop)
 
 			/* don't let it be played again! */
 			audio_sup_free_audio_data(data);
-			return (AUDIO_SUCCESS);
+			return;
 		} else if (data->adata_orig == data->adata_optr) {
 			/* or that we are just about to use a new msg */
 			ATRACE("am_fix_play_pause() new message", statep);
 
 			/* put it back to use next */
 			audio_sup_putback_audio_data(chptr, data);
-			return (AUDIO_SUCCESS);
+			return;
 		}
 
 		/* see if we need to process the data */
@@ -2485,7 +2474,7 @@ am_fix_play_pause(audio_ch_t *chptr, audio_apm_info_t *apm_infop)
 			 */
 			ATRACE("am_fix_play_pause() am_reprocess() failed",
 			    statep);
-			return (AUDIO_SUCCESS);
+			return;
 		}
 		mutex_exit(&chptr->ch_lock);
 		ATRACE("am_fix_play_pause() process successful", data);
@@ -2495,8 +2484,6 @@ am_fix_play_pause(audio_ch_t *chptr, audio_apm_info_t *apm_infop)
 	}
 
 	ATRACE("am_fix_play_pause() successful", statep);
-
-	return (AUDIO_SUCCESS);
 
 }	/* am_fix_play_pause() */
 
@@ -2861,19 +2848,26 @@ am_set_compat_mode(audio_ch_t *chptr, am_ad_info_t *ad_infop,
 		nchptr.ch_apm_infop = apm_infop;
 		nchptr.ch_private = &ch_private;
 		nchptr.ch_info.info = &new_info;
+		/*
+		 * It's possible that when the bcopy above happens,
+		 * the ch_lock is held by someone else. It should be
+		 * cleared. Or, later when we try to hold it and find
+		 * it's held, deadlock may happen.
+		 */
+		mutex_init(&nchptr.ch_lock, NULL, MUTEX_DRIVER, NULL);
 
 		if (am_audio_set_info(&nchptr, &new_info, NULL) ==
 		    AUDIO_FAILURE) {
-
-		    ATRACE("am_set_compat_mode() am_audio_set_info() failed",
-			&nchptr);
-		    audio_sup_log(AUDIO_STATE2HDL(statep), CE_NOTE,
-			"set_compat() "
-			"couldn't reconfigure hardware");
-		    stpptr->am_pstate->apm_mode = AM_MIXER_MODE;
-		    hw_info->sw_features_enabled |= AUDIO_SWFEATURE_MIXER;
-		    return (AUDIO_FAILURE);
+			ATRACE("am_set_compat_mode() am_audio_set_info()"
+			    "failed", &nchptr);
+			audio_sup_log(AUDIO_STATE2HDL(statep), CE_NOTE,
+			    "set_compat() couldn't reconfigure hardware");
+			stpptr->am_pstate->apm_mode = AM_MIXER_MODE;
+			hw_info->sw_features_enabled |= AUDIO_SWFEATURE_MIXER;
+			mutex_destroy(&nchptr.ch_lock);
+			return (AUDIO_FAILURE);
 		}
+		mutex_destroy(&nchptr.ch_lock);
 	}
 
 	/* update the hardware open flags */
@@ -3005,6 +2999,53 @@ am_set_mixer_mode(audio_ch_t *chptr, am_ad_info_t *ad_infop,
 	persistp = stpptr->am_pstate;
 	hw_info = apm_infop->apm_ad_state;
 
+	/*
+	 * see if we need to update the sample rate conv. routines. This should
+	 * be done before setting the apm_mode to AM_MIXER_MODE. Or, other code
+	 * path,e.g. am_flush, may find apm_mode == AM_MIXER_MODE and then find
+	 * the src module has not been update correctly and panic the system.
+	 * We update the src module before update the hardware so that if it
+	 * fails, the hardware state is still correct.
+	 */
+	if (pchptr) {
+		ATRACE("am_set_mixer_mode(), "
+		    "calling play src update", pchptr);
+		audio_sup_log(AUDIO_STATE2HDL(statep), CE_NOTE,
+		    "am_set_mixer_mode calling play src update");
+		if (ad_infop->ad_play.ad_conv->ad_src_update(
+		    AM_SRC_CHPTR2HDL(pchptr),
+		    &((audio_info_t *)pchptr->ch_info.info)->
+		    play,
+		    &((audio_info_t *)apm_infop->apm_ad_state)->
+		    play,
+		    ((am_ad_info_t *)apm_infop->apm_ad_infop)->
+		    ad_play.ad_sr_info,
+		    AUDIO_PLAY) == AUDIO_FAILURE) {
+			ATRACE("am_set_mixer_mode() "
+			    "play src_update() failed", 0);
+			return (AUDIO_FAILURE);
+		}
+	}
+	if (rchptr) {
+		ATRACE("am_set_mixer_mode(), "
+		    "calling record src update", rchptr);
+		audio_sup_log(AUDIO_STATE2HDL(statep), CE_NOTE,
+		    "am_set_mixer_mode calling record src update");
+		if (ad_infop->ad_record.ad_conv->ad_src_update(
+		    AM_SRC_CHPTR2HDL(rchptr),
+		    &((audio_info_t *)rchptr->ch_info.info)->
+		    record,
+		    &((audio_info_t *)apm_infop->apm_ad_state)->
+		    record,
+		    ((am_ad_info_t *)apm_infop->apm_ad_infop)->
+		    ad_record.ad_sr_info,
+		    AUDIO_RECORD) == AUDIO_FAILURE) {
+			ATRACE("am_set_mixer_mode() "
+			    "record src_update() failed", 0);
+			return (AUDIO_FAILURE);
+		}
+	}
+
 	/* copy the original channel structure to the temp, just in case */
 	bcopy(chptr, &nchptr, sizeof (nchptr));
 
@@ -3056,6 +3097,13 @@ am_set_mixer_mode(audio_ch_t *chptr, am_ad_info_t *ad_infop,
 	nchptr.ch_apm_infop = apm_infop;
 	nchptr.ch_private = &ch_private;
 	nchptr.ch_info.info = &new_info;
+	/*
+	 * It's possible that when the bcopy above happens,
+	 * the ch_lock is held by someone else. It should be
+	 * cleared. Or, later when we try to hold it and find
+	 * it's held, deadlock may happen.
+	 */
+	mutex_init(&nchptr.ch_lock, NULL, MUTEX_DRIVER, NULL);
 
 	if (am_audio_set_info(&nchptr, &new_info, &new_info) == AUDIO_FAILURE) {
 		ATRACE("am_set_mixer_mode() am_audio_set_info() failed",
@@ -3063,8 +3111,11 @@ am_set_mixer_mode(audio_ch_t *chptr, am_ad_info_t *ad_infop,
 		audio_sup_log(AUDIO_STATE2HDL(statep), CE_NOTE,
 		    "set_mixer() "
 		    "couldn't reconfigure hardware");
+		mutex_destroy(&nchptr.ch_lock);
 		return (AUDIO_FAILURE);
 	}
+	mutex_destroy(&nchptr.ch_lock);
+
 
 	/*
 	 * We need to look like we've changed modes AFTER we try to set hw.
@@ -5024,36 +5075,10 @@ am_set_mode_task(void *arg)
 
 		/* now we need to re-initialize the src structures */
 		if (pchptr) {
-			ATRACE("am_set_mode_task() calling play src update",
+			ATRACE("am_set_mode_task() calling am_fix_play_pause",
 				pchptr->ch_private);
 
-			if (am_fix_play_pause(pchptr, apm_infop) ==
-			    AUDIO_FAILURE) {
-				/* flag that we need to update the SRC */
-				tchpptr = pchptr->ch_private;
-				mutex_enter(&pchptr->ch_lock);
-				tchpptr->acp_flags |= AM_CHNL_PLAY_UPDATE;
-				ATRACE("am_set_mode_task() need to update PLAY",
-				    tchpptr->acp_flags);
-				mutex_exit(&pchptr->ch_lock);
-			}
-		}
-		if (rchptr) {
-			ATRACE("am_set_mode_task() calling rec src update",
-			    rchptr->ch_private);
-			if (ad_infop->ad_record.ad_conv->ad_src_update(
-			    AM_SRC_CHPTR2HDL(rchptr),
-			    &((audio_info_t *)rchptr->ch_info.info)->record,
-			    &hw_info->record, ad_infop->ad_record.ad_sr_info,
-			    AUDIO_RECORD) == AUDIO_FAILURE) {
-				/* flag that we need to update the SRC */
-				tchpptr = pchptr->ch_private;
-				mutex_enter(&rchptr->ch_lock);
-				tchpptr->acp_flags |= AM_CHNL_REC_UPDATE;
-				ATRACE("am_set_mode_task() need to update REC",
-				    tchpptr->acp_flags);
-				mutex_exit(&rchptr->ch_lock);
-			}
+			am_fix_play_pause(pchptr);
 		}
 	} else {
 		/* start over with the reference count */

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This header file defines the internal interfaces for the audio mixer
@@ -186,8 +186,6 @@ _NOTE(SCHEME_PROTECTS_DATA("method", am_ch_private::acp_rec_src_data))
 #define	AM_CHNL_PFLOW		0x00400u /* play side has been flow cntrlled */
 #define	AM_CHNL_RSTREAMS_SET	0x00800u /* rec side's STREAMS H2O marks set */
 #define	AM_CHNL_MSG_ON_QUEUE	0x01000u /* data message on STREAMS Q */
-#define	AM_CHNL_PLAY_UPDATE	0x02000u /* play SRC needs to be updated */
-#define	AM_CHNL_REC_UPDATE	0x04000u /* record SRC needs to be updated */
 #define	AM_CHNL_IOCTL_TASK	0x08000u /* ioctl() task scheduled */
 #define	AM_CHNL_QPROCSOFF	0x10000u /* qprocsoff() has been called */
 #define	AM_CHNL_SIGNAL_NEEDED	0x20000u /* someone needs to send a signal */

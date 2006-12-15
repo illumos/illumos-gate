@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3964,30 +3964,6 @@ am_p_process(audio_ch_t *chptr, void *buf, size_t size, int **orig_data,
 	 * we've got good buffers.
 	 */
 	if (mode == AM_MIXER_MODE && ad_infop->ad_codec_type == AM_TRAD_CODEC) {
-		audio_apm_info_t	*apm_infop = chptr->ch_apm_infop;
-
-		/*
-		 * Make sure we have the sample rate converter set up
-		 * properly. If we cannot we try again later.
-		 */
-		if (chpptr->acp_flags & AM_CHNL_PLAY_UPDATE) {
-			ATRACE_32("am_p_process() need to update src",
-			    chpptr->acp_flags);
-			if (ad_infop->ad_play.ad_conv->ad_src_update(
-			    AM_SRC_CHPTR2HDL(chptr), &info->play,
-			    &((audio_info_t *)apm_infop->apm_ad_state)->play,
-			    ad_infop->ad_play.ad_sr_info, AUDIO_PLAY) ==
-			    AUDIO_FAILURE) {
-				ATRACE_32("am_p_process() update src failed",
-				    chpptr->acp_flags);
-				src_samples = orig_samples;
-			} else {
-				chpptr->acp_flags &= ~AM_CHNL_PLAY_UPDATE;
-				ATRACE_32("am_p_process() update src good",
-				    chpptr->acp_flags);
-			}
-		}
-
 		/*
 		 * Make sure we've got good sample rate converter buffers.
 		 * However, even if we fail we still proceed. We get a second
