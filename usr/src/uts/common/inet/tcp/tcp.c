@@ -11759,7 +11759,17 @@ tcp_rput_common(tcp_t *tcp, mblk_t *mp)
 			freemsg(mp);
 			return;
 		default:
-			break;
+			/*
+			 * tcp_icmp_err() will process the M_CTL packets.
+			 * Non-ICMP packets, if any, will be discarded in
+			 * tcp_icmp_err(). We will process the ICMP packet
+			 * even if we are TCP_IS_DETACHED_NONEAGER as the
+			 * incoming ICMP packet may result in changing
+			 * the tcp_mss, which we would need if we have
+			 * packets to retransmit.
+			 */
+			tcp_icmp_error(tcp, mp);
+			return;
 		}
 	}
 
@@ -15717,17 +15727,13 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 			break;
 		}
 		break;
-	case M_CTL:
-		/*
-		 * ICMP messages.
-		 */
-		tcp_icmp_error(tcp, mp);
-		return;
 	case M_FLUSH:
 		if (*rptr & FLUSHR)
 			flushq(q, FLUSHDATA);
 		break;
 	default:
+		/* M_CTL will be directly sent to tcp_icmp_error() */
+		ASSERT(DB_TYPE(mp) != M_CTL);
 		break;
 	}
 	/*
