@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,314 +22,131 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# This script takes a file list and a workspace
-# and builds a set of html files suitable for doing
-# a code review of source changes via a web page.
+# This script takes a file list and a workspace and builds a set of html files
+# suitable for doing a code review of source changes via a web page.
+# Documentation is available via the manual page, webrev.1, or just
+# type 'webrev -h'.
 #
-# Here's how you use it:
+# Acknowledgements to contributors to webrev are listed in the webrev(1)
+# man page.
 #
-#	$ webrev file.list
+
 #
-# Alternatively, just run "webrev -l" and it'll extract
-# a file list from the output of "putback -n" that will
-# include any files updated, created, or currently sccs
-# checked out. The script creates a "webrev" directory
-# in the workspace directory that contains all the generated
-# html files.  It also stashes a copy of the file list in
-# there.
-#
-#
-# 1) If you run "webrev -l" it'll extract a file list from
-#    the output of "putback -n" that will include any files
-#    updated, created, or currently checked out.  This is
-#    the easiest way to use webrev.  If you use the "-l"
-#    option to generate the file list then skip to step (4).
-#    Note: if the workspace is large (e.g. all of Solaris usr/src
-#    then this might take a while. You can run "webrev -l -f flp"
-#    to have webrev extract a file list from the output of
-#    "putback -n -f flp".
-#
-#    The file list created by "webrev -l" is stashed in the
-#    webrev directory as "file.list".
-#
-#    If you would like more control over the file list then
-#    create a file containing a list of all the files to
-#    be included in your review with paths relative to your
-#    workspace directory, e.g.
-#
-#          usr/src/uts/common/fs/nfs/nfs_subr.c
-#          usr/src/uts/common/fs/nfs/nfs_export.c
-#          usr/src/cmd/fs.d/nfs/mountd/mountd.c
-#           :
-#
-#    Include the paths of any files added, deleted, or modified.
-#    You can keep this list of files in the webrev directory
-#    that the script creates in your workspace directory
-#    (CODEMGR_WS).
-#
-# 2) The script needs to be able locate your workspace and
-#    its parent.  If you have already activated your workspace
-#    with the "ws" command then the script will use the
-#    CODEMGR_WS environment variable.  If you are not working
-#    within a workspace activation, then you'll need to set
-#    the environment variable within the file list, e.g.
-#
-#          CODEMGR_WS=/home/brent/myws
-#
-#          usr/src/uts/common/fs/nfs/nfs_subr.c
-#          usr/src/uts/common/fs/nfs/nfs_export.c
-#          usr/src/cmd/fs.d/nfs/mountd/mountd.c
-#           :
-#
-#    If you would like to compare against some other workspace
-#    that is not the parent, then you can set the CODEMGR_PARENT
-#    environment variable in the file list, e.g.
-#
-#          CODEMGR_WS=/home/brent/myws
-#          CODEMGR_PARENT=/ws/on297-gate
-#
-#          usr/src/uts/common/fs/nfs/nfs_subr.c
-#          usr/src/uts/common/fs/nfs/nfs_export.c
-#          usr/src/cmd/fs.d/nfs/mountd/mountd.c
-#           :
-#
-# 3) Run this script with the name of the file containing
-#    the file list as an argument, e.g.
-#
-#      $ webrev  file.list
-#
-#    If you supply "-" as the name of the file, then stdin
-#    will be used.
-#
-#    If you use the "-w" flag, i.e. "webrev  -w  file.list"
-#    then webrev will assume the file list is in the format
-#    expected by the "wx" package: pathname lines alternating
-#    with SCCS comment lines separated by blank lines, e.g.
-#
-#          usr/src/uts/common/fs/nfs/nfs_subr.c
-#
-#          1206578 Fix spelling error in comment
-#
-#          usr/src/uts/common/fs/nfs/nfs_export.c
-#
-#          4039272 cstyle fixes
-#
-#          usr/src/cmd/fs.d/nfs/mountd/mountd.c
-#
-#          1927634 mountd daemon doesn't handle expletives
-#
-#    Embedded bug ids (any sequence of 5 or more digits)
-#    will be converted to a URL (see URL environment variable
-#    below).
-#
-# 4) For each file in the list, the script will compare it
-#    with the version in the parent workspace (CODEMGR_PARENT)
-#    and generate context and side-by-side diffs (sdiffs) as
-#    HTML files as well as HTML renderings of the old and new
-#    files with prepended line numbers for easy cross-checking
-#    with diffs.
-#
-#    The HTML files will have additional formatting to
-#    color code the source lines:
-#
-#      unchanged : black
-#        removed : brown
-#        changed : blue
-#            new : bold blue
-#
-#  
-# 5) Webrev will create a directory $CODEMGR_WS/webrev
-#    and create the HTML files in a hierarchy beneath
-#    this directory. Links to these HTML files will be
-#    built into an index.html file in the "webrev" directory.
-#    If you would like the "webrev" directory to appear
-#    somewhere other than $CODEMGR_WS, then set the WDIR
-#    environment variable, e.g.
-#
-#        WDIR=/tmp  webrev -l
-#
-#    Each file will be listed on a line with a link to
-#    its Cdiffs, Udiffs, Sdiffs, Old, and New versions.  A blank
-#    line will be inserted between filenames that do not exist
-#    within the same directory as a grouping aid.
-#    SCCS comments for each delta will be included
-#    automatically. Bug numbers (any sequence of 5 or more
-#    digits) in the comment will be replaced by a URL to
-#    your local bug server.  You may need to modify the URL
-#    below:
-#
-    if [[ -z $WEBREV_BUGURL ]]; then
-	URL='http://monaco.sfbay.sun.com/detail.jsp?cr='
-    else
-	URL="$WEBREV_BUGURL"
-    fi
-#
-#    Likewise, ARC cases will be replaced by a URL starting with:
-#
-     URL2="http://sac.eng.sun.com/"
-#
-#    As a review aid, you can add value to the index
-#    file by including text that explains the changes in front
-#    of the links for each file.  You might also add links
-#    to the one-pager, project plan, or other documents
-#    helpful to the reviewer.
-#
-# 6) View the index.html file with your web browser to 
-#    verify that its what you want your reviewers to see.
-#    The browser must support HTML tables and colored fonts.
-#    Then send an Email invitation to your reviewers including
-#    the URL to the index.html file in your workspace.  If you
-#    use an "http:" URL then you can omit the "index.html"
-#    filename, e.g.
-#
-#          To: bob, jane, wendy
-#          Subject: Please review fix for bug 1234576
-#
-#          I'd be grateful if would review my bugfix.
-#          All the relevant information can be obtained
-#          with the following URL:
-#
-#             http://jurassic.eng/home/brent/myws/webrev
-#
-#          Thanks
-#                 Brent
-#
-###############
-#
-#    Acknowledgements to Rob Thurlow, Mike Eisler, Lin Ling,
-#    Rod Evans, Mike Kupfer, Greg Onufer, Glenn Skinner,
-#    Oleg Larin, David Robinson, Matthew Cross, David L. Paktor,
-#    Neal Gafter, John Beck, Darren Moffat, Norm Shulman, Bill Watson,
-#    Pedro Rubio and Bill Shannon for valuable feedback and insight in
-#    building this script.
-#
-#    Have fun!
-#			Brent Callaghan  11/28/96
-###############
-#
-#          Change Log
-#
-# 3/28/97  Add support for specifying stdin as a "-" argument.
-#
-# 6/15/97  Fix to allow file overwrite for users who set "noclobber"
-#
-# 8/19/97  Fix illegal "&" escape sequences (from Greg Onufer)
-#
-# 10/29/97 Create all HTML files under a "webrev" directory
-#          Add -bw flags to "sdiff"
-#
-# 3/9/98   Improvements to better handle Java code.
-#          Fix for quoting of code in <pre> blocks.
-#          Fix some color bugs.  SCCS fix with not
-#          getting appropriate parent version depending
-#          on whether child version is checked out or
-#          not (from Bill Shannon).
-#
-# 3/13/98  Added code from Bill Shannon's "spc" script
-#          To add SCCS comments automatically to index.html.
-#
-# 3/18/98  Added -l option to generate file list automatically.
-#
-# 4/4/98   Added -w option to support Bonwick's wx package
-#          active file list which can included pending
-#          SCCS comments.
-#          Reorganized layout of index file so that SCCS comments
-#          now come after the file diffs line.  This looks much
-#          better. Also, reduced the text point size in diffs
-#          so that more source code can be viewed.
-#
-# 3/6/98   Handle files in the root directory of the workspace.
-#
-# 10/15/98 Fix minor bugs in sdiff color coding.
-#          Replace long runs of unchanged lines in sdiff
-#          by a horiz rule.
-#	   Link bugids in SCCS & wx comments to web page via URL.
-#          Bracket HTML page with <html> ... </html>.
-#	   Add HTML comment to index file to help in placing
-#	   change comments.
-#
-# 10/22/98 Fixed a bug affecting wx comments output.
-#          File names in index file are now bold.
-#          Basename of child workspace is used as the title.
-#
-# 12/22/98 Allow user to specify WDIR target directory for
-#          "webrev" directory.
-#
-# 2/8/99   Allow file comparison with a parent that is not
-#          a workspace - just a raw directory hierarchy of
-#          files created by a workspace snapshot tool like
-#          freezept (from Matthew Cross).
-#
-# 3/18/99  Allow the -l option to extract values for
-#	   CODEMGR_WS and for CODEMGR_PARENT if they
-#          are not already defined.  Play the file list
-#          out through stdout once it's created
-#	   (from David L. Paktor).
-#
-# 3/18/99  Correctly handle the case where no changes are found
-#
-# 4/7/99   Handle case of relative name for -w filename.
-#
-# 8/20/99  Fix handling of file.list
-#
-# 10/25/99 Additions or deletions to the beginning of a file
-#          caused the lines to go out of synch.  Added new
-#          code to handle this case.  Thanks to Glenn Skinner
-#          for reporting the bug.
-#
-# 4/21/00  Added date of webrev run to last line of index page
-#	   (suggestion by David Robinson)
-#
-# 8/2/00   Changed "sort" to "sort -u" to eliminate
-#          duplicates in putback output. Thanks to 
-#          Bill Shannon.
-#
-# 11/21/00 Added filenames to the HTML page titles.
-#          (suggestion by David Robinson)
-#
-# 11/21/00 Fixed a problem with lost sccs comments in a
-#          new file.  Also added a default for the -w wxfile
-#          flag.  Thanks to Darren Moffat for these.
-#
-# 11/22/00 Fix to detect and handle renames correctly.
-#
-# 1/17/01  Allow the use of a file list program (flp) to
-#          be specified as an argument to -l. For example:
-#          "webrev -l -f ~/aux.flp". An flp is a program
-#          that generates a file list. Thanks to Norm Shulman.
-#
-# 2/1/01   Invoke context diff from CDIFFCMD environment
-#          variable.  This allows an alternative diff
-#          command line to be invoked if set in the environment.
-#          Thanks to John Beck (a fan of udiff).
-#
-# 2/2/01   Change "sort -k1,1" to "sort -k 1,1"
-#          Bugfix from Neal Gafter
-#
-# 4/27/01  Added webrev script date to index page
-#	   Suggestion from John Beck
-#
-# 4/27/01  Protect HTML sensitive characters in SCCS
-#          delta comments. Bug reported by Pedro Rubio
-#
-# 7/24/01  Modify page title to be workspace name - suggestion
-#	   from Bill Watson.
-#
-# Following variable is set to SCCS delta date 20YY/MM/DD.
+# The following variable is set to SCCS delta date 20YY/MM/DD.
 # Note this will have to be changed in 2100 or when SCCS has support for
 # 4 digit years; whichever is the sooner!
 #
-  WEBREV_UPDATED=20%E%
-#
-###############
+WEBREV_UPDATED=20%E%
 
 REMOVED_COLOR=brown
 CHANGED_COLOR=blue
 NEW_COLOR=blue
 
+HTML='<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">\n'
+
+FRAMEHTML='<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">\n'
+
+STDHEAD='<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+a:hover { background-color: #ffcc99; }
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+'
+
+#
+# UDiffs need a slightly different CSS rule for 'new' items (we don't
+# want them to be bolded as we do in cdiffs or sdiffs).
+#
+UDIFFCSS='
+<style type="text/css" media="screen">
+span.new {
+    color: blue;
+    font-weight: normal;
+}
+</style>
+'
+
+#
+# input_cmd | html_quote | output_cmd
+# or
+# html_quote filename | output_cmd
 #
 # Make a piece of source code safe for display in an HTML <pre> block.
 #
@@ -339,32 +155,107 @@ html_quote()
 	sed -e "s/&/\&amp;/g" -e "s/</\&lt;/g" -e "s/>/\&gt;/g" "$@" | expand
 }
 
-sdiff_to_html()
+#
+# input_cmd | bug2url | output_cmd
+#
+# Scan for bugids and insert <a> links to the relevent bug database.
+#
+bug2url()
 {
+	sed -e 's|[0-9]\{5,\}|<a href=\"'$BUGURL'&\">&</a>|g'
+}
+
 #
-#  This function takes two files as arguments, obtains their diff,
-#  and processes the diff output to present the files as an HTML
-#  document with the files displayed side-by-side, differences
-#  shown in color.
+# input_cmd | sac2url | output_cmd
 #
-#  This HTML generated by this function assumes that the browser
-#  can handle HTML 3.0 tables and colored text as implemented
-#  in Netscape 2.0.  The output is "wide" so it will be necessary
-#  to widen the browser window when viewing the output.
+# Scan for ARC cases and insert <a> links to the relevent SAC database.
+# This is slightly complicated because inside the SWAN, SAC cases are
+# grouped by ARC: PSARC/2006/123.  But on OpenSolaris.org, they are
+# referenced as 2006/123 (without labelling the ARC).
 #
-#  The function takes two files as arguments
-#  and the HTML will be delivered on stdout, e.g.
+sac2url()
+{
+	if [[ -z $Oflag ]]; then
+	    sed -e 's|\([A-Z]\{1,2\}ARC\)[ /]\([0-9]\{4\}\)/\([0-9]\{3\}\)|<a href=\"'$SACURL'\1/\2/\3\">\1 \2/\3</a>|g'
+	else
+	    sed -e 's|\([A-Z]\{1,2\}ARC\)[ /]\([0-9]\{4\}\)/\([0-9]\{3\}\)|<a href=\"'$SACURL'/\2/\3\">\1 \2/\3</a>|g'
+	fi
+}
+
 #
-#    $ sdiff_html  prog.c-  prog.c  >  prog.diffs.html
+# strip_unchanged <infile> | output_cmd
 #
-#  In addition if WEBREV_FRAMES == 'yes' then framed_sdiff() is called
-#  which creates $2.frames.html in the webrev tree.
+# Removes chunks of sdiff documents that have not changed. This makes it
+# easier for a code reviewer to find the bits that have changed.
 #
-#  FYI: This function is rather unusual in its use of awk.
-#  The initial diff run produces conventional diff output
-#  showing changed lines mixed with editing codes.  The
-#  changes lines are ignored - we're interested in the 
-#  editing codes, e.g.
+# Deleted lines of text are replaced by a horizontal rule. Some
+# identical lines are retained before and after the changed lines to
+# provide some context.  The number of these lines is controlled by the
+# variable C in the nawk script below.
+#
+# The script detects changed lines as any line that has a "<span class="
+# string embedded (unchanged lines have no particular class and are not
+# part of a <span>).  Blank lines (without a sequence number) are also
+# detected since they flag lines that have been inserted or deleted.
+#
+strip_unchanged()
+{
+	nawk '
+	BEGIN	{ C = c = 20 }
+	NF == 0 || /span class=/ {
+		if (c > C) {
+			c -= C
+			inx = 0
+			if (c > C) {
+				print "\n</pre><hr /><pre>"
+				inx = c % C
+				c = C
+			}
+
+			for (i = 0; i < c; i++)
+				print ln[(inx + i) % C]
+		}
+		c = 0;
+		print
+		next
+	}
+	{	if (c >= C) {
+			ln[c % C] = $0
+			c++;
+			next;
+		}
+		c++;
+		print
+	}
+	END	{ if (c > (C * 2)) print "\n</pre><hr />" }
+
+	' $1
+}
+
+#
+# sdiff_to_html
+#
+# This function takes two files as arguments, obtains their diff, and
+# processes the diff output to present the files as an HTML document with
+# the files displayed side-by-side, differences shown in color.  It also
+# takes a delta comment, rendered as an HTML snippet, as the third
+# argument.  The function takes two files as arguments, then the name of
+# file, the path, and the comment.  The HTML will be delivered on stdout,
+# e.g.
+#
+#   $ sdiff_to_html old/usr/src/tools/scripts/webrev.sh \
+#         new/usr/src/tools/scripts/webrev.sh \
+#         webrev.sh usr/src/tools/scripts \
+#         '<a href="http://monaco.sfbay.sun.com/detail.jsp?cr=1234567">
+#          1234567</a> my bugid' > <file>.html
+#
+# framed_sdiff() is then called which creates $2.frames.html
+# in the webrev tree.
+#
+# FYI: This function is rather unusual in its use of awk.  The initial
+# diff run produces conventional diff output showing changed lines mixed
+# with editing codes.  The changed lines are ignored - we're interested in
+# the editing codes, e.g.
 #
 #      8c8
 #      57a61
@@ -373,53 +264,60 @@ sdiff_to_html()
 #      106d90
 #      108,110d91
 #
-#  These editing codes are parsed by the awk script and used to
-#  generate another awk script that generates HTML, e.g the
-#  above lines would turn into something like this:
+#  These editing codes are parsed by the awk script and used to generate
+#  another awk script that generates HTML, e.g the above lines would turn
+#  into something like this:
 #
 #      BEGIN { printf "<pre>\n" }
 #      function sp(n) {for (i=0;i<n;i++)printf "\n"}
-#      function wl(n) {printf "<FONT COLOR=%s>%3d %s </FONT>\n", n, NR, $0}
+#      function wl(n) {printf "<font color=%s>%4d %s </font>\n", n, NR, $0}
 #      NR==8           {wl("#7A7ADD");next}
 #      NR==54          {wl("#7A7ADD");sp(3);next}
 #      NR==56          {wl("#7A7ADD");next}
 #      NR==57          {wl("black");printf "\n"; next}
 #        :               :
 #
-#  This script is then run on the original source file to generate
-#  the HTML that corresponds to the source file.
+#  This script is then run on the original source file to generate the
+#  HTML that corresponds to the source file.
 #
-#  The two HTML files are then combined into a single piece of 
-#  HTML that uses an HTML table construct to present the files
-#  side by side.  You'll notice that the changes are color-coded:
+#  The two HTML files are then combined into a single piece of HTML that
+#  uses an HTML table construct to present the files side by side.  You'll
+#  notice that the changes are color-coded:
 #
 #   black     - unchanged lines
 #   blue      - changed lines
 #   bold blue - new lines
 #   brown     - deleted lines
 #
-#  Blank lines are inserted in each file to keep unchanged
-#  lines in sync (side-by-side).  This format is familiar
-#  to users of sdiff(1) or Teamware's filemerge tool.
-
-diff -b $1 $2 > /tmp/$$.diffs
-
+#  Blank lines are inserted in each file to keep unchanged lines in sync
+#  (side-by-side).  This format is familiar to users of sdiff(1) or
+#  Teamware's filemerge tool.
 #
-#  Now we have the diffs, generate the HTML for the old file.
-#
-
-TNAME=$2
-
-nawk '
-BEGIN	{
-	printf "function sp(n) {for (i=0;i<n;i++)printf \"\\n\"}\n"
-	printf "function wl(n) {printf \"<FONT COLOR=%%s>%%3d %%s </FONT>\\n\", n, NR, $0}\n"
-	printf "function bl() {printf \"%%3d %%s\\n\", NR, $0}\n"
-}
-/^</	{next}
-/^>/	{next}
-/^---/	{next}
+sdiff_to_html()
 {
+	diff -b $1 $2 > /tmp/$$.diffs
+
+	TNAME=$3
+	TPATH=$4
+	COMMENT=$5
+
+	#
+	#  Now we have the diffs, generate the HTML for the old file.
+	#
+	nawk '
+	BEGIN	{
+		printf "function sp(n) {for (i=0;i<n;i++)printf \"\\n\"}\n"
+		printf "function removed() "
+		printf "{printf \"<span class=\\\"removed\\\">%%4d %%s</span>\\n\", NR, $0}\n"
+		printf "function changed() "
+		printf "{printf \"<span class=\\\"changed\\\">%%4d %%s</span>\\n\", NR, $0}\n"
+		printf "function bl() {printf \"%%4d %%s\\n\", NR, $0}\n"
+}
+	/^</	{next}
+	/^>/	{next}
+	/^---/	{next}
+
+	{
 	split($1, a, /[cad]/) ;
 	if (index($1, "a")) {
 		if (a[1] == 0) {
@@ -442,17 +340,17 @@ BEGIN	{
 			printf "bl();sp(%d);next}\n",\
 			(r[2] - r[1]) + 1
 		}
-		next	
+		next
 	}
 	if (index($1, "d")) {
 		n = split(a[1], r, /,/);
 		n1 = r[1]
 		n2 = r[2]
 		if (n == 1)
-			printf "NR==%s\t\t{wl(\"'$REMOVED_COLOR'\") ; next}\n" , n1
+			printf "NR==%s\t\t{removed(); next}\n" , n1
 		else
-			printf "NR==%s,NR==%s\t{wl(\"'$REMOVED_COLOR'\") ; next}\n" , n1, n2
-		next	
+			printf "NR==%s,NR==%s\t{removed(); next}\n" , n1, n2
+		next
 	}
 	if (index($1, "c")) {
 		n = split(a[1], r, /,/);
@@ -461,10 +359,10 @@ BEGIN	{
 		final = n2
 		d1 = 0
 		if (n == 1)
-			printf "NR==%s\t\t{wl(\"'$CHANGED_COLOR'\");" , n1
+			printf "NR==%s\t\t{changed();" , n1
 		else {
 			d1 = n2 - n1
-			printf "NR==%s,NR==%s\t{wl(\"'$CHANGED_COLOR'\");" , n1, n2
+			printf "NR==%s,NR==%s\t{changed();" , n1, n2
 		}
 		m = split(a[2], r, /,/);
 		n1 = r[1]
@@ -477,30 +375,32 @@ BEGIN	{
 			}
 		}
 		printf "next}\n" ;
-		
-		next	
+
+		next
 	}
-}
-END	{ printf "{printf \"%%3d %%s\\n\", NR, $0 }\n" }
-' /tmp/$$.diffs > /tmp/$$.file1
+	}
 
-html_quote $1 | nawk -f /tmp/$$.file1 > /tmp/$$.file1.html
+	END	{ printf "{printf \"%%4d %%s\\n\", NR, $0 }\n" }
+	' /tmp/$$.diffs > /tmp/$$.file1
 
-#
-#  Now generate the HTML for the new file
-#
+	#
+	#  Now generate the HTML for the new file
+	#
+	nawk '
+	BEGIN	{
+		printf "function sp(n) {for (i=0;i<n;i++)printf \"\\n\"}\n"
+		printf "function new() "
+		printf "{printf \"<span class=\\\"new\\\">%%4d %%s</span>\\n\", NR, $0}\n"
+		printf "function changed() "
+		printf "{printf \"<span class=\\\"changed\\\">%%4d %%s</span>\\n\", NR, $0}\n"
+		printf "function bl() {printf \"%%4d %%s\\n\", NR, $0}\n"
+	}
 
-nawk '
-BEGIN	{ 
-	printf "function sp(n) {for (i=0;i<n;i++)printf \"\\n\"}\n"
-	printf "function wl(n) {printf \"<FONT COLOR=%%s>%%3d %%s </FONT>\\n\", n, NR, $0}\n"
-	printf "function wlb(n) {printf \"<FONT COLOR=%%s><b>%%3d %%s</b></FONT>\\n\", n, NR, $0}\n"
-	printf "function bl() {printf \"%%3d %%s\\n\", NR, $0}\n"
-}
-/^</	{next}
-/^>/	{next}
-/^---/	{next}
-{
+	/^</	{next}
+	/^>/	{next}
+	/^---/	{next}
+
+	{
 	split($1, a, /[cad]/) ;
 	if (index($1, "d")) {
 		if (a[2] == 0) {
@@ -523,17 +423,17 @@ BEGIN	{
 			printf "bl();sp(%d);next}\n",\
 			(r[2] - r[1]) + 1
 		}
-		next	
+		next
 	}
 	if (index($1, "a")) {
 		n = split(a[2], r, /,/);
 		n1 = r[1]
 		n2 = r[2]
 		if (n == 1)
-			printf "NR==%s\t\t{wlb(\"'$NEW_COLOR'\") ; next}\n" , n1
+			printf "NR==%s\t\t{new() ; next}\n" , n1
 		else
-			printf "NR==%s,NR==%s\t{wlb(\"'$NEW_COLOR'\") ; next}\n" , n1, n2
-		next	
+			printf "NR==%s,NR==%s\t{new() ; next}\n" , n1, n2
+		next
 	}
 	if (index($1, "c")) {
 		n = split(a[2], r, /,/);
@@ -543,10 +443,10 @@ BEGIN	{
 		d2 = 0;
 		if (n == 1) {
 			final = n1
-			printf "NR==%s\t\t{wl(\"'$CHANGED_COLOR'\");" , n1
+			printf "NR==%s\t\t{changed();" , n1
 		} else {
 			d2 = n2 - n1
-			printf "NR==%s,NR==%s\t{wl(\"'$CHANGED_COLOR'\");" , n1, n2
+			printf "NR==%s,NR==%s\t{changed();" , n1, n2
 		}
 		m = split(a[1], r, /,/);
 		n1 = r[1]
@@ -559,230 +459,281 @@ BEGIN	{
 			}
 		}
 		printf "next}\n" ;
-		next	
+		next
 	}
+	}
+	END	{ printf "{printf \"%%4d %%s\\n\", NR, $0 }\n" }
+	' /tmp/$$.diffs > /tmp/$$.file2
+
+	#
+	# Post-process the HTML files by running them back through nawk
+	#
+	html_quote < $1 | nawk -f /tmp/$$.file1 > /tmp/$$.file1.html
+
+	html_quote < $2 | nawk -f /tmp/$$.file2 > /tmp/$$.file2.html
+
+	#
+	# Now combine into a valid HTML file and side-by-side into a table
+	#
+	print "$HTML<head>$STDHEAD"
+	print "<title>$WNAME Sdiff $TPATH </title>"
+	print "</head><body id=\"SUNWwebrev\">"
+        print "<a class=\"print\" href=\"javascript:print()\">Print this page</a>"
+	print "<pre>$COMMENT</pre>\n"
+	print "<table><tr valign=\"top\">"
+	print "<td><pre>"
+
+	strip_unchanged /tmp/$$.file1.html
+
+	print "</pre></td><td><pre>"
+
+	strip_unchanged /tmp/$$.file2.html
+
+	print "</pre></td>"
+	print "</tr></table>"
+	print "</body></html>"
+
+	framed_sdiff $TNAME $TPATH /tmp/$$.file1.html /tmp/$$.file2.html \
+	    "$COMMENT"
 }
-END	{ printf "{printf \"%%3d %%s\\n\", NR, $0 }\n" }
-' /tmp/$$.diffs > /tmp/$$.file2
 
-html_quote $2 | nawk -f /tmp/$$.file2 > /tmp/$$.file2.html
 
-# Now combine into a table
-
-echo "<body bgcolor=#EEEEEE>"
-echo "<title> Sdiff $TNAME </title>"
-echo "<table><tr valign=top>"
-echo "<td><pre>"
-
-strip_unchanged /tmp/$$.file1.html
-
-echo "</pre></td><td><pre>"
-
-strip_unchanged /tmp/$$.file2.html
-
-echo "</pre></td>"
-echo "</tr></table>"
-
-if [[ $WEBREV_FRAMES == 'yes' ]]; then
-    framed_sdiff $TNAME /tmp/$$.file1.html /tmp/$$.file2.html
-fi
-
-}
-
-####################################
-
+#
+# framed_sdiff <filename> <filepath> <lhsfile> <rhsfile> <comment>
+#
+# Expects lefthand and righthand side html files created by sdiff_to_html.
+# We use insert_anchors() to augment those with HTML navigation anchors,
+# and then emit the main frame.  Content is placed into:
+#
+#    $WDIR/DIR/$TNAME.lhs.html
+#    $WDIR/DIR/$TNAME.rhs.html
+#    $WDIR/DIR/$TNAME.frames.html
+#
+# NOTE: We rely on standard usage of $WDIR and $DIR.
+#
 function framed_sdiff
 {
-# Expects html files created by sdiff_to_html which it then augments
-# with HTML navigation anchors.  
-#
-# NOTE: We rely on standard usage of $TNAME and $WDIR/$DIR.
-#
-    typeset TNAME=$1
-    typeset file1=$2
-    typeset file2=$3
-    typeset RTOP
-    # Make the rhs/lhs files and output the frameset file.
-    insert_anchors $file1 > $WDIR/$DIR/$TNAME.lhs.html
-    insert_anchors $file2 > $WDIR/$DIR/$TNAME.rhs.html
-    # Enable html files to access WDIR via a relative path.
-    RTOP=$(relative_cws)
-    cat > $WDIR/$DIR/$TNAME.frames.html <<-EOF
-	<html><head>
-	    <title>Framed Sdiff for $TNAME</title>
-	  </head>
-	  <FRAMESET ROWS="*,50">
-	    <FRAMESET COLS="50%,50%">
-	      <FRAME SRC="$TNAME.lhs.html" SCROLLING="auto" NAME="lhs">
-	      <FRAME SRC="$TNAME.rhs.html" SCROLLING="auto" NAME="rhs">
-	    </FRAMESET>
-	  <FRAME SRC="${RTOP}ancnav.html" SCROLLING="no" MARGINWIDTH="0"
-	   MARGINHEIGHT="0">
-	  <NOFRAMES>
-	    <P>Alas FRAMES webrev requires that your browser supports FRAMES
-	    and has the feature enabled.  
-	    <a href="index.html">Return to webrev index</a>.</p>
-	  </NOFRAMES>
-	  </FRAMESET>
+	typeset TNAME=$1
+	typeset TPATH=$2
+	typeset lhsfile=$3
+	typeset rhsfile=$4
+	typeset comments=$5
+	typeset RTOP
+
+	# Enable html files to access WDIR via a relative path.
+	RTOP=$(relative_dir $TPATH $WDIR)
+
+	# Make the rhs/lhs files and output the frameset file.
+	print "$HTML<head>$STDHEAD" > $WDIR/$DIR/$TNAME.lhs.html
+
+	cat >> $WDIR/$DIR/$TNAME.lhs.html <<-EOF
+	    <script type="text/javascript" src="$RTOP/ancnav.js" />
+	    </head>
+	    <body id="SUNWwebrev" onkeypress="keypress(event);">
+	    <a name="0" />
+	    <pre>$comments</pre><hr />
+	EOF
+
+	cp $WDIR/$DIR/$TNAME.lhs.html $WDIR/$DIR/$TNAME.rhs.html
+
+	insert_anchors $lhsfile >> $WDIR/$DIR/$TNAME.lhs.html
+	insert_anchors $rhsfile >> $WDIR/$DIR/$TNAME.rhs.html
+
+	close='</body></html>'
+
+	print $close >> $WDIR/$DIR/$TNAME.lhs.html
+	print $close >> $WDIR/$DIR/$TNAME.rhs.html
+
+	print "$FRAMEHTML<head>$STDHEAD" > $WDIR/$DIR/$TNAME.frames.html
+	print "<title>$WNAME Framed-Sdiff " \
+	    "$TPATH/$TNAME</title> </head>" >> $WDIR/$DIR/$TNAME.frames.html
+	cat >> $WDIR/$DIR/$TNAME.frames.html <<-EOF
+	  <frameset rows="*,60">
+	    <frameset cols="50%,50%">
+	      <frame src="$TNAME.lhs.html" scrolling="auto" name="lhs" />
+	      <frame src="$TNAME.rhs.html" scrolling="auto" name="rhs" />
+	    </frameset>
+	  <frame src="$RTOP/ancnav.html" scrolling="no" marginwidth="0"
+	   marginheight="0" name="nav" />
+	  <noframes>
+            <body id="SUNWwebrev">
+	      Alas 'frames' webrev requires that your browser supports frames
+	      and has the feature enabled.
+            </body>
+	  </noframes>
+	  </frameset>
 	</html>
 	EOF
 }
 
-####################################
 
-strip_unchanged()
+#
+# fix_postscript
+#
+# Merge codereview output files to a single conforming postscript file, by:
+# 	- removing all extraneous headers/trailers
+#	- making the page numbers right
+#	- removing pages devoid of contents which confuse some
+#	  postscript readers.
+#
+# From Casper.
+#
+function fix_postscript
 {
-# Removes chunks of sdiff documents that have not
-# changed. This makes it easier for a code reviewer
-# to find the bits that have changed.
-#
-# Deleted lines of text are replaced by an
-# horizontal rule. Some identical lines are
-# retained before and after the changed lines
-# to provide some context.  The number of these
-# lines is controlled by the variable C in the
-# nawk script below.
-#
-# The script detects changed lines as any line
-# that has a "FONT COLOR=" string embedded (unchanged
-# lines use the default color and have no FONT directive).
-# Blank lines (without a sequence number) are also detected
-# since they flag lines that have been inserted or deleted.
+	infile=$1
 
-nawk '
+	cat > /tmp/$$.crmerge.pl << \EOF
 
-BEGIN	{ C = c = 20 }
-NF == 0 || /FONT COLOR=/ {
-	if (c > C) {
-		c -= C
-		inx = 0
-                if (c > C) {
-			print "\n<hr>"
-			inx = c % C
-			c = C
+	print scalar(<>);		# %!PS-Adobe---
+	print "%%Orientation: Landscape\n";
+
+	$pno = 0;
+	$doprint = 1;
+
+	$page = "";
+
+	while (<>) {
+		next if (/^%%Pages:\s*\d+/);
+
+		if (/^%%Page:/) {
+			if ($pno == 0 || $page =~ /\)S/) {
+				# Header or single page containing text
+				print "%%Page: ? $pno\n" if ($pno > 0);
+				print $page;
+				$pno++;
+			} else {
+				# Empty page, skip it.
+			}
+			$page = "";
+			$doprint = 1;
+			next;
 		}
 
-		for (i = 0; i < c; i++)
-			print ln[(inx + i) % C]
+		# Skip from %%Trailer of one document to Endprolog
+		# %%Page of the next
+		$doprint = 0 if (/^%%Trailer/);
+		$page .= $_ if ($doprint);
 	}
-	c = 0;
-	print
-	next
-}
-{	if (c >= C) {
-		ln[c % C] = $0
-                c++;
-		next;
+
+	if ($page =~ /\)S/) {
+		print "%%Page: ? $pno\n";
+		print $page;
+	} else {
+		$pno--;
 	}
-	c++;
-	print
-}
-END	{ if (c > (C * 2)) print "\n<hr>" }
+	print "%%Trailer\n%%Pages: $pno\n";
+EOF
 
-' $1
+	perl /tmp/$$.crmerge.pl < $infile
 }
-####################################
 
-function insert_anchors
-{
+
+#
+# input_cmd | insert_anchors | output_cmd
+#
 # Flag blocks of difference with sequentially numbered invisible
-# anchors.  These are used to drive the WEBREV_FRAMES version of the
+# anchors.  These are used to drive the frames version of the
 # sdiffs output.
 #
 # NOTE: Anchor zero flags the top of the file irrespective of changes,
 # an additional anchor is also appended to flag the bottom.
 #
-# The script detects changed lines as any line that has a "<FONT
-# COLOR=" string embedded (unchanged lines use the default color and
-# have no FONT directive).  Blank lines (without a sequence number)
+# The script detects changed lines as any line that has a "<span
+# class=" string embedded (unchanged lines have no class set and are
+# not part of a <span>.  Blank lines (without a sequence number)
 # are also detected since they flag lines that have been inserted or
 # deleted.
 #
-# In addition, here is a good place to top and tail the document for
-# use in its parent frame.  We add a lot of blank lines to tackily
-# assist the last anchors to have an effect on the screen.
-
-print '<html>\n<body bgcolor="#EEEEEE">\n<pre>'
-
-nawk '
-function ia() {
-	printf "<A NAME=\"%d\"></A>", anc++;
-}
-BEGIN {
-	anc=0;
-	inblock=1;
-	ia();
-}
-NF == 0 || /^<FONT COLOR=/ {
-	if (inblock == 0) {
-		ia();
-		inblock=1;
+function insert_anchors
+{
+	nawk '
+	function ia() {
+		# This should be able to be a singleton <a /> but that
+		# seems to trigger a bug in firefox a:hover rule processing
+		printf "<a name=\"%d\" id=\"anc%d\"></a>", anc, anc++;
 	}
-	print;
-	next;
+
+	BEGIN {
+		anc=1;
+		inblock=1;
+		printf "<pre>\n";
+	}
+	NF == 0 || /^<span class=/ {
+		if (inblock == 0) {
+			ia();
+			inblock=1;
+		}
+		print;
+		next;
+	}
+	{
+		inblock=0;
+		print;
+	}
+	END {
+		ia();
+
+		printf "<b style=\"font-size: large; color: red\">";
+		printf "--- EOF ---</b>"
+        	for(i=0;i<8;i++) printf "\n\n\n\n\n\n\n\n\n\n";
+		printf "</pre>"
+		printf "<form name=\"eof\">";
+		printf "<input name=\"value\" value=\"%d\" type=\"hidden\" />",
+		    anc - 1;
+		printf "</form>";
+	}
+	' $1
 }
+
+
+#
+# relative_dir
+#
+# Print a relative return path from $1 to $2.  For example if
+# $1=/tmp/myreview/raw_files/usr/src/tools/scripts and $2=/tmp/myreview,
+# this function would print "../../../../".
+#
+# In the event that $1 is not in $2 a warning is printed to stderr,
+# and $2 is returned-- the result of this is that the resulting webrev
+# is not relocatable.
+#
+function relative_dir
 {
-	inblock=0;
-	print;
-}
-END {
-	ia();
-	print "<center><font color=\"red\"><b>--- EOF ---</b></font></center>";
-	for(i=0;i<8;i++) printf "\n\n\n\n\n\n\n\n\n\n";
-}
-' $1
+	typeset cur="${1##$2?(/)}"
+	typeset ret=""
+	if [[ $2 == $cur ]]; then   # Should never happen.
+		# Should never happen.
+		print -u2 "\nWarning: relative_dir: \"$1\" not relative "
+		print -u2 "to \"$2\".  Check input paths.  Framed webrev "
+		print -u2 "will not be relocatable!"
+		print $2
+		return
+	fi
 
-print '</pre>\n</html>'
-}
-
-####################################
-
-function relative_cws
-{
-#
-# Print a relative return path from PWD to CWS.  for example if
-# PWD=/ws/onnv-gate/usr/src/tools/scripts and CWS=/ws/onnv-gate this
-# function would print "../../../../".
-#
-# In the event that CWS is not in PWD a warning is printed to stderr,
-# WDIR is returned and thus the resulting webrev is not relocatable.
-#
-    typeset cur="${PWD##$CWS(/)}" ret
-    if [[ $PWD == $cur ]]; then # Should never happen.
-	print -u2 "\nWarning: relative_cws: \"$PWD\" not relative to \"$CWS\"."
-	print -u2 "Check input paths.  Framed webrev will not be relocatable!"
-	print $WDIR
-    else
-	while [[ -n ${cur} ]]
+	while [[ -n ${cur} ]];
 	do
-	    cur=${cur%%*(/)*([!/])}
-	    ret="../$ret"
+		cur=${cur%%*(/)*([!/])}
+		if [[ -z $ret ]]; then
+			ret=".."
+		else
+			ret="../$ret"
+		fi
 	done
 	print $ret
-    fi
 }
 
-####################################
 
-function frame_navigation
+#
+# frame_nav_js
+#
+# Emit javascript for frame navigation
+#
+function frame_nav_js
 {
-# Output anchor navigation file for framed sdiffs.
 cat << \EOF
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
-<html><head><title>Anchor Navigation</title>
-<meta http-equiv="Content-Script-Type" content="text/javascript">
-<meta http-equiv="Content-Type" content="text/html">
-    <style>
-      div.button td { background: #900;}
-      div.button a { color: white }
-      div.button a:hover { background: black; color: white }
-    </style>
-    <script language="JavaScript">
-<!--
-var anc=0;
 var myInt;
 var scrolling=0;
-var sfactor;
+var sfactor = 3;
 var scount=10;
 
 function scrollByPix() {
@@ -795,28 +746,59 @@ function scrollByPix() {
 	scount--;
 }
 
-function scrollByAnc(num) {
-	if (num < 0) {
-		anc=0;
-		num=0;
-	}
-	if (num >= parent.lhs.document.anchors.length) {
-		anc=parent.lhs.document.anchors.length - 1;
-		num=anc;
-	}
+function scrollToAnc(num) {
+
+	// Update the value of the anchor in the form which we use as
+	// storage for this value.  setAncValue() will take care of
+	// correcting for overflow and underflow of the value and return
+	// us the new value.
+	num = setAncValue(num);
+
+	// Set location and scroll back a little to expose previous
+	// lines.
+	//
+	// Note that this could be improved: it is possible although
+	// complex to compute the x and y position of an anchor, and to
+	// scroll to that location directly.
+	//
 	parent.lhs.location.replace(parent.lhs.location.pathname + "#" + num);
 	parent.rhs.location.replace(parent.rhs.location.pathname + "#" + num);
-	anc=num;
-	if (num <= 0) {
-	    document.diff.sync.value="BOF";
-	} else if (num < parent.lhs.document.anchors.length - 1) {
-	    document.diff.sync.value=num;
-        } else {
-	    document.diff.sync.value="EOF";
-	}
-	// Scroll back a little to expose previous lines.
+
 	parent.lhs.scrollBy(0,-30);
 	parent.rhs.scrollBy(0,-30);
+}
+
+function getAncValue()
+{
+	return (parseInt(parent.nav.document.diff.real.value));
+}
+
+function setAncValue(val)
+{
+	if (val <= 0) {
+		val = 0;
+		parent.nav.document.diff.real.value = val;
+		parent.nav.document.diff.display.value = "BOF";
+		return (val);
+	}
+
+	//
+	// The way we compute the max anchor value is to stash it
+	// inline in the left and right hand side pages-- it's the same
+	// on each side, so we pluck from the left.
+	//
+	maxval = parent.lhs.document.eof.value.value;
+	if (val < maxval) {
+		parent.nav.document.diff.real.value = val;
+		parent.nav.document.diff.display.value = val.toString();
+		return (val);
+	}
+
+	// this must be: val >= maxval
+	val = maxval;
+	parent.nav.document.diff.real.value = val;
+	parent.nav.document.diff.display.value = "EOF";
+	return (val);
 }
 
 function stopScroll() {
@@ -832,13 +814,14 @@ function startScroll() {
 	myInt=setInterval("scrollByPix()",10);
 }
 
-function handlePress(b) { 
+function handlePress(b) {
+
 	switch (b) {
 	    case 1 :
-		scrollByAnc(-1);
+		scrollToAnc(-1);
 		break;
 	    case 2 :
-		scrollByAnc(anc-1);
+		scrollToAnc(getAncValue() - 1);
 		break;
 	    case 3 :
 		sfactor=-3;
@@ -849,10 +832,10 @@ function handlePress(b) {
 		startScroll();
 		break;
 	    case 5 :
-		scrollByAnc(anc+1);
+		scrollToAnc(getAncValue() + 1);
 		break;
 	    case 6 :
-		scrollByAnc(parent.lhs.document.anchors.length);
+		scrollToAnc(999999);
 		break;
 	}
 }
@@ -861,509 +844,997 @@ function handleRelease(b) {
 	stopScroll();
 }
 
-function ValidateDiffNum(){
-        i=Number(document.diff.sync.value);
-	if (isNaN(i)) {
-		document.diff.sync.value=anc;
-	} else {
-		scrollByAnc(i);
+function keypress(ev) {
+	var keynum;
+	var keychar;
+
+	if (window.event) { // IE
+		keynum = ev.keyCode;
+	} else if (ev.which) { // non-IE
+		keynum = ev.which;
 	}
-	return false;
+
+	keychar = String.fromCharCode(keynum);
+
+	if (keychar == "k") {
+		handlePress(2);
+		return (0);
+	} else if (keychar == "j" || keychar == " ") {
+		handlePress(5);
+		return (0);
+	}
+	return (1);
 }
 
-//-->
-    </script>
-  </head>
-  <body>
+function ValidateDiffNum(){
+	val = parent.nav.document.diff.display.value;
+	if (val == "EOF") {
+		scrollToAnc(999999);
+		return;
+	}
+
+	if (val == "BOF") {
+		scrollToAnc(0);
+		return;
+	}
+
+        i=parseInt(val);
+        if (isNaN(i)) {
+                parent.nav.document.diff.display.value = getAncValue();
+        } else {
+                scrollToAnc(i);
+        }
+        return false;
+}
+
+EOF
+}
+
+#
+# frame_navigation
+#
+# Output anchor navigation file for framed sdiffs.
+#
+function frame_navigation
+{
+	print "$HTML<head>$STDHEAD"
+
+	cat << \EOF
+<title>Anchor Navigation</title>
+<meta http-equiv="Content-Script-Type" content="text/javascript">
+<meta http-equiv="Content-Type" content="text/html">
+
+<style type="text/css">
+    div.button td { padding-left: 5px; padding-right: 5px;
+		    background-color: #eee; text-align: center;
+		    border: 1px #444 outset; cursor: pointer; }
+    div.button a { font-weight: bold; color: black }
+    div.button td:hover { background: #ffcc99; }
+</style>
+EOF
+
+	print "<script type=\"text/javascript\" src=\"ancnav.js\" />"
+
+	cat << \EOF
+</head>
+<body id="SUNWwebrev" bgcolor="#eeeeee" onload="document.diff.real.focus();"
+	onkeypress="keypress(event);">
     <noscript lang="javascript">
       <center>
-	<p><big>Framed Navigation controls require Javascript</big><br>
+	<p><big>Framed Navigation controls require Javascript</big><br />
 	Either this browser is incompatable or javascript is not enabled</p>
       </center>
     </noscript>
     <table width="100%" border="0" align="center">
-	<tr><th valign="middle" width="25%"><i>Diff navigation:</i></th>
-	  <td align="centre" valign="top" width="50%">
+	<tr>
+          <td valign="middle" width="25%">Diff navigation:
+          Use 'j' and 'k' for next and previous diffs; or use buttons
+          at right</td>
+	  <td align="center" valign="top" width="50%">
 	    <div class="button">
-	      <table border="0" cellpadding="2" align="center"><tr>
-		    <td align="center" valign="left">
+	      <table border="0" align="center">
+                  <tr>
+		    <td>
 		      <a onMouseDown="handlePress(1);return true;"
 			 onMouseUp="handleRelease(1);return true;"
 			 onMouseOut="handleRelease(1);return true;"
 			 onClick="return false;"
 			 title="Go to Beginning Of file">BOF</a></td>
-		    <td align="center" valign="middle">
+		    <td>
 		      <a onMouseDown="handlePress(3);return true;"
 			 onMouseUp="handleRelease(3);return true;"
 			 onMouseOut="handleRelease(3);return true;"
 			 title="Scroll Up: Press and Hold to accelerate"
-			 onClick="return false;">Scroll frames Up</a></td>
-		    <td align="center" valign="right">
+			 onClick="return false;">Scroll Up</a></td>
+		    <td>
 		      <a onMouseDown="handlePress(2);return true;"
 			 onMouseUp="handleRelease(2);return true;"
-			 onMouseOut="handleRelease(2);return true;" 
+			 onMouseOut="handleRelease(2);return true;"
 			 title="Go to previous Diff"
 			 onClick="return false;">Prev Diff</a>
 		    </td></tr>
+
 		  <tr>
-		    <td align="center" valign="left">
-		      <a onMouseDown="handlePress(6);return true;" 
-			 onMouseUp="handleRelease(6);return true;" 
-			 onMouseOut="handleRelease(6);return true;" 
+		    <td>
+		      <a onMouseDown="handlePress(6);return true;"
+			 onMouseUp="handleRelease(6);return true;"
+			 onMouseOut="handleRelease(6);return true;"
 			 onClick="return false;"
 			 title="Go to End Of File">EOF</a></td>
-		    <td align="center" valign="middle">
-		      <a onMouseDown="handlePress(4);return true;" 
-			 onMouseUp="handleRelease(4);return true;" 
-			 onMouseOut="handleRelease(4);return true;" 
+		    <td>
+		      <a onMouseDown="handlePress(4);return true;"
+			 onMouseUp="handleRelease(4);return true;"
+			 onMouseOut="handleRelease(4);return true;"
 			 title="Scroll Down: Press and Hold to accelerate"
-			 onClick="return false;">Scroll frames Down</a></td>
-		    <td align="center" valign="right">
-		      <a onMouseDown="handlePress(5);return true;" 
-			 onMouseUp="handleRelease(5);return true;" 
-			 onMouseOut="handleRelease(5);return true;" 
+			 onClick="return false;">Scroll Down</a></td>
+		    <td>
+		      <a onMouseDown="handlePress(5);return true;"
+			 onMouseUp="handleRelease(5);return true;"
+			 onMouseOut="handleRelease(5);return true;"
 			 title="Go to next Diff"
 			 onClick="return false;">Next Diff</a></td>
-		  </tr></table>
-	    </dev>
-	  </TD>
+		  </tr>
+              </table>
+	    </div>
+	  </td>
 	  <th valign="middle" width="25%">
-	    <form name="diff" onsubmit="return ValidateDiffNum();">
-		<input name="sync" value="BOF" size="8" type="text">
+	    <form action="" name="diff" onsubmit="return ValidateDiffNum();">
+		<input name="display" value="BOF" size="8" type="text" />
+		<input name="real" value="0" size="8" type="hidden" />
 	    </form>
 	  </th>
-	</TR>
+	</tr>
     </table>
   </body>
 </html>
 EOF
 }
 
-####################################
 
+
+#
+# diff_to_html <filename> <filepath> { U | C } <comment>
+#
+# Processes the output of diff to produce an HTML file representing either
+# context or unified diffs.
+#
 diff_to_html()
 {
-TNAME=$1
-DIFFTYPE=$2
+	TNAME=$1
+	TPATH=$2
+	DIFFTYPE=$3
+	COMMENT=$4
 
-html_quote | nawk '
-BEGIN	{printf "<body bgcolor=\"#EEEEEE\"><title>'$DIFFTYPE'diff '$TNAME'</title><pre>\n"}
-/^-------/	{ printf "<center><h1>%s</h1></center>\n", $0; next }
-/^\*\*\*\*/	{ printf "<hr>\n"; next}
-/^\*\*\*/	{ printf "<FONT COLOR=\"red\" SIZE=+1><b>%s</b></FONT>\n", $0 ; next}
-/^---/		{ printf "<FONT COLOR=\"green\" SIZE=+1><b>%s</b></FONT>\n", $0 ; next}
-/^\+/	{printf "<FONT COLOR=\"'$NEW_COLOR'\"><b>%s</b></FONT>\n", $0; next}
-/^!/	{printf "<FONT COLOR=\"'$CHANGED_COLOR'\">%s</FONT>\n", $0; next}
-/^-/	{printf "<FONT COLOR=\"'$REMOVED_COLOR'\">%s</FONT>\n", $0; next}
-	{printf "<FONT COLOR=\"black\">%s</FONT>\n", $0; next}
-END	{printf "</pre></FONT></body>\n"}
-'
+	print "$HTML<head>$STDHEAD"
+	print "<title>$WNAME ${DIFFTYPE}diff $TPATH</title>"
+
+	if [[ $DIFFTYPE == "U" ]]; then
+		print "$UDIFFCSS"
+	fi
+
+	cat <<-EOF
+	</head>
+	<body id="SUNWwebrev">
+        <a class="print" href="javascript:print()">Print this page</a>
+	<pre>$COMMENT</pre>
+        <pre>
+	EOF
+
+	html_quote | nawk '
+	/^--- new/	{ next }
+	/^\+\+\+ new/	{ next }
+	/^--- old/	{ next }
+	/^\*\*\* old/	{ next }
+	/^\*\*\*\*/	{ next }
+	/^-------/	{ printf "<center><h1>%s</h1></center>\n", $0; next }
+	/^\@\@.*\@\@$/	{ printf "</pre><hr /><pre>\n";
+			  printf "<span class=\"newmarker\">%s</span>\n", $0;
+			  next}
+
+	/^\*\*\*/	{ printf "<hr /><span class=\"oldmarker\">%s</span>\n", $0;
+			  next}
+	/^---/		{ printf "<span class=\"newmarker\">%s</span>\n", $0;
+			  next}
+	/^\+/		{printf "<span class=\"new\">%s</span>\n", $0; next}
+	/^!/		{printf "<span class=\"changed\">%s</span>\n", $0; next}
+	/^-/		{printf "<span class=\"removed\">%s</span>\n", $0; next}
+			{printf "%s\n", $0; next}
+	'
+
+	print "</pre></body></html>\n"
 }
 
-####################################
 
+#
+# source_to_html { new | old } <filename>
+#
+# Process a plain vanilla source file to transform it into an HTML file.
+#
 source_to_html()
 {
-WHICH=$1
-TNAME=$2
+	WHICH=$1
+	TNAME=$2
 
-html_quote | nawk '
-BEGIN	{printf "<body bgcolor=\"#EEEEEE\"><title>'"$WHICH $TNAME"'</title><pre>\n"}
-	{line += 1 ; printf "%3d %s\n", line, $0 }
-'
+	print "$HTML<head>$STDHEAD"
+	print "<title>$WHICH $TNAME</title>"
+	print "<body id=\"SUNWwebrev\">"
+	print "<pre>"
+	html_quote | nawk '{line += 1 ; printf "%4d %s\n", line, $0 }'
+	print "</pre></body></html>"
 }
 
-####################################
-# Find the first delta in the child that's not in the parent.
-# Get the newest delta from the parent, get all deltas from the
-# child starting with that delta, and then get all info starting
-# with the second oldest delta in that list (the first delta
-# unique to the child).
+#
+# teamwarecomments {text|html} parent-file child-file
+#
+# Find the first delta in the child that's not in the parent.  Get the
+# newest delta from the parent, get all deltas from the child starting
+# with that delta, and then get all info starting with the second oldest
+# delta in that list (the first delta unique to the child).
 #
 # This code adapted from Bill Shannon's "spc" script
-
-deltacomments()
+#
+comments_from_teamware()
 {
-pfile=$PWS/$1
-cfile=$CWS/$2
+	fmt=$1
+	pfile=$PWS/$2
+	cfile=$CWS/$3
 
-if [ -f $pfile ]; then
-	psid=$(sccs prs -d:I: $pfile 2>/dev/null)
-else
-	psid=1.1
-fi
+	if [[ -f $pfile ]]; then
+		psid=$(sccs prs -d:I: $pfile 2>/dev/null)
+	else
+		psid=1.1
+	fi
 
-set -A sids $(sccs prs -l -r$psid -d:I: $cfile 2>/dev/null)
-N=${#sids[@]}
+	set -A sids $(sccs prs -l -r$psid -d:I: $cfile 2>/dev/null)
+	N=${#sids[@]}
 
-if [[ $N -ge 2 ]]; then
-	sid1=${sids[$((N-2))]}	# Gets 2nd to last sid
+	nawkprg='
+		/^COMMENTS:/	{p=1; continue}
+		/^D [0-9]+\.[0-9]+/ {printf "--- %s ---\n", $2; p=0; }
+		NF == 0u	{ continue }
+		{if (p==0) continue; print $0 }'
 
-	echo "<ul>"
-	sccs prs -l -r$sid1 $cfile  2>/dev/null |
-	html_quote |
-	sed -e 's|[0-9]\{5,\}|<a href='$URL'&>&</a>|g' \
-	    -e 's|\([A-Z]\{1,2\}ARC\)[ /]\([0-9]\{4\}/[0-9]\{3\}\)|<a href='$URL2'\1/\2>\1 \2</a>|g'|
-	nawk '/^COMMENTS:/ {p=1; printf "<li>"; continue}
-		NF == 0 { continue }
-		/^D / {p=0}
-		{if (p==0) continue; print $0 "<br>"}'
-	echo "</ul>"
-fi
+	if [[ $N -ge 2 ]]; then
+		sid1=${sids[$((N-2))]}	# Gets 2nd to last sid
+
+		if [[ $fmt == "text" ]]; then
+			sccs prs -l -r$sid1 $cfile  2>/dev/null | \
+			    nawk "$nawkprg"
+			return
+		fi
+
+		sccs prs -l -r$sid1 $cfile  2>/dev/null | \
+		    html_quote | bug2url | sac2url | nawk "$nawkprg"
+	fi
 }
 
-####################################
-# Given the pathname of a file, find its location
-# in a "wx" active file list and print the following
-# sccs comment. Embedded bugids (sequence of 5 or
-# more digits) are turned into URLs.
-
-wxcomments()
+#
+# wxcomments {text|html} filepath
+#
+# Given the pathname of a file, find its location in a "wx" active file
+# list and print the following sccs comment.  Output is either text or
+# HTML; if the latter, embedded bugids (sequence of 5 or more digits) are
+# turned into URLs.
+#
+comments_from_wx()
 {
+	typeset fmt=$1
+	typeset p=$2
 
-	echo "<blockquote><pre>"
-	nawk '
-	$1 == "'$1'" {
+	comm=`nawk '
+	$1 == "'$p'" {
 		do getline ; while (NF > 0)
 		getline
 		while (NF > 0) { print ; getline }
 		exit
-	}' < $WXFILE | html_quote |
-	sed -e 's|[0-9]\{5,\}|<a href='$URL'&>&</a>|g' \
-	    -e 's|\([A-Z]\{1,2\}ARC\)[ /]\([0-9]\{4\}/[0-9]\{3\}\)|<a href='$URL2'\1/\2>\1 \2</a>|g'
-	echo "</pre></blockquote>"
-}
+	}' < $wxfile`
 
-#####################################
-# Calculate number of changes.
-# 
-
-function difflines
-{
-    integer tot chg del ins unc err
-    typeset filename
-
-    diff -e $1 $2 | eval $( nawk '
-    ## Change range of lines: N,Nc
-    /^[0-9]*,[0-9]*c$/ {
-	n=split(substr($1,1,length($1)-1), counts, ",");
-	if (n != 2) {
-	    error=2
-	    exit;
-	}
-	## 3,5c means lines 3 , 4 and 5 are changed, a total of 3 lines.
-	## following would be 5 - 3 = 2! Hence +1 for correction.
-	r=(counts[2]-counts[1])+1;
-	## Now count replacement lines: each represents a change instead
-	## of a delete, so increment c and decrement r.
-	while (getline != /^\.$/) {
-		c++;
-		r--;
-	}
-	## If there were more replacement lines than original lines,
-	## then r will be negative; in this case there are no deletions,
-	## but there are r changes that should be counted as adds, and
-	## since r is negative, subtract it from a and add it to c.
-	if (r < 0) {
-		a-=r;
-		c+=r;
-	}
-	## If there were more original lines than replacement lines, then
-	## r will be positive; in this case, increment d by that much.
-	if (r > 0) {
-		d+=r;
-	}
-	next;
-    }
-
-    ## Change lines: Nc
-    /^[0-9].*c$/ {
-	## The first line is a replacement; any more are additions.
-	if (getline != /^\.$/) {
-		c++;
-		while (getline != /^\.$/) a++;
-	}
-	next;
-    }
-
-    ## Add lines: both Na and N,Na
-    /^[0-9].*a$/ {
-	while (getline != /^\.$/) a++;
-	next;
-    }
-
-    ## Delete range of lines: N,Nd
-    /^[0-9]*,[0-9]*d$/ {
-	n=split(substr($1,1,length($1)-1), counts, ",");
-	if (n != 2) {
-	    error=2
-	    exit;
-	}
-	## 3,5d means lines 3 , 4 and 5 are deleted, a total of 3 lines.
-	## following would be 5 - 3 = 2! Hence +1 for correction.
-	r=(counts[2]-counts[1])+1;
-	d+=r;
-	next;
-    }
-
-    ## Delete line: Nd
-    ## For example 10d says line 10 is deleted. 
-    /^[0-9]*d$/ {d++; next}
-
-    ## Should not get here!
-    {
-	error=1;
-	exit;
-    }
-
-    ## Finish off - print results
-    END{
-	printf("tot=%d;chg=%d;del=%d;ins=%d;err=%d\n",
-	    (c+d+a), c, d, a, error);
-    }' )
-
-    # End of nawk, Check to see if any trouble occurred.
-    if (( $? > 0 || err > 0 )); then
-	print "Unexpected Error occurred reading \`diff -e $1 $2\`: \$?=$?, err=" $err
-    else
-	# Accumulate totals
-	(( TOTL += tot ))
-	(( TCHG += chg ))
-    	(( TDEL += del ))
-	(( TINS += ins ))
-	# Calculate unchanged lines
-	wc -l $1 | read unc filename
-	if (( unc > 0 )); then
-	    (( unc -= del + chg ))
-	    (( TUNC += unc ))
+	if [[ $fmt == "text" ]]; then
+		print "$comm"
+		return
 	fi
-	# print summary
-	printCI $tot $ins $del $chg $unc
-    fi
+
+	print "$comm" | html_quote | bug2url | sac2url
 }
 
-#####################################
+#
+# getcomments {text|html} filepath parentpath
+#
+# Fetch the comments depending on what SCM mode we're in.
+#
+getcomments()
+{
+	typeset fmt=$1
+	typeset p=$2
+	typeset pp=$3
+
+	if [[ -n $wxfile ]]; then
+		comments_from_wx $fmt $p
+	else
+		if [[ $SCM_MODE == "teamware" ]]; then
+			comments_from_teamware $fmt $pp $p
+		fi
+	fi
+}
+
+#
+# printCI <total-changed> <inserted> <deleted> <modified> <unchanged>
+#
 # Print out Code Inspection figures similar to sccs-prt(1) format.
 #
 function printCI
 {
-    integer tot=$1 ins=$2 del=$3 chg=$4 unc=$5
-    typeset str
-    if (( tot == 1 )); then
-	str="line"
-    else
-	str="lines"
-    fi
-    printf "%d %s changed : %d/%d/%d/%d %s\n" \
-	$tot $str $ins $del $chg $unc "(inserted/deleted/modified/unchanged)"
+	integer tot=$1 ins=$2 del=$3 mod=$4 unc=$5
+	typeset str
+	if (( tot == 1 )); then
+		str="line"
+	else
+		str="lines"
+	fi
+	printf '%d %s changed: %d ins; %d del; %d mod; %d unchg\n' \
+	    $tot $str $ins $del $mod $unc
 }
 
-#####################################
+
 #
-#   Start Here
+# difflines <oldfile> <newfile>
 #
-#####################################
+# Calculate and emit number of added, removed, modified and unchanged lines,
+# and total lines changed, the sum of added + removed + modified.
+#
+function difflines
+{
+	integer tot mod del ins unc err
+	typeset filename
 
-trap "rm -f /tmp/$$.* ; exit" 0 1 2 3 15
+	diff -e $1 $2 | eval $( nawk '
+	# Change range of lines: N,Nc
+	/^[0-9]*,[0-9]*c$/ {
+		n=split(substr($1,1,length($1)-1), counts, ",");
+		if (n != 2) {
+		    error=2
+		    exit;
+		}
+		#
+		# 3,5c means lines 3 , 4 and 5 are changed, a total of 3 lines.
+		# following would be 5 - 3 = 2! Hence +1 for correction.
+		#
+		r=(counts[2]-counts[1])+1;
 
-set +o noclobber
+		#
+		# Now count replacement lines: each represents a change instead
+		# of a delete, so increment c and decrement r.
+		#
+		while (getline != /^\.$/) {
+			c++;
+			r--;
+		}
+		#
+		# If there were more replacement lines than original lines,
+		# then r will be negative; in this case there are no deletions,
+		# but there are r changes that should be counted as adds, and
+		# since r is negative, subtract it from a and add it to c.
+		#
+		if (r < 0) {
+			a-=r;
+			c+=r;
+		}
 
-WDIFF=${WDIFF:-/ws/onnv-gate/public/bin/wdiff}
+		#
+		# If there were more original lines than replacement lines, then
+		# r will be positive; in this case, increment d by that much.
+		#
+		if (r > 0) {
+			d+=r;
+		}
+		next;
+	}
 
-FLIST=$1
+	# Change lines: Nc
+	/^[0-9].*c$/ {
+		# The first line is a replacement; any more are additions.
+		if (getline != /^\.$/) {
+			c++;
+			while (getline != /^\.$/) a++;
+		}
+		next;
+	}
 
-# By default enable frame diff.
-WEBREV_FRAMES=${WEBREV_FRAMES:-yes}
+	# Add lines: both Na and N,Na
+	/^[0-9].*a$/ {
+		while (getline != /^\.$/) a++;
+		next;
+	}
 
-# Declare global total counters.
-integer TOTL TINS TDEL TCHG TUNC
+	# Delete range of lines: N,Nd
+	/^[0-9]*,[0-9]*d$/ {
+		n=split(substr($1,1,length($1)-1), counts, ",");
+		if (n != 2) {
+			error=2
+			exit;
+		}
+		#
+		# 3,5d means lines 3 , 4 and 5 are deleted, a total of 3 lines.
+		# following would be 5 - 3 = 2! Hence +1 for correction.
+		#
+		r=(counts[2]-counts[1])+1;
+		d+=r;
+		next;
+	}
 
-if [ "$FLIST" = "-" ]; then
-	FLIST=/tmp/$$.flist
-	cat > $FLIST
-fi
+	# Delete line: Nd.   For example 10d says line 10 is deleted.
+	/^[0-9]*d$/ {d++; next}
 
-# If the -l flag is given instead of the name of
-# a file list, then generate the file list by
-# extracting file names from a putback -n.
-# Some names may come from the "update/create"
-# messages and others from the "currently checked out"
-# warning. Renames are detected here too.
-# Extract values for CODEMGR_WS and CODEMGR_PARENT
-# from the output of the putback -n as well, but remove
-# them if they are already defined.
+	# Should not get here!
+	{
+		error=1;
+		exit;
+	}
 
-if [ "$FLIST" = "-l" ]; then
+	# Finish off - print results
+	END {
+		printf("tot=%d;mod=%d;del=%d;ins=%d;err=%d\n",
+		    (c+d+a), c, d, a, error);
+	}' )
 
-	FLIST=/tmp/$$.filelist
-	print "Generating file list ...\c"
-
-	putback -n $2 $3 2>&1 |
-	awk '/^update:|^create:/{print $2}
-		/^Parent workspace:/{printf("CODEMGR_PARENT=%s\n",$3)}   \
-		/^Child workspace:/{printf("CODEMGR_WS=%s\n",$3)}   \
-		/^The following files/{p=1 ; continue}
-		/^rename/{old=$3}
-		$1 == "to:"{print $2, old}
-		/^"/ {continue}
-		NF == 0 {p=0 ; continue}
-		{if (p==1) print $1}' |
-	sort -r -k 1,1 -u | sort > $FLIST
-
-	print " Done\n"
-fi
-
-# If the -w flag is given then assume the file
-# list is in Bonwick's "wx" command format, i.e.
-# pathname lines alternating with SCCS comment
-# lines with blank lines as separators.
-# Use the SCCS comments later in building
-# the index.html file.
-
-if [ "$FLIST" = "-w" ]; then
-	shift
-	WXFILE=$1
-
-	# If the wx file pathname is relative
-	# then make it absolute because the
-	# webrev does a "cd" later on.
-	#
-	# If no wx file pathname is given, then
-	# it defaults to "wx/active" in the
-	# workspace directory.
-
-	if [ -z "${WXFILE}" ]; then
-		WXFILE=${CODEMGR_WS}/wx/active
-	elif [ ${WXFILE%%/*} ]; then
-		WXFILE=$PWD/$WXFILE
+	# End of nawk, Check to see if any trouble occurred.
+	if (( $? > 0 || err > 0 )); then
+		print "Unexpected Error occurred reading" \
+		    "\`diff -e $1 $2\`: \$?=$?, err=" $err
+		return
 	fi
 
-	FLIST=/tmp/$$.filelist
+	# Accumulate totals
+	(( TOTL += tot ))
+	(( TMOD += mod ))
+	(( TDEL += del ))
+	(( TINS += ins ))
+	# Calculate unchanged lines
+	wc -l $1 | read unc filename
+	if (( unc > 0 )); then
+		(( unc -= del + mod ))
+		(( TUNC += unc ))
+	fi
+	# print summary
+	print "<span class=\"lineschanged\">"
+	printCI $tot $ins $del $mod $unc
+	print "</span>"
+}
+
+
+#
+# flist_from_wx
+#
+# Sets up webrev to source its information from a wx-formatted file.
+# Sets the global 'wxfile' variable.
+#
+function flist_from_wx
+{
+	typeset argfile=$1
+	if [[ -n ${argfile%%/*} ]]; then
+		#
+		# If the wx file pathname is relative then make it absolute
+		# because the webrev does a "cd" later on.
+		#
+		wxfile=$PWD/$argfile
+	else
+		wxfile=$argfile
+	fi
+
 	nawk '{ c = 1; print;
 	  while (getline) {
 		if (NF == 0) { c = -c; continue }
 		if (c > 0) print
 	  }
-	}' $WXFILE > $FLIST
+	}' $wxfile > $FLIST
+
+	print " Done."
+}
+
+#
+# flist_from_teamware [ <args-to-putback-n> ]
+#
+# Generate the file list by extracting file names from a putback -n.  Some
+# names may come from the "update/create" messages and others from the
+# "currently checked out" warning.  Renames are detected here too.  Extract
+# values for CODEMGR_WS and CODEMGR_PARENT from the output of the putback
+# -n as well, but remove them if they are already defined.
+#
+function flist_from_teamware
+{
+	if [[ -n $codemgr_parent ]]; then
+		if [[ ! -d $codemgr_parent/Codemgr_wsdata ]]; then
+			print -u2 "parent $codemgr_parent doesn't look like a" \
+			    "valid teamware workspace"
+			exit 1
+		fi
+		parent_args="-p $codemgr_parent"
+	fi
+
+	print " File list from: 'putback -n $parent_args $*' ... \c"
+
+	putback -n $parent_args $* 2>&1 |
+	    nawk '
+		/^update:|^create:/	{print $2}
+		/^Parent workspace:/	{printf("CODEMGR_PARENT=%s\n",$3)}
+		/^Child workspace:/	{printf("CODEMGR_WS=%s\n",$3)}
+		/^The following files are currently checked out/ {p = 1; continue}
+		NF == 0			{p=0 ; continue}
+		/^rename/		{old=$3}
+		$1 == "to:"		{print $2, old}
+		/^"/			{continue}
+		p == 1			{print $1}' |
+	    sort -r -k 1,1 -u | sort > $FLIST
+
+	print " Done."
+}
+
+function env_from_flist
+{
+	[[ -r $FLIST ]] || return
+
+	#
+	# Use "eval" to set env variables that are listed in the file
+	# list.  Then copy those into our local versions of those
+	# variables if they have not been set already.
+	#
+	eval `sed -e "s/#.*$//" $FLIST | grep = `
+
+	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && codemgr_ws=$CODEMGR_WS
+
+	#
+	# Check to see if CODEMGR_PARENT is set in the flist file.
+	#
+	[[ -z $codemgr_parent && -n $CODEMGR_PARENT ]] && \
+	    codemgr_parent=$CODEMGR_PARENT
+}
+
+#
+# detect_scm
+#
+# We dynamically test the SCM type; this allows future extensions to
+# new SCM types
+#
+function detect_scm
+{
+	#
+	# If CODEMGR_WS is specified in the flist file, we assume teamware.
+	#
+	if [[ -r $FLIST ]]; then
+		egrep '^CODEMGR_WS=' $FLIST > /dev/null 2>&1
+		if [[ $? -eq 0 ]]; then
+			print "teamware"
+			return
+		fi
+	fi
+
+	#
+	# The presence of $CODEMGR_WS and a Codemgr_wsdata directory
+	# is our clue that this is a teamware workspace.
+	#
+	if [[ -n $CODEMGR_WS && -d "$CODEMGR_WS/Codemgr_wsdata" ]]; then
+		print "teamware"
+	else
+		print "unknown"
+	fi
+}
+
+#
+# Usage message.
+#
+function usage
+{
+	print 'Usage:\twebrev [common-options]
+	webrev [common-options] ( <file> | - )
+	webrev [common-options] -w <wx file>
+	webrev [common-options] -l [arguments to 'putback']
+
+Options:
+	-O: Print bugids/arc cases suitable for OpenSolaris.
+	-i <filename>: Include <filename> in the index.html file.
+	-o <outdir>: Output webrev to specified directory.
+	-p <compare-against>: Use specified parent wkspc or basis for comparison
+	-w <wxfile>: Use specified wx active file.
+
+Environment:
+	WDIR: Control the output directory.
+	WEBREV_BUGURL: Control the URL prefix for bugids.
+	WEBREV_SACURL: Control the URL prefix for ARC cases.
+
+SCM Environment:
+	Teamware: CODEMGR_WS: Workspace location.
+	Teamware: CODEMGR_PARENT: Parent workspace location.
+'
+
+	exit 2
+}
+
+#
+#
+# Main program starts here
+#
+#
+
+trap "rm -f /tmp/$$.* ; exit" 0 1 2 3 15
+
+set +o noclobber
+
+if [[ -z $WDIFF ]]; then
+	WDIFF=`whence wdiff`
+	if [[ -z $WDIFF ]]; then
+		if [[ -x /opt/onbld/bin/wdiff ]]; then
+			WDIFF=/opt/onbld/bin/wdiff
+		elif [[ -x /ws/onnv-gate/public/bin/wdiff ]]; then
+			WDIFF=/ws/onnv-gate/public/bin/wdiff
+		else
+			print -u2 "Warning: wdiff not found!"
+		fi
+	fi
 fi
 
-if [ ! -f $FLIST ]; then
-	echo "$FLIST: no such file"
+# Declare global total counters.
+integer TOTL TINS TDEL TMOD TUNC
 
-	echo "Usage: webrev <file>"
-	echo "       webrev -"
-	echo "       webrev -w [<wx file>]"
-	echo "       webrev -l [-f flp]"
+flist_autodetect=
+iflag=
+oflag=
+pflag=
+lflag=
+wflag=
+Oflag=
+while getopts "i:o:p:lwO" opt
+do
+	case $opt in
+	i)	iflag=1
+		INCLUDE_FILE=$OPTARG;;
+
+	o)	oflag=1
+		WDIR=$OPTARG;;
+
+	p)	pflag=1
+		codemgr_parent=$OPTARG;;
+
+	#
+	# If -l has been specified, we need to abort further options
+	# processing, because subsequent arguments are going to be
+	# arguments to 'putback -n'.
+	#
+	l)	lflag=1
+		break;;
+
+	w)	wflag=1;;
+
+	O)	Oflag=1;;
+
+	?)	usage;;
+	esac
+done
+
+FLIST=/tmp/$$.flist
+
+if [[ -n $wflag && -n $lflag ]]; then
+	usage
+fi
+
+#
+# If this manually set as the parent, and it appears to be an earlier webrev,
+# then note that fact and set the parent to the raw_files/new subdirectory.
+#
+if [[ -n $pflag && -d $codemgr_parent/raw_files/new ]]; then
+	parent_webrev="$codemgr_parent"
+	codemgr_parent="$codemgr_parent/raw_files/new"
+fi
+
+if [[ -z $wflag && -z $lflag ]]; then
+	shift $(($OPTIND - 1))
+
+	if [[ $1 == "-" ]]; then
+		cat > $FLIST
+	elif [[ -n $1 ]]; then
+		if [[ -r $1 ]]; then
+			print -u2 "$1: no such file or not readable"
+			usage
+		fi
+		cat $1 > $FLIST
+	else
+		flist_autodetect=1
+	fi
+fi
+
+#
+# Before we go on to further consider -l and -w, work out which SCM we think
+# is in use.
+#
+SCM_MODE=`detect_scm $FLIST`
+if [[ $SCM_MODE == "unknown" ]]; then
+	print -u2 "Unable to determine SCM type currently in use."
+	print -u2 "For teamware: webrev looks for \$CODEMGR_WS either in"
+	print -u2 "              the environment or in the file list."
 	exit 1
 fi
 
+print -u2 "   SCM detected: $SCM_MODE"
 
-# Remove workspace variables from the flist
-# file if they're already set in the environment.
-# We want the environment variables to take
-# precedence over any set in the file list.
+if [[ -n $lflag ]]; then
+	#
+	# If the -l flag is given instead of the name of a file list,
+	# then generate the file list by extracting file names from a
+	# putback -n.
+	#
+	shift $(($OPTIND - 1))
+	flist_from_teamware "$*"
+	flist_done=1
+	shift $#
 
-if [ "$CODEMGR_WS" != "" ]; then
-	egrep -v '^CODEMGR_WS=' $FLIST > $FLIST.$$
-	mv $FLIST.$$ $FLIST
-fi
-if [ "$CODEMGR_PARENT" != "" ]; then
-	egrep -v '^CODEMGR_PARENT=' $FLIST > $FLIST.$$
-	mv $FLIST.$$ $FLIST
-fi
+elif [[ -n $wflag ]]; then
+	#
+	# If the -w is given then assume the file list is in Bonwick's "wx"
+	# command format, i.e.  pathname lines alternating with SCCS comment
+	# lines with blank lines as separators.  Use the SCCS comments later
+	# in building the index.html file.
+	#
+	shift $(($OPTIND - 1))
+	wxfile=$1
+	if [[ -z $wxfile && -n $CODEMGR_WS ]]; then
+		if [[ -r $CODEMGR_WS/wx/active ]]; then
+			wxfile=$CODEMGR_WS/wx/active
+		fi
+	fi
 
+	[[ -z $wxfile ]] && print -u2 "wx file not specified, and could not " \
+	    "be auto-detected (check \$CODEMGR_WS)" && exit 1
 
-# Now do an "eval" to set env variables that
-# are listed in the file list.
-
-eval `sed -e "s/#.*$//" $FLIST | grep = `
-
-
-if [ "$CODEMGR_WS" = "" ]; then
-	echo "CODEMGR_WS not set."
-	echo "Activate a workspace or set in $FLIST"
-	exit 1
-fi
-
-if [ ! -d $CODEMGR_WS ]; then
-	echo "$CODEMGR_WS: no such workspace"
-	exit 1
-fi
-
-# Observe true directory name of CODEMGR_WS, as used later in webrev title.
-CODEMGR_WS=$(cd $CODEMGR_WS;print $PWD)
-
-if [ "$CODEMGR_PARENT" = "" ]; then
-	CODEMGR_PARENT=`workspace parent`
-fi
-
-if [ ! -d $CODEMGR_PARENT ]; then
-	echo "$CODEMGR_PARENT: no such parent workspace"
-	exit 1
+	print -u2 " File list from: wx 'active' file '$wxfile' ... \c"
+	flist_from_wx $wxfile
+	flist_done=1
+	if [[ -n "$*" ]]; then
+		shift
+	fi
 fi
 
-echo
-echo CODEMGR_WS=$CODEMGR_WS
-echo CODEMGR_PARENT=$CODEMGR_PARENT
-echo
+if [[ $# -gt 0 ]]; then
+	print -u2 "Warning: unused arguments: $*"
+fi
 
-CWS=$CODEMGR_WS
-PWS=$CODEMGR_PARENT
-WDIR=${WDIR:-$CWS}/webrev
+if [[ $SCM_MODE == "teamware" ]]; then
+	#
+	# Parent (internally $codemgr_parent) and workspace ($codemgr_ws) can
+	# be set in a number of ways, in decreasing precedence:
+	#
+	#      1) on the command line (only for the parent)
+	#      2) in the user environment
+	#      3) in the flist
+	#      4) automatically based on the workspace (only for the parent)
+	#
+
+	#
+	# Here is case (2): the user environment
+	#
+	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && codemgr_ws=$CODEMGR_WS
+	if [[ -n $codemgr_ws && ! -d $codemgr_ws ]]; then
+		print -u2 "$codemgr_ws: no such workspace"
+		exit 1
+	fi
+
+	[[ -z $codemgr_parent && -n $CODEMGR_PARENT ]] && \
+	    codemgr_parent=$CODEMGR_PARENT
+	if [[ -n $codemgr_parent && ! -d $codemgr_parent ]]; then
+		print -u2 "$codemgr_parent: no such directory"
+		exit 1
+	fi
+
+	#
+	# If we're in auto-detect mode and we haven't already gotten the file
+	# list, then see if we can get it by probing for wx.
+	#
+	if [[ -z $flist_done && -n $flist_autodetect && -n $codemgr_ws ]]; then
+		if [[ -z $WX ]]; then
+			WX=`whence wx`
+			if [[ -z $WX ]]; then
+				if [[ -x /opt/onbld/bin/wx ]]; then
+					WDIFF=/opt/onbld/bin/wx
+				elif [[ -x /ws/onnv-gate/public/bin/wx ]]; then
+					WDIFF=/ws/onnv-gate/public/bin/wx
+				else
+					print -u2 "Warning: wx not found!"
+				fi
+			fi
+		fi
+
+		#
+		# We need to use wx list -w so that we get renamed files, etc.
+		# but only if a wx active file exists-- otherwise wx will
+		# hang asking us to initialize our wx information.
+		#
+		if [[ -n $WX && -f $codemgr_ws/wx/active ]]; then
+			print -u2 " File list from: 'wx list -w' ... \c"
+			$WX list -w > $FLIST
+			$WX comments > /tmp/$$.wx_comments
+			wxfile=/tmp/$$.wx_comments
+			print -u2 "done"
+			flist_done=1
+		fi
+	fi
+
+	#
+	# If by hook or by crook we've gotten a file list by now (perhaps
+	# from the command line), eval it to extract environment variables from
+	# it: This is step (3).
+	#
+	env_from_flist
+
+	#
+	# Continuing step (3): If we still have no file list, we'll try to get
+	# it from teamware.
+	#
+	if [[ -z $flist_done ]]; then
+		flist_from_teamware
+		env_from_flist
+	fi
+
+	#
+	# Observe true directory name of CODEMGR_WS, as used later in
+	# webrev title.
+	#
+	codemgr_ws=$(cd $codemgr_ws;print $PWD)
+
+	#
+	# (4) If we still don't have a value for codemgr_parent, get it
+	# from workspace.
+	#
+	[[ -z $codemgr_parent ]] && codemgr_parent=`workspace parent`
+	if [[ ! -d $codemgr_parent ]]; then
+		print -u2 "$CODEMGR_PARENT: no such parent workspace"
+		exit 1
+	fi
+
+	#
+	# Reset CODEMGR_WS to make sure teamware commands are happy.
+	#
+	CODEMGR_WS=$codemgr_ws
+	CWS=$codemgr_ws
+	PWS=$codemgr_parent
+fi
+
+#
+# If the user didn't specify a -i option, check to see if there is a
+# webrev-info file in the workspace directory.
+#
+if [[ -z $iflag && -r "$CWS/webrev-info" ]]; then
+	iflag=1
+	INCLUDE_FILE="$CWS/webrev-info"
+fi
+
+if [[ -n $iflag ]]; then
+	if [[ ! -r $INCLUDE_FILE ]]; then
+		print -u2 "include file '$INCLUDE_FILE' does not exist or is" \
+		    "not readable."
+		exit 1
+	else
+		#
+		# $INCLUDE_FILE may be a relative path, and the script alters
+		# PWD, so we just stash a copy in /tmp.
+		#
+		cp $INCLUDE_FILE /tmp/$$.include
+	fi
+fi
+
+#
+# Output directory.
+#
+WDIR=${WDIR:-$CWS/webrev}
+
+#
+# Name of the webrev, derived from the workspace name; in the
+# future this could potentially be an option.
+#
+WNAME=${CWS##*/}
+
 if [ ${WDIR%%/*} ]; then
 	WDIR=$PWD/$WDIR
 fi
-if [ ! -d $WDIR ]; then
-	mkdir $WDIR
+
+if [[ ! -d $WDIR ]]; then
+	mkdir -p $WDIR
+	[[ $? != 0 ]] && exit 1
 fi
 
+#
+# Summarize what we're going to do.
+#
+print "      Workspace: $CWS"
+if [[ -n $parent_webrev ]]; then
+	print "Compare against: webrev at $parent_webrev"
+else
+	print "Compare against: $PWS"
+fi
+
+[[ -n $INCLUDE_FILE ]] && print "      Including: $INCLUDE_FILE"
+print "      Output to: $WDIR"
+
+#
 # Save the file list in the webrev dir
+#
+[[ ! $FLIST -ef $WDIR/file.list ]] && cp $FLIST $WDIR/file.list
 
-if [ ! $FLIST -ef $WDIR/file.list ]; then
-	cp $FLIST $WDIR/file.list
-fi
+#
+#    Bug IDs will be replaced by a URL.  Order of precedence
+#    is: default location, $WEBREV_BUGURL, the -O flag.
+#
+BUGURL='http://monaco.sfbay.sun.com/detail.jsp?cr='
+[[ -n $WEBREV_BUGURL ]] && BUGURL="$WEBREV_BUGURL"
+[[ -n "$Oflag" ]] && \
+    BUGURL='http://bugs.opensolaris.org/bugdatabase/view_bug.do?bug_id='
 
-# Remove comments, blank lines and env variables from the file list
+#
+#    Likewise, ARC cases will be replaced by a URL.  Order of precedence
+#    is: default, $WEBREV_SACURL, the -O flag.
+#
+#    Note that -O also triggers different substitution behavior for
+#    SACURL.  See sac2url().
+#
+SACURL='http://sac.eng.sun.com'
+[[ -n $WEBREV_SACURL ]] && SACURL="$WEBREV_SACURL"
+[[ -n $Oflag ]] && \
+    SACURL='http://www.opensolaris.org/os/community/arc/caselog'
 
-sed -e "s/#.*$//" -e "/=/d" -e "/^[   ]*$/d" $FLIST |
+rm -f $WDIR/$WNAME.patch
+rm -f $WDIR/$WNAME.ps
+rm -f $WDIR/$WNAME.pdf
 
-# ... and read lines from the cleaned-up file list
+touch $WDIR/$WNAME.patch
+touch $WDIR/$WNAME.ps
 
-while read LINE
+print "   Output Files:"
+
+#
+# Clean up the file list: Remove comments, blank lines and env variables.
+#
+sed -e "s/#.*$//" -e "/=/d" -e "/^[   ]*$/d" $FLIST > /tmp/$$.flist.clean
+FLIST=/tmp/$$.flist.clean
+
+#
+# First pass through the files: generate the per-file webrev HTML-files.
+#
+cat $FLIST | while read LINE
 do
 	set - $LINE
 	P=$1
 
-	# Normally, each line in the file list is
-	# just a pathname of a file that has
-	# been modified or created in the child.
-	# A file that is renamed in the child workspace
-	# has two names on the line: new name followed
-	# by the old name.
-
-	if [ $# = 2 ]; then
+	#
+	# Normally, each line in the file list is just a pathname of a
+	# file that has been modified or created in the child.  A file
+	# that is renamed in the child workspace has two names on the
+	# line: new name followed by the old name.
+	#
+	oldname=""
+	oldpath=""
+	rename=
+	if [[ $# -eq 2 ]]; then
 		PP=$2			# old filename
-		OLDNAME=" (was $PP)"
+		oldname=" (was $PP)"
+		oldpath="$PP"
+		rename=1
         	PDIR=${PP%/*}
-        	if [ "$PDIR" == "$PP" ]; then
+        	if [[ $PDIR == $PP ]]; then
 			PDIR="."   # File at root of workspace
 		fi
 
 		PF=${PP##*/}
 
 	        DIR=${P%/*}
-	        if [ "$DIR" == "$P" ]; then
+	        if [[ $DIR == $P ]]; then
 			DIR="."   # File at root of workspace
 		fi
-	
+
 		F=${P##*/}
+
         else
-		OLDNAME=""
 	        DIR=${P%/*}
-	        if [ "$DIR" == "$P" ]; then
+	        if [[ "$DIR" == "$P" ]]; then
 			DIR="."   # File at root of workspace
 		fi
-	
+
 		F=${P##*/}
 
 		PP=$P
@@ -1371,110 +1842,236 @@ do
 		PF=$F
 	fi
 
+	COMM=`getcomments html $P $PP`
 
-
-	if [ ! -d $CWS/$DIR ]; then
-		echo "  $CWS/$DIR: no such directory"
+	if [[ ! -d $CWS/$DIR ]]; then
+		print "  $CWS/$DIR: no such directory"
 		continue
 	fi
 
-	print "  $P$OLDNAME\n\t\c"
+	print "\t$P$oldname\n\t\t\c"
 
 	# Make the webrev mirror directory if necessary
-
-	if [ ! -d $WDIR/$DIR ]; then
-		mkdir -p $WDIR/$DIR
-	fi
+	mkdir -p $WDIR/$DIR
 
 	# cd to the directory so the names are short
-
 	cd $CWS/$DIR
 
-	# If the child's version doesn't exist then
-	# get a readonly copy.
-
-	if [ ! -f $F -a -f SCCS/s.$F ]; then
-		sccs get -s $F
-	fi
-
-	# Get the parent's version of the file. First see
-	# whether the child's version is checked out and
-	# get the parent's version with keywords expanded
-	# or unexpanded as appropriate.
-
-	if [ -f $PWS/$PDIR/SCCS/s.$PF -o -f $PWS/$PDIR/SCCS/p.$PF ]; then
-		if [ -f SCCS/p.$F ]; then
-			sccs get -s -p -k $PWS/$PDIR/$PF > $WDIR/$DIR/$F-
-		else
-			sccs get -s -p    $PWS/$PDIR/$PF > $WDIR/$DIR/$F-
+	#
+	# If we're in OpenSolaris mode, we enforce a minor policy:
+	# help to make sure the reviewer doesn't accidentally publish
+	# source which is in usr/closed/*
+	#
+	if [[ -n $Oflag ]]; then
+		pclosed=${P##usr/closed/}
+		if [[ $pclosed != $P ]]; then
+			print "*** Omitting closed source for OpenSolaris" \
+			    "mode review"
+			continue
 		fi
-        else
-                if [ -f $PWS/$PDIR/$PF ]; then
-                        # Parent is not a real workspace, but just a raw
-                        # directory tree - use the file that's there as
-                        # the old file.
-  
-                        cp $PWS/$PDIR/$PF $WDIR/$DIR/$F-
-                fi
 	fi
 
-	if [ ! -f $F -a ! -f $WDIR/$DIR/$F- ]; then
-		echo "*** Error: file not in parent or child"
+	#
+	# We stash old and new files into parallel directories in /tmp
+	# and do our diffs there.  This makes it possible to generate
+	# clean looking diffs which don't have absolute paths present.
+	#
+	olddir=$WDIR/raw_files/old
+	newdir=$WDIR/raw_files/new
+	mkdir -p $olddir
+	mkdir -p $newdir
+	mkdir -p $olddir/$PDIR
+	mkdir -p $newdir/$DIR
+
+	if [[ $SCM_MODE == "teamware" ]]; then
+		# If the child's version doesn't exist then
+		# get a readonly copy.
+
+		if [[ ! -f $F && -f SCCS/s.$F ]]; then
+			sccs get -s $F
+		fi
+
+		#
+		# Snag new version of file.
+		#
+		rm -f $newdir/$DIR/$F
+		cp $F $newdir/$DIR/$F
+
+		#
+		# Get the parent's version of the file. First see whether the
+		# child's version is checked out and get the parent's version
+		# with keywords expanded or unexpanded as appropriate.
+		#
+		if [ -f $PWS/$PDIR/SCCS/s.$PF -o \
+		    -f $PWS/$PDIR/SCCS/p.$PF ]; then
+			rm -f $olddir/$PDIR/$PF
+			if [ -f SCCS/p.$F ]; then
+				sccs get -s -p -k $PWS/$PDIR/$PF \
+				    > $olddir/$PDIR/$PF
+			else
+				sccs get -s -p    $PWS/$PDIR/$PF \
+				    > $olddir/$PDIR/$PF
+			fi
+		else
+			if [[ -f $PWS/$PDIR/$PF ]]; then
+				# Parent is not a real workspace, but just a raw
+				# directory tree - use the file that's there as
+				# the old file.
+
+				rm -f $olddir/$DIR/$F
+				cp $PWS/$PDIR/$PF $olddir/$DIR/$F
+			fi
+		fi
+	fi
+
+	if [[ ! -f $F && ! -f $olddir/$DIR/$F ]]; then
+		print "*** Error: file not in parent or child"
 		continue
 	fi
 
-	# If we have old and new versions of the file
-	# then run the appropriate diffs.
+	cd $WDIR/raw_files
+	ofile=old/$PDIR/$PF
+	nfile=new/$DIR/$F
 
-	if [ -f $F -a -f $WDIR/$DIR/$F- ]; then
-		${CDIFFCMD:-diff -b -C 5} $WDIR/$DIR/$F- $F > $WDIR/$DIR/$F.cdiff
-		diff_to_html $F "C" < $WDIR/$DIR/$F.cdiff > $WDIR/$DIR/$F.cdiff.html
+	mv_but_nodiff=
+	cmp $ofile $nfile > /dev/null 2>&1
+	if [[ $? == 0 && $rename == 1 ]]; then
+		mv_but_nodiff=1
+	fi
+
+	#
+	# If we have old and new versions of the file then run the appropriate
+	# diffs.  This is complicated by a couple of factors:
+	#
+	#	- renames must be handled specially: we emit a 'remove'
+	#	  diff and an 'add' diff
+	#	- new files and deleted files must be handled specially
+	#	- Solaris patch(1m) can't cope with file creation
+	#	  (and hence renames) as of this writing.
+	#       - To make matters worse, gnu patch doesn't interpret the
+	#	  output of Solaris diff properly when it comes to
+	#	  adds and deletes.  We need to do some "cleansing"
+	#         transformations:
+	# 	    [to add a file] @@ -1,0 +X,Y @@  -->  @@ -0,0 +X,Y @@
+	#	    [to del a file] @@ -X,Y +1,0 @@  -->  @@ -X,Y +0,0 @@
+	#
+	cleanse_rmfile="sed 's/^\(@@ [0-9+,-]*\) [0-9+,-]* @@$/\1 +0,0 @@/'"
+	cleanse_newfile="sed 's/^@@ [0-9+,-]* \([0-9+,-]* @@\)$/@@ -0,0 \1/'"
+
+	rm -f $WDIR/$DIR/$F.patch
+	if [[ -z $rename ]]; then
+		if [ ! -f $ofile ]; then
+			diff -u /dev/null $nfile | sh -c "$cleanse_newfile" \
+			    > $WDIR/$DIR/$F.patch
+		elif [ ! -f $nfile ]; then
+			diff -u $ofile /dev/null | sh -c "$cleanse_rmfile" \
+			    > $WDIR/$DIR/$F.patch
+		else
+			diff -u $ofile $nfile > $WDIR/$DIR/$F.patch
+		fi
+	else
+		diff -u $ofile /dev/null | sh -c "$cleanse_rmfile" \
+		    > $WDIR/$DIR/$F.patch
+
+		diff -u /dev/null $nfile | sh -c "$cleanse_newfile" \
+		    >> $WDIR/$DIR/$F.patch
+
+	fi
+
+	#
+	# Tack the patch we just made onto the accumulated patch for the
+	# whole wad.
+	#
+	cat $WDIR/$DIR/$F.patch >> $WDIR/$WNAME.patch
+
+	print " patch\c"
+
+	if [[ -f $ofile && -f $nfile && -z $mv_but_nodiff ]]; then
+
+		${CDIFFCMD:-diff -bt -C 5} $ofile $nfile > $WDIR/$DIR/$F.cdiff
+		diff_to_html $F $DIR/$F "C" "$COMM" < $WDIR/$DIR/$F.cdiff \
+		    > $WDIR/$DIR/$F.cdiff.html
 		print " cdiffs\c"
 
-		${UDIFFCMD:-diff -b -U 5} $WDIR/$DIR/$F- $F > $WDIR/$DIR/$F.udiff
-		diff_to_html $F "U" < $WDIR/$DIR/$F.udiff > $WDIR/$DIR/$F.udiff.html
+		${UDIFFCMD:-diff -bt -U 5} $ofile $nfile > $WDIR/$DIR/$F.udiff
+		diff_to_html $F $DIR/$F "U" "$COMM" < $WDIR/$DIR/$F.udiff \
+		    > $WDIR/$DIR/$F.udiff.html
+
 		print " udiffs\c"
 
 		if [[ -x $WDIFF ]]; then
-			$WDIFF -t "Wdiff $DIR/$F" $WDIR/$DIR/$F- $F > $WDIR/$DIR/$F.wdiff.html
-			print " wdiffs\c"
+			$WDIFF -c "$COMM" \
+			    -t "$WNAME Wdiff $DIR/$F" $ofile $nfile > \
+			    $WDIR/$DIR/$F.wdiff.html 2>/dev/null
+			if [[ $? -eq 0 ]]; then
+				print " wdiffs\c"
+			else
+				print " wdiffs[fail]\c"
+			fi
 		fi
 
-		sdiff_to_html $WDIR/$DIR/$F- $F > $WDIR/$DIR/$F.sdiff.html
+		sdiff_to_html $ofile $nfile $F $DIR "$COMM" \
+		    > $WDIR/$DIR/$F.sdiff.html
 		print " sdiffs\c"
 
-		if [[ $WEBREV_FRAMES == 'yes' ]]; then
-			print " frames\c"
-		fi
+		print " frames\c"
 
 		rm -f $WDIR/$DIR/$F.cdiff $WDIR/$DIR/$F.udiff
 
-		difflines $WDIR/$DIR/$F- $F > $WDIR/$DIR/$F.count
-	elif [ -f $F ]; then
+		difflines $ofile $nfile > $WDIR/$DIR/$F.count
+
+	elif [[ -f $ofile && -f $nfile && -n $mv_but_nodiff ]]; then
+		# renamed file: may also have differences
+		difflines $ofile $nfile > $WDIR/$DIR/$F.count
+	elif [[ -f $nfile ]]; then
 		# new file: count added lines
-		difflines /dev/null $F > $WDIR/$DIR/$F.count
-	elif [ -f $WDIR/$DIR/$F- ]; then
+		difflines /dev/null $nfile > $WDIR/$DIR/$F.count
+	elif [[ -f $ofile ]]; then
 		# old file: count deleted lines
-		difflines $WDIR/$DIR/$F- /dev/null > $WDIR/$DIR/$F.count
+		difflines $ofile /dev/null > $WDIR/$DIR/$F.count
 	fi
 
-	if [ -f $WDIR/$DIR/$F- ]; then
-		source_to_html Old $PF < $WDIR/$DIR/$F- > $WDIR/$DIR/$F-.html
-		rm -f $WDIR/$DIR/$F-
+	#
+	# Now we generate the postscript for this file.  We generate diffs
+	# only in the event that there is delta, or the file is new (it seems
+	# tree-killing to print out the contents of deleted files).
+	#
+	if [[ -f $nfile ]]; then
+		ocr=$ofile
+		[[ ! -f $ofile ]] && ocr=/dev/null
+
+		if [[ -z $mv_but_nodiff ]]; then
+			textcomm=`getcomments text $P $PP`
+			codereview -y "$textcomm" \
+			    -e $ocr $nfile >> $WDIR/$WNAME.ps  # 2>/dev/null
+			if [[ $? -eq 0 ]]; then
+				print " ps\c"
+			else
+				print " ps[fail]\c"
+			fi
+		fi
+	fi
+
+	if [[ -f $ofile && -z $mv_but_nodiff ]]; then
+		source_to_html Old $P < $ofile > $WDIR/$DIR/$F-.html
 		print " old\c"
 	fi
 
-	if [ -f $F ]; then
-		source_to_html New $F < $F > $WDIR/$DIR/$F.html
+	if [[ -f $nfile ]]; then
+		source_to_html New $P < $nfile > $WDIR/$DIR/$F.html
 		print " new\c"
 	fi
 
-	echo
+	print
 done
 
-if [[ $WEBREV_FRAMES == 'yes' ]]; then
-	frame_navigation > $WDIR/ancnav.html	
-fi
+frame_nav_js > $WDIR/ancnav.js
+frame_navigation > $WDIR/ancnav.html
+
+print " ${B}Generating PDF: ${NB}\c"
+fix_postscript $WDIR/$WNAME.ps | ps2pdf - > $WDIR/$WNAME.pdf
+rm -f $WDIR/$WNAME.ps
+print "Done."
 
 # Now build the index.html file that contains
 # links to the source files and their diffs.
@@ -1482,39 +2079,90 @@ fi
 cd $CWS
 
 # Save total changed lines for Code Inspection.
-echo "$TOTL" > $WDIR/TotalChangedLines
+print "$TOTL" > $WDIR/TotalChangedLines
 
+print "     index.html: \c"
 INDEXFILE=$WDIR/index.html
 exec 3<&1			# duplicate stdout to FD3.
 exec 1<&-			# Close stdout.
 exec > $INDEXFILE		# Open stdout to index file.
 
-echo "<html>"
-echo '<body bgcolor="#EEEEEE">'
-echo "<title>${CWS##*/}</title>"
-echo "<center><h1>${CWS##*/}</h1></center>"
-echo "<p>"
-echo "Parent workspace is $PWS <br>"
-echo "Child  workspace is $CWS <br>"
-printCI $TOTL $TINS $TDEL $TCHG $TUNC
-echo "<hr>"
-echo "<code>"
+print "$HTML<head>$STDHEAD"
+print "<title>$WNAME</title>"
+print "</head>"
+print "<body id=\"SUNWwebrev\">"
+print "<div class=\"summary\">"
+print "<h2>Code Review for $WNAME</h2>"
 
-sed -e "s/#.*$//" -e "/=/d" -e "/^[   ]*$/d" $FLIST |
+print "<table>"
 
-# ... and read lines from the cleaned-up file list
+#
+# Figure out the username and gcos name.  To maintain compatibility
+# with passwd(4), we must support '&' substitutions.
+#
+username=`id | cut -d '(' -f 2 | cut -d ')' -f 1`
+realname=`getent passwd $username | cut -d':' -f 5`
+userupper=`perl -e "print ucfirst $username"`
+realname=`print $realname | sed s/\&/$userupper/`
+date="on `date`"
 
-while read LINE
+if [[ -n "$username" && -n "$realname" ]]; then
+	print "<tr><th>Prepared by:</th>"
+	print "<td>$realname ($username) $date</td></tr>"
+elif [[ -n "$username" ]]; then
+	print "<tr><th>Prepared by:</th><td>$username $date</td></tr>"
+fi
+
+print "<tr><th>Workspace:</th><td>$CWS</td></tr>"
+print "<tr><th>Compare against:</th><td>"
+if [[ -n $parent_webrev ]]; then
+	print "webrev at $parent_webrev"
+else
+	print "$PWS"
+fi
+print "</td></tr>"
+print "<tr><th>Summary of changes:</th><td>"
+printCI $TOTL $TINS $TDEL $TMOD $TUNC
+print "</td></tr>"
+
+if [[ -f $WDIR/$WNAME.patch ]]; then
+	print "<tr><th>Patch of changes:</th><td>"
+	print "<a href=\"$WNAME.patch\">$WNAME.patch</a></td></tr>"
+fi
+if [[ -f $WDIR/$WNAME.pdf ]]; then
+	print "<tr><th>Printable review:</th><td>"
+	print "<a href=\"$WNAME.pdf\">$WNAME.pdf</a></td></tr>"
+fi
+
+if [[ -n "$iflag" ]]; then
+	print "<tr><th>Author comments:</th><td><div>"
+	cat /tmp/$$.include
+	print "</div></td></tr>"
+fi
+print "</table>"
+print "</div>"
+
+
+#
+# Second pass through the files: generate the rest of the index file
+#
+cat $FLIST | while read LINE
 do
 	set - $LINE
 	P=$1
 
-	if [ $# = 2 ]; then
+	if [[ $# == 2 ]]; then
 		PP=$2
-		OLDNAME=" <i>(was $PP)</i>"
+		oldname=" <i>(was $PP)</i>"
+
 	else
 		PP=$P
-		OLDNAME=""
+		oldname=""
+	fi
+
+	DIR=${P%/*}
+	if [[ $DIR == $P ]]; then
+		DIR="."   # File at root of workspace
 	fi
 
 	# Avoid processing the same file twice.
@@ -1523,95 +2171,105 @@ do
 
 	F=$WDIR/$P
 
-	# Group files in
-	# the same directory
-
-	D=${F%/*}
-	if [ "$D" != "$PD" ]; then
-		echo "<p>"
-	else
-		echo "<br>"
-	fi
-	echo
-	echo
-	PD=$D
+	print "<p>"
 
 	# If there's a diffs file, make diffs links
 
-	if [ -f $F.cdiff.html ]; then
-		echo "<a href=$P.cdiff.html>Cdiffs</a>"
-		echo "<a href=$P.udiff.html>Udiffs</a>"
+	if [[ -f $F.cdiff.html ]]; then
+		print "<a href=\"$P.cdiff.html\">Cdiffs</a>"
+		print "<a href=\"$P.udiff.html\">Udiffs</a>"
 
-		if [ -x $WDIFF ]; then
-			echo "<a href=$P.wdiff.html>Wdiffs</a>"
+		if [[ -f $F.wdiff.html && -x $WDIFF ]]; then
+			print "<a href=\"$P.wdiff.html\">Wdiffs</a>"
 		fi
 
-		echo "<a href=$P.sdiff.html>Sdiffs</a>"
+		print "<a href=\"$P.sdiff.html\">Sdiffs</a>"
 
-		if [[ $WEBREV_FRAMES == 'yes' ]]; then
-			print "<a href=\"$P.frames.html\">Frames</a>"
-		fi
+		print "<a href=\"$P.frames.html\">Frames</a>"
 	else
-		echo "------ ------ ------"
+		print " ------ ------ ------"
 
-		if [ -x $WDIFF ]; then
-			echo " ------"
-		fi
-
-		if [[ $WEBREV_FRAMES == 'yes' ]]; then
+		if [[ -x $WDIFF ]]; then
 			print " ------"
 		fi
+
+		print " ------"
 	fi
-	
+
 	# If there's an old file, make the link
 
-	if [ -f $F-.html ]; then
-		echo "<a href=$P-.html>Old</a>"
+	if [[ -f $F-.html ]]; then
+		print "<a href=\"$P-.html\">Old</a>"
 	else
-		echo "---"
+		print " ---"
 	fi
-	
+
 	# If there's an new file, make the link
 
-	if [ -f $F.html ]; then
-		echo "<a href=$P.html>New</a>"
+	if [[ -f $F.html ]]; then
+		print "<a href=\"$P.html\">New</a>"
 	else
-		echo "---"
+		print " ---"
 	fi
-	echo "<b>$P</b>$OLDNAME<p>"
 
+	if [[ -f $F.patch ]]; then
+		print "<a href=\"$P.patch\">Patch</a>"
+	else
+		print " -----"
+	fi
+
+	if [[ -f $WDIR/raw_files/new/$P ]]; then
+		print "<a href=\"raw_files/new/$P\">Raw</a>"
+	else
+		print " ---"
+	fi
+
+	print "<b>$P</b> $oldname"
+
+	#
+	# Check for usr/closed
+	#
+	if [ ! -z "$Oflag" ]; then
+		if [[ $P == usr/closed/* ]]; then
+			print "&nbsp;&nbsp;<i>Closed source: omitted from" \
+			    "this review</i>"
+		fi
+	fi
+
+	print "</p>"
 	# Insert delta comments
 
-	if [ "$WXFILE" ]; then
-		wxcomments $P
-	else
-		deltacomments $PP $P
-	fi
+	print "<blockquote><pre>"
+	getcomments html $P $PP
+	print "</pre>"
 
 	# Add additional comments comment
 
-	echo "<!-- Add comments to explain changes in $P here -->"
+	print "<!-- Add comments to explain changes in $P here -->"
 
 	# Add count of changes.
 
-	if [ -f $F.count ]; then
-	    echo "<blockquote>"
+	if [[ -f $F.count ]]; then
 	    cat $F.count
-	    echo "</blockquote>"
 	    rm $F.count
 	fi
+	print "</blockquote>"
 done
 
-echo "</code>"
-echo
-echo
-echo "<P><HR><FONT SIZE=2>"
-echo "This code review page prepared with <b>webrev</b> (vers $WEBREV_UPDATED) on `date`."
-echo "</FONT>"
-echo "</html>"
+print
+print
+print "<hr />"
+print "<p style=\"font-size: small\">"
+print "This code review page was prepared using <b>$0</b>"
+print "(vers $WEBREV_UPDATED)."
+print "Webrev is maintained by the <a href=\"http://www.opensolaris.org\">"
+print "OpenSolaris</a> project.  The latest version may be obtained"
+print "<a href=\"http://cvs.opensolaris.org/source/xref/on/usr/src/tools/scripts/webrev.sh\">here</a>.</p>"
+print "</body>"
+print "</html>"
 
 exec 1<&-			# Close FD 1.
 exec 1<&3			# dup FD 3 to restore stdout.
 exec 3<&-			# close FD 3.
 
-print "\n$WDIR created."
+print "Done."

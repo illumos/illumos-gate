@@ -930,9 +930,11 @@ Usage:  $ME command [-D] [args]
                         Will skip checks for files listed in wx/pbchk.NOT.
 
 ======================== Code Review Commands ======================
-        $ME webrev      generate webrev for active and renamed/deleted files.
+        $ME webrev [webrev-args]
+		        generate webrev for active and renamed/deleted files.
                         Note, uses comments in the active list.  This is the
-                        preferred way of reviewing code.
+                        preferred way of reviewing code.  Arguments to webrev
+			may also be specified.
                         Will skip files listed in wx/webrev.NOT
 
         $ME codereview [-N] [codereview options]
@@ -1131,7 +1133,8 @@ wx_webrev() {
 	# End of subshell
 	) > $wxdir/tmp/webrev.list
 	
-	${WXWEBREV:-webrev} -w $(basename $wxdir)/tmp/webrev.list
+	# Note that the file list must come last.
+	${WXWEBREV:-webrev} -w "$@" $(basename $wxdir)/tmp/webrev.list
 
 	cd $origdir
 }
@@ -4769,6 +4772,7 @@ export workspace parent wxdir file dir filepath backup_done DEFAULT_SRCDIR
 command=$1
 comlist=$command
 shift
+
 case $command in
 	apply|eval)	subcommand=$1; shift;;
 	grep|egrep|sed|nawk)	pattern=$1; shift;;
@@ -4778,11 +4782,18 @@ case $command in
 		comlist="$comlist rmdelchk deltachk comchk rtichk outchk";;
 esac
 
-orig_args="$*"
+orig_args="$@"
 silent=
 args=
 file_list=
 typeset tmp_file_list tmp_args
+
+#
+# Some subcommands pass through all arguments.
+#
+case $command in
+	webrev)	args="$orig_args"; shift $#;;
+esac
 
 # Parse args
 while [ $# -gt 0 ]; do
@@ -5229,7 +5240,7 @@ case $command in
 		wx_eval 'echo $filepath; $command $args '\'$pattern\'' $file';;
 	codereview) args="-e $args"; wx_eval wx_fullreview;;
 	fullreview) wx_eval wx_fullreview;;
-	webrev) wx_webrev;;
+	webrev) wx_webrev $args;;
 	dir)	echo $wxdir;;
 	e)	cd $wxdir; exec ${EDITOR-vi} $orig_args;;
 	ws)	cd $wsdata; cat $orig_args;;

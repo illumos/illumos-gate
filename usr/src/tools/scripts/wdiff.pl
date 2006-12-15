@@ -1,11 +1,10 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Make a dynamic HTML page for the unified diffs between two (C) files.
@@ -34,7 +33,7 @@ use Getopt::Std;
 $diffword = "wdiff";
 $context = 10;
 
-getopt('t');
+getopt('t:c:');
 
 if ($#ARGV + 1 == 1) {
 	$diffword = $ARGV[0];
@@ -44,11 +43,15 @@ if ($#ARGV + 1 == 1) {
 } elsif ($#ARGV + 1 == 2) {
 	open DIFF, "diff -D $diffword $ARGV[0] $ARGV[1] | expand |";
 } else {
-	print "Usage: $0 [-t title] file1 file2\n";
+	print "Usage: $0 [-t title] [-c comment] file1 file2\n";
 	exit 2;
 }
 
 $title = $opt_t ? $opt_t : "Differences between $ARGV[0] and $ARGV[1]";
+$comment = "";
+if (defined $opt_c) {
+	$comment = "<pre>\n" . $opt_c . "\n</pre>\n<hr />";
+}
 
 $indiff = 0;
 $line1 = 0;
@@ -61,30 +64,74 @@ $inelided = 0;		# Elided section open?
 $elided_lines = 0;
 
 print <<END;
-<html>
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
   <head>
     <title>$title</title>
-    <style type='text/css'>
-      pre	{ margin: 0; border: 2px solid white }
 
-      .subtracted { color: red }
+    <meta http-equiv="cache-control" content="no-cache" />
+
+    <style type='text/css' media='screen'>
+      pre	{ margin: 2px; }
+
+      body	{ background-color: #eeeeee; }
+
+      hr	{ border: none 0; border-top: 1px solid #aaa; height: 1px; }
+
+      .subtracted { color: brown }
       .added	{ color: blue }
 
-      .elided	{ border: 2px solid; cursor: n-resize; padding: 1px }
+      .elided	{ border: 1px solid #444; cursor: pointer; margin: 1px }
 
-      .hidebar	{ background-color: #cccccc; border: 1px solid black;
-      		  text-align: center; 
-		  border-collapse: separate; border-spacing: 0px; }
+      table.hidebar { border: 1px solid #ff9900; background-color: #eee;
+      		  text-align: center; border-collapse: collapse; }
 
-      .hidebar .active { border: 2px black outset; cursor: n-resize }
+      .hidebar td.active-down { border: 1px solid #ff9900;
+		border-right: 1px solid #ccc; cursor: s-resize }
 
-      .cmdbox	{ position: fixed; top: 0; right: 0; border: solid 1px black;
-      		  background-color: white; text-align: center }
+      .hidebar td.active-down:hover { background-color: #ffcc99; }
 
-      .cmdbox td { border: outset #808080; cursor: default; padding: 3px 4px; }
+      .hidebar td.active-up { border: 1px solid #ff9900; cursor: n-resize;
+		border-left: 1px solid #ccc; }
 
+      .hidebar td.active-up:hover { background-color: #ffcc99; }
+
+      .hidebar td.elided-label { font-style: italic; width: 12em; }
+
+      .cmdbox	{ position: fixed; top: 0; right: 0;
+	          border-left: solid 1px #444;
+	          border-bottom: solid 1px #444;
+      		  background-color: #ccc; text-align: center }
+
+      .cmdbox td { background-color: #eee; border: 1px #444 outset;
+		   cursor: pointer; padding: 3px 4px; }
+      .cmdbox td:hover { background-color: #ffcc99;
+ 		outline: thin solid #ff9900; }
+
+      a:hover { background-color: #ffcc99; }
+
+      a.print { font-size: x-small; }
     </style>
-    <script>
+
+    <style type='text/css' media='print'>
+	pre { font-family: courier, monospace; font-size: 0.8em; }
+	.cmdbox { display: none; }
+        a.print { display: none; }
+	.hidebar td.active-down { display: none; }
+	.hidebar td.active-up { display: none; }
+        .hidebar td.elided-label { font-style: italic; font-size: small; }
+	table.hidebar { border: none; border-bottom: 1px dotted #000000; }
+	span.added { font-weight: bold;
+	         background-color: #eee; width: 100%; display: block; }
+	span.subtracted { font-style: italic;
+		 background-color: #eee; width: 100%; display: block; }
+	.elided { display: none; }
+        hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+    </style>
+
+    <script type="text/javascript">
       function show_n_hide_dir(id_to_show, id_to_hide, dir) {
 	      var elt_to_show = document.getElementById(id_to_show);
 	      var elt_to_hide = document.getElementById(id_to_hide);
@@ -134,20 +181,22 @@ print <<END;
 	if (otherf == window)
 	  otherf = window.parent.frames[1];
 
-	parent.location.href = page + "?" + otherf.scrollY;
+	parent.location.replace(page + "?" + otherf.scrollY);
       }
-
     </script>
   </head>
-  <body>
+  <body id='SUNWwebrev'>
+    <a class="print" href="javascript:print()">Print this page</a>
+    $comment
     <table class='cmdbox'>
       <tr>
         <td onclick='split()'>Split</td>
 	<td id='close' onclick='closeframe()'>Close</td>
       </tr>
-      <tr><td colspan=2 onclick='open_or_close_all(1)'>Expand all</td></tr>
-      <tr><td colspan=2 onclick='open_or_close_all(0)'>Collapse all</td></tr>
+      <tr><td colspan="2" onclick='open_or_close_all(1)'>Expand all</td></tr>
+      <tr><td colspan="2" onclick='open_or_close_all(0)'>Collapse all</td></tr>
     </table>
+
     <script type='text/javascript'>
       if (window == top)
         document.getElementById('close').style.setProperty('display', 'none', '');
@@ -172,13 +221,15 @@ sub end_elided {
 	print <<END;
 <table id='hb-elided$nelided' class='hidebar'>
   <tr>
-    <td class='active' onclick='show_n_hide_dir("elided$nelided", "hb-elided$nelided", "down")'>
-      Click to open down</td>
-    <td style='width: 5em'>$elided_lines lines</td>
-    <td class='active' onclick='show_n_hide_dir("elided$nelided", "hb-elided$nelided", "up")'>
-      Click to open up</td>
+    <td class='active-down'
+      onclick='show_n_hide_dir("elided$nelided", "hb-elided$nelided", "down")'>
+      &darr;&nbsp;open down&nbsp;&darr;</td>
+    <td class="elided-label">$elided_lines lines elided</td>
+    <td class='active-up'
+      onclick='show_n_hide_dir("elided$nelided", "hb-elided$nelided", "up")'>
+      &uarr;&nbsp;open up&nbsp;&uarr;</td>
   </tr>
-<table>
+</table>
 END
 	$inelided = 0;
 }
@@ -222,7 +273,6 @@ while (<DIFF>) {
 		print @pretext;
 		@pretext = ();
 		$endfunc = 0;
-		$infunc = -1;
 
 		printf "<span class='%s'>",
 		    ($indiff > 0 ? "added" : "subtracted");
@@ -280,24 +330,28 @@ if ($inelided) {
 	print "    </pre>\n";
 }
 
-print "<pre id='linerefpre'><span id='lineref'>", ' ' x (4 + 1 + 4 + 2 + 80),
+print "<pre id='linerefpre'><span id='lineref'>", 'X' x (4 + 1 + 4 + 2 + 80),
     "</span></pre>\n";
 
 print <<END;
-    <script>
+    <br clear="all" />
+    <br />
+
+    <script type="text/javascript">
       /* Assign event handlers and widths. */
       var w = document.getElementById('lineref').offsetWidth;
       for (var i = 1; i <= $nelided; ++i) {
 	      var e = document.getElementById("elided" + i);
 	      e.onclick = handle_click;
-	      e.style.setProperty('width', w, '');
+              e.style.setProperty('width', w + "px", '');
 
 	      e = document.getElementById("hb-elided" + i);
-	      e.style.setProperty('width', w, '');
+              e.style.setProperty('width', w + "px", '');
       }
 
       /* Hide our line size reference. */
-      document.getElementById('linerefpre').style.setProperty('display', 'none', '');
+      document.getElementById('linerefpre').style.setProperty('display',
+          'none', '');
 
       /* Scroll as indicated. */
       str = location.search;
