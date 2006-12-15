@@ -398,14 +398,25 @@ typedef struct {
 	uchar_t		i, j;
 } rc4_key_t;
 
+/*
+ * Offset within the ctx.
+ */
+#define	BLOCK_KEY_OFFSET	offsetof(n2cp_block_ctx_t, keystruct)
+#define	BLOCK_IV_OFFSET		offsetof(n2cp_block_ctx_t, iv)
+#define	HASH_IV_OFFSET		offsetof(n2cp_hash_ctx_t, iv)
+#define	HMAC_KEY_OFFSET		offsetof(n2cp_hmac_ctx_t, keyval)
+#define	HMAC_IV_OFFSET		offsetof(n2cp_hmac_ctx_t, iv)
+
 struct n2cp_block_ctx {
+	int		keylen;
 	union {
 		uchar_t		val[MAXVALUE];
 		rc4_key_t	rc4val;
 	} keystruct;
-	int		keylen;
+	uint64_t	key_paddr;	/* paddr of value */
 	int		ivlen;
 	uchar_t		iv[MAXBLOCK];
+	uint64_t	iv_paddr;	/* paddr of iv */
 	int		nextivlen;
 	uchar_t		nextiv[MAXBLOCK];
 	int		ctrbits;	/* used for AES_CTR */
@@ -467,6 +478,7 @@ struct n2cp_request {
 	nr_ctx_t		*nr_context;
 	int			nr_context_sz;
 	int			nr_blocksz;
+	uint64_t		nr_context_paddr;
 
 	/*
 	 * Callback.
@@ -475,8 +487,12 @@ struct n2cp_request {
 	/*
 	 * Other stuff.
 	 */
+	/* pre-allocated buffers */
 	uchar_t			*nr_in_buf;
+	uint64_t		nr_in_buf_paddr;
 	uchar_t			*nr_out_buf;
+	uint64_t		nr_out_buf_paddr;
+
 	uint32_t		nr_flags;
 	int			nr_resultlen;
 	/*
