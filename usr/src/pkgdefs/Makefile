@@ -54,6 +54,7 @@ sparc_SUBDIRS= \
 	SUNWefcr \
 	SUNWefcu \
 	SUNWefc.u \
+	SUNWefck \
 	SUNWerid \
 	SUNWfruid \
 	SUNWfruip.u \

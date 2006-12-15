@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -34,19 +34,17 @@
 #!default <mode> <owner> <group>	# default used if not specified on entry
 #!<param>=<value>			# puts parameter in pkg environment
 
-# packaging files
-i pkginfo
-i copyright
-i depend
+#
+# Include ISA independent files (prototype_com)
+#
+!include prototype_com
+#
+#
+#
+# List files which are SPARC specific here
 #
 # source locations relative to the prototype file
 #
-# SUNWefc.u
 #
-d none platform 755 root sys
-d none platform/sun4u 755 root sys
-d none platform/sun4u/kernel 755 root sys
-d none platform/sun4u/kernel/misc 755 root sys
-d none platform/sun4u/kernel/misc/sparcv9 755 root sys
-f none platform/sun4u/kernel/misc/sparcv9/gptwocfg 755 root sys
-f none platform/sun4u/kernel/misc/sparcv9/gptwo_cpu 755 root sys
+# SUNWefck
+#
