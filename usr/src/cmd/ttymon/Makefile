@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -97,8 +96,8 @@ $(ROOTUSRSBINF) $(ROOTLIBF) :=	GROUP =		sys
 $(LIBSAFD)/% : %
 	$(INS.file)
 
-# /usr/xpg6/bin/stty is a hard link to /usr/bin/stty
-ROOTXPG6LINK= $(ROOTXPG6BIN)/stty
+# /usr/xpg6/bin/stty is a symlink to /usr/bin/stty
+ROOTXPG6SYMLINK= $(ROOTXPG6BIN)/stty
 .KEEP_STATE:
 
 all: $(PROG) $(XPG4)
@@ -138,13 +137,13 @@ sttydefs: $(STTYDEFSOBJ)
 	$(POST_PROCESS)
 
 install: all $(DIRS) $(ROOTLIBF) $(ROOTUSRSBINF) $(ROOTBINF) \
-	$(ROOTXPG4PROG) $(ROOTXPG6LINK)
+	$(ROOTXPG4PROG) $(ROOTXPG6SYMLINK)
 	-$(RM) $(ROOTETC)/getty
 	-$(SYMLINK) ../usr/lib/saf/ttymon $(ROOTETC)/getty
 
-$(ROOTXPG6LINK): $(ROOTBINF)
+$(ROOTXPG6SYMLINK): $(ROOTBINF)
 	-$(RM) $@
-	-$(LN) -f $(ROOTBINF) $@
+	-$(SYMLINK) ../../bin/$(BINF) $@
 
 $(POFILE):      $(POFILES)
 	$(RM) $@
