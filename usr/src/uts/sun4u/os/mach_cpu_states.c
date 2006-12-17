@@ -524,3 +524,10 @@ xt_sync(cpuset_t cpuset)
 	xt_some(cpuset, (xcfunc_t *)xt_sync_tl1, 0, 0);
 	kpreempt_enable();
 }
+
+/*
+ * mach_soft_state_init() - dummy routine for sun4v soft state
+ */
+void
+mach_soft_state_init(void)
+{}

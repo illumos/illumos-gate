@@ -87,6 +87,7 @@ HDRS=	\
 	pte.h			\
 	prom_plat.h		\
 	qcn.h			\
+	soft_state.h		\
 	traptrace.h
 
 CLOSED_HDRS=	\

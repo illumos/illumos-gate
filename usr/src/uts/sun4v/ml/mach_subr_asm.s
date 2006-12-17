@@ -43,6 +43,7 @@
 #include <sys/cmpregs.h>
 #include <sys/clock.h>
 #include <sys/fpras.h>
+#include <sys/soft_state.h>
 
 #if defined(lint)
 /* ARGSUSED */
@@ -397,5 +398,32 @@ fpras_chkfn_type1(void)
 	retl				! 15
 	  mov	FPRAS_BADTRAP, %o0	! 16, how detected
 	SET_SIZE(fpras_chkfn_type1)
+#endif	/* lint */
 
+#if defined(lint)
+char	soft_state_message_strings[SOLARIS_SOFT_STATE_MSG_CNT][SSM_SIZE];
+#else	/* lint */
+	.seg	".data"
+	.global soft_state_message_strings
+
+	.align	SSM_SIZE
+soft_state_message_strings:
+	.asciz	SOLARIS_SOFT_STATE_BOOT_MSG_STR
+	.align	SSM_SIZE
+	.asciz	SOLARIS_SOFT_STATE_RUN_MSG_STR
+	.align	SSM_SIZE
+	.asciz	SOLARIS_SOFT_STATE_HALT_MSG_STR
+	.align	SSM_SIZE
+	.asciz	SOLARIS_SOFT_STATE_POWER_MSG_STR
+	.align	SSM_SIZE
+	.asciz	SOLARIS_SOFT_STATE_PANIC_MSG_STR
+	.align	SSM_SIZE
+	.asciz	SOLARIS_SOFT_STATE_REBOOT_MSG_STR
+	.align	SSM_SIZE
+	.asciz	SOLARIS_SOFT_STATE_DEBUG_MSG_STR
+	.align	SSM_SIZE
+	.skip	SSM_SIZE			/* saved message */
+	.nword	0
+
+	.seg	".text"
 #endif	/* lint */

@@ -304,6 +304,7 @@ f none usr/platform/sun4v/include/sys/prom_plat.h 644 root bin
 f none usr/platform/sun4v/include/sys/pte.h 644 root bin
 f none usr/platform/sun4v/include/sys/qcn.h 644 root bin
 f none usr/platform/sun4v/include/sys/scb.h 644 root bin
+f none usr/platform/sun4v/include/sys/soft_state.h 644 root bin
 f none usr/platform/sun4v/include/sys/sun4asi.h 644 root bin
 f none usr/platform/sun4v/include/sys/tod.h 644 root bin
 f none usr/platform/sun4v/include/sys/trapstat.h 644 root bin

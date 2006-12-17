@@ -52,5 +52,6 @@ CORE_OBJS +=				\
 	prom_set_mmfsa_traptable.o	\
 	prom_sparc.o			\
 	prom_sun4v_api_version.o	\
+	prom_sun4v_soft_state_supported.o	\
 	prom_vercheck.o			\
 	prom_vername.o

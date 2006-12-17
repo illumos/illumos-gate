@@ -33,6 +33,8 @@
 #include <sys/mdesc.h>
 #include <sys/mach_descrip.h>
 #include <sys/ldoms.h>
+#include <sys/hypervisor_api.h>
+#include <sys/soft_state.h>
 
 /*
  * Useful for disabling MP bring-up for an MP capable kernel
@@ -84,6 +86,11 @@ init_cpu_info(struct cpu *cp)
 		 * alone for now.
 		 */
 		CPU_SIGNATURE(OS_SIG, SIGST_RUN, SIGSUBST_NULL, cpuid);
+		/*
+		 * On first cpu setup, tell hv we are booting
+		 */
+		mach_set_soft_state(SIS_TRANSITION,
+				&SOLARIS_SOFT_STATE_BOOT_MSG);
 #ifdef	lint
 		cpuid = cpuid;
 #endif	/* lint */

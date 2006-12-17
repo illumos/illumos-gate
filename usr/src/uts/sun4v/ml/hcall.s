@@ -336,6 +336,16 @@ int64_t
 hv_cnread(uint64_t buf_ra, uint64_t count, int64_t *retcount)
 { return (0); }
 
+/*ARGSUSED*/
+uint64_t
+hv_soft_state_set(uint64_t state, uint64_t string)
+{ return (0); }
+
+/*ARGSUSED*/	
+uint64_t
+hv_soft_state_get(uint64_t string, uint64_t *state)
+{ return (0); }
+
 #else	/* lint || __lint */
 
 	/*
@@ -1187,5 +1197,32 @@ hv_cnread(uint64_t buf_ra, uint64_t count, int64_t *retcount)
 	retl
 	nop
 	SET_SIZE(hv_cnread)
+
+	/*
+	 * SOFT_STATE_SET
+	 * arg0 state (%o0)
+	 * arg1 string (%o1)
+	 * ret0 status (%o0)
+	 */
+	ENTRY(hv_soft_state_set)
+	mov	SOFT_STATE_SET, %o5
+	ta	FAST_TRAP
+	retl
+	nop
+	SET_SIZE(hv_soft_state_set)
+
+	/*
+	 * SOFT_STATE_GET
+	 * arg0 string buffer (%o0)
+	 * ret0 status (%o0)
+	 * ret1 current state (%o1)
+	 */
+	ENTRY(hv_soft_state_get)
+	mov	%o1, %o2
+	mov	SOFT_STATE_GET, %o5
+	ta	FAST_TRAP
+	retl
+	stx	%o1, [%o2]
+	SET_SIZE(hv_soft_state_get)
 
 #endif	/* lint || __lint */

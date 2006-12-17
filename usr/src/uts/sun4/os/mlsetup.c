@@ -72,6 +72,7 @@
 extern void map_wellknown_devices(void);
 extern void hsvc_setup(void);
 extern void mach_descrip_startup_init(void);
+extern void mach_soft_state_init(void);
 
 int	dcache_size;
 int	dcache_linesize;
@@ -231,6 +232,7 @@ mlsetup(struct regs *rp, void *cif, kfpu_t *fp)
 	 * Negotiate hypervisor services, if any
 	 */
 	hsvc_setup();
+	mach_soft_state_init();
 
 #ifdef TRAPTRACE
 	/*

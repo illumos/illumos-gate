@@ -122,6 +122,9 @@ extern "C" {
 #define	CONS_READ		0x62
 #define	CONS_WRITE		0x63
 
+#define	SOFT_STATE_SET		0x70
+#define	SOFT_STATE_GET		0x71
+
 #define	TTRACE_BUF_CONF		0x90
 #define	TTRACE_BUF_INFO		0x91
 #define	TTRACE_ENABLE		0x92
@@ -176,6 +179,13 @@ extern "C" {
 #define	API_EXIT		0x02
 #define	API_GET_VERSION		0x03
 
+
+/*
+ * Definitions for MACH_SOFT_STATE routines
+ */
+
+#define	SIS_NORMAL		0x01
+#define	SIS_TRANSITION		0x02
 
 /*
  * Bits for MMU functions flags argument:
@@ -376,6 +386,8 @@ extern uint64_t hvio_intr_getstate(uint64_t sysino,
 extern uint64_t hvio_intr_setstate(uint64_t sysino, int intr_state);
 extern uint64_t hvio_intr_gettarget(uint64_t sysino, uint32_t *cpuid);
 extern uint64_t hvio_intr_settarget(uint64_t sysino, uint32_t cpuid);
+extern uint64_t hv_soft_state_set(uint64_t state, uint64_t string_ra);
+extern uint64_t hv_soft_state_get(uint64_t string_ra, uint64_t *state);
 
 extern uint64_t hv_ldc_tx_qconf(uint64_t channel, uint64_t ra_base,
     uint64_t nentries);

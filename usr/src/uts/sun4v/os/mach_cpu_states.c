@@ -51,6 +51,9 @@
 #include <sys/mdesc.h>
 #include <sys/mach_descrip.h>
 #include <sys/wdt.h>
+#include <sys/soft_state.h>
+#include <sys/promimpl.h>
+#include <sys/hsvc.h>
 
 /*
  * hvdump_buf_va is a pointer to the currently-configured hvdump_buf.
@@ -154,8 +157,12 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 	watchdog_clear();
 
 	if (fcn == AD_HALT) {
+		mach_set_soft_state(SIS_TRANSITION,
+				&SOLARIS_SOFT_STATE_HALT_MSG);
 		halt((char *)NULL);
 	} else if (fcn == AD_POWEROFF) {
+		mach_set_soft_state(SIS_TRANSITION,
+				&SOLARIS_SOFT_STATE_POWER_MSG);
 		power_down(NULL);
 	} else {
 		if (bootstr == NULL) {
@@ -183,6 +190,8 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 				break;
 			}
 		}
+		mach_set_soft_state(SIS_TRANSITION,
+				&SOLARIS_SOFT_STATE_REBOOT_MSG);
 		reboot_machine(bootstr);
 	}
 	/* MAYBE REACHED */
@@ -291,6 +300,9 @@ panic_enter_hw(int spl)
 		TRAPTRACE_FREEZE;
 #endif
 	}
+
+	mach_set_soft_state(SIS_TRANSITION, &SOLARIS_SOFT_STATE_PANIC_MSG);
+
 	if (spl == ipltospl(PIL_14)) {
 		uint_t opstate = disable_vec_intr();
 
@@ -878,7 +890,9 @@ sticksync_master(void)
 
 void
 cpu_init_cache_scrub(void)
-{}
+{
+	mach_set_soft_state(SIS_NORMAL, &SOLARIS_SOFT_STATE_RUN_MSG);
+}
 
 int
 dtrace_blksuword32_err(uintptr_t addr, uint32_t *data)
@@ -1002,16 +1016,47 @@ cpu_kdi_init(kdi_t *kdi)
 	kdi->mkdi_get_stick = kdi_get_stick;
 }
 
+uint64_t	soft_state_message_ra[SOLARIS_SOFT_STATE_MSG_CNT];
+static uint64_t	soft_state_saved_state = (uint64_t)-1;
+static int	soft_state_initialized = 0;
+static uint64_t soft_state_sup_minor;		/* Supported minor number */
+static hsvc_info_t soft_state_hsvc = {
+			HSVC_REV_1, NULL, HSVC_GROUP_SOFT_STATE, 1, 0, NULL };
+
+
 static void
 sun4v_system_claim(void)
 {
 	watchdog_suspend();
+	/*
+	 * For "mdb -K", set soft state to debugging
+	 */
+	if (soft_state_saved_state == -1) {
+		mach_get_soft_state(&soft_state_saved_state,
+				&SOLARIS_SOFT_STATE_SAVED_MSG);
+	}
+	/*
+	 * check again as the read above may or may not have worked and if
+	 * it didn't then soft state will still be -1
+	 */
+	if (soft_state_saved_state != -1) {
+		mach_set_soft_state(SIS_TRANSITION,
+				&SOLARIS_SOFT_STATE_DEBUG_MSG);
+	}
 }
 
 static void
 sun4v_system_release(void)
 {
 	watchdog_resume();
+	/*
+	 * For "mdb -K", set soft_state state back to original state on exit
+	 */
+	if (soft_state_saved_state != -1) {
+		mach_set_soft_state(soft_state_saved_state,
+					&SOLARIS_SOFT_STATE_SAVED_MSG);
+		soft_state_saved_state = -1;
+	}
 }
 
 void
@@ -1301,4 +1346,64 @@ done:
 	if (nrnode > 0)
 		md_free_scan_dag(mdp, &platlist);
 	(void) md_fini_handle(mdp);
+}
+
+void
+mach_soft_state_init(void)
+{
+	int		i;
+	uint64_t	ra;
+
+	/*
+	 * Try to register soft_state api. If it fails, soft_state api has not
+	 * been implemented in the firmware, so do not bother to setup
+	 * soft_state in the kernel.
+	 */
+	if ((i = hsvc_register(&soft_state_hsvc, &soft_state_sup_minor)) != 0) {
+		return;
+	}
+	for (i = 0; i < SOLARIS_SOFT_STATE_MSG_CNT; i++) {
+		ASSERT(strlen((const char *)(void *)
+				soft_state_message_strings + i) < SSM_SIZE);
+		if ((ra = va_to_pa((void *)(soft_state_message_strings + i))) ==
+									-1ll) {
+			return;
+		}
+		soft_state_message_ra[i] = ra;
+	}
+	/*
+	 * Tell OBP that we are supporting Guest State
+	 */
+	prom_sun4v_soft_state_supported();
+	soft_state_initialized = 1;
+}
+
+void
+mach_set_soft_state(uint64_t state, uint64_t *string_ra)
+{
+	uint64_t	rc;
+
+	if (soft_state_initialized && *string_ra) {
+		rc = hv_soft_state_set(state, *string_ra);
+
+		if (rc != H_EOK) {
+			cmn_err(CE_WARN, "hv_soft_state_set returned %ld\n",
+				rc);
+		}
+	}
+}
+
+void
+mach_get_soft_state(uint64_t *state, uint64_t *string_ra)
+{
+	int	rc;
+
+	if (soft_state_initialized && *string_ra) {
+		rc = hv_soft_state_get(*string_ra, state);
+		if (rc != H_EOK) {
+			cmn_err(CE_WARN, "hv_soft_state_get returned %d\n",
+				rc);
+			*state = -1;
+		}
+	}
 }
