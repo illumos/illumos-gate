@@ -107,7 +107,6 @@ typedef struct pxu {
 	uint64_t	*ib_config_state;
 	uint64_t	*xcb_config_state;
 	uint64_t	*msiq_config_state;
-	uint_t		cpr_flag;
 
 	/* sun4u specific vars */
 	caddr_t			px_address[4];
@@ -118,10 +117,6 @@ typedef struct pxu {
 } pxu_t;
 
 #define	PX2CB(px_p) (((pxu_t *)px_p->px_plat_p)->px_cb_p)
-
-/* cpr_flag */
-#define	PX_NOT_CPR	0
-#define	PX_ENTERED_CPR	1
 
 /*
  * Event Queue data structure.
@@ -388,7 +383,7 @@ extern int px_link_wait4l1idle(caddr_t csr_base);
 extern int px_link_retrain(caddr_t csr_base);
 extern void px_enable_detect_quiet(caddr_t csr_base);
 
-extern void px_lib_clr_errs(px_t *px_p, dev_info_t *rdip, uint64_t addr);
+extern void px_lib_clr_errs(px_t *px_p);
 
 /*
  * Hotplug functions:

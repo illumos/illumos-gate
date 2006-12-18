@@ -90,7 +90,7 @@ typedef struct px_err_reg_desc {
  * Macro to create the error handling forward declaration
  *
  * The error handlers examines error, determine the nature of the error
- * and return error status in terms of PX_HW_RESET | PX_PANIC | ...
+ * and return error status in terms of PX_FATAL_HW | PX_FATAL_GOS | ...
  * terminology.
  */
 #define	PX_ERR_BIT_HANDLE_DEC(n)	int px_err_ ## n ## _handle\
@@ -114,21 +114,25 @@ typedef struct px_err_reg_desc {
 /*
  * Predefined error handling functions.
  */
-void px_err_log_handle(dev_info_t *rpdip, px_err_reg_desc_t *err_reg_descr,
-	px_err_bit_desc_t *err_bit_descr, char *msg);
-int px_err_hw_reset_handle(dev_info_t *rpdip, caddr_t csr_base,
+int px_err_fatal_hw_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
-int px_err_panic_handle(dev_info_t *rpdip, caddr_t csr_base,
+int px_err_fatal_gos_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
-int px_err_protected_handle(dev_info_t *rpdip, caddr_t csr_base,
+int px_err_fatal_stuck_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
-int px_err_no_panic_handle(dev_info_t *rpdip, caddr_t csr_base,
+int px_err_fatal_sw_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
-int px_err_no_error_handle(dev_info_t *rpdip, caddr_t csr_base,
+int px_err_non_fatal_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr);
+int px_err_ok_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr);
+int px_err_unknown_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
 
@@ -147,8 +151,8 @@ PX_ERPT_SEND_DEC(do_not);
 
 /*
  * Fire JBC error Handling Forward Declarations
- * the must-panic type errors such as PX_PANIC or
- * post-reset-diagnosed type error such as PX_HW_RESET
+ * the must-panic type errors such as PX_FATAL_GOS or
+ * post-reset-diagnosed type error such as PX_FATAL_HW
  * are not furthur diagnosed here because there is no
  * justification to find out more as immediate error
  * handling. FMA DE will do the post analysis.
@@ -163,6 +167,9 @@ int px_err_jbc_dmcint_odcd_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
 int px_err_jbc_safe_acc_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr);
+int px_err_jbc_csr_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
 
@@ -186,6 +193,12 @@ PX_ERPT_SEND_DEC(ubc_fatal);
 #define	PX_ERR_DMC_CLASS(n)	PCIEX_FIRE "." FIRE_DMC_ ## n
 
 /* Fire Bit Error Handling Forward Declarations */
+int px_err_imu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr);
+int px_err_imu_pme_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr);
 int px_err_imu_eq_ovfl_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
@@ -195,7 +208,10 @@ int px_err_mmu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 int px_err_mmu_tfa_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
-int px_err_mmu_parity_handle(dev_info_t *rpdip, caddr_t csr_base,
+int px_err_mmu_tte_cae_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr);
+int px_err_mmu_tblwlk_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
 
@@ -213,9 +229,6 @@ PX_ERPT_SEND_DEC(mmu);
 #define	PX_ERR_PEC_CLASS(n)	PCIEX_FIRE "." FIRE_PEC_ ## n
 #define	PX_ERR_PEC_OB_CLASS(n)	PCIEX_OBERON "." FIRE_PEC_ ## n
 
-int px_err_wuc_ruc_handle(dev_info_t *rpdip, caddr_t csr_base,
-	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
-	px_err_bit_desc_t *err_bit_descr);
 int px_err_tlu_lup_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);

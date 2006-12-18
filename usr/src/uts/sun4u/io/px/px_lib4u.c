@@ -1260,7 +1260,6 @@ px_lib_suspend(dev_info_t *dip)
 		if (ret != H_EOK)
 			cb_p->attachcnt++;
 	}
-	pxu_p->cpr_flag = PX_ENTERED_CPR;
 
 fail:
 	return ((ret != H_EOK) ? DDI_FAILURE: DDI_SUCCESS);
@@ -1425,19 +1424,14 @@ px_lib_map_attr_check(ddi_map_req_t *mp)
 		hp->ah_acc.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 }
 
-/* This function is called only by poke, caut put and pxtool poke. */
 void
-px_lib_clr_errs(px_t *px_p, dev_info_t *rdip, uint64_t addr)
+px_lib_clr_errs(px_t *px_p)
 {
 	px_pec_t	*pec_p = px_p->px_pec_p;
 	dev_info_t	*rpdip = px_p->px_dip;
-	int		rc_err, fab_err, i;
+	int		err = PX_OK, ret;
 	int		acctype = pec_p->pec_safeacc_type;
 	ddi_fm_error_t	derr;
-	px_ranges_t	*ranges_p;
-	int		range_len;
-	uint32_t	addr_high, addr_low;
-	pcie_req_id_t	bdf = 0;
 
 	/* Create the derr */
 	bzero(&derr, sizeof (ddi_fm_error_t));
@@ -1453,44 +1447,19 @@ px_lib_clr_errs(px_t *px_p, dev_info_t *rdip, uint64_t addr)
 	mutex_enter(&px_p->px_fm_mutex);
 
 	/* send ereport/handle/clear fire registers */
-	rc_err = px_err_cmn_intr(px_p, &derr, PX_LIB_CALL, PX_FM_BLOCK_ALL);
+	err = px_err_handle(px_p, &derr, PX_LIB_CALL, B_TRUE);
 
-	/* Figure out if this is a cfg or mem32 access */
-	addr_high = (uint32_t)(addr >> 32);
-	addr_low = (uint32_t)addr;
-	range_len = px_p->px_ranges_length / sizeof (px_ranges_t);
-	i = 0;
-	for (ranges_p = px_p->px_ranges_p; i < range_len; i++, ranges_p++) {
-		if (ranges_p->parent_high == addr_high) {
-			switch (ranges_p->child_high & PCI_ADDR_MASK) {
-			case PCI_ADDR_CONFIG:
-				bdf = (pcie_req_id_t)(addr_low >> 12);
-				addr_low = 0;
-				break;
-			case PCI_ADDR_MEM32:
-				if (rdip)
-					(void) pcie_get_bdf_from_dip(rdip,
-					    &bdf);
-				else
-					bdf = NULL;
-				break;
-			}
-			break;
-		}
-	}
-
-	px_rp_en_q(px_p, bdf, addr_low, NULL);
-
-	/*
-	 * XXX - Current code scans the fabric for all px_tool accesses.
-	 * In future, do not scan fabric for px_tool access to IO Root Nexus
-	 */
-	fab_err = pf_scan_fabric(rpdip, &derr, px_p->px_dq_p,
-	    &px_p->px_dq_tail);
+	/* Check all child devices for errors */
+	ret = ndi_fm_handler_dispatch(rpdip, NULL, &derr);
 
 	mutex_exit(&px_p->px_fm_mutex);
 
-	px_err_panic(rc_err, PX_RC, fab_err);
+	/*
+	 * PX_FATAL_HW indicates a condition recovered from Fatal-Reset,
+	 * therefore it does not cause panic.
+	 */
+	if ((err & (PX_FATAL_GOS | PX_FATAL_SW)) || (ret == DDI_FM_FATAL))
+		PX_FM_PANIC("Fatal System Port Error has occurred\n");
 }
 
 #ifdef  DEBUG
@@ -1523,7 +1492,7 @@ px_lib_do_poke(dev_info_t *dip, dev_info_t *rdip,
 	} else
 		err = DDI_FAILURE;
 
-	px_lib_clr_errs(px_p, rdip, in_args->dev_addr);
+	px_lib_clr_errs(px_p);
 
 	if (otd.ot_trap & OT_DATA_ACCESS)
 		err = DDI_FAILURE;
@@ -1598,7 +1567,7 @@ px_lib_do_caut_put(dev_info_t *dip, dev_info_t *rdip,
 			if (flags == DDI_DEV_AUTOINCR)
 				dev_addr += size;
 
-			px_lib_clr_errs(px_p, rdip, dev_addr);
+			px_lib_clr_errs(px_p);
 
 			if (pec_p->pec_ontrap_data->ot_trap & OT_DATA_ACCESS) {
 				err = DDI_FAILURE;
@@ -2336,7 +2305,6 @@ px_cpr_callb(void *arg, int code)
 		break;
 
 	case CB_CODE_CPR_RESUME:
-		pxu_p->cpr_flag = PX_NOT_CPR;
 		mutex_enter(&ib_p->ib_ino_lst_mutex);
 
 		ce_ino_p = px_ib_locate_ino(ib_p, ce_ino);

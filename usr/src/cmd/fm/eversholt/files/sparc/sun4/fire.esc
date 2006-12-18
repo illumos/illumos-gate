@@ -2,8 +2,9 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -18,10 +19,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
+/* 
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved. 
+ * Use is subject to license terms. 
+ */ 
  
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -38,16 +39,8 @@
 #define EBUS_FIT		1000 
 #define LINK_EVENTS_COUNT	10
 #define LINK_EVENTS_TIME	1h
-#define	CE_EVENTS_COUNT		10
-#define	CE_EVENTS_TIME		1h
-
+ 
 #define PROP_PLAT_FRU		"PLAT-FRU"
-
-/*
- * Macros for CE Fabric ereports
- */
-#define	PF_CE (1 << 1)
-#define	MATCH_CE (payloadprop("severity") == PF_CE)
 
 /*
  * Test for primary or secondary ereports
@@ -202,8 +195,7 @@ event ereport.io.fire.pec.rto@hostbridge/pciexrc {within(5s)};
  * Whenever a leaf device sends an error message (fatal, non-fatal, or CE) to 
  * root complex, the nexus driver publishes this ereport to log the ereport.
  */
-event ereport.io.fire.fabric@pciexbus/pciexdev/pciexfn {within(1s)};
-event ereport.io.fire.fabric@pcibus/pcidev/pcifn {within(1s)};
+event ereport.io.fire.fabric@hostbridge/pciexrc {within(5s)};
 
 /* 
  * A faulty Fire hostbridge may cause (* may cause PCI-E abort): 
@@ -730,56 +722,7 @@ prop upset.io.fire.nodiag@hostbridge (0)->
     ereport.io.fire.pec.lin@hostbridge/pciexrc,
     ereport.io.fire.pec.lup@hostbridge/pciexrc,
     error.io.fire.pec.secondary@hostbridge/pciexrc,
-    error.io.fire.pec.fabric_error@hostbridge/pciexrc
+    error.io.fire.pec.fabric_error@hostbridge/pciexrc,
+    ereport.io.fire.fabric@hostbridge/pciexrc
     ; 
-
-event error.io.fire.fabric@hostbridge/pciexrc;
-
-prop fault.io.fire.pciex.device@pciexbus/pciexdev/pciexfn (1) ->
-	ereport.io.fire.fabric@pciexbus/pciexdev/pciexfn { !MATCH_CE };
-
-prop fault.io.fire.pci.device@pcibus/pcidev/pcifn (1) ->
-	ereport.io.fire.fabric@pcibus/pcidev/pcifn;
-
-/*
- * Below rules are so we get a single suspect list in 1 fault with percentage
- * of indiction being equal among all the suspect FRUs
- */
-prop error.io.fire.fabric@hostbridge/pciexrc (0) ->
-	ereport.io.fire.fabric@pciexbus/pciexdev/pciexfn {
-		is_under(hostbridge/pciexrc, pciexbus/pciexdev/pciexfn) && !MATCH_CE
-	};
-
-prop error.io.fire.fabric@hostbridge/pciexrc (0) ->
-	ereport.io.fire.fabric@pcibus/pcidev/pcifn {
-		is_under(hostbridge/pciexrc, pcibus/pcidev/pcifn)
-	};
-
-prop fault.io.fire.pciex.device@pciexbus/pciexdev/pciexfn (1) ->
-	error.io.fire.fabric@hostbridge/pciexrc {
-		is_under(hostbridge/pciexrc, pciexbus/pciexdev/pciexfn)
-	};
-
-prop fault.io.fire.pci.device@pcibus/pcidev/pcifn (1) ->
-	error.io.fire.fabric@hostbridge/pciexrc {
-		is_under(hostbridge/pciexrc, pcibus/pcidev/pcifn)
-	};
-
-event upset.io.fire.fabric@pciexbus/pciexdev/pciexfn{within(1s)};
-event ereport.io.fire.pciex.ce@pciexbus/pciexdev/pciexfn{within(1s)};
-
-/* SERD CEs */
-prop upset.io.fire.fabric@pciexbus[b]/pciexdev[d]/pciexfn[f] (0) ->
-	ereport.io.fire.fabric@pciexbus[b]/pciexdev[d]/pciexfn[f]
-	    { MATCH_CE };
-
-event upset.io.fire.fabric@pciexbus/pciexdev/pciexfn,
-    engine=serd.io.fire.fabric@pciexbus/pciexdev/pciexfn;
-
-engine serd.io.fire.fabric@pciexbus/pciexdev/pciexfn, 
-    N=CE_EVENTS_COUNT, T=CE_EVENTS_TIME, method=persistent, 
-    trip=ereport.io.fire.pciex.ce@pciexbus/pciexdev/pciexfn;
-
-prop fault.io.fire.pciex.device@pciexbus/pciexdev/pciexfn (0) ->
-	ereport.io.fire.pciex.ce@pciexbus/pciexdev/pciexfn;
 

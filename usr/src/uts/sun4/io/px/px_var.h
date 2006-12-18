@@ -146,13 +146,6 @@ struct px {
 	/* CPR callback id */
 	callb_id_t	px_cprcb_id;
 	uint32_t	px_dma_sync_opt; /* DMA syncing req. of hw */
-
-	/* Handle for soft intr */
-	ddi_softint_handle_t    px_dbg_hdl; /* HDL for dbg printing */
-
-	/* array to keep track of register snapshots during error handling */
-	int		px_dq_tail; /* last valid index in cs array */
-	pf_data_t	*px_dq_p;
 };
 
 /* px soft state flag */

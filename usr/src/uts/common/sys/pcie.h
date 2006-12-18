@@ -592,11 +592,6 @@ typedef uint16_t pcie_req_id_t;
 #define	PCIE_REQ_ID_FUNC_SHIFT	0
 #define	PCIE_REQ_ID_FUNC_MASK	0x0007
 
-#define	PCIE_CPL_STS_SUCCESS	0
-#define	PCIE_CPL_STS_UR		1
-#define	PCIE_CPL_STS_CRS	2
-#define	PCIE_CPL_STS_CA		4
-
 #if defined(_BIT_FIELDS_LTOH)
 /*
  * PCI Express little-endian common TLP header format

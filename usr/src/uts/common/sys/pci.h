@@ -695,19 +695,8 @@ extern "C" {
 /*
  * PCI-X bridge capability related definitions
  */
-#define	PCI_PCIX_SEC_STATUS		0x2	/* Secondary Status offset */
-#define	PCI_PCIX_SEC_STATUS_SCD		0x4	/* Split Completion Discarded */
-#define	PCI_PCIX_SEC_STATUS_USC		0x8	/* Unexpected Split Complete */
-#define	PCI_PCIX_SEC_STATUS_SCO		0x10	/* Split Completion Overrun */
-#define	PCI_PCIX_SEC_STATUS_SRD		0x20	/* Split Completion Delayed */
-#define	PCI_PCIX_SEC_STATUS_ERR_MASK	0x3C
-
-#define	PCI_PCIX_BDG_STATUS		0x4	/* Bridge Status offset */
-#define	PCI_PCIX_BDG_STATUS_USC		0x80000
-#define	PCI_PCIX_BDG_STATUS_SCO		0x100000
-#define	PCI_PCIX_BDG_STATUS_SRD		0x200000
-#define	PCI_PCIX_BDG_STATUS_ERR_MASK	0x380000
-
+#define	PCI_PCIX_SEC_STATUS	0x2	/* Secondary status register offset */
+#define	PCI_PCIX_BDG_STATUS	0x4	/* Bridge Status register offset */
 #define	PCI_PCIX_UP_SPL_CTL	0x8	/* Upstream split ctrl reg offset */
 #define	PCI_PCIX_DOWN_SPL_CTL	0xC	/* Downstream split ctrl reg offset */
 #define	PCI_PCIX_BDG_ECC_STATUS	0x10	/* ECC Status register offset */
