@@ -55,9 +55,30 @@
 #include <sys/open.h>
 #include <sys/stat.h>
 #include <sys/file.h>
+#include <sys/promif.h>		/* prom_printf */
 #include "pcie_pwr.h"
 #include "px_pci.h"
-#include "px_debug.h"
+
+#if defined(DEBUG)
+#define	DBG pxb_dbg
+static void pxb_dbg(uint_t bit, dev_info_t *dip, char *fmt, ...);
+static uint_t pxb_dbg_print = 0;
+
+#else /* DEBUG */
+
+#define	DBG 0 &&
+
+#endif /* DEBUG */
+
+typedef enum {	/* same sequence as px_debug_sym[] */
+	/*  0 */ DBG_ATTACH,
+	/*  1 */ DBG_PWR
+} pxb_debug_bit_t;
+
+static char *pxb_debug_sym [] = {	/* same sequence as px_debug_bit */
+	/*  0 */ "attach",
+	/*  1 */ "pwr"
+};
 
 /* Tunables. Beware: Some are for debug purpose only. */
 /*
@@ -199,7 +220,7 @@ static struct dev_ops pxb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"PCIe/PCI nexus driver 1.29",
+	"PCIe/PCI nexus driver %I%",
 	&pxb_ops,   /* driver ops */
 };
 
@@ -584,6 +605,10 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	int	totreg;
 	struct detachspec *ds;
 	struct attachspec *as;
+	pxb_devstate_t	*pxb_p;
+
+	pxb_p = (pxb_devstate_t *)ddi_get_soft_state(pxb_state,
+	    ddi_get_instance(dip));
 
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:
@@ -612,6 +637,9 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		break;
 
 	case DDI_CTLOPS_ATTACH:
+		if (!pcie_is_child(dip, rdip))
+			return (DDI_SUCCESS);
+
 		as = (struct attachspec *)arg;
 		switch (as->when) {
 		case DDI_PRE:
@@ -643,6 +671,8 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			if (as->cmd == DDI_ATTACH && as->result != DDI_SUCCESS)
 				pcie_pm_release(dip);
 
+			pf_init(rdip, (void *)pxb_p->pxb_fm_ibc);
+
 			/*
 			 * For hotplug-capable slots, we should explicitly
 			 * disable the errors, so that we won't panic upon
@@ -667,8 +697,15 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		break;
 
 	case DDI_CTLOPS_DETACH:
+		if (!pcie_is_child(dip, rdip))
+			return (DDI_SUCCESS);
+
 		ds = (struct detachspec *)arg;
 		switch (ds->when) {
+		case DDI_PRE:
+			pf_fini(rdip);
+			return (DDI_SUCCESS);
+
 		case DDI_POST:
 			if (ds->cmd == DDI_DETACH &&
 			    ds->result == DDI_SUCCESS) {
@@ -1733,8 +1770,7 @@ static int
 pxb_fm_err_callback(dev_info_t *dip, ddi_fm_error_t *derr,
     const void *impl_data)
 {
-	pci_ereport_post(dip, derr, NULL);
-	return (derr->fme_status);
+	return (DDI_FM_OK);
 }
 
 /*
@@ -2014,3 +2050,26 @@ pxb_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	    cache_flags));
 }
 #endif	/* BCM_SW_WORKAROUNDS */
+
+#ifdef DEBUG
+static void
+pxb_dbg(uint_t bit, dev_info_t *dip, char *fmt, ...)
+{
+	va_list ap;
+
+	if (!(bit & pxb_dbg_print))
+		return;
+
+	if (dip)
+		prom_printf("%s(%d): %s", ddi_driver_name(dip),
+		    ddi_get_instance(dip), pxb_debug_sym[bit]);
+body:
+	va_start(ap, fmt);
+	if (ap)
+		prom_vprintf(fmt, ap);
+	else
+		prom_printf(fmt);
+
+	va_end(ap);
+}
+#endif

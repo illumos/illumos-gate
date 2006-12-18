@@ -36,52 +36,27 @@
 #include <sys/membar.h>
 #include "px_obj.h"
 
-typedef struct px_fabric_cfgspace {
-	/* Error information */
-	msgcode_t	msg_code;
-	pcie_req_id_t	rid;
+#define	PX_PCIE_PANIC_BITS \
+	(PCIE_AER_UCE_DLP | PCIE_AER_UCE_FCP | PCIE_AER_UCE_TO | \
+	PCIE_AER_UCE_RO | PCIE_AER_UCE_MTLP | PCIE_AER_UCE_ECRC | \
+	PCIE_AER_UCE_UR)
+#define	PX_PCIE_NO_PANIC_BITS \
+	(PCIE_AER_UCE_TRAINING | PCIE_AER_UCE_SD | PCIE_AER_UCE_CA | \
+	PCIE_AER_UCE_UC)
 
-	/* Config space header and device type */
-	uint8_t		hdr_type;
-	uint16_t	dev_type;
+static void px_err_fill_pfd(dev_info_t *rpdip, px_err_pcie_t *regs);
+static int px_pcie_ptlp(dev_info_t *dip, ddi_fm_error_t *derr,
+    px_err_pcie_t *regs);
 
-	/* Register pointers */
-	uint16_t	cap_off;
-	uint16_t	aer_off;
+#if defined(DEBUG)
+static void px_pcie_log(dev_info_t *dip, px_err_pcie_t *regs, int severity);
+#else	/* DEBUG */
+#define	px_pcie_log 0 &&
+#endif	/* DEBUG */
 
-	/* PCI register values */
-	uint32_t	sts_reg;
-	uint32_t	sts_sreg;
-
-	/* PCIE register values */
-	uint32_t	dev_sts_reg;
-	uint32_t	aer_ce_reg;
-	uint32_t	aer_ue_reg;
-	uint32_t	aer_sev_reg;
-	uint32_t	aer_ue_sreg;
-	uint32_t	aer_sev_sreg;
-
-	/* PCIE Header Log Registers */
-	uint32_t	aer_h1;
-	uint32_t	aer_h2;
-	uint32_t	aer_h3;
-	uint32_t	aer_h4;
-	uint32_t	aer_sh1;
-	uint32_t	aer_sh2;
-	uint32_t	aer_sh3;
-	uint32_t	aer_sh4;
-} px_fabric_cfgspace_t;
-
-static uint16_t px_fabric_get_aer(px_t *px_p, pcie_req_id_t rid);
-static uint16_t px_fabric_get_pciecap(px_t *px_p, pcie_req_id_t rid);
-static int px_fabric_handle_psts(px_fabric_cfgspace_t *cs);
-static int px_fabric_handle_ssts(px_fabric_cfgspace_t *cs);
-static int px_fabric_handle_paer(px_t *px_p, px_fabric_cfgspace_t *cs);
-static int px_fabric_handle_saer(px_t *px_p, px_fabric_cfgspace_t *cs);
-static int px_fabric_handle(px_t *px_p, px_fabric_cfgspace_t *cs);
-static void px_fabric_fill_cs(px_t *px_p, px_fabric_cfgspace_t *cs);
-static uint_t px_fabric_check(px_t *px_p, msgcode_t msg_code,
-    pcie_req_id_t rid, ddi_fm_error_t *derr);
+/* external functions */
+extern int pci_xcap_locate(ddi_acc_handle_t h, uint16_t id, uint16_t *base_p);
+extern int pci_lcap_locate(ddi_acc_handle_t h, uint8_t id, uint16_t *base_p);
 
 /*
  * Initialize px FMA support
@@ -197,17 +172,6 @@ px_fm_acc_setup(ddi_map_req_t *mp, dev_info_t *rdip)
 }
 
 /*
- * Function used by PCI error handlers to check if captured address is stored
- * in the DMA or ACC handle caches.
- */
-int
-px_handle_lookup(dev_info_t *dip, int type, uint64_t fme_ena, void *afar)
-{
-	int ret = ndi_fmc_error(dip, NULL, type, fme_ena, afar);
-	return (ret == DDI_FM_UNKNOWN ? DDI_FM_FATAL : ret);
-}
-
-/*
  * Function used to initialize FMA for our children nodes. Called
  * through pci busops when child node calls ddi_fm_init.
  */
@@ -262,435 +226,109 @@ px_bus_exit(dev_info_t *dip, ddi_acc_handle_t handle)
 /*
  * PCI error callback which is registered with our parent to call
  * for PCIe logging when the CPU traps due to PCIe Uncorrectable Errors
- * and PCI BERR/TO/UE
- *
- * Dispatch on all known leaves of this fire device because we cannot tell
- * which side the error came from.
+ * and PCI BERR/TO/UE on IO Loads.
  */
 /*ARGSUSED*/
 int
 px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 {
-	px_t	*px_p = (px_t *)impl_data;
-	int	err = PX_OK;
-	int	fatal = 0;
-	int	nonfatal = 0;
-	int	unknown = 0;
-	int	ret = DDI_FM_OK;
+	dev_info_t	*pdip = ddi_get_parent(dip);
+	px_t		*px_p = (px_t *)impl_data;
+	int		i, acc_type = 0;
+	int		lookup, rc_err, fab_err = PF_NO_PANIC;
+	uint32_t	addr, addr_high, addr_low;
+	pcie_req_id_t	bdf;
+	px_ranges_t	*ranges_p;
+	int		range_len;
 
-	mutex_enter(&px_p->px_fm_mutex);
-
-	err = px_err_handle(px_p, derr, PX_TRAP_CALL, B_TRUE);
-
-	if (!px_lib_is_in_drain_state(px_p))
-		ret = ndi_fm_handler_dispatch(px_p->px_dip, NULL, derr);
-
-	mutex_exit(&px_p->px_fm_mutex);
-
-	switch (ret) {
-	case DDI_FM_FATAL:
-		fatal++;
-		break;
-	case DDI_FM_NONFATAL:
-		nonfatal++;
-		break;
-	case DDI_FM_UNKNOWN:
-		unknown++;
-		break;
-	default:
-		break;
+	/*
+	 * Deadlock scenario:
+	 * 1. A fabric or mondo 62 interrupt with respect to px0 - T1/cpu0;
+	 * 2. While error handling thread T1 is running on cpu0, a trap
+	 *    occurs to cpu1 - T2/cpu1;
+	 * 3. While doing error handling on T1, a precise trap occurs,
+	 *    overtaken T1 - T1+/cpu0;
+	 *
+	 * Why threads deadlock:
+	 *   T1 owns px_fm_mutex, T2 owns rootnex' fh_lock, but blocked on
+	 *   px_fm_mutex, T1+ blocked on rootnex' fh_lock which won't be
+	 *   released since T2 will never get px_fm_mutex since T1+ buried
+	 *   thread T1 who is responsible for releasing px_fm_mutex.
+	 *
+	 * Solution:
+	 *   px_fm_callback must release rootnex' fh_lock prior to acquire
+	 *   px_fm_mutex and reaquire the fh_lock after release px_fm_mutex;
+	 *   if px_fm_callback is unable to acquire px_fm_mutex, meaning the
+	 *   latest trap has either overtaken the error handling thread or an
+	 *   error handling thread on another cpu owns it, just quit with OK
+	 *   status. Note, in this case, the cpu sync error handler should
+	 *   respect nexus'return status and not to panic, otherwise system
+	 *   will hang.
+	 */
+	i_ddi_fm_handler_exit(pdip);
+	if (!mutex_tryenter(&px_p->px_fm_mutex)) {
+		i_ddi_fm_handler_enter(pdip);
+		return (DDI_FM_OK);
 	}
 
-	ret = (fatal != 0) ? DDI_FM_FATAL :
-	    ((nonfatal != 0) ? DDI_FM_NONFATAL :
-	    (((unknown != 0) ? DDI_FM_UNKNOWN : DDI_FM_OK)));
+	addr_high = (uint32_t)((uint64_t)derr->fme_bus_specific >> 32);
+	addr_low = (uint32_t)((uint64_t)derr->fme_bus_specific);
 
-	/* fire fatal error overrides device error */
-	if (err & (PX_FATAL_GOS | PX_FATAL_SW))
-		ret = DDI_FM_FATAL;
-	/* if fire encounts no error, then take whatever device error */
-	else if ((err != PX_OK) && (ret != DDI_FM_FATAL))
-		ret = DDI_FM_NONFATAL;
-
-	return (ret);
-}
-
-static uint16_t
-px_fabric_get_aer(px_t *px_p, pcie_req_id_t rid)
-{
-	uint32_t	hdr, hdr_next_ptr, hdr_cap_id;
-	uint16_t	offset = PCIE_EXT_CAP;
-	int		deadcount = 0;
-
-	/* Find the Advanced Error Register */
-	hdr = px_fab_get(px_p, rid, offset);
-	hdr_next_ptr = (hdr >> PCIE_EXT_CAP_NEXT_PTR_SHIFT) &
-	    PCIE_EXT_CAP_NEXT_PTR_MASK;
-	hdr_cap_id = (hdr >> PCIE_EXT_CAP_ID_SHIFT) &
-	    PCIE_EXT_CAP_ID_MASK;
-
-	while ((hdr_next_ptr != PCIE_EXT_CAP_NEXT_PTR_NULL) &&
-	    (hdr_cap_id != PCIE_EXT_CAP_ID_AER)) {
-		offset = hdr_next_ptr;
-		hdr = px_fab_get(px_p, rid, offset);
-		hdr_next_ptr = (hdr >> PCIE_EXT_CAP_NEXT_PTR_SHIFT) &
-		    PCIE_EXT_CAP_NEXT_PTR_MASK;
-		hdr_cap_id = (hdr >> PCIE_EXT_CAP_ID_SHIFT) &
-		    PCIE_EXT_CAP_ID_MASK;
-
-		if (deadcount++ > 100)
-			break;
-	}
-
-	if (hdr_cap_id == PCIE_EXT_CAP_ID_AER)
-		return (offset);
-
-	return (0);
-}
-
-static uint16_t
-px_fabric_get_pciecap(px_t *px_p, pcie_req_id_t rid)
-{
-	uint32_t	hdr, hdr_next_ptr, hdr_cap_id;
-	uint16_t	offset = PCI_CONF_STAT;
-	int		deadcount = 0;
-
-	hdr = px_fab_get(px_p, rid, PCI_CONF_COMM) >> 16;
-	if (!(hdr & PCI_STAT_CAP)) {
-		/* This is not a PCIE device */
-		return (0);
-	}
-
-	hdr = px_fab_get(px_p, rid, PCI_CONF_CAP_PTR);
-	hdr_next_ptr = hdr & 0xFF;
-	hdr_cap_id = 0;
-
-	while ((hdr_next_ptr != PCI_CAP_NEXT_PTR_NULL) &&
-	    (hdr_cap_id != PCI_CAP_ID_PCI_E)) {
-		offset = hdr_next_ptr;
-
-		if (hdr_next_ptr < 0x40) {
+	/*
+	 * Make sure this failed load came from this PCIe port.  Check by
+	 * matching the upper 32 bits of the address with the ranges property.
+	 */
+	range_len = px_p->px_ranges_length / sizeof (px_ranges_t);
+	i = 0;
+	for (ranges_p = px_p->px_ranges_p; i < range_len; i++, ranges_p++) {
+		if (ranges_p->parent_high == addr_high) {
+			switch (ranges_p->child_high & PCI_ADDR_MASK) {
+			case PCI_ADDR_CONFIG:
+				acc_type = PF_CFG_ADDR;
+				addr = NULL;
+				bdf = (pcie_req_id_t)(addr_low >> 12);
+				break;
+			case PCI_ADDR_MEM32:
+				acc_type = PF_DMA_ADDR;
+				addr = addr_low;
+				bdf = NULL;
+				break;
+			}
 			break;
 		}
-
-		hdr = px_fab_get(px_p, rid, hdr_next_ptr);
-		hdr_next_ptr = (hdr >> 8) & 0xFF;
-		hdr_cap_id = hdr & 0xFF;
-
-		if (deadcount++ > 100)
-			break;
 	}
 
-	if (hdr_cap_id == PCI_CAP_ID_PCI_E)
-		return (offset);
+	/* This address doesn't belong to this leaf, just return with OK */
+	if (!acc_type) {
+		mutex_exit(&px_p->px_fm_mutex);
+		i_ddi_fm_handler_enter(pdip);
+		return (DDI_FM_OK);
+	}
 
-	return (0);
-}
+	rc_err = px_err_cmn_intr(px_p, derr, PX_TRAP_CALL, PX_FM_BLOCK_ALL);
+	lookup = pf_hdl_lookup(dip, derr->fme_ena, acc_type, addr, bdf);
 
-/*
- * This function checks the primary status registers.
- * Take the PCI status register and translate it to PCIe equivalent.
- */
-static int
-px_fabric_handle_psts(px_fabric_cfgspace_t *cs) {
-	uint16_t	sts_reg = cs->sts_reg >> 16;
-	uint16_t	pci_status;
-	uint32_t	pcie_status;
-	int		ret = PX_NONFATAL;
-
-	/* Parity Err == Send/Recv Poisoned TLP */
-	pci_status = PCI_STAT_S_PERROR | PCI_STAT_PERROR;
-	pcie_status = PCIE_AER_UCE_PTLP | PCIE_AER_UCE_ECRC;
-	if (sts_reg & pci_status)
-		ret |= PX_FABRIC_ERR_SEV(pcie_status,
-		    px_fabric_die_ue, px_fabric_die_ue_gos);
-
-	/* Target Abort == Completer Abort */
-	pci_status = PCI_STAT_S_TARG_AB | PCI_STAT_R_TARG_AB;
-	pcie_status = PCIE_AER_UCE_CA;
-	if (sts_reg & pci_status)
-		ret |= PX_FABRIC_ERR_SEV(pcie_status,
-		    px_fabric_die_ue, px_fabric_die_ue_gos);
-
-	/* Master Abort == Unsupport Request */
-	pci_status = PCI_STAT_R_MAST_AB;
-	pcie_status = PCIE_AER_UCE_UR;
-	if (sts_reg & pci_status)
-		ret |= PX_FABRIC_ERR_SEV(pcie_status,
-		    px_fabric_die_ue, px_fabric_die_ue_gos);
-
-	/* System Error == Uncorrectable Error */
-	pci_status = PCI_STAT_S_SYSERR;
-	pcie_status = (uint32_t)-1;
-	if (sts_reg & pci_status)
-		ret |= PX_FABRIC_ERR_SEV(pcie_status,
-		    px_fabric_die_ue, px_fabric_die_ue_gos);
-
-	return (ret);
-}
-
-/*
- * This function checks the secondary status registers.
- * Switches and Bridges have a different behavior.
- */
-static int
-px_fabric_handle_ssts(px_fabric_cfgspace_t *cs) {
-	uint16_t	sts_reg = cs->sts_sreg >> 16;
-	int		ret = PX_NONFATAL;
-
-	if (cs->dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) {
+	if (!px_lib_is_in_drain_state(px_p)) {
 		/*
-		 * This is a PCIE-PCI bridge, but only check the severity
-		 * if this device doesn't support AERs.
+		 * This is to ensure that device corresponding to the addr of
+		 * the failed PIO/CFG load gets scanned.
 		 */
-		if (!cs->aer_off)
-			ret |= PX_FABRIC_ERR_SEV(sts_reg, px_fabric_die_bdg_sts,
-			    px_fabric_die_bdg_sts_gos);
-	} else {
-		/* This is most likely a PCIE switch */
-		ret |= PX_FABRIC_ERR_SEV(sts_reg, px_fabric_die_sw_sts,
-		    px_fabric_die_sw_sts_gos);
+		px_rp_en_q(px_p, bdf, addr,
+		    (PCI_STAT_R_MAST_AB | PCI_STAT_R_TARG_AB));
+		fab_err = pf_scan_fabric(dip, derr, px_p->px_dq_p,
+		    &px_p->px_dq_tail);
 	}
 
-	return (ret);
-}
+	mutex_exit(&px_p->px_fm_mutex);
+	i_ddi_fm_handler_enter(pdip);
 
-/*
- * This function checks and clears the primary AER.
- */
-static int
-px_fabric_handle_paer(px_t *px_p, px_fabric_cfgspace_t *cs) {
-	uint32_t	chk_reg, chk_reg_gos, off_reg, reg;
-	int		ret = PX_NONFATAL;
-
-	/* Determine severity and clear the AER */
-	switch (cs->msg_code) {
-	case PCIE_MSG_CODE_ERR_COR:
-		off_reg = PCIE_AER_CE_STS;
-		chk_reg = px_fabric_die_ce;
-		chk_reg_gos = px_fabric_die_ce_gos;
-		reg = cs->aer_ce_reg;
-		break;
-	case PCIE_MSG_CODE_ERR_NONFATAL:
-		off_reg = PCIE_AER_UCE_STS;
-		chk_reg = px_fabric_die_ue;
-		chk_reg_gos = px_fabric_die_ue_gos;
-		reg = cs->aer_ue_reg & ~(cs->aer_sev_reg);
-		break;
-	case PCIE_MSG_CODE_ERR_FATAL:
-		off_reg = PCIE_AER_UCE_STS;
-		chk_reg = px_fabric_die_ue;
-		chk_reg_gos = px_fabric_die_ue_gos;
-		reg = cs->aer_ue_reg & cs->aer_sev_reg;
-		break;
-	default:
-		/* Major error force a panic */
-		return (PX_FATAL_GOS);
-	}
-	px_fab_set(px_p, cs->rid, cs->aer_off + off_reg, reg);
-	ret |= PX_FABRIC_ERR_SEV(reg, chk_reg, chk_reg_gos);
-
-	return (ret);
-}
-
-/*
- * This function checks and clears the secondary AER.
- */
-static int
-px_fabric_handle_saer(px_t *px_p, px_fabric_cfgspace_t *cs) {
-	uint32_t	chk_reg, chk_reg_gos, off_reg, reg;
-	uint32_t	sev;
-	int		ret = PX_NONFATAL;
-
-	/* Determine severity and clear the AER */
-	switch (cs->msg_code) {
-	case PCIE_MSG_CODE_ERR_COR:
-		/* Ignore Correctable Errors */
-		sev = 0;
-		break;
-	case PCIE_MSG_CODE_ERR_NONFATAL:
-		sev = ~(cs->aer_sev_sreg);
-		break;
-	case PCIE_MSG_CODE_ERR_FATAL:
-		sev = cs->aer_sev_sreg;
-		break;
-	default:
-		/* Major error force a panic */
+	if ((rc_err & (PX_PANIC | PX_PROTECTED)) || (fab_err & PF_PANIC) ||
+	    (lookup == PF_HDL_NOTFOUND))
 		return (DDI_FM_FATAL);
-	}
-	off_reg = PCIE_AER_SUCE_STS;
-	chk_reg = px_fabric_die_sue;
-	chk_reg_gos = px_fabric_die_sue_gos;
-	reg = cs->aer_ue_sreg & sev;
-	px_fab_set(px_p, cs->rid, cs->aer_off + off_reg, reg);
-	ret |= PX_FABRIC_ERR_SEV(reg, chk_reg, chk_reg_gos);
+	else if ((rc_err == PX_NO_ERROR) && (fab_err == PF_NO_ERROR))
+		return (DDI_FM_OK);
 
-	return (ret);
-}
-
-static int
-px_fabric_handle(px_t *px_p, px_fabric_cfgspace_t *cs)
-{
-	pcie_req_id_t	rid = cs->rid;
-	uint16_t	cap_off = cs->cap_off;
-	uint16_t	aer_off = cs->aer_off;
-	uint8_t		hdr_type = cs->hdr_type;
-	uint16_t	dev_type = cs->dev_type;
-	int		ret = PX_NONFATAL;
-
-	if (hdr_type == PCI_HEADER_PPB) {
-		ret |= px_fabric_handle_ssts(cs);
-	}
-
-	if (!aer_off) {
-		ret |= px_fabric_handle_psts(cs);
-	}
-
-	if (aer_off) {
-		ret |= px_fabric_handle_paer(px_p, cs);
-	}
-
-	if (aer_off && (dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI)) {
-		ret |= px_fabric_handle_saer(px_p, cs);
-	}
-
-	/* Clear the standard PCIe error registers */
-	px_fab_set(px_p, rid, cap_off + PCIE_DEVCTL, cs->dev_sts_reg);
-
-	/* Clear the legacy error registers */
-	px_fab_set(px_p, rid, PCI_CONF_COMM, cs->sts_reg);
-
-	/* Clear the legacy secondary error registers */
-	if (hdr_type == PCI_HEADER_PPB) {
-		px_fab_set(px_p, rid, PCI_BCNF_IO_BASE_LOW,
-		    cs->sts_sreg);
-	}
-
-	return (ret);
-}
-
-static void
-px_fabric_fill_cs(px_t *px_p, px_fabric_cfgspace_t *cs)
-{
-	uint16_t	cap_off, aer_off;
-	pcie_req_id_t	rid = cs->rid;
-
-	/* Gather Basic Device Information */
-	cs->hdr_type = (px_fab_get(px_p, rid, PCI_CONF_CACHE_LINESZ) >> 16) &
-	    PCI_HEADER_TYPE_M;
-
-	cs->cap_off = px_fabric_get_pciecap(px_p, rid);
-	cap_off = cs->cap_off;
-	if (!cap_off)
-		return;
-
-	cs->aer_off = px_fabric_get_aer(px_p, rid);
-	aer_off = cs->aer_off;
-
-	cs->dev_type = px_fab_get(px_p, rid, cap_off) >> 16;
-	cs->dev_type &= PCIE_PCIECAP_DEV_TYPE_MASK;
-
-	/* Get the Primary Sts Reg */
-	cs->sts_reg = px_fab_get(px_p, rid, PCI_CONF_COMM);
-
-	/* If it is a bridge/switch get the Secondary Sts Reg */
-	if (cs->hdr_type == PCI_HEADER_PPB)
-		cs->sts_sreg = px_fab_get(px_p, rid,
-		    PCI_BCNF_IO_BASE_LOW);
-
-	/* Get the PCIe Dev Sts Reg */
-	cs->dev_sts_reg = px_fab_get(px_p, rid,
-	    cap_off + PCIE_DEVCTL);
-
-	if (!aer_off)
-		return;
-
-	/* Get the AER register information */
-	cs->aer_ce_reg = px_fab_get(px_p, rid, aer_off + PCIE_AER_CE_STS);
-	cs->aer_ue_reg = px_fab_get(px_p, rid, aer_off + PCIE_AER_UCE_STS);
-	cs->aer_sev_reg = px_fab_get(px_p, rid, aer_off + PCIE_AER_UCE_SERV);
-	cs->aer_h1 = px_fab_get(px_p, rid, aer_off + PCIE_AER_HDR_LOG + 0x0);
-	cs->aer_h2 = px_fab_get(px_p, rid, aer_off + PCIE_AER_HDR_LOG + 0x4);
-	cs->aer_h3 = px_fab_get(px_p, rid, aer_off + PCIE_AER_HDR_LOG + 0x8);
-	cs->aer_h4 = px_fab_get(px_p, rid, aer_off + PCIE_AER_HDR_LOG + 0xC);
-
-	if (cs->dev_type != PCIE_PCIECAP_DEV_TYPE_PCIE2PCI)
-		return;
-
-	/* If this is a bridge check secondary aer */
-	cs->aer_ue_sreg = px_fab_get(px_p, rid, aer_off + PCIE_AER_SUCE_STS);
-	cs->aer_sev_sreg = px_fab_get(px_p, rid, aer_off + PCIE_AER_SUCE_SERV);
-	cs->aer_sh1 = px_fab_get(px_p, rid, aer_off + PCIE_AER_SHDR_LOG + 0x0);
-	cs->aer_sh2 = px_fab_get(px_p, rid, aer_off + PCIE_AER_SHDR_LOG + 0x4);
-	cs->aer_sh3 = px_fab_get(px_p, rid, aer_off + PCIE_AER_SHDR_LOG + 0x8);
-	cs->aer_sh4 = px_fab_get(px_p, rid, aer_off + PCIE_AER_SHDR_LOG + 0xC);
-}
-
-/*
- * If a fabric intr occurs, query and clear the error registers on that device.
- * Based on the error found return DDI_FM_OK or DDI_FM_FATAL.
- */
-static uint_t
-px_fabric_check(px_t *px_p, msgcode_t msg_code,
-    pcie_req_id_t rid, ddi_fm_error_t *derr)
-{
-	dev_info_t	*dip = px_p->px_dip;
-	char		buf[FM_MAX_CLASS];
-	px_fabric_cfgspace_t cs;
-	int		ret;
-
-	/* clear cs */
-	bzero(&cs, sizeof (px_fabric_cfgspace_t));
-
-	cs.msg_code = msg_code;
-	cs.rid = rid;
-
-	px_fabric_fill_cs(px_p, &cs);
-	if (cs.cap_off)
-		ret = px_fabric_handle(px_p, &cs);
-	else
-		ret = PX_FATAL_GOS;
-
-	(void) snprintf(buf, FM_MAX_CLASS, "%s", PX_FM_FABRIC_CLASS);
-	ddi_fm_ereport_post(dip, buf, derr->fme_ena,
-	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    PX_FM_FABRIC_MSG_CODE, DATA_TYPE_UINT8, msg_code,
-	    PX_FM_FABRIC_REQ_ID, DATA_TYPE_UINT16, rid,
-	    "cap_off", DATA_TYPE_UINT16, cs.cap_off,
-	    "aer_off", DATA_TYPE_UINT16, cs.aer_off,
-	    "sts_reg", DATA_TYPE_UINT16, cs.sts_reg >> 16,
-	    "sts_sreg", DATA_TYPE_UINT16, cs.sts_sreg >> 16,
-	    "dev_sts_reg", DATA_TYPE_UINT16, cs.dev_sts_reg >> 16,
-	    "aer_ce", DATA_TYPE_UINT32, cs.aer_ce_reg,
-	    "aer_ue", DATA_TYPE_UINT32, cs.aer_ue_reg,
-	    "aer_sev", DATA_TYPE_UINT32, cs.aer_sev_reg,
-	    "aer_h1", DATA_TYPE_UINT32, cs.aer_h1,
-	    "aer_h2", DATA_TYPE_UINT32, cs.aer_h2,
-	    "aer_h3", DATA_TYPE_UINT32, cs.aer_h3,
-	    "aer_h4", DATA_TYPE_UINT32, cs.aer_h4,
-	    "saer_ue", DATA_TYPE_UINT32, cs.aer_ue_sreg,
-	    "saer_sev", DATA_TYPE_UINT32, cs.aer_sev_sreg,
-	    "saer_h1", DATA_TYPE_UINT32, cs.aer_sh1,
-	    "saer_h2", DATA_TYPE_UINT32, cs.aer_sh2,
-	    "saer_h3", DATA_TYPE_UINT32, cs.aer_sh3,
-	    "saer_h4", DATA_TYPE_UINT32, cs.aer_sh4,
-	    "severity", DATA_TYPE_UINT32, ret,
-	    NULL);
-
-	/* Check for protected access */
-	switch (derr->fme_flag) {
-	case DDI_FM_ERR_EXPECTED:
-	case DDI_FM_ERR_PEEK:
-	case DDI_FM_ERR_POKE:
-		ret &= PX_FATAL_GOS;
-		break;
-	}
-
-
-	if (px_fabric_die &&
-	    (ret & (PX_FATAL_GOS | PX_FATAL_SW)))
-			ret = DDI_FM_FATAL;
-	return (ret);
+	return (DDI_FM_NONFATAL);
 }
 
 /*
@@ -698,7 +336,7 @@ px_fabric_check(px_t *px_p, msgcode_t msg_code,
  * Interrupt handler for PCIE fabric block.
  * o lock
  * o create derr
- * o px_err_handle(leaf, with jbc)
+ * o px_err_cmn_intr(leaf, with jbc)
  * o send ereport(fire fmri, derr, payload = BDF)
  * o dispatch (leaf)
  * o unlock
@@ -706,11 +344,10 @@ px_fabric_check(px_t *px_p, msgcode_t msg_code,
  */
 /* ARGSUSED */
 uint_t
-px_err_fabric_intr(px_t *px_p, msgcode_t msg_code,
-    pcie_req_id_t rid)
+px_err_fabric_intr(px_t *px_p, msgcode_t msg_code, pcie_req_id_t rid)
 {
 	dev_info_t	*rpdip = px_p->px_dip;
-	int		err = PX_OK, ret = DDI_FM_OK, fab_err = DDI_FM_OK;
+	int		rc_err, fab_err = PF_NO_PANIC;
 	ddi_fm_error_t	derr;
 
 	mutex_enter(&px_p->px_fm_mutex);
@@ -721,26 +358,20 @@ px_err_fabric_intr(px_t *px_p, msgcode_t msg_code,
 	derr.fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
 	derr.fme_flag = DDI_FM_ERR_UNEXPECTED;
 
-	/* send ereport/handle/clear fire registers */
-	err |= px_err_handle(px_p, &derr, PX_INTR_CALL, B_TRUE);
+	/* Ensure that the rid of the fabric message will get scanned. */
+	px_rp_en_q(px_p, rid, NULL, NULL);
 
-	/* Check and clear the fabric error */
-	fab_err = px_fabric_check(px_p, msg_code, rid, &derr);
+	rc_err = px_err_cmn_intr(px_p, &derr, PX_INTR_CALL, PX_FM_BLOCK_PCIE);
 
-	/* Check all child devices for errors */
-	ret = ndi_fm_handler_dispatch(rpdip, NULL, &derr);
+	/* call rootport dispatch */
+	if (!px_lib_is_in_drain_state(px_p)) {
+		fab_err = pf_scan_fabric(rpdip, &derr, px_p->px_dq_p,
+		    &px_p->px_dq_tail);
+	}
 
 	mutex_exit(&px_p->px_fm_mutex);
 
-	/*
-	 * PX_FATAL_HW indicates a condition recovered from Fatal-Reset,
-	 * therefore it does not cause panic.
-	 */
-	if ((err & (PX_FATAL_GOS | PX_FATAL_SW)) ||
-	    (ret == DDI_FM_FATAL) || (fab_err == DDI_FM_FATAL))
-		PX_FM_PANIC("%s#%d: Fatal PCIe Fabric Error has occurred"
-				"(%x,%x,%x)\n", ddi_driver_name(rpdip),
-				ddi_get_instance(rpdip), err, fab_err, ret);
+	px_err_panic(rc_err, PX_RC, fab_err);
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -806,4 +437,256 @@ px_err_safeacc_check(px_t *px_p, ddi_fm_error_t *derr)
 		derr->fme_flag = acctype;
 		break;
 	}
+}
+
+/*
+ * Suggest panic if any EQ (except CE q) has overflown.
+ */
+int
+px_err_check_eq(dev_info_t *dip)
+{
+	px_t			*px_p = DIP_TO_STATE(dip);
+	px_msiq_state_t 	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
+	px_pec_t		*pec_p = px_p->px_pec_p;
+	msiqid_t		eq_no = msiq_state_p->msiq_1st_msiq_id;
+	pci_msiq_state_t	msiq_state;
+	int			i;
+
+	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
+		if (i + eq_no == pec_p->pec_corr_msg_msiq_id) /* skip CE q */
+			continue;
+		if ((px_lib_msiq_getstate(dip, i + eq_no, &msiq_state) !=
+			DDI_SUCCESS) || msiq_state == PCI_MSIQ_STATE_ERROR)
+			return (PX_PANIC);
+	}
+	return (PX_NO_PANIC);
+}
+
+static void
+px_err_fill_pfd(dev_info_t *rpdip, px_err_pcie_t *regs)
+{
+	px_t		*px_p = DIP_TO_STATE(rpdip);
+	pf_data_t	pf_data = {0};
+	pcie_req_id_t	fault_bdf = 0;
+	uint32_t	fault_addr = 0;
+	uint16_t	s_status = 0;
+
+	/*
+	 * set RC s_status in PCI term to coordinate with downstream fabric
+	 * errors ananlysis.
+	 */
+	if (regs->primary_ue & PCIE_AER_UCE_UR)
+		s_status = PCI_STAT_R_MAST_AB;
+	if (regs->primary_ue & PCIE_AER_UCE_CA)
+		s_status = PCI_STAT_R_TARG_AB;
+	if (regs->primary_ue & (PCIE_AER_UCE_PTLP | PCIE_AER_UCE_ECRC))
+		s_status = PCI_STAT_PERROR;
+
+	if (regs->primary_ue & (PCIE_AER_UCE_UR | PCIE_AER_UCE_CA)) {
+		pf_data.aer_h0 = regs->rx_hdr1;
+		pf_data.aer_h1 = regs->rx_hdr2;
+		pf_data.aer_h2 = regs->rx_hdr3;
+		pf_data.aer_h3 = regs->rx_hdr4;
+
+		pf_tlp_decode(rpdip, &pf_data, &fault_bdf, NULL, NULL);
+	} else if (regs->primary_ue & PCIE_AER_UCE_PTLP) {
+		pcie_tlp_hdr_t	*tlp_p;
+
+		pf_data.aer_h0 = regs->rx_hdr1;
+		pf_data.aer_h1 = regs->rx_hdr2;
+		pf_data.aer_h2 = regs->rx_hdr3;
+		pf_data.aer_h3 = regs->rx_hdr4;
+
+		tlp_p = (pcie_tlp_hdr_t *)&pf_data.aer_h0;
+		if (tlp_p->type == PCIE_TLP_TYPE_CPL)
+			pf_tlp_decode(rpdip, &pf_data, &fault_bdf, NULL, NULL);
+
+		pf_data.aer_h0 = regs->tx_hdr1;
+		pf_data.aer_h1 = regs->tx_hdr2;
+		pf_data.aer_h2 = regs->tx_hdr3;
+		pf_data.aer_h3 = regs->tx_hdr4;
+
+		pf_tlp_decode(rpdip, &pf_data, NULL, &fault_addr, NULL);
+	}
+
+	px_rp_en_q(px_p, fault_bdf, fault_addr, s_status);
+}
+
+int
+px_err_check_pcie(dev_info_t *dip, ddi_fm_error_t *derr, px_err_pcie_t *regs)
+{
+	uint32_t ce_reg, ue_reg;
+	int err = PX_NO_ERROR;
+
+	ce_reg = regs->ce_reg;
+	if (ce_reg)
+		err |= (ce_reg & px_fabric_die_rc_ce) ? PX_PANIC : PX_NO_ERROR;
+
+	ue_reg = regs->ue_reg;
+	if (!ue_reg)
+		goto done;
+
+	if (ue_reg & PCIE_AER_UCE_PTLP)
+		err |= px_pcie_ptlp(dip, derr, regs);
+
+	if (ue_reg & PX_PCIE_PANIC_BITS)
+		err |= PX_PANIC;
+
+	if (ue_reg & PX_PCIE_NO_PANIC_BITS)
+		err |= PX_NO_PANIC;
+
+	/* Scan the fabric to clean up error bits, for the following errors. */
+	if (ue_reg & (PCIE_AER_UCE_PTLP | PCIE_AER_UCE_CA | PCIE_AER_UCE_UR))
+		px_err_fill_pfd(dip, regs);
+done:
+	px_pcie_log(dip, regs, err);
+	return (err);
+}
+
+#if defined(DEBUG)
+static void
+px_pcie_log(dev_info_t *dip, px_err_pcie_t *regs, int severity)
+{
+	DBG(DBG_ERR_INTR, dip,
+	    "A PCIe RC error has occured with a severity of \"%s\"\n"
+	    "\tCE: 0x%x UE: 0x%x Primary UE: 0x%x\n"
+	    "\tTX Hdr: 0x%x 0x%x 0x%x 0x%x\n\tRX Hdr: 0x%x 0x%x 0x%x 0x%x\n",
+	    (severity & PX_PANIC) ? "PANIC" : "NO PANIC", regs->ce_reg,
+	    regs->ue_reg, regs->primary_ue, regs->tx_hdr1, regs->tx_hdr2,
+	    regs->tx_hdr3, regs->tx_hdr4, regs->rx_hdr1, regs->rx_hdr2,
+	    regs->rx_hdr3, regs->rx_hdr4);
+}
+#endif	/* DEBUG */
+
+/*
+ * look through poisoned TLP cases and suggest panic/no panic depend on
+ * handle lookup.
+ */
+static int
+px_pcie_ptlp(dev_info_t *dip, ddi_fm_error_t *derr, px_err_pcie_t *regs)
+{
+	pf_data_t	pf_data;
+	pcie_req_id_t	bdf;
+	uint32_t	addr, trans_type;
+	int		tlp_sts, tlp_cmd;
+	int		sts = PF_HDL_NOTFOUND;
+
+	if (regs->primary_ue != PCIE_AER_UCE_PTLP)
+		return (PX_PANIC);
+
+	if (!regs->rx_hdr1)
+		goto done;
+
+	pf_data.aer_h0 = regs->rx_hdr1;
+	pf_data.aer_h1 = regs->rx_hdr2;
+	pf_data.aer_h2 = regs->rx_hdr3;
+	pf_data.aer_h3 = regs->rx_hdr4;
+
+	tlp_sts = pf_tlp_decode(dip, &pf_data, &bdf, &addr, &trans_type);
+	tlp_cmd = ((pcie_tlp_hdr_t *)(&pf_data.aer_h0))->type;
+
+	if (tlp_sts == DDI_FAILURE)
+		goto done;
+
+	switch (tlp_cmd) {
+	case PCIE_TLP_TYPE_CPL:
+	case PCIE_TLP_TYPE_CPLLK:
+		/*
+		 * Usually a PTLP is a CPL with data.  Grab the completer BDF
+		 * from the RX TLP, and the original address from the TX TLP.
+		 */
+		if (regs->tx_hdr1) {
+			pf_data.aer_h0 = regs->tx_hdr1;
+			pf_data.aer_h1 = regs->tx_hdr2;
+			pf_data.aer_h2 = regs->tx_hdr3;
+			pf_data.aer_h3 = regs->tx_hdr4;
+
+			sts = pf_tlp_decode(dip, &pf_data, NULL, &addr,
+			    &trans_type);
+		} /* FALLTHRU */
+	case PCIE_TLP_TYPE_IO:
+	case PCIE_TLP_TYPE_MEM:
+	case PCIE_TLP_TYPE_MEMLK:
+		sts = pf_hdl_lookup(dip, derr->fme_ena, trans_type, addr, bdf);
+		break;
+	default:
+		sts = PF_HDL_NOTFOUND;
+	}
+done:
+	return (sts == PF_HDL_NOTFOUND ? PX_PANIC : PX_NO_PANIC);
+}
+
+/*
+ * This function appends a pf_data structure to the error q which is used later
+ * during PCIe fabric scan.  It signifies:
+ * o errs rcvd in RC, that may have been propagated to/from the fabric
+ * o the fabric scan code should scan the device path of fault bdf/addr
+ *
+ * fault_bdf: The bdf that caused the fault, which may have error bits set.
+ * fault_addr: The PIO addr that caused the fault, such as failed PIO, but not
+ *	       failed DMAs.
+ * s_status: Secondary Status equivalent to why the fault occured.
+ *	     (ie S-TA/MA, R-TA)
+ * Either the fault bdf or addr may be NULL, but not both.
+ */
+int px_foo = 0;
+void
+px_rp_en_q(px_t *px_p, pcie_req_id_t fault_bdf, uint32_t fault_addr,
+    uint16_t s_status)
+{
+	pf_data_t pf_data = {0};
+
+	if (!fault_bdf && !fault_addr)
+		return;
+
+	pf_data.dev_type = PCIE_PCIECAP_DEV_TYPE_ROOT;
+	if (px_foo) {
+		pf_data.fault_bdf = px_foo;
+		px_foo = 0;
+	} else
+		pf_data.fault_bdf = fault_bdf;
+
+	pf_data.fault_addr = fault_addr;
+	pf_data.s_status = s_status;
+	pf_data.send_erpt = PF_SEND_ERPT_NO;
+
+	(void) pf_en_dq(&pf_data, px_p->px_dq_p, &px_p->px_dq_tail, -1);
+}
+
+/*
+ * Panic if the err tunable is set and that we are not already in the middle
+ * of panic'ing.
+ */
+#define	MSZ (sizeof (fm_msg) -strlen(fm_msg) - 1)
+void
+px_err_panic(int err, int msg, int fab_err)
+{
+	char fm_msg[96] = "";
+	int ferr = PX_NO_ERROR;
+
+	if (panicstr)
+		return;
+
+	if (!(err & px_die))
+		goto fabric;
+	if (msg & PX_RC)
+		(void) strncat(fm_msg, px_panic_rc_msg, MSZ);
+	if (msg & PX_RP)
+		(void) strncat(fm_msg, px_panic_rp_msg, MSZ);
+	if (msg & PX_HB)
+		(void) strncat(fm_msg, px_panic_hb_msg, MSZ);
+
+fabric:
+	if (fab_err & PF_PANIC)
+		ferr = PX_PANIC;
+	if (fab_err & ~(PF_PANIC | PF_NO_ERROR))
+		ferr = PX_NO_PANIC;
+	if (ferr & px_die) {
+		if (strlen(fm_msg))
+			(void) strncat(fm_msg, " and", MSZ);
+		(void) strncat(fm_msg, px_panic_fab_msg, MSZ);
+	}
+
+	if (strlen(fm_msg))
+		fm_panic("Fatal error has occured in:%s.", fm_msg);
 }

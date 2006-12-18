@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-#
 # uts/sparc/pci_pci/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -80,6 +79,11 @@ CFLAGS += -dalign
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
+
+#
+#	Dependency
+#
+LDFLAGS += -dy -Nmisc/pcie
 
 #
 #	Default build targets.

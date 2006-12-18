@@ -207,7 +207,7 @@ pxtool_safe_phys_poke(px_t *px_p, boolean_t type, size_t size, uint64_t paddr,
 	} else
 		err = DDI_FAILURE;
 
-	px_lib_clr_errs(px_p);
+	px_lib_clr_errs(px_p, 0, paddr);
 
 	if (otd.ot_trap & OT_DATA_ACCESS)
 		err = DDI_FAILURE;

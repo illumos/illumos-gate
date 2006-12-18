@@ -32,8 +32,6 @@
 extern "C" {
 #endif
 
-#include "px_ioapi.h"	/* for msiq */
-
 /* index of counters for each level */
 #define	PCIE_D3_INDEX		PM_LEVEL_D3
 #define	PCIE_D2_INDEX 		PM_LEVEL_D2
