@@ -2216,18 +2216,35 @@ top:
 	return (err);
 }
 
-/*
- * Search back through the directory tree, using the ".." entries.
- * Lock each directory in the chain to prevent concurrent renames.
- * Fail any attempt to move a directory into one of its own descendants.
- * XXX - z_parent_lock can overlap with map or grow locks
- */
 typedef struct zfs_zlock {
 	krwlock_t	*zl_rwlock;	/* lock we acquired */
 	znode_t		*zl_znode;	/* znode we held */
 	struct zfs_zlock *zl_next;	/* next in list */
 } zfs_zlock_t;
 
+/*
+ * Drop locks and release vnodes that were held by zfs_rename_lock().
+ */
+static void
+zfs_rename_unlock(zfs_zlock_t **zlpp)
+{
+	zfs_zlock_t *zl;
+
+	while ((zl = *zlpp) != NULL) {
+		if (zl->zl_znode != NULL)
+			VN_RELE(ZTOV(zl->zl_znode));
+		rw_exit(zl->zl_rwlock);
+		*zlpp = zl->zl_next;
+		kmem_free(zl, sizeof (*zl));
+	}
+}
+
+/*
+ * Search back through the directory tree, using the ".." entries.
+ * Lock each directory in the chain to prevent concurrent renames.
+ * Fail any attempt to move a directory into one of its own descendants.
+ * XXX - z_parent_lock can overlap with map or grow locks
+ */
 static int
 zfs_rename_lock(znode_t *szp, znode_t *tdzp, znode_t *sdzp, zfs_zlock_t **zlpp)
 {
@@ -2243,13 +2260,36 @@ zfs_rename_lock(znode_t *szp, znode_t *tdzp, znode_t *sdzp, zfs_zlock_t **zlpp)
 	 * Later passes read-lock zp and compare to zp->z_parent.
 	 */
 	do {
+		if (!rw_tryenter(rwlp, rw)) {
+			/*
+			 * Another thread is renaming in this path.
+			 * Note that if we are a WRITER, we don't have any
+			 * parent_locks held yet.
+			 */
+			if (rw == RW_READER && zp->z_id > szp->z_id) {
+				/*
+				 * Drop our locks and restart
+				 */
+				zfs_rename_unlock(&zl);
+				*zlpp = NULL;
+				zp = tdzp;
+				oidp = &zp->z_id;
+				rwlp = &szp->z_parent_lock;
+				rw = RW_WRITER;
+				continue;
+			} else {
+				/*
+				 * Wait for other thread to drop its locks
+				 */
+				rw_enter(rwlp, rw);
+			}
+		}
+
 		zl = kmem_alloc(sizeof (*zl), KM_SLEEP);
 		zl->zl_rwlock = rwlp;
 		zl->zl_znode = NULL;
 		zl->zl_next = *zlpp;
 		*zlpp = zl;
-
-		rw_enter(rwlp, rw);
 
 		if (*oidp == szp->z_id)		/* We're a descendant of szp */
 			return (EINVAL);
@@ -2270,23 +2310,6 @@ zfs_rename_lock(znode_t *szp, znode_t *tdzp, znode_t *sdzp, zfs_zlock_t **zlpp)
 	} while (zp->z_id != sdzp->z_id);
 
 	return (0);
-}
-
-/*
- * Drop locks and release vnodes that were held by zfs_rename_lock().
- */
-static void
-zfs_rename_unlock(zfs_zlock_t **zlpp)
-{
-	zfs_zlock_t *zl;
-
-	while ((zl = *zlpp) != NULL) {
-		if (zl->zl_znode != NULL)
-			VN_RELE(ZTOV(zl->zl_znode));
-		rw_exit(zl->zl_rwlock);
-		*zlpp = zl->zl_next;
-		kmem_free(zl, sizeof (*zl));
-	}
 }
 
 /*
