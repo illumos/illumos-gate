@@ -242,9 +242,12 @@ display_pci(Board_node *board)
 			 * intermediate node
 			 * Stop if pci board node is reached.
 			 */
-			if (card_node->sibling != NULL)
-				card_node = card_node->sibling;
-			else {
+			if (card_node->sibling != NULL) {
+				if (card_node == pci)
+					card_node = NULL;
+				else
+					card_node = card_node->sibling;
+			} else {
 				Prom_node *cparent;
 				cparent = card_node->parent;
 				card_node = NULL;
