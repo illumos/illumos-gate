@@ -40,6 +40,8 @@
 
 #include "rcv.h"
 #include <locale.h>
+#include <stdlib.h>
+#include <string.h>
 
 /*
  * mailx -- a modified version of a University of California at Berkeley
@@ -50,6 +52,7 @@
 
 static int	check(int mesg, int f);
 static int	evalcol(int col);
+static int	isinteger(char *buf);
 static void	mark(int mesg);
 static int	markall(char buf[], int f);
 static int	matchsubj(char *str, int mesg);
@@ -72,7 +75,9 @@ getmessage(char *buf, int *vector, int flags)
 {
 	register int *ip;
 	register struct message *mp;
-	int i, firstmsg = -1;
+	int firstmsg = -1;
+	char delims[] = "\t- ";
+	char *result  = NULL;
 
 	if (markall(buf, flags) < 0)
 		return (-1);
@@ -82,12 +87,9 @@ getmessage(char *buf, int *vector, int flags)
 	 * Check for first message number and make sure it is
 	 * at the beginning of the vector.
 	 */
-	i = 0;
-	while (any(buf[i], " \t"))
-		i++;
-
-	if (isdigit(buf[i])) {
-		firstmsg = buf[i] - '0';
+	result = strtok(buf, delims);
+	if (result != NULL && isinteger(result)) {
+		firstmsg = atoi(result);
 		*ip++ = firstmsg;
 	}
 
@@ -104,6 +106,33 @@ getmessage(char *buf, int *vector, int flags)
 	}
 	*ip = NULL;
 	return (ip - vector);
+}
+
+/*
+ * Check to see if string is an integer
+ *
+ * Returns 1 if is an integer and 0 if it is not
+ */
+static int
+isinteger(char *buf)
+{
+	int i, result = 1;
+
+	/* check for empty string */
+	if (strcmp(buf, "") == 0) {
+		result = 0;
+		return (result);
+	}
+
+	i = 0;
+	while (buf[i] != '\0') {
+		if (!isdigit(buf[i])) {
+			result = 0;
+			break;
+		}
+		i++;
+	}
+	return (result);
 }
 
 /*
