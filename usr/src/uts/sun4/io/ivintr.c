@@ -54,6 +54,7 @@ intr_vec_t	*softint_list = NULL;
 /* Reserved pool for interrupt allocation */
 intr_vec_t	*intr_vec_pool = NULL;	/* For HW and single target SW intrs */
 intr_vecx_t	*intr_vecx_pool = NULL;	/* For multi target SW intrs */
+static	kmutex_t intr_vec_pool_mutex;	/* Protect interrupt vector pool */
 
 /* Kmem cache handle for interrupt allocation */
 kmem_cache_t	*intr_vec_cache = NULL;	/* For HW and single target SW intrs */
@@ -66,6 +67,7 @@ init_ivintr()
 {
 	mutex_init(&intr_vec_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&softint_mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&intr_vec_pool_mutex, NULL, MUTEX_DRIVER, NULL);
 
 	/*
 	 * Initialize the reserved interrupt vector data structure pools
@@ -90,8 +92,9 @@ fini_ivintr()
 	if (intr_vec_cache)
 		kmem_cache_destroy(intr_vec_cache);
 
-	mutex_destroy(&intr_vec_mutex);
+	mutex_destroy(&intr_vec_pool_mutex);
 	mutex_destroy(&softint_mutex);
+	mutex_destroy(&intr_vec_mutex);
 }
 
 /*
@@ -113,13 +116,17 @@ iv_alloc(softint_type_t type)
 	 * First try to allocate an interrupt vector data structure from the
 	 * reserved pool, otherwise allocate it using kmem_cache_alloc().
 	 */
+	mutex_enter(&intr_vec_pool_mutex);
 	for (i = 0; i < count; i++) {
 		iv_p = (type == SOFTINT_MT) ?
 		    (intr_vec_t *)&intr_vecx_pool[i] : &intr_vec_pool[i];
 
-		if (iv_p->iv_pil == 0)
+		if (iv_p->iv_pil == 0) {
+			iv_p->iv_pil = 1;	/* Default PIL */
 			break;
+		}
 	}
+	mutex_exit(&intr_vec_pool_mutex);
 
 	if (i < count)
 		return (iv_p);
@@ -141,8 +148,8 @@ iv_alloc(softint_type_t type)
 
 	iv_p = kmem_cache_alloc(intr_vec_cache, KM_SLEEP);
 	bzero(iv_p, sizeof (intr_vec_t));
-
 	iv_p->iv_flags =  IV_CACHE_ALLOC;
+
 	return (iv_p);
 }
 
@@ -156,9 +163,10 @@ iv_free(intr_vec_t *iv_p)
 		ASSERT(!(iv_p->iv_flags & IV_SOFTINT_MT));
 		kmem_cache_free(intr_vec_cache, iv_p);
 	} else {
-		(iv_p->iv_flags & IV_SOFTINT_MT) ?
-		    bzero(iv_p, sizeof (intr_vecx_t)) :
-		    bzero(iv_p, sizeof (intr_vec_t));
+		mutex_enter(&intr_vec_pool_mutex);
+		bzero(iv_p, (iv_p->iv_flags & IV_SOFTINT_MT) ?
+		    sizeof (intr_vecx_t) : sizeof (intr_vec_t));
+		mutex_exit(&intr_vec_pool_mutex);
 	}
 }
 
