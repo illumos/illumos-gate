@@ -63,6 +63,8 @@ static uint32_t find_last_obj_id(char *file_mark, off_t eod);
 static char *sense_dev_config(ssc_params_t *s, char *data);
 static char *sense_compression(ssc_params_t *s, char *data);
 
+static long ssc_page_size;
+
 /*
  * []----
  * | ssc_init_common -- initialize common information that all ITLs will use
@@ -73,6 +75,8 @@ ssc_common_init(t10_lu_common_t *lu)
 {
 	ssc_params_t	*s;
 	ssc_obj_mark_t	mark;
+
+	ssc_page_size = sysconf(_SC_PAGESIZE);
 
 	if (lu->l_mmap == MAP_FAILED)
 		return (False);
@@ -474,13 +478,27 @@ ssc_write_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 		return;
 
 	if (s->s_fast_write_ack == False) {
+		uint64_t	sa;
+		size_t		len;
+
+		/*
+		 * msync requires the address to be page aligned.
+		 * That means we need to account for any alignment
+		 * loss in the len field and access the full page.
+		 */
+		sa = (uint64_t)(intptr_t)data & ~(ssc_page_size - 1);
+		len = (((size_t)data & (ssc_page_size - 1)) +
+		    data_len + ssc_page_size - 1) &
+		    ~(ssc_page_size -1);
+
 		/*
 		 * We only need to worry about sync'ing the blocks
 		 * in the mmap case because if the fast cache isn't
 		 * enabled for AIO the file will be opened with F_SYNC
 		 * which performs the correct action.
 		 */
-		if (fsync(cmd->c_lu->l_common->l_fd) == -1) {
+		if (msync((char *)(intptr_t)sa, len, MS_SYNC) == -1) {
+			perror("msync");
 			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			trans_send_complete(cmd, STATUS_CHECK);
 			return;

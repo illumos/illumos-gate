@@ -75,6 +75,7 @@ static char *sense_mode_control(t10_lu_impl_t *lu, char *buf);
 static char *sense_info_ctrl(char *buf);
 static scsi_cmd_table_t lba_table[];
 
+static long sbc_page_size;
 /*
  * []----
  * | sbc_init_common -- Initialize LU data which is common to all I_T_Ls
@@ -85,6 +86,8 @@ sbc_common_init(t10_lu_common_t *lu)
 {
 	disk_params_t	*d;
 	tgt_node_t	*node	= lu->l_root;
+
+	sbc_page_size = sysconf(_SC_PAGESIZE);
 
 	if ((d = (disk_params_t *)calloc(1, sizeof (*d))) == NULL)
 		return (False);
@@ -690,6 +693,18 @@ sbc_write_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 			return;
 
 		if (d->d_fast_write == False) {
+			uint64_t	sa;
+			size_t		len;
+
+			/*
+			 * msync requires the address to be page aligned.
+			 * That means we need to account for any alignment
+			 * loss in the len field and access the full page.
+			 */
+			sa = (uint64_t)(intptr_t)data & ~(sbc_page_size - 1);
+			len = (((size_t)data & (sbc_page_size - 1)) +
+			    data_len + sbc_page_size - 1) &
+			    ~(sbc_page_size -1);
 
 			/*
 			 * We only need to worry about sync'ing the blocks
@@ -697,7 +712,8 @@ sbc_write_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 			 * enabled for AIO the file will be opened with F_SYNC
 			 * which performs the correct action.
 			 */
-			if (fsync(cmd->c_lu->l_common->l_fd) == -1) {
+			if (msync((char *)(intptr_t)sa, len, MS_SYNC) == -1) {
+				perror("msync");
 				spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 				trans_send_complete(cmd, STATUS_CHECK);
 				return;
@@ -803,10 +819,19 @@ send_error:
 		/*
 		 * Immediate bit is not set, so go ahead a flush things.
 		 */
-		if (fsync(cmd->c_lu->l_common->l_fd) != 0) {
-			spc_sense_create(cmd, KEY_MEDIUM_ERROR, 0);
-			trans_send_complete(cmd, STATUS_CHECK);
-			return;
+		if (cmd->c_lu->l_common->l_mmap == MAP_FAILED) {
+			if (fsync(cmd->c_lu->l_common->l_fd) != 0) {
+				spc_sense_create(cmd, KEY_MEDIUM_ERROR, 0);
+				trans_send_complete(cmd, STATUS_CHECK);
+				return;
+			}
+		} else {
+			if (msync(cmd->c_lu->l_common->l_mmap,
+			    cmd->c_lu->l_common->l_size, MS_SYNC) == -1) {
+				spc_sense_create(cmd, KEY_MEDIUM_ERROR, 0);
+				trans_send_complete(cmd, STATUS_CHECK);
+				return;
+			}
 		}
 	}
 	trans_send_complete(cmd, STATUS_GOOD);
@@ -1086,21 +1111,45 @@ sbc_synccache(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 			/*
 			 * Immediately return a status of GOOD. If an error
-			 * occurs with the fsync the next command will pick
-			 * up an error.
+			 * occurs with the fsync/msync the next command will
+			 * pick up an error.
 			 */
 			trans_send_complete(cmd, STATUS_GOOD);
-			if (fsync(cmd->c_lu->l_common->l_fd) == -1) {
-				cmd->c_lu->l_status	= KEY_HARDWARE_ERROR;
-				cmd->c_lu->l_asc	= 0x00;
-				cmd->c_lu->l_ascq	= 0x00;
+			if (cmd->c_lu->l_common->l_mmap == MAP_FAILED) {
+				if (fsync(cmd->c_lu->l_common->l_fd) == -1) {
+					cmd->c_lu->l_status =
+					    KEY_HARDWARE_ERROR;
+					cmd->c_lu->l_asc = 0x00;
+					cmd->c_lu->l_ascq = 0x00;
+				}
+			} else {
+				if (msync(cmd->c_lu->l_common->l_mmap,
+				    cmd->c_lu->l_common->l_size, MS_SYNC) ==
+				    -1) {
+					cmd->c_lu->l_status =
+					    KEY_HARDWARE_ERROR;
+					cmd->c_lu->l_asc = 0x00;
+					cmd->c_lu->l_ascq = 0x00;
+				}
 			}
 		} else {
-			if (fsync(cmd->c_lu->l_common->l_fd) == -1) {
-				spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
-				trans_send_complete(cmd, STATUS_CHECK);
-			} else
-				trans_send_complete(cmd, STATUS_GOOD);
+			if (cmd->c_lu->l_common->l_mmap == MAP_FAILED) {
+				if (fsync(cmd->c_lu->l_common->l_fd) == -1) {
+					spc_sense_create(cmd,
+					    KEY_HARDWARE_ERROR, 0);
+					trans_send_complete(cmd, STATUS_CHECK);
+				} else
+					trans_send_complete(cmd, STATUS_GOOD);
+			} else {
+				if (msync(cmd->c_lu->l_common->l_mmap,
+				    cmd->c_lu->l_common->l_size, MS_SYNC) ==
+				    -1) {
+					spc_sense_create(cmd,
+					    KEY_HARDWARE_ERROR, 0);
+					trans_send_complete(cmd, STATUS_CHECK);
+				} else
+					trans_send_complete(cmd, STATUS_GOOD);
+			}
 		}
 	}
 }

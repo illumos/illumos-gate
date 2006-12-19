@@ -457,6 +457,7 @@ tgt_node_add(tgt_node_t *p, tgt_node_t *c)
 	if ((p == NULL) || (c == NULL))
 		return;
 
+	c->x_parent = p;
 	if (p->x_child == NULL)
 		p->x_child = c;
 	else {
@@ -683,10 +684,12 @@ tgt_node_dup(tgt_node_t *n)
 		return (NULL);
 	if (node_name(d, (xmlChar *)n->x_name) == False)
 		return (NULL);
-	if (node_value(d, (xmlChar *)n->x_value, True) == False)
+	if (n->x_value && (node_value(d, (xmlChar *)n->x_value, True) == False))
 		return (NULL);
 	for (c = n->x_child; c; c = c->x_sibling)
 		(void) tgt_node_add(d, tgt_node_dup(c));
+	for (c = n->x_attr; c; c = c->x_sibling)
+		(void) tgt_node_add_attr(d, tgt_node_dup(c));
 	return (d);
 }
 

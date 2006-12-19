@@ -37,8 +37,9 @@
 extern "C" {
 #endif
 
-#define	DEFAULT_CONFIG_LOCATION	"/etc/iscsi/target_config.xml"
-#define	DEFAULT_TARGET_BASEDIR	"/iscsi_targets"
+#define	DEFAULT_CONFIG		"/etc/iscsi/"
+#define	DEFAULT_CONFIG_LOCATION	DEFAULT_CONFIG "target_config.xml"
+#define	DEFAULT_TARGET_BASEDIR	DEFAULT_CONFIG
 #define	DEFAULT_TARGET_LOG	"/tmp/target_log"
 
 /*

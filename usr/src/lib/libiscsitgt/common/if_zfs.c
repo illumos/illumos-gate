@@ -58,11 +58,13 @@ iscsitgt_zfs_share(const char *dataset)
 	if (strcmp(n->x_name, XML_ELEMENT_ERROR) == 0 &&
 	    tgt_find_value_int(n, XML_ELEMENT_CODE, &code) == True &&
 	    code == 1000) {
+		free(str);
 		tgt_node_free(n);
 		return (0);
 	}
 
 	errno = EINVAL;
+	free(str);
 	tgt_node_free(n);
 	return (-1);
 }
@@ -87,10 +89,12 @@ iscsitgt_zfs_unshare(const char *dataset)
 	if (strcmp(n->x_name, XML_ELEMENT_ERROR) == 0 &&
 	    tgt_find_value_int(n, XML_ELEMENT_CODE, &code) == True &&
 	    code == 1000) {
+		free(str);
 		tgt_node_free(n);
 		return (0);
 	}
 
+	free(str);
 	tgt_node_free(n);
 	errno = EINVAL;
 	return (-1);
@@ -114,10 +118,12 @@ iscsitgt_zfs_is_shared(const char *dataset)
 	if (strcmp(n->x_name, XML_ELEMENT_ERROR) == 0 &&
 	    tgt_find_value_int(n, XML_ELEMENT_CODE, &code) == True &&
 	    code == 1000) {
+		free(str);
 		tgt_node_free(n);
 		return (1);
 	}
 
+	free(str);
 	tgt_node_free(n);
 	return (0);
 }

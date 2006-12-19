@@ -250,7 +250,6 @@ process_target_config()
 			return (False);
 		}
 
-		targets_config = node;
 		while ((next = tgt_node_next(node, XML_ELEMENT_TARG,
 		    next)) != NULL) {
 			if (tgt_find_value_str(next, XML_ELEMENT_INAME,
@@ -272,6 +271,21 @@ process_target_config()
 		xmlTextReaderClose(r);
 		xmlFreeTextReader(r);
 		xmlCleanupParser();
+
+		/*
+		 * It's possible that nodes exist, these would be ZFS nodes.
+		 * We to move them to the new configuration tree.
+		 */
+		if (targets_config) {
+			next = NULL;
+			while ((next = tgt_node_next(targets_config,
+			    XML_ELEMENT_TARG, next)) != NULL) {
+				tgt_node_add(node, tgt_node_dup(next));
+			}
+
+			tgt_node_free(targets_config);
+		}
+		targets_config = node;
 		return (True);
 	} else {
 
@@ -819,6 +833,18 @@ main(int argc, char **argv)
 	}
 
 	q = queue_alloc();
+
+	/*
+	 * During the normal corse of events 'target_basedir' will be
+	 * free when the administrator changes the base directory. Instead
+	 * of trying to check for the initial case of this value being set
+	 * to some static string, always allocate that string.
+	 * NOTE: This must be done *after* process_config() is called since
+	 * it's possible and very likely that this value will be set at that
+	 * time.
+	 */
+	if (target_basedir == NULL)
+		target_basedir = strdup(DEFAULT_TARGET_BASEDIR);
 
 	/*
 	 * Initialize the various subsystems. In most cases these are

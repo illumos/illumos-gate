@@ -45,7 +45,7 @@ SERVICE="svc:/system/iscsitgt:default"
 # Check to see if the service is enabled and if so disable it.
 #
 
-SVCPROP=`svcprop -p general/enabled ${SERVICE}`
+SVCPROP=`svcprop -c -p general/enabled ${SERVICE}`
 
 if [ "${SVCPROP}" = "true" ]; then
     svcadm disable ${SERVICE}

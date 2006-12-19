@@ -677,7 +677,8 @@ update_basedir(char *name, char *prop)
 {
 	tgt_node_t	*targ	= NULL;
 	int		count	= 0;
-	char		*msg	= NULL;
+	char		*msg	= NULL,
+			*val	= NULL;
 
 	if ((prop == NULL) || (strlen(prop) == 0) || (prop[0] != '/')) {
 		xml_rtn_msg(&msg, ERR_INVALID_BASEDIR);
@@ -686,7 +687,24 @@ update_basedir(char *name, char *prop)
 
 	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG,
 	    targ)) != NULL) {
-		count++;
+		/*
+		 * If the target does not have the "in-core" attribute, or
+		 * if it does have the attribute, but is set to "false" then
+		 * count the target.
+		 * Targets that are marked as in-core simply mean that some
+		 * other entity is storing the configuration data. Since that's
+		 * the case there's no trouble in change the base directory
+		 * because nothing will be lost.
+		 */
+		if ((tgt_find_attr_str(targ, XML_ELEMENT_INCORE, &val) ==
+		    False) ||
+		    ((val != NULL) && (strcmp(val, XML_VALUE_TRUE) != 0))) {
+			count++;
+		}
+		if (val) {
+			free(val);
+			val = NULL;
+		}
 	}
 
 	if (target_basedir == NULL) {
