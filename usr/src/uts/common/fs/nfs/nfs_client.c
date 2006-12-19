@@ -506,6 +506,8 @@ nfs_attr_cache(vnode_t *vp, vattr_t *vap, hrtime_t t, cred_t *cr)
 		was_serial = 1;
 
 	if (rp->r_mtime > t) {
+		if (!CACHE_VALID(rp, vap->va_mtime, vap->va_size))
+			PURGE_ATTRCACHE_LOCKED(rp);
 		mutex_exit(&rp->r_statelock);
 		return;
 	}
@@ -613,6 +615,8 @@ nfs3_attr_cache(vnode_t *vp, vattr_t *bvap, vattr_t *avap, hrtime_t t,
 		was_serial = 1;
 
 	if (rp->r_mtime > t) {
+		if (!CACHE_VALID(rp, avap->va_mtime, avap->va_size))
+			PURGE_ATTRCACHE_LOCKED(rp);
 		mutex_exit(&rp->r_statelock);
 		return;
 	}

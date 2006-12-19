@@ -511,8 +511,11 @@ nfs4_attr_cache(vnode_t *vp, nfs4_ga_res_t *garp,
 	if (rp->r_time_attr_saved > t) {
 		/*
 		 * Attributes have been cached since these attributes were
-		 * made, so don't act on them.
+		 * probably made. If there is an inconsistency in what is
+		 * cached, mark them invalid. If not, don't act on them.
 		 */
+		if (!CACHE4_VALID(rp, vap->va_mtime, vap->va_size))
+			PURGE_ATTRCACHE4_LOCKED(rp);
 		mutex_exit(&rp->r_statelock);
 		return;
 	}
