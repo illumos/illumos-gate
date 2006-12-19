@@ -580,6 +580,8 @@ f none opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.paren1.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.paren2.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.paren3.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/lexer/tst.D_MACRO_OFLOW.ParIntOvflow.d.ksh 0444 root bin
+d none opt/SUNWdtrt/tst/common/mdb 0755 root bin
+f none opt/SUNWdtrt/tst/common/mdb/tst.dtracedcmd.ksh 0444 root bin
 d none opt/SUNWdtrt/tst/common/mib 0755 root bin
 f none opt/SUNWdtrt/tst/common/mib/tst.icmp.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/mib/tst.tcp.ksh 0444 root bin
@@ -664,6 +666,7 @@ f none opt/SUNWdtrt/tst/common/pid/tst.fork.exe 0555 root bin
 f none opt/SUNWdtrt/tst/common/pid/tst.gcc.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/pid/tst.gcc.exe 0555 root bin
 f none opt/SUNWdtrt/tst/common/pid/tst.manypids.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/pid/tst.probemod.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/pid/tst.ret1.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/pid/tst.ret1.exe 0555 root bin
 f none opt/SUNWdtrt/tst/common/pid/tst.ret2.d 0444 root bin

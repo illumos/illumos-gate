@@ -2283,6 +2283,64 @@ dtrace_dynstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+typedef struct dtrace_ecb_walk {
+	dtrace_ecb_t **dtew_ecbs;
+	int dtew_necbs;
+	int dtew_curecb;
+} dtrace_ecb_walk_t;
+
+static int
+dtrace_ecb_init(mdb_walk_state_t *wsp)
+{
+	uintptr_t addr;
+	dtrace_state_t state;
+	dtrace_ecb_walk_t *ecbwp;
+
+	if ((addr = wsp->walk_addr) == NULL) {
+		mdb_warn("dtrace_ecb walk needs dtrace_state_t\n");
+		return (WALK_ERR);
+	}
+
+	if (mdb_vread(&state, sizeof (state), addr) == -1) {
+		mdb_warn("failed to read dtrace state pointer at %p", addr);
+		return (WALK_ERR);
+	}
+
+	ecbwp = mdb_zalloc(sizeof (dtrace_ecb_walk_t), UM_SLEEP | UM_GC);
+
+	ecbwp->dtew_ecbs = state.dts_ecbs;
+	ecbwp->dtew_necbs = state.dts_necbs;
+	ecbwp->dtew_curecb = 0;
+
+	wsp->walk_data = ecbwp;
+
+	return (WALK_NEXT);
+}
+
+static int
+dtrace_ecb_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t ecbp, addr;
+	dtrace_ecb_walk_t *ecbwp = wsp->walk_data;
+
+	addr = (uintptr_t)ecbwp->dtew_ecbs +
+	    ecbwp->dtew_curecb * sizeof (dtrace_ecb_t *);
+
+	if (ecbwp->dtew_curecb++ == ecbwp->dtew_necbs)
+		return (WALK_DONE);
+
+	if (mdb_vread(&ecbp, sizeof (addr), addr) == -1) {
+		mdb_warn("failed to read ecb at entry %d\n",
+		    ecbwp->dtew_curecb);
+		return (WALK_ERR);
+	}
+
+	if (ecbp == NULL)
+		return (WALK_NEXT);
+
+	return (wsp->walk_callback(ecbp, NULL, wsp->walk_cbdata));
+}
+
 const mdb_dcmd_t kernel_dcmds[] = {
 	{ "id2probe", ":", "translate a dtrace_id_t to a dtrace_probe_t",
 	    id2probe },
@@ -2311,5 +2369,7 @@ const mdb_walker_t kernel_walkers[] = {
 		dtrace_aggkey_init, dtrace_aggkey_step, dtrace_aggkey_fini },
 	{ "dtrace_dynvar", "walk DTrace dynamic variables",
 		dtrace_dynvar_init, dtrace_dynvar_step, dtrace_dynvar_fini },
+	{ "dtrace_ecb", "walk a DTrace consumer's enabling control blocks",
+		dtrace_ecb_init, dtrace_ecb_step },
 	{ NULL }
 };
