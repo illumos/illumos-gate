@@ -1017,7 +1017,7 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 			return (EINVAL);
 		}
 
-		if (error = zfs_get_xattrdir(VTOZ(dvp), vpp, cr)) {
+		if (error = zfs_get_xattrdir(VTOZ(dvp), vpp, cr, flags)) {
 			ZFS_EXIT(zfsvfs);
 			return (error);
 		}

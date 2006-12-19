@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +59,7 @@ extern void zfs_rmnode(znode_t *);
 extern boolean_t zfs_dirempty(znode_t *);
 extern void zfs_dq_add(znode_t *, dmu_tx_t *);
 extern int zfs_sticky_remove_access(znode_t *, znode_t *, cred_t *cr);
-extern int zfs_get_xattrdir(znode_t *, vnode_t **, cred_t *);
+extern int zfs_get_xattrdir(znode_t *, vnode_t **, cred_t *, int);
 extern int zfs_make_xattrdir(znode_t *, vattr_t *, vnode_t **, cred_t *);
 
 #ifdef	__cplusplus
