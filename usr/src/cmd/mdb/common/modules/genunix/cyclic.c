@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +34,29 @@
 #include <sys/cyclic_impl.h>
 #include <sys/sysmacros.h>
 #include <stdio.h>
+
+int
+cyccpu_vread(cyc_cpu_t *cpu, uintptr_t addr)
+{
+	static int inited = 0;
+	static int cyc_trace_enabled = 0;
+	static size_t cyccpu_size;
+
+	if (!inited) {
+		inited = 1;
+		(void) mdb_readvar(&cyc_trace_enabled, "cyc_trace_enabled");
+		cyccpu_size = (cyc_trace_enabled) ? sizeof (*cpu) :
+		    OFFSETOF(cyc_cpu_t, cyp_trace);
+	}
+
+	if (mdb_vread(cpu, cyccpu_size, addr) == -1)
+		return (-1);
+
+	if (!cyc_trace_enabled)
+		bzero(cpu->cyp_trace, sizeof (cpu->cyp_trace));
+
+	return (0);
+}
 
 int
 cyccpu_walk_init(mdb_walk_state_t *wsp)
@@ -53,7 +75,7 @@ cyccpu_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = (uintptr_t)((cpu_t *)wsp->walk_layer)->cpu_cyclic;
 	cyc_cpu_t cpu;
 
-	if (mdb_vread(&cpu, sizeof (cpu), addr) == -1) {
+	if (cyccpu_vread(&cpu, addr) == -1) {
 		mdb_warn("couldn't read cyc_cpu at %p", addr);
 		return (WALK_ERR);
 	}
@@ -257,7 +279,7 @@ cycinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    CYC_ADDR_WIDTH, "CYC_CPU", "STATE", "NELEMS",
 		    CYC_ADDR_WIDTH, "ROOT", "FIRE", "HANDLER");
 
-	if (mdb_vread(&cpu, sizeof (cpu), addr) == -1) {
+	if (cyccpu_vread(&cpu, addr) == -1) {
 		mdb_warn("couldn't read cyc_cpu at %p", addr);
 		return (DCMD_ERR);
 	}
@@ -471,7 +493,7 @@ cyctrace_walk_init(mdb_walk_state_t *wsp)
 
 		wsp->walk_addr = addr - offsetof(cyc_cpu_t, cyp_trace[0]);
 	} else {
-		if (mdb_vread(cpu, sizeof (cyc_cpu_t), wsp->walk_addr) == -1) {
+		if (cyccpu_vread(cpu, wsp->walk_addr) == -1) {
 			mdb_warn("couldn't read cyc_cpu at %p", wsp->walk_addr);
 			mdb_free(cpu, sizeof (cyc_cpu_t));
 			return (-1);
@@ -690,7 +712,7 @@ cycid_cpu(cyc_cpu_t *addr, int ndx)
 	uintptr_t caddr;
 	cyclic_t cyc;
 
-	if (mdb_vread(&cpu, sizeof (cpu), (uintptr_t)addr) == -1) {
+	if (cyccpu_vread(&cpu, (uintptr_t)addr) == -1) {
 		mdb_warn("couldn't read cyc_cpu at %p", addr);
 		return (DCMD_ERR);
 	}

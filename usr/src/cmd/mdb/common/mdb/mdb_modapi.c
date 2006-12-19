@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -730,7 +729,7 @@ mdb_set_pipe(const mdb_pipe_t *p)
 	if (cp != NULL) {
 		size_t nbytes = sizeof (uintptr_t) * p->pipe_len;
 
-		mdb_addrvec_destroy(&cp->c_addrv);
+		mdb_cmd_reset(cp);
 		cp->c_addrv.ad_data = mdb_alloc(nbytes, UM_SLEEP);
 		bcopy(p->pipe_data, cp->c_addrv.ad_data, nbytes);
 		cp->c_addrv.ad_nelems = p->pipe_len;

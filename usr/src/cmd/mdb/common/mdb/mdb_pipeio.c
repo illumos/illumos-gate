@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,12 +50,14 @@
 #include <stropts.h>
 #include <limits.h>
 
+#include <mdb/mdb.h>
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_string.h>
 #include <mdb/mdb_context.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_io_impl.h>
+#include <mdb/mdb_frame.h>
 
 typedef struct pipe_data {
 	mdb_iobsvc_f *pipe_rdsvc;	/* Read-side service routine */
@@ -278,10 +279,17 @@ pio_unlink(mdb_io_t *io, mdb_iob_t *iob)
 			 * the pipeline is already completely flushed.
 			 */
 			do {
-				if (pd->pipe_rdiob == NULL ||
-				    mdb_iob_err(pd->pipe_rdiob) != 0)
+				if (pd->pipe_rdiob == NULL)
+					break;
+				if (mdb_iob_err(pd->pipe_rdiob) != 0) {
+					if (pd->pipe_ctx.ctx_wptr != NULL) {
+						mdb_frame_pop(
+						    pd->pipe_ctx.ctx_wptr,
+						    MDB_ERR_ABORT);
+						pd->pipe_ctx.ctx_wptr = NULL;
+					}
 					break; /* don't read if error bit set */
-
+				}
 				if (pd->pipe_ctx.ctx_data == NULL ||
 				    setjmp(*mdb_context_getpcb(
 				    pd->pipe_ctx.ctx_data)) == 0) {

@@ -1398,7 +1398,11 @@ elt_print(const char *name, mdb_ctf_id_t id, ulong_t off, int depth, void *data)
 	}
 
 	pap->pa_depth = depth;
-	ASSERT(kind > CTF_K_UNKNOWN && kind < CTF_K_TYPEDEF);
+	if (kind <= CTF_K_UNKNOWN || kind >= CTF_K_TYPEDEF) {
+		mdb_warn("unknown ctf for %s type %s kind %d\n",
+			name, type, kind);
+		return (-1);
+	}
 	rc = printfuncs[kind - 1](type, name, id, base, off, pap);
 
 	if (rc != 0)

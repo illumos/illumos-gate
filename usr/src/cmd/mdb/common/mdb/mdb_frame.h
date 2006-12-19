@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +66,7 @@ typedef struct mdb_frame {
 	int f_oldstate;			/* Last lex state */
 	struct mdb_lex_state *f_lstate;	/* Current lex state */
 	uintmax_t f_dot;		/* Value of '.' */
+	mdb_bool_t pipe;		/* frame has pipe context */
 } mdb_frame_t;
 
 #ifdef _MDB
@@ -80,6 +80,10 @@ extern void mdb_frame_push(mdb_frame_t *);
 extern void mdb_frame_pop(mdb_frame_t *, int);
 
 extern void mdb_frame_switch(mdb_frame_t *);
+
+extern void mdb_frame_set_pipe(mdb_frame_t *);
+extern void mdb_frame_clear_pipe(mdb_frame_t *);
+extern mdb_frame_t *mdb_frame_pipe(void);
 
 #endif	/* _MDB */
 
