@@ -164,6 +164,8 @@ cpu_halt(void)
 	 * We check for the presence of our bit after disabling interrupts.
 	 * If it's cleared, we'll return. If the bit is cleared after
 	 * we check then the poke will pop us out of the halted state.
+	 * Also, if the offlined CPU has been brought back on-line, then
+	 * we return as well.
 	 *
 	 * The ordering of the poke and the clearing of the bit by cpu_wakeup
 	 * is important.
@@ -178,7 +180,8 @@ cpu_halt(void)
 	 */
 	s = disable_vec_intr();
 	while (*p == 0 &&
-	    (!hset_update || CPU_IN_SET(cp->cp_mach->mc_haltset, cpun))) {
+	    ((hset_update && CPU_IN_SET(cp->cp_mach->mc_haltset, cpun)) ||
+	    (!hset_update && (CPU->cpu_flags & CPU_OFFLINE)))) {
 		(void) hv_cpu_yield();
 		enable_vec_intr(s);
 		s = disable_vec_intr();
