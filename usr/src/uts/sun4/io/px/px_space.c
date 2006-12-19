@@ -30,10 +30,12 @@
  */
 
 #include <sys/types.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 #include <sys/time.h>
 #include <sys/pcie.h>
-#include "px_space.h"
+#include "px_obj.h"
 
 /*LINTLIBRARY*/
 
@@ -77,6 +79,11 @@ hrtime_t px_intrpend_timeout = 5ull * NANOSEC;	/* 5 seconds in nanoseconds */
 uint64_t px_perr_fatal = -1ull;
 uint64_t px_serr_fatal = -1ull;
 uint64_t px_errtrig_pa = 0x0;
+
+char px_panic_hb_msg[] = " System bus";
+char px_panic_rc_msg[] = " PCIe root complex";
+char px_panic_rp_msg[] = " PCIe root port";
+char px_panic_fab_msg[] = " PCIe fabric";
 
 /*
  * The following flag controls behavior of the ino handler routine
@@ -157,24 +164,24 @@ uint32_t px_pwr_pil		= PX_PWR_PIL;
 
 uint32_t px_max_l1_tries	= PX_MAX_L1_TRIES;
 
+/* Print and Log tunables.  The following variables are booleans */
+#ifdef DEBUG
+uint32_t px_log = PX_PANIC | PX_NO_PANIC | PX_PROTECTED | PX_HW_RESET;
+#else
+uint32_t px_log = PX_PANIC;
+#endif
+uint32_t px_die = PX_PANIC | PX_PROTECTED | PX_HW_RESET;
+
 /* Fire PCIe Error that should cause panics */
-uint32_t px_fabric_die = 1;
+boolean_t px_fabric_die = B_TRUE;
 
+/* Root Complex PCIe Error bit flags that should cause panics */
 uint32_t px_fabric_die_rc_ce = 0;
-uint32_t px_fabric_die_rc_ue = PCIE_AER_UCE_UR |
-    PCIE_AER_UCE_TO |
-    PCIE_AER_UCE_RO |
-    PCIE_AER_UCE_FCP |
-    PCIE_AER_UCE_DLP |
-    PCIE_AER_UCE_ECRC |
-    PCIE_AER_UCE_PTLP |
-    PCIE_AER_UCE_MTLP;
+uint32_t px_fabric_die_rc_ue = 0;
 
-/* Fire PCIe Error that should cause panics even under protected access */
-uint32_t px_fabric_die_rc_ce_gos = 0;
-uint32_t px_fabric_die_rc_ue_gos = PCIE_AER_UCE_RO |
-    PCIE_AER_UCE_FCP |
-    PCIE_AER_UCE_DLP;
+/* Root Complex PCIe Error bit flags that should cause forgiven */
+uint32_t px_fabric_forgive_rc_ce = 0;
+uint32_t px_fabric_forgive_rc_ue = 0;
 
 /* Fabric Error that should cause panics */
 uint32_t px_fabric_die_ce = 0;
@@ -184,9 +191,7 @@ uint32_t px_fabric_die_ue = PCIE_AER_UCE_UR |
     PCIE_AER_UCE_RO |
     PCIE_AER_UCE_FCP |
     PCIE_AER_UCE_DLP |
-    PCIE_AER_UCE_TRAINING |
-    PCIE_AER_UCE_PTLP |
-    PCIE_AER_UCE_MTLP;
+    PCIE_AER_UCE_TRAINING;
 
 /* Fabric Error that should cause panics even under protected access */
 uint32_t px_fabric_die_ce_gos = 0;

@@ -1436,8 +1436,13 @@ px_lib_map_attr_check(ddi_map_req_t *mp)
  * This will initiate something similar to px_fm_callback.
  */
 static void
-px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag)
+px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag,
+    r_addr_t addr)
 {
+	uint32_t	addr_high, addr_low;
+	pcie_req_id_t	bdf;
+	px_ranges_t	*ranges_p;
+	int		range_len, i;
 	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)handle;
 	ddi_fm_error_t derr;
 
@@ -1449,9 +1454,41 @@ px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag)
 	if (hp)
 		hp->ahi_err->err_expected = DDI_FM_ERR_EXPECTED;
 
+	addr_high = (uint32_t)(addr >> 32);
+	addr_low = (uint32_t)addr;
+
+	/*
+	 * Make sure this failed load came from this PCIe port.  Check by
+	 * matching the upper 32 bits of the address with the ranges property.
+	 */
+	range_len = px_p->px_ranges_length / sizeof (px_ranges_t);
+	i = 0;
+	for (ranges_p = px_p->px_ranges_p; i < range_len; i++, ranges_p++) {
+		if (ranges_p->parent_high == addr_high) {
+			switch (ranges_p->child_high & PCI_ADDR_MASK) {
+			case PCI_ADDR_CONFIG:
+				bdf = (pcie_req_id_t)(addr_low >> 12);
+				break;
+			default:
+				bdf = NULL;
+				break;
+			}
+			break;
+		}
+	}
+
 	mutex_enter(&px_p->px_fm_mutex);
 
-	(void) ndi_fm_handler_dispatch(px_p->px_dip, NULL, &derr);
+	if (!px_lib_is_in_drain_state(px_p)) {
+		/*
+		 * This is to ensure that device corresponding to the addr of
+		 * the failed PIO/CFG load gets scanned.
+		 */
+		px_rp_en_q(px_p, bdf, addr,
+		    (PCI_STAT_R_MAST_AB | PCI_STAT_R_TARG_AB));
+		(void) pf_scan_fabric(px_p->px_dip, &derr,
+		    px_p->px_dq_p, &px_p->px_dq_tail);
+	}
 
 	mutex_exit(&px_p->px_fm_mutex);
 }
@@ -1556,7 +1593,7 @@ px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
 			 */
 			px_lib_log_safeacc_err(px_p, (ddi_acc_handle_t)hp,
 			    (hp ? DDI_FM_ERR_EXPECTED :
-			    DDI_FM_ERR_POKE));
+			    DDI_FM_ERR_POKE), ra);
 
 			pec_p->pec_ontrap_data = NULL;
 			pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
@@ -1646,7 +1683,7 @@ px_lib_ctlops_peek(dev_info_t *dip, dev_info_t *rdip,
 			 */
 			px_lib_log_safeacc_err(px_p, (ddi_acc_handle_t)hp,
 			    (hp ? DDI_FM_ERR_EXPECTED :
-			    DDI_FM_ERR_PEEK));
+			    DDI_FM_ERR_PEEK), ra);
 
 			/* Stuff FFs in host addr if peek. */
 			if (hp == NULL) {

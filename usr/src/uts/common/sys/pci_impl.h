@@ -123,22 +123,6 @@ extern int memlist_count(struct memlist *);
 #endif /* __i386 || __amd64 */
 
 /*
- * Parent private data structure for PCI/PCI-X/PCIe devices.
- */
-typedef struct pci_parent_data {
-	uint32_t	pci_bdf;	/* BDF for pci/pci-x/pcie */
-	uint8_t		pci_sec_bus;	/* PCIE2PCI bridge's secondary bus */
-	uint8_t		pci_phfun;	/* Phantom funs for pci-x/pcie */
-} pci_parent_data_t;
-
-#define	PCI_GET_BDF(dip)	\
-	((pci_parent_data_t *)DEVI((dip))->devi_parent_data)->pci_bdf
-#define	PCI_GET_SEC_BUS(dip)	\
-	((pci_parent_data_t *)DEVI((dip))->devi_parent_data)->pci_sec_bus
-#define	PCI_GET_PHFUN(dip)	\
-	((pci_parent_data_t *)DEVI((dip))->devi_parent_data)->pci_phfun
-
-/*
  * PCI capability related definitions.
  */
 

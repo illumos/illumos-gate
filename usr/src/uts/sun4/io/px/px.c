@@ -256,6 +256,10 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip,
 				"device_type", "pciex");
+
+		/* Initialize px_dbg for high pil printing */
+		px_dbg_attach(dip, &px_p->px_dbg_hdl);
+
 		/*
 		 * Get key properties of the pci bridge node and
 		 * determine it's type (psycho, schizo, etc ...).
@@ -268,6 +272,12 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* Initialize device handle */
 		px_p->px_dev_hdl = dev_hdl;
+
+		px_p->px_dq_p = (pf_data_t *)
+		    kmem_zalloc(sizeof (pf_data_t) * pf_get_dq_size(),
+		    KM_SLEEP);
+
+		px_p->px_dq_tail = -1;
 
 		/*
 		 * Initialize interrupt block.  Note that this
@@ -372,6 +382,7 @@ err_bad_ib:
 err_bad_dev_init:
 		px_free_props(px_p);
 err_bad_px_prop:
+		px_dbg_detach(dip, &px_p->px_dbg_hdl);
 		mutex_destroy(&px_p->px_mutex);
 		ddi_soft_state_free(px_state_p, instance);
 err_bad_px_softstate:
@@ -468,11 +479,15 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		px_ib_detach(px_p);
 		(void) px_lib_dev_fini(dip);
 
+		kmem_free(px_p->px_dq_p, sizeof (pf_data_t) *
+		    pf_get_dq_size());
+
 		/*
 		 * Free the px soft state structure and the rest of the
 		 * resources it's using.
 		 */
 		px_free_props(px_p);
+		px_dbg_detach(dip, &px_p->px_dbg_hdl);
 		mutex_exit(&px_p->px_mutex);
 		mutex_destroy(&px_p->px_mutex);
 
@@ -1234,6 +1249,8 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			if (as->cmd == DDI_ATTACH && as->result != DDI_SUCCESS)
 				pcie_pm_release(dip);
 
+			pf_init(rdip, (void *)px_p->px_fm_ibc);
+
 			(void) pcie_postattach_child(rdip);
 
 			return (DDI_SUCCESS);
@@ -1253,6 +1270,9 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 				    ddi_get_instance(rdip));
 				return (pcie_pm_remove_child(dip, rdip));
 			}
+			return (DDI_SUCCESS);
+		case DDI_PRE:
+			pf_fini(rdip);
 			return (DDI_SUCCESS);
 		default:
 			break;

@@ -110,6 +110,18 @@ typedef enum {	/* same sequence as px_debug_sym[] */
 #define	DBG_BITS	6
 #define	DBG_CONT	(1 << DBG_BITS)
 #define	DBG_MASK	(DBG_CONT - 1)
+#define	DBG_MSG_SIZE	320
+
+/* Used only during High PIL printing */
+typedef struct px_dbg_msg {
+	boolean_t	active;
+	px_debug_bit_t  bit;
+	dev_info_t	*dip;
+	char		msg[DBG_MSG_SIZE];
+} px_dbg_msg_t;
+
+extern void px_dbg_attach(dev_info_t *dip, ddi_softint_handle_t *px_dbg_hdl);
+extern void px_dbg_detach(dev_info_t *dip, ddi_softint_handle_t *px_dbg_hdl);
 
 #if defined(DEBUG)
 

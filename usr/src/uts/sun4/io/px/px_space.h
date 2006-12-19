@@ -34,6 +34,12 @@ extern "C" {
 
 #define	PX_SPURINTR_MSG_DEFAULT -1ull
 
+extern char px_panic_hb_msg[];
+extern char px_panic_rc_msg[];
+extern char px_panic_rp_msg[];
+extern char px_panic_fab_msg[];
+
+extern uint_t px_max_errorq_size;
 extern ushort_t px_command_default;
 extern uint_t px_set_latency_timer_register;
 extern uint64_t px_perr_fatal;
@@ -105,12 +111,16 @@ extern uint64_t px_lup_poll_interval;
 extern uint32_t	px_pwr_pil;
 extern uint32_t px_max_l1_tries;
 
+/* Print and Log tunables */
+extern uint32_t px_log;
+extern uint32_t px_die;
+
 /* Fabric Error that should cause panics */
-extern uint32_t px_fabric_die;
+extern boolean_t px_fabric_die;
 extern uint32_t px_fabric_die_rc_ce;
 extern uint32_t px_fabric_die_rc_ue;
-extern uint32_t px_fabric_die_rc_ce_gos;
-extern uint32_t px_fabric_die_rc_ue_gos;
+extern uint32_t px_fabric_forgive_rc_ce;
+extern uint32_t px_fabric_forgive_rc_ue;
 extern uint32_t px_fabric_die_ce;
 extern uint32_t px_fabric_die_ue;
 extern uint32_t px_fabric_die_ce_gos;

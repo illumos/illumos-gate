@@ -36,8 +36,8 @@
 #include <sys/autoconf.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_subrdefs.h>
-#include <sys/pci.h>
-#include <sys/pci_impl.h>
+#include <sys/pcie.h>
+#include <sys/pcie_impl.h>
 #include <sys/pci_cap.h>
 #include <sys/pci/pci_nexus.h>
 #include <sys/pci/pci_regs.h>
@@ -140,7 +140,6 @@ static int ppb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 						cred_t *credp, int *rvalp);
 static int ppb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
     int flags, char *name, caddr_t valuep, int *lengthp);
-static int ppb_get_bdf_from_dip(dev_info_t *dip, uint32_t *bdf);
 
 static struct cb_ops ppb_cb_ops = {
 	ppb_open,			/* open */
@@ -244,6 +243,8 @@ typedef struct {
 #define	PPB_SOFT_STATE_OPEN_EXCL	0x02
 	int fm_cap;
 	ddi_iblock_cookie_t fm_ibc;
+
+	uint8_t parent_bus;
 } ppb_devstate_t;
 
 /*
@@ -291,6 +292,7 @@ static void ppb_fm_fini(ppb_devstate_t *ppb_p);
 
 static void ppb_removechild(dev_info_t *);
 static int ppb_initchild(dev_info_t *child);
+static void ppb_uninitchild(dev_info_t *child);
 static dev_info_t *get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip);
 static void ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *dip);
 static void ppb_pwr_teardown(ppb_devstate_t *ppb, dev_info_t *dip);
@@ -545,8 +547,13 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	pci_regspec_t *drv_regp;
 	int	reglen;
 	int	rn;
-
+	struct	attachspec *as;
+	struct	detachspec *ds;
 	int	totreg;
+	ppb_devstate_t *ppb_p;
+
+	ppb_p = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
+	    ddi_get_instance(dip));
 
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:
@@ -562,7 +569,29 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		return (ppb_initchild((dev_info_t *)arg));
 
 	case DDI_CTLOPS_UNINITCHILD:
-		ppb_removechild((dev_info_t *)arg);
+		ppb_uninitchild((dev_info_t *)arg);
+		return (DDI_SUCCESS);
+
+	case DDI_CTLOPS_ATTACH:
+		if (!pcie_is_child(dip, rdip))
+			return (DDI_SUCCESS);
+
+		as = (struct attachspec *)arg;
+		if ((ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) &&
+		    (as->when == DDI_POST))
+			pf_init(rdip, ppb_p->fm_ibc);
+
+		return (DDI_SUCCESS);
+
+	case DDI_CTLOPS_DETACH:
+		if (!pcie_is_child(dip, rdip))
+			return (DDI_SUCCESS);
+
+		ds = (struct detachspec *)arg;
+		if ((ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) &&
+		    (ds->when == DDI_PRE))
+			pf_fini(rdip);
+
 		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_SIDDEV:
@@ -750,7 +779,6 @@ ppb_initchild(dev_info_t *child)
 	uchar_t header_type;
 	uchar_t min_gnt, latency_timer;
 	ppb_devstate_t *ppb;
-	pci_parent_data_t *pd_p;
 
 	/*
 	 * Name the child
@@ -798,10 +826,10 @@ ppb_initchild(dev_info_t *child)
 		return (DDI_NOT_WELL_FORMED);
 	}
 
-	ddi_set_parent_data(child, NULL);
-
 	ppb = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
 	    ddi_get_instance(ddi_get_parent(child)));
+
+	ddi_set_parent_data(child, NULL);
 
 	/*
 	 * If hardware is PM capable, set up the power info structure.
@@ -866,7 +894,7 @@ ppb_initchild(dev_info_t *child)
 	 * If the device has a bus control register then program it
 	 * based on the settings in the command register.
 	 */
-	if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
+	if ((header_type  & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
 		bcr = pci_config_get8(config_handle, PCI_BCNF_BCNTRL);
 		if (ppb_command_default & PCI_COMM_PARITY_DETECT)
 			bcr |= PCI_BCNF_BCNTRL_PARITY_ENABLE;
@@ -917,6 +945,18 @@ ppb_initchild(dev_info_t *child)
 	}
 
 	/*
+	 * SPARC PCIe FMA specific
+	 *
+	 * Note: parent_data for parent is created only if this is sparc PCI-E
+	 * platform, for which, SG take a different route to handle device
+	 * errors.
+	 */
+	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
+		if (pcie_init_ppd(child) == NULL)
+			return (DDI_FAILURE);
+	}
+
+	/*
 	 * Check to see if the XMITS/PCI-X workaround applies.
 	 */
 	n = ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_NOTPROM,
@@ -929,38 +969,31 @@ ppb_initchild(dev_info_t *child)
 		pcix_set_cmd_reg(child, n);
 	}
 
-	/* Allocate memory for pci parent data */
-	pd_p = kmem_zalloc(sizeof (pci_parent_data_t), KM_SLEEP);
+	/* since cached, teardown config handle in ppb_uninitchild() */
+	return (DDI_SUCCESS);
+}
+
+static void
+ppb_uninitchild(dev_info_t *child)
+{
+	ppb_devstate_t *ppb;
+
+	ppb = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
+	    ddi_get_instance(ddi_get_parent(child)));
 
 	/*
-	 * Retrieve and save BDF and PCIE2PCI bridge's secondary bus
-	 * information in the parent private data structure.
+	 * SG OPL FMA specific
 	 */
-	if (ppb_get_bdf_from_dip(child, &pd_p->pci_bdf) != DDI_SUCCESS) {
-		kmem_free(pd_p, sizeof (pci_parent_data_t));
-		pci_config_teardown(&config_handle);
-		return (DDI_FAILURE);
-	}
+	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+		pcie_uninit_ppd(child);
 
-	pd_p->pci_sec_bus = ddi_prop_get_int(DDI_DEV_T_ANY, child, 0,
-	    "pcie2pci-sec-bus", 0);
-
-	ddi_set_parent_data(child, (void *)pd_p);
-	pci_config_teardown(&config_handle);
-
-	return (DDI_SUCCESS);
+	ppb_removechild(child);
 }
 
 static void
 ppb_removechild(dev_info_t *dip)
 {
 	ppb_devstate_t *ppb;
-	pci_parent_data_t *pd_p;
-
-	if (pd_p = ddi_get_parent_data(dip)) {
-		ddi_set_parent_data(dip, NULL);
-		kmem_free(pd_p, sizeof (pci_parent_data_t));
-	}
 
 	ppb = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
 	    ddi_get_instance(ddi_get_parent(dip)));
@@ -1648,34 +1681,16 @@ static int ppb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 	return (ddi_prop_op(dev, dip, prop_op, flags, name, valuep, lengthp));
 }
 
-static int
-ppb_get_bdf_from_dip(dev_info_t *dip, uint32_t *bdf)
-{
-	pci_regspec_t	*regspec;
-	int		reglen;
-
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "reg", (int **)&regspec, (uint_t *)&reglen) != DDI_SUCCESS)
-		return (DDI_FAILURE);
-
-	if (reglen < (sizeof (pci_regspec_t) / sizeof (int))) {
-		ddi_prop_free(regspec);
-		return (DDI_FAILURE);
-	}
-
-	/* Get phys_hi from first element.  All have same bdf. */
-	*bdf = (regspec->pci_phys_hi & (PCI_REG_BDFR_M ^ PCI_REG_REG_M)) >> 8;
-
-	ddi_prop_free(regspec);
-	return (DDI_SUCCESS);
-}
-
 /*
  * Initialize our FMA resources
  */
 static void
 ppb_fm_init(ppb_devstate_t *ppb_p)
 {
+	dev_info_t *root = ddi_root_node();
+	dev_info_t *pdip;
+	char *bus;
+
 	ppb_p->fm_cap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
 		DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 
@@ -1693,6 +1708,21 @@ ppb_fm_init(ppb_devstate_t *ppb_p)
 	 * Register error callback with our parent.
 	 */
 	ddi_fm_handler_register(ppb_p->dip, ppb_err_callback, NULL);
+
+	ppb_p->parent_bus = PCIE_PCIECAP_DEV_TYPE_PCI_DEV;
+	for (pdip = ddi_get_parent(ppb_p->dip); pdip && (pdip != root) &&
+	    (ppb_p->parent_bus != PCIE_PCIECAP_DEV_TYPE_PCIE_DEV);
+	    pdip = ddi_get_parent(pdip)) {
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip,
+		    DDI_PROP_DONTPASS, "device_type", &bus) !=
+		    DDI_PROP_SUCCESS)
+			break;
+
+		if (strcmp(bus, "pciex") == 0)
+			ppb_p->parent_bus = PCIE_PCIECAP_DEV_TYPE_PCIE_DEV;
+
+		ddi_prop_free(bus);
+	}
 }
 
 /*
@@ -1730,6 +1760,18 @@ ppb_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
 static int
 ppb_err_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 {
+	ppb_devstate_t *ppb_p = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
+			ddi_get_instance(dip));
+
+	/*
+	 * errors handled by SPARC PCI-E framework for PCIe platforms
+	 */
+	if (ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+		return (DDI_FM_OK);
+
+	/*
+	 * do the following for SPARC PCI platforms
+	 */
 	ASSERT(impl_data == NULL);
 	pci_ereport_post(dip, derr, NULL);
 	return (derr->fme_status);
