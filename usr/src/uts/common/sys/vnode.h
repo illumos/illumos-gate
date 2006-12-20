@@ -960,6 +960,11 @@ extern uint_t pvn_vmodsort_supported;
 	((VP1) && (VP2) && (vn_getops(VP1) == vn_getops(VP2)) ? \
 	VOP_CMP(VP1, VP2) : 0))
 
+extern struct vnode kvp;
+extern struct vnode zvp;
+
+#define	VN_ISKAS(vp)		((vp) == &kvp || (vp) == &zvp)
+
 #endif	/* _KERNEL */
 
 /*
@@ -1001,7 +1006,7 @@ struct async_reqs {
  */
 #define	VN_DISPOSE(pp, flag, dn, cr)	{ \
 	extern struct vnode kvp; \
-	if ((pp)->p_vnode != NULL && (pp)->p_vnode != &kvp) \
+	if ((pp)->p_vnode != NULL && !VN_ISKAS((pp)->p_vnode)) \
 		VOP_DISPOSE((pp)->p_vnode, (pp), (flag), (dn), (cr)); \
 	else if ((flag) == B_FREE) \
 		page_free((pp), (dn)); \

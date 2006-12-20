@@ -504,9 +504,11 @@ dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t *flags)
 		dprintf_dbuf_bp(db, bp, "%s", "blkptr:");
 
 	if (bp == NULL || BP_IS_HOLE(bp)) {
+		arc_buf_contents_t type = DBUF_GET_BUFC_TYPE(db);
+
 		ASSERT(bp == NULL || BP_IS_HOLE(bp));
 		dbuf_set_data(db, arc_buf_alloc(db->db_dnode->dn_objset->os_spa,
-		    db->db.db_size, db));
+		    db->db.db_size, db, type));
 		bzero(db->db.db_data, db->db.db_size);
 		db->db_state = DB_CACHED;
 		*flags |= DB_RF_CACHED;
@@ -615,10 +617,12 @@ dbuf_noread(dmu_buf_impl_t *db)
 	while (db->db_state == DB_READ || db->db_state == DB_FILL)
 		cv_wait(&db->db_changed, &db->db_mtx);
 	if (db->db_state == DB_UNCACHED) {
+		arc_buf_contents_t type = DBUF_GET_BUFC_TYPE(db);
+
 		ASSERT(db->db_buf == NULL);
 		ASSERT(db->db.db_data == NULL);
 		dbuf_set_data(db, arc_buf_alloc(db->db_dnode->dn_objset->os_spa,
-		    db->db.db_size, db));
+		    db->db.db_size, db, type));
 		db->db_state = DB_FILL;
 	} else {
 		ASSERT3U(db->db_state, ==, DB_CACHED);
@@ -643,6 +647,7 @@ static void
 dbuf_fix_old_data(dmu_buf_impl_t *db, uint64_t txg)
 {
 	arc_buf_t **quiescing, **syncing;
+	arc_buf_contents_t type;
 
 	ASSERT(MUTEX_HELD(&db->db_mtx));
 	ASSERT(db->db.db_data != NULL);
@@ -665,8 +670,9 @@ dbuf_fix_old_data(dmu_buf_impl_t *db, uint64_t txg)
 		ASSERT(*syncing != db->db_buf);
 		if (refcount_count(&db->db_holds) > db->db_dirtycnt) {
 			int size = db->db.db_size;
+			type = DBUF_GET_BUFC_TYPE(db);
 			*quiescing = arc_buf_alloc(
-			    db->db_dnode->dn_objset->os_spa, size, db);
+			    db->db_dnode->dn_objset->os_spa, size, db, type);
 			bcopy(db->db.db_data, (*quiescing)->b_data, size);
 		} else {
 			dbuf_set_data(db, NULL);
@@ -685,10 +691,11 @@ dbuf_fix_old_data(dmu_buf_impl_t *db, uint64_t txg)
 		ASSERT3U(db->db_dirtycnt, ==, 1);
 		if (refcount_count(&db->db_holds) > db->db_dirtycnt) {
 			int size = db->db.db_size;
+			type = DBUF_GET_BUFC_TYPE(db);
 			/* we can't copy if we have already started a write */
 			ASSERT(*syncing != db->db_data_pending);
 			*syncing = arc_buf_alloc(
-			    db->db_dnode->dn_objset->os_spa, size, db);
+			    db->db_dnode->dn_objset->os_spa, size, db, type);
 			bcopy(db->db.db_data, (*syncing)->b_data, size);
 		} else {
 			dbuf_set_data(db, NULL);
@@ -860,6 +867,7 @@ dbuf_new_size(dmu_buf_impl_t *db, int size, dmu_tx_t *tx)
 {
 	arc_buf_t *buf, *obuf;
 	int osize = db->db.db_size;
+	arc_buf_contents_t type = DBUF_GET_BUFC_TYPE(db);
 
 	ASSERT(db->db_blkid != DB_BONUS_BLKID);
 
@@ -879,7 +887,7 @@ dbuf_new_size(dmu_buf_impl_t *db, int size, dmu_tx_t *tx)
 	dbuf_will_dirty(db, tx);
 
 	/* create the data buffer for the new block */
-	buf = arc_buf_alloc(db->db_dnode->dn_objset->os_spa, size, db);
+	buf = arc_buf_alloc(db->db_dnode->dn_objset->os_spa, size, db, type);
 
 	/* copy old block data to the new block */
 	obuf = db->db_buf;
@@ -1588,9 +1596,10 @@ top:
 	    db->db_data_pending == db->db_buf) {
 		int size = (db->db_blkid == DB_BONUS_BLKID) ?
 		    DN_MAX_BONUSLEN : db->db.db_size;
+		arc_buf_contents_t type = DBUF_GET_BUFC_TYPE(db);
 
 		dbuf_set_data(db, arc_buf_alloc(db->db_dnode->dn_objset->os_spa,
-		    size, db));
+		    size, db, type));
 		bcopy(db->db_data_pending->b_data, db->db.db_data,
 		    db->db.db_size);
 	}
@@ -1766,6 +1775,7 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 	int checksum, compress;
 	zbookmark_t zb;
 	int blksz;
+	arc_buf_contents_t type;
 
 	ASSERT(dmu_tx_is_syncing(tx));
 
@@ -1823,6 +1833,7 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 	}
 
 	if (db->db_level == 0) {
+		type = DBUF_GET_BUFC_TYPE(db);
 		data = &db->db_d.db_data_old[txg&TXG_MASK];
 		blksz = arc_buf_size(*data);
 
@@ -1849,7 +1860,8 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 		    db->db_d.db_overridden_by[txg&TXG_MASK] == NULL) {
 			if (refcount_count(&db->db_holds) > 1 &&
 			    *data == db->db_buf) {
-				*data = arc_buf_alloc(os->os_spa, blksz, db);
+				*data = arc_buf_alloc(os->os_spa, blksz, db,
+				    type);
 				bcopy(db->db.db_data, (*data)->b_data, blksz);
 			}
 			db->db_data_pending = *data;

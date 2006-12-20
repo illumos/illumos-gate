@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -218,6 +217,7 @@ page_walk_fini(mdb_walk_state_t *wsp)
 /* Summary statistics of pages */
 typedef struct memstat {
 	struct vnode    *ms_kvp;	/* Cached address of kernel vnode */
+	struct vnode    *ms_zvp;	/* Cached address of zio vnode    */
 	uint64_t	ms_kmem;	/* Pages of kernel memory	  */
 	uint64_t	ms_anon;	/* Pages of anonymous memory	  */
 	uint64_t	ms_vnode;	/* Pages of named (vnode) memory  */
@@ -225,6 +225,10 @@ typedef struct memstat {
 	uint64_t	ms_cachelist;	/* Pages on the cachelist (free)  */
 	uint64_t	ms_total;	/* Pages on page hash		  */
 } memstat_t;
+
+#define	MS_PP_ISKAS(pp, stats)				\
+	(((pp)->p_vnode == (stats)->ms_kvp) ||		\
+	    (((stats)->ms_zvp != NULL) && ((pp)->p_vnode == (stats)->ms_zvp)))
 
 /*
  * Summarize pages by type; called from page walker.
@@ -252,7 +256,7 @@ memstat_callback(page_t *page, page_t *pp, memstat_t *stats)
 		stats->ms_cachelist++;
 	else if (vp && IS_SWAPFSVP(vp))
 		stats->ms_anon++;
-	else if (pp->p_vnode == stats->ms_kvp)
+	else if (MS_PP_ISKAS(pp, stats))
 		stats->ms_kmem++;
 	else if (vp && (((vp)->v_flag & VVMEXEC)) != 0)
 		stats->ms_exec++;
@@ -307,6 +311,17 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	stats.ms_kvp = (struct vnode *)(uintptr_t)sym.st_value;
+
+	/*
+	 * Read the zio vnode pointer.  It may not exist on all kernels, so it
+	 * it isn't found, it's not a fatal error.
+	 */
+	if (mdb_lookup_by_obj(MDB_OBJ_EXEC, "zvp",
+		(GElf_Sym *)&sym) == -1) {
+		stats.ms_zvp = NULL;
+	} else {
+		stats.ms_zvp = (struct vnode *)(uintptr_t)sym.st_value;
+	}
 
 	/* Walk page structures, summarizing usage */
 	if (mdb_walk("page", (mdb_walk_cb_t)memstat_callback,

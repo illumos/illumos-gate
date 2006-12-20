@@ -306,6 +306,9 @@ typedef struct blkptr {
 
 #include <sys/dmu.h>
 
+#define	BP_GET_BUFC_TYPE(bp)						\
+	(((BP_GET_LEVEL(bp) > 0) || (dmu_ot[BP_GET_TYPE(bp)].ot_metadata)) ? \
+	ARC_BUFC_METADATA : ARC_BUFC_DATA);
 /*
  * Routines found in spa.c
  */

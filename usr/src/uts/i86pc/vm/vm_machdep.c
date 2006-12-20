@@ -1920,8 +1920,8 @@ top:
 			 *	 with kernel vnode 'kvp'.
 			 */
 			/* XX64 - to debug why this happens! */
-			ASSERT(vp != &kvp);
-			if (vp == &kvp)
+			ASSERT(!VN_ISKAS(vp));
+			if (VN_ISKAS(vp))
 				cmn_err(CE_NOTE,
 				    "page_create: page not expected "
 				    "in hash list for kernel vnode - pp 0x%p",

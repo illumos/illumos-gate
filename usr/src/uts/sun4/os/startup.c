@@ -192,6 +192,10 @@ struct seg *segkp = &kpseg;	/* Pageable kernel virtual memory segment */
 struct seg *segkmap = &kmapseg;	/* Kernel generic mapping segment */
 struct seg *segkpm = &kpmseg;	/* 64bit kernel physical mapping segment */
 
+int segzio_fromheap = 0;	/* zio allocations occur from heap */
+caddr_t segzio_base;		/* Base address of segzio */
+pgcnt_t segziosize = 0;		/* size of zio segment in pages */
+
 /*
  * debugger pages (if allocated)
  */
@@ -373,6 +377,8 @@ static int bootops_gone_on = 0;
  * 0xFFFFFFFC.00000000  -|-----------------------|-
  *                       :                       :
  *                       :                       :
+ *                      -|-----------------------|-
+ *                       |       segzio          | (base and size vary)
  * 0xFFFFFE00.00000000  -|-----------------------|-
  *                       |                       |  Ultrasparc I/II support
  *                       |    segkpm segment     |  up to 2TB of physical
@@ -2057,6 +2063,47 @@ startup_vm(void)
 
 		mach_kpm_init();
 	}
+
+	if (!segzio_fromheap) {
+		size_t size;
+
+		/* size is in bytes, segziosize is in pages */
+		if (segziosize == 0) {
+			size = mmu_ptob(physmem * 2);
+		} else {
+			size = mmu_ptob(segziosize);
+		}
+
+		if (size < SEGZIOMINSIZE) {
+			size = SEGZIOMINSIZE;
+		} else if (size > mmu_ptob(physmem * 4)) {
+			size = mmu_ptob(physmem * 4);
+		}
+		segziosize = mmu_btop(roundup(size, MMU_PAGESIZE));
+		/* put the base of the ZIO segment after the kpm segment */
+		segzio_base = kpm_vbase + (kpm_size * vac_colors);
+		PRM_DEBUG(segziosize);
+		PRM_DEBUG(segzio_base);
+
+		/*
+		 * On some platforms, kvm_init is called after the kpm
+		 * sizes have been determined.  On SPARC, kvm_init is called
+		 * before, so we have to attach the kzioseg after kvm is
+		 * initialized, otherwise we'll try to allocate from the boot
+		 * area since the kernel heap hasn't yet been configured.
+		 */
+		rw_enter(&kas.a_lock, RW_WRITER);
+
+		(void) seg_attach(&kas, segzio_base, mmu_ptob(segziosize),
+		    &kzioseg);
+		(void) segkmem_zio_create(&kzioseg);
+
+		/* create zio area covering new segment */
+		segkmem_zio_init(segzio_base, mmu_ptob(segziosize));
+
+		rw_exit(&kas.a_lock);
+	}
+
 
 	/*
 	 * Now create generic mapping segment.  This mapping

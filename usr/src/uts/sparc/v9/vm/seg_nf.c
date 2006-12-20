@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,8 +121,8 @@ struct seg_ops segnf_ops = {
  * vnode and page for the page of zeros we use for the nf mappings.
  */
 static kmutex_t segnf_lock;
-static struct vnode zvp;
-static struct page **zpp;
+static struct vnode nfvp;
+static struct page **nfpp;
 
 #define	addr_to_vcolor(addr)                                            \
 	(shm_alignment) ?						\
@@ -195,7 +194,7 @@ segnf_create(struct seg *seg, void *argsp)
 	 * Need a page per virtual color or just 1 if no vac.
 	 */
 	mutex_enter(&segnf_lock);
-	if (zpp == NULL) {
+	if (nfpp == NULL) {
 		struct seg kseg;
 
 		vacpgs = 1;
@@ -203,16 +202,16 @@ segnf_create(struct seg *seg, void *argsp)
 			vacpgs = shm_alignment >> PAGESHIFT;
 		}
 
-		zpp = kmem_alloc(sizeof (*zpp) * vacpgs, KM_SLEEP);
+		nfpp = kmem_alloc(sizeof (*nfpp) * vacpgs, KM_SLEEP);
 
 		kseg.s_as = &kas;
 		for (i = 0; i < vacpgs; i++, off += PAGESIZE,
 		    vaddr += PAGESIZE) {
-			zpp[i] = page_create_va(&zvp, off, PAGESIZE,
+			nfpp[i] = page_create_va(&nfvp, off, PAGESIZE,
 			    PG_WAIT | PG_NORELOC, &kseg, vaddr);
-			page_io_unlock(zpp[i]);
-			page_downgrade(zpp[i]);
-			pagezero(zpp[i], 0, PAGESIZE);
+			page_io_unlock(nfpp[i]);
+			page_downgrade(nfpp[i]);
+			pagezero(nfpp[i], 0, PAGESIZE);
 		}
 	}
 	mutex_exit(&segnf_lock);
@@ -234,7 +233,7 @@ segnf_create(struct seg *seg, void *argsp)
 	color = addr_to_vcolor(seg->s_base);
 	if (as != &kas)
 		prot |= PROT_USER;
-	hat_memload(as->a_hat, seg->s_base, zpp[color],
+	hat_memload(as->a_hat, seg->s_base, nfpp[color],
 	    prot | HAT_NOFAULT, HAT_LOAD);
 
 	/*
@@ -456,7 +455,7 @@ segnf_getvp(struct seg *seg, caddr_t addr, struct vnode **vpp)
 {
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
 
-	*vpp = &zvp;
+	*vpp = &nfvp;
 	return (0);
 }
 

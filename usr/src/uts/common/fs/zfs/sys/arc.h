@@ -54,6 +54,11 @@ struct arc_buf {
 	void			*b_private;
 };
 
+typedef enum arc_buf_contents {
+	ARC_BUFC_UNDEF,				/* buffer contents undefined */
+	ARC_BUFC_DATA,				/* buffer contains data */
+	ARC_BUFC_METADATA			/* buffer contains metadata */
+} arc_buf_contents_t;
 /*
  * These are the flags we pass into calls to the arc
  */
@@ -62,7 +67,8 @@ struct arc_buf {
 #define	ARC_PREFETCH	(1 << 3)	/* I/O is a prefetch */
 #define	ARC_CACHED	(1 << 4)	/* I/O was already in cache */
 
-arc_buf_t *arc_buf_alloc(spa_t *spa, int size, void *tag);
+arc_buf_t *arc_buf_alloc(spa_t *spa, int size, void *tag,
+    arc_buf_contents_t type);
 void arc_buf_add_ref(arc_buf_t *buf, void *tag);
 int arc_buf_remove_ref(arc_buf_t *buf, void *tag);
 int arc_buf_size(arc_buf_t *buf);

@@ -877,8 +877,9 @@ int	page_szc_user_filtered(size_t);
 #define	PP_ISAGED(pp)		(((pp)->p_state & P_FREE) && \
 					((pp)->p_vnode == NULL))
 #define	PP_ISNORELOC(pp)	((pp)->p_state & P_NORELOC)
-#define	PP_ISKVP(pp)		((pp)->p_vnode == &kvp)
-#define	PP_ISNORELOCKERNEL(pp)	(PP_ISNORELOC(pp) && PP_ISKVP(pp))
+#define	PP_ISKAS(pp)		(((pp)->p_vnode == &kvp) || \
+					    ((pp)->p_vnode == &zvp))
+#define	PP_ISNORELOCKERNEL(pp)	(PP_ISNORELOC(pp) && PP_ISKAS(pp))
 #define	PP_ISMIGRATE(pp)	((pp)->p_state & P_MIGRATE)
 #define	PP_ISSWAP(pp)		((pp)->p_state & P_SWAP)
 
@@ -956,7 +957,7 @@ int	page_szc_user_filtered(size_t);
 #define	PP_PR_REQ(pp)	(((pp)->p_toxic & PR_REASONS) && !PP_RETIRED(pp))
 #define	PP_PR_NOSHARE(pp)						\
 	((((pp)->p_toxic & (PR_RETIRED | PR_FMA | PR_UE)) == PR_FMA) &&	\
-	!PP_ISKVP(pp))
+	!PP_ISKAS(pp))
 
 /*
  * Flags for page_unretire_pp

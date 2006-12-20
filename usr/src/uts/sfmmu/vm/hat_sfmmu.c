@@ -3672,14 +3672,21 @@ rehash:
 			 * Somebody is holding SE_EXCL lock. Might
 			 * even be hat_page_relocate(). Drop all
 			 * our locks, lookup the page in &kvp, and
-			 * retry. If it doesn't exist in &kvp, then
-			 * we must be dealing with a kernel mapped
+			 * retry. If it doesn't exist in &kvp and &zvp,
+			 * then we must be dealing with a kernel mapped
 			 * page which doesn't actually belong to
 			 * segkmem so we punt.
 			 */
 			sfmmu_mlist_exit(pml);
 			SFMMU_HASH_UNLOCK(hmebp);
 			pp = page_lookup(&kvp, (u_offset_t)saddr, SE_SHARED);
+
+			/* check zvp before giving up */
+			if (pp == NULL)
+				pp = page_lookup(&zvp, (u_offset_t)saddr,
+				    SE_SHARED);
+
+			/* Okay, we didn't find it, give up */
 			if (pp == NULL) {
 				kmem_cache_free(pa_hment_cache, pahmep);
 				*rpfn = pfn;
@@ -3710,7 +3717,7 @@ rehash:
 		goto rehash;
 	}
 
-	if (vp != &kvp) {
+	if (!VN_ISKAS(vp)) {
 		/*
 		 * This is not a segkmem page but another page which
 		 * has been kernel mapped. It had better have at least
@@ -3841,14 +3848,19 @@ rehash:
 			 * Somebody is holding SE_EXCL lock. Might
 			 * even be hat_page_relocate(). Drop all
 			 * our locks, lookup the page in &kvp, and
-			 * retry. If it doesn't exist in &kvp, then
-			 * we must be dealing with a kernel mapped
+			 * retry. If it doesn't exist in &kvp and &zvp,
+			 * then we must be dealing with a kernel mapped
 			 * page which doesn't actually belong to
 			 * segkmem so we punt.
 			 */
 			sfmmu_mlist_exit(pml);
 			SFMMU_HASH_UNLOCK(hmebp);
 			pp = page_lookup(&kvp, (u_offset_t)saddr, SE_SHARED);
+			/* check zvp before giving up */
+			if (pp == NULL)
+				pp = page_lookup(&zvp, (u_offset_t)saddr,
+				    SE_SHARED);
+
 			if (pp == NULL) {
 				ASSERT(cookie == NULL);
 				return;
@@ -3875,7 +3887,7 @@ rehash:
 		goto rehash;
 	}
 
-	if (vp != &kvp) {
+	if (!VN_ISKAS(vp)) {
 		/*
 		 * This is not a segkmem page but another page which
 		 * has been kernel mapped.
@@ -6522,7 +6534,7 @@ sfmmu_pageunload(page_t *pp, struct sf_hment *sfhme, int cons)
 
 	ASSERT(pp != NULL);
 	ASSERT(sfmmu_mlist_held(pp));
-	ASSERT(pp->p_vnode != &kvp);
+	ASSERT(!PP_ISKAS(pp));
 
 	CPUSET_ZERO(cpuset);
 

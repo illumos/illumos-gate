@@ -295,6 +295,8 @@ extern void zio_nowait(zio_t *zio);
 
 extern void *zio_buf_alloc(size_t size);
 extern void zio_buf_free(void *buf, size_t size);
+extern void *zio_data_buf_alloc(size_t size);
+extern void zio_data_buf_free(void *buf, size_t size);
 
 /*
  * Move an I/O to the next stage of the pipeline and execute that stage.

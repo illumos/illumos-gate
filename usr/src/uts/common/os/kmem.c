@@ -154,9 +154,11 @@ static const int kmem_alloc_sizes[] = {
 	P2ALIGN(8192 / 1, 64),
 	4096 * 3,
 	8192 * 2,
+	8192 * 3,
+	8192 * 4,
 };
 
-#define	KMEM_MAXBUF	16384
+#define	KMEM_MAXBUF	32768
 
 static kmem_cache_t *kmem_alloc_table[KMEM_MAXBUF >> KMEM_ALIGN_SHIFT];
 

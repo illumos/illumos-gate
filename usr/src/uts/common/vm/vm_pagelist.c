@@ -3909,7 +3909,7 @@ page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp_target,
 	 * pages, since we cannot properly handle demotion of kernel
 	 * pages.
 	 */
-	if (like_pp->p_vnode == &kvp)
+	if (PP_ISKAS(like_pp))
 		pgrflags |= PGR_SAMESZC;
 
 	/* LINTED */

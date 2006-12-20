@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -103,6 +102,7 @@ char *kernelheap;		/* start of primary kernel heap */
 char *ekernelheap;		/* end of primary kernel heap */
 struct seg kvseg;		/* primary kernel heap segment */
 struct seg kvseg_core;		/* "core" kernel heap segment */
+struct seg kzioseg;		/* Segment for zio mappings */
 vmem_t *heap_arena;		/* primary kernel heap arena */
 vmem_t *heap_core_arena;	/* core kernel heap arena */
 char *heap_core_base;		/* start of core kernel heap arena */
@@ -114,9 +114,12 @@ vmem_t *heap32_arena;		/* 32-bit kernel heap arena */
 vmem_t *heaptext_arena;		/* heaptext arena */
 struct as kas;			/* kernel address space */
 struct vnode kvp;		/* vnode for all segkmem pages */
+struct vnode zvp;		/* vnode for zfs pages */
 int segkmem_reloc;		/* enable/disable relocatable segkmem pages */
 vmem_t *static_arena;		/* arena for caches to import static memory */
 vmem_t *static_alloc_arena;	/* arena for allocating static memory */
+vmem_t *zio_arena = NULL;	/* arena for allocating zio memory */
+vmem_t *zio_alloc_arena = NULL;	/* arena for allocating zio memory */
 
 /*
  * seg_kmem driver can map part of the kernel heap with large pages.
@@ -427,6 +430,7 @@ segkmem_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t size,
 	pgcnt_t npages;
 	spgcnt_t pg;
 	page_t *pp;
+	struct vnode *vp = seg->s_data;
 
 	ASSERT(RW_READ_HELD(&seg->s_as->a_lock));
 
@@ -451,7 +455,7 @@ segkmem_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t size,
 	switch (type) {
 	case F_SOFTLOCK:	/* lock down already-loaded translations */
 		for (pg = 0; pg < npages; pg++) {
-			pp = page_lookup(&kvp, (u_offset_t)(uintptr_t)addr,
+			pp = page_lookup(vp, (u_offset_t)(uintptr_t)addr,
 			    SE_SHARED);
 			if (pp == NULL) {
 				/*
@@ -461,7 +465,7 @@ segkmem_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t size,
 				if (!hat_probe(kas.a_hat, addr)) {
 					addr -= PAGESIZE;
 					while (--pg >= 0) {
-						pp = page_find(&kvp,
+						pp = page_find(vp,
 						(u_offset_t)(uintptr_t)addr);
 						if (pp)
 							page_unlock(pp);
@@ -477,7 +481,7 @@ segkmem_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t size,
 		return (0);
 	case F_SOFTUNLOCK:
 		while (npages--) {
-			pp = page_find(&kvp, (u_offset_t)(uintptr_t)addr);
+			pp = page_find(vp, (u_offset_t)(uintptr_t)addr);
 			if (pp)
 				page_unlock(pp);
 			addr += PAGESIZE;
@@ -645,6 +649,13 @@ segkmem_dump(struct seg *seg)
 		    segkmem_dump_range, seg->s_as);
 		vmem_walk(heaptext_arena, VMEM_ALLOC | VMEM_REENTRANT,
 		    segkmem_dump_range, seg->s_as);
+	} else if (seg == &kzioseg) {
+		/*
+		 * We don't want to dump pages attached to kzioseg since they
+		 * contain file data from ZFS.  If this page's segment is
+		 * kzioseg return instead of writing it to the dump device.
+		 */
+		return;
 	} else {
 		segkmem_dump_range(seg->s_as, seg->s_base, seg->s_size);
 	}
@@ -666,6 +677,7 @@ segkmem_pagelock(struct seg *seg, caddr_t addr, size_t len,
 	pgcnt_t npages;
 	spgcnt_t pg;
 	size_t nb;
+	struct vnode *vp = seg->s_data;
 
 	ASSERT(ppp != NULL);
 
@@ -706,7 +718,7 @@ segkmem_pagelock(struct seg *seg, caddr_t addr, size_t len,
 	}
 
 	for (pg = 0; pg < npages; pg++) {
-		pp = page_lookup(&kvp, (u_offset_t)(uintptr_t)addr, SE_SHARED);
+		pp = page_lookup(vp, (u_offset_t)(uintptr_t)addr, SE_SHARED);
 		if (pp == NULL) {
 			while (--pg >= 0)
 				page_unlock(pplist[pg]);
@@ -791,11 +803,21 @@ static struct seg_ops segkmem_ops = {
 };
 
 int
+segkmem_zio_create(struct seg *seg)
+{
+	ASSERT(seg->s_as == &kas && RW_WRITE_HELD(&kas.a_lock));
+	seg->s_ops = &segkmem_ops;
+	seg->s_data = &zvp;
+	kas.a_size += seg->s_size;
+	return (0);
+}
+
+int
 segkmem_create(struct seg *seg)
 {
 	ASSERT(seg->s_as == &kas && RW_WRITE_HELD(&kas.a_lock));
 	seg->s_ops = &segkmem_ops;
-	seg->s_data = NULL;
+	seg->s_data = &kvp;
 	kas.a_size += seg->s_size;
 	return (0);
 }
@@ -806,6 +828,10 @@ segkmem_page_create(void *addr, size_t size, int vmflag, void *arg)
 {
 	struct seg kseg;
 	int pgflags;
+	struct vnode *vp = arg;
+
+	if (vp == NULL)
+		vp = &kvp;
 
 	kseg.s_as = &kas;
 	pgflags = PG_EXCL;
@@ -819,7 +845,7 @@ segkmem_page_create(void *addr, size_t size, int vmflag, void *arg)
 	if (vmflag & VM_PUSHPAGE)
 		pgflags |= PG_PUSHPAGE;
 
-	return (page_create_va(&kvp, (u_offset_t)(uintptr_t)addr, size,
+	return (page_create_va(vp, (u_offset_t)(uintptr_t)addr, size,
 	    pgflags, &kseg, addr));
 }
 
@@ -897,11 +923,13 @@ segkmem_xalloc(vmem_t *vmp, void *inaddr, size_t size, int vmflag, uint_t attr,
 	return (addr);
 }
 
-void *
-segkmem_alloc(vmem_t *vmp, size_t size, int vmflag)
+static void *
+segkmem_alloc_vn(vmem_t *vmp, size_t size, int vmflag, struct vnode *vp)
 {
 	void *addr;
 	segkmem_gc_list_t *gcp, **prev_gcpp;
+
+	ASSERT(vp != NULL);
 
 	if (kvseg.s_base == NULL) {
 #ifndef __sparc
@@ -928,7 +956,19 @@ segkmem_alloc(vmem_t *vmp, size_t size, int vmflag)
 		return (addr);
 	}
 	return (segkmem_xalloc(vmp, NULL, size, vmflag, 0,
-	    segkmem_page_create, NULL));
+	    segkmem_page_create, vp));
+}
+
+void *
+segkmem_alloc(vmem_t *vmp, size_t size, int vmflag)
+{
+	return (segkmem_alloc_vn(vmp, size, vmflag, &kvp));
+}
+
+void *
+segkmem_zio_alloc(vmem_t *vmp, size_t size, int vmflag)
+{
+	return (segkmem_alloc_vn(vmp, size, vmflag, &zvp));
 }
 
 /*
@@ -937,8 +977,8 @@ segkmem_alloc(vmem_t *vmp, size_t size, int vmflag)
  * we currently don't have a special kernel segment for non-paged
  * kernel memory that is exported by drivers to user space.
  */
-void
-segkmem_free(vmem_t *vmp, void *inaddr, size_t size)
+static void
+segkmem_free_vn(vmem_t *vmp, void *inaddr, size_t size, struct vnode *vp)
 {
 	page_t *pp;
 	caddr_t addr = inaddr;
@@ -946,6 +986,7 @@ segkmem_free(vmem_t *vmp, void *inaddr, size_t size)
 	pgcnt_t npages = btopr(size);
 
 	ASSERT(((uintptr_t)addr & PAGEOFFSET) == 0);
+	ASSERT(vp != NULL);
 
 	if (kvseg.s_base == NULL) {
 		segkmem_gc_list_t *gc = inaddr;
@@ -960,7 +1001,7 @@ segkmem_free(vmem_t *vmp, void *inaddr, size_t size)
 
 	for (eaddr = addr + size; addr < eaddr; addr += PAGESIZE) {
 #if defined(__x86)
-		pp = page_find(&kvp, (u_offset_t)(uintptr_t)addr);
+		pp = page_find(vp, (u_offset_t)(uintptr_t)addr);
 		if (pp == NULL)
 			panic("segkmem_free: page not found");
 		if (!page_tryupgrade(pp)) {
@@ -969,11 +1010,11 @@ segkmem_free(vmem_t *vmp, void *inaddr, size_t size)
 			 * it to drop the lock so we can free this page.
 			 */
 			page_unlock(pp);
-			pp = page_lookup(&kvp, (u_offset_t)(uintptr_t)addr,
+			pp = page_lookup(vp, (u_offset_t)(uintptr_t)addr,
 			    SE_EXCL);
 		}
 #else
-		pp = page_lookup(&kvp, (u_offset_t)(uintptr_t)addr, SE_EXCL);
+		pp = page_lookup(vp, (u_offset_t)(uintptr_t)addr, SE_EXCL);
 #endif
 		if (pp == NULL)
 			panic("segkmem_free: page not found");
@@ -985,6 +1026,19 @@ segkmem_free(vmem_t *vmp, void *inaddr, size_t size)
 
 	if (vmp != NULL)
 		vmem_free(vmp, inaddr, size);
+
+}
+
+void
+segkmem_free(vmem_t *vmp, void *inaddr, size_t size)
+{
+	segkmem_free_vn(vmp, inaddr, size, &kvp);
+}
+
+void
+segkmem_zio_free(vmem_t *vmp, void *inaddr, size_t size)
+{
+	segkmem_free_vn(vmp, inaddr, size, &zvp);
 }
 
 void
@@ -1439,6 +1493,22 @@ segkmem_lpsetup()
 
 #endif
 	return (use_large_pages);
+}
+
+void
+segkmem_zio_init(void *zio_mem_base, size_t zio_mem_size)
+{
+	ASSERT(zio_mem_base != NULL);
+	ASSERT(zio_mem_size != 0);
+
+	zio_arena = vmem_create("zio", zio_mem_base, zio_mem_size, PAGESIZE,
+	    NULL, NULL, NULL, 0, VM_SLEEP);
+
+	zio_alloc_arena = vmem_create("zio_buf", NULL, 0, PAGESIZE,
+	    segkmem_zio_alloc, segkmem_zio_free, zio_arena, 0, VM_SLEEP);
+
+	ASSERT(zio_arena != NULL);
+	ASSERT(zio_alloc_arena != NULL);
 }
 
 #ifdef __sparc

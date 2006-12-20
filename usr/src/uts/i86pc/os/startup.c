@@ -209,6 +209,19 @@ char bootblock_fstype[16];
 char kern_bootargs[OBP_MAXPATHLEN];
 
 /*
+ * ZFS zio segment.  This allows us to exclude large portions of ZFS data that
+ * gets cached in kmem caches on the heap.  If this is set to zero, we allocate
+ * zio buffers from their own segment, otherwise they are allocated from the
+ * heap.  The optimization of allocating zio buffers from their own segment is
+ * only valid on 64-bit kernels.
+ */
+#if defined(__amd64)
+int segzio_fromheap = 0;
+#else
+int segzio_fromheap = 1;
+#endif
+
+/*
  * new memory fragmentations are possible in startup() due to BOP_ALLOCs. this
  * depends on number of BOP_ALLOC calls made and requested size, memory size
  * combination and whether boot.bin memory needs to be freed.
@@ -239,11 +252,13 @@ struct seg *segkpm = NULL;	/* Unused on IA32 */
 #endif
 
 caddr_t segkp_base;		/* Base address of segkp */
+caddr_t segzio_base;		/* Base address of segzio */
 #if defined(__amd64)
 pgcnt_t segkpsize = btop(SEGKPDEFSIZE);	/* size of segkp segment in pages */
 #else
 pgcnt_t segkpsize = 0;
 #endif
+pgcnt_t segziosize = 0;		/* size of zio segment in pages */
 
 struct memseg *memseg_base;
 struct vnode unused_pages_vp;
@@ -362,6 +377,8 @@ static pgcnt_t kphysm_init(page_t *, struct memseg *, pgcnt_t, pgcnt_t);
  * 0xFFFFFXXX.XXX00000  |-----------------------|- segkmap_start (floating)
  *			|    device mappings	|
  * 0xFFFFFXXX.XXX00000  |-----------------------|- toxic_addr (floating)
+ *			|	  segzio	|
+ * 0xFFFFFXXX.XXX00000  |-----------------------|- segzio_base (floating)
  *			|	  segkp		|
  * ---                  |-----------------------|- segkp_base
  *			|	 segkpm		|
@@ -1566,6 +1583,29 @@ startup_vm(void)
 		PRM_DEBUG(final_kernelheap);
 	}
 
+	if (!segzio_fromheap) {
+		size_t size;
+
+		/* size is in bytes, segziosize is in pages */
+		if (segziosize == 0) {
+			size = mmu_ptob(physmem * 2);
+		} else {
+			size = mmu_ptob(segziosize);
+		}
+
+		if (size < SEGZIOMINSIZE) {
+			size = SEGZIOMINSIZE;
+		} else if (size > mmu_ptob(physmem * 4)) {
+			size = mmu_ptob(physmem * 4);
+		}
+		segziosize = mmu_btop(ROUND_UP_LPAGE(size));
+		segzio_base = final_kernelheap;
+		PRM_DEBUG(segziosize);
+		PRM_DEBUG(segzio_base);
+		final_kernelheap = segzio_base + mmu_ptob(segziosize);
+		PRM_DEBUG(final_kernelheap);
+	}
+
 	/*
 	 * put the range of VA for device mappings next
 	 */
@@ -2377,6 +2417,16 @@ kvm_init(void)
 #if defined(__amd64)
 	(void) seg_attach(&kas, (caddr_t)core_base, core_size, &kvseg_core);
 	(void) segkmem_create(&kvseg_core);
+
+	/* segzio optimization is only valid for 64-bit kernels */
+	if (!segzio_fromheap) {
+		(void) seg_attach(&kas, segzio_base, mmu_ptob(segziosize),
+		    &kzioseg);
+		(void) segkmem_zio_create(&kzioseg);
+
+		/* create zio area covering new segment */
+		segkmem_zio_init(segzio_base, mmu_ptob(segziosize));
+	}
 #endif
 
 	(void) seg_attach(&kas, (caddr_t)SEGDEBUGBASE, (size_t)SEGDEBUGSIZE,

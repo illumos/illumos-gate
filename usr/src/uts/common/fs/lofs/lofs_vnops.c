@@ -1048,7 +1048,7 @@ static void
 lo_dispose(vnode_t *vp, page_t *pp, int fl, int dn, cred_t *cr)
 {
 	vp = realvp(vp);
-	if (vp != NULL && vp != &kvp)
+	if (vp != NULL && !VN_ISKAS(vp))
 		VOP_DISPOSE(vp, pp, fl, dn, cr);
 }
 

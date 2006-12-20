@@ -355,7 +355,7 @@ int pr_types[PRT_ALL+1];
 	int whichtype = 0;			\
 	if (pp->p_vnode)			\
 		whichtype |= PRT_NAMED;		\
-	if (PP_ISKVP(pp))			\
+	if (PP_ISKAS(pp))			\
 		whichtype |= PRT_KERNEL;	\
 	if (PP_ISFREE(pp))			\
 		whichtype |= PRT_FREE;		\
@@ -882,7 +882,7 @@ static void
 page_retire_thread_cb(page_t *pp)
 {
 	PR_DEBUG(prd_tctop);
-	if (!PP_ISKVP(pp) && page_trylock(pp, SE_EXCL)) {
+	if (!PP_ISKAS(pp) && page_trylock(pp, SE_EXCL)) {
 		PR_DEBUG(prd_tclocked);
 		page_unlock(pp);
 	}
@@ -901,7 +901,7 @@ page_retire_mdboot_cb(page_t *pp)
 	 * Don't scrub the kernel, since we might still need it, unless
 	 * we have UEs on the page, in which case we have nothing to lose.
 	 */
-	if (!PP_ISKVP(pp) || PP_TOXIC(pp)) {
+	if (!PP_ISKAS(pp) || PP_TOXIC(pp)) {
 		pp->p_selock = -1;	/* pacify ASSERTs */
 		PP_CLRFREE(pp);
 		pagescrub(pp, 0, PAGESIZE);

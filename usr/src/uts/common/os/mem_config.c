@@ -1923,7 +1923,7 @@ delete_memory_thread(caddr_t amhp)
 				 * Unload the mappings and check if mod bit
 				 * is set.
 				 */
-				ASSERT(pp->p_vnode != &kvp);
+				ASSERT(!PP_ISKAS(pp));
 				(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
 				mod = hat_ismod(pp);
 

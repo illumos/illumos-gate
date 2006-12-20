@@ -1308,7 +1308,7 @@ kcage_setnoreloc_pages(page_t *rootpp, se_t se)
 		 * non-swapfs (i.e. anonymous memory) file system pages.
 		 */
 		ASSERT(rootpp->p_vnode != NULL &&
-		    rootpp->p_vnode != &kvp &&
+		    !PP_ISKAS(rootpp) &&
 		    !IS_SWAPFSVP(rootpp->p_vnode));
 		PP_SETNORELOC(rootpp);
 		return (1);
@@ -1783,7 +1783,7 @@ again:
 				continue;
 			}
 
-			if ((pp->p_vnode == &kvp && pp->p_lckcnt > 0) ||
+			if ((PP_ISKAS(pp) && pp->p_lckcnt > 0) ||
 			    !page_trylock(pp, SE_EXCL)) {
 				KCAGE_STAT_INCR_SCAN(kt_cantlock);
 				continue;
@@ -1791,7 +1791,7 @@ again:
 
 			/* P_NORELOC bit should not have gone away. */
 			ASSERT(PP_ISNORELOC(pp));
-			if (PP_ISFREE(pp) || (pp->p_vnode == &kvp &&
+			if (PP_ISFREE(pp) || (PP_ISKAS(pp) &&
 			    pp->p_lckcnt > 0)) {
 				page_unlock(pp);
 				continue;

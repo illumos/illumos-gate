@@ -230,10 +230,6 @@ struct arc_callback {
 };
 
 struct arc_buf_hdr {
-	/* immutable */
-	uint64_t		b_size;
-	spa_t			*b_spa;
-
 	/* protected by hash lock */
 	dva_t			b_dva;
 	uint64_t		b_birth;
@@ -247,8 +243,13 @@ struct arc_buf_hdr {
 	uint32_t		b_flags;
 	uint32_t		b_datacnt;
 
-	kcondvar_t		b_cv;
 	arc_callback_t		*b_acb;
+	kcondvar_t		b_cv;
+
+	/* immutable */
+	arc_buf_contents_t	b_type;
+	uint64_t		b_size;
+	spa_t			*b_spa;
 
 	/* protected by arc state mutex */
 	arc_state_t		*b_state;
@@ -746,7 +747,7 @@ arc_change_state(arc_state_t *new_state, arc_buf_hdr_t *ab, kmutex_t *hash_lock)
 }
 
 arc_buf_t *
-arc_buf_alloc(spa_t *spa, int size, void *tag)
+arc_buf_alloc(spa_t *spa, int size, void *tag, arc_buf_contents_t type)
 {
 	arc_buf_hdr_t *hdr;
 	arc_buf_t *buf;
@@ -755,6 +756,7 @@ arc_buf_alloc(spa_t *spa, int size, void *tag)
 	hdr = kmem_cache_alloc(hdr_cache, KM_SLEEP);
 	ASSERT(BUF_EMPTY(hdr));
 	hdr->b_size = size;
+	hdr->b_type = type;
 	hdr->b_spa = spa;
 	hdr->b_state = arc.anon;
 	hdr->b_arc_access = 0;
@@ -839,10 +841,16 @@ arc_buf_destroy(arc_buf_t *buf, boolean_t recycle, boolean_t all)
 	if (buf->b_data) {
 		arc_state_t *state = buf->b_hdr->b_state;
 		uint64_t size = buf->b_hdr->b_size;
+		arc_buf_contents_t type = buf->b_hdr->b_type;
 
 		arc_cksum_verify(buf);
 		if (!recycle) {
-			zio_buf_free(buf->b_data, size);
+			if (type == ARC_BUFC_METADATA) {
+				zio_buf_free(buf->b_data, size);
+			} else {
+				ASSERT(type == ARC_BUFC_DATA);
+				zio_data_buf_free(buf->b_data, size);
+			}
 			atomic_add_64(&arc.size, -size);
 		}
 		if (list_link_active(&buf->b_hdr->b_arc_node)) {
@@ -1003,7 +1011,8 @@ arc_buf_size(arc_buf_t *buf)
  * new buffer in a full arc cache.
  */
 static void *
-arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle)
+arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle,
+    arc_buf_contents_t type)
 {
 	arc_state_t *evicted_state;
 	uint64_t bytes_evicted = 0, skipped = 0, missed = 0;
@@ -1041,7 +1050,8 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle)
 				arc_buf_t *buf = ab->b_buf;
 				if (buf->b_data) {
 					bytes_evicted += ab->b_size;
-					if (recycle && ab->b_size == bytes) {
+					if (recycle && ab->b_type == type &&
+					    ab->b_size == bytes) {
 						stolen = buf->b_data;
 						recycle = FALSE;
 					}
@@ -1147,7 +1157,7 @@ arc_adjust(void)
 
 	if (top_sz > arc.p && arc.mru->lsize > 0) {
 		int64_t toevict = MIN(arc.mru->lsize, top_sz-arc.p);
-		(void) arc_evict(arc.mru, toevict, FALSE);
+		(void) arc_evict(arc.mru, toevict, FALSE, ARC_BUFC_UNDEF);
 		top_sz = arc.anon->size + arc.mru->size;
 	}
 
@@ -1165,7 +1175,8 @@ arc_adjust(void)
 
 		if (arc.mfu->lsize > 0) {
 			int64_t toevict = MIN(arc.mfu->lsize, arc_over);
-			(void) arc_evict(arc.mfu, toevict, FALSE);
+			(void) arc_evict(arc.mfu, toevict, FALSE,
+			    ARC_BUFC_UNDEF);
 		}
 
 		tbl_over = arc.size + arc.mru_ghost->lsize +
@@ -1207,9 +1218,9 @@ void
 arc_flush(void)
 {
 	while (list_head(&arc.mru->list))
-		(void) arc_evict(arc.mru, -1, FALSE);
+		(void) arc_evict(arc.mru, -1, FALSE, ARC_BUFC_UNDEF);
 	while (list_head(&arc.mfu->list))
-		(void) arc_evict(arc.mfu, -1, FALSE);
+		(void) arc_evict(arc.mfu, -1, FALSE, ARC_BUFC_UNDEF);
 
 	arc_evict_ghost(arc.mru_ghost, -1);
 	arc_evict_ghost(arc.mfu_ghost, -1);
@@ -1315,7 +1326,9 @@ arc_kmem_reap_now(arc_reclaim_strategy_t strat)
 {
 	size_t			i;
 	kmem_cache_t		*prev_cache = NULL;
+	kmem_cache_t		*prev_data_cache = NULL;
 	extern kmem_cache_t	*zio_buf_cache[];
+	extern kmem_cache_t	*zio_data_buf_cache[];
 
 #ifdef _KERNEL
 	/*
@@ -1343,6 +1356,10 @@ arc_kmem_reap_now(arc_reclaim_strategy_t strat)
 		if (zio_buf_cache[i] != prev_cache) {
 			prev_cache = zio_buf_cache[i];
 			kmem_cache_reap_now(zio_buf_cache[i]);
+		}
+		if (zio_data_buf_cache[i] != prev_data_cache) {
+			prev_data_cache = zio_data_buf_cache[i];
+			kmem_cache_reap_now(zio_data_buf_cache[i]);
 		}
 	}
 	kmem_cache_reap_now(buf_cache);
@@ -1498,8 +1515,9 @@ arc_evict_needed()
 static void
 arc_get_data_buf(arc_buf_t *buf)
 {
-	arc_state_t	*state = buf->b_hdr->b_state;
-	uint64_t	size = buf->b_hdr->b_size;
+	arc_state_t		*state = buf->b_hdr->b_state;
+	uint64_t		size = buf->b_hdr->b_size;
+	arc_buf_contents_t	type = buf->b_hdr->b_type;
 
 	arc_adapt(size, state);
 
@@ -1508,7 +1526,12 @@ arc_get_data_buf(arc_buf_t *buf)
 	 * just allocate a new buffer.
 	 */
 	if (!arc_evict_needed()) {
-		buf->b_data = zio_buf_alloc(size);
+		if (type == ARC_BUFC_METADATA) {
+			buf->b_data = zio_buf_alloc(size);
+		} else {
+			ASSERT(type == ARC_BUFC_DATA);
+			buf->b_data = zio_data_buf_alloc(size);
+		}
 		atomic_add_64(&arc.size, size);
 		goto out;
 	}
@@ -1530,8 +1553,13 @@ arc_get_data_buf(arc_buf_t *buf)
 		uint64_t mfu_space = arc.c - arc.p;
 		state =  (mfu_space > arc.mfu->size) ? arc.mru : arc.mfu;
 	}
-	if ((buf->b_data = arc_evict(state, size, TRUE)) == NULL) {
-		buf->b_data = zio_buf_alloc(size);
+	if ((buf->b_data = arc_evict(state, size, TRUE, type)) == NULL) {
+		if (type == ARC_BUFC_METADATA) {
+			buf->b_data = zio_buf_alloc(size);
+		} else {
+			ASSERT(type == ARC_BUFC_DATA);
+			buf->b_data = zio_data_buf_alloc(size);
+		}
 		atomic_add_64(&arc.size, size);
 		atomic_add_64(&arc.recycle_miss, 1);
 	}
@@ -1916,8 +1944,8 @@ top:
 		if (hdr == NULL) {
 			/* this block is not in the cache */
 			arc_buf_hdr_t	*exists;
-
-			buf = arc_buf_alloc(spa, size, private);
+			arc_buf_contents_t type = BP_GET_BUFC_TYPE(bp);
+			buf = arc_buf_alloc(spa, size, private, type);
 			hdr = buf->b_hdr;
 			hdr->b_dva = *BP_IDENTITY(bp);
 			hdr->b_birth = bp->blk_birth;
@@ -2177,6 +2205,7 @@ arc_release(arc_buf_t *buf, void *tag)
 		arc_buf_t **bufp;
 		uint64_t blksz = hdr->b_size;
 		spa_t *spa = hdr->b_spa;
+		arc_buf_contents_t type = hdr->b_type;
 
 		ASSERT(hdr->b_datacnt > 1);
 		/*
@@ -2202,6 +2231,7 @@ arc_release(arc_buf_t *buf, void *tag)
 		nhdr = kmem_cache_alloc(hdr_cache, KM_SLEEP);
 		nhdr->b_size = blksz;
 		nhdr->b_spa = spa;
+		nhdr->b_type = type;
 		nhdr->b_buf = buf;
 		nhdr->b_state = arc.anon;
 		nhdr->b_arc_access = 0;

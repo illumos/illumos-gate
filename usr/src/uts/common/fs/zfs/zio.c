@@ -82,11 +82,21 @@ zio_sync_pass_t zio_sync_pass = {
  * ==========================================================================
  */
 kmem_cache_t *zio_buf_cache[SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT];
+kmem_cache_t *zio_data_buf_cache[SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT];
+
+#ifdef _KERNEL
+extern vmem_t *zio_alloc_arena;
+#endif
 
 void
 zio_init(void)
 {
 	size_t c;
+	vmem_t *data_alloc_arena = NULL;
+
+#ifdef _KERNEL
+	data_alloc_arena = zio_alloc_arena;
+#endif
 
 	/*
 	 * For small buffers, we want a cache for each multiple of
@@ -111,10 +121,16 @@ zio_init(void)
 		}
 
 		if (align != 0) {
-			char name[30];
+			char name[36];
 			(void) sprintf(name, "zio_buf_%lu", (ulong_t)size);
 			zio_buf_cache[c] = kmem_cache_create(name, size,
 			    align, NULL, NULL, NULL, NULL, NULL, KMC_NODEBUG);
+
+			(void) sprintf(name, "zio_data_buf_%lu", (ulong_t)size);
+			zio_data_buf_cache[c] = kmem_cache_create(name, size,
+			    align, NULL, NULL, NULL, NULL, data_alloc_arena,
+			    KMC_NODEBUG);
+
 			dprintf("creating cache for size %5lx align %5lx\n",
 			    size, align);
 		}
@@ -124,6 +140,10 @@ zio_init(void)
 		ASSERT(zio_buf_cache[c] != NULL);
 		if (zio_buf_cache[c - 1] == NULL)
 			zio_buf_cache[c - 1] = zio_buf_cache[c];
+
+		ASSERT(zio_data_buf_cache[c] != NULL);
+		if (zio_data_buf_cache[c - 1] == NULL)
+			zio_data_buf_cache[c - 1] = zio_data_buf_cache[c];
 	}
 
 	zio_inject_init();
@@ -134,6 +154,7 @@ zio_fini(void)
 {
 	size_t c;
 	kmem_cache_t *last_cache = NULL;
+	kmem_cache_t *last_data_cache = NULL;
 
 	for (c = 0; c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT; c++) {
 		if (zio_buf_cache[c] != last_cache) {
@@ -141,6 +162,12 @@ zio_fini(void)
 			kmem_cache_destroy(zio_buf_cache[c]);
 		}
 		zio_buf_cache[c] = NULL;
+
+		if (zio_data_buf_cache[c] != last_data_cache) {
+			last_data_cache = zio_data_buf_cache[c];
+			kmem_cache_destroy(zio_data_buf_cache[c]);
+		}
+		zio_data_buf_cache[c] = NULL;
 	}
 
 	zio_inject_fini();
@@ -151,6 +178,13 @@ zio_fini(void)
  * Allocate and free I/O buffers
  * ==========================================================================
  */
+
+/*
+ * Use zio_buf_alloc to allocate ZFS metadata.  This data will appear in a
+ * crashdump if the kernel panics, so use it judiciously.  Obviously, it's
+ * useful to inspect ZFS metadata, but if possible, we should avoid keeping
+ * excess / transient data in-core during a crashdump.
+ */
 void *
 zio_buf_alloc(size_t size)
 {
@@ -159,6 +193,22 @@ zio_buf_alloc(size_t size)
 	ASSERT(c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
 
 	return (kmem_cache_alloc(zio_buf_cache[c], KM_SLEEP));
+}
+
+/*
+ * Use zio_data_buf_alloc to allocate data.  The data will not appear in a
+ * crashdump if the kernel panics.  This exists so that we will limit the amount
+ * of ZFS data that shows up in a kernel crashdump.  (Thus reducing the amount
+ * of kernel heap dumped to disk when the kernel panics)
+ */
+void *
+zio_data_buf_alloc(size_t size)
+{
+	size_t c = (size - 1) >> SPA_MINBLOCKSHIFT;
+
+	ASSERT(c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
+
+	return (kmem_cache_alloc(zio_data_buf_cache[c], KM_SLEEP));
 }
 
 void
@@ -171,6 +221,15 @@ zio_buf_free(void *buf, size_t size)
 	kmem_cache_free(zio_buf_cache[c], buf);
 }
 
+void
+zio_data_buf_free(void *buf, size_t size)
+{
+	size_t c = (size - 1) >> SPA_MINBLOCKSHIFT;
+
+	ASSERT(c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
+
+	kmem_cache_free(zio_data_buf_cache[c], buf);
+}
 /*
  * ==========================================================================
  * Push and pop I/O transform buffers

@@ -1035,7 +1035,7 @@ page_exists_physcontig(vnode_t *vp, u_offset_t off, uint_t szc, page_t *ppa[])
 	ASSERT(szc != 0);
 	ASSERT(vp != NULL);
 	ASSERT(!IS_SWAPFSVP(vp));
-	ASSERT(vp != &kvp);
+	ASSERT(!VN_ISKAS(vp));
 
 again:
 	if (++loopcnt > 3) {
@@ -2704,7 +2704,7 @@ page_free(page_t *pp, int dontneed)
 
 	if (pp->p_szc != 0) {
 		if (pp->p_vnode == NULL || IS_SWAPFSVP(pp->p_vnode) ||
-		    pp->p_vnode == &kvp) {
+		    PP_ISKAS(pp)) {
 			panic("page_free: anon or kernel "
 			    "or no vnode large page %p", (void *)pp);
 		}
@@ -3153,7 +3153,7 @@ page_destroy(page_t *pp, int dontfree)
 
 	if (pp->p_szc != 0) {
 		if (pp->p_vnode == NULL || IS_SWAPFSVP(pp->p_vnode) ||
-		    pp->p_vnode == &kvp) {
+		    PP_ISKAS(pp)) {
 			panic("page_destroy: anon or kernel or no vnode "
 			    "large page %p", (void *)pp);
 		}
@@ -3332,7 +3332,7 @@ page_rename(page_t *opp, vnode_t *vp, u_offset_t off)
 		vnode_t *ovp = opp->p_vnode;
 		ASSERT(ovp != NULL);
 		ASSERT(!IS_SWAPFSVP(ovp));
-		ASSERT(ovp != &kvp);
+		ASSERT(!VN_ISKAS(ovp));
 		page_demote_vp_pages(opp);
 		ASSERT(opp->p_szc == 0);
 	}
@@ -3399,14 +3399,14 @@ top:
 			(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
 			if (pp->p_szc != 0) {
 				ASSERT(!IS_SWAPFSVP(vp));
-				ASSERT(vp != &kvp);
+				ASSERT(!VN_ISKAS(vp));
 				page_demote_vp_pages(pp);
 				ASSERT(pp->p_szc == 0);
 			}
 			mutex_enter(phm);
 		} else if (pp->p_szc != 0) {
 			ASSERT(!IS_SWAPFSVP(vp));
-			ASSERT(vp != &kvp);
+			ASSERT(!VN_ISKAS(vp));
 			mutex_exit(phm);
 			page_demote_vp_pages(pp);
 			ASSERT(pp->p_szc == 0);
@@ -4378,7 +4378,7 @@ page_busy(int cleanit)
 		 * (g)	Backed by a filesystem which doesn't have a
 		 *	stubbed-out sync operation
 		 */
-		if (!PP_ISFREE(pp) && vp != NULL && vp != &kvp &&
+		if (!PP_ISFREE(pp) && vp != NULL && !VN_ISKAS(vp) &&
 		    hat_ismod(pp) && !IS_SWAPVP(vp) && vp->v_vfsp != NULL &&
 		    vfs_can_sync(vp->v_vfsp)) {
 			nppbusy++;
@@ -4457,10 +4457,10 @@ top:
 		 * with the kernel vnode or prom allocated kernel mem.
 		 */
 #if defined(__sparc)
-		if ((vp = pp->p_vnode) == NULL || vp == &kvp ||
+		if ((vp = pp->p_vnode) == NULL || VN_ISKAS(vp) ||
 		    vp == &prom_ppages)
 #else /* x86 doesn't have prom or prom_ppage */
-		if ((vp = pp->p_vnode) == NULL || vp == &kvp)
+		if ((vp = pp->p_vnode) == NULL || VN_ISKAS(vp))
 #endif /* __sparc */
 			continue;
 
@@ -4747,7 +4747,7 @@ retry:
 	}
 	if (pp->p_szc != pszc) {
 		ASSERT(pp->p_szc < pszc);
-		ASSERT(pp->p_vnode != NULL && pp->p_vnode != &kvp &&
+		ASSERT(pp->p_vnode != NULL && !PP_ISKAS(pp) &&
 		    !IS_SWAPFSVP(pp->p_vnode));
 		tpp = pp + 1;
 		for (i = 1; i < npgs; i++, tpp++) {
@@ -4879,7 +4879,7 @@ do_page_relocate(
 		 * seg kmem pages require that the target and replacement
 		 * page be the same pagesize.
 		 */
-		flags = (targ->p_vnode == &kvp) ? PGR_SAMESZC : 0;
+		flags = (VN_ISKAS(targ->p_vnode)) ? PGR_SAMESZC : 0;
 		repl = page_get_replacement_page(targ, lgrp, flags);
 		if (repl == NULL) {
 			if (grouplock != 0) {
@@ -4900,7 +4900,7 @@ do_page_relocate(
 	/*
 	 * Let hat_page_relocate() complete the relocation if it's kernel page
 	 */
-	if (targ->p_vnode == &kvp) {
+	if (VN_ISKAS(targ->p_vnode)) {
 		*replacement = repl;
 		if (hat_page_relocate(target, replacement, nrelocp) != 0) {
 			if (grouplock != 0) {
@@ -5244,7 +5244,7 @@ page_try_demote_pages(page_t *pp)
 		return (1);
 	}
 
-	if (vp != NULL && !IS_SWAPFSVP(vp) && vp != &kvp) {
+	if (vp != NULL && !IS_SWAPFSVP(vp) && !VN_ISKAS(vp)) {
 		VM_STAT_ADD(pagecnt.pc_try_demote_pages[2]);
 		page_demote_vp_pages(pp);
 		ASSERT(pp->p_szc == 0);
@@ -5269,7 +5269,7 @@ page_try_demote_pages(page_t *pp)
 	 * We can't demote kernel pages since we can't hat_unload()
 	 * the mappings.
 	 */
-	if (rootpp->p_vnode == &kvp)
+	if (VN_ISKAS(rootpp->p_vnode))
 		return (0);
 
 	/*
@@ -5393,7 +5393,7 @@ page_demote_vp_pages(page_t *pp)
 	ASSERT(!PP_ISFREE(pp));
 	ASSERT(pp->p_vnode != NULL);
 	ASSERT(!IS_SWAPFSVP(pp->p_vnode));
-	ASSERT(pp->p_vnode != &kvp);
+	ASSERT(!PP_ISKAS(pp));
 
 	VM_STAT_ADD(pagecnt.pc_demote_pages[0]);
 
@@ -6850,7 +6850,7 @@ skip_relocate:
 		ret = EAGAIN;
 		goto cleanup;
 	}
-	if (PP_ISKVP(pp)) {
+	if (PP_ISKAS(pp)) {
 		ret = EAGAIN;
 		goto cleanup;
 	}
@@ -6932,7 +6932,7 @@ page_capture_pre_checks(page_t *pp, uint_t flags)
 		return (EPERM);
 	}
 #else
-	if (PP_ISKVP(pp)) {
+	if (PP_ISKAS(pp)) {
 		return (EPERM);
 	}
 #endif /* __sparc */
@@ -7344,7 +7344,7 @@ page_retire_mdboot()
 			bp = page_capture_hash[i].lists[j].next;
 			while (bp != &page_capture_hash[i].lists[j]) {
 				pp = bp->pp;
-				if (!PP_ISKVP(pp) && PP_TOXIC(pp)) {
+				if (!PP_ISKAS(pp) && PP_TOXIC(pp)) {
 					pp->p_selock = -1;  /* pacify ASSERTs */
 					PP_CLRFREE(pp);
 					pagescrub(pp, 0, PAGESIZE);

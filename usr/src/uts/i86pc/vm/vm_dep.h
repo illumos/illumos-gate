@@ -406,7 +406,7 @@ extern struct cpu	cpus[];
  */
 
 #define	MTYPE_INIT(mtype, vp, vaddr, flags, pgsz) {			\
-	if (restricted_kmemalloc && (vp) == &kvp &&			\
+	if (restricted_kmemalloc && VN_ISKAS(vp) &&			\
 	    (caddr_t)(vaddr) >= kernelheap &&				\
 	    (caddr_t)(vaddr) < ekernelheap) {				\
 		ASSERT(physmax4g);					\

@@ -737,7 +737,8 @@ dmu_objset_sync(objset_impl_t *os, dmu_tx_t *tx)
 	int err;
 	zbookmark_t zb;
 	arc_buf_t *abuf =
-	    arc_buf_alloc(os->os_spa, sizeof (objset_phys_t), FTAG);
+	    arc_buf_alloc(os->os_spa, sizeof (objset_phys_t), FTAG,
+		ARC_BUFC_METADATA);
 
 	ASSERT(dmu_tx_is_syncing(tx));
 	ASSERT(os->os_synctx == NULL);

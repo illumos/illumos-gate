@@ -408,7 +408,7 @@ segvn_create(struct seg *seg, void *argsp)
 				a->szc = 0;
 			} else if (a->vp != NULL) {
 				extern struct vnode kvp;
-				if (IS_SWAPFSVP(a->vp) || a->vp == &kvp) {
+				if (IS_SWAPFSVP(a->vp) || VN_ISKAS(a->vp)) {
 					/*
 					 * paranoid check.
 					 * hat_page_demote() is not supported
@@ -5537,7 +5537,7 @@ segvn_setpagesize(struct seg *seg, caddr_t addr, size_t len, uint_t szc)
 
 	/* paranoid check */
 	if (svd->vp != NULL &&
-	    (IS_SWAPFSVP(svd->vp) || svd->vp == &kvp)) {
+	    (IS_SWAPFSVP(svd->vp) || VN_ISKAS(svd->vp))) {
 		    return (EINVAL);
 	}
 

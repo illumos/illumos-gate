@@ -167,6 +167,11 @@ extern "C" {
 #define	SEGKPMINSIZE	(200L * 1024 * 1024L)			/* 200M */
 
 /*
+ * minimum size for segzio
+ */
+#define	SEGZIOMINSIZE	(400L * 1024 * 1024L)			/* 400M */
+
+/*
  * Boot (or, more precisely, vmx) maps most pages twice - once in the
  * bottom 2GB of memory and once in the bottom 2GB of the topmost 4GB.
  * When boot is unmapped this range is available to the kernel, but until

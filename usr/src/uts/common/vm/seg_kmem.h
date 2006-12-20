@@ -51,6 +51,7 @@ extern char *heap_lp_base;	/* start of kernel large page heap arena */
 extern char *heap_lp_end;	/* end of kernel large page heap arena */
 extern struct seg kvseg;	/* primary kernel heap segment */
 extern struct seg kvseg_core;	/* "core" kernel heap segment */
+extern struct seg kzioseg;	/* Segment for zio mappings */
 extern vmem_t *heap_lp_arena;	/* kernel large page heap arena */
 extern vmem_t *heap_arena;	/* primary kernel heap arena */
 extern vmem_t *hat_memload_arena; /* HAT translation arena */
@@ -59,9 +60,12 @@ extern vmem_t *heap32_arena;	/* 32-bit kernel heap arena */
 extern vmem_t *heaptext_arena;	/* kernel text arena, from heap */
 extern struct as kas;		/* kernel address space */
 extern struct vnode kvp;	/* vnode for all segkmem pages */
+extern struct vnode zvp;	/* vnode for all segkmem pages for zfs */
 extern int segkmem_reloc;	/* enable/disable segkmem relocatable pages */
 extern vmem_t *static_arena;	/* arena for caches to import static memory */
 extern vmem_t *static_alloc_arena;	/* arena for allocating static memory */
+extern vmem_t *zio_arena;	/* arena for zio caches */
+extern vmem_t *zio_alloc_arena;	/* arena for zio caches */
 
 extern int segkmem_create(struct seg *);
 extern page_t *segkmem_page_create(void *, size_t, int, void *);
@@ -76,6 +80,11 @@ extern void boot_mapin(caddr_t addr, size_t size);
 extern void kernelheap_init(void *, void *, char *, void *, void *);
 extern void kernelheap_extend(void *, void *);
 extern void segkmem_gc(void);
+
+extern void *segkmem_zio_alloc(vmem_t *, size_t, int);
+extern int segkmem_zio_create(struct seg *);
+extern void segkmem_zio_free(vmem_t *, void *, size_t);
+extern void segkmem_zio_init(void *, size_t);
 
 /*
  * Flags for segkmem_xalloc().

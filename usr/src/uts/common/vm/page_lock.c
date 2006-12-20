@@ -142,6 +142,12 @@ static pad_mutex_t	pszc_mutex[PSZC_MTX_TABLE_SIZE];
 
 extern	struct vnode	kvp;
 
+/*
+ * Two slots after VPH_TABLE_SIZE are reserved in vph_mutex for kernel vnodes.
+ * The lock for kvp is VPH_TABLE_SIZE + 0, and the lock for zvp is
+ * VPH_TABLE_SIZE + 1.
+ */
+
 kmutex_t	vph_mutex[VPH_TABLE_SIZE + 2];
 
 /*
@@ -861,6 +867,9 @@ page_vnode_mutex(vnode_t *vp)
 {
 	if (vp == &kvp)
 		return (&vph_mutex[VPH_TABLE_SIZE + 0]);
+
+	if (vp == &zvp)
+		return (&vph_mutex[VPH_TABLE_SIZE + 1]);
 #ifdef DEBUG
 	if (page_vnode_mutex_stress != 0)
 		return (&vph_mutex[0]);
@@ -913,7 +922,7 @@ page_szc_lock(page_t *pp)
 	ASSERT(!PP_ISFREE(pp));
 	ASSERT(pp->p_vnode != NULL);
 	ASSERT(!IS_SWAPFSVP(pp->p_vnode));
-	ASSERT(pp->p_vnode != &kvp);
+	ASSERT(!PP_ISKAS(pp));
 
 again:
 	if (pszc == 0) {

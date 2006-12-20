@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,10 +21,9 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright (c) 1989,1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SYS_VM_MACHPARAM_H
@@ -94,6 +92,11 @@ extern "C" {
 #define	SEGKPMAXSIZE	(512 * 1024 * 1024)
 #define	SEGKPMINSIZE	(512 * 1024 * 1024)
 #endif	/* _LP64 */
+
+/*
+ * Define minimum size for zio segment
+ */
+#define	SEGZIOMINSIZE	(512L * 1024 * 1024L)			/* 512M */
 
 /*
  * The time for a process to be blocked before being very swappable.
