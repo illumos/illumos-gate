@@ -273,7 +273,6 @@ static mblk_t	*ip_rput_frag_v6(queue_t *, mblk_t *, ip6_t *,
 static boolean_t	ip_source_routed_v6(ip6_t *, mblk_t *);
 static void	ip_wput_ire_v6(queue_t *, mblk_t *, ire_t *, int, int,
     conn_t *, int, int, int, zoneid_t);
-static boolean_t ip_ulp_cando_pkt2big(int);
 
 void ip_rput_v6(queue_t *, mblk_t *);
 static void ip_wput_v6(queue_t *, mblk_t *);
@@ -1113,8 +1112,8 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 			 * the IPsec overhead.
 			 */
 			if (ii != NULL)
-				icmp6->icmp6_mtu = htons(
-				    ntohs(icmp6->icmp6_mtu) -
+				icmp6->icmp6_mtu = htonl(
+				    ntohl(icmp6->icmp6_mtu) -
 					ipsec_in_extra_length(first_mp));
 		} else {
 			/*
@@ -11437,7 +11436,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			int extra_len = ipsec_out_extra_length(first_mp);
 
 			if (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN + extra_len >
-			    max_frag && ip_ulp_cando_pkt2big(nexthdr)) {
+			    max_frag) {
 				/*
 				 * IPsec headers will push the packet over the
 				 * MTU limit.  Issue an ICMPv6 Packet Too Big
@@ -12949,23 +12948,6 @@ ip_massage_options_v6(ip6_t *ip6h, ip6_rthdr_t *rth)
 
 	return (cksm);
 }
-
-/*
- * See if the upper-level protocol indicated by 'proto' will be able
- * to do something with an ICMP_FRAGMENTATION_NEEDED (IPv4) or
- * ICMP6_PACKET_TOO_BIG (IPv6).
- */
-static boolean_t
-ip_ulp_cando_pkt2big(int proto)
-{
-	/*
-	 * For now, only TCP can handle this.
-	 * Tunnels may be able to also, but since tun isn't working over
-	 * IPv6 yet, don't worry about it for now.
-	 */
-	return (proto == IPPROTO_TCP);
-}
-
 
 /*
  * Propagate a multicast group membership operation (join/leave) (*fn) on

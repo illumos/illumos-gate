@@ -3018,6 +3018,7 @@ tun_rdata_v6(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 			atomic_add_32(&atp->tun_InErrors, 1);
 			goto drop;
 		}
+		ipsec_mp = NULL;
 		if (data_mp != orig_mp) {
 			/* mp has changed, reset appropriate pointers */
 
@@ -3051,6 +3052,7 @@ tun_rdata_v6(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 			atomic_add_32(&atp->tun_InErrors, 1);
 			goto drop;
 		}
+		ipsec_mp = NULL;
 		if (data_mp != orig_mp) {
 			/* mp has changed, reset appropriate pointers */
 			/* v6src should still be a valid and relevant ptr */
@@ -3147,6 +3149,8 @@ tun_rdata_v4(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 		if (!pullupmsg(data_mp, hdrlen + pullup_len)) {
 			atomic_add_32(&atp->tun_InErrors, 1);
 			atomic_add_32(&atp->tun_InDiscard, 1);
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
 			goto drop;
 		}
 		iph = (ipha_t *)data_mp->b_rptr;
@@ -3162,10 +3166,10 @@ tun_rdata_v4(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 		ASSERT(IN6_ARE_ADDR_EQUAL(&v4mapped_dst, &atp->tun_laddr) &&
 		    IN6_ARE_ADDR_EQUAL(&v4mapped_src, &atp->tun_faddr));
 
+		/* NOTE:  ipsec_tun_inbound() always frees ipsec_mp. */
 		if (!ipsec_tun_inbound(ipsec_mp, &data_mp, atp->tun_itp,
 			inner_iph, NULL, iph, NULL, 0)) {
 			data_mp = NULL;
-			ipsec_mp = NULL;
 			atomic_add_32(&atp->tun_InErrors, 1);
 			goto drop;
 		}
@@ -3195,10 +3199,10 @@ tun_rdata_v4(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 		ip6h = (ip6_t *)data_mp->b_rptr;
 		ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
 
+		/* NOTE:  ipsec_tun_inbound() always frees ipsec_mp. */
 		if (!ipsec_tun_inbound(ipsec_mp, &data_mp, atp->tun_itp, NULL,
 			ip6h, iph, NULL, 0)) {
 			data_mp = NULL;
-			ipsec_mp = NULL;
 			atomic_add_32(&atp->tun_InErrors, 1);
 			goto drop;
 		}
@@ -3426,8 +3430,6 @@ tun_rdata_v4(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 	TUN_PUTMSG_CHAIN_STATS(q, data_mp, nmp, &atp->tun_HCInOctets);
 	return (0);
 drop:
-	if (ipsec_mp != NULL)
-		freeb(ipsec_mp);
 	tun_freemsg_chain(data_mp, NULL);
 	return (0);
 }
@@ -3578,7 +3580,8 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 	 * us to receive it.  We now have to use inner policy to see if
 	 * we want to percolate it up (like conn_t's are checked).
 	 *
-	 * Use -outer_hlen to indicate this is an ICMP packet.
+	 * Use -outer_hlen to indicate this is an ICMP packet.  And
+	 * ipsec_tun_inbound() always frees ipsec_mp.
 	 */
 	if (!ipsec_tun_inbound(ipsec_mp, &mp, atp->tun_itp, inner_ipha, NULL,
 		outer_ipha, NULL, -outer_hlen)) {
@@ -3602,8 +3605,6 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 				tun0dbg(("icmp_ricmp_err_v4_v4: invalid " \
 				    "icmp mtu\n"));
 				atomic_add_32(&atp->tun_InErrors, 1);
-				if (ipsec_mp != NULL)
-					freeb(ipsec_mp);
 				freemsg(mp);
 				return;
 			}
@@ -3657,8 +3658,6 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 			break;
 		default:
 			atomic_add_32(&atp->tun_InErrors, 1);
-			if (ipsec_mp != NULL)
-				freeb(ipsec_mp);
 			freemsg(mp);
 			return;
 		}
@@ -3674,8 +3673,6 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 			tun0dbg(("icmp_ricmp_err_v4_v4: ICMP_PARAM_PROBLEM " \
 			    "too short\n"));
 			atomic_add_32(&atp->tun_InErrors, 1);
-			if (ipsec_mp != NULL)
-				freeb(ipsec_mp);
 			freemsg(mp);
 			return;
 		}
@@ -3685,8 +3682,6 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 		break;
 	default:
 		atomic_add_32(&atp->tun_InErrors, 1);
-		if (ipsec_mp != NULL)
-			freeb(ipsec_mp);
 		freemsg(mp);
 		return;
 	}
@@ -3740,7 +3735,8 @@ icmp_ricmp_err_v4_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp, icmp6_t *icmph)
 	 * us to receive it.  We now have to use inner policy to see if
 	 * we want to percolate it up (like conn_t's are checked).
 	 *
-	 * Use -outer_hlen to indicate this is an ICMP packet.
+	 * Use -outer_hlen to indicate this is an ICMP packet.  And
+	 * ipsec_tun_inbound() always frees ipsec_mp.
 	 */
 	if (!ipsec_tun_inbound(ipsec_mp, &mp, atp->tun_itp, ipha, NULL, NULL,
 		ip6, -outer_hlen))
@@ -3807,8 +3803,6 @@ icmp_ricmp_err_v4_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp, icmp6_t *icmph)
 		}
 
 		if (found != B_TRUE) {
-			if (ipsec_mp != NULL)
-				freeb(ipsec_mp);
 			freemsg(mp);
 			return;
 		}
@@ -3832,13 +3826,16 @@ icmp_ricmp_err_v4_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp, icmp6_t *icmph)
 		if (ipha->ipha_fragment_offset_and_flags & IPH_DF) {
 			icmp.icmph_type = ICMP_DEST_UNREACHABLE;
 			icmp.icmph_code = ICMP_FRAGMENTATION_NEEDED;
-			icmp.icmph_du_mtu = htonl(mtu);
+			/*
+			 * NOTE - htons() because ICMP (for IPv4) uses a
+			 * uint16_t here.
+			 */
+			icmp.icmph_du_mtu = htons(mtu);
+			icmp.icmph_du_zero = 0;
 		}
 		break;
 	}
 	default:
-		if (ipsec_mp != NULL)
-			freeb(ipsec_mp);
 		freemsg(mp);
 		return;
 	}
@@ -3893,7 +3890,8 @@ icmp_ricmp_err_v6_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp, icmp6_t *icmph)
 	 * us to receive it.  We now have to use inner policy to see if
 	 * we want to percolate it up (like conn_t's are checked).
 	 *
-	 * Use -outer_hlen to indicate this is an ICMP packet.
+	 * Use -outer_hlen to indicate this is an ICMP packet.  And
+	 * ipsec_tun_inbound() always frees ipsec_mp.
 	 */
 	if (!ipsec_tun_inbound(ipsec_mp, &mp, atp->tun_itp, NULL, inner_ip6,
 		NULL, ip6, -outer_hlen))
@@ -3960,8 +3958,6 @@ icmp_ricmp_err_v6_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp, icmp6_t *icmph)
 		}
 
 		if (found != B_TRUE) {
-			if (ipsec_mp != NULL)
-				freeb(ipsec_mp);
 			freemsg(mp);
 			return;	/* case */
 		}
@@ -3991,8 +3987,6 @@ icmp_ricmp_err_v6_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp, icmp6_t *icmph)
 		break;
 	}
 	default:
-		if (ipsec_mp != NULL)
-			freeb(ipsec_mp);
 		freemsg(mp);
 		return;
 	}
@@ -4103,7 +4097,8 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 	 * us to receive it.  We now have to use inner policy to see if
 	 * we want to percolate it up (like conn_t's are checked).
 	 *
-	 * Use -outer_hlen to indicate this is an ICMP packet.
+	 * Use -outer_hlen to indicate this is an ICMP packet.  And
+	 * ipsec_tun_inbound() always frees ipsec_mp.
 	 */
 	if (!ipsec_tun_inbound(ipsec_mp, &mp, atp->tun_itp, NULL, ip6h,
 		outer_ipha, NULL, -outer_hlen))
@@ -4126,8 +4121,6 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 				tun0dbg(("icmp_ricmp_err_v6_v4: invalid " \
 				    "icmp mtu\n"));
 				atomic_add_32(&atp->tun_InErrors, 1);
-				if (ipsec_mp != NULL)
-					freeb(ipsec_mp);
 				freemsg(mp);
 				return;
 			}
@@ -4195,8 +4188,6 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 			break;
 		default:
 			atomic_add_32(&atp->tun_InErrors, 1);
-			if (ipsec_mp != NULL)
-				freeb(ipsec_mp);
 			freemsg(mp);
 			return;
 		}
@@ -4212,8 +4203,6 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 			tun0dbg(("icmp_ricmp_err_v6_v4: ICMP_PARAM_PROBLEM " \
 			    "too short\n"));
 			atomic_add_32(&atp->tun_InErrors, 1);
-			if (ipsec_mp != NULL)
-				freeb(ipsec_mp);
 			freemsg(mp);
 			return;
 		}
@@ -4224,8 +4213,6 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 
 	default:
 		atomic_add_32(&atp->tun_InErrors, 1);
-		if (ipsec_mp != NULL)
-			freeb(ipsec_mp);
 		freemsg(mp);
 		return;
 	}
