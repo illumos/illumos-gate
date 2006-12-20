@@ -138,6 +138,10 @@ typedef	struct ar_entry_query_s {
 	uchar_t	areq_sap[8];		/* to insert in returned template */
 } areq_t;
 
+#define	AR_EQ_DEFAULT_XMIT_COUNT	6
+#define	AR_EQ_DEFAULT_XMIT_INTERVAL	1000
+#define	AR_EQ_DEFAULT_MAX_BUFFERED	4
+
 /*
  * Structure used with AR_ENTRY_LLAQUERY to map from the link_addr
  * (in Neighbor Discovery option format excluding the option type and
