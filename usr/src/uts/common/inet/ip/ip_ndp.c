@@ -2156,7 +2156,7 @@ ndp_input(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 
 	if (!pullupmsg(mp, -1)) {
 		ip1dbg(("ndp_input: pullupmsg failed\n"));
-		BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 		goto done;
 	}
 	ip6h = (ip6_t *)mp->b_rptr;

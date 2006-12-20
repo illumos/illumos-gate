@@ -1561,7 +1561,7 @@ typedef struct ipfb_s {
  * hash bucket without stumbling up on a free pointer.
  *
  * irb_t structures in ip_ftable are dynamically allocated and freed.
- * In order to identify the irb_t structures that cna be safely kmem_free'd
+ * In order to identify the irb_t structures that can be safely kmem_free'd
  * we need to ensure that
  *  - the irb_refcnt is quiescent, indicating no other walkers,
  *  - no other threads or ire's are holding references to the irb,
@@ -1886,7 +1886,7 @@ typedef struct ill_s {
 	in6_addr_t	ill_token;
 	uint_t		ill_token_length;
 	uint32_t	ill_xmit_count;		/* ndp max multicast xmits */
-	mib2_ipv6IfStatsEntry_t	*ill_ip6_mib;	/* Per interface mib */
+	mib2_ipIfStatsEntry_t	*ill_ip_mib;	/* ver indep. interface mib */
 	mib2_ipv6IfIcmpEntry_t	*ill_icmp6_mib;	/* Per interface mib */
 	/*
 	 * Following two mblks are allocated common to all
@@ -2924,7 +2924,7 @@ extern nv_t	*ire_nv_tbl;
 extern time_t	ip_g_frag_timeout;
 extern clock_t	ip_g_frag_timo_ms;
 
-extern mib2_ip_t	ip_mib;	/* For tcpInErrs and udpNoPorts */
+extern mib2_ipIfStatsEntry_t	ip_mib;	/* For tcpInErrs and udpNoPorts */
 
 extern struct module_info ip_mod_info;
 
@@ -3169,6 +3169,10 @@ extern void	ip_rput_forward_multicast(ipaddr_t, mblk_t *, ipif_t *);
 
 extern int	ip_snmpmod_close(queue_t *);
 extern void	ip_snmpmod_wput(queue_t *, mblk_t *);
+extern void	ip_mib2_add_ip_stats(mib2_ipIfStatsEntry_t *,
+		    mib2_ipIfStatsEntry_t *);
+extern void	ip_mib2_add_icmp6_stats(mib2_ipv6IfIcmpEntry_t *,
+		    mib2_ipv6IfIcmpEntry_t *);
 extern void	ip_udp_input(queue_t *, mblk_t *, ipha_t *, ire_t *, ill_t *);
 extern void	ip_proto_input(queue_t *, mblk_t *, ipha_t *, ire_t *, ill_t *);
 extern void	ip_rput_other(ipsq_t *, queue_t *, mblk_t *, void *);

@@ -2597,7 +2597,7 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 	if (tcp->tcp_ipversion == IPV4_VERSION) {
 
 		if (CLASSD(tcp->tcp_connp->conn_rem)) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(&ip_mib, ipIfStatsInDiscards);
 			return (0);
 		}
 		/*
@@ -4509,9 +4509,9 @@ tcp_closei_local(tcp_t *tcp)
 	if (!TCP_IS_SOCKET(tcp))
 		tcp_acceptor_hash_remove(tcp);
 
-	UPDATE_MIB(&tcp_mib, tcpInSegs, tcp->tcp_ibsegs);
+	UPDATE_MIB(&tcp_mib, tcpHCInSegs, tcp->tcp_ibsegs);
 	tcp->tcp_ibsegs = 0;
-	UPDATE_MIB(&tcp_mib, tcpOutSegs, tcp->tcp_obsegs);
+	UPDATE_MIB(&tcp_mib, tcpHCOutSegs, tcp->tcp_obsegs);
 	tcp->tcp_obsegs = 0;
 
 	/*
@@ -5950,6 +5950,8 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	if (mp1 == NULL)
 		goto error1;
 	DB_CPID(mp1) = tcp->tcp_cpid;
+	eager->tcp_cpid = tcp->tcp_cpid;
+	eager->tcp_open_time = lbolt64;
 
 	/*
 	 * We need to start the rto timer. In normal case, we start
@@ -7702,9 +7704,9 @@ tcp_reinit(tcp_t *tcp)
 	 * Reset everything in the state vector, after updating global
 	 * MIB data from instance counters.
 	 */
-	UPDATE_MIB(&tcp_mib, tcpInSegs, tcp->tcp_ibsegs);
+	UPDATE_MIB(&tcp_mib, tcpHCInSegs, tcp->tcp_ibsegs);
 	tcp->tcp_ibsegs = 0;
-	UPDATE_MIB(&tcp_mib, tcpOutSegs, tcp->tcp_obsegs);
+	UPDATE_MIB(&tcp_mib, tcpHCOutSegs, tcp->tcp_obsegs);
 	tcp->tcp_obsegs = 0;
 
 	tcp_close_mpp(&tcp->tcp_xmit_head);
@@ -7912,6 +7914,7 @@ tcp_reinit_values(tcp)
 	tcp->tcp_hard_bound = 0;
 	PRESERVE(tcp->tcp_cred);
 	PRESERVE(tcp->tcp_cpid);
+	PRESERVE(tcp->tcp_open_time);
 	PRESERVE(tcp->tcp_exclbind);
 
 	tcp->tcp_fin_acked = 0;
@@ -9628,6 +9631,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	tcp->tcp_cred = connp->conn_cred = credp;
 	crhold(connp->conn_cred);
 	tcp->tcp_cpid = curproc->p_pid;
+	tcp->tcp_open_time = lbolt64;
 	connp->conn_zoneid = zoneid;
 	connp->conn_mlp_type = mlptSingle;
 	connp->conn_ulp_labeled = !is_system_labeled();
@@ -16108,9 +16112,9 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 				continue;	/* not in this zone */
 
 			tcp = connp->conn_tcp;
-			UPDATE_MIB(&tcp_mib, tcpInSegs, tcp->tcp_ibsegs);
+			UPDATE_MIB(&tcp_mib, tcpHCInSegs, tcp->tcp_ibsegs);
 			tcp->tcp_ibsegs = 0;
-			UPDATE_MIB(&tcp_mib, tcpOutSegs, tcp->tcp_obsegs);
+			UPDATE_MIB(&tcp_mib, tcpHCOutSegs, tcp->tcp_obsegs);
 			tcp->tcp_obsegs = 0;
 
 			tce6.tcp6ConnState = tce.tcpConnState =
@@ -16176,6 +16180,11 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 			tce6.tcp6ConnEntryInfo.ce_mss =  tcp->tcp_mss;
 			tce6.tcp6ConnEntryInfo.ce_state = tcp->tcp_state;
 
+			tce6.tcp6ConnCreationProcess =
+			    (tcp->tcp_cpid < 0) ? MIB2_UNKNOWN_PROCESS :
+			    tcp->tcp_cpid;
+			tce6.tcp6ConnCreationTime = tcp->tcp_open_time;
+
 			(void) snmp_append_data2(mp6_conn_ctl->b_cont,
 			    &mp6_conn_tail, (char *)&tce6, sizeof (tce6));
 
@@ -16237,6 +16246,11 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 				tce.tcpConnEntryInfo.ce_state =
 				    tcp->tcp_state;
 
+				tce.tcpConnCreationProcess =
+				    (tcp->tcp_cpid < 0) ? MIB2_UNKNOWN_PROCESS :
+				    tcp->tcp_cpid;
+				tce.tcpConnCreationTime = tcp->tcp_open_time;
+
 				(void) snmp_append_data2(mp_conn_ctl->b_cont,
 				    &mp_conn_tail, (char *)&tce, sizeof (tce));
 
@@ -16253,6 +16267,9 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 	/* fixed length structure for IPv4 and IPv6 counters */
 	SET_MIB(tcp_mib.tcpConnTableSize, sizeof (mib2_tcpConnEntry_t));
 	SET_MIB(tcp_mib.tcp6ConnTableSize, sizeof (mib2_tcp6ConnEntry_t));
+	/* synchronize 32- and 64-bit counters */
+	SYNC32_MIB(&tcp_mib, tcpInSegs, tcpHCInSegs);
+	SYNC32_MIB(&tcp_mib, tcpOutSegs, tcpHCOutSegs);
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_TCP;
 	optp->name = 0;
@@ -18773,7 +18790,11 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 
 	UPDATE_OB_PKT_COUNT(ire);
 	ire->ire_last_used_time = lbolt;
-	BUMP_MIB(&ip_mib, ipOutRequests);
+
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutRequests);
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits);
+	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets,
+	    ntohs(ipha->ipha_length));
 
 	if (ILL_DLS_CAPABLE(ill)) {
 		/*
@@ -20523,11 +20544,12 @@ tcp_multisend_data(tcp_t *tcp, ire_t *ire, const ill_t *ill, mblk_t *md_mp_head,
 
 	if (tcp->tcp_ipversion == IPV4_VERSION) {
 		TCP_STAT_UPDATE(tcp_mdt_pkt_out_v4, obsegs);
-		UPDATE_MIB(&ip_mib, ipOutRequests, obsegs);
 	} else {
 		TCP_STAT_UPDATE(tcp_mdt_pkt_out_v6, obsegs);
-		UPDATE_MIB(&ip6_mib, ipv6OutRequests, obsegs);
 	}
+	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutRequests, obsegs);
+	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits, obsegs);
+	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets, obbytes);
 
 	ire->ire_ob_pkt_count += obsegs;
 	if (ire->ire_ipif != NULL)
@@ -20692,7 +20714,10 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 
 	UPDATE_OB_PKT_COUNT(ire);
 	ire->ire_last_used_time = lbolt;
-	BUMP_MIB(&ip_mib, ipOutRequests);
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutRequests);
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits);
+	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets,
+	    ntohs(ipha->ipha_length));
 
 	if (ILL_DLS_CAPABLE(ill)) {
 		/*
@@ -22221,7 +22246,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		if (ipha->ipha_src == 0 || ipha->ipha_src == INADDR_BROADCAST ||
 		    CLASSD(ipha->ipha_src)) {
 			freemsg(ipsec_mp);
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(&ip_mib, ipIfStatsInDiscards);
 			return;
 		}
 	} else {
@@ -22230,7 +22255,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		if (IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src) ||
 		    IN6_IS_ADDR_MULTICAST(&ip6h->ip6_src)) {
 			freemsg(ipsec_mp);
-			BUMP_MIB(&ip6_mib, ipv6InDiscards);
+			BUMP_MIB(&ip6_mib, ipIfStatsInDiscards);
 			return;
 		}
 
@@ -25657,8 +25682,8 @@ tcp_kstat_init(void)
 		{ "attemptFails",	KSTAT_DATA_UINT32, 0 },
 		{ "estabResets",	KSTAT_DATA_UINT32, 0 },
 		{ "currEstab",		KSTAT_DATA_UINT32, 0 },
-		{ "inSegs",		KSTAT_DATA_UINT32, 0 },
-		{ "outSegs",		KSTAT_DATA_UINT32, 0 },
+		{ "inSegs",		KSTAT_DATA_UINT64, 0 },
+		{ "outSegs",		KSTAT_DATA_UINT64, 0 },
 		{ "retransSegs",	KSTAT_DATA_UINT32, 0 },
 		{ "connTableSize",	KSTAT_DATA_INT32, 0 },
 		{ "outRsts",		KSTAT_DATA_UINT32, 0 },
@@ -25769,8 +25794,8 @@ tcp_kstat_update(kstat_t *kp, int rw)
 	tcpkp->passiveOpens.value.ui32 = tcp_mib.tcpPassiveOpens;
 	tcpkp->attemptFails.value.ui32 = tcp_mib.tcpAttemptFails;
 	tcpkp->estabResets.value.ui32 = tcp_mib.tcpEstabResets;
-	tcpkp->inSegs.value.ui32 = tcp_mib.tcpInSegs;
-	tcpkp->outSegs.value.ui32 = tcp_mib.tcpOutSegs;
+	tcpkp->inSegs.value.ui64 = tcp_mib.tcpHCInSegs;
+	tcpkp->outSegs.value.ui64 = tcp_mib.tcpHCOutSegs;
 	tcpkp->retransSegs.value.ui32 =	tcp_mib.tcpRetransSegs;
 	tcpkp->connTableSize.value.i32 = tcp_mib.tcpConnTableSize;
 	tcpkp->outRsts.value.ui32 = tcp_mib.tcpOutRsts;

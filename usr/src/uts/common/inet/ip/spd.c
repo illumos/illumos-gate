@@ -4001,7 +4001,6 @@ ipsec_attach_ipsec_out(mblk_t *mp, conn_t *connp, ipsec_policy_t *pol,
 	if (ipsec_mp == NULL) {
 		ipsec_rl_strlog(IP_MOD_ID, 0, 0, SL_ERROR|SL_NOTE,
 		    "ipsec_attach_ipsec_out: Allocation failure\n");
-		BUMP_MIB(&ip_mib, ipOutDiscards);
 		ip_drop_packet(mp, B_FALSE, NULL, NULL, &ipdrops_spd_nomem,
 		    &spd_dropper);
 		return (NULL);
@@ -4371,7 +4370,7 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 		default:
 			if (!ip_hdr_length_nexthdr_v6(mp, ip6h,
 			    &hdr_len, &nexthdrp)) {
-				BUMP_MIB(&ip6_mib, ipv6OutDiscards);
+				BUMP_MIB(&ip6_mib, ipIfStatsOutDiscards);
 				freemsg(ipsec_mp); /* Not IPsec-related drop. */
 				return (NULL);
 			}
@@ -4382,9 +4381,9 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 
 	if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h, 0)) {
 		if (ipha != NULL) {
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+			BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 		} else {
-			BUMP_MIB(&ip6_mib, ipv6OutDiscards);
+			BUMP_MIB(&ip6_mib, ipIfStatsOutDiscards);
 		}
 
 		/* Callee dropped the packet. */

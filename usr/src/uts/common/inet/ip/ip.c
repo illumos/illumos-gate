@@ -761,11 +761,15 @@ void	ip_rput_forward(ire_t *, ipha_t *, mblk_t *, ill_t *);
 static int	ip_rput_forward_options(mblk_t *, ipha_t *, ire_t *);
 static boolean_t	ip_rput_local_options(queue_t *, mblk_t *, ipha_t *,
 			    ire_t *);
+static boolean_t	ip_rput_multimblk_ipoptions(queue_t *, ill_t *,
+			    mblk_t *, ipha_t **, ipaddr_t *);
 static int	ip_rput_options(queue_t *, mblk_t *, ipha_t *, ipaddr_t *);
 static boolean_t ip_rput_fragment(queue_t *, mblk_t **, ipha_t *, uint32_t *,
 		    uint16_t *);
 int		ip_snmp_get(queue_t *, mblk_t *);
-static mblk_t	*ip_snmp_get_mib2_ip(queue_t *, mblk_t *);
+static mblk_t	*ip_snmp_get_mib2_ip(queue_t *, mblk_t *,
+		    mib2_ipIfStatsEntry_t *);
+static mblk_t	*ip_snmp_get_mib2_ip_traffic_stats(queue_t *, mblk_t *);
 static mblk_t	*ip_snmp_get_mib2_ip6(queue_t *, mblk_t *);
 static mblk_t	*ip_snmp_get_mib2_icmp(queue_t *, mblk_t *);
 static mblk_t	*ip_snmp_get_mib2_icmp6(queue_t *, mblk_t *);
@@ -883,8 +887,8 @@ vmem_t *ip_minor_arena;
 /*
  * MIB-2 stuff for SNMP (both IP and ICMP)
  */
-mib2_ip_t	ip_mib;
-mib2_icmp_t	icmp_mib;
+mib2_ipIfStatsEntry_t	ip_mib;
+mib2_icmp_t		icmp_mib;
 
 #ifdef DEBUG
 uint32_t ipsechw_debug = 0;
@@ -1843,7 +1847,8 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 			if (wptr +  tstamp_len > mp->b_wptr) {
 				if (!pullupmsg(mp, wptr + tstamp_len -
 				    mp->b_rptr)) {
-					BUMP_MIB(&ip_mib, ipInDiscards);
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsInDiscards);
 					freemsg(first_mp);
 					return;
 				}
@@ -1974,7 +1979,7 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 		ipha = (ipha_t *)&icmph[1];
 		if ((uchar_t *)&ipha[1] > mp->b_wptr) {
 			if (!pullupmsg(mp, (uchar_t *)&ipha[1] - mp->b_rptr)) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				freemsg(first_mp);
 				return;
 			}
@@ -1982,20 +1987,20 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 			ipha = (ipha_t *)&icmph[1];
 		}
 		if ((IPH_HDR_VERSION(ipha) != IPV4_VERSION)) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(first_mp);
 			return;
 		}
 		hdr_length = IPH_HDR_LENGTH(ipha);
 		if (hdr_length < sizeof (ipha_t)) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(first_mp);
 			return;
 		}
 		if ((uchar_t *)ipha + hdr_length > mp->b_wptr) {
 			if (!pullupmsg(mp,
 			    (uchar_t *)ipha + hdr_length - mp->b_rptr)) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				freemsg(first_mp);
 				return;
 			}
@@ -2131,7 +2136,7 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 		if (src_ire == NULL) {
 			ipif = ipif_get_next_ipif(NULL, ill);
 			if (ipif == NULL) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				freemsg(mp);
 				return;
 			}
@@ -2156,7 +2161,7 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 		 */
 		ASSERT(first_mp == mp);
 		if ((first_mp = ipsec_in_alloc(B_TRUE)) == NULL) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(mp);
 			return;
 		}
@@ -2183,7 +2188,7 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 	ii->ipsec_in_zoneid = zoneid;
 	ASSERT(zoneid != ALL_ZONES);
 	if (!ipsec_in_to_out(first_mp, ipha, NULL)) {
-		BUMP_MIB(&ip_mib, ipInDiscards);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 		return;
 	}
 	BUMP_MIB(&icmp_mib, icmpOutMsgs);
@@ -2312,6 +2317,7 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
 
 	ASSERT(icmph->icmph_type == ICMP_DEST_UNREACHABLE &&
 	    icmph->icmph_code == ICMP_FRAGMENTATION_NEEDED);
+	ASSERT(ill != NULL);
 
 	hdr_length = IPH_HDR_LENGTH(ipha);
 
@@ -2327,7 +2333,7 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
 	    mp->b_wptr) {
 		if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length +
 		    ICMP_MIN_TP_HDR_LEN - mp->b_rptr)) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			ip1dbg(("icmp_inbound_too_big: insufficient hdr\n"));
 			return (B_FALSE);
 		}
@@ -2448,10 +2454,8 @@ icmp_inbound_self_encap_error(mblk_t *mp, int iph_hdr_length, int hdr_length)
 	 * outer IP header.
 	 */
 
-	if (!pullupmsg(mp, -1)) {
-		BUMP_MIB(&ip_mib, ipInDiscards);
+	if (!pullupmsg(mp, -1))
 		return (NULL);
-	}
 
 	icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
 	ipha = (ipha_t *)&icmph[1];
@@ -2550,6 +2554,8 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 	tcph_t	*tcph;
 	conn_t	*connp;
 
+	ASSERT(ill != NULL);
+
 	first_mp = mp;
 	if (mctl_present) {
 		mp = first_mp->b_cont;
@@ -2571,8 +2577,7 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 		    mp->b_wptr) {
 			if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length +
 			    ICMP_MIN_TP_HDR_LEN - mp->b_rptr)) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
-				goto drop_pkt;
+				goto discard_pkt;
 			}
 			icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
 			ipha = (ipha_t *)&icmph[1];
@@ -2612,8 +2617,7 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 		    mp->b_wptr) {
 			if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length +
 			    ICMP_MIN_TP_HDR_LEN - mp->b_rptr)) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
-				goto drop_pkt;
+				goto discard_pkt;
 			}
 			icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
 			ipha = (ipha_t *)&icmph[1];
@@ -2625,10 +2629,8 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 		 */
 		tcph = (tcph_t *)((uchar_t *)ipha + hdr_length);
 		connp = ipcl_tcp_lookup_reversed_ipv4(ipha, tcph, TCPS_LISTEN);
-		if (connp == NULL) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
-			goto drop_pkt;
-		}
+		if (connp == NULL)
+			goto discard_pkt;
 
 		/* Have to change db_type after any pullupmsg */
 		DB_TYPE(mp) = M_CTL;
@@ -2645,8 +2647,7 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 		    mp->b_wptr) {
 			if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length +
 			    ICMP_MIN_TP_HDR_LEN - mp->b_rptr)) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
-				goto drop_pkt;
+				goto discard_pkt;
 			}
 			icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
 			ipha = (ipha_t *)&icmph[1];
@@ -2720,7 +2721,7 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 			first_mp = ipsec_in_alloc(B_TRUE);
 			if (first_mp == NULL) {
 				freemsg(mp);
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				return;
 			}
 			ii = (ipsec_in_t *)first_mp->b_rptr;
@@ -2772,9 +2773,7 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 				if (!pullupmsg(mp, (uchar_t *)ipha +
 				    hdr_length + sizeof (ipha_t) -
 				    mp->b_rptr)) {
-
-					BUMP_MIB(&ip_mib, ipInDiscards);
-					goto drop_pkt;
+					goto discard_pkt;
 				}
 				icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
 				ipha = (ipha_t *)&icmph[1];
@@ -2790,12 +2789,10 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 			 */
 			in_ipha = (ipha_t *)((uchar_t *)ipha + hdr_length);
 			if ((IPH_HDR_VERSION(in_ipha) != IPV4_VERSION)) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
-				goto drop_pkt;
+				goto discard_pkt;
 			}
 			if (IPH_HDR_LENGTH(in_ipha) < sizeof (ipha_t)) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
-				goto drop_pkt;
+				goto discard_pkt;
 			}
 			/* Check for Self-encapsulated tunnels */
 			if (in_ipha->ipha_src == ipha->ipha_src &&
@@ -2804,7 +2801,7 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 				mp = icmp_inbound_self_encap_error(mp,
 				    iph_hdr_length, hdr_length);
 				if (mp == NULL)
-					goto drop_pkt;
+					goto discard_pkt;
 				icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
 				ipha = (ipha_t *)&icmph[1];
 				hdr_length = IPH_HDR_LENGTH(ipha);
@@ -2814,8 +2811,7 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 				 * which we could not have possibly generated.
 				 */
 				if (ipha->ipha_protocol == IPPROTO_ENCAP) {
-					BUMP_MIB(&ip_mib, ipInDiscards);
-					goto drop_pkt;
+					goto discard_pkt;
 				}
 				icmp_inbound_error_fanout(q, ill, first_mp,
 				    icmph, ipha, iph_hdr_length, hdr_length,
@@ -2855,6 +2851,8 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 		return;
 	}
 	/* NOTREACHED */
+discard_pkt:
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 drop_pkt:;
 	ip1dbg(("icmp_inbound_error_fanout: drop pkt\n"));
 	freemsg(first_mp);
@@ -3396,7 +3394,7 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 			 * Convert the IPSEC_IN to IPSEC_OUT.
 			 */
 			if (!ipsec_in_to_out(ipsec_mp, ipha, NULL)) {
-				BUMP_MIB(&ip_mib, ipOutDiscards);
+				BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 				return;
 			}
 			io = (ipsec_out_t *)ipsec_mp->b_rptr;
@@ -3426,7 +3424,7 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		ASSERT(DB_TYPE(mp) == M_DATA);
 		if ((ipsec_mp = ipsec_in_alloc(B_TRUE)) == NULL) {
 			freemsg(mp);
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+			BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 			return;
 		}
 		ii = (ipsec_in_t *)ipsec_mp->b_rptr;
@@ -3447,7 +3445,7 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		 * Convert the IPSEC_IN to IPSEC_OUT.
 		 */
 		if (!ipsec_in_to_out(ipsec_mp, ipha, NULL)) {
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+			BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 			return;
 		}
 		io = (ipsec_out_t *)ipsec_mp->b_rptr;
@@ -3467,7 +3465,7 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		ire = ire_route_lookup(dst, 0, 0, 0, NULL, NULL, zoneid, NULL,
 		    (MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE|MATCH_IRE_ZONEONLY));
 		if (ire == NULL) {
-			BUMP_MIB(&ip_mib, ipOutNoRoutes);
+			BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 			freemsg(ipsec_mp);
 			return;
 		}
@@ -3483,7 +3481,7 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		 */
 		if (io == NULL) {
 			/* This is not a IPSEC_OUT type control msg */
-			BUMP_MIB(&ip_mib, ipOutNoRoutes);
+			BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 			freemsg(ipsec_mp);
 			return;
 		}
@@ -3494,7 +3492,7 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 			ill_refrele(ill);
 		}
 		if (ipif == NULL) {
-			BUMP_MIB(&ip_mib, ipOutNoRoutes);
+			BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 			freemsg(ipsec_mp);
 			return;
 		}
@@ -3642,7 +3640,7 @@ icmp_pkt_err_ok(mblk_t *mp)
 		return (NULL);
 	ipha = (ipha_t *)mp->b_rptr;
 	if (ip_csum_hdr(ipha)) {
-		BUMP_MIB(&ip_mib, ipInCksumErrs);
+		BUMP_MIB(&ip_mib, ipIfStatsInCksumErrs);
 		freemsg(mp);
 		return (NULL);
 	}
@@ -6135,26 +6133,28 @@ ip_proto_not_sup(queue_t *q, mblk_t *ipsec_mp, uint_t flags, zoneid_t zoneid)
 	mp = ipsec_mp->b_cont;
 	ipsec_mp->b_cont = NULL;
 	ipha = (ipha_t *)mp->b_rptr;
-	if (IPH_HDR_VERSION(ipha) == IP_VERSION) {
-		if (ip_fanout_send_icmp(q, mp, flags, ICMP_DEST_UNREACHABLE,
-		    ICMP_PROTOCOL_UNREACHABLE, B_FALSE, zoneid)) {
-			BUMP_MIB(&ip_mib, ipInUnknownProtos);
-		}
-	} else {
-		/* Get ill from index in ipsec_in_t. */
-		ill = ill_lookup_on_ifindex(ii->ipsec_in_ill_index,
-		    B_TRUE, NULL, NULL, NULL, NULL);
-		if (ill != NULL) {
+	/* Get ill from index in ipsec_in_t. */
+	ill = ill_lookup_on_ifindex(ii->ipsec_in_ill_index,
+	    (IPH_HDR_VERSION(ipha) == IPV6_VERSION), NULL, NULL, NULL, NULL);
+	if (ill != NULL) {
+		if (IPH_HDR_VERSION(ipha) == IP_VERSION) {
+			if (ip_fanout_send_icmp(q, mp, flags,
+			    ICMP_DEST_UNREACHABLE,
+			    ICMP_PROTOCOL_UNREACHABLE, B_FALSE, zoneid)) {
+				BUMP_MIB(ill->ill_ip_mib,
+				    ipIfStatsInUnknownProtos);
+			}
+		} else {
 			if (ip_fanout_send_icmp_v6(q, mp, flags,
 			    ICMP6_PARAM_PROB, ICMP6_PARAMPROB_NEXTHEADER,
 			    0, B_FALSE, zoneid)) {
-				BUMP_MIB(ill->ill_ip6_mib, ipv6InUnknownProtos);
+				BUMP_MIB(ill->ill_ip_mib,
+				    ipIfStatsInUnknownProtos);
 			}
-
-			ill_refrele(ill);
-		} else { /* re-link for the freemsg() below. */
-			ipsec_mp->b_cont = mp;
 		}
+		ill_refrele(ill);
+	} else { /* re-link for the freemsg() below. */
+		ipsec_mp->b_cont = mp;
 	}
 
 	/* If ICMP delivered, ipsec_mp will be a singleton (b_cont == NULL). */
@@ -6236,7 +6236,9 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 	conn_t	*connp, *first_connp, *next_connp;
 	connf_t	*connfp;
 	boolean_t shared_addr;
+	mib2_ipIfStatsEntry_t *mibptr;
 
+	mibptr = (ill != NULL) ? ill->ill_ip_mib : &ip_mib;
 	if (mctl_present) {
 		mp = first_mp->b_cont;
 		secure = ipsec_in_is_secure(first_mp);
@@ -6308,7 +6310,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 			if (ip_fanout_send_icmp(q, first_mp, flags,
 			    ICMP_DEST_UNREACHABLE, ICMP_PROTOCOL_UNREACHABLE,
 			    mctl_present, zoneid)) {
-				BUMP_MIB(&ip_mib, ipInUnknownProtos);
+				BUMP_MIB(mibptr, ipIfStatsInUnknownProtos);
 			}
 		}
 		return;
@@ -6352,7 +6354,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 		rq = connp->conn_rq;
 		if (!canputnext(rq)) {
 			if (flags & IP_FF_RAWIP) {
-				BUMP_MIB(&ip_mib, rawipInOverflows);
+				BUMP_MIB(mibptr, rawipIfStatsInOverflows);
 			} else {
 				BUMP_MIB(&icmp_mib, icmpInOverflows);
 			}
@@ -6392,7 +6394,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 					mp1 = ip_add_info(mp1, recv_ill,
 						IPF_RECVIF);
 				}
-				BUMP_MIB(&ip_mib, ipInDelivers);
+				BUMP_MIB(mibptr, ipIfStatsHCInDelivers);
 				if (mctl_present)
 					freeb(first_mp1);
 				putnext(rq, mp1);
@@ -6427,7 +6429,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 	rq = connp->conn_rq;
 	if (!canputnext(rq)) {
 		if (flags & IP_FF_RAWIP) {
-			BUMP_MIB(&ip_mib, rawipInOverflows);
+			BUMP_MIB(mibptr, rawipIfStatsInOverflows);
 		} else {
 			BUMP_MIB(&icmp_mib, icmpInOverflows);
 		}
@@ -6474,7 +6476,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 				ASSERT(recv_ill != NULL);
 				mp = ip_add_info(mp, recv_ill, IPF_RECVIF);
 			}
-			BUMP_MIB(&ip_mib, ipInDelivers);
+			BUMP_MIB(mibptr, ipIfStatsHCInDelivers);
 			putnext(rq, mp);
 			if (mctl_present)
 				freeb(first_mp);
@@ -6505,6 +6507,8 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 	boolean_t syn_present = B_FALSE;
 	conn_t	*connp;
 
+	ASSERT(recv_ill != NULL);
+
 	first_mp = mp;
 	if (mctl_present) {
 		ASSERT(first_mp->b_datap->db_type == M_CTL);
@@ -6532,7 +6536,7 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 			if (first_mp == NULL)
 				return;
 		}
-		BUMP_MIB(&ip_mib, ipInDelivers);
+		BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsHCInDelivers);
 		ip2dbg(("ip_fanout_tcp: no listener; send reset to zone %d\n",
 		    zoneid));
 		tcp_xmit_listeners_reset(first_mp, ip_hdr_len, zoneid);
@@ -6573,6 +6577,7 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 
 	if (IPCL_IS_TCP(connp) && IPCL_IS_BOUND(connp) && !syn_present) {
 		uint_t	flags = (unsigned int)tcph->th_flags[0] & 0xFF;
+		BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsHCInDelivers);
 		if ((flags & TH_RST) || (flags & TH_URG)) {
 			CONN_DEC_REF(connp);
 			freemsg(first_mp);
@@ -6593,6 +6598,7 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 		first_mp = ipsec_check_inbound_policy(first_mp, connp, ipha,
 		    NULL, mctl_present);
 		if (first_mp == NULL) {
+			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
 			CONN_DEC_REF(connp);
 			return;
 		}
@@ -6652,6 +6658,7 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 		ASSERT(recv_ill != NULL);
 		mp = ip_add_info(mp, recv_ill, IPF_RECVIF);
 		if (mp == NULL) {
+			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
 			CONN_DEC_REF(connp);
 			if (mctl_present)
 				freeb(first_mp);
@@ -6667,7 +6674,7 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 		}
 	}
 
-	BUMP_MIB(&ip_mib, ipInDelivers);
+	BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsHCInDelivers);
 	if (IPCL_IS_TCP(connp)) {
 		(*ip_input_proc)(connp->conn_sqp, first_mp,
 		    connp->conn_recv, connp, SQTAG_IP_FANOUT_TCP);
@@ -6691,12 +6698,14 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
  */
 static void
 ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
-    boolean_t secure, ipha_t *ipha, uint_t flags, ill_t *recv_ill,
+    boolean_t secure, ill_t *ill, ipha_t *ipha, uint_t flags, ill_t *recv_ill,
     boolean_t ip_policy)
 {
 	boolean_t	mctl_present = (first_mp != NULL);
 	uint32_t	in_flags = 0; /* set to IP_RECVSLLA and/or IP_RECVIF */
 	uint32_t	ill_index;
+
+	ASSERT(ill != NULL);
 
 	if (mctl_present)
 		first_mp->b_cont = mp;
@@ -6704,7 +6713,7 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
 		first_mp = mp;
 
 	if (CONN_UDP_FLOWCTLD(connp)) {
-		BUMP_MIB(&ip_mib, udpInOverflows);
+		BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
 		freemsg(first_mp);
 		return;
 	}
@@ -6712,8 +6721,10 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
 	if (CONN_INBOUND_POLICY_PRESENT(connp) || secure) {
 		first_mp = ipsec_check_inbound_policy(first_mp, connp, ipha,
 		    NULL, mctl_present);
-		if (first_mp == NULL)
+		if (first_mp == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			return;	/* Freed by ipsec_check_inbound_policy(). */
+		}
 	}
 	if (mctl_present)
 		freeb(first_mp);
@@ -6748,8 +6759,7 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
 		ASSERT(recv_ill != NULL);
 		mp = ip_add_info(mp, recv_ill, in_flags);
 	}
-	BUMP_MIB(&ip_mib, ipInDelivers);
-
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 	/* Send it upstream */
 	CONN_UDP_RECV(connp, mp);
 }
@@ -6839,8 +6849,8 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 
 		CONN_INC_REF(connp);
 		mutex_exit(&connfp->connf_lock);
-		ip_fanout_udp_conn(connp, first_mp, mp, secure, ipha, flags,
-		    recv_ill, ip_policy);
+		ip_fanout_udp_conn(connp, first_mp, mp, secure, ill, ipha,
+		    flags, recv_ill, ip_policy);
 		IP_STAT(ip_udp_fannorm);
 		CONN_DEC_REF(connp);
 		return;
@@ -6933,7 +6943,7 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 		 * processing per-conn, then we would need to do it
 		 * here too.
 		 */
-		ip_fanout_udp_conn(connp, first_mp1, mp1, secure,
+		ip_fanout_udp_conn(connp, first_mp1, mp1, secure, ill,
 		    ipha, flags, recv_ill, B_FALSE);
 		mutex_enter(&connfp->connf_lock);
 		/* Follow the next pointer before releasing the conn. */
@@ -6945,8 +6955,8 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 
 	/* Last one.  Send it upstream. */
 	mutex_exit(&connfp->connf_lock);
-	ip_fanout_udp_conn(connp, first_mp, mp, secure, ipha, flags, recv_ill,
-	    ip_policy);
+	ip_fanout_udp_conn(connp, first_mp, mp, secure, ill, ipha, flags,
+	    recv_ill, ip_policy);
 	IP_STAT(ip_udp_fanmb);
 	CONN_DEC_REF(connp);
 	return;
@@ -7004,7 +7014,8 @@ notfound:
 				    ICMP_DEST_UNREACHABLE,
 				    ICMP_PORT_UNREACHABLE,
 				    mctl_present, zoneid)) {
-					BUMP_MIB(&ip_mib, udpNoPorts);
+					BUMP_MIB(ill->ill_ip_mib,
+					    udpIfStatsNoPorts);
 				}
 			}
 			return;
@@ -7012,8 +7023,8 @@ notfound:
 
 		CONN_INC_REF(connp);
 		mutex_exit(&connfp->connf_lock);
-		ip_fanout_udp_conn(connp, first_mp, mp, secure, ipha, flags,
-		    recv_ill, ip_policy);
+		ip_fanout_udp_conn(connp, first_mp, mp, secure, ill, ipha,
+		    flags, recv_ill, ip_policy);
 		CONN_DEC_REF(connp);
 		return;
 	}
@@ -7060,7 +7071,7 @@ notfound:
 			 * and we don't send icmp errors in response to
 			 * multicast, just drop the packet and give up sooner.
 			 */
-			BUMP_MIB(&ip_mib, udpNoPorts);
+			BUMP_MIB(ill->ill_ip_mib, udpIfStatsNoPorts);
 			freemsg(first_mp);
 		}
 		return;
@@ -7116,7 +7127,7 @@ notfound:
 		 * processing per-conn, then we would need to do it
 		 * here too.
 		 */
-		ip_fanout_udp_conn(connp, first_mp1, mp1, secure,
+		ip_fanout_udp_conn(connp, first_mp1, mp1, secure, ill,
 		    ipha, flags, recv_ill, B_FALSE);
 		mutex_enter(&connfp->connf_lock);
 		/* Follow the next pointer before releasing the conn. */
@@ -7127,8 +7138,8 @@ notfound:
 
 	/* Last one.  Send it upstream. */
 	mutex_exit(&connfp->connf_lock);
-	ip_fanout_udp_conn(connp, first_mp, mp, secure, ipha, flags, recv_ill,
-	    ip_policy);
+	ip_fanout_udp_conn(connp, first_mp, mp, secure, ill, ipha, flags,
+	    recv_ill, ip_policy);
 	CONN_DEC_REF(connp);
 }
 
@@ -7320,7 +7331,7 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 	if (((in_ill->ill_flags & ((ill_t *)ire->ire_stq->q_ptr)->ill_flags &
 		ILLF_ROUTER) == 0) ||
 	    (in_ill == (ill_t *)ire->ire_stq->q_ptr)) {
-		BUMP_MIB(&ip_mib, ipForwProhibits);
+		BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsForwProhibits);
 		ip0dbg(("ip_mrtun_forward: Can't forward :"
 		    "forwarding is not turned on\n"));
 		goto drop_pkt;
@@ -7330,8 +7341,7 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 	 * Don't forward if the interface is down
 	 */
 	if (ire->ire_ipif->ipif_ill->ill_ipif_up_count == 0) {
-		BUMP_MIB(&ip_mib, ipInDiscards);
-		goto drop_pkt;
+		goto discard_pkt;
 	}
 
 	ipha = (ipha_t *)mp->b_rptr;
@@ -7341,14 +7351,15 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 	ipha->ipha_hdr_checksum = (uint16_t)(sum + (sum >> 16));
 	if (ipha->ipha_ttl-- <= 1) {
 		if (ip_csum_hdr(ipha)) {
-			BUMP_MIB(&ip_mib, ipInCksumErrs);
+			BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsInCksumErrs);
 			goto drop_pkt;
 		}
 		q = ire->ire_stq;
 		if ((first_mp = allocb(sizeof (ipsec_info_t),
 		    BPRI_HI)) == NULL) {
-			goto drop_pkt;
+			goto discard_pkt;
 		}
+		BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsForwProhibits);
 		ip_ipsec_out_prepend(first_mp, mp, in_ill);
 		/* Sent by forwarding path, and router is global zone */
 		icmp_time_exceeded(q, first_mp, ICMP_TTL_EXCEEDED,
@@ -7394,7 +7405,7 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 		 * was good coming in.
 		 */
 		if (ip_csum_hdr(ipha)) {
-			BUMP_MIB(&ip_mib, ipInCksumErrs);
+			BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsInCksumErrs);
 			goto drop_pkt;
 		}
 
@@ -7410,7 +7421,7 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 		}
 		if ((first_mp = allocb(sizeof (ipsec_info_t),
 		    BPRI_HI)) == NULL) {
-			goto drop_pkt;
+			goto discard_pkt;
 		}
 		ip_ipsec_out_prepend(first_mp, mp, in_ill);
 		mp = first_mp;
@@ -7442,7 +7453,8 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 	}
 
 	return;
-
+discard_pkt:
+	BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsInDiscards);
 drop_pkt:;
 	ip2dbg(("ip_mrtun_forward: dropping pkt\n"));
 	freemsg(mp);
@@ -7563,14 +7575,18 @@ ip_grab_attach_ill(ill_t *ill, mblk_t *first_mp, int ifindex, boolean_t isv6)
 	    (ret_ill->ill_phyint->phyint_flags & PHYI_OFFLINE)) {
 		if (isv6) {
 			if (ill != NULL) {
-				BUMP_MIB(ill->ill_ip6_mib, ipv6OutDiscards);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
 			} else {
-				BUMP_MIB(&ip6_mib, ipv6OutDiscards);
+				BUMP_MIB(&ip6_mib, ipIfStatsOutDiscards);
 			}
 			ip1dbg(("ip_grab_attach_ill (IPv6): "
 			    "bad ifindex %d.\n", ifindex));
 		} else {
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+			if (ill != NULL) {
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			} else {
+				BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
+			}
 			ip1dbg(("ip_grab_attach_ill (IPv4): "
 			    "bad ifindex %d.\n", ifindex));
 		}
@@ -8787,9 +8803,17 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 	if (mp->b_prev) {
 		mp->b_next = NULL;
 		mp->b_prev = NULL;
-		BUMP_MIB(&ip_mib, ipInDiscards);
+		if (in_ill != NULL) {
+			BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsInDiscards);
+		} else {
+			BUMP_MIB(&ip_mib, ipIfStatsInDiscards);
+		}
 	} else {
-		BUMP_MIB(&ip_mib, ipOutDiscards);
+		if (dst_ill != NULL) {
+			BUMP_MIB(dst_ill->ill_ip_mib, ipIfStatsOutDiscards);
+		} else {
+			BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
+		}
 	}
 	ASSERT(copy_mp == NULL);
 	MULTIRT_DEBUG_UNTAG(first_mp);
@@ -8816,9 +8840,18 @@ icmp_err_ret:
 	if (mp->b_prev) {
 		mp->b_next = NULL;
 		mp->b_prev = NULL;
-		/* XXX ipInNoRoutes */
+		if (in_ill != NULL) {
+			BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsInNoRoutes);
+		} else {
+			BUMP_MIB(&ip_mib, ipIfStatsInNoRoutes);
+		}
 		q = WR(q);
 	} else {
+		/*
+		 * There is no outgoing ill, so just increment the
+		 * system MIB.
+		 */
+		BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 		/*
 		 * Since ip_wput() isn't close to finished, we fill
 		 * in enough of the header for credible error reporting.
@@ -8832,7 +8865,6 @@ icmp_err_ret:
 			return;
 		}
 	}
-	BUMP_MIB(&ip_mib, ipOutNoRoutes);
 
 	/*
 	 * At this point we will have ire only if RTF_BLACKHOLE
@@ -9801,13 +9833,13 @@ ip_setqinfo(queue_t *q, minor_t minor, boolean_t bump_mib)
 
 	if (minor == IPV6_MINOR)  {
 		if (bump_mib)
-			BUMP_MIB(&ip6_mib, ipv6OutSwitchIPv4);
+			BUMP_MIB(&ip6_mib, ipIfStatsOutSwitchIPVersion);
 		q->q_qinfo = &rinit_ipv6;
 		WR(q)->q_qinfo = &winit_ipv6;
 		(Q_TO_CONN(q))->conn_pkt_isv6 = B_TRUE;
 	} else {
 		if (bump_mib)
-			BUMP_MIB(&ip_mib, ipOutSwitchIPv6);
+			BUMP_MIB(&ip_mib, ipIfStatsOutSwitchIPVersion);
 		q->q_qinfo = &iprinit;
 		WR(q)->q_qinfo = &ipwinit;
 		(Q_TO_CONN(q))->conn_pkt_isv6 = B_FALSE;
@@ -11787,13 +11819,8 @@ ip_reassemble(mblk_t *mp, ipf_t *ipf, uint_t start, boolean_t more, ill_t *ill,
 				if (end < IP_REASS_END(mp1)) {
 					mp->b_wptr -= end - offset;
 					IP_REASS_SET_END(mp, offset);
-					if (ill->ill_isv6) {
-						BUMP_MIB(ill->ill_ip6_mib,
-						    ipv6ReasmPartDups);
-					} else {
-						BUMP_MIB(&ip_mib,
-						    ipReasmPartDups);
-					}
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsReasmPartDups);
 					break;
 				}
 				/* Did we cover another hole? */
@@ -11818,12 +11845,8 @@ ip_reassemble(mblk_t *mp, ipf_t *ipf, uint_t start, boolean_t more, ill_t *ill,
 				ipf->ipf_count -= mp1->b_datap->db_lim -
 				    mp1->b_datap->db_base;
 				freeb(mp1);
-				if (ill->ill_isv6) {
-					BUMP_MIB(ill->ill_ip6_mib,
-					    ipv6ReasmPartDups);
-				} else {
-					BUMP_MIB(&ip_mib, ipReasmPartDups);
-				}
+				BUMP_MIB(ill->ill_ip_mib,
+				    ipIfStatsReasmPartDups);
 				mp1 = mp->b_cont;
 				if (!mp1)
 					break;
@@ -11851,13 +11874,8 @@ ip_reassemble(mblk_t *mp, ipf_t *ipf, uint_t start, boolean_t more, ill_t *ill,
 						incr_dups = B_FALSE;
 					}
 					freeb(mp);
-					if (ill->ill_isv6) {
-						BUMP_MIB(ill->ill_ip6_mib,
-						    ipv6ReasmDuplicates);
-					} else {
-						BUMP_MIB(&ip_mib,
-						    ipReasmDuplicates);
-					}
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsReasmDuplicates);
 					break;
 				}
 				/*
@@ -11866,12 +11884,8 @@ ip_reassemble(mblk_t *mp, ipf_t *ipf, uint_t start, boolean_t more, ill_t *ill,
 				 */
 				IP_REASS_SET_START(mp, offset);
 				mp->b_rptr += offset - start;
-				if (ill->ill_isv6) {
-					BUMP_MIB(ill->ill_ip6_mib,
-					    ipv6ReasmPartDups);
-				} else {
-					BUMP_MIB(&ip_mib, ipReasmPartDups);
-				}
+				BUMP_MIB(ill->ill_ip_mib,
+				    ipIfStatsReasmPartDups);
 				start = offset;
 				if (!mp1->b_cont) {
 					/*
@@ -11907,14 +11921,8 @@ ip_reassemble(mblk_t *mp, ipf_t *ipf, uint_t start, boolean_t more, ill_t *ill,
 						 * this up twice if there is
 						 * overlap at both ends.
 						 */
-						if (ill->ill_isv6) {
-							BUMP_MIB(
-							    ill->ill_ip6_mib,
-							    ipv6ReasmPartDups);
-						} else {
-							BUMP_MIB(&ip_mib,
-							    ipReasmPartDups);
-						}
+						BUMP_MIB(ill->ill_ip_mib,
+						    ipIfStatsReasmPartDups);
 						break;
 					}
 					/* Did we cover another hole? */
@@ -11944,13 +11952,8 @@ ip_reassemble(mblk_t *mp, ipf_t *ipf, uint_t start, boolean_t more, ill_t *ill,
 					    mp1->b_datap->db_lim -
 					    mp1->b_datap->db_base;
 					freeb(mp1);
-					if (ill->ill_isv6) {
-						BUMP_MIB(ill->ill_ip6_mib,
-						    ipv6ReasmPartDups);
-					} else {
-						BUMP_MIB(&ip_mib,
-						    ipReasmPartDups);
-					}
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsReasmPartDups);
 					mp1 = mp->b_cont;
 					if (!mp1)
 						break;
@@ -12244,15 +12247,14 @@ ip_rput_fragment(queue_t *q, mblk_t **mpp, ipha_t *ipha,
 		/* New guy.  Allocate a frag message. */
 		mp1 = allocb(sizeof (*ipf), BPRI_MED);
 		if (mp1 == NULL) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(mp);
 reass_done:
 			mutex_exit(&ipfb->ipfb_lock);
 			return (B_FALSE);
 		}
 
-
-		BUMP_MIB(&ip_mib, ipReasmReqds);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsReasmReqds);
 		mp1->b_cont = mp;
 
 		/* Initialize the fragment header. */
@@ -12430,7 +12432,7 @@ reass_done:
 	 * to report back to the transport.
 	 */
 	ecn_info = ipf->ipf_ecn;
-	BUMP_MIB(&ip_mib, ipReasmOKs);
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsReasmOKs);
 	ipfp = ipf->ipf_ptphn;
 
 	/* We need to supply these to caller */
@@ -12459,7 +12461,7 @@ reass_done:
 	packet_size = (uint32_t)msgdsize(mp);
 	if (packet_size > IP_MAXPACKET) {
 		freemsg(mp);
-		BUMP_MIB(&ip_mib, ipInHdrErrors);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
 		return (B_FALSE);
 	}
 
@@ -12468,7 +12470,7 @@ reass_done:
 
 		freemsg(mp);
 		if (mp2 == NULL) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			return (B_FALSE);
 		}
 		mp = mp2;
@@ -12498,7 +12500,7 @@ reass_done:
  * the mp. caller is responsible for decrementing ire ref cnt.
  */
 static boolean_t
-ip_options_cksum(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire)
+ip_options_cksum(queue_t *q, ill_t *ill, mblk_t *mp, ipha_t *ipha, ire_t *ire)
 {
 	mblk_t		*first_mp;
 	boolean_t	mctl_present;
@@ -12512,7 +12514,11 @@ ip_options_cksum(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire)
 	if (!mctl_present) {
 		sum = ip_csum_hdr(ipha);
 		if (sum != 0) {
-			BUMP_MIB(&ip_mib, ipInCksumErrs);
+			if (ill != NULL) {
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
+			} else {
+				BUMP_MIB(&ip_mib, ipIfStatsInCksumErrs);
+			}
 			freemsg(first_mp);
 			return (B_FALSE);
 		}
@@ -12548,6 +12554,7 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
 	ASSERT(!mctl_present || ipsec_in_is_secure(first_mp));
 	ASSERT(ipha->ipha_protocol == IPPROTO_UDP);
+	ASSERT(ill != NULL);
 
 	/*
 	 * FAST PATH for udp packets
@@ -12578,7 +12585,7 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		 * back from AH/ESP as we already did it.
 		 */
 		if (!mctl_present && sum != 0 && sum != 0xFFFF) {
-			BUMP_MIB(&ip_mib, ipInCksumErrs);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
 			freemsg(first_mp);
 			return;
 		}
@@ -12637,8 +12644,7 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		    mp, mp1, cksum_err);
 
 		if (cksum_err) {
-			BUMP_MIB(&ip_mib, udpInCksumErrs);
-
+			BUMP_MIB(ill->ill_ip_mib, udpIfStatsInCksumErrs);
 			if (hck_flags & HCK_FULLCKSUM)
 				IP_STAT(ip_udp_in_full_hw_cksum_err);
 			else if (hck_flags & HCK_PARTIALCKSUM)
@@ -12662,10 +12668,11 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 
 		if (CONN_UDP_FLOWCTLD(connp)) {
 			freemsg(mp);
-			BUMP_MIB(&ip_mib, udpInOverflows);
+			BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
 		} else {
 			if (!mctl_present) {
-				BUMP_MIB(&ip_mib, ipInDelivers);
+				BUMP_MIB(ill->ill_ip_mib,
+				    ipIfStatsHCInDelivers);
 			}
 			/*
 			 * mp and first_mp can change.
@@ -12697,7 +12704,7 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	goto udpslowpath;
 
 ipoptions:
-	if (!ip_options_cksum(q, mp, ipha, ire)) {
+	if (!ip_options_cksum(q, ill, mp, ipha, ire)) {
 		goto slow_done;
 	}
 
@@ -12729,7 +12736,7 @@ fragmented:
 	if ((MBLKL(mp)) < (u1 + UDPH_SIZE)) {
 udppullup:
 		if (!pullupmsg(mp, u1 + UDPH_SIZE)) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(first_mp);
 			goto slow_done;
 		}
@@ -12753,7 +12760,7 @@ udppullup:
 		    iphs[9] + up[2], sum, cksum_err);
 
 		if (cksum_err) {
-			BUMP_MIB(&ip_mib, udpInCksumErrs);
+			BUMP_MIB(ill->ill_ip_mib, udpIfStatsInCksumErrs);
 
 			if (reass_hck_flags & HCK_FULLCKSUM)
 				IP_STAT(ip_udp_in_full_hw_cksum_err);
@@ -12808,6 +12815,7 @@ ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 #define	rptr	((uchar_t *)ipha)
 
 	ASSERT(ipha->ipha_protocol == IPPROTO_TCP);
+	ASSERT(ill != NULL);
 
 	/*
 	 * FAST PATH for tcp packets
@@ -12838,7 +12846,8 @@ ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 			 * is coming back from AH/ESP as we already did it.
 			 */
 			if (!mctl_present && (sum != 0) && sum != 0xFFFF) {
-				BUMP_MIB(&ip_mib, ipInCksumErrs);
+				BUMP_MIB(ill->ill_ip_mib,
+				    ipIfStatsInCksumErrs);
 				goto error;
 			}
 		}
@@ -12919,7 +12928,7 @@ ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 	    mp, mp1, cksum_err);
 
 	if (cksum_err) {
-		BUMP_MIB(&ip_mib, tcpInErrs);
+		BUMP_MIB(ill->ill_ip_mib, tcpIfStatsInErrs);
 
 		if (hck_flags & HCK_FULLCKSUM)
 			IP_STAT(ip_tcp_in_full_hw_cksum_err);
@@ -12955,6 +12964,7 @@ try_again:
 	if (IPCL_IS_TCP4_CONNECTED_NO_POLICY(connp) && !mctl_present &&
 	    !IPP_ENABLED(IPP_LOCAL_IN)) {
 		ASSERT(first_mp == mp);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 		SET_SQUEUE(mp, tcp_rput_data, connp);
 		return (mp);
 	}
@@ -12967,10 +12977,14 @@ try_again:
 			    (intptr_t)ip_squeue_get(ill_ring);
 			if (IPCL_IS_FULLY_BOUND(connp) && !mctl_present &&
 			    !CONN_INBOUND_POLICY_PRESENT(connp)) {
+				BUMP_MIB(ill->ill_ip_mib,
+				    ipIfStatsHCInDelivers);
 				SET_SQUEUE(mp, connp->conn_recv, connp);
 				return (mp);
 			} else if (IPCL_IS_BOUND(connp) && !mctl_present &&
 			    !CONN_INBOUND_POLICY_PRESENT(connp)) {
+				BUMP_MIB(ill->ill_ip_mib,
+				    ipIfStatsHCInDelivers);
 				ip_squeue_enter_unbound++;
 				SET_SQUEUE(mp, tcp_conn_request_unbound,
 				    connp);
@@ -12984,6 +12998,7 @@ try_again:
 	if (IPCL_IS_TCP(connp) && IPCL_IS_BOUND(connp) && !syn_present) {
 		uint_t	flags = (unsigned int)tcph->th_flags[0] & 0xFF;
 
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 		/* No need to send this packet to TCP */
 		if ((flags & TH_RST) || (flags & TH_URG)) {
 			CONN_DEC_REF(connp);
@@ -13005,6 +13020,7 @@ try_again:
 		first_mp = ipsec_check_inbound_policy(first_mp, connp,
 		    ipha, NULL, mctl_present);
 		if (first_mp == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			CONN_DEC_REF(connp);
 			return (NULL);
 		}
@@ -13061,6 +13077,7 @@ try_again:
 	if (!syn_present && connp->conn_ipv6_recvpktinfo) {
 		mp = ip_add_info(mp, recv_ill, flags);
 		if (mp == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			CONN_DEC_REF(connp);
 			if (mctl_present)
 				freeb(first_mp);
@@ -13076,6 +13093,7 @@ try_again:
 		}
 	}
 
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 	if (IPCL_IS_TCP(connp)) {
 		SET_SQUEUE(first_mp, connp->conn_recv, connp);
 		return (first_mp);
@@ -13095,11 +13113,12 @@ no_conn:
 			return (NULL);
 		}
 	}
-	BUMP_MIB(&ip_mib, ipInDelivers);
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
+
 	tcp_xmit_listeners_reset(first_mp, IPH_HDR_LENGTH(mp->b_rptr), zoneid);
 	return (NULL);
 ipoptions:
-	if (!ip_options_cksum(q, first_mp, ipha, ire)) {
+	if (!ip_options_cksum(q, ill, first_mp, ipha, ire)) {
 		goto slow_done;
 	}
 
@@ -13132,7 +13151,7 @@ fragmented:
 	if (len < (u1 + 20)) {
 tcppullup:
 		if (!pullupmsg(mp, u1 + 20)) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			goto error;
 		}
 		ipha = (ipha_t *)mp->b_rptr;
@@ -13147,7 +13166,7 @@ tcppullup:
 	if (offset != 5) {
 tcpoptions:
 		if (offset < 5) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			goto error;
 		}
 		/*
@@ -13158,7 +13177,7 @@ tcpoptions:
 		offset += u1;
 		if (len < offset) {
 			if (!pullupmsg(mp, offset)) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				goto error;
 			}
 			ipha = (ipha_t *)mp->b_rptr;
@@ -13200,7 +13219,7 @@ multipkttcp:
 	 */
 	IP_STAT(ip_in_sw_cksum);
 	if (IP_CSUM(mp, (int32_t)((uchar_t *)up - rptr), u1) != 0) {
-		BUMP_MIB(&ip_mib, tcpInErrs);
+		BUMP_MIB(ill->ill_ip_mib, tcpIfStatsInErrs);
 		goto error;
 	}
 
@@ -13236,6 +13255,7 @@ ip_sctp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 #define	rptr	((uchar_t *)ipha)
 
 	ASSERT(ipha->ipha_protocol == IPPROTO_SCTP);
+	ASSERT(ill != NULL);
 
 	/* u1 is # words of IP options */
 	u1 = ipha->ipha_version_and_hdr_length - (uchar_t)((IP_VERSION << 4)
@@ -13259,7 +13279,7 @@ ip_sctp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 			 * is coming back from AH/ESP as we already did it.
 			 */
 			if (!mctl_present && (sum != 0) && sum != 0xFFFF) {
-				BUMP_MIB(&ip_mib, ipInCksumErrs);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
 				goto error;
 			}
 		}
@@ -13293,7 +13313,7 @@ find_sctp_client:
 	if (len < (u1 + SCTP_COMMON_HDR_LENGTH)) {
 		if (mp->b_cont == NULL ||
 		    !pullupmsg(mp, u1 + SCTP_COMMON_HDR_LENGTH)) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			goto error;
 		}
 		ipha = (ipha_t *)mp->b_rptr;
@@ -13329,7 +13349,7 @@ find_sctp_client:
 	}
 
 	/* Found a client; up it goes */
-	BUMP_MIB(&ip_mib, ipInDelivers);
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 	sctp_input(connp, ipha, mp, first_mp, recv_ill, B_TRUE, mctl_present);
 	return;
 
@@ -13340,7 +13360,7 @@ no_conn:
 
 ipoptions:
 	DB_CKSUMFLAGS(mp) = 0;
-	if (!ip_options_cksum(q, first_mp, ipha, ire))
+	if (!ip_options_cksum(q, ill, first_mp, ipha, ire))
 		goto slow_done;
 
 	UPDATE_IB_PKT_COUNT(ire);
@@ -13377,7 +13397,7 @@ slow_done:
 #define	VERSION_6	0x60
 
 static boolean_t
-ip_rput_multimblk_ipoptions(queue_t *q, mblk_t *mp, ipha_t **iphapp,
+ip_rput_multimblk_ipoptions(queue_t *q, ill_t *ill, mblk_t *mp, ipha_t **iphapp,
     ipaddr_t *dstp)
 {
 	uint_t	opt_len;
@@ -13385,13 +13405,14 @@ ip_rput_multimblk_ipoptions(queue_t *q, mblk_t *mp, ipha_t **iphapp,
 	ssize_t len;
 	uint_t	pkt_len;
 
+	ASSERT(ill != NULL);
 	IP_STAT(ip_ipoptions);
 	ipha = *iphapp;
 
 #define	rptr    ((uchar_t *)ipha)
 	/* Assume no IPv6 packets arrive over the IPv4 queue */
 	if (IPH_HDR_VERSION(ipha) == IPV6_VERSION) {
-		BUMP_MIB(&ip_mib, ipInIPv6);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInWrongIPVersion);
 		freemsg(mp);
 		return (B_FALSE);
 	}
@@ -13404,7 +13425,7 @@ ip_rput_multimblk_ipoptions(queue_t *q, mblk_t *mp, ipha_t **iphapp,
 	if (opt_len) {
 		/* IP Options present!  Validate and process. */
 		if (opt_len > (15 - IP_SIMPLE_HDR_LENGTH_IN_WORDS)) {
-			BUMP_MIB(&ip_mib, ipInHdrErrors);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
 			goto done;
 		}
 		/*
@@ -13414,11 +13435,11 @@ ip_rput_multimblk_ipoptions(queue_t *q, mblk_t *mp, ipha_t **iphapp,
 		len = ((size_t)opt_len + IP_SIMPLE_HDR_LENGTH_IN_WORDS) << 2;
 		if (len > (mp->b_wptr - rptr)) {
 			if (len > pkt_len) {
-				BUMP_MIB(&ip_mib, ipInHdrErrors);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
 				goto done;
 			}
 			if (!pullupmsg(mp, len)) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				goto done;
 			}
 			ipha = (ipha_t *)mp->b_rptr;
@@ -13430,6 +13451,7 @@ ip_rput_multimblk_ipoptions(queue_t *q, mblk_t *mp, ipha_t **iphapp,
 		 */
 		IP_STAT(ip_opt);
 		if (ip_rput_options(q, mp, ipha, dstp) == -1) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			return (B_FALSE);
 		}
 	}
@@ -13475,7 +13497,7 @@ ip_rput_noire(queue_t *q, ill_t *in_ill, mblk_t *mp, int ll_multicast,
 		return (NULL);
 	}
 	if (!(ill->ill_flags & ILLF_ROUTER) && !ip_source_routed(ipha)) {
-		BUMP_MIB(&ip_mib, ipForwProhibits);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
 		freemsg(mp);
 		return (NULL);
 	}
@@ -13549,6 +13571,8 @@ ip_check_and_align_header(queue_t *q, mblk_t *mp)
 	len = MBLKL(mp);
 
 	if (!OK_32PTR(mp->b_rptr) || len < IP_SIMPLE_HDR_LENGTH) {
+		ill = (ill_t *)q->q_ptr;
+
 		if (!OK_32PTR(mp->b_rptr))
 			IP_STAT(ip_notaligned1);
 		else
@@ -13557,13 +13581,12 @@ ip_check_and_align_header(queue_t *q, mblk_t *mp)
 		if (len < 0) {
 			/* clear b_prev - used by ip_mroute_decap */
 			mp->b_prev = NULL;
-			BUMP_MIB(&ip_mib, ipInHdrErrors);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
 			freemsg(mp);
 			return (B_FALSE);
 		}
 
 		if (ip_rput_pullups++ == 0) {
-			ill = (ill_t *)q->q_ptr;
 			ipha = (ipha_t *)mp->b_rptr;
 			(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
 			    "ip_check_and_align_header: %s forced us to "
@@ -13573,7 +13596,7 @@ ip_check_and_align_header(queue_t *q, mblk_t *mp)
 		if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH)) {
 			/* clear b_prev - used by ip_mroute_decap */
 			mp->b_prev = NULL;
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(mp);
 			return (B_FALSE);
 		}
@@ -13637,7 +13660,7 @@ ip_rput_notforus(queue_t **qp, mblk_t *mp, ire_t *ire, ill_t *ill)
 		    ire->ire_ipif->ipif_ill->ill_flags &
 		    ILLF_ROUTER) == 0)) {
 			/* Drop packet */
-			BUMP_MIB(&ip_mib, ipForwProhibits);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
 			freemsg(mp);
 			return (B_TRUE);
 		}
@@ -13662,6 +13685,7 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	ire_t	*src_ire = NULL;
 	ill_t	*stq_ill;
 	uint_t	hlen;
+	uint_t	pkt_len;
 	uint32_t sum;
 	queue_t	*dev_q;
 	boolean_t check_multirt = B_FALSE;
@@ -13679,16 +13703,17 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 
 	if (ip_dst == INADDR_ANY || IN_BADCLASS(ip_dst) ||
 	    IN_CLASSD(ip_src)) {
-		BUMP_MIB(&ip_mib, ipForwProhibits);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
 		goto drop;
 	}
 	src_ire = ire_ctable_lookup(ipha->ipha_src, 0, IRE_BROADCAST, NULL,
 	    ALL_ZONES, NULL, MATCH_IRE_TYPE);
 
 	if (src_ire != NULL) {
-		BUMP_MIB(&ip_mib, ipForwProhibits);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
 		goto drop;
 	}
+
 
 	/* No ire cache of nexthop. So first create one  */
 	if (ire == NULL) {
@@ -13700,7 +13725,9 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 		 */
 		ASSERT(!check_multirt);
 		if (ire == NULL) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			/* An attempt was made to forward the packet */
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInForwDatagrams);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			mp->b_prev = mp->b_next = 0;
 			/* send icmp unreachable */
 			/* Sent by forwarding path, and router is global zone */
@@ -13728,6 +13755,7 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	 * The codeflow from here on is thus:
 	 *	ip_rput_process_forward->ip_rput_forward->ip_xmit_v4
 	 */
+	pkt_len = ntohs(ipha->ipha_length);
 	stq_ill = (ill_t *)ire->ire_stq->q_ptr;
 	if (!(stq_ill->ill_flags & ILLF_ROUTER) ||
 	    !(ill->ill_flags & ILLF_ROUTER) ||
@@ -13735,12 +13763,13 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	    (ill->ill_group != NULL && ill->ill_group == stq_ill->ill_group) ||
 	    (ire->ire_nce == NULL) ||
 	    (ire->ire_nce->nce_state != ND_REACHABLE) ||
-	    (ntohs(ipha->ipha_length) > ire->ire_max_frag) ||
+	    (pkt_len > ire->ire_max_frag) ||
 	    ipha->ipha_ttl <= 1) {
 		ip_rput_process_forward(ill->ill_rq, mp, ire,
 		    ipha, ill, B_FALSE);
 		return (ire);
 	}
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInForwDatagrams);
 
 	DTRACE_PROBE4(ip4__forwarding__start,
 	    ill_t *, ill, ill_t *, stq_ill, ipha_t *, ipha, mblk_t *, mp);
@@ -13786,14 +13815,18 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 
 			UPDATE_IB_PKT_COUNT(ire);
 			ire->ire_last_used_time = lbolt;
-			BUMP_MIB(&ip_mib, ipForwDatagrams);
+			BUMP_MIB(stq_ill->ill_ip_mib,
+			    ipIfStatsHCOutForwDatagrams);
+			BUMP_MIB(stq_ill->ill_ip_mib, ipIfStatsHCOutTransmits);
+			UPDATE_MIB(stq_ill->ill_ip_mib, ipIfStatsHCOutOctets,
+			    pkt_len);
 			putnext(ire->ire_stq, mp);
 			return (ire);
 		}
 	}
 
 indiscard:
-	BUMP_MIB(&ip_mib, ipInDiscards);
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 drop:
 	if (mp != NULL)
 		freemsg(mp);
@@ -13823,8 +13856,10 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 	mp->b_prev = NULL; /* ip_rput_noire sets incoming interface here */
 	mp->b_next = NULL; /* ip_rput_noire sets dst here */
 
-	if (ll_multicast != 0)
+	if (ll_multicast != 0) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 		goto drop_pkt;
+	}
 
 	/*
 	 * check if ipha_src is a broadcast address. Note that this
@@ -13840,7 +13875,7 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 	    IN_BADCLASS(ntohl(ipha->ipha_dst))) {
 		if (src_ire != NULL)
 			ire_refrele(src_ire);
-		BUMP_MIB(&ip_mib, ipForwProhibits);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
 		ip2dbg(("ip_rput_process_forward: Received packet with"
 		    " bad src/dst address on %s\n", ill->ill_name));
 		goto drop_pkt;
@@ -13865,7 +13900,7 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 	    ILLF_ROUTER) == 0) &&
 	    !(ip_source_routed(ipha) && (ire->ire_rfq == q ||
 	    (ill_group != NULL && ill_group == ire_group)))) {
-		BUMP_MIB(&ip_mib, ipForwProhibits);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
 		if (ip_source_routed(ipha)) {
 			q = WR(q);
 			/*
@@ -13880,6 +13915,8 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 		}
 		goto drop_pkt;
 	}
+
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInForwDatagrams);
 
 	/* Packet is being forwarded. Turning off hwcksum flag. */
 	DB_CKSUMFLAGS(mp) = 0;
@@ -13965,7 +14002,7 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 sendit:
 	dev_q = ire->ire_stq->q_next;
 	if ((dev_q->q_next || dev_q->q_first) && !canput(dev_q)) {
-		BUMP_MIB(&ip_mib, ipInDiscards);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 		freemsg(mp);
 		return;
 	}
@@ -13987,6 +14024,8 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 
 	q = *qp;
 
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInBcastPkts);
+
 	/*
 	 * Clear the indication that this may have hardware
 	 * checksum as we are not using it for forwarding.
@@ -14001,7 +14040,7 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 	if (ipha->ipha_protocol == IPPROTO_TCP) {
 		ire_refrele(ire);
 		freemsg(mp);
-		BUMP_MIB(&ip_mib, ipInDiscards);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 		return (NULL);
 	}
 	/*
@@ -14027,7 +14066,7 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 		if (ipif == NULL) {
 			ire_refrele(ire);
 			freemsg(mp);
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			return (NULL);
 		}
 		new_ire = ire_ctable_lookup(dst, 0, 0,
@@ -14039,7 +14078,7 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 				ire_refrele(ire);
 				ire_refrele(new_ire);
 				freemsg(mp);
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				return (NULL);
 			}
 			/*
@@ -14069,7 +14108,7 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 				 */
 				ire_refrele(ire);
 				freemsg(mp);
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				return (NULL);
 			}
 		} else {
@@ -14144,7 +14183,7 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 			 * will decrement it by one.
 			 */
 			if (ip_csum_hdr(ipha)) {
-				BUMP_MIB(&ip_mib, ipInCksumErrs);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
 				ip2dbg(("ip_rput_broadcast:drop pkt\n"));
 				freemsg(mp);
 				ire_refrele(ire);
@@ -14173,6 +14212,10 @@ static boolean_t
 ip_rput_process_multicast(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
     int *ll_multicast, ipaddr_t *dstp)
 {
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInMcastPkts);
+	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInMcastOctets,
+	    ntohs(ipha->ipha_length));
+
 	/*
 	 * Forward packets only if we have joined the allmulti
 	 * group on this interface.
@@ -14296,7 +14339,11 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 				mp1->b_prev = NULL;
 			}
 			freemsg(mp);
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			if (ill != NULL) {
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			} else {
+				BUMP_MIB(&ip_mib, ipIfStatsInDiscards);
+			}
 			return (B_TRUE);
 		}
 		for (from_mp = mp, to_mp = mp1; from_mp != NULL;
@@ -14535,7 +14582,7 @@ ip_rput(queue_t *q, mblk_t *mp)
 			/* clear b_prev - used by ip_mroute_decap */
 			mp->b_prev = NULL;
 			freemsg(mp);
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
 			    "ip_rput_end: q %p (%S)", q, "copymsg");
 			return;
@@ -14654,12 +14701,16 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 
 		ipha = (ipha_t *)mp->b_rptr;
 		len = mp->b_wptr - rptr;
+		pkt_len = ntohs(ipha->ipha_length);
 
-		BUMP_MIB(&ip_mib, ipInReceives);
-
+		/*
+		 * We must count all incoming packets, even if they end
+		 * up being dropped later on.
+		 */
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInReceives);
+		UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInOctets, pkt_len);
 
 		/* multiple mblk or too short */
-		pkt_len = ntohs(ipha->ipha_length);
 		len -= pkt_len;
 		if (len != 0) {
 			/*
@@ -14668,15 +14719,17 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			 */
 			if (mp->b_cont == NULL) {
 				if (len < 0 || pkt_len < IP_SIMPLE_HDR_LENGTH) {
-					BUMP_MIB(&ip_mib, ipInHdrErrors);
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsInHdrErrors);
 					ip2dbg(("ip_input: drop pkt\n"));
 					freemsg(mp);
 					continue;
 				}
 				mp->b_wptr = rptr + pkt_len;
-			} else if (len += msgdsize(mp->b_cont)) {
+			} else if ((len += msgdsize(mp->b_cont)) != 0) {
 				if (len < 0 || pkt_len < IP_SIMPLE_HDR_LENGTH) {
-					BUMP_MIB(&ip_mib, ipInHdrErrors);
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsInHdrErrors);
 					ip2dbg(("ip_input: drop pkt\n"));
 					freemsg(mp);
 					continue;
@@ -14691,7 +14744,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 
 		if (IP_LOOPBACK_ADDR(dst) ||
 		    IP_LOOPBACK_ADDR(ipha->ipha_src)) {
-			BUMP_MIB(&ip_mib, ipInAddrErrors);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInAddrErrors);
 			cmn_err(CE_CONT, "dst %X src %X\n",
 			    dst, ipha->ipha_src);
 			freemsg(mp);
@@ -14724,7 +14777,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		 */
 		if (is_system_labeled() &&
 		    !tsol_get_pkt_label(mp, IPV4_VERSION)) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(mp);
 			continue;
 		}
@@ -14786,7 +14839,8 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 				IP_STAT(ip_multimblk4);
 			else
 				IP_STAT(ip_ipoptions);
-			if (!ip_rput_multimblk_ipoptions(q, mp, &ipha, &dst))
+			if (!ip_rput_multimblk_ipoptions(q, ill, mp, &ipha,
+			    &dst))
 				continue;
 		}
 
@@ -16310,9 +16364,11 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 	uint32_t	max_frag;
 	uint32_t	ill_index;
 	ill_t		*out_ill;
+	mib2_ipIfStatsEntry_t *mibptr;
 
 	/* Get the ill_index of the incoming ILL */
 	ill_index = (in_ill != NULL) ? in_ill->ill_phyint->phyint_ifindex : 0;
+	mibptr = (in_ill != NULL) ? in_ill->ill_ip_mib : &ip_mib;
 
 	/* Initiate Read side IPPF processing */
 	if (IPP_ENABLED(IPP_FWD_IN)) {
@@ -16332,7 +16388,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 
 	if (ipha->ipha_ttl-- <= 1) {
 		if (ip_csum_hdr(ipha)) {
-			BUMP_MIB(&ip_mib, ipInCksumErrs);
+			BUMP_MIB(mibptr, ipIfStatsInCksumErrs);
 			goto drop_pkt;
 		}
 		/*
@@ -16342,6 +16398,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 		 * problems since we don't generate ICMP errors for
 		 * multicast packets.
 		 */
+		BUMP_MIB(mibptr, ipIfStatsForwProhibits);
 		q = ire->ire_stq;
 		if (q != NULL) {
 			/* Sent by forwarding path, and router is global zone */
@@ -16356,7 +16413,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 	 * Don't forward if the interface is down
 	 */
 	if (ire->ire_ipif->ipif_ill->ill_ipif_up_count == 0) {
-		BUMP_MIB(&ip_mib, ipInDiscards);
+		BUMP_MIB(mibptr, ipIfStatsInDiscards);
 		ip2dbg(("ip_rput_forward:interface is down\n"));
 		goto drop_pkt;
 	}
@@ -16382,7 +16439,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 		mblk_t *mp1;
 
 		if ((mp1 = tsol_ip_forward(ire, mp)) == NULL) {
-			BUMP_MIB(&ip_mib, ipForwProhibits);
+			BUMP_MIB(mibptr, ipIfStatsForwProhibits);
 			goto drop_pkt;
 		}
 		/* Size may have changed */
@@ -16394,10 +16451,11 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 	/* Check if there are options to update */
 	if (!IS_SIMPLE_IPH(ipha)) {
 		if (ip_csum_hdr(ipha)) {
-			BUMP_MIB(&ip_mib, ipInCksumErrs);
+			BUMP_MIB(mibptr, ipIfStatsInCksumErrs);
 			goto drop_pkt;
 		}
 		if (ip_rput_forward_options(mp, ipha, ire)) {
+			BUMP_MIB(mibptr, ipIfStatsForwProhibits);
 			return;
 		}
 
@@ -16414,7 +16472,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 		 * was good coming in.
 		 */
 		if (ip_csum_hdr(ipha)) {
-			BUMP_MIB(&ip_mib, ipInCksumErrs);
+			BUMP_MIB(mibptr, ipIfStatsInCksumErrs);
 			goto drop_pkt;
 		}
 		/* Initiate Write side IPPF processing */
@@ -16513,7 +16571,6 @@ ip_rput_forward_options(mblk_t *mp, ipha_t *ipha, ire_t *ire)
 		case IPOPT_LSRR:
 			/* Check if adminstratively disabled */
 			if (!ip_forward_src_routed) {
-				BUMP_MIB(&ip_mib, ipForwProhibits);
 				if (ire->ire_stq != NULL) {
 					/*
 					 * Sent by forwarding path, and router
@@ -16940,6 +16997,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	    "ip_rput_locl_start: q %p", q);
 
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
+	ASSERT(ill != NULL);
 
 
 #define	rptr	((uchar_t *)ipha)
@@ -16992,7 +17050,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	    + IP_SIMPLE_HDR_LENGTH_IN_WORDS);
 
 	if (u1) {
-		if (!ip_options_cksum(q, mp, ipha, ire)) {
+		if (!ip_options_cksum(q, ill, mp, ipha, ire)) {
 			if (hada_mp != NULL)
 				freemsg(hada_mp);
 			return;
@@ -17011,7 +17069,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		 * back from AH/ESP as we already did it.
 		 */
 		if (!mctl_present && (sum && sum != 0xFFFF)) {
-			BUMP_MIB(&ip_mib, ipInCksumErrs);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
 			goto drop_pkt;
 		}
 	}
@@ -17154,7 +17212,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		if (is_system_labeled() && !tsol_can_accept_raw(mp, B_TRUE)) {
 			freemsg(first_mp);
 			ip1dbg(("ip_proto_input: zone all cannot accept raw"));
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			return;
 		}
 		if ((mp = igmp_input(q, mp, ill)) == NULL) {
@@ -17194,7 +17252,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		if (is_system_labeled() && !tsol_can_accept_raw(mp, B_TRUE)) {
 			freemsg(first_mp);
 			ip1dbg(("ip_proto_input: zone all cannot accept PIM"));
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			return;
 		}
 		if (pim_input(q, mp) != 0) {
@@ -17227,7 +17285,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		    mp->b_wptr) {
 			if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length +
 			    sizeof (ipha_t) - mp->b_rptr)) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				freemsg(first_mp);
 				return;
 			}
@@ -17238,12 +17296,12 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		 * Check the sanity of the inner IP header.
 		 */
 		if ((IPH_HDR_VERSION(inner_ipha) != IPV4_VERSION)) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(first_mp);
 			return;
 		}
 		if (IPH_HDR_LENGTH(inner_ipha) < sizeof (ipha_t)) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(first_mp);
 			return;
 		}
@@ -17280,7 +17338,8 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 				    NULL) {
 					ip1dbg(("ip_proto_input: IPSEC_IN "
 					    "allocation failure.\n"));
-					BUMP_MIB(&ip_mib, ipInDiscards);
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsInDiscards);
 					freemsg(mp);
 					return;
 				}
@@ -17309,7 +17368,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 				 * times. We don't want to recurse infinitely.
 				 * To keep it simple, drop the packet.
 				 */
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				freemsg(first_mp);
 				return;
 			}
@@ -17338,7 +17397,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 				ip1dbg(("ip_proto_input: IPSEC_IN "
 				    "allocation failure.\n"));
 				freemsg(hada_mp); /* okay ifnull */
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				freemsg(mp);
 				return;
 			}
@@ -17396,7 +17455,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		case IPSEC_STATUS_SUCCESS:
 			break;
 		case IPSEC_STATUS_FAILED:
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			/* FALLTHRU */
 		case IPSEC_STATUS_PENDING:
 			return;
@@ -17841,12 +17900,11 @@ bad_src_route:
 int
 ip_snmp_get(queue_t *q, mblk_t *mpctl)
 {
-
 	if (mpctl == NULL || mpctl->b_cont == NULL) {
 		return (0);
 	}
 
-	if ((mpctl = ip_snmp_get_mib2_ip(q, mpctl)) == NULL) {
+	if ((mpctl = ip_snmp_get_mib2_ip_traffic_stats(q, mpctl)) == NULL) {
 		return (1);
 	}
 
@@ -17918,10 +17976,11 @@ ip_snmp_get(queue_t *q, mblk_t *mpctl)
 }
 
 
-/* Get global IPv4 statistics */
+/* Get global (legacy) IPv4 statistics */
 static mblk_t *
-ip_snmp_get_mib2_ip(queue_t *q, mblk_t *mpctl)
+ip_snmp_get_mib2_ip(queue_t *q, mblk_t *mpctl, mib2_ipIfStatsEntry_t *ipmib)
 {
+	mib2_ip_t		old_ip_mib;
 	struct opthdr		*optp;
 	mblk_t			*mp2ctl;
 
@@ -17934,26 +17993,74 @@ ip_snmp_get_mib2_ip(queue_t *q, mblk_t *mpctl)
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_IP;
 	optp->name = 0;
-	SET_MIB(ip_mib.ipForwarding,
+	SET_MIB(old_ip_mib.ipForwarding,
 	    (WE_ARE_FORWARDING ? 1 : 2));
-	SET_MIB(ip_mib.ipDefaultTTL,
+	SET_MIB(old_ip_mib.ipDefaultTTL,
 	    (uint32_t)ip_def_ttl);
-	SET_MIB(ip_mib.ipReasmTimeout,
+	SET_MIB(old_ip_mib.ipReasmTimeout,
 	    ip_g_frag_timeout);
-	SET_MIB(ip_mib.ipAddrEntrySize,
+	SET_MIB(old_ip_mib.ipAddrEntrySize,
 	    sizeof (mib2_ipAddrEntry_t));
-	SET_MIB(ip_mib.ipRouteEntrySize,
+	SET_MIB(old_ip_mib.ipRouteEntrySize,
 	    sizeof (mib2_ipRouteEntry_t));
-	SET_MIB(ip_mib.ipNetToMediaEntrySize,
+	SET_MIB(old_ip_mib.ipNetToMediaEntrySize,
 	    sizeof (mib2_ipNetToMediaEntry_t));
-	SET_MIB(ip_mib.ipMemberEntrySize, sizeof (ip_member_t));
-	SET_MIB(ip_mib.ipGroupSourceEntrySize, sizeof (ip_grpsrc_t));
-	SET_MIB(ip_mib.ipRouteAttributeSize, sizeof (mib2_ipAttributeEntry_t));
-	SET_MIB(ip_mib.transportMLPSize, sizeof (mib2_transportMLPEntry_t));
-	if (!snmp_append_data(mpctl->b_cont, (char *)&ip_mib,
-	    (int)sizeof (ip_mib))) {
+	SET_MIB(old_ip_mib.ipMemberEntrySize, sizeof (ip_member_t));
+	SET_MIB(old_ip_mib.ipGroupSourceEntrySize, sizeof (ip_grpsrc_t));
+	SET_MIB(old_ip_mib.ipRouteAttributeSize,
+	    sizeof (mib2_ipAttributeEntry_t));
+	SET_MIB(old_ip_mib.transportMLPSize, sizeof (mib2_transportMLPEntry_t));
+
+	/*
+	 * Grab the statistics from the new IP MIB
+	 */
+	SET_MIB(old_ip_mib.ipInReceives,
+	    (uint32_t)ipmib->ipIfStatsHCInReceives);
+	SET_MIB(old_ip_mib.ipInHdrErrors, ipmib->ipIfStatsInHdrErrors);
+	SET_MIB(old_ip_mib.ipInAddrErrors, ipmib->ipIfStatsInAddrErrors);
+	SET_MIB(old_ip_mib.ipForwDatagrams,
+	    (uint32_t)ipmib->ipIfStatsHCOutForwDatagrams);
+	SET_MIB(old_ip_mib.ipInUnknownProtos,
+	    ipmib->ipIfStatsInUnknownProtos);
+	SET_MIB(old_ip_mib.ipInDiscards, ipmib->ipIfStatsInDiscards);
+	SET_MIB(old_ip_mib.ipInDelivers,
+	    (uint32_t)ipmib->ipIfStatsHCInDelivers);
+	SET_MIB(old_ip_mib.ipOutRequests,
+	    (uint32_t)ipmib->ipIfStatsHCOutRequests);
+	SET_MIB(old_ip_mib.ipOutDiscards, ipmib->ipIfStatsOutDiscards);
+	SET_MIB(old_ip_mib.ipOutNoRoutes, ipmib->ipIfStatsOutNoRoutes);
+	SET_MIB(old_ip_mib.ipReasmReqds, ipmib->ipIfStatsReasmReqds);
+	SET_MIB(old_ip_mib.ipReasmOKs, ipmib->ipIfStatsReasmOKs);
+	SET_MIB(old_ip_mib.ipReasmFails, ipmib->ipIfStatsReasmFails);
+	SET_MIB(old_ip_mib.ipFragOKs, ipmib->ipIfStatsOutFragOKs);
+	SET_MIB(old_ip_mib.ipFragFails, ipmib->ipIfStatsOutFragFails);
+	SET_MIB(old_ip_mib.ipFragCreates, ipmib->ipIfStatsOutFragCreates);
+
+	/* ipRoutingDiscards is not being used */
+	SET_MIB(old_ip_mib.ipRoutingDiscards, 0);
+	SET_MIB(old_ip_mib.tcpInErrs, ipmib->tcpIfStatsInErrs);
+	SET_MIB(old_ip_mib.udpNoPorts, ipmib->udpIfStatsNoPorts);
+	SET_MIB(old_ip_mib.ipInCksumErrs, ipmib->ipIfStatsInCksumErrs);
+	SET_MIB(old_ip_mib.ipReasmDuplicates,
+	    ipmib->ipIfStatsReasmDuplicates);
+	SET_MIB(old_ip_mib.ipReasmPartDups, ipmib->ipIfStatsReasmPartDups);
+	SET_MIB(old_ip_mib.ipForwProhibits, ipmib->ipIfStatsForwProhibits);
+	SET_MIB(old_ip_mib.udpInCksumErrs, ipmib->udpIfStatsInCksumErrs);
+	SET_MIB(old_ip_mib.udpInOverflows, ipmib->udpIfStatsInOverflows);
+	SET_MIB(old_ip_mib.rawipInOverflows,
+	    ipmib->rawipIfStatsInOverflows);
+
+	SET_MIB(old_ip_mib.ipsecInSucceeded, ipmib->ipsecIfStatsInSucceeded);
+	SET_MIB(old_ip_mib.ipsecInFailed, ipmib->ipsecIfStatsInFailed);
+	SET_MIB(old_ip_mib.ipInIPv6, ipmib->ipIfStatsInWrongIPVersion);
+	SET_MIB(old_ip_mib.ipOutIPv6, ipmib->ipIfStatsOutWrongIPVersion);
+	SET_MIB(old_ip_mib.ipOutSwitchIPv6,
+	    ipmib->ipIfStatsOutSwitchIPVersion);
+
+	if (!snmp_append_data(mpctl->b_cont, (char *)&old_ip_mib,
+	    (int)sizeof (old_ip_mib))) {
 		ip1dbg(("ip_snmp_get_mib2_ip: failed to allocate %u bytes\n",
-		    (uint_t)sizeof (ip_mib)));
+		    (uint_t)sizeof (old_ip_mib)));
 	}
 
 	optp->len = (t_uscalar_t)msgdsize(mpctl->b_cont);
@@ -17961,6 +18068,77 @@ ip_snmp_get_mib2_ip(queue_t *q, mblk_t *mpctl)
 	    (int)optp->level, (int)optp->name, (int)optp->len));
 	qreply(q, mpctl);
 	return (mp2ctl);
+}
+
+/* Per interface IPv4 statistics */
+static mblk_t *
+ip_snmp_get_mib2_ip_traffic_stats(queue_t *q, mblk_t *mpctl)
+{
+	struct opthdr		*optp;
+	mblk_t			*mp2ctl;
+	ill_t			*ill;
+	ill_walk_context_t	ctx;
+	mblk_t			*mp_tail = NULL;
+	mib2_ipIfStatsEntry_t	global_ip_mib;
+
+	/*
+	 * Make a copy of the original message
+	 */
+	mp2ctl = copymsg(mpctl);
+
+	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
+	optp->level = MIB2_IP;
+	optp->name = MIB2_IP_TRAFFIC_STATS;
+	/* Include "unknown interface" ip_mib */
+	ip_mib.ipIfStatsIPVersion = MIB2_INETADDRESSTYPE_ipv4;
+	ip_mib.ipIfStatsIfIndex = MIB2_UNKNOWN_INTERFACE; /* Flag to netstat */
+	SET_MIB(ip_mib.ipIfStatsForwarding, (WE_ARE_FORWARDING ? 1 : 2));
+	SET_MIB(ip_mib.ipIfStatsDefaultTTL, (uint32_t)ip_def_ttl);
+	SET_MIB(ip_mib.ipIfStatsEntrySize, sizeof (mib2_ipIfStatsEntry_t));
+	SET_MIB(ip_mib.ipIfStatsAddrEntrySize, sizeof (mib2_ipAddrEntry_t));
+	SET_MIB(ip_mib.ipIfStatsRouteEntrySize, sizeof (mib2_ipRouteEntry_t));
+	SET_MIB(ip_mib.ipIfStatsNetToMediaEntrySize,
+	    sizeof (mib2_ipNetToMediaEntry_t));
+	SET_MIB(ip_mib.ipIfStatsMemberEntrySize, sizeof (ip_member_t));
+	SET_MIB(ip_mib.ipIfStatsGroupSourceEntrySize, sizeof (ip_grpsrc_t));
+
+	if (!snmp_append_data2(mpctl->b_cont, &mp_tail, (char *)&ip_mib,
+	    (int)sizeof (ip_mib))) {
+		ip1dbg(("ip_snmp_get_mib2_ip_traffic_stats: "
+		    "failed to allocate %u bytes\n",
+		    (uint_t)sizeof (ip_mib)));
+	}
+
+	bcopy(&ip_mib, &global_ip_mib, sizeof (global_ip_mib));
+
+	rw_enter(&ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_V4(&ctx);
+	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
+		ill->ill_ip_mib->ipIfStatsIfIndex =
+		    ill->ill_phyint->phyint_ifindex;
+		SET_MIB(ill->ill_ip_mib->ipIfStatsForwarding,
+		    (WE_ARE_FORWARDING ? 1 : 2));
+		SET_MIB(ill->ill_ip_mib->ipIfStatsDefaultTTL,
+		    (uint32_t)ip_def_ttl);
+
+		ip_mib2_add_ip_stats(&global_ip_mib, ill->ill_ip_mib);
+		if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
+		    (char *)ill->ill_ip_mib,
+		    (int)sizeof (*ill->ill_ip_mib))) {
+			ip1dbg(("ip_snmp_get_mib2_ip_traffic_stats: "
+			    "failed to allocate %u bytes\n",
+			    (uint_t)sizeof (*ill->ill_ip_mib)));
+		}
+	}
+	rw_exit(&ill_g_lock);
+
+	optp->len = (t_uscalar_t)msgdsize(mpctl->b_cont);
+	ip3dbg(("ip_snmp_get_mib2_ip_traffic_stats: "
+	    "level %d, name %d, len %d\n",
+	    (int)optp->level, (int)optp->name, (int)optp->len));
+	qreply(q, mpctl);
+
+	return (ip_snmp_get_mib2_ip(q, mp2ctl, &global_ip_mib));
 }
 
 /* Global IPv4 ICMP statistics */
@@ -18097,7 +18275,7 @@ ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl)
 			    bitval <<= 1)
 				noop;
 			mae.ipAdEntBcastAddr = bitval;
-			mae.ipAdEntReasmMaxSize = 65535;
+			mae.ipAdEntReasmMaxSize = IP_MAXPACKET;
 			mae.ipAdEntInfo.ae_mtu = ipif->ipif_mtu;
 			mae.ipAdEntInfo.ae_metric  = ipif->ipif_metric;
 			mae.ipAdEntInfo.ae_broadcast_addr =
@@ -18106,6 +18284,7 @@ ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl)
 			    ipif->ipif_pp_dst_addr;
 			    mae.ipAdEntInfo.ae_flags = ipif->ipif_flags |
 			    ill->ill_flags | ill->ill_phyint->phyint_flags;
+			mae.ipAdEntRetransmitTime = AR_EQ_DEFAULT_XMIT_INTERVAL;
 
 			if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
 			    (char *)&mae, (int)sizeof (mib2_ipAddrEntry_t))) {
@@ -18201,6 +18380,12 @@ ip_snmp_get_mib2_ip6_addr(queue_t *q, mblk_t *mpctl)
 						ipif->ipif_v6pp_dst_addr;
 			mae6.ipv6AddrInfo.ae_flags = ipif->ipif_flags |
 			    ill->ill_flags | ill->ill_phyint->phyint_flags;
+			mae6.ipv6AddrReasmMaxSize = IP_MAXPACKET;
+			mae6.ipv6AddrIdentifier = ill->ill_token;
+			mae6.ipv6AddrIdentifierLen = ill->ill_token_length;
+			mae6.ipv6AddrReachableTime = ill->ill_reachable_time;
+			mae6.ipv6AddrRetransmitTime =
+			    ill->ill_reachable_retrans_time;
 			if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
 				(char *)&mae6,
 				(int)sizeof (mib2_ipv6AddrEntry_t))) {
@@ -18685,7 +18870,7 @@ ip_snmp_get_mib2_ip6_route_media(queue_t *q, mblk_t *mpctl)
 }
 
 /*
- * ICMPv6 mib: One per ill
+ * IPv6 mib: One per ill
  */
 static mblk_t *
 ip_snmp_get_mib2_ip6(queue_t *q, mblk_t *mpctl)
@@ -18707,17 +18892,31 @@ ip_snmp_get_mib2_ip6(queue_t *q, mblk_t *mpctl)
 	optp->level = MIB2_IP6;
 	optp->name = 0;
 	/* Include "unknown interface" ip6_mib */
-	ip6_mib.ipv6IfIndex = 0;	/* Flag to netstat */
-	SET_MIB(ip6_mib.ipv6Forwarding, ipv6_forward ? 1 : 2);
-	SET_MIB(ip6_mib.ipv6DefaultHopLimit, ipv6_def_hops);
-	SET_MIB(ip6_mib.ipv6IfStatsEntrySize,
-	    sizeof (mib2_ipv6IfStatsEntry_t));
-	SET_MIB(ip6_mib.ipv6AddrEntrySize, sizeof (mib2_ipv6AddrEntry_t));
-	SET_MIB(ip6_mib.ipv6RouteEntrySize, sizeof (mib2_ipv6RouteEntry_t));
-	SET_MIB(ip6_mib.ipv6NetToMediaEntrySize,
+	ip6_mib.ipIfStatsIPVersion = MIB2_INETADDRESSTYPE_ipv6;
+	ip6_mib.ipIfStatsIfIndex = MIB2_UNKNOWN_INTERFACE; /* Flag to netstat */
+	SET_MIB(ip6_mib.ipIfStatsForwarding, ipv6_forward ? 1 : 2);
+	SET_MIB(ip6_mib.ipIfStatsDefaultHopLimit, ipv6_def_hops);
+	SET_MIB(ip6_mib.ipIfStatsEntrySize,
+	    sizeof (mib2_ipIfStatsEntry_t));
+	SET_MIB(ip6_mib.ipIfStatsAddrEntrySize, sizeof (mib2_ipv6AddrEntry_t));
+	SET_MIB(ip6_mib.ipIfStatsRouteEntrySize,
+	    sizeof (mib2_ipv6RouteEntry_t));
+	SET_MIB(ip6_mib.ipIfStatsNetToMediaEntrySize,
 	    sizeof (mib2_ipv6NetToMediaEntry_t));
-	SET_MIB(ip6_mib.ipv6MemberEntrySize, sizeof (ipv6_member_t));
-	SET_MIB(ip6_mib.ipv6GroupSourceEntrySize, sizeof (ipv6_grpsrc_t));
+	SET_MIB(ip6_mib.ipIfStatsMemberEntrySize, sizeof (ipv6_member_t));
+	SET_MIB(ip6_mib.ipIfStatsGroupSourceEntrySize, sizeof (ipv6_grpsrc_t));
+
+	/*
+	 * Synchronize 64- and 32-bit counters
+	 */
+	SYNC32_MIB(&ip6_mib, ipIfStatsInReceives, ipIfStatsHCInReceives);
+	SYNC32_MIB(&ip6_mib, ipIfStatsInDelivers, ipIfStatsHCInDelivers);
+	SYNC32_MIB(&ip6_mib, ipIfStatsOutRequests, ipIfStatsHCOutRequests);
+	SYNC32_MIB(&ip6_mib, ipIfStatsOutForwDatagrams,
+	    ipIfStatsHCOutForwDatagrams);
+	SYNC32_MIB(&ip6_mib, ipIfStatsOutMcastPkts, ipIfStatsHCOutMcastPkts);
+	SYNC32_MIB(&ip6_mib, ipIfStatsInMcastPkts, ipIfStatsHCInMcastPkts);
+
 	if (!snmp_append_data2(mpctl->b_cont, &mp_tail, (char *)&ip6_mib,
 	    (int)sizeof (ip6_mib))) {
 		ip1dbg(("ip_snmp_get_mib2_ip6: failed to allocate %u bytes\n",
@@ -18727,29 +18926,35 @@ ip_snmp_get_mib2_ip6(queue_t *q, mblk_t *mpctl)
 	rw_enter(&ill_g_lock, RW_READER);
 	ill = ILL_START_WALK_V6(&ctx);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
-		ill->ill_ip6_mib->ipv6IfIndex =
+		ill->ill_ip_mib->ipIfStatsIfIndex =
 		    ill->ill_phyint->phyint_ifindex;
-		SET_MIB(ill->ill_ip6_mib->ipv6Forwarding,
+		SET_MIB(ill->ill_ip_mib->ipIfStatsForwarding,
 		    ipv6_forward ? 1 : 2);
-		SET_MIB(ill->ill_ip6_mib->ipv6DefaultHopLimit,
+		SET_MIB(ill->ill_ip_mib->ipIfStatsDefaultHopLimit,
 		    ill->ill_max_hops);
-		SET_MIB(ill->ill_ip6_mib->ipv6IfStatsEntrySize,
-		    sizeof (mib2_ipv6IfStatsEntry_t));
-		SET_MIB(ill->ill_ip6_mib->ipv6AddrEntrySize,
-		    sizeof (mib2_ipv6AddrEntry_t));
-		SET_MIB(ill->ill_ip6_mib->ipv6RouteEntrySize,
-		    sizeof (mib2_ipv6RouteEntry_t));
-		SET_MIB(ill->ill_ip6_mib->ipv6NetToMediaEntrySize,
-		    sizeof (mib2_ipv6NetToMediaEntry_t));
-		SET_MIB(ill->ill_ip6_mib->ipv6MemberEntrySize,
-		    sizeof (ipv6_member_t));
+
+		/*
+		 * Synchronize 64- and 32-bit counters
+		 */
+		SYNC32_MIB(&ip6_mib, ipIfStatsInReceives,
+		    ipIfStatsHCInReceives);
+		SYNC32_MIB(&ip6_mib, ipIfStatsInDelivers,
+		    ipIfStatsHCInDelivers);
+		SYNC32_MIB(&ip6_mib, ipIfStatsOutRequests,
+		    ipIfStatsHCOutRequests);
+		SYNC32_MIB(&ip6_mib, ipIfStatsOutForwDatagrams,
+		    ipIfStatsHCOutForwDatagrams);
+		SYNC32_MIB(&ip6_mib, ipIfStatsOutMcastPkts,
+		    ipIfStatsHCOutMcastPkts);
+		SYNC32_MIB(&ip6_mib, ipIfStatsInMcastPkts,
+		    ipIfStatsHCInMcastPkts);
 
 		if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
-		    (char *)ill->ill_ip6_mib,
-		    (int)sizeof (*ill->ill_ip6_mib))) {
+		    (char *)ill->ill_ip_mib,
+		    (int)sizeof (*ill->ill_ip_mib))) {
 			ip1dbg(("ip_snmp_get_mib2_ip6: failed to allocate "
 				"%u bytes\n",
-				(uint_t)sizeof (*ill->ill_ip6_mib)));
+				(uint_t)sizeof (*ill->ill_ip_mib)));
 		}
 	}
 	rw_exit(&ill_g_lock);
@@ -18783,7 +18988,7 @@ ip_snmp_get_mib2_icmp6(queue_t *q, mblk_t *mpctl)
 	optp->level = MIB2_ICMP6;
 	optp->name = 0;
 	/* Include "unknown interface" icmp6_mib */
-	icmp6_mib.ipv6IfIcmpIfIndex = 0;	/* Flag to netstat */
+	icmp6_mib.ipv6IfIcmpIfIndex = MIB2_UNKNOWN_INTERFACE; /* netstat flag */
 	icmp6_mib.ipv6IfIcmpEntrySize = sizeof (mib2_ipv6IfIcmpEntry_t);
 	if (!snmp_append_data2(mpctl->b_cont, &mp_tail, (char *)&icmp6_mib,
 	    (int)sizeof (icmp6_mib))) {
@@ -18796,8 +19001,6 @@ ip_snmp_get_mib2_icmp6(queue_t *q, mblk_t *mpctl)
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		ill->ill_icmp6_mib->ipv6IfIcmpIfIndex =
 		    ill->ill_phyint->phyint_ifindex;
-		ill->ill_icmp6_mib->ipv6IfIcmpEntrySize =
-		    sizeof (mib2_ipv6IfIcmpEntry_t);
 		if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
 		    (char *)ill->ill_icmp6_mib,
 		    (int)sizeof (*ill->ill_icmp6_mib))) {
@@ -19200,6 +19403,136 @@ ip_snmp_set(queue_t *q, int level, int name, uchar_t *ptr, int len)
 	default:
 		return (1);
 	}
+}
+
+/*
+ * When there exists both a 64- and 32-bit counter of a particular type
+ * (i.e., InReceives), only the 64-bit counters are added.
+ */
+void
+ip_mib2_add_ip_stats(mib2_ipIfStatsEntry_t *o1, mib2_ipIfStatsEntry_t *o2)
+{
+	UPDATE_MIB(o1, ipIfStatsInHdrErrors, o2->ipIfStatsInHdrErrors);
+	UPDATE_MIB(o1, ipIfStatsInTooBigErrors, o2->ipIfStatsInTooBigErrors);
+	UPDATE_MIB(o1, ipIfStatsInNoRoutes, o2->ipIfStatsInNoRoutes);
+	UPDATE_MIB(o1, ipIfStatsInAddrErrors, o2->ipIfStatsInAddrErrors);
+	UPDATE_MIB(o1, ipIfStatsInUnknownProtos, o2->ipIfStatsInUnknownProtos);
+	UPDATE_MIB(o1, ipIfStatsInTruncatedPkts, o2->ipIfStatsInTruncatedPkts);
+	UPDATE_MIB(o1, ipIfStatsInDiscards, o2->ipIfStatsInDiscards);
+	UPDATE_MIB(o1, ipIfStatsOutDiscards, o2->ipIfStatsOutDiscards);
+	UPDATE_MIB(o1, ipIfStatsOutFragOKs, o2->ipIfStatsOutFragOKs);
+	UPDATE_MIB(o1, ipIfStatsOutFragFails, o2->ipIfStatsOutFragFails);
+	UPDATE_MIB(o1, ipIfStatsOutFragCreates, o2->ipIfStatsOutFragCreates);
+	UPDATE_MIB(o1, ipIfStatsReasmReqds, o2->ipIfStatsReasmReqds);
+	UPDATE_MIB(o1, ipIfStatsReasmOKs, o2->ipIfStatsReasmOKs);
+	UPDATE_MIB(o1, ipIfStatsReasmFails, o2->ipIfStatsReasmFails);
+	UPDATE_MIB(o1, ipIfStatsOutNoRoutes, o2->ipIfStatsOutNoRoutes);
+	UPDATE_MIB(o1, ipIfStatsReasmDuplicates, o2->ipIfStatsReasmDuplicates);
+	UPDATE_MIB(o1, ipIfStatsReasmPartDups, o2->ipIfStatsReasmPartDups);
+	UPDATE_MIB(o1, ipIfStatsForwProhibits, o2->ipIfStatsForwProhibits);
+	UPDATE_MIB(o1, udpInCksumErrs, o2->udpInCksumErrs);
+	UPDATE_MIB(o1, udpInOverflows, o2->udpInOverflows);
+	UPDATE_MIB(o1, rawipInOverflows, o2->rawipInOverflows);
+	UPDATE_MIB(o1, ipIfStatsInWrongIPVersion,
+	    o2->ipIfStatsInWrongIPVersion);
+	UPDATE_MIB(o1, ipIfStatsOutWrongIPVersion,
+	    o2->ipIfStatsInWrongIPVersion);
+	UPDATE_MIB(o1, ipIfStatsOutSwitchIPVersion,
+	    o2->ipIfStatsOutSwitchIPVersion);
+	UPDATE_MIB(o1, ipIfStatsHCInReceives, o2->ipIfStatsHCInReceives);
+	UPDATE_MIB(o1, ipIfStatsHCInOctets, o2->ipIfStatsHCInOctets);
+	UPDATE_MIB(o1, ipIfStatsHCInForwDatagrams,
+	    o2->ipIfStatsHCInForwDatagrams);
+	UPDATE_MIB(o1, ipIfStatsHCInDelivers, o2->ipIfStatsHCInDelivers);
+	UPDATE_MIB(o1, ipIfStatsHCOutRequests, o2->ipIfStatsHCOutRequests);
+	UPDATE_MIB(o1, ipIfStatsHCOutForwDatagrams,
+	    o2->ipIfStatsHCOutForwDatagrams);
+	UPDATE_MIB(o1, ipIfStatsOutFragReqds, o2->ipIfStatsOutFragReqds);
+	UPDATE_MIB(o1, ipIfStatsHCOutTransmits, o2->ipIfStatsHCOutTransmits);
+	UPDATE_MIB(o1, ipIfStatsHCOutOctets, o2->ipIfStatsHCOutOctets);
+	UPDATE_MIB(o1, ipIfStatsHCInMcastPkts, o2->ipIfStatsHCInMcastPkts);
+	UPDATE_MIB(o1, ipIfStatsHCInMcastOctets, o2->ipIfStatsHCInMcastOctets);
+	UPDATE_MIB(o1, ipIfStatsHCOutMcastPkts, o2->ipIfStatsHCOutMcastPkts);
+	UPDATE_MIB(o1, ipIfStatsHCOutMcastOctets,
+	    o2->ipIfStatsHCOutMcastOctets);
+	UPDATE_MIB(o1, ipIfStatsHCInBcastPkts, o2->ipIfStatsHCInBcastPkts);
+	UPDATE_MIB(o1, ipIfStatsHCOutBcastPkts, o2->ipIfStatsHCOutBcastPkts);
+	UPDATE_MIB(o1, ipsecInSucceeded, o2->ipsecInSucceeded);
+	UPDATE_MIB(o1, ipsecInFailed, o2->ipsecInFailed);
+	UPDATE_MIB(o1, ipInCksumErrs, o2->ipInCksumErrs);
+	UPDATE_MIB(o1, tcpInErrs, o2->tcpInErrs);
+	UPDATE_MIB(o1, udpNoPorts, o2->udpNoPorts);
+}
+
+void
+ip_mib2_add_icmp6_stats(mib2_ipv6IfIcmpEntry_t *o1, mib2_ipv6IfIcmpEntry_t *o2)
+{
+	UPDATE_MIB(o1, ipv6IfIcmpInMsgs, o2->ipv6IfIcmpInMsgs);
+	UPDATE_MIB(o1, ipv6IfIcmpInErrors, o2->ipv6IfIcmpInErrors);
+	UPDATE_MIB(o1, ipv6IfIcmpInDestUnreachs, o2->ipv6IfIcmpInDestUnreachs);
+	UPDATE_MIB(o1, ipv6IfIcmpInAdminProhibs, o2->ipv6IfIcmpInAdminProhibs);
+	UPDATE_MIB(o1, ipv6IfIcmpInTimeExcds, o2->ipv6IfIcmpInTimeExcds);
+	UPDATE_MIB(o1, ipv6IfIcmpInParmProblems, o2->ipv6IfIcmpInParmProblems);
+	UPDATE_MIB(o1, ipv6IfIcmpInPktTooBigs, o2->ipv6IfIcmpInPktTooBigs);
+	UPDATE_MIB(o1, ipv6IfIcmpInEchos, o2->ipv6IfIcmpInEchos);
+	UPDATE_MIB(o1, ipv6IfIcmpInEchoReplies, o2->ipv6IfIcmpInEchoReplies);
+	UPDATE_MIB(o1, ipv6IfIcmpInRouterSolicits,
+	    o2->ipv6IfIcmpInRouterSolicits);
+	UPDATE_MIB(o1, ipv6IfIcmpInRouterAdvertisements,
+	    o2->ipv6IfIcmpInRouterAdvertisements);
+	UPDATE_MIB(o1, ipv6IfIcmpInNeighborSolicits,
+	    o2->ipv6IfIcmpInNeighborSolicits);
+	UPDATE_MIB(o1, ipv6IfIcmpInNeighborAdvertisements,
+	    o2->ipv6IfIcmpInNeighborAdvertisements);
+	UPDATE_MIB(o1, ipv6IfIcmpInRedirects, o2->ipv6IfIcmpInRedirects);
+	UPDATE_MIB(o1, ipv6IfIcmpInGroupMembQueries,
+	    o2->ipv6IfIcmpInGroupMembQueries);
+	UPDATE_MIB(o1, ipv6IfIcmpInGroupMembResponses,
+	    o2->ipv6IfIcmpInGroupMembResponses);
+	UPDATE_MIB(o1, ipv6IfIcmpInGroupMembReductions,
+	    o2->ipv6IfIcmpInGroupMembReductions);
+	UPDATE_MIB(o1, ipv6IfIcmpOutMsgs, o2->ipv6IfIcmpOutMsgs);
+	UPDATE_MIB(o1, ipv6IfIcmpOutErrors, o2->ipv6IfIcmpOutErrors);
+	UPDATE_MIB(o1, ipv6IfIcmpOutDestUnreachs,
+	    o2->ipv6IfIcmpOutDestUnreachs);
+	UPDATE_MIB(o1, ipv6IfIcmpOutAdminProhibs,
+	    o2->ipv6IfIcmpOutAdminProhibs);
+	UPDATE_MIB(o1, ipv6IfIcmpOutTimeExcds, o2->ipv6IfIcmpOutTimeExcds);
+	UPDATE_MIB(o1, ipv6IfIcmpOutParmProblems,
+	    o2->ipv6IfIcmpOutParmProblems);
+	UPDATE_MIB(o1, ipv6IfIcmpOutPktTooBigs, o2->ipv6IfIcmpOutPktTooBigs);
+	UPDATE_MIB(o1, ipv6IfIcmpOutEchos, o2->ipv6IfIcmpOutEchos);
+	UPDATE_MIB(o1, ipv6IfIcmpOutEchoReplies, o2->ipv6IfIcmpOutEchoReplies);
+	UPDATE_MIB(o1, ipv6IfIcmpOutRouterSolicits,
+	    o2->ipv6IfIcmpOutRouterSolicits);
+	UPDATE_MIB(o1, ipv6IfIcmpOutRouterAdvertisements,
+	    o2->ipv6IfIcmpOutRouterAdvertisements);
+	UPDATE_MIB(o1, ipv6IfIcmpOutNeighborSolicits,
+	    o2->ipv6IfIcmpOutNeighborSolicits);
+	UPDATE_MIB(o1, ipv6IfIcmpOutNeighborAdvertisements,
+	    o2->ipv6IfIcmpOutNeighborAdvertisements);
+	UPDATE_MIB(o1, ipv6IfIcmpOutRedirects, o2->ipv6IfIcmpOutRedirects);
+	UPDATE_MIB(o1, ipv6IfIcmpOutGroupMembQueries,
+	    o2->ipv6IfIcmpOutGroupMembQueries);
+	UPDATE_MIB(o1, ipv6IfIcmpOutGroupMembResponses,
+	    o2->ipv6IfIcmpOutGroupMembResponses);
+	UPDATE_MIB(o1, ipv6IfIcmpOutGroupMembReductions,
+	    o2->ipv6IfIcmpOutGroupMembReductions);
+	UPDATE_MIB(o1, ipv6IfIcmpInOverflows, o2->ipv6IfIcmpInOverflows);
+	UPDATE_MIB(o1, ipv6IfIcmpBadHoplimit, o2->ipv6IfIcmpBadHoplimit);
+	UPDATE_MIB(o1, ipv6IfIcmpInBadNeighborAdvertisements,
+	    o2->ipv6IfIcmpInBadNeighborAdvertisements);
+	UPDATE_MIB(o1, ipv6IfIcmpInBadNeighborSolicitations,
+	    o2->ipv6IfIcmpInBadNeighborSolicitations);
+	UPDATE_MIB(o1, ipv6IfIcmpInBadRedirects, o2->ipv6IfIcmpInBadRedirects);
+	UPDATE_MIB(o1, ipv6IfIcmpInGroupMembTotal,
+	    o2->ipv6IfIcmpInGroupMembTotal);
+	UPDATE_MIB(o1, ipv6IfIcmpInGroupMembBadQueries,
+	    o2->ipv6IfIcmpInGroupMembBadQueries);
+	UPDATE_MIB(o1, ipv6IfIcmpInGroupMembBadReports,
+	    o2->ipv6IfIcmpInGroupMembBadReports);
+	UPDATE_MIB(o1, ipv6IfIcmpInGroupMembOurReports,
+	    o2->ipv6IfIcmpInGroupMembOurReports);
 }
 
 /*
@@ -19610,7 +19943,7 @@ ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 		 * originating from tcp should have been directed over to
 		 * tcp_multisend() in the first place.
 		 */
-		BUMP_MIB(&ip_mib, ipOutDiscards);
+		BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 		freemsg(mp);
 		return;
 	} else if (DB_TYPE(mp) != M_DATA)
@@ -19653,7 +19986,7 @@ ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 			if (err == EINVAL)
 				goto icmp_parameter_problem;
 			ip2dbg(("ip_wput: label check failed (%d)\n", err));
-			goto drop_pkt;
+			goto discard_pkt;
 		}
 		iplen = ntohs(ipha->ipha_length) + adjust;
 		ipha->ipha_length = htons(iplen);
@@ -19669,6 +20002,7 @@ ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 	if (connp->conn_out_enforce_policy || (connp->conn_latch != NULL)) {
 		if (((mp = ipsec_attach_ipsec_out(mp, connp, NULL,
 		    ipha->ipha_protocol)) == NULL)) {
+			BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 			if (need_decref)
 				CONN_DEC_REF(connp);
 			return;
@@ -19694,6 +20028,7 @@ ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 		attach_ill = conn_get_held_ill(connp,
 		    &connp->conn_nofailover_ill, &err);
 		if (err == ILL_LOOKUP_FAILED) {
+			BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 			if (need_decref)
 				CONN_DEC_REF(connp);
 			freemsg(first_mp);
@@ -19751,6 +20086,7 @@ ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 			xmit_ill = conn_get_held_ill(connp,
 			    &connp->conn_xmit_if_ill, &err);
 			if (err == ILL_LOOKUP_FAILED) {
+				BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 				if (attach_ill != NULL)
 					ill_refrele(attach_ill);
 				if (need_decref)
@@ -20126,7 +20462,7 @@ qnext:
 						    ifindex));
 						freemsg(first_mp);
 						BUMP_MIB(&ip_mib,
-						    ipOutDiscards);
+						    ipIfStatsOutDiscards);
 						ASSERT(!need_decref);
 						return;
 					}
@@ -20149,7 +20485,7 @@ qnext:
 					    "(BIND TO IPIF_NOFAILOVER) %d\n",
 					    ifindex));
 					freemsg(first_mp);
-					BUMP_MIB(&ip_mib, ipOutDiscards);
+					BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 					ASSERT(!need_decref);
 					return;
 				}
@@ -20172,12 +20508,11 @@ qnext:
 	    (mp->b_wptr - rptr) < IP_SIMPLE_HDR_LENGTH) {
 	    hdrtoosmall:
 		if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH)) {
-			BUMP_MIB(&ip_mib, ipOutDiscards);
 			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
 			    "ip_wput_end: q %p (%S)", q, "pullupfailed");
 			if (first_mp == NULL)
 				first_mp = mp;
-			goto drop_pkt;
+			goto discard_pkt;
 		}
 
 		/* This function assumes that mp points to an IPv4 packet. */
@@ -20196,7 +20531,7 @@ qnext:
 					goto icmp_parameter_problem;
 				ip2dbg(("ip_wput: label check failed (%d)\n",
 				    err));
-				goto drop_pkt;
+				goto discard_pkt;
 			}
 			iplen = ntohs(ipha->ipha_length) + adjust;
 			ipha->ipha_length = htons(iplen);
@@ -20212,6 +20547,7 @@ qnext:
 			if (connp->conn_out_enforce_policy) {
 				if (((mp = ipsec_attach_ipsec_out(mp, connp,
 				    NULL, ipha->ipha_protocol)) == NULL)) {
+					BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 					if (need_decref)
 						CONN_DEC_REF(connp);
 					return;
@@ -20255,7 +20591,7 @@ qnext:
 			if (q->q_next == NULL) /* Avoid ill queue */
 				ip_setqinfo(RD(q), B_TRUE, B_TRUE);
 #endif
-			BUMP_MIB(&ip_mib, ipOutIPv6);
+			BUMP_MIB(&ip_mib, ipIfStatsOutWrongIPVersion);
 			ASSERT(xmit_ill == NULL);
 			if (attach_ill != NULL)
 				ill_refrele(attach_ill);
@@ -20266,10 +20602,9 @@ qnext:
 		}
 
 		if ((v_hlen >> 4) != IP_VERSION) {
-			BUMP_MIB(&ip_mib, ipOutDiscards);
 			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
 			    "ip_wput_end: q %p (%S)", q, "badvers");
-			goto drop_pkt;
+			goto discard_pkt;
 		}
 		/*
 		 * Is the header length at least 20 bytes?
@@ -20280,17 +20615,15 @@ qnext:
 		v_hlen &= 0xF;
 		v_hlen <<= 2;
 		if (v_hlen < IP_SIMPLE_HDR_LENGTH) {
-			BUMP_MIB(&ip_mib, ipOutDiscards);
 			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
 			    "ip_wput_end: q %p (%S)", q, "badlen");
-			goto drop_pkt;
+			goto discard_pkt;
 		}
 		if (v_hlen > (mp->b_wptr - rptr)) {
 			if (!pullupmsg(mp, v_hlen)) {
-				BUMP_MIB(&ip_mib, ipOutDiscards);
 				TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
 				    "ip_wput_end: q %p (%S)", q, "badpullup2");
-				goto drop_pkt;
+				goto discard_pkt;
 			}
 			ipha = (ipha_t *)mp->b_rptr;
 		}
@@ -20300,6 +20633,7 @@ qnext:
 		 */
 		if (ip_wput_options(q, first_mp, ipha, mctl_present, zoneid)) {
 			ASSERT(xmit_ill == NULL);
+			BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 			if (attach_ill != NULL)
 				ill_refrele(attach_ill);
 			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
@@ -20377,6 +20711,7 @@ qnext:
 			    &connp->conn_xmit_if_ill, &err);
 			if (err == ILL_LOOKUP_FAILED) {
 				ip1dbg(("ip_wput: No ill for IP_XMIT_IF\n"));
+				BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 				goto drop_pkt;
 			}
 			if (xmit_ill == NULL) {
@@ -20385,7 +20720,7 @@ qnext:
 				if (err == IPIF_LOOKUP_FAILED) {
 					ip1dbg(("ip_wput: No ipif for "
 					    "multicast\n"));
-					BUMP_MIB(&ip_mib, ipOutNoRoutes);
+					BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 					goto drop_pkt;
 				}
 			}
@@ -20394,7 +20729,7 @@ qnext:
 				if (ipif == NULL) {
 					ip1dbg(("ip_wput: No ipif for "
 					    "IP_XMIT_IF\n"));
-					BUMP_MIB(&ip_mib, ipOutNoRoutes);
+					BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 					goto drop_pkt;
 				}
 			} else if (ipif == NULL || ipif->ipif_isv6) {
@@ -20420,7 +20755,7 @@ qnext:
 				if (ipif == NULL) {
 					ip1dbg(("ip_wput: No ipif for "
 					    "multicast\n"));
-					BUMP_MIB(&ip_mib, ipOutNoRoutes);
+					BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 					goto drop_pkt;
 				}
 				err = conn_set_held_ipif(connp,
@@ -20429,7 +20764,7 @@ qnext:
 					ipif_refrele(ipif);
 					ip1dbg(("ip_wput: No ipif for "
 					    "multicast\n"));
-					BUMP_MIB(&ip_mib, ipOutNoRoutes);
+					BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 					goto drop_pkt;
 				}
 			}
@@ -20452,7 +20787,7 @@ qnext:
 			    BPRI_HI)) == NULL) {
 				ipif_refrele(ipif);
 				first_mp = mp;
-				goto drop_pkt;
+				goto discard_pkt;
 			}
 			first_mp->b_datap->db_type = M_CTL;
 			first_mp->b_wptr += sizeof (ipsec_info_t);
@@ -20645,7 +20980,7 @@ dontroute:
 				if (dst_ipif == NULL) {
 					ip1dbg(("ip_wput: no route for "
 					    "dst using SO_DONTROUTE\n"));
-					BUMP_MIB(&ip_mib, ipOutNoRoutes);
+					BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 					mp->b_prev = mp->b_next = NULL;
 					if (first_mp == NULL)
 						first_mp = mp;
@@ -20668,7 +21003,7 @@ dontroute:
 						    " dst using"
 						    " SO_DONTROUTE\n"));
 						BUMP_MIB(&ip_mib,
-						    ipOutNoRoutes);
+						    ipIfStatsOutNoRoutes);
 						mp->b_prev = mp->b_next = NULL;
 						if (first_mp == NULL)
 							first_mp = mp;
@@ -20702,7 +21037,7 @@ send_from_ill:
 			attach_ipif = ipif_get_next_ipif(NULL, attach_ill);
 			if (attach_ipif == NULL) {
 				ip1dbg(("ip_wput: No ipif for attach_ill\n"));
-				goto drop_pkt;
+				goto discard_pkt;
 			}
 			ire = ire_ctable_lookup(dst, 0, 0, attach_ipif,
 			    zoneid, MBLK_GETLABEL(mp), match_flags);
@@ -20721,6 +21056,7 @@ send_from_ill:
 				xmit_ill = conn_get_held_ill(connp,
 				    &connp->conn_xmit_if_ill, &err);
 				if (err == ILL_LOOKUP_FAILED) {
+					BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 					if (need_decref)
 						CONN_DEC_REF(connp);
 					freemsg(first_mp);
@@ -20788,7 +21124,7 @@ send_from_ill:
 					    sizeof (ipsec_info_t), BPRI_HI);
 					if (first_mp == NULL) {
 						first_mp = mp;
-						goto drop_pkt;
+						goto discard_pkt;
 					}
 					first_mp->b_datap->db_type = M_CTL;
 					first_mp->b_wptr +=
@@ -20921,12 +21257,14 @@ icmp_parameter_problem:
 	/* could not have originated externally */
 	ASSERT(mp->b_prev == NULL);
 	if (ip_hdr_complete(ipha, zoneid) == 0) {
-		BUMP_MIB(&ip_mib, ipOutNoRoutes);
+		BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 		/* it's the IP header length that's in trouble */
 		icmp_param_problem(q, first_mp, 0, zoneid);
 		first_mp = NULL;
 	}
 
+discard_pkt:
+	BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 drop_pkt:
 	ip1dbg(("ip_wput: dropped packet\n"));
 	if (ire != NULL)
@@ -21614,7 +21952,7 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller,
 			ire_refrele(ire);
 			if (conn_outgoing_ill != NULL)
 				ill_refrele(conn_outgoing_ill);
-			BUMP_MIB(&ip_mib, ipOutNoRoutes);
+			BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 			if (src_ire != NULL) {
 				if (src_ire->ire_flags & RTF_BLACKHOLE) {
 					ire_refrele(src_ire);
@@ -21776,7 +22114,12 @@ another:;
 				if (conn_outgoing_ill != NULL)
 					ill_refrele(conn_outgoing_ill);
 				freemsg(first_mp);
-				BUMP_MIB(&ip_mib, ipOutDiscards);
+				if (ill != NULL) {
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsOutDiscards);
+				} else {
+					BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
+				}
 				return;
 			}
 		} else {
@@ -21811,7 +22154,7 @@ another:;
 	/* The ill_index for outbound ILL */
 	ill_index = Q_TO_INDEX(stq);
 
-	BUMP_MIB(&ip_mib, ipOutRequests);
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutRequests);
 	ttl_protocol = ((uint16_t *)ipha)[4];
 
 	/* pseudo checksum (do it in parts for IP header checksum) */
@@ -22024,6 +22367,12 @@ release_ire_and_ill:
 			return;
 		}
 
+		if (CLASSD(dst)) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutMcastPkts);
+			UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutMcastOctets,
+			    ntohs(ipha->ipha_length));
+		}
+
 		TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
 		    "ip_wput_ire_end: q %p (%S)",
 		    q, "last copy out");
@@ -22042,6 +22391,7 @@ release_ire_and_ill:
 			next_mp = NULL;
 			ipha = (ipha_t *)mp->b_rptr;
 			ill_index = Q_TO_INDEX(stq);
+			ill = (ill_t *)stq->q_ptr;
 		}
 	} while (multirt_send);
 	if (conn_outgoing_ill != NULL)
@@ -22228,8 +22578,9 @@ broadcast:
 		 * A non-NULL send-to queue means this packet is going
 		 * out of this machine.
 		 */
+		out_ill = (ill_t *)stq->q_ptr;
 
-		BUMP_MIB(&ip_mib, ipOutRequests);
+		BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsHCOutRequests);
 		ttl_protocol = ((uint16_t *)ipha)[4];
 		/*
 		 * We accumulate the pseudo header checksum in cksum.
@@ -22313,7 +22664,9 @@ broadcast:
 						    first_mp);
 					}
 				} else {
-					BUMP_MIB(&ip_mib, ipOutDiscards);
+					out_ill = (ill_t *)stq->q_ptr;
+					BUMP_MIB(out_ill->ill_ip_mib,
+					    ipIfStatsOutDiscards);
 					freemsg(first_mp);
 					TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
 					    "ip_wput_ire_end: q %p (%S)",
@@ -22618,6 +22971,17 @@ release_ire_and_ill_2:
 					return;
 				}
 
+				if (CLASSD(dst)) {
+					BUMP_MIB(out_ill->ill_ip_mib,
+					    ipIfStatsHCOutMcastPkts);
+					UPDATE_MIB(out_ill->ill_ip_mib,
+					    ipIfStatsHCOutMcastOctets,
+					    ntohs(ipha->ipha_length));
+				} else if (ire->ire_type == IRE_BROADCAST) {
+					BUMP_MIB(out_ill->ill_ip_mib,
+					    ipIfStatsHCOutBcastPkts);
+				}
+
 				if (multirt_send) {
 					/*
 					 * We are in a multiple send case,
@@ -22665,8 +23029,11 @@ release_ire_and_ill_2:
 			if (ipsec_len != 0) {
 				if ((max_frag < (unsigned int)(LENGTH +
 				    ipsec_len)) && (offset & IPH_DF)) {
-
-					BUMP_MIB(&ip_mib, ipFragFails);
+					out_ill = (ill_t *)stq->q_ptr;
+					BUMP_MIB(out_ill->ill_ip_mib,
+					    ipIfStatsOutFragFails);
+					BUMP_MIB(out_ill->ill_ip_mib,
+					    ipIfStatsOutFragReqds);
 					ipha->ipha_hdr_checksum = 0;
 					ipha->ipha_hdr_checksum =
 					    (uint16_t)ip_csum_hdr(ipha);
@@ -22683,7 +23050,7 @@ release_ire_and_ill_2:
 				} else {
 					/*
 					 * This won't cause a icmp_frag_needed
-					 * message. to be gnerated. Send it on
+					 * message. to be generated. Send it on
 					 * the wire. Note that this could still
 					 * cause fragmentation and all we
 					 * do is the generation of the message
@@ -22720,8 +23087,9 @@ release_ire_and_ill_2:
 					ip_process(IPP_LOCAL_OUT, &mp,
 					    ill_index);
 					if (mp == NULL) {
-						BUMP_MIB(&ip_mib,
-						    ipOutDiscards);
+						out_ill = (ill_t *)stq->q_ptr;
+						BUMP_MIB(out_ill->ill_ip_mib,
+						    ipIfStatsOutDiscards);
 						if (next_mp != NULL) {
 							freemsg(next_mp);
 							ire_refrele(ire1);
@@ -23218,9 +23586,13 @@ ip_wput_frag_mdt(ire_t *ire, mblk_t *mp, ip_pkt_t pkt_type, int len,
 	unsigned char	*hdr_ptr, *pld_ptr;
 	multidata_t	*mmd;
 	ip_pdescinfo_t	pdi;
+	ill_t		*ill;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 	ASSERT(MBLKL(mp) > sizeof (ipha_t));
+
+	ill = ire_to_ill(ire);
+	ASSERT(ill != NULL);
 
 	ipha_orig = (ipha_t *)mp->b_rptr;
 	mp->b_rptr += sizeof (ipha_t);
@@ -23251,7 +23623,7 @@ free_mmd:		IP_STAT(ip_frag_mdt_discarded);
 			freemsg(md_mp);
 		}
 		IP_STAT(ip_frag_mdt_allocfail);
-		UPDATE_MIB(&ip_mib, ipOutDiscards, pkts);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
 		return;
 	}
 	IP_STAT(ip_frag_mdt_allocd);
@@ -23394,9 +23766,14 @@ free_mmd:		IP_STAT(ip_frag_mdt_discarded);
 	ASSERT(mp->b_wptr == pld_ptr);
 
 	/* Update IP statistics */
-	UPDATE_MIB(&ip_mib, ipFragCreates, pkts);
-	BUMP_MIB(&ip_mib, ipFragOKs);
 	IP_STAT_UPDATE(ip_frag_mdt_pkt_out, pkts);
+
+	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsOutFragCreates, pkts);
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragOKs);
+
+	len = ntohs(ipha_orig->ipha_length) + (pkts - 1) * IP_SIMPLE_HDR_LENGTH;
+	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits, pkts);
+	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets, len);
 
 	if (pkt_type == OB_PKT) {
 		ire->ire_ob_pkt_count += pkts;
@@ -23410,10 +23787,13 @@ free_mmd:		IP_STAT(ip_frag_mdt_discarded);
 		 */
 		ire->ire_ib_pkt_count += pkts;
 		ASSERT(!IRE_IS_LOCAL(ire));
-		if (ire->ire_type & IRE_BROADCAST)
+		if (ire->ire_type & IRE_BROADCAST) {
 			atomic_add_32(&ire->ire_ipif->ipif_ib_pkt_count, pkts);
-		else
+		} else {
+			UPDATE_MIB(ill->ill_ip_mib,
+			    ipIfStatsHCOutForwDatagrams, pkts);
 			atomic_add_32(&ire->ire_ipif->ipif_fo_pkt_count, pkts);
+		}
 	}
 	ire->ire_last_used_time = lbolt;
 	/* Send it down */
@@ -23462,6 +23842,12 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	boolean_t	multirt_send = B_FALSE;
 	ire_t		*first_ire = NULL;
 	irb_t		*irb = NULL;
+	mib2_ipIfStatsEntry_t *mibptr = NULL;
+
+	ill = ire_to_ill(ire);
+	mibptr = (ill != NULL) ? ill->ill_ip_mib : &ip_mib;
+
+	BUMP_MIB(mibptr, ipIfStatsOutFragReqds);
 
 	/*
 	 * IPSEC does not allow hw accelerated packets to be fragmented
@@ -23482,7 +23868,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE);
 		ip1dbg(("ip_wput_frag: mac address for ire is unresolved"
 		    " -  dropping packet\n"));
-		BUMP_MIB(&ip_mib, ipFragFails);
+		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
 		freemsg(mp);
 		return;
 	}
@@ -23508,7 +23894,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	 */
 	offset = ntohs(ipha->ipha_fragment_offset_and_flags);
 	if (offset & IPH_DF) {
-		BUMP_MIB(&ip_mib, ipFragFails);
+		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
 		/*
 		 * Need to compute hdr checksum if called from ip_wput_ire.
 		 * Note that ip_rput_forward verifies the checksum before
@@ -23534,7 +23920,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	v_hlen_tos_len = ((uint32_t *)ipha)[0];
 	if (((max_frag - LENGTH) & ~7) < 8) {
 		/* TODO: notify ulp somehow */
-		BUMP_MIB(&ip_mib, ipFragFails);
+		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
 		freemsg(mp);
 		TRACE_1(TR_FAC_IP, TR_IP_WPUT_FRAG_END,
 		    "ip_wput_frag_end:(%S)",
@@ -23556,7 +23942,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	ASSERT(!IRE_IS_LOCAL(ire));
 	if (hdr_len == IP_SIMPLE_HDR_LENGTH && ip_multidata_outbound &&
 	    !(ire->ire_flags & RTF_MULTIRT) && !IPP_ENABLED(IPP_LOCAL_OUT) &&
-	    (ill = ire_to_ill(ire)) != NULL && ILL_MDT_CAPABLE(ill) &&
+	    ill != NULL && ILL_MDT_CAPABLE(ill) &&
 	    IP_CAN_FRAG_MDT(mp, IP_SIMPLE_HDR_LENGTH, len)) {
 		ASSERT(ill->ill_mdt_capab != NULL);
 		if (!ill->ill_mdt_capab->ill_mdt_on) {
@@ -23577,7 +23963,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	/* Get a copy of the header for the trailing frags */
 	hdr_mp = ip_wput_frag_copyhdr((uchar_t *)ipha, hdr_len, offset);
 	if (!hdr_mp) {
-		BUMP_MIB(&ip_mib, ipOutDiscards);
+		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
 		freemsg(mp);
 		TRACE_1(TR_FAC_IP, TR_IP_WPUT_FRAG_END,
 		    "ip_wput_frag_end:(%S)",
@@ -23611,7 +23997,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	 * original IP header.
 	 */
 	if (!(mp = ip_carve_mp(&mp_orig, i1))) {
-		BUMP_MIB(&ip_mib, ipOutDiscards);
+		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
 		freeb(hdr_mp);
 		freemsg(mp_orig);
 		TRACE_1(TR_FAC_IP, TR_IP_WPUT_FRAG_END,
@@ -23772,7 +24158,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		/* Corner case if copyb has failed */
 		} else if (!(xmit_mp = copyb(ll_hdr_mp))) {
 			UNLOCK_IRE_FP_MP(ire);
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+			BUMP_MIB(mibptr, ipIfStatsOutFragFails);
 			freeb(hdr_mp);
 			freemsg(mp);
 			freemsg(mp_orig);
@@ -23812,10 +24198,11 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 				xmit_mp->b_band = mp->b_band;
 		}
 		UNLOCK_IRE_FP_MP(ire);
-		q = ire->ire_stq;
-		BUMP_MIB(&ip_mib, ipFragCreates);
 
+		q = ire->ire_stq;
 		out_ill = (ill_t *)q->q_ptr;
+
+		BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsOutFragCreates);
 
 		DTRACE_PROBE4(ip4__physical__out__start,
 		    ill_t *, NULL, ill_t *, out_ill,
@@ -23828,12 +24215,19 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 
 		if (xmit_mp != NULL) {
 			putnext(q, xmit_mp);
+
+			BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsHCOutTransmits);
+			UPDATE_MIB(out_ill->ill_ip_mib,
+			    ipIfStatsHCOutOctets, i1);
+
 			if (pkt_type != OB_PKT) {
 				/*
-				 * Update the packet count of trailing
-				 * RTF_MULTIRT ires.
+				 * Update the packet count and MIB stats
+				 * of trailing RTF_MULTIRT ires.
 				 */
 				UPDATE_OB_PKT_COUNT(ire);
+				BUMP_MIB(out_ill->ill_ip_mib,
+				    ipIfStatsOutFragReqds);
 			}
 		}
 
@@ -23868,6 +24262,8 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	if (pkt_type == OB_PKT) {
 		UPDATE_OB_PKT_COUNT(ire);
 	} else {
+		out_ill = (ill_t *)q->q_ptr;
+		BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsHCOutForwDatagrams);
 		UPDATE_IB_PKT_COUNT(ire);
 	}
 
@@ -23973,6 +24369,9 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		if (pkt_type == OB_PKT) {
 			UPDATE_OB_PKT_COUNT(ire);
 		} else {
+			out_ill = (ill_t *)q->q_ptr;
+			BUMP_MIB(out_ill->ill_ip_mib,
+			    ipIfStatsHCOutForwDatagrams);
 			UPDATE_IB_PKT_COUNT(ire);
 		}
 
@@ -24096,10 +24495,11 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 				goto drop_pkt;
 			}
 			UNLOCK_IRE_FP_MP(ire);
-			BUMP_MIB(&ip_mib, ipFragCreates);
 
 			mp1 = mp;
 			out_ill = (ill_t *)q->q_ptr;
+
+			BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsOutFragCreates);
 
 			DTRACE_PROBE4(ip4__physical__out__start,
 			    ill_t *, NULL, ill_t *, out_ill,
@@ -24120,6 +24520,11 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 			if (xmit_mp != NULL) {
 				putnext(q, xmit_mp);
 
+				BUMP_MIB(out_ill->ill_ip_mib,
+				    ipIfStatsHCOutTransmits);
+				UPDATE_MIB(out_ill->ill_ip_mib,
+				    ipIfStatsHCOutOctets, ip_len);
+
 				if (pkt_type != OB_PKT) {
 					/*
 					 * Update the packet count of trailing
@@ -24132,6 +24537,8 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 			/* All done if we just consumed the hdr_mp. */
 			if (mp == hdr_mp) {
 				last_frag = B_TRUE;
+				BUMP_MIB(out_ill->ill_ip_mib,
+				    ipIfStatsOutFragOKs);
 			}
 
 			if (multirt_send) {
@@ -24165,7 +24572,6 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		}
 
 		if (last_frag) {
-			BUMP_MIB(&ip_mib, ipFragOKs);
 			TRACE_1(TR_FAC_IP, TR_IP_WPUT_FRAG_END,
 			    "ip_wput_frag_end:(%S)",
 			    "consumed hdr_mp");
@@ -24180,7 +24586,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 
 drop_pkt:
 	/* Clean up following allocation failure. */
-	BUMP_MIB(&ip_mib, ipOutDiscards);
+	BUMP_MIB(mibptr, ipIfStatsOutFragFails);
 	freemsg(mp);
 	if (mp != hdr_mp)
 		freeb(hdr_mp);
@@ -24480,7 +24886,7 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 		 */
 		if ((ushort_t)ire_type == IRE_BROADCAST) {
 			freemsg(first_mp);
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			ip2dbg(("ip_wput_local: discard broadcast\n"));
 			return;
 		}
@@ -25237,7 +25643,7 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 		if (ipif == NULL) {
 			ip1dbg(("ip_wput_ipsec_out: No ipif for"
 			    " multicast\n"));
-			BUMP_MIB(&ip_mib, ipOutNoRoutes);
+			BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
 			freemsg(ipsec_mp);
 			goto done;
 		}
@@ -25633,7 +26039,8 @@ send:
 
 			freeb(ipsec_mp); /* ip_xmit_v4 frees the mp */
 drop_pkt:
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+			BUMP_MIB(((ill_t *)ire->ire_stq->q_ptr)->ill_ip_mib,
+			    ipIfStatsOutDiscards);
 			if (ire_need_rele)
 				ire_refrele(ire);
 			if (ire1 != NULL) {
@@ -25933,7 +26340,7 @@ ipsec_out_process(queue_t *q, mblk_t *ipsec_mp, ire_t *ire, uint_t ill_index)
 			ip2dbg(("ipsec_out_process: packet dropped "\
 			    "during IPPF processing\n"));
 			freeb(ipsec_mp);
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+			BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 			return;
 		}
 	}
@@ -25955,9 +26362,9 @@ ipsec_out_process(queue_t *q, mblk_t *ipsec_mp, ire_t *ire, uint_t ill_index)
 	if (!ipsec_loaded()) {
 		ipha = (ipha_t *)ipsec_mp->b_cont->b_rptr;
 		if (IPH_HDR_VERSION(ipha) == IP_VERSION) {
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+			BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 		} else {
-			BUMP_MIB(&ip6_mib, ipv6OutDiscards);
+			BUMP_MIB(&ip6_mib, ipIfStatsOutDiscards);
 		}
 		ip_drop_packet(ipsec_mp, B_FALSE, NULL, ire,
 		    &ipdrops_ip_ipsec_not_loaded, &ip_dropper);
@@ -26006,7 +26413,11 @@ ipsec_out_process(queue_t *q, mblk_t *ipsec_mp, ire_t *ire, uint_t ill_index)
 			    "ipsec_out_process: "
 			    "Self-Encapsulation failed: Out of memory\n");
 			freemsg(ipsec_mp);
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+			if (ill != NULL) {
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			} else {
+				BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
+			}
 			return;
 		}
 		inner_mp = ipsec_mp->b_cont;
@@ -26061,7 +26472,11 @@ ipsec_out_process(queue_t *q, mblk_t *ipsec_mp, ire_t *ire, uint_t ill_index)
 		case IPSEC_STATUS_SUCCESS:
 			break;
 		case IPSEC_STATUS_FAILED:
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+			if (ill != NULL) {
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			} else {
+				BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
+			}
 			/* FALLTHRU */
 		case IPSEC_STATUS_PENDING:
 			return;
@@ -26087,7 +26502,11 @@ ipsec_out_process(queue_t *q, mblk_t *ipsec_mp, ire_t *ire, uint_t ill_index)
 		case IPSEC_STATUS_SUCCESS:
 			break;
 		case IPSEC_STATUS_FAILED:
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+			if (ill != NULL) {
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			} else {
+				BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
+			}
 			/* FALLTHRU */
 		case IPSEC_STATUS_PENDING:
 			if (ill != NULL && ill_need_rele)
@@ -28436,14 +28855,14 @@ ip_kstat_init(void)
 	ip_named_kstat_t template = {
 		{ "forwarding",		KSTAT_DATA_UINT32, 0 },
 		{ "defaultTTL",		KSTAT_DATA_UINT32, 0 },
-		{ "inReceives",		KSTAT_DATA_UINT32, 0 },
+		{ "inReceives",		KSTAT_DATA_UINT64, 0 },
 		{ "inHdrErrors",	KSTAT_DATA_UINT32, 0 },
 		{ "inAddrErrors",	KSTAT_DATA_UINT32, 0 },
-		{ "forwDatagrams",	KSTAT_DATA_UINT32, 0 },
+		{ "forwDatagrams",	KSTAT_DATA_UINT64, 0 },
 		{ "inUnknownProtos",	KSTAT_DATA_UINT32, 0 },
 		{ "inDiscards",		KSTAT_DATA_UINT32, 0 },
-		{ "inDelivers",		KSTAT_DATA_UINT32, 0 },
-		{ "outRequests",	KSTAT_DATA_UINT32, 0 },
+		{ "inDelivers",		KSTAT_DATA_UINT64, 0 },
+		{ "outRequests",	KSTAT_DATA_UINT64, 0 },
 		{ "outDiscards",	KSTAT_DATA_UINT32, 0 },
 		{ "outNoRoutes",	KSTAT_DATA_UINT32, 0 },
 		{ "reasmTimeout",	KSTAT_DATA_UINT32, 0 },
@@ -28512,6 +28931,9 @@ static int
 ip_kstat_update(kstat_t *kp, int rw)
 {
 	ip_named_kstat_t *ipkp;
+	mib2_ipIfStatsEntry_t ipmib;
+	ill_walk_context_t ctx;
+	ill_t *ill;
 
 	if (!kp || !kp->ks_data)
 		return (EIO);
@@ -28521,42 +28943,49 @@ ip_kstat_update(kstat_t *kp, int rw)
 
 	ipkp = (ip_named_kstat_t *)kp->ks_data;
 
-	ipkp->forwarding.value.ui32 =		ip_mib.ipForwarding;
-	ipkp->defaultTTL.value.ui32 =		ip_mib.ipDefaultTTL;
-	ipkp->inReceives.value.ui32 =		ip_mib.ipInReceives;
-	ipkp->inHdrErrors.value.ui32 =		ip_mib.ipInHdrErrors;
-	ipkp->inAddrErrors.value.ui32 =		ip_mib.ipInAddrErrors;
-	ipkp->forwDatagrams.value.ui32 =	ip_mib.ipForwDatagrams;
-	ipkp->inUnknownProtos.value.ui32 =	ip_mib.ipInUnknownProtos;
-	ipkp->inDiscards.value.ui32 =		ip_mib.ipInDiscards;
-	ipkp->inDelivers.value.ui32 =		ip_mib.ipInDelivers;
-	ipkp->outRequests.value.ui32 =		ip_mib.ipOutRequests;
-	ipkp->outDiscards.value.ui32 =		ip_mib.ipOutDiscards;
-	ipkp->outNoRoutes.value.ui32 =		ip_mib.ipOutNoRoutes;
-	ipkp->reasmTimeout.value.ui32 =		ip_mib.ipReasmTimeout;
-	ipkp->reasmReqds.value.ui32 =		ip_mib.ipReasmReqds;
-	ipkp->reasmOKs.value.ui32 =		ip_mib.ipReasmOKs;
-	ipkp->reasmFails.value.ui32 =		ip_mib.ipReasmFails;
-	ipkp->fragOKs.value.ui32 =		ip_mib.ipFragOKs;
-	ipkp->fragFails.value.ui32 =		ip_mib.ipFragFails;
-	ipkp->fragCreates.value.ui32 =		ip_mib.ipFragCreates;
+	bcopy(&ip_mib, &ipmib, sizeof (ipmib));
+	rw_enter(&ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_V4(&ctx);
+	for (; ill != NULL; ill = ill_next(&ctx, ill))
+		ip_mib2_add_ip_stats(&ipmib, ill->ill_ip_mib);
+	rw_exit(&ill_g_lock);
 
-	ipkp->routingDiscards.value.ui32 =	ip_mib.ipRoutingDiscards;
-	ipkp->inErrs.value.ui32 =		ip_mib.tcpInErrs;
-	ipkp->noPorts.value.ui32 =		ip_mib.udpNoPorts;
-	ipkp->inCksumErrs.value.ui32 =		ip_mib.ipInCksumErrs;
-	ipkp->reasmDuplicates.value.ui32 =	ip_mib.ipReasmDuplicates;
-	ipkp->reasmPartDups.value.ui32 =	ip_mib.ipReasmPartDups;
-	ipkp->forwProhibits.value.ui32 =	ip_mib.ipForwProhibits;
-	ipkp->udpInCksumErrs.value.ui32 =	ip_mib.udpInCksumErrs;
-	ipkp->udpInOverflows.value.ui32 =	ip_mib.udpInOverflows;
-	ipkp->rawipInOverflows.value.ui32 =	ip_mib.rawipInOverflows;
-	ipkp->ipsecInSucceeded.value.ui32 =	ip_mib.ipsecInSucceeded;
-	ipkp->ipsecInFailed.value.i32 =		ip_mib.ipsecInFailed;
+	ipkp->forwarding.value.ui32 =		ipmib.ipIfStatsForwarding;
+	ipkp->defaultTTL.value.ui32 =		ipmib.ipIfStatsDefaultTTL;
+	ipkp->inReceives.value.ui64 =		ipmib.ipIfStatsHCInReceives;
+	ipkp->inHdrErrors.value.ui32 =		ipmib.ipIfStatsInHdrErrors;
+	ipkp->inAddrErrors.value.ui32 =		ipmib.ipIfStatsInAddrErrors;
+	ipkp->forwDatagrams.value.ui64 = ipmib.ipIfStatsHCOutForwDatagrams;
+	ipkp->inUnknownProtos.value.ui32 =	ipmib.ipIfStatsInUnknownProtos;
+	ipkp->inDiscards.value.ui32 =		ipmib.ipIfStatsInDiscards;
+	ipkp->inDelivers.value.ui64 =		ipmib.ipIfStatsHCInDelivers;
+	ipkp->outRequests.value.ui64 =		ipmib.ipIfStatsHCOutRequests;
+	ipkp->outDiscards.value.ui32 =		ipmib.ipIfStatsOutDiscards;
+	ipkp->outNoRoutes.value.ui32 =		ipmib.ipIfStatsOutNoRoutes;
+	ipkp->reasmTimeout.value.ui32 =		ip_g_frag_timeout;
+	ipkp->reasmReqds.value.ui32 =		ipmib.ipIfStatsReasmReqds;
+	ipkp->reasmOKs.value.ui32 =		ipmib.ipIfStatsReasmOKs;
+	ipkp->reasmFails.value.ui32 =		ipmib.ipIfStatsReasmFails;
+	ipkp->fragOKs.value.ui32 =		ipmib.ipIfStatsOutFragOKs;
+	ipkp->fragFails.value.ui32 =		ipmib.ipIfStatsOutFragFails;
+	ipkp->fragCreates.value.ui32 =		ipmib.ipIfStatsOutFragCreates;
 
-	ipkp->inIPv6.value.ui32 =		ip_mib.ipInIPv6;
-	ipkp->outIPv6.value.ui32 =		ip_mib.ipOutIPv6;
-	ipkp->outSwitchIPv6.value.ui32 =	ip_mib.ipOutSwitchIPv6;
+	ipkp->routingDiscards.value.ui32 =	0;
+	ipkp->inErrs.value.ui32 =		ipmib.tcpIfStatsInErrs;
+	ipkp->noPorts.value.ui32 =		ipmib.udpIfStatsNoPorts;
+	ipkp->inCksumErrs.value.ui32 =		ipmib.ipIfStatsInCksumErrs;
+	ipkp->reasmDuplicates.value.ui32 =	ipmib.ipIfStatsReasmDuplicates;
+	ipkp->reasmPartDups.value.ui32 =	ipmib.ipIfStatsReasmPartDups;
+	ipkp->forwProhibits.value.ui32 =	ipmib.ipIfStatsForwProhibits;
+	ipkp->udpInCksumErrs.value.ui32 =	ipmib.udpIfStatsInCksumErrs;
+	ipkp->udpInOverflows.value.ui32 =	ipmib.udpIfStatsInOverflows;
+	ipkp->rawipInOverflows.value.ui32 =	ipmib.rawipIfStatsInOverflows;
+	ipkp->ipsecInSucceeded.value.ui32 =	ipmib.ipsecIfStatsInSucceeded;
+	ipkp->ipsecInFailed.value.i32 =		ipmib.ipsecIfStatsInFailed;
+
+	ipkp->inIPv6.value.ui32 =	ipmib.ipIfStatsInWrongIPVersion;
+	ipkp->outIPv6.value.ui32 =	ipmib.ipIfStatsOutWrongIPVersion;
+	ipkp->outSwitchIPv6.value.ui32 = ipmib.ipIfStatsOutSwitchIPVersion;
 
 	return (0);
 }
@@ -28712,7 +29141,7 @@ ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
 	rq = connp->conn_rq;
 	if (!canputnext(rq)) {
 		CONN_DEC_REF(connp);
-		BUMP_MIB(&ip_mib, rawipInOverflows);
+		BUMP_MIB(recv_ill->ill_ip_mib, rawipIfStatsInOverflows);
 		freemsg(first_mp);
 		return;
 	}
@@ -28721,6 +29150,7 @@ ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
 		first_mp = ipsec_check_inbound_policy(first_mp, connp,
 		    (isv4 ? ipha : NULL), ip6h, mctl_present);
 		if (first_mp == NULL) {
+			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
 			CONN_DEC_REF(connp);
 			return;
 		}
@@ -28760,13 +29190,15 @@ ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
 		} else {
 			mp = ip_add_info_v6(mp, recv_ill, &ip6h->ip6_dst);
 			if (mp == NULL) {
+				BUMP_MIB(recv_ill->ill_ip_mib,
+				    ipIfStatsInDiscards);
 				CONN_DEC_REF(connp);
 				return;
 			}
 		}
 	}
 
-	BUMP_MIB(&ip_mib, ipInDelivers);
+	BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsHCInDelivers);
 	/*
 	 * We are sending the IPSEC_IN message also up. Refer
 	 * to comments above this function.
@@ -28775,6 +29207,11 @@ ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
 	CONN_DEC_REF(connp);
 }
 
+#define	UPDATE_IP_MIB_OB_COUNTERS(ill, len)				\
+{									\
+	BUMP_MIB((ill)->ill_ip_mib, ipIfStatsHCOutTransmits);		\
+	UPDATE_MIB((ill)->ill_ip_mib, ipIfStatsHCOutOctets, (len));	\
+}
 /*
  * This function should be called only if all packet processing
  * including fragmentation is complete. Callers of this function
@@ -28807,6 +29244,7 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 	boolean_t	xmit_drop = B_FALSE;
 	ip_proc_t	proc;
 	ill_t		*out_ill;
+	int		pkt_len;
 
 	arpce = ire->ire_nce;
 	ASSERT(arpce != NULL);
@@ -28834,6 +29272,8 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 
 			nxt_mp = mp->b_next;
 			mp->b_next = NULL;
+			ASSERT(mp->b_datap->db_type != M_CTL);
+			pkt_len = ntohs(((ipha_t *)mp->b_rptr)->ipha_length);
 			/*
 			 * This info is needed for IPQOS to do COS marking
 			 * in ip_wput_attach_llhdr->ip_process.
@@ -28848,11 +29288,8 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 			    ill_index);
 			if (first_mp == NULL) {
 				xmit_drop = B_TRUE;
-				if (proc == IPP_FWD_OUT) {
-					BUMP_MIB(&ip_mib, ipInDiscards);
-				} else {
-					BUMP_MIB(&ip_mib, ipOutDiscards);
-				}
+				BUMP_MIB(out_ill->ill_ip_mib,
+				    ipIfStatsOutDiscards);
 				goto next_mp;
 			}
 			/* non-ipsec hw accel case */
@@ -28868,16 +29305,16 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 
 				if (flow_ctl_enabled || canputnext(q))  {
 					if (proc == IPP_FWD_OUT) {
-						BUMP_MIB(&ip_mib,
-						    ipForwDatagrams);
+						BUMP_MIB(out_ill->ill_ip_mib,
+						ipIfStatsHCOutForwDatagrams);
 					}
+					UPDATE_IP_MIB_OB_COUNTERS(out_ill,
+					    pkt_len);
 
-					if (mp == NULL)
-						goto next_mp;
 					putnext(q, first_mp);
 				} else {
-					BUMP_MIB(&ip_mib,
-					    ipOutDiscards);
+					BUMP_MIB(out_ill->ill_ip_mib,
+					    ipIfStatsOutDiscards);
 					xmit_drop = B_TRUE;
 					freemsg(first_mp);
 				}
@@ -28895,8 +29332,9 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 					xmit_drop = B_TRUE;
 					freemsg(mp);
 				} else {
-					ipsec_hw_putnext(ire->ire_stq,
-					    mp);
+					UPDATE_IP_MIB_OB_COUNTERS(ill1,
+					    pkt_len);
+					ipsec_hw_putnext(ire->ire_stq, mp);
 				}
 			}
 next_mp:
@@ -28946,6 +29384,8 @@ next_mp:
 		return (LLHDR_RESLV_FAILED);
 	}
 }
+
+#undef	UPDATE_IP_MIB_OB_COUNTERS
 
 /*
  * Return B_TRUE if the buffers differ in length or content.

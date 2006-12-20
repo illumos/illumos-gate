@@ -29,8 +29,10 @@
 #include "tables.h"
 
 #include <time.h>
+#include <assert.h>
 
 struct phyint *phyints = NULL;
+int num_of_phyints = 0;
 
 static void	phyint_print(struct phyint *pi);
 static void	phyint_insert(struct phyint *pi);
@@ -157,6 +159,7 @@ phyint_insert(struct phyint *pi)
 	if (phyints)
 		phyints->pi_prev = pi;
 	phyints = pi;
+	num_of_phyints++;
 }
 
 /*
@@ -498,6 +501,8 @@ phyint_delete(struct phyint *pi)
 	if (debug & D_PHYINT)
 		logmsg(LOG_DEBUG, "phyint_delete(%s)\n", pi->pi_name);
 
+	assert(num_of_phyints > 0);
+
 	while (pi->pi_router_list)
 		router_delete(pi->pi_router_list);
 	while (pi->pi_prefix_list)
@@ -525,6 +530,7 @@ phyint_delete(struct phyint *pi)
 	if (pi->pi_group_name != NULL)
 		free(pi->pi_group_name);
 	free(pi);
+	num_of_phyints--;
 }
 
 /*

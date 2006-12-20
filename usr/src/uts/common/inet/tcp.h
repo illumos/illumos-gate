@@ -437,6 +437,7 @@ typedef struct tcp_s {
 	mblk_t		*tcp_timercache;
 	cred_t		*tcp_cred;	/* Credentials when this was opened */
 	pid_t		tcp_cpid;	/* Process id when this was opened */
+	uint64_t	tcp_open_time;	/* time when this was opened */
 
 
 	union {

@@ -3199,7 +3199,7 @@ sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, uint_t ipif_seqid,
 		 * assume a single contiguous chunk of data.
 		 */
 		if (pullupmsg(mp, -1) == 0) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(first_mp);
 			return;
 		}
@@ -3214,7 +3214,7 @@ sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, uint_t ipif_seqid,
 	mlen = mp->b_wptr - (uchar_t *)(sctph + 1);
 	if ((ch = sctp_first_chunk((uchar_t *)(sctph + 1), mlen)) == NULL) {
 		dprint(3, ("sctp_ootb_input: invalid packet\n"));
-		BUMP_MIB(&ip_mib, ipInDiscards);
+		BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
 		freemsg(first_mp);
 		return;
 	}
@@ -3235,7 +3235,8 @@ sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, uint_t ipif_seqid,
 			mutex_enter(&sctp->sctp_lock);
 			if (sctp->sctp_running) {
 				if (!sctp_add_recvq(sctp, mp, B_FALSE)) {
-					BUMP_MIB(&ip_mib, ipInDiscards);
+					BUMP_MIB(recv_ill->ill_ip_mib,
+					    ipIfStatsInDiscards);
 					freemsg(mp);
 				}
 				mutex_exit(&sctp->sctp_lock);
@@ -3297,6 +3298,7 @@ sctp_input(conn_t *connp, ipha_t *ipha, mblk_t *mp, mblk_t *first_mp,
 		first_mp = ipsec_check_inbound_policy(first_mp, connp,
 		    ipha, NULL, mctl_present);
 		if (first_mp == NULL) {
+			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
 			SCTP_REFRELE(sctp);
 			return;
 		}
@@ -3339,6 +3341,7 @@ sctp_input(conn_t *connp, ipha_t *ipha, mblk_t *mp, mblk_t *first_mp,
 			    &(((ip6_t *)ipha)->ip6_dst));
 		}
 		if (mp == NULL) {
+			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
 			SCTP_REFRELE(sctp);
 			if (mctl_present)
 				freeb(first_mp);
@@ -3359,7 +3362,7 @@ sctp_input(conn_t *connp, ipha_t *ipha, mblk_t *mp, mblk_t *first_mp,
 		if (mctl_present)
 			mp->b_prev = first_mp;
 		if (!sctp_add_recvq(sctp, mp, B_FALSE)) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(first_mp);
 		}
 		mutex_exit(&sctp->sctp_lock);
@@ -3374,7 +3377,8 @@ sctp_input(conn_t *connp, ipha_t *ipha, mblk_t *mp, mblk_t *first_mp,
 			if (mctl_present)
 				mp->b_prev = first_mp;
 			if (!sctp_add_recvq(sctp, mp, B_TRUE)) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(recv_ill->ill_ip_mib,
+				    ipIfStatsInDiscards);
 				freemsg(first_mp);
 			}
 			mutex_exit(&sctp->sctp_recvq_lock);
@@ -3449,7 +3453,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 		 * assume a single contiguous chunk of data.
 		 */
 		if (pullupmsg(mp, -1) == 0) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(&ip_mib, ipIfStatsInDiscards);
 			if (ipsec_mp != NULL)
 				freeb(ipsec_mp);
 			if (pinfo != NULL)
@@ -3467,7 +3471,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 	mlen = mp->b_wptr - (uchar_t *)(sctph + 1);
 	ch = sctp_first_chunk((uchar_t *)(sctph + 1), mlen);
 	if (ch == NULL) {
-		BUMP_MIB(&ip_mib, ipInDiscards);
+		BUMP_MIB(&ip_mib, ipIfStatsInDiscards);
 		if (ipsec_mp != NULL)
 			freeb(ipsec_mp);
 		freemsg(mp);
@@ -3475,7 +3479,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 	}
 
 	if (!sctp_check_input(sctp, ch, mlen, 1)) {
-		BUMP_MIB(&ip_mib, ipInDiscards);
+		BUMP_MIB(&ip_mib, ipIfStatsInDiscards);
 		goto done;
 	}
 	/*

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -164,6 +164,8 @@ union pkt_buf {
 	uint8_t	packet[OVER_MAXPACKETSIZE*2];
 	struct	rip rip;
 };
+
+extern struct dr *drs;
 
 /*
  * IF_NAME_LEN is the maximum size of interface names represented within
@@ -585,6 +587,7 @@ extern int	rip_sock;		/* RIP socket */
 extern struct interface *rip_sock_interface; /* current output interface */
 extern int	rt_sock;		/* routing socket */
 extern int	rdisc_sock;		/* router-discovery raw socket */
+extern int	rdisc_mib_sock;		/* AF_UNIX mib info socket */
 
 extern boolean_t rip_enabled;		/* is rip on? */
 extern boolean_t supplier;		/* process should supply updates */
@@ -717,6 +720,7 @@ extern void	input_route(in_addr_t, in_addr_t, struct rt_spare *,
     struct netinfo *, uint16_t);
 extern void	read_rt(void);
 extern void	read_d(void);
+extern void	process_d_mib_sock(void);
 extern void	rdisc_adv(boolean_t);
 extern void	rdisc_sol(void);
 extern struct interface *receiving_interface(struct msghdr *, boolean_t);

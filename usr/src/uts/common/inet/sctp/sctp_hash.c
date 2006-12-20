@@ -455,7 +455,7 @@ ip_fanout_sctp(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 
 	/* Assume IP provides aligned packets - otherwise toss */
 	if (!OK_32PTR(mp->b_rptr)) {
-		BUMP_MIB(&ip_mib, ipInDiscards);
+		BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
 		freemsg(first_mp);
 		return;
 	}
@@ -483,7 +483,7 @@ ip_fanout_sctp(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 	sctp = CONN2SCTP(connp);
 
 	/* Found a client; up it goes */
-	BUMP_MIB(&ip_mib, ipInDelivers);
+	BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsHCInDelivers);
 
 	/*
 	 * We check some fields in conn_t without holding a lock.
@@ -554,7 +554,7 @@ ip_fanout_sctp(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 		if (mctl_present)
 			mp->b_prev = first_mp;
 		if (!sctp_add_recvq(sctp, mp, B_FALSE)) {
-			BUMP_MIB(&ip_mib, ipInDiscards);
+			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(first_mp);
 		}
 		mutex_exit(&sctp->sctp_lock);
@@ -567,7 +567,8 @@ ip_fanout_sctp(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 			if (mctl_present)
 				mp->b_prev = first_mp;
 			if (!sctp_add_recvq(sctp, mp, B_TRUE)) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
+				BUMP_MIB(recv_ill->ill_ip_mib,
+				    ipIfStatsInDiscards);
 				freemsg(first_mp);
 			}
 			mutex_exit(&sctp->sctp_recvq_lock);

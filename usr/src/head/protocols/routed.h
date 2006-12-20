@@ -150,6 +150,25 @@ struct entryinfo {
 	char	int_name[16];
 };
 
+typedef struct rdisc_info_s {
+	uint_t  info_type;
+	uint_t  info_version;
+	uint_t	info_num_of_routers;
+} rdisc_info_t;
+
+/*
+ * Structure that is returned with the default router info.
+ */
+typedef struct defr_s {
+	uint32_t	defr_info_type;
+	uint32_t	defr_version;
+	struct in_addr	defr_addr;
+	uint32_t	defr_index;
+	uint32_t	defr_life;
+	uint32_t	defr_pref;
+} defr_t;
+
+
 /*
  * Packet types.
  */
@@ -170,6 +189,15 @@ struct entryinfo {
 #define	RIPCMD_SEC_T_RESPONSE	52	/* tunneling */
 
 #define	RIPCMD_MAX		7
+
+#define	RDISC_SNMP_SOCKET	"/var/run/in.rdisc_mib"
+
+#define	RDISC_SNMP_INFO_REQ		1
+#define	RDISC_SNMP_INFO_RESPONSE	2
+#define	RDISC_DEF_ROUTER_INFO		3
+
+#define	RDISC_SNMP_INFO_VER	1
+#define	RDISC_DEF_ROUTER_VER	1
 
 #define	HOPCNT_INFINITY		16	/* per Xerox NS */
 #define	MAXPACKETSIZE		512	/* max broadcast size */

@@ -28,6 +28,7 @@
 #include "defs.h"
 #include "tables.h"
 #include <fcntl.h>
+#include <sys/un.h>
 
 static void	initlog(void);
 static void	run_timeouts(void);
@@ -93,6 +94,7 @@ int	rtsock = -1;			/* Routing socket */
 struct	rt_msghdr	*rt_msg;	/* Routing socket message */
 struct	sockaddr_in6	*rta_gateway;	/* RTA_GATEWAY sockaddr */
 struct	sockaddr_dl	*rta_ifp;	/* RTA_IFP sockaddr */
+int	mibsock = -1;			/* mib request socket */
 
 /*
  * Return the current time in milliseconds truncated to
@@ -349,7 +351,7 @@ poll_add(int fd)
 	int i;
 	int new_num;
 	struct pollfd *newfds;
-retry:
+
 	/* Check if already present */
 	for (i = 0; i < pollfd_num; i++) {
 		if (pollfds[i].fd == fd)
@@ -370,13 +372,17 @@ retry:
 		logperror("poll_add: realloc");
 		return (-1);
 	}
+
+	newfds[pollfd_num].fd = fd;
+	newfds[pollfd_num++].events = POLLIN;
+
 	for (i = pollfd_num; i < new_num; i++) {
 		newfds[i].fd = -1;
 		newfds[i].events = POLLIN;
 	}
 	pollfd_num = new_num;
 	pollfds = newfds;
-	goto retry;
+	return (0);
 }
 
 /*
@@ -1379,6 +1385,7 @@ in_signal(int fd)
 
 			phyint_delete(pi);
 		}
+		(void) unlink(NDPD_SNMP_SOCKET);
 		(void) unlink(PATH_PID);
 		exit(0);
 		/* NOTREACHED */
@@ -1506,6 +1513,45 @@ setup_rtsock(void)
 	rta_ifp->sdl_family = AF_LINK;
 
 	return (s);
+}
+
+static int
+setup_mibsock(void)
+{
+	int sock;
+	int ret;
+	int len;
+	struct sockaddr_un laddr;
+
+	sock = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if (sock == -1) {
+		logperror("setup_mibsock: socket(AF_UNIX)");
+		exit(1);
+	}
+
+	bzero(&laddr, sizeof (laddr));
+	laddr.sun_family = AF_UNIX;
+
+	(void) strncpy(laddr.sun_path, NDPD_SNMP_SOCKET,
+	    sizeof (laddr.sun_path));
+	len = sizeof (struct sockaddr_un);
+
+	(void) unlink(NDPD_SNMP_SOCKET);
+	ret = bind(sock, (struct sockaddr *)&laddr, len);
+	if (ret < 0) {
+		logperror("setup_mibsock: bind\n");
+		exit(1);
+	}
+
+	ret = fcntl(sock, F_SETFL, O_NONBLOCK);
+	if (ret < 0) {
+		logperror("fcntl(O_NONBLOCK)");
+		exit(1);
+	}
+	if (poll_add(sock) == -1) {
+		exit(1);
+	}
+	return (sock);
 }
 
 /*
@@ -1641,6 +1687,113 @@ process_rtsock(int rtsock)
 		check_if_removed(pi);
 		if (show_ifs)
 			phyint_print_all();
+	}
+}
+
+static void
+process_mibsock(int mibsock)
+{
+	struct phyint *pi;
+	socklen_t fromlen;
+	struct sockaddr_un from;
+	ndpd_info_t ndpd_info;
+	ssize_t len;
+	int command;
+
+	fromlen = (socklen_t)sizeof (from);
+	len = recvfrom(mibsock, &command, sizeof (int), 0,
+	    (struct sockaddr *)&from, &fromlen);
+
+	if (len < sizeof (int) || command != NDPD_SNMP_INFO_REQ) {
+		logperror("process_mibsock: bad command \n");
+		return;
+	}
+
+	ndpd_info.info_type = NDPD_SNMP_INFO_RESPONSE;
+	ndpd_info.info_version = NDPD_SNMP_INFO_VER;
+	ndpd_info.info_num_of_phyints = num_of_phyints;
+
+	(void) sendto(mibsock, &ndpd_info, sizeof (ndpd_info_t), 0,
+	    (struct sockaddr *)&from, fromlen);
+
+	for (pi = phyints; pi != NULL; pi = pi->pi_next) {
+		int prefixes;
+		int routers;
+		struct prefix   *prefix_list;
+		struct router   *router_list;
+		ndpd_phyint_info_t phyint;
+		ndpd_prefix_info_t prefix;
+		ndpd_router_info_t router;
+		/*
+		 * get number of prefixes
+		 */
+		routers = 0;
+		prefixes = 0;
+		prefix_list = pi->pi_prefix_list;
+		while (prefix_list != NULL) {
+			prefixes++;
+			prefix_list = prefix_list->pr_next;
+		}
+
+		/*
+		 * get number of routers
+		 */
+		router_list = pi->pi_router_list;
+		while (router_list != NULL) {
+			routers++;
+			router_list = router_list->dr_next;
+		}
+
+		phyint.phyint_info_type = NDPD_PHYINT_INFO;
+		phyint.phyint_info_version = NDPD_PHYINT_INFO_VER;
+		phyint.phyint_index = pi->pi_index;
+		bcopy(pi->pi_config,
+		    phyint.phyint_config, I_IFSIZE);
+		phyint.phyint_num_of_prefixes = prefixes;
+		phyint.phyint_num_of_routers = routers;
+		(void) sendto(mibsock, &phyint, sizeof (phyint), 0,
+		    (struct sockaddr *)&from, fromlen);
+
+		/*
+		 * Copy prefix information
+		 */
+
+		prefix_list = pi->pi_prefix_list;
+		while (prefix_list != NULL) {
+			prefix.prefix_info_type = NDPD_PREFIX_INFO;
+			prefix.prefix_info_version = NDPD_PREFIX_INFO_VER;
+			prefix.prefix_prefix = prefix_list->pr_prefix;
+			prefix.prefix_len = prefix_list->pr_prefix_len;
+			prefix.prefix_flags = prefix_list->pr_flags;
+			prefix.prefix_phyint_index = pi->pi_index;
+			prefix.prefix_ValidLifetime =
+			    prefix_list->pr_ValidLifetime;
+			prefix.prefix_PreferredLifetime =
+			    prefix_list->pr_PreferredLifetime;
+			prefix.prefix_OnLinkLifetime =
+			    prefix_list->pr_OnLinkLifetime;
+			prefix.prefix_OnLinkFlag =
+			    prefix_list->pr_OnLinkFlag;
+			prefix.prefix_AutonomousFlag =
+			    prefix_list->pr_AutonomousFlag;
+			(void) sendto(mibsock, &prefix, sizeof (prefix), 0,
+			    (struct sockaddr *)&from, fromlen);
+			prefix_list = prefix_list->pr_next;
+		}
+		/*
+		 * Copy router information
+		 */
+		router_list = pi->pi_router_list;
+		while (router_list != NULL) {
+			router.router_info_type = NDPD_ROUTER_INFO;
+			router.router_info_version = NDPD_ROUTER_INFO_VER;
+			router.router_address = router_list->dr_address;
+			router.router_lifetime = router_list->dr_lifetime;
+			router.router_phyint_index = pi->pi_index;
+			(void) sendto(mibsock, &router, sizeof (router), 0,
+			    (struct sockaddr *)&from, fromlen);
+			router_list = router_list->dr_next;
+		}
 	}
 }
 
@@ -1940,6 +2093,7 @@ main(int argc, char *argv[])
 
 	setup_eventpipe();
 	rtsock = setup_rtsock();
+	mibsock = setup_mibsock();
 	timer_init();
 	initifs(_B_TRUE);
 
@@ -1961,6 +2115,10 @@ main(int argc, char *argv[])
 			}
 			if (pollfds[i].fd == rtsock) {
 				process_rtsock(rtsock);
+				break;
+			}
+			if (pollfds[i].fd == mibsock) {
+				process_mibsock(mibsock);
 				break;
 			}
 			/*

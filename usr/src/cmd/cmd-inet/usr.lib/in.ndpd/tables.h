@@ -32,6 +32,8 @@
 extern "C" {
 #endif
 
+#include <protocols/ndpd.h>
+
 enum adv_states { NO_ADV = 0, REG_ADV, INIT_ADV, SOLICIT_ADV, FINAL_ADV };
 enum adv_events { ADV_OFF, START_INIT_ADV, START_FINAL_ADV, RECEIVED_SOLICIT,
 			ADV_TIMER };
@@ -39,40 +41,6 @@ enum adv_events { ADV_OFF, START_INIT_ADV, START_FINAL_ADV, RECEIVED_SOLICIT,
 enum solicit_states { NO_SOLICIT = 0, INIT_SOLICIT, DONE_SOLICIT };
 enum solicit_events { SOLICIT_OFF, START_INIT_SOLICIT, SOL_TIMER,
 			SOLICIT_DONE };
-
-/*
- * Data structures used to handle configuration variables set in ndpd.conf.
- * cf_notdefault is set for variables explicitly set in ndpd.conf.
- */
-struct confvar {
-	uint_t		cf_value;
-	boolean_t	cf_notdefault;
-};
-
-extern struct confvar ifdefaults[];
-
-/*
- * Interfaces configuration variable indicies
- */
-#define	I_DupAddrDetectTransmits	0	/* From RFC 2462 */
-#define	I_AdvSendAdvertisements		1
-#define	I_MaxRtrAdvInterval		2	/* In seconds */
-#define	I_MinRtrAdvInterval		3	/* In seconds */
-#define	I_AdvManagedFlag		4
-#define	I_AdvOtherConfigFlag		5
-#define	I_AdvLinkMTU			6
-#define	I_AdvReachableTime		7	/* In milliseconds */
-#define	I_AdvRetransTimer		8	/* In milliseconds */
-#define	I_AdvCurHopLimit		9
-#define	I_AdvDefaultLifetime		10	/* In seconds */
-#define	I_StatelessAddrConf		11
-#define	I_TmpAddrsEnabled		12	/* From RFC 3041 */
-#define	I_TmpValidLifetime		13	/* In seconds */
-#define	I_TmpPreferredLifetime		14	/* In seconds */
-#define	I_TmpRegenAdvance		15	/* In seconds */
-#define	I_TmpMaxDesyncFactor		16	/* In seconds */
-#define	I_IFSIZE			17	/* # of variables */
-
 /*
  * A doubly linked list of all physical interfaces that each contain a
  * doubly linked list of prefixes (i.e. logical interfaces) and default
@@ -270,6 +238,7 @@ struct router {
  * Globals
  */
 extern struct phyint *phyints;
+extern int num_of_phyints;
 
 
 /*

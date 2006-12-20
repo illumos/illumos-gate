@@ -132,6 +132,7 @@ extern "C" {
 #define	SET_MIB(x, y)		x = y
 #define	BUMP_LOCAL(x)		(x)++
 #define	UPDATE_LOCAL(x, y)	(x) += (y)
+#define	SYNC32_MIB(s, m32, m64)	SET_MIB((s)->m32, (s)->m64 & 0xffffffff)
 
 #define	OCTET_LENGTH	32	/* Must be at least LIFNAMSIZ */
 typedef struct Octet_s {
@@ -149,15 +150,19 @@ typedef Octet_t		DeviceName;
 typedef Octet_t		PhysAddress;
 typedef uint32_t	DeviceIndex;	/* Interface index */
 
+#define	MIB2_UNKNOWN_INTERFACE	0
+#define	MIB2_UNKNOWN_PROCESS	0
+
 /*
  *  IP group
  */
-#define	MIB2_IP_ADDR	20	/* ipAddrEntry */
-#define	MIB2_IP_ROUTE	21	/* ipRouteEntry */
-#define	MIB2_IP_MEDIA	22	/* ipNetToMediaEntry */
-#define	MIB2_IP6_ROUTE	23	/* ipv6RouteEntry */
-#define	MIB2_IP6_MEDIA	24	/* ipv6NetToMediaEntry */
-#define	MIB2_IP6_ADDR	25	/* ipv6AddrEntry */
+#define	MIB2_IP_ADDR		20	/* ipAddrEntry */
+#define	MIB2_IP_ROUTE		21	/* ipRouteEntry */
+#define	MIB2_IP_MEDIA		22	/* ipNetToMediaEntry */
+#define	MIB2_IP6_ROUTE		23	/* ipv6RouteEntry */
+#define	MIB2_IP6_MEDIA		24	/* ipv6NetToMediaEntry */
+#define	MIB2_IP6_ADDR		25	/* ipv6AddrEntry */
+#define	MIB2_IP_TRAFFIC_STATS	31	/* ipIfStatsEntry (IPv4) */
 #define	EXPER_IP_GROUP_MEMBERSHIP	100
 #define	EXPER_IP6_GROUP_MEMBERSHIP	101
 #define	EXPER_IP_GROUP_SOURCES		102
@@ -371,6 +376,208 @@ typedef struct mib2_ipv6IfStatsEntry {
 } mib2_ipv6IfStatsEntry_t;
 
 /*
+ * Per interface IP statistics, both v4 and v6.
+ *
+ * Some applications expect to get mib2_ipv6IfStatsEntry_t structs back when
+ * making a request. To ensure backwards compatability, the first
+ * sizeof(mib2_ipv6IfStatsEntry_t) bytes of the structure is identical to
+ * mib2_ipv6IfStatsEntry_t. This should work as long the application is
+ * written correctly (i.e., using ipv6IfStatsEntrySize to get the size of
+ * the struct)
+ *
+ * RFC4293 introduces several new counters, as well as defining 64-bit
+ * versions of existing counters. For a new counters, if they have both 32-
+ * and 64-bit versions, then we only added the latter. However, for already
+ * existing counters, we have added the 64-bit versions without removing the
+ * old (32-bit) ones. The 64- and 32-bit counters will only be synchronized
+ * when the structure contains IPv6 statistics, which is done to ensure
+ * backwards compatibility.
+ */
+
+/* The following are defined in RFC 4001 and are used for ipIfStatsIPVersion */
+#define	MIB2_INETADDRESSTYPE_unknown	0
+#define	MIB2_INETADDRESSTYPE_ipv4	1
+#define	MIB2_INETADDRESSTYPE_ipv6	2
+
+/*
+ * On amd64, the alignment requirements for long long's is different for
+ * 32 and 64 bits. If we have a struct containing long long's that is being
+ * passed between a 64-bit kernel to a 32-bit application, then it is very
+ * likely that the size of the struct will differ due to padding. Therefore, we
+ * pack the data to ensure that the struct size is the same for 32- and
+ * 64-bits.
+ */
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
+
+typedef struct mib2_ipIfStatsEntry {
+
+	/* Local ifindex to identify the interface */
+	DeviceIndex	ipIfStatsIfIndex;
+
+	/* forwarder?  1 gateway, 2 NOT gateway	{ ipv6MIBObjects 1} RW */
+	int	ipIfStatsForwarding;
+	/* default Hoplimit for IPv6		{ ipv6MIBObjects 2} RW */
+	int	ipIfStatsDefaultHopLimit;
+#define	ipIfStatsDefaultTTL	ipIfStatsDefaultHopLimit
+
+	int	ipIfStatsEntrySize;
+	int	ipIfStatsAddrEntrySize;
+	int	ipIfStatsRouteEntrySize;
+	int	ipIfStatsNetToMediaEntrySize;
+	int	ipIfStatsMemberEntrySize;
+	int	ipIfStatsGroupSourceEntrySize;
+
+	/* # input datagrams (incl errors)	{ ipIfStatsEntry 3 } */
+	Counter	ipIfStatsInReceives;
+	/* # errors in IP headers and options	{ ipIfStatsEntry 7 } */
+	Counter	ipIfStatsInHdrErrors;
+	/* # exceeds outgoing link MTU(v6 only)	{ ipv6IfStatsEntry 3 } */
+	Counter	ipIfStatsInTooBigErrors;
+	/* # discarded due to no route to dest 	{ ipIfStatsEntry 8 } */
+	Counter	ipIfStatsInNoRoutes;
+	/* # invalid or unsupported addresses	{ ipIfStatsEntry 9 } */
+	Counter	ipIfStatsInAddrErrors;
+	/* # unknown next header 		{ ipIfStatsEntry 10 } */
+	Counter	ipIfStatsInUnknownProtos;
+	/* # too short packets			{ ipIfStatsEntry 11 } */
+	Counter	ipIfStatsInTruncatedPkts;
+	/* # discarded e.g. due to no buffers	{ ipIfStatsEntry 17 } */
+	Counter	ipIfStatsInDiscards;
+	/* # delivered to upper layer protocols	{ ipIfStatsEntry 18 } */
+	Counter	ipIfStatsInDelivers;
+	/* # forwarded out interface		{ ipIfStatsEntry 23 } */
+	Counter	ipIfStatsOutForwDatagrams;
+	/* # originated out interface		{ ipIfStatsEntry 20 } */
+	Counter	ipIfStatsOutRequests;
+	/* # discarded e.g. due to no buffers	{ ipIfStatsEntry 25 } */
+	Counter	ipIfStatsOutDiscards;
+	/* # sucessfully fragmented packets	{ ipIfStatsEntry 27 } */
+	Counter	ipIfStatsOutFragOKs;
+	/* # fragmentation failed		{ ipIfStatsEntry 28 } */
+	Counter	ipIfStatsOutFragFails;
+	/* # fragments created			{ ipIfStatsEntry 29 } */
+	Counter	ipIfStatsOutFragCreates;
+	/* # fragments to reassemble		{ ipIfStatsEntry 14 } */
+	Counter	ipIfStatsReasmReqds;
+	/* # packets after reassembly		{ ipIfStatsEntry 15 } */
+	Counter	ipIfStatsReasmOKs;
+	/* # reassembly failed			{ ipIfStatsEntry 16 } */
+	Counter	ipIfStatsReasmFails;
+	/* # received multicast packets		{ ipIfStatsEntry 34 } */
+	Counter	ipIfStatsInMcastPkts;
+	/* # transmitted multicast packets	{ ipIfStatsEntry 38 } */
+	Counter	ipIfStatsOutMcastPkts;
+
+	/*
+	 * In addition to defined MIBs
+	 */
+
+	/* # discarded due to no route to dest 	{ ipSystemStatsEntry 22 } */
+	Counter	ipIfStatsOutNoRoutes;
+	/* # of complete duplicates in reassembly */
+	Counter	ipIfStatsReasmDuplicates;
+	/* # of partial duplicates in reassembly */
+	Counter	ipIfStatsReasmPartDups;
+	/* # of packets not forwarded due to adminstrative reasons */
+	Counter	ipIfStatsForwProhibits;
+	/* # of UDP packets with bad UDP checksums */
+	Counter udpInCksumErrs;
+#define	udpIfStatsInCksumErrs	udpInCksumErrs
+	/* # of UDP packets droped due to queue overflow */
+	Counter udpInOverflows;
+#define	udpIfStatsInOverflows	udpInOverflows
+	/*
+	 * # of RAW IP packets (all IP protocols except UDP, TCP
+	 * and ICMP) droped due to queue overflow
+	 */
+	Counter rawipInOverflows;
+#define	rawipIfStatsInOverflows	rawipInOverflows
+
+	/*
+	 * # of IP packets received with the wrong version (i.e., not equal
+	 * to ipIfStatsIPVersion) and that were dropped.
+	 */
+	Counter ipIfStatsInWrongIPVersion;
+	/*
+	 * Depending on the value of ipIfStatsIPVersion, this counter tracks
+	 * v4: # of IPv6 packets transmitted by ip_wput or,
+	 * v6: # of IPv4 packets transmitted by ip_wput_v6.
+	 */
+	Counter ipIfStatsOutWrongIPVersion;
+	/*
+	 * Depending on the value of ipIfStatsIPVersion, this counter tracks
+	 * # of times ip_wput has switched to become ip_wput_v6, or vice versa.
+	 */
+	Counter ipIfStatsOutSwitchIPVersion;
+
+	/*
+	 * Fields defined in RFC 4293
+	 */
+
+	/* ip version				{ ipIfStatsEntry 1 } */
+	int		ipIfStatsIPVersion;
+	/* # input datagrams (incl errors)	{ ipIfStatsEntry 4 } */
+	Counter64	ipIfStatsHCInReceives;
+	/* # input octets (incl errors)		{ ipIfStatsEntry 6 } */
+	Counter64	ipIfStatsHCInOctets;
+	/*
+	 *					{ ipIfStatsEntry 13 }
+	 * # input datagrams for which a forwarding attempt was made
+	 */
+	Counter64	ipIfStatsHCInForwDatagrams;
+	/* # delivered to upper layer protocols	{ ipIfStatsEntry 19 } */
+	Counter64	ipIfStatsHCInDelivers;
+	/* # originated out interface		{ ipIfStatsEntry 21 } */
+	Counter64	ipIfStatsHCOutRequests;
+	/* # forwarded out interface		{ ipIfStatsEntry 23 } */
+	Counter64	ipIfStatsHCOutForwDatagrams;
+	/* # dg's requiring fragmentation 	{ ipIfStatsEntry 26 } */
+	Counter		ipIfStatsOutFragReqds;
+	/* # output datagrams			{ ipIfStatsEntry 31 } */
+	Counter64	ipIfStatsHCOutTransmits;
+	/* # output octets			{ ipIfStatsEntry 33 } */
+	Counter64	ipIfStatsHCOutOctets;
+	/* # received multicast datagrams	{ ipIfStatsEntry 35 } */
+	Counter64	ipIfStatsHCInMcastPkts;
+	/* # received multicast octets		{ ipIfStatsEntry 37 } */
+	Counter64	ipIfStatsHCInMcastOctets;
+	/* # transmitted multicast datagrams	{ ipIfStatsEntry 39 } */
+	Counter64	ipIfStatsHCOutMcastPkts;
+	/* # transmitted multicast octets	{ ipIfStatsEntry 41 } */
+	Counter64	ipIfStatsHCOutMcastOctets;
+	/* # received broadcast datagrams	{ ipIfStatsEntry 43 } */
+	Counter64	ipIfStatsHCInBcastPkts;
+	/* # transmitted broadcast datagrams	{ ipIfStatsEntry 45 } */
+	Counter64	ipIfStatsHCOutBcastPkts;
+
+	/*
+	 * Fields defined in mib2_ip_t
+	 */
+
+	/* # of incoming packets that succeeded policy checks */
+	Counter		ipsecInSucceeded;
+#define	ipsecIfStatsInSucceeded	ipsecInSucceeded
+	/* # of incoming packets that failed policy checks */
+	Counter		ipsecInFailed;
+#define	ipsecIfStatsInFailed	ipsecInFailed
+	/* # of bad IP header checksums */
+	Counter		ipInCksumErrs;
+#define	ipIfStatsInCksumErrs	ipInCksumErrs
+	/* total # of segments recv'd with error	{ tcp 14 } */
+	Counter		tcpInErrs;
+#define	tcpIfStatsInErrs	tcpInErrs
+	/* # of recv'd dg's not deliverable (no appl.)	{ udp 2 } */
+	Counter		udpNoPorts;
+#define	udpIfStatsNoPorts	udpNoPorts
+} mib2_ipIfStatsEntry_t;
+
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
+
+/*
  * The IP address table contains this entity's IP addressing information.
  *
  *	ipAddrTable OBJECT-TYPE
@@ -411,6 +618,7 @@ typedef struct mib2_ipAddrEntry {
 		int		ae_subnet_len;	/* Subnet prefix length */
 		IpAddress	ae_src_addr;	/* Source address */
 	}		ipAdEntInfo;
+	uint32_t	ipAdEntRetransmitTime;  /* ipInterfaceRetransmitTime */
 } mib2_ipAddrEntry_t;
 
 /*
@@ -455,6 +663,11 @@ typedef struct mib2_ipv6AddrEntry {
 		int		ae_subnet_len;	/* Subnet prefix length */
 		Ip6Address	ae_src_addr;	/* Source address */
 	}		ipv6AddrInfo;
+	uint32_t	ipv6AddrReasmMaxSize;	/* InterfaceReasmMaxSize */
+	Ip6Address	ipv6AddrIdentifier;	/* InterfaceIdentifier */
+	uint32_t	ipv6AddrIdentifierLen;
+	uint32_t	ipv6AddrReachableTime;	/* InterfaceReachableTime */
+	uint32_t	ipv6AddrRetransmitTime; /* InterfaceRetransmitTime */
 } mib2_ipv6AddrEntry_t;
 
 /*
@@ -940,6 +1153,10 @@ typedef struct mib2_ipv6IfIcmpEntry {
 /* Old name retained for compatibility */
 #define	MIB2_TCP_13	MIB2_TCP_CONN
 
+/* Pack data in mib2_tcp to make struct size the same for 32- and 64-bits */
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
 typedef struct mib2_tcp {
 		/* algorithm used for transmit timeout value	{ tcp 1 } */
 	int	tcpRtoAlgorithm;
@@ -1052,7 +1269,20 @@ typedef struct mib2_tcp {
 	Counter	tcpOutSackRetransSegs;
 
 	int	tcp6ConnTableSize;	/* Size of tcp6ConnEntry_t */
+
+	/*
+	 * fields from RFC 4022
+	 */
+
+	/* total # of segments recv'd				{ tcp 17 } */
+	Counter64	tcpHCInSegs;
+	/* total # of segments sent				{ tcp 18 } */
+	Counter64	tcpHCOutSegs;
 } mib2_tcp_t;
+
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
 
 /*
  * The TCP/IPv4 connection table {tcp 13} contains information about this
@@ -1072,6 +1302,10 @@ typedef struct mib2_tcp {
 #define	MIB2_TCP_timeWait	11
 #define	MIB2_TCP_deleteTCB	12		/* only writeable value */
 
+/* Pack data to make struct size the same for 32- and 64-bits */
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
 typedef struct mib2_tcpConnEntry {
 		/* state of tcp connection		{ tcpConnEntry 1} RW */
 	int		tcpConnState;
@@ -1103,7 +1337,15 @@ typedef struct mib2_tcpConnEntry {
 				/* actual internal state */
 		int		ce_state;
 	} 		tcpConnEntryInfo;
+
+	/* pid of the processes that created this connection */
+	uint32_t	tcpConnCreationProcess;
+	/* system uptime when the connection was created */
+	uint64_t	tcpConnCreationTime;
 } mib2_tcpConnEntry_t;
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
 
 
 /*
@@ -1111,6 +1353,10 @@ typedef struct mib2_tcpConnEntry {
  * entity's existing TCP connections over IPv6.
  */
 
+/* Pack data to make struct size the same for 32- and 64-bits */
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
 typedef struct mib2_tcp6ConnEntry {
 	/* local ip addr for this connection	{ ipv6TcpConnEntry 1 } */
 	Ip6Address	tcp6ConnLocalAddress;
@@ -1144,7 +1390,15 @@ typedef struct mib2_tcp6ConnEntry {
 				/* actual internal state */
 		int		ce_state;
 	} 		tcp6ConnEntryInfo;
+
+	/* pid of the processes that created this connection */
+	uint32_t	tcp6ConnCreationProcess;
+	/* system uptime when the connection was created */
+	uint64_t	tcp6ConnCreationTime;
 } mib2_tcp6ConnEntry_t;
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
 
 /*
  * the UDP group
@@ -1155,6 +1409,10 @@ typedef struct mib2_tcp6ConnEntry {
 /* Old name retained for compatibility */
 #define	MIB2_UDP_5	MIB2_UDP_ENTRY
 
+/* Pack data to make struct size the same for 32- and 64-bits */
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
 typedef struct mib2_udp {
 		/* total # of UDP datagrams sent upstream	{ udp 1 } */
 	Counter	udpInDatagrams;
@@ -1167,7 +1425,19 @@ typedef struct mib2_udp {
 	int	udpEntrySize;			/* Size of udpEntry_t */
 	int	udp6EntrySize;			/* Size of udp6Entry_t */
 	Counter	udpOutErrors;
+
+	/*
+	 * fields from RFC 4113
+	 */
+
+	/* total # of UDP datagrams sent upstream		{ udp 8 } */
+	Counter64	udpHCInDatagrams;
+	/* total # of dg's sent					{ udp 9 } */
+	Counter64	udpHCOutDatagrams;
 } mib2_udp_t;
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
 
 /*
  * The UDP listener table contains information about this entity's UDP
@@ -1180,6 +1450,10 @@ typedef struct mib2_udp {
 #define	MIB2_UDP_connected	3
 #define	MIB2_UDP_unknown	4
 
+/* Pack data to make struct size the same for 32- and 64-bits */
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
 typedef struct mib2_udpEntry {
 		/* local ip addr of listener		{ udpEntry 1 } */
 	IpAddress	udpLocalAddress;
@@ -1190,7 +1464,21 @@ typedef struct mib2_udpEntry {
 		IpAddress	ue_RemoteAddress;
 		int		ue_RemotePort;	/* In host byte order */
 	}		udpEntryInfo;
+
+	/*
+	 * RFC 4113
+	 */
+
+	/* Unique id for this 4-tuple		{ udpEndpointEntry 7 } */
+	uint32_t	udpInstance;
+	/* pid of the processes that created this endpoint */
+	uint32_t	udpCreationProcess;
+	/* system uptime when the endpoint was created */
+	uint64_t	udpCreationTime;
 } mib2_udpEntry_t;
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
 
 /*
  * The UDP (for IPv6) listener table contains information about this
@@ -1198,6 +1486,10 @@ typedef struct mib2_udpEntry {
  * currently accepting datagrams.
  */
 
+/* Pack data to make struct size the same for 32- and 64-bits */
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
 typedef	struct mib2_udp6Entry {
 		/* local ip addr of listener		{ ipv6UdpEntry 1 } */
 	Ip6Address	udp6LocalAddress;
@@ -1210,7 +1502,21 @@ typedef	struct mib2_udp6Entry {
 		Ip6Address	ue_RemoteAddress;
 		int		ue_RemotePort;	/* In host byte order */
 	}		udp6EntryInfo;
+
+	/*
+	 * RFC 4113
+	 */
+
+	/* Unique id for this 4-tuple		{ udpEndpointEntry 7 } */
+	uint32_t	udp6Instance;
+	/* pid of the processes that created this endpoint */
+	uint32_t	udp6CreationProcess;
+	/* system uptime when the endpoint was created */
+	uint64_t	udp6CreationTime;
 } mib2_udp6Entry_t;
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
 
 /*
  * the RAWIP group

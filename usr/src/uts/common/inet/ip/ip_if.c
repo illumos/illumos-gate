@@ -82,6 +82,7 @@
 #include <inet/tun.h>
 #include <inet/sctp_ip.h>
 #include <inet/ip_netinfo.h>
+#include <inet/mib2.h>
 
 #include <net/pfkeyv2.h>
 #include <inet/ipsec_info.h>
@@ -392,9 +393,9 @@ static areq_t	ip_areq_template = {
 	0,				/* flags */
 	sizeof (areq_t) + IP_ADDR_LEN,	/* sender addr offset */
 	IP_ADDR_LEN,			/* sender addr length */
-	6,				/* xmit_count */
-	1000,				/* (re)xmit_interval in milliseconds */
-	4				/* max # of requests to buffer */
+	AR_EQ_DEFAULT_XMIT_COUNT,	/* xmit_count */
+	AR_EQ_DEFAULT_XMIT_INTERVAL,	/* (re)xmit_interval in milliseconds */
+	AR_EQ_DEFAULT_MAX_BUFFERED	/* max # of requests to buffer */
 	/* anything else filled in by the code */
 };
 
@@ -580,35 +581,73 @@ ipif_rand(void)
 }
 
 /*
- * Allocate per-interface mibs. Only used for ipv6.
+ * Allocate per-interface mibs.
  * Returns true if ok. False otherwise.
  *  ipsq  may not yet be allocated (loopback case ).
  */
 static boolean_t
 ill_allocate_mibs(ill_t *ill)
 {
-	ASSERT(ill->ill_isv6);
-
 	/* Already allocated? */
-	if (ill->ill_ip6_mib != NULL) {
-		ASSERT(ill->ill_icmp6_mib != NULL);
+	if (ill->ill_ip_mib != NULL) {
+		if (ill->ill_isv6)
+			ASSERT(ill->ill_icmp6_mib != NULL);
 		return (B_TRUE);
 	}
 
-	ill->ill_ip6_mib = kmem_zalloc(sizeof (*ill->ill_ip6_mib),
+	ill->ill_ip_mib = kmem_zalloc(sizeof (*ill->ill_ip_mib),
 	    KM_NOSLEEP);
-	if (ill->ill_ip6_mib == NULL) {
+	if (ill->ill_ip_mib == NULL) {
 		return (B_FALSE);
 	}
+
+	/* Setup static information */
+	SET_MIB(ill->ill_ip_mib->ipIfStatsEntrySize,
+	    sizeof (mib2_ipIfStatsEntry_t));
+	if (ill->ill_isv6) {
+		ill->ill_ip_mib->ipIfStatsIPVersion = MIB2_INETADDRESSTYPE_ipv6;
+		SET_MIB(ill->ill_ip_mib->ipIfStatsAddrEntrySize,
+		    sizeof (mib2_ipv6AddrEntry_t));
+		SET_MIB(ill->ill_ip_mib->ipIfStatsRouteEntrySize,
+		    sizeof (mib2_ipv6RouteEntry_t));
+		SET_MIB(ill->ill_ip_mib->ipIfStatsNetToMediaEntrySize,
+		    sizeof (mib2_ipv6NetToMediaEntry_t));
+		SET_MIB(ill->ill_ip_mib->ipIfStatsMemberEntrySize,
+		    sizeof (ipv6_member_t));
+		SET_MIB(ill->ill_ip_mib->ipIfStatsGroupSourceEntrySize,
+		    sizeof (ipv6_grpsrc_t));
+	} else {
+		ill->ill_ip_mib->ipIfStatsIPVersion = MIB2_INETADDRESSTYPE_ipv4;
+		SET_MIB(ill->ill_ip_mib->ipIfStatsAddrEntrySize,
+		    sizeof (mib2_ipAddrEntry_t));
+		SET_MIB(ill->ill_ip_mib->ipIfStatsRouteEntrySize,
+		    sizeof (mib2_ipRouteEntry_t));
+		SET_MIB(ill->ill_ip_mib->ipIfStatsNetToMediaEntrySize,
+		    sizeof (mib2_ipNetToMediaEntry_t));
+		SET_MIB(ill->ill_ip_mib->ipIfStatsMemberEntrySize,
+		    sizeof (ip_member_t));
+		SET_MIB(ill->ill_ip_mib->ipIfStatsGroupSourceEntrySize,
+		    sizeof (ip_grpsrc_t));
+
+		/*
+		 * For a v4 ill, we are done at this point, because per ill
+		 * icmp mibs are only used for v6.
+		 */
+		return (B_TRUE);
+	}
+
 	ill->ill_icmp6_mib = kmem_zalloc(sizeof (*ill->ill_icmp6_mib),
 	    KM_NOSLEEP);
 	if (ill->ill_icmp6_mib == NULL) {
-		kmem_free(ill->ill_ip6_mib, sizeof (*ill->ill_ip6_mib));
-		ill->ill_ip6_mib = NULL;
+		kmem_free(ill->ill_ip_mib, sizeof (*ill->ill_ip_mib));
+		ill->ill_ip_mib = NULL;
 		return (B_FALSE);
 	}
+	/* static icmp info */
+	ill->ill_icmp6_mib->ipv6IfIcmpEntrySize =
+	    sizeof (mib2_ipv6IfIcmpEntry_t);
 	/*
-	 * The ipv6Ifindex and ipv6IfIcmpIndex will be assigned later
+	 * The ipIfStatsIfindex and ipv6IfIcmpIndex will be assigned later
 	 * after the phyint merge occurs in ipif_set_values -> ill_glist_insert
 	 * -> ill_phyint_reinit
 	 */
@@ -978,11 +1017,22 @@ ill_delete_tail(ill_t *ill)
 static void
 ill_free_mib(ill_t *ill)
 {
-	if (ill->ill_ip6_mib != NULL) {
-		kmem_free(ill->ill_ip6_mib, sizeof (*ill->ill_ip6_mib));
-		ill->ill_ip6_mib = NULL;
+	/*
+	 * MIB statistics must not be lost, so when an interface
+	 * goes away the counter values will be added to the global
+	 * MIBs.
+	 */
+	if (ill->ill_ip_mib != NULL) {
+		if (ill->ill_isv6)
+			ip_mib2_add_ip_stats(&ip6_mib, ill->ill_ip_mib);
+		else
+			ip_mib2_add_ip_stats(&ip_mib, ill->ill_ip_mib);
+
+		kmem_free(ill->ill_ip_mib, sizeof (*ill->ill_ip_mib));
+		ill->ill_ip_mib = NULL;
 	}
 	if (ill->ill_icmp6_mib != NULL) {
+		ip_mib2_add_icmp6_stats(&icmp6_mib, ill->ill_icmp6_mib);
 		kmem_free(ill->ill_icmp6_mib, sizeof (*ill->ill_icmp6_mib));
 		ill->ill_icmp6_mib = NULL;
 	}
@@ -3766,7 +3816,6 @@ ill_frag_timeout(ill_t *ill, time_t dead_interval)
 			 * the icmp messages after we have dropped the lock.
 			 */
 			if (ill->ill_isv6) {
-				BUMP_MIB(ill->ill_ip6_mib, ipv6ReasmFails);
 				if (hdr_length != 0) {
 					mp->b_next = send_icmp_head_v6;
 					send_icmp_head_v6 = mp;
@@ -3774,7 +3823,6 @@ ill_frag_timeout(ill_t *ill, time_t dead_interval)
 					freemsg(mp);
 				}
 			} else {
-				BUMP_MIB(&ip_mib, ipReasmFails);
 				if (hdr_length != 0) {
 					mp->b_next = send_icmp_head;
 					send_icmp_head = mp;
@@ -3782,6 +3830,7 @@ ill_frag_timeout(ill_t *ill, time_t dead_interval)
 					freemsg(mp);
 				}
 			}
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsReasmFails);
 			freeb(ipf->ipf_mp);
 		}
 		mutex_exit(&ipfb->ipfb_lock);
@@ -3950,7 +3999,7 @@ ill_frag_free_pkts(ill_t *ill, ipfb_t *ipfb, ipf_t *ipf, int free_cnt)
 		ASSERT(ipfb->ipfb_frag_pkts > 0);
 		ipfb->ipfb_frag_pkts--;
 		freemsg(mp);
-		BUMP_MIB(&ip_mib, ipReasmFails);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsReasmFails);
 	}
 
 	if (ipf)
@@ -5058,11 +5107,11 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 	if (isv6) {
 		ill->ill_isv6 = B_TRUE;
 		ill->ill_max_frag += IPV6_HDR_LEN + 20;	/* for TCP */
-		if (!ill_allocate_mibs(ill))
-			goto done;
 	} else {
 		ill->ill_max_frag += IP_SIMPLE_HDR_LENGTH + 20;
 	}
+	if (!ill_allocate_mibs(ill))
+		goto done;
 	ill->ill_max_mtu = ill->ill_max_frag;
 	/*
 	 * ipif_loopback_name can't be pointed at directly because its used
@@ -22540,9 +22589,9 @@ ill_phyint_reinit(ill_t *ill)
 	 * Now that the phyint's ifindex has been assigned, complete the
 	 * remaining
 	 */
+
+	ill->ill_ip_mib->ipIfStatsIfIndex = ill->ill_phyint->phyint_ifindex;
 	if (ill->ill_isv6) {
-		ill->ill_ip6_mib->ipv6IfIndex =
-		    ill->ill_phyint->phyint_ifindex;
 		ill->ill_icmp6_mib->ipv6IfIcmpIfIndex =
 		    ill->ill_phyint->phyint_ifindex;
 	}
@@ -22843,14 +22892,11 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 	ASSERT(ill->ill_phyint != NULL);
 
 	/*
-	 * The ipv6Ifindex and ipv6IfIcmpIfIndex assignments will
+	 * The ipIfStatsIfindex and ipv6IfIcmpIfIndex assignments will
 	 * be completed in ill_glist_insert -> ill_phyint_reinit
 	 */
-	if (ill->ill_isv6) {
-		/* allocate v6 mib */
-		if (!ill_allocate_mibs(ill))
-			return (ENOMEM);
-	}
+	if (!ill_allocate_mibs(ill))
+		return (ENOMEM);
 
 	/*
 	 * Pick a default sap until we get the DL_INFO_ACK back from

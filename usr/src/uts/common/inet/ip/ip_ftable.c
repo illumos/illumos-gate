@@ -1396,9 +1396,9 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 	}
 discard:
 	if (dst_addr->sa_family == AF_INET) {
-		BUMP_MIB(&ip_mib, ipOutDiscards);
+		BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
 	} else {
-		BUMP_MIB(&ip6_mib, ipv6OutDiscards);
+		BUMP_MIB(&ip6_mib, ipIfStatsOutDiscards);
 	}
 	if (ire != NULL)
 		ire_refrele(ire);

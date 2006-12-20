@@ -1267,7 +1267,7 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2) {
 				MDIFF(d, t2, t1, tcpAttemptFails);
 				MDIFF(d, t2, t1, tcpEstabResets);
 				d->tcpCurrEstab = t2->tcpCurrEstab;
-				MDIFF(d, t2, t1, tcpOutSegs);
+				MDIFF(d, t2, t1, tcpHCOutSegs);
 				MDIFF(d, t2, t1, tcpOutDataSegs);
 				MDIFF(d, t2, t1, tcpOutDataBytes);
 				MDIFF(d, t2, t1, tcpRetransSegs);
@@ -1280,7 +1280,7 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2) {
 				MDIFF(d, t2, t1, tcpOutControl);
 				MDIFF(d, t2, t1, tcpOutRsts);
 				MDIFF(d, t2, t1, tcpOutFastRetrans);
-				MDIFF(d, t2, t1, tcpInSegs);
+				MDIFF(d, t2, t1, tcpHCInSegs);
 				MDIFF(d, t2, t1, tcpInAckSegs);
 				MDIFF(d, t2, t1, tcpInAckBytes);
 				MDIFF(d, t2, t1, tcpInDupAck);
@@ -1326,9 +1326,9 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2) {
 				if (d == NULL)
 					goto mibdiff_out_of_memory;
 				diffptr->valp = d;
-				MDIFF(d, u2, u1, udpInDatagrams);
+				MDIFF(d, u2, u1, udpHCInDatagrams);
 				MDIFF(d, u2, u1, udpInErrors);
-				MDIFF(d, u2, u1, udpOutDatagrams);
+				MDIFF(d, u2, u1, udpHCOutDatagrams);
 				MDIFF(d, u2, u1, udpOutErrors);
 				prevp = diffptr++;
 				break;
@@ -2267,7 +2267,7 @@ print_tcp_stats(mib2_tcp_t *tcp)
 	prval("tcpAttemptFails",	tcp->tcpAttemptFails);
 	prval("tcpEstabResets",		tcp->tcpEstabResets);
 	prval("tcpCurrEstab",		tcp->tcpCurrEstab);
-	prval("tcpOutSegs",		tcp->tcpOutSegs);
+	prval64("tcpOutSegs",		tcp->tcpHCOutSegs);
 	prval("tcpOutDataSegs",		tcp->tcpOutDataSegs);
 	prval("tcpOutDataBytes",	tcp->tcpOutDataBytes);
 	prval("tcpRetransSegs",		tcp->tcpRetransSegs);
@@ -2280,7 +2280,7 @@ print_tcp_stats(mib2_tcp_t *tcp)
 	prval("tcpOutControl",		tcp->tcpOutControl);
 	prval("tcpOutRsts",		tcp->tcpOutRsts);
 	prval("tcpOutFastRetrans",	tcp->tcpOutFastRetrans);
-	prval("tcpInSegs",		tcp->tcpInSegs);
+	prval64("tcpInSegs",		tcp->tcpHCInSegs);
 	prval_end();
 	prval("tcpInAckSegs",		tcp->tcpInAckSegs);
 	prval("tcpInAckBytes",		tcp->tcpInAckBytes);
@@ -2318,9 +2318,9 @@ static void
 print_udp_stats(mib2_udp_t *udp)
 {
 	prval_init();
-	prval("udpInDatagrams",		udp->udpInDatagrams);
+	prval64("udpInDatagrams",	udp->udpHCInDatagrams);
 	prval("udpInErrors",		udp->udpInErrors);
-	prval("udpOutDatagrams",	udp->udpOutDatagrams);
+	prval64("udpOutDatagrams",	udp->udpHCOutDatagrams);
 	prval("udpOutErrors",		udp->udpOutErrors);
 	prval_end();
 }

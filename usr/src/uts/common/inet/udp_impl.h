@@ -152,6 +152,9 @@ typedef	struct udp_s {
 	uint_t		udp_label_len;		/* length of security label */
 	uint_t		udp_label_len_v6;	/* len of v6 security label */
 	in6_addr_t 	udp_v6lastdst;		/* most recent destination */
+
+	uint64_t	udp_open_time;	/* time when this was opened */
+	pid_t		udp_open_pid;	/* process id when this was opened */
 } udp_t;
 
 /* UDP Protocol header */

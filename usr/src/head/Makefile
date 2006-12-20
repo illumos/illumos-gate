@@ -307,7 +307,7 @@ $(LVMRPCHDRS:%.h=%.x)
 
 RPCSVCHDRS= $(RPCSVC_SRC_HDRS) $(RPCSVC_GEN_HDRS)
 
-PROTOHDRS=   dumprestore.h routed.h ripngd.h rwhod.h timed.h
+PROTOHDRS=   dumprestore.h ndpd.h routed.h ripngd.h rwhod.h timed.h
 
 ROOTHDRS= $(HDRS:%=$(ROOT)/usr/include/%)  \
 	$(KRB5HDRS:%=$(ROOT)/usr/include/kerberosv5/%)  \

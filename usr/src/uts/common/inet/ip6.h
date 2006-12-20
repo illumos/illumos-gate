@@ -334,7 +334,7 @@ extern const in6_addr_t	ipv6_unspecified_group;
  * IPv6 mibs when the interface (ill) is not known.
  * When the ill is known the per-interface mib in the ill is used.
  */
-extern mib2_ipv6IfStatsEntry_t	ip6_mib;
+extern mib2_ipIfStatsEntry_t	ip6_mib;
 extern mib2_ipv6IfIcmpEntry_t	icmp6_mib;
 
 /*

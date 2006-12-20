@@ -2971,6 +2971,9 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	connp->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
 	connp->conn_zoneid = zoneid;
 
+	udp->udp_open_time = lbolt64;
+	udp->udp_open_pid = curproc->p_pid;
+
 	/*
 	 * If the caller has the process-wide flag set, then default to MAC
 	 * exempt mode.  This allows read-down to unlabeled hosts.
@@ -5155,7 +5158,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 		/* No IP_RECVDSTADDR for IPv6. */
 	}
 
-	BUMP_MIB(&udp_mib, udpInDatagrams);
+	BUMP_MIB(&udp_mib, udpHCInDatagrams);
 	TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
 		"udp_rput_end: q %p (%S)", q, "end");
 	if (options_mp != NULL)
@@ -5568,7 +5571,7 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 
 		ASSERT(udi_size == 0);	/* "Consumed" all of allocated space */
 	}
-	BUMP_MIB(&udp_mib, udpInDatagrams);
+	BUMP_MIB(&udp_mib, udpHCInDatagrams);
 	TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
 	    "udp_rput_other_end: q %p (%S)", q, "end");
 	if (options_mp != NULL)
@@ -5757,6 +5760,10 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 	/* fixed length structure for IPv4 and IPv6 counters */
 	SET_MIB(udp_mib.udpEntrySize, sizeof (mib2_udpEntry_t));
 	SET_MIB(udp_mib.udp6EntrySize, sizeof (mib2_udp6Entry_t));
+	/* synchronize 64- and 32-bit counters */
+	SYNC32_MIB(&udp_mib, udpInDatagrams, udpHCInDatagrams);
+	SYNC32_MIB(&udp_mib, udpOutDatagrams, udpHCOutDatagrams);
+
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_UDP;
 	optp->name = 0;
@@ -5837,6 +5844,19 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 					ude.udpEntryInfo.ue_RemoteAddress = 0;
 					ude.udpEntryInfo.ue_RemotePort = 0;
 				}
+
+				/*
+				 * We make the assumption that all udp_t
+				 * structs will be created within an address
+				 * region no larger than 32-bits.
+				 */
+				ude.udpInstance = (uint32_t)(uintptr_t)udp;
+				ude.udpCreationProcess =
+				    (udp->udp_open_pid < 0) ?
+				    MIB2_UNKNOWN_PROCESS :
+				    udp->udp_open_pid;
+				ude.udpCreationTime = udp->udp_open_time;
+
 				(void) snmp_append_data2(mp_conn_ctl->b_cont,
 				    &mp_conn_tail, (char *)&ude, sizeof (ude));
 				mlp.tme_connidx = v4_conn_idx++;
@@ -5860,6 +5880,18 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 					    sin6_null.sin6_addr;
 					ude6.udp6EntryInfo.ue_RemotePort = 0;
 				}
+				/*
+				 * We make the assumption that all udp_t
+				 * structs will be created within an address
+				 * region no larger than 32-bits.
+				 */
+				ude6.udp6Instance = (uint32_t)(uintptr_t)udp;
+				ude6.udp6CreationProcess =
+				    (udp->udp_open_pid < 0) ?
+				    MIB2_UNKNOWN_PROCESS :
+				    udp->udp_open_pid;
+				ude6.udp6CreationTime = udp->udp_open_time;
+
 				(void) snmp_append_data2(mp6_conn_ctl->b_cont,
 				    &mp6_conn_tail, (char *)&ude6,
 				    sizeof (ude6));
@@ -6460,7 +6492,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	mp = NULL;
 
 	/* We're done.  Pass the packet to ip. */
-	BUMP_MIB(&udp_mib, udpOutDatagrams);
+	BUMP_MIB(&udp_mib, udpHCOutDatagrams);
 	TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_END,
 		"udp_wput_end: q %p (%S)", q, "end");
 
@@ -6617,10 +6649,10 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 		return;
 	}
 
-	BUMP_MIB(&ip_mib, ipOutRequests);
-
 	ill = ire_to_ill(ire);
 	ASSERT(ill != NULL);
+
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutRequests);
 
 	dev_q = ire->ire_stq->q_next;
 	ASSERT(dev_q != NULL);
@@ -6633,7 +6665,7 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 		if (ip_output_queue) {
 			(void) putq(q, mp);
 		} else {
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
 			freemsg(mp);
 		}
 		if (ipif != NULL)
@@ -6716,6 +6748,10 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 
 	UPDATE_OB_PKT_COUNT(ire);
 	ire->ire_last_used_time = lbolt;
+
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits);
+	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets,
+	    ntohs(ipha->ipha_length));
 
 	if (ILL_DLS_CAPABLE(ill)) {
 		/*
@@ -7660,7 +7696,7 @@ no_options:
 	mp = NULL;
 
 	/* We're done. Pass the packet to IP */
-	BUMP_MIB(&udp_mib, udpOutDatagrams);
+	BUMP_MIB(&udp_mib, udpHCOutDatagrams);
 	ip_output_v6(connp, mp1, q, IP_WPUT);
 
 done:
@@ -8154,9 +8190,9 @@ static void
 udp_kstat_init(void)
 {
 	udp_named_kstat_t template = {
-		{ "inDatagrams",	KSTAT_DATA_UINT32, 0 },
+		{ "inDatagrams",	KSTAT_DATA_UINT64, 0 },
 		{ "inErrors",		KSTAT_DATA_UINT32, 0 },
-		{ "outDatagrams",	KSTAT_DATA_UINT32, 0 },
+		{ "outDatagrams",	KSTAT_DATA_UINT64, 0 },
 		{ "entrySize",		KSTAT_DATA_INT32, 0 },
 		{ "entry6Size",		KSTAT_DATA_INT32, 0 },
 		{ "outErrors",		KSTAT_DATA_UINT32, 0 },
@@ -8212,10 +8248,10 @@ udp_kstat_update(kstat_t *kp, int rw)
 
 	udpkp = (udp_named_kstat_t *)kp->ks_data;
 
-	udpkp->inDatagrams.value.ui32 =	udp_mib.udpInDatagrams;
-	udpkp->inErrors.value.ui32 =	udp_mib.udpInErrors;
-	udpkp->outDatagrams.value.ui32 = udp_mib.udpOutDatagrams;
-	udpkp->outErrors.value.ui32 =	udp_mib.udpOutErrors;
+	udpkp->inDatagrams.value.ui64 =		udp_mib.udpHCInDatagrams;
+	udpkp->inErrors.value.ui32 =		udp_mib.udpInErrors;
+	udpkp->outDatagrams.value.ui64 = 	udp_mib.udpHCOutDatagrams;
+	udpkp->outErrors.value.ui32 =		udp_mib.udpOutErrors;
 
 	return (0);
 }

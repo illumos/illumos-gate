@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1995
@@ -42,6 +42,8 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <fcntl.h>
+#include <strings.h>
 
 /*
  * The size of the control buffer passed to recvmsg() used to receive
@@ -79,6 +81,7 @@ union ad_u {
 
 
 int	rdisc_sock = -1;		/* router-discovery raw socket */
+int	rdisc_mib_sock = -1;		/* AF_UNIX mib info socket */
 static struct interface *rdisc_sock_interface; /* current rdisc interface */
 
 struct timeval rdisc_timer;
@@ -87,7 +90,8 @@ boolean_t rdisc_ok;				/* using solicited route */
 #define	MAX_ADS		16
 int max_ads; /* at least one per interface */
 /* accumulated advertisements */
-static struct dr *cur_drp, *drs;
+static struct dr *cur_drp;
+struct dr *drs;
 
 /*
  * adjust unsigned preference by interface metric,
@@ -152,6 +156,8 @@ get_rdisc_sock(void)
 {
 	int on = 1;
 	unsigned char ttl = 1;
+	struct sockaddr_un laddr;
+	int len;
 
 	if (rdisc_sock < 0) {
 		max_ads = MAX_ADS;
@@ -170,6 +176,33 @@ get_rdisc_sock(void)
 		    &ttl, sizeof (ttl)) < 0)
 			DBGERR(_B_TRUE,
 			    "rdisc_sock setsockopt(IP_MULTICAST_TTL)");
+
+		/*
+		 * On Solaris also open an AF_UNIX socket to
+		 * pass default router information to mib agent
+		 */
+
+		rdisc_mib_sock = socket(AF_UNIX, SOCK_DGRAM, 0);
+		if (rdisc_mib_sock < 0) {
+			BADERR(_B_TRUE, "rdisc_mib_sock = socket()");
+		}
+
+		bzero(&laddr, sizeof (laddr));
+		laddr.sun_family = AF_UNIX;
+
+		(void) strncpy(laddr.sun_path, RDISC_SNMP_SOCKET,
+		    sizeof (laddr.sun_path));
+		len = sizeof (struct sockaddr_un);
+
+		(void) unlink(RDISC_SNMP_SOCKET);
+
+		if (bind(rdisc_mib_sock, (struct sockaddr *)&laddr, len) < 0) {
+			BADERR(_B_TRUE, "bind(rdisc_mib_sock)");
+		}
+
+		if (fcntl(rdisc_mib_sock, F_SETFL, O_NONBLOCK) < 0) {
+			BADERR(_B_TRUE, "rdisc_mib_sock fcntl O_NONBLOCK");
+		}
 
 		fix_select();
 	}
@@ -1397,4 +1430,59 @@ rdisc_restore(struct interface *ifp)
 	ifp->int_state &= ~(IS_SUPPRESS_RDISC|IS_FLUSH_RDISC);
 	trace_misc("restoring rdisc adv on %s", ifp->int_name);
 	rdisc_timer.tv_sec = 0;
+}
+
+void
+process_d_mib_sock(void)
+{
+
+	socklen_t fromlen;
+	struct sockaddr_un from;
+	ssize_t	len;
+	int command;
+	struct dr *drp;
+	rdisc_info_t rdisc_info;
+	defr_t def_router;
+	extern int max_ads;
+	int num = 0;
+
+	fromlen = (socklen_t)sizeof (from);
+	len = recvfrom(rdisc_mib_sock, &command, sizeof (int), 0,
+	    (struct sockaddr *)&from, &fromlen);
+
+	if (len < sizeof (int) || command != RDISC_SNMP_INFO_REQ) {
+		trace_misc("Bad command on rdisc_mib_sock");
+		return;
+	}
+
+	/*
+	 * Count number of good routers
+	 */
+	for (drp = drs; drp < &drs[max_ads]; drp++) {
+		if (drp->dr_ts != 0) {
+			num++;
+		}
+	}
+
+	rdisc_info.info_type = RDISC_SNMP_INFO_RESPONSE;
+	rdisc_info.info_version = RDISC_SNMP_INFO_VER;
+	rdisc_info.info_num_of_routers = num;
+
+	(void) sendto(rdisc_mib_sock, &rdisc_info, sizeof (rdisc_info_t), 0,
+	    (struct sockaddr *)&from, fromlen);
+
+	for (drp = drs; drp < &drs[max_ads]; drp++) {
+		if (drp->dr_ts != 0) {
+			def_router.defr_info_type = RDISC_DEF_ROUTER_INFO;
+			def_router.defr_version = RDISC_DEF_ROUTER_VER;
+			def_router.defr_index =
+			    drp->dr_ifp->int_phys->phyi_index;
+			def_router.defr_life = drp->dr_life;
+			def_router.defr_addr.s_addr = drp->dr_gate;
+			def_router.defr_pref = drp->dr_pref;
+			(void) sendto(rdisc_mib_sock, &def_router,
+			    sizeof (defr_t), 0, (struct sockaddr *)&from,
+			    fromlen);
+		}
+	}
 }
