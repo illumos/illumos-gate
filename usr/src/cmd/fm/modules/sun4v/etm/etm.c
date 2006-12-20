@@ -167,6 +167,9 @@ etm_xid_posted_ev = 0;	/* xid of last FMA_EVENT msg/event posted OK to FMD */
 static uint8_t
 etm_resp_ver = ETM_PROTO_V1; /* proto ver [negotiated] for msg sends */
 
+static pthread_mutex_t
+etm_write_lock = PTHREAD_MUTEX_INITIALIZER;	/* for write operations */
+
 static log_ctl_t syslog_ctl;	/* log(7D) meta-data for each msg */
 static int syslog_facility;	/* log(7D) facility (part of priority) */
 static int syslog_logfd = -1;	/* log(7D) file descriptor */
@@ -680,7 +683,7 @@ func_ret:
 
 	if (rv < 0) {
 		io_fail_stat.fmds_value.ui64++;
-		fmd_hdl_error(hdl, "error: %s: errno %d\n",
+		fmd_hdl_debug(hdl, "error: %s: errno %d\n",
 					err_substr, (int)(-rv));
 	}
 	if (etm_debug_lvl >= 3) {
@@ -748,7 +751,7 @@ etm_magic_read(fmd_hdl_t *hdl, etm_xport_conn_t conn, uint32_t *magic_ptr)
 func_ret:
 
 	if (byte_cnt != sizeof (magic_num)) {
-		fmd_hdl_error(hdl, "warning: bad proto frame "
+		fmd_hdl_debug(hdl, "warning: bad proto frame "
 				"implies corrupt/lost msg(s)\n");
 	}
 	if ((byte_cnt > sizeof (magic_num)) && (etm_debug_lvl >= 2)) {
@@ -1354,11 +1357,14 @@ etm_maybe_send_response(fmd_hdl_t *hdl, etm_xport_conn_t conn,
 		    resp_hdrp->resp_len);
 	}
 
+	(void) pthread_mutex_lock(&etm_write_lock);
 	if ((n = etm_io_op(hdl, "bad io write on resp msg", conn,
 	    resp_msg, hdr_sz + resp_hdrp->resp_len, ETM_IO_OP_WR)) < 0) {
+		(void) pthread_mutex_unlock(&etm_write_lock);
 		rv = n;
 		goto func_ret;
 	}
+	(void) pthread_mutex_unlock(&etm_write_lock);
 
 	etm_stats.etm_wr_hdr_response.fmds_value.ui64++;
 	etm_stats.etm_wr_body_response.fmds_value.ui64++;
@@ -1428,7 +1434,7 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 
 	if ((ev_hdrp = etm_hdr_read(hdl, conn, &hdr_sz)) == NULL) {
 		/* errno assumed set by above call */
-		fmd_hdl_error(hdl, "error: FMA event dropped: "
+		fmd_hdl_debug(hdl, "error: FMA event dropped: "
 					"bad hdr read errno %d\n", errno);
 		etm_stats.etm_rd_drop_fmaevent.fmds_value.ui64++;
 		goto func_ret;
@@ -1442,6 +1448,19 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 	if (ev_hdrp->ev_pp.pp_msg_type == ETM_MSG_TYPE_FMA_EVENT) {
 
 		fmd_hdl_debug(hdl, "info: rcvd FMA_EVENT msg from xport\n");
+
+		/*
+		 * check for dup msg/xid against last good response sent,
+		 * if a dup then resend response but skip repost to FMD
+		 */
+
+		if (ev_hdrp->ev_pp.pp_xid == etm_xid_posted_ev) {
+			(void) etm_maybe_send_response(hdl, conn, ev_hdrp, 0);
+			fmd_hdl_debug(hdl, "info: skipping dup FMA event post "
+			    "xid 0x%x\n", etm_xid_posted_ev);
+			etm_stats.etm_rd_dup_fmaevent.fmds_value.ui64++;
+			goto func_ret;
+		}
 
 		/* allocate buf large enough for whole body / all FMA events */
 
@@ -1471,23 +1490,10 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 		etm_stats.etm_rd_xport_bytes.fmds_value.ui64 += body_sz;
 		etm_stats.etm_rd_body_fmaevent.fmds_value.ui64 += ev_cnt;
 
-		/*
-		 * check for dup msg/xid against last good response sent,
-		 * if a dup then resend response but skip repost to FMD
-		 */
-
-		if (ev_hdrp->ev_pp.pp_xid == etm_xid_posted_ev) {
-			(void) etm_maybe_send_response(hdl, conn, ev_hdrp, 0);
-			fmd_hdl_debug(hdl, "info: skipping dup FMA event post "
-			    "xid 0x%x\n", etm_xid_posted_ev);
-			etm_stats.etm_rd_dup_fmaevent.fmds_value.ui64++;
-			goto func_ret;
-		}
-
 		/* unpack each FMA event and post it to FMD */
 
 		bp = body_buf;
-		for (i = 0; ev_hdrp->ev_lens[i] != 0; i++) {
+		for (i = 0; i < ev_cnt; i++) {
 			if ((n = nvlist_unpack((char *)bp,
 					ev_hdrp->ev_lens[i], &evp, 0)) != 0) {
 				resp_code = (-n);
@@ -1940,10 +1946,13 @@ etm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *evp, const char *class)
 			continue;
 		}
 
+		(void) pthread_mutex_lock(&etm_write_lock);
+
 		/* write the ETM message header */
 
 		if ((hdrp = etm_hdr_write(hdl, conn, evp, NV_ENCODE_XDR,
 							&sz)) == NULL) {
+			(void) pthread_mutex_unlock(&etm_write_lock);
 			fmd_hdl_error(hdl, "error: FMA event dropped: "
 					"bad hdr write errno %d\n", errno);
 			(void) etm_conn_close(hdl,
@@ -1962,11 +1971,14 @@ etm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *evp, const char *class)
 		if ((n = etm_io_op(hdl, "FMA event dropped: "
 					"bad io write on event", conn,
 					buf, buflen, ETM_IO_OP_WR)) < 0) {
+			(void) pthread_mutex_unlock(&etm_write_lock);
 			(void) etm_conn_close(hdl,
 				"bad conn close per bad body wr", conn);
 			etm_stats.etm_wr_drop_fmaevent.fmds_value.ui64++;
 			continue;
 		}
+
+		(void) pthread_mutex_unlock(&etm_write_lock);
 
 		etm_stats.etm_wr_body_fmaevent.fmds_value.ui64++;
 		etm_stats.etm_wr_xport_bytes.fmds_value.ui64 += buflen;
