@@ -55,11 +55,15 @@ extern "C" {
 #define	AUDIOHD_VID_ALC888	0x10ec0888
 #define	AUDIOHD_VID_STAC9200	0x83847690
 #define	AUDIOHD_VID_STAC9200D	0x83847691
+#define	AUDIOHD_VID_AD1986A	0x11d41986
+#define	AUDIOHD_VID_AD1988A	0x11d41988
+#define	AUDIOHD_VID_AD1988B	0x11d4198b
 
 /* vendor-id and device-id for ATI SB450 */
 #define	AUDIOHD_ATI_SB450	0x437d1002
 
 #define	AUDIOHDC_NID(x)		x
+#define	AUDIOHDC_NULL_NODE	-1
 /*
  * currently, only the format of 48K sample rate, 16-bit
  * 2-channel is supported.
@@ -252,6 +256,7 @@ extern "C" {
 
 #define	AUDIOHDC_VERB_GET_UNS_ENABLE		0xf08
 #define	AUDIOHDC_VERB_GET_PIN_SENSE		0xf09
+#define	AUDIOHDC_VERB_EXEC_PIN_SENSE		0x709
 #define	AUDIOHDC_VERB_GET_BEEP_GEN		0xf0a
 #define	AUDIOHDC_VERB_GET_DEFAULT_CONF		0xf1c
 
@@ -330,6 +335,18 @@ extern "C" {
 
 
 #define	AUDIOHD_CODEC_FAILURE	(uint32_t)(-1)
+
+
+/*
+ * input index for analog mixer (nid=0x20) of AD1988 CODEC
+ */
+enum {
+	AD1988_NID20H_INPUT_INDEX_MIC1 = 0,
+	AD1988_NID20H_INPUT_INDEX_LINE_IN = 1,
+	AD1988_NID20H_INPUT_INDEX_MIC2 = 4,
+	AD1988_NID20H_INPUT_INDEX_CD = 6,
+	AD1988_NID20H_INPUT_INDEX_NULL = -1
+};
 
 struct audiohd_codec_ops;
 typedef struct  {
