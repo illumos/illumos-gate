@@ -42,6 +42,7 @@
 #include <sys/dls.h>
 #include <sys/dld.h>
 #include <sys/modctl.h>
+#include <sys/atomic.h>
 
 #define	IMPL_HASHSZ	67	/* prime */
 
@@ -53,6 +54,11 @@ uint_t			i_mac_impl_count;
 #define	MACTYPE_KMODDIR	"mac"
 #define	MACTYPE_HASHSZ	67
 static mod_hash_t	*i_mactype_hash;
+/*
+ * i_mactype_lock synchronizes threads that obtain references to mactype_t
+ * structures through i_mactype_getplugin().
+ */
+static kmutex_t		i_mactype_lock;
 
 static void i_mac_notify_task(void *);
 
@@ -185,37 +191,41 @@ i_mac_notify_task(void *notify_arg)
 }
 
 static mactype_t *
-i_mactype_getplugin(const char *plugin_name)
+i_mactype_getplugin(const char *pname)
 {
 	mactype_t	*mtype = NULL;
 	boolean_t	tried_modload = B_FALSE;
 
+	mutex_enter(&i_mactype_lock);
+
 find_registered_mactype:
-	if (mod_hash_find(i_mactype_hash, (mod_hash_key_t)plugin_name,
-	    (mod_hash_val_t *)&mtype) == 0) {
+	if (mod_hash_find(i_mactype_hash, (mod_hash_key_t)pname,
+	    (mod_hash_val_t *)&mtype) != 0) {
+		if (!tried_modload) {
+			/*
+			 * If the plugin has not yet been loaded, then
+			 * attempt to load it now.  If modload() succeeds,
+			 * the plugin should have registered using
+			 * mactype_register(), in which case we can go back
+			 * and attempt to find it again.
+			 */
+			if (modload(MACTYPE_KMODDIR, (char *)pname) != -1) {
+				tried_modload = B_TRUE;
+				goto find_registered_mactype;
+			}
+		}
+	} else {
 		/*
-		 * Because the reference count is initialized at 1 (see
-		 * mactype_register()), we don't need to bump up the
-		 * reference count if we're the first reference.
+		 * Note that there's no danger that the plugin we've loaded
+		 * could be unloaded between the modload() step and the
+		 * reference count bump here, as we're holding
+		 * i_mactype_lock, which mactype_unregister() also holds.
 		 */
-		if (!tried_modload)
-			mtype->mt_ref++;
-		return (mtype);
-	} else if (tried_modload) {
-		return (NULL);
+		atomic_inc_32(&mtype->mt_ref);
 	}
 
-	/*
-	 * If the plugin has not yet been loaded, then attempt to load it
-	 * now.  If modload succeeds, the plugin should have registered
-	 * using mactype_register(), in which case we can go back and
-	 * attempt to find it again.
-	 */
-	if (modload(MACTYPE_KMODDIR, (char *)plugin_name) != -1) {
-		tried_modload = B_TRUE;
-		goto find_registered_mactype;
-	}
-	return (NULL);
+	mutex_exit(&i_mactype_lock);
+	return (mtype);
 }
 
 /*
@@ -1078,7 +1088,7 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 		rw_exit(&i_mac_impl_lock);
 		return (EEXIST);
 	}
-	i_mac_impl_count++;
+	atomic_inc_32(&i_mac_impl_count);
 
 	mip->mi_driver = mregp->m_driver;
 
@@ -1230,7 +1240,7 @@ fail:
 	(void) mod_hash_remove(i_mac_impl_hash, (mod_hash_key_t)mip->mi_name,
 	    &val);
 	ASSERT(mip == (mac_impl_t *)val);
-	i_mac_impl_count--;
+	atomic_dec_32(&i_mac_impl_count);
 
 	if (mip->mi_info.mi_unicst_addr != NULL) {
 		kmem_free(mip->mi_info.mi_unicst_addr,
@@ -1245,7 +1255,7 @@ fail:
 	mac_stat_destroy(mip);
 
 	if (mip->mi_type != NULL) {
-		mip->mi_type->mt_ref--;
+		atomic_dec_32(&mip->mi_type->mt_ref);
 		mip->mi_type = NULL;
 	}
 
@@ -1311,7 +1321,7 @@ mac_unregister(mac_handle_t mh)
 	ASSERT(mip == (mac_impl_t *)val);
 
 	ASSERT(i_mac_impl_count > 0);
-	i_mac_impl_count--;
+	atomic_dec_32(&i_mac_impl_count);
 
 	if (mip->mi_pdata != NULL)
 		kmem_free(mip->mi_pdata, mip->mi_pdata_size);
@@ -1331,7 +1341,7 @@ mac_unregister(mac_handle_t mh)
 	kmem_free(mip->mi_info.mi_unicst_addr, mip->mi_type->mt_addr_length);
 	mip->mi_info.mi_unicst_addr = NULL;
 
-	mip->mi_type->mt_ref--;
+	atomic_dec_32(&mip->mi_type->mt_ref);
 	mip->mi_type = NULL;
 
 	cmn_err(CE_NOTE, "!%s unregistered", mip->mi_name);
@@ -1825,18 +1835,6 @@ mactype_register(mactype_register_t *mtrp)
 	mtp->mt_stats = mtrp->mtr_stats;
 	mtp->mt_statcount = mtrp->mtr_statcount;
 
-	/*
-	 * A MAC-Type plugin only registers when i_mactype_getplugin() does
-	 * an explicit modload() as a result of a driver requesting to use
-	 * that plugin in mac_register().  We pre-emptively set the initial
-	 * reference count to 1 here to prevent the plugin module from
-	 * unloading before the driver's mac_register() completes.  If we
-	 * were to initialize the reference count to 0, then there would be
-	 * a window during which the module could unload before the
-	 * reference count could be bumped up to 1.
-	 */
-	mtp->mt_ref = 1;
-
 	if (mod_hash_insert(i_mactype_hash,
 	    (mod_hash_key_t)mtp->mt_ident, (mod_hash_val_t)mtp) != 0) {
 		kmem_free(mtp->mt_brdcst_addr, mtp->mt_addr_length);
@@ -1855,34 +1853,36 @@ mactype_unregister(const char *ident)
 
 	/*
 	 * Let's not allow MAC drivers to use this plugin while we're
-	 * trying to unregister it...
+	 * trying to unregister it.  Holding i_mactype_lock also prevents a
+	 * plugin from unregistering while a MAC driver is attempting to
+	 * hold a reference to it in i_mactype_getplugin().
 	 */
-	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	mutex_enter(&i_mactype_lock);
 
 	if ((err = mod_hash_find(i_mactype_hash, (mod_hash_key_t)ident,
 	    (mod_hash_val_t *)&mtp)) != 0) {
 		/* A plugin is trying to unregister, but it never registered. */
-		rw_exit(&i_mac_impl_lock);
-		return (ENXIO);
+		err = ENXIO;
+		goto done;
 	}
 
-	if (mtp->mt_ref > 0) {
-		rw_exit(&i_mac_impl_lock);
-		return (EBUSY);
+	if (mtp->mt_ref != 0) {
+		err = EBUSY;
+		goto done;
 	}
 
 	err = mod_hash_remove(i_mactype_hash, (mod_hash_key_t)ident, &val);
 	ASSERT(err == 0);
 	if (err != 0) {
 		/* This should never happen, thus the ASSERT() above. */
-		rw_exit(&i_mac_impl_lock);
-		return (EINVAL);
+		err = EINVAL;
+		goto done;
 	}
 	ASSERT(mtp == (mactype_t *)val);
 
 	kmem_free(mtp->mt_brdcst_addr, mtp->mt_addr_length);
 	kmem_free(mtp, sizeof (mactype_t));
-	rw_exit(&i_mac_impl_lock);
-
-	return (0);
+done:
+	mutex_exit(&i_mactype_lock);
+	return (err);
 }
