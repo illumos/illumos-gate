@@ -57,7 +57,7 @@ static tsol_tpc_t *tpc_unlab;
  * tnrhc_table and tnrhc_table_v6 are similar to the IP forwarding tables
  * in organization and search. The tnrhc_table[_v6] is an array of 33/129
  * pointers to the 33/129 tnrhc tables indexed by the prefix length.
- * A largest prefix match search is done by find_rhc_v[46] and it walks the
+ * A largest prefix match search is done by find_rhc and it walks the
  * tables from the most specific to the least specific table. Table 0
  * corresponds to the single entry for 0.0.0.0/0 or ::0/0.
  */
@@ -329,70 +329,57 @@ flush_rh_table(tnrhc_hash_t **htable, int nbits)
  *
  * Return 0 for success, error code for failure.
  */
-int
-tnrh_load(const tsol_rhent_t *rhent)
+static int
+tnrh_hash_add(tsol_tnrhc_t *new, short prefix)
 {
 	tsol_tnrhc_t **rhp;
-	tsol_tnrhc_t *rh, *new;
-	tsol_tpc_t *tpc;
+	tsol_tnrhc_t *rh;
 	ipaddr_t tmpmask;
 	in6_addr_t tmpmask_v6;
 	tnrhc_hash_t *tnrhc_hash;
 
 	/* Find the existing entry, if any, leaving the hash locked */
-	if (rhent->rh_address.ta_family == AF_INET) {
-		if (rhent->rh_prefix < 0 || rhent->rh_prefix > IP_ABITS)
+	if (new->rhc_host.ta_family == AF_INET) {
+		if (prefix < 0 || prefix > IP_ABITS)
 			return (EINVAL);
-		if (tnrhc_table[rhent->rh_prefix] == NULL &&
-		    !tnrhc_init_table(tnrhc_table, rhent->rh_prefix,
+		if (tnrhc_table[prefix] == NULL &&
+		    !tnrhc_init_table(tnrhc_table, prefix,
 		    KM_NOSLEEP))
 			return (ENOMEM);
-		tmpmask = tsol_plen_to_mask(rhent->rh_prefix);
-		tnrhc_hash = &tnrhc_table[rhent->rh_prefix][
-		    TSOL_ADDR_HASH(rhent->rh_address.ta_addr_v4.s_addr &
+		tmpmask = tsol_plen_to_mask(prefix);
+		tnrhc_hash = &tnrhc_table[prefix][
+		    TSOL_ADDR_HASH(new->rhc_host.ta_addr_v4.s_addr &
 		    tmpmask, TNRHC_SIZE)];
 		mutex_enter(&tnrhc_hash->tnrh_lock);
 		for (rhp = &tnrhc_hash->tnrh_list; (rh = *rhp) != NULL;
 		    rhp = &rh->rhc_next) {
 			ASSERT(rh->rhc_host.ta_family == AF_INET);
 			if (((rh->rhc_host.ta_addr_v4.s_addr ^
-			    rhent->rh_address.ta_addr_v4.s_addr) & tmpmask) ==
+			    new->rhc_host.ta_addr_v4.s_addr) & tmpmask) ==
 			    0)
 				break;
 		}
-	} else if (rhent->rh_address.ta_family == AF_INET6) {
-		if (rhent->rh_prefix < 0 || rhent->rh_prefix > IPV6_ABITS)
+	} else if (new->rhc_host.ta_family == AF_INET6) {
+		if (prefix < 0 || prefix > IPV6_ABITS)
 			return (EINVAL);
-		if (tnrhc_table_v6[rhent->rh_prefix] == NULL &&
-		    !tnrhc_init_table(tnrhc_table_v6, rhent->rh_prefix,
+		if (tnrhc_table_v6[prefix] == NULL &&
+		    !tnrhc_init_table(tnrhc_table_v6, prefix,
 		    KM_NOSLEEP))
 			return (ENOMEM);
-		tsol_plen_to_mask_v6(rhent->rh_prefix, &tmpmask_v6);
-		tnrhc_hash = &tnrhc_table_v6[rhent->rh_prefix][
-		    TSOL_ADDR_MASK_HASH_V6(rhent->rh_address.ta_addr_v6,
+		tsol_plen_to_mask_v6(prefix, &tmpmask_v6);
+		tnrhc_hash = &tnrhc_table_v6[prefix][
+		    TSOL_ADDR_MASK_HASH_V6(new->rhc_host.ta_addr_v6,
 		    tmpmask_v6, TNRHC_SIZE)];
 		mutex_enter(&tnrhc_hash->tnrh_lock);
 		for (rhp = &tnrhc_hash->tnrh_list; (rh = *rhp) != NULL;
 		    rhp = &rh->rhc_next) {
 			ASSERT(rh->rhc_host.ta_family == AF_INET6);
 			if (V6_MASK_EQ_2(rh->rhc_host.ta_addr_v6, tmpmask_v6,
-			    rhent->rh_address.ta_addr_v6))
+			    new->rhc_host.ta_addr_v6))
 				break;
 		}
 	} else {
 		return (EAFNOSUPPORT);
-	}
-
-	if ((new = kmem_zalloc(sizeof (*new), KM_NOSLEEP)) == NULL) {
-		mutex_exit(&tnrhc_hash->tnrh_lock);
-		return (ENOMEM);
-	}
-
-	/* Find and bump the reference count on the named template */
-	if ((tpc = tnrhtp_find(rhent->rh_template, tpc_name_hash)) == NULL) {
-		mutex_exit(&tnrhc_hash->tnrh_lock);
-		kmem_free(new, sizeof (*new));
-		return (EINVAL);
 	}
 
 	/* Clobber the old remote host entry. */
@@ -401,7 +388,42 @@ tnrh_load(const tsol_rhent_t *rhent)
 		rh->rhc_invalid = 1;
 		*rhp = rh->rhc_next;
 		rh->rhc_next = NULL;
+		DTRACE_PROBE1(tx__tndb__l2__tnrhhashadd__invalidaterh,
+		    tsol_tnrhc_t *, rh);
 		TNRHC_RELE(rh);
+	}
+
+	TNRHC_HOLD(new);
+	new->rhc_next = tnrhc_hash->tnrh_list;
+	tnrhc_hash->tnrh_list = new;
+	DTRACE_PROBE1(tx__tndb__l2__tnrhhashadd__addedrh, tsol_tnrhc_t *, new);
+	mutex_exit(&tnrhc_hash->tnrh_lock);
+
+	return (0);
+}
+
+/*
+ * Load a remote host entry into kernel cache.
+ *
+ * Return 0 for success, error code for failure.
+ */
+int
+tnrh_load(const tsol_rhent_t *rhent)
+{
+	tsol_tnrhc_t *new;
+	tsol_tpc_t *tpc;
+	int status;
+
+	/* Find and bump the reference count on the named template */
+	if ((tpc = tnrhtp_find(rhent->rh_template, tpc_name_hash)) == NULL) {
+		return (EINVAL);
+	}
+	ASSERT(tpc->tpc_tp.host_type == UNLABELED ||
+	    tpc->tpc_tp.host_type == SUN_CIPSO);
+
+	if ((new = kmem_zalloc(sizeof (*new), KM_NOSLEEP)) == NULL) {
+		TPC_RELE(tpc);
+		return (ENOMEM);
 	}
 
 	/* Initialize the new entry. */
@@ -411,16 +433,17 @@ tnrh_load(const tsol_rhent_t *rhent)
 	/* The rhc now owns this tpc reference, so no TPC_RELE past here */
 	new->rhc_tpc = tpc;
 
-	ASSERT(tpc->tpc_tp.host_type == UNLABELED ||
-	    tpc->tpc_tp.host_type == SUN_CIPSO);
-
+	/*
+	 * tnrh_hash_add handles the tnrh entry ref count for hash
+	 * table inclusion. The ref count is incremented and decremented
+	 * here to trigger deletion of the new hash table entry in the
+	 * event that tnrh_hash_add fails.
+	 */
 	TNRHC_HOLD(new);
-	new->rhc_next = tnrhc_hash->tnrh_list;
-	tnrhc_hash->tnrh_list = new;
-	DTRACE_PROBE(tx__tndb__l2__tnrhload__addedrh);
-	mutex_exit(&tnrhc_hash->tnrh_lock);
+	status = tnrh_hash_add(new, rhent->rh_prefix);
+	TNRHC_RELE(new);
 
-	return (0);
+	return (status);
 }
 
 static int
@@ -1015,81 +1038,145 @@ tnmlp(int cmd, void *buf)
  * The returned rhc's refcnt is incremented.
  */
 tsol_tnrhc_t *
-find_rhc_v4(const in_addr_t *in4)
+find_rhc(const void *addr, uchar_t version, boolean_t staleok)
 {
 	tsol_tnrhc_t *rh = NULL;
+	tsol_tnrhc_t *new;
+	tsol_tpc_t *tpc;
 	tnrhc_hash_t *tnrhc_hash;
 	ipaddr_t tmpmask;
+	in_addr_t *in4 = (in_addr_t *)addr;
+	in6_addr_t *in6 = (in6_addr_t *)addr;
+	in_addr_t tmpin4;
+	in6_addr_t tmpmask6;
 	int	i;
+	int	prefix;
 
-	for (i = (TSOL_MASK_TABLE_SIZE - 1); i >= 0; i--) {
+	/*
+	 * An IPv4-mapped IPv6 address is really an IPv4 address
+	 * in IPv6 format.
+	 */
+	if (version == IPV6_VERSION &&
+	    IN6_IS_ADDR_V4MAPPED(in6)) {
+		IN6_V4MAPPED_TO_IPADDR(in6, tmpin4);
+		version = IPV4_VERSION;
+		in4 = &tmpin4;
+	}
 
-		if ((tnrhc_table[i]) == NULL)
-			continue;
+	/*
+	 * Search the tnrh hash table for each prefix length,
+	 * starting at longest prefix length, until a matching
+	 * rhc entry is found.
+	 */
+	if (version == IPV4_VERSION) {
+		for (i = (TSOL_MASK_TABLE_SIZE - 1); i >= 0; i--) {
 
-		tmpmask = tsol_plen_to_mask(i);
-		tnrhc_hash = &tnrhc_table[i][
-		    TSOL_ADDR_HASH(*in4 & tmpmask, TNRHC_SIZE)];
+			if ((tnrhc_table[i]) == NULL)
+				continue;
 
-		mutex_enter(&tnrhc_hash->tnrh_lock);
-		for (rh = tnrhc_hash->tnrh_list; rh != NULL;
-		    rh = rh->rhc_next) {
-			if ((rh->rhc_host.ta_family == AF_INET) &&
-			    ((rh->rhc_host.ta_addr_v4.s_addr & tmpmask) ==
-			    (*in4 & tmpmask))) {
-				TNRHC_HOLD(rh);
-				mutex_exit(&tnrhc_hash->tnrh_lock);
-				return (rh);
+			tmpmask = tsol_plen_to_mask(i);
+			tnrhc_hash = &tnrhc_table[i][
+			    TSOL_ADDR_HASH(*in4 & tmpmask, TNRHC_SIZE)];
+
+			mutex_enter(&tnrhc_hash->tnrh_lock);
+			for (rh = tnrhc_hash->tnrh_list; rh != NULL;
+			    rh = rh->rhc_next) {
+				if ((rh->rhc_host.ta_family == AF_INET) &&
+				    ((rh->rhc_host.ta_addr_v4.s_addr &
+				    tmpmask) == (*in4 & tmpmask))) {
+					prefix = i;
+					TNRHC_HOLD(rh);
+					break;
+				}
+			}
+			mutex_exit(&tnrhc_hash->tnrh_lock);
+			if (rh != NULL)
+				break;
+		}
+		if (rh == NULL)
+			DTRACE_PROBE1(tx__tndb__l1__findrhc__norhv4ent,
+			    in_addr_t *, in4);
+	} else {
+		for (i = (TSOL_MASK_TABLE_SIZE_V6 - 1); i >= 0; i--) {
+			if ((tnrhc_table_v6[i]) == NULL)
+				continue;
+
+			tsol_plen_to_mask_v6(i, &tmpmask6);
+			tnrhc_hash = &tnrhc_table_v6[i][
+			    TSOL_ADDR_MASK_HASH_V6(*in6, tmpmask6, TNRHC_SIZE)];
+
+			mutex_enter(&tnrhc_hash->tnrh_lock);
+			for (rh = tnrhc_hash->tnrh_list; rh != NULL;
+			    rh = rh->rhc_next) {
+				if ((rh->rhc_host.ta_family == AF_INET6) &&
+				    V6_MASK_EQ_2(rh->rhc_host.ta_addr_v6,
+				    tmpmask6, *in6)) {
+					prefix = i;
+					TNRHC_HOLD(rh);
+					break;
+				}
+			}
+			mutex_exit(&tnrhc_hash->tnrh_lock);
+			if (rh != NULL)
+				break;
+		}
+		if (rh == NULL)
+			DTRACE_PROBE1(tx__tndb__l1__findrhc__norhv6ent,
+			    in6_addr_t *, in6);
+	}
+
+	/*
+	 * Does the tnrh entry point to a stale template?
+	 * This can happen any time the user deletes or modifies
+	 * a template that has existing tnrh entries pointing
+	 * to it. Try to find a new version of the template.
+	 * If there is no template, then just give up.
+	 * If the template exists, reload the tnrh entry.
+	 */
+	if (rh != NULL && rh->rhc_tpc->tpc_invalid) {
+		tpc = tnrhtp_find(rh->rhc_tpc->tpc_tp.name, tpc_name_hash);
+		if (tpc == NULL) {
+			if (!staleok) {
+				DTRACE_PROBE2(tx__tndb__l1__findrhc__staletpc,
+				    tsol_tnrhc_t *, rh, tsol_tpc_t *,
+				    rh->rhc_tpc);
+				TNRHC_RELE(rh);
+				rh = NULL;
+			}
+		} else {
+			ASSERT(tpc->tpc_tp.host_type == UNLABELED ||
+			    tpc->tpc_tp.host_type == SUN_CIPSO);
+
+			if ((new = kmem_zalloc(sizeof (*new),
+			    KM_NOSLEEP)) == NULL) {
+				DTRACE_PROBE(tx__tndb__l1__findrhc__nomem);
+				TNRHC_RELE(rh);
+				TPC_RELE(tpc);
+				return (NULL);
+			}
+
+			mutex_init(&new->rhc_lock, NULL, MUTEX_DEFAULT, NULL);
+			new->rhc_host = rh->rhc_host;
+			new->rhc_tpc = tpc;
+			new->rhc_isbcast = rh->rhc_isbcast;
+			new->rhc_local = rh->rhc_local;
+			TNRHC_RELE(rh);
+			rh = new;
+
+			/*
+			 * This function increments the tnrh entry ref count
+			 * for the pointer returned to the caller.
+			 * tnrh_hash_add increments the tnrh entry ref count
+			 * for the pointer in the hash table.
+			 */
+			TNRHC_HOLD(rh);
+			if (tnrh_hash_add(new, prefix) != 0) {
+				TNRHC_RELE(rh);
+				rh = NULL;
 			}
 		}
-		mutex_exit(&tnrhc_hash->tnrh_lock);
 	}
-
-	return (NULL);
-}
-
-/*
- * Returns a tnrhc matching the addr address.
- * The returned rhc's refcnt is incremented.
- */
-tsol_tnrhc_t *
-find_rhc_v6(const in6_addr_t *in6)
-{
-	tsol_tnrhc_t *rh = NULL;
-	tnrhc_hash_t *tnrhc_hash;
-	in6_addr_t tmpmask;
-	int i;
-
-	if (IN6_IS_ADDR_V4MAPPED(in6)) {
-		in_addr_t in4;
-
-		IN6_V4MAPPED_TO_IPADDR(in6, in4);
-		return (find_rhc_v4(&in4));
-	}
-
-	for (i = (TSOL_MASK_TABLE_SIZE_V6 - 1); i >= 0; i--) {
-		if ((tnrhc_table_v6[i]) == NULL)
-			continue;
-
-		tsol_plen_to_mask_v6(i, &tmpmask);
-		tnrhc_hash = &tnrhc_table_v6[i][
-		    TSOL_ADDR_MASK_HASH_V6(*in6, tmpmask, TNRHC_SIZE)];
-
-		mutex_enter(&tnrhc_hash->tnrh_lock);
-		for (rh = tnrhc_hash->tnrh_list; rh != NULL;
-		    rh = rh->rhc_next) {
-			if ((rh->rhc_host.ta_family == AF_INET6) &&
-			    V6_MASK_EQ_2(rh->rhc_host.ta_addr_v6, tmpmask,
-			    *in6)) {
-				TNRHC_HOLD(rh);
-				mutex_exit(&tnrhc_hash->tnrh_lock);
-				return (rh);
-			}
-		}
-		mutex_exit(&tnrhc_hash->tnrh_lock);
-	}
-
-	return (NULL);
+	return (rh);
 }
 
 tsol_tpc_t *
@@ -1098,33 +1185,13 @@ find_tpc(const void *addr, uchar_t version, boolean_t staleok)
 	tsol_tpc_t *tpc;
 	tsol_tnrhc_t *rhc;
 
-	if (version == IPV4_VERSION)
-		rhc = find_rhc_v4(addr);
-	else
-		rhc = find_rhc_v6(addr);
+	if ((rhc = find_rhc(addr, version, staleok)) == NULL)
+		return (NULL);
 
-	if (rhc != NULL) {
-		tpc = rhc->rhc_tpc;
-		if (!staleok && tpc->tpc_invalid) {
-			/*
-			 * This should not happen unless the user deletes
-			 * templates without recreating them.  Try to find the
-			 * new version of template.  If there is none, then
-			 * just give up.
-			 */
-			tpc = tnrhtp_find(tpc->tpc_tp.name, tpc_name_hash);
-			if (tpc != NULL) {
-				TPC_RELE(rhc->rhc_tpc);
-				rhc->rhc_tpc = tpc;
-			}
-		}
-		if (tpc != NULL)
-			TPC_HOLD(tpc);
-		TNRHC_RELE(rhc);
-		return (tpc);
-	}
-	DTRACE_PROBE(tx__tndb__l1__findtpc__notemplate);
-	return (NULL);
+	tpc = rhc->rhc_tpc;
+	TPC_HOLD(tpc);
+	TNRHC_RELE(rhc);
+	return (tpc);
 }
 
 /*

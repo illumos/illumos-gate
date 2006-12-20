@@ -47,8 +47,7 @@ extern "C" {
 #define	TSOL_MAX_IPV6_OPTION	(8 + IP_MAX_OPT_LENGTH)
 
 extern int tsol_tnrh_chk(tsol_tpent_t *, bslabel_t *, int);
-extern tsol_tnrhc_t *find_rhc_v4(const in_addr_t *);
-extern tsol_tnrhc_t *find_rhc_v6(const in6_addr_t *);
+extern tsol_tnrhc_t *find_rhc(const void *, uchar_t, boolean_t);
 extern int tsol_compute_label(const cred_t *, ipaddr_t, uchar_t *, boolean_t);
 extern int tsol_compute_label_v6(const cred_t *, const in6_addr_t *, uchar_t *,
     boolean_t);

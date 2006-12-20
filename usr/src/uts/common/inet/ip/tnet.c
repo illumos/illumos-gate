@@ -1307,10 +1307,7 @@ tsol_ire_match_gwattr(ire_t *ire, const ts_label_t *tsl)
 		/* We've found a gateway address to do the template lookup */
 		if (paddr != NULL) {
 			ASSERT(gw_rhc == NULL);
-			if (ire->ire_ipversion == IPV4_VERSION)
-				gw_rhc = find_rhc_v4(paddr);
-			else
-				gw_rhc = find_rhc_v6(paddr);
+			gw_rhc = find_rhc(paddr, ire->ire_ipversion, B_FALSE);
 			if (gw_rhc != NULL) {
 				/*
 				 * Note that if the lookup above returned an
@@ -1850,8 +1847,7 @@ tsol_ire_init_gwattr(ire_t *ire, uchar_t ipversion, tsol_gc_t *gc,
 	 * real one.
 	 */
 	if (paddr != NULL) {
-		attrp->igsa_rhc = (ipversion == IPV4_VERSION) ?
-		    find_rhc_v4(paddr) : find_rhc_v6(paddr);
+		attrp->igsa_rhc = find_rhc(paddr, ipversion, B_FALSE);
 	}
 
 	if (exists)
