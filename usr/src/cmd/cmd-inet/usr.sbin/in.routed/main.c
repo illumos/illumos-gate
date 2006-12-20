@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -631,6 +631,10 @@ usage:
 			read_d();
 			n--;
 		}
+		if (rdisc_mib_sock >= 0 && FD_ISSET(rdisc_mib_sock, &ibits)) {
+			process_d_mib_sock();
+			n--;
+		}
 		if (rip_sock >= 0 && FD_ISSET(rip_sock, &ibits)) {
 			if (read_rip() == -1) {
 				rip_enabled = _B_FALSE;
@@ -692,6 +696,9 @@ fix_select(void)
 		FD_SET(rdisc_sock, &fdbits);
 		if (sock_max <= rdisc_sock)
 			sock_max = rdisc_sock+1;
+		FD_SET(rdisc_mib_sock, &fdbits);
+		if (sock_max <= rdisc_mib_sock)
+			sock_max = rdisc_mib_sock+1;
 	}
 }
 
