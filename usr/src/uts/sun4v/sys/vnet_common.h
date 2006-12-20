@@ -50,6 +50,8 @@ extern "C" {
 
 #define	VNET_IPALIGN		6	/* padding for IP header alignment */
 
+#define	VNET_NUM_HANDSHAKES	3	/* # of handshake attempts */
+
 /* vnet descriptor */
 typedef struct vnet_public_desc {
 	vio_dring_entry_hdr_t	hdr;		/* descriptor header */
@@ -59,17 +61,17 @@ typedef struct vnet_public_desc {
 } vnet_public_desc_t;
 
 /*
- * VIO in-band descriptor. Used by those vio clients
+ * Vnet in-band descriptor. Used by those vnet clients
  * such as OBP who do not use descriptor rings.
  */
-typedef struct vio_ibnd_desc {
+typedef struct vnet_ibnd_desc {
 	vio_inband_desc_msg_hdr_t	hdr;
 
 	/* payload */
 	uint32_t			nbytes;
 	uint32_t			ncookies;
 	ldc_mem_cookie_t		memcookie[MAX_COOKIES];
-} vio_ibnd_desc_t;
+} vnet_ibnd_desc_t;
 
 #ifdef __cplusplus
 }

@@ -282,6 +282,7 @@ typedef struct lane {
 	uint8_t		addr_type;	/* Only MAC address at moment */
 	uint8_t		xfer_mode;	/* Dring or Pkt based */
 	uint8_t		ack_freq;	/* Only non zero for Pkt based xfer */
+	krwlock_t	dlistrw;	/* Lock for dring list */
 	dring_info_t	*dringp;	/* List of drings for this lane */
 } lane_t;
 
@@ -305,6 +306,7 @@ typedef struct vsw_ldc {
 	int			hcnt;		/* # handshake attempts */
 	kmutex_t		status_lock;
 	ldc_status_t		ldc_status;	/* channel status */
+	uint8_t			reset_active;	/* reset flag */
 	uint64_t		local_session;	/* Our session id */
 	uint64_t		peer_session;	/* Our peers session id */
 	uint8_t			session_status;	/* Session recv'd, sent */

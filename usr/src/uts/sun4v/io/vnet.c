@@ -471,6 +471,9 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 	RW_EXIT(&vnet_rw);
 
+	kmem_free(vnetp->fdbhp,
+	    sizeof (fdb_fanout_t) * (vnetp->nfdb_hash + 1));
+
 	KMEM_FREE(vnetp);
 
 	return (DDI_SUCCESS);

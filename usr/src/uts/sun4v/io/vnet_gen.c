@@ -256,7 +256,7 @@ static vgen_ver_t vgen_versions[VGEN_NUM_VER] = { {1, 0} };
 
 /* Tunables */
 uint32_t vgen_hwd_interval = 1000;	/* handshake watchdog freq in msec */
-uint32_t vgen_max_hretries = 1;		/* max # of handshake retries */
+uint32_t vgen_max_hretries = VNET_NUM_HANDSHAKES; /* # of handshake retries */
 uint32_t vgen_ldcwr_retries = 10;	/* max # of ldc_write() retries */
 uint32_t vgen_ldcup_retries = 5;	/* max # of ldc_up() retries */
 uint32_t vgen_recv_delay = 1;		/* delay when rx descr not ready */
@@ -1204,6 +1204,7 @@ static void
 vgen_mdeg_unreg(vgen_t *vgenp)
 {
 	(void) mdeg_unregister(vgenp->mdeg_hdl);
+	kmem_free(vgenp->mdeg_parentp->specp, sizeof (vgen_prop_template));
 	KMEM_FREE(vgenp->mdeg_parentp);
 	vgenp->mdeg_parentp = NULL;
 	vgenp->mdeg_hdl = NULL;

@@ -55,6 +55,9 @@
 #include <sys/mdeg.h>
 #include <sys/vcc_impl.h>
 
+#define	VCC_LDC_RETRIES		5
+#define	VCC_LDC_DELAY		1000 /* usec */
+
 /*
  * Function prototypes.
  */
@@ -456,12 +459,13 @@ i_vcc_ldc_init(vcc_t *vccp, vcc_port_t *vport)
 }
 
 /*  release a ldc channel */
-static int
+static void
 i_vcc_ldc_fini(vcc_port_t *vport)
 {
 	int 		rv = EIO;
 	vcc_msg_t	buf;
 	size_t		sz;
+	int		retry = 0;
 
 	D1("i_vcc_ldc_fini: port@%lld, ldc_id%%llx\n", vport->number,
 	    vport->ldc_id);
@@ -471,57 +475,76 @@ i_vcc_ldc_fini(vcc_port_t *vport)
 	/* wait for write available */
 	rv = i_vcc_wait_port_status(vport, &vport->write_cv,
 	    VCC_PORT_USE_WRITE_LDC);
-	if (rv) {
-		return (rv);
+
+	if (rv == 0) {
+		vport->status &= ~VCC_PORT_USE_WRITE_LDC;
+
+		/* send a HUP message */
+		buf.type = LDC_CONSOLE_CTRL;
+		buf.ctrl_msg = LDC_CONSOLE_HUP;
+		buf.size = 0;
+
+		/*
+		 * ignore write error since we still want to clean up
+		 * ldc channel.
+		 */
+		(void) i_vcc_write_ldc(vport, &buf);
+
+		mutex_exit(&vport->lock);
+		i_vcc_set_port_status(vport, &vport->write_cv,
+		    VCC_PORT_USE_WRITE_LDC);
+		mutex_enter(&vport->lock);
 	}
-	vport->status &= ~VCC_PORT_USE_WRITE_LDC;
-	/* send a HUP message */
-	buf.type = LDC_CONSOLE_CTRL;
-	buf.ctrl_msg = LDC_CONSOLE_HUP;
-	buf.size = 0;
-
-	/* in case of error, we still want to clean up ldc channel */
-	(void) i_vcc_write_ldc(vport, &buf);
-
-	mutex_exit(&vport->lock);
-	i_vcc_set_port_status(vport, &vport->write_cv, VCC_PORT_USE_WRITE_LDC);
-	mutex_enter(&vport->lock);
 
 	/* flush ldc channel */
 	rv = i_vcc_wait_port_status(vport, &vport->read_cv,
 	    VCC_PORT_USE_READ_LDC);
-	if (rv) {
-		return (rv);
+
+	if (rv == 0) {
+		vport->status &= ~VCC_PORT_USE_READ_LDC;
+		do {
+			sz = sizeof (buf);
+			rv = i_vcc_read_ldc(vport, (char *)&buf, &sz);
+		} while (rv == 0 && sz > 0);
+
+		vport->status |= VCC_PORT_USE_READ_LDC;
+
 	}
 
-	vport->status &= ~VCC_PORT_USE_READ_LDC;
-	do {
-		sz = sizeof (buf);
-		rv = i_vcc_read_ldc(vport, (char *)&buf, &sz);
-	} while (rv == 0 && sz > 0);
-
-	vport->status |= VCC_PORT_USE_READ_LDC;
+	/*
+	 * ignore read error since we still want to clean up
+	 * ldc channel.
+	 */
 
 	(void) ldc_set_cb_mode(vport->ldc_handle, LDC_CB_DISABLE);
-	if ((rv = ldc_close(vport->ldc_handle)) != 0) {
-		cmn_err(CE_CONT, "i_vcc_ldc_fini: cannot close channel %ld\n",
-		    vport->ldc_id);
-		return (rv);
+
+	/* close LDC channel - retry on EAGAIN */
+	while ((rv = ldc_close(vport->ldc_handle)) == EAGAIN) {
+
+		if (++retry > VCC_LDC_RETRIES) {
+			cmn_err(CE_CONT, "i_vcc_ldc_fini: cannot close channel"
+			    " %ld\n", vport->ldc_id);
+			break;
+		}
+
+		drv_usecwait(VCC_LDC_DELAY);
 	}
 
-	if ((rv = ldc_unreg_callback(vport->ldc_handle)) != 0) {
-		cmn_err(CE_CONT, "i_vcc_ldc_fini: port@%d ldc_unreg_callback"
-			"failed\n", vport->number);
-		return (rv);
+	if (rv == 0) {
+		(void) ldc_unreg_callback(vport->ldc_handle);
+		(void) ldc_fini(vport->ldc_handle);
+	} else {
+		/*
+		 * Closing the LDC channel has failed. Ideally we should
+		 * fail here but there is no Zeus level infrastructure
+		 * to handle this. The MD has already been changed and
+		 * we have to do the close. So we try to do as much
+		 * clean up as we can.
+		 */
+		while (ldc_unreg_callback(vport->ldc_handle) == EAGAIN)
+			drv_usecwait(VCC_LDC_DELAY);
 	}
 
-	if ((rv = ldc_fini(vport->ldc_handle)) != 0) {
-		cmn_err(CE_CONT, "i_vcc_ldc_fini: cannot finilize channel"
-		    "%ld\n", vport->ldc_id);
-		return (rv);
-	}
-
-	return (0);
 }
 
 /* read data from ldc channel */
@@ -1160,6 +1183,15 @@ vcc_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 		return (0);
 	}
 
+	/*
+	 * the port may just be added by mdeg callback and may
+	 * not be configured yet.
+	 */
+	if (vport->ldc_id == VCC_INVALID_CHANNEL) {
+		mutex_exit(&vport->lock);
+		return (ENXIO);
+	}
+
 
 	/* check if channel has been initialized */
 	if ((vport->status & VCC_PORT_LDC_CHANNEL_READY) == 0) {
@@ -1189,7 +1221,6 @@ vcc_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 static int
 i_vcc_close_port(vcc_port_t *vport)
 {
-	int	rv = EIO;
 
 	if ((vport->status & VCC_PORT_OPEN) == 0) {
 		return (0);
@@ -1199,9 +1230,7 @@ i_vcc_close_port(vcc_port_t *vport)
 
 	if (vport->status & VCC_PORT_LDC_CHANNEL_READY) {
 		/* clean up ldc channel */
-		if ((rv = i_vcc_ldc_fini(vport)) != 0) {
-			return (rv);
-		}
+		i_vcc_ldc_fini(vport);
 		vport->status &= ~VCC_PORT_LDC_CHANNEL_READY;
 	}
 
@@ -1246,7 +1275,14 @@ vcc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 	vport = &(vccp->port[portno]);
 
 
+	/*
+	 * needs lock to provent i_vcc_delete_port, which is called by
+	 * the mdeg callback, from closing port.
+	 */
+	mutex_enter(&vport->lock);
+
 	if ((vport->status & VCC_PORT_OPEN) == 0) {
+		mutex_exit(&vport->lock);
 		return (0);
 	}
 
@@ -1255,11 +1291,11 @@ vcc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 		 * vntsd closes control port before it exits. There
 		 * could be events still pending for vntsd.
 		 */
+		mutex_exit(&vport->lock);
 		rv = i_vcc_reset_events(vccp);
 		return (0);
 	}
 
-	mutex_enter(&vport->lock);
 
 	/* check minor no and pid */
 	if ((rv = i_vcc_can_use_port(VCCMINORP(vccp, minor),

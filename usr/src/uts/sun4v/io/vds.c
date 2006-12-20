@@ -69,6 +69,7 @@
 #define	VD_CHANNEL_ENDPOINT	"channel-endpoint"
 #define	VD_ID_PROP		"id"
 #define	VD_BLOCK_DEVICE_PROP	"vds-block-device"
+#define	VD_REG_PROP		"reg"
 
 /* Virtual disk initialization flags */
 #define	VD_LOCKING		0x01
@@ -109,6 +110,33 @@
 	    (((vd)->xfer_mode == VIO_DRING_MODE) ? "dring client" :	\
 		(((vd)->xfer_mode == 0) ? "null client" :		\
 		    "unsupported client")))
+
+/*
+ * Specification of an MD node passed to the MDEG to filter any
+ * 'vport' nodes that do not belong to the specified node. This
+ * template is copied for each vds instance and filled in with
+ * the appropriate 'cfg-handle' value before being passed to the MDEG.
+ */
+static mdeg_prop_spec_t	vds_prop_template[] = {
+	{ MDET_PROP_STR,	"name",		VDS_NAME },
+	{ MDET_PROP_VAL,	"cfg-handle",	NULL },
+	{ MDET_LIST_END,	NULL, 		NULL }
+};
+
+#define	VDS_SET_MDEG_PROP_INST(specp, val) (specp)[1].ps_val = (val);
+
+/*
+ * Matching criteria passed to the MDEG to register interest
+ * in changes to 'virtual-device-port' nodes identified by their
+ * 'id' property.
+ */
+static md_prop_match_t	vd_prop_match[] = {
+	{ MDET_PROP_VAL,	VD_ID_PROP },
+	{ MDET_LIST_END,	NULL }
+};
+
+static mdeg_node_match_t vd_match = {"virtual-device-port",
+				    vd_prop_match};
 
 /* Debugging macros */
 #ifdef DEBUG
@@ -221,6 +249,7 @@ typedef struct vds {
 	dev_info_t	*dip;		/* driver inst devinfo pointer */
 	ldi_ident_t	ldi_ident;	/* driver's identifier for LDI */
 	mod_hash_t	*vd_table;	/* table of virtual disks served */
+	mdeg_node_spec_t *ispecp;	/* mdeg node specification */
 	mdeg_handle_t	mdeg;		/* handle for MDEG operations  */
 } vds_t;
 
@@ -2176,8 +2205,14 @@ vds_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	PR0("Detaching");
-	if (vds->initialized & VDS_MDEG)
+	if (vds->initialized & VDS_MDEG) {
 		(void) mdeg_unregister(vds->mdeg);
+		kmem_free(vds->ispecp->specp, sizeof (vds_prop_template));
+		kmem_free(vds->ispecp, sizeof (mdeg_node_spec_t));
+		vds->ispecp = NULL;
+		vds->mdeg = NULL;
+	}
+
 	if (vds->initialized & VDS_LDI)
 		(void) ldi_ident_release(vds->ldi_ident);
 	mod_hash_destroy_hash(vds->vd_table);
@@ -2876,27 +2911,12 @@ vds_process_md(void *arg, mdeg_result_t *md)
 static int
 vds_do_attach(dev_info_t *dip)
 {
-	static char	reg_prop[] = "reg";	/* devinfo ID prop */
-
-	/* MDEG specification for a (particular) vds node */
-	static mdeg_prop_spec_t	vds_prop_spec[] = {
-		{MDET_PROP_STR, "name", {VDS_NAME}},
-		{MDET_PROP_VAL, "cfg-handle", {0}},
-		{MDET_LIST_END, NULL, {0}}};
-	static mdeg_node_spec_t	vds_spec = {"virtual-device", vds_prop_spec};
-
-	/* MDEG specification for matching a vd node */
-	static md_prop_match_t	vd_prop_spec[] = {
-		{MDET_PROP_VAL, VD_ID_PROP},
-		{MDET_LIST_END, NULL}};
-	static mdeg_node_match_t vd_spec = {"virtual-device-port",
-					    vd_prop_spec};
-
-	int			status;
-	uint64_t		cfg_handle;
+	int			status, sz;
+	int			cfg_handle;
 	minor_t			instance = ddi_get_instance(dip);
 	vds_t			*vds;
-
+	mdeg_prop_spec_t	*pspecp;
+	mdeg_node_spec_t	*ispecp;
 
 	/*
 	 * The "cfg-handle" property of a vds node in an MD contains the MD's
@@ -2909,14 +2929,15 @@ vds_do_attach(dev_info_t *dip)
 	 * property cannot be found, the device tree state is presumably so
 	 * broken that there is no point in continuing.
 	 */
-	if (!ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, reg_prop)) {
-		PRN("vds \"%s\" property does not exist", reg_prop);
+	if (!ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+		VD_REG_PROP)) {
+		PRN("vds \"%s\" property does not exist", VD_REG_PROP);
 		return (DDI_FAILURE);
 	}
 
 	/* Get the MD instance for later MDEG registration */
 	cfg_handle = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    reg_prop, -1);
+	    VD_REG_PROP, -1);
 
 	if (ddi_soft_state_zalloc(vds_state, instance) != DDI_SUCCESS) {
 		PRN("Could not allocate state for instance %u", instance);
@@ -2928,7 +2949,6 @@ vds_do_attach(dev_info_t *dip)
 		ddi_soft_state_free(vds_state, instance);
 		return (DDI_FAILURE);
 	}
-
 
 	vds->dip	= dip;
 	vds->vd_table	= mod_hash_create_ptrhash("vds_vd_table", VDS_NCHAINS,
@@ -2943,12 +2963,26 @@ vds_do_attach(dev_info_t *dip)
 	vds->initialized |= VDS_LDI;
 
 	/* Register for MD updates */
-	vds_prop_spec[1].ps_val = cfg_handle;
-	if (mdeg_register(&vds_spec, &vd_spec, vds_process_md, vds,
+	sz = sizeof (vds_prop_template);
+	pspecp = kmem_alloc(sz, KM_SLEEP);
+	bcopy(vds_prop_template, pspecp, sz);
+
+	VDS_SET_MDEG_PROP_INST(pspecp, cfg_handle);
+
+	/* initialize the complete prop spec structure */
+	ispecp = kmem_zalloc(sizeof (mdeg_node_spec_t), KM_SLEEP);
+	ispecp->namep = "virtual-device";
+	ispecp->specp = pspecp;
+
+	if (mdeg_register(ispecp, &vd_match, vds_process_md, vds,
 		&vds->mdeg) != MDEG_SUCCESS) {
 		PRN("Unable to register for MD updates");
+		kmem_free(ispecp, sizeof (mdeg_node_spec_t));
+		kmem_free(pspecp, sz);
 		return (DDI_FAILURE);
 	}
+
+	vds->ispecp = ispecp;
 	vds->initialized |= VDS_MDEG;
 
 	/* Prevent auto-detaching so driver is available whenever MD changes */
