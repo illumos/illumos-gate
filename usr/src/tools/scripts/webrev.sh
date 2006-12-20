@@ -624,7 +624,7 @@ function fix_postscript
 	print "%%Trailer\n%%Pages: $pno\n";
 EOF
 
-	perl /tmp/$$.crmerge.pl < $infile
+	$PERL /tmp/$$.crmerge.pl < $infile
 }
 
 
@@ -703,7 +703,7 @@ function relative_dir
 	typeset ret=""
 	if [[ $2 == $cur ]]; then   # Should never happen.
 		# Should never happen.
-		print -u2 "\nWarning: relative_dir: \"$1\" not relative "
+		print -u2 "\nWARNING: relative_dir: \"$1\" not relative "
 		print -u2 "to \"$2\".  Check input paths.  Framed webrev "
 		print -u2 "will not be relocatable!"
 		print $2
@@ -1419,6 +1419,23 @@ function detect_scm
 	fi
 }
 
+function look_for_prog
+{
+	typeset path
+	typeset ppath
+	typeset progname=$1
+
+	ppath=$PATH
+	ppath=$ppath:/usr/sfw/bin:/usr/bin:/usr/sbin
+	ppath=$ppath:/opt/teamware/bin:/opt/onbld/bin
+	ppath=$ppath:/opt/onbld/bin/`/usr/bin/uname -p`
+
+	PATH=$ppath prog=`whence $progname`
+	if [[ -n $prog ]]; then
+		print $prog
+	fi
+}
+
 #
 # Usage message.
 #
@@ -1459,23 +1476,31 @@ trap "rm -f /tmp/$$.* ; exit" 0 1 2 3 15
 
 set +o noclobber
 
-if [[ -z $WDIFF ]]; then
-	WDIFF=`whence wdiff`
-	if [[ -z $WDIFF ]]; then
-		if [[ -x /opt/onbld/bin/wdiff ]]; then
-			WDIFF=/opt/onbld/bin/wdiff
-		elif [[ -x /ws/onnv-gate/public/bin/wdiff ]]; then
-			WDIFF=/ws/onnv-gate/public/bin/wdiff
-		else
-			print -u2 "Warning: wdiff not found!"
-		fi
-	fi
+[[ -z $WDIFF ]] && WDIFF=`look_for_prog wdiff`
+[[ -z $WX ]] && WX=`look_for_prog wx`
+[[ -z $CODEREVIEW ]] && CODEREVIEW=`look_for_prog codereview`
+[[ -z $PS2PDF ]] && PS2PDF=`look_for_prog ps2pdf`
+[[ -z $PERL ]] && PERL=`look_for_prog perl`
+
+if [[ ! -x $PERL ]]; then
+	print -u2 "Error: No perl interpreter found.  Exiting."
+	exit 1
 fi
+
+#
+# These aren't fatal, but we want to note them to the user.
+# We don't warn on the absence of 'wx' until later when we've
+# determined that we actually need to try to invoke it.
+#
+[[ ! -x $CODEREVIEW ]] && print -u2 "WARNING: codereview(1) not found."
+[[ ! -x $PS2PDF ]] && print -u2 "WARNING: ps2pdf(1) not found."
+[[ ! -x $WDIFF ]] && print -u2 "WARNING: wdiff not found."
 
 # Declare global total counters.
 integer TOTL TINS TDEL TMOD TUNC
 
-flist_autodetect=
+flist_mode=
+flist_file=
 iflag=
 oflag=
 pflag=
@@ -1530,14 +1555,21 @@ if [[ -z $wflag && -z $lflag ]]; then
 
 	if [[ $1 == "-" ]]; then
 		cat > $FLIST
+		flist_mode="stdin"
+		flist_done=1
+		shift
 	elif [[ -n $1 ]]; then
-		if [[ -r $1 ]]; then
+		if [[ ! -r $1 ]]; then
 			print -u2 "$1: no such file or not readable"
 			usage
 		fi
 		cat $1 > $FLIST
+		flist_mode="file"
+		flist_file=$1
+		flist_done=1
+		shift
 	else
-		flist_autodetect=1
+		flist_mode="auto"
 	fi
 fi
 
@@ -1590,10 +1622,14 @@ elif [[ -n $wflag ]]; then
 	if [[ -n "$*" ]]; then
 		shift
 	fi
+elif [[ $flist_mode == "stdin" ]]; then
+	print -u2 " File list from: standard input"
+elif [[ $flist_mode == "file" ]]; then
+	print -u2 " File list from: $flist_file"
 fi
 
 if [[ $# -gt 0 ]]; then
-	print -u2 "Warning: unused arguments: $*"
+	print -u2 "WARNING: unused arguments: $*"
 fi
 
 if [[ $SCM_MODE == "teamware" ]]; then
@@ -1627,18 +1663,9 @@ if [[ $SCM_MODE == "teamware" ]]; then
 	# If we're in auto-detect mode and we haven't already gotten the file
 	# list, then see if we can get it by probing for wx.
 	#
-	if [[ -z $flist_done && -n $flist_autodetect && -n $codemgr_ws ]]; then
-		if [[ -z $WX ]]; then
-			WX=`whence wx`
-			if [[ -z $WX ]]; then
-				if [[ -x /opt/onbld/bin/wx ]]; then
-					WDIFF=/opt/onbld/bin/wx
-				elif [[ -x /ws/onnv-gate/public/bin/wx ]]; then
-					WDIFF=/ws/onnv-gate/public/bin/wx
-				else
-					print -u2 "Warning: wx not found!"
-				fi
-			fi
+	if [[ -z $flist_done && $flist_mode == "auto" && -n $codemgr_ws ]]; then
+		if [[ ! -x $WX ]]; then
+			print -u2 "WARNING: wx not found!"
 		fi
 
 		#
@@ -1646,7 +1673,7 @@ if [[ $SCM_MODE == "teamware" ]]; then
 		# but only if a wx active file exists-- otherwise wx will
 		# hang asking us to initialize our wx information.
 		#
-		if [[ -n $WX && -f $codemgr_ws/wx/active ]]; then
+		if [[ -x $WX && -f $codemgr_ws/wx/active ]]; then
 			print -u2 " File list from: 'wx list -w' ... \c"
 			$WX list -w > $FLIST
 			$WX comments > /tmp/$$.wx_comments
@@ -1783,7 +1810,6 @@ rm -f $WDIR/$WNAME.ps
 rm -f $WDIR/$WNAME.pdf
 
 touch $WDIR/$WNAME.patch
-touch $WDIR/$WNAME.ps
 
 print "   Output Files:"
 
@@ -2042,12 +2068,16 @@ do
 
 		if [[ -z $mv_but_nodiff ]]; then
 			textcomm=`getcomments text $P $PP`
-			codereview -y "$textcomm" \
-			    -e $ocr $nfile >> $WDIR/$WNAME.ps  # 2>/dev/null
-			if [[ $? -eq 0 ]]; then
-				print " ps\c"
-			else
-				print " ps[fail]\c"
+			if [[ -x $CODEREVIEW ]]; then
+				$CODEREVIEW -y "$textcomm" \
+				    -e $ocr $nfile \
+				    > /tmp/$$.psfile 2>/dev/null &&
+				    cat /tmp/$$.psfile >> $WDIR/$WNAME.ps
+				if [[ $? -eq 0 ]]; then
+					print " ps\c"
+				else
+					print " ps[fail]\c"
+				fi
 			fi
 		fi
 	fi
@@ -2068,10 +2098,16 @@ done
 frame_nav_js > $WDIR/ancnav.js
 frame_navigation > $WDIR/ancnav.html
 
-print " ${B}Generating PDF: ${NB}\c"
-fix_postscript $WDIR/$WNAME.ps | ps2pdf - > $WDIR/$WNAME.pdf
-rm -f $WDIR/$WNAME.ps
-print "Done."
+if [[ ! -f $WDIR/$WNAME.ps ]]; then
+	print " Generating PDF: Skipped: no output available"
+elif [[ -x $CODEREVIEW && -x $PS2PDF ]]; then
+	print " Generating PDF: \c"
+	fix_postscript $WDIR/$WNAME.ps | $PS2PDF - > $WDIR/$WNAME.pdf
+	rm -f $WDIR/$WNAME.ps
+	print "Done."
+else
+	print " Generating PDF: Skipped: missing 'ps2pdf' or 'codereview'"
+fi
 
 # Now build the index.html file that contains
 # links to the source files and their diffs.
@@ -2102,7 +2138,7 @@ print "<table>"
 #
 username=`id | cut -d '(' -f 2 | cut -d ')' -f 1`
 realname=`getent passwd $username | cut -d':' -f 5`
-userupper=`perl -e "print ucfirst $username"`
+userupper=`$PERL -e "print ucfirst $username"`
 realname=`print $realname | sed s/\&/$userupper/`
 date="on `date`"
 
@@ -2264,7 +2300,7 @@ print "This code review page was prepared using <b>$0</b>"
 print "(vers $WEBREV_UPDATED)."
 print "Webrev is maintained by the <a href=\"http://www.opensolaris.org\">"
 print "OpenSolaris</a> project.  The latest version may be obtained"
-print "<a href=\"http://cvs.opensolaris.org/source/xref/on/usr/src/tools/scripts/webrev.sh\">here</a>.</p>"
+print "<a href=\"http://src.opensolaris.org/source/xref/on/usr/src/tools/scripts/webrev.sh\">here</a>.</p>"
 print "</body>"
 print "</html>"
 
