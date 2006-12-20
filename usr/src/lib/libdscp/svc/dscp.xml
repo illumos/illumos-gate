@@ -85,6 +85,18 @@
 	        <service_fmri value='svc:/system/fmd:default' />
 	</dependent>
 
+	<!--
+		The 'ntp' service on an OPL domain can be configured 
+		with SP as the NTP server, so create a dependency such that
+		the 'ntp' service is started after the DSCP service. 
+	-->
+	<dependent
+	    name='dscp_ntp'
+	    grouping='optional_all'
+	    restart_on='none'>
+	        <service_fmri value='svc:/network/ntp:default' />
+	</dependent>
+
 	<exec_method
 	    type='method'
 	    name='start'
