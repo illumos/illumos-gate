@@ -62,6 +62,8 @@ POFILE= md_monitordp.po
 
 ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
 
+$(ROOTSVCMETHOD):	$(SVCMETHOD)
+
 all     :=      TARGET = all
 install :=      TARGET = install
 clean   :=      TARGET = clean

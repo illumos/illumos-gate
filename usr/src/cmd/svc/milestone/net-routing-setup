@@ -184,21 +184,26 @@ if [ -z "$defrouters" ]; then
 	#
 	# Set default value for ipv4-routing to enabled.  If routeadm -e/-d
 	# has not yet been run by the administrator, we apply this default.
+	# The -b option is project-private and informs routeadm not
+	# to treat the enable as administrator-driven.
 	#
 	/usr/sbin/svccfg -s $SMF_FMRI \
 	    setprop routeadm/default-ipv4-routing = true
 	if [ "$ipv4_routing_set" = "false" ]; then
-		/sbin/routeadm -e ipv4-routing -u
+		/sbin/routeadm -b -e ipv4-routing -u
 	fi
 else
 	#
 	# Default router(s) have been found,  so ipv4-routing default value
 	# should be disabled.  If routaedm -e/d has not yet been run by
-	# the administrator, we apply this default.
+	# the administrator, we apply this default.  The -b option is
+	# project-private and informs routeadm not to treat the disable as
+	# administrator-driven.
+	#
 	/usr/sbin/svccfg -s $SMF_FMRI \
 	    setprop routeadm/default-ipv4-routing = false
 	if [ "$ipv4_routing_set" = "false" ]; then
-		/sbin/routeadm -d ipv4-routing -u
+		/sbin/routeadm -b -d ipv4-routing -u
 	fi
 fi
 

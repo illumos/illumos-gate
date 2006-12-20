@@ -409,6 +409,9 @@ static int ra_get_persistent_opt_cb(void *, scf_walkinfo_t *);
 static int ra_get_default_opt_cb(void *, scf_walkinfo_t *);
 static int ra_get_set_opt_common_cb(raopt_t *, scf_walkinfo_t *, boolean_t,
     boolean_t);
+static int ra_routing_opt_set_cb(void *, scf_walkinfo_t *);
+static int ra_routing_opt_unset_cb(void *, scf_walkinfo_t *);
+static int ra_routing_opt_set_unset_cb(raopt_t *, scf_walkinfo_t *, boolean_t);
 
 /* Callbacks used to set/retrieve routing variables */
 static int ra_set_persistent_var_cb(void *, scf_walkinfo_t *);
@@ -469,7 +472,7 @@ main(int argc, char *argv[])
 	int		numvalues, i;
 	ssize_t		keylen;
 	boolean_t	modify = B_FALSE, report = B_TRUE, update = B_FALSE;
-	boolean_t	alt_root_set = B_FALSE;
+	boolean_t	booting = B_FALSE, alt_root_set = B_FALSE;
 	boolean_t	parseable = B_FALSE;
 	char		*key, *nk, *keyend, *val, **vals, *options, *fmri;
 	char		*parseopt = NULL;
@@ -493,8 +496,19 @@ main(int argc, char *argv[])
 	 */
 	if (ra_upgrade_from_legacy_conf() == -1)
 		exit(EXIT_FAILURE);
-	while ((opt = getopt(argc, argv, ":d:e:l:m:p:R:r:s:u")) != EOF) {
+	while ((opt = getopt(argc, argv, ":bd:e:l:m:p:R:r:s:u")) != EOF) {
 		switch (opt) {
+		case 'b':
+			/*
+			 * Project-private option that tells us enable/disable
+			 * operations should not set ipv4(6)-routing-set
+			 * property.  Used in routing-setup service method
+			 * to change default routing state, and, if
+			 * no explicit enable/disable operations have been
+			 * carried out, change current ipv4 routing state.
+			 */
+			booting = B_TRUE;
+			break;
 		case 'd':
 		case 'e':
 		case 'r':
@@ -542,6 +556,27 @@ main(int argc, char *argv[])
 				if (ra_smf_cb(ra_set_persistent_opt_cb,
 				    raopt->opt_fmri, raopt) == -1)
 					exit(EXIT_FAILURE);
+				/*
+				 * ipv4(6)-routing explicitly enabled/disabled,
+				 * need to set ipv4(6)-routing-set property
+				 * for routing-setup service.  Once this
+				 * is set, routing-setup will not override
+				 * administrator action and will not enable
+				 * ipv4-routing in the case that no default
+				 * route can be determined.  If ipv4(6)-routing
+				 * is reverted to its default value,  set
+				 * ipv4(6)-routing-set back to false.
+				 */
+				if (!booting && (raopt->opt_flags &
+				    (RA_SVC_FLAG_IPV4_ROUTING |
+				    RA_SVC_FLAG_IPV6_ROUTING))) {
+					if (ra_smf_cb(opt == 'r' ?
+					    ra_routing_opt_unset_cb :
+					    ra_routing_opt_set_cb,
+					    raopt->opt_default_fmri, raopt)
+					    == -1)
+						exit(EXIT_FAILURE);
+				}
 			} else if ((ravar = ra_str2var(optarg)) != NULL) {
 				if (opt != 'r') {
 					usage();
@@ -1284,6 +1319,36 @@ ra_get_persistent_opt_cb(void *data, scf_walkinfo_t *wip)
 	return (ra_get_set_opt_common_cb(data, wip, B_TRUE, B_TRUE));
 }
 
+static int
+ra_routing_opt_set_cb(void *data, scf_walkinfo_t *wip)
+{
+	return (ra_routing_opt_set_unset_cb(data, wip, B_TRUE));
+}
+
+static int
+ra_routing_opt_unset_cb(void *data, scf_walkinfo_t *wip)
+{
+	return (ra_routing_opt_set_unset_cb(data, wip, B_FALSE));
+}
+
+/*
+ * Notify network/routing-setup service that administrator has explicitly
+ * set/reset ipv4(6)-routing value.  If no explicit setting of this value is
+ * done,  ipv4-routing can be enabled in the situation when no default route can
+ * be determined.
+ */
+static int
+ra_routing_opt_set_unset_cb(raopt_t *raopt, scf_walkinfo_t *wip, boolean_t set)
+{
+	scf_instance_t	*inst = wip->inst;
+	scf_handle_t	*h = scf_instance_handle(inst);
+
+	return (ra_set_boolean_prop(h, inst, RA_PG_ROUTEADM,
+	    raopt->opt_flags & RA_SVC_FLAG_IPV4_ROUTING ?
+	    RA_PROP_IPV4_ROUTING_SET : RA_PROP_IPV6_ROUTING_SET,
+	    B_FALSE, set));
+}
+
 /*
  * Shared function that either sets or determines persistent or current
  * state. Setting persistent state (for next boot) involves setting
@@ -1304,7 +1369,6 @@ ra_get_set_opt_common_cb(raopt_t *raopt, scf_walkinfo_t *wip,
 {
 	const char		*inst_fmri = wip->fmri;
 	scf_instance_t		*inst = wip->inst;
-	scf_instance_t		*rinst = NULL;
 	scf_handle_t		*h = scf_instance_handle(inst);
 	scf_propertygroup_t	*routeadm_pg;
 	boolean_t		persistent_state_enabled;
@@ -1465,29 +1529,6 @@ ra_get_set_opt_common_cb(raopt_t *raopt, scf_walkinfo_t *wip,
 			(void) smf_refresh_instance(inst_fmri);
 			if (raopt->opt_fmri != NULL)
 				return (0);
-			/*
-			 * Notify network/routing-setup service that
-			 * administrator has explicitly set ipv4(6)-routing
-			 * value.  If no explicit setting of this value is
-			 * done, ipv4-routing can be enabled in the situation
-			 * when no default routes can be determined.
-			 */
-			if ((rinst = scf_instance_create(h)) == NULL ||
-			    scf_handle_decode_fmri(h, RA_INSTANCE_ROUTING_SETUP,
-			    NULL, NULL, rinst, NULL, NULL,
-			    SCF_DECODE_FMRI_EXACT) == -1) {
-				(void) fprintf(stderr, gettext(
-				    "%s: unexpected libscf error: %s\n"),
-				    myname, scf_strerror(scf_error()));
-				return (-1);
-			}
-			ret = ra_set_boolean_prop(h, rinst, RA_PG_ROUTEADM,
-			    raopt->opt_flags & RA_SVC_FLAG_IPV4_ROUTING ?
-			    RA_PROP_IPV4_ROUTING_SET :
-			    RA_PROP_IPV6_ROUTING_SET, B_FALSE, B_TRUE);
-			scf_instance_destroy(rinst);
-			if (ret != 0)
-				return (-1);
 			(void) smf_refresh_instance(RA_INSTANCE_ROUTING_SETUP);
 		} else {
 			/*
@@ -2438,6 +2479,22 @@ ra_parseopt(char *confstr, int lineno, raopt_t *raopt)
 	raopt->opt_default_enabled = d_oval == OPT_ENABLED;
 	if (oval == OPT_DEFAULT)
 		raopt->opt_enabled = d_oval == OPT_ENABLED;
+
+	/*
+	 * Set ipv4(6)-routing-set property as appropriate on upgrading
+	 * routing.conf.  If option was default, set this value to false,
+	 * as this indicates the administrator has not explicitly enabled
+	 * or disabled ipv4(6)-routing.  The ipv4-routing-set value is used
+	 * in the routing-setup service, and if it is false, ipv4-routing
+	 * is enabled in the case where no default route can be determined.
+	 */
+	if (raopt->opt_flags & (RA_SVC_FLAG_IPV4_ROUTING |
+	    RA_SVC_FLAG_IPV6_ROUTING)) {
+		if (ra_smf_cb(oval == OPT_DEFAULT ? ra_routing_opt_unset_cb :
+		    ra_routing_opt_set_cb, raopt->opt_default_fmri, raopt)
+		    == -1)
+			return (-1);
+	}
 	return (0);
 }
 
