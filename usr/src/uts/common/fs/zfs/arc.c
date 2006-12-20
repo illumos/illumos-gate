@@ -1401,6 +1401,10 @@ arc_reclaim_thread(void)
 			arc.no_grow = FALSE;
 		}
 
+		if (2 * arc.c <
+		    arc.size + arc.mru_ghost->size + arc.mfu_ghost->size)
+			arc_adjust();
+
 		if (arc_eviction_list != NULL)
 			arc_do_user_evicts();
 
@@ -1577,6 +1581,13 @@ out:
 			ASSERT(refcount_is_zero(&hdr->b_refcnt));
 			atomic_add_64(&hdr->b_state->lsize, size);
 		}
+		/*
+		 * If we are growing the cache, and we are adding anonymous
+		 * data, and we have outgrown arc.p, update arc.p
+		 */
+		if (arc.size < arc.c && hdr->b_state == arc.anon &&
+		    arc.anon->size + arc.mru->size > arc.p)
+			arc.p = MIN(arc.c, arc.p + size);
 	}
 }
 
