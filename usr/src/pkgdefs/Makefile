@@ -308,6 +308,7 @@ COMMON_SUBDIRS= \
 	SUNWrcmdc \
 	SUNWrcmdr \
 	SUNWrcmds \
+	SUNWrds \
 	SUNWrge \
 	SUNWrmvolmgr \
 	SUNWrmvolmgrr \

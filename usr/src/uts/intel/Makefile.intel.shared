@@ -269,6 +269,7 @@ DRV_KMODS	+= pts
 DRV_KMODS	+= ptsl
 DRV_KMODS	+= ramdisk
 DRV_KMODS	+= random
+DRV_KMODS	+= rds
 DRV_KMODS	+= rpcib
 DRV_KMODS	+= rsm
 DRV_KMODS	+= rts
@@ -396,7 +397,7 @@ DRV_KMODS	+= dcam1394
 #
 #	InfiniBand pseudo drivers
 #
-DRV_KMODS	+= ib ibd
+DRV_KMODS	+= ib ibd rdsib
 
 #
 #	LVM modules
