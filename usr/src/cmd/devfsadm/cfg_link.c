@@ -760,6 +760,7 @@ DEF:
 	 * if our name still won't fit <ap_pathsz>, then use the leaf <node>'s
 	 * default name
 	 */
+	pci_dev = PCIHP_AP_MINOR_NUM_TO_PCI_DEVNUM(di_minor_devt(minor));
 	rv = pci_cfg_ap_node(pci_dev, node, ph, buf, bufsz, APNODE_DEFNAME);
 	if (rv == 0) {
 		dprint(("%s: cannot create default ap node name for %s%d\n",
