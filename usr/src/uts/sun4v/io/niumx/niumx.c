@@ -165,16 +165,37 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
+void
+niumx_intr_dist(void *arg)
+{
+	kmutex_t 	*lock_p = (kmutex_t *)arg;
+	int		i = NIUMX_RSVD_INTRS;
+	niumx_ih_t	*ih_p = niumx_ihtable + i;
+
+	DBG(DBG_A_INTX, NULL, "niumx_intr_dist entered\n");
+	mutex_enter(lock_p);
+	for (; i < NIUMX_MAX_INTRS; i++, ih_p++) {
+		sysino_t sysino = ih_p->ih_sysino;
+		cpuid_t	cpuid;
+		int	intr_state;
+		if (!sysino ||	/* sequence is significant */
+		    (hvio_intr_getvalid(sysino, &intr_state) != H_EOK) ||
+		    (intr_state == HV_INTR_NOTVALID) ||
+		    (cpuid = intr_dist_cpuid()) == ih_p->ih_cpuid)
+			continue;
+
+		(void) hvio_intr_setvalid(sysino, HV_INTR_NOTVALID);
+		(void) hvio_intr_settarget(sysino, cpuid);
+		(void) hvio_intr_setvalid(sysino, HV_INTR_VALID);
+		ih_p->ih_cpuid = cpuid;
+	}
+	mutex_exit(lock_p);
+}
 
 /*
- * Hypervisor VPCI services information for the NIU nexus driver.
+ * Hypervisor INTR services information for the NIU nexus driver.
  */
-static	uint64_t	niumx_vpci_min_ver;   /* Neg. VPCI API minor version */
-static hsvc_info_t niumx_hv_vpci = {
-	HSVC_REV_1, NULL, HSVC_GROUP_VPCI, NIUMX_VPCI_MAJOR_VER,
-	NIUMX_VPCI_MINOR_VER, "NIUMX"
-};
-static	uint64_t	niumx_intr_min_ver;   /* Neg. VPCI API minor version */
+static	uint64_t	niumx_intr_min_ver;   /* Neg. API minor version */
 static hsvc_info_t niumx_hv_intr = {
 	HSVC_REV_1, NULL, HSVC_GROUP_INTR, NIUMX_INTR_MAJOR_VER,
 	NIUMX_INTR_MINOR_VER, "NIUMX"
@@ -216,18 +237,8 @@ niumx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			"niumxds_p = %p\n", instance, niumxds_p);
 
 		/*
-		 * Negotiate the API version for HV VPCI & INTR services.
+		 * Negotiate the API version for HV INTR services.
 		 */
-		if ((ret = hsvc_register(&niumx_hv_vpci, &niumx_vpci_min_ver))
-			!= H_EOK) {
-		    cmn_err(CE_WARN, "%s: cannot negotiate hypervisor services "
-		    "group: 0x%lx major: 0x%lx minor: 0x%lx errno: %d\n",
-		    niumx_hv_vpci.hsvc_modname, niumx_hv_vpci.hsvc_group,
-		    niumx_hv_vpci.hsvc_major, niumx_hv_vpci.hsvc_minor, ret);
-		    ret = DDI_FAILURE;
-		    goto cleanup;
-		}
-
 		if ((ret = hsvc_register(&niumx_hv_intr, &niumx_intr_min_ver))
 			!= H_EOK) {
 		    cmn_err(CE_WARN, "%s: cannot negotiate hypervisor services "
@@ -235,21 +246,21 @@ niumx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    niumx_hv_intr.hsvc_modname, niumx_hv_intr.hsvc_group,
 		    niumx_hv_intr.hsvc_major, niumx_hv_intr.hsvc_minor, ret);
 		    ret = DDI_FAILURE;
-		    goto unregister;
+		    goto cleanup;
 		}
 
 		DBG(DBG_ATTACH, dip, "neg. HV API major 0x%lx minor 0x%lx\n",
-			niumx_hv_vpci.hsvc_major, niumx_vpci_min_ver);
+			niumx_hv_intr.hsvc_major, niumx_intr_min_ver);
 
 		/* hv devhdl: low 28-bit of 1st "reg" entry's addr.hi */
 		niumxds_p->niumx_dev_hdl = (devhandle_t)(reg_p->addr_high &
 			NIUMX_DEVHDLE_MASK);
 
+		/* add interrupt redistribution callback */
+		intr_dist_add(niumx_intr_dist, &niumxds_p->niumx_mutex);
+
 		ret = DDI_SUCCESS;
 		goto prop_free;
-
-unregister:
-		(void) hsvc_unregister(&niumx_hv_vpci);
 cleanup:
 		mutex_destroy(&niumxds_p->niumx_mutex);
 		ddi_soft_state_free(niumx_state, ddi_get_instance(dip));
@@ -272,12 +283,12 @@ niumx_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_DETACH:
-		(void) hsvc_unregister(&niumx_hv_vpci);
 		(void) hsvc_unregister(&niumx_hv_intr);
 
 		niumxds_p = (niumx_devstate_t *)
 		    ddi_get_soft_state(niumx_state, ddi_get_instance(dip));
 
+		intr_dist_rem(niumx_intr_dist, &niumxds_p->niumx_mutex);
 		mutex_destroy(&niumxds_p->niumx_mutex);
 		ddi_soft_state_free(niumx_state, ddi_get_instance(dip));
 		return (DDI_SUCCESS);

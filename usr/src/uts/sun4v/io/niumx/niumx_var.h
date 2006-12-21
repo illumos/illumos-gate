@@ -83,6 +83,7 @@ typedef struct niumx_devstate {
 
 #define	NIUMX_FUNC_NUM_MASK	1
 #define	NIUMX_MAX_INTRS	64
+#define	NIUMX_RSVD_INTRS	16
 
 /* currently Error Interrupt handler slot is hardcoded */
 #define	NIUMX_EI_IH 52
@@ -121,16 +122,10 @@ typedef struct {
 } niu_regspec_t;
 
 /*
- * HV VPCI & INTR  API versioning.
+ * HV INTR  API versioning.
  *
- * Currently NIU nexus driver supports VPCI API version 1.0
+ * Currently NIU nexus driver supports version 1.0
  */
-#define	NIUMX_VPCI_MAJOR_VER_1	0x1ull
-#define	NIUMX_VPCI_MAJOR_VER	NIUMX_VPCI_MAJOR_VER_1
-
-#define	NIUMX_VPCI_MINOR_VER_0	0x0ull
-#define	NIUMX_VPCI_MINOR_VER	NIUMX_VPCI_MINOR_VER_0
-
 #define	NIUMX_INTR_MAJOR_VER_1	0x1ull
 #define	NIUMX_INTR_MAJOR_VER	NIUMX_INTR_MAJOR_VER_1
 
