@@ -3244,8 +3244,8 @@ am_wiocdata_mixerctl_chinfo(queue_t *q, mblk_t *mp, audio_i_state_t *state)
 	mp->b_cont = NULL;
 
 	/* Setup for copyin */
-	mcopyin(mp, (mblk_t *)state, sizeof (audio_info_t),
-	    (caddr_t)state->ais_address);
+	ASSERT(state->ais_address != NULL);
+	mcopyin(mp, state, sizeof (audio_info_t), (caddr_t)state->ais_address);
 
 	/* send the copy in request */
 	qreply(q, mp);
@@ -3284,8 +3284,8 @@ am_wiocdata_mixerctl_get_chinfo(queue_t *q, mblk_t *mp, audio_i_state_t *state)
 	tmp = (mblk_t *)state->ais_address2;
 
 	/* Setup for copyout */
-	mcopyout(mp, (mblk_t *)state, tmp->b_wptr - tmp->b_rptr,
-	    state->ais_address, tmp);
+	ASSERT(state->ais_address != NULL);
+	mcopyout(mp, state, tmp->b_wptr - tmp->b_rptr, state->ais_address, tmp);
 
 	state->ais_address2 = NULL;
 
@@ -3356,7 +3356,8 @@ am_wiocdata_sr(queue_t *q, mblk_t *mp, struct copyreq *cqp,
 	ASSERT(cqp->cq_private == (mblk_t *)state);
 
 	/* Setup for copyin */
-	mcopyin(mp, (mblk_t *)state, size, (caddr_t)state->ais_address);
+	ASSERT(state->ais_address != NULL);
+	mcopyin(mp, state, size, (caddr_t)state->ais_address);
 
 	/* send the copy in request */
 	qreply(q, mp);
@@ -3481,7 +3482,10 @@ am_wioctl_copyin(queue_t *q, mblk_t *mp, audio_ch_t *chptr,
 	state->ais_address = (caddr_t)(*(caddr_t *)mp->b_cont->b_rptr);
 
 	/* Setup for copyin */
-	mcopyin(mp, (mblk_t *)state, size, state->ais_address);
+	if (state->ais_address == NULL) {
+		return (EINVAL);
+	}
+	mcopyin(mp, state, size, state->ais_address);
 
 	/* send the copy in request */
 	qreply(q, mp);
@@ -3628,8 +3632,11 @@ am_wioctl_getdev(queue_t *q, mblk_t *mp, audio_ch_t *chptr,
 	state->ais_address = (caddr_t)(*(caddr_t *)mp->b_cont->b_rptr);
 
 	/* Setup for copyout */
-	mcopyout(mp, (mblk_t *)state, sizeof (*ad_infop->ad_dev_info),
-	    state->ais_address, NULL);
+	if (state->ais_address == NULL) {
+		return (EINVAL);
+	}
+	mcopyout(mp, state, sizeof (*ad_infop->ad_dev_info), state->ais_address,
+	    NULL);
 
 	/* put the data in the buffer, but try to reuse it first */
 	if (audio_sup_mblk_alloc(mp, sizeof (*ad_infop->ad_dev_info)) ==
@@ -3849,8 +3856,8 @@ am_get_chinfo_task(void *arg)
 	state->ais_command = AM_COPY_OUT_MIXCTL_GET_CHINFO;
 
 	/* Setup for copyout */
-	mcopyout(mp, (mblk_t *)state, sizeof (audio_info_t),
-	    (caddr_t)info, tmp);
+	ASSERT(state->ais_address != NULL);
+	mcopyout(mp, state, sizeof (audio_info_t), (caddr_t)info, tmp);
 
 	ASSERT(mp->b_cont == tmp);
 
@@ -3898,6 +3905,7 @@ am_get_mode_task(void *arg)
 	am_apm_private_t	*stpptr = apm_infop->apm_private;
 	struct copyreq		*cqp = (struct copyreq *)mp->b_rptr;
 	audio_i_state_t		*state = (audio_i_state_t *)cqp->cq_private;
+	int 			error = 0;
 
 	ATRACE("in am_get_mode_task() arg", arg);
 
@@ -3908,15 +3916,16 @@ am_get_mode_task(void *arg)
 	state->ais_address = (caddr_t)(*(caddr_t *)mp->b_cont->b_rptr);
 
 	/* Setup for copyout */
-	mcopyout(mp, (mblk_t *)state, sizeof (int), state->ais_address, NULL);
+	if (state->ais_address == NULL) {
+		error = EINVAL;
+		goto done;
+	}
+	mcopyout(mp, state, sizeof (int), state->ais_address, NULL);
 
 	/* put the data in the buffer, but try to reuse it first */
 	if (audio_sup_mblk_alloc(mp, sizeof (int)) == AUDIO_FAILURE) {
-		if (cqp->cq_private) {
-			kmem_free(cqp->cq_private, sizeof (audio_i_state_t));
-			cqp->cq_private = NULL;
-		}
-		miocnak(q, mp, 0, ENOMEM);
+		error = ENOMEM;
+		goto done;
 	} else {
 		*((int *)mp->b_cont->b_rptr) = stpptr->am_pstate->apm_mode;
 		mp->b_cont->b_wptr = mp->b_cont->b_rptr +
@@ -3924,6 +3933,14 @@ am_get_mode_task(void *arg)
 		qreply(q, mp);
 	}
 
+done:
+	if (error) {
+		if (cqp->cq_private) {
+			kmem_free(cqp->cq_private, sizeof (audio_i_state_t));
+			cqp->cq_private = NULL;
+		}
+		miocnak(q, mp, 0, error);
+	}
 	kmem_free(arg, sizeof (am_ioctl_args_t));
 
 	am_exit_task(chptr);
@@ -3958,6 +3975,7 @@ am_getinfo_task(void *arg)
 	struct copyreq		*cqp = (struct copyreq *)mp->b_rptr;
 	audio_i_state_t		*state = (audio_i_state_t *)cqp->cq_private;
 	audio_info_t		*info_out;
+	int			error = 0;
 
 	ATRACE("in am_getinfo_task() arg", arg);
 
@@ -3968,18 +3986,18 @@ am_getinfo_task(void *arg)
 	state->ais_address = (caddr_t)(*(caddr_t *)mp->b_cont->b_rptr);
 
 	/* Setup for copyout */
-	mcopyout(mp, (mblk_t *)state, sizeof (*info_out), state->ais_address,
-	    NULL);
+	if (state->ais_address == NULL) {
+		error = EINVAL;
+		ATRACE("am_getinfo_task() with invalid address", chptr);
+		goto done;
+	}
+	mcopyout(mp, state, sizeof (*info_out), state->ais_address, NULL);
 
 	/* put the data in the buffer, but try to reuse it first */
 	if (audio_sup_mblk_alloc(mp, sizeof (*info_out)) == AUDIO_FAILURE) {
-		am_mixer_task_acknack(state, chptr, q, mp, arg, ENOMEM);
-
-		am_release_rwlock();
-
-		ATRACE("am_getinfo_task() returning error", chptr);
-
-		return;
+		error = ENOMEM;
+		ATRACE("am_getinfo_task() failing to alloc mblk", chptr);
+		goto done;
 	}
 
 	info_out = (audio_info_t *)mp->b_cont->b_rptr;
@@ -3997,6 +4015,10 @@ am_getinfo_task(void *arg)
 
 	am_exit_task(chptr);
 
+done:
+	if (error) {
+		am_mixer_task_acknack(state, chptr, q, mp, arg, error);
+	}
 	am_release_rwlock();
 
 	ATRACE("am_getinfo_task() returning", chptr);
@@ -4056,8 +4078,13 @@ am_mixerctl_getinfo_task(void *arg)
 	state->ais_address = (caddr_t)(*(caddr_t *)mp->b_cont->b_rptr);
 
 	/* Setup for copyout */
-	mcopyout(mp, (mblk_t *)state, size, state->ais_address,
-	    NULL);
+	if (state->ais_address == NULL) {
+		ATRACE("am_mixerctl_getinfo_task() bad address from user",
+		    NULL);
+		error = EINVAL;
+		goto nack;
+	}
+	mcopyout(mp, state, size, state->ais_address, NULL);
 
 	/* put the data in the buffer, but try to reuse it first */
 	if (audio_sup_mblk_alloc(mp, size) == AUDIO_FAILURE) {
@@ -4213,8 +4240,8 @@ am_mixerctl_setinfo_task(void *arg)
 	state->ais_command = AM_COPY_OUT_MIXCTLINFO;
 
 	/* Setup for copyout */
-	mcopyout(mp, (mblk_t *)state, sizeof (*tinfo), state->ais_address,
-	    NULL);
+	ASSERT(state->ais_address != NULL);
+	mcopyout(mp, state, sizeof (*tinfo), state->ais_address, NULL);
 	ASSERT(mp->b_cont->b_wptr == (mp->b_cont->b_rptr + sizeof (*tinfo)));
 
 	qreply(q, mp);
@@ -4408,7 +4435,8 @@ am_sample_rate_task(void *arg)
 	state->ais_command = AM_COPY_OUT_SAMP_RATES;
 
 	/* Setup for copyout */
-	mcopyout(mp, (mblk_t *)state, size, state->ais_address, NULL);
+	ASSERT(state->ais_address != NULL);
+	mcopyout(mp, state, size, state->ais_address, NULL);
 	ASSERT(mp->b_cont->b_wptr == (mp->b_cont->b_rptr + size));
 
 	qreply(q, mp);
@@ -4544,8 +4572,8 @@ am_set_chinfo_task(void *arg)
 	state->ais_command = AM_COPY_OUT_MIXCTL_GET_CHINFO;
 
 	/* Setup for copyout */
-	mcopyout(mp, (mblk_t *)state, sizeof (*tinfo), state->ais_address,
-	    NULL);
+	ASSERT(state->ais_address != NULL);
+	mcopyout(mp, state, sizeof (*tinfo), state->ais_address, NULL);
 	ASSERT(mp->b_cont->b_wptr == (mp->b_cont->b_rptr + sizeof (*tinfo)));
 
 	qreply(q, mp);
@@ -5224,8 +5252,8 @@ am_setinfo_task(void *arg)
 	state->ais_command = AM_COPY_OUT_AUDIOINFO2;
 
 	/* Setup for copyout */
-	mcopyout(mp, (mblk_t *)state, sizeof (*tinfo), state->ais_address,
-	    NULL);
+	ASSERT(state->ais_address != NULL);
+	mcopyout(mp, state, sizeof (*tinfo), state->ais_address, NULL);
 	ASSERT(mp->b_cont->b_wptr == (mp->b_cont->b_rptr + sizeof (*tinfo)));
 
 	qreply(q, mp);
