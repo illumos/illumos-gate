@@ -327,6 +327,7 @@ DRV_KMODS	+= glvc
 DRV_KMODS	+= mdesc
 DRV_KMODS	+= niumx
 DRV_KMODS	+= nxge
+DRV_KMODS	+= n2piupc
 DRV_KMODS	+= px
 DRV_KMODS	+= qcn
 DRV_KMODS	+= rootnex
