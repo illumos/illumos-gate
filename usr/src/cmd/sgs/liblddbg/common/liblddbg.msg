@@ -329,8 +329,8 @@
 @ MSG_REL_BADROFFSET	"<offset lies outside memory image; \
 			 relocation discarded>"
 
-@ MSG_REL_TRANS		"relocation transition: offset: %#llx old reloc: %s \
-			 new reloc: %s symbol `%s'"
+@ MSG_REL_TRANSITION	"relocation: %s: section=%s; input from file=%s; \
+			 offset=0x%llx; symbol=%s; transitioned to: %s"
 @ MSG_REL_DISCARDED	"relocation against discarded section=%s from file=%s; \
 			 relocation type=%s offset=0x%llx; relocation discarded"
 @ MSG_REL_COPY		"copy data from file=%s to file=%s: symbol `%s'%s"

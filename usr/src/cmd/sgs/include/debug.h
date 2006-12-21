@@ -713,8 +713,7 @@ extern	void	Dbg_reloc_out(Ofl_desc *, int, Word, void *, const char *,
 		    const char *);
 extern	void	Dbg_reloc_proc(Lm_list *, Os_desc *, Is_desc *, Is_desc *);
 extern	void	Dbg_reloc_run(Rt_map *, uint_t, int, int);
-extern	void	Dbg_reloc_transition(Lm_list *, Half, Word, Word, Xword,
-		    const char *);
+extern	void	Dbg_reloc_transition(Lm_list *, Half, Word, Rel_desc *);
 extern	void	Dbg_reloc_sloppycomdat(Lm_list *, const char *, Sym_desc *);
 
 extern	void	Dbg_sec_added(Lm_list *, Os_desc *, Sg_desc *);

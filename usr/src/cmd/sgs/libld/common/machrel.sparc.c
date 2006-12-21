@@ -753,30 +753,26 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		switch (rtype) {
 		case R_SPARC_TLS_GD_HI22:
 			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-			    rtype, R_SPARC_TLS_IE_HI22, arsp->rel_roffset,
-			    sdp->sd_name));
+			    R_SPARC_TLS_IE_HI22, arsp));
 			arsp->rel_rtype = R_SPARC_TLS_IE_HI22;
 			return (FIX_RELOC);
 
 		case R_SPARC_TLS_GD_LO10:
 			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-			    rtype, R_SPARC_TLS_IE_LO10, arsp->rel_roffset,
-			    sdp->sd_name));
+			    R_SPARC_TLS_IE_LO10, arsp));
 			arsp->rel_rtype = R_SPARC_TLS_IE_LO10;
 			return (FIX_RELOC);
 
 		case R_SPARC_TLS_GD_ADD:
 			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-			    rtype, R_SPARC_NONE, arsp->rel_roffset,
-			    sdp->sd_name));
+			    R_SPARC_NONE, arsp));
 			*offset = (TLS_GD_IE_LD |
 			    (*offset & (FM3_REG_MSK_RS1 | FM3_REG_MSK_RS2)));
 			return (FIX_DONE);
 
 		case R_SPARC_TLS_GD_CALL:
 			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-			    rtype, R_SPARC_NONE, arsp->rel_roffset,
-			    sdp->sd_name));
+			    R_SPARC_NONE, arsp));
 			*offset = TLS_GD_IE_ADD;
 			return (FIX_DONE);
 		}
@@ -790,14 +786,14 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 	case R_SPARC_TLS_IE_HI22:
 	case R_SPARC_TLS_GD_HI22:
 	case R_SPARC_TLS_LDO_HIX22:
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_SPARC_TLS_LE_HIX22, arsp->rel_roffset, sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_SPARC_TLS_LE_HIX22, arsp));
 		arsp->rel_rtype = R_SPARC_TLS_LE_HIX22;
 		return (FIX_RELOC);
 
 	case R_SPARC_TLS_LDO_LOX10:
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_SPARC_TLS_LE_LOX10, arsp->rel_roffset, sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_SPARC_TLS_LE_LOX10, arsp));
 		arsp->rel_rtype = R_SPARC_TLS_LE_LOX10;
 		return (FIX_RELOC);
 
@@ -815,8 +811,8 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 *
 		 *	xor r1, %lox(x), r2
 		 */
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_SPARC_TLS_LE_LOX10, arsp->rel_roffset, sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_SPARC_TLS_LE_LOX10, arsp));
 		*offset = TLS_GD_LE_XOR |
 		    (*offset & (FM3_REG_MSK_RS1 | FM3_REG_MSK_RD));
 		arsp->rel_rtype = R_SPARC_TLS_LE_LOX10;
@@ -832,8 +828,8 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 *
 		 *	mov	r2, r3   (or  %g0, r2, r3)
 		 */
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_SPARC_NONE, arsp->rel_roffset, sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_SPARC_NONE, arsp));
 		*offset = ((*offset) & (FM3_REG_MSK_RS2 | FM3_REG_MSK_RD)) |
 		    TLS_IE_LE_OR;
 		return (FIX_DONE);
@@ -849,15 +845,15 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 *
 		 *	add %g7, r2, r3
 		 */
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_SPARC_NONE, arsp->rel_roffset, sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_SPARC_NONE, arsp));
 		*offset = *offset & (~FM3_REG_MSK_RS1);
 		*offset = *offset | (REG_G7 << 14);
 		return (FIX_DONE);
 
 	case R_SPARC_TLS_LDM_CALL:
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_SPARC_NONE, arsp->rel_roffset, sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_SPARC_NONE, arsp));
 		*offset = TLS_LD_LE_CLRO0;
 		return (FIX_DONE);
 
@@ -866,8 +862,8 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 	case R_SPARC_TLS_LDM_ADD:
 	case R_SPARC_TLS_IE_ADD:
 	case R_SPARC_TLS_GD_CALL:
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_SPARC_NONE, arsp->rel_roffset, sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_SPARC_NONE, arsp));
 		*offset = M_NOP;
 		return (FIX_DONE);
 	}
@@ -879,21 +875,20 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 static Fixupret
 gotop_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 {
-	Sym_desc	*sdp = arsp->rel_sym;
 	Word		rtype = arsp->rel_rtype;
 	uint_t		*offset;
 	const char	*ifl_name;
 
 	switch (rtype) {
 	case R_SPARC_GOTDATA_OP_HIX22:
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_SPARC_GOTDATA_HIX22, arsp->rel_roffset, sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_SPARC_GOTDATA_HIX22, arsp));
 		arsp->rel_rtype = R_SPARC_GOTDATA_HIX22;
 		return (FIX_RELOC);
 
 	case R_SPARC_GOTDATA_OP_LOX10:
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_SPARC_GOTDATA_LOX10, arsp->rel_roffset, sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_SPARC_GOTDATA_LOX10, arsp));
 		arsp->rel_rtype = R_SPARC_GOTDATA_LOX10;
 		return (FIX_RELOC);
 
@@ -906,8 +901,8 @@ gotop_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 *
 		 *	add	r1, r2, r3
 		 */
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_SPARC_NONE, arsp->rel_roffset, sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_SPARC_NONE, arsp));
 		offset = (uint_t *)(uintptr_t)(arsp->rel_roffset +
 		    _elf_getxoff(arsp->rel_isdesc->is_indata) +
 		    (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
@@ -1597,12 +1592,28 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 	return (ld_add_actrel(NULL, rsp, ofl));
 }
 
+/*
+ * Establish a relocation transition.  Note, at this point of input relocation
+ * processing, we have no idea of the relocation value that will be used in
+ * the eventual relocation calculation.  This value is only known after the
+ * initial image has been constructed.  Therefore, there is a small chance
+ * that a value can exceed the capabilities of the transitioned relocation.
+ * One example might be the offset from the GOT to a symbol.
+ *
+ * The only instance of this failure discovered so far has been via the use of
+ * ABS symbols to represent an external memory location.  This situation is
+ * rare, since ABS symbols aren't typically generated by the compilers.
+ * Therefore, our solution is to excluded ABS symbols from the transition
+ * relocation possibilities.  As an additional safeguard, if an inappropriate
+ * value is passed to the final relocation engine, a verification ("V")
+ * relocation should trigger a fatal error condition.
+ */
 uintptr_t
-ld_reloc_GOTOP(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
+ld_reloc_GOTOP(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Word	rtype = rsp->rel_rtype;
 
-	if (!local) {
+	if (!local || (rsp->rel_sym->sd_sym->st_shndx == SHN_ABS)) {
 		/*
 		 * When binding to a external symbol, no fixups are required
 		 * and the GOTDATA_OP relocation can be ignored.
@@ -1623,7 +1634,7 @@ ld_reloc_GOTOP(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 }
 
 uintptr_t
-ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
+ld_reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Word		rtype = rsp->rel_rtype;
 	Sym_desc	*sdp = rsp->rel_sym;

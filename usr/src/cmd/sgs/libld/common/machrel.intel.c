@@ -382,13 +382,12 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 			 *	0x6 addl x@gotntpoff(r1), %eax
 			 */
 			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-			    rtype, R_386_TLS_GOTIE, arsp->rel_roffset,
-			    sdp->sd_name));
+			    R_386_TLS_GOTIE, arsp));
 			arsp->rel_rtype = R_386_TLS_GOTIE;
 			arsp->rel_roffset += 5;
 
 			/*
-			 * Addjust 'offset' to beginning of instruction
+			 * Adjust 'offset' to beginning of instruction
 			 * sequence.
 			 */
 			offset -= 3;
@@ -408,8 +407,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 			 * Fixup done via the TLS_GD relocation
 			 */
 			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-			    rtype, R_386_NONE, arsp->rel_roffset,
-			    sdp->sd_name));
+			    R_386_NONE, arsp));
 			return (FIX_DONE);
 		}
 	}
@@ -431,13 +429,13 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 *	0xc
 		 */
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    rtype, R_386_TLS_LE, arsp->rel_roffset, sdp->sd_name));
+		    R_386_TLS_LE, arsp));
 
 		arsp->rel_rtype = R_386_TLS_LE;
 		arsp->rel_roffset += 4;
 
 		/*
-		 * Addjust 'offset' to beginning of instruction
+		 * Adjust 'offset' to beginning of instruction
 		 * sequence.
 		 */
 		offset -= 3;
@@ -451,12 +449,12 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 * Fixup done via the TLS_GD relocation
 		 */
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    rtype, R_386_NONE, arsp->rel_roffset, sdp->sd_name));
+		    R_386_NONE, arsp));
 		return (FIX_DONE);
 
 	case R_386_TLS_LDM_PLT:
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    rtype, R_386_NONE, arsp->rel_roffset, sdp->sd_name));
+		    R_386_NONE, arsp));
 
 		/*
 		 * Transition:
@@ -477,7 +475,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 
 	case R_386_TLS_LDM:
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    rtype, R_386_NONE, arsp->rel_roffset, sdp->sd_name));
+		    R_386_NONE, arsp));
 
 		/*
 		 * Transition:
@@ -505,7 +503,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		offset -= 2;
 
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    rtype, R_386_TLS_LE, arsp->rel_roffset, sdp->sd_name));
+		    R_386_TLS_LE, arsp));
 		arsp->rel_rtype = R_386_TLS_LE;
 		return (FIX_RELOC);
 
@@ -535,7 +533,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 * Note: reg1 != 4 (%esp)
 		 */
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    rtype, R_386_TLS_LE, arsp->rel_roffset, sdp->sd_name));
+		    R_386_TLS_LE, arsp));
 		arsp->rel_rtype = R_386_TLS_LE;
 
 		offset -= 2;

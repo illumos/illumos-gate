@@ -2446,7 +2446,7 @@ dowrite(Prfbuf * prf)
  * Define a local buffer size for building a numeric value - large enough to
  * hold a 64-bit value.
  */
-#define	NUM_SIZE	20
+#define	NUM_SIZE	22
 
 size_t
 doprf(const char *format, va_list args, Prfbuf *prf)

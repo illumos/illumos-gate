@@ -233,27 +233,32 @@ Dbg_reloc_dooutrel(Lm_list *lml, Word type)
 void
 Dbg_reloc_discard(Lm_list *lml, Half mach, Rel_desc *rsp)
 {
+	Is_desc	*isp;
+
 	if (DBG_NOTCLASS(DBG_C_RELOC))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
-	dbg_print(lml, MSG_INTL(MSG_REL_DISCARDED),
-	    rsp->rel_isdesc->is_basename, rsp->rel_isdesc->is_file->ifl_name,
-	    conv_reloc_type(mach, rsp->rel_rtype, 0),
+	isp = rsp->rel_isdesc;
+	dbg_print(lml, MSG_INTL(MSG_REL_DISCARDED), isp->is_basename,
+	    isp->is_file->ifl_name, conv_reloc_type(mach, rsp->rel_rtype, 0),
 	    EC_OFF(rsp->rel_roffset));
 }
 
 void
-Dbg_reloc_transition(Lm_list *lml, Half mach, Word oldrtype, Word newrtype,
-    Xword off, const char *sym)
+Dbg_reloc_transition(Lm_list *lml, Half mach, Word rtype, Rel_desc *rsp)
 {
+	Is_desc	*isp;
+
 	if (DBG_NOTCLASS(DBG_C_RELOC))
 		return;
 
-	dbg_print(lml, MSG_INTL(MSG_REL_TRANS), EC_OFF(off),
-	    conv_reloc_type(mach, oldrtype, 0) + M_R_STR_LEN,
-	    conv_reloc_type(mach, newrtype, 0) + M_R_STR_LEN, sym);
+	isp = rsp->rel_isdesc;
+	dbg_print(lml, MSG_INTL(MSG_REL_TRANSITION),
+	    conv_reloc_type(mach, rsp->rel_rtype, 0), isp->is_basename,
+	    isp->is_file->ifl_name, EC_OFF(rsp->rel_roffset), rsp->rel_sname,
+	    conv_reloc_type(mach, rtype, 0));
 }
 
 void

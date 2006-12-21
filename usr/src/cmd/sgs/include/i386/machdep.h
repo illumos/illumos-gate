@@ -240,11 +240,6 @@ extern "C" {
 #endif
 
 /*
- * Length of R_AMD64_
- */
-#define	M_R_STR_LEN	8
-
-/*
  * The following are defined as M_R_NONE so that checks
  * for these relocations can be performed in common code - although
  * the checks are really only relevant to SPARC.

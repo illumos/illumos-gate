@@ -168,7 +168,8 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 /* R_SPARC_TLS_DTPOFF64 */  {0x0, FLG_RE_NOTREL, 8, 0, 0},
 /* R_SPARC_TLS_TPOFF32 */   {0x0, FLG_RE_NOTREL, 4, 0, 0},
 /* R_SPARC_TLS_TPOFF64 */   {0x0, FLG_RE_NOTREL, 8, 0, 0},
-/* R_SPARC_GOTDATA_HIX22 */	{0, FLG_RE_GOTREL, 4, 10, 22},
+/* R_SPARC_GOTDATA_HIX22 */	{0, FLG_RE_SIGN | FLG_RE_GOTREL |
+					FLG_RE_VERIFY, 4, 10, 22},
 /* R_SPARC_GOTDATA_LOX10 */	{ 0x3ff, FLG_RE_GOTREL | FLG_RE_SIGN, 4, 0, 13},
 /* R_SPARC_GOTDATA_OP_HIX22 */	{ 0x0, FLG_RE_GOTOPINS | FLG_RE_GOTADD,
 					4, 10, 22},
@@ -270,7 +271,7 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
  * R_SPARC_TLS_DTPOFF64	    77	V-word64	@dtpoff(S + A)
  * R_SPARC_TLS_TPOFF32	    78	V-word32	@tpoff(S + A)
  * R_SPARC_TLS_TPOFF64	    79	V-word64	@tpoff(S + A)
- * R_SPARC_GOTDATA_HIX22    80	T-imm22		((S + A - GOT) >> 10) ^
+ * R_SPARC_GOTDATA_HIX22    80	V-imm22		((S + A - GOT) >> 10) ^
  *						  ((S + A - GOT) >> 31)
  * R_SPARC_GOTDATA_LOX10    81	T-simm13	((S + A - GOT) & 0x3ff) |
  *						  (((S + A - GOT) >> 31) &

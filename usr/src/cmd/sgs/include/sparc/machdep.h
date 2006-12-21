@@ -245,11 +245,6 @@ extern "C" {
 #define	M_R_FPTR	R_SPARC_NONE
 #define	M_R_NUM		R_SPARC_NUM
 
-/*
- * Length of R_SPARC_
- */
-#define	M_R_STR_LEN	8
-
 #ifdef	_ELF64
 #define	M_R_ARRAYADDR	R_SPARC_64
 #define	M_R_DTPMOD	R_SPARC_TLS_DTPMOD64

@@ -1150,3 +1150,4 @@ Bugid   Risk Synopsis
 6487284 ld.so.1: buffer overflow in doprf() function
 6496718 restricted visibility symbol references should trigger archive
 	extraction
+6501793 GOTOP relocation transition (optimization) fails with offsets > 2^32

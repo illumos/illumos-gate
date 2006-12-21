@@ -475,14 +475,13 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 			 *	0x10
 			 */
 			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-			    rtype, R_AMD64_GOTTPOFF, arsp->rel_roffset,
-			    sdp->sd_name));
+			    R_AMD64_GOTTPOFF, arsp));
 			arsp->rel_rtype = R_AMD64_GOTTPOFF;
 			arsp->rel_roffset += 8;
 			arsp->rel_raddend = (Sxword)-4;
 
 			/*
-			 * Addjust 'offset' to beginning of instruction
+			 * Adjust 'offset' to beginning of instruction
 			 * sequence.
 			 */
 			offset -= 4;
@@ -492,11 +491,10 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 
 		case R_AMD64_PLT32:
 			/*
-			 * Fixup done via the TLS_GD relocation
+			 * Fixup done via the TLS_GD relocation.
 			 */
 			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-			    rtype, R_AMD64_NONE, arsp->rel_roffset,
-			    sdp->sd_name));
+			    R_AMD64_NONE, arsp));
 			return (FIX_DONE);
 		}
 	}
@@ -522,15 +520,13 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 *	0x10
 		 */
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    rtype, R_AMD64_TPOFF32, arsp->rel_roffset, sdp->sd_name));
-
+		    R_AMD64_TPOFF32, arsp));
 		arsp->rel_rtype = R_AMD64_TPOFF32;
 		arsp->rel_roffset += 8;
 		arsp->rel_raddend = 0;
 
 		/*
-		 * Addjust 'offset' to beginning of instruction
-		 * sequence.
+		 * Adjust 'offset' to beginning of instruction sequence.
 		 */
 		offset -= 4;
 		(void) memcpy(offset, tlsinstr_gd_le, sizeof (tlsinstr_gd_le));
@@ -549,21 +545,18 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 *	0x09 leaq x@tpoff(%rax), %rax
 		 *	0x10
 		 */
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_AMD64_TPOFF32, arsp->rel_roffset, sdp->sd_name));
-
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_AMD64_TPOFF32, arsp));
 		arsp->rel_rtype = R_AMD64_TPOFF32;
 		arsp->rel_raddend = 0;
 
 		/*
-		 * Addjust 'offset' to beginning of instruction
-		 * sequence.
+		 * Adjust 'offset' to beginning of instruction sequence.
 		 */
 		offset -= 12;
 
 		/*
-		 * Same code sequence used in the GD -> LE
-		 * transition.
+		 * Same code sequence used in the GD -> LE transition.
 		 */
 		(void) memcpy(offset, tlsinstr_gd_le, sizeof (tlsinstr_gd_le));
 		return (FIX_RELOC);
@@ -582,8 +575,8 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 *	0x02 .byte 0x66
 		 *	0x03 movq %fs:0, %rax
 		 */
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_AMD64_NONE, arsp->rel_roffset, sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_AMD64_NONE, arsp));
 		offset -= 3;
 		(void) memcpy(offset, tlsinstr_ld_le, sizeof (tlsinstr_ld_le));
 		return (FIX_DONE);
@@ -597,8 +590,8 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 * To:
 		 *	0x00 leaq x1@tpoff(%rax), %rcx
 		 */
-		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
-		    R_AMD64_TPOFF32, arsp->rel_roffset, sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+		    R_AMD64_TPOFF32, arsp));
 		arsp->rel_rtype = R_AMD64_TPOFF32;
 		arsp->rel_raddend = 0;
 		return (FIX_RELOC);

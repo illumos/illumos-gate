@@ -1218,7 +1218,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	if (IS_TLS_INS(rtype))
 		return (reloc_TLS(local, reld, ofl));
 
-	if (IS_GOT_INS(rtype))
+	if (IS_GOT_OPINS(rtype))
 		return (ld_reloc_GOTOP(local, reld, ofl));
 
 	if (IS_GOT_RELATIVE(rtype))

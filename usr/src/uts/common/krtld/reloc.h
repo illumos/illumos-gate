@@ -113,7 +113,7 @@ extern	const Rel_entry		reloc_table[];
 					(FLG_RE_GOTPC | FLG_RE_GOTADD))
 #define	IS_GOT_BASED(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_GOTREL) != 0)
-#define	IS_GOT_INS(X)		((reloc_table[(X)].re_flags & \
+#define	IS_GOT_OPINS(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_GOTOPINS) != 0)
 #define	IS_GOT_REQUIRED(X)	((reloc_table[(X)].re_flags & \
 					(FLG_RE_GOTADD | FLG_RE_GOTREL | \
