@@ -350,26 +350,27 @@ panel_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,  void **resultp)
 static  uint_t
 panel_intr(caddr_t arg)
 {
-	int	instance;
 	struct panel_state *statep = (struct panel_state *)arg;
-
-	instance = ddi_get_instance(statep->dip);
-
-	DCMN_ERR((CE_CONT, "%s%d: intr\n", panel_name, instance));
 
 	/* to confirm the validity of the interrupt */
 	if (!(ddi_get8(statep->panel_regs_handle, statep->panelregs) &
 	    PNLINT_MASK)) {
-		cmn_err(CE_WARN, "%s%d: spurious interrupt detected.",
-		    panel_name, instance);
 		return (DDI_INTR_UNCLAIMED);
 	}
 
-	/* clear the PNLINT bit */
+	/*
+	 * Clear the PNLINT bit
+	 * HW reported that there might be a delay in the PNLINT bit
+	 * clearing. We force synchronization by attempting to read
+	 * back the reg after clearing the bit.
+	 */
 	panel_ddi_put8(statep->panel_regs_handle, statep->panelregs,
 	    statep->panelregs_state | PNLINT_MASK);
+	ddi_get8(statep->panel_regs_handle, statep->panelregs);
 
 	if (panel_enable) {
+		uint_t pstate_save;
+
 		/* avoid double panic */
 		panel_enable 	= 0;
 
@@ -384,7 +385,9 @@ panel_intr(caddr_t arg)
 		 * to minimize exposure of this new logic to other existing
 		 * platforms.
 		 */
+		pstate_save = disable_vec_intr();
 		intr_enqueue_req(PIL_15, cpc_level15_inum);
+		enable_vec_intr(pstate_save);
 
 		cmn_err(CE_PANIC,
 		    "System Panel Driver: Emergency panic request "
