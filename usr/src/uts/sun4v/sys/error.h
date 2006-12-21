@@ -54,6 +54,7 @@ extern "C" {
 #define	ERRH_DESC_PR_NRE	2	/* Precise non-resumable error */
 #define	ERRH_DESC_DEF_NRE	3	/* Deferred non-resumalbe error */
 #define	ERRH_DESC_WARN_RE	4	/* Power-off for vBSC HostShutdown() */
+#define	ERRH_DESC_USER_DCORE	5	/* User initiated panic */
 
 /*
  * Sun4v Error Report Error Attributes specifies the attributes of the error

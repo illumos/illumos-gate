@@ -310,6 +310,17 @@ process_nonresumable_error(struct regs *rp, uint64_t flags,
 
 			break;
 
+		case ERRH_DESC_USER_DCORE:
+			/*
+			 * User generated panic. Call panic directly
+			 * since there are no FMA e-reports to
+			 * display.
+			 */
+
+			panic("Panic - Generated at user request");
+
+			break;
+
 		default:
 			cmn_err(CE_WARN, "Panic - Error Descriptor 0x%llx "
 			    " invalid in non-resumable error handler",
