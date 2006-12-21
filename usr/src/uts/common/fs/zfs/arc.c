@@ -551,7 +551,7 @@ arc_cksum_verify(arc_buf_t *buf)
 {
 	zio_cksum_t zc;
 
-	if (!zfs_flags & ZFS_DEBUG_MODIFY)
+	if (!(zfs_flags & ZFS_DEBUG_MODIFY))
 		return;
 
 	mutex_enter(&buf->b_hdr->b_freeze_lock);
@@ -569,7 +569,7 @@ arc_cksum_verify(arc_buf_t *buf)
 static void
 arc_cksum_compute(arc_buf_t *buf)
 {
-	if (!zfs_flags & ZFS_DEBUG_MODIFY)
+	if (!(zfs_flags & ZFS_DEBUG_MODIFY))
 		return;
 
 	mutex_enter(&buf->b_hdr->b_freeze_lock);
@@ -586,7 +586,7 @@ arc_cksum_compute(arc_buf_t *buf)
 void
 arc_buf_thaw(arc_buf_t *buf)
 {
-	if (!zfs_flags & ZFS_DEBUG_MODIFY)
+	if (!(zfs_flags & ZFS_DEBUG_MODIFY))
 		return;
 
 	if (buf->b_hdr->b_state != arc.anon)
@@ -605,6 +605,9 @@ arc_buf_thaw(arc_buf_t *buf)
 void
 arc_buf_freeze(arc_buf_t *buf)
 {
+	if (!(zfs_flags & ZFS_DEBUG_MODIFY))
+		return;
+
 	ASSERT(buf->b_hdr->b_freeze_cksum != NULL ||
 	    buf->b_hdr->b_state == arc.anon);
 	arc_cksum_compute(buf);
@@ -2260,9 +2263,11 @@ arc_release(arc_buf_t *buf, void *tag)
 		nhdr->b_arc_access = 0;
 		nhdr->b_flags = 0;
 		nhdr->b_datacnt = 1;
-		nhdr->b_freeze_cksum =
-		    kmem_alloc(sizeof (zio_cksum_t), KM_SLEEP);
-		*nhdr->b_freeze_cksum = *hdr->b_freeze_cksum; /* struct copy */
+		if (hdr->b_freeze_cksum != NULL) {
+			nhdr->b_freeze_cksum =
+			    kmem_alloc(sizeof (zio_cksum_t), KM_SLEEP);
+			*nhdr->b_freeze_cksum = *hdr->b_freeze_cksum;
+		}
 		buf->b_hdr = nhdr;
 		buf->b_next = NULL;
 		(void) refcount_add(&nhdr->b_refcnt, tag);
