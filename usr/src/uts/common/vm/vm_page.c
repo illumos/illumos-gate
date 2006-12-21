@@ -7265,11 +7265,11 @@ page_unlock_capture(page_t *pp)
 	 * vphm mutex otherwise there will be a panic.
 	 */
 	if (mutex_owned(page_vnode_mutex(&retired_pages))) {
-		page_unlock(pp);
+		page_unlock_nocapture(pp);
 		return;
 	}
 	if (pp->p_vnode != NULL && mutex_owned(page_vnode_mutex(pp->p_vnode))) {
-		page_unlock(pp);
+		page_unlock_nocapture(pp);
 		return;
 	}
 
