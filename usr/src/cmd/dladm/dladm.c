@@ -1211,7 +1211,7 @@ do_show_aggr(int argc, char *argv[])
 				die_optdup(option);
 
 			if (L_arg)
-				die("the option -L cannot be used with -k");
+				die("the option -s cannot be used with -L");
 
 			s_arg = B_TRUE;
 			break;
@@ -1659,7 +1659,7 @@ static wifi_field_t wifi_fields[] = {
 { "ibssid",	"BSSID/IBSSID", 17,	WLADM_WLAN_ATTR_BSSID,	WIFI_CMD_ALL},
 { "mode",	"MODE",		6,	WLADM_WLAN_ATTR_MODE,	WIFI_CMD_ALL},
 { "speed",	"SPEED",	6,	WLADM_WLAN_ATTR_SPEED,	WIFI_CMD_ALL},
-{ "auth",	"AUTH",		8,	WLADM_WLAN_ATTR_AUTH,	WIFI_CMD_ALL},
+{ "auth",	"AUTH",		8,	WLADM_WLAN_ATTR_AUTH,	WIFI_CMD_SHOW},
 { "bsstype",	"BSSTYPE",	8,	WLADM_WLAN_ATTR_BSSTYPE, WIFI_CMD_ALL},
 { "sec",	"SEC",		6,	WLADM_WLAN_ATTR_SECMODE, WIFI_CMD_ALL},
 { "status",	"STATUS",	17,	WLADM_LINK_ATTR_STATUS, WIFI_CMD_SHOW},
@@ -1667,7 +1667,7 @@ static wifi_field_t wifi_fields[] = {
 ;
 
 static char *all_scan_wifi_fields =
-	"link,essid,bssid,sec,strength,mode,speed,auth,bsstype";
+	"link,essid,bssid,sec,strength,mode,speed,bsstype";
 static char *all_show_wifi_fields =
 	"link,status,essid,sec,strength,mode,speed,auth,bssid,bsstype";
 static char *def_scan_wifi_fields =
@@ -1766,7 +1766,7 @@ parse_wifi_fields(char *str, wifi_field_t ***fields, uint_t *countp,
 		for (j = 0; j < WIFI_MAX_FIELDS; j++) {
 			if (strcasecmp(sp->s_fields[i],
 			    wifi_fields[j].wf_name) == 0) {
-				good_match = wifi_fields[i].
+				good_match = wifi_fields[j].
 				    wf_cmdtype & cmdtype;
 				break;
 			}
@@ -2249,11 +2249,11 @@ again:
 			if (attr.wa_valid == 0) {
 				die("no wifi networks are available");
 			} else {
-				die("no wifi networks with the specified"
+				die("no wifi networks with the specified "
 				    "criteria are available");
 			}
 		}
-		die_wlerr(status, "cannot connect");
+		die_wlerr(status, "cannot connect link '%s'", link);
 	}
 	free(keys);
 }
@@ -2525,7 +2525,7 @@ do_show_linkprop(int argc, char **argv)
 		switch (option) {
 		case 'p':
 			if (parse_props(optarg, &proplist, B_TRUE) < 0)
-				die("invalid field(s) specified");
+				die("invalid link properties specified");
 			break;
 		case 'c':
 			state.ls_parseable = B_TRUE;
@@ -2659,8 +2659,11 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 			    "on '%s'", link);
 		}
 		if (!temp) {
-			status = set_linkprop_persist(link, NULL, NULL, 0,
-			    reset);
+			dladm_status_t	s;
+
+			s = set_linkprop_persist(link, NULL, NULL, 0, reset);
+			if (s != DLADM_STATUS_OK)
+				status = s;
 		}
 		goto done;
 	}

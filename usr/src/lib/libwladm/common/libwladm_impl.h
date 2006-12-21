@@ -55,7 +55,7 @@ extern "C" {
  */
 #define	WLADM_OFDM2CHAN(mhz)		(((mhz) - 5000) / 5)
 
-#define	WLADM_CONNECT_POLLRATE		200000000 /* nanoseconds */
+#define	WLADM_CONNECT_POLLRATE		200 /* milliseconds */
 #define	WLADM_CONNECT_DEFAULT_CHANNEL	1
 
 #define	WLADM_MAX_RATES	4

@@ -515,46 +515,46 @@ do_connect(int fd, wldp_t *gbuf, wladm_wlan_attr_t *attrp,
 	wladm_bsstype_t		bsstype;
 	wladm_essid_t		essid;
 	boolean_t		essid_valid = B_FALSE;
-	wladm_status_t		status = WLADM_STATUS_FAILED;
 	wladm_channel_t		channel;
 	hrtime_t		start;
-	struct timespec		ts;
 
 	if ((attrp->wa_valid & WLADM_WLAN_ATTR_CHANNEL) != 0) {
 		channel = attrp->wa_channel;
 		if (do_set_channel(fd, gbuf, &channel) < 0)
-			goto done;
+			goto fail;
 	}
 
 	secmode = ((attrp->wa_valid & WLADM_WLAN_ATTR_SECMODE) != 0) ?
 	    attrp->wa_secmode : WLADM_SECMODE_NONE;
 
 	if (do_set_encryption(fd, gbuf, &secmode) < 0)
-		goto done;
+		goto fail;
 
 	authmode = ((attrp->wa_valid & WLADM_WLAN_ATTR_AUTH) != 0) ?
 	    attrp->wa_auth : WLADM_AUTH_OPEN;
 
 	if (do_set_authmode(fd, gbuf, &authmode) < 0)
-		goto done;
+		goto fail;
 
 	bsstype = ((attrp->wa_valid & WLADM_WLAN_ATTR_BSSTYPE) != 0) ?
 	    attrp->wa_bsstype : WLADM_BSSTYPE_BSS;
 
 	if (do_set_bsstype(fd, gbuf, &bsstype) < 0)
-		goto done;
+		goto fail;
 
-	if (secmode == WLADM_SECMODE_WEP &&
-	    (keys == NULL || key_count == 0 || key_count > MAX_NWEPKEYS ||
-	    do_set_wepkey(fd, gbuf, keys, key_count) < 0))
-		goto done;
+	if (secmode == WLADM_SECMODE_WEP) {
+		if (keys == NULL || key_count == 0 || key_count > MAX_NWEPKEYS)
+			return (WLADM_STATUS_BADARG);
+		if (do_set_wepkey(fd, gbuf, keys, key_count) < 0)
+			goto fail;
+	}
 
 	if (create_ibss) {
 		if (do_set_channel(fd, gbuf, &channel) < 0)
-			goto done;
+			goto fail;
 
 		if (do_set_createibss(fd, gbuf, &create_ibss) < 0)
-			goto done;
+			goto fail;
 
 		if ((attrp->wa_valid & WLADM_WLAN_ATTR_ESSID) == 0) {
 			generate_essid(&essid);
@@ -567,31 +567,27 @@ do_connect(int fd, wldp_t *gbuf, wladm_wlan_attr_t *attrp,
 		essid_valid = B_TRUE;
 	}
 
-	if (!essid_valid || do_set_essid(fd, gbuf, &essid) < 0)
-		goto done;
+	if (!essid_valid)
+		return (WLADM_STATUS_FAILED);
+	if (do_set_essid(fd, gbuf, &essid) < 0)
+		goto fail;
 
-	ts.tv_sec = 0;
-	ts.tv_nsec = WLADM_CONNECT_POLLRATE;
 	start = gethrtime();
 	for (;;) {
-		if (do_get_linkstatus(fd, gbuf) < 0) {
-			status = WLADM_STATUS_FAILED;
-			goto done;
-		}
+		if (do_get_linkstatus(fd, gbuf) < 0)
+			goto fail;
 
 		if (IS_CONNECTED(gbuf))
 			break;
 
-		(void) nanosleep(&ts, NULL);
+		(void) poll(NULL, 0, WLADM_CONNECT_POLLRATE);
 		if ((timeout >= 0) && (gethrtime() - start) /
-		    NANOSEC >= timeout) {
-			status = WLADM_STATUS_TIMEDOUT;
-			goto done;
-		}
+		    NANOSEC >= timeout)
+			return (WLADM_STATUS_TIMEDOUT);
 	}
-	status = WLADM_STATUS_OK;
-done:
-	return (status);
+	return (WLADM_STATUS_OK);
+fail:
+	return (wladm_wlresult2status(gbuf));
 }
 
 wladm_status_t
