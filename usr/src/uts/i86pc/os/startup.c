@@ -1585,18 +1585,22 @@ startup_vm(void)
 
 	if (!segzio_fromheap) {
 		size_t size;
+		size_t maxsize;
 
 		/* size is in bytes, segziosize is in pages */
 		if (segziosize == 0) {
-			size = mmu_ptob(physmem * 2);
+			size = mmu_ptob(physmem / 2);
 		} else {
 			size = mmu_ptob(segziosize);
 		}
 
+		/* max size is 3/4ths of physmem */
+		maxsize = mmu_ptob(physmem) - mmu_ptob(physmem / 4);
+
 		if (size < SEGZIOMINSIZE) {
 			size = SEGZIOMINSIZE;
-		} else if (size > mmu_ptob(physmem * 4)) {
-			size = mmu_ptob(physmem * 4);
+		} else if (size > maxsize) {
+			size = maxsize;
 		}
 		segziosize = mmu_btop(ROUND_UP_LPAGE(size));
 		segzio_base = final_kernelheap;

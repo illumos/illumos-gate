@@ -1297,6 +1297,18 @@ arc_reclaim_needed(void)
 	if (availrmem < swapfs_minfree + swapfs_reserve + extra)
 		return (1);
 
+	/*
+	 * If zio data pages are being allocated out of a separate heap segment,
+	 * then check that the size of available vmem for this area remains
+	 * above 1/4th free.  This needs to be done since the size of the
+	 * non-default segment is smaller than physical memory, so we could
+	 * conceivably run out of VA in that segment before running out of
+	 * physical memory.
+	 */
+	if ((zio_arena != NULL) && (btop(vmem_size(zio_arena, VMEM_FREE)) <
+	    (btop(vmem_size(zio_arena, VMEM_FREE | VMEM_ALLOC)) >> 2)))
+		return (1);
+
 #if defined(__i386)
 	/*
 	 * If we're on an i386 platform, it's possible that we'll exhaust the

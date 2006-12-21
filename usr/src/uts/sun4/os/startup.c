@@ -2066,18 +2066,22 @@ startup_vm(void)
 
 	if (!segzio_fromheap) {
 		size_t size;
+		size_t maxsize;
 
 		/* size is in bytes, segziosize is in pages */
 		if (segziosize == 0) {
-			size = mmu_ptob(physmem * 2);
+			size = mmu_ptob(physmem / 2);
 		} else {
 			size = mmu_ptob(segziosize);
 		}
 
+		/* maxsize is 3/4th physmem */
+		maxsize = mmu_ptob(physmem) - mmu_ptob(physmem / 4);
+
 		if (size < SEGZIOMINSIZE) {
 			size = SEGZIOMINSIZE;
-		} else if (size > mmu_ptob(physmem * 4)) {
-			size = mmu_ptob(physmem * 4);
+		} else if (size > maxsize) {
+			size = maxsize;
 		}
 		segziosize = mmu_btop(roundup(size, MMU_PAGESIZE));
 		/* put the base of the ZIO segment after the kpm segment */
