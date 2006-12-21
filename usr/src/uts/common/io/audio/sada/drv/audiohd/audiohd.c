@@ -2464,12 +2464,18 @@ audiohd_alc880_init_codec(audiohd_state_t *statep)
 
 		/* AUDIO_HEADPHONE */
 		AUDIOHD_NODE_ENABLE_PIN_OUT(statep, caddr, 0x14);
+		(void) audioha_codec_verb_get(statep, caddr,
+		    AUDIOHDC_NID(0x14), AUDIOHDC_VERB_SET_CONN_SEL, 0);
 
 		/* AUDIO_AUX1_OUT */
 		AUDIOHD_NODE_ENABLE_PIN_OUT(statep, caddr, 0x15);
+		(void) audioha_codec_verb_get(statep, caddr,
+		    AUDIOHDC_NID(0x15), AUDIOHDC_VERB_SET_CONN_SEL, 0);
 
 		/* AUDIO_LINE_OUT */
 		AUDIOHD_NODE_ENABLE_PIN_OUT(statep, caddr, 0x1B);
+		(void) audioha_codec_verb_get(statep, caddr,
+		    AUDIOHDC_NID(0x1B), AUDIOHDC_VERB_SET_CONN_SEL, 0);
 
 		if (!statep->hda_outputs_muted) {
 			AUDIOHD_NODE_UNMUTE_OUT(statep, caddr, 0x14);
