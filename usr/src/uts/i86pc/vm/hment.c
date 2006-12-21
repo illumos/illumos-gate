@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +50,7 @@ struct hment {
 	struct hment	*hm_next;	/* next mapping of same page */
 	struct hment	*hm_prev;	/* previous mapping of same page */
 	htable_t	*hm_htable;	/* corresponding htable_t */
+	pfn_t		hm_pfn;		/* mapping page frame number */
 	uint16_t	hm_entry;	/* index of pte in htable */
 	uint16_t	hm_pad;		/* explicitly expose compiler padding */
 #ifdef __amd64
@@ -223,6 +223,7 @@ hment_alloc()
 	hm->hm_hashnext = NULL;
 	hm->hm_next = NULL;
 	hm->hm_prev = NULL;
+	hm->hm_pfn = PFN_INVALID;
 	return (hm);
 }
 
@@ -370,6 +371,7 @@ hment_prepare(htable_t *htable, uint_t entry, page_t *pp)
 			if (hm != NULL) {
 				hm->hm_htable = pp->p_mapping;
 				hm->hm_entry = pp->p_mlentry;
+				hm->hm_pfn = pp->p_pagenum;
 				pp->p_mapping = NULL;
 				pp->p_share = 0;
 				pp->p_embed = 0;
@@ -445,6 +447,7 @@ hment_assign(htable_t *htable, uint_t entry, page_t *pp, hment_t *hm)
 	ASSERT(hm != NULL);
 	hm->hm_htable = htable;
 	hm->hm_entry = entry;
+	hm->hm_pfn = pp->p_pagenum;
 	hment_insert(hm, pp);
 }
 
@@ -497,6 +500,7 @@ hment_remove(page_t *pp, htable_t *ht, uint_t entry)
 	hment_t		*prev = NULL;
 	hment_t		*hm;
 	uint_t		idx;
+	pfn_t		pfn;
 
 	ASSERT(x86_hm_held(pp));
 
@@ -518,10 +522,12 @@ hment_remove(page_t *pp, htable_t *ht, uint_t entry)
 	 * Find the hment in the system-wide hash table and remove it.
 	 */
 	ASSERT(pp->p_share != 0);
+	pfn = pp->p_pagenum;
 	idx = HMENT_HASH(ht->ht_pfn, entry);
 	mutex_enter(HASH_MUTEX(idx));
 	hm = hment_hash[idx];
-	while (hm && (hm->hm_htable != ht || hm->hm_entry != entry)) {
+	while (hm && (hm->hm_htable != ht || hm->hm_entry != entry ||
+	    hm->hm_pfn != pfn)) {
 		prev = hm;
 		hm = hm->hm_hashnext;
 	}
