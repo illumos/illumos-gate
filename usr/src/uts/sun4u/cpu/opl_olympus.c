@@ -40,6 +40,7 @@
 #include <vm/vm_dep.h>
 #include <vm/hat_sfmmu.h>
 #include <vm/seg_kpm.h>
+#include <vm/seg_kmem.h>
 #include <sys/cpuvar.h>
 #include <sys/opl_olympus_regs.h>
 #include <sys/opl_module.h>
@@ -2115,10 +2116,25 @@ cpu_mp_init(void)
 	mutex_exit(&cpu_lock);
 }
 
-/*ARGSUSED*/
+int heaplp_use_stlb = -1;
+
 void
 mmu_init_kernel_pgsz(struct hat *hat)
 {
+	uint_t tte = page_szc(segkmem_lpsize);
+	uchar_t new_cext_primary, new_cext_nucleus;
+
+	if (heaplp_use_stlb == 0) {
+		/* do not reprogram stlb */
+		tte = TTE8K;
+	}
+
+	new_cext_nucleus = TAGACCEXT_MKSZPAIR(tte, TTE8K);
+	new_cext_primary = TAGACCEXT_MKSZPAIR(TTE8K, tte);
+
+	hat->sfmmu_cext = new_cext_primary;
+	kcontextreg = ((uint64_t)new_cext_nucleus << CTXREG_NEXT_SHIFT) |
+		((uint64_t)new_cext_primary << CTXREG_EXT_SHIFT);
 }
 
 size_t

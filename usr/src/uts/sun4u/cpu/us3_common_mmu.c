@@ -570,7 +570,6 @@ mmu_init_kernel_pgsz(struct hat *hat)
 	hat->sfmmu_cext = new_cext_primary;
 	kcontextreg = ((uint64_t)new_cext_nucleus << CTXREG_NEXT_SHIFT) |
 		((uint64_t)new_cext_primary << CTXREG_EXT_SHIFT);
-	mmu_init_kcontext();
 }
 
 size_t

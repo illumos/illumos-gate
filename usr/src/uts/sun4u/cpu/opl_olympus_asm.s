@@ -989,15 +989,20 @@ label/**/1:
  * corrupted, so we set here some reasonable values for
  * them. Note that resetting MMU registers also reset the context
  * info, we will need to reset the window registers to prevent
- * spill/fill that depends on context info for correct behaviour
+ * spill/fill that depends on context info for correct behaviour.
+ * Note that the TLBs must be flushed before programming the context
+ * registers.
  */
 
 #if !defined(lint)
 #define	RESET_MMU_REGS(tmp1, tmp2, tmp3)			\
+	FLUSH_ALL_TLB(tmp1)					;\
 	set	MMU_PCONTEXT, tmp1				;\
-	stxa	%g0, [tmp1]ASI_DMMU				;\
+	sethi	%hi(kcontextreg), tmp2				;\
+	ldx	[tmp2 + %lo(kcontextreg)], tmp2			;\
+	stxa	tmp2, [tmp1]ASI_DMMU				;\
 	set	MMU_SCONTEXT, tmp1				;\
-	stxa	%g0, [tmp1]ASI_DMMU				;\
+	stxa	tmp2, [tmp1]ASI_DMMU				;\
 	sethi	%hi(ktsb_base), tmp1				;\
 	ldx	[tmp1 + %lo(ktsb_base)], tmp2			;\
 	mov	MMU_TSB, tmp3					;\
