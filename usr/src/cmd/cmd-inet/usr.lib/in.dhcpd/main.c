@@ -856,6 +856,7 @@ static boolean_t
 int_v(DHCP_COP *dp, const char *option)
 {
 	if (dp != NULL && option != NULL) {
+		errno = 0;
 		dp->cop_num = strtol(option, NULL, 0L);
 		if (errno == 0)
 			return (B_TRUE);
@@ -871,6 +872,7 @@ static boolean_t
 uint_v(DHCP_COP *dp, const char *option)
 {
 	if (dp != NULL && option != NULL) {
+		errno = 0;
 		dp->cop_num = strtoul(option, NULL, 0L);
 		if (errno == 0)
 			return (B_TRUE);
