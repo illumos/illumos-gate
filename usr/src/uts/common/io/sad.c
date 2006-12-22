@@ -601,7 +601,7 @@ vml_ioctl(
 		miocnak(qp, mp, 0, EINVAL);
 		return;
 	}
-	ASSERT(iocp->ioc_cmd == SAD_VML);
+	ASSERT(SAD_CMD(iocp->ioc_cmd) == SAD_VML);
 	mcopyin(mp, (void *)GETSTRUCT,
 	    SIZEOF_STRUCT(str_list, iocp->ioc_flag), NULL);
 	qreply(qp, mp);
@@ -630,7 +630,7 @@ vml_iocdata(
 		return;
 	}
 
-	ASSERT(csp->cp_cmd == SAD_VML);
+	ASSERT(SAD_CMD(csp->cp_cmd) == SAD_VML);
 	sadp = (struct saddev *)qp->q_ptr;
 	switch ((long)csp->cp_private) {
 	case GETSTRUCT:
