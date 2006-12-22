@@ -43,6 +43,7 @@ static kstat_t *n2piupc_create_cntr_kstat(char *name, int dev_inst,
 static int n2piupc_kstat_update(kstat_t *ksp, int rw);
 static kstat_t *n2piupc_create_picN_kstat(char *mod_name, int pic,
     uint64_t mask, int num_ev, n2piu_event_t *ev_array);
+static int n2piupc_write(n2piupc_t *n2piupc_p, int regid, uint64_t data);
 
 /*
  * One-time initialization for this module.
@@ -124,6 +125,15 @@ n2piupc_kstat_attach(n2piupc_t *n2piupc_p)
 		    n2piupc_kstat_update, ksinfo_p, grp_p->num_counters);
 		if (ksinfo_p->cntr_ksp == NULL)
 			goto err;
+	}
+
+	/*
+	 * Special treatment for bit err registers: enable them so they start
+	 * counting now.
+	 */
+	if (n2piupc_write(n2piupc_p, leaf_grps[BIT_ERR_GRP]->regsel_p->regoff,
+	    BTERR_CTR_ENABLE) != SUCCESS) {
+		goto err;
 	}
 
 	N2PIUPC_DBG2("n2piupc: kstat_attach: success exit\n");
