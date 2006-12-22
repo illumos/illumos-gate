@@ -1002,7 +1002,8 @@ ath_m_tx(void *arg, mblk_t *mp)
 		ATH_DEBUG((ATH_DBG_SEND, "ath: ath_m_tx(): "
 		    "discard, state %u\n", ic->ic_state));
 		asc->asc_stats.ast_tx_discard ++;
-		return (mp);
+		freemsgchain(mp);
+		return (NULL);
 	}
 
 	while (mp != NULL) {
