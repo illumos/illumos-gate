@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -153,7 +153,7 @@ abstract class AbstractObjective implements Objective
 	public void setExpression(Expression exp)
 	{
 		this.exp = exp;
-	}	
+	}
 
 	/**
 	 * Get the objective's expression.
@@ -162,7 +162,7 @@ abstract class AbstractObjective implements Objective
 	{
 		return (exp);
 	}
-	
+
 	/**
 	 * A factory method which returns a created objective which is
 	 * associated with the supplied expression. The type and the
@@ -325,9 +325,9 @@ final class WeightedLoadObjective extends AbstractObjective
 	static final String name = "wt-load";
 
 	/**
-	 * The list of calculations made during examination.
+	 * The map of calculations made during examination.
 	 */
-	List calcList;
+	Map calcMap;
 
 	/**
 	 * Determine whether an objective is satisfied. If the
@@ -356,7 +356,7 @@ final class WeightedLoadObjective extends AbstractObjective
 		Monitor mon = solver.getMonitor();
 		Value val = new Value("type", "pset");
 		List valueList = new LinkedList();
-		calcList = new LinkedList();
+		calcMap = new HashMap();
 		valueList.add(val);
 
 		List resList = conf.getResources(valueList);
@@ -372,10 +372,10 @@ final class WeightedLoadObjective extends AbstractObjective
 
 			try {
 				Calculation calc = new Calculation(res, CPUs,
-				     mon.getUtilization(res),
-				     res.getLongProperty("pset.min"),
-				     res.getLongProperty("pset.max"));
-				calcList.add(calc);
+				    mon.getUtilization(res),
+				    res.getLongProperty("pset.min"),
+				    res.getLongProperty("pset.max"));
+				calcMap.put(res, calc);
 			} catch (StaleMonitorException sme) {
 				Poold.MON_LOG.log(Severity.INFO,
 				    res.toString() +
@@ -384,10 +384,11 @@ final class WeightedLoadObjective extends AbstractObjective
 				    "available statistics.");
 			}
 		}
-		Iterator itCalc = calcList.iterator();
+		Iterator itCalc = calcMap.values().iterator();
 		while (itCalc.hasNext()) {
 			Calculation calc = (Calculation) itCalc.next();
-			if (calc.getShare() != calc.comp.size()) {
+			if (calc.getShare() != calc.comp.size() &&
+			    calc.getShare() >= calc.min) {
 				Poold.MON_LOG.log(Severity.INFO,
 				    elem.toString() +
 				    " utilization objective not satisfied " +
@@ -454,17 +455,13 @@ final class WeightedLoadObjective extends AbstractObjective
 		 * @param max The maximum qty of resource for this set
 		 */
 		public Calculation(Resource res, List comp, double util,
-		    long min, long max) 
+		    long min, long max)
 		{
 			this.res = res;
 			this.comp = comp;
 			this.min = min;
 			this.max = max;
 			this.util = (util / 100) * comp.size();
-			if (this.util < min)
-				this.util = min;
-			if (this.util > max)
-				this.util = max;
 			Calculation.totalUtil += this.util;
 			Calculation.resQ += comp.size();
 		}
@@ -475,8 +472,8 @@ final class WeightedLoadObjective extends AbstractObjective
 		 */
 		long getShare()
 		{
-			if (totalUtil == 0)
-				return (min);
+			if (util == 0)
+				return (0);
 			return (Math.round((util / totalUtil) * resQ));
 		}
 
@@ -494,14 +491,14 @@ final class WeightedLoadObjective extends AbstractObjective
 			return (buf.toString());
 		}
 	}
-		
+
 	/**
 	 * Calculates the value of a configuration in terms of this
 	 * objective.
 	 *
 	 * In the examination step, calculations of each resource's
 	 * current and desired share were made. The moves can thus be
-	 * assessed in terms of their desired impact upon the desired
+	 * assessed in terms of their impact upon the desired
 	 * share. The current difference from desired is already
 	 * known, so each move will serve to reduce or increase that
 	 * difference. Moves that increase the difference have a
@@ -518,6 +515,7 @@ final class WeightedLoadObjective extends AbstractObjective
 	    throws PoolsException
 	{
 		double ret = 0;
+
 		Poold.OPT_LOG.log(Severity.DEBUG,
 		    "Calculating objective type: " + name);
 		/*
@@ -526,38 +524,42 @@ final class WeightedLoadObjective extends AbstractObjective
 		 */
 		if (move.getQty() == 0)
 			return (0);
-		Iterator itCalc = calcList.iterator();
-		while (itCalc.hasNext()) {
-			Calculation calc = (Calculation) itCalc.next();
-			long diff = calc.comp.size() - calc.getShare();
 
-			if (Math.abs(diff) > 1) {
-				double delta = 1 -
-				    (move.getQty() / (double)Math.abs(diff));
-
-				if (calc.res.equals(move.getFrom())) {
-					if (diff > 0)
-						ret += delta;
-					else
-						ret -= delta;
-				} else if (calc.res.equals(move.getTo())) {
-					if (diff > 0)
-						ret -= delta;
-					else
-						ret += delta;
-				}
-			} else {
-				if (calc.res.equals(move.getFrom()))
-					ret += diff;
-				else if (calc.res.equals(move.getTo()))
-					ret -= diff;
-			}
-			
-		}
 		/*
-		 * Normalize
+		 * Find the calculations that represent the source and
+		 * target of the move.
 		 */
-		ret /= 2;
+		Calculation src = (Calculation) calcMap.get(move.getFrom());
+		Calculation tgt = (Calculation) calcMap.get(move.getTo());
+
+		/*
+		 * Use the calculation details to determine the "gap"
+		 * i.e. number of discrete resources (for a processor
+		 * set these are CPUs), between the desired quantity in
+		 * the set which the calculations represent. Do this
+		 * both before and after the proposed move.
+		 *
+		 * The maximum possible improvement is equal to the
+		 * total number of resources for each set participating
+		 * in the calculation. Since there are two sets we
+		 * know the maximum possible improvement is resQ * 2.
+		 *
+		 * Divide the aggregated change in gap across participating
+		 * sets by the maximum possible improvement to obtain
+		 * a value which scores the move and which is normalised
+		 * between -1 <= ret <= 1.
+		 */
+		long oldGap = Math.abs(src.getShare() -
+		    src.comp.size());
+		long newGap = Math.abs(src.getShare() -
+		    (src.comp.size() - move.getQty()));
+		ret = oldGap - newGap;
+		oldGap = Math.abs(tgt.getShare() -
+		    tgt.comp.size());
+		newGap = Math.abs(tgt.getShare() -
+		    (tgt.comp.size() + move.getQty()));
+		ret += oldGap - newGap;
+		ret /= ((double) Calculation.resQ * 2);
 
 		Poold.MON_LOG.log(Severity.DEBUG, "ret: " + ret);
 		return (ret);
@@ -609,7 +611,7 @@ final class LocalityObjective extends AbstractObjective
 	{
 		this.ldom = ldom;
 	}
-	
+
 	/**
 	 * Calculates the value of a configuration in terms of this
 	 * objective.
@@ -676,7 +678,7 @@ final class LocalityObjective extends AbstractObjective
 
 		if (elem.equals(move.getFrom()))
 			contains.removeAll(cm.getComponents());
-		else 
+		else
 			contains.addAll(cm.getComponents());
 		/*
 		 * Recalculate lgrps to take account of new components
@@ -705,7 +707,7 @@ final class LocalityObjective extends AbstractObjective
 	 *
 	 * @throws PoolsException if there is an error accessing the
 	 * CPUs.
-	 */ 
+	 */
 	private double calcQ(List contains, Set groups) throws PoolsException
 	{
 		Iterator groupIt = groups.iterator();
@@ -735,7 +737,7 @@ final class LocalityObjective extends AbstractObjective
 		}
 		q /= groups.size();
 		return (q);
-	}	
+	}
 }
 
 /**
@@ -843,7 +845,7 @@ final class UtilizationObjective extends AbstractObjective
 			    (zone & StatisticOperations.ZONET) ==
 			    StatisticOperations.ZONELT)
 				return (false);
-			
+
 			if (kve.getOp() == KVOpExpression.GT &&
 			    (zone & StatisticOperations.ZONET) ==
 			    StatisticOperations.ZONEGT)
@@ -861,7 +863,7 @@ final class UtilizationObjective extends AbstractObjective
 		checkShort(mon, elem, val);
 		return (false);
 	}
-	
+
 	/**
 	 * Calculates the value of a configuration in terms of this
 	 * objective.
@@ -907,7 +909,7 @@ final class UtilizationObjective extends AbstractObjective
 		try {
 			double val, gap;
 			StatisticList sl;
-			
+
 			if (elem.equals(move.getFrom())) {
 				val = gapSolver.getMonitor().
 				    getUtilization(move.getFrom());
@@ -1001,7 +1003,7 @@ final class UtilizationObjective extends AbstractObjective
 		boolean checkOne = true;
 		int checkOnePos = 0;
 		boolean doCheckOne = false;
-		
+
 		Iterator itZones = zoneList.iterator();
 		while (itZones.hasNext()) {
 			int zone = ((Integer) itZones.next()).intValue();
@@ -1030,5 +1032,4 @@ final class UtilizationObjective extends AbstractObjective
 			zoneList.clear();
 		}
 	}
-	
 }
