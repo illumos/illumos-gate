@@ -1412,10 +1412,8 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 			return (NULL);
 
 		if (Pread(P, dp, phdr.p_filesz, phdr.p_vaddr) !=
-		    phdr.p_filesz) {
-			free(dp);
-			return (NULL);
-		}
+		    phdr.p_filesz)
+			goto bad32;
 
 		/*
 		 * Allow librtld_db the opportunity to "fix" the program
@@ -1483,7 +1481,7 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 		if (dcount + 4 != DI_NENT) {
 			dprintf("text section missing required dynamic "
 			    "entries\n");
-			return (NULL);
+			goto bad32;
 		}
 
 		if (ehdr.e_type == ET_DYN) {
@@ -1755,10 +1753,8 @@ bad32:
 			return (NULL);
 
 		if (Pread(P, dp, phdr.p_filesz, phdr.p_vaddr) !=
-		    phdr.p_filesz) {
-			free(dp);
-			return (NULL);
-		}
+		    phdr.p_filesz)
+			goto bad64;
 
 		for (i = 0; i < phdr.p_filesz / sizeof (Elf64_Dyn); i++) {
 			switch (dp[i].d_tag) {
@@ -1818,7 +1814,7 @@ bad32:
 		if (dcount + 4 != DI_NENT) {
 			dprintf("text section missing required dynamic "
 			    "entries\n");
-			return (NULL);
+			goto bad64;
 		}
 
 		if (ehdr.e_type == ET_DYN) {
