@@ -3817,8 +3817,13 @@ ipif_dup_recovery(void *arg)
 
 	ipif->ipif_recovery_id = 0;
 
+	/*
+	 * No lock needed for moving or condemned check, as this is just an
+	 * optimization.
+	 */
 	if (ill->ill_arp_closing || !(ipif->ipif_flags & IPIF_DUPLICATE) ||
-	    (ipif->ipif_flags & IPIF_POINTOPOINT)) {
+	    (ipif->ipif_flags & IPIF_POINTOPOINT) ||
+	    (ipif->ipif_state_flags & (IPIF_MOVING | IPIF_CONDEMNED))) {
 		/* No reason to try to bring this address back. */
 		return;
 	}
@@ -3840,12 +3845,20 @@ ipif_dup_recovery(void *arg)
 	return;
 
 alloc_fail:
-	/* On allocation failure, just restart the timer */
+	/*
+	 * On allocation failure, just restart the timer.  Note that the ipif
+	 * is down here, so no other thread could be trying to start a recovery
+	 * timer.  The ill_lock protects the condemned flag and the recovery
+	 * timer ID.
+	 */
 	freemsg(arp_add_mp);
-	if (ip_dup_recovery > 0) {
+	mutex_enter(&ill->ill_lock);
+	if (ip_dup_recovery > 0 && ipif->ipif_recovery_id == 0 &&
+	    !(ipif->ipif_state_flags & IPIF_CONDEMNED)) {
 		ipif->ipif_recovery_id = timeout(ipif_dup_recovery, ipif,
 		    MSEC_TO_TICK(ip_dup_recovery));
 	}
+	mutex_exit(&ill->ill_lock);
 }
 
 /*
@@ -3908,6 +3921,7 @@ ip_arp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		if (!bring_up && (ipif->ipif_flags & IPIF_DUPLICATE) &&
 		    !(ipif->ipif_flags & (IPIF_DHCPRUNNING|IPIF_TEMPORARY)) &&
 		    ill->ill_net_type == IRE_IF_RESOLVER &&
+		    !(ipif->ipif_state_flags & IPIF_CONDEMNED) &&
 		    ip_dup_recovery > 0 && ipif->ipif_recovery_id == 0) {
 			ipif->ipif_recovery_id = timeout(ipif_dup_recovery,
 			    ipif, MSEC_TO_TICK(ip_dup_recovery));
@@ -3961,12 +3975,15 @@ ip_arp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		 */
 		(void) ipif_down(ipif, NULL, NULL);
 		ipif_down_tail(ipif);
+		mutex_enter(&ill->ill_lock);
 		if (!(ipif->ipif_flags & (IPIF_DHCPRUNNING|IPIF_TEMPORARY)) &&
 		    ill->ill_net_type == IRE_IF_RESOLVER &&
+		    !(ipif->ipif_state_flags & IPIF_CONDEMNED) &&
 		    ip_dup_recovery > 0) {
 			ipif->ipif_recovery_id = timeout(ipif_dup_recovery,
 			    ipif, MSEC_TO_TICK(ip_dup_recovery));
 		}
+		mutex_exit(&ill->ill_lock);
 	}
 	freemsg(mp);
 }

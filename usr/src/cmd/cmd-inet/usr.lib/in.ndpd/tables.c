@@ -1637,11 +1637,14 @@ prefix_update_k(struct prefix *pr)
 			logperror_pr(pr, "prefix_update_k: SIOCSLIFSUBNET");
 			return;
 		}
-		if (!(pr->pr_state & PR_AUTO)) {
-			if (prefix_modify_flags(pr, IFF_NOLOCAL, 0) == -1)
-				return;
-		}
-		if (prefix_modify_flags(pr, IFF_UP, 0) == -1)
+		/*
+		 * If we've previously marked the interface "up" while
+		 * processing the PR_AUTO flag -- via incoming_prefix_addrconf
+		 * -- then there's no need to set it "up" again.  We're done;
+		 * just set PR_ONLINK to indicate that we've set the subnet.
+		 */
+		if (!(pr->pr_state & PR_AUTO) &&
+		    prefix_modify_flags(pr, IFF_UP | IFF_NOLOCAL, 0) == -1)
 			return;
 		pr->pr_kernel_state |= PR_ONLINK;
 	}

@@ -1499,10 +1499,12 @@ ip_ndp_recover(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		}
 
 		/*
-		 * If we have already recovered, then ignore.
+		 * If we have already recovered or if the interface is going
+		 * away, then ignore.
 		 */
 		mutex_enter(&ill->ill_lock);
-		if (!(ipif->ipif_flags & IPIF_DUPLICATE)) {
+		if (!(ipif->ipif_flags & IPIF_DUPLICATE) ||
+		    (ipif->ipif_flags & (IPIF_MOVING | IPIF_CONDEMNED))) {
 			mutex_exit(&ill->ill_lock);
 			continue;
 		}
@@ -1539,6 +1541,12 @@ ipif6_dup_recovery(void *arg)
 	if (!(ipif->ipif_flags & IPIF_DUPLICATE))
 		return;
 
+	/*
+	 * No lock, because this is just an optimization.
+	 */
+	if (ipif->ipif_state_flags & (IPIF_MOVING | IPIF_CONDEMNED))
+		return;
+
 	/* If the link is down, we'll retry this later */
 	if (!(ipif->ipif_ill->ill_phyint->phyint_flags & PHYI_RUNNING))
 		return;
@@ -1560,8 +1568,14 @@ ndp_do_recovery(ipif_t *ipif)
 
 	mp = allocb(sizeof (ipif->ipif_v6lcl_addr), BPRI_MED);
 	if (mp == NULL) {
-		ipif->ipif_recovery_id = timeout(ipif6_dup_recovery,
-		    ipif, MSEC_TO_TICK(ip_dup_recovery));
+		mutex_enter(&ill->ill_lock);
+		if (ipif->ipif_recovery_id == 0 &&
+		    !(ipif->ipif_state_flags & (IPIF_MOVING |
+		    IPIF_CONDEMNED))) {
+			ipif->ipif_recovery_id = timeout(ipif6_dup_recovery,
+			    ipif, MSEC_TO_TICK(ip_dup_recovery));
+		}
+		mutex_exit(&ill->ill_lock);
 	} else {
 		bcopy(&ipif->ipif_v6lcl_addr, mp->b_rptr,
 		    sizeof (ipif->ipif_v6lcl_addr));
@@ -1714,11 +1728,16 @@ ip_ndp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		mutex_exit(&ill->ill_lock);
 		(void) ipif_down(ipif, NULL, NULL);
 		ipif_down_tail(ipif);
+		mutex_enter(&ill->ill_lock);
 		if (!(ipif->ipif_flags & (IPIF_DHCPRUNNING|IPIF_TEMPORARY)) &&
 		    ill->ill_net_type == IRE_IF_RESOLVER &&
-		    ip_dup_recovery > 0)
+		    !(ipif->ipif_state_flags & (IPIF_MOVING |
+		    IPIF_CONDEMNED)) &&
+		    ip_dup_recovery > 0) {
 			ipif->ipif_recovery_id = timeout(ipif6_dup_recovery,
 			    ipif, MSEC_TO_TICK(ip_dup_recovery));
+		}
+		mutex_exit(&ill->ill_lock);
 	}
 ignore_conflict:
 	if (dl_mp != NULL)

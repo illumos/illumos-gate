@@ -17737,6 +17737,10 @@ ill_move(ill_t *from_ill, ill_t *to_ill, queue_t *q, mblk_t *mp)
 	 * send rts messages and multicast messages.
 	 */
 	if (rep_ipif_ptr != NULL) {
+		if (rep_ipif_ptr->ipif_recovery_id != 0) {
+			(void) untimeout(rep_ipif_ptr->ipif_recovery_id);
+			rep_ipif_ptr->ipif_recovery_id = 0;
+		}
 		ip_rts_ifmsg(rep_ipif_ptr);
 		ip_rts_newaddrmsg(RTM_DELETE, 0, rep_ipif_ptr);
 		IPIF_TRACE_CLEANUP(rep_ipif_ptr);
@@ -18948,12 +18952,25 @@ ipif_free(ipif_t *ipif)
 	 */
 	(void) ipif_down(ipif, NULL, NULL);
 
+	/*
+	 * Now that the interface is down, there's no chance it can still
+	 * become a duplicate.  Cancel any timer that may have been set while
+	 * tearing down.
+	 */
+	if (ipif->ipif_recovery_id != 0)
+		(void) untimeout(ipif->ipif_recovery_id);
+	ipif->ipif_recovery_id = 0;
+
 	rw_enter(&ill_g_lock, RW_WRITER);
 	/* Remove pointers to this ill in the multicast routing tables */
 	reset_mrt_vif_ipif(ipif);
 	rw_exit(&ill_g_lock);
 }
 
+/*
+ * Warning: this is not the only function that calls mi_free on an ipif_t.  See
+ * also ill_move().
+ */
 static void
 ipif_free_tail(ipif_t *ipif)
 {
@@ -19013,6 +19030,7 @@ ipif_free_tail(ipif_t *ipif)
 	mutex_destroy(&ipif->ipif_saved_ire_lock);
 
 	ASSERT(!(ipif->ipif_flags & (IPIF_UP | IPIF_DUPLICATE)));
+	ASSERT(ipif->ipif_recovery_id == 0);
 
 	/* Free the memory. */
 	mi_free((char *)ipif);
