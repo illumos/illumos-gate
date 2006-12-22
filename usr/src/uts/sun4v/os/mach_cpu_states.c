@@ -1126,7 +1126,7 @@ xt_sync(cpuset_t cpuset)
 	} cpu_sync;
 	uint64_t starttick, endtick, tick, lasttick;
 	uint_t largestid, smallestid;
-	int i;
+	int i, j;
 
 	kpreempt_disable();
 	CPUSET_DEL(cpuset, CPU->cpu_id);
@@ -1176,9 +1176,13 @@ xt_sync(cpuset_t cpuset)
 			if (tick > endtick) {
 				if (panic_quiesce)
 					goto out;
-				cmn_err(CE_CONT, "Cross trap sync timeout "
-				    "at cpu_sync.xword[%d]: 0x%lx\n",
-				    i, cpu_sync.xword[i]);
+				cmn_err(CE_CONT, "Cross trap sync timeout:  "
+				    "cpuids:");
+				for (j = (i * 8); j <= largestid; j++) {
+					if (cpu_sync.byte[j] != 0)
+						cmn_err(CE_CONT, " 0x%x", j);
+				}
+				cmn_err(CE_CONT, "\n");
 				cmn_err(CE_PANIC, "xt_sync: timeout");
 			}
 		}
