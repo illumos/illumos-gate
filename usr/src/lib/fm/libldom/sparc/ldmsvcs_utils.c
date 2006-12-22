@@ -132,9 +132,12 @@ channel_close(struct ldmsvcs_info *lsp)
 {
 	(void) pthread_mutex_lock(&lsp->mt);
 
-	(void) close(lsp->fds_chan.fd);
-	lsp->fds_chan.state = CHANNEL_CLOSED;
-	lsp->cv_twait = LDM_INIT_WAIT_TIME;
+	if (lsp->fds_chan.state == CHANNEL_OPEN ||
+		lsp->fds_chan.state == CHANNEL_READY) {
+		(void) close(lsp->fds_chan.fd);
+		lsp->cv_twait = LDM_INIT_WAIT_TIME;
+		lsp->fds_chan.state = CHANNEL_CLOSED;
+	}
 
 	(void) pthread_mutex_unlock(&lsp->mt);
 }
@@ -742,6 +745,14 @@ ds_handle_init_req(struct ldmsvcs_info *lsp, void *buf, size_t len)
 		(void) pthread_mutex_lock(&lsp->mt);
 		ASSERT(lsp->fds_chan.state == CHANNEL_OPEN);
 		lsp->fds_chan.state = CHANNEL_READY;
+
+		/*
+		 * Now the channel is ready after the handshake completes.
+		 * Reset the timeout to a smaller value for receiving messages
+		 * from the domain services.
+		 */
+		lsp->cv_twait = LDM_RUNNING_WAIT_TIME;
+
 		(void) pthread_mutex_unlock(&lsp->mt);
 	} else {
 		ds_hdr_t *H;
@@ -1058,7 +1069,6 @@ channel_openreset(struct ldmsvcs_info *lsp)
 				return (1);
 			}
 		}
-		lsp->cv_twait = LDM_RUNNING_WAIT_TIME;
 		lsp->fds_chan.state = CHANNEL_OPEN;
 	}
 

@@ -64,12 +64,13 @@ mem_page_cmd(int cmd, nvlist_t *nvl)
 		return (-1);
 	}
 
-	if (rc > -1) {
-		return (0);
-	} else {
-		errno = EIO;
+	/* Make the return value and errno value similar to the ioctl() call */
+	if (rc > 0) {
+		errno = rc;
 		return (-1);
 	}
+
+	return (0);
 #else
 	mem_page_t mpage;
 	char *fmribuf;

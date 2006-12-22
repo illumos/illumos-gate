@@ -270,7 +270,11 @@ os_mem_page_retire(ldom_hdl_t *lhp, int cmd, nvlist_t *nvl)
 	mem_page_t mpage;
 	char *fmribuf;
 	size_t fmrisz;
-	int fd, rc;
+	int fd, rc, err;
+
+	if (cmd != MEM_PAGE_RETIRE && cmd != MEM_PAGE_FMRI_RETIRE &&
+	    cmd != MEM_PAGE_ISRETIRED && cmd != MEM_PAGE_FMRI_ISRETIRED)
+			return (EINVAL);
 
 	if ((fd = open("/dev/mem", O_RDONLY)) < 0)
 		return (EINVAL);
@@ -293,18 +297,16 @@ os_mem_page_retire(ldom_hdl_t *lhp, int cmd, nvlist_t *nvl)
 	mpage.m_fmrisz = fmrisz;
 
 	rc = ioctl(fd, cmd, &mpage);
+	err = errno;
+
 	lhp->freep(fmribuf, fmrisz);
 	(void) close(fd);
 
-	if (rc < 0)
-		return (EINVAL);
+	if (rc < 0) {
+		rc = err;
+	}
 
-	if ((cmd == MEM_PAGE_RETIRE || cmd == MEM_PAGE_FMRI_RETIRE ||
-	    cmd == MEM_PAGE_ISRETIRED || cmd == MEM_PAGE_FMRI_ISRETIRED) &&
-	    (rc == 0 || rc == EIO || rc == EAGAIN))
-			return (rc);
-
-	return (EINVAL);
+	return (rc);
 }
 
 int
