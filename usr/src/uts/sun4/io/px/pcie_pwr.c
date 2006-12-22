@@ -898,8 +898,10 @@ pcie_pwr_resume(dev_info_t *dip)
 		if (is_pcie = pcie_is_pcie(config_handle))
 			pcie_disable_errors(cdip, config_handle);
 		(void) pci_restore_config_regs(cdip);
-		if (is_pcie)
+		if (is_pcie) {
 			pcie_enable_errors(cdip, config_handle);
+			(void) pcie_enable_ce(cdip, config_handle);
+		}
 		pci_config_teardown(&config_handle);
 
 		if (ndi_prop_remove(DDI_DEV_T_NONE, cdip,
@@ -1028,8 +1030,10 @@ pcie_pwr_suspend(dev_info_t *dip)
 		if (is_pcie = pcie_is_pcie(config_handle))
 			pcie_disable_errors(cdip, config_handle);
 		(void) pci_save_config_regs(cdip);
-		if (is_pcie)
+		if (is_pcie) {
 			pcie_enable_errors(cdip, config_handle);
+			(void) pcie_enable_ce(cdip, config_handle);
+		}
 		pci_config_teardown(&config_handle);
 	}
 	return (DDI_SUCCESS);

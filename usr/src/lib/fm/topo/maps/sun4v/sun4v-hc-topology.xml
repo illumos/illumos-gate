@@ -38,6 +38,9 @@
       </propgroup>
     </node>
     <dependents grouping='children'>
+     <range name='chip' min='0' max='32'>
+       <enum-method name='chip' version='1' />
+     </range>
      <range name='hostbridge' min='0' max='254'>
        <enum-method name='hostbridge' version='1' />
      </range>

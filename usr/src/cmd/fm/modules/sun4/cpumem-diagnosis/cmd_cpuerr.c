@@ -127,11 +127,15 @@ CMD_CPU_SIMPLEHANDLER(dtlb, dtlb, CMD_PTR_CPU_DTLB, "dtlb", "dtlb")
 CMD_CPU_SIMPLEHANDLER(irc, ireg, CMD_PTR_CPU_IREG, "ireg", "ireg")
 CMD_CPU_SIMPLEHANDLER(frc, freg, CMD_PTR_CPU_FREG, "freg", "freg")
 CMD_CPU_SIMPLEHANDLER(mau, mau, CMD_PTR_CPU_MAU, "mau", "mau")
+CMD_CPU_SIMPLEHANDLER(miscregs_ce, misc_regs, CMD_PTR_CPU_MISC_REGS,
+	"misc_regs", "misc_regs")
 
 CMD_CPU_SIMPLEHANDLER(fpu, fpu, CMD_PTR_CPU_FPU, "", "fpu")
 CMD_CPU_SIMPLEHANDLER(l2ctl, l2ctl, CMD_PTR_CPU_L2CTL, "", "l2ctl")
 CMD_CPU_SIMPLEHANDLER(iru, ireg, CMD_PTR_CPU_IREG, "", "ireg")
 CMD_CPU_SIMPLEHANDLER(fru, freg, CMD_PTR_CPU_FREG, "", "freg")
+CMD_CPU_SIMPLEHANDLER(miscregs_ue, misc_regs, CMD_PTR_CPU_MISC_REGS,
+	"", "misc_regs")
 
 
 #ifdef sun4u

@@ -58,6 +58,12 @@ typedef union ma_mpa		ma_mpa_t;
 typedef union ma_ma		ma_ma_t;
 typedef uint64_t		ma_np_t;
 
+/* MAU error type */
+#define	MAU_ERR_OK	0x00
+#define	MAU_ERR_INVOP	0x01
+#define	MAU_ERR_HWE	0x02
+#define	MAU_ERR_MASK	0x03
+
 /*
  * Modulare Arithmetic Unit (MA) control register definition.
  */
@@ -89,6 +95,11 @@ union ma_ctl {
 	} bits;
 };
 
+/* CWQ error type */
+#define	CWQ_ERR_OK		0x00
+#define	CWQ_ERR_PROTOCOL	0x04
+#define	CWQ_ERR_HWE		0x08
+#define	CWQ_ERR_MASK		0x0C
 
 typedef struct {
 	union {
@@ -139,7 +150,7 @@ typedef struct {
 #define	cw_dst_addr	_ux._cw_dst_addr
 #define	cw_csr		_ux._cw_csr
 
-#endif /* _ASM */
+#endif /* !_ASM */
 
 /* Values for ma_ctl operation field */
 #define	MA_OP_LOAD		0x0

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -142,10 +141,10 @@ BIG_ERR_CODE ncp_RSA_key_init(RSAkey *key, int psize, int qsize);
 void ncp_RSA_key_finish(RSAkey *key);
 BIG_ERR_CODE ncp_big_mont_rr(BIGNUM *result, BIGNUM *n);
 BIG_ERR_CODE ncp_big_modexp(BIGNUM *result, BIGNUM *a, BIGNUM *e,
-    BIGNUM *n, BIGNUM *n_rr, void *ncp);
+    BIGNUM *n, BIGNUM *n_rr, void *ncp, void *reqp);
 BIG_ERR_CODE ncp_big_modexp_crt(BIGNUM *result, BIGNUM *a, BIGNUM *dmodpminus1,
     BIGNUM *dmodqminus1, BIGNUM *p, BIGNUM *q, BIGNUM *pinvmodq,
-    BIGNUM *p_rr, BIGNUM *q_rr, void *ncp);
+    BIGNUM *p_rr, BIGNUM *q_rr, void *ncp, void *reqp);
 int ncp_big_cmp_abs(BIGNUM *a, BIGNUM *b);
 BIG_ERR_CODE ncp_randombignum(BIGNUM *r, int lengthinbits);
 BIG_ERR_CODE ncp_big_div_pos(BIGNUM *result, BIGNUM *remainder,
@@ -154,7 +153,8 @@ BIG_ERR_CODE ncp_big_ext_gcd_pos(BIGNUM *gcd, BIGNUM *cm, BIGNUM *ce,
     BIGNUM *m, BIGNUM *e);
 BIG_ERR_CODE ncp_big_add(BIGNUM *result, BIGNUM *aa, BIGNUM *bb);
 BIG_ERR_CODE ncp_big_mul(BIGNUM *result, BIGNUM *aa, BIGNUM *bb);
-BIG_ERR_CODE ncp_big_nextprime_pos(BIGNUM *result, BIGNUM *n, void *ncp);
+BIG_ERR_CODE ncp_big_nextprime_pos(BIGNUM *result, BIGNUM *n, void *ncp,
+    void *reqp);
 BIG_ERR_CODE ncp_big_sub_pos(BIGNUM *result, BIGNUM *aa, BIGNUM *bb);
 BIG_ERR_CODE ncp_big_copy(BIGNUM *dest, BIGNUM *src);
 BIG_ERR_CODE ncp_big_sub(BIGNUM *result, BIGNUM *aa, BIGNUM *bb);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -60,14 +59,14 @@ extern void cmd_bank_fault(fmd_hdl_t *, cmd_bank_t *);
 static void
 dp_page_defer_data_write(fmd_hdl_t *hdl, cmd_dp_defer_t *dpage)
 {
-	fmd_buf_write(hdl, dpage->dp_defer_page->page_case, "mcids",
+	fmd_buf_write(hdl, dpage->dp_defer_page->page_case.cc_cp, "mcids",
 	    &dpage->dp_defer_mcids, sizeof (dpage->dp_defer_mcids));
 }
 
 static void
 dp_page_defer_data_restore(fmd_hdl_t *hdl, cmd_dp_defer_t *dpage)
 {
-	fmd_buf_read(hdl, dpage->dp_defer_page->page_case, "mcids",
+	fmd_buf_read(hdl, dpage->dp_defer_page->page_case.cc_cp, "mcids",
 	    &dpage->dp_defer_mcids, sizeof (dpage->dp_defer_mcids));
 }
 
@@ -140,14 +139,14 @@ cmd_dp_page_defer(fmd_hdl_t *hdl, nvlist_t *modasru, fmd_event_t *ep,
 	if (page == NULL) {
 		page = cmd_page_create(hdl, modasru, afar);
 		dpage = dp_page_defer_create(hdl, page, afar);
-		page->page_case = cmd_case_create(hdl, &page->page_header,
+		page->page_case.cc_cp = cmd_case_create(hdl, &page->page_header,
 		    CMD_PTR_DP_PAGE_DEFER, &uuid);
-		fmd_case_setprincipal(hdl, page->page_case, ep);
+		fmd_case_setprincipal(hdl, page->page_case.cc_cp, ep);
 	} else {
 		dpage = dp_page_defer_lookup(page);
 		if (dpage == NULL)
 			fmd_hdl_abort(hdl, "deferred page with no defer data");
-		fmd_case_add_ereport(hdl, page->page_case, ep);
+		fmd_case_add_ereport(hdl, page->page_case.cc_cp, ep);
 	}
 
 	dp_page_defer_add_data(hdl, dpage, afar);
@@ -192,7 +191,7 @@ cmd_dp_page_replay(fmd_hdl_t *hdl)
 			fmd_hdl_debug(hdl, "deferred memory UE  overtaken by "
 			    "dp fault");
 			CMD_STAT_BUMP(dp_ignored_ue);
-			fmd_case_close(hdl, page->page_case);
+			fmd_case_close(hdl, page->page_case.cc_cp);
 			cmd_list_delete(&cmd.cmd_deferred_pages, dpage);
 			fmd_hdl_free(hdl, dpage, sizeof (cmd_dp_defer_t));
 			cmd_page_destroy(hdl, page);
@@ -203,17 +202,17 @@ cmd_dp_page_replay(fmd_hdl_t *hdl)
 
 		bank = cmd_bank_lookup(hdl, nvl);
 
-		ep = fmd_case_getprincipal(hdl, page->page_case);
+		ep = fmd_case_getprincipal(hdl, page->page_case.cc_cp);
 		fmd_case_add_ereport(hdl, bank->bank_case.cc_cp, ep);
 
 		bank->bank_nretired++;
 		bank->bank_retstat.fmds_value.ui64++;
 		cmd_bank_dirty(hdl, bank);
 
-		fmd_case_reset(hdl, page->page_case);
-		cmd_case_fini(hdl, page->page_case, FMD_B_TRUE);
+		fmd_case_reset(hdl, page->page_case.cc_cp);
+		cmd_case_fini(hdl, page->page_case.cc_cp, FMD_B_TRUE);
 
-		page->page_case = NULL;
+		page->page_case.cc_cp = NULL;
 		cmd_page_fault(hdl, nvl, nvl, ep, page->page_physbase);
 		cmd_bank_fault(hdl, bank);
 

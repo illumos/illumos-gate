@@ -93,6 +93,7 @@ extern cmd_evdisp_t cmd_opl_io_mem(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 
 extern nvlist_t *opl_cpursrc_create(fmd_hdl_t *, uint32_t);
+extern char *cmd_cpu_getfrustr_by_id(fmd_hdl_t *, uint32_t);
 extern cmd_list_t *opl_cpulist_insert(fmd_hdl_t *, uint32_t, int);
 extern void opl_cpulist_free(fmd_hdl_t *, cmd_list_t *);
 extern uint8_t opl_avg(uint_t, uint_t);

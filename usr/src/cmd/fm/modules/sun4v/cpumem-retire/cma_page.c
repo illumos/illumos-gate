@@ -99,6 +99,12 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 		return (CMA_RA_FAILURE);
 	}
 
+	if (!fmd_nvl_fmri_present(hdl, asru)) {
+		fmd_hdl_debug(hdl, "page retire overtaken by events\n");
+		cma_stats.page_nonent.fmds_value.ui64++;
+		return (CMA_RA_SUCCESS);
+	}
+
 	if (nvlist_lookup_uint64(asru, FM_FMRI_MEM_PHYSADDR, &pageaddr) != 0) {
 		fmd_hdl_debug(hdl, "mem fault missing '%s'\n",
 		    FM_FMRI_MEM_PHYSADDR);
@@ -111,12 +117,6 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 		    (u_longlong_t)pageaddr);
 		cma_stats.page_supp.fmds_value.ui64++;
 		return (CMA_RA_FAILURE);
-	}
-
-	if (!fmd_nvl_fmri_present(hdl, asru)) {
-		fmd_hdl_debug(hdl, "page retire overtaken by events\n");
-		cma_stats.page_nonent.fmds_value.ui64++;
-		return (CMA_RA_SUCCESS);
 	}
 
 	/*

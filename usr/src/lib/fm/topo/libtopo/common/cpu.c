@@ -30,11 +30,18 @@
 #include <limits.h>
 #include <strings.h>
 #include <unistd.h>
+#include <topo_error.h>
 #include <fm/topo_mod.h>
 #include <sys/fm/protocol.h>
 
 #include <topo_method.h>
 #include <cpu.h>
+
+/*
+ * platform specific cpu module
+ */
+#define	PLATFORM_CPU_VERSION	CPU_VERSION
+#define	PLATFORM_CPU_NAME	"platform-cpu"
 
 static int cpu_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
     topo_instance_t, void *, void *);
@@ -185,19 +192,50 @@ static int
 cpu_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
     topo_instance_t min, topo_instance_t max, void *arg, void *notused2)
 {
+	topo_mod_t *nmp;
 	cpu_node_t *cpuip = (cpu_node_t *)arg;
 
-	if (topo_node_range_create(mod, pnode, "cpu", 0,
-	    cpuip->cn_ncpustats + 1) < 0) {
-		topo_mod_dprintf(mod, "cpu enumeration failed to create cpu "
-		    "range [0-%d]: %s\n", cpuip->cn_ncpustats + 1,
-		    topo_mod_errmsg(mod));
-		return (-1); /* mod_errno set */
+	if ((nmp = topo_mod_load(mod, PLATFORM_CPU_NAME,
+				PLATFORM_CPU_VERSION)) == NULL) {
+		if (topo_mod_errno(mod) == ETOPO_MOD_NOENT) {
+			/*
+			 * There is no platform specific cpu module, so use
+			 * the default enumeration with kstats of this builtin
+			 * cpu module.
+			 */
+			if (topo_node_range_create(mod, pnode, name, 0,
+						cpuip->cn_ncpustats + 1) < 0) {
+				topo_mod_dprintf(mod,
+					"cpu enumeration failed to create "
+					"cpu range [0-%d]: %s\n",
+					cpuip->cn_ncpustats + 1,
+					topo_mod_errmsg(mod));
+				return (-1); /* mod_errno set */
+			}
+			(void) topo_method_register(mod, pnode, cpu_methods);
+			return (cpu_create(mod, pnode, name, min, max, cpuip));
+
+		} else {
+			/* Fail to load the module */
+			topo_mod_dprintf(mod,
+					"Failed to load module %s: %s",
+					PLATFORM_CPU_NAME,
+					topo_mod_errmsg(mod));
+			return (-1);
+		}
 	}
 
+	if (topo_mod_enumerate(nmp, pnode, PLATFORM_CPU_NAME, name,
+				min, max, NULL) < 0) {
+		topo_mod_dprintf(mod,
+				"%s failed to enumerate: %s",
+				PLATFORM_CPU_NAME,
+				topo_mod_errmsg(mod));
+		return (-1);
+	}
 	(void) topo_method_register(mod, pnode, cpu_methods);
 
-	return (cpu_create(mod, pnode, name, min, max, cpuip));
+	return (0);
 }
 
 static void

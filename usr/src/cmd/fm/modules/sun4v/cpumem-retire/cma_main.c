@@ -80,19 +80,17 @@ static const cma_subscriber_t cma_subrs[] = {
 	    NULL },
 
 	/*
-	 * The following ultraSPARC-T1 faults do NOT retire a cpu thread,
+	 * The following ultraSPARC-T1/T2 faults do NOT retire a cpu thread,
 	 * and therefore must be intercepted before
 	 * the default "fault.cpu.*" dispatch to cma_cpu_retire.
 	 */
-	{ "fault.cpu.ultraSPARC-T1.freg", FM_FMRI_SCHEME_CPU,
+	{ "fault.cpu.*.l2cachedata", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.ultraSPARC-T1.l2cachedata", FM_FMRI_SCHEME_CPU,
+	{ "fault.cpu.*.l2cachetag", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.ultraSPARC-T1.l2cachetag", FM_FMRI_SCHEME_CPU,
+	{ "fault.cpu.*.l2cachectl", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.ultraSPARC-T1.l2cachectl", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.ultraSPARC-T1.mau", FM_FMRI_SCHEME_CPU,
+	{ "fault.cpu.*.mau", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },
 	{ "fault.cpu.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    cma_cpu_retire },

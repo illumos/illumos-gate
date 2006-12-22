@@ -42,14 +42,37 @@ physnm_t t200_pnms[] = {
 	{ 226, "PCIE2" }
 };
 
+physnm_t t5120_pnms[] = {
+	/* Slot #, Label */
+	{   1, "MB/RISER1/PCIE1" },
+	{   2, "MB/RISER2/PCIE2" },
+	{   3, "MB/RISER3/PCIE3" }
+};
+
+physnm_t t5220_pnms[] = {
+	/* Slot #, Label */
+	{   1, "MB/RISER1/PCIE1" },
+	{   2, "MB/RISER2/PCIE2" },
+	{   3, "MB/RISER3/PCIE3" },
+	{   4, "MB/RISER1/PCIE4" },
+	{   5, "MB/RISER2/PCIE5" },
+	{   6, "MB/RISER3/PCIE6" }
+};
+
 pphysnm_t plat_pnames[] = {
 	{ "Sun-Fire-T200",
 	    sizeof (t200_pnms) / sizeof (physnm_t),
-	    t200_pnms }
+	    t200_pnms },
+	{ "SPARC-Enterprise-T5120",
+	    sizeof (t5120_pnms) / sizeof (physnm_t),
+	    t5120_pnms },
+	{ "SPARC-Enterprise-T5220",
+	    sizeof (t5220_pnms) / sizeof (physnm_t),
+	    t5220_pnms }
 };
 
 physlot_names_t PhyslotNMs = {
-	1,
+	3,
 	plat_pnames
 };
 
@@ -62,11 +85,17 @@ devlab_t t200_missing[] = {
 pdevlabs_t plats_missing[] = {
 	{ "Sun-Fire-T200",
 	    sizeof (t200_missing) / sizeof (devlab_t),
-	    t200_missing }
+	    t200_missing },
+	{ "SPARC-Enterprise-T5120",
+	    0,
+	    NULL },
+	{ "SPARC-Enterprise-T5220",
+	    0,
+	    NULL }
 };
 
 missing_names_t Missing = {
-	1,
+	3,
 	plats_missing
 };
 

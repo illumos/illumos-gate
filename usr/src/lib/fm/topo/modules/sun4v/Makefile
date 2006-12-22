@@ -25,6 +25,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = chip hostbridge pcibus
+SUBDIRS = chip hostbridge pcibus motherboard niu platform-cpu
+
 
 include ../../../Makefile.subdirs

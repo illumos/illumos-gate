@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +31,7 @@
 
 #include <cmd_page.h>
 #include <cmd.h>
+#include <cmd_mem.h>
 
 #include <errno.h>
 #include <string.h>
@@ -49,7 +49,7 @@ cmd_page_fault(fmd_hdl_t *hdl, nvlist_t *modasru, nvlist_t *modfru,
 	if (page == NULL)
 		page = cmd_page_create(hdl, modasru, afar);
 
-	if (page->page_case != NULL) {
+	if (page->page_flags & CMD_MEM_F_FAULTING) {
 		/*
 		 * We've already faulted this page.  No need to kick it while
 		 * it's down -- don't fault it again.
@@ -57,7 +57,8 @@ cmd_page_fault(fmd_hdl_t *hdl, nvlist_t *modasru, nvlist_t *modfru,
 		return;
 	}
 
-	page->page_case = cmd_case_create(hdl, &page->page_header,
+	if (page->page_case.cc_cp == NULL)
+	    page->page_case.cc_cp = cmd_case_create(hdl, &page->page_header,
 	    CMD_PTR_PAGE_CASE, &uuid);
 
 	flt = fmd_nvl_create_fault(hdl, "fault.memory.page", 100,
@@ -66,9 +67,9 @@ cmd_page_fault(fmd_hdl_t *hdl, nvlist_t *modasru, nvlist_t *modfru,
 	if (nvlist_add_boolean_value(flt, FM_SUSPECT_MESSAGE, B_FALSE) != 0)
 		fmd_hdl_abort(hdl, "failed to add no-message member to fault");
 
-	fmd_case_add_ereport(hdl, page->page_case, ep);
-	fmd_case_add_suspect(hdl, page->page_case, flt);
-	fmd_case_solve(hdl, page->page_case);
+	fmd_case_add_ereport(hdl, page->page_case.cc_cp, ep);
+	fmd_case_add_suspect(hdl, page->page_case.cc_cp, flt);
+	fmd_case_solve(hdl, page->page_case.cc_cp);
 }
 
 void

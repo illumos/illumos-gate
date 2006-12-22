@@ -34,6 +34,7 @@ extern "C" {
 
 #include <sys/ddi.h>
 
+#define	ERNAME_DETAILED_ERR_TYPE	"detailed error type"
 #define	ERNAME_ERR_PORTN		"port number"
 #define	ERNAME_ERR_DCHAN		"dma channel number"
 #define	ERNAME_TCAM_ERR_LOG		"tcam error log"
@@ -101,6 +102,7 @@ typedef	uint32_t nxge_fm_ereport_id_t;
 
 typedef	struct _nxge_fm_ereport_attr {
 	uint32_t		index;
+	char			*str;
 	char			*eclass;
 	ddi_fault_impact_t	impact;
 } nxge_fm_ereport_attr_t;

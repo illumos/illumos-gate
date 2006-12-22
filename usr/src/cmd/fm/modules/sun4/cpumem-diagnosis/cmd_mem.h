@@ -113,6 +113,8 @@ typedef cmd_evdisp_t cmd_xe_handler_f(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     nvlist_t *);
 
 extern ce_dispact_t cmd_mem_name2type(const char *, int);
+extern int cmd_synd2upos(uint16_t);
+extern int cmd_upos2dram(uint16_t);
 extern cmd_evdisp_t cmd_ce(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 extern cmd_evdisp_t cmd_ue(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
@@ -168,6 +170,7 @@ extern nvlist_t *cmd_mem_fmri_derive(fmd_hdl_t *, uint64_t, uint64_t, uint16_t);
 extern void cmd_mem_case_restore(fmd_hdl_t *, cmd_case_t *, fmd_case_t *,
     const char *, const char *);
 extern char *cmd_mem_serdnm_create(fmd_hdl_t *, const char *, const char *);
+extern char *cmd_page_serdnm_create(fmd_hdl_t *, const char *, uint64_t);
 extern void cmd_mem_retirestat_create(fmd_hdl_t *, fmd_stat_t *, const char *,
     uint64_t);
 extern int cmd_mem_thresh_check(fmd_hdl_t *, uint_t);

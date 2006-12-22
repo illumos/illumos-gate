@@ -29,7 +29,7 @@
 #include	<sys/nxge/nxge_mac.h>
 
 static void nxge_get_niu_property(dev_info_t *, niu_type_t *);
-static void nxge_get_mac_addr_properties(p_nxge_t);
+static nxge_status_t nxge_get_mac_addr_properties(p_nxge_t);
 static nxge_status_t nxge_use_cfg_n2niu_properties(p_nxge_t);
 static void nxge_use_cfg_neptune_properties(p_nxge_t);
 static void nxge_use_cfg_dma_config(p_nxge_t);
@@ -1779,7 +1779,10 @@ nxge_get_config_properties(p_nxge_t nxgep)
 		break;
 	}
 
-	nxge_get_mac_addr_properties(nxgep);
+	status = nxge_get_mac_addr_properties(nxgep);
+	if (status != NXGE_OK) {
+		return (NXGE_ERROR);
+	}
 		/*
 		 * read the configuration type.
 		 * If none is specified, used default.
@@ -3102,9 +3105,6 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 {
 	int			i, maxldvs, maxldgs, start, end, nldvs;
 	int			ldv, endldg;
-#ifdef	S11
-	int			ldg;
-#endif
 	uint8_t			func;
 	uint8_t			channel;
 	uint8_t			chn_start;
@@ -3189,18 +3189,12 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		"==> nxge_ldgv_init_n2: maxldvs %d maxldgs %d",
 		maxldvs, maxldgs));
 	/* logical start_ldg is ldv */
-#if S11
-	ldg = p_cfgp->start_ldg;
-#endif
 	ptr = ldgp;
 	for (i = 0; i < maxldgs; i++) {
 		ptr->func = func;
 		ptr->arm = B_TRUE;
 		ptr->vldg_index = (uint8_t)i;
 		ptr->ldg_timer = NXGE_TIMER_LDG;
-#if S11
-		ptr->ldg = ldg++;
-#endif
 		ptr->ldg = p_cfgp->ldg[i];
 		ptr->sys_intr_handler = nxge_intr;
 		ptr->nldvs = 0;
@@ -3213,9 +3207,6 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ptr++;
 	}
 
-#ifdef	S11
-	ldg = p_cfgp->start_ldg;
-#endif
 	endldg = NXGE_INT_MAX_LDG;
 	nldvs = 0;
 	ldgvp->nldvs = 0;
@@ -3238,13 +3229,6 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ldvp->ldv_intr_handler = nxge_mac_intr;
 		ldvp->ldv_ldf_masks = 0;
 		ldvp->nxgep = nxgep;
-#if S11
-		if (!func) {
-			ldgp->ldg = NXGE_N2_MAC_0_LDG;
-		} else {
-			ldgp->ldg = NXGE_N2_MAC_1_LDG;
-		}
-#endif
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
 			"==> nxge_ldgv_init_n2(mac): maxldvs %d ldv %d "
 			"ldg %d ldgptr $%p ldvptr $%p",
@@ -3260,9 +3244,6 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ldvp->ldv_intr_handler = nxge_mif_intr;
 		ldvp->ldv_ldf_masks = 0;
 		ldvp->nxgep = nxgep;
-#ifdef	S11
-		ldgp->ldg = NXGE_N2_MIF_LDG;
-#endif
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
 			"==> nxge_ldgv_init_n2(mif): maxldvs %d ldv %d "
 			"ldg %d ldgptr $%p ldvptr $%p",
@@ -3275,13 +3256,6 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	ldvp->use_timer = B_TRUE;
 	if (own_sys_err && p_cfgp->ser_ldvid) {
 		ldv = p_cfgp->ser_ldvid;
-#ifdef	NXGE_SYSERR_USE_INT
-		ldvp->use_timer = B_FALSE;
-#else
-		ldvp->use_timer = B_TRUE;
-#endif
-		ldvp->use_timer = B_FALSE;
-
 		/*
 		 * Unmask the system interrupt states.
 		 */
@@ -3302,7 +3276,7 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		"ldg %d ldgptr $%p ldvptr p%p",
 		maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
 
-	if (ldvp->use_timer == B_FALSE) {
+	if (own_sys_err && p_cfgp->ser_ldvid) {
 		(void) nxge_ldgv_setup(&ldgp, &ldvp, ldv, endldg, nrequired_p);
 	} else {
 		ldvp++;
@@ -3332,10 +3306,6 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ldvp->ldv_intr_handler = nxge_rx_intr;
 		ldvp->ldv_ldf_masks = 0;
 		ldvp->nxgep = nxgep;
-#ifdef	S11
-		ldgp->ldg = ((NXGE_N2_RXDMA_START_LDG + i) +
-				(func * NXGE_N2_LDG_GAP));
-#endif
 		ldgp->ldg = p_cfgp->ldg[chn_start];
 
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
@@ -3367,10 +3337,6 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ldvp->vdma_index = (uint8_t)i;
 		ldvp->ldv_intr_handler = nxge_tx_intr;
 		ldvp->ldv_ldf_masks = 0;
-#ifdef	S11
-		ldgp->ldg = ((NXGE_N2_TXDMA_START_LDG + i) +
-				(func * NXGE_N2_LDG_GAP));
-#endif
 		ldgp->ldg = p_cfgp->ldg[chn_start];
 		ldvp->nxgep = nxgep;
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
@@ -3578,6 +3544,7 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	/*
 	 * Function 0 owns system error interrupts.
 	 */
+	ldvp->use_timer = B_TRUE;
 	if (own_sys_err) {
 		ldv = NXGE_SYS_ERROR_LD;
 		ldvp->ldv = (uint8_t)ldv;
@@ -3585,11 +3552,6 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ldvp->ldv_intr_handler = nxge_syserr_intr;
 		ldvp->ldv_ldf_masks = 0;
 		ldvp->nxgep = nxgep;
-#ifdef	NXGE_SYSERR_USE_INT
-		ldvp->use_timer = B_FALSE;
-#else
-		ldvp->use_timer = B_TRUE;
-#endif
 		ldgvp->ldvp_syserr = ldvp;
 		/*
 		 * Unmask the system interrupt states.
@@ -3607,10 +3569,7 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ldvp->ldv_intr_handler = nxge_syserr_intr;
 		ldvp->nxgep = nxgep;
 		ldvp->ldv_ldf_masks = 0;
-		ldvp->use_timer = B_TRUE;
 		ldgvp->ldvp_syserr = ldvp;
-		(void) nxge_ldgv_setup(&ldgp, &ldvp, ldv, endldg, nrequired_p);
-		nldvs++;
 	}
 
 	ldgvp->ldg_intrs = *nrequired_p;
@@ -3859,7 +3818,7 @@ nxge_intr_mask_mgmt_set(p_nxge_t nxgep, boolean_t on)
 	return (NXGE_OK);
 }
 
-void
+static nxge_status_t
 nxge_get_mac_addr_properties(p_nxge_t nxgep)
 {
 	uchar_t 		*prop_val;
@@ -3919,6 +3878,7 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 		} else {
 			NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
 			"nxge_get_mac_addr_properties, espc access failed"));
+			return (NXGE_ERROR);
 		}
 	}
 
@@ -3967,6 +3927,8 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 	 * Initialize alt. mac addr. in the mac pool
 	 */
 	(void) nxge_init_mmac(nxgep);
+
+	return (NXGE_OK);
 }
 
 void

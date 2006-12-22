@@ -141,7 +141,6 @@ struct px {
 	int		px_pm_flags;
 	msiqid_t	px_pm_msiq_id;	/* EQ id for PCIE_PME_ACK_MSG Message */
 	uint32_t	px_pmetoack_ignored; /* count of PME_To_ACKs ignored */
-	uint32_t	px_pme_ignored; /* count of PME ignored */
 
 	/* CPR callback id */
 	callb_id_t	px_cprcb_id;

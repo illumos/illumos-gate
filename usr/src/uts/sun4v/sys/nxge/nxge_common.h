@@ -158,9 +158,13 @@ typedef struct  nxge_rdc_cfg {
 	/* RBR Configuration B */
 	uint32_t	bksize;		/* Block size is fixed. */
 #define	RBR_BKSIZE_4K			0
+#define	RBR_BKSIZE_4K_BYTES		(4 * 1024)
 #define	RBR_BKSIZE_8K			1
+#define	RBR_BKSIZE_8K_BYTES		(8 * 1024)
 #define	RBR_BKSIZE_16K			2
+#define	RBR_BKSIZE_16K_BYTES		(16 * 1024)
 #define	RBR_BKSIZE_32K			3
+#define	RBR_BKSIZE_32K_BYTES		(32 * 1024)
 
 	uint32_t	bufsz2;
 #define	RBR_BUFSZ2_2K			0

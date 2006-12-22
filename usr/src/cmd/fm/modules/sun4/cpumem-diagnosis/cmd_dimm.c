@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,8 +77,13 @@ nvlist_t *
 cmd_dimm_create_fault(fmd_hdl_t *hdl, cmd_dimm_t *dimm, const char *fltnm,
     uint_t cert)
 {
+#ifdef sun4v
+	return (fmd_nvl_create_fault(hdl, fltnm, cert, dimm->dimm_asru_nvl,
+	    cmd_mem2hc(hdl, dimm->dimm_asru_nvl), NULL));
+#else
 	return (fmd_nvl_create_fault(hdl, fltnm, cert, dimm->dimm_asru_nvl,
 	    dimm->dimm_asru_nvl, NULL));
+#endif /* sun4v */
 }
 
 static void
@@ -111,6 +115,16 @@ cmd_dimm_free(fmd_hdl_t *hdl, cmd_dimm_t *dimm, int destroy)
 void
 cmd_dimm_destroy(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 {
+	int i;
+	cmd_mq_t *q;
+
+	for (i = 0; i < CMD_MAX_CKWDS; i++) {
+		while ((q = cmd_list_next(&dimm->mq_root[i])) != NULL) {
+			cmd_list_delete(&dimm->mq_root[i], q);
+			fmd_hdl_free(hdl, q, sizeof (cmd_mq_t));
+		}
+	}
+
 	fmd_stat_destroy(hdl, 1, &(dimm->dimm_retstat));
 	cmd_dimm_free(hdl, dimm, FMD_B_TRUE);
 }

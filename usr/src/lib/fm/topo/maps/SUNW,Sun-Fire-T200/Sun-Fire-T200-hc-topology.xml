@@ -37,21 +37,26 @@
           value='MB' />
       </propgroup>
     </node>
+    <dependents grouping='children'>
+      <range name='chip' min='0' max='0'>
+        <enum-method name='chip' version='1' />
+      </range>
+    </dependents>
   </range>
   <range name='ioboard' min='0' max='0'>
     <node instance='0'>
-     <propgroup name='protocol' version='1'
+      <propgroup name='protocol' version='1'
         name-stability='Private' data-stability='Private' >
         <propval name='FRU' type='fmri'
           value='hc:///component=IOBD' />
         <propval name='label' type='string'
           value='IOBD' />
       </propgroup>
-      </node>
-      <dependents grouping='children'>
-        <range name='hostbridge' min='0' max='254'>
-          <enum-method name='hostbridge' version='1' />
-        </range>
-      </dependents>
-    </range>
+    </node>
+    <dependents grouping='children'>
+      <range name='hostbridge' min='0' max='254'>
+        <enum-method name='hostbridge' version='1' />
+      </range>
+    </dependents>
+  </range>
 </topology>

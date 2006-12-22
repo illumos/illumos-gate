@@ -162,6 +162,19 @@ nxge_classify_init(p_nxge_t nxgep)
 	return (NXGE_OK);
 }
 
+nxge_status_t
+nxge_classify_uninit(p_nxge_t nxgep)
+{
+	nxge_status_t	status = NXGE_OK;
+
+	status = nxge_classify_exit_sw(nxgep);
+	if (status != NXGE_OK) {
+		return (status);
+	}
+
+	return (NXGE_OK);
+}
+
 /* ARGSUSED */
 uint64_t
 nxge_classify_get_cfg_value(p_nxge_t nxgep, uint8_t cfg_type,

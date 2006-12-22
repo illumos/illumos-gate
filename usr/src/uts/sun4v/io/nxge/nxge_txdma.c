@@ -2905,11 +2905,9 @@ nxge_tx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp, tx_cs_t cs)
 			channel, cs.value));
 		status = nxge_txdma_fatal_err_recover(nxgep, channel,
 								tx_ring_p);
-#ifdef	NXGE_FM
 		if (status == NXGE_OK) {
 			FM_SERVICE_RESTORED(nxgep);
 		}
-#endif
 	}
 
 	NXGE_DEBUG_MSG((nxgep, RX2_CTL, "<== nxge_tx_err_evnts"));

@@ -348,8 +348,10 @@ int
 mem_discover_mdesc(md_t *mdp, size_t mdbufsz)
 {
 	mde_cookie_t *listp;
-	int num_nodes, idx, mdesc_dimm_count;
+	int num_nodes, idx, mdesc_dimm_count, unique_ch;
 	mem_dimm_map_t *dm;
+	uint64_t sysmem_size, i, drgen = fmd_fmri_get_drgen();
+	char curr_ch;
 
 	num_nodes = md_node_count(mdp);
 	listp = fmd_fmri_alloc(sizeof (mde_cookie_t) * num_nodes);
@@ -371,20 +373,61 @@ mem_discover_mdesc(md_t *mdp, size_t mdbufsz)
 	    md_find_name(mdp, "fwd"), listp);
 
 	for (idx = 0; idx < mdesc_dimm_count; idx++) {
-		char *unum, *serial;
+		char *unum, *serial, *part;
 
 		if (md_get_prop_str(mdp, listp[idx], "nac", &unum) < 0)
 			unum = "";
 		if (md_get_prop_str(mdp, listp[idx], "serial#", &serial) < 0)
 			serial = "";
+		if (md_get_prop_str(mdp, listp[idx], "part#", &part) < 0)
+			part = "DIMM PART # not available";
 
 		dm = fmd_fmri_zalloc(sizeof (mem_dimm_map_t));
 		dm->dm_label = fmd_fmri_strdup(unum);
 		(void) strncpy(dm->dm_serid, serial, MEM_SERID_MAXLEN - 1);
+		dm->dm_part = fmd_fmri_strdup(part);
+		dm->dm_drgen = drgen;
 
 		dm->dm_next = mem.mem_dm;
 		mem.mem_dm = dm;
 	}
+
+	if (strstr(mem.mem_dm->dm_label, "BR") != NULL) { /* N2 */
+		mem.mem_rank_str = "CH";
+	} else  { /* Niagara-1 */
+		mem.mem_rank_str = "/R";
+	}
+
+	curr_ch = '\0';
+	unique_ch = 0;
+	for (dm = mem.mem_dm; dm != NULL; dm = dm->dm_next) {
+		char my_ch;
+		if (mem.mem_rank_str == "CH")
+			my_ch = *(strstr(dm->dm_label, "BR") + 2);
+		else my_ch = *(strstr(dm->dm_label, "CH") + 2);
+		if (curr_ch != my_ch) {
+			unique_ch++;
+			curr_ch = my_ch;
+		}
+	}
+
+	if (unique_ch == 1) mem.mem_ch_shift = 0;
+	else if (unique_ch == 2) mem.mem_ch_shift = 1;
+	else mem.mem_ch_shift = 2;
+
+	mdesc_dimm_count = md_scan_dag(mdp,
+	    MDE_INVAL_ELEM_COOKIE, md_find_name(mdp, "mblock"),
+	    md_find_name(mdp, "fwd"), listp);
+
+	sysmem_size = 0;
+	for (idx = 0; idx < mdesc_dimm_count; idx++) {
+		uint64_t size = 0;
+		if (md_get_prop_val(mdp, listp[idx], "size", &size) == 0)
+			sysmem_size += size;
+	}
+
+	for (i = 1 << 30; i < sysmem_size; i <<= 1); /* round up to 2^i */
+	mem.mem_rank_mask = i >> 1; /* PA high order bit */
 
 	fmd_fmri_free(listp, sizeof (mde_cookie_t) * num_nodes);
 	fmd_fmri_free(*mdp, mdbufsz);

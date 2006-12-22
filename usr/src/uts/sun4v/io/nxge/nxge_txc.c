@@ -199,7 +199,7 @@ nxge_txc_handle_sys_errors(p_nxge_t nxgep)
 		return (NXGE_ERROR);
 	}
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			    " nxge_txc_handle_sys_erors: errored port %d",
+			    " nxge_txc_handle_sys_errors: errored port %d",
 			    err_portn));
 	if (my_err) {
 		status = nxge_txc_handle_port_errors(nxgep, err_status);
@@ -329,15 +329,13 @@ nxge_txc_handle_port_errors(p_nxge_t nxgep, uint32_t err_status)
 
 	if (txport_fatal) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" nxge_txc_handle_sys_errors:"
+				" nxge_txc_handle_port_errors:"
 				" fatal Error on Port#%d\n",
 				portn));
 		status = nxge_tx_port_fatal_err_recover(nxgep);
-#ifdef	NXGE_FM
 		if (status == NXGE_OK) {
 			FM_SERVICE_RESTORED(nxgep);
 		}
-#endif
 	}
 
 	return (status);

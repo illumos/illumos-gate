@@ -25,11 +25,6 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-
-#ifdef LINUX
-#include <stdint.h>
-#endif
-
 #include <nxge_fflp_hash.h>
 
 static void nxge_crc32c_word(uint32_t *crcptr, const uint32_t *buf, int len);

@@ -86,6 +86,9 @@
 extern "C" {
 #endif
 
+#define	CPU_FRU_FMRI		FM_FMRI_SCHEME_HC":///" \
+    FM_FMRI_LEGACY_HC"="
+
 typedef struct cmd_cpu cmd_cpu_t;
 
 typedef enum cmd_cpu_type {
@@ -115,6 +118,10 @@ typedef struct cmd_cpu_cases {
 	cmd_case_t cpuc_freg;		/* Floatpnt reg errors (frc, fru) */
 	cmd_case_t cpuc_mau;		/* Modular arith errors (MAU) */
 	cmd_case_t cpuc_l2ctl;		/* L2$ directory, VUAD parity */
+	cmd_case_t cpuc_misc_regs;	/* Scratchpad array (SCA) */
+					/* Tick compare (TC) */
+					/* Store buffer (SBD) */
+					/* Trap stack array errors (TSA) */
 #ifdef sun4u
 	cmd_case_t cpuc_opl_invsfsr;	/* Olympus-C cpu inv-sfsr errors */
 	cmd_case_t cpuc_oplue_detcpu;	/* Olympus-C cpu det. ue (eid=CPU) */
@@ -416,6 +423,7 @@ struct cmd_cpu {
 #define	cpu_freg		cpu_cases.cpuc_freg
 #define	cpu_mau			cpu_cases.cpuc_mau
 #define	cpu_l2ctl		cpu_cases.cpuc_l2ctl
+#define	cpu_misc_regs		cpu_cases.cpuc_misc_regs
 #ifdef sun4u
 #define	cpu_opl_invsfsr		cpu_cases.cpuc_opl_invsfsr
 #define	cpu_oplue_detcpu	cpu_cases.cpuc_oplue_detcpu
@@ -612,6 +620,30 @@ extern cmd_evdisp_t cmd_l2ctl(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 
 /*
+ * SBD (Storage Buffer Data) errors
+ * SCA (Scratchpath Array) erros
+ * TC (Tick compare) errors
+ * TSA (Trap stack Array) errors
+ *
+ *         SERD name
+ *   Type  (if any)   Fault
+ *  ------ --------- -------------------------------
+ *   SBDC     misc_regs    fault.cpu.<cputype>.misc_regs
+ *   SBDU
+ *   SCAC, SCAU
+ *   TCC, TCU
+ *   TSAC, TSAU
+ *
+ * The expected resolution of misc_regs faults is the repair of
+ * the indicated CPU.
+ */
+extern cmd_evdisp_t cmd_miscregs_ce(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_miscregs_ue(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+
+
+/*
  * CPUs are described by FMRIs.  This routine will retrieve the CPU state
  * structure (creating a new one if necessary) described by the detector
  * FMRI in the passed ereport.
@@ -619,7 +651,11 @@ extern cmd_evdisp_t cmd_l2ctl(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
 extern cmd_cpu_t *cmd_cpu_lookup_from_detector(fmd_hdl_t *, nvlist_t *,
     const char *, uint8_t);
 
-extern char *cpu_getfrustr(fmd_hdl_t *, uint32_t);
+extern char *cmd_cpu_getfrustr(fmd_hdl_t *, cmd_cpu_t *);
+extern char *cmd_cpu_getpartstr(fmd_hdl_t *, cmd_cpu_t *);
+
+extern char *cmd_cpu_getserialstr(fmd_hdl_t *, cmd_cpu_t *);
+
 extern cmd_cpu_t *cmd_cpu_lookup(fmd_hdl_t *, nvlist_t *, const char *,
     uint8_t);
 

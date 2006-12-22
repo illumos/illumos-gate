@@ -97,7 +97,8 @@ static cmd_case_closer_f *const cmd_case_closers[] = {
 	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_CORE_ERR */
 	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_DAE */
 	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_IAE */
-	cmd_cpuerr_close	/* CMD_PTR_CPU_UGESR_UGE */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_UGE */
+	cmd_cpuerr_close	/* CMD_PTR_CPU_MISC_REGS */
 };
 
 fmd_case_t *

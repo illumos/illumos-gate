@@ -81,6 +81,7 @@ static const topo_modinfo_t hc_info =
 	{ HC, FM_FMRI_SCHEME_HC, HC_VERSION, &hc_ops };
 
 static const hcc_t hc_canon[] = {
+	{ BRANCH, TOPO_STABILITY_PRIVATE },
 	{ CMP, TOPO_STABILITY_PRIVATE },
 	{ CENTERPLANE, TOPO_STABILITY_PRIVATE },
 	{ CHASSIS, TOPO_STABILITY_PRIVATE },
@@ -95,6 +96,8 @@ static const hcc_t hc_canon[] = {
 	{ IOBOARD, TOPO_STABILITY_PRIVATE },
 	{ MEMORYCONTROL, TOPO_STABILITY_PRIVATE },
 	{ MOTHERBOARD, TOPO_STABILITY_PRIVATE },
+	{ NIU, TOPO_STABILITY_PRIVATE },
+	{ NIUFN, TOPO_STABILITY_PRIVATE },
 	{ PCI_BUS, TOPO_STABILITY_PRIVATE },
 	{ PCI_DEVICE, TOPO_STABILITY_PRIVATE },
 	{ PCI_FUNCTION, TOPO_STABILITY_PRIVATE },
@@ -106,7 +109,9 @@ static const hcc_t hc_canon[] = {
 	{ PCIEX_SWDWN, TOPO_STABILITY_PRIVATE },
 	{ RANK, TOPO_STABILITY_PRIVATE },
 	{ SATA_PORT, TOPO_STABILITY_PRIVATE },
-	{ SYSTEMBOARD, TOPO_STABILITY_PRIVATE }
+	{ SYSTEMBOARD, TOPO_STABILITY_PRIVATE },
+	{ XAUI, TOPO_STABILITY_PRIVATE },
+	{ XFP, TOPO_STABILITY_PRIVATE }
 };
 
 static int hc_ncanon = sizeof (hc_canon) / sizeof (hcc_t);
@@ -684,16 +689,16 @@ char **rev, nvlist_t **auth)
 		 * Return possible serial, part and revision
 		 */
 		if (strcmp(aname, FM_FMRI_HC_SERIAL_ID) == 0) {
-			*serial = aid;
+			*serial = topo_mod_strdup(mod, aid);
 		} else if (strcmp(aname, FM_FMRI_HC_PART) == 0) {
-			*part = aid;
+			*part = topo_mod_strdup(mod, aid);
 		} else if (strcmp(aname, FM_FMRI_HC_REVISION) == 0) {
-			*rev = aid;
+			*rev = topo_mod_strdup(mod, aid);
 		} else {
 			if (na == NULL) {
 				if (topo_mod_nvalloc(mod, &na,
 				    NV_UNIQUE_NAME) == 0) {
-					nvlist_add_string(na, aname, aid);
+				    (void) nvlist_add_string(na, aname, aid);
 				}
 			} else {
 				(void) nvlist_add_string(na, aname, aid);

@@ -112,8 +112,6 @@ typedef struct ncp_listnode ncp_listnode_t;
 typedef struct ncp_request ncp_request_t;
 typedef struct ncp_stat ncp_stat_t;
 
-
-
 /*
  * Linked-list linkage.
  */
@@ -142,6 +140,8 @@ struct ncp_request {
 	uint16_t		nr_pkt_length;
 	crypto_req_handle_t	nr_kcf_req;
 	ncp_t			*nr_ncp;
+	clock_t			nr_timeout;
+
 	/*
 	 * Consumer's I/O buffers.
 	 */
@@ -165,7 +165,6 @@ struct ncp_request {
 	uint8_t			nr_outbuf[RSA_MAX_KEY_LEN];
 
 	unsigned		nr_inlen;
-
 	unsigned		nr_modlen;
 	unsigned		nr_explen;
 	unsigned		nr_plen;
@@ -273,6 +272,13 @@ struct ncp_stat {
 };
 
 /*
+ * Device flags (ncp_t.n_flags)
+ */
+#define	NCP_FAILED		0x0000001
+#define	NCP_ATTACHED		0x0000002
+#define	NCP_REGISTERED		0x0000004
+
+/*
  * IMPORTANT:
  *	NCP_MAQUEUE_NENTRIES *must* be a power-of-2.
  *	requirement: sizeof (ncs_hvdesc_t) == 64
@@ -313,6 +319,7 @@ typedef struct ncp_descjob {
 	ncp_desc_t		*dj_jobp;
 	struct ncp_descjob	*dj_prev;
 	struct ncp_descjob	*dj_next;
+	int			dj_error;
 } ncp_descjob_t;
 
 /*
@@ -359,27 +366,16 @@ typedef struct {
 	int		mm_ncpus;
 	int		mm_nextcpuidx;
 	/*
-	 * Only protects mm_nextcpuidx field.
+	 * Only protects mm_nextcpuidx
 	 */
 	kmutex_t	mm_lock;
-	/*
-	 * xxx - maybe need RW lock for mm_state?
-	 */
 	int		mm_state;	/* MAU_STATE_... */
-
 	ncp_mau_queue_t	mm_queue;
 } mau_entry_t;
 
 typedef struct {
 	int		mc_cpuid;
 	int		mc_mauid;
-	/*
-	 * xxx - maybe need RW lock for mm_state?
-	 * Mirrors mm_state in mau_entry_t.  Duplicated
-	 * for speed so we don't have search mau_entry
-	 * table.  Field rarely updated.
-	 */
-	int		mc_state;	/* MAU_STATE_... */
 } cpu_entry_t;
 
 typedef struct {
@@ -389,6 +385,7 @@ typedef struct {
 	int		m_maulistsz;
 	mau_entry_t	*m_maulist;
 	int		m_nmaus;
+	int		m_nmaus_online;
 	int		m_nextmauidx;
 	/*
 	 * Only protects m_nextmauidx field.
@@ -403,6 +400,40 @@ typedef struct {
 	int		m_ncpus;
 } ncp_mau2cpu_map_t;
 
+
+#define	SECOND			1000000	/* micro seconds */
+#define	NCP_JOB_STALL_LIMIT	2
+typedef u_longlong_t ncp_counter_t;
+
+/* Information for performing periodic timeout (stall) checks */
+typedef struct ncp_timeout {
+	clock_t		ticks;	/* Number of clock ticks before next check */
+	timeout_id_t	id;	/* ID of timeout thread (used in detach) */
+	ncp_counter_t	count;	/* Number of timeout checks made (statistic) */
+} ncp_timeout_t;
+
+/*
+ * Job timeout information:
+ *
+ * A timeout condition will be detected if all "submitted" jobs have not been
+ * "reclaimed" (completed) and we have not made any "progress" within the
+ * cumulative timeout "limit".  The cumulative timeout "limit" is incremented
+ * with a job specific timeout value (usually one second) each time a new job
+ * is submitted.
+ */
+typedef struct ncp_job_info {
+	kmutex_t	lock;		/* Lock for all other elements */
+	ncp_counter_t	submitted;	/* Number of jobs submitted */
+	ncp_counter_t	reclaimed;	/* Number of jobs completed */
+	ncp_counter_t	progress;	/* Progress recorded during TO check */
+	ncp_timeout_t	timeout;	/* Timeout processing information */
+	struct {
+		clock_t count;		/* Ticks since last completion */
+		clock_t addend;		/* Added to count during TO check */
+		clock_t limit;		/* Cumulative timeout value */
+	} stalled;
+} ncp_job_info_t;
+
 struct ncp {
 	uint_t				n_hvapi_major_version;
 	uint_t				n_hvapi_minor_version;
@@ -415,6 +446,8 @@ struct ncp {
 	dev_info_t			*n_dip;
 
 	ddi_taskq_t			*n_taskq;
+
+	uint_t				n_flags;	/* dev state flags */
 
 	int				n_max_nmaus;
 	int				n_max_cpus_per_mau;
@@ -439,6 +472,9 @@ struct ncp {
 
 	md_t				*n_mdp;
 	ncp_mau2cpu_map_t		n_maumap;
+	kmutex_t			n_timeout_lock;
+	ncp_timeout_t			n_timeout;
+	ncp_job_info_t			n_job[NCP_MAX_MAX_NMAUS];
 };
 
 #endif	/* _KERNEL */
@@ -533,6 +569,7 @@ int	ncp_map_cpu_to_mau(ncp_t *, int);
 int	ncp_map_mau_to_cpu(ncp_t *, int);
 int	ncp_map_nextmau(ncp_t *);
 mau_entry_t	*ncp_map_findmau(ncp_t *, int);
+void	ncp_offline_mau(ncp_t *ncp, int mid);
 
 /*
  * ncp_kstat.c
@@ -568,6 +605,12 @@ void	ncp_reverse(void *, void *, int, int);
 int	ncp_numcmp(caddr_t, int, caddr_t, int);
 
 int	ncp_free_context(crypto_ctx_t *);
+
+#define	ncp_setfailed(ncp)	((ncp)->n_flags |= NCP_FAILED)
+#define	ncp_isfailed(ncp)	((ncp)->n_flags & NCP_FAILED)
+#define	ncp_setregistered(ncp)	((ncp)->n_flags |= NCP_REGISTERED)
+#define	ncp_clrregistered(ncp)	((ncp)->n_flags &= ~NCP_REGISTERED)
+#define	ncp_isregistered(ncp)	((ncp)->n_flags & NCP_REGISTERED)
 
 #ifdef	__cplusplus
 }

@@ -53,7 +53,7 @@ extern "C" {
 #define	N_MBLKL(mp)	((uint64_t)(mp)->b_wptr - (uint64_t)(mp)->b_rptr)
 
 /*
- * NCP Structures.
+ * N2CP Structures.
  */
 typedef struct n2cp n2cp_t;
 typedef struct n2cp_minor n2cp_minor_t;
@@ -64,10 +64,16 @@ typedef	struct n2cp_block_ctx n2cp_block_ctx_t;
 typedef	struct n2cp_hash_ctx n2cp_hash_ctx_t;
 typedef	struct n2cp_hmac_ctx n2cp_hmac_ctx_t;
 
-
 #define	N2CP_MAX_NCWQS		8
 #define	N2CP_MAX_CPUS_PER_CWQ	8
-#define	N2CP_MAX_HELPERTHREADS   (N2CP_MAX_NCWQS * N2CP_MAX_CPUS_PER_CWQ)
+#define	N2CP_MAX_HELPERTHREADS	(N2CP_MAX_NCWQS * N2CP_MAX_CPUS_PER_CWQ)
+
+/*
+ * Device flags (n2cp_t.n_flags)
+ */
+#define	N2CP_FAILED		0x0000001
+#define	N2CP_ATTACHED		0x0000002
+#define	N2CP_REGISTERED		0x0000004
 
 /*
  * HW limitaions for Data and Key. For an input greater than 64KB, Driver will
@@ -144,6 +150,7 @@ typedef struct cwq_cwjob {
 	struct cwq_cwjob	*cj_prev;
 	struct cwq_cwjob	*cj_next;
 	void			*cj_ctx;	/* ptr to n2cp_request */
+	int			cj_error;
 } cwq_cwjob_t;
 
 typedef struct {
@@ -188,27 +195,16 @@ typedef struct {
 	int		mm_ncpus;
 	int		mm_nextcpuidx;
 	/*
-	 * Only protects mm_nextcpuidx field.
+	 * Only protects mm_nextcpuidx
 	 */
 	kmutex_t	mm_lock;
-	/*
-	 * xxx - maybe need RW lock for mm_state?
-	 */
 	int		mm_state;	/* CWQ_STATE_... */
-
 	cwq_t		mm_queue;
 } cwq_entry_t;
 
 typedef struct {
 	int		mc_cpuid;
 	int		mc_cwqid;
-	/*
-	 * xxx - maybe need RW lock for mm_state?
-	 * Mirrors mm_state in mau_entry_t.  Duplicated
-	 * for speed so we don't have search mau_entry
-	 * table.  Field rarely updated.
-	 */
-	int		mc_state;	/* CWQ_STATE_... */
 } cpu_entry_t;
 
 typedef struct {
@@ -218,9 +214,10 @@ typedef struct {
 	int		m_cwqlistsz;
 	cwq_entry_t	*m_cwqlist;
 	int		m_ncwqs;
+	int		m_ncwqs_online;
 	int		m_nextcwqidx;
 	/*
-	 * Only protects m_nextcwqidx field.
+	 * Only protects m_nextcwqidx,  field.
 	 */
 	kmutex_t	m_lock;
 
@@ -231,6 +228,40 @@ typedef struct {
 	cpu_entry_t	*m_cpulist;
 	int		m_ncpus;
 } n2cp_cwq2cpu_map_t;
+
+#define	SECOND				1000000 /* micro seconds */
+#define	N2CP_JOB_STALL_LIMIT		2
+
+typedef uint64_t	n2cp_counter_t;
+
+/* Information for performing periodic timeout (stall) checks */
+typedef struct n2cp_timeout {
+	clock_t		ticks;	/* Number of clock ticks before next check */
+	timeout_id_t	id;	/* ID of timeout thread (used in detach) */
+	n2cp_counter_t	count;	/* Number of timeout checks made (statistic) */
+} n2cp_timeout_t;
+
+/*
+ * Job timeout information:
+ *
+ * A timeout condition will be detected if all "submitted" jobs have not been
+ * "reclaimed" (completed) and we have not made any "progress" within the
+ * cumulative timeout "limit".  The cumulative timeout "limit" is incremented
+ * with a job specific timeout value (usually one second) each time a new job
+ * is submitted.
+ */
+typedef struct n2cp_job_info {
+	kmutex_t	lock;		/* Lock for all other elements */
+	n2cp_counter_t	submitted;	/* Number of jobs submitted */
+	n2cp_counter_t	reclaimed;	/* Number of jobs completed */
+	n2cp_counter_t	progress;	/* Progress recorded during TO check */
+	n2cp_timeout_t	timeout;	/* Timeout processing information */
+	struct {
+		clock_t count;		/* Ticks since last completion */
+		clock_t addend;		/* Added to count during TO check */
+		clock_t limit;		/* Cumulative timeout value */
+	} stalled;
+} n2cp_job_info_t;
 
 #define	MAX_FIXED_IV_WORDS	8
 typedef struct fixed_iv {
@@ -336,7 +367,7 @@ struct n2cp_stat {
 		kstat_named_t	ns_nintr;
 		kstat_named_t	ns_nintr_err;
 		kstat_named_t	ns_nintr_jobs;
-	}			ns_cwq[N2CP_MAX_NCWQS];
+	} ns_cwq[N2CP_MAX_NCWQS];
 };
 
 
@@ -461,6 +492,7 @@ struct n2cp_request {
 	uint16_t		nr_pkt_length;
 	crypto_req_handle_t	nr_kcfreq;
 	n2cp_t			*nr_n2cp;
+	clock_t			nr_timeout;
 	int			nr_errno;
 	/*
 	 * Consumer's I/O buffers.
@@ -533,6 +565,10 @@ struct n2cp {
 
 	md_t				*n_mdp;
 	n2cp_cwq2cpu_map_t		n_cwqmap;
+
+	kmutex_t			n_timeout_lock;
+	n2cp_timeout_t			n_timeout;
+	n2cp_job_info_t			n_job[N2CP_MAX_NCWQS];
 };
 
 /* CK_AES_CTR_PARAMS provides the parameters to the CKM_AES_CTR mechanism */
@@ -620,8 +656,7 @@ void	n2cp_error(n2cp_t *, const char *, ...);
 void	n2cp_diperror(dev_info_t *, const char *, ...);
 void	n2cp_dipverror(dev_info_t *, const char *, va_list);
 void	n2cp_dump_cwb(cwq_cw_t *cw);
-
-
+void	n2cp_offline_cwq(n2cp_t *n2cp, int cwq_id);
 
 /*
  * n2cp_kstat.c
@@ -704,7 +739,7 @@ int	n2cp_ssl3_sha1_mac_verifyatomic(n2cp_t *, crypto_mechanism_t *,
  */
 int	n2cp_init_cwq2cpu_map(n2cp_t *);
 void	n2cp_deinit_cwq2cpu_map(n2cp_t *);
-int	n2cp_map_cwq_to_cpu(n2cp_t *, int);
+int	n2cp_map_cwq_to_cpu(n2cp_t *, int, int);
 int	n2cp_map_cpu_to_cwq(n2cp_t *, int);
 int	n2cp_map_nextcwq(n2cp_t *);
 cwq_entry_t	*n2cp_map_findcwq(n2cp_t *, int);
@@ -742,6 +777,13 @@ extern noncache_info_t	n2cp_nc;
 #define	BCOPY	bcopy
 
 #endif /* N2_ERRATUM_175 */
+
+#define	n2cp_setfailed(n2cp)		((n2cp)->n_flags |= N2CP_FAILED)
+#define	n2cp_isfailed(n2cp)		((n2cp)->n_flags & N2CP_FAILED)
+#define	n2cp_setregistered(n2cp)	((n2cp)->n_flags |= N2CP_REGISTERED)
+#define	n2cp_clrregistered(n2cp)	((n2cp)->n_flags &= ~N2CP_REGISTERED)
+#define	n2cp_isregistered(n2cp)		((n2cp)->n_flags & N2CP_REGISTERED)
+
 
 #endif /* _KERNEL */
 

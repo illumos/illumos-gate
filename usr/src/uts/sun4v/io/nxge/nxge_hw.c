@@ -100,17 +100,16 @@ void
 nxge_hw_id_init(p_nxge_t nxgep)
 {
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_hw_id_init"));
-
 	/*
 	 * Set up initial hardware parameters required such as mac mtu size.
 	 */
 	nxgep->mac.is_jumbo = B_FALSE;
 	nxgep->mac.maxframesize = NXGE_MTU_DEFAULT_MAX; /* 1522 */
-	if (nxge_jumbo_enable) {
-		nxgep->mac.maxframesize = nxge_jumbo_mtu +
-			sizeof (ether_header_t) + ETHERFCSL;
+	if (nxgep->param_arr[param_accept_jumbo].value || nxge_jumbo_enable) {
+		nxgep->mac.maxframesize = (uint16_t)nxge_jumbo_mtu;
 		nxgep->mac.is_jumbo = B_TRUE;
 	}
+
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 		"==> nxge_hw_id_init: maxframesize %d",
 		nxgep->mac.maxframesize));
@@ -974,20 +973,32 @@ nxge_check_hw_state(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, SYSERR_CTL, "==> nxge_check_hw_state"));
 
+	MUTEX_ENTER(nxgep->genlock);
+	nxgep->nxge_timerid = 0;
+	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
+		goto nxge_check_hw_state_exit;
+	}
+
 	nxge_check_tx_hang(nxgep);
 
 	ldgvp = nxgep->ldgvp;
 	if (ldgvp == NULL || (ldgvp->ldvp_syserr == NULL)) {
 		NXGE_ERROR_MSG((nxgep, SYSERR_CTL, "<== nxge_check_hw_state: "
 			"NULL ldgvp (interrupt not ready)."));
-		return;
+		goto nxge_check_hw_state_exit;
 	}
+
 	t_ldvp = ldgvp->ldvp_syserr;
 	if (!t_ldvp->use_timer) {
 		NXGE_DEBUG_MSG((nxgep, SYSERR_CTL, "<== nxge_check_hw_state: "
 			"ldgvp $%p t_ldvp $%p use_timer flag %d",
 			ldgvp, t_ldvp, t_ldvp->use_timer));
-		return;
+		goto nxge_check_hw_state_exit;
+	}
+
+	if (fm_check_acc_handle(nxgep->dev_regs->nxge_regh) != DDI_FM_OK) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			"port%d Bad register acc handle", nxgep->mac.portnum));
 	}
 
 	(void) nxge_syserr_intr((void *)t_ldvp, (void *)nxgep);
@@ -995,6 +1006,8 @@ nxge_check_hw_state(p_nxge_t nxgep)
 	nxgep->nxge_timerid = nxge_start_timer(nxgep, nxge_check_hw_state,
 		NXGE_CHECK_TIMER);
 
+nxge_check_hw_state_exit:
+	MUTEX_EXIT(nxgep->genlock);
 	NXGE_DEBUG_MSG((nxgep, SYSERR_CTL, "<== nxge_check_hw_state"));
 }
 

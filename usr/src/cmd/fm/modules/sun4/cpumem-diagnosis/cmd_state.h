@@ -122,7 +122,8 @@ typedef enum cmd_ptrsubtype {
 	CMD_PTR_CPU_UGESR_CORE_ERR,
 	CMD_PTR_CPU_UGESR_DAE,
 	CMD_PTR_CPU_UGESR_IAE,
-	CMD_PTR_CPU_UGESR_UGE
+	CMD_PTR_CPU_UGESR_UGE,
+	CMD_PTR_CPU_MISC_REGS
 } cmd_ptrsubtype_t;
 
 /*

@@ -65,7 +65,6 @@ extern nxge_rxbuf_threshold_t nxge_rx_threshold_lo;
 #define	RDC_NPI_DIRECT
 #endif
 
-#define	USE_DYNAMIC_BLANKING
 
 #ifdef	USE_DYNAMIC_BLANKING
 uint16_t	nxge_rx_intr_timeout = 0x8008;
@@ -152,6 +151,8 @@ nxge_rxdma_fatal_err_recover(p_nxge_t, uint16_t);
 nxge_status_t
 nxge_rx_port_fatal_err_recover(p_nxge_t);
 
+static uint16_t
+nxge_get_pktbuf_size(p_nxge_t nxgep, int bufsz_type, rbr_cfig_b_t rbr_cfgb);
 
 nxge_status_t
 nxge_init_rxdma_channels(p_nxge_t nxgep)
@@ -1000,7 +1001,7 @@ nxge_rx_parse_header(p_nxge_t nxgep, uint64_t *pkt_buf_addr_p,
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
 					"==> nxge_rx_parse_header: "
-					"buffer $%p headr_size %d",
+					"buffer $%p hdr_size %d",
 					pkt_buf_addr_p, hdr_size));
 
 
@@ -1581,7 +1582,7 @@ nxge_allocb(size_t size, uint32_t pri, p_nxge_dma_common_t dmabuf_p)
 	nxge_mp->free = B_TRUE;
 	nxge_mp->rx_use_bcopy = B_FALSE;
 
-	atomic_add_32(&nxge_mblks_pending, 1);
+	atomic_inc_32(&nxge_mblks_pending);
 
 	goto nxge_allocb_exit;
 
@@ -1644,6 +1645,7 @@ nxge_dupb(p_rx_msg_t nxge_mp, uint_t offset, size_t size)
 #else
 	atomic_inc_32(&nxge_mp->ref_cnt);
 #endif
+	atomic_inc_32(&nxge_mblks_pending);
 
 
 nxge_dupb_exit:
@@ -1873,7 +1875,9 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 		"nxge_freeb:rx_msg_p = $%p (block pending %d)",
 		rx_msg_p, nxge_mblks_pending));
 
+
 	ref_cnt = atomic_add_32_nv(&rx_msg_p->ref_cnt, -1);
+	atomic_dec_32(&nxge_mblks_pending);
 	if (!ref_cnt) {
 		buffer = rx_msg_p->buffer;
 		size = rx_msg_p->block_size;
@@ -1881,10 +1885,12 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 			"will free: rx_msg_p = $%p (block pending %d)",
 			(long long)rx_msg_p, nxge_mblks_pending));
 
-		KMEM_FREE(rx_msg_p, sizeof (rx_msg_t));
 		if (!rx_msg_p->use_buf_pool) {
 			KMEM_FREE(buffer, size);
 		}
+
+		KMEM_FREE(rx_msg_p, sizeof (rx_msg_t));
+		return;
 	}
 
 #if !defined(RX_USE_RECLAIM_POST)
@@ -2043,6 +2049,7 @@ nxge_intr_exit:
 #if !defined(_BIG_ENDIAN) && defined(RDC_NPI_DIRECT)
 static void
 nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
+				    rx_dma_ctl_stat_t cs)
 #else
 static void
 nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp)
@@ -2068,10 +2075,10 @@ nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp)
 #ifdef  NXGE_DEBUG
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
 			"==> nxge_rx_pkts_vring:calling mac_rx "
-			"LEN %d mp $%p mp->b_next $%p rcrp $%p "
+			"LEN %d mp $%p mp->b_cont $%p mp->b_next $%p rcrp $%p "
 			"mac_handle $%p",
-			(mp->b_wptr - mp->b_rptr),
-			mp, mp->b_next,
+			mp->b_wptr - mp->b_rptr,
+			mp, mp->b_cont, mp->b_next,
 			rcrp, rcrp->rcr_mac_handle));
 
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
@@ -2080,16 +2087,25 @@ nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp)
 			mp,
 			mp->b_rptr,
 			mp->b_wptr,
-			nxge_dump_packet((char *)mp->b_rptr, 64)));
-
+			nxge_dump_packet((char *)mp->b_rptr,
+			mp->b_wptr - mp->b_rptr)));
+		if (mp->b_cont) {
+			NXGE_DEBUG_MSG((nxgep, RX_CTL,
+				"==> nxge_rx_pkts_vring: dump b_cont packets "
+				"(mp->b_cont $%p b_rptr $%p b_wptr $%p):\n %s",
+				mp->b_cont,
+				mp->b_cont->b_rptr,
+				mp->b_cont->b_wptr,
+				nxge_dump_packet((char *)mp->b_cont->b_rptr,
+				mp->b_cont->b_wptr - mp->b_cont->b_rptr)));
+		}
 		if (mp->b_next) {
 			NXGE_DEBUG_MSG((nxgep, RX_CTL,
 				"==> nxge_rx_pkts_vring: dump next packets "
 				"(b_rptr $%p): %s",
 				mp->b_next->b_rptr,
 				nxge_dump_packet((char *)mp->b_next->b_rptr,
-				64)));
-
+				mp->b_next->b_wptr - mp->b_next->b_rptr)));
 		}
 #endif
 
@@ -2151,6 +2167,8 @@ nxge_rx_pkts(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
 	boolean_t		multi;
 #ifdef USE_DYNAMIC_BLANKING
 	uint64_t rcr_cfg_b = 0x0ull;
+#else
+	rcrcfig_b_t rcr_cfg_b;
 #endif
 
 #ifndef RDC_NPI_DIRECT
@@ -2273,13 +2291,23 @@ nxge_rx_pkts(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
 		/*
 		 * message chaining modes
 		 */
-		if (nmp && !multi) {
+		if (nmp) {
 			nmp->b_next = NULL;
-			*tail_mp = nmp;
-			tail_mp = &nmp->b_next;
-			nmp = mp_cont = NULL;
+			if (!multi && !mp_cont) { /* frame fits a partition */
+				*tail_mp = nmp;
+				tail_mp = &nmp->b_next;
+				nmp = NULL;
+			} else if (multi && !mp_cont) { /* first segment */
+				*tail_mp = nmp;
+				tail_mp = &nmp->b_cont;
+			} else if (multi && mp_cont) {	/* mid of multi segs */
+				*tail_mp = mp_cont;
+				tail_mp = &mp_cont->b_cont;
+			} else if (!multi && mp_cont) { /* last segment */
+				tail_mp = &nmp->b_next;
+				nmp = NULL;
+			}
 		}
-
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
 			"==> nxge_rx_pkts: loop: rcr channel %d "
 			"before updating: multi %d "
@@ -2339,6 +2367,19 @@ nxge_rx_pkts(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
 #ifdef USE_DYNAMIC_BLANKING
 	RXDMA_REG_WRITE64(handle, RCRCFIG_B_REG,
 			    channel, rcr_cfg_b);
+#else
+	if ((nxgep->intr_timeout != rcr_p->intr_timeout) ||
+		(nxgep->intr_threshold != rcr_p->intr_threshold)) {
+		rcr_p->intr_timeout = nxgep->intr_timeout;
+		rcr_p->intr_threshold = nxgep->intr_threshold;
+		rcr_cfg_b.value = 0x0ULL;
+		if (rcr_p->intr_timeout)
+			rcr_cfg_b.bits.ldw.entout = 1;
+		rcr_cfg_b.bits.ldw.timeout = rcr_p->intr_timeout;
+		rcr_cfg_b.bits.ldw.pthres = rcr_p->intr_threshold;
+		RXDMA_REG_WRITE64(handle, RCRCFIG_B_REG,
+				    channel, rcr_cfg_b.value);
+	}
 #endif
 
 #ifdef RDC_NPI_DIRECT
@@ -2384,6 +2425,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 	uint16_t		l2_len;
 	uint16_t		skip_len;
 	uint8_t			pktbufsz_type;
+	uint16_t		pktbufsz;
 	uint64_t		rcr_entry;
 	uint64_t		*pkt_buf_addr_pp;
 	uint64_t		*pkt_buf_addr_p;
@@ -2401,10 +2443,10 @@ nxge_receive_packet(p_nxge_t nxgep,
 
 	uint64_t			pkt_type;
 	uint64_t			frag;
+	static uint32_t		bytes_read;
 #ifdef	NXGE_DEBUG
 	int			dump_len;
 #endif
-
 	NXGE_DEBUG_MSG((nxgep, RX2_CTL, "==> nxge_receive_packet"));
 	first_entry = (*mp == NULL) ? B_TRUE : B_FALSE;
 
@@ -2429,7 +2471,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 
 	NXGE_DEBUG_MSG((nxgep, RX2_CTL,
 		"==> nxge_receive_packet: entryp $%p entry 0x%0llx "
-		"pkt_buf_addr_pp $%p l2_len %d multi %d "
+		"pkt_buf_addr_pp $%p l2_len %d multi 0x%llx "
 		"error_type 0x%x pkt_type 0x%x  "
 		"pktbufsz_type %d ",
 		rcr_desc_rd_head_p,
@@ -2441,7 +2483,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 
 	NXGE_DEBUG_MSG((nxgep, RX2_CTL,
 		"==> nxge_receive_packet: entryp $%p entry 0x%0llx "
-		"pkt_buf_addr_pp $%p l2_len %d multi %d "
+		"pkt_buf_addr_pp $%p l2_len %d multi 0x%llx "
 		"error_type 0x%x pkt_type 0x%x ", rcr_desc_rd_head_p,
 		rcr_entry, pkt_buf_addr_pp, l2_len,
 		multi,
@@ -2808,9 +2850,25 @@ nxge_receive_packet(p_nxge_t nxgep,
 			nmp->b_rptr));
 	}
 	if (nmp != NULL) {
+		pktbufsz = nxge_get_pktbuf_size(nxgep, pktbufsz_type,
+			rx_rbr_p->rbr_cfgb);
 		if (!rx_msg_p->rx_use_bcopy) {
-			nmp->b_rptr = &nmp->b_rptr[skip_len];
-			nmp->b_wptr = &nmp->b_rptr[l2_len];
+			if (first_entry) {
+				bytes_read = 0;
+				nmp->b_rptr = &nmp->b_rptr[skip_len];
+				if (l2_len > pktbufsz - skip_len)
+					nmp->b_wptr = &nmp->b_rptr[pktbufsz
+						- skip_len];
+				else
+					nmp->b_wptr = &nmp->b_rptr[l2_len];
+			} else {
+				if (l2_len - bytes_read > pktbufsz)
+					nmp->b_wptr = &nmp->b_rptr[pktbufsz];
+				else
+					nmp->b_wptr =
+					    &nmp->b_rptr[l2_len - bytes_read];
+			}
+			bytes_read += nmp->b_wptr - nmp->b_rptr;
 			NXGE_DEBUG_MSG((nxgep, RX_CTL,
 				"==> nxge_receive_packet after dupb: "
 				"rbr consumed %d "
@@ -2890,7 +2948,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 					B_TRUE: B_FALSE);
 
 		NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_receive_packet: "
-			"is_valid 0x%x multi %d pkt %d frag %d error %d",
+			"is_valid 0x%x multi 0x%llx pkt %d frag %d error %d",
 			is_valid, multi, is_tcp_udp, frag, error_type));
 
 		if (is_tcp_udp && !frag && !error_type) {
@@ -2898,7 +2956,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 				HCK_FULLCKSUM_OK | HCK_FULLCKSUM, 0);
 			NXGE_DEBUG_MSG((nxgep, RX_CTL,
 				"==> nxge_receive_packet: Full tcp/udp cksum "
-				"is_valid 0x%x multi %d pkt %d frag %d "
+				"is_valid 0x%x multi 0x%llx pkt %d frag %d "
 				"error %d",
 				is_valid, multi, is_tcp_udp, frag, error_type));
 		}
@@ -3120,11 +3178,9 @@ nxge_rx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp,
 				" fatal error on Port #%d\n",
 				portn));
 		status = nxge_ipp_fatal_err_recover(nxgep);
-#ifdef	NXGE_FM
 		if (status == NXGE_OK) {
 			FM_SERVICE_RESTORED(nxgep);
 		}
-#endif
 	}
 
 	if (rxchan_fatal) {
@@ -3133,11 +3189,9 @@ nxge_rx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp,
 				" fatal error on Channel #%d\n",
 				channel));
 		status = nxge_rxdma_fatal_err_recover(nxgep, channel);
-#ifdef	NXGE_FM
 		if (status == NXGE_OK) {
 			FM_SERVICE_RESTORED(nxgep);
 		}
-#endif
 	}
 
 	NXGE_DEBUG_MSG((nxgep, RX2_CTL, "<== nxge_rx_err_evnts"));
@@ -3188,20 +3242,28 @@ nxge_map_rxdma(p_nxge_t nxgep)
 	num_chunks = dma_buf_poolp->num_chunks;
 	dma_buf_p = dma_buf_poolp->dma_buf_pool_p;
 	dma_cntl_p = dma_cntl_poolp->dma_buf_pool_p;
+
 	rx_rbr_rings = (p_rx_rbr_rings_t)
-			KMEM_ZALLOC(sizeof (rx_rbr_rings_t), KM_SLEEP);
-	rbr_rings = (p_rx_rbr_ring_t *)KMEM_ZALLOC(
-			sizeof (p_rx_rbr_ring_t) * ndmas, KM_SLEEP);
-
+		KMEM_ZALLOC(sizeof (rx_rbr_rings_t), KM_SLEEP);
+	rbr_rings = (p_rx_rbr_ring_t *)
+		KMEM_ZALLOC(sizeof (p_rx_rbr_ring_t) * ndmas, KM_SLEEP);
 	rx_rcr_rings = (p_rx_rcr_rings_t)
-			KMEM_ZALLOC(sizeof (rx_rcr_rings_t), KM_SLEEP);
-	rcr_rings = (p_rx_rcr_ring_t *)KMEM_ZALLOC(
-			sizeof (p_rx_rcr_ring_t) * ndmas, KM_SLEEP);
-
+		KMEM_ZALLOC(sizeof (rx_rcr_rings_t), KM_SLEEP);
+	rcr_rings = (p_rx_rcr_ring_t *)
+		KMEM_ZALLOC(sizeof (p_rx_rcr_ring_t) * ndmas, KM_SLEEP);
 	rx_mbox_areas_p = (p_rx_mbox_areas_t)
-			KMEM_ZALLOC(sizeof (rx_mbox_areas_t), KM_SLEEP);
-	rx_mbox_p = (p_rx_mbox_t *)KMEM_ZALLOC(
-			sizeof (p_rx_mbox_t) * ndmas, KM_SLEEP);
+		KMEM_ZALLOC(sizeof (rx_mbox_areas_t), KM_SLEEP);
+	rx_mbox_p = (p_rx_mbox_t *)
+		KMEM_ZALLOC(sizeof (p_rx_mbox_t) * ndmas, KM_SLEEP);
+
+	/*
+	 * Timeout should be set based on the system clock divider.
+	 * The following timeout value of 1 assumes that the
+	 * granularity (1000) is 3 microseconds running at 300MHz.
+	 */
+
+	nxgep->intr_threshold = RXDMA_RCR_PTHRES_DEFAULT;
+	nxgep->intr_timeout = RXDMA_RCR_TO_DEFAULT;
 
 	/*
 	 * Map descriptors from the buffer polls for each dam channel.
@@ -3654,9 +3716,8 @@ nxge_map_rxdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 
 	/* Map in the receive completion ring */
 	rcrp = (p_rx_rcr_ring_t)
-			KMEM_ZALLOC(sizeof (rx_rcr_ring_t), KM_SLEEP);
+		KMEM_ZALLOC(sizeof (rx_rcr_ring_t), KM_SLEEP);
 	rcrp->rdc = dma_channel;
-
 
 	nxge_port_rcr_size = nxgep->nxge_port_rcr_size;
 	rcrp->comp_size = nxge_port_rcr_size;
@@ -3698,7 +3759,8 @@ nxge_map_rxdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 	 * Zero out buffer block ring descriptors.
 	 */
 	bzero((caddr_t)dmap->kaddrp, dmap->alength);
-
+	rcrp->intr_timeout = nxgep->intr_timeout;
+	rcrp->intr_threshold = nxgep->intr_threshold;
 	rcrp->full_hdr_flag = B_FALSE;
 	rcrp->sw_priv_hdr_len = 0;
 
@@ -3719,8 +3781,8 @@ nxge_map_rxdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 	 * The following timeout value of 1 assumes that the
 	 * granularity (1000) is 3 microseconds running at 300MHz.
 	 */
-	cfgb_p->bits.ldw.pthres = RXDMA_RCR_PTHRES_DEFAULT;
-	cfgb_p->bits.ldw.timeout = RXDMA_RCR_TO_DEFAULT;
+	cfgb_p->bits.ldw.pthres = rcrp->intr_threshold;
+	cfgb_p->bits.ldw.timeout = rcrp->intr_timeout;
 	cfgb_p->bits.ldw.entout = 1;
 
 	/* Map in the mailbox */
@@ -3864,7 +3926,7 @@ nxge_map_rxdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 
 	rbrp->block_size = nxgep->rx_default_block_size;
 
-	if (!nxge_jumbo_enable) {
+	if (!nxge_jumbo_enable && !nxgep->param_arr[param_accept_jumbo].value) {
 		rbrp->pkt_buf_size2 = RBR_BUFSZ2_2K;
 		rbrp->pkt_buf_size2_bytes = RBR_BUFSZ2_2K_BYTES;
 		rbrp->npi_pkt_buf_size2 = SIZE_2KB;
@@ -3981,7 +4043,7 @@ nxge_map_rxdma_channel_buf_ring_fail1:
 #ifdef RXBUFF_USE_SEPARATE_UP_CNTR
 			rx_msg_p->release = B_TRUE;
 #endif
-			nxge_freeb(rx_msg_p);
+			freeb(rx_msg_p->rx_mblk_p);
 			rx_msg_ring[index] = NULL;
 		}
 	}
@@ -4052,7 +4114,7 @@ nxge_unmap_rxdma_channel_buf_ring(p_nxge_t nxgep,
 			"rx_msg_p $%p",
 			rx_msg_p));
 		if (rx_msg_p != NULL) {
-			nxge_freeb(rx_msg_p);
+			freeb(rx_msg_p->rx_mblk_p);
 			rx_msg_ring[i] = NULL;
 		}
 	}
@@ -4546,11 +4608,9 @@ nxge_rxdma_handle_port_errors(p_nxge_t nxgep, uint32_t ipp_status,
 			    " fatal error on Port #%d\n",
 				portn));
 		status = nxge_rx_port_fatal_err_recover(nxgep);
-#ifdef	NXGE_FM
 		if (status == NXGE_OK) {
 			FM_SERVICE_RESTORED(nxgep);
 		}
-#endif
 	}
 
 	return (status);
@@ -4870,4 +4930,99 @@ nxge_rxdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 	case NXGE_FM_EREPORT_RDMC_COMPLETION_ERR:
 		break;
 	}
+}
+
+
+static uint16_t
+nxge_get_pktbuf_size(p_nxge_t nxgep, int bufsz_type, rbr_cfig_b_t rbr_cfgb)
+{
+	uint16_t sz = RBR_BKSIZE_8K_BYTES;
+
+	switch (bufsz_type) {
+	case RCR_PKTBUFSZ_0:
+		switch (rbr_cfgb.bits.ldw.bufsz0) {
+		case RBR_BUFSZ0_256B:
+			sz = RBR_BUFSZ0_256_BYTES;
+			break;
+		case RBR_BUFSZ0_512B:
+			sz = RBR_BUFSZ0_512B_BYTES;
+			break;
+		case RBR_BUFSZ0_1K:
+			sz = RBR_BUFSZ0_1K_BYTES;
+			break;
+		case RBR_BUFSZ0_2K:
+			sz = RBR_BUFSZ0_2K_BYTES;
+			break;
+		default:
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			"nxge_get_pktbug_size: bad bufsz0"));
+			break;
+		}
+		break;
+	case RCR_PKTBUFSZ_1:
+		switch (rbr_cfgb.bits.ldw.bufsz1) {
+		case RBR_BUFSZ1_1K:
+			sz = RBR_BUFSZ1_1K_BYTES;
+			break;
+		case RBR_BUFSZ1_2K:
+			sz = RBR_BUFSZ1_2K_BYTES;
+			break;
+		case RBR_BUFSZ1_4K:
+			sz = RBR_BUFSZ1_4K_BYTES;
+			break;
+		case RBR_BUFSZ1_8K:
+			sz = RBR_BUFSZ1_8K_BYTES;
+			break;
+		default:
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			"nxge_get_pktbug_size: bad bufsz1"));
+			break;
+		}
+		break;
+	case RCR_PKTBUFSZ_2:
+		switch (rbr_cfgb.bits.ldw.bufsz2) {
+		case RBR_BUFSZ2_2K:
+			sz = RBR_BUFSZ2_2K_BYTES;
+			break;
+		case RBR_BUFSZ2_4K:
+			sz = RBR_BUFSZ2_4K_BYTES;
+			break;
+		case RBR_BUFSZ2_8K:
+			sz = RBR_BUFSZ2_8K_BYTES;
+			break;
+		case RBR_BUFSZ2_16K:
+			sz = RBR_BUFSZ2_16K_BYTES;
+			break;
+		default:
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			"nxge_get_pktbug_size: bad bufsz2"));
+			break;
+		}
+		break;
+	case RCR_SINGLE_BLOCK:
+		switch (rbr_cfgb.bits.ldw.bksize) {
+		case BKSIZE_4K:
+			sz = RBR_BKSIZE_4K_BYTES;
+			break;
+		case BKSIZE_8K:
+			sz = RBR_BKSIZE_8K_BYTES;
+			break;
+		case BKSIZE_16K:
+			sz = RBR_BKSIZE_16K_BYTES;
+			break;
+		case BKSIZE_32K:
+			sz = RBR_BKSIZE_32K_BYTES;
+			break;
+		default:
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			"nxge_get_pktbug_size: bad bksize"));
+			break;
+		}
+		break;
+	default:
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		"nxge_get_pktbug_size: bad bufsz_type"));
+		break;
+	}
+	return (sz);
 }

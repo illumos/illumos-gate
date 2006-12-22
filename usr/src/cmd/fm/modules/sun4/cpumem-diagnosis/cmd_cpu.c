@@ -57,8 +57,6 @@
 #endif /* sun4u */
 
 #define	CMD_CPU_UEC_INCR	10
-#define	CPU_FRU_FMRI		FM_FMRI_SCHEME_HC":///" \
-    FM_FMRI_LEGACY_HC"="
 
 /* Must be in sync with cmd_cpu_type_t */
 static const char *const cpu_names[] = {
@@ -157,6 +155,10 @@ core2cpus(uint32_t core, cmd_cpu_type_t type, uint8_t level,
 #define	UST1_CPU_CORE_STEP		1
 #define	UST1_CPUS_PER_CHIP		32
 #define	UST1_CPU_CHIP_STEP		1
+#define	UST2_CPUS_PER_CORE		8
+#define	UST2_CPU_CORE_STEP		1
+#define	UST2_CPUS_PER_CHIP		64
+#define	UST2_CPU_CHIP_STEP		1
 
 	case CPU_ULTRASPARC_T1:
 		switch (level) {
@@ -175,7 +177,24 @@ core2cpus(uint32_t core, cmd_cpu_type_t type, uint8_t level,
 			*cpustep = 1;
 			return;
 		}
-	/* core2cpus CPU_ULTRASPARC_T2 */
+	case CPU_ULTRASPARC_T2:
+		switch (level) {
+		case CMD_CPU_LEVEL_CORE:
+			*cpuinit = core * UST2_CPUS_PER_CORE;
+			*cpufinal = *cpuinit + UST2_CPUS_PER_CORE - 1;
+			*cpustep = UST2_CPU_CORE_STEP;
+			return;
+		case CMD_CPU_LEVEL_CHIP:
+			*cpuinit = core * UST2_CPUS_PER_CHIP;
+			*cpufinal = *cpuinit + UST2_CPUS_PER_CHIP - 1;
+			*cpustep = UST2_CPU_CHIP_STEP;
+			return;
+		default:
+			*cpuinit = *cpufinal = core;
+			*cpustep = 1;
+			return;
+		}
+
 #endif /* sun4u */
 	default:
 		*cpuinit = *cpufinal = core;
@@ -217,7 +236,16 @@ cmd_cpu2core(uint32_t cpuid, cmd_cpu_type_t type, uint8_t level) {
 		default:
 			return (cpuid);
 		}
-	/* cmd_cpu2core CPU_ULTRASPARC_T2 */
+	case CPU_ULTRASPARC_T2:
+		switch (level) {
+		case CMD_CPU_LEVEL_CORE:
+			return (cpuid/UST2_CPUS_PER_CORE);
+		case CMD_CPU_LEVEL_CHIP:
+			return (cpuid/UST2_CPUS_PER_CHIP);
+		default:
+			return (cpuid);
+		}
+
 #endif /* sun4u */
 	default:
 		return (cpuid);
@@ -1478,41 +1506,8 @@ cpu_lookup_by_cpuid(uint32_t cpuid, uint8_t level)
 	return (NULL);
 }
 
-char *
-cpu_getfrustr(fmd_hdl_t *hdl, uint32_t cpuid)
-{
-	kstat_named_t *kn;
-	kstat_ctl_t *kc;
-	kstat_t *ksp;
-	int i;
-
-	if ((kc = kstat_open()) == NULL)
-		return (NULL); /* errno is set for us */
-
-	if ((ksp = kstat_lookup(kc, "cpu_info", cpuid, NULL)) == NULL ||
-	    kstat_read(kc, ksp, NULL) == -1) {
-		int oserr = errno;
-		(void) kstat_close(kc);
-		(void) cmd_set_errno(oserr);
-		return (NULL);
-	}
-
-	for (kn = ksp->ks_data, i = 0; i < ksp->ks_ndata; i++, kn++) {
-		if (strcmp(kn->name, "cpu_fru") == 0) {
-			char *str = fmd_hdl_strdup(hdl,
-			    KSTAT_NAMED_STR_PTR(kn), FMD_SLEEP);
-			(void) kstat_close(kc);
-			return (str);
-		}
-	}
-
-	(void) kstat_close(kc);
-	(void) cmd_set_errno(ENOENT);
-	return (NULL);
-}
-
 static nvlist_t *
-cpu_mkfru(char *frustr)
+cpu_mkfru(char *frustr, char *serialstr, char *partstr)
 {
 	char *comp;
 	nvlist_t *fru, *hcelem;
@@ -1538,8 +1533,12 @@ cpu_mkfru(char *frustr)
 	}
 
 	if (nvlist_add_uint8(fru, FM_VERSION, FM_HC_SCHEME_VERSION) != 0 ||
-	    nvlist_add_string(fru, FM_FMRI_SCHEME,
-	    FM_FMRI_SCHEME_HC) != 0 ||
+	    nvlist_add_string(fru, FM_FMRI_SCHEME, FM_FMRI_SCHEME_HC) != 0 ||
+	    (partstr != NULL &&
+		nvlist_add_string(fru, FM_FMRI_HC_PART, partstr) != 0) ||
+	    (serialstr != NULL &&
+		nvlist_add_string(fru, FM_FMRI_HC_SERIAL_ID,
+		serialstr) != 0) ||
 	    nvlist_add_string(fru, FM_FMRI_HC_ROOT, "") != 0 ||
 	    nvlist_add_uint32(fru, FM_FMRI_HC_LIST_SZ, 1) != 0 ||
 	    nvlist_add_nvlist_array(fru, FM_FMRI_HC_LIST, &hcelem, 1) != 0) {
@@ -1553,18 +1552,23 @@ cpu_mkfru(char *frustr)
 }
 
 static nvlist_t *
-cpu_getfru(fmd_hdl_t *hdl, uint32_t cpuid)
+cpu_getfru(fmd_hdl_t *hdl, cmd_cpu_t *cp)
 {
-	char *frustr;
+	char *frustr, *partstr, *serialstr;
 	nvlist_t *nvlp;
 
-	if ((frustr = cpu_getfrustr(hdl, cpuid)) == NULL) {
+	if ((frustr = cmd_cpu_getfrustr(hdl, cp)) == NULL) {
 		fmd_hdl_error(hdl, "failed to retrieve FRU string for CPU %d",
-		    cpuid);
+		    cp->cpu_cpuid);
 		return (NULL);
 	}
-	nvlp = cpu_mkfru(frustr);
+	partstr = cmd_cpu_getpartstr(hdl, cp);
+	serialstr = cmd_cpu_getserialstr(hdl, cp);
+	nvlp = cpu_mkfru(frustr, partstr, serialstr);
 	fmd_hdl_strfree(hdl, frustr);
+	fmd_hdl_strfree(hdl, partstr);
+	fmd_hdl_strfree(hdl, serialstr);
+
 	return (nvlp);
 }
 
@@ -1620,7 +1624,6 @@ cpu_create(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t cpuid, uint8_t level,
 {
 	cmd_cpu_t *cpu;
 	nvlist_t *fru;
-	char *frustr;
 
 	/*
 	 * No CPU state matches the CPU described in the ereport.  Create a new
@@ -1652,34 +1655,7 @@ cpu_create(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t cpuid, uint8_t level,
 
 	cmd_fmri_init(hdl, &cpu->cpu_asru, asru, "cpu_asru_%d", cpu->cpu_cpuid);
 
-	/*
-	 * If this ereport contains a 'cpufru' element, use it to construct
-	 * the FRU FMRI instead of going to kstats.
-	 *
-	 * Unfortunately, the string associated with 'cpufru' is
-	 * not in precisely the right form -- so the following code is
-	 * written to adjust.
-	 */
-	if (nvlist_lookup_string(asru, FM_FMRI_CPU_CPUFRU, &frustr) == 0) {
-		char *s1, *s2;
-		size_t frustrlen = strlen(frustr) + sizeof (CPU_FRU_FMRI) + 1;
-
-		s1 = fmd_hdl_zalloc(hdl, frustrlen, FMD_SLEEP);
-		s2 = strrchr(frustr, '/') + 1;
-		if (s2 == NULL)
-			s2 = "MB";
-
-		(void) snprintf(s1, frustrlen, "%s%s",
-		    CPU_FRU_FMRI, s2);
-
-		if ((fru = cpu_mkfru(s1)) != NULL) {
-			cmd_fmri_init(hdl, &cpu->cpu_fru, fru, "cpu_fru_%d",
-			    cpu->cpu_cpuid);
-			nvlist_free(fru);
-		}
-		fmd_hdl_free(hdl, s1, frustrlen);
-
-	} else if ((fru = cpu_getfru(hdl, cpuid)) != NULL) {
+	if ((fru = cpu_getfru(hdl, cpu)) != NULL) {
 		cmd_fmri_init(hdl, &cpu->cpu_fru, fru, "cpu_fru_%d",
 		    cpu->cpu_cpuid);
 		nvlist_free(fru);
@@ -2056,6 +2032,10 @@ cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 		break;
 	case CMD_PTR_CPU_L2CTL:
 		cpu_case_restore(hdl, cpu, &cpu->cpu_l2ctl, cp, "l2ctl");
+		break;
+	case CMD_PTR_CPU_MISC_REGS:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_misc_regs, cp,
+		    "misc_regs");
 		break;
 	default:
 		fmd_hdl_abort(hdl, "invalid %s subtype %d\n",

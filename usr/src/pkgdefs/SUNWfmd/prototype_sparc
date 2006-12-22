@@ -109,6 +109,7 @@ d none usr/platform/sun4v/lib 755 root bin
 d none usr/platform/sun4v/lib/fm 755 root bin
 d none usr/platform/sun4v/lib/fm/eft 755 root bin
 f none usr/platform/sun4v/lib/fm/eft/fire.eft 444 root bin
+f none usr/platform/sun4v/lib/fm/eft/n2piu.eft 444 root bin
 d none usr/platform/sun4v/lib/fm/fmd 755 root bin
 d none usr/platform/sun4v/lib/fm/fmd/plugins 755 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.so 555 root bin
@@ -122,8 +123,11 @@ d none usr/platform/sun4v/lib/fm/topo/maps 755 root bin
 f none usr/platform/sun4v/lib/fm/topo/maps/sun4v-hc-topology.xml 444 root bin
 d none usr/platform/sun4v/lib/fm/topo/plugins 755 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/chip.so 555 root bin
+f none usr/platform/sun4v/lib/fm/topo/plugins/platform-cpu.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/hostbridge.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/pcibus.so 555 root bin
+f none usr/platform/sun4v/lib/fm/topo/plugins/motherboard.so 555 root bin
+f none usr/platform/sun4v/lib/fm/topo/plugins/niu.so 555 root bin
 d none usr/platform/SUNW,SPARC-Enterprise 755 root sys
 d none usr/platform/SUNW,SPARC-Enterprise/lib 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise/lib/fm 755 root bin
@@ -165,3 +169,5 @@ f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Sun-Fire-T200-hc-topolog
 f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Sun-Fire-T1000-hc-topology.xml 444 root bin
 f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/SPARC-Enterprise-T1000-hc-topology.xml 444 root bin
 f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Sun-Blade-T6300-hc-topology.xml 444 root bin
+f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/SPARC-Enterprise-T5120-hc-topology.xml 444 root bin
+f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/SPARC-Enterprise-T5220-hc-topology.xml 444 root bin

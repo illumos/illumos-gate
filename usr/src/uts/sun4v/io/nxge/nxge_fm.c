@@ -35,211 +35,297 @@ static nxge_fm_ereport_attr_t
 *nxge_fm_get_ereport_attr(nxge_fm_ereport_id_t);
 
 nxge_fm_ereport_attr_t	nxge_fm_ereport_pcs[] = {
-	{NXGE_FM_EREPORT_XPCS_LINK_DOWN,	"10g.link_down",
+	{NXGE_FM_EREPORT_XPCS_LINK_DOWN,	"10g_link_down",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_XPCS_TX_LINK_FAULT,	"10g.tx_link_fault",
+	{NXGE_FM_EREPORT_XPCS_TX_LINK_FAULT,	"10g_tx_link_fault",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_XPCS_RX_LINK_FAULT,	"10g.rx_link_fault",
+	{NXGE_FM_EREPORT_XPCS_RX_LINK_FAULT,	"10g_rx_link_fault",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_PCS_LINK_DOWN,		"1g.link_down",
+	{NXGE_FM_EREPORT_PCS_LINK_DOWN,		"1g_link_down",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_PCS_REMOTE_FAULT,	"1g.remote_fault",
+	{NXGE_FM_EREPORT_PCS_REMOTE_FAULT,	"1g_remote_fault",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
 };
 
 nxge_fm_ereport_attr_t	nxge_fm_ereport_mif[] = {
-	{NXGE_FM_EREPORT_MIF_ACCESS_FAIL,	"transceiver.access_fail"}
+	{NXGE_FM_EREPORT_MIF_ACCESS_FAIL,	"transceiver_access_fail"}
 };
 
 nxge_fm_ereport_attr_t nxge_fm_ereport_fflp[] = {
-	{NXGE_FM_EREPORT_FFLP_TCAM_ERR,		"classifier.tcam_err",
+	{NXGE_FM_EREPORT_FFLP_TCAM_ERR,		"classifier_tcam_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_FFLP_VLAN_PAR_ERR,	"classifier.vlan_par_err",
+	{NXGE_FM_EREPORT_FFLP_VLAN_PAR_ERR,	"classifier_vlan_par_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_FFLP_HASHT_DATA_ERR,	"classifier.hasht_data_err",
+	{NXGE_FM_EREPORT_FFLP_HASHT_DATA_ERR,	"classifier_hasht_data_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_FFLP_HASHT_LOOKUP_ERR,	"classifier.hasht_lookup_err",
+	{NXGE_FM_EREPORT_FFLP_HASHT_LOOKUP_ERR,	"classifier_hasht_lookup_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_FFLP_ACCESS_FAIL,	"classifier.access_fail",
+	{NXGE_FM_EREPORT_FFLP_ACCESS_FAIL,	"classifier_access_fail",
+						DDI_FM_DEVICE_NO_RESPONSE,
 						DDI_SERVICE_DEGRADED}
 };
 
 nxge_fm_ereport_attr_t nxge_fm_ereport_ipp[] = {
-	{NXGE_FM_EREPORT_IPP_EOP_MISS,		"rx.eop_miss",
+	{NXGE_FM_EREPORT_IPP_EOP_MISS,		"rx_eop_miss",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_IPP_SOP_MISS,		"rx.sop_miss",
+	{NXGE_FM_EREPORT_IPP_SOP_MISS,		"rx_sop_miss",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_IPP_DFIFO_UE,		"rx.dfifo_ucorr_err",
+	{NXGE_FM_EREPORT_IPP_DFIFO_UE,		"rx_dfifo_ucorr_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_IPP_DFIFO_CE,		"rx.dfifo_corr_err",
+	{NXGE_FM_EREPORT_IPP_DFIFO_CE,		"rx_dfifo_corr_err",
+						DDI_FM_DEVICE_INTERN_CORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_IPP_PFIFO_PERR,	"rx.dfifo_parity_err",
+	{NXGE_FM_EREPORT_IPP_PFIFO_PERR,	"rx_dfifo_parity_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_IPP_ECC_ERR_MAX,	"rx.ecc_err_max",
+	{NXGE_FM_EREPORT_IPP_ECC_ERR_MAX,	"rx_ecc_err_max",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_IPP_PFIFO_OVER,	"rx.pfifo_overflow",
+	{NXGE_FM_EREPORT_IPP_PFIFO_OVER,	"rx_pfifo_overflow",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_IPP_PFIFO_UND,		"rx.pfifo_underrun",
+	{NXGE_FM_EREPORT_IPP_PFIFO_UND,		"rx_pfifo_underrun",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_IPP_BAD_CS_MX,		"rx.bad_cksum_max",
+	{NXGE_FM_EREPORT_IPP_BAD_CS_MX,		"rx_bad_cksum_max",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_IPP_PKT_DIS_MX,	"rx.pkt_discard_max",
+	{NXGE_FM_EREPORT_IPP_PKT_DIS_MX,	"rx_pkt_discard_max",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_IPP_RESET_FAIL,	"rx.reset_fail",
+	{NXGE_FM_EREPORT_IPP_RESET_FAIL,	"rx_reset_fail",
+						DDI_FM_DEVICE_NO_RESPONSE,
 						DDI_SERVICE_LOST}
 };
 
 nxge_fm_ereport_attr_t nxge_fm_ereport_rdmc[] = {
-	{NXGE_FM_EREPORT_RDMC_DCF_ERR,		"rxdma.dcf_err",
+	{NXGE_FM_EREPORT_RDMC_DCF_ERR,		"rxdma_dcf_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_RDMC_RCR_ACK_ERR,	"rxdma.rcr_ack_err",
+	{NXGE_FM_EREPORT_RDMC_RCR_ACK_ERR,	"rxdma_rcr_ack_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_RDMC_DC_FIFO_ERR,	"rxdma.dc_fifo_err",
+	{NXGE_FM_EREPORT_RDMC_DC_FIFO_ERR,	"rxdma_dc_fifo_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_RDMC_RCR_SHA_PAR,	"rxdma.rcr_sha_par_err",
+	{NXGE_FM_EREPORT_RDMC_RCR_SHA_PAR,	"rxdma_rcr_sha_par_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_RDMC_RBR_PRE_PAR,	"rxdma.rbr_pre_par_err",
+	{NXGE_FM_EREPORT_RDMC_RBR_PRE_PAR,	"rxdma_rbr_pre_par_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_RDMC_RBR_TMOUT,	"rxdma.rbr_tmout",
+	{NXGE_FM_EREPORT_RDMC_RBR_TMOUT,	"rxdma_rbr_tmout",
+						DDI_FM_DEVICE_NO_RESPONSE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_RDMC_RSP_CNT_ERR,	"rxdma.rsp_cnt_err",
+	{NXGE_FM_EREPORT_RDMC_RSP_CNT_ERR,	"rxdma_rsp_cnt_err",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_RDMC_BYTE_EN_BUS,	"rxdma.byte_en_bus",
+	{NXGE_FM_EREPORT_RDMC_BYTE_EN_BUS,	"rxdma_byte_en_bus",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_RDMC_RSP_DAT_ERR,	"rxdma.rsp_dat_err",
+	{NXGE_FM_EREPORT_RDMC_RSP_DAT_ERR,	"rxdma_rsp_dat_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_RDMC_ID_MISMATCH,	"rxdma.id_mismatch",
+	{NXGE_FM_EREPORT_RDMC_ID_MISMATCH,	"rxdma_id_mismatch",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_RDMC_ZCP_EOP_ERR,	"rxdma.zcp_eop_err",
+	{NXGE_FM_EREPORT_RDMC_ZCP_EOP_ERR,	"rxdma_zcp_eop_err",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_RDMC_IPP_EOP_ERR,	"rxdma.ipp_eop_err",
+	{NXGE_FM_EREPORT_RDMC_IPP_EOP_ERR,	"rxdma_ipp_eop_err",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_RDMC_COMPLETION_ERR,	"rxdma.completion_err",
+	{NXGE_FM_EREPORT_RDMC_COMPLETION_ERR,	"rxdma_completion_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_RDMC_CONFIG_ERR,	"rxdma.config_err",
+	{NXGE_FM_EREPORT_RDMC_CONFIG_ERR,	"rxdma_config_err",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_RDMC_RCRINCON,		"rxdma.rcrincon",
+	{NXGE_FM_EREPORT_RDMC_RCRINCON,		"rxdma_rcrincon",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_RDMC_RCRFULL,		"rxdma.rcrfull",
+	{NXGE_FM_EREPORT_RDMC_RCRFULL,		"rxdma_rcrfull",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_RDMC_RBRFULL,		"rxdma.rbrfull",
+	{NXGE_FM_EREPORT_RDMC_RBRFULL,		"rxdma_rbrfull",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_RDMC_RBRLOGPAGE,	"rxdma.rbrlogpage",
+	{NXGE_FM_EREPORT_RDMC_RBRLOGPAGE,	"rxdma_rbrlogpage",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_RDMC_CFIGLOGPAGE,	"rxdma.cfiglogpage",
+	{NXGE_FM_EREPORT_RDMC_CFIGLOGPAGE,	"rxdma_cfiglogpage",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED}
 };
 
 nxge_fm_ereport_attr_t nxge_fm_ereport_zcp[] = {
-	{NXGE_FM_EREPORT_ZCP_RRFIFO_UNDERRUN,	"rxzcopy.rrfifo_underrun",
+	{NXGE_FM_EREPORT_ZCP_RRFIFO_UNDERRUN,	"rxzcopy_rrfifo_underrun",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_UNAFFECTED},
 	{NXGE_FM_EREPORT_ZCP_RSPFIFO_UNCORR_ERR,
-						"rxzcopy.rspfifo_uncorr_err",
+						"rxzcopy_rspfifo_uncorr_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_ZCP_STAT_TBL_PERR,	"rxzcopy.stat_tbl_perr",
+	{NXGE_FM_EREPORT_ZCP_STAT_TBL_PERR,	"rxzcopy_stat_tbl_perr",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_ZCP_DYN_TBL_PERR,	"rxzcopy.dyn_tbl_perr",
+	{NXGE_FM_EREPORT_ZCP_DYN_TBL_PERR,	"rxzcopy_dyn_tbl_perr",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_ZCP_BUF_TBL_PERR,	"rxzcopy.buf_tbl_perr",
+	{NXGE_FM_EREPORT_ZCP_BUF_TBL_PERR,	"rxzcopy_buf_tbl_perr",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_ZCP_CFIFO_ECC,		"rxzcopy.cfifo_ecc",
+	{NXGE_FM_EREPORT_ZCP_CFIFO_ECC,		"rxzcopy_cfifo_ecc",
+						DDI_FM_DEVICE_INTERN_CORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_ZCP_RRFIFO_OVERRUN,	"rxzcopy.rrfifo_overrun",
+	{NXGE_FM_EREPORT_ZCP_RRFIFO_OVERRUN,	"rxzcopy_rrfifo_overrun",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_ZCP_BUFFER_OVERFLOW,	"rxzcopy.buffer_overflow",
+	{NXGE_FM_EREPORT_ZCP_BUFFER_OVERFLOW,	"rxzcopy_buffer_overflow",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_ZCP_TT_PROGRAM_ERR,	"rxzcopy.tt_program_err",
+	{NXGE_FM_EREPORT_ZCP_TT_PROGRAM_ERR,	"rxzcopy_tt_program_err",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_ZCP_RSP_TT_INDEX_ERR,	"rxzcopy.rsp_tt_index_err",
+	{NXGE_FM_EREPORT_ZCP_RSP_TT_INDEX_ERR,	"rxzcopy_rsp_tt_index_err",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_ZCP_SLV_TT_INDEX_ERR,	"rxzcopy.slv_tt_index_err",
+	{NXGE_FM_EREPORT_ZCP_SLV_TT_INDEX_ERR,	"rxzcopy_slv_tt_index_err",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_ZCP_TT_INDEX_ERR,	"rxzcopy.tt_index_err",
+	{NXGE_FM_EREPORT_ZCP_TT_INDEX_ERR,	"rxzcopy_tt_index_err",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_ZCP_ACCESS_FAIL,	"rxzcopy.access_fail",
+	{NXGE_FM_EREPORT_ZCP_ACCESS_FAIL,	"rxzcopy_access_fail",
+						DDI_FM_DEVICE_NO_RESPONSE,
 						DDI_SERVICE_LOST},
 };
 
 nxge_fm_ereport_attr_t nxge_fm_ereport_rxmac[] = {
-	{NXGE_FM_EREPORT_RXMAC_UNDERFLOW,	"rxmac.underflow",
+	{NXGE_FM_EREPORT_RXMAC_UNDERFLOW,	"rxmac_underflow",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_RXMAC_CRC_ERRCNT_EXP,	"rxmac.crc_errcnt_exp",
+	{NXGE_FM_EREPORT_RXMAC_CRC_ERRCNT_EXP,	"rxmac_crc_errcnt_exp",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
 	{NXGE_FM_EREPORT_RXMAC_LENGTH_ERRCNT_EXP,
-						"rxmac.length_errcnt_exp",
+						"rxmac_length_errcnt_exp",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_RXMAC_VIOL_ERRCNT_EXP,	"rxmac.viol_errcnt_exp",
+	{NXGE_FM_EREPORT_RXMAC_VIOL_ERRCNT_EXP,	"rxmac_viol_errcnt_exp",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_RXMAC_RXFRAG_CNT_EXP,	"rxmac.rxfrag_cnt_exp",
+	{NXGE_FM_EREPORT_RXMAC_RXFRAG_CNT_EXP,	"rxmac_rxfrag_cnt_exp",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_RXMAC_ALIGN_ECNT_EXP,	"rxmac.align_ecnt_exp",
+	{NXGE_FM_EREPORT_RXMAC_ALIGN_ECNT_EXP,	"rxmac_align_ecnt_exp",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
 	{NXGE_FM_EREPORT_RXMAC_LINKFAULT_CNT_EXP,
-						"rxmac.linkfault_cnt_exp",
+						"rxmac_linkfault_cnt_exp",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_RXMAC_RESET_FAIL,	"rxmac.reset_fail",
+	{NXGE_FM_EREPORT_RXMAC_RESET_FAIL,	"rxmac_reset_fail",
+						DDI_FM_DEVICE_NO_RESPONSE,
 						DDI_SERVICE_UNAFFECTED},
 };
 
 nxge_fm_ereport_attr_t nxge_fm_ereport_tdmc[] = {
-	{NXGE_FM_EREPORT_TDMC_PREF_BUF_PAR_ERR,	"txdma.pref_buf_par_err",
+	{NXGE_FM_EREPORT_TDMC_PREF_BUF_PAR_ERR,	"txdma_pref_buf_par_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_TDMC_MBOX_ERR,		"txdma.mbox_err",
+	{NXGE_FM_EREPORT_TDMC_MBOX_ERR,		"txdma_mbox_err",
+						DDI_FM_DEVICE_NO_RESPONSE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_TDMC_NACK_PREF,	"txdma.nack_pref",
+	{NXGE_FM_EREPORT_TDMC_NACK_PREF,	"txdma_nack_pref",
+						DDI_FM_DEVICE_NO_RESPONSE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_TDMC_NACK_PKT_RD,	"txdma.nack_pkt_rd",
+	{NXGE_FM_EREPORT_TDMC_NACK_PKT_RD,	"txdma_nack_pkt_rd",
+						DDI_FM_DEVICE_NO_RESPONSE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_TDMC_PKT_SIZE_ERR,	"txdma.pkt_size_err",
+	{NXGE_FM_EREPORT_TDMC_PKT_SIZE_ERR,	"txdma_pkt_size_err",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_TDMC_TX_RING_OFLOW,	"txdma.tx_ring_oflow",
+	{NXGE_FM_EREPORT_TDMC_TX_RING_OFLOW,	"txdma_tx_ring_oflow",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_TDMC_CONF_PART_ERR,	"txdma.conf_part_err",
+	{NXGE_FM_EREPORT_TDMC_CONF_PART_ERR,	"txdma_conf_part_err",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_TDMC_PKT_PRT_ERR,	"txdma.pkt_prt_err",
+	{NXGE_FM_EREPORT_TDMC_PKT_PRT_ERR,	"txdma_pkt_prt_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_DEGRADED},
-	{NXGE_FM_EREPORT_TDMC_RESET_FAIL,	"txdma.reset_fail"}
+	{NXGE_FM_EREPORT_TDMC_RESET_FAIL,	"txdma_reset_fail",
+						DDI_FM_DEVICE_NO_RESPONSE,
+						DDI_SERVICE_LOST},
 };
 
 nxge_fm_ereport_attr_t nxge_fm_ereport_txc[] = {
-	{NXGE_FM_EREPORT_TXC_RO_CORRECT_ERR,	"tx.ro_correct_err",
+	{NXGE_FM_EREPORT_TXC_RO_CORRECT_ERR,	"tx_ro_correct_err",
+						DDI_FM_DEVICE_INTERN_CORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_TXC_RO_UNCORRECT_ERR,	"tx.ro_uncorrect_err",
+	{NXGE_FM_EREPORT_TXC_RO_UNCORRECT_ERR,	"tx_ro_uncorrect_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_TXC_SF_CORRECT_ERR,	"tx.sf_correct_err",
+	{NXGE_FM_EREPORT_TXC_SF_CORRECT_ERR,	"tx_sf_correct_err",
+						DDI_FM_DEVICE_INTERN_CORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_TXC_SF_UNCORRECT_ERR,	"tx.sf_uncorrect_err",
+	{NXGE_FM_EREPORT_TXC_SF_UNCORRECT_ERR,	"tx_sf_uncorrect_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_TXC_ASSY_DEAD,		"tx.assembly_uncorrect_err",
+	{NXGE_FM_EREPORT_TXC_ASSY_DEAD,		"tx_assembly_uncorrect_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_TXC_REORDER_ERR,	"tx.reorder_err",
+	{NXGE_FM_EREPORT_TXC_REORDER_ERR,	"tx_reorder_err",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
 };
 
 nxge_fm_ereport_attr_t nxge_fm_ereport_txmac[] = {
-	{NXGE_FM_EREPORT_TXMAC_UNDERFLOW,	"txmac.underflow",
+	{NXGE_FM_EREPORT_TXMAC_UNDERFLOW,	"txmac_underflow",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_TXMAC_OVERFLOW,	"txmac.overflow",
+	{NXGE_FM_EREPORT_TXMAC_OVERFLOW,	"txmac_overflow",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_TXMAC_TXFIFO_XFR_ERR,	"txmac.txfifo_xfr_err",
+	{NXGE_FM_EREPORT_TXMAC_TXFIFO_XFR_ERR,	"txmac_txfifo_xfr_err",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_TXMAC_MAX_PKT_ERR,	"txmac.max_pkt_err",
+	{NXGE_FM_EREPORT_TXMAC_MAX_PKT_ERR,	"txmac_max_pkt_err",
+						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
-	{NXGE_FM_EREPORT_TXMAC_RESET_FAIL,	"txmac.reset_fail",
+	{NXGE_FM_EREPORT_TXMAC_RESET_FAIL,	"txmac_reset_fail",
+						DDI_FM_DEVICE_NO_RESPONSE,
 						DDI_SERVICE_UNAFFECTED},
 };
 
 nxge_fm_ereport_attr_t nxge_fm_ereport_espc[] = {
-	{NXGE_FM_EREPORT_ESPC_ACCESS_FAIL,	"eprom.access_fail",
+	{NXGE_FM_EREPORT_ESPC_ACCESS_FAIL,	"eprom_access_fail",
+						DDI_FM_DEVICE_NO_RESPONSE,
 						DDI_SERVICE_LOST},
 };
 
 nxge_fm_ereport_attr_t nxge_fm_ereport_sw[] = {
 	{NXGE_FM_EREPORT_SW_INVALID_PORT_NUM,	"invalid_port_num",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
 	{NXGE_FM_EREPORT_SW_INVALID_CHAN_NUM,	"invalid_chan_num",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
 	{NXGE_FM_EREPORT_SW_INVALID_PARAM,	"invalid_param",
+						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
 };
 
@@ -250,7 +336,7 @@ nxge_fm_init(p_nxge_t nxgep, ddi_device_acc_attr_t *reg_attr,
 	ddi_iblock_cookie_t iblk;
 
 	nxgep->fm_capabilities = ddi_prop_get_int(DDI_DEV_T_ANY, nxgep->dip,
-			DDI_PROP_DONTPASS, "fm-capable", 0);
+			DDI_PROP_DONTPASS, "fm-capable", 1);
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 		"FM capable = %d\n", nxgep->fm_capabilities));
 
@@ -491,10 +577,13 @@ nxge_fm_ereport(p_nxge_t nxgep, uint8_t err_portn, uint8_t err_chan,
 					nxge_fm_ereport_attr_t *ereport)
 {
 	uint64_t		ena;
-	char			*eclass;
+	char			eclass[FM_MAX_CLASS];
+	char			*err_str;
 	p_nxge_stats_t		statsp;
 
-	eclass = ereport->eclass;
+	(void) snprintf(eclass, FM_MAX_CLASS, "%s.%s", DDI_FM_DEVICE,
+			ereport->eclass);
+	err_str = ereport->str;
 	ena = fm_ena_generate(0, FM_ENA_FMT1);
 	statsp = nxgep->statsp;
 
@@ -774,6 +863,8 @@ nxge_fm_ereport(p_nxge_t nxgep, uint8_t err_portn, uint8_t err_chan,
 			ddi_fm_ereport_post(nxgep->dip, eclass, ena,
 				DDI_NOSLEEP,
 				FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+				ERNAME_DETAILED_ERR_TYPE, DATA_TYPE_STRING,
+					err_str,
 				ERNAME_ERR_PORTN, DATA_TYPE_UINT8, err_portn,
 				ERNAME_TXC_RO_STATE0, DATA_TYPE_UINT32,
 					(uint32_t)statsp->
@@ -849,8 +940,27 @@ nxge_fm_report_error(p_nxge_t nxgep, uint8_t err_portn, uint8_t err_chan,
 
 	if (fm_ereport_attr != NULL) {
 		nxge_fm_ereport(nxgep, err_portn, err_chan, fm_ereport_attr);
-		cmn_err(CE_NOTE, "!service_impact = %d\n",
-			fm_ereport_attr->impact);
 		ddi_fm_service_impact(nxgep->dip, fm_ereport_attr->impact);
 	}
+}
+
+int
+fm_check_acc_handle(ddi_acc_handle_t handle)
+{
+	ddi_fm_error_t err;
+
+	ddi_fm_acc_err_get(handle, &err, DDI_FME_VERSION);
+#ifndef	NXGE_FM_S10
+	ddi_fm_acc_err_clear(handle, DDI_FME_VERSION);
+#endif
+	return (err.fme_status);
+}
+
+int
+fm_check_dma_handle(ddi_dma_handle_t handle)
+{
+	ddi_fm_error_t err;
+
+	ddi_fm_dma_err_get(handle, &err, DDI_FME_VERSION);
+	return (err.fme_status);
 }

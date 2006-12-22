@@ -27,6 +27,8 @@
 
 #include <nxge_impl.h>
 #include <nxge_zcp.h>
+#include <nxge_ipp.h>
+
 
 nxge_status_t
 nxge_zcp_init(p_nxge_t nxgep)
@@ -87,6 +89,9 @@ nxge_zcp_init(p_nxge_t nxgep)
 		NXGE_REG_WR64(handle, ZCP_CFIFO_ECC_PORT3_REG, 0);
 		break;
 	}
+
+	if ((rs = npi_zcp_clear_istatus(handle)) != NPI_SUCCESS)
+		return (NXGE_ERROR | rs);
 
 	if ((rs = npi_zcp_get_istatus(handle, &istatus)) != NPI_SUCCESS)
 		return (NXGE_ERROR | rs);
@@ -206,12 +211,21 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 		((portn == 1) && (istatus & ICFG_ZCP_CFIFO_ECC1)) ||
 		((portn == 2) && (istatus & ICFG_ZCP_CFIFO_ECC2)) ||
 		((portn == 3) && (istatus & ICFG_ZCP_CFIFO_ECC3))) {
-		statsp->cfifo_ecc++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-				NXGE_FM_EREPORT_ZCP_CFIFO_ECC);
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_zcp_err_evnts: port%d buf_cfifo_ecc", portn));
-		rxport_fatal = B_TRUE;
+		boolean_t ue_ecc_valid;
+
+		if ((status = nxge_ipp_eccue_valid_check(nxgep,
+						&ue_ecc_valid)) != NXGE_OK)
+			return (status);
+
+		if (ue_ecc_valid) {
+			statsp->cfifo_ecc++;
+			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+					NXGE_FM_EREPORT_ZCP_CFIFO_ECC);
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			"nxge_zcp_err_evnts: port%d buf_cfifo_ecc",
+					portn));
+			rxport_fatal = B_TRUE;
+		}
 	}
 
 	/*
@@ -241,11 +255,9 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 			    " fatal Error on  Port #%d\n",
 			    portn));
 		status = nxge_zcp_fatal_err_recover(nxgep);
-#ifdef	NXGE_FM
 		if (status == NXGE_OK) {
 			FM_SERVICE_RESTORED(nxgep);
 		}
-#endif
 	}
 	return (status);
 }

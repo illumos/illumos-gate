@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +63,13 @@ extern "C" {
 #endif
 
 /*
+ * CMD_MAX_CKWDS denotes the highest number, across all covered
+ * SPARC architectures, of checkwords per cache line.
+ */
+
+#define	CMD_MAX_CKWDS	4
+
+/*
  * The DIMM structure started life without a version number.  Making things more
  * complicated, the version number in the new struct occupies the space used for
  * the case pointer in the non-versioned struct.  We therefore have to use
@@ -98,12 +104,30 @@ typedef struct cmd_dimm_pers {
 	uint_t dimmp_nretired;		/* # ret'd pages for CEs in DIMM */
 } cmd_dimm_pers_t;
 
+/*
+ * Index block for MQSC rules 4A and 4B correlation of memory CEs
+ * on a single DIMM. "Unit Position" refers to bit or nibble depending
+ * on the memory ECC.  This structure is not persisted.
+ */
+
+typedef struct cmd_mq {
+	cmd_list_t mq_l;		/* pointers to prev and next */
+	uint64_t mq_tstamp;		/* timestamp of ereport in secs */
+	uint16_t mq_ckwd;		/* phys addr mod 64 */
+	uint64_t mq_phys_addr;		/* from ereport */
+	uint16_t mq_unit_position;	/* bit for sun4u, nibble for sun4v */
+	uint16_t mq_dram;		/* by table lookup from unit pos */
+	fmd_event_t *mq_ep;		/* ereport - for potential fault */
+} cmd_mq_t;
+
 struct cmd_dimm {
 	cmd_dimm_pers_t dimm_pers;
 	cmd_bank_t *dimm_bank;		/* This DIMM's bank (if discovered) */
 	const char *dimm_unum;		/* This DIMM's name */
 	cmd_case_t dimm_case;		/* Open CE case against this DIMM */
-	fmd_stat_t dimm_retstat;
+	fmd_stat_t dimm_retstat;	/* retirement statistics, this DIMM */
+	cmd_list_t
+	    mq_root[CMD_MAX_CKWDS];	/* per-checkword CEs to correlate */
 };
 
 #define	CMD_DIMM_MAXSIZE \
@@ -126,6 +150,9 @@ extern cmd_dimm_t *cmd_dimm_create(fmd_hdl_t *, nvlist_t *);
 extern nvlist_t *cmd_dimm_fru(cmd_dimm_t *);
 extern nvlist_t *cmd_dimm_create_fault(fmd_hdl_t *, cmd_dimm_t *, const char *,
     uint_t);
+#ifdef sun4v
+extern nvlist_t *cmd_mem2hc(fmd_hdl_t *, nvlist_t *);
+#endif /* sun4v */
 
 extern nvlist_t *cmd_dimm_fmri_derive(fmd_hdl_t *, uint64_t, uint16_t,
     uint64_t);

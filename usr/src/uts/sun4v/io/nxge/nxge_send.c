@@ -116,8 +116,7 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	statsp = nxgep->statsp;
 
 	if (nxgep->statsp->port_stats.lb_mode == nxge_lb_normal) {
-		if ((!statsp->mac_stats.link_up) ||
-			(FM_GET_DEVSTATE(nxgep) <= DDI_DEVSTATE_DEGRADED)) {
+		if (!statsp->mac_stats.link_up) {
 			freemsg(mp);
 			NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: "
 				"link not up or LB mode"));
@@ -243,19 +242,22 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 			"len %d pkt_len %d pack_len %d",
 			nmblks, len, pkt_len, pack_len));
 		/*
-		 * Hardware limits the transfer length to 4K.
-		 * If len is more than 4K, we need to break
-		 * nmp into two chunks: Make first chunk smaller
-		 * than 4K. The second chunk will be broken into
-		 * less than 4K (if needed) during the next pass.
+		 * Hardware limits the transfer length to 4K for NIU and
+		 * 4076 (TX_MAX_TRANSFER_LENGTH) for Neptune. But we just
+		 * use TX_MAX_TRANSFER_LENGTH as the limit for both.
+		 * If len is longer than the limit, then we break nmp into
+		 * two chunks: Make the first chunk equal to the limit and
+		 * the second chunk for the remaining data. If the second
+		 * chunk is still larger than the limit, then it will be
+		 * broken into two in the next pass.
 		 */
-		if (len > TX_MAX_TRANSFER_LENGTH) {
+		if (len > TX_MAX_TRANSFER_LENGTH - TX_PKT_HEADER_SIZE) {
 			t_mp = dupb(nmp);
-			nmp->b_wptr = nmp->b_rptr + TX_MAX_TRANSFER_LENGTH;
+			nmp->b_wptr = nmp->b_rptr +
+				(TX_MAX_TRANSFER_LENGTH - TX_PKT_HEADER_SIZE);
 			t_mp->b_rptr = nmp->b_wptr;
 			t_mp->b_cont = nmp->b_cont;
 			nmp->b_cont = t_mp;
-
 			len = MBLKL(nmp);
 		}
 
@@ -733,7 +735,6 @@ nxge_start_control_header_only:
 			sop_index * sizeof (tx_desc_t),
 			nsdescs * sizeof (tx_desc_t),
 			DDI_DMA_SYNC_FORDEV);
-
 		NXGE_DEBUG_MSG((nxgep, TX_CTL, "nxge_start(20): sync 1 "
 			"cs_off = 0x%02X cs_s_off = 0x%02X "
 			"pkt_len %d ngathers %d sop_index %d\n",

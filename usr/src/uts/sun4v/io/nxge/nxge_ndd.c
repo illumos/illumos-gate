@@ -359,12 +359,14 @@ static	nxge_param_t	nxge_param_arr[] = {
 	"default-port-rdc",	"default_port_rdc"},
 
 {  nxge_param_get_generic,	nxge_param_rx_intr_time,
-	NXGE_PARAM_RXDMA_RW | NXGE_PARAM_PROP_ARR32,
-	0, 31,	0,	0,
+	NXGE_PARAM_RXDMA_RW,
+	NXGE_RDC_RCR_TIMEOUT_MIN, NXGE_RDC_RCR_TIMEOUT_MAX,
+    RXDMA_RCR_TO_DEFAULT,	0,
 	"rxdma-intr-time",	"rxdma_intr_time"},
 {  nxge_param_get_generic,	nxge_param_rx_intr_pkts,
-	NXGE_PARAM_RXDMA_RW | NXGE_PARAM_PROP_ARR32,
-	0, 31,	0,	0,
+	NXGE_PARAM_RXDMA_RW,
+	NXGE_RDC_RCR_THRESHOLD_MIN, NXGE_RDC_RCR_THRESHOLD_MAX,
+	RXDMA_RCR_PTHRES_DEFAULT,	0,
 	"rxdma-intr-pkts",	"rxdma_intr_pkts"},
 
 {  nxge_param_get_generic,	NULL, NXGE_PARAM_READ_PROP,
@@ -1240,86 +1242,28 @@ nxge_param_set_mac(p_nxge_t nxgep, queue_t *q,
 
 /* ARGSUSED */
 static int
-nxge_param_rx_intr_set(p_nxge_t nxgep, uint16_t value,
-			    uint8_t channel, uint8_t type)
-{
-	int status = 0;
-	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_rx_intr_set"));
-
-		/* setup value */
-	switch (type) {
-		case SET_RX_INTR_TIME_DISABLE:
-			status = nxge_rxdma_cfg_rcr_timeout(nxgep, channel,
-								    value, 0);
-			break;
-		case SET_RX_INTR_TIME_ENABLE:
-			status = nxge_rxdma_cfg_rcr_timeout(nxgep, channel,
-								value, 1);
-			break;
-		case SET_RX_INTR_PKTS:
-			status = nxge_rxdma_cfg_rcr_threshold(nxgep, channel,
-								    value);
-			break;
-		default:
-			status = NXGE_ERROR;
-			break;
-	}
-
-	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "<== nxge_param_rx_intr_set"));
-	return (status);
-}
-
-/* ARGSUSED */
-static int
 nxge_param_rx_intr_pkts(p_nxge_t nxgep, queue_t *q,
 			    mblk_t	*mp, char *value, caddr_t cp)
 {
 	char *end;
-	uint32_t status, cfg_value;
+	uint32_t cfg_value;
 	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	uint32_t cfg_it = B_FALSE;
-	nxge_rcr_param_t *threshold;
-	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
-	p_nxge_hw_pt_cfg_t	p_cfgp;
-	uint32_t *val_ptr, *old_val_ptr;
+
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_rx_intr_pkts"));
 
-	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
-	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
+	cfg_value = (uint32_t)mi_strtol(value, &end, BASE_ANY);
 
-	cfg_value = (uint32_t)mi_strtol(value, &end, BASE_HEX);
-		/* now do decoding */
-		/*
-		 * format is
-		 * bit[30]= enable
-		 * bit[29]= remove
-		 * bits[23-16] = rdc
-		 * bits[15-0] = blanking parameter
-		 *
-		 */
-	threshold = (nxge_rcr_param_t *)&cfg_value;
-	if ((threshold->rdc < p_cfgp->max_rdcs) &&
-		(threshold->cfg_val < NXGE_RDC_RCR_TIMEOUT_MAX) &&
-		(threshold->cfg_val >= NXGE_RDC_RCR_TIMEOUT_MIN)) {
-		val_ptr = (uint32_t *)pa->value;
-		old_val_ptr = (uint32_t *)pa->old_value;
-		if (val_ptr[threshold->rdc] != cfg_value) {
-			old_val_ptr[threshold->rdc] = val_ptr[threshold->rdc];
-			val_ptr[threshold->rdc] = cfg_value;
-			p_dma_cfgp->rcr_threshold[threshold->rdc] =
-				    threshold->cfg_val;
-			cfg_it = B_TRUE;
-		}
-	} else {
+	if ((cfg_value > NXGE_RDC_RCR_THRESHOLD_MAX) ||
+		(cfg_value < NXGE_RDC_RCR_THRESHOLD_MIN)) {
 		return (EINVAL);
 	}
-	if (cfg_it == B_TRUE) {
-		status = nxge_param_rx_intr_set(nxgep, threshold->cfg_val,
-						    threshold->rdc,
-						    SET_RX_INTR_PKTS);
-		if (status != NXGE_OK)
-		return (EINVAL);
+
+	if ((pa->value != cfg_value)) {
+		pa->old_value = pa->value;
+		pa->value = cfg_value;
+		nxgep->intr_threshold = pa->value;
 	}
+
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_rx_intr_pkts"));
 	return (0);
 }
@@ -1332,62 +1276,22 @@ nxge_param_rx_intr_time(p_nxge_t nxgep, queue_t *q,
 		    mblk_t	*mp, char *value, caddr_t cp)
 {
 	char *end;
-	uint32_t status = 0, cfg_value;
+	uint32_t cfg_value;
 	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	uint32_t cfg_it = B_FALSE;
-	nxge_rcr_param_t *tout;
-	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
-	p_nxge_hw_pt_cfg_t	p_cfgp;
-	uint32_t *val_ptr, *old_val_ptr;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_rx_intr_time"));
 
-	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
-	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
+	cfg_value = (uint32_t)mi_strtol(value, &end, BASE_ANY);
 
-	cfg_value = (uint32_t)mi_strtol(value, &end, BASE_HEX);
-		/* now do decoding */
-		/*
-		 * format is
-		 * bit[30]= enable
-		 * bit[29]= remove
-		 * bits[23-16] = rdc
-		 * bits[15-0] = blanking parameter
-		 *
-		 */
-	tout = (nxge_rcr_param_t *)&cfg_value;
-	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-			    " nxge_param_rx_intr_time value %x",
-			    cfg_value));
-	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-			    " nxge_param_rx_intr_time %x %x",
-			    tout->rdc, tout->cfg_val));
-	if ((tout->rdc < p_cfgp->max_rdcs) &&
-		(tout->cfg_val < NXGE_RDC_RCR_TIMEOUT_MAX) &&
-		(tout->cfg_val >= NXGE_RDC_RCR_TIMEOUT_MIN)) {
-		val_ptr = (uint32_t *)pa->value;
-		old_val_ptr = (uint32_t *)pa->old_value;
-		if (val_ptr[tout->rdc] != cfg_value) {
-			old_val_ptr[tout->rdc] = val_ptr[tout->rdc];
-			val_ptr[tout->rdc] = cfg_value;
-			p_dma_cfgp->rcr_timeout[tout->rdc] = tout->cfg_val;
-			cfg_it = B_TRUE;
-		}
-	} else {
+	if ((cfg_value > NXGE_RDC_RCR_TIMEOUT_MAX) ||
+		(cfg_value < NXGE_RDC_RCR_TIMEOUT_MIN)) {
 		return (EINVAL);
 	}
 
-	if (cfg_it == B_TRUE) {
-		if (tout->remove)
-			status = nxge_param_rx_intr_set(nxgep,
-						    tout->cfg_val, tout->rdc,
-						    SET_RX_INTR_TIME_DISABLE);
-		else
-			status = nxge_param_rx_intr_set(nxgep,
-						    tout->cfg_val, tout->rdc,
-						    SET_RX_INTR_TIME_ENABLE);
-		if (status != NXGE_OK)
-			return (EINVAL);
+	if ((pa->value != cfg_value)) {
+		pa->old_value = pa->value;
+		pa->value = cfg_value;
+		nxgep->intr_timeout = pa->value;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_rx_intr_time"));

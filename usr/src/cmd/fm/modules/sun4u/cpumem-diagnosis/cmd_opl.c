@@ -148,7 +148,7 @@ opl_cpursrc_create(fmd_hdl_t *hdl, uint32_t cpuid)
 	if ((errno = nvlist_alloc(&fmri, NV_UNIQUE_NAME, 0)) != 0)
 		return (NULL);
 
-	if ((frustr = cpu_getfrustr(hdl, cpuid)) == NULL) {
+	if ((frustr = cmd_cpu_getfrustr_by_id(hdl, cpuid)) == NULL) {
 		nvlist_free(fmri);
 		return (NULL);
 	}

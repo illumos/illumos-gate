@@ -1096,7 +1096,20 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 				}
 				BMAC_REG_RD(handle, portn, BMAC_MAX_REG, &val);
 				val &= ~BMAC_MAX_FRAME_MASK;
-				val |= max_fsize;
+				if (max_fsize <= 0x5EE)
+					val |= 0x5EE;
+				else if ((max_fsize > 0x5EE) &&
+					(max_fsize <= 0x5F6))
+					val |= 0x5F6;
+				else if ((max_fsize > 0x5F6) &&
+					(max_fsize <= 0x7D6))
+					val |= 0x7D6;
+				else if ((max_fsize > 0x7D6) &&
+					(max_fsize <= 0x232E))
+					val |= 0x232E;
+				else if ((max_fsize > 0x232E) &&
+					(max_fsize <= 0x2406))
+					val |= 0x2406;
 				BMAC_REG_WR(handle, portn, BMAC_MAX_REG, val);
 				BMAC_REG_WR(handle, portn, BMAC_MIN_REG,
 						min_fsize);

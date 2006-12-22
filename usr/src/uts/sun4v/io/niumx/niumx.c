@@ -259,6 +259,12 @@ niumx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		/* add interrupt redistribution callback */
 		intr_dist_add(niumx_intr_dist, &niumxds_p->niumx_mutex);
 
+		niumxds_p->niumx_fm_cap = DDI_FM_EREPORT_CAPABLE |
+			DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
+
+		ddi_fm_init(niumxds_p->dip, &niumxds_p->niumx_fm_cap,
+			&niumxds_p->niumx_fm_ibc);
+
 		ret = DDI_SUCCESS;
 		goto prop_free;
 cleanup:
@@ -289,6 +295,7 @@ niumx_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		    ddi_get_soft_state(niumx_state, ddi_get_instance(dip));
 
 		intr_dist_rem(niumx_intr_dist, &niumxds_p->niumx_mutex);
+		ddi_fm_fini(dip);
 		mutex_destroy(&niumxds_p->niumx_mutex);
 		ddi_soft_state_free(niumx_state, ddi_get_instance(dip));
 		return (DDI_SUCCESS);

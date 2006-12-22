@@ -38,11 +38,12 @@
 #include <fm/topo_mod.h>
 #include <fm/topo_hc.h>
 #include <libdevinfo.h>
-
 #include <hostbridge.h>
 #include <pcibus.h>
 #include <did.h>
 #include <did_props.h>
+#include "topo_tree.h"
+#include <fm/libtopo.h>
 
 static int ASRU_set(tnode_t *, did_t *,
     const char *, const char *, const char *);
@@ -415,15 +416,24 @@ ASRU_set(tnode_t *tn, did_t *pd,
 static int
 FRU_fmri_hack(topo_mod_t *mp, tnode_t *tn, const char *label)
 {
-	char buf[PATH_MAX];
 	nvlist_t *fmri;
 	int err, e;
+	tnode_t *pnode, *cnode = tn;
+	char *plabel;
 
+	pnode = tn->tn_parent;
+	while (pnode != NULL) {
+		if (topo_node_label(pnode, &plabel, &err) < 0)
+			break;
+		if (strcmp(plabel, label) != 0)
+			break;
+		cnode = pnode;
+		pnode = pnode->tn_parent;
+	}
 
-	(void) snprintf(buf, PATH_MAX, "hc:///component=%s", label);
-	if (topo_mod_str2nvl(mp, buf, &fmri) < 0)
-		return (-1);
-
+	if (topo_node_resource(cnode, &fmri, &err) < 0 ||
+	    fmri == NULL)
+		return (topo_mod_seterrno(mp, err));
 	e = topo_node_fru_set(tn, fmri, 0, &err);
 	nvlist_free(fmri);
 	if (e < 0)

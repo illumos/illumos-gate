@@ -34,20 +34,28 @@
 #include <errno.h>
 #include <cpu_mdesc.h>
 
-int
-cpu_get_serialid_mdesc(uint32_t cpuid, uint64_t *serialidp)
-{
+md_cpumap_t *
+cpu_find_cpumap(uint32_t cpuid) {
 	int i;
 	md_cpumap_t *mcmp;
 
 	for (i = 0, mcmp = cpu.cpu_mdesc_cpus;
 	    i < cpu.cpu_mdesc_ncpus; i++, mcmp++) {
 		if (cpuid == mcmp->cpumap_pid) {
-			*serialidp = mcmp->cpumap_serialno;
-			return (0);
+			return (mcmp);
 		}
 	}
+	return (NULL);
+}
 
+int
+cpu_get_serialid_mdesc(uint32_t cpuid, uint64_t *serialidp)
+{
+	md_cpumap_t *mcmp;
+	if ((mcmp = cpu_find_cpumap(cpuid)) != NULL) {
+		*serialidp = mcmp->cpumap_serialno;
+		return (0);
+	}
 	return (fmd_fmri_set_errno(ENOENT));
 }
 
@@ -87,6 +95,7 @@ cpu_mdesc_init(ldom_hdl_t *lhp)
 	    idx < cpu.cpu_mdesc_ncpus;
 	    idx++, mcmp++) {
 		uint64_t tl;
+		char *cpufru, *cpufrusn, *cpufrupn;
 
 		if (md_get_prop_val(mdp, listp[idx], "id", &tl) < 0)
 			tl = (uint64_t)-1; /* invalid value */
@@ -99,6 +108,21 @@ cpu_mdesc_init(ldom_hdl_t *lhp)
 		if (md_get_prop_val(mdp, listp[idx], "serial#",
 		    &mcmp->cpumap_serialno) < 0)
 			mcmp->cpumap_serialno = 0;
+
+		if (md_get_prop_str(mdp, listp[idx], "cpufru",
+		    &cpufru) < 0)
+			cpufru = "mb";
+		mcmp->cpumap_cpufru = fmd_fmri_strdup(cpufru);
+
+		if (md_get_prop_str(mdp, listp[idx], "cpufru-serial#",
+		    &cpufrusn) < 0)
+			cpufrusn = "CPU FRU serial number not available";
+		mcmp->cpumap_cpufrusn = fmd_fmri_strdup(cpufrusn);
+
+		if (md_get_prop_str(mdp, listp[idx], "cpufru-part#",
+		    &cpufrupn) < 0)
+			cpufrupn = "CPU FRU part number not available";
+		mcmp->cpumap_cpufrupn = fmd_fmri_strdup(cpufrupn);
 	}
 
 	fmd_fmri_free(listp, sizeof (mde_cookie_t) * num_nodes);
@@ -112,6 +136,15 @@ void
 cpu_mdesc_fini(void)
 {
 	if (cpu.cpu_mdesc_cpus != NULL) {
+		int idx;
+		md_cpumap_t *mcmp;
+		for (idx = 0, mcmp = cpu.cpu_mdesc_cpus;
+		    idx < cpu.cpu_mdesc_ncpus;
+		    idx++, mcmp++) {
+			fmd_fmri_strfree(mcmp->cpumap_cpufru);
+			fmd_fmri_strfree(mcmp->cpumap_cpufrusn);
+			fmd_fmri_strfree(mcmp->cpumap_cpufrupn);
+		}
 		fmd_fmri_free(cpu.cpu_mdesc_cpus,
 		    cpu.cpu_mdesc_ncpus * sizeof (md_cpumap_t));
 	}

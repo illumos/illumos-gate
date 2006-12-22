@@ -181,6 +181,18 @@ fmd_fmri_expand(nvlist_t *nvl)
 			if ((rc = nvlist_add_uint64(nvl, FM_FMRI_CPU_SERIAL_ID,
 			    serialid)) != 0)
 				return (fmd_fmri_set_errno(rc));
+#ifdef sparc
+			if (cpu.cpu_mdesc_cpus != NULL) {
+				md_cpumap_t *mcmp = cpu_find_cpumap(cpuid);
+				(void) nvlist_add_string(nvl,
+				    FM_FMRI_CPU_CPUFRU, mcmp->cpumap_cpufru);
+				(void) nvlist_add_string(nvl,
+				    FM_FMRI_HC_PART, mcmp->cpumap_cpufrupn);
+				(void) nvlist_add_string(nvl,
+				    FM_FMRI_HC_SERIAL_ID,
+				    mcmp->cpumap_cpufrusn);
+			}
+#endif	/* sparc */
 		}
 	} else if (version == CPU_SCHEME_VERSION1) {
 		if ((rc = nvlist_lookup_string(nvl, FM_FMRI_CPU_SERIAL_ID,

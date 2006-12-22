@@ -28,4 +28,8 @@
 include ../Makefile.com
 include ../../../../Makefile.lib.64
 
+CPPFLAGS += -I $(ROOT)/usr/platform/sun4v/include
+LDLIBS += -L$(ROOTLIBDIR64) -lmdesc -lldom
+DYNFLAGS += -R/usr/lib/fm/$(MACH64)
+
 install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)

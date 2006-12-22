@@ -543,7 +543,7 @@ struct _nxge_t {
 	nxge_txc_t		txc;
 	nxge_classify_t		classifier;
 
-	mac_handle_t		mach;	/* mac module handle    */
+	mac_handle_t		mach;	/* mac module handle */
 	p_nxge_stats_t		statsp;
 	uint32_t		param_count;
 	p_nxge_param_t		param_arr;
@@ -648,7 +648,8 @@ struct _nxge_t {
 	boolean_t 		nxge_htraffic;
 	uint32_t 		nxge_ncpus;
 	uint32_t 		nxge_cpumask;
-	uint32_t 		nxge_intrpkt;
+	uint16_t 		intr_timeout;
+	uint16_t 		intr_threshold;
 	uchar_t 		nxge_rxmode;
 	uint32_t 		active_threads;
 

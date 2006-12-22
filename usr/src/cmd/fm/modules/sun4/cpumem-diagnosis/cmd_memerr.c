@@ -166,13 +166,220 @@ ce_thresh_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 	fmd_case_solve(hdl, cp);
 }
 
+/* Create a fresh index block for MQSC CE correlation. */
+
+cmd_mq_t *
+mq_create(fmd_hdl_t *hdl, fmd_event_t *ep,
+    uint64_t afar, uint16_t upos, uint64_t now)
+{
+	cmd_mq_t *cp;
+	cp = fmd_hdl_zalloc(hdl, sizeof (cmd_mq_t), FMD_SLEEP);
+	cp->mq_tstamp = now;
+	cp->mq_ckwd = (afar >> 4) & 0x3;
+	cp->mq_phys_addr = afar;
+	cp->mq_unit_position = upos;
+	cp->mq_dram = cmd_upos2dram(upos);
+	cp->mq_ep = ep;
+
+	return (cp);
+}
+
+/*
+ * Add an index block for a new CE, sorted
+ * a) by ascending unit position
+ * b) order of arrival (~= time order)
+ */
+
+void
+mq_add(fmd_hdl_t *hdl, cmd_dimm_t *dimm, fmd_event_t *ep,
+    uint64_t afar, uint16_t synd, uint64_t now)
+{
+	cmd_mq_t *ip, *jp;
+	int cw, unit_position;
+
+	cw = (afar & 0x30) >> 4;		/* 0:3 */
+	if ((unit_position = cmd_synd2upos(synd)) < 0)
+		return;				/* not a CE */
+
+	for (ip = cmd_list_next(&dimm->mq_root[cw]); ip != NULL; ) {
+		if (ip->mq_unit_position > unit_position) break;
+		else if (ip->mq_unit_position == unit_position &&
+		    ip->mq_phys_addr == afar) {
+			/*
+			 * Found a duplicate cw, unit_position, and afar.
+			 * Delete this node, to be superseded by the new
+			 * node added below.
+			 */
+			jp = cmd_list_next(ip);
+			cmd_list_delete(&dimm->mq_root[cw], &ip->mq_l);
+			fmd_hdl_free(hdl, ip, sizeof (cmd_mq_t));
+			ip = jp;
+		} else ip = cmd_list_next(ip);
+	}
+	jp = mq_create(hdl, ep, afar, unit_position, now);
+	if (ip == NULL)
+		cmd_list_append(&dimm->mq_root[cw], jp);
+	else
+		cmd_list_insert_before(&dimm->mq_root[cw], ip, jp);
+}
+
+/*
+ * Prune the MQSC index lists (one for each checkword), by deleting
+ * outdated index blocks from each list.
+ */
+
+void
+mq_prune(fmd_hdl_t *hdl, cmd_dimm_t *dimm, uint64_t now)
+{
+	cmd_mq_t *ip, *jp;
+	int cw;
+
+	for (cw = 0; cw < CMD_MAX_CKWDS; cw++) {
+		for (ip = cmd_list_next(&dimm->mq_root[cw]); ip != NULL; ) {
+			if (ip->mq_tstamp < now - (72*60*60)) {
+				jp = cmd_list_next(ip);
+				cmd_list_delete(&dimm->mq_root[cw], ip);
+				fmd_hdl_free(hdl, ip, sizeof (cmd_mq_t));
+				ip = jp;
+			} /* tstamp < now - ce_t */
+			else ip = cmd_list_next(ip);
+		} /* per checkword */
+	} /* cw = 0...3 */
+}
+
+/*
+ * Check the MQSC index lists (one for each checkword) by making a
+ * complete pass through each list, checking if the criteria for either
+ * Rule 4A or 4B have been met.  Rule 4A checking is done for each checkword;
+ * 4B check is done at end.
+ *
+ * Rule 4A: fault a DIMM  "whenever Solaris reports two or more CEs from
+ * two or more different physical addresses on each of two or more different
+ * bit positions from the same DIMM within 72 hours of each other, and all
+ * the addresses are in the same relative checkword (that is, the AFARs
+ * are all the same modulo 64).  [Note: This means at least 4 CEs; two
+ * from one bit position, with unique addresses, and two from another,
+ * also with unique addresses, and the lower 6 bits of all the addresses
+ * are the same."
+ *
+ * Rule 4B: fault a DIMM "whenever Solaris reports two or more CEs from
+ * two or more different physical addresses on each of three or more
+ * different outputs from the same DRAM within 72 hours of each other, as
+ * long as the three outputs do not all correspond to the same relative
+ * bit position in their respective checkwords.  [Note: This means at least
+ * 6 CEs; two from one DRAM output signal, with unique addresses, two from
+ * another output from the same DRAM, also with unique addresses, and two
+ * more from yet another output from the same DRAM, again with unique
+ * addresses, as long as the three outputs do not all correspond to the
+ * same relative bit position in their respective checkwords.]"
+ */
+
+void
+mq_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
+{
+	int upos_pairs, curr_upos, cw, i, j, k;
+	nvlist_t *flt;
+	typedef struct upos_pair {
+		int upos;
+		int dram;
+		cmd_mq_t *mq1;
+		cmd_mq_t *mq2;
+	} upos_pair_t;
+	upos_pair_t upos_array[8]; /* max per cw = 2, * 4 cw's */
+	cmd_mq_t *ip;
+
+	upos_pairs = 0;
+	upos_array[0].mq1 = NULL;
+	for (cw = 0; cw < CMD_MAX_CKWDS; cw++) {
+		i = upos_pairs;
+		curr_upos = -1;
+		for (ip = cmd_list_next(&dimm->mq_root[cw]); ip != NULL;
+		    ip = cmd_list_next(ip)) {
+			if (curr_upos != ip->mq_unit_position)
+				curr_upos = ip->mq_unit_position;
+			else if (i > upos_pairs &&
+			    curr_upos == upos_array[i-1].upos)
+				continue; /* skip triples, quads, etc. */
+			else if (upos_array[i].mq1 == NULL) {
+				/* we have a pair */
+				upos_array[i].upos = curr_upos;
+				upos_array[i].dram = ip->mq_dram;
+				upos_array[i].mq1 = cmd_list_prev(ip);
+				upos_array[i].mq2 = ip;
+				upos_array[++i].mq1 = NULL;
+			}
+		}
+		if (i - upos_pairs >= 2) {
+			flt = cmd_dimm_create_fault(hdl,
+			    dimm, "fault.memory.dimm", CMD_FLTMAXCONF);
+			for (j = upos_pairs; j < i; j++) {
+				fmd_case_add_ereport(hdl,
+				    dimm->dimm_case.cc_cp,
+				    upos_array[j].mq1->mq_ep);
+				fmd_case_add_ereport(hdl,
+				    dimm->dimm_case.cc_cp,
+				    upos_array[j].mq2->mq_ep);
+			}
+			fmd_case_add_suspect(hdl, dimm->dimm_case.cc_cp, flt);
+			fmd_case_solve(hdl, dimm->dimm_case.cc_cp);
+			return;
+		}
+		upos_pairs += i;
+	}
+
+	if (upos_pairs  < 3)
+		return; /* 4B violation needs at least 3 pairs */
+
+	for (i = 0; i < upos_pairs; i++) {
+		for (j = i+1; j < upos_pairs; j++) {
+			if (upos_array[i].dram != upos_array[j].dram)
+				continue;
+			for (k = j+1; k < upos_pairs; k++) {
+				if (upos_array[j].dram != upos_array[k].dram)
+					continue;
+				if ((upos_array[i].upos !=
+				    upos_array[j].upos) ||
+				    (upos_array[j].upos !=
+				    upos_array[k].upos)) {
+					flt = cmd_dimm_create_fault(hdl,
+					    dimm, "fault.memory.dimm",
+					    CMD_FLTMAXCONF);
+					fmd_case_add_ereport(hdl,
+					    dimm->dimm_case.cc_cp,
+					    upos_array[i].mq1->mq_ep);
+					fmd_case_add_ereport(hdl,
+					    dimm->dimm_case.cc_cp,
+					    upos_array[i].mq2->mq_ep);
+					fmd_case_add_ereport(hdl,
+					    dimm->dimm_case.cc_cp,
+					    upos_array[j].mq1->mq_ep);
+					fmd_case_add_ereport(hdl,
+					    dimm->dimm_case.cc_cp,
+					    upos_array[j].mq2->mq_ep);
+					fmd_case_add_ereport(hdl,
+					    dimm->dimm_case.cc_cp,
+					    upos_array[k].mq1->mq_ep);
+					fmd_case_add_ereport(hdl,
+					    dimm->dimm_case.cc_cp,
+					    upos_array[k].mq2->mq_ep);
+					fmd_case_add_suspect(hdl,
+					    dimm->dimm_case.cc_cp, flt);
+					fmd_case_solve(hdl,
+					    dimm->dimm_case.cc_cp);
+					return;
+				}
+			}
+		}
+	}
+}
+
 /*ARGSUSED*/
 cmd_evdisp_t
 cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
     const char *class, uint64_t afar, uint8_t afar_status, uint16_t synd,
     uint8_t synd_status, ce_dispact_t type, uint64_t disp, nvlist_t *asru)
 {
-	cmd_dimm_t *dimm;
+	cmd_dimm_t *dimm, *d;
 	cmd_page_t *page;
 	const char *uuid;
 
@@ -180,8 +387,9 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	    synd_status != AFLT_STAT_VALID)
 		return (CMD_EVD_UNUSED);
 
-	if ((page = cmd_page_lookup(afar)) != NULL && page->page_case != NULL &&
-	    fmd_case_solved(hdl, page->page_case))
+	if ((page = cmd_page_lookup(afar)) != NULL &&
+	    page->page_case.cc_cp != NULL &&
+	    fmd_case_solved(hdl, page->page_case.cc_cp))
 		return (CMD_EVD_REDUND);
 
 #ifdef sun4u
@@ -200,13 +408,72 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	    (dimm = cmd_dimm_create(hdl, asru)) == NULL)
 		return (CMD_EVD_UNUSED);
 
+	if (dimm->dimm_case.cc_cp == NULL) {
+		dimm->dimm_case.cc_cp = cmd_case_create(hdl,
+		    &dimm->dimm_header, CMD_PTR_DIMM_CASE, &uuid);
+	}
+
+	/*
+	 * Add to MQSC correlation lists all CEs which pass validity
+	 * checks above.
+	 */
+	{
+		uint64_t *now;
+		uint_t nelem;
+		if (nvlist_lookup_uint64_array(nvl,
+		    "__tod", &now, &nelem) == 0) {
+
+			mq_add(hdl, dimm, ep, afar, synd, *now);
+			mq_prune(hdl, dimm, *now);
+			mq_check(hdl, dimm);
+		}
+	}
+
 	switch (type) {
 	case CE_DISP_UNKNOWN:
 		CMD_STAT_BUMP(ce_unknown);
-		return (CMD_EVD_UNUSED);
+		break;
 	case CE_DISP_INTERMITTENT:
 		CMD_STAT_BUMP(ce_interm);
-		return (CMD_EVD_UNUSED);
+		fmd_hdl_debug(hdl,
+		    "adding intermittent event to CE serd engine\n");
+
+		if (dimm->dimm_case.cc_serdnm == NULL) {
+			dimm->dimm_case.cc_serdnm = cmd_mem_serdnm_create(hdl,
+			    "dimm", dimm->dimm_unum);
+
+			fmd_serd_create(hdl, dimm->dimm_case.cc_serdnm,
+			    fmd_prop_get_int32(hdl, "int_ce_n"),
+			    fmd_prop_get_int64(hdl, "int_ce_t"));
+		}
+
+		/*
+		 * At most one such SERD engine for intermittent events is
+		 * allowed at any time.  Destroy SERD engines on other DIMMs.
+		 */
+
+		for (d = cmd_list_next(&cmd.cmd_dimms); d != NULL;
+		    d = cmd_list_next(d)) {
+			if (d == dimm) continue; /* skip current dimm */
+			else if (d->dimm_case.cc_serdnm != NULL) {
+				fmd_serd_destroy(hdl, d->dimm_case.cc_serdnm);
+				d->dimm_case.cc_serdnm = NULL;
+			}
+		}
+
+		if (fmd_serd_record(hdl, dimm->dimm_case.cc_serdnm, ep) ==
+		    FMD_B_FALSE)
+			return (CMD_EVD_OK); /* engine hasn't fired */
+
+		fmd_hdl_debug(hdl, "ce int serd fired\n");
+		fmd_case_add_serd(hdl, dimm->dimm_case.cc_cp,
+		    dimm->dimm_case.cc_serdnm);
+		fmd_case_add_suspect(hdl, dimm->dimm_case.cc_cp,
+		    cmd_dimm_create_fault(hdl, dimm, "fault.memory.dimm", 100));
+		fmd_case_solve(hdl, dimm->dimm_case.cc_cp);
+		dimm->dimm_flags |= CMD_MEM_F_FAULTING;
+		fmd_serd_reset(hdl, dimm->dimm_case.cc_serdnm);
+		return (CMD_EVD_OK);
 	case CE_DISP_POSS_PERS:
 		CMD_STAT_BUMP(ce_ppersis);
 		break;
@@ -246,9 +513,12 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		return (CMD_EVD_BAD);
 	}
 
-	if (dimm->dimm_case.cc_cp == NULL) {
-		dimm->dimm_case.cc_cp = cmd_case_create(hdl,
-		    &dimm->dimm_header, CMD_PTR_DIMM_CASE, &uuid);
+	if (page == NULL)
+		page = cmd_page_create(hdl, asru, afar);
+
+	if (page->page_case.cc_cp == NULL) {
+		page->page_case.cc_cp = cmd_case_create(hdl,
+		    &page->page_header, CMD_PTR_PAGE_CASE, &uuid);
 	}
 
 	switch (type) {
@@ -257,28 +527,28 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		fmd_hdl_debug(hdl, "adding %sPersistent event to CE serd "
 		    "engine\n", type == CE_DISP_POSS_PERS ? "Possible-" : "");
 
-		if (dimm->dimm_case.cc_serdnm == NULL) {
-			dimm->dimm_case.cc_serdnm = cmd_mem_serdnm_create(hdl,
-			    "dimm", dimm->dimm_unum);
+		if (page->page_case.cc_serdnm == NULL) {
+			page->page_case.cc_serdnm = cmd_page_serdnm_create(hdl,
+			    "page", page->page_physbase);
 
-			fmd_serd_create(hdl, dimm->dimm_case.cc_serdnm,
+			fmd_serd_create(hdl, page->page_case.cc_serdnm,
 			    fmd_prop_get_int32(hdl, "ce_n"),
 			    fmd_prop_get_int64(hdl, "ce_t"));
 		}
 
-		if (fmd_serd_record(hdl, dimm->dimm_case.cc_serdnm, ep) ==
+		if (fmd_serd_record(hdl, page->page_case.cc_serdnm, ep) ==
 		    FMD_B_FALSE)
 				return (CMD_EVD_OK); /* engine hasn't fired */
 
-		fmd_hdl_debug(hdl, "ce serd fired\n");
-		fmd_case_add_serd(hdl, dimm->dimm_case.cc_cp,
-		    dimm->dimm_case.cc_serdnm);
-		fmd_serd_reset(hdl, dimm->dimm_case.cc_serdnm);
+		fmd_hdl_debug(hdl, "ce page serd fired\n");
+		fmd_case_add_serd(hdl, page->page_case.cc_cp,
+		    page->page_case.cc_serdnm);
+		fmd_serd_reset(hdl, page->page_case.cc_serdnm);
 		break;	/* to retire */
 
 	case CE_DISP_LEAKY:
 	case CE_DISP_STICKY:
-		fmd_case_add_ereport(hdl, dimm->dimm_case.cc_cp, ep);
+		fmd_case_add_ereport(hdl, page->page_case.cc_cp, ep);
 		break;	/* to retire */
 	}
 
@@ -309,9 +579,70 @@ cmd_bank_fault(fmd_hdl_t *hdl, cmd_bank_t *bank)
 	bank->bank_flags |= CMD_MEM_F_FAULTING;
 	cmd_bank_dirty(hdl, bank);
 
+#ifdef	sun4u
 	flt = cmd_bank_create_fault(hdl, bank, "fault.memory.bank",
 	    CMD_FLTMAXCONF);
 	fmd_case_add_suspect(hdl, cp, flt);
+#else /* sun4v */
+	{
+		/*
+		 * Break up the bank's unum into separate unums for each dimm.
+		 * Create an asru from each unum.
+		 */
+
+		cmd_bank_memb_t *d;
+		char dimm_unum_string[MAXPATHLEN];
+		const char *q, *r;
+		nvlist_t *fmri;
+		size_t baselen;
+
+		q = strchr(bank->bank_unum, ' ');
+		baselen = q - bank->bank_unum + 1;
+		(void) strncpy(dimm_unum_string, bank->bank_unum, baselen);
+
+		/*
+		 * This method of breaking apart the bank unum works for
+		 * sun4v bank unums, until such time as a dimm enumerator
+		 * is written for libtopo.
+		 */
+
+		while (*q == ' ') {
+			r = strchr(q+1, ' ');
+			if (r == NULL)
+			    r = bank->bank_unum +
+			    strlen(bank->bank_unum) + 1; /* null@end */
+			(void) strncpy(dimm_unum_string+baselen,
+			    q+1, r-q-1);
+			dimm_unum_string[baselen+(r-q-1)] = 0;
+			fmri = cmd_mem_fmri_create(dimm_unum_string);
+			if (fmd_nvl_fmri_expand(hdl, fmri) < 0) {
+				nvlist_free(fmri);
+				fmd_hdl_abort(hdl,
+				    "failed to expand dimm FMRI from "
+				    "previously validated bank\n");
+			}
+
+			/*
+			 * If dimm structure doesn't already exist for
+			 * each dimm, create and link to bank.
+			 */
+
+			if (cmd_dimm_lookup(hdl, fmri) == NULL)
+			    (void) cmd_dimm_create(hdl, fmri);
+			nvlist_free(fmri);
+			q = r;
+		}
+
+		/* create separate fault for each dimm in bank */
+
+		for (d = cmd_list_next(&bank->bank_dimms);
+		    d != NULL; d = cmd_list_next(d)) {
+			flt = cmd_dimm_create_fault(hdl, d->bm_dimm,
+			    "fault.memory.bank", CMD_FLTMAXCONF);
+			fmd_case_add_suspect(hdl, cp, flt);
+		}
+	}
+#endif /* sun4u */
 	fmd_case_solve(hdl, cp);
 }
 
@@ -369,8 +700,9 @@ cmd_ue_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	if (afar_status != AFLT_STAT_VALID)
 		return (CMD_EVD_UNUSED);
 
-	if ((page = cmd_page_lookup(afar)) != NULL && page->page_case != NULL &&
-	    fmd_case_solved(hdl, page->page_case))
+	if ((page = cmd_page_lookup(afar)) != NULL &&
+	    page->page_case.cc_cp != NULL &&
+	    fmd_case_solved(hdl, page->page_case.cc_cp))
 		return (CMD_EVD_REDUND);
 
 	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {

@@ -74,6 +74,7 @@ nxge_status_t nxge_ipp_init(p_nxge_t);
 nxge_status_t nxge_ipp_disable(p_nxge_t);
 nxge_status_t nxge_ipp_handle_sys_errors(p_nxge_t);
 nxge_status_t nxge_ipp_fatal_err_recover(p_nxge_t);
+nxge_status_t nxge_ipp_eccue_valid_check(p_nxge_t, boolean_t *);
 void nxge_ipp_inject_err(p_nxge_t, uint32_t);
 
 #ifdef	__cplusplus

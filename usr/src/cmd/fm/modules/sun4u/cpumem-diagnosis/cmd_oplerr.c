@@ -93,8 +93,8 @@ opl_ue_mem(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	}
 
 	if ((page = cmd_page_lookup(pa)) != NULL &&
-	    page->page_case != NULL &&
-	    fmd_case_solved(hdl, page->page_case))
+	    page->page_case.cc_cp != NULL &&
+	    fmd_case_solved(hdl, page->page_case.cc_cp))
 		return (CMD_EVD_REDUND);
 
 	if (nvlist_dup(rsrc, &asru, 0) != 0) {
@@ -333,7 +333,8 @@ cmd_opl_mac_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		return (CMD_EVD_BAD);
 
 	if ((page = cmd_page_lookup(pa)) != NULL &&
-	    page->page_case != NULL && fmd_case_solved(hdl, page->page_case))
+	    page->page_case.cc_cp != NULL &&
+	    fmd_case_solved(hdl, page->page_case.cc_cp))
 		return (CMD_EVD_REDUND);
 
 	if (nvlist_dup(rsrc, &asru, 0) != 0) {

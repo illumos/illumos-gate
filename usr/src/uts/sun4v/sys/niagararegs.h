@@ -143,21 +143,39 @@ extern uint64_t hv_niagara_mmustat_info(uint64_t *buf);
 /*
  * Bits defined in L2 Error Status Register
  *
+ *	(Niagara 1)
  * +---+---+---+---+----+----+----+----+----+----+----+----+----+----+
  * |MEU|MEC|RW |RSV|MODA|VCID|LDAC|LDAU|LDWC|LDWU|LDRC|LDRU|LDSC|LDSU|
  * +---+---+---+---+----+----+----+----+----+----+----+----+----+----+
  *  63  62  61  60   59 58-54  53   52   51   50   49   48   47   46
  *
+ *	(Niagara 2)
+ * +---+---+---+----+--------+----+----+----+----+----+----+----+----+
+ * |MEU|MEC|RW |MODA|  VCID  |LDAC|LDAU|LDWC|LDWU|LDRC|LDRU|LDSC|LDSU|
+ * +---+---+---+----+--------+----+----+----+----+----+----+----+----+
+ *  63  62  61  60     59-54   53   52   51   50   49   48   47   46
+ *
+ *      (Niagara 1)
  * +---+---+---+---+---+---+---+---+---+---+---+-------+------+
  * |LTC|LRU|LVU|DAC|DAU|DRC|DRU|DSC|DSU|VEC|VEU| RSVD1 | SYND |
  * +---+---+---+---+---+---+---+---+---+---+---+-------+------+
  *  45  44  43  42  41  40  39  38  37  36  35   34-32   31-0
+ *
+ *      (Niagara 2)
+ * +---+---+---+---+---+---+---+---+---+---+---+---+----+-----+
+ * |LTC|LRU|LVU|DAC|DAU|DRC|DRU|DSC|DSU|VEC|VEU|LVC|RSVD| SYND|
+ * +---+---+---+---+---+---+---+---+---+---+---+---+----+-----+
+ *  45  44  43  42  41  40  39  38  37  36  35  34  33-28 27-0
+ *
+ * Note that relative to error status bits, Niagara-1 is a strict subset of
+ * Niagara-2.
  */
+
 #define	NI_L2AFSR_MEU 	0x8000000000000000ULL
 #define	NI_L2AFSR_MEC	0x4000000000000000ULL
 #define	NI_L2AFSR_RW 	0x2000000000000000ULL
-#define	NI_L2AFSR_RSVD0	0x1000000000000000ULL
-#define	NI_L2AFSR_MODA	0x0800000000000000ULL
+#define	NI2_L2AFSR_MODA	0x1000000000000000ULL
+#define	NI1_L2AFSR_MODA	0x0800000000000000ULL
 #define	NI_L2AFSR_VCID	0x07C0000000000000ULL
 #define	NI_L2AFSR_LDAC	0x0020000000000000ULL
 #define	NI_L2AFSR_LDAU	0x0010000000000000ULL
@@ -178,8 +196,9 @@ extern uint64_t hv_niagara_mmustat_info(uint64_t *buf);
 #define	NI_L2AFSR_DSU	0x0000002000000000ULL
 #define	NI_L2AFSR_VEC	0x0000001000000000ULL
 #define	NI_L2AFSR_VEU	0x0000000800000000ULL
-#define	NI_L2AFSR_RSVD1	0x0000000700000000ULL
-#define	NI_L2AFSR_SYND	0x00000000FFFFFFFFULL
+#define	NI_L2AFSR_LVC	0x0000000400000000ULL
+#define	NI1_L2AFSR_SYND	0x00000000FFFFFFFFULL
+#define	NI2_L2AFSR_SYND	0x000000000FFFFFFFULL
 
 /*
  * These L2 bit masks are used to determine if another bit of higher priority
@@ -193,19 +212,21 @@ extern uint64_t hv_niagara_mmustat_info(uint64_t *buf);
 #define	NI_L2AFSR_P04	(NI_L2AFSR_P03 | NI_L2AFSR_LDWU)
 #define	NI_L2AFSR_P05	(NI_L2AFSR_P04 | NI_L2AFSR_LDRU)
 #define	NI_L2AFSR_P06	(NI_L2AFSR_P05 | NI_L2AFSR_DAU | NI_L2AFSR_DRU)
-#define	NI_L2AFSR_P07	(NI_L2AFSR_P06 | NI_L2AFSR_LTC)
-#define	NI_L2AFSR_P08	(NI_L2AFSR_P07 | NI_L2AFSR_LDAC | NI_L2AFSR_LDSC)
-#define	NI_L2AFSR_P09	(NI_L2AFSR_P08 | NI_L2AFSR_LDWC)
-#define	NI_L2AFSR_P10	(NI_L2AFSR_P09 | NI_L2AFSR_LDRC)
-#define	NI_L2AFSR_P11	(NI_L2AFSR_P10 | NI_L2AFSR_DAC | NI_L2AFSR_DRC)
+#define	NI_L2AFSR_P07   (NI_L2AFSR_P06 | NI_L2AFSR_LVC)
+#define	NI_L2AFSR_P08	(NI_L2AFSR_P07 | NI_L2AFSR_LTC)
+#define	NI_L2AFSR_P09	(NI_L2AFSR_P08 | NI_L2AFSR_LDAC | NI_L2AFSR_LDSC)
+#define	NI_L2AFSR_P10	(NI_L2AFSR_P09 | NI_L2AFSR_LDWC)
+#define	NI_L2AFSR_P11	(NI_L2AFSR_P10 | NI_L2AFSR_LDRC)
+#define	NI_L2AFSR_P12	(NI_L2AFSR_P11 | NI_L2AFSR_DAC | NI_L2AFSR_DRC)
 
 /*
- * Bits defined in DRAM Error Status Register
+ * Bits defined in DRAM Error Status Register (Niagara-2)
+ * Niagara-1 is strict subset
  *
- * +---+---+---+---+---+---+---+----------+------+
- * |MEU|MEC|DAC|DAU|DSC|DSU|DBU| RESERVED | SYND |
- * +---+---+---+---+---+---+---+----------+------+
- *  63  62  61  60  59  58  57    56-16     15-0
+ * +---+---+---+---+---+---+---+---+---+---+----------+------+
+ * |MEU|MEC|DAC|DAU|DSC|DSU|DBU|MEB|FBU|FBR| RESERVED | SYND |
+ * +---+---+---+---+---+---+---+---+---+---+----------+------+
+ *  63  62  61  60  59  58  57  56  55  54    53-16     15-0
  *
  */
 #define	NI_DMAFSR_MEU 	0x8000000000000000ULL
@@ -215,11 +236,13 @@ extern uint64_t hv_niagara_mmustat_info(uint64_t *buf);
 #define	NI_DMAFSR_DSC	0x0800000000000000ULL
 #define	NI_DMAFSR_DSU	0x0400000000000000ULL
 #define	NI_DMAFSR_DBU	0x0200000000000000ULL
-#define	NI_DMAFSR_RSVD	0x01FFFFFFFFFF0000ULL
+#define	NI_DMAFSR_MEB	0x0100000000000000ULL
+#define	NI_DMAFSR_FBU	0x0080000000000000ULL
+#define	NI_DMAFSR_FBR	0x0040000000000000ULL
 #define	NI_DMAFSR_SYND	0x000000000000FFFFULL
 
 /* Bit mask for DRAM priority determination */
-#define	NI_DMAFSR_P01	(NI_DMAFSR_DSU | NI_DMAFSR_DAU)
+#define	NI_DMAFSR_P01	(NI_DMAFSR_DSU | NI_DMAFSR_DAU | NI_DMAFSR_FBU)
 
 /*
  * The following is the syndrome value placed in memory

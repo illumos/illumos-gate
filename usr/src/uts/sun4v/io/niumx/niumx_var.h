@@ -79,6 +79,8 @@ typedef struct niumx_devstate {
 	dev_info_t *dip;
 	devhandle_t	niumx_dev_hdl;	/* device handle */
 	kmutex_t niumx_mutex;
+	int niumx_fm_cap;
+	ddi_iblock_cookie_t niumx_fm_ibc;
 } niumx_devstate_t;
 
 #define	NIUMX_FUNC_NUM_MASK	1

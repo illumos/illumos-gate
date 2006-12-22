@@ -318,10 +318,12 @@ typedef	enum {
 	XMAC_STAT_TX_PAUSE_STATE,
 	XMAC_STAT_TX_NOPAUSE_STATE,
 	XMAC_STAT_XPCS_DESKEW_ERR_CNT,
+#ifdef	NXGE_DEBUG_SYMBOL_ERR
 	XMAC_STAT_XPCS_SYMBOL_L0_ERR_CNT,
 	XMAC_STAT_XPCS_SYMBOL_L1_ERR_CNT,
 	XMAC_STAT_XPCS_SYMBOL_L2_ERR_CNT,
 	XMAC_STAT_XPCS_SYMBOL_L3_ERR_CNT,
+#endif
 	XMAC_STAT_END
 } nxge_xmac_stat_index_t;
 
@@ -363,6 +365,7 @@ nxge_kstat_index_t nxge_xmac_stats[] = {
 	{XMAC_STAT_TX_NOPAUSE_STATE, KSTAT_DATA_ULONG,	"txmac_nopause_state"},
 	{XMAC_STAT_XPCS_DESKEW_ERR_CNT,
 				KSTAT_DATA_ULONG,	"xpcs_deskew_err_cnt"},
+#ifdef	NXGE_DEBUG_SYMBOL_ERR
 	{XMAC_STAT_XPCS_SYMBOL_L0_ERR_CNT,
 				KSTAT_DATA_ULONG, "xpcs_ln0_symbol_err_cnt"},
 	{XMAC_STAT_XPCS_SYMBOL_L1_ERR_CNT,
@@ -371,6 +374,7 @@ nxge_kstat_index_t nxge_xmac_stats[] = {
 				KSTAT_DATA_ULONG, "xpcs_ln2_symbol_err_cnt"},
 	{XMAC_STAT_XPCS_SYMBOL_L3_ERR_CNT,
 				KSTAT_DATA_ULONG, "xpcs_ln3_symbol_err_cnt"},
+#endif
 	{XMAC_STAT_END,		NULL,			NULL}
 };
 
@@ -857,6 +861,7 @@ nxge_xmac_stat_update(kstat_t *ksp, int rw)
 				xmac_kstatsp->rx_remote_fault_err_cnt.value.ul;
 		statsp->xpcs_deskew_err_cnt =
 				xmac_kstatsp->xpcs_deskew_err_cnt.value.ul;
+#ifdef	NXGE_DEBUG_SYMBOL_ERR
 		statsp->xpcs_ln0_symbol_err_cnt =
 				xmac_kstatsp->xpcs_ln0_symbol_err_cnt.value.ul;
 		statsp->xpcs_ln1_symbol_err_cnt =
@@ -865,6 +870,7 @@ nxge_xmac_stat_update(kstat_t *ksp, int rw)
 				xmac_kstatsp->xpcs_ln2_symbol_err_cnt.value.ul;
 		statsp->xpcs_ln3_symbol_err_cnt =
 				xmac_kstatsp->xpcs_ln3_symbol_err_cnt.value.ul;
+#endif
 	} else {
 		xmac_kstatsp->tx_frame_cnt.value.ul = statsp->tx_frame_cnt;
 		xmac_kstatsp->tx_underflow_err.value.ul =
@@ -903,6 +909,7 @@ nxge_xmac_stat_update(kstat_t *ksp, int rw)
 				statsp->rx_remotefault_err;
 		xmac_kstatsp->xpcs_deskew_err_cnt.value.ul =
 				statsp->xpcs_deskew_err_cnt;
+#ifdef	NXGE_DEBUG_SYMBOL_ERR
 		xmac_kstatsp->xpcs_ln0_symbol_err_cnt.value.ul =
 				statsp->xpcs_ln0_symbol_err_cnt;
 		xmac_kstatsp->xpcs_ln1_symbol_err_cnt.value.ul =
@@ -911,6 +918,7 @@ nxge_xmac_stat_update(kstat_t *ksp, int rw)
 				statsp->xpcs_ln2_symbol_err_cnt;
 		xmac_kstatsp->xpcs_ln3_symbol_err_cnt.value.ul =
 				statsp->xpcs_ln3_symbol_err_cnt;
+#endif
 	}
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, "<== nxge_xmac_stat_update"));
 	return (0);
@@ -1670,6 +1678,7 @@ nxge_xmac_init_kstats(struct kstat *ksp)
 
 	kstat_named_init(&nxgekp->xpcs_deskew_err_cnt,	"xpcs_deskew_err_cnt",
 			KSTAT_DATA_ULONG);
+#ifdef	NXGE_DEBUG_SYMBOL_ERR
 	kstat_named_init(&nxgekp->xpcs_ln0_symbol_err_cnt,
 						"xpcs_ln0_symbol_err_cnt",
 			KSTAT_DATA_ULONG);
@@ -1682,6 +1691,7 @@ nxge_xmac_init_kstats(struct kstat *ksp)
 	kstat_named_init(&nxgekp->xpcs_ln3_symbol_err_cnt,
 						"xpcs_ln3_symbol_err_cnt",
 			KSTAT_DATA_ULONG);
+#endif
 }
 
 void
@@ -2325,7 +2335,6 @@ void
 nxge_save_cntrs(p_nxge_t nxgep)
 {
 	p_nxge_stats_t 		statsp;
-	ddi_devstate_t 		dev_stat;
 	uint64_t		val;
 	npi_handle_t		handle;
 	uint8_t			portn;
@@ -2334,11 +2343,6 @@ nxge_save_cntrs(p_nxge_t nxgep)
 	uint32_t		cnt32;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_save_cntrs"));
-
-	dev_stat = FM_GET_DEVSTATE(nxgep);
-	if (dev_stat < DDI_DEVSTATE_DEGRADED) {
-		goto nxge_save_cntrs_exit;
-	}
 
 	statsp = (p_nxge_stats_t)nxgep->statsp;
 	handle = nxgep->npi_handle;
@@ -2404,6 +2408,7 @@ nxge_save_cntrs(p_nxge_t nxgep)
 					XPCS_REG_DESCWERR_COUNTER, &cnt32);
 		statsp->xmac_stats.xpcs_deskew_err_cnt +=
 					(val & XMAC_XPCS_DESKEW_ERR_CNT_MASK);
+#ifdef	NXGE_DEBUG_SYMBOL_ERR
 		(void) npi_xmac_xpcs_read(handle, portn,
 				XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &cnt32);
 		statsp->xmac_stats.xpcs_ln0_symbol_err_cnt +=
@@ -2418,6 +2423,7 @@ nxge_save_cntrs(p_nxge_t nxgep)
 		statsp->xmac_stats.xpcs_ln3_symbol_err_cnt +=
 				((cnt32 & XMAC_XPCS_SYM_ERR_CNT_L3_MASK) >>
 					XMAC_XPCS_SYM_ERR_CNT_L3_SHIFT);
+#endif
 	} else if (nxgep->mac.porttype == PORT_TYPE_BMAC) {
 		/*
 		 * Transmit MAC statistics.

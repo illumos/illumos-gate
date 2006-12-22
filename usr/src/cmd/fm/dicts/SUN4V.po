@@ -233,3 +233,371 @@ msgid "SUN4V-8000-E2.impact"
 msgstr "Total system memory capacity will be reduced as pages are retired."
 msgid "SUN4V-8000-E2.action"
 msgstr "Schedule a repair procedure to replace the affected memory module. Use fmdump -v -u <EVENT_ID> to identify the module."
+#
+# code: SUN4V-8000-FJ
+# keys: fault.memory.link-c
+#
+msgid "SUN4V-8000-FJ.type"
+msgstr "Fault"
+msgid "SUN4V-8000-FJ.severity"
+msgstr "Major"
+msgid "SUN4V-8000-FJ.description"
+msgstr "A problem was detected in the interconnect between a memory DIMM module and\nits memory controller. \n  Refer to %s for more information."
+msgid "SUN4V-8000-FJ.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8000-FJ.impact"
+msgstr "System performance may be impacted.\n"
+msgid "SUN4V-8000-FJ.action"
+msgstr "At convenient time, try reseating the memory module(s).  If problem persists,\ncontact Sun to schedule part replacement.\n"
+#
+# code: SUN4V-8000-GE
+# keys: fault.cpu.ultraSPARC-T2.ireg
+#
+msgid "SUN4V-8000-GE.type"
+msgstr "Fault"
+msgid "SUN4V-8000-GE.severity"
+msgstr "Minor"
+msgid "SUN4V-8000-GE.description"
+msgstr "The number of integer register errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-GE.response"
+msgstr "The fault manager will attempt to remove the affected thread\nfrom service.\n"
+msgid "SUN4V-8000-GE.impact"
+msgstr "System performance may be affected. \n"
+msgid "SUN4V-8000-GE.action"
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-HP
+# keys: fault.cpu.ultraSPARC-T2.freg
+#
+msgid "SUN4V-8000-HP.type"
+msgstr "Fault"
+msgid "SUN4V-8000-HP.severity"
+msgstr "Minor"
+msgid "SUN4V-8000-HP.description"
+msgstr "The number of floating register errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-HP.response"
+msgstr "The fault manager will attempt to remove the affected thread\nfrom service.\n"
+msgid "SUN4V-8000-HP.impact"
+msgstr "System performance may be affected. \n"
+msgid "SUN4V-8000-HP.action"
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-JA
+# keys: fault.cpu.ultraSPARC-T2.misc_reg
+#
+msgid "SUN4V-8000-JA.type"
+msgstr "Fault"
+msgid "SUN4V-8000-JA.severity"
+msgstr "Minor"
+msgid "SUN4V-8000-JA.description"
+msgstr "The number of ancillary register errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-JA.response"
+msgstr "The fault manager will attempt to remove the affected thread\nfrom service.\n"
+msgid "SUN4V-8000-JA.impact"
+msgstr "System performance may be affected. \n"
+msgid "SUN4V-8000-JA.action"
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-KS
+# keys: fault.cpu.ultraSPARC-T2.itlb
+#
+msgid "SUN4V-8000-KS.type"
+msgstr "Fault"
+msgid "SUN4V-8000-KS.severity"
+msgstr "Major"
+msgid "SUN4V-8000-KS.description"
+msgstr "The number of ITLB errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-KS.response"
+msgstr "The fault manager will attempt to remove all threads associated with\nthis resource from service.\n"
+msgid "SUN4V-8000-KS.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8000-KS.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-L5
+# keys: fault.cpu.ultraSPARC-T2.dtlb
+#
+msgid "SUN4V-8000-L5.type"
+msgstr "Fault"
+msgid "SUN4V-8000-L5.severity"
+msgstr "Major"
+msgid "SUN4V-8000-L5.description"
+msgstr "The number of DTLB errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-L5.response"
+msgstr "The fault manager will attempt to remove all threads associated with\nthis resource from service.\n"
+msgid "SUN4V-8000-L5.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8000-L5.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-MY
+# keys: fault.cpu.ultraSPARC-T2.icache
+#
+msgid "SUN4V-8000-MY.type"
+msgstr "Fault"
+msgid "SUN4V-8000-MY.severity"
+msgstr "Major"
+msgid "SUN4V-8000-MY.description"
+msgstr "The number of I-cache errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-MY.response"
+msgstr "The fault manager will attempt to remove all threads associated with\nthis resource from service.\n"
+msgid "SUN4V-8000-MY.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8000-MY.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-N3
+# keys: fault.cpu.ultraSPARC-T2.dcache
+#
+msgid "SUN4V-8000-N3.type"
+msgstr "Fault"
+msgid "SUN4V-8000-N3.severity"
+msgstr "Major"
+msgid "SUN4V-8000-N3.description"
+msgstr "The number of D-cache errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-N3.response"
+msgstr "The fault manager will attempt to remove all threads associated with\nthis resource from service.\n"
+msgid "SUN4V-8000-N3.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8000-N3.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-PH
+# keys: fault.cpu.ultraSPARC-T2.mau
+#
+msgid "SUN4V-8000-PH.type"
+msgstr "Fault"
+msgid "SUN4V-8000-PH.severity"
+msgstr "Major"
+msgid "SUN4V-8000-PH.description"
+msgstr "The number of modular arithmetic unit errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-PH.response"
+msgstr "The fault manager will attempt to remove all threads associated with\nthis resource from service.\n"
+msgid "SUN4V-8000-PH.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8000-PH.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-QD
+# keys: fault.cpu.ultraSPARC-T2.l2data-c
+#
+msgid "SUN4V-8000-QD.type"
+msgstr "Fault"
+msgid "SUN4V-8000-QD.severity"
+msgstr "Critical"
+msgid "SUN4V-8000-QD.description"
+msgstr "The number of level 2 cache correctable data errors has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-QD.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8000-QD.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8000-QD.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-R4
+# keys: fault.cpu.ultraSPARC-T2.l2cachetag
+#
+msgid "SUN4V-8000-R4.type"
+msgstr "Fault"
+msgid "SUN4V-8000-R4.severity"
+msgstr "Critical"
+msgid "SUN4V-8000-R4.description"
+msgstr "The number of level 2 cache tag errors has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-R4.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8000-R4.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8000-R4.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-SR
+# keys: fault.cpu.ultraSPARC-T2.l2cachectl
+#
+msgid "SUN4V-8000-SR.type"
+msgstr "Fault"
+msgid "SUN4V-8000-SR.severity"
+msgstr "Critical"
+msgid "SUN4V-8000-SR.description"
+msgstr "The number of level 2 cache control errors has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-SR.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8000-SR.impact"
+msgstr "System performance is likely to be affected. System may be unstable.\n"
+msgid "SUN4V-8000-SR.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-TC
+# keys: fault.memory.link-u
+#
+msgid "SUN4V-8000-TC.type"
+msgstr "Fault"
+msgid "SUN4V-8000-TC.severity"
+msgstr "Critical"
+msgid "SUN4V-8000-TC.description"
+msgstr "A problem was detected in the interconnect between a memory DIMM module and\nits memory controller. \n  Refer to %s for more information."
+msgid "SUN4V-8000-TC.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8000-TC.impact"
+msgstr "System performance may be impacted.\n"
+msgid "SUN4V-8000-TC.action"
+msgstr "At convenient time, try reseating the memory module.  If problem persists,\ncontact Sun to schedule part replacement.\n"
+#
+# code: SUN4V-8000-UQ
+# keys: fault.cpu.ultraSPARC-T2.l2data-u
+#
+msgid "SUN4V-8000-UQ.type"
+msgstr "Fault"
+msgid "SUN4V-8000-UQ.severity"
+msgstr "Critical"
+msgid "SUN4V-8000-UQ.description"
+msgstr "The number of level 2 cache uncorrectable data errors has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-UQ.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8000-UQ.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8000-UQ.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-VE
+# keys: fault.cpu.ultraSPARC-T1.l2data-c
+#
+msgid "SUN4V-8000-VE.type"
+msgstr "Fault"
+msgid "SUN4V-8000-VE.severity"
+msgstr "Critical"
+msgid "SUN4V-8000-VE.description"
+msgstr "The number of level 2 cache correctable data errors has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-VE.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8000-VE.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8000-VE.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-WJ
+# keys: fault.cpu.ultraSPARC-T1.l2data-u
+#
+msgid "SUN4V-8000-WJ.type"
+msgstr "Fault"
+msgid "SUN4V-8000-WJ.severity"
+msgstr "Critical"
+msgid "SUN4V-8000-WJ.description"
+msgstr "The number of level 2 cache uncorrectable data errors has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8000-WJ.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8000-WJ.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8000-WJ.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8000-X2
+# keys: fault.memory.datapath
+#
+msgid "SUN4V-8000-X2.type"
+msgstr "Fault"
+msgid "SUN4V-8000-X2.severity"
+msgstr "Major"
+msgid "SUN4V-8000-X2.description"
+msgstr "Errors have been detected on multiple memory modules, suggesting that a problem exists somewhere else in the system.\n  Refer to %s for more information."
+msgid "SUN4V-8000-X2.response"
+msgstr "Error reports from the affected components will be logged for examination by Sun.\n"
+msgid "SUN4V-8000-X2.impact"
+msgstr "System performance and stability may be affected. \n"
+msgid "SUN4V-8000-X2.action"
+msgstr "Contact your service provider for further diagnosis.\n"
+#
+# code: SUN4V-8000-YX
+# keys: fault.io.n2.ncu
+#
+msgid "SUN4V-8000-YX.type"
+msgstr "Fault"
+msgid "SUN4V-8000-YX.severity"
+msgstr "Critical"
+msgid "SUN4V-8000-YX.description"
+msgstr "A problem was detected in the NCU subsystem of the N2's SOC\n  Refer to %s for more information."
+msgid "SUN4V-8000-YX.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "SUN4V-8000-YX.impact"
+msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
+msgid "SUN4V-8000-YX.action"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+#
+# code: SUN4V-8001-02
+# keys: fault.io.n2.dmu
+#
+msgid "SUN4V-8001-02.type"
+msgstr "Fault"
+msgid "SUN4V-8001-02.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-02.description"
+msgstr "A problem was detected in the DMU subsystem of the N2's SOC\n  Refer to %s for more information."
+msgid "SUN4V-8001-02.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "SUN4V-8001-02.impact"
+msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
+msgid "SUN4V-8001-02.action"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+#
+# code: SUN4V-8001-1X
+# keys: fault.io.n2.niu
+#
+msgid "SUN4V-8001-1X.type"
+msgstr "Fault"
+msgid "SUN4V-8001-1X.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-1X.description"
+msgstr "A problem was detected in the NIU subsystem of the N2's SOC\n  Refer to %s for more information."
+msgid "SUN4V-8001-1X.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "SUN4V-8001-1X.impact"
+msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
+msgid "SUN4V-8001-1X.action"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+#
+# code: SUN4V-8001-2E
+# keys: fault.io.n2.siu
+#
+msgid "SUN4V-8001-2E.type"
+msgstr "Fault"
+msgid "SUN4V-8001-2E.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-2E.description"
+msgstr "A problem was detected in the SIU subsystem of the N2's SOC\n  Refer to %s for more information."
+msgid "SUN4V-8001-2E.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "SUN4V-8001-2E.impact"
+msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
+msgid "SUN4V-8001-2E.action"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+#
+# code: SUN4V-8001-3J
+# keys: fault.io.n2.soc
+#
+msgid "SUN4V-8001-3J.type"
+msgstr "Fault"
+msgid "SUN4V-8001-3J.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-3J.description"
+msgstr "A problem was detected in N2's SOC\n  Refer to %s for more information."
+msgid "SUN4V-8001-3J.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "SUN4V-8001-3J.impact"
+msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
+msgid "SUN4V-8001-3J.action"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+#
+# code: SUN4V-8001-4C
+# keys: fault.io.n2.crossbar
+#
+msgid "SUN4V-8001-4C.type"
+msgstr "Fault"
+msgid "SUN4V-8001-4C.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-4C.description"
+msgstr "A problem was detected in the crossbar of the N2's SOC\n  Refer to %s for more information."
+msgid "SUN4V-8001-4C.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "SUN4V-8001-4C.impact"
+msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
+msgid "SUN4V-8001-4C.action"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"

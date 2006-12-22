@@ -93,6 +93,57 @@ cmd_afar_valid(fmd_hdl_t *hdl, nvlist_t *nvl, cmd_errcl_t clcode,
 			return (0);
 		} else
 			return (-1);
+	} else
+		return (-1);
+}
+
+char *
+cmd_cpu_getfrustr_by_id(fmd_hdl_t *hdl, uint32_t cpuid)
+{
+	kstat_named_t *kn;
+	kstat_ctl_t *kc;
+	kstat_t *ksp;
+	int i;
+
+	if ((kc = kstat_open()) == NULL)
+		return (NULL); /* errno is set for us */
+
+	if ((ksp = kstat_lookup(kc, "cpu_info", cpuid, NULL)) == NULL ||
+	    kstat_read(kc, ksp, NULL) == -1) {
+		int oserr = errno;
+		(void) kstat_close(kc);
+		(void) cmd_set_errno(oserr);
+		return (NULL);
 	}
-	return (-1);
+
+	for (kn = ksp->ks_data, i = 0; i < ksp->ks_ndata; i++, kn++) {
+		if (strcmp(kn->name, "cpu_fru") == 0) {
+			char *str = fmd_hdl_strdup(hdl,
+			    KSTAT_NAMED_STR_PTR(kn), FMD_SLEEP);
+			(void) kstat_close(kc);
+			return (str);
+		}
+	}
+
+	(void) kstat_close(kc);
+	(void) cmd_set_errno(ENOENT);
+	return (NULL);
+}
+
+char *
+cmd_cpu_getfrustr(fmd_hdl_t *hdl, cmd_cpu_t *cp)
+{
+	return (cmd_cpu_getfrustr_by_id(hdl, cp->cpu_cpuid));
+}
+
+/*ARGSUSED*/
+char *
+cmd_cpu_getpartstr(fmd_hdl_t *hdl, cmd_cpu_t *cp) {
+	return (NULL);
+}
+
+/*ARGSUSED*/
+char *
+cmd_cpu_getserialstr(fmd_hdl_t *hdl, cmd_cpu_t *cp) {
+	return (NULL);
 }

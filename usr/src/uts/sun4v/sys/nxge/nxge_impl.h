@@ -91,7 +91,7 @@ extern "C" {
 #if	defined(_KERNEL)
 #include 	<sys/mac.h>
 #include	<sys/mac_impl.h>
-#include 	<sys/mac_ether.h>
+#include	<sys/mac_ether.h>
 #endif
 
 #if	defined(sun4v)
@@ -260,7 +260,7 @@ typedef enum  {
 #define	NXGE_RDC_RCR_THRESHOLD		8
 #define	NXGE_RDC_RCR_TIMEOUT		16
 
-#define	NXGE_RDC_RCR_THRESHOLD_MAX	256
+#define	NXGE_RDC_RCR_THRESHOLD_MAX	1024
 #define	NXGE_RDC_RCR_TIMEOUT_MAX	64
 #define	NXGE_RDC_RCR_THRESHOLD_MIN	1
 #define	NXGE_RDC_RCR_TIMEOUT_MIN	1
@@ -588,12 +588,16 @@ extern int secpolicy_net_config(const cred_t *, boolean_t);
 extern int drv_priv(cred_t *);
 extern void nxge_fm_report_error(p_nxge_t, uint8_t,
 			uint8_t, nxge_fm_ereport_id_t);
+extern int fm_check_acc_handle(ddi_acc_handle_t);
+extern int fm_check_dma_handle(ddi_dma_handle_t);
 
 #pragma weak    secpolicy_net_config
 
 /* nxge_classify.c */
 nxge_status_t nxge_classify_init(p_nxge_t);
+nxge_status_t nxge_classify_uninit(p_nxge_t);
 nxge_status_t nxge_set_hw_classify_config(p_nxge_t);
+nxge_status_t nxge_classify_exit_sw(p_nxge_t);
 
 /* nxge_fflp.c */
 void nxge_put_tcam(p_nxge_t, p_mblk_t);

@@ -36,6 +36,7 @@ extern "C" {
 /*
  * Allowable hardware component names for hc FMRIs
  */
+#define	BRANCH		"branch"
 #define	CMP		"CMP"
 #define	CENTERPLANE	"centerplane"
 #define	CHASSIS		"chassis"
@@ -50,6 +51,8 @@ extern "C" {
 #define	IOBOARD		"ioboard"
 #define	MEMORYCONTROL	"memory-controller"
 #define	MOTHERBOARD	"motherboard"
+#define	NIU		"niu"
+#define	NIUFN		"niufn"
 #define	PCI_BUS		"pcibus"
 #define	PCI_DEVICE	"pcidev"
 #define	PCI_FUNCTION    "pcifn"
@@ -62,6 +65,8 @@ extern "C" {
 #define	RANK		"rank"
 #define	SATA_PORT	"sata-port"
 #define	SYSTEMBOARD	"systemboard"
+#define	XAUI		"xaui"
+#define	XFP		"xfp"
 
 /*
  * Allowable hc node property group and property names

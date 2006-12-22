@@ -127,7 +127,8 @@ NIUMX_OBJS	+= niumx.o
 #
 MEMTEST_OBJS	+= memtest.o memtest_asm.o \
 			memtest_v.o memtest_v_asm.o \
-			memtest_ni.o memtest_ni_asm.o
+			memtest_ni.o memtest_ni_asm.o \
+			memtest_n2.o memtest_n2_asm.o
 
 #
 #			sun4v virtual devices

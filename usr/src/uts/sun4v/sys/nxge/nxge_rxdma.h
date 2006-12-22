@@ -271,6 +271,8 @@ typedef struct _rx_rcr_ring_t {
 	uint64_t		rcr_tail_pp;
 	uint64_t		rcr_head_pp;
 	struct _rx_rbr_ring_t	*rx_rbr_p;
+	uint32_t		intr_timeout;
+	uint32_t		intr_threshold;
 	uint64_t		max_receive_pkts;
 	p_mblk_t		rx_first_mp;
 	mac_resource_handle_t	rcr_mac_handle;

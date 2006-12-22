@@ -179,7 +179,7 @@ nxge_espc_phy_type_get(p_nxge_t nxgep)
 		break;
 	case ESC_PHY_NONE:
 		status = NXGE_ERROR;
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_espc_phy_type_get:"
+		NXGE_DEBUG_MSG((nxgep, CFG_CTL, "nxge_espc_phy_type_get:"
 				"No phy type set"));
 		break;
 	default:

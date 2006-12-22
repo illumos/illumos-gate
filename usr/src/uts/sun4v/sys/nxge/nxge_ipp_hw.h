@@ -237,8 +237,8 @@ typedef	union _ipp_ecc_ctrl {
 
 /* DFIFO RD/WR pointers mask */
 
-#define	IPP_XMAC_DFIFO_PTR_MASK			0xFFF
-#define	IPP_BMAC_DFIFO_PTR_MASK			0x7FF
+#define	IPP_XMAC_DFIFO_PTR_MASK			0x7FF
+#define	IPP_BMAC_DFIFO_PTR_MASK			0x3FF
 
 #define	IPP_ECC_CNT_MASK			0xFF
 #define	IPP_BAD_CS_CNT_MASK			0x3FFF

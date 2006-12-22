@@ -44,4 +44,6 @@ SUBDIRS = \
 
 libldom: libmdesc
 
+topo: $($(MACH)_SUBDIRS)
+
 include ./Makefile.subdirs

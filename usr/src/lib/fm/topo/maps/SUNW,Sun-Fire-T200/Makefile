@@ -31,7 +31,9 @@ DTDFILE =
 TOPOFILE = Sun-Fire-T200-hc-topology.xml	\
 	Sun-Fire-T1000-hc-topology.xml	\
 	SPARC-Enterprise-T1000-hc-topology.xml \
-	Sun-Blade-T6300-hc-topology.xml
+	Sun-Blade-T6300-hc-topology.xml \
+	SPARC-Enterprise-T5120-hc-topology.xml \
+	SPARC-Enterprise-T5220-hc-topology.xml
 
 SRCDIR = ../SUNW,Sun-Fire-T200
 

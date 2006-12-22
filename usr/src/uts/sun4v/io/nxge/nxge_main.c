@@ -29,6 +29,7 @@
  * SunOs MT STREAMS NIU/Neptune 10Gb Ethernet Device Driver.
  */
 #include	<sys/nxge/nxge_impl.h>
+#include	<sys/pcie.h>
 
 uint32_t 	nxge_use_partition = 0;		/* debug partition flag */
 uint32_t 	nxge_dma_obp_props_only = 1;	/* use obp published props */
@@ -470,7 +471,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	status = nxge_get_xcvr_type(nxgep);
 
 	if (status != NXGE_OK) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_attach: "
+		NXGE_DEBUG_MSG((nxgep, NXGE_DDI_CTL, "nxge_attach: "
 				    " Couldn't determine card type"
 				    " .... exit "));
 		goto nxge_attach_fail;
@@ -754,6 +755,10 @@ nxge_map_regs(p_nxge_t nxgep)
 #endif
 	off_t		regsize;
 	nxge_status_t	status = NXGE_OK;
+#if !defined(_BIG_ENDIAN)
+	off_t pci_offset;
+	uint16_t pcie_devctl;
+#endif
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_map_regs"));
 	nxgep->dev_regs = NULL;
@@ -831,9 +836,15 @@ nxge_map_regs(p_nxge_t nxgep)
 			 * resulting, in DMA not synched properly
 			 */
 #if !defined(_BIG_ENDIAN)
-		/* workarounds */
-		pci_config_put16(dev_regs->nxge_pciregh, 0x88, 0x80f);
+		/* workarounds for x86 systems */
+		pci_offset = 0x80 + PCIE_DEVCTL;
+		pcie_devctl = 0x0;
+		pcie_devctl &= PCIE_DEVCTL_ENABLE_NO_SNOOP;
+		pcie_devctl |= PCIE_DEVCTL_RO_EN;
+		pci_config_put16(dev_regs->nxge_pciregh, pci_offset,
+				    pcie_devctl);
 #endif
+
 		(void) ddi_dev_regsize(nxgep->dip, 1, &regsize);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 			"nxge_map_regs: pio size 0x%x", regsize));
@@ -1154,6 +1165,10 @@ nxge_init(p_nxge_t nxgep)
 	nxge_status_t	status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, STR_CTL, "==> nxge_init"));
+
+	if (nxgep->drv_state & STATE_HW_INITIALIZED) {
+		return (status);
+	}
 
 	/*
 	 * Allocate system memory for the receive/transmit buffer blocks
@@ -1574,6 +1589,13 @@ nxge_setup_dev(p_nxge_t nxgep)
 	}
 
 	status = nxge_link_init(nxgep);
+
+	if (fm_check_acc_handle(nxgep->dev_regs->nxge_regh) != DDI_FM_OK) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			"port%d Bad register acc handle", nxgep->mac.portnum));
+		status = NXGE_ERROR;
+	}
+
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    " nxge_setup_dev status "
@@ -2873,20 +2895,15 @@ nxge_m_start(void *arg)
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "==> nxge_m_start"));
 
 	MUTEX_ENTER(nxgep->genlock);
-	if (nxgep->drv_state & STATE_HW_INITIALIZED) {
-		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-			"<== nxge_m_start: hardware already initialized"));
-		MUTEX_EXIT(nxgep->genlock);
-		return (EINVAL);
-	}
-
-	if (nxge_init(nxgep) != DDI_SUCCESS) {
+	if (nxge_init(nxgep) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"<== nxge_m_start: initialization failed"));
 		MUTEX_EXIT(nxgep->genlock);
 		return (EIO);
 	}
 
+	if (nxgep->nxge_mac_state == NXGE_MAC_STARTED)
+		goto nxge_m_start_exit;
 	/*
 	 * Start timer to check the system error and tx hangs
 	 */
@@ -2895,9 +2912,9 @@ nxge_m_start(void *arg)
 
 	nxgep->nxge_mac_state = NXGE_MAC_STARTED;
 
+nxge_m_start_exit:
 	MUTEX_EXIT(nxgep->genlock);
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "<== nxge_m_start"));
-
 	return (0);
 }
 
@@ -3122,10 +3139,22 @@ nxge_m_resources(void *arg)
 	p_rx_rcr_rings_t	rcr_rings;
 	p_rx_rcr_ring_t		*rcr_p;
 	uint32_t		i, ndmas;
+	nxge_status_t		status;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_m_resources"));
 
 	MUTEX_ENTER(nxgep->genlock);
+
+	/*
+	 * CR 6492541 Check to see if the drv_state has been intialized,
+	 * if not * call nxge_init().
+	 */
+	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
+		status = nxge_init(nxgep);
+		if (status != NXGE_OK)
+			goto nxge_m_resources_exit;
+	}
+
 	mrf.mrf_type = MAC_RX_FIFO;
 	mrf.mrf_blank = nxge_rx_hw_blank;
 	mrf.mrf_arg = (void *)nxgep;
@@ -3136,6 +3165,9 @@ nxge_m_resources(void *arg)
 	rcr_p = rcr_rings->rcr_rings;
 	ndmas = rcr_rings->ndmas;
 
+	/*
+	 * Export our receive resources to the MAC layer.
+	 */
 	for (i = 0; i < ndmas; i++) {
 		((p_rx_rcr_ring_t)rcr_p[i])->rcr_mac_handle =
 				mac_resource_add(nxgep->mach,
@@ -3149,8 +3181,8 @@ nxge_m_resources(void *arg)
 			((p_rx_rcr_ring_t)rcr_p[i])->rcr_mac_handle));
 	}
 
+nxge_m_resources_exit:
 	MUTEX_EXIT(nxgep->genlock);
-
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_m_resources"));
 }
 

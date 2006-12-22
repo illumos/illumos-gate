@@ -113,12 +113,16 @@ typedef struct mem_dimm_map {
 	char *dm_label;			/* The UNUM for this DIMM */
 	char *dm_device;		/* Path to I2C device for DIMM */
 	char dm_serid[MEM_SERID_MAXLEN]; /* Cached serial number */
+	char *dm_part;			/* DIMM part number */
 	uint64_t dm_drgen;		/* DR gen count for cached S/N */
 } mem_dimm_map_t;
 
 typedef struct mem {
 	mem_dimm_map_t *mem_dm;		/* List supported DIMMs */
 	uint64_t mem_memconfig;		/* HV memory-configuration-id# */
+	uint64_t mem_rank_mask;		/* "rank" bit */
+	int mem_ch_shift;		/* # bits for "CH" */
+	const char *mem_rank_str;	/* string denoting "rank" */
 } mem_t;
 
 extern int mem_discover(void);

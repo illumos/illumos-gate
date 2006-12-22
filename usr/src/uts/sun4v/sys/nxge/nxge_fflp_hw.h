@@ -1299,15 +1299,11 @@ typedef struct tcam_entry {
 
 #if defined(SOLARIS) || defined(COSIM)
 #include <netinet/in.h>
-#else
-#include <linux/in.h>
-#include <linux/in6.h>
 #endif
-
 
 typedef union flow_template {
 
-    struct {
+	struct {
 #if defined(_BIG_ENDIAN)
 		uint32_t l4_0:16;  /* src port */
 		uint32_t l4_1:16;  /* dest Port */

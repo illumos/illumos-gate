@@ -853,9 +853,9 @@ nxge_xcvr_init(p_nxge_t nxgep)
 {
 	p_nxge_param_t		param_arr;
 	p_nxge_stats_t		statsp;
-	uint8_t			portn;
 	uint16_t		val;
 #ifdef	NXGE_DEBUG
+	uint8_t			portn;
 	uint16_t		val1;
 #endif
 	uint8_t			phy_port_addr;
@@ -866,8 +866,9 @@ nxge_xcvr_init(p_nxge_t nxgep)
 	uint32_t		delay = 0;
 	optics_dcntr_t		op_ctr;
 	nxge_status_t		status = NXGE_OK;
-
+#ifdef	NXGE_DEBUG
 	portn = nxgep->mac.portnum;
+#endif
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_xcvr_init: port<%d>", portn));
 
 	param_arr = nxgep->param_arr;
@@ -1004,33 +1005,6 @@ nxge_xcvr_init(p_nxge_t nxgep)
 				!= NXGE_OK)
 			goto fail;
 
-
-		if (((nxgep->board_ver < 4) && (portn == 1)) &&
-			((nxgep->niu_type == NEPTUNE) ||
-			(nxgep->niu_type == NEPTUNE_2))) {
-			/*
-			 * XAUI signals' polarity on Channel 0 to 2 are swapped
-			 * on port 1 due to routing.
-			 */
-			if ((status = nxge_mdio_write(nxgep,
-					phy_port_addr,
-					BCM8704_USER_DEV4_ADDR,
-					BCM8704_USER_RX2_CONTROL1_REG,
-					BCM8704_RXPOL_FLIP)) != NXGE_OK)
-				goto fail;
-			if ((status = nxge_mdio_write(nxgep,
-					phy_port_addr,
-					BCM8704_USER_DEV4_ADDR,
-					BCM8704_USER_RX1_CONTROL1_REG,
-					BCM8704_RXPOL_FLIP)) != NXGE_OK)
-				goto fail;
-			if ((status = nxge_mdio_write(nxgep,
-					phy_port_addr,
-					BCM8704_USER_DEV4_ADDR,
-					BCM8704_USER_RX0_CONTROL1_REG,
-					BCM8704_RXPOL_FLIP)) != NXGE_OK)
-				goto fail;
-		}
 
 		/* Enable Tx and Rx LEDs to be driven by traffic */
 		if ((status = nxge_mdio_read(nxgep,
@@ -1188,7 +1162,7 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 			portn));
 
 	/* Set Max and Min Frame Size */
-	if (nxge_jumbo_enable) {
+	if (nxgep->param_arr[param_accept_jumbo].value || nxge_jumbo_enable) {
 		SET_MAC_ATTR2(handle, ap, portn,
 		    MAC_PORT_FRAME_SIZE, 64, 0x2400, rs);
 	} else {
@@ -1198,8 +1172,8 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 
 	if (rs != NPI_SUCCESS)
 		goto fail;
-	nxgep->mac.is_jumbo = B_FALSE;
-	if (nxgep->mac.is_jumbo == B_TRUE)
+	if (nxgep->param_arr[param_accept_jumbo].value ||
+		nxgep->mac.is_jumbo == B_TRUE)
 		nxgep->mac.maxframesize = 0x2400;
 	else
 		nxgep->mac.maxframesize = 0x5EE + 4;
@@ -2506,7 +2480,7 @@ nxge_check_mii_link(p_nxge_t nxgep)
 	mii_anlpar_t anlpar;
 	mii_gsr_t gsr;
 	p_mii_regs_t mii_regs;
-	ddi_devstate_t dev_stat;
+
 	nxge_status_t status = NXGE_OK;
 	uint8_t portn;
 
@@ -2519,11 +2493,6 @@ nxge_check_mii_link(p_nxge_t nxgep)
 
 	RW_ENTER_WRITER(&nxgep->filter_lock);
 
-	dev_stat = FM_GET_DEVSTATE(nxgep);
-
-	if (dev_stat < DDI_DEVSTATE_DEGRADED) {
-		goto nxge_check_mii_link_exit;
-	}
 	if (nxgep->statsp->port_stats.lb_mode > nxge_lb_ext10)
 		goto nxge_check_mii_link_exit;
 
@@ -2572,10 +2541,6 @@ nxge_check_mii_link(p_nxge_t nxgep)
 	nxgep->bmsr.value = bmsr_data.value;
 	if ((status = nxge_mii_check(nxgep, bmsr_data, bmsr_ints)) != NXGE_OK)
 		goto fail;
-	if (FM_CHECK_DEV_HANDLE(nxgep) != DDI_SUCCESS) {
-		FM_REPORT_FAULT(nxgep, SERVICE_LOST, DEVICE_FAULT,
-		"register access fault detected in nxge_check_mii_link");
-	}
 
 nxge_check_mii_link_exit:
 	RW_EXIT(&nxgep->filter_lock);
@@ -2602,7 +2567,7 @@ nxge_status_t
 nxge_check_10g_link(p_nxge_t nxgep)
 {
 	uint8_t		portn;
-	ddi_devstate_t	dev_stat;
+
 	nxge_status_t	status = NXGE_OK;
 	boolean_t	link_up;
 
@@ -2610,12 +2575,6 @@ nxge_check_10g_link(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_check_10g_link port<%d>",
 				portn));
-
-	dev_stat = FM_GET_DEVSTATE(nxgep);
-
-	if (dev_stat < DDI_DEVSTATE_DEGRADED) {
-		goto fail;
-	}
 
 	status = nxge_check_bcm8704_link(nxgep, &link_up);
 
@@ -2647,11 +2606,6 @@ nxge_check_10g_link(p_nxge_t nxgep)
 		}
 	}
 
-	if (FM_CHECK_DEV_HANDLE(nxgep) != DDI_SUCCESS) {
-		FM_REPORT_FAULT(nxgep, SERVICE_LOST, DEVICE_FAULT,
-		"register access fault detected in nxge_check_mii_link");
-	}
-
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_check_10g_link port<%d>",
 				portn));
@@ -2678,11 +2632,6 @@ nxge_link_is_down(p_nxge_t nxgep)
 	statsp = nxgep->statsp;
 	(void) sprintf(link_stat_msg, "xcvr addr:0x%02x - link down",
 			statsp->mac_stats.xcvr_portn);
-
-	if (nxge_no_msg == 0) {
-		FM_REPORT_FAULT(nxgep, SERVICE_DEGRADED, EXTERNAL_FAULT,
-				link_stat_msg);
-	}
 
 	mac_link_update(nxgep->mach, LINK_STATE_DOWN);
 
@@ -2713,11 +2662,6 @@ nxge_link_is_up(p_nxge_t nxgep)
 		(void) strcat(link_stat_msg, "half duplex");
 
 	(void) nxge_xif_init(nxgep);
-
-	if (nxge_no_msg == 0) {
-		FM_REPORT_FAULT(nxgep, SERVICE_RESTORED, EXTERNAL_FAULT,
-					link_stat_msg);
-	}
 
 	/* Clean up symbol errors incurred during link transition */
 	if (nxgep->mac.portmode == PORT_10G_FIBER) {

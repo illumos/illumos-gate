@@ -51,6 +51,7 @@
 #include <sys/errclassify.h>
 #include <sys/niagararegs.h>
 #include <sys/fm/ldom.h>
+#include <ctype.h>
 
 extern ldom_hdl_t *cpumem_diagnosis_lhp;
 
@@ -113,13 +114,31 @@ xe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	uint64_t disp;
 	int minorvers = 1;
 
+	if (nvlist_lookup_uint64(nvl,
+	    FM_EREPORT_PAYLOAD_NAME_L2_AFSR, &l2_afsr) != 0 &&
+	    nvlist_lookup_uint64(nvl,
+	    FM_EREPORT_PAYLOAD_NAME_L2_ESR, &l2_afsr) != 0)
+		return (CMD_EVD_BAD);
+
+	if (nvlist_lookup_uint64(nvl,
+	    FM_EREPORT_PAYLOAD_NAME_DRAM_AFSR, &dram_afsr) != 0 &&
+	    nvlist_lookup_uint64(nvl,
+	    FM_EREPORT_PAYLOAD_NAME_DRAM_ESR, &dram_afsr) != 0)
+		return (CMD_EVD_BAD);
+
+	if (nvlist_lookup_uint64(nvl,
+	    FM_EREPORT_PAYLOAD_NAME_L2_AFAR, &l2_afar) != 0 &&
+	    nvlist_lookup_uint64(nvl,
+	    FM_EREPORT_PAYLOAD_NAME_L2_EAR, &l2_afar) != 0)
+		return (CMD_EVD_BAD);
+
+	if (nvlist_lookup_uint64(nvl,
+	    FM_EREPORT_PAYLOAD_NAME_DRAM_AFAR, &dram_afar) != 0 &&
+	    nvlist_lookup_uint64(nvl,
+	    FM_EREPORT_PAYLOAD_NAME_DRAM_EAR, &dram_afar) != 0)
+		return (CMD_EVD_BAD);
+
 	if (nvlist_lookup_pairs(nvl, 0,
-	    FM_EREPORT_PAYLOAD_NAME_L2_AFSR, DATA_TYPE_UINT64, &l2_afsr,
-	    FM_EREPORT_PAYLOAD_NAME_DRAM_AFSR, DATA_TYPE_UINT64, &dram_afsr,
-	    FM_EREPORT_PAYLOAD_NAME_L2_AFAR, DATA_TYPE_UINT64,
-	    &l2_afar,
-	    FM_EREPORT_PAYLOAD_NAME_DRAM_AFAR, DATA_TYPE_UINT64,
-	    &dram_afar,
 	    FM_EREPORT_PAYLOAD_NAME_ERR_TYPE, DATA_TYPE_STRING, &typenm,
 	    FM_EREPORT_PAYLOAD_NAME_RESOURCE, DATA_TYPE_NVLIST, &rsrc,
 	    NULL) != 0)
@@ -253,4 +272,253 @@ cmd_mem_get_phys_pages(fmd_hdl_t *hdl)
 	(void) md_fini(mdp);
 
 	return (npage);
+}
+
+static int galois_mul[16][16] = {
+/* 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F */
+{  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0}, /* 0 */
+{  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15}, /* 1 */
+{  0,  2,  4,  6,  8, 10, 12, 14,  3,  1,  7,  5, 11,  9, 15, 13}, /* 2 */
+{  0,  3,  6,  5, 12, 15, 10,  9, 11,  8, 13, 14,  7,  4,  1,  2}, /* 3 */
+{  0,  4,  8, 12,  3,  7, 11, 15,  6,  2, 14, 10,  5,  1, 13,  9}, /* 4 */
+{  0,  5, 10, 15,  7,  2, 13,  8, 14, 11,  4,  1,  9, 12,  3,  6}, /* 5 */
+{  0,  6, 12, 10, 11, 13,  7,  1,  5,  3,  9, 15, 14,  8,  2,  4}, /* 6 */
+{  0,  7, 14,  9, 15,  8,  1,  6, 13, 10,  3,  4,  2,  5, 12, 11}, /* 7 */
+{  0,  8,  3, 11,  6, 14,  5, 13, 12,  4, 15,  7, 10,  2,  9,  1}, /* 8 */
+{  0,  9,  1,  8,  2, 11,  3, 10,  4, 13,  5, 12,  6, 15,  7, 14}, /* 9 */
+{  0, 10,  7, 13, 14,  4,  9,  3, 15,  5,  8,  2,  1, 11,  6, 12}, /* A */
+{  0, 11,  5, 14, 10,  1, 15,  4,  7, 12,  2,  9, 13,  6,  8,  3}, /* B */
+{  0, 12, 11,  7,  5,  9, 14,  2, 10,  6,  1, 13, 15,  3,  4,  8}, /* C */
+{  0, 13,  9,  4,  1, 12,  8,  5,  2, 15, 11,  6,  3, 14, 10,  7}, /* D */
+{  0, 14, 15,  1, 13,  3,  2, 12,  9,  7,  6,  8,  4, 10, 11,  5}, /* E */
+{  0, 15, 13,  2,  9,  6,  4, 11,  1, 14, 12,  3,  8,  7,  5, 10}  /* F */
+};
+
+static int
+galois_div(int num, int denom) {
+	int i;
+
+	for (i = 0; i < 16; i++) {
+		if (galois_mul[denom][i] == num)
+		    return (i);
+	}
+	return (-1);
+}
+
+/*
+ * Data nibbles N0-N31 => 0-31
+ * check nibbles C0-3 => 32-35
+ */
+
+int
+cmd_synd2upos(uint16_t syndrome) {
+
+	uint16_t s0, s1, s2, s3;
+
+	if (syndrome == 0)
+		return (-1); /* clean syndrome, not a CE */
+
+	s0 = syndrome & 0xF;
+	s1 = (syndrome >> 4) & 0xF;
+	s2 = (syndrome >> 8) & 0xF;
+	s3 = (syndrome >> 12) & 0xF;
+
+	if (s3 == 0) {
+		if (s2 == 0 && s1 == 0)
+			return (32); /* 0 0 0 e => C0 */
+		if (s2 == 0 && s0 == 0)
+			return (33); /* 0 0 e 0 => C1 */
+		if (s1 == 0 && s0 == 0)
+			return (34); /* 0 e 0 0 => C2 */
+		if (s2 == s1 && s1 == s0)
+			return (31); /* 0 d d d => N31 */
+		return (-1); /* multibit error */
+	} else if (s2 == 0) {
+		if (s1 == 0 && s0 == 0)
+			return (35); /* e 0 0 0 => C4 */
+		if (s1 == 0 || s0 == 0)
+			return (-1); /* not a 0 b c */
+		if (s3 != galois_div(galois_mul[s1][s1], s0))
+			return (-1); /* check nibble not valid */
+		return (galois_div(s0, s1) - 1); /* N0 - N14 */
+	} else if (s1 == 0) {
+		if (s2 == 0 || s0 == 0)
+			return (-1); /* not a b 0 c */
+		if (s3 != galois_div(galois_mul[s2][s2], s0))
+			return (-1); /* check nibble not valid */
+		return (galois_div(s0, s2) + 14); /* N15 - N29 */
+	} else if (s0 == 0) {
+		if (s3 == s2 && s2 == s1)
+			return (30); /* d d d 0 => N30 */
+		return (-1);
+	} else return (-1);
+}
+
+int
+cmd_upos2dram(uint16_t upos) {
+
+	/*
+	 * If and/or when x8 DIMMs are used on sun4v systems, this
+	 * function will become more complicated.
+	 */
+
+	return ((int)upos);
+
+}
+
+typedef struct tr_ent {
+	const char *nac_component;
+	const char *hc_component;
+} tr_ent_t;
+
+static tr_ent_t tr_tbl[] = {
+	{ "MB",		"motherboard" },
+	{ "CMP",	"chip" },
+	{ "BR",		"branch" },
+	{ "CH",		"dram-channel" },
+	{ "R",		"rank" },
+	{ "D",		"dimm" }
+};
+
+#define	tr_tbl_n	sizeof (tr_tbl) / sizeof (tr_ent_t)
+
+static int
+map_name(const char *p) {
+	int i;
+
+	for (i = 0; i < tr_tbl_n; i++) {
+		if (strncmp(p, tr_tbl[i].nac_component,
+		    strlen(tr_tbl[i].nac_component)) == 0)
+			return (i);
+	}
+	return (-1);
+}
+
+static int
+count_components(const char *str, char sep)
+{
+	int num = 0;
+	const char *cptr = str;
+
+	if (*cptr == sep) cptr++;		/* skip initial sep */
+	if (strlen(cptr) > 0) num = 1;
+	while ((cptr = strchr(cptr, sep)) != NULL) {
+		cptr++;
+		if (cptr == NULL || strcmp(cptr, "") == 0) break;
+		if (map_name(cptr) >= 0) num++;
+	}
+	return (num);
+}
+
+/*
+ * This version of breakup_components assumes that all component names which
+ * it sees are of the form:  <nonnumeric piece><numeric piece>
+ * i.e. no embedded numerals in component name which have to be spelled out.
+ */
+
+static int
+breakup_components(char *str, char *sep, nvlist_t **hc_nvl)
+{
+	char namebuf[64], instbuf[64];
+	char *token, *tokbuf;
+	int i, j, namelen, instlen;
+
+	i = 0;
+	for (token = strtok_r(str, sep, &tokbuf);
+	    token != NULL;
+	    token = strtok_r(NULL, sep, &tokbuf)) {
+		namelen = strcspn(token, "0123456789");
+		instlen = strspn(token+namelen, "0123456789");
+		(void) strncpy(namebuf, token, namelen);
+		namebuf[namelen] = '\0';
+
+		if ((j = map_name(namebuf) < 0))
+		    continue; /* skip names that don't map */
+
+		if (instlen == 0) {
+			(void) strncpy(instbuf, "0", 2);
+		} else {
+			(void) strncpy(instbuf, token+namelen, instlen);
+			instbuf[instlen] = '\0';
+		}
+		if (nvlist_add_string(hc_nvl[i], FM_FMRI_HC_NAME,
+		    tr_tbl[j].hc_component) != 0 ||
+		    nvlist_add_string(hc_nvl[i], FM_FMRI_HC_ID, instbuf) != 0)
+			return (-1);
+		i++;
+	}
+	return (1);
+}
+
+nvlist_t *
+cmd_mem2hc(fmd_hdl_t *hdl, nvlist_t *mem_fmri) {
+
+	char *nac_name, *s, *p, **sa;
+	const char *unum = cmd_fmri_get_unum(mem_fmri);
+	nvlist_t *fp, **hc_list;
+	int i, n;
+	unsigned int usi;
+
+	nac_name = fmd_hdl_zalloc(hdl, strlen(unum)+1, FMD_SLEEP);
+	if ((s = strstr(unum, ": ")) != NULL) {
+		(void) strncpy(nac_name, unum, s-unum); /* up to ": " */
+		(void) strncpy(nac_name+(s-unum), "/", 2); /* add "/" and \0 */
+		(void) strncat(nac_name, s+2, strlen(unum)-(s+2-unum)+1);
+	} else {
+		(void) strcpy(nac_name, unum);
+	}
+
+	n = count_components(nac_name, '/');
+	hc_list = fmd_hdl_zalloc(hdl, sizeof (nvlist_t *)*n, FMD_SLEEP);
+
+	for (i = 0; i < n; i++) {
+		(void) nvlist_alloc(&hc_list[i],
+		    NV_UNIQUE_NAME|NV_UNIQUE_NAME_TYPE, 0);
+	}
+
+	if (breakup_components(nac_name, "/", hc_list) < 0) {
+		fmd_hdl_error(hdl, "cannot allocate components for hc-list\n");
+		for (i = 0; i < n; n++) {
+			if (hc_list[i] != NULL)
+			    nvlist_free(hc_list[i]);
+		}
+		fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
+		fmd_hdl_free(hdl, nac_name, strlen(unum)+1);
+		return (NULL);
+	}
+	(void) nvlist_alloc(&fp, NV_UNIQUE_NAME|NV_UNIQUE_NAME_TYPE, 0);
+	if ((nvlist_add_uint8(fp, FM_VERSION,
+	    FM_HC_VERS0) != 0) ||
+	    (nvlist_add_string(fp, FM_FMRI_SCHEME, FM_FMRI_SCHEME_HC) != 0) ||
+	    (nvlist_add_string(fp, FM_FMRI_HC_ROOT, "/") != 0) ||
+	    (nvlist_add_uint32(fp, FM_FMRI_HC_LIST_SZ, n) != 0) ||
+	    (nvlist_add_nvlist_array(fp, FM_FMRI_HC_LIST, hc_list, n) != 0)) {
+		for (i = 0; i < n; n++) {
+			nvlist_free(hc_list[i]);
+		}
+		fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
+		fmd_hdl_free(hdl, nac_name, strlen(unum)+1);
+		nvlist_free(fp);
+		return (NULL);
+	}
+	/*
+	 * if the nvlist_add_nvlist_array succeeds, then it frees
+	 * the hc_list[i]'s.
+	 */
+	fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
+	fmd_hdl_free(hdl, nac_name, strlen(unum)+1);
+	if (nvlist_lookup_string_array(mem_fmri, FM_FMRI_HC_SERIAL_ID,
+	    &sa, &usi) == 0) {
+		if (nvlist_add_string(fp, FM_FMRI_HC_SERIAL_ID, *sa) != 0) {
+			nvlist_free(fp);
+			return (NULL);
+		}
+	}
+	if (nvlist_lookup_string(mem_fmri, FM_FMRI_HC_PART, &p) == 0) {
+		if (nvlist_add_string(fp, FM_FMRI_HC_PART, p) != 0) {
+			nvlist_free(fp);
+			return (NULL);
+		}
+	}
+	return (fp);
 }

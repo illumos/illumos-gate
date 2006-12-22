@@ -81,9 +81,9 @@ hv_niu_tx_logical_page_info(uint64_t chidx, uint64_t pgidx,
 	mov	%o3, %g2
 	mov	N2NIU_RX_LP_INFO, %o5
 	ta	FAST_TRAP
-	stx     %o1, [%g1]
+	stx	%o1, [%g1]
 	retl
-	stx     %o2, [%g2]
+	stx	%o2, [%g2]
 	SET_SIZE(hv_niu_rx_logical_page_info)
 
 	/*
@@ -106,9 +106,9 @@ hv_niu_tx_logical_page_info(uint64_t chidx, uint64_t pgidx,
 	mov	%o3, %g2
 	mov	N2NIU_TX_LP_INFO, %o5
 	ta	FAST_TRAP
-	stx     %o1, [%g1]
+	stx	%o1, [%g1]
 	retl
-	stx     %o2, [%g2]
+	stx	%o2, [%g2]
 	SET_SIZE(hv_niu_tx_logical_page_info)
 
 #endif	/* lint || __lint */

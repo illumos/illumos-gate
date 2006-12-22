@@ -27,6 +27,8 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 #include <sys/fm/protocol.h>
 #include <fm/topo_mod.h>
 #include <fm/topo_hc.h>
@@ -64,6 +66,30 @@ strtonum(topo_mod_t *mp, char *str, int *err)
 	return (r);
 }
 
+static int
+get_pci_vpd_sn_pn(topo_mod_t *mp, di_node_t dn, char **serial, char **part)
+{
+	char *s = NULL, *p = NULL;
+	di_prom_handle_t promtree = DI_PROM_HANDLE_NIL;
+
+	if ((promtree = topo_mod_prominfo(mp)) == DI_PROM_HANDLE_NIL) {
+		topo_mod_dprintf(mp,
+			"get vpd data: di_prom_handle_init failed.\n");
+		return (-1);
+	}
+
+	/* Get Serial Number and Part Number */
+	if ((di_prom_prop_lookup_bytes(promtree, dn, "vpd-serial-number",
+		(uchar_t **)&s) > 0) && (s != NULL))
+		*serial = topo_mod_strdup(mp, s);
+
+	if ((di_prom_prop_lookup_bytes(promtree, dn, "vpd-part-number",
+		(uchar_t **)&p) > 0) && (p != NULL))
+		*part = topo_mod_strdup(mp, p);
+
+	return (0);
+}
+
 tnode_t *
 tnode_create(topo_mod_t *mp, tnode_t *parent,
     const char *name, topo_instance_t i, void *priv)
@@ -71,11 +97,23 @@ tnode_create(topo_mod_t *mp, tnode_t *parent,
 	nvlist_t *fmri;
 	tnode_t *ntn;
 	nvlist_t *auth;
+	char *serial = NULL, *part = NULL;
 
 	auth = topo_mod_auth(mp, parent);
+	/*
+	 * Get PCI/PCIEX Device Serial Number and Part Number
+	 * from PCI VPD
+	 */
+	if ((strcmp(name, PCI_DEVICE) == 0) ||
+	    (strcmp(name, PCIEX_DEVICE) == 0))
+		(void) get_pci_vpd_sn_pn(mp, priv, &serial, &part);
+
 	fmri = topo_mod_hcfmri(mp, parent, FM_HC_SCHEME_VERSION, name, i, NULL,
-	    auth, NULL, NULL, NULL);
+		auth, part, NULL, serial);
 	nvlist_free(auth);
+	topo_mod_strfree(mp, serial);
+	topo_mod_strfree(mp, part);
+
 	if (fmri == NULL) {
 		topo_mod_dprintf(mp,
 		    "Unable to make nvlist for %s bind.\n", name);

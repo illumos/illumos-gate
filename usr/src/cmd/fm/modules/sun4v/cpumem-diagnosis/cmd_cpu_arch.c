@@ -52,14 +52,20 @@ cmd_xr_fill(fmd_hdl_t *hdl, nvlist_t *nvl, cmd_xr_t *xr, cmd_errcl_t clcode)
 	uint64_t niagara_l2_afsr = 0;
 
 	if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_L2_AFSR,
+	    &niagara_l2_afsr) != 0 &&
+	    nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_L2_ESR,
 	    &niagara_l2_afsr) != 0)
 		return (-1);
-	if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_L2_REAL_AFAR,
+	if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_L2_AFAR,
+	    &xr->xr_afar) != 0 &&
+	    nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_L2_EAR,
 	    &xr->xr_afar) != 0)
 		return (-1);
 	if (nvlist_lookup_uint32(nvl, FM_EREPORT_PAYLOAD_NAME_L2_SYND,
-	    &xr->xr_synd) != 0)
-		return (-1);
+	    &xr->xr_synd) != 0) {
+		/* Niagara-2 doesn't provide separate (redundant) l2-synd */
+		xr->xr_synd = niagara_l2_afsr & NI2_L2AFSR_SYND;
+	}
 
 	if (cmd_afsr_check(hdl, niagara_l2_afsr, clcode,
 	    &xr->xr_synd_status) != 0)
@@ -123,17 +129,17 @@ cmd_afsr_check(fmd_hdl_t *hdl, uint64_t afsr,
 	case CMD_ERRCL_LDAC:
 	case CMD_ERRCL_LDSC:
 		*stat_val =
-			((afsr & NI_L2AFSR_P07) == 0) ?
+			((afsr & NI_L2AFSR_P08) == 0) ?
 			AFLT_STAT_VALID : AFLT_STAT_INVALID;
 		break;
 	case CMD_ERRCL_LDWC:
 		*stat_val =
-			((afsr & NI_L2AFSR_P08) == 0) ?
+			((afsr & NI_L2AFSR_P09) == 0) ?
 			AFLT_STAT_VALID : AFLT_STAT_INVALID;
 		break;
 	case CMD_ERRCL_LDRC:
 		*stat_val =
-			((afsr & NI_L2AFSR_P09) == 0) ?
+			((afsr & NI_L2AFSR_P10) == 0) ?
 			AFLT_STAT_VALID : AFLT_STAT_INVALID;
 		break;
 	default:
@@ -150,7 +156,17 @@ cmd_afar_valid(fmd_hdl_t *hdl, nvlist_t *nvl, cmd_errcl_t clcode,
 {
 	uint64_t niagara_l2_afsr = 0;
 	uint8_t stat_val;
+
+	/*
+	 * In Niagara-1, we carried forward the register names afsr and afar
+	 * in ereports from sun4u, even though the hardware registers were
+	 * named esr and ear respectively.  In Niagara-2 we decided to conform
+	 * to the hardware names.
+	 */
+
 	if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_L2_AFSR,
+	    &niagara_l2_afsr) != 0 &&
+	    nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_L2_ESR,
 	    &niagara_l2_afsr) != 0)
 		return (-1);
 
@@ -159,8 +175,67 @@ cmd_afar_valid(fmd_hdl_t *hdl, nvlist_t *nvl, cmd_errcl_t clcode,
 
 	if (stat_val == AFLT_STAT_VALID) {
 		if (nvlist_lookup_uint64(nvl,
-		    FM_EREPORT_PAYLOAD_NAME_L2_REAL_AFAR, afar) == 0)
+		    FM_EREPORT_PAYLOAD_NAME_L2_AFAR, afar) == 0 ||
+		    nvlist_lookup_uint64(nvl,
+		    FM_EREPORT_PAYLOAD_NAME_L2_EAR, afar) == 0)
 			return (0);
 	}
 	return (-1);
+}
+
+/*
+ * sun4v cmd_cpu_get_frustr expects a 'cpufru' element in 'detector' FMRI
+ * of ereport (which is stored as 'asru' of cmd_cpu_t).  For early sun4v,
+ * this was mistakenly spec'ed as "hc://MB" instead of "hc:///component=MB",
+ * so this situation must be remediated when found.
+ */
+
+char *
+cmd_cpu_getfrustr(fmd_hdl_t *hdl, cmd_cpu_t *cp)
+{
+	char *frustr;
+	nvlist_t *asru = cp->cpu_asru_nvl;
+
+	if (nvlist_lookup_string(asru, FM_FMRI_CPU_CPUFRU, &frustr) == 0) {
+		if (strncmp(frustr, CPU_FRU_FMRI,
+		    sizeof (CPU_FRU_FMRI) -1) == 0)
+			return (fmd_hdl_strdup(hdl, frustr, FMD_SLEEP));
+		else {
+			char *s1, *s2;
+			size_t frustrlen;
+
+			s2 = strrchr(frustr, '/') + 1;
+			if (s2 == NULL)
+				s2 = "MB";
+			frustrlen = strlen(s2) + sizeof (CPU_FRU_FMRI);
+			s1 = fmd_hdl_alloc(hdl, frustrlen, FMD_SLEEP);
+			s1 = strcpy(s1, CPU_FRU_FMRI);
+			s1 = strcat(s1, s2);
+			return (s1);
+		}
+	}
+	(void) cmd_set_errno(ENOENT);
+	return (NULL);
+}
+
+char *
+cmd_cpu_getpartstr(fmd_hdl_t *hdl, cmd_cpu_t *cp) {
+	char *partstr;
+	nvlist_t *asru = cp->cpu_asru_nvl;
+
+	if (nvlist_lookup_string(asru, FM_FMRI_HC_PART, &partstr) == 0)
+		return (fmd_hdl_strdup(hdl, partstr, FMD_SLEEP));
+	else
+		return (NULL);
+}
+
+char *
+cmd_cpu_getserialstr(fmd_hdl_t *hdl, cmd_cpu_t *cp) {
+	char *serialstr;
+	nvlist_t *asru = cp->cpu_asru_nvl;
+
+	if (nvlist_lookup_string(asru, FM_FMRI_HC_SERIAL_ID, &serialstr) == 0)
+		return (fmd_hdl_strdup(hdl, serialstr, FMD_SLEEP));
+	else
+		return (NULL);
 }

@@ -40,11 +40,15 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_NAME_L2_AFAR		"l2-afar"
 #define	FM_EREPORT_PAYLOAD_NAME_L2_REAL_AFAR	"l2-real-afar"
 #define	FM_EREPORT_PAYLOAD_NAME_L2_SYND		"l2-synd"
+#define	FM_EREPORT_PAYLOAD_NAME_L2_ESR		"l2-esr"
+#define	FM_EREPORT_PAYLOAD_NAME_L2_EAR		"l2-ear"
 
 #define	FM_EREPORT_PAYLOAD_NAME_DRAM_AFSR	"dram-afsr"
 #define	FM_EREPORT_PAYLOAD_NAME_DRAM_AFAR	"dram-afar"
 #define	FM_EREPORT_PAYLOAD_NAME_DRAM_REAL_AFAR	"dram-real-afar"
 #define	FM_EREPORT_PAYLOAD_NAME_DRAM_SYND	"dram-synd"
+#define	FM_EREPORT_PAYLOAD_NAME_DRAM_ESR	"dram-esr"
+#define	FM_EREPORT_PAYLOAD_NAME_DRAM_EAR	"dram-ear"
 
 #define	FM_EREPORT_CPU_UST1_DAU			"dau"
 #define	FM_EREPORT_CPU_UST1_DAC			"dac"

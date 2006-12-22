@@ -34,20 +34,8 @@ extern "C" {
 
 #if defined(SOLARIS) && defined(_KERNEL)
 #include <netinet/in.h>
-#define	 S6_addr32		_S6_un._S6_u32
-#elif defined(LINUX) && defined(__KERNEL_)
-#include <linux/in.h>
-#include <linux/in6.h>
-#define	 S6_addr32		s6_addr32
-#elif defined(COSIM) || defined(IODIAG)
-#include <netinet/in.h>
-#if defined(LINUX)
-#define	S6_addr32		s6_addr32
-#else
-#define	S6_addr32		_S6_un._S6_u32
+#define	S6_addr32	_S6_un._S6_u32
 #endif
-#endif
-
 
 typedef struct tcpip4_spec_s {
 	in_addr_t  ip4src;

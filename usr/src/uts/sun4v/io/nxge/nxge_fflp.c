@@ -75,13 +75,11 @@ static tcam_location_t nxge_get_tcam_location(p_nxge_t, uint8_t);
 nxge_status_t nxge_fflp_config_vlan_table(p_nxge_t, uint16_t);
 nxge_status_t nxge_fflp_ip_class_config_all(p_nxge_t);
 nxge_status_t nxge_add_flow(p_nxge_t, flow_resource_t *);
-void nxge_handle_tcam_fragment_bug(p_nxge_t);
+static nxge_status_t nxge_tcam_handle_ip_fragment(p_nxge_t);
 nxge_status_t nxge_add_tcam_entry(p_nxge_t, flow_resource_t *);
 nxge_status_t nxge_add_fcram_entry(p_nxge_t, flow_resource_t *);
 nxge_status_t nxge_flow_get_hash(p_nxge_t, flow_resource_t *,
 			    uint32_t *, uint16_t *);
-
-nxge_status_t nxge_classify_exit_sw(p_nxge_t);
 
 nxge_status_t
 nxge_tcam_dump_entry(p_nxge_t nxgep, uint32_t location)
@@ -1521,30 +1519,32 @@ nxge_add_tcam_entry(p_nxge_t nxgep, flow_resource_t *flow_res)
 }
 
 
-void
-nxge_handle_tcam_fragment_bug(p_nxge_t nxgep)
+static nxge_status_t
+nxge_tcam_handle_ip_fragment(p_nxge_t nxgep)
 {
 	tcam_entry_t tcam_ptr;
 	tcam_location_t location;
 	uint8_t class;
+	uint32_t class_config;
 	npi_handle_t handle;
 	npi_status_t rs = NPI_SUCCESS;
 	p_nxge_hw_list_t	hw_p;
+	nxge_status_t status = NXGE_OK;
 
 	handle = nxgep->npi_reg_handle;
 	class = 0;
 	bzero((void*)&tcam_ptr, sizeof (tcam_entry_t));
 	tcam_ptr.ip4_noport_key = 1;
 	tcam_ptr.ip4_noport_mask = 1;
-	location = nxge_get_tcam_location(nxgep, class);
+	location = nxgep->function_num;
 	nxgep->classifier.fragment_bug_location = location;
 
 	if ((hw_p = nxgep->nxge_hw_p) == NULL) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			" nxge_handle_tcam_fragment_bug:"
+			" nxge_tcam_handle_ip_fragment:"
 			" common hardware not set",
 			nxgep->niu_type));
-		return;
+		return (NXGE_ERROR);
 	}
 
 	MUTEX_ENTER(&hw_p->nxge_tcam_lock);
@@ -1554,11 +1554,11 @@ nxge_handle_tcam_fragment_bug(p_nxge_t nxgep)
 	if (rs & NPI_FFLP_ERROR) {
 		MUTEX_EXIT(&hw_p->nxge_tcam_lock);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				    " nxge_handle_tcam_fragment_bug "
+				    " nxge_tcam_handle_ip_fragment "
 				    " tcam_entry write"
 				    " failed for location %d",
 				    location));
-		return;
+		return (NXGE_ERROR);
 	}
 
 	tcam_ptr.match_action.bits.ldw.rdctbl = nxgep->class_config.mac_rdcgrp;
@@ -1574,17 +1574,44 @@ nxge_handle_tcam_fragment_bug(p_nxge_t nxgep)
 		MUTEX_EXIT(&hw_p->nxge_tcam_lock);
 		NXGE_DEBUG_MSG((nxgep,
 				    FFLP_CTL,
-				    " nxge_handle_tcam_fragment_bug "
+				    " nxge_tcam_handle_ip_fragment "
 				    " tcam_entry write"
 				    " failed for ASC RAM location %d",
 				    location));
-		return;
+		return (NXGE_ERROR);
 	}
 
 	bcopy((void *)&tcam_ptr,
 		    (void *)&nxgep->classifier.tcam_entries[location].tce,
 		    sizeof (tcam_entry_t));
+	for (class = TCAM_CLASS_TCP_IPV4;
+		    class <= TCAM_CLASS_SCTP_IPV6; class++) {
+		class_config = nxgep->class_config.class_cfg[class];
+		class_config |= NXGE_CLASS_TCAM_LOOKUP;
+		status = nxge_fflp_ip_class_config(nxgep, class, class_config);
+
+		if (status & NPI_FFLP_ERROR) {
+			MUTEX_EXIT(&hw_p->nxge_tcam_lock);
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					"nxge_tcam_handle_ip_fragment "
+					"nxge_fflp_ip_class_config failed "
+					" class %d config %x ",
+					class, class_config));
+			return (NXGE_ERROR);
+		}
+	}
+
+	rs = npi_fflp_cfg_tcam_enable(handle);
+	if (rs & NPI_FFLP_ERROR) {
+		MUTEX_EXIT(&hw_p->nxge_tcam_lock);
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				"nxge_tcam_handle_ip_fragment "
+			    " nxge_fflp_config_tcam_enable failed"));
+		return (NXGE_ERROR);
+	}
+
 	MUTEX_EXIT(&hw_p->nxge_tcam_lock);
+	return (NXGE_OK);
 }
 
 #ifdef lint
@@ -2122,7 +2149,13 @@ nxge_classify_init_hw(p_nxge_t nxgep)
 		    "nxge_multicast_mac_assign_rdc_table failed"));
 		return (NXGE_ERROR);
 	}
-/* If requested, attach RDC table to VLAN ID */
+
+	status = nxge_tcam_handle_ip_fragment(nxgep);
+	if (status != NXGE_OK) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "nxge_tcam_handle_ip_fragment failed"));
+		return (NXGE_ERROR);
+	}
 
 	nxgep->classifier.state |= NXGE_FFLP_HW_INIT;
 

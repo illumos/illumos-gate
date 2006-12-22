@@ -41,16 +41,20 @@ typedef struct md_cpumap {
 	uint32_t cpumap_id;
 	uint32_t cpumap_pid;
 	uint64_t cpumap_serialno;
+	char *cpumap_cpufru;
+	char *cpumap_cpufrusn;
+	char *cpumap_cpufrupn;
 } md_cpumap_t;
 
 typedef struct cpu {
-	md_cpumap_t *cpu_mdesc_cpus;	/* head of ptr list for cpu maps */
+	md_cpumap_t *cpu_mdesc_cpus;	/* ptr to array of cpu maps */
 	uint32_t cpu_mdesc_ncpus;	/* number of cpu maps */
 } cpu_t;
 
 extern cpu_t cpu;
 
 extern int cpu_get_serialid_mdesc(uint32_t, uint64_t *);
+extern md_cpumap_t *cpu_find_cpumap(uint32_t);
 extern int cpu_mdesc_init(ldom_hdl_t *lhp);
 extern void cpu_mdesc_fini(void);
 

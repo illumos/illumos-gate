@@ -75,6 +75,18 @@ cmd_mem_serdnm_create(fmd_hdl_t *hdl, const char *serdbase, const char *unum)
 	return (nm);
 }
 
+char *
+cmd_page_serdnm_create(fmd_hdl_t *hdl, const char *serdbase,
+    uint64_t phys_addr)
+{
+	const char *fmt = "%s_%llXserd";
+	size_t sz = snprintf(NULL, 0, fmt, serdbase, phys_addr) + 1;
+	char *nm = fmd_hdl_alloc(hdl, sz, FMD_SLEEP);
+	(void) snprintf(nm, sz, fmt, serdbase, phys_addr);
+
+	return (nm);
+}
+
 void
 cmd_mem_case_restore(fmd_hdl_t *hdl, cmd_case_t *cc, fmd_case_t *cp,
     const char *serdbase, const char *unum)

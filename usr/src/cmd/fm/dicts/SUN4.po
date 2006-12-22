@@ -265,3 +265,19 @@ msgid "SUN4-8000-FC.impact"
 msgstr "Loss of services provided by the device instances associated with this fault"
 msgid "SUN4-8000-FC.action"
 msgstr "\nUse fmdump -v -u EVENT_ID and fmdump -eV -u\nEVENT_ID to collect information to \nhelp Sun Service personnel identify the device in need of repair. Schedule \na repair procedure to replace the affected device.\n"
+#
+# code: SUN4-8000-GQ
+# keys: fault.io.fire.datapath fault.io.fire.hbus
+#
+msgid "SUN4-8000-GQ.type"
+msgstr "Fault"
+msgid "SUN4-8000-GQ.severity"
+msgstr "Critical"
+msgid "SUN4-8000-GQ.description"
+msgstr "Fault in either the PCIe asic's internal hostbus or connector between IO and CPU Board\n  Refer to %s for more information."
+msgid "SUN4-8000-GQ.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "SUN4-8000-GQ.impact"
+msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
+msgid "SUN4-8000-GQ.action"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
