@@ -1502,7 +1502,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				    ~SCTP_IPV6_RECVPKTINFO;
 			/* Send it with the next msg */
 			sctp->sctp_recvifindex = 0;
-			connp->conn_ipv6_recvpktinfo = onoff;
+			connp->conn_ip_recvpktinfo = onoff;
 			break;
 		case IPV6_RECVHOPLIMIT:
 			if (inlen < sizeof (int32_t)) {

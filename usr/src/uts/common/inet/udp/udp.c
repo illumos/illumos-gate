@@ -267,7 +267,12 @@ static clock_t udp_last_ndd_get_info_time;
 
 /* Option processing attrs */
 typedef struct udpattrs_s {
-	ip6_pkt_t	*udpattr_ipp;
+	union {
+		ip6_pkt_t	*udpattr_ipp6;	/* For V6 */
+		ip4_pkt_t 	*udpattr_ipp4;	/* For V4 */
+	} udpattr_ippu;
+#define	udpattr_ipp6 udpattr_ippu.udpattr_ipp6
+#define	udpattr_ipp4 udpattr_ippu.udpattr_ipp4
 	mblk_t		*udpattr_mb;
 	boolean_t	udpattr_credset;
 } udpattrs_t;
@@ -2887,7 +2892,6 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	conn_t *connp;
 	zoneid_t zoneid = getzoneid();
 	queue_t	*ip_wq;
-	char	*name;
 
 	TRACE_1(TR_FAC_UDP, TR_UDP_OPEN, "udp_open: q %p", q);
 
@@ -2916,10 +2920,7 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	 * sake of MIB browsers and fail everything else.
 	 */
 	ip_wq = WR(q)->q_next;
-	if (ip_wq->q_next != NULL ||
-	    (name = ip_wq->q_qinfo->qi_minfo->mi_idname) == NULL ||
-	    strcmp(name, IP_MOD_NAME) != 0 ||
-	    ip_wq->q_qinfo->qi_minfo->mi_idnum != IP_MOD_ID) {
+	if (NOT_OVER_IP(ip_wq)) {
 		/* Support just SNMP for MIB browsers */
 		connp = ipcl_conn_create(IPCL_IPCCONN, KM_SLEEP);
 		connp->conn_rq = q;
@@ -3166,7 +3167,16 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 			*i1 = (int)udp->udp_ttl;
 			break;	/* goto sizeof (int) option return */
 		case IP_NEXTHOP:
-			/* Handled at IP level */
+		case IP_RECVPKTINFO:
+			/*
+			 * This also handles IP_PKTINFO.
+			 * IP_PKTINFO and IP_RECVPKTINFO have the same value.
+			 * Differentiation is based on the size of the argument
+			 * passed in.
+			 * This option is handled in IP which will return an
+			 * error for IP_PKTINFO as it's not supported as a
+			 * sticky option.
+			 */
 			return (-EINVAL);
 		case IP_MULTICAST_IF:
 			/* 0 address if not set */
@@ -3257,7 +3267,7 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 			*i1 = udp->udp_unspec_source;
 			break;	/* goto sizeof (int) option return */
 		case IPV6_RECVPKTINFO:
-			*i1 = udp->udp_ipv6_recvpktinfo;
+			*i1 = udp->udp_ip_recvpktinfo;
 			break;	/* goto sizeof (int) option return */
 		case IPV6_RECVTCLASS:
 			*i1 = udp->udp_ipv6_recvtclass;
@@ -3658,6 +3668,58 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 			if (!checkonly)
 				udp->udp_recvttl = onoff;
 			break;
+		case IP_PKTINFO: {
+			/*
+			 * This also handles IP_RECVPKTINFO.
+			 * IP_PKTINFO and IP_RECVPKTINFO have same value.
+			 * Differentiation is based on the size of the
+			 * argument passed in.
+			 */
+			struct in_pktinfo *pktinfop;
+			ip4_pkt_t *attr_pktinfop;
+
+			if (checkonly)
+				break;
+
+			if (inlen == sizeof (int)) {
+				/*
+				 * This is IP_RECVPKTINFO option.
+				 * Keep a local copy of whether this option is
+				 * set or not and pass it down to IP for
+				 * processing.
+				 */
+
+				udp->udp_ip_recvpktinfo = onoff;
+				return (-EINVAL);
+			}
+
+			if (attrs == NULL ||
+			    (attr_pktinfop = attrs->udpattr_ipp4) == NULL) {
+				/*
+				 * sticky option or no buffer to return
+				 * the results.
+				 */
+				return (EINVAL);
+			}
+
+			if (inlen != sizeof (struct in_pktinfo))
+				return (EINVAL);
+
+			pktinfop = (struct in_pktinfo *)invalp;
+
+			/*
+			 * At least one of the values should be specified
+			 */
+			if (pktinfop->ipi_ifindex == 0 &&
+			    pktinfop->ipi_spec_dst.s_addr == INADDR_ANY) {
+				return (EINVAL);
+			}
+
+			attr_pktinfop->ip4_addr = pktinfop->ipi_spec_dst.s_addr;
+			attr_pktinfop->ip4_ill_index = pktinfop->ipi_ifindex;
+
+			break;
+		}
 		case IP_ADD_MEMBERSHIP:
 		case IP_DROP_MEMBERSHIP:
 		case IP_BLOCK_SOURCE:
@@ -3707,7 +3769,8 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 		 * Deal with both sticky options and ancillary data
 		 */
 		sticky = B_FALSE;
-		if (attrs == NULL || (ipp = attrs->udpattr_ipp) == NULL) {
+		if (attrs == NULL || (ipp = attrs->udpattr_ipp6) ==
+		    NULL) {
 			/* sticky options, or none */
 			ipp = &udp->udp_sticky_ipp;
 			sticky = B_TRUE;
@@ -3801,7 +3864,7 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 		 */
 		case IPV6_RECVPKTINFO:
 			if (!checkonly)
-				udp->udp_ipv6_recvpktinfo = onoff;
+				udp->udp_ip_recvpktinfo = onoff;
 			break;
 		case IPV6_RECVTCLASS:
 			if (!checkonly) {
@@ -4492,7 +4555,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 	ip6i_t			*ip6i;
 	mblk_t			*mp1;
 	mblk_t			*options_mp = NULL;
-	in_pktinfo_t		*pinfo = NULL;
+	ip_pktinfo_t		*pinfo = NULL;
 	cred_t			*cr = NULL;
 	queue_t			*q = connp->conn_rq;
 	pid_t			cpid;
@@ -4512,15 +4575,15 @@ udp_input(conn_t *connp, mblk_t *mp)
 	 * a valid ICMP message
 	 */
 	if (DB_TYPE(mp) == M_CTL) {
-		if (MBLKL(mp) == sizeof (in_pktinfo_t) &&
-		    ((in_pktinfo_t *)mp->b_rptr)->in_pkt_ulp_type ==
+		if (MBLKL(mp) == sizeof (ip_pktinfo_t) &&
+		    ((ip_pktinfo_t *)mp->b_rptr)->ip_pkt_ulp_type ==
 		    IN_PKTINFO) {
 			/*
-			 * IP_RECVIF or IP_RECVSLLA information has been
-			 * appended to the packet by IP. We need to
+			 * IP_RECVIF or IP_RECVSLLA or IPF_RECVADDR information
+			 * has been appended to the packet by IP. We need to
 			 * extract the mblk and adjust the rptr
 			 */
-			pinfo = (in_pktinfo_t *)mp->b_rptr;
+			pinfo = (ip_pktinfo_t *)mp->b_rptr;
 			options_mp = mp;
 			mp = mp->b_cont;
 			rptr = mp->b_rptr;
@@ -4589,10 +4652,10 @@ udp_input(conn_t *connp, mblk_t *mp)
 
 		/* Handle IPV6_RECVHOPLIMIT. */
 		if ((udp->udp_family == AF_INET6) && (pinfo != NULL) &&
-		    udp->udp_ipv6_recvpktinfo) {
-			if (pinfo->in_pkt_flags & IPF_RECVIF) {
+		    udp->udp_ip_recvpktinfo) {
+			if (pinfo->ip_pkt_flags & IPF_RECVIF) {
 				ipp.ipp_fields |= IPPF_IFINDEX;
-				ipp.ipp_ifindex = pinfo->in_pkt_ifindex;
+				ipp.ipp_ifindex = pinfo->ip_pkt_ifindex;
 			}
 		}
 		break;
@@ -4691,18 +4754,25 @@ udp_input(conn_t *connp, mblk_t *mp)
 			UDP_STAT(udp_in_recvdstaddr);
 		}
 
+		if (udp->udp_ip_recvpktinfo && (pinfo != NULL) &&
+		    (pinfo->ip_pkt_flags & IPF_RECVADDR)) {
+			udi_size += sizeof (struct T_opthdr) +
+			    sizeof (struct in_pktinfo);
+			UDP_STAT(udp_ip_recvpktinfo);
+		}
+
 		/*
 		 * If the IP_RECVSLLA or the IP_RECVIF is set then allocate
 		 * space accordingly
 		 */
 		if (udp->udp_recvif && (pinfo != NULL) &&
-		    (pinfo->in_pkt_flags & IPF_RECVIF)) {
+		    (pinfo->ip_pkt_flags & IPF_RECVIF)) {
 			udi_size += sizeof (struct T_opthdr) + sizeof (uint_t);
 			UDP_STAT(udp_in_recvif);
 		}
 
 		if (udp->udp_recvslla && (pinfo != NULL) &&
-		    (pinfo->in_pkt_flags & IPF_RECVSLLA)) {
+		    (pinfo->ip_pkt_flags & IPF_RECVSLLA)) {
 			udi_size += sizeof (struct T_opthdr) +
 			    sizeof (struct sockaddr_dl);
 			UDP_STAT(udp_in_recvslla);
@@ -4794,8 +4864,31 @@ udp_input(conn_t *connp, mblk_t *mp)
 				udi_size -= toh->len;
 			}
 
+			if (udp->udp_ip_recvpktinfo && (pinfo != NULL) &&
+			    (pinfo->ip_pkt_flags & IPF_RECVADDR)) {
+				struct T_opthdr *toh;
+				struct in_pktinfo *pktinfop;
+
+				toh = (struct T_opthdr *)dstopt;
+				toh->level = IPPROTO_IP;
+				toh->name = IP_PKTINFO;
+				toh->len = sizeof (struct T_opthdr) +
+				    sizeof (*pktinfop);
+				toh->status = 0;
+				dstopt += sizeof (struct T_opthdr);
+				pktinfop = (struct in_pktinfo *)dstopt;
+				pktinfop->ipi_ifindex = pinfo->ip_pkt_ifindex;
+				pktinfop->ipi_spec_dst =
+				    pinfo->ip_pkt_match_addr;
+				pktinfop->ipi_addr.s_addr =
+				    ((ipha_t *)rptr)->ipha_dst;
+
+				dstopt += sizeof (struct in_pktinfo);
+				udi_size -= toh->len;
+			}
+
 			if (udp->udp_recvslla && (pinfo != NULL) &&
-			    (pinfo->in_pkt_flags & IPF_RECVSLLA)) {
+			    (pinfo->ip_pkt_flags & IPF_RECVSLLA)) {
 
 				struct T_opthdr *toh;
 				struct sockaddr_dl	*dstptr;
@@ -4808,14 +4901,14 @@ udp_input(conn_t *connp, mblk_t *mp)
 				toh->status = 0;
 				dstopt += sizeof (struct T_opthdr);
 				dstptr = (struct sockaddr_dl *)dstopt;
-				bcopy(&pinfo->in_pkt_slla, dstptr,
+				bcopy(&pinfo->ip_pkt_slla, dstptr,
 				    sizeof (struct sockaddr_dl));
 				dstopt = (char *)toh + toh->len;
 				udi_size -= toh->len;
 			}
 
 			if (udp->udp_recvif && (pinfo != NULL) &&
-			    (pinfo->in_pkt_flags & IPF_RECVIF)) {
+			    (pinfo->ip_pkt_flags & IPF_RECVIF)) {
 
 				struct T_opthdr *toh;
 				uint_t		*dstptr;
@@ -4828,7 +4921,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				toh->status = 0;
 				dstopt += sizeof (struct T_opthdr);
 				dstptr = (uint_t *)dstopt;
-				*dstptr = pinfo->in_pkt_ifindex;
+				*dstptr = pinfo->ip_pkt_ifindex;
 				dstopt = (char *)toh + toh->len;
 				udi_size -= toh->len;
 			}
@@ -4941,7 +5034,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				    ipp.ipp_rthdrlen;
 				UDP_STAT(udp_in_recvrthdr);
 			}
-			if (udp->udp_ipv6_recvpktinfo &&
+			if (udp->udp_ip_recvpktinfo &&
 			    (ipp.ipp_fields & IPPF_IFINDEX)) {
 				udi_size += sizeof (struct T_opthdr) +
 				    sizeof (struct in6_pktinfo);
@@ -5019,7 +5112,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 			uchar_t *dstopt;
 
 			dstopt = (uchar_t *)&sin6[1];
-			if (udp->udp_ipv6_recvpktinfo &&
+			if (udp->udp_ip_recvpktinfo &&
 			    (ipp.ipp_fields & IPPF_IFINDEX)) {
 				struct T_opthdr *toh;
 				struct in6_pktinfo *pkti;
@@ -5221,7 +5314,7 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 	sin_t			*sin;
 	struct T_error_ack	*tea;
 	mblk_t			*options_mp = NULL;
-	in_pktinfo_t		*pinfo;
+	ip_pktinfo_t		*pinfo;
 	boolean_t		recv_on = B_FALSE;
 	cred_t			*cr = NULL;
 	udp_t			*udp = Q_TO_UDP(q);
@@ -5241,7 +5334,7 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 		 */
 		recv_on = B_TRUE;
 		options_mp = mp;
-		pinfo = (in_pktinfo_t *)options_mp->b_rptr;
+		pinfo = (ip_pktinfo_t *)options_mp->b_rptr;
 
 		/*
 		 * The actual data is in mp->b_cont
@@ -5393,6 +5486,14 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 		udi_size += sizeof (struct T_opthdr) + sizeof (struct in_addr);
 		UDP_STAT(udp_in_recvdstaddr);
 	}
+
+	if (udp->udp_ip_recvpktinfo && recv_on &&
+	    (pinfo->ip_pkt_flags & IPF_RECVADDR)) {
+		udi_size += sizeof (struct T_opthdr) +
+		    sizeof (struct in_pktinfo);
+		UDP_STAT(udp_ip_recvpktinfo);
+	}
+
 	if (udp->udp_recvopts && opt_len > 0) {
 		udi_size += sizeof (struct T_opthdr) + opt_len;
 		UDP_STAT(udp_in_recvopts);
@@ -5403,13 +5504,13 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 	 * space accordingly
 	 */
 	if (udp->udp_recvif && recv_on &&
-	    (pinfo->in_pkt_flags & IPF_RECVIF)) {
+	    (pinfo->ip_pkt_flags & IPF_RECVIF)) {
 		udi_size += sizeof (struct T_opthdr) + sizeof (uint_t);
 		UDP_STAT(udp_in_recvif);
 	}
 
 	if (udp->udp_recvslla && recv_on &&
-	    (pinfo->in_pkt_flags & IPF_RECVSLLA)) {
+	    (pinfo->ip_pkt_flags & IPF_RECVSLLA)) {
 		udi_size += sizeof (struct T_opthdr) +
 		    sizeof (struct sockaddr_dl);
 		UDP_STAT(udp_in_recvslla);
@@ -5499,9 +5600,31 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 			dstopt += opt_len;
 			udi_size -= toh->len;
 		}
+		if (udp->udp_ip_recvpktinfo && recv_on &&
+		    (pinfo->ip_pkt_flags & IPF_RECVADDR)) {
+
+			struct T_opthdr *toh;
+			struct in_pktinfo *pktinfop;
+
+			toh = (struct T_opthdr *)dstopt;
+			toh->level = IPPROTO_IP;
+			toh->name = IP_PKTINFO;
+			toh->len = sizeof (struct T_opthdr) +
+			sizeof (*pktinfop);
+			toh->status = 0;
+			dstopt += sizeof (struct T_opthdr);
+			pktinfop = (struct in_pktinfo *)dstopt;
+			pktinfop->ipi_ifindex = pinfo->ip_pkt_ifindex;
+			pktinfop->ipi_spec_dst = pinfo->ip_pkt_match_addr;
+
+			pktinfop->ipi_addr.s_addr = ((ipha_t *)rptr)->ipha_dst;
+
+			dstopt += sizeof (struct in_pktinfo);
+			udi_size -= toh->len;
+		}
 
 		if (udp->udp_recvslla && recv_on &&
-		    (pinfo->in_pkt_flags & IPF_RECVSLLA)) {
+		    (pinfo->ip_pkt_flags & IPF_RECVSLLA)) {
 
 			struct T_opthdr *toh;
 			struct sockaddr_dl	*dstptr;
@@ -5514,14 +5637,14 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 			toh->status = 0;
 			dstopt += sizeof (struct T_opthdr);
 			dstptr = (struct sockaddr_dl *)dstopt;
-			bcopy(&pinfo->in_pkt_slla, dstptr,
+			bcopy(&pinfo->ip_pkt_slla, dstptr,
 			    sizeof (struct sockaddr_dl));
 			dstopt += sizeof (struct sockaddr_dl);
 			udi_size -= toh->len;
 		}
 
 		if (udp->udp_recvif && recv_on &&
-		    (pinfo->in_pkt_flags & IPF_RECVIF)) {
+		    (pinfo->ip_pkt_flags & IPF_RECVIF)) {
 
 			struct T_opthdr *toh;
 			uint_t		*dstptr;
@@ -5534,7 +5657,7 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 			toh->status = 0;
 			dstopt += sizeof (struct T_opthdr);
 			dstptr = (uint_t *)dstopt;
-			*dstptr = pinfo->in_pkt_ifindex;
+			*dstptr = pinfo->ip_pkt_ifindex;
 			dstopt += sizeof (uint_t);
 			udi_size -= toh->len;
 		}
@@ -6269,8 +6392,16 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	udpattrs_t	attrs;
 	uchar_t	ip_snd_opt[IP_MAX_OPT_LENGTH];
 	uint32_t	ip_snd_opt_len = 0;
+	ip4_pkt_t  pktinfo;
+	ip4_pkt_t  *pktinfop = &pktinfo;
+	ip_opt_info_t optinfo;
+
 
 	*error = 0;
+	pktinfop->ip4_ill_index = 0;
+	pktinfop->ip4_addr = INADDR_ANY;
+	optinfo.ip_opt_flags = 0;
+	optinfo.ip_opt_ill_index = 0;
 
 	if (v4dst == INADDR_ANY)
 		v4dst = htonl(INADDR_LOOPBACK);
@@ -6282,7 +6413,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	if (DB_TYPE(mp) != M_DATA) {
 		mp1 = mp->b_cont;
 		if (((struct T_unitdata_req *)mp->b_rptr)->OPT_length != 0) {
-			attrs.udpattr_ipp = NULL;
+			attrs.udpattr_ipp4 = pktinfop;
 			attrs.udpattr_mb = mp;
 			if (udp_unitdata_opt_process(q, mp, error, &attrs) < 0)
 				goto done;
@@ -6371,17 +6502,27 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	/* Set ttl and protocol */
 	*(uint16_t *)&ipha->ipha_ttl = (IPPROTO_UDP << 8) | udp->udp_ttl;
 #endif
-	/*
-	 * Copy our address into the packet.  If this is zero,
-	 * first look at __sin6_src_id for a hint. If we leave the source
-	 * as INADDR_ANY then ip will fill in the real source address.
-	 */
-	IN6_V4MAPPED_TO_IPADDR(&udp->udp_v6src, ipha->ipha_src);
-	if (srcid != 0 && ipha->ipha_src == INADDR_ANY) {
-		in6_addr_t v6src;
+	if (pktinfop->ip4_addr != INADDR_ANY) {
+		ipha->ipha_src = pktinfop->ip4_addr;
+		optinfo.ip_opt_flags = IP_VERIFY_SRC;
+	} else {
+		/*
+		 * Copy our address into the packet.  If this is zero,
+		 * first look at __sin6_src_id for a hint. If we leave the
+		 * source as INADDR_ANY then ip will fill in the real source
+		 * address.
+		 */
+		IN6_V4MAPPED_TO_IPADDR(&udp->udp_v6src, ipha->ipha_src);
+		if (srcid != 0 && ipha->ipha_src == INADDR_ANY) {
+			in6_addr_t v6src;
 
-		ip_srcid_find_id(srcid, &v6src, connp->conn_zoneid);
-		IN6_V4MAPPED_TO_IPADDR(&v6src, ipha->ipha_src);
+			ip_srcid_find_id(srcid, &v6src, connp->conn_zoneid);
+			IN6_V4MAPPED_TO_IPADDR(&v6src, ipha->ipha_src);
+		}
+	}
+
+	if (pktinfop->ip4_ill_index != 0) {
+		optinfo.ip_opt_ill_index = pktinfop->ip4_ill_index;
 	}
 
 	ipha->ipha_fragment_offset_and_flags = 0;
@@ -6477,6 +6618,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 			ip_len <<= 16;
 #endif
 	}
+
 	/* Set UDP length and checksum */
 	*((uint32_t *)&udpha->uha_length) = ip_len;
 	if (DB_CRED(mp) != NULL)
@@ -6500,11 +6642,13 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	    CONN_OUTBOUND_POLICY_PRESENT(connp) ||
 	    connp->conn_dontroute || connp->conn_xmit_if_ill != NULL ||
 	    connp->conn_nofailover_ill != NULL ||
-	    connp->conn_outgoing_ill != NULL ||
+	    connp->conn_outgoing_ill != NULL || optinfo.ip_opt_flags != 0 ||
+	    optinfo.ip_opt_ill_index != 0 ||
 	    ipha->ipha_version_and_hdr_length != IP_SIMPLE_HDR_VERSION ||
 	    IPP_ENABLED(IPP_LOCAL_OUT) || ip_g_mrouter != NULL) {
 		UDP_STAT(udp_ip_send);
-		ip_output(connp, mp1, connp->conn_wq, IP_WPUT);
+		ip_output_options(connp, mp1, connp->conn_wq, IP_WPUT,
+		    &optinfo);
 	} else {
 		udp_send_data(udp, connp->conn_wq, mp1, ipha);
 	}
@@ -7168,7 +7312,7 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error)
 	if (DB_TYPE(mp) != M_DATA) {
 		mp1 = mp->b_cont;
 		if (((struct T_unitdata_req *)mp->b_rptr)->OPT_length != 0) {
-			attrs.udpattr_ipp = ipp;
+			attrs.udpattr_ipp6 = ipp;
 			attrs.udpattr_mb = mp;
 			if (udp_unitdata_opt_process(q, mp, error, &attrs) < 0)
 				goto done;

@@ -84,7 +84,7 @@ typedef	struct icmp_s {
 	    icmp_raw_checksum : 1,	/* raw checksum per IPV6_CHECKSUM */
 	    icmp_no_tp_cksum : 1,	/* icmp_proto is UDP or TCP */
 
-	    icmp_ipv6_recvpktinfo : 1,	/* IPV6_RECVPKTINFO option  */
+	    icmp_ip_recvpktinfo : 1,	/* IPV[4,6]_RECVPKTINFO option  */
 	    icmp_ipv6_recvhoplimit : 1,	/* IPV6_RECVHOPLIMIT option */
 	    icmp_ipv6_recvhopopts : 1,	/* IPV6_RECVHOPOPTS option */
 	    icmp_ipv6_recvdstopts : 1,	/* IPV6_RECVDSTOPTS option */

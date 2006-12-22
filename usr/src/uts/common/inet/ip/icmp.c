@@ -76,6 +76,11 @@
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
 
+#include <inet/ip_ire.h>
+#include <inet/ip_if.h>
+
+#include <inet/ip_impl.h>
+
 #define	ICMP6 "icmp6"
 major_t	ICMP6_MAJ;
 
@@ -1624,6 +1629,17 @@ icmp_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 		case IP_RECVIF:
 			*ptr = icmp->icmp_recvif;
 			break;	/* goto sizeof (int) option return */
+		case IP_RECVPKTINFO:
+			/*
+			 * This also handles IP_PKTINFO.
+			 * IP_PKTINFO and IP_RECVPKTINFO have the same value.
+			 * Differentiation is based on the size of the argument
+			 * passed in.
+			 * This option is handled in IP which will return an
+			 * error for IP_PKTINFO as it's not supported as a
+			 * sticky option.
+			 */
+			return (-EINVAL);
 		/*
 		 * Cannot "get" the value of following options
 		 * at this level. Action is same as "default" to
@@ -1709,7 +1725,7 @@ icmp_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 			/* cannot "get" the value for these */
 			return (-1);
 		case IPV6_RECVPKTINFO:
-			*i1 = icmp->icmp_ipv6_recvpktinfo;
+			*i1 = icmp->icmp_ip_recvpktinfo;
 			break;
 		case IPV6_RECVTCLASS:
 			*i1 = icmp->icmp_ipv6_recvtclass;
@@ -2138,6 +2154,57 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (!checkonly)
 				icmp->icmp_recvif = onoff;
 			break;
+
+		case IP_PKTINFO: {
+			/*
+			 * This also handles IP_RECVPKTINFO.
+			 * IP_PKTINFO and IP_RECVPKTINFO have the same value.
+			 * Differentiation is based on the size of the argument
+			 * passed in.
+			 */
+			struct in_pktinfo *pktinfop;
+			ip4_pkt_t *attr_pktinfop;
+
+			if (checkonly)
+				break;
+
+			if (inlen == sizeof (int)) {
+				/*
+				 * This is IP_RECVPKTINFO option.
+				 * Keep a local copy of wether this option is
+				 * set or not and pass it down to IP for
+				 * processing.
+				 */
+				icmp->icmp_ip_recvpktinfo = onoff;
+				return (-EINVAL);
+			}
+
+
+			if (inlen != sizeof (struct in_pktinfo))
+				return (EINVAL);
+
+			if ((attr_pktinfop = (ip4_pkt_t *)thisdg_attrs)
+			    == NULL) {
+				/*
+				 * sticky option is not supported
+				 */
+				return (EINVAL);
+			}
+
+			pktinfop = (struct in_pktinfo *)invalp;
+
+			/*
+			 * Atleast one of the values should be specified
+			 */
+			if (pktinfop->ipi_ifindex == 0 &&
+			    pktinfop->ipi_spec_dst.s_addr == INADDR_ANY) {
+				return (EINVAL);
+			}
+
+			attr_pktinfop->ip4_addr = pktinfop->ipi_spec_dst.s_addr;
+			attr_pktinfop->ip4_ill_index = pktinfop->ipi_ifindex;
+		}
+			break;
 		case IP_ADD_MEMBERSHIP:
 		case IP_DROP_MEMBERSHIP:
 		case IP_BLOCK_SOURCE:
@@ -2319,7 +2386,7 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 		 */
 		case IPV6_RECVPKTINFO:
 			if (!checkonly)
-				icmp->icmp_ipv6_recvpktinfo = onoff;
+				icmp->icmp_ip_recvpktinfo = onoff;
 			break;
 		case IPV6_RECVPATHMTU:
 			if (!checkonly)
@@ -2879,7 +2946,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 	ip6_pkt_t		ipp;
 	uint8_t			nexthdr;
 	boolean_t		recvif = B_FALSE;
-	in_pktinfo_t		*pinfo;
+	ip_pktinfo_t		*pinfo = NULL;
 	mblk_t			*options_mp = NULL;
 	uint_t			icmp_opt = 0;
 	boolean_t		icmp_ipv6_recvhoplimit = B_FALSE;
@@ -2901,9 +2968,10 @@ icmp_rput(queue_t *q, mblk_t *mp)
 			freeb(mp);
 			mp = mp1;
 		} else {
-			pinfo = (in_pktinfo_t *)mp->b_rptr;
-			if ((icmp->icmp_recvif != 0) &&
-			    (pinfo->in_pkt_ulp_type == IN_PKTINFO)) {
+			pinfo = (ip_pktinfo_t *)mp->b_rptr;
+			if ((icmp->icmp_recvif != 0 ||
+			    icmp->icmp_ip_recvpktinfo) &&
+			    (pinfo->ip_pkt_ulp_type == IN_PKTINFO)) {
 				/*
 				 * IP has passed the options in mp and the
 				 * actual data is in b_cont.
@@ -3100,10 +3168,18 @@ icmp_rput(queue_t *q, mblk_t *mp)
 	if (icmp->icmp_family == AF_INET) {
 		ASSERT(ipvers == IPV4_VERSION);
 		udi_size =  sizeof (struct T_unitdata_ind) + sizeof (sin_t);
-		if (recvif) {
+		if (icmp->icmp_recvif && recvif &&
+		    (pinfo->ip_pkt_flags & IPF_RECVIF)) {
 			udi_size += sizeof (struct T_opthdr) +
 			    sizeof (uint_t);
 		}
+
+		if (icmp->icmp_ip_recvpktinfo && recvif &&
+		    (pinfo->ip_pkt_flags & IPF_RECVADDR)) {
+			udi_size += sizeof (struct T_opthdr) +
+			    sizeof (struct in_pktinfo);
+		}
+
 		/*
 		 * If SO_TIMESTAMP is set allocate the appropriate sized
 		 * buffer. Since gethrestime() expects a pointer aligned
@@ -3146,7 +3222,8 @@ icmp_rput(queue_t *q, mblk_t *mp)
 			char *dstopt;
 
 			dstopt = (char *)&sin[1];
-			if (recvif) {
+			if (icmp->icmp_recvif && recvif &&
+			    (pinfo->ip_pkt_flags & IPF_RECVIF)) {
 
 				struct T_opthdr *toh;
 				uint_t		*dstptr;
@@ -3159,7 +3236,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 				toh->status = 0;
 				dstopt += sizeof (struct T_opthdr);
 				dstptr = (uint_t *)dstopt;
-				*dstptr = pinfo->in_pkt_ifindex;
+				*dstptr = pinfo->ip_pkt_ifindex;
 				dstopt += sizeof (uint_t);
 				freeb(options_mp);
 				udi_size -= toh->len;
@@ -3178,7 +3255,29 @@ icmp_rput(queue_t *q, mblk_t *mp)
 				dstopt = (char *)P2ROUNDUP((intptr_t)dstopt,
 				    sizeof (intptr_t));
 				gethrestime((timestruc_t *)dstopt);
-				dstopt += sizeof (timestruc_t);
+				dstopt = (char *)toh + toh->len;
+				udi_size -= toh->len;
+			}
+			if (icmp->icmp_ip_recvpktinfo && recvif &&
+			    (pinfo->ip_pkt_flags & IPF_RECVADDR)) {
+				struct	T_opthdr *toh;
+				struct	in_pktinfo *pktinfop;
+
+				toh = (struct T_opthdr *)dstopt;
+				toh->level = IPPROTO_IP;
+				toh->name = IP_PKTINFO;
+				toh->len = sizeof (struct T_opthdr) +
+				    sizeof (in_pktinfo_t);
+				toh->status = 0;
+				dstopt += sizeof (struct T_opthdr);
+				pktinfop = (struct in_pktinfo *)dstopt;
+				pktinfop->ipi_ifindex = pinfo->ip_pkt_ifindex;
+				pktinfop->ipi_spec_dst =
+				    pinfo->ip_pkt_match_addr;
+
+				pktinfop->ipi_addr.s_addr = ipha->ipha_dst;
+
+				dstopt += sizeof (struct in_pktinfo);
 				udi_size -= toh->len;
 			}
 
@@ -3395,7 +3494,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 			    ipp.ipp_rthdrlen;
 			icmp_opt |= IPPF_RTHDR;
 		}
-		if (icmp->icmp_ipv6_recvpktinfo &&
+		if (icmp->icmp_ip_recvpktinfo &&
 		    (ipp.ipp_fields & IPPF_IFINDEX)) {
 			udi_size += sizeof (struct T_opthdr) +
 			    sizeof (struct in6_pktinfo);
@@ -3827,14 +3926,18 @@ icmp_unbind(queue_t *q, mblk_t *mp)
  * IPPROTO_IGMP).
  */
 static void
-icmp_wput_hdrincl(queue_t *q, mblk_t *mp, icmp_t *icmp)
+icmp_wput_hdrincl(queue_t *q, mblk_t *mp, icmp_t *icmp, ip4_pkt_t *pktinfop,
+boolean_t use_putnext)
 {
 	ipha_t	*ipha;
 	int	ip_hdr_length;
 	int	tp_hdr_len;
 	mblk_t	*mp1;
 	uint_t	pkt_len;
+	ip_opt_info_t optinfo;
 
+	optinfo.ip_opt_flags = 0;
+	optinfo.ip_opt_ill_index = 0;
 	ipha = (ipha_t *)mp->b_rptr;
 	ip_hdr_length = IP_SIMPLE_HDR_LENGTH + icmp->icmp_ip_snd_options_len;
 	if ((mp->b_wptr - mp->b_rptr) < IP_SIMPLE_HDR_LENGTH) {
@@ -3931,8 +4034,30 @@ icmp_wput_hdrincl(queue_t *q, mblk_t *mp, icmp_t *icmp)
 		 */
 		(void) ip_massage_options(ipha);
 	}
+
+	if (pktinfop != NULL) {
+		/*
+		 * Over write the source address provided in the header
+		 */
+		if (pktinfop->ip4_addr != INADDR_ANY) {
+			ipha->ipha_src = pktinfop->ip4_addr;
+			optinfo.ip_opt_flags = IP_VERIFY_SRC;
+			ASSERT(use_putnext == B_FALSE);
+		}
+
+		if (pktinfop->ip4_ill_index != 0) {
+			optinfo.ip_opt_ill_index = pktinfop->ip4_ill_index;
+			ASSERT(use_putnext == B_FALSE);
+		}
+	}
+
 	mblk_setcred(mp, icmp->icmp_credp);
-	putnext(q, mp);
+	if (use_putnext) {
+		putnext(q, mp);
+	} else {
+		ip_output_options(Q_TO_CONN(q->q_next), mp, q->q_next, IP_WPUT,
+		    &optinfo);
+	}
 }
 
 static boolean_t
@@ -3979,6 +4104,11 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	sin6_t	*sin6;
 	sin_t	*sin;
 	ipaddr_t	v4dst;
+	ip4_pkt_t	pktinfo;
+	ip4_pkt_t	*pktinfop = &pktinfo;
+	ip_opt_info_t	optinfo;
+	queue_t		*ip_wq;
+	boolean_t	use_putnext = B_TRUE;
 
 	icmp = (icmp_t *)q->q_ptr;
 	if (icmp->icmp_restricted) {
@@ -4011,7 +4141,7 @@ icmp_wput(queue_t *q, mblk_t *mp)
 			    !icmp_update_label(q, icmp, mp, ipha->ipha_dst)) {
 				return;
 			}
-			icmp_wput_hdrincl(q, mp, icmp);
+			icmp_wput_hdrincl(q, mp, icmp, NULL, use_putnext);
 			return;
 		}
 		freemsg(mp);
@@ -4032,6 +4162,8 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	}
 
 	/* Handle T_UNITDATA_REQ messages here. */
+
+
 
 	if (icmp->icmp_state == TS_UNBND) {
 		/* If a port has not been bound to the stream, fail. */
@@ -4094,25 +4226,47 @@ icmp_wput(queue_t *q, mblk_t *mp)
 		ASSERT(0);
 	}
 
+	pktinfop->ip4_ill_index = 0;
+	pktinfop->ip4_addr = INADDR_ANY;
+	optinfo.ip_opt_flags = 0;
+	optinfo.ip_opt_ill_index = 0;
+
+
 	/*
 	 * If options passed in, feed it for verification and handling
 	 */
 	if (tudr->OPT_length != 0) {
 		int error;
 
+		error = 0;
 		if (icmp_unitdata_opt_process(q, mp, &error,
-		    (uchar_t *)0) < 0) {
+		    (void *)pktinfop) < 0) {
 			/* failure */
 			BUMP_MIB(&rawip_mib, rawipOutErrors);
 			icmp_ud_err(q, mp, error);
 			return;
 		}
+		ASSERT(error == 0);
 		/*
 		 * Note: Success in processing options.
 		 * mp option buffer represented by
 		 * OPT_length/offset now potentially modified
 		 * and contain option setting results
 		 */
+
+		if (pktinfop->ip4_ill_index != 0 ||
+		    pktinfop->ip4_addr != INADDR_ANY) {
+			/*
+			 * PKTINFO option is supported only when ICMP is
+			 * over IP.
+			 */
+			ip_wq = WR(q)->q_next;
+			if (NOT_OVER_IP(ip_wq)) {
+				icmp_ud_err(q, mp, EINVAL);
+				return;
+			}
+			use_putnext = B_FALSE;
+		}
 	}
 
 	if (v4dst == INADDR_ANY)
@@ -4129,9 +4283,10 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	/* Protocol 255 contains full IP headers */
 	if (icmp->icmp_hdrincl) {
 		freeb(mp);
-		icmp_wput_hdrincl(q, mp1, icmp);
+		icmp_wput_hdrincl(q, mp1, icmp, pktinfop, use_putnext);
 		return;
 	}
+
 
 	/* Add an IP header */
 	ip_hdr_length = IP_SIMPLE_HDR_LENGTH + icmp->icmp_ip_snd_options_len;
@@ -4165,12 +4320,26 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	/* Set ttl and protocol */
 	*(uint16_t *)&ipha->ipha_ttl = (icmp->icmp_proto << 8) | icmp->icmp_ttl;
 #endif
-	/*
-	 * Copy our address into the packet.  If this is zero,
-	 * ip will fill in the real source address.
-	 */
-	IN6_V4MAPPED_TO_IPADDR(&icmp->icmp_v6src, ipha->ipha_src);
+	if (pktinfop->ip4_addr != INADDR_ANY) {
+		ASSERT(use_putnext == B_FALSE);
+		ipha->ipha_src = pktinfop->ip4_addr;
+		optinfo.ip_opt_flags = IP_VERIFY_SRC;
+	} else {
+
+		/*
+		 * Copy our address into the packet.  If this is zero,
+		 * ip will fill in the real source address.
+		 */
+		IN6_V4MAPPED_TO_IPADDR(&icmp->icmp_v6src, ipha->ipha_src);
+	}
+
 	ipha->ipha_fragment_offset_and_flags = 0;
+
+	if (pktinfop->ip4_ill_index != 0) {
+		optinfo.ip_opt_ill_index = pktinfop->ip4_ill_index;
+		ASSERT(use_putnext == B_FALSE);
+	}
+
 
 	/*
 	 * For the socket of SOCK_RAW type, the checksum is provided in the
@@ -4221,10 +4390,16 @@ icmp_wput(queue_t *q, mblk_t *mp)
 		 */
 		(void) ip_massage_options(ipha);
 	}
+
 	freeb(mp);
 	BUMP_MIB(&rawip_mib, rawipOutDatagrams);
 	mblk_setcred(mp1, icmp->icmp_credp);
-	putnext(q, mp1);
+	if (use_putnext) {
+		putnext(q, mp1);
+	} else {
+		ip_output_options(Q_TO_CONN(q->q_next), mp1, q->q_next, IP_WPUT,
+		    &optinfo);
+	}
 #undef	ipha
 #undef tudr
 }

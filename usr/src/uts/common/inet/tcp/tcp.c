@@ -12540,7 +12540,7 @@ mblk_t *
 tcp_find_pktinfo(tcp_t *tcp, mblk_t *mp, uint_t *ipversp, uint_t *ip_hdr_lenp,
     uint_t *ifindexp, ip6_pkt_t *ippp)
 {
-	in_pktinfo_t	*pinfo;
+	ip_pktinfo_t	*pinfo;
 	ip6_t		*ip6h;
 	uchar_t		*rptr;
 	mblk_t		*first_mp = mp;
@@ -12591,13 +12591,13 @@ tcp_find_pktinfo(tcp_t *tcp, mblk_t *mp, uint_t *ipversp, uint_t *ip_hdr_lenp,
 		 */
 		if ((tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVPKTINFO) &&
 		    mctl_present) {
-			pinfo = (in_pktinfo_t *)first_mp->b_rptr;
-			if ((MBLKL(first_mp) == sizeof (in_pktinfo_t)) &&
-			    (pinfo->in_pkt_ulp_type == IN_PKTINFO) &&
-			    (pinfo->in_pkt_flags & IPF_RECVIF)) {
+			pinfo = (ip_pktinfo_t *)first_mp->b_rptr;
+			if ((MBLKL(first_mp) == sizeof (ip_pktinfo_t)) &&
+			    (pinfo->ip_pkt_ulp_type == IN_PKTINFO) &&
+			    (pinfo->ip_pkt_flags & IPF_RECVIF)) {
 				ipp.ipp_fields |= IPPF_IFINDEX;
-				ipp.ipp_ifindex = pinfo->in_pkt_ifindex;
-				ifindex = pinfo->in_pkt_ifindex;
+				ipp.ipp_ifindex = pinfo->ip_pkt_ifindex;
+				ifindex = pinfo->ip_pkt_ifindex;
 			}
 			freeb(first_mp);
 			mctl_present = B_FALSE;

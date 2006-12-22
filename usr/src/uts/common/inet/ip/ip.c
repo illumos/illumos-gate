@@ -746,7 +746,7 @@ ipaddr_t	ip_net_mask(ipaddr_t);
 void		ip_newroute(queue_t *, mblk_t *, ipaddr_t, ill_t *, conn_t *,
 		    zoneid_t);
 static void	ip_newroute_ipif(queue_t *, mblk_t *, ipif_t *, ipaddr_t,
-		    conn_t *, uint32_t, zoneid_t);
+		    conn_t *, uint32_t, zoneid_t, ip_opt_info_t *);
 char		*ip_nv_lookup(nv_t *, int);
 static boolean_t	ip_check_for_ipsec_opt(queue_t *, mblk_t *);
 static int	ip_param_get(queue_t *, mblk_t *, caddr_t, cred_t *);
@@ -4249,27 +4249,79 @@ ip_arp_news(queue_t *q, mblk_t *mp)
  * application.
  */
 mblk_t *
-ip_add_info(mblk_t *data_mp, ill_t *ill, uint_t flags)
+ip_add_info(mblk_t *data_mp, ill_t *ill, uint_t flags, zoneid_t zoneid)
 {
 	mblk_t		*mp;
-	in_pktinfo_t	*pinfo;
+	ip_pktinfo_t	*pinfo;
 	ipha_t *ipha;
 	struct ether_header *pether;
 
-	mp = allocb(sizeof (in_pktinfo_t), BPRI_MED);
+	mp = allocb(sizeof (ip_pktinfo_t), BPRI_MED);
 	if (mp == NULL) {
 		ip1dbg(("ip_add_info: allocation failure.\n"));
 		return (data_mp);
 	}
 
 	ipha	= (ipha_t *)data_mp->b_rptr;
-	pinfo = (in_pktinfo_t *)mp->b_rptr;
-	bzero(pinfo, sizeof (in_pktinfo_t));
-	pinfo->in_pkt_flags = (uchar_t)flags;
-	pinfo->in_pkt_ulp_type = IN_PKTINFO;	/* Tell ULP what type of info */
+	pinfo = (ip_pktinfo_t *)mp->b_rptr;
+	bzero(pinfo, sizeof (ip_pktinfo_t));
+	pinfo->ip_pkt_flags = (uchar_t)flags;
+	pinfo->ip_pkt_ulp_type = IN_PKTINFO;	/* Tell ULP what type of info */
 
-	if (flags & IPF_RECVIF)
-		pinfo->in_pkt_ifindex = ill->ill_phyint->phyint_ifindex;
+	if (flags & (IPF_RECVIF | IPF_RECVADDR))
+		pinfo->ip_pkt_ifindex = ill->ill_phyint->phyint_ifindex;
+	if (flags & IPF_RECVADDR) {
+		ipif_t	*ipif;
+		ire_t	*ire;
+
+		/*
+		 * Only valid for V4
+		 */
+		ASSERT((ipha->ipha_version_and_hdr_length & 0xf0) ==
+		    (IPV4_VERSION << 4));
+
+		ipif = ipif_get_next_ipif(NULL, ill);
+		if (ipif != NULL) {
+			/*
+			 * Since a decision has already been made to deliver the
+			 * packet, there is no need to test for SECATTR and
+			 * ZONEONLY.
+			 */
+			ire = ire_ctable_lookup(ipha->ipha_dst, 0, 0, ipif,
+			    zoneid, NULL, MATCH_IRE_ILL_GROUP);
+			if (ire == NULL) {
+				/*
+				 * packet must have come on a different
+				 * interface.
+				 * Since a decision has already been made to
+				 * deliver the packet, there is no need to test
+				 * for SECATTR and ZONEONLY.
+				 */
+				ire = ire_ctable_lookup(ipha->ipha_dst, 0, 0,
+				    ipif, zoneid, NULL, NULL);
+			}
+
+			if (ire == NULL) {
+				/*
+				 * This is either a multicast packet or
+				 * the address has been removed since
+				 * the packet was received.
+				 * Return INADDR_ANY so that normal source
+				 * selection occurs for the response.
+				 */
+
+				pinfo->ip_pkt_match_addr.s_addr = INADDR_ANY;
+			} else {
+				ASSERT(ire->ire_type != IRE_CACHE);
+				pinfo->ip_pkt_match_addr.s_addr =
+				    ire->ire_src_addr;
+				ire_refrele(ire);
+			}
+			ipif_refrele(ipif);
+		} else {
+			pinfo->ip_pkt_match_addr.s_addr = INADDR_ANY;
+		}
+	}
 
 	pether = (struct ether_header *)((char *)ipha
 	    - sizeof (struct ether_header));
@@ -4284,19 +4336,19 @@ ip_add_info(mblk_t *data_mp, ill_t *ill, uint_t flags)
 	    (ill->ill_type == IFT_ETHER) &&
 	    (ill->ill_net_type == IRE_IF_RESOLVER)) {
 
-		pinfo->in_pkt_slla.sdl_type = IFT_ETHER;
+		pinfo->ip_pkt_slla.sdl_type = IFT_ETHER;
 		bcopy((uchar_t *)pether->ether_shost.ether_addr_octet,
-		    (uchar_t *)pinfo->in_pkt_slla.sdl_data, ETHERADDRL);
+		    (uchar_t *)pinfo->ip_pkt_slla.sdl_data, ETHERADDRL);
 	} else {
 		/*
 		 * Clear the bit. Indicate to upper layer that IP is not
 		 * sending this ancillary info.
 		 */
-		pinfo->in_pkt_flags = pinfo->in_pkt_flags & ~IPF_RECVSLLA;
+		pinfo->ip_pkt_flags = pinfo->ip_pkt_flags & ~IPF_RECVSLLA;
 	}
 
 	mp->b_datap->db_type = M_CTL;
-	mp->b_wptr += sizeof (in_pktinfo_t);
+	mp->b_wptr += sizeof (ip_pktinfo_t);
 	mp->b_cont = data_mp;
 
 	return (mp);
@@ -6372,6 +6424,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 				    mctl_present);
 			}
 			if (first_mp1 != NULL) {
+				int in_flags = 0;
 				/*
 				 * ip_fanout_proto also gets called from
 				 * icmp_inbound_error_fanout, in which case
@@ -6381,7 +6434,28 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 				 * inbound iface index for ICMP error msgs,
 				 * then this can be changed.
 				 */
-				if ((connp->conn_recvif != 0) &&
+				if (connp->conn_recvif)
+					in_flags = IPF_RECVIF;
+				/*
+				 * The ULP may support IP_RECVPKTINFO for both
+				 * IP v4 and v6 so pass the appropriate argument
+				 * based on conn IP version.
+				 */
+				if (connp->conn_ip_recvpktinfo) {
+					if (connp->conn_af_isv6) {
+						/*
+						 * V6 only needs index
+						 */
+						in_flags |= IPF_RECVIF;
+					} else {
+						/*
+						 * V4 needs index +
+						 * matching address.
+						 */
+						in_flags |= IPF_RECVADDR;
+					}
+				}
+				if ((in_flags != 0) &&
 				    (mp->b_datap->db_type != M_CTL)) {
 					/*
 					 * the actual data will be
@@ -6392,7 +6466,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 					 */
 					ASSERT(recv_ill != NULL);
 					mp1 = ip_add_info(mp1, recv_ill,
-						IPF_RECVIF);
+					    in_flags, IPCL_ZONEID(connp));
 				}
 				BUMP_MIB(mibptr, ipIfStatsHCInDelivers);
 				if (mctl_present)
@@ -6455,6 +6529,8 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 		}
 
 		if (first_mp != NULL) {
+			int in_flags = 0;
+
 			/*
 			 * ip_fanout_proto also gets called
 			 * from icmp_inbound_error_fanout, in
@@ -6465,8 +6541,25 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 			 * index for ICMP error msgs, then this
 			 * can be changed
 			 */
-			if ((connp->conn_recvif != 0) &&
+			if (connp->conn_recvif)
+				in_flags = IPF_RECVIF;
+			if (connp->conn_ip_recvpktinfo) {
+				if (connp->conn_af_isv6) {
+					/*
+					 * V6 only needs index
+					 */
+					in_flags |= IPF_RECVIF;
+				} else {
+					/*
+					 * V4 needs index +
+					 * matching address.
+					 */
+					in_flags |= IPF_RECVADDR;
+				}
+			}
+			if ((in_flags != 0) &&
 			    (mp->b_datap->db_type != M_CTL)) {
+
 				/*
 				 * the actual data will be contained in
 				 * b_cont upon successful return
@@ -6474,7 +6567,8 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 				 * mblk is returned
 				 */
 				ASSERT(recv_ill != NULL);
-				mp = ip_add_info(mp, recv_ill, IPF_RECVIF);
+				mp = ip_add_info(mp, recv_ill,
+				    in_flags, IPCL_ZONEID(connp));
 			}
 			BUMP_MIB(mibptr, ipIfStatsHCInDelivers);
 			putnext(rq, mp);
@@ -6651,12 +6745,16 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 
 
 
-	/* Handle IPv6 socket options. */
+	/* Handle socket options. */
 	if (!syn_present &&
-	    connp->conn_ipv6_recvpktinfo && (flags & IP_FF_IP6INFO)) {
+	    connp->conn_ip_recvpktinfo && (flags & IP_FF_IPINFO)) {
 		/* Add header */
 		ASSERT(recv_ill != NULL);
-		mp = ip_add_info(mp, recv_ill, IPF_RECVIF);
+		/*
+		 * Since tcp does not support IP_RECVPKTINFO for V4, only pass
+		 * IPF_RECVIF.
+		 */
+		mp = ip_add_info(mp, recv_ill, IPF_RECVIF, IPCL_ZONEID(connp));
 		if (mp == NULL) {
 			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
 			CONN_DEC_REF(connp);
@@ -6729,14 +6827,29 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
 	if (mctl_present)
 		freeb(first_mp);
 
+	/* Handle options. */
 	if (connp->conn_recvif)
 		in_flags = IPF_RECVIF;
+	/*
+	 * UDP supports IP_RECVPKTINFO option for both v4 and v6 so the flag
+	 * passed to ip_add_info is based on IP version of connp.
+	 */
+	if (connp->conn_ip_recvpktinfo && (flags & IP_FF_IPINFO)) {
+		if (connp->conn_af_isv6) {
+			/*
+			 * V6 only needs index
+			 */
+			in_flags |= IPF_RECVIF;
+		} else {
+			/*
+			 * V4 needs index + matching address.
+			 */
+			in_flags |= IPF_RECVADDR;
+		}
+	}
+
 	if (connp->conn_recvslla && !(flags & IP_FF_SEND_SLLA))
 		in_flags |= IPF_RECVSLLA;
-
-	/* Handle IPv6 options. */
-	if (connp->conn_ipv6_recvpktinfo && (flags & IP_FF_IP6INFO))
-		in_flags |= IPF_RECVIF;
 
 	/*
 	 * Initiate IPPF processing here, if needed. Note first_mp won't be
@@ -6757,7 +6870,7 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
 		 * else original mblk is returned
 		 */
 		ASSERT(recv_ill != NULL);
-		mp = ip_add_info(mp, recv_ill, in_flags);
+		mp = ip_add_info(mp, recv_ill, in_flags, IPCL_ZONEID(connp));
 	}
 	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 	/* Send it upstream */
@@ -8888,6 +9001,8 @@ icmp_err_ret:
 	icmp_unreachable(q, first_mp, ICMP_HOST_UNREACHABLE, zoneid);
 }
 
+ip_opt_info_t zero_info;
+
 /*
  * IPv4 -
  * ip_newroute_ipif is called by ip_wput_multicast and
@@ -8916,7 +9031,7 @@ icmp_err_ret:
  */
 static void
 ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
-    conn_t *connp, uint32_t flags, zoneid_t zoneid)
+    conn_t *connp, uint32_t flags, zoneid_t zoneid, ip_opt_info_t *infop)
 {
 	areq_t	*areq;
 	ire_t	*ire = NULL;
@@ -9140,7 +9255,8 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 		 * route optimization.
 		 */
 		if (CLASSD(ipha_dst) && (connp == NULL ||
-		    connp->conn_xmit_if_ill == NULL)) {
+		    connp->conn_xmit_if_ill == NULL) &&
+		    infop->ip_opt_ill_index == 0) {
 			/* ipif_to_ire returns an held ire */
 			ire = ipif_to_ire(ipif);
 			if (ire == NULL)
@@ -9186,7 +9302,8 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 		} else {
 			ASSERT((connp == NULL) ||
 			    (connp->conn_xmit_if_ill != NULL) ||
-			    (connp->conn_dontroute));
+			    (connp->conn_dontroute) ||
+			    infop->ip_opt_ill_index != 0);
 			/*
 			 * The only ways we can come here are:
 			 * 1) IP_XMIT_IF socket option is set
@@ -9194,6 +9311,7 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			 *    ip_mrtun_forward() routine and it needs
 			 *    to go through the specified ill.
 			 * 3) SO_DONTROUTE socket option is set
+			 * 4) IP_PKTINFO option is passed in as ancillary data.
 			 * In all cases, the new ire will not be added
 			 * into cache table.
 			 */
@@ -10946,6 +11064,13 @@ ip_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				mutex_exit(&connp->conn_lock);
 			}
 			break;	/* goto sizeof (int) option return */
+		case IP_RECVPKTINFO:
+			if (!checkonly) {
+				mutex_enter(&connp->conn_lock);
+				connp->conn_ip_recvpktinfo = *i1 ? 1 : 0;
+				mutex_exit(&connp->conn_lock);
+			}
+			break;	/* goto sizeof (int) option return */
 		case IP_RECVSLLA:
 			/* Retrieve the source link layer address */
 			if (!checkonly) {
@@ -11242,7 +11367,7 @@ ip_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 		case IPV6_RECVPKTINFO:
 			if (!checkonly) {
 				mutex_enter(&connp->conn_lock);
-				connp->conn_ipv6_recvpktinfo = *i1 ? 1 : 0;
+				connp->conn_ip_recvpktinfo = *i1 ? 1 : 0;
 				mutex_exit(&connp->conn_lock);
 			}
 			break;	/* goto sizeof (int) option return */
@@ -11493,6 +11618,9 @@ ip_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 				return (sizeof (ipaddr_t));
 			} else
 				return (0);
+		case IP_RECVPKTINFO:
+			*(int *)ptr = connp->conn_ip_recvpktinfo ? 1: 0;
+			return (sizeof (int));
 		default:
 			break;
 		}
@@ -12017,10 +12145,27 @@ ip_udp_check(queue_t *q, conn_t *connp, ill_t *ill, ipha_t *ipha,
 	 * IP_RECVSLLA and/or IPV6_RECVPKTINFO options are not set
 	 */
 	if (connp->conn_recvif || connp->conn_recvslla ||
-	    connp->conn_ipv6_recvpktinfo) {
-		if (connp->conn_recvif ||
-		    connp->conn_ipv6_recvpktinfo) {
+	    connp->conn_ip_recvpktinfo) {
+		if (connp->conn_recvif) {
 			in_flags = IPF_RECVIF;
+		}
+		/*
+		 * UDP supports IP_RECVPKTINFO option for both v4 and v6
+		 * so the flag passed to ip_add_info is based on IP version
+		 * of connp.
+		 */
+		if (connp->conn_ip_recvpktinfo) {
+			if (connp->conn_af_isv6) {
+				/*
+				 * V6 only needs index
+				 */
+				in_flags |= IPF_RECVIF;
+			} else {
+				/*
+				 * V4 needs index + matching address.
+				 */
+				in_flags |= IPF_RECVADDR;
+			}
 		}
 		if (connp->conn_recvslla) {
 			in_flags |= IPF_RECVSLLA;
@@ -12036,7 +12181,7 @@ ip_udp_check(queue_t *q, conn_t *connp, ill_t *ill, ipha_t *ipha,
 		 * If the call fails then the original mblk is
 		 * returned.
 		 */
-		*mpp = ip_add_info(*mpp, ill, in_flags);
+		*mpp = ip_add_info(*mpp, ill, in_flags, IPCL_ZONEID(connp));
 	}
 
 	return (B_TRUE);
@@ -12780,7 +12925,7 @@ udpslowpath:
 
 	ip_fanout_udp(q, first_mp, ill, ipha, *(uint32_t *)up,
 	    (ire->ire_type == IRE_BROADCAST),
-	    IP_FF_SEND_ICMP | IP_FF_CKSUM | IP_FF_IP6INFO,
+	    IP_FF_SEND_ICMP | IP_FF_CKSUM | IP_FF_IPINFO,
 	    mctl_present, B_TRUE, recv_ill, ire->ire_zoneid);
 
 slow_done:
@@ -13074,8 +13219,13 @@ try_again:
 
 	}
 
-	if (!syn_present && connp->conn_ipv6_recvpktinfo) {
-		mp = ip_add_info(mp, recv_ill, flags);
+	if (!syn_present && connp->conn_ip_recvpktinfo) {
+		/*
+		 * TCP does not support IP_RECVPKTINFO for v4 so lets
+		 * make sure IPF_RECVIF is passed to ip_add_info.
+		 */
+		mp = ip_add_info(mp, recv_ill, flags|IPF_RECVIF,
+		    IPCL_ZONEID(connp));
 		if (mp == NULL) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			CONN_DEC_REF(connp);
@@ -16534,7 +16684,7 @@ ip_rput_forward_multicast(ipaddr_t dst, mblk_t *mp, ipif_t *ipif)
 		mp->b_prev = NULL;
 		mp->b_next = mp;
 		ip_newroute_ipif(ipif->ipif_ill->ill_wq, mp, ipif, dst,
-		    NULL, 0, GLOBAL_ZONEID);
+		    NULL, 0, GLOBAL_ZONEID, &zero_info);
 	} else {
 		ip_rput_forward(ire, (ipha_t *)mp->b_rptr, mp, NULL);
 		IRE_REFRELE(ire);
@@ -19877,6 +20027,13 @@ ip_unbind(queue_t *q, mblk_t *mp)
 void
 ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 {
+	ip_output_options(arg, mp, arg2, caller, &zero_info);
+}
+
+void
+ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
+    ip_opt_info_t *infop)
+{
 	conn_t		*connp = NULL;
 	queue_t		*q = (queue_t *)arg2;
 	ipha_t		*ipha;
@@ -19992,6 +20149,48 @@ ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 		ipha->ipha_length = htons(iplen);
 	}
 
+	ASSERT(infop != NULL);
+
+	if (infop->ip_opt_flags & IP_VERIFY_SRC) {
+		/*
+		 * IP_PKTINFO ancillary option is present.
+		 * IPCL_ZONEID is used to honor IP_ALLZONES option which
+		 * allows using address of any zone as the source address.
+		 */
+		ire = ire_ctable_lookup(ipha->ipha_src, 0,
+		    (IRE_LOCAL|IRE_LOOPBACK), NULL, IPCL_ZONEID(connp),
+		    NULL, MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY);
+		if (ire == NULL)
+			goto drop_pkt;
+		ire_refrele(ire);
+		ire = NULL;
+	}
+
+	/*
+	 * IP_DONTFAILOVER_IF and IP_XMIT_IF have precedence over
+	 * ill index passed in IP_PKTINFO.
+	 */
+	if (infop->ip_opt_ill_index != 0 &&
+	    connp->conn_xmit_if_ill == NULL &&
+	    connp->conn_nofailover_ill == NULL) {
+
+		xmit_ill = ill_lookup_on_ifindex(
+		    infop->ip_opt_ill_index, B_FALSE, NULL, NULL, NULL, NULL);
+
+		if (xmit_ill == NULL || IS_VNI(xmit_ill))
+			goto drop_pkt;
+		/*
+		 * check that there is an ipif belonging
+		 * to our zone. IPCL_ZONEID is not used because
+		 * IP_ALLZONES option is valid only when the ill is
+		 * accessible from all zones i.e has a valid ipif in
+		 * all zones.
+		 */
+		if (!ipif_lookup_zoneid_group(xmit_ill, zoneid, 0, NULL)) {
+			goto drop_pkt;
+		}
+	}
+
 	/*
 	 * If there is a policy, try to attach an ipsec_out in
 	 * the front. At the end, first_mp either points to a
@@ -20036,9 +20235,18 @@ ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 		}
 	}
 
+
 	/* is packet multicast? */
 	if (CLASSD(dst))
 		goto multicast;
+
+	/*
+	 * If xmit_ill is set above due to index passed in ip_pkt_info. It
+	 * takes precedence over conn_dontroute and conn_nexthop_set
+	 */
+	if (xmit_ill != NULL) {
+		goto send_from_ill;
+	}
 
 	if ((connp->conn_dontroute) || (connp->conn_xmit_if_ill != NULL) ||
 	    (connp->conn_nexthop_set)) {
@@ -20657,7 +20865,6 @@ qnext:
 
 	    multicast:
 		ASSERT(first_mp != NULL);
-		ASSERT(xmit_ill == NULL);
 		ip2dbg(("ip_wput: CLASSD\n"));
 		if (connp == NULL) {
 			/*
@@ -20702,18 +20909,22 @@ qnext:
 			    ntohl(dst), ill->ill_name));
 		} else {
 			/*
-			 * If both IP_MULTICAST_IF and IP_XMIT_IF are set,
-			 * IP_XMIT_IF is honoured.
+			 * The order of precedence is IP_XMIT_IF, IP_PKTINFO
+			 * and IP_MULTICAST_IF.
 			 * Block comment above this function explains the
 			 * locking mechanism used here
 			 */
-			xmit_ill = conn_get_held_ill(connp,
-			    &connp->conn_xmit_if_ill, &err);
-			if (err == ILL_LOOKUP_FAILED) {
-				ip1dbg(("ip_wput: No ill for IP_XMIT_IF\n"));
-				BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
-				goto drop_pkt;
+			if (xmit_ill == NULL) {
+				xmit_ill = conn_get_held_ill(connp,
+				    &connp->conn_xmit_if_ill, &err);
+				if (err == ILL_LOOKUP_FAILED) {
+					ip1dbg(("ip_wput: No ill for "
+					    "IP_XMIT_IF\n"));
+					BUMP_MIB(&ip_mib, ipIfStatsOutNoRoutes);
+					goto drop_pkt;
+				}
 			}
+
 			if (xmit_ill == NULL) {
 				ipif = conn_get_held_ipif(connp,
 				    &connp->conn_multicast_ipif, &err);
@@ -20904,7 +21115,7 @@ qnext:
 			if (xmit_ill == NULL ||
 			    xmit_ill->ill_ipif_up_count > 0) {
 				ip_newroute_ipif(q, first_mp, ipif, dst, connp,
-				    setsrc | RTF_MULTIRT, zoneid);
+				    setsrc | RTF_MULTIRT, zoneid, infop);
 				TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
 				    "ip_wput_end: q %p (%S)", q, "noire");
 			} else {
@@ -21069,30 +21280,56 @@ send_from_ill:
 				}
 			}
 			/*
-			 * could be SO_DONTROUTE case also.
+			 * Could be SO_DONTROUTE case also.
 			 * check at least one interface is UP as
-			 * spcified by this ILL, and then call
-			 * ip_newroute_ipif()
+			 * specified by this ILL
 			 */
 			if (xmit_ill->ill_ipif_up_count > 0) {
 				ipif_t *ipif;
 
 				ipif = ipif_get_next_ipif(NULL, xmit_ill);
-				if (ipif != NULL) {
+				if (ipif == NULL) {
+					ip1dbg(("ip_output: "
+					    "xmit_ill NULL ipif\n"));
+					goto drop_pkt;
+				}
+				/*
+				 * Look for a ire that is part of the group,
+				 * if found use it else call ip_newroute_ipif.
+				 * IPCL_ZONEID is not used for matching because
+				 * IP_ALLZONES option is valid only when the
+				 * ill is accessible from all zones i.e has a
+				 * valid ipif in all zones.
+				 */
+				match_flags = MATCH_IRE_ILL_GROUP |
+				    MATCH_IRE_SECATTR;
+				ire = ire_ctable_lookup(dst, 0, 0, ipif, zoneid,
+				    MBLK_GETLABEL(mp), match_flags);
+				/*
+				 * If an ire exists use it or else create
+				 * an ire but don't add it to the cache.
+				 * Adding an ire may cause issues with
+				 * asymmetric routing.
+				 * In case of multiroute always act as if
+				 * ire does not exist.
+				 */
+				if (ire == NULL ||
+				    ire->ire_flags & RTF_MULTIRT) {
+					if (ire != NULL)
+						ire_refrele(ire);
 					ip_newroute_ipif(q, first_mp, ipif,
-					    dst, connp, 0, zoneid);
+					    dst, connp, 0, zoneid, infop);
 					ipif_refrele(ipif);
 					ip1dbg(("ip_wput: ip_unicast_if\n"));
+					ill_refrele(xmit_ill);
+					if (need_decref)
+						CONN_DEC_REF(connp);
+					return;
 				}
+				ipif_refrele(ipif);
 			} else {
-				freemsg(first_mp);
+				goto drop_pkt;
 			}
-			ill_refrele(xmit_ill);
-			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-			    "ip_wput_end: q %p (%S)", q, "unicast_if");
-			if (need_decref)
-				CONN_DEC_REF(connp);
-			return;
 		} else if (ip_nexthop || (connp != NULL &&
 		    (connp->conn_nexthop_set)) && !ignore_nexthop) {
 			if (!ip_nexthop) {
@@ -21233,8 +21470,9 @@ noirefound:
 		if (CLASSD(dst)) {
 			ipif_t *ipif = ipif_lookup_group(dst, zoneid);
 			if (ipif) {
+				ASSERT(infop->ip_opt_ill_index == 0);
 				ip_newroute_ipif(q, copy_mp, ipif, dst, connp,
-				    RTF_SETSRC | RTF_MULTIRT, zoneid);
+				    RTF_SETSRC | RTF_MULTIRT, zoneid, infop);
 				ipif_refrele(ipif);
 			} else {
 				MULTIRT_DEBUG_UNTAG(copy_mp);
@@ -24873,7 +25111,7 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 		ip_fanout_udp(q, first_mp, ill, ipha, ports,
 		    (ire_type == IRE_BROADCAST),
 		    fanout_flags | IP_FF_SEND_ICMP | IP_FF_HDR_COMPLETE |
-		    IP_FF_SEND_SLLA | IP_FF_IP6INFO, mctl_present, B_FALSE,
+		    IP_FF_SEND_SLLA | IP_FF_IPINFO, mctl_present, B_FALSE,
 		    ill, zoneid);
 		TRACE_2(TR_FAC_IP, TR_IP_WPUT_LOCAL_END,
 		    "ip_wput_local_end: q %p (%S)", q, "ip_fanout_udp");
@@ -24905,7 +25143,7 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 		    <= mp->b_wptr);
 		ip_fanout_tcp(q, first_mp, ill, ipha,
 		    fanout_flags | IP_FF_SEND_ICMP | IP_FF_HDR_COMPLETE |
-		    IP_FF_SYN_ADDIRE | IP_FF_IP6INFO,
+		    IP_FF_SYN_ADDIRE | IP_FF_IPINFO,
 		    mctl_present, B_FALSE, zoneid);
 		TRACE_2(TR_FAC_IP, TR_IP_WPUT_LOCAL_END,
 		    "ip_wput_local_end: q %p (%S)", q, "ip_fanout_tcp");
@@ -24918,7 +25156,7 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 		bcopy(rptr + IPH_HDR_LENGTH(ipha), &ports, sizeof (ports));
 		ip_fanout_sctp(first_mp, ill, ipha, ports,
 		    fanout_flags | IP_FF_SEND_ICMP | IP_FF_HDR_COMPLETE |
-		    IP_FF_IP6INFO,
+		    IP_FF_IPINFO,
 		    mctl_present, B_FALSE, 0, zoneid);
 		return;
 	}
@@ -25127,7 +25365,7 @@ ip_wput_multicast(queue_t *q, mblk_t *mp, ipif_t *ipif, zoneid_t zoneid)
 		mp->b_prev = NULL;
 		mp->b_next = NULL;
 		ip_newroute_ipif(q, first_mp, ipif, dst, NULL, RTF_SETSRC,
-		    zoneid);
+		    zoneid, &zero_info);
 		return;
 	}
 
@@ -25695,7 +25933,7 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 		 * Also handle RTF_MULTIRT routes.
 		 */
 		ip_newroute_ipif(q, ipsec_mp, ipif, dst, NULL, RTF_MULTIRT,
-		    zoneid);
+		    zoneid, &zero_info);
 	} else {
 		if (attach_if) {
 			ire = ire_ctable_lookup(dst, 0, 0, ill->ill_ipif,
@@ -29174,19 +29412,24 @@ ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
 	}
 
 	if (connp->conn_recvif || connp->conn_recvslla ||
-	    ((connp->conn_ipv6_recvpktinfo ||
+	    ((connp->conn_ip_recvpktinfo ||
 	    (!isv4 && IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_src))) &&
-	    (flags & IP_FF_IP6INFO))) {
+	    (flags & IP_FF_IPINFO))) {
 		int in_flags = 0;
 
-		if (connp->conn_recvif || connp->conn_ipv6_recvpktinfo) {
+		/*
+		 * Since sctp does not support IP_RECVPKTINFO for v4, only pass
+		 * IPF_RECVIF.
+		 */
+		if (connp->conn_recvif || connp->conn_ip_recvpktinfo) {
 			in_flags = IPF_RECVIF;
 		}
 		if (connp->conn_recvslla) {
 			in_flags |= IPF_RECVSLLA;
 		}
 		if (isv4) {
-			mp = ip_add_info(mp, recv_ill, in_flags);
+			mp = ip_add_info(mp, recv_ill, in_flags,
+			    IPCL_ZONEID(connp));
 		} else {
 			mp = ip_add_info_v6(mp, recv_ill, &ip6h->ip6_dst);
 			if (mp == NULL) {

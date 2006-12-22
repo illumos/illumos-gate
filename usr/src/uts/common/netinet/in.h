@@ -829,6 +829,12 @@ struct sockaddr_in6 {
 #define	IP_ADD_SOURCE_MEMBERSHIP  0x17	/* add  mcast group/source pair	   */
 #define	IP_DROP_SOURCE_MEMBERSHIP 0x18	/* drop mcast group/source pair	   */
 #define	IP_NEXTHOP		0x19	/* send directly to next hop	   */
+/*
+ * IP_PKTINFO and IP_RECVPKTINFO have same value. Size of argument passed in
+ * is used to differentiate b/w the two.
+ */
+#define	IP_PKTINFO		0x1a	/* specify src address and/or index */
+#define	IP_RECVPKTINFO		0x1a	/* recv dest/matched addr and index */
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 /*
@@ -1027,6 +1033,15 @@ int getipv4sourcefilter(int, struct in_addr, struct in_addr, uint32_t *,
  */
 #define	MCAST_INCLUDE	1
 #define	MCAST_EXCLUDE	2
+
+/*
+ * Argument struct for IP_PKTINFO option
+ */
+typedef struct in_pktinfo {
+	unsigned int		ipi_ifindex;	/* send/recv interface index */
+	struct in_addr		ipi_spec_dst;	/* matched source address */
+	struct in_addr		ipi_addr;	/* src/dst address in IP hdr */
+} in_pktinfo_t;
 
 /*
  * Argument struct for IPV6_PKTINFO option

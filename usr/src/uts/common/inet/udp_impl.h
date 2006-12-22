@@ -99,7 +99,7 @@ typedef	struct udp_s {
 
 		udp_discon_pending : 1,	/* T_DISCON_REQ in progress */
 		udp_unspec_source : 1,	/* IP*_UNSPEC_SRC option */
-		udp_ipv6_recvpktinfo : 1,	/* IPV6_RECVPKTINFO option  */
+		udp_ip_recvpktinfo : 1,	/* IPV[4,6]_RECVPKTINFO option  */
 		udp_ipv6_recvhoplimit : 1,	/* IPV6_RECVHOPLIMIT option */
 
 		udp_ipv6_recvhopopts : 1,	/* IPV6_RECVHOPOPTS option */
@@ -219,6 +219,7 @@ typedef struct {				/* Class "net" kstats */
 	kstat_named_t	udp_in_recvpktinfo;
 	kstat_named_t	udp_in_recvtclass;
 	kstat_named_t	udp_in_timestamp;
+	kstat_named_t	udp_ip_recvpktinfo;
 #ifdef DEBUG
 	kstat_named_t	udp_data_conn;
 	kstat_named_t	udp_data_notconn;

@@ -3332,9 +3332,9 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 		 * For link-local always add ifindex so that transport can set
 		 * sin6_scope_id. Avoid it for ICMP error fanout.
 		 */
-		if ((connp->conn_ipv6_recvpktinfo ||
+		if ((connp->conn_ip_recvpktinfo ||
 		    IN6_IS_ADDR_LINKLOCAL(&src)) &&
-		    (flags & IP_FF_IP6INFO)) {
+		    (flags & IP_FF_IPINFO)) {
 			/* Add header */
 			mp1 = ip_add_info_v6(mp1, inill, &dst);
 		}
@@ -3399,8 +3399,8 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 	 * For link-local always add ifindex so that transport can set
 	 * sin6_scope_id. Avoid it for ICMP error fanout.
 	 */
-	if ((connp->conn_ipv6_recvpktinfo || IN6_IS_ADDR_LINKLOCAL(&src)) &&
-	    (flags & IP_FF_IP6INFO)) {
+	if ((connp->conn_ip_recvpktinfo || IN6_IS_ADDR_LINKLOCAL(&src)) &&
+	    (flags & IP_FF_IPINFO)) {
 		/* Add header */
 		mp = ip_add_info_v6(mp, inill, &dst);
 		if (mp == NULL) {
@@ -3708,9 +3708,9 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 	 * For link-local always add ifindex so that TCP can bind to that
 	 * interface. Avoid it for ICMP error fanout.
 	 */
-	if (!syn_present && ((connp->conn_ipv6_recvpktinfo ||
+	if (!syn_present && ((connp->conn_ip_recvpktinfo ||
 	    IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_src)) &&
-	    (flags & IP_FF_IP6INFO))) {
+	    (flags & IP_FF_IPINFO))) {
 		/* Add header */
 		mp = ip_add_info_v6(mp, inill, &ip6h->ip6_dst);
 		if (mp == NULL) {
@@ -3856,9 +3856,9 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 		 * transport can set sin6_scope_id. Avoid it for
 		 * ICMP error fanout.
 		 */
-		if ((connp->conn_ipv6_recvpktinfo ||
+		if ((connp->conn_ip_recvpktinfo ||
 		    IN6_IS_ADDR_LINKLOCAL(&src)) &&
-		    (flags & IP_FF_IP6INFO)) {
+		    (flags & IP_FF_IPINFO)) {
 				/* Add header */
 			mp = ip_add_info_v6(mp, inill, &dst);
 			if (mp == NULL) {
@@ -3937,9 +3937,9 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 		 * can set sin6_scope_id. Avoid it for ICMP error
 		 * fanout.
 		 */
-		if ((connp->conn_ipv6_recvpktinfo ||
+		if ((connp->conn_ip_recvpktinfo ||
 		    IN6_IS_ADDR_LINKLOCAL(&src)) &&
-		    (flags & IP_FF_IP6INFO)) {
+		    (flags & IP_FF_IPINFO)) {
 			/* Add header */
 			mp1 = ip_add_info_v6(mp1, inill, &dst);
 		}
@@ -4007,8 +4007,8 @@ next_one:
 	 * For link-local always add ifindex so that transport can set
 	 * sin6_scope_id. Avoid it for ICMP error fanout.
 	 */
-	if ((connp->conn_ipv6_recvpktinfo ||
-	    IN6_IS_ADDR_LINKLOCAL(&src)) && (flags & IP_FF_IP6INFO)) {
+	if ((connp->conn_ip_recvpktinfo ||
+	    IN6_IS_ADDR_LINKLOCAL(&src)) && (flags & IP_FF_IPINFO)) {
 		/* Add header */
 		mp = ip_add_info_v6(mp, inill, &dst);
 		if (mp == NULL) {
@@ -4056,7 +4056,7 @@ notfound:
 	 */
 	if (ipcl_proto_fanout_v6[IPPROTO_UDP].connf_head != NULL) {
 		ip_fanout_proto_v6(q, first_mp, ip6h, ill, inill, IPPROTO_UDP,
-		    0, flags | IP_FF_RAWIP | IP_FF_IP6INFO, mctl_present,
+		    0, flags | IP_FF_RAWIP | IP_FF_IPINFO, mctl_present,
 		    zoneid);
 	} else {
 		if (ip_fanout_send_icmp_v6(q, first_mp, flags,
@@ -7885,7 +7885,7 @@ ipv6forus:
 tcp_fanout:
 			ip_fanout_tcp_v6(q, first_mp, ip6h, ill, inill,
 			    (flags|IP_FF_SEND_ICMP|IP_FF_SYN_ADDIRE|
-			    IP_FF_IP6INFO), hdr_len, mctl_present, zoneid);
+			    IP_FF_IPINFO), hdr_len, mctl_present, zoneid);
 			return;
 		}
 		case IPPROTO_SCTP:
@@ -7927,7 +7927,7 @@ tcp_fanout:
 				ip_fanout_sctp_raw(first_mp, ill,
 				    (ipha_t *)ip6h, B_FALSE, ports,
 				    mctl_present,
-				    (flags|IP_FF_SEND_ICMP|IP_FF_IP6INFO),
+				    (flags|IP_FF_SEND_ICMP|IP_FF_IPINFO),
 				    B_TRUE, ipif_id, zoneid);
 				return;
 			}
@@ -8124,7 +8124,7 @@ tcp_fanout:
 			/*
 			 * Handle protocols with which IPv6 is less intimate.
 			 */
-			uint_t proto_flags = IP_FF_RAWIP|IP_FF_IP6INFO;
+			uint_t proto_flags = IP_FF_RAWIP|IP_FF_IPINFO;
 
 			if (hada_mp != NULL) {
 				ip0dbg(("default hada drop\n"));
@@ -8483,7 +8483,7 @@ udp_fanout:
 		    UDP_PORTS_OFFSET);
 		IP6_STAT(ip6_udp_slow_path);
 		ip_fanout_udp_v6(q, first_mp, ip6h, ports, ill, inill,
-		    (flags|IP_FF_SEND_ICMP|IP_FF_IP6INFO), mctl_present,
+		    (flags|IP_FF_SEND_ICMP|IP_FF_IPINFO), mctl_present,
 		    zoneid);
 		return;
 	}
@@ -8505,7 +8505,7 @@ udp_fanout:
 		}
 	}
 
-	if (connp->conn_ipv6_recvpktinfo ||
+	if (connp->conn_ip_recvpktinfo ||
 	    IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_src)) {
 		mp = ip_add_info_v6(mp, inill, &ip6h->ip6_dst);
 		if (mp == NULL) {
@@ -9668,9 +9668,13 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 
 			ASSERT(!IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src));
 			if (secpolicy_net_rawaccess(cr) != 0) {
+				/*
+				 * Use IPCL_ZONEID to honor SO_ALLZONES.
+				 */
 				ire = ire_route_lookup_v6(&ip6h->ip6_src,
 				    0, 0, (IRE_LOCAL|IRE_LOOPBACK), NULL,
-				    NULL, zoneid, NULL,
+				    NULL, connp != NULL ?
+				    IPCL_ZONEID(connp) : zoneid, NULL,
 				    MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY);
 				if (ire == NULL) {
 					if (do_outrequests)
@@ -10683,7 +10687,7 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 			    TCP_PORTS_OFFSET);
 			ip_fanout_tcp_v6(q, first_mp, ip6h, ill, ill,
 			    fanout_flags|IP_FF_SEND_ICMP|IP_FF_SYN_ADDIRE|
-			    IP_FF_IP6INFO|IP6_NO_IPPOLICY|IP_FF_LOOPBACK,
+			    IP_FF_IPINFO|IP6_NO_IPPOLICY|IP_FF_LOOPBACK,
 			    hdr_length, mctl_present, ire->ire_zoneid);
 			return;
 
@@ -10691,7 +10695,7 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 			ports = *(uint32_t *)(mp->b_rptr + hdr_length +
 			    UDP_PORTS_OFFSET);
 			ip_fanout_udp_v6(q, first_mp, ip6h, ports, ill, ill,
-			    fanout_flags|IP_FF_SEND_ICMP|IP_FF_IP6INFO|
+			    fanout_flags|IP_FF_SEND_ICMP|IP_FF_IPINFO|
 			    IP6_NO_IPPOLICY, mctl_present, ire->ire_zoneid);
 			return;
 
@@ -10701,7 +10705,7 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 
 			ports = *(uint32_t *)(mp->b_rptr + hdr_length);
 			ip_fanout_sctp(mp, ill, (ipha_t *)ip6h, ports,
-			    fanout_flags|IP_FF_SEND_ICMP|IP_FF_IP6INFO,
+			    fanout_flags|IP_FF_SEND_ICMP|IP_FF_IPINFO,
 			    mctl_present, IP6_NO_IPPOLICY, ipif_seqid,
 			    ire->ire_zoneid);
 			return;
@@ -10788,7 +10792,7 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 			/*
 			 * Handle protocols with which IPv6 is less intimate.
 			 */
-			fanout_flags |= IP_FF_RAWIP|IP_FF_IP6INFO;
+			fanout_flags |= IP_FF_RAWIP|IP_FF_IPINFO;
 
 			/*
 			 * Enable sending ICMP for "Unknown" nexthdr

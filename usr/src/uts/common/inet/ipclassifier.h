@@ -153,7 +153,7 @@ struct conn_s {
 		conn_out_enforce_policy : 1,	/* Enforce Policy on outbound */
 		conn_af_isv6 : 1,		/* ip address family ver 6 */
 		conn_pkt_isv6 : 1,		/* ip packet format ver 6 */
-		conn_ipv6_recvpktinfo : 1,	/* IPV6_RECVPKTINFO option */
+		conn_ip_recvpktinfo : 1,	/* IPV*_RECVPKTINFO option */
 
 		conn_ipv6_recvhoplimit : 1,	/* IPV6_RECVHOPLIMIT option */
 		conn_ipv6_recvhopopts : 1,	/* IPV6_RECVHOPOPTS option */

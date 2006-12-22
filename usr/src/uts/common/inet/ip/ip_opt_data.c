@@ -112,6 +112,8 @@ opdes_t		ip_opt_arr[] = {
 
 { IP_RECVIF, IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
 
+{ IP_PKTINFO, IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+
 { IP_RECVSLLA, IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
 
 { IP_BOUND_IF, IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,

@@ -519,17 +519,18 @@ ip_fanout_sctp(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 	}
 
 	if (connp->conn_recvif || connp->conn_recvslla ||
-	    connp->conn_ipv6_recvpktinfo) {
+	    connp->conn_ip_recvpktinfo) {
 		int in_flags = 0;
 
-		if (connp->conn_recvif || connp->conn_ipv6_recvpktinfo) {
+		if (connp->conn_recvif || connp->conn_ip_recvpktinfo) {
 			in_flags = IPF_RECVIF;
 		}
 		if (connp->conn_recvslla) {
 			in_flags |= IPF_RECVSLLA;
 		}
 		if (isv4) {
-			mp = ip_add_info(mp, recv_ill, in_flags);
+			mp = ip_add_info(mp, recv_ill, in_flags,
+			    IPCL_ZONEID(connp));
 		} else {
 			mp = ip_add_info_v6(mp, recv_ill, &ip6h->ip6_dst);
 		}

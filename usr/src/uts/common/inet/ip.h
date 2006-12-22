@@ -314,7 +314,7 @@ typedef struct ipoptp_s
 #define	IP_FF_RAWIP		0x08	/* Use rawip mib variable */
 #define	IP_FF_SRC_QUENCH	0x10	/* OK to send ICMP_SOURCE_QUENCH */
 #define	IP_FF_SYN_ADDIRE	0x20	/* Add IRE if TCP syn packet */
-#define	IP_FF_IP6INFO		0x80	/* Add ip6i_t if needed */
+#define	IP_FF_IPINFO		0x80	/* Used for both V4 and V6 */
 #define	IP_FF_SEND_SLLA		0x100	/* Send source link layer info ? */
 #define	IPV6_REACHABILITY_CONFIRMATION	0x200	/* Flags for ip_xmit_v6 */
 #define	IP_FF_NO_MCAST_LOOP	0x400	/* No multicasts for sending zone */
@@ -2662,23 +2662,52 @@ typedef struct ip6_pkt_s ip6_pkt_t;
 extern void ip6_pkt_free(ip6_pkt_t *);	/* free storage inside ip6_pkt_t */
 
 /*
- * This structure is used to convey information from IP and the ULP.
- * Currently used for the IP_RECVSLLA and IP_RECVIF options. The
- * type of information field is set to IN_PKTINFO (i.e inbound pkt info)
+ * This struct is used by ULP_opt_set() functions to return value of IPv4
+ * ancillary options. Currently this is only used by udp and icmp and only
+ * IP_PKTINFO option is supported.
  */
-typedef struct in_pktinfo {
-	uint32_t		in_pkt_ulp_type;	/* type of info sent */
-							/* to UDP */
-	uint32_t		in_pkt_flags;	/* what is sent up by IP */
-	uint32_t		in_pkt_ifindex;	/* inbound interface index */
-	struct sockaddr_dl	in_pkt_slla;	/* has source link layer addr */
-} in_pktinfo_t;
+typedef struct ip4_pkt_s {
+	uint_t		ip4_ill_index;	/* interface index */
+	ipaddr_t	ip4_addr;	/* source address */
+} ip4_pkt_t;
+
+/*
+ * Used by ULP's to pass options info to ip_output
+ * currently only IP_PKTINFO is supported.
+ */
+typedef struct ip_opt_info_s {
+	uint_t ip_opt_ill_index;
+	uint_t ip_opt_flags;
+} ip_opt_info_t;
+
+/*
+ * value for ip_opt_flags
+ */
+#define	IP_VERIFY_SRC	0x1
+
+/*
+ * This structure is used to convey information from IP and the ULP.
+ * Currently used for the IP_RECVSLLA, IP_RECVIF and IP_RECVPKTINFO options.
+ * The type of information field is set to IN_PKTINFO (i.e inbound pkt info)
+ */
+typedef struct ip_pktinfo {
+	uint32_t		ip_pkt_ulp_type;	/* type of info sent */
+	uint32_t		ip_pkt_flags;	/* what is sent up by IP */
+	uint32_t		ip_pkt_ifindex;	/* inbound interface index */
+	struct sockaddr_dl	ip_pkt_slla;	/* has source link layer addr */
+	struct in_addr		ip_pkt_match_addr; /* matched address */
+} ip_pktinfo_t;
 
 /*
  * flags to tell UDP what IP is sending; in_pkt_flags
  */
 #define	IPF_RECVIF	0x01	/* inbound interface index */
 #define	IPF_RECVSLLA	0x02	/* source link layer address */
+/*
+ * Inbound interface index + matched address.
+ * Used only by IPV4.
+ */
+#define	IPF_RECVADDR	0x04
 
 /* ipp_fields values */
 #define	IPPF_IFINDEX	0x0001	/* Part of in6_pktinfo: ifindex */
@@ -3141,7 +3170,7 @@ extern void	ip_lwput(queue_t *, mblk_t *);
 extern boolean_t icmp_err_rate_limit(void);
 extern void	icmp_time_exceeded(queue_t *, mblk_t *, uint8_t, zoneid_t);
 extern void	icmp_unreachable(queue_t *, mblk_t *, uint8_t, zoneid_t);
-extern mblk_t	*ip_add_info(mblk_t *, ill_t *, uint_t);
+extern mblk_t	*ip_add_info(mblk_t *, ill_t *, uint_t, zoneid_t);
 extern mblk_t	*ip_bind_v4(queue_t *, mblk_t *, conn_t *);
 extern int	ip_bind_connected(conn_t *, mblk_t *, ipaddr_t *, uint16_t,
     ipaddr_t, uint16_t, boolean_t, boolean_t, boolean_t,
@@ -3181,6 +3210,8 @@ extern void	ip_trash_ire_reclaim(void *);
 extern void	ip_trash_timer_expire(void *);
 extern void	ip_wput(queue_t *, mblk_t *);
 extern void	ip_output(void *, mblk_t *, void *, int);
+extern void	ip_output_options(void *, mblk_t *, void *, int,
+    ip_opt_info_t *);
 extern void	ip_wput_md(queue_t *, mblk_t *, conn_t *);
 
 extern void	ip_wput_ire(queue_t *, mblk_t *, ire_t *, conn_t *, int,
@@ -3537,6 +3568,13 @@ typedef void    (*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 #define	SQTAG_UDP_OUTPUT		35
 #define	SQTAG_TCP_KSSL_INPUT		36
 #define	SQTAG_TCP_DROP_Q0		37
+
+#define	NOT_OVER_IP(ip_wq)	\
+	(ip_wq->q_next != NULL ||	\
+	    (ip_wq->q_qinfo->qi_minfo->mi_idname) == NULL ||	\
+	    strcmp(ip_wq->q_qinfo->qi_minfo->mi_idname,	\
+	    IP_MOD_NAME) != 0 ||	\
+	    ip_wq->q_qinfo->qi_minfo->mi_idnum != IP_MOD_ID)
 
 #endif	/* _KERNEL */
 

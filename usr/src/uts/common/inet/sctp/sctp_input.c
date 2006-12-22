@@ -3051,7 +3051,7 @@ sctp_check_input(sctp_t *sctp, sctp_chunk_hdr_t *ch, ssize_t len, int first)
 /* ARGSUSED */
 static sctp_hdr_t *
 find_sctp_hdrs(mblk_t *mp, in6_addr_t *src, in6_addr_t *dst,
-    uint_t *ifindex, uint_t *ip_hdr_len, ip6_pkt_t *ipp, in_pktinfo_t *pinfo)
+    uint_t *ifindex, uint_t *ip_hdr_len, ip6_pkt_t *ipp, ip_pktinfo_t *pinfo)
 {
 	uchar_t	*rptr;
 	ipha_t	*ip4h;
@@ -3067,9 +3067,9 @@ find_sctp_hdrs(mblk_t *mp, in6_addr_t *src, in6_addr_t *dst,
 
 		ipp->ipp_fields |= IPPF_HOPLIMIT;
 		ipp->ipp_hoplimit = ((ipha_t *)rptr)->ipha_ttl;
-		if (pinfo != NULL && (pinfo->in_pkt_flags & IPF_RECVIF)) {
+		if (pinfo != NULL && (pinfo->ip_pkt_flags & IPF_RECVIF)) {
 			ipp->ipp_fields |= IPPF_IFINDEX;
-			ipp->ipp_ifindex = pinfo->in_pkt_ifindex;
+			ipp->ipp_ifindex = pinfo->ip_pkt_ifindex;
 		}
 	} else {
 		ASSERT(IPH_HDR_VERSION(rptr) == IPV6_VERSION);
@@ -3172,7 +3172,7 @@ sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, uint_t ipif_seqid,
 	uint_t			ifindex;
 	ip6_pkt_t		ipp;
 	ssize_t			mlen;
-	in_pktinfo_t		*pinfo = NULL;
+	ip_pktinfo_t		*pinfo = NULL;
 	mblk_t			*first_mp;
 
 	BUMP_MIB(&sctp_mib, sctpOutOfBlue);
@@ -3325,17 +3325,18 @@ sctp_input(conn_t *connp, ipha_t *ipha, mblk_t *mp, mblk_t *first_mp,
 	}
 
 	if (connp->conn_recvif || connp->conn_recvslla ||
-	    connp->conn_ipv6_recvpktinfo) {
+	    connp->conn_ip_recvpktinfo) {
 		int in_flags = 0;
 
-		if (connp->conn_recvif || connp->conn_ipv6_recvpktinfo) {
+		if (connp->conn_recvif || connp->conn_ip_recvpktinfo) {
 			in_flags = IPF_RECVIF;
 		}
 		if (connp->conn_recvslla) {
 			in_flags |= IPF_RECVSLLA;
 		}
 		if (isv4) {
-			mp = ip_add_info(mp, recv_ill, in_flags);
+			mp = ip_add_info(mp, recv_ill, in_flags,
+			    IPCL_ZONEID(connp));
 		} else {
 			mp = ip_add_info_v6(mp, recv_ill,
 			    &(((ip6_t *)ipha)->ip6_dst));
@@ -3426,16 +3427,16 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 	int			recv_adaption;
 	boolean_t		wake_eager = B_FALSE;
 	mblk_t			*pinfo_mp;
-	in_pktinfo_t		*pinfo = NULL;
+	ip_pktinfo_t		*pinfo = NULL;
 	in6_addr_t		peer_src;
 	int64_t			now;
 
 	if (DB_TYPE(mp) != M_DATA) {
 		ASSERT(DB_TYPE(mp) == M_CTL);
-		if (MBLKL(mp) == sizeof (in_pktinfo_t) &&
-		    ((in_pktinfo_t *)mp->b_rptr)->in_pkt_ulp_type ==
+		if (MBLKL(mp) == sizeof (ip_pktinfo_t) &&
+		    ((ip_pktinfo_t *)mp->b_rptr)->ip_pkt_ulp_type ==
 		    IN_PKTINFO) {
-			pinfo = (in_pktinfo_t *)mp->b_rptr;
+			pinfo = (ip_pktinfo_t *)mp->b_rptr;
 			pinfo_mp = mp;
 			mp = mp->b_cont;
 		} else {
