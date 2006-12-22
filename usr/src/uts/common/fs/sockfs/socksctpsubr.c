@@ -139,7 +139,7 @@ sosctp_aid_grow(struct sctp_sonode *ss, sctp_assoc_t maxid, int kmflags)
 int
 sosctp_assoc(struct sctp_sonode *ss, sctp_assoc_t id, struct sctp_soassoc **ssa)
 {
-	ASSERT(*ssa != NULL);
+	ASSERT(ssa != NULL);
 	ASSERT(MUTEX_HELD(&ss->ss_so.so_lock));
 	if ((uint32_t)id >= ss->ss_maxassoc) {
 		*ssa = NULL;

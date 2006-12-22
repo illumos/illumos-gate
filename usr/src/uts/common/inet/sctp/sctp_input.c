@@ -3684,6 +3684,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				error = sctp_handle_error(sctp, sctph, ch, mp);
 				if (error != 0) {
+					sctp_assoc_event(sctp, SCTP_COMM_LOST,
+					    0, NULL);
 					sctp_clean_death(sctp, error);
 					goto done;
 				}
@@ -3966,6 +3968,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 						BUMP_MIB(&sctp_mib,
 						    sctpAborted);
 						sctp_error_event(sctp, ch);
+						sctp_assoc_event(sctp,
+						    SCTP_COMM_LOST, 0, NULL);
 						sctp_clean_death(sctp,
 						    ECONNREFUSED);
 						goto done;

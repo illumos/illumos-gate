@@ -1145,6 +1145,8 @@ sctp_icmp_error(sctp_t *sctp, mblk_t *mp)
 					break;
 				}
 				BUMP_MIB(&sctp_mib, sctpAborted);
+				sctp_assoc_event(sctp, SCTP_CANT_STR_ASSOC, 0,
+				    NULL);
 				sctp_clean_death(sctp, ECONNREFUSED);
 				break;
 			}
@@ -1250,6 +1252,8 @@ sctp_icmp_error_ipv6(sctp_t *sctp, mblk_t *mp)
 			if (sctp->sctp_state == SCTPS_COOKIE_WAIT ||
 			    sctp->sctp_state == SCTPS_COOKIE_ECHOED) {
 				BUMP_MIB(&sctp_mib, sctpAborted);
+				sctp_assoc_event(sctp, SCTP_CANT_STR_ASSOC, 0,
+				    NULL);
 				sctp_clean_death(sctp, ECONNREFUSED);
 			}
 			break;
@@ -1277,6 +1281,8 @@ sctp_icmp_error_ipv6(sctp_t *sctp, mblk_t *mp)
 			}
 			if (sctp->sctp_state == SCTPS_COOKIE_WAIT) {
 				BUMP_MIB(&sctp_mib, sctpAborted);
+				sctp_assoc_event(sctp, SCTP_CANT_STR_ASSOC, 0,
+				    NULL);
 				sctp_clean_death(sctp, ECONNREFUSED);
 			}
 			break;

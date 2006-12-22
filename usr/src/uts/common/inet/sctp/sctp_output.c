@@ -236,6 +236,7 @@ sctp_sendmsg(sctp_t *sctp, mblk_t *mp, int flags)
 		}
 		RUN_SCTP(sctp);
 		sctp_user_abort(sctp, mp, B_TRUE);
+		sctp_assoc_event(sctp, SCTP_COMM_LOST, 0, NULL);
 		sctp_clean_death(sctp, ECONNRESET);
 		freemsg(mproto);
 		goto process_sendq;
