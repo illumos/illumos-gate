@@ -42,6 +42,7 @@
 #include <gelf.h>
 
 #include <topo_method.h>
+#include <topo_subr.h>
 #include <mod.h>
 
 static int mod_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
@@ -49,10 +50,14 @@ static int mod_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
 static void mod_release(topo_mod_t *, tnode_t *);
 static int mod_fmri_create_meth(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
+static int mod_fmri_nvl2str(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
 
 static const topo_method_t mod_methods[] = {
 	{ TOPO_METH_FMRI, TOPO_METH_FMRI_DESC, TOPO_METH_FMRI_VERSION,
 	    TOPO_STABILITY_INTERNAL, mod_fmri_create_meth },
+	{ TOPO_METH_NVL2STR, TOPO_METH_NVL2STR_DESC, TOPO_METH_NVL2STR_VERSION,
+	    TOPO_STABILITY_INTERNAL, mod_fmri_nvl2str },
 	{ NULL }
 };
 
@@ -101,21 +106,20 @@ mod_release(topo_mod_t *mod, tnode_t *node)
 	topo_method_unregister_all(mod, node);
 }
 
-static char *
-mod_binary_path_get(topo_mod_t *mp, char *objpath)
+static int
+mod_binary_path_get(topo_mod_t *mp, const char *objpath)
 {
-	static char Pathbuf[PATH_MAX];
 	Elf *elf = NULL;
 	Elf_Scn *scn = NULL;
-	Elf_Data *edata;
 	GElf_Ehdr ehdr;
 	GElf_Shdr shdr;
 	int fd;
 
 	if ((fd = open(objpath, O_RDONLY)) < 0) {
-		topo_mod_dprintf(mp, "failed to open %s", objpath);
-		goto mbpg_bail;
+		topo_mod_dprintf(mp, "unable to open %s\n", objpath);
+		return (-1);
 	}
+
 	if (elf_version(EV_CURRENT) == EV_NONE) {
 		topo_mod_dprintf(mp, "Elf version out of whack\n");
 		goto mbpg_bail;
@@ -141,16 +145,15 @@ mod_binary_path_get(topo_mod_t *mp, char *objpath)
 		    ehdr.e_shstrndx, (size_t)shdr.sh_name);
 		if (strcmp(sh_name, ".filename") != 0)
 			continue;
-		if ((edata = elf_getdata(scn, NULL)) == NULL) {
+		if (elf_getdata(scn, NULL) == NULL) {
 			topo_mod_dprintf(mp, "no filename data");
 			break;
 		}
-		(void) strlcpy(Pathbuf, edata->d_buf, PATH_MAX);
 		break;
 	}
 	elf_end(elf);
 	(void) close(fd);
-	return (Pathbuf);
+	return (0);
 
 mbpg_bail:
 	if (elf != NULL)
@@ -158,7 +161,7 @@ mbpg_bail:
 	if (fd >= 0)
 		(void) close(fd);
 	(void) topo_mod_seterrno(mp, EMOD_METHOD_INVAL);
-	return (NULL);
+	return (-1);
 }
 
 static int
@@ -178,7 +181,6 @@ mod_nvl_data(topo_mod_t *mp, nvlist_t *out, const char *path)
 	mi.mi_id = mi.mi_nextid = id;
 	mi.mi_info = MI_INFO_ONE | MI_INFO_NOBASE;
 	if (modctl(MODINFO, id, &mi) < 0) {
-		topo_mod_dprintf(mp, "failed to get modinfo for %s", path);
 		return (topo_mod_seterrno(mp, EMOD_METHOD_INVAL));
 	}
 	mi.mi_name[MODMAXNAMELEN - 1] = '\0';
@@ -199,9 +201,7 @@ static nvlist_t *
 mod_fmri_create(topo_mod_t *mp, const char *driver)
 {
 	nvlist_t *out = NULL;
-	nvlist_t *pkg = NULL;
 	char objpath[PATH_MAX];
-	char *path = NULL;
 
 	if (topo_mod_nvalloc(mp, &out, NV_UNIQUE_NAME) != 0) {
 		(void) topo_mod_seterrno(mp, EMOD_FMRI_NVL);
@@ -210,27 +210,20 @@ mod_fmri_create(topo_mod_t *mp, const char *driver)
 
 	(void) snprintf(objpath, PATH_MAX, "%s/%s/object", OBJFS_ROOT, driver);
 
-	if ((path = mod_binary_path_get(mp, objpath)) == NULL)
+	/*
+	 * Validate the module object ELF header if possible
+	 */
+	if (mod_binary_path_get(mp, objpath) < 0)
 		goto mfc_bail;
 
-	if (mod_nvl_data(mp, out, objpath) < 0)
-		goto mfc_bail;
-
-	pkg = topo_mod_pkgfmri(mp, FM_PKG_SCHEME_VERSION, path);
-	if (pkg == NULL) {
+	if (mod_nvl_data(mp, out, objpath) < 0) {
+		topo_mod_dprintf(mp, "failed to get modinfo for %s", driver);
 		goto mfc_bail;
 	}
-
-	if (nvlist_add_nvlist(out, FM_FMRI_MOD_PKG, pkg) != 0) {
-		(void) topo_mod_seterrno(mp, EMOD_FMRI_NVL);
-		goto mfc_bail;
-	}
-	nvlist_free(pkg);
 
 	return (out);
 
 mfc_bail:
-	nvlist_free(pkg);
 	nvlist_free(out);
 	return (NULL);
 }
@@ -257,8 +250,123 @@ mod_fmri_create_meth(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 	if (modnvl == NULL) {
 		*out = NULL;
 		topo_mod_dprintf(mp, "failed to create contained mod FMRI\n");
-		return (topo_mod_seterrno(mp, EMOD_FMRI_NVL));
+		return (-1);
 	}
 	*out = modnvl;
+	return (0);
+}
+
+#define	MAXINTSTR	11
+
+static ssize_t
+fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
+{
+	nvlist_t *anvl = NULL;
+	uint8_t version;
+	ssize_t size = 0;
+	int32_t modid;
+	char *achas = NULL;
+	char *aprod = NULL;
+	char *asrvr = NULL;
+	char *modname = NULL;
+	char numbuf[MAXINTSTR];
+	int more_auth = 0;
+	int err;
+
+	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
+	    version > FM_MOD_SCHEME_VERSION)
+		return (-1);
+
+	/* Get authority, if present */
+	err = nvlist_lookup_nvlist(nvl, FM_FMRI_AUTHORITY, &anvl);
+	if (err != 0 && err != ENOENT)
+		return (-1);
+
+	/*
+	 *  For brevity, we only include the module name and id
+	 *  present in the FMRI in our output string.  The FMRI
+	 *  also has data on the package containing the module.
+	 */
+
+	/* There must be a module name */
+	err = nvlist_lookup_string(nvl, FM_FMRI_MOD_NAME, &modname);
+	if (err != 0 || modname == NULL)
+		return (-1);
+
+	/* There must be a module id */
+	err = nvlist_lookup_int32(nvl, FM_FMRI_MOD_ID, &modid);
+	if (err != 0)
+		return (-1);
+
+	if (anvl != NULL) {
+		(void) nvlist_lookup_string(anvl,
+		    FM_FMRI_AUTH_PRODUCT, &aprod);
+		(void) nvlist_lookup_string(anvl,
+		    FM_FMRI_AUTH_CHASSIS, &achas);
+		(void) nvlist_lookup_string(anvl,
+		    FM_FMRI_AUTH_SERVER, &asrvr);
+		if (aprod != NULL)
+			more_auth++;
+		if (achas != NULL)
+			more_auth++;
+		if (asrvr != NULL)
+			more_auth++;
+	}
+
+	/* mod:// */
+	topo_fmristr_build(&size, buf, buflen, FM_FMRI_SCHEME_MOD, NULL, "://");
+
+	/* authority, if any */
+	if (aprod != NULL)
+		topo_fmristr_build(&size, buf, buflen, aprod,
+		    ":" FM_FMRI_AUTH_PRODUCT "=", NULL);
+	if (achas != NULL)
+		topo_fmristr_build(&size, buf, buflen, achas,
+		    ":" FM_FMRI_AUTH_CHASSIS "=", NULL);
+	if (asrvr != NULL)
+		topo_fmristr_build(&size, buf, buflen, asrvr,
+		    ":" FM_FMRI_AUTH_SERVER "=", NULL);
+
+	/* module parts */
+	topo_fmristr_build(&size, buf, buflen, modname,
+	    "/" FM_FMRI_MOD_NAME "=", "/");
+
+	(void) snprintf(numbuf, MAXINTSTR, "%d", modid);
+	topo_fmristr_build(&size, buf, buflen, numbuf, FM_FMRI_MOD_ID "=",
+	    NULL);
+
+	return (size);
+}
+
+/*ARGSUSED*/
+static int
+mod_fmri_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *nvl, nvlist_t **out)
+{
+	ssize_t len;
+	char *name = NULL;
+	nvlist_t *fmristr;
+
+	if (version > TOPO_METH_NVL2STR_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if ((len = fmri_nvl2str(nvl, NULL, 0)) == 0 ||
+	    (name = topo_mod_alloc(mod, len + 1)) == NULL ||
+	    fmri_nvl2str(nvl, name, len + 1) == 0) {
+		if (name != NULL)
+			topo_mod_free(mod, name, len + 1);
+		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
+	}
+
+	if (topo_mod_nvalloc(mod, &fmristr, NV_UNIQUE_NAME) != 0)
+		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
+	if (nvlist_add_string(fmristr, "fmri-string", name) != 0) {
+		topo_mod_free(mod, name, len + 1);
+		nvlist_free(fmristr);
+		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
+	}
+	topo_mod_free(mod, name, len + 1);
+	*out = fmristr;
+
 	return (0);
 }

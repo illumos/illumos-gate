@@ -52,6 +52,8 @@ static int DEVprop_set(tnode_t *, did_t *,
     const char *, const char *, const char *);
 static int DRIVERprop_set(tnode_t *, did_t *,
     const char *, const char *, const char *);
+static int MODULEprop_set(tnode_t *, did_t *,
+    const char *, const char *, const char *);
 static int EXCAP_set(tnode_t *, did_t *,
     const char *, const char *, const char *);
 static int BDF_set(tnode_t *, did_t *,
@@ -91,6 +93,7 @@ txprop_t Fn_common_props[] = {
 	{ DI_DEVTYPPROP, &io_pgroup, TOPO_IO_DEVTYPE, maybe_di_chars_copy },
 	{ DI_DEVIDPROP, &pci_pgroup, TOPO_PCI_DEVID, maybe_di_uint_to_str },
 	{ NULL, &io_pgroup, TOPO_IO_DRIVER, DRIVERprop_set },
+	{ NULL, &io_pgroup, TOPO_IO_MODULE, MODULEprop_set },
 	{ NULL, &pci_pgroup, TOPO_PCI_EXCAP, EXCAP_set },
 	{ DI_CLASSPROP, &pci_pgroup, TOPO_PCI_CLASS, maybe_di_uint_to_str },
 	{ DI_VENDIDPROP, &pci_pgroup, TOPO_PCI_VENDID, maybe_di_uint_to_str },
@@ -108,6 +111,7 @@ txprop_t Dev_common_props[] = {
 txprop_t Bus_common_props[] = {
 	{ DI_DEVTYPPROP, &io_pgroup, TOPO_IO_DEVTYPE, maybe_di_chars_copy },
 	{ NULL, &io_pgroup, TOPO_IO_DRIVER, DRIVERprop_set },
+	{ NULL, &io_pgroup, TOPO_IO_MODULE, MODULEprop_set },
 	{ NULL, &protocol_pgroup, TOPO_PROP_LABEL, label_set },
 	{ NULL, &protocol_pgroup, TOPO_PROP_FRU, FRU_set },
 	{ NULL, &protocol_pgroup, TOPO_PROP_ASRU, ASRU_set }
@@ -117,6 +121,7 @@ txprop_t RC_common_props[] = {
 	{ NULL, &io_pgroup, TOPO_IO_DEV, DEVprop_set },
 	{ DI_DEVTYPPROP, &io_pgroup, TOPO_IO_DEVTYPE, maybe_di_chars_copy },
 	{ NULL, &io_pgroup, TOPO_IO_DRIVER, DRIVERprop_set },
+	{ NULL, &io_pgroup, TOPO_IO_MODULE, MODULEprop_set },
 	{ NULL, &pci_pgroup, TOPO_PCI_EXCAP, EXCAP_set },
 	{ NULL, &pci_pgroup, TOPO_PCI_BDF, BDF_set },
 	{ NULL, &protocol_pgroup, TOPO_PROP_LABEL, label_set },
@@ -139,6 +144,7 @@ txprop_t IOB_common_props[] = {
 txprop_t HB_common_props[] = {
 	{ NULL, &io_pgroup, TOPO_IO_DEV, DEVprop_set },
 	{ NULL, &io_pgroup, TOPO_IO_DRIVER, DRIVERprop_set },
+	{ NULL, &io_pgroup, TOPO_IO_MODULE, MODULEprop_set },
 	{ NULL, &protocol_pgroup, TOPO_PROP_LABEL, label_set },
 	{ NULL, &protocol_pgroup, TOPO_PROP_FRU, FRU_set },
 	{ NULL, &protocol_pgroup, TOPO_PROP_ASRU, ASRU_set }
@@ -593,6 +599,33 @@ DRIVERprop_set(tnode_t *tn, did_t *pd,
 	if (topo_prop_set_string(tn,
 	    tpgrp, tpnm, TOPO_PROP_IMMUTABLE, dnm, &err) < 0)
 		return (topo_mod_seterrno(did_mod(pd), err));
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+MODULEprop_set(tnode_t *tn, did_t *pd,
+    const char *dpnm, const char *tpgrp, const char *tpnm)
+{
+	nvlist_t *mod;
+	topo_mod_t *mp;
+	char *dnm;
+	int err;
+
+	if ((dnm = di_driver_name(did_dinode(pd))) == NULL)
+		return (0);
+
+	mp = did_mod(pd);
+	if ((mod = topo_mod_modfmri(mp, FM_MOD_SCHEME_VERSION, dnm)) == NULL)
+		return (-1); /* mod errno set */
+
+	if (topo_prop_set_fmri(tn, tpgrp, tpnm, TOPO_PROP_IMMUTABLE, mod,
+	    &err) < 0) {
+		nvlist_free(mod);
+		return (topo_mod_seterrno(mp, err));
+	}
+	nvlist_free(mod);
 
 	return (0);
 }

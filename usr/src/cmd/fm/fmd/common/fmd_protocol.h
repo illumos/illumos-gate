@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +68,7 @@ struct fmd_module;			/* see <fmd_module.h> */
 extern nvlist_t *fmd_protocol_authority(void);
 extern nvlist_t *fmd_protocol_fmri_module(struct fmd_module *);
 extern nvlist_t *fmd_protocol_fault(const char *,
-    uint8_t, nvlist_t *, nvlist_t *, nvlist_t *);
+    uint8_t, nvlist_t *, nvlist_t *, nvlist_t *, const char *);
 extern nvlist_t *fmd_protocol_list(const char *, nvlist_t *,
     const char *, const char *, uint_t, nvlist_t **, uint8_t *, int);
 extern nvlist_t *fmd_protocol_rsrc_asru(const char *, nvlist_t *,

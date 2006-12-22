@@ -221,43 +221,12 @@ mc_nvl_add_prop(nvlist_t *nvl, void *node, mcamd_propcode_t code, int reqval)
 		(void) nvlist_add_uint64(nvl, name, value);
 }
 
-static nvlist_t *
-mc_nvl_create(mc_t *mc)
+static void
+mc_nvl_add_cslist(nvlist_t *mcnvl, mc_t *mc)
 {
 	mc_cs_t *mccs = mc->mc_cslist;
-	nvlist_t *cslist[MC_CHIP_NCS], *dimmlist[MC_CHIP_NDIMM];
-	nvlist_t *mcnvl;
-	mc_dimm_t *mcd;
+	nvlist_t *cslist[MC_CHIP_NCS];
 	int nelem, i;
-
-	(void) nvlist_alloc(&mcnvl, NV_UNIQUE_NAME, KM_SLEEP);
-
-	/*
-	 * Any changes to member names, types, value semantics or to
-	 * whether they are optional or required should result in
-	 * a new version number *after* an ARC case since this nvlist_t
-	 * is intended to become a contracted interface.
-	 */
-	(void) nvlist_add_uint8(mcnvl, MC_NVLIST_VERSTR, MC_NVLIST_VERS1);
-
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_NUM, 0);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_REV, 0);
-	(void) nvlist_add_string(mcnvl, "revname", mc->mc_revname);
-	mc_nvl_add_socket(mcnvl, mc);
-	mc_nvl_add_ecctype(mcnvl, mc);
-
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_BASE_ADDR, 0);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_LIM_ADDR, 0);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_ILEN, 0);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_ILSEL, 0);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_CSINTLVFCTR, 0);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_DRAMHOLE_SIZE, 0);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_ACCESS_WIDTH, 0);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_CSBANKMAPREG, 0);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_BANKSWZL, 0);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_MOD64MUX, 0);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_SPARECS, 1);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_BADCS, 1);
 
 	for (nelem = 0; mccs != NULL; mccs = mccs->mccs_next, nelem++) {
 		nvlist_t **csp = &cslist[nelem];
@@ -292,6 +261,14 @@ mc_nvl_create(mc_t *mc)
 	(void) nvlist_add_nvlist_array(mcnvl, "cslist", cslist, nelem);
 	for (i = 0; i < nelem; i++)
 		nvlist_free(cslist[i]);
+}
+
+static void
+mc_nvl_add_dimmlist(nvlist_t *mcnvl, mc_t *mc)
+{
+	nvlist_t *dimmlist[MC_CHIP_NDIMM];
+	mc_dimm_t *mcd;
+	int nelem, i;
 
 	for (nelem = 0, mcd = mc->mc_dimmlist; mcd != NULL;
 	    mcd = mcd->mcd_next, nelem++) {
@@ -325,6 +302,93 @@ mc_nvl_create(mc_t *mc)
 	(void) nvlist_add_nvlist_array(mcnvl, "dimmlist", dimmlist, nelem);
 	for (i = 0; i < nelem; i++)
 		nvlist_free(dimmlist[i]);
+}
+
+static void
+mc_nvl_add_htconfig(nvlist_t *mcnvl, mc_t *mc)
+{
+	mc_cfgregs_t *mcr = &mc->mc_cfgregs;
+	union mcreg_htroute *htrp = (union mcreg_htroute *)&mcr->mcr_htroute[0];
+	union mcreg_nodeid *nip = (union mcreg_nodeid *)&mcr->mcr_htnodeid;
+	union mcreg_unitid *uip = (union mcreg_unitid *)&mcr->mcr_htunitid;
+	int ndcnt = HT_COHERENTNODES(nip);
+	uint32_t BCRte[MC_CHIP_MAXNODES];
+	uint32_t RPRte[MC_CHIP_MAXNODES];
+	uint32_t RQRte[MC_CHIP_MAXNODES];
+	nvlist_t *nvl;
+	int i;
+
+	(void) nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP);
+
+	(void) nvlist_add_uint32(nvl, "NodeId", MCREG_FIELD_CMN(nip, NodeId));
+	(void) nvlist_add_uint32(nvl, "CoherentNodes", HT_COHERENTNODES(nip));
+	(void) nvlist_add_uint32(nvl, "SbNode", MCREG_FIELD_CMN(nip, SbNode));
+	(void) nvlist_add_uint32(nvl, "LkNode", MCREG_FIELD_CMN(nip, LkNode));
+	(void) nvlist_add_uint32(nvl, "SystemCoreCount",
+	    HT_SYSTEMCORECOUNT(nip));
+
+	(void) nvlist_add_uint32(nvl, "C0Unit", MCREG_FIELD_CMN(uip, C0Unit));
+	(void) nvlist_add_uint32(nvl, "C1Unit", MCREG_FIELD_CMN(uip, C1Unit));
+	(void) nvlist_add_uint32(nvl, "McUnit", MCREG_FIELD_CMN(uip, McUnit));
+	(void) nvlist_add_uint32(nvl, "HbUnit", MCREG_FIELD_CMN(uip, HbUnit));
+	(void) nvlist_add_uint32(nvl, "SbLink", MCREG_FIELD_CMN(uip, SbLink));
+
+	if (ndcnt <= MC_CHIP_MAXNODES) {
+		for (i = 0; i < ndcnt; i++, htrp++) {
+			BCRte[i] = MCREG_FIELD_CMN(htrp, BCRte);
+			RPRte[i] = MCREG_FIELD_CMN(htrp, RPRte);
+			RQRte[i] = MCREG_FIELD_CMN(htrp, RQRte);
+		}
+
+		(void) nvlist_add_uint32_array(nvl, "BroadcastRoutes",
+		    &BCRte[0], ndcnt);
+		(void) nvlist_add_uint32_array(nvl, "ResponseRoutes",
+		    &RPRte[0], ndcnt);
+		(void) nvlist_add_uint32_array(nvl, "RequestRoutes",
+		    &RQRte[0], ndcnt);
+	}
+
+	(void) nvlist_add_nvlist(mcnvl, "htconfig", nvl);
+	nvlist_free(nvl);
+}
+
+static nvlist_t *
+mc_nvl_create(mc_t *mc)
+{
+	nvlist_t *mcnvl;
+
+	(void) nvlist_alloc(&mcnvl, NV_UNIQUE_NAME, KM_SLEEP);
+
+	/*
+	 * Since this nvlist is used in populating the topo tree changes
+	 * made here may propogate through to changed property names etc
+	 * in the topo tree.  Some properties in the topo tree will be
+	 * contracted via ARC, so be careful what you change here.
+	 */
+	(void) nvlist_add_uint8(mcnvl, MC_NVLIST_VERSTR, MC_NVLIST_VERS1);
+
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_NUM, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_REV, 0);
+	(void) nvlist_add_string(mcnvl, "revname", mc->mc_revname);
+	mc_nvl_add_socket(mcnvl, mc);
+	mc_nvl_add_ecctype(mcnvl, mc);
+
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_BASE_ADDR, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_LIM_ADDR, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_ILEN, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_ILSEL, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_CSINTLVFCTR, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_DRAMHOLE_SIZE, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_ACCESS_WIDTH, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_CSBANKMAPREG, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_BANKSWZL, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_MOD64MUX, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_SPARECS, 1);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_BADCS, 1);
+
+	mc_nvl_add_cslist(mcnvl, mc);
+	mc_nvl_add_dimmlist(mcnvl, mc);
+	mc_nvl_add_htconfig(mcnvl, mc);
 
 	return (mcnvl);
 }
@@ -547,6 +611,27 @@ mc_report_testfails(mc_t *mc)
 }
 
 /*
+ * Function 0 - HyperTransport Technology Configuration
+ */
+static void
+mc_mkprops_htcfg(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
+{
+	union mcreg_nodeid nodeid;
+	off_t offset;
+	int i;
+
+	mc->mc_cfgregs.mcr_htnodeid = MCREG_VAL32(&nodeid) =
+	    mc_pcicfg_get32(cfghdl, MC_HT_REG_NODEID);
+
+	mc->mc_cfgregs.mcr_htunitid = mc_pcicfg_get32(cfghdl, MC_HT_REG_UNITID);
+
+	for (i = 0, offset = MC_HT_REG_RTBL_NODE_0;
+	    i < HT_COHERENTNODES(&nodeid);
+	    i++, offset += MC_HT_REG_RTBL_INCR)
+		mc->mc_cfgregs.mcr_htroute[i] = mc_pcicfg_get32(cfghdl, offset);
+}
+
+/*
  * Function 1 Configuration - Address Map (see BKDG 3.4.4 DRAM Address Map)
  *
  * Read the Function 1 Address Map for each potential DRAM node.  The Base
@@ -561,19 +646,19 @@ mc_report_testfails(mc_t *mc)
 static void
 mc_mkprops_addrmap(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 {
-	union mcreg_drambase base[MC_AM_REG_NODE_NUM];
-	union mcreg_dramlimit lim[MC_AM_REG_NODE_NUM];
+	union mcreg_drambase base[MC_CHIP_MAXNODES];
+	union mcreg_dramlimit lim[MC_CHIP_MAXNODES];
 	mc_props_t *mcp = &mc->mc_props;
 	mc_cfgregs_t *mcr = &mc->mc_cfgregs;
 	union mcreg_dramhole hole;
 	int i;
 
 	mc_prop_read_pair(cfghdl,
-	    (uint32_t *)base, MC_AM_REG_DRAMBASE_0, MC_AM_REG_NODE_NUM,
-	    (uint32_t *)lim, MC_AM_REG_DRAMLIM_0, MC_AM_REG_NODE_NUM,
+	    (uint32_t *)base, MC_AM_REG_DRAMBASE_0, MC_CHIP_MAXNODES,
+	    (uint32_t *)lim, MC_AM_REG_DRAMLIM_0, MC_CHIP_MAXNODES,
 	    MC_AM_REG_DRAM_INCR);
 
-	for (i = 0; i < MC_AM_REG_NODE_NUM; i++) {
+	for (i = 0; i < MC_CHIP_MAXNODES; i++) {
 		/*
 		 * Don't create properties for empty nodes.
 		 */
@@ -907,7 +992,7 @@ typedef struct mc_bind_map {
 
 static const mc_bind_map_t mc_bind_map[] = {
 	{ MC_FUNC_HTCONFIG_BINDNM, MC_FUNC_HTCONFIG,
-	    "AMD Memory Controller (HT Configuration)", NULL },
+	    "AMD Memory Controller (HT Configuration)", mc_mkprops_htcfg },
 	{ MC_FUNC_ADDRMAP_BINDNM, MC_FUNC_ADDRMAP,
 	    "AMD Memory Controller (Address Map)", mc_mkprops_addrmap },
 	{ MC_FUNC_DRAMCTL_BINDNM, MC_FUNC_DRAMCTL,

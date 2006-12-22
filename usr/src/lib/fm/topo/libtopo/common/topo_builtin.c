@@ -47,7 +47,7 @@ static const struct topo_builtin _topo_builtins[] = {
 	{ "pkg", PKG_VERSION, pkg_init, pkg_fini },
 	{ "mod", MOD_VERSION, mod_init, mod_fini },
 	{ "hc", HC_VERSION, hc_init, hc_fini },		/* hc must go last */
-	{ NULL, NULL, NULL }
+	{ NULL, 0, NULL, NULL }
 };
 
 static int

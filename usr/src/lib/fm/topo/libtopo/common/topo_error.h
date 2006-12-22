@@ -80,6 +80,7 @@ typedef enum topo_errno {
     ETOPO_ENUM_PARTIAL,	/* partial enumeration completed for client */
     ETOPO_ENUM_NOMAP,	/* no topology map file for enumeration */
     ETOPO_ENUM_FATAL,	/* fatal enumeration error */
+    ETOPO_ENUM_RECURS,	/* recursive enumertation detected */
     ETOPO_FMRI_NVL,	/* nvlist allocation failure for FMRI */
     ETOPO_FMRI_VERSION, /* invalid FMRI scheme version */
     ETOPO_FMRI_MALFORM,	/* malformed FMRI */

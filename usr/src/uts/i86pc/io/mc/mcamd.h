@@ -78,10 +78,17 @@ enum mc_funcnum {
  */
 
 /*
+ * Function 0 (HT Config) offsets
+ */
+#define	MC_HT_REG_RTBL_NODE_0	0x40
+#define	MC_HT_REG_RTBL_INCR	4
+#define	MC_HT_REG_NODEID	0x60
+#define	MC_HT_REG_UNITID	0x64
+
+/*
  * Function 1 (address mask) offsets for DRAM base, DRAM limit, DRAM hole
  * registers.
  */
-#define	MC_AM_REG_NODE_NUM	8	/* Number of DRAM nodes */
 #define	MC_AM_REG_DRAMBASE_0	0x40	/* Offset for DRAM Base 0 */
 #define	MC_AM_REG_DRAMLIM_0	0x44	/* Offset for DRAM Limit 0 */
 #define	MC_AM_REG_DRAM_INCR	8	/* incr between base/limit pairs */
@@ -207,6 +214,9 @@ typedef struct mc_props {
  * Memory controller config register values
  */
 typedef struct mc_cfgregs {
+	mcamd_cfgreg_t mcr_htroute[MC_CHIP_MAXNODES];
+	mcamd_cfgreg_t mcr_htnodeid;
+	mcamd_cfgreg_t mcr_htunitid;
 	mcamd_cfgreg_t mcr_drambase;
 	mcamd_cfgreg_t mcr_dramlimit;
 	mcamd_cfgreg_t mcr_dramhole;

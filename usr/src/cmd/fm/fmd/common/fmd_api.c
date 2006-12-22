@@ -1641,27 +1641,51 @@ fmd_timer_remove(fmd_hdl_t *hdl, id_t id)
 		    "id %ld is not a valid timer id\n", id);
 	}
 
-	t = fmd_timerq_remove(fmd.d_timers, mp->mod_timerids, id);
+	/*
+	 * If the timer has not fired (t != NULL), remove it from the timer
+	 * queue.  If the timer has fired (t == NULL), we could be in one of
+	 * two situations: a) we are processing the timer callback or b)
+	 * the timer event is on the module queue awaiting dispatch.  For a),
+	 * fmd_timerq_remove() will wait for the timer callback function
+	 * to complete and queue an event for dispatch.  For a) and b),
+	 * we cancel the outstanding timer event from the module's dispatch
+	 * queue.
+	 */
+	if ((t = fmd_timerq_remove(fmd.d_timers, mp->mod_timerids, id)) != NULL)
+		fmd_free(t, sizeof (fmd_modtimer_t));
 	fmd_module_unlock(mp);
 
-	if (t != NULL) {
-		fmd_eventq_cancel(mp->mod_queue, FMD_EVT_TIMEOUT, t);
-		fmd_free(t, sizeof (fmd_modtimer_t));
-	}
+	fmd_eventq_cancel(mp->mod_queue, FMD_EVT_TIMEOUT, (void *)id);
 }
 
 nvlist_t *
 fmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class,
     uint8_t certainty, nvlist_t *asru, nvlist_t *fru, nvlist_t *rsrc)
 {
-	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	fmd_module_t *mp;
+	topo_hdl_t *thp;
 	nvlist_t *nvl;
+	char *loc = NULL;
+	int err;
 
+	thp = fmd_hdl_topology(hdl, TOPO_VERSION);
+
+	mp = fmd_api_module_lock(hdl);
 	if (class == NULL || class[0] == '\0')
 		fmd_api_error(mp, EFMD_NVL_INVAL, "invalid fault class\n");
 
-	nvl = fmd_protocol_fault(class, certainty, asru, fru, rsrc);
+	/*
+	 * Try to find the location label for this resource
+	 */
+	(void) topo_fmri_label(thp, rsrc, &loc, &err);
+
+	nvl = fmd_protocol_fault(class, certainty, asru, fru, rsrc, loc);
+
 	fmd_module_unlock(mp);
+
+	if (loc != NULL)
+		topo_hdl_strfree(thp, loc);
+
 	return (nvl);
 }
 

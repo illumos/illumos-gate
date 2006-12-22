@@ -4615,6 +4615,10 @@ mondo_loop() {
 	rm -f $usr/lib/fm/SUN4U.dict
 	rm -f $usr/lib/fm/SUNOS.dict
 
+	# Remove unused SMF dictionary
+	rm -f $root/usr/lib/fm/dict/SMF.dict
+	rm -f $root/usr/lib/locale/C/LC_MESSAGES/SMF.mo
+
 	#
 	# Remove old FMA .eft files and directories
 	#

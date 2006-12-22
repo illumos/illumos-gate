@@ -702,14 +702,28 @@ node_process(topo_mod_t *mp, xmlNodePtr nn, tf_rdata_t *rd)
 	if ((str = xmlGetProp(nn, (xmlChar *)Static)) != NULL) {
 		if (xmlStrcmp(str, (xmlChar *)True) == 0)
 			s = 1;
+		xmlFree(str);
 	}
 
-	if (topo_mod_enumerate(rd->rd_mod, rd->rd_pn, rd->rd_finfo->tf_scheme,
-	    rd->rd_name, inst, inst, s == 1 ? &s : NULL) < 0)
-		goto nodedone;
+	if (s == 0) {
+		if (topo_mod_enumerate(rd->rd_mod, rd->rd_pn,
+		    rd->rd_finfo->tf_scheme, rd->rd_name, inst, inst,
+		    s == 1 ? &s : NULL) < 0)
+			goto nodedone;
+	}
 	ntn = topo_node_lookup(rd->rd_pn, rd->rd_name, inst);
-	if (ntn == NULL)
+	if (ntn == NULL) {
+
+		/*
+		 * If this is a static node declaration, we can
+		 * ignore the lookup failure and continue
+		 * processing.  Otherwise, something
+		 * went wrong during enumeration
+		 */
+		if (s == 1)
+			rv = 0;
 		goto nodedone;
+	}
 
 	if ((newi = tf_idata_new(mp, inst, ntn)) == NULL) {
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
@@ -748,13 +762,21 @@ enum_attributes_process(topo_mod_t *mp, xmlNodePtr en)
 		(void) topo_mod_seterrno(mp, ETOPO_PRSR_NOATTR);
 		goto enodedone;
 	}
+
+	/*
+	 * Check for recursive enumeration
+	 */
+	if (strcmp(einfo->te_name, mp->tm_name) == 0) {
+		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
+		    "Recursive enumeration detected for %s\n",
+		    einfo->te_name);
+		(void) topo_mod_seterrno(mp, ETOPO_ENUM_RECURS);
+		goto enodedone;
+	}
 	if (xmlattr_to_int(mp, en, Version, &ui) < 0)
 		goto enodedone;
 	einfo->te_vers = (int)ui;
-	/*
-	 * FMXXX must deal with name-stability and apply-methods (which are
-	 * child xmlNodes)
-	 */
+
 	return (einfo);
 
 enodedone:
@@ -822,7 +844,7 @@ topo_xml_range_process(topo_mod_t *mp, xmlNodePtr rn, tf_rdata_t *rd)
 	    rd->rd_name, topo_node_name(rd->rd_pn));
 	e = topo_node_range_create(mp,
 	    rd->rd_pn, rd->rd_name, rd->rd_min, rd->rd_max);
-	if (e != 0) {
+	if (e != 0 && topo_mod_errno(mp) != ETOPO_NODE_DUP) {
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
 		    "Range create failed due to %s.\n",
 		    topo_strerror(topo_mod_errno(mp)));

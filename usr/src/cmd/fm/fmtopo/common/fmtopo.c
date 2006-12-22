@@ -197,6 +197,8 @@ print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl, int skip)
 	topo_type_t type;
 	char *tstr, *propn, buf[48];
 	nvpair_t *pv_nvp;
+	int i;
+	uint_t nelem;
 
 	if ((pv_nvp = nvlist_next_nvpair(nvl, NULL)) == NULL)
 		return;
@@ -311,6 +313,16 @@ print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl, int skip)
 			}
 
 			topo_hdl_strfree(thp, fmri);
+			break;
+		}
+		case DATA_TYPE_UINT32_ARRAY: {
+			uint32_t *val;
+
+			(void) nvpair_value_uint32_array(pv_nvp, &val, &nelem);
+			(void) printf(" [ ");
+			for (i = 0; i < nelem; i++)
+				(void) printf("%u ", val[i]);
+			(void) printf("]");
 			break;
 		}
 		default:

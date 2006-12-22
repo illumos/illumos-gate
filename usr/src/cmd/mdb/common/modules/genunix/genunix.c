@@ -100,6 +100,7 @@
 #include "zone.h"
 #include "modhash.h"
 #include "mdi.h"
+#include "fm.h"
 
 /*
  * Surely this is defined somewhere...
@@ -3322,6 +3323,10 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "devinfo_fmce", ":", "devinfo fault managment cache entry",
 	    devinfo_fmce},
 
+	/* from fm.c */
+	{ "ereport", "[-v]", "print ereports logged in dump",
+	    ereport },
+
 	/* from findstack.c */
 	{ "findstack", ":[-v]", "find kernel thread stack", findstack },
 	{ "findstack_debug", NULL, "toggle findstack debugging",
@@ -3514,6 +3519,10 @@ static const mdb_walker_t walkers[] = {
 	{ "anon", "given an amp, list of anon structures",
 		anon_walk_init, anon_walk_step, anon_walk_fini },
 	{ "cpu", "walk cpu structures", cpu_walk_init, cpu_walk_step },
+	{ "ereportq_dump", "walk list of ereports in dump error queue",
+		ereportq_dump_walk_init, ereportq_dump_walk_step, NULL },
+	{ "ereportq_pend", "walk list of ereports in pending error queue",
+		ereportq_pend_walk_init, ereportq_pend_walk_step, NULL },
 	{ "errorq", "walk list of system error queues",
 		errorq_walk_init, errorq_walk_step, NULL },
 	{ "errorq_data", "walk pending error queue data buffers",

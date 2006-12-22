@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -355,6 +354,7 @@ fmd_log_xopen(const char *root, const char *name, const char *tag, int oflags)
 	fmd_log_t *lp = fmd_zalloc(sizeof (fmd_log_t), FMD_SLEEP);
 
 	char buf[PATH_MAX];
+	char *slash = "/";
 	size_t len;
 	int err;
 
@@ -362,9 +362,11 @@ fmd_log_xopen(const char *root, const char *name, const char *tag, int oflags)
 	(void) pthread_cond_init(&lp->log_cv, NULL);
 	(void) pthread_mutex_lock(&lp->log_lock);
 
-	len = strlen(root) + strlen(name) + 2; /* for "/" and "\0" */
+	if (strcmp(root, "") == 0)
+		slash = "";
+	len = strlen(root) + strlen(name) + strlen(slash) + 1; /* for "\0" */
 	lp->log_name = fmd_alloc(len, FMD_SLEEP);
-	(void) snprintf(lp->log_name, len, "%s/%s", root, name);
+	(void) snprintf(lp->log_name, len, "%s%s%s", root, slash, name);
 	lp->log_tag = fmd_strdup(tag, FMD_SLEEP);
 	(void) fmd_conf_getprop(fmd.d_conf, "log.minfree", &lp->log_minfree);
 
@@ -1017,6 +1019,17 @@ fmd_log_rotate(fmd_log_t *lp)
 	char npath[PATH_MAX];
 	fmd_log_t *nlp;
 
+	(void) snprintf(npath, sizeof (npath), "%s+", lp->log_name);
+
+	/*
+	 * Open new log file.
+	 */
+	if ((nlp = fmd_log_open("", npath, lp->log_tag)) == NULL) {
+		fmd_error(EFMD_LOG_ROTATE, "failed to open %s", npath);
+		(void) fmd_set_errno(EFMD_LOG_ROTATE);
+		return (NULL);
+	}
+
 	(void) snprintf(npath, sizeof (npath), "%s.0-", lp->log_name);
 	(void) pthread_mutex_lock(&lp->log_lock);
 
@@ -1027,6 +1040,8 @@ fmd_log_rotate(fmd_log_t *lp)
 	 */
 	if (lp->log_pending != 0) {
 		(void) pthread_mutex_unlock(&lp->log_lock);
+		(void) unlink(nlp->log_name);
+		fmd_log_rele(nlp);
 		(void) fmd_set_errno(EFMD_LOG_ROTBUSY);
 		return (NULL);
 	}
@@ -1034,17 +1049,27 @@ fmd_log_rotate(fmd_log_t *lp)
 	if (rename(lp->log_name, npath) != 0) {
 		(void) pthread_mutex_unlock(&lp->log_lock);
 		fmd_error(EFMD_LOG_ROTATE, "failed to rename %s", lp->log_name);
+		(void) unlink(nlp->log_name);
+		fmd_log_rele(nlp);
 		(void) fmd_set_errno(EFMD_LOG_ROTATE);
 		return (NULL);
 	}
 
-	if ((nlp = fmd_log_open("", lp->log_name, lp->log_tag)) == NULL) {
-		(void) rename(npath, lp->log_name);
+	if (rename(nlp->log_name, lp->log_name) != 0) {
 		(void) pthread_mutex_unlock(&lp->log_lock);
-		fmd_error(EFMD_LOG_ROTATE, "failed to reopen %s", lp->log_name);
+		fmd_error(EFMD_LOG_ROTATE, "failed to rename %s",
+		    nlp->log_name);
+		(void) unlink(nlp->log_name);
+		fmd_log_rele(nlp);
 		(void) fmd_set_errno(EFMD_LOG_ROTATE);
 		return (NULL);
 	}
+
+	/*
+	 * Change name of new log file
+	 */
+	fmd_strfree(nlp->log_name);
+	nlp->log_name = fmd_strdup(lp->log_name, FMD_SLEEP);
 
 	/*
 	 * If we've rotated the log, no pending events exist so we don't have

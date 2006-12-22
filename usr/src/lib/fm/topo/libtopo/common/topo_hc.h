@@ -69,6 +69,7 @@ extern "C" {
 #define	TOPO_PGROUP_IO		"io"
 #define	TOPO_IO_DEVTYPE		"devtype"
 #define	TOPO_IO_DRIVER		"driver"
+#define	TOPO_IO_MODULE		"module"
 #define	TOPO_IO_DEV		"dev"
 #define	TOPO_IO_DEV_PATH	"devfs-path"
 #define	TOPO_IO_AP_PATH		"ap-path"

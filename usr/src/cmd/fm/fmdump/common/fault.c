@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -29,6 +28,7 @@
 
 #include <fmdump.h>
 #include <stdio.h>
+#include <strings.h>
 
 /*ARGSUSED*/
 static int
@@ -62,6 +62,7 @@ flt_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 
 	for (i = 0; i < size; i++) {
 		char *class = NULL, *rname = NULL, *aname = NULL, *fname = NULL;
+		char *loc = NULL;
 		nvlist_t *fru, *asru, *rsrc;
 		uint8_t pct = 0;
 
@@ -77,6 +78,14 @@ flt_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 		if (nvlist_lookup_nvlist(nva[i], FM_FAULT_RESOURCE, &rsrc) == 0)
 			rname = fmdump_nvl2str(rsrc);
 
+		if (nvlist_lookup_string(nva[i], FM_FAULT_LOCATION, &loc)
+		    == 0) {
+			if (strncmp(fname, FM_FMRI_LEGACY_HC_PREFIX,
+			    sizeof (FM_FMRI_LEGACY_HC_PREFIX)) == 0)
+				loc = fname + sizeof (FM_FMRI_LEGACY_HC_PREFIX);
+		}
+
+
 		fmdump_printf(fp, "  %3u%%  %s\n\n",
 		    pct, class ? class : "-");
 
@@ -90,8 +99,11 @@ flt_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 		fmdump_printf(fp, "           Affects: %s\n",
 		    aname ? aname : "-");
 
-		fmdump_printf(fp, "               FRU: %s\n\n",
+		fmdump_printf(fp, "               FRU: %s\n",
 		    fname ? fname : "-");
+
+		fmdump_printf(fp, "          Location: %s\n\n",
+		    loc ? loc : "-");
 
 		free(fname);
 		free(aname);

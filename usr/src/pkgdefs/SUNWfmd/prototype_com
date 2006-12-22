@@ -47,7 +47,6 @@ d none usr/lib/fm 755 root bin
 d none usr/lib/fm/dict 755 root bin
 f none usr/lib/fm/dict/DISK.dict 444 root bin
 f none usr/lib/fm/dict/FMD.dict 444 root bin
-f none usr/lib/fm/dict/SMF.dict 444 root bin
 f none usr/lib/fm/dict/SUNOS.dict 444 root bin
 f none usr/lib/fm/dict/PCI.dict 444 root bin
 f none usr/lib/fm/dict/ZFS.dict 444 root bin
@@ -112,7 +111,6 @@ d none usr/lib/locale/C 755 root bin
 d none usr/lib/locale/C/LC_MESSAGES 755 root bin
 f none usr/lib/locale/C/LC_MESSAGES/DISK.mo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/FMD.mo 444 root bin
-f none usr/lib/locale/C/LC_MESSAGES/SMF.mo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUNOS.mo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/PCI.mo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/ZFS.mo 444 root bin

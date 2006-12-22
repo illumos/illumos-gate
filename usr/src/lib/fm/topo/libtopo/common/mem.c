@@ -123,10 +123,10 @@ mem_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	 * If we have a DIMM offset, include it in the string.  If we have a
 	 * PA then use that.  Otherwise just format the unum element.
 	 */
-	if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &val) == 0) {
+	if (nvlist_lookup_uint64(in, FM_FMRI_MEM_OFFSET, &val) == 0) {
 		format = FM_FMRI_SCHEME_MEM ":///%1$s/"
 		    FM_FMRI_MEM_OFFSET "=%2$llx";
-	} else if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &val) == 0) {
+	} else if (nvlist_lookup_uint64(in, FM_FMRI_MEM_PHYSADDR, &val) == 0) {
 		format = FM_FMRI_SCHEME_MEM ":///%1$s/"
 		    FM_FMRI_MEM_PHYSADDR "=%2$llx";
 	} else

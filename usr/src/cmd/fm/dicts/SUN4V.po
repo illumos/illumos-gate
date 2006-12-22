@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -41,7 +40,7 @@ msgstr "The fault manager will attempt to remove the affected CPU from service."
 msgid "SUN4V-8000-1S.impact"
 msgstr "System performance may be affected."
 msgid "SUN4V-8000-1S.action"
-msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u &lt;EVENT_ID&gt;."
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>."
 #
 # code: SUN4V-8000-2A
 # keys: fault.cpu.ultraSPARC-T1.freg
@@ -57,7 +56,7 @@ msgstr "None"
 msgid "SUN4V-8000-2A.impact"
 msgstr "System performance may be affected."
 msgid "SUN4V-8000-2A.action"
-msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u &lt;EVENT_ID&gt;."
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>."
 #
 # code: SUN4V-8000-3P
 # keys: fault.cpu.ultraSPARC-T1.itlb
@@ -73,7 +72,7 @@ msgstr "The fault manager will attempt to remove the affected CPU from service."
 msgid "SUN4V-8000-3P.impact"
 msgstr "System performance may be affected.\n"
 msgid "SUN4V-8000-3P.action"
-msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u &lt;EVENT_ID&gt;."
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>."
 #
 # code: SUN4V-8000-4D
 # keys: fault.cpu.ultraSPARC-T1.dtlb
@@ -89,7 +88,7 @@ msgstr "The fault manager will attempt to remove the affected CPU from service."
 msgid "SUN4V-8000-4D.impact"
 msgstr "System performance may be affected.\n"
 msgid "SUN4V-8000-4D.action"
-msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u &lt;EVENT_ID&gt;."
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>."
 #
 # code: SUN4V-8000-5H
 # keys: fault.cpu.ultraSPARC-T1.icache
@@ -105,7 +104,7 @@ msgstr "The fault manager will attempt to remove the affected CPU from service."
 msgid "SUN4V-8000-5H.impact"
 msgstr "System performance may be affected.\n"
 msgid "SUN4V-8000-5H.action"
-msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u &lt;EVENT_ID&gt;."
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>."
 #
 # code: SUN4V-8000-63
 # keys: fault.cpu.ultraSPARC-T1.dcache
@@ -121,7 +120,7 @@ msgstr "The fault manager will attempt to remove the affected CPU from service."
 msgid "SUN4V-8000-63.impact"
 msgstr "System performance may be affected.\n"
 msgid "SUN4V-8000-63.action"
-msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u &lt;EVENT_ID&gt;."
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>."
 #
 # code: SUN4V-8000-7Y
 # keys: fault.cpu.ultraSPARC-T1.mau
@@ -137,7 +136,7 @@ msgstr "None"
 msgid "SUN4V-8000-7Y.impact"
 msgstr "System performance may be affected.\n"
 msgid "SUN4V-8000-7Y.action"
-msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u &lt;EVENT_ID&gt;."
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>."
 #
 # code: SUN4V-8000-8Q
 # keys: fault.cpu.ultraSPARC-T1.l2cachedata
@@ -153,7 +152,7 @@ msgstr "None"
 msgid "SUN4V-8000-8Q.impact"
 msgstr "System performance may be affected.\n"
 msgid "SUN4V-8000-8Q.action"
-msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u &lt;EVENT_ID&gt;."
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>."
 #
 # code: SUN4V-8000-9C
 # keys: fault.cpu.ultraSPARC-T1.l2cachetag
@@ -169,7 +168,7 @@ msgstr "None"
 msgid "SUN4V-8000-9C.impact"
 msgstr "System performance may be affected.\n"
 msgid "SUN4V-8000-9C.action"
-msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u &lt;EVENT_ID&gt;."
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>."
 #
 # code: SUN4V-8000-AR
 # keys: fault.cpu.ultraSPARC-T1.l2cachectl
@@ -185,7 +184,7 @@ msgstr "None"
 msgid "SUN4V-8000-AR.impact"
 msgstr "System performance may be affected.\n"
 msgid "SUN4V-8000-AR.action"
-msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u &lt;EVENT_ID&gt;."
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>."
 #
 # code: SUN4V-8000-C4
 # keys: fault.memory.page
@@ -217,7 +216,7 @@ msgstr "Pages of memory associated with this memory module are being removed fro
 msgid "SUN4V-8000-DX.impact"
 msgstr "Total system memory capacity will be reduced as pages are retired."
 msgid "SUN4V-8000-DX.action"
-msgstr "Schedule a repair procedure to replace the affected memory module. Use fmdump -v -u &lt;EVENT_ID&gt; to identify the module."
+msgstr "Schedule a repair procedure to replace the affected memory module. Use fmdump -v -u <EVENT_ID> to identify the module."
 #
 # code: SUN4V-8000-E2
 # keys: fault.memory.bank
@@ -233,4 +232,4 @@ msgstr "Pages of memory associated with this memory module are being removed fro
 msgid "SUN4V-8000-E2.impact"
 msgstr "Total system memory capacity will be reduced as pages are retired."
 msgid "SUN4V-8000-E2.action"
-msgstr "Schedule a repair procedure to replace the affected memory module. Use fmdump -v -u &lt;EVENT_ID&gt; to identify the module."
+msgstr "Schedule a repair procedure to replace the affected memory module. Use fmdump -v -u <EVENT_ID> to identify the module."

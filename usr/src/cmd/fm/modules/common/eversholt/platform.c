@@ -629,67 +629,34 @@ rewrite_resource(char *pname, struct config *croot, char *path)
 }
 
 static void
-defect_units(nvlist_t **ap, nvlist_t **fp, struct config *croot, char *path)
+defect_units(nvlist_t **ap, struct config *croot, char *path)
 {
-	const char *driverstr;
-	nvlist_t *cf, *nf;
+	const char *modstr;
 	nvlist_t *na;
-	nvlist_t *arg;
 	int err;
 
 	/*
-	 * Defects aren't required to have ASRUs and FRUs defined with
+	 * Defects aren't required to have ASRUs defined with
 	 * them in the eversholt fault tree, so usually we'll be
-	 * creating original FMRIs here.  If either the ASRU or FRU
+	 * creating original FMRIs here.  If the ASRU
 	 * is defined when we get here, we won't replace it.
 	 */
-	if (*ap != NULL && *fp != NULL)
+	if (*ap != NULL)
 		return;
 
 	/*
 	 * Find the driver for this resource and use that to get
-	 * mod and pkg fmris for ASRU and FRU respectively.
+	 * a mod fmri for ASRU.  There are no FRUs for defects.
 	 */
-	if ((driverstr = cfgstrprop_lookup(croot, path, TOPO_IO_DRIVER))
-	    == NULL)
+	if ((modstr = cfgstrprop_lookup(croot, path, TOPO_IO_MODULE)) == NULL)
 		return;
 
-	if (topo_hdl_nvalloc(Eft_topo_hdl, &arg, NV_UNIQUE_NAME) != 0) {
-		out(O_ALTFP, "Can not allocate nvlist for MOD fmri lookup");
+	if (topo_fmri_str2nvl(Eft_topo_hdl, modstr, &na, &err) < 0) {
+		out(O_ALTFP, "topo_fmri_str2nvl() of %s failed", modstr);
 		return;
 	}
-	if (nvlist_add_string(arg, TOPO_IO_DRIVER, driverstr) != 0) {
-		out(O_ALTFP, "Failed to add DRIVER string to arg nvlist");
-		nvlist_free(arg);
-		return;
-	}
-	na = topo_fmri_create(Eft_topo_hdl, FM_FMRI_SCHEME_MOD,
-	    FM_FMRI_SCHEME_MOD, 0, arg, &err);
-	if (na == NULL) {
-		out(O_ALTFP, "topo_fmri_create() of %s scheme fmri"
-		    " for driver %s failed.", FM_FMRI_SCHEME_MOD, driverstr);
-		nvlist_free(arg);
-		return;
-	}
-	nvlist_free(arg);
 
-	if (*ap != NULL)
-		nvlist_free(*ap);
 	*ap = na;
-
-	err = nvlist_lookup_nvlist(na, FM_FMRI_MOD_PKG, &cf);
-	if (err != 0) {
-		out(O_ALTFP, "No pkg RTI within mod FMRI for %s (%s)\n",
-		    driverstr, topo_strerror(err));
-		return;
-	}
-	if (nvlist_xdup(cf, &nf, &Eft_nv_hdl) != 0) {
-		out(O_ALTFP, "Dup of pkg FMRI to be FRU FMRI failed\n");
-		return;
-	}
-	if (*fp != NULL)
-		nvlist_free(*fp);
-	*fp = nf;
 }
 
 /*
@@ -724,27 +691,34 @@ platform_units_translate(int isdefect, struct config *croot,
 	 * module.
 	 */
 	if (isdefect) {
-		defect_units(dfltasru, dfltfru, croot, path);
+		defect_units(dfltasru, croot, path);
 		return;
 	}
 
 	/*
 	 * Find the TOPO_PROP_ASRU and TOPO_PROP_FRU properties
-	 * for this resource
+	 * for this resource if *dfltasru and *dfltfru are set
 	 */
-	if ((asru = rewrite_resource(TOPO_PROP_ASRU, croot, path)) == NULL) {
-		out(O_ALTFP, "Cannot rewrite %s for %s.", TOPO_PROP_ASRU, path);
-	} else {
-		nvlist_free(*dfltasru);
-		*dfltasru = asru;
+	if (*dfltasru != NULL) {
+		if ((asru = rewrite_resource(TOPO_PROP_ASRU, croot, path))
+		    == NULL) {
+			out(O_ALTFP, "Cannot rewrite %s for %s.",
+			    TOPO_PROP_ASRU, path);
+		} else {
+			nvlist_free(*dfltasru);
+			*dfltasru = asru;
+		}
 	}
 
-	if ((fru = rewrite_resource(TOPO_PROP_FRU, croot, path)) == NULL) {
-		out(O_ALTFP, "Cannot rewrite %s for %s.",
-		    TOPO_PROP_FRU, path);
-	} else {
-		nvlist_free(*dfltfru);
-		*dfltfru = fru;
+	if (*dfltfru != NULL) {
+		if ((fru = rewrite_resource(TOPO_PROP_FRU, croot, path))
+		    == NULL) {
+			out(O_ALTFP, "Cannot rewrite %s for %s.",
+			    TOPO_PROP_FRU, path);
+		} else {
+			nvlist_free(*dfltfru);
+			*dfltfru = fru;
+		}
 	}
 }
 
@@ -2224,6 +2198,7 @@ platform_fault2ipath(nvlist_t *flt)
 	nvlist_t *rsrc;
 	struct node *np;
 	char *scheme;
+	const struct ipath *ip;
 
 	if (nvlist_lookup_nvlist(flt, FM_FAULT_RESOURCE, &rsrc) != 0) {
 		out(O_ALTFP, "platform_fault2ipath: no resource member");
@@ -2243,5 +2218,7 @@ platform_fault2ipath(nvlist_t *flt)
 	if ((np = hc_fmri_nodeize(rsrc)) == NULL)
 		return (NULL);		/* nodeize will already have whinged */
 
-	return (ipath(np));
+	ip = ipath(np);
+	tree_free(np);
+	return (ip);
 }

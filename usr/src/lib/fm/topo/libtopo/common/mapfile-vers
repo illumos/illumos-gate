@@ -36,6 +36,7 @@ SUNWprivate {
 	topo_fmri_expand;
 	topo_fmri_fru;
 	topo_fmri_invoke;
+	topo_fmri_label;
 	topo_fmri_nvl2str;
 	topo_fmri_present;
 	topo_fmri_str2nvl;

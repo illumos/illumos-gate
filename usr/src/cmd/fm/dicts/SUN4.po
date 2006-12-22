@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -41,7 +40,7 @@ msgstr "This fault does not have an automated response agent and thus requires i
 msgid "SUN4-8000-0Y.impact"
 msgstr "Loss of services provided by the device instances associated with this fault"
 msgid "SUN4-8000-0Y.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.  \n\nIf this message occurs on a Sun Fire T2000 also refer to the NOTE\nat the end of the Details section below.\n"
 #
 # code: SUN4-8000-13
 # keys: fault.io.ebus
@@ -105,7 +104,7 @@ msgstr "This fault does not have an automated response agent and thus requires i
 msgid "SUN4-8000-4P.impact"
 msgstr "Loss of services provided by the device instances associated with this fault"
 msgid "SUN4-8000-4P.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.  \n\nIf this message occurs on a Sun Fire T2000 also refer to the NOTE\nat the end of the Details section below."
 #
 # code: SUN4-8000-5A
 # keys: defect.io.fire.pciex.driver
@@ -121,7 +120,7 @@ msgstr "This fault does not have an automated response agent and thus requires i
 msgid "SUN4-8000-5A.impact"
 msgstr "Loss of services provided by the device instances associated with\nthis problem"
 msgid "SUN4-8000-5A.action"
-msgstr "Ensure latest driver and patch are installed.  Use fmdump -v -u &lt;EVENT_ID&gt; to identify the module/package, or contact Sun for support."
+msgstr "Ensure latest driver and patch are installed.  Use fmdump -v -u <EVENT_ID> to identify the module/package, or contact Sun for support."
 #
 # code: SUN4-8000-6S
 # keys: fault.io.datapath fault.io.fire.asic
@@ -153,7 +152,7 @@ msgstr "This fault does not have an automated response agent and thus requires i
 msgid "SUN4-8000-75.impact"
 msgstr "Loss of services provided by the device instances associated with this fault"
 msgid "SUN4-8000-75.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.  \n\nIf this message occurs on a Sun Fire T2000 also refer to the NOTE\nat the end of the Details section below.\n"
 #
 # code: SUN4-8000-8E
 # keys: defect.io.fire.pci.driver defect.io.fire.pciex.driver
@@ -169,7 +168,7 @@ msgstr "This fault does not have an automated response agent and thus requires i
 msgid "SUN4-8000-8E.impact"
 msgstr "Loss of services provided by the device instances associated with this problem"
 msgid "SUN4-8000-8E.action"
-msgstr "Ensure latest driver and patch are installed.  Use fmdump -v -u &lt;EVENT_ID&gt; to identify the module/package, or contact Sun for support."
+msgstr "Ensure latest driver and patch are installed.  Use fmdump -v -u <EVENT_ID> to identify the module/package, or contact Sun for support."
 #
 # code: SUN4-8000-9J
 # keys: fault.io.fire.pci.device fault.io.fire.pciex.device
@@ -233,7 +232,7 @@ msgstr "This fault does not have an automated response agent and thus requires i
 msgid "SUN4-8000-D4.impact"
 msgstr "Loss of services provided by the device instances associated with this fault"
 msgid "SUN4-8000-D4.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.  \n\nIf this message occurs on a Sun Fire T2000 also refer to the NOTE\nat the end of the Details section below.\n"
 #
 # code: SUN4-8000-ER
 # keys: fault.io.fire.asic fault.io.fire.pci.device
@@ -249,7 +248,7 @@ msgstr "This fault does not have an automated response agent and thus requires i
 msgid "SUN4-8000-ER.impact"
 msgstr "Loss of services provided by the device instances associated with this fault"
 msgid "SUN4-8000-ER.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.  \n\nIf this message occurs on a Sun Fire T2000 also refer to the NOTE\nat the end of the Details section below.\n"
 #
 # code: SUN4-8000-FC
 # keys: fault.io.fire.hbus

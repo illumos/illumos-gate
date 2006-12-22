@@ -163,6 +163,9 @@ hc_prop_set(tnode_t *node, nvlist_t *auth)
 	struct utsname uts;
 	char *prod, *csn, *server;
 
+	if (auth == NULL)
+		return;
+
 	if (topo_pgroup_create(node, &auth_pgroup, &err) != 0) {
 		if (err != ETOPO_PROP_DEFD)
 			return;
@@ -210,7 +213,7 @@ hc_prop_set(tnode_t *node, nvlist_t *auth)
 /*ARGSUSED*/
 int
 hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
-    topo_instance_t max, void *notused1, void *arg)
+    topo_instance_t max, void *notused1, void *notused2)
 {
 	nvlist_t *pfmri = NULL;
 	nvlist_t *nvl;
@@ -233,8 +236,7 @@ hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
 	}
 
 	(void) topo_node_resource(pnode, &pfmri, &err);
-	if (arg == NULL)
-		auth = topo_mod_auth(mod, pnode);
+	auth = topo_mod_auth(mod, pnode);
 	nvl = hc_fmri_create(mod, pfmri, FM_HC_SCHEME_VERSION, name, min,
 	    auth, NULL, NULL, NULL);
 	nvlist_free(pfmri);	/* callee ignores NULLs */
@@ -251,8 +253,7 @@ hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
 		return (-1);
 	}
 
-	if (arg == NULL)
-		hc_prop_set(node, auth);
+	hc_prop_set(node, auth);
 	nvlist_free(nvl);
 	nvlist_free(auth);
 

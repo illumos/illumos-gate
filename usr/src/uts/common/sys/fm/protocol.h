@@ -94,6 +94,7 @@ extern "C" {
 #define	FM_FAULT_FRU_LABEL		"fru-label"
 #define	FM_FAULT_CERTAINTY		"certainty"
 #define	FM_FAULT_RESOURCE		"resource"
+#define	FM_FAULT_LOCATION		"location"
 
 /* resource event versions and payload member names */
 #define	FM_RSRC_VERS0			0
@@ -241,6 +242,8 @@ extern "C" {
 
 /* legacy-hc scheme member names */
 #define	FM_FMRI_LEGACY_HC		"component"
+#define	FM_FMRI_LEGACY_HC_PREFIX	FM_FMRI_SCHEME_HC":///" \
+    FM_FMRI_LEGACY_HC"="
 
 /* mem scheme member names */
 #define	FM_FMRI_MEM_UNUM		"unum"

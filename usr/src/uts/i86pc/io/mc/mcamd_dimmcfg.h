@@ -32,6 +32,10 @@
 #include <sys/types.h>
 #include <sys/mc_amd.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct mcdcfg_csl mcdcfg_csl_t;
 typedef struct mcdcfg_rslt mcdcfg_rslt_t;
 

@@ -23,54 +23,25 @@
  * Use is subject to license terms.
  */
 
-#ifndef _CHIP_H
-#define	_CHIP_H
+#ifndef	_FM_H
+#define	_FM_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <kstat.h>
-#include <libnvpair.h>
-#include <fm/libtopo.h>
-
-#ifdef __cplusplus
+#ifdef	__cplusplus
 extern "C" {
 #endif
 
-#define	CHIP_VERSION		TOPO_VERSION
+#include <mdb/mdb_modapi.h>
 
-#define	CHIP_NODE_NAME	"chip"
-#define	MCT_NODE_NAME	"memory-controller"
-#define	CHAN_NODE_NAME	"dram-channel"
-#define	CPU_NODE_NAME	"cpu"
-#define	CS_NODE_NAME	"chip-select"
-#define	DIMM_NODE_NAME	"dimm"
-#define	RANK_NODE_NAME	"rank"
+extern int ereportq_dump_walk_init(mdb_walk_state_t *);
+extern int ereportq_dump_walk_step(mdb_walk_state_t *);
+extern int ereportq_pend_walk_init(mdb_walk_state_t *);
+extern int ereportq_pend_walk_step(mdb_walk_state_t *);
+extern int ereport(uintptr_t, uint_t, int, const mdb_arg_t *);
 
-#define	PGNAME(prefix)	(prefix##_NODE_NAME "-properties")
-
-/*
- * chip-properties
- */
-#define	CHIP_VENDOR_ID	"vendor_id"
-#define	CHIP_FAMILY	"family"
-#define	CHIP_MODEL	"model"
-#define	CHIP_STEPPING	"stepping"
-
-/*
- * cpu-properties
- */
-#define	CPU_CHIP_ID	"chip_id"
-#define	CPU_CORE_ID	"core_id"
-#define	CPU_CLOG_ID	"clog_id"
-
-typedef struct chip {
-	kstat_ctl_t *chip_kc;
-	kstat_t **chip_cpustats;
-	uint_t chip_ncpustats;
-} chip_t;
-
-#ifdef __cplusplus
+#ifdef	__cplusplus
 }
 #endif
 
-#endif /* _CHIP_H */
+#endif	/* _FM_H */

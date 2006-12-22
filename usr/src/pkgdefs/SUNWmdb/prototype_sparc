@@ -77,6 +77,7 @@ f none usr/lib/mdb/proc/sparcv9/libc.so 555 root sys
 f none usr/lib/mdb/proc/sparcv9/libnvpair.so 555 root sys
 f none usr/lib/mdb/proc/sparcv9/libproc.so 555 root sys
 f none usr/lib/mdb/proc/sparcv9/libsysevent.so 555 root sys
+f none usr/lib/mdb/proc/sparcv9/libtopo.so 555 root sys
 f none usr/lib/mdb/proc/sparcv9/libumem.so 555 root sys
 f none usr/lib/mdb/proc/sparcv9/libuutil.so 555 root sys
 f none usr/lib/mdb/proc/sparcv9/mdb_ds.so 555 root sys

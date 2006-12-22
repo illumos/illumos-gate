@@ -128,11 +128,10 @@ extern int topo_fmri_str2nvl(topo_hdl_t *, const char *, nvlist_t **, int *);
 extern int topo_fmri_asru(topo_hdl_t *, nvlist_t *, nvlist_t **, int *);
 extern int topo_fmri_fru(topo_hdl_t *, nvlist_t *, nvlist_t **,
     int *);
+extern int topo_fmri_label(topo_hdl_t *, nvlist_t *, char **, int *);
 extern int topo_fmri_compare(topo_hdl_t *, nvlist_t *, nvlist_t *, int *);
 extern int topo_fmri_invoke(topo_hdl_t *, nvlist_t *, topo_walk_cb_t, void *,
     int *);
-extern nvlist_t *topo_fmri_create(topo_hdl_t *, const char *, const char *,
-    topo_instance_t, nvlist_t *, int *);
 
 /*
  * Topo node utilities: callable from topo_walk_step() callback or module

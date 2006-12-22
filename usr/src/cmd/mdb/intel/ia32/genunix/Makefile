@@ -38,6 +38,7 @@ COMMONSRCS = \
 	cyclic.c \
 	devinfo.c \
 	findstack.c \
+	fm.c \
 	genunix.c \
 	kgrep.c \
 	kmem.c \

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,7 +117,7 @@ self_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 			return; /* case is already closed but error in _fini */
 
 		class = err == EFMD_MOD_FAIL ? FMD_FLT_MOD : FMD_FLT_CONF;
-		flt = fmd_protocol_fault(class, 100, mod, NULL, NULL);
+		flt = fmd_protocol_fault(class, 100, mod, NULL, NULL, NULL);
 
 		fmd_case_add_suspect(hdl, cp, flt);
 		fmd_case_solve(hdl, cp);
@@ -158,7 +157,7 @@ self_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	fmd_case_add_ereport(hdl, cp, ep);
 	self_stats.nosub.fmds_value.ui64++;
 
-	flt = fmd_protocol_fault(FMD_FLT_NOSUB, 100, NULL, NULL, NULL);
+	flt = fmd_protocol_fault(FMD_FLT_NOSUB, 100, NULL, NULL, NULL, NULL);
 	fmd_case_add_suspect(hdl, cp, flt);
 	fmd_case_solve(hdl, cp);
 }

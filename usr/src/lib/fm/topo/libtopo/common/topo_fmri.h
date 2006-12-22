@@ -18,59 +18,29 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _CHIP_H
-#define	_CHIP_H
+#ifndef _TOPO_FMRI_H
+#define	_TOPO_FMRI_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <kstat.h>
-#include <libnvpair.h>
-#include <fm/libtopo.h>
+#include <sys/nvpair.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define	CHIP_VERSION		TOPO_VERSION
-
-#define	CHIP_NODE_NAME	"chip"
-#define	MCT_NODE_NAME	"memory-controller"
-#define	CHAN_NODE_NAME	"dram-channel"
-#define	CPU_NODE_NAME	"cpu"
-#define	CS_NODE_NAME	"chip-select"
-#define	DIMM_NODE_NAME	"dimm"
-#define	RANK_NODE_NAME	"rank"
-
-#define	PGNAME(prefix)	(prefix##_NODE_NAME "-properties")
-
-/*
- * chip-properties
- */
-#define	CHIP_VENDOR_ID	"vendor_id"
-#define	CHIP_FAMILY	"family"
-#define	CHIP_MODEL	"model"
-#define	CHIP_STEPPING	"stepping"
-
-/*
- * cpu-properties
- */
-#define	CPU_CHIP_ID	"chip_id"
-#define	CPU_CORE_ID	"core_id"
-#define	CPU_CLOG_ID	"clog_id"
-
-typedef struct chip {
-	kstat_ctl_t *chip_kc;
-	kstat_t **chip_cpustats;
-	uint_t chip_ncpustats;
-} chip_t;
+extern nvlist_t *topo_fmri_create(topo_hdl_t *, const char *, const char *,
+    topo_instance_t, nvlist_t *, int *);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _CHIP_H */
+#endif /* _TOPO_FMRI_H */

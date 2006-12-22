@@ -72,20 +72,22 @@ static int mem_asru_compute(topo_mod_t *, tnode_t *, topo_version_t,
 static const topo_modops_t chip_ops =
 	{ chip_enum, NULL};
 static const topo_modinfo_t chip_info =
-	{ "chip", FM_FMRI_SCHEME_HC, CHIP_VERSION, &chip_ops };
+	{ CHIP_NODE_NAME, FM_FMRI_SCHEME_HC, CHIP_VERSION, &chip_ops };
 
 static const topo_pgroup_info_t cs_pgroup =
-	{ CS_PGROUP, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+	{ PGNAME(CS), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
 static const topo_pgroup_info_t dimm_pgroup =
-	{ DIMM_PGROUP, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+	{ PGNAME(DIMM), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
 static const topo_pgroup_info_t mc_pgroup =
-	{ MCT_PGROUP, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+	{ PGNAME(MCT), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
 static const topo_pgroup_info_t chip_pgroup =
-	{ CHIP_PGROUP, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+	{ PGNAME(CHIP), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+static const topo_pgroup_info_t cpu_pgroup =
+	{ PGNAME(CPU), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
 static const topo_pgroup_info_t rank_pgroup =
-	{ RANK_PGROUP, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+	{ PGNAME(RANK), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
 static const topo_pgroup_info_t chan_pgroup =
-	{ CHAN_PGROUP, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+	{ PGNAME(CHAN), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
 
 const topo_method_t rank_methods[] = {
 	{ TOPO_METH_ASRU_COMPUTE, TOPO_METH_ASRU_COMPUTE_DESC,
@@ -169,33 +171,61 @@ _topo_fini(topo_mod_t *mod)
 }
 
 static int
-chip_strprop(tnode_t *cnode, kstat_t *ksp, const char *name)
+add_kstat_strprop(topo_mod_t *mod, tnode_t *node, kstat_t *ksp,
+    const char *pgname, const char *pname)
 {
-	int err;
+	int err = 0;
 	kstat_named_t *k;
 
-	if ((k = kstat_data_lookup(ksp, (char *)name)) == NULL)
+	if ((k = kstat_data_lookup(ksp, (char *)pname)) == NULL)
+		return (-1);
+
+	if (topo_prop_set_string(node, pgname, pname,
+	    TOPO_PROP_IMMUTABLE, k->value.str.addr.ptr, &err) == 0) {
 		return (0);
-
-	(void) topo_prop_set_string(cnode, CHIP_PGROUP, name,
-	    TOPO_PROP_IMMUTABLE, k->value.str.addr.ptr, &err);
-
-	return (-1);
+	} else {
+		whinge(mod, &err, "chip_strprop: failed to add '%s'\n",
+		    pname);
+		return (-1);
+	}
 }
 
 static int
-chip_longprop(tnode_t *cnode, kstat_t *ksp, const char *name)
+add_kstat_longprop(topo_mod_t *mod, tnode_t *node, kstat_t *ksp,
+    const char *pgname, const char *pname)
 {
 	int err;
 	kstat_named_t *k;
 
-	if ((k = kstat_data_lookup(ksp, (char *)name)) == NULL)
+	if ((k = kstat_data_lookup(ksp, (char *)pname)) == NULL)
+		return (-1);
+
+	if (topo_prop_set_int32(node, pgname, pname,
+	    TOPO_PROP_IMMUTABLE, k->value.l, &err) == 0) {
 		return (0);
+	} else {
+		whinge(mod, &err, "chip_longprop: failed to add '%s'\n",
+		    pname);
+		return (-1);
+	}
+}
 
-	(void) topo_prop_set_int32(cnode, CHIP_PGROUP, name,
-	    TOPO_PROP_IMMUTABLE, k->value.l, &err);
+static int
+add_kstat_longprops(topo_mod_t *mod, tnode_t *node, kstat_t *ksp,
+    const char *pgname, ...)
+{
+	const char *pname;
+	va_list ap;
+	int nerr = 0;
 
-	return (-1);
+	va_start(ap, pgname);
+	while ((pname = va_arg(ap, const char *)) != NULL) {
+		if (add_kstat_longprop(mod, node, ksp, pgname, pname) != 0)
+			nerr++;		/* have whinged elsewhere */
+	}
+	va_end(ap);
+
+	return (nerr == 0 ? 0 : -1);
 }
 
 static int
@@ -320,6 +350,16 @@ cpu_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int chipid,
 			    "failed\n");
 		}
 		(void) topo_node_fru_set(cnode, NULL, 0, &err);
+
+		(void) topo_pgroup_create(cnode, &cpu_pgroup, &err);
+
+		(void) topo_prop_set_uint32(cnode, PGNAME(CPU), "cpuid",
+		    TOPO_PROP_IMMUTABLE, cpuid, &err);
+
+		if (add_kstat_longprops(mod, cnode, chip->chip_cpustats[cpuid],
+		    PGNAME(CPU), CPU_CHIP_ID, CPU_CORE_ID, CPU_CLOG_ID,
+		    NULL) != 0)
+			nerr++;		/* have whinged elsewhere */
 	}
 
 	return (nerr == 0 ? 0 : -1);
@@ -328,45 +368,90 @@ cpu_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int chipid,
 static int
 nvprop_add(topo_mod_t *mod, nvpair_t *nvp, const char *pgname, tnode_t *node)
 {
-	int err = 0;
+	int success = 0;
+	int err;
 	char *pname = nvpair_name(nvp);
 
 	switch (nvpair_type(nvp)) {
 	case DATA_TYPE_BOOLEAN_VALUE: {
 		boolean_t val;
 
-		if (nvpair_value_boolean_value(nvp, &val) == 0) {
-			(void) topo_prop_set_string(node, pgname, pname,
-			    TOPO_PROP_IMMUTABLE, val ? "true" : "false", &err);
-		}
-		return (0);
+		if (nvpair_value_boolean_value(nvp, &val) == 0 &&
+		    topo_prop_set_string(node, pgname, pname,
+		    TOPO_PROP_IMMUTABLE, val ? "true" : "false", &err) == 0)
+			success = 1;
+		break;
+	}
+
+	case DATA_TYPE_UINT32: {
+		uint32_t val;
+
+		if (nvpair_value_uint32(nvp, &val) == 0 &&
+		    topo_prop_set_uint32(node, pgname, pname,
+		    TOPO_PROP_IMMUTABLE, val, &err) == 0)
+			success = 1;
+		break;
 	}
 
 	case DATA_TYPE_UINT64: {
 		uint64_t val;
 
-		if (nvpair_value_uint64(nvp, &val) == 0) {
-			(void) topo_prop_set_uint64(node, pgname, pname,
-			    TOPO_PROP_IMMUTABLE, val, &err);
-		}
-		return (0);
+		if (nvpair_value_uint64(nvp, &val) == 0 &&
+		    topo_prop_set_uint64(node, pgname, pname,
+		    TOPO_PROP_IMMUTABLE, val, &err) == 0)
+			success = 1;
+		break;
+	}
+
+	case DATA_TYPE_UINT32_ARRAY: {
+		uint32_t *arrp;
+		uint_t nelem;
+
+		if (nvpair_value_uint32_array(nvp, &arrp, &nelem) == 0 &&
+		    nelem > 0 && topo_prop_set_uint32_array(node, pgname, pname,
+		    TOPO_PROP_IMMUTABLE, arrp, nelem, &err) == 0)
+			success = 1;
+		break;
 	}
 
 	case DATA_TYPE_STRING: {
 		char *str;
 
-		if (nvpair_value_string(nvp, &str) == 0)
-			(void) topo_prop_set_string(node, pgname, pname,
-			    TOPO_PROP_IMMUTABLE, str, &err);
-		return (0);
+		if (nvpair_value_string(nvp, &str) == 0 &&
+		    topo_prop_set_string(node, pgname, pname,
+		    TOPO_PROP_IMMUTABLE, str, &err) == 0)
+			success = 1;
+		break;
 	}
 
 	default:
 		whinge(mod, &err, "nvprop_add: Can't handle type %d for "
 		    "'%s' in property group %s of %s node\n",
 		    nvpair_type(nvp), pname, pgname, topo_node_name(node));
-		return (1);
+		break;
 	}
+
+	return (success ? 0 : 1);
+}
+
+static int
+chip_htconfig(topo_mod_t *mod, tnode_t *cnode, nvlist_t *htnvl)
+{
+	nvpair_t *nvp;
+	int nerr = 0;
+
+	if (strcmp(topo_node_name(cnode), CHIP_NODE_NAME) != 0) {
+		whinge(mod, &nerr, "chip_htconfig: must pass a chip node!");
+		return (-1);
+	}
+
+	for (nvp = nvlist_next_nvpair(htnvl, NULL); nvp != NULL;
+	    nvp = nvlist_next_nvpair(htnvl, nvp)) {
+		if (nvprop_add(mod, nvp, PGNAME(CHIP), cnode) != 0)
+			nerr++;
+	}
+
+	return (nerr == 0 ? 0 : -1);
 }
 
 static int
@@ -384,7 +469,7 @@ dramchan_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	 * channel A is in use (i.e., running in 64-bit mode).  Only
 	 * the socket 754 package has a single channel.
 	 */
-	if (topo_prop_get_string(pnode, MCT_PGROUP, "socket",
+	if (topo_prop_get_string(pnode, PGNAME(MCT), "socket",
 	    &socket, &err) != 0)
 		return (-1);
 
@@ -417,7 +502,7 @@ dramchan_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 
 		(void) topo_pgroup_create(chnode, &chan_pgroup, &err);
 
-		(void) topo_prop_set_string(chnode, CHAN_PGROUP, "channel",
+		(void) topo_prop_set_string(chnode, PGNAME(CHAN), "channel",
 		    TOPO_PROP_IMMUTABLE, i == 0 ? "A" : "B", &err);
 	}
 
@@ -471,7 +556,7 @@ cs_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc,
 
 		for (nvp = nvlist_next_nvpair(csarr[i], NULL); nvp != NULL;
 		    nvp = nvlist_next_nvpair(csarr[i], nvp)) {
-			nerr += nvprop_add(mod, nvp, CS_PGROUP, csnode);
+			nerr += nvprop_add(mod, nvp, PGNAME(CS), csnode);
 		}
 	}
 
@@ -588,7 +673,8 @@ rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl, nvlist_t *auth)
 		return (nerr);
 	}
 
-	if (topo_prop_get_uint64(pnode, DIMM_PGROUP, "size", &dsz, &err) == 0) {
+	if (topo_prop_get_uint64(pnode, PGNAME(DIMM), "size", &dsz,
+	    &err) == 0) {
 		rsz = dsz / ncs;
 	} else {
 		whinge(mod, &nerr, "rank_create: parent dimm has no size\n");
@@ -628,13 +714,13 @@ rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl, nvlist_t *auth)
 
 		(void) topo_pgroup_create(ranknode, &rank_pgroup, &err);
 
-		(void) topo_prop_set_uint64(ranknode, RANK_PGROUP, "size",
+		(void) topo_prop_set_uint64(ranknode, PGNAME(RANK), "size",
 		    TOPO_PROP_IMMUTABLE, rsz, &err);
 
-		(void) topo_prop_set_string(ranknode, RANK_PGROUP, "csname",
+		(void) topo_prop_set_string(ranknode, PGNAME(RANK), "csname",
 		    TOPO_PROP_IMMUTABLE, csnamearr[i], &err);
 
-		(void) topo_prop_set_uint64(ranknode, RANK_PGROUP, "csnum",
+		(void) topo_prop_set_uint64(ranknode, PGNAME(RANK), "csnum",
 		    TOPO_PROP_IMMUTABLE, csnumarr[i], &err);
 	}
 
@@ -718,7 +804,7 @@ dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc,
 			    strcmp(nvpair_name(nvp), "csnames") == 0)
 				continue;	/* used in rank_create() */
 
-			nerr += nvprop_add(mod, nvp, DIMM_PGROUP, dimmnode);
+			nerr += nvprop_add(mod, nvp, PGNAME(DIMM), dimmnode);
 		}
 
 		nerr += rank_create(mod, dimmnode, dimmarr[i], auth);
@@ -833,15 +919,25 @@ mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth)
 
 	for (nvp = nvlist_next_nvpair(mc, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(mc, nvp)) {
-		if (nvpair_type(nvp) == DATA_TYPE_NVLIST_ARRAY &&
-		    (strcmp(nvpair_name(nvp), "cslist") == 0 ||
-		    strcmp(nvpair_name(nvp), "dimmlist") == 0)) {
+		char *name = nvpair_name(nvp);
+		data_type_t type = nvpair_type(nvp);
+
+		if (type == DATA_TYPE_NVLIST_ARRAY &&
+		    (strcmp(name, "cslist") == 0 ||
+		    strcmp(name, "dimmlist") == 0)) {
 			continue;
-		} else if (nvpair_type(nvp) == DATA_TYPE_UINT8 &&
-		    strcmp(nvpair_name(nvp), MC_NVLIST_VERSTR) == 0) {
+		} else if (type == DATA_TYPE_UINT8 &&
+		    strcmp(name, MC_NVLIST_VERSTR) == 0) {
 			continue;
+		} else if (type == DATA_TYPE_NVLIST &&
+		    strcmp(name, "htconfig") == 0) {
+			nvlist_t *htnvl;
+
+			(void) nvpair_value_nvlist(nvp, &htnvl);
+			if (chip_htconfig(mod, pnode, htnvl) != 0)
+				rc = -1;
 		} else {
-			if (nvprop_add(mod, nvp, MCT_PGROUP, mcnode) != 0)
+			if (nvprop_add(mod, nvp, PGNAME(MCT), mcnode) != 0)
 				rc = -1;
 		}
 	}
@@ -931,10 +1027,13 @@ chip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		nvlist_free(fmri);
 
 		(void) topo_pgroup_create(cnode, &chip_pgroup, &err);
-		(void) chip_strprop(cnode, ksp, CHIP_VENDOR_ID);
-		(void) chip_longprop(cnode, ksp, CHIP_FAMILY);
-		(void) chip_longprop(cnode, ksp, CHIP_MODEL);
-		(void) chip_longprop(cnode, ksp, CHIP_STEPPING);
+		if (add_kstat_strprop(mod, cnode, ksp, PGNAME(CHIP),
+		    CHIP_VENDOR_ID) != 0)
+			nerr++;		/* have whinged elsewhere */
+
+		if (add_kstat_longprops(mod, cnode, ksp, PGNAME(CHIP),
+		    CHIP_FAMILY, CHIP_MODEL, CHIP_STEPPING, NULL) != 0)
+			nerr++;		/* have whinged elsewhere */
 
 		if (cpu_create(mod, cnode, CPU_NODE_NAME, chipid, chip, auth)
 		    != 0 || mc_create(mod, cnode, MCT_NODE_NAME, auth) != 0)
@@ -962,7 +1061,7 @@ chip_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 
 	auth = topo_mod_auth(mod, pnode);
 
-	if (strcmp(name, "chip") == 0)
+	if (strcmp(name, CHIP_NODE_NAME) == 0)
 		rv = chip_create(mod, pnode, name, min, max, chip, auth);
 
 	nvlist_free(auth);

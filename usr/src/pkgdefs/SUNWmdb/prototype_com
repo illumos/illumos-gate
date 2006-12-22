@@ -48,6 +48,7 @@ f none usr/lib/mdb/proc/libc.so 555 root sys
 f none usr/lib/mdb/proc/libnvpair.so 555 root sys
 f none usr/lib/mdb/proc/libproc.so 555 root sys
 f none usr/lib/mdb/proc/libsysevent.so 555 root sys
+f none usr/lib/mdb/proc/libtopo.so 555 root sys
 f none usr/lib/mdb/proc/libumem.so 555 root sys
 f none usr/lib/mdb/proc/libuutil.so 555 root sys
 f none usr/lib/mdb/proc/mdb_ds.so 555 root sys

@@ -30,6 +30,10 @@
 #include <sys/mc.h>
 #include <sys/x86_archext.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * The mc-amd driver exports an nvlist to userland, where the primary
  * consumer is the "chip" topology enumerator for this platform type which
@@ -95,15 +99,6 @@
 #define	MC_NVLIST_VERS0		0
 #define	MC_NVLIST_VERS1		1
 #define	MC_NVLIST_VERS		MC_NVLIST_VERS1
-
-/*
- * Definitions describing various memory controller constant properties and
- * the structure of configuration registers.
- */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /*
  * Constants and feature/revision test macros that are not expected to vary
@@ -226,6 +221,58 @@ extern "C" {
 #define	MCREG_FIELD_CMN(up, field)	_MCREG_FIELD(up, cmn, field)
 #define	MCREG_FIELD_preF(up, field)	_MCREG_FIELD(up, preF, field)
 #define	MCREG_FIELD_revFG(up, field)	_MCREG_FIELD(up, revFG, field)
+
+/*
+ * Function 0 - HT Configuration: Routing Table Node Register
+ */
+union mcreg_htroute {
+	uint32_t	_val32;
+	struct {
+		uint32_t	RQRte:4;	/*  3:0 */
+		uint32_t	reserved1:4;	/*  7:4 */
+		uint32_t	RPRte:4;	/* 11:8 */
+		uint32_t	reserved2:4;	/* 15:12 */
+		uint32_t	BCRte:4;	/* 19:16 */
+		uint32_t	reserved3:12;	/* 31:20 */
+	} _fmt_cmn;
+};
+
+/*
+ * Function 0 - HT Configuration: Node ID Register
+ */
+union mcreg_nodeid {
+	uint32_t	_val32;
+	struct {
+		uint32_t	NodeId:3;	/*  2:0 */
+		uint32_t	reserved1:1;	/*  3:3 */
+		uint32_t	NodeCnt:3;	/*  6:4 */
+		uint32_t	reserved2:1;	/*  7:7 */
+		uint32_t	SbNode:3;	/* 10:8 */
+		uint32_t	reserved3:1;	/* 11:11 */
+		uint32_t	LkNode:3;	/* 14:12 */
+		uint32_t	reserved4:1;	/* 15:15 */
+		uint32_t	CpuCnt:4;	/* 19:16 */
+		uint32_t	reserved:12;	/* 31:20 */
+	} _fmt_cmn;
+};
+
+#define	HT_COHERENTNODES(up)	(MCREG_FIELD_CMN(up, NodeCnt) + 1)
+#define	HT_SYSTEMCORECOUNT(up)	(MCREG_FIELD_CMN(up, CpuCnt) + 1)
+
+/*
+ * Function 0 - HT Configuration: Unit ID Register
+ */
+union mcreg_unitid {
+	uint32_t	_val32;
+	struct {
+		uint32_t	C0Unit:2;	/*  1:0 */
+		uint32_t	C1Unit:2;	/*  3:2 */
+		uint32_t	McUnit:2;	/*  5:4 */
+		uint32_t	HbUnit:2;	/*  7:6 */
+		uint32_t	SbLink:2;	/*  9:8 */
+		uint32_t	reserved:22;	/* 31:10 */
+	} _fmt_cmn;
+};
 
 /*
  * Function 1 - DRAM Address Map: DRAM Base i Registers

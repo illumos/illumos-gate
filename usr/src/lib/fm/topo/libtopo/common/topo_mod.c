@@ -77,6 +77,7 @@
 #include <topo_alloc.h>
 #include <topo_error.h>
 #include <topo_file.h>
+#include <topo_fmri.h>
 #include <topo_module.h>
 #include <topo_method.h>
 #include <topo_string.h>
@@ -461,8 +462,8 @@ topo_mod_pkgfmri(topo_mod_t *mod, int version, const char *path)
 		return (set_fmri_err(mod, EMOD_FMRI_NVL));
 	}
 
-	if ((fmri = topo_fmri_create(mod->tm_hdl, FM_FMRI_SCHEME_CPU,
-	    FM_FMRI_SCHEME_CPU, 0, args, &err)) == NULL) {
+	if ((fmri = topo_fmri_create(mod->tm_hdl, FM_FMRI_SCHEME_PKG,
+	    FM_FMRI_SCHEME_PKG, 0, args, &err)) == NULL) {
 		nvlist_free(args);
 		return (set_fmri_err(mod, err));
 	}
@@ -493,8 +494,8 @@ topo_mod_modfmri(topo_mod_t *mod, int version, const char *driver)
 		return (set_fmri_err(mod, EMOD_FMRI_NVL));
 	}
 
-	if ((fmri = topo_fmri_create(mod->tm_hdl, FM_FMRI_SCHEME_CPU,
-	    FM_FMRI_SCHEME_CPU, 0, args, &err)) == NULL) {
+	if ((fmri = topo_fmri_create(mod->tm_hdl, FM_FMRI_SCHEME_MOD,
+	    FM_FMRI_SCHEME_MOD, 0, args, &err)) == NULL) {
 		nvlist_free(args);
 		return (set_fmri_err(mod, err));
 	}

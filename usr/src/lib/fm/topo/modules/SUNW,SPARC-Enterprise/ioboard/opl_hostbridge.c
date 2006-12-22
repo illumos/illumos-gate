@@ -111,6 +111,7 @@ opl_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode, int inst)
 	tnode_t *rcn;
 	const char *slot_name;
 	char *dnpath;
+	nvlist_t *mod;
 
 	rcn = opl_node_create(mp, parent, PCIEX_ROOT, inst, (void *)dnode);
 	if (rcn == NULL) {
@@ -205,6 +206,14 @@ opl_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode, int inst)
 	    TOPO_PROP_IMMUTABLE, OPL_PX_DRV, &err) != 0) {
 		topo_mod_dprintf(mp, "Failed to set DRIVER property\n");
 	}
+	if ((mod = topo_mod_modfmri(mp, FM_MOD_SCHEME_VERSION, OPL_PX_DRV))
+	    == NULL || topo_prop_set_fmri(rcn, TOPO_PGROUP_IO,
+	    TOPO_IO_MODULE, TOPO_PROP_IMMUTABLE, mod,  &err) != 0) {
+		topo_mod_dprintf(mp, "Failed to set MODULE property\n");
+	}
+	if (mod != NULL)
+		nvlist_free(mod);
+
 	/* This is a PCIEX Root Complex */
 	if (topo_prop_set_string(rcn, TOPO_PGROUP_PCI, TOPO_PCI_EXCAP,
 	    TOPO_PROP_IMMUTABLE, PCIEX_ROOT, &err) != 0) {
