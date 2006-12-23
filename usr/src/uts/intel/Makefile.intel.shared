@@ -383,6 +383,7 @@ DRV_KMODS	+= usbsprl
 DRV_KMODS	+= usb_ac
 DRV_KMODS	+= usb_as
 DRV_KMODS	+= usbskel
+DRV_KMODS	+= usbvc
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= usbser_edge
 

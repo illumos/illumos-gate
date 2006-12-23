@@ -49,6 +49,8 @@ static devfsadm_create_t usb_cbt[] = {
 						ILEVEL_0, usb_process },
 	{ "usb", NULL, "ddivs_usbc",	DRV_EXACT,
 						ILEVEL_0, usb_process },
+	{ "usb", NULL, "usbvc",		DRV_EXACT,
+						ILEVEL_0, usb_process },
 	{ "usb", NULL, "hid",		DRV_EXACT,
 						ILEVEL_0, usb_process },
 	{ "usb", DDI_NT_NEXUS, "hubd",	DRV_EXACT|TYPE_EXACT,
@@ -86,6 +88,8 @@ DEVFSADM_CREATE_INIT_V0(usb_cbt);
 #define	USB_LINK_RE_AUDIOCTL	"^usb/audio-control[0-9]+$"
 #define	USB_LINK_RE_AUDIOSTREAM	"^usb/audio-stream[0-9]+$"
 #define	USB_LINK_RE_DDIVS_USBC	"^usb/ddivs_usbc[0-9]+$"
+#define	USB_LINK_RE_VIDEO	"^usb/video[0-9]+$"
+#define	USB_LINK_RE_VIDEO2	"^video[0-9]+$"
 #define	USB_LINK_RE_DEVICE	"^usb/device[0-9]+$"
 #define	USB_LINK_RE_HID		"^usb/hid[0-9]+$"
 #define	USB_LINK_RE_HUB		"^usb/hub[0-9]+$"
@@ -105,6 +109,10 @@ static devfsadm_remove_t usb_remove_cbt[] = {
 			ILEVEL_0, devfsadm_rm_all },
 	{ "usb", USB_LINK_RE_DDIVS_USBC, RM_POST | RM_HOT | RM_ALWAYS,
 			ILEVEL_0, devfsadm_rm_all },
+	{ "usb", USB_LINK_RE_VIDEO, RM_POST | RM_HOT | RM_ALWAYS, ILEVEL_0,
+			devfsadm_rm_all },
+	{ "usb", USB_LINK_RE_VIDEO2, RM_POST | RM_HOT | RM_ALWAYS, ILEVEL_0,
+			devfsadm_rm_all },
 	{ "usb", USB_LINK_RE_DEVICE, RM_POST | RM_HOT, ILEVEL_0,
 			devfsadm_rm_all },
 	{ "usb", USB_LINK_RE_HID, RM_POST | RM_HOT | RM_ALWAYS, ILEVEL_0,
@@ -132,6 +140,8 @@ static devfsadm_enumerate_t audio_stream_rules[1] =
 	{"^usb$/^audio-stream([0-9]+)$", 1, MATCH_ALL};
 static devfsadm_enumerate_t ddivs_usbc_rules[1] =
 	{"^usb$/^ddivs_usbc([0-9]+)$", 1, MATCH_ALL};
+static devfsadm_enumerate_t video_rules[1] =
+	{"^usb$/^video([0-9]+)$", 1, MATCH_ALL};
 static devfsadm_enumerate_t device_rules[1] =
 	{"^usb$/^device([0-9]+)$", 1, MATCH_ALL};
 static devfsadm_enumerate_t hid_rules[1] =
@@ -172,7 +182,8 @@ typedef enum {
 	DRIVER_SCSA2USB = 9,
 	DRIVER_USBPRN	= 10,
 	DRIVER_UGEN	= 11,
-	DRIVER_UNKNOWN	= 12
+	DRIVER_VIDEO	= 12,
+	DRIVER_UNKNOWN	= 13
 } driver_defs_t;
 
 typedef struct {
@@ -193,9 +204,9 @@ driver_name_table_entry_t driver_name_table[] = {
 	{ "scsa2usb",	DRIVER_SCSA2USB },
 	{ "usbprn",	DRIVER_USBPRN },
 	{ "ugen",	DRIVER_UGEN },
+	{ "usbvc",	DRIVER_VIDEO },
 	{ NULL,		DRIVER_UNKNOWN }
 };
-
 
 /*
  * This function is called for every usb minor node.
@@ -297,6 +308,11 @@ usb_process(di_minor_t minor, di_node_t node)
 		rules[0] = audio_stream_rules[0];
 		name = "audio-stream";		/* For audio */
 		break;
+	case DRIVER_VIDEO:
+		rules[0] = video_rules[0];
+		name = "video";			/* For video */
+		create_secondary_link = 1;
+		break;
 	case DRIVER_HID:
 		rules[0] = hid_rules[0];
 		name = "hid";			/* For HIDs */
@@ -356,6 +372,8 @@ usb_process(di_minor_t minor, di_node_t node)
 			(void) devfsadm_secondary_link("audio", l_path, 0);
 		} else if (strcmp(name, "audio-control") == 0) {
 			(void) devfsadm_secondary_link("audioctl", l_path, 0);
+		} else if (strcmp(name, "video") == 0) {
+			(void) devfsadm_secondary_link(l_path + 4, l_path, 0);
 		}
 	}
 

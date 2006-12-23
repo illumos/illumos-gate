@@ -108,6 +108,9 @@ usb/clients/printer/%.check:  usb/clients/printer/%.h
 usb/clients/usbcdc/%.check:	usb/clients/usbcdc/%.h
 	$(DOT_H_CHECK)
 
+usb/clients/video/usbvc/%.check:  usb/clients/video/usbvc/%.h
+	$(DOT_H_CHECK)
+
 1394/%.check:         1394/%.h
 	$(DOT_H_CHECK)
 
@@ -166,6 +169,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/usb/clients/mass_storage	\
 	$(ROOTDIR)/usb/clients/printer  \
 	$(ROOTDIR)/usb/clients/usbcdc  \
+	$(ROOTDIR)/usb/clients/video/usbvc  \
 	$(ROOTDIR)/usb/clients/ugen  \
 	$(ROOTDIR)/1394         \
 	$(ROOTDIR)/rsm		\
@@ -230,6 +234,7 @@ ROOTUSBHIDHDRS = $(USBHIDHDRS:%=$(ROOTDIR)/usb/clients/hid/%)
 ROOTUSBMSHDRS= $(USBMSHDRS:%=$(ROOTDIR)/usb/clients/mass_storage/%)
 ROOTUSBPRNHDRS= $(USBPRNHDRS:%=$(ROOTDIR)/usb/clients/printer/%)
 ROOTUSBCDCHDRS= $(USBCDCHDRS:%=$(ROOTDIR)/usb/clients/usbcdc/%)
+ROOTUSBVIDHDRS= $(USBVIDHDRS:%=$(ROOTDIR)/usb/clients/video/usbvc/%)
 ROOTUGENHDRS= $(UGENHDRS:%=$(ROOTDIR)/usb/clients/ugen/%)
 
 ROOT1394HDRS= $(I1394HDRS:%=$(ROOTDIR)/1394/%)
@@ -249,7 +254,7 @@ sparc_ROOTHDRS=	$(ROOTSDKTPHDRS) $(ROOTSCSICADHDRS) $(ROOTSCSITARGETSHDRS) \
 		$(ROOTFCHDRS) $(ROOTUSBHDRS) $(ROOTUSBHUBDHDRS) $(ROOTPCMCIAHDRS) \
 		$(ROOTUSBAUDHDRS) \
 		$(ROOTUSBHIDHDRS) $(ROOTUSBMSHDRS) $(ROOTUSBPRNHDRS) \
-		$(ROOTUGENHDRS)
+		$(ROOTUGENHDRS) $(ROOTUSBVIDHDRS)
 
 i386_ROOTHDRS=	$(ROOTDKTPHDRS) $(ROOTPCHDRS) $(ROOTSCSITARGETSHDRS)	\
 		$(ROOTSCSIVHCIHDRS) $(ROOTFCHDRS)	\

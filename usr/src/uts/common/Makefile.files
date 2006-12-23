@@ -598,6 +598,8 @@ HID_OBJS += hid.o
 
 USBSKEL_OBJS += usbskel.o
 
+USBVC_OBJS += usbvc.o usbvc_v4l2.o
+
 HIDPARSER_OBJS += hidparser.o
 
 USB_AC_OBJS += usb_ac.o

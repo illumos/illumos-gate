@@ -542,6 +542,7 @@ CHKHDRS=			\
 	vfs.h			\
 	vfstab.h		\
 	vgareg.h		\
+	videodev2.h		\
 	visual_io.h		\
 	vlan.h			\
 	vm.h			\
@@ -848,6 +849,9 @@ USBPRNHDRS=           \
 USBCDCHDRS=		\
 	usb_cdc.h
 
+USBVIDHDRS=           \
+	usbvc.h
+
 UGENHDRS=           \
 	usb_ugen.h
 
@@ -971,6 +975,7 @@ CHECKHDRS=						\
 	$(USBMSHDRS:%.h=usb/clients/mass_storage/%.check)	\
 	$(USBPRNHDRS:%.h=usb/clients/printer/%.check)   \
 	$(USBCDCHDRS:%.h=usb/clients/usbcdc/%.check)	\
+	$(USBVIDHDRS:%.h=usb/clients/video/usbvc/%.check)   \
 	$(UGENHDRS:%.h=usb/clients/ugen/%.check)   \
 	$(USBHDRS:%.h=usb/%.check)                      \
 	$(I1394HDRS:%.h=1394/%.check)			\
@@ -1016,6 +1021,7 @@ CHECKHDRS=						\
 	$(ROOTUSBMSHDRS)	\
 	$(ROOTUSBPRNHDRS)       \
 	$(ROOTUSBCDCHDRS)       \
+	$(ROOTUSBVIDHDRS)       \
 	$(ROOTUGENHDRS)		\
 	$(ROOT1394HDRS)         \
 	$(ROOTHOTPLUGHDRS)	\
@@ -1063,6 +1069,7 @@ install_h:			\
 	$(ROOTUSBMSHDRS)	\
 	$(ROOTUSBPRNHDRS)       \
 	$(ROOTUSBCDCHDRS)       \
+	$(ROOTUSBVIDHDRS)       \
 	$(ROOTUGENHDRS)		\
 	$(ROOT1394HDRS)         \
 	$(ROOTHOTPLUGHDRS)	\
