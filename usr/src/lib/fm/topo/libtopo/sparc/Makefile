@@ -28,7 +28,7 @@
 include ../Makefile.com
 
 CPPFLAGS += -I $(ROOT)/usr/platform/sun4v/include
-LDLIBS += -L$(ROOTLIBDIR) -lmdesc -lldom
+LDLIBS += -L$(ROOTLIBDIR)
 DYNFLAGS += -R/usr/lib/fm
 
 install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
