@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1732,9 +1733,15 @@ set_timer(int interval)
 	itimerspec_t time_struct;
 	struct sigevent sig_struct;
 	struct sigaction act;
+	sigset_t sig_set;
 
 	bzero(&sig_struct, sizeof (struct sigevent));
 	bzero(&act, sizeof (struct sigaction));
+
+	/* Ensure that our signal is unblocked. */
+	(void) sigemptyset(&sig_set);
+	(void) sigaddset(&sig_set, SIGUSR1);
+	(void) sigprocmask(SIG_UNBLOCK, &sig_set, NULL);
 
 	/* Create timer */
 	sig_struct.sigev_notify = SIGEV_SIGNAL;
