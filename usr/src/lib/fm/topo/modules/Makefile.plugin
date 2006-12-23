@@ -64,7 +64,7 @@ MAPFILES =		# use APIMAP instead
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
 CFLAGS += -G $(XREGSFLAG)
 
-CPPFLAGS += -I.
+CPPFLAGS += -I. -I../../../libtopo/common
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
 LDFLAGS += $(ZIGNORE) -M$(APIMAP)
 LDLIBS += -L$(ROOTLIBDIR)/fm -R/usr/lib/fm -ltopo -lnvpair -lc
