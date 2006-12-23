@@ -432,7 +432,7 @@ breakup_components(char *str, char *sep, nvlist_t **hc_nvl)
 		(void) strncpy(namebuf, token, namelen);
 		namebuf[namelen] = '\0';
 
-		if ((j = map_name(namebuf) < 0))
+		if ((j = map_name(namebuf)) < 0)
 		    continue; /* skip names that don't map */
 
 		if (instlen == 0) {
