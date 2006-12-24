@@ -142,3 +142,4 @@ warlock.sata:
 	@cd ../sata; make clean; $(MAKE) warlock
 	@cd ../si3124; make clean; $(MAKE) warlock
 	@cd $(CLOSED)/uts/sparc/marvell88sx ; make clean; $(MAKE) warlock
+	@cd ../ahci; make clean; $(MAKE) warlock

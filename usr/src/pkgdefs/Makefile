@@ -110,6 +110,7 @@ i386_SUBDIRS= \
 	SUNWagp \
 	SUNWagph \
 	SUNWamd8111s \
+	SUNWahci \
 	SUNWamr \
 	SUNWatheros \
 	SUNWaudiohd \

@@ -215,6 +215,7 @@ ALL_DEFS	 = $(DEBUG_DEFS) $(OPTION_DEFS)
 #
 DRV_KMODS	+= aac
 DRV_KMODS	+= aggr
+DRV_KMODS	+= ahci
 DRV_KMODS	+= amr
 DRV_KMODS	+= arp
 DRV_KMODS	+= asy
