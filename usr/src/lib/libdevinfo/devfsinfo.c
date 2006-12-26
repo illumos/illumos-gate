@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,7 +60,9 @@
 #define	MAXPROPSIZE	256
 #define	MAXVALSIZE	(BUFSIZE - MAXPROPSIZE - sizeof (uint_t))
 
+/* prom_obp_vers() return values */
 #define	OBP_OF			0x4	/* versions OBP 3.x */
+#define	OBP_NO_ALIAS_NODE	0x8	/* No alias node */
 
 /* for nftw call */
 #define	FT_DEPTH	15
@@ -112,10 +113,15 @@ static void prom_close(int);
 static int is_openprom(int);
 
 static int prom_dev_to_alias(char *dev, uint_t options, char ***ret_buf);
+static int alias_to_prom_dev(char *alias, char *ret_buf);
 static int prom_srch_aliases_by_def(char *, struct name_list **,
     struct name_list **, int);
+static int prom_find_aliases_node(int fd);
 static int prom_compare_devs(char *prom_dev1, char *prom_dev2);
 static int _prom_strcmp(char *s1, char *s2);
+static int prom_srch_node(int fd, char *prop_name, char *ret_buf);
+static uint_t prom_next_node(int fd, uint_t node_id);
+static uint_t prom_child_node(int fd, uint_t node_id);
 
 static int prom_obp_vers(void);
 
@@ -918,17 +924,29 @@ process_bootdev(const char *bootdevice, const char *default_root,
 			return (DEVFS_NOMEM);
 		}
 
-		(void) strcpy(prom_path, ptr);
-		/* now we have a prom device path - convert to a devfs name */
-		if (devfs_prom_to_dev_name(prom_path, ret_buf) < 0) {
-			continue;
-		}
-		/* append any default minor names necessary */
-		if (process_minor_name(ret_buf, default_root) < 0) {
-			continue;
+		/*
+		 * prom boot-device may be aliased, so we need to do
+		 * the necessary prom alias to dev translation.
+		 */
+		if (*ptr != '/') {
+			if (alias_to_prom_dev(ptr, prom_path) < 0) {
+				continue;
+			}
+		} else {
+			(void) strcpy(prom_path, ptr);
 		}
 
+		/* now we have a prom device path - convert to a devfs name */
+		if (devfs_prom_to_dev_name(prom_path, ret_buf) < 0) {
+		    continue;
+		}
+
+		/* append any default minor names necessary */
+		if (process_minor_name(ret_buf, default_root) < 0) {
+		    continue;
+		}
 		found = 1;
+
 		/*
 		 * store the physical device path for now - when
 		 * we are all done with the entries, we will convert
@@ -1063,6 +1081,7 @@ devfs_phys_to_logical(struct boot_dev **bootdev_array, const int array_size,
 	if ((default_root_len != 0) && (*default_root != '/')) {
 		return (-1);
 	}
+
 	/* short cut for an empty array */
 	if (*bootdev_array == NULL) {
 		return (0);
@@ -1073,6 +1092,7 @@ devfs_phys_to_logical(struct boot_dev **bootdev_array, const int array_size,
 	if ((full_path = (char *)malloc(len)) == NULL) {
 		return (-1);
 	}
+
 	/*
 	 * if the default root path is terminated with a /, we have to
 	 * make sure we don't end up with one too many slashes in the
@@ -1119,6 +1139,7 @@ devfs_phys_to_logical(struct boot_dev **bootdev_array, const int array_size,
 		(void) mutex_unlock(&dev_lists_lk);
 		return (-1);
 	}
+
 	/*
 	 * now we have a filled in dev_list.  So for each logical device
 	 * list in dev_list, count the number of entries in the list,
@@ -1140,7 +1161,6 @@ devfs_phys_to_logical(struct boot_dev **bootdev_array, const int array_size,
 		    == NULL) {
 			continue;
 		}
-
 		list = dev_list[i];
 		count = 0;
 
@@ -1150,16 +1170,19 @@ devfs_phys_to_logical(struct boot_dev **bootdev_array, const int array_size,
 			count++;
 			list = list->next;
 		}
+
 		/*
 		 * null terminate the array
 		 */
 		dev_name_array[count] = NULL;
-
-		if (bootdev_array[i]->bootdev_trans[0] != NULL) {
+		if ((bootdev_array[i] != NULL) && (bootdev_array[i]->
+		    bootdev_trans[0] != NULL)) {
 			free(bootdev_array[i]->bootdev_trans[0]);
 		}
-		free(bootdev_array[i]->bootdev_trans);
-		bootdev_array[i]->bootdev_trans = dev_name_array;
+		if (bootdev_array[i] != NULL) {
+			free(bootdev_array[i]->bootdev_trans);
+			bootdev_array[i]->bootdev_trans = dev_name_array;
+		}
 	}
 	bootdev_list = NULL;
 	free(full_path);
@@ -2097,6 +2120,205 @@ parse_name(char *name, char **drvname, char **addrname, char **minorname)
 	if (*minorname) {
 		*((*minorname)-1) = '\0';
 	}
+}
+
+/*
+ * converts a prom alias to a prom device name.
+ * if we find no matching device, then we fail since if were
+ * given a valid alias, then by definition, there must be a
+ * device pathname associated with it in the /aliases node.
+ */
+static int
+alias_to_prom_dev(char *alias, char *ret_buf)
+{
+	char *options_ptr;
+	char alias_buf[MAXNAMELEN];
+	char alias_def[MAXPATHLEN];
+	char options[16] = "";
+	int prom_fd = -1;
+	int ret;
+	int found = 0;
+	int i;
+
+	if (strchr(alias, '/') != NULL)
+		return (DEVFS_INVAL);
+
+	if (strlen(alias) > (MAXNAMELEN - 1))
+		return (DEVFS_INVAL);
+
+	if (ret_buf == NULL) {
+		return (DEVFS_INVAL);
+	}
+
+	prom_fd = prom_open(O_RDONLY);
+	if (prom_fd < 0) {
+		return (prom_fd);
+	}
+
+	(void) strlcpy(alias_buf, alias, sizeof (alias_buf));
+
+	/*
+	 * save off any options (minor name info) that is
+	 * explicitly called out in the alias name
+	 */
+	if ((options_ptr = strchr(alias_buf, ':')) != NULL) {
+		*options_ptr = '\0';
+		(void) strlcpy(options, ++options_ptr, sizeof (options));
+	}
+
+	*alias_def = '\0';
+
+	ret = prom_find_aliases_node(prom_fd);
+	if (ret == 0) {
+		/*
+		 * we loop because one alias may define another... we have
+		 * to work our way down to an actual device definition.
+		 */
+		for (i = 0; i <= 10; i++) {
+			ret = prom_srch_node(prom_fd, alias_buf, alias_def);
+			if (ret == -1) {
+				break;
+			}
+			(void) strlcpy(alias_buf, alias_def,
+			    sizeof (alias_buf));
+			if (*alias_def == '/') {
+				break;
+			}
+
+			/*
+			 * save off any explicit options (minor name info)
+			 * if none has been encountered yet
+			 */
+			if (options_ptr == NULL) {
+				options_ptr = strchr(alias_buf, ':');
+				if (options_ptr != NULL) {
+				    *options_ptr = '\0';
+				    (void) strlcpy(options, ++options_ptr,
+					    sizeof (options));
+				}
+			}
+		}
+	}
+	prom_close(prom_fd);
+
+	/* error */
+	if (ret == -1) {
+		return (ret);
+	}
+
+	(void) strlcpy(ret_buf, alias_def, strlen(ret_buf) + 1);
+
+	/* override minor name information */
+	if (options_ptr != NULL) {
+		if ((options_ptr = strrchr(ret_buf, ':')) == NULL) {
+			(void) strcat(ret_buf, ":");
+		} else {
+			*(++options_ptr) = '\0';
+		}
+		(void) strcat(ret_buf, options);
+	}
+	return (0);
+}
+
+/*
+ * search a prom node for a property name
+ */
+static int
+prom_srch_node(int fd, char *prop_name, char *ret_buf)
+{
+	Oppbuf  oppbuf;
+	struct openpromio *opp = &(oppbuf.opp);
+	int *ip = (int *)((void *)opp->oprom_array);
+
+	(void) memset(oppbuf.buf, 0, BUFSIZE);
+	opp->oprom_size = MAXPROPSIZE;
+	*ip = 0;
+
+	if (ioctl(fd, OPROMNXTPROP, opp) < 0)
+		return (-1);
+	if (opp->oprom_size == 0)
+		return (-1);
+
+	while (strcmp(prop_name, opp->oprom_array) != 0) {
+		opp->oprom_size = MAXPROPSIZE;
+		if (ioctl(fd, OPROMNXTPROP, opp) < 0)
+			return (-1);
+		if (opp->oprom_size == 0)
+			return (-1);
+	}
+	opp->oprom_size = MAXVALSIZE;
+	if (ioctl(fd, OPROMGETPROP, opp) < 0)
+		return (-1);
+
+	if (opp->oprom_size == 0)
+		return (-1);
+	(void) strlcpy(ret_buf, opp->oprom_array, strlen(ret_buf) + 1);
+	return (0);
+}
+
+/*
+ * return the aliases node.
+ */
+static int
+prom_find_aliases_node(int fd)
+{
+	uint_t child_id;
+	char buf[MAXNAMELEN];
+
+	if ((child_id = prom_next_node(fd, 0)) == 0)
+		return (-1);
+	if ((child_id = prom_child_node(fd, child_id)) == 0)
+		return (-1);
+
+	while (child_id != 0) {
+		if (prom_srch_node(fd, "name", buf) == 0) {
+			if (strcmp(buf, "aliases") == 0) {
+				return (0);
+			}
+		}
+		child_id = prom_next_node(fd, child_id);
+	}
+	return (-1);
+}
+
+/*
+ * get sibling
+ */
+static uint_t
+prom_next_node(int fd, uint_t node_id)
+{
+	Oppbuf  oppbuf;
+	struct openpromio *opp = &(oppbuf.opp);
+	uint_t *ip = (uint_t *)((void *)opp->oprom_array);
+
+	(void) memset(oppbuf.buf, 0, BUFSIZE);
+	opp->oprom_size = MAXVALSIZE;
+	*ip = node_id;
+
+	if (ioctl(fd, OPROMNEXT, opp) < 0)
+		return (0);
+
+	return (*(uint_t *)((void *)opp->oprom_array));
+}
+
+/*
+ * get child
+ */
+static uint_t
+prom_child_node(int fd, uint_t node_id)
+{
+	Oppbuf  oppbuf;
+	struct openpromio *opp = &(oppbuf.opp);
+	uint_t *ip = (uint_t *)((void *)opp->oprom_array);
+
+	(void) memset(oppbuf.buf, 0, BUFSIZE);
+	opp->oprom_size = MAXVALSIZE;
+	*ip = node_id;
+
+	if (ioctl(fd, OPROMCHILD, opp) < 0)
+		return (0);
+
+	return (*(uint_t *)((void *)opp->oprom_array));
 }
 
 /*
