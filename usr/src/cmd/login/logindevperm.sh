@@ -66,6 +66,9 @@ cat <<EOM
 /dev/console	0400	/dev/removable-media/rdsk/*	# removable media
 /dev/console	0400	/dev/hotpluggable/dsk/*		# hotpluggable storage
 /dev/console	0400	/dev/hotpluggable/rdsk/*	# hotpluggable storage
+/dev/console	0600	/dev/video[0-9]+	# video devices
+/dev/console	0600	/dev/usb/hid[0-9]+	# hid devices should have the same permission with conskbd and consms
+/dev/console	0600	/dev/usb/[0-9a-f]+[.][0-9a-f]+/[0-9]+/* driver=scsa2usb,usb_mid,usbprn,ugen	#libusb/ugen devices
 EOM
 
 case "$MACH" in

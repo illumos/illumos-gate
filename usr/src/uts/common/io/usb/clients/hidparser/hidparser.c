@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -849,12 +848,11 @@ hidparser_get_usage_list_in_order_internal(entity_item_t *parser_handle,
 	entity_item_t *current = parser_handle;
 	entity_attribute_t *attribute;
 	uchar_t foundreportid, right_report_id, valid_usage;
-	uchar_t found_usage_min, found_usage_max;
-	int i = 0;
+	uchar_t found_usage_min, found_usage_max, found_usage;
+	int i, j;
 	int rval;
-	uint32_t usage, usage_min, usage_max;
-	hidparser_usage_info_t ui;
-	boolean_t	delim_pre = B_FALSE;
+	uint32_t usage, usage_min, usage_max, usage_id[USAGE_MAX];
+	hidparser_usage_info_t *ui;
 
 	found_usage_min = 0;
 	found_usage_max = 0;
@@ -902,6 +900,7 @@ hidparser_get_usage_list_in_order_internal(entity_item_t *parser_handle,
 			right_report_id = 0;
 			found_usage_min = 0;
 			found_usage_max = 0;
+			found_usage = 0;
 			valid_usage = 0;
 
 			attribute = current->entity_item_attributes;
@@ -921,128 +920,137 @@ hidparser_get_usage_list_in_order_internal(entity_item_t *parser_handle,
 					}
 
 					break;
+				case R_ITEM_USAGE:
+					if (found_usage >= USAGE_MAX) {
+
+						return (HIDPARSER_FAILURE);
+					}
+					usage = hidparser_find_unsigned_val(
+					    attribute);
+					if (usage) {
+						usage_id[found_usage] = usage;
+						found_usage++;
+					}
+
+					break;
 				case R_ITEM_USAGE_MIN:
 					found_usage_min = 1;
 					usage_min = hidparser_find_unsigned_val(
 					    attribute);
-					ui.usage_min = HID_USAGE_ID(usage_min);
 
 					break;
 				case R_ITEM_USAGE_MAX:
 					found_usage_max = 1;
 					usage_max = hidparser_find_unsigned_val(
 					    attribute);
-					ui.usage_max = HID_USAGE_ID(usage_max);
-					if (attribute->
-					    entity_attribute_length == 3) {
-						ui.usage_page = HID_USAGE_PAGE(
-								    usage_max);
-					}
 
 					break;
 				case R_ITEM_SET_DELIMITER:
-					delim_pre = B_TRUE;
-					attribute =
-					    attribute->entity_attribute_next;
+					/* skip over alternate usages */
+					do {
+						attribute = attribute->
+						    entity_attribute_next;
+					} while (attribute->
+					    entity_attribute_tag !=
+					    R_ITEM_SET_DELIMITER);
 
 					break;
 				}
 
-				/*
-				 * If we have a usage item, and we had
-				 * a report id match (or report ids
-				 * are not present), put the usage
-				 * item into the list.
-				 * Don't put undefined usage items
-				 * (HID_USAGE_UNDEFINED, 0) into
-				 * the list; a 0 usage item is
-				 * used to match padding fields
-				 * that don't have an attached
-				 * usage.
-				 */
-				if ((!foundreportid ||
-				    (foundreportid && right_report_id)) &&
-				    (attribute->entity_attribute_tag ==
-				    R_ITEM_USAGE) &&
-				    hidparser_find_unsigned_val(attribute)) {
-					/* Put in usage list */
-					if (rpt->no_of_usages >= USAGE_MAX) {
-
-						return (HIDPARSER_FAILURE);
-					}
-
-					hidparser_fill_usage_info(&ui,
-					    current->entity_item_attributes);
-
-					ui.collection_usage = collection_usage;
-
-					usage = hidparser_find_unsigned_val(
-					    attribute);
-					ui.usage_id = HID_USAGE_ID(usage);
-					if (attribute->
-					    entity_attribute_length == 3) {
-						if (HID_USAGE_PAGE(usage))
-							ui.usage_page =
-							    HID_USAGE_PAGE(
-							    usage);
-					}
-
-					i = rpt->no_of_usages++;
-					rpt->usage_descr[i] = ui;
-					rpt->report_id = report_id;
-					valid_usage = 1;
-					if (delim_pre == B_TRUE) {
-						/* skip over alternate usages */
-						while (attribute->
-						    entity_attribute_tag !=
-						    R_ITEM_SET_DELIMITER) {
-							attribute = attribute->
-							entity_attribute_next;
-						}
-						delim_pre = B_FALSE;
-					}
-				}
-
-				/*
-				 * If we have a usage min & max, and
-				 * we had a report id match(or report
-				 * ids are not present) put the usage
-				 * range into the list.
-				 */
-				if ((!foundreportid || (foundreportid &&
-				    right_report_id)) &&
-				    found_usage_min && found_usage_max) {
-
-					/* Put in usage list */
-					if (rpt->no_of_usages >= USAGE_MAX) {
-
-						return (HIDPARSER_FAILURE);
-					}
-
-					hidparser_fill_usage_info(&ui,
-					    current->entity_item_attributes);
-
-					ui.collection_usage = collection_usage;
-
-					i = rpt->no_of_usages++;
-					rpt->usage_descr[i] = ui;
-					rpt->report_id = report_id;
-					valid_usage = 1;
-					if (delim_pre == B_TRUE) {
-						/* skip over alternate usages */
-						while (attribute->
-						    entity_attribute_tag !=
-						    R_ITEM_SET_DELIMITER) {
-							attribute = attribute->
-							entity_attribute_next;
-						}
-						delim_pre = B_FALSE;
-					}
-
-					found_usage_min = found_usage_max = 0;
-				}
-
 				attribute = attribute->entity_attribute_next;
+			}
+
+			/*
+			 * If we have a report id match (or report ids
+			 * are not present), and have a usage item or
+			 * usage min&max, put the usage item into the
+			 * list. Don't put undefined usage items
+			 * (HID_USAGE_UNDEFINED, 0) into the list;
+			 * a 0 usage item is used to match padding
+			 * fields that don't have an attached usage.
+			 */
+			if (!foundreportid ||
+			    (foundreportid && right_report_id)) {
+
+				for (j = 0; j < found_usage; j++) {
+
+					/* Put in usage list */
+					if (rpt->no_of_usages >= USAGE_MAX) {
+
+						return (HIDPARSER_FAILURE);
+					}
+
+					i = rpt->no_of_usages++;
+					ui = &(rpt->usage_descr[i]);
+
+					hidparser_fill_usage_info(ui,
+					    current->entity_item_attributes);
+
+					ui->rptcnt /= found_usage;
+					ui->collection_usage = collection_usage;
+					ui->usage_id = HID_USAGE_ID(
+					    usage_id[j]);
+
+					/*
+					 * This is an extended usage ie.
+					 * usage page in upper 16 bits
+					 * or-ed with usage in the lower
+					 * 16 bits.
+					 */
+					if (usage_id[j] >> 16) {
+						ui->usage_page =
+						    HID_USAGE_PAGE(usage_id[j]);
+					}
+
+					rpt->report_id = report_id;
+					valid_usage = 1;
+				}
+
+				if (found_usage_min && found_usage_max) {
+
+					/* Put in usage list */
+					if (rpt->no_of_usages >= USAGE_MAX) {
+
+						return (HIDPARSER_FAILURE);
+					}
+
+					if (found_usage) {
+
+						/* handle duplication */
+						ui->usage_min = HID_USAGE_ID(
+						    usage_min);
+						ui->usage_max = HID_USAGE_ID(
+						    usage_max);
+					} else {
+						i = rpt->no_of_usages++;
+						ui = &(rpt->usage_descr[i]);
+
+						hidparser_fill_usage_info(ui,
+						    current->
+						    entity_item_attributes);
+
+						ui->collection_usage =
+						    collection_usage;
+						ui->usage_min = HID_USAGE_ID(
+						    usage_min);
+						ui->usage_max = HID_USAGE_ID(
+						    usage_max);
+
+						rpt->report_id = report_id;
+						valid_usage = 1;
+					}
+
+					/*
+					 * This is an extended usage ie.
+					 * usage page in upper 16 bits
+					 * or-ed with usage_max in the lower
+					 * 16 bits.
+					 */
+					if (usage_max >> 16) {
+						ui->usage_page =
+						    HID_USAGE_PAGE(usage_max);
+					}
+				}
 			}
 
 			/*
@@ -1059,14 +1067,15 @@ hidparser_get_usage_list_in_order_internal(entity_item_t *parser_handle,
 					return (HIDPARSER_FAILURE);
 				}
 
-				hidparser_fill_usage_info(&ui,
+				i = rpt->no_of_usages++;
+				ui = &(rpt->usage_descr[i]);
+
+				hidparser_fill_usage_info(ui,
 				    current->entity_item_attributes);
 
-				ui.collection_usage = collection_usage;
-				ui.usage_id = HID_USAGE_UNDEFINED;
+				ui->collection_usage = collection_usage;
+				ui->usage_id = HID_USAGE_UNDEFINED;
 
-				i = rpt->no_of_usages++;
-				rpt->usage_descr[i] = ui;
 				rpt->report_id = report_id;
 			}
 
