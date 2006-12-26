@@ -118,6 +118,9 @@ static const nd_param_t nd_template[] = {
 /* MSI count */
 { PARAM_MSI_CNT,	    0,	  7,	0,	"+msi_cnt"		},
 
+/* Performance tuning */
+{ PARAM_DRAIN_MAX,	    1,	  512,	64,	"+drain_max"		},
+
 /* Terminator */
 { PARAM_COUNT,		    0,	  0,	0,	NULL			}
 };

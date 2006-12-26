@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_BGE_IMPL_H
-#define	_SYS_BGE_IMPL_H
+#ifndef _BGE_IMPL_H
+#define	_BGE_IMPL_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -234,6 +234,11 @@ extern int secpolicy_net_config(const cred_t *, boolean_t);
 #define	BGE_RECV_SLOTS_USED	1024		/* could be 2048 anyway	*/
 #endif
 
+#define	BGE_SEND_BUF_NUM	512
+#define	BGE_SEND_BUF_ARRAY	16
+#define	BGE_SEND_BUF_ARRAY_JUMBO	3
+#define	BGE_SEND_BUF_MAX	(BGE_SEND_BUF_NUM*BGE_SEND_BUF_ARRAY)
+
 /*
  * PCI type. PCI-Express or PCI/PCIX
  */
@@ -292,22 +297,6 @@ extern int secpolicy_net_config(const cred_t *, boolean_t);
 #define	BGE_RECV_RINGS_SPLIT	(BGE_RECV_RINGS_MAX + 1)
 
 /*
- * MONOLITHIC allocation is a hardware debugging aid, so that a logic
- * analyser can more easily be programmed with the (single) range of
- * memory addresses that the chip will then use for DMA.
- *
- * It's incompatible with non-DVMA architectures that require BGE_SPLIT
- * to be set greater than 1.  Here, it overrides BGE_SPLIT, so the code
- * will compile correctly but will *probably* fail at runtime because it
- * simply won't be able to allocate a big enough piece of memory ...
- */
-#define	BGE_MONOLITHIC	0
-#if	BGE_MONOLITHIC
-#undef	BGE_SPLIT
-#define	BGE_SPLIT	1		/* must be 1 if MONOLITHIC	*/
-#endif	/* BGE_MONOLITHIC */
-
-/*
  * STREAMS parameters
  */
 #define	BGE_IDNUM		0		/* zero seems to work	*/
@@ -356,6 +345,16 @@ typedef struct {
 	uint32_t		token;		/* arbitrary identifier	*/
 } dma_area_t;					/* 0x50 (80) bytes	*/
 
+typedef struct bge_queue_item {
+	struct bge_queue_item	*next;
+	void			*item;
+} bge_queue_item_t;
+
+typedef struct bge_queue {
+	bge_queue_item_t	*head;
+	uint32_t		count;
+	kmutex_t		*lock;
+} bge_queue_t;
 /*
  * Software version of the Receive Buffer Descriptor
  * There's one of these for each receive buffer (up to 256/512/1024 per ring).
@@ -435,25 +434,33 @@ typedef struct recv_ring {
 } recv_ring_t;					/* 0x90 (144) bytes	*/
 
 /*
+ * Send packet structure
+ */
+typedef struct send_pkt {
+	uint16_t		vlan_tci;
+	uint32_t		pflags;
+	boolean_t		tx_ready;
+	bge_queue_item_t	*txbuf_item;
+} send_pkt_t;
+
+/*
+ * Software version of tx buffer structure
+ */
+typedef struct sw_txbuf {
+	dma_area_t		buf;
+	uint32_t		copy_len;
+} sw_txbuf_t;
+
+/*
  * Software version of the Send Buffer Descriptor
  * There's one of these for each send buffer (up to 512 per ring)
  */
 typedef struct sw_sbd {
 	dma_area_t		desc;		/* (const) related h/w	*/
 						/* descriptor area	*/
-	dma_area_t		pbuf;		/* (const) related	*/
+	bge_queue_item_t	*pbuf;		/* (const) related	*/
 						/* buffer area		*/
-
-	void			(*recycle)(struct sw_sbd *);
-	uint64_t		flags;
-
-	mblk_t			*mp;		/* related mblk, if any	*/
-	ddi_dma_handle_t	mblk_hdl;	/* handle for same	*/
-} sw_sbd_t;					/* 0xc0 (192) bytes	*/
-
-#define	SW_SBD_FLAG_BUSY	0x0000000000000001
-#define	SW_SBD_FLAG_PBUF	0x0000000000000002
-#define	SW_SBD_FLAG_BIND	0x0000000000000004
+} sw_sbd_t;
 
 /*
  * Software Send Ring Control Block
@@ -466,7 +473,7 @@ typedef struct send_ring {
 	 */
 	dma_area_t		desc;		/* (const) related h/w	*/
 						/* descriptor area	*/
-	dma_area_t		buf[BGE_SPLIT];	/* (const) related	*/
+	dma_area_t		buf[BGE_SEND_BUF_ARRAY][BGE_SPLIT];
 						/* buffer area(s)	*/
 	bge_rcb_t		hw_rcb;		/* (const) image of h/w	*/
 						/* RCB, and used to	*/
@@ -479,10 +486,32 @@ typedef struct send_ring {
 
 	bge_regno_t		chip_mbx_reg;	/* (const) h/w producer	*/
 						/* index mailbox offset	*/
+	/*
+	 * Tx buffer queue
+	 */
+	bge_queue_t		txbuf_queue;
+	bge_queue_t		freetxbuf_queue;
+	bge_queue_t		*txbuf_push_queue;
+	bge_queue_t		*txbuf_pop_queue;
+	kmutex_t		txbuf_lock[1];
+	kmutex_t		freetxbuf_lock[1];
+	bge_queue_item_t	*txbuf_head;
+	send_pkt_t		*pktp;
+	uint64_t		txpkt_next;
+	uint64_t		txfill_next;
+	sw_txbuf_t		*txbuf;
+	uint32_t		tx_buffers;
+	uint32_t		tx_buffers_low;
+	uint32_t		tx_array_max;
+	uint32_t		tx_array;
 	kmutex_t		tx_lock[1];	/* serialize h/w update	*/
 						/* ("producer index")	*/
 	uint64_t		tx_next;	/* next slot to use	*/
 	uint64_t		tx_flow;	/* # concurrent sends	*/
+	uint64_t		tx_block;
+	uint64_t		tx_nobd;
+	uint64_t		tx_nobuf;
+	uint64_t		tx_alloc_fail;
 
 	/*
 	 * These counters/indexes are manipulated in the transmit
@@ -581,9 +610,9 @@ typedef struct {
 	uint32_t		mbuf_lo_water_rmac;
 	uint32_t		mbuf_lo_water_rdma;
 
-	uint64_t		rx_rings;	/* from bge.conf	*/
-	uint64_t		tx_rings;	/* from bge.conf	*/
-	uint64_t		default_mtu;	/* from bge.conf	*/
+	uint32_t		rx_rings;	/* from bge.conf	*/
+	uint32_t		tx_rings;	/* from bge.conf	*/
+	uint32_t		default_mtu;	/* from bge.conf	*/
 
 	uint64_t		hw_mac_addr;	/* from chip register	*/
 	bge_mac_addr_t		vendor_addr;	/* transform of same	*/
@@ -671,6 +700,8 @@ enum {
 	PARAM_LOOP_MODE,
 	PARAM_MSI_CNT,
 
+	PARAM_DRAIN_MAX,
+
 	PARAM_COUNT
 };
 
@@ -743,7 +774,7 @@ typedef struct bge {
 	void			*io_regs;	/* mapped registers	*/
 	cyclic_id_t		cyclic_id;	/* cyclic callback	*/
 	ddi_softintr_t		factotum_id;	/* factotum callback	*/
-	ddi_softintr_t		resched_id;	/* reschedule callback	*/
+	ddi_softintr_t		drain_id;	/* reschedule callback	*/
 
 	ddi_intr_handle_t 	*htable;	/* For array of interrupts */
 	int			intr_type;	/* What type of interrupt */
@@ -785,7 +816,7 @@ typedef struct bge {
 	 * be gotten from statistic registers.And bge_statistics_reg_t record
 	 * the statistic registers value
 	 */
-	bge_statistics_reg_t	stat_val;
+	bge_statistics_reg_t	*pstats;
 
 	/*
 	 * Runtime read-write data starts here ...
@@ -905,8 +936,8 @@ typedef struct bge {
 	uint32_t		watchdog;	/* watches for Tx stall	*/
 	boolean_t		bge_intr_running;
 	boolean_t		bge_dma_error;
-	boolean_t		resched_needed;
-	boolean_t		resched_running;
+	boolean_t		tx_resched_needed;
+	uint64_t		tx_resched;
 	uint32_t		factotum_flag;	/* softint pending	*/
 	uintptr_t		pagemask;
 
@@ -914,9 +945,7 @@ typedef struct bge {
 	 * NDD parameters (protected by genlock)
 	 */
 	caddr_t			nd_data_p;
-	nd_param_t		nd_params[PARAM_COUNT];
-
-	uintptr_t		resmap[BGE_MAX_RESOURCES];
+	nd_param_t		*nd_params;
 
 	/*
 	 * A flag to prevent excessive config space accesses
@@ -995,6 +1024,7 @@ typedef struct bge {
 
 #define	param_loop_mode		nd_params[PARAM_LOOP_MODE].ndp_val
 #define	param_msi_cnt		nd_params[PARAM_MSI_CNT].ndp_val
+#define	param_drain_max		nd_params[PARAM_DRAIN_MAX].ndp_val
 
 /*
  * Sync a DMA area described by a dma_area_t
@@ -1016,7 +1046,7 @@ typedef struct bge {
 /*
  * Next value of a cyclic index
  */
-#define	NEXT(index, limit)	((index)+1 < (limit) ? (index)+1 : 0);
+#define	NEXT(index, limit)	((index)+1 < (limit) ? (index)+1 : 0)
 
 /*
  * Property lookups
@@ -1232,6 +1262,8 @@ int bge_check_acc_handle(bge_t *bgep, ddi_acc_handle_t handle);
 int bge_check_dma_handle(bge_t *bgep, ddi_dma_handle_t handle);
 void bge_init_rings(bge_t *bgep);
 void bge_fini_rings(bge_t *bgep);
+bge_queue_item_t *bge_alloc_txbuf_array(bge_t *bgep, send_ring_t *srp);
+void bge_free_txbuf_arrays(send_ring_t *srp);
 int bge_alloc_bufs(bge_t *bgep);
 void bge_free_bufs(bge_t *bgep);
 void bge_intr_enable(bge_t *bgep);
@@ -1256,15 +1288,16 @@ void bge_receive(bge_t *bgep, bge_status_t *bsp);
 /* bge_send.c */
 mblk_t *bge_m_tx(void *arg, mblk_t *mp);
 void bge_recycle(bge_t *bgep, bge_status_t *bsp);
-uint_t bge_reschedule(caddr_t arg);
+uint_t bge_send_drain(caddr_t arg);
 
-/* bge_atomic_sparc.s/bge_atomic_intel.c */
+/* bge_atomic.c */
 uint64_t bge_atomic_reserve(uint64_t *count_p, uint64_t n);
 void bge_atomic_renounce(uint64_t *count_p, uint64_t n);
 uint64_t bge_atomic_claim(uint64_t *count_p, uint64_t limit);
+uint64_t bge_atomic_next(uint64_t *sp, uint64_t limit);
+void bge_atomic_sub64(uint64_t *count_p, uint64_t n);
 uint64_t bge_atomic_clr64(uint64_t *sp, uint64_t bits);
 uint32_t bge_atomic_shl32(uint32_t *sp, uint_t count);
-
 
 /*
  * Reset type
@@ -1292,4 +1325,4 @@ uint32_t bge_atomic_shl32(uint32_t *sp, uint_t count);
 }
 #endif
 
-#endif	/* _SYS_BGE_IMPL_H */
+#endif	/* _BGE_IMPL_H */

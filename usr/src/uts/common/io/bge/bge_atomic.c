@@ -89,6 +89,41 @@ bge_atomic_claim(uint64_t *count_p, uint64_t limit)
 }
 
 /*
+ * Atomically NEXT a 64-bit integer, returning the
+ * value it had *before* the NEXT was applied
+ */
+uint64_t
+bge_atomic_next(uint64_t *sp, uint64_t limit)
+{
+	uint64_t oldval;
+	uint64_t newval;
+
+	/* ATOMICALLY */
+	do {
+		oldval = *sp;
+		newval = NEXT(oldval, limit);
+	} while (cas64(sp, oldval, newval) != oldval);
+
+	return (oldval);
+}
+
+/*
+ * Atomically decrement a counter
+ */
+void
+bge_atomic_sub64(uint64_t *count_p, uint64_t n)
+{
+	uint64_t oldval;
+	uint64_t newval;
+
+	/* ATOMICALLY */
+	do {
+		oldval = *count_p;
+		newval = oldval - n;
+	} while (cas64(count_p, oldval, newval) != oldval);
+}
+
+/*
  * Atomically clear bits in a 64-bit word, returning
  * the value it had *before* the bits were cleared.
  */

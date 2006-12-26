@@ -70,7 +70,6 @@
 
 #define	BGE_DBG		BGE_DBG_SEND	/* debug flag for this code	*/
 
-
 /*
  * ========== Send-side recycle routines ==========
  */
@@ -93,17 +92,15 @@ static void bge_recycle_ring(bge_t *bgep, send_ring_t *srp);
 static void
 bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
 {
+	sw_sbd_t *ssbdp;
+	bge_queue_item_t *buf_item;
+	bge_queue_item_t *buf_item_head;
+	bge_queue_item_t *buf_item_tail;
+	bge_queue_t *txbuf_queue;
 	uint64_t slot;
 	uint64_t n;
 
-	_NOTE(ARGUNUSED(bgep))
-
 	ASSERT(mutex_owned(srp->tc_lock));
-
-	slot = *srp->cons_index_p;			/* volatile	*/
-	n = slot - srp->tc_next;
-	if (slot < srp->tc_next)
-		n += srp->desc.nslots;
 
 	/*
 	 * We're about to release one or more places :-)
@@ -113,8 +110,31 @@ bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
 	 *	we're not about to free more places than were claimed!
 	 */
 	ASSERT(srp->tx_free > 0);
+	ASSERT(srp->tx_free < srp->desc.nslots);
 
+	buf_item_head = buf_item_tail = NULL;
+	for (n = 0, slot = srp->tc_next; slot != *srp->cons_index_p;
+	    slot = NEXT(slot, srp->desc.nslots)) {
+		ssbdp = &srp->sw_sbds[slot];
+		ASSERT(ssbdp->pbuf != NULL);
+		buf_item = ssbdp->pbuf;
+		if (buf_item_head == NULL)
+			buf_item_head = buf_item_tail = buf_item;
+		else {
+			buf_item_tail->next = buf_item;
+			buf_item_tail = buf_item;
+		}
+		ssbdp->pbuf = NULL;
+		n++;
+	}
+	if (n == 0)
+		return;
+
+	/*
+	 * Update recycle index and free tx BD number
+	 */
 	srp->tc_next = slot;
+	ASSERT(srp->tx_free + n <= srp->desc.nslots);
 	bge_atomic_renounce(&srp->tx_free, n);
 
 	/*
@@ -128,6 +148,28 @@ bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
 	 * the watchdog will restart on the next send() call).
 	 */
 	bgep->watchdog = srp->tx_free == srp->desc.nslots ? 0 : 1;
+
+	/*
+	 * Return tx buffers to buffer push queue
+	 */
+	txbuf_queue = srp->txbuf_push_queue;
+	mutex_enter(txbuf_queue->lock);
+	buf_item_tail->next = txbuf_queue->head;
+	txbuf_queue->head = buf_item_head;
+	txbuf_queue->count += n;
+	mutex_exit(txbuf_queue->lock);
+
+	/*
+	 * Check if we need exchange the tx buffer push and pop queue
+	 */
+	if ((srp->txbuf_pop_queue->count < srp->tx_buffers_low) &&
+	    (srp->txbuf_pop_queue->count < txbuf_queue->count)) {
+		srp->txbuf_push_queue = srp->txbuf_pop_queue;
+		srp->txbuf_pop_queue = txbuf_queue;
+	}
+
+	if (bgep->tx_resched_needed)
+		ddi_trigger_softintr(bgep->drain_id);
 }
 
 /*
@@ -181,15 +223,11 @@ restart:
 
 		if (*srp->cons_index_p == srp->tc_next)
 			continue;		/* no slots to recycle	*/
-
-		mutex_enter(srp->tc_lock);
+		if (mutex_tryenter(srp->tc_lock) == 0)
+			continue;		/* already in process	*/
 		bge_recycle_ring(bgep, srp);
 		mutex_exit(srp->tc_lock);
 
-		if (bgep->resched_needed && !bgep->resched_running) {
-			bgep->resched_running = B_TRUE;
-			ddi_trigger_softintr(bgep->resched_id);
-		}
 		/*
 		 * Restart from ring 0, if we're not on ring 0 already.
 		 * As H/W selects send BDs totally based on priority and
@@ -210,38 +248,6 @@ restart:
 /*
  * ========== Send-side transmit routines ==========
  */
-
-/*
- * CLAIM an already-reserved place on the next train
- *
- * This is the point of no return!
- */
-static uint64_t bge_send_claim(bge_t *bgep, send_ring_t *srp);
-#pragma	inline(bge_send_claim)
-
-static uint64_t
-bge_send_claim(bge_t *bgep, send_ring_t *srp)
-{
-	uint64_t slot;
-
-	mutex_enter(srp->tx_lock);
-	atomic_add_64(&srp->tx_flow, 1);
-	slot = bge_atomic_claim(&srp->tx_next, srp->desc.nslots);
-	mutex_exit(srp->tx_lock);
-
-	/*
-	 * Bump the watchdog counter, thus guaranteeing that it's
-	 * nonzero (watchdog activated).  Note that non-synchonised
-	 * access here means we may race with the reclaim() code
-	 * above, but the outcome will be harmless.  At worst, the
-	 * counter may not get reset on a partial reclaim; but the
-	 * large trigger threshold makes false positives unlikely
-	 */
-	bgep->watchdog += 1;
-
-	return (slot);
-}
-
 #define	TCP_CKSUM_OFFSET	16
 #define	UDP_CKSUM_OFFSET	6
 
@@ -280,239 +286,311 @@ bge_pseudo_cksum(uint8_t *buf)
 	*(uint16_t *)buf = htons((uint16_t)cksum);
 }
 
-/*
- * Send a message by copying it into a preallocated (and premapped) buffer
- */
-static enum send_status bge_send_copy(bge_t *bgep, mblk_t *mp,
-	send_ring_t *srp, uint16_t tci);
-#pragma	inline(bge_send_copy)
+static bge_queue_item_t *
+bge_get_txbuf(bge_t *bgep, send_ring_t *srp)
+{
+	bge_queue_item_t *txbuf_item;
+	bge_queue_t *txbuf_queue;
 
-static enum send_status
-bge_send_copy(bge_t *bgep, mblk_t *mp, send_ring_t *srp, uint16_t tci)
+	txbuf_queue = srp->txbuf_pop_queue;
+	mutex_enter(txbuf_queue->lock);
+	if (txbuf_queue->count == 0) {
+		mutex_exit(txbuf_queue->lock);
+		txbuf_queue = srp->txbuf_push_queue;
+		mutex_enter(txbuf_queue->lock);
+		if (txbuf_queue->count == 0) {
+			mutex_exit(txbuf_queue->lock);
+			/* Try to allocate more tx buffers */
+			if (srp->tx_array < srp->tx_array_max) {
+				mutex_enter(srp->tx_lock);
+				txbuf_item = bge_alloc_txbuf_array(bgep, srp);
+				mutex_exit(srp->tx_lock);
+			} else
+				txbuf_item = NULL;
+			return (txbuf_item);
+		}
+	}
+	txbuf_item = txbuf_queue->head;
+	txbuf_queue->head = (bge_queue_item_t *)txbuf_item->next;
+	txbuf_queue->count--;
+	mutex_exit(txbuf_queue->lock);
+	txbuf_item->next = NULL;
+
+	return (txbuf_item);
+}
+
+static void bge_send_fill_txbd(send_ring_t *srp, send_pkt_t *pktp);
+#pragma	inline(bge_send_fill_txbd)
+
+static void
+bge_send_fill_txbd(send_ring_t *srp, send_pkt_t *pktp)
 {
 	bge_sbd_t *hw_sbd_p;
 	sw_sbd_t *ssbdp;
-	mblk_t *bp;
-	char *txb;
+	bge_queue_item_t *txbuf_item;
+	sw_txbuf_t *txbuf;
 	uint64_t slot;
-	size_t totlen;
-	size_t mblen;
-	uint32_t pflags;
 
-	BGE_TRACE(("bge_send_copy($%p, $%p, $%p, 0x%x)",
-		(void *)bgep, (void *)mp, (void *)srp));
+	ASSERT(mutex_owned(srp->tx_lock));
 
 	/*
-	 * IMPORTANT:
-	 *	Up to the point where it claims a place, a send_msg()
-	 *	routine can indicate failure by returning SEND_FAIL.
-	 *	Once it's claimed a place, it mustn't fail.
-	 *
-	 * In this version, there's no setup to be done here, and there's
-	 * nothing that can fail, so we can go straight to claiming our
-	 * already-reserved place on the train.
-	 *
-	 * This is the point of no return!
+	 * Go straight to claiming our already-reserved places
+	 * on the train!
 	 */
-	slot = bge_send_claim(bgep, srp);
+	ASSERT(pktp->txbuf_item != NULL);
+	txbuf_item = pktp->txbuf_item;
+	txbuf = txbuf_item->item;
+	slot = srp->tx_next;
 	ssbdp = &srp->sw_sbds[slot];
+	hw_sbd_p = DMA_VPTR(ssbdp->desc);
+	hw_sbd_p->flags = 0;
+	ASSERT(txbuf->copy_len != 0);
+	(void) ddi_dma_sync(txbuf->buf.dma_hdl,  0,
+	    txbuf->copy_len, DDI_DMA_SYNC_FORDEV);
+	ASSERT(ssbdp->pbuf == NULL);
+	ssbdp->pbuf = txbuf_item;
+	srp->tx_next = NEXT(slot, srp->desc.nslots);
+	pktp->txbuf_item = NULL;
 
 	/*
-	 * Copy the data into a pre-mapped buffer, which avoids the
-	 * overhead (and complication) of mapping/unmapping STREAMS
-	 * buffers and keeping hold of them until the DMA has completed.
-	 *
-	 * Because all buffers are the same size, and larger than the
-	 * longest single valid message, we don't have to bother about
-	 * splitting the message across multiple buffers either.
+	 * Setting hardware send buffer descriptor
 	 */
-	txb = DMA_VPTR(ssbdp->pbuf);
-	totlen = 0;
+	hw_sbd_p->host_buf_addr = txbuf->buf.cookie.dmac_laddress;
+	hw_sbd_p->len = txbuf->copy_len;
+	if (pktp->vlan_tci != 0) {
+		hw_sbd_p->vlan_tci = pktp->vlan_tci;
+		hw_sbd_p->flags |= SBD_FLAG_VLAN_TAG;
+	}
+	if (pktp->pflags & HCK_IPV4_HDRCKSUM)
+		hw_sbd_p->flags |= SBD_FLAG_IP_CKSUM;
+	if (pktp->pflags & HCK_FULLCKSUM)
+		hw_sbd_p->flags |= SBD_FLAG_TCP_UDP_CKSUM;
+	hw_sbd_p->flags |= SBD_FLAG_PACKET_END;
+}
+
+/*
+ * Send a message by copying it into a preallocated (and premapped) buffer
+ */
+static void bge_send_copy(bge_t *bgep, sw_txbuf_t *txbuf, mblk_t *mp,
+    uint16_t tci);
+#pragma	inline(bge_send_copy)
+
+static void
+bge_send_copy(bge_t *bgep, sw_txbuf_t *txbuf, mblk_t *mp, uint16_t tci)
+{
+	mblk_t *bp;
+	uint32_t mblen;
+	char *pbuf;
+
+	txbuf->copy_len = 0;
+	pbuf = DMA_VPTR(txbuf->buf);
 	bp = mp;
 	if (tci != 0) {
-		mblen = bp->b_wptr - bp->b_rptr;
-
+		mblen = MBLKL(bp);
 		ASSERT(mblen >= 2 * ETHERADDRL + VLAN_TAGSZ);
-
-		bcopy(bp->b_rptr, txb, 2 * ETHERADDRL);
-		txb += 2 * ETHERADDRL;
-		totlen = 2 * ETHERADDRL;
-
-		if (mblen -= 2 * ETHERADDRL + VLAN_TAGSZ) {
-			if ((totlen += mblen) <= bgep->chipid.ethmax_size) {
-				bcopy(bp->b_wptr-mblen, txb, mblen);
-				txb += mblen;
-			}
+		bcopy(bp->b_rptr, pbuf, 2 * ETHERADDRL);
+		pbuf += 2 * ETHERADDRL;
+		txbuf->copy_len += 2 * ETHERADDRL;
+		mblen -= 2 * ETHERADDRL + VLAN_TAGSZ;
+		if ((txbuf->copy_len += mblen) <= bgep->chipid.ethmax_size) {
+			bcopy(bp->b_wptr - mblen, pbuf, mblen);
+			pbuf += mblen;
 		}
 		bp = bp->b_cont;
 	}
 	for (; bp != NULL; bp = bp->b_cont) {
-		mblen = bp->b_wptr - bp->b_rptr;
-		if ((totlen += mblen) <= bgep->chipid.ethmax_size) {
-			bcopy(bp->b_rptr, txb, mblen);
-			txb += mblen;
+		if ((mblen = MBLKL(bp)) == 0)
+			continue;
+		if ((txbuf->copy_len += mblen) <= bgep->chipid.ethmax_size) {
+			bcopy(bp->b_rptr, pbuf, mblen);
+			pbuf += mblen;
 		}
 	}
+}
+
+/*
+ * Fill the Tx buffer descriptors and trigger the h/w transmission
+ */
+static void
+bge_send_serial(bge_t *bgep, send_ring_t *srp)
+{
+	send_pkt_t *pktp;
+	uint64_t txfill_next;
+	uint32_t count;
+	uint32_t tx_next;
+	sw_sbd_t *ssbdp;
+	bge_status_t *bsp;
 
 	/*
-	 * We've reached the end of the chain; and we should have
-	 * collected no more than ETHERMAX bytes into our buffer.
+	 * Try to hold the tx lock:
+	 *	If we are in an interrupt context, use mutex_enter() to
+	 *	ensure quick response for tx in interrupt context;
+	 *	Otherwise, use mutex_tryenter() to serialize this h/w tx
+	 *	BD filling and transmission triggering task.
 	 */
-	ASSERT(bp == NULL);
-	ASSERT(totlen <= bgep->chipid.ethmax_size);
-	DMA_SYNC(ssbdp->pbuf, DDI_DMA_SYNC_FORDEV);
+	if (servicing_interrupt() != 0)
+		mutex_enter(srp->tx_lock);
+	else if (mutex_tryenter(srp->tx_lock) == 0)
+		return;		/* already in process	*/
+
+	bsp = DMA_VPTR(bgep->status_block);
+	txfill_next = srp->txfill_next;
+	tx_next = srp->tx_next;
+	ssbdp = &srp->sw_sbds[tx_next];
+	for (count = 0; count < bgep->param_drain_max; ++count) {
+		pktp = &srp->pktp[txfill_next];
+		if (!pktp->tx_ready) {
+			if (count == 0)
+				srp->tx_block++;
+			break;
+		}
+
+		/*
+		 * If there are no enough BDs: try to recycle more
+		 */
+		if (srp->tx_free <= 1)
+			bge_recycle(bgep, bsp);
+
+		/*
+		 * Reserved required BDs: 1 is enough
+		 */
+		if (!bge_atomic_reserve(&srp->tx_free, 1)) {
+			srp->tx_nobd++;
+			break;
+		}
+
+		/*
+		 * Filling the tx BD
+		 */
+		bge_send_fill_txbd(srp, pktp);
+		txfill_next = NEXT(txfill_next, BGE_SEND_BUF_MAX);
+		pktp->tx_ready = B_FALSE;
+	}
 
 	/*
-	 * Update the hardware send buffer descriptor; then we're done.
-	 * The return status indicates that the message can be freed
-	 * right away, as we've already copied the contents ...
+	 * Trigger h/w to start transmission.
 	 */
-	hw_sbd_p = DMA_VPTR(ssbdp->desc);
-	hw_sbd_p->host_buf_addr = ssbdp->pbuf.cookie.dmac_laddress;
-	hw_sbd_p->len = totlen;
-	hw_sbd_p->flags = SBD_FLAG_PACKET_END;
-	if (tci != 0) {
-		hw_sbd_p->vlan_tci = tci;
-		hw_sbd_p->flags |= SBD_FLAG_VLAN_TAG;
+	if (count != 0) {
+		bge_atomic_sub64(&srp->tx_flow, count);
+		if (tx_next + count > srp->desc.nslots) {
+			(void) ddi_dma_sync(ssbdp->desc.dma_hdl,  0,
+			    (srp->desc.nslots - tx_next) * sizeof (bge_sbd_t),
+			    DDI_DMA_SYNC_FORDEV);
+			count -= srp->desc.nslots - tx_next;
+			ssbdp = &srp->sw_sbds[0];
+		}
+		(void) ddi_dma_sync(ssbdp->desc.dma_hdl,  0,
+		    count*sizeof (bge_sbd_t), DDI_DMA_SYNC_FORDEV);
+		bge_mbx_put(bgep, srp->chip_mbx_reg, srp->tx_next);
+		srp->txfill_next = txfill_next;
+		bgep->watchdog++;
 	}
 
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &pflags);
-	if (pflags & HCK_IPV4_HDRCKSUM)
-		hw_sbd_p->flags |= SBD_FLAG_IP_CKSUM;
-	if (pflags & HCK_FULLCKSUM) {
-		hw_sbd_p->flags |= SBD_FLAG_TCP_UDP_CKSUM;
-		if (bgep->chipid.flags & CHIP_FLAG_PARTIAL_CSUM)
-			bge_pseudo_cksum((uint8_t *)DMA_VPTR(ssbdp->pbuf));
-	}
-
-	return (SEND_FREE);
+	mutex_exit(srp->tx_lock);
 }
 
 static boolean_t
 bge_send(bge_t *bgep, mblk_t *mp)
 {
+	uint_t ring = 0;	/* use ring 0 */
 	send_ring_t *srp;
-	enum send_status status;
 	struct ether_vlan_header *ehp;
-	boolean_t need_strip = B_FALSE;
-	bge_status_t *bsp;
-	uint16_t tci;
-	uint_t ring = 0;
+	bge_queue_item_t *txbuf_item;
+	sw_txbuf_t *txbuf;
+	send_pkt_t *pktp;
+	uint64_t pkt_slot;
+	uint16_t vlan_tci;
+	uint32_t pflags;
 
 	ASSERT(mp->b_next == NULL);
+	srp = &bgep->send[ring];
+
+	/*
+	 * Get a s/w tx buffer first
+	 */
+	txbuf_item = bge_get_txbuf(bgep, srp);
+	if (txbuf_item == NULL) {
+		/* no tx buffer available */
+		srp->tx_nobuf++;
+		bgep->tx_resched_needed = B_TRUE;
+		bge_send_serial(bgep, srp);
+		return (B_FALSE);
+	}
 
 	/*
 	 * Determine if the packet is VLAN tagged.
 	 */
 	ASSERT(MBLKL(mp) >= sizeof (struct ether_header));
 	ehp = (struct ether_vlan_header *)mp->b_rptr;
-
-	if (ehp->ether_tpid == htons(ETHERTYPE_VLAN)) {
-		if (MBLKL(mp) < sizeof (struct ether_vlan_header)) {
-			uint32_t pflags;
-
-			/*
-			 * Need to preserve checksum flags across pullup.
-			 */
-			hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL,
-			    NULL, &pflags);
-
-			if (!pullupmsg(mp,
-			    sizeof (struct ether_vlan_header))) {
-				BGE_DEBUG(("bge_send: pullup failure"));
-				bgep->resched_needed = B_TRUE;
-				return (B_FALSE);
-			}
-
-			(void) hcksum_assoc(mp, NULL, NULL, NULL, NULL, NULL,
-			    NULL, pflags, KM_NOSLEEP);
-		}
-
-		ehp = (struct ether_vlan_header *)mp->b_rptr;
-		need_strip = B_TRUE;
-	}
+	if (ehp->ether_tpid == htons(ETHERTYPE_VLAN))
+		vlan_tci  = ntohs(ehp->ether_tci);
+	else
+		vlan_tci = 0;
 
 	/*
-	 * Try to reserve a place in the chosen ring. Shouldn't try next
-	 * higher-numbered (lower-priority) ring, if there aren't any
-	 * available. Otherwise, packets with same priority may get
-	 * transmission starvation.
+	 * Copy all mp fragments to the pkt buffer
 	 */
-	srp = &bgep->send[ring];
-	if (!bge_atomic_reserve(&srp->tx_free, 1)) {
-		BGE_DEBUG(("bge_send: no free slots"));
-		bgep->resched_needed = B_TRUE;
-		return (B_FALSE);
-	}
+	txbuf = txbuf_item->item;
+	bge_send_copy(bgep, txbuf, mp, vlan_tci);
+	ASSERT(txbuf->copy_len <= bgep->chipid.ethmax_size);
 
 	/*
-	 * Now that we know that there is space to transmit the packet
-	 * strip any VLAN tag that is present.
+	 * Retrieve checksum offloading info.
 	 */
-	if (need_strip) {
-		tci = ntohs(ehp->ether_tci);
-	} else {
-		tci = 0;
-	}
-
-	if (srp->tx_free <= 16) {
-		bsp = DMA_VPTR(bgep->status_block);
-		bge_recycle(bgep, bsp);
-	}
-	/*
-	 * We've reserved a place :-)
-	 * These ASSERTions check that our invariants still hold:
-	 *	there must still be at least one free place
-	 *	there must be at least one place NOT free (ours!)
-	 */
-	ASSERT(srp->tx_free > 0);
-
-	if ((status = bge_send_copy(bgep, mp, srp, tci)) == SEND_FAIL) {
-		/*
-		 * The send routine failed :(  So we have to renounce
-		 * our reservation before returning the error.
-		 */
-		bge_atomic_renounce(&srp->tx_free, 1);
-		bgep->resched_needed = B_TRUE;
-		return (B_FALSE);
-	}
+	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &pflags);
 
 	/*
-	 * The send routine succeeded; it will have updated the
-	 * h/w ring descriptor, and the <tx_next> and <tx_flow>
-	 * counters.
-	 *
-	 * Because there can be multiple concurrent threads in
-	 * transit through this code, we only want to prod the
-	 * hardware once the last one is departing ...
+	 * Calculate pseudo checksum if needed.
 	 */
-	mutex_enter(srp->tx_lock);
-	if (--srp->tx_flow == 0) {
-		DMA_SYNC(srp->desc, DDI_DMA_SYNC_FORDEV);
-		bge_mbx_put(bgep, srp->chip_mbx_reg, srp->tx_next);
-		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
-			bgep->bge_chip_state = BGE_CHIP_ERROR;
-	}
-	mutex_exit(srp->tx_lock);
+	if ((pflags & HCK_FULLCKSUM) &&
+	    (bgep->chipid.flags & CHIP_FLAG_PARTIAL_CSUM))
+		bge_pseudo_cksum((uint8_t *)DMA_VPTR(txbuf->buf));
 
-	if (status == SEND_FREE)
-		freemsg(mp);
+	/*
+	 * Packet buffer is ready to send: get and fill pkt info
+	 */
+	pkt_slot = bge_atomic_next(&srp->txpkt_next, BGE_SEND_BUF_MAX);
+	pktp = &srp->pktp[pkt_slot];
+	ASSERT(pktp->txbuf_item == NULL);
+	pktp->txbuf_item = txbuf_item;
+	pktp->vlan_tci = vlan_tci;
+	pktp->pflags = pflags;
+	atomic_inc_64(&srp->tx_flow);
+	ASSERT(pktp->tx_ready == B_FALSE);
+	pktp->tx_ready = B_TRUE;
+
+	/*
+	 * Filling the h/w bd and trigger the h/w to start transmission
+	 */
+	bge_send_serial(bgep, srp);
+
+	/*
+	 * We've copied the contents, the message can be freed right away
+	 */
+	freemsg(mp);
+
 	return (B_TRUE);
 }
 
 uint_t
-bge_reschedule(caddr_t arg)
+bge_send_drain(caddr_t arg)
 {
+	uint_t ring = 0;	/* use ring 0 */
 	bge_t *bgep;
+	send_ring_t *srp;
 
 	bgep = (bge_t *)arg;
+	BGE_TRACE(("bge_send_drain($%p)", (void *)bgep));
 
-	BGE_TRACE(("bge_reschedule($%p)", (void *)bgep));
+	srp = &bgep->send[ring];
+	bge_send_serial(bgep, srp);
 
-	if (bgep->bge_mac_state == BGE_MAC_STARTED && bgep->resched_needed) {
+	if (bgep->tx_resched_needed &&
+	    (srp->tx_flow < srp->tx_buffers_low) &&
+	    (bgep->bge_mac_state == BGE_MAC_STARTED)) {
 		mac_tx_update(bgep->mh);
-		bgep->resched_needed = B_FALSE;
-		bgep->resched_running = B_FALSE;
+		bgep->tx_resched_needed = B_FALSE;
+		bgep->tx_resched++;
 	}
 
 	return (DDI_INTR_CLAIMED);

@@ -101,10 +101,6 @@ static ddi_device_acc_attr_t bge_data_accattr = {
 	DDI_STRICTORDER_ACC
 };
 
-static ether_addr_t bge_broadcast_addr = {
-	0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-};
-
 /*
  * Versions of the O/S up to Solaris 8 didn't support network booting
  * from any network interface except the first (NET0).  Patching this
@@ -161,21 +157,67 @@ static mac_callbacks_t bge_m_callbacks = {
 static void
 bge_reinit_send_ring(send_ring_t *srp)
 {
+	bge_queue_t *txbuf_queue;
+	bge_queue_item_t *txbuf_head;
+	sw_txbuf_t *txbuf;
+	sw_sbd_t *ssbdp;
+	uint32_t slot;
+
 	/*
 	 * Reinitialise control variables ...
 	 */
-	ASSERT(srp->tx_flow == 0);
+	srp->tx_flow = 0;
 	srp->tx_next = 0;
+	srp->txfill_next = 0;
 	srp->tx_free = srp->desc.nslots;
-
 	ASSERT(mutex_owned(srp->tc_lock));
 	srp->tc_next = 0;
+	srp->txpkt_next = 0;
+	srp->tx_block = 0;
+	srp->tx_nobd = 0;
+	srp->tx_nobuf = 0;
+
+	/*
+	 * Initialize the tx buffer push queue
+	 */
+	mutex_enter(srp->freetxbuf_lock);
+	mutex_enter(srp->txbuf_lock);
+	txbuf_queue = &srp->freetxbuf_queue;
+	txbuf_queue->head = NULL;
+	txbuf_queue->count = 0;
+	txbuf_queue->lock = srp->freetxbuf_lock;
+	srp->txbuf_push_queue = txbuf_queue;
+
+	/*
+	 * Initialize the tx buffer pop queue
+	 */
+	txbuf_queue = &srp->txbuf_queue;
+	txbuf_queue->head = NULL;
+	txbuf_queue->count = 0;
+	txbuf_queue->lock = srp->txbuf_lock;
+	srp->txbuf_pop_queue = txbuf_queue;
+	txbuf_head = srp->txbuf_head;
+	txbuf = srp->txbuf;
+	for (slot = 0; slot < srp->tx_buffers; ++slot) {
+		txbuf_head->item = txbuf;
+		txbuf_head->next = txbuf_queue->head;
+		txbuf_queue->head = txbuf_head;
+		txbuf_queue->count++;
+		txbuf++;
+		txbuf_head++;
+	}
+	mutex_exit(srp->txbuf_lock);
+	mutex_exit(srp->freetxbuf_lock);
 
 	/*
 	 * Zero and sync all the h/w Send Buffer Descriptors
 	 */
 	DMA_ZERO(srp->desc);
 	DMA_SYNC(srp->desc, DDI_DMA_SYNC_FORDEV);
+	bzero(srp->pktp, BGE_SEND_BUF_MAX * sizeof (*srp->pktp));
+	ssbdp = srp->sw_sbds;
+	for (slot = 0; slot < srp->desc.nslots; ++ssbdp, ++slot)
+		ssbdp->pbuf = NULL;
 }
 
 static void
@@ -188,7 +230,7 @@ bge_reinit_recv_ring(recv_ring_t *rrp)
 }
 
 static void
-bge_reinit_buff_ring(buff_ring_t *brp, uint64_t ring)
+bge_reinit_buff_ring(buff_ring_t *brp, uint32_t ring)
 {
 	bge_rbd_t *hw_rbd_p;
 	sw_rbd_t *srbdp;
@@ -238,7 +280,7 @@ bge_reinit_buff_ring(buff_ring_t *brp, uint64_t ring)
 static void
 bge_reinit_rings(bge_t *bgep)
 {
-	uint64_t ring;
+	uint32_t ring;
 
 	ASSERT(mutex_owned(bgep->genlock));
 
@@ -285,7 +327,7 @@ bge_reset(bge_t *bgep, uint_t asf_mode)
 bge_reset(bge_t *bgep)
 #endif
 {
-	uint64_t	ring;
+	uint32_t	ring;
 	int retval;
 
 	BGE_TRACE(("bge_reset($%p)", (void *)bgep));
@@ -302,6 +344,8 @@ bge_reset(bge_t *bgep)
 		mutex_enter(bgep->buff[ring].rf_lock);
 	rw_enter(bgep->errlock, RW_WRITER);
 	for (ring = 0; ring < BGE_SEND_RINGS_MAX; ++ring)
+		mutex_enter(bgep->send[ring].tx_lock);
+	for (ring = 0; ring < BGE_SEND_RINGS_MAX; ++ring)
 		mutex_enter(bgep->send[ring].tc_lock);
 
 #ifdef BGE_IPMI_ASF
@@ -316,6 +360,8 @@ bge_reset(bge_t *bgep)
 	 */
 	for (ring = BGE_SEND_RINGS_MAX; ring-- > 0; )
 		mutex_exit(bgep->send[ring].tc_lock);
+	for (ring = 0; ring < BGE_SEND_RINGS_MAX; ++ring)
+		mutex_exit(bgep->send[ring].tx_lock);
 	rw_exit(bgep->errlock);
 	for (ring = BGE_BUFF_RINGS_MAX; ring-- > 0; )
 		mutex_exit(bgep->buff[ring].rf_lock);
@@ -394,7 +440,7 @@ bge_restart(bge_t *bgep, boolean_t reset_phys)
 		if (bge_start(bgep, reset_phys) != DDI_SUCCESS)
 			retval = DDI_FAILURE;
 		bgep->watchdog = 0;
-		ddi_trigger_softintr(bgep->resched_id);
+		ddi_trigger_softintr(bgep->drain_id);
 	}
 
 	BGE_DEBUG(("bge_restart($%p, %d) done", (void *)bgep, reset_phys));
@@ -416,6 +462,8 @@ static void
 bge_m_stop(void *arg)
 {
 	bge_t *bgep = arg;		/* private device info	*/
+	send_ring_t *srp;
+	uint32_t ring;
 
 	BGE_TRACE(("bge_m_stop($%p)", arg));
 
@@ -428,9 +476,25 @@ bge_m_stop(void *arg)
 		mutex_exit(bgep->genlock);
 		return;
 	}
-
 	bgep->link_up_msg = bgep->link_down_msg = " (stopped)";
 	bge_stop(bgep);
+	/*
+	 * Free the possible tx buffers allocated in tx process.
+	 */
+#ifdef BGE_IPMI_ASF
+	if (!bgep->asf_pseudostop)
+#endif
+	{
+		rw_enter(bgep->errlock, RW_WRITER);
+		for (ring = 0; ring < bgep->chipid.tx_rings; ++ring) {
+			srp = &bgep->send[ring];
+			mutex_enter(srp->tx_lock);
+			if (srp->tx_array > 1)
+				bge_free_txbuf_arrays(srp);
+			mutex_exit(srp->tx_lock);
+		}
+		rw_exit(bgep->errlock);
+	}
 	bgep->bge_mac_state = BGE_MAC_STOPPED;
 	BGE_DEBUG(("bge_m_stop($%p) done", arg));
 	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
@@ -1319,7 +1383,77 @@ bge_m_resources(void *arg)
 
 #undef	BGE_DBG
 #define	BGE_DBG		BGE_DBG_INIT	/* debug flag for this code	*/
+/*
+ * Allocate an area of memory and a DMA handle for accessing it
+ */
+static int
+bge_alloc_dma_mem(bge_t *bgep, size_t memsize, ddi_device_acc_attr_t *attr_p,
+	uint_t dma_flags, dma_area_t *dma_p)
+{
+	caddr_t va;
+	int err;
 
+	BGE_TRACE(("bge_alloc_dma_mem($%p, %ld, $%p, 0x%x, $%p)",
+		(void *)bgep, memsize, attr_p, dma_flags, dma_p));
+
+	/*
+	 * Allocate handle
+	 */
+	err = ddi_dma_alloc_handle(bgep->devinfo, &dma_attr,
+		DDI_DMA_DONTWAIT, NULL, &dma_p->dma_hdl);
+	if (err != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	/*
+	 * Allocate memory
+	 */
+	err = ddi_dma_mem_alloc(dma_p->dma_hdl, memsize, attr_p,
+		dma_flags, DDI_DMA_DONTWAIT, NULL, &va, &dma_p->alength,
+		&dma_p->acc_hdl);
+	if (err != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	/*
+	 * Bind the two together
+	 */
+	dma_p->mem_va = va;
+	err = ddi_dma_addr_bind_handle(dma_p->dma_hdl, NULL,
+		va, dma_p->alength, dma_flags, DDI_DMA_DONTWAIT, NULL,
+		&dma_p->cookie, &dma_p->ncookies);
+
+	BGE_DEBUG(("bge_alloc_dma_mem(): bind %d bytes; err %d, %d cookies",
+		dma_p->alength, err, dma_p->ncookies));
+
+	if (err != DDI_DMA_MAPPED || dma_p->ncookies != 1)
+		return (DDI_FAILURE);
+
+	dma_p->nslots = ~0U;
+	dma_p->size = ~0U;
+	dma_p->token = ~0U;
+	dma_p->offset = 0;
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Free one allocated area of DMAable memory
+ */
+static void
+bge_free_dma_mem(dma_area_t *dma_p)
+{
+	if (dma_p->dma_hdl != NULL) {
+		if (dma_p->ncookies) {
+			(void) ddi_dma_unbind_handle(dma_p->dma_hdl);
+			dma_p->ncookies = 0;
+		}
+		ddi_dma_free_handle(&dma_p->dma_hdl);
+		dma_p->dma_hdl = NULL;
+	}
+
+	if (dma_p->acc_hdl != NULL) {
+		ddi_dma_mem_free(&dma_p->acc_hdl);
+		dma_p->acc_hdl = NULL;
+	}
+}
 /*
  * Utility routine to carve a slice off a chunk of allocated memory,
  * updating the chunk descriptor accordingly.  The size of the slice
@@ -1527,6 +1661,7 @@ bge_init_send_ring(bge_t *bgep, uint64_t ring)
 	uint32_t nslots;
 	uint32_t slot;
 	uint32_t split;
+	sw_txbuf_t *txbuf;
 
 	BGE_TRACE(("bge_init_send_ring($%p, %d)",
 		(void *)bgep, ring));
@@ -1556,30 +1691,55 @@ bge_init_send_ring(bge_t *bgep, uint64_t ring)
 	srp->chip_mbx_reg = SEND_RING_HOST_INDEX_REG(ring);
 	mutex_init(srp->tx_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(bgep->intr_pri));
+	mutex_init(srp->txbuf_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(bgep->intr_pri));
+	mutex_init(srp->freetxbuf_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(bgep->intr_pri));
 	mutex_init(srp->tc_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(bgep->intr_pri));
+	if (nslots == 0)
+		return;
 
 	/*
 	 * Allocate the array of s/w Send Buffer Descriptors
 	 */
 	ssbdp = kmem_zalloc(nslots*sizeof (*ssbdp), KM_SLEEP);
+	txbuf = kmem_zalloc(BGE_SEND_BUF_MAX*sizeof (*txbuf), KM_SLEEP);
+	srp->txbuf_head =
+	    kmem_zalloc(BGE_SEND_BUF_MAX*sizeof (bge_queue_item_t), KM_SLEEP);
+	srp->pktp = kmem_zalloc(BGE_SEND_BUF_MAX*sizeof (send_pkt_t), KM_SLEEP);
 	srp->sw_sbds = ssbdp;
+	srp->txbuf = txbuf;
+	srp->tx_buffers = BGE_SEND_BUF_NUM;
+	srp->tx_buffers_low = srp->tx_buffers / 4;
+	if (bgep->chipid.snd_buff_size > BGE_SEND_BUFF_SIZE_DEFAULT)
+		srp->tx_array_max = BGE_SEND_BUF_ARRAY_JUMBO;
+	else
+		srp->tx_array_max = BGE_SEND_BUF_ARRAY;
+	srp->tx_array = 1;
 
 	/*
-	 * Now initialise each array element once and for all
+	 * Chunk tx desc area
 	 */
 	desc = srp->desc;
+	for (slot = 0; slot < nslots; ++ssbdp, ++slot) {
+		bge_slice_chunk(&ssbdp->desc, &desc, 1,
+		    sizeof (bge_sbd_t));
+	}
+	ASSERT(desc.alength == 0);
+
+	/*
+	 * Chunk tx buffer area
+	 */
 	for (split = 0; split < BGE_SPLIT; ++split) {
-		pbuf = srp->buf[split];
-		for (slot = 0; slot < nslots/BGE_SPLIT; ++ssbdp, ++slot) {
-			bge_slice_chunk(&ssbdp->desc, &desc, 1,
-				sizeof (bge_sbd_t));
-			bge_slice_chunk(&ssbdp->pbuf, &pbuf, 1,
-				bgep->chipid.snd_buff_size);
+		pbuf = srp->buf[0][split];
+		for (slot = 0; slot < BGE_SEND_BUF_NUM/BGE_SPLIT; ++slot) {
+			bge_slice_chunk(&txbuf->buf, &pbuf, 1,
+			    bgep->chipid.snd_buff_size);
+			txbuf++;
 		}
 		ASSERT(pbuf.alength == 0);
 	}
-	ASSERT(desc.alength == 0);
 }
 
 /*
@@ -1589,17 +1749,33 @@ static void
 bge_fini_send_ring(bge_t *bgep, uint64_t ring)
 {
 	send_ring_t *srp;
-	sw_sbd_t *ssbdp;
+	uint32_t array;
+	uint32_t split;
+	uint32_t nslots;
 
 	BGE_TRACE(("bge_fini_send_ring($%p, %d)",
 		(void *)bgep, ring));
 
 	srp = &bgep->send[ring];
-	ssbdp = srp->sw_sbds;
-	kmem_free(ssbdp, srp->desc.nslots*sizeof (*ssbdp));
-
-	mutex_destroy(srp->tx_lock);
 	mutex_destroy(srp->tc_lock);
+	mutex_destroy(srp->freetxbuf_lock);
+	mutex_destroy(srp->txbuf_lock);
+	mutex_destroy(srp->tx_lock);
+	nslots = srp->desc.nslots;
+	if (nslots == 0)
+		return;
+
+	for (array = 1; array < srp->tx_array; ++array)
+		for (split = 0; split < BGE_SPLIT; ++split)
+			bge_free_dma_mem(&srp->buf[array][split]);
+	kmem_free(srp->sw_sbds, nslots*sizeof (*srp->sw_sbds));
+	kmem_free(srp->txbuf_head, BGE_SEND_BUF_MAX*sizeof (*srp->txbuf_head));
+	kmem_free(srp->txbuf, BGE_SEND_BUF_MAX*sizeof (*srp->txbuf));
+	kmem_free(srp->pktp, BGE_SEND_BUF_MAX*sizeof (*srp->pktp));
+	srp->sw_sbds = NULL;
+	srp->txbuf_head = NULL;
+	srp->txbuf = NULL;
+	srp->pktp = NULL;
 }
 
 /*
@@ -1608,7 +1784,7 @@ bge_fini_send_ring(bge_t *bgep, uint64_t ring)
 void
 bge_init_rings(bge_t *bgep)
 {
-	uint64_t ring;
+	uint32_t ring;
 
 	BGE_TRACE(("bge_init_rings($%p)", (void *)bgep));
 
@@ -1629,7 +1805,7 @@ bge_init_rings(bge_t *bgep)
 void
 bge_fini_rings(bge_t *bgep)
 {
-	uint64_t ring;
+	uint32_t ring;
 
 	BGE_TRACE(("bge_fini_rings($%p)", (void *)bgep));
 
@@ -1642,80 +1818,122 @@ bge_fini_rings(bge_t *bgep)
 }
 
 /*
- * Allocate an area of memory and a DMA handle for accessing it
+ * Called from the bge_m_stop() to free the tx buffers which are
+ * allocated from the tx process.
  */
-static int
-bge_alloc_dma_mem(bge_t *bgep, size_t memsize, ddi_device_acc_attr_t *attr_p,
-	uint_t dma_flags, dma_area_t *dma_p)
+void
+bge_free_txbuf_arrays(send_ring_t *srp)
 {
-	caddr_t va;
-	int err;
+	uint32_t array;
+	uint32_t split;
 
-	BGE_TRACE(("bge_alloc_dma_mem($%p, %ld, $%p, 0x%x, $%p)",
-		(void *)bgep, memsize, attr_p, dma_flags, dma_p));
-
-	/*
-	 * Allocate handle
-	 */
-	err = ddi_dma_alloc_handle(bgep->devinfo, &dma_attr,
-		DDI_DMA_SLEEP, NULL, &dma_p->dma_hdl);
-	if (err != DDI_SUCCESS)
-		return (DDI_FAILURE);
+	ASSERT(mutex_owned(srp->tx_lock));
 
 	/*
-	 * Allocate memory
+	 * Free the extra tx buffer DMA area
 	 */
-	err = ddi_dma_mem_alloc(dma_p->dma_hdl, memsize, attr_p,
-		dma_flags & (DDI_DMA_CONSISTENT | DDI_DMA_STREAMING),
-		DDI_DMA_SLEEP, NULL, &va, &dma_p->alength, &dma_p->acc_hdl);
-	if (err != DDI_SUCCESS)
-		return (DDI_FAILURE);
+	for (array = 1; array < srp->tx_array; ++array)
+		for (split = 0; split < BGE_SPLIT; ++split)
+			bge_free_dma_mem(&srp->buf[array][split]);
 
 	/*
-	 * Bind the two together
+	 * Restore initial tx buffer numbers
 	 */
-	dma_p->mem_va = va;
-	err = ddi_dma_addr_bind_handle(dma_p->dma_hdl, NULL,
-		va, dma_p->alength, dma_flags, DDI_DMA_SLEEP, NULL,
-		&dma_p->cookie, &dma_p->ncookies);
-
-	BGE_DEBUG(("bge_alloc_dma_mem(): bind %d bytes; err %d, %d cookies",
-		dma_p->alength, err, dma_p->ncookies));
-
-	if (err != DDI_DMA_MAPPED || dma_p->ncookies != 1)
-		return (DDI_FAILURE);
-
-	dma_p->nslots = ~0U;
-	dma_p->size = ~0U;
-	dma_p->token = ~0U;
-	dma_p->offset = 0;
-	return (DDI_SUCCESS);
+	srp->tx_array = 1;
+	srp->tx_buffers = BGE_SEND_BUF_NUM;
+	srp->tx_buffers_low = srp->tx_buffers / 4;
+	srp->tx_flow = 0;
+	bzero(srp->pktp, BGE_SEND_BUF_MAX * sizeof (*srp->pktp));
 }
 
 /*
- * Free one allocated area of DMAable memory
+ * Called from tx process to allocate more tx buffers
  */
-static void
-bge_free_dma_mem(dma_area_t *dma_p)
+bge_queue_item_t *
+bge_alloc_txbuf_array(bge_t *bgep, send_ring_t *srp)
 {
-	if (dma_p->dma_hdl != NULL) {
-		if (dma_p->ncookies) {
-			(void) ddi_dma_unbind_handle(dma_p->dma_hdl);
-			dma_p->ncookies = 0;
+	bge_queue_t *txbuf_queue;
+	bge_queue_item_t *txbuf_item_last;
+	bge_queue_item_t *txbuf_item;
+	bge_queue_item_t *txbuf_item_rtn;
+	sw_txbuf_t *txbuf;
+	dma_area_t area;
+	size_t txbuffsize;
+	uint32_t slot;
+	uint32_t array;
+	uint32_t split;
+	uint32_t err;
+
+	ASSERT(mutex_owned(srp->tx_lock));
+
+	array = srp->tx_array;
+	if (array >= srp->tx_array_max)
+		return (NULL);
+
+	/*
+	 * Allocate memory & handles for TX buffers
+	 */
+	txbuffsize = BGE_SEND_BUF_NUM*bgep->chipid.snd_buff_size;
+	ASSERT((txbuffsize % BGE_SPLIT) == 0);
+	for (split = 0; split < BGE_SPLIT; ++split) {
+		err = bge_alloc_dma_mem(bgep, txbuffsize/BGE_SPLIT,
+			&bge_data_accattr, DDI_DMA_WRITE | BGE_DMA_MODE,
+			&srp->buf[array][split]);
+		if (err != DDI_SUCCESS) {
+			/* Free the last already allocated OK chunks */
+			for (slot = 0; slot <= split; ++slot)
+				bge_free_dma_mem(&srp->buf[array][slot]);
+			srp->tx_alloc_fail++;
+			return (NULL);
 		}
-		ddi_dma_free_handle(&dma_p->dma_hdl);
-		dma_p->dma_hdl = NULL;
 	}
 
-	if (dma_p->acc_hdl != NULL) {
-		ddi_dma_mem_free(&dma_p->acc_hdl);
-		dma_p->acc_hdl = NULL;
+	/*
+	 * Chunk tx buffer area
+	 */
+	txbuf = srp->txbuf + array*BGE_SEND_BUF_NUM;
+	for (split = 0; split < BGE_SPLIT; ++split) {
+		area = srp->buf[array][split];
+		for (slot = 0; slot < BGE_SEND_BUF_NUM/BGE_SPLIT; ++slot) {
+			bge_slice_chunk(&txbuf->buf, &area, 1,
+			    bgep->chipid.snd_buff_size);
+			txbuf++;
+		}
 	}
+
+	/*
+	 * Add above buffers to the tx buffer pop queue
+	 */
+	txbuf_item = srp->txbuf_head + array*BGE_SEND_BUF_NUM;
+	txbuf = srp->txbuf + array*BGE_SEND_BUF_NUM;
+	txbuf_item_last = NULL;
+	for (slot = 0; slot < BGE_SEND_BUF_NUM; ++slot) {
+		txbuf_item->item = txbuf;
+		txbuf_item->next = txbuf_item_last;
+		txbuf_item_last = txbuf_item;
+		txbuf++;
+		txbuf_item++;
+	}
+	txbuf_item = srp->txbuf_head + array*BGE_SEND_BUF_NUM;
+	txbuf_item_rtn = txbuf_item;
+	txbuf_item++;
+	txbuf_queue = srp->txbuf_pop_queue;
+	mutex_enter(txbuf_queue->lock);
+	txbuf_item->next = txbuf_queue->head;
+	txbuf_queue->head = txbuf_item_last;
+	txbuf_queue->count += BGE_SEND_BUF_NUM - 1;
+	mutex_exit(txbuf_queue->lock);
+
+	srp->tx_array++;
+	srp->tx_buffers += BGE_SEND_BUF_NUM;
+	srp->tx_buffers_low = srp->tx_buffers / 4;
+
+	return (txbuf_item_rtn);
 }
 
 /*
  * This function allocates all the transmit and receive buffers
- * and descriptors, in four chunks (or one, if MONOLITHIC).
+ * and descriptors, in four chunks.
  */
 int
 bge_alloc_bufs(bge_t *bgep)
@@ -1726,9 +1944,9 @@ bge_alloc_bufs(bge_t *bgep)
 	size_t rxbuffdescsize;
 	size_t rxdescsize;
 	size_t txdescsize;
-	uint64_t ring;
-	uint64_t rx_rings = bgep->chipid.rx_rings;
-	uint64_t tx_rings = bgep->chipid.tx_rings;
+	uint32_t ring;
+	uint32_t rx_rings = bgep->chipid.rx_rings;
+	uint32_t tx_rings = bgep->chipid.tx_rings;
 	int split;
 	int err;
 
@@ -1739,7 +1957,7 @@ bge_alloc_bufs(bge_t *bgep)
 	rxbuffsize += bgep->chipid.jumbo_slots*bgep->chipid.recv_jumbo_size;
 	rxbuffsize += BGE_MINI_SLOTS_USED*BGE_MINI_BUFF_SIZE;
 
-	txbuffsize = BGE_SEND_SLOTS_USED*bgep->chipid.snd_buff_size;
+	txbuffsize = BGE_SEND_BUF_NUM*bgep->chipid.snd_buff_size;
 	txbuffsize *= tx_rings;
 
 	rxdescsize = rx_rings*bgep->chipid.recv_slots;
@@ -1756,26 +1974,6 @@ bge_alloc_bufs(bge_t *bgep)
 	txdescsize += sizeof (bge_status_t);
 	txdescsize += BGE_STATUS_PADDING;
 
-#if	BGE_MONOLITHIC
-
-	err = bge_alloc_dma_mem(bgep,
-		rxbuffsize+txbuffsize+rxbuffdescsize+rxdescsize+txdescsize,
-		&bge_data_accattr, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, &area);
-	if (err != DDI_SUCCESS)
-		return (DDI_FAILURE);
-
-	BGE_DEBUG(("allocated range $%p-$%p (0x%lx-0x%lx)",
-		DMA_VPTR(area),
-		(caddr_t)DMA_VPTR(area)+area.alength,
-		area.cookie.dmac_laddress,
-		area.cookie.dmac_laddress+area.alength));
-
-	bge_slice_chunk(&bgep->rx_buff[0], &area, 1, rxbuffsize);
-	bge_slice_chunk(&bgep->tx_buff[0], &area, 1, txbuffsize);
-	bge_slice_chunk(&bgep->rx_desc[0], &area, 1, rxdescsize);
-	bge_slice_chunk(&bgep->tx_desc, &area, 1, txdescsize);
-
-#else
 	/*
 	 * Allocate memory & handles for RX buffers
 	 */
@@ -1829,8 +2027,6 @@ bge_alloc_bufs(bge_t *bgep)
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
-#endif	/* BGE_MONOLITHIC */
-
 	/*
 	 * Now carve up each of the allocated areas ...
 	 */
@@ -1851,13 +2047,12 @@ bge_alloc_bufs(bge_t *bgep)
 	for (split = 0; split < BGE_SPLIT; ++split) {
 		area = bgep->tx_buff[split];
 		for (ring = 0; ring < tx_rings; ++ring)
-			bge_slice_chunk(&bgep->send[ring].buf[split],
-				&area, BGE_SEND_SLOTS_USED/BGE_SPLIT,
+			bge_slice_chunk(&bgep->send[ring].buf[0][split],
+				&area, BGE_SEND_BUF_NUM/BGE_SPLIT,
 				bgep->chipid.snd_buff_size);
 		for (; ring < BGE_SEND_RINGS_MAX; ++ring)
-			bge_slice_chunk(&bgep->send[ring].buf[split],
-				&area, 0/BGE_SPLIT,
-				bgep->chipid.snd_buff_size);
+			bge_slice_chunk(&bgep->send[ring].buf[0][split],
+				&area, 0, bgep->chipid.snd_buff_size);
 		ASSERT(area.alength >= 0);
 	}
 
@@ -1904,9 +2099,6 @@ bge_free_bufs(bge_t *bgep)
 	BGE_TRACE(("bge_free_bufs($%p)",
 		(void *)bgep));
 
-#if	BGE_MONOLITHIC
-	bge_free_dma_mem(&bgep->rx_buff[0]);
-#else
 	bge_free_dma_mem(&bgep->tx_desc);
 	for (split = 0; split < BGE_RECV_RINGS_SPLIT; ++split)
 		bge_free_dma_mem(&bgep->rx_desc[split]);
@@ -1914,7 +2106,6 @@ bge_free_bufs(bge_t *bgep)
 		bge_free_dma_mem(&bgep->tx_buff[split]);
 	for (split = 0; split < BGE_SPLIT; ++split)
 		bge_free_dma_mem(&bgep->rx_buff[split]);
-#endif	/* BGE_MONOLITHIC */
 }
 
 /*
@@ -2202,7 +2393,7 @@ bge_unattach(bge_t *bgep)
 	if (bgep->progress & PROGRESS_FACTOTUM)
 		ddi_remove_softintr(bgep->factotum_id);
 	if (bgep->progress & PROGRESS_RESCHED)
-		ddi_remove_softintr(bgep->resched_id);
+		ddi_remove_softintr(bgep->drain_id);
 	if (bgep->progress & PROGRESS_BUFS)
 		bge_free_bufs(bgep);
 	if (bgep->progress & PROGRESS_REGS)
@@ -2213,6 +2404,8 @@ bge_unattach(bge_t *bgep)
 	bge_fm_fini(bgep);
 
 	ddi_remove_minor_node(bgep->devinfo, NULL);
+	kmem_free(bgep->pstats, sizeof (bge_statistics_reg_t));
+	kmem_free(bgep->nd_params, PARAM_COUNT * sizeof (nd_param_t));
 	kmem_free(bgep, sizeof (*bgep));
 }
 
@@ -2328,6 +2521,9 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	}
 
 	bgep = kmem_zalloc(sizeof (*bgep), KM_SLEEP);
+	bgep->pstats = kmem_zalloc(sizeof (bge_statistics_reg_t), KM_SLEEP);
+	bgep->nd_params =
+	    kmem_zalloc(PARAM_COUNT * sizeof (nd_param_t), KM_SLEEP);
 	ddi_set_driver_private(devinfo, bgep);
 	bgep->bge_guard = BGE_GUARD;
 	bgep->devinfo = devinfo;
@@ -2479,8 +2675,8 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * state, just in case we aren't getting link status change
 	 * interrupts ...
 	 */
-	err = ddi_add_softintr(devinfo, DDI_SOFTINT_LOW, &bgep->resched_id,
-		NULL, NULL, bge_reschedule, (caddr_t)bgep);
+	err = ddi_add_softintr(devinfo, DDI_SOFTINT_LOW, &bgep->drain_id,
+		NULL, NULL, bge_send_drain, (caddr_t)bgep);
 	if (err != DDI_SUCCESS) {
 		bge_problem(bgep, "ddi_add_softintr() failed");
 		goto attach_fail;
