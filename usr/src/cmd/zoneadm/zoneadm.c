@@ -161,7 +161,9 @@ static int apply_func(int argc, char *argv[]);
 static int sanity_check(char *zone, int cmd_num, boolean_t running,
     boolean_t unsafe_when_running, boolean_t force);
 static int cmd_match(char *cmd);
-static int verify_details(int);
+static int verify_details(int, char *argv[]);
+static int verify_brand(zone_dochandle_t, int, char *argv[]);
+static int invoke_brand_handler(int, char *argv[]);
 
 static struct cmd cmdtab[] = {
 	{ CMD_HELP,		"help",		SHELP_HELP,	help_func },
@@ -1395,6 +1397,30 @@ call_zoneadmd(const char *zone_name, zone_cmd_arg_t *arg)
 }
 
 static int
+invoke_brand_handler(int cmd_num, char *argv[])
+{
+	zone_dochandle_t handle;
+	int err;
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(cmd_num), B_TRUE);
+		return (Z_ERR);
+	}
+	if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(cmd_num), B_TRUE);
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+	if (verify_brand(handle, cmd_num, argv) != Z_OK) {
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+	zonecfg_fini_handle(handle);
+	return (Z_OK);
+}
+
+static int
 ready_func(int argc, char *argv[])
 {
 	zone_cmd_arg_t zarg;
@@ -1423,7 +1449,7 @@ ready_func(int argc, char *argv[])
 	if (sanity_check(target_zone, CMD_READY, B_FALSE, B_FALSE, B_FALSE)
 	    != Z_OK)
 		return (Z_ERR);
-	if (verify_details(CMD_READY) != Z_OK)
+	if (verify_details(CMD_READY, argv) != Z_OK)
 		return (Z_ERR);
 
 	zarg.cmd = Z_READY;
@@ -1499,7 +1525,7 @@ boot_func(int argc, char *argv[])
 	if (sanity_check(target_zone, CMD_BOOT, B_FALSE, B_FALSE, force)
 	    != Z_OK)
 		return (Z_ERR);
-	if (verify_details(CMD_BOOT) != Z_OK)
+	if (verify_details(CMD_BOOT, argv) != Z_OK)
 		return (Z_ERR);
 	zarg.cmd = force ? Z_FORCEBOOT : Z_BOOT;
 	if (call_zoneadmd(target_zone, &zarg) != 0) {
@@ -1658,6 +1684,15 @@ list_func(int argc, char *argv[])
 		zone_print(&zent, verbose, parsable);
 		output = B_TRUE;
 	}
+
+	/*
+	 * Invoke brand-specific handler. Note that we do this
+	 * only if we're in the global zone, and target_zone is specified.
+	 */
+	if (zone_id == GLOBAL_ZONEID && target_zone != NULL)
+		if (invoke_brand_handler(CMD_LIST, argv) != Z_OK)
+			return (Z_ERR);
+
 	return (output ? Z_OK : Z_ERR);
 }
 
@@ -2011,6 +2046,12 @@ halt_func(int argc, char *argv[])
 	    != Z_OK)
 		return (Z_ERR);
 
+	/*
+	 * Invoke brand-specific handler.
+	 */
+	if (invoke_brand_handler(CMD_HALT, argv) != Z_OK)
+		return (Z_ERR);
+
 	zarg.cmd = Z_HALT;
 	return ((call_zoneadmd(target_zone, &zarg) == 0) ? Z_OK : Z_ERR);
 }
@@ -2062,7 +2103,7 @@ reboot_func(int argc, char *argv[])
 	if (sanity_check(target_zone, CMD_REBOOT, B_TRUE, B_FALSE, B_FALSE)
 	    != Z_OK)
 		return (Z_ERR);
-	if (verify_details(CMD_REBOOT) != Z_OK)
+	if (verify_details(CMD_REBOOT, argv) != Z_OK)
 		return (Z_ERR);
 
 	zarg.cmd = Z_REBOOT;
@@ -2070,13 +2111,13 @@ reboot_func(int argc, char *argv[])
 }
 
 static int
-verify_brand(zone_dochandle_t handle)
+verify_brand(zone_dochandle_t handle, int cmd_num, char *argv[])
 {
 	char cmdbuf[MAXPATHLEN];
 	int err;
 	char zonepath[MAXPATHLEN];
 	brand_handle_t bh = NULL;
-	int status;
+	int status, i;
 
 	/*
 	 * Fetch the verify command from the brand configuration.
@@ -2086,7 +2127,7 @@ verify_brand(zone_dochandle_t handle)
 	if ((err = zonecfg_get_zonepath(handle, zonepath, sizeof (zonepath))) !=
 	    Z_OK) {
 		errno = err;
-		zperror(cmd_to_str(CMD_VERIFY), B_TRUE);
+		zperror(cmd_to_str(cmd_num), B_TRUE);
 		return (Z_ERR);
 	}
 	if ((bh = brand_open(target_brand)) == NULL) {
@@ -2096,19 +2137,38 @@ verify_brand(zone_dochandle_t handle)
 
 	/*
 	 * If the brand has its own verification routine, execute it now.
+	 * The verification routine validates the intended zoneadm
+	 * operation for the specific brand. The zoneadm subcommand and
+	 * all its arguments are passed to the routine.
 	 */
 	(void) strcpy(cmdbuf, EXEC_PREFIX);
 	err = brand_get_verify_adm(bh, target_zone, zonepath,
 	    cmdbuf + EXEC_LEN, sizeof (cmdbuf) - EXEC_LEN, 0, NULL);
 	brand_close(bh);
-	if (err == 0 && strlen(cmdbuf) > EXEC_LEN) {
-		status = do_subproc_interactive(cmdbuf);
-		err = subproc_status(gettext("brand-specific verification"),
-		    status, B_FALSE);
-		return ((err == ZONE_SUBPROC_OK) ? Z_OK : Z_BRAND_ERROR);
+	if (err != 0)
+		return (Z_BRAND_ERROR);
+	if (strlen(cmdbuf) <= EXEC_LEN)
+		return (Z_OK);
+
+	if (strlcat(cmdbuf, cmd_to_str(cmd_num),
+	    sizeof (cmdbuf)) >= sizeof (cmdbuf))
+		return (Z_ERR);
+
+	/* Build the argv string */
+	i = 0;
+	while (argv[i] != NULL) {
+		if ((strlcat(cmdbuf, " ",
+		    sizeof (cmdbuf)) >= sizeof (cmdbuf)) ||
+		    (strlcat(cmdbuf, argv[i++],
+		    sizeof (cmdbuf)) >= sizeof (cmdbuf)))
+			return (Z_ERR);
 	}
 
-	return ((err == Z_OK) ? Z_OK : Z_BRAND_ERROR);
+	status = do_subproc_interactive(cmdbuf);
+	err = subproc_status(gettext("brand-specific verification"),
+	    status, B_FALSE);
+
+	return ((err == ZONE_SUBPROC_OK) ? Z_OK : Z_BRAND_ERROR);
 }
 
 static int
@@ -2691,7 +2751,7 @@ print_net_err(char *phys, char *addr, int af, char *msg)
 }
 
 static int
-verify_handle(int cmd_num, zone_dochandle_t handle)
+verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 {
 	struct zone_nwiftab nwiftab;
 	int return_code = Z_OK;
@@ -2777,7 +2837,7 @@ no_net:
 		return_code = Z_ERR;
 	if (!in_alt_root && verify_pool(handle) != Z_OK)
 		return_code = Z_ERR;
-	if (!in_alt_root && verify_brand(handle) != Z_OK)
+	if (!in_alt_root && verify_brand(handle, cmd_num, argv) != Z_OK)
 		return_code = Z_ERR;
 	if (!in_alt_root && verify_datasets(handle) != Z_OK)
 		return_code = Z_ERR;
@@ -2797,7 +2857,7 @@ no_net:
 }
 
 static int
-verify_details(int cmd_num)
+verify_details(int cmd_num, char *argv[])
 {
 	zone_dochandle_t handle;
 	char zonepath[MAXPATHLEN], checkpath[MAXPATHLEN];
@@ -2849,7 +2909,7 @@ verify_details(int cmd_num)
 		return_code = Z_ERR;
 	}
 
-	if (verify_handle(cmd_num, handle) != Z_OK)
+	if (verify_handle(cmd_num, handle, argv) != Z_OK)
 		return_code = Z_ERR;
 
 	zonecfg_fini_handle(handle);
@@ -2883,7 +2943,7 @@ verify_func(int argc, char *argv[])
 	if (sanity_check(target_zone, CMD_VERIFY, B_FALSE, B_FALSE, B_FALSE)
 	    != Z_OK)
 		return (Z_ERR);
-	return (verify_details(CMD_VERIFY));
+	return (verify_details(CMD_VERIFY, argv));
 }
 
 static int
@@ -3008,7 +3068,7 @@ install_func(int argc, char *argv[])
 	if (sanity_check(target_zone, CMD_INSTALL, B_FALSE, B_TRUE, B_FALSE)
 	    != Z_OK)
 		return (Z_ERR);
-	if (verify_details(CMD_INSTALL) != Z_OK)
+	if (verify_details(CMD_INSTALL, argv) != Z_OK)
 		return (Z_ERR);
 
 	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
@@ -3676,7 +3736,7 @@ clone_func(int argc, char *argv[])
 	if (sanity_check(target_zone, CMD_CLONE, B_FALSE, B_TRUE, B_FALSE)
 	    != Z_OK)
 		return (Z_ERR);
-	if (verify_details(CMD_CLONE) != Z_OK)
+	if (verify_details(CMD_CLONE, argv) != Z_OK)
 		return (Z_ERR);
 
 	/*
@@ -3959,7 +4019,7 @@ move_func(int argc, char *argv[])
 	if (sanity_check(target_zone, CMD_MOVE, B_FALSE, B_TRUE, B_FALSE)
 	    != Z_OK)
 		return (Z_ERR);
-	if (verify_details(CMD_MOVE) != Z_OK)
+	if (verify_details(CMD_MOVE, argv) != Z_OK)
 		return (Z_ERR);
 
 	/*
@@ -4219,7 +4279,7 @@ detach_func(int argc, char *argv[])
 		if (sanity_check(target_zone, CMD_DETACH, B_FALSE, B_TRUE,
 		    B_FALSE) != Z_OK)
 			return (Z_ERR);
-		if (verify_details(CMD_DETACH) != Z_OK)
+		if (verify_details(CMD_DETACH, argv) != Z_OK)
 			return (Z_ERR);
 	} else {
 		/*
@@ -4412,7 +4472,7 @@ dev_fix(zone_dochandle_t handle)
  * manifest.
  */
 static int
-dryrun_attach(char *manifest_path)
+dryrun_attach(char *manifest_path, char *argv[])
 {
 	int fd;
 	int err;
@@ -4461,7 +4521,7 @@ dryrun_attach(char *manifest_path)
 	}
 	is_native_zone = (strcmp(target_brand, NATIVE_BRAND_NAME) == 0);
 
-	res = verify_handle(CMD_ATTACH, local_handle);
+	res = verify_handle(CMD_ATTACH, local_handle, argv);
 
 	/* Get the detach information for the locally defined zone. */
 	if ((err = zonecfg_get_detach_info(local_handle, B_FALSE)) != Z_OK) {
@@ -4528,12 +4588,12 @@ attach_func(int argc, char *argv[])
 	 * configured for this option.
 	 */
 	if (!execute)
-		return (dryrun_attach(manifest_path));
+		return (dryrun_attach(manifest_path, argv));
 
 	if (sanity_check(target_zone, CMD_ATTACH, B_FALSE, B_TRUE, B_FALSE)
 	    != Z_OK)
 		return (Z_ERR);
-	if (verify_details(CMD_ATTACH) != Z_OK)
+	if (verify_details(CMD_ATTACH, argv) != Z_OK)
 		return (Z_ERR);
 
 	if ((err = zone_get_zonepath(target_zone, zonepath, sizeof (zonepath)))
@@ -4695,6 +4755,12 @@ uninstall_func(int argc, char *argv[])
 	    != Z_OK)
 		return (Z_ERR);
 
+	/*
+	 * Invoke brand-specific handler.
+	 */
+	if (invoke_brand_handler(CMD_UNINSTALL, argv) != Z_OK)
+		return (Z_ERR);
+
 	if (!force) {
 		(void) snprintf(line, sizeof (line),
 		    gettext("Are you sure you want to %s zone %s"),
@@ -4800,7 +4866,7 @@ mount_func(int argc, char *argv[])
 	if (sanity_check(target_zone, CMD_MOUNT, B_FALSE, B_FALSE, force)
 	    != Z_OK)
 		return (Z_ERR);
-	if (verify_details(CMD_MOUNT) != Z_OK)
+	if (verify_details(CMD_MOUNT, argv) != Z_OK)
 		return (Z_ERR);
 
 	zarg.cmd = force ? Z_FORCEMOUNT : Z_MOUNT;
@@ -4840,6 +4906,12 @@ mark_func(int argc, char *argv[])
 		return (Z_USAGE);
 	if (sanity_check(target_zone, CMD_MARK, B_FALSE, B_FALSE, B_FALSE)
 	    != Z_OK)
+		return (Z_ERR);
+
+	/*
+	 * Invoke brand-specific handler.
+	 */
+	if (invoke_brand_handler(CMD_MARK, argv) != Z_OK)
 		return (Z_ERR);
 
 	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
