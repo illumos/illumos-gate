@@ -2137,7 +2137,6 @@ alias_to_prom_dev(char *alias, char *ret_buf)
 	char options[16] = "";
 	int prom_fd = -1;
 	int ret;
-	int found = 0;
 	int i;
 
 	if (strchr(alias, '/') != NULL)
