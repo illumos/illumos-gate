@@ -176,6 +176,7 @@ extern	int	ill_dls_info(struct sockaddr_dl *, const ipif_t *);
 extern	void	ill_fastpath_ack(ill_t *, mblk_t *);
 extern	void	ill_fastpath_nack(ill_t *);
 extern	int	ill_fastpath_probe(ill_t *, mblk_t *);
+extern	void	ill_fastpath_flush(ill_t *);
 extern	void	ill_frag_prune(ill_t *, uint_t);
 extern	void	ill_frag_free_pkts(ill_t *, ipfb_t *, ipf_t *, int);
 extern	time_t	ill_frag_timeout(ill_t *, time_t);
@@ -183,8 +184,9 @@ extern	int	ill_init(queue_t *, ill_t *);
 extern	int	ill_nominate_mcast_rcv(ill_group_t *);
 extern	boolean_t	ill_setdefaulttoken(ill_t *);
 extern	void	ill_restart_dad(ill_t *, boolean_t);
+extern	int	ill_set_phys_addr(ill_t *, mblk_t *);
+extern	void	ill_set_ndmp(ill_t *, mblk_t *, uint_t, uint_t);
 
-extern void	ill_lock_ills(ill_t **, int);
 extern mblk_t	*ill_pending_mp_get(ill_t *, conn_t **, uint_t);
 extern boolean_t ill_pending_mp_add(ill_t *, conn_t *, mblk_t *);
 extern	boolean_t ill_is_quiescent(ill_t *ill);
@@ -241,7 +243,7 @@ extern	int	ipif_down(ipif_t *, queue_t *, mblk_t *);
 extern	void	ipif_down_tail(ipif_t *);
 extern	void	ipif_multicast_up(ipif_t *);
 extern	void	ipif_ndp_down(ipif_t *);
-extern	int	ipif_ndp_up(ipif_t *, const in6_addr_t *, boolean_t);
+extern	int	ipif_ndp_up(ipif_t *, const in6_addr_t *);
 extern	int	ipif_ndp_setup_multicast(ipif_t *, struct nce_s **);
 extern	int	ipif_up_done(ipif_t *);
 extern	int	ipif_up_done_v6(ipif_t *);
@@ -263,6 +265,8 @@ extern	void	ipif_mask_reply(ipif_t *);
 extern	int	illgrp_insert(ill_group_t **, ill_t *, char *, ill_group_t *,
     boolean_t);
 
+extern	void	ipsq_current_start(ipsq_t *, ipif_t *, int);
+extern	void	ipsq_current_finish(ipsq_t *);
 extern	void	ipsq_enq(ipsq_t *, queue_t *, mblk_t *, ipsq_func_t, int,
     ill_t *);
 extern	boolean_t ipsq_enter(ill_t *, boolean_t);

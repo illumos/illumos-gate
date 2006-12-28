@@ -54,9 +54,6 @@ extern "C" {
 #define	MBLKIN(mp, off, len) (((off) <= MBLKL(mp)) && \
 			(((mp)->b_rptr + (off) + (len)) <= (mp)->b_wptr))
 
-#define	MBLK_GETLABEL(mp) \
-	(DB_CRED(mp) != NULL ? crgetlabel(DB_CRED(mp)) : NULL)
-
 #ifdef	_KERNEL
 extern void	mcopyin(mblk_t *, void *, size_t, void *);
 extern void	mcopyout(mblk_t *, void *, size_t, void *, mblk_t *);

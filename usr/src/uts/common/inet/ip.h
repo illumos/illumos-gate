@@ -1326,13 +1326,13 @@ typedef struct ipif_s {
  *		 Table of ipif_t members and their protection
  *
  * ipif_next		ill_g_lock		ill_g_lock
- * ipif_ill		ipsq + down ipif		write once
- * ipif_id		ipsq + down ipif		write once
+ * ipif_ill		ipsq + down ipif	write once
+ * ipif_id		ipsq + down ipif	write once
  * ipif_mtu		ipsq
- * ipif_v6lcl_addr	ipsq + down ipif		up ipif
- * ipif_v6src_addr	ipsq + down ipif		up ipif
- * ipif_v6subnet	ipsq + down ipif		up ipif
- * ipif_v6net_mask	ipsq + down ipif		up ipif
+ * ipif_v6lcl_addr	ipsq + down ipif	up ipif
+ * ipif_v6src_addr	ipsq + down ipif	up ipif
+ * ipif_v6subnet	ipsq + down ipif	up ipif
+ * ipif_v6net_mask	ipsq + down ipif	up ipif
  *
  * ipif_v6brd_addr
  * ipif_v6pp_dst_addr
@@ -1404,6 +1404,7 @@ typedef struct ipif_s {
 #define	CONN_CLOSE	1		/* No mi_copy */
 #define	COPYOUT		2		/* do an mi_copyout if needed */
 #define	NO_COPYOUT	3		/* do an mi_copy_done */
+#define	IPI2MODE(ipi)	((ipi)->ipi_flags & IPI_GET_CMD ? COPYOUT : NO_COPYOUT)
 
 /*
  * The IP-MT design revolves around the serialization object ipsq_t.
@@ -1428,14 +1429,15 @@ typedef struct ipif_s {
 typedef struct ipsq_s {
 	kmutex_t ipsq_lock;
 	int	ipsq_reentry_cnt;
-	kthread_t	*ipsq_writer;	/* current owner (thread id) */
+	kthread_t *ipsq_writer;		/* current owner (thread id) */
 	int	ipsq_flags;
 	mblk_t	*ipsq_xopq_mphead;	/* list of excl ops mostly ioctls */
 	mblk_t	*ipsq_xopq_mptail;
 	mblk_t	*ipsq_mphead;		/* msgs on ipsq linked thru b_next */
 	mblk_t	*ipsq_mptail;		/* msgs on ipsq linked thru b_next */
+	int	ipsq_current_ioctl;	/* current ioctl, or 0 if no ioctl */
+	ipif_t	*ipsq_current_ipif;	/* ipif associated with current op */
 	ipif_t	*ipsq_pending_ipif;	/* ipif associated w. ipsq_pending_mp */
-	ipif_t	*ipsq_current_ipif;	/* ipif associated with current ioctl */
 	mblk_t	*ipsq_pending_mp;	/* current ioctl mp while waiting for */
 					/* response from another module */
 	struct	ipsq_s	*ipsq_next;	/* list of all syncq's (ipsq_g_list) */
@@ -1444,7 +1446,7 @@ typedef struct ipsq_s {
 	boolean_t	ipsq_split;	/* ipsq may need to be split */
 	int		ipsq_waitfor;	/* Values encoded below */
 	char		ipsq_name[LIFNAMSIZ+1];	/* same as phyint_groupname */
-	int		ipsq_last_cmd;	/* debugging aid */
+
 #ifdef ILL_DEBUG
 	int		ipsq_depth;	/* debugging aid */
 	pc_t		ipsq_stack[IP_STACK_DEPTH];	/* debugging aid */
@@ -1990,11 +1992,11 @@ extern	void	ill_delete_glist(ill_t *);
  * ill_ipif_up_count		ill_lock + ipsq		ill_lock
  * ill_max_frag			ipsq			Write once
  *
- * ill_name			ill_g_lock + ipsq		Write once
- * ill_name_length		ill_g_lock + ipsq		Write once
+ * ill_name			ill_g_lock + ipsq	Write once
+ * ill_name_length		ill_g_lock + ipsq	Write once
  * ill_ndd_name			ipsq			Write once
  * ill_net_type			ipsq			Write once
- * ill_ppa			ill_g_lock + ipsq		Write once
+ * ill_ppa			ill_g_lock + ipsq	Write once
  * ill_sap			ipsq + down ill		Write once
  * ill_sap_length		ipsq + down ill		Write once
  * ill_phys_addr_length		ipsq + down ill		Write once
@@ -2020,9 +2022,8 @@ extern	void	ill_delete_glist(ill_t *);
  * ill_down_mp			ipsq			ipsq
  * ill_dlpi_deferred		ipsq			ipsq
  * ill_dlpi_pending		ipsq and ill_lock	ipsq or ill_lock
- * ill_phys_addr_mp		ipsq			ipsq
- * ill_phys_addr		ipsq			up ill
- * ill_ick			ipsq + down ill		only when ill is up
+ * ill_phys_addr_mp		ipsq + down ill		only when ill is up
+ * ill_phys_addr		ipsq + down ill		only when ill is up
  *
  * ill_state_flags		ill_lock		ill_lock
  * exclusive bit flags		ipsq_t			ipsq_t
@@ -2041,7 +2042,7 @@ extern	void	ill_delete_glist(ill_t *);
  * ill_max_mtu
  *
  * ill_reachable_time		ipsq + ill_lock		ill_lock
- * ill_reachable_retrans_time	ipsq  + ill_lock		ill_lock
+ * ill_reachable_retrans_time	ipsq + ill_lock		ill_lock
  * ill_max_buf			ipsq + ill_lock		ill_lock
  *
  * Next 2 fields need ill_lock because of the get ioctls. They should not
@@ -2063,12 +2064,12 @@ extern	void	ill_delete_glist(ill_t *);
  * ill_mrtun_refcnt		ill_lock		ill_lock
  * ill_srcif_refcnt		ill_lock		ill_lock
  * ill_srcif_table		ill_lock		ill_lock
- * ill_nd_lla_mp		ill_lock		ill_lock
- * ill_nd_lla			ill_lock		ill_lock
- * ill_nd_lla_len		ill_lock		ill_lock
+ * ill_nd_lla_mp		ipsq + down ill		only when ill is up
+ * ill_nd_lla			ipsq + down ill		only when ill is up
+ * ill_nd_lla_len		ipsq + down ill		only when ill is up
  * ill_phys_addr_pend		ipsq + down ill		only when ill is up
  * ill_ifname_pending_err	ipsq			ipsq
- * ill_avl_byppa		ipsq, ill_g_lock		Write once
+ * ill_avl_byppa		ipsq, ill_g_lock	write once
  *
  * ill_fastpath_list		ill_lock		ill_lock
  * ill_refcnt			ill_lock		ill_lock
@@ -3289,8 +3290,7 @@ extern void	ip_process_ioctl(ipsq_t *, queue_t *, mblk_t *, void *);
 extern void	ip_quiesce_conn(conn_t *);
 extern  void    ip_reprocess_ioctl(ipsq_t *, queue_t *, mblk_t *, void *);
 extern void	ip_restart_optmgmt(ipsq_t *, queue_t *, mblk_t *, void *);
-extern void	ip_ioctl_finish(queue_t *, mblk_t *, int, int, ipif_t *,
-    ipsq_t *);
+extern void	ip_ioctl_finish(queue_t *, mblk_t *, int, int, ipsq_t *);
 
 extern boolean_t ip_cmpbuf(const void *, uint_t, boolean_t, const void *,
     uint_t);

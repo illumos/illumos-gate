@@ -1514,7 +1514,7 @@ ip_ndp_recover(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		mutex_exit(&ill->ill_lock);
 		ipif->ipif_was_dup = B_TRUE;
 
-		if (ipif_ndp_up(ipif, addr, B_FALSE) != EINPROGRESS)
+		if (ipif_ndp_up(ipif, addr) != EINPROGRESS)
 			(void) ipif_up_done_v6(ipif);
 	}
 	freeb(mp);
@@ -2361,7 +2361,6 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 
 	hw_addr = NULL;
 	if (!(flag & NDP_PROBE)) {
-		mutex_enter(&hwaddr_ill->ill_lock);
 		hw_addr = use_nd_lla ? hwaddr_ill->ill_nd_lla :
 		    hwaddr_ill->ill_phys_addr;
 		if (hw_addr != NULL) {
@@ -2369,7 +2368,6 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 			opt->nd_opt_len = (uint8_t)plen;
 			bcopy(hw_addr, &opt[1], hwaddr_ill->ill_nd_lla_len);
 		}
-		mutex_exit(&hwaddr_ill->ill_lock);
 	}
 	if (hw_addr == NULL) {
 		/* If there's no link layer address option, then strip it. */

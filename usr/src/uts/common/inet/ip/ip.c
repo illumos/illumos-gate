@@ -15436,9 +15436,8 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	ipif_t		*ipif = NULL;
 	mblk_t		*mp1 = NULL;
 	conn_t		*connp = NULL;
-	t_uscalar_t	physaddr_req;
+	t_uscalar_t	paddrreq;
 	mblk_t		*mp_hw;
-	union DL_primitives *dlp;
 	boolean_t	success;
 	boolean_t	ioctl_aborted = B_FALSE;
 	boolean_t	log = B_TRUE;
@@ -15492,13 +15491,13 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * We don't complete the IOCTL until all three DL_PARs
 			 * have been attempted, so set *_len to 0 and break.
 			 */
-			physaddr_req = ill->ill_phys_addr_pend;
+			paddrreq = ill->ill_phys_addr_pend;
 			ill_dlpi_done(ill, DL_PHYS_ADDR_REQ);
-			if (physaddr_req == DL_IPV6_TOKEN) {
+			if (paddrreq == DL_IPV6_TOKEN) {
 				ill->ill_token_length = 0;
 				log = B_FALSE;
 				break;
-			} else if (physaddr_req == DL_IPV6_LINK_LAYER_ADDR) {
+			} else if (paddrreq == DL_IPV6_LINK_LAYER_ADDR) {
 				ill->ill_nd_lla_len = 0;
 				log = B_FALSE;
 				break;
@@ -15672,6 +15671,10 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			mp1 = ipsq_pending_mp_get(ipsq, &connp);
 		if (mp1 == NULL)
 			break;
+		/*
+		 * Because mp1 was added by ill_dl_up(), and it always
+		 * passes a valid connp, connp must be valid here.
+		 */
 		ASSERT(connp != NULL);
 		q = CONNP_TO_WQ(connp);
 
@@ -15730,8 +15733,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * in ip_rput(). If there's an error, we
 			 * complete it here.
 			 */
-			err = ipif_ndp_up(ipif, &ipif->ipif_v6lcl_addr,
-			    B_FALSE);
+			err = ipif_ndp_up(ipif, &ipif->ipif_v6lcl_addr);
 			if (err == 0) {
 				if (ill->ill_flags & ILLF_XRESOLV) {
 					mutex_enter(&connp->conn_lock);
@@ -15811,148 +15813,15 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		boolean_t need_ire_walk_v4 = B_FALSE;
 		boolean_t need_ire_walk_v6 = B_FALSE;
 
-		/*
-		 * Change the address everywhere we need to.
-		 * What we're getting here is a link-level addr or phys addr.
-		 * The new addr is at notify + notify->dl_addr_offset
-		 * The address length is notify->dl_addr_length;
-		 */
 		switch (notify->dl_notification) {
 		case DL_NOTE_PHYS_ADDR:
-			mp_hw = copyb(mp);
-			if (mp_hw == NULL) {
-				err = ENOMEM;
-				break;
-			}
-			dlp = (union DL_primitives *)mp_hw->b_rptr;
-			/*
-			 * We currently don't support changing
-			 * the token via DL_NOTIFY_IND.
-			 * When we do support it, we have to consider
-			 * what the implications are with respect to
-			 * the token and the link local address.
-			 */
-			mutex_enter(&ill->ill_lock);
-			if (dlp->notify_ind.dl_data ==
-			    DL_IPV6_LINK_LAYER_ADDR) {
-				if (ill->ill_nd_lla_mp != NULL)
-					freemsg(ill->ill_nd_lla_mp);
-				ill->ill_nd_lla_mp = mp_hw;
-				ill->ill_nd_lla = (uchar_t *)mp_hw->b_rptr +
-				    dlp->notify_ind.dl_addr_offset;
-				ill->ill_nd_lla_len =
-				    dlp->notify_ind.dl_addr_length -
-				    ABS(ill->ill_sap_length);
-				mutex_exit(&ill->ill_lock);
-				break;
-			} else if (dlp->notify_ind.dl_data ==
-			    DL_CURR_PHYS_ADDR) {
-				if (ill->ill_phys_addr_mp != NULL)
-					freemsg(ill->ill_phys_addr_mp);
-				ill->ill_phys_addr_mp = mp_hw;
-				ill->ill_phys_addr = (uchar_t *)mp_hw->b_rptr +
-				    dlp->notify_ind.dl_addr_offset;
-				ill->ill_phys_addr_length =
-				    dlp->notify_ind.dl_addr_length -
-				    ABS(ill->ill_sap_length);
-				if (ill->ill_isv6 &&
-				    !(ill->ill_flags & ILLF_XRESOLV)) {
-					if (ill->ill_nd_lla_mp != NULL)
-						freemsg(ill->ill_nd_lla_mp);
-					ill->ill_nd_lla_mp = copyb(mp_hw);
-					ill->ill_nd_lla = (uchar_t *)
-					    ill->ill_nd_lla_mp->b_rptr +
-					    dlp->notify_ind.dl_addr_offset;
-					ill->ill_nd_lla_len =
-					    ill->ill_phys_addr_length;
-				}
-			}
-			mutex_exit(&ill->ill_lock);
-			/*
-			 * Send out gratuitous arp request for our new
-			 * hardware address.
-			 */
-			for (ipif = ill->ill_ipif; ipif != NULL;
-			    ipif = ipif->ipif_next) {
-				if (!(ipif->ipif_flags & IPIF_UP))
-					continue;
-				if (ill->ill_isv6) {
-					ipif_ndp_down(ipif);
-					/*
-					 * Set B_TRUE to enable
-					 * ipif_ndp_up() to send out
-					 * unsolicited advertisements.
-					 */
-					err = ipif_ndp_up(ipif,
-					    &ipif->ipif_v6lcl_addr,
-					    B_TRUE);
-					if (err) {
-						ip1dbg((
-						    "ip_rput_dlpi_writer: "
-						    "Failed to update ndp "
-						    "err %d\n", err));
-					}
-				} else {
-					/*
-					 * IPv4 ARP case
-					 *
-					 * Set Res_act_move, as we only want
-					 * ipif_resolver_up to send an
-					 * AR_ENTRY_ADD request up to
-					 * ARP.
-					 */
-					err = ipif_resolver_up(ipif,
-					    Res_act_move);
-					if (err) {
-						ip1dbg((
-						    "ip_rput_dlpi_writer: "
-						    "Failed to update arp "
-						    "err %d\n", err));
-					}
-				}
-			}
-			/*
-			 * Allow "fall through" to the DL_NOTE_FASTPATH_FLUSH
-			 * case so that all old fastpath information can be
-			 * purged from IRE caches.
-			 */
-		/* FALLTHRU */
-		case DL_NOTE_FASTPATH_FLUSH:
-			/*
-			 * Any fastpath probe sent henceforth will get the
-			 * new fp mp. So we first delete any ires that are
-			 * waiting for the fastpath. Then walk all ires and
-			 * delete the ire or delete the fp mp. In the case of
-			 * IRE_MIPRTUN and IRE_BROADCAST it is difficult to
-			 * recreate the ire's without going through a complex
-			 * ipif up/down dance. So we don't delete the ire
-			 * itself, but just the nce_fp_mp for these 2 ire's
-			 * In the case of the other ire's we delete the ire's
-			 * themselves. Access to nce_fp_mp is completely
-			 * protected by ire_lock for IRE_MIPRTUN and
-			 * IRE_BROADCAST. Deleting the ire is preferable in the
-			 * other cases for performance.
-			 */
-			if (ill->ill_isv6) {
-				nce_fastpath_list_dispatch(ill, NULL, NULL);
-				ndp_walk(ill, (pfi_t)ndp_fastpath_flush,
-				    NULL);
-			} else {
-				ire_fastpath_list_dispatch(ill, NULL, NULL);
-				ire_walk_ill_v4(MATCH_IRE_WQ | MATCH_IRE_TYPE,
-				    IRE_CACHE | IRE_BROADCAST,
-				    ire_fastpath_flush, NULL, ill);
-				mutex_enter(&ire_mrtun_lock);
-				if (ire_mrtun_count != 0) {
-					mutex_exit(&ire_mrtun_lock);
-					ire_walk_ill_mrtun(MATCH_IRE_WQ,
-					    IRE_MIPRTUN, ire_fastpath_flush,
-					    NULL, ill);
-				} else {
-					mutex_exit(&ire_mrtun_lock);
-				}
-			}
+			err = ill_set_phys_addr(ill, mp);
 			break;
+
+		case DL_NOTE_FASTPATH_FLUSH:
+			ill_fastpath_flush(ill);
+			break;
+
 		case DL_NOTE_SDU_SIZE:
 			/*
 			 * Change the MTU size of the interface, of all
@@ -16114,64 +15983,42 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	}
 	case DL_PHYS_ADDR_ACK: {
 		/*
-		 * We should have an IOCTL waiting on this when request
-		 * sent by ill_dl_phys.
-		 * However, ill_dl_phys was called on an ill queue (from
-		 * SIOCSLIFNAME), thus conn_pending_ill is not set. But the
-		 * ioctl is known to be pending on ill_wq.
-		 * There are two additional phys_addr_req's sent to the
-		 * driver to get the token and lla. ill_phys_addr_pend
-		 * keeps track of the last one sent so we know which
-		 * response we are dealing with. ill_dlpi_done will
-		 * update ill_phys_addr_pend when it sends the next req.
-		 * We don't complete the IOCTL until all three DL_PARs
-		 * have been attempted.
-		 *
-		 * We don't need any lock to update ill_nd_lla* fields,
-		 * since the ill is not yet up, We grab the lock just
-		 * for uniformity with other code that accesses ill_nd_lla.
+		 * As part of plumbing the interface via SIOCSLIFNAME,
+		 * ill_dl_phys() will queue a series of DL_PHYS_ADDR_REQs,
+		 * whose answers we receive here.  As each answer is received,
+		 * we call ill_dlpi_done() to dispatch the next request as
+		 * we're processing the current one.  Once all answers have
+		 * been received, we use ipsq_pending_mp_get() to dequeue the
+		 * outstanding IOCTL and reply to it.  (Because ill_dl_phys()
+		 * is invoked from an ill queue, conn_oper_pending_ill is not
+		 * available, but we know the ioctl is pending on ill_wq.)
 		 */
-		physaddr_req = ill->ill_phys_addr_pend;
-		ill_dlpi_done(ill, DL_PHYS_ADDR_REQ);
-		if (physaddr_req == DL_IPV6_TOKEN ||
-		    physaddr_req == DL_IPV6_LINK_LAYER_ADDR) {
-			if (physaddr_req == DL_IPV6_TOKEN) {
-				/*
-				 * bcopy to low-order bits of ill_token
-				 *
-				 * XXX Temporary hack - currently,
-				 * all known tokens are 64 bits,
-				 * so I'll cheat for the moment.
-				 */
-				dlp = (union DL_primitives *)mp->b_rptr;
+		uint_t paddrlen, paddroff;
 
-				mutex_enter(&ill->ill_lock);
-				bcopy((uchar_t *)(mp->b_rptr +
-				dlp->physaddr_ack.dl_addr_offset),
-				(void *)&ill->ill_token.s6_addr32[2],
-				dlp->physaddr_ack.dl_addr_length);
-				ill->ill_token_length =
-					dlp->physaddr_ack.dl_addr_length;
-				mutex_exit(&ill->ill_lock);
-			} else {
-				ASSERT(ill->ill_nd_lla_mp == NULL);
-				mp_hw = copyb(mp);
-				if (mp_hw == NULL) {
-					err = ENOMEM;
-					break;
-				}
-				dlp = (union DL_primitives *)mp_hw->b_rptr;
-				mutex_enter(&ill->ill_lock);
-				ill->ill_nd_lla_mp = mp_hw;
-				ill->ill_nd_lla = (uchar_t *)mp_hw->b_rptr +
-				dlp->physaddr_ack.dl_addr_offset;
-				ill->ill_nd_lla_len =
-					dlp->physaddr_ack.dl_addr_length;
-				mutex_exit(&ill->ill_lock);
-			}
+		paddrreq = ill->ill_phys_addr_pend;
+		paddrlen = ((dl_phys_addr_ack_t *)mp->b_rptr)->dl_addr_length;
+		paddroff = ((dl_phys_addr_ack_t *)mp->b_rptr)->dl_addr_offset;
+
+		ill_dlpi_done(ill, DL_PHYS_ADDR_REQ);
+		if (paddrreq == DL_IPV6_TOKEN) {
+			/*
+			 * bcopy to low-order bits of ill_token
+			 *
+			 * XXX Temporary hack - currently, all known tokens
+			 * are 64 bits, so I'll cheat for the moment.
+			 */
+			bcopy(mp->b_rptr + paddroff,
+			    &ill->ill_token.s6_addr32[2], paddrlen);
+			ill->ill_token_length = paddrlen;
+			break;
+		} else if (paddrreq == DL_IPV6_LINK_LAYER_ADDR) {
+			ASSERT(ill->ill_nd_lla_mp == NULL);
+			ill_set_ndmp(ill, mp, paddroff, paddrlen);
+			mp = NULL;
 			break;
 		}
-		ASSERT(physaddr_req == DL_CURR_PHYS_ADDR);
+
+		ASSERT(paddrreq == DL_CURR_PHYS_ADDR);
 		ASSERT(ill->ill_phys_addr_mp == NULL);
 		if (!ill->ill_ifname_pending)
 			break;
@@ -16192,61 +16039,47 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			ill->ill_ifname_pending_err = 0;
 			break;
 		}
+
+		ill->ill_phys_addr_mp = mp;
+		ill->ill_phys_addr = mp->b_rptr + paddroff;
+		mp = NULL;
+
 		/*
-		 * Get the interface token.  If the zeroth interface
-		 * address is zero then set the address to the link local
-		 * address
+		 * If paddrlen is zero, the DLPI provider doesn't support
+		 * physical addresses.  The other two tests were historical
+		 * workarounds for bugs in our former PPP implementation, but
+		 * now other things have grown dependencies on them -- e.g.,
+		 * the tun module specifies a dl_addr_length of zero in its
+		 * DL_BIND_ACK, but then specifies an incorrect value in its
+		 * DL_PHYS_ADDR_ACK.  These bogus checks need to be removed,
+		 * but only after careful testing ensures that all dependent
+		 * broken DLPI providers have been fixed.
 		 */
-		mp_hw = copyb(mp);
-		if (mp_hw == NULL) {
-			err = ENOMEM;
-			break;
-		}
-		dlp = (union DL_primitives *)mp_hw->b_rptr;
-		ill->ill_phys_addr_mp = mp_hw;
-		ill->ill_phys_addr = (uchar_t *)mp_hw->b_rptr +
-				dlp->physaddr_ack.dl_addr_offset;
-		if (dlp->physaddr_ack.dl_addr_length == 0 ||
-		    ill->ill_phys_addr_length == 0 ||
+		if (paddrlen == 0 || ill->ill_phys_addr_length == 0 ||
 		    ill->ill_phys_addr_length == IP_ADDR_LEN) {
-			/*
-			 * Compatibility: atun driver returns a length of 0.
-			 * ipdptp has an ill_phys_addr_length of zero(from
-			 * DL_BIND_ACK) but a non-zero length here.
-			 * ipd has an ill_phys_addr_length of 4(from
-			 * DL_BIND_ACK) but a non-zero length here.
-			 */
 			ill->ill_phys_addr = NULL;
-		} else if (dlp->physaddr_ack.dl_addr_length !=
-		    ill->ill_phys_addr_length) {
-			ip0dbg(("DL_PHYS_ADDR_ACK: "
-			    "Address length mismatch %d %d\n",
-			    dlp->physaddr_ack.dl_addr_length,
-			    ill->ill_phys_addr_length));
+		} else if (paddrlen != ill->ill_phys_addr_length) {
+			ip0dbg(("DL_PHYS_ADDR_ACK: got addrlen %d, expected %d",
+			    paddrlen, ill->ill_phys_addr_length));
 			err = EINVAL;
 			break;
 		}
-		mutex_enter(&ill->ill_lock);
+
 		if (ill->ill_nd_lla_mp == NULL) {
-			ill->ill_nd_lla_mp = copyb(mp_hw);
-			if (ill->ill_nd_lla_mp == NULL) {
+			if ((mp_hw = copyb(ill->ill_phys_addr_mp)) == NULL) {
 				err = ENOMEM;
-				mutex_exit(&ill->ill_lock);
 				break;
 			}
-			ill->ill_nd_lla =
-			    (uchar_t *)ill->ill_nd_lla_mp->b_rptr +
-			    dlp->physaddr_ack.dl_addr_offset;
-			ill->ill_nd_lla_len = ill->ill_phys_addr_length;
+			ill_set_ndmp(ill, mp_hw, paddroff, paddrlen);
 		}
-		mutex_exit(&ill->ill_lock);
+
+		/*
+		 * Set the interface token.  If the zeroth interface address
+		 * is unspecified, then set it to the link local address.
+		 */
 		if (IN6_IS_ADDR_UNSPECIFIED(&ill->ill_token))
 			(void) ill_setdefaulttoken(ill);
 
-		/*
-		 * If the ill zero interface has a zero address assign
-		 * it the proper link local address.
-		 */
 		ASSERT(ill->ill_ipif->ipif_id == 0);
 		if (ipif != NULL &&
 		    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr))
@@ -16270,30 +16103,29 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	}
 
 	freemsg(mp);
-	if (mp1) {
-		struct iocblk *iocp;
-		int mode;
-
+	if (mp1 != NULL) {
 		/*
-		 * Complete the waiting IOCTL. For SIOCLIFADDIF or
-		 * SIOCSLIFNAME do a copyout.
-		 */
-		iocp = (struct iocblk *)mp1->b_rptr;
-
-		if (iocp->ioc_cmd == SIOCLIFADDIF ||
-		    iocp->ioc_cmd == SIOCSLIFNAME)
-			mode = COPYOUT;
-		else
-			mode = NO_COPYOUT;
-		/*
-		 * The ioctl must complete now without EINPROGRESS
-		 * since ipsq_pending_mp_get has removed the ioctl mblk
-		 * from ipsq_pending_mp. Otherwise the ioctl will be
-		 * stuck for ever in the ipsq.
+		 * The operation must complete without EINPROGRESS
+		 * since ipsq_pending_mp_get() has removed the mblk
+		 * from ipsq_pending_mp.  Otherwise, the operation
+		 * will be stuck forever in the ipsq.
 		 */
 		ASSERT(err != EINPROGRESS);
-		ip_ioctl_finish(q, mp1, err, mode, ipif, ipsq);
 
+		switch (ipsq->ipsq_current_ioctl) {
+		case 0:
+			ipsq_current_finish(ipsq);
+			break;
+
+		case SIOCLIFADDIF:
+		case SIOCSLIFNAME:
+			ip_ioctl_finish(q, mp1, err, COPYOUT, ipsq);
+			break;
+
+		default:
+			ip_ioctl_finish(q, mp1, err, NO_COPYOUT, ipsq);
+			break;
+		}
 	}
 }
 
@@ -16363,7 +16195,6 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 				if (ta->ifta_flags & (IFTUN_SRC | IFTUN_DST)) {
 					ipif_set_tun_llink(ill, ta);
 				}
-
 			}
 			if (mp1 != NULL) {
 				/*
@@ -16379,11 +16210,9 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 					    mp1->b_cont->b_prev;
 				}
 				inet_freemsg(mp1);
-				ASSERT(ipsq->ipsq_current_ipif != NULL);
 				ASSERT(connp != NULL);
 				ip_ioctl_finish(CONNP_TO_WQ(connp), mp,
-				    iocp->ioc_error, NO_COPYOUT,
-				    ipsq->ipsq_current_ipif, ipsq);
+				    iocp->ioc_error, NO_COPYOUT, ipsq);
 			} else {
 				ASSERT(connp == NULL);
 				putnext(q, mp);
@@ -16415,7 +16244,7 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 					mp->b_datap->db_type = M_IOCDATA;
 				ASSERT(connp != NULL);
 				ip_ioctl_finish(CONNP_TO_WQ(connp), mp,
-				    iocp->ioc_error, COPYOUT, NULL, NULL);
+				    iocp->ioc_error, COPYOUT, NULL);
 			} else {
 				ASSERT(connp == NULL);
 				putnext(q, mp);
@@ -16430,7 +16259,6 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 		switch (iocp->ioc_cmd) {
 		int mode;
-		ipif_t	*ipif;
 
 		case DL_IOC_HDR_INFO:
 			/*
@@ -16471,12 +16299,9 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 				    iocp->ioc_id);
 				mode = COPYOUT;
 				ipsq = NULL;
-				ipif = NULL;
 			} else {
 				mp1 = ipsq_pending_mp_get(ipsq, &connp);
 				mode = NO_COPYOUT;
-				ASSERT(ipsq->ipsq_current_ipif != NULL);
-				ipif = ipsq->ipsq_current_ipif;
 			}
 			if (mp1 != NULL) {
 				/*
@@ -16496,7 +16321,7 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 					iocp->ioc_error = EINVAL;
 				ASSERT(connp != NULL);
 				ip_ioctl_finish(CONNP_TO_WQ(connp), mp,
-				    iocp->ioc_error, mode, ipif, ipsq);
+				    iocp->ioc_error, mode, ipsq);
 			} else {
 				ASSERT(connp == NULL);
 				putnext(q, mp);
@@ -26829,7 +26654,6 @@ ip_reprocess_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 {
 	struct iocblk *iocp;
 	mblk_t *mp1;
-	ipif_t	*ipif;
 	ip_ioctl_cmd_t *ipip;
 	int err;
 	sin_t	*sin;
@@ -26842,9 +26666,8 @@ ip_reprocess_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	mp1 = mp->b_cont->b_cont;
 	ipip = ip_sioctl_lookup(iocp->ioc_cmd);
 	if (ipip->ipi_cmd == SIOCSLIFNAME || ipip->ipi_cmd == IF_UNITSEL) {
-		ill_t *ill;
 		/*
-		 * Special case where ipsq_current_ipif may not be set.
+		 * Special case where ipsq_current_ipif is not set:
 		 * ill_phyint_reinit merged the v4 and v6 into a single ipsq.
 		 * ill could also have become part of a ipmp group in the
 		 * process, we are here as were not able to complete the
@@ -26852,13 +26675,11 @@ ip_reprocess_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		 * exclusive on the new ipsq, In such a case ipsq_current_ipif
 		 * will not be set so we need to set it.
 		 */
-		ill = (ill_t *)q->q_ptr;
-		ipsq->ipsq_current_ipif = ill->ill_ipif;
-		ipsq->ipsq_last_cmd = ipip->ipi_cmd;
+		ill_t *ill = q->q_ptr;
+		ipsq_current_start(ipsq, ill->ill_ipif, ipip->ipi_cmd);
 	}
+	ASSERT(ipsq->ipsq_current_ipif != NULL);
 
-	ipif = ipsq->ipsq_current_ipif;
-	ASSERT(ipif != NULL);
 	if (ipip->ipi_cmd_type == IF_CMD) {
 		/* This a old style SIOC[GS]IF* command */
 		ifr = (struct ifreq *)mp1->b_rptr;
@@ -26871,13 +26692,10 @@ ip_reprocess_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		sin = NULL;
 	}
 
-	err = (*ipip->ipi_func_restart)(ipif, sin, q, mp, ipip,
-	    (void *)mp1->b_rptr);
+	err = (*ipip->ipi_func_restart)(ipsq->ipsq_current_ipif, sin, q, mp,
+	    ipip, mp1->b_rptr);
 
-	/* SIOCLIFREMOVEIF could have removed the ipif */
-	ip_ioctl_finish(q, mp, err,
-	    ipip->ipi_flags & IPI_GET_CMD ? COPYOUT : NO_COPYOUT,
-	    ipip->ipi_cmd == SIOCLIFREMOVEIF ? NULL : ipif, ipsq);
+	ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), ipsq);
 }
 
 /*
@@ -26928,9 +26746,7 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	 */
 	if (ipip->ipi_cmd == SIOCLIFADDIF) {
 		err = ip_sioctl_addif(NULL, NULL, q, mp, NULL, NULL);
-		ip_ioctl_finish(q, mp, err,
-		    ipip->ipi_flags & IPI_GET_CMD ? COPYOUT : NO_COPYOUT,
-		    NULL, NULL);
+		ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), NULL);
 		return;
 	}
 
@@ -26946,9 +26762,7 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 		err = ip_extract_lifreq_cmn(q, mp, ipip->ipi_cmd_type,
 		    ipip->ipi_flags, &ci, ip_process_ioctl);
 		if (err != 0) {
-			ip_ioctl_finish(q, mp, err,
-			    ipip->ipi_flags & IPI_GET_CMD ?
-			    COPYOUT : NO_COPYOUT, NULL, NULL);
+			ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), NULL);
 			return;
 		}
 		ASSERT(ci.ci_ipif != NULL);
@@ -26961,9 +26775,7 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 		 */
 		err = ip_extract_tunreq(q, mp, &ci.ci_ipif, ip_process_ioctl);
 		if (err != 0) {
-			ip_ioctl_finish(q, mp, err,
-			    ipip->ipi_flags & IPI_GET_CMD ?
-			    COPYOUT : NO_COPYOUT, NULL, NULL);
+			ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), NULL);
 			return;
 		}
 		ASSERT(ci.ci_ipif != NULL);
@@ -26987,10 +26799,8 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 			err = ip_extract_msfilter(q, mp, &ci.ci_ipif,
 			    ip_process_ioctl);
 			if (err != 0) {
-				ip_ioctl_finish(q, mp, err,
-				    ipip->ipi_flags & IPI_GET_CMD ?
-				    COPYOUT : NO_COPYOUT, NULL, NULL);
-				return;
+				ip_ioctl_finish(q, mp, err, IPI2MODE(ipip),
+				    NULL);
 			}
 			break;
 		}
@@ -27015,9 +26825,7 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 		    ci.ci_lifr);
 		if (ci.ci_ipif != NULL)
 			ipif_refrele(ci.ci_ipif);
-		ip_ioctl_finish(q, mp, err,
-		    ipip->ipi_flags & IPI_GET_CMD ? COPYOUT : NO_COPYOUT,
-		    NULL, NULL);
+		ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), NULL);
 		return;
 	}
 
@@ -27038,12 +26846,8 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	if (ipsq == NULL)
 		return;
 
-	mutex_enter(&ipsq->ipsq_lock);
-	ASSERT(ipsq->ipsq_current_ipif == NULL);
-	ipsq->ipsq_current_ipif = ci.ci_ipif;
-	ipsq->ipsq_last_cmd = ipip->ipi_cmd;
-	mutex_exit(&ipsq->ipsq_lock);
-	mutex_enter(&(ci.ci_ipif)->ipif_ill->ill_lock);
+	ipsq_current_start(ipsq, ci.ci_ipif, ipip->ipi_cmd);
+
 	/*
 	 * For most set ioctls that come here, this serves as a single point
 	 * where we set the IPIF_CHANGING flag. This ensures that there won't
@@ -27057,6 +26861,7 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	 * sets the IPIF_CONDEMNED flag internally after identifying the right
 	 * ipif to operate on.
 	 */
+	mutex_enter(&(ci.ci_ipif)->ipif_ill->ill_lock);
 	if (ipip->ipi_cmd != SIOCLIFREMOVEIF &&
 	    ipip->ipi_cmd != SIOCLIFFAILOVER &&
 	    ipip->ipi_cmd != SIOCLIFFAILBACK &&
@@ -27069,13 +26874,9 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	 * either queued and waiting for some reason or has
 	 * already completed.
 	 */
-	err = (*ipip->ipi_func)(ci.ci_ipif, ci.ci_sin, q, mp, ipip,
-	    ci.ci_lifr);
+	err = (*ipip->ipi_func)(ci.ci_ipif, ci.ci_sin, q, mp, ipip, ci.ci_lifr);
 
-	/* SIOCLIFREMOVEIF could have removed the ipif */
-	ip_ioctl_finish(q, mp, err,
-	    ipip->ipi_flags & IPI_GET_CMD ? COPYOUT : NO_COPYOUT,
-	    ipip->ipi_cmd == SIOCLIFREMOVEIF ? NULL : ci.ci_ipif, ipsq);
+	ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), ipsq);
 
 	if (entered_ipsq)
 		ipsq_exit(ipsq, B_TRUE, B_TRUE);
@@ -27086,11 +26887,9 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
  * do mi_copyout/mi_copy_done.
  */
 void
-ip_ioctl_finish(queue_t *q, mblk_t *mp, int err, int mode,
-    ipif_t *ipif, ipsq_t *ipsq)
+ip_ioctl_finish(queue_t *q, mblk_t *mp, int err, int mode, ipsq_t *ipsq)
 {
 	conn_t	*connp = NULL;
-	hook_nic_event_t *info;
 
 	if (err == EINPROGRESS)
 		return;
@@ -27113,7 +26912,7 @@ ip_ioctl_finish(queue_t *q, mblk_t *mp, int err, int mode,
 		break;
 
 	default:
-		/* An ioctl aborted through a conn close would take this path */
+		ASSERT(mode == CONN_CLOSE);	/* aborted through CONN_CLOSE */
 		break;
 	}
 
@@ -27123,46 +26922,8 @@ ip_ioctl_finish(queue_t *q, mblk_t *mp, int err, int mode,
 	if (connp != NULL)
 		CONN_OPER_PENDING_DONE(connp);
 
-	/*
-	 * If the ioctl were an exclusive ioctl it would have set
-	 * IPIF_CHANGING at the start of the ioctl which is undone here.
-	 */
-	if (ipif != NULL) {
-		mutex_enter(&(ipif)->ipif_ill->ill_lock);
-		ipif->ipif_state_flags &= ~IPIF_CHANGING;
-
-		/*
-		 * Unhook the nic event message from the ill and enqueue it into
-		 * the nic event taskq.
-		 */
-		if ((info = ipif->ipif_ill->ill_nic_event_info) != NULL) {
-			if (ddi_taskq_dispatch(eventq_queue_nic,
-			    ip_ne_queue_func, (void *)info, DDI_SLEEP)
-			    == DDI_FAILURE) {
-				ip2dbg(("ip_ioctl_finish: ddi_taskq_dispatch"
-				    "failed\n"));
-				if (info->hne_data != NULL)
-					kmem_free(info->hne_data,
-					    info->hne_datalen);
-				kmem_free(info, sizeof (hook_nic_event_t));
-			}
-
-			ipif->ipif_ill->ill_nic_event_info = NULL;
-		}
-
-		mutex_exit(&(ipif)->ipif_ill->ill_lock);
-	}
-
-	/*
-	 * Clear the current ipif in the ipsq at the completion of the ioctl.
-	 * Note that a non-null ipsq_current_ipif prevents new ioctls from
-	 * entering the ipsq
-	 */
-	if (ipsq != NULL) {
-		mutex_enter(&ipsq->ipsq_lock);
-		ipsq->ipsq_current_ipif = NULL;
-		mutex_exit(&ipsq->ipsq_lock);
-	}
+	if (ipsq != NULL)
+		ipsq_current_finish(ipsq);
 }
 
 /*
@@ -28715,18 +28476,30 @@ ip_arp_done(ipsq_t *dummy_sq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		freeb(mp);
 	}
 
-	/* We should have an IOCTL waiting on this. */
 	ipsq = ill->ill_phyint->phyint_ipsq;
 	ipif = ipsq->ipsq_pending_ipif;
 	mp1 = ipsq_pending_mp_get(ipsq, &connp);
-	ASSERT(!((mp1 != NULL)  ^ (ipif != NULL)));
+	ASSERT(!((mp1 != NULL) ^ (ipif != NULL)));
 	if (mp1 == NULL) {
 		/* bringup was aborted by the user */
 		freemsg(mp2);
 		return;
 	}
-	ASSERT(connp != NULL);
-	q = CONNP_TO_WQ(connp);
+
+	/*
+	 * If an IOCTL is waiting on this (ipsq_current_ioctl != 0), then we
+	 * must have an associated conn_t.  Otherwise, we're bringing this
+	 * interface back up as part of handling an asynchronous event (e.g.,
+	 * physical address change).
+	 */
+	if (ipsq->ipsq_current_ioctl != 0) {
+		ASSERT(connp != NULL);
+		q = CONNP_TO_WQ(connp);
+	} else {
+		ASSERT(connp == NULL);
+		q = ill->ill_rq;
+	}
+
 	/*
 	 * If the DL_BIND_REQ fails, it is noted
 	 * in arc_name_offset.
@@ -28752,18 +28525,19 @@ ip_arp_done(ipsq_t *dummy_sq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			return;
 	}
 
-	if (ill->ill_up_ipifs) {
+	if (ill->ill_up_ipifs)
 		ill_group_cleanup(ill);
-	}
 
 	/*
-	 * The ioctl must complete now without EINPROGRESS
-	 * since ipsq_pending_mp_get has removed the ioctl mblk
-	 * from ipsq_pending_mp. Otherwise the ioctl will be
-	 * stuck for ever in the ipsq.
+	 * The operation must complete without EINPROGRESS since
+	 * ipsq_pending_mp_get() has removed the mblk from ipsq_pending_mp.
+	 * Otherwise, the operation will be stuck forever in the ipsq.
 	 */
 	ASSERT(err != EINPROGRESS);
-	ip_ioctl_finish(q, mp1, err, NO_COPYOUT, ipif, ipsq);
+	if (ipsq->ipsq_current_ioctl != 0)
+		ip_ioctl_finish(q, mp1, err, NO_COPYOUT, ipsq);
+	else
+		ipsq_current_finish(ipsq);
 }
 
 /* Allocate the private structure */

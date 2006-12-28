@@ -1055,17 +1055,9 @@ ill_setdefaulttoken(ill_t *ill)
 	int 		i;
 	in6_addr_t	v6addr, v6mask;
 
-	/*
-	 * Though we execute on the ipsq, we need to hold the ill_lock
-	 * to prevent readers from seeing partially updated values
-	 * while we do the update.
-	 */
-	mutex_enter(&ill->ill_lock);
 	if (!MEDIA_V6INTFID(ill->ill_media, ill->ill_phys_addr_length,
-	    ill->ill_phys_addr, &v6addr)) {
-		mutex_exit(&ill->ill_lock);
+	    ill->ill_phys_addr, &v6addr))
 		return (B_FALSE);
-	}
 
 	(void) ip_plen_to_mask_v6(IPV6_TOKEN_LEN, &v6mask);
 
@@ -1075,7 +1067,6 @@ ill_setdefaulttoken(ill_t *ill)
 
 	V6_MASK_COPY(v6addr, v6mask, ill->ill_token);
 	ill->ill_token_length = IPV6_TOKEN_LEN;
-	mutex_exit(&ill->ill_lock);
 	return (B_TRUE);
 }
 
@@ -1364,7 +1355,7 @@ ipif_ndp_setup_multicast(ipif_t *ipif, nce_t **ret_nce)
  * as writer.)
  */
 int
-ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr, boolean_t macaddr_change)
+ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr)
 {
 	ill_t		*ill = ipif->ipif_ill;
 	int		err = 0;
@@ -1408,8 +1399,7 @@ ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr, boolean_t macaddr_change)
 		uchar_t	*hw_addr = NULL;
 
 		/* Permanent entries don't need NUD */
-		flags = NCE_F_PERMANENT;
-		flags |= NCE_F_NONUD;
+		flags = NCE_F_PERMANENT | NCE_F_NONUD;
 		if (ill->ill_flags & ILLF_ROUTER)
 			flags |= NCE_F_ISROUTER;
 
@@ -1419,7 +1409,7 @@ ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr, boolean_t macaddr_change)
 		if (ill->ill_net_type == IRE_IF_RESOLVER) {
 			hw_addr = ill->ill_nd_lla;
 
-			if (ill->ill_move_in_progress || macaddr_change) {
+			if (ill->ill_move_in_progress) {
 				/*
 				 * Addresses are failing over to this ill.
 				 * Don't wait for NUD to see this change.

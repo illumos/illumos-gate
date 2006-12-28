@@ -361,6 +361,9 @@ typedef struct datab {
  */
 #define	DB_TCI(mp)		((mp)->b_datap->db_struioun.cksum.pad)
 
+#define	MBLK_GETLABEL(mp) \
+	(DB_CRED(mp) != NULL ? crgetlabel(DB_CRED(mp)) : NULL)
+
 /*
  * Message block descriptor
  */
