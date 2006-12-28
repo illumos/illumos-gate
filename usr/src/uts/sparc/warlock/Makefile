@@ -77,6 +77,7 @@ warlock.usb:
 	@cd ../usb_ah; make clean; $(MAKE) warlock
 	@cd ../ugen; make clean; $(MAKE) warlock
 	@cd ../usb_mid; make clean; $(MAKE) warlock
+	@cd ../usb_ia; make clean; $(MAKE) warlock
 	@cd ../usbprn; make clean; $(MAKE) warlock
 	@cd ../usbser; make clean; $(MAKE) warlock
 	@cd $(CLOSED)/uts/sparc/usbser_edge; make clean; $(MAKE) warlock

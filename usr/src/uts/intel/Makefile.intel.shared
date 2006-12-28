@@ -374,6 +374,7 @@ DRV_KMODS	+= uhci
 DRV_KMODS	+= ehci
 DRV_KMODS	+= ohci
 DRV_KMODS	+= usb_mid
+DRV_KMODS	+= usb_ia
 DRV_KMODS	+= scsa2usb
 DRV_KMODS	+= usbprn
 DRV_KMODS	+= ugen

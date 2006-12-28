@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +33,8 @@
 #define	USBA_FRAMEWORK
 #include <sys/usb/usba/usba_impl.h>
 #include <sys/usb/usba/hcdi_impl.h>
+
+extern void usba_free_evdata(usba_evdata_t *);
 
 static mblk_t *usba_get_cfg_cloud(dev_info_t *, usb_pipe_handle_t, int);
 
@@ -815,6 +816,21 @@ usb_owns_device(dev_info_t *dip)
 }
 
 
+/* check whether the interface is in this interface association */
+boolean_t
+usba_check_if_in_ia(dev_info_t *dip, int n_if)
+{
+	int first_if, if_count;
+
+	first_if = usb_get_if_number(dip);
+	if_count = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+		DDI_PROP_DONTPASS, "interface-count", -1);
+	if_count += first_if;
+
+	return ((n_if >= first_if && n_if < if_count) ? B_TRUE : B_FALSE);
+}
+
+
 uint8_t
 usba_get_ifno(dev_info_t *dip)
 {
@@ -917,8 +933,8 @@ usba_sync_set_alt_if(dev_info_t	*dip,
 	    "uf=0x%x", ddi_node_name(dip), interface,
 	    alt_number, flags);
 
-	/* if we don't own the device, we must own the interface */
-	if (!usb_owns_device(dip) &&
+	/* if we don't own the device, we must own the interface or ia */
+	if (!usb_owns_device(dip) && !usba_check_if_in_ia(dip, interface) &&
 	    (interface != usb_get_if_number(dip))) {
 		usba_release_ph_data(ph_data->p_ph_impl);
 
@@ -2177,3 +2193,242 @@ usba_test_allocb(size_t size, uint_t pri)
 	}
 }
 #endif
+
+
+/*
+ * usb common power management for usb_mid, usb_ia and maybe other simple
+ * drivers.
+ */
+
+/*
+ * functions to handle power transition for OS levels 0 -> 3
+ */
+static int
+usb_common_pwrlvl0(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
+{
+	int	rval;
+
+	switch (*dev_state) {
+	case USB_DEV_ONLINE:
+		/* Issue USB D3 command to the device here */
+		rval = usb_set_device_pwrlvl3(dip);
+		ASSERT(rval == USB_SUCCESS);
+
+		*dev_state = USB_DEV_PWRED_DOWN;
+		pm->uc_current_power = USB_DEV_OS_PWR_OFF;
+		/* FALLTHRU */
+	case USB_DEV_DISCONNECTED:
+	case USB_DEV_SUSPENDED:
+		/* allow a disconnected/cpr'ed device to go to low pwr */
+
+		return (USB_SUCCESS);
+	case USB_DEV_PWRED_DOWN:
+	default:
+		return (USB_FAILURE);
+	}
+}
+
+
+/* ARGSUSED */
+static int
+usb_common_pwrlvl1(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
+{
+	int	rval;
+
+	/* Issue USB D2 command to the device here */
+	rval = usb_set_device_pwrlvl2(dip);
+	ASSERT(rval == USB_SUCCESS);
+
+	return (USB_FAILURE);
+}
+
+
+/* ARGSUSED */
+static int
+usb_common_pwrlvl2(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
+{
+	int	rval;
+
+	/* Issue USB D1 command to the device here */
+	rval = usb_set_device_pwrlvl1(dip);
+	ASSERT(rval == USB_SUCCESS);
+
+	return (USB_FAILURE);
+}
+
+
+static int
+usb_common_pwrlvl3(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
+{
+	int	rval;
+
+	switch (*dev_state) {
+	case USB_DEV_PWRED_DOWN:
+		/* Issue USB D0 command to the device here */
+		rval = usb_set_device_pwrlvl0(dip);
+		ASSERT(rval == USB_SUCCESS);
+
+		*dev_state = USB_DEV_ONLINE;
+		pm->uc_current_power = USB_DEV_OS_FULL_PWR;
+
+		/* FALLTHRU */
+	case USB_DEV_ONLINE:
+		/* we are already in full power */
+
+		/* FALLTHRU */
+	case USB_DEV_DISCONNECTED:
+	case USB_DEV_SUSPENDED:
+		/* allow a disconnected/cpr'ed device to go to low power */
+
+		return (USB_SUCCESS);
+	default:
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usbai_log_handle,
+		    "usb_common_pwrlvl3: Illegal state (%s)",
+		    usb_str_dev_state(*dev_state));
+
+		return (USB_FAILURE);
+	}
+}
+
+/* power management */
+int
+usba_common_power(dev_info_t *dip, usb_common_power_t *pm, int *dev_state,
+		int level)
+{
+	int rval = DDI_FAILURE;
+
+	switch (level) {
+	case USB_DEV_OS_PWR_OFF:
+		rval = usb_common_pwrlvl0(dip, pm, dev_state);
+		break;
+	case USB_DEV_OS_PWR_1:
+		rval = usb_common_pwrlvl1(dip, pm, dev_state);
+		break;
+	case USB_DEV_OS_PWR_2:
+		rval = usb_common_pwrlvl2(dip, pm, dev_state);
+		break;
+	case USB_DEV_OS_FULL_PWR:
+		rval = usb_common_pwrlvl3(dip, pm, dev_state);
+		break;
+	}
+
+	return ((rval == USB_SUCCESS) ? DDI_SUCCESS : DDI_FAILURE);
+}
+
+/*
+ * register and unregister for events from our parent for usb_mid and usb_ia
+ * and maybe other nexus driver.
+ *
+ * Note: The cookie fields in usba_device structure is not used. They are
+ * used/shared by children.
+ */
+void
+usba_common_register_events(dev_info_t *dip, uint_t if_num,
+	void (*event_cb)(dev_info_t *, ddi_eventcookie_t, void *, void *))
+{
+	int rval;
+	usba_evdata_t *evdata;
+	ddi_eventcookie_t cookie;
+
+	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
+	    "usb_common_register_events:");
+
+	evdata = usba_get_evdata(dip);
+
+	/* get event cookie, discard level and icookie for now */
+	rval = ddi_get_eventcookie(dip, DDI_DEVI_REMOVE_EVENT,
+		&cookie);
+
+	if (rval == DDI_SUCCESS) {
+		rval = ddi_add_event_handler(dip,
+		    cookie, event_cb, NULL, &evdata->ev_rm_cb_id);
+
+		if (rval != DDI_SUCCESS) {
+
+			goto fail;
+		}
+	}
+	rval = ddi_get_eventcookie(dip, DDI_DEVI_INSERT_EVENT,
+		&cookie);
+	if (rval == DDI_SUCCESS) {
+		rval = ddi_add_event_handler(dip, cookie, event_cb,
+		    NULL, &evdata->ev_ins_cb_id);
+
+		if (rval != DDI_SUCCESS) {
+
+			goto fail;
+		}
+	}
+	rval = ddi_get_eventcookie(dip, USBA_PRE_SUSPEND_EVENT, &cookie);
+	if (rval == DDI_SUCCESS) {
+		rval = ddi_add_event_handler(dip,
+		    cookie, event_cb, NULL, &evdata->ev_suspend_cb_id);
+
+		if (rval != DDI_SUCCESS) {
+
+			goto fail;
+		}
+	}
+	rval = ddi_get_eventcookie(dip, USBA_POST_RESUME_EVENT, &cookie);
+	if (rval == DDI_SUCCESS) {
+		rval = ddi_add_event_handler(dip, cookie, event_cb, NULL,
+		    &evdata->ev_resume_cb_id);
+
+		if (rval != DDI_SUCCESS) {
+
+			goto fail;
+		}
+	}
+
+	return;
+
+
+fail:
+	usba_common_unregister_events(dip, if_num);
+
+}
+
+void
+usba_common_unregister_events(dev_info_t *dip, uint_t if_num)
+{
+	usba_evdata_t	*evdata;
+	usba_device_t	*usba_device = usba_get_usba_device(dip);
+	int i;
+
+	evdata = usba_get_evdata(dip);
+
+	if (evdata->ev_rm_cb_id != NULL) {
+		(void) ddi_remove_event_handler(evdata->ev_rm_cb_id);
+		evdata->ev_rm_cb_id = NULL;
+	}
+
+	if (evdata->ev_ins_cb_id != NULL) {
+		(void) ddi_remove_event_handler(evdata->ev_ins_cb_id);
+		evdata->ev_ins_cb_id = NULL;
+	}
+
+	if (evdata->ev_suspend_cb_id != NULL) {
+		(void) ddi_remove_event_handler(evdata->ev_suspend_cb_id);
+		evdata->ev_suspend_cb_id = NULL;
+	}
+
+	if (evdata->ev_resume_cb_id != NULL) {
+		(void) ddi_remove_event_handler(evdata->ev_resume_cb_id);
+		evdata->ev_resume_cb_id = NULL;
+	}
+
+	/* clear event data for children, required for cfgmadm unconfigure */
+	if (usb_owns_device(dip)) {
+		usba_free_evdata(usba_device->usb_evdata);
+		usba_device->usb_evdata = NULL;
+		usba_device->rm_cookie = NULL;
+		usba_device->ins_cookie = NULL;
+		usba_device->suspend_cookie = NULL;
+		usba_device->resume_cookie = NULL;
+	} else {
+		for (i = 0; i < if_num; i++) {
+			usba_device->usb_client_flags[usba_get_ifno(dip) + i]
+				&= ~USBA_CLIENT_FLAG_EV_CBS;
+		}
+	}
+}

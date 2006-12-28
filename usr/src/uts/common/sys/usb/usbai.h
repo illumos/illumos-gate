@@ -317,6 +317,22 @@ typedef struct usb_other_speed_cfg_descr {
 
 
 /*
+ * usb_ia_descr:
+ *	usb interface association descriptor, refer to USB 2.0 ECN(IAD)
+ */
+typedef  struct usb_ia_descr {
+	uint8_t		bLength;		/* descriptor size	*/
+	uint8_t		bDescriptorType;	/* INTERFACE_ASSOCIATION */
+	uint8_t		bFirstInterface;	/* 1st interface number */
+	uint8_t		bInterfaceCount;	/* number of interfaces */
+	uint8_t		bFunctionClass;		/* class code		*/
+	uint8_t		bFunctionSubClass;	/* sub class code	*/
+	uint8_t		bFunctionProtocol;	/* protocol code	*/
+	uint8_t		iFunction;		/* description string	*/
+} usb_ia_descr_t;
+
+
+/*
  * usb_if_descr:
  *	usb interface descriptor, refer	to USB 2.0/9.6.5
  */
@@ -1326,6 +1342,7 @@ typedef struct usb_ctrl_req {
 #define	USB_DESCR_TYPE_DEV_QLF			0x06
 #define	USB_DESCR_TYPE_OTHER_SPEED_CFG		0x07
 #define	USB_DESCR_TYPE_IF_PWR			0x08
+#define	USB_DESCR_TYPE_IA			0x0B
 
 /*
  * device request type
@@ -2335,14 +2352,16 @@ void usb_unregister_hotplug_cbs(dev_info_t *dip);
 #define	USB_CLASS_CDC_CTRL	2	/* CDC-control iface class, also 2 */
 #define	USB_CLASS_HID		3
 #define	USB_CLASS_PHYSICAL	5
+#define	USB_CLASS_IMAGE		6
 #define	USB_CLASS_PRINTER	7
 #define	USB_CLASS_MASS_STORAGE	8
 #define	USB_CLASS_HUB		9	/* Device class */
 #define	USB_CLASS_CDC_DATA	10
 #define	USB_CLASS_CCID		11
 #define	USB_CLASS_SECURITY	13
+#define	USB_CLASS_VIDEO		14
 #define	USB_CLASS_DIAG		220	/* Device class */
-#define	USB_CLASS_WIRELESS	224	/* Device class */
+#define	USB_CLASS_WIRELESS	224
 #define	USB_CLASS_MISC		239	/* Device class */
 #define	USB_CLASS_APP		254
 #define	USB_CLASS_VENDOR_SPEC	255	/* Device class */
@@ -2393,7 +2412,17 @@ void usb_unregister_hotplug_cbs(dev_info_t *dip);
 #define	USB_SUBCLS_APP_IRDA		0x02	/* app spec IrDa subclass */
 #define	USB_SUBCLS_APP_TEST		0x03	/* app spec test subclass */
 
+/* Video subclasses */
+#define	USB_SUBCLS_VIDEO_CONTROL	0x01	/* video control */
+#define	USB_SUBCLS_VIDEO_STREAM		0x02	/* video stream */
+#define	USB_SUBCLS_VIDEO_COLLECTION	0x03	/* video interface collection */
 
+/* Wireless controller subclasses and protocols */
+#define	USB_SUBCLS_WUSB_1		0x01
+#define	USB_SUBCLS_WUSB_2		0x02
+#define	USB_PROTO_WUSB_HWA		0x01	/* host wire adapter */
+#define	USB_PROTO_WUSB_DWA		0x02	/* device wire adapter */
+#define	USB_PROTO_WUSB_DWA_ISO		0x03	/* device wire adapter isoc */
 
 #ifdef __cplusplus
 }

@@ -39,9 +39,9 @@ LINKDIR=${BASEDIR}/dev/usb
 LINKFILES="hub* mass-storage* device*"
 
 # since ohci, uhci and ehci are self probing nexus drivers,
-# add_drv -n hid, hubd and usb_mid before add_drv ohci/uhci/ehci.
+# add_drv -n hid, hubd, usb_ia and usb_mid before add_drv ohci/uhci/ehci.
 # ohci/uhci/ehci will create the hub and usb,device nodes and attach
-# hubd and usb_mid drivers
+# hubd, usb_mid and usb_ia drivers
 
 not_installed() {
 	driver=$1
@@ -60,6 +60,9 @@ not_installed hubd || add_drv ${BASEDIR_OPT} -m '* 0644 root sys' \
 
 not_installed scsa2usb || add_drv ${BASEDIR_OPT} \
 	-i '"usbif,class8" "usb584,222"' -n scsa2usb || EXIT=1
+
+not_installed usb_ia || add_drv ${BASEDIR_OPT} -i '"usb,ia"' -n usb_ia || 
+EXIT=1
 
 not_installed usb_mid || add_drv ${BASEDIR_OPT} -i '"usb,device"' -n usb_mid || 
 EXIT=1

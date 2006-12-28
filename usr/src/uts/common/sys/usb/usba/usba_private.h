@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,9 +70,10 @@ extern "C" {
  *	ret_descr	buffer the data is to be returned in
  *	ret_buf_len	size of the buffer at ret_descr
  *
- *	if_index the index in the array of concurrent interfaces
+ * 	first_if	the first interace associated with current iad
+ *	if_index	the index in the array of concurrent interfaces
  *			supported by this configuration
- *	alt_if_setting alternate setting for the interface identified
+ *	alt_if_setting	alternate setting for the interface identified
  *			by if_index
  *	ep_index	the index in the array of endpoints supported by
  *			this configuration
@@ -97,6 +97,14 @@ size_t usb_parse_cfg_descr(
 	uchar_t			*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 	size_t			buflen,
 	usb_cfg_descr_t		*ret_descr,
+	size_t			ret_buf_len);
+
+
+size_t usb_parse_ia_descr(
+	uchar_t			*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
+	size_t			buflen,
+	size_t			first_if,
+	usb_ia_descr_t		*ret_descr,
 	size_t			ret_buf_len);
 
 
@@ -281,10 +289,15 @@ ddi_dma_attr_t *usba_get_hc_dma_attr(dev_info_t *dip);
  */
 int usba_bind_driver(dev_info_t *);
 
+/* check whether the dip owns an interface-associaiton */
+boolean_t usba_owns_ia(dev_info_t *dip);
+
 /*
  * Driver binding functions
  */
 dev_info_t *usba_ready_device_node(dev_info_t *);
+dev_info_t *usba_ready_interface_association_node(dev_info_t *,
+					uint_t, uint_t *);
 dev_info_t *usba_ready_interface_node(dev_info_t *, uint_t);
 
 /* Some Nexus driver functions. */
@@ -345,6 +358,7 @@ extern usb_ep_descr_t   usba_default_ep_descr;
 #define	USB_IF_DESCR_SIZE	 9	/* interface descr size */
 #define	USBA_IF_PWR_DESCR_SIZE	15	/* interface pwr descr size */
 #define	USB_EP_DESCR_SIZE	 7	/* endpoint descr size */
+#define	USB_IA_DESCR_SIZE	 8	/* interface association descr size */
 
 /*
  * For compatibility with old code.
@@ -409,6 +423,45 @@ size_t usba_parse_if_pwr_descr(uchar_t *, size_t buflen, uint_t,
  * If so, then more comments about how it differs?
  */
 size_t usba_ascii_string_descr(uchar_t *, size_t, char *, size_t);
+
+
+/*
+ * usb common power management, for usb_mid, usb_ia and maybe other simple
+ * drivers.
+ */
+typedef struct usb_common_power_struct {
+	void		*uc_usb_statep;	/* points back to state structure */
+
+	uint8_t		uc_wakeup_enabled;
+
+	/* this is the bit mask of the power states that device has */
+	uint8_t		uc_pwr_states;
+
+	/* wakeup and power transition capabilites of an interface */
+	uint8_t		uc_pm_capabilities;
+
+	uint8_t		uc_current_power;	/* current power level */
+} usb_common_power_t;
+
+/* warlock directives, stable data */
+_NOTE(DATA_READABLE_WITHOUT_LOCK(usb_common_power_t::uc_usb_statep))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(usb_common_power_t::uc_wakeup_enabled))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(usb_common_power_t::uc_pwr_states))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(usb_common_power_t::uc_pm_capabilities))
+
+/* power management */
+int usba_common_power(dev_info_t *, usb_common_power_t *, int *, int);
+
+/*
+ * usb common events handler for usb_mid, usb_ia and maybe other nexus
+ * drivers.
+ */
+
+void usba_common_register_events(dev_info_t *, uint_t,
+	void (*)(dev_info_t *, ddi_eventcookie_t, void *, void *));
+
+void usba_common_unregister_events(dev_info_t *, uint_t);
+
 
 #ifdef	__cplusplus
 }

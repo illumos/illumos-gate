@@ -83,7 +83,7 @@ extern struct mod_ops mod_miscops;
 
 struct modlmisc modlmisc	= {
 	&mod_miscops,	/* Type	of module */
-	"USBA: USB Architecture 2.0 %I%"
+	"USBA: USB Architecture 2.0 1.66"
 };
 
 struct modlinkage modlinkage = {
@@ -152,6 +152,14 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
+boolean_t
+usba_owns_ia(dev_info_t *dip)
+{
+	int if_count = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "interface-count", 0);
+
+	return ((if_count) ? B_TRUE : B_FALSE);
+}
 
 /*
  * common bus ctl for hcd, usb_mid, and hubd
@@ -199,6 +207,14 @@ usba_bus_ctl(dev_info_t	*dip,
 				    "usb%x,%x",
 				    usba_device->usb_dev_descr->idVendor,
 				    usba_device->usb_dev_descr->idProduct);
+			} else if (usba_owns_ia(rdip)) {
+				(void) snprintf(compat_name,
+				    sizeof (compat_name),
+				    "usbia%x,%x.config%x.%x",
+				    usba_device->usb_dev_descr->idVendor,
+				    usba_device->usb_dev_descr->idProduct,
+				    usba_device->usb_cfg_value,
+				    usb_get_if_number(rdip));
 			} else {
 				(void) snprintf(compat_name,
 				    sizeof (compat_name),
@@ -230,7 +246,9 @@ usba_bus_ctl(dev_info_t	*dip,
 			    "%s@%s, %s%d at bus address %d\n",
 			    (usba_device->usb_dev_descr->bcdUSB & 0xff00) >> 8,
 			    usba_device->usb_dev_descr->bcdUSB & 0xff,
-			    (usb_owns_device(rdip) ? "device" : "interface"),
+			    (usb_owns_device(rdip) ? "device" :
+			    ((usba_owns_ia(rdip) ? "interface-association" :
+			    "interface"))),
 			    compat_name, speed,
 			    (hub_usba_device->usb_dev_descr->bcdUSB &
 			    0xff00) >> 8,
@@ -1386,7 +1404,19 @@ usba_set_usba_device(dev_info_t *dip, usba_device_t *usba_device)
 static node_name_entry_t device_node_name_table[] = {
 { USB_CLASS_COMM,	DONTCARE,	DONTCARE,	"communications" },
 { USB_CLASS_HUB,	DONTCARE,	DONTCARE,	"hub" },
+{ USB_CLASS_DIAG,	DONTCARE,	DONTCARE,	"diagnostics" },
+{ USB_CLASS_MISC,	DONTCARE,	DONTCARE,	"miscellaneous" },
 { DONTCARE,		DONTCARE,	DONTCARE,	"device" }
+};
+
+/* interface-association node table */
+static node_name_entry_t ia_node_name_table[] = {
+{ USB_CLASS_AUDIO,	DONTCARE,	DONTCARE, "audio" },
+{ USB_CLASS_VIDEO,	DONTCARE,	DONTCARE, "video" },
+{ USB_CLASS_WIRELESS,	USB_SUBCLS_WUSB_2, USB_PROTO_WUSB_DWA,
+						"device-wire-adaptor" },
+{ USB_CLASS_WIRELESS,	DONTCARE,	DONTCARE, "wireless-controller" },
+{ DONTCARE,		DONTCARE,	DONTCARE, "interface-association" }
 };
 
 /* interface node table, refer to section 3.3.2.1 */
@@ -1403,7 +1433,7 @@ static node_name_entry_t if_node_name_table[] = {
 { USB_CLASS_COMM, USB_SUBCLS_CDCC_ISDN,		DONTCARE, "isdn" },
 { USB_CLASS_COMM, USB_SUBCLS_CDCC_ETHERNET,	DONTCARE, "ethernet" },
 { USB_CLASS_COMM, USB_SUBCLS_CDCC_ATM_NETWORK, DONTCARE, "atm-network" },
-{ USB_CLASS_COMM, DONTCARE,		DONTCARE,	"control" },
+{ USB_CLASS_COMM, DONTCARE,		DONTCARE,	"communications" },
 
 { USB_CLASS_HID, USB_SUBCLS_HID_1, USB_PROTO_HID_KEYBOARD,	"keyboard" },
 { USB_CLASS_HID, USB_SUBCLS_HID_1, USB_PROTO_HID_MOUSE,	"mouse" },
@@ -1413,6 +1443,8 @@ static node_name_entry_t if_node_name_table[] = {
 
 { USB_CLASS_PHYSICAL,	DONTCARE,	DONTCARE,	"physical" },
 
+{ USB_CLASS_IMAGE,	DONTCARE,	DONTCARE,	"image" },
+
 { USB_CLASS_PRINTER,	DONTCARE,	DONTCARE,	"printer" },
 
 { USB_CLASS_MASS_STORAGE, DONTCARE,	DONTCARE,	"storage" },
@@ -1420,6 +1452,10 @@ static node_name_entry_t if_node_name_table[] = {
 { USB_CLASS_CDC_DATA,	DONTCARE,	DONTCARE,	"data" },
 
 { USB_CLASS_SECURITY,	DONTCARE,	DONTCARE,	"security" },
+
+{ USB_CLASS_VIDEO, USB_SUBCLS_VIDEO_CONTROL, DONTCARE,	"video-control" },
+{ USB_CLASS_VIDEO, USB_SUBCLS_VIDEO_STREAM,  DONTCARE,	"video-stream" },
+{ USB_CLASS_VIDEO,	DONTCARE,	DONTCARE,	"video" },
 
 { USB_CLASS_APP,	USB_SUBCLS_APP_FIRMWARE, DONTCARE, "firmware" },
 { USB_CLASS_APP,	USB_SUBCLS_APP_IRDA,	DONTCARE, "IrDa" },
@@ -1443,7 +1479,7 @@ static node_name_entry_t combined_node_name_table[] = {
 { USB_CLASS_COMM, USB_SUBCLS_CDCC_ISDN,		DONTCARE, "isdn" },
 { USB_CLASS_COMM, USB_SUBCLS_CDCC_ETHERNET,	DONTCARE, "ethernet" },
 { USB_CLASS_COMM, USB_SUBCLS_CDCC_ATM_NETWORK, DONTCARE, "atm-network" },
-{ USB_CLASS_COMM, DONTCARE,		DONTCARE,	"control" },
+{ USB_CLASS_COMM, DONTCARE,		DONTCARE,	"communications" },
 
 { USB_CLASS_HID, USB_SUBCLS_HID_1, USB_PROTO_HID_KEYBOARD, "keyboard" },
 { USB_CLASS_HID, USB_SUBCLS_HID_1, USB_PROTO_HID_MOUSE,	"mouse" },
@@ -1451,25 +1487,41 @@ static node_name_entry_t combined_node_name_table[] = {
 
 { USB_CLASS_PHYSICAL,	DONTCARE,	DONTCARE,	"physical" },
 
+{ USB_CLASS_IMAGE,	DONTCARE,	DONTCARE,	"image" },
+
 { USB_CLASS_PRINTER,	DONTCARE,	DONTCARE,	"printer" },
 
+{ USB_CLASS_MASS_STORAGE, USB_SUBCLS_MS_RBC_T10,	DONTCARE, "storage" },
+{ USB_CLASS_MASS_STORAGE, USB_SUBCLS_MS_SFF8020I,	DONTCARE, "cdrom" },
+{ USB_CLASS_MASS_STORAGE, USB_SUBCLS_MS_QIC_157,	DONTCARE, "tape" },
+{ USB_CLASS_MASS_STORAGE, USB_SUBCLS_MS_UFI,		DONTCARE, "floppy" },
+{ USB_CLASS_MASS_STORAGE, USB_SUBCLS_MS_SFF8070I,	DONTCARE, "storage" },
+{ USB_CLASS_MASS_STORAGE, USB_SUBCLS_MS_SCSI,		DONTCARE, "storage" },
 { USB_CLASS_MASS_STORAGE, DONTCARE,	DONTCARE,	"storage" },
 
 { USB_CLASS_CDC_DATA,	DONTCARE,	DONTCARE,	"data" },
 
 { USB_CLASS_SECURITY,	DONTCARE,	DONTCARE,	"security" },
 
+{ USB_CLASS_VIDEO, USB_SUBCLS_VIDEO_CONTROL, DONTCARE,	"video-control" },
+{ USB_CLASS_VIDEO, USB_SUBCLS_VIDEO_STREAM,  DONTCARE,	"video-stream" },
+{ USB_CLASS_VIDEO,	DONTCARE,	DONTCARE,	"video" },
+
 { USB_CLASS_APP,	USB_SUBCLS_APP_FIRMWARE, DONTCARE, "firmware" },
 { USB_CLASS_APP,	USB_SUBCLS_APP_IRDA,	DONTCARE, "IrDa" },
 { USB_CLASS_APP,	USB_SUBCLS_APP_TEST,	DONTCARE, "test" },
 
-{ USB_CLASS_HUB,	DONTCARE,	DONTCARE,	"hub" },
 { USB_CLASS_COMM,	DONTCARE,	DONTCARE,	"communications" },
-{ DONTCARE,		DONTCARE,	DONTCARE,	"device" },
+{ USB_CLASS_HUB,	DONTCARE,	DONTCARE,	"hub" },
+{ USB_CLASS_DIAG,	DONTCARE,	DONTCARE,	"diagnostics" },
+{ USB_CLASS_MISC,	DONTCARE,	DONTCARE,	"miscellaneous" },
+{ DONTCARE,		DONTCARE,	DONTCARE,	"device" }
 };
 
 static size_t device_node_name_table_size =
 	sizeof (device_node_name_table)/sizeof (struct node_name_entry);
+static size_t ia_node_name_table_size =
+	sizeof (ia_node_name_table)/sizeof (struct node_name_entry);
 static size_t if_node_name_table_size =
 	sizeof (if_node_name_table)/sizeof (struct node_name_entry);
 static size_t combined_node_name_table_size =
@@ -1485,6 +1537,11 @@ usba_set_node_name(dev_info_t *dip, uint8_t class, uint8_t subclass,
 	node_name_entry_t *node_name_table;
 
 	switch (flag) {
+	/* interface share node names with interface-association */
+	case FLAG_INTERFACE_ASSOCIATION_NODE:
+		node_name_table = ia_node_name_table;
+		size = ia_node_name_table_size;
+		break;
 	case FLAG_INTERFACE_NODE:
 		node_name_table = if_node_name_table;
 		size = if_node_name_table_size;
@@ -1511,6 +1568,7 @@ usba_set_node_name(dev_info_t *dip, uint8_t class, uint8_t subclass,
 		    ((s == DONTCARE) || (s == subclass)) &&
 		    ((p == DONTCARE) || (p == protocol))) {
 			char *name = node_name_table[i].name;
+
 			(void) ndi_devi_set_nodename(dip, name, 0);
 			break;
 		}
@@ -2094,6 +2152,248 @@ usba_ready_device_node(dev_info_t *child_dip)
 
 
 /*
+ * driver binding at interface association level. the first arg is the parent
+ * dip. if_count returns amount of interfaces which are associated within
+ * this interface-association that starts from first_if.
+ */
+/*ARGSUSED*/
+dev_info_t *
+usba_ready_interface_association_node(dev_info_t	*dip,
+					uint_t		first_if,
+					uint_t		*if_count)
+{
+	dev_info_t		*child_dip = NULL;
+	usba_device_t		*child_ud = usba_get_usba_device(dip);
+	usb_dev_descr_t		*usb_dev_descr;
+	size_t			usb_cfg_length;
+	uchar_t			*usb_cfg;
+	usb_ia_descr_t		ia_descr;
+	int			i, n, rval;
+	int			reg[2];
+	size_t			size;
+	usb_port_status_t	port_status;
+	char			*force_bind = NULL;
+
+	usb_cfg = usb_get_raw_cfg_data(dip, &usb_cfg_length);
+
+	mutex_enter(&child_ud->usb_mutex);
+
+	usb_dev_descr = child_ud->usb_dev_descr;
+
+	/*
+	 * for each interface association, determine all compatible names
+	 */
+	USB_DPRINTF_L3(DPRINT_MASK_USBA, usba_log_handle,
+	    "usba_ready_ia_node: "
+	    "port %d, interface = %d, port_status = %x",
+	    child_ud->usb_port, first_if, child_ud->usb_port_status);
+
+	/* Parse the interface descriptor */
+	size = usb_parse_ia_descr(
+			usb_cfg,
+			usb_cfg_length,
+			first_if,	/* interface index */
+			&ia_descr,
+			USB_IA_DESCR_SIZE);
+
+	*if_count = 1;
+	if (size != USB_IA_DESCR_SIZE) {
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
+		    "parsing ia: size (%lu) != USB_IA_DESCR_SIZE (%d)",
+		    size, USB_IA_DESCR_SIZE);
+		mutex_exit(&child_ud->usb_mutex);
+
+		return (NULL);
+	}
+
+	port_status = child_ud->usb_port_status;
+
+	/* create reg property */
+	reg[0] = first_if;
+	reg[1] = child_ud->usb_cfg_value;
+
+	mutex_exit(&child_ud->usb_mutex);
+
+	/* clone this dip */
+	rval =	usba_create_child_devi(dip,
+			"interface-association",
+			NULL,		/* usba_hcdi ops */
+			NULL,		/* root hub dip */
+			port_status,	/* port status */
+			child_ud,	/* share this usba_device */
+			&child_dip);
+
+	if (rval != USB_SUCCESS) {
+
+		goto fail;
+	}
+
+	rval = ndi_prop_update_int_array(
+		DDI_DEV_T_NONE, child_dip, "reg", reg, 2);
+
+	if (rval != DDI_PROP_SUCCESS) {
+
+		goto fail;
+	}
+
+	usba_set_node_name(child_dip, ia_descr.bFunctionClass,
+	    ia_descr.bFunctionSubClass, ia_descr.bFunctionProtocol,
+	    FLAG_INTERFACE_ASSOCIATION_NODE);
+
+	/* check force binding */
+	if (usba_ugen_force_binding ==
+	    USBA_UGEN_INTERFACE_ASSOCIATION_BINDING) {
+		force_bind = "ugen";
+	}
+
+	/*
+	 * check whether there is another dip with this name and address
+	 */
+	ASSERT(usba_find_existing_node(child_dip) == NULL);
+
+	mutex_enter(&usba_mutex);
+	n = 0;
+
+	if (force_bind) {
+		(void) ndi_devi_set_nodename(child_dip, force_bind, 0);
+		(void) strncpy(usba_name[n++], force_bind,
+						USBA_MAX_COMPAT_NAME_LEN);
+	}
+
+	/* 1) usbiaVID,PID.REV.configCN.FN */
+	(void) sprintf(usba_name[n++],
+			"usbia%x,%x.%x.config%x.%x",
+			usb_dev_descr->idVendor,
+			usb_dev_descr->idProduct,
+			usb_dev_descr->bcdDevice,
+			child_ud->usb_cfg_value,
+			first_if);
+
+	/* 2) usbiaVID,PID.configCN.FN */
+	(void) sprintf(usba_name[n++],
+			"usbia%x,%x.config%x.%x",
+			usb_dev_descr->idVendor,
+			usb_dev_descr->idProduct,
+			child_ud->usb_cfg_value,
+			first_if);
+
+
+	if (ia_descr.bFunctionClass) {
+		/* 3) usbiaVID,classFC.FSC.FPROTO */
+		(void) sprintf(usba_name[n++],
+			"usbia%x,class%x.%x.%x",
+			usb_dev_descr->idVendor,
+			ia_descr.bFunctionClass,
+			ia_descr.bFunctionSubClass,
+			ia_descr.bFunctionProtocol);
+
+		/* 4) usbiaVID,classFC.FSC */
+		(void) sprintf(usba_name[n++],
+			"usbia%x,class%x.%x",
+			usb_dev_descr->idVendor,
+			ia_descr.bFunctionClass,
+			ia_descr.bFunctionSubClass);
+
+		/* 5) usbiaVID,classFC */
+		(void) sprintf(usba_name[n++],
+			"usbia%x,class%x",
+			usb_dev_descr->idVendor,
+			ia_descr.bFunctionClass);
+
+		/* 6) usbia,classFC.FSC.FPROTO */
+		(void) sprintf(usba_name[n++],
+			"usbia,class%x.%x.%x",
+			ia_descr.bFunctionClass,
+			ia_descr.bFunctionSubClass,
+			ia_descr.bFunctionProtocol);
+
+		/* 7) usbia,classFC.FSC */
+		(void) sprintf(usba_name[n++],
+			"usbia,class%x.%x",
+			ia_descr.bFunctionClass,
+			ia_descr.bFunctionSubClass);
+
+		/* 8) usbia,classFC */
+		(void) sprintf(usba_name[n++],
+			"usbia,class%x",
+			ia_descr.bFunctionClass);
+	}
+
+	if (usba_get_ugen_binding(child_dip) ==
+	    USBA_UGEN_INTERFACE_ASSOCIATION_BINDING) {
+		/* 9) ugen */
+		(void) sprintf(usba_name[n++], "ugen");
+	} else {
+
+		(void) sprintf(usba_name[n++], "usb,ia");
+	}
+
+	for (i = 0; i < n; i += 2) {
+		USB_DPRINTF_L3(DPRINT_MASK_USBA, usba_log_handle,
+		    "compatible name:\t%s\t%s", usba_compatible[i],
+		    (((i+1) < n)? usba_compatible[i+1] : ""));
+	}
+	mutex_exit(&usba_mutex);
+
+	/* create compatible property */
+	if (n) {
+		rval = ndi_prop_update_string_array(
+		    DDI_DEV_T_NONE, child_dip,
+		    "compatible", (char **)usba_compatible,
+		    n);
+
+		if (rval != DDI_PROP_SUCCESS) {
+
+			goto fail;
+		}
+	}
+
+	/* update the address property */
+	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
+	    "assigned-address", child_ud->usb_addr);
+	if (rval != DDI_PROP_SUCCESS) {
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
+		    "usba_ready_interface_node: address update failed");
+	}
+
+	/* create property with first interface number */
+	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
+	    "interface", ia_descr.bFirstInterface);
+
+	if (rval != DDI_PROP_SUCCESS) {
+
+		goto fail;
+	}
+
+	/* create property with the count of interfaces in this ia */
+	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
+	    "interface-count", ia_descr.bInterfaceCount);
+
+	if (rval != DDI_PROP_SUCCESS) {
+
+		goto fail;
+	}
+
+	USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
+	    "%s%d port %d: %s, dip = 0x%p",
+	    ddi_node_name(ddi_get_parent(dip)),
+	    ddi_get_instance(ddi_get_parent(dip)),
+	    child_ud->usb_port, ddi_node_name(child_dip), child_dip);
+
+	*if_count = ia_descr.bInterfaceCount;
+	usba_set_usba_device(child_dip, child_ud);
+	ASSERT(!mutex_owned(&(usba_get_usba_device(child_dip)->usb_mutex)));
+
+	return (child_dip);
+
+fail:
+	(void) usba_destroy_child_devi(child_dip, NDI_DEVI_REMOVE);
+
+	return (NULL);
+}
+
+
+/*
  * driver binding at interface level, the first arg will be the
  * the parent dip
  */
@@ -2184,12 +2484,10 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 		force_bind = "ugen";
 	}
 
-#ifdef DEBUG
 	/*
 	 * check whether there is another dip with this name and address
 	 */
 	ASSERT(usba_find_existing_node(child_dip) == NULL);
-#endif
 
 	mutex_enter(&usba_mutex);
 	n = 0;

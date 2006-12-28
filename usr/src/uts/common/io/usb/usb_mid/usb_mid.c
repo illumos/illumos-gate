@@ -131,6 +131,7 @@ static int usb_mid_bus_ctl(dev_info_t *, dev_info_t	*,
 static int usb_mid_power(dev_info_t *, int, int);
 static int usb_mid_restore_device_state(dev_info_t *, usb_mid_t *);
 static usb_mid_t  *usb_mid_obtain_state(dev_info_t *);
+static void usb_mid_event_cb(dev_info_t *, ddi_eventcookie_t, void *, void *);
 
 /*
  * Busops vector
@@ -200,12 +201,6 @@ static	void	*usb_mid_statep;
  */
 static void usb_mid_create_children(usb_mid_t *usb_mid);
 static int usb_mid_cleanup(dev_info_t *dip, usb_mid_t	*usb_mid);
-static void usb_mid_register_events(usb_mid_t *usb_mid);
-static void usb_mid_unregister_events(usb_mid_t *usb_mid);
-
-/* usbai private */
-char	*usba_get_mfg_prod_sn_str(dev_info_t  *dip,
-					char *buffer, int buflen);
 
 /*
  * event definition
@@ -467,7 +462,7 @@ usb_mid_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 
 	dev_info_t	*cdip, *mdip;
 	int		interface, circular_count;
-	int		 rval = NDI_SUCCESS;
+	int		rval = NDI_SUCCESS;
 
 	USB_DPRINTF_L4(DPRINT_MASK_ALL, usb_mid->mi_log_handle,
 	    "usb_mid_bus_unconfig: op=%d", op);
@@ -496,12 +491,13 @@ usb_mid_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	/* update children's list */
 	mutex_enter(&usb_mid->mi_mutex);
 	for (interface = 0; usb_mid->mi_children_dips &&
-	    (interface < usb_mid->mi_n_ifs); interface++) {
+	    (interface < usb_mid->mi_n_ifs) &&
+	    (usb_mid->mi_children_ifs[interface]); interface++) {
 		mdip = usb_mid->mi_children_dips[interface];
 
 		/* now search if this dip still exists */
 		for (cdip = ddi_get_child(dip); cdip && (cdip != mdip);
-		    cdip = ddi_get_next_sibling(cdip));
+			cdip = ddi_get_next_sibling(cdip));
 
 		if (cdip != mdip) {
 			/* we lost the dip on this interface */
@@ -524,106 +520,15 @@ usb_mid_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	return (rval);
 }
 
-/*
- * functions to handle power transition for OS levels 0 -> 3
- */
-static int
-usb_mid_pwrlvl0(usb_mid_t *usb_mid)
-{
-	int	rval;
-
-	switch (usb_mid->mi_dev_state) {
-	case USB_DEV_ONLINE:
-		/* Issue USB D3 command to the device here */
-		rval = usb_set_device_pwrlvl3(usb_mid->mi_dip);
-		ASSERT(rval == USB_SUCCESS);
-
-		usb_mid->mi_dev_state = USB_DEV_PWRED_DOWN;
-		usb_mid->mi_pm->mip_current_power =
-					USB_DEV_OS_PWR_OFF;
-		/* FALLTHRU */
-	case USB_DEV_DISCONNECTED:
-	case USB_DEV_SUSPENDED:
-		/* allow a disconnected/cpr'ed device to go to low pwr */
-
-		return (USB_SUCCESS);
-	case USB_DEV_PWRED_DOWN:
-	default:
-		return (USB_FAILURE);
-	}
-}
-
-
-/* ARGSUSED */
-static int
-usb_mid_pwrlvl1(usb_mid_t *usb_mid)
-{
-	int	rval;
-
-	/* Issue USB D2 command to the device here */
-	rval = usb_set_device_pwrlvl2(usb_mid->mi_dip);
-	ASSERT(rval == USB_SUCCESS);
-
-	return (USB_FAILURE);
-}
-
-
-/* ARGSUSED */
-static int
-usb_mid_pwrlvl2(usb_mid_t *usb_mid)
-{
-	int	rval;
-
-	/* Issue USB D1 command to the device here */
-	rval = usb_set_device_pwrlvl1(usb_mid->mi_dip);
-	ASSERT(rval == USB_SUCCESS);
-
-	return (USB_FAILURE);
-}
-
-
-static int
-usb_mid_pwrlvl3(usb_mid_t *usb_mid)
-{
-	int	rval;
-
-	switch (usb_mid->mi_dev_state) {
-	case USB_DEV_PWRED_DOWN:
-		/* Issue USB D0 command to the device here */
-		rval = usb_set_device_pwrlvl0(usb_mid->mi_dip);
-		ASSERT(rval == USB_SUCCESS);
-
-		usb_mid->mi_dev_state = USB_DEV_ONLINE;
-		usb_mid->mi_pm->mip_current_power = USB_DEV_OS_FULL_PWR;
-
-		/* FALLTHRU */
-	case USB_DEV_ONLINE:
-		/* we are already in full power */
-
-		/* FALLTHRU */
-	case USB_DEV_DISCONNECTED:
-	case USB_DEV_SUSPENDED:
-		/* allow a disconnected/cpr'ed device to go to low power */
-
-		return (USB_SUCCESS);
-	default:
-		USB_DPRINTF_L2(DPRINT_MASK_PM, usb_mid->mi_log_handle,
-		    "usb_mid_pwrlvl3: Illegal state (%s)",
-		    usb_str_dev_state(usb_mid->mi_dev_state));
-
-		return (USB_FAILURE);
-	}
-}
-
 
 /* power entry point */
 /* ARGSUSED */
 static int
 usb_mid_power(dev_info_t *dip, int comp, int level)
 {
-	usb_mid_t	*usb_mid;
-	usb_mid_power_t	*midpm;
-	int		rval = DDI_FAILURE;
+	usb_mid_t		*usb_mid;
+	usb_common_power_t	*midpm;
+	int			rval = DDI_FAILURE;
 
 	usb_mid =  usb_mid_obtain_state(dip);
 
@@ -634,34 +539,21 @@ usb_mid_power(dev_info_t *dip, int comp, int level)
 	midpm = usb_mid->mi_pm;
 
 	/* check if we are transitioning to a legal power level */
-	if (USB_DEV_PWRSTATE_OK(midpm->mip_pwr_states, level)) {
+	if (USB_DEV_PWRSTATE_OK(midpm->uc_pwr_states, level)) {
 		USB_DPRINTF_L2(DPRINT_MASK_PM, usb_mid->mi_log_handle,
 		    "usb_mid_power: illegal power level = %d "
-		    "mip_pwr_states = %x", level, midpm->mip_pwr_states);
+		    "uc_pwr_states = %x", level, midpm->uc_pwr_states);
 
 		mutex_exit(&usb_mid->mi_mutex);
 
 		return (rval);
 	}
 
-	switch (level) {
-	case USB_DEV_OS_PWR_OFF:
-		rval = usb_mid_pwrlvl0(usb_mid);
-		break;
-	case USB_DEV_OS_PWR_1:
-		rval = usb_mid_pwrlvl1(usb_mid);
-		break;
-	case USB_DEV_OS_PWR_2:
-		rval = usb_mid_pwrlvl2(usb_mid);
-		break;
-	case USB_DEV_OS_FULL_PWR:
-		rval = usb_mid_pwrlvl3(usb_mid);
-		break;
-	}
+	rval = usba_common_power(dip, midpm, &(usb_mid->mi_dev_state), level);
 
 	mutex_exit(&usb_mid->mi_mutex);
 
-	return ((rval == USB_SUCCESS) ? DDI_SUCCESS : DDI_FAILURE);
+	return (rval);
 }
 
 
@@ -673,7 +565,7 @@ usb_mid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int		instance = ddi_get_instance(dip);
 	usb_mid_t	*usb_mid = NULL;
-	uint_t		n_ifs;
+	uint_t		n_ifs, i;
 	size_t		size;
 
 	switch (cmd) {
@@ -762,6 +654,12 @@ usb_mid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	usb_mid->mi_children_dips = kmem_zalloc(size, KM_SLEEP);
 	usb_mid->mi_child_events = kmem_zalloc(sizeof (uint8_t) * n_ifs,
 								KM_SLEEP);
+	usb_mid->mi_children_ifs = kmem_zalloc(sizeof (uint_t) * n_ifs,
+								KM_SLEEP);
+	for (i = 0; i < n_ifs; i++) {
+		usb_mid->mi_children_ifs[i] = 1;
+	}
+
 	/*
 	 * Event handling: definition and registration
 	 * get event handle for events that we have defined
@@ -787,7 +685,7 @@ usb_mid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	usb_mid_create_pm_components(dip, usb_mid);
 
 	/* event registration for events from our parent */
-	usb_mid_register_events(usb_mid);
+	usba_common_register_events(usb_mid->mi_dip, 1, usb_mid_event_cb);
 
 	usb_mid->mi_init_state |= USB_MID_EVENTS_REGISTERED;
 
@@ -854,7 +752,7 @@ usb_mid_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 static int
 usb_mid_cleanup(dev_info_t *dip, usb_mid_t *usb_mid)
 {
-	usb_mid_power_t	*midpm;
+	usb_common_power_t	*midpm;
 	int		rval;
 
 	USB_DPRINTF_L4(DPRINT_MASK_ATTA, usb_mid->mi_log_handle,
@@ -887,7 +785,7 @@ usb_mid_cleanup(dev_info_t *dip, usb_mid_t *usb_mid)
 	 * Note that cleanup can't fail after deregistration of events.
 	 */
 	if (usb_mid->mi_init_state & USB_MID_EVENTS_REGISTERED) {
-		usb_mid_unregister_events(usb_mid);
+		usba_common_unregister_events(usb_mid->mi_dip, 1);
 	}
 
 	midpm = usb_mid->mi_pm;
@@ -899,7 +797,7 @@ usb_mid_cleanup(dev_info_t *dip, usb_mid_t *usb_mid)
 		mutex_exit(&usb_mid->mi_mutex);
 
 		(void) pm_busy_component(dip, 0);
-		if (midpm->mip_wakeup_enabled) {
+		if (midpm->uc_wakeup_enabled) {
 
 			/* First bring the device to full power */
 			(void) pm_raise_power(dip, 0, USB_DEV_OS_FULL_PWR);
@@ -922,7 +820,7 @@ usb_mid_cleanup(dev_info_t *dip, usb_mid_t *usb_mid)
 	}
 
 	if (midpm) {
-		kmem_free(midpm, sizeof (usb_mid_power_t));
+		kmem_free(midpm, sizeof (usb_common_power_t));
 	}
 
 	/* free children list */
@@ -933,6 +831,11 @@ usb_mid_cleanup(dev_info_t *dip, usb_mid_t *usb_mid)
 
 	if (usb_mid->mi_child_events) {
 		kmem_free(usb_mid->mi_child_events, sizeof (uint8_t) *
+		    usb_mid->mi_n_ifs);
+	}
+
+	if (usb_mid->mi_children_ifs) {
+		kmem_free(usb_mid->mi_children_ifs, sizeof (uint_t) *
 		    usb_mid->mi_n_ifs);
 	}
 
@@ -956,49 +859,6 @@ done:
 	ddi_prop_remove_all(dip);
 
 	return (DDI_SUCCESS);
-}
-
-
-int
-usb_mid_devi_bind_driver(usb_mid_t *usb_mid, dev_info_t *dip)
-{
-	char	*name;
-	uint8_t if_num = usba_get_ifno(dip);
-	int	rval = USB_SUCCESS;
-
-	USB_DPRINTF_L4(DPRINT_MASK_ATTA, usb_mid->mi_log_handle,
-	    "usb_mid_devi_bind_driver: dip = 0x%p, if_num = 0x%x", dip, if_num);
-
-	name = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
-
-	/* bind device to the driver */
-	if (ndi_devi_bind_driver(dip, 0) != NDI_SUCCESS) {
-		/* if we fail to bind report an error */
-		(void) usba_get_mfg_prod_sn_str(dip, name, MAXNAMELEN);
-		if (name[0] != '\0') {
-			if (!usb_owns_device(dip)) {
-				USB_DPRINTF_L1(DPRINT_MASK_ATTA,
-				    usb_mid->mi_log_handle,
-				    "no driver found for "
-				    "interface %d (nodename: '%s') of %s",
-				    if_num, ddi_node_name(dip), name);
-			} else {
-				USB_DPRINTF_L1(DPRINT_MASK_ATTA,
-				    usb_mid->mi_log_handle,
-				    "no driver found for device %s", name);
-			}
-		} else {
-			(void) ddi_pathname(dip, name);
-			USB_DPRINTF_L1(DPRINT_MASK_ATTA,
-			    usb_mid->mi_log_handle,
-			    "no driver found for device %s", name);
-		}
-		rval = USB_FAILURE;
-	}
-
-	kmem_free(name, MAXNAMELEN);
-
-	return (rval);
 }
 
 
@@ -1053,9 +913,9 @@ static void
 usb_mid_create_children(usb_mid_t *usb_mid)
 {
 	usba_device_t		*usba_device;
-	uint_t			n_ifs;
-	uint_t			i;
-	dev_info_t		*cdip;
+	uint_t			n_ifs, if_count;
+	uint_t			i, j;
+	dev_info_t		*cdip, *ia_dip;
 	uint_t			ugen_bound = 0;
 	uint_t			bound_children = 0;
 
@@ -1071,6 +931,7 @@ usb_mid_create_children(usb_mid_t *usb_mid)
 	}
 
 	n_ifs = usb_mid->mi_n_ifs;
+	if_count = 1;
 
 	USB_DPRINTF_L4(DPRINT_MASK_ATTA, usb_mid->mi_log_handle,
 	    "usb_mid_create_children: #interfaces = %d", n_ifs);
@@ -1078,7 +939,14 @@ usb_mid_create_children(usb_mid_t *usb_mid)
 	/*
 	 * create all children if not already present
 	 */
-	for (i = 0; i < n_ifs; i++) {
+	for (i = 0; i < n_ifs; i += if_count) {
+
+		/* ignore since this if is included by an ia */
+		if (usb_mid->mi_children_ifs[i] == 0) {
+
+			continue;
+		}
+
 		if (usb_mid->mi_children_dips[i] != NULL) {
 			if (i_ddi_node_state(
 				usb_mid->mi_children_dips[i]) >=
@@ -1090,10 +958,36 @@ usb_mid_create_children(usb_mid_t *usb_mid)
 		}
 
 		mutex_exit(&usb_mid->mi_mutex);
+		ia_dip = usba_ready_interface_association_node(usb_mid->mi_dip,
+		    i, &if_count);
+
+		if (ia_dip != NULL) {
+			if (usba_bind_driver(ia_dip) == USB_SUCCESS) {
+				bound_children++;
+				if (strcmp(ddi_driver_name(ia_dip),
+				    "ugen") == 0) {
+					ugen_bound++;
+				}
+			}
+
+			/*
+			 * IA node owns if_count interfaces.
+			 * The rest interfaces own none.
+			 */
+			mutex_enter(&usb_mid->mi_mutex);
+			usb_mid->mi_children_dips[i] = ia_dip;
+			usb_mid->mi_children_ifs[i] = if_count;
+			for (j = i + 1; j < i + if_count; j++) {
+				usb_mid->mi_children_ifs[j] = 0;
+			}
+
+			continue;
+		}
+
 		cdip = usba_ready_interface_node(usb_mid->mi_dip, i);
-		mutex_enter(&usb_mid->mi_mutex);
+
 		if (cdip != NULL) {
-			if (usb_mid_devi_bind_driver(usb_mid, cdip) ==
+			if (usba_bind_driver(cdip) ==
 			    USB_SUCCESS) {
 				bound_children++;
 				if (strcmp(ddi_driver_name(cdip),
@@ -1102,9 +996,17 @@ usb_mid_create_children(usb_mid_t *usb_mid)
 				}
 			}
 
+			/*
+			 * interface node owns 1 interface always.
+			 */
+			mutex_enter(&usb_mid->mi_mutex);
 			usb_mid->mi_children_dips[i] = cdip;
+			usb_mid->mi_children_ifs[i] = 1;
+			mutex_exit(&usb_mid->mi_mutex);
 
 		}
+
+		mutex_enter(&usb_mid->mi_mutex);
 	}
 
 	usb_mid->mi_removed_children = (bound_children ? B_FALSE : B_TRUE);
@@ -1262,7 +1164,7 @@ usb_mid_busop_post_event(dev_info_t *dip,
 static int
 usb_mid_restore_device_state(dev_info_t *dip, usb_mid_t *usb_mid)
 {
-	usb_mid_power_t		*midpm;
+	usb_common_power_t		*midpm;
 
 	USB_DPRINTF_L4(DPRINT_MASK_EVENTS, usb_mid->mi_log_handle,
 	    "usb_mid_restore_device_state: usb_mid = %p", usb_mid);
@@ -1291,7 +1193,7 @@ usb_mid_restore_device_state(dev_info_t *dip, usb_mid_t *usb_mid)
 	 * if the device had remote wakeup earlier,
 	 * enable it again
 	 */
-	if (midpm->mip_wakeup_enabled) {
+	if (midpm->uc_wakeup_enabled) {
 		(void) usb_handle_remote_wakeup(usb_mid->mi_dip,
 		    USB_REMOTE_WAKEUP_ENABLE);
 	}
@@ -1390,8 +1292,9 @@ usb_mid_event_cb(dev_info_t *dip, ddi_eventcookie_t cookie,
 			 */
 			mutex_enter(&usb_mid->mi_mutex);
 			for (i = 0; i < usb_mid->mi_n_ifs; i++) {
-				if (usb_mid->mi_child_events[i] &
-				    USB_MID_CHILD_EVENT_DISCONNECT) {
+				if ((usb_mid->mi_child_events[i] &
+				    USB_MID_CHILD_EVENT_DISCONNECT) &&
+				    usb_mid->mi_children_ifs[i]) {
 					usb_mid->mi_child_events[i] &=
 					    ~USB_MID_CHILD_EVENT_DISCONNECT;
 					child_dip =
@@ -1427,8 +1330,9 @@ usb_mid_event_cb(dev_info_t *dip, ddi_eventcookie_t cookie,
 		 * event before it registered for event cb
 		 */
 		for (i = 0; i < usb_mid->mi_n_ifs; i++) {
-			if (usb_mid->mi_child_events[i] &
-			    USB_MID_CHILD_EVENT_PRESUSPEND) {
+			if ((usb_mid->mi_child_events[i] &
+			    USB_MID_CHILD_EVENT_PRESUSPEND) &&
+			    usb_mid->mi_children_ifs[i]) {
 				usb_mid->mi_child_events[i] &=
 				    ~USB_MID_CHILD_EVENT_PRESUSPEND;
 				child_dip = usb_mid->mi_children_dips[i];
@@ -1457,145 +1361,25 @@ usb_mid_event_cb(dev_info_t *dip, ddi_eventcookie_t cookie,
 
 
 /*
- * register and unregister for events from our parent
- *
- * Note: usb_mid doesn't use the cookie fields in usba_device structure.
- *	They are used/shared by children of usb_mid.
- */
-static void
-usb_mid_register_events(usb_mid_t *usb_mid)
-{
-	int rval;
-	usba_evdata_t *evdata;
-	ddi_eventcookie_t cookie;
-
-	USB_DPRINTF_L4(DPRINT_MASK_PM, usb_mid->mi_log_handle,
-	    "usb_mid_register_events:");
-
-	evdata = usba_get_evdata(usb_mid->mi_dip);
-
-	/* get event cookie, discard level and icookie for now */
-	rval = ddi_get_eventcookie(usb_mid->mi_dip, DDI_DEVI_REMOVE_EVENT,
-		&cookie);
-
-	if (rval == DDI_SUCCESS) {
-		rval = ddi_add_event_handler(usb_mid->mi_dip,
-		    cookie, usb_mid_event_cb, NULL, &evdata->ev_rm_cb_id);
-
-		if (rval != DDI_SUCCESS) {
-
-			goto fail;
-		}
-	}
-	rval = ddi_get_eventcookie(usb_mid->mi_dip, DDI_DEVI_INSERT_EVENT,
-		&cookie);
-	if (rval == DDI_SUCCESS) {
-		rval = ddi_add_event_handler(usb_mid->mi_dip,
-		    cookie, usb_mid_event_cb, NULL, &evdata->ev_ins_cb_id);
-
-		if (rval != DDI_SUCCESS) {
-
-			goto fail;
-		}
-	}
-	rval = ddi_get_eventcookie(usb_mid->mi_dip, USBA_PRE_SUSPEND_EVENT,
-		&cookie);
-	if (rval == DDI_SUCCESS) {
-		rval = ddi_add_event_handler(usb_mid->mi_dip,
-		    cookie, usb_mid_event_cb, NULL, &evdata->ev_suspend_cb_id);
-
-		if (rval != DDI_SUCCESS) {
-
-			goto fail;
-		}
-	}
-	rval = ddi_get_eventcookie(usb_mid->mi_dip, USBA_POST_RESUME_EVENT,
-		&cookie);
-	if (rval == DDI_SUCCESS) {
-		rval = ddi_add_event_handler(usb_mid->mi_dip,
-		    cookie, usb_mid_event_cb, NULL,
-		    &evdata->ev_resume_cb_id);
-
-		if (rval != DDI_SUCCESS) {
-
-			goto fail;
-		}
-	}
-
-	return;
-
-
-fail:
-	usb_mid_unregister_events(usb_mid);
-
-}
-
-
-static void
-usb_mid_unregister_events(usb_mid_t *usb_mid)
-{
-	int rval;
-	usba_evdata_t *evdata;
-	usba_device_t *usba_device = usba_get_usba_device(usb_mid->mi_dip);
-
-	USB_DPRINTF_L4(DPRINT_MASK_PM, usb_mid->mi_log_handle,
-	    "usb_mid_unregister_events:");
-
-	evdata = usba_get_evdata(usb_mid->mi_dip);
-	if (evdata) {
-		if (evdata->ev_rm_cb_id) {
-			rval = ddi_remove_event_handler(evdata->ev_rm_cb_id);
-			ASSERT(rval == DDI_SUCCESS);
-		}
-
-		if (evdata->ev_ins_cb_id) {
-			rval = ddi_remove_event_handler(evdata->ev_ins_cb_id);
-			ASSERT(rval == DDI_SUCCESS);
-		}
-
-		if (evdata->ev_resume_cb_id) {
-			rval =
-			    ddi_remove_event_handler(evdata->ev_resume_cb_id);
-			ASSERT(rval == DDI_SUCCESS);
-		}
-
-		if (evdata->ev_suspend_cb_id) {
-			rval =
-			    ddi_remove_event_handler(evdata->ev_suspend_cb_id);
-			ASSERT(rval == DDI_SUCCESS);
-		}
-	}
-
-	/* clear event data for children, required for cfgmadm unconfigure */
-	usba_free_evdata(usba_device->usb_evdata);
-	usba_device->usb_evdata = NULL;
-	usba_device->rm_cookie = NULL;
-	usba_device->ins_cookie = NULL;
-	usba_device->suspend_cookie = NULL;
-	usba_device->resume_cookie = NULL;
-}
-
-
-/*
  * create the pm components required for power management
  */
 static void
 usb_mid_create_pm_components(dev_info_t *dip, usb_mid_t *usb_mid)
 {
-	usb_mid_power_t	*midpm;
+	usb_common_power_t	*midpm;
 	uint_t		pwr_states;
 
 	USB_DPRINTF_L4(DPRINT_MASK_PM, usb_mid->mi_log_handle,
 	    "usb_mid_create_pm_components: Begin");
 
 	/* Allocate the PM state structure */
-	midpm = kmem_zalloc(sizeof (usb_mid_power_t), KM_SLEEP);
+	midpm = kmem_zalloc(sizeof (usb_common_power_t), KM_SLEEP);
 
 	mutex_enter(&usb_mid->mi_mutex);
 	usb_mid->mi_pm = midpm;
-	midpm->mip_usb_mid = usb_mid;
-	midpm->mip_pm_capabilities = 0; /* XXXX should this be 0?? */
-	midpm->mip_current_power = USB_DEV_OS_FULL_PWR;
+	midpm->uc_usb_statep = usb_mid;
+	midpm->uc_pm_capabilities = 0; /* XXXX should this be 0?? */
+	midpm->uc_current_power = USB_DEV_OS_FULL_PWR;
 	mutex_exit(&usb_mid->mi_mutex);
 
 	/*
@@ -1626,12 +1410,12 @@ usb_mid_create_pm_components(dev_info_t *dip, usb_mid_t *usb_mid)
 		USB_DPRINTF_L3(DPRINT_MASK_PM, usb_mid->mi_log_handle,
 		    "usb_mid_create_pm_components: "
 		    "Remote Wakeup Enabled");
-		midpm->mip_wakeup_enabled = 1;
+		midpm->uc_wakeup_enabled = 1;
 	}
 
 	if (usb_create_pm_components(dip, &pwr_states) ==
 	    USB_SUCCESS) {
-		midpm->mip_pwr_states = (uint8_t)pwr_states;
+		midpm->uc_pwr_states = (uint8_t)pwr_states;
 		(void) pm_raise_power(dip, 0, USB_DEV_OS_FULL_PWR);
 	}
 

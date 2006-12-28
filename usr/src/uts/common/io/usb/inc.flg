@@ -64,6 +64,7 @@ find_files "s.*"	\
 	usr/src/uts/sparc/hubd	\
 	usr/src/uts/sparc/scsa2usb \
 	usr/src/uts/sparc/usb_mid \
+	usr/src/uts/sparc/usb_ia \
 	usr/src/uts/sparc/usbkbm \
 	usr/src/uts/sparc/usbms \
 	usr/src/uts/sparc/usbprn \
@@ -85,6 +86,7 @@ find_files "s.*"	\
 	usr/src/uts/intel/ehci	\
 	usr/src/uts/intel/hubd	\
 	usr/src/uts/intel/usb_mid \
+	usr/src/uts/intel/usb_ia \
 	usr/src/uts/intel/usba	\
 	usr/src/uts/intel/usbkbm \
 	usr/src/uts/intel/usbms	\

@@ -1260,6 +1260,8 @@ HUBD_OBJS += hubd.o
 
 USB_MID_OBJS += usb_mid.o
 
+USB_IA_OBJS += usb_ia.o
+
 SCSA2USB_OBJS += scsa2usb.o usb_ms_bulkonly.o usb_ms_cbi.o
 
 PHX_OBJS += phx.o

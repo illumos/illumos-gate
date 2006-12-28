@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -18,8 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,26 +33,6 @@ extern "C" {
 #endif
 
 #include <sys/usb/usba/usbai_private.h>
-
-typedef struct usb_mid_power_struct {
-	void		*mip_usb_mid;	/* points back to usb_mid_t */
-
-	uint8_t		mip_wakeup_enabled;
-
-	/* this is the bit mask of the power states that device has */
-	uint8_t		mip_pwr_states;
-
-	/* wakeup and power transistion capabilites of an interface */
-	uint8_t		mip_pm_capabilities;
-
-	uint8_t		mip_current_power;	/* current power level */
-} usb_mid_power_t;
-
-/* warlock directives, stable data */
-_NOTE(DATA_READABLE_WITHOUT_LOCK(usb_mid_power_t::mip_usb_mid))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(usb_mid_power_t::mip_wakeup_enabled))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(usb_mid_power_t::mip_pwr_states))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(usb_mid_power_t::mip_pm_capabilities))
 
 
 /*
@@ -71,8 +51,8 @@ typedef struct usb_mid {
 	 */
 	dev_info_t		*mi_dip;
 
-	/* pointer to usb_mid_power_t */
-	usb_mid_power_t		*mi_pm;
+	/* pointer to usb_common_power_t */
+	usb_common_power_t	*mi_pm;
 
 	/*
 	 * save the usba_device pointer
@@ -87,11 +67,16 @@ typedef struct usb_mid {
 
 	/* track event registration of children */
 	uint8_t			*mi_child_events;
+
+	/* record the interface num of each child node */
+	uint_t			*mi_children_ifs;
+
 	/*
-	 * mi_children_dips is a  array for holding
+	 * mi_children_dips is an array for holding
 	 * each child dip indexed by interface number
 	 */
 	dev_info_t		**mi_children_dips;
+
 	boolean_t		mi_removed_children;
 
 	size_t			mi_cd_list_length;
@@ -112,7 +97,7 @@ typedef struct usb_mid {
 } usb_mid_t;
 
 _NOTE(MUTEX_PROTECTS_DATA(usb_mid::mi_mutex, usb_mid))
-_NOTE(MUTEX_PROTECTS_DATA(usb_mid::mi_mutex, usb_mid_power_t))
+_NOTE(MUTEX_PROTECTS_DATA(usb_mid::mi_mutex, usb_common_power_t))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usb_mid::mi_instance
 		usb_mid::mi_ndi_event_hdl
 		usb_mid::mi_dev_data
