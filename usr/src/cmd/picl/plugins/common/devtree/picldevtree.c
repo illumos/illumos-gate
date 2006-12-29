@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -966,6 +965,53 @@ add_openprom_props(picl_nodehdl_t nodeh, di_node_t di_node)
 	return (PICL_SUCCESS);
 }
 
+static void
+add_boolean_prop(picl_nodehdl_t nodeh, ptree_propinfo_t propinfo, char *di_val)
+{
+	(void) ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
+	    PICL_PTYPE_VOID, PICL_READ, (size_t)0, di_val, NULL, NULL);
+	(void) ptree_create_and_add_prop(nodeh, &propinfo, NULL, NULL);
+}
+
+static void
+add_uints_prop(picl_nodehdl_t nodeh, ptree_propinfo_t propinfo, char *di_val,
+    int *idata, int len)
+{
+	if (len == 1)
+		(void) ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
+		    PICL_PTYPE_UNSIGNED_INT, PICL_READ, sizeof (int), di_val,
+		    NULL, NULL);
+	else
+		(void) ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
+		    PICL_PTYPE_BYTEARRAY, PICL_READ, len * sizeof (int), di_val,
+		    NULL, NULL);
+
+	(void) ptree_create_and_add_prop(nodeh, &propinfo, idata, NULL);
+}
+
+static void
+add_strings_prop(picl_nodehdl_t nodeh, ptree_propinfo_t propinfo, char *di_val,
+    char *sdata, int len)
+{
+	if (len == 1) {
+		(void) ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
+		    PICL_PTYPE_CHARSTRING, PICL_READ, strlen(sdata) + 1, di_val,
+		    NULL, NULL);
+		(void) ptree_create_and_add_prop(nodeh, &propinfo, sdata, NULL);
+	} else {
+		(void) add_string_list_prop(nodeh, di_val, sdata, len);
+	}
+}
+
+static void
+add_bytes_prop(picl_nodehdl_t nodeh, ptree_propinfo_t propinfo, char *di_val,
+    unsigned char *bdata, int len)
+{
+	(void) ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
+	    PICL_PTYPE_BYTEARRAY, PICL_READ, len, di_val, NULL, NULL);
+	(void) ptree_create_and_add_prop(nodeh, &propinfo, bdata, NULL);
+}
+
 /*
  * Add properties provided by libdevinfo
  */
@@ -977,6 +1023,10 @@ add_devinfo_props(picl_nodehdl_t nodeh, di_node_t di_node)
 	di_prop_t		di_prop;
 	int			di_ptype;
 	ptree_propinfo_t	propinfo;
+	char			*sdata;
+	unsigned char		*bdata;
+	int			*idata;
+	int			len;
 
 	instance = di_instance(di_node);
 	(void) ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
@@ -1027,76 +1077,53 @@ add_devinfo_props(picl_nodehdl_t nodeh, di_node_t di_node)
 
 		di_val = di_prop_name(di_prop);
 		di_ptype = di_prop_type(di_prop);
+
 		switch (di_ptype) {
 		case DI_PROP_TYPE_BOOLEAN:
-			(void) ptree_init_propinfo(&propinfo,
-			    PTREE_PROPINFO_VERSION, PICL_PTYPE_VOID,
-			    PICL_READ, (size_t)0, di_val, NULL, NULL);
-			(void) ptree_create_and_add_prop(nodeh, &propinfo,
-			    NULL, NULL);
+			add_boolean_prop(nodeh, propinfo, di_val);
 			break;
-		case DI_PROP_TYPE_INT: {
-			int	*idata;
-			int	len;
-
+		case DI_PROP_TYPE_INT:
 			len = di_prop_ints(di_prop, &idata);
 			if (len < 0)
-				/* Recieved error, so ignore prop */
+				/* Received error, so ignore prop */
 				break;
-
-			if (len == 1)
-				(void) ptree_init_propinfo(&propinfo,
-				    PTREE_PROPINFO_VERSION, PICL_PTYPE_INT,
-				    PICL_READ, len * sizeof (int), di_val,
-				    NULL, NULL);
-			else
-				(void) ptree_init_propinfo(&propinfo,
-				    PTREE_PROPINFO_VERSION,
-				    PICL_PTYPE_BYTEARRAY, PICL_READ,
-				    len * sizeof (int), di_val,
-				    NULL, NULL);
-
-			(void) ptree_create_and_add_prop(nodeh, &propinfo,
-			    idata, NULL);
-		}
-		break;
-		case DI_PROP_TYPE_STRING: {
-			char	*sdata;
-			int	len;
-
+			add_uints_prop(nodeh, propinfo, di_val, idata, len);
+			break;
+		case DI_PROP_TYPE_STRING:
 			len = di_prop_strings(di_prop, &sdata);
 			if (len < 0)
 				break;
-
-			if (len == 1) {
-				(void) ptree_init_propinfo(&propinfo,
-				    PTREE_PROPINFO_VERSION,
-				    PICL_PTYPE_CHARSTRING, PICL_READ,
-				    strlen(sdata) + 1, di_val,
-				    NULL, NULL);
-				(void) ptree_create_and_add_prop(nodeh,
-				    &propinfo, sdata, NULL);
-			} else {
-				(void) add_string_list_prop(nodeh, di_val,
-				    sdata, len);
-			}
-		}
-		break;
-		case DI_PROP_TYPE_BYTE: {
-			int		len;
-			unsigned char *bdata;
-
+			add_strings_prop(nodeh, propinfo, di_val, sdata, len);
+			break;
+		case DI_PROP_TYPE_BYTE:
 			len = di_prop_bytes(di_prop, &bdata);
 			if (len < 0)
 				break;
-			(void) ptree_init_propinfo(&propinfo,
-			    PTREE_PROPINFO_VERSION, PICL_PTYPE_BYTEARRAY,
-			    PICL_READ, len, di_val, NULL, NULL);
-			(void) ptree_create_and_add_prop(nodeh, &propinfo,
-			    bdata, NULL);
-		}
-		break;
+			add_bytes_prop(nodeh, propinfo, di_val, bdata, len);
+			break;
 		case DI_PROP_TYPE_UNKNOWN:
+			/*
+			 * Unknown type, we'll try and guess what it should be.
+			 */
+			len = di_prop_strings(di_prop, &sdata);
+			if ((len > 0) && (sdata[0] != 0)) {
+				add_strings_prop(nodeh, propinfo, di_val, sdata,
+				    len);
+				break;
+			}
+			len = di_prop_ints(di_prop, &idata);
+			if (len > 0) {
+				add_uints_prop(nodeh, propinfo, di_val,
+				    idata, len);
+				break;
+			}
+			len = di_prop_rawdata(di_prop, &bdata);
+			if (len > 0)
+				add_bytes_prop(nodeh, propinfo,
+				    di_val, bdata, len);
+			else if (len == 0)
+				add_boolean_prop(nodeh, propinfo,
+				    di_val);
 			break;
 		case DI_PROP_TYPE_UNDEF_IT:
 			break;
