@@ -173,17 +173,21 @@ __uaio_init(void)
 
 	/*
 	 * Allocate and initialize the hash table.
+	 * Do this only once, even if __uaio_init() is called twice.
 	 */
-	/* LINTED pointer cast */
-	_aio_hash = (aio_hash_t *)mmap(NULL,
-	    HASHSZ * sizeof (aio_hash_t), PROT_READ | PROT_WRITE,
-	    MAP_PRIVATE | MAP_ANON, -1, (off_t)0);
-	if ((void *)_aio_hash == MAP_FAILED) {
-		_aio_hash = NULL;
-		goto out;
+	if (_aio_hash == NULL) {
+		/* LINTED pointer cast */
+		_aio_hash = (aio_hash_t *)mmap(NULL,
+		    HASHSZ * sizeof (aio_hash_t), PROT_READ | PROT_WRITE,
+		    MAP_PRIVATE | MAP_ANON, -1, (off_t)0);
+		if ((void *)_aio_hash == MAP_FAILED) {
+			_aio_hash = NULL;
+			goto out;
+		}
+		for (i = 0; i < HASHSZ; i++)
+			(void) mutex_init(&_aio_hash[i].hash_lock,
+			    USYNC_THREAD, NULL);
 	}
-	for (i = 0; i < HASHSZ; i++)
-		(void) mutex_init(&_aio_hash[i].hash_lock, USYNC_THREAD, NULL);
 
 	/*
 	 * Initialize worker's signal mask to only catch SIGAIOCANCEL.
@@ -192,15 +196,26 @@ __uaio_init(void)
 	(void) sigdelset(&_worker_set, SIGAIOCANCEL);
 
 	/*
+	 * Create one worker to send asynchronous notifications.
+	 * Do this only once, even if __uaio_init() is called twice.
+	 */
+	if (__no_workerscnt == 0 &&
+	    (_aio_create_worker(NULL, AIONOTIFY) != 0)) {
+		errno = EAGAIN;
+		goto out;
+	}
+
+	/*
 	 * Create the minimum number of read/write workers.
+	 * And later check whether atleast one worker is created;
+	 * lwp_create() calls could fail because of segkp exhaustion.
 	 */
 	for (i = 0; i < _min_workers; i++)
 		(void) _aio_create_worker(NULL, AIOREAD);
-
-	/*
-	 * Create one worker to send asynchronous notifications.
-	 */
-	(void) _aio_create_worker(NULL, AIONOTIFY);
+	if (__rw_workerscnt == 0) {
+		errno = EAGAIN;
+		goto out;
+	}
 
 	ret = 0;
 out:
