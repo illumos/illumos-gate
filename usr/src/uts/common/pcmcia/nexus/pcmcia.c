@@ -220,7 +220,6 @@ extern struct pc_socket_services pc_socket_services;
 /* some function declarations */
 static int pcm_adapter_callback(dev_info_t *, int, int, int);
 extern void pcmcia_init_adapter(anp_t *, dev_info_t *);
-static void pcmcia_enum_thread(anp_t *);
 extern void pcmcia_find_cards(anp_t *);
 extern void pcmcia_merge_power(struct power_entry *);
 extern void pcmcia_do_resume(int, pcmcia_logical_socket_t *);
@@ -419,13 +418,6 @@ pcmcia_attach(dev_info_t *dip, anp_t *adapter)
 	pcmcia_init_adapter(adapter, dip);
 	/* exit mutex so CS can run for any cards found */
 	mutex_exit(&pcmcia_global_lock);
-
-	/*
-	 * schedule an asynchronous thread to enumerate the cards
-	 * present in the adapter at boot time
-	 */
-	(void) thread_create(NULL, 0, pcmcia_enum_thread, adapter, 0, &p0,
-	    TS_RUN, minclsyspri);
 
 	/*
 	 * make sure the devices are identified before
@@ -1325,23 +1317,6 @@ pcmcia_init_adapter(anp_t *adapter, dev_info_t *dip)
 				pcmcia_power_table[n].ValidSignals);
 	}
 #endif
-}
-
-/*
- * pcmcia_enum_thread()
- *
- *	This thread is scheduled by pcmcia_attach() to enumerate the
- *	cards present in an adapter at boot time.
- *	pcmcia_enum_lock is used to serialize the execution of this
- *	thread with pcmcia_attach().
- */
-static void
-pcmcia_enum_thread(anp_t *adapter)
-{
-	mutex_enter(&pcmcia_enum_lock);
-	pcmcia_find_cards(adapter);
-	mutex_exit(&pcmcia_enum_lock);
-	thread_exit();
 }
 
 /*
