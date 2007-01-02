@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -573,13 +572,13 @@ count_sections(pgcore_t *pgc)
 				hit_symtab = 1;
 			}
 
-			if (sym->sym_data != NULL && sym->sym_symn != 0 &&
+			if (sym->sym_data_pri != NULL && sym->sym_symn != 0 &&
 			    sym->sym_strs != NULL)
 				nshdrs += 2;
 		}
 
 		if ((pgc->pgc_content & CC_CONTENT_SYMTAB) && !hit_symtab &&
-		    fptr->file_symtab.sym_data != NULL &&
+		    fptr->file_symtab.sym_data_pri != NULL &&
 		    fptr->file_symtab.sym_symn != 0 &&
 		    fptr->file_symtab.sym_strs != NULL) {
 			nshdrs += 2;
@@ -651,18 +650,18 @@ dump_symtab(pgcore_t *pgc, file_info_t *fptr, uint_t index, int dynsym)
 	size_t size;
 	uintptr_t addr = fptr->file_map->map_pmap.pr_vaddr;
 
-	if (sym->sym_data == NULL || sym->sym_symn == 0 ||
+	if (sym->sym_data_pri == NULL || sym->sym_symn == 0 ||
 	    sym->sym_strs == NULL)
 		return (0);
 
-	size = sym->sym_hdr.sh_size;
-	if (pwrite64(pgc->pgc_fd, sym->sym_data->d_buf, size,
+	size = sym->sym_hdr_pri.sh_size;
+	if (pwrite64(pgc->pgc_fd, sym->sym_data_pri->d_buf, size,
 	    *pgc->pgc_doff) != size)
 		return (-1);
 
 	if (write_shdr(pgc, symname, symtype, 0, addr, *pgc->pgc_doff, size,
-	    index + 1, sym->sym_hdr.sh_info, sym->sym_hdr.sh_addralign,
-	    sym->sym_hdr.sh_entsize) != 0)
+	    index + 1, sym->sym_hdr_pri.sh_info, sym->sym_hdr_pri.sh_addralign,
+	    sym->sym_hdr_pri.sh_entsize) != 0)
 		return (-1);
 
 	*pgc->pgc_doff += roundup(size, 8);
@@ -718,7 +717,7 @@ dump_sections(pgcore_t *pgc)
 				hit_symtab = 1;
 			}
 
-			if (sym->sym_data != NULL && sym->sym_symn != 0 &&
+			if (sym->sym_data_pri != NULL && sym->sym_symn != 0 &&
 			    sym->sym_strs != NULL) {
 				symindex = index;
 				if (dump_symtab(pgc, fptr, index, dynsym) != 0)
@@ -745,7 +744,7 @@ dump_sections(pgcore_t *pgc)
 		}
 
 		if ((pgc->pgc_content & CC_CONTENT_SYMTAB) && !hit_symtab &&
-		    fptr->file_symtab.sym_data != NULL &&
+		    fptr->file_symtab.sym_data_pri != NULL &&
 		    fptr->file_symtab.sym_symn != 0 &&
 		    fptr->file_symtab.sym_strs != NULL) {
 			if (dump_symtab(pgc, fptr, index, 0) != 0)

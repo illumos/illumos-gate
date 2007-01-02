@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,6 +40,8 @@ CMNOBJS =	\
 	Plwpregs.o	\
 	Pservice.o	\
 	Psymtab.o	\
+	Psymtab_machelf32.o \
+	$(CMNOBJS64)	\
 	Pscantext.o	\
 	Pstack.o	\
 	Psyscall.o	\

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,12 +53,31 @@ extern "C" {
  * These may change without affecting clients of libproc.
  */
 
+/*
+ * sym_tbl_t contains a primary and an (optional) auxiliary symbol table, which
+ * we wish to treat as a single logical symbol table. In this logical table,
+ * the data from the auxiliary table preceeds that from the primary. Symbol
+ * indices start at [0], which is the first item in the auxiliary table
+ * if there is one. The sole purpose for this is so that we can treat the
+ * combination of .SUNW_ldynsym and .dynsym sections as a logically single
+ * entity without having to violate the public interface to libelf.
+ *
+ * Both tables must share the same string table section.
+ *
+ * The symtab_getsym() function serves as a gelf_getsym() replacement
+ * that is aware of the two tables and makes them look like a single table
+ * to the caller.
+ *
+ */
 typedef struct sym_tbl {	/* symbol table */
-	Elf_Data *sym_data;	/* start of table */
-	size_t	sym_symn;	/* number of entries */
+	Elf_Data *sym_data_pri;	/* primary table */
+	Elf_Data *sym_data_aux;	/* auxiliary table */
+	size_t	sym_symn_aux;	/* number of entries in auxiliary table */
+	size_t	sym_symn;	/* total number of entries in both tables */
 	char	*sym_strs;	/* ptr to strings */
 	size_t	sym_strsz;	/* size of string table */
-	GElf_Shdr sym_hdr;	/* symbol table section header */
+	GElf_Shdr sym_hdr_pri;	/* primary symbol table section header */
+	GElf_Shdr sym_hdr_aux;	/* auxiliary symbol table section header */
 	GElf_Shdr sym_strhdr;	/* string table section header */
 	Elf	*sym_elf;	/* faked-up ELF handle from core file */
 	void	*sym_elfmem;	/* data for faked-up ELF handle */

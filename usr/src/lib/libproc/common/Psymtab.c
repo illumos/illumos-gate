@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@
 #include "libproc.h"
 #include "Pcontrol.h"
 #include "Putil.h"
+#include "Psymtab_machelf.h"
 
 static file_info_t *build_map_symtab(struct ps_prochandle *, map_info_t *);
 static map_info_t *exec_map(struct ps_prochandle *);
@@ -708,7 +709,7 @@ Pbuild_file_ctf(struct ps_prochandle *P, file_info_t *fptr)
 		return (NULL);
 
 	symp = fptr->file_ctf_dyn ? &fptr->file_dynsym : &fptr->file_symtab;
-	if (symp->sym_data == NULL)
+	if (symp->sym_data_pri == NULL)
 		return (NULL);
 
 	/*
@@ -741,12 +742,12 @@ Pbuild_file_ctf(struct ps_prochandle *P, file_info_t *fptr)
 	ctdata.cts_offset = 0;
 
 	symtab.cts_name = fptr->file_ctf_dyn ? ".dynsym" : ".symtab";
-	symtab.cts_type = symp->sym_hdr.sh_type;
-	symtab.cts_flags = symp->sym_hdr.sh_flags;
-	symtab.cts_data = symp->sym_data->d_buf;
-	symtab.cts_size = symp->sym_hdr.sh_size;
-	symtab.cts_entsize = symp->sym_hdr.sh_entsize;
-	symtab.cts_offset = symp->sym_hdr.sh_offset;
+	symtab.cts_type = symp->sym_hdr_pri.sh_type;
+	symtab.cts_flags = symp->sym_hdr_pri.sh_flags;
+	symtab.cts_data = symp->sym_data_pri->d_buf;
+	symtab.cts_size = symp->sym_hdr_pri.sh_size;
+	symtab.cts_entsize = symp->sym_hdr_pri.sh_entsize;
+	symtab.cts_offset = symp->sym_hdr_pri.sh_offset;
 
 	strtab.cts_name = fptr->file_ctf_dyn ? ".dynstr" : ".strtab";
 	strtab.cts_type = symp->sym_strhdr.sh_type;
@@ -1294,27 +1295,17 @@ found_cksum:
 	return (0);
 }
 
+/*
+ * Read data from the specified process and construct an in memory
+ * image of an ELF file that represents it well enough to let
+ * us probe it for information.
+ */
 static Elf *
 fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 {
-	enum {
-		DI_PLTGOT = 0,
-		DI_JMPREL,
-		DI_PLTRELSZ,
-		DI_PLTREL,
-		DI_SYMTAB,
-		DI_HASH,
-		DI_SYMENT,
-		DI_STRTAB,
-		DI_STRSZ,
-		DI_NENT
-	};
-	uintptr_t addr;
-	size_t size = 0;
-	caddr_t elfdata = NULL;
 	Elf *elf;
-	Elf32_Word nchain;
-	static char shstr[] = ".shstrtab\0.dynsym\0.dynstr\0.dynamic\0.plt";
+	uintptr_t addr;
+	uint_t phnum;
 
 	if (fptr->file_map == NULL)
 		return (NULL);
@@ -1325,753 +1316,27 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 
 	addr = fptr->file_map->map_pmap.pr_vaddr;
 
-	/*
-	 * We're building a in memory elf file that will let us use libelf
-	 * for most of the work we need to later (e.g. symbol table lookups).
-	 * We need sections for the dynsym, dynstr, and plt, and we need
-	 * the program headers from the text section. The former is used in
-	 * Pbuild_file_symtab(); the latter is used in several functions in
-	 * Pcore.c to reconstruct the origin of each mapping from the load
-	 * object that spawned it.
-	 *
-	 * Here are some useful pieces of elf trivia that will help
-	 * to elucidate this code.
-	 *
-	 * All the information we need about the dynstr can be found in these
-	 * two entries in the dynamic section:
-	 *
-	 *	DT_STRTAB	base of dynstr
-	 *	DT_STRSZ	size of dynstr
-	 *
-	 * So deciphering the dynstr is pretty straightforward.
-	 *
-	 * The dynsym is a little trickier.
-	 *
-	 *	DT_SYMTAB	base of dynsym
-	 *	DT_SYMENT	size of a dynstr entry (Elf{32,64}_Sym)
-	 *	DT_HASH		base of hash table for dynamic lookups
-	 *
-	 * The DT_SYMTAB entry gives us any easy way of getting to the base
-	 * of the dynsym, but getting the size involves rooting around in the
-	 * dynamic lookup hash table. Here's the layout of the hash table:
-	 *
-	 *		+-------------------+
-	 *		|	nbucket	    |	All values are of type
-	 *		+-------------------+	Elf32_Word
-	 *		|	nchain	    |
-	 *		+-------------------+
-	 *		|	bucket[0]   |
-	 *		|	. . .	    |
-	 *		| bucket[nbucket-1] |
-	 *		+-------------------+
-	 *		|	chain[0]    |
-	 *		|	. . .	    |
-	 *		|  chain[nchain-1]  |
-	 *		+-------------------+
-	 *	(figure 5-12 from the SYS V Generic ABI)
-	 *
-	 * Symbols names are hashed into a particular bucket which contains
-	 * an index into the symbol table. Each entry in the symbol table
-	 * has a corresponding entry in the chain table which tells the
-	 * consumer where the next entry in the hash chain is. We can use
-	 * the nchain field to find out the size of the dynsym.
-	 *
-	 * We can figure out the size of the .plt section, but it takes some
-	 * doing. We need to use the following information:
-	 *
-	 *	DT_PLTGOT	base of the PLT
-	 *	DT_JMPREL	base of the PLT's relocation section
-	 *	DT_PLTRELSZ	size of the PLT's relocation section
-	 *	DT_PLTREL	type of the PLT's relocation section
-	 *
-	 * We can use the relocation section to figure out the address of the
-	 * last entry and subtract off the value of DT_PLTGOT to calculate
-	 * the size of the PLT.
-	 *
-	 * For more information, check out the System V Generic ABI.
-	 */
-
 	if (P->status.pr_dmodel == PR_MODEL_ILP32) {
-		Elf32_Ehdr ehdr, *ep;
+		Elf32_Ehdr ehdr;
 		Elf32_Phdr phdr;
-		Elf32_Shdr *sp;
-		Elf32_Dyn *dp;
-		Elf32_Dyn *d[DI_NENT] = { 0 };
-		uint_t phnum, i, dcount = 0;
-		uint32_t off;
-		size_t pltsz = 0, pltentsz;
 
 		if ((read_ehdr32(P, &ehdr, &phnum, addr) != 0) ||
 		    read_dynamic_phdr32(P, &ehdr, phnum, &phdr, addr) != 0)
 			return (NULL);
 
-		if (ehdr.e_type == ET_DYN)
-			phdr.p_vaddr += addr;
-
-		if ((dp = malloc(phdr.p_filesz)) == NULL)
-			return (NULL);
-
-		if (Pread(P, dp, phdr.p_filesz, phdr.p_vaddr) !=
-		    phdr.p_filesz)
-			goto bad32;
-
-		/*
-		 * Allow librtld_db the opportunity to "fix" the program
-		 * headers, if it needs to, before we process them.
-		 */
-		if (P->rap != NULL && ehdr.e_type == ET_DYN) {
-			rd_fix_phdrs(P->rap, dp, phdr.p_filesz, addr);
-		}
-
-		for (i = 0; i < phdr.p_filesz / sizeof (Elf32_Dyn); i++) {
-			switch (dp[i].d_tag) {
-			/*
-			 * For the .plt section.
-			 */
-			case DT_PLTGOT:
-				d[DI_PLTGOT] = &dp[i];
-				continue;
-			case DT_JMPREL:
-				d[DI_JMPREL] = &dp[i];
-				continue;
-			case DT_PLTRELSZ:
-				d[DI_PLTRELSZ] = &dp[i];
-				continue;
-			case DT_PLTREL:
-				d[DI_PLTREL] = &dp[i];
-				continue;
-			default:
-				continue;
-
-			/*
-			 * For the .dynsym section.
-			 */
-			case DT_SYMTAB:
-				d[DI_SYMTAB] = &dp[i];
-				break;
-			case DT_HASH:
-				d[DI_HASH] = &dp[i];
-				break;
-			case DT_SYMENT:
-				d[DI_SYMENT] = &dp[i];
-				break;
-
-			/*
-			 * For the .dynstr section.
-			 */
-			case DT_STRTAB:
-				d[DI_STRTAB] = &dp[i];
-				break;
-			case DT_STRSZ:
-				d[DI_STRSZ] = &dp[i];
-				break;
-			}
-
-			dcount++;
-		}
-
-		/*
-		 * We need all of those dynamic entries in order to put
-		 * together a complete set of elf sections, but we'll
-		 * let the PLT section slide if need be. The dynsym- and
-		 * dynstr-related dynamic entries are mandatory in both
-		 * executables and shared objects so if one of those is
-		 * missing, we're in some trouble and should abort.
-		 */
-		if (dcount + 4 != DI_NENT) {
-			dprintf("text section missing required dynamic "
-			    "entries\n");
-			goto bad32;
-		}
-
-		if (ehdr.e_type == ET_DYN) {
-			if (d[DI_PLTGOT] != NULL)
-				d[DI_PLTGOT]->d_un.d_ptr += addr;
-			if (d[DI_JMPREL] != NULL)
-				d[DI_JMPREL]->d_un.d_ptr += addr;
-			d[DI_SYMTAB]->d_un.d_ptr += addr;
-			d[DI_HASH]->d_un.d_ptr += addr;
-			d[DI_STRTAB]->d_un.d_ptr += addr;
-		}
-
-		/* elf header */
-		size = sizeof (Elf32_Ehdr);
-
-		/* program headers from in-core elf fragment */
-		size += phnum * ehdr.e_phentsize;
-
-		/* unused shdr, and .shstrtab section */
-		size += sizeof (Elf32_Shdr);
-		size += sizeof (Elf32_Shdr);
-		size += roundup(sizeof (shstr), 4);
-
-		/* .dynsym section */
-		size += sizeof (Elf32_Shdr);
-		if (Pread(P, &nchain, sizeof (nchain),
-		    d[DI_HASH]->d_un.d_ptr + 4) != sizeof (nchain)) {
-			dprintf("Pread of .dynsym at %lx failed\n",
-			    (long)(d[DI_HASH]->d_un.d_val + 4));
-			goto bad32;
-		}
-		size += sizeof (Elf32_Sym) * nchain;
-
-		/* .dynstr section */
-		size += sizeof (Elf32_Shdr);
-		size += roundup(d[DI_STRSZ]->d_un.d_val, 4);
-
-		/* .dynamic section */
-		size += sizeof (Elf32_Shdr);
-		size += roundup(phdr.p_filesz, 4);
-
-		/* .plt section */
-		if (d[DI_PLTGOT] != NULL && d[DI_JMPREL] != NULL &&
-		    d[DI_PLTRELSZ] != NULL && d[DI_PLTREL] != NULL) {
-			uintptr_t penult, ult;
-			uintptr_t jmprel = d[DI_JMPREL]->d_un.d_ptr;
-			size_t pltrelsz = d[DI_PLTRELSZ]->d_un.d_val;
-
-			if (d[DI_PLTREL]->d_un.d_val == DT_RELA) {
-				uint_t ndx = pltrelsz / sizeof (Elf32_Rela) - 2;
-				Elf32_Rela r[2];
-
-				if (Pread(P, r, sizeof (r), jmprel +
-				    sizeof (r[0]) * ndx) != sizeof (r)) {
-					dprintf("Pread of DT_RELA failed\n");
-					goto bad32;
-				}
-
-				penult = r[0].r_offset;
-				ult = r[1].r_offset;
-
-			} else if (d[DI_PLTREL]->d_un.d_val == DT_REL) {
-				uint_t ndx = pltrelsz / sizeof (Elf32_Rel) - 2;
-				Elf32_Rel r[2];
-
-				if (Pread(P, r, sizeof (r), jmprel +
-				    sizeof (r[0]) * ndx) != sizeof (r)) {
-					dprintf("Pread of DT_REL failed\n");
-					goto bad32;
-				}
-
-				penult = r[0].r_offset;
-				ult = r[1].r_offset;
-			} else {
-				dprintf(".plt: unknown jmprel value\n");
-				goto bad32;
-			}
-
-			pltentsz = ult - penult;
-
-			if (ehdr.e_type == ET_DYN)
-				ult += addr;
-
-			pltsz = ult - d[DI_PLTGOT]->d_un.d_ptr + pltentsz;
-
-			size += sizeof (Elf32_Shdr);
-			size += roundup(pltsz, 4);
-		}
-
-		if ((elfdata = calloc(1, size)) == NULL)
-			goto bad32;
-
-		/* LINTED - alignment */
-		ep = (Elf32_Ehdr *)elfdata;
-		(void) memcpy(ep, &ehdr, offsetof(Elf32_Ehdr, e_phoff));
-
-		ep->e_ehsize = sizeof (Elf32_Ehdr);
-		ep->e_phoff = sizeof (Elf32_Ehdr);
-		ep->e_phentsize = ehdr.e_phentsize;
-		ep->e_phnum = phnum;
-		ep->e_shoff = ep->e_phoff + phnum * ep->e_phentsize;
-		ep->e_shentsize = sizeof (Elf32_Shdr);
-		ep->e_shnum = (pltsz == 0) ? 5 : 6;
-		ep->e_shstrndx = 1;
-
-		/* LINTED - alignment */
-		sp = (Elf32_Shdr *)(elfdata + ep->e_shoff);
-		off = ep->e_shoff + ep->e_shentsize * ep->e_shnum;
-
-		/*
-		 * Copying the program headers directly from the process's
-		 * address space is a little suspect, but since we only
-		 * use them for their address and size values, this is fine.
-		 */
-		if (Pread(P, &elfdata[ep->e_phoff], phnum * ep->e_phentsize,
-		    addr + ehdr.e_phoff) != phnum * ep->e_phentsize) {
-			free(elfdata);
-			dprintf("failed to read program headers\n");
-			goto bad32;
-		}
-
-		/*
-		 * The first elf section is always skipped.
-		 */
-		sp++;
-
-		/*
-		 * Section Header[1]  sh_name: .shstrtab
-		 */
-		sp->sh_name = 0;
-		sp->sh_type = SHT_STRTAB;
-		sp->sh_flags = SHF_STRINGS;
-		sp->sh_addr = 0;
-		sp->sh_offset = off;
-		sp->sh_size = sizeof (shstr);
-		sp->sh_link = 0;
-		sp->sh_info = 0;
-		sp->sh_addralign = 1;
-		sp->sh_entsize = 0;
-
-		(void) memcpy(&elfdata[off], shstr, sizeof (shstr));
-		off += roundup(sp->sh_size, 4);
-		sp++;
-
-		/*
-		 * Section Header[2]  sh_name: .dynsym
-		 */
-		sp->sh_name = 10;
-		sp->sh_type = SHT_DYNSYM;
-		sp->sh_flags = SHF_ALLOC;
-		sp->sh_addr = d[DI_SYMTAB]->d_un.d_ptr;
-		if (ehdr.e_type == ET_DYN)
-			sp->sh_addr -= addr;
-		sp->sh_offset = off;
-		sp->sh_size = nchain * sizeof (Elf32_Sym);
-		sp->sh_link = 3;
-		sp->sh_info = 1;
-		sp->sh_addralign = 4;
-		sp->sh_entsize = sizeof (Elf32_Sym);
-
-		if (Pread(P, &elfdata[off], sp->sh_size,
-		    d[DI_SYMTAB]->d_un.d_ptr) != sp->sh_size) {
-			free(elfdata);
-			dprintf("failed to read .dynsym at %lx\n",
-			    (long)d[DI_SYMTAB]->d_un.d_ptr);
-			goto bad32;
-		}
-
-		off += roundup(sp->sh_size, 4);
-		sp++;
-
-		/*
-		 * Section Header[3]  sh_name: .dynstr
-		 */
-		sp->sh_name = 18;
-		sp->sh_type = SHT_STRTAB;
-		sp->sh_flags = SHF_ALLOC | SHF_STRINGS;
-		sp->sh_addr = d[DI_STRTAB]->d_un.d_ptr;
-		if (ehdr.e_type == ET_DYN)
-			sp->sh_addr -= addr;
-		sp->sh_offset = off;
-		sp->sh_size = d[DI_STRSZ]->d_un.d_val;
-		sp->sh_link = 0;
-		sp->sh_info = 0;
-		sp->sh_addralign = 1;
-		sp->sh_entsize = 0;
-
-		if (Pread(P, &elfdata[off], sp->sh_size,
-		    d[DI_STRTAB]->d_un.d_ptr) != sp->sh_size) {
-			free(elfdata);
-			dprintf("failed to read .dynstr\n");
-			goto bad32;
-		}
-		off += roundup(sp->sh_size, 4);
-		sp++;
-
-		/*
-		 * Section Header[4]  sh_name: .dynamic
-		 */
-		sp->sh_name = 26;
-		sp->sh_type = SHT_DYNAMIC;
-		sp->sh_flags = SHF_WRITE | SHF_ALLOC;
-		sp->sh_addr = phdr.p_vaddr;
-		if (ehdr.e_type == ET_DYN)
-			sp->sh_addr -= addr;
-		sp->sh_offset = off;
-		sp->sh_size = phdr.p_filesz;
-		sp->sh_link = 3;
-		sp->sh_info = 0;
-		sp->sh_addralign = 4;
-		sp->sh_entsize = sizeof (Elf32_Dyn);
-
-		(void) memcpy(&elfdata[off], dp, sp->sh_size);
-		off += roundup(sp->sh_size, 4);
-		sp++;
-
-		/*
-		 * Section Header[5]  sh_name: .plt
-		 */
-		if (pltsz != 0) {
-			sp->sh_name = 35;
-			sp->sh_type = SHT_PROGBITS;
-			sp->sh_flags = SHF_WRITE | SHF_ALLOC | SHF_EXECINSTR;
-			sp->sh_addr = d[DI_PLTGOT]->d_un.d_ptr;
-			if (ehdr.e_type == ET_DYN)
-				sp->sh_addr -= addr;
-			sp->sh_offset = off;
-			sp->sh_size = pltsz;
-			sp->sh_link = 0;
-			sp->sh_info = 0;
-			sp->sh_addralign = 4;
-			sp->sh_entsize = pltentsz;
-
-			if (Pread(P, &elfdata[off], sp->sh_size,
-			    d[DI_PLTGOT]->d_un.d_ptr) != sp->sh_size) {
-				free(elfdata);
-				dprintf("failed to read .plt\n");
-				goto bad32;
-			}
-			off += roundup(sp->sh_size, 4);
-			sp++;
-		}
-
-		free(dp);
-		goto good;
-
-bad32:
-		free(dp);
-		return (NULL);
+		elf = fake_elf32(P, fptr, addr, &ehdr, phnum, &phdr);
 #ifdef _LP64
-	} else if (P->status.pr_dmodel == PR_MODEL_LP64) {
-		Elf64_Ehdr ehdr, *ep;
+	} else {
+		Elf64_Ehdr ehdr;
 		Elf64_Phdr phdr;
-		Elf64_Shdr *sp;
-		Elf64_Dyn *dp;
-		Elf64_Dyn *d[DI_NENT] = { 0 };
-		uint_t phnum, i, dcount = 0;
-		uint64_t off;
-		size_t pltsz = 0, pltentsz;
 
 		if (read_ehdr64(P, &ehdr, &phnum, addr) != 0 ||
 		    read_dynamic_phdr64(P, &ehdr, phnum, &phdr, addr) != 0)
 			return (NULL);
 
-		if (ehdr.e_type == ET_DYN)
-			phdr.p_vaddr += addr;
-
-		if ((dp = malloc(phdr.p_filesz)) == NULL)
-			return (NULL);
-
-		if (Pread(P, dp, phdr.p_filesz, phdr.p_vaddr) !=
-		    phdr.p_filesz)
-			goto bad64;
-
-		for (i = 0; i < phdr.p_filesz / sizeof (Elf64_Dyn); i++) {
-			switch (dp[i].d_tag) {
-			/*
-			 * For the .plt section.
-			 */
-			case DT_PLTGOT:
-				d[DI_PLTGOT] = &dp[i];
-				continue;
-			case DT_JMPREL:
-				d[DI_JMPREL] = &dp[i];
-				continue;
-			case DT_PLTRELSZ:
-				d[DI_PLTRELSZ] = &dp[i];
-				continue;
-			case DT_PLTREL:
-				d[DI_PLTREL] = &dp[i];
-				continue;
-			default:
-				continue;
-
-			/*
-			 * For the .dynsym section.
-			 */
-			case DT_SYMTAB:
-				d[DI_SYMTAB] = &dp[i];
-				break;
-			case DT_HASH:
-				d[DI_HASH] = &dp[i];
-				break;
-			case DT_SYMENT:
-				d[DI_SYMENT] = &dp[i];
-				break;
-
-			/*
-			 * For the .dynstr section.
-			 */
-			case DT_STRTAB:
-				d[DI_STRTAB] = &dp[i];
-				break;
-			case DT_STRSZ:
-				d[DI_STRSZ] = &dp[i];
-				break;
-			}
-
-			dcount++;
-		}
-
-		/*
-		 * We need all of those dynamic entries in order to put
-		 * together a complete set of elf sections, but we'll
-		 * let the PLT section slide if need be. The dynsym- and
-		 * dynstr-related dynamic entries are mandatory in both
-		 * executables and shared objects so if one of those is
-		 * missing, we're in some trouble and should abort.
-		 */
-		if (dcount + 4 != DI_NENT) {
-			dprintf("text section missing required dynamic "
-			    "entries\n");
-			goto bad64;
-		}
-
-		if (ehdr.e_type == ET_DYN) {
-			if (d[DI_PLTGOT] != NULL)
-				d[DI_PLTGOT]->d_un.d_ptr += addr;
-			if (d[DI_JMPREL] != NULL)
-				d[DI_JMPREL]->d_un.d_ptr += addr;
-			d[DI_SYMTAB]->d_un.d_ptr += addr;
-			d[DI_HASH]->d_un.d_ptr += addr;
-			d[DI_STRTAB]->d_un.d_ptr += addr;
-		}
-
-		/* elf header */
-		size = sizeof (Elf64_Ehdr);
-
-		/* program headers from in-core elf fragment */
-		size += phnum * ehdr.e_phentsize;
-
-		/* unused shdr, and .shstrtab section */
-		size += sizeof (Elf64_Shdr);
-		size += sizeof (Elf64_Shdr);
-		size += roundup(sizeof (shstr), 8);
-
-		/* .dynsym section */
-		size += sizeof (Elf64_Shdr);
-		if (Pread(P, &nchain, sizeof (nchain),
-		    d[DI_HASH]->d_un.d_ptr + 4) != sizeof (nchain))
-			goto bad64;
-		size += sizeof (Elf64_Sym) * nchain;
-
-		/* .dynstr section */
-		size += sizeof (Elf64_Shdr);
-		size += roundup(d[DI_STRSZ]->d_un.d_val, 8);
-
-		/* .dynamic section */
-		size += sizeof (Elf64_Shdr);
-		size += roundup(phdr.p_filesz, 8);
-
-		/* .plt section */
-		if (d[DI_PLTGOT] != NULL && d[DI_JMPREL] != NULL &&
-		    d[DI_PLTRELSZ] != NULL && d[DI_PLTREL] != NULL) {
-			uintptr_t penult, ult;
-			uintptr_t jmprel = d[DI_JMPREL]->d_un.d_ptr;
-			size_t pltrelsz = d[DI_PLTRELSZ]->d_un.d_val;
-
-			if (d[DI_PLTREL]->d_un.d_val == DT_RELA) {
-				uint_t ndx = pltrelsz / sizeof (Elf64_Rela) - 2;
-				Elf64_Rela r[2];
-
-				if (Pread(P, r, sizeof (r), jmprel +
-				    sizeof (r[0]) * ndx) != sizeof (r)) {
-					dprintf("Pread jmprel DT_RELA at %p "
-					    "failed\n",
-					    (void *)(jmprel +
-						sizeof (r[0]) * ndx));
-					goto bad64;
-				}
-
-				penult = r[0].r_offset;
-				ult = r[1].r_offset;
-
-			} else if (d[DI_PLTREL]->d_un.d_val == DT_REL) {
-				uint_t ndx = pltrelsz / sizeof (Elf64_Rel) - 2;
-				Elf64_Rel r[2];
-
-				if (Pread(P, r, sizeof (r), jmprel +
-				    sizeof (r[0]) * ndx) != sizeof (r)) {
-					dprintf("Pread jmprel DT_REL at %p "
-					    "failed\n",
-					    (void *)(jmprel +
-						sizeof (r[0]) * ndx));
-					goto bad64;
-				}
-
-				penult = r[0].r_offset;
-				ult = r[1].r_offset;
-			} else {
-				dprintf("DT_PLTREL value %p unknown\n",
-				    (void *)d[DI_PLTREL]->d_un.d_ptr);
-				goto bad64;
-			}
-
-			pltentsz = ult - penult;
-
-			if (ehdr.e_type == ET_DYN)
-				ult += addr;
-
-			pltsz = ult - d[DI_PLTGOT]->d_un.d_ptr + pltentsz;
-
-			size += sizeof (Elf64_Shdr);
-			size += roundup(pltsz, 8);
-		}
-
-		if ((elfdata = calloc(1, size)) == NULL)
-			goto bad64;
-
-		/* LINTED - alignment */
-		ep = (Elf64_Ehdr *)elfdata;
-		(void) memcpy(ep, &ehdr, offsetof(Elf64_Ehdr, e_phoff));
-
-		ep->e_ehsize = sizeof (Elf64_Ehdr);
-		ep->e_phoff = sizeof (Elf64_Ehdr);
-		ep->e_phentsize = ehdr.e_phentsize;
-		ep->e_phnum = phnum;
-		ep->e_shoff = ep->e_phoff + phnum * ep->e_phentsize;
-		ep->e_shentsize = sizeof (Elf64_Shdr);
-		ep->e_shnum = (pltsz == 0) ? 5 : 6;
-		ep->e_shstrndx = 1;
-
-		/* LINTED - alignment */
-		sp = (Elf64_Shdr *)(elfdata + ep->e_shoff);
-		off = ep->e_shoff + ep->e_shentsize * ep->e_shnum;
-
-		/*
-		 * Copying the program headers directly from the process's
-		 * address space is a little suspect, but since we only
-		 * use them for their address and size values, this is fine.
-		 */
-		if (Pread(P, &elfdata[ep->e_phoff], phnum * ep->e_phentsize,
-		    addr + ehdr.e_phoff) != phnum * ep->e_phentsize) {
-			free(elfdata);
-			goto bad64;
-		}
-
-		/*
-		 * The first elf section is always skipped.
-		 */
-		sp++;
-
-		/*
-		 * Section Header[1]  sh_name: .shstrtab
-		 */
-		sp->sh_name = 0;
-		sp->sh_type = SHT_STRTAB;
-		sp->sh_flags = SHF_STRINGS;
-		sp->sh_addr = 0;
-		sp->sh_offset = off;
-		sp->sh_size = sizeof (shstr);
-		sp->sh_link = 0;
-		sp->sh_info = 0;
-		sp->sh_addralign = 1;
-		sp->sh_entsize = 0;
-
-		(void) memcpy(&elfdata[off], shstr, sizeof (shstr));
-		off += roundup(sp->sh_size, 8);
-		sp++;
-
-		/*
-		 * Section Header[2]  sh_name: .dynsym
-		 */
-		sp->sh_name = 10;
-		sp->sh_type = SHT_DYNSYM;
-		sp->sh_flags = SHF_ALLOC;
-		sp->sh_addr = d[DI_SYMTAB]->d_un.d_ptr;
-		if (ehdr.e_type == ET_DYN)
-			sp->sh_addr -= addr;
-		sp->sh_offset = off;
-		sp->sh_size = nchain * sizeof (Elf64_Sym);
-		sp->sh_link = 3;
-		sp->sh_info = 1;
-		sp->sh_addralign = 8;
-		sp->sh_entsize = sizeof (Elf64_Sym);
-
-		if (Pread(P, &elfdata[off], sp->sh_size,
-		    d[DI_SYMTAB]->d_un.d_ptr) != sp->sh_size) {
-			free(elfdata);
-			goto bad64;
-		}
-
-		off += roundup(sp->sh_size, 8);
-		sp++;
-
-		/*
-		 * Section Header[3]  sh_name: .dynstr
-		 */
-		sp->sh_name = 18;
-		sp->sh_type = SHT_STRTAB;
-		sp->sh_flags = SHF_ALLOC | SHF_STRINGS;
-		sp->sh_addr = d[DI_STRTAB]->d_un.d_ptr;
-		if (ehdr.e_type == ET_DYN)
-			sp->sh_addr -= addr;
-		sp->sh_offset = off;
-		sp->sh_size = d[DI_STRSZ]->d_un.d_val;
-		sp->sh_link = 0;
-		sp->sh_info = 0;
-		sp->sh_addralign = 1;
-		sp->sh_entsize = 0;
-
-		if (Pread(P, &elfdata[off], sp->sh_size,
-		    d[DI_STRTAB]->d_un.d_ptr) != sp->sh_size) {
-			free(elfdata);
-			goto bad64;
-		}
-		off += roundup(sp->sh_size, 8);
-		sp++;
-
-		/*
-		 * Section Header[4]  sh_name: .dynamic
-		 */
-		sp->sh_name = 26;
-		sp->sh_type = SHT_DYNAMIC;
-		sp->sh_flags = SHF_WRITE | SHF_ALLOC;
-		sp->sh_addr = phdr.p_vaddr;
-		if (ehdr.e_type == ET_DYN)
-			sp->sh_addr -= addr;
-		sp->sh_offset = off;
-		sp->sh_size = phdr.p_filesz;
-		sp->sh_link = 3;
-		sp->sh_info = 0;
-		sp->sh_addralign = 8;
-		sp->sh_entsize = sizeof (Elf64_Dyn);
-
-		(void) memcpy(&elfdata[off], dp, sp->sh_size);
-		off += roundup(sp->sh_size, 8);
-		sp++;
-
-		/*
-		 * Section Header[5]  sh_name: .plt
-		 */
-		if (pltsz != 0) {
-			sp->sh_name = 35;
-			sp->sh_type = SHT_PROGBITS;
-			sp->sh_flags = SHF_WRITE | SHF_ALLOC | SHF_EXECINSTR;
-			sp->sh_addr = d[DI_PLTGOT]->d_un.d_ptr;
-			if (ehdr.e_type == ET_DYN)
-				sp->sh_addr -= addr;
-			sp->sh_offset = off;
-			sp->sh_size = pltsz;
-			sp->sh_link = 0;
-			sp->sh_info = 0;
-			sp->sh_addralign = 8;
-			sp->sh_entsize = pltentsz;
-
-			if (Pread(P, &elfdata[off], sp->sh_size,
-			    d[DI_PLTGOT]->d_un.d_ptr) != sp->sh_size) {
-				free(elfdata);
-				goto bad64;
-			}
-			off += roundup(sp->sh_size, 8);
-			sp++;
-		}
-
-		free(dp);
-		goto good;
-
-bad64:
-		free(dp);
-		return (NULL);
-#endif	/* _LP64 */
+		elf = fake_elf64(P, fptr, addr, &ehdr, phnum, &phdr);
+#endif
 	}
-good:
-	if ((elf = elf_memory(elfdata, size)) == NULL) {
-		free(elfdata);
-		return (NULL);
-	}
-
-	fptr->file_elfmem = elfdata;
 
 	return (elf);
 }
@@ -2169,23 +1434,46 @@ byname_cmp(const void *aa, const void *bb)
 	return (strcmp(aname, bname));
 }
 
+/*
+ * Given a symbol index, look up the corresponding symbol from the
+ * given symbol table.
+ *
+ * This function allows the caller to treat the symbol table as a single
+ * logical entity even though there may be 2 actual ELF symbol tables
+ * involved. See the comments in Pcontrol.h for details.
+ */
+static GElf_Sym *
+symtab_getsym(sym_tbl_t *symtab, int ndx, GElf_Sym *dst)
+{
+	/* If index is in range of primary symtab, look it up there */
+	if (ndx >= symtab->sym_symn_aux) {
+		return (gelf_getsym(symtab->sym_data_pri,
+		    ndx - symtab->sym_symn_aux, dst));
+	}
+
+	/* Not in primary: Look it up in the auxiliary symtab */
+	return (gelf_getsym(symtab->sym_data_aux, ndx, dst));
+}
+
 void
 optimize_symtab(sym_tbl_t *symtab)
 {
 	GElf_Sym *symp, *syms;
 	uint_t i, *indexa, *indexb;
-	Elf_Data *data;
 	size_t symn, strsz, count;
 
-	if (symtab == NULL || symtab->sym_data == NULL ||
+	if (symtab == NULL || symtab->sym_data_pri == NULL ||
 	    symtab->sym_byaddr != NULL)
 		return;
 
-	data = symtab->sym_data;
 	symn = symtab->sym_symn;
 	strsz = symtab->sym_strsz;
 
 	symp = syms = malloc(sizeof (GElf_Sym) * symn);
+	if (symp == NULL) {
+		dprintf("optimize_symtab: failed to malloc symbol array");
+		return;
+	}
 
 	/*
 	 * First record all the symbols into a table and count up the ones
@@ -2193,7 +1481,7 @@ optimize_symtab(sym_tbl_t *symtab)
 	 * the st_name to an illegal value.
 	 */
 	for (i = 0, count = 0; i < symn; i++, symp++) {
-		if (gelf_getsym(data, i, symp) != NULL &&
+		if (symtab_getsym(symtab, i, symp) != NULL &&
 		    symp->st_name < strsz &&
 		    IS_DATA_TYPE(GELF_ST_TYPE(symp->st_info)))
 			count++;
@@ -2208,7 +1496,17 @@ optimize_symtab(sym_tbl_t *symtab)
 	symtab->sym_count = count;
 	indexa = symtab->sym_byaddr = calloc(sizeof (uint_t), count);
 	indexb = symtab->sym_byname = calloc(sizeof (uint_t), count);
-
+	if (indexa == NULL || indexb == NULL) {
+		dprintf(
+		    "optimize_symtab: failed to malloc symbol index arrays");
+		symtab->sym_count = 0;
+		if (indexa != NULL) {	/* First alloc succeeded. Free it */
+			free(indexa);
+			symtab->sym_byaddr = NULL;
+		}
+		free(syms);
+		return;
+	}
 	for (i = 0, symp = syms; i < symn; i++, symp++) {
 		if (symp->st_name < strsz)
 			*indexa++ = *indexb++ = i;
@@ -2398,7 +1696,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 
 	/*
 	 * Now iterate through the section cache in order to locate info
-	 * for the .symtab, .dynsym, .dynamic, .plt, and .SUNW_ctf sections:
+	 * for the .symtab, .dynsym, .SUNW_ldynsym, .dynamic, .plt,
+	 * and .SUNW_ctf sections:
 	 */
 	for (i = 1, cp = cache + 1; i < nshdrs; i++, cp++) {
 		GElf_Shdr *shp = &cp->c_shdr;
@@ -2416,22 +1715,37 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 			 * with an equivalent one. In either case, this
 			 * check isn't essential, but it's a good idea.
 			 */
-			if (symp->sym_data == NULL) {
+			if (symp->sym_data_pri == NULL) {
 				dprintf("Symbol table found for %s\n",
 				    objectfile);
-				symp->sym_data = cp->c_data;
-				symp->sym_symn = shp->sh_size / shp->sh_entsize;
+				symp->sym_data_pri = cp->c_data;
+				symp->sym_symn +=
+				    shp->sh_size / shp->sh_entsize;
 				symp->sym_strs =
 				    cache[shp->sh_link].c_data->d_buf;
 				symp->sym_strsz =
 				    cache[shp->sh_link].c_data->d_size;
-				symp->sym_hdr = cp->c_shdr;
+				symp->sym_hdr_pri = cp->c_shdr;
 				symp->sym_strhdr = cache[shp->sh_link].c_shdr;
 			} else {
 				dprintf("Symbol table already there for %s\n",
 				    objectfile);
 			}
-
+		} else if (shp->sh_type == SHT_SUNW_LDYNSYM) {
+			/* .SUNW_ldynsym section is auxiliary to .dynsym */
+			if (fptr->file_dynsym.sym_data_aux == NULL) {
+				dprintf(".SUNW_ldynsym symbol table"
+				    " found for %s\n", objectfile);
+				fptr->file_dynsym.sym_data_aux = cp->c_data;
+				fptr->file_dynsym.sym_symn_aux =
+				    shp->sh_size / shp->sh_entsize;
+				fptr->file_dynsym.sym_symn +=
+				    fptr->file_dynsym.sym_symn_aux;
+				fptr->file_dynsym.sym_hdr_aux = cp->c_shdr;
+			} else {
+				dprintf(".SUNW_ldynsym symbol table already"
+				    " there for %s\n", objectfile);
+			}
 		} else if (shp->sh_type == SHT_DYNAMIC) {
 			dyn = cp;
 		} else if (strcmp(cp->c_name, ".plt") == 0) {
@@ -2777,12 +2091,11 @@ sym_prefer(GElf_Sym *sym1, char *name1, GElf_Sym *sym2, char *name2)
 static GElf_Sym *
 sym_by_addr(sym_tbl_t *symtab, GElf_Addr addr, GElf_Sym *symp, uint_t *idp)
 {
-	Elf_Data *data = symtab->sym_data;
 	GElf_Sym sym, osym;
 	uint_t i, oid, *byaddr = symtab->sym_byaddr;
 	int min, max, mid, omid, found = 0;
 
-	if (data == NULL)
+	if (symtab->sym_data_pri == NULL || symtab->sym_count == 0)
 		return (NULL);
 
 	min = 0;
@@ -2797,7 +2110,7 @@ sym_by_addr(sym_tbl_t *symtab, GElf_Addr addr, GElf_Sym *symp, uint_t *idp)
 		mid = (max + min) / 2;
 
 		i = byaddr[mid];
-		(void) gelf_getsym(data, i, &sym);
+		(void) symtab_getsym(symtab, i, &sym);
 
 		if (addr >= sym.st_value &&
 		    addr < sym.st_value + sym.st_size &&
@@ -2829,7 +2142,7 @@ sym_by_addr(sym_tbl_t *symtab, GElf_Addr addr, GElf_Sym *symp, uint_t *idp)
 			break;
 
 		oid = byaddr[--omid];
-		(void) gelf_getsym(data, oid, &osym);
+		(void) symtab_getsym(symtab, oid, &osym);
 	} while (addr >= osym.st_value &&
 	    addr < sym.st_value + osym.st_size &&
 	    osym.st_value == sym.st_value);
@@ -2846,12 +2159,12 @@ sym_by_addr(sym_tbl_t *symtab, GElf_Addr addr, GElf_Sym *symp, uint_t *idp)
 static GElf_Sym *
 sym_by_name(sym_tbl_t *symtab, const char *name, GElf_Sym *symp, uint_t *idp)
 {
-	Elf_Data *data = symtab->sym_data;
 	char *strs = symtab->sym_strs;
 	uint_t i, *byname = symtab->sym_byname;
 	int min, mid, max, cmp;
 
-	if (data == NULL || strs == NULL)
+	if (symtab->sym_data_pri == NULL || strs == NULL ||
+	    symtab->sym_count == 0)
 		return (NULL);
 
 	min = 0;
@@ -2861,7 +2174,7 @@ sym_by_name(sym_tbl_t *symtab, const char *name, GElf_Sym *symp, uint_t *idp)
 		mid = (max + min) / 2;
 
 		i = byname[mid];
-		(void) gelf_getsym(data, i, symp);
+		(void) symtab_getsym(symtab, i, symp);
 
 		if ((cmp = strcmp(name, strs + symp->st_name)) == 0) {
 			if (idp != NULL)
@@ -3013,7 +2326,7 @@ Pxlookup_by_name(
 		    lmid != fptr->file_lo->rl_lmident)
 			continue;
 
-		if (fptr->file_symtab.sym_data != NULL &&
+		if (fptr->file_symtab.sym_data_pri != NULL &&
 		    sym_by_name(&fptr->file_symtab, sname, symp, &id)) {
 			if (sip != NULL) {
 				sip->prs_id = id;
@@ -3023,7 +2336,7 @@ Pxlookup_by_name(
 				sip->prs_lmid = fptr->file_lo == NULL ?
 				    LM_ID_BASE : fptr->file_lo->rl_lmident;
 			}
-		} else if (fptr->file_dynsym.sym_data != NULL &&
+		} else if (fptr->file_dynsym.sym_data_pri != NULL &&
 		    sym_by_name(&fptr->file_dynsym, sname, symp, &id)) {
 			if (sip != NULL) {
 				sip->prs_id = id;
@@ -3187,7 +2500,6 @@ Psymbol_iter_com(struct ps_prochandle *P, Lmid_t lmid, const char *object_name,
 	map_info_t *mptr;
 	file_info_t *fptr;
 	sym_tbl_t *symtab;
-	Elf_Data *data;
 	size_t symn;
 	const char *strs;
 	size_t strsz;
@@ -3222,13 +2534,9 @@ Psymbol_iter_com(struct ps_prochandle *P, Lmid_t lmid, const char *object_name,
 	si.prs_lmid = fptr->file_lo == NULL ?
 	    LM_ID_BASE : fptr->file_lo->rl_lmident;
 
-	data = symtab->sym_data;
 	symn = symtab->sym_symn;
 	strs = symtab->sym_strs;
 	strsz = symtab->sym_strsz;
-
-	if (data == NULL || strs == NULL)
-		return (-1);
 
 	switch (order) {
 	case PRO_NATURAL:
@@ -3247,11 +2555,14 @@ Psymbol_iter_com(struct ps_prochandle *P, Lmid_t lmid, const char *object_name,
 		return (-1);
 	}
 
+	if (symtab->sym_data_pri == NULL || strs == NULL || count == 0)
+		return (-1);
+
 	rv = 0;
 
 	for (i = 0; i < count; i++) {
 		ndx = map == NULL ? i : map[i];
-		if (gelf_getsym(data, ndx, &sym) != NULL) {
+		if (symtab_getsym(symtab, ndx, &sym) != NULL) {
 			uint_t s_bind, s_type, type;
 
 			if (sym.st_name >= strsz)	/* invalid st_name */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,9 @@ static int
 pr_symtab(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	sym_tbl_t symtab;
-	Elf_Data data;
+	Elf_Data data_pri;
+	Elf_Data data_aux;
+	Elf_Data *data;
 #ifdef _LP64
 	Elf64_Sym sym;
 	int width = 16;
@@ -85,9 +87,25 @@ pr_symtab(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (mdb_vread(&data, sizeof (Elf_Data),
-	    (uintptr_t)symtab.sym_data) == -1) {
-		mdb_warn("failed to read Elf_Data at %p", symtab.sym_data);
+	/*
+	 * As described in the libproc header Pcontrol.h, a sym_tbl_t
+	 * contains a primary and an optional auxiliary symbol table.
+	 * We treat the combination as a single table, with the auxiliary
+	 * values coming before the primary ones.
+	 *
+	 * Read the primary and auxiliary Elf_Data structs.
+	 */
+	if (mdb_vread(&data_pri, sizeof (Elf_Data),
+	    (uintptr_t)symtab.sym_data_pri) == -1) {
+		mdb_warn("failed to read primary Elf_Data at %p",
+		    symtab.sym_data_pri);
+		return (DCMD_ERR);
+	}
+	if ((symtab.sym_symn_aux > 0) &&
+	    (mdb_vread(&data_aux, sizeof (Elf_Data),
+	    (uintptr_t)symtab.sym_data_aux) == -1)) {
+		mdb_warn("failed to read auxiliary Elf_Data at %p",
+		    symtab.sym_data_aux);
 		return (DCMD_ERR);
 	}
 
@@ -116,10 +134,18 @@ pr_symtab(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		else
 			idx = i;
 
-		if (mdb_vread(&sym, sizeof (sym), (uintptr_t)data.d_buf +
+		/* If index is in range of primary symtab, look it up there */
+		if (idx >= symtab.sym_symn_aux) {
+			data = &data_pri;
+			idx -= symtab.sym_symn_aux;
+		} else {	/* Look it up in the auxiliary symtab */
+			data = &data_aux;
+		}
+
+		if (mdb_vread(&sym, sizeof (sym), (uintptr_t)data->d_buf +
 		    idx * sizeof (sym)) == -1) {
 			mdb_warn("failed to read symbol at %p",
-			    (uintptr_t)data.d_buf + idx * sizeof (sym));
+			    (uintptr_t)data->d_buf + idx * sizeof (sym));
 			if (symlist)
 				mdb_free(symlist, symlistsz);
 			return (DCMD_ERR);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -812,7 +812,7 @@ fake_up_symtab(struct ps_prochandle *P, const elf_file_header_t *ehdr,
 	if (symtab->sh_addr == 0 ||
 	    (mp = Paddr2mptr(P, symtab->sh_addr)) == NULL ||
 	    (fp = mp->map_file) == NULL ||
-	    fp->file_symtab.sym_data != NULL) {
+	    fp->file_symtab.sym_data_pri != NULL) {
 		dprintf("fake_up_symtab: invalid section\n");
 		return;
 	}
@@ -950,7 +950,7 @@ fake_up_symtab(struct ps_prochandle *P, const elf_file_header_t *ehdr,
 	}
 
 	if ((scn = elf_getscn(fp->file_symtab.sym_elf, 1)) == NULL ||
-	    (fp->file_symtab.sym_data = elf_getdata(scn, NULL)) == NULL ||
+	    (fp->file_symtab.sym_data_pri = elf_getdata(scn, NULL)) == NULL ||
 	    (scn = elf_getscn(fp->file_symtab.sym_elf, 2)) == NULL ||
 	    (data = elf_getdata(scn, NULL)) == NULL) {
 		dprintf("fake_up_symtab: failed to get section data at %p\n",
@@ -961,7 +961,7 @@ fake_up_symtab(struct ps_prochandle *P, const elf_file_header_t *ehdr,
 	fp->file_symtab.sym_strs = data->d_buf;
 	fp->file_symtab.sym_strsz = data->d_size;
 	fp->file_symtab.sym_symn = symtab->sh_size / symtab->sh_entsize;
-	fp->file_symtab.sym_hdr = *symtab;
+	fp->file_symtab.sym_hdr_pri = *symtab;
 	fp->file_symtab.sym_strhdr = *strtab;
 
 	optimize_symtab(&fp->file_symtab);
