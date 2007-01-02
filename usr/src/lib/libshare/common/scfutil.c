@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <uuid/uuid.h>
 #include <sys/param.h>
+#include <signal.h>
 
 ssize_t scf_max_name_len;
 extern struct sa_proto_plugin *sap_proto_list;
@@ -418,6 +419,7 @@ sa_share_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 	ssize_t vallen;
 	char *valuestr;
 	int ret = SA_OK;
+	int have_path = 0;
 
 	/*
 	 * While preliminary check (starts with 'S') passed before
@@ -475,6 +477,14 @@ sa_share_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 			}
 		    }
 		    if (ret == SA_OK) {
+			/*
+			 * check that we have the "path" property in
+			 * name. The string in name will always be nul
+			 * terminated if scf_property_get_name()
+			 * succeeded.
+			 */
+			if (strcmp(name, "path") == 0)
+			    have_path = 1;
 			if (is_share_attr(name)) {
 				/*
 				 * if a share attr, then simple -
@@ -497,6 +507,17 @@ sa_share_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 		    }
 		}
 	    }
+	}
+	/*
+	 * a share without a path is broken so we want to not include
+	 * these.  They shouldn't happen but if you kill a sharemgr in
+	 * the process of creating a share, it could happen.  They
+	 * should be harmless.  It is also possible that another
+	 * sharemgr is running and in the process of creating a share.
+	 */
+	if (have_path == 0 && node != NULL) {
+	    xmlUnlinkNode(node);
+	    xmlFreeNode(node);
 	}
 	if (name != NULL)
 	    free(name);
@@ -1301,10 +1322,21 @@ sa_commit_share(scfutilhandle_t *handle, sa_group_t group, sa_share_t share)
 		sharename = strdup(shname);
 	    }
 	    if (sharename != NULL) {
+		sigset_t old, new;
 		/*
-		 * have a share name allocated so create a pgroup
-		 * for it. It may already exist, but that is OK.
+		 * have a share name allocated so create a pgroup for
+		 * it. It may already exist, but that is OK.  In order
+		 * to avoid creating a share pgroup that doesn't have
+		 * a path property, block signals around the critical
+		 * region of creating the share pgroup and props.
 		 */
+		(void) sigprocmask(SIG_BLOCK, NULL, &new);
+		(void) sigaddset(&new, SIGHUP);
+		(void) sigaddset(&new, SIGINT);
+		(void) sigaddset(&new, SIGQUIT);
+		(void) sigaddset(&new, SIGTSTP);
+		(void) sigprocmask(SIG_SETMASK, &new, &old);
+
 		ret = sa_create_pgroup(handle, sharename);
 		if (ret == SA_OK) {
 			/*
@@ -1345,6 +1377,9 @@ sa_commit_share(scfutilhandle_t *handle, sa_group_t group, sa_share_t share)
 		} else {
 		    sa_abort_transaction(handle);
 		}
+
+		(void) sigprocmask(SIG_SETMASK, &old, NULL);
+
 		free(sharename);
 	    }
 	}

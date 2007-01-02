@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -514,7 +514,11 @@ sa_comment_line(char *line, char *err)
 		(void) lockf(fileno(dfstab), F_LOCK, 0);
 		list = getdfstab(dfstab);
 		rewind(dfstab);
-		(void) remdfsline(list, line);
+		/*
+		 * don't ignore the return since the list could have
+		 * gone to NULL if the file only had one line in it.
+		 */
+		list = remdfsline(list, line);
 		outdfstab(dfstab, list);
 		(void) fprintf(dfstab, "# Error: %s: %s", err, line);
 		(void) fsync(fileno(dfstab));
@@ -1079,19 +1083,21 @@ legacy_removes(sa_group_t group, char *file)
 	if (dfstab != NULL) {
 	    list = getdfstab(dfstab);
 	    (void) fclose(dfstab);
+retry:
 	    for (share = sa_get_share(group, NULL); share != NULL;
 		share = sa_get_next_share(share)) {
 		/* now see if the share is in the dfstab file */
 		path = sa_get_share_attr(share, "path");
 		if (path != NULL) {
 		    item = finddfsentry(list, path);
+		    sa_free_attr_string(path);
 		    if (item == NULL) {
 			/* the share was removed this way */
 			(void) sa_remove_share(share);
+
 			/* start over since the list was broken */
-			share = sa_get_share(group, NULL);
+			goto retry;
 		    }
-		    sa_free_attr_string(path);
 		}
 	    }
 	    if (list != NULL)
@@ -1316,9 +1322,12 @@ parse_sharetab(void)
 	    } else {
 		/*
 		 * if this is a legacy share, mark as shared so we
-		 * only update sharetab appropriately.
+		 * only update sharetab appropriately. We also keep
+		 * the sharetab options in order to display for legacy
+		 * share with no arguments.
 		 */
 		set_node_attr(share, "shared", "true");
+		set_node_attr(share, "shareopts", tmplist->options);
 	    }
 	}
 	dfs_free_list(list);

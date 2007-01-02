@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,9 +90,15 @@ typedef void *sa_handle_t;	/* opaque handle to access core functions */
  */
 
 #define	SA_MAX_NAME_LEN		100	/* must fit service instance name */
-#define	SA_SHARE_PERMANENT	2	/* share goes to repository */
-#define	SA_SHARE_LEGACY		1	/* share is in dfstab only */
+
+/* Used in calls to sa_add_share() */
 #define	SA_SHARE_TRANSIENT	0	/* shared but not across reboot */
+#define	SA_SHARE_LEGACY		1	/* share is in dfstab only */
+#define	SA_SHARE_PERMANENT	2	/* share goes to repository */
+
+/* sa_check_path() related */
+#define	SA_CHECK_NORMAL		0	/* only check against active shares */
+#define	SA_CHECK_STRICT		1	/* check against all shares */
 
 /* RBAC related */
 #define	SA_RBAC_MANAGE	"solaris.smf.manage.shares"
@@ -133,7 +139,7 @@ extern int sa_valid_group_name(char *);
 
 /* share control */
 extern sa_share_t sa_add_share(sa_group_t, char *, int, int *);
-extern int sa_check_path(sa_group_t, char *);
+extern int sa_check_path(sa_group_t, char *, int);
 extern int sa_move_share(sa_group_t, sa_share_t);
 extern int sa_remove_share(sa_share_t);
 extern sa_share_t sa_get_share(sa_group_t, char *);

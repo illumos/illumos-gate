@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -282,12 +282,19 @@ is_shared(sa_share_t share)
 }
 
 /*
- * checksubdir determines if the specified path is a subdirectory of
- * another share. It calls issubdir() from the old share
- * implementation to do the complicated work.
+ * checksubdir(newpath, strictness)
+ *
+ * checksubdir determines if the specified path (newpath) is a
+ * subdirectory of another share. It calls issubdir() from the old
+ * share implementation to do the complicated work. The strictness
+ * parameter determines how strict a check to make against the
+ * path. The strictness values mean:
+ * SA_CHECK_NORMAL == only check newpath against shares that are active
+ * SA_CHECK_STRICT == check newpath against both active shares and those
+ *		      stored in the repository
  */
 static int
-checksubdir(char *newpath)
+checksubdir(char *newpath, int strictness)
 {
 	sa_group_t group;
 	sa_share_t share;
@@ -307,10 +314,17 @@ checksubdir(char *newpath)
 		 * could be considered incorrect.  We may tighten this
 		 * up in the future.
 		 */
-		if (!is_shared(share))
+		if (strictness == SA_CHECK_NORMAL && !is_shared(share))
 		    continue;
 
 		path = sa_get_share_attr(share, "path");
+		/*
+		 * If path is NULL, then a share is in the process of
+		 * construction or someone has modified the property
+		 * group inappropriately. It should be ignored.
+		 */
+		if (path == NULL)
+		    continue;
 		if (newpath != NULL &&
 		    (strcmp(path, newpath) == 0 || issubdir(newpath, path) ||
 			issubdir(path, newpath))) {
@@ -329,13 +343,13 @@ checksubdir(char *newpath)
 }
 
 /*
- * validpath(path)
+ * validpath(path, strictness)
  * determine if the provided path is valid for a share. It shouldn't
  * be a sub-dir of an already shared path or the parent directory of a
  * share path.
  */
 static int
-validpath(char *path)
+validpath(char *path, int strictness)
 {
 	int error = SA_OK;
 	struct stat st;
@@ -370,7 +384,7 @@ validpath(char *path)
 		    sa_free_fstype(fstype);
 	    }
 	    if (error == SA_OK) {
-		error = checksubdir(path);
+		error = checksubdir(path, strictness);
 	    }
 	}
 	return (error);
@@ -514,7 +528,7 @@ sa_security_name(sa_security_t security, char *oname, size_t len, char *id)
 }
 
 /*
- * sa_init()
+ * sa_init(init_service)
  *	Initialize the API
  *	find all the shared objects
  *	init the tables with all objects
@@ -875,21 +889,24 @@ sa_find_share(char *sharepath)
 }
 
 /*
- *  sa_check_path(group, path)
+ *  sa_check_path(group, path, strictness)
  *
  * check that path is a valid path relative to the group.  Currently,
  * we are ignoring the group and checking only the NFS rules. Later,
  * we may want to use the group to then check against the protocols
- * enabled on the group.
+ * enabled on the group. The strictness values mean:
+ * SA_CHECK_NORMAL == only check newpath against shares that are active
+ * SA_CHECK_STRICT == check newpath against both active shares and those
+ *		      stored in the repository
  */
 
 int
-sa_check_path(sa_group_t group, char *path)
+sa_check_path(sa_group_t group, char *path, int strictness)
 {
 #ifdef lint
 	group = group;
 #endif
-	return (validpath(path));
+	return (validpath(path, strictness));
 }
 
 /*
@@ -964,9 +981,24 @@ sa_add_share(sa_group_t group, char *sharepath, int persist, int *error)
 {
 	xmlNodePtr node = NULL;
 	sa_share_t dup;
+	int strictness = SA_CHECK_NORMAL;
+
+	/*
+	 * If the share is to be permanent, use strict checking so a
+	 * bad config doesn't get created. Transient shares only need
+	 * to check against the currently active
+	 * shares. SA_SHARE_PARSER is a modifier used internally to
+	 * indicate that we are being called by the dfstab parser and
+	 * that we need strict checking in all cases. Normally persist
+	 * is in integer value but SA_SHARE_PARSER may be or'd into
+	 * it as an override.
+	 */
+	if (persist & SA_SHARE_PARSER || persist == SA_SHARE_PERMANENT)
+	    strictness = SA_CHECK_STRICT;
 
 	if ((dup = sa_find_share(sharepath)) == NULL &&
-		(*error = sa_check_path(group, sharepath)) == SA_OK) {
+		(*error = sa_check_path(group, sharepath, strictness)) ==
+			SA_OK) {
 	    node = _sa_add_share(group, sharepath, persist, error);
 	}
 	if (dup != NULL)
@@ -1326,19 +1358,12 @@ sa_remove_group(sa_group_t group)
 int
 sa_update_config()
 {
-	struct stat st;
-
 	/*
 	 * do legacy files first so we can tell when they change.
 	 * This will go away when we start updating individual records
 	 * rather than the whole file.
 	 */
 	update_legacy_config();
-	/* update legacy timestamp */
-	if (stat(SA_LEGACY_DFSTAB, &st) >= 0) {
-	    set_legacy_timestamp(sa_config_tree, SA_LEGACY_DFSTAB,
-					TSTAMP(st.st_ctim));
-	}
 	return (SA_OK);
 }
 

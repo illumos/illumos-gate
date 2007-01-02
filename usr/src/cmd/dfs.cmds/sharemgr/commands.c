@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1568,10 +1568,12 @@ sa_addshare(int flags, int argc, char *argv[])
 		    } else {
 			/*
 			 * need to check that resource name is unique
-			 * at some point.
+			 * at some point. Path checking should use the
+			 * "normal" rules which don't check the repository.
 			 */
 			if (dryrun)
-			    ret = sa_check_path(group, sharepath);
+			    ret = sa_check_path(group, sharepath,
+						SA_CHECK_NORMAL);
 			else
 			    share = sa_add_share(group, sharepath,
 							persist, &ret);
@@ -3468,14 +3470,14 @@ run_legacy_command(char *path, char *argv[])
 }
 
 /*
- * out_share(out, group, proto, options)
+ * out_share(out, group, proto)
  *
  * Display the share information in the format that the "share"
  * command has traditionally used.
  */
 
 static void
-out_share(FILE *out, sa_group_t group, char *proto, char *options)
+out_share(FILE *out, sa_group_t group, char *proto)
 {
 	sa_share_t share;
 	char resfmt[128];
@@ -3502,15 +3504,18 @@ out_share(FILE *out, sa_group_t group, char *proto, char *options)
 		groupname = NULL;
 	    }
 	    description = sa_get_share_description(share);
-	    soptions = options;
+
+	    /* want the sharetab version if it exists */
+	    soptions = sa_get_share_attr(share, "shareopts");
 
 	    if (sharedstate == NULL)
 		shared = 0;
 
-	    soptions = sa_proto_legacy_format(proto, share, 1);
+	    if (soptions == NULL)
+		soptions = sa_proto_legacy_format(proto, share, 1);
 
 	    if (shared) {
-		/* only persisting share go here */
+		/* only active shares go here */
 		(void) snprintf(resfmt, sizeof (resfmt), "%s%s%s",
 			resource != NULL ? resource : "-",
 			groupname != NULL ? "@" : "",
@@ -3535,7 +3540,7 @@ out_share(FILE *out, sa_group_t group, char *proto, char *options)
 		sa_free_share_description(description);
 	    if (sharedstate != NULL)
 		sa_free_attr_string(sharedstate);
-	    if (soptions != NULL && soptions != options)
+	    if (soptions != NULL)
 		sa_format_free(soptions);
 	}
 }
@@ -3573,11 +3578,11 @@ output_legacy_file(FILE *out, char *proto)
 		    zgroup = sa_get_next_group(zgroup)) {
 
 		    /* got a group, so display it */
-		    out_share(out, zgroup, proto, options);
+		    out_share(out, zgroup, proto);
 		}
 	    } else {
 		options = sa_proto_legacy_format(proto, group, 1);
-		out_share(out, group, proto, options);
+		out_share(out, group, proto);
 	    }
 	    if (options != NULL)
 		free(options);
