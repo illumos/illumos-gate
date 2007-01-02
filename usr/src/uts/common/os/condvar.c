@@ -631,15 +631,16 @@ cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp,
 	timestruc_t *when, int timecheck)
 {
 	timestruc_t now;
+	timestruc_t delta;
 	int rval;
 
 	if (when == NULL)
 		return (cv_wait_sig_swap(cvp, mp));
 
 	gethrestime(&now);
-	if (when->tv_sec < now.tv_sec ||
-	    (when->tv_sec == now.tv_sec &&
-	    when->tv_nsec <= now.tv_nsec)) {
+	delta = *when;
+	timespecsub(&delta, &now);
+	if (delta.tv_sec < 0 || (delta.tv_sec == 0 && delta.tv_nsec == 0)) {
 		/*
 		 * We have already reached the absolute future time.
 		 * Call cv_timedwait_sig() just to check for signals.
@@ -664,9 +665,10 @@ cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp,
 			 * If not, change rval to indicate a normal wakeup.
 			 */
 			gethrestime(&now);
-			if (when->tv_sec > now.tv_sec ||
-			    (when->tv_sec == now.tv_sec &&
-			    when->tv_nsec > now.tv_nsec))
+			delta = *when;
+			timespecsub(&delta, &now);
+			if (delta.tv_sec > 0 || (delta.tv_sec == 0 &&
+			    delta.tv_nsec > 0))
 				rval = 1;
 		}
 	}

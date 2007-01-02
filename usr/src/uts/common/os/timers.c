@@ -1221,13 +1221,13 @@ nanosleep(timespec_t *rqtp, timespec_t *rmtp)
 		 */
 		rmtime.tv_sec = rmtime.tv_nsec = 0;
 		if (ret == 0) {
+			timespec_t delta = rqtime;
+
 			gethrestime(&now);
-			if ((now.tv_sec < rqtime.tv_sec) ||
-			    ((now.tv_sec == rqtime.tv_sec) &&
-			    (now.tv_nsec < rqtime.tv_nsec))) {
-				rmtime = rqtime;
-				timespecsub(&rmtime, &now);
-			}
+			timespecsub(&delta, &now);
+			if (delta.tv_sec > 0 || (delta.tv_sec == 0 &&
+			    delta.tv_nsec > 0))
+				rmtime = delta;
 		}
 
 		if (datamodel == DATAMODEL_NATIVE) {

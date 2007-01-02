@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,22 +53,37 @@ cmdbuf_shiftr(mdb_cmdbuf_t *cmd, size_t nbytes)
 	    cmd->cmd_buflen - cmd->cmd_bufidx);
 }
 
+static void
+mdb_cmdbuf_allocchunk(mdb_cmdbuf_t *cmd)
+{
+	int i;
+	char **newhistory;
+	ssize_t newhalloc = cmd->cmd_halloc + MDB_DEF_HISTLEN;
+
+	if (newhalloc > cmd->cmd_histlen)
+		newhalloc = cmd->cmd_histlen;
+	newhistory = mdb_alloc(newhalloc * sizeof (char *), UM_SLEEP);
+	bcopy(cmd->cmd_history, newhistory, cmd->cmd_halloc * sizeof (char *));
+	mdb_free(cmd->cmd_history, cmd->cmd_halloc * sizeof (char *));
+	for (i = cmd->cmd_halloc; i < newhalloc; i++)
+		newhistory[i] = mdb_alloc(CMDBUF_LINELEN, UM_SLEEP);
+	cmd->cmd_history = newhistory;
+	cmd->cmd_halloc = newhalloc;
+}
+
 void
 mdb_cmdbuf_create(mdb_cmdbuf_t *cmd)
 {
 	size_t i;
 
-	/*
-	 * This is pretty weak, but good enough for the moment: just allocate
-	 * BUFSIZ-sized chunks in advance for every history element.  Later
-	 * it would be nice to replace this with either code that allocates
-	 * space for the history list on-the-fly so as not to waste so much
-	 * memory, or that keeps a mapped history file like the shell.
-	 */
-	cmd->cmd_history = mdb_alloc(mdb.m_histlen * sizeof (char *), UM_SLEEP);
+	cmd->cmd_halloc = MDB_DEF_HISTLEN < mdb.m_histlen ?
+	    MDB_DEF_HISTLEN : mdb.m_histlen;
+
+	cmd->cmd_history = mdb_alloc(cmd->cmd_halloc * sizeof (char *),
+	    UM_SLEEP);
 	cmd->cmd_linebuf = mdb_alloc(CMDBUF_LINELEN, UM_SLEEP);
 
-	for (i = 0; i < mdb.m_histlen; i++)
+	for (i = 0; i < cmd->cmd_halloc; i++)
 		cmd->cmd_history[i] = mdb_alloc(CMDBUF_LINELEN, UM_SLEEP);
 
 	cmd->cmd_buf = cmd->cmd_history[0];
@@ -88,11 +102,11 @@ mdb_cmdbuf_destroy(mdb_cmdbuf_t *cmd)
 {
 	size_t i;
 
-	for (i = 0; i < cmd->cmd_histlen; i++)
+	for (i = 0; i < cmd->cmd_halloc; i++)
 		mdb_free(cmd->cmd_history[i], CMDBUF_LINELEN);
 
 	mdb_free(cmd->cmd_linebuf, CMDBUF_LINELEN);
-	mdb_free(cmd->cmd_history, cmd->cmd_histlen * sizeof (char *));
+	mdb_free(cmd->cmd_history, cmd->cmd_halloc * sizeof (char *));
 }
 
 int
@@ -161,6 +175,9 @@ mdb_cmdbuf_accept(mdb_cmdbuf_t *cmd)
 		 */
 		if (cmd->cmd_buflen > 1) {
 			cmd->cmd_hnew = (cmd->cmd_hnew + 1) % cmd->cmd_histlen;
+			if (cmd->cmd_hnew >= cmd->cmd_halloc)
+				mdb_cmdbuf_allocchunk(cmd);
+
 			cmd->cmd_buf = cmd->cmd_history[cmd->cmd_hnew];
 			cmd->cmd_hcur = cmd->cmd_hnew;
 
@@ -414,7 +431,7 @@ mdb_cmdbuf_prevhist(mdb_cmdbuf_t *cmd, int c)
 		}
 
 		if (cmd->cmd_hcur < 0)
-			cmd->cmd_hcur = cmd->cmd_histlen - 1;
+			cmd->cmd_hcur = cmd->cmd_halloc - 1;
 
 		(void) strcpy(cmd->cmd_buf, cmd->cmd_history[cmd->cmd_hcur]);
 		cmd->cmd_bufidx = strlen(cmd->cmd_buf);
@@ -431,7 +448,7 @@ int
 mdb_cmdbuf_nexthist(mdb_cmdbuf_t *cmd, int c)
 {
 	if (cmd->cmd_hcur != cmd->cmd_hnew) {
-		cmd->cmd_hcur = (cmd->cmd_hcur + 1) % cmd->cmd_histlen;
+		cmd->cmd_hcur = (cmd->cmd_hcur + 1) % cmd->cmd_halloc;
 
 		if (cmd->cmd_hcur == cmd->cmd_hnew) {
 			(void) strcpy(cmd->cmd_buf, cmd->cmd_linebuf);
@@ -463,7 +480,7 @@ mdb_cmdbuf_findhist(mdb_cmdbuf_t *cmd, int c)
 
 	for (i = cmd->cmd_hcur, n = 0; n < cmd->cmd_hlen; n++) {
 		if (--i < 0)
-			i = cmd->cmd_histlen - 1;
+			i = cmd->cmd_halloc - 1;
 
 		if (strstr(cmd->cmd_history[i], cmd->cmd_linebuf) != NULL) {
 			(void) strcpy(cmd->cmd_buf, cmd->cmd_history[i]);
