@@ -19,11 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 
 #include <sys/debug.h>
 #include <sys/types.h>
@@ -353,11 +354,6 @@ _info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
 }
-
-/*
- * The following routines are used to set up the memory
- * properties in the board structure.
- */
 
 struct drmach_mc_lookup {
 	int	bnum;
@@ -1398,7 +1394,7 @@ drmach_board_connect(drmachid_t id, drmach_opts_t *opts)
 		return (drerr_new(0, EOPL_INAPPROP, NULL));
 
 	if (opl_probe_sb(obj->bnum) != 0)
-		return (DRMACH_INTERNAL_ERROR());
+		return (drerr_new(0, EOPL_PROBE, NULL));
 
 	(void) prom_attach_notice(obj->bnum);
 
@@ -2030,6 +2026,7 @@ struct drmach_io_cb {
 	char	*name;	/* name of the node */
 	int	(*func)(dev_info_t *);
 	int	rv;
+	dev_info_t *dip;
 };
 
 #define	DRMACH_IO_POST_ATTACH	0
@@ -2049,7 +2046,8 @@ drmach_io_cb_check(dev_info_t *dip, void *arg)
 	}
 
 	if (strcmp(name, p->name) == 0) {
-		p->rv = (*p->func)(dip);
+		ndi_hold_devi(dip);
+		p->dip = dip;
 		return (DDI_WALK_TERMINATE);
 	}
 
@@ -2083,15 +2081,16 @@ drmach_console_ops(drmachid_t *id, int state)
 		    modgetsymvalue("oplmsu_dr_attach", 0);
 		if (msuattp != NULL)
 			arg.func = msuattp;
-	}
-	else
+	} else {
 		return (0);
+	}
 
 	if (arg.func == NULL) {
 		return (0);
 	}
 
 	arg.rv = 0;
+	arg.dip = NULL;
 
 	dip = obj->dev.node->n_getdip(obj->dev.node);
 	if (pdip = ddi_get_parent(dip)) {
@@ -2104,9 +2103,14 @@ drmach_console_ops(drmachid_t *id, int state)
 
 	ddi_walk_devs(dip, drmach_io_cb_check, (void *)&arg);
 
-	if (pdip) {
-		ndi_devi_exit(pdip, circ);
-		ndi_rele_devi(pdip);
+	ndi_devi_exit(pdip, circ);
+	ndi_rele_devi(pdip);
+
+	if (arg.dip) {
+		arg.rv = (*arg.func)(arg.dip);
+		ndi_rele_devi(arg.dip);
+	} else {
+		arg.rv = -1;
 	}
 
 	return (arg.rv);
@@ -2199,8 +2203,17 @@ drmach_mem_new(drmach_device_t *proto, drmachid_t *idp)
 	static sbd_error_t *drmach_mem_release(drmachid_t);
 	static sbd_error_t *drmach_mem_status(drmachid_t, drmach_status_t *);
 	dev_info_t *dip;
+	int rv;
 
 	drmach_mem_t	*mp;
+
+	rv = 0;
+
+	if ((proto->node->n_getproplen(proto->node, "mc-addr", &rv) < 0) ||
+		(rv <= 0)) {
+		*idp = (drmachid_t)0;
+		return (NULL);
+	}
 
 	mp = kmem_zalloc(sizeof (drmach_mem_t), KM_SLEEP);
 	proto->unum = 0;
@@ -2217,10 +2230,16 @@ drmach_mem_new(drmach_device_t *proto, drmachid_t *idp)
 
 	dip = mp->dev.node->n_getdip(mp->dev.node);
 	if (drmach_setup_mc_info(dip, mp) != 0) {
-		return (DRMACH_INTERNAL_ERROR());
+		return (drerr_new(0, EOPL_MC_SETUP, NULL));
 	}
 
-	*idp = (drmachid_t)mp;
+	/* make sure we do not create memoryless nodes */
+	if (mp->nbytes == 0) {
+		*idp = (drmachid_t)NULL;
+		kmem_free(mp, sizeof (drmach_mem_t));
+	} else
+		*idp = (drmachid_t)mp;
+
 	return (NULL);
 }
 
@@ -2241,6 +2260,8 @@ drmach_mem_dispose(drmachid_t id)
 		memlist_delete(mp->memlist);
 		mp->memlist = NULL;
 	}
+
+	kmem_free(mp, sizeof (*mp));
 }
 
 sbd_error_t *
@@ -2394,7 +2415,6 @@ drmach_mem_get_memlist(drmachid_t id, struct memlist **ml)
 	DRMACH_PR("Derived memlist:");
 	memlist_dump(mlist);
 #endif
-
 	*ml = mlist;
 
 	return (NULL);
@@ -2476,7 +2496,7 @@ drmach_board_deprobe(drmachid_t id)
 
 	bp = id;
 
-	cmn_err(CE_CONT, "DR: PROM detach board %d\n", bp->bnum);
+	cmn_err(CE_CONT, "DR: detach board %d\n", bp->bnum);
 
 	if (bp->tree) {
 		drmach_node_dispose(bp->tree);
@@ -2929,21 +2949,6 @@ opl_check_dr_status()
 	}
 }
 
-static sbd_error_t *
-drmach_get_scf_addr(uint64_t *addr)
-{
-	caddr_t *scf_cmd_addr;
-	uint64_t pa;
-	scf_cmd_addr = (caddr_t *)modgetsymvalue("scf_avail_cmd_reg_vaddr", 0);
-	if (scf_cmd_addr != NULL) {
-		pa = (uint64_t)va_to_pa(*scf_cmd_addr);
-		*addr = pa;
-		return (NULL);
-	}
-
-	return (DRMACH_INTERNAL_ERROR());
-}
-
 /* we are allocating memlist from TLB locked pages to avoid tlbmisses */
 
 static struct memlist *
@@ -3050,6 +3055,12 @@ static int	fmem_timeout = 17;
 static int	min_copy_size_per_sec = 20 * 1024 * 1024;
 int drmach_disable_mcopy = 0;
 
+/*
+ * The following delay loop executes sleep instruction to yield the
+ * CPU to other strands.  If this is not done, some strand will tie
+ * up the CPU in busy loops while the other strand cannot do useful
+ * work.  The copy procedure will take a much longer time without this.
+ */
 #define	DR_DELAY_IL(ms, freq)					\
 	{							\
 		uint64_t start;					\
@@ -3075,7 +3086,22 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 	extern uint64_t		drmach_get_stick_il();
 	extern void		membar_sync_il();
 	extern void		flush_instr_mem_il(void*);
+	extern void		flush_windows_il(void);
 	uint64_t		copy_start;
+
+	/*
+	 * flush_windows is moved here to make sure all
+	 * registers used in the callers are flushed to
+	 * memory before the copy.
+	 *
+	 * If flush_windows() is called too early in the
+	 * calling function, the compiler might put some
+	 * data in the local registers after flush_windows().
+	 * After FMA, if there is any fill trap, the registers
+	 * will contain stale data.
+	 */
+
+	flush_windows_il();
 
 	prog->critical->stat[cpuid] = FMEM_LOOP_COPY_READY;
 	membar_sync_il();
@@ -3083,7 +3109,6 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 	if (prog->data->cpuid == cpuid) {
 		limit = drmach_get_stick_il();
 		limit += prog->critical->delay;
-
 		for (i = 0; i < NCPU; i++) {
 			if (CPU_IN_SET(prog->data->cpu_slave_set, i)) {
 			/* wait for all CPU's to be ready */
@@ -3092,6 +3117,7 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 					FMEM_LOOP_COPY_READY) {
 					break;
 				}
+				DR_DELAY_IL(1, prog->data->stick_freq);
 			    }
 			    curr = drmach_get_stick_il();
 			    if (curr > limit) {
@@ -3114,6 +3140,7 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 				prog->data->error[cpuid] = FMEM_TERMINATE;
 				return (FMEM_TERMINATE);
 			}
+			DR_DELAY_IL(1, prog->data->stick_freq);
 		}
 	}
 
@@ -3248,7 +3275,6 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 		 */
 		rtn = prog->critical->loop((void *)(prog->critical),
 			PAGESIZE, (void *)&(prog->critical->stat[cpuid]));
-
 		prog->data->error[cpuid] = rtn;
 		/* slave thread does not care the rv */
 		return (0);
@@ -3288,6 +3314,39 @@ drmach_setup_memlist(drmach_copy_rename_program_t *p)
 	}
 }
 
+static void
+drmach_lock_critical(caddr_t va, caddr_t new_va)
+{
+	tte_t tte;
+	int i;
+
+	kpreempt_disable();
+
+	for (i = 0; i < DRMACH_FMEM_LOCKED_PAGES; i++) {
+		vtag_flushpage(new_va, (uint64_t)ksfmmup);
+		sfmmu_memtte(&tte, va_to_pfn(va),
+			PROC_DATA|HAT_NOSYNC, TTE8K);
+		tte.tte_intlo |= TTE_LCK_INT;
+		sfmmu_dtlb_ld_kva(new_va, &tte);
+		sfmmu_itlb_ld_kva(new_va, &tte);
+		va += PAGESIZE;
+		new_va += PAGESIZE;
+	}
+}
+
+static void
+drmach_unlock_critical(caddr_t va)
+{
+	int i;
+
+	for (i = 0; i < DRMACH_FMEM_LOCKED_PAGES; i++) {
+		vtag_flushpage(va, (uint64_t)ksfmmup);
+		va += PAGESIZE;
+	}
+
+	kpreempt_enable();
+}
+
 sbd_error_t *
 drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	struct memlist *c_ml, drmachid_t *pgm_id)
@@ -3301,18 +3360,19 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	int			s_bd, t_bd, cpuid, active_cpus, i;
 	uint64_t		c_addr;
 	size_t			c_size, copy_sz, sz;
-	static sbd_error_t	*drmach_get_scf_addr(uint64_t *);
 	extern void		drmach_fmem_loop_script();
 	extern void		drmach_fmem_loop_script_rtn();
 	extern int		drmach_fmem_exec_script();
 	extern void		drmach_fmem_exec_script_end();
 	sbd_error_t	*err;
-	drmach_copy_rename_program_t *prog;
+	drmach_copy_rename_program_t *prog = NULL;
+	drmach_copy_rename_program_t *prog_kmem = NULL;
 	void		(*mc_suspend)(void);
 	void		(*mc_resume)(void);
 	int		(*scf_fmem_start)(int, int);
 	int		(*scf_fmem_end)(void);
 	int		(*scf_fmem_cancel)(void);
+	uint64_t	(*scf_get_base_addr)(void);
 
 	if (!DRMACH_IS_MEM_ID(s_id))
 		return (drerr_new(0, EOPL_INAPPROP, NULL));
@@ -3344,7 +3404,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 		    (1 << strand_id)) {
 		    if (!(bp->cores[onb_core_num].core_started &
 			(1 << strand_id))) {
-			return (DRMACH_INTERNAL_ERROR());
+			return (drerr_new(0, EOPL_CPU_STATE, NULL));
 		    }
 		}
 	}
@@ -3355,23 +3415,28 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	    modgetsymvalue("opl_mc_resume", 0);
 
 	if (mc_suspend == NULL || mc_resume == NULL) {
-		return (DRMACH_INTERNAL_ERROR());
+		return (drerr_new(0, EOPL_MC_OPL, NULL));
 	}
 
 	scf_fmem_start = (int (*)(int, int))
 	    modgetsymvalue("scf_fmem_start", 0);
 	if (scf_fmem_start == NULL) {
-		return (DRMACH_INTERNAL_ERROR());
+		return (drerr_new(0, EOPL_SCF_FMEM, NULL));
 	}
 	scf_fmem_end = (int (*)(void))
 	    modgetsymvalue("scf_fmem_end", 0);
 	if (scf_fmem_end == NULL) {
-		return (DRMACH_INTERNAL_ERROR());
+		return (drerr_new(0, EOPL_SCF_FMEM, NULL));
 	}
 	scf_fmem_cancel = (int (*)(void))
 	    modgetsymvalue("scf_fmem_cancel", 0);
 	if (scf_fmem_cancel == NULL) {
-		return (DRMACH_INTERNAL_ERROR());
+		return (drerr_new(0, EOPL_SCF_FMEM, NULL));
+	}
+	scf_get_base_addr = (uint64_t (*)(void))
+	    modgetsymvalue("scf_get_base_addr", 0);
+	if (scf_get_base_addr == NULL) {
+		return (drerr_new(0, EOPL_SCF_FMEM, NULL));
 	}
 	s_mem = s_id;
 	t_mem = t_id;
@@ -3395,11 +3460,36 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	 * bp will be page aligned, since we're calling
 	 * kmem_zalloc() with an exact multiple of PAGESIZE.
 	 */
-	wp = bp = kmem_zalloc(DRMACH_FMEM_LOCKED_PAGES * PAGESIZE,
-		KM_SLEEP);
 
-	prog = (drmach_copy_rename_program_t *)(wp +
-		DRMACH_FMEM_DATA_PAGE * PAGESIZE);
+	prog_kmem = (drmach_copy_rename_program_t *)kmem_zalloc(
+		DRMACH_FMEM_LOCKED_PAGES * PAGESIZE, KM_SLEEP);
+
+	prog_kmem->prog = prog_kmem;
+
+	/*
+	 * To avoid MTLB hit, we allocate a new VM space and remap
+	 * the kmem_alloc buffer to that address.  This solves
+	 * 2 problems we found:
+	 * - the kmem_alloc buffer can be just a chunk inside
+	 *   a much larger, e.g. 4MB buffer and MTLB will occur
+	 *   if there are both a 4MB and a 8K TLB mapping to
+	 *   the same VA range.
+	 * - the kmem mapping got dropped into the TLB by other
+	 *   strands, unintentionally.
+	 * Note that the pointers like data, critical, memlist_buffer,
+	 * and stat inside the copy rename structure are mapped to this
+	 * alternate VM space so we must make sure we lock the TLB mapping
+	 * whenever we access data pointed to by these pointers.
+	 */
+
+	prog = prog_kmem->locked_prog = vmem_alloc(heap_arena,
+		DRMACH_FMEM_LOCKED_PAGES * PAGESIZE, VM_SLEEP);
+	wp = bp = (caddr_t)prog;
+
+	/* Now remap prog_kmem to prog */
+	drmach_lock_critical((caddr_t)prog_kmem, (caddr_t)prog);
+
+	/* All pointers in prog are based on the alternate mapping */
 	prog->data = (drmach_copy_rename_data_t *)roundup(((uint64_t)prog +
 		sizeof (drmach_copy_rename_program_t)), sizeof (void *));
 
@@ -3421,12 +3511,6 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 		* PAGESIZE));
 
 	prog->critical->scf_reg_base = (uint64_t)-1;
-	err = drmach_get_scf_addr(&(prog->critical->scf_reg_base));
-	if (err) {
-		kmem_free(wp, DRMACH_FMEM_LOCKED_PAGES * PAGESIZE);
-		return (err);
-	}
-
 	prog->critical->scf_td[0] = (s_bd & 0xff);
 	prog->critical->scf_td[1] = (t_bd & 0xff);
 	for (i = 2; i < 15; i++) {
@@ -3459,8 +3543,8 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	/* now we make sure there is 1K extra */
 
 	if ((wp - bp) > PAGESIZE) {
-		kmem_free(prog, DRMACH_FMEM_LOCKED_PAGES * PAGESIZE);
-		return (DRMACH_INTERNAL_ERROR());
+		err = drerr_new(0, EOPL_FMEM_SETUP, NULL);
+		goto out;
 	}
 
 	bp = (caddr_t)prog->critical;
@@ -3494,11 +3578,12 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 
 	/* now we are committed, call SCF, soft suspend mac patrol */
 	if ((*scf_fmem_start)(s_bd, t_bd)) {
-		kmem_free(prog, DRMACH_FMEM_LOCKED_PAGES * PAGESIZE);
-		return (DRMACH_INTERNAL_ERROR());
+		err = drerr_new(0, EOPL_SCF_FMEM_START, NULL);
+		goto out;
 	}
 	prog->data->scf_fmem_end = scf_fmem_end;
 	prog->data->scf_fmem_cancel = scf_fmem_cancel;
+	prog->data->scf_get_base_addr = scf_get_base_addr;
 	prog->data->fmem_status.op |= OPL_FMEM_SCF_START;
 	/* soft suspend mac patrol */
 	(*mc_suspend)();
@@ -3607,9 +3692,21 @@ end:
 	prog->data->s_copybasepa = s_copybasepa;
 	prog->data->t_copybasepa = t_copybasepa;
 	prog->data->c_ml = c_ml;
-	*pgm_id = prog;
+	*pgm_id = prog_kmem;
 
+	/* Unmap the alternate space.  It will have to be remapped again */
+	drmach_unlock_critical((caddr_t)prog);
 	return (NULL);
+out:
+	if (prog != NULL) {
+		drmach_unlock_critical((caddr_t)prog);
+		vmem_free(heap_arena, prog,
+			DRMACH_FMEM_LOCKED_PAGES * PAGESIZE);
+	}
+	if (prog_kmem != NULL) {
+		kmem_free(prog_kmem, DRMACH_FMEM_LOCKED_PAGES * PAGESIZE);
+	}
+	return (err);
 }
 
 sbd_error_t *
@@ -3629,6 +3726,12 @@ drmach_copy_rename_fini(drmachid_t id)
 	 * mc-opl will return UNKNOWN as the unum.
 	 */
 
+	/*
+	 * we have to remap again because all the pointer like data,
+	 * critical in prog are based on the alternate vmem space.
+	 */
+	(void) drmach_lock_critical((caddr_t)prog, (caddr_t)prog->locked_prog);
+
 	if (prog->data->c_ml != NULL)
 		memlist_delete(prog->data->c_ml);
 
@@ -3646,7 +3749,7 @@ drmach_copy_rename_fini(drmachid_t id)
 			cmn_err(CE_PANIC, "scf fmem request failed");
 		rv = (*prog->data->scf_fmem_end)();
 		if (rv) {
-			cmn_err(CE_PANIC, "scf_fmem_end() failed");
+			cmn_err(CE_PANIC, "scf_fmem_end() failed rv=%d", rv);
 		}
 		/*
 		 * If we get here, rename is successful.
@@ -3658,77 +3761,51 @@ drmach_copy_rename_fini(drmachid_t id)
 		if (prog->data->fmem_status.error != 0) {
 			cmn_err(CE_WARN, "Kernel Migration fails. 0x%x",
 				prog->data->fmem_status.error);
-			err = DRMACH_INTERNAL_ERROR();
+			err = drerr_new(1, EOPL_FMEM_ERROR, "FMEM error = 0x%x",
+				prog->data->fmem_status.error);
 		}
 		rv = (*prog->data->scf_fmem_cancel)();
 		if (rv) {
-			cmn_err(CE_WARN, "scf_fmem_cancel() failed");
-			if (!err)
-				err = DRMACH_INTERNAL_ERROR();
+		    cmn_err(CE_WARN, "scf_fmem_cancel() failed rv=0x%x", rv);
+		    if (!err)
+			err = drerr_new(1, EOPL_SCF_FMEM_CANCEL,
+			    "rv = 0x%x", rv);
 		}
 	}
 	/* soft resume mac patrol */
 	(*prog->data->mc_resume)();
 
+	drmach_unlock_critical((caddr_t)prog->locked_prog);
+
+	vmem_free(heap_arena, prog->locked_prog,
+		DRMACH_FMEM_LOCKED_PAGES * PAGESIZE);
 	kmem_free(prog, DRMACH_FMEM_LOCKED_PAGES * PAGESIZE);
 	return (err);
-}
-
-static void
-drmach_lock_critical(caddr_t va)
-{
-	tte_t tte;
-	int i;
-
-	for (i = 0; i < DRMACH_FMEM_LOCKED_PAGES; i++) {
-		vtag_flushpage(va, (uint64_t)ksfmmup);
-		sfmmu_memtte(&tte, va_to_pfn(va),
-			PROC_DATA|HAT_NOSYNC, TTE8K);
-		tte.tte_intlo |= TTE_LCK_INT;
-		sfmmu_dtlb_ld_kva(va, &tte);
-		sfmmu_itlb_ld_kva(va, &tte);
-		va += PAGESIZE;
-	}
-}
-
-static void
-drmach_unlock_critical(caddr_t va)
-{
-	int i;
-
-	for (i = 0; i < DRMACH_FMEM_LOCKED_PAGES; i++) {
-		vtag_flushpage(va, (uint64_t)ksfmmup);
-		va += PAGESIZE;
-	}
 }
 
 /*ARGSUSED*/
 static void
 drmach_copy_rename_slave(struct regs *rp, drmachid_t id)
 {
-	drmach_copy_rename_program_t	*prog = id;
+	drmach_copy_rename_program_t	*prog =
+		(drmach_copy_rename_program_t *)id;
 	register int			cpuid;
 	extern void			drmach_flush();
 	extern void			membar_sync_il();
 	extern void			drmach_flush_icache();
 	on_trap_data_t			otd;
 
-	kpreempt_disable();
 	cpuid = CPU->cpu_id;
 
 	if (on_trap(&otd, OT_DATA_EC)) {
 		no_trap();
-		drmach_unlock_critical((caddr_t)prog);
-		kpreempt_enable();
 		prog->data->error[cpuid] = FMEM_COPY_ERROR;
 		prog->critical->stat[cpuid] = FMEM_LOOP_EXIT;
+		drmach_flush_icache();
+		membar_sync_il();
 		return;
 	}
 
-
-	(void) drmach_lock_critical((caddr_t)prog);
-
-	flush_windows();
 
 	/*
 	 * jmp drmach_copy_rename_prog().
@@ -3739,11 +3816,9 @@ drmach_copy_rename_slave(struct regs *rp, drmachid_t id)
 	drmach_flush_icache();
 
 	no_trap();
-	drmach_unlock_critical((caddr_t)prog);
-
-	kpreempt_enable();
 
 	prog->critical->stat[cpuid] = FMEM_LOOP_EXIT;
+
 	membar_sync_il();
 }
 
@@ -3789,7 +3864,8 @@ drmach_swap_pa(drmach_mem_t *s_mem, drmach_mem_t *t_mem)
 void
 drmach_copy_rename(drmachid_t id)
 {
-	drmach_copy_rename_program_t	*prog = id;
+	drmach_copy_rename_program_t	*prog_kmem = id;
+	drmach_copy_rename_program_t	*prog;
 	cpuset_t	cpuset;
 	int		cpuid;
 	uint64_t	inst;
@@ -3802,12 +3878,30 @@ drmach_copy_rename(drmachid_t id)
 	extern uint64_t	patch_inst(uint64_t *, uint64_t);
 	on_trap_data_t	otd;
 
-	if (prog->critical->scf_reg_base == (uint64_t)-1) {
+	prog = prog_kmem->locked_prog;
+
+	/*
+	 * We must immediately drop in the TLB because all pointers
+	 * are based on the alternate vmem space.
+	 */
+
+	(void) drmach_lock_critical((caddr_t)prog_kmem, (caddr_t)prog);
+
+	/*
+	 * we call scf to get the base address here becuase if scf
+	 * has not been suspended yet, the active path can be changing and
+	 * sometimes it is not even mapped.  We call the interface when
+	 * the OS has been quiesced.
+	 */
+	prog->critical->scf_reg_base = (*prog->data->scf_get_base_addr)();
+
+	if (prog->critical->scf_reg_base == (uint64_t)-1 ||
+		prog->critical->scf_reg_base == NULL) {
 		prog->data->fmem_status.error = FMEM_SCF_ERR;
+		drmach_unlock_critical((caddr_t)prog);
 		return;
 	}
 
-	kpreempt_disable();
 	cpuset = prog->data->cpu_ready_set;
 
 	for (cpuid = 0; cpuid < NCPU; cpuid++) {
@@ -3823,21 +3917,25 @@ drmach_copy_rename(drmachid_t id)
 
 	CPUSET_DEL(cpuset, cpuid);
 
-	xc_some(cpuset, (xcfunc_t *)drmach_lock_critical,
-		(uint64_t)prog, (uint64_t)0);
+	for (cpuid = 0; cpuid < NCPU; cpuid++) {
+		if (CPU_IN_SET(cpuset, cpuid)) {
+			xc_one(cpuid, (xcfunc_t *)drmach_lock_critical,
+				(uint64_t)prog_kmem, (uint64_t)prog);
+		}
+	}
+
+	cpuid = CPU->cpu_id;
 
 	xt_some(cpuset, (xcfunc_t *)drmach_sys_trap,
-		(uint64_t)drmach_copy_rename_slave, (uint64_t)prog);
+				(uint64_t)drmach_copy_rename_slave,
+				(uint64_t)prog);
 	xt_sync(cpuset);
-
-	(void) drmach_lock_critical((caddr_t)prog);
 
 	if (on_trap(&otd, OT_DATA_EC)) {
 		rtn = FMEM_COPY_ERROR;
+		drmach_flush_icache();
 		goto done;
 	}
-
-	flush_windows();
 
 	/*
 	 * jmp drmach_copy_rename_prog().
@@ -3912,11 +4010,34 @@ done:
 				"detected during FMEM.\n");
 		}
 	}
-	drmach_unlock_critical((caddr_t)prog);
+
+	/*
+	 * This must be done after all strands have exit.
+	 * Removing the TLB entry will affect both strands
+	 * in the same core.
+	 */
+
+	for (cpuid = 0; cpuid < NCPU; cpuid++) {
+		if (CPU_IN_SET(cpuset, cpuid)) {
+			xc_one(cpuid, (xcfunc_t *)drmach_unlock_critical,
+				(uint64_t)prog, 0);
+		}
+	}
 
 	in_sync = old_in_sync;
 
-	kpreempt_enable();
+	/*
+	 * we should unlock before the following lock to keep the kpreempt
+	 * count correct.
+	 */
+	(void) drmach_unlock_critical((caddr_t)prog);
+
+	/*
+	 * we must remap again.  TLB might have been removed in above xcall.
+	 */
+
+	(void) drmach_lock_critical((caddr_t)prog_kmem, (caddr_t)prog);
+
 	if (prog->data->fmem_status.error == 0)
 		prog->data->fmem_status.error = rtn;
 
@@ -3926,4 +4047,5 @@ done:
 			prog->data->copy_wait_time/prog->data->stick_freq,
 			prog->data->slowest_cpuid);
 	}
+	drmach_unlock_critical((caddr_t)prog);
 }

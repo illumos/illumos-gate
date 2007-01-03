@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -594,6 +594,14 @@ typedef struct {
 	/* drmach parameter is inappropriate for operation */
 #define	EOPL_INTERNAL		5011	/* Unexpected internal condition */
 #define	EOPL_FINDDEVICE		5012	/* Firmware cannot find node. */
+#define	EOPL_MC_SETUP		5013	/* Cannot setup memory node */
+#define	EOPL_CPU_STATE		5014	/* Invalid CPU/core state */
+#define	EOPL_MC_OPL		5015	/* Cannot find mc-opl interface */
+#define	EOPL_SCF_FMEM		5016	/* Cannot find scf_fmem interface */
+#define	EOPL_FMEM_SETUP		5017	/* Error setting up FMEM buffer */
+#define	EOPL_SCF_FMEM_START	5018	/* scf_fmem_start error */
+#define	EOPL_FMEM_ERROR		5019	/* FMEM error */
+#define	EOPL_SCF_FMEM_CANCEL	5020	/* scf_fmem_cancel error */
 
 #ifdef	__cplusplus
 }

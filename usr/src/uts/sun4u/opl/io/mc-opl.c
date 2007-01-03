@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -2581,6 +2581,33 @@ mc_suspend(mc_opl_t *mcp, uint32_t flag)
 	mutex_exit(&mcp->mc_lock);
 
 	return (DDI_SUCCESS);
+}
+
+void
+opl_mc_update_mlist(void)
+{
+	int i;
+	mc_opl_t *mcp;
+
+	/*
+	 * memory information is not updated until
+	 * the post attach/detach stage during DR.
+	 * This interface is used by dr_mem to inform
+	 * mc-opl to update the mlist.
+	 */
+
+	mutex_enter(&mcmutex);
+	for (i = 0; i < OPL_MAX_BOARDS; i++) {
+		if ((mcp = mc_instances[i]) == NULL)
+			continue;
+		mutex_enter(&mcp->mc_lock);
+		if (mcp->mlist)
+			mc_memlist_delete(mcp->mlist);
+		mcp->mlist = NULL;
+		mc_get_mlist(mcp);
+		mutex_exit(&mcp->mc_lock);
+	}
+	mutex_exit(&mcmutex);
 }
 
 /* caller must clear the SUSPEND bits or this will do nothing */

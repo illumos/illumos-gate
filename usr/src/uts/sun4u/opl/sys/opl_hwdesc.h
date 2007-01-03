@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,7 +125,9 @@ typedef struct {
  */
 typedef struct {
 	hwd_stat_t	sb_status[HWD_SBS_PER_DOMAIN];	/* status of all LSBs */
-	uint32_t	sb_spare[15];
+	/* PSB number of respective LSB */
+	uint8_t		sb_psb_number[HWD_SBS_PER_DOMAIN];
+	uint32_t	sb_spare[7];
 	uint32_t	sb_check_sum;
 } hwd_sb_status_t;
 
@@ -169,7 +171,9 @@ typedef struct {
 	char		dinf_banner_name[64];	/* system banner string */
 	char		dinf_platform_token[64]; /* platform name */
 	uint32_t	dinf_floating_board_bitmap;	/* bit 0 = SB0 ... */
-	uint32_t	dinf_spare2[12];
+	char		dinf_chassis_sn[16];
+	uint32_t	dinf_brand_control;
+	uint32_t	dinf_spare2[7];
 	uint32_t	dinf_check_sum;
 } hwd_domain_info_t;
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1478,7 +1478,8 @@ dr_disconnect(dr_handle_t *hp)
 			(hp->h_err->e_code == ESTC_MBXRQST) ||
 			(hp->h_err->e_code == ESTC_SMS_ERR_UNRECOVERABLE) ||
 			(hp->h_err->e_code == ESTC_SMS_ERR_RECOVERABLE) ||
-			(hp->h_err->e_code == ESTC_DEPROBE)) {
+			(hp->h_err->e_code == ESTC_DEPROBE) ||
+			(hp->h_err->e_code == EOPL_DEPROBE)) {
 			bp->b_ostate = SBD_STAT_UNCONFIGURED;
 			bp->b_busy = 0;
 			(void) drv_getparm(TIME, (void *)&bp->b_time);
@@ -1499,7 +1500,8 @@ dr_disconnect(dr_handle_t *hp)
 		 */
 		if ((hp->h_err->e_code == ESTC_MBXRQST) ||
 		    (hp->h_err->e_code == ESTC_SMS_ERR_RECOVERABLE) ||
-		    (hp->h_err->e_code == ESTC_DEPROBE)) {
+		    (hp->h_err->e_code == ESTC_DEPROBE) ||
+		    (hp->h_err->e_code == EOPL_DEPROBE)) {
 			/*
 			 * With this failure, the board has been deprobed
 			 * by IKP, and reprobed.  We've already gotten rid

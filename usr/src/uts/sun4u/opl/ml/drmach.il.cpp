@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,7 +168,7 @@ flush_instr_mem_il(caddr_t vaddr)
 	ENTRY_NP(flush_instr_mem_il)
 	flush	%o0			! address irrelevent
 	retl
-	nop
+	 nop
 	SET_SIZE(flush_instr_mem_il)
 
 #endif	/* lint */
@@ -191,8 +191,29 @@ drmach_sleep_il(void)
 
 	ENTRY_NP(drmach_sleep_il)
 .word	0x81b01060
-	 retl
-	nop
-	SET_SIZE(flush_instr_mem_il)
+	retl
+	 nop
+	SET_SIZE(drmach_sleep_il)
+
+#endif	/* lint */
+
+#if defined(lint)
+
+/* ARGSUSED */
+void
+flush_windows_il(void)
+{}
+
+#else	/* lint */
+
+/*
+ * flush_windows_il:
+ *
+ */
+
+	ENTRY_NP(flush_windows_il)
+	retl
+	 flushw
+	SET_SIZE(flush_windows_il)
 
 #endif	/* lint */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -634,8 +634,8 @@ plat_lgrp_config(lgrp_config_flag_t evt, uintptr_t arg)
 		 * Special handling for possible memory holes.
 		 */
 		if (tnode != -1 && mem_node_config[tnode].exists) {
-			start = mem_node_config[mnode].physbase;
-			end = mem_node_config[mnode].physmax;
+			start = mem_node_config[tnode].physbase;
+			end = mem_node_config[tnode].physmax;
 			mem_node_pre_del_slice(start, end);
 			mem_node_post_del_slice(start, end, 0);
 		}

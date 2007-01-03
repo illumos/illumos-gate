@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,15 +56,16 @@
 #include <sys/dr.h>
 #include <sys/dr_util.h>
 #include <sys/drmach.h>
+#include <sys/kobj.h>
 
 extern struct memlist	*phys_install;
-extern vnode_t		retired_pages;
+extern vnode_t		*retired_pages;
 
 /* TODO: push this reference below drmach line */
 extern int		kcage_on;
 
 /* for the DR*INTERNAL_ERROR macros.  see sys/dr.h. */
-static char *dr_ie_fmt = "%M% %d";
+static char *dr_ie_fmt = "dr_mem.c %d";
 
 typedef enum {
 	DR_TP_INVALID = -1,
@@ -98,8 +99,6 @@ static struct memlist	*dr_get_nonreloc_mlist(struct memlist *s_ml,
 static int		dr_memlist_canfit(struct memlist *s_mlist,
 				struct memlist *t_mlist, dr_mem_unit_t *s_mp,
 				dr_mem_unit_t *t_mp);
-
-extern void		page_unretire_pages(void);
 
 /*
  * dr_mem_unit_t.sbm_flags
@@ -385,7 +384,7 @@ dr_memlist_del_retired_pages(struct memlist *mlist)
 	page_t		*pp;
 	pfn_t		pfn;
 	kmutex_t	*vphm;
-	vnode_t		*vp = &retired_pages;
+	vnode_t		*vp = retired_pages;
 	static fn_t	f = "dr_memlist_del_retired_pages";
 
 	vphm = page_vnode_mutex(vp);
@@ -406,7 +405,7 @@ dr_memlist_del_retired_pages(struct memlist *mlist)
 		 * changes to the retired vnode locking scheme.
 		 */
 		ASSERT(PAGE_LOCKED(pp));
-		ASSERT(pp->p_vnode == &retired_pages);
+		ASSERT(pp->p_vnode == retired_pages);
 
 		if (!page_trylock(pp, SE_SHARED))
 			continue;
@@ -435,84 +434,6 @@ dr_memlist_del_retired_pages(struct memlist *mlist)
 	return (mlist);
 }
 
-#ifdef	DEBUG
-int dbg_retirecnt = 10;
-
-static void
-dbg_page_retire(struct memlist *r_ml)
-{
-	struct memlist	*t_ml;
-	page_t		*pp, *epp;
-	pfn_t		pfn, epfn;
-	struct memseg	*seg;
-
-	int dbg_retired = 0;
-	int dbg_skip = 10;
-	int dbg_seq = 1;
-
-	if (r_ml == NULL)
-		return;
-
-	for (t_ml = r_ml; (t_ml != NULL); t_ml = t_ml->next) {
-		pfn = _b64top(t_ml->address);
-		epfn = _b64top(t_ml->address + t_ml->size);
-
-		for (seg = memsegs; seg != NULL; seg = seg->next) {
-			int retire = 0;
-			int skip = 0;
-			if (pfn >= seg->pages_end || epfn < seg->pages_base)
-				continue;
-
-			pp = seg->pages;
-			if (pfn > seg->pages_base)
-				pp += pfn - seg->pages_base;
-
-			epp = seg->epages;
-			if (epfn < seg->pages_end)
-				epp -= seg->pages_end - epfn;
-
-			ASSERT(pp < epp);
-#if 0
-			while (pp < epp) {
-				if (PP_ISFREE(pp) && !page_isfaulty(pp)) {
-					if (retire++ < dbg_seq) {
-						page_settoxic(pp,
-							PAGE_IS_FAULTY);
-						page_retire(pp,
-							PAGE_IS_FAILING);
-						if (++dbg_retired >=
-							dbg_retirecnt)
-							return;
-					} else if (skip++ >= dbg_skip) {
-						skip = 0;
-						retire = 0;
-						dbg_seq++;
-					}
-				}
-				pp++;
-			}
-#endif /* 0 */
-			while (pp < epp) {
-				if (PP_ISFREE(pp)) {
-					if (retire++ < dbg_seq) {
-						page_retire(t_ml->address,
-						    PR_OK);
-						if (++dbg_retired >=
-							dbg_retirecnt)
-							return;
-					} else if (skip++ >= dbg_skip) {
-						skip = 0;
-						retire = 0;
-						dbg_seq++;
-					}
-				}
-				pp++;
-			}
-		}
-	}
-}
-#endif
-
 static int
 dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 {
@@ -536,11 +457,6 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 
 	ASSERT(t_mp->sbm_flags & DR_MFLAG_TARGET);
 	ASSERT(t_mp->sbm_peer == s_mp);
-
-#ifdef	DEBUG
-	if (dbg_retirecnt)
-		dbg_page_retire(s_mp->sbm_mlist);
-#endif
 
 	/*
 	 * create a memlist of spans to copy by removing
@@ -1014,6 +930,26 @@ dr_pre_attach_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 	return (err_flag ? -1 : 0);
 }
 
+static void
+dr_update_mc_memory()
+{
+	void		(*mc_update_mlist)(void);
+
+	/*
+	 * mc-opl is configured during drmach_mem_new but the memory
+	 * has not been added to phys_install at that time.
+	 * we must inform mc-opl to update the mlist after we
+	 * attach or detach a system board.
+	 */
+
+	mc_update_mlist = (void (*)(void))
+	    modgetsymvalue("opl_mc_update_mlist", 0);
+
+	if (mc_update_mlist != NULL) {
+		(*mc_update_mlist)();
+	}
+}
+
 int
 dr_post_attach_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 {
@@ -1030,7 +966,7 @@ dr_post_attach_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 
 		mlist = dr_get_memlist(mp);
 		if (mlist == NULL) {
-			dr_dev_err(CE_WARN, &mp->sbm_cm, ESBD_MEMFAIL);
+			/* OPL supports memoryless board */
 			continue;
 		}
 
@@ -1084,6 +1020,8 @@ dr_post_attach_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		}
 	}
 
+	dr_update_mc_memory();
+
 	return (0);
 }
 
@@ -1122,6 +1060,7 @@ dr_post_detach_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		if (dr_post_detach_mem_unit(mp))
 			rv = -1;
 	}
+	dr_update_mc_memory();
 
 	return (rv);
 }
@@ -1171,6 +1110,139 @@ dr_add_memory_spans(dr_mem_unit_t *mp, struct memlist *ml)
 			continue;
 		}
 	}
+}
+
+static int
+memlist_touch(struct memlist *ml, uint64_t add)
+{
+	while (ml != NULL) {
+		if ((add == ml->address) ||
+			(add == (ml->address + ml->size)))
+			return (1);
+		ml = ml->next;
+	}
+	return (0);
+}
+
+static sbd_error_t *
+dr_process_excess_mlist(dr_mem_unit_t *s_mp,
+	dr_mem_unit_t *t_mp, struct memlist *t_excess_mlist)
+{
+	struct memlist	*ml;
+	sbd_error_t	*err;
+	static fn_t	f = "dr_process_excess_mlist";
+	uint64_t	new_pa, nbytes;
+	int rv;
+
+	err = NULL;
+
+	/*
+	 * After the small <-> big copy-rename,
+	 * the original address space for the
+	 * source board may have excess to be
+	 * deleted. This is a case different
+	 * from the big->small excess source
+	 * memory case listed below.
+	 * Remove s_mp->sbm_del_mlist from
+	 * the kernel cage glist.
+	 */
+	for (ml = s_mp->sbm_del_mlist; ml;
+		ml = ml->next) {
+		PR_MEM("%s: delete small<->big copy-"
+		    "rename source excess memory", f);
+		PR_MEMLIST_DUMP(ml);
+
+		err = drmach_mem_del_span(
+			s_mp->sbm_cm.sbdev_id,
+			    ml->address, ml->size);
+		if (err)
+			DRERR_SET_C(&s_mp->
+			    sbm_cm.sbdev_error, &err);
+		ASSERT(err == NULL);
+	}
+
+	PR_MEM("%s: adding back remaining portion"
+		" of %s, memlist:\n",
+		f, t_mp->sbm_cm.sbdev_path);
+	PR_MEMLIST_DUMP(t_excess_mlist);
+
+	for (ml = t_excess_mlist; ml; ml = ml->next) {
+	    struct memlist ml0;
+
+	    ml0.address = ml->address;
+	    ml0.size = ml->size;
+	    ml0.next = ml0.prev = NULL;
+
+	/*
+	 * If the memory object is 256 MB aligned (max page size
+	 * on OPL, it will not be coalesced to the adjacent memory
+	 * chunks.  The coalesce logic assumes contiguous page
+	 * structures for contiguous memory and we hit panic.
+	 * For anything less than 256 MB alignment, we have
+	 * to make sure that it is not adjacent to anything.
+	 * If the new chunk is adjacent to phys_install, we
+	 * truncate it to 4MB boundary.  4 MB is somewhat
+	 * arbitrary.  However we do not want to create
+	 * very small segments because they can cause problem.
+	 * The extreme case of 8K segment will fail
+	 * kphysm_add_memory_dynamic(), e.g.
+	 */
+	    if ((ml->address & (MH_MPSS_ALIGNMENT - 1)) ||
+		(ml->size & (MH_MPSS_ALIGNMENT - 1))) {
+
+		memlist_read_lock();
+		rv = memlist_touch(phys_install, ml0.address);
+		memlist_read_unlock();
+
+		if (rv) {
+		    new_pa = roundup(ml0.address + 1, MH_MIN_ALIGNMENT);
+		    nbytes = (new_pa -  ml0.address);
+		    if (nbytes >= ml0.size) {
+			t_mp->sbm_dyn_segs =
+			    memlist_del_span(t_mp->sbm_dyn_segs,
+				ml0.address, ml0.size);
+			continue;
+		    }
+		    t_mp->sbm_dyn_segs =
+			memlist_del_span(t_mp->sbm_dyn_segs,
+			    ml0.address, nbytes);
+		    ml0.size -= nbytes;
+		    ml0.address = new_pa;
+		}
+
+		if (ml0.size == 0) {
+		    continue;
+		}
+
+		memlist_read_lock();
+		rv = memlist_touch(phys_install, ml0.address + ml0.size);
+		memlist_read_unlock();
+
+		if (rv) {
+		    new_pa = rounddown(ml0.address + ml0.size - 1,
+			MH_MIN_ALIGNMENT);
+		    nbytes = (ml0.address + ml0.size - new_pa);
+		    if (nbytes >= ml0.size) {
+			t_mp->sbm_dyn_segs =
+			    memlist_del_span(t_mp->sbm_dyn_segs,
+				ml0.address, ml0.size);
+			continue;
+		    }
+		    t_mp->sbm_dyn_segs =
+			memlist_del_span(t_mp->sbm_dyn_segs,
+			    new_pa, nbytes);
+		    ml0.size -= nbytes;
+		}
+
+		if (ml0.size > 0) {
+		    dr_add_memory_spans(s_mp, &ml0);
+		}
+	    } else if (ml0.size > 0) {
+		dr_add_memory_spans(s_mp, &ml0);
+	    }
+	}
+	memlist_delete(t_excess_mlist);
+	return (err);
 }
 
 static int
@@ -1321,6 +1393,8 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 
 		PR_MEM("%s: renamed source memlist:\n", f);
 		PR_MEMLIST_DUMP(s_mp->sbm_mlist);
+		PR_MEM("%s: source dyn seg memlist:\n", f);
+		PR_MEMLIST_DUMP(s_mp->sbm_dyn_segs);
 
 		/*
 		 * Keep track of dynamically added segments
@@ -1344,6 +1418,8 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 			    memlist_del_span(t_excess_mlist,
 			    ml->address, ml->size);
 		}
+		PR_MEM("%s: excess memlist:\n", f);
+		PR_MEMLIST_DUMP(t_excess_mlist);
 
 		/*
 		 * Update dynamically added segs
@@ -1363,46 +1439,11 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 		PR_MEMLIST_DUMP(t_mp->sbm_dyn_segs);
 
 		if (t_excess_mlist != NULL) {
-			/*
-			 * After the small <-> big copy-rename,
-			 * the original address space for the
-			 * source board may have excess to be
-			 * deleted. This is a case different
-			 * from the big->small excess source
-			 * memory case listed below.
-			 * Remove s_mp->sbm_del_mlist from
-			 * the kernel cage glist.
-			 */
-			for (ml = s_mp->sbm_del_mlist; ml;
-				ml = ml->next) {
-				PR_MEM("%s: delete small<->big copy-"
-				    "rename source excess memory", f);
-				PR_MEMLIST_DUMP(ml);
-
-				err = drmach_mem_del_span(
-					s_mp->sbm_cm.sbdev_id,
-					    ml->address, ml->size);
-				if (err)
-					DRERR_SET_C(&s_mp->
-					    sbm_cm.sbdev_error, &err);
-				ASSERT(err == NULL);
-			}
-
-			/*
-			 * mark sbm_del_mlist as been deleted so that
-			 * we won't end up to delete it twice later
-			 * from the span list
-			 */
+			err = dr_process_excess_mlist(s_mp, t_mp,
+				t_excess_mlist);
 			s_excess_mem_deleted = 1;
-
-			PR_MEM("%s: adding back remaining portion"
-				" of %s, memlist:\n",
-				f, t_mp->sbm_cm.sbdev_path);
-			PR_MEMLIST_DUMP(t_excess_mlist);
-
-			dr_add_memory_spans(s_mp, t_excess_mlist);
-			memlist_delete(t_excess_mlist);
 		}
+
 		memlist_delete(s_copy_mlist);
 
 #ifdef DEBUG
@@ -1579,6 +1620,7 @@ dr_pre_release_mem(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		 * copy-rename.
 		 */
 		ASSERT(mp->sbm_npages != 0);
+
 		rv = dr_del_mlist_query(ml, &mq);
 		if (rv != KPHYSM_OK) {
 			memlist_delete(ml);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2214,6 +2214,10 @@ px_cb_intr_redist(px_t	*px_p)
 	px_cb_t		*cb_p = PX2CB(px_p);
 	devino_t	ino = px_p->px_inos[PX_INTR_XBC];
 	cpuid_t		cpuid;
+
+	/* Make sure there is an interrupt control block setup. */
+	if (!cb_p)
+		return;
 
 	mutex_enter(&cb_p->cb_mutex);
 

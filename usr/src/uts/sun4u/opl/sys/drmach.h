@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,16 +73,15 @@ extern "C" {
 #define	FMEM_LOOP_EXIT		7
 
 #define	FMEM_NO_ERROR		0
-#define	FMEM_OBP_FAIL		1
-#define	FMEM_XC_TIMEOUT		2
-#define	FMEM_COPY_TIMEOUT	3
-#define	FMEM_SCF_BUSY		4
-#define	FMEM_RETRY_OUT		5
-#define	FMEM_TIMEOUT		6
-#define	FMEM_HW_ERROR		7
-#define	FMEM_TERMINATE		8
-#define	FMEM_COPY_ERROR		9
-#define	FMEM_SCF_ERR		10
+#define	FMEM_XC_TIMEOUT		1
+#define	FMEM_COPY_TIMEOUT	2
+#define	FMEM_SCF_BUSY		3
+#define	FMEM_RETRY_OUT		4
+#define	FMEM_TIMEOUT		5
+#define	FMEM_HW_ERROR		6
+#define	FMEM_TERMINATE		7
+#define	FMEM_COPY_ERROR		8
+#define	FMEM_SCF_ERR		9
 
 #define	SCF_CMD_BUSY		0x8000
 #define	SCF_STATUS_READY	0x8000
@@ -100,6 +99,23 @@ extern "C" {
 
 #define	SCF_RETRY_CNT		15
 
+/*
+ * dynamic memory blocks cannot be added back to phys_install
+ * safely if the alignment is smaller than the largest
+ * physical page size the OS supports.  The VM subsystem
+ * will try to coalesce smaller pages together and
+ * it assumes that the page structures are contiguous.
+ * That assumption does not hold so we have to work around it.
+ * On OPL, the largest page size is 256MB so we can just
+ * add such memory block back.  For everything else,
+ * we round them up to 4MB boundaries and make sure
+ * they are disjoint from phys_install.
+ */
+
+#define	MH_MPSS_ALIGNMENT	(256 * 1024 * 1024)
+#define	MH_MIN_ALIGNMENT	(4 * 1024 * 1024)
+#define	rounddown(x, y)		((x) & ~(y - 1))
+
 #ifndef _ASM
 
 /*
@@ -110,28 +126,68 @@ extern "C" {
 typedef void *drmachid_t;
 
 /*
- *	We have to split up the copy rename data structure
- *	into several pieces:
- *	1. critical region that must be locked in TLB and must
- *	   be physically contiguous/no ecache conflict.
- *	   This region contains the assembly code that handles
- *	   the rename programming, the slave code that loops
- *	   until the master script completes and all data
- *	   required to do the programming.
+ *	There are several requirements to do copy rename:
+ *	1 There should be no subroutine calls/TLBmiss
+ *	  once the copying has begun.
+ *	2 There should be no external memory access by the CPU
+ *	  during the memory rename programming.
  *
- *	   It also contains the status of each CPU because the
- *	   master must wait for all the slaves to get ready before
- *	   it can program the SCF.
+ *	All data and instruction pages used in the copy rename
+ *	procedure are kept in locked pages to satisfy 1 and 2.
+ *	However that is not enough.  To satisfy 2, we must keep
+ *	all the data and instructions in the 2 assembly routines
+ *	drmach_fmem_loop_script and drmach_fmem_exec_script
+ *	in the same contiguous page.  They are packed into
+ *	the 2nd 8K page of the buffer as shown in the diagram
+ *	below.
  *
- *	   We do not need the error code in the critical section.
- *	   It is not set until the FMEM is done.
- *	2. relocatable section that must be locked in TLB.  All data
- *	   referenced in this section must also be locked in TLB to
- *	   avoid tlbmiss.
+ *	Note that it is important to keep the "critical"
+ *	data in one 8K page to avoid any cache line
+ *	contention.   The assembly routines read all the
+ *	critical data into the cache so that there is no
+ *	external memory access during FMEM operation.
  *
- *	   We will also put everything else in this section even it
- *	   does not need such protection.
+ *	layout of the FMEM buffers:
+ *	They are all locked in TLB and the critical data
+ *	used in drmach_fmem_xxx assembly code are all
+ *	packed in the second page.
+ *
+ *	1st 8k page
+ *	+--------------------------------+
+ *	|drmach_copy_rename_program_t    |
+ *	+--------------------------------+
+ *	|drmach_copy_rename_data_t       |
+ *	|                                |
+ *	+--------------------------------+
+ *
+ *	2nd 8k page
+ *	+--------------------------------+
+ *	|drmach_copy_rename_critical_t   |
+ *	|                                |
+ *	+--------------------------------+
+ *	|run (drmach_copy_rename_prog__relocatable)
+ *	|(roundup boundary to 1K)        |
+ *	+--------------------------------+
+ *	| fmem_script                    |
+ *	|(roundup boundary to 1K)        |
+ *	+--------------------------------+
+ *	|loop_script                     |
+ *	|                                |
+ *	+--------------------------------+
+ *	|at least 1K NOP/0's             |
+ *	|                                |
+ *	+--------------------------------+
+ *
+ *	3rd 8k page
+ *	+--------------------------------+
+ *	|memlist_buffer (free_mlist)     |
+ *	|                                |
+ *	+--------------------------------+
+ *
+ *	4th 8k page - drmach_cr_stat_t.
+ *
  */
+
 typedef struct {
 	int16_t	scf_command;
 	int8_t	scf_rsv1[2];
@@ -183,11 +239,10 @@ typedef struct {
 	volatile uchar_t 	error[NCPU];
 	struct memlist		*c_ml;
 	struct memlist		*cpu_ml[NCPU];
-	caddr_t			locked_va;
-	tte_t			locked_tte;
 	void			(*mc_resume)(void);
 	int			(*scf_fmem_end)(void);
 	int			(*scf_fmem_cancel)(void);
+	uint64_t		(*scf_get_base_addr)(void);
 	uint64_t		copy_delay;
 	uint64_t		stick_freq;
 	uint64_t		copy_wait_time;
@@ -198,12 +253,14 @@ typedef struct {
 	uint64_t	nbytes[NCPU];
 } drmach_cr_stat_t;
 
-typedef struct {
-	drmach_copy_rename_critical_t	*critical;
-	drmach_copy_rename_data_t	*data;
-	caddr_t				memlist_buffer;
-	struct memlist			*free_mlist;
-	drmach_cr_stat_t		*stat;
+typedef struct drmach_copy_rename_program {
+	drmach_copy_rename_critical_t		*critical;
+	struct drmach_copy_rename_program	*locked_prog;
+	struct drmach_copy_rename_program	*prog;
+	drmach_copy_rename_data_t		*data;
+	caddr_t					memlist_buffer;
+	struct memlist				*free_mlist;
+	drmach_cr_stat_t			*stat;
 } drmach_copy_rename_program_t;
 
 #define	DRMACH_FMEM_LOCKED_PAGES	4

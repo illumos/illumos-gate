@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -721,8 +721,14 @@ opl_create_node(opl_probe_t *probe)
 static int
 opl_destroy_node(dev_info_t *node)
 {
-	if (e_ddi_branch_destroy(node, NULL, 0) != 0)
+	if (e_ddi_branch_destroy(node, NULL, 0) != 0) {
+		char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		(void) ddi_pathname(node, path);
+		cmn_err(CE_WARN, "OPL node removal failed: %s (%p)",
+			    path, (void *)node);
+		kmem_free(path, MAXPATHLEN);
 		return (-1);
+	}
 
 	return (0);
 }
@@ -1046,8 +1052,18 @@ opl_create_pseudo_mc(dev_info_t *node, void *arg, uint_t flags)
 		mc[j].mc_lo = OPL_LO(bank[i].bank_register_address);
 		j++;
 	}
-	ASSERT(j > 0);
-	OPL_UPDATE_PROP_ARRAY(int, node, "mc-addr", (int *)mc, j*3);
+
+	if (j > 0) {
+		OPL_UPDATE_PROP_ARRAY(int, node, "mc-addr", (int *)mc, j*3);
+	} else {
+		/*
+		 * If there is no memory, we need the mc-addr property, but
+		 * it is length 0.  The only way to do this using ndi seems
+		 * to be by creating a boolean property.
+		 */
+		ret = ndi_prop_create_boolean(DDI_DEV_T_NONE, node, "mc-addr");
+		OPL_UPDATE_PROP_ERR(ret, "mc-addr");
+	}
 
 	OPL_UPDATE_PROP_ARRAY(byte, node, "cs0-mc-pa-trans-table",
 	    mem->mem_cs[0].cs_pa_mac_table, 64);
@@ -1074,9 +1090,20 @@ opl_create_pseudo_mc(dev_info_t *node, void *arg, uint_t flags)
 			j++;
 		}
 	}
-	ASSERT(j > 0);
-	OPL_UPDATE_PROP_ARRAY(int, node, "cs-status", (int *)status,
-	    j*7);
+
+	if (j > 0) {
+		OPL_UPDATE_PROP_ARRAY(int, node, "cs-status", (int *)status,
+		    j*7);
+	} else {
+		/*
+		 * If there is no memory, we need the cs-status property, but
+		 * it is length 0.  The only way to do this using ndi seems
+		 * to be by creating a boolean property.
+		 */
+		ret = ndi_prop_create_boolean(DDI_DEV_T_NONE, node,
+		    "cs-status");
+		OPL_UPDATE_PROP_ERR(ret, "cs-status");
+	}
 
 	return (DDI_WALK_TERMINATE);
 }
@@ -1170,6 +1197,13 @@ opl_fc_ops_free_handle(fco_handle_t rp)
 		switch (resp->type) {
 
 		case RT_MAP:
+			/*
+			 * If this is still mapped, we'd better unmap it now,
+			 * or all our structures that are tracking it will
+			 * be leaked.
+			 */
+			if (resp->fc_map_handle != NULL)
+				opl_unmap_phys(&resp->fc_map_handle);
 			break;
 
 		case RT_DMA:
@@ -1897,6 +1931,7 @@ opl_map_phys(dev_info_t *dip, struct regspec *phys_spec,
 
 	if (result != DDI_SUCCESS) {
 		impl_acc_hdl_free(*handlep);
+		kmem_free(rspecp, sizeof (struct regspec));
 		*handlep = (ddi_acc_handle_t)NULL;
 	} else {
 		acc_handlep->ah_addr = *addrp;
@@ -2512,8 +2547,10 @@ opl_init_leaves(int myboard)
 				ret = OPL_GET_PROP(int, node, "board#",
 				    &board, -1);
 				if ((ret != DDI_PROP_SUCCESS) ||
-				    (board != myboard))
+				    (board != myboard)) {
+					kmem_free(name, len);
 					continue;
+				}
 
 				cfg = &opl_boards[board];
 				channel = OPL_PORTID_TO_CHANNEL(portid);

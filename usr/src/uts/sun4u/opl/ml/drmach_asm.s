@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,7 +121,6 @@ drmach_fmem_loop_script(caddr_t critical, int size, caddr_t stat)
 	 * is already in inconsistent state.
 	 */
 2:
-	mov	%g0, %o1
 	mov	ASI_L2_CTRL_RW_ADDR, %o3
 	ldxa	[%o3]ASI_L2_CTRL, %o3
 	sethi	%hi(ASI_L2_CTRL_UGE_TRAP), %o4
@@ -158,7 +157,6 @@ drmach_fmem_loop_script(caddr_t critical, int size, caddr_t stat)
 	 */
 	ba	2b
 .word	 0x81b01060
-	 nop
 	SET_SIZE(drmach_fmem_loop_script)
 #endif /* lint */
 
