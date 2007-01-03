@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1528,6 +1528,14 @@ recov_retry:
 				" remove file", e.error));
 			VN_RELE(vp);
 			(void) nfs4_remove(dvp, file_name, cr);
+			/*
+			 * Since we've reled the vnode and removed
+			 * the file we now need to return the error.
+			 * At this point we don't want to update the
+			 * dircaches, call nfs4_waitfor_purge_complete
+			 * or set vpp to vp so we need to skip these
+			 * as well.
+			 */
 			goto skip_update_dircaches;
 		}
 	}
@@ -1558,7 +1566,6 @@ recov_retry:
 		nfs4_update_dircaches(&op_res->cinfo, dvp, vp, file_name,
 					dinfop);
 	}
-skip_update_dircaches:
 
 	/*
 	 * If the page cache for this file was flushed from actions
@@ -1579,6 +1586,8 @@ skip_update_dircaches:
 	 * Be sure to set *vpp to the correct value before returning.
 	 */
 	*vpp = vp;
+
+skip_update_dircaches:
 
 	nfs4args_copen_free(open_args);
 	if (setgid_flag) {
