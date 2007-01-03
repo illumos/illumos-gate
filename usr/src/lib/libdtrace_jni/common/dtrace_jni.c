@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -231,16 +231,14 @@ dtj_add_consumer(JNIEnv *jenv, dtj_consumer_t *c, int *seq)
 		bzero(g_consumer_table, (INITIAL_CAPACITY *
 		    sizeof (dtj_consumer_t *)));
 		g_consumer_capacity = INITIAL_CAPACITY;
+	} else if ((g_max_consumers > 0) && (g_consumer_count >=
+	    g_max_consumers)) {
+		dtj_throw_resource_limit(jenv, "Too many consumers");
+		(void) pthread_mutex_unlock(&g_table_lock);
+		return (B_FALSE);
 	} else if (g_consumer_count >= g_consumer_capacity) {
 		dtj_consumer_t **t;
 		size_t new_capacity;
-
-		if ((g_max_consumers > 0) && (g_consumer_count >=
-		    g_max_consumers)) {
-			dtj_throw_resource_limit(jenv, "Too many consumers");
-			(void) pthread_mutex_unlock(&g_table_lock);
-			return (B_FALSE);
-		}
 
 		if (g_consumer_capacity <= g_max_capacity_increment) {
 			new_capacity = (g_consumer_capacity * 2);

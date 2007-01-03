@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1784,6 +1784,7 @@ dtj_agghandler(const dtrace_bufdata_t *bufdata, dtj_java_consumer_t *jc)
 		if (jc->dtjj_tuple == NULL) {
 			(*jenv)->CallVoidMethod(jenv, jc->dtjj_probedata,
 			    g_pdatainvalidate_printa_jm);
+			goto printa_output;
 		}
 
 		tuple_member_count = (*jenv)->CallIntMethod(jenv,
@@ -1794,9 +1795,6 @@ dtj_agghandler(const dtrace_bufdata_t *bufdata, dtj_java_consumer_t *jc)
 			    g_pdatainvalidate_printa_jm);
 			(*jenv)->DeleteLocalRef(jenv, jc->dtjj_tuple);
 			jc->dtjj_tuple = NULL;
-		}
-
-		if (jc->dtjj_tuple == NULL) {
 			goto printa_output;
 		}
 

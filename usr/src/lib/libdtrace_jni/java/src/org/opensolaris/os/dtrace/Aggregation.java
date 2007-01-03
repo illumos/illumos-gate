@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -79,7 +79,7 @@ public final class Aggregation implements Serializable {
 	    BeanInfo info = Introspector.getBeanInfo(Aggregation.class);
 	    PersistenceDelegate persistenceDelegate =
 		    new DefaultPersistenceDelegate(
-		    new String[] {"name", "id", "records"})
+		    new String[] {"name", "ID", "records"})
 	    {
 		@Override
 		protected boolean
