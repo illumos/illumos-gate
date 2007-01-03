@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,7 @@
 #include <sys/modctl.h>
 #include <libbrand.h>
 #include <libscf.h>
+#include <procfs.h>
 
 #include <pool.h>
 #include <sys/pool.h>
@@ -4982,6 +4983,88 @@ check_cpu_shares_sched(zone_dochandle_t handle)
 }
 
 /*
+ * Check if there is a mix of processes running in different pools within the
+ * zone.  This is currently only going to be called for the global zone from
+ * apply_func but that could be generalized in the future.
+ */
+static boolean_t
+mixed_pools(zoneid_t zoneid)
+{
+	DIR *dirp;
+	dirent_t *dent;
+	boolean_t mixed = B_FALSE;
+	boolean_t poolid_set = B_FALSE;
+	poolid_t last_poolid = 0;
+
+	if ((dirp = opendir("/proc")) == NULL) {
+		zerror(gettext("could not open /proc"));
+		return (B_FALSE);
+	}
+
+	while ((dent = readdir(dirp)) != NULL) {
+		int procfd;
+		psinfo_t ps;
+		char procpath[MAXPATHLEN];
+
+		if (dent->d_name[0] == '.')
+			continue;
+
+		(void) snprintf(procpath, sizeof (procpath), "/proc/%s/psinfo",
+		    dent->d_name);
+
+		if ((procfd = open(procpath, O_RDONLY)) == -1)
+			continue;
+
+		if (read(procfd, &ps, sizeof (ps)) == sizeof (psinfo_t)) {
+			/* skip processes in other zones and system processes */
+			if (zoneid != ps.pr_zoneid || ps.pr_flag & SSYS) {
+				(void) close(procfd);
+				continue;
+			}
+
+			if (poolid_set) {
+				if (ps.pr_poolid != last_poolid)
+					mixed = B_TRUE;
+			} else {
+				last_poolid = ps.pr_poolid;
+				poolid_set = B_TRUE;
+			}
+		}
+
+		(void) close(procfd);
+
+		if (mixed)
+			break;
+	}
+
+	(void) closedir(dirp);
+
+	return (mixed);
+}
+
+/*
+ * Check if a persistent or temporary pool is configured for the zone.
+ * This is currently only going to be called for the global zone from
+ * apply_func but that could be generalized in the future.
+ */
+static boolean_t
+pool_configured(zone_dochandle_t handle)
+{
+	int err1, err2;
+	struct zone_psettab pset_tab;
+	char poolname[MAXPATHLEN];
+
+	err1 = zonecfg_lookup_pset(handle, &pset_tab);
+	err2 = zonecfg_get_pool(handle, poolname, sizeof (poolname));
+
+	if (err1 == Z_NO_ENTRY &&
+	    (err2 == Z_NO_ENTRY || (err2 == Z_OK && strlen(poolname) == 0)))
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
  * This is an undocumented interface which is currently only used to apply
  * the global zone resource management settings when the system boots.
  * This function does not yet properly handle updating a running system so
@@ -5050,29 +5133,45 @@ apply_func(int argc, char *argv[])
 	if ((err = check_cpu_shares_sched(handle)) != Z_OK)
 		res = Z_ERR;
 
-	/*
-	 * The next two blocks of code attempt to set up temporary pools as
-	 * well as persistent pools.  In both cases we call the functions
-	 * unconditionally.  Within each funtion the code will check if the
-	 * zone is actually configured for a temporary pool or persistent pool
-	 * and just return if there is nothing to do.
-	 */
-	if ((err = zonecfg_bind_tmp_pool(handle, zoneid, pool_err,
-	    sizeof (pool_err))) != Z_OK) {
-		if (err == Z_POOL || err == Z_POOL_CREATE || err == Z_POOL_BIND)
-			zerror("%s: %s", zonecfg_strerror(err), pool_err);
-		else
-			zerror(gettext("could not bind zone to temporary "
-			    "pool: %s"), zonecfg_strerror(err));
-		res = Z_ERR;
-	}
+	if (pool_configured(handle)) {
+		if (mixed_pools(zoneid)) {
+			zerror(gettext("Zone is using multiple resource "
+			    "pools.  The pool\nconfiguration cannot be "
+			    "applied without rebooting."));
+			res = Z_ERR;
+		} else {
 
-	if ((err = zonecfg_bind_pool(handle, zoneid, pool_err,
-	    sizeof (pool_err))) != Z_OK) {
-		if (err == Z_POOL || err == Z_POOL_BIND)
-			zerror("%s: %s", zonecfg_strerror(err), pool_err);
-		else
-			zerror("%s", zonecfg_strerror(err));
+			/*
+			 * The next two blocks of code attempt to set up
+			 * temporary pools as well as persistent pools.  In
+			 * both cases we call the functions unconditionally.
+			 * Within each funtion the code will check if the zone
+			 * is actually configured for a temporary pool or
+			 * persistent pool and just return if there is nothing
+			 * to do.
+			 */
+			if ((err = zonecfg_bind_tmp_pool(handle, zoneid,
+			    pool_err, sizeof (pool_err))) != Z_OK) {
+				if (err == Z_POOL || err == Z_POOL_CREATE ||
+				    err == Z_POOL_BIND)
+					zerror("%s: %s", zonecfg_strerror(err),
+					    pool_err);
+				else
+					zerror(gettext("could not bind zone to "
+					    "temporary pool: %s"),
+					    zonecfg_strerror(err));
+				res = Z_ERR;
+			}
+
+			if ((err = zonecfg_bind_pool(handle, zoneid, pool_err,
+			    sizeof (pool_err))) != Z_OK) {
+				if (err == Z_POOL || err == Z_POOL_BIND)
+					zerror("%s: %s", zonecfg_strerror(err),
+					    pool_err);
+				else
+					zerror("%s", zonecfg_strerror(err));
+			}
+		}
 	}
 
 	/*
