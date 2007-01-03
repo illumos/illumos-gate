@@ -2,7 +2,7 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").  
+ * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,29 @@ pcibl_t	ata_pciide_blacklist[] = {
 	{ 0x1166, 0xffff, 0x0212, 0xffff, ATA_BL_BMSTATREG_PIO_BROKEN|
 							ATA_BL_NO_SIMPLEX},
 	{ 0x1166, 0xffff, 0x0213, 0xffff, ATA_BL_BMSTATREG_PIO_BROKEN},
+
+	/*
+	 * On Intel ICH5/ICH5R (SATA controller), the simplex bit lies
+	 */
+	{ 0x8086, 0xffff, 0x24d1, 0xffff, ATA_BL_NO_SIMPLEX},
+	{ 0x8086, 0xffff, 0x24df, 0xffff, ATA_BL_NO_SIMPLEX},
+
+	/*
+	 * On Intel ICH6/ICH6R/ICH6-M (IDE and SATA controllers), the
+	 * simplex bit lies
+	 */
+	{ 0x8086, 0xffff, 0x266f, 0xffff, ATA_BL_NO_SIMPLEX},
+	{ 0x8086, 0xffff, 0x2651, 0xffff, ATA_BL_NO_SIMPLEX},
+	{ 0x8086, 0xffff, 0x2652, 0xffff, ATA_BL_NO_SIMPLEX},
+	{ 0x8086, 0xffff, 0x2653, 0xffff, ATA_BL_NO_SIMPLEX},
+
+	/*
+	 * On Intel ICH7 (IDE and SATA(Non-AHCI/Non-RAID, desktop and
+	 * mobile)), the simplex bit lies
+	 */
+	{ 0x8086, 0xffff, 0x27df, 0xffff, ATA_BL_NO_SIMPLEX},
+	{ 0x8086, 0xffff, 0x27c0, 0xffff, ATA_BL_NO_SIMPLEX},
+	{ 0x8086, 0xffff, 0x27c4, 0xffff, ATA_BL_NO_SIMPLEX},
 
 	{ 0, 0, 0, 0, 0 }
 };
