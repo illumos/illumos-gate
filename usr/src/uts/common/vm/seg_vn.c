@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3616,6 +3616,17 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				ierr = VOP_GETPAGE(vp, (offset_t)off, pgsz,
 				    &vpprot, ppa, pgsz, seg, a, arw,
 				    svd->cred);
+#ifdef DEBUG
+				if (ierr == 0) {
+					for (i = 0; i < pages; i++) {
+						ASSERT(PAGE_LOCKED(ppa[i]));
+						ASSERT(!PP_ISFREE(ppa[i]));
+						ASSERT(ppa[i]->p_vnode == vp);
+						ASSERT(ppa[i]->p_offset ==
+						    off + (i << PAGESHIFT));
+					}
+				}
+#endif /* DEBUG */
 				if (segtype == MAP_PRIVATE) {
 					SEGVN_VMSTAT_FLTVNPAGES(15);
 					vpprot &= ~PROT_WRITE;
@@ -3922,7 +3933,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 					ierr = -1;
 					break;
 				}
-				if (szc != 0 && !xhat) {
+				if (szc != 0 && !xhat && !upgrdfail) {
 					segvn_faultvnmpss_align_err5++;
 				}
 				SEGVN_VMSTAT_FLTVNPAGES(34);

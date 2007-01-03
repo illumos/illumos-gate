@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,6 +140,7 @@ vmem_t *zio_alloc_arena = NULL;	/* arena for allocating zio memory */
 
 size_t	segkmem_lpsize;
 static  uint_t	segkmem_lpshift = PAGESHIFT;
+int	segkmem_lpszc = 0;
 
 size_t  segkmem_kmemlp_quantum = 0x400000;	/* 4MB */
 size_t  segkmem_heaplp_quantum;
@@ -1489,7 +1490,8 @@ segkmem_lpsetup()
 	}
 
 	use_large_pages = 1;
-	segkmem_lpshift = page_get_shift(page_szc(segkmem_lpsize));
+	segkmem_lpszc = page_szc(segkmem_lpsize);
+	segkmem_lpshift = page_get_shift(segkmem_lpszc);
 
 #endif
 	return (use_large_pages);

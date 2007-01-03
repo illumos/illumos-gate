@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1112,6 +1112,7 @@ pvn_getpages(
 /*
  * Initialize the page list array.
  */
+/*ARGSUSED*/
 void
 pvn_plist_init(page_t *pp, page_t *pl[], size_t plsz,
     u_offset_t off, size_t io_len, enum seg_rw rw)
@@ -1119,32 +1120,27 @@ pvn_plist_init(page_t *pp, page_t *pl[], size_t plsz,
 	ssize_t sz;
 	page_t *ppcur, **ppp;
 
-	if (plsz >= io_len) {
+	/*
+	 * Set up to load plsz worth
+	 * starting at the needed page.
+	 */
+	while (pp != NULL && pp->p_offset != off) {
 		/*
-		 * Everything fits, set up to load
-		 * all the pages.
+		 * Remove page from the i/o list,
+		 * release the i/o and the page lock.
 		 */
-		sz = io_len;
-	} else {
-		/*
-		 * Set up to load plsz worth
-		 * starting at the needed page.
-		 */
-		while (pp->p_offset != off) {
-			/* XXX - Do we need this assert? */
-			ASSERT(pp->p_next->p_offset !=
-			    pp->p_offset);
-			/*
-			 * Remove page from the i/o list,
-			 * release the i/o and the page lock.
-			 */
-			ppcur = pp;
-			page_sub(&pp, ppcur);
-			page_io_unlock(ppcur);
-			(void) page_release(ppcur, 1);
-		}
-		sz = plsz;
+		ppcur = pp;
+		page_sub(&pp, ppcur);
+		page_io_unlock(ppcur);
+		(void) page_release(ppcur, 1);
 	}
+
+	if (pp == NULL) {
+		pl[0] = NULL;
+		return;
+	}
+
+	sz = plsz;
 
 	/*
 	 * Initialize the page list array.

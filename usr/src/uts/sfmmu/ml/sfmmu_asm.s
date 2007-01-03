@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3550,6 +3550,13 @@ sfmmu_vatopfn(caddr_t vaddr, sfmmu_t *sfmmup, tte_t *ttep)
 	return(0);
 }
 
+/* ARGSUSED */
+pfn_t
+sfmmu_kvaszc2pfn(caddr_t vaddr, int hashno)
+{
+	return(0);
+}
+
 #else /* lint */
 
 	ENTRY_NP(sfmmu_vatopfn)
@@ -3700,6 +3707,83 @@ vatopfn_nokernel:
 	 or	%o0, %lo(sfmmu_panic3), %o0
 
 	SET_SIZE(sfmmu_vatopfn)
+
+	/*
+	 * %o0 = vaddr
+	 * %o1 = hashno (aka szc)
+	 *
+	 * 
+	 * This routine is similar to sfmmu_vatopfn() but will only look for
+	 * a kernel vaddr in the hash structure for the specified rehash value.
+	 * It's just an optimization for the case when pagesize for a given
+	 * va range is already known (e.g. large page heap) and we don't want
+	 * to start the search with rehash value 1 as sfmmu_vatopfn() does.
+	 *
+	 * Returns valid pfn or PFN_INVALID if
+	 * tte for specified rehash # is not found, invalid or suspended.
+	 */
+	ENTRY_NP(sfmmu_kvaszc2pfn)
+ 	/*
+ 	 * disable interrupts
+ 	 */
+ 	rdpr	%pstate, %o3
+#ifdef DEBUG
+	PANIC_IF_INTR_DISABLED_PSTR(%o3, sfmmu_di_l6, %g1)
+#endif
+	/*
+	 * disable interrupts to protect the TSBMISS area
+	 */
+	andn    %o3, PSTATE_IE, %o5
+	wrpr    %o5, 0, %pstate
+
+	CPU_TSBMISS_AREA(%g1, %o5)
+	ldn	[%g1 + TSBMISS_KHATID], %o4
+	sll	%o1, 1, %g6
+	add	%g6, %o1, %g6
+	add	%g6, MMU_PAGESHIFT, %g6
+	/*
+	 * %o0 = vaddr
+	 * %o1 = hashno
+	 * %o3 = old %pstate
+	 * %o4 = ksfmmup
+	 * %g1 = tsbmiss area
+	 * %g6 = hmeshift
+	 */
+
+	/*
+	 * The first arg to GET_TTE is actually tagaccess register
+	 * not just vaddr. Since this call is for kernel we need to clear
+	 * any lower vaddr bits that would be interpreted as ctx bits.
+	 */
+	srlx	%o0, MMU_PAGESHIFT, %o0
+	sllx	%o0, MMU_PAGESHIFT, %o0
+	GET_TTE(%o0, %o4, %g3, %g4, %g5, %g1, %o5, %g6, %o1,
+		kvaszc2pfn_l1, kvaszc2pfn_hblk_found, kvaszc2pfn_nohblk,
+		kvaszc2pfn_nohblk)
+
+kvaszc2pfn_hblk_found:
+	/*
+	 * %g3 = tte
+	 * %o0 = vaddr
+	 */
+	brgez,a,pn %g3, 1f			/* check if tte is invalid */
+	  mov	-1, %o0				/* output = -1 (PFN_INVALID) */
+	TTETOPFN(%g3, %o0, kvaszc2pfn_l2, %g2, %g4, %g5)
+	/*
+	 * g3 = pfn
+	 */
+	ba,pt	%xcc, 1f
+	  mov	%g3, %o0
+
+kvaszc2pfn_nohblk:
+	mov	-1, %o0
+
+1:
+	retl
+ 	  wrpr	%g0, %o3, %pstate		/* re-enable interrupts */
+
+	SET_SIZE(sfmmu_kvaszc2pfn)
+
 #endif /* lint */
 
 

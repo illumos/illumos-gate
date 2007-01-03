@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,9 +119,10 @@ extern void	segkmem_free_lp(vmem_t *, void *, size_t);
 extern int	segkmem_lpsetup();
 extern void	segkmem_heap_lp_init(void);
 
-extern size_t segkmem_lpsize;
-extern size_t segkmem_heaplp_quantum;
-extern size_t segkmem_kmemlp_max;
+extern size_t	segkmem_lpsize;
+extern int	segkmem_lpszc;
+extern size_t	segkmem_heaplp_quantum;
+extern size_t	segkmem_kmemlp_max;
 
 #define	SEGKMEM_USE_LARGEPAGES (segkmem_lpsize > PAGESIZE)
 

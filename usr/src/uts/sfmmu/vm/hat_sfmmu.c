@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3133,9 +3133,13 @@ sfmmu_shadow_hcreate(sfmmu_t *sfmmup, caddr_t vaddr, int ttesz, uint_t flags)
 		 * potentially be a previous large page hblk so we need to
 		 * set the shadow bit.
 		 */
+		ASSERT(!hmeblkp->hblk_vcnt && !hmeblkp->hblk_hmecnt);
 		hmeblkp->hblk_shw_bit = 1;
+	} else if (hmeblkp->hblk_shw_bit == 0) {
+		panic("sfmmu_shadow_hcreate: shw bit not set in hmeblkp 0x%p",
+		    (void *)hmeblkp);
 	}
-	ASSERT(hmeblkp->hblk_shw_bit == 1);
+
 	vshift = vaddr_to_vshift(hblktag, vaddr, size);
 	ASSERT(vshift < 8);
 	/*
@@ -5335,11 +5339,10 @@ sfmmu_hblk_unload(struct hat *sfmmup, struct hme_blk *hmeblkp, caddr_t addr,
 
 	while (addr < endaddr) {
 		pml = NULL;
-again:
 		sfmmu_copytte(&sfhmep->hme_tte, &tte);
 		if (TTE_IS_VALID(&tte)) {
 			pp = sfhmep->hme_page;
-			if (pp && pml == NULL) {
+			if (pp != NULL) {
 				pml = sfmmu_mlist_enter(pp);
 			}
 
@@ -5349,9 +5352,8 @@ again:
 			 */
 			if (sfhmep->hme_page != pp) {
 				if (pp != NULL && sfhmep->hme_page != NULL) {
-					if (pml) {
-						sfmmu_mlist_exit(pml);
-					}
+					ASSERT(pml != NULL);
+					sfmmu_mlist_exit(pml);
 					/* Re-start this iteration. */
 					continue;
 				}
@@ -5375,6 +5377,7 @@ again:
 			 * Page_unload can also invalidate the tte after
 			 * we read tte outside of p_mapping lock.
 			 */
+again:
 			ttemod = tte;
 
 			TTE_SET_INVALID(&ttemod);
@@ -5383,17 +5386,15 @@ again:
 
 			if (ret <= 0) {
 				if (TTE_IS_VALID(&tte)) {
+					ASSERT(ret < 0);
 					goto again;
-				} else {
-					/*
-					 * We read in a valid pte, but it
-					 * is unloaded by page_unload.
-					 * hme_page has become NULL and
-					 * we hold no p_mapping lock.
-					 */
-					ASSERT(pp == NULL && pml == NULL);
-					goto tte_unloaded;
 				}
+				if (pp != NULL) {
+					panic("sfmmu_hblk_unload: pp = 0x%p "
+					    "tte became invalid under mlist"
+					    " lock = 0x%p", pp, pml);
+				}
+				continue;
 			}
 
 			if (!(flags & HAT_UNLOAD_NOSYNC)) {
@@ -5511,8 +5512,7 @@ again:
 				pml = sfmmu_mlist_enter(pp);
 				if (sfhmep->hme_page != NULL) {
 					sfmmu_mlist_exit(pml);
-					pml = NULL;
-					goto again;
+					continue;
 				}
 				ASSERT(sfhmep->hme_page == NULL);
 		} else if (hmeblkp->hblk_hmecnt != 0) {
@@ -7158,8 +7158,16 @@ hat_getpfnum(struct hat *hat, caddr_t addr)
 	ASSERT(hat->sfmmu_xhat_provider == NULL);
 
 	if (hat == ksfmmup) {
-		if (segkpm && IS_KPM_ADDR(addr))
+		if (IS_KMEM_VA_LARGEPAGE(addr)) {
+			ASSERT(segkmem_lpszc > 0);
+			pfn = sfmmu_kvaszc2pfn(addr, segkmem_lpszc);
+			if (pfn != PFN_INVALID) {
+				sfmmu_check_kpfn(pfn);
+				return (pfn);
+			}
+		} else if (segkpm && IS_KPM_ADDR(addr)) {
 			return (sfmmu_kpm_vatopfn(addr));
+		}
 		while ((pfn = sfmmu_vatopfn(addr, ksfmmup, &tte))
 		    == PFN_SUSPENDED) {
 			sfmmu_vatopfn_suspended(addr, ksfmmup, &tte);

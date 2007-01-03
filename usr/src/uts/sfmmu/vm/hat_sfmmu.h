@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1736,6 +1736,7 @@ extern void	sfmmu_patch_utsb(void);
 #endif /* UTSB_PHYS */
 extern pfn_t	sfmmu_vatopfn(caddr_t, sfmmu_t *, tte_t *);
 extern void	sfmmu_vatopfn_suspended(caddr_t, sfmmu_t *, tte_t *);
+extern pfn_t	sfmmu_kvaszc2pfn(caddr_t, int);
 #ifdef	DEBUG
 extern void	sfmmu_check_kpfn(pfn_t);
 #else
