@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4039,15 +4039,34 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 	}
 
 	/*
-	 * If we are rebooting then we don't want to destroy an existing
-	 * temporary pool at this point so that we can just reuse it when the
-	 * zone boots back up.
+	 * If we are rebooting then we normally don't want to destroy an
+	 * existing temporary pool at this point so that we can just reuse it
+	 * when the zone boots back up.  However, it is also possible we were
+	 * running with a temporary pool and the zone configuration has been
+	 * modified to no longer use a temporary pool.  In that case we need
+	 * to destroy the temporary pool now.  This case looks like the case
+	 * where we never had a temporary pool configured but
+	 * zonecfg_destroy_tmp_pool will do the right thing either way.
 	 */
-	if (!unmount_cmd && !rebooting) {
-		if ((res = zonecfg_destroy_tmp_pool(zone_name, pool_err,
-		    sizeof (pool_err))) != Z_OK) {
-			if (res == Z_POOL)
-				zerror(zlogp, B_FALSE, pool_err);
+	if (!unmount_cmd) {
+		boolean_t destroy_tmp_pool = B_TRUE;
+
+		if (rebooting) {
+			struct zone_psettab pset_tab;
+			zone_dochandle_t handle;
+
+			if ((handle = zonecfg_init_handle()) != NULL &&
+			    zonecfg_get_handle(zone_name, handle) == Z_OK &&
+			    zonecfg_lookup_pset(handle, &pset_tab) == Z_OK)
+				destroy_tmp_pool = B_FALSE;
+		}
+
+		if (destroy_tmp_pool) {
+			if ((res = zonecfg_destroy_tmp_pool(zone_name, pool_err,
+			    sizeof (pool_err))) != Z_OK) {
+				if (res == Z_POOL)
+					zerror(zlogp, B_FALSE, pool_err);
+			}
 		}
 	}
 
