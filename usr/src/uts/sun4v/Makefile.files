@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -139,6 +139,7 @@ CNEX_OBJS	= cnex.o
 GLVC_OBJS	= glvc.o glvc_hcall.o
 MDESC_OBJS	= mdesc.o
 LDC_OBJS	= ldc.o vio_util.o vdsk_common.o
+NTWDT_OBJS	= ntwdt.o
 VLDC_OBJS	= vldc.o
 VCC_OBJS	= vcc.o
 VNET_OBJS	= vnet.o vnet_gen.o

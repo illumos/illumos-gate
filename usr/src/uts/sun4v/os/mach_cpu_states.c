@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -481,8 +481,11 @@ ptl1_panic_handler(ptl1_state_t *pstate)
 void
 clear_watchdog_on_exit(void)
 {
-	prom_printf("Debugging requested; hardware watchdog suspended.\n");
-	(void) watchdog_suspend();
+	if (watchdog_enabled && watchdog_activated) {
+		prom_printf("Debugging requested; hardware watchdog "
+			"suspended.\n");
+		(void) watchdog_suspend();
+	}
 }
 
 /*

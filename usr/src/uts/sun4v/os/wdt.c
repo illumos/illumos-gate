@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,7 @@ static void config_watchdog(uint64_t, int);
 /*
  * Flag used to pat/suspend/resume the watchdog timer.
  */
-static int watchdog_activated = WDT_OFF;
+int watchdog_activated = WDT_OFF;
 static uint64_t watchdog_regular_timeout = WDT_REGULAR_TIMEOUT;
 static uint64_t watchdog_long_timeout = 0;
 static uint64_t watchdog_resolution = WDT_DEFAULT_RESOLUTION;

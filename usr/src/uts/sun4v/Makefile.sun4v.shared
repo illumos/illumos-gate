@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -326,6 +326,7 @@ DRV_KMODS	+= fpc
 DRV_KMODS	+= glvc
 DRV_KMODS	+= mdesc
 DRV_KMODS	+= niumx
+DRV_KMODS	+= ntwdt
 DRV_KMODS	+= nxge
 DRV_KMODS	+= n2piupc
 DRV_KMODS	+= px

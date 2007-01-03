@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -299,6 +299,7 @@ f none usr/platform/sun4v/include/sys/memnode.h 644 root bin
 f none usr/platform/sun4v/include/sys/nexusdebug.h 644 root bin
 f none usr/platform/sun4v/include/sys/niagaraasi.h 644 root bin
 f none usr/platform/sun4v/include/sys/niagararegs.h 644 root bin
+f none usr/platform/sun4v/include/sys/ntwdt.h 644 root bin
 f none usr/platform/sun4v/include/sys/prom_debug.h 644 root bin
 f none usr/platform/sun4v/include/sys/prom_plat.h 644 root bin
 f none usr/platform/sun4v/include/sys/pte.h 644 root bin

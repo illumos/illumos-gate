@@ -23,8 +23,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_WDT_H
-#define	_SYS_WDT_H
+#ifndef _SYS_NTWDT_H
+#define	_SYS_NTWDT_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -32,18 +32,29 @@
 extern "C" {
 #endif
 
-extern void watchdog_init(void);
-extern void watchdog_pat(void);
-extern void watchdog_suspend(void);
-extern void watchdog_resume(void);
-extern void watchdog_clear(void);
-extern void restore_watchdog_on_entry(void);
+#include <sys/ioccom.h>
 
-extern int watchdog_enabled;
-extern int watchdog_activated;
+/* ioctls for application watchdog */
+#define	LOMIOCDOGSTATE	_IOR('a', 6, lom_dogstate_t)
+#define	LOMIOCDOGCTL	_IOW('a', 7, lom_dogctl_t)
+#define	LOMIOCDOGTIME	_IOW('a', 8, uint_t)
+#define	LOMIOCDOGPAT	_IO('a', 9)
+
+typedef
+struct {
+	int reset_enable;
+	int dog_enable;
+} lom_dogctl_t;
+
+typedef
+struct {
+	int reset_enable;
+	int dog_enable;
+	uint_t dog_timeout;
+} lom_dogstate_t;
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _SYS_WDT_H */
+#endif	/* _SYS_NTWDT_H */
