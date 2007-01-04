@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -18928,17 +18928,17 @@ ip_snmp_get_mib2_ip6(queue_t *q, mblk_t *mpctl)
 		/*
 		 * Synchronize 64- and 32-bit counters
 		 */
-		SYNC32_MIB(&ip6_mib, ipIfStatsInReceives,
+		SYNC32_MIB(ill->ill_ip_mib, ipIfStatsInReceives,
 		    ipIfStatsHCInReceives);
-		SYNC32_MIB(&ip6_mib, ipIfStatsInDelivers,
+		SYNC32_MIB(ill->ill_ip_mib, ipIfStatsInDelivers,
 		    ipIfStatsHCInDelivers);
-		SYNC32_MIB(&ip6_mib, ipIfStatsOutRequests,
+		SYNC32_MIB(ill->ill_ip_mib, ipIfStatsOutRequests,
 		    ipIfStatsHCOutRequests);
-		SYNC32_MIB(&ip6_mib, ipIfStatsOutForwDatagrams,
+		SYNC32_MIB(ill->ill_ip_mib, ipIfStatsOutForwDatagrams,
 		    ipIfStatsHCOutForwDatagrams);
-		SYNC32_MIB(&ip6_mib, ipIfStatsOutMcastPkts,
+		SYNC32_MIB(ill->ill_ip_mib, ipIfStatsOutMcastPkts,
 		    ipIfStatsHCOutMcastPkts);
-		SYNC32_MIB(&ip6_mib, ipIfStatsInMcastPkts,
+		SYNC32_MIB(ill->ill_ip_mib, ipIfStatsInMcastPkts,
 		    ipIfStatsHCInMcastPkts);
 
 		if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
