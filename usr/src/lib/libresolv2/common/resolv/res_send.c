@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,7 +311,8 @@ res_nsend(res_state statp,
 	highestFD = sysconf(_SC_OPEN_MAX) - 1;
 #endif
 
-	if (statp->nscount == 0) {
+	/* No name servers or previous res_ninit() failure */
+	if (statp->nscount == 0 || EXT(statp).ext == NULL) {
 		errno = ESRCH;
 		return (-1);
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -524,8 +524,10 @@ duplicate IP address detection!\n\n"));
 		local_closelog();
 		return (1);
 	}
-	if (res_ninit(&resolv_conf) == -1)
+	(void) memset(&resolv_conf, 0, sizeof (resolv_conf));
+	if (res_ninit(&resolv_conf) == -1) {
 		dhcpmsg(LOG_ERR, "Cannot acquire resolver configuration.\n");
+	}
 	i = 0;
 	if (server_mode) {
 		/*
@@ -621,6 +623,7 @@ duplicate IP address detection!\n\n"));
 			local_closelog();
 			(void) mutex_destroy(&ttg_mtx);
 			(void) cond_destroy(&ttg_cv);
+			res_ndestroy(&resolv_conf);
 			return (1);
 		}
 
@@ -629,6 +632,7 @@ duplicate IP address detection!\n\n"));
 			local_closelog();
 			(void) mutex_destroy(&ttg_mtx);
 			(void) cond_destroy(&ttg_cv);
+			res_ndestroy(&resolv_conf);
 			return (1);
 		}
 
@@ -642,6 +646,7 @@ duplicate IP address detection!\n\n"));
 				local_closelog();
 				(void) mutex_destroy(&ttg_mtx);
 				(void) cond_destroy(&ttg_cv);
+				res_ndestroy(&resolv_conf);
 				return (err);
 			}
 		} else
@@ -650,6 +655,9 @@ duplicate IP address detection!\n\n"));
 
 	if ((err = open_interfaces()) != 0) {
 		local_closelog();
+		(void) mutex_destroy(&ttg_mtx);
+		(void) cond_destroy(&ttg_cv);
+		res_ndestroy(&resolv_conf);
 		return (err);
 	}
 
@@ -674,6 +682,7 @@ duplicate IP address detection!\n\n"));
 	(void) fflush(NULL);
 	(void) mutex_destroy(&ttg_mtx);
 	(void) cond_destroy(&ttg_cv);
+	res_ndestroy(&resolv_conf);
 	return (err);
 }
 

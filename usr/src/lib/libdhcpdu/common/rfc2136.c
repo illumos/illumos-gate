@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,6 +129,7 @@ init(void)
 	 *	on the host running this code.  In practice, life must be very
 	 *	bad for res_ninit() to fail.
 	 */
+	(void) memset(&res, 0, sizeof (res));
 	if (res_ninit(&res) == -1) {
 		dprint("res_ninit() failed - dns_config_ok FALSE\n");
 		dns_config_ok = B_FALSE;
@@ -137,6 +137,7 @@ init(void)
 		dprint("res_ninit() succeeded\n");
 		dns_config_ok = B_TRUE;
 	}
+	res_ndestroy(&res);
 }
 
 /*
@@ -400,8 +401,11 @@ getNS(char *domain, struct in_addr *iap)
 		    domain);
 		return (B_TRUE);
 	}
-
-	(void) res_ninit(&res);
+	(void) memset(&res, 0, sizeof (res));
+	if (res_ninit(&res) == -1) {
+		dprint("getNS(\"%s\"):  res_ninit failed\n", domain);
+		return (B_FALSE);
+	}
 	for (retries = 0; retries < MAX_RETRIES; retries++) {
 		alen = res_nquery(&res, domain, C_IN, T_NS, (uchar_t *)&abuf,
 		    sizeof (abuf));
@@ -419,6 +423,7 @@ getNS(char *domain, struct in_addr *iap)
 			} else {
 				dprint("getNS(\"%s\"):  res_nquery failed "
 				    "(h_errno %d)\n", domain, h_errno);
+				res_ndestroy(&res);
 				return (B_FALSE);
 			}
 		}
@@ -426,6 +431,7 @@ getNS(char *domain, struct in_addr *iap)
 	if (alen <= 0) {
 		dprint("getNS(\"%s\"):  res_nquery failed " "(h_errno %d)\n",
 		    domain, h_errno);
+		res_ndestroy(&res);
 		return (B_FALSE);
 	}
 
@@ -449,6 +455,7 @@ getNS(char *domain, struct in_addr *iap)
 		dlen = dn_skipname(data, m_bound);
 		if (dlen < 0) {
 			dprint("dn_skipname returned < 0\n");
+			res_ndestroy(&res);
 			return (B_FALSE);
 		}
 		data += dlen + QFIXEDSZ;
@@ -460,6 +467,7 @@ getNS(char *domain, struct in_addr *iap)
 		if ((dlen = dn_expand((unsigned char *) &abuf, m_bound,
 				data, (char *)name, sizeof (name))) < 0) {
 			dprint("dn_expand() dom failed\n");
+			res_ndestroy(&res);
 			return (B_FALSE);
 		}
 		data += dlen;
@@ -501,6 +509,7 @@ getNS(char *domain, struct in_addr *iap)
 		case T_A:
 			(void) memcpy(iap, data, sizeof (struct in_addr));
 			cacheNS(domain, iap, ttl);
+			res_ndestroy(&res);
 			return (B_TRUE);
 
 		case T_NS:
@@ -509,6 +518,7 @@ getNS(char *domain, struct in_addr *iap)
 			if (dn_expand((unsigned char *) &abuf, m_bound, data,
 			    (char *)name, sizeof (name)) < 0) {
 				dprint("\tdn_expand() T_NS failed\n");
+				res_ndestroy(&res);
 				return (B_FALSE);
 			}
 			dprint("\tname %s\n", name);
@@ -527,12 +537,14 @@ getNS(char *domain, struct in_addr *iap)
 		if (dn_expand((unsigned char *) &abuf, m_bound, NS_data,
 		    (char *)name, sizeof (name)) < 0) {
 			dprint("\tdn_expand() T_NS failed\n");
+			res_ndestroy(&res);
 			return (B_FALSE);
 		}
 
 		if (ep = res_gethostbyname((const char *)name)) {
 			(void) memcpy(iap, ep->h_addr, sizeof (struct in_addr));
 			cacheNS(domain, iap, ttl);
+			res_ndestroy(&res);
 			return (B_TRUE);
 		} else
 			dprint("getNS:  res_gethostbyname(%s) failed\n", name);
@@ -540,6 +552,7 @@ getNS(char *domain, struct in_addr *iap)
 		dprint("getNS:  reply contained no NS records\n");
 	}
 
+	res_ndestroy(&res);
 	return (B_FALSE);
 }
 
@@ -611,7 +624,11 @@ send_update(struct hostent *hp, struct in_addr *to_server)
 	struct in_addr netaddr;
 	char revnamebuf[MAXDNAME];
 
-	(void) res_ninit(&res);
+	(void) memset(&res, 0, sizeof (res));
+	if (res_ninit(&res) == -1) {
+		dprint("send_updated res_ninit failed!");
+		return (B_FALSE);
+	}
 	res.nscount = 1;
 	res.nsaddr.sin_family = AF_INET;
 	res.nsaddr.sin_port = htons(NAMESERVER_PORT);
@@ -623,6 +640,7 @@ send_update(struct hostent *hp, struct in_addr *to_server)
 
 	if (strchr(hp->h_name, '.') == NULL) {
 		dprint("send_update handed non-FQDN:  %s\n", hp->h_name);
+		res_ndestroy(&res);
 		return (B_FALSE);
 	}
 	forfqhost = hp->h_name;
@@ -647,9 +665,11 @@ send_update(struct hostent *hp, struct in_addr *to_server)
 	if (!delA(&res, forfqhost) ||
 	    !delPTR(&res, forfqhost, revnamebuf) ||
 	    !addA(&res, forfqhost, netaddr) ||
-	    !addPTR(&res, forfqhost, revnamebuf))
+	    !addPTR(&res, forfqhost, revnamebuf)) {
+		res_ndestroy(&res);
 		return (B_FALSE);
-
+	}
+	res_ndestroy(&res);
 	return (B_TRUE);
 }
 
