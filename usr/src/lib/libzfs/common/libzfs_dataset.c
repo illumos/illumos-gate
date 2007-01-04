@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -563,7 +563,7 @@ prop_parse_boolean(libzfs_handle_t *hdl, nvpair_t *elem, uint64_t *val)
 	case DATA_TYPE_STRING:
 		{
 			char *value;
-			VERIFY(nvpair_value_string(elem, &value) == 0);
+			verify(nvpair_value_string(elem, &value) == 0);
 
 			if (strcmp(value, "on") == 0) {
 				ret = 1;
@@ -580,7 +580,7 @@ prop_parse_boolean(libzfs_handle_t *hdl, nvpair_t *elem, uint64_t *val)
 
 	case DATA_TYPE_UINT64:
 		{
-			VERIFY(nvpair_value_uint64(elem, &ret) == 0);
+			verify(nvpair_value_uint64(elem, &ret) == 0);
 			if (ret > 1) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "'%s' must be a boolean value"),
@@ -593,7 +593,7 @@ prop_parse_boolean(libzfs_handle_t *hdl, nvpair_t *elem, uint64_t *val)
 	case DATA_TYPE_BOOLEAN_VALUE:
 		{
 			boolean_t value;
-			VERIFY(nvpair_value_boolean_value(elem, &value) == 0);
+			verify(nvpair_value_boolean_value(elem, &value) == 0);
 			ret = value;
 			break;
 		}
