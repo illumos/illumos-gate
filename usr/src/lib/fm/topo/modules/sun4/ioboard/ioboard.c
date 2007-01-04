@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,14 +82,12 @@ _topo_init(topo_mod_t *modhdl)
 
 	topo_mod_register(modhdl, &Iob_info, TOPO_VERSION);
 
-	did_hash_init(modhdl);
 	topo_mod_dprintf(modhdl, "Ioboard enumr initd\n");
 }
 
 void
 _topo_fini(topo_mod_t *modhdl)
 {
-	did_hash_fini(modhdl);
 	topo_mod_unregister(modhdl);
 }
 
