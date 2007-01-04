@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1200,12 +1200,13 @@ static int  sd_validate_geometry(struct sd_lun *un, int path_flag);
 static void sd_convert_geometry(uint64_t capacity, struct dk_geom *un_g);
 #endif
 
-static void sd_resync_geom_caches(struct sd_lun *un, int capacity, int lbasize,
-	int path_flag);
+static void sd_resync_geom_caches(struct sd_lun *un, uint64_t capacity,
+	int lbasize, int path_flag);
 static int  sd_read_fdisk(struct sd_lun *un, uint_t capacity, int lbasize,
 	int path_flag);
 static void sd_get_physical_geometry(struct sd_lun *un,
-	struct geom_cache *pgeom_p, int capacity, int lbasize, int path_flag);
+	struct geom_cache *pgeom_p, uint64_t capacity, int lbasize,
+	int path_flag);
 static void sd_get_virtual_geometry(struct sd_lun *un, int capacity,
 	int lbasize);
 static int  sd_uselabel(struct sd_lun *un, struct dk_label *l, int path_flag);
@@ -4350,7 +4351,7 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 	int	label_error = 0;
 	int	gvalid		= un->un_f_geometry_is_valid;
 	int	lbasize;
-	uint_t	capacity;
+	uint64_t	capacity;
 	int	count;
 #if defined(__i386) || defined(__amd64)
 	int forced_under_1t = 0;
@@ -4775,7 +4776,7 @@ sd_convert_geometry(uint64_t capacity, struct dk_geom *un_g)
  */
 
 static void
-sd_resync_geom_caches(struct sd_lun *un, int capacity, int lbasize,
+sd_resync_geom_caches(struct sd_lun *un, uint64_t capacity, int lbasize,
 	int path_flag)
 {
 	struct 	geom_cache 	pgeom;
@@ -5114,7 +5115,7 @@ done:
 
 static void
 sd_get_physical_geometry(struct sd_lun *un, struct geom_cache *pgeom_p,
-	int capacity, int lbasize, int path_flag)
+	uint64_t capacity, int lbasize, int path_flag)
 {
 	struct	mode_format	*page3p;
 	struct	mode_geometry	*page4p;
