@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,7 @@ chkauthattr(const char *authname, const char *username)
 	int		auth_granted = 0;
 	char		*auths;
 	char		*profiles;
-	userattr_t	*user;
+	userattr_t	*user = NULL;
 	char		*chkedprof[MAXPROFS];
 	int		chkedprof_cnt = 0;
 	int		i;
@@ -58,34 +58,34 @@ chkauthattr(const char *authname, const char *username)
 	if (authname == NULL || username == NULL)
 		return (0);
 
+	/* Check against AUTHS_GRANTED and PROFS_GRANTED in policy.conf */
 	auth_granted = _chk_policy_auth(authname, chkedprof, &chkedprof_cnt);
-	if (auth_granted) {
-		return (1);
-	}
+	if (auth_granted)
+		goto exit;
+
 	if ((user = getusernam(username)) == NULL)
-		return (0);
+		goto exit;
 
+	/* Check against authorizations listed in user_attr */
 	if ((auths = kva_match(user->attr, USERATTR_AUTHS_KW)) != NULL) {
-		if (_is_authorized(authname, auths)) {
-			free_userattr(user);
-			return (1);
-		}
+		auth_granted = _is_authorized(authname, auths);
+		if (auth_granted)
+			goto exit;
 	}
 
-	if ((profiles = kva_match(user->attr, USERATTR_PROFILES_KW)) == NULL) {
-		free_userattr(user);
-		return (0);
-	}
+	/* Check against authorizations specified by profiles */
+	if ((profiles = kva_match(user->attr, USERATTR_PROFILES_KW)) != NULL)
+		auth_granted = _chkprof_for_auth(profiles, authname,
+		    chkedprof, &chkedprof_cnt);
 
-	auth_granted = _chkprof_for_auth(profiles, authname,
-	    chkedprof, &chkedprof_cnt);
-
+exit:
 	/* free memory allocated for checked array */
 	for (i = 0; i < chkedprof_cnt; i++) {
 		free(chkedprof[i]);
 	}
 
-	free_userattr(user);
+	if (user != NULL)
+		free_userattr(user);
 
 	return (auth_granted);
 }

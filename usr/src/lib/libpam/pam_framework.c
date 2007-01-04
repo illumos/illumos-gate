@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1544,6 +1544,7 @@ out:
 
 /*
  * pam_getenvlist - retrieve all environment variables from the PAM handle
+ *                  in a NULL terminated array. On error, return NULL.
  */
 char **
 pam_getenvlist(pam_handle_t *pamh)
@@ -1552,7 +1553,8 @@ pam_getenvlist(pam_handle_t *pamh)
 	char		**list = 0;
 	int		length = 0;
 	env_list	*traverse;
-	char		env_buf[1024];
+	char		*tenv;
+	size_t		tenv_size;
 
 	pam_trace(PAM_DEBUG_DEFAULT,
 	    "pam_getenvlist(%p)", (void *)pamh);
@@ -1568,7 +1570,7 @@ pam_getenvlist(pam_handle_t *pamh)
 	}
 
 	/* allocate the array we will return to the caller */
-	if ((list = (char **)calloc(length + 1, sizeof (char *))) == 0) {
+	if ((list = (char **)calloc(length + 1, sizeof (char *))) == NULL) {
 		error = PAM_BUF_ERR;
 		goto out;
 	}
@@ -1576,19 +1578,19 @@ pam_getenvlist(pam_handle_t *pamh)
 	/* add the variables one by one */
 	length = 0;
 	traverse = pamh->pam_env;
-	while (traverse) {
-		(void) snprintf(env_buf, sizeof (env_buf), "%s=%s",
-		    traverse->name, traverse->value);
-		if ((list[length] = strdup(env_buf)) == 0) {
+	while (traverse != NULL) {
+		tenv_size = strlen(traverse->name) +
+		    strlen(traverse->value) + 2; /* name=val\0 */
+		if ((tenv = malloc(tenv_size)) == NULL) {
 			error = PAM_BUF_ERR;
 			goto out;
 		}
-		length++;
+		/*LINTED*/
+		(void) sprintf(tenv, "%s=%s", traverse->name, traverse->value);
+		list[length++] = tenv;
 		traverse = traverse->next;
 	}
-
-	/* null terminate the list */
-	list[length] = 0;
+	list[length] = NULL;
 
 	error = PAM_SUCCESS;
 out:
