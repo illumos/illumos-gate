@@ -24,7 +24,7 @@
 /*	  All Rights Reserved					*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,7 @@
 #include <sys/modctl.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/pci.h>
 #include <sys/asy.h>
 #include <sys/policy.h>
 
@@ -406,6 +407,138 @@ _info(struct modinfo *modinfop)
 }
 
 static int
+asy_get_bus_type(dev_info_t *devinfo)
+{
+	char	parent_type[16];
+	int	parentlen;
+
+	parentlen = sizeof (parent_type);
+
+	if (ddi_prop_op(DDI_DEV_T_ANY, devinfo, PROP_LEN_AND_VAL_BUF, 0,
+	    "device_type", (caddr_t)parent_type, &parentlen)
+	    != DDI_PROP_SUCCESS && ddi_prop_op(DDI_DEV_T_ANY, devinfo,
+	    PROP_LEN_AND_VAL_BUF, 0, "bus-type", (caddr_t)parent_type,
+	    &parentlen) != DDI_PROP_SUCCESS) {
+			cmn_err(CE_WARN,
+			    "asy: can't figure out device type for"
+			    " parent \"%s\"",
+			    ddi_get_name(ddi_get_parent(devinfo)));
+			return (ASY_BUS_UNKNOWN);
+	}
+	if (strcmp(parent_type, "isa") == 0)
+		return (ASY_BUS_ISA);
+	else if (strcmp(parent_type, "pci") == 0)
+		return (ASY_BUS_PCI);
+	else
+		return (ASY_BUS_UNKNOWN);
+}
+
+static int
+asy_get_io_regnum_pci(dev_info_t *devi, struct asycom *asy)
+{
+	int reglen, nregs;
+	int regnum, i;
+	uint64_t size;
+	struct pci_phys_spec *reglist;
+
+	if (ddi_getlongprop(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
+	    "reg", (caddr_t)&reglist, &reglen) != DDI_PROP_SUCCESS) {
+		cmn_err(CE_WARN, "asy_get_io_regnum_pci: reg property"
+		    " not found in devices property list");
+		return (-1);
+	}
+
+	/*
+	 * PCI devices are assumed to not have broken FIFOs;
+	 * Agere/Lucent Venus PCI modem chipsets are an example
+	 */
+	if (asy)
+		asy->asy_flags2 |= ASY2_NO_LOOPBACK;
+
+	regnum = -1;
+	nregs = reglen / sizeof (*reglist);
+	for (i = 0; i < nregs; i++) {
+		switch (reglist[i].pci_phys_hi & PCI_ADDR_MASK) {
+		case PCI_ADDR_IO:		/* I/O bus reg property */
+			if (regnum == -1) /* use only the first one */
+				regnum = i;
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	/* check for valid count of registers */
+	if (regnum >= 0) {
+		size = ((uint64_t)reglist[regnum].pci_size_low) |
+		    ((uint64_t)reglist[regnum].pci_size_hi) << 32;
+		if (size < 8)
+			regnum = -1;
+	}
+	kmem_free(reglist, reglen);
+	return (regnum);
+}
+
+static int
+asy_get_io_regnum_isa(dev_info_t *devi, struct asycom *asy)
+{
+	int reglen, nregs;
+	int regnum, i;
+	struct {
+		uint_t bustype;
+		int base;
+		int size;
+	} *reglist;
+
+	if (ddi_getlongprop(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
+	    "reg", (caddr_t)&reglist, &reglen) != DDI_PROP_SUCCESS) {
+		cmn_err(CE_WARN, "asy_get_io_regnum: reg property not found "
+			"in devices property list");
+		return (-1);
+	}
+
+	regnum = -1;
+	nregs = reglen / sizeof (*reglist);
+	for (i = 0; i < nregs; i++) {
+		switch (reglist[i].bustype) {
+		case 1:			/* I/O bus reg property */
+			if (regnum == -1) /* only use the first one */
+				regnum = i;
+			break;
+
+		case pnpMTS0219:	/* Multitech MT5634ZTX modem */
+			/* Venus chipset can't do loopback test */
+			if (asy)
+				asy->asy_flags2 |= ASY2_NO_LOOPBACK;
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	/* check for valid count of registers */
+	if ((regnum < 0) || (reglist[regnum].size < 8))
+		regnum = -1;
+	kmem_free(reglist, reglen);
+	return (regnum);
+}
+
+static int
+asy_get_io_regnum(dev_info_t *devinfo, struct asycom *asy)
+{
+	switch (asy_get_bus_type(devinfo)) {
+	case ASY_BUS_ISA:
+		return (asy_get_io_regnum_isa(devinfo, asy));
+	case ASY_BUS_PCI:
+		return (asy_get_io_regnum_pci(devinfo, asy));
+	default:
+		return (-1);
+	}
+}
+
+static int
 asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
 	int instance;
@@ -456,57 +589,8 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 static int
 asyprobe(dev_info_t *devi)
 {
-	int instance;
-	int ret = DDI_PROBE_FAILURE;
-	int regnum;
-	int reglen, nregs;
-	struct reglist {
-		uint_t bustype;
-		int base;
-		int size;
-	} *reglist = NULL;
-
-	instance = ddi_get_instance(devi);
-
-	/* Retrieve "reg" property */
-
-	if (ddi_getlongprop(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
-	    "reg", (caddr_t)&reglist, &reglen) != DDI_PROP_SUCCESS) {
-		cmn_err(CE_WARN, "asyprobe: \"reg\" property not found "
-		    "in devices property list");
-		goto probedone;
-	}
-
-	/* find I/O bus register property */
-
-	nregs = reglen / sizeof (struct reglist);
-	for (regnum = 0; regnum < nregs; regnum++) {
-		if (reglist[regnum].bustype == 1)
-			break;
-	}
-	if (regnum >= nregs) {
-		DEBUGCONT1(ASY_DEBUG_INIT,
-		    "asy%dprobe: No I/O register property", instance);
-		goto probedone;
-	}
-
-	if (reglist[regnum].size < 8) {	/* not enough registers for a UART */
-		DEBUGCONT1(ASY_DEBUG_INIT,
-		    "asy%dprobe: Invalid I/O register property", instance);
-		goto probedone;
-	}
-
-	ret = DDI_PROBE_DONTCARE;	/* OK, looks like it might be usable */
-
-probedone:
-	if (reglist != NULL)
-		kmem_free(reglist, reglen);
-
-	DEBUGCONT2(ASY_DEBUG_INIT, "asy%dprobe: ret=%s\n", instance,
-	    ret == DDI_PROBE_DONTCARE ? "DDI_PROBE_DONTCARE" :
-	    "DDI_PROBE_FAILURE");
-
-	return (ret);
+	return ((asy_get_io_regnum(devi, NULL) < 0) ?
+	    DDI_PROBE_FAILURE : DDI_PROBE_DONTCARE);
 }
 
 static int
@@ -518,7 +602,7 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	int regnum = 0;
 	int i;
 	struct asycom *asy;
-	char name[40];
+	char name[ASY_MINOR_LEN];
 	int status;
 	static ddi_device_acc_attr_t ioattr = {
 		DDI_DEVICE_ATTR_V0,
@@ -541,44 +625,7 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		max_asy_instance = instance;
 	mutex_exit(&asy_glob_lock);
 
-	/*CSTYLED*/
-	{
-		int reglen, nregs;
-		int i;
-		struct {
-			uint_t bustype;
-			int base;
-			int size;
-		} *reglist;
-
-		/* new probe */
-		if (ddi_getlongprop(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
-		    "reg", (caddr_t)&reglist, &reglen) != DDI_PROP_SUCCESS) {
-			cmn_err(CE_WARN, "asyattach: reg property not found "
-				"in devices property list");
-			asy_soft_state_free(asy);
-			return (DDI_PROBE_FAILURE);
-		}
-		regnum = -1;
-		nregs = reglen / sizeof (*reglist);
-		for (i = 0; i < nregs; i++) {
-			switch (reglist[i].bustype) {
-			case 1:			/* I/O bus reg property */
-				if (regnum == -1) /* only use the first one */
-					regnum = i;
-				break;
-
-			case pnpMTS0219:	/* Multitech MT5634ZTX modem */
-				/* Venus chipset can't do loopback test */
-				asy->asy_flags2 |= ASY2_NO_LOOPBACK;
-				break;
-
-			default:
-				break;
-			}
-		}
-		kmem_free(reglist, reglen);
-	}
+	regnum = asy_get_io_regnum(devi, asy);
 
 	if (regnum < 0 ||
 	    ddi_regs_map_setup(devi, regnum, (caddr_t *)&asy->asy_ioaddr,
@@ -818,10 +865,10 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		name[1] = '\0';
 	} else {
 		/*
-		 * ISA port which isn't a standard DOS COM
-		 * port needs no further qualification.
+		 * asy port which isn't a standard DOS COM
+		 * port gets a numeric name based on instance
 		 */
-		name[0] = '\0';
+		(void) snprintf(name, ASY_MINOR_LEN, "%d", instance);
 	}
 	status = ddi_create_minor_node(devi, name, S_IFCHR, instance,
 	    asy->asy_com_port != 0 ? DDI_NT_SERIAL_MB : DDI_NT_SERIAL, NULL);

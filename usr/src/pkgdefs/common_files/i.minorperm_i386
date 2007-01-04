@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -157,6 +157,8 @@ elx:*
 win:*
 cmtp:*
 profile:profile
+asy:[a-z]
+asy:[a-z],cu
 EOF
 }
 
@@ -269,6 +271,8 @@ systrace:systrace
 lx_ptm:lx_ptmajor
 lx_systrace:*
 physmem:*
+asy:*
+asy:*,cu
 EOF
 }
 

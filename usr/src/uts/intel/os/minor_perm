@@ -80,8 +80,8 @@ sysmsg:msglog 0600 root sys
 sysmsg:sysmsg 0600 root sys
 systrace:systrace 0644 root sys
 winlock:* 0666 root sys
-asy:[a-z] 0666 root sys
-asy:[a-z],cu 0600 uucp uucp
+asy:* 0666 root sys
+asy:*,cu 0600 uucp uucp
 tl:* 0666 root sys
 md:* 0640 root sys
 md:admin 644 root sys
