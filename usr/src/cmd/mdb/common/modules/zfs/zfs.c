@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,7 +171,8 @@ freelist_walk_step(mdb_walk_state_t *wsp)
 {
 	uint64_t entry;
 	uintptr_t number = (uintptr_t)wsp->walk_data;
-	char *ddata[] = { "ALLOC", "FREE", "CONDENSE", "INVALID" };
+	char *ddata[] = { "ALLOC", "FREE", "CONDENSE", "INVALID",
+			    "INVALID", "INVALID", "INVALID", "INVALID" };
 	int mapshift = SPA_MINBLOCKSHIFT;
 
 	if (mdb_vread(&entry, sizeof (entry), wsp->walk_addr) == -1) {

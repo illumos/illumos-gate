@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -373,7 +373,8 @@ dump_spacemap(objset_t *os, space_map_obj_t *smo, space_map_t *sm)
 	uint64_t alloc, offset, entry;
 	uint8_t mapshift = sm->sm_shift;
 	uint64_t mapstart = sm->sm_start;
-	char *ddata[] = { "ALLOC", "FREE", "CONDENSE", "INVALID" };
+	char *ddata[] = { "ALLOC", "FREE", "CONDENSE", "INVALID",
+			    "INVALID", "INVALID", "INVALID", "INVALID" };
 
 	if (smo->smo_object == 0)
 		return;
