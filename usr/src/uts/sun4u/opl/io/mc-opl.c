@@ -1695,6 +1695,7 @@ mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
 	bzero(&flt_stat, 2 * sizeof (mc_flt_stat_t));
 	bzero(&mi_flt_stat, 2 * sizeof (mc_flt_stat_t));
 
+
 	mc_aflt.mflt_mcp = mcp;
 	mc_aflt.mflt_id = gethrtime();
 
@@ -3523,11 +3524,17 @@ mc_prepare_dimmlist(board_dimm_info_t *bd_dimmp)
 
 		d = (mc_dimm_info_t *)kmem_alloc(sizeof (mc_dimm_info_t),
 		    KM_SLEEP);
-		snprintf(d->md_dimmname, dnamesz + 1, "%s", dimm_name);
+
+		bcopy(dimm_name, d->md_dimmname, dnamesz);
+		d->md_dimmname[dnamesz] = 0;
+
 		serial = dimm_name + dnamesz;
-		snprintf(d->md_serial, sersz + 1, "%s", serial);
+		bcopy(serial, d->md_serial, sersz);
+		d->md_serial[sersz] = 0;
+
 		part = serial + sersz;
-		snprintf(d->md_partnum, partsz + 1, "%s", part);
+		bcopy(part, d->md_partnum, partsz);
+		d->md_partnum[partsz] = 0;
 
 		d->md_next = dimm_list;
 		dimm_list = d;
@@ -3546,11 +3553,17 @@ mc_dump_dimm(char *buf, int dnamesz, int serialsz, int partnumsz)
 	char *b;
 
 	b = buf;
-	snprintf(dname, dnamesz + 1, "%s", b);
+	bcopy(b, dname, dnamesz);
+	dname[dnamesz] = 0;
+
 	b += dnamesz;
-	snprintf(serial, serialsz + 1, "%s", b);
+	bcopy(b, serial, serialsz);
+	serial[serialsz] = 0;
+
 	b += serialsz;
-	snprintf(part, partnumsz + 1, "%s", b);
+	bcopy(b, part, partnumsz);
+	part[partnumsz] = 0;
+
 	printf("DIMM=%s  Serial=%s PartNum=%s\n", dname, serial, part);
 }
 
