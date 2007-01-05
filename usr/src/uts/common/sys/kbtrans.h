@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,10 +41,10 @@ extern "C" {
 #include <sys/consdev.h>
 
 /*
- * By default, set conskbd's layout to US
+ * The default value (0) indicates that the keyboard layout isn't
+ * configured in kernel.
  */
-#define	KBTRANS_USBKB_LAYOUT_US		0x21
-#define	KBTRANS_USBKB_DEFAULT_LAYOUT	KBTRANS_USBKB_LAYOUT_US
+#define	KBTRANS_USBKB_DEFAULT_LAYOUT	0
 
 /*
  * Maximum of keys in a keyboard
