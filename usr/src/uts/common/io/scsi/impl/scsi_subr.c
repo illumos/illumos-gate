@@ -20,13 +20,14 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/scsi/scsi.h>
+#include <sys/file.h>
 
 /*
  * Utility SCSI routines
@@ -37,6 +38,7 @@
  */
 
 extern uintptr_t scsi_callback_id;
+extern uchar_t	scsi_cdb_size[];
 
 /*
  * Common buffer for scsi_log
@@ -1878,4 +1880,427 @@ scsi_validate_descr(struct scsi_descr_sense_hdr *sdsp,
 	}
 
 	return (DESCR_GOOD);
+}
+
+/*
+ * Internal data structure for handling uscsi command.
+ */
+typedef	struct	uscsi_i_cmd {
+	struct uscsi_cmd	uic_cmd;
+	caddr_t			uic_rqbuf;
+	uchar_t			uic_rqlen;
+	caddr_t			uic_cdb;
+	int			uic_flag;
+	struct scsi_address	*uic_ap;
+} uscsi_i_cmd_t;
+
+#if !defined(lint)
+_NOTE(SCHEME_PROTECTS_DATA("unshared data", uscsi_i_cmd))
+#endif
+
+/*ARGSUSED*/
+static void
+scsi_uscsi_mincnt(struct buf *bp)
+{
+	/*
+	 * Do not break up because the CDB count would then be
+	 * incorrect and create spurious data underrun errors.
+	 */
+}
+
+/*
+ *    Function: scsi_uscsi_alloc_and_copyin
+ *
+ * Description: Target drivers call this function to allocate memeory,
+ *    copy in, and convert ILP32/LP64 to make preparations for handling
+ *    uscsi commands.
+ *
+ *   Arguments: arg - pointer to the caller's uscsi command struct
+ *    flag      - mode, corresponds to ioctl(9e) 'mode'
+ *    ap        - SCSI address structure
+ *    uscmdp    - pointer to the converted uscsi command
+ *
+ * Return code: 0
+ *    EFAULT
+ *    EINVAL
+ *
+ *     Context: Never called at interrupt context.
+ */
+
+int
+scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
+    struct uscsi_cmd **uscmdp)
+{
+#ifdef _MULTI_DATAMODEL
+	/*
+	 * For use when a 32 bit app makes a call into a
+	 * 64 bit ioctl
+	 */
+	struct uscsi_cmd32	uscsi_cmd_32_for_64;
+	struct uscsi_cmd32	*ucmd32 = &uscsi_cmd_32_for_64;
+#endif /* _MULTI_DATAMODEL */
+	struct uscsi_i_cmd	*uicmd;
+	struct uscsi_cmd	*uscmd;
+	int	max_hba_cdb;
+	int	rval;
+
+	/*
+	 * In order to not worry about where the uscsi structure came
+	 * from (or where the cdb it points to came from) we're going
+	 * to make kmem_alloc'd copies of them here. This will also
+	 * allow reference to the data they contain long after this
+	 * process has gone to sleep and its kernel stack has been
+	 * unmapped, etc. First get some memory for the uscsi_cmd
+	 * struct and copy the contents of the given uscsi_cmd struct
+	 * into it. We also save infos of the uscsi command by using
+	 * uicmd to supply referrence for the copyout operation.
+	 */
+	uicmd = (struct uscsi_i_cmd *)
+	    kmem_zalloc(sizeof (struct uscsi_i_cmd), KM_SLEEP);
+	*uscmdp = &(uicmd->uic_cmd);
+	uscmd = *uscmdp;
+
+#ifdef _MULTI_DATAMODEL
+	switch (ddi_model_convert_from(flag & FMODELS)) {
+	case DDI_MODEL_ILP32:
+		if (ddi_copyin((void *)arg, ucmd32, sizeof (*ucmd32), flag)) {
+			rval = EFAULT;
+			goto done;
+		}
+		/*
+		 * Convert the ILP32 uscsi data from the
+		 * application to LP64 for internal use.
+		 */
+		uscsi_cmd32touscsi_cmd(ucmd32, uscmd);
+		break;
+	case DDI_MODEL_NONE:
+		if (ddi_copyin((void *)arg, uscmd, sizeof (*uscmd), flag)) {
+			rval = EFAULT;
+			goto done;
+		}
+		break;
+	}
+#else /* ! _MULTI_DATAMODEL */
+	if (ddi_copyin((void *)arg, uscmd, sizeof (*uscmd), flag)) {
+		rval = EFAULT;
+		goto done;
+	}
+#endif /* _MULTI_DATAMODEL */
+
+	uicmd->uic_rqbuf = uscmd->uscsi_rqbuf;
+	uicmd->uic_rqlen = uscmd->uscsi_rqlen;
+	uicmd->uic_cdb   = uscmd->uscsi_cdb;
+	uicmd->uic_flag  = flag;
+	uicmd->uic_ap    = ap;
+
+	/*
+	 * Skip the following steps if we meet RESET commands.
+	 */
+	if (uscmd->uscsi_flags &
+	    (USCSI_RESET_LUN | USCSI_RESET_TARGET | USCSI_RESET_ALL)) {
+		uscmd->uscsi_rqbuf = NULL;
+		uscmd->uscsi_cdb = NULL;
+		return (0);
+	}
+
+	/*
+	 * Perfunctory sanity checks. Get the maximum hba supported
+	 * cdb length first.
+	 */
+	max_hba_cdb = scsi_ifgetcap(ap, "max-cdb-length", 1);
+	if (max_hba_cdb < CDB_GROUP0) {
+		max_hba_cdb = CDB_GROUP4;
+	}
+	if (uscmd->uscsi_cdblen < CDB_GROUP0 ||
+	    uscmd->uscsi_cdblen > max_hba_cdb) {
+		rval = EINVAL;
+		goto done;
+	}
+	if ((uscmd->uscsi_flags & USCSI_RQENABLE) &&
+	    (uscmd->uscsi_rqlen == 0 || uscmd->uscsi_rqbuf == NULL)) {
+		rval = EINVAL;
+		goto done;
+	}
+
+	/*
+	 * Now we get some space for the CDB, and copy the given CDB into
+	 * it. Use ddi_copyin() in case the data is in user space.
+	 */
+	uscmd->uscsi_cdb = kmem_zalloc((size_t)uscmd->uscsi_cdblen, KM_SLEEP);
+	if (ddi_copyin(uicmd->uic_cdb, uscmd->uscsi_cdb,
+	    (uint_t)uscmd->uscsi_cdblen, flag) != 0) {
+		kmem_free(uscmd->uscsi_cdb, (size_t)uscmd->uscsi_cdblen);
+		rval = EFAULT;
+		goto done;
+	}
+
+	/*
+	 * If the length of the CDB is greater than 16 bytes, it must be
+	 * a variable length CDB (i.e. the opcode must be 0x7f).
+	 */
+	if (uscmd->uscsi_cdblen > SCSI_CDB_SIZE &&
+	    uscmd->uscsi_cdb[0] != SCMD_VAR_LEN) {
+		kmem_free(uscmd->uscsi_cdb, (size_t)uscmd->uscsi_cdblen);
+		rval = EINVAL;
+		goto done;
+	}
+
+	/*
+	 * Initialize Request Sense buffering, if requested.
+	 */
+	if (uscmd->uscsi_flags & USCSI_RQENABLE) {
+		/*
+		 * Here uscmd->uscsi_rqbuf currently points to the caller's
+		 * buffer, but we replace this with a kernel buffer that
+		 * we allocate to use with the sense data. The sense data
+		 * (if present) gets copied into this new buffer before the
+		 * command is completed.  Then we copy the sense data from
+		 * our allocated buf into the caller's buffer below. Note
+		 * that uscmd->uscsi_rqbuf and uscmd->uscsi_rqlen are used
+		 * below to perform the copy back to the caller's buf.
+		 */
+		uscmd->uscsi_rqlen = min(SENSE_LENGTH, uscmd->uscsi_rqlen);
+		uscmd->uscsi_rqbuf = kmem_zalloc(uscmd->uscsi_rqlen, KM_SLEEP);
+		uscmd->uscsi_rqresid = uscmd->uscsi_rqlen;
+	} else {
+		uscmd->uscsi_rqbuf = NULL;
+		uscmd->uscsi_rqlen = 0;
+		uscmd->uscsi_rqresid = 0;
+	}
+	return (0);
+
+done:
+	kmem_free(uicmd, sizeof (struct uscsi_i_cmd));
+	return (rval);
+}
+
+/*
+ *    Function: scsi_uscsi_handle_cmd
+ *
+ * Description: Target drivers call this function to handle uscsi commands.
+ *
+ *   Arguments: dev - device number
+ *    dataspace     - UIO_USERSPACE or UIO_SYSSPACE
+ *    uscmd         - pointer to the converted uscsi command
+ *    strat         - pointer to the driver's strategy routine
+ *    bp            - buf struct ptr
+ *    private_data  - pointer to bp->b_private
+ *
+ * Return code: 0
+ *    EIO      - scsi_reset() failed, or see biowait()/physio() codes.
+ *    EINVAL
+ *    return code of biowait(9F) or physio(9F):
+ *      EIO    - IO error
+ *      ENXIO
+ *      EACCES - reservation conflict
+ *
+ *     Context: Never called at interrupt context.
+ */
+
+int
+scsi_uscsi_handle_cmd(dev_t dev, enum uio_seg dataspace,
+    struct uscsi_cmd *uscmd, int (*strat)(struct buf *),
+    struct buf *bp, void *private_data)
+{
+	struct uscsi_i_cmd	*uicmd = (struct uscsi_i_cmd *)uscmd;
+	int	bp_alloc_flag = 0;
+	int	rval;
+
+	/*
+	 * Perform resets directly; no need to generate a command to do it.
+	 */
+	if (uscmd->uscsi_flags &
+	    (USCSI_RESET_LUN | USCSI_RESET_TARGET | USCSI_RESET_ALL)) {
+		int flags = (uscmd->uscsi_flags & USCSI_RESET_ALL) ?
+		    RESET_ALL : ((uscmd->uscsi_flags & USCSI_RESET_TARGET) ?
+		    RESET_TARGET : RESET_LUN);
+		if (scsi_reset(uicmd->uic_ap, flags) == 0) {
+			/* Reset attempt was unsuccessful */
+			return (EIO);
+		}
+		return (0);
+	}
+
+	/*
+	 * Force asynchronous mode, if necessary.  Doing this here
+	 * has the unfortunate effect of running other queued
+	 * commands async also, but since the main purpose of this
+	 * capability is downloading new drive firmware, we can
+	 * probably live with it.
+	 */
+	if (uscmd->uscsi_flags & USCSI_ASYNC) {
+		if (scsi_ifgetcap(uicmd->uic_ap, "synchronous", 1) == 1) {
+			if (scsi_ifsetcap(uicmd->uic_ap, "synchronous",
+			    0, 1) != 1) {
+				return (EINVAL);
+			}
+		}
+	}
+
+	/*
+	 * Re-enable synchronous mode, if requested.
+	 */
+	if (uscmd->uscsi_flags & USCSI_SYNC) {
+		if (scsi_ifgetcap(uicmd->uic_ap, "synchronous", 1) == 0) {
+			rval = scsi_ifsetcap(uicmd->uic_ap, "synchronous",
+			    1, 1);
+		}
+	}
+
+	/*
+	 * If bp is NULL, allocate space here.
+	 */
+	if (bp == NULL) {
+		bp = getrbuf(KM_SLEEP);
+		bp->b_private = private_data;
+		bp_alloc_flag = 1;
+	}
+
+	/*
+	 * If we're going to do actual I/O, let physio do all the right things.
+	 */
+	if (uscmd->uscsi_buflen != 0) {
+		struct iovec	aiov;
+		struct uio	auio;
+		struct uio	*uio = &auio;
+
+		bzero(&auio, sizeof (struct uio));
+		bzero(&aiov, sizeof (struct iovec));
+		aiov.iov_base = uscmd->uscsi_bufaddr;
+		aiov.iov_len  = uscmd->uscsi_buflen;
+		uio->uio_iov  = &aiov;
+
+		uio->uio_iovcnt  = 1;
+		uio->uio_resid   = uscmd->uscsi_buflen;
+		uio->uio_segflg  = dataspace;
+
+		/*
+		 * physio() will block here until the command completes....
+		 */
+		rval = physio(strat, bp, dev,
+		    ((uscmd->uscsi_flags & USCSI_READ) ? B_READ : B_WRITE),
+		    scsi_uscsi_mincnt, uio);
+	} else {
+		/*
+		 * We have to mimic that physio would do here! Argh!
+		 */
+		bp->b_flags  = B_BUSY |
+		    ((uscmd->uscsi_flags & USCSI_READ) ? B_READ : B_WRITE);
+		bp->b_edev   = dev;
+		bp->b_dev    = cmpdev(dev);	/* maybe unnecessary? */
+		bp->b_bcount = 0;
+		bp->b_blkno  = 0;
+		bp->b_resid  = 0;
+
+		(void) (*strat)(bp);
+		rval = biowait(bp);
+	}
+	uscmd->uscsi_resid = bp->b_resid;
+
+	if (bp_alloc_flag == 1) {
+		bp_mapout(bp);
+		freerbuf(bp);
+	}
+
+	return (rval);
+}
+
+/*
+ *    Function: scsi_uscsi_copyout_and_free
+ *
+ * Description: Target drivers call this function to undo what was done by
+ *    scsi_uscsi_alloc_and_copyin.
+ *
+ *   Arguments: arg - pointer to the uscsi command to be returned
+ *    uscmd     - pointer to the converted uscsi command
+ *
+ * Return code: 0
+ *    EFAULT
+ *
+ *     Context: Never called at interrupt context.
+ */
+
+int
+scsi_uscsi_copyout_and_free(intptr_t arg, struct uscsi_cmd *uscmd)
+{
+#ifdef _MULTI_DATAMODEL
+	/*
+	 * For use when a 32 bit app makes a call into a
+	 * 64 bit ioctl.
+	 */
+	struct uscsi_cmd32	uscsi_cmd_32_for_64;
+	struct uscsi_cmd32	*ucmd32 = &uscsi_cmd_32_for_64;
+#endif /* _MULTI_DATAMODEL */
+	struct uscsi_i_cmd	*uicmd = (struct uscsi_i_cmd *)uscmd;
+	caddr_t	k_rqbuf;
+	uchar_t	k_rqlen;
+	caddr_t	k_cdb;
+	int	rval = 0;
+
+	/*
+	 * If the caller wants sense data, copy back whatever sense data
+	 * we may have gotten, and update the relevant rqsense info.
+	 */
+	if ((uscmd->uscsi_flags & USCSI_RQENABLE) &&
+	    (uscmd->uscsi_rqbuf != NULL)) {
+		int rqlen = uscmd->uscsi_rqlen - uscmd->uscsi_rqresid;
+		rqlen = min(((int)uicmd->uic_rqlen), rqlen);
+		uscmd->uscsi_rqresid = uicmd->uic_rqlen - rqlen;
+		/*
+		 * Copy out the sense data for user process.
+		 */
+		if ((uicmd->uic_rqbuf != NULL) && (rqlen != 0)) {
+			if (ddi_copyout(uscmd->uscsi_rqbuf,
+			    uicmd->uic_rqbuf, rqlen, uicmd->uic_flag) != 0) {
+				rval = EFAULT;
+			}
+		}
+	}
+
+	/*
+	 * Free allocated resources and return, mapout the buf in case it was
+	 * mapped in by a lower layer.
+	 */
+	k_rqbuf = uscmd->uscsi_rqbuf;
+	k_rqlen = uscmd->uscsi_rqlen;
+	k_cdb   = uscmd->uscsi_cdb;
+	uscmd->uscsi_rqbuf = uicmd->uic_rqbuf;
+	uscmd->uscsi_rqlen = uicmd->uic_rqlen;
+	uscmd->uscsi_cdb   = uicmd->uic_cdb;
+
+#ifdef _MULTI_DATAMODEL
+	switch (ddi_model_convert_from(uicmd->uic_flag & FMODELS)) {
+	case DDI_MODEL_ILP32:
+		/*
+		 * Convert back to ILP32 before copyout to the
+		 * application
+		 */
+		uscsi_cmdtouscsi_cmd32(uscmd, ucmd32);
+		if (ddi_copyout(ucmd32, (void *)arg, sizeof (*ucmd32),
+		    uicmd->uic_flag)) {
+			rval = EFAULT;
+		}
+		break;
+	case DDI_MODEL_NONE:
+		if (ddi_copyout(uscmd, (void *)arg, sizeof (*uscmd),
+		    uicmd->uic_flag)) {
+			rval = EFAULT;
+		}
+		break;
+	}
+#else /* _MULTI_DATAMODE */
+	if (ddi_copyout(uscmd, (void *)arg, sizeof (*uscmd), uicmd->uic_flag)) {
+		rval = EFAULT;
+	}
+#endif /* _MULTI_DATAMODE */
+
+	if (k_rqbuf != NULL) {
+		kmem_free(k_rqbuf, k_rqlen);
+	}
+	if (k_cdb != NULL) {
+		kmem_free(k_cdb, (size_t)uscmd->uscsi_cdblen);
+	}
+	kmem_free(uicmd, sizeof (struct uscsi_i_cmd));
+
+	return (rval);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,6 @@
 #include <sys/sysmacros.h>
 
 #include <sys/cdio.h>
-#include <sys/dktp/cm.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/scsi/generic/sense.h>
 #include <sys/scsi/impl/uscsi.h>	/* Needed for defn of USCSICMD ioctl */

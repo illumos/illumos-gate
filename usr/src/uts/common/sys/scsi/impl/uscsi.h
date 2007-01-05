@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,7 +117,9 @@ struct uscsi_cmd32 {
 #define	USCSI_DIAGNOSE	0x00002	/* fail if any error occurs */
 #define	USCSI_ISOLATE	0x00004	/* isolate from normal commands */
 #define	USCSI_READ	0x00008	/* get data from device */
+#define	USCSI_RESET_LUN	0x40000	/* Reset logical unit */
 #define	USCSI_RESET	0x04000	/* Reset target */
+#define	USCSI_RESET_TARGET	USCSI_RESET	/* Reset target */
 #define	USCSI_RESET_ALL	0x08000	/* Reset all targets */
 #define	USCSI_RQENABLE	0x10000	/* Enable Request Sense extensions */
 #define	USCSI_RENEGOT	0x20000	/* renegotiate wide/sync on next I/O */
@@ -181,6 +182,19 @@ struct uscsi_rqs32	{
 #define	USCSIIOC	(0x04 << 8)
 #define	USCSICMD	(USCSIIOC|201) 	/* user scsi command */
 #define	USCSIGETRQS	(USCSIIOC|202) 	/* retrieve SCSI sense data */
+
+#ifdef	_KERNEL
+
+#include <sys/scsi/scsi_types.h>
+
+int	scsi_uscsi_alloc_and_copyin(intptr_t, int,
+	    struct scsi_address *, struct uscsi_cmd **);
+int	scsi_uscsi_handle_cmd(dev_t, enum uio_seg,
+	    struct uscsi_cmd *, int (*)(struct buf *),
+	    struct buf *, void *);
+int	scsi_uscsi_copyout_and_free(intptr_t, struct uscsi_cmd *);
+
+#endif	/* _KERNEL */
 
 #ifdef	__cplusplus
 }

@@ -37,8 +37,6 @@
 #include <sys/mhd.h>
 #include <sys/vtoc.h>
 #include <sys/dktp/fdisk.h>
-#include <sys/file.h>
-#include <sys/stat.h>
 #include <sys/kstat.h>
 #include <sys/vtrace.h>
 #include <sys/note.h>
@@ -1047,7 +1045,6 @@ static int sd_pm_idletime = 1;
 #define	sd_alloc_rqs			ssd_alloc_rqs
 #define	sd_free_rqs			ssd_free_rqs
 #define	sd_dump_memory			ssd_dump_memory
-#define	sd_uscsi_ioctl			ssd_uscsi_ioctl
 #define	sd_get_media_info		ssd_get_media_info
 #define	sd_dkio_ctrl_info		ssd_dkio_ctrl_info
 #define	sd_dkio_get_geometry		ssd_dkio_get_geometry
@@ -1360,9 +1357,8 @@ static void sd_add_buf_to_waitq(struct sd_lun *un, struct buf *bp);
 static void sdintr(struct scsi_pkt *pktp);
 static void sd_start_cmds(struct sd_lun *un, struct buf *immed_bp);
 
-static int sd_send_scsi_cmd(dev_t dev, struct uscsi_cmd *incmd,
-	enum uio_seg cdbspace, enum uio_seg dataspace, enum uio_seg rqbufspace,
-	int path_flag);
+static int sd_send_scsi_cmd(dev_t dev, struct uscsi_cmd *incmd, int flag,
+	enum uio_seg dataspace, int path_flag);
 
 static struct buf *sd_bioclone_alloc(struct buf *bp, size_t datalen,
 	daddr_t blkno, int (*func)(struct buf *));
@@ -1543,7 +1539,6 @@ static void sd_panic_for_res_conflict(struct sd_lun *un);
 /*
  * Disk Ioctl Function Prototypes
  */
-static int sd_uscsi_ioctl(dev_t dev, caddr_t arg, int flag);
 static int sd_get_media_info(dev_t dev, caddr_t arg, int flag);
 static int sd_dkio_ctrl_info(dev_t dev, caddr_t arg, int flag);
 static int sd_dkio_get_geometry(dev_t dev, caddr_t arg, int flag,
@@ -5584,7 +5579,7 @@ sd_use_efi(struct sd_lun *un, int path_flag)
 			if ((rval = sd_send_scsi_READ(un, buf, lbasize,
 			    cap - 1, (ISCD(un)) ? SD_PATH_DIRECT_PRIORITY :
 			    path_flag)) != 0) {
-					goto done_err;
+				goto done_err;
 			}
 			sd_swap_efi_gpt((efi_gpt_t *)buf);
 			if ((rval = sd_validate_efi((efi_gpt_t *)buf)) != 0)
@@ -12146,24 +12141,6 @@ sd_uscsi_strategy(struct buf *bp)
 	return (0);
 }
 
-
-/*
- * These routines perform raw i/o operations.
- */
-/*ARGSUSED*/
-static void
-sduscsimin(struct buf *bp)
-{
-	/*
-	 * do not break up because the CDB count would then
-	 * be incorrect and data underruns would result (incomplete
-	 * read/writes which would be retried and then failed, see
-	 * sdintr().
-	 */
-}
-
-
-
 /*
  *    Function: sd_send_scsi_cmd
  *
@@ -12172,38 +12149,35 @@ sduscsimin(struct buf *bp)
  *
  *   Arguments: dev - the dev_t for the device
  *		incmd - ptr to a valid uscsi_cmd struct
- *		cdbspace - UIO_USERSPACE or UIO_SYSSPACE
+ *		flag - bit flag, indicating open settings, 32/64 bit type
  *		dataspace - UIO_USERSPACE or UIO_SYSSPACE
- *		rqbufspace - UIO_USERSPACE or UIO_SYSSPACE
  *		path_flag - SD_PATH_DIRECT to use the USCSI "direct" chain and
  *			the normal command waitq, or SD_PATH_DIRECT_PRIORITY
  *			to use the USCSI "direct" chain and bypass the normal
  *			command waitq.
  *
  * Return Code: 0 -  successful completion of the given command
- *		EIO - scsi_reset() failed, or see biowait()/physio() codes.
+ *		EIO - scsi_uscsi_handle_command() failed
  *		ENXIO  - soft state not found for specified dev
  *		EINVAL
  *		EFAULT - copyin/copyout error
- *		return code of biowait(9F) or physio(9F):
- *			EIO - IO error, caller may check incmd->uscsi_status
+ *		return code of scsi_uscsi_handle_command():
+ *			EIO
  *			ENXIO
- *			EACCES - reservation conflict
+ *			EACCES
  *
  *     Context: Waits for command to complete. Can sleep.
  */
 
 static int
-sd_send_scsi_cmd(dev_t dev, struct uscsi_cmd *incmd,
-	enum uio_seg cdbspace, enum uio_seg dataspace, enum uio_seg rqbufspace,
-	int path_flag)
+sd_send_scsi_cmd(dev_t dev, struct uscsi_cmd *incmd, int flag,
+	enum uio_seg dataspace, int path_flag)
 {
 	struct sd_uscsi_info	*uip;
 	struct uscsi_cmd	*uscmd;
 	struct sd_lun	*un;
-	struct buf	*bp;
+	int	format = 0;
 	int	rval;
-	int	flags;
 
 	un = ddi_get_soft_state(sd_state, SDUNIT(dev));
 	if (un == NULL) {
@@ -12229,67 +12203,21 @@ sd_send_scsi_cmd(dev_t dev, struct uscsi_cmd *incmd,
 	}
 #endif
 
-	/*
-	 * Perform resets directly; no need to generate a command to do it.
-	 */
-	if (incmd->uscsi_flags & (USCSI_RESET | USCSI_RESET_ALL)) {
-		flags = ((incmd->uscsi_flags & USCSI_RESET_ALL) != 0) ?
-		    RESET_ALL : RESET_TARGET;
-		SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_cmd: Issuing reset\n");
-		if (scsi_reset(SD_ADDRESS(un), flags) == 0) {
-			/* Reset attempt was unsuccessful */
-			SD_TRACE(SD_LOG_IO, un,
-			    "sd_send_scsi_cmd: reset: failure\n");
-			return (EIO);
-		}
-		SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_cmd: reset: success\n");
-		return (0);
+	rval = scsi_uscsi_alloc_and_copyin((intptr_t)incmd, flag,
+	    SD_ADDRESS(un), &uscmd);
+	if (rval != 0) {
+		SD_TRACE(SD_LOG_IO, un, "sd_sense_scsi_cmd: "
+		    "scsi_uscsi_alloc_and_copyin failed\n", un);
+		return (rval);
 	}
 
-	/* Perfunctory sanity check... */
-	if (incmd->uscsi_cdblen <= 0) {
-		SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_cmd: "
-		    "invalid uscsi_cdblen, returning EINVAL\n");
-		return (EINVAL);
-	} else if (incmd->uscsi_cdblen > un->un_max_hba_cdb) {
-		SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_cmd: "
-		    "unsupported uscsi_cdblen, returning EINVAL\n");
-		return (EINVAL);
+	if ((uscmd->uscsi_cdb != NULL) &&
+	    (uscmd->uscsi_cdb[0] == SCMD_FORMAT)) {
+		mutex_enter(SD_MUTEX(un));
+		un->un_f_format_in_progress = TRUE;
+		mutex_exit(SD_MUTEX(un));
+		format = 1;
 	}
-
-	/*
-	 * In order to not worry about where the uscsi structure came from
-	 * (or where the cdb it points to came from) we're going to make
-	 * kmem_alloc'd copies of them here. This will also allow reference
-	 * to the data they contain long after this process has gone to
-	 * sleep and its kernel stack has been unmapped, etc.
-	 *
-	 * First get some memory for the uscsi_cmd struct and copy the
-	 * contents of the given uscsi_cmd struct into it.
-	 */
-	uscmd = kmem_zalloc(sizeof (struct uscsi_cmd), KM_SLEEP);
-	bcopy(incmd, uscmd, sizeof (struct uscsi_cmd));
-
-	SD_DUMP_MEMORY(un, SD_LOG_IO, "sd_send_scsi_cmd: uscsi_cmd",
-	    (uchar_t *)uscmd, sizeof (struct uscsi_cmd), SD_LOG_HEX);
-
-	/*
-	 * Now get some space for the CDB, and copy the given CDB into
-	 * it. Use ddi_copyin() in case the data is in user space.
-	 */
-	uscmd->uscsi_cdb = kmem_zalloc((size_t)incmd->uscsi_cdblen, KM_SLEEP);
-	flags = (cdbspace == UIO_SYSSPACE) ? FKIOCTL : 0;
-	if (ddi_copyin(incmd->uscsi_cdb, uscmd->uscsi_cdb,
-	    (uint_t)incmd->uscsi_cdblen, flags) != 0) {
-		kmem_free(uscmd->uscsi_cdb, (size_t)incmd->uscsi_cdblen);
-		kmem_free(uscmd, sizeof (struct uscsi_cmd));
-		return (EFAULT);
-	}
-
-	SD_DUMP_MEMORY(un, SD_LOG_IO, "sd_send_scsi_cmd: CDB",
-	    (uchar_t *)uscmd->uscsi_cdb, incmd->uscsi_cdblen, SD_LOG_HEX);
-
-	bp = getrbuf(KM_SLEEP);
 
 	/*
 	 * Allocate an sd_uscsi_info struct and fill it with the info
@@ -12301,81 +12229,7 @@ sd_send_scsi_cmd(dev_t dev, struct uscsi_cmd *incmd,
 	 */
 	uip = kmem_zalloc(sizeof (struct sd_uscsi_info), KM_SLEEP);
 	uip->ui_flags = path_flag;
-	uip->ui_cmdp  = uscmd;
-	bp->b_private = uip;
-
-	/*
-	 * Initialize Request Sense buffering, if requested.
-	 */
-	if (((uscmd->uscsi_flags & USCSI_RQENABLE) != 0) &&
-	    (uscmd->uscsi_rqlen != 0) && (uscmd->uscsi_rqbuf != NULL)) {
-		/*
-		 * Here uscmd->uscsi_rqbuf currently points to the caller's
-		 * buffer, but we replace this with a kernel buffer that
-		 * we allocate to use with the sense data. The sense data
-		 * (if present) gets copied into this new buffer before the
-		 * command is completed.  Then we copy the sense data from
-		 * our allocated buf into the caller's buffer below. Note
-		 * that incmd->uscsi_rqbuf and incmd->uscsi_rqlen are used
-		 * below to perform the copy back to the caller's buf.
-		 */
-		uscmd->uscsi_rqbuf = kmem_zalloc(SENSE_LENGTH, KM_SLEEP);
-		if (rqbufspace == UIO_USERSPACE) {
-			uscmd->uscsi_rqlen   = SENSE_LENGTH;
-			uscmd->uscsi_rqresid = SENSE_LENGTH;
-		} else {
-			uchar_t rlen = min(SENSE_LENGTH, uscmd->uscsi_rqlen);
-			uscmd->uscsi_rqlen   = rlen;
-			uscmd->uscsi_rqresid = rlen;
-		}
-	} else {
-		uscmd->uscsi_rqbuf = NULL;
-		uscmd->uscsi_rqlen   = 0;
-		uscmd->uscsi_rqresid = 0;
-	}
-
-	SD_INFO(SD_LOG_IO, un, "sd_send_scsi_cmd: rqbuf:0x%p  rqlen:%d\n",
-	    uscmd->uscsi_rqbuf, uscmd->uscsi_rqlen);
-
-	if (un->un_f_is_fibre == FALSE) {
-		/*
-		 * Force asynchronous mode, if necessary.  Doing this here
-		 * has the unfortunate effect of running other queued
-		 * commands async also, but since the main purpose of this
-		 * capability is downloading new drive firmware, we can
-		 * probably live with it.
-		 */
-		if ((uscmd->uscsi_flags & USCSI_ASYNC) != 0) {
-			if (scsi_ifgetcap(SD_ADDRESS(un), "synchronous", 1)
-				== 1) {
-				if (scsi_ifsetcap(SD_ADDRESS(un),
-					    "synchronous", 0, 1) == 1) {
-					SD_TRACE(SD_LOG_IO, un,
-					"sd_send_scsi_cmd: forced async ok\n");
-				} else {
-					SD_TRACE(SD_LOG_IO, un,
-					"sd_send_scsi_cmd:\
-					forced async failed\n");
-					rval = EINVAL;
-					goto done;
-				}
-			}
-		}
-
-		/*
-		 * Re-enable synchronous mode, if requested
-		 */
-		if (uscmd->uscsi_flags & USCSI_SYNC) {
-			if (scsi_ifgetcap(SD_ADDRESS(un), "synchronous", 1)
-				== 0) {
-				int i = scsi_ifsetcap(SD_ADDRESS(un),
-						"synchronous", 1, 1);
-				SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_cmd: "
-					"re-enabled sync %s\n",
-					(i == 1) ? "ok" : "failed");
-			}
-		}
-	}
+	uip->ui_cmdp = uscmd;
 
 	/*
 	 * Commands sent with priority are intended for error recovery
@@ -12384,62 +12238,10 @@ sd_send_scsi_cmd(dev_t dev, struct uscsi_cmd *incmd,
 	if (path_flag == SD_PATH_DIRECT_PRIORITY) {
 		uscmd->uscsi_flags |= USCSI_DIAGNOSE;
 	}
+	uscmd->uscsi_flags &= ~USCSI_NOINTR;
 
-	/*
-	 * If we're going to do actual I/O, let physio do all the right things
-	 */
-	if (uscmd->uscsi_buflen != 0) {
-		struct iovec	aiov;
-		struct uio	auio;
-		struct uio	*uio = &auio;
-
-		bzero(&auio, sizeof (struct uio));
-		bzero(&aiov, sizeof (struct iovec));
-		aiov.iov_base = uscmd->uscsi_bufaddr;
-		aiov.iov_len  = uscmd->uscsi_buflen;
-		uio->uio_iov  = &aiov;
-
-		uio->uio_iovcnt  = 1;
-		uio->uio_resid   = uscmd->uscsi_buflen;
-		uio->uio_segflg  = dataspace;
-
-		/*
-		 * physio() will block here until the command completes....
-		 */
-		SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_cmd: calling physio.\n");
-
-		rval = physio(sd_uscsi_strategy, bp, dev,
-		    ((uscmd->uscsi_flags & USCSI_READ) ? B_READ : B_WRITE),
-		    sduscsimin, uio);
-
-		SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_cmd: "
-		    "returned from physio with 0x%x\n", rval);
-
-	} else {
-		/*
-		 * We have to mimic what physio would do here! Argh!
-		 */
-		bp->b_flags  = B_BUSY |
-		    ((uscmd->uscsi_flags & USCSI_READ) ? B_READ : B_WRITE);
-		bp->b_edev   = dev;
-		bp->b_dev    = cmpdev(dev);	/* maybe unnecessary? */
-		bp->b_bcount = 0;
-		bp->b_blkno  = 0;
-
-		SD_TRACE(SD_LOG_IO, un,
-		    "sd_send_scsi_cmd: calling sd_uscsi_strategy...\n");
-
-		(void) sd_uscsi_strategy(bp);
-
-		SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_cmd: calling biowait\n");
-
-		rval = biowait(bp);
-
-		SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_cmd: "
-		    "returned from  biowait with 0x%x\n", rval);
-	}
-
-done:
+	rval = scsi_uscsi_handle_cmd(dev, dataspace, uscmd,
+	    sd_uscsi_strategy, NULL, uip);
 
 #ifdef SDDEBUG
 	SD_INFO(SD_LOG_IO, un, "sd_send_scsi_cmd: "
@@ -12457,64 +12259,14 @@ done:
 	}
 #endif
 
-	/*
-	 * Get the status and residual to return to the caller.
-	 */
-	incmd->uscsi_status = uscmd->uscsi_status;
-	incmd->uscsi_resid  = uscmd->uscsi_resid;
-
-	/*
-	 * If the caller wants sense data, copy back whatever sense data
-	 * we may have gotten, and update the relevant rqsense info.
-	 */
-	if (((uscmd->uscsi_flags & USCSI_RQENABLE) != 0) &&
-	    (uscmd->uscsi_rqlen != 0) && (uscmd->uscsi_rqbuf != NULL)) {
-
-		int rqlen = uscmd->uscsi_rqlen - uscmd->uscsi_rqresid;
-		rqlen = min(((int)incmd->uscsi_rqlen), rqlen);
-
-		/* Update the Request Sense status and resid */
-		incmd->uscsi_rqresid  = incmd->uscsi_rqlen - rqlen;
-		incmd->uscsi_rqstatus = uscmd->uscsi_rqstatus;
-
-		SD_INFO(SD_LOG_IO, un, "sd_send_scsi_cmd: "
-		    "uscsi_rqstatus: 0x%02x  uscsi_rqresid:0x%x\n",
-		    incmd->uscsi_rqstatus, incmd->uscsi_rqresid);
-
-		/* Copy out the sense data for user processes */
-		if ((incmd->uscsi_rqbuf != NULL) && (rqlen != 0)) {
-			int flags =
-			    (rqbufspace == UIO_USERSPACE) ? 0 : FKIOCTL;
-			if (ddi_copyout(uscmd->uscsi_rqbuf, incmd->uscsi_rqbuf,
-			    rqlen, flags) != 0) {
-				rval = EFAULT;
-			}
-			/*
-			 * Note: Can't touch incmd->uscsi_rqbuf so use
-			 * uscmd->uscsi_rqbuf instead. They're the same.
-			 */
-			SD_INFO(SD_LOG_IO, un, "sd_send_scsi_cmd: "
-			    "incmd->uscsi_rqbuf: 0x%p  rqlen:%d\n",
-			    incmd->uscsi_rqbuf, rqlen);
-			SD_DUMP_MEMORY(un, SD_LOG_IO, "rq",
-			    (uchar_t *)uscmd->uscsi_rqbuf, rqlen, SD_LOG_HEX);
-		}
+	if (format == 1) {
+		mutex_enter(SD_MUTEX(un));
+		un->un_f_format_in_progress = FALSE;
+		mutex_exit(SD_MUTEX(un));
 	}
 
-	/*
-	 * Free allocated resources and return; mapout the buf in case it was
-	 * mapped in by a lower layer.
-	 */
-	bp_mapout(bp);
-	freerbuf(bp);
+	(void) scsi_uscsi_copyout_and_free((intptr_t)incmd, uscmd);
 	kmem_free(uip, sizeof (struct sd_uscsi_info));
-	if (uscmd->uscsi_rqbuf != NULL) {
-		kmem_free(uscmd->uscsi_rqbuf, SENSE_LENGTH);
-	}
-	kmem_free(uscmd->uscsi_cdb, (size_t)uscmd->uscsi_cdblen);
-	kmem_free(uscmd, sizeof (struct uscsi_cmd));
-
-	SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_cmd: exit\n");
 
 	return (rval);
 }
@@ -19455,8 +19207,8 @@ sd_send_scsi_DOORLOCK(struct sd_lun *un, int flag, int path_flag)
 	SD_TRACE(SD_LOG_IO, un,
 	    "sd_send_scsi_DOORLOCK: returning sd_send_scsi_cmd()\n");
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, path_flag);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, path_flag);
 
 	if ((status == EIO) && (ucmd_buf.uscsi_status == STATUS_CHECK) &&
 	    (ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
@@ -19546,8 +19298,8 @@ sd_send_scsi_READ_CAPACITY(struct sd_lun *un, uint64_t *capp, uint32_t *lbap,
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_READ | USCSI_SILENT;
 	ucmd_buf.uscsi_timeout	= 60;
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, path_flag);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, path_flag);
 
 	switch (status) {
 	case 0:
@@ -19761,8 +19513,8 @@ sd_send_scsi_READ_CAPACITY_16(struct sd_lun *un, uint64_t *capp,
 	 */
 	FORMG4COUNT(&cdb, ucmd_buf.uscsi_buflen);
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, path_flag);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, path_flag);
 
 	switch (status) {
 	case 0:
@@ -19902,8 +19654,8 @@ sd_send_scsi_START_STOP_UNIT(struct sd_lun *un, int flag, int path_flag)
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_SILENT;
 	ucmd_buf.uscsi_timeout	= 200;
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, path_flag);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, path_flag);
 
 	switch (status) {
 	case 0:
@@ -20096,8 +19848,8 @@ sd_send_scsi_INQUIRY(struct sd_lun *un, uchar_t *bufaddr, size_t buflen,
 	ucmd_buf.uscsi_flags	= USCSI_READ | USCSI_SILENT;
 	ucmd_buf.uscsi_timeout	= 200;	/* Excessive legacy value */
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, SD_PATH_DIRECT);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, SD_PATH_DIRECT);
 
 	if ((status == 0) && (residp != NULL)) {
 		*residp = ucmd_buf.uscsi_resid;
@@ -20188,9 +19940,9 @@ sd_send_scsi_TEST_UNIT_READY(struct sd_lun *un, int flag)
 	}
 	ucmd_buf.uscsi_timeout	= 60;
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE,
-	    ((flag & SD_BYPASS_PM) ? SD_PATH_DIRECT : SD_PATH_STANDARD));
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, ((flag & SD_BYPASS_PM) ? SD_PATH_DIRECT :
+	    SD_PATH_STANDARD));
 
 	switch (status) {
 	case 0:
@@ -20281,8 +20033,8 @@ sd_send_scsi_PERSISTENT_RESERVE_IN(struct sd_lun *un, uchar_t  usr_cmd,
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_READ | USCSI_SILENT;
 	ucmd_buf.uscsi_timeout	= 60;
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, SD_PATH_STANDARD);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, SD_PATH_STANDARD);
 
 	switch (status) {
 	case 0:
@@ -20426,8 +20178,8 @@ sd_send_scsi_PERSISTENT_RESERVE_OUT(struct sd_lun *un, uchar_t usr_cmd,
 		break;
 	}
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, SD_PATH_STANDARD);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, SD_PATH_STANDARD);
 
 	switch (status) {
 	case 0:
@@ -20685,8 +20437,8 @@ sd_send_scsi_GET_CONFIGURATION(struct sd_lun *un, struct uscsi_cmd *ucmdbuf,
 	ucmdbuf->uscsi_rqlen = rqbuflen;
 	ucmdbuf->uscsi_flags = USCSI_RQENABLE|USCSI_SILENT|USCSI_READ;
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), ucmdbuf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, SD_PATH_STANDARD);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), ucmdbuf, FKIOCTL,
+	    UIO_SYSSPACE, SD_PATH_STANDARD);
 
 	switch (status) {
 	case 0:
@@ -20774,8 +20526,8 @@ sd_send_scsi_feature_GET_CONFIGURATION(struct sd_lun *un,
 	ucmdbuf->uscsi_rqlen = rqbuflen;
 	ucmdbuf->uscsi_flags = USCSI_RQENABLE|USCSI_SILENT|USCSI_READ;
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), ucmdbuf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, SD_PATH_STANDARD);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), ucmdbuf, FKIOCTL,
+	    UIO_SYSSPACE, SD_PATH_STANDARD);
 
 	switch (status) {
 	case 0:
@@ -20879,8 +20631,8 @@ sd_send_scsi_MODE_SENSE(struct sd_lun *un, int cdbsize, uchar_t *bufaddr,
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_READ | USCSI_SILENT;
 	ucmd_buf.uscsi_timeout	= 60;
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, path_flag);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, path_flag);
 
 	switch (status) {
 	case 0:
@@ -20991,8 +20743,8 @@ sd_send_scsi_MODE_SELECT(struct sd_lun *un, int cdbsize, uchar_t *bufaddr,
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_WRITE | USCSI_SILENT;
 	ucmd_buf.uscsi_timeout	= 60;
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, path_flag);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, path_flag);
 
 	switch (status) {
 	case 0:
@@ -21123,8 +20875,8 @@ sd_send_scsi_RDWR(struct sd_lun *un, uchar_t cmd, void *bufaddr,
 	ucmd_buf.uscsi_rqlen	= sizeof (struct scsi_extended_sense);
 	ucmd_buf.uscsi_flags	= flag | USCSI_RQENABLE | USCSI_SILENT;
 	ucmd_buf.uscsi_timeout	= 60;
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-				UIO_SYSSPACE, UIO_SYSSPACE, path_flag);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, path_flag);
 	switch (status) {
 	case 0:
 		break;	/* Success! */
@@ -21200,8 +20952,8 @@ sd_send_scsi_LOG_SENSE(struct sd_lun *un, uchar_t *bufaddr, uint16_t buflen,
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_READ | USCSI_SILENT;
 	ucmd_buf.uscsi_timeout	= 60;
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, path_flag);
+	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, path_flag);
 
 	switch (status) {
 	case 0:
@@ -21246,8 +20998,7 @@ sd_send_scsi_LOG_SENSE(struct sd_lun *un, uchar_t *bufaddr, uint16_t buflen,
 					    un->un_start_stop_cycle_page;
 					mutex_exit(SD_MUTEX(un));
 					status = sd_send_scsi_cmd(
-					    SD_GET_DEV(un), &ucmd_buf,
-					    UIO_SYSSPACE, UIO_SYSSPACE,
+					    SD_GET_DEV(un), &ucmd_buf, FKIOCTL,
 					    UIO_SYSSPACE, path_flag);
 
 					break;
@@ -21789,7 +21540,15 @@ skip_ready_valid:
 		if ((drv_priv(cred_p) != 0) && (drv_priv(cr) != 0)) {
 			err = EPERM;
 		} else {
-			err = sd_uscsi_ioctl(dev, (caddr_t)arg, flag);
+			enum uio_seg	uioseg;
+			uioseg = (flag & FKIOCTL) ? UIO_SYSSPACE :
+			    UIO_USERSPACE;
+			if (un->un_f_format_in_progress == TRUE) {
+				err = EAGAIN;
+				break;
+			}
+			err = sd_send_scsi_cmd(dev, (struct uscsi_cmd *)arg,
+			    flag, uioseg, SD_PATH_STANDARD);
 		}
 		break;
 
@@ -22439,152 +22198,6 @@ skip_ready_valid:
 
 	SD_TRACE(SD_LOG_IOCTL, un, "sdioctl: exit: %d\n", err);
 	return (err);
-}
-
-
-/*
- *    Function: sd_uscsi_ioctl
- *
- * Description: This routine is the driver entry point for handling USCSI ioctl
- *		requests (USCSICMD).
- *
- *   Arguments: dev	- the device number
- *		arg	- user provided scsi command
- *		flag	- this argument is a pass through to ddi_copyxxx()
- *			  directly from the mode argument of ioctl().
- *
- * Return Code: code returned by sd_send_scsi_cmd
- *		ENXIO
- *		EFAULT
- *		EAGAIN
- */
-
-static int
-sd_uscsi_ioctl(dev_t dev, caddr_t arg, int flag)
-{
-#ifdef _MULTI_DATAMODEL
-	/*
-	 * For use when a 32 bit app makes a call into a
-	 * 64 bit ioctl
-	 */
-	struct uscsi_cmd32	uscsi_cmd_32_for_64;
-	struct uscsi_cmd32	*ucmd32 = &uscsi_cmd_32_for_64;
-	model_t			model;
-#endif /* _MULTI_DATAMODEL */
-	struct uscsi_cmd	*scmd = NULL;
-	struct sd_lun		*un = NULL;
-	enum uio_seg		uioseg;
-	char			cdb[CDB_GROUP0];
-	int			rval = 0;
-
-	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
-		return (ENXIO);
-	}
-
-	SD_TRACE(SD_LOG_IOCTL, un, "sd_uscsi_ioctl: entry: un:0x%p\n", un);
-
-	scmd = (struct uscsi_cmd *)
-	    kmem_zalloc(sizeof (struct uscsi_cmd), KM_SLEEP);
-
-#ifdef _MULTI_DATAMODEL
-	switch (model = ddi_model_convert_from(flag & FMODELS)) {
-	case DDI_MODEL_ILP32:
-	{
-		if (ddi_copyin((void *)arg, ucmd32, sizeof (*ucmd32), flag)) {
-			rval = EFAULT;
-			goto done;
-		}
-		/*
-		 * Convert the ILP32 uscsi data from the
-		 * application to LP64 for internal use.
-		 */
-		uscsi_cmd32touscsi_cmd(ucmd32, scmd);
-		break;
-	}
-	case DDI_MODEL_NONE:
-		if (ddi_copyin((void *)arg, scmd, sizeof (*scmd), flag)) {
-			rval = EFAULT;
-			goto done;
-		}
-		break;
-	}
-#else /* ! _MULTI_DATAMODEL */
-	if (ddi_copyin((void *)arg, scmd, sizeof (*scmd), flag)) {
-		rval = EFAULT;
-		goto done;
-	}
-#endif /* _MULTI_DATAMODEL */
-
-	scmd->uscsi_flags &= ~USCSI_NOINTR;
-	uioseg = (flag & FKIOCTL) ? UIO_SYSSPACE : UIO_USERSPACE;
-	if (un->un_f_format_in_progress == TRUE) {
-		rval = EAGAIN;
-		goto done;
-	}
-
-	/*
-	 * Gotta do the ddi_copyin() here on the uscsi_cdb so that
-	 * we will have a valid cdb[0] to test.
-	 */
-	if ((ddi_copyin(scmd->uscsi_cdb, cdb, CDB_GROUP0, flag) == 0) &&
-	    (cdb[0] == SCMD_FORMAT)) {
-		SD_TRACE(SD_LOG_IOCTL, un,
-		    "sd_uscsi_ioctl: scmd->uscsi_cdb 0x%x\n", cdb[0]);
-		mutex_enter(SD_MUTEX(un));
-		un->un_f_format_in_progress = TRUE;
-		mutex_exit(SD_MUTEX(un));
-		rval = sd_send_scsi_cmd(dev, scmd, uioseg, uioseg, uioseg,
-		    SD_PATH_STANDARD);
-		mutex_enter(SD_MUTEX(un));
-		un->un_f_format_in_progress = FALSE;
-		mutex_exit(SD_MUTEX(un));
-	} else {
-		SD_TRACE(SD_LOG_IOCTL, un,
-		    "sd_uscsi_ioctl: scmd->uscsi_cdb 0x%x\n", cdb[0]);
-		/*
-		 * It's OK to fall into here even if the ddi_copyin()
-		 * on the uscsi_cdb above fails, because sd_send_scsi_cmd()
-		 * does this same copyin and will return the EFAULT
-		 * if it fails.
-		 */
-		rval = sd_send_scsi_cmd(dev, scmd, uioseg, uioseg, uioseg,
-		    SD_PATH_STANDARD);
-	}
-#ifdef _MULTI_DATAMODEL
-	switch (model) {
-	case DDI_MODEL_ILP32:
-		/*
-		 * Convert back to ILP32 before copyout to the
-		 * application
-		 */
-		uscsi_cmdtouscsi_cmd32(scmd, ucmd32);
-		if (ddi_copyout(ucmd32, (void *)arg, sizeof (*ucmd32), flag)) {
-			if (rval != 0) {
-				rval = EFAULT;
-			}
-		}
-		break;
-	case DDI_MODEL_NONE:
-		if (ddi_copyout(scmd, (void *)arg, sizeof (*scmd), flag)) {
-			if (rval != 0) {
-				rval = EFAULT;
-			}
-		}
-		break;
-	}
-#else /* ! _MULTI_DATAMODE */
-	if (ddi_copyout(scmd, (void *)arg, sizeof (*scmd), flag)) {
-		if (rval != 0) {
-			rval = EFAULT;
-		}
-	}
-#endif /* _MULTI_DATAMODE */
-done:
-	kmem_free(scmd, sizeof (struct uscsi_cmd));
-
-	SD_TRACE(SD_LOG_IOCTL, un, "sd_uscsi_ioctl: exit: un:0x%p\n", un);
-
-	return (rval);
 }
 
 
@@ -26479,8 +26092,8 @@ sd_reserve_release(dev_t dev, int cmd)
 	}
 
 	/* Send the command. */
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
+	    SD_PATH_STANDARD);
 
 	/*
 	 * "break" a reservation that is held by another host, by issuing a
@@ -26518,8 +26131,8 @@ sd_reserve_release(dev_t dev, int cmd)
 		 * Reissue the last reserve command, this time without request
 		 * sense.  Assume that it is just a regular reserve command.
 		 */
-		rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-		    UIO_SYSSPACE, SD_PATH_STANDARD);
+		rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
+		    SD_PATH_STANDARD);
 	}
 
 	/* Return an error if still getting a reservation conflict. */
@@ -28023,8 +27636,7 @@ sr_atapi_change_speed(dev_t dev, int cmd, intptr_t data, int flag)
 		com->uscsi_bufaddr = NULL;
 		com->uscsi_buflen  = 0;
 		com->uscsi_flags   = USCSI_DIAGNOSE|USCSI_SILENT;
-		rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, 0,
-		    UIO_SYSSPACE, SD_PATH_STANDARD);
+		rval = sd_send_scsi_cmd(dev, com, FKIOCTL, 0, SD_PATH_STANDARD);
 		break;
 	default:
 		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
@@ -28091,8 +27703,8 @@ sr_pause_resume(dev_t dev, int cmd)
 	com->uscsi_cdblen = CDB_GROUP1;
 	com->uscsi_flags  = USCSI_DIAGNOSE|USCSI_SILENT;
 
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
+	    SD_PATH_STANDARD);
 
 done:
 	kmem_free(com, sizeof (*com));
@@ -28164,8 +27776,8 @@ sr_play_msf(dev_t dev, caddr_t data, int flag)
 	com->uscsi_cdb    = cdb;
 	com->uscsi_cdblen = CDB_GROUP1;
 	com->uscsi_flags  = USCSI_DIAGNOSE|USCSI_SILENT;
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
+	    SD_PATH_STANDARD);
 	kmem_free(com, sizeof (*com));
 	return (rval);
 }
@@ -28219,8 +27831,8 @@ sr_play_trkind(dev_t dev, caddr_t data, int flag)
 	com->uscsi_cdb    = cdb;
 	com->uscsi_cdblen = CDB_GROUP1;
 	com->uscsi_flags  = USCSI_DIAGNOSE|USCSI_SILENT;
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
+	    SD_PATH_STANDARD);
 	kmem_free(com, sizeof (*com));
 	return (rval);
 }
@@ -28344,8 +27956,8 @@ sr_read_all_subcodes(dev_t dev, caddr_t data, int flag)
 	com->uscsi_bufaddr = (caddr_t)subcode->cdsc_addr;
 	com->uscsi_buflen  = buflen;
 	com->uscsi_flags   = USCSI_DIAGNOSE|USCSI_SILENT|USCSI_READ;
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_USERSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_USERSPACE,
+	    SD_PATH_STANDARD);
 	kmem_free(subcode, sizeof (struct cdrom_subcode));
 	kmem_free(com, sizeof (*com));
 	return (rval);
@@ -28419,8 +28031,8 @@ sr_read_subchannel(dev_t dev, caddr_t data, int flag)
 	com->uscsi_bufaddr = buffer;
 	com->uscsi_buflen  = 16;
 	com->uscsi_flags   = USCSI_DIAGNOSE|USCSI_SILENT|USCSI_READ;
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
+	    SD_PATH_STANDARD);
 	if (rval != 0) {
 		kmem_free(buffer, 16);
 		kmem_free(com, sizeof (*com));
@@ -28548,8 +28160,8 @@ sr_read_tocentry(dev_t dev, caddr_t data, int flag)
 	com->uscsi_bufaddr = buffer;
 	com->uscsi_buflen  = 0x0C;
 	com->uscsi_flags   = (USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ);
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
+	    SD_PATH_STANDARD);
 	if (rval != 0) {
 		kmem_free(buffer, 12);
 		kmem_free(com, sizeof (*com));
@@ -28577,8 +28189,8 @@ sr_read_tocentry(dev_t dev, caddr_t data, int flag)
 		 * must be in LBA format.
 		 */
 		cdb[1] = 0;
-		rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-		    UIO_SYSSPACE, SD_PATH_STANDARD);
+		rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
+		    SD_PATH_STANDARD);
 		if (rval != 0) {
 			kmem_free(buffer, 12);
 			kmem_free(com, sizeof (*com));
@@ -28598,8 +28210,8 @@ sr_read_tocentry(dev_t dev, caddr_t data, int flag)
 		 * must be in LBA format.
 		 */
 		cdb[1] = 0;
-		rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-		    UIO_SYSSPACE, SD_PATH_STANDARD);
+		rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
+		    SD_PATH_STANDARD);
 		if (rval != 0) {
 			kmem_free(buffer, 12);
 			kmem_free(com, sizeof (*com));
@@ -28621,8 +28233,8 @@ sr_read_tocentry(dev_t dev, caddr_t data, int flag)
 		cdb[5] = buffer[11];
 		cdb[8] = 0x08;
 		com->uscsi_buflen = 0x08;
-		rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-		    UIO_SYSSPACE, SD_PATH_STANDARD);
+		rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
+		    SD_PATH_STANDARD);
 		if (rval == 0) {
 			entry->cdte_datamode = buffer[0];
 		} else {
@@ -28708,8 +28320,8 @@ sr_read_tochdr(dev_t dev, caddr_t data, int flag)
 	com->uscsi_timeout = 300;
 	com->uscsi_flags   = USCSI_DIAGNOSE|USCSI_SILENT|USCSI_READ;
 
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
+	    SD_PATH_STANDARD);
 	if (un->un_f_cfg_read_toc_trk_bcd == TRUE) {
 		hdr->cdth_trk0 = BCD_TO_BYTE(buffer[2]);
 		hdr->cdth_trk1 = BCD_TO_BYTE(buffer[3]);
@@ -28917,8 +28529,8 @@ sr_read_cd_mode2(dev_t dev, caddr_t data, int flag)
 	com->uscsi_buflen = mode2->cdread_buflen;
 	com->uscsi_flags = USCSI_DIAGNOSE|USCSI_SILENT|USCSI_READ;
 
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_USERSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_USERSPACE,
+	    SD_PATH_STANDARD);
 	kmem_free(com, sizeof (*com));
 	return (rval);
 }
@@ -29056,8 +28668,8 @@ sr_read_mode2(dev_t dev, caddr_t data, int flag)
 	 * standard path, so that if the device was powered down, then
 	 * it would be 'awakened' to handle the command.
 	 */
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_USERSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_USERSPACE,
+	    SD_PATH_STANDARD);
 
 	kmem_free(com, sizeof (*com));
 
@@ -29316,8 +28928,8 @@ sr_read_cdda(dev_t dev, caddr_t data, int flag)
 	com->uscsi_buflen = buflen;
 	com->uscsi_flags = USCSI_DIAGNOSE|USCSI_SILENT|USCSI_READ;
 
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_USERSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_USERSPACE,
+	    SD_PATH_STANDARD);
 
 	kmem_free(cdda, sizeof (struct cdrom_cdda));
 	kmem_free(com, sizeof (*com));
@@ -29464,8 +29076,8 @@ sr_read_cdxa(dev_t dev, caddr_t data, int flag)
 	com->uscsi_bufaddr = (caddr_t)cdxa->cdxa_data;
 	com->uscsi_buflen  = buflen;
 	com->uscsi_flags   = USCSI_DIAGNOSE|USCSI_SILENT|USCSI_READ;
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_USERSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_USERSPACE,
+	    SD_PATH_STANDARD);
 	kmem_free(cdxa, sizeof (struct cdrom_cdxa));
 	kmem_free(com, sizeof (*com));
 	return (rval);
@@ -29828,8 +29440,8 @@ sr_read_sony_session_offset(dev_t dev, caddr_t data, int flag)
 	com->uscsi_buflen = SONY_SESSION_OFFSET_LEN;
 	com->uscsi_flags = USCSI_DIAGNOSE|USCSI_SILENT|USCSI_READ;
 
-	rval = sd_send_scsi_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
+	    SD_PATH_STANDARD);
 	if (rval != 0) {
 		kmem_free(buffer, SONY_SESSION_OFFSET_LEN);
 		kmem_free(com, sizeof (*com));

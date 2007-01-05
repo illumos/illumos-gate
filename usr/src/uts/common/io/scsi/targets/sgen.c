@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,6 @@
 #include <sys/modctl.h>
 #include <sys/file.h>
 #include <sys/scsi/scsi.h>
-#include <sys/stat.h>
 #include <sys/scsi/targets/sgendef.h>
 
 #define	DDI_NT_SGEN		"ddi_generic:scsi"
@@ -132,8 +131,7 @@ static void sgen_cleanup_binddb();
 /*
  * Packet transport routines
  */
-static int  sgen_uscsi_cmd(dev_t, struct uscsi_cmd *,
-    enum uio_seg, enum uio_seg, enum uio_seg);
+static int  sgen_uscsi_cmd(dev_t, struct uscsi_cmd *, int);
 static int sgen_start(struct buf *);
 static void sgen_hold_cmdbuf(sgen_state_t *);
 static void sgen_rele_cmdbuf(sgen_state_t *);
@@ -1119,7 +1117,6 @@ sgen_ioctl(dev_t dev,
     int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 {
 	int retval = 0;
-	enum uio_seg uioseg;
 	sgen_state_t *sg_state;
 	int instance;
 
@@ -1163,80 +1160,10 @@ sgen_ioctl(dev_t dev,
 		break;
 	}
 
-	case USCSICMD: {
-		struct uscsi_cmd scmd;
-#ifdef _MULTI_DATAMODEL
-		struct uscsi_cmd32 ucmd32;
-		model_t model;
-
-		switch (model = ddi_model_convert_from(flag & FMODELS)) {
-		case DDI_MODEL_ILP32:
-			if (ddi_copyin((void *)arg, &ucmd32,
-			    sizeof (ucmd32), flag)) {
-				retval = EFAULT;
-				break;
-			}
-			/*
-			 * Convert the ILP32 uscsi data from the application
-			 * to LP64 for internal use.
-			 */
-			uscsi_cmd32touscsi_cmd((&ucmd32), (&scmd));
-			break;
-		case DDI_MODEL_NONE:
-			if (ddi_copyin((void *)arg, &scmd, sizeof (scmd),
-			    flag)) {
-				retval = EFAULT;
-			}
-			break;
-		}
-
-#else /* ! _MULTI_DATAMODEL */
-		if (ddi_copyin((void *)arg, &scmd, sizeof (scmd), flag)) {
-			retval = EFAULT;
-		}
-#endif /* _MULTI_DATAMODEL */
-		if (retval != 0) {
-			break;
-		}
-
-
-		uioseg = (flag & FKIOCTL) ? UIO_SYSSPACE : UIO_USERSPACE;
-		retval = sgen_uscsi_cmd(dev, &scmd, uioseg, uioseg, uioseg);
-
-#ifdef _MULTI_DATAMODEL
-		switch (model) {
-		case DDI_MODEL_ILP32:
-			/*
-			 * Convert back to ILP32 before copyout to the
-			 * application
-			 */
-			uscsi_cmdtouscsi_cmd32((&scmd), (&ucmd32));
-			if (ddi_copyout(&ucmd32, (void *)arg,
-			    sizeof (ucmd32), flag)) {
-				if (retval == 0) {
-					retval = EFAULT;
-				}
-			}
-			break;
-		case DDI_MODEL_NONE:
-			if (ddi_copyout(&scmd, (void *)arg, sizeof (scmd),
-			    flag)) {
-				if (retval == 0) {
-					retval = EFAULT;
-				}
-			}
-			break;
-		}
-
-#else /* ! _MULTI_DATAMODEL */
-		if (ddi_copyout(&scmd, (void *)arg, sizeof (scmd), flag)) {
-			if (retval == 0) {
-				retval = EFAULT;
-			}
-		}
-#endif /* _MULTI_DATAMODEL */
+	case USCSICMD:
+		retval = sgen_uscsi_cmd(dev, (struct uscsi_cmd *)arg, flag);
 		break;
-	}
+
 	default:
 		retval = ENOTTY;
 	}
@@ -1247,34 +1174,22 @@ sgen_ioctl(dev_t dev,
 	return (retval);
 }
 
-/*ARGSUSED*/
-static void
-sgen_minphys(struct buf *bp)
-{
-	/*
-	 * Do not break up the CDB; using normal minphys() causes breakup of
-	 * large uscsi requests and headaches.  This matches the implementation
-	 * found in sd and st.
-	 */
-}
-
 /*
  * sgen_uscsi_cmd()
  * 	Setup, configuration and teardown for a uscsi(7I) command
  */
 /*ARGSUSED*/
 static int
-sgen_uscsi_cmd(dev_t dev, struct uscsi_cmd *ucmd,
-    enum uio_seg cdbspace, enum uio_seg dataspace, enum uio_seg rqbufspace)
+sgen_uscsi_cmd(dev_t dev, struct uscsi_cmd *ucmd, int flag)
 {
-	caddr_t cdb = NULL;
-	caddr_t saved_rqbuf = NULL;
-	caddr_t saved_cdb = NULL;
-	uchar_t saved_rqlen = 0;
-	int instance, err, rw, rqlen, flag, newflags;
-	struct buf  *bp;
-	sgen_state_t  *sg_state;
-	int cmdbufhold = 0;
+	struct uscsi_cmd	*uscmd;
+	struct buf	*bp;
+	sgen_state_t	*sg_state;
+	enum uio_seg	uioseg;
+	int	cmdbufhold = 0;
+	int	instance;
+	int	flags;
+	int	err;
 
 	instance = getminor(dev);
 
@@ -1284,61 +1199,23 @@ sgen_uscsi_cmd(dev_t dev, struct uscsi_cmd *ucmd,
 	sgen_log(sg_state, SGEN_DIAG2, "in sgen_uscsi_cmd(): instance = %d",
 	    instance);
 
-	/*
-	 * Stash values from the user's command.  They are restored on exit
-	 * from this routine.
-	 */
-	saved_cdb = ucmd->uscsi_cdb;
-	saved_rqbuf = ucmd->uscsi_rqbuf;
-	saved_rqlen = ucmd->uscsi_rqlen;
+	err = scsi_uscsi_alloc_and_copyin((intptr_t)ucmd, flag,
+	    &sg_state->sgen_scsiaddr, &uscmd);
+	if (err != 0) {
+		sgen_log(sg_state, SGEN_DIAG1, "sgen_uscsi_cmd: "
+		    "scsi_uscsi_alloc_and_copyin failed\n");
+		return (err);
+	}
 
 	/*
 	 * Clear out undesirable command flags
 	 */
-	newflags = (ucmd->uscsi_flags & ~(USCSI_NOINTR | USCSI_NOPARITY |
+	flags = (uscmd->uscsi_flags & ~(USCSI_NOINTR | USCSI_NOPARITY |
 	    USCSI_OTAG | USCSI_HTAG | USCSI_HEAD));
-	if (newflags != ucmd->uscsi_flags) {
+	if (flags != uscmd->uscsi_flags) {
 		sgen_log(sg_state, SGEN_DIAG1, "sgen_uscsi_cmd: cleared "
-		    "unsafe uscsi_flags 0x%x", ucmd->uscsi_flags & ~newflags);
-		ucmd->uscsi_flags = newflags;
-	}
-
-	/*
-	 * Skip sanity checks for RESET commands
-	 */
-	if ((ucmd->uscsi_flags & (USCSI_RESET|USCSI_RESET_ALL)) == 0) {
-		/*
-		 * Do some sanity checks -- these seem to catch 90% of the
-		 * coding mistakes people make when using uscsi.
-		 *
-		 * 1. cdb's must be at least 6 bytes long.  After the
-		 *    copyin we will check for CDBs that are greater
-		 *    than 16 bytes long which don't have the opcode set
-		 *    correctly.
-		 * 2. If no buffer is specified, neither the read nor write
-		 *    flag should be turned on.
-		 * 3. If auto request sense is enabled, then the rqlen and
-		 *    the rqbuf must be non-zero and non-null respectively.
-		 */
-		if (ucmd->uscsi_cdblen < 6) {
-			sgen_log(sg_state, SGEN_DIAG1, "sgen_uscsi_cmd: "
-			    "rejected command because uscsi_cdblen less "
-			    "than 6");
-			err = EINVAL;
-			goto exit;
-		}
-
-		if (ucmd->uscsi_flags & USCSI_RQENABLE) {
-			if ((ucmd->uscsi_rqlen == 0) ||
-			    (ucmd->uscsi_rqbuf == NULL)) {
-				sgen_log(sg_state, SGEN_DIAG1,
-				    "sgen_uscsi_cmd: rejected command because "
-				    "USCSI_RQENABLE is set and uscsi_rqlen is "
-				    "0 or uscsi_rqbuf is NULL");
-				err = EINVAL;
-				goto exit;
-			}
-		}
+		    "unsafe uscsi_flags 0x%x", ucmd->uscsi_flags & ~flags);
+		uscmd->uscsi_flags = flags;
 	}
 
 	/*
@@ -1347,179 +1224,42 @@ sgen_uscsi_cmd(dev_t dev, struct uscsi_cmd *ucmd,
 	 */
 	sgen_hold_cmdbuf(sg_state);	/* lock command buf for this target */
 	cmdbufhold = 1;
-	bp = sg_state->sgen_cmdbuf;
 
-	/*
-	 * A reset?  Go no further.
-	 */
-	if (ucmd->uscsi_flags & (USCSI_RESET|USCSI_RESET_ALL)) {
-		flag = (ucmd->uscsi_flags & USCSI_RESET_ALL) ?
-			RESET_ALL : RESET_TARGET;
-		err = (scsi_reset(&sg_state->sgen_scsiaddr, flag)) ? 0 : EIO;
-		goto exit;
+	if (uscmd->uscsi_cdb != NULL) {
+		sgen_dump_cdb(sg_state, "sgen_uscsi_cmd: ",
+		    (union scsi_cdb *)uscmd->uscsi_cdb, uscmd->uscsi_cdblen);
 	}
 
 	/*
-	 * Enable asynchronous mode if requested.
-	 */
-	if ((ucmd->uscsi_flags & USCSI_ASYNC) &&
-	    (scsi_ifgetcap(&sg_state->sgen_scsiaddr, "synchronous", 1) == 1)) {
-		if (scsi_ifsetcap(&sg_state->sgen_scsiaddr, "synchronous",
-		    0, 1) == 1) {
-			sgen_log(sg_state, SGEN_DIAG3,
-			    "sgen_uscsi_cmd: set target asynchronous");
-		} else {
-			sgen_log(sg_state, SGEN_DIAG3, "sgen_uscsi_cmd: "
-			    "failed to set target asynchronous");
-			err = EINVAL;
-			goto exit;
-		}
-	}
-
-	/*
-	 * Enable synchronous mode if requested.
-	 */
-	if ((ucmd->uscsi_flags & USCSI_SYNC) &&
-	    (scsi_ifgetcap(&sg_state->sgen_scsiaddr, "synchronous", 1) == 0)) {
-		if (scsi_ifsetcap(&sg_state->sgen_scsiaddr, "synchronous",
-		    1, 1) == 1) {
-			sgen_log(sg_state, SGEN_DIAG3,
-			    "sgen_uscsi_cmd: set target synchronous");
-		} else {
-			sgen_log(sg_state, SGEN_DIAG3,
-			    "sgen_uscsi_cmd: failed to set target synchronous");
-			err = EINVAL;
-			goto exit;
-		}
-	}
-
-	sgen_log(sg_state, SGEN_DIAG2, "sgen_uscsi_cmd: uscsi_cmd copied-in");
-
-	/*
-	 * copyin from kernel space if the cdb's origin is inside the kernel.
-	 */
-	cdb = kmem_zalloc((size_t)ucmd->uscsi_cdblen, KM_SLEEP);
-	if (ddi_copyin(ucmd->uscsi_cdb, cdb, (size_t)ucmd->uscsi_cdblen,
-	    (cdbspace == UIO_SYSSPACE) ? FKIOCTL : 0)) {
-		err = EFAULT;
-		goto exit;
-	}
-	/*
-	 * if the length of the CDB is greater than 16 bytes, it must be
-	 * a variable length CDB (i.e. the opcode must be 0x7f)
-	 */
-	if ((ucmd->uscsi_cdblen > SCSI_CDB_SIZE) &&
-	    (cdb[0] != SCMD_VAR_LEN)) {
-		sgen_log(sg_state, SGEN_DIAG1, "sgen_uscsi_cmd: "
-		    "rejected command because uscsi_cdblen is "
-		    "0x%x, but opcode is 0x%x",
-		    ucmd->uscsi_cdblen, cdb[0]);
-		err = EINVAL;
-		goto exit;
-	}
-	ucmd->uscsi_cdb = cdb;
-
-	sgen_log(sg_state, SGEN_DIAG2, "sgen_uscsi_cmd: cdb copied-in");
-	sgen_dump_cdb(sg_state, "sgen_uscsi_cmd: ",
-	    (union scsi_cdb *)ucmd->uscsi_cdb, ucmd->uscsi_cdblen);
-
-	rw = (ucmd->uscsi_flags & USCSI_READ) ? B_READ : B_WRITE;
-
-	/*
-	 * Initialize Request Sense buffering.  Allocate a kernel copy of
-	 * the sense buffer, if sense is requested and supported by the HBA.
 	 * Stash the sense buffer into sgen_rqs_sen for convenience.
 	 */
-	if (ucmd->uscsi_flags & USCSI_RQENABLE) {
-		sgen_log(sg_state, SGEN_DIAG3, "sgen_uscsi_cmd: setting up "
-		    "sense buffer");
-		ucmd->uscsi_rqlen = SENSE_LENGTH;
-		ucmd->uscsi_rqresid = SENSE_LENGTH;
-		ucmd->uscsi_rqbuf = kmem_zalloc(SENSE_LENGTH, KM_SLEEP);
-		sg_state->sgen_rqs_sen = ucmd->uscsi_rqbuf;
-	} else {
-		ucmd->uscsi_rqlen = 0;
-		ucmd->uscsi_rqresid = 0;
-		ucmd->uscsi_rqbuf = NULL;
-		sg_state->sgen_rqs_sen = NULL;
-	}
+	sg_state->sgen_rqs_sen = uscmd->uscsi_rqbuf;
 
-
+	bp = sg_state->sgen_cmdbuf;
 	bp->av_back = NULL;
 	bp->av_forw = NULL;
-	bp->b_private = (struct buf *)ucmd;
+	bp->b_private = (struct buf *)uscmd;
+	uioseg = (flag & FKIOCTL) ? UIO_SYSSPACE : UIO_USERSPACE;
 
-	if (ucmd->uscsi_buflen) {
-		struct iovec aiov;
-		struct uio auio;
-		struct uio *uio = &auio;
-
-		bzero(&auio, sizeof (struct uio));
-		bzero(&aiov, sizeof (struct iovec));
-		aiov.iov_base = ucmd->uscsi_bufaddr;
-		aiov.iov_len = ucmd->uscsi_buflen;
-
-		uio->uio_iov = &aiov;
-		uio->uio_iovcnt = 1;
-		uio->uio_resid = aiov.iov_len;
-		uio->uio_segflg = dataspace;
-
-		/*
-		 * Call physio, waiting here until the command is completed.
-		 */
-		err = physio(sgen_start, bp, dev, rw, sgen_minphys, uio);
-	} else {
-		/*
-		 * Since we're not actually moving data (uscsi_buflen == 0)
-		 * call sgen_start directly, mimicing physio().
-		 */
-		sgen_log(sg_state, SGEN_DIAG3, "sgen_uscsi_cmd: taking "
-		    "non-physio path because uscsi_buflen == 0");
-		bp->b_flags = B_BUSY | rw;
-		bp->b_edev = dev;
-		bp->b_bcount = bp->b_blkno = 0;
-		(void) sgen_start(bp);
-		err = biowait(bp);
-	}
+	err = scsi_uscsi_handle_cmd(dev, uioseg, uscmd, sgen_start, bp, NULL);
 
 	if (sg_state->sgen_cmdpkt != NULL) {
-		ucmd->uscsi_status = SCBP_C(sg_state->sgen_cmdpkt);
-		ucmd->uscsi_resid = bp->b_resid;
+		uscmd->uscsi_status = SCBP_C(sg_state->sgen_cmdpkt);
 	} else {
-		ucmd->uscsi_status = 0;
+		uscmd->uscsi_status = 0;
 	}
 
 	sgen_log(sg_state, SGEN_DIAG3, "sgen_uscsi_cmd: awake from waiting "
-	    "for command.  Status is 0x%x", ucmd->uscsi_status);
+	    "for command.  Status is 0x%x", uscmd->uscsi_status);
 
-	/*
-	 * If sense was requested, copy available sense data into ucmd.
-	 */
-	if (ucmd->uscsi_rqbuf != NULL) {
-		sgen_log(sg_state, SGEN_DIAG3, "sgen_uscsi_cmd: checking for "
-		    "sense. ucmd->uscsi_rqlen=%d ucmd->uscsi_rqresid=%d",
-		    ucmd->uscsi_rqlen, ucmd->uscsi_rqresid);
-
-		rqlen = ucmd->uscsi_rqlen - ucmd->uscsi_rqresid;
-		rqlen = MIN(saved_rqlen, rqlen);
-		ucmd->uscsi_rqresid = ucmd->uscsi_rqlen - rqlen;
-		rqlen = MIN((int)ucmd->uscsi_rqlen, rqlen);
-
-		if (rqlen) {
-			sgen_dump_sense(sg_state, rqlen,
-			    (uchar_t *)ucmd->uscsi_rqbuf);
-			sgen_log(sg_state, SGEN_DIAG3, "sgen_uscsi_cmd: "
-			    "copyout of rqlen=0x%x sense bytes to buffer at "
-			    "0x%p", rqlen, (void *)saved_rqbuf);
-			if (ddi_copyout(ucmd->uscsi_rqbuf, saved_rqbuf, rqlen,
-			    (rqbufspace == UIO_SYSSPACE) ? FKIOCTL : 0)) {
-				err = EFAULT;
-			}
-		}
-		kmem_free(ucmd->uscsi_rqbuf, ucmd->uscsi_rqlen);
+	if (uscmd->uscsi_rqbuf != NULL) {
+		int rqlen = uscmd->uscsi_rqlen - uscmd->uscsi_rqresid;
+		sgen_dump_sense(sg_state, rqlen,
+		    (uchar_t *)uscmd->uscsi_rqbuf);
 	}
 
-exit:
+	(void) scsi_uscsi_copyout_and_free((intptr_t)ucmd, uscmd);
+
 	if (sg_state->sgen_cmdpkt != NULL) {
 		scsi_destroy_pkt(sg_state->sgen_cmdpkt);
 		sg_state->sgen_cmdpkt = NULL;
@@ -1530,14 +1270,6 @@ exit:
 	 */
 	if (cmdbufhold) {
 		sgen_rele_cmdbuf(sg_state);
-	}
-
-	ucmd->uscsi_rqbuf = saved_rqbuf;
-	ucmd->uscsi_cdb = saved_cdb;
-	ucmd->uscsi_rqlen = saved_rqlen;
-
-	if (cdb) {
-		kmem_free(cdb, ucmd->uscsi_cdblen);
 	}
 
 	sgen_log(sg_state, SGEN_DIAG2, "done sgen_uscsi_cmd()");
@@ -2167,8 +1899,7 @@ sgen_tur(dev_t dev)
 	scmd.uscsi_cdb = cmdblk;
 	scmd.uscsi_cdblen = CDB_GROUP0;
 
-	return (sgen_uscsi_cmd(dev, &scmd, UIO_SYSSPACE, UIO_SYSSPACE,
-	    UIO_SYSSPACE));
+	return (sgen_uscsi_cmd(dev, &scmd, FKIOCTL));
 }
 
 /*

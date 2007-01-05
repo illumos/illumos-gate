@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,6 @@
 #include <sys/mtio.h>
 #include <sys/scsi/targets/stdef.h>
 #include <sys/file.h>
-#include <sys/stat.h>
 #include <sys/kstat.h>
 #include <sys/ddidmareq.h>
 #include <sys/ddi.h>
@@ -108,7 +107,6 @@
  * Global External Data Definitions
  */
 extern struct scsi_key_strings scsi_cmds[];
-extern uchar_t	scsi_cdb_size[];
 
 /*
  * Local Static Data
@@ -422,8 +420,7 @@ static int st_rw(dev_t dev, struct uio *uio, int flag);
 static int st_arw(dev_t dev, struct aio_req *aio, int flag);
 static int st_find_eom(dev_t dev);
 static int st_check_density_or_wfm(dev_t dev, int wfm, int mode, int stepflag);
-static int st_ioctl_cmd(dev_t dev, struct uscsi_cmd *,
-	enum uio_seg, enum uio_seg, enum uio_seg);
+static int st_ioctl_cmd(dev_t dev, struct uscsi_cmd *, int flag);
 static int st_mtioctop(struct scsi_tape *un, intptr_t arg, int flag);
 static void st_start(struct scsi_tape *un);
 static int st_handle_start_busy(struct scsi_tape *un, struct buf *bp,
@@ -513,7 +510,6 @@ static struct buf *st_get_bigblk_bp(struct buf *bp);
  * error statistics create/update functions
  */
 static int st_create_errstats(struct scsi_tape *, int);
-static void st_uscsi_minphys(struct buf *bp);
 static int st_validate_tapemarks(struct scsi_tape *un, int fileno, daddr_t bn);
 
 #ifdef STDEBUG
@@ -522,7 +518,8 @@ static char *st_dev_name(dev_t dev);
 #endif /* STDEBUG */
 
 #if !defined(lint)
-_NOTE(SCHEME_PROTECTS_DATA("unique per pkt", scsi_pkt buf uio scsi_cdb))
+_NOTE(SCHEME_PROTECTS_DATA("unique per pkt",
+    scsi_pkt buf uio scsi_cdb uscsi_cmd))
 _NOTE(SCHEME_PROTECTS_DATA("unique per pkt", scsi_extended_sense scsi_status))
 _NOTE(SCHEME_PROTECTS_DATA("stable data", scsi_device))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(st_drivetype scsi_address))
@@ -2967,16 +2964,6 @@ st_minphys(struct buf *bp)
 	}
 }
 
-/*ARGSUSED*/
-static void
-st_uscsi_minphys(struct buf *bp)
-{
-	/*
-	 * do not break up because the CDB count would then be
-	 * incorrect and create spurious data underrun errors.
-	 */
-}
-
 static int
 st_rw(dev_t dev, struct uio *uio, int flag)
 {
@@ -4360,107 +4347,19 @@ check_commands:
 		}
 
 	case USCSICMD:
+		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_ioctl: USCSICMD\n");
 	{
 		cred_t	*cr;
-#ifdef _MULTI_DATAMODEL
-		/*
-		 * For use when a 32 bit app makes a call into a
-		 * 64 bit ioctl
-		 */
-		struct uscsi_cmd32	ucmd_32;
-		struct uscsi_cmd32	*ucmd_32_ptr = &ucmd_32;
-#endif /* _MULTI_DATAMODEL */
-
-		/*
-		 * Run a generic USCSI command
-		 */
-		struct uscsi_cmd ucmd;
-		struct uscsi_cmd *ucmd_ptr = &ucmd;
-		enum uio_seg uioseg;
-
-		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-			"st_ioctl: USCSICMD\n");
-
 		cr = ddi_get_cred();
 		if ((drv_priv(cred_p) != 0) && (drv_priv(cr) != 0)) {
 			rval = EPERM;
-			break;
+		} else {
+			rval = st_ioctl_cmd(dev, (struct uscsi_cmd *)arg,
+			    flag);
 		}
-
-#ifdef _MULTI_DATAMODEL
-		switch (ddi_model_convert_from(flag & FMODELS)) {
-		case DDI_MODEL_ILP32:
-		{
-			if (ddi_copyin((void *)arg, ucmd_32_ptr,
-			    sizeof (struct uscsi_cmd32), flag)) {
-				rval = EFAULT;
-				break;
-			}
-			uscsi_cmd32touscsi_cmd(ucmd_32_ptr, ucmd_ptr);
-			break;
-		}
-		case DDI_MODEL_NONE:
-			if (ddi_copyin((void *)arg, ucmd_ptr, sizeof (ucmd),
-			    flag)) {
-				rval = EFAULT;
-				break;
-			}
-		}
-
-#else /* ! _MULTI_DATAMODEL */
-		if (ddi_copyin((void *)arg, ucmd_ptr, sizeof (ucmd), flag)) {
-			rval = EFAULT;
-			break;
-		}
-#endif /* _MULTI_DATAMODEL */
-
-
-		/*
-		 * although st_ioctl_cmd() never makes use of these
-		 * now, we are just being safe and consistent
-		 */
-		ucmd.uscsi_flags &= ~(USCSI_NOINTR | USCSI_NOPARITY |
-		    USCSI_OTAG | USCSI_HTAG | USCSI_HEAD);
-
-
-		uioseg = (flag & FKIOCTL) ?  UIO_SYSSPACE : UIO_USERSPACE;
-
-		rval = st_ioctl_cmd(dev, &ucmd, uioseg, uioseg, uioseg);
-
-
-#ifdef _MULTI_DATAMODEL
-		switch (ddi_model_convert_from(flag & FMODELS)) {
-		case DDI_MODEL_ILP32:
-			/*
-			 * Convert 64 bit back to 32 bit before doing
-			 * copyout. This is what the ILP32 app expects.
-			 */
-			uscsi_cmdtouscsi_cmd32(ucmd_ptr, ucmd_32_ptr);
-
-			if (ddi_copyout(&ucmd_32, (void *)arg,
-			    sizeof (ucmd_32), flag)) {
-				if (rval != 0)
-					rval = EFAULT;
-				}
-			break;
-
-		case DDI_MODEL_NONE:
-			if (ddi_copyout(&ucmd, (void *)arg,
-			    sizeof (ucmd), flag)) {
-				if (rval != 0)
-					rval = EFAULT;
-				}
-			break;
-		}
-#else /* ! _MULTI_DATAMODEL */
-		if (ddi_copyout(&ucmd, (void *)arg, sizeof (ucmd), flag)) {
-			if (rval != 0)
-				rval = EFAULT;
-		}
-#endif /* _MULTI_DATAMODEL */
-
-		break;
 	}
+		break;
 
 	case MTIOCTOP:
 		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
@@ -5623,22 +5522,16 @@ mtnbsf:
 
 /*
  * Run a command for uscsi ioctl.
- * cdbspace is address space of cdb.
- * dataspace is address space of the uscsi data buffer.
  */
 static int
-st_ioctl_cmd(dev_t dev, struct uscsi_cmd *ucmd,
-	enum uio_seg cdbspace, enum uio_seg dataspace,
-	enum uio_seg rqbufspace)
+st_ioctl_cmd(dev_t dev, struct uscsi_cmd *ucmd, int flag)
 {
-	struct buf *bp;
-	struct uscsi_cmd *kcmd;
-	caddr_t kcdb;
-	int flag;
-	int err;
-	int rqlen;
-	int offline_state = 0;
-	char *krqbuf = NULL;
+	struct uscsi_cmd	*uscmd;
+	struct buf	*bp;
+	enum uio_seg	uioseg;
+	int	offline_state = 0;
+	int	err = 0;
+	int	rw;
 
 	GET_SOFT_STATE(dev);
 
@@ -5656,7 +5549,7 @@ st_ioctl_cmd(dev_t dev, struct uscsi_cmd *ucmd,
 	 * which it never will, as we set it below.  To prevent
 	 * st_tape_init() from getting called, we have to set state to other
 	 * than ST_STATE_OFFLINE, so we choose ST_STATE_INITIALIZING, which
-	 * achieves this purpose already
+	 * achieves this purpose already.
 	 *
 	 * We use offline_state to preserve the OFFLINE state, if it exists,
 	 * so other entry points to the driver might have the chance to call
@@ -5667,88 +5560,27 @@ st_ioctl_cmd(dev_t dev, struct uscsi_cmd *ucmd,
 		un->un_state = ST_STATE_INITIALIZING;
 		offline_state = 1;
 	}
-	/*
-	 * Is this a request to reset the bus?
-	 * If so, we need go no further.
-	 */
-	if (ucmd->uscsi_flags & (USCSI_RESET|USCSI_RESET_ALL)) {
-		flag = ((ucmd->uscsi_flags & USCSI_RESET_ALL)) ?
-			RESET_ALL : RESET_TARGET;
 
-		mutex_exit(ST_MUTEX);
-		err = (scsi_reset(ROUTE, flag)) ? 0 : EIO;
-		mutex_enter(ST_MUTEX);
-
-		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-			"reset %s %s\n",
-			(flag == RESET_ALL) ? "all" : "target",
-			(err == 0) ? "ok" : "failed");
-		/*
-		 * If scsi reset successful, don't write any filemarks.
-		 */
-		if (err == 0) {
-			un->un_fmneeded = 0;
-		} else {
-			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-			    "st_ioctl_cmd : EIO : scsi_reset failed");
-		}
+	mutex_exit(ST_MUTEX);
+	err = scsi_uscsi_alloc_and_copyin((intptr_t)ucmd, flag,
+	    ROUTE, &uscmd);
+	mutex_enter(ST_MUTEX);
+	if (err != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_ioctl_cmd: scsi_uscsi_alloc_and_copyin failed\n");
 		goto exit;
 	}
 
-	/*
-	 * First do some sanity checks for USCSI commands.
-	 */
-	if ((ucmd->uscsi_cdblen <= 0) ||
-	    (ucmd->uscsi_cdblen > un->un_max_cdb_sz)) {
-		if (cdbspace != UIO_SYSSPACE) {
-			scsi_log(ST_DEVINFO, st_label, SCSI_DEBUG,
-			    "USCSICMD with cdb larger then transport supports");
-		}
-		return (EINVAL);
-	}
-
-	/*
-	 * In order to not worry about where the uscsi structure
-	 * or cdb it points to came from, we kmem_alloc copies
-	 * of them here.  This will allow reference to the data
-	 * they contain long after this process has gone to
-	 * sleep and its kernel stack has been unmapped, etc.
-	 */
-
-	kcdb = kmem_alloc((size_t)ucmd->uscsi_cdblen, KM_SLEEP);
-	if (cdbspace == UIO_SYSSPACE) {
-		bcopy(ucmd->uscsi_cdb, kcdb, ucmd->uscsi_cdblen);
-	} else {
-		if (ddi_copyin(ucmd->uscsi_cdb, kcdb,
-		    (size_t)ucmd->uscsi_cdblen, 0)) {
-			kmem_free(kcdb, (size_t)ucmd->uscsi_cdblen);
-			err = EFAULT;
-			goto exit;
-		}
-	}
-
-	/*
-	 * can't peek at the cdb till is copied into kernal space.
-	 */
-	if (scsi_cdb_size[CDB_GROUPID(kcdb[0])] > un->un_max_cdb_sz) {
-		if (cdbspace != UIO_SYSSPACE) {
-			scsi_log(ST_DEVINFO, st_label, SCSI_DEBUG,
-			    "USCSICMD with cdb larger then transport supports");
-		}
-		kmem_free(kcdb, ucmd->uscsi_cdblen);
-		return (EINVAL);
-	}
-	kcmd = kmem_alloc(sizeof (struct uscsi_cmd), KM_SLEEP);
-	bcopy(ucmd, kcmd, sizeof (struct uscsi_cmd));
-	kcmd->uscsi_cdb = kcdb;
-
-	flag = (kcmd->uscsi_flags & USCSI_READ) ? B_READ : B_WRITE;
+	uioseg = (flag & FKIOCTL) ? UIO_SYSSPACE : UIO_USERSPACE;
+	rw = (uscmd->uscsi_flags & USCSI_READ) ? B_READ : B_WRITE;
 
 	/* check to see if this command requires the drive to be reserved */
-	err = st_check_cdb_for_need_to_reserve(un, &kcdb[0]);
-
-	if (err) {
-		goto exit_free;
+	if (uscmd->uscsi_cdb != NULL) {
+		err = st_check_cdb_for_need_to_reserve(un,
+		    &((char *)uscmd->uscsi_cdb)[0]);
+		if (err) {
+			goto exit_free;
+		}
 	}
 
 	/*
@@ -5759,170 +5591,47 @@ st_ioctl_cmd(dev_t dev, struct uscsi_cmd *ucmd,
 	un->un_sbuf_busy = 1;
 
 #ifdef STDEBUG
-	if (st_debug > 6) {
+	if (uscmd->uscsi_cdb != NULL && st_debug > 6) {
 		st_clean_print(ST_DEVINFO, st_label, SCSI_DEBUG,
-		    "uscsi cdb", kcdb, kcmd->uscsi_cdblen);
-		if (kcmd->uscsi_buflen) {
+		    "uscsi cdb", uscmd->uscsi_cdb, uscmd->uscsi_cdblen);
+		if (uscmd->uscsi_buflen) {
 			ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
-			"uscsi %s of %ld bytes %s %s space\n",
-			(flag == B_READ) ? rd_str : wr_str,
-			kcmd->uscsi_buflen,
-			(flag == B_READ) ? "to" : "from",
-			(dataspace == UIO_SYSSPACE) ? "system" : "user");
+			    "uscsi %s of %ld bytes %s %s space\n",
+			    (rw == B_READ) ? rd_str : wr_str,
+			    uscmd->uscsi_buflen,
+			    (rw == B_READ) ? "to" : "from",
+			    (uioseg == UIO_SYSSPACE) ? "system" : "user");
 		}
 	}
 #endif /* ST_DEBUG */
 
 	/*
-	 * Initialize Request Sense buffering, if requested.
-	 * For user processes, allocate a kernel copy of the sense buffer
+	 * Although st_ioctl_cmd() never makes use of these
+	 * now, we are just being safe and consistent.
 	 */
-	if ((kcmd->uscsi_flags & USCSI_RQENABLE) &&
-			kcmd->uscsi_rqlen && kcmd->uscsi_rqbuf) {
-		if (rqbufspace == UIO_USERSPACE) {
-			krqbuf = kmem_alloc(SENSE_LENGTH, KM_SLEEP);
-		}
-		kcmd->uscsi_rqlen = SENSE_LENGTH;
-		kcmd->uscsi_rqresid = SENSE_LENGTH;
-	} else {
-		kcmd->uscsi_rqlen = 0;
-		kcmd->uscsi_rqresid = 0;
-	}
+	uscmd->uscsi_flags &= ~(USCSI_NOINTR | USCSI_NOPARITY |
+	    USCSI_OTAG | USCSI_HTAG | USCSI_HEAD);
 
-	un->un_srqbufp = krqbuf;
+	un->un_srqbufp = uscmd->uscsi_rqbuf;
 	bp = un->un_sbufp;
 	bzero(bp, sizeof (buf_t));
-
-	/*
-	 * Force asynchronous mode, if necessary.
-	 */
-	if (ucmd->uscsi_flags & USCSI_ASYNC) {
-		mutex_exit(ST_MUTEX);
-		if (scsi_ifgetcap(ROUTE, "synchronous", 1) == 1) {
-			if (scsi_ifsetcap(ROUTE, "synchronous", 0, 1) == 1) {
-				ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
-				    "forced async ok\n");
-			} else {
-				ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
-				    "forced async failed\n");
-				err = EINVAL;
-				mutex_enter(ST_MUTEX);
-				goto done;
-			}
-		}
-		mutex_enter(ST_MUTEX);
+	if (uscmd->uscsi_cdb != NULL) {
+		bp->b_forw =
+		    (struct buf *)(uintptr_t)((char *)uscmd->uscsi_cdb)[0];
+		bp->b_back = (struct buf *)uscmd;
 	}
 
-	/*
-	 * Re-enable synchronous mode, if requested
-	 */
-	if (ucmd->uscsi_flags & USCSI_SYNC) {
-		mutex_exit(ST_MUTEX);
-		if (scsi_ifgetcap(ROUTE, "synchronous", 1) == 0) {
-			int i = scsi_ifsetcap(ROUTE, "synchronous", 1, 1);
-			ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
-				"re-enabled sync %s\n",
-				(i == 1) ? "ok" : "failed");
-		}
-		mutex_enter(ST_MUTEX);
-	}
-
-	if (kcmd->uscsi_buflen) {
-		/*
-		 * We're going to do actual I/O.
-		 * Set things up for physio.
-		 */
-		struct iovec aiov;
-		struct uio auio;
-		struct uio *uio = &auio;
-
-		bzero(&auio, sizeof (struct uio));
-		bzero(&aiov, sizeof (struct iovec));
-		aiov.iov_base = kcmd->uscsi_bufaddr;
-		aiov.iov_len = kcmd->uscsi_buflen;
-
-		uio->uio_iov = &aiov;
-		uio->uio_iovcnt = 1;
-		uio->uio_resid = aiov.iov_len;
-		uio->uio_segflg = dataspace;
-
-		/*
-		 * Let physio do the rest...
-		 */
-		bp->b_forw = (struct buf *)(uintptr_t)kcdb[0];
-		bp->b_back = (struct buf *)kcmd;
-
-		mutex_exit(ST_MUTEX);
-		err = physio(st_strategy, bp, dev, flag, st_uscsi_minphys, uio);
-		mutex_enter(ST_MUTEX);
-	} else {
-		/*
-		 * Mimic physio
-		 */
-		bp->b_forw = (struct buf *)(uintptr_t)kcdb[0];
-		bp->b_back = (struct buf *)kcmd;
-		bp->b_flags = B_BUSY | flag;
-		bp->b_edev = dev;
-		bp->b_dev = cmpdev(dev);
-		bp->b_bcount = 0;
-		bp->b_blkno = 0;
-		bp->b_resid = 0;
-		mutex_exit(ST_MUTEX);
-		(void) st_strategy(bp);
-
-		/*
-		 * BugTraq #4260046
-		 * ----------------
-		 * See comments in st_cmd.
-		 */
-
-		err = biowait(bp);
-		mutex_enter(ST_MUTEX);
-		ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
-		    "st_ioctl_cmd: biowait returns %d\n", err);
-	}
+	mutex_exit(ST_MUTEX);
+	err = scsi_uscsi_handle_cmd(dev, uioseg, uscmd,
+	    st_strategy, bp, NULL);
+	mutex_enter(ST_MUTEX);
 
 	/*
-	 * Copy status from kernel copy of uscsi_cmd to user copy
-	 * of uscsi_cmd - this was saved in st_done_and_mutex_exit()
+	 * If scsi reset successful, don't write any filemarks.
 	 */
-	ucmd->uscsi_status = kcmd->uscsi_status;
-
-done:
-	ucmd->uscsi_resid = bp->b_resid;
-
-	/*
-	 * Update the Request Sense status and resid
-	 */
-	rqlen = kcmd->uscsi_rqlen - kcmd->uscsi_rqresid;
-	rqlen = min(((int)ucmd->uscsi_rqlen), rqlen);
-	ucmd->uscsi_rqresid = ucmd->uscsi_rqlen - rqlen;
-	ucmd->uscsi_rqstatus = kcmd->uscsi_rqstatus;
-	/*
-	 * Copy out the sense data for user processes
-	 */
-	if (ucmd->uscsi_rqbuf && rqlen && rqbufspace == UIO_USERSPACE) {
-		if (copyout(krqbuf, ucmd->uscsi_rqbuf, rqlen)) {
-			err = EFAULT;
-		}
-	}
-
-	ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "st_ioctl_cmd status is 0x%x, resid is 0x%lx\n",
-	    ucmd->uscsi_status, ucmd->uscsi_resid);
-	if (DEBUGGING && (rqlen != 0)) {
-		int i, n, len;
-		char *data = krqbuf;
-		scsi_log(ST_DEVINFO, st_label, SCSI_DEBUG,
-			"rqstatus=0x%x	rqlen=0x%x  rqresid=0x%x\n",
-			ucmd->uscsi_rqstatus, ucmd->uscsi_rqlen,
-			ucmd->uscsi_rqresid);
-		len = (int)ucmd->uscsi_rqlen - ucmd->uscsi_rqresid;
-		for (i = 0; i < len; i += 16) {
-			n = min(16, len-1);
-			st_clean_print(ST_DEVINFO, st_label, CE_NOTE,
-				"  ", &data[i], n);
-		}
+	if ((err == 0) && (uscmd->uscsi_flags &
+	    (USCSI_RESET_LUN | USCSI_RESET_TARGET | USCSI_RESET_ALL))) {
+		un->un_fmneeded = 0;
 	}
 
 exit_free:
@@ -5932,16 +5641,11 @@ exit_free:
 	un->un_sbuf_busy = 0;
 	un->un_srqbufp = NULL;
 	cv_signal(&un->un_sbuf_cv);
-
-	if (krqbuf) {
-		kmem_free(krqbuf, SENSE_LENGTH);
-	}
-	kmem_free(kcdb, kcmd->uscsi_cdblen);
-	kmem_free(kcmd, sizeof (struct uscsi_cmd));
-
+	mutex_exit(ST_MUTEX);
+	(void) scsi_uscsi_copyout_and_free((intptr_t)ucmd, uscmd);
+	mutex_enter(ST_MUTEX);
 	ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
 	    "st_ioctl_cmd returns 0x%x\n", err);
-
 
 exit:
 	/* don't lose offline state */
@@ -7746,11 +7450,9 @@ st_gen_mode_sense(struct scsi_tape *un, int page, struct seq_mode *page_data,
 	com->uscsi_bufaddr = (caddr_t)page_data;
 	com->uscsi_buflen = page_size;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
-	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT |
-			    USCSI_READ | USCSI_RQENABLE;
+	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
 
-	r = st_ioctl_cmd(un->un_dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-		UIO_SYSSPACE);
+	r = st_ioctl_cmd(un->un_dev, com, FKIOCTL);
 	kmem_free(com, sizeof (*com));
 	return (r);
 }
@@ -7797,11 +7499,9 @@ st_gen_mode_select(struct scsi_tape *un, struct seq_mode *page_data,
 	com->uscsi_bufaddr = (caddr_t)page_data;
 	com->uscsi_buflen = page_size;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
-	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT
-		| USCSI_WRITE | USCSI_RQENABLE;
+	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_WRITE;
 
-	r = st_ioctl_cmd(un->un_dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-		UIO_SYSSPACE);
+	r = st_ioctl_cmd(un->un_dev, com, FKIOCTL);
 
 	kmem_free(com, sizeof (*com));
 	return (r);
@@ -10486,12 +10186,10 @@ st_report_exabyte_soft_errors(dev_t dev, int flag)
 	com->uscsi_cdblen = CDB_GROUP0;
 	com->uscsi_bufaddr = (caddr_t)sensep;
 	com->uscsi_buflen = TAPE_SENSE_LENGTH;
-	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT
-		| USCSI_READ | USCSI_RQENABLE;
+	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
 
-	rval = st_ioctl_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-		UIO_SYSSPACE);
+	rval = st_ioctl_cmd(dev, com, FKIOCTL);
 	if (rval || com->uscsi_status) {
 		goto done;
 	}
@@ -10613,10 +10311,9 @@ st_report_dat_soft_errors(dev_t dev, int flag)
 	com->uscsi_bufaddr = (caddr_t)sensep;
 	com->uscsi_buflen  = LOG_SENSE_LENGTH;
 	com->uscsi_flags   =
-	    USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ | USCSI_RQENABLE;
+	    USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
-	rval =
-	    st_ioctl_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE, UIO_SYSSPACE);
+	rval = st_ioctl_cmd(dev, com, FKIOCTL);
 	if (rval) {
 		scsi_log(ST_DEVINFO, st_label, CE_WARN,
 		    "DAT soft error reporting failed\n");
@@ -10745,9 +10442,8 @@ st_report_dat_soft_errors(dev_t dev, int flag)
 	*c   = 0;
 	com->uscsi_bufaddr = NULL;
 	com->uscsi_buflen  = 0;
-	com->uscsi_flags   = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_RQENABLE;
-	rval =
-	    st_ioctl_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE, UIO_SYSSPACE);
+	com->uscsi_flags   = USCSI_DIAGNOSE | USCSI_SILENT;
+	rval = st_ioctl_cmd(dev, com, FKIOCTL);
 	if (rval) {
 		scsi_log(ST_DEVINFO, st_label, CE_WARN,
 		    "DAT soft error reset failed\n");
@@ -11054,8 +10750,7 @@ st_reserve_release(struct scsi_tape *un, int cmd)
 	com->uscsi_cdblen = CDB_GROUP0;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
 
-	rval = st_ioctl_cmd(un->un_dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-	    UIO_SYSSPACE);
+	rval = st_ioctl_cmd(un->un_dev, com, FKIOCTL);
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
 	    "st_reserve_release: rval(1)=%d\n", rval);
@@ -11309,9 +11004,9 @@ st_logpage_supported(dev_t dev, uchar_t page)
 	com->uscsi_bufaddr = (caddr_t)sensep;
 	com->uscsi_buflen = LOG_SENSE_LENGTH;
 	com->uscsi_flags =
-		USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ | USCSI_RQENABLE;
+		USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
-	rval = st_ioctl_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE, UIO_SYSSPACE);
+	rval = st_ioctl_cmd(dev, com, FKIOCTL);
 	if (rval || com->uscsi_status) {
 		/* uscsi-command failed */
 		rval = -1;
@@ -11465,14 +11160,14 @@ st_check_sequential_clean_bit(dev_t dev)
 	sp  = kmem_zalloc(sizeof (struct log_sequential_page), KM_SLEEP);
 
 	cmd->uscsi_flags   =
-		USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ | USCSI_RQENABLE;
+		USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
 	cmd->uscsi_timeout = un->un_dp->non_motion_timeout;
 	cmd->uscsi_cdb	   = cdb;
 	cmd->uscsi_cdblen  = CDB_GROUP1;
 	cmd->uscsi_bufaddr = (caddr_t)sp;
 	cmd->uscsi_buflen  = sizeof (struct log_sequential_page);
 
-	rval = st_ioctl_cmd(dev, cmd, UIO_SYSSPACE, UIO_SYSSPACE, UIO_SYSSPACE);
+	rval = st_ioctl_cmd(dev, cmd, FKIOCTL);
 
 	if (rval || cmd->uscsi_status || cmd->uscsi_resid) {
 
@@ -11546,10 +11241,10 @@ st_check_alert_flags(dev_t dev)
 	com->uscsi_bufaddr = (caddr_t)ta;
 	com->uscsi_buflen = sizeof (struct st_tape_alert);
 	com->uscsi_flags =
-		USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ | USCSI_RQENABLE;
+		USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
 
-	rval = st_ioctl_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE, UIO_SYSSPACE);
+	rval = st_ioctl_cmd(dev, com, FKIOCTL);
 
 	if (rval || com->uscsi_status || com->uscsi_resid) {
 
@@ -11687,11 +11382,10 @@ st_check_sense_clean_bit(dev_t dev)
 	com->uscsi_bufaddr = (caddr_t)sensep;
 	com->uscsi_buflen = length;
 	com->uscsi_flags =
-		USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ | USCSI_RQENABLE;
+		USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
 
-	rval = st_ioctl_cmd(dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
-			UIO_SYSSPACE);
+	rval = st_ioctl_cmd(dev, com, FKIOCTL);
 
 	if (rval || com->uscsi_status || com->uscsi_resid) {
 
@@ -11973,8 +11667,7 @@ st_is_stk_worm(struct scsi_tape *un)
 	cmd->uscsi_rqlen = 0;
 	cmd->uscsi_rqbuf = NULL;
 
-	result = st_ioctl_cmd(un->un_dev, cmd,
-	    UIO_SYSSPACE, UIO_SYSSPACE, UIO_SYSSPACE);
+	result = st_ioctl_cmd(un->un_dev, cmd, FKIOCTL);
 
 	if (result != 0 || cmd->uscsi_status != 0) {
 		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
@@ -12280,8 +11973,7 @@ st_read_attributes(struct scsi_tape *un, uint16_t attribute, caddr_t buf,
 	cmd->uscsi_buflen = size;
 	cmd->uscsi_cdblen = sizeof (cdb);
 
-	result = st_ioctl_cmd(un->un_dev, cmd,
-	    UIO_SYSSPACE, UIO_SYSSPACE, UIO_SYSSPACE);
+	result = st_ioctl_cmd(un->un_dev, cmd, FKIOCTL);
 
 	if (result != 0 || cmd->uscsi_status != 0) {
 		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
@@ -12324,8 +12016,7 @@ st_get_special_inquiry(struct scsi_tape *un, uchar_t size, caddr_t dest,
 	cmd->uscsi_rqlen = sizeof (struct scsi_extended_sense);
 	cmd->uscsi_rqbuf = (caddr_t)sense;
 
-	result = st_ioctl_cmd(un->un_dev, cmd,
-	    UIO_SYSSPACE, UIO_SYSSPACE, UIO_SYSSPACE);
+	result = st_ioctl_cmd(un->un_dev, cmd, FKIOCTL);
 
 	if (result != 0 || cmd->uscsi_status != 0) {
 		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,

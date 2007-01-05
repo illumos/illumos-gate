@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,14 +21,13 @@
 /*
  * Enclosure Services Device target driver
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 #include <sys/file.h>
-#include <sys/stat.h>
 #include <sys/scsi/scsi.h>
 #include <sys/scsi/generic/status.h>
 #include <sys/scsi/targets/sesio.h>
@@ -814,7 +812,7 @@ ses_ioctl(dev_t dev, int cmd, intptr_t arg, int flg, cred_t *cred_p, int *rvalp)
 		break;
 
 	case USCSICMD:
-		rv = ses_uscsi_cmd(ssc, (Uscmd *) arg, flg, flg, flg, flg);
+		rv = ses_uscsi_cmd(ssc, (Uscmd *)arg, flg);
 		break;
 
 	default:
@@ -836,7 +834,7 @@ ses_runcmd(ses_softc_t *ssc, Uscmd *lp)
 	int e;
 
 	lp->uscsi_status = 0;
-	e = ses_uscsi_cmd(ssc, lp, FKIOCTL, FKIOCTL, FKIOCTL, FKIOCTL);
+	e = ses_uscsi_cmd(ssc, lp, FKIOCTL);
 
 #ifdef	not
 	/*
@@ -865,72 +863,12 @@ ses_runcmd(ses_softc_t *ssc, Uscmd *lp)
  * Run a scsi command.
  */
 int
-ses_uscsi_cmd(ses_softc_t *ssc, Uscmd *Uc, int Uf, int Cf, int Df, int Rf)
+ses_uscsi_cmd(ses_softc_t *ssc, Uscmd *Uc, int Uf)
 {
-	Uscmd local, *lc = &local, *scmd = &ssc->ses_uscsicmd;
-	int err = EOK;
-	int rw, rqlen;
-	struct buf *bp;
-
-#ifdef	_MULTI_DATAMODEL
-	/*
-	 * 32 bit application to 64 bit kernel call.
-	 */
-	struct uscsi_cmd32 ucmd_32, *uc = &ucmd_32;
-
-	switch (ddi_model_convert_from(Uf & FMODELS)) {
-	case DDI_MODEL_ILP32:
-		if (ddi_copyin(Uc, uc, sizeof (*uc), Uf)) {
-			SES_LOG(ssc, SES_CE_DEBUG2, efl, __LINE__);
-			return (EFAULT);
-		}
-		uscsi_cmd32touscsi_cmd(uc, lc);
-		break;
-	case DDI_MODEL_NONE:
-		uc = NULL;
-		if (ddi_copyin(Uc, lc, sizeof (*lc), Uf)) {
-			SES_LOG(ssc, SES_CE_DEBUG2, efl, __LINE__);
-			return (EFAULT);
-		}
-		break;
-	default:
-		SES_LOG(ssc, CE_NOTE, "Unknown model conversion flag %x",
-		    Uf & FMODELS);
-		return (EINVAL);
-	}
-#else	/* _MULTI_DATAMODEL */
-	if (ddi_copyin(Uc, lc, sizeof (*lc), Uf)) {
-		SES_LOG(ssc, SES_CE_DEBUG2, efl, __LINE__);
-		return (EFAULT);
-	}
-#endif	/* _MULTI_DATAMODEL */
-
-	/*
-	 * Is this a request to reset the bus?
-	 * If so, we need go no further.
-	 */
-	if (lc->uscsi_flags & (USCSI_RESET|USCSI_RESET_ALL)) {
-		int flag = ((lc->uscsi_flags & USCSI_RESET_ALL)) ?
-			RESET_ALL : RESET_TARGET;
-		err = (scsi_reset(SES_ROUTE(ssc), flag))? 0 : EIO;
-		SES_LOG(ssc, SES_CE_DEBUG1, "reset %s %s\n",
-			(flag == RESET_ALL)? "all" : "target",
-			(err)? "failed" : "ok");
-		return (err);
-	}
-
-	/*
-	 * First do some sanity checks.
-	 */
-	if (lc->uscsi_cdblen == 0) {
-		SES_LOG(ssc, SES_CE_DEBUG1, "cblen %d", lc->uscsi_cdblen);
-		return (EINVAL);
-	}
-	if (lc->uscsi_flags & USCSI_RQENABLE &&
-	    (lc->uscsi_rqlen == 0 || lc->uscsi_rqbuf == NULL)) {
-		return (EINVAL);
-	}
-
+	Uscmd	*uscmd;
+	struct buf	*bp;
+	enum uio_seg	uioseg;
+	int	err;
 
 	/*
 	 * Grab local 'special' buffer
@@ -954,151 +892,82 @@ ses_uscsi_cmd(ses_softc_t *ssc, Uscmd *Uc, int Uf, int Cf, int Df, int Rf)
 		return (EIO);
 	}
 
-
-	bcopy(lc, scmd, sizeof (Uscmd));
-
-	if (ddi_copyin(lc->uscsi_cdb, &ssc->ses_srqcdb,
-	    (size_t)scmd->uscsi_cdblen, Cf)) {
+	err = scsi_uscsi_alloc_and_copyin((intptr_t)Uc, Uf,
+	    SES_ROUTE(ssc), &uscmd);
+	if (err != 0) {
+		SES_LOG(ssc, SES_CE_DEBUG1, "ses_uscsi_cmd: "
+		    "scsi_uscsi_alloc_and_copyin failed\n");
 		mutex_enter(SES_MUTEX);
 		ssc->ses_sbufbsy = 0;
 		cv_signal(&ssc->ses_sbufcv);
 		mutex_exit(SES_MUTEX);
 		SES_LOG(ssc, SES_CE_DEBUG2, efl, __LINE__);
-		return (EFAULT);
-	}
-	scmd->uscsi_cdb = (char *)ssc->ses_srqcdb;
-
-
-	if (scmd->uscsi_flags & USCSI_RQENABLE) {
-		scmd->uscsi_rqlen = min(SENSE_LENGTH, scmd->uscsi_rqlen);
-		scmd->uscsi_rqresid = scmd->uscsi_rqlen;
-		scmd->uscsi_rqbuf = (char *)&ssc->ses_srqsbuf;
-	} else {
-		scmd->uscsi_flags &= ~USCSI_RQENABLE;
-		scmd->uscsi_rqlen = 0;
-		scmd->uscsi_rqresid = 0;
-		scmd->uscsi_rqbuf = (char *)NULL;
+		return (err);
 	}
 
 	/*
-	 * Drive on..
+	 * Copy the uscsi command related infos to ssc for use in ses_start()
+	 * and ses_callback().
 	 */
-	rw = (scmd->uscsi_flags & USCSI_READ) ? B_READ : B_WRITE;
+	bcopy(uscmd, &ssc->ses_uscsicmd, sizeof (Uscmd));
+	if (uscmd->uscsi_cdb != NULL) {
+		bcopy(uscmd->uscsi_cdb, &ssc->ses_srqcdb,
+		    (size_t)(uscmd->uscsi_cdblen));
+	}
 
-	/*
-	 * We're going to do actual I/O,
-	 * let physio do all the right things.
-	 */
 	bp = ssc->ses_sbufp;
 	bp->av_back = (struct buf *)NULL;
 	bp->av_forw = (struct buf *)NULL;
 	bp->b_back = (struct buf *)ssc;
 	bp->b_edev = NODEV;
 
-	if (scmd->uscsi_cdblen == CDB_GROUP0) {
-		SES_LOG(ssc, SES_CE_DEBUG7,
-		    "scsi_cmd: %x %x %x %x %x %x",
-		    ssc->ses_srqcdb[0], ssc->ses_srqcdb[1],
-		    ssc->ses_srqcdb[2], ssc->ses_srqcdb[3],
-		    ssc->ses_srqcdb[4], ssc->ses_srqcdb[5]);
-	} else {
-		SES_LOG(ssc, SES_CE_DEBUG7,
-		    "scsi cmd: %x %x %x %x %x %x %x %x %x %x",
-		    ssc->ses_srqcdb[0], ssc->ses_srqcdb[1],
-		    ssc->ses_srqcdb[2], ssc->ses_srqcdb[3],
-		    ssc->ses_srqcdb[4], ssc->ses_srqcdb[5],
-		    ssc->ses_srqcdb[6], ssc->ses_srqcdb[7],
-		    ssc->ses_srqcdb[8], ssc->ses_srqcdb[9]);
-	}
-
-	if (scmd->uscsi_buflen) {
-		struct iovec aiov;
-		struct uio auio;
-		struct uio *uio = &auio;
-
-		bzero(&auio, sizeof (struct uio));
-		bzero(&aiov, sizeof (struct iovec));
-
-		aiov.iov_base = scmd->uscsi_bufaddr;
-		aiov.iov_len = scmd->uscsi_buflen;
-		uio->uio_iov = &aiov;
-		uio->uio_iovcnt = 1;
-		uio->uio_resid = aiov.iov_len;
-		uio->uio_segflg =
-			(Df & FKIOCTL)? UIO_SYSSPACE : UIO_USERSPACE;
-
-		/*
-		 * Call physio and let that do the rest.
-		 * Note: we wait there until the command is complete.
-		 */
-		err = physio(ses_start, bp, NODEV, rw, minphys, uio);
-		scmd->uscsi_resid = bp->b_resid;
-	} else {
-		/*
-		 * Since we do not move any data in this section
-		 * call ses_start directly. Mimic physio.
-		 */
-		bp->b_flags = B_BUSY | rw;
-		bp->b_bcount = 0;
-		(void) ses_start(bp);
-		scmd->uscsi_resid = 0;
-		err = biowait(bp);
-	}
-
-
-	/*
-	 * Copy status and sense data to where it needs to be..
-	 * If the sender of the scsi command is in user space,
-	 * mask off the high bits.
-	 */
-	lc->uscsi_status = scmd->uscsi_status;
-	if (lc->uscsi_status)
-		SES_LOG(ssc, SES_CE_DEBUG5, "status %x", lc->uscsi_status);
-	lc->uscsi_resid = scmd->uscsi_resid;
-
-	rqlen = scmd->uscsi_rqlen - scmd->uscsi_rqresid;
-	lc->uscsi_rqresid = scmd->uscsi_rqlen - rqlen;
-
-	if (lc->uscsi_rqbuf && rqlen) {
-		SES_LOG(ssc, SES_CE_DEBUG5, "Sense Key %x",
-		    scmd->uscsi_rqbuf[2] & 0xf);
-		if (ddi_copyout(scmd->uscsi_rqbuf, lc->uscsi_rqbuf,
-		    rqlen, Rf)) {
-			SES_LOG(ssc, SES_CE_DEBUG2,
-			    "ses_uscsi_cmd: rqbuf copy-out problem");
-			SES_LOG(ssc, SES_CE_DEBUG2, efl, __LINE__);
-			err = EFAULT;
+	if (uscmd->uscsi_cdb != NULL) {
+		if (uscmd->uscsi_cdblen == CDB_GROUP0) {
+			SES_LOG(ssc, SES_CE_DEBUG7,
+			    "scsi_cmd: %x %x %x %x %x %x",
+			    ((char *)uscmd->uscsi_cdb)[0],
+			    ((char *)uscmd->uscsi_cdb)[1],
+			    ((char *)uscmd->uscsi_cdb)[2],
+			    ((char *)uscmd->uscsi_cdb)[3],
+			    ((char *)uscmd->uscsi_cdb)[4],
+			    ((char *)uscmd->uscsi_cdb)[5]);
+		} else {
+			SES_LOG(ssc, SES_CE_DEBUG7,
+			    "scsi cmd: %x %x %x %x %x %x %x %x %x %x",
+			    ((char *)uscmd->uscsi_cdb)[0],
+			    ((char *)uscmd->uscsi_cdb)[1],
+			    ((char *)uscmd->uscsi_cdb)[2],
+			    ((char *)uscmd->uscsi_cdb)[3],
+			    ((char *)uscmd->uscsi_cdb)[4],
+			    ((char *)uscmd->uscsi_cdb)[5],
+			    ((char *)uscmd->uscsi_cdb)[6],
+			    ((char *)uscmd->uscsi_cdb)[7],
+			    ((char *)uscmd->uscsi_cdb)[8],
+			    ((char *)uscmd->uscsi_cdb)[9]);
 		}
 	}
 
+	uioseg = (Uf & FKIOCTL) ? UIO_SYSSPACE : UIO_USERSPACE;
+	err = scsi_uscsi_handle_cmd(NODEV, uioseg, uscmd,
+	    ses_start, bp, NULL);
+
 	/*
-	 * Free up allocated resources.
+	 * ses_callback() may set values for ssc->ses_uscsicmd or
+	 * ssc->ses_srqsbuf, so copy them back to uscmd.
 	 */
+	if (uscmd->uscsi_rqbuf != NULL) {
+		bcopy(&ssc->ses_srqsbuf, uscmd->uscsi_rqbuf,
+		    (size_t)(uscmd->uscsi_rqlen));
+		uscmd->uscsi_rqresid = ssc->ses_uscsicmd.uscsi_rqresid;
+	}
+	uscmd->uscsi_status = ssc->ses_uscsicmd.uscsi_status;
+
+	(void) scsi_uscsi_copyout_and_free((intptr_t)Uc, uscmd);
 	mutex_enter(SES_MUTEX);
 	ssc->ses_sbufbsy = 0;
 	cv_signal(&ssc->ses_sbufcv);
 	mutex_exit(SES_MUTEX);
 
-	/*
-	 * Copy out changed values
-	 */
-#ifdef	_MULTI_DATAMODEL
-	if (uc != NULL) {
-		uscsi_cmdtouscsi_cmd32(lc, uc);
-		if (ddi_copyout(uc, Uc, sizeof (*uc), Uf)) {
-			SES_LOG(ssc, SES_CE_DEBUG2, efl, __LINE__);
-			return (EFAULT);
-		}
-	} else
-#endif	/* _MULTI_DATAMODEL */
-
-	if (ddi_copyout(lc, Uc, sizeof (*lc), Uf)) {
-		SES_LOG(ssc, SES_CE_DEBUG2, efl, __LINE__);
-		if (err == 0)
-			err = EFAULT;
-	}
-	if (err)
-		SES_LOG(ssc, SES_CE_DEBUG5, "ses_uscsi_cmd returning %d", err);
 	return (err);
 }
 
