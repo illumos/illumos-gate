@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -628,7 +628,7 @@ audit_symlink(struct pathname *pnp, struct pathname *sympath)
 
 	/* is there anything to save? */
 	if (len_path) {
-		pnp->pn_path = cp;
+		pnp->pn_path = pnp->pn_buf;
 		audit_pathbuild(pnp);
 		pnp->pn_path = sp;
 	}
