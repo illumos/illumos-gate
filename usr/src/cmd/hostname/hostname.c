@@ -29,12 +29,13 @@
  * contributors.
  */
 
-/* Portions Copyright 2006 Jeremy Teo */
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/* Portions Copyright 2007 Jeremy Teo */
+/* Portions Copyright 2006 Stephen P. Potter */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
@@ -44,8 +45,7 @@
 #include <libgen.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <sys/utsname.h>
-#include <sys/systeminfo.h>
+#include <netdb.h>
 
 #ifndef	TEXT_DOMAIN		/* should be defined by cc -D */
 #define	TEXT_DOMAIN "SYS_TEST"	/* use this only if it wasn't */
@@ -65,7 +65,7 @@ int
 main(int argc, char *argv[])
 {
 	char	*nodename = NULL;
-	char	c_hostname[SYS_NMLN];
+	char    c_hostname[MAXHOSTNAMELEN];
 	int	optlet;
 	char	*optstring = "?";
 
@@ -86,13 +86,13 @@ main(int argc, char *argv[])
 	 * if called with no options, just print out the hostname/nodename
 	 */
 	if (argc <= optind) {
-		if (sysinfo(SI_HOSTNAME, c_hostname, SYS_NMLN)) {
-			(void) fprintf(stdout, "%s\n", c_hostname);
-		} else {
+		if (gethostname(c_hostname, sizeof (c_hostname)) < 0) {
 			(void) fprintf(stderr,
 			    gettext("%s: unable to obtain hostname\n"),
 			    basename(progname));
 			exit(1);
+		} else {
+			(void) fprintf(stdout, "%s\n", c_hostname);
 		}
 	} else {
 		/*
@@ -103,7 +103,7 @@ main(int argc, char *argv[])
 			usage();	/* too many arguments */
 
 		nodename = argv[optind];
-		if (sysinfo(SI_SET_HOSTNAME, nodename, strlen(nodename)) < 0) {
+		if (sethostname(nodename, strlen(nodename)) < 0) {
 			int err = errno;
 			(void) fprintf(stderr,
 			    gettext("%s: error in setting name: %s\n"),
