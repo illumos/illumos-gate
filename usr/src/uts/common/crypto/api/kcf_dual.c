@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -882,7 +882,6 @@ crypto_encrypt_mac_update(crypto_context_t context,
 	}
 
 	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
-	KCF_PROV_REFHOLD(pd);
 
 	if ((kcf_mac_ctx = kcf_ctx->kc_secondctx) != NULL) {
 		off_t save_offset;
@@ -963,7 +962,6 @@ crypto_encrypt_mac_update(crypto_context_t context,
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 out:
-	KCF_PROV_REFRELE(pd);
 	return (error);
 }
 
@@ -987,7 +985,6 @@ int crypto_encrypt_mac_final(crypto_context_t context, crypto_dual_data_t *ct,
 	}
 
 	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
-	KCF_PROV_REFHOLD(pd);
 
 	if ((kcf_mac_ctx = kcf_ctx->kc_secondctx) != NULL) {
 		off_t save_offset;
@@ -996,7 +993,6 @@ int crypto_encrypt_mac_final(crypto_context_t context, crypto_dual_data_t *ct,
 		crypto_call_flag_t save_flag;
 
 		if (kcf_mac_ctx->kc_prov_desc == NULL) {
-			KCF_PROV_REFRELE(pd);
 			return (CRYPTO_INVALID_CONTEXT);
 		}
 		mac_ctx = &kcf_mac_ctx->kc_glbl_ctx;
@@ -1006,8 +1002,6 @@ int crypto_encrypt_mac_final(crypto_context_t context, crypto_dual_data_t *ct,
 			/* Get the last chunk of ciphertext */
 			error = crypto_encrypt_final(context,
 			    (crypto_data_t *)ct, NULL);
-
-			KCF_PROV_REFRELE(pd);
 
 			if (error != CRYPTO_SUCCESS)  {
 				/*
@@ -1052,7 +1046,6 @@ int crypto_encrypt_mac_final(crypto_context_t context, crypto_dual_data_t *ct,
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 
 		cr->cr_flag = save_flag;
-		KCF_PROV_REFRELE(pd);
 		return (error);
 	}
 	/* The fast path for SW providers. */
@@ -1065,7 +1058,6 @@ int crypto_encrypt_mac_final(crypto_context_t context, crypto_dual_data_t *ct,
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 out:
-	KCF_PROV_REFRELE(pd);
 	/* Release the hold done in kcf_new_ctx() during init step. */
 	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
 	return (error);
@@ -1996,7 +1988,6 @@ crypto_mac_decrypt_update(crypto_context_t context,
 	}
 
 	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
-	KCF_PROV_REFHOLD(pd);
 
 	if ((kcf_mac_ctx = kcf_ctx->kc_secondctx) != NULL) {
 		off_t save_offset;
@@ -2063,7 +2054,6 @@ crypto_mac_decrypt_update(crypto_context_t context,
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 out:
-	KCF_PROV_REFRELE(pd);
 	return (error);
 }
 
@@ -2088,7 +2078,6 @@ crypto_mac_decrypt_final(crypto_context_t context, crypto_data_t *mac,
 	}
 
 	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
-	KCF_PROV_REFHOLD(pd);
 
 	if ((kcf_mac_ctx = kcf_ctx->kc_secondctx) != NULL) {
 		crypto_call_flag_t save_flag;
@@ -2112,7 +2101,6 @@ crypto_mac_decrypt_final(crypto_context_t context, crypto_data_t *mac,
 				error = crypto_decrypt_final(context, pt, NULL);
 			}
 
-			KCF_PROV_REFRELE(pd);
 			return (error);
 		}
 		/* submit a pure asynchronous request. */
@@ -2127,7 +2115,6 @@ crypto_mac_decrypt_final(crypto_context_t context, crypto_data_t *mac,
 
 		cr->cr_flag = save_flag;
 
-		KCF_PROV_REFRELE(pd);
 		return (error);
 	}
 
@@ -2142,7 +2129,6 @@ crypto_mac_decrypt_final(crypto_context_t context, crypto_data_t *mac,
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 out:
-	KCF_PROV_REFRELE(pd);
 	/* Release the hold done in kcf_new_ctx() during init step. */
 	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
 	return (error);

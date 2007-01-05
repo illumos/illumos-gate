@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,11 +162,9 @@ crypto_verify_single(crypto_context_t context, crypto_data_t *data,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
-	KCF_PROV_REFHOLD(pd);
 	KCF_WRAP_VERIFY_OPS_PARAMS(&params, KCF_OP_SINGLE, 0, NULL,
 	    NULL, data, signature, NULL);
 	error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
-	KCF_PROV_REFRELE(pd);
 
 	/* Release the hold done in kcf_new_ctx() during init step. */
 	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
@@ -194,11 +192,9 @@ crypto_verify_update(crypto_context_t context, crypto_data_t *data,
 	}
 
 	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
-	KCF_PROV_REFHOLD(pd);
 	KCF_WRAP_VERIFY_OPS_PARAMS(&params, KCF_OP_UPDATE, ctx->cc_session,
 	    NULL, NULL, data, NULL, NULL);
 	rv = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
-	KCF_PROV_REFRELE(pd);
 
 	return (rv);
 }
@@ -223,11 +219,9 @@ crypto_verify_final(crypto_context_t context, crypto_data_t *signature,
 	}
 
 	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
-	KCF_PROV_REFHOLD(pd);
 	KCF_WRAP_VERIFY_OPS_PARAMS(&params, KCF_OP_FINAL, ctx->cc_session,
 	    NULL, NULL, NULL, signature, NULL);
 	rv = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
-	KCF_PROV_REFRELE(pd);
 
 	/* Release the hold done in kcf_new_ctx() during init step. */
 	KCF_CONTEXT_COND_RELEASE(rv, kcf_ctx);
@@ -454,11 +448,9 @@ crypto_verify_recover_single(crypto_context_t context, crypto_data_t *signature,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
-	KCF_PROV_REFHOLD(pd);
 	KCF_WRAP_VERIFY_OPS_PARAMS(&params, KCF_OP_VERIFY_RECOVER, 0, NULL,
 	    NULL, data, signature, NULL);
 	error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
-	KCF_PROV_REFRELE(pd);
 
 	/* Release the hold done in kcf_new_ctx() during init step. */
 	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);

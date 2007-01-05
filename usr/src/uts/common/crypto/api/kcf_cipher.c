@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -451,7 +451,6 @@ crypto_encrypt_update(crypto_context_t context, crypto_data_t *plaintext,
 	}
 
 	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
-	KCF_PROV_REFHOLD(pd);
 
 	/* The fast path for SW providers. */
 	if (CHECK_FASTPATH(cr, pd)) {
@@ -464,7 +463,6 @@ crypto_encrypt_update(crypto_context_t context, crypto_data_t *plaintext,
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 
-	KCF_PROV_REFRELE(pd);
 	return (error);
 }
 
@@ -503,7 +501,6 @@ crypto_encrypt_final(crypto_context_t context, crypto_data_t *ciphertext,
 	}
 
 	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
-	KCF_PROV_REFHOLD(pd);
 
 	/* The fast path for SW providers. */
 	if (CHECK_FASTPATH(cr, pd)) {
@@ -515,7 +512,6 @@ crypto_encrypt_final(crypto_context_t context, crypto_data_t *ciphertext,
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 
-	KCF_PROV_REFRELE(pd);
 	/* Release the hold done in kcf_new_ctx() during init step. */
 	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
 	return (error);
@@ -728,7 +724,6 @@ crypto_decrypt_update(crypto_context_t context, crypto_data_t *ciphertext,
 	}
 
 	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
-	KCF_PROV_REFHOLD(pd);
 
 	/* The fast path for SW providers. */
 	if (CHECK_FASTPATH(cr, pd)) {
@@ -741,7 +736,6 @@ crypto_decrypt_update(crypto_context_t context, crypto_data_t *ciphertext,
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 
-	KCF_PROV_REFRELE(pd);
 	return (error);
 }
 
@@ -780,7 +774,6 @@ crypto_decrypt_final(crypto_context_t context, crypto_data_t *plaintext,
 	}
 
 	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
-	KCF_PROV_REFHOLD(pd);
 
 	/* The fast path for SW providers. */
 	if (CHECK_FASTPATH(cr, pd)) {
@@ -793,7 +786,6 @@ crypto_decrypt_final(crypto_context_t context, crypto_data_t *plaintext,
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 
-	KCF_PROV_REFRELE(pd);
 	/* Release the hold done in kcf_new_ctx() during init step. */
 	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
 	return (error);
@@ -818,7 +810,6 @@ crypto_encrypt_single(crypto_context_t context, crypto_data_t *plaintext,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
-	KCF_PROV_REFHOLD(pd);
 
 	/* The fast path for SW providers. */
 	if (CHECK_FASTPATH(cr, pd)) {
@@ -831,7 +822,6 @@ crypto_encrypt_single(crypto_context_t context, crypto_data_t *plaintext,
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 
-	KCF_PROV_REFRELE(pd);
 	/* Release the hold done in kcf_new_ctx() during init step. */
 	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
 	return (error);
@@ -856,7 +846,6 @@ crypto_decrypt_single(crypto_context_t context, crypto_data_t *ciphertext,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
-	KCF_PROV_REFHOLD(pd);
 
 	/* The fast path for SW providers. */
 	if (CHECK_FASTPATH(cr, pd)) {
@@ -869,7 +858,6 @@ crypto_decrypt_single(crypto_context_t context, crypto_data_t *ciphertext,
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 
-	KCF_PROV_REFRELE(pd);
 	/* Release the hold done in kcf_new_ctx() during init step. */
 	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
 	return (error);
