@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1087,6 +1087,7 @@ source(int argc, char *argv[])
 	char *last, *name, buf[RCP_BUFSIZE];
 	off_t off, size, i;
 	ssize_t cnt;
+	struct linger lingerbuf;
 
 	for (x = 0; x < argc; x++) {
 		name = argv[x];
@@ -1204,10 +1205,28 @@ notreg:
 						break;
 					}
 				}
+				if (cnt == 0)
+					break;
 				size -= cnt;
 			}
-			if (cnt == -1) {
+			if (cnt < 0) {
 				error("rcp: %s: %s\n", name, strerror(errno));
+			} else if (cnt == 0 && size != 0) {
+				error("rcp: %s: unexpected end of file\n",
+					name);
+				lingerbuf.l_onoff = 1;
+				lingerbuf.l_linger = 0;
+				(void) setsockopt(rem, SOL_SOCKET, SO_LINGER,
+					&lingerbuf, sizeof (lingerbuf));
+				/*
+				 * When response() (see below) is invoked it
+				 * tries to read data from closed handle which
+				 * triggers error and lostconn() function.
+				 * lostconn() terminates the program with
+				 * appropriate message.
+				 */
+				(void) close(rem);
+				rem = -1;
 			} else {
 				(void) write(rem, "", 1);
 			}
