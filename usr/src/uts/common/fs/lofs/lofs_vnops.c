@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -702,6 +702,27 @@ lo_link(vnode_t *tdvp, vnode_t *vp, char *tnm, struct cred *cr)
 #ifdef LODEBUG
 	lo_dprint(4, "lo_link vp %p realvp %p\n", vp, realvp(vp));
 #endif
+
+	/*
+	 * The source and destination vnodes may be in different lofs
+	 * filesystems sharing the same underlying filesystem, so we need to
+	 * make sure that the filesystem containing the source vnode is not
+	 * mounted read-only (vn_link() has already checked the target vnode).
+	 *
+	 * In a situation such as:
+	 *
+	 * /data	- regular filesystem
+	 * /foo		- lofs mount of /data/foo
+	 * /bar		- read-only lofs mount of /data/bar
+	 *
+	 * This disallows a link from /bar/somefile to /foo/somefile,
+	 * which would otherwise allow changes to somefile on the read-only
+	 * mounted /bar.
+	 */
+
+	if (vn_is_readonly(vp)) {
+		return (EROFS);
+	}
 	while (vn_matchops(vp, lo_vnodeops)) {
 		vp = realvp(vp);
 	}
