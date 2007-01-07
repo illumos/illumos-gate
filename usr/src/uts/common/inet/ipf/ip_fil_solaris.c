@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,8 @@ static	int	ipf_hook __P((hook_data_t, int, int));
 
 static	hook_t	ipfhook_in;
 static	hook_t	ipfhook_out;
+static  hook_t  ipfhook_loop_in;
+static  hook_t  ipfhook_loop_out;
 static	hook_t	ipfhook_nicevents;
 
 /* flags to indicate whether hooks are registered. */
@@ -183,11 +185,11 @@ int ipldetach()
 		}
 		if (hook6_loopback_in) {
 			hook6_loopback_in = (net_unregister_hook(ipf_ipv6,
-			    NH_LOOPBACK_IN, &ipfhook_in) != 0);
+			    NH_LOOPBACK_IN, &ipfhook_loop_in) != 0);
 		}
 		if (hook6_loopback_out) {
 			hook6_loopback_out = (net_unregister_hook(ipf_ipv6,
-			    NH_LOOPBACK_OUT, &ipfhook_out) != 0);
+			    NH_LOOPBACK_OUT, &ipfhook_loop_out) != 0);
 		}
 
 		if (net_release(ipf_ipv6) != 0)
@@ -213,11 +215,11 @@ int ipldetach()
 		}
 		if (hook4_loopback_in) {
 			hook4_loopback_in = (net_unregister_hook(ipf_ipv4,
-			    NH_LOOPBACK_IN, &ipfhook_in) != 0);
+			    NH_LOOPBACK_IN, &ipfhook_loop_in) != 0);
 		}
 		if (hook4_loopback_out) {
 			hook4_loopback_out = (net_unregister_hook(ipf_ipv4,
-			    NH_LOOPBACK_OUT, &ipfhook_out) != 0);
+			    NH_LOOPBACK_OUT, &ipfhook_loop_out) != 0);
 		}
 
 		if (net_release(ipf_ipv4) != 0)
@@ -281,6 +283,9 @@ int iplattach __P((void))
 		  "ipfilter_hook_nicevents");
 	HOOK_INIT(&ipfhook_in, ipf_hook_in, "ipfilter_hook_in");
 	HOOK_INIT(&ipfhook_out, ipf_hook_out, "ipfilter_hook_out");
+	HOOK_INIT(&ipfhook_loop_in, ipf_hook_loop_in, "ipfilter_hook_loop_in");
+	HOOK_INIT(&ipfhook_loop_out, ipf_hook_loop_out,
+	    "ipfilter_hook_loop_out");
 
 	/*
 	 * If we hold this lock over all of the net_register_hook calls, we
@@ -302,28 +307,24 @@ int iplattach __P((void))
 	if (!hook4_nic_events)
 		goto hookup_failed;
 
-	ipfhook_in.h_func = ipf_hook_in;
 	hook4_physical_in = (net_register_hook(ipf_ipv4, NH_PHYSICAL_IN,
 	    &ipfhook_in) == 0);
 	if (!hook4_physical_in)
 		goto hookup_failed;
 
-	ipfhook_in.h_func = ipf_hook_out;
 	hook4_physical_out = (net_register_hook(ipf_ipv4, NH_PHYSICAL_OUT,
 	    &ipfhook_out) == 0);
 	if (!hook4_physical_out)
 		goto hookup_failed;
 
 	if (ipf_loopback) {
-		ipfhook_in.h_func = ipf_hook_loop_in;
 		hook4_loopback_in = (net_register_hook(ipf_ipv4,
-		    NH_LOOPBACK_IN, &ipfhook_in) == 0);
+		    NH_LOOPBACK_IN, &ipfhook_loop_in) == 0);
 		if (!hook4_loopback_in)
 			goto hookup_failed;
 
-		ipfhook_in.h_func = ipf_hook_loop_out;
 		hook4_loopback_out = (net_register_hook(ipf_ipv4,
-		    NH_LOOPBACK_OUT, &ipfhook_out) == 0);
+		    NH_LOOPBACK_OUT, &ipfhook_loop_out) == 0);
 		if (!hook4_loopback_out)
 			goto hookup_failed;
 	}
@@ -341,28 +342,24 @@ int iplattach __P((void))
 	if (!hook6_nic_events)
 		goto hookup_failed;
 
-	ipfhook_in.h_func = ipf_hook_in;
 	hook6_physical_in = (net_register_hook(ipf_ipv6, NH_PHYSICAL_IN,
 	    &ipfhook_in) == 0);
 	if (!hook6_physical_in)
 		goto hookup_failed;
 
-	ipfhook_in.h_func = ipf_hook_out;
 	hook6_physical_out = (net_register_hook(ipf_ipv6, NH_PHYSICAL_OUT,
 	    &ipfhook_out) == 0);
 	if (!hook6_physical_out)
 		goto hookup_failed;
 
 	if (ipf_loopback) {
-		ipfhook_in.h_func = ipf_hook_loop_in;
 		hook6_loopback_in = (net_register_hook(ipf_ipv6,
-		    NH_LOOPBACK_IN, &ipfhook_in) == 0);
+		    NH_LOOPBACK_IN, &ipfhook_loop_in) == 0);
 		if (!hook6_loopback_in)
 			goto hookup_failed;
 
-		ipfhook_in.h_func = ipf_hook_loop_out;
 		hook6_loopback_out = (net_register_hook(ipf_ipv6,
-		    NH_LOOPBACK_OUT, &ipfhook_out) == 0);
+		    NH_LOOPBACK_OUT, &ipfhook_loop_out) == 0);
 		if (!hook6_loopback_out)
 			goto hookup_failed;
 	}
@@ -440,22 +437,22 @@ int set;
 		ipf_loopback = 1;
 
 		hook4_loopback_in = (net_register_hook(ipf_ipv4,
-		    NH_LOOPBACK_IN, &ipfhook_in) == 0);
+		    NH_LOOPBACK_IN, &ipfhook_loop_in) == 0);
 		if (!hook4_loopback_in)
 			return EINVAL;
 
 		hook4_loopback_out = (net_register_hook(ipf_ipv4,
-		    NH_LOOPBACK_OUT, &ipfhook_out) == 0);
+		    NH_LOOPBACK_OUT, &ipfhook_loop_out) == 0);
 		if (!hook4_loopback_out)
 			return EINVAL;
 
 		hook6_loopback_in = (net_register_hook(ipf_ipv6,
-		    NH_LOOPBACK_IN, &ipfhook_in) == 0);
+		    NH_LOOPBACK_IN, &ipfhook_loop_in) == 0);
 		if (!hook6_loopback_in)
 			return EINVAL;
 
 		hook6_loopback_out = (net_register_hook(ipf_ipv6,
-		    NH_LOOPBACK_OUT, &ipfhook_out) == 0);
+		    NH_LOOPBACK_OUT, &ipfhook_loop_out) == 0);
 		if (!hook6_loopback_out)
 			return EINVAL;
 
@@ -463,22 +460,22 @@ int set;
 		ipf_loopback = 0;
 
 		hook4_loopback_in = (net_unregister_hook(ipf_ipv4,
-		    NH_LOOPBACK_IN, &ipfhook_in) != 0);
+		    NH_LOOPBACK_IN, &ipfhook_loop_in) != 0);
 		if (hook4_loopback_in)
 			return EBUSY;
 
 		hook4_loopback_out = (net_unregister_hook(ipf_ipv4,
-		    NH_LOOPBACK_OUT, &ipfhook_out) != 0);
+		    NH_LOOPBACK_OUT, &ipfhook_loop_out) != 0);
 		if (hook4_loopback_out)
 			return EBUSY;
 
 		hook6_loopback_in = (net_unregister_hook(ipf_ipv6,
-		    NH_LOOPBACK_IN, &ipfhook_in) != 0);
+		    NH_LOOPBACK_IN, &ipfhook_loop_in) != 0);
 		if (hook6_loopback_in)
 			return EBUSY;
 
 		hook6_loopback_out = (net_unregister_hook(ipf_ipv6,
-		    NH_LOOPBACK_OUT, &ipfhook_out) != 0);
+		    NH_LOOPBACK_OUT, &ipfhook_loop_out) != 0);
 		if (hook6_loopback_out)
 			return EBUSY;
 	}
@@ -1386,12 +1383,8 @@ void fr_slowtimer __P((void *ptr))
 {
 
 	WRITE_ENTER(&ipf_global);
-	if (fr_running <= 0) {
-		if (fr_running == -1)
-			fr_timer_id = timeout(fr_slowtimer, NULL,
-					      drv_usectohz(500000));
-		else
-			fr_timer_id = NULL;
+	if (fr_running == -1 || fr_running == 0) {
+		fr_timer_id = timeout(fr_slowtimer, NULL, drv_usectohz(500000));
 		RWLOCK_EXIT(&ipf_global);
 		return;
 	}
