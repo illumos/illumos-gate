@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,7 +170,8 @@ krb5_gss_inquire_cred_no_lock(ctx, minor_status, cred_handle, name,
        lifetime = GSS_C_INDEFINITE;
 
    if (name) {
-      if ((code = krb5_copy_principal(context, cred->princ, &ret_name))) {
+     if (cred->princ &&
+      (code = krb5_copy_principal(context, cred->princ, &ret_name))) {
 	 *minor_status = code;
 	 return(GSS_S_FAILURE);
       }
@@ -193,7 +194,12 @@ krb5_gss_inquire_cred_no_lock(ctx, minor_status, cred_handle, name,
        }
    }
 
-   if (name) {
+   /* Solaris Kerberos:
+    * Don't set name to ret_name if cred->princ is NULL.
+    * If cred->princ is NULL, ret_name is uninitialized and
+    * name already points to NULL. 
+    */ 
+   if (name && cred->princ) {
       if (! kg_save_name((gss_name_t) ret_name)) {
 	 (void) gss_release_oid_set(minor_status, &mechs);
 	 krb5_free_principal(context, ret_name);

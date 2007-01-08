@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -415,7 +415,13 @@ krb5_gss_accept_sec_context(ct, minor_status, context_handle,
    }
 
    /* handle default cred handle */
-   if (verifier_cred_handle == GSS_C_NO_CREDENTIAL) {
+   /* 
+    * Solaris Kerberos:
+    * If there is no princ associated with the cred then treat it the
+    * the same as GSS_C_NO_CREDENTIAL. 
+    */
+   if (verifier_cred_handle == GSS_C_NO_CREDENTIAL ||
+    ((krb5_gss_cred_id_t)verifier_cred_handle)->princ == NULL) {
        /* Note that we try to acquire a cred for the service principal
 	* named in the AP-REQ. This allows us to implement option (ii)
 	* of the recommended behaviour for GSS_Accept_sec_context() as
