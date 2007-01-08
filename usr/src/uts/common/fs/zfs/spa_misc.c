@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -175,8 +175,8 @@ static kcondvar_t spa_namespace_cv;
 static int spa_active_count;
 int spa_max_replication_override = SPA_DVAS_PER_BP;
 
-static avl_tree_t spa_spare_avl;
 static kmutex_t spa_spare_lock;
+static avl_tree_t spa_spare_avl;
 
 kmem_cache_t *spa_buffer_pool;
 int spa_mode;
@@ -355,13 +355,30 @@ spa_refcount_zero(spa_t *spa)
  */
 
 /*
- * We track spare information on a global basis.  This allows us to do two
- * things: determine when a spare is no longer referenced by any active pool,
- * and (quickly) determine if a spare is currently in use in another pool on the
- * system.
+ * Spares are tracked globally due to the following constraints:
+ *
+ * 	- A spare may be part of multiple pools.
+ * 	- A spare may be added to a pool even if it's actively in use within
+ *	  another pool.
+ * 	- A spare in use in any pool can only be the source of a replacement if
+ *	  the target is a spare in the same pool.
+ *
+ * We keep track of all spares on the system through the use of a reference
+ * counted AVL tree.  When a vdev is added as a spare, or used as a replacement
+ * spare, then we bump the reference count in the AVL tree.  In addition, we set
+ * the 'vdev_isspare' member to indicate that the device is a spare (active or
+ * inactive).  When a spare is made active (used to replace a device in the
+ * pool), we also keep track of which pool its been made a part of.
+ *
+ * The 'spa_spare_lock' protects the AVL tree.  These functions are normally
+ * called under the spa_namespace lock as part of vdev reconfiguration.  The
+ * separate spare lock exists for the status query path, which does not need to
+ * be completely consistent with respect to other vdev configuration changes.
  */
+
 typedef struct spa_spare {
 	uint64_t	spare_guid;
+	uint64_t	spare_pool;
 	avl_node_t	spare_avl;
 	int		spare_count;
 } spa_spare_t;
@@ -381,29 +398,31 @@ spa_spare_compare(const void *a, const void *b)
 }
 
 void
-spa_spare_add(uint64_t guid)
+spa_spare_add(vdev_t *vd)
 {
 	avl_index_t where;
 	spa_spare_t search;
 	spa_spare_t *spare;
 
 	mutex_enter(&spa_spare_lock);
+	ASSERT(!vd->vdev_isspare);
 
-	search.spare_guid = guid;
+	search.spare_guid = vd->vdev_guid;
 	if ((spare = avl_find(&spa_spare_avl, &search, &where)) != NULL) {
 		spare->spare_count++;
 	} else {
-		spare = kmem_alloc(sizeof (spa_spare_t), KM_SLEEP);
-		spare->spare_guid = guid;
+		spare = kmem_zalloc(sizeof (spa_spare_t), KM_SLEEP);
+		spare->spare_guid = vd->vdev_guid;
 		spare->spare_count = 1;
 		avl_insert(&spa_spare_avl, spare, where);
 	}
+	vd->vdev_isspare = B_TRUE;
 
 	mutex_exit(&spa_spare_lock);
 }
 
 void
-spa_spare_remove(uint64_t guid)
+spa_spare_remove(vdev_t *vd)
 {
 	spa_spare_t search;
 	spa_spare_t *spare;
@@ -411,34 +430,62 @@ spa_spare_remove(uint64_t guid)
 
 	mutex_enter(&spa_spare_lock);
 
-	search.spare_guid = guid;
+	search.spare_guid = vd->vdev_guid;
 	spare = avl_find(&spa_spare_avl, &search, &where);
 
+	ASSERT(vd->vdev_isspare);
 	ASSERT(spare != NULL);
 
 	if (--spare->spare_count == 0) {
 		avl_remove(&spa_spare_avl, spare);
 		kmem_free(spare, sizeof (spa_spare_t));
+	} else if (spare->spare_pool == spa_guid(vd->vdev_spa)) {
+		spare->spare_pool = 0ULL;
 	}
 
+	vd->vdev_isspare = B_FALSE;
 	mutex_exit(&spa_spare_lock);
 }
 
 boolean_t
-spa_spare_inuse(uint64_t guid)
+spa_spare_exists(uint64_t guid, uint64_t *pool)
 {
-	spa_spare_t search;
+	spa_spare_t search, *found;
 	avl_index_t where;
-	boolean_t ret;
 
 	mutex_enter(&spa_spare_lock);
 
 	search.spare_guid = guid;
-	ret = (avl_find(&spa_spare_avl, &search, &where) != NULL);
+	found = avl_find(&spa_spare_avl, &search, &where);
+
+	if (pool) {
+		if (found)
+			*pool = found->spare_pool;
+		else
+			*pool = 0ULL;
+	}
 
 	mutex_exit(&spa_spare_lock);
 
-	return (ret);
+	return (found != NULL);
+}
+
+void
+spa_spare_activate(vdev_t *vd)
+{
+	spa_spare_t search, *found;
+	avl_index_t where;
+
+	mutex_enter(&spa_spare_lock);
+	ASSERT(vd->vdev_isspare);
+
+	search.spare_guid = vd->vdev_guid;
+	found = avl_find(&spa_spare_avl, &search, &where);
+	ASSERT(found != NULL);
+	ASSERT(found->spare_pool == 0ULL);
+
+	found->spare_pool = spa_guid(vd->vdev_spa);
+	mutex_exit(&spa_spare_lock);
 }
 
 /*
@@ -680,9 +727,23 @@ spa_guid_exists(uint64_t pool_guid, uint64_t device_guid)
 			continue;
 		if (spa->spa_root_vdev == NULL)
 			continue;
-		if (spa_guid(spa) == pool_guid && (device_guid == 0 ||
-		    vdev_lookup_by_guid(spa->spa_root_vdev, device_guid)))
-			break;
+		if (spa_guid(spa) == pool_guid) {
+			if (device_guid == 0)
+				break;
+
+			if (vdev_lookup_by_guid(spa->spa_root_vdev,
+			    device_guid) != NULL)
+				break;
+
+			/*
+			 * Check any devices we may in the process of adding.
+			 */
+			if (spa->spa_pending_vdev) {
+				if (vdev_lookup_by_guid(spa->spa_pending_vdev,
+				    device_guid) != NULL)
+					break;
+			}
+		}
 	}
 
 	return (spa != NULL);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -301,14 +301,22 @@ spa_load_spares(spa_t *spa)
 	nvlist_t **spares;
 	uint_t nspares;
 	int i;
+	vdev_t *vd, *tvd;
 
 	/*
 	 * First, close and free any existing spare vdevs.
 	 */
 	for (i = 0; i < spa->spa_nspares; i++) {
-		vdev_close(spa->spa_spares[i]);
-		vdev_free(spa->spa_spares[i]);
+		vd = spa->spa_spares[i];
+
+		/* Undo the call to spa_activate() below */
+		if ((tvd = spa_lookup_by_guid(spa, vd->vdev_guid)) != NULL &&
+		    tvd->vdev_isspare)
+			spa_spare_remove(tvd);
+		vdev_close(vd);
+		vdev_free(vd);
 	}
+
 	if (spa->spa_spares)
 		kmem_free(spa->spa_spares, spa->spa_nspares * sizeof (void *));
 
@@ -326,17 +334,41 @@ spa_load_spares(spa_t *spa)
 
 	/*
 	 * Construct the array of vdevs, opening them to get status in the
-	 * process.
+	 * process.   For each spare, there is potentially two different vdev_t
+	 * structures associated with it: one in the list of spares (used only
+	 * for basic validation purposes) and one in the active vdev
+	 * configuration (if it's spared in).  During this phase we open and
+	 * validate each vdev on the spare list.  If the vdev also exists in the
+	 * active configuration, then we also mark this vdev as an active spare.
 	 */
 	spa->spa_spares = kmem_alloc(nspares * sizeof (void *), KM_SLEEP);
 	for (i = 0; i < spa->spa_nspares; i++) {
-		vdev_t *vd;
-
 		VERIFY(spa_config_parse(spa, &vd, spares[i], NULL, 0,
 		    VDEV_ALLOC_SPARE) == 0);
 		ASSERT(vd != NULL);
 
 		spa->spa_spares[i] = vd;
+
+		if ((tvd = spa_lookup_by_guid(spa, vd->vdev_guid)) != NULL) {
+			if (!tvd->vdev_isspare)
+				spa_spare_add(tvd);
+
+			/*
+			 * We only mark the spare active if we were successfully
+			 * able to load the vdev.  Otherwise, importing a pool
+			 * with a bad active spare would result in strange
+			 * behavior, because multiple pool would think the spare
+			 * is actively in use.
+			 *
+			 * There is a vulnerability here to an equally bizarre
+			 * circumstance, where a dead active spare is later
+			 * brought back to life (onlined or otherwise).  Given
+			 * the rarity of this scenario, and the extra complexity
+			 * it adds, we ignore the possibility.
+			 */
+			if (!vdev_is_dead(tvd))
+				spa_spare_activate(tvd);
+		}
 
 		if (vdev_open(vd) != 0)
 			continue;
@@ -867,6 +899,7 @@ spa_add_spares(spa_t *spa, nvlist_t *config)
 	uint64_t guid;
 	vdev_stat_t *vs;
 	uint_t vsc;
+	uint64_t pool;
 
 	if (spa->spa_nspares == 0)
 		return;
@@ -889,7 +922,7 @@ spa_add_spares(spa_t *spa, nvlist_t *config)
 		for (i = 0; i < nspares; i++) {
 			VERIFY(nvlist_lookup_uint64(spares[i],
 			    ZPOOL_CONFIG_GUID, &guid) == 0);
-			if (spa_spare_inuse(guid)) {
+			if (spa_spare_exists(guid, &pool) && pool != 0ULL) {
 				VERIFY(nvlist_lookup_uint64_array(
 				    spares[i], ZPOOL_CONFIG_STATS,
 				    (uint64_t **)&vs, &vsc) == 0);
@@ -943,7 +976,9 @@ spa_get_stats(const char *name, nvlist_t **config, char *altroot, size_t buflen)
 
 /*
  * Validate that the 'spares' array is well formed.  We must have an array of
- * nvlists, each which describes a valid leaf vdev.
+ * nvlists, each which describes a valid leaf vdev.  If this is an import (mode
+ * is VDEV_ALLOC_SPARE), then we allow corrupted spares to be specified, as long
+ * as they are well-formed.
  */
 static int
 spa_validate_spares(spa_t *spa, nvlist_t *nvroot, uint64_t crtxg, int mode)
@@ -970,34 +1005,45 @@ spa_validate_spares(spa_t *spa, nvlist_t *nvroot, uint64_t crtxg, int mode)
 	if (spa_version(spa) < ZFS_VERSION_SPARES)
 		return (ENOTSUP);
 
+	/*
+	 * Set the pending spare list so we correctly handle device in-use
+	 * checking.
+	 */
+	spa->spa_pending_spares = spares;
+	spa->spa_pending_nspares = nspares;
+
 	for (i = 0; i < nspares; i++) {
 		if ((error = spa_config_parse(spa, &vd, spares[i], NULL, 0,
 		    mode)) != 0)
-			return (error);
+			goto out;
 
 		if (!vd->vdev_ops->vdev_op_leaf) {
 			vdev_free(vd);
-			return (EINVAL);
-		}
-
-		if ((error = vdev_open(vd)) != 0) {
-			vdev_free(vd);
-			return (error);
+			error = EINVAL;
+			goto out;
 		}
 
 		vd->vdev_top = vd;
-		if ((error = vdev_label_spare(vd, crtxg)) != 0) {
-			vdev_free(vd);
-			return (error);
+
+		if ((error = vdev_open(vd)) == 0 &&
+		    (error = vdev_label_init(vd, crtxg,
+		    VDEV_LABEL_SPARE)) == 0) {
+			VERIFY(nvlist_add_uint64(spares[i], ZPOOL_CONFIG_GUID,
+			    vd->vdev_guid) == 0);
 		}
 
-		VERIFY(nvlist_add_uint64(spares[i], ZPOOL_CONFIG_GUID,
-		    vd->vdev_guid) == 0);
-
 		vdev_free(vd);
+
+		if (error && mode != VDEV_ALLOC_SPARE)
+			goto out;
+		else
+			error = 0;
 	}
 
-	return (0);
+out:
+	spa->spa_pending_spares = NULL;
+	spa->spa_pending_nspares = 0;
+	return (error);
 }
 
 /*
@@ -1455,31 +1501,45 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	    VDEV_ALLOC_ADD)) != 0)
 		return (spa_vdev_exit(spa, NULL, txg, error));
 
-	if ((error = spa_validate_spares(spa, nvroot, txg,
-	    VDEV_ALLOC_ADD)) != 0)
-		return (spa_vdev_exit(spa, vd, txg, error));
+	spa->spa_pending_vdev = vd;
 
 	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
 	    &spares, &nspares) != 0)
 		nspares = 0;
 
-	if (vd->vdev_children == 0 && nspares == 0)
+	if (vd->vdev_children == 0 && nspares == 0) {
+		spa->spa_pending_vdev = NULL;
 		return (spa_vdev_exit(spa, vd, txg, EINVAL));
+	}
 
 	if (vd->vdev_children != 0) {
-		if ((error = vdev_create(vd, txg, B_FALSE)) != 0)
+		if ((error = vdev_create(vd, txg, B_FALSE)) != 0) {
+			spa->spa_pending_vdev = NULL;
 			return (spa_vdev_exit(spa, vd, txg, error));
-
-		/*
-		 * Transfer each new top-level vdev from vd to rvd.
-		 */
-		for (c = 0; c < vd->vdev_children; c++) {
-			tvd = vd->vdev_child[c];
-			vdev_remove_child(vd, tvd);
-			tvd->vdev_id = rvd->vdev_children;
-			vdev_add_child(rvd, tvd);
-			vdev_config_dirty(tvd);
 		}
+	}
+
+	/*
+	 * We must validate the spares after checking the children.  Otherwise,
+	 * vdev_inuse() will blindly overwrite the spare.
+	 */
+	if ((error = spa_validate_spares(spa, nvroot, txg,
+	    VDEV_ALLOC_ADD)) != 0) {
+		spa->spa_pending_vdev = NULL;
+		return (spa_vdev_exit(spa, vd, txg, error));
+	}
+
+	spa->spa_pending_vdev = NULL;
+
+	/*
+	 * Transfer each new top-level vdev from vd to rvd.
+	 */
+	for (c = 0; c < vd->vdev_children; c++) {
+		tvd = vd->vdev_child[c];
+		vdev_remove_child(vd, tvd);
+		tvd->vdev_id = rvd->vdev_children;
+		vdev_add_child(rvd, tvd);
+		vdev_config_dirty(tvd);
 	}
 
 	if (nspares != 0) {
@@ -1613,9 +1673,15 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 		/*
 		 * If the source is a hot spare, and the parent isn't already a
 		 * spare, then we want to create a new hot spare.  Otherwise, we
-		 * want to create a replacing vdev.
+		 * want to create a replacing vdev.  The user is not allowed to
+		 * attach to a spared vdev child unless the 'isspare' state is
+		 * the same (spare replaces spare, non-spare replaces
+		 * non-spare).
 		 */
 		if (pvd->vdev_ops == &vdev_replacing_ops)
+			return (spa_vdev_exit(spa, newrootvd, txg, ENOTSUP));
+		else if (pvd->vdev_ops == &vdev_spare_ops &&
+		    newvd->vdev_isspare != oldvd->vdev_isspare)
 			return (spa_vdev_exit(spa, newrootvd, txg, ENOTSUP));
 		else if (pvd->vdev_ops != &vdev_spare_ops &&
 		    newvd->vdev_isspare)
@@ -1695,7 +1761,8 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	    open_txg - TXG_INITIAL + 1);
 	mutex_exit(&newvd->vdev_dtl_lock);
 
-	dprintf("attached %s in txg %llu\n", newvd->vdev_path, txg);
+	if (newvd->vdev_isspare)
+		spa_spare_activate(newvd);
 
 	/*
 	 * Mark newvd's DTL dirty in this txg.
@@ -1818,9 +1885,7 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 	 * it may be that the unwritability of the disk is the reason
 	 * it's being detached!
 	 */
-	error = vdev_label_init(vd, 0, B_FALSE);
-	if (error)
-		dprintf("unable to erase labels on %s\n", vdev_description(vd));
+	error = vdev_label_init(vd, 0, VDEV_LABEL_REMOVE);
 
 	/*
 	 * Remove vd from its parent and compact the parent's children.
@@ -1841,8 +1906,7 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 	 */
 	if (unspare) {
 		ASSERT(cvd->vdev_isspare);
-		spa_spare_remove(cvd->vdev_guid);
-		cvd->vdev_isspare = B_FALSE;
+		spa_spare_remove(cvd);
 		unspare_guid = cvd->vdev_guid;
 	}
 
@@ -1861,39 +1925,37 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 	ASSERT(tvd->vdev_parent == rvd);
 
 	/*
-	 * Reopen this top-level vdev to reassess health after detach.
+	 * Reevaluate the parent vdev state.
 	 */
-	vdev_reopen(tvd);
+	vdev_propagate_state(cvd->vdev_parent);
 
 	/*
-	 * If the device we just detached was smaller than the others,
-	 * it may be possible to add metaslabs (i.e. grow the pool).
-	 * vdev_metaslab_init() can't fail because the existing metaslabs
-	 * are already in core, so there's nothing to read from disk.
+	 * If the device we just detached was smaller than the others, it may be
+	 * possible to add metaslabs (i.e. grow the pool).  vdev_metaslab_init()
+	 * can't fail because the existing metaslabs are already in core, so
+	 * there's nothing to read from disk.
 	 */
 	VERIFY(vdev_metaslab_init(tvd, txg) == 0);
 
 	vdev_config_dirty(tvd);
 
 	/*
-	 * Mark vd's DTL as dirty in this txg.
-	 * vdev_dtl_sync() will see that vd->vdev_detached is set
-	 * and free vd's DTL object in syncing context.
-	 * But first make sure we're not on any *other* txg's DTL list,
-	 * to prevent vd from being accessed after it's freed.
+	 * Mark vd's DTL as dirty in this txg.  vdev_dtl_sync() will see that
+	 * vd->vdev_detached is set and free vd's DTL object in syncing context.
+	 * But first make sure we're not on any *other* txg's DTL list, to
+	 * prevent vd from being accessed after it's freed.
 	 */
 	for (t = 0; t < TXG_SIZE; t++)
 		(void) txg_list_remove_this(&tvd->vdev_dtl_list, vd, t);
 	vd->vdev_detached = B_TRUE;
 	vdev_dirty(tvd, VDD_DTL, vd, txg);
 
-	dprintf("detached %s in txg %llu\n", vd->vdev_path, txg);
-
 	error = spa_vdev_exit(spa, vd, txg, 0);
 
 	/*
-	 * If we are supposed to remove the given vdev from the list of spares,
-	 * iterate over all pools in the system and replace it if it's present.
+	 * If this was the removal of the original device in a hot spare vdev,
+	 * then we want to go through and remove the device from the hot spare
+	 * list of every other pool.
 	 */
 	if (unspare) {
 		spa = NULL;
@@ -3021,10 +3083,18 @@ boolean_t
 spa_has_spare(spa_t *spa, uint64_t guid)
 {
 	int i;
+	uint64_t spareguid;
 
 	for (i = 0; i < spa->spa_nspares; i++)
 		if (spa->spa_spares[i]->vdev_guid == guid)
 			return (B_TRUE);
+
+	for (i = 0; i < spa->spa_pending_nspares; i++) {
+		if (nvlist_lookup_uint64(spa->spa_pending_spares[i],
+		    ZPOOL_CONFIG_GUID, &spareguid) == 0 &&
+		    spareguid == guid)
+			return (B_TRUE);
+	}
 
 	return (B_FALSE);
 }

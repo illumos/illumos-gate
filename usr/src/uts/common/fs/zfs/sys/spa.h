@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -344,9 +344,10 @@ extern int spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare);
 extern int spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath);
 
 /* spare state (which is global across all pools) */
-extern void spa_spare_add(uint64_t guid);
-extern void spa_spare_remove(uint64_t guid);
-extern boolean_t spa_spare_inuse(uint64_t guid);
+extern void spa_spare_add(vdev_t *vd);
+extern void spa_spare_remove(vdev_t *vd);
+extern boolean_t spa_spare_exists(uint64_t guid, uint64_t *pool);
+extern void spa_spare_activate(vdev_t *vd);
 
 /* scrubbing */
 extern int spa_scrub(spa_t *spa, pool_scrub_type_t type, boolean_t force);

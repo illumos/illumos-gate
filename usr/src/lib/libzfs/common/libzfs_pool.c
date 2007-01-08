@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1182,7 +1182,7 @@ zpool_vdev_remove(zpool_handle_t *zhp, const char *path)
 
 	if (!avail_spare) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "only hot spares can be removed"));
+		    "only inactive hot spares can be removed"));
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 	}
 

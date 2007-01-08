@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -898,7 +898,7 @@ zpool_in_use(libzfs_handle_t *hdl, int fd, pool_state_t *state, char **namestr,
 	uint64_t guid, vdev_guid;
 	zpool_handle_t *zhp;
 	nvlist_t *pool_config;
-	uint64_t stateval;
+	uint64_t stateval, isspare;
 	spare_cbdata_t cb = { 0 };
 	boolean_t isactive;
 
@@ -960,6 +960,18 @@ zpool_in_use(libzfs_handle_t *hdl, int fd, pool_state_t *state, char **namestr,
 			} else {
 				ret = B_FALSE;
 			}
+
+			/*
+			 * If this is an active spare within another pool, we
+			 * treat it like an unused hot spare.  This allows the
+			 * user to create a pool with a hot spare that currently
+			 * in use within another pool.  Since we return B_TRUE,
+			 * libdiskmgt will continue to prevent generic consumers
+			 * from using the device.
+			 */
+			if (ret && nvlist_lookup_uint64(config,
+			    ZPOOL_CONFIG_IS_SPARE, &isspare) == 0 && isspare)
+				stateval = POOL_STATE_SPARE;
 
 			if (zhp != NULL)
 				zpool_close(zhp);

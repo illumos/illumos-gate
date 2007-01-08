@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -334,9 +334,110 @@ vdev_label_read_config(vdev_t *vd)
 	return (config);
 }
 
-static int
-vdev_label_common(vdev_t *vd, uint64_t crtxg, boolean_t isspare,
-    boolean_t isreplacing)
+/*
+ * Determine if a device is in use.  The 'spare_guid' parameter will be filled
+ * in with the device guid if this spare is active elsewhere on the system.
+ */
+static boolean_t
+vdev_inuse(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason,
+    uint64_t *spare_guid)
+{
+	spa_t *spa = vd->vdev_spa;
+	uint64_t state, pool_guid, device_guid, txg, spare_pool;
+	uint64_t vdtxg = 0;
+	nvlist_t *label;
+
+	if (spare_guid)
+		*spare_guid = 0ULL;
+
+	/*
+	 * Read the label, if any, and perform some basic sanity checks.
+	 */
+	if ((label = vdev_label_read_config(vd)) == NULL)
+		return (B_FALSE);
+
+	(void) nvlist_lookup_uint64(label, ZPOOL_CONFIG_CREATE_TXG,
+	    &vdtxg);
+
+	if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_STATE,
+	    &state) != 0 ||
+	    nvlist_lookup_uint64(label, ZPOOL_CONFIG_GUID,
+	    &device_guid) != 0) {
+		nvlist_free(label);
+		return (B_FALSE);
+	}
+
+	if (state != POOL_STATE_SPARE &&
+	    (nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_GUID,
+	    &pool_guid) != 0 ||
+	    nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_TXG,
+	    &txg) != 0)) {
+		nvlist_free(label);
+		return (B_FALSE);
+	}
+
+	nvlist_free(label);
+
+	/*
+	 * Check to see if this device indeed belongs to the pool it claims to
+	 * be a part of.  The only way this is allowed is if the device is a hot
+	 * spare (which we check for later on).
+	 */
+	if (state != POOL_STATE_SPARE &&
+	    !spa_guid_exists(pool_guid, device_guid) &&
+	    !spa_spare_exists(device_guid, NULL))
+		return (B_FALSE);
+
+	/*
+	 * If the transaction group is zero, then this an initialized (but
+	 * unused) label.  This is only an error if the create transaction
+	 * on-disk is the same as the one we're using now, in which case the
+	 * user has attempted to add the same vdev multiple times in the same
+	 * transaction.
+	 */
+	if (state != POOL_STATE_SPARE && txg == 0 && vdtxg == crtxg)
+		return (B_TRUE);
+
+	/*
+	 * Check to see if this is a spare device.  We do an explicit check for
+	 * spa_has_spare() here because it may be on our pending list of spares
+	 * to add.
+	 */
+	if (spa_spare_exists(device_guid, &spare_pool) ||
+	    spa_has_spare(spa, device_guid)) {
+		if (spare_guid)
+			*spare_guid = device_guid;
+
+		switch (reason) {
+		case VDEV_LABEL_CREATE:
+			return (B_TRUE);
+
+		case VDEV_LABEL_REPLACE:
+			return (!spa_has_spare(spa, device_guid) ||
+			    spare_pool != 0ULL);
+
+		case VDEV_LABEL_SPARE:
+			return (spa_has_spare(spa, device_guid));
+		}
+	}
+
+	/*
+	 * If the device is marked ACTIVE, then this device is in use by another
+	 * pool on the system.
+	 */
+	return (state == POOL_STATE_ACTIVE);
+}
+
+/*
+ * Initialize a vdev label.  We check to make sure each leaf device is not in
+ * use, and writable.  We put down an initial label which we will later
+ * overwrite with a complete label.  Note that it's important to do this
+ * sequentially, not in parallel, so that we catch cases of multiple use of the
+ * same leaf vdev in the vdev we're creating -- e.g. mirroring a disk with
+ * itself.
+ */
+int
+vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 {
 	spa_t *spa = vd->vdev_spa;
 	nvlist_t *label;
@@ -348,108 +449,62 @@ vdev_label_common(vdev_t *vd, uint64_t crtxg, boolean_t isspare,
 	char *buf;
 	size_t buflen;
 	int error;
+	uint64_t spare_guid;
 
 	ASSERT(spa_config_held(spa, RW_WRITER));
 
 	for (c = 0; c < vd->vdev_children; c++)
-		if ((error = vdev_label_common(vd->vdev_child[c],
-		    crtxg, isspare, isreplacing)) != 0)
+		if ((error = vdev_label_init(vd->vdev_child[c],
+		    crtxg, reason)) != 0)
 			return (error);
 
 	if (!vd->vdev_ops->vdev_op_leaf)
 		return (0);
 
 	/*
-	 * Make sure each leaf device is writable, and zero its initial content.
-	 * Along the way, also make sure that no leaf is already in use.
-	 * Note that it's important to do this sequentially, not in parallel,
-	 * so that we catch cases of multiple use of the same leaf vdev in
-	 * the vdev we're creating -- e.g. mirroring a disk with itself.
+	 * Dead vdevs cannot be initialized.
 	 */
 	if (vdev_is_dead(vd))
 		return (EIO);
 
 	/*
-	 * Check whether this device is already in use.
-	 * Ignore the check if crtxg == 0, which we use for device removal.
+	 * Determine if the vdev is in use.
 	 */
-	if (crtxg != 0 &&
-	    (label = vdev_label_read_config(vd)) != NULL) {
-		uint64_t state, pool_guid, device_guid, txg, spare;
-		uint64_t mycrtxg = 0;
+	if (reason != VDEV_LABEL_REMOVE &&
+	    vdev_inuse(vd, crtxg, reason, &spare_guid))
+		return (EBUSY);
 
-		(void) nvlist_lookup_uint64(label, ZPOOL_CONFIG_CREATE_TXG,
-		    &mycrtxg);
+	ASSERT(reason != VDEV_LABEL_REMOVE ||
+	    vdev_inuse(vd, crtxg, reason, NULL));
 
-		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_STATE,
-		    &state) == 0 && state == POOL_STATE_ACTIVE &&
-		    nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_GUID,
-		    &pool_guid) == 0 &&
-		    nvlist_lookup_uint64(label, ZPOOL_CONFIG_GUID,
-		    &device_guid) == 0 &&
-		    spa_guid_exists(pool_guid, device_guid) &&
-		    nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_TXG,
-		    &txg) == 0 && (txg != 0 || mycrtxg == crtxg)) {
-			if (isspare && pool_guid != spa_guid(spa) &&
-			    nvlist_lookup_uint64(label,
-			    ZPOOL_CONFIG_IS_SPARE, &spare) == 0 &&
-			    !spa_has_spare(spa, device_guid)) {
-				/*
-				 * If this is a request to add a spare that
-				 * is actively in use in another pool, simply
-				 * return success, after updating the guid.
-				 */
-				vdev_t *pvd = vd->vdev_parent;
+	/*
+	 * If this is a request to add or replace a spare that is in use
+	 * elsewhere on the system, then we must update the guid (which was
+	 * initialized to a random value) to reflect the actual GUID (which is
+	 * shared between multiple pools).
+	 */
+	if (reason != VDEV_LABEL_REMOVE && spare_guid != 0ULL) {
+		vdev_t *pvd = vd->vdev_parent;
 
-				for (; pvd != NULL; pvd = pvd->vdev_parent) {
-					pvd->vdev_guid_sum -= vd->vdev_guid;
-					pvd->vdev_guid_sum += device_guid;
-				}
-
-				vd->vdev_guid = vd->vdev_guid_sum = device_guid;
-				nvlist_free(label);
-				return (0);
-			}
-			nvlist_free(label);
-			return (EBUSY);
+		for (; pvd != NULL; pvd = pvd->vdev_parent) {
+			pvd->vdev_guid_sum -= vd->vdev_guid;
+			pvd->vdev_guid_sum += spare_guid;
 		}
+
+		vd->vdev_guid = vd->vdev_guid_sum = spare_guid;
 
 		/*
-		 * If this device is reserved as a hot spare for this pool,
-		 * adopt its GUID, and mark it as such.  This way we preserve
-		 * the fact that it is a hot spare even as it is added and
-		 * removed from the pool.
+		 * If this is a replacement, then we want to fallthrough to the
+		 * rest of the code.  If we're adding a spare, then it's already
+		 * labelled appropriately and we can just return.
 		 */
-		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_STATE,
-		    &state) == 0 && state == POOL_STATE_SPARE &&
-		    nvlist_lookup_uint64(label, ZPOOL_CONFIG_GUID,
-		    &device_guid) == 0) {
-			vdev_t *pvd = vd->vdev_parent;
-
-			if ((isspare || !isreplacing) &&
-			    spa_has_spare(spa, device_guid)) {
-				nvlist_free(label);
-				return (EBUSY);
-			}
-
-			for (; pvd != NULL; pvd = pvd->vdev_parent) {
-				pvd->vdev_guid_sum -= vd->vdev_guid;
-				pvd->vdev_guid_sum += device_guid;
-			}
-
-			vd->vdev_guid = vd->vdev_guid_sum = device_guid;
-
-			if (!isspare) {
-				vd->vdev_isspare = B_TRUE;
-				spa_spare_add(vd->vdev_guid);
-			}
-		}
-
-		nvlist_free(label);
+		if (reason == VDEV_LABEL_SPARE)
+			return (0);
+		ASSERT(reason == VDEV_LABEL_REPLACE);
 	}
 
 	/*
-	 * The device isn't in use, so initialize its label.
+	 * Initialize its label.
 	 */
 	vp = zio_buf_alloc(sizeof (vdev_phys_t));
 	bzero(vp, sizeof (vdev_phys_t));
@@ -459,16 +514,16 @@ vdev_label_common(vdev_t *vd, uint64_t crtxg, boolean_t isspare,
 	 * We mark it as being from txg 0 to indicate that it's not
 	 * really part of an active pool just yet.  The labels will
 	 * be written again with a meaningful txg by spa_sync().
-	 *
-	 * For hot spares, we generate a special label that identifies as a
-	 * mutually shared hot spare.  If this is being added as a hot spare,
-	 * always write out the spare label.  If this was a hot spare, then
-	 * always label it as such.  If we are adding the vdev, it will remain
-	 * labelled in this state until it's really added to the config.  If we
-	 * are removing the vdev or destroying the pool, then it goes back to
-	 * its original hot spare state.
 	 */
-	if (isspare || vd->vdev_isspare) {
+	if (reason == VDEV_LABEL_SPARE ||
+	    (reason == VDEV_LABEL_REMOVE && vd->vdev_isspare)) {
+		/*
+		 * For inactive hot spares, we generate a special label that
+		 * identifies as a mutually shared hot spare.  We write the
+		 * label if we are adding a hot spare, or if we are removing an
+		 * active hot spare (in which case we want to revert the
+		 * labels).
+		 */
 		VERIFY(nvlist_alloc(&label, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
 		VERIFY(nvlist_add_uint64(label, ZPOOL_CONFIG_VERSION,
@@ -546,23 +601,17 @@ vdev_label_common(vdev_t *vd, uint64_t crtxg, boolean_t isspare,
 	zio_buf_free(vb, sizeof (vdev_boot_header_t));
 	zio_buf_free(vp, sizeof (vdev_phys_t));
 
+	/*
+	 * If this vdev hasn't been previously identified as a spare, then we
+	 * mark it as such only if a) we are labelling it as a spare, or b) it
+	 * exists as a spare elsewhere in the system.
+	 */
+	if (error == 0 && !vd->vdev_isspare &&
+	    (reason == VDEV_LABEL_SPARE ||
+	    spa_spare_exists(vd->vdev_guid, NULL)))
+		spa_spare_add(vd);
+
 	return (error);
-}
-
-int
-vdev_label_init(vdev_t *vd, uint64_t crtxg, boolean_t isreplacing)
-{
-	return (vdev_label_common(vd, crtxg, B_FALSE, isreplacing));
-}
-
-/*
- * Label a disk as a hot spare.  A hot spare label is a special label with only
- * the following members: version, pool_state, and guid.
- */
-int
-vdev_label_spare(vdev_t *vd, uint64_t crtxg)
-{
-	return (vdev_label_common(vd, crtxg, B_TRUE, B_FALSE));
 }
 
 /*

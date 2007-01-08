@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,6 +138,9 @@ struct spa {
 	uint64_t	spa_deflate;		/* should we deflate? */
 	uint64_t	spa_history;		/* history object */
 	kmutex_t	spa_history_lock;	/* history lock */
+	vdev_t		*spa_pending_vdev;	/* pending vdev additions */
+	nvlist_t	**spa_pending_spares;	/* pending spare additions */
+	uint_t		spa_pending_nspares;	/* # pending spares */
 	/*
 	 * spa_refcnt must be the last element because it changes size based on
 	 * compilation options.  In order for the MDB module to function

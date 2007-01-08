@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,8 +115,15 @@ struct uberblock;
 extern uint64_t vdev_label_offset(uint64_t psize, int l, uint64_t offset);
 extern nvlist_t *vdev_label_read_config(vdev_t *vd);
 extern void vdev_uberblock_load(zio_t *zio, vdev_t *vd, struct uberblock *ub);
-int vdev_label_init(vdev_t *vd, uint64_t create_txg, boolean_t isreplacing);
-int vdev_label_spare(vdev_t *vd, uint64_t create_txg);
+
+typedef enum {
+	VDEV_LABEL_CREATE,	/* create/add a new device */
+	VDEV_LABEL_REPLACE,	/* replace an existing device */
+	VDEV_LABEL_SPARE,	/* add a new hot spare */
+	VDEV_LABEL_REMOVE	/* remove an existing device */
+} vdev_labeltype_t;
+
+extern int vdev_label_init(vdev_t *vd, uint64_t txg, vdev_labeltype_t reason);
 
 #ifdef	__cplusplus
 }

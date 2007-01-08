@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,6 +53,12 @@ case "$1" in
 	# Start up mountd and nfsd if anything is exported.
 
 	if /usr/bin/grep -s nfs /etc/dfs/sharetab >/dev/null; then
+		startnfsd=1
+	fi
+
+	# If auto-enable behavior is disabled, always start nfsd
+
+	if [ `svcprop -p application/auto_enable nfs/server` = "false" ]; then
 		startnfsd=1
 	fi
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -328,7 +328,7 @@ vdev_free_common(vdev_t *vd)
 		spa_strfree(vd->vdev_devid);
 
 	if (vd->vdev_isspare)
-		spa_spare_remove(vd->vdev_guid);
+		spa_spare_remove(vd);
 
 	txg_list_destroy(&vd->vdev_ms_list);
 	txg_list_destroy(&vd->vdev_dtl_list);
@@ -454,15 +454,6 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	 * Get the alignment requirement.
 	 */
 	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_ASHIFT, &vd->vdev_ashift);
-
-	/*
-	 * Look for the 'is_spare' flag.  If this is the case, then we are a
-	 * repurposed hot spare.
-	 */
-	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_SPARE,
-	    &vd->vdev_isspare);
-	if (vd->vdev_isspare)
-		spa_spare_add(vd->vdev_guid);
 
 	/*
 	 * If we're a top-level vdev, try to load the allocation parameters.
@@ -1019,6 +1010,22 @@ vdev_reopen(vdev_t *vd)
 	(void) vdev_open(vd);
 
 	/*
+	 * Call vdev_validate() here to make sure we have the same device.
+	 * Otherwise, a device with an invalid label could be successfully
+	 * opened in response to vdev_reopen().
+	 *
+	 * The downside to this is that if the user is simply experimenting by
+	 * overwriting an entire disk, we'll fault the device rather than
+	 * demonstrate self-healing capabilities.  On the other hand, with
+	 * proper FMA integration, the series of errors we'd see from the device
+	 * would result in a faulted device anyway.  Given that this doesn't
+	 * model any real-world corruption, it's better to catch this here and
+	 * correctly identify that the device has either changed beneath us, or
+	 * is corrupted beyond recognition.
+	 */
+	(void) vdev_validate(vd);
+
+	/*
 	 * Reassess root vdev's health.
 	 */
 	vdev_propagate_state(spa->spa_root_vdev);
@@ -1044,7 +1051,8 @@ vdev_create(vdev_t *vd, uint64_t txg, boolean_t isreplacing)
 	/*
 	 * Recursively initialize all labels.
 	 */
-	if ((error = vdev_label_init(vd, txg, isreplacing)) != 0) {
+	if ((error = vdev_label_init(vd, txg, isreplacing ?
+	    VDEV_LABEL_REPLACE : VDEV_LABEL_CREATE)) != 0) {
 		vdev_close(vd);
 		return (error);
 	}
@@ -1324,6 +1332,8 @@ vdev_validate_spare(vdev_t *vd)
 		nvlist_free(label);
 		return (-1);
 	}
+
+	spa_spare_add(vd);
 
 	/*
 	 * We don't actually check the pool state here.  If it's in fact in

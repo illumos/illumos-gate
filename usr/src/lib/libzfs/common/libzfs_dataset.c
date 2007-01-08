@@ -1416,6 +1416,10 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 		*val = (zhp->zfs_mntopts != NULL);
 		break;
 
+	case ZFS_PROP_NUMCLONES:
+		*val = zhp->zfs_dmustats.dds_num_clones;
+		break;
+
 	default:
 		zfs_error_aux(zhp->zfs_hdl, dgettext(TEXT_DOMAIN,
 		    "cannot get non-numeric property"));
@@ -1503,6 +1507,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 	case ZFS_PROP_USED:
 	case ZFS_PROP_VOLSIZE:
 	case ZFS_PROP_VOLBLOCKSIZE:
+	case ZFS_PROP_NUMCLONES:
 		/*
 		 * Basic numeric values are built on top of
 		 * get_numeric_property().

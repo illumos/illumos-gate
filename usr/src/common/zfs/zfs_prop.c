@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -167,6 +167,8 @@ static prop_desc_t zfs_prop_table[ZFS_NPROP_ALL] = {
 	    ZFS_TYPE_ANY, NULL, "NAME", B_FALSE },
 	{ "iscsioptions", prop_type_string,	0,	NULL,	prop_inherit,
 	    ZFS_TYPE_VOLUME, NULL, "ISCSIOPTIONS", B_FALSE },
+	{ "numclones", prop_type_number,	0,	NULL,	prop_readonly,
+	    ZFS_TYPE_SNAPSHOT, NULL, NULL, B_FALSE },
 };
 
 zfs_proptype_t
