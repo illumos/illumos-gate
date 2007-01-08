@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1302,7 +1302,7 @@ flt_to_trap_type(struct async_flt *aflt)
 		return (TRAP_TYPE_ECC_D);
 	if (aflt->flt_status & OPL_ECC_URGENT_TRAP)
 		return (TRAP_TYPE_URGENT);
-	return (-1);
+	return (TRAP_TYPE_UNKNOWN);
 }
 
 /*
