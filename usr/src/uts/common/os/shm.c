@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,7 +130,7 @@ static int shmem_lock(kshmid_t *sp, struct anon_map *amp);
 static void shmem_unlock(kshmid_t *sp, struct anon_map *amp);
 static void sa_add(struct proc *pp, caddr_t addr, size_t len, ulong_t flags,
 	kshmid_t *id);
-static void shm_rm_amp(struct anon_map *amp);
+static void shm_rm_amp(kshmid_t *sp);
 static void shm_dtor(kipc_perm_t *);
 static void shm_rmid(kipc_perm_t *);
 static void shm_remove_zone(zoneid_t, void *);
@@ -587,7 +587,7 @@ shm_dtor(kipc_perm_t *perm)
 	cnt = --sp->shm_amp->refcnt;
 	ANON_LOCK_EXIT(&sp->shm_amp->a_rwlock);
 	ASSERT(cnt == 0);
-	shm_rm_amp(sp->shm_amp);
+	shm_rm_amp(sp);
 
 	if (sp->shm_perm.ipc_id != IPC_ID_INVAL) {
 		rsize = ptob(btopr(sp->shm_segsz));
@@ -1230,8 +1230,16 @@ shmem_unlock(kshmid_t *sp, struct anon_map *amp)
  * amp.  This means all shmdt()s and the IPC_RMID have been done.
  */
 static void
-shm_rm_amp(struct anon_map *amp)
+shm_rm_amp(kshmid_t *sp)
 {
+	struct anon_map *amp = sp->shm_amp;
+	zone_t *zone;
+
+	/*
+	 * This may return NULL if global zone is removing a shm created by
+	 * a non-global zone that has been destroyed.
+	 */
+	zone = zone_find_by_id(sp->shm_perm.ipc_proj->kpj_zoneid);
 	/*
 	 * Free up the anon_map.
 	 */
@@ -1243,7 +1251,9 @@ shm_rm_amp(struct anon_map *amp)
 	} else {
 		anon_free(amp->ahp, 0, amp->size);
 	}
-	anon_unresv(amp->swresv);
+	anon_unresv_zone(amp->swresv, zone);
+	if (zone != NULL)
+		zone_rele(zone);
 	anonmap_free(amp);
 }
 

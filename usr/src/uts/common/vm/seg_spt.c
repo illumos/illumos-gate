@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -448,6 +448,7 @@ segspt_create(struct seg *seg, caddr_t argsp)
 		size_t  share_sz;
 		pgcnt_t new_npgs, more_pgs;
 		struct anon_hdr *nahp;
+		zone_t *zone;
 
 		share_sz = page_get_pagesize(seg->s_szc);
 		if (!IS_P2ALIGNED(amp->size, share_sz)) {
@@ -462,16 +463,30 @@ segspt_create(struct seg *seg, caddr_t argsp)
 			new_npgs = btop(P2ROUNDUP(amp->size, share_sz));
 			more_pgs = new_npgs - npages;
 
-			if (anon_resv(ptob(more_pgs)) == 0) {
+			/*
+			 * This may return NULL if global zone is removing a
+			 * shm created by a non-global zone that has been
+			 * destroyed.
+			 */
+			zone =
+			    zone_find_by_id(sp->shm_perm.ipc_proj->kpj_zoneid);
+
+			if (anon_resv_zone(ptob(more_pgs), zone) == 0) {
+				if (zone != NULL)
+					zone_rele(zone);
 				err = ENOMEM;
 				goto out4;
 			}
+			if (zone != NULL)
+				zone_rele(zone);
+
 			nahp = anon_create(new_npgs, ANON_SLEEP);
 			ANON_LOCK_ENTER(&amp->a_rwlock, RW_WRITER);
 			(void) anon_copy_ptr(amp->ahp, 0, nahp, 0, npages,
 			    ANON_SLEEP);
 			anon_release(amp->ahp, npages);
 			amp->ahp = nahp;
+			ASSERT(amp->swresv == ptob(npages));
 			amp->swresv = amp->size = ptob(new_npgs);
 			ANON_LOCK_EXIT(&amp->a_rwlock);
 			npages = new_npgs;
