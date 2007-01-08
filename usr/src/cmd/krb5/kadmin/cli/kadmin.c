@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -441,8 +441,12 @@ char *kadmin_startup(argc, argv)
      * Initialize the kadm5 connection.  If we were given a ccache,
      * use it.  Otherwise, use/prompt for the password.
      */
+
+    /* Solaris Kerberos:
+     * Send warnings to stderr
+     */
     if (ccache_name) {
-	 printf(gettext(
+	 fprintf(stderr, gettext(
 		"Authenticating as principal %s with existing credentials.\n"),
 		princstr);
 	 retval = kadm5_init_with_creds(princstr, cc,
@@ -453,10 +457,10 @@ char *kadmin_startup(argc, argv)
 					&handle);
     } else if (use_keytab) {
 	 if (keytab_name)
-	     printf(gettext("Authenticating as principal %s with keytab %s.\n"),
+	     fprintf(stderr, gettext("Authenticating as principal %s with keytab %s.\n"),
 		    princstr, keytab_name);
 	 else
-	     printf(gettext(
+	     fprintf(stderr, gettext(
 		    "Authenticating as principal %s with default keytab.\n"),
 		    princstr);
 	 retval = kadm5_init_with_skey(princstr, keytab_name,
@@ -466,7 +470,7 @@ char *kadmin_startup(argc, argv)
 				       KADM5_API_VERSION_2,
 				       &handle);
     } else {
-	 printf(gettext("Authenticating as principal %s with password.\n"),
+	 fprintf(stderr, gettext("Authenticating as principal %s with password.\n"),
 		princstr);
 	 retval = kadm5_init_with_password(princstr, password,
 					   svcname, 
@@ -1521,6 +1525,13 @@ void kadmin_getprincs(argc, argv)
 
 	wait(&waitb);
 
+	/* Solaris Kerberos:
+	 * Restore the original handler for SIGINT
+	 */
+	if (sigaction(SIGINT, &osig, (struct sigaction *)0) == -1) {
+		perror("sigaction");
+	}
+
     kadm5_free_name_list(handle, names, count);
 }
 
@@ -1781,6 +1792,15 @@ void kadmin_getpols(argc, argv)
     char *expr, **names;
     int i, count;
 
+    /* Solaris Kerberos:
+     * Use a pager for listing policies (similar to listing princs)
+     */
+    FILE *output = NULL;
+    int fd;
+    struct sigaction nsig, osig;
+    sigset_t nmask, omask;
+    int waitb;
+
     expr = NULL;
     if (! (argc == 1 || (argc == 2 && (expr = argv[1])))) {
 	fprintf(stderr, "%s: get_policies %s\n",
@@ -1793,8 +1813,81 @@ void kadmin_getpols(argc, argv)
 			gettext("while retrieving list."));
 	return;
     }
-    for (i = 0; i < count; i++)
-	 printf("%s\n", names[i]);
+
+    if (sigemptyset(&nmask) == -1) {
+        perror("sigemptyset");
+        kadm5_free_name_list(handle, names, count);
+        return;
+    }
+
+    if (sigaddset(&nmask, SIGINT) == -1) {
+        perror("sigaddset");
+        kadm5_free_name_list(handle, names, count);
+        return;
+    }
+
+    if (sigemptyset(&nsig.sa_mask) == -1) {
+        perror("sigemptyset");
+        kadm5_free_name_list(handle, names, count);
+        return;
+    }
+
+    if (sigprocmask(SIG_BLOCK, &nmask, &omask) == -1) {
+        perror("sigprocmask");
+        kadm5_free_name_list(handle, names, count);
+        return;
+    }
+
+    nsig.sa_handler = SIG_IGN;
+    nsig.sa_flags = 0;
+    if (sigaction(SIGINT, &nsig, &osig) == -1) {
+        perror("sigaction");
+        if (sigprocmask(SIG_SETMASK, &omask, (sigset_t *)0) == -1) {
+            perror("sigprocmask");
+        }
+        kadm5_free_name_list(handle, names, count);
+        return;
+    }
+
+    fd = ss_pager_create();
+    if (fd == -1) {
+        fprintf(stderr, "%s: failed to create pager\n", whoami);
+        if (sigprocmask(SIG_SETMASK, &omask, (sigset_t *)0) == -1) {
+            perror("sigprocmask");
+        }
+
+        if (sigaction(SIGINT, &osig, (struct sigaction *)0) == -1) {
+            perror("sigaction");
+        }
+
+        kadm5_free_name_list(handle, names, count);
+        return;
+    }
+
+    output = fdopen(fd, "w");
+    if (output == NULL) {
+        perror("fdopen");
+    }
+
+    if (sigprocmask(SIG_SETMASK, &omask, (sigset_t *)0) == -1) {
+        perror("sigprocmask");
+    }
+
+    if (output != NULL) {
+        for (i = 0; i < count; i++)
+        fprintf(output, "%s\n", names[i]);
+    }
+
+    if (output != NULL && fclose(output) != 0) {
+        perror("fclose");
+    }
+
+    if (wait(&waitb) == -1) {
+        perror("wait");
+    }
+
+    if (sigaction(SIGINT, &osig, (struct sigaction *)0) == -1) {
+        perror("sigaction");
+    }
     kadm5_free_name_list(handle, names, count);
 }
-

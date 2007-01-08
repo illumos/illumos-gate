@@ -29,6 +29,12 @@
  * Registration functions for ccache.
  */
 
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+
 #include "k5-int.h"
 #include "k5-thread.h"
 
@@ -143,6 +149,10 @@ krb5_cc_resolve (krb5_context context, const char *name, krb5_ccache *cache)
     unsigned int pfxlen;
     krb5_error_code err;
     
+    /* Solaris Kerberos */
+    if (!name)
+        return KRB5_CC_BADNAME;
+
     cp = strchr (name, ':');
     if (!cp) {
 	if (krb5_cc_dfl_ops)
