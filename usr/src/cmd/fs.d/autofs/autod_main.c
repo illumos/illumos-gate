@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -251,12 +251,14 @@ main(argc, argv)
 	/* other initializations */
 	(void) rwlock_init(&portmap_cache_lock, USYNC_THREAD, NULL);
 
-	/* on a labeled system, the automounter implements read-down policy */
+	/*
+	 * On a labeled system, allow read-down nfs mounts if privileged
+	 * (PRIV_NET_MAC_AWARE) to do so.  Otherwise, ignore the error
+	 * and "mount equal label only" behavior will result.
+	 */
 	if (is_system_labeled()) {
-		if ((setpflags(NET_MAC_AWARE, 1) == -1) ||
-		    (setpflags(NET_MAC_AWARE_INHERIT, 1) == -1))
-			syslog(LOG_ERR, "ignored failure to set MAC-aware "
-			    "mode: %m");
+		(void) setpflags(NET_MAC_AWARE, 1);
+		(void) setpflags(NET_MAC_AWARE_INHERIT, 1);
 	}
 
 	(void) signal(SIGHUP, warn_hup);

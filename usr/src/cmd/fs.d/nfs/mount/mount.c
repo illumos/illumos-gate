@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,6 +77,7 @@
 #include <nfs/nfs_sec.h>
 #include <rpcsvc/daemon_utils.h>
 #include <priv.h>
+#include <tsol/label.h>
 #include "nfs_subr.h"
 #include "webnfs.h"
 #include <rpcsvc/nfs4_prot.h>
@@ -303,6 +303,14 @@ main(int argc, char *argv[])
 		pr_err(gettext("insufficient privileges\n"));
 		exit(RET_ERR);
 	}
+
+	/*
+	 * On a labeled system, allow read-down nfs mounts if privileged
+	 * (PRIV_NET_MAC_AWARE) to do so.  Otherwise, ignore the error
+	 * and "mount equal label only" behavior will result.
+	 */
+	if (is_system_labeled())
+		(void) setpflags(NET_MAC_AWARE, 1);
 
 	/*
 	 * Read the defaults file to see if the min/max versions have
