@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -633,6 +633,12 @@ zfs_unshare_iscsi(zfs_handle_t *zhp)
 {
 	const char *dataset = zfs_get_name(zhp);
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
+
+	/*
+	 * Return if the volume is not shared
+	 */
+	if (!zfs_is_shared_iscsi(zhp))
+		return (0);
 
 	/*
 	 * If this fails with ENODEV it indicates that zvol wasn't shared so
