@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3282,6 +3282,14 @@ save_default_entry(menu_t *mp)
 	int entry = 0;	/* default is 0 */
 	char linebuf[BAM_MAXLINE];
 	line_t *lp = mp->curdefault;
+
+	if (mp->start) {
+		lineNum = mp->end->lineNum;
+		entryNum = mp->end->entryNum;
+	} else {
+		lineNum = LINE_INIT;
+		entryNum = ENTRY_INIT;
+	}
 
 	if (lp)
 		entry = s_strtol(lp->arg);
