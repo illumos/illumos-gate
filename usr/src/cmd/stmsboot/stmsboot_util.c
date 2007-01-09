@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +53,19 @@
 
 #define	VHCI_CTL_NODE	"/devices/scsi_vhci:devctl"
 #define	SLASH_DEVICES	"/devices/"
-#define	SLASH_SSD_AT	"/ssd@"
+
+#ifdef	sparc
+#define	DISK_NODE_NAME	"ssd"
+#define	DISK_DRV_NAME	"ssd"
+#define	SLASH_DISK_AT	"/ssd@"
+#define	DISK_AT_G	"ssd@g"
+#else	/* sparc */
+#define	DISK_NODE_NAME	"disk"
+#define	DISK_DRV_NAME	"sd"
+#define	SLASH_DISK_AT	"/disk@"
+#define	DISK_AT_G	"disk@g"
+#endif
+
 #define	SLASH_FP_AT	"/fp@"
 #define	SLASH_SCSI_VHCI	"/scsi_vhci"
 #define	DEV_DSK		"/dev/dsk/"
@@ -87,6 +99,7 @@ static int vhci_fd = -1;
 static int patch_vfstab, cap_m_option, debug;
 static int list_option, list_guid_mappings, list_controllernum = -1;
 static char *mapdev = "";
+static char *map_vhciname = "";
 static char *stmsboot = "stmsboot";
 
 static int make_temp(char *, char *, char *, size_t);
@@ -134,9 +147,13 @@ usage(char *argv0)
 	 *	list non-STMS to STMS device name mappings for the specific
 	 *	controller
 	 * -L	list non-STMS to STMS device name mappings for all controllers
+	 * -p devname
+	 *	if devname is vhci based name and open-able, get the first
+	 *	onlined phci based name without /devices prefix.
+	 *	Used in stmsboot to update the phci based bootpath.
 	 */
 	(void) fprintf(stderr, gettext("usage: %s -u | -m devname | "
-	    "-M devname | -l controller | -L\n"), progname);
+	    "-M devname | -l controller | -L | -p devname\n"), progname);
 	exit(2);
 }
 
@@ -154,7 +171,7 @@ parse_args(int argc, char *argv[])
 		/*NOTREACHED*/
 	}
 
-	while ((opt = getopt(argc, argv, "udm:M:Ll:g")) != EOF) {
+	while ((opt = getopt(argc, argv, "udm:M:Ll:gp:")) != EOF) {
 		switch (opt) {
 		case 'u':
 			patch_vfstab = 1;
@@ -200,6 +217,13 @@ parse_args(int argc, char *argv[])
 			list_guid_mappings = 1;
 			n++;
 			break;
+		case 'p':
+			/*
+			 * map openable vhci based name to phci base name
+			 */
+			map_vhciname = s_strdup(optarg);
+			n++;
+			break;
 
 		default:
 			usage(argv[0]);
@@ -239,6 +263,16 @@ main(int argc, char *argv[])
 
 		if (map_devname(mapdev, newname, sizeof (newname),
 		    cap_m_option) == 0) {
+			(void) printf("%s\n", newname);
+			clean_exit(0);
+		}
+		clean_exit(1);
+	}
+	if (*map_vhciname != '\0') {
+		char newname[MAXPATHLEN];
+
+		if (map_openable_vhciname(map_vhciname, newname,
+		    sizeof (newname)) == 0) {
 			(void) printf("%s\n", newname);
 			clean_exit(0);
 		}
@@ -368,8 +402,13 @@ get_guid(char *physpath, char *guid, int guid_len, int no_delay_flag,
 
 	logdmsg("get_guid: physpath = %s\n", physpath);
 
+#ifdef sparc
 	(void) snprintf(physpath_raw, MAXPATHLEN,
 	    "/devices%s:a,raw", physpath);
+#else
+	(void) snprintf(physpath_raw, MAXPATHLEN,
+	    "/devices%s:c,raw", physpath);
+#endif
 
 	*guid = '\0';
 
@@ -443,8 +482,13 @@ out:
  * client_name is /devices name of a client without the /devices prefix.
  *
  * client_name			Return value
+ * on sparc:
  * .../fp@xxx/ssd@yyy		CLIENT_TYPE_PHCI
  * .../scsi_vhci/ssd@yyy	CLIENT_TYPE_VHCI
+ * other			CLIENT_TYPE_UNKNOWN
+ * on x86:
+ * .../fp@xxx/disk@yyy		CLIENT_TYPE_PHCI
+ * .../scsi_vhci/disk@yyy	CLIENT_TYPE_VHCI
  * other			CLIENT_TYPE_UNKNOWN
  */
 static client_type_t
@@ -456,9 +500,8 @@ client_name_type(char *client_name)
 	if (*client_name != '/')
 		return (CLIENT_TYPE_UNKNOWN);
 
-	/* we only care for ssd devices */
 	if ((p1 = strrchr(client_name, '/')) == NULL ||
-	    strncmp(p1, SLASH_SSD_AT, sizeof (SLASH_SSD_AT) - 1) != 0)
+	    strncmp(p1, SLASH_DISK_AT, sizeof (SLASH_DISK_AT) - 1) != 0)
 		return (CLIENT_TYPE_UNKNOWN);
 
 	*p1 = '\0';
@@ -481,12 +524,16 @@ client_name_type(char *client_name)
  * phci_name
  *	phci based client /devices name without the /devices prefix and
  *	minor name component.
- *	ex: /pci@8,600000/SUNW,qlc@4/fp@0,0/ssd@w2100002037cd9f72,0
+ *	ex:
+ *	for sparc: /pci@8,600000/SUNW,qlc@4/fp@0,0/ssd@w2100002037cd9f72,0
+ *	for x86: /pci@8,600000/SUNW,qlc@4/fp@0,0/disk@w2100002037cd9f72,0
  *
  * vhci_name
  *	Caller supplied buffer where vhci /devices name will be placed on
  *	return (without the /devices prefix and minor name component).
- *	ex: /scsi_vhci/ssd@g2000002037cd9f72
+ *	ex:
+ *	for sparc: /scsi_vhci/ssd@g2000002037cd9f72
+ *	for x86: /scsi_vhci/disk@g2000002037cd9f72
  *
  * vhci_name_len
  *	Length of the caller supplied vhci_name buffer.
@@ -508,7 +555,7 @@ phci_to_vhci(char *phci_name, char *vhci_name, size_t vhci_name_len)
 
 	if (client_name_type(phci_name_buf) != CLIENT_TYPE_PHCI ||
 	    (slash = strrchr(phci_name_buf, '/')) == NULL ||
-	    strncmp(slash, SLASH_SSD_AT, sizeof (SLASH_SSD_AT) - 1) != 0) {
+	    strncmp(slash, SLASH_DISK_AT, sizeof (SLASH_DISK_AT) - 1) != 0) {
 		logdmsg("phci_to_vhci: %s is not of CLIENT_TYPE_PHCI\n",
 		    phci_name);
 		return (-1);
@@ -520,7 +567,7 @@ phci_to_vhci(char *phci_name, char *vhci_name, size_t vhci_name_len)
 	}
 
 	*slash = '\0';
-	s_strlcpy(addr_buf, slash + sizeof (SLASH_SSD_AT) - 1, MAXNAMELEN);
+	s_strlcpy(addr_buf, slash + sizeof (SLASH_DISK_AT) - 1, MAXNAMELEN);
 
 	bzero(&ioc, sizeof (sv_iocdata_t));
 	ioc.client = vhci_name_buf;
@@ -547,12 +594,16 @@ phci_to_vhci(char *phci_name, char *vhci_name, size_t vhci_name_len)
  * vhci_name
  *	vhci based client /devices name without the /devices prefix and
  *	minor name component.
- *	ex: /scsi_vhci/ssd@g2000002037cd9f72
+ *	ex:
+ *	sparc: /scsi_vhci/ssd@g2000002037cd9f72
+ *	x86: /scsi_vhci/disk@g2000002037cd9f72
  *
  * phci_name
  *	Caller supplied buffer where phci /devices name will be placed on
  *	return (without the /devices prefix and minor name component).
- *	ex: /pci@8,600000/SUNW,qlc@4/fp@0,0/ssd@w2100002037cd9f72,0
+ *	ex:
+ *	sparc: /pci@8,600000/SUNW,qlc@4/fp@0,0/ssd@w2100002037cd9f72,0
+ *	x86: /pci@8,600000/SUNW,qlc@4/fp@0,0/disk@w2100002037cd9f72,0
  *
  * phci_name_len
  *	Length of the caller supplied phci_name buffer.
@@ -599,10 +650,10 @@ vhci_to_phci(char *vhci_name, char *phci_name, size_t phci_name_len)
 		logdmsg("vhci_to_phci: done taking devinfo snapshot\n");
 	}
 
-	for (node = di_drv_first_node("ssd", devinfo_root);
+	for (node = di_drv_first_node(DISK_DRV_NAME, devinfo_root);
 	    node != DI_NODE_NIL; node = di_drv_next_node(node)) {
 		if ((node_name = di_node_name(node)) == NULL ||
-		    strcmp(node_name, "ssd") != 0 ||
+		    strcmp(node_name, DISK_NODE_NAME) != 0 ||
 		    (parent = di_parent_node(node)) == DI_NODE_NIL ||
 		    (parent_name = di_node_name(parent)) == NULL ||
 		    strcmp(parent_name, "fp") != 0 ||
@@ -628,6 +679,114 @@ vhci_to_phci(char *vhci_name, char *phci_name, size_t phci_name_len)
 
 	logdmsg("vhci_to_phci: couldn't get phci name for %s\n", vhci_name);
 	return (-1);
+}
+
+/*
+ * Map vhci based client name to phci based client name.
+ * If the client has multiple paths, only one of the paths with which client
+ * can be accessed is returned.
+ * This function uses SCSI_VHCI ioctls to get the phci paths
+ *
+ * vhci_name
+ *	vhci based client /devices name without the /devices prefix and
+ *	minor name component.
+ *	ex:
+ *	sparc: /scsi_vhci/ssd@g2000002037cd9f72
+ *	x86: /scsi_vhci/disk@g2000002037cd9f72
+ *
+ * phci_name
+ *	Caller supplied buffer where phci /devices name will be placed on
+ *	return (without the /devices prefix and minor name component).
+ *	ex:
+ *	sparc: /pci@8,600000/SUNW,qlc@4/fp@0,0/ssd@w2100002037cd9f72,0
+ *	x86: /pci@8,600000/SUNW,qlc@4/fp@0,0/disk@w2100002037cd9f72,0
+ *
+ * phci_name_len
+ *	Length of the caller supplied phci_name buffer.
+ *
+ * Returns 0 on success, -1 on failure.
+ */
+
+static int
+vhci_to_phci_by_ioctl(char *vhci_name, char *phci_name, size_t phci_name_len)
+{
+	sv_iocdata_t	ioc;
+	uint_t npaths;
+	char *node_name, *at;
+	char vhci_name_buf[MAXPATHLEN];
+	int  ret;
+	sv_path_info_t *pi;
+
+	logdmsg("vhci_to_phci_by_ioctl: client = %s\n", vhci_name);
+
+	if (vhci_fd < 0) {
+		if ((vhci_fd = open(VHCI_CTL_NODE, O_RDWR)) < 0)
+			return (-1);
+	}
+
+	(void) strlcpy(vhci_name_buf, vhci_name, MAXPATHLEN);
+
+	/* first get the number paths */
+	bzero(&ioc, sizeof (sv_iocdata_t));
+	ioc.client = vhci_name_buf;
+	ioc.ret_elem = &npaths;
+	if ((ret = ioctl(vhci_fd, SCSI_VHCI_GET_CLIENT_MULTIPATH_INFO,
+	    &ioc)) != 0 || npaths == 0) {
+		logdmsg("SCSI_VHCI_GET_CLIENT_MULTIPATH_INFO on %s "
+		    "failed: %s\n", vhci_name,
+		    ret?strerror(errno):"got 0 paths");
+		return (-1);
+	}
+
+	/* now allocate memory for the path information and get all paths */
+	bzero(&ioc, sizeof (sv_iocdata_t));
+	ioc.client = vhci_name_buf;
+	ioc.buf_elem = npaths;
+	ioc.ret_elem = &npaths;
+	if ((ioc.ret_buf = (sv_path_info_t *)calloc(npaths,
+	    sizeof (sv_path_info_t))) == NULL)
+		return (-1);
+	if ((ret = ioctl(vhci_fd, SCSI_VHCI_GET_CLIENT_MULTIPATH_INFO,
+	    &ioc)) != 0 || npaths == 0) {
+		logdmsg("SCSI_VHCI_GET_CLIENT_MULTIPATH_INFO on %s "
+		    "failed: %s\n", vhci_name,
+		    ret?strerror(errno):"got 0 paths");
+		goto out;
+	}
+
+	if (ioc.buf_elem < npaths)
+		npaths = ioc.buf_elem;
+	if ((node_name = strrchr(vhci_name_buf, '/')) == NULL ||
+	    (at = strchr(node_name, '@')) == NULL)
+		goto out;
+
+	node_name++;
+	*at = '\0';
+
+	/*
+	 * return the first online paths as non-online paths may
+	 * not be accessible in the target environment.
+	 */
+	pi = (sv_path_info_t *)ioc.ret_buf;
+	while (npaths--) {
+		if (MDI_PATHINFO_STATE_ONLINE == pi->ret_state) {
+			(void) snprintf(phci_name, phci_name_len, "%s/%s@%s",
+			    pi->device.ret_phci, node_name,
+			    pi->ret_addr);
+			logdmsg("vhci_to_phci_by_ioctl: %s maps to %s\n",
+			    vhci_name, phci_name);
+			free(ioc.ret_buf);
+			return (0);
+		}
+		pi++;
+	}
+
+out:
+	logdmsg("vhci_to_phci_by_ioctl: couldn't get phci name for %s\n",
+	    vhci_name);
+	free(ioc.ret_buf);
+	return (-1);
+
 }
 
 /*
@@ -849,7 +1008,7 @@ map_devname(char *devname, char *new_devname, size_t len, int devlink_flag)
 {
 	char physname[MAXPATHLEN];
 	char minor[MAXNAMELEN];
-	char new_physname[MAXNAMELEN];
+	char new_physname[MAXPATHLEN];
 
 	if (get_physname_minor(devname, physname, sizeof (physname),
 	    minor, sizeof (minor)) == 0 &&
@@ -870,6 +1029,35 @@ map_devname(char *devname, char *new_devname, size_t len, int devlink_flag)
 	return (-1);
 }
 
+/*
+ * If the devname is a vhci based name and open-able, map it to phci
+ * based name.
+ *
+ * devname	either a /dev link or /devices name to client device
+ * new_devname	caller supplied buffer where the mapped device name without
+ *		/devices prefix is placed on return.
+ * len		caller supplied new_devname buffer length
+ */
+static int
+map_openable_vhciname(char *devname, char *new_devname, size_t len)
+{
+	char physname[MAXPATHLEN];
+	char minor[MAXNAMELEN];
+	char new_physname[MAXPATHLEN];
+
+	if (get_physname_minor(devname, physname, sizeof (physname),
+	    minor, sizeof (minor)) == 0 &&
+	    canopen(devname) == 1 &&
+	    client_name_type(physname) == CLIENT_TYPE_VHCI &&
+	    vhci_to_phci_by_ioctl(physname, new_physname,
+		sizeof (new_physname)) == 0) {
+		(void) snprintf(new_devname, len, "%s:%s",
+		    new_physname, minor);
+		return (0);
+	}
+
+	return (-1);
+}
 /*
  * Make a new /etc/vfstab:
  * Read vfstab_in, convert the device name entries to appropriate vhci or phci
@@ -1087,7 +1275,7 @@ list_mappings(int controller, int guidmap)
 			if (get_guid(physname, guid, sizeof (guid), 1,
 			    DI_NODE_NIL) == 0)
 				(void) snprintf(new_physname, MAXPATHLEN,
-				    "/scsi_vhci/ssd@g%s", guid);
+				    "/scsi_vhci/%s%s", DISK_AT_G, guid);
 			else
 				mapped = 0;
 		}
@@ -1117,11 +1305,11 @@ list_mappings(int controller, int guidmap)
 			(void) printf("%s\t\t%s\n", devname, new_devname);
 		} else {
 			/* extract guid part */
-			if ((p1 = strstr(new_physname, "ssd@g")) == NULL) {
+			if ((p1 = strstr(new_physname, DISK_AT_G)) == NULL) {
 				logdmsg("invalid vhci: %s\n", new_physname);
 				continue;
 			}
-			p1 += sizeof ("ssd@g") - 1;
+			p1 += sizeof (DISK_AT_G) - 1;
 			if ((p2 = strrchr(p1, ':')) != NULL)
 				*p2 = '\0';
 

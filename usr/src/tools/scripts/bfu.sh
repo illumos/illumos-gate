@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -1071,6 +1071,7 @@ smf_obsolete_manifests="
 	var/svc/manifest/network/lp.xml
 	var/svc/manifest/system/filesystem/volfs.xml
 	var/svc/manifest/network/pfil.xml
+	var/svc/manifest/platform/sun4u/mpxio-upgrade.xml
 "
 
 # smf services whose manifests have been renamed

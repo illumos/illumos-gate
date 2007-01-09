@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,11 +46,9 @@
 #
 # SUNWcsr
 #
-f none lib/svc/method/mpxio-upgrade 555 root bin
 d none var/ld/sparcv9 755 root bin
 s none var/ld/64=sparcv9
 d none var/svc/manifest/platform/sun4u 755 root sys
-f manifest var/svc/manifest/platform/sun4u/mpxio-upgrade.xml 444 root sys
 f none var/svc/profile/platform_SUNW,SPARC-Enterprise.xml 444 root sys
 f none var/svc/profile/platform_SUNW,Sun-Fire.xml 444 root sys
 f none var/svc/profile/platform_SUNW,Sun-Fire-880.xml 444 root sys

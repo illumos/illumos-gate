@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,9 +28,9 @@
 PATH=/usr/bin:/usr/sbin:$PATH; export PATH
 STMSBOOTUTIL=/lib/mpxio/stmsboot_util
 STMSMETHODSCRIPT=/lib/svc/method/mpxio-upgrade
-STMSINSTANCE=platform/sun4u/mpxio-upgrade:default
 FPCONF=/kernel/drv/fp.conf
 TMPFPCONF=/var/run/tmp.fp.conf.$$
+TMPFPCONF_MPXIO_ENTRY=/var/run/tmp.fp.conf.mpxioentry.$$
 VFSTAB=/etc/vfstab
 SAVEDIR=/etc/mpxio
 RECOVERFILE=$SAVEDIR/recover_instructions
@@ -38,7 +38,17 @@ SVCCFG_RECOVERY=$SAVEDIR/svccfg_recover
 USAGE=`gettext "Usage: stmsboot -e | -d | -u | -L | -l controller_number"`
 TEXTDOMAIN=SUNW_OST_OSCMD
 export TEXTDOMAIN
+STMSINSTANCE=system/device/mpxio-upgrade:default
 
+MACH=`/usr/bin/uname -p`
+if [ "x$MACH" = "xsparc" ]; then
+	CLIENT_TYPE_VHCI="/scsi_vhci.*/ssd@.*"
+	CLIENT_TYPE_PHCI="/fp@.*/ssd@.*"
+else
+	CLIENT_TYPE_VHCI="/scsi_vhci.*/disk@.*"
+	CLIENT_TYPE_PHCI="/fp@.*/disk@.*"
+	BOOTENV_FILE=/boot/solaris/bootenv.rc
+fi
 #
 # Copy all entries (including comments) from source driver.conf to destination
 # driver.conf except those entries which contain mpxio-disable property.
@@ -59,7 +69,9 @@ delete_mpxio_disable_entries()
 		/^$/{ p
 		      d
 		    }
-		/mpxio-disable[ 	]*=.*;$/d
+		/mpxio-disable[ 	]*=.*;$/{ w '$3'
+						  d
+						}
 		/;$/{ p
 		      d
 		    }
@@ -67,7 +79,11 @@ delete_mpxio_disable_entries()
 		N
 		s/[ 	]*$//
 		/[^;]$/b rdnext
-		/mpxio-disable[ 	]*=/d' $1 > $2
+		/mpxio-disable[ 	]*=/{ s/\n/ /g
+					      w '$3'
+					      d
+					    }
+		' $1 > $2
 
 	return $?
 }
@@ -117,6 +133,10 @@ build_recover()
 		echo "exit" >> $SVCCFG_RECOVERY
 
 		echo "\t/usr/sbin/svccfg -f /mnt$SVCCFG_RECOVERY" >> $RECOVERFILE
+
+		if [ "x$MACH" = "xi386" -a "x$new_bootpath" != "x" ]; then
+			echo "\tcp /mnt${SAVEDIR}/bootenv.rc /mnt$BOOTENV_FILE" >> $RECOVERFILE
+		fi
 	fi
 
 	rootdisk=`mount | grep "/ on " | cut -f 3 -d " "`
@@ -158,10 +178,10 @@ update_sysfiles()
 		#
 		if [ "x$cmd" = xenable ]; then
 			ls -l /dev/dsk/*s2 2> /dev/null | \
-			    egrep -s "/fp@.*/ssd@.*"
+			    egrep -s $CLIENT_TYPE_PHCI
 		else
 			ls -l /dev/dsk/*s2 2> /dev/null | \
-			    egrep -s "/scsi_vhci.*/ssd@.*"
+			    egrep -s $CLIENT_TYPE_VHCI
 		fi
 
 		if [ $? -ne 0 ]; then
@@ -170,6 +190,11 @@ update_sysfiles()
 	fi
 
 	if [ $need_bootscript -eq 1 ]; then
+		if [ "x$MACH" = "xi386" -a "x$new_bootpath" != "x" ]; then
+			#only update bootpath for x86.
+			cp $BOOTENV_FILE $SAVEDIR
+			eeprom bootpath=$new_bootpath
+		fi
 		#
 		# Enable the mpxio-upgrade service, but don't run it now.
 		# The service will run during the next reboot and will do
@@ -201,30 +226,57 @@ EOF
 #
 configure_mpxio()
 {
+	mpxiodisableno='mpxio-disable[ 	]*=[ 	]*"no"[ 	]*;'
+	mpxiodisableyes='mpxio-disable[ 	]*=[ 	]*"yes"[ 	]*;'
+
 	if [ "x$cmd" = xenable ]; then
+		mpxiodisable_cur_entry=$mpxiodisableyes
 		propval=no
 		msg=`gettext "STMS already enabled."`
 	else
+		mpxiodisable_cur_entry=$mpxiodisableno
 		propval=yes
 		msg=`gettext "STMS already disabled."`
 	fi
 
-	if delete_mpxio_disable_entries $FPCONF $TMPFPCONF; then
-		echo "mpxio-disable=\"${propval}\";" >> $TMPFPCONF
-		if diff -b $FPCONF $TMPFPCONF > /dev/null; then
-			rm -f $TMPFPCONF
-			echo "$msg"
-			return 0
+	if delete_mpxio_disable_entries $FPCONF $TMPFPCONF $TMPFPCONF_MPXIO_ENTRY; then
+		if [ -s $TMPFPCONF_MPXIO_ENTRY ]; then
+			# fp.conf does have mpxiodisable entries
+			egrep -s "$mpxiodisable_cur_entry" $TMPFPCONF_MPXIO_ENTRY
+			if [ $? -ne 0 ]; then
+				# if all mpxiodisable entries are no/yes for
+				# enable/disable mpxio, notify the user
+				rm -f $TMPFPCONF $TMPFPCONF_MPXIO_ENTRY
+				echo "$msg"
+				return 0
+			fi
+			# If mpxiodisable entries does not exist, always continue update
 		fi
-		update_sysfiles
-		return $?
 	else
-		rm -f $TMPFPCONF
-		gettext "failed to update " 1>&2
-		echo "$FPCONF." 1>&2
+		rm -f $TMPFPCONF $TMPFPCONF_MPXIO_ENTRY
+		gettext "failed to update " 1>&2 
+		echo "$FPCONF." 1>&2 
 		gettext "No changes were made to your STMS configuration.\n" 1>&2
 		return 1
 	fi
+
+	rm $TMPFPCONF_MPXIO_ENTRY
+	echo "mpxio-disable=\"${propval}\";" >> $TMPFPCONF
+
+	#Need to update bootpath on x86 if boot system from FC disk
+	#Only update bootpath before reboot when mpxio is enabled
+	#If mpxio is disabled currently, will update bootpath in mpxio-upgrade
+	if [ "x$MACH" = "xi386" -a "x$cmd" = "xdisable" ]; then
+		get_newbootpath_for_stmsdev
+		if [ $? -ne 0 ]; then
+			rm -f $TMPFPCONF
+			gettext "failed to update bootpath.\n" 1>&2
+			gettext "No changes were made to your STMS configuration.\n" 1>&2
+			return 1
+		fi
+	fi
+	update_sysfiles
+	return $?
 }
 
 setcmd()
@@ -236,6 +288,35 @@ setcmd()
 		exit 2
 	fi
 }
+
+
+#Need to update bootpath on x86 if boot system from FC disk
+#Only update bootpath here when mpxio is enabled
+#If mpxio is disabled currently, will update bootpath in mpxio-upgrade
+get_newbootpath_for_stmsdev() {
+	if [ "x$cmd" = "xenable" ]; then
+		return 0
+	fi
+
+	cur_bootpath=`eeprom bootpath | sed 's/bootpath=[ 	]*//g' | sed 's/[ 	]*$//'`
+	if [ "x$cur_bootpath" = "x" ]; then
+		gettext "failed to get bootpath by eeprom\n" 1>&2
+		return 1
+	fi
+
+	#only update bootpath for STMS path
+	echo $cur_bootpath|grep $CLIENT_TYPE_VHCI > /dev/null 2>&1
+	if [ $? -eq 1 ]; then
+		return 0
+	fi
+
+	new_bootpath=`$STMSBOOTUTIL -p /devices$cur_bootpath`
+	if [ $? -ne 0 ]; then
+		new_bootpath=""
+		return 1
+	fi
+}
+
 
 cmd=none
 
@@ -294,7 +375,11 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable -o "x$cmd" = xupdate ]; then
 		# keep a copy of the last saved files, useful for manual
 		# recovery in case of a problem.
 		#
-		backup_lastsaved $FPCONF $VFSTAB
+		if [ "x$MACH" = "xsparc" ]; then
+			backup_lastsaved $FPCONF $VFSTAB
+		else
+			backup_lastsaved $FPCONF $VFSTAB $BOOTENV_FILE
+		fi
 	else
 		mkdir $SAVEDIR
 	fi
@@ -304,6 +389,16 @@ fi
 if [ "x$cmd" = xenable -o "x$cmd" = xdisable ]; then
 	configure_mpxio $cmd
 elif [ "x$cmd" = xupdate ]; then
+	if [ "x$MACH" = "xi386" ]; then
+	# In this case we always change the bootpath to phci-based
+	# path first. bootpath will later be modified in mpxio-upgrade
+	# to the vhci-based path if mpxio is enabled on root.
+		get_newbootpath_for_stmsdev
+		if [ $? -ne 0 ]; then
+			gettext "failed to update bootpath.\n" 1>&2
+			return 1
+		fi
+	fi
 	update_sysfiles
 elif [ "x$cmd" = xlist ]; then
 	$STMSBOOTUTIL -l $controller

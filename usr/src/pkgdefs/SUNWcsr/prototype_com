@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -346,6 +346,7 @@ f none lib/svc/method/identity-domain 0555 root bin
 f none lib/svc/method/inetd-upgrade 0555 root bin
 f none lib/svc/method/keymap 0555 root bin
 f none lib/svc/method/manifest-import 0555 root bin
+f none lib/svc/method/mpxio-upgrade 0555 root bin
 f none lib/svc/method/net-init 0555 root bin
 f none lib/svc/method/net-loopback 0555 root bin
 f none lib/svc/method/net-physical 0555 root bin
@@ -497,6 +498,7 @@ d none var/svc/manifest/system 755 root sys
 f manifest var/svc/manifest/system/boot-archive.xml 0444 root sys
 d none var/svc/manifest/system/device 755 root sys
 f manifest var/svc/manifest/system/device/devices-local.xml 0444 root sys
+f manifest var/svc/manifest/system/device/mpxio-upgrade.xml 0444 root sys
 d none var/svc/manifest/system/filesystem 0755 root sys
 f manifest var/svc/manifest/system/filesystem/local-fs.xml 0444 root sys
 f manifest var/svc/manifest/system/filesystem/minimal-fs.xml 0444 root sys

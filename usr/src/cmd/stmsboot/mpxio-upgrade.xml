@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -36,7 +36,7 @@
 <service_bundle type='manifest' name='SUNWcsr:mpxio-upgrade'>
 
 <service
-	name='platform/sun4u/mpxio-upgrade'
+	name='system/device/mpxio-upgrade'
 	type='service'
 	version='1'>
 

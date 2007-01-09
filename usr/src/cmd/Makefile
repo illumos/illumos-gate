@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -351,6 +351,7 @@ COMMON_SUBDIRS=		\
 	srchtxt		\
 	ssh		\
 	stat		\
+	stmsboot	\
 	streams		\
 	strings		\
 	su		\
@@ -465,7 +466,6 @@ sparc_SUBDIRS=		\
 	scadm		\
 	sckmd		\
 	sf880drd	\
-	stmsboot	\
 	vntsd		\
 	wrsmconf	\
 	wrsmstat
@@ -642,6 +642,7 @@ MSGSUBDIRS=		\
 	split		\
 	ssh		\
 	stat		\
+	stmsboot	\
 	strings		\
 	su		\
 	sum		\
@@ -710,7 +711,6 @@ sparc_MSGSUBDIRS=	\
 	fruadm		\
 	prtdscp		\
 	prtfru		\
-	stmsboot	\
 	vntsd		\
 	wrsmconf	\
 	wrsmstat

@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -39,7 +39,7 @@ POFILE = pstmsboot.po
 CLOBBERFILES = $(SHFILES) $(STMSBOOT_UTIL) $(POFILE)
 ROOTFSLIB_MPXIO = $(ROOT)/lib/mpxio
 
-ROOTMANIFESTDIR=	$(ROOTSVCPLATFORMSUN4U)
+ROOTMANIFESTDIR = $(ROOTSVCSYSTEMDEVICE)
 
 LDLIBS += -ldevinfo -lgen -ldevid
 

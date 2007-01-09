@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,8 +48,6 @@
 # SUNWcslr
 #
 f none lib/libc.so.1 755 root bin
-d none lib/mpxio 755 root bin
-f none lib/mpxio/stmsboot_util 555 root bin
 d none lib/secure/sparcv9 755 root bin
 s none lib/secure/64=sparcv9
 d none lib/sparcv9 755 root bin
