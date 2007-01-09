@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -149,9 +149,19 @@ dataset_namecheck(const char *path, namecheck_err_t *why, char *what)
 		}
 
 		/* Zero-length components are not allowed */
-		if (loc == end && *end != '@') {
-			if (why)
-				*why = NAME_ERR_EMPTY_COMPONENT;
+		if (loc == end) {
+			if (why) {
+				/*
+				 * Make sure this is really a zero-length
+				 * component and not a '@@'.
+				 */
+				if (*end == '@' && found_snapshot) {
+					*why = NAME_ERR_MULTIPLE_AT;
+				} else {
+					*why = NAME_ERR_EMPTY_COMPONENT;
+				}
+			}
+
 			return (-1);
 		}
 
