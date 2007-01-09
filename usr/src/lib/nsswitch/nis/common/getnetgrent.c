@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -805,7 +805,7 @@ easy_way(be, ia, argp, map, try_lc, statusp)
 /* =====> is this (an authoritative "no") always the right thing to do?	*/
 /*	  Answer:  yes, except for hostnames that aren't all lowercase	*/
 
-	*statusp = NSS_SUCCESS;		/* Yup, three different flavours of */
+	*statusp = NSS_NOTFOUND;	/* Yup, three different flavours of */
 	ia->status = NSS_NETGR_NO;	/*   status information, so-called. */
 	return (1);			/*   Silly, innit?		    */
 }

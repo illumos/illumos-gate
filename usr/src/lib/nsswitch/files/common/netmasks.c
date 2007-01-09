@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * files/netmasks.c -- "files" backend for nsswitch "netmasks" database
@@ -100,7 +100,7 @@ getbynet(be, a)
 		argp->buf.buffer = tmpbuf;
 		argp->buf.buflen = NSS_LINELEN_NETMASKS;
 	}
-	res = _nss_files_XY_all(be, argp, 0, argp->key.name, check_addr);
+	res = _nss_files_XY_all(be, argp, 1, argp->key.name, check_addr);
 	if (argp->buf.result != NULL) {
 		argp->buf.buffer = NULL;
 		argp->buf.buflen = 0;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Common code and structures used by name-service-switch "compat" backends.
@@ -544,21 +544,30 @@ _attrdb_compat_XY_all(be, argp, netdb, check, op_num)
 	/*
 	 * assume a NULL buf.result pointer is an indication
 	 * that the lookup result should be returned in /etc
-	 * file format
+	 * file format (if called from _nss_compat_getent(),
+	 * be->return_string_data and argp->buf.result
+	 * would be set already if argp->buf.result is NULL)
 	 */
-	if (argp->buf.result == NULL) {
-		be->return_string_data = 1;
+	if (check != NULL) {
+		if (argp->buf.result == NULL) {
+			be->return_string_data = 1;
 
-		/*
-		 * the code executed later needs the result struct
-		 * as working area
-		 */
-		argp->buf.result = be->workarea;
-		func = be->str2ent_alt;
-	} else {
-		be->return_string_data = 0;
-		func = argp->str2ent;
+			/*
+			 * the code executed later needs the result struct
+			 * as working area
+			 */
+			argp->buf.result = be->workarea;
+		} else
+			be->return_string_data = 0;
 	}
+
+	/*
+	 * use an alternate str2ent function if necessary
+	 */
+	if (be->return_string_data == 1)
+		func = be->str2ent_alt;
+	else
+		func = argp->str2ent;
 
 	/*CONSTCOND*/
 	while (1) {

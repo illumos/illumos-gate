@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,8 +127,8 @@ _nss_ldap_group2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 
 	members = __ns_ldap_getAttrStruct(result->entry, _G_MEM);
 	if (members == NULL || members->attrvalue == NULL) {
-		nss_result = NSS_STR_PARSE_PARSE;
-		goto result_grp2str;
+		/* no member is fine, skip processing the member list */
+		goto nomember;
 	}
 
 	for (i = 0; i < members->value_count; i++) {
@@ -147,6 +147,7 @@ _nss_ldap_group2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 			TEST_AND_ADJUST(len, buffer, buflen, result_grp2str);
 		}
 	}
+nomember:
 	/* The front end marshaller doesn't need the trailing nulls */
 	if (argp->buf.result != NULL)
 		be->buflen = strlen(be->buffer);
