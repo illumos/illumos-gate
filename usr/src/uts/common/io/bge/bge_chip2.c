@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2957,6 +2957,12 @@ bge_poll_firmware(bge_t *bgep)
 	return (mac);
 }
 
+/*
+ * Maximum times of trying to get the NVRAM access lock
+ * by calling bge_nvmem_acquire()
+ */
+#define	MAX_TRY_NVMEM_ACQUIRE	10000
+
 #ifdef BGE_IPMI_ASF
 int bge_chip_reset(bge_t *bgep, boolean_t enable_dma, uint_t asf_mode);
 #else
@@ -2977,7 +2983,7 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	uint32_t modeflags;
 	uint32_t mhcr;
 	uint32_t sx0;
-	uint32_t i;
+	uint32_t i, tries;
 #ifdef BGE_IPMI_ASF
 	uint32_t mailbox;
 #endif
@@ -3050,12 +3056,15 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	/*
 	 * NVRAM Corruption Workaround
 	 */
-	for (i = 0; i < 600; i++)
+	for (tries = 0; tries < MAX_TRY_NVMEM_ACQUIRE; tries++)
 		if (bge_nvmem_acquire(bgep) == 0)
 			break;
-	if (i >= 600)
+	if (tries >= MAX_TRY_NVMEM_ACQUIRE) {
 		BGE_DEBUG(("%s: fail to acquire nvram lock",
 			bgep->ifname));
+		bge_fm_ereport(bgep, DDI_FM_DEVICE_NO_RESPONSE);
+		return (DDI_FAILURE);
+	}
 
 #ifdef BGE_IPMI_ASF
 	if (!bgep->asf_enabled) {

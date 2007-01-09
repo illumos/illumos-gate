@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -436,7 +436,8 @@ bge_restart(bge_t *bgep, boolean_t reset_phys)
 	if (bge_reset(bgep) != DDI_SUCCESS)
 		retval = DDI_FAILURE;
 #endif
-	if (bgep->bge_mac_state == BGE_MAC_STARTED) {
+	if (bgep->bge_mac_state == BGE_MAC_STARTED &&
+			retval == DDI_SUCCESS) {
 		if (bge_start(bgep, reset_phys) != DDI_SUCCESS)
 			retval = DDI_FAILURE;
 		bgep->watchdog = 0;
