@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,13 +201,14 @@ typedef struct ip6_info	ip6i_t;
 
 /*
  * The high-order bit of the version field is used by the transports to
- * indicate a rechability confirmation to IP.
+ * indicate a reachability confirmation to IP.
  */
+#define	IP_FORWARD_PROG_BIT		0x8
+
 #ifdef _BIG_ENDIAN
 #define	IPV6_DEFAULT_VERS_AND_FLOW	0x60000000
 #define	IPV6_VERS_AND_FLOW_MASK		0xF0000000
-#define	IP_FORWARD_PROG			0x80000000
-
+#define	IP_FORWARD_PROG			((uint32_t)IP_FORWARD_PROG_BIT << 28)
 #define	V6_MCAST			0xFF000000
 #define	V6_LINKLOCAL			0xFE800000
 
@@ -218,7 +219,7 @@ typedef struct ip6_info	ip6i_t;
 #else
 #define	IPV6_DEFAULT_VERS_AND_FLOW	0x00000060
 #define	IPV6_VERS_AND_FLOW_MASK		0x000000F0
-#define	IP_FORWARD_PROG			0x00000080
+#define	IP_FORWARD_PROG			((uint32_t)IP_FORWARD_PROG_BIT << 4)
 
 #define	V6_MCAST			0x000000FF
 #define	V6_LINKLOCAL			0x000080FE

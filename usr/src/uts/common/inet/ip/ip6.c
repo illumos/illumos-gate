@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -4229,7 +4229,7 @@ ip_hdr_length_nexthdr_v6(mblk_t *mp, ip6_t *ip6h, uint16_t *hdr_length_ptr,
 	ip6_rthdr_t *rthdr;
 	ip6_frag_t *fraghdr;
 
-	ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
+	ASSERT((IPH_HDR_VERSION(ip6h) & ~IP_FORWARD_PROG_BIT) == IPV6_VERSION);
 	length = IPV6_HDR_LEN;
 	whereptr = ((uint8_t *)&ip6h[1]); /* point to next hdr */
 	endptr = mp->b_wptr;
@@ -10618,6 +10618,14 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 		mctl_present = B_FALSE;
 	}
 
+	/*
+	 * Remove reachability confirmation bit from version field
+	 * before passing the packet on to any firewall hooks or
+	 * looping back the packet.
+	 */
+	if (ip6h->ip6_vcf & IP_FORWARD_PROG)
+		ip6h->ip6_vcf &= ~IP_FORWARD_PROG;
+
 	DTRACE_PROBE4(ip6__loopback__in__start,
 	    ill_t *, ill, ill_t *, NULL,
 	    ip6_t *, ip6h, mblk_t *, first_mp);
@@ -10661,14 +10669,6 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 
 	UPDATE_OB_PKT_COUNT(ire);
 	ire->ire_last_used_time = lbolt;
-
-	/*
-	 * Remove reacability confirmation bit from version field
-	 * before looping back the packet.
-	 */
-	if (ip6h->ip6_vcf & IP_FORWARD_PROG) {
-		ip6h->ip6_vcf &= ~IP_FORWARD_PROG;
-	}
 
 	switch (nexthdr) {
 		case IPPROTO_TCP:
