@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1852,8 +1852,13 @@ nfs_validate_property(sa_property_t property, sa_optionset_t parent)
 /*
  * Protocol management functions
  *
- * properties defined in the default files are defined in
- * proto_option_defs for parsing and validation.
+ * Properties defined in the default files are defined in
+ * proto_option_defs for parsing and validation. If "other" and
+ * "compare" are set, then the value for this property should be
+ * compared against the property specified in "other" using the
+ * "compare" check (either <= or >=) in order to ensure that the
+ * values are in the correct range.  E.g. setting server_versmin
+ * higher than server_versmax should not be allowed.
  */
 
 struct proto_option_defs {
@@ -1869,6 +1874,10 @@ struct proto_option_defs {
 	int32_t minval;
 	int32_t maxval;
 	char *file;
+	char *other;
+	int compare;
+#define	OPT_CMP_GE	0
+#define	OPT_CMP_LE	1
 	int (*check)(char *);
 } proto_options[] = {
 #define	PROTO_OPT_NFSD_SERVERS			0
@@ -1895,22 +1904,22 @@ struct proto_option_defs {
 	{"nfs_server_versmin",
 	    "server_versmin", PROTO_OPT_NFS_SERVER_VERSMIN, OPT_TYPE_NUMBER,
 	    (int)NFS_VERSMIN_DEFAULT, SVC_NFSD|SVC_MOUNTD, NFS_VERSMIN,
-	    NFS_VERSMAX, NFSADMIN},
+	    NFS_VERSMAX, NFSADMIN, "server_versmax", OPT_CMP_LE},
 #define	PROTO_OPT_NFS_SERVER_VERSMAX		6
 	{"nfs_server_versmax",
 	    "server_versmax", PROTO_OPT_NFS_SERVER_VERSMAX, OPT_TYPE_NUMBER,
 	    (int)NFS_VERSMAX_DEFAULT, SVC_NFSD|SVC_MOUNTD, NFS_VERSMIN,
-	    NFS_VERSMAX, NFSADMIN},
+	    NFS_VERSMAX, NFSADMIN, "server_versmin", OPT_CMP_GE},
 #define	PROTO_OPT_NFS_CLIENT_VERSMIN		7
 	{"nfs_client_versmin",
 	    "client_versmin", PROTO_OPT_NFS_CLIENT_VERSMIN, OPT_TYPE_NUMBER,
 	    (int)NFS_VERSMIN_DEFAULT, NULL, NFS_VERSMIN, NFS_VERSMAX,
-	    NFSADMIN},
+	    NFSADMIN, "client_versmax", OPT_CMP_LE},
 #define	PROTO_OPT_NFS_CLIENT_VERSMAX		8
 	{"nfs_client_versmax",
 	    "client_versmax", PROTO_OPT_NFS_CLIENT_VERSMAX, OPT_TYPE_NUMBER,
 	    (int)NFS_VERSMAX_DEFAULT, NULL, NFS_VERSMIN, NFS_VERSMAX,
-	    NFSADMIN},
+	    NFSADMIN, "client_versmin", OPT_CMP_GE},
 #define	PROTO_OPT_NFS_SERVER_DELEGATION		9
 	{"nfs_server_delegation",
 	    "server_delegation", PROTO_OPT_NFS_SERVER_DELEGATION,
@@ -2046,7 +2055,8 @@ initprotofromdefault()
  * add_default()
  *
  * Add the default values for any property not defined in the parsing
- * of the default files.
+ * of the default files. Values are set according to their defined
+ * types.
  */
 
 static void
@@ -2066,10 +2076,22 @@ add_defaults()
 				proto_options[i].defvalue.intval);
 		    prop = sa_create_property(proto_options[i].name, number);
 		    break;
+
 		case OPT_TYPE_BOOLEAN:
 		    prop = sa_create_property(proto_options[i].name,
 					proto_options[i].defvalue.intval ?
 					"true" : "false");
+		    break;
+
+		case OPT_TYPE_ONOFF:
+		    prop = sa_create_property(proto_options[i].name,
+					proto_options[i].defvalue.intval ?
+					"on" : "off");
+		    break;
+
+		default:
+		    /* treat as strings of zero length */
+		    prop = sa_create_property(proto_options[i].name, "");
 		    break;
 		}
 		if (prop != NULL)
@@ -2312,46 +2334,148 @@ set_default_file_value(char *tag, char *value)
 }
 
 /*
+ * service_in_state(service, chkstate)
+ *
+ * Want to know if the specified service is in the desired state
+ * (chkstate) or not. Return true (1) if it is and false (0) if it
+ * isn't.
+ */
+static int
+service_in_state(char *service, const char *chkstate)
+{
+	char *state;
+	int ret = B_FALSE;
+
+	state = smf_get_state(service);
+	if (state != NULL) {
+	    /* got the state so get the equality for the return value */
+	    ret = strcmp(state, chkstate) == 0 ? B_TRUE : B_FALSE;
+	    free(state);
+	}
+	return (ret);
+}
+
+/*
  * restart_service(svcs)
  *
  * Walk through the bit mask of services that need to be restarted in
  * order to use the new property values. Some properties affect
- * multiple daemons.
+ * multiple daemons. Should only restart a service if it is currently
+ * enabled (online).
  */
 
 static void
 restart_service(uint32_t svcs)
 {
 	uint32_t mask;
+	int ret;
+	char *service;
+
 	for (mask = 1; svcs != 0; mask <<= 1) {
 	    switch (svcs & mask) {
 	    case SVC_LOCKD:
-		(void) smf_restart_instance(LOCKD);
+		service = LOCKD;
 		break;
 	    case SVC_STATD:
-		(void) smf_restart_instance(STATD);
+		service = STATD;
 		break;
 	    case SVC_NFSD:
-		(void) smf_restart_instance(NFSD);
+		service = NFSD;
 		break;
 	    case SVC_MOUNTD:
-		(void) smf_restart_instance(MOUNTD);
+		service = MOUNTD;
 		break;
 	    case SVC_NFS4CBD:
-		(void) smf_restart_instance(NFS4CBD);
+		service = NFS4CBD;
 		break;
 	    case SVC_NFSMAPID:
-		(void) smf_restart_instance(NFSMAPID);
+		service = NFSMAPID;
 		break;
 	    case SVC_RQUOTAD:
-		(void) smf_restart_instance(RQUOTAD);
+		service = RQUOTAD;
 		break;
 	    case SVC_NFSLOGD:
-		(void) smf_restart_instance(NFSLOGD);
+		service = NFSLOGD;
 		break;
+	    default:
+		continue;
+	    }
+
+		/*
+		 * Only attempt to restart the service if it is
+		 * currently running. In the future, it may be
+		 * desirable to use smf_refresh_instance if the NFS
+		 * services ever implement the refresh method.
+		 */
+	    if (service_in_state(service, SCF_STATE_STRING_ONLINE)) {
+		ret = smf_restart_instance(service);
+		/*
+		 * There are only a few SMF errors at this point, but
+		 * it is also possible that a bad value may have put
+		 * the service into maintenance if there wasn't an
+		 * SMF level error.
+		 */
+		if (ret != 0) {
+		    (void) fprintf(stderr,
+				gettext("%s failed to restart: %s\n"),
+				scf_strerror(scf_error()));
+		} else {
+			/*
+			 * Check whether it has gone to "maintenance"
+			 * mode or not. Maintenance implies something
+			 * went wrong.
+			 */
+		    if (service_in_state(service, SCF_STATE_STRING_MAINT)) {
+			(void) fprintf(stderr,
+					gettext("%s failed to restart\n"),
+					service);
+		    }
+		}
 	    }
 	    svcs &= ~mask;
 	}
+}
+
+/*
+ * nfs_minmax_check(name, value)
+ *
+ * Verify that the value for the property specified by index is valid
+ * relative to the opposite value in the case of a min/max variable.
+ * Currently, server_minvers/server_maxvers and
+ * client_minvers/client_maxvers are the only ones to check.
+ */
+
+static int
+nfs_minmax_check(int index, int value)
+{
+	int val;
+	char *pval;
+	sa_property_t prop;
+	sa_optionset_t opts;
+	int ret = B_TRUE;
+
+	if (proto_options[index].other != NULL) {
+	    /* have a property to compare against */
+	    opts = nfs_get_proto_set();
+	    prop = sa_get_property(opts, proto_options[index].other);
+		/*
+		 * If we don't find the property, assume default
+		 * values which will work since the max will be at the
+		 * max and the min at the min.
+		 */
+	    if (prop != NULL) {
+		pval = sa_get_property_attr(prop, "value");
+		if (pval != NULL) {
+		    val = strtoul(pval, NULL, 0);
+		    if (proto_options[index].compare == OPT_CMP_LE) {
+			ret = value <= val ? B_TRUE : B_FALSE;
+		    } else if (proto_options[index].compare == OPT_CMP_GE) {
+			ret = value >= val ? B_TRUE : B_FALSE;
+		    }
+		}
+	    }
+	}
+	return (ret);
 }
 
 /*
@@ -2359,7 +2483,14 @@ restart_service(uint32_t svcs)
  *
  * Verify that the property specifed by name can take the new
  * value. This is a sanity check to prevent bad values getting into
- * the default files.
+ * the default files. All values need to be checked against what is
+ * allowed by their defined type. If a type isn't explicitly defined
+ * here, it is treated as a string.
+ *
+ * Note that OPT_TYPE_NUMBER will additionally check that the value is
+ * within the range specified and potentially against another property
+ * value as well as specified in the proto_options members other and
+ * compare.
  */
 
 static int
@@ -2381,17 +2512,32 @@ nfs_validate_proto_prop(int index, char *name, char *value)
 		if (val < proto_options[index].minval ||
 		    val > proto_options[index].maxval)
 		    ret = SA_BAD_VALUE;
+		/*
+		 * For server_versmin/server_versmax and
+		 * client_versmin/client_versmax, the value of the
+		 * min(max) should be checked to be correct relative
+		 * to the current max(min).
+		 */
+		if (!nfs_minmax_check(index, val)) {
+		    ret = SA_BAD_VALUE;
+		}
 	    }
 	    break;
+
 	case OPT_TYPE_DOMAIN:
 		/*
-		 * needs to be a qualified domain so will have at least
-		 * one period and other characters on either side of it.
+		 * needs to be a qualified domain so will have at
+		 * least one period and other characters on either
+		 * side of it.  A zero length string is also allowed
+		 * and is the way to turn off the override.
 		 */
+	    if (strlen(value) == 0)
+		break;
 	    cp = strchr(value, '.');
-	    if (cp == NULL || cp == value ||strchr(value, '@') != NULL)
+	    if (cp == NULL || cp == value || strchr(value, '@') != NULL)
 		ret = SA_BAD_VALUE;
 	    break;
+
 	case OPT_TYPE_BOOLEAN:
 	    if (strlen(value) == 0 ||
 		strcasecmp(value, "true") == 0 ||
@@ -2403,17 +2549,24 @@ nfs_validate_proto_prop(int index, char *name, char *value)
 		ret = SA_BAD_VALUE;
 	    }
 	    break;
+
 	case OPT_TYPE_ONOFF:
 	    if (strcasecmp(value, "on") != 0 &&
 		strcasecmp(value, "off") != 0) {
 		ret = SA_BAD_VALUE;
 	    }
 	    break;
+
 	case OPT_TYPE_PROTOCOL:
 	    if (strcasecmp(value, "all") != 0 &&
 		strcasecmp(value, "tcp") != 0 &&
 		strcasecmp(value, "udp") != 0)
 		ret = SA_BAD_VALUE;
+	    break;
+
+	default:
+	    /* treat as a string */
+	    break;
 	}
 	return (ret);
 }

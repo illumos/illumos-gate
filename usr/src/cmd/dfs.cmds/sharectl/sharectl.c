@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,13 +100,13 @@ sc_get_usage(sc_usage_t index)
 
 	switch (index) {
 	case USAGE_CTL_GET:
-	    ret = gettext("get [-h] -p property ... proto");
+	    ret = gettext("get [-h | -p property ...] proto");
 	    break;
 	case USAGE_CTL_SET:
 	    ret = gettext("set [-h] -p property=value ... proto");
 	    break;
 	case USAGE_CTL_STATUS:
-	    ret = gettext("status -h | proto...");
+	    ret = gettext("status [-h | proto ...]");
 	    break;
 	}
 	return (ret);
@@ -191,6 +191,7 @@ sc_get(int flags, int argc, char *argv[])
 			} else {
 			    (void) printf(gettext("%s: not defined\n"),
 						opt->optname);
+			    ret = SA_NO_SUCH_PROP;
 			}
 		    }
 		}
@@ -249,6 +250,7 @@ sc_set(int flags, int argc, char *argv[])
 	    propset = sa_proto_get_properties(proto);
 	    if (propset != NULL) {
 		sa_property_t prop;
+		int err;
 
 		if (optlist == NULL) {
 		    (void) printf(gettext("usage: %s\n"),
@@ -261,15 +263,28 @@ sc_set(int flags, int argc, char *argv[])
 		    for (opt = optlist; opt != NULL; opt = opt->next) {
 			prop = sa_get_protocol_property(propset, opt->optname);
 			if (prop != NULL) {
-			    ret = sa_set_protocol_property(prop, opt->optvalue);
-			    if (ret != SA_OK) {
+				/*
+				 * "err" is used in order to prevent
+				 * setting ret to SA_OK if there has
+				 * been a real error. We want to be
+				 * able to return an error status on
+				 * exit in that case. Error messages
+				 * are printed for each error, so we
+				 * only care on exit that there was an
+				 * error and not the specific error
+				 * value.
+				 */
+			    err = sa_set_protocol_property(prop, opt->optvalue);
+			    if (err != SA_OK) {
 				(void) printf(gettext("Could not set property"
-						" %s: %s\n"),
-					opt->optname, sa_errorstr(ret));
+							" %s: %s\n"),
+					opt->optname, sa_errorstr(err));
+				ret = err;
 			    }
 			} else {
 			    (void) printf(gettext("%s: not defined\n"),
 						opt->optname);
+			    ret = SA_NO_SUCH_PROP;
 			}
 		    }
 		}
@@ -322,11 +337,11 @@ sc_status(int flags, int argc, char *argv[])
 	    case '?':
 	    case 'h':
 		(void) printf(gettext("usage: %s\n"),
-				sc_get_usage(USAGE_CTL_SET));
+				sc_get_usage(USAGE_CTL_STATUS));
 		return (SA_OK);
 	    default:
 		(void) printf(gettext("usage: %s\n"),
-				sc_get_usage(USAGE_CTL_SET));
+				sc_get_usage(USAGE_CTL_STATUS));
 		return (SA_SYNTAX_ERR);
 	    }
 	}

@@ -2656,7 +2656,7 @@ sa_set_protocol_property(sa_property_t prop, char *value)
 	    if (proto != NULL) {
 		set_node_attr((xmlNodePtr)prop, "value", value);
 		ret = sa_proto_set_property(proto, prop);
-		sa_free_attr_string(prop);
+		sa_free_attr_string(proto);
 	    }
 	}
 	return (ret);
