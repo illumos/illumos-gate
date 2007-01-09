@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,8 +130,8 @@ typedef struct mfs_snego_t mfs_snego_t;
 static struct cache_entry *cache_head = NULL;
 rwlock_t cache_lock;	/* protect the cache chain */
 
-static enum nfsstat nfsmount(struct mapfs *, char *, char *, int, int,
-	ucred_t *, action_list *);
+static enum nfsstat nfsmount(struct mapfs *, char *, char *, int, int, uid_t,
+	action_list *);
 static int is_nfs_port(char *);
 
 void netbuf_free(struct netbuf *);
@@ -226,7 +226,7 @@ mount_nfs(
 	char *mntpnt,
 	char *prevhost,
 	int overlay,
-	ucred_t	*cred,
+	uid_t uid,
 	action_list **alpp)
 {
 	struct mapfs *mfs, *mp;
@@ -274,7 +274,7 @@ mount_nfs(
 	if (err) {
 		cached = strcmp(me->map_mounter, MNTTYPE_CACHEFS) == 0;
 		err = nfsmount(mfs, mntpnt, me->map_mntopts,
-				cached, overlay, cred, alp);
+				cached, overlay, uid, alp);
 		if (err && trace > 1) {
 			trace_prt(1, "	Couldn't mount %s:%s, err=%d\n",
 				mfs->mfs_host, mfs->mfs_dir, err);
@@ -631,7 +631,7 @@ nfsmount(
 	struct mapfs *mfs_in,
 	char *mntpnt, char *opts,
 	int cached, int overlay,
-	ucred_t	*cred,
+	uid_t uid,
 	action_list *alp)
 {
 	CLIENT *cl;
@@ -2032,7 +2032,7 @@ try_mnt_slash:
 		if (is_system_labeled())
 			nfs_sec.sc_uid = (uid_t)0;
 		else
-			nfs_sec.sc_uid = ucred_geteuid(cred);
+			nfs_sec.sc_uid = uid;
 		/*
 		 * If AUTH_DH is a chosen flavor now, its data will be stored
 		 * in the sec_data structure via nfs_clnt_secdata().

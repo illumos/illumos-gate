@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +75,7 @@ pam_sm_setcred(
 	int	err = 0;
 	int	debug = 0;
 	krb5_module_data_t	*kmd = NULL;
-	char			*user;
+	char			*user = NULL;
 	int			result;
 	krb5_repository_data_t	*krb5_data = NULL;
 	pam_repository_t	*rep_data = NULL;
@@ -89,7 +88,7 @@ pam_sm_setcred(
 	}
 
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (setcred): start: nowarn = %d, flags = 0x%x",
 		    flags & PAM_SILENT ? 1 : 0, flags);
 
@@ -100,23 +99,20 @@ pam_sm_setcred(
 	    !(flags & PAM_REFRESH_CRED) &&
 	    !(flags & PAM_DELETE_CRED) &&
 	    !(flags & PAM_SILENT)) {
-		syslog(LOG_ERR,
-		    dgettext(TEXT_DOMAIN,
-			    "PAM-KRB5 (setcred): illegal flag %d"), flags);
+		__pam_log(LOG_AUTH | LOG_ERR,
+			    "PAM-KRB5 (setcred): illegal flag %d", flags);
 		err = PAM_SYSTEM_ERR;
 		goto out;
 	}
 
-	err = pam_get_item(pamh, PAM_USER, (void**) &user);
-	if (err != PAM_SUCCESS)
-		return (err);
+	(void) pam_get_item(pamh, PAM_USER, (void**) &user);
 
-	if (user == NULL || !user[0])
-		return (PAM_AUTH_ERR);
+	if (user == NULL || *user == '\0')
+		return (PAM_USER_UNKNOWN);
 
 	if (pam_get_data(pamh, KRB5_DATA, (const void**)&kmd) != PAM_SUCCESS) {
 		if (debug) {
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (setcred): kmd get failed, kmd=0x%p",
 			    kmd);
 		}
@@ -126,7 +122,7 @@ pam_sm_setcred(
 		 * or for PAM_DELETE_CRED
 		 */
 		if (flags & (PAM_REFRESH_CRED|PAM_DELETE_CRED)) {
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5 (setcred): inst kmd structure");
 
 			kmd = calloc(1, sizeof (krb5_module_data_t));
@@ -149,7 +145,7 @@ pam_sm_setcred(
 	} else {  /* pam_get_data success */
 		if (kmd == NULL) {
 			if (debug) {
-				syslog(LOG_DEBUG,
+				__pam_log(LOG_AUTH | LOG_DEBUG,
 				    "PAM-KRB5 (setcred): kmd structure"
 				    " gotten but is NULL for user %s", user);
 			}
@@ -158,7 +154,7 @@ pam_sm_setcred(
 		}
 
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (setcred): kmd auth_status: %s",
 			    pam_strerror(pamh, kmd->auth_status));
 
@@ -173,7 +169,6 @@ pam_sm_setcred(
 
 	kmd->debug = debug;
 
-
 	/*
 	 * User must have passed pam_authenticate()
 	 * in order to use PAM_ESTABLISH_CRED or PAM_REINITIALIZE_CRED
@@ -181,7 +176,7 @@ pam_sm_setcred(
 	if ((flags & (PAM_ESTABLISH_CRED|PAM_REINITIALIZE_CRED)) &&
 	    (kmd->auth_status != PAM_SUCCESS)) {
 		if (kmd->debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (setcred): unable to "
 			    "setcreds, not authenticated!");
 		return (PAM_CRED_UNAVAIL);
@@ -195,19 +190,27 @@ pam_sm_setcred(
 	 * leaks.
 	 */
 	if (kmd->kcontext != NULL && kmd->debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 			"PAM-KRB5 (setcred): kcontext != NULL, "
 			"possible memory leak.");
+
+	/*
+	 * Use the authenticated and validated user, if applicable.
+	 */
+	if (kmd->user != NULL)
+		user = kmd->user;
 
 	/*
 	 * If auth was short-circuited we will not have anything to
 	 * renew, so just return here.
 	 */
-	err = pam_get_item(pamh, PAM_REPOSITORY, (void **)&rep_data);
+	(void) pam_get_item(pamh, PAM_REPOSITORY, (void **)&rep_data);
+
 	if (rep_data != NULL) {
 		if (strcmp(rep_data->type, KRB5_REPOSITORY_NAME) != 0) {
 			if (debug)
-				syslog(LOG_DEBUG, "PAM-KRB5 (setcred): wrong"
+				__pam_log(LOG_AUTH | LOG_DEBUG,
+					"PAM-KRB5 (setcred): wrong"
 					"repository found (%s), returning "
 					"PAM_IGNORE", rep_data->type);
 			return (PAM_IGNORE);
@@ -220,7 +223,7 @@ pam_sm_setcred(
 				krb5_data->principal != NULL &&
 				strlen(krb5_data->principal)) {
 				if (debug)
-					syslog(LOG_DEBUG,
+					__pam_log(LOG_AUTH | LOG_DEBUG,
 						"PAM-KRB5 (setcred): "
 						"Principal %s already "
 						"authenticated, "
@@ -244,8 +247,8 @@ pam_sm_setcred(
 		err = attempt_refresh_cred(kmd, user, PAM_ESTABLISH_CRED);
 	}
 
-	if (err)
-		syslog(LOG_ERR,
+	if (err != PAM_SUCCESS)
+		__pam_log(LOG_AUTH | LOG_ERR,
 		    "PAM-KRB5 (setcred): pam_setcred failed "
 		    "for %s (%s).", user, pam_strerror(pamh, err));
 
@@ -263,10 +266,8 @@ out:
 	/*
 	 * 'kmd' is not freed here, it is handled in krb5_cleanup
 	 */
-
-
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (setcred): end: %s",
 		    pam_strerror(pamh, err));
 	return (err);
@@ -291,7 +292,7 @@ attempt_refresh_cred(
 	/* User must have passed pam_authenticate() */
 	if (kmd->auth_status != PAM_SUCCESS) {
 		if (kmd->debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (setcred): unable to "
 			    "setcreds, not authenticated!");
 		return (PAM_CRED_UNAVAIL);
@@ -300,14 +301,14 @@ attempt_refresh_cred(
 	/* Create a new context here. */
 	if (krb5_init_context(&kmd->kcontext) != 0) {
 		if (kmd->debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (setcred): unable to "
 			    "initialize krb5 context");
 		return (PAM_SYSTEM_ERR);
 	}
 
 	if (krb5_cc_default(kmd->kcontext, &kmd->ccache) != 0) {
-		return (PAM_CRED_ERR);
+		return (PAM_SYSTEM_ERR);
 	}
 
 	if ((code = get_kmd_kuser(kmd->kcontext, (const char *)user, kuser,
@@ -316,7 +317,7 @@ attempt_refresh_cred(
 	}
 
 	if (krb5_parse_name(kmd->kcontext, kuser, &me) != 0) {
-		return (PAM_CRED_ERR);
+		return (PAM_SYSTEM_ERR);
 	}
 
 	if (code = krb5_build_principal_ext(kmd->kcontext, &server,
@@ -325,19 +326,20 @@ attempt_refresh_cred(
 			    tgtname.length, tgtname.data,
 			    krb5_princ_realm(kmd->kcontext, me)->length,
 			    krb5_princ_realm(kmd->kcontext, me)->data, 0)) {
-		code = PAM_CRED_ERR;
-		goto out;
+		krb5_free_principal(kmd->kcontext, me);
+		return (PAM_SYSTEM_ERR);
 	}
 
 	code = krb5_renew_tgt(kmd, me, server, flag);
 
-out:
-	if (server)
-		krb5_free_principal(kmd->kcontext, server);
-	if (me)
-		krb5_free_principal(kmd->kcontext, me);
+	krb5_free_principal(kmd->kcontext, server);
+	krb5_free_principal(kmd->kcontext, me);
 
 	if (code) {
+		if (kmd->debug)
+			__pam_log(LOG_AUTH | LOG_DEBUG,
+				"PAM-KRB5(setcred): krb5_renew_tgt() "
+				"failed: %s", error_message((errcode_t)code));
 		return (PAM_CRED_ERR);
 	} else {
 		return (PAM_SUCCESS);
@@ -375,19 +377,17 @@ krb5_renew_tgt(
 	if ((flag != PAM_REFRESH_CRED) &&
 		(flag != PAM_REINITIALIZE_CRED) &&
 		(flag != PAM_ESTABLISH_CRED))
-			return (PAM_SYSTEM_ERR);
+			return (KRB5KRB_ERR_GENERIC);
 
 	/* this is needed only for the ktkt_warnd */
-	if (krb5_unparse_name(kmd->kcontext, me, &client_name) != 0) {
-		krb5_free_principal(kmd->kcontext, me);
-		return (PAM_CRED_ERR);
-	}
+	if ((retval = krb5_unparse_name(kmd->kcontext, me, &client_name)) != 0)
+		return (retval);
 
 	(void) memset((char *)credsp, 0, sizeof (krb5_creds));
 	if ((retval = krb5_copy_principal(kmd->kcontext,
 				server, &credsp->server))) {
 		if (kmd->debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5 (setcred): krb5_copy_principal "
 				"failed: %s",
 				error_message((errcode_t)retval));
@@ -398,10 +398,9 @@ krb5_renew_tgt(
 	retval = krb5_cc_get_principal(kmd->kcontext,
 				kmd->ccache, &credsp->client);
 	if (retval && (kmd->debug))
-		syslog(LOG_DEBUG,
-			dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 			"PAM-KRB5 (setcred): User not in cred "
-			"cache (%s)"), error_message((errcode_t)retval));
+			"cache (%s)", error_message((errcode_t)retval));
 
 	if ((retval == KRB5_FCC_NOFILE) &&
 		(flag & (PAM_ESTABLISH_CRED|PAM_REINITIALIZE_CRED))) {
@@ -411,14 +410,14 @@ krb5_renew_tgt(
 		 */
 		if ((retval = krb5_cc_initialize(kmd->kcontext,
 				kmd->ccache, me)) != 0) {
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5 (setcred): krb5_cc_initialize "
 				"failed: %s",
 				error_message((errcode_t)retval));
 			goto cleanup_creds;
 		} else if ((retval = krb5_cc_store_cred(kmd->kcontext,
 				kmd->ccache, &my_creds)) != 0) {
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5 (setcred): krb5_cc_store_cred "
 				"failed: %s",
 				error_message((errcode_t)retval));
@@ -430,10 +429,9 @@ krb5_renew_tgt(
 		 * This might be due to permission error on the cache,
 		 * or maybe we are looking in the wrong cache file!
 		 */
-		syslog(LOG_ERR,
-			dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_ERR,
 			"PAM-KRB5 (setcred): Cannot find creds"
-			" for %s (%s)"),
+			" for %s (%s)",
 			client_name ? client_name : "(unknown)",
 			error_message((errcode_t)retval));
 
@@ -449,7 +447,7 @@ krb5_renew_tgt(
 		if ((retval = krb5_get_credentials_renew(kmd->kcontext, 0,
 					kmd->ccache, &creds, &credsp))) {
 			if (kmd->debug)
-			    syslog(LOG_DEBUG,
+			    __pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5 (setcred): krb5_get_credentials",
 				"_renew(reinitialize) failed: %s",
 				error_message((errcode_t)retval));
@@ -547,7 +545,7 @@ krb5_renew_tgt(
 		    (retval = krb5_get_credentials_renew(kmd->kcontext,
 				0, kmd->ccache, &creds, &credsp))) {
 			if (kmd->debug)
-			    syslog(LOG_DEBUG,
+			    __pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5 (setcred): krb5_get_credentials"
 				"_renew(update) failed: %s",
 				error_message((errcode_t)retval));
@@ -585,7 +583,7 @@ krb5_renew_tgt(
 			fetched = fetched->next;
 			if (retval) {
 			    if (kmd->debug)
-				syslog(LOG_DEBUG,
+				__pam_log(LOG_AUTH | LOG_DEBUG,
 				    "PAM-KRB5(setcred): krb5_cc_store_cred() "
 				    "failed: %s",
 				    error_message((errcode_t)retval));
@@ -624,22 +622,23 @@ cleanup_creds:
 
 			if (get_pw_uid(username, &uuid) == 0 ||
 			    get_pw_gid(username, &ugid) == 0) {
-				syslog(LOG_ERR, "PAM-KRB5 (setcred): Unable to "
+				__pam_log(LOG_AUTH | LOG_ERR,
+				    "PAM-KRB5 (setcred): Unable to "
 				    "find matching uid/gid pair for user `%s'",
 				    username);
-				return (PAM_SYSTEM_ERR);
+				return (KRB5KRB_ERR_GENERIC);
 			}
 			if (!(filepath = strchr(kmd->env, ':')) ||
 			    !(filepath+1)) {
-				syslog(LOG_ERR,
+				__pam_log(LOG_AUTH | LOG_ERR,
 					"PAM-KRB5 (setcred): Invalid pathname "
 					"for credential cache of user `%s'",
 					username);
-				return (PAM_SYSTEM_ERR);
+				return (KRB5KRB_ERR_GENERIC);
 			}
 			if (chown(filepath+1, uuid, ugid)) {
 				if (kmd->debug)
-					syslog(LOG_DEBUG,
+					__pam_log(LOG_AUTH | LOG_DEBUG,
 					    "PAM-KRB5 (setcred): chown to user "
 					    "`%s' failed for FILE=%s",
 					    username, filepath);
@@ -652,9 +651,9 @@ cleanup_creds:
 			kwarn_del_warning(client_name);
 			if (kwarn_add_warning(client_name,
 			    creds.times.endtime) != 0) {
-				syslog(LOG_NOTICE, dgettext(TEXT_DOMAIN,
+				__pam_log(LOG_AUTH | LOG_NOTICE,
 					"PAM-KRB5 (auth): kwarn_add_warning"
-					" failed: ktkt_warnd(1M) down?"));
+					" failed: ktkt_warnd(1M) down?");
 			}
 		}
 	}
@@ -687,15 +686,15 @@ static int
 attempt_delete_initcred(krb5_module_data_t *kmd)
 {
 	if (kmd == NULL)
-		return (0);
+		return (PAM_SUCCESS);
 
 	if (kmd->debug) {
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 			"PAM-KRB5 (setcred): deleting user's "
 			"credentials (initcreds)");
 	}
 	krb5_free_cred_contents(kmd->kcontext, &kmd->initcreds);
 	(void) memset((char *)&kmd->initcreds, 0, sizeof (krb5_creds));
 	kmd->auth_status = PAM_AUTHINFO_UNAVAIL;
-	return (0);
+	return (PAM_SUCCESS);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,7 @@ set_ccname(
 	int result;
 
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (password): password: finalize"
 		    " ccname env, login_result =%d, env ='%s'",
 		    login_result, kmd->env ? kmd->env : "<null>");
@@ -82,10 +82,9 @@ set_ccname(
 			if ((result = pam_putenv(pamh, kmd->env))
 			    != PAM_SUCCESS) {
 				/* should not happen but... */
-				syslog(LOG_ERR,
-				    dgettext(TEXT_DOMAIN,
+				__pam_log(LOG_AUTH | LOG_ERR,
 					    "PAM-KRB5 (password):"
-					    " pam_putenv failed: result: %d"),
+					    " pam_putenv failed: result: %d",
 				    result);
 				goto cleanupccname;
 			}
@@ -126,7 +125,7 @@ get_set_creds(
 	 */
 	login_result = attempt_krb5_auth(kmd, user, &newpass, 0);
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (password): get_set_creds: login_result= %d",
 		    login_result);
 	/*
@@ -170,14 +169,13 @@ pam_sm_chauthtok(
 		if (strcmp(argv[i], "debug") == 0)
 			debug = 1;
 		else
-			syslog(LOG_ERR,
-			    dgettext(TEXT_DOMAIN,
-				    "PAM-KRB5 (password): illegal option %s"),
+			__pam_log(LOG_AUTH | LOG_ERR,
+				    "PAM-KRB5 (password): illegal option %s",
 			    argv[i]);
 	}
 
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (password): start: flags = %x",
 		    flags);
 
@@ -186,7 +184,8 @@ pam_sm_chauthtok(
 	if (rep_data != NULL) {
 		if (strcmp(rep_data->type, KRB5_REPOSITORY_NAME) != 0) {
 			if (debug)
-				syslog(LOG_DEBUG, "PAM-KRB5 (auth): wrong"
+				__pam_log(LOG_AUTH | LOG_DEBUG,
+					"PAM-KRB5 (auth): wrong"
 					"repository found (%s), returning "
 					"PAM_IGNORE", rep_data->type);
 			return (PAM_IGNORE);
@@ -196,15 +195,15 @@ pam_sm_chauthtok(
 	if (flags & PAM_PRELIM_CHECK) {
 		/* Nothing to do here */
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (password): prelim check");
 		return (PAM_IGNORE);
 	}
 
 	/* make sure PAM framework is telling us to update passwords */
 	if (!(flags & PAM_UPDATE_AUTHTOK)) {
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
-			"PAM-KRB5 (password): bad flags: %d"),
+		__pam_log(LOG_AUTH | LOG_ERR,
+			"PAM-KRB5 (password): bad flags: %d",
 			flags);
 		return (PAM_SYSTEM_ERR);
 	}
@@ -213,7 +212,7 @@ pam_sm_chauthtok(
 	if ((err = pam_get_data(pamh, KRB5_DATA, (const void **)&kmd))
 	    != PAM_SUCCESS) {
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (password): get mod data failed %d",
 			    err);
 		kmd = NULL;
@@ -223,7 +222,7 @@ pam_sm_chauthtok(
 		/* let's make sure we know the krb5 pw has expired */
 
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (password): kmd age status %d",
 			    kmd ? kmd->age_status : -99);
 
@@ -233,13 +232,14 @@ pam_sm_chauthtok(
 
 	(void) pam_get_item(pamh, PAM_USER, (void **)&user);
 
-	if (user == NULL || user == '\0') {
-		syslog(LOG_ERR, "PAM-KRB5 (password): username is empty");
+	if (user == NULL || *user == '\0') {
+		__pam_log(LOG_AUTH | LOG_ERR,
+			"PAM-KRB5 (password): username is empty");
 		return (PAM_USER_UNKNOWN);
 	}
 
 	if (!get_pw_uid(user, &pw_uid)) {
-		syslog(LOG_ERR,
+		__pam_log(LOG_AUTH | LOG_ERR,
 		    "PAM-KRB5 (password): can't get uid for %s", user);
 		return (PAM_USER_UNKNOWN);
 	}
@@ -251,7 +251,7 @@ pam_sm_chauthtok(
 	if ((strcmp(user, ROOT_UNAME) == 0) &&
 	    key_in_keytab(user, debug)) {
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (password): "
 			    "key for '%s' in keytab, returning IGNORE", user);
 		result = PAM_IGNORE;
@@ -270,7 +270,8 @@ pam_sm_chauthtok(
 
 	result = krb5_verifypw(user, oldpass, debug);
 	if (debug)
-		syslog(LOG_DEBUG, "PAM-KRB5 (password): verifypw %d", result);
+		__pam_log(LOG_AUTH | LOG_DEBUG,
+			"PAM-KRB5 (password): verifypw %d", result);
 
 	/*
 	 * If it's a bad password or general failure, we are done.
@@ -292,7 +293,8 @@ pam_sm_chauthtok(
 
 out:
 	if (debug)
-		syslog(LOG_DEBUG, "PAM-KRB5 (password): out: returns %d",
+		__pam_log(LOG_AUTH | LOG_DEBUG,
+			"PAM-KRB5 (password): out: returns %d",
 		    result);
 
 	return (result);
@@ -345,10 +347,9 @@ krb5_verifypw(
 
 
 	if (kadm5_get_cpw_host_srv_name(context, admin_realm, &cpw_service)) {
-		syslog(LOG_ERR,
-		    dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_ERR,
 			"PAM-KRB5 (password): unable to get host based "
-			"service name for realm %s\n"),
+			"service name for realm %s\n",
 			admin_realm);
 		krb5_free_principal(context, princ);
 		return (3);
@@ -359,7 +360,7 @@ krb5_verifypw(
 					KADM5_API_VERSION_2, &server_handle);
 	if (code != 0) {
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5: krb5_verifypw: init_with_pw"
 			    " failed: (%s)", error_message(code));
 		krb5_free_principal(context, princ);
@@ -441,10 +442,9 @@ krb5_changepw(
 
 
 	if (kadm5_get_cpw_host_srv_name(context, admin_realm, &cpw_service)) {
-		syslog(LOG_ERR,
-			dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_ERR,
 				"PAM-KRB5 (password):unable to get host based "
-				"service name for realm %s\n"),
+				"service name for realm %s\n",
 			admin_realm);
 		return (PAM_SYSTEM_ERR);
 	}
@@ -455,7 +455,7 @@ krb5_changepw(
 	free(cpw_service);
 	if (code != 0) {
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (password): changepw: "
 			    "init_with_pw failed:  (%s)", error_message(code));
 		krb5_free_principal(context, princ);
@@ -485,7 +485,7 @@ krb5_changepw(
 	(void) kadm5_destroy(server_handle);
 
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (password): changepw: end %d", code);
 
 	if (code != 0)

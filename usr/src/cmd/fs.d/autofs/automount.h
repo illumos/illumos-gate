@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,6 @@
 #include <rpc/rpc.h>
 #include <sys/fs/autofs.h>
 #include <netinet/in.h>		/* needed for sockaddr_in declaration */
-#include <ucred.h>
 
 #ifdef MALLOC_DEBUG
 #include <debug_alloc.h>
@@ -278,16 +277,16 @@ extern enum clnt_stat pingnfs(char *, int, rpcvers_t *, rpcvers_t,
 
 extern void *autofs_get_buffer(size_t);
 extern int self_check(char *);
-extern int do_mount1(char *, char *, char *, char *, char *, uint_t,
-	action_list **, ucred_t *, int);
-extern int do_lookup1(char *, char *, char *, char *, char *, uint_t,
-	autofs_action_t *, struct linka *, ucred_t *);
+extern int do_mount1(char *, char *, char *, char *, char *, uint_t, uid_t,
+	action_list **, int);
+extern int do_lookup1(char *, char *, char *, char *, char *, uint_t, uid_t,
+	autofs_action_t *, struct linka *);
 extern int do_unmount1(umntrequest *);
-extern int do_readdir(autofs_rddirargs *, autofs_rddirres *, ucred_t *);
+extern int do_readdir(autofs_rddirargs *, autofs_rddirres *);
 extern int nfsunmount(struct mnttab *);
 extern int loopbackmount(char *, char *, char *, int);
-extern int mount_nfs(struct mapent *, char *, char *, int,
-	ucred_t *, action_list **);
+extern int mount_nfs(struct mapent *, char *, char *, int, uid_t,
+	action_list **);
 extern int mount_autofs(struct mapent *, char *, action_list *,
 	char *rootp, char *subdir, char *key);
 extern int mount_generic(char *, char *, char *, char *, int);

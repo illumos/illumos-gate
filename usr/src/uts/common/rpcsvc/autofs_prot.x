@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 %/*
-% * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+% * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 % * Use is subject to license terms.
 % */
 %
@@ -86,6 +86,7 @@ struct autofs_lookupargs {
 	string	subdir<AUTOFS_MAXPATHLEN>;	/* subdir within map */
 	string	opts<AUTOFS_MAXOPTSLEN>;
 	bool_t	isdirect;			/* direct mountpoint? */
+	uid_t	uid;				/* uid of caller */
 };
 
 /*
@@ -231,6 +232,7 @@ struct autofs_rddirargs {
 	string	rda_map<AUTOFS_MAXPATHLEN>;
 	u_int	rda_offset;		/* starting offset */
 	u_int	rda_count;		/* total size requested */
+	uid_t	uid;			/* uid of caller */
 };
 
 struct autofsrddir {

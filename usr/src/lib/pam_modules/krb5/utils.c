@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +98,6 @@ get_pw_gid(char *user, gid_t *gid)
  * procedure as for server principals and lowercase the domainname.
  *
  * Returns:
- *	PAM_AUTH_ERR	- if local host name is not found
  *	PAM_BUF_ERR	- if there is an error from krb5_sname_to_principal(),
  *			  or krb5_unparse_name()
  *	0		- if there was no error
@@ -157,7 +155,7 @@ key_in_keytab(const char *user, int debug)
 
 
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (%s): start for user '%s'",
 				    whoami, user ? user : "<null>");
 
@@ -167,7 +165,7 @@ key_in_keytab(const char *user, int debug)
 	/* need to free context with krb5_free_context */
 	if (code = krb5_init_context(&kcontext)) {
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (%s): Error initializing "
 			    "krb5: %s", whoami,
 			    error_message(code));
@@ -182,7 +180,7 @@ key_in_keytab(const char *user, int debug)
 	/* need to free princ with krb5_free_principal */
 	if ((code = krb5_parse_name(kcontext, kuser, &princ)) != 0) {
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (%s): can't parse name (%s)",
 				    whoami, error_message(code));
 		goto out;
@@ -191,7 +189,7 @@ key_in_keytab(const char *user, int debug)
 	/* need to close keytab handle with krb5_kt_close */
 	if ((code = krb5_kt_default(kcontext, &kt_handle))) {
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (%s): krb5_kt_default failed (%s)",
 			    whoami, error_message(code));
 		goto out;
@@ -201,20 +199,20 @@ key_in_keytab(const char *user, int debug)
 	if (code != 0) {
 		if (code == ENOENT) {
 				if (debug)
-					syslog(LOG_DEBUG,
+					__pam_log(LOG_AUTH | LOG_DEBUG,
 					    "PAM-KRB5 (%s): "
 					    "Keytab does not exist",
 					    whoami);
 		} else if (code == KRB5_KT_NOTFOUND) {
 				if (debug)
-					syslog(LOG_DEBUG,
+					__pam_log(LOG_AUTH | LOG_DEBUG,
 					    "PAM-KRB5 (%s): "
 					    "No entry for principal "
 					    "'%s' exists in keytab",
 					    whoami, kuser);
 		} else {
 				if (debug)
-					syslog(LOG_DEBUG,
+					__pam_log(LOG_AUTH | LOG_DEBUG,
 					    "PAM-KRB5 (%s): "
 					    "krb5_kt_get_entry failed (%s)",
 					    whoami, error_message(code));
@@ -222,7 +220,7 @@ key_in_keytab(const char *user, int debug)
 	} else { /* Key found in keytab, return success */
 			(void) krb5_kt_free_entry(kcontext, &kt_ent);
 			if (debug)
-				syslog(LOG_DEBUG,
+				__pam_log(LOG_AUTH | LOG_DEBUG,
 				    "PAM-KRB5 (%s): "
 				    "keytab entry for '%s' found",
 				    whoami, user);

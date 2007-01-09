@@ -46,7 +46,6 @@
 #include <string.h>
 #include <thread.h>
 #include <locale.h>
-#include <ucred.h>
 #include <door.h>
 #include "automount.h"
 #include <sys/vfs.h>
@@ -64,17 +63,13 @@
 
 static void autofs_doorfunc(void *, char *, size_t, door_desc_t *, uint_t);
 static void autofs_setdoor(int);
-static void autofs_mntinfo_1_r(autofs_lookupargs *,
-		autofs_mountres *, ucred_t *);
+static void autofs_mntinfo_1_r(autofs_lookupargs *, autofs_mountres *);
 static void autofs_mount_1_free_r(struct autofs_mountres *);
-static void autofs_lookup_1_r(autofs_lookupargs *,
-		autofs_lookupres *, ucred_t *);
+static void autofs_lookup_1_r(autofs_lookupargs *, autofs_lookupres *);
 static void autofs_lookup_1_free_args(autofs_lookupargs *);
-static void autofs_unmount_1_r(umntrequest *, umntres *,
-		ucred_t *);
+static void autofs_unmount_1_r(umntrequest *, umntres *);
 static void autofs_unmount_1_free_args(umntrequest *);
-static void autofs_readdir_1_r(autofs_rddirargs *,
-		autofs_rddirres *, ucred_t *);
+static void autofs_readdir_1_r(autofs_rddirargs *, autofs_rddirres *);
 static void autofs_readdir_1_free_r(struct autofs_rddirres *);
 static int decode_args(xdrproc_t, autofs_door_args_t *, caddr_t *, int);
 static bool_t encode_res(xdrproc_t, autofs_door_res_t **, caddr_t, int *);
@@ -94,7 +89,6 @@ extern int _autofssys(int, void *);
 #ifdef DEBUG
 #define	AUTOFS_DOOR	"/var/run/autofs_door"
 #endif /* DEBUG */
-
 
 static thread_key_t	s_thr_key;
 
@@ -299,14 +293,13 @@ usage()
 static void
 autofs_readdir_1_r(
 	autofs_rddirargs *req,
-	autofs_rddirres *res,
-	ucred_t	*autofs_cred)
+	autofs_rddirres *res)
 {
 	if (trace > 0)
 		trace_prt(1, "READDIR REQUEST	: %s @ %ld\n",
 		req->rda_map, req->rda_offset);
 
-	do_readdir(req, res, autofs_cred);
+	do_readdir(req, res);
 	if (trace > 0)
 		trace_prt(1, "READDIR REPLY	: status=%d\n",
 			res->rd_status);
@@ -326,8 +319,7 @@ autofs_readdir_1_free_r(struct autofs_rddirres *res)
 static void
 autofs_unmount_1_r(
 	umntrequest *m,
-	umntres *res,
-	ucred_t	*autofs_cred)
+	umntres *res)
 {
 	struct umntrequest *ul;
 
@@ -357,8 +349,7 @@ autofs_unmount_1_r(
 static void
 autofs_lookup_1_r(
 	autofs_lookupargs *m,
-	autofs_lookupres *res,
-	ucred_t	*autofs_cred)
+	autofs_lookupres *res)
 {
 	autofs_action_t action;
 	struct	linka link;
@@ -378,7 +369,7 @@ autofs_lookup_1_r(
 	bzero(&link, sizeof (struct linka));
 
 	status = do_lookup1(m->map, m->name, m->subdir, m->opts, m->path,
-			(uint_t)m->isdirect, &action, &link, autofs_cred);
+			(uint_t)m->isdirect, m->uid, &action, &link);
 	if (status == 0) {
 		/*
 		 * Return action list to kernel.
@@ -402,8 +393,7 @@ autofs_lookup_1_r(
 static void
 autofs_mntinfo_1_r(
 	autofs_lookupargs *m,
-	autofs_mountres *res,
-	ucred_t	*autofs_cred)
+	autofs_mountres *res)
 {
 	int status;
 	action_list		*alp = NULL;
@@ -420,7 +410,7 @@ autofs_mntinfo_1_r(
 	}
 
 	status = do_mount1(m->map, m->name, m->subdir, m->opts, m->path,
-			(uint_t)m->isdirect, &alp, autofs_cred, DOMOUNT_USER);
+			(uint_t)m->isdirect, m->uid, &alp, DOMOUNT_USER);
 	if (status != 0) {
 		/*
 		 * An error occurred, free action list if allocated.
@@ -671,12 +661,6 @@ autofs_doorfunc(
 	autofs_door_res_t	*door_res;
 	autofs_door_res_t	failed_res;
 
-	/*
-	 * autofs_cred is nulled because door_cred assumes non-null
-	 * to have been previously allocated.
-	 */
-	ucred_t 		*autofs_cred = NULL;
-
 	if (arg_size < sizeof (autofs_door_args_t)) {
 		failed_res.res_status = EINVAL;
 		error = door_return((char *)&failed_res,
@@ -685,19 +669,6 @@ autofs_doorfunc(
 		 * If we got here the door_return() failed.
 		 */
 		syslog(LOG_ERR, "Bad argument, door_return failure %d",
-			error);
-		return;
-	}
-
-	error = door_ucred(&autofs_cred);
-	if (error) {
-		failed_res.res_status = error;
-		error = door_return((char *)&failed_res,
-		    sizeof (autofs_door_res_t), NULL, 0);
-		/*
-		 * If we got here, door_return() failed
-		 */
-		syslog(LOG_ERR, "Bad cred, door_return() failed, %d",
 			error);
 		return;
 	}
@@ -720,7 +691,7 @@ autofs_doorfunc(
 		}
 		bzero(&lookup_res, sizeof (autofs_lookupres));
 
-		autofs_lookup_1_r(xdrargs, &lookup_res, autofs_cred);
+		autofs_lookup_1_r(xdrargs, &lookup_res);
 
 		autofs_lookup_1_free_args(xdrargs);
 		free(xdrargs);
@@ -751,8 +722,7 @@ autofs_doorfunc(
 			break;
 		}
 
-		autofs_mntinfo_1_r((autofs_lookupargs *)xdrargs,
-					&mount_res, autofs_cred);
+		autofs_mntinfo_1_r((autofs_lookupargs *)xdrargs, &mount_res);
 
 		autofs_lookup_1_free_args(xdrargs);
 		free(xdrargs);
@@ -790,8 +760,7 @@ autofs_doorfunc(
 			break;
 		}
 
-		autofs_unmount_1_r(umnt_args,
-		    &umount_res, autofs_cred);
+		autofs_unmount_1_r(umnt_args, &umount_res);
 
 		error = umount_res.status;
 
@@ -826,7 +795,7 @@ autofs_doorfunc(
 			break;
 		}
 
-		autofs_readdir_1_r(rddir_args, &rddir_res, autofs_cred);
+		autofs_readdir_1_r(rddir_args, &rddir_res);
 
 		free(rddir_args->rda_map);
 		free(rddir_args);
@@ -847,7 +816,6 @@ autofs_doorfunc(
 		break;
 #ifdef MALLOC_DEBUG
 	case AUTOFS_DUMP_DEBUG:
-			ucred_free(autofs_cred);
 			check_leaks("/var/tmp/automountd.leak");
 			error = door_return(NULL, 0, NULL, 0);
 			/*
@@ -867,7 +835,6 @@ autofs_doorfunc(
 			res_size = sizeof (autofs_door_res_t);
 			break;
 	}
-	ucred_free(autofs_cred);
 	error = door_return(res, res_size, NULL, 0);
 	/*
 	 * If we got here, door_return failed.

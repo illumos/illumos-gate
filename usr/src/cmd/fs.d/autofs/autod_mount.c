@@ -21,7 +21,7 @@
 /*
  *	autod_mount.c
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,8 +69,8 @@ do_mount1(
 	char *mapopts,
 	char *path,
 	uint_t isdirect,
+	uid_t uid,
 	action_list **alpp,
-	ucred_t	*cred,
 	int flags)
 {
 	struct mapline ml;
@@ -178,7 +178,7 @@ retry:
 			} else
 				alp = NULL;
 			err =
-			    mount_nfs(me, spec_mntpnt, private, overlay, cred,
+			    mount_nfs(me, spec_mntpnt, private, overlay, uid,
 				    &alp);
 			/*
 			 * We must retry if we don't have access to the

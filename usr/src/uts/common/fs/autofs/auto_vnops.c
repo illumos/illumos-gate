@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -909,6 +909,7 @@ again:
 		rda.rda_offset = (uint_t)uiop->uio_offset;
 		rd.rd_rddir.rddir_entries = dp;
 		rda.rda_count = rd.rd_rddir.rddir_size = (uint_t)alloc_count;
+		rda.uid = crgetuid(cred);
 
 		error = auto_calldaemon(fngp->fng_zoneid,
 			AUTOFS_READDIR,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,8 +84,8 @@ static int auto_perform_actions(fninfo_t *, fnnode_t *,
     action_list *, cred_t *);
 static int auto_getmntpnt(vnode_t *, char *, vnode_t **, cred_t *);
 static int auto_lookup_request(fninfo_t *, char *, struct linka *,
-    bool_t, bool_t *);
-static int auto_mount_request(fninfo_t *, char *, action_list **,
+    bool_t, bool_t *, cred_t *);
+static int auto_mount_request(fninfo_t *, char *, action_list **, cred_t *,
     bool_t);
 
 extern struct autofs_globals *autofs_zone_init(void);
@@ -159,7 +159,7 @@ auto_lookup_aux(fnnode_t *fnp, char *name, cred_t *cred)
 
 	fnip = vfstofni(fntovn(fnp)->v_vfsp);
 	bzero(&link, sizeof (link));
-	error = auto_lookup_request(fnip, name, &link, TRUE, &mountreq);
+	error = auto_lookup_request(fnip, name, &link, TRUE, &mountreq, cred);
 	if (!error) {
 		if (link.link != NULL || link.link != '\0') {
 			/*
@@ -263,7 +263,7 @@ auto_mount_thread(struct autofs_callargs *argsp)
 	cred = argsp->fnc_cred;
 	ASSERT(crgetzoneid(argsp->fnc_cred) == fnip->fi_zoneid);
 
-	error = auto_mount_request(fnip, name, &alp, TRUE);
+	error = auto_mount_request(fnip, name, &alp, cred, TRUE);
 	if (!error)
 		error = auto_perform_actions(fnip, fnp, alp, cred);
 	mutex_enter(&fnp->fn_lock);
@@ -539,7 +539,8 @@ auto_lookup_request(
 	char *key,
 	struct linka *lnp,
 	bool_t hard,
-	bool_t *mountreq)
+	bool_t *mountreq,
+	cred_t *cred)
 {
 	int 				error;
 	struct autofs_globals 		*fngp;
@@ -565,6 +566,7 @@ auto_lookup_request(
 	reqst.subdir = fnip->fi_subdir;
 	reqst.opts = fnip->fi_opts;
 	reqst.isdirect = fnip->fi_flags & MF_DIRECT ? TRUE : FALSE;
+	reqst.uid = crgetuid(cred);
 
 	resp = kmem_zalloc(sizeof (*resp), KM_SLEEP);
 
@@ -640,6 +642,7 @@ auto_mount_request(
 	fninfo_t *fnip,
 	char *key,
 	action_list **alpp,
+	cred_t *cred,
 	bool_t hard)
 {
 	int 			error;
@@ -664,6 +667,7 @@ auto_mount_request(
 	reqst.subdir = fnip->fi_subdir;
 	reqst.opts = fnip->fi_opts;
 	reqst.isdirect = fnip->fi_flags & MF_DIRECT ? TRUE : FALSE;
+	reqst.uid = crgetuid(cred);
 
 	xdrres = kmem_zalloc(sizeof (*xdrres), KM_SLEEP);
 
@@ -675,7 +679,6 @@ auto_mount_request(
 		(void *)xdrres,
 		sizeof (autofs_mountres),
 		hard);
-
 
 	if (!error) {
 		fngp->fng_verbose = xdrres->mr_verbose;

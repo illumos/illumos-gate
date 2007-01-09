@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +88,7 @@ fetch_princ_entry(
 		krb5_free_principal(context, princ);
 		krb5_free_context(context);
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (acct): fetch_princ_entry: pwlen=0");
 		return (PAM_AUTH_ERR);
 	}
@@ -103,10 +102,9 @@ fetch_princ_entry(
 	params.realm = admin_realm;
 
 	if (kadm5_get_cpw_host_srv_name(context, admin_realm, &cpw_service)) {
-		syslog(LOG_ERR,
-		    dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_ERR,
 			"PAM-KRB5 (acct):  unable to get host based "
-			"service name for realm '%s'"),
+			"service name for realm '%s'",
 			admin_realm);
 		krb5_free_principal(context, princ);
 		krb5_free_context(context);
@@ -118,7 +116,7 @@ fetch_princ_entry(
 					KADM5_API_VERSION_2, &server_handle);
 	if (code != 0) {
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (acct): fetch_princ_entry: "
 			    "init_with_pw failed: code = %d", code);
 		krb5_free_principal(context, princ);
@@ -129,7 +127,7 @@ fetch_princ_entry(
 
 	if (_kadm5_get_kpasswd_protocol(server_handle) != KRB5_CHGPWD_RPCSEC) {
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (acct): fetch_princ_entry: "
 			    "non-RPCSEC_GSS chpw server, can't get "
 			    "princ entry");
@@ -154,9 +152,8 @@ fetch_princ_entry(
 		(void) kadm5_destroy(server_handle);
 		krb5_free_principal(context, princ);
 		krb5_free_context(context);
-		syslog(LOG_ERR,
-		    dgettext(TEXT_DOMAIN,
-			    "PAM-KRB5 (acct): krb5_timeofday fail: code=%d"),
+		__pam_log(LOG_AUTH | LOG_ERR,
+			    "PAM-KRB5 (acct): krb5_timeofday fail: code=%d",
 		    code);
 		return (PAM_SYSTEM_ERR);
 	}
@@ -194,7 +191,7 @@ exp_warn(
 	char    messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
 
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (acct): exp_warn start: user = '%s'",
 		    user ? user : "<null>");
 
@@ -207,14 +204,14 @@ exp_warn(
 	if ((err = fetch_princ_entry(user, password, &prent,
 				    &now, debug)) != PAM_SUCCESS) {
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (acct): exp_warn: fetch_pr failed %d",
 			    err);
 		goto out;
 	}
 
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (acct): exp_warn: fetch_princ success:"
 		    " princ exp=%ld pw_exp = %ld, now =%ld, days=%ld",
 		    prent.princ_expire_time,
@@ -252,7 +249,7 @@ exp_warn(
 
 out:
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (acct): exp_warn end: err = %d", err);
 
 	return (err);
@@ -295,18 +292,19 @@ pam_sm_acct_mgmt(
 			nowarn = 1;
 			flags = flags | PAM_SILENT;
 		} else {
-			syslog(LOG_ERR,
+			__pam_log(LOG_AUTH | LOG_ERR,
 			    "PAM-KRB5 (acct): illegal option %s",
 			    argv[i]);
 		}
 	}
 
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (acct): debug=%d, nowarn=%d",
 		    debug, nowarn);
 
-	err = pam_get_item(pamh, PAM_REPOSITORY, (void **)&rep_data);
+	(void) pam_get_item(pamh, PAM_REPOSITORY, (void **)&rep_data);
+
 	if (rep_data != NULL) {
 		/*
 		 * If the repository is not ours,
@@ -314,7 +312,8 @@ pam_sm_acct_mgmt(
 		 */
 		if (strcmp(rep_data->type, KRB5_REPOSITORY_NAME) != 0) {
 			if (debug)
-				syslog(LOG_DEBUG, "PAM-KRB5 (acct): wrong"
+				__pam_log(LOG_AUTH | LOG_DEBUG,
+					"PAM-KRB5 (acct): wrong"
 					"repository found (%s), returning "
 					"PAM_IGNORE", rep_data->type);
 			return (PAM_IGNORE);
@@ -323,16 +322,9 @@ pam_sm_acct_mgmt(
 
 
 	/* get user name */
-	if ((err = pam_get_item(pamh, PAM_USER, (void **) &user))
-	    != PAM_SUCCESS) {
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
-					"PAM-KRB5 (acct):"
-					" get user failed: err=%d"),
-		    err);
-		goto out;
-	}
+	(void) pam_get_item(pamh, PAM_USER, (void **) &user);
 
-	if (user == NULL) {
+	if (user == NULL || *user == '\0') {
 		err = PAM_USER_UNKNOWN;
 		goto out;
 	}
@@ -342,9 +334,8 @@ pam_sm_acct_mgmt(
 					(const void **)&userdata);
 	if (err != PAM_SUCCESS) {
 		if (debug)
-			syslog(LOG_DEBUG, dgettext(TEXT_DOMAIN,
-				"PAM-KRB5 (acct): "
-				"no module data for KRB5_AUTOMIGRATE_DATA"));
+			__pam_log(LOG_AUTH | LOG_DEBUG, "PAM-KRB5 (acct): "
+				"no module data for KRB5_AUTOMIGRATE_DATA");
 	} else {
 		/*
 		 * We try and reauthenticate, since this user has a
@@ -357,9 +348,9 @@ pam_sm_acct_mgmt(
 					(const char **)argv);
 		else
 			if (debug)
-				syslog(LOG_DEBUG, dgettext(TEXT_DOMAIN,
+				__pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5 (acct): PAM_USER %s"
-				"does not match user %s from pam_get_data()"),
+				"does not match user %s from pam_get_data()",
 				user, (char *)userdata);
 	}
 
@@ -375,15 +366,14 @@ pam_sm_acct_mgmt(
 			 * was instantiated (normal for auth 'acceptor')
 			 */
 			if (debug)
-				syslog(LOG_DEBUG,
+				__pam_log(LOG_AUTH | LOG_DEBUG,
 				    "PAM-KRB5 (acct): no module data");
 			err = PAM_IGNORE;
 			goto out;
 		} else {
-			syslog(LOG_ERR,
-			    dgettext(TEXT_DOMAIN,
+			__pam_log(LOG_AUTH | LOG_ERR,
 				    "PAM-KRB5 (acct): get module"
-				    " data failed: err=%d"),
+				    " data failed: err=%d",
 			    err);
 		}
 		goto out;
@@ -397,9 +387,21 @@ pam_sm_acct_mgmt(
 	 */
 	if (kmd->auth_status == PAM_IGNORE) {
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (acct): kmd auth_status is IGNORE");
 		err = PAM_IGNORE;
+		goto out;
+	}
+
+	/*
+	 * auth mod set status to user_unknown, most likely cuz user is
+	 * not a kerberos user.
+	 */
+	if (kmd->auth_status == PAM_USER_UNKNOWN) {
+		if (debug)
+			syslog(LOG_DEBUG,
+			    "PAM-KRB5 (acct): kmd auth_status is USER UNKNOWN");
+		err = PAM_USER_UNKNOWN;
 		goto out;
 	}
 
@@ -424,12 +426,14 @@ pam_sm_acct_mgmt(
 		(void) exp_warn(pamh, user, kmd->password, debug);
 	}
 
-	/* everything a-ok */
-	err = PAM_SUCCESS;
+	/*
+	 * Here we return any errors during the auth pass, if any.
+	 */
+	err = kmd->auth_status;
 
 out:
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (acct): end: %s", pam_strerror(pamh, err));
 
 	return (err);

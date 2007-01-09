@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,9 +88,9 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 			    (strcmp((strstr(argv[i], "=") + 1), "") != 0)) {
 			service = (char *)strdup(strstr(argv[i], "=") + 1);
 		} else {
-			syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+			__pam_log(LOG_AUTH | LOG_ERR,
 				"PAM-KRB5-AUTOMIGRATE (auth): unrecognized "
-				"option %s"),
+				"option %s",
 				argv[i]);
 		}
 	}
@@ -109,9 +108,9 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 	 */
 	if (user == NULL || (user[0] == '\0')) {
 		if (debug)
-			syslog(LOG_DEBUG, dgettext(TEXT_DOMAIN,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5-AUTOMIGRATE (auth): "
-				"user empty or null"));
+				"user empty or null");
 		goto cleanup;
 	}
 
@@ -125,9 +124,9 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 
 	if (password == NULL || (password[0] == '\0')) {
 		if (debug)
-			syslog(LOG_DEBUG, dgettext(TEXT_DOMAIN,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5-AUTOMIGRATE (auth): "
-				"authentication token is empty or null"));
+				"authentication token is empty or null");
 		goto cleanup;
 	}
 
@@ -136,9 +135,9 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 	 * Now, lets do the all krb5/kadm5 setup for the principal addition
 	 */
 	if (retval = krb5_init_context(&context)) {
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_ERR,
 			"PAM-KRB5-AUTOMIGRATE (auth): Error initializing "
-			"krb5: %s"),
+			"krb5: %s",
 			error_message(retval));
 		goto cleanup;
 	}
@@ -147,9 +146,9 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 	(void) memset(&kadm5_userprinc, 0, sizeof (kadm5_userprinc));
 
 	if (def_realm == NULL && krb5_get_default_realm(context, &def_realm)) {
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_ERR,
 			"PAM-KRB5-AUTOMIGRATE (auth): Error while obtaining "
-			"default krb5 realm"));
+			"default krb5 realm");
 		goto cleanup;
 	}
 
@@ -158,9 +157,9 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 
 	if (kadm5_get_adm_host_srv_name(context, def_realm,
 					&kadmin_princ)) {
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_ERR,
 			"PAM-KRB5-AUTOMIGRATE (auth): Error while obtaining "
-			"host based service name for realm %s\n"), def_realm);
+			"host based service name for realm %s\n", def_realm);
 		goto cleanup;
 	}
 
@@ -168,18 +167,18 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 				(service != NULL)?service:"host",
 				KRB5_NT_SRV_HST,
 				&svcprinc)) {
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_ERR,
 			"PAM-KRB5-AUTOMIGRATE (auth): Error while creating "
-			"krb5 host service principal: %s"),
+			"krb5 host service principal: %s",
 			error_message(retval));
 		goto cleanup;
 	}
 
 	if (retval = krb5_unparse_name(context, svcprinc,
 				&svcprincstr)) {
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_ERR,
 			"PAM-KRB5-AUTOMIGRATE (auth): Error while "
-			"unparsing principal name: %s"),
+			"unparsing principal name: %s",
 			error_message(retval));
 		krb5_free_principal(context, svcprinc);
 		goto cleanup;
@@ -197,9 +196,9 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 					KADM5_API_VERSION_2,
 					&handle);
 	if (retval) {
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_ERR,
 			"PAM-KRB5-AUTOMIGRATE (auth): Error while "
-			"doing kadm5_init_with_skey: %s"),
+			"doing kadm5_init_with_skey: %s",
 			error_message(retval));
 		goto cleanup;
 	}
@@ -220,9 +219,9 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 
 	if (retval = krb5_parse_name(context, userprincstr,
 				&userprinc)) {
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_ERR,
 			"PAM-KRB5-AUTOMIGRATE (auth): Error while "
-			"parsing user principal name: %s"),
+			"parsing user principal name: %s",
 			error_message(retval));
 		goto cleanup;
 	}
@@ -236,10 +235,10 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 		switch (retval) {
 		case KADM5_AUTH_GET:
 			if (debug)
-				syslog(LOG_DEBUG, dgettext(TEXT_DOMAIN,
+				__pam_log(LOG_AUTH | LOG_DEBUG,
 				    "PAM-KRB5-AUTOMIGRATE (auth): %s does "
 				    "not have the GET privilege "
-				    "for kadm5_get_principal: %s"),
+				    "for kadm5_get_principal: %s",
 				    svcprincstr, error_message(retval));
 			break;
 
@@ -256,9 +255,9 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 		 * Principal already exists in the KDC database, quit now
 		 */
 		if (debug)
-			syslog(LOG_DEBUG, dgettext(TEXT_DOMAIN,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5-AUTOMIGRATE (auth): Principal %s "
-				"already exists in Kerberos KDC database"),
+				"already exists in Kerberos KDC database",
 				userprincstr);
 		goto cleanup;
 	}
@@ -267,9 +266,9 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 
 	if (retval = krb5_parse_name(context, userprincstr,
 				&(kadm5_userprinc.principal))) {
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_ERR,
 			"PAM-KRB5-AUTOMIGRATE (auth): Error while "
-			"parsing user principal name: %s"),
+			"parsing user principal name: %s",
 			error_message(retval));
 		goto cleanup;
 	}
@@ -287,17 +286,17 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 		switch (retval) {
 		case KADM5_AUTH_ADD:
 			if (debug)
-				syslog(LOG_DEBUG, dgettext(TEXT_DOMAIN,
+				__pam_log(LOG_AUTH | LOG_DEBUG,
 				    "PAM-KRB5-AUTOMIGRATE (auth): %s does "
 				    "not have the ADD privilege "
-				    "for kadm5_create_principal: %s"),
+				    "for kadm5_create_principal: %s",
 				    svcprincstr, error_message(retval));
 			break;
 
 		default:
-			syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+			__pam_log(LOG_AUTH | LOG_ERR,
 				"PAM-KRB5-AUTOMIGRATE (auth): Generic error"
-				"while doing kadm5_create_principal: %s"),
+				"while doing kadm5_create_principal: %s",
 				error_message(retval));
 			break;
 		}
@@ -318,9 +317,9 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 				messages, NULL);
 	}
 	if (debug)
-		syslog(LOG_DEBUG, dgettext(TEXT_DOMAIN,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 			"PAM-KRB5-AUTOMIGRATE (auth): User %s "
-			"has been added to the Kerberos KDC database"),
+			"has been added to the Kerberos KDC database",
 			userprincstr);
 
 	/*

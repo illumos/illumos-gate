@@ -21,7 +21,7 @@
 /*
  *	autod_lookup.c
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,9 +46,9 @@ do_lookup1(
 	char *mapopts,
 	char *path,
 	uint_t isdirect,
+	uid_t uid,
 	autofs_action_t *action,
-	struct linka *linkp,
-	ucred_t	*cred)
+	struct linka *linkp)
 {
 	struct mapline ml;
 	struct mapent *mapents = NULL;
@@ -122,7 +122,7 @@ do_lookup1(
 	 * to superusers.
 	 */
 	if (mapents == NULL && *action == AUTOFS_NONE) {
-		if (*key == '=' && ucred_geteuid(cred) == 0) {
+		if (*key == '=' && uid == 0) {
 			if (isdigit(*(key+1))) {
 				/*
 				 * If next character is a digit

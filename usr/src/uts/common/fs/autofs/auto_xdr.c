@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,6 +281,8 @@ xdr_autofs_lookupargs(XDR *xdrs, autofs_lookupargs *objp)
 		return (FALSE);
 	if (!xdr_bool_t(xdrs, &objp->isdirect))
 		return (FALSE);
+	if (!xdr_u_int(xdrs, (uint_t *)&objp->uid))
+		return (FALSE);
 	return (TRUE);
 }
 
@@ -350,6 +352,8 @@ xdr_autofs_rddirargs(XDR *xdrs, autofs_rddirargs *objp)
 	if (!xdr_u_int(xdrs, &objp->rda_offset))
 		return (FALSE);
 	if (!xdr_u_int(xdrs, &objp->rda_count))
+		return (FALSE);
+	if (!xdr_u_int(xdrs, (uint_t *)&objp->uid))
 		return (FALSE);
 	return (TRUE);
 }

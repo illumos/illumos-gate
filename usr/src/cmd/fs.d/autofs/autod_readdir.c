@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,7 @@ rwlock_t autofs_rddir_cache_lock;		/* readdir cache lock */
 struct autofs_rddir_cache *rddir_head;		/* readdir cache head */
 
 int
-do_readdir(autofs_rddirargs *rda, autofs_rddirres *rd, ucred_t *cred)
+do_readdir(autofs_rddirargs *rda, autofs_rddirres *rd)
 {
 	struct dir_entry *list = NULL, *l;
 	struct autofs_rddir_cache *rdcp = NULL;
@@ -121,7 +121,7 @@ do_readdir(autofs_rddirargs *rda, autofs_rddirres *rd, ucred_t *cred)
 			 */
 			stack_op(INIT, NULL, stack, &stkptr);
 			(void) getmapkeys(rda->rda_map, &list, &error,
-			    &cache_time, stack, &stkptr, ucred_geteuid(cred));
+			    &cache_time, stack, &stkptr, rda->uid);
 			if (!error)
 				build_dir_entry_list(rdcp, list);
 			else if (list) {
