@@ -14674,7 +14674,6 @@ void
 ip_rput(queue_t *q, mblk_t *mp)
 {
 	ill_t	*ill;
-	mblk_t	 *dmp = NULL;
 
 	TRACE_1(TR_FAC_IP, TR_IP_RPUT_START, "ip_rput_start: q %p", q);
 
@@ -14766,23 +14765,6 @@ ip_rput(queue_t *q, mblk_t *mp)
 		freemsg(mp);
 		mp = mp1;
 	}
-	if (DB_TYPE(mp) == M_DATA) {
-		dmp = mp;
-	} else if (DB_TYPE(mp) == M_PROTO &&
-	    *(t_uscalar_t *)mp->b_rptr == DL_UNITDATA_IND) {
-		dmp = mp->b_cont;
-	}
-	if (dmp != NULL) {
-		/*
-		 * IP header ptr not aligned?
-		 * OR IP header not complete in first mblk
-		 */
-		if (!OK_32PTR(dmp->b_rptr) ||
-		    (dmp->b_wptr - dmp->b_rptr) < IP_SIMPLE_HDR_LENGTH) {
-			if (!ip_check_and_align_header(q, dmp))
-				return;
-		}
-	}
 
 	TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
 	    "ip_rput_end: q %p (%S)", q, "end");
@@ -14805,7 +14787,9 @@ ip_rput(queue_t *q, mblk_t *mp)
  *   - 'mp' is either an untagged or a special priority-tagged packet.
  *   - Any VLAN tag that was in the MAC header has been stripped.
  *
- * Thus, there is no need to adjust b_rptr in this function.
+ * If the IP header in packet is not 32-bit aligned, every message in the
+ * chain will be aligned before further operations. This is required on SPARC
+ * platform.
  */
 /* ARGSUSED */
 void
@@ -14827,6 +14811,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 	mblk_t			*tail = NULL;
 	mblk_t			*first_mp;
 	mblk_t 			*mp;
+	mblk_t			*dmp;
 	int			cnt = 0;
 
 	ASSERT(mp_chain != NULL);
@@ -14852,19 +14837,42 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		prev_dst = dst;
 
 		/*
+		 * Check and align the IP header.
+		 */
+		if (DB_TYPE(mp) == M_DATA) {
+			dmp = mp;
+		} else if (DB_TYPE(mp) == M_PROTO &&
+		    *(t_uscalar_t *)mp->b_rptr == DL_UNITDATA_IND) {
+			dmp = mp->b_cont;
+		} else {
+			dmp = NULL;
+		}
+		if (dmp != NULL) {
+			/*
+			 * IP header ptr not aligned?
+			 * OR IP header not complete in first mblk
+			 */
+			if (!OK_32PTR(dmp->b_rptr) ||
+			    MBLKL(dmp) < IP_SIMPLE_HDR_LENGTH) {
+				if (!ip_check_and_align_header(q, dmp))
+					continue;
+			}
+		}
+
+		/*
 		 * ip_input fast path
 		 */
 
 		/* mblk type is not M_DATA */
-		if (mp->b_datap->db_type != M_DATA) {
+		if (DB_TYPE(mp) != M_DATA) {
 			if (ip_rput_process_notdata(q, &first_mp, ill,
 			    &ll_multicast, &mp))
 				continue;
 		}
 
 		/* Make sure its an M_DATA and that its aligned */
-		ASSERT(mp->b_datap->db_type == M_DATA);
-		ASSERT(mp->b_datap->db_ref == 1 && OK_32PTR(mp->b_rptr));
+		ASSERT(DB_TYPE(mp) == M_DATA);
+		ASSERT(DB_REF(mp) == 1 && OK_32PTR(mp->b_rptr));
 
 		ipha = (ipha_t *)mp->b_rptr;
 		len = mp->b_wptr - rptr;

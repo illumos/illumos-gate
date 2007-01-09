@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,10 +75,6 @@ extern "C" {
 #define	XGELL_TX_LEVEL_HIGH	32
 
 #include <xgehal.h>
-
-#if defined(__sparc) || defined(__amd64)
-#define	XGELL_L3_ALIGNED		1
-#endif
 
 /*
  * These default values can be overridden by vaules in xge.conf.
@@ -239,10 +235,6 @@ typedef struct xgell_rx_buffer_t {
 	ddi_acc_handle_t		dma_acch;
 	void				*lldev;
 	frtn_t				frtn;
-#ifdef XGELL_L3_ALIGNED
-	unsigned char			header[XGE_HAL_TCPIP_HEADER_MAX_SIZE * 2
-					+ 8];
-#endif
 } xgell_rx_buffer_t;
 
 /* Buffer pool for all rings */

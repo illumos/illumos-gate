@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,10 +47,8 @@
 
 #define	HEADROOM		2	/* for DIX-only packets */
 
-#ifdef XGELL_L3_ALIGNED
 void header_free_func(void *arg) { }
 frtn_t header_frtn = {header_free_func, NULL};
-#endif
 
 /* DMA attributes used for Tx side */
 static struct ddi_dma_attr tx_dma_attr = {
@@ -633,68 +631,17 @@ xgell_rx_1b_msg_alloc(xgelldev_t *lldev, xgell_rx_buffer_t *rx_buffer,
     int pkt_length, xge_hal_dtr_info_t *ext_info, boolean_t *copyit)
 {
 	mblk_t *mp;
-	mblk_t *nmp = NULL;
 	char *vaddr;
-	int hdr_length = 0;
-
-#ifdef XGELL_L3_ALIGNED
-	boolean_t doalign = B_TRUE;
-	struct ip *ip;
-	struct tcphdr *tcp;
-	int tcp_off;
-	int mp_align_len;
-	int ip_off;
-#endif
 
 	vaddr = (char *)rx_buffer->vaddr + HEADROOM;
-#ifdef XGELL_L3_ALIGNED
-	ip_off = xgell_get_ip_offset(ext_info);
-
-	/* Check ip_off with HEADROOM */
-	if ((ip_off & 3) == HEADROOM) {
-		doalign = B_FALSE;
-	}
-
-	/*
-	 * Doalign? Check for types of packets.
-	 */
-	/* Is IPv4 or IPv6? */
-	if (doalign && !(ext_info->proto & XGE_HAL_FRAME_PROTO_IPV4 ||
-	    ext_info->proto & XGE_HAL_FRAME_PROTO_IPV6)) {
-		doalign = B_FALSE;
-	}
-
-	/* Is TCP? */
-	if (doalign &&
-	    ((ip = (struct ip *)(vaddr + ip_off))->ip_p == IPPROTO_TCP)) {
-		tcp_off = ip->ip_hl * 4 + ip_off;
-		tcp = (struct tcphdr *)(vaddr + tcp_off);
-		hdr_length = tcp_off + tcp->th_off * 4;
-		if (pkt_length < (XGE_HAL_TCPIP_HEADER_MAX_SIZE +
-		    XGE_HAL_MAC_HEADER_MAX_SIZE)) {
-			hdr_length = pkt_length;
-		}
-	} else {
-		doalign = B_FALSE;
-	}
-#endif
-
 	/*
 	 * Copy packet into new allocated message buffer, if pkt_length
 	 * is less than XGELL_RX_DMA_LOWAT
 	 */
 	if (*copyit || pkt_length <= lldev->config.rx_dma_lowat) {
-		/* Keep room for alignment */
-		if ((mp = allocb(pkt_length + HEADROOM + 4, 0)) == NULL) {
+		if ((mp = allocb(pkt_length, 0)) == NULL) {
 			return (NULL);
 		}
-#ifdef XGELL_L3_ALIGNED
-		if (doalign) {
-			mp_align_len =
-			    (4 - ((uint64_t)(mp->b_rptr + ip_off) & 3));
-			mp->b_rptr += mp_align_len;
-		}
-#endif
 		bcopy(vaddr, mp->b_rptr, pkt_length);
 		mp->b_wptr = mp->b_rptr + pkt_length;
 		*copyit = B_TRUE;
@@ -704,53 +651,15 @@ xgell_rx_1b_msg_alloc(xgelldev_t *lldev, xgell_rx_buffer_t *rx_buffer,
 	/*
 	 * Just allocate mblk for current data buffer
 	 */
-	if ((nmp = (mblk_t *)desballoc((unsigned char *)vaddr, pkt_length, 0,
+	if ((mp = (mblk_t *)desballoc((unsigned char *)vaddr, pkt_length, 0,
 	    &rx_buffer->frtn)) == NULL) {
 		/* Drop it */
 		return (NULL);
 	}
-
 	/*
-	 * Adjust the b_rptr/b_wptr in the mblk_t structure to point to
-	 * payload.
+	 * Adjust the b_rptr/b_wptr in the mblk_t structure.
 	 */
-	nmp->b_rptr += hdr_length;
-	nmp->b_wptr += pkt_length;
-
-#ifdef XGELL_L3_ALIGNED
-	if (doalign) {
-		if ((mp = esballoc(rx_buffer->header, hdr_length + 4, 0,
-		    &header_frtn)) == NULL) {
-			/* can not align! */
-			mp = nmp;
-			mp->b_rptr = (u8 *)vaddr;
-			mp->b_wptr = mp->b_rptr + pkt_length;
-			mp->b_next = NULL;
-			mp->b_cont = NULL;
-		} else {
-			/* align packet's ip-header offset */
-			mp_align_len =
-			    (4 - ((uint64_t)(mp->b_rptr + ip_off) & 3));
-			mp->b_rptr += mp_align_len;
-			mp->b_wptr += mp_align_len + hdr_length;
-			mp->b_cont = nmp;
-			mp->b_next = NULL;
-			nmp->b_cont = NULL;
-			nmp->b_next = NULL;
-
-			bcopy(vaddr, mp->b_rptr, hdr_length);
-		}
-	} else {
-		/* no need to align */
-		mp = nmp;
-		mp->b_next = NULL;
-		mp->b_cont = NULL;
-	}
-#else
-	mp = nmp;
-	mp->b_next = NULL;
-	mp->b_cont = NULL;
-#endif
+	mp->b_wptr += pkt_length;
 
 	return (mp);
 }
@@ -2340,6 +2249,10 @@ xgell_device_register(xgelldev_t *lldev, xgell_config_t *config)
 
 	if (mac_register(macp, &lldev->mh) != 0)
 		goto xgell_register_fail;
+
+	/* Always free the macp after register */
+	if (macp != NULL)
+		mac_free(macp);
 
 	/* Calculate tx_copied_max here ??? */
 	lldev->tx_copied_max = hldev->config.fifo.max_frags *
