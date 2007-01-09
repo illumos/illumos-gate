@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -556,6 +556,7 @@ typedef struct connection {
 						/* when shared == 0 */
 	int			shared;		/* number of threads */
 						/* using this connection */
+	pid_t			pid;		/* process id */
 	char			*serverAddr;
 	ns_cred_t		*auth;
 	LDAP			*ld;
@@ -656,6 +657,7 @@ typedef struct ns_ldap_cookie {
 	LDAPControl		**resultctrl;
 	/* Flag to indicate password less account management is required */
 	int			nopasswd_acct_mgmt;
+	int			err_from_result;
 } ns_ldap_cookie_t;
 
 /*
@@ -859,6 +861,7 @@ int		__s_api_sasl_bind_callback(
 
 int		__s_api_self_gssapi_only_get(void);
 int		__s_api_sasl_gssapi_init(void);
+int		__s_api_check_MTC_tsd();
 
 /* Multiple threads per connection functions */
 void ns_tsd_cleanup(void *);

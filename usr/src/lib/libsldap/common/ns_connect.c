@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,8 @@ static int openConnection(LDAP **, const char *, const ns_cred_t *,
  * MTperCon is a flag to enable/disable multiple threads sharing the same
  * connection.
  * sessionPoolLock is a mutex lock for the connection pool.
+ * sharedConnNumber is the number of sharable connections in the pool.
+ * sharedConnNumberLock is a mutex for sharedConnNumber.
  */
 static mutex_t	sessionLock = DEFAULTMUTEX;
 static int	wait4session = 0;
@@ -70,6 +72,8 @@ static rwlock_t sessionPoolLock = DEFAULTRWLOCK;
 
 static Connection **sessionPool = NULL;
 static int sessionPoolSize = 0;
+static int sharedConnNumber = 0;
+static mutex_t sharedConnNumberLock = DEFAULTMUTEX;
 
 
 static mutex_t	nscdLock = DEFAULTMUTEX;
@@ -188,6 +192,16 @@ set_ld_error(int err, char *matched, char *errmsg, void *dummy)
 		ldap_memfree(le->le_errmsg);
 	}
 	le->le_errmsg = errmsg;
+}
+
+int
+/* check and allocate the thread-specific data for using a shared connection */
+__s_api_check_MTC_tsd()
+{
+	if (tsd_setup() != 0)
+		return (NS_LDAP_MEMORY);
+
+	return (NS_LDAP_SUCCESS);
 }
 
 /* Callback function for getting the per thread LDAP error */
@@ -599,9 +613,11 @@ printCred(int pri, const ns_cred_t *cred)
 	if (cred->cred.unix_cred.userID)
 		syslog(pri, "tid= %d: userID=%s\n",
 			t, cred->cred.unix_cred.userID);
+#ifdef DEBUG
 	if (cred->cred.unix_cred.passwd)
 		syslog(pri, "tid= %d: passwd=%s\n",
 			t, cred->cred.unix_cred.passwd);
+#endif
 }
 
 /*
@@ -711,9 +727,13 @@ addConnection(Connection *con)
 				t, sessionPoolSize);
 	}
 	sessionPool[i] = con;
-	if (noMTperC == 0)
+	if (noMTperC == 0) {
 		con->shared++;
-	else
+		con->pid = getpid();
+		(void) mutex_lock(&sharedConnNumberLock);
+		sharedConnNumber++;
+		(void) mutex_unlock(&sharedConnNumberLock);
+	} else
 		con->usedBit = B_TRUE;
 
 	(void) rw_unlock(&sessionPoolLock);
@@ -865,16 +885,21 @@ findConnection(int flags, const char *serverAddr,
 	}
 
 	/*
-	 * If no connection in cache, then serialize the opening
+	 * If no sharable connections in cache, then serialize the opening
 	 * of connections. Make sure only one is being opened
 	 * at a time. Otherwise, we may end up with more
 	 * connections than we want (if multiple threads get
 	 * here at the same time)
 	 */
-	if (sessionPool == NULL) {
+	(void) mutex_lock(&sharedConnNumberLock);
+	if (sessionPool == NULL || (sharedConnNumber == 0 && MTperConn == 1)) {
+		(void) mutex_unlock(&sharedConnNumberLock);
 		(void) rw_unlock(&sessionPoolLock);
 		(void) mutex_lock(&sessionLock);
-		if (sessionPool == NULL) {
+		(void) mutex_lock(&sharedConnNumberLock);
+		if (sessionPool == NULL || (sharedConnNumber == 0 &&
+						MTperConn == 1)) {
+			(void) mutex_unlock(&sharedConnNumberLock);
 			wait4session = 1;
 			sessionTid = thr_self();
 #ifdef DEBUG
@@ -893,16 +918,20 @@ findConnection(int flags, const char *serverAddr,
 		}
 
 #ifdef DEBUG
-		(void) fprintf(stderr, "tid= %d: session pool not empty\n", t);
+		(void) fprintf(stderr, "tid= %d: shareable connections "
+				"exist\n", t);
 		fflush(stderr);
 #endif /* DEBUG */
+		(void) mutex_unlock(&sharedConnNumberLock);
 		/*
-		 * connection pool is not empty, check to see if
+		 * There are sharable connections, check to see if
 		 * one can be shared.
 		 */
 		(void) mutex_unlock(&sessionLock);
 		(void) rw_rdlock(&sessionPoolLock);
-	}
+	} else
+		(void) mutex_unlock(&sharedConnNumberLock);
+
 	try = 0;
 	check_again:
 
@@ -938,6 +967,17 @@ findConnection(int flags, const char *serverAddr,
 		if (MTperConn == 0)
 			cp->usedBit = B_TRUE;
 		else {
+			/*
+			 * if connection was established in a different
+			 * process, drop it and get a new one
+			 */
+			if (cp->pid != getpid()) {
+				(void) rw_unlock(&sessionPoolLock);
+				DropConnection(cp->connectionId,
+					NS_LDAP_NEW_CONN);
+
+				goto get_conn;
+			}
 			/* allocate TSD for per thread ldap error */
 			rc = tsd_setup();
 
@@ -961,6 +1001,9 @@ findConnection(int flags, const char *serverAddr,
 #endif /* DEBUG */
 		return (i + CONID_OFFSET);
 	}
+
+	get_conn:
+
 	(void) rw_unlock(&sessionPoolLock);
 
 	/*
@@ -994,6 +1037,7 @@ findConnection(int flags, const char *serverAddr,
 		} else {
 			syslog(LOG_WARNING, "libsldap: mutex_trylock "
 				"%d times. Stop.", TRY_TIMES);
+			(void) rw_unlock(&sessionPoolLock);
 			return (-1);
 		}
 	} else if (rc == 0) {
@@ -1015,7 +1059,7 @@ findConnection(int flags, const char *serverAddr,
 		return (-1);
 	} else {
 		syslog(LOG_WARNING, "libsldap: mutex_trylock unexpected "
-			"error", rc);
+			"error %d", rc);
 		return (-1);
 	}
 }
@@ -1306,6 +1350,7 @@ create_con:
 	}
 
 	con->threadID = thr_self();
+	con->pid = getpid();
 
 	con->ld = ld;
 	if ((id = addConnection(con)) == -1) {
@@ -1404,7 +1449,18 @@ _DropConnection(ConnectionID cID, int flag, int fini)
 		fflush(stderr);
 #endif /* DEBUG */
 			cp->shared--;
-			cp->notAvail = 1;
+			/*
+			 * Mark this connection not available and decrement
+			 * sharedConnNumber. There could be multiple threads
+			 * sharing this connection so decrement
+			 * sharedConnNumber only once per connection.
+			 */
+			if (cp->notAvail == 0) {
+				cp->notAvail = 1;
+				(void) mutex_lock(&sharedConnNumberLock);
+				sharedConnNumber--;
+				(void) mutex_unlock(&sharedConnNumberLock);
+			}
 		}
 
 		if (cp->shared <= 0) {
@@ -1421,6 +1477,15 @@ _DropConnection(ConnectionID cID, int flag, int fini)
 
 		if (use_lock)
 			(void) rw_unlock(&sessionPoolLock);
+	}
+
+	if (MTperConn) {
+		void	*tsd;
+		(void) thr_getspecific(ns_mtckey, &tsd);
+		if (tsd != NULL) {
+			ns_tsd_cleanup(tsd);
+			(void) thr_setspecific(ns_mtckey, NULL);
+		}
 	}
 }
 

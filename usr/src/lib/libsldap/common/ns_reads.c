@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2042,6 +2042,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 	errorp = &error;
 	cookie->err_rc = 0;
 	cookie->state = state;
+	errstr[0] = '\0';
 
 	for (;;) {
 		switch (cookie->state) {
@@ -2279,12 +2280,24 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 						cookie->resultMsg, 1);
 					break;
 				}
+				if (rc == LDAP_TIMEOUT ||
+				    rc == LDAP_SERVER_DOWN) {
+					if (rc == LDAP_TIMEOUT)
+						(void) __s_api_removeServer(
+						    cookie->conn->serverAddr);
+					if (cookie->connectionId > -1) {
+							DropConnection(
+							cookie->connectionId,
+							NS_LDAP_NEW_CONN);
+						cookie->connectionId = -1;
+					}
+					cookie->err_from_result = 1;
+				}
 				(void) ldap_msgfree(cookie->resultMsg);
 				cookie->resultMsg = NULL;
 				if (rc == LDAP_BUSY ||
 				    rc == LDAP_UNAVAILABLE ||
-				    rc == LDAP_UNWILLING_TO_PERFORM ||
-				    rc == LDAP_SERVER_DOWN) {
+				    rc == LDAP_UNWILLING_TO_PERFORM) {
 					cookie->new_state = NEXT_SESSION;
 					break;
 				}
@@ -2355,12 +2368,24 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 						cookie->resultMsg, 1);
 					break;
 				}
+				if (rc == LDAP_TIMEOUT ||
+				    rc == LDAP_SERVER_DOWN) {
+					if (rc == LDAP_TIMEOUT)
+						(void) __s_api_removeServer(
+						    cookie->conn->serverAddr);
+					if (cookie->connectionId > -1) {
+							DropConnection(
+							cookie->connectionId,
+							NS_LDAP_NEW_CONN);
+						cookie->connectionId = -1;
+					}
+					cookie->err_from_result = 1;
+				}
 				(void) ldap_msgfree(cookie->resultMsg);
 				cookie->resultMsg = NULL;
 				if (rc == LDAP_BUSY ||
 				    rc == LDAP_UNAVAILABLE ||
-				    rc == LDAP_UNWILLING_TO_PERFORM ||
-				    rc == LDAP_SERVER_DOWN) {
+				    rc == LDAP_UNWILLING_TO_PERFORM) {
 					cookie->new_state = NEXT_SESSION;
 					break;
 				}
@@ -2458,13 +2483,37 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			}
 			break;
 		case LDAP_ERROR:
-			(void) sprintf(errstr,
-				gettext("LDAP ERROR (%d): %s."),
-				cookie->err_rc,
-				ldap_err2string(cookie->err_rc));
+			if (cookie->err_from_result) {
+				if (cookie->err_rc == LDAP_SERVER_DOWN) {
+					(void) sprintf(errstr,
+						gettext("LDAP ERROR (%d): "
+							"Error occurred during"
+							" receiving results. "
+							"This may be due to a "
+							"stalled connection."),
+							cookie->err_rc);
+				} else if (cookie->err_rc == LDAP_TIMEOUT) {
+					(void) sprintf(errstr,
+						gettext("LDAP ERROR (%d): "
+							"Error occurred during"
+							" receiving results. %s"
+							"."), cookie->err_rc,
+							ldap_err2string(
+							cookie->err_rc));
+				}
+			} else
+				(void) sprintf(errstr,
+					gettext("LDAP ERROR (%d): %s."),
+					cookie->err_rc,
+					ldap_err2string(cookie->err_rc));
 			err = strdup(errstr);
-			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-			NULL);
+			if (cookie->err_from_result) {
+				MKERROR(LOG_WARNING, *errorp, cookie->err_rc,
+					err, NULL);
+			} else {
+				MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL,
+					err, NULL);
+			}
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			return (ERROR);
@@ -2527,6 +2576,7 @@ __ns_ldap_list(
 	char			**dns = NULL;
 	int			scope;
 	int			rc;
+	int			from_result;
 
 	*errorp = NULL;
 
@@ -2637,13 +2687,14 @@ __ns_ldap_list(
 	if (rc != NS_LDAP_SUCCESS)
 		*errorp = cookie->errorp;
 	*rResult = cookie->result;
+	from_result = cookie->err_from_result;
 
 	cookie->errorp = NULL;
 	cookie->result = NULL;
 	delete_search_cookie(cookie);
 	cookie = NULL;
 
-	if (*rResult == NULL)
+	if (from_result == 0 && *rResult == NULL)
 		rc = NS_LDAP_NOTFOUND;
 	return (rc);
 }
@@ -2926,6 +2977,17 @@ __ns_ldap_nextEntry(
 
 	state = END_PROCESS_RESULT;
 	for (;;) {
+		/*
+		 * if the ldap connection being used is shared,
+		 * ensure the thread-specific data area for setting
+		 * status is allocated
+		 */
+		if (cookie->conn->shared > 0) {
+			rc = __s_api_check_MTC_tsd();
+			if (rc != NS_LDAP_SUCCESS)
+				return (rc);
+		}
+
 		state = search_state_machine(cookie, state, ONE_STEP);
 		switch (state) {
 		case PROCESS_RESULT:
