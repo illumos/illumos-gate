@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -144,6 +144,7 @@ typedef	void		*_RESTRICT_KYWD Psocklen_t;
 #define	SO_PROTOTYPE	0x1009		/* get/set protocol type */
 #define	SO_ANON_MLP	0x100a		/* create MLP on anonymous bind */
 #define	SO_MAC_EXEMPT	0x100b		/* allow dominated unlabeled peers */
+#define	SO_DOMAIN	0x100c		/* get socket domain */
 
 /* "Socket"-level control message types: */
 #define	SCM_RIGHTS	0x1010		/* access rights (array of int) */

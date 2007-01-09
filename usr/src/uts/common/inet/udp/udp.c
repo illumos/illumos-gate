@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -3142,6 +3142,12 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 			break;	/* goto sizeof (int) option return */
 		case SO_EXCLBIND:
 			*i1 = udp->udp_exclbind ? SO_EXCLBIND : 0;
+			break;
+		case SO_PROTOTYPE:
+			*i1 = IPPROTO_UDP;
+			break;
+		case SO_DOMAIN:
+			*i1 = udp->udp_family;
 			break;
 		default:
 			return (-1);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,6 +81,10 @@ opdes_t	tcp_opt_arr[] = {
 { SO_ALLZONES, SOL_SOCKET, OA_R, OA_RW, OP_CONFIG, OP_PASSNEXT, sizeof (int),
 	0 },
 { SO_EXCLBIND, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
+
+{ SO_DOMAIN,	SOL_SOCKET, OA_R, OA_R, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
+
+{ SO_PROTOTYPE,	SOL_SOCKET, OA_R, OA_R, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
 
 { TCP_NODELAY,	IPPROTO_TCP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0
 	},

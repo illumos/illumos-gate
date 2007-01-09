@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1769,6 +1769,7 @@ sol_optname(private_t *pri, long val)
 		case SO_PROTOTYPE:	return ("SO_PROTOTYPE");
 		case SO_ALLZONES:	return ("SO_ALLZONES");
 		case SO_EXCLBIND:	return ("SO_EXCLBIND");
+		case SO_DOMAIN:		return ("SO_DOMAIN");
 
 		default:		(void) snprintf(pri->code_buf, CBSIZE,
 						    "0x%lx", val);

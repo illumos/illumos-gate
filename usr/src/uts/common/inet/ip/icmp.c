@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -1571,6 +1571,10 @@ icmp_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 		case SO_MAC_EXEMPT:
 			*i1 = icmp->icmp_mac_exempt;
 			break;
+		case SO_DOMAIN:
+			*i1 = icmp->icmp_family;
+			break;
+
 		/*
 		 * Following four not meaningful for icmp
 		 * Action is same as "default" to which we fallthrough

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,6 +81,8 @@ opdes_t	udp_opt_arr[] = {
     0 },
 { SCM_UCRED, SOL_SOCKET, OA_W, OA_W, OP_NP, OP_VARLEN|OP_NODEFAULT, 512, 0 },
 { SO_EXCLBIND, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
+{ SO_DOMAIN,	SOL_SOCKET, OA_R, OA_R, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
+{ SO_PROTOTYPE,	SOL_SOCKET, OA_R, OA_R, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
 
 { IP_OPTIONS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP,
 	(OP_PASSNEXT|OP_VARLEN|OP_NODEFAULT), 40, -1 /* not initialized */ },

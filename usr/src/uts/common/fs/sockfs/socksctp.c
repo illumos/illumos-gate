@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1670,6 +1670,14 @@ sosctp_getsockopt(struct sonode *so, int level, int option_name,
 
 	if (level == SOL_SOCKET) {
 		switch (option_name) {
+		/* Not supported options */
+		case SO_SNDTIMEO:
+		case SO_RCVTIMEO:
+		case SO_EXCLBIND:
+			error = ENOPROTOOPT;
+			eprintsoline(so, error);
+			goto done;
+
 		case SO_TYPE:
 		case SO_ERROR:
 		case SO_DEBUG:
@@ -1685,6 +1693,8 @@ sosctp_getsockopt(struct sonode *so, int level, int option_name,
 		case SO_SNDLOWAT:
 		case SO_RCVLOWAT:
 		case SO_DGRAM_ERRIND:
+		case SO_PROTOTYPE:
+		case SO_DOMAIN:
 			if (maxlen < (t_uscalar_t)sizeof (int32_t)) {
 				error = EINVAL;
 				eprintsoline(so, error);
@@ -1702,6 +1712,11 @@ sosctp_getsockopt(struct sonode *so, int level, int option_name,
 		len = (t_uscalar_t)sizeof (uint32_t);   /* Default */
 		option = &value;
 
+		/*
+		 * Most of the SOL_SOCKET level option values are also
+		 * recorded in sockfs.  So we can return the recorded value
+		 * here without calling into SCTP.
+		 */
 		switch (option_name) {
 		case SO_TYPE:
 			value = so->so_type;
@@ -1727,34 +1742,34 @@ sosctp_getsockopt(struct sonode *so, int level, int option_name,
 			value = (so->so_options & option_name);
 			goto copyout;
 
-			/*
-			 * The following options are only returned by sockfs
-			 * when sctp_get_opt() fails.
-			 */
+		case SO_SNDBUF:
+			value = so->so_sndbuf;
+			goto copyout;
+
+		case SO_RCVBUF:
+			value = so->so_rcvbuf;
+			goto copyout;
+
+		case SO_SNDLOWAT:
+			value = so->so_sndlowat;
+			goto copyout;
+
+		case SO_RCVLOWAT:
+			value = so->so_rcvlowat;
+			goto copyout;
+
+		case SO_PROTOTYPE:
+			value = IPPROTO_SCTP;
+			goto copyout;
+
+		case SO_DOMAIN:
+			value = so->so_family;
+			goto copyout;
 
 		case SO_LINGER:
 			option = &so->so_linger;
 			len = (t_uscalar_t)sizeof (struct linger);
 			break;
-		case SO_SNDBUF:
-			value = so->so_sndbuf;
-			len = (t_uscalar_t)sizeof (int);
-			goto copyout;
-
-		case SO_RCVBUF:
-			value = so->so_rcvbuf;
-			len = (t_uscalar_t)sizeof (int);
-			goto copyout;
-
-		case SO_SNDLOWAT:
-			value = so->so_sndlowat;
-			len = (t_uscalar_t)sizeof (int);
-			goto copyout;
-
-		case SO_RCVLOWAT:
-			value = so->so_rcvlowat;
-			len = (t_uscalar_t)sizeof (int);
-			goto copyout;
 
 		default:
 			option = NULL;
@@ -2004,9 +2019,14 @@ sosctp_setsockopt(struct sonode *so, int level, int option_name,
 #define	intvalue (*(int32_t *)optval)
 
 		switch (option_name) {
+		case SO_SNDTIMEO:
+		case SO_RCVTIMEO:
+		case SO_EXCLBIND:
 		case SO_TYPE:
 		case SO_ERROR:
 		case SO_ACCEPTCONN:
+		case SO_PROTOTYPE:
+		case SO_DOMAIN:
 			/* Can't be set */
 			error = ENOPROTOOPT;
 			goto done;

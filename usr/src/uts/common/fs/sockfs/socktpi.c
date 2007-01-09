@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4804,6 +4804,7 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 		case SO_SNDTIMEO:
 		case SO_RCVTIMEO:
 #endif /* notyet */
+		case SO_DOMAIN:
 		case SO_DGRAM_ERRIND:
 			if (maxlen < (t_uscalar_t)sizeof (int32_t)) {
 				error = EINVAL;
@@ -4940,6 +4941,11 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 			len = (t_uscalar_t)sizeof (so->so_rcvbuf);
 			break;
 		}
+		case SO_DOMAIN:
+			value = so->so_family;
+			option = &value;
+			goto copyout; /* No need to issue T_SVR4_OPTMGMT_REQ */
+
 #ifdef notyet
 		/*
 		 * We do not implement the semantics of these options

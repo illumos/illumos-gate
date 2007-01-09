@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -9851,6 +9851,12 @@ tcp_opt_get(queue_t *q, int level, int	name, uchar_t *ptr)
 			break;
 		case SO_EXCLBIND:
 			*i1 = tcp->tcp_exclbind ? SO_EXCLBIND : 0;
+			break;
+		case SO_PROTOTYPE:
+			*i1 = IPPROTO_TCP;
+			break;
+		case SO_DOMAIN:
+			*i1 = tcp->tcp_family;
 			break;
 		default:
 			return (-1);

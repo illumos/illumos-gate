@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -681,6 +681,7 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 	int	buflen = *optlen;
 	conn_t		*connp = sctp->sctp_connp;
 	ip6_pkt_t	*ipp = &sctp->sctp_sticky_ipp;
+
 	/* In most cases, the return buffer is just an int */
 	*optlen = sizeof (int32_t);
 
@@ -727,8 +728,14 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 		case SO_MAC_EXEMPT:
 			*i1 = connp->conn_mac_exempt;
 			break;
+		case SO_PROTOTYPE:
+			*i1 = IPPROTO_SCTP;
+			break;
+		case SO_DOMAIN:
+			*i1 = sctp->sctp_family;
+			break;
 		default:
-			retval = EINVAL;
+			retval = ENOPROTOOPT;
 			break;
 		}
 		break;
@@ -874,7 +881,7 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 		case SCTP_DISABLE_FRAGMENTS:
 			/* Not yet supported. */
 		default:
-			retval = EINVAL;
+			retval = ENOPROTOOPT;
 			break;
 		}
 		break;
@@ -940,7 +947,7 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			}
 			break;
 		default:
-			retval = EINVAL;
+			retval = ENOPROTOOPT;
 			break;
 		}
 		break;
@@ -1099,13 +1106,13 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			*i1 = sctp->sctp_connp->conn_ipv6_v6only;
 			break;
 		default:
-			retval = EINVAL;
+			retval = ENOPROTOOPT;
 			break;
 		}
 		break;
 
 	default:
-		retval = EINVAL;
+		retval = ENOPROTOOPT;
 		break;
 	}
 	WAKE_SCTP(sctp);
@@ -1242,7 +1249,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			connp->conn_mac_exempt = onoff;
 			break;
 		default:
-			retval = EINVAL;
+			retval = ENOPROTOOPT;
 			break;
 		}
 		break;
@@ -1373,7 +1380,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 		case SCTP_DISABLE_FRAGMENTS:
 			/* Not yet supported. */
 		default:
-			retval = EINVAL;
+			retval = ENOPROTOOPT;
 			break;
 		}
 		break;
@@ -1453,7 +1460,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			break;
 		}
 		default:
-			retval = EINVAL;
+			retval = ENOPROTOOPT;
 			break;
 		}
 		break;
@@ -1746,13 +1753,13 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			}
 			break;
 		default:
-			retval = EINVAL;
+			retval = ENOPROTOOPT;
 			break;
 		}
 		break;
 	}
 	default:
-		retval = EINVAL;
+		retval = ENOPROTOOPT;
 		break;
 	}
 
