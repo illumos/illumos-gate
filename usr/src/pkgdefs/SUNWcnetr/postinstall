@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,4 +29,6 @@ if [ -f $ORIG ]; then
 	# use cat instead of cp/mv to keep owner+group of dest
 	cat $ORIG > $BASEDIR/etc/dladm/aggregation.conf
 	rm -f $ORIG
+	removef $PKGINST /etc/aggregation.conf > /dev/null
+	removef -f $PKGINST > /dev/null 2>&1
 fi
