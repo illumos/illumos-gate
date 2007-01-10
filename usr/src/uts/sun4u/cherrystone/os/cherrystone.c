@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,6 +165,11 @@ load_platform_drivers(void)
 	e_ddi_walk_driver("i2c-ssc050", cherry_dev_search, (void *)&keysw_dip);
 	ASSERT(keysw_dip != NULL);
 
+	/*
+	 * prevent detach of i2c-ssc050
+	 */
+	e_ddi_hold_devi(keysw_dip);
+
 	keypoll_timeout_hz = drv_usectohz(10 * MICROSEC);
 	keyswitch_poll(keysw_dip);
 	abort_seq_handler = cherry_abort_seq_handler;
@@ -225,6 +230,8 @@ keyswitch_poll(void *arg)
 	err = cherry_ssc050_get_port_bit(dip, port, bit,
 		&port_byte, I2C_NOSLEEP);
 	if (err != 0) {
+		cmn_err(CE_WARN, "keyswitch polling disabled: "
+			"errno=%d while reading ssc050", err);
 		return;
 	}
 

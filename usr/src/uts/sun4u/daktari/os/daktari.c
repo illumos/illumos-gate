@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 #include <sys/systm.h>
 #include <sys/sunddi.h>
 #include <sys/ddi.h>
+#include <sys/esunddi.h>
 #include <sys/sysmacros.h>
 #include <sys/note.h>
 
@@ -161,6 +162,11 @@ load_platform_drivers(void)
 	ddi_walk_devs(ddi_root_node(), daktari_dev_search, (void *)&keysw_dip);
 	ASSERT(keysw_dip != NULL);
 
+	/*
+	 * prevent detach of i2c-ssc050
+	 */
+	e_ddi_hold_devi(keysw_dip);
+
 	keypoll_timeout_hz = drv_usectohz(10 * MICROSEC);
 	keyswitch_poll(keysw_dip);
 	abort_seq_handler = daktari_abort_seq_handler;
@@ -216,6 +222,8 @@ keyswitch_poll(void *arg)
 	err = daktari_ssc050_get_port_bit(dip, port, bit,
 		&port_byte, I2C_NOSLEEP);
 	if (err != 0) {
+		cmn_err(CE_WARN, "keyswitch polling disabled: "
+			"errno=%d while reading ssc050", err);
 		return;
 	}
 
