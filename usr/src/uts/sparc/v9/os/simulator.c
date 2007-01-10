@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +56,8 @@
 
 #define	IS_IBIT_SET(x)	(x & 0x2000)
 #define	IS_VIS1(op, op3)(op == 2 && op3 == 0x36)
+#define	IS_FLOAT_QUAD_OP(op, op3)(op == 2 && (op3 == 0x34 ||	\
+		op3 == 0x35))
 #define	IS_PARTIAL_OR_SHORT_FLOAT_LD_ST(op, op3, asi)		\
 		(op == 3 && (op3 == IOP_V8_LDDFA ||		\
 		op3 == IOP_V8_STDFA) &&	asi > ASI_SNFL)
@@ -812,7 +813,8 @@ simulate_unimp(struct regs *rp, caddr_t *badaddr)
 	}
 
 	if (IS_VIS1(optype, op3) ||
-	    IS_PARTIAL_OR_SHORT_FLOAT_LD_ST(optype, op3, asi)) {
+	    IS_PARTIAL_OR_SHORT_FLOAT_LD_ST(optype, op3, asi) ||
+	    IS_FLOAT_QUAD_OP(optype, op3)) {
 		klwp_t *lwp = ttolwp(curthread);
 		kfpu_t *fp = lwptofpu(lwp);
 		if (fpu_exists) {
