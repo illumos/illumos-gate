@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -3633,7 +3633,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 		if ((nce == NULL) ||
 		    (nce->nce_flags & NCE_F_CONDEMNED) ||
 		    (!allow_unresolved &&
-		    ((nce->nce_state & ND_REACHABLE) == 0))) {
+		    (nce->nce_state != ND_REACHABLE))) {
 			if (nce != NULL)
 				mutex_exit(&nce->nce_lock);
 			ire_atomic_end(irb_ptr, ire);

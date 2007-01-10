@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,15 +46,15 @@ static mac_stat_info_t ether_stats[] = {
 	/* RFC1643 stats */
 	{ ETHER_STAT_ALIGN_ERRORS, "align_errors", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_FCS_ERRORS, "fcs_errors", KSTAT_DATA_UINT32,	0 },
-	{ ETHER_STAT_FIRST_COLLISIONS, "first_collsions", KSTAT_DATA_UINT32,
+	{ ETHER_STAT_FIRST_COLLISIONS, "first_collisions", KSTAT_DATA_UINT32,
 	    0 },
-	{ ETHER_STAT_MULTI_COLLISIONS, "multi_collsions", KSTAT_DATA_UINT32,
+	{ ETHER_STAT_MULTI_COLLISIONS, "multi_collisions", KSTAT_DATA_UINT32,
 	    0 },
 	{ ETHER_STAT_SQE_ERRORS, "sqe_errors", KSTAT_DATA_UINT32,	0},
 	{ ETHER_STAT_DEFER_XMTS, "defer_xmts", KSTAT_DATA_UINT32,	0},
-	{ ETHER_STAT_TX_LATE_COLLISIONS, "tx_late_collsions",
+	{ ETHER_STAT_TX_LATE_COLLISIONS, "tx_late_collisions",
 	    KSTAT_DATA_UINT32, 0 },
-	{ ETHER_STAT_EX_COLLISIONS, "ex_collsions", KSTAT_DATA_UINT32,	0 },
+	{ ETHER_STAT_EX_COLLISIONS, "ex_collisions", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_MACXMT_ERRORS, "macxmt_errors", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CARRIER_ERRORS, "carrier_errors", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_TOOLONG_ERRORS, "toolong_errors", KSTAT_DATA_UINT32, 0 },
