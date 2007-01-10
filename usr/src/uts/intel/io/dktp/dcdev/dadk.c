@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -591,14 +591,14 @@ dadk_create_errstats(struct dadk *dadkp, int instance)
 	/* get model */
 	dep->dadk_model.value.c[0] = 0;
 	dadk_ioc_string.is_buf = &dep->dadk_model.value.c[0];
-	dadk_ioc_string.is_size = 16;
+	dadk_ioc_string.is_size = sizeof (dep->dadk_model.value.c);
 	CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETMODEL,
 	    (uintptr_t)&dadk_ioc_string, FKIOCTL | FNATIVE);
 
 	/* get serial */
 	dep->dadk_serial.value.c[0] = 0;
 	dadk_ioc_string.is_buf = &dep->dadk_serial.value.c[0];
-	dadk_ioc_string.is_size = 16;
+	dadk_ioc_string.is_size = sizeof (dep->dadk_serial.value.c);
 	CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETSERIAL,
 	    (uintptr_t)&dadk_ioc_string, FKIOCTL | FNATIVE);
 
@@ -1353,7 +1353,6 @@ dadk_chkerr(struct cmpkt *pktp)
 	struct dadk *dadkp = PKT2DADK(pktp);
 	dadk_errstats_t *dep;
 	int scb = *(char *)pktp->cp_scbp;
-	int action;
 
 	if (scb == DERR_SUCCESS) {
 		if (pktp->cp_retry != 0 && dadkp->dad_errstats != NULL) {
@@ -1364,9 +1363,6 @@ dadk_chkerr(struct cmpkt *pktp)
 		return (COMMAND_DONE);
 	}
 
-	/* check error code table */
-	action = dadk_errtab[scb].d_action;
-
 	if (pktp->cp_retry) {
 		err_blkno = pktp->cp_srtsec + ((pktp->cp_bytexfer -
 			pktp->cp_resid) >> dadkp->dad_secshf);
@@ -1376,10 +1372,18 @@ dadk_chkerr(struct cmpkt *pktp)
 	if (dadkp->dad_errstats != NULL) {
 		dep = (dadk_errstats_t *)dadkp->dad_errstats->ks_data;
 
-		if (action == GDA_RETRYABLE)
-			dep->dadk_softerrs.value.ui32++;
-		else if (action == GDA_FATAL)
-			dep->dadk_harderrs.value.ui32++;
+		switch (dadk_errtab[scb].d_severity) {
+			case GDA_RETRYABLE:
+				dep->dadk_softerrs.value.ui32++;
+				break;
+
+			case GDA_FATAL:
+				dep->dadk_harderrs.value.ui32++;
+				break;
+
+			default:
+				break;
+		}
 
 		switch (scb) {
 			case DERR_INVCDB:
@@ -1437,7 +1441,7 @@ dadk_chkerr(struct cmpkt *pktp)
 		(void) timeout(dadk_restart, (void *)pktp, DADK_BSY_TIMEOUT);
 	}
 
-	return (action);
+	return (dadk_errtab[scb].d_action);
 }
 
 static void
