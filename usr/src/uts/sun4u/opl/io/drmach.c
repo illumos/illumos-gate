@@ -1394,7 +1394,7 @@ drmach_board_connect(drmachid_t id, drmach_opts_t *opts)
 		return (drerr_new(0, EOPL_INAPPROP, NULL));
 
 	if (opl_probe_sb(obj->bnum) != 0)
-		return (drerr_new(0, EOPL_PROBE, NULL));
+		return (drerr_new(1, EOPL_PROBE, NULL));
 
 	(void) prom_attach_notice(obj->bnum);
 
@@ -1476,7 +1476,7 @@ drmach_board_disconnect(drmachid_t id, drmach_opts_t *opts)
 	obj = (drmach_board_t *)id;
 
 	if (drmach_disconnect_cpus(obj)) {
-		err = drerr_new(0, EOPL_DEPROBE, obj->cm.name);
+		err = drerr_new(1, EOPL_DEPROBE, obj->cm.name);
 		return (err);
 	}
 
@@ -1487,7 +1487,7 @@ drmach_board_disconnect(drmachid_t id, drmach_opts_t *opts)
 		obj->connected = 0;
 
 	} else
-		err = drerr_new(0, EOPL_DEPROBE, obj->cm.name);
+		err = drerr_new(1, EOPL_DEPROBE, obj->cm.name);
 
 	return (err);
 }
@@ -2230,7 +2230,7 @@ drmach_mem_new(drmach_device_t *proto, drmachid_t *idp)
 
 	dip = mp->dev.node->n_getdip(mp->dev.node);
 	if (drmach_setup_mc_info(dip, mp) != 0) {
-		return (drerr_new(0, EOPL_MC_SETUP, NULL));
+		return (drerr_new(1, EOPL_MC_SETUP, NULL));
 	}
 
 	/* make sure we do not create memoryless nodes */
@@ -2526,7 +2526,7 @@ drmach_pt_ikprobe(drmachid_t id, drmach_opts_t *opts)
 	DRMACH_PR("calling opl_probe_board for bnum=%d\n", bp->bnum);
 	rv = opl_probe_sb(bp->bnum);
 	if (rv != 0) {
-		err = drerr_new(0, EOPL_PROBE, bp->cm.name);
+		err = drerr_new(1, EOPL_PROBE, bp->cm.name);
 		return (err);
 	}
 	return (err);
@@ -2548,7 +2548,7 @@ drmach_pt_ikdeprobe(drmachid_t id, drmach_opts_t *opts)
 
 	rv = opl_unprobe_sb(bp->bnum);
 	if (rv != 0) {
-		err = drerr_new(0, EOPL_DEPROBE, bp->cm.name);
+		err = drerr_new(1, EOPL_DEPROBE, bp->cm.name);
 	}
 
 	return (err);
@@ -3404,7 +3404,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 		    (1 << strand_id)) {
 		    if (!(bp->cores[onb_core_num].core_started &
 			(1 << strand_id))) {
-			return (drerr_new(0, EOPL_CPU_STATE, NULL));
+			return (drerr_new(1, EOPL_CPU_STATE, NULL));
 		    }
 		}
 	}
@@ -3415,28 +3415,28 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	    modgetsymvalue("opl_mc_resume", 0);
 
 	if (mc_suspend == NULL || mc_resume == NULL) {
-		return (drerr_new(0, EOPL_MC_OPL, NULL));
+		return (drerr_new(1, EOPL_MC_OPL, NULL));
 	}
 
 	scf_fmem_start = (int (*)(int, int))
 	    modgetsymvalue("scf_fmem_start", 0);
 	if (scf_fmem_start == NULL) {
-		return (drerr_new(0, EOPL_SCF_FMEM, NULL));
+		return (drerr_new(1, EOPL_SCF_FMEM, NULL));
 	}
 	scf_fmem_end = (int (*)(void))
 	    modgetsymvalue("scf_fmem_end", 0);
 	if (scf_fmem_end == NULL) {
-		return (drerr_new(0, EOPL_SCF_FMEM, NULL));
+		return (drerr_new(1, EOPL_SCF_FMEM, NULL));
 	}
 	scf_fmem_cancel = (int (*)(void))
 	    modgetsymvalue("scf_fmem_cancel", 0);
 	if (scf_fmem_cancel == NULL) {
-		return (drerr_new(0, EOPL_SCF_FMEM, NULL));
+		return (drerr_new(1, EOPL_SCF_FMEM, NULL));
 	}
 	scf_get_base_addr = (uint64_t (*)(void))
 	    modgetsymvalue("scf_get_base_addr", 0);
 	if (scf_get_base_addr == NULL) {
-		return (drerr_new(0, EOPL_SCF_FMEM, NULL));
+		return (drerr_new(1, EOPL_SCF_FMEM, NULL));
 	}
 	s_mem = s_id;
 	t_mem = t_id;
@@ -3543,7 +3543,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	/* now we make sure there is 1K extra */
 
 	if ((wp - bp) > PAGESIZE) {
-		err = drerr_new(0, EOPL_FMEM_SETUP, NULL);
+		err = drerr_new(1, EOPL_FMEM_SETUP, NULL);
 		goto out;
 	}
 
@@ -3578,7 +3578,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 
 	/* now we are committed, call SCF, soft suspend mac patrol */
 	if ((*scf_fmem_start)(s_bd, t_bd)) {
-		err = drerr_new(0, EOPL_SCF_FMEM_START, NULL);
+		err = drerr_new(1, EOPL_SCF_FMEM_START, NULL);
 		goto out;
 	}
 	prog->data->scf_fmem_end = scf_fmem_end;
@@ -3746,7 +3746,9 @@ drmach_copy_rename_fini(drmachid_t id)
 	/* possible ops are SCF_START, MC_SUSPEND */
 	if (prog->critical->fmem_issued) {
 		if (prog->data->fmem_status.error != FMEM_NO_ERROR)
-			cmn_err(CE_PANIC, "scf fmem request failed");
+			cmn_err(CE_PANIC, "scf fmem request failed. "
+				"error code = 0x%x.",
+				prog->data->fmem_status.error);
 		rv = (*prog->data->scf_fmem_end)();
 		if (rv) {
 			cmn_err(CE_PANIC, "scf_fmem_end() failed rv=%d", rv);
@@ -3878,7 +3880,9 @@ drmach_copy_rename(drmachid_t id)
 	extern uint64_t	patch_inst(uint64_t *, uint64_t);
 	on_trap_data_t	otd;
 
+
 	prog = prog_kmem->locked_prog;
+
 
 	/*
 	 * We must immediately drop in the TLB because all pointers
@@ -3940,6 +3944,7 @@ drmach_copy_rename(drmachid_t id)
 	/*
 	 * jmp drmach_copy_rename_prog().
 	 */
+
 	drmach_flush(prog->critical, PAGESIZE);
 	rtn = prog->critical->run(prog, cpuid);
 	drmach_flush_icache();

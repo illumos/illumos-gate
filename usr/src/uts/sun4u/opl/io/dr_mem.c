@@ -1776,7 +1776,7 @@ dr_release_mem_done(dr_common_unit_t *cp)
 	 */
 /* XXX Can we know that sbdev_error was encountered during release? */
 	if (s_mp->sbm_cm.sbdev_error != NULL) {
-		PR_MEM("%s: %s: error %d noted\n",
+		cmn_err(CE_WARN, "%s: %s: error %d noted\n",
 			f,
 			s_mp->sbm_cm.sbdev_path,
 			s_mp->sbm_cm.sbdev_error->e_code);
