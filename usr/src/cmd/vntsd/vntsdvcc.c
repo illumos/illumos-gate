@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -521,12 +521,12 @@ deleted_cons_by_consno(vntsd_cons_t *consp, int *cons_no)
 	if ((consp->status & VNTSD_CONS_DELETED) == 0)
 		return (B_TRUE);
 
-	/* notify clients of console ? */
-	clientp = (vntsd_client_t *)consp->clientpq->handle;
-
-	if (clientp == NULL)
-		/* therre is no client for this console */
+	if (consp->clientpq == NULL)
+		/* there is no client for this console */
 		return (B_TRUE);
+
+	/* need to notify clients of console ? */
+	clientp = (vntsd_client_t *)consp->clientpq->handle;
 
 	if (clientp->status & VNTSD_CLIENT_CONS_DELETED)
 		/* clients of console have notified */
@@ -576,18 +576,23 @@ delete_cons_before_add(vntsd_t *vntsdp, uint_t cons_no)
 		(void) mutex_unlock(&groupp->lock);
 		return;
 	}
-	/* console exists - delete console */
 
+	/* console exists - mark console for main thread to delete it */
 	(void) mutex_lock(&consp->lock);
+
+	if (consp->status & VNTSD_CONS_DELETED) {
+		/* already marked */
+		(void) mutex_unlock(&consp->lock);
+		(void) mutex_unlock(&groupp->lock);
+		return;
+	}
 
 	consp->status |= VNTSD_CONS_DELETED;
 	groupp->status |= VNTSD_GROUP_CLEAN_CONS;
 
 	(void) mutex_unlock(&consp->lock);
-
 	(void) mutex_unlock(&groupp->lock);
 
-	vntsd_delete_cons(vntsdp);
 }
 
 /* add a console */

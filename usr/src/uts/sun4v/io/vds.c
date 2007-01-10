@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,15 +48,17 @@
 #include <sys/vdsk_mailbox.h>
 #include <sys/vdsk_common.h>
 #include <sys/vtoc.h>
-
+#include <sys/vfs.h>
+#include <sys/stat.h>
 
 /* Virtual disk server initialization flags */
 #define	VDS_LDI			0x01
 #define	VDS_MDEG		0x02
 
 /* Virtual disk server tunable parameters */
-#define	VDS_LDC_RETRIES		5
-#define	VDS_LDC_DELAY		1000 /* usec */
+#define	VDS_RETRIES		5
+#define	VDS_LDC_DELAY		1000 /* 1 msecs */
+#define	VDS_DEV_DELAY		10000000 /* 10 secs */
 #define	VDS_NCHAINS		32
 
 /* Identification parameters for MD, synthetic dkio(7i) structures, etc. */
@@ -72,11 +74,12 @@
 #define	VD_REG_PROP		"reg"
 
 /* Virtual disk initialization flags */
-#define	VD_LOCKING		0x01
-#define	VD_LDC			0x02
-#define	VD_DRING		0x04
-#define	VD_SID			0x08
-#define	VD_SEQ_NUM		0x10
+#define	VD_DISK_READY		0x01
+#define	VD_LOCKING		0x02
+#define	VD_LDC			0x04
+#define	VD_DRING		0x08
+#define	VD_SID			0x10
+#define	VD_SEQ_NUM		0x20
 
 /* Flags for opening/closing backing devices via LDI */
 #define	VD_OPEN_FLAGS		(FEXCL | FREAD | FWRITE)
@@ -143,13 +146,12 @@ static mdeg_node_match_t vd_match = {"virtual-device-port",
 
 static int	vd_msglevel = 0;
 
-
 #define	PR0 if (vd_msglevel > 0)	PRN
 #define	PR1 if (vd_msglevel > 1)	PRN
 #define	PR2 if (vd_msglevel > 2)	PRN
 
 #define	VD_DUMP_DRING_ELEM(elem)					\
-	PRN("dst:%x op:%x st:%u nb:%lx addr:%lx ncook:%u\n",		\
+	PR0("dst:%x op:%x st:%u nb:%lx addr:%lx ncook:%u\n",		\
 	    elem->hdr.dstate,						\
 	    elem->payload.operation,					\
 	    elem->payload.status,					\
@@ -284,6 +286,7 @@ typedef struct vd {
 	ddi_taskq_t		*startq;	/* queue for I/O start tasks */
 	ddi_taskq_t		*completionq;	/* queue for completion tasks */
 	ldi_handle_t		ldi_handle[V_NUMPAR];	/* LDI slice handles */
+	char			device_path[MAXPATHLEN + 1]; /* vdisk device */
 	dev_t			dev[V_NUMPAR];	/* dev numbers for slices */
 	uint_t			nslices;	/* number of slices */
 	size_t			vdisk_size;	/* number of blocks in vdisk */
@@ -291,6 +294,10 @@ typedef struct vd {
 	vd_disk_label_t		vdisk_label;	/* EFI or VTOC label */
 	ushort_t		max_xfer_sz;	/* max xfer size in DEV_BSIZE */
 	boolean_t		pseudo;		/* underlying pseudo dev */
+	boolean_t		file;		/* underlying file */
+	char			*file_maddr;	/* file mapping address */
+	vnode_t			*file_vnode;	/* file vnode */
+	size_t			file_size;	/* file size */
 	struct dk_efi		dk_efi;		/* synthetic for slice type */
 	struct dk_geom		dk_geom;	/* synthetic for slice type */
 	struct vtoc		vtoc;		/* synthetic for slice type */
@@ -340,8 +347,10 @@ typedef struct vd_ioctl {
 #define	VD_IDENTITY	((void (*)(void *, void *))-1)
 
 
-static int	vds_ldc_retries = VDS_LDC_RETRIES;
+static int	vds_ldc_retries = VDS_RETRIES;
 static int	vds_ldc_delay = VDS_LDC_DELAY;
+static int	vds_dev_retries = VDS_RETRIES;
+static int	vds_dev_delay = VDS_DEV_DELAY;
 static void	*vds_state;
 static uint64_t	vds_operations;	/* see vds_operation[] definition below */
 
@@ -359,6 +368,8 @@ static const size_t	vds_num_versions =
     sizeof (vds_version)/sizeof (vds_version[0]);
 
 static void vd_free_dring_task(vd_t *vdp);
+static int vd_setup_vd(vd_t *vd);
+static boolean_t vd_enabled(vd_t *vd);
 
 static int
 vd_start_bio(vd_task_t *task)
@@ -368,11 +379,16 @@ vd_start_bio(vd_task_t *task)
 	vd_dring_payload_t	*request	= task->request;
 	struct buf		*buf		= &task->buf;
 	uint8_t			mtype;
-
+	caddr_t			addr;
+	size_t			offset, maxlen;
+	int 			slice;
 
 	ASSERT(vd != NULL);
 	ASSERT(request != NULL);
-	ASSERT(request->slice < vd->nslices);
+
+	slice = request->slice;
+
+	ASSERT(slice < vd->nslices);
 	ASSERT((request->operation == VD_OP_BREAD) ||
 	    (request->operation == VD_OP_BWRITE));
 
@@ -387,7 +403,7 @@ vd_start_bio(vd_task_t *task)
 	buf->b_flags		= B_BUSY;
 	buf->b_bcount		= request->nbytes;
 	buf->b_lblkno		= request->addr;
-	buf->b_edev		= vd->dev[request->slice];
+	buf->b_edev		= vd->dev[slice];
 
 	mtype = (&vd->inband_task == task) ? LDC_SHADOW_MAP : LDC_DIRECT_MAP;
 
@@ -412,9 +428,62 @@ vd_start_bio(vd_task_t *task)
 	buf->b_flags |= (request->operation == VD_OP_BREAD) ? B_READ : B_WRITE;
 
 	/* Start the block I/O */
-	if ((status = ldi_strategy(vd->ldi_handle[request->slice], buf)) == 0)
-		return (EINPROGRESS);	/* will complete on completionq */
+	if (vd->file) {
 
+		if (request->addr >= vd->vtoc.v_part[slice].p_size) {
+			/* address past the end of the slice */
+			PR0("req_addr (0x%lx) > psize (0x%lx)",
+			    request->addr, vd->vtoc.v_part[slice].p_size);
+			request->nbytes = 0;
+			status = 0;
+			goto cleanup;
+		}
+
+		offset = (vd->vtoc.v_part[slice].p_start +
+		    request->addr) * DEV_BSIZE;
+
+		/*
+		 * If the requested size is greater than the size
+		 * of the partition, truncate the read/write.
+		 */
+		maxlen = (vd->vtoc.v_part[slice].p_size -
+		    request->addr) * DEV_BSIZE;
+
+		if (request->nbytes > maxlen) {
+			PR0("I/O size truncated to %lu bytes from %lu bytes",
+			    maxlen, request->nbytes);
+			request->nbytes = maxlen;
+		}
+
+		/*
+		 * We have to ensure that we are reading/writing into the mmap
+		 * range. If we have a partial disk image (e.g. an image of
+		 * s0 instead s2) the system can try to access slices that
+		 * are not included into the disk image.
+		 */
+		if ((offset + request->nbytes) >= vd->file_size) {
+			PR0("offset + nbytes (0x%lx + 0x%lx) >= "
+			    "file_size (0x%lx)", offset, request->nbytes,
+			    vd->file_size);
+			request->nbytes = 0;
+			status = EIO;
+			goto cleanup;
+		}
+
+		addr = vd->file_maddr + offset;
+
+		if (request->operation == VD_OP_BREAD)
+			bcopy(addr, buf->b_un.b_addr, request->nbytes);
+		else
+			bcopy(buf->b_un.b_addr, addr, request->nbytes);
+
+	} else {
+		status = ldi_strategy(vd->ldi_handle[slice], buf);
+		if (status == 0)
+			return (EINPROGRESS); /* will complete on completionq */
+	}
+
+cleanup:
 	/* Clean up after error */
 	rv = ldc_mem_release(task->mhdl, 0, buf->b_bcount);
 	if (rv) {
@@ -492,6 +561,13 @@ vd_reset_if_needed(vd_t *vd)
 	 */
 	ddi_taskq_wait(vd->completionq);
 
+	if (vd->file) {
+		status = VOP_FSYNC(vd->file_vnode, FSYNC, kcred);
+		if (status) {
+			PR0("VOP_FSYNC returned errno %d", status);
+		}
+	}
+
 	if ((vd->initialized & VD_DRING) &&
 	    ((status = ldc_mem_dring_unmap(vd->dring_handle)) != 0))
 		PR0("ldc_mem_dring_unmap() returned errno %d", status);
@@ -552,7 +628,7 @@ vd_mark_in_reset(vd_t *vd)
 }
 
 static int
-vd_mark_elem_done(vd_t *vd, int idx, int elem_status)
+vd_mark_elem_done(vd_t *vd, int idx, int elem_status, int elem_nbytes)
 {
 	boolean_t		accepted;
 	int			status;
@@ -577,6 +653,7 @@ vd_mark_elem_done(vd_t *vd, int idx, int elem_status)
 	/* Set the element's status and mark it done */
 	accepted = (elem->hdr.dstate == VIO_DESC_ACCEPTED);
 	if (accepted) {
+		elem->payload.nbytes	= elem_nbytes;
 		elem->payload.status	= elem_status;
 		elem->hdr.dstate	= VIO_DESC_DONE;
 	} else {
@@ -614,9 +691,13 @@ vd_complete_bio(void *arg)
 	ASSERT(request != NULL);
 	ASSERT(task->msg != NULL);
 	ASSERT(task->msglen >= sizeof (*task->msg));
+	ASSERT(!vd->file);
 
 	/* Wait for the I/O to complete */
 	request->status = biowait(buf);
+
+	/* return back the number of bytes read/written */
+	request->nbytes = buf->b_bcount - buf->b_resid;
 
 	/* Release the buffer */
 	if (!vd->reset_state)
@@ -644,7 +725,8 @@ vd_complete_bio(void *arg)
 	/* Update the dring element for a dring client */
 	if (!vd->reset_state && (status == 0) &&
 	    (vd->xfer_mode == VIO_DRING_MODE)) {
-		status = vd_mark_elem_done(vd, task->index, request->status);
+		status = vd_mark_elem_done(vd, task->index,
+		    request->status, request->nbytes);
 		if (status == ECONNRESET)
 			vd_mark_in_reset(vd);
 	}
@@ -787,10 +869,28 @@ vd_read_vtoc(ldi_handle_t handle, struct vtoc *vtoc, vd_disk_label_t *label)
 	return (0);
 }
 
+static short
+vd_lbl2cksum(struct dk_label *label)
+{
+	int	count;
+	short	sum, *sp;
+
+	count =	(sizeof (struct dk_label)) / (sizeof (short)) - 1;
+	sp = (short *)label;
+	sum = 0;
+	while (count--) {
+		sum ^= *sp++;
+	}
+
+	return (sum);
+}
+
 static int
 vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 {
 	dk_efi_t *dk_ioc;
+	struct dk_label *label;
+	int i;
 
 	switch (vd->vdisk_label) {
 
@@ -804,6 +904,36 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 		case DKIOCGVTOC:
 			ASSERT(ioctl_arg != NULL);
 			bcopy(&vd->vtoc, ioctl_arg, sizeof (vd->vtoc));
+			return (0);
+		case DKIOCSVTOC:
+			if (!vd->file)
+				return (ENOTSUP);
+			ASSERT(ioctl_arg != NULL);
+			bcopy(ioctl_arg, &vd->vtoc, sizeof (vd->vtoc));
+			/* write new VTOC to file */
+			label = (struct dk_label *)vd->file_maddr;
+			label->dkl_vtoc.v_nparts = vd->vtoc.v_nparts;
+			label->dkl_vtoc.v_sanity = vd->vtoc.v_sanity;
+			label->dkl_vtoc.v_version = vd->vtoc.v_version;
+			bcopy(vd->vtoc.v_volume, label->dkl_vtoc.v_volume,
+			    LEN_DKL_VVOL);
+			for (i = 0; i < vd->vtoc.v_nparts; i++) {
+				label->dkl_vtoc.v_timestamp[i] =
+				    vd->vtoc.timestamp[i];
+				label->dkl_vtoc.v_part[i].p_tag =
+				    vd->vtoc.v_part[i].p_tag;
+				label->dkl_vtoc.v_part[i].p_flag =
+				    vd->vtoc.v_part[i].p_flag;
+				label->dkl_map[i].dkl_cylno =
+				    vd->vtoc.v_part[i].p_start /
+				    (label->dkl_nhead * label->dkl_nsect);
+				label->dkl_map[i].dkl_nblk =
+				    vd->vtoc.v_part[i].p_size;
+			}
+
+			/* re-compute checksum */
+			label->dkl_cksum = vd_lbl2cksum(label);
+
 			return (0);
 		default:
 			return (ENOTSUP);
@@ -862,7 +992,7 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 	 * Handle single-slice block devices internally; otherwise, have the
 	 * real driver perform the ioctl()
 	 */
-	if (vd->vdisk_type == VD_DISK_TYPE_SLICE && !vd->pseudo) {
+	if (vd->file || (vd->vdisk_type == VD_DISK_TYPE_SLICE && !vd->pseudo)) {
 		if ((status = vd_do_slice_ioctl(vd, ioctl->cmd,
 			    (void *)ioctl->arg)) != 0)
 			return (status);
@@ -990,7 +1120,7 @@ vd_ioctl(vd_task_t *task)
 	status = vd_do_ioctl(vd, request, buf, &ioctl[i]);
 	if (request->nbytes)
 		kmem_free(buf, request->nbytes);
-	if (vd->vdisk_type == VD_DISK_TYPE_DISK &&
+	if (!vd->file && vd->vdisk_type == VD_DISK_TYPE_DISK &&
 	    (request->operation == VD_OP_SET_VTOC ||
 	    request->operation == VD_OP_SET_EFI)) {
 		/* update disk information */
@@ -1014,6 +1144,11 @@ vd_get_devid(vd_task_t *task)
 	int bufbytes;
 
 	PR1("Get Device ID, nbytes=%ld", request->nbytes);
+
+	if (vd->file) {
+		/* no devid for disk on file */
+		return (ENOENT);
+	}
 
 	if (ddi_lyr_get_devid(vd->dev[request->slice],
 	    (ddi_devid_t *)&devid) != DDI_SUCCESS) {
@@ -1294,6 +1429,7 @@ static int
 vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 {
 	vd_attr_msg_t	*attr_msg = (vd_attr_msg_t *)msg;
+	int		status, retry = 0;
 
 
 	ASSERT(msglen >= sizeof (msg->tag));
@@ -1319,6 +1455,39 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	    (attr_msg->xfer_mode != VIO_DRING_MODE)) {
 		PR0("Client requested unsupported transfer mode");
 		return (EBADMSG);
+	}
+
+	/*
+	 * check if the underlying disk is ready, if not try accessing
+	 * the device again. Open the vdisk device and extract info
+	 * about it, as this is needed to respond to the attr info msg
+	 */
+	if ((vd->initialized & VD_DISK_READY) == 0) {
+		PR0("Retry setting up disk (%s)", vd->device_path);
+		do {
+			status = vd_setup_vd(vd);
+			if (status != EAGAIN || ++retry > vds_dev_retries)
+				break;
+
+			/* incremental delay */
+			delay(drv_usectohz(vds_dev_delay));
+
+			/* if vdisk is no longer enabled - return error */
+			if (!vd_enabled(vd))
+				return (ENXIO);
+
+		} while (status == EAGAIN);
+
+		if (status)
+			return (ENXIO);
+
+		vd->initialized |= VD_DISK_READY;
+		ASSERT(vd->nslices > 0 && vd->nslices <= V_NUMPAR);
+		PR0("vdisk_type = %s, pseudo = %s, file = %s, nslices = %u",
+		    ((vd->vdisk_type == VD_DISK_TYPE_DISK) ? "disk" : "slice"),
+		    (vd->pseudo ? "yes" : "no"),
+		    (vd->file ? "yes" : "no"),
+		    vd->nslices);
 	}
 
 	/* Success:  valid message and transfer mode */
@@ -1670,7 +1839,9 @@ vd_process_element(vd_t *vd, vd_task_type_t type, uint32_t idx,
 
 	vd->dring_task[idx].msglen	= msglen;
 	if ((status = vd_process_task(&vd->dring_task[idx])) != EINPROGRESS)
-		status = vd_mark_elem_done(vd, idx, elem->payload.status);
+		status = vd_mark_elem_done(vd, idx,
+		    vd->dring_task[idx].request->status,
+		    vd->dring_task[idx].request->nbytes);
 
 	return (status);
 }
@@ -2353,11 +2524,232 @@ vd_setup_partition_efi(vd_t *vd)
 }
 
 static int
-vd_setup_vd(char *device_path, vd_t *vd)
+vd_setup_file(vd_t *vd)
+{
+	int 		i, rval, status;
+	short		sum;
+	vattr_t		vattr;
+	dev_t		dev;
+	char		*file_path = vd->device_path;
+	char		dev_path[MAXPATHLEN + 1];
+	ldi_handle_t	lhandle;
+	struct dk_cinfo	dk_cinfo;
+	struct dk_label *label;
+
+	/* make sure the file is valid */
+	if ((status = lookupname(file_path, UIO_SYSSPACE, FOLLOW,
+		NULLVPP, &vd->file_vnode)) != 0) {
+		PR0("Cannot lookup file(%s) errno %d", file_path, status);
+		return (status);
+	}
+
+	if (vd->file_vnode->v_type != VREG) {
+		PR0("Invalid file type (%s)\n", file_path);
+		VN_RELE(vd->file_vnode);
+		return (EBADF);
+	}
+	VN_RELE(vd->file_vnode);
+
+	if ((status = vn_open(file_path, UIO_SYSSPACE, vd_open_flags | FOFFMAX,
+	    0, &vd->file_vnode, 0, 0)) != 0) {
+		PR0("vn_open(%s) = errno %d", file_path, status);
+		return (status);
+	}
+
+	vattr.va_mask = AT_SIZE;
+	if ((status = VOP_GETATTR(vd->file_vnode, &vattr, 0, kcred)) != 0) {
+		PR0("VOP_GETATTR(%s) = errno %d", file_path, status);
+		(void) VOP_CLOSE(vd->file_vnode, vd_open_flags, 1, 0, kcred);
+		VN_RELE(vd->file_vnode);
+		return (EIO);
+	}
+
+	vd->file_size = vattr.va_size;
+	/* size should be at least sizeof(dk_label) */
+	if (vd->file_size < sizeof (struct dk_label)) {
+		PRN("Size of file has to be at least %ld bytes",
+		    sizeof (struct dk_label));
+		(void) VOP_CLOSE(vd->file_vnode, vd_open_flags, 1, 0, kcred);
+		VN_RELE(vd->file_vnode);
+		return (EIO);
+	}
+
+	if ((status = VOP_MAP(vd->file_vnode, 0, &kas, &vd->file_maddr,
+	    vd->file_size, PROT_READ | PROT_WRITE, PROT_READ | PROT_WRITE,
+	    MAP_SHARED, kcred)) != 0) {
+		PR0("VOP_MAP(%s) = errno %d", file_path, status);
+		(void) VOP_CLOSE(vd->file_vnode, vd_open_flags, 1, 0, kcred);
+		VN_RELE(vd->file_vnode);
+		return (EIO);
+	}
+
+	label = (struct dk_label *)vd->file_maddr;
+
+	/* label checksum */
+	sum = vd_lbl2cksum(label);
+
+	if (label->dkl_magic != DKL_MAGIC || label->dkl_cksum != sum) {
+		PR0("%s has an invalid disk label "
+		    "(magic=%x cksum=%x (expect %x))",
+		    file_path, label->dkl_magic, label->dkl_cksum, sum);
+
+		/* default label */
+		bzero(label, sizeof (struct dk_label));
+
+		/*
+		 * We must have a resonable number of cylinders and sectors so
+		 * that newfs can run using default values.
+		 *
+		 * if (disk_size < 2MB)
+		 * 	phys_cylinders = disk_size / 100K
+		 * else
+		 * 	phys_cylinders = disk_size / 300K
+		 *
+		 * phys_cylinders = (phys_cylinders == 0) ? 1 : phys_cylinders
+		 * alt_cylinders = (phys_cylinders > 2) ? 2 : 0;
+		 * data_cylinders = phys_cylinders - alt_cylinders
+		 *
+		 * sectors = disk_size / (phys_cylinders * blk_size)
+		 */
+		if (vd->file_size < (2 * 1024 * 1024))
+			label->dkl_pcyl = vd->file_size / (100 * 1024);
+		else
+			label->dkl_pcyl = vd->file_size / (300 * 1024);
+
+		if (label->dkl_pcyl == 0)
+			label->dkl_pcyl = 1;
+
+		if (label->dkl_pcyl > 2)
+			label->dkl_acyl = 2;
+		else
+			label->dkl_acyl = 0;
+
+		label->dkl_nsect = vd->file_size /
+			(DEV_BSIZE * label->dkl_pcyl);
+		label->dkl_ncyl = label->dkl_pcyl - label->dkl_acyl;
+		label->dkl_nhead = 1;
+		label->dkl_write_reinstruct = 0;
+		label->dkl_read_reinstruct = 0;
+		label->dkl_rpm = 7200;
+		label->dkl_apc = 0;
+		label->dkl_intrlv = 0;
+		label->dkl_magic = DKL_MAGIC;
+
+		PR0("requested disk size: %ld bytes\n", vd->file_size);
+		PR0("setup: ncyl=%d nhead=%d nsec=%d\n", label->dkl_pcyl,
+		    label->dkl_nhead, label->dkl_nsect);
+		PR0("provided disk size: %ld bytes\n", (uint64_t)
+		    (label->dkl_pcyl *
+			label->dkl_nhead * label->dkl_nsect * DEV_BSIZE));
+
+		/*
+		 * We must have a correct label name otherwise format(1m) will
+		 * not recognized the disk as labeled.
+		 */
+		(void) snprintf(label->dkl_asciilabel, LEN_DKL_ASCII,
+		    "SUNVDSK cyl %d alt %d hd %d sec %d",
+		    label->dkl_ncyl, label->dkl_acyl, label->dkl_nhead,
+		    label->dkl_nsect);
+
+		/* default VTOC */
+		label->dkl_vtoc.v_version = V_VERSION;
+		label->dkl_vtoc.v_nparts = 8;
+		label->dkl_vtoc.v_sanity = VTOC_SANE;
+		label->dkl_vtoc.v_part[2].p_tag = V_BACKUP;
+		label->dkl_map[2].dkl_cylno = 0;
+		label->dkl_map[2].dkl_nblk = label->dkl_ncyl *
+			label->dkl_nhead * label->dkl_nsect;
+		label->dkl_map[0] = label->dkl_map[2];
+		label->dkl_map[0] = label->dkl_map[2];
+		label->dkl_cksum = vd_lbl2cksum(label);
+	}
+
+	vd->nslices = label->dkl_vtoc.v_nparts;
+
+	/* sector size = block size = DEV_BSIZE */
+	vd->vdisk_size = (label->dkl_pcyl *
+	    label->dkl_nhead * label->dkl_nsect) / DEV_BSIZE;
+	vd->vdisk_type = VD_DISK_TYPE_DISK;
+	vd->vdisk_label = VD_DISK_LABEL_VTOC;
+	vd->max_xfer_sz = maxphys / DEV_BSIZE; /* default transfer size */
+
+	/* Get max_xfer_sz from the device where the file is */
+	dev = vd->file_vnode->v_vfsp->vfs_dev;
+	dev_path[0] = NULL;
+	if (ddi_dev_pathname(dev, S_IFBLK, dev_path) == DDI_SUCCESS) {
+		PR0("underlying device = %s\n", dev_path);
+	}
+
+	if ((status = ldi_open_by_dev(&dev, OTYP_BLK, FREAD,
+		kcred, &lhandle, vd->vds->ldi_ident)) != 0) {
+		PR0("ldi_open_by_dev() returned errno %d for device %s",
+		    status, dev_path);
+	} else {
+		if ((status = ldi_ioctl(lhandle, DKIOCINFO,
+		    (intptr_t)&dk_cinfo, (vd_open_flags | FKIOCTL), kcred,
+		    &rval)) != 0) {
+			PR0("ldi_ioctl(DKIOCINFO) returned errno %d for %s",
+			    status, dev_path);
+		} else {
+			/*
+			 * Store the device's max transfer size for
+			 * return to the client
+			 */
+			vd->max_xfer_sz = dk_cinfo.dki_maxtransfer;
+		}
+
+		PR0("close the device %s", dev_path);
+		(void) ldi_close(lhandle, FREAD, kcred);
+	}
+
+	PR0("using for file %s, dev %s, max_xfer = %u blks",
+	    file_path, dev_path, vd->max_xfer_sz);
+
+	vd->pseudo = B_FALSE;
+	vd->file = B_TRUE;
+
+	vd->dk_geom.dkg_ncyl = label->dkl_ncyl;
+	vd->dk_geom.dkg_acyl = label->dkl_acyl;
+	vd->dk_geom.dkg_pcyl = label->dkl_pcyl;
+	vd->dk_geom.dkg_nhead = label->dkl_nhead;
+	vd->dk_geom.dkg_nsect = label->dkl_nsect;
+	vd->dk_geom.dkg_intrlv = label->dkl_intrlv;
+	vd->dk_geom.dkg_apc = label->dkl_apc;
+	vd->dk_geom.dkg_rpm = label->dkl_rpm;
+	vd->dk_geom.dkg_write_reinstruct = label->dkl_write_reinstruct;
+	vd->dk_geom.dkg_read_reinstruct = label->dkl_read_reinstruct;
+
+	vd->vtoc.v_sanity = label->dkl_vtoc.v_sanity;
+	vd->vtoc.v_version = label->dkl_vtoc.v_version;
+	vd->vtoc.v_sectorsz = DEV_BSIZE;
+	vd->vtoc.v_nparts = label->dkl_vtoc.v_nparts;
+
+	bcopy(label->dkl_vtoc.v_volume, vd->vtoc.v_volume,
+	    LEN_DKL_VVOL);
+	bcopy(label->dkl_asciilabel, vd->vtoc.v_asciilabel,
+	    LEN_DKL_ASCII);
+
+	for (i = 0; i < vd->nslices; i++) {
+		vd->vtoc.timestamp[i] = label->dkl_vtoc.v_timestamp[i];
+		vd->vtoc.v_part[i].p_tag = label->dkl_vtoc.v_part[i].p_tag;
+		vd->vtoc.v_part[i].p_flag = label->dkl_vtoc.v_part[i].p_flag;
+		vd->vtoc.v_part[i].p_start = label->dkl_map[i].dkl_cylno *
+			label->dkl_nhead * label->dkl_nsect;
+		vd->vtoc.v_part[i].p_size = label->dkl_map[i].dkl_nblk;
+		vd->ldi_handle[i] = NULL;
+		vd->dev[i] = NULL;
+	}
+
+	return (0);
+}
+
+static int
+vd_setup_vd(vd_t *vd)
 {
 	int		rval, status;
 	dev_info_t	*dip;
 	struct dk_cinfo	dk_cinfo;
+	char		*device_path = vd->device_path;
 
 	/*
 	 * We need to open with FNDELAY so that opening an empty partition
@@ -2365,7 +2757,19 @@ vd_setup_vd(char *device_path, vd_t *vd)
 	 */
 	if ((status = ldi_open_by_name(device_path, vd_open_flags | FNDELAY,
 	    kcred, &vd->ldi_handle[0], vd->vds->ldi_ident)) != 0) {
-		PRN("ldi_open_by_name(%s) = errno %d", device_path, status);
+		PR0("ldi_open_by_name(%s) = errno %d", device_path, status);
+
+		/* this may not be a device try opening as a file */
+		if (status == ENXIO || status == ENODEV)
+			status = vd_setup_file(vd);
+		if (status) {
+			PR0("Cannot use device/file (%s), errno=%d\n",
+			    device_path, status);
+			if (status == ENXIO || status == ENODEV ||
+			    status == ENOENT) {
+				return (EAGAIN);
+			}
+		}
 		return (status);
 	}
 
@@ -2374,6 +2778,7 @@ vd_setup_vd(char *device_path, vd_t *vd)
 	 * the slice we have just opened in case of an error.
 	 */
 	vd->nslices = 1;
+	vd->file = B_FALSE;
 
 	/* Get device number and size of backing device */
 	if ((status = ldi_get_dev(vd->ldi_handle[0], &vd->dev[0])) != 0) {
@@ -2421,7 +2826,6 @@ vd_setup_vd(char *device_path, vd_t *vd)
 	/* Store the device's max transfer size for return to the client */
 	vd->max_xfer_sz = dk_cinfo.dki_maxtransfer;
 
-
 	/* Determine if backing device is a pseudo device */
 	if ((dip = ddi_hold_devi_by_instance(getmajor(vd->dev[0]),
 		    dev_to_instance(vd->dev[0]), 0))  == NULL) {
@@ -2435,7 +2839,6 @@ vd_setup_vd(char *device_path, vd_t *vd)
 		vd->nslices	= 1;
 		return (0);	/* ...and we're done */
 	}
-
 
 	/* If slice is entire-disk slice, initialize for full disk */
 	if (dk_cinfo.dki_partition == VD_ENTIRE_DISK_SLICE)
@@ -2504,16 +2907,21 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t ldc_id,
 	}
 	*vdp = vd;	/* assign here so vds_destroy_vd() can cleanup later */
 	vd->vds = vds;
-
+	(void) strncpy(vd->device_path, device_path, MAXPATHLEN);
 
 	/* Open vdisk and initialize parameters */
-	if ((status = vd_setup_vd(device_path, vd)) != 0)
-		return (status);
-	ASSERT(vd->nslices > 0 && vd->nslices <= V_NUMPAR);
-	PR0("vdisk_type = %s, pseudo = %s, nslices = %u",
-	    ((vd->vdisk_type == VD_DISK_TYPE_DISK) ? "disk" : "slice"),
-	    (vd->pseudo ? "yes" : "no"), vd->nslices);
+	if ((status = vd_setup_vd(vd)) == 0) {
+		vd->initialized |= VD_DISK_READY;
 
+		ASSERT(vd->nslices > 0 && vd->nslices <= V_NUMPAR);
+		PR0("vdisk_type = %s, pseudo = %s, file = %s, nslices = %u",
+		    ((vd->vdisk_type == VD_DISK_TYPE_DISK) ? "disk" : "slice"),
+		    (vd->pseudo ? "yes" : "no"), (vd->file ? "yes" : "no"),
+		    vd->nslices);
+	} else {
+		if (status != EAGAIN)
+			return (status);
+	}
 
 	/* Initialize locking */
 	if (ddi_get_soft_iblock_cookie(vds->dip, DDI_SOFTINT_MED,
@@ -2689,13 +3097,22 @@ vds_destroy_vd(void *arg)
 		kmem_free(vd->inband_task.msg, vd->max_msglen);
 		vd->inband_task.msg = NULL;
 	}
-
-	/* Close any open backing-device slices */
-	for (uint_t slice = 0; slice < vd->nslices; slice++) {
-		if (vd->ldi_handle[slice] != NULL) {
-			PR0("Closing slice %u", slice);
-			(void) ldi_close(vd->ldi_handle[slice],
-			    vd_open_flags | FNDELAY, kcred);
+	if (vd->initialized & VD_DISK_READY) {
+		if (vd->file) {
+			/* Unmap and close file */
+			(void) as_unmap(&kas, vd->file_maddr, vd->file_size);
+			(void) VOP_CLOSE(vd->file_vnode, vd_open_flags, 1,
+			    0, kcred);
+			VN_RELE(vd->file_vnode);
+		} else {
+			/* Close any open backing-device slices */
+			for (uint_t slice = 0; slice < vd->nslices; slice++) {
+				if (vd->ldi_handle[slice] != NULL) {
+					PR0("Closing slice %u", slice);
+					(void) ldi_close(vd->ldi_handle[slice],
+					    vd_open_flags | FNDELAY, kcred);
+				}
+			}
 		}
 	}
 
@@ -2908,6 +3325,7 @@ vds_process_md(void *arg, mdeg_result_t *md)
 	return (MDEG_SUCCESS);
 }
 
+
 static int
 vds_do_attach(dev_info_t *dip)
 {
@@ -2949,6 +3367,7 @@ vds_do_attach(dev_info_t *dip)
 		ddi_soft_state_free(vds_state, instance);
 		return (DDI_FAILURE);
 	}
+
 
 	vds->dip	= dip;
 	vds->vd_table	= mod_hash_create_ptrhash("vds_vd_table", VDS_NCHAINS,

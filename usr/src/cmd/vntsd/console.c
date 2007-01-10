@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -704,10 +704,28 @@ console_chk_status(vntsd_group_t *groupp, vntsd_client_t *clientp, int status)
 
 	case VNTSD_SUCCESS:
 	case VNTSD_STATUS_CONTINUE:
-	case VNTSD_STATUS_NO_CONS:
 		(void) mutex_unlock(&groupp->lock);
 		client_init(clientp);
 		return;
+
+
+	case VNTSD_STATUS_NO_CONS:
+		/*
+		 * there are two cases when the status is VNTSD_SATATUS_NO_CONS.
+		 * case 1. the console was removed but there is at least one
+		 * another console in the group that client can connect to.
+		 * case 2. there is no console in the group. Client needs to
+		 * be disconnected from vntsd.
+		 */
+		if (groupp->num_cons == 0) {
+			(void) mutex_unlock(&groupp->lock);
+			client_fini(groupp, clientp);
+		} else {
+			(void) mutex_unlock(&groupp->lock);
+			client_init(clientp);
+		}
+		return;
+
 
 	case VNTSD_ERR_INVALID_INPUT:
 		(void) mutex_unlock(&groupp->lock);
@@ -742,6 +760,9 @@ vntsd_console_thread(vntsd_thr_arg_t *argp)
 
 	assert(groupp);
 	assert(clientp);
+
+	/* free argp, which was allocated in listen thread */
+	free(argp);
 
 	/* check if group is removed */
 
@@ -801,9 +822,11 @@ vntsd_console_thread(vntsd_thr_arg_t *argp)
 
 		case ' ':
 
-			if (num_cons == 0)
+			if (num_cons == 0) {
 				/* no console in the group */
+				rv = VNTSD_STATUS_NO_CONS;
 				break;
+			}
 
 			if (clientp->cons == NULL) {
 				if (num_cons == 1) {
@@ -832,6 +855,15 @@ vntsd_console_thread(vntsd_thr_arg_t *argp)
 					rv = display_help(clientp);
 					break;
 				}
+
+				/*
+				 * all consoles in the group
+				 * may be gone before this client
+				 * could select one.
+				 */
+				if (rv != VNTSD_SUCCESS)
+					break;
+
 			} else {
 				consp = clientp->cons;
 			}

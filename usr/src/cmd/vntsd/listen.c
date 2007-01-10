@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -170,6 +170,12 @@ open_socket(int port_no, int *sockfd)
 			if (errno == EADDRINUSE && retries < MAX_BIND_RETRIES) {
 				/* port may be in TIME_WAIT state, retry */
 				(void) sleep(5);
+
+				/* woke up by signal? */
+				if (errno == EINTR) {
+					return (VNTSD_STATUS_INTR);
+				}
+
 				retries++;
 				continue;
 			}
@@ -198,7 +204,7 @@ static int
 create_console_thread(vntsd_group_t *groupp, int sockfd)
 {
 	vntsd_client_t	    *clientp;
-	vntsd_thr_arg_t	    arg;
+	vntsd_thr_arg_t	    *thr_arg;
 	int		    rv;
 
 
@@ -223,6 +229,14 @@ create_console_thread(vntsd_group_t *groupp, int sockfd)
 	/* append client to group */
 	(void) mutex_lock(&groupp->lock);
 
+	/* check if the group is [being] removed */
+	if (groupp->status & VNTSD_GROUP_IN_CLEANUP) {
+		(void) mutex_unlock(&groupp->lock);
+		vntsd_free_client(clientp);
+		return (VNTSD_STATUS_NO_CONS);
+	}
+
+
 	if ((rv = vntsd_que_append(&groupp->no_cons_clientpq, clientp))
 	    != VNTSD_SUCCESS) {
 		(void) mutex_unlock(&groupp->lock);
@@ -232,18 +246,28 @@ create_console_thread(vntsd_group_t *groupp, int sockfd)
 
 	(void) mutex_unlock(&groupp->lock);
 
+	/*
+	 * allocate thr_arg from heap for console thread so
+	 * that thr_arg is still valid after this function exits.
+	 * console thread will free thr_arg.
+	 */
+
+	thr_arg = (vntsd_thr_arg_t *)malloc(sizeof (vntsd_thr_arg_t));
+	if (thr_arg  == NULL) {
+		vntsd_free_client(clientp);
+		return (VNTSD_ERR_NO_MEM);
+	}
+	thr_arg->handle = groupp;
+	thr_arg->arg = clientp;
+
 	(void) mutex_lock(&clientp->lock);
 
-	/* parameters for console thread */
-	bzero(&arg, sizeof (arg));
-
-	arg.handle = groupp;
-	arg.arg = clientp;
 
 	/* create console selection thread */
 	if (thr_create(NULL, 0, (thr_func_t)vntsd_console_thread,
-		    &arg, THR_DETACHED, &clientp->cons_tid)) {
+		    thr_arg, THR_DETACHED, &clientp->cons_tid)) {
 
+		free(thr_arg);
 		(void) mutex_unlock(&clientp->lock);
 		(void) mutex_lock(&groupp->lock);
 		(void) vntsd_que_rm(&groupp->no_cons_clientpq, clientp);

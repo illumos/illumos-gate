@@ -203,6 +203,7 @@ static int	vdc_set_efi_convert(vdc_t *vdc, void *from, void *to,
  * various operations
  */
 static int	vdc_retries = 10;
+static int	vdc_hshake_retries = 3;
 
 /* calculated from 'vdc_usec_timeout' during attach */
 static uint64_t	vdc_hz_timeout;				/* units: Hz */
@@ -2373,8 +2374,15 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
 	mutex_enter(&vdcp->lock);
 
 	do {
-		while (vdcp->state != VDC_STATE_RUNNING)
+		while (vdcp->state != VDC_STATE_RUNNING) {
 			cv_wait(&vdcp->running_cv, &vdcp->lock);
+
+			/* return error if detaching */
+			if (vdcp->state == VDC_STATE_DETACH) {
+				mutex_exit(&vdcp->lock);
+				return (ENXIO);
+			}
+		}
 
 	} while (vdc_populate_descriptor(vdcp, operation, addr,
 	    nbytes, slice, offset, cb_type, cb_arg, dir));
@@ -2604,10 +2612,13 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
 		cv_wait(&vdcp->sync_pending_cv, &vdcp->lock);
 
 	DMSG(vdcp, 2, ": operation returned %d\n", vdcp->sync_op_status);
-	if (vdcp->state == VDC_STATE_DETACH)
+	if (vdcp->state == VDC_STATE_DETACH) {
+		vdcp->sync_op_pending = B_FALSE;
 		status = ENXIO;
-	else
+	} else {
 		status = vdcp->sync_op_status;
+	}
+
 	vdcp->sync_op_status = 0;
 	vdcp->sync_op_blocked = B_FALSE;
 	vdcp->sync_op_cnt--;
@@ -2780,11 +2791,12 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 	 */
 	if (ldep->align_addr) {
 		ASSERT(ldep->addr != NULL);
-		ASSERT(dep->payload.nbytes > 0);
 
-		bcopy(ldep->align_addr, ldep->addr, dep->payload.nbytes);
+		if (dep->payload.nbytes > 0)
+			bcopy(ldep->align_addr, ldep->addr,
+			    dep->payload.nbytes);
 		kmem_free(ldep->align_addr,
-			sizeof (caddr_t) * P2ROUNDUP(dep->payload.nbytes, 8));
+			sizeof (caddr_t) * P2ROUNDUP(ldep->nbytes, 8));
 		ldep->align_addr = NULL;
 	}
 
@@ -2909,7 +2921,7 @@ vdc_populate_mem_hdl(vdc_t *vdcp, vdc_local_desc_t *ldep)
 					vdcp->instance, mhdl, i, rv);
 			if (ldep->align_addr) {
 				kmem_free(ldep->align_addr,
-					sizeof (caddr_t) * dep->payload.nbytes);
+					sizeof (caddr_t) * ldep->nbytes);
 				ldep->align_addr = NULL;
 			}
 			return (EAGAIN);
@@ -3280,7 +3292,9 @@ vdc_process_msg_thread(vdc_t *vdcp)
 		case VDC_STATE_INIT:
 
 			/* Check if have re-initializing repeatedly */
-			if (vdcp->hshake_cnt++ > VDC_RETRIES) {
+			if (vdcp->hshake_cnt++ > vdc_hshake_retries) {
+				cmn_err(CE_NOTE, "[%d] disk access failed.\n",
+				    vdcp->instance);
 				vdcp->state = VDC_STATE_DETACH;
 				break;
 			}
@@ -3461,6 +3475,12 @@ done:
 			DMSG(vdcp, 0, "[%d] Reset thread exit cleanup ..\n",
 			    vdcp->instance);
 
+			/*
+			 * Signal anyone waiting for connection
+			 * to come online
+			 */
+			cv_broadcast(&vdcp->running_cv);
+
 			while (vdcp->sync_op_pending) {
 				cv_signal(&vdcp->sync_pending_cv);
 				cv_signal(&vdcp->sync_blocked_cv);
@@ -3469,7 +3489,6 @@ done:
 				mutex_enter(&vdcp->lock);
 			}
 
-			cv_signal(&vdcp->running_cv);
 			mutex_exit(&vdcp->lock);
 
 			DMSG(vdcp, 0, "[%d] Msg processing thread exiting ..\n",
@@ -3584,6 +3603,8 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 		case CB_STRATEGY:
 			bufp = ldep->cb_arg;
 			ASSERT(bufp != NULL);
+			bufp->b_resid =
+				bufp->b_bcount - ldep->dep->payload.nbytes;
 			status = ldep->dep->payload.status; /* Future:ntoh */
 			if (status != 0) {
 				DMSG(vdcp, 1, "strategy status=%d\n", status);
@@ -3591,6 +3612,10 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 			}
 			status = vdc_depopulate_descriptor(vdcp, idx);
 			biodone(bufp);
+
+			DMSG(vdcp, 1,
+			    "strategy complete req=%ld bytes resp=%ld bytes\n",
+			    bufp->b_bcount, ldep->dep->payload.nbytes);
 			break;
 
 		default:
