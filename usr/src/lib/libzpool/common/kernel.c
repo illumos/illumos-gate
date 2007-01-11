@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,29 @@ zk_thread_create(void (*func)(), void *arg)
 
 	return ((void *)(uintptr_t)tid);
 }
+
+/*
+ * =========================================================================
+ * kstats
+ * =========================================================================
+ */
+/*ARGSUSED*/
+kstat_t *
+kstat_create(char *module, int instance, char *name, char *class,
+    uchar_t type, ulong_t ndata, uchar_t ks_flag)
+{
+	return (NULL);
+}
+
+/*ARGSUSED*/
+void
+kstat_install(kstat_t *ksp)
+{}
+
+/*ARGSUSED*/
+void
+kstat_delete(kstat_t *ksp)
+{}
 
 /*
  * =========================================================================

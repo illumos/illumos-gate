@@ -776,6 +776,143 @@ abuf_help(void)
 	mdb_printf("::abuf_find dva_word[0] dva_word[1]\n");
 }
 
+/*ARGSUSED*/
+static int
+arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	kstat_named_t *stats;
+	GElf_Sym sym;
+	int nstats, i, j;
+	uint_t opt_a = FALSE;
+
+	/*
+	 * In its default mode, ::arc prints exactly what one would see with
+	 * the legacy "arc::print".  The legacy[] array tracks the order of
+	 * the legacy "arc" structure -- and whether the variable can be found
+	 * in a global variable or within the arc_stats (the default).
+	 */
+	struct {
+		const char *name;
+		const char *var;
+	} legacy[] = {
+		{ "anon",		"arc_anon" },
+		{ "mru",		"arc_mru" },
+		{ "mru_ghost",		"arc_mru_ghost" },
+		{ "mfu",		"arc_mfu" },
+		{ "mfu_ghost",		"arc_mfu_ghost" },
+		{ "size" },
+		{ "p" },
+		{ "c" },
+		{ "c_min" },
+		{ "c_max" },
+		{ "hits" },
+		{ "misses" },
+		{ "deleted" },
+		{ "recycle_miss" },
+		{ "mutex_miss" },
+		{ "evict_skip" },
+		{ "hash_elements" },
+		{ "hash_elements_max" },
+		{ "hash_collisions" },
+		{ "hash_chains" },
+		{ "hash_chain_max" },
+		{ "no_grow",		"arc_no_grow" },
+		{ NULL }
+	};
+
+	if (mdb_lookup_by_name("arc_stats", &sym) == -1) {
+		mdb_warn("failed to find 'arc_stats'");
+		return (DCMD_ERR);
+	}
+
+	stats = mdb_zalloc(sym.st_size, UM_SLEEP | UM_GC);
+
+	if (mdb_vread(stats, sym.st_size, sym.st_value) == -1) {
+		mdb_warn("couldn't read 'arc_stats' at %p", sym.st_value);
+		return (DCMD_ERR);
+	}
+
+	nstats = sym.st_size / sizeof (kstat_named_t);
+
+	if (mdb_getopts(argc, argv, 'a',
+	    MDB_OPT_SETBITS, TRUE, &opt_a, NULL) != argc)
+		return (DCMD_USAGE);
+
+	mdb_printf("{\n");
+
+	if (opt_a) {
+		for (i = 0; i < nstats; i++) {
+			mdb_printf("    %s = 0x%llx\n", stats[i].name,
+			    stats[i].value.ui64);
+		}
+
+		mdb_printf("}\n");
+		return (DCMD_OK);
+	}
+
+	for (i = 0; legacy[i].name != NULL; i++) {
+		if (legacy[i].var != NULL) {
+			uint64_t buf;
+
+			if (mdb_lookup_by_name(legacy[i].var, &sym) == -1) {
+				mdb_warn("failed to find '%s'", legacy[i].var);
+				return (DCMD_ERR);
+			}
+
+			if (sym.st_size != sizeof (uint64_t) &&
+			    sym.st_size != sizeof (uint32_t)) {
+				mdb_warn("expected scalar for legacy "
+				    "variable '%s'\n", legacy[i].var);
+				return (DCMD_ERR);
+			}
+
+			if (mdb_vread(&buf, sym.st_size, sym.st_value) == -1) {
+				mdb_warn("couldn't read '%s'", legacy[i].var);
+				return (DCMD_ERR);
+			}
+
+			mdb_printf("    %s = ", legacy[i].name);
+
+			if (sym.st_size == sizeof (uint64_t))
+				mdb_printf("%a\n", buf);
+
+			if (sym.st_size == sizeof (uint32_t))
+				mdb_printf("%d\n", *((uint32_t *)&buf));
+
+			continue;
+		}
+
+		for (j = 0; j < nstats; j++) {
+			if (strcmp(legacy[i].name, stats[j].name) != 0)
+				continue;
+
+			mdb_printf("    %s = ", stats[j].name);
+
+			if (stats[j].value.ui64 == 0) {
+				/*
+				 * To remain completely output compatible with
+				 * the legacy arc::print, we print 0 not as
+				 * "0x0" but rather 0.
+				 */
+				mdb_printf("0\n");
+			} else {
+				mdb_printf("0x%llx\n", stats[j].value.ui64);
+			}
+
+			break;
+		}
+
+		if (j == nstats) {
+			mdb_warn("couldn't find statistic in 'arc_stats' "
+			    "for field '%s'\n", legacy[i].name);
+		}
+	}
+
+	mdb_printf("}\n");
+
+	return (DCMD_OK);
+}
+
 /*
  * ::spa
  *
@@ -1563,6 +1700,7 @@ spa_walk_step(mdb_walk_state_t *wsp)
  */
 
 static const mdb_dcmd_t dcmds[] = {
+	{ "arc", "[-a]", "print ARC variables", arc_print },
 	{ "blkptr", ":", "print blkptr_t", blkptr },
 	{ "dbuf", ":", "print dmu_buf_impl_t", dbuf },
 	{ "dbuf_stats", ":", "dbuf stats", dbuf_stats },
