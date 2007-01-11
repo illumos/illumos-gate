@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * logadm/main.c -- main routines for logadm
@@ -391,8 +391,6 @@ main(int argc, char *argv[])
 
 	/* execute any gzip commands */
 	lut_walk(Gzipnames, do_delayed_gzip, clopts);
-	lut_free(Gzipnames, free);
-	Gzipnames = NULL;
 
 	/* write out any conffile changes */
 	conf_close(clopts);
@@ -964,7 +962,7 @@ expirefiles(struct fn *fnp, struct opts *opts)
 				dorm(opts, "expire by age rule", nextfnp);
 				fn_free(nextfnp);
 			} else {
-				fn_free(nextfnp);
+				fn_list_addfn(files, nextfnp);
 				break;
 			}
 		}

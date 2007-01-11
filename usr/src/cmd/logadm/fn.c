@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * logadm/fn.c -- "filename" string module
@@ -538,15 +538,18 @@ fn_list_popoldest(struct fn_list *fnlp)
 		return (NULL);
 
 	/* oldest file is ret, remove it from list */
-	if (fnlp->fnl_first == ret)
+	if (fnlp->fnl_first == ret) {
 		fnlp->fnl_first = ret->fn_next;
-	else {
+	} else {
 		fn_list_rewind(fnlp);
-		while ((fnp = fn_list_next(fnlp)) != NULL)
+		while ((fnp = fn_list_next(fnlp)) != NULL) {
 			if (fnp->fn_next == ret) {
 				fnp->fn_next = ret->fn_next;
+				if (fnlp->fnl_last == ret)
+					fnlp->fnl_last = fnp;
 				break;
 			}
+		}
 	}
 
 	ret->fn_next = NULL;
