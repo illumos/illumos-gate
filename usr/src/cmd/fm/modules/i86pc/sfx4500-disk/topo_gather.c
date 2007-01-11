@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -285,7 +285,11 @@ topo_add_disk(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 	dm_fru_t	*frup;
 	diskmon_t	*diskp;
 
-	dm_assert(wdp->pfmri != NULL);
+	if (wdp->pfmri == NULL) {
+		log_msg(MM_TOPO, "No diskmon for parent of node %p.\n", node);
+		return (0);
+	}
+
 	if (nvlist_lookup_uint64(g_topo2diskmon, wdp->pfmri, &ptr) != 0) {
 		log_msg(MM_TOPO, "No diskmon for %s: parent of node %p.\n",
 		    wdp->pfmri, node);
