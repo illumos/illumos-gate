@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /* LINTLIBRARY */
 /* PROTOLIB1 */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -433,7 +433,6 @@ getstats_aclreq(void)
 static void
 putstats(void)
 {
-
 	if (rpc_clts_client_kstat != NULL)
 		safe_kstat_write(kc, rpc_clts_client_kstat, NULL);
 	if (rpc_cots_client_kstat != NULL)
@@ -510,7 +509,7 @@ setup(void)
 	if (rpc_clts_client_kstat == NULL && rpc_cots_server_kstat == NULL &&
 	    rfsproccnt_v2_kstat == NULL && rfsreqcnt_v3_kstat == NULL)
 		fail(0, "Multiple kstat lookups failed."
-		    "Your kernal module may not be loaded\n");
+		    "Your kernel module may not be loaded\n");
 }
 
 static int
@@ -574,6 +573,9 @@ cr_print(int zflag)
 	int field_width;
 
 	field_width = getstats_rpc();
+	if (field_width == 0)
+		return;
+
 	stat_print("\nClient rpc:\nConnection oriented:",
 		    rpc_cots_client_kstat,
 		    &old_rpc_cots_client_kstat.kst, field_width,
@@ -592,6 +594,9 @@ sr_print(int zflag)
 	int field_width;
 
 	field_width = getstats_rpc();
+	if (field_width == 0)
+		return;
+
 	stat_print("\nServer rpc:\nConnection oriented:", rpc_cots_server_kstat,
 		    &old_rpc_cots_server_kstat.kst, field_width,
 		    zflag);
@@ -609,6 +614,8 @@ cn_print(int zflag, int vflag)
 	int field_width;
 
 	field_width = getstats_nfs();
+	if (field_width == 0)
+		return;
 
 	if (vflag == 0) {
 		kstat_sum(nfs_client_kstat, nfs4_client_kstat, ksum_kstat);
@@ -653,6 +660,9 @@ sn_print(int zflag, int vflag)
 	int  field_width;
 
 	field_width = getstats_nfs();
+	if (field_width == 0)
+		return;
+
 	if (vflag == 2 || vflag == 0) {
 		stat_print("\nServer NFSv2:", nfs_server_v2_kstat,
 			    &old_nfs_server_v2_kstat.kst,
@@ -697,6 +707,9 @@ ca_print(int zflag, int vflag)
 	int  field_width;
 
 	field_width = getstats_aclreq();
+	if (field_width == 0)
+		return;
+
 	printf("\nClient nfs_acl:\n");
 
 	if (vflag == 2 || vflag == 0) {
@@ -716,6 +729,8 @@ sa_print(int zflag, int vflag)
 	int  field_width;
 
 	field_width = getstats_aclproc();
+	if (field_width == 0)
+		return;
 
 	printf("\nServer nfs_acl:\n");
 
@@ -746,13 +761,15 @@ req_print(kstat_t *req, kstat_t *req_old, int ver, int field_width,
 	if (req == NULL)
 		return;
 
+	if (field_width == 0)
+		return;
+
 	ncolumns = (MAX_COLUMNS -1)/field_width;
 	knp = kstat_data_lookup(req, "null");
 	knp_old = KSTAT_NAMED_PTR(req_old);
 
 	kptr = KSTAT_NAMED_PTR(req);
 	nreq = req->ks_ndata - (knp - KSTAT_NAMED_PTR(req));
-
 
 	tot = 0;
 	old_tot = 0;
@@ -824,6 +841,9 @@ req_print_v4(kstat_t *req, kstat_t *req_old, int field_width, int zflag)
 	kstat_named_t *kptr_old;
 
 	if (req == NULL)
+		return;
+
+	if (field_width == 0)
 		return;
 
 	ncolumns = (MAX_COLUMNS)/field_width;
@@ -921,6 +941,9 @@ stat_print(const char *title_string, kstat_t *req, kstat_t  *req_old,
 	if (req == NULL)
 		return;
 
+	if (field_width == 0)
+		return;
+
 	printf("%s\n", title_string);
 	ncolumns = (MAX_COLUMNS -1)/field_width;
 
@@ -956,6 +979,7 @@ stat_print(const char *title_string, kstat_t *req, kstat_t  *req_old,
 	else
 		kstat_copy(req, req_old, 0);
 }
+
 static void
 kstat_sum(kstat_t *kstat1, kstat_t *kstat2, kstat_t *sum)
 {
@@ -1017,7 +1041,6 @@ mi_print(void)
 
 	list = NULL;
 	resetmnttab(mt);
-
 
 	while (getextmntent(mt, &m, sizeof (struct extmnttab)) == 0) {
 		/* ignore non "nfs" and save the "ignore" entries */
