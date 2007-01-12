@@ -21,22 +21,18 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-include ../../Makefile.master
 
 include ../Makefile.lib
 
 HDRS =		libshare.h
 HDRDIR =	common
 SUBDIRS =	$(MACH)
-ROOTHDRDIR=     $(ROOT)/usr/include
-ROOTHDRS=       $(HDRS:%=$(ROOTHDRDIR)/%)
 
 MSGFILES=	common/libshare.c common/libsharecore.c common/scfutil.c \
-		common/parser.c common/libshare_zfs.c
+		common/plugin.c common/parser.c common/libshare_zfs.c
 POFILE=		libshare.po
 
 all :=		TARGET = all

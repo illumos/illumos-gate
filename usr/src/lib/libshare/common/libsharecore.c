@@ -962,11 +962,12 @@ parse_dfstab(char *dfstab, xmlNodePtr root)
 		else
 		    sgroup = NULL;
 	    } else {
-		(void) printf(gettext("No share specified in dfstab: "
+		(void) printf(dgettext(TEXT_DOMAIN,
+					"No share specified in dfstab: "
 					"line %d: %s\n"),
 			list->lineno, list->origline);
 		add_syntax_comment(root, list->origline,
-				    gettext("No share specified"),
+				    dgettext(TEXT_DOMAIN, "No share specified"),
 				    1);
 		continue;
 	    }
@@ -977,11 +978,13 @@ parse_dfstab(char *dfstab, xmlNodePtr root)
 		group = defgroup;
 	    }
 	    if (defined_group && group == NULL) {
-		(void) printf(gettext("Unknown group used in dfstab: "
+		(void) printf(dgettext(TEXT_DOMAIN,
+					"Unknown group used in dfstab: "
 					"line %d: %s\n"),
 			list->lineno, list->origline);
 		add_syntax_comment(root, list->origline,
-				    gettext("Unknown group specified"), 1);
+				    dgettext(TEXT_DOMAIN,
+						"Unknown group specified"), 1);
 		continue;
 	    }
 	    if (group != NULL) {
@@ -1006,26 +1009,31 @@ parse_dfstab(char *dfstab, xmlNodePtr root)
 				(void) sa_set_share_attr(share, "resource",
 						    list->resource);
 			} else {
-			    (void) printf(gettext("Error in dfstab: "
+			    (void) printf(dgettext(TEXT_DOMAIN,
+					    "Error in dfstab: "
 					    "line %d: %s\n"),
 				    list->lineno, list->origline);
 			    if (err != SA_BAD_PATH)
 				add_syntax_comment(root, list->origline,
-						gettext("Syntax"), 1);
+						dgettext(TEXT_DOMAIN,
+							    "Syntax"), 1);
 			    else
 				add_syntax_comment(root, list->origline,
-						gettext("Path"), 1);
+						dgettext(TEXT_DOMAIN,
+							    "Path"), 1);
 			    continue;
 			}
 		    }
 		} else {
 		    if (group != sgroup) {
-			(void) printf(gettext("Attempt to change"
+			(void) printf(dgettext(TEXT_DOMAIN, "Attempt to change"
 						"configuration in"
 						"dfstab: line %d: %s\n"),
 				list->lineno, list->origline);
 			add_syntax_comment(root, list->origline,
-				gettext("Attempt to change configuration"), 1);
+				dgettext(TEXT_DOMAIN,
+					    "Attempt to change configuration"),
+				1);
 			continue;
 		    }
 		    /* its the same group but could have changed options */
@@ -1295,7 +1303,8 @@ parse_sharetab(void)
 		    }
 		}
 		if (share == NULL)
-		    (void) printf(gettext("Problem with transient: %s\n"),
+		    (void) printf(dgettext(TEXT_DOMAIN,
+					    "Problem with transient: %s\n"),
 				    sa_errorstr(err));
 		if (share != NULL)
 		    set_node_attr(share, "shared", "true");

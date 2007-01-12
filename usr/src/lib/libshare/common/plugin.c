@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,7 +109,8 @@ proto_plugin_init()
 		    }
 		} else {
 		    (void) fprintf(stderr,
-			    gettext("Error in plugin for protocol %s: %s\n"),
+			    dgettext(TEXT_DOMAIN,
+				    "Error in plugin for protocol %s: %s\n"),
 			    dent->d_name, dlerror());
 		}
 	    }

@@ -21,61 +21,43 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 LIBRARY =	libshare.a
 VERS =		.1
 NFSLIB_DIR =	$(SRC)/cmd/fs.d/nfs/lib
-NFSSECSRC  =	$(NFSLIB_DIR)/nfs_sec.c
-NFSSHARETAB =	$(NFSLIB_DIR)/sharetab.c
 
 LIBOBJS =	libshare.o libsharecore.o scfutil.o libshare_zfs.o \
 		plugin.o parser.o issubdir.o
 OTHOBJS =	sharetab.o nfs_sec.o
 OBJECTS =	$(LIBOBJS) $(OTHOBJS)
-COMMON =	../common
-
-SRCS =		$(OBJECTS:%.o=../%.c)
-LIBSRCS =	$(LIBOBJS:%.o=$(COMMON)/%.c)
-POFILES	=	$(OBJECTS:%.o=%.po)
-POFILE  =	libshare.po
 
 include ../../Makefile.lib
+SRCDIR =	../common
 
-ROOTDIRS= $(ROOT)/usr/include
-
-ROOTHDRS= $(HDRS:%=$(ROOTDIRS)/%)
-
-CHECKHDRS= $(HDRS:%.h=%.check)
+LIBSRCS =	$(LIBOBJS:%.o=$(SRCDIR)/%.c)
+# we don't want to lint the sharetab and nfs_sec files
+lintcheck := SRCS = $(LIBSRCS)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc -lnsl -lscf -lzfs -luuid
 all install := LDLIBS += -lxml2
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-SRCDIR =	../common
-MAPDIR =	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
-
 #add nfs/lib directory as part of the include path
-CFLAGS +=	$(CCVERBOSE) -g
-CPPFLAGS +=	-D_REENTRANT -I$(SRC)/cmd/fs.d/nfs/lib -I/usr/include/libxml2 \
-		-I../common
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-D_REENTRANT -I$(NFSLIB_DIR) -I/usr/include/libxml2 \
+		-I$(SRCDIR)
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-# we don't want to lint the sharetab and nfs_sec files
-lint: $$(LIBSRCS)
-	$(LINT.c) $(LINTCHECKFLAGS) $(LIBSRCS) $(LDLIBS)
+lint: lintcheck
 
 pics/%.o:	$(NFSLIB_DIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
 include ../../Makefile.targ
-
-$(POFILE):      $(POFILES)
-	$(RM) $@; cat $(POFILES) > $@

@@ -87,80 +87,80 @@ sa_errorstr(int err)
 
 	switch (err) {
 	case SA_OK:
-	    ret = gettext("ok");
+	    ret = dgettext(TEXT_DOMAIN, "ok");
 	    break;
 	case SA_NO_SUCH_PATH:
-	    ret = gettext("path doesn't exist");
+	    ret = dgettext(TEXT_DOMAIN, "path doesn't exist");
 	    break;
 	case SA_NO_MEMORY:
-	    ret = gettext("no memory");
+	    ret = dgettext(TEXT_DOMAIN, "no memory");
 	    break;
 	case SA_DUPLICATE_NAME:
-	    ret = gettext("name in use");
+	    ret = dgettext(TEXT_DOMAIN, "name in use");
 	    break;
 	case SA_BAD_PATH:
-	    ret = gettext("bad path");
+	    ret = dgettext(TEXT_DOMAIN, "bad path");
 	    break;
 	case SA_NO_SUCH_GROUP:
-	    ret = gettext("no such group");
+	    ret = dgettext(TEXT_DOMAIN, "no such group");
 	    break;
 	case SA_CONFIG_ERR:
-	    ret = gettext("configuration error");
+	    ret = dgettext(TEXT_DOMAIN, "configuration error");
 	    break;
 	case SA_SYSTEM_ERR:
-	    ret = gettext("system error");
+	    ret = dgettext(TEXT_DOMAIN, "system error");
 	    break;
 	case SA_SYNTAX_ERR:
-	    ret = gettext("syntax error");
+	    ret = dgettext(TEXT_DOMAIN, "syntax error");
 	    break;
 	case SA_NO_PERMISSION:
-	    ret = gettext("no permission");
+	    ret = dgettext(TEXT_DOMAIN, "no permission");
 	    break;
 	case SA_BUSY:
-	    ret = gettext("busy");
+	    ret = dgettext(TEXT_DOMAIN, "busy");
 	    break;
 	case SA_NO_SUCH_PROP:
-	    ret = gettext("no such property");
+	    ret = dgettext(TEXT_DOMAIN, "no such property");
 	    break;
 	case SA_INVALID_NAME:
-	    ret = gettext("invalid name");
+	    ret = dgettext(TEXT_DOMAIN, "invalid name");
 	    break;
 	case SA_INVALID_PROTOCOL:
-	    ret = gettext("invalid protocol");
+	    ret = dgettext(TEXT_DOMAIN, "invalid protocol");
 	    break;
 	case SA_NOT_ALLOWED:
-	    ret = gettext("operation not allowed");
+	    ret = dgettext(TEXT_DOMAIN, "operation not allowed");
 	    break;
 	case SA_BAD_VALUE:
-	    ret = gettext("bad property value");
+	    ret = dgettext(TEXT_DOMAIN, "bad property value");
 	    break;
 	case SA_INVALID_SECURITY:
-	    ret = gettext("invalid security type");
+	    ret = dgettext(TEXT_DOMAIN, "invalid security type");
 	    break;
 	case SA_NO_SUCH_SECURITY:
-	    ret = gettext("security type not found");
+	    ret = dgettext(TEXT_DOMAIN, "security type not found");
 	    break;
 	case SA_VALUE_CONFLICT:
-	    ret = gettext("property value conflict");
+	    ret = dgettext(TEXT_DOMAIN, "property value conflict");
 	    break;
 	case SA_NOT_IMPLEMENTED:
-	    ret = gettext("not implemented");
+	    ret = dgettext(TEXT_DOMAIN, "not implemented");
 	    break;
 	case SA_INVALID_PATH:
-	    ret = gettext("invalid path");
+	    ret = dgettext(TEXT_DOMAIN, "invalid path");
 	    break;
 	case SA_NOT_SUPPORTED:
-	    ret = gettext("operation not supported");
+	    ret = dgettext(TEXT_DOMAIN, "operation not supported");
 	    break;
 	case SA_PROP_SHARE_ONLY:
-	    ret = gettext("property not valid for group");
+	    ret = dgettext(TEXT_DOMAIN, "property not valid for group");
 	    break;
 	case SA_NOT_SHARED:
-	    ret = gettext("not shared");
+	    ret = dgettext(TEXT_DOMAIN, "not shared");
 	    break;
 	default:
 	    (void) snprintf(errstr, sizeof (errstr),
-				gettext("unknown %d"), err);
+				dgettext(TEXT_DOMAIN, "unknown %d"), err);
 	    ret = errstr;
 	}
 	return (ret);

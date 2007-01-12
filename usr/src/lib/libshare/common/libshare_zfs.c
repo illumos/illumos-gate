@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -556,7 +556,8 @@ sa_get_zfs_shares(char *groupname)
 				if (err == 0) {
 				    /* only print error once */
 				    (void) fprintf(stderr,
-					gettext("Cannot create ZFS subgroup "
+					dgettext(TEXT_DOMAIN,
+						"Cannot create ZFS subgroup "
 						"during initialization:"
 						" %s\n"),
 					sa_errorstr(SA_SYSTEM_ERR));
