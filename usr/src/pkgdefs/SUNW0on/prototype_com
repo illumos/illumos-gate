@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -245,6 +245,9 @@ f none usr/lib/help/auths/locale/NetworkHeader.html 444 root bin
 f none usr/lib/help/auths/locale/WifiConfig.html 444 root bin
 f none usr/lib/help/auths/locale/WifiWep.html 444 root bin
 f none usr/lib/help/auths/locale/LinkSecurity.html 444 root bin
+f none usr/lib/help/auths/locale/MailHeader.html 0444 root bin
+f none usr/lib/help/auths/locale/MailQueue.html 0444 root bin
+f none usr/lib/help/auths/locale/DevCDRW.html 0444 root bin
 d none usr/lib/help/profiles 755 root bin
 d none usr/lib/help/profiles/locale 755 root bin
 f none usr/lib/help/profiles/locale/RtAll.html 444 root bin
