@@ -1399,8 +1399,15 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 	case ZFS_PROP_AVAILABLE:
 	case ZFS_PROP_VOLSIZE:
 	case ZFS_PROP_VOLBLOCKSIZE:
+		*val = getprop_uint64(zhp, prop, source);
+		break;
+
 	case ZFS_PROP_CANMOUNT:
 		*val = getprop_uint64(zhp, prop, source);
+		if (*val == 0)
+			*source = zhp->zfs_name;
+		else
+			*source = "";	/* default */
 		break;
 
 	case ZFS_PROP_QUOTA:
