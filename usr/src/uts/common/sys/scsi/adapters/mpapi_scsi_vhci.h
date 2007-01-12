@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,7 @@ typedef union mpoid {
 typedef	struct mpapi_item {
 	mpoid_t			oid;
 	void			*idata; /* item data */
+	kmutex_t		item_mutex;
 } mpapi_item_t;
 
 typedef	struct mpapi_item_list {

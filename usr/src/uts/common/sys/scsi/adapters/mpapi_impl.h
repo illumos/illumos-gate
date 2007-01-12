@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -277,6 +277,15 @@ typedef struct mp_lu_tpg_pair {
 	uint64_t	tpgId;
 } mp_lu_tpg_pair_t;
 
+/* used for uscsi commmands */
+typedef struct mp_uscsi_cmd {
+	struct scsi_address	*ap;		/* address of the path */
+	struct uscsi_cmd	*uscmdp;	/* uscsi command */
+	struct buf		*cmdbp;		/* original buffer */
+	struct buf		*rqbp;		/* auto-rqsense packet */
+	mdi_pathinfo_t		*pip;		/* path information */
+	int			arq_enabled;	/* auto-rqsense enable flag */
+}mp_uscsi_cmd_t;
 
 /*
  * Structure used as input to
@@ -398,7 +407,8 @@ typedef struct mp_iocdata32 {
 #define	MP_GET_PROPRIETARY_LOADBALANCE_LIST	(MP_SUB_CMD + 0x17)
 #define	MP_GET_PROPRIETARY_LOADBALANCE_PROP	(MP_SUB_CMD + 0x18)
 #define	MP_ASSIGN_LU_TO_TPG			(MP_SUB_CMD + 0x19)
-#define	MP_API_SUBCMD_MAX			(MP_ASSIGN_LU_TO_TPG)
+#define	MP_SEND_SCSI_CMD			(MP_SUB_CMD + 0x1a)
+#define	MP_API_SUBCMD_MAX			(MP_SEND_SCSI_CMD)
 
 
 /*
@@ -413,6 +423,7 @@ typedef struct mp_iocdata32 {
 #define	MP_DRVR_PATH_UNAVAILABLE		(MP_IOCTL_ERROR_START + 5)
 #define	MP_DRVR_IDS_NOT_ASSOCIATED		(MP_IOCTL_ERROR_START + 6)
 #define	MP_DRVR_ILLEGAL_ACCESS_STATE_REQUEST	(MP_IOCTL_ERROR_START + 7)
+#define	MP_DRVR_IO_ERROR			(MP_IOCTL_ERROR_START + 8)
 
 /*
  * Macros for OID operations
