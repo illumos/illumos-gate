@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1357,7 +1357,7 @@ ds_handle_unreg_req(ds_port_t *port, caddr_t buf, size_t len)
 	/* send message */
 	mutex_enter(&port->lock);
 	(void) ds_send_msg(port, msg, msglen);
-	mutex_enter(&port->lock);
+	mutex_exit(&port->lock);
 
 done:
 	rw_exit(&ds_svcs.rwlock);

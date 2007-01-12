@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,12 @@ typedef struct {
 #define	DR_CPU_STAT_NOT_PRESENT		0x0	/* CPU ID not in MD */
 #define	DR_CPU_STAT_UNCONFIGURED	0x1	/* CPU unconfigured */
 #define	DR_CPU_STAT_CONFIGURED		0x2	/* CPU configured */
+
+/*
+ * Macros to access arrays that follow message header
+ */
+#define	DR_CPU_CMD_CPUIDS(_hdr)		((uint32_t *)((_hdr) + 1))
+#define	DR_CPU_RESP_STATS(_hdr)		((dr_cpu_stat_t *)((_hdr) + 1))
 
 #ifdef __cplusplus
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,11 +100,22 @@ retry:
 
 	up_err = door_ki_upcall(dh, &door_args);
 	if (up_err == 0) {
-		if (door_args.rbuf != NULL && obufp != NULL) {
+		if (door_args.rbuf == NULL)
+			goto done;
+
+		DR_DBG_CTL("%s: rbuf %p rsize %ld\n", me,
+		    (void *)door_args.rbuf, door_args.rsize);
+
+		if (obufp != NULL) {
 			*obufp = door_args.rbuf;
 			*osize = door_args.rsize;
-			DR_DBG_CTL("%s: rbuf %p rsize %ld\n",
-			    me, (void *)door_args.rbuf, door_args.rsize);
+		} else {
+			/*
+			 * No output buffer pointer was passed in,
+			 * so the response buffer allocated by the
+			 * door code must be deallocated.
+			 */
+			kmem_free(door_args.rbuf, door_args.rsize);
 		}
 	} else {
 		switch (up_err) {
@@ -133,6 +144,7 @@ retry:
 		}
 	}
 
+done:
 	door_ki_rele(dh);
 	return (rv);
 }
