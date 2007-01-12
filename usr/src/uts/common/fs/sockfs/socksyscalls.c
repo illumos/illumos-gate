@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2316,8 +2316,11 @@ done:
 		stp = vp->v_stream;
 		mutex_enter(&stp->sd_lock);
 		while (!(stp->sd_flag & STZCNOTIFY)) {
-			(void) cv_wait_sig(&stp->sd_zcopy_wait,
-			    &stp->sd_lock);
+			if (cv_wait_sig(&stp->sd_zcopy_wait,
+				&stp->sd_lock) == 0) {
+				error = EINTR;
+				break;
+			}
 		}
 		stp->sd_flag &= ~STZCNOTIFY;
 		mutex_exit(&stp->sd_lock);
