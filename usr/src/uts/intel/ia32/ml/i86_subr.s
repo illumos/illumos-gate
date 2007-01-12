@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3813,9 +3813,9 @@ bcmp(const void *s1, const void *s2, size_t count)
 #define	ARG_LENGTH	16
 
 	ENTRY(bcmp)
+	pushl	%ebp
+	movl	%esp, %ebp	/ create new stack frame
 #ifdef DEBUG
-	pushl   %ebp
-	movl    %esp, %ebp
 	movl    kernelbase, %eax
 	cmpl    %eax, ARG_S1(%ebp)
 	jb	0f
@@ -3823,15 +3823,15 @@ bcmp(const void *s1, const void *s2, size_t count)
 	jnb	1f
 0:	pushl   $.bcmp_panic_msg
 	call    panic
-1:	popl    %ebp
+1:
 #endif	/* DEBUG */
 
 	pushl	%edi		/ save register variable
-	movl	ARG_S1(%esp), %eax	/ %eax = address of string 1
-	movl	ARG_S2(%esp), %ecx	/ %ecx = address of string 2
+	movl	ARG_S1(%ebp), %eax	/ %eax = address of string 1
+	movl	ARG_S2(%ebp), %ecx	/ %ecx = address of string 2
 	cmpl	%eax, %ecx	/ if the same string
 	je	.equal		/ goto .equal
-	movl	ARG_LENGTH(%esp), %edi	/ %edi = length in bytes
+	movl	ARG_LENGTH(%ebp), %edi	/ %edi = length in bytes
 	cmpl	$4, %edi	/ if %edi < 4
 	jb	.byte_check	/ goto .byte_check
 	.align	4
@@ -3862,11 +3862,13 @@ bcmp(const void *s1, const void *s2, size_t count)
 .equal:
 	xorl	%eax, %eax	/ %eax = 0
 	popl	%edi		/ restore register variable
+	leave			/ restore old stack frame
 	ret			/ return (NULL)
 	.align	4
 .not_equal:
 	movl	$1, %eax	/ return 1
 	popl	%edi		/ restore register variable
+	leave			/ restore old stack frame
 	ret			/ return (NULL)
 	SET_SIZE(bcmp)
 
