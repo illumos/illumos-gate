@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Opl Platform specific functions.
@@ -94,9 +94,11 @@ void	display_cpu_devices(Sys_tree *tree);
 void	display_cpus(Board_node *board);
 void	display_memoryconf(Sys_tree *tree, struct grp_info *grps);
 void	display_io_cards(struct io_card *list);
+void	display_io_devices(Sys_tree *tree);
 void	display_diaginfo(int flag, Prom_node *root, Sys_tree *tree,
     struct system_kstat_data *kstats);
 Prop 	*find_prop(Prom_node *pnode, char *name);
+int	do_piclinfo(int);
 
 /* Local functions */
 static	void opl_disp_environ(void);
@@ -106,6 +108,37 @@ static	uint64_t print_opl_memory_line(int lsb, struct cs_status *cs_stat,
 static	uint64_t get_opl_mem_regs(Board_node *bnode);
 void 	add_node(Sys_tree *root, Prom_node *pnode);
 static	int get_prop_size(Prop *prop);
+
+static int v_flag = 0;
+
+/*
+ * For display of I/O devices for "prtdiag"
+ */
+void
+display_io_devices(Sys_tree *tree)
+{
+	Board_node *bnode;
+
+	if (v_flag) {
+		/*
+		 * OPL's PICL interface for display of PCI I/O devices
+		 * for "prtdiag -v"
+		 */
+		(void) do_piclinfo(v_flag);
+	} else {
+		log_printf("\n", 0);
+		log_printf("=========================", 0);
+		log_printf(dgettext(TEXT_DOMAIN, " IO Cards "), 0);
+		log_printf("=========================", 0);
+		log_printf("\n", 0);
+		log_printf("\n", 0);
+		bnode = tree->bd_list;
+		while (bnode != NULL) {
+			display_pci(bnode);
+			bnode = bnode->next;
+		}
+	}
+}
 
 /*
  * Display all the leaf PCI nodes on this board that have "reg" property.
@@ -682,8 +715,7 @@ display_diaginfo(int flag, Prom_node *root, Sys_tree *tree,
 	struct system_kstat_data *kstats)
 {
 	/* Print the PROM revisions */
-	if (flag)
-		opl_disp_hw_revisions(tree, root);
+	opl_disp_hw_revisions(tree, root);
 }
 
 /*
@@ -780,6 +812,7 @@ opl_disp_environ(void)
 int
 do_prominfo(int syserrlog, char *pgname, int log_flag, int prt_flag)
 {
+	v_flag = syserrlog;
 	return (do_devinfo(syserrlog, pgname, log_flag, prt_flag));
 }
 

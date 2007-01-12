@@ -19,23 +19,24 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/libprtdiag_psr/sparc/opl/Makefile
 
 UTSBASE = ../../../../../src/uts
 
-PLATFORM_OBJECTS= opl.o
+PLATFORM_OBJECTS= opl.o opl_picl.o
 
 include ../Makefile.com
 
 IFLAGS += -I$(USR_PLAT_DIR)/sun4u/include -I ../../../libprtdiag/inc
-LINTFLAGS += $(IFLAGS)
+IFLAGS += -I$(SRC)/uts/common/ -I$(SRC)/cmd/picl/plugins/inc
+LDLIBS += -lpicl -ldevinfo -lkstat
 
-LDLIBS +=	-ldevinfo -lkstat
+LINTFLAGS += $(IFLAGS)
 
 #IMPLEMENTED_PLATFORM	= SUNW,OPL-Enterprise
 #PLATFORM=$(IMPLEMENTED_PLATFORM)
