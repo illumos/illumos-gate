@@ -20,27 +20,31 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <arpa/inet.h>
 #include <errno.h>
 #include <sys/sysmacros.h>
-#include <netdb.h> /* hostent */
-#include <netinet/in.h>
-#include <openssl/rsa.h>
 #include <security/cryptoki.h>
 #include <security/pkcs11.h>
-#include <cryptoutil.h>
 #include <stdio.h>
 #include <strings.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
-#include <libscf.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <fcntl.h>
 #include <inet/kssl/kssl.h>
+#include <cryptoutil.h>
+#include <libscf.h>
 #include "kssladm.h"
+
+#include <kmfapi.h>
 
 void
 usage_create(boolean_t do_print)
@@ -69,56 +73,6 @@ usage_create(boolean_t do_print)
 		"\t[-v]\n");
 }
 
-static uchar_t *
-get_cert_val(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE cert_obj, int *len)
-{
-	CK_RV rv;
-	uchar_t *buf;
-	CK_ATTRIBUTE cert_attrs[] = {{CKA_VALUE, NULL_PTR, 0}};
-
-	/* the certs ... */
-	rv = C_GetAttributeValue(sess, cert_obj, cert_attrs, 1);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr, "Cannot get cert size."
-		    " error = %s\n", pkcs11_strerror(rv));
-		return (NULL);
-	}
-
-	buf = malloc(cert_attrs[0].ulValueLen);
-	if (buf == NULL)
-		return (NULL);
-	cert_attrs[0].pValue = buf;
-
-	rv = C_GetAttributeValue(sess, cert_obj, cert_attrs, 1);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr, "Cannot get cert value."
-		    " error = %s\n", pkcs11_strerror(rv));
-		free(buf);
-		return (NULL);
-	}
-
-	*len = cert_attrs[0].ulValueLen;
-	return (buf);
-}
-
-#define	OPT_ATTR_CNT	6
-#define	MAX_ATTR_CNT	16
-
-int known_attr_cnt = 0;
-
-#define	CKA_TOKEN_INDEX	1
-/*
- * The order of the attributes must stay in the same order
- * as in the attribute template, privkey_tmpl, in load_from_pkcs11().
- */
-CK_ATTRIBUTE key_gattrs[MAX_ATTR_CNT] = {
-	{CKA_MODULUS, NULL_PTR, 0},
-	{CKA_TOKEN, NULL_PTR, 0},
-	{CKA_CLASS, NULL_PTR, 0},
-	{CKA_KEY_TYPE, NULL_PTR, 0},
-};
-CK_ATTRIBUTE known_cert_attrs[1];
-
 /*
  * Everything is allocated in one single contiguous buffer.
  * The layout is the following:
@@ -134,522 +88,28 @@ CK_ATTRIBUTE known_cert_attrs[1];
  * to sc_sizes[0] and sc_certs_offset points to sc_certs[0].
  */
 static kssl_params_t *
-pkcs11_to_kssl(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE privkey_obj,
-    boolean_t is_nxkey, int *paramsize, char *label, char *pin, int pinlen)
-{
-	int i;
-	CK_RV rv;
-	int total_attr_cnt;
-	uint32_t cert_size, bufsize;
-	char *buf;
-	kssl_key_t *key;
-	kssl_params_t *kssl_params;
-	CK_ATTRIBUTE privkey_opt_attrs[OPT_ATTR_CNT] = {
-		{CKA_PUBLIC_EXPONENT, NULL_PTR, 0},
-		{CKA_PRIME_1, NULL_PTR, 0},
-		{CKA_PRIME_2, NULL_PTR, 0},
-		{CKA_EXPONENT_1, NULL_PTR, 0},
-		{CKA_EXPONENT_2, NULL_PTR, 0},
-		{CKA_COEFFICIENT, NULL_PTR, 0}
-	};
-	kssl_object_attribute_t kssl_attrs[MAX_ATTR_CNT];
-
-	/* Get the certificate size */
-	bufsize = sizeof (kssl_params_t);
-	cert_size = (uint32_t)known_cert_attrs[0].ulValueLen;
-	bufsize += cert_size + MAX_CHAIN_LENGTH * sizeof (uint32_t);
-
-	/* These are attributes for which we have the value and length */
-	for (i = 0; i < known_attr_cnt; i++) {
-		bufsize += sizeof (crypto_object_attribute_t) +
-		    key_gattrs[i].ulValueLen;
-	}
-	total_attr_cnt = known_attr_cnt;
-
-	if (!is_nxkey) {
-		/* Add CKA_PRIVATE_EXPONENT for extractable key */
-		key_gattrs[total_attr_cnt].type = CKA_PRIVATE_EXPONENT;
-		key_gattrs[total_attr_cnt].pValue  = NULL_PTR;
-		key_gattrs[total_attr_cnt].ulValueLen = 0;
-
-		rv = C_GetAttributeValue(sess, privkey_obj,
-		    &key_gattrs[total_attr_cnt], 1);
-		if (rv != CKR_OK) {
-			(void) fprintf(stderr,
-			    "Cannot get private key object attribute."
-			    " error = %s\n", pkcs11_strerror(rv));
-			return (NULL);
-		}
-
-		bufsize += sizeof (crypto_object_attribute_t) +
-		    key_gattrs[total_attr_cnt].ulValueLen;
-		total_attr_cnt++;
-	}
-
-	/*
-	 * Get the optional key attributes. The return values could be
-	 * CKR_ATTRIBUTE_TYPE_INVALID with ulValueLen set to -1 OR
-	 * CKR_OK with ulValueLen set to 0. The latter is done by
-	 * soft token and seems dubious.
-	 */
-	if (!is_nxkey) {
-		rv = C_GetAttributeValue(sess, privkey_obj, privkey_opt_attrs,
-		    OPT_ATTR_CNT);
-		if (rv != CKR_OK && rv != CKR_ATTRIBUTE_TYPE_INVALID) {
-			(void) fprintf(stderr,
-			    "Cannot get private key object attributes."
-			    " error = %s\n", pkcs11_strerror(rv));
-			return (NULL);
-		}
-
-		for (i = 0; i < OPT_ATTR_CNT; i++) {
-			if (privkey_opt_attrs[i].ulValueLen == (CK_ULONG)-1 ||
-			    privkey_opt_attrs[i].ulValueLen == 0)
-				continue;
-			/* Structure copy */
-			key_gattrs[total_attr_cnt] = privkey_opt_attrs[i];
-			bufsize += sizeof (crypto_object_attribute_t) +
-			    privkey_opt_attrs[i].ulValueLen;
-			total_attr_cnt++;
-		}
-	} else
-		bufsize += pinlen;
-
-	/* Add 4-byte cushion as sc_sizes[0] needs 32-bit alignment */
-	bufsize += sizeof (uint32_t);
-
-	/* Now the big memory allocation */
-	if ((buf = calloc(bufsize, 1)) == NULL) {
-		(void) fprintf(stderr,
-			"Cannot allocate memory for the kssl_params "
-			"and values\n");
-		return (NULL);
-	}
-
-	/* LINTED */
-	kssl_params = (kssl_params_t *)buf;
-
-	buf = (char *)(kssl_params + 1);
-
-	if (is_nxkey) {
-		kssl_params->kssl_is_nxkey = 1;
-		bcopy(label, kssl_params->kssl_token.toklabel,
-		    CRYPTO_EXT_SIZE_LABEL);
-		kssl_params->kssl_token.pinlen = pinlen;
-		kssl_params->kssl_token.tokpin_offset =
-		    buf - (char *)kssl_params;
-		kssl_params->kssl_token.ck_rv = 0;
-		bcopy(pin, buf, pinlen);
-		buf += pinlen;
-	}
-
-	/* the keys attributes structs array */
-	key = &kssl_params->kssl_privkey;
-	key->ks_format = CRYPTO_KEY_ATTR_LIST;
-	key->ks_count = total_attr_cnt;
-	key->ks_attrs_offset = buf - (char *)kssl_params;
-	buf += total_attr_cnt * sizeof (kssl_object_attribute_t);
-
-	/* These are attributes for which we already have the value */
-	for (i = 0; i < known_attr_cnt; i++) {
-		bcopy(key_gattrs[i].pValue, buf, key_gattrs[i].ulValueLen);
-		kssl_attrs[i].ka_type = key_gattrs[i].type;
-		kssl_attrs[i].ka_value_offset = buf - (char *)kssl_params;
-		kssl_attrs[i].ka_value_len = key_gattrs[i].ulValueLen;
-		buf += key_gattrs[i].ulValueLen;
-	}
-
-	if (total_attr_cnt > known_attr_cnt) {
-		/* These are attributes for which we need to get the value */
-		for (i = known_attr_cnt; i < total_attr_cnt; i++) {
-			key_gattrs[i].pValue = buf;
-			kssl_attrs[i].ka_type = key_gattrs[i].type;
-			kssl_attrs[i].ka_value_offset =
-			    buf - (char *)kssl_params;
-			kssl_attrs[i].ka_value_len = key_gattrs[i].ulValueLen;
-			buf += key_gattrs[i].ulValueLen;
-		}
-
-		rv = C_GetAttributeValue(sess, privkey_obj,
-		    &key_gattrs[known_attr_cnt],
-		    total_attr_cnt - known_attr_cnt);
-		if (rv != CKR_OK) {
-			(void) fprintf(stderr,
-			    "Cannot get private key object attributes."
-			    " error = %s\n", pkcs11_strerror(rv));
-			return (NULL);
-		}
-	}
-
-	bcopy(kssl_attrs, ((char *)kssl_params) + key->ks_attrs_offset,
-	    total_attr_cnt * sizeof (kssl_object_attribute_t));
-
-	buf = (char *)P2ROUNDUP((uintptr_t)buf, sizeof (uint32_t));
-	kssl_params->kssl_certs.sc_count = 1;
-	bcopy(&cert_size, buf, sizeof (uint32_t));
-	kssl_params->kssl_certs.sc_sizes_offset = buf - (char *)kssl_params;
-	buf += MAX_CHAIN_LENGTH * sizeof (uint32_t);
-
-	/* now the certs values */
-	bcopy(known_cert_attrs[0].pValue, buf, known_cert_attrs[0].ulValueLen);
-	free(known_cert_attrs[0].pValue);
-	kssl_params->kssl_certs.sc_certs_offset = buf - (char *)kssl_params;
-
-	*paramsize = bufsize;
-	bzero(pin, pinlen);
-	(void) C_Logout(sess);
-	(void) C_CloseSession(sess);
-	return (kssl_params);
-}
-
-#define	max_num_cert 32
-
-static kssl_params_t *
-load_from_pkcs11(const char *token_label, const char *password_file,
-    const char *certname, int *bufsize)
-{
-	static CK_BBOOL true = TRUE;
-	static CK_BBOOL false = FALSE;
-
-	CK_RV rv;
-	CK_SLOT_ID slot;
-	CK_SLOT_ID_PTR	pk11_slots;
-	CK_ULONG slotcnt = 10;
-	CK_TOKEN_INFO	token_info;
-	CK_SESSION_HANDLE sess;
-	static CK_OBJECT_CLASS cert_class = CKO_CERTIFICATE;
-	static CK_CERTIFICATE_TYPE cert_type = CKC_X_509;
-	CK_ATTRIBUTE cert_tmpl[4] = {
-		{CKA_TOKEN, &true, sizeof (true)},
-		{CKA_LABEL, NULL_PTR, 0},
-		{CKA_CLASS, &cert_class, sizeof (cert_class)},
-		{CKA_CERTIFICATE_TYPE, &cert_type, sizeof (cert_type)}
-	};
-	CK_ULONG cert_tmpl_count = 4, cert_obj_count = 1;
-	CK_OBJECT_HANDLE cert_obj, privkey_obj;
-	CK_OBJECT_HANDLE cert_objs[max_num_cert];
-	static CK_OBJECT_CLASS privkey_class = CKO_PRIVATE_KEY;
-	static CK_KEY_TYPE privkey_type = CKK_RSA;
-	CK_ATTRIBUTE privkey_tmpl[] = {
-		/*
-		 * The order of attributes must stay in the same order
-		 * as in the global attribute array, key_gattrs.
-		 */
-		{CKA_MODULUS, NULL_PTR, 0},
-		{CKA_TOKEN, &true, sizeof (true)},
-		{CKA_CLASS, &privkey_class, sizeof (privkey_class)},
-		{CKA_KEY_TYPE, &privkey_type, sizeof (privkey_type)}
-	};
-	CK_ULONG privkey_tmpl_count = 4, privkey_obj_count = 1;
-	CK_BBOOL is_extractable;
-	CK_ATTRIBUTE privkey_attrs[1] = {
-		{CKA_EXTRACTABLE, NULL_PTR, 0},
-	};
-	boolean_t bingo = B_FALSE;
-	int i, blen, mlen;
-	uchar_t *mval, *ber_buf;
-	char token_label_padded[sizeof (token_info.label) + 1];
-	char passphrase[MAX_PIN_LENGTH];
-	CK_ULONG ulPinLen;
-
-	(void) snprintf(token_label_padded, sizeof (token_label_padded),
-		"%-32s", token_label);
-
-	rv = C_Initialize(NULL_PTR);
-
-	if ((rv != CKR_OK) && (rv != CKR_CRYPTOKI_ALREADY_INITIALIZED)) {
-		(void) fprintf(stderr,
-		    "Cannot initialize PKCS#11. error = %s\n",
-		    pkcs11_strerror(rv));
-		return (NULL);
-	}
-
-	/* Get slot count */
-	rv = C_GetSlotList(1, NULL_PTR, &slotcnt);
-	if (rv != CKR_OK || slotcnt == 0) {
-		(void) fprintf(stderr,
-		    "Cannot get PKCS#11 slot list. error = %s\n",
-		    pkcs11_strerror(rv));
-		return (NULL);
-	}
-
-	pk11_slots = calloc(slotcnt, sizeof (CK_SLOT_ID));
-	if (pk11_slots == NULL) {
-		(void) fprintf(stderr,
-		    "Cannot get memory for %ld slots\n", slotcnt);
-		return (NULL);
-	}
-
-	rv = C_GetSlotList(1, pk11_slots, &slotcnt);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr,
-		    "Cannot get PKCS#11 slot list. error = %s\n",
-		    pkcs11_strerror(rv));
-		return (NULL);
-	}
-
-	if (verbose)
-		(void) printf("Found %ld slots\n", slotcnt);
-
-	/* Search the token that matches the label */
-	while (slotcnt > 0) {
-		rv = C_GetTokenInfo(pk11_slots[--slotcnt], &token_info);
-		if (rv != CKR_OK)
-			continue;
-
-		if (verbose)
-			(void) printf("slot [%ld] = %s\n",
-			    slotcnt, token_info.label);
-		if (memcmp(token_label_padded, token_info.label,
-		    sizeof (token_info.label)) == 0) {
-			bingo = B_TRUE;
-			slot = pk11_slots[slotcnt];
-			break;
-		}
-		if (verbose) {
-			token_info.label[31] = '\0';
-			(void) printf("found slot [%s]\n", token_info.label);
-		}
-	}
-
-	if (!bingo) {
-		(void) fprintf(stderr, "no matching PKCS#11 token found\n");
-		return (NULL);
-	}
-
-	rv = C_OpenSession(slot, CKF_SERIAL_SESSION, NULL_PTR, NULL_PTR,
-		&sess);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr, "Cannot open session. error = %s\n",
-		    pkcs11_strerror(rv));
-		return (NULL);
-	}
-
-	/*
-	 * Some tokens may not be setting CKF_LOGIN_REQUIRED. So, we do
-	 * not check for this flag and always login to be safe.
-	 */
-	ulPinLen = get_passphrase(password_file, passphrase,
-	    sizeof (passphrase));
-	if (ulPinLen == 0) {
-		(void) fprintf(stderr, "Unable to read passphrase");
-		return (NULL);
-	}
-
-	rv = C_Login(sess, CKU_USER, (CK_UTF8CHAR_PTR)passphrase,
-	    ulPinLen);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr, "Cannot login to the token."
-		    " error = %s\n", pkcs11_strerror(rv));
-		return (NULL);
-	}
-
-	cert_tmpl[1].pValue = (CK_VOID_PTR) certname;
-	cert_tmpl[1].ulValueLen = strlen(certname);
-
-	rv = C_FindObjectsInit(sess, cert_tmpl, cert_tmpl_count);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr,
-		    "Cannot initialize cert search."
-		    " error = %s\n", pkcs11_strerror(rv));
-		return (NULL);
-	}
-
-	rv = C_FindObjects(sess, cert_objs,
-		(certname == NULL ? 1 : max_num_cert), &cert_obj_count);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr,
-		    "Cannot retrieve cert object. error = %s\n",
-		    pkcs11_strerror(rv));
-		return (NULL);
-	}
-
-	/* Who cares if this fails! */
-	(void) C_FindObjectsFinal(sess);
-	if (verbose)
-		(void) printf("found %ld certificates\n", cert_obj_count);
-
-	if (cert_obj_count == 0) {
-		(void) fprintf(stderr, "\"%s\" not found.\n", certname);
-		(void) fprintf(stderr, "no certs. bye.\n");
-		return (NULL);
-	}
-
-	cert_obj = cert_objs[0];
-
-	/* Get the modulus value from the certificate */
-	ber_buf = get_cert_val(sess, cert_obj, &blen);
-	if (ber_buf == NULL) {
-		(void) fprintf(stderr,
-		    "Cannot get certificate data for \"%s\".\n", certname);
-		return (NULL);
-	}
-
-	/* Store it for later use. We free the buffer at that time. */
-	known_cert_attrs[0].type = CKA_VALUE;
-	known_cert_attrs[0].pValue = ber_buf;
-	known_cert_attrs[0].ulValueLen = blen;
-
-	mval = get_modulus(ber_buf, blen, &mlen);
-	if (mval == NULL) {
-		(void) fprintf(stderr,
-		    "Cannot get Modulus in certificate \"%s\".\n", certname);
-		return (NULL);
-	}
-
-	/* Now get the private key */
-	privkey_tmpl[0].pValue = mval;
-	privkey_tmpl[0].ulValueLen = mlen;
-
-	rv = C_FindObjectsInit(sess, privkey_tmpl, privkey_tmpl_count);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr, "Cannot intialize private key search."
-		    " error = %s\n", pkcs11_strerror(rv));
-		return (NULL);
-	}
-
-	rv = C_FindObjects(sess, &privkey_obj, 1,  &privkey_obj_count);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr, "Cannot retrieve private key object "
-		    " error = %s\n", pkcs11_strerror(rv));
-		return (NULL);
-	}
-	/* Who cares if this fails! */
-	(void) C_FindObjectsFinal(sess);
-
-	if (privkey_obj_count == 0) {
-		(void) fprintf(stderr, "no private keys. bye.\n");
-		return (NULL);
-	}
-
-	(void) printf("found %ld private keys\n", privkey_obj_count);
-	if (verbose) {
-		(void) printf("private key attributes:    \n");
-		(void) printf("\tmodulus: size %d \n", mlen);
-	}
-
-	/*
-	 * Store it for later use. The index of the attributes
-	 * is the same in both the structures.
-	 */
-	known_attr_cnt = privkey_tmpl_count;
-	for (i = 0; i < privkey_tmpl_count; i++)
-		key_gattrs[i] = privkey_tmpl[i];
-
-	/*
-	 * Get CKA_EXTRACTABLE value. We set the default value
-	 * TRUE if the token returns CKR_ATTRIBUTE_TYPE_INVALID.
-	 * The token would supply this attribute if the key
-	 * is not extractable.
-	 */
-	privkey_attrs[0].pValue = &is_extractable;
-	privkey_attrs[0].ulValueLen = sizeof (is_extractable);
-	rv = C_GetAttributeValue(sess, privkey_obj, privkey_attrs, 1);
-	if (rv != CKR_OK && rv != CKR_ATTRIBUTE_TYPE_INVALID) {
-		(void) fprintf(stderr,
-		    "Cannot get CKA_EXTRACTABLE attribute."
-		    " error = %s\n", pkcs11_strerror(rv));
-		return (NULL);
-	}
-
-	if (rv == CKR_ATTRIBUTE_TYPE_INVALID)
-		is_extractable = TRUE;
-	key_gattrs[known_attr_cnt++] = privkey_attrs[0];
-
-	if (is_extractable) {
-	/* Now wrap the key, then unwrap it */
-	CK_BYTE	aes_key_val[16] = {
-		1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
-	static CK_BYTE aes_param[16] = {
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-	CK_MECHANISM aes_cbc_pad_mech = {CKM_AES_CBC_PAD, aes_param, 16};
-	CK_OBJECT_HANDLE aes_key_obj, sess_privkey_obj;
-	CK_BYTE *wrapped_privkey;
-	CK_ULONG wrapped_privkey_len;
-
-	CK_ATTRIBUTE unwrap_tmpl[] = {
-		/* code below depends on the following attribute order */
-		{CKA_TOKEN, &false, sizeof (false)},
-		{CKA_CLASS, &privkey_class, sizeof (privkey_class)},
-		{CKA_KEY_TYPE, &privkey_type, sizeof (privkey_type)},
-		{CKA_SENSITIVE, &false, sizeof (false)},
-		{CKA_PRIVATE, &false, sizeof (false)}
-	};
-
-	rv = SUNW_C_KeyToObject(sess, CKM_AES_CBC_PAD, aes_key_val, 16,
-	    &aes_key_obj);
-
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr,
-		    "Cannot create wrapping key. error = %s\n",
-		    pkcs11_strerror(rv));
-		return (NULL);
-	}
-
-	/* get the size of the wrapped key */
-	rv = C_WrapKey(sess, &aes_cbc_pad_mech, aes_key_obj, privkey_obj,
-	    NULL, &wrapped_privkey_len);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr, "Cannot get key size. error = %s\n",
-		    pkcs11_strerror(rv));
-		return (NULL);
-	}
-
-	wrapped_privkey = malloc(wrapped_privkey_len * sizeof (CK_BYTE));
-	if (wrapped_privkey == NULL) {
-		return (NULL);
-	}
-
-	/* do the actual key wrapping */
-	rv = C_WrapKey(sess, &aes_cbc_pad_mech, aes_key_obj, privkey_obj,
-	    wrapped_privkey, &wrapped_privkey_len);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr, "Cannot wrap private key. error = %s\n",
-		    pkcs11_strerror(rv));
-		return (NULL);
-	}
-	(void) printf("private key successfully wrapped, "
-		"wrapped blob length: %ld\n",
-		wrapped_privkey_len);
-
-	rv = C_UnwrapKey(sess, &aes_cbc_pad_mech, aes_key_obj,
-	    wrapped_privkey, wrapped_privkey_len,
-	    unwrap_tmpl, 5, &sess_privkey_obj);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr, "Cannot unwrap private key."
-		    " error = %s\n", pkcs11_strerror(rv));
-		return (NULL);
-	}
-	(void) printf("session private key successfully unwrapped\n");
-
-	privkey_obj = sess_privkey_obj;
-	/* Store the one modified attribute and the two new attributes. */
-	key_gattrs[CKA_TOKEN_INDEX] = unwrap_tmpl[0];
-	key_gattrs[known_attr_cnt++] = unwrap_tmpl[3];
-	key_gattrs[known_attr_cnt++] = unwrap_tmpl[4];
-	}
-
-	return (pkcs11_to_kssl(sess, privkey_obj, !is_extractable, bufsize,
-	    token_label_padded, passphrase, ulPinLen));
-}
-
-#define	MAX_OPENSSL_ATTR_CNT	8
-
-/*
- * See the comments for pkcs11_to_kssl() for the layout of the
- * returned buffer.
- */
-static kssl_params_t *
-openssl_to_kssl(RSA *rsa, int ncerts, uchar_t *cert_bufs[], int *cert_sizes,
-    int *paramsize)
+kmf_to_kssl(int nxkey, KMF_RAW_KEY_DATA *rsa, int ncerts,
+	KMF_DATA *certs, int *paramsize, char *token_label, KMF_DATA *idstr,
+	KMF_CREDENTIAL *creds)
 {
 	int i, tcsize;
 	kssl_params_t *kssl_params;
 	kssl_key_t *key;
 	char *buf;
 	uint32_t bufsize;
-	kssl_object_attribute_t kssl_attrs[MAX_OPENSSL_ATTR_CNT];
-	kssl_object_attribute_t kssl_tmpl_attrs[MAX_OPENSSL_ATTR_CNT] = {
+	static CK_BBOOL true = TRUE;
+	static CK_BBOOL false = FALSE;
+	static CK_OBJECT_CLASS class = CKO_PRIVATE_KEY;
+	static CK_KEY_TYPE keytype = CKK_RSA;
+	kssl_object_attribute_t kssl_attrs[MAX_ATTR_CNT];
+	CK_ATTRIBUTE exkey_attrs[MAX_ATTR_CNT] = {
+		{CKA_TOKEN, &true, sizeof (true)},
+		{CKA_EXTRACTABLE, &false, sizeof (false)},
+		{CKA_CLASS,	&class, sizeof (class) },
+		{CKA_KEY_TYPE,	&keytype, sizeof (keytype) },
+		{CKA_ID,	NULL, 0}
+	};
+	kssl_object_attribute_t kssl_tmpl_attrs[MAX_ATTR_CNT] = {
 		{SUN_CKA_MODULUS, NULL, 0},
 		{SUN_CKA_PUBLIC_EXPONENT, NULL, 0},
 		{SUN_CKA_PRIVATE_EXPONENT, NULL, 0},
@@ -659,42 +119,64 @@ openssl_to_kssl(RSA *rsa, int ncerts, uchar_t *cert_bufs[], int *cert_sizes,
 		{SUN_CKA_EXPONENT_2, NULL, 0},
 		{SUN_CKA_COEFFICIENT, NULL, 0}
 	};
-	BIGNUM *priv_key_bignums[MAX_OPENSSL_ATTR_CNT];
+	KMF_BIGINT priv_key_bignums[MAX_ATTR_CNT];
 	int attr_cnt;
 
+	if (nxkey && idstr != NULL) {
+		exkey_attrs[4].pValue = idstr->Data;
+		exkey_attrs[4].ulValueLen = idstr->Length;
+	}
 	tcsize = 0;
 	for (i = 0; i < ncerts; i++)
-		tcsize += cert_sizes[i];
+		tcsize += certs[i].Length;
 
 	bufsize = sizeof (kssl_params_t);
-	bufsize += (tcsize + MAX_CHAIN_LENGTH * sizeof (uint32_t));
+	bufsize += (tcsize + (MAX_CHAIN_LENGTH * sizeof (uint32_t)));
 
-	/* and the key attributes */
-	priv_key_bignums[0] = rsa->n;		/* MODULUS */
-	priv_key_bignums[1] = rsa->e; 		/* PUBLIC_EXPONENT */
-	priv_key_bignums[2] = rsa->d; 		/* PRIVATE_EXPONENT */
-	priv_key_bignums[3] = rsa->p;		/* PRIME_1 */
-	priv_key_bignums[4] = rsa->q;		/* PRIME_2 */
-	priv_key_bignums[5] = rsa->dmp1;	/* EXPONENT_1 */
-	priv_key_bignums[6] = rsa->dmq1;	/* EXPONENT_2 */
-	priv_key_bignums[7] = rsa->iqmp;	/* COEFFICIENT */
+	if (!nxkey) {
+		bzero(priv_key_bignums, sizeof (KMF_BIGINT) *
+			MAX_ATTR_CNT);
+		/* and the key attributes */
+		priv_key_bignums[0] = rsa->rawdata.rsa.mod;
+		priv_key_bignums[1] = rsa->rawdata.rsa.pubexp;
+		priv_key_bignums[2] = rsa->rawdata.rsa.priexp;
+		priv_key_bignums[3] = rsa->rawdata.rsa.prime1;
+		priv_key_bignums[4] = rsa->rawdata.rsa.prime2;
+		priv_key_bignums[5] = rsa->rawdata.rsa.exp1;
+		priv_key_bignums[6] = rsa->rawdata.rsa.exp2;
+		priv_key_bignums[7] = rsa->rawdata.rsa.coef;
 
-	if (rsa->n == NULL || rsa->d == NULL) {
-		(void) fprintf(stderr,
-		    "missing required attributes in private key.\n");
-		return (NULL);
-	}
+		if (rsa->rawdata.rsa.mod.val == NULL ||
+			rsa->rawdata.rsa.priexp.val == NULL) {
+			(void) fprintf(stderr,
+			    "missing required attributes in private key.\n");
+			return (NULL);
+		}
 
-	attr_cnt = 0;
-	for (i = 0; i < MAX_OPENSSL_ATTR_CNT; i++) {
-		if (priv_key_bignums[i] == NULL)
-			continue;
-		kssl_attrs[attr_cnt].ka_type = kssl_tmpl_attrs[i].ka_type;
-		kssl_attrs[attr_cnt].ka_value_len =
-		    BN_num_bytes(priv_key_bignums[i]);
-		bufsize += sizeof (crypto_object_attribute_t) +
-		    kssl_attrs[attr_cnt].ka_value_len;
-		attr_cnt++;
+		attr_cnt = 0;
+		for (i = 0; i < MAX_ATTR_CNT; i++) {
+			if (priv_key_bignums[i].val == NULL)
+				continue;
+			kssl_attrs[attr_cnt].ka_type =
+				kssl_tmpl_attrs[i].ka_type;
+			kssl_attrs[attr_cnt].ka_value_len =
+				priv_key_bignums[i].len;
+			bufsize += sizeof (crypto_object_attribute_t) +
+			    kssl_attrs[attr_cnt].ka_value_len;
+			attr_cnt++;
+		}
+	} else {
+		/*
+		 * Compute space for the attributes and values that the
+		 * kssl kernel module will need in order to search for
+		 * the private key.
+		 */
+		for (attr_cnt = 0; attr_cnt < 5; attr_cnt++) {
+			bufsize += sizeof (crypto_object_attribute_t) +
+				exkey_attrs[attr_cnt].ulValueLen;
+		}
+		if (creds)
+			bufsize += creds->credlen;
 	}
 
 	/* Add 4-byte cushion as sc_sizes[0] needs 32-bit alignment */
@@ -713,60 +195,458 @@ openssl_to_kssl(RSA *rsa, int ncerts, uchar_t *cert_bufs[], int *cert_sizes,
 
 	buf = (char *)(kssl_params + 1);
 
-	/* the keys attributes structs array */
-	key = &kssl_params->kssl_privkey;
-	key->ks_format = CRYPTO_KEY_ATTR_LIST;
-	key->ks_count = attr_cnt;
-	key->ks_attrs_offset = buf - (char *)kssl_params;
-	buf += attr_cnt * sizeof (kssl_object_attribute_t);
+	if (!nxkey) {
+		/* the keys attributes structs array */
+		key = &kssl_params->kssl_privkey;
+		key->ks_format = CRYPTO_KEY_ATTR_LIST;
+		key->ks_count = attr_cnt;
+		key->ks_attrs_offset = buf - (char *)kssl_params;
+		buf += attr_cnt * sizeof (kssl_object_attribute_t);
 
-	attr_cnt = 0;
-	/* then the key attributes values */
-	for (i = 0; i < MAX_OPENSSL_ATTR_CNT; i++) {
-		if (priv_key_bignums[i] == NULL)
-			continue;
-		(void) BN_bn2bin(priv_key_bignums[i], (unsigned char *)buf);
-		kssl_attrs[attr_cnt].ka_value_offset =
-		    buf - (char *)kssl_params;
-		buf += kssl_attrs[attr_cnt].ka_value_len;
-		attr_cnt++;
+		attr_cnt = 0;
+		/* then the key attributes values */
+		for (i = 0; i < MAX_ATTR_CNT; i++) {
+			if (priv_key_bignums[i].val == NULL)
+				continue;
+			(void) memcpy(buf, priv_key_bignums[i].val,
+				priv_key_bignums[i].len);
+			kssl_attrs[attr_cnt].ka_value_offset =
+			    buf - (char *)kssl_params;
+			buf += kssl_attrs[attr_cnt].ka_value_len;
+			attr_cnt++;
+		}
+	} else {
+		char tlabel[CRYPTO_EXT_SIZE_LABEL];
+		bzero(tlabel, sizeof (tlabel));
+		(void) strlcpy(tlabel, token_label, sizeof (tlabel));
+
+		/*
+		 * For a non-extractable key, we must provide the PIN
+		 * so the kssl module can access the token to find
+		 * the key handle.
+		 */
+		kssl_params->kssl_is_nxkey = 1;
+		bcopy(tlabel, kssl_params->kssl_token.toklabel,
+			CRYPTO_EXT_SIZE_LABEL);
+		kssl_params->kssl_token.pinlen = creds->credlen;
+		kssl_params->kssl_token.tokpin_offset =
+			buf - (char *)kssl_params;
+		kssl_params->kssl_token.ck_rv = 0;
+		bcopy(creds->cred, buf, creds->credlen);
+		buf += creds->credlen;
+
+		/*
+		 * Next in the buffer, we must provide the attributes
+		 * that the kssl module will use to search in the
+		 * token to find the protected key handle.
+		 */
+		key = &kssl_params->kssl_privkey;
+		key->ks_format = CRYPTO_KEY_ATTR_LIST;
+		key->ks_count = attr_cnt;
+		key->ks_attrs_offset = buf - (char *)kssl_params;
+
+		buf += attr_cnt * sizeof (kssl_object_attribute_t);
+		for (i = 0; i < attr_cnt; i++) {
+			bcopy(exkey_attrs[i].pValue, buf,
+				exkey_attrs[i].ulValueLen);
+
+			kssl_attrs[i].ka_type = exkey_attrs[i].type;
+			kssl_attrs[i].ka_value_offset =
+				buf - (char *)kssl_params;
+			kssl_attrs[i].ka_value_len = exkey_attrs[i].ulValueLen;
+
+			buf += exkey_attrs[i].ulValueLen;
+		}
 	}
-
+	/* Copy the key attributes array here */
 	bcopy(kssl_attrs, ((char *)kssl_params) + key->ks_attrs_offset,
-	    attr_cnt * sizeof (kssl_object_attribute_t));
+		attr_cnt * sizeof (kssl_object_attribute_t));
 
 	buf = (char *)P2ROUNDUP((uintptr_t)buf, sizeof (uint32_t));
+
+	/*
+	 * Finally, add the certificate chain to the buffer.
+	 */
 	kssl_params->kssl_certs.sc_count = ncerts;
-	bcopy(cert_sizes, buf, ncerts * sizeof (uint32_t));
+
+	/* First, an array of certificate sizes */
+	for (i = 0; i < ncerts; i++) {
+		uint32_t certsz = (uint32_t)certs[i].Length;
+		char *p = buf + (i * sizeof (uint32_t));
+		bcopy(&certsz, p, sizeof (uint32_t));
+	}
+
 	kssl_params->kssl_certs.sc_sizes_offset = buf - (char *)kssl_params;
 	buf += MAX_CHAIN_LENGTH * sizeof (uint32_t);
 
 	kssl_params->kssl_certs.sc_certs_offset = buf - (char *)kssl_params;
-	/* now the certs values */
+
+	/* Now add the certificate data (ASN.1 DER encoded) */
 	for (i = 0; i < ncerts; i++) {
-		bcopy(cert_bufs[i], buf, cert_sizes[i]);
-		buf += cert_sizes[i];
+		bcopy(certs[i].Data, buf, certs[i].Length);
+		buf += certs[i].Length;
 	}
 
 	*paramsize = bufsize;
 	return (kssl_params);
 }
 
-static kssl_params_t *
-add_cacerts(kssl_params_t *old_params, const char *cacert_chain_file,
-    const char *password_file)
+/*
+ * Extract a sensitive key via wrap/unwrap operations.
+ *
+ * This function requires that we call PKCS#11 API directly since
+ * KMF does not yet support wrapping/unwrapping of keys.   By extracting
+ * a sensitive key in wrapped form, we then unwrap it into a session key
+ * object.  KMF is then used to find the session key and return it in
+ * KMF_RAW_KEY format which is then passed along to KSSL by the caller.
+ */
+static KMF_RETURN
+get_sensitive_key_data(KMF_HANDLE_T kmfh, KMF_FINDKEY_PARAMS *fkparams,
+	KMF_KEY_HANDLE *key, KMF_KEY_HANDLE *rawkey)
 {
-	int i, ncerts, newlen;
-	int *cert_sizes;
-	uint32_t certlen = 0;
-	char *buf;
-	uchar_t **cert_bufs;
-	kssl_params_t *kssl_params;
+	KMF_RETURN rv = KMF_OK;
+	static CK_BYTE aes_param[16];
+	static CK_OBJECT_CLASS privkey_class = CKO_PRIVATE_KEY;
+	static CK_KEY_TYPE privkey_type = CKK_RSA;
+	static CK_BBOOL true = TRUE;
+	static CK_BBOOL false = FALSE;
+	char *err = NULL;
+	char wrapkey_label[BUFSIZ];
+	int fd;
+	uint32_t nkeys = 0;
+	CK_RV ckrv;
+	CK_SESSION_HANDLE pk11session;
+	CK_BYTE aes_key_val[16];
 
-	ncerts = 0;
-	cert_bufs = PEM_get_rsa_key_certs(cacert_chain_file,
-	    (char *)password_file, NULL, &cert_sizes, &ncerts);
-	if (cert_bufs == NULL || ncerts == 0) {
+	CK_MECHANISM aes_cbc_pad_mech = {CKM_AES_CBC_PAD, aes_param,
+		sizeof (aes_param)};
+	CK_OBJECT_HANDLE aes_key_obj = CK_INVALID_HANDLE;
+	CK_OBJECT_HANDLE sess_privkey_obj = CK_INVALID_HANDLE;
+	CK_BYTE *wrapped_privkey = NULL;
+	CK_ULONG wrapped_privkey_len = 0;
+
+	CK_ATTRIBUTE unwrap_tmpl[] = {
+		/* code below depends on the following attribute order */
+		{CKA_TOKEN, &false, sizeof (false)},
+		{CKA_CLASS, &privkey_class, sizeof (privkey_class)},
+		{CKA_KEY_TYPE, &privkey_type, sizeof (privkey_type)},
+		{CKA_SENSITIVE, &false, sizeof (false)},
+		{CKA_PRIVATE, &false, sizeof (false)},
+		{CKA_LABEL, NULL, 0}
+	};
+
+	/*
+	 * Create a wrap key with random data.
+	 */
+	fd = open("/dev/urandom", O_RDONLY);
+	if (fd == -1) {
+		perror("Error reading /dev/urandom");
+		return (KMF_ERR_INTERNAL);
+	}
+	if (read(fd, aes_key_val, sizeof (aes_key_val)) !=
+		sizeof (aes_key_val)) {
+		perror("Error reading from /dev/urandom");
+		(void) close(fd);
+		return (KMF_ERR_INTERNAL);
+	}
+	(void) close(fd);
+
+	pk11session = KMF_GetPK11Handle(kmfh);
+
+	/*
+	 * Login to create the wrap key stuff.
+	 */
+	ckrv = C_Login(pk11session, CKU_USER,
+		(CK_UTF8CHAR_PTR)fkparams->cred.cred,
+		fkparams->cred.credlen);
+	if (ckrv != CKR_OK && ckrv != CKR_USER_ALREADY_LOGGED_IN) {
+		(void) fprintf(stderr,
+			"Cannot login to the token. error = %s\n",
+			pkcs11_strerror(ckrv));
+		return (KMF_ERR_INTERNAL);
+	}
+
+	/*
+	 * Turn the random key into a PKCS#11 session object.
+	 */
+	ckrv = SUNW_C_KeyToObject(pk11session, CKM_AES_CBC_PAD, aes_key_val,
+		sizeof (aes_key_val), &aes_key_obj);
+	if (ckrv != CKR_OK) {
+		(void) fprintf(stderr,
+			"Cannot create wrapping key. error = %s\n",
+			pkcs11_strerror(ckrv));
+		return (KMF_ERR_INTERNAL);
+	}
+
+	/*
+	 * Find the original private key that we are going to wrap.
+	 */
+	rv = KMF_FindKey(kmfh, fkparams, key, &nkeys);
+	if (rv != KMF_OK) {
+		REPORT_KMF_ERROR(rv, "Error finding private key", err);
+		goto out;
+	}
+
+	/*
+	 * Get the size of the wrapped private key.
+	 */
+	bzero(aes_param, sizeof (aes_param));
+	ckrv = C_WrapKey(pk11session, &aes_cbc_pad_mech,
+		aes_key_obj, (CK_OBJECT_HANDLE)key->keyp,
+		NULL, &wrapped_privkey_len);
+	if (ckrv != CKR_OK) {
+		/*
+		 * Most common error here is that the token doesn't
+		 * support the wrapping mechanism or the key is
+		 * marked non-extractable.  Return an error and let
+		 * the caller deal with it gracefully.
+		 */
+		(void) fprintf(stderr,
+			"Cannot get wrap key size. error = %s\n",
+			pkcs11_strerror(ckrv));
+		rv = KMF_ERR_INTERNAL;
+		goto out;
+	}
+	wrapped_privkey = malloc(wrapped_privkey_len);
+	if (wrapped_privkey == NULL) {
+		rv = KMF_ERR_MEMORY;
+		goto out;
+	}
+	/*
+	 * Now get the actual wrapped key data.
+	 */
+	ckrv = C_WrapKey(pk11session, &aes_cbc_pad_mech,
+		aes_key_obj, (CK_OBJECT_HANDLE)key->keyp,
+		wrapped_privkey, &wrapped_privkey_len);
+	if (ckrv != CKR_OK) {
+		(void) fprintf(stderr,
+			"Cannot wrap private key. error = %s\n",
+			pkcs11_strerror(ckrv));
+		rv = KMF_ERR_INTERNAL;
+		goto out;
+	}
+	/*
+	 * Create a label for the wrapped session key so we can find
+	 * it easier later.
+	 */
+	snprintf(wrapkey_label, sizeof (wrapkey_label), "ksslprikey_%d",
+		getpid());
+
+	unwrap_tmpl[5].pValue = wrapkey_label;
+	unwrap_tmpl[5].ulValueLen = strlen(wrapkey_label);
+
+	/*
+	 * Unwrap the key into the template and create a temporary
+	 * session private key.
+	 */
+	ckrv = C_UnwrapKey(pk11session, &aes_cbc_pad_mech, aes_key_obj,
+		wrapped_privkey, wrapped_privkey_len,
+		unwrap_tmpl, 6, &sess_privkey_obj);
+	if (ckrv != CKR_OK) {
+		(void) fprintf(stderr,
+			"Cannot unwrap private key. error = %s\n",
+			pkcs11_strerror(ckrv));
+		rv = KMF_ERR_INTERNAL;
+		goto out;
+	}
+
+	/*
+	 * Use KMF to find the session key and return it as RAW data
+	 * so we can pass it along to KSSL.
+	 */
+	fkparams->kstype = KMF_KEYSTORE_PK11TOKEN;
+	fkparams->keyclass = KMF_ASYM_PRI;
+	fkparams->format = KMF_FORMAT_RAWKEY;
+	fkparams->findLabel = wrapkey_label;
+	fkparams->pkcs11parms.sensitive = FALSE;
+	fkparams->pkcs11parms.private = FALSE;
+	fkparams->pkcs11parms.token = FALSE; /* <-- very important! */
+
+	rv = KMF_FindKey(kmfh, fkparams, rawkey, &nkeys);
+	if (rv != KMF_OK) {
+		REPORT_KMF_ERROR(rv, "Error finding raw private key", err);
+		goto out;
+	}
+out:
+	if (wrapped_privkey)
+		free(wrapped_privkey);
+
+	if (aes_key_obj != CK_INVALID_HANDLE)
+		C_DestroyObject(pk11session, aes_key_obj);
+
+	if (sess_privkey_obj != CK_INVALID_HANDLE)
+		C_DestroyObject(pk11session, sess_privkey_obj);
+
+	return (rv);
+}
+
+static kssl_params_t *
+load_from_pkcs11(const char *token_label, const char *password_file,
+    const char *certname, int *bufsize)
+{
+	KMF_RETURN rv;
+	KMF_HANDLE_T kmfh;
+	KMF_X509_DER_CERT cert;
+	KMF_KEY_HANDLE key, rawkey;
+	KMF_CREDENTIAL creds;
+	KMF_FINDCERT_PARAMS fcparams;
+	KMF_FINDKEY_PARAMS fkparams;
+	KMF_CONFIG_PARAMS cfgparams;
+	KMF_DATA iddata = { NULL, 0 };
+	kssl_params_t *kssl_params = NULL;
+	uint32_t ncerts, nkeys;
+	char *err, *idstr = NULL;
+	char password_buf[1024];
+	int nxkey = 0;
+
+	rv = KMF_Initialize(&kmfh, NULL, NULL);
+	if (rv != KMF_OK) {
+		REPORT_KMF_ERROR(rv, "Error initializing KMF", err);
+		return (0);
+	}
+	if (get_passphrase(password_file, password_buf,
+		sizeof (password_buf)) <= 0) {
+		perror("Unable to read passphrase");
+		goto done;
+	}
+	creds.cred = password_buf;
+	creds.credlen = strlen(password_buf);
+
+	bzero(&cfgparams, sizeof (cfgparams));
+	bzero(&fcparams, sizeof (fcparams));
+	bzero(&fkparams, sizeof (fkparams));
+
+	cfgparams.kstype = KMF_KEYSTORE_PK11TOKEN;
+	cfgparams.pkcs11config.label = (char *)token_label;
+	cfgparams.pkcs11config.readonly = B_FALSE;
+
+	rv = KMF_ConfigureKeystore(kmfh, &cfgparams);
+	if (rv != KMF_OK) {
+		REPORT_KMF_ERROR(rv, "Error configuring KMF keystore", err);
+		goto done;
+	}
+
+	/*
+	 * Find the certificate matching the given label.
+	 */
+	fcparams.kstype = KMF_KEYSTORE_PK11TOKEN;
+	fcparams.certLabel = (char *)certname;
+	rv = KMF_FindCert(kmfh, &fcparams, &cert, &ncerts);
+	if (rv != KMF_OK || ncerts == 0)
+		goto done;
+
+	/*
+	 * Find the associated private key for this cert by
+	 * keying off of the label and the ASCII ID string.
+	 */
+	rv = KMF_GetCertIDString(&cert.certificate, &idstr);
+	if (rv != KMF_OK)
+		goto done;
+
+	fkparams.kstype = KMF_KEYSTORE_PK11TOKEN;
+	fkparams.keyclass = KMF_ASYM_PRI;
+	fkparams.cred = creds;
+	fkparams.format = KMF_FORMAT_RAWKEY;
+	fkparams.findLabel = (char *)certname;
+	fkparams.idstr = idstr;
+	fkparams.pkcs11parms.private = TRUE;
+	fkparams.pkcs11parms.token = TRUE;
+
+	rv = KMF_FindKey(kmfh, &fkparams, &key, &nkeys);
+	if (rv == KMF_ERR_SENSITIVE_KEY) {
+		KMF_FreeKMFKey(kmfh, &key);
+		/*
+		 * Get a normal key handle and then do a wrap/unwrap
+		 * in order to get the necessary raw data fields needed
+		 * to send to KSSL.
+		 */
+		fkparams.format = KMF_FORMAT_NATIVE;
+		rv = get_sensitive_key_data(kmfh, &fkparams, &key, &rawkey);
+		if (rv == KMF_OK) {
+			/* Swap "key" for "rawkey" */
+			KMF_FreeKMFKey(kmfh, &key);
+
+			key = rawkey;
+		} else {
+			KMF_FreeKMFKey(kmfh, &key);
+
+			/* Let kssl try to find the key. */
+			nxkey = 1;
+			rv = KMF_GetCertIDData(&cert.certificate, &iddata);
+		}
+	} else if (rv == KMF_ERR_UNEXTRACTABLE_KEY) {
+			KMF_FreeKMFKey(kmfh, &key);
+
+			/* Let kssl try to find the key. */
+			nxkey = 1;
+			rv = KMF_GetCertIDData(&cert.certificate, &iddata);
+	} else if (rv != KMF_OK || nkeys == 0)
+		goto done;
+
+	if (rv == KMF_OK)
+		kssl_params = kmf_to_kssl(nxkey, (KMF_RAW_KEY_DATA *)key.keyp,
+			1, &cert.certificate, bufsize,
+			(char *)token_label, &iddata, &creds);
+done:
+	if (ncerts != 0)
+		KMF_FreeKMFCert(kmfh, &cert);
+	if (nkeys != 0)
+		KMF_FreeKMFKey(kmfh, &key);
+	if (idstr)
+		free(idstr);
+
+	if (kmfh != NULL)
+		(void) KMF_Finalize(kmfh);
+
+	return (kssl_params);
+}
+
+/*
+ * add_cacerts
+ *
+ * Load a chain of certificates from a PEM file.
+ */
+static kssl_params_t *
+add_cacerts(kssl_params_t *old_params, const char *cacert_chain_file)
+{
+	int i, newlen;
+	uint32_t certlen = 0, ncerts;
+	char *buf;
+	KMF_RETURN rv;
+	KMF_X509_DER_CERT *certs = NULL;
+	KMF_FINDCERT_PARAMS fcparms;
+	kssl_params_t *kssl_params;
+	KMF_HANDLE_T kmfh;
+	char *err = NULL;
+
+	bzero(&fcparms, sizeof (fcparms));
+	fcparms.kstype = KMF_KEYSTORE_OPENSSL;
+	fcparms.sslparms.certfile = (char *)cacert_chain_file;
+
+	rv = KMF_Initialize(&kmfh, NULL, NULL);
+	if (rv != KMF_OK) {
+		REPORT_KMF_ERROR(rv, "Error initializing KMF", err);
+		return (0);
+	}
+	rv = KMF_FindCert(kmfh, &fcparms, NULL, &ncerts);
+	if (rv != KMF_OK) {
+		REPORT_KMF_ERROR(rv, "Error finding CA certificates", err);
+		(void) KMF_Finalize(kmfh);
+		return (0);
+	}
+	certs = (KMF_X509_DER_CERT *)malloc(ncerts *
+		sizeof (KMF_X509_DER_CERT));
+	if (certs == NULL) {
+		(void) fprintf(stderr, "memory allocation error.\n");
+		(void) KMF_Finalize(kmfh);
+		return (NULL);
+	}
+	bzero(certs, ncerts * sizeof (KMF_X509_DER_CERT));
+	rv = KMF_FindCert(kmfh, &fcparms, certs, &ncerts);
+
+	(void) KMF_Finalize(kmfh);
+
+	if (rv != KMF_OK || ncerts == 0) {
 		bzero(old_params, old_params->kssl_params_size);
 		free(old_params);
 		return (NULL);
@@ -778,7 +658,7 @@ add_cacerts(kssl_params_t *old_params, const char *cacert_chain_file,
 
 	newlen = old_params->kssl_params_size;
 	for (i = 0; i < ncerts; i++)
-		newlen += cert_sizes[i];
+		newlen += certs[i].certificate.Length;
 
 	/*
 	 * Get a bigger structure and update the
@@ -789,12 +669,16 @@ add_cacerts(kssl_params_t *old_params, const char *cacert_chain_file,
 	kssl_params->kssl_params_size = newlen;
 	kssl_params->kssl_certs.sc_count += ncerts;
 
-	/* Put the cert_sizes starting from sc_sizes[1] */
+	/* Put the cert size info starting from sc_sizes[1] */
 	buf = (char *)kssl_params;
 	buf += kssl_params->kssl_certs.sc_sizes_offset;
 	bcopy(buf, &certlen, sizeof (uint32_t));
 	buf += sizeof (uint32_t);
-	bcopy(cert_sizes, buf, ncerts * sizeof (uint32_t));
+	for (i = 0; i < ncerts; i++) {
+		uint32_t size = (uint32_t)certs[i].certificate.Length;
+		bcopy(&size, buf, sizeof (uint32_t));
+		buf += sizeof (uint32_t);
+	}
 
 	/* Put the cert_bufs starting from sc_certs[1] */
 	buf = (char *)kssl_params;
@@ -803,60 +687,65 @@ add_cacerts(kssl_params_t *old_params, const char *cacert_chain_file,
 
 	/* now the certs values */
 	for (i = 0; i < ncerts; i++) {
-		bcopy(cert_bufs[i], buf, cert_sizes[i]);
-		buf += cert_sizes[i];
+		bcopy(certs[i].certificate.Data, buf,
+			certs[i].certificate.Length);
+		buf += certs[i].certificate.Length;
 	}
 
 	for (i = 0; i < ncerts; i++)
-		free(cert_bufs[i]);
-	free(cert_bufs);
-	free(cert_sizes);
+		KMF_FreeKMFCert(kmfh, &certs[i]);
+	free(certs);
 
 	return (kssl_params);
 }
 
+/*
+ * Find a key and certificate(s) from a single PEM file.
+ */
 static kssl_params_t *
 load_from_pem(const char *filename, const char *password_file, int *paramsize)
 {
-	uchar_t **cert_bufs;
-	int *cert_sizes, ncerts, i;
-	RSA *rsa;
+	int ncerts = 0, i;
 	kssl_params_t *kssl_params;
+	KMF_RAW_KEY_DATA *rsa = NULL;
+	KMF_DATA *certs = NULL;
 
-	ncerts = 0;
-	cert_bufs = PEM_get_rsa_key_certs(filename, (char *)password_file,
-	    &rsa, &cert_sizes, &ncerts);
-	if (rsa == NULL || cert_bufs == NULL || ncerts == 0) {
+	ncerts = PEM_get_rsa_key_certs(filename, (char *)password_file,
+		&rsa, &certs);
+	if (rsa == NULL || certs == NULL || ncerts == 0) {
 		return (NULL);
 	}
 
 	if (verbose)
 		(void) printf("%d certificates read successfully\n", ncerts);
 
-	kssl_params = openssl_to_kssl(rsa, ncerts, cert_bufs,
-	    cert_sizes, paramsize);
+	kssl_params = kmf_to_kssl(0, rsa, ncerts, certs, paramsize, NULL,
+		NULL, NULL);
 
 	for (i = 0; i < ncerts; i++)
-		free(cert_bufs[i]);
-	free(cert_bufs);
-	free(cert_sizes);
-	RSA_free(rsa);
+		KMF_FreeData(&certs[i]);
+	free(certs);
+	KMF_FreeRawKey(rsa);
+
 	return (kssl_params);
 }
 
+/*
+ * Load a raw key and certificate(s) from a PKCS#12 file.
+ */
 static kssl_params_t *
 load_from_pkcs12(const char *filename, const char *password_file,
     int *paramsize)
 {
-	RSA *rsa;
+	KMF_RAW_KEY_DATA *rsa = NULL;
 	kssl_params_t *kssl_params;
-	uchar_t **cert_bufs;
-	int *cert_sizes, ncerts, i;
+	KMF_DATA *certs = NULL;
+	int ncerts = 0, i;
 
-	ncerts = 0;
-	cert_bufs = PKCS12_get_rsa_key_certs(filename, password_file, &rsa,
-	    &cert_sizes, &ncerts);
-	if (cert_bufs == NULL || ncerts == 0) {
+	ncerts = PKCS12_get_rsa_key_certs(filename,
+		password_file, &rsa, &certs);
+
+	if (certs == NULL || ncerts == 0) {
 		(void) fprintf(stderr,
 		    "Unable to read cert and/or key from %s\n", filename);
 		return (NULL);
@@ -865,18 +754,16 @@ load_from_pkcs12(const char *filename, const char *password_file,
 	if (verbose)
 		(void) printf("%d certificates read successfully\n", ncerts);
 
-	kssl_params = openssl_to_kssl(rsa, ncerts, cert_bufs,
-	    cert_sizes, paramsize);
+	kssl_params = kmf_to_kssl(0, rsa, ncerts, certs, paramsize, NULL,
+		NULL, NULL);
 
 	for (i = 0; i < ncerts; i++)
-		free(cert_bufs[i]);
-	free(cert_bufs);
-	free(cert_sizes);
+		KMF_FreeData(&certs[i]);
+	free(certs);
 
-	RSA_free(rsa);
+	KMF_FreeRawKey(rsa);
 	return (kssl_params);
 }
-
 
 int
 parse_and_set_addr(char *server_address, char *server_port,
@@ -1105,6 +992,9 @@ do_create(int argc, char *argv[])
 		return (FAILURE);
 	}
 
+	/*
+	 * Add the list of supported ciphers to the buffer.
+	 */
 	bcopy(kssl_suites, kssl_params->kssl_suites,
 	    sizeof (kssl_params->kssl_suites));
 	kssl_params->kssl_params_size = bufsize;
@@ -1114,8 +1004,7 @@ do_create(int argc, char *argv[])
 	kssl_params->kssl_session_cache_size = scache_size;
 
 	if (cacert_chain_file != NULL) {
-		kssl_params = add_cacerts(kssl_params, cacert_chain_file,
-		    password_file);
+		kssl_params = add_cacerts(kssl_params, cacert_chain_file);
 		if (kssl_params == NULL) {
 			return (FAILURE);
 		}

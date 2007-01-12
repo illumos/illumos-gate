@@ -17,11 +17,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
  *
+ *
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -528,4 +527,10 @@ KMF_SelectToken(KMF_HANDLE_T handle, char *label,
 	handle->pk11handle = hSession;
 
 	return (kmf_rv);
+}
+
+CK_SESSION_HANDLE
+KMF_GetPK11Handle(KMF_HANDLE_T kmfh)
+{
+	return (kmfh->pk11handle);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -291,6 +291,7 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 			parms.cred = *tokencred;
 			parms.pkcs11parms.private =
 				((oclass & PK_PRIVATE_OBJ) > 0);
+			parms.pkcs11parms.token = 1;
 
 			/* list asymmetric private keys */
 			rv = pk_list_keys(kmfhandle, &parms);
@@ -303,6 +304,7 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 			parms.format = KMF_FORMAT_RAWKEY;
 			parms.pkcs11parms.private =
 				((oclass & PK_PRIVATE_OBJ) > 0);
+			parms.pkcs11parms.token = 1;
 
 			/* list symmetric keys */
 			rv = pk_list_keys(kmfhandle, &parms);
@@ -313,6 +315,7 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 			parms.findLabel = objlabel;
 			parms.pkcs11parms.private =
 				((oclass & PK_PRIVATE_OBJ) > 0);
+			parms.pkcs11parms.token = 1;
 
 			/* list asymmetric public keys (if any) */
 			rv = pk_list_keys(kmfhandle, &parms);

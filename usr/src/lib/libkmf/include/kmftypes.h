@@ -23,7 +23,7 @@
  *
  * Copyright (c) 1995-2000 Intel Corporation. All rights reserved.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,8 +110,10 @@ typedef enum {
 	KMF_FORMAT_ASN1 =	1,	/* DER */
 	KMF_FORMAT_PEM =	2,
 	KMF_FORMAT_PKCS12 =	3,
-	KMF_FORMAT_RAWKEY =	4	/* For FindKey operation */
+	KMF_FORMAT_RAWKEY =	4,	/* For FindKey operation */
+	KMF_FORMAT_PEM_KEYPAIR = 5
 } KMF_ENCODE_FORMAT;
+#define	KMF_FORMAT_NATIVE KMF_FORMAT_UNDEF
 
 typedef enum {
 	KMF_ALL_CERTS =		0,
@@ -193,6 +195,7 @@ typedef struct {
 	boolean_t	private; /* for finding CKA_PRIVATE objects */
 	boolean_t	sensitive;
 	boolean_t	not_extractable;
+	boolean_t	token; /* true == token object, false == session */
 } KMF_PKCS11_PARAMS;
 
 typedef struct {
@@ -599,7 +602,10 @@ typedef enum {
 	KMF_ERR_UNINITIALIZED_TOKEN	= 0x4d,
 	KMF_ERR_INCOMPLETE_TBS_CERT	= 0x4e,
 	KMF_ERR_MISSING_ERRCODE		= 0x4f,
-	KMF_KEYSTORE_ALREADY_INITIALIZED = 0x50
+	KMF_KEYSTORE_ALREADY_INITIALIZED = 0x50,
+	KMF_ERR_SENSITIVE_KEY		= 0x51,
+	KMF_ERR_UNEXTRACTABLE_KEY	= 0x52,
+	KMF_ERR_KEY_MISMATCH		= 0x53
 } KMF_RETURN;
 
 typedef enum {

@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -105,12 +104,14 @@ SUNWprivate_1.1 {
 	KMF_GetKMFErrorString;
 	KMF_GetOCSPForCert;
 	KMF_GetOCSPStatusForCert;
+	KMF_GetPK11Handle;
 	KMF_GetPluginErrorString;
 	KMF_GetPolicy;
 	KMF_GetSymKeyValue;
 	KMF_HexString2Bytes;
 	KMF_ImportCRL;
 	KMF_ImportCert;
+	KMF_ImportKeypair;
 	KMF_ImportPK12;
 	KMF_Initialize;
 	KMF_IsCRLFile;

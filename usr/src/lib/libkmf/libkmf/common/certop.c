@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright(c) 1995-2000 Intel Corporation. All rights reserved.
@@ -2289,6 +2289,49 @@ KMF_ImportPK12(KMF_HANDLE_T handle, char *filename,
 	return (rv);
 }
 
+KMF_RETURN
+KMF_ImportKeypair(KMF_HANDLE_T handle, char *filename,
+	KMF_CREDENTIAL *cred,
+	KMF_DATA **certs, int *ncerts,
+	KMF_RAW_KEY_DATA **rawkeys, int *nkeys)
+{
+	KMF_RETURN rv;
+	KMF_PLUGIN *plugin;
+	KMF_RETURN (*import_keypair)(KMF_HANDLE *,
+		char *, KMF_CREDENTIAL *,
+		KMF_DATA **, int *,
+		KMF_RAW_KEY_DATA **, int *);
+
+	CLEAR_ERROR(handle, rv);
+	if (rv != KMF_OK)
+		return (rv);
+
+	if (filename == NULL ||
+		cred == NULL ||
+		certs == NULL || ncerts == NULL ||
+		rawkeys == NULL || nkeys == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/*
+	 * Use the Keypair reader from the OpenSSL plugin.
+	 */
+	plugin = FindPlugin(handle, KMF_KEYSTORE_OPENSSL);
+	if (plugin == NULL || plugin->dldesc == NULL) {
+		return (KMF_ERR_PLUGIN_NOTFOUND);
+	}
+
+	import_keypair = (KMF_RETURN(*)())dlsym(plugin->dldesc,
+	    "openssl_import_keypair");
+	if (import_keypair == NULL) {
+		return (KMF_ERR_FUNCTION_NOT_FOUND);
+	}
+
+	/* Use OpenSSL interfaces to get raw key and cert data */
+	rv = import_keypair(handle, filename, cred, certs, ncerts,
+		rawkeys, nkeys);
+
+	return (rv);
+}
 
 KMF_BOOL
 IsEqualOid(KMF_OID *Oid1, KMF_OID *Oid2)

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -280,6 +280,7 @@ delete_pk11_keys(KMF_HANDLE_T kmfhandle,
 	parms.findLabel = (char *)objlabel;
 	parms.keytype = 0;
 	parms.pkcs11parms.private = ((oclass & PK_PRIVATE_OBJ) > 0);
+	parms.pkcs11parms.token = 1;
 	parms.cred.cred = tokencred->cred;
 	parms.cred.credlen = tokencred->credlen;
 

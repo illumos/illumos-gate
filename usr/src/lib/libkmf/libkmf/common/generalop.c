@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright(c) 1995-2000 Intel Corporation. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -135,7 +134,10 @@ static kmf_error_map kmf_errcodes[] = {
 	{KMF_ERR_UNINITIALIZED_TOKEN,	"KMF_ERR_UNINITIALIZED_TOKEN"},
 	{KMF_ERR_INCOMPLETE_TBS_CERT,	"KMF_ERR_INCOMPLETE_TBS_CERT"},
 	{KMF_ERR_MISSING_ERRCODE,	"KMF_ERR_MISSING_ERRCODE"},
-	{KMF_KEYSTORE_ALREADY_INITIALIZED, "KMF_KEYSTORE_ALREADY_INITIALIZED"}
+	{KMF_KEYSTORE_ALREADY_INITIALIZED, "KMF_KEYSTORE_ALREADY_INITIALIZED"},
+	{KMF_ERR_SENSITIVE_KEY,		"KMF_ERR_SENSITIVE_KEY"},
+	{KMF_ERR_UNEXTRACTABLE_KEY,	"KMF_ERR_UNEXTRACTABLE_KEY"},
+	{KMF_ERR_KEY_MISMATCH,		"KMF_ERR_KEY_MISMATCH"}
 };
 
 
@@ -720,6 +722,8 @@ KMF_GetFileFormat(char *filename, KMF_ENCODE_FORMAT *fmt)
 		} else {
 			*fmt = KMF_FORMAT_ASN1;
 		}
+	} else if (memcmp(buf, "Bag Attr", 8) == 0) {
+		*fmt = KMF_FORMAT_PEM_KEYPAIR;
 	} else {
 		/* Cannot determine this file format */
 		*fmt = 0;

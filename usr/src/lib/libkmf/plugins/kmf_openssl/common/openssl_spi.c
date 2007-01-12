@@ -20,12 +20,13 @@
  *
  * OpenSSL keystore wrapper
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <stdlib.h>
 #include <kmfapiP.h>
 #include <ber_der.h>
 #include <oidsalg.h>
@@ -98,6 +99,13 @@ static uchar_t G[] = { 0x00, 0x62, 0x6d, 0x02, 0x78, 0x39, 0xea, 0x0a,
 
 mutex_t init_lock = DEFAULTMUTEX;
 static int ssl_initialized = 0;
+
+static KMF_RETURN
+extract_objects(KMF_HANDLE *, char *, CK_UTF8CHAR *, CK_ULONG,
+	EVP_PKEY **, KMF_DATA **, int *);
+
+static KMF_RETURN
+kmf_load_cert(KMF_HANDLE *, KMF_FINDCERT_PARAMS *, char *, KMF_DATA *);
 
 KMF_RETURN
 OpenSSL_FindCert(KMF_HANDLE_T,
@@ -567,6 +575,99 @@ cleanup:
 	return (rv);
 }
 
+static int
+datacmp(const void *a, const void *b)
+{
+	KMF_DATA *adata = (KMF_DATA *)a;
+	KMF_DATA *bdata = (KMF_DATA *)b;
+	if (adata->Length > bdata->Length)
+		return (-1);
+	if (adata->Length < bdata->Length)
+		return (1);
+	return (0);
+}
+
+static KMF_RETURN
+load_certs(KMF_HANDLE *kmfh, KMF_FINDCERT_PARAMS *params, char *pathname,
+	KMF_DATA **certlist, uint32_t *numcerts)
+{
+	KMF_RETURN rv = KMF_OK;
+	int i;
+	KMF_DATA *certs = NULL;
+	int nc = 0;
+	int hits = 0;
+	KMF_ENCODE_FORMAT format;
+
+	rv = KMF_GetFileFormat(pathname, &format);
+	if (rv != KMF_OK) {
+		if (rv == KMF_ERR_OPEN_FILE)
+			rv = KMF_ERR_CERT_NOT_FOUND;
+		return (rv);
+	}
+	if (format == KMF_FORMAT_ASN1) {
+		/* load a single certificate */
+		certs = (KMF_DATA *)malloc(sizeof (KMF_DATA));
+		if (certs == NULL)
+			return (KMF_ERR_MEMORY);
+		certs->Data = NULL;
+		certs->Length = 0;
+		rv = kmf_load_cert(kmfh, params, pathname, certs);
+		if (rv == KMF_OK) {
+			*certlist = certs;
+			*numcerts = 1;
+		}
+		return (rv);
+	} else if (format == KMF_FORMAT_PKCS12) {
+		/* We need a credential to access a PKCS#12 file */
+		rv = KMF_ERR_BAD_CERT_FORMAT;
+	} else if (format == KMF_FORMAT_PEM ||
+		format != KMF_FORMAT_PEM_KEYPAIR) {
+
+		/* This function only works on PEM files */
+		rv = extract_objects(kmfh, pathname,
+			(uchar_t *)NULL, 0, NULL,
+			&certs, &nc);
+	} else {
+		return (KMF_ERR_ENCODING);
+	}
+
+	if (rv != KMF_OK)
+		return (rv);
+
+	for (i = 0; i < nc; i++) {
+		if (params->find_cert_validity == KMF_NONEXPIRED_CERTS) {
+			rv = KMF_CheckCertDate(kmfh, &certs[i]);
+		} else if (params->find_cert_validity == KMF_EXPIRED_CERTS) {
+			rv = KMF_CheckCertDate(kmfh, &certs[i]);
+			if (rv == KMF_OK)
+				rv = KMF_ERR_CERT_NOT_FOUND;
+			if (rv == KMF_ERR_VALIDITY_PERIOD)
+				rv = KMF_OK;
+		}
+		if (rv != KMF_OK) {
+			/* Remove this cert from the list by clearing it. */
+			KMF_FreeData(&certs[i]);
+		} else {
+			hits++; /* count valid certs found */
+		}
+		rv = KMF_OK;
+	}
+	if (rv == KMF_OK && hits == 0) {
+		rv = KMF_ERR_CERT_NOT_FOUND;
+	} else if (rv == KMF_OK && hits > 0) {
+		/*
+		 * Sort the list of certs by length to put the cleared ones
+		 * at the end so they don't get accessed by the caller.
+		 */
+		qsort((void *)certs, nc, sizeof (KMF_DATA), datacmp);
+		*certlist = certs;
+
+		/* since we sorted the list, just return the number of hits */
+		*numcerts = hits;
+	}
+	return (rv);
+}
+
 static KMF_RETURN
 kmf_load_cert(KMF_HANDLE *kmfh,
 	KMF_FINDCERT_PARAMS *params,
@@ -631,7 +732,8 @@ openssl_load_key(KMF_HANDLE_T handle, const char *file)
 
 	if (format == KMF_FORMAT_ASN1)
 		pkey = d2i_PrivateKey_bio(keyfile, NULL);
-	else if (format == KMF_FORMAT_PEM)
+	else if (format == KMF_FORMAT_PEM ||
+		format == KMF_FORMAT_PEM_KEYPAIR)
 		pkey = PEM_read_bio_PrivateKey(keyfile, NULL, NULL, NULL);
 
 end:
@@ -652,8 +754,8 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
-	KMF_DATA certdata = {NULL, 0};
 	char *fullpath;
+	int i;
 
 	if (num_certs == NULL || params == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -677,6 +779,9 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 		}
 		while ((dp = readdir(dirp)) != NULL) {
 			char *fname;
+			KMF_DATA *certlist = NULL;
+			uint32_t numcerts = 0;
+
 			if (strcmp(dp->d_name, ".") == 0 ||
 			    strcmp(dp->d_name, "..") == 0)
 				continue;
@@ -684,34 +789,43 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 			fname = get_fullpath(fullpath,
 				(char *)&dp->d_name);
 
-			rv = kmf_load_cert(kmfh, params, fname,
-				&certdata);
+			rv = load_certs(kmfh, params, fname, &certlist,
+				&numcerts);
 
 			if (rv != KMF_OK) {
 				free(fname);
-				KMF_FreeData(&certdata);
+				if (certlist != NULL) {
+					for (i = 0; i < numcerts; i++)
+						KMF_FreeData(&certlist[i]);
+					free(certlist);
+				}
 				continue;
 			}
 
 			/* If load succeeds, add certdata to the list */
 			if (kmf_cert != NULL) {
-				kmf_cert[n].certificate.Data = certdata.Data;
-				kmf_cert[n].certificate.Length =
-					certdata.Length;
+				for (i = 0; i < numcerts; i++) {
+					kmf_cert[n].certificate.Data =
+						certlist[i].Data;
+					kmf_cert[n].certificate.Length =
+						certlist[i].Length;
 
-				kmf_cert[n].kmf_private.keystore_type =
-					KMF_KEYSTORE_OPENSSL;
-				kmf_cert[n].kmf_private.flags =
-					KMF_FLAG_CERT_VALID;
-				kmf_cert[n].kmf_private.label = fname;
-
-				certdata.Data = NULL;
-				certdata.Length = 0;
+					kmf_cert[n].kmf_private.keystore_type =
+						KMF_KEYSTORE_OPENSSL;
+					kmf_cert[n].kmf_private.flags =
+						KMF_FLAG_CERT_VALID;
+					kmf_cert[n].kmf_private.label =
+						strdup(fname);
+					n++;
+				}
+				free(certlist);
 			} else {
-				free(fname);
-				KMF_FreeData(&certdata);
+				for (i = 0; i < numcerts; i++)
+					KMF_FreeData(&certlist[i]);
+				free(certlist);
+				n += numcerts;
 			}
-			n++;
+			free(fname);
 		}
 		(*num_certs) = n;
 		if (*num_certs == 0)
@@ -721,33 +835,42 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 exit:
 		(void) closedir(dirp);
 	} else {
-		/* Just try to load a single certificate */
-		rv = kmf_load_cert(kmfh, params, fullpath, &certdata);
+		KMF_DATA *certlist = NULL;
+		uint32_t numcerts = 0;
+
+		rv = load_certs(kmfh, params, fullpath, &certlist, &numcerts);
 		if (rv != KMF_OK) {
 			free(fullpath);
-			KMF_FreeData(&certdata);
 			return (rv);
 		}
 
-		if (kmf_cert != NULL) {
-			kmf_cert->certificate.Data = certdata.Data;
-			kmf_cert->certificate.Length = certdata.Length;
-			kmf_cert->kmf_private.keystore_type =
-				KMF_KEYSTORE_OPENSSL;
-			kmf_cert->kmf_private.flags = KMF_FLAG_CERT_VALID;
-			kmf_cert->kmf_private.label = fullpath;
+		if (kmf_cert != NULL && certlist != NULL) {
+			for (i = 0; i < numcerts; i++) {
+				kmf_cert[i].certificate.Data =
+					certlist[i].Data;
+				kmf_cert[i].certificate.Length =
+					certlist[i].Length;
+				kmf_cert[i].kmf_private.keystore_type =
+					KMF_KEYSTORE_OPENSSL;
+				kmf_cert[i].kmf_private.flags =
+					KMF_FLAG_CERT_VALID;
+				kmf_cert[i].kmf_private.label =
+					strdup(fullpath);
+			}
+			free(certlist);
 		} else {
-			KMF_FreeData(&certdata);
+			if (certlist != NULL) {
+				for (i = 0; i < numcerts; i++)
+					KMF_FreeData(&certlist[i]);
+				free(certlist);
+			}
 		}
-
-		*num_certs = 1;
+		*num_certs = numcerts;
 	}
 
-	if (kmf_cert == NULL || rv != KMF_OK)
-		free(fullpath);
+	free(fullpath);
 
 	return (rv);
-
 }
 
 void
@@ -3265,6 +3388,107 @@ end:
 	return (rv);
 }
 
+#define	MAX_CHAIN_LENGTH 100
+/*
+ * Helper function to extract keys and certificates from
+ * a single PEM file.  Typically the file should contain a
+ * private key and an associated public key wrapped in an x509 cert.
+ * However, the file may be just a list of X509 certs with no keys.
+ */
+static KMF_RETURN
+extract_objects(KMF_HANDLE *kmfh, char *filename, CK_UTF8CHAR *pin,
+	CK_ULONG pinlen, EVP_PKEY **priv_key, KMF_DATA **certs,
+	int *numcerts)
+/* ARGSUSED */
+{
+	KMF_RETURN rv = KMF_OK;
+	FILE *fp;
+	STACK_OF(X509_INFO) *x509_info_stack;
+	int i, ncerts = 0;
+	EVP_PKEY *pkey = NULL;
+	X509_INFO *info;
+	X509 *x;
+	X509_INFO *cert_infos[MAX_CHAIN_LENGTH];
+	KMF_DATA *certlist = NULL;
+
+	if (priv_key)
+		*priv_key = NULL;
+	if (certs)
+		*certs = NULL;
+	fp = fopen(filename, "r");
+	if (fp == NULL) {
+		return (KMF_ERR_OPEN_FILE);
+	}
+	x509_info_stack = PEM_X509_INFO_read(fp, NULL, NULL, pin);
+	if (x509_info_stack == NULL) {
+		(void) fclose(fp);
+		return (KMF_ERR_ENCODING);
+	}
+
+	/*LINTED*/
+	while ((info = sk_X509_INFO_pop(x509_info_stack)) != NULL &&
+		ncerts < MAX_CHAIN_LENGTH) {
+		cert_infos[ncerts] = info;
+		ncerts++;
+	}
+
+	if (ncerts == 0) {
+		(void) fclose(fp);
+		return (KMF_ERR_CERT_NOT_FOUND);
+	}
+
+	if (priv_key != NULL) {
+		rewind(fp);
+		pkey = PEM_read_PrivateKey(fp, NULL, NULL, pin);
+	}
+	(void) fclose(fp);
+
+	x = cert_infos[ncerts - 1]->x509;
+	/*
+	 * Make sure the private key matchs the last cert in the file.
+	 */
+	if (pkey != NULL && !X509_check_private_key(x, pkey)) {
+		EVP_PKEY_free(pkey);
+		return (KMF_ERR_KEY_MISMATCH);
+	}
+
+	certlist = (KMF_DATA *)malloc(ncerts * sizeof (KMF_DATA));
+	if (certlist == NULL) {
+		if (pkey != NULL)
+			EVP_PKEY_free(pkey);
+		X509_INFO_free(info);
+		return (KMF_ERR_MEMORY);
+	}
+
+	/*
+	 * Convert all of the certs to DER format.
+	 */
+	for (i = 0; rv == KMF_OK && certs != NULL && i < ncerts; i++) {
+		info =  cert_infos[ncerts - 1 - i];
+
+		rv = ssl_cert2KMFDATA(kmfh, info->x509, &certlist[i]);
+
+		if (rv != KMF_OK) {
+			free(certlist);
+			certlist = NULL;
+			ncerts = 0;
+		}
+		X509_INFO_free(info);
+	}
+
+	if (numcerts != NULL)
+		*numcerts = ncerts;
+	if (certs != NULL)
+		*certs = certlist;
+
+	if (priv_key == NULL && pkey != NULL)
+		EVP_PKEY_free(pkey);
+	else if (priv_key != NULL && pkey != NULL)
+		*priv_key = pkey;
+
+	return (rv);
+}
+
 /*
  * Helper function to decrypt and parse PKCS#12 import file.
  */
@@ -3517,7 +3741,7 @@ convertPK12Objects(
 	}
 
 	/* Also add any included CA certs to the list */
-	for (i = 0; i != sk_X509_num(sslcacerts); i++) {
+	for (i = 0; sslcacerts != NULL && i < sk_X509_num(sslcacerts); i++) {
 		X509 *c;
 		/*
 		 * sk_X509_value() is macro that embeds a cast to (X509 *).
@@ -3596,6 +3820,54 @@ end:
 
 	if (cacerts)
 		sk_X509_free(cacerts);
+
+	return (rv);
+}
+
+KMF_RETURN
+openssl_import_keypair(KMF_HANDLE *kmfh,
+	char *filename, KMF_CREDENTIAL *cred,
+	KMF_DATA **certlist, int *ncerts,
+	KMF_RAW_KEY_DATA **keylist, int *nkeys)
+{
+	KMF_RETURN	rv = KMF_OK;
+	EVP_PKEY	*privkey = NULL;
+	KMF_ENCODE_FORMAT format;
+
+	/*
+	 * auto-detect the file format, regardless of what
+	 * the 'format' parameters in the params say.
+	 */
+	rv = KMF_GetFileFormat(filename, &format);
+	if (rv != KMF_OK) {
+		if (rv == KMF_ERR_OPEN_FILE)
+			rv = KMF_ERR_CERT_NOT_FOUND;
+		return (rv);
+	}
+
+	/* This function only works on PEM files */
+	if (format != KMF_FORMAT_PEM &&
+		format != KMF_FORMAT_PEM_KEYPAIR)
+		return (KMF_ERR_ENCODING);
+
+	*certlist = NULL;
+	*keylist = NULL;
+	*ncerts = 0;
+	*nkeys = 0;
+	rv = extract_objects(kmfh, filename,
+		(uchar_t *)cred->cred,
+		(uint32_t)cred->credlen,
+		&privkey, certlist, ncerts);
+
+	/* Reached end of import file? */
+	if (rv == KMF_OK)
+		/* Convert keys and certs to exportable format */
+		rv = convertPK12Objects(kmfh, privkey, NULL, NULL,
+			keylist, nkeys, NULL, NULL);
+
+end:
+	if (privkey)
+		EVP_PKEY_free(privkey);
 
 	return (rv);
 }

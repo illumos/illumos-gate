@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *
@@ -269,6 +269,8 @@ extern KMF_RETURN KMF_SetCertBasicConstraintExt(KMF_X509_CERTIFICATE *,
 extern KMF_RETURN KMF_ExportPK12(KMF_HANDLE_T, KMF_EXPORTP12_PARAMS *, char *);
 extern KMF_RETURN KMF_ImportPK12(KMF_HANDLE_T, char *, KMF_CREDENTIAL *,
 	KMF_DATA **, int *, KMF_RAW_KEY_DATA **, int *);
+extern KMF_RETURN KMF_ImportKeypair(KMF_HANDLE_T, char *, KMF_CREDENTIAL *,
+	KMF_DATA **, int *, KMF_RAW_KEY_DATA **, int *);
 
 /*
  * Get OCSP response operation.
@@ -339,6 +341,7 @@ extern void KMF_FreeCRLDistributionPoints(KMF_X509EXT_CRLDISTPOINTS *);
 
 /* APIs for PKCS#11 token */
 extern KMF_RETURN KMF_PK11TokenLookup(KMF_HANDLE_T, char *, CK_SLOT_ID *);
+extern CK_SESSION_HANDLE KMF_GetPK11Handle(KMF_HANDLE_T);
 
 #ifdef __cplusplus
 }

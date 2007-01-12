@@ -21,7 +21,7 @@
 /*
  * PKCS11 token KMF Plugin
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,9 @@ typedef struct _objlist {
 static KMF_RETURN
 search_certs(KMF_HANDLE_T, char *, char *, char *, KMF_BIGINT *,
 	boolean_t, KMF_CERT_VALIDITY, OBJLIST **, uint32_t *);
+
+static CK_RV
+getObjectLabel(KMF_HANDLE_T, CK_OBJECT_HANDLE, char **);
 
 static KMF_RETURN
 keyObj2RawKey(KMF_HANDLE_T, KMF_KEY_HANDLE *, KMF_RAW_KEY_DATA **);
@@ -213,13 +216,12 @@ PK11Cert2KMFCert(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE hObj,
 
 	CK_CERTIFICATE_TYPE cktype;
 	CK_OBJECT_CLASS	class;
-	CK_BBOOL	cktrusted, token;
 	CK_ULONG subject_len, value_len, issuer_len, serno_len, id_len;
 	CK_BYTE *subject = NULL, *value = NULL;
-	CK_BYTE *label = NULL;
-	CK_ULONG label_len = 0;
+	char *label = NULL;
 	CK_ATTRIBUTE templ[10];
 
+	(void) memset(templ, 0, 10 * sizeof (CK_ATTRIBUTE));
 	SETATTR(templ, 0, CKA_CLASS, &class, sizeof (class));
 
 	/*  Is this a certificate object ? */
@@ -230,30 +232,32 @@ PK11Cert2KMFCert(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE hObj,
 	}
 
 	SETATTR(templ, 0, CKA_CERTIFICATE_TYPE, &cktype, sizeof (cktype));
-	SETATTR(templ, 1, CKA_TOKEN, &token, sizeof (token));
-	SETATTR(templ, 2, CKA_TRUSTED, &cktrusted, sizeof (cktrusted));
-
-	ckrv = C_GetAttributeValue(kmfh->pk11handle, hObj, templ, 3);
+	ckrv = C_GetAttributeValue(kmfh->pk11handle, hObj, templ, 1);
 
 	if (ckrv != CKR_OK || cktype != CKC_X_509)  {
 		SET_ERROR(kmfh, ckrv);
 		return (ckrv);
 	} else {
+		int i = 0;
 		/* What attributes are available and how big are they? */
-		subject_len = issuer_len = serno_len = id_len = value_len =
-			label_len = 0;
-		SETATTR(templ, 0, CKA_SUBJECT,	NULL, subject_len);
-		SETATTR(templ, 1, CKA_ISSUER,	NULL, issuer_len);
-		SETATTR(templ, 2, CKA_SERIAL_NUMBER, NULL, serno_len);
-		SETATTR(templ, 3, CKA_ID, NULL, id_len);
-		SETATTR(templ, 4, CKA_VALUE, NULL, value_len);
-		SETATTR(templ, 5, CKA_LABEL, NULL, label_len);
+		subject_len = issuer_len = serno_len = id_len = value_len = 0;
+
+		SETATTR(templ, i, CKA_SUBJECT,	NULL, subject_len);
+		i++;
+		SETATTR(templ, i, CKA_ISSUER,	NULL, issuer_len);
+		i++;
+		SETATTR(templ, i, CKA_SERIAL_NUMBER, NULL, serno_len);
+		i++;
+		SETATTR(templ, i, CKA_ID, NULL, id_len);
+		i++;
+		SETATTR(templ, i, CKA_VALUE, NULL, value_len);
+		i++;
 
 		/*
 		 * Query the object with NULL values in the pValue spot
 		 * so we know how much space to allocate for each field.
 		 */
-		ckrv = C_GetAttributeValue(kmfh->pk11handle, hObj, templ, 6);
+		ckrv = C_GetAttributeValue(kmfh->pk11handle, hObj, templ, i);
 		if (ckrv != CKR_OK)  {
 			SET_ERROR(kmfh, ckrv);
 			return (KMF_ERR_INTERNAL); /* TODO - Error messages ? */
@@ -264,7 +268,6 @@ PK11Cert2KMFCert(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE hObj,
 		serno_len	= templ[2].ulValueLen;
 		id_len		= templ[3].ulValueLen;
 		value_len	= templ[4].ulValueLen;
-		label_len	= templ[5].ulValueLen;
 
 		/*
 		 * For PKCS#11 CKC_X_509 certificate objects,
@@ -288,17 +291,6 @@ PK11Cert2KMFCert(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE hObj,
 
 			SETATTR(templ, i, CKA_VALUE, value, value_len);
 			i++;
-			if (label_len > 0) {
-				label = malloc(label_len + 1);
-				if (label == NULL) {
-					rv = KMF_ERR_MEMORY;
-					goto errout;
-				}
-				(void) memset(label, 0, label_len + 1);
-				SETATTR(templ, i, CKA_LABEL, label,
-					label_len);
-				i++;
-			}
 
 			/* re-query the object with room for the value attr */
 			ckrv = C_GetAttributeValue(kmfh->pk11handle, hObj,
@@ -315,7 +307,11 @@ PK11Cert2KMFCert(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE hObj,
 			kmfcert->kmf_private.flags |= KMF_FLAG_CERT_SIGNED;
 			kmfcert->kmf_private.keystore_type =
 				KMF_KEYSTORE_PK11TOKEN;
-			kmfcert->kmf_private.label = (char *)label;
+
+			ckrv = getObjectLabel(kmfh, hObj, &label);
+			if (ckrv == CKR_OK && label != NULL) {
+				kmfcert->kmf_private.label = (char *)label;
+			}
 
 			rv = KMF_OK;
 		}
@@ -1024,7 +1020,7 @@ CreateCertObject(KMF_HANDLE_T handle, char *label, KMF_DATA *pcert)
 
 	CK_RV ckrv;
 	CK_ULONG subject_len, issuer_len, serno_len;
-	CK_BYTE *subject, *issuer, *serial;
+	CK_BYTE *subject, *issuer, *serial, nullserno;
 	CK_BBOOL true = TRUE;
 	CK_CERTIFICATE_TYPE certtype = CKC_X_509;
 	CK_OBJECT_CLASS certClass = CKO_CERTIFICATE;
@@ -1082,8 +1078,13 @@ CreateCertObject(KMF_HANDLE_T handle, char *label, KMF_DATA *pcert)
 		serial = signed_cert_ptr->certificate.serialNumber.val;
 		serno_len = signed_cert_ptr->certificate.serialNumber.len;
 	} else {
-		rv = KMF_ERR_ENCODING;
-		goto cleanup;
+		/*
+		 * RFC3280 says to gracefully handle certs with serial numbers
+		 * of 0.
+		 */
+		nullserno = '\0';
+		serial  = &nullserno;
+		serno_len = 1;
 	}
 
 	/* Generate an ID from the SPKI data */
@@ -1110,7 +1111,6 @@ CreateCertObject(KMF_HANDLE_T handle, char *label, KMF_DATA *pcert)
 		SETATTR(x509templ, i, CKA_LABEL, label, strlen(label));
 		i++;
 	}
-
 	/*
 	 * The cert object handle is actually "leaked" here.  If the app
 	 * really wants to clean up the data space, it will have to call
@@ -1999,6 +1999,7 @@ static KMF_RETURN
 get_raw_rsa(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE obj, KMF_RAW_RSA_KEY *rawrsa)
 {
 	KMF_RETURN rv = KMF_OK;
+	CK_RV ckrv;
 	CK_SESSION_HANDLE sess = kmfh->pk11handle;
 	CK_ATTRIBUTE	rsa_pri_attrs[8] = {
 		{ CKA_MODULUS, NULL, 0 },
@@ -2013,10 +2014,16 @@ get_raw_rsa(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE obj, KMF_RAW_RSA_KEY *rawrsa)
 	CK_ULONG	count = sizeof (rsa_pri_attrs) / sizeof (CK_ATTRIBUTE);
 	int		i;
 
-	if ((rv = C_GetAttributeValue(sess, obj,
+	if ((ckrv = C_GetAttributeValue(sess, obj,
 			rsa_pri_attrs, count)) != CKR_OK) {
-		SET_ERROR(kmfh, rv);
-		return (KMF_ERR_INTERNAL);
+		SET_ERROR(kmfh, ckrv);
+		/* Tell the caller know why the key data cannot be retrieved. */
+		if (ckrv == CKR_ATTRIBUTE_SENSITIVE)
+			return (KMF_ERR_SENSITIVE_KEY);
+		else if (ckrv == CKR_KEY_UNEXTRACTABLE)
+			return (KMF_ERR_UNEXTRACTABLE_KEY);
+		else
+			return (KMF_ERR_INTERNAL);
 	}
 
 	/* Allocate memory for each attribute. */
@@ -2314,7 +2321,6 @@ KMFPK11_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 	CK_ATTRIBUTE pTmpl[10];
 	CK_OBJECT_CLASS class;
 	CK_BBOOL true = TRUE;
-	CK_BBOOL false = FALSE;
 	CK_ULONG alg;
 	CK_BBOOL is_token;
 
@@ -2332,15 +2338,13 @@ KMFPK11_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 	else
 		want_keys = MAXINT; /* count them all */
 
+	is_token = parms->pkcs11parms.token;
 	if (parms->keyclass == KMF_ASYM_PUB) {
 		class = CKO_PUBLIC_KEY;
-		is_token = false;
 	} else if (parms->keyclass == KMF_ASYM_PRI) {
 		class = CKO_PRIVATE_KEY;
-		is_token = true;
 	} else if (parms->keyclass == KMF_SYMMETRIC) {
 		class = CKO_SECRET_KEY;
-		is_token = true;
 	} else {
 		return (KMF_ERR_BAD_KEY_CLASS);
 	}
@@ -2403,7 +2407,11 @@ KMFPK11_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 		i++;
 	}
 
-	if (is_token) {
+	/*
+	 * Authenticate if the object is a token object,
+	 * a private or secred key, or if the user passed in credentials.
+	 */
+	if (parms->cred.credlen > 0) {
 		rv = pk11_authenticate(handle, &parms->cred);
 		if (rv != KMF_OK) {
 			return (rv);
@@ -2462,17 +2470,18 @@ KMFPK11_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 		/* "numkeys" indicates the number that were actually found */
 		*numkeys = n;
 	}
-	if (ckrv == KMF_OK && keys != NULL && (*numkeys) > 0 &&
-		parms->format == KMF_FORMAT_RAWKEY) {
-		/* Convert keys to "rawkey" format */
-		for (i = 0; i < (*numkeys); i++) {
-			KMF_RAW_KEY_DATA *rkey = NULL;
-			rv = keyObj2RawKey(handle, &keys[i], &rkey);
-			if (rv == KMF_OK) {
-				keys[i].keyp = rkey;
-				keys[i].israw = TRUE;
-			} else {
-				break;
+	if (ckrv == KMF_OK && keys != NULL && (*numkeys) > 0) {
+		if (parms->format == KMF_FORMAT_RAWKEY) {
+			/* Convert keys to "rawkey" format */
+			for (i = 0; i < (*numkeys); i++) {
+				KMF_RAW_KEY_DATA *rkey = NULL;
+				rv = keyObj2RawKey(handle, &keys[i], &rkey);
+				if (rv == KMF_OK) {
+					keys[i].keyp = rkey;
+					keys[i].israw = TRUE;
+				} else {
+					break;
+				}
 			}
 		}
 	}
@@ -2604,6 +2613,7 @@ KMFPK11_StorePrivateKey(KMF_HANDLE_T handle, KMF_STOREKEY_PARAMS *params,
 	SETATTR(templ, i, CKA_TOKEN, &cktrue, sizeof (cktrue)); i++;
 	SETATTR(templ, i, CKA_PRIVATE, &cktrue, sizeof (cktrue)); i++;
 	SETATTR(templ, i, CKA_SUBJECT, subject.Data, subject.Length); i++;
+	SETATTR(templ, i, CKA_DECRYPT, &cktrue, sizeof (cktrue)); i++;
 
 	/*
 	 * Only set the KeyUsage stuff if the KU extension was present.
