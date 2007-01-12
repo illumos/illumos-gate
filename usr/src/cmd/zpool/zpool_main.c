@@ -2832,7 +2832,7 @@ status_callback(zpool_handle_t *zhp, void *data)
 
 	case ZPOOL_STATUS_OFFLINE_DEV:
 		(void) printf(gettext("status: One or more devices has "
-		    "been taken offline by the adminstrator.\n\tSufficient "
+		    "been taken offline by the administrator.\n\tSufficient "
 		    "replicas exist for the pool to continue functioning in "
 		    "a\n\tdegraded state.\n"));
 		(void) printf(gettext("action: Online the device using "
@@ -3155,7 +3155,7 @@ zpool_do_upgrade(int argc, char **argv)
 	cb.cb_first = B_TRUE;
 	if (showversions) {
 		(void) printf(gettext("The following versions are "
-		    "suppored:\n\n"));
+		    "supported:\n\n"));
 		(void) printf(gettext("VER  DESCRIPTION\n"));
 		(void) printf("---  -----------------------------------------"
 		    "---------------\n");

@@ -189,7 +189,7 @@ zfs_validate_name(libzfs_handle_t *hdl, const char *path, int type)
 	if (type == ZFS_TYPE_SNAPSHOT && strchr(path, '@') == NULL) {
 		if (hdl != NULL)
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "missing '@' delimeter in snapshot name"));
+			    "missing '@' delimiter in snapshot name"));
 		return (0);
 	}
 
@@ -702,7 +702,7 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 
 	if (type == ZFS_TYPE_SNAPSHOT) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "snaphot properties cannot be modified"));
+		    "snapshot properties cannot be modified"));
 		(void) zfs_error(hdl, EZFS_PROPTYPE, errbuf);
 		goto error;
 	}
@@ -2053,7 +2053,7 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
 
 		case EINVAL:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "parent '%s' is not a filesysem"), parent);
+			    "parent '%s' is not a filesystem"), parent);
 			return (zfs_error(hdl, EZFS_BADTYPE, errbuf));
 
 		case EDOM:
@@ -2558,7 +2558,7 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap)
 
 		case EXDEV:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "not an ealier snapshot from the same fs"));
+			    "not an earlier snapshot from the same fs"));
 			return (zfs_error(hdl, EZFS_CROSSTARGET, errbuf));
 
 		case EDQUOT:

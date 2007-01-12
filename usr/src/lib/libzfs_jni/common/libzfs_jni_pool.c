@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -475,8 +475,8 @@ populate_DiskVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 	result = nvlist_lookup_string(vdev, ZPOOL_CONFIG_PATH, &path);
 	if (result != 0) {
 		zjni_throw_exception(env,
-		    "could not retrive path from disk virtual device (pool %s)",
-		    zpool_get_name(zhp));
+		    "could not retrieve path from disk virtual device "
+		    "(pool %s)", zpool_get_name(zhp));
 	} else {
 
 		regex_t re;
@@ -529,7 +529,7 @@ populate_SliceVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 	result = nvlist_lookup_string(vdev, ZPOOL_CONFIG_PATH, &path);
 	if (result != 0) {
 		zjni_throw_exception(env,
-		    "could not retrive path from slice virtual device (pool "
+		    "could not retrieve path from slice virtual device (pool "
 		    "%s)", zpool_get_name(zhp));
 	} else {
 
@@ -559,8 +559,8 @@ populate_FileVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 	result = nvlist_lookup_string(vdev, ZPOOL_CONFIG_PATH, &path);
 	if (result != 0) {
 		zjni_throw_exception(env,
-		    "could not retrive path from disk virtual device (pool %s)",
-		    zpool_get_name(zhp));
+		    "could not retrieve path from disk virtual device "
+		    "(pool %s)", zpool_get_name(zhp));
 	} else {
 
 		jstring pathUTF = (*env)->NewStringUTF(env, path);
