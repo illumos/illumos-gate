@@ -31,12 +31,13 @@ SVCMETHOD = mpxio-upgrade
 include ../Makefile.cmd
 
 SHFILES = stmsboot
-SRCS = stmsboot_util.c
 STMSBOOT_UTIL = stmsboot_util
+OBJS = $(STMSBOOT_UTIL).o
+SRCS = $(OBJS:%.o=%.c)
 
 POFILES = $(SRCS:.c=.po) $(SHFILES:%=%.po)
 POFILE = pstmsboot.po
-CLOBBERFILES = $(SHFILES) $(STMSBOOT_UTIL) $(POFILE)
+CLOBBERFILES = $(SHFILES) $(STMSBOOT_UTIL) $(POFILE) $(OBJS)
 ROOTFSLIB_MPXIO = $(ROOT)/lib/mpxio
 
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEMDEVICE)
@@ -61,6 +62,10 @@ clean:
 	$(RM) $(POFILES)
 
 lint:	lint_SRCS
+
+$(STMSBOOT_UTIL): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $< $(LDLIBS)
+	$(POST_PROCESS)
 
 include ../Makefile.targ
 

@@ -113,6 +113,7 @@ static void logdmsg(char *, ...);
 static void *s_malloc(const size_t);
 static char *s_strdup(const char *);
 static void s_strlcpy(char *, const char *, size_t);
+static int map_openable_vhciname(char *, char *, size_t);
 /*
  * Using an exit function not marked __NORETURN causes a warning with gcc.
  * To suppress the warning, use __NORETURN attribute.
