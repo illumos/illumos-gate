@@ -3,7 +3,7 @@
 #
 default=0
 timeout=60
-title Solaris Developer Express
+title Solaris Express, Developer Edition
 	kernel /boot/multiboot kernel/unix -B install_media=cdrom,soldevx=true
 	module /boot/x86.miniroot
 title Solaris Express
