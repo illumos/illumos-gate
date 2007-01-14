@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1220,6 +1220,9 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		return (px_uninit_child(px_p, (dev_info_t *)arg));
 
 	case DDI_CTLOPS_ATTACH:
+		if (!pcie_is_child(dip, rdip))
+			return (DDI_SUCCESS);
+
 		as = (struct attachspec *)arg;
 		switch (as->when) {
 		case DDI_PRE:

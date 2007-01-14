@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -253,7 +253,7 @@ px_err_bit_desc_t px_err_imu_tbl[] = {
 	{ IMU_BIT_DESC(MSI_NOT_EN,		panic,		imu_rds) },
 
 	/* DMC IMU SCS */
-	{ IMU_BIT_DESC(EQ_NOT_EN,		panic,		imu_rds) },
+	{ IMU_BIT_DESC(EQ_NOT_EN,		panic,		imu_scs) },
 
 	/* DMC IMU */
 	{ IMU_BIT_DESC(EQ_OVER,			imu_eq_ovfl,	imu) }
