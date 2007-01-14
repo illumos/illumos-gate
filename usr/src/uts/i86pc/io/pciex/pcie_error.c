@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -292,9 +292,12 @@ pcie_error_enable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 	device_ctl |= pcie_device_ctrl_default;
 
 	/*
-	 * Disable UR for any non-RBER enabled leaf PCIe device or bridge
+	 * Disable UR for any non-RBER enabled leaf PCIe device,
+	 * bridge or switch devices.
 	 */
 	if ((dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV ||
+	    dev_type == PCIE_PCIECAP_DEV_TYPE_UP ||
+	    dev_type == PCIE_PCIECAP_DEV_TYPE_DOWN ||
 	    dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) &&
 	    ((pci_config_get16(cfg_hdl, cap_ptr + PCIE_DEVCAP) &
 	    PCIE_DEVCAP_ROLE_BASED_ERR_REP) !=

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -897,8 +897,10 @@ pcie_ereport_setup(dev_info_t *dip, pci_erpt_t *erpt_p)
 
 	/* Disable PTLP/ECRC (or mask these two) for Switches */
 	if (dev_type == PCIE_PCIECAP_DEV_TYPE_UP ||
-	    dev_type == PCIE_PCIECAP_DEV_TYPE_DOWN)
+	    dev_type == PCIE_PCIECAP_DEV_TYPE_DOWN) {
+		erpt_p->pe_dflags |= PCIEX_SWITCH_DEV;
 		mask |= PCIE_AER_UCE_PTLP | PCIE_AER_UCE_ECRC;
+	}
 
 	if (pcie_regs->pcie_adv_regs->pcie_ue_mask != mask) {
 		pci_config_put32(erpt_p->pe_hdl,
@@ -1952,12 +1954,12 @@ pcie_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 			goto done;
 #if !defined(__sparc)
 		/*
-		 * On x86 ignore UR on non-RBER leaf devices and pciex-pci
-		 * bridges.
+		 * On x86 ignore UR on non-RBER leaf devices, pciex-pci
+		 * bridges and switches.
 		 */
 		if ((pcie_regs->pcie_err_status & PCIE_DEVSTS_UR_DETECTED) &&
 		    !(pcie_regs->pcie_err_status & PCIE_DEVSTS_FE_DETECTED) &&
-		    ((erpt_p->pe_dflags & PCIEX_2PCI_DEV) ||
+		    ((erpt_p->pe_dflags & (PCIEX_2PCI_DEV|PCIEX_SWITCH_DEV)) ||
 		    !(erpt_p->pe_dflags & PCI_BRIDGE_DEV)) &&
 		    !(pcie_regs->pcie_dev_cap & PCIE_DEVCAP_ROLE_BASED_ERR_REP))
 			goto done;
@@ -2019,7 +2021,8 @@ pcie_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 			 * advisory nonfatal.
 			 */
 			if (pciex_ue_err_tbl[i].reg_bit == PCIE_AER_UCE_UR &&
-			    ((erpt_p->pe_dflags & PCIEX_2PCI_DEV) ||
+			    ((erpt_p->pe_dflags &
+			    (PCIEX_2PCI_DEV|PCIEX_SWITCH_DEV)) ||
 			    !(erpt_p->pe_dflags & PCI_BRIDGE_DEV))) {
 				if (!(pcie_regs->pcie_dev_cap &
 				    PCIE_DEVCAP_ROLE_BASED_ERR_REP))

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@ extern "C" {
 #define	PCIEX_ADV_DEV			0x10
 #define	PCIEX_RC_DEV			0x20
 #define	PCIEX_2PCI_DEV			0x40
+#define	PCIEX_SWITCH_DEV		0x80
 
 /*
  * PCI and PCI-X valid flags
