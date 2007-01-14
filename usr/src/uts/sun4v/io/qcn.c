@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -606,7 +606,9 @@ qcn_wput(queue_t *q, mblk_t *mp)
 			qcn_start();
 			break;
 		default:
+			mutex_exit(&qcn_state->qcn_lock);
 			qcn_ioctl(q, mp);
+			mutex_enter(&qcn_state->qcn_lock);
 		}
 		break;
 
@@ -659,6 +661,7 @@ qcn_wput(queue_t *q, mblk_t *mp)
 	}
 
 	mutex_exit(&qcn_state->qcn_lock);
+
 	return (0);
 }
 
@@ -694,6 +697,8 @@ qcn_ioctl(queue_t *q, mblk_t *mp)
 		    bufcall(data_size, BPRI_HI, qcn_reioctl, qcn_state);
 		return;
 	}
+
+	mutex_enter(&qcn_state->qcn_lock);
 
 	if (error < 0) {
 		iocp = (struct iocblk *)mp->b_rptr;
@@ -739,6 +744,7 @@ qcn_ioctl(queue_t *q, mblk_t *mp)
 		iocp->ioc_error = error;
 		mp->b_datap->db_type = M_IOCNAK;
 	}
+	mutex_exit(&qcn_state->qcn_lock);
 	qreply(q, mp);
 }
 
@@ -803,7 +809,9 @@ qcn_start(void)
 			 * These are those IOCTLs queued up
 			 * do it now
 			 */
+			mutex_exit(&qcn_state->qcn_lock);
 			qcn_ioctl(q, mp);
+			mutex_enter(&qcn_state->qcn_lock);
 			continue;
 		}
 		/*
@@ -946,12 +954,14 @@ qcn_soft_intr(caddr_t arg1, caddr_t arg2)
 	do {
 		(void) atomic_swap_uint(&qcn_state->qcn_soft_pend, QCN_SP_IP);
 		mutex_enter(&qcn_state->qcn_hi_lock);
-		if ((cc = RING_CNT(qcn_state)) <= 0) {
-			mutex_exit(&qcn_state->qcn_hi_lock);
+		cc = RING_CNT(qcn_state);
+		mutex_exit(&qcn_state->qcn_hi_lock);
+		if (cc <= 0) {
 			goto out;
 		}
 
 		if ((mp = allocb(cc, BPRI_MED)) == NULL) {
+			mutex_enter(&qcn_state->qcn_hi_lock);
 			qcn_input_dropped += cc;
 			mutex_exit(&qcn_state->qcn_hi_lock);
 			cmn_err(CE_WARN, "qcn_intr: allocb"
@@ -959,6 +969,7 @@ qcn_soft_intr(caddr_t arg1, caddr_t arg2)
 			goto out;
 		}
 
+		mutex_enter(&qcn_state->qcn_hi_lock);
 		do {
 			/* put console input onto stream */
 			*(char *)mp->b_wptr++ = RING_GET(qcn_state);
