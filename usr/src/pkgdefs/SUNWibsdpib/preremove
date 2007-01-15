@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+if [ "${BASEDIR:=/}" != "/" ]
+then
+	BASEDIR_OPT="-b $BASEDIR"
+fi
+
+# Remove Drivers
+rem_drv ${BASEDIR} sdpib
+
+exit 0

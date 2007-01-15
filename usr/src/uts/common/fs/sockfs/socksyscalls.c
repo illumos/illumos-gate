@@ -161,6 +161,9 @@ so_socket(int domain, int type, int protocol, char *devpath, int version)
 	if (protocol == IPPROTO_SCTP) {
 		so = sosctp_create(accessvp, domain, type, protocol, version,
 		    NULL, &error);
+	} else if (protocol == PROTO_SDP) {
+		so = sosdp_create(accessvp, domain, type, protocol, version,
+		    NULL, &error);
 	} else {
 		so = sotpi_create(accessvp, domain, type, protocol, version,
 		    NULL, &error);

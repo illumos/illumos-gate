@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -400,7 +400,7 @@ DRV_KMODS	+= dcam1394
 #
 #	InfiniBand pseudo drivers
 #
-DRV_KMODS	+= ib ibd rdsib
+DRV_KMODS	+= ib ibd rdsib sdp
 
 #
 #	LVM modules
@@ -579,6 +579,7 @@ $(CLOSED_BUILD)CLOSED_XMODS =		\
 	e1000g		\
 	lsimega		\
 	nge		\
+	sdpib		\
 	tavor
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -173,6 +173,8 @@ typedef	uint16_t	sa_family_t;
 
 #define	IPPROTO_RAW		255		/* raw IP packet */
 #define	IPPROTO_MAX		256
+
+#define	PROTO_SDP		257		/* Sockets Direct Protocol */
 
 /*
  * Port/socket numbers: network standard functions

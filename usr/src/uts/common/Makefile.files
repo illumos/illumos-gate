@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -849,6 +849,7 @@ SPEC_OBJS +=	specsubr.o	specvfsops.o	specvnops.o
 SOCK_OBJS +=	socksubr.o	sockvfsops.o	sockvnops.o	\
 		socksyscalls.o	socktpi.o	sockstr.o	\
 		socksctp.o	socksctpsubr.o	socksctpvnops.o	sockssl.o \
+		socksdp.o       socksdpsubr.o   socksdpvnops.o  \
 		nl7c.o		nl7curi.o	nl7chttp.o	nl7clogd.o \
 		nl7cnca.o
 
@@ -1271,6 +1272,8 @@ IPF_OBJS += ip_fil_solaris.o fil.o solaris.o ip_state.o ip_frag.o ip_nat.o \
 	    ip_log.o misc.o
  
 IBD_OBJS +=	ibd.o
+
+SDP_OBJS +=	sdpddi.o
 
 VNI_OBJS += vni.o
 

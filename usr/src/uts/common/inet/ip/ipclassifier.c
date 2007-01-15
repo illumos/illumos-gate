@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -801,7 +801,6 @@ ipcl_hash_remove_locked(conn_t *connp, connf_t	*connfp)
 void
 ipcl_hash_insert_wildcard(connf_t *connfp, conn_t *connp)
 {
-	ASSERT(!connp->conn_mac_exempt);
 	IPCL_HASH_INSERT_WILDCARD(connfp, connp);
 }
 

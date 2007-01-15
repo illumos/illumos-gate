@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1164,6 +1164,27 @@ stubs_base:
 	STUB(dld, dld_fini_ops, nomod_void);
 	END_MODULE(dld);
 #endif
+
+#ifndef SDPIB_MODULE
+	MODULE(sdpib,drv);
+	STUB(sdpib, sdp_create, nomod_zero);
+	STUB(sdpib, sdp_bind, nomod_einval);
+	STUB(sdpib, sdp_listen, nomod_einval);
+	STUB(sdpib, sdp_connect, nomod_einval);
+	STUB(sdpib, sdp_recv, nomod_einval);
+	STUB(sdpib, sdp_send, nomod_einval);
+	STUB(sdpib, sdp_getpeername, nomod_einval);
+	STUB(sdpib, sdp_getsockname, nomod_einval);
+	STUB(sdpib, sdp_disconnect, nomod_einval);
+	STUB(sdpib, sdp_shutdown, nomod_einval);
+	STUB(sdpib, sdp_get_opt, nomod_einval);
+	STUB(sdpib, sdp_set_opt, nomod_einval);
+	STUB(sdpib, sdp_close, nomod_void);
+	STUB(sdpib, sdp_polldata, nomod_zero);
+	STUB(sdpib, sdp_ioctl, nomod_einval);
+	END_MODULE(sdpib);
+#endif
+
 
 /*
  * Stubs for kssl, the kernel SSL proxy

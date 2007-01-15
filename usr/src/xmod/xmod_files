@@ -67,6 +67,10 @@ cmd/cmd-inet/usr.sbin/bootconfchk
 ../closed/uts/intel/daplt
 ../closed/uts/common/io/ib/clients/daplt
 ../closed/uts/common/sys/ib/clients/daplt
+../closed/uts/sparc/sdpib
+../closed/uts/intel/sdpib
+../closed/uts/common/io/ib/clients/sdpib
+../closed/uts/common/sys/ib/clients/sdpib
 common/openssl
 lib/libresolv2/cylink
 lib/libresolv2/dnssafe

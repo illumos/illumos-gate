@@ -167,3 +167,4 @@ chxge:* 0666 root sys
 vsw:* 0666 root sys
 vnet:* 0666 root sys
 physmem:* 0600 root sys
+sdp:sdp 0666 root sys

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,7 +106,7 @@ static devfsadm_create_t misc_cbt[] = {
 	    "(^ip$)|(^tcp$)|(^udp$)|(^icmp$)|(^sctp$)|"
 	    "(^ip6$)|(^tcp6$)|(^udp6$)|(^icmp6$)|(^sctp6$)|"
 	    "(^rts$)|(^arp$)|(^ipsecah$)|(^ipsecesp$)|(^keysock$)|(^spdsock$)|"
-	    "(^nca$)|(^rds$)",
+	    "(^nca$)|(^rds$)|(^sdp$)",
 	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name
 	},
 	{ "pseudo", "ddi_pseudo",

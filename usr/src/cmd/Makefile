@@ -333,6 +333,7 @@ COMMON_SUBDIRS=		\
 	savecore	\
 	script		\
 	sdiff		\
+	sdpadm		\
 	sendmail	\
 	setfacl		\
 	setmnt		\
@@ -635,6 +636,7 @@ MSGSUBDIRS=		\
 	scadm		\
 	script		\
 	sdiff		\
+	sdpadm		\
 	sgs		\
 	sh		\
 	sleep		\

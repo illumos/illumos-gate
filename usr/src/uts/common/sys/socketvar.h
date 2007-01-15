@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -833,6 +833,11 @@ extern int	socktpi_setfl(vnode_t *, int, int, cred_t *);
 extern struct sonode	*sosctp_create(vnode_t *, int, int, int, int,
 			    struct sonode *, int *);
 extern int sosctp_init(void);
+
+/* SDP sockfs */
+extern struct sonode    *sosdp_create(vnode_t *, int, int, int, int,
+			    struct sonode *, int *);
+extern int sosdp_init(void);
 
 #endif
 
