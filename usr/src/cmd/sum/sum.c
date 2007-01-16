@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +33,8 @@
  */
 
 
+#define	TRUE	1
+#define	FALSE	0
 #define	WDMSK 0177777L
 #define	BUFSIZE 512
 #include <locale.h>
@@ -55,7 +56,7 @@ main(int argc, char **argv)
 	int		ca;
 	int		i		= 0;
 	int		alg		= 0;
-	int		errflg		= 0;
+	char		errflg		= FALSE;
 	int		c;
 	FILE		*f;
 	long long	nbytes;
@@ -91,7 +92,7 @@ main(int argc, char **argv)
 			if ((f = fopen(argv[i], "r")) == NULL) {
 				(void) fprintf(stderr, "sum: %s ", argv[i]);
 				perror("");
-				errflg += 10;
+				errflg = TRUE;
 				continue;
 			}
 		} else
@@ -116,7 +117,7 @@ main(int argc, char **argv)
 			}
 		}
 		if (ferror(f)) {
-			errflg++;
+			errflg = TRUE;
 			(void) fprintf(stderr, gettext("sum: read error "
 			    "on '%s': %s\n"), (argc > 0) ? argv[i] : "-",
 			    strerror(errno));
