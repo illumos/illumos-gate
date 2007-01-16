@@ -1998,7 +1998,6 @@ segspt_shmfault(struct hat *hat, struct seg *seg, caddr_t addr,
 	struct vnode *vp;
 	struct anon_map *amp;		/* XXX - for locknest */
 	struct anon *ap = NULL;
-	anon_sync_obj_t cookie;
 	size_t		pgsz;
 	pgcnt_t		pgcnt;
 	caddr_t		a;
@@ -2125,11 +2124,9 @@ segspt_shmfault(struct hat *hat, struct seg *seg, caddr_t addr,
 
 		ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
 		for (i = 0; i < npages; i++) {
-			anon_array_enter(amp, anon_index, &cookie);
 			ap = anon_get_ptr(amp->ahp, anon_index++);
 			ASSERT(ap != NULL);
 			swap_xlate(ap, &vp, &offset);
-			anon_array_exit(&cookie);
 			pp = page_lookup(vp, offset, SE_SHARED);
 			ASSERT(pp != NULL);
 			ppa[i] = pp;
