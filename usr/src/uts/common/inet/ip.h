@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -2519,7 +2519,6 @@ typedef struct ire_s {
 	ipaddr_t	ire_in_src_addr;
 					/* source ip-addr of incoming packet */
 	clock_t		ire_last_used_time;	/* Last used time */
-	struct ire_s 	*ire_fastpath;	/* Pointer to next ire in fastpath */
 	tsol_ire_gw_secattr_t *ire_gw_secattr; /* gateway security attributes */
 	zoneid_t	ire_zoneid;	/* for local address discrimination */
 	/*

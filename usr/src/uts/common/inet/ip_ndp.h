@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,6 +128,7 @@ extern ndp_g_t	ndp4, ndp6;
 #define	NCE_F_ANYCAST		0x20
 #define	NCE_F_CONDEMNED		0x40
 #define	NCE_F_UNSOL_ADV		0x80
+#define	NCE_F_BCAST		0x100
 
 #define	NCE_EXTERNAL_FLAGS_MASK \
 	(NCE_F_PERMANENT | NCE_F_MAPPING | NCE_F_ISROUTER | NCE_F_NONUD | \
@@ -331,6 +332,7 @@ extern	void	nce_queue_mp_common(nce_t *, mblk_t *, boolean_t);
 extern	void	ndp_flush_qd_mp(nce_t *);
 extern	nce_t	*nce_reinit(nce_t *);
 extern	void	nce_delete_hw_changed(nce_t *, void *);
+extern	void	nce_fastpath(nce_t *);
 
 #ifdef NCE_DEBUG
 extern	void	nce_trace_inactive(nce_t *);

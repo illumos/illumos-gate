@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -1765,11 +1765,7 @@ ill_downi_mrtun_srcif(ire_t *ire, char *ill_arg)
 void
 ill_fastpath_nack(ill_t *ill)
 {
-	if (ill->ill_isv6) {
-		nce_fastpath_list_dispatch(ill, NULL, NULL);
-	} else {
-		ire_fastpath_list_dispatch(ill, NULL, NULL);
-	}
+	nce_fastpath_list_dispatch(ill, NULL, NULL);
 }
 
 /* Consume an M_IOCACK of the fastpath probe. */
@@ -1796,38 +1792,7 @@ ill_fastpath_ack(ill_t *ill, mblk_t *mp)
 		 * Update all IRE's or NCE's that are waiting for
 		 * fastpath update.
 		 */
-		if (ill->ill_isv6) {
-			/*
-			 * update nce's in the fastpath list.
-			 */
-			nce_fastpath_list_dispatch(ill,
-			    ndp_fastpath_update, mp);
-		} else {
-
-			/*
-			 * update ire's in the fastpath list.
-			 */
-			ire_fastpath_list_dispatch(ill,
-			    ire_fastpath_update, mp);
-			/*
-			 * Check if we need to traverse reverse tunnel table.
-			 * Since there is only single ire_type (IRE_MIPRTUN)
-			 * in the table, we don't need to match on ire_type.
-			 * We have to check ire_mrtun_count and not the
-			 * ill_mrtun_refcnt since ill_mrtun_refcnt is set
-			 * on the incoming ill and here we are dealing with
-			 * outgoing ill.
-			 */
-			mutex_enter(&ire_mrtun_lock);
-			if (ire_mrtun_count != 0) {
-				mutex_exit(&ire_mrtun_lock);
-				ire_walk_ill_mrtun(MATCH_IRE_WQ, IRE_MIPRTUN,
-				    (void (*)(ire_t *, void *))
-					ire_fastpath_update, mp, ill);
-			} else {
-				mutex_exit(&ire_mrtun_lock);
-			}
-		}
+		nce_fastpath_list_dispatch(ill, ndp_fastpath_update, mp);
 		mp1 = mp->b_cont;
 		freeb(mp);
 		mp = mp1;
@@ -15470,10 +15435,8 @@ redo:
 		clear_ire->ire_marks |= IRE_MARK_CONDEMNED;
 		irb->irb_marks |= IRB_MARK_CONDEMNED;
 
-		if (clear_ire_stq != NULL) {
-			ire_fastpath_list_delete(
-			    (ill_t *)clear_ire_stq->ire_stq->q_ptr,
-			    clear_ire_stq);
+		if (clear_ire_stq != NULL && clear_ire_stq->ire_nce != NULL) {
+			nce_fastpath_list_delete(clear_ire_stq->ire_nce);
 			clear_ire_stq->ire_marks |= IRE_MARK_CONDEMNED;
 		}
 
@@ -24267,30 +24230,17 @@ ipif_getby_indexes(uint_t ifindex, uint_t lifidx, boolean_t isv6)
 }
 
 /*
- * Flush the fastpath by deleting any IRE's that are waiting for the fastpath,
- * and any IRE's that are using the fastpath.  There are two exceptions:
- * IRE_MIPRTUN and IRE_BROADCAST are difficult to recreate, so instead we just
- * nuke their nce_fp_mp's; see ire_fastpath_flush() for details.
+ * Flush the fastpath by deleting any nce's that are waiting for the fastpath,
+ * There is one exceptions IRE_BROADCAST are difficult to recreate,
+ * so instead we just nuke their nce_fp_mp's; see ndp_fastpath_flush()
+ * for details.
  */
 void
 ill_fastpath_flush(ill_t *ill)
 {
-	if (ill->ill_isv6) {
-		nce_fastpath_list_dispatch(ill, NULL, NULL);
-		ndp_walk(ill, (pfi_t)ndp_fastpath_flush, NULL);
-	} else {
-		ire_fastpath_list_dispatch(ill, NULL, NULL);
-		ire_walk_ill_v4(MATCH_IRE_WQ | MATCH_IRE_TYPE,
-		    IRE_CACHE | IRE_BROADCAST, ire_fastpath_flush, NULL, ill);
-		mutex_enter(&ire_mrtun_lock);
-		if (ire_mrtun_count != 0) {
-			mutex_exit(&ire_mrtun_lock);
-			ire_walk_ill_mrtun(MATCH_IRE_WQ, IRE_MIPRTUN,
-			    ire_fastpath_flush, NULL, ill);
-		} else {
-			mutex_exit(&ire_mrtun_lock);
-		}
-	}
+	nce_fastpath_list_dispatch(ill, NULL, NULL);
+	ndp_walk_common((ill->ill_isv6 ? &ndp6 : &ndp4), ill,
+	    (pfi_t)ndp_fastpath_flush, NULL, B_TRUE);
 }
 
 /*

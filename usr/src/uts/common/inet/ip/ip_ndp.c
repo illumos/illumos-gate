@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,7 +81,6 @@
 
 static	boolean_t nce_cmp_ll_addr(const nce_t *nce, const uchar_t *new_ll_addr,
     uint32_t ll_addr_len);
-static	void	nce_fastpath(nce_t *nce);
 static	void	nce_ire_delete(nce_t *nce);
 static	void	nce_ire_delete1(ire_t *ire, char *nce_arg);
 static	void 	nce_set_ll(nce_t *nce, uchar_t *ll_addr);
@@ -3220,7 +3219,7 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
  * Note that since ill_fastpath_probe() copies the mblk there is
  * no need for the hold beyond this function.
  */
-static void
+void
 nce_fastpath(nce_t *nce)
 {
 	ill_t	*ill = nce->nce_ill;
@@ -3260,8 +3259,6 @@ nce_fastpath_list_dispatch(ill_t *ill, boolean_t (*func)(nce_t *, void  *),
 	nce_t *first_nce;
 	nce_t *prev_nce = NULL;
 
-	ASSERT(ill != NULL && ill->ill_isv6);
-
 	mutex_enter(&ill->ill_lock);
 	first_nce = current_nce = (nce_t *)ill->ill_fastpath_list;
 	while (current_nce != (nce_t *)&ill->ill_fastpath_list) {
@@ -3299,7 +3296,6 @@ nce_fastpath_list_add(nce_t *nce)
 	ill_t *ill;
 
 	ill = nce->nce_ill;
-	ASSERT(ill != NULL && ill->ill_isv6);
 
 	mutex_enter(&ill->ill_lock);
 	mutex_enter(&nce->nce_lock);
@@ -3330,12 +3326,6 @@ nce_fastpath_list_delete(nce_t *nce)
 
 	ill = nce->nce_ill;
 	ASSERT(ill != NULL);
-	if (!ill->ill_isv6)  {
-		/*
-		 * v4 nce_t's do not have nce_fastpath set.
-		 */
-		return;
-	}
 
 	mutex_enter(&ill->ill_lock);
 	if (nce->nce_fastpath == NULL)
@@ -3429,8 +3419,30 @@ ndp_fastpath_flush(nce_t *nce, char *arg)
 	if (nce->nce_fp_mp == NULL || nce->nce_res_mp == NULL)
 		return;
 
-	/* Just delete the NCE... */
-	ndp_delete(nce);
+	if (nce->nce_ipversion == IPV4_VERSION &&
+	    nce->nce_flags & NCE_F_BCAST) {
+		/*
+		 * IPv4 BROADCAST entries:
+		 * We can't delete the nce since it is difficult to
+		 * recreate these without going through the
+		 * ipif down/up dance.
+		 *
+		 * All access to nce->nce_fp_mp in the case of these
+		 * is protected by nce_lock.
+		 */
+		mutex_enter(&nce->nce_lock);
+		if (nce->nce_fp_mp != NULL) {
+			freeb(nce->nce_fp_mp);
+			nce->nce_fp_mp = NULL;
+			mutex_exit(&nce->nce_lock);
+			nce_fastpath(nce);
+		} else {
+			mutex_exit(&nce->nce_lock);
+		}
+	} else {
+		/* Just delete the NCE... */
+		ndp_delete(nce);
+	}
 }
 
 /*

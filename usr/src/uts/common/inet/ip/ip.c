@@ -27681,7 +27681,7 @@ nak:
 			nce->nce_res_mp = mp1;
 			nce->nce_state = ND_REACHABLE;
 			mutex_exit(&nce->nce_lock);
-			ire_fastpath(ire);
+			nce_fastpath(nce);
 		}
 		/*
 		 * The cached nce_t has been updated to be reachable;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -313,8 +313,6 @@ extern	void	ire_delete_srcif(ire_t *);
 extern	void	ire_delete_v6(ire_t *);
 
 extern	void	ire_expire(ire_t *, char *);
-extern	void	ire_fastpath_flush(ire_t *, void *);
-extern	boolean_t ire_fastpath_update(ire_t *, void *);
 
 extern	void	ire_flush_cache_v4(ire_t *, int);
 extern	void	ire_flush_cache_v6(ire_t *, int);
@@ -376,16 +374,11 @@ extern boolean_t	ire_multirt_need_resolve_v6(const in6_addr_t *,
 extern ire_t	*ipif_lookup_multi_ire(ipif_t *, ipaddr_t);
 extern ire_t	*ipif_lookup_multi_ire_v6(ipif_t *, const in6_addr_t *);
 
-extern void	ire_fastpath_list_dispatch(ill_t *,
-    boolean_t (*)(ire_t *, void *), void *);
-extern void	ire_fastpath_list_delete(ill_t *, ire_t *);
-
 extern ire_t	*ire_get_next_bcast_ire(ire_t *, ire_t *);
 extern ire_t	*ire_get_next_default_ire(ire_t *, ire_t *);
 
 extern  void	ire_arpresolve(ire_t *,  ill_t *);
 extern  void	ire_freemblk(ire_t *);
-extern  void	ire_fastpath(ire_t *);
 extern boolean_t	ire_match_args(ire_t *, ipaddr_t, ipaddr_t, ipaddr_t,
     int, const ipif_t *, zoneid_t, uint32_t, const struct ts_label_s *, int);
 extern  int	ire_nce_init(ire_t *, mblk_t *, mblk_t *);

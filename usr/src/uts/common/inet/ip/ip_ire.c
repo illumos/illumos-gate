@@ -399,7 +399,6 @@ static void	ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type,
     pfv_t func, void *arg, uchar_t vers, ill_t *ill);
 static void	ire_cache_cleanup(irb_t *irb, uint32_t threshold, int cnt);
 extern void	ill_unlock_ills(ill_t **list, int cnt);
-static void	ire_fastpath_list_add(ill_t *ill, ire_t *ire);
 static	void	ip_nce_clookup_and_delete(nce_t *nce, void *arg);
 extern void	th_trace_rrecord(th_trace_t *);
 #ifdef IRE_DEBUG
@@ -2139,284 +2138,6 @@ ire_expire(ire_t *ire, char *arg)
 }
 
 /*
- * Do fast path probing if necessary.
- */
-void
-ire_fastpath(ire_t *ire)
-{
-	ill_t	*ill;
-	int res;
-
-	if (ire->ire_nce == NULL || ire->ire_nce->nce_fp_mp != NULL ||
-	    ire->ire_nce->nce_state != ND_REACHABLE ||
-	    ire->ire_nce->nce_res_mp == NULL) {
-
-		/*
-		 * Already contains fastpath info or
-		 * doesn't have DL_UNITDATA_REQ header or
-		 * or is an incomplete ire in the ire table
-		 * or is a loopback broadcast ire i.e. no stq.
-		 */
-		return;
-	}
-	ill = ire_to_ill(ire);
-	if (ill == NULL)
-		return;
-	ire_fastpath_list_add(ill, ire);
-	res = ill_fastpath_probe(ill, ire->ire_nce->nce_res_mp);
-	/*
-	 * EAGAIN is an indication of a transient error
-	 * i.e. allocation failure etc. leave the ire in the list it will
-	 * be updated when another probe happens for another ire if not
-	 * it will be taken out of the list when the ire is deleted.
-	 */
-	if (res != 0 && res != EAGAIN)
-		ire_fastpath_list_delete(ill, ire);
-}
-
-/*
- * Update all IRE's that are not in fastpath mode and
- * have an dlureq_mp that matches mp. mp->b_cont contains
- * the fastpath header.
- *
- * Returns TRUE if entry should be dequeued, or FALSE otherwise.
- */
-boolean_t
-ire_fastpath_update(ire_t *ire, void *arg)
-{
-	mblk_t 	*mp,  *fp_mp;
-	uchar_t 	*up, *up2;
-	ptrdiff_t	cmplen;
-	nce_t		*arpce;
-
-	ASSERT((ire->ire_type & (IRE_CACHE | IRE_BROADCAST |
-	    IRE_MIPRTUN)) != 0);
-
-	/*
-	 * Already contains fastpath info or doesn't have
-	 * DL_UNITDATA_REQ header or is an incomplete ire.
-	 */
-	if (ire->ire_nce == NULL || ire->ire_nce->nce_res_mp == NULL ||
-	    ire->ire_nce->nce_fp_mp != NULL ||
-	    ire->ire_nce->nce_state != ND_REACHABLE)
-		return (B_TRUE);
-
-	ip2dbg(("ire_fastpath_update: trying\n"));
-	mp = arg;
-	up = mp->b_rptr;
-	cmplen = mp->b_wptr - up;
-	/* Serialize multiple fast path updates */
-	mutex_enter(&ire->ire_nce->nce_lock);
-	up2 = ire->ire_nce->nce_res_mp->b_rptr;
-	ASSERT(cmplen >= 0);
-	if (ire->ire_nce->nce_res_mp->b_wptr - up2 != cmplen ||
-	    bcmp(up, up2, cmplen) != 0) {
-		mutex_exit(&ire->ire_nce->nce_lock);
-		/*
-		 * Don't take the ire off the fastpath list yet,
-		 * since the response may come later.
-		 */
-		return (B_FALSE);
-	}
-	arpce = ire->ire_nce;
-	/* Matched - install mp as the nce_fp_mp */
-	ip1dbg(("ire_fastpath_update: match\n"));
-	fp_mp = dupb(mp->b_cont);
-	if (fp_mp) {
-		/*
-		 * We checked nce_fp_mp above. Check it again with the
-		 * lock. Update fp_mp only if it has not been done
-		 * already.
-		 */
-		if (arpce->nce_fp_mp == NULL) {
-			/*
-			 * ire_ll_hdr_length is just an optimization to
-			 * store the length. It is used to return the
-			 * fast path header length to the upper layers.
-			 */
-			arpce->nce_fp_mp = fp_mp;
-			ire->ire_ll_hdr_length =
-			    (uint_t)(fp_mp->b_wptr - fp_mp->b_rptr);
-		} else {
-			freeb(fp_mp);
-		}
-	}
-	mutex_exit(&ire->ire_nce->nce_lock);
-	return (B_TRUE);
-}
-
-/*
- * This function handles the DL_NOTE_FASTPATH_FLUSH notification from the
- * driver.
- */
-/* ARGSUSED */
-void
-ire_fastpath_flush(ire_t *ire, void *arg)
-{
-	ill_t	*ill;
-	int	res;
-
-	/* No fastpath info? */
-	if (ire->ire_nce == NULL ||
-	    ire->ire_nce->nce_fp_mp == NULL || ire->ire_nce->nce_res_mp == NULL)
-		return;
-
-	/*
-	 * Just remove the IRE if it is for non-broadcast dest.  Then
-	 * we will create another one which will have the correct
-	 * fastpath info.
-	 */
-	switch (ire->ire_type) {
-	case IRE_CACHE:
-		ire_delete(ire);
-		break;
-	case IRE_MIPRTUN:
-	case IRE_BROADCAST:
-		/*
-		 * We can't delete the ire since it is difficult to
-		 * recreate these ire's without going through the
-		 * ipif down/up dance. The nce_fp_mp is protected by the
-		 * nce_lock in the case of IRE_MIPRTUN and IRE_BROADCAST.
-		 * All access to ire->ire_nce->nce_fp_mp in the case of these
-		 * 2 ire types * is protected by nce_lock.
-		 */
-		mutex_enter(&ire->ire_nce->nce_lock);
-		if (ire->ire_nce->nce_fp_mp != NULL) {
-			freeb(ire->ire_nce->nce_fp_mp);
-			ire->ire_nce->nce_fp_mp = NULL;
-			mutex_exit(&ire->ire_nce->nce_lock);
-			/*
-			 * No fastpath probe if there is no stq i.e.
-			 * i.e. the case of loopback broadcast ire.
-			 */
-			if (ire->ire_stq == NULL)
-				break;
-			ill = (ill_t *)((ire->ire_stq)->q_ptr);
-			ire_fastpath_list_add(ill, ire);
-			res = ill_fastpath_probe(ill, ire->ire_nce->nce_res_mp);
-			/*
-			 * EAGAIN is an indication of a transient error
-			 * i.e. allocation failure etc. leave the ire in the
-			 * list it will be updated when another probe happens
-			 * for another ire if not it will be taken out of the
-			 * list when the ire is deleted.
-			 */
-			if (res != 0 && res != EAGAIN)
-				ire_fastpath_list_delete(ill, ire);
-		} else {
-			mutex_exit(&ire->ire_nce->nce_lock);
-		}
-		break;
-	default:
-		/* This should not happen! */
-		ip0dbg(("ire_fastpath_flush: Wrong ire type %s\n",
-		    ip_nv_lookup(ire_nv_tbl, (int)ire->ire_type)));
-		break;
-	}
-}
-
-/*
- * Drain the list of ire's waiting for fastpath response.
- */
-void
-ire_fastpath_list_dispatch(ill_t *ill, boolean_t (*func)(ire_t *, void *),
-    void *arg)
-{
-	ire_t	 *next_ire;
-	ire_t	 *current_ire;
-	ire_t	 *first_ire;
-	ire_t	 *prev_ire = NULL;
-
-	ASSERT(ill != NULL);
-
-	mutex_enter(&ill->ill_lock);
-	first_ire = current_ire = (ire_t *)ill->ill_fastpath_list;
-	while (current_ire != (ire_t *)&ill->ill_fastpath_list) {
-		next_ire = current_ire->ire_fastpath;
-		/*
-		 * Take it off the list if we're flushing, or if the callback
-		 * routine tells us to do so.  Otherwise, leave the ire in the
-		 * fastpath list to handle any pending response from the lower
-		 * layer.  We can't drain the list when the callback routine
-		 * comparison failed, because the response is asynchronous in
-		 * nature, and may not arrive in the same order as the list
-		 * insertion.
-		 */
-		if (func == NULL || func(current_ire, arg)) {
-			current_ire->ire_fastpath = NULL;
-			if (current_ire == first_ire)
-				ill->ill_fastpath_list = first_ire = next_ire;
-			else
-				prev_ire->ire_fastpath = next_ire;
-		} else {
-			/* previous element that is still in the list */
-			prev_ire = current_ire;
-		}
-		current_ire = next_ire;
-	}
-	mutex_exit(&ill->ill_lock);
-}
-
-/*
- * Add ire to the ire fastpath list.
- */
-static void
-ire_fastpath_list_add(ill_t *ill, ire_t *ire)
-{
-	ASSERT(ill != NULL);
-	ASSERT(ire->ire_stq != NULL);
-
-	rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
-	mutex_enter(&ill->ill_lock);
-
-	/*
-	 * if ire has not been deleted and
-	 * is not already in the list add it.
-	 */
-	if (((ire->ire_marks & IRE_MARK_CONDEMNED) == 0) &&
-	    (ire->ire_fastpath == NULL)) {
-		ire->ire_fastpath = (ire_t *)ill->ill_fastpath_list;
-		ill->ill_fastpath_list = ire;
-	}
-
-	mutex_exit(&ill->ill_lock);
-	rw_exit(&ire->ire_bucket->irb_lock);
-}
-
-/*
- * remove ire from the ire fastpath list.
- */
-void
-ire_fastpath_list_delete(ill_t *ill, ire_t *ire)
-{
-	ire_t	*ire_ptr;
-
-	ASSERT(ire->ire_stq != NULL && ill != NULL);
-
-	mutex_enter(&ill->ill_lock);
-	if (ire->ire_fastpath == NULL)
-		goto done;
-
-	ASSERT(ill->ill_fastpath_list != &ill->ill_fastpath_list);
-
-	if (ill->ill_fastpath_list == ire) {
-		ill->ill_fastpath_list = ire->ire_fastpath;
-	} else {
-		ire_ptr = ill->ill_fastpath_list;
-		while (ire_ptr != (ire_t *)&ill->ill_fastpath_list) {
-			if (ire_ptr->ire_fastpath == ire) {
-				ire_ptr->ire_fastpath = ire->ire_fastpath;
-				break;
-			}
-			ire_ptr = ire_ptr->ire_fastpath;
-		}
-	}
-	ire->ire_fastpath = NULL;
-done:
-	mutex_exit(&ill->ill_lock);
-}
-
-/*
  * Return any local address.  We use this to target ourselves
  * when the src address was specified as 'default'.
  * Preference for IRE_LOCAL entries.
@@ -3844,8 +3565,11 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 	 * in the list. Otherwise the fast path ack won't find the ire in
 	 * the table.
 	 */
-	if (ire->ire_type == IRE_CACHE || ire->ire_type == IRE_BROADCAST)
-		ire_fastpath(ire);
+	if (ire->ire_type == IRE_CACHE ||
+	    (ire->ire_type == IRE_BROADCAST && ire->ire_stq != NULL)) {
+		ASSERT(ire->ire_nce != NULL);
+		nce_fastpath(ire->ire_nce);
+	}
 	if (ire->ire_ipif != NULL)
 		ASSERT(!MUTEX_HELD(&ire->ire_ipif->ipif_ill->ill_lock));
 	*ire_p = ire;
@@ -4074,12 +3798,11 @@ ire_delete(ire_t *ire)
 	/*
 	 * In case of V4 we might still be waiting for fastpath ack.
 	 */
-	if (ire->ire_ipversion == IPV4_VERSION && ire->ire_stq != NULL) {
-		ill_t *ill;
-
-		ill = ire_to_ill(ire);
-		if (ill != NULL)
-			ire_fastpath_list_delete(ill, ire);
+	if (ire->ire_ipversion == IPV4_VERSION &&
+	    (ire->ire_type == IRE_CACHE ||
+	    (ire->ire_type == IRE_BROADCAST && ire->ire_stq != NULL))) {
+		ASSERT(ire->ire_nce != NULL);
+		nce_fastpath_list_delete(ire->ire_nce);
 	}
 
 	if (ire->ire_ptpn == NULL) {
@@ -4213,7 +3936,6 @@ ire_inactive(ire_t *ire)
 	}
 
 	if (ire->ire_mp != NULL) {
-		ASSERT(ire->ire_fastpath == NULL);
 		ASSERT(ire->ire_bucket == NULL);
 		mutex_destroy(&ire->ire_lock);
 		BUMP_IRE_STATS(ire_stats_v4, ire_stats_freed);
@@ -4346,7 +4068,6 @@ ire_inactive(ire_t *ire)
 	}
 end:
 	/* This should be true for both V4 and V6 */
-	ASSERT(ire->ire_fastpath == NULL);
 
 	if ((ire->ire_type & IRE_FORWARDTABLE) &&
 	    (ire->ire_ipversion == IPV4_VERSION) &&
@@ -5486,7 +5207,7 @@ ire_add_mrtun(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 	}
 
 	ire_atomic_end(irb_ptr, ire);
-	ire_fastpath(ire);
+	nce_fastpath(ire->ire_nce);
 	*ire_p = ire;
 	return (0);
 }
@@ -6947,7 +6668,7 @@ ire_nce_init(ire_t *ire, mblk_t *fp_mp, mblk_t *res_mp)
 		 */
 		mutex_enter(&arpce->nce_lock);
 		arpce->nce_state = ND_REACHABLE;
-		arpce->nce_flags |= NCE_F_PERMANENT;
+		arpce->nce_flags |= (NCE_F_PERMANENT | NCE_F_BCAST);
 		arpce->nce_last = TICK_TO_MSEC(lbolt64);
 		ire->ire_nce = arpce;
 		mutex_exit(&arpce->nce_lock);
