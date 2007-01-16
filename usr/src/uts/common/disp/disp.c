@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -626,7 +626,6 @@ idle()
 			if (t == T_DONTSTEAL)
 				continue;
 			idle_exit();
-			restore_mstate(t);
 			swtch_to(t);
 		}
 		idle_enter(); /* returned from swtch/swtch_to */
@@ -715,7 +714,6 @@ reschedule:
 		if (disp_ratify(tp, kpq) != NULL) {
 			TRACE_1(TR_FAC_DISP, TR_DISP_END,
 			    "disp_end:tid %p", tp);
-			restore_mstate(tp);
 			return (tp);
 		}
 	}
@@ -754,7 +752,6 @@ reschedule:
 		}
 		TRACE_1(TR_FAC_DISP, TR_DISP_END,
 			"disp_end:tid %p", tp);
-		restore_mstate(tp);
 		return (tp);
 	}
 
@@ -820,7 +817,6 @@ reschedule:
 	if (disp_ratify(tp, kpq) == NULL)
 		goto reschedule;
 
-	restore_mstate(tp);
 	return (tp);
 }
 
@@ -883,6 +879,22 @@ swtch()
 				CHIP_NRUNNING(cp->cpu_chip, -1);
 			}
 
+			/*
+			 * If t was previously in the TS_ONPROC state,
+			 * setfrontdq and setbackdq won't have set its t_waitrq.
+			 * Since we now finally know that we're switching away
+			 * from this thread, set its t_waitrq if it is on a run
+			 * queue.
+			 */
+			if ((t->t_state == TS_RUN) && (t->t_waitrq == 0)) {
+				t->t_waitrq = gethrtime_unscaled();
+			}
+
+			/*
+			 * restore mstate of thread that we are switching to
+			 */
+			restore_mstate(next);
+
 			CPU_STATS_ADDQ(cp, sys, pswitch, 1);
 			cp->cpu_last_swtch = t->t_disp_time = lbolt;
 			TRACE_0(TR_FAC_DISP, TR_RESUME_START, "resume_start");
@@ -933,6 +945,8 @@ swtch_from_zombie()
 
 	if (next == cpu->cpu_idle_thread)
 		CHIP_NRUNNING(cpu->cpu_chip, -1);
+
+	restore_mstate(next);
 
 	if (dtrace_vtime_active)
 		dtrace_vtime_switch(next);
@@ -1017,6 +1031,19 @@ swtch_to(kthread_t *next)
 
 	/* record last execution time */
 	cp->cpu_last_swtch = curthread->t_disp_time = lbolt;
+
+	/*
+	 * If t was previously in the TS_ONPROC state, setfrontdq and setbackdq
+	 * won't have set its t_waitrq.  Since we now finally know that we're
+	 * switching away from this thread, set its t_waitrq if it is on a run
+	 * queue.
+	 */
+	if ((curthread->t_state == TS_RUN) && (curthread->t_waitrq == 0)) {
+		curthread->t_waitrq = gethrtime_unscaled();
+	}
+
+	/* restore next thread to previously running microstate */
+	restore_mstate(next);
 
 	if (dtrace_vtime_active)
 		dtrace_vtime_switch(next);
@@ -1161,17 +1188,6 @@ setbackdq(kthread_t *tp)
 
 	ASSERT(THREAD_LOCK_HELD(tp));
 	ASSERT((tp->t_schedflag & TS_ALLSTART) == 0);
-
-	if (tp->t_waitrq == 0) {
-		hrtime_t curtime;
-
-		curtime = gethrtime_unscaled();
-		(void) cpu_update_pct(tp, curtime);
-		tp->t_waitrq = curtime;
-	} else {
-		(void) cpu_update_pct(tp, gethrtime_unscaled());
-	}
-
 	ASSERT(!thread_on_queue(tp));	/* make sure tp isn't on a runq */
 
 	/*
@@ -1254,6 +1270,24 @@ setbackdq(kthread_t *tp)
 		    tp->t_weakbound_cpu : tp->t_bound_cpu;
 		bound = 1;
 	}
+	/*
+	 * A thread that is ONPROC may be temporarily placed on the run queue
+	 * but then chosen to run again by disp.  If the thread we're placing on
+	 * the queue is in TS_ONPROC state, don't set its t_waitrq until a
+	 * replacement process is actually scheduled in swtch().  In this
+	 * situation, curthread is the only thread that could be in the ONPROC
+	 * state.
+	 */
+	if ((tp != curthread) && (tp->t_waitrq == 0)) {
+		hrtime_t curtime;
+
+		curtime = gethrtime_unscaled();
+		(void) cpu_update_pct(tp, curtime);
+		tp->t_waitrq = curtime;
+	} else {
+		(void) cpu_update_pct(tp, gethrtime_unscaled());
+	}
+
 	dp = cp->cpu_disp;
 	disp_lock_enter_high(&dp->disp_lock);
 
@@ -1332,17 +1366,6 @@ setfrontdq(kthread_t *tp)
 
 	ASSERT(THREAD_LOCK_HELD(tp));
 	ASSERT((tp->t_schedflag & TS_ALLSTART) == 0);
-
-	if (tp->t_waitrq == 0) {
-		hrtime_t curtime;
-
-		curtime = gethrtime_unscaled();
-		(void) cpu_update_pct(tp, curtime);
-		tp->t_waitrq = curtime;
-	} else {
-		(void) cpu_update_pct(tp, gethrtime_unscaled());
-	}
-
 	ASSERT(!thread_on_queue(tp));	/* make sure tp isn't on a runq */
 
 	/*
@@ -1396,6 +1419,25 @@ setfrontdq(kthread_t *tp)
 		    tp->t_weakbound_cpu : tp->t_bound_cpu;
 		bound = 1;
 	}
+
+	/*
+	 * A thread that is ONPROC may be temporarily placed on the run queue
+	 * but then chosen to run again by disp.  If the thread we're placing on
+	 * the queue is in TS_ONPROC state, don't set its t_waitrq until a
+	 * replacement process is actually scheduled in swtch().  In this
+	 * situation, curthread is the only thread that could be in the ONPROC
+	 * state.
+	 */
+	if ((tp != curthread) && (tp->t_waitrq == 0)) {
+		hrtime_t curtime;
+
+		curtime = gethrtime_unscaled();
+		(void) cpu_update_pct(tp, curtime);
+		tp->t_waitrq = curtime;
+	} else {
+		(void) cpu_update_pct(tp, gethrtime_unscaled());
+	}
+
 	dp = cp->cpu_disp;
 	disp_lock_enter_high(&dp->disp_lock);
 
