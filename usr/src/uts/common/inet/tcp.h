@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -235,40 +235,39 @@ typedef struct tcp_s {
 		tcp_fin_rcvd : 1,	/* Have we seen a FIN? */
 		tcp_fin_sent : 1,	/* Have we sent our FIN yet? */
 		tcp_ordrel_done : 1,	/* Have we sent the ord_rel upstream? */
-		tcp_flow_stopped : 1,	/* Have we flow controlled xmitter? */
-
 		tcp_detached : 1,	/* If we're detached from a stream */
+
 		tcp_bind_pending : 1,	/* Client is waiting for bind ack */
 		tcp_unbind_pending : 1, /* Client sent T_UNBIND_REQ */
 		tcp_deferred_clean_death : 1,
 					/* defer tcp endpoint cleanup etc. */
-
 		tcp_conn_def_q0: 1,	/* move from q0 to q deferred */
+
 		tcp_ka_enabled: 1,	/* Connection KeepAlive Timer needed */
 		tcp_zero_win_probe: 1,	/* Zero win probing is in progress */
 		tcp_loopback: 1,	/* src and dst are the same machine */
-
 		tcp_localnet: 1,	/* src and dst are on the same subnet */
+
 		tcp_syn_defense: 1,	/* For defense against SYN attack */
 #define	tcp_dontdrop	tcp_syn_defense
 		tcp_set_timer : 1,
 		tcp_active_open: 1,	/* This is a active open */
-
 		tcp_timeout : 1,	/* qbufcall failed, qtimeout pending */
+
 		tcp_rexmit : 1,		/* TCP is retransmitting */
 		tcp_snd_sack_ok : 1,	/* Can use SACK for this connection */
 		tcp_empty_flag : 1,	/* Empty flag for future use */
-
 		tcp_recvdstaddr : 1,	/* return T_EXTCONN_IND with dst addr */
+
 		tcp_hwcksum : 1,	/* The NIC is capable of hwcksum */
 		tcp_ip_forward_progress : 1,
 		tcp_anon_priv_bind : 1,
-
 		tcp_ecn_ok : 1,		/* Can use ECN for this connection */
+
 		tcp_ecn_echo_on : 1,	/* Need to do ECN echo */
 		tcp_ecn_cwr_sent : 1,	/* ECN_CWR has been sent */
-		tcp_cwr : 1;		/* Cwnd has reduced recently */
-
+		tcp_cwr : 1,		/* Cwnd has reduced recently */
+		tcp_pad_to_bit31 : 1;
 	/* Following manipulated by TCP under squeue protection */
 	uint32_t
 		tcp_mdt : 1,		/* Lower layer is capable of MDT */
@@ -528,9 +527,11 @@ typedef struct tcp_s {
 	uint_t	tcp_fuse_rcv_unread_hiwater;	/* max # of outstanding pkts */
 	/*
 	 * The following fusion-related fields and bit fields are to be
-	 * manipulated with squeue protection or with tcp_fuse_lock held.
+	 * manipulated with squeue protection or with tcp_non_sq_lock held.
+	 * tcp_non_sq_lock is used to protect fields that may be modified
+	 * accessed outside the squeue.
 	 */
-	kmutex_t tcp_fuse_lock;
+	kmutex_t tcp_non_sq_lock;
 	kcondvar_t tcp_fuse_plugcv;
 	uint_t tcp_fuse_rcv_unread_cnt;	/* # of outstanding pkts */
 	uint32_t
@@ -550,6 +551,7 @@ typedef struct tcp_s {
 	 */
 	boolean_t	tcp_issocket;	/* this is a socket tcp */
 
+	/* protected by the tcp_non_sq_lock lock */
 	uint32_t	tcp_squeue_bytes;
 	/*
 	 * Kernel SSL session information
@@ -579,6 +581,16 @@ typedef struct tcp_s {
 	 */
 	struct tcp_s	*tcp_eager_prev_drop_q0;
 	struct tcp_s	*tcp_eager_next_drop_q0;
+
+	/*
+	 * Have we flow controlled xmitter?
+	 * This variable can be modified outside the squeue and hence must
+	 * not be declared as a bit field along with the rest that are
+	 * modified only within the squeue.
+	 * protected by the tcp_non_sq_lock lock.
+	 */
+	boolean_t	tcp_flow_stopped;
+
 #ifdef DEBUG
 	pc_t			tcmp_stk[15];
 #endif

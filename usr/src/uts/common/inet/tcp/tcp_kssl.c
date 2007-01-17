@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,10 +137,9 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 			 * outgoing flow. tcp_output() will decrement it
 			 * as they are sent out.
 			 */
-			ASSERT(!MUTEX_HELD(&connp->conn_lock));
-			mutex_enter(&connp->conn_lock);
+			mutex_enter(&tcp->tcp_non_sq_lock);
 			tcp->tcp_squeue_bytes += msgdsize(outmp);
-			mutex_exit(&connp->conn_lock);
+			mutex_exit(&tcp->tcp_non_sq_lock);
 			tcp_output(connp, outmp, NULL);
 
 		/* FALLTHROUGH */
@@ -330,14 +329,11 @@ tcp_kssl_input_callback(void *arg, mblk_t *mp, kssl_cmd_t kssl_cmd)
 			/*
 			 * See comment in tcp_kssl_input() call to tcp_output()
 			 */
-			ASSERT(!MUTEX_HELD(&connp->conn_lock));
-			mutex_enter(&connp->conn_lock);
-			CONN_INC_REF_LOCKED(connp);
+			mutex_enter(&tcp->tcp_non_sq_lock);
 			tcp->tcp_squeue_bytes += msgdsize(mp);
-			mutex_exit(&connp->conn_lock);
-		} else {
-			CONN_INC_REF(connp);
+			mutex_exit(&tcp->tcp_non_sq_lock);
 		}
+		CONN_INC_REF(connp);
 		(*tcp_squeue_wput_proc)(connp->conn_sqp, mp,
 		    tcp_output, connp, SQTAG_TCP_OUTPUT);
 

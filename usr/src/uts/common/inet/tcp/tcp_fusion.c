@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,18 +62,18 @@
  * because the tcp_fuse_rrw() path bypasses the M_PROTO processing done
  * by strsock_proto() hook.
  *
- * Sychronization is handled by squeue and the mutex tcp_fuse_lock.
+ * Sychronization is handled by squeue and the mutex tcp_non_sq_lock.
  * One of the requirements for fusion to succeed is that both endpoints
  * need to be using the same squeue.  This ensures that neither side
  * can disappear while the other side is still sending data.  By itself,
  * squeue is not sufficient for guaranteeing safety when synchronous
  * streams is enabled.  The reason is that tcp_fuse_rrw() doesn't enter
  * the squeue and its access to tcp_rcv_list and other fusion-related
- * fields needs to be sychronized with the sender.  tcp_fuse_lock is
+ * fields needs to be sychronized with the sender.  tcp_non_sq_lock is
  * used for this purpose.  When there is urgent data, the sender needs
  * to push the data up the receiver's streams read queue.  In order to
- * avoid holding the tcp_fuse_lock across putnext(), the sender sets
- * the peer tcp's tcp_fuse_syncstr_plugged bit and releases tcp_fuse_lock
+ * avoid holding the tcp_non_sq_lock across putnext(), the sender sets
+ * the peer tcp's tcp_fuse_syncstr_plugged bit and releases tcp_non_sq_lock
  * (see macro TCP_FUSE_SYNCSTR_PLUG_DRAIN()).  If tcp_fuse_rrw() enters
  * after this point, it will see that synchronous streams is plugged and
  * will wait on tcp_fuse_plugcv.  After the sender has finished pushing up
@@ -456,6 +456,8 @@ tcp_fuse_output_urg(tcp_t *tcp, mblk_t *mp)
 
 /*
  * Fusion output routine, called by tcp_output() and tcp_wput_proto().
+ * If we are modifying any member that can be changed outside the squeue,
+ * like tcp_flow_stopped, we need to take tcp_non_sq_lock.
  */
 boolean_t
 tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
@@ -597,7 +599,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		freemsg(mp1);
 	}
 
-	mutex_enter(&peer_tcp->tcp_fuse_lock);
+	mutex_enter(&peer_tcp->tcp_non_sq_lock);
 	/*
 	 * Wake up and signal the peer; it is okay to do this before
 	 * enqueueing because we are holding the lock.  One of the
@@ -644,6 +646,20 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	if (TCP_IS_DETACHED(peer_tcp) || max_unread == 0)
 		max_unread = UINT_MAX;
 
+	/*
+	 * Since we are accessing our tcp_flow_stopped and might modify it,
+	 * we need to take tcp->tcp_non_sq_lock. The lock for the highest
+	 * address is held first. Dropping peer_tcp->tcp_non_sq_lock should
+	 * not be an issue here since we are within the squeue and the peer
+	 * won't disappear.
+	 */
+	if (tcp > peer_tcp) {
+		mutex_exit(&peer_tcp->tcp_non_sq_lock);
+		mutex_enter(&tcp->tcp_non_sq_lock);
+		mutex_enter(&peer_tcp->tcp_non_sq_lock);
+	} else {
+		mutex_enter(&tcp->tcp_non_sq_lock);
+	}
 	flow_stopped = tcp->tcp_flow_stopped;
 	if (!flow_stopped &&
 	    (((peer_tcp->tcp_direct_sockfs || TCP_IS_DETACHED(peer_tcp)) &&
@@ -662,7 +678,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		tcp_clrqfull(tcp);
 		flow_stopped = B_FALSE;
 	}
-
+	mutex_exit(&tcp->tcp_non_sq_lock);
 	loopback_packets++;
 	tcp->tcp_last_sent_len = send_size;
 
@@ -682,7 +698,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	BUMP_LOCAL(tcp->tcp_obsegs);
 	BUMP_LOCAL(peer_tcp->tcp_ibsegs);
 
-	mutex_exit(&peer_tcp->tcp_fuse_lock);
+	mutex_exit(&peer_tcp->tcp_non_sq_lock);
 
 	DTRACE_PROBE2(tcp__fuse__output, tcp_t *, tcp, uint_t, send_size);
 
@@ -826,14 +842,26 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 /*
  * Synchronous stream entry point for sockfs to retrieve
  * data directly from tcp_rcv_list.
+ * tcp_fuse_rrw() might end up modifying the peer's tcp_flow_stopped,
+ * for which it  must take the tcp_non_sq_lock of the peer as well
+ * making any change. The order of taking the locks is based on
+ * the TCP pointer itself. Before we get the peer we need to take
+ * our tcp_non_sq_lock so that the peer doesn't disappear. However,
+ * we cannot drop the lock if we have to grab the peer's lock (because
+ * of ordering), since the peer might disappear in the interim. So,
+ * we take our tcp_non_sq_lock, get the peer, increment the ref on the
+ * peer's conn, drop all the locks and then take the tcp_non_sq_lock in the
+ * desired order. Incrementing the conn ref on the peer means that the
+ * peer won't disappear when we drop our tcp_non_sq_lock.
  */
 int
 tcp_fuse_rrw(queue_t *q, struiod_t *dp)
 {
 	tcp_t *tcp = Q_TO_CONN(q)->conn_tcp;
 	mblk_t *mp;
+	tcp_t *peer_tcp;
 
-	mutex_enter(&tcp->tcp_fuse_lock);
+	mutex_enter(&tcp->tcp_non_sq_lock);
 
 	/*
 	 * If tcp_fuse_syncstr_plugged is set, then another thread is moving
@@ -841,16 +869,19 @@ tcp_fuse_rrw(queue_t *q, struiod_t *dp)
 	 * done, then return EBUSY so that strget() will dequeue data from the
 	 * stream head to ensure data is drained in-order.
 	 */
+plugged:
 	if (tcp->tcp_fuse_syncstr_plugged) {
 		do {
-			cv_wait(&tcp->tcp_fuse_plugcv, &tcp->tcp_fuse_lock);
+			cv_wait(&tcp->tcp_fuse_plugcv, &tcp->tcp_non_sq_lock);
 		} while (tcp->tcp_fuse_syncstr_plugged);
 
-		mutex_exit(&tcp->tcp_fuse_lock);
+		mutex_exit(&tcp->tcp_non_sq_lock);
 		TCP_STAT(tcp_fusion_rrw_plugged);
 		TCP_STAT(tcp_fusion_rrw_busy);
 		return (EBUSY);
 	}
+
+	peer_tcp = tcp->tcp_loopback_peer;
 
 	/*
 	 * If someone had turned off tcp_direct_sockfs or if synchronous
@@ -858,13 +889,33 @@ tcp_fuse_rrw(queue_t *q, struiod_t *dp)
 	 * dequeue data from the stream head instead.
 	 */
 	if (!tcp->tcp_direct_sockfs || tcp->tcp_fuse_syncstr_stopped) {
-		mutex_exit(&tcp->tcp_fuse_lock);
+		mutex_exit(&tcp->tcp_non_sq_lock);
 		TCP_STAT(tcp_fusion_rrw_busy);
 		return (EBUSY);
 	}
 
+	/*
+	 * Grab lock in order. The highest addressed tcp is locked first.
+	 * We don't do this within the tcp_rcv_list check since if we
+	 * have to drop the lock, for ordering, then the tcp_rcv_list
+	 * could change.
+	 */
+	if (peer_tcp > tcp) {
+		CONN_INC_REF(peer_tcp->tcp_connp);
+		mutex_exit(&tcp->tcp_non_sq_lock);
+		mutex_enter(&peer_tcp->tcp_non_sq_lock);
+		mutex_enter(&tcp->tcp_non_sq_lock);
+		CONN_DEC_REF(peer_tcp->tcp_connp);
+		/* This might have changed in the interim */
+		if (tcp->tcp_fuse_syncstr_plugged) {
+			mutex_exit(&peer_tcp->tcp_non_sq_lock);
+			goto plugged;
+		}
+	} else {
+		mutex_enter(&peer_tcp->tcp_non_sq_lock);
+	}
+
 	if ((mp = tcp->tcp_rcv_list) != NULL) {
-		tcp_t *peer_tcp = tcp->tcp_loopback_peer;
 
 		DTRACE_PROBE3(tcp__fuse__rrw, tcp_t *, tcp,
 		    uint32_t, tcp->tcp_rcv_cnt, ssize_t, dp->d_uio.uio_resid);
@@ -892,7 +943,7 @@ tcp_fuse_rrw(queue_t *q, struiod_t *dp)
 			TCP_STAT(tcp_fusion_backenabled);
 		}
 	}
-
+	mutex_exit(&peer_tcp->tcp_non_sq_lock);
 	/*
 	 * Either we just dequeued everything or we get here from sockfs
 	 * and have nothing to return; in this case clear RSLEEP.
@@ -903,7 +954,7 @@ tcp_fuse_rrw(queue_t *q, struiod_t *dp)
 	ASSERT(tcp->tcp_fuse_rcv_unread_cnt == 0);
 	STR_WAKEUP_CLEAR(STREAM(q));
 
-	mutex_exit(&tcp->tcp_fuse_lock);
+	mutex_exit(&tcp->tcp_non_sq_lock);
 	dp->d_mp = mp;
 	return (0);
 }
@@ -922,7 +973,7 @@ tcp_fuse_rinfop(queue_t *q, infod_t *dp)
 	int	error = 0;
 	struct stdata *stp = STREAM(q);
 
-	mutex_enter(&tcp->tcp_fuse_lock);
+	mutex_enter(&tcp->tcp_non_sq_lock);
 	/* If shutdown on read has happened, return nothing */
 	mutex_enter(&stp->sd_lock);
 	if (stp->sd_flag & STREOF) {
@@ -989,7 +1040,7 @@ tcp_fuse_rinfop(queue_t *q, infod_t *dp)
 		dp->d_cmd &= ~INFOD_COPYOUT;
 	}
 done:
-	mutex_exit(&tcp->tcp_fuse_lock);
+	mutex_exit(&tcp->tcp_non_sq_lock);
 
 	dp->d_res |= res;
 

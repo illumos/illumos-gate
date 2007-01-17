@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,9 +76,9 @@ extern "C" {
  */
 #define	TCP_FUSE_SYNCSTR_STOP(tcp) {				\
 	if ((tcp)->tcp_direct_sockfs) {				\
-		mutex_enter(&(tcp)->tcp_fuse_lock);		\
+		mutex_enter(&(tcp)->tcp_non_sq_lock);		\
 		(tcp)->tcp_fuse_syncstr_stopped = B_TRUE;	\
-		mutex_exit(&(tcp)->tcp_fuse_lock);		\
+		mutex_exit(&(tcp)->tcp_non_sq_lock);		\
 	}							\
 }
 
@@ -88,10 +88,10 @@ extern "C" {
  */
 #define	TCP_FUSE_SYNCSTR_PLUG_DRAIN(tcp) {			\
 	if ((tcp)->tcp_direct_sockfs) {				\
-		mutex_enter(&(tcp)->tcp_fuse_lock);		\
+		mutex_enter(&(tcp)->tcp_non_sq_lock);		\
 		ASSERT(!(tcp)->tcp_fuse_syncstr_plugged);	\
 		(tcp)->tcp_fuse_syncstr_plugged = B_TRUE;	\
-		mutex_exit(&(tcp)->tcp_fuse_lock);		\
+		mutex_exit(&(tcp)->tcp_non_sq_lock);		\
 	}							\
 }
 
@@ -101,10 +101,10 @@ extern "C" {
  */
 #define	TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(tcp) {			\
 	if ((tcp)->tcp_direct_sockfs) {				\
-		mutex_enter(&(tcp)->tcp_fuse_lock);		\
+		mutex_enter(&(tcp)->tcp_non_sq_lock);		\
 		(tcp)->tcp_fuse_syncstr_plugged = B_FALSE;	\
 		(void) cv_broadcast(&(tcp)->tcp_fuse_plugcv);	\
-		mutex_exit(&(tcp)->tcp_fuse_lock);		\
+		mutex_exit(&(tcp)->tcp_non_sq_lock);		\
 	}							\
 }
 

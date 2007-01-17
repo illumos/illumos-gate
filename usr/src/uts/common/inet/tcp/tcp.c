@@ -3983,9 +3983,11 @@ tcp_stop_lingering(tcp_t *tcp)
 	tcp->tcp_linger_tid = 0;
 	if (tcp->tcp_state > TCPS_LISTEN) {
 		tcp_acceptor_hash_remove(tcp);
+		mutex_enter(&tcp->tcp_non_sq_lock);
 		if (tcp->tcp_flow_stopped) {
 			tcp_clrqfull(tcp);
 		}
+		mutex_exit(&tcp->tcp_non_sq_lock);
 
 		if (tcp->tcp_timer_tid != 0) {
 			delta = TCP_TIMER_CANCEL(tcp, tcp->tcp_timer_tid);
@@ -4347,9 +4349,11 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 		 */
 		tcp_acceptor_hash_remove(tcp);
 
+		mutex_enter(&tcp->tcp_non_sq_lock);
 		if (tcp->tcp_flow_stopped) {
 			tcp_clrqfull(tcp);
 		}
+		mutex_exit(&tcp->tcp_non_sq_lock);
 
 		if (tcp->tcp_timer_tid != 0) {
 			delta = TCP_TIMER_CANCEL(tcp, tcp->tcp_timer_tid);
@@ -4558,8 +4562,10 @@ tcp_closei_local(tcp_t *tcp)
 			tcp->tcp_ip_addr_cache = NULL;
 		}
 	}
+	mutex_enter(&tcp->tcp_non_sq_lock);
 	if (tcp->tcp_flow_stopped)
 		tcp_clrqfull(tcp);
+	mutex_exit(&tcp->tcp_non_sq_lock);
 
 	tcp_bind_hash_remove(tcp);
 	/*
@@ -7714,10 +7720,12 @@ tcp_reinit(tcp_t *tcp)
 		tcp_zcopy_notify(tcp);
 	tcp->tcp_xmit_last = tcp->tcp_xmit_tail = NULL;
 	tcp->tcp_unsent = tcp->tcp_xmit_tail_unsent = 0;
+	mutex_enter(&tcp->tcp_non_sq_lock);
 	if (tcp->tcp_flow_stopped &&
 	    TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
 		tcp_clrqfull(tcp);
 	}
+	mutex_exit(&tcp->tcp_non_sq_lock);
 	tcp_close_mpp(&tcp->tcp_reass_head);
 	tcp->tcp_reass_tail = NULL;
 	if (tcp->tcp_rcv_list != NULL) {
@@ -10272,8 +10280,6 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				tcp->tcp_dgram_errind = onoff;
 			break;
 		case SO_SNDBUF: {
-			tcp_t *peer_tcp;
-
 			if (*i1 > tcp_max_buf) {
 				*outlenp = 0;
 				return (ENOBUFS);
@@ -10292,22 +10298,13 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			 * There are apps that increase SO_SNDBUF size when
 			 * flow-controlled (EWOULDBLOCK), and expect the flow
 			 * control condition to be lifted right away.
-			 *
-			 * For the fused tcp loopback case, in order to avoid
-			 * a race with the peer's tcp_fuse_rrw() we need to
-			 * hold its fuse_lock while accessing tcp_flow_stopped.
 			 */
-			peer_tcp = tcp->tcp_loopback_peer;
-			ASSERT(!tcp->tcp_fused || peer_tcp != NULL);
-			if (tcp->tcp_fused)
-				mutex_enter(&peer_tcp->tcp_fuse_lock);
-
+			mutex_enter(&tcp->tcp_non_sq_lock);
 			if (tcp->tcp_flow_stopped &&
 			    TCP_UNSENT_BYTES(tcp) < tcp->tcp_xmit_hiwater) {
 				tcp_clrqfull(tcp);
 			}
-			if (tcp->tcp_fused)
-				mutex_exit(&peer_tcp->tcp_fuse_lock);
+			mutex_exit(&tcp->tcp_non_sq_lock);
 			break;
 		}
 		case SO_RCVBUF:
@@ -17389,9 +17386,9 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	ASSERT(DB_TYPE(mp) == M_DATA);
 	msize = (mp->b_cont == NULL) ? MBLKL(mp) : msgdsize(mp);
 
-	mutex_enter(&connp->conn_lock);
+	mutex_enter(&tcp->tcp_non_sq_lock);
 	tcp->tcp_squeue_bytes -= msize;
-	mutex_exit(&connp->conn_lock);
+	mutex_exit(&tcp->tcp_non_sq_lock);
 
 	/* Bypass tcp protocol for fused tcp loopback */
 	if (tcp->tcp_fused && tcp_fuse_output(tcp, mp, msize))
@@ -17475,10 +17472,12 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 		goto slow;
 	}
 
+	mutex_enter(&tcp->tcp_non_sq_lock);
 	if (tcp->tcp_flow_stopped &&
 	    TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
 		tcp_clrqfull(tcp);
 	}
+	mutex_exit(&tcp->tcp_non_sq_lock);
 
 	/*
 	 * determine if anything to send (Nagle).
@@ -17862,15 +17861,29 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 		 * For fused tcp loopback, back-enable peer endpoint
 		 * if it's currently flow-controlled.
 		 */
-		if (tcp->tcp_fused &&
-		    tcp->tcp_loopback_peer->tcp_flow_stopped) {
+		if (tcp->tcp_fused) {
 			tcp_t *peer_tcp = tcp->tcp_loopback_peer;
 
 			ASSERT(peer_tcp != NULL);
 			ASSERT(peer_tcp->tcp_fused);
-
-			tcp_clrqfull(peer_tcp);
-			TCP_STAT(tcp_fusion_backenabled);
+			/*
+			 * In order to change the peer's tcp_flow_stopped,
+			 * we need to take locks for both end points. The
+			 * highest address is taken first.
+			 */
+			if (peer_tcp > tcp) {
+				mutex_enter(&peer_tcp->tcp_non_sq_lock);
+				mutex_enter(&tcp->tcp_non_sq_lock);
+			} else {
+				mutex_enter(&tcp->tcp_non_sq_lock);
+				mutex_enter(&peer_tcp->tcp_non_sq_lock);
+			}
+			if (peer_tcp->tcp_flow_stopped) {
+				tcp_clrqfull(peer_tcp);
+				TCP_STAT(tcp_fusion_backenabled);
+			}
+			mutex_exit(&peer_tcp->tcp_non_sq_lock);
+			mutex_exit(&tcp->tcp_non_sq_lock);
 		}
 	}
 	ASSERT(tcp->tcp_rcv_list == NULL || tcp->tcp_fused_sigurg);
@@ -18228,16 +18241,14 @@ tcp_wput(queue_t *q, mblk_t *mp)
 
 		msize = msgdsize(mp);
 
-		mutex_enter(&connp->conn_lock);
-		CONN_INC_REF_LOCKED(connp);
-
+		mutex_enter(&tcp->tcp_non_sq_lock);
 		tcp->tcp_squeue_bytes += msize;
 		if (TCP_UNSENT_BYTES(tcp) > tcp->tcp_xmit_hiwater) {
-			mutex_exit(&connp->conn_lock);
 			tcp_setqfull(tcp);
-		} else
-			mutex_exit(&connp->conn_lock);
+		}
+		mutex_exit(&tcp->tcp_non_sq_lock);
 
+		CONN_INC_REF(connp);
 		(*tcp_squeue_wput_proc)(connp->conn_sqp, mp,
 		    tcp_output, connp, SQTAG_TCP_OUTPUT);
 		return;
@@ -18929,10 +18940,12 @@ tcp_wput_data(tcp_t *tcp, mblk_t *mp, boolean_t urgent)
 		    (mp->b_datap->db_struioflag & STRUIO_ZCNOTIFY) != 0)
 			tcp_zcopy_notify(tcp);
 		freemsg(mp);
+		mutex_enter(&tcp->tcp_non_sq_lock);
 		if (tcp->tcp_flow_stopped &&
 		    TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
 			tcp_clrqfull(tcp);
 		}
+		mutex_exit(&tcp->tcp_non_sq_lock);
 		return;
 	}
 
@@ -19268,6 +19281,7 @@ done:;
 	}
 	/* Note that len is the amount we just sent but with a negative sign */
 	tcp->tcp_unsent += len;
+	mutex_enter(&tcp->tcp_non_sq_lock);
 	if (tcp->tcp_flow_stopped) {
 		if (TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
 			tcp_clrqfull(tcp);
@@ -19275,6 +19289,7 @@ done:;
 	} else if (TCP_UNSENT_BYTES(tcp) >= tcp->tcp_xmit_hiwater) {
 		tcp_setqfull(tcp);
 	}
+	mutex_exit(&tcp->tcp_non_sq_lock);
 }
 
 /*
@@ -21537,9 +21552,11 @@ tcp_wput_flush(tcp_t *tcp, mblk_t *mp)
 		 * We have no unsent data, so unsent must be less than
 		 * tcp_xmit_lowater, so re-enable flow.
 		 */
+		mutex_enter(&tcp->tcp_non_sq_lock);
 		if (tcp->tcp_flow_stopped) {
 			tcp_clrqfull(tcp);
 		}
+		mutex_exit(&tcp->tcp_non_sq_lock);
 	}
 	/*
 	 * TODO: you can't just flush these, you have to increase rwnd for one
