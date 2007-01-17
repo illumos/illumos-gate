@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,12 +36,35 @@
 #
 # hme0.RELEASE_ON_SIGTERM=no
 # RELEASE_ON_SIGTERM=yes
+#
+# An interface name alone specifies IPv4 DHCP.  For DHCPv6, append ".v6".
+# Some examples:
+#
+# hme0.RELEASE_ON_SIGTERM=no	specify hme0 v4 behavior
+# hme0.v6.RELEASE_ON_SIGTERM=no	specify hme0 v6 behavior
+# RELEASE_ON_SIGTERM=no		match all v4 interfaces
+# .v6.RELEASE_ON_SIGTERM=no	match all v6 interfaces
 
-# By default, when the DHCP agent is sent a SIGTERM, all managed
-# interfaces are dropped.  By uncommenting the following
-# parameter-value pair, all managed interfaces are released instead.
+# By default, when the DHCP agent is sent a SIGTERM (typically when
+# the system is shut down), all managed addresses are dropped rather
+# than released.  Dropping an address does not notify the DHCP server
+# that the address is no longer in use, leaving it possibly available
+# for subsequent use by the same client.  If DHCP is later restarted
+# on the interface, the client will ask the server if it can continue
+# to use the address.  If the server either grants the request, or
+# does not answer (and the lease has not yet expired), then the client
+# will use the original address.
+#
+# By uncommenting the following parameter-value pairs, all managed
+# interfaces are released on SIGTERM instead.  In that case, the DHCP
+# server is notified that the address is available for use.  Further,
+# if DHCP is later restarted on the interface, the client will not
+# request its previous address from the server, nor will it attempt to
+# reuse the previous lease.  This behavior is often preferred for
+# roaming systems.
 #
 # RELEASE_ON_SIGTERM=yes
+# .v6.RELEASE_ON_SIGTERM=yes
 
 # By default, the DHCP agent waits 3 seconds to collect OFFER
 # responses to a DISCOVER.  If it receives no OFFERs in this time, it
@@ -82,6 +105,14 @@
 # address (28), and encapsulated vendor options (43), is sent to the DHCP
 # server when the DHCP agent sends requests.  However, if desired, this
 # can be changed by altering the following parameter-value pair.  The
-# numbers correspond to the values defined in RFC 2132.
+# numbers correspond to the values defined in the IANA bootp-dhcp-parameters
+# registry at the time of this writing.
 #
 PARAM_REQUEST_LIST=1,3,6,12,15,28,43
+
+# The default DHCPv6 parameter request list has preference (7), unicast (12),
+# DNS addresses (23), DNS search list (24), NIS addresses (27), and
+# NIS domain (29).  This may be changed by altering the following parameter-
+# value pair.  The numbers correspond to the values defined in the IANA
+# dhcpv6-parameters registry at the time of this writing.
+.v6.PARAM_REQUEST_LIST=7,12,23,24,27,29

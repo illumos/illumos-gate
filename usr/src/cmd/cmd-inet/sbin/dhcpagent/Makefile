@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,7 +31,8 @@ DEFAULTFILES = dhcpagent.dfl
 
 LOCOBJS = adopt.o agent.o async.o bound.o class_id.o defaults.o   \
 	  dlpi_io.o dlprims.o inform.o init_reboot.o interface.o ipc_action.o \
-	  packet.o release.o renew.o request.o script_handler.o select.o util.o
+	  packet.o release.o renew.o request.o script_handler.o select.o \
+	  states.o util.o
 COMDIR  = $(SRC)/common/net/dhcp
 COMOBJS = ipv4_sum.o udp_sum.o
 
@@ -47,8 +48,11 @@ XGETFLAGS += -a -x dhcpagent.xcl
 # to compile a debug version, do a `make COPTFLAG="-g -XO0"'
 #
 
-CPPFLAGS  += -I$(COMDIR)
-LDLIBS    += -lsocket -lnvpair -lnsl -ldhcpagent -ldhcputil -linetutil -ldevinfo
+CPPFLAGS  += -I$(COMDIR) -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
+LDLIBS    += -lxnet -lnvpair -ldhcpagent -ldhcputil -linetutil -ldevinfo
+
+# Disable warnings that affect all XPG applications.
+LINTFLAGS += -erroff=E_INCONS_ARG_DECL2 -erroff=E_INCONS_VAL_TYPE_DECL2
 
 .KEEP_STATE:
 

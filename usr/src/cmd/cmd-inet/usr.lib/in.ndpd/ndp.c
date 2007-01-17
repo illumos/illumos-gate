@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,9 @@
 #include "tables.h"
 
 #include <sys/sysmacros.h>
+
+#include <dhcpagent_ipc.h>
+#include <dhcpagent_util.h>
 
 static boolean_t verify_opt_len(struct nd_opt_hdr *opt, int optlen,
 		    struct phyint *pi, struct sockaddr_in6 *from);
@@ -41,10 +44,10 @@ void		incoming_ra(struct phyint *pi, struct nd_router_advert *ra,
 		    int len, struct sockaddr_in6 *from, boolean_t loopback);
 static void	incoming_prefix_opt(struct phyint *pi, uchar_t *opt,
 		    struct sockaddr_in6 *from, boolean_t loopback);
-static void	incoming_prefix_onlink(struct phyint *pi, uchar_t *opt,
-		    struct sockaddr_in6 *from, boolean_t loopback);
+static void	incoming_prefix_onlink(struct phyint *pi, uchar_t *opt);
 void		incoming_prefix_onlink_process(struct prefix *pr,
 		    uchar_t *opt);
+static void	incoming_prefix_stateful(struct phyint *, uchar_t *);
 static boolean_t	incoming_prefix_addrconf(struct phyint *pi,
 		    uchar_t *opt, struct sockaddr_in6 *from,
 		    boolean_t loopback);
@@ -67,8 +70,6 @@ static void	verify_mtu_opt(struct phyint *pi, uchar_t *opt,
 
 static void	update_ra_flag(const struct phyint *pi,
 		    const struct sockaddr_in6 *from, int isrouter);
-
-static uint_t	ra_flags;	/* Global to detect when to trigger DHCP */
 
 /*
  * Return a pointer to the specified option buffer.
@@ -308,6 +309,61 @@ incoming_rs(struct phyint *pi, struct nd_router_solicit *rs, int len,
 }
 
 /*
+ * Start up DHCPv6 on a given physical interface.  Does not wait for a message
+ * to be returned from the daemon.
+ */
+void
+start_dhcp(struct phyint *pi)
+{
+	dhcp_ipc_request_t	*request;
+	dhcp_ipc_reply_t	*reply	= NULL;
+	int			error;
+	int			type;
+
+	if (dhcp_start_agent(DHCP_IPC_MAX_WAIT) == -1) {
+		logmsg(LOG_ERR, "start_dhcp: unable to start %s\n",
+		    DHCP_AGENT_PATH);
+		/* make sure we try again next time there's a chance */
+		pi->pi_ra_flags &= ~ND_RA_FLAG_MANAGED & ~ND_RA_FLAG_OTHER;
+		return;
+	}
+
+	type = (pi->pi_ra_flags & ND_RA_FLAG_MANAGED) ? DHCP_START :
+	    DHCP_INFORM;
+
+	request = dhcp_ipc_alloc_request(type | DHCP_V6, pi->pi_name, NULL, 0,
+	    DHCP_TYPE_NONE);
+	if (request == NULL) {
+		logmsg(LOG_ERR, "start_dhcp: out of memory\n");
+		/* make sure we try again next time there's a chance */
+		pi->pi_ra_flags &= ~ND_RA_FLAG_MANAGED & ~ND_RA_FLAG_OTHER;
+		return;
+	}
+
+	error = dhcp_ipc_make_request(request, &reply, 0);
+	free(request);
+	if (error != 0) {
+		logmsg(LOG_ERR, "start_dhcp: err: %s: %s\n", pi->pi_name,
+		    dhcp_ipc_strerror(error));
+		return;
+	}
+
+	error = reply->return_code;
+	free(reply);
+
+	/*
+	 * Timeout is considered to be "success" because we don't wait for DHCP
+	 * to do its exchange.
+	 */
+	if (error != DHCP_IPC_SUCCESS && error != DHCP_IPC_E_RUNNING &&
+	    error != DHCP_IPC_E_TIMEOUT) {
+		logmsg(LOG_ERR, "start_dhcp: ret: %s: %s\n", pi->pi_name,
+		    dhcp_ipc_strerror(error));
+		return;
+	}
+}
+
+/*
  * Process a received router advertisement.
  * Called both when packets arrive as well as when we send RAs.
  * In the latter case 'loopback' is set.
@@ -385,20 +441,34 @@ incoming_ra(struct phyint *pi, struct nd_router_advert *ra, int len,
 		}
 	}
 
-	if ((ra->nd_ra_flags_reserved & ND_RA_FLAG_MANAGED) &&
-	    !(ra_flags & ND_RA_FLAG_MANAGED)) {
-		ra_flags |= ND_RA_FLAG_MANAGED;
-		/* TODO trigger dhcpv6 */
-		logmsg(LOG_DEBUG, "incoming_ra: trigger dhcp MANAGED\n");
-	}
-	if ((ra->nd_ra_flags_reserved & ND_RA_FLAG_OTHER) &&
-	    !(ra_flags & ND_RA_FLAG_OTHER)) {
-		ra_flags |= ND_RA_FLAG_OTHER;
-		if (!(ra_flags & ND_RA_FLAG_MANAGED)) {
-			/* TODO trigger dhcpv6 for non-address info */
-			logmsg(LOG_DEBUG, "incoming_ra: trigger dhcp OTHER\n");
+	/*
+	 * If the "managed" flag is set, then just assume that the "other" flag
+	 * is set as well.  It's not legal to get addresses alone without
+	 * getting other data.
+	 */
+	if (ra->nd_ra_flags_reserved & ND_RA_FLAG_MANAGED)
+		ra->nd_ra_flags_reserved |= ND_RA_FLAG_OTHER;
+
+	/*
+	 * If either the "managed" or "other" bits have turned on, then it's
+	 * now time to invoke DHCP.  If only the "other" bit is set, then don't
+	 * get addresses via DHCP; only "other" data.  If "managed" is set,
+	 * then we must always get both addresses and "other" data.
+	 */
+	if (pi->pi_StatefulAddrConf &&
+	    (ra->nd_ra_flags_reserved & ~pi->pi_ra_flags &
+	    (ND_RA_FLAG_MANAGED | ND_RA_FLAG_OTHER))) {
+		if (debug & D_DHCP) {
+			logmsg(LOG_DEBUG,
+			    "incoming_ra: trigger dhcp %s on %s\n",
+			    (ra->nd_ra_flags_reserved & ~pi->pi_ra_flags &
+				ND_RA_FLAG_MANAGED) ? "MANAGED" : "OTHER",
+			    pi->pi_name);
 		}
+		pi->pi_ra_flags |= ra->nd_ra_flags_reserved;
+		start_dhcp(pi);
 	}
+
 	/* Skip default router code if sent from ourselves */
 	if (!loopback) {
 		/* Find and update or add default router in list */
@@ -494,8 +564,10 @@ incoming_prefix_opt(struct phyint *pi, uchar_t *opt,
 	}
 	if ((po->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ONLINK) &&
 	    good_prefix) {
-		incoming_prefix_onlink(pi, opt, from, loopback);
+		incoming_prefix_onlink(pi, opt);
 	}
+	if (pi->pi_StatefulAddrConf)
+		incoming_prefix_stateful(pi, opt);
 }
 
 /*
@@ -509,10 +581,8 @@ incoming_prefix_opt(struct phyint *pi, uchar_t *opt,
  * as if a failover happened earlier, the addresses belonging to
  * a different interface may be found here on this interface.
  */
-/* ARGSUSED2 */
 static void
-incoming_prefix_onlink(struct phyint *pi, uchar_t *opt,
-    struct sockaddr_in6 *from, boolean_t loopback)
+incoming_prefix_onlink(struct phyint *pi, uchar_t *opt)
 {
 	struct nd_opt_prefix_info *po = (struct nd_opt_prefix_info *)opt;
 	int plen;
@@ -592,13 +662,76 @@ incoming_prefix_onlink_process(struct prefix *pr, uchar_t *opt)
 }
 
 /*
+ * Process all prefix options by locating the DHCPv6-configured interfaces, and
+ * applying the netmasks as needed.
+ */
+static void
+incoming_prefix_stateful(struct phyint *pi, uchar_t *opt)
+{
+	struct nd_opt_prefix_info *po = (struct nd_opt_prefix_info *)opt;
+	struct prefix *pr;
+	boolean_t foundpref;
+	char abuf[INET6_ADDRSTRLEN];
+
+	/* Make sure it's a valid prefix. */
+	if (ntohl(po->nd_opt_pi_valid_time) == 0) {
+		if (debug & D_DHCP)
+			logmsg(LOG_DEBUG, "incoming_prefix_stateful: ignoring "
+			    "prefix with no valid time\n");
+		return;
+	}
+
+	if (debug & D_DHCP)
+		logmsg(LOG_DEBUG, "incoming_prefix_stateful(%s, %s/%d)\n",
+		    pi->pi_name, inet_ntop(AF_INET6,
+		    (void *)&po->nd_opt_pi_prefix, abuf, sizeof (abuf)),
+		    po->nd_opt_pi_prefix_len);
+	foundpref = _B_FALSE;
+	for (pr = pi->pi_prefix_list; pr != NULL; pr = pr->pr_next) {
+		if (prefix_equal(po->nd_opt_pi_prefix, pr->pr_address,
+		    po->nd_opt_pi_prefix_len)) {
+			if ((pr->pr_flags & IFF_DHCPRUNNING) &&
+			    pr->pr_prefix_len != po->nd_opt_pi_prefix_len) {
+				pr->pr_prefix_len = po->nd_opt_pi_prefix_len;
+				if (pr->pr_flags & IFF_UP) {
+					if (debug & D_DHCP)
+						logmsg(LOG_DEBUG,
+						    "incoming_prefix_stateful:"
+						    " set mask on DHCP %s\n",
+						    pr->pr_name);
+					prefix_update_dhcp(pr);
+				}
+			}
+			if (pr->pr_prefix_len == po->nd_opt_pi_prefix_len &&
+			    (!(pr->pr_state & PR_STATIC) ||
+			    (pr->pr_flags & IFF_DHCPRUNNING)))
+				foundpref = _B_TRUE;
+		}
+	}
+	/*
+	 * If there's no matching DHCPv6 prefix present, then create an empty
+	 * one so that we'll be able to configure it later.
+	 */
+	if (!foundpref) {
+		pr = prefix_create(pi, po->nd_opt_pi_prefix,
+		    po->nd_opt_pi_prefix_len, IFF_DHCPRUNNING);
+		if (pr != NULL) {
+			pr->pr_state = PR_STATIC;
+			if (debug & D_DHCP)
+				logmsg(LOG_DEBUG,
+				    "incoming_prefix_stateful: created dummy "
+				    "prefix for later\n");
+		}
+	}
+}
+
+/*
  * Process prefix options with the autonomous flag set.
  * Returns false if this prefix results in a bad address (duplicate)
  * This function needs to loop to find the same prefix multiple times
  * as if a failover happened earlier, the addresses belonging to
  * a different interface may be found here on this interface.
  */
-/* ARGSUSED2 */
 static boolean_t
 incoming_prefix_addrconf(struct phyint *pi, uchar_t *opt,
     struct sockaddr_in6 *from, boolean_t loopback)
@@ -635,8 +768,9 @@ incoming_prefix_addrconf(struct phyint *pi, uchar_t *opt,
 		if (pr->pr_prefix_len == plen &&
 		    prefix_equal(po->nd_opt_pi_prefix, pr->pr_prefix, plen)) {
 
-			/* Exclude static prefixes */
-			if (pr->pr_state & PR_STATIC)
+			/* Exclude static prefixes and DHCP */
+			if ((pr->pr_state & PR_STATIC) ||
+			    (pr->pr_flags & IFF_DHCPRUNNING))
 				continue;
 			if (pr->pr_flags & IFF_TEMPORARY) {
 				/*
@@ -1196,7 +1330,7 @@ verify_prefix_opt(struct phyint *pi, uchar_t *opt, char *frombuf)
 	myflag = (adv_pr->adv_pr_AdvAutonomousFlag != 0);
 	if (pktflag != myflag) {
 		logmsg(LOG_INFO,
-		    "RA from %s on %s inconsistent autonumous flag for \n\t"
+		    "RA from %s on %s inconsistent autonomous flag for \n\t"
 		    "prefix %s/%u: received %s configuration %s\n",
 		    frombuf, pi->pi_name, prefixbuf, adv_pr->adv_pr_prefix_len,
 		    (pktflag ? "ON" : "OFF"),

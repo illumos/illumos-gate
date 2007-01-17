@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,6 +106,15 @@ extern void	unixpr(kstat_ctl_t *kc);
 #define	IN6_IS_V4MASK(v6)	((v6)._S6_un._S6_u32[0] == 0xfffffffful && \
 				(v6)._S6_un._S6_u32[1] == 0xfffffffful && \
 				(v6)._S6_un._S6_u32[2] == 0xfffffffful)
+
+/*
+ * This is used as a cushion in the buffer allocation directed by SIOCGLIFNUM.
+ * Because there's no locking between SIOCGLIFNUM and SIOCGLIFCONF, it's
+ * possible for an administrator to plumb new interfaces between those two
+ * calls, resulting in the failure of the latter.  This addition makes that
+ * less likely.
+ */
+#define	LIFN_GUARD_VALUE	10
 
 typedef struct mib_item_s {
 	struct mib_item_s	*next_item;
@@ -3286,8 +3295,8 @@ if_report_ip6(mib2_ipv6AddrEntry_t *ap6,
 
 /* --------------------- DHCP_REPORT  (netstat -D) ------------------------- */
 
-dhcp_ipc_reply_t *
-dhcp_do_ipc(dhcp_ipc_type_t type, const char *ifname)
+static boolean_t
+dhcp_do_ipc(dhcp_ipc_type_t type, const char *ifname, boolean_t printed_one)
 {
 	dhcp_ipc_request_t	*request;
 	dhcp_ipc_reply_t	*reply;
@@ -3305,100 +3314,116 @@ dhcp_do_ipc(dhcp_ipc_type_t type, const char *ifname)
 
 	free(request);
 	error = reply->return_code;
+	if (error == DHCP_IPC_E_UNKIF) {
+		free(reply);
+		return (printed_one);
+	}
 	if (error != 0) {
 		free(reply);
 		fail(0, "dhcp_do_ipc: %s", dhcp_ipc_strerror(error));
 	}
 
-	return (reply);
+	if (!printed_one)
+		(void) printf("%s", dhcp_status_hdr_string());
+
+	(void) printf("%s", dhcp_status_reply_to_string(reply));
+	free(reply);
+	return (B_TRUE);
 }
 
 /*
- * get_ifnames: return a dynamically allocated string of all interface
- * names which have all of the IFF_* flags listed in `flags_on' on and
- * all of the IFF_* flags in `flags_off' off.  If no such interfaces
- * are found, "" is returned.  If an unexpected failure occurs, NULL
- * is returned.
+ * dhcp_walk_interfaces: walk the list of interfaces that have a given set of
+ * flags turned on (flags_on) and a given set turned off (flags_off) for a
+ * given address family (af).  For each, print out the DHCP status using
+ * dhcp_do_ipc.
  */
-static char *
-get_ifnames(int flags_on, int flags_off)
+static boolean_t
+dhcp_walk_interfaces(uint_t flags_on, uint_t flags_off, int af,
+    boolean_t printed_one)
 {
-	struct ifconf	ifc;
+	struct lifnum	lifn;
+	struct lifconf	lifc;
 	int		n_ifs, i, sock_fd;
-	char		*ifnames;
 
-	sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	sock_fd = socket(af, SOCK_DGRAM, 0);
 	if (sock_fd == -1)
-		return (NULL);
+		return (printed_one);
 
-	if ((ioctl(sock_fd, SIOCGIFNUM, &n_ifs) == -1) || (n_ifs <= 0)) {
-		(void) close(sock_fd);
-		return (NULL);
-	}
+	/*
+	 * SIOCGLIFNUM is just an estimate.  If the ioctl fails, we don't care;
+	 * just drive on and use SIOCGLIFCONF with increasing buffer sizes, as
+	 * is traditional.
+	 */
+	(void) memset(&lifn, 0, sizeof (lifn));
+	lifn.lifn_family = af;
+	lifn.lifn_flags = LIFC_ALLZONES | LIFC_NOXMIT;
+	if (ioctl(sock_fd, SIOCGLIFNUM, &lifn) == -1)
+		n_ifs = LIFN_GUARD_VALUE;
+	else
+		n_ifs = lifn.lifn_count + LIFN_GUARD_VALUE;
 
-	ifnames = calloc(1, n_ifs * (IFNAMSIZ + 1));
-	ifc.ifc_len = n_ifs * sizeof (struct ifreq);
-	ifc.ifc_req = calloc(n_ifs, sizeof (struct ifreq));
-	if (ifc.ifc_req != NULL && ifnames != NULL) {
+	(void) memset(&lifc, 0, sizeof (lifc));
+	lifc.lifc_family = af;
+	lifc.lifc_flags = lifn.lifn_flags;
+	lifc.lifc_len = n_ifs * sizeof (struct lifreq);
+	lifc.lifc_buf = malloc(lifc.lifc_len);
+	if (lifc.lifc_buf != NULL) {
 
-		if (ioctl(sock_fd, SIOCGIFCONF, &ifc) == -1) {
+		if (ioctl(sock_fd, SIOCGLIFCONF, &lifc) == -1) {
 			(void) close(sock_fd);
-			free(ifnames);
-			free(ifc.ifc_req);
+			free(lifc.lifc_buf);
 			return (NULL);
 		}
 
-		/* 'for' loop 1: */
+		n_ifs = lifc.lifc_len / sizeof (struct lifreq);
+
 		for (i = 0; i < n_ifs; i++) {
-
-			if (ioctl(sock_fd, SIOCGIFFLAGS, &ifc.ifc_req[i]) == 0)
-				if ((ifc.ifc_req[i].ifr_flags &
-				    (flags_on | flags_off)) != flags_on)
-					continue; /* 'for' loop 1 */
-
-			(void) strcat(ifnames, ifc.ifc_req[i].ifr_name);
-			(void) strcat(ifnames, " ");
-		} /* 'for' loop 1 ends */
-
-		if (strlen(ifnames) > 1)
-			ifnames[strlen(ifnames) - 1] = '\0';
+			if (ioctl(sock_fd, SIOCGLIFFLAGS, &lifc.lifc_req[i]) ==
+			    0 && (lifc.lifc_req[i].lifr_flags & (flags_on |
+			    flags_off)) != flags_on)
+				continue;
+			printed_one = dhcp_do_ipc(DHCP_STATUS |
+			    (af == AF_INET6 ? DHCP_V6 : 0),
+			    lifc.lifc_req[i].lifr_name, printed_one);
+		}
 	}
-
 	(void) close(sock_fd);
-	if (ifc.ifc_req != NULL)
-		free(ifc.ifc_req);
-	return (ifnames);
+	free(lifc.lifc_buf);
+	return (printed_one);
 }
 
 static void
 dhcp_report(char *ifname)
 {
-	int			did_alloc = 0;
-	dhcp_ipc_reply_t	*reply;
+	boolean_t printed_one;
 
-	if (!(family_selected(AF_INET)))
+	if (!family_selected(AF_INET) && !family_selected(AF_INET6))
 		return;
 
-	if (ifname == NULL) {
-		ifname = get_ifnames(IFF_DHCPRUNNING, 0);
-		if (ifname == NULL)
-			fail(0, "dhcp_report: unable to retrieve list of"
-			    " interfaces using DHCP");
-		did_alloc++;
+	printed_one = B_FALSE;
+	if (ifname != NULL) {
+		if (family_selected(AF_INET)) {
+			printed_one = dhcp_do_ipc(DHCP_STATUS, ifname,
+			    printed_one);
+		}
+		if (family_selected(AF_INET6)) {
+			printed_one = dhcp_do_ipc(DHCP_STATUS | DHCP_V6,
+			    ifname, printed_one);
+		}
+		if (!printed_one) {
+			fail(0, "%s: %s", ifname,
+			    dhcp_ipc_strerror(DHCP_IPC_E_UNKIF));
+		}
+	} else {
+		if (family_selected(AF_INET)) {
+			printed_one = dhcp_walk_interfaces(IFF_DHCPRUNNING,
+			    0, AF_INET, printed_one);
+		}
+		if (family_selected(AF_INET6)) {
+			(void) dhcp_walk_interfaces(IFF_DHCPRUNNING,
+			    IFF_ADDRCONF, AF_INET6, printed_one);
+		}
 	}
-
-	(void) printf("%s", dhcp_status_hdr_string());
-
-	for (ifname = strtok(ifname, " ");
-	    ifname != NULL;
-	    ifname = strtok(NULL, " ")) {
-		reply = dhcp_do_ipc(DHCP_STATUS, ifname);
-		(void) printf("%s", dhcp_status_reply_to_string(reply));
-		free(reply);
-	}
-
-	if (did_alloc)
-		free(ifname);
 }
 
 /* --------------------- GROUP_REPORT (netstat -g) ------------------------- */

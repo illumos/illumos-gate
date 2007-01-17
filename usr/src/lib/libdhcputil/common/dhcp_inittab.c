@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,10 +36,13 @@
 #include <libgen.h>
 #include <sys/isa_defs.h>
 #include <sys/socket.h>
+#include <net/if_arp.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/sysmacros.h>
 #include <libinetutil.h>
+#include <libdlpi.h>
+#include <netinet/dhcp6.h>
 
 #include "dhcp_symbol.h"
 #include "dhcp_inittab.h"
@@ -61,6 +63,10 @@ static boolean_t	parse_entry(char *, char **);
 /*
  * forward declaration of our internal inittab_table[].  too bulky to put
  * up front -- check the end of this file for its definition.
+ *
+ * Note: we have only an IPv4 version here.  The inittab_verify() function is
+ * used by the DHCP server and manager.  We'll need a new function if the
+ * server is extended to DHCPv6.
  */
 static dhcp_symbol_t	inittab_table[];
 
@@ -95,6 +101,58 @@ static category_map_entry_t category_map[] = {
 };
 
 /*
+ * dlpi_to_arp(): converts DLPI datalink types into ARP datalink types
+ *
+ *   input: uint_t: the DLPI datalink type
+ *  output: uint_t: the ARP datalink type (0 if no corresponding code)
+ *
+ *    note: this function does not belong in this library, but it's here until
+ *	    dhcpagent is ported over to libdlpi.  It should move to libdlpi
+ *	    instead.
+ */
+
+uint_t
+dlpi_to_arp(uint_t dlpi_type)
+{
+	switch (dlpi_type) {
+
+	case DL_ETHER:
+		return (ARPHRD_ETHER);
+
+	case DL_FRAME:
+		return (ARPHRD_FRAME);
+
+	case DL_ATM:
+		return (ARPHRD_ATM);
+
+	case DL_IPATM:
+		return (ARPHRD_IPATM);
+
+	case DL_HDLC:
+		return (ARPHRD_HDLC);
+
+	case DL_FC:
+		return (ARPHRD_FC);
+
+	case DL_CSMACD:				/* ieee 802 networks */
+	case DL_TPB:
+	case DL_TPR:
+	case DL_METRO:
+	case DL_FDDI:
+		return (ARPHRD_IEEE802);
+
+	case DL_IB:
+		return (ARPHRD_IB);
+
+	case DL_IPV4:
+	case DL_IPV6:
+		return (ARPHRD_TUNNEL);
+	}
+
+	return (0);
+}
+
+/*
  * inittab_load(): returns all inittab entries with the specified criteria
  *
  *   input: uchar_t: the categories the consumer is interested in
@@ -103,6 +161,7 @@ static category_map_entry_t category_map[] = {
  *  output: dhcp_symbol_t *: an array of dynamically allocated entries
  *	    on success, NULL upon failure
  */
+
 dhcp_symbol_t	*
 inittab_load(uchar_t categories, char consumer, size_t *n_entries)
 {
@@ -118,6 +177,7 @@ inittab_load(uchar_t categories, char consumer, size_t *n_entries)
  *  output: dhcp_symbol_t *: a dynamically allocated dhcp_symbol structure
  *	    on success, NULL upon failure
  */
+
 dhcp_symbol_t	*
 inittab_getbyname(uchar_t categories, char consumer, const char *name)
 {
@@ -133,6 +193,7 @@ inittab_getbyname(uchar_t categories, char consumer, const char *name)
  *  output: dhcp_symbol_t *: a dynamically allocated dhcp_symbol structure
  *	    on success, NULL upon failure
  */
+
 dhcp_symbol_t	*
 inittab_getbycode(uchar_t categories, char consumer, uint16_t code)
 {
@@ -152,6 +213,7 @@ inittab_getbycode(uchar_t categories, char consumer, uint16_t code)
  *  output: dhcp_symbol_t *: dynamically allocated dhcp_symbol structures
  *	    on success, NULL upon failure
  */
+
 static dhcp_symbol_t *
 inittab_lookup(uchar_t categories, char consumer, const char *name,
     int32_t code, size_t *n_entriesp)
@@ -163,18 +225,24 @@ inittab_lookup(uchar_t categories, char consumer, const char *name,
 	char			*fields[ITAB_FIELDS];
 	unsigned long		line = 0;
 	size_t			i, n_entries = 0;
-	char			*inittab_path;
+	const char		*inittab_path;
 	uchar_t			category_code;
 	dsym_cdtype_t		type;
 
-	inittab_path = getenv("DHCP_INITTAB_PATH");
-	if (inittab_path == NULL)
-		inittab_path = ITAB_INITTAB_PATH;
+	if (categories & ITAB_CAT_V6) {
+		inittab_path = getenv("DHCP_INITTAB6_PATH");
+		if (inittab_path == NULL)
+			inittab_path = ITAB_INITTAB6_PATH;
+	} else {
+		inittab_path = getenv("DHCP_INITTAB_PATH");
+		if (inittab_path == NULL)
+			inittab_path = ITAB_INITTAB_PATH;
+	}
 
 	inittab_fp = fopen(inittab_path, "r");
 	if (inittab_fp == NULL) {
 		inittab_msg("inittab_lookup: fopen: %s: %s",
-		    ITAB_INITTAB_PATH, strerror(errno));
+		    inittab_path, strerror(errno));
 		return (NULL);
 	}
 
@@ -275,6 +343,7 @@ inittab_lookup(uchar_t categories, char consumer, const char *name,
 		entry.ds_classes.dc_names = NULL;
 		(void) strlcpy(entry.ds_name, fields[ITAB_NAME],
 		    sizeof (entry.ds_name));
+		entry.ds_dhcpv6	  = (categories & ITAB_CAT_V6) ? 1 : 0;
 
 		entries = new_entries;
 		entries[n_entries++] = entry;
@@ -301,6 +370,7 @@ inittab_lookup(uchar_t categories, char consumer, const char *name,
  *		     pointers into the entry on upon return
  *  output: boolean_t: B_TRUE on success, B_FALSE on failure
  */
+
 static boolean_t
 parse_entry(char *entry, char **fields)
 {
@@ -375,9 +445,12 @@ parse_entry(char *entry, char **fields)
  *	    dhcp_symbol_t *: if non-NULL, a place to store the internal
  *			       inittab entry upon return
  *  output: int: ITAB_FAILURE, ITAB_SUCCESS, or ITAB_UNKNOWN
+ *
+ *   notes: IPv4 only
  */
+
 int
-inittab_verify(dhcp_symbol_t *inittab_ent, dhcp_symbol_t *internal_ent)
+inittab_verify(const dhcp_symbol_t *inittab_ent, dhcp_symbol_t *internal_ent)
 {
 	unsigned int	i;
 
@@ -403,29 +476,152 @@ inittab_verify(dhcp_symbol_t *inittab_ent, dhcp_symbol_t *internal_ent)
 }
 
 /*
+ * get_hw_type(): interpret ",hwtype" in the input string, as part of a DUID.
+ *		  The hwtype string is optional, and must be 0-65535 if
+ *		  present.
+ *
+ *   input: char **: pointer to string pointer
+ *	    int *: error return value
+ *  output: int: hardware type, or -1 for empty, or -2 for error.
+ */
+
+static int
+get_hw_type(char **strp, int *ierrnop)
+{
+	char *str = *strp;
+	ulong_t hwtype;
+
+	if (*str++ != ',') {
+		*ierrnop = ITAB_BAD_NUMBER;
+		return (-2);
+	}
+	if (*str == ',' || *str == '\0') {
+		*strp = str;
+		return (-1);
+	}
+	hwtype = strtoul(str, strp, 0);
+	if (errno != 0 || *strp == str || hwtype > 65535) {
+		*ierrnop = ITAB_BAD_NUMBER;
+		return (-2);
+	} else {
+		return ((int)hwtype);
+	}
+}
+
+/*
+ * get_mac_addr(): interpret ",macaddr" in the input string, as part of a DUID.
+ *		   The 'macaddr' may be a hex string (in any standard format),
+ *		   or the name of a physical interface.  If an interface name
+ *		   is given, then the interface type is extracted as well.
+ *
+ *   input: const char *: input string
+ *	    int *: error return value
+ *	    uint16_t *: hardware type output (network byte order)
+ *	    int: hardware type input; -1 for empty
+ *	    uchar_t *: output buffer for MAC address
+ *  output: int: length of MAC address, or -1 for error
+ */
+
+static int
+get_mac_addr(const char *str, int *ierrnop, uint16_t *hwret, int hwtype,
+    uchar_t *outbuf)
+{
+	int fd = -1;
+	int maclen;
+	int dig, val;
+	dlpi_if_attr_t dia;
+	dl_info_ack_t dl_info;
+	char chr;
+
+	if (*str != '\0') {
+		if (*str++ != ',')
+			goto failed;
+		if ((fd = dlpi_if_open(str, &dia, B_FALSE)) == -1) {
+			maclen = 0;
+			dig = val = 0;
+			/*
+			 * Allow MAC addresses with separators matching regexp
+			 * (:|-| *).
+			 */
+			while ((chr = *str++) != '\0') {
+				if (isdigit(chr)) {
+					val = (val << 4) + chr - '0';
+				} else if (isxdigit(chr)) {
+					val = (val << 4) + chr -
+					    (isupper(chr) ? 'A' : 'a') + 10;
+				} else if (isspace(chr) && dig == 0) {
+					continue;
+				} else if (chr == ':' || chr == '-' ||
+				    isspace(chr)) {
+					dig = 1;
+				} else {
+					goto failed;
+				}
+				if (++dig == 2) {
+					*outbuf++ = val;
+					maclen++;
+					dig = val = 0;
+				}
+			}
+		} else {
+			if (dlpi_info(fd, -1, &dl_info, NULL, NULL, NULL,
+			    NULL, NULL, NULL) == -1)
+				goto failed;
+			maclen = dl_info.dl_addr_length -
+			    abs(dl_info.dl_sap_length);
+			if (maclen > MAXADDRLEN)
+				goto failed;
+			if (dlpi_phys_addr(fd, -1, DL_CURR_PHYS_ADDR, outbuf,
+			    NULL) == -1)
+				goto failed;
+			(void) dlpi_close(fd);
+			if (hwtype == -1)
+				hwtype = dlpi_to_arp(dl_info.dl_mac_type);
+		}
+	}
+	if (hwtype == -1)
+		goto failed;
+	*hwret = htons(hwtype);
+	return (maclen);
+
+failed:
+	if (fd != -1)
+		(void) dlpi_close(fd);
+	*ierrnop = ITAB_BAD_NUMBER;
+	return (-1);
+}
+
+/*
  * inittab_encode_e(): converts a string representation of a given datatype into
  *		     binary; used for encoding ascii values into a form that
  *		     can be put in DHCP packets to be sent on the wire.
  *
- *   input: dhcp_symbol_t *: the entry describing the value option
+ *   input: const dhcp_symbol_t *: the entry describing the value option
  *	    const char *: the value to convert
  *	    uint16_t *: set to the length of the binary data returned
  *	    boolean_t: if false, return a full DHCP option
+ *	    int *: error return value
  *  output: uchar_t *: a dynamically allocated byte array with converted data
  */
+
 uchar_t *
-inittab_encode_e(dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
+inittab_encode_e(const dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
     boolean_t just_payload, int *ierrnop)
 {
-	uint16_t	length = 0;
+	int		hlen = 0;
+	uint16_t	length;
 	uchar_t		n_entries = 0;
 	const char	*valuep;
 	char		*currp;
 	uchar_t		*result = NULL;
+	uchar_t		*optstart;
 	unsigned int	i;
 	uint8_t		type_size = inittab_type_to_size(ie);
 	boolean_t	is_signed;
 	uint_t		vallen, reslen;
+	dhcpv6_option_t	*d6o;
+	int		type;
+	char		*cp2;
 
 	*ierrnop = 0;
 	if (type_size == 0) {
@@ -433,60 +629,319 @@ inittab_encode_e(dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
 		return (NULL);
 	}
 
-	if (ie->ds_type == DSYM_ASCII)
+	switch (ie->ds_type) {
+	case DSYM_ASCII:
 		n_entries = strlen(value);		/* no NUL */
-	else if (ie->ds_type == DSYM_OCTET) {
+		break;
+
+	case DSYM_OCTET:
 		vallen = strlen(value);
 		n_entries = vallen / 2;
 		n_entries += vallen % 2;
-	} else {
+		break;
+
+	case DSYM_DOMAIN:
+		/*
+		 * Maximum (worst-case) encoded length is one byte more than
+		 * the number of characters on input.
+		 */
+		n_entries = strlen(value) + 1;
+		break;
+
+	case DSYM_DUID:
+		/* Worst case is ":::::" */
+		n_entries = strlen(value);
+		if (n_entries < MAXADDRLEN)
+			n_entries = MAXADDRLEN;
+		n_entries += sizeof (duid_llt_t);
+		break;
+
+	default:
 		/*
 		 * figure out the number of entries by counting the spaces
 		 * in the value string
 		 */
 		for (valuep = value; valuep++ != NULL; n_entries++)
 			valuep = strchr(valuep, ' ');
+		break;
 	}
 
 	/*
 	 * if we're gonna return a complete option, then include the
 	 * option length and code in the size of the packet we allocate
 	 */
-	if (just_payload == B_FALSE)
-		length += 2;
+	if (!just_payload)
+		hlen = ie->ds_dhcpv6 ? sizeof (*d6o) : 2;
 
-	length += n_entries * type_size;
-	if (length > 0)
-		result = malloc(length);
+	length = n_entries * type_size;
+	if (hlen + length > 0)
+		result = malloc(hlen + length);
+
+	if ((optstart = result) != NULL && !just_payload)
+		optstart += hlen;
 
 	switch (ie->ds_type) {
 
 	case DSYM_ASCII:
 
-		if (result == NULL) {
+		if (optstart == NULL) {
 			*ierrnop = ITAB_NOMEM;
 			return (NULL);
 		}
 
-		if (strlen(value) > length) {
-			free(result);
-			*ierrnop = ITAB_BAD_STRING;
+		(void) memcpy(optstart, value, length);
+		break;
+
+	case DSYM_DOMAIN:
+		if (optstart == NULL) {
+			*ierrnop = ITAB_NOMEM;
 			return (NULL);
 		}
 
-		(void) memcpy(result, value, length);
+		/*
+		 * Note that this encoder always presents the trailing 0-octet
+		 * when dealing with a list.  This means that you can't have
+		 * non-fully-qualified members anywhere but at the end of a
+		 * list (or as the only member of the list).
+		 */
+		valuep = value;
+		while (*valuep != '\0') {
+			int dig, val, inchr;
+			boolean_t escape;
+			uchar_t *flen;
+
+			/*
+			 * Skip over whitespace that delimits list members.
+			 */
+			if (isascii(*valuep) && isspace(*valuep)) {
+				valuep++;
+				continue;
+			}
+			dig = val = 0;
+			escape = B_FALSE;
+			flen = optstart++;
+			while ((inchr = *valuep) != '\0') {
+				valuep++;
+				/*
+				 * Just copy non-ASCII text directly to the
+				 * output string.  This simplifies the use of
+				 * other ctype macros below, as, unlike the
+				 * special isascii function, they don't handle
+				 * non-ASCII.
+				 */
+				if (!isascii(inchr)) {
+					escape = B_FALSE;
+					*optstart++ = inchr;
+					continue;
+				}
+				if (escape) {
+					/*
+					 * Handle any of \D, \DD, or \DDD for
+					 * a digit escape.
+					 */
+					if (isdigit(inchr)) {
+						val = val * 10 + inchr - '0';
+						if (++dig == 3) {
+							*optstart++ = val;
+							dig = val = 0;
+							escape = B_FALSE;
+						}
+						continue;
+					} else if (dig > 0) {
+						/*
+						 * User terminated \D or \DD
+						 * with non-digit.  An error,
+						 * but we can assume he means
+						 * to treat as \00D or \0DD.
+						 */
+						*optstart++ = val;
+						dig = val = 0;
+					}
+					/* Fall through and copy character */
+					escape = B_FALSE;
+				} else if (inchr == '\\') {
+					escape = B_TRUE;
+					continue;
+				} else if (inchr == '.') {
+					/*
+					 * End of component.  Write the length
+					 * prefix.  If the component is zero
+					 * length (i.e., ".."), the just omit
+					 * it.
+					 */
+					*flen = (optstart - flen) - 1;
+					if (*flen > 0)
+						flen = optstart++;
+					continue;
+				} else if (isspace(inchr)) {
+					/*
+					 * Unescaped space; end of domain name
+					 * in list.
+					 */
+					break;
+				}
+				*optstart++ = inchr;
+			}
+			/*
+			 * Handle trailing escape sequence.  If string ends
+			 * with \, then assume user wants \ at end of encoded
+			 * string.  If it ends with \D or \DD, assume \00D or
+			 * \0DD.
+			 */
+			if (escape)
+				*optstart++ = dig > 0 ? val : '\\';
+			*flen = (optstart - flen) - 1;
+			/*
+			 * If user specified FQDN with trailing '.', then above
+			 * will result in zero for the last component length.
+			 * We're done, and optstart already points to the start
+			 * of the next in list.  Otherwise, we need to write a
+			 * single zero byte to end the entry, if there are more
+			 * entries that will be decoded.
+			 */
+			while (isascii(*valuep) && isspace(*valuep))
+				valuep++;
+			if (*flen > 0 && *valuep != '\0')
+				*optstart++ = '\0';
+		}
+		length = (optstart - result) - hlen;
+		break;
+
+	case DSYM_DUID:
+		if (optstart == NULL) {
+			*ierrnop = ITAB_NOMEM;
+			return (NULL);
+		}
+
+		errno = 0;
+		type = strtoul(value, &currp, 0);
+		if (errno != 0 || value == currp || type > 65535 ||
+		    (*currp != ',' && *currp != '\0')) {
+			free(result);
+			*ierrnop = ITAB_BAD_NUMBER;
+			return (NULL);
+		}
+		switch (type) {
+		case DHCPV6_DUID_LLT: {
+			duid_llt_t dllt;
+			int hwtype;
+			ulong_t tstamp;
+			int maclen;
+
+			if ((hwtype = get_hw_type(&currp, ierrnop)) == -2) {
+				free(result);
+				return (NULL);
+			}
+			if (*currp++ != ',') {
+				free(result);
+				*ierrnop = ITAB_BAD_NUMBER;
+				return (NULL);
+			}
+			if (*currp == ',' || *currp == '\0') {
+				tstamp = time(NULL) - DUID_TIME_BASE;
+			} else {
+				tstamp = strtoul(currp, &cp2, 0);
+				if (errno != 0 || currp == cp2) {
+					free(result);
+					*ierrnop = ITAB_BAD_NUMBER;
+					return (NULL);
+				}
+				currp = cp2;
+			}
+			maclen = get_mac_addr(currp, ierrnop,
+			    &dllt.dllt_hwtype, hwtype,
+			    optstart + sizeof (dllt));
+			if (maclen == -1) {
+				free(result);
+				return (NULL);
+			}
+			dllt.dllt_dutype = htons(type);
+			dllt.dllt_time = htonl(tstamp);
+			(void) memcpy(optstart, &dllt, sizeof (dllt));
+			length = maclen + sizeof (dllt);
+			break;
+		}
+		case DHCPV6_DUID_EN: {
+			duid_en_t den;
+			ulong_t enterp;
+
+			if (*currp++ != ',') {
+				free(result);
+				*ierrnop = ITAB_BAD_NUMBER;
+				return (NULL);
+			}
+			enterp = strtoul(currp, &cp2, 0);
+			DHCPV6_SET_ENTNUM(&den, enterp);
+			if (errno != 0 || currp == cp2 ||
+			    enterp != DHCPV6_GET_ENTNUM(&den) ||
+			    (*cp2 != ',' && *cp2 != '\0')) {
+				free(result);
+				*ierrnop = ITAB_BAD_NUMBER;
+				return (NULL);
+			}
+			if (*cp2 == ',')
+				cp2++;
+			vallen = strlen(cp2);
+			reslen = (vallen + 1) / 2;
+			if (hexascii_to_octet(cp2, vallen,
+			    optstart + sizeof (den), &reslen) != 0) {
+				free(result);
+				*ierrnop = ITAB_BAD_NUMBER;
+				return (NULL);
+			}
+			den.den_dutype = htons(type);
+			(void) memcpy(optstart, &den, sizeof (den));
+			length = reslen + sizeof (den);
+			break;
+		}
+		case DHCPV6_DUID_LL: {
+			duid_ll_t dll;
+			int hwtype;
+			int maclen;
+
+			if ((hwtype = get_hw_type(&currp, ierrnop)) == -2) {
+				free(result);
+				return (NULL);
+			}
+			maclen = get_mac_addr(currp, ierrnop, &dll.dll_hwtype,
+			    hwtype, optstart + sizeof (dll));
+			if (maclen == -1) {
+				free(result);
+				return (NULL);
+			}
+			dll.dll_dutype = htons(type);
+			(void) memcpy(optstart, &dll, sizeof (dll));
+			length = maclen + sizeof (dll);
+			break;
+		}
+		default:
+			if (*currp == ',')
+				currp++;
+			vallen = strlen(currp);
+			reslen = (vallen + 1) / 2;
+			if (hexascii_to_octet(currp, vallen, optstart + 2,
+			    &reslen) != 0) {
+				free(result);
+				*ierrnop = ITAB_BAD_NUMBER;
+				return (NULL);
+			}
+			optstart[0] = type >> 8;
+			optstart[1] = type;
+			length = reslen + 2;
+			break;
+		}
 		break;
 
 	case DSYM_OCTET:
 
-		if (result == NULL) {
+		if (optstart == NULL) {
 			*ierrnop = ITAB_BAD_OCTET;
 			return (NULL);
 		}
 
 		reslen = length;
 		/* Call libinetutil function to decode */
-		if (hexascii_to_octet(value, vallen, result, &reslen) != 0) {
+		if (hexascii_to_octet(value, vallen, optstart, &reslen) != 0) {
 			free(result);
 			*ierrnop = ITAB_BAD_OCTET;
 			return (NULL);
@@ -494,8 +949,9 @@ inittab_encode_e(dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
 		break;
 
 	case DSYM_IP:
+	case DSYM_IPV6:
 
-		if (result == NULL) {
+		if (optstart == NULL) {
 			*ierrnop = ITAB_BAD_IPADDR;
 			return (NULL);
 		}
@@ -512,8 +968,8 @@ inittab_encode_e(dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
 			currp = strchr(valuep, ' ');
 			if (currp != NULL)
 				*currp = '\0';
-			if (inet_pton(AF_INET, valuep,
-			    &result[i * sizeof (ipaddr_t)]) != 1) {
+			if (inet_pton(ie->ds_type == DSYM_IP ? AF_INET :
+			    AF_INET6, valuep, optstart) != 1) {
 				*ierrnop = ITAB_BAD_IPADDR;
 				inittab_msg("inittab_encode: bogus ip address");
 				free(result);
@@ -531,6 +987,7 @@ inittab_encode_e(dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
 				}
 				break;
 			}
+			optstart += type_size;
 		}
 		break;
 
@@ -539,12 +996,13 @@ inittab_encode_e(dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
 	case DSYM_SNUMBER8:				/* FALLTHRU */
 	case DSYM_UNUMBER16:				/* FALLTHRU */
 	case DSYM_SNUMBER16:				/* FALLTHRU */
+	case DSYM_UNUMBER24:				/* FALLTHRU */
 	case DSYM_UNUMBER32:				/* FALLTHRU */
 	case DSYM_SNUMBER32:				/* FALLTHRU */
 	case DSYM_UNUMBER64:				/* FALLTHRU */
 	case DSYM_SNUMBER64:
 
-		if (result == NULL) {
+		if (optstart == NULL) {
 			*ierrnop = ITAB_BAD_NUMBER;
 			return (NULL);
 		}
@@ -555,7 +1013,7 @@ inittab_encode_e(dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
 		    ie->ds_type == DSYM_SNUMBER8);
 
 		if (encode_number(n_entries, type_size, is_signed, 0, value,
-		    result, ierrnop) == B_FALSE) {
+		    optstart, ierrnop) == B_FALSE) {
 			free(result);
 			return (NULL);
 		}
@@ -575,18 +1033,23 @@ inittab_encode_e(dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
 	}
 
 	/*
-	 * if just_payload is false, then we need to slide the option
-	 * code and length fields in. (length includes them in its
-	 * count, so we have to subtract 2)
+	 * if just_payload is false, then we need to add the option
+	 * code and length fields in.
 	 */
-	if (just_payload == B_FALSE) {
-		(void) memmove(result + 2, result, length - 2);
-		result[0] = ie->ds_code;
-		result[1] = length - 2;
+	if (!just_payload) {
+		if (ie->ds_dhcpv6) {
+			/* LINTED: alignment */
+			d6o = (dhcpv6_option_t *)result;
+			d6o->d6o_code = htons(ie->ds_code);
+			d6o->d6o_len = htons(length);
+		} else {
+			result[0] = ie->ds_code;
+			result[1] = length;
+		}
 	}
 
 	if (lengthp != NULL)
-		*lengthp = length;
+		*lengthp = length + hlen;
 
 	return (result);
 }
@@ -603,16 +1066,18 @@ inittab_encode_e(dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
  *	    int *: set to extended error code if error occurs.
  *  output: char *: a dynamically allocated string containing the converted data
  */
+
 char *
-inittab_decode_e(dhcp_symbol_t *ie, uchar_t *payload, uint16_t length,
-    boolean_t just_payload, int *ierrnop)
+inittab_decode_e(const dhcp_symbol_t *ie, const uchar_t *payload,
+    uint16_t length, boolean_t just_payload, int *ierrnop)
 {
-	char		*resultp, *end, *result = NULL;
-	char		*currp;
-	uchar_t		n_entries;
+	char		*resultp, *result = NULL;
+	uint_t		n_entries;
 	struct in_addr	in_addr;
+	in6_addr_t	in6_addr;
 	uint8_t		type_size = inittab_type_to_size(ie);
 	boolean_t	is_signed;
+	int		type;
 
 	*ierrnop = 0;
 	if (type_size == 0) {
@@ -620,9 +1085,17 @@ inittab_decode_e(dhcp_symbol_t *ie, uchar_t *payload, uint16_t length,
 		return (NULL);
 	}
 
-	if (just_payload == B_FALSE) {
-		length = payload[1];
-		payload += 2;
+	if (!just_payload) {
+		if (ie->ds_dhcpv6) {
+			dhcpv6_option_t d6o;
+
+			(void) memcpy(&d6o, payload, sizeof (d6o));
+			length = ntohs(d6o.d6o_len);
+			payload += sizeof (d6o);
+		} else {
+			length = payload[1];
+			payload += 2;
+		}
 	}
 
 	/*
@@ -659,6 +1132,167 @@ inittab_decode_e(dhcp_symbol_t *ie, uchar_t *payload, uint16_t length,
 		result[n_entries] = '\0';
 		break;
 
+	case DSYM_DOMAIN:
+
+		/*
+		 * A valid, decoded RFC 1035 domain string or sequence of
+		 * strings is always the same size as the encoded form, but we
+		 * allow for RFC 1035 \DDD and \\ and \. escaping.
+		 *
+		 * Decoding stops at the end of the input or the first coding
+		 * violation.  Coding violations result in discarding the
+		 * offending list entry entirely.  Note that we ignore the 255
+		 * character overall limit on domain names.
+		 */
+		if ((result = malloc(4 * length + 1)) == NULL) {
+			*ierrnop = ITAB_NOMEM;
+			return (NULL);
+		}
+		resultp = result;
+		while (length > 0) {
+			char *dstart;
+			int slen;
+
+			dstart = resultp;
+			while (length > 0) {
+				slen = *payload++;
+				length--;
+				/* Upper two bits of length must be zero */
+				if ((slen & 0xc0) != 0 || slen > length) {
+					length = 0;
+					resultp = dstart;
+					break;
+				}
+				if (resultp != dstart)
+					*resultp++ = '.';
+				if (slen == 0)
+					break;
+				length -= slen;
+				while (slen > 0) {
+					if (!isascii(*payload) ||
+					    !isgraph(*payload)) {
+						(void) snprintf(resultp, 5,
+						    "\\%03d",
+						    *(unsigned char *)payload);
+						resultp += 4;
+						payload++;
+					} else {
+						if (*payload == '.' ||
+						    *payload == '\\')
+							*resultp++ = '\\';
+						*resultp++ = *payload++;
+					}
+					slen--;
+				}
+			}
+			if (resultp != dstart && length > 0)
+				*resultp++ = ' ';
+		}
+		*resultp = '\0';
+		break;
+
+	case DSYM_DUID:
+
+		/*
+		 * First, determine the type of DUID.  We need at least two
+		 * octets worth of data to grab the type code.  Once we have
+		 * that, the number of octets required for representation
+		 * depends on the type.
+		 */
+
+		if (length < 2) {
+			*ierrnop = ITAB_BAD_GRAN;
+			return (NULL);
+		}
+		type = (payload[0] << 8) + payload[1];
+		switch (type) {
+		case DHCPV6_DUID_LLT: {
+			duid_llt_t dllt;
+
+			if (length < sizeof (dllt)) {
+				*ierrnop = ITAB_BAD_GRAN;
+				return (NULL);
+			}
+			(void) memcpy(&dllt, payload, sizeof (dllt));
+			payload += sizeof (dllt);
+			length -= sizeof (dllt);
+			n_entries = sizeof ("1,65535,4294967295,") +
+			    length * 3;
+			if ((result = malloc(n_entries)) == NULL) {
+				*ierrnop = ITAB_NOMEM;
+				return (NULL);
+			}
+			(void) snprintf(result, n_entries, "%d,%u,%u,", type,
+			    ntohs(dllt.dllt_hwtype), ntohl(dllt.dllt_time));
+			break;
+		}
+		case DHCPV6_DUID_EN: {
+			duid_en_t den;
+
+			if (length < sizeof (den)) {
+				*ierrnop = ITAB_BAD_GRAN;
+				return (NULL);
+			}
+			(void) memcpy(&den, payload, sizeof (den));
+			payload += sizeof (den);
+			length -= sizeof (den);
+			n_entries = sizeof ("2,4294967295,") + length * 2;
+			if ((result = malloc(n_entries)) == NULL) {
+				*ierrnop = ITAB_NOMEM;
+				return (NULL);
+			}
+			(void) snprintf(result, n_entries, "%d,%u,", type,
+			    DHCPV6_GET_ENTNUM(&den));
+			break;
+		}
+		case DHCPV6_DUID_LL: {
+			duid_ll_t dll;
+
+			if (length < sizeof (dll)) {
+				*ierrnop = ITAB_BAD_GRAN;
+				return (NULL);
+			}
+			(void) memcpy(&dll, payload, sizeof (dll));
+			payload += sizeof (dll);
+			length -= sizeof (dll);
+			n_entries = sizeof ("3,65535,") + length * 3;
+			if ((result = malloc(n_entries)) == NULL) {
+				*ierrnop = ITAB_NOMEM;
+				return (NULL);
+			}
+			(void) snprintf(result, n_entries, "%d,%u,", type,
+			    ntohs(dll.dll_hwtype));
+			break;
+		}
+		default:
+			n_entries = sizeof ("0,") + length * 2;
+			if ((result = malloc(n_entries)) == NULL) {
+				*ierrnop = ITAB_NOMEM;
+				return (NULL);
+			}
+			(void) snprintf(result, n_entries, "%d,", type);
+			break;
+		}
+		resultp = result + strlen(result);
+		n_entries -= strlen(result);
+		if (type == DHCPV6_DUID_LLT || type == DHCPV6_DUID_LL) {
+			if (length > 0) {
+				resultp += snprintf(resultp, 3, "%02X",
+				    *payload++);
+				length--;
+			}
+			while (length-- > 0) {
+				resultp += snprintf(resultp, 4, ":%02X",
+				    *payload++);
+			}
+		} else {
+			while (length-- > 0) {
+				resultp += snprintf(resultp, 3, "%02X",
+				    *payload++);
+			}
+		}
+		break;
+
 	case DSYM_OCTET:
 
 		result = malloc(n_entries * (sizeof ("0xNN") + 1));
@@ -667,50 +1301,50 @@ inittab_decode_e(dhcp_symbol_t *ie, uchar_t *payload, uint16_t length,
 			return (NULL);
 		}
 
-		for (resultp = result; n_entries != 0; n_entries--) {
-			currp = resultp;
-			resultp += sprintf(resultp, "0x%02X ", *payload++);
-			if (currp == resultp) {
-				free(result);
-				*ierrnop = ITAB_BAD_OCTET;
-				return (NULL);
-			}
+		result[0] = '\0';
+		resultp = result;
+		if (n_entries > 0) {
+			resultp += sprintf(resultp, "0x%02X", *payload++);
+			n_entries--;
 		}
+		while (n_entries-- > 0)
+			resultp += sprintf(resultp, " 0x%02X", *payload++);
 
-		resultp[-1] = '\0';
 		break;
 
 	case DSYM_IP:
-
-		if ((length / sizeof (ipaddr_t)) % ie->ds_gran != 0) {
+	case DSYM_IPV6:
+		if ((length / type_size) % ie->ds_gran != 0) {
 			*ierrnop = ITAB_BAD_GRAN;
 			inittab_msg("inittab_decode: number of entries "
 			    "not compatible with option granularity");
 			return (NULL);
 		}
 
-		result = malloc(n_entries * (sizeof ("aaa.bbb.ccc.ddd") + 1));
-		end = &result[n_entries * (sizeof ("aaa.bbb.ccc.ddd") + 1)];
+		result = malloc(n_entries * (ie->ds_type == DSYM_IP ?
+		    INET_ADDRSTRLEN : INET6_ADDRSTRLEN));
 		if (result == NULL) {
 			*ierrnop = ITAB_NOMEM;
 			return (NULL);
 		}
 
 		for (resultp = result; n_entries != 0; n_entries--) {
-			(void) memcpy(&in_addr.s_addr, payload,
-			    sizeof (ipaddr_t));
-			currp = resultp;
-			resultp += snprintf(resultp, end - resultp, "%s ",
-			    inet_ntoa(in_addr));
-			if (currp == resultp) {
-				free(result);
-				*ierrnop = ITAB_BAD_IPADDR;
-				return (NULL);
+			if (ie->ds_type == DSYM_IP) {
+				(void) memcpy(&in_addr.s_addr, payload,
+				    sizeof (ipaddr_t));
+				(void) strcpy(resultp, inet_ntoa(in_addr));
+			} else {
+				(void) memcpy(&in6_addr, payload,
+				    sizeof (in6_addr));
+				(void) inet_ntop(AF_INET6, &in6_addr, resultp,
+				    INET6_ADDRSTRLEN);
 			}
-			payload += sizeof (ipaddr_t);
+			resultp += strlen(resultp);
+			if (n_entries > 1)
+				*resultp++ = ' ';
+			payload += type_size;
 		}
-
-		resultp[-1] = '\0';
+		*resultp = '\0';
 		break;
 
 	case DSYM_NUMBER:				/* FALLTHRU */
@@ -761,8 +1395,9 @@ inittab_decode_e(dhcp_symbol_t *ie, uchar_t *payload, uint16_t length,
  *	    boolean_t: if false, return a full DHCP option
  *  output: uchar_t *: a dynamically allocated byte array with converted data
  */
+
 uchar_t *
-inittab_encode(dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
+inittab_encode(const dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
     boolean_t just_payload)
 {
 	int ierrno;
@@ -781,8 +1416,9 @@ inittab_encode(dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
  *	    boolean_t: if false, payload is assumed to be a DHCP option
  *  output: char *: a dynamically allocated string containing the converted data
  */
+
 char *
-inittab_decode(dhcp_symbol_t *ie, uchar_t *payload, uint16_t length,
+inittab_decode(const dhcp_symbol_t *ie, const uchar_t *payload, uint16_t length,
     boolean_t just_payload)
 {
 	int ierrno;
@@ -797,6 +1433,7 @@ inittab_decode(dhcp_symbol_t *ie, uchar_t *payload, uint16_t length,
  *	    ...: arguments to the format string
  *  output: void
  */
+
 /*PRINTFLIKE1*/
 static void
 inittab_msg(const char *fmt, ...)
@@ -852,6 +1489,7 @@ inittab_msg(const char *fmt, ...)
  *	    char *: where to decode the numbers to
  *  output: boolean_t: true on successful conversion, false on failure
  */
+
 static boolean_t
 decode_number(uint8_t n_entries, uint8_t size, boolean_t is_signed,
     uint8_t granularity, const uint8_t *from, char *to, int *ierrnop)
@@ -874,24 +1512,31 @@ decode_number(uint8_t n_entries, uint8_t size, boolean_t is_signed,
 		switch (size) {
 
 		case 1:
-			to += sprintf(to, is_signed ? "%d " : "%u ", *from);
+			to += sprintf(to, is_signed ? "%d" : "%u", *from);
 			break;
 
 		case 2:
 			(void) memcpy(&uint16, from, 2);
-			to += sprintf(to, is_signed ? "%hd " : "%hu ",
+			to += sprintf(to, is_signed ? "%hd" : "%hu",
 			    ntohs(uint16));
+			break;
+
+		case 3:
+			uint32 = 0;
+			(void) memcpy((uchar_t *)&uint32 + 1, from, 3);
+			to += sprintf(to, is_signed ? "%ld" : "%lu",
+			    ntohl(uint32));
 			break;
 
 		case 4:
 			(void) memcpy(&uint32, from, 4);
-			to += sprintf(to, is_signed ? "%ld " : "%lu ",
+			to += sprintf(to, is_signed ? "%ld" : "%lu",
 			    ntohl(uint32));
 			break;
 
 		case 8:
 			(void) memcpy(&uint64, from, 8);
-			to += sprintf(to, is_signed ? "%lld " : "%llu ",
+			to += sprintf(to, is_signed ? "%lld" : "%llu",
 			    dhcp_ntohll(uint64));
 			break;
 
@@ -901,9 +1546,11 @@ decode_number(uint8_t n_entries, uint8_t size, boolean_t is_signed,
 			    size);
 			return (B_FALSE);
 		}
+		if (n_entries > 0)
+			*to++ = ' ';
 	}
 
-	to[-1] = '\0';
+	*to = '\0';
 	return (B_TRUE);
 }
 
@@ -920,6 +1567,7 @@ decode_number(uint8_t n_entries, uint8_t size, boolean_t is_signed,
  *	    int *: set to extended error code if error occurs.
  *  output: boolean_t: true on successful conversion, false on failure
  */
+
 static boolean_t /* ARGSUSED */
 encode_number(uint8_t n_entries, uint8_t size, boolean_t is_signed,
     uint8_t granularity, const char *from, uint8_t *to, int *ierrnop)
@@ -939,7 +1587,7 @@ encode_number(uint8_t n_entries, uint8_t size, boolean_t is_signed,
 		}
 	}
 
-	for (i = 0; i < n_entries; i++, from++) {
+	for (i = 0; i < n_entries; i++, from++, to += size) {
 
 		/*
 		 * totally obscure c factoid: it is legal to pass a
@@ -954,7 +1602,7 @@ encode_number(uint8_t n_entries, uint8_t size, boolean_t is_signed,
 		switch (size) {
 
 		case 1:
-			to[i] = strtoul(from, &endptr, 0);
+			*to = strtoul(from, &endptr, 0);
 			if (errno != 0 || from == endptr) {
 				goto error;
 			}
@@ -965,7 +1613,15 @@ encode_number(uint8_t n_entries, uint8_t size, boolean_t is_signed,
 			if (errno != 0 || from == endptr) {
 				goto error;
 			}
-			(void) memcpy(to + (i * 2), &uint16, 2);
+			(void) memcpy(to, &uint16, 2);
+			break;
+
+		case 3:
+			uint32 = htonl(strtoul(from, &endptr, 0));
+			if (errno != 0 || from == endptr) {
+				goto error;
+			}
+			(void) memcpy(to, (uchar_t *)&uint32 + 1, 3);
 			break;
 
 		case 4:
@@ -973,7 +1629,7 @@ encode_number(uint8_t n_entries, uint8_t size, boolean_t is_signed,
 			if (errno != 0 || from == endptr) {
 				goto error;
 			}
-			(void) memcpy(to + (i * 4), &uint32, 4);
+			(void) memcpy(to, &uint32, 4);
 			break;
 
 		case 8:
@@ -981,7 +1637,7 @@ encode_number(uint8_t n_entries, uint8_t size, boolean_t is_signed,
 			if (errno != 0 || from == endptr) {
 				goto error;
 			}
-			(void) memcpy(to + (i * 8), &uint64, 8);
+			(void) memcpy(to, &uint64, 8);
 			break;
 
 		default:
@@ -1010,11 +1666,14 @@ error:
  *   input: dhcp_symbol_t *: an entry of the given type
  *  output: uint8_t: the size in bytes of an entry of that type
  */
+
 uint8_t
-inittab_type_to_size(dhcp_symbol_t *ie)
+inittab_type_to_size(const dhcp_symbol_t *ie)
 {
 	switch (ie->ds_type) {
 
+	case DSYM_DUID:
+	case DSYM_DOMAIN:
 	case DSYM_ASCII:
 	case DSYM_OCTET:
 	case DSYM_SNUMBER8:
@@ -1026,6 +1685,10 @@ inittab_type_to_size(dhcp_symbol_t *ie)
 	case DSYM_UNUMBER16:
 
 		return (2);
+
+	case DSYM_UNUMBER24:
+
+		return (3);
 
 	case DSYM_SNUMBER32:
 	case DSYM_UNUMBER32:
@@ -1041,6 +1704,10 @@ inittab_type_to_size(dhcp_symbol_t *ie)
 	case DSYM_NUMBER:
 
 		return (ie->ds_gran);
+
+	case DSYM_IPV6:
+
+		return (sizeof (in6_addr_t));
 	}
 
 	return (0);
@@ -1053,6 +1720,7 @@ inittab_type_to_size(dhcp_symbol_t *ie)
  *   input: uchar_t: the inittab category code
  *  output: dsym_category_t: the dsym category code
  */
+
 static dsym_category_t
 itabcode_to_dsymcode(uchar_t itabcode)
 {
@@ -1072,6 +1740,7 @@ itabcode_to_dsymcode(uchar_t itabcode)
  *   input: const char *: the category name
  *  output: uchar_t: its internal code (numeric representation)
  */
+
 static uchar_t
 category_to_code(const char *category)
 {
@@ -1090,6 +1759,7 @@ category_to_code(const char *category)
  *   input: uint64_t: the number to convert
  *  output: uint64_t: its value in network byte order
  */
+
 static uint64_t
 dhcp_htonll(uint64_t uint64_hbo)
 {
@@ -1102,6 +1772,7 @@ dhcp_htonll(uint64_t uint64_hbo)
  *   input: uint64_t: the number to convert
  *  output: uint64_t: its value in host byte order
  */
+
 static uint64_t
 dhcp_ntohll(uint64_t uint64_nbo)
 {

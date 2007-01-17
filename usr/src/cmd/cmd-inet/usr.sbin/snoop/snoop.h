@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -237,6 +237,7 @@ extern void interpret_sctp(int, struct sctp_hdr *, int, int);
 extern void interpret_mip_cntrlmsg(int, uchar_t *, int);
 struct dhcp;
 extern int interpret_dhcp(int, struct dhcp *, int);
+extern int interpret_dhcpv6(int, const uint8_t *, int);
 struct tftphdr;
 extern int interpret_tftp(int, struct tftphdr *, int);
 extern int interpret_http(int, char *, int);
@@ -258,6 +259,7 @@ extern char *ether_ouiname(uint32_t);
 extern char *tohex(char *p, int len);
 extern char *printether(struct ether_addr *);
 extern char *print_ethertype(int);
+extern const char *arp_htype(int);
 
 /*
  * Describes characteristics of the Media Access Layer.

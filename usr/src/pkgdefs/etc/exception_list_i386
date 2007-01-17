@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -435,6 +435,7 @@ usr/include/sys/kmdb.h			i386
 # for customer use, so the files are excluded from packaging.
 #
 usr/include/dhcp_hostconf.h		i386
+usr/include/dhcp_stable.h		i386
 usr/include/dhcp_impl.h			i386
 usr/include/dhcp_inittab.h		i386
 usr/include/dhcp_symbol_common.h	i386

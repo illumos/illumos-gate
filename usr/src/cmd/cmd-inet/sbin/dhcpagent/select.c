@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * SELECTING state of the client state machine.
@@ -28,20 +28,17 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-#include <stdlib.h>
 #include <stdio.h>
 #include <strings.h>
 #include <time.h>
 #include <limits.h>
 #include <netinet/in.h>
-#include <sys/socket.h>
 #include <net/route.h>
 #include <net/if.h>
 #include <netinet/dhcp.h>
 #include <netinet/udp.h>
 #include <netinet/ip_var.h>
 #include <netinet/udp_var.h>
-#include <stropts.h>				/* FLUSHR/FLUSHW */
 #include <dhcpmsg.h>
 
 #include "states.h"
@@ -51,14 +48,13 @@
 #include "packet.h"
 #include "defaults.h"
 
-static iu_eh_callback_t	dhcp_collect_offers;
 static stop_func_t	stop_selecting;
 
 /*
- * dhcp_start(): starts DHCP on an interface
+ * dhcp_start(): starts DHCP on a state machine
  *
  *   input: iu_tq_t *: unused
- *	    void *: the interface to start DHCP on
+ *	    void *: the state machine on which to start DHCP
  *  output: void
  */
 
@@ -66,160 +62,267 @@ static stop_func_t	stop_selecting;
 void
 dhcp_start(iu_tq_t *tqp, void *arg)
 {
-	struct ifslist	*ifsp = (struct ifslist *)arg;
+	dhcp_smach_t	*dsmp = arg;
 
-	if (check_ifs(ifsp) == 0) {
-		(void) release_ifs(ifsp);
-		return;
-	}
+	release_smach(dsmp);
 
-	dhcpmsg(MSG_VERBOSE, "starting DHCP on %s", ifsp->if_name);
-	dhcp_selecting(ifsp);
+	dhcpmsg(MSG_VERBOSE, "starting DHCP on %s", dsmp->dsm_name);
+	dhcp_selecting(dsmp);
 }
 
 /*
- * dhcp_selecting(): sends a DISCOVER and sets up reception for an OFFER
+ * dhcp_selecting(): sends a DISCOVER and sets up reception of OFFERs for
+ *		     IPv4, or sends a Solicit and sets up reception of
+ *		     Advertisements for DHCPv6.
  *
- *   input: struct ifslist *: the interface to send the DISCOVER on, ...
+ *   input: dhcp_smach_t *: the state machine on which to send the DISCOVER
  *  output: void
  */
 
 void
-dhcp_selecting(struct ifslist *ifsp)
+dhcp_selecting(dhcp_smach_t *dsmp)
 {
 	dhcp_pkt_t		*dpkt;
 	const char		*reqhost;
 	char			hostfile[PATH_MAX + 1];
 
 	/*
-	 * we first set up to collect OFFER packets as they arrive.
-	 * we then send out DISCOVER probes.  then we wait at a
-	 * user-tunable number of seconds before seeing if OFFERs have
-	 * come in response to our DISCOVER.  if none have come in, we
-	 * continue to wait, sending out our DISCOVER probes with
-	 * exponential backoff.  if an OFFER is never received, we
-	 * will wait forever (note that since we're event-driven
-	 * though, we're still able to service other interfaces.)
+	 * We first set up to collect OFFER/Advertise packets as they arrive.
+	 * We then send out DISCOVER/Solicit probes.  Then we wait a
+	 * user-tunable number of seconds before seeing if OFFERs/
+	 * Advertisements have come in response to our DISCOVER/Solicit.  If
+	 * none have come in, we continue to wait, sending out our DISCOVER/
+	 * Solicit probes with exponential backoff.  If no OFFER/Advertisement
+	 * is ever received, we will wait forever (note that since we're
+	 * event-driven though, we're still able to service other state
+	 * machines).
 	 *
-	 * note that we do an reset_ifs() here because we may be
-	 * landing in dhcp_selecting() as a result of restarting DHCP,
-	 * so the ifs may not be fresh.
+	 * Note that we do an reset_smach() here because we may be landing in
+	 * dhcp_selecting() as a result of restarting DHCP, so the state
+	 * machine may not be fresh.
 	 */
 
-	reset_ifs(ifsp);
-	ifsp->if_state = SELECTING;
+	reset_smach(dsmp);
+	if (!set_smach_state(dsmp, SELECTING)) {
+		dhcpmsg(MSG_ERROR,
+		    "dhcp_selecting: cannot switch to SELECTING state; "
+		    "reverting to INIT on %s", dsmp->dsm_name);
+		goto failed;
 
-	if ((ifsp->if_offer_id = iu_register_event(eh, ifsp->if_dlpi_fd, POLLIN,
-	    dhcp_collect_offers, ifsp)) == -1) {
+	}
 
-		dhcpmsg(MSG_ERROR, "dhcp_selecting: cannot register to collect "
-		    "OFFER packets, reverting to INIT on %s",
-		    ifsp->if_name);
-
-		ifsp->if_state   = INIT;
-		ifsp->if_dflags |= DHCP_IF_FAILED;
-		ipc_action_finish(ifsp, DHCP_IPC_E_MEMORY);
-		async_finish(ifsp);
-		return;
-	} else
-		hold_ifs(ifsp);
-
-
-	if ((ifsp->if_offer_timer = iu_schedule_timer(tq,
-	    ifsp->if_offer_wait, dhcp_requesting, ifsp)) == -1) {
-
+	dsmp->dsm_offer_timer = iu_schedule_timer(tq,
+	    dsmp->dsm_offer_wait, dhcp_requesting, dsmp);
+	if (dsmp->dsm_offer_timer == -1) {
 		dhcpmsg(MSG_ERROR, "dhcp_selecting: cannot schedule to read "
-		    "OFFER packets");
+		    "%s packets", dsmp->dsm_isv6 ? "Advertise" : "OFFER");
+		goto failed;
+	}
 
-		if (iu_unregister_event(eh, ifsp->if_offer_id, NULL) != 0) {
-			ifsp->if_offer_id = -1;
-			(void) release_ifs(ifsp);
-		}
-
-		ifsp->if_state   = INIT;
-		ifsp->if_dflags |= DHCP_IF_FAILED;
-		ipc_action_finish(ifsp, DHCP_IPC_E_MEMORY);
-		async_finish(ifsp);
-		return;
-	} else
-		hold_ifs(ifsp);
+	hold_smach(dsmp);
 
 	/*
-	 * Assemble DHCPDISCOVER message.  The max dhcp message size
-	 * option is set to the interface max, minus the size of the udp and
-	 * ip headers.
+	 * Assemble and send the DHCPDISCOVER or Solicit message.
+	 *
+	 * If this fails, we'll wait for the select timer to go off
+	 * before trying again.
 	 */
+	if (dsmp->dsm_isv6) {
+		dhcpv6_ia_na_t d6in;
 
-	dpkt = init_pkt(ifsp, DISCOVER);
-
-	add_pkt_opt16(dpkt, CD_MAX_DHCP_SIZE, htons(ifsp->if_max -
-			sizeof (struct udpiphdr)));
-	add_pkt_opt32(dpkt, CD_LEASE_TIME, htonl(DHCP_PERM));
-
-	add_pkt_opt(dpkt, CD_CLASS_ID, class_id, class_id_len);
-	add_pkt_opt(dpkt, CD_REQUEST_LIST, ifsp->if_prl, ifsp->if_prllen);
-
-	if (df_get_bool(ifsp->if_name, DF_REQUEST_HOSTNAME)) {
-		dhcpmsg(MSG_DEBUG, "dhcp_selecting: DF_REQUEST_HOSTNAME");
-		(void) snprintf(hostfile, sizeof (hostfile), "/etc/hostname.%s",
-		    ifsp->if_name);
-
-		if ((reqhost = iffile_to_hostname(hostfile)) != NULL) {
-			dhcpmsg(MSG_DEBUG, "dhcp_selecting: host %s", reqhost);
-			if ((ifsp->if_reqhost = strdup(reqhost)) != NULL)
-				add_pkt_opt(dpkt, CD_HOSTNAME, ifsp->if_reqhost,
-				    strlen(ifsp->if_reqhost));
-			else
-				dhcpmsg(MSG_WARNING, "dhcp_selecting: cannot"
-				    " allocate memory for host name option");
+		if ((dpkt = init_pkt(dsmp, DHCPV6_MSG_SOLICIT)) == NULL) {
+			dhcpmsg(MSG_ERROR, "dhcp_selecting: unable to set up "
+			    "Solicit packet");
+			return;
 		}
-	}
-	add_pkt_opt(dpkt, CD_END, NULL, 0);
 
-	(void) send_pkt(ifsp, dpkt, htonl(INADDR_BROADCAST), stop_selecting);
+		/* Add an IA_NA option for our controlling LIF */
+		d6in.d6in_iaid = htonl(dsmp->dsm_lif->lif_iaid);
+		d6in.d6in_t1 = htonl(0);
+		d6in.d6in_t2 = htonl(0);
+		(void) add_pkt_opt(dpkt, DHCPV6_OPT_IA_NA,
+		    (dhcpv6_option_t *)&d6in + 1,
+		    sizeof (d6in) - sizeof (dhcpv6_option_t));
+
+		/* Option Request option for desired information */
+		(void) add_pkt_prl(dpkt, dsmp);
+
+		/* Enable Rapid-Commit */
+		(void) add_pkt_opt(dpkt, DHCPV6_OPT_RAPID_COMMIT, NULL, 0);
+
+		/* xxx add Reconfigure Accept */
+
+		(void) send_pkt_v6(dsmp, dpkt, ipv6_all_dhcp_relay_and_servers,
+		    stop_selecting, DHCPV6_SOL_TIMEOUT, DHCPV6_SOL_MAX_RT);
+	} else {
+		if ((dpkt = init_pkt(dsmp, DISCOVER)) == NULL) {
+			dhcpmsg(MSG_ERROR, "dhcp_selecting: unable to set up "
+			    "DISCOVER packet");
+			return;
+		}
+
+		/*
+		 * The max DHCP message size option is set to the interface
+		 * MTU, minus the size of the UDP and IP headers.
+		 */
+		(void) add_pkt_opt16(dpkt, CD_MAX_DHCP_SIZE,
+		    htons(dsmp->dsm_lif->lif_max - sizeof (struct udpiphdr)));
+		(void) add_pkt_opt32(dpkt, CD_LEASE_TIME, htonl(DHCP_PERM));
+
+		(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id, class_id_len);
+		(void) add_pkt_prl(dpkt, dsmp);
+
+		if (df_get_bool(dsmp->dsm_name, dsmp->dsm_isv6,
+		    DF_REQUEST_HOSTNAME)) {
+			dhcpmsg(MSG_DEBUG,
+			    "dhcp_selecting: DF_REQUEST_HOSTNAME");
+			(void) snprintf(hostfile, sizeof (hostfile),
+			    "/etc/hostname.%s", dsmp->dsm_name);
+
+			if ((reqhost = iffile_to_hostname(hostfile)) != NULL) {
+				dhcpmsg(MSG_DEBUG, "dhcp_selecting: host %s",
+				    reqhost);
+				dsmp->dsm_reqhost = strdup(reqhost);
+				if (dsmp->dsm_reqhost != NULL)
+					(void) add_pkt_opt(dpkt, CD_HOSTNAME,
+					    dsmp->dsm_reqhost,
+					    strlen(dsmp->dsm_reqhost));
+				else
+					dhcpmsg(MSG_WARNING,
+					    "dhcp_selecting: cannot allocate "
+					    "memory for host name option");
+			}
+		}
+		(void) add_pkt_opt(dpkt, CD_END, NULL, 0);
+
+		(void) send_pkt(dsmp, dpkt, htonl(INADDR_BROADCAST),
+		    stop_selecting);
+	}
+	return;
+
+failed:
+	(void) set_smach_state(dsmp, INIT);
+	dsmp->dsm_dflags |= DHCP_IF_FAILED;
+	ipc_action_finish(dsmp, DHCP_IPC_E_MEMORY);
 }
 
 /*
- * dhcp_collect_offers(): collects incoming OFFERs to a DISCOVER
+ * dhcp_collect_dlpi(): collects incoming OFFERs, ACKs, and NAKs via DLPI.
  *
  *   input: iu_eh_t *: unused
- *	    int: the file descriptor the OFFER arrived on
+ *	    int: the file descriptor the mesage arrived on
  *	    short: unused
  *	    iu_event_id_t: the id of this event callback with the handler
- *	    void *: the interface that received the OFFER
+ *	    void *: the physical interface that received the message
  *  output: void
  */
 
 /* ARGSUSED */
-static void
-dhcp_collect_offers(iu_eh_t *eh, int fd, short events, iu_event_id_t id,
+void
+dhcp_collect_dlpi(iu_eh_t *eh, int fd, short events, iu_event_id_t id,
     void *arg)
 {
-	struct ifslist	*ifsp = (struct ifslist *)arg;
+	dhcp_pif_t	*pif = arg;
+	PKT_LIST	*plp;
+	uchar_t		recv_type;
+	const char	*pname;
+	dhcp_smach_t	*dsmp;
+	uint_t		xid;
 
-	if (verify_ifs(ifsp) == 0) {
-		(void) ioctl(fd, I_FLUSH, FLUSHR|FLUSHW);
+	if ((plp = recv_pkt(fd, pif->pif_max, B_FALSE, B_TRUE)) == NULL)
 		return;
-	}
+
+	recv_type = pkt_recv_type(plp);
+	pname = pkt_type_to_string(recv_type, B_FALSE);
 
 	/*
 	 * DHCP_PUNTYPED messages are BOOTP server responses.
 	 */
+	if (!pkt_v4_match(recv_type,
+	    DHCP_PACK | DHCP_PNAK | DHCP_POFFER | DHCP_PUNTYPED)) {
+		dhcpmsg(MSG_VERBOSE, "dhcp_collect_dlpi: ignored %s packet "
+		    "received via DLPI on %s", pname, pif->pif_name);
+		free_pkt_entry(plp);
+		return;
+	}
 
-	(void) recv_pkt(ifsp, fd, DHCP_POFFER|DHCP_PUNTYPED, B_TRUE);
+	/*
+	 * Loop through the state machines that match on XID to find one that's
+	 * interested in this offer.  If there are none, then discard.
+	 */
+	xid = pkt_get_xid(plp->pkt, B_FALSE);
+	for (dsmp = lookup_smach_by_xid(xid, NULL, B_FALSE); dsmp != NULL;
+	    dsmp = lookup_smach_by_xid(xid, dsmp, B_FALSE)) {
+
+		/*
+		 * Find state machine on correct interface.
+		 */
+		if (dsmp->dsm_lif->lif_pif == pif)
+			break;
+	}
+
+	if (dsmp == NULL) {
+		dhcpmsg(MSG_VERBOSE, "dhcp_collect_dlpi: no matching state "
+		    "machine for %s packet XID %#x received via DLPI on %s",
+		    pname, xid, pif->pif_name);
+		free_pkt_entry(plp);
+		return;
+	}
+
+	/*
+	 * Ignore state machines that aren't looking for DLPI messages.
+	 */
+	if (!dsmp->dsm_using_dlpi) {
+		dhcpmsg(MSG_VERBOSE, "dhcp_collect_dlpi: ignore state "
+		    "machine for %s packet XID %#x received via DLPI on %s",
+		    pname, xid, pif->pif_name);
+		free_pkt_entry(plp);
+		return;
+	}
+
+	if (pkt_v4_match(recv_type, DHCP_PACK | DHCP_PNAK)) {
+		if (!dhcp_bound(dsmp, plp)) {
+			dhcpmsg(MSG_WARNING, "dhcp_collect_dlpi: dhcp_bound "
+			    "failed for %s", dsmp->dsm_name);
+			dhcp_restart(dsmp);
+			return;
+		}
+		dhcpmsg(MSG_VERBOSE, "dhcp_collect_dlpi: %s on %s",
+		    pname, dsmp->dsm_name);
+	} else {
+		pkt_smach_enqueue(dsmp, plp);
+	}
 }
 
 /*
- * stop_selecting(): decides when to stop retransmitting DISCOVERs (never)
+ * stop_selecting(): decides when to stop retransmitting DISCOVERs -- only when
+ *		     abandoning the state machine.  For DHCPv6, this timer may
+ *		     go off before the offer wait timer.  If so, then this is a
+ *		     good time to check for valid Advertisements, so cancel the
+ *		     timer and go check.
  *
- *   input: struct ifslist *: the interface DISCOVERs are being sent on
+ *   input: dhcp_smach_t *: the state machine DISCOVERs are being sent on
  *	    unsigned int: the number of DISCOVERs sent so far
  *  output: boolean_t: B_TRUE if retransmissions should stop
  */
 
-/* ARGSUSED */
+/* ARGSUSED1 */
 static boolean_t
-stop_selecting(struct ifslist *ifsp, unsigned int n_discovers)
+stop_selecting(dhcp_smach_t *dsmp, unsigned int n_discovers)
 {
+	/*
+	 * If we're using v4 and the underlying LIF we're trying to configure
+	 * has been touched by the user, then bail out.
+	 */
+	if (!dsmp->dsm_isv6 && !verify_lif(dsmp->dsm_lif)) {
+		finished_smach(dsmp, DHCP_IPC_E_UNKIF);
+		return (B_TRUE);
+	}
+
+	if (dsmp->dsm_recv_pkt_list != NULL) {
+		dhcp_requesting(NULL, dsmp);
+		if (dsmp->dsm_state != SELECTING)
+			return (B_TRUE);
+	}
 	return (B_FALSE);
 }

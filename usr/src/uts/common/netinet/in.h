@@ -178,6 +178,9 @@ typedef	uint16_t	sa_family_t;
 
 /*
  * Port/socket numbers: network standard functions
+ *
+ * Entries should exist here for each port number compiled into an ON
+ * component, such as snoop.
  */
 #define	IPPORT_ECHO		7
 #define	IPPORT_DISCARD		9
@@ -191,6 +194,7 @@ typedef	uint16_t	sa_family_t;
 #define	IPPORT_TIMESERVER	37
 #define	IPPORT_NAMESERVER	42
 #define	IPPORT_WHOIS		43
+#define	IPPORT_DOMAIN		53
 #define	IPPORT_MTP		57
 
 /*
@@ -201,8 +205,17 @@ typedef	uint16_t	sa_family_t;
 #define	IPPORT_TFTP		69
 #define	IPPORT_RJE		77
 #define	IPPORT_FINGER		79
+#define	IPPORT_HTTP		80
+#define	IPPORT_HTTP_ALT		8080
 #define	IPPORT_TTYLINK		87
 #define	IPPORT_SUPDUP		95
+#define	IPPORT_NTP		123
+#define	IPPORT_NETBIOS_NS	137
+#define	IPPORT_NETBIOS_DGM	138
+#define	IPPORT_NETBIOS_SSN	139
+#define	IPPORT_LDAP		389
+#define	IPPORT_SLP		427
+#define	IPPORT_MIP		434
 
 /*
  * Internet Key Exchange (IKE) ports
@@ -216,6 +229,7 @@ typedef	uint16_t	sa_family_t;
 #define	IPPORT_EXECSERVER	512
 #define	IPPORT_LOGINSERVER	513
 #define	IPPORT_CMDSERVER	514
+#define	IPPORT_PRINTER		515
 #define	IPPORT_EFSSERVER	520
 
 /*
@@ -223,7 +237,18 @@ typedef	uint16_t	sa_family_t;
  */
 #define	IPPORT_BIFFUDP		512
 #define	IPPORT_WHOSERVER	513
-#define	IPPORT_ROUTESERVER	520	/* 520+1 also used */
+#define	IPPORT_SYSLOG		514
+#define	IPPORT_TALK		517
+#define	IPPORT_ROUTESERVER	520
+#define	IPPORT_RIPNG		521
+
+/*
+ * DHCPv6 UDP ports
+ */
+#define	IPPORT_DHCPV6C		546
+#define	IPPORT_DHCPV6S		547
+
+#define	IPPORT_SOCKS		1080
 
 /*
  * Ports < IPPORT_RESERVED are reserved for

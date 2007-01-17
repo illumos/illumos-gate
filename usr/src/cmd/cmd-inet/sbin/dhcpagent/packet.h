@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_PACKET_H
@@ -30,12 +29,12 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-#include <sys/sysmacros.h>		/* MIN, MAX, ... */
 #include <netinet/in.h>
 #include <netinet/dhcp.h>
+#include <netinet/dhcp6.h>
 #include <dhcp_impl.h>
 
-#include "agent.h"
+#include "common.h"
 
 /*
  * packet.[ch] contain routines for manipulating, setting, and
@@ -47,43 +46,52 @@
 extern "C" {
 #endif
 
-struct ifslist;				/* forward declaration */
-
 /*
  * data type for recv_pkt().  needed because we may want to wait for
  * several kinds of packets at once, and the existing enumeration of
  * DHCP packet types does not provide a way to do that easily.  here,
  * we light a different bit in the enumeration for each type of packet
  * we want to receive.
+ *
+ * Note that for DHCPv6, types 4 (CONFIRM), 5 (RENEW), 6 (REBIND), 12
+ * (RELAY-FORW, and 13 (RELAY-REPL) are not in the table.  They're never
+ * received by a client, so there's no reason to process them.  (SOLICIT,
+ * REQUEST, DECLINE, RELEASE, and INFORMATION-REQUEST are also never seen by
+ * clients, but are included for consistency.)
+ *
+ * Note also that the symbols are named for the DHCPv4 message types, and that
+ * DHCPv6 has analogous message types.
  */
 
 typedef enum {
 
 	DHCP_PUNTYPED	= 0x001,	/* untyped (BOOTP) message */
-	DHCP_PDISCOVER	= 0x002,
-	DHCP_POFFER 	= 0x004,
-	DHCP_PREQUEST	= 0x008,
-	DHCP_PDECLINE	= 0x010,
-	DHCP_PACK	= 0x020,
-	DHCP_PNAK	= 0x040,
-	DHCP_PRELEASE	= 0x080,
-	DHCP_PINFORM	= 0x100
+	DHCP_PDISCOVER	= 0x002,	/* in v6: SOLICIT (1) */
+	DHCP_POFFER 	= 0x004,	/* in v6: ADVERTISE (2) */
+	DHCP_PREQUEST	= 0x008,	/* in v6: REQUEST (3) */
+	DHCP_PDECLINE	= 0x010,	/* in v6: DECLINE (9) */
+	DHCP_PACK	= 0x020,	/* in v6: REPLY (7), status == 0 */
+	DHCP_PNAK	= 0x040,	/* in v6: REPLY (7), status != 0 */
+	DHCP_PRELEASE	= 0x080,	/* in v6: RELEASE (8) */
+	DHCP_PINFORM	= 0x100,	/* in v6: INFORMATION-REQUEST (11) */
+	DHCP_PRECONFIG	= 0x200		/* v6 only: RECONFIGURE (10) */
 
 } dhcp_message_type_t;
 
 /*
- * a dhcp_pkt_t is (right now) what is used by the packet manipulation
- * functions.  while the structure is not strictly necessary, it allows
- * a better separation of functionality since metadata about the packet
- * (such as its current length) is stored along with the packet.
+ * A dhcp_pkt_t is used by the output-side packet manipulation functions.
+ * While the structure is not strictly necessary, it allows a better separation
+ * of functionality since metadata about the packet (such as its current
+ * length) is stored along with the packet.
+ *
+ * Note that 'pkt' points to a dhcpv6_message_t if the packet is IPv6.
  */
 
-typedef struct dhcp_pkt {
-
+typedef struct dhcp_pkt_s {
 	PKT		*pkt;		/* the real underlying packet */
 	unsigned int	pkt_max_len; 	/* its maximum length */
 	unsigned int	pkt_cur_len;	/* its current length */
-
+	boolean_t	pkt_isv6;
 } dhcp_pkt_t;
 
 /*
@@ -94,19 +102,42 @@ typedef struct dhcp_pkt {
  * packet.c
  */
 
-typedef boolean_t stop_func_t(struct ifslist *, unsigned int);
+typedef boolean_t stop_func_t(dhcp_smach_t *, unsigned int);
 
-dhcp_pkt_t	*init_pkt(struct ifslist *, uchar_t);
-void		add_pkt_opt(dhcp_pkt_t *, uchar_t, const void *, uchar_t);
-void		add_pkt_opt16(dhcp_pkt_t *, uchar_t, uint16_t);
-void		add_pkt_opt32(dhcp_pkt_t *, uchar_t, uint32_t);
+/*
+ * Default I/O and interface control sockets.
+ */
+extern int v6_sock_fd;
+extern int v4_sock_fd;
+
+extern const in6_addr_t ipv6_all_dhcp_relay_and_servers;
+extern const in6_addr_t my_in6addr_any;
+
+PKT_LIST	*alloc_pkt_entry(size_t, boolean_t);
+void		free_pkt_entry(PKT_LIST *);
 void		free_pkt_list(PKT_LIST **);
-void		remove_from_pkt_list(PKT_LIST **, PKT_LIST *);
-void		stop_pkt_retransmission(struct ifslist *);
-int		recv_pkt(struct ifslist *, int, dhcp_message_type_t, boolean_t);
-int		send_pkt(struct ifslist *, dhcp_pkt_t *, in_addr_t,
+uchar_t		pkt_recv_type(const PKT_LIST *);
+uint_t		pkt_get_xid(const PKT *, boolean_t);
+dhcp_pkt_t	*init_pkt(dhcp_smach_t *, uchar_t);
+boolean_t	remove_pkt_opt(dhcp_pkt_t *, uint_t);
+boolean_t	update_v6opt_len(dhcpv6_option_t *, int);
+void		*add_pkt_opt(dhcp_pkt_t *, uint_t, const void *, uint_t);
+void		*add_pkt_subopt(dhcp_pkt_t *, dhcpv6_option_t *, uint_t,
+		    const void *, uint_t);
+void		*add_pkt_opt16(dhcp_pkt_t *, uint_t, uint16_t);
+void		*add_pkt_opt32(dhcp_pkt_t *, uint_t, uint32_t);
+void		*add_pkt_prl(dhcp_pkt_t *, dhcp_smach_t *);
+boolean_t	add_pkt_lif(dhcp_pkt_t *, dhcp_lif_t *, int, const char *);
+void		stop_pkt_retransmission(dhcp_smach_t *);
+void		retransmit_now(dhcp_smach_t *);
+PKT_LIST	*recv_pkt(int, int, boolean_t, boolean_t);
+boolean_t	pkt_v4_match(uchar_t, dhcp_message_type_t);
+void		pkt_smach_enqueue(dhcp_smach_t *, PKT_LIST *);
+boolean_t	send_pkt(dhcp_smach_t *, dhcp_pkt_t *, in_addr_t,
 		    stop_func_t *);
-void		get_pkt_times(PKT_LIST *, uint32_t *, uint32_t *, uint32_t *);
+boolean_t	send_pkt_v6(dhcp_smach_t *, dhcp_pkt_t *, in6_addr_t,
+		    stop_func_t *, uint_t, uint_t);
+boolean_t	dhcp_ip_default(void);
 
 #ifdef	__cplusplus
 }

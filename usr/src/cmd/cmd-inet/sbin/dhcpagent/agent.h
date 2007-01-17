@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 
 #include <sys/types.h>
 #include <libinetutil.h>
+#include <dhcpagent_ipc.h>
 
 /*
  * agent.h contains general symbols that should be available to all
@@ -48,7 +49,7 @@ extern "C" {
  * and event handler, as described in the README. `class_id' is our
  * vendor class id set early on in main().  `inactivity_id' is the
  * timer id of the global inactivity timer, which shuts down the agent
- * if there are no interfaces to manage for DHCP_INACTIVITY_WAIT
+ * if there are no state machines to manage for DHCP_INACTIVITY_WAIT
  * seconds. `grandparent' is the pid of the original process when in
  * adopt mode.  `rtsock_fd' is the global routing socket file descriptor.
  */
@@ -62,6 +63,7 @@ extern pid_t		grandparent;
 extern int		rtsock_fd;
 
 boolean_t	drain_script(iu_eh_t *, void *);
+boolean_t	check_cmd_allowed(DHCPSTATE, dhcp_ipc_type_t);
 
 /*
  * global tunable parameters.  an `I' in the preceding comment indicates
@@ -111,6 +113,31 @@ boolean_t	drain_script(iu_eh_t *, void *);
 
 /* I: the maximum amount of milliseconds to wait for an ipc request */
 #define	DHCP_IPC_REQUEST_WAIT	(3*1000)	/* three seconds */
+
+/*
+ * DHCPv6 timer and retransmit values from RFC 3315.
+ */
+#define	DHCPV6_SOL_MAX_DELAY	1000	/* Max delay of first Solicit; 1s */
+#define	DHCPV6_CNF_MAX_DELAY	1000	/* Max delay of first Confirm; 1s */
+#define	DHCPV6_INF_MAX_DELAY	1000	/* Max delay of first Info-req; 1s */
+#define	DHCPV6_SOL_TIMEOUT	1000	/* Initial Solicit timeout; 1s */
+#define	DHCPV6_REQ_TIMEOUT	1000	/* Initial Request timeout; 1s */
+#define	DHCPV6_CNF_TIMEOUT	1000	/* Initial Confirm timeout; 1s */
+#define	DHCPV6_REN_TIMEOUT	10000	/* Initial Renew timeout; 10s */
+#define	DHCPV6_REB_TIMEOUT	10000	/* Initial Rebind timeout; 10s */
+#define	DHCPV6_INF_TIMEOUT	1000	/* Initial Info-req timeout; 1s */
+#define	DHCPV6_REL_TIMEOUT	1000	/* Initial Release timeout; 1s */
+#define	DHCPV6_DEC_TIMEOUT	1000	/* Initial Decline timeout; 1s */
+#define	DHCPV6_SOL_MAX_RT	120000	/* Max Solicit timeout; 2m */
+#define	DHCPV6_REQ_MAX_RT	30000	/* Max Request timeout; 30s */
+#define	DHCPV6_CNF_MAX_RT	4000	/* Max Confirm timeout; 4s */
+#define	DHCPV6_REN_MAX_RT	600000	/* Max Renew timeout; 5m */
+#define	DHCPV6_REB_MAX_RT	600000	/* Max Rebind timeout; 5m */
+#define	DHCPV6_INF_MAX_RT	120000	/* Max Info-req timeout; 2m */
+#define	DHCPV6_CNF_MAX_RD	10000	/* Max Confirm duration; 10s */
+#define	DHCPV6_REQ_MAX_RC	10	/* Max Request attempts */
+#define	DHCPV6_REL_MAX_RC	5	/* Max Release attempts */
+#define	DHCPV6_DEC_MAX_RC	5	/* Max Decline attempts */
 
 /*
  * reasons for why iu_handle_events() returned

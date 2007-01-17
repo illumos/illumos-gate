@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +34,11 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <net/if.h>
 #include <sys/sockio.h>
 #include <sys/fcntl.h>
+#include <sys/time.h>
 #include <stdio.h>		/* snprintf */
 #include <arpa/inet.h>		/* ntohl, ntohs, etc */
 
@@ -71,7 +72,6 @@
 
 #define	BUFMAX	256
 
-static int	dhcp_ipc_rresvport(in_port_t *);
 static int	dhcp_ipc_timed_read(int, void *, unsigned int, int *);
 static int	getinfo_ifnames(const char *, dhcp_optnum_t *, DHCP_OPT **);
 static char	*get_ifnames(int, int);
@@ -82,15 +82,15 @@ static char	*get_ifnames(int, int);
  *
  *   input: dhcp_ipc_type_t: the type of ipc request to allocate
  *	    const char *: the interface to associate the request with
- *	    void *: the payload to send with the message (NULL if none)
+ *	    const void *: the payload to send with the message (NULL if none)
  *	    uint32_t: the payload size (0 if none)
  *	    dhcp_data_type_t: the description of the type of payload
  *  output: dhcp_ipc_request_t *: the request on success, NULL on failure
  */
 
 dhcp_ipc_request_t *
-dhcp_ipc_alloc_request(dhcp_ipc_type_t type, const char *ifname, void *buffer,
-    uint32_t buffer_size, dhcp_data_type_t data_type)
+dhcp_ipc_alloc_request(dhcp_ipc_type_t type, const char *ifname,
+    const void *buffer, uint32_t buffer_size, dhcp_data_type_t data_type)
 {
 	dhcp_ipc_request_t *request = calloc(1, DHCP_IPC_REQUEST_SIZE +
 	    buffer_size);
@@ -116,15 +116,15 @@ dhcp_ipc_alloc_request(dhcp_ipc_type_t type, const char *ifname, void *buffer,
  *
  *   input: dhcp_ipc_request_t *: the request the reply is for
  *	    int: the return code (0 for success, DHCP_IPC_E_* otherwise)
- *	    void *: the payload to send with the message (NULL if none)
+ *	    const void *: the payload to send with the message (NULL if none)
  *	    uint32_t: the payload size (0 if none)
  *	    dhcp_data_type_t: the description of the type of payload
  *  output: dhcp_ipc_reply_t *: the reply on success, NULL on failure
  */
 
 dhcp_ipc_reply_t *
-dhcp_ipc_alloc_reply(dhcp_ipc_request_t *request, int return_code, void *buffer,
-    uint32_t buffer_size, dhcp_data_type_t data_type)
+dhcp_ipc_alloc_reply(dhcp_ipc_request_t *request, int return_code,
+    const void *buffer, uint32_t buffer_size, dhcp_data_type_t data_type)
 {
 	dhcp_ipc_reply_t *reply = calloc(1, DHCP_IPC_REPLY_SIZE + buffer_size);
 
@@ -175,33 +175,36 @@ dhcp_ipc_get_data(dhcp_ipc_reply_t *reply, size_t *size, dhcp_data_type_t *type)
  *		     (dynamically allocated)
  *	    uint32_t: the minimum length of the packet
  *	    int: the # of milliseconds to wait for the message (-1 is forever)
- *  output: int: 0 on success, DHCP_IPC_E_* otherwise
+ *  output: int: DHCP_IPC_SUCCESS on success, DHCP_IPC_E_* otherwise
  */
 
 static int
 dhcp_ipc_recv_msg(int fd, void **msg, uint32_t base_length, int msec)
 {
-	ssize_t			retval;
+	int			retval;
 	dhcp_ipc_reply_t	*ipc_msg;
 	uint32_t		length;
 
 	retval = dhcp_ipc_timed_read(fd, &length, sizeof (uint32_t), &msec);
-	if (retval != sizeof (uint32_t))
-		return (DHCP_IPC_E_READ);
+	if (retval != DHCP_IPC_SUCCESS)
+		return (retval);
+
+	if (length == 0)
+		return (DHCP_IPC_E_PROTO);
 
 	*msg = malloc(length);
 	if (*msg == NULL)
 		return (DHCP_IPC_E_MEMORY);
 
 	retval = dhcp_ipc_timed_read(fd, *msg, length, &msec);
-	if (retval != length) {
+	if (retval != DHCP_IPC_SUCCESS) {
 		free(*msg);
-		return (DHCP_IPC_E_READ);
+		return (retval);
 	}
 
 	if (length < base_length) {
 		free(*msg);
-		return (DHCP_IPC_E_READ);
+		return (DHCP_IPC_E_PROTO);
 	}
 
 	/*
@@ -211,10 +214,10 @@ dhcp_ipc_recv_msg(int fd, void **msg, uint32_t base_length, int msec)
 	ipc_msg = (dhcp_ipc_reply_t *)(*msg);
 	if (ipc_msg->data_length + base_length != length) {
 		free(*msg);
-		return (DHCP_IPC_E_READ);
+		return (DHCP_IPC_E_PROTO);
 	}
 
-	return (0);
+	return (DHCP_IPC_SUCCESS);
 }
 
 /*
@@ -335,28 +338,30 @@ int
 dhcp_ipc_make_request(dhcp_ipc_request_t *request, dhcp_ipc_reply_t **reply,
     int32_t timeout)
 {
-	int			fd, retval;
-	struct sockaddr_in	sin_peer;
-	in_port_t		source_port = IPPORT_RESERVED - 1;
+	int			fd, on, retval;
+	struct sockaddr_in	sinv;
 
-	(void) memset(&sin_peer, 0, sizeof (sin_peer));
+	fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (fd == -1)
+		return (DHCP_IPC_E_SOCKET);
 
-	sin_peer.sin_family	 = AF_INET;
-	sin_peer.sin_port	 = htons(IPPORT_DHCPAGENT);
-	sin_peer.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	/*
+	 * Bind a privileged port if we have sufficient privilege to do so.
+	 * Continue as non-privileged otherwise.
+	 */
+	on = 1;
+	(void) setsockopt(fd, IPPROTO_TCP, TCP_ANONPRIVBIND, &on, sizeof (on));
 
-	if ((fd = dhcp_ipc_rresvport(&source_port)) == -1) {
-
-		/*
-		 * user isn't privileged.  just make a socket.
-		 */
-
-		fd = socket(AF_INET, SOCK_STREAM, 0);
-		if (fd == -1)
-			return (DHCP_IPC_E_SOCKET);
+	(void) memset(&sinv, 0, sizeof (sinv));
+	sinv.sin_family	 = AF_INET;
+	if (bind(fd, (struct sockaddr *)&sinv, sizeof (sinv)) == -1) {
+		(void) dhcp_ipc_close(fd);
+		return (DHCP_IPC_E_BIND);
 	}
 
-	retval = connect(fd, (struct sockaddr *)&sin_peer, sizeof (sin_peer));
+	sinv.sin_port = htons(IPPORT_DHCPAGENT);
+	sinv.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	retval = connect(fd, (struct sockaddr *)&sinv, sizeof (sinv));
 	if (retval == -1) {
 		(void) dhcp_ipc_close(fd);
 		return (DHCP_IPC_E_CONNECT);
@@ -504,7 +509,7 @@ dhcp_ipc_strerror(int error)
 	/* note: this must be kept in sync with DHCP_IPC_E_* definitions */
 	const char *syscalls[] = {
 		"<unknown>", "socket", "fcntl", "read", "accept", "close",
-		"bind", "listen", "malloc", "connect", "writev"
+		"bind", "listen", "malloc", "connect", "writev", "poll"
 	};
 
 	const char	*error_string;
@@ -525,7 +530,8 @@ dhcp_ipc_strerror(int error)
 	case DHCP_IPC_E_BIND:			/* FALLTHRU */
 	case DHCP_IPC_E_LISTEN:			/* FALLTHRU */
 	case DHCP_IPC_E_CONNECT:		/* FALLTHRU */
-	case DHCP_IPC_E_WRITEV:
+	case DHCP_IPC_E_WRITEV:			/* FALLTHRU */
+	case DHCP_IPC_E_POLL:
 
 		error_string = strerror(errno);
 		if (error_string == NULL)
@@ -605,9 +611,16 @@ dhcp_ipc_strerror(int error)
 		error_string = "no value was found for this option";
 		break;
 
-	case DHCP_IPC_E_NOIFCID:
-		error_string = "interface does not have a configured DHCP "
-		    "client id";
+	case DHCP_IPC_E_RUNNING:
+		error_string = "DHCP is already running";
+		break;
+
+	case DHCP_IPC_E_SRVFAILED:
+		error_string = "DHCP server refused request";
+		break;
+
+	case DHCP_IPC_E_EOF:
+		error_string = "ipc connection closed";
 		break;
 
 	default:
@@ -620,6 +633,28 @@ dhcp_ipc_strerror(int error)
 	 */
 
 	return (error_string);
+}
+
+/*
+ * dhcp_ipc_type_to_string(): maps an ipc command code into a human-readable
+ *			      string
+ *
+ *   input: int: the ipc command code to map
+ *  output: const char *: the corresponding human-readable string
+ */
+
+const char *
+dhcp_ipc_type_to_string(dhcp_ipc_type_t type)
+{
+	static const char *typestr[] = {
+		"drop", "extend", "ping", "release", "start", "status",
+		"inform", "get_tag"
+	};
+
+	if (type < 0 || type >= DHCP_NIPC)
+		return ("unknown");
+	else
+		return (typestr[(int)type]);
 }
 
 /*
@@ -879,53 +914,14 @@ dhcp_ipc_getinfo(dhcp_optnum_t *optnum, DHCP_OPT **result, int32_t timeout)
 }
 
 /*
- * NOTE: we provide our own version of this function because currently
- *       (sunos 5.7), if we link against the one in libnsl, we will
- *       increase the size of our binary by more than 482K due to
- *	 perversions in linking.  besides, this one is tighter :-)
- */
-
-static int
-dhcp_ipc_rresvport(in_port_t *start_port)
-{
-	struct sockaddr_in	sin;
-	int			s, saved_errno;
-
-	(void) memset(&sin, 0, sizeof (struct sockaddr_in));
-	sin.sin_family		= AF_INET;
-	sin.sin_addr.s_addr	= htonl(INADDR_ANY);
-
-	if ((s = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-		return (-1);
-
-	errno = EAGAIN;
-	while (*start_port > IPPORT_RESERVED / 2) {
-
-		sin.sin_port = htons((*start_port)--);
-
-		if (bind(s, (struct sockaddr *)&sin, sizeof (sin)) == 0)
-			return (s);
-
-		if (errno != EADDRINUSE) {
-			saved_errno = errno;
-			break;
-		}
-	}
-
-	(void) close(s);
-	errno = saved_errno;
-	return (-1);
-}
-
-/*
  * dhcp_ipc_timed_read(): reads from a descriptor using a maximum timeout
  *
  *   input: int: the file descriptor to read from
  *	    void *: the buffer to read into
  *	    unsigned int: the total length of data to read
  *	    int *: the number of milliseconds to wait; the number of
- *		   milliseconds left are returned
- *  output: int: -1 on failure, otherwise the number of bytes read
+ *		   milliseconds left are returned (-1 is "forever")
+ *  output: int: DHCP_IPC_SUCCESS on success, DHCP_IPC_E_* otherwise
  */
 
 static int
@@ -934,56 +930,63 @@ dhcp_ipc_timed_read(int fd, void *buffer, unsigned int length, int *msec)
 	unsigned int	n_total = 0;
 	ssize_t		n_read;
 	struct pollfd	pollfd;
-	struct timeval	start, end, elapsed;
-
-	/* make sure that any errors we return are ours */
-	errno = 0;
+	hrtime_t	start, end;
+	int		retv;
 
 	pollfd.fd	= fd;
 	pollfd.events	= POLLIN;
 
 	while (n_total < length) {
 
-		if (gettimeofday(&start, NULL) == -1)
-			return (-1);
+		start = gethrtime();
 
-		switch (poll(&pollfd, 1, *msec)) {
-
-		case 0:
+		retv = poll(&pollfd, 1, *msec);
+		if (retv == 0) {
+			/* This can happen only if *msec is not -1 */
 			*msec = 0;
-			return (n_total);
-
-		case -1:
-			*msec = 0;
-			return (-1);
-
-		default:
-			if ((pollfd.revents & POLLIN) == 0)
-				return (-1);
-
-			if (gettimeofday(&end, NULL) == -1)
-				return (-1);
-
-			elapsed.tv_sec  = end.tv_sec  - start.tv_sec;
-			elapsed.tv_usec = end.tv_usec - start.tv_usec;
-			if (elapsed.tv_usec < 0) {
-				elapsed.tv_sec--;
-				elapsed.tv_usec += 1000000;	/* one second */
-			}
-
-			n_read = read(fd, (caddr_t)buffer + n_total,
-			    length - n_total);
-
-			if (n_read == -1)
-				return (-1);
-
-			n_total += n_read;
-			*msec -= elapsed.tv_sec * 1000 + elapsed.tv_usec / 1000;
-			if (*msec <= 0 || n_read == 0)
-				return (n_total);
-			break;
+			return (DHCP_IPC_E_TIMEOUT);
 		}
+
+		if (*msec != -1) {
+			end = gethrtime();
+			*msec -= (end - start) / (NANOSEC / MILLISEC);
+			if (*msec < 0)
+				*msec = 0;
+		}
+
+		if (retv == -1) {
+			if (errno != EINTR)
+				return (DHCP_IPC_E_POLL);
+			else if (*msec == 0)
+				return (DHCP_IPC_E_TIMEOUT);
+			continue;
+		}
+
+		if (!(pollfd.revents & POLLIN)) {
+			errno = EINVAL;
+			return (DHCP_IPC_E_POLL);
+		}
+
+		n_read = read(fd, (caddr_t)buffer + n_total, length - n_total);
+
+		if (n_read == -1) {
+			if (errno != EINTR)
+				return (DHCP_IPC_E_READ);
+			else if (*msec == 0)
+				return (DHCP_IPC_E_TIMEOUT);
+			continue;
+		}
+
+		if (n_read == 0) {
+			return (n_total == 0 ? DHCP_IPC_E_EOF :
+			    DHCP_IPC_E_PROTO);
+		}
+
+		n_total += n_read;
+
+		if (*msec == 0 && n_total < length)
+			return (DHCP_IPC_E_TIMEOUT);
 	}
 
-	return (n_total);
+	return (DHCP_IPC_SUCCESS);
 }

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -257,6 +257,7 @@ f none usr/include/netdir.h 644 root bin
 d none usr/include/netinet 755 root bin
 f none usr/include/netinet/arp.h 644 root bin
 f none usr/include/netinet/dhcp.h 644 root bin
+f none usr/include/netinet/dhcp6.h 644 root bin
 f none usr/include/netinet/icmp_var.h 644 root bin
 f none usr/include/netinet/icmp6.h 644 root bin
 f none usr/include/netinet/if_ether.h 644 root bin

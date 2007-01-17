@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,7 @@ extern "C" {
 #define	DHCP_AGENT_PATH		"/sbin/dhcpagent"
 #define	DHCP_IPC_LISTEN_BACKLOG	30
 #define	IPPORT_DHCPAGENT	4999
+#define	DHCP_IPC_MAX_WAIT	15	/* max seconds to wait to start agent */
 
 /*
  * return values which should be used by programs which talk to the
@@ -83,21 +84,25 @@ typedef enum {
  *
  * code in dhcpagent relies on the numeric values of these
  * requests -- but there's no sane reason to change them anyway.
+ *
+ * If any commands are changed, added, or removed, see the typestr[]
+ * array in dhcpagent_ipc.c.
  */
 
 typedef enum {
 	DHCP_DROP,	DHCP_EXTEND,  DHCP_PING,    DHCP_RELEASE,
 	DHCP_START,  	DHCP_STATUS,  DHCP_INFORM,  DHCP_GET_TAG,
 	DHCP_NIPC,	/* number of supported requests */
-	DHCP_PRIMARY = 0x100
+	DHCP_PRIMARY = 0x100,
+	DHCP_V6 = 0x200
 } dhcp_ipc_type_t;
 
 /* structure passed with the DHCP_GET_TAG request */
 
 typedef struct {
-	uchar_t		category;
-	uint16_t	code;
-	uint16_t	size;
+	uint_t		category;
+	uint_t		code;
+	uint_t		size;
 } dhcp_optnum_t;
 
 #define	DHCP_IPC_CMD(type)	((type) & 0x00ff)
@@ -114,15 +119,19 @@ typedef struct {
  */
 
 enum {
+	/* System call errors must be kept contiguous */
 	DHCP_IPC_SUCCESS,	DHCP_IPC_E_SOCKET,	DHCP_IPC_E_FCNTL,
 	DHCP_IPC_E_READ,	DHCP_IPC_E_ACCEPT,	DHCP_IPC_E_CLOSE,
 	DHCP_IPC_E_BIND,	DHCP_IPC_E_LISTEN,	DHCP_IPC_E_MEMORY,
-	DHCP_IPC_E_CONNECT,	DHCP_IPC_E_WRITEV,	DHCP_IPC_E_TIMEOUT,
+	DHCP_IPC_E_CONNECT,	DHCP_IPC_E_WRITEV,	DHCP_IPC_E_POLL,
+
+	/* All others follow */
+	DHCP_IPC_E_TIMEOUT,	DHCP_IPC_E_SRVFAILED,	DHCP_IPC_E_EOF,
 	DHCP_IPC_E_INVIF,	DHCP_IPC_E_INT,		DHCP_IPC_E_PERM,
 	DHCP_IPC_E_OUTSTATE,	DHCP_IPC_E_PEND,	DHCP_IPC_E_BOOTP,
 	DHCP_IPC_E_CMD_UNKNOWN, DHCP_IPC_E_UNKIF,	DHCP_IPC_E_PROTO,
 	DHCP_IPC_E_FAILEDIF,	DHCP_IPC_E_NOPRIMARY,	DHCP_IPC_E_DOWNIF,
-	DHCP_IPC_E_NOIPIF,	DHCP_IPC_E_NOVALUE,	DHCP_IPC_E_NOIFCID
+	DHCP_IPC_E_NOIPIF,	DHCP_IPC_E_NOVALUE,	DHCP_IPC_E_RUNNING
 };
 
 /*
@@ -133,11 +142,12 @@ enum {
 
 extern const char	*dhcp_ipc_strerror(int);
 extern dhcp_ipc_request_t *dhcp_ipc_alloc_request(dhcp_ipc_type_t, const char *,
-			    void *, uint32_t, dhcp_data_type_t);
+			    const void *, uint32_t, dhcp_data_type_t);
 extern void		*dhcp_ipc_get_data(dhcp_ipc_reply_t *, size_t *,
 			    dhcp_data_type_t *);
 extern int		dhcp_ipc_make_request(dhcp_ipc_request_t *,
 			    dhcp_ipc_reply_t **, int32_t);
+extern const char	*dhcp_ipc_type_to_string(dhcp_ipc_type_t);
 
 /*
  * high-level public dhcpagent ipc functions
@@ -153,8 +163,8 @@ extern int		dhcp_ipc_getinfo(dhcp_optnum_t *, DHCP_OPT **, int32_t);
 extern int		dhcp_ipc_init(int *);
 extern int		dhcp_ipc_accept(int, int *, int *);
 extern int		dhcp_ipc_recv_request(int, dhcp_ipc_request_t **, int);
-extern dhcp_ipc_reply_t	*dhcp_ipc_alloc_reply(dhcp_ipc_request_t *, int, void *,
-			    uint32_t, dhcp_data_type_t);
+extern dhcp_ipc_reply_t	*dhcp_ipc_alloc_reply(dhcp_ipc_request_t *, int,
+			    const void *, uint32_t, dhcp_data_type_t);
 extern int		dhcp_ipc_send_reply(int, dhcp_ipc_reply_t *);
 extern int		dhcp_ipc_close(int);
 
@@ -174,9 +184,11 @@ typedef enum {
 	RENEWING,			/* have lease, but trying to renew */
 	REBINDING,			/* have lease, but trying to rebind */
 	INFORMATION,			/* sent INFORM, received ACK */
-	INIT_REBOOT,			/* attempting to use cached ACK */
+	INIT_REBOOT,			/* attempt to use cached ACK/Reply */
 	ADOPTING,			/* attempting to adopt */
 	INFORM_SENT,			/* sent INFORM, awaiting ACK */
+	DECLINING,			/* sent v6 Decline, awaiting Reply */
+	RELEASING,			/* sent v6 Release, awaiting Reply */
 	DHCP_NSTATES			/* total number of states */
 } DHCPSTATE;
 
@@ -187,6 +199,7 @@ typedef enum {
 #define	DHCP_IF_BOOTP		0x0400	/* interface is using bootp */
 #define	DHCP_IF_REMOVED		0x0800	/* interface is going away */
 #define	DHCP_IF_FAILED		0x1000	/* interface configuration problem */
+#define	DHCP_IF_V6		0x2000	/* DHCPv6 interface */
 
 /*
  * structure passed with the DHCP_STATUS replies

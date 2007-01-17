@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,32 +51,34 @@ static const struct porttable pt_udp[] = {
 	{ IPPORT_ECHO,		"ECHO" },
 	{ IPPORT_DISCARD,	"DISCARD" },
 	{ IPPORT_DAYTIME,	"DAYTIME" },
-	{ 19,			"CHARGEN" },
+	{ IPPORT_CHARGEN,	"CHARGEN" },
 	{ IPPORT_TIMESERVER,	"TIME" },
 	{ IPPORT_NAMESERVER,	"NAME" },
-	{ 53,			"DNS" },
+	{ IPPORT_DOMAIN,	"DNS" },
 	{ IPPORT_BOOTPS,	"BOOTPS" },
 	{ IPPORT_BOOTPC,	"BOOTPC" },
 	{ IPPORT_TFTP,		"TFTP" },
 	{ IPPORT_FINGER,	"FINGER" },
 /*	{ 111,			"PORTMAP" }, Just Sun RPC */
-	{ 123,			"NTP" },
-	{ 137,			"NBNS" },
-	{ 138,			"NBDG" },
-	{ 389,			"LDAP" },
-	{ 427,			"SLP" },
+	{ IPPORT_NTP,		"NTP" },
+	{ IPPORT_NETBIOS_NS,	"NBNS" },
+	{ IPPORT_NETBIOS_DGM,	"NBDG" },
+	{ IPPORT_LDAP,		"LDAP" },
+	{ IPPORT_SLP,		"SLP" },
 /* Mobile IP defines a set of new control messages sent over UDP port 434 */
-	{ 434,			"Mobile IP" },
+	{ IPPORT_MIP,		"Mobile IP" },
 	{ IPPORT_BIFFUDP,	"BIFF" },
 	{ IPPORT_WHOSERVER,	"WHO" },
-	{ 514,			"SYSLOG" },
-	{ 517,			"TALK" },
+	{ IPPORT_SYSLOG,	"SYSLOG" },
+	{ IPPORT_TALK,		"TALK" },
 	{ IPPORT_ROUTESERVER,	"RIP" },
-	{ 521,			"RIPng" },
+	{ IPPORT_RIPNG,		"RIPng" },
+	{ IPPORT_DHCPV6C,	"DHCPv6C" },
+	{ IPPORT_DHCPV6S,	"DHCPv6S" },
 	{ 550,			"NEW-RWHO" },
 	{ 560,			"RMONITOR" },
 	{ 561,			"MONITOR" },
-	{ 1080,			"SOCKS" },
+	{ IPPORT_SOCKS,		"SOCKS" },
 	{ 0,			NULL }
 };
 
@@ -87,7 +89,7 @@ static struct porttable pt_tcp[] = {
 	{ IPPORT_SYSTAT,	"SYSTAT" },
 	{ IPPORT_DAYTIME,	"DAYTIME" },
 	{ IPPORT_NETSTAT,	"NETSTAT" },
-	{ 19,			"CHARGEN" },
+	{ IPPORT_CHARGEN,	"CHARGEN" },
 	{ 20,			"FTP-DATA" },
 	{ IPPORT_FTP,		"FTP" },
 	{ IPPORT_TELNET,	"TELNET" },
@@ -96,11 +98,11 @@ static struct porttable pt_tcp[] = {
 	{ 39,			"RLP" },
 	{ IPPORT_NAMESERVER,	"NAMESERVER" },
 	{ IPPORT_WHOIS,		"NICNAME" },
-	{ 53,			"DNS" },
+	{ IPPORT_DOMAIN,	"DNS" },
 	{ 70,			"GOPHER" },
 	{ IPPORT_RJE,		"RJE" },
 	{ IPPORT_FINGER,	"FINGER" },
-	{ 80,			"HTTP" },
+	{ IPPORT_HTTP,		"HTTP" },
 	{ IPPORT_TTYLINK,	"LINK" },
 	{ IPPORT_SUPDUP,	"SUPDUP" },
 	{ 101,			"HOSTNAME" },
@@ -113,27 +115,27 @@ static struct porttable pt_tcp[] = {
 	{ 113,			"AUTH" },
 	{ 117,			"UUCP-PATH" },
 	{ 119,			"NNTP" },
-	{ 123,			"NTP" },
-	{ 139,			"NBT" },
+	{ IPPORT_NTP,		"NTP" },
+	{ IPPORT_NETBIOS_SSN,	"NBT" },
 	{ 143,			"IMAP" },
 	{ 144,			"NeWS" },
-	{ 389,			"LDAP" },
-	{ 427,			"SLP" },
+	{ IPPORT_LDAP,		"LDAP" },
+	{ IPPORT_SLP,		"SLP" },
 	{ 443,			"HTTPS" },
 	{ 445,			"SMB" },
 	{ IPPORT_EXECSERVER,	"EXEC" },
 	{ IPPORT_LOGINSERVER,	"RLOGIN" },
 	{ IPPORT_CMDSERVER,	"RSHELL" },
-	{ 515,			"PRINTER" },
+	{ IPPORT_PRINTER,	"PRINTER" },
 	{ 530,			"COURIER" },
 	{ 540,			"UUCP" },
 	{ 600,			"PCSERVER" },
-	{ 1080,			"SOCKS" },
+	{ IPPORT_SOCKS,		"SOCKS" },
 	{ 1524,			"INGRESLOCK" },
 	{ 2904,			"M2UA" },
 	{ 2905,			"M3UA" },
 	{ 6000,			"XWIN" },
-	{ 8080,			"HTTP (proxy)" },
+	{ IPPORT_HTTP_ALT,	"HTTP (proxy)" },
 	{ 9900,			"IUA" },
 	{ 0,			NULL },
 };
@@ -352,12 +354,13 @@ interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
 		which = dst;
 	}
 
-	if ((dst == 53 || src == 53) && proto != IPPROTO_TCP) {
+	if ((dst == IPPORT_DOMAIN || src == IPPORT_DOMAIN) &&
+	    proto != IPPROTO_TCP) {
 		interpret_dns(flags, proto, (uchar_t *)data, dlen);
 		return (1);
 	}
 
-	if (dst == 514 && proto != IPPROTO_TCP) {
+	if (dst == IPPORT_SYSLOG && proto != IPPROTO_TCP) {
 		/*
 		 * TCP port 514 is rshell.  UDP port 514 is syslog.
 		 */
@@ -372,26 +375,30 @@ interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
 			(void) interpret_dhcp(flags, (struct dhcp *)data,
 			    dlen);
 			return (1);
+		case IPPORT_DHCPV6S:
+		case IPPORT_DHCPV6C:
+			(void) interpret_dhcpv6(flags, (uint8_t *)data, dlen);
+			return (1);
 		case  IPPORT_TFTP:
 			(void) interpret_tftp(flags, (struct tftphdr *)data,
 			    dlen);
 			return (1);
-		case  80:
-		case  8080:
+		case  IPPORT_HTTP:
+		case  IPPORT_HTTP_ALT:
 			(void) interpret_http(flags, data, dlen);
 			return (1);
-		case 123:
+		case IPPORT_NTP:
 			(void) interpret_ntp(flags, (struct ntpdata *)data,
 			    dlen);
 			return (1);
-		case 137:
+		case IPPORT_NETBIOS_NS:
 			interpret_netbios_ns(flags, (uchar_t *)data, dlen);
 			return (1);
-		case 138:
+		case IPPORT_NETBIOS_DGM:
 			interpret_netbios_datagram(flags, (uchar_t *)data,
 			    dlen);
 			return (1);
-		case 139:
+		case IPPORT_NETBIOS_SSN:
 		case 445:
 			/*
 			 * SMB on port 445 is a subset of NetBIOS SMB
@@ -400,23 +407,23 @@ interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
 			 */
 			interpret_netbios_ses(flags, (uchar_t *)data, dlen);
 			return (1);
-		case 389:
+		case IPPORT_LDAP:
 			interpret_ldap(flags, data, dlen, src, dst);
 			return (1);
-		case 427:
+		case IPPORT_SLP:
 			interpret_slp(flags, data, dlen);
 			return (1);
-		case 434:
+		case IPPORT_MIP:
 			interpret_mip_cntrlmsg(flags, (uchar_t *)data, dlen);
 			return (1);
 		case IPPORT_ROUTESERVER:
 			(void) interpret_rip(flags, (struct rip *)data, dlen);
 			return (1);
-		case 521:
+		case IPPORT_RIPNG:
 			(void) interpret_rip6(flags, (struct rip6 *)data,
 			    dlen);
 			return (1);
-		case 1080:
+		case IPPORT_SOCKS:
 			if (dir == 'C')
 				(void) interpret_socks_call(flags, data, dlen);
 			else

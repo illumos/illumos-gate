@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,18 +29,20 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
 #include <dhcpagent_ipc.h>
 #include <dhcp_inittab.h>
 #include <dhcp_symbol.h>
 
-#define	DHCP_INFO_VENDOR_START	256
+#define	DHCP_INFO_VENDOR_START_V4	256
+#define	DHCP_INFO_VENDOR_START_V6	65536
 
 static void
 usage(const char *program)
 {
 	(void) fprintf(stderr,
-	    "usage: %s [-i interface] [-n limit] [-c] code\n"
-	    "       %s [-i interface] [-n limit] [-c] identifier\n",
+	    "usage: %s [-c] [-i interface] [-n limit] [-v {4|6}] code\n"
+	    "       %s [-c] [-i interface] [-n limit] [-v {4|6}] identifier\n",
 	    program, program);
 
 	exit(DHCP_EXIT_BADARGS);
@@ -62,8 +63,11 @@ main(int argc, char **argv)
 	DHCP_OPT		*opt;
 	size_t			opt_len;
 	boolean_t		is_canonical = B_FALSE;
+	long			version = 4;
+	boolean_t		isv6;
+	uint8_t			*valptr;
 
-	while ((c = getopt(argc, argv, "cn:i:")) != EOF) {
+	while ((c = getopt(argc, argv, "ci:n:v:")) != EOF) {
 
 		switch (c) {
 
@@ -77,6 +81,12 @@ main(int argc, char **argv)
 
 		case 'n':
 			max_lines = strtoul(optarg, NULL, 0);
+			break;
+
+		case 'v':
+			version = strtol(optarg, NULL, 0);
+			if (version != 4 && version != 6)
+				usage(argv[0]);
 			break;
 
 		case '?':
@@ -97,10 +107,13 @@ main(int argc, char **argv)
 	 * identifier into a code, then send the request over the wire.
 	 */
 
+	isv6 = (version == 6);
+
 	if (isalpha(*argv[optind])) {
 
-		entry = inittab_getbyname(ITAB_CAT_SITE|ITAB_CAT_STANDARD|
-		    ITAB_CAT_VENDOR|ITAB_CAT_FIELD, ITAB_CONS_INFO,
+		entry = inittab_getbyname(ITAB_CAT_SITE | ITAB_CAT_STANDARD |
+		    ITAB_CAT_VENDOR | ITAB_CAT_FIELD |
+		    (isv6 ? ITAB_CAT_V6 : 0), ITAB_CONS_INFO,
 		    argv[optind]);
 
 		if (entry == NULL) {
@@ -113,19 +126,25 @@ main(int argc, char **argv)
 		optnum.category = entry->ds_category;
 
 	} else {
+		ulong_t start;
 
 		optnum.code	= strtoul(argv[optind], 0, 0);
-		optnum.category = ITAB_CAT_STANDARD|ITAB_CAT_SITE;
+		optnum.category = ITAB_CAT_STANDARD | ITAB_CAT_SITE;
 
 		/*
 		 * sigh.  this is a hack, but it's needed for backward
 		 * compatibility with the CA dhcpinfo program.
 		 */
 
-		if (optnum.code > DHCP_INFO_VENDOR_START) {
-			optnum.code    -= DHCP_INFO_VENDOR_START;
+		start = isv6 ? DHCP_INFO_VENDOR_START_V6 :
+		    DHCP_INFO_VENDOR_START_V4;
+		if (optnum.code > start) {
+			optnum.code    -= start;
 			optnum.category = ITAB_CAT_VENDOR;
 		}
+
+		if (isv6)
+			optnum.category |= ITAB_CAT_V6;
 
 		entry = inittab_getbycode(optnum.category, ITAB_CONS_INFO,
 		    optnum.code);
@@ -144,8 +163,8 @@ main(int argc, char **argv)
 	 * send the request to the agent and reap the reply
 	 */
 
-	request = dhcp_ipc_alloc_request(DHCP_GET_TAG, ifname, &optnum,
-	    sizeof (dhcp_optnum_t), DHCP_TYPE_OPTNUM);
+	request = dhcp_ipc_alloc_request(DHCP_GET_TAG | (isv6 ? DHCP_V6 : 0),
+	    ifname, &optnum, sizeof (dhcp_optnum_t), DHCP_TYPE_OPTNUM);
 
 	if (request == NULL)
 		return (DHCP_EXIT_SYSTEM);
@@ -179,26 +198,40 @@ main(int argc, char **argv)
 	 * check for protocol error
 	 */
 
-	if (opt_len < 2 || (opt_len - 2 != opt->len))
-		return (DHCP_EXIT_FAILURE);
+	if (isv6) {
+		dhcpv6_option_t d6o;
+
+		if (opt_len < sizeof (d6o))
+			return (DHCP_EXIT_FAILURE);
+		(void) memcpy(&d6o, opt, sizeof (d6o));
+		if (opt_len != ntohs(d6o.d6o_len) + sizeof (d6o))
+			return (DHCP_EXIT_FAILURE);
+		valptr = (uint8_t *)opt + sizeof (d6o);
+		opt_len -= sizeof (d6o);
+	} else {
+		if (opt_len < 2 || (opt_len - 2 != opt->len))
+			return (DHCP_EXIT_FAILURE);
+		opt_len -= 2;
+		valptr = opt->value;
+	}
 
 	if (is_canonical) {
 
-		value = malloc(opt->len * (sizeof ("0xNN") + 1));
+		value = malloc(opt_len * (sizeof ("0xNN") + 1));
 		if (value == NULL) {
 			(void) fprintf(stderr, "%s: out of memory\n", argv[0]);
 			return (DHCP_EXIT_FAILURE);
 		}
 
-		for (i = 0, valuep = value; i < opt->len; i++)
-			valuep += sprintf(valuep, "0x%02X ", opt->value[i]);
+		for (i = 0, valuep = value; i < opt_len; i++)
+			valuep += sprintf(valuep, "0x%02X ", valptr[i]);
 
 		valuep[-1] = '\0';
 		gran = 1;
 
 	} else {
 
-		value = inittab_decode(entry, opt->value, opt->len, B_TRUE);
+		value = inittab_decode(entry, valptr, opt_len, B_TRUE);
 		if (value == NULL) {
 			(void) fprintf(stderr, "%s: cannot decode agent's "
 			    "reply\n", argv[0]);

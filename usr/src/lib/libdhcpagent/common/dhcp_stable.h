@@ -18,17 +18,37 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+#ifndef _DHCP_STABLE_H
+#define	_DHCP_STABLE_H
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/* LINTLIBRARY */
-/* PROTOLIB1 */
+/*
+ * This module reads and writes the stable identifier values, DUID and IAID.
+ */
 
-#include <dhcp_hostconf.h>
-#include <dhcp_stable.h>
-#include <dhcpagent_ipc.h>
-#include <dhcpagent_util.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <sys/types.h>
+
+extern uchar_t	*read_stable_duid(size_t *);
+extern int	write_stable_duid(const uchar_t *, size_t);
+extern uchar_t	*make_stable_duid(const char *, size_t *);
+
+extern uint32_t	read_stable_iaid(const char *);
+extern int	write_stable_iaid(const char *, uint32_t);
+extern uint32_t	make_stable_iaid(const char *, uint32_t);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _DHCP_STABLE_H */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1265,7 +1265,8 @@ pf_primary()
 		    EQ("length") || EQ("less") || EQ("greater") ||
 		    EQ("port") || EQ("srcport") || EQ("dstport") ||
 		    EQ("rpc") || EQ("gateway") || EQ("nofrag") ||
-		    EQ("bootp") || EQ("dhcp") || EQ("slp") || EQ("ldap")) {
+		    EQ("bootp") || EQ("dhcp") || EQ("dhcp6") ||
+		    EQ("slp") || EQ("ldap")) {
 			break;
 		}
 

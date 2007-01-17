@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,6 @@
 #include <netinet/in.h>		/* struct in_addr */
 #include <netinet/dhcp.h>
 #include <signal.h>
-#include <sys/dlpi.h>
 #include <sys/socket.h>
 #include <net/route.h>
 #include <net/if_arp.h>
@@ -56,6 +55,9 @@
  *  o  conversion functions -- functions to turn integers into strings,
  *     or to convert between units of a similar measure.
  *
+ *  o  time and timer functions -- functions to handle time measurement
+ *     and events.
+ *
  *  o  ipc-related functions -- functions to simplify the generation of
  *     ipc messages to the agent's clients.
  *
@@ -64,75 +66,49 @@
  *
  *  o  routing table manipulation functions
  *
- *  o  acknak handler functions
- *
  *  o  true miscellany -- anything else
  */
 
 /*
  * pkt_type_to_string(): stringifies a packet type
  *
- *   input: uchar_t: a DHCP packet type value, as defined in RFC2131
+ *   input: uchar_t: a DHCP packet type value, RFC 2131 or 3315
+ *	    boolean_t: B_TRUE if IPv6
  *  output: const char *: the stringified packet type
  */
 
 const char *
-pkt_type_to_string(uchar_t type)
+pkt_type_to_string(uchar_t type, boolean_t isv6)
 {
 	/*
-	 * note: the ordering here allows direct indexing of the table
-	 *	 based on the RFC2131 packet type value passed in.
+	 * note: the ordering in these arrays allows direct indexing of the
+	 *	 table based on the RFC packet type value passed in.
 	 */
 
-	static const char *types[] = {
+	static const char *v4types[] = {
 		"BOOTP",  "DISCOVER", "OFFER",   "REQUEST", "DECLINE",
 		"ACK",    "NAK",      "RELEASE", "INFORM"
 	};
+	static const char *v6types[] = {
+		NULL, "SOLICIT", "ADVERTISE", "REQUEST",
+		"CONFIRM", "RENEW", "REBIND", "REPLY",
+		"RELEASE", "DECLINE", "RECONFIGURE", "INFORMATION-REQUEST",
+		"RELAY-FORW", "RELAY-REPL"
+	};
 
-	if (type >= (sizeof (types) / sizeof (*types)) || types[type] == NULL)
-		return ("<unknown>");
-
-	return (types[type]);
-}
-
-/*
- * dlpi_to_arp(): converts DLPI datalink types into ARP datalink types
- *
- *   input: uchar_t: the DLPI datalink type
- *  output: uchar_t: the ARP datalink type (0 if no corresponding code)
- */
-
-uchar_t
-dlpi_to_arp(uchar_t dlpi_type)
-{
-	switch (dlpi_type) {
-
-	case DL_ETHER:
-		return (1);
-
-	case DL_FRAME:
-		return (15);
-
-	case DL_ATM:
-		return (16);
-
-	case DL_HDLC:
-		return (17);
-
-	case DL_FC:
-		return (18);
-
-	case DL_CSMACD:				/* ieee 802 networks */
-	case DL_TPB:
-	case DL_TPR:
-	case DL_METRO:
-	case DL_FDDI:
-		return (6);
-	case DL_IB:
-		return (ARPHRD_IB);
+	if (isv6) {
+		if (type >= sizeof (v6types) / sizeof (*v6types) ||
+		    v6types[type] == NULL)
+			return ("<unknown>");
+		else
+			return (v6types[type]);
+	} else {
+		if (type >= sizeof (v4types) / sizeof (*v4types) ||
+		    v4types[type] == NULL)
+			return ("<unknown>");
+		else
+			return (v4types[type]);
 	}
-
-	return (0);
 }
 
 /*
@@ -181,92 +157,34 @@ monosec_to_time(monosec_t abs_monosec)
 }
 
 /*
- * send_ok_reply(): sends an "ok" reply to a request and closes the ipc
- *		    connection
+ * hrtime_to_monosec(): converts a hrtime_t to monosec_t
  *
- *   input: dhcp_ipc_request_t *: the request to reply to
- *	    int *: the ipc connection file descriptor (set to -1 on return)
- *  output: void
- *    note: the request is freed (thus the request must be on the heap).
+ *    input: hrtime_t: the time to convert
+ *   output: monosec_t: the time in monosec_t
  */
 
-void
-send_ok_reply(dhcp_ipc_request_t *request, int *control_fd)
+monosec_t
+hrtime_to_monosec(hrtime_t hrtime)
 {
-	send_error_reply(request, 0, control_fd);
-}
-
-/*
- * send_error_reply(): sends an "error" reply to a request and closes the ipc
- *		       connection
- *
- *   input: dhcp_ipc_request_t *: the request to reply to
- *	    int: the error to send back on the ipc connection
- *	    int *: the ipc connection file descriptor (set to -1 on return)
- *  output: void
- *    note: the request is freed (thus the request must be on the heap).
- */
-
-void
-send_error_reply(dhcp_ipc_request_t *request, int error, int *control_fd)
-{
-	send_data_reply(request, control_fd, error, DHCP_TYPE_NONE, NULL, NULL);
-}
-
-/*
- * send_data_reply(): sends a reply to a request and closes the ipc connection
- *
- *   input: dhcp_ipc_request_t *: the request to reply to
- *	    int *: the ipc connection file descriptor (set to -1 on return)
- *	    int: the status to send back on the ipc connection (zero for
- *		 success, DHCP_IPC_E_* otherwise).
- *	    dhcp_data_type_t: the type of the payload in the reply
- *	    void *: the payload for the reply, or NULL if there is no payload
- *	    size_t: the size of the payload
- *  output: void
- *    note: the request is freed (thus the request must be on the heap).
- */
-
-void
-send_data_reply(dhcp_ipc_request_t *request, int *control_fd,
-    int error, dhcp_data_type_t type, void *buffer, size_t size)
-{
-	dhcp_ipc_reply_t	*reply;
-
-	if (*control_fd == -1)
-		return;
-
-	reply = dhcp_ipc_alloc_reply(request, error, buffer, size, type);
-	if (reply == NULL)
-		dhcpmsg(MSG_ERR, "send_data_reply: cannot allocate reply");
-
-	else if (dhcp_ipc_send_reply(*control_fd, reply) != 0)
-		dhcpmsg(MSG_ERR, "send_data_reply: dhcp_ipc_send_reply");
-
-	/*
-	 * free the request since we've now used it to send our reply.
-	 * we can also close the socket since the reply has been sent.
-	 */
-
-	free(reply);
-	free(request);
-	(void) dhcp_ipc_close(*control_fd);
-	*control_fd = -1;
+	return (hrtime / NANOSEC);
 }
 
 /*
  * print_server_msg(): prints a message from a DHCP server
  *
- *   input: struct ifslist *: the interface the message came in on
- *	    DHCP_OPT *: the option containing the string to display
+ *   input: dhcp_smach_t *: the state machine the message is associated with
+ *	    const char *: the string to display
+ *	    uint_t: length of string
  *  output: void
  */
 
 void
-print_server_msg(struct ifslist *ifsp, DHCP_OPT *p)
+print_server_msg(dhcp_smach_t *dsmp, const char *msg, uint_t msglen)
 {
-	dhcpmsg(MSG_INFO, "%s: message from server: %.*s", ifsp->if_name,
-	    p->len, p->value);
+	if (msglen > 0) {
+		dhcpmsg(MSG_INFO, "%s: message from server: %.*s",
+		    dsmp->dsm_name, msglen, msg);
+	}
 }
 
 /*
@@ -365,12 +283,19 @@ daemonize(void)
 	default:
 		if (grandparent != 0) {
 			(void) signal(SIGCHLD, SIG_IGN);
-			dhcpmsg(MSG_DEBUG, "dhcpagent: daemonize: "
+			/*
+			 * Note that we're not the agent here, so the DHCP
+			 * logging subsystem hasn't been configured yet.
+			 */
+			syslog(LOG_DEBUG | LOG_DAEMON, "dhcpagent: daemonize: "
 			    "waiting for adoption to complete.");
 			if (sleep(DHCP_ADOPT_SLEEP) == 0) {
-				dhcpmsg(MSG_WARNING, "dhcpagent: daemonize: "
-				    "timed out awaiting adoption.");
+				syslog(LOG_WARNING | LOG_DAEMON,
+				    "dhcpagent: daemonize: timed out awaiting "
+				    "adoption.");
 			}
+			syslog(LOG_DEBUG | LOG_DAEMON, "dhcpagent: daemonize: "
+			    "wait finished");
 		}
 		_exit(EXIT_SUCCESS);
 	}
@@ -385,10 +310,10 @@ daemonize(void)
  *	    struct in_addr: the default gateway to use
  *	    const char *: the interface associated with the route
  *	    int: any additional flags (besides RTF_STATIC and RTF_GATEWAY)
- *  output: int: 1 on success, 0 on failure
+ *  output: boolean_t: B_TRUE on success, B_FALSE on failure
  */
 
-static int
+static boolean_t
 update_default_route(const char *ifname, int type, struct in_addr *gateway_nbo,
     int flags)
 {
@@ -428,14 +353,14 @@ update_default_route(const char *ifname, int type, struct in_addr *gateway_nbo,
  *
  *   input: const char *: the name of the interface associated with the route
  *	    struct in_addr: the default gateway to add
- *  output: int: 1 on success, 0 on failure
+ *  output: boolean_t: B_TRUE on success, B_FALSE otherwise
  */
 
-int
+boolean_t
 add_default_route(const char *ifname, struct in_addr *gateway_nbo)
 {
 	if (strchr(ifname, ':') != NULL)	/* see README */
-		return (1);
+		return (B_TRUE);
 
 	return (update_default_route(ifname, RTM_ADD, gateway_nbo, RTF_UP));
 }
@@ -445,23 +370,24 @@ add_default_route(const char *ifname, struct in_addr *gateway_nbo)
  *
  *   input: const char *: the name of the interface associated with the route
  *	    struct in_addr: if not INADDR_ANY, the default gateway to remove
- *  output: int: 1 on success, 0 on failure
+ *  output: boolean_t: B_TRUE on success, B_FALSE on failure
  */
 
-int
+boolean_t
 del_default_route(const char *ifname, struct in_addr *gateway_nbo)
 {
 	if (strchr(ifname, ':') != NULL)
-		return (1);
+		return (B_TRUE);
 
 	if (gateway_nbo->s_addr == htonl(INADDR_ANY)) /* no router */
-		return (1);
+		return (B_TRUE);
 
 	return (update_default_route(ifname, RTM_DELETE, gateway_nbo, 0));
 }
 
 /*
- * inactivity_shutdown(): shuts down agent if there are no interfaces to manage
+ * inactivity_shutdown(): shuts down agent if there are no state machines left
+ *			  to manage
  *
  *   input: iu_tq_t *: unused
  *	    void *: unused
@@ -472,8 +398,10 @@ del_default_route(const char *ifname, struct in_addr *gateway_nbo)
 void
 inactivity_shutdown(iu_tq_t *tqp, void *arg)
 {
-	if (ifs_count() > 0)	/* shouldn't happen, but... */
+	if (smach_count() > 0)	/* shouldn't happen, but... */
 		return;
+
+	dhcpmsg(MSG_VERBOSE, "inactivity_shutdown: timed out");
 
 	iu_stop_handling_events(eh, DHCP_REASON_INACTIVITY, NULL, NULL);
 }
@@ -493,131 +421,15 @@ graceful_shutdown(int sig)
 }
 
 /*
- * register_acknak(): registers dhcp_acknak() to be called back when ACK or
- *		      NAK packets are received on a given interface
- *
- *   input: struct ifslist *: the interface to register for
- *  output: int: 1 on success, 0 on failure
- */
-
-int
-register_acknak(struct ifslist *ifsp)
-{
-	iu_event_id_t	ack_id, ack_bcast_id = -1;
-
-	/*
-	 * having an acknak id already registered isn't impossible;
-	 * handle the situation as gracefully as possible.
-	 */
-
-	if (ifsp->if_acknak_id != -1) {
-		dhcpmsg(MSG_DEBUG, "register_acknak: acknak id pending, "
-		    "attempting to cancel");
-		if (unregister_acknak(ifsp) == 0)
-			return (0);
-	}
-
-	switch (ifsp->if_state) {
-
-	case BOUND:
-	case REBINDING:
-	case RENEWING:
-
-		ack_bcast_id = iu_register_event(eh, ifsp->if_sock_fd, POLLIN,
-		    dhcp_acknak, ifsp);
-
-		if (ack_bcast_id == -1) {
-			dhcpmsg(MSG_WARNING, "register_acknak: cannot "
-			    "register to receive socket broadcasts");
-			return (0);
-		}
-
-		ack_id = iu_register_event(eh, ifsp->if_sock_ip_fd, POLLIN,
-		    dhcp_acknak, ifsp);
-		break;
-
-	default:
-		ack_id = iu_register_event(eh, ifsp->if_dlpi_fd, POLLIN,
-		    dhcp_acknak, ifsp);
-		break;
-	}
-
-	if (ack_id == -1) {
-		dhcpmsg(MSG_WARNING, "register_acknak: cannot register event");
-		(void) iu_unregister_event(eh, ack_bcast_id, NULL);
-		return (0);
-	}
-
-	ifsp->if_acknak_id = ack_id;
-	hold_ifs(ifsp);
-
-	ifsp->if_acknak_bcast_id = ack_bcast_id;
-	if (ifsp->if_acknak_bcast_id != -1) {
-		hold_ifs(ifsp);
-		dhcpmsg(MSG_DEBUG, "register_acknak: registered broadcast id "
-		    "%d", ack_bcast_id);
-	}
-
-	dhcpmsg(MSG_DEBUG, "register_acknak: registered acknak id %d", ack_id);
-	return (1);
-}
-
-/*
- * unregister_acknak(): unregisters dhcp_acknak() to be called back
- *
- *   input: struct ifslist *: the interface to unregister for
- *  output: int: 1 on success, 0 on failure
- */
-
-int
-unregister_acknak(struct ifslist *ifsp)
-{
-	if (ifsp->if_acknak_id != -1) {
-
-		if (iu_unregister_event(eh, ifsp->if_acknak_id, NULL) == 0) {
-			dhcpmsg(MSG_DEBUG, "unregister_acknak: cannot "
-			    "unregister acknak id %d on %s",
-			    ifsp->if_acknak_id, ifsp->if_name);
-			return (0);
-		}
-
-		dhcpmsg(MSG_DEBUG, "unregister_acknak: unregistered acknak id "
-		    "%d", ifsp->if_acknak_id);
-
-		ifsp->if_acknak_id = -1;
-		(void) release_ifs(ifsp);
-	}
-
-	if (ifsp->if_acknak_bcast_id != -1) {
-
-		if (iu_unregister_event(eh, ifsp->if_acknak_bcast_id, NULL)
-		    == 0) {
-			dhcpmsg(MSG_DEBUG, "unregister_acknak: cannot "
-			    "unregister broadcast id %d on %s",
-			    ifsp->if_acknak_id, ifsp->if_name);
-			return (0);
-		}
-
-		dhcpmsg(MSG_DEBUG, "unregister_acknak: unregistered "
-		    "broadcast id %d", ifsp->if_acknak_bcast_id);
-
-		ifsp->if_acknak_bcast_id = -1;
-		(void) release_ifs(ifsp);
-	}
-
-	return (1);
-}
-
-/*
  * bind_sock(): binds a socket to a given IP address and port number
  *
  *   input: int: the socket to bind
  *	    in_port_t: the port number to bind to, host byte order
  *	    in_addr_t: the address to bind to, host byte order
- *  output: int: 1 on success, 0 on failure
+ *  output: boolean_t: B_TRUE on success, B_FALSE on failure
  */
 
-int
+boolean_t
 bind_sock(int fd, in_port_t port_hbo, in_addr_t addr_hbo)
 {
 	struct sockaddr_in	sin;
@@ -631,6 +443,34 @@ bind_sock(int fd, in_port_t port_hbo, in_addr_t addr_hbo)
 	(void) setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (int));
 
 	return (bind(fd, (struct sockaddr *)&sin, sizeof (sin)) == 0);
+}
+
+/*
+ * bind_sock_v6(): binds a socket to a given IP address and port number
+ *
+ *   input: int: the socket to bind
+ *	    in_port_t: the port number to bind to, host byte order
+ *	    in6_addr_t: the address to bind to, network byte order
+ *  output: boolean_t: B_TRUE on success, B_FALSE on failure
+ */
+
+boolean_t
+bind_sock_v6(int fd, in_port_t port_hbo, const in6_addr_t *addr_nbo)
+{
+	struct sockaddr_in6	sin6;
+	int			on = 1;
+
+	(void) memset(&sin6, 0, sizeof (struct sockaddr_in6));
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_port   = htons(port_hbo);
+	if (addr_nbo != NULL) {
+		(void) memcpy(&sin6.sin6_addr, addr_nbo,
+		    sizeof (sin6.sin6_addr));
+	}
+
+	(void) setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (int));
+
+	return (bind(fd, (struct sockaddr *)&sin6, sizeof (sin6)) == 0);
 }
 
 /*
@@ -741,4 +581,113 @@ iffile_to_hostname(const char *path)
 
 	(void) fclose(fp);
 	return (NULL);
+}
+
+/*
+ * init_timer(): set up a DHCP timer
+ *
+ *   input: dhcp_timer_t *: the timer to set up
+ *  output: void
+ */
+
+void
+init_timer(dhcp_timer_t *dt, lease_t startval)
+{
+	dt->dt_id = -1;
+	dt->dt_start = startval;
+}
+
+/*
+ * cancel_timer(): cancel a DHCP timer
+ *
+ *   input: dhcp_timer_t *: the timer to cancel
+ *  output: boolean_t: B_TRUE on success, B_FALSE otherwise
+ */
+
+boolean_t
+cancel_timer(dhcp_timer_t *dt)
+{
+	if (dt->dt_id == -1)
+		return (B_TRUE);
+
+	if (iu_cancel_timer(tq, dt->dt_id, NULL) == 1) {
+		dt->dt_id = -1;
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+/*
+ * schedule_timer(): schedule a DHCP timer.  Note that it must not be already
+ *		     running, and that we can't cancel here.  If it were, and
+ *		     we did, we'd leak a reference to the callback argument.
+ *
+ *   input: dhcp_timer_t *: the timer to schedule
+ *  output: boolean_t: B_TRUE on success, B_FALSE otherwise
+ */
+
+boolean_t
+schedule_timer(dhcp_timer_t *dt, iu_tq_callback_t *cbfunc, void *arg)
+{
+	if (dt->dt_id != -1)
+		return (B_FALSE);
+	dt->dt_id = iu_schedule_timer(tq, dt->dt_start, cbfunc, arg);
+	return (dt->dt_id != -1);
+}
+
+/*
+ * dhcpv6_status_code(): report on a DHCPv6 status code found in an option
+ *			 buffer.
+ *
+ *   input: const dhcpv6_option_t *: pointer to option
+ *	    uint_t: option length
+ *	    const char **: error string (nul-terminated)
+ *	    const char **: message from server (unterminated)
+ *	    uint_t *: length of server message
+ *  output: int: -1 on error, or >= 0 for a DHCPv6 status code
+ */
+
+int
+dhcpv6_status_code(const dhcpv6_option_t *d6o, uint_t olen, const char **estr,
+    const char **msg, uint_t *msglenp)
+{
+	uint16_t status;
+	static const char *v6_status[] = {
+		NULL,
+		"Unknown reason",
+		"Server has no addresses available",
+		"Client record unavailable",
+		"Prefix inappropriate for link",
+		"Client must use multicast",
+		"No prefix available"
+	};
+	static char sbuf[32];
+
+	*estr = "";
+	*msg = "";
+	*msglenp = 0;
+	if (d6o == NULL)
+		return (0);
+	olen -= sizeof (*d6o);
+	if (olen < 2) {
+		*estr = "garbled status code";
+		return (-1);
+	}
+
+	*msg = (const char *)(d6o + 1) + 2;
+	*msglenp = olen - 2;
+
+	(void) memcpy(&status, d6o + 1, sizeof (status));
+	status = ntohs(status);
+	if (status > 0) {
+		if (status > DHCPV6_STAT_NOPREFIX) {
+			(void) snprintf(sbuf, sizeof (sbuf), "status %u",
+			    status);
+			*estr = sbuf;
+		} else {
+			*estr = v6_status[status];
+		}
+	}
+	return (status);
 }

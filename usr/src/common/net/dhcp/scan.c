@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996-2001, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Routines used to extract/insert DHCP options. Must be kept MT SAFE,
@@ -174,4 +173,67 @@ dhcp_options_scan(PKT_LIST *pl, boolean_t scan_vendor)
 		}
 	}
 	return (0);
+}
+
+/*
+ * Locate a DHCPv6 option or suboption within a buffer.  DHCPv6 uses nested
+ * options within options, and this function is designed to work with both
+ * primary options and the suboptions contained within.
+ *
+ * The 'oldopt' is a previous option pointer, and is typically used to iterate
+ * over options of the same code number.  The 'codenum' is in host byte order
+ * for simplicity.  'retlenp' may be NULL, and if present gets the _entire_
+ * option length (including header).
+ *
+ * Warning: the returned pointer has no particular alignment because DHCPv6
+ * defines options without alignment.  The caller must deal with unaligned
+ * pointers carefully.
+ */
+dhcpv6_option_t *
+dhcpv6_find_option(const void *buffer, size_t buflen,
+    const dhcpv6_option_t *oldopt, uint16_t codenum, uint_t *retlenp)
+{
+	const uchar_t *bp;
+	dhcpv6_option_t d6o;
+	uint_t olen;
+
+	codenum = htons(codenum);
+	bp = buffer;
+	while (buflen >= sizeof (dhcpv6_option_t)) {
+		(void) memcpy(&d6o, bp, sizeof (d6o));
+		olen = ntohs(d6o.d6o_len) + sizeof (d6o);
+		if (olen > buflen)
+			break;
+		if (d6o.d6o_code != codenum ||
+		    (oldopt != NULL && bp <= (const uchar_t *)oldopt)) {
+			bp += olen;
+			buflen -= olen;
+			continue;
+		}
+		if (retlenp != NULL)
+			*retlenp = olen;
+		/* LINTED: alignment */
+		return ((dhcpv6_option_t *)bp);
+	}
+	return (NULL);
+}
+
+/*
+ * Locate a DHCPv6 option within the top level of a PKT_LIST entry.  DHCPv6
+ * uses nested options within options, and this function returns only the
+ * primary options.  Use dhcpv6_find_option to traverse suboptions.
+ *
+ * See dhcpv6_find_option for usage details and warnings.
+ */
+dhcpv6_option_t *
+dhcpv6_pkt_option(const PKT_LIST *plp, const dhcpv6_option_t *oldopt,
+    uint16_t codenum, uint_t *retlenp)
+{
+	const dhcpv6_message_t *d6m;
+
+	if (plp == NULL || plp->pkt == NULL || plp->len < sizeof (*d6m))
+		return (NULL);
+	d6m = (const dhcpv6_message_t *)plp->pkt;
+	return (dhcpv6_find_option(d6m + 1, plp->len - sizeof (*d6m), oldopt,
+	    codenum, retlenp));
 }

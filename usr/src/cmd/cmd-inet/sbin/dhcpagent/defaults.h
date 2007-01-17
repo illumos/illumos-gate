@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,15 +52,16 @@ enum {
 	_UNUSED_DF_ARP_WAIT,
 	DF_CLIENT_ID,		/* our client id */
 	DF_PARAM_REQUEST_LIST,	/* our parameter request list */
-	DF_REQUEST_HOSTNAME	/* request hostname associated with interface */
+	DF_REQUEST_HOSTNAME,	/* request hostname associated with interface */
+	DF_DEBUG_LEVEL,		/* set debug level (undocumented) */
+	DF_VERBOSE		/* set verbose mode (undocumented) */
 };
 
 #define	DHCP_AGENT_DEFAULTS	"/etc/default/dhcpagent"
 
-boolean_t	df_get_bool(const char *, unsigned int);
-int		df_get_int(const char *, unsigned int);
-const char	*df_get_string(const char *, unsigned int);
-uchar_t		*df_get_octet(const char *, unsigned int, unsigned int *);
+boolean_t	df_get_bool(const char *, boolean_t, uint_t);
+int		df_get_int(const char *, boolean_t, uint_t);
+const char	*df_get_string(const char *, boolean_t, uint_t);
 
 #ifdef	__cplusplus
 }

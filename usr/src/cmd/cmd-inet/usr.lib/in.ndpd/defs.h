@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,6 +98,7 @@ extern struct	sockaddr_dl	*rta_ifp;
 #define	D_PKTBAD	0x0400		/* Malformed packet */
 #define	D_PKTOUT	0x0800		/* Sent packet */
 #define	D_TMP		0x1000		/* RFC3041 mechanism */
+#define	D_DHCP		0x2000		/* RFC3315 DHCPv6 (stateful addrs) */
 
 #define	IF_SEPARATOR		':'
 #define	IPV6_MAX_HOPS		255

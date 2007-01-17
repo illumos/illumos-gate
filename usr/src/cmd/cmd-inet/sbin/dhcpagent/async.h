@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,8 @@
 #include <libinetutil.h>
 #include <dhcpagent_ipc.h>
 
+#include "common.h"
+
 /*
  * async.[ch] comprise the interface used to handle asynchronous DHCP
  * commands.  see ipc_event() in agent.c for more documentation on
@@ -44,21 +45,15 @@
 extern "C" {
 #endif
 
-struct ifslist;					/* forward declaration */
+typedef struct async_action {
+	dhcp_ipc_type_t	as_cmd;		/* command/action in progress */
+	boolean_t	as_user;	/* user-generated async cmd */
+	boolean_t	as_present;	/* async operation present */
+} async_action_t;
 
-struct async_action {
-
-	dhcp_ipc_type_t		as_cmd;		/* command/action in progress */
-	iu_timer_id_t		as_tid;		/* async timer id */
-	boolean_t		as_user;	/* user-generated async cmd */
-};
-
-#define	DHCP_ASYNC_WAIT		60		/* seconds */
-
-boolean_t	async_pending(struct ifslist *);
-int		async_start(struct ifslist *, dhcp_ipc_type_t, boolean_t);
-void		async_finish(struct ifslist *);
-int		async_cancel(struct ifslist *);
+boolean_t	async_start(dhcp_smach_t *, dhcp_ipc_type_t, boolean_t);
+void		async_finish(dhcp_smach_t *);
+boolean_t	async_cancel(dhcp_smach_t *);
 
 #ifdef	__cplusplus
 }

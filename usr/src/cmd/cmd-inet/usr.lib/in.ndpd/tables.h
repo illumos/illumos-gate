@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,7 +40,8 @@ enum adv_events { ADV_OFF, START_INIT_ADV, START_FINAL_ADV, RECEIVED_SOLICIT,
 
 enum solicit_states { NO_SOLICIT = 0, INIT_SOLICIT, DONE_SOLICIT };
 enum solicit_events { SOLICIT_OFF, START_INIT_SOLICIT, SOL_TIMER,
-			SOLICIT_DONE };
+			SOLICIT_DONE, RESTART_INIT_SOLICIT };
+
 /*
  * A doubly linked list of all physical interfaces that each contain a
  * doubly linked list of prefixes (i.e. logical interfaces) and default
@@ -101,6 +102,7 @@ struct phyint {
 #define	pi_TmpPreferredLifetime	pi_config[I_TmpPreferredLifetime].cf_value
 #define	pi_TmpRegenAdvance	pi_config[I_TmpRegenAdvance].cf_value
 #define	pi_TmpMaxDesyncFactor	pi_config[I_TmpMaxDesyncFactor].cf_value
+#define	pi_StatefulAddrConf	pi_config[I_StatefulAddrConf].cf_value
 
 	/* Recorded variables for RFC3041 addresses */
 	uint_t		pi_TmpDesyncFactor;		/* In milliseconds */
@@ -123,6 +125,8 @@ struct phyint {
 	 */
 	uint_t		pi_RetransTimer;		/* In milliseconds */
 	char		*pi_group_name;
+
+	uint_t		pi_ra_flags;		/* Detect when to start DHCP */
 };
 
 /*
@@ -144,7 +148,8 @@ struct phyint {
 #define	I_PREFIXSIZE		6	/* # of variables */
 
 /*
- * A doubly linked list of prefixes for onlink and addrconf.
+ * A doubly-linked list of prefixes for onlink and addrconf.
+ * ("Prefixes" in this context are identical to logical interfaces.)
  */
 struct prefix {
 	struct prefix	*pr_next;	/* Next prefix for this physical */
@@ -272,6 +277,7 @@ extern int		prefix_init_from_k(struct prefix *pr);
 extern void		prefix_delete(struct prefix *pr);
 extern boolean_t	prefix_equal(struct in6_addr p1, struct in6_addr p2,
 			    int bits);
+extern void		prefix_update_dhcp(struct prefix *pr);
 extern void		prefix_update_k(struct prefix *pr);
 extern uint_t		prefix_timer(struct prefix *pr, uint_t elapsed);
 extern uint_t		adv_prefix_timer(struct adv_prefix *adv_pr,
@@ -311,6 +317,8 @@ extern void	print_iflist(struct confvar *confvar);
 extern void	print_prefixlist(struct confvar *confvar);
 
 extern void	in_data(struct phyint *pi);
+
+extern void	start_dhcp(struct phyint *pi);
 
 extern void	incoming_ra(struct phyint *pi, struct nd_router_advert *ra,
 		    int len, struct sockaddr_in6 *from, boolean_t loopback);

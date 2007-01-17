@@ -19,16 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-#include <netinet/in.h>
-#include <netinet/inetutil.h>
-#include <netinet/dhcp.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -37,6 +34,7 @@
 #include <sys/stat.h>
 #include <libnvpair.h>
 
+#include "common.h"
 #include "defaults.h"
 
 struct dhcp_default {
@@ -58,8 +56,10 @@ static struct dhcp_default defaults[] = {
 	{ "OFFER_WAIT",		 "3",	 1,   20  },
 	{ "ARP_WAIT",		 "1000", 0,   -1  },
 	{ "CLIENT_ID",		 NULL,	 0,   0	  },
-	{ "PARAM_REQUEST_LIST",  NULL,	 0,   0    },
-	{ "REQUEST_HOSTNAME",	 "1",	 0,   0	  }
+	{ "PARAM_REQUEST_LIST",  NULL,	 0,   0   },
+	{ "REQUEST_HOSTNAME",	 "1",	 0,   0	  },
+	{ "DEBUG_LEVEL",	 "0",	 0,   3   },
+	{ "VERBOSE",		 "0",	 0,   0   }
 };
 
 /*
@@ -74,7 +74,7 @@ df_build_cache(void)
 {
 	char		entry[1024];
 	int		i;
-	char		*param, *value, *end;
+	char		*param, *pastv6, *value, *end;
 	FILE		*fp;
 	nvlist_t 	*nvlist;
 	struct dhcp_default *defp;
@@ -107,15 +107,18 @@ df_build_cache(void)
 		 * leading interface name) in upper case.
 		 */
 
-		if ((param = strchr(entry, '.')) == NULL)
-			param = entry;
-		else
-			param++;
+		if ((param = strchr(entry, '.')) == NULL) {
+			pastv6 = param = entry;
+		} else {
+			pastv6 = ++param;
+			if (strncasecmp(param, "v6.", 3) == 0)
+				pastv6 += 3;
+		}
 
 		for (defp = defaults;
 		    (char *)defp < (char *)defaults + sizeof (defaults);
 		    defp++) {
-			if (strcasecmp(param, defp->df_name) == 0) {
+			if (strcasecmp(pastv6, defp->df_name) == 0) {
 				if (defp->df_max == -1) {
 					dhcpmsg(MSG_WARNING, "parameter %s is "
 					    "obsolete; ignored", defp->df_name);
@@ -144,7 +147,8 @@ df_build_cache(void)
  * df_get_string(): gets the string value of a given user-tunable parameter
  *
  *   input: const char *: the interface the parameter applies to
- *	    unsigned int: the parameter number to look up
+ *	    boolean_t: B_TRUE for DHCPv6, B_FALSE for IPv4 DHCP
+ *	    uint_t: the parameter number to look up
  *  output: const char *: the parameter's value, or default if not set
  *			  (must be copied by caller to be kept)
  *    NOTE: df_get_string() is both used by functions outside this source
@@ -153,16 +157,17 @@ df_build_cache(void)
  */
 
 const char *
-df_get_string(const char *if_name, unsigned int p)
+df_get_string(const char *if_name, boolean_t isv6, uint_t param)
 {
 	char			*value;
-	char			param[256];
+	char			paramstr[256];
+	char			name[256];
 	struct stat		statbuf;
 	static struct stat	df_statbuf;
 	static boolean_t	df_unavail_msg = B_FALSE;
 	static nvlist_t		*df_nvlist = NULL;
 
-	if (p >= (sizeof (defaults) / sizeof (*defaults)))
+	if (param >= (sizeof (defaults) / sizeof (*defaults)))
 		return (NULL);
 
 	if (stat(DHCP_AGENT_DEFAULTS, &statbuf) != 0) {
@@ -171,7 +176,7 @@ df_get_string(const char *if_name, unsigned int p)
 			    "built-in defaults", DHCP_AGENT_DEFAULTS);
 			df_unavail_msg = B_TRUE;
 		}
-		return (defaults[p].df_default);
+		return (defaults[param].df_default);
 	}
 
 	/*
@@ -186,120 +191,84 @@ df_get_string(const char *if_name, unsigned int p)
 		df_nvlist = df_build_cache();
 	}
 
-	(void) snprintf(param, sizeof (param), "%s.%s", if_name,
-	    defaults[p].df_name);
+	if (isv6) {
+		(void) snprintf(name, sizeof (name), ".V6.%s",
+		    defaults[param].df_name);
+		(void) snprintf(paramstr, sizeof (paramstr), "%s%s", if_name,
+		    name);
+	} else {
+		(void) strlcpy(name, defaults[param].df_name, sizeof (name));
+		(void) snprintf(paramstr, sizeof (paramstr), "%s.%s", if_name,
+		    name);
+	}
 
 	/*
-	 * first look for `if_name.param', then `param'.  if neither
+	 * first look for `if_name.[v6.]param', then `[v6.]param'.  if neither
 	 * has been set, use the built-in default.
 	 */
 
-	if (nvlist_lookup_string(df_nvlist, param, &value) == 0 ||
-	    nvlist_lookup_string(df_nvlist, defaults[p].df_name, &value) == 0)
+	if (nvlist_lookup_string(df_nvlist, paramstr, &value) == 0 ||
+	    nvlist_lookup_string(df_nvlist, name, &value) == 0)
 		return (value);
 
-	return (defaults[p].df_default);
-}
-
-/*
- * df_get_octet(): gets the integer value of a given user-tunable parameter
- *
- *   input: const char *: the interface the parameter applies to
- *	    unsigned int: the parameter number to look up
- *	    unsigned int *: the length of the returned value
- *  output: uchar_t *: a pointer to byte array (default value if not set)
- *		       (must be copied by caller to be kept)
- */
-
-uchar_t *
-df_get_octet(const char *if_name, unsigned int p, unsigned int *len)
-{
-	const char	*value;
-	static uchar_t	octet_value[256]; /* as big as defread() returns */
-
-	if (p >= (sizeof (defaults) / sizeof (*defaults)))
-		return (NULL);
-
-	value = df_get_string(if_name, p);
-	if (value == NULL)
-		goto do_default;
-
-	if (strncasecmp("0x", value, 2) != 0) {
-		*len = strlen(value);			/* no NUL */
-		return ((uchar_t *)value);
-	}
-
-	/* skip past the 0x and convert the value to binary */
-	value += 2;
-	*len = sizeof (octet_value);
-	if (hexascii_to_octet(value, strlen(value), octet_value, len) != 0) {
-		dhcpmsg(MSG_WARNING, "df_get_octet: cannot convert value "
-		    "for parameter `%s', using default", defaults[p].df_name);
-		goto do_default;
-	}
-	return (octet_value);
-
-do_default:
-	if (defaults[p].df_default == NULL) {
-		*len = 0;
-		return (NULL);
-	}
-
-	*len = strlen(defaults[p].df_default);		/* no NUL */
-	return ((uchar_t *)defaults[p].df_default);
+	return (defaults[param].df_default);
 }
 
 /*
  * df_get_int(): gets the integer value of a given user-tunable parameter
  *
  *   input: const char *: the interface the parameter applies to
- *	    unsigned int: the parameter number to look up
+ *	    boolean_t: B_TRUE for DHCPv6, B_FALSE for IPv4 DHCP
+ *	    uint_t: the parameter number to look up
  *  output: int: the parameter's value, or default if not set
  */
 
 int
-df_get_int(const char *if_name, unsigned int p)
+df_get_int(const char *if_name, boolean_t isv6, uint_t param)
 {
 	const char	*value;
 	int		value_int;
 
-	if (p >= (sizeof (defaults) / sizeof (*defaults)))
+	if (param >= (sizeof (defaults) / sizeof (*defaults)))
 		return (0);
 
-	value = df_get_string(if_name, p);
+	value = df_get_string(if_name, isv6, param);
 	if (value == NULL || !isdigit(*value))
 		goto failure;
 
 	value_int = atoi(value);
-	if (value_int > defaults[p].df_max || value_int < defaults[p].df_min)
+	if (value_int > defaults[param].df_max ||
+	    value_int < defaults[param].df_min)
 		goto failure;
 
 	return (value_int);
 
 failure:
 	dhcpmsg(MSG_WARNING, "df_get_int: parameter `%s' is not between %d and "
-	    "%d, defaulting to `%s'", defaults[p].df_name, defaults[p].df_min,
-	    defaults[p].df_max, defaults[p].df_default);
-	return (atoi(defaults[p].df_default));
+	    "%d, defaulting to `%s'", defaults[param].df_name,
+	    defaults[param].df_min, defaults[param].df_max,
+	    defaults[param].df_default);
+	return (atoi(defaults[param].df_default));
 }
 
 /*
  * df_get_bool(): gets the boolean value of a given user-tunable parameter
  *
  *   input: const char *: the interface the parameter applies to
- *	    unsigned int: the parameter number to look up
+ *	    boolean_t: B_TRUE for DHCPv6, B_FALSE for IPv4 DHCP
+ *	    uint_t: the parameter number to look up
  *  output: boolean_t: B_TRUE if true, B_FALSE if false, default if not set
  */
 
 boolean_t
-df_get_bool(const char *if_name, unsigned int p)
+df_get_bool(const char *if_name, boolean_t isv6, uint_t param)
 {
 	const char	*value;
 
-	if (p >= (sizeof (defaults) / sizeof (*defaults)))
+	if (param >= (sizeof (defaults) / sizeof (*defaults)))
 		return (0);
 
-	value = df_get_string(if_name, p);
+	value = df_get_string(if_name, isv6, param);
 	if (value != NULL) {
 
 		if (strcasecmp(value, "true") == 0 ||
@@ -312,8 +281,8 @@ df_get_bool(const char *if_name, unsigned int p)
 	}
 
 	dhcpmsg(MSG_WARNING, "df_get_bool: parameter `%s' has invalid value "
-	    "`%s', defaulting to `%s'", defaults[p].df_name,
-	    value ? value : "NULL", defaults[p].df_default);
+	    "`%s', defaulting to `%s'", defaults[param].df_name,
+	    value != NULL ? value : "NULL", defaults[param].df_default);
 
-	return ((atoi(defaults[p].df_default) == 0) ? B_FALSE : B_TRUE);
+	return ((atoi(defaults[param].df_default) == 0) ? B_FALSE : B_TRUE);
 }

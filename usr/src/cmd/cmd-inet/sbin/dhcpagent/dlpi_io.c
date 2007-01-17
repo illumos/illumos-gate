@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,13 +30,11 @@
 #include <sys/pfmod.h>
 #include <sys/socket.h>
 #include <net/if.h>			/* IFNAMSIZ */
-#include <netinet/in_systm.h>		/* n_long (ip.h) */
 #include <netinet/in.h>			/* in_addr (ip.h) */
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <stropts.h>
 #include <string.h>			/* strpbrk */
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/uio.h>
@@ -47,10 +44,8 @@
 #include <dhcpmsg.h>
 #include <libinetutil.h>
 
-#include "agent.h"
 #include "dlprims.h"
 #include "dlpi_io.h"
-#include "interface.h"
 #include "v4_sum_impl.h"
 
 /*
@@ -138,22 +133,24 @@ dlpi_open(const char *if_name, dl_info_ack_t *dlia, size_t dlia_size,
 	}
 
 	if (dlia->dl_version != DL_VERSION_2) {
-		dhcpmsg(MSG_ERROR, "dlpi_open: %s is DLPI version %d, not 2",
+		dhcpmsg(MSG_ERROR, "dlpi_open: %s is DLPI version %ld, not 2",
 		    device_name, dlia->dl_version);
 		(void) close(fd);
 		return (-1);
 	}
 
 	if (is_style2 && dlia->dl_provider_style != DL_STYLE2) {
-		dhcpmsg(MSG_ERROR, "dlpi_open: %s is DL_STYLE%d, not DL_STYLE2",
+		dhcpmsg(MSG_ERROR,
+		    "dlpi_open: %s is DL_STYLE %lx, not DL_STYLE2",
 		    device_name, dlia->dl_provider_style);
 		(void) close(fd);
 		return (-1);
 	}
 
 	if ((dlia->dl_service_mode & DL_CLDLS) == 0) {
-		dhcpmsg(MSG_ERROR, "dlpi_open: %s is %#x, not DL_CLDLS, which "
-		    "is not supported", device_name, dlia->dl_service_mode);
+		dhcpmsg(MSG_ERROR, "dlpi_open: %s is %#lx, not DL_CLDLS, "
+		    "which is not supported", device_name,
+		    dlia->dl_service_mode);
 		(void) close(fd);
 		return (-1);
 	}
@@ -214,11 +211,13 @@ dlpi_close(int fd)
  *	    void *: a buffer to store the data in
  *	    size_t: the size of the buffer
  *	    struct sockaddr_in *: if non-NULL, sender's IP address is filled in
+ *	    struct sockaddr_in *: if non-NULL, recipient's IP address
  *  output: ssize_t: the number of bytes read on success, -1 on failure
  */
 
 ssize_t
-dlpi_recvfrom(int fd, void *buffer, size_t buf_len, struct sockaddr_in *from)
+dlpi_recvfrom(int fd, void *buffer, size_t buf_len, struct sockaddr_in *from,
+    struct sockaddr_in *to)
 {
 	struct ip		*ip;
 	struct udphdr		*udphdr;
@@ -274,8 +273,15 @@ dlpi_recvfrom(int fd, void *buffer, size_t buf_len, struct sockaddr_in *from)
 	(void) memcpy(buffer, &udphdr[1], data_length);
 
 	if (from != NULL) {
-		from->sin_addr = ip->ip_dst;
+		from->sin_family = AF_INET;
+		from->sin_addr = ip->ip_src;
 		from->sin_port = udphdr->uh_sport;
+	}
+
+	if (to != NULL) {
+		to->sin_family = AF_INET;
+		to->sin_addr = ip->ip_dst;
+		to->sin_port = udphdr->uh_dport;
 	}
 
 	free(data_buffer);
@@ -506,8 +512,8 @@ set_packet_filter(int fd, filter_func_t *filter, void *arg,
 	if (ioctl(fd, I_STR, &sioc) == -1)
 		dhcpmsg(MSG_ERR, "set_packet_filter: PFIOCSETF");
 	else
-		dhcpmsg(MSG_DEBUG, "set_packet_filter: set filter %#x "
-		    "(%s filter)", filter, filter_name);
+		dhcpmsg(MSG_DEBUG, "set_packet_filter: set filter %p "
+		    "(%s filter)", (void *)filter, filter_name);
 
 	/*
 	 * clean out any potential cruft on the descriptor that
@@ -571,22 +577,6 @@ dhcp_filter(ushort_t *pfp, void *arg)
 	*pfp++ = ENF_PUSHLIT | ENF_CAND;
 	*pfp++ = htons(IPPORT_BOOTPC);
 
-	return (pfp);
-}
-
-/*
- * blackhole_filter(): builds a packet filter that tosses all messages
- *
- *   input: ushort_t *: a place to store the packet filter code
- *	    void *: not used
- *  output: ushort_t *: two bytes past the last byte in the packet filter
- */
-
-/* ARGSUSED */
-ushort_t *
-blackhole_filter(ushort_t *pfp, void *arg)
-{
-	*pfp++ = ENF_PUSHZERO;
 	return (pfp);
 }
 

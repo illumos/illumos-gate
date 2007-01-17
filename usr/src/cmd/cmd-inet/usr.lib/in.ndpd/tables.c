@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1192,9 +1192,10 @@ prefix_insert(struct phyint *pi, struct prefix *pr)
 /*
  * Initialize the prefix from the content of the kernel.
  * If IFF_ADDRCONF is set we treat it as PR_AUTO (i.e. an addrconf
- * prefix). However, we not derive the lifetimes from
- * the kernel thus they are set to 1 week.
+ * prefix).  However, we cannot derive the lifetime from
+ * the kernel, thus it is set to 1 week.
  * Ignore the prefix if the interface is not IFF_UP.
+ * If it's from DHCPv6, then we set the netmask.
  */
 int
 prefix_init_from_k(struct prefix *pr)
@@ -1223,38 +1224,92 @@ prefix_init_from_k(struct prefix *pr)
 	}
 	pr->pr_flags = lifr.lifr_flags;
 
-	if (ioctl(sock, SIOCGLIFSUBNET, (char *)&lifr) < 0) {
-		logperror_pr(pr, "prefix_init_from_k: ioctl (get subnet)");
-		goto error;
-	}
-	if (lifr.lifr_subnet.ss_family != AF_INET6) {
-		logmsg(LOG_ERR, "ignoring interface %s: not AF_INET6\n",
-		    pr->pr_name);
-		goto error;
-	}
 	/*
-	 * Guard against the prefix having non-zero bits after the prefix
-	 * len bits.
+	 * If this is a DHCPv6 interface, then we control the netmask.
 	 */
-	sin6 = (struct sockaddr_in6 *)&lifr.lifr_subnet;
-	pr->pr_prefix_len = lifr.lifr_addrlen;
-	prefix_set(&pr->pr_prefix, sin6->sin6_addr, pr->pr_prefix_len);
+	if (lifr.lifr_flags & IFF_DHCPRUNNING) {
+		struct phyint *pi = pr->pr_physical;
+		struct prefix *pr2;
 
-	if (pr->pr_prefix_len != IPV6_ABITS && (pr->pr_flags & IFF_UP) &&
-	    IN6_ARE_ADDR_EQUAL(&pr->pr_address, &pr->pr_prefix)) {
-		char abuf[INET6_ADDRSTRLEN];
+		pr->pr_prefix_len = IPV6_ABITS;
+		if (!(lifr.lifr_flags & IFF_UP) ||
+		    IN6_IS_ADDR_UNSPECIFIED(&pr->pr_address) ||
+		    IN6_IS_ADDR_LINKLOCAL(&pr->pr_address)) {
+			if (debug & D_DHCP)
+				logmsg(LOG_DEBUG, "prefix_init_from_k: "
+				    "ignoring DHCP %s not ready\n",
+				    pr->pr_name);
+			return (0);
+		}
 
-		logmsg(LOG_ERR, "ingoring interface %s: it appears to be "
-		    "configured with an invalid interface id (%s/%u)\n",
-		    pr->pr_name,
-		    inet_ntop(AF_INET6, (void *)&pr->pr_address,
-			abuf, sizeof (abuf)), pr->pr_prefix_len);
-		goto error;
+		for (pr2 = pi->pi_prefix_list; pr2 != NULL;
+		    pr2 = pr2->pr_next) {
+			/*
+			 * Examine any non-static (autoconfigured) prefixes as
+			 * well as existing DHCP-controlled prefixes for valid
+			 * prefix length information.
+			 */
+			if (pr2->pr_prefix_len != IPV6_ABITS &&
+			    (!(pr2->pr_state & PR_STATIC) ||
+			    (pr2->pr_flags & IFF_DHCPRUNNING)) &&
+			    prefix_equal(pr->pr_prefix, pr2->pr_prefix,
+			    pr2->pr_prefix_len)) {
+				pr->pr_prefix_len = pr2->pr_prefix_len;
+				break;
+			}
+		}
+		if (pr2 == NULL) {
+			if (debug & D_DHCP)
+				logmsg(LOG_DEBUG, "prefix_init_from_k: no "
+				    "saved mask for DHCP %s; need to "
+				    "resolicit\n", pr->pr_name);
+			(void) check_to_solicit(pi, RESTART_INIT_SOLICIT);
+		} else {
+			if (debug & D_DHCP)
+				logmsg(LOG_DEBUG, "prefix_init_from_k: using "
+				    "%s mask for DHCP %s\n",
+				    pr2->pr_name[0] == '\0' ? "saved" :
+				    pr2->pr_name, pr->pr_name);
+			prefix_update_dhcp(pr);
+		}
+	} else {
+		if (ioctl(sock, SIOCGLIFSUBNET, (char *)&lifr) < 0) {
+			logperror_pr(pr,
+			    "prefix_init_from_k: ioctl (get subnet)");
+			goto error;
+		}
+		if (lifr.lifr_subnet.ss_family != AF_INET6) {
+			logmsg(LOG_ERR,
+			    "ignoring interface %s: not AF_INET6\n",
+			    pr->pr_name);
+			goto error;
+		}
+		/*
+		 * Guard against the prefix having non-zero bits after the
+		 * prefix len bits.
+		 */
+		sin6 = (struct sockaddr_in6 *)&lifr.lifr_subnet;
+		pr->pr_prefix_len = lifr.lifr_addrlen;
+		prefix_set(&pr->pr_prefix, sin6->sin6_addr, pr->pr_prefix_len);
+
+		if (pr->pr_prefix_len != IPV6_ABITS &&
+		    (pr->pr_flags & IFF_UP) &&
+		    IN6_ARE_ADDR_EQUAL(&pr->pr_address, &pr->pr_prefix)) {
+			char abuf[INET6_ADDRSTRLEN];
+
+			logmsg(LOG_ERR, "ingoring interface %s: it appears to "
+			    "be configured with an invalid interface id "
+			    "(%s/%u)\n",
+			    pr->pr_name,
+			    inet_ntop(AF_INET6, (void *)&pr->pr_address,
+			    abuf, sizeof (abuf)), pr->pr_prefix_len);
+			goto error;
+		}
 	}
 	pr->pr_kernel_state = 0;
 	if (pr->pr_prefix_len != IPV6_ABITS)
 		pr->pr_kernel_state |= PR_ONLINK;
-	if (!(pr->pr_flags & IFF_NOLOCAL))
+	if (!(pr->pr_flags & (IFF_NOLOCAL | IFF_DHCPRUNNING)))
 		pr->pr_kernel_state |= PR_AUTO;
 	if ((pr->pr_flags & IFF_DEPRECATED) && (pr->pr_kernel_state & PR_AUTO))
 		pr->pr_kernel_state |= PR_DEPRECATED;
@@ -1385,6 +1440,29 @@ prefix_modify_flags(struct prefix *pr, uint64_t onflags, uint64_t offflags)
 		return (-1);
 	}
 	return (0);
+}
+
+/*
+ * Update the subnet mask for this interface under DHCPv6 control.
+ */
+void
+prefix_update_dhcp(struct prefix *pr)
+{
+	struct lifreq lifr;
+
+	(void) memset(&lifr, 0, sizeof (lifr));
+	(void) strlcpy(lifr.lifr_name, pr->pr_name, sizeof (lifr.lifr_name));
+	lifr.lifr_addr.ss_family = AF_INET6;
+	prefix_set(&((struct sockaddr_in6 *)&lifr.lifr_addr)->sin6_addr,
+	    pr->pr_address, pr->pr_prefix_len);
+	lifr.lifr_addrlen = pr->pr_prefix_len;
+	/*
+	 * Ignore ENXIO, as the dhcpagent process is responsible for plumbing
+	 * and unplumbing these.
+	 */
+	if (ioctl(pr->pr_physical->pi_sock, SIOCSLIFSUBNET, (char *)&lifr) ==
+	    -1 && errno != ENXIO)
+		logperror_pr(pr, "prefix_update_dhcp: ioctl (set subnet)");
 }
 
 /*

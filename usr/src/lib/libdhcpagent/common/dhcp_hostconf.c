@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,23 +42,26 @@
 #include "dhcp_hostconf.h"
 
 static void		relativize_time(DHCP_OPT *, time_t, time_t);
+static void		relativize_v6(uint32_t *, time_t, time_t);
 
 /*
  * ifname_to_hostconf(): converts an interface name into a hostconf file for
  *			 that interface
  *
  *   input: const char *: the interface name
+ *	    boolean_t: B_TRUE if using DHCPv6
  *  output: char *: the hostconf filename
  *    note: uses an internal static buffer (not threadsafe)
  */
 
 char *
-ifname_to_hostconf(const char *ifname)
+ifname_to_hostconf(const char *ifname, boolean_t isv6)
 {
-	static char filename[sizeof (DHCP_HOSTCONF_TMPL) + IFNAMSIZ];
+	static char filename[sizeof (DHCP_HOSTCONF_TMPL6) + LIFNAMSIZ];
 
 	(void) snprintf(filename, sizeof (filename), "%s%s%s",
-	    DHCP_HOSTCONF_PREFIX, ifname, DHCP_HOSTCONF_SUFFIX);
+	    DHCP_HOSTCONF_PREFIX, ifname,
+	    isv6 ? DHCP_HOSTCONF_SUFFIX6 : DHCP_HOSTCONF_SUFFIX);
 
 	return (filename);
 }
@@ -68,14 +70,15 @@ ifname_to_hostconf(const char *ifname)
  * remove_hostconf(): removes an interface.dhc file
  *
  *   input: const char *: the interface name
+ *	    boolean_t: B_TRUE if using DHCPv6
  *  output: int: 0 if the file is removed, -1 if it can't be removed
  *          (errno is set)
  */
 
 int
-remove_hostconf(const char *ifname)
+remove_hostconf(const char *ifname, boolean_t isv6)
 {
-	return (unlink(ifname_to_hostconf(ifname)));
+	return (unlink(ifname_to_hostconf(ifname, isv6)));
 }
 
 /*
@@ -84,13 +87,15 @@ remove_hostconf(const char *ifname)
  *   input: const char *: the interface name
  *	    PKT_LIST **: a pointer to a PKT_LIST * to store the info in
  *	    uint_t: the length of the list of PKT_LISTs
- *  output: int: 0 if the file is read and loaded into the PKT_LIST *
+ *	    boolean_t: B_TRUE if using DHCPv6
+ *  output: int: >0 if the file is read and loaded into the PKT_LIST *
  *	    successfully, -1 otherwise (errno is set)
  *    note: the PKT and PKT_LISTs are dynamically allocated here
  */
 
 int
-read_hostconf(const char *ifname, PKT_LIST **plpp, uint_t plplen)
+read_hostconf(const char *ifname, PKT_LIST **plpp, uint_t plplen,
+    boolean_t isv6)
 {
 	PKT_LIST	*plp = NULL;
 	PKT		*pkt = NULL;
@@ -101,23 +106,23 @@ read_hostconf(const char *ifname, PKT_LIST **plpp, uint_t plplen)
 	int		pcnt = 0;
 	int		retval;
 
-	fd = open(ifname_to_hostconf(ifname), O_RDONLY);
+	fd = open(ifname_to_hostconf(ifname, isv6), O_RDONLY);
 	if (fd == -1)
 		return (-1);
 
 	if (read(fd, &magic, sizeof (magic)) != sizeof (magic))
 		goto failure;
 
-	if (magic != DHCP_HOSTCONF_MAGIC)
+	if (magic != (isv6 ? DHCP_HOSTCONF_MAGIC6 : DHCP_HOSTCONF_MAGIC))
 		goto failure;
 
 	if (read(fd, &orig_time, sizeof (orig_time)) != sizeof (orig_time))
 		goto failure;
 
 	/*
-	 * read the packet back in from disk, and run it through
-	 * dhcp_options_scan(). note that we use calloc() since
-	 * dhcp_options_scan() relies on the packet being zeroed.
+	 * read the packet back in from disk, and for v4, run it through
+	 * dhcp_options_scan(). note that we use calloc() because
+	 * dhcp_options_scan() relies on the structure being zeroed.
 	 */
 
 	for (pcnt = 0; pcnt < plplen; pcnt++) {
@@ -151,7 +156,7 @@ read_hostconf(const char *ifname, PKT_LIST **plpp, uint_t plplen)
 
 		plpp[pcnt] = plp;
 
-		if (dhcp_options_scan(plp, B_TRUE) != 0)
+		if (!isv6 && dhcp_options_scan(plp, B_TRUE) != 0)
 			goto failure;
 
 		/*
@@ -162,26 +167,129 @@ read_hostconf(const char *ifname, PKT_LIST **plpp, uint_t plplen)
 		if (pcnt == 0)
 			continue;
 
-		/*
-		 * make sure the lease is still valid.
-		 */
+		if (isv6) {
+			dhcpv6_option_t	d6o;
+			dhcpv6_ia_na_t	d6in;
+			dhcpv6_iaaddr_t	d6ia;
+			uchar_t		*opts, *optmax, *subomax;
 
-		if (plp->opts[CD_LEASE_TIME] != NULL &&
-		    plp->opts[CD_LEASE_TIME]->len == sizeof (lease_t)) {
+			/*
+			 * Loop over contents of the packet to find the address
+			 * options.
+			 */
+			opts = (uchar_t *)pkt + sizeof (dhcpv6_message_t);
+			optmax = (uchar_t *)pkt + plp->len;
+			while (opts + sizeof (d6o) <= optmax) {
 
-			(void) memcpy(&lease, plp->opts[CD_LEASE_TIME]->value,
-			    sizeof (lease_t));
+				/*
+				 * Extract option header and make sure option
+				 * is intact.
+				 */
+				(void) memcpy(&d6o, opts, sizeof (d6o));
+				d6o.d6o_code = ntohs(d6o.d6o_code);
+				d6o.d6o_len = ntohs(d6o.d6o_len);
+				subomax = opts + sizeof (d6o) + d6o.d6o_len;
+				if (subomax > optmax)
+					break;
 
-			lease = ntohl(lease);
-			if ((lease != DHCP_PERM) &&
-			    (orig_time + lease) <= current_time)
-				goto failure;
+				/*
+				 * If this isn't an option that contains
+				 * address or prefix leases, then skip over it.
+				 */
+				if (d6o.d6o_code != DHCPV6_OPT_IA_NA &&
+				    d6o.d6o_code != DHCPV6_OPT_IA_TA &&
+				    d6o.d6o_code != DHCPV6_OPT_IA_PD) {
+					opts = subomax;
+					continue;
+				}
+
+				/*
+				 * Handle the option first.
+				 */
+				if (d6o.d6o_code == DHCPV6_OPT_IA_TA) {
+					/* no timers in this structure */
+					opts += sizeof (dhcpv6_ia_ta_t);
+				} else {
+					/* both na and pd */
+					if (opts + sizeof (d6in) > subomax) {
+						opts = subomax;
+						continue;
+					}
+					(void) memcpy(&d6in, opts,
+					    sizeof (d6in));
+					relativize_v6(&d6in.d6in_t1, orig_time,
+					    current_time);
+					relativize_v6(&d6in.d6in_t2, orig_time,
+					    current_time);
+					(void) memcpy(opts, &d6in,
+					    sizeof (d6in));
+					opts += sizeof (d6in);
+				}
+
+				/*
+				 * Now handle each suboption (address) inside.
+				 */
+				while (opts + sizeof (d6o) <= subomax) {
+					/*
+					 * Verify the suboption header first.
+					 */
+					(void) memcpy(&d6o, opts,
+					    sizeof (d6o));
+					d6o.d6o_code = ntohs(d6o.d6o_code);
+					d6o.d6o_len = ntohs(d6o.d6o_len);
+					if (opts + sizeof (d6o) + d6o.d6o_len >
+					    subomax)
+						break;
+					if (d6o.d6o_code != DHCPV6_OPT_IAADDR) {
+						opts += sizeof (d6o) +
+						    d6o.d6o_len;
+						continue;
+					}
+
+					/*
+					 * Now process the contents.
+					 */
+					if (opts + sizeof (d6ia) > subomax)
+						break;
+					(void) memcpy(&d6ia, opts,
+					    sizeof (d6ia));
+					relativize_v6(&d6ia.d6ia_preflife,
+					    orig_time, current_time);
+					relativize_v6(&d6ia.d6ia_vallife,
+					    orig_time, current_time);
+					(void) memcpy(opts, &d6ia,
+					    sizeof (d6ia));
+					opts += sizeof (d6o) + d6o.d6o_len;
+				}
+				opts = subomax;
+			}
+		} else {
+
+			/*
+			 * make sure the IPv4 DHCP lease is still valid.
+			 */
+
+			if (plp->opts[CD_LEASE_TIME] != NULL &&
+			    plp->opts[CD_LEASE_TIME]->len ==
+			    sizeof (lease_t)) {
+
+				(void) memcpy(&lease,
+				    plp->opts[CD_LEASE_TIME]->value,
+				    sizeof (lease_t));
+
+				lease = ntohl(lease);
+				if ((lease != DHCP_PERM) &&
+				    (orig_time + lease) <= current_time)
+					goto failure;
+			}
+
+			relativize_time(plp->opts[CD_T1_TIME], orig_time,
+			    current_time);
+			relativize_time(plp->opts[CD_T2_TIME], orig_time,
+			    current_time);
+			relativize_time(plp->opts[CD_LEASE_TIME], orig_time,
+			    current_time);
 		}
-
-		relativize_time(plp->opts[CD_T1_TIME], orig_time, current_time);
-		relativize_time(plp->opts[CD_T2_TIME], orig_time, current_time);
-		relativize_time(plp->opts[CD_LEASE_TIME], orig_time,
-		    current_time);
 	}
 
 	(void) close(fd);
@@ -203,9 +311,10 @@ failure:
  *
  *   input: const char *: the interface name
  *	    PKT_LIST **: a list of pointers to PKT_LIST to write
- *	    int: length of the list of PKT_LIST pointers
+ *	    uint_t: length of the list of PKT_LIST pointers
  *	    time_t: a starting time to treat the relative lease times
  *		    in the first packet as relative to
+ *	    boolean_t: B_TRUE if using DHCPv6
  *  output: int: 0 if the file is written successfully, -1 otherwise
  *	    (errno is set)
  */
@@ -215,16 +324,18 @@ write_hostconf(
     const char *ifname,
     PKT_LIST *pl[],
     uint_t pllen,
-    time_t relative_to)
+    time_t relative_to,
+    boolean_t isv6)
 {
 	int		fd;
 	struct iovec	iov[IOV_MAX];
 	int		retval;
-	uint32_t	magic = DHCP_HOSTCONF_MAGIC;
+	uint32_t	magic;
 	ssize_t		explen = 0; /* Expected length of write */
 	int		i, iovlen = 0;
 
-	fd = open(ifname_to_hostconf(ifname), O_WRONLY|O_CREAT|O_TRUNC, 0600);
+	fd = open(ifname_to_hostconf(ifname, isv6), O_WRONLY|O_CREAT|O_TRUNC,
+	    0600);
 	if (fd == -1)
 		return (-1);
 
@@ -235,6 +346,7 @@ write_hostconf(
 	 * read_hostconf() to recalculate the lease times for the first packet.
 	 */
 
+	magic = isv6 ? DHCP_HOSTCONF_MAGIC6 : DHCP_HOSTCONF_MAGIC;
 	iov[iovlen].iov_base = (caddr_t)&magic;
 	explen += iov[iovlen++].iov_len  = sizeof (magic);
 	iov[iovlen].iov_base = (caddr_t)&relative_to;
@@ -279,4 +391,28 @@ relativize_time(DHCP_OPT *option, time_t orig_time, time_t current_time)
 		pkt_time = htonl(ntohl(pkt_time) - time_diff);
 
 	(void) memcpy(option->value, &pkt_time, option->len);
+}
+
+/*
+ * relativize_v6(): re-relativizes a time in a DHCPv6 option
+ *
+ *   input: uint32_t *: the time value to convert
+ *	    time_t: the time the leases in the packet are currently relative to
+ *	    time_t: the current time which leases will become relative to
+ *  output: void
+ */
+
+static void
+relativize_v6(uint32_t *val, time_t orig_time, time_t current_time)
+{
+	uint32_t	hval;
+	time_t		time_diff = current_time - orig_time;
+
+	hval = ntohl(*val);
+	if (hval != DHCPV6_INFTIME) {
+		if (hval < time_diff)
+			*val = 0;
+		else
+			*val = htonl(hval - time_diff);
+	}
 }

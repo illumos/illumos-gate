@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -203,7 +203,6 @@ static int	updownifs(iface_t *ifs, int up);
  */
 
 #define	DHCP_EXIT_IF_FAILURE	-1
-#define	DHCP_IPC_MAX_WAIT	15	/* max seconds to wait to start agent */
 
 #define	NEXTARG		0xffffff	/* command takes an argument */
 #define	OPTARG		0xfffffe 	/* command takes an optional argument */
@@ -714,21 +713,17 @@ ifconfig(int argc, char *argv[], int af, struct lifreq *lifrp)
 	}
 
 	if (strcmp(*argv, "auto-dhcp") == 0 || strcmp(*argv, "dhcp") == 0) {
-		if (af == AF_INET) {
-
-			/*
-			 * some errors are ignored in the case where
-			 * more than one interface is being operated on.
-			 */
-			ret = setifdhcp("ifconfig", name, argc, argv);
-			if (ret == DHCP_EXIT_IF_FAILURE) {
-				if (!all)
-					exit(DHCP_EXIT_FAILURE);
-			} else if (ret != DHCP_EXIT_SUCCESS)
-				exit(ret);
-		} else
-			(void) fprintf(stderr, "ifconfig: dhcp not supported "
-			    "for inet6\n");
+		/*
+		 * Some errors are ignored in the case where more than one
+		 * interface is being operated on.
+		 */
+		ret = setifdhcp("ifconfig", name, argc, argv);
+		if (ret == DHCP_EXIT_IF_FAILURE) {
+			if (!all)
+				exit(DHCP_EXIT_FAILURE);
+		} else if (ret != DHCP_EXIT_SUCCESS) {
+			exit(ret);
+		}
 		return;
 	}
 
@@ -4489,7 +4484,10 @@ setifdhcp(const char *caller, const char *ifname, int argc, char *argv[])
 	}
 
 	if (is_primary)
-		type = type | DHCP_PRIMARY;
+		type |= DHCP_PRIMARY;
+
+	if (af != AF_INET)
+		type |= DHCP_V6;
 
 	request = dhcp_ipc_alloc_request(type, ifname, NULL, 0, DHCP_TYPE_NONE);
 	if (request == NULL) {

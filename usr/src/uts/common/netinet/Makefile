@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/common/netinet/Makefile
@@ -30,7 +29,7 @@
 # include global definitions
 include ../../../Makefile.master
 
-HDRS=	arp.h dhcp.h icmp6.h icmp_var.h if_ether.h igmp.h igmp_var.h \
+HDRS=	arp.h dhcp.h dhcp6.h icmp6.h icmp_var.h if_ether.h igmp.h igmp_var.h \
 	in.h inetutil.h in_pcb.h in_systm.h in_var.h ip.h ip6.h ip_icmp.h \
 	ip_mroute.h ip_var.h pim.h sctp.h tcp.h tcp_debug.h tcp_fsm.h \
 	tcp_seq.h tcp_timer.h tcp_var.h tcpip.h udp.h udp_var.h

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2041,7 +2041,7 @@ checkstack(int numargs)
 static void
 primary()
 {
-	int m, s;
+	int m, m2, s;
 
 	for (;;) {
 		if (tokentype == FIELD) {
@@ -2219,22 +2219,47 @@ primary()
 		}
 
 		if (EQ("bootp") || EQ("dhcp")) {
+			ethertype_match(ETHERTYPE_IP);
+			emitop(OP_BRFL);
+			m = chain(0);
 			emitop(OP_OFFSET_LINK);
-			emitop(OP_LOAD_CONST);
-			emitval(9);
-			emitop(OP_LOAD_OCTET);
-			emitop(OP_LOAD_CONST);
-			emitval(IPPROTO_UDP);
+			compare_value(9, 1, IPPROTO_UDP);
+			emitop(OP_OFFSET_POP);
+			emitop(OP_BRFL);
+			m = chain(m);
 			emitop(OP_OFFSET_IP);
 			compare_value(0, 4,
-			    (IPPORT_BOOTPS << 16 | IPPORT_BOOTPC));
+			    (IPPORT_BOOTPS << 16) | IPPORT_BOOTPC);
 			emitop(OP_BRTR);
-			m = chain(0);
+			m2 = chain(0);
 			compare_value(0, 4,
-			    (IPPORT_BOOTPC << 16 | IPPORT_BOOTPS));
+			    (IPPORT_BOOTPC << 16) | IPPORT_BOOTPS);
+			resolve_chain(m2);
+			emitop(OP_OFFSET_POP);
 			resolve_chain(m);
+			opstack++;
+			dir = ANY;
+			next();
+			break;
+		}
+
+		if (EQ("dhcp6")) {
+			ethertype_match(ETHERTYPE_IPV6);
+			emitop(OP_BRFL);
+			m = chain(0);
+			emitop(OP_OFFSET_LINK);
+			compare_value(6, 1, IPPROTO_UDP);
 			emitop(OP_OFFSET_POP);
+			emitop(OP_BRFL);
+			m = chain(m);
+			emitop(OP_OFFSET_IP);
+			compare_value(2, 2, IPPORT_DHCPV6S);
+			emitop(OP_BRTR);
+			m2 = chain(0);
+			compare_value(2, 2, IPPORT_DHCPV6C);
+			resolve_chain(m2);
 			emitop(OP_OFFSET_POP);
+			resolve_chain(m);
 			opstack++;
 			dir = ANY;
 			next();

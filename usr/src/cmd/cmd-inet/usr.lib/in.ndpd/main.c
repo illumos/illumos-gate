@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -541,6 +541,7 @@ if_process(int s, char *ifname, boolean_t first)
 		pr->pr_in_use = _B_TRUE;
 
 	if ((lifr.lifr_flags & IFF_DUPLICATE) &&
+	    !(lifr.lifr_flags & IFF_DHCPRUNNING) &&
 	    (pr->pr_flags & IFF_TEMPORARY)) {
 		in6_addr_t *token;
 		int i;
@@ -1041,9 +1042,25 @@ solicit_event(struct phyint *pi, enum solicit_events event, uint_t elapsed)
 		check_daemonize();
 		return (TIMER_INFINITY);
 
+	case RESTART_INIT_SOLICIT:
+		/*
+		 * This event allows us to start solicitation over again
+		 * without losing the RA flags.  We start solicitation over
+		 * when we are missing an interface prefix for a newly-
+		 * encountered DHCP interface.
+		 */
+		if (pi->pi_sol_state == INIT_SOLICIT)
+			return (pi->pi_sol_time_left);
+		pi->pi_sol_count = ND_MAX_RTR_SOLICITATIONS;
+		pi->pi_sol_time_left =
+		    GET_RANDOM(0, ND_MAX_RTR_SOLICITATION_DELAY);
+		pi->pi_sol_state = INIT_SOLICIT;
+		break;
+
 	case START_INIT_SOLICIT:
 		if (pi->pi_sol_state == INIT_SOLICIT)
 			return (pi->pi_sol_time_left);
+		pi->pi_ra_flags = 0;
 		pi->pi_sol_count = ND_MAX_RTR_SOLICITATIONS;
 		pi->pi_sol_time_left =
 		    GET_RANDOM(0, ND_MAX_RTR_SOLICITATION_DELAY);
@@ -1073,6 +1090,13 @@ solicit_event(struct phyint *pi, enum solicit_events event, uint_t elapsed)
 	case INIT_SOLICIT:
 		solicit(&v6allrouters, pi);
 		if (--pi->pi_sol_count == 0) {
+			logmsg(LOG_DEBUG, "solicit_event: giving up on %s\n",
+			    pi->pi_name);
+			if (pi->pi_StatefulAddrConf) {
+				pi->pi_ra_flags |= ND_RA_FLAG_MANAGED |
+				    ND_RA_FLAG_OTHER;
+				start_dhcp(pi);
+			}
 			pi->pi_sol_state = DONE_SOLICIT;
 			check_daemonize();
 			return (TIMER_INFINITY);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +47,7 @@ typedef struct dsym_cat {
 	ushort_t	dc_max;		/* maximum valid code */
 } dsym_cat_t;
 
-static dsym_cat_t cats[DSYM_CATEGORY_NUM] = {
+static dsym_cat_t cats[] = {
 	{ "Extend", 6, DSYM_EXTEND, B_TRUE, DHCP_LAST_STD + 1,
 		DHCP_SITE_OPT - 1 },
 	{ "Vendor=", 6, DSYM_VENDOR, B_TRUE, DHCP_FIRST_OPT,
@@ -72,7 +71,7 @@ typedef struct dsym_type {
 	boolean_t	dt_dhcptab;	/* valid for dhcptab use? */
 } dsym_type_t;
 
-static dsym_type_t types[DSYM_CDTYPE_NUM] = {
+static dsym_type_t types[] = {
 	{ "ASCII", DSYM_ASCII, B_TRUE },
 	{ "OCTET", DSYM_OCTET, B_TRUE },
 	{ "IP", DSYM_IP, B_TRUE },
@@ -81,12 +80,16 @@ static dsym_type_t types[DSYM_CDTYPE_NUM] = {
 	{ "INCLUDE", DSYM_INCLUDE, B_FALSE },
 	{ "UNUMBER8", DSYM_UNUMBER8, B_TRUE },
 	{ "UNUMBER16", DSYM_UNUMBER16, B_TRUE },
+	{ "UNUMBER24", DSYM_UNUMBER24, B_TRUE },
 	{ "UNUMBER32", DSYM_UNUMBER32, B_TRUE },
 	{ "UNUMBER64", DSYM_UNUMBER64, B_TRUE },
 	{ "SNUMBER8", DSYM_SNUMBER8, B_TRUE },
 	{ "SNUMBER16", DSYM_SNUMBER16, B_TRUE },
 	{ "SNUMBER32", DSYM_SNUMBER32, B_TRUE },
-	{ "SNUMBER64", DSYM_SNUMBER64, B_TRUE }
+	{ "SNUMBER64", DSYM_SNUMBER64, B_TRUE },
+	{ "IPV6", DSYM_IPV6, B_TRUE },
+	{ "DUID", DSYM_DUID, B_TRUE },
+	{ "DOMAIN", DSYM_DOMAIN, B_TRUE }
 };
 
 /*
@@ -103,6 +106,7 @@ static dsym_type_t types[DSYM_CDTYPE_NUM] = {
  *  input: char **: a pointer to a string to trim of whitespace.
  * output: none
  */
+
 static void
 dsym_trim(char **str)
 {
@@ -153,6 +157,7 @@ dsym_trim(char **str)
  *         boolean_t: should delimiters be ignored if within quoted string?
  * output: char *: token, or NULL if no more tokens
  */
+
 static char *
 dsym_get_token(char *str, char *dels, char **lasts, boolean_t quote_support)
 {
@@ -214,6 +219,7 @@ dsym_get_token(char *str, char *dels, char **lasts, boolean_t quote_support)
  *         long *: the return location for the long value
  * output: DSYM_SUCCESS, DSYM_VALUE_OUT_OF_RANGE or DSYM_SYNTAX_ERROR
  */
+
 static dsym_errcode_t
 dsym_get_long(const char *str, long *val)
 {
@@ -242,6 +248,7 @@ dsym_get_long(const char *str, long *val)
  *  input: dhcp_classes_t *: pointer to structure containing classes to free
  * output: none
  */
+
 void
 dsym_free_classes(dhcp_classes_t *classes)
 {
@@ -270,6 +277,7 @@ dsym_free_classes(dhcp_classes_t *classes)
  * output: DSYM_SUCCESS, DSYM_INVALID_CAT, DSYM_EXCEEDS_MAX_CLASS_SIZE,
  *         DSYM_EXCEEDS_CLASS_SIZE, DSYM_SYNTAX_ERROR, or DSYM_NO_MEMORY
  */
+
 static dsym_errcode_t
 dsym_parse_classes(char *ptr, dhcp_classes_t *classes_ret)
 {
@@ -352,6 +360,7 @@ dsym_parse_classes(char *ptr, dhcp_classes_t *classes_ret)
  *         boolean_t: case-sensitive name compare
  * output: int: DSYM_SUCCESS or DSYM_INVALID_CAT
  */
+
 static dsym_errcode_t
 dsym_get_cat_by_name(const char *cat, dsym_cat_t **entry, boolean_t cs)
 {
@@ -416,6 +425,7 @@ dsym_get_cat_by_name(const char *cat, dsym_cat_t **entry, boolean_t cs)
  *         dsym_category_t *: the return location for the category value
  * output: int: DSYM_SUCCESS or DSYM_INVALID_CAT
  */
+
 static dsym_errcode_t
 dsym_parse_cat(const char *field, dsym_category_t *cat)
 {
@@ -449,6 +459,7 @@ dsym_parse_cat(const char *field, dsym_category_t *cat)
  *         int: the maximum valid value
  * output: int: DSYM_SUCCESS, DSYM_SYNTAX_ERROR, or DSYM_VALUE_OUT_OF_RANGE
  */
+
 static dsym_errcode_t
 dsym_parse_intrange(const char *field, int *intval, int min, int max)
 {
@@ -475,6 +486,7 @@ dsym_parse_intrange(const char *field, int *intval, int min, int max)
  *         uint16_t: the symbol code
  * output: DSYM_SUCCESS, DSYM_INVALID_CAT or DSYM_CODE_OUT_OF_RANGE
  */
+
 static dsym_errcode_t
 dsym_validate_code(dsym_category_t cat, ushort_t code)
 {
@@ -507,6 +519,7 @@ dsym_validate_code(dsym_category_t cat, ushort_t code)
  *         uchar_t: the symbol granularity
  * output: DSYM_SUCCESS or DSYM_VALUE_OUT_OF_RANGE
  */
+
 static dsym_errcode_t
 dsym_validate_granularity(dsym_cdtype_t type, uchar_t gran)
 {
@@ -530,6 +543,7 @@ dsym_validate_granularity(dsym_cdtype_t type, uchar_t gran)
  *         boolean_t: case-sensitive name compare
  * output: int: DSYM_SUCCESS or DSYM_INVALID_TYPE
  */
+
 static dsym_errcode_t
 dsym_get_type_by_name(const char *type, dsym_type_t **entry, boolean_t cs)
 {
@@ -561,6 +575,7 @@ dsym_get_type_by_name(const char *type, dsym_type_t **entry, boolean_t cs)
  *         dsym_cdtype_t *: the return location for the type id
  * output: int: DSYM_SUCCESS or DSYM_INVALID_TYPE
  */
+
 static dsym_errcode_t
 dsym_parse_type(char *field, dsym_cdtype_t *type)
 {
@@ -592,6 +607,7 @@ dsym_parse_type(char *field, dsym_cdtype_t *type)
  *  input: char **: array of fields to free
  * output: none
  */
+
 void
 dsym_free_fields(char **fields)
 {
@@ -611,6 +627,7 @@ dsym_free_fields(char **fields)
  *         dhcp_symbol_t *: the structure populated by dsym_init_parser()
  * output: none
  */
+
 void
 dsym_close_parser(char **fields, dhcp_symbol_t *sym)
 {
@@ -630,6 +647,7 @@ dsym_close_parser(char **fields, dhcp_symbol_t *sym)
  * output: int: DSYM_SUCCESS, DYSM_NO_MEMORY, DSYM_NULL_FIELD or
  *              DSYM_TOO_MANY_FIELDS
  */
+
 dsym_errcode_t
 dsym_init_parser(const char *name, const char *value, char ***fields_ret,
     dhcp_symbol_t *sym)
@@ -710,6 +728,7 @@ dsym_init_parser(const char *name, const char *value, char ***fields_ret,
  *              DSYM_EXCEEDS_MAX_CLASS_SIZE, DSYM_NO_MEMORY,
  *              DSYM_INVALID_FIELD_NUM, DSYM_VALUE_OUT_OF_RANGE
  */
+
 dsym_errcode_t
 dsym_parse_field(int field_num, char **fields, dhcp_symbol_t *sym)
 {
@@ -778,6 +797,7 @@ dsym_parse_field(int field_num, char **fields, dhcp_symbol_t *sym)
  *              DSYM_EXCEEDS_MAX_CLASS_SIZE, DSYM_NO_MEMORY
  *              DSYM_INVALID_FIELD_NUM, DSYM_VALUE_OUT_OF_RANGE
  */
+
 dsym_errcode_t
 dsym_parser(char **fields, dhcp_symbol_t *sym, int *lastField,
     boolean_t bestEffort)
@@ -818,6 +838,7 @@ dsym_parser(char **fields, dhcp_symbol_t *sym, int *lastField,
  *         boolean_t: case-sensitive name compare
  * output: int: DSYM_SUCCESS or DSYM_INVALID_CAT
  */
+
 dsym_errcode_t
 dsym_get_cat_id(const char *cat, dsym_category_t *id, boolean_t cs)
 {
@@ -843,6 +864,7 @@ dsym_get_cat_id(const char *cat, dsym_category_t *id, boolean_t cs)
  *         boolean_t: case-sensitive name compare
  * output: int: DSYM_SUCCESS or DSYM_INVALID_CAT
  */
+
 dsym_errcode_t
 dsym_get_code_ranges(const char *cat, ushort_t *min, ushort_t *max,
     boolean_t cs)
@@ -868,6 +890,7 @@ dsym_get_code_ranges(const char *cat, ushort_t *min, ushort_t *max,
  *         boolean_t: case-sensitive name compare
  * output: int: DSYM_SUCCESS or DSYM_INVALID_TYPE
  */
+
 dsym_errcode_t
 dsym_get_type_id(const char *type, dsym_cdtype_t *id, boolean_t cs)
 {

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,7 @@
 #include <time.h>
 #include <netinet/in.h>
 #include <netinet/dhcp.h>
+#include <netinet/dhcp6.h>
 #include <dhcp_impl.h>
 
 /*
@@ -45,15 +45,19 @@
 extern "C" {
 #endif
 
-#define	DHCP_HOSTCONF_MAGIC	0x44484301		/* hex "DHC1" */
+#define	DHCP_HOSTCONF_MAGIC	0x44484301		/* hex "DHC\1" */
+#define	DHCP_HOSTCONF_MAGIC6	0x44484302		/* hex "DHC\2" */
 #define	DHCP_HOSTCONF_PREFIX	"/etc/dhcp/"
 #define	DHCP_HOSTCONF_SUFFIX	".dhc"
+#define	DHCP_HOSTCONF_SUFFIX6	".dh6"
 #define	DHCP_HOSTCONF_TMPL	DHCP_HOSTCONF_PREFIX DHCP_HOSTCONF_SUFFIX
+#define	DHCP_HOSTCONF_TMPL6	DHCP_HOSTCONF_PREFIX DHCP_HOSTCONF_SUFFIX6
 
-extern char	*ifname_to_hostconf(const char *);
-extern int	remove_hostconf(const char *);
-extern int	read_hostconf(const char *, PKT_LIST **, uint_t);
-extern int	write_hostconf(const char *, PKT_LIST **, uint_t, time_t);
+extern char	*ifname_to_hostconf(const char *, boolean_t);
+extern int	remove_hostconf(const char *, boolean_t);
+extern int	read_hostconf(const char *, PKT_LIST **, uint_t, boolean_t);
+extern int	write_hostconf(const char *, PKT_LIST **, uint_t, time_t,
+    boolean_t);
 
 #ifdef	__cplusplus
 }

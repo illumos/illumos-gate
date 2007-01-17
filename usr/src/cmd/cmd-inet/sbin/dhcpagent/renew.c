@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +27,6 @@
 
 #include <sys/types.h>
 #include <time.h>
-#include <unistd.h>
 #include <netinet/in.h>
 #include <netinet/dhcp.h>
 #include <netinet/udp.h>
@@ -45,177 +44,239 @@
 #include "util.h"
 
 /*
- * next_extend_time(): returns the next time an EXTEND request should be sent
- *
- *   input: monosec_t: the absolute time when the next state is entered
- *  output: uint32_t: the number of seconds in the future to send the next
- *		      EXTEND request
+ * Number of seconds to wait for a retry if the user is interacting with the
+ * daemon.
  */
-
-static uint32_t
-next_extend_time(monosec_t limit_monosec)
-{
-	monosec_t	current_monosec = monosec();
-
-	if (limit_monosec - current_monosec < DHCP_REBIND_MIN)
-		return (0);
-
-	return ((limit_monosec - current_monosec) / 2);
-}
+#define	RETRY_DELAY	10
 
 /*
- * dhcp_renew(): attempts to renew a DHCP lease
+ * If the renew timer fires within this number of seconds of the rebind timer,
+ * then skip renew.  This prevents us from sending back-to-back renew and
+ * rebind messages -- a pointless activity.
+ */
+#define	TOO_CLOSE	2
+
+static boolean_t stop_extending(dhcp_smach_t *, unsigned int);
+
+/*
+ * dhcp_renew(): attempts to renew a DHCP lease on expiration of the T1 timer.
  *
  *   input: iu_tq_t *: unused
- *	    void *: the ifslist to renew the lease on
+ *	    void *: the lease to renew (dhcp_lease_t)
  *  output: void
+ *
+ *   notes: The primary expense involved with DHCP (like most UDP protocols) is
+ *	    with the generation and handling of packets, not the contents of
+ *	    those packets.  Thus, we try to reduce the number of packets that
+ *	    are sent.  It would be nice to just renew all leases here (each one
+ *	    added has trivial added overhead), but the DHCPv6 RFC doesn't
+ *	    explicitly allow that behavior.  Rather than having that argument,
+ *	    we settle for ones that are close in expiry to the one that fired.
+ *	    For v4, we repeatedly reschedule the T1 timer to do the
+ *	    retransmissions.  For v6, we rely on the common timer computation
+ *	    in packet.c.
  */
 
 /* ARGSUSED */
 void
 dhcp_renew(iu_tq_t *tqp, void *arg)
 {
-	struct ifslist *ifsp = (struct ifslist *)arg;
-	uint32_t	next;
+	dhcp_lease_t *dlp = arg;
+	dhcp_smach_t *dsmp = dlp->dl_smach;
+	uint32_t	t2;
 
+	dhcpmsg(MSG_VERBOSE, "dhcp_renew: T1 timer expired on %s",
+	    dsmp->dsm_name);
 
-	ifsp->if_timer[DHCP_T1_TIMER] = -1;
+	dlp->dl_t1.dt_id = -1;
 
-	if (check_ifs(ifsp) == 0) {
-		(void) release_ifs(ifsp);
+	if (dsmp->dsm_state == RENEWING || dsmp->dsm_state == REBINDING) {
+		dhcpmsg(MSG_DEBUG, "dhcp_renew: already renewing");
+		release_lease(dlp);
 		return;
 	}
 
 	/*
-	 * sanity check: don't send packets if we're past t2.
+	 * Sanity check: don't send packets if we're past T2, or if we're
+	 * extremely close.
 	 */
 
-	if (monosec() > (ifsp->if_curstart_monosec + ifsp->if_t2))
+	t2 = dsmp->dsm_curstart_monosec + dlp->dl_t2.dt_start;
+	if (monosec() + TOO_CLOSE >= t2) {
+		dhcpmsg(MSG_DEBUG, "dhcp_renew: %spast T2 on %s",
+		    monosec() > t2 ? "" : "almost ", dsmp->dsm_name);
+		release_lease(dlp);
 		return;
-
-	next = next_extend_time(ifsp->if_curstart_monosec + ifsp->if_t2);
+	}
 
 	/*
-	 * if there isn't an async event pending, then try to renew.
+	 * If there isn't an async event pending, or if we can cancel the one
+	 * that's there, then try to renew by sending an extension request.  If
+	 * that fails, we'll try again when the next timer fires.
 	 */
-
-	if (!async_pending(ifsp))
-		if (async_start(ifsp, DHCP_EXTEND, B_FALSE) != 0)
-
+	if (!async_cancel(dsmp) || !async_start(dsmp, DHCP_EXTEND, B_FALSE) ||
+	    !dhcp_extending(dsmp)) {
+		if (monosec() + RETRY_DELAY < t2) {
 			/*
-			 * try to send extend.  if we don't succeed,
-			 * async_timeout() will clean us up.
+			 * Try again in RETRY_DELAY seconds; user command
+			 * should be gone.
 			 */
-
-			(void) dhcp_extending(ifsp);
-
-	/*
-	 * if we're within DHCP_REBIND_MIN seconds of REBINDING, don't
-	 * reschedule ourselves.
-	 */
-
-	if (next == 0)
-		return;
-
-	/*
-	 * no big deal if we can't reschedule; we still have the REBIND
-	 * state to save us.
-	 */
-
-	(void) schedule_ifs_timer(ifsp, DHCP_T1_TIMER, next, dhcp_renew);
+			init_timer(&dlp->dl_t1, RETRY_DELAY);
+			(void) set_smach_state(dsmp, BOUND);
+			if (!schedule_lease_timer(dlp, &dlp->dl_t1,
+			    dhcp_renew)) {
+				dhcpmsg(MSG_INFO, "dhcp_renew: unable to "
+				    "reschedule renewal around user command "
+				    "on %s; will wait for rebind",
+				    dsmp->dsm_name);
+			}
+		} else {
+			dhcpmsg(MSG_DEBUG, "dhcp_renew: user busy on %s; will "
+			    "wait for rebind", dsmp->dsm_name);
+		}
+	}
+	release_lease(dlp);
 }
 
 /*
- * dhcp_rebind(): attempts to renew a DHCP lease from the REBINDING state
+ * dhcp_rebind(): attempts to renew a DHCP lease from the REBINDING state (T2
+ *		  timer expiry).
  *
  *   input: iu_tq_t *: unused
- *	    void *: the ifslist to renew the lease on
+ *	    void *: the lease to renew
  *  output: void
+ *   notes: For v4, we repeatedly reschedule the T2 timer to do the
+ *	    retransmissions.  For v6, we rely on the common timer computation
+ *	    in packet.c.
  */
 
 /* ARGSUSED */
 void
 dhcp_rebind(iu_tq_t *tqp, void *arg)
 {
-	struct ifslist *ifsp = (struct ifslist *)arg;
-	uint32_t	next;
+	dhcp_lease_t	*dlp = arg;
+	dhcp_smach_t	*dsmp = dlp->dl_smach;
+	int		nlifs;
+	dhcp_lif_t	*lif;
+	boolean_t	some_valid;
+	uint32_t	expiremax;
+	DHCPSTATE	oldstate;
 
-	ifsp->if_timer[DHCP_T2_TIMER] = -1;
+	dhcpmsg(MSG_VERBOSE, "dhcp_rebind: T2 timer expired on %s",
+	    dsmp->dsm_name);
 
-	if (check_ifs(ifsp) == 0) {
-		(void) release_ifs(ifsp);
+	dlp->dl_t2.dt_id = -1;
+
+	if ((oldstate = dsmp->dsm_state) == REBINDING) {
+		dhcpmsg(MSG_DEBUG, "dhcp_renew: already rebinding");
+		release_lease(dlp);
 		return;
 	}
 
 	/*
-	 * sanity check: don't send packets if we've already expired.
+	 * Sanity check: don't send packets if we've already expired on all of
+	 * the addresses.  We compute the maximum expiration time here, because
+	 * it won't matter for v4 (there's only one lease) and for v6 we need
+	 * to know when the last lease ages away.
 	 */
 
-	if (monosec() > (ifsp->if_curstart_monosec + ifsp->if_lease))
+	some_valid = B_FALSE;
+	expiremax = monosec();
+	lif = dlp->dl_lifs;
+	for (nlifs = dlp->dl_nlifs; nlifs > 0; nlifs--, lif = lif->lif_next) {
+		uint32_t expire;
+
+		expire = dsmp->dsm_curstart_monosec + lif->lif_expire.dt_start;
+		if (expire > expiremax) {
+			expiremax = expire;
+			some_valid = B_TRUE;
+		}
+	}
+	if (!some_valid) {
+		dhcpmsg(MSG_DEBUG, "dhcp_rebind: all leases expired on %s",
+		    dsmp->dsm_name);
+		release_lease(dlp);
 		return;
-
-	next = next_extend_time(ifsp->if_curstart_monosec + ifsp->if_lease);
-
-	/*
-	 * if this is our first venture into the REBINDING state, then
-	 * reset the server address.  we know the renew timer has
-	 * already been cancelled (or we wouldn't be here).
-	 */
-
-	if (ifsp->if_state == RENEWING) {
-		ifsp->if_state = REBINDING;
-		ifsp->if_server.s_addr = htonl(INADDR_BROADCAST);
 	}
 
 	/*
-	 * if there isn't an async event pending, then try to rebind.
+	 * This is our first venture into the REBINDING state, so reset the
+	 * server address.  We know the renew timer has already been cancelled
+	 * (or we wouldn't be here).
 	 */
+	if (dsmp->dsm_isv6) {
+		dsmp->dsm_server = ipv6_all_dhcp_relay_and_servers;
+	} else {
+		IN6_IPADDR_TO_V4MAPPED(htonl(INADDR_BROADCAST),
+		    &dsmp->dsm_server);
+	}
 
-	if (!async_pending(ifsp))
-		if (async_start(ifsp, DHCP_EXTEND, B_FALSE) != 0)
+	/* {Bound,Renew}->rebind transitions cannot fail */
+	(void) set_smach_state(dsmp, REBINDING);
 
+	/*
+	 * If there isn't an async event pending, or if we can cancel the one
+	 * that's there, then try to rebind by sending an extension request.
+	 * If that fails, we'll clean up when the lease expires.
+	 */
+	if (!async_cancel(dsmp) || !async_start(dsmp, DHCP_EXTEND, B_FALSE) ||
+	    !dhcp_extending(dsmp)) {
+		if (monosec() + RETRY_DELAY < expiremax) {
 			/*
-			 * try to send extend.  if we don't succeed,
-			 * async_timeout() will clean us up.
+			 * Try again in RETRY_DELAY seconds; user command
+			 * should be gone.
 			 */
-
-			(void) dhcp_extending(ifsp);
-
-	/*
-	 * if we're within DHCP_REBIND_MIN seconds of EXPIRE, don't
-	 * reschedule ourselves.
-	 */
-
-	if (next == 0) {
-		dhcpmsg(MSG_WARNING, "dhcp_rebind: lease on %s expires in less "
-		    "than %i seconds!", ifsp->if_name, DHCP_REBIND_MIN);
-		return;
+			init_timer(&dlp->dl_t2, RETRY_DELAY);
+			(void) set_smach_state(dsmp, oldstate);
+			if (!schedule_lease_timer(dlp, &dlp->dl_t2,
+			    dhcp_rebind)) {
+				dhcpmsg(MSG_INFO, "dhcp_rebind: unable to "
+				    "reschedule rebind around user command on "
+				    "%s; lease may expire", dsmp->dsm_name);
+			}
+		} else {
+			dhcpmsg(MSG_WARNING, "dhcp_rebind: user busy on %s; "
+			    "will expire", dsmp->dsm_name);
+		}
 	}
-
-	if (schedule_ifs_timer(ifsp, DHCP_T2_TIMER, next, dhcp_rebind) == 0)
-
-		/*
-		 * we'll just end up in dhcp_expire(), but it sure sucks.
-		 */
-
-		dhcpmsg(MSG_CRIT, "dhcp_rebind: cannot reschedule another "
-		    "rebind attempt; lease may expire for %s", ifsp->if_name);
+	release_lease(dlp);
 }
 
 /*
- * dhcp_restart_lease(): callback function to script_start
+ * dhcp_finish_expire(): finish expiration of a lease after the user script
+ *			 runs.  If this is the last lease, then restart DHCP.
+ *			 The caller has a reference to the LIF, which will be
+ *			 dropped.
  *
- *   input: struct ifslist *: the interface to be restarted
- *	    const char *: unused
+ *   input: dhcp_smach_t *: the state machine to be restarted
+ *	    void *: logical interface that has expired
  *  output: int: always 1
  */
 
-/* ARGSUSED */
 static int
-dhcp_restart_lease(struct ifslist *ifsp, const char *msg)
+dhcp_finish_expire(dhcp_smach_t *dsmp, void *arg)
 {
-	dhcpmsg(MSG_INFO, "lease expired on %s -- restarting DHCP",
-	    ifsp->if_name);
+	dhcp_lif_t *lif = arg;
+	dhcp_lease_t *dlp;
+
+	dhcpmsg(MSG_DEBUG, "lease expired on %s; removing", lif->lif_name);
+
+	dlp = lif->lif_lease;
+	unplumb_lif(lif);
+	if (dlp->dl_nlifs == 0)
+		remove_lease(dlp);
+	release_lif(lif);
+
+	/* If some valid leases remain, then drive on */
+	if (dsmp->dsm_leases != NULL) {
+		dhcpmsg(MSG_DEBUG,
+		    "dhcp_finish_expire: some leases remain on %s",
+		    dsmp->dsm_name);
+		return (1);
+	}
+
+	dhcpmsg(MSG_INFO, "last lease expired on %s -- restarting DHCP",
+	    dsmp->dsm_name);
 
 	/*
 	 * in the case where the lease is less than DHCP_REBIND_MIN
@@ -223,24 +284,45 @@ dhcp_restart_lease(struct ifslist *ifsp, const char *msg)
 	 * counters will not be reset.  in that case, reset them here.
 	 */
 
-	if (ifsp->if_state == BOUND) {
-		ifsp->if_bad_offers = 0;
-		ifsp->if_sent	    = 0;
-		ifsp->if_received   = 0;
+	if (dsmp->dsm_state == BOUND) {
+		dsmp->dsm_bad_offers	= 0;
+		dsmp->dsm_sent		= 0;
+		dsmp->dsm_received	= 0;
 	}
 
-	(void) canonize_ifs(ifsp);
+	deprecate_leases(dsmp);
 
-	/* reset_ifs() in dhcp_selecting() will clean up any leftover state */
-	dhcp_selecting(ifsp);
+	/* reset_smach() in dhcp_selecting() will clean up any leftover state */
+	dhcp_selecting(dsmp);
+
 	return (1);
 }
 
 /*
- * dhcp_expire(): expires a lease on a given interface and restarts DHCP
+ * dhcp_deprecate(): deprecates an address on a given logical interface when
+ *		     the preferred lifetime expires.
  *
  *   input: iu_tq_t *: unused
- *	    void *: the ifslist to expire the lease on
+ *	    void *: the logical interface whose lease is expiring
+ *  output: void
+ */
+
+/* ARGSUSED */
+void
+dhcp_deprecate(iu_tq_t *tqp, void *arg)
+{
+	dhcp_lif_t *lif = arg;
+
+	set_lif_deprecated(lif);
+	release_lif(lif);
+}
+
+/*
+ * dhcp_expire(): expires a lease on a given logical interface and, if there
+ *		  are no more leases, restarts DHCP.
+ *
+ *   input: iu_tq_t *: unused
+ *	    void *: the logical interface whose lease has expired
  *  output: void
  */
 
@@ -248,38 +330,58 @@ dhcp_restart_lease(struct ifslist *ifsp, const char *msg)
 void
 dhcp_expire(iu_tq_t *tqp, void *arg)
 {
-	struct ifslist	*ifsp = (struct ifslist *)arg;
+	dhcp_lif_t	*lif = arg;
+	dhcp_smach_t	*dsmp;
+	const char	*event;
 
-	ifsp->if_timer[DHCP_LEASE_TIMER] = -1;
+	dhcpmsg(MSG_VERBOSE, "dhcp_expire: lease timer expired on %s",
+	    lif->lif_name);
 
-	if (check_ifs(ifsp) == 0) {
-		(void) release_ifs(ifsp);
+	lif->lif_expire.dt_id = -1;
+	if (lif->lif_lease == NULL) {
+		release_lif(lif);
 		return;
 	}
 
-	if (async_pending(ifsp))
+	set_lif_deprecated(lif);
 
-		if (async_cancel(ifsp) == 0) {
+	dsmp = lif->lif_lease->dl_smach;
 
-			dhcpmsg(MSG_WARNING, "dhcp_expire: cannot cancel "
-			    "current asynchronous command against %s",
-			    ifsp->if_name);
+	if (!async_cancel(dsmp)) {
 
-			/*
-			 * try to schedule ourselves for callback.
-			 * we're really situation critical here
-			 * there's not much hope for us if this fails.
-			 */
+		dhcpmsg(MSG_WARNING,
+		    "dhcp_expire: cannot cancel current asynchronous command "
+		    "on %s", dsmp->dsm_name);
 
-			if (iu_schedule_timer(tq, DHCP_EXPIRE_WAIT, dhcp_expire,
-			    ifsp) != -1) {
-				hold_ifs(ifsp);
-				return;
-			}
+		/*
+		 * Try to schedule ourselves for callback.  We're really
+		 * situation-critical here; there's not much hope for us if
+		 * this fails.
+		 */
+		init_timer(&lif->lif_expire, DHCP_EXPIRE_WAIT);
+		if (schedule_lif_timer(lif, &lif->lif_expire, dhcp_expire))
+			return;
 
-			dhcpmsg(MSG_CRIT, "dhcp_expire: cannot reschedule "
-			    "dhcp_expire to get called back, proceeding...");
-		}
+		dhcpmsg(MSG_CRIT, "dhcp_expire: cannot reschedule dhcp_expire "
+		    "to get called back, proceeding...");
+	}
+
+	if (!async_start(dsmp, DHCP_START, B_FALSE))
+		dhcpmsg(MSG_WARNING, "dhcp_expire: cannot start asynchronous "
+		    "transaction on %s, continuing...", dsmp->dsm_name);
+
+	/*
+	 * Determine if this state machine has any non-expired LIFs left in it.
+	 * If it doesn't, then this is an "expire" event.  Otherwise, if some
+	 * valid leases remain, it's a "loss" event.  The SOMEEXP case can
+	 * occur only with DHCPv6.
+	 */
+	if (expired_lif_state(dsmp) == DHCP_EXP_SOMEEXP)
+		event = EVENT_LOSS6;
+	else if (dsmp->dsm_isv6)
+		event = EVENT_EXPIRE6;
+	else
+		event = EVENT_EXPIRE;
 
 	/*
 	 * just march on if this fails; at worst someone will be able
@@ -287,80 +389,165 @@ dhcp_expire(iu_tq_t *tqp, void *arg)
 	 * asynchronous transaction.  better than not having a lease.
 	 */
 
-	if (async_start(ifsp, DHCP_START, B_FALSE) == 0)
-		dhcpmsg(MSG_WARNING, "dhcp_expire: cannot start asynchronous "
-		    "transaction on %s, continuing...", ifsp->if_name);
-
-	(void) script_start(ifsp, EVENT_EXPIRE, dhcp_restart_lease, NULL, NULL);
+	(void) script_start(dsmp, event, dhcp_finish_expire, lif, NULL);
 }
 
 /*
- * dhcp_extending(): sends a REQUEST to extend a lease on a given interface
- *		     and registers to receive the ACK/NAK server reply
+ * dhcp_extending(): sends a REQUEST (IPv4 DHCP) or Rebind/Renew (DHCPv6) to
+ *		     extend a lease on a given state machine
  *
- *   input: struct ifslist *: the interface to send the REQUEST on
- *  output: int: 1 if the extension request was sent, 0 otherwise
+ *   input: dhcp_smach_t *: the state machine to send the message from
+ *  output: boolean_t: B_TRUE if the extension request was sent
  */
 
-int
-dhcp_extending(struct ifslist *ifsp)
+boolean_t
+dhcp_extending(dhcp_smach_t *dsmp)
 {
 	dhcp_pkt_t		*dpkt;
 
-	if (ifsp->if_state == BOUND) {
-		ifsp->if_neg_monosec	= monosec();
-		ifsp->if_state		= RENEWING;
-		ifsp->if_bad_offers	= 0;
-		ifsp->if_sent		= 0;
-		ifsp->if_received	= 0;
+	stop_pkt_retransmission(dsmp);
+
+	/*
+	 * We change state here because this function is also called when
+	 * adopting a lease and on demand by the user.
+	 */
+	if (dsmp->dsm_state == BOUND) {
+		dsmp->dsm_neg_hrtime	= gethrtime();
+		dsmp->dsm_bad_offers	= 0;
+		dsmp->dsm_sent		= 0;
+		dsmp->dsm_received	= 0;
+		/* Bound->renew can't fail */
+		(void) set_smach_state(dsmp, RENEWING);
 	}
 
-	dhcpmsg(MSG_DEBUG, "dhcp_extending: registering dhcp_acknak on %s",
-	    ifsp->if_name);
+	dhcpmsg(MSG_DEBUG, "dhcp_extending: sending request on %s",
+	    dsmp->dsm_name);
 
-	if (register_acknak(ifsp) == 0) {
+	if (dsmp->dsm_isv6) {
+		dhcp_lease_t *dlp;
+		dhcp_lif_t *lif;
+		uint_t nlifs;
+		uint_t irt, mrt;
 
-		ipc_action_finish(ifsp, DHCP_IPC_E_MEMORY);
-		async_finish(ifsp);
+		/*
+		 * Start constructing the Renew/Rebind message.  Only Renew has
+		 * a server ID, as we still think our server might be
+		 * reachable.
+		 */
+		if (dsmp->dsm_state == RENEWING) {
+			dpkt = init_pkt(dsmp, DHCPV6_MSG_RENEW);
+			(void) add_pkt_opt(dpkt, DHCPV6_OPT_SERVERID,
+			    dsmp->dsm_serverid, dsmp->dsm_serveridlen);
+			irt = DHCPV6_REN_TIMEOUT;
+			mrt = DHCPV6_REN_MAX_RT;
+		} else {
+			dpkt = init_pkt(dsmp, DHCPV6_MSG_REBIND);
+			irt = DHCPV6_REB_TIMEOUT;
+			mrt = DHCPV6_REB_MAX_RT;
+		}
 
-		dhcpmsg(MSG_WARNING, "dhcp_extending: cannot register "
-		    "dhcp_acknak for %s, not sending renew request",
-		    ifsp->if_name);
+		/*
+		 * Loop over the leases, and add an IA_NA for each and an
+		 * IAADDR for each address.
+		 */
+		for (dlp = dsmp->dsm_leases; dlp != NULL; dlp = dlp->dl_next) {
+			lif = dlp->dl_lifs;
+			for (nlifs = dlp->dl_nlifs; nlifs > 0;
+			    nlifs--, lif = lif->lif_next) {
+				(void) add_pkt_lif(dpkt, lif,
+				    DHCPV6_STAT_SUCCESS, NULL);
+			}
+		}
 
-		return (0);
+		/* Add required Option Request option */
+		(void) add_pkt_prl(dpkt, dsmp);
+
+		return (send_pkt_v6(dsmp, dpkt, dsmp->dsm_server,
+		    stop_extending, irt, mrt));
+	} else {
+		dhcp_lif_t *lif = dsmp->dsm_lif;
+		ipaddr_t server;
+
+		/* assemble the DHCPREQUEST message. */
+		dpkt = init_pkt(dsmp, REQUEST);
+		dpkt->pkt->ciaddr.s_addr = lif->lif_addr;
+
+		/*
+		 * The max dhcp message size option is set to the interface
+		 * max, minus the size of the udp and ip headers.
+		 */
+		(void) add_pkt_opt16(dpkt, CD_MAX_DHCP_SIZE,
+		    htons(lif->lif_max - sizeof (struct udpiphdr)));
+		(void) add_pkt_opt32(dpkt, CD_LEASE_TIME, htonl(DHCP_PERM));
+
+		(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id, class_id_len);
+		(void) add_pkt_prl(dpkt, dsmp);
+		/*
+		 * dsm_reqhost was set for this state machine in
+		 * dhcp_selecting() if the REQUEST_HOSTNAME option was set and
+		 * a host name was found.
+		 */
+		if (dsmp->dsm_reqhost != NULL) {
+			(void) add_pkt_opt(dpkt, CD_HOSTNAME, dsmp->dsm_reqhost,
+			    strlen(dsmp->dsm_reqhost));
+		}
+		(void) add_pkt_opt(dpkt, CD_END, NULL, 0);
+
+		IN6_V4MAPPED_TO_IPADDR(&dsmp->dsm_server, server);
+		return (send_pkt(dsmp, dpkt, server, stop_extending));
+	}
+}
+
+/*
+ * stop_extending(): decides when to stop retransmitting v4 REQUEST or v6
+ *		     Renew/Rebind messages.  If we're renewing, then stop if
+ *		     T2 is soon approaching.
+ *
+ *   input: dhcp_smach_t *: the state machine REQUESTs are being sent from
+ *	    unsigned int: the number of REQUESTs sent so far
+ *  output: boolean_t: B_TRUE if retransmissions should stop
+ */
+
+/* ARGSUSED */
+static boolean_t
+stop_extending(dhcp_smach_t *dsmp, unsigned int n_requests)
+{
+	dhcp_lease_t *dlp;
+
+	/*
+	 * If we're renewing and rebind time is soon approaching, then don't
+	 * schedule
+	 */
+	if (dsmp->dsm_state == RENEWING) {
+		monosec_t t2;
+
+		t2 = 0;
+		for (dlp = dsmp->dsm_leases; dlp != NULL; dlp = dlp->dl_next) {
+			if (dlp->dl_t2.dt_start > t2)
+				t2 = dlp->dl_t2.dt_start;
+		}
+		t2 += dsmp->dsm_curstart_monosec;
+		if (monosec() + TOO_CLOSE >= t2) {
+			dhcpmsg(MSG_DEBUG, "stop_extending: %spast T2 on %s",
+			    monosec() > t2 ? "" : "almost ", dsmp->dsm_name);
+			return (B_TRUE);
+		}
 	}
 
 	/*
-	 * assemble DHCPREQUEST message.  The max dhcp message size
-	 * option is set to the interface max, minus the size of the udp and
-	 * ip headers.
+	 * Note that returning B_TRUE cancels both this transmission and the
+	 * one that would occur at dsm_send_timeout, and that for v4 we cut the
+	 * time in half for each retransmission.  Thus we check here against
+	 * half of the minimum.
 	 */
-
-	dpkt = init_pkt(ifsp, REQUEST);
-	dpkt->pkt->ciaddr.s_addr = ifsp->if_addr.s_addr;
-
-	add_pkt_opt16(dpkt, CD_MAX_DHCP_SIZE, htons(ifsp->if_max -
-			sizeof (struct udpiphdr)));
-	add_pkt_opt32(dpkt, CD_LEASE_TIME, htonl(DHCP_PERM));
-
-	add_pkt_opt(dpkt, CD_CLASS_ID, class_id, class_id_len);
-	add_pkt_opt(dpkt, CD_REQUEST_LIST, ifsp->if_prl, ifsp->if_prllen);
-	/*
-	 * if_reqhost was set for this interface in dhcp_selecting()
-	 * if the REQUEST_HOSTNAME option was set and a host name was
-	 * found.
-	 */
-	if (ifsp->if_reqhost != NULL) {
-		add_pkt_opt(dpkt, CD_HOSTNAME, ifsp->if_reqhost,
-		    strlen(ifsp->if_reqhost));
+	if (!dsmp->dsm_isv6 &&
+	    dsmp->dsm_send_timeout < DHCP_REBIND_MIN * MILLISEC / 2) {
+		dhcpmsg(MSG_DEBUG, "stop_extending: next retry would be in "
+		    "%d.%03d; stopping", dsmp->dsm_send_timeout / MILLISEC,
+		    dsmp->dsm_send_timeout % MILLISEC);
+		return (B_TRUE);
 	}
-	add_pkt_opt(dpkt, CD_END, NULL, 0);
 
-	/*
-	 * if we can't send the packet, leave the event handler registered
-	 * anyway, since we're not expecting to get any other types of
-	 * packets in other than ACKs/NAKs anyway.
-	 */
-
-	return (send_pkt(ifsp, dpkt, ifsp->if_server.s_addr, NULL));
+	/* Otherwise, w stop only when the next timer (rebind, expire) fires */
+	return (B_FALSE);
 }

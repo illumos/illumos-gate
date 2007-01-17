@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -441,6 +441,7 @@ usr/include/sys/kmdb.h			sparc
 usr/include/dhcp_hostconf.h		sparc
 usr/include/dhcp_impl.h			sparc
 usr/include/dhcp_inittab.h		sparc
+usr/include/dhcp_stable.h		sparc
 usr/include/dhcp_symbol_common.h	sparc
 usr/include/dhcpagent_ipc.h		sparc
 usr/include/dhcpagent_util.h		sparc

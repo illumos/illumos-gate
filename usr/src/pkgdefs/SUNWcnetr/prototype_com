@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,6 +42,7 @@ i postinstall
 i i.ipsecalgsbase
 i i.preserve
 i i.sock2path
+i i.dhcpagent
 #
 # source locations relative to the prototype file
 #
@@ -53,7 +54,7 @@ e preserve etc/dladm/aggregation.conf 644 dladm sys
 e preserve etc/dladm/linkprop.conf 644 dladm sys
 e preserve etc/dladm/secobj.conf 600 dladm sys
 d none etc/default 755 root sys
-e preserve etc/default/dhcpagent 644 root sys
+e dhcpagent etc/default/dhcpagent 644 root sys
 e preserve etc/default/inetinit 644 root sys
 e preserve etc/default/ipsec 644 root sys
 e preserve etc/default/mpathd 644 root sys

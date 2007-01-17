@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,7 +27,7 @@
 
 LIBRARY	=	libdhcpagent.a
 VERS =		.1
-OBJECTS	=	dhcp_hostconf.o dhcpagent_ipc.o dhcpagent_util.o
+OBJECTS	=	dhcp_hostconf.o dhcpagent_ipc.o dhcpagent_util.o dhcp_stable.o
 
 include ../../Makefile.lib
 
@@ -36,7 +36,7 @@ include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
-LDLIBS +=	-lc -lsocket -ldhcputil
+LDLIBS +=	-lc -lsocket -ldhcputil -luuid -ldlpi
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,8 +31,11 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <netinet/dhcp.h>
+#include <netinet/dhcp6.h>
 #include <libinetutil.h>
 #include <dhcpagent_ipc.h>
+
+#include "common.h"
 
 /*
  * general utility functions which have no better home.  see util.c
@@ -44,38 +46,37 @@
 extern "C" {
 #endif
 
-struct ifslist;				/* forward declaration */
-
-typedef int64_t monosec_t;		/* see README for details */
+struct dhcp_timer_s {
+	iu_timer_id_t	dt_id;
+	lease_t		dt_start;		/* Initial timer value */
+};
 
 /* conversion functions */
-const char	*pkt_type_to_string(uchar_t);
+const char	*pkt_type_to_string(uchar_t, boolean_t);
 const char	*monosec_to_string(monosec_t);
 time_t		monosec_to_time(monosec_t);
-uchar_t		dlpi_to_arp(uchar_t);
+monosec_t	hrtime_to_monosec(hrtime_t);
 
 /* shutdown handlers */
 void		graceful_shutdown(int);
 void		inactivity_shutdown(iu_tq_t *, void *);
 
-/* acknak handlers */
-int		register_acknak(struct ifslist *);
-int		unregister_acknak(struct ifslist *);
-
-/* ipc functions */
-void		send_error_reply(dhcp_ipc_request_t *, int, int *);
-void		send_ok_reply(dhcp_ipc_request_t *, int *);
-void		send_data_reply(dhcp_ipc_request_t *, int *, int,
-		    dhcp_data_type_t, void *, size_t);
+/* timer functions */
+void		init_timer(dhcp_timer_t *, lease_t);
+boolean_t	cancel_timer(dhcp_timer_t *);
+boolean_t	schedule_timer(dhcp_timer_t *, iu_tq_callback_t *, void *);
 
 /* miscellaneous */
-int		add_default_route(const char *, struct in_addr *);
-int		del_default_route(const char *, struct in_addr *);
+boolean_t	add_default_route(const char *, struct in_addr *);
+boolean_t	del_default_route(const char *, struct in_addr *);
 int		daemonize(void);
 monosec_t	monosec(void);
-void		print_server_msg(struct ifslist *, DHCP_OPT *);
-int		bind_sock(int, in_port_t, in_addr_t);
+void		print_server_msg(dhcp_smach_t *, const char *, uint_t);
+boolean_t	bind_sock(int, in_port_t, in_addr_t);
+boolean_t	bind_sock_v6(int, in_port_t, const in6_addr_t *);
 const char	*iffile_to_hostname(const char *);
+int		dhcpv6_status_code(const dhcpv6_option_t *, uint_t,
+    const char **, const char **, uint_t *);
 
 #ifdef	__cplusplus
 }

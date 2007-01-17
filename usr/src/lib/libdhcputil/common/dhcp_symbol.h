@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +98,8 @@ typedef struct dhcp_classes {
  * This structure is used to define a DHCP symbol. The structure is
  * used by both the inittab parsing routines and by the dhcptab parsing
  * routines to define a symbol definition in either of those tables.
+ * Note that ds_dhcpv6 is defined last so that it needn't be initialized
+ * as part of the inittab_table[] definition.
  */
 typedef struct dhcp_symbol {
 	dsym_category_t	ds_category;			/* category */
@@ -108,6 +109,7 @@ typedef struct dhcp_symbol {
 	uchar_t		ds_gran;			/* granularity */
 	uchar_t		ds_max;				/* maximum number */
 	dhcp_classes_t	ds_classes;			/* client classes */
+	uchar_t		ds_dhcpv6;			/* dhcpv6 flag */
 } dhcp_symbol_t;
 
 extern void dsym_free_fields(char **);

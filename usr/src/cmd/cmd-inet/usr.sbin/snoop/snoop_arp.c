@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2001, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,7 +137,8 @@ interpret_arp(int flags, struct arphdr *ap, int alen)
 		show_header("ARP:  ", "ARP/RARP Frame", alen);
 		show_space();
 		(void) snprintf(get_line(0, 0), get_line_remain(),
-		    "Hardware type = %d", ntohs(ap->ar_hrd));
+		    "Hardware type = %d (%s)", ntohs(ap->ar_hrd),
+		    arp_htype(ntohs(ap->ar_hrd)));
 		(void) snprintf(get_line(0, 0), get_line_remain(),
 		    "Protocol type = %04x (%s)", ntohs(ap->ar_pro),
 		    print_ethertype(ntohs(ap->ar_pro)));
@@ -206,4 +206,58 @@ addrtoname_align(unsigned char *p)
 
 	memcpy(&a, p, 4);
 	return ((char *)addrtoname(AF_INET, &a));
+}
+
+/*
+ * These numbers are assigned by the IANA.  See the arp-parameters registry.
+ * Only those values that are used within Solaris have #defines.
+ */
+const char *
+arp_htype(int t)
+{
+	switch (t) {
+	case ARPHRD_ETHER:
+		return ("Ethernet (10Mb)");
+	case 2:
+		return ("Experimental Ethernet (3MB)");
+	case 3:
+		return ("Amateur Radio AX.25");
+	case 4:
+		return ("Proteon ProNET Token Ring");
+	case 5:
+		return ("Chaos");
+	case ARPHRD_IEEE802:
+		return ("IEEE 802");
+	case 7:
+		return ("ARCNET");
+	case 8:
+		return ("Hyperchannel");
+	case 9:
+		return ("Lanstar");
+	case 10:
+		return ("Autonet");
+	case 11:
+		return ("LocalTalk");
+	case 12:
+		return ("LocalNet");
+	case 13:
+		return ("Ultra Link");
+	case 14:
+		return ("SMDS");
+	case ARPHRD_FRAME:
+		return ("Frame Relay");
+	case ARPHRD_ATM:
+		return ("ATM");
+	case ARPHRD_HDLC:
+		return ("HDLC");
+	case ARPHRD_FC:
+		return ("Fibre Channel");
+	case ARPHRD_IPATM:
+		return ("IP-ATM");
+	case ARPHRD_TUNNEL:
+		return ("Tunnel");
+	case ARPHRD_IB:
+		return ("IPIB");
+	};
+	return ("UNKNOWN");
 }

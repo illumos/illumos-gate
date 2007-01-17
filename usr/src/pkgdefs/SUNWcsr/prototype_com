@@ -136,6 +136,7 @@ e preserve etc/dfs/dfstab 644 root sys
 e preserve etc/dgroup.tab 444 root sys
 d none etc/dhcp 755 root sys
 e dhcpinittab etc/dhcp/inittab 644 root sys
+e dhcpinittab etc/dhcp/inittab6 644 root sys
 e preserve etc/dumpdates 664 root sys
 s none etc/ff=../usr/sbin/ff
 s none etc/fmthard=../usr/sbin/fmthard

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -56,8 +56,7 @@
 		exec='/lib/svc/method/svc-ndp'
 		timeout_seconds='60'>
 		<method_context>
-			<method_credential user='root' group='root'
-privileges='basic,proc_owner,proc_fork,proc_exec,proc_info,proc_session,file_chown,sys_net_config,net_privaddr,net_icmpaccess'/>
+			<method_credential user='root' group='root' />
 		</method_context>
 	</exec_method>
 

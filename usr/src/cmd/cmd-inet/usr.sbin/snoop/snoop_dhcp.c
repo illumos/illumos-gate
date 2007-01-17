@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,8 +41,6 @@
 #include <dhcp_symbol.h>
 #include "snoop.h"
 
-extern char *dlc_header;
-static char *show_htype(int);
 static const char *show_msgtype(unsigned char);
 static int show_options(unsigned char *, int);
 static void display_ip(int, char *, char *, unsigned char **);
@@ -163,7 +161,7 @@ interpret_dhcp(int flags, struct dhcp *dp, int len)
 		(void) sprintf(get_line((char *)(uintptr_t)dp->htype -
 		    dlc_header, 1),
 		    "Hardware address type (htype) =  %d (%s)", dp->htype,
-		    show_htype(dp->htype));
+		    arp_htype(dp->htype));
 		(void) sprintf(get_line((char *)(uintptr_t)dp->hlen -
 		    dlc_header, 1),
 		    "Hardware address length (hlen) = %d octets", dp->hlen);
@@ -264,6 +262,7 @@ interpret_dhcp(int flags, struct dhcp *dp, int len)
 	}
 	return (len);
 }
+
 static int
 show_options(unsigned char  *cp, int len)
 {
@@ -612,47 +611,7 @@ show_options(unsigned char  *cp, int len)
 	}
 	return (nooverload);
 }
-static char *
-show_htype(int t)
-{
-	switch (t) {
-	case 1:
-		return ("Ethernet (10Mb)");
-	case 2:
-		return ("Experimental Ethernet (3MB)");
-	case 3:
-		return ("Amateur Radio AX.25");
-	case 4:
-		return ("Proteon ProNET Token Ring");
-	case 5:
-		return ("Chaos");
-	case 6:
-		return ("IEEE 802");
-	case 7:
-		return ("ARCNET");
-	case 8:
-		return ("Hyperchannel");
-	case 9:
-		return ("Lanstar");
-	case 10:
-		return ("Autonet");
-	case 11:
-		return ("LocalTalk");
-	case 12:
-		return ("LocalNet");
-	case 13:
-		return ("Ultra Link");
-	case 14:
-		return ("SMDS");
-	case 15:
-		return ("Frame Relay");
-	case 16:
-		return ("ATM");
-	case ARPHRD_IB:
-		return ("IPIB");
-	};
-	return ("UNKNOWN");
-}
+
 static const char *
 show_msgtype(unsigned char type)
 {
@@ -672,6 +631,7 @@ show_msgtype(unsigned char type)
 
 	return (types[type]);
 }
+
 static void
 display_ip(int items, char *fmt, char *msg, unsigned char **opt)
 {
@@ -684,6 +644,7 @@ display_ip(int items, char *fmt, char *msg, unsigned char **opt)
 		*opt += 4;
 	}
 }
+
 static void
 display_ascii(char *fmt, char *msg, unsigned char **opt)
 {
@@ -699,6 +660,7 @@ display_ascii(char *fmt, char *msg, unsigned char **opt)
 	(void) sprintf(get_line(0, 0), fmt, msg, buf);
 	(*opt) += slen;
 }
+
 static void
 display_number(char *fmt, char *msg, unsigned char **opt)
 {
@@ -737,6 +699,7 @@ display_number(char *fmt, char *msg, unsigned char **opt)
 	}
 	(*opt) += len;
 }
+
 static void
 display_ascii_hex(char *msg, unsigned char **opt)
 {

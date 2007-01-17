@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +34,7 @@
 #include <dhcpagent_ipc.h>
 #include <libinetutil.h>
 
-#include "agent.h"
+#include "common.h"
 
 /*
  * ipc_action.[ch] make up the interface used to control the current
@@ -47,22 +46,21 @@
 extern "C" {
 #endif
 
-struct ifslist;					/* forward declaration */
-
-void		ipc_action_init(struct ifslist *);
-int		ipc_action_start(struct ifslist *, dhcp_ipc_request_t *, int);
-void		ipc_action_finish(struct ifslist *, int);
-boolean_t	ipc_action_pending(struct ifslist *);
-void		ipc_action_cancel_timer(struct ifslist *);
-
-
-struct ipc_action {
-
+typedef struct ipc_action {
 	dhcp_ipc_type_t		ia_cmd;		/* command/action requested  */
 	int			ia_fd;		/* ipc channel descriptor */
 	iu_timer_id_t		ia_tid;		/* ipc timer id */
+	iu_event_id_t		ia_eid;		/* ipc event ID */
 	dhcp_ipc_request_t	*ia_request;	/* ipc request pointer */
-};
+} ipc_action_t;
+
+void		ipc_action_init(ipc_action_t *);
+boolean_t	ipc_action_start(dhcp_smach_t *, ipc_action_t *);
+void		ipc_action_finish(dhcp_smach_t *, int);
+void		send_error_reply(ipc_action_t *, int);
+void		send_ok_reply(ipc_action_t *);
+void		send_data_reply(ipc_action_t *, int, dhcp_data_type_t,
+		    const void *, size_t);
 
 #ifdef	__cplusplus
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,7 +67,9 @@ dhcp_state_to_string(DHCPSTATE state)
 		"INFORMATION",
 		"INIT_REBOOT",
 		"ADOPTING",
-		"INFORM_SENT"
+		"INFORM_SENT",
+		"DECLINING",
+		"RELEASING"
 	};
 
 	if (state < 0 || state >= DHCP_NSTATES)
@@ -241,6 +243,9 @@ dhcp_status_reply_to_string(dhcp_ipc_reply_t *reply)
 
 	if (status->if_dflags & DHCP_IF_BUSY)
 		(void) strlcat(str, "[BUSY] ", sizeof (str));
+
+	if (status->if_dflags & DHCP_IF_V6)
+		(void) strlcat(str, "[V6] ", sizeof (str));
 
 	(void) strlcat(str, "\n", sizeof (str));
 

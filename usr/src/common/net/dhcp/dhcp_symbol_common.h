@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,8 +54,6 @@ typedef enum {
 	DSYM_INTERNAL	= 5	/* Solaris DHCP internal option */
 } dsym_category_t;
 
-#define	DSYM_CATEGORY_NUM DSYM_INTERNAL + 1	/* DSYM_BAD_CAT excluded */
-
 /*
  * Symbol type ids and strings
  */
@@ -75,10 +72,12 @@ typedef enum {
 	DSYM_SNUMBER8	= 10,	/* An 8-bit signed integer */
 	DSYM_SNUMBER16	= 11,	/* A 16-bit signed integer */
 	DSYM_SNUMBER32	= 12,	/* A 32-bit signed integer */
-	DSYM_SNUMBER64	= 13	/* A 64-bit signed integer */
+	DSYM_SNUMBER64	= 13,	/* A 64-bit signed integer */
+	DSYM_UNUMBER24	= 14,	/* A 24-bit unsigned integer */
+	DSYM_IPV6	= 15,	/* An IPv6 address */
+	DSYM_DUID	= 16,	/* A DHCP Unique Identifier */
+	DSYM_DOMAIN	= 17	/* An RFC 1035-encoded domain name */
 } dsym_cdtype_t;
-
-#define	DSYM_CDTYPE_NUM	DSYM_SNUMBER64 + 1	/* DSYM_BAD_TYPE excluded */
 
 #ifdef __cplusplus
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * INFORM_SENT state of the client state machine.
  */
@@ -29,10 +28,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-#include <string.h>
 #include <time.h>
-#include <unistd.h>
-#include <sys/sockio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/udp.h>
@@ -40,109 +36,89 @@
 #include <netinet/udp_var.h>
 #include <dhcpmsg.h>
 
-#include "util.h"
-#include "packet.h"
+#include "agent.h"
+#include "states.h"
 #include "interface.h"
+#include "packet.h"
+
+static boolean_t stop_informing(dhcp_smach_t *, unsigned int);
 
 /*
  * dhcp_inform(): sends an INFORM packet and sets up reception for an ACK
  *
- *   input: struct ifslist *: the interface to send the inform on, ...
+ *   input: dhcp_smach_t *: the state machine to use
  *  output: void
  *    note: the INFORM cannot be sent successfully if the interface
- *	    does not have an IP address
+ *	    does not have an IP address (this is mostly an issue for IPv4).
  */
 
 void
-dhcp_inform(struct ifslist *ifsp)
+dhcp_inform(dhcp_smach_t *dsmp)
 {
 	dhcp_pkt_t		*dpkt;
-	struct in_addr		*our_addr;
-	struct ifreq		ifr;
 
-	ifsp->if_state = INIT;
+	if (!set_smach_state(dsmp, INIT))
+		goto failed;
 
-	/*
-	 * fetch our IP address -- since we may not manage the
-	 * interface, go fetch it with ioctl()
-	 */
+	if (dsmp->dsm_isv6) {
+		dpkt = init_pkt(dsmp, DHCPV6_MSG_INFO_REQ);
 
-	(void) memset(&ifr, 0, sizeof (struct ifreq));
-	(void) strlcpy(ifr.ifr_name, ifsp->if_name, IFNAMSIZ);
-	ifr.ifr_addr.sa_family = AF_INET;
+		/* Add required Option Request option */
+		(void) add_pkt_prl(dpkt, dsmp);
+		dsmp->dsm_server = ipv6_all_dhcp_relay_and_servers;
+		(void) send_pkt_v6(dsmp, dpkt, dsmp->dsm_server,
+		    stop_informing, DHCPV6_INF_TIMEOUT, DHCPV6_INF_MAX_RT);
+	} else {
+		ipaddr_t server;
 
-	if (ioctl(ifsp->if_sock_fd, SIOCGIFADDR, &ifr) == -1) {
-		ifsp->if_dflags |= DHCP_IF_FAILED;
-		ipc_action_finish(ifsp, DHCP_IPC_E_INT);
-		async_finish(ifsp);
-		return;
+		/*
+		 * Assemble a DHCPREQUEST packet, without the Server ID option.
+		 * Fill in ciaddr, since we know this.  dsm_server will be set
+		 * to the server's IP address, which will be the broadcast
+		 * address if we don't know it.  The max DHCP message size
+		 * option is set to the interface max, minus the size of the
+		 * UDP and IP headers.
+		 */
+
+		dpkt = init_pkt(dsmp, INFORM);
+		IN6_V4MAPPED_TO_INADDR(&dsmp->dsm_lif->lif_v6addr,
+		    &dpkt->pkt->ciaddr);
+
+		(void) add_pkt_opt16(dpkt, CD_MAX_DHCP_SIZE,
+		    htons(dsmp->dsm_lif->lif_pif->pif_max -
+		    sizeof (struct udpiphdr)));
+		(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id, class_id_len);
+		(void) add_pkt_prl(dpkt, dsmp);
+		(void) add_pkt_opt(dpkt, CD_END, NULL, 0);
+
+		IN6_V4MAPPED_TO_IPADDR(&dsmp->dsm_server, server);
+		if (!send_pkt(dsmp, dpkt, server, NULL)) {
+			dhcpmsg(MSG_ERROR, "dhcp_inform: send_pkt failed");
+			goto failed;
+		}
 	}
 
-	/*
-	 * the error handling here and in the check for IFF_UP below
-	 * are handled different from most since it is the user who is
-	 * at fault for the problem, not the machine.
-	 */
+	if (!set_smach_state(dsmp, INFORM_SENT))
+		goto failed;
 
-	/* LINTED [ifr_addr is a sockaddr which will be aligned] */
-	our_addr = &((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr;
-	if (our_addr->s_addr == htonl(INADDR_ANY)) {
-		dhcpmsg(MSG_WARNING, "dhcp_inform: INFORM attempted on "
-		    "interface with no IP address");
-		ipc_action_finish(ifsp, DHCP_IPC_E_NOIPIF);
-		async_finish(ifsp);
-		remove_ifs(ifsp);
-		return;
-	}
+	return;
 
-	if (ioctl(ifsp->if_sock_fd, SIOCGIFFLAGS, &ifr) == -1) {
-		ifsp->if_dflags |= DHCP_IF_FAILED;
-		ipc_action_finish(ifsp, DHCP_IPC_E_INT);
-		async_finish(ifsp);
-		return;
-	}
+failed:
+	dsmp->dsm_dflags |= DHCP_IF_FAILED;
+	ipc_action_finish(dsmp, DHCP_IPC_E_INT);
+}
 
-	if ((ifr.ifr_flags & IFF_UP) == 0) {
-		dhcpmsg(MSG_WARNING, "dhcp_inform: INFORM attempted on downed "
-		    "interface");
-		ipc_action_finish(ifsp, DHCP_IPC_E_DOWNIF);
-		async_finish(ifsp);
-		remove_ifs(ifsp);
-		return;
-	}
+/*
+ * stop_informing(): decides when to stop retransmitting Information-Requests
+ *
+ *   input: dhcp_smach_t *: the state machine Info-Reqs are being sent from
+ *	    unsigned int: the number of requests sent so far
+ *  output: boolean_t: B_TRUE if retransmissions should stop
+ */
 
-	/*
-	 * assemble a DHCPREQUEST packet, without the server id
-	 * option.  fill in ciaddr, since we know this.  if_server
-	 * will be set to the server's IP address, which will be the
-	 * broadcast address if we don't know it.  The max dhcp message size
-	 * option is set to the interface max, minus the size of the udp and
-	 * ip headers.
-	 */
-
-	dpkt = init_pkt(ifsp, INFORM);
-	dpkt->pkt->ciaddr = *our_addr;
-
-	add_pkt_opt16(dpkt, CD_MAX_DHCP_SIZE, htons(ifsp->if_max -
-			sizeof (struct udpiphdr)));
-	add_pkt_opt(dpkt, CD_CLASS_ID, class_id, class_id_len);
-	add_pkt_opt(dpkt, CD_REQUEST_LIST, ifsp->if_prl, ifsp->if_prllen);
-	add_pkt_opt(dpkt, CD_END, NULL, 0);
-
-	if (send_pkt(ifsp, dpkt, ifsp->if_server.s_addr, NULL) == 0) {
-		ifsp->if_dflags |= DHCP_IF_FAILED;
-		dhcpmsg(MSG_ERROR, "dhcp_inform: send_pkt failed");
-		ipc_action_finish(ifsp, DHCP_IPC_E_INT);
-		async_finish(ifsp);
-		return;
-	}
-
-	if (register_acknak(ifsp) == 0) {
-		ifsp->if_dflags |= DHCP_IF_FAILED;
-		ipc_action_finish(ifsp, DHCP_IPC_E_MEMORY);
-		async_finish(ifsp);
-		return;
-	}
-
-	ifsp->if_state = INFORM_SENT;
+/* ARGSUSED */
+static boolean_t
+stop_informing(dhcp_smach_t *dsmp, unsigned int n_requests)
+{
+	return (B_FALSE);
 }

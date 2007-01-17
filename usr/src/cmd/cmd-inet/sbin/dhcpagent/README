@@ -1,9 +1,8 @@
 CDDL HEADER START
 
 The contents of this file are subject to the terms of the
-Common Development and Distribution License, Version 1.0 only
-(the "License").  You may not use this file except in compliance
-with the License.
+Common Development and Distribution License (the "License").
+You may not use this file except in compliance with the License.
 
 You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 or http://www.opensolaris.org/os/licensing.
@@ -18,7 +17,7 @@ information: Portions Copyright [yyyy] [name of copyright owner]
 
 CDDL HEADER END
 
-Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
 Architectural Overview for the DHCP agent
@@ -28,45 +27,48 @@ ident	"%Z%%M%	%I%	%E% SMI"
 INTRODUCTION
 ============
 
-The Solaris DHCP agent (dhcpagent) is an RFC2131-compliant DHCP client
-implementation.  The major forces shaping its design were:
+The Solaris DHCP agent (dhcpagent) is a DHCP client implementation
+compliant with RFCs 2131, 3315, and others.  The major forces shaping
+its design were:
 
 	* Must be capable of managing multiple network interfaces.
 	* Must consume little CPU, since it will always be running.
 	* Must have a small memory footprint, since it will always be
 	  running.
-	* Must not rely on any shared libraries, since it must run
-	  before all filesystems have been mounted.
+	* Must not rely on any shared libraries outside of /lib, since
+	  it must run before all filesystems have been mounted.
 
 When a DHCP agent implementation is only required to control a single
 interface on a machine, the problem is expressed well as a simple
 state-machine, as shown in RFC2131.  However, when a DHCP agent is
 responsible for managing more than one interface at a time, the
-problem becomes much more complicated, especially when threads cannot
-be used to attack the problem (since the filesystems containing the
-thread libraries may not be available when the agent starts).
-Instead, the problem must be solved using an event-driven model, which
-while tried-and-true, is subtle and easy to get wrong.  Indeed, much
-of the agent's code is there to manage the complexity of programming
-in an asynchronous event-driven paradigm.
+problem becomes much more complicated.
+
+This can be resolved using threads or with an event-driven model.
+Given that DHCP's behavior can be expressed concisely as a state
+machine, the event-driven model is the closest match.
+
+While tried-and-true, that model is subtle and easy to get wrong.
+Indeed, much of the agent's code is there to manage the complexity of
+programming in an asynchronous event-driven paradigm.
 
 THE BASICS
 ==========
 
-The DHCP agent consists of roughly 20 source files, most with a
-companion header file.  While the largest source file is around 700
+The DHCP agent consists of roughly 30 source files, most with a
+companion header file.  While the largest source file is around 1700
 lines, most are much shorter.  The source files can largely be broken
 up into three groups:
 
-	* Source files, which along with their companion header files,
+	* Source files that, along with their companion header files,
 	  define an abstract "object" that is used by other parts of
-	  the system.  Examples include "timer_queue.c", which along
-	  with "timer_queue.h" provide a Timer Queue object for use
-	  by the rest of the agent, and "async.c", which along with
-	  "async.h" defines an interface for managing asynchronous
-	  transactions within the agent.
+	  the system.  Examples include "packet.c", which along with
+	  "packet.h" provide a Packet object for use by the rest of
+	  the agent; and "async.c", which along with "async.h" defines
+	  an interface for managing asynchronous transactions within
+	  the agent.
 
-	* Source files which implement a given state of the agent; for
+	* Source files that implement a given state of the agent; for
 	  instance, there is a "request.c" which comprises all of
 	  the procedural "work" which must be done while in the
 	  REQUESTING state of the agent.  By encapsulating states in
@@ -89,6 +91,10 @@ Here we discuss the essential objects and subtle aspects of the
 DHCP agent implementation.  Note that there is of course much more
 that is not discussed here, but after this overview you should be able 
 to fend for yourself in the source code.
+
+For details on the DHCPv6 aspects of the design, and how this relates
+to the implementation present in previous releases of Solaris, see the
+README.v6 file.
 
 Event Handlers and Timer Queues
 -------------------------------
@@ -142,16 +148,31 @@ Network Interfaces
 
 For each network interface managed by the agent, there is a set of
 associated state that describes both its general properties (such as
-the maximum MTU) and its DHCP-related state (such as when it acquired
-a lease).  This state is stored in a a structure called an `ifslist',
-which is a poor name (since it suggests implementation artifacts but
-not purpose) but has historical precedent.  Another way to think about 
-an `ifslist' is that it provides all of the context necessary to
-perform DHCP on a given interface: the state the interface is in, the
-last packet DHCP packet received on that interface, and so forth.  As
-one can imagine, the `ifslist' structure is quite complicated and rules
-governing accessing its fields are equally convoluted -- see the
-comments in interface.h for more information.
+the maximum MTU) and its connections to DHCP-related state (the
+protocol state machines).  This state is stored in a pair of
+structures called `dhcp_pif_t' (the IP physical interface layer or
+PIF) and `dhcp_lif_t' (the IP logical interface layer or LIF).  Each
+dhcp_pif_t represents a single physical interface, such as "hme0," for
+a given IP protocol version (4 or 6), and has a list of dhcp_lif_t
+structures representing the logical interfaces (such as "hme0:1") in
+use by the agent.
+
+This split is important because of differences between IPv4 and IPv6.
+For IPv4, each DHCP state machine manages a single IP address and
+associated configuration data.  This corresponds to a single logical
+interface, which must be specified by the user.  For IPv6, however,
+each DHCP state machine manages a group of addresses, and is
+associated with DUID value rather than with just an interface.
+
+Thus, DHCPv6 behaves more like in.ndpd in its creation of "ADDRCONF"
+interfaces.  The agent automatically plumbs logical interfaces when
+needed and removes them when the addresses expire.
+
+The state for a given session is stored separately in `dhcp_smach_t'.
+This state machine then points to the main LIF used for I/O, and to a
+list of `dhcp_lease_t' structures representing individual leases, and
+each of those points to a list of LIFs corresponding to the individual
+addresses being managed.
 
 One point that was brushed over in the preceding discussion of event
 handlers and timer queues was context.  Recall that the event-driven
@@ -159,27 +180,26 @@ nature of the agent requires that functions cannot block, lest they
 starve out others and impact the observed responsiveness of the agent.
 As an example, consider the process of extending a lease: the agent
 must send a REQUEST packet and wait for an ACK or NAK packet in
-response.  This is done by sending a REQUEST and then registering a
-callback with the event handler that waits for an ACK or NAK packet to
-arrive on the file descriptor associated with the interface.  Note
-however, that when the ACK or NAK does arrive, and the callback
-function called back, it must know which interface this packet is for
-(it must get back its context).  This could be handled through an
-ad-hoc mapping of file descriptors to interfaces, but a cleaner
-approach is to have the event handler's register function
-(iu_register_event()) take in an opaque context pointer, which will
-then be passed back to the callback.  In the agent, this context
-pointer is always the `ifslist', but for reasons of decoupling and
-generality, the timer queue and event handler objects allow a generic
-(void *) context argument.
+response.  This is done by sending a REQUEST and then returning to the
+event handler that waits for an ACK or NAK packet to arrive on the
+file descriptor associated with the interface.  Note however, that
+when the ACK or NAK does arrive, and the callback function called
+back, it must know which state machine this packet is for (it must get
+back its context).  This could be handled through an ad-hoc mapping of
+file descriptors to state machines, but a cleaner approach is to have
+the event handler's register function (iu_register_event()) take in an
+opaque context pointer, which will then be passed back to the
+callback.  In the agent, the context pointer used depends on the
+nature of the event: events on LIFs use the dhcp_lif_t pointer, events
+on the state machine use dhcp_smach_t, and so on.
 
 Note that there is nothing that guarantees the pointer passed into
 iu_register_event() or iu_schedule_timer() will still be valid when
 the callback is called back (for instance, the memory may have been
-freed in the meantime).  To solve this problem, ifslists are reference
-counted.  For more details on how the reference count scheme is
-implemented, see the closing comments in interface.h regarding memory
-management.
+freed in the meantime).  To solve this problem, all of the data
+structures used in this way are reference counted.  For more details
+on how the reference count scheme is implemented, see the closing
+comments in interface.h regarding memory management.
 
 Transactions
 ------------
@@ -192,17 +212,17 @@ that due to the event-driven model the agent operates in, these
 operations are not inherently "grouped" -- instead, the agent sends a
 DISCOVER, goes back into the main event loop, waits for events
 (perhaps even requests on the IPC channel to begin acquiring a lease
-on another interface), eventually checks to see if an acceptable OFFER
-has come in, and so forth.  To some degree, the notion of the current
-state of an interface (SELECTING, REQUESTING, etc) helps control the
-potential chaos of the event-driven model (for instance, if while the
-agent is waiting for an OFFER on a given interface, an IPC event comes
-in requesting that the interface be RELEASED, the agent knows to send
-back an error since the interface must be in at least the BOUND state
-before a RELEASE can be performed.)
+on another state machine), eventually checks to see if an acceptable
+OFFER has come in, and so forth.  To some degree, the notion of the
+state machine's current state (SELECTING, REQUESTING, etc) helps
+control the potential chaos of the event-driven model (for instance,
+if while the agent is waiting for an OFFER on a given state machine,
+an IPC event comes in requesting that the leases be RELEASED, the
+agent knows to send back an error since the state machine must be in
+at least the BOUND state before a RELEASE can be performed.)
 
 However, states are not enough -- for instance, suppose that the agent
-begins trying to renew a lease -- this is done by sending a REQUEST
+begins trying to renew a lease.  This is done by sending a REQUEST
 packet and waiting for an ACK or NAK, which might never come.  If,
 while waiting for the ACK or NAK, the user sends a request to renew
 the lease as well, then if the agent were to send another REQUEST,
@@ -213,79 +233,56 @@ independent of one another; the more essential object is the
 `async_action', which we will discuss first.
 
 In short, an `async_action' represents a pending transaction (aka
-asynchronous action), of which each interface can have at most one.
-The `async_action' structure is embedded in the `ifslist' structure,
-which is fine since there can be at most one pending transaction per
-interface.  Typical "asynchronous transactions" are START, EXTEND, and
-INFORM, since each consists of a sequence of packets that must be done
-without interruption.  Note that not all DHCP operations are
-"asynchronous" -- for instance, a RELEASE operation is synchronous
-(not asynchronous) since after the RELEASE is sent no reply is
-expected from the DHCP server.  Also, note that there can be
-synchronous operations intermixed with asynchronous operations
-although it's not recommended.
+asynchronous action), of which each state machine can have at most
+one.  The `async_action' structure is embedded in the `dhcp_smach_t'
+structure, which is fine since there can be at most one pending
+transaction per state machine.  Typical "asynchronous transactions"
+are START, EXTEND, and INFORM, since each consists of a sequence of
+packets that must be done without interruption.  Note that not all
+DHCP operations are "asynchronous" -- for instance, a DHCPv4 RELEASE
+operation is synchronous (not asynchronous) since after the RELEASE is
+sent no reply is expected from the DHCP server, but DHCPv6 Release is
+asynchronous, as all DHCPv6 messages are transactional.  Some
+operations, such as status query, are synchronous and do not affect
+the system state, and thus do not require sequencing.
 
 When the agent realizes it must perform an asynchronous transaction,
-it first calls async_pending() to see if there is already one pending;
-if so, the new transaction must fail (the details of failure depend on
-how the transaction was initiated, which is described in more detail
-later when the `ipc_action' object is discussed).  If there is no
-pending asynchronous transaction, async_start() is called to begin
-one.
+it calls async_async() to open the transaction.  If one is already
+pending, then the new transaction must fail (the details of failure
+depend on how the transaction was initiated, which is described in
+more detail later when the `ipc_action' object is discussed).  If
+there is no pending asynchronous transaction, the operation succeeds.
 
-When the transaction is complete, async_finish() must be called to
-complete the asynchronous action on that interface.  If the
-transaction is unable to complete within a certain amount of time
-(more on this later), async_timeout() is invoked which attempts to
-cancel the asynchronous action with async_cancel().  If the event is
-not cancellable it is left pending, although this means that no future
-asynchronous actions can be performed on the interface until the
-transaction voluntarily calls async_finish().  While this may seem
-suboptimal, cancellation here is quite analogous to thread
-cancellation, which is generally considered a difficult problem.
+When the transaction is complete, either async_finish() or
+async_cancel() must be called to complete or cancel the asynchronous
+action on that state machine.  If the transaction is unable to
+complete within a certain amount of time (more on this later), a timer
+should be used to cancel the operation.
 
 The notion of asynchronous transactions is complicated by the fact
 that they may originate from both inside and outside of the agent.
 For instance, a user initiates an asynchronous START transaction when
 he performs an `ifconfig hme0 dhcp start', but the agent will
 internally need to perform asynchronous EXTEND transactions to extend
-the lease before it expires.  This leads us into the `ipc_action'
-object.
+the lease before it expires.  Note that user-initiated actions always
+have priority over internal actions: the former will cancel the
+latter, if necessary.
 
-An `ipc_action' represents the IPC-related pieces of an asynchronous
-transaction that was started as a result of a user request.  Only
-IPC-generated asynchronous transactions have a valid `ipc_action'
-object.  Note that since there can be at most one asynchronous action
-per interface, there can also be at most one `ipc_action' per
-interface (this means it can also conveniently be embedded inside the
-`ifslist' structure).
+This leads us into the `ipc_action' object.  An `ipc_action'
+represents the IPC-related pieces of an asynchronous transaction that
+was started as a result of a user request, as well as the `BUSY' state
+of the administrative interface.  Only IPC-generated asynchronous
+transactions have a valid `ipc_action' object.  Note that since there
+can be at most one asynchronous action per state machine, there can
+also be at most one `ipc_action' per state machine (this means it can
+also conveniently be embedded inside the `dhcp_smach_t' structure).
 
-One of the main purposes of the `ipc_action' object is to timeout user 
-events.  This is not the same as timing out the transaction; for
-instance, when the user specifies a timeout value as an argument to
+One of the main purposes of the `ipc_action' object is to timeout user
+events.  When the user specifies a timeout value as an argument to
 ifconfig, he is specifying an `ipc_action' timeout; in other words,
-how long he is willing to wait for the command to complete.  However,
-even after the command times out for the user, the asynchronous
-transaction continues until async_timeout() occurs.
-
-It is worth understanding these timeouts since the relationship is
-subtle but powerful.  The `async_action' timer specifies how long the
-agent will try to perform the transaction; the `ipc_action' timer
-specifies how long the user is willing to wait for the action to
-complete.  If when the `async_action' timer fires and async_timeout()
-is called, there is no associated `ipc_action' (either because the
-transaction was not initiated by a user or because the user already
-timed out), then async_cancel() proceeds as described previously.  If,
-on the other hand, the user is still waiting for the transaction to
-complete, then async_timeout() is rescheduled and the transaction is
-left pending.  While this behavior might seem odd, it adheres to the
-principles of least surprise: when a user is willing to wait for a
-transaction to complete, the agent should try for as long as they're
-willing to wait.  On the other hand, if the agent were to take that
-stance with its internal transactions, it would block out
-user-requested operations if the internal transaction never completed
-(perhaps because the server never sent an ACK in response to our lease
-extension REQUEST).
+how long he is willing to wait for the command to complete.  When this
+time expires, the ipc_action is terminated, as well as the
+asynchronous operation.
 
 The API provided for the `ipc_action' object is quite similar to the
 one for the `async_action' object: when an IPC request comes in for an 
@@ -304,31 +301,48 @@ unimportant details away from the rest of the agent code.  In order to
 send a DHCP packet, code first calls init_pkt(), which returns a
 dhcp_pkt_t initialized suitably for transmission.  Note that currently
 init_pkt() returns a dhcp_pkt_t that is actually allocated as part of
-the `ifslist', but this may change in the future..  After calling
+the `dhcp_smach_t', but this may change in the future..  After calling
 init_pkt(), the add_pkt_opt*() functions are used to add options to
-the DHCP packet.  Finally, send_pkt() can be used to transmit the
-packet to a given IP address.
+the DHCP packet.  Finally, send_pkt() and send_pkt_v6() can be used to
+transmit the packet to a given IP address.
 
 The send_pkt() function is actually quite complicated; for one, it
-must internally use either DLPI or sockets depending on the state of
-the interface; for two, it handles the details of packet timeout and
+must internally use either DLPI or sockets depending on the machine
+state; for another, it handles the details of packet timeout and
 retransmission.  The last argument to send_pkt() is a pointer to a
-"stop function".  If this argument is passed as NULL, then the packet
+"stop function."  If this argument is passed as NULL, then the packet
 will only be sent once (it won't be retransmitted).  Otherwise, before
 each retransmission, the stop function will be called back prior to
-retransmission.  The return value from this function indicates whether
-to continue retransmission or not, which allows the send_pkt() caller
-to control the retransmission policy without making it have to deal
-with the retransmission mechanism.  See init_reboot.c for an example
-of this in action.
+retransmission.  The callback may alter dsm_send_timeout if necessary
+to place a cap on the next timeout; this is done for DHCPv6 in
+stop_init_reboot() in order to implement the CNF_MAX_RD constraint.
+
+The return value from this function indicates whether to continue
+retransmission or not, which allows the send_pkt() caller to control
+the retransmission policy without making it have to deal with the
+retransmission mechanism.  See request.c for an example of this in
+action.
 
 The recv_pkt() function is simpler but still complicated by the fact
 that one may want to receive several different types of packets at
-once; for instance, after sending a REQUEST, either an ACK or a NAK is
-acceptable.  Also, before calling recv_pkt(), the caller must know
-that there is data to be read from the socket (this can be
-accomplished by using the event handler), otherwise recv_pkt() will
-block, which is clearly not acceptable.
+once and in different ways (DLPI or sockets).  The caller registers an
+event handler on the file descriptor, and then calls recv_pkt() to
+read in the packet along with meta information about the message (the
+sender and interface identifier).
+
+For IPv6, packet reception is done with a single socket, using
+IPV6_PKTINFO to determine the actual destination address and receiving
+interface.  Packets are then matched against the state machines on the
+given interface through the transaction ID.
+
+The same facility exists for inbound IPv4 packets, but because there's
+no IP_PKTINFO processing on output yet in Solaris, and because IPv4
+still relies on DLPI, DHCP packets are handled on a per-LIF (when
+bound) and per-PIF (when unbound) basis.  Eventually, when IP_PKTINFO
+is available for IPv4, the per-LIF sockets can go away.  If it ever
+becomes possible to send and receive IP packets without having an IP
+address configured on an interface, then the DLPI streams can go as
+well.
 
 Time
 ----
@@ -394,13 +408,13 @@ To work around this (and other checkpoint/resume related problems),
 when a system is resumed, the DHCP client makes the pessimistic
 assumption that all finite leases have expired while the machine was
 suspended and must be obtained again.  This is known as "refreshing"
-the leases, and is handled by refresh_ifslist().
+the leases, and is handled by refresh_smachs().
 
 Note that it appears like a more intelligent approach would be to
 record the time(2) when the system is suspended, compare that against
 the time(2) when the system is resumed, and use the delta between them
 to decide which leases have expired.  Sadly, this cannot be done since
-through at least Solaris 8, it is not possible for userland programs
+through at least Solaris 10, it is not possible for userland programs
 to be notified of system suspend events.
 
 Configuration
@@ -413,25 +427,34 @@ from the DHCP client.  This is desirable because it keeps the mechanism
 of retrieving the configuration data decoupled from the policy of using
 the data.
 
-However, unless used in "inform" mode, the DHCP client *does* configure
-each interface enough to allow it to communicate with other hosts.
-Specifically, the DHCP client configures the interface's IP address,
-netmask, and broadcast address using the information provided by the
-server.  Further, for physical interfaces, any provided default routes
-are also configured.  Since logical interfaces cannot be stored in the
-kernel routing table, and in most cases, logical interfaces share a
-default route with their associated physical interface, the DHCP client
-does not automatically add or remove default routes when leases are
-acquired or expired on logical interfaces.
+However, unless used in "inform" mode, the DHCP client *does*
+configure each IP interface enough to allow it to communicate with
+other hosts.  Specifically, the DHCP client configures the interface's
+IP address, netmask, and broadcast address using the information
+provided by the server.  Further, for IPv4 logical interface 0
+("hme0"), any provided default routes are also configured.
+
+For IPv6, only the IP addresses are set.  The netmask (prefix) is then
+set automatically by in.ndpd, and routes are discovered in the usual
+way by router discovery or routing protocols.  DHCPv6 doesn't set
+routes.
+
+Since logical interfaces cannot be specified as output interfaces in
+the kernel forwarding table, and in most cases, logical interfaces
+share a default route with their associated physical interface, the
+DHCP client does not automatically add or remove default routes when
+IPv4 leases are acquired or expired on logical interfaces.
 
 Event Scripting
 ---------------
 
 The DHCP client supports user program invocations on DHCP events.  The
-supported events are BOUND, EXTEND, EXPIRE, DROP and RELEASE.  The user
-program runs asynchronous to the DHCP client so that the main event
-loop stays active to process other events, including events triggered
-by the user program (for example, when it invokes dhcpinfo).
+supported events are BOUND, EXTEND, EXPIRE, DROP, RELEASE, and INFORM
+for DHCPv4, and BUILD6, EXTEND6, EXPIRE6, DROP6, LOSS6, RELEASE6, and
+INFORM6 for DHCPv6.  The user program runs asynchronous to the DHCP
+client so that the main event loop stays active to process other
+events, including events triggered by the user program (for example,
+when it invokes dhcpinfo).
 
 The user program execution is part of the transaction of a DHCP command.
 For example, if the user program is not enabled, the transaction of the
@@ -442,7 +465,7 @@ transaction is considered over only when the user program exits.  The
 event scripting implementation makes use of the asynchronous operations
 discussed in the "Transactions" section.
 
-The upper bound of 58 seconds is imposed on how long the user program
+An upper bound of 58 seconds is imposed on how long the user program
 can run. If the user program does not exit after 55 seconds, the signal
 SIGTERM is sent to it. If it still does not exit after additional 3
 seconds, the signal SIGKILL is sent to it.  Since the event handler is
@@ -450,7 +473,7 @@ a wrapper around poll(), the DHCP client cannot directly observe the
 completion of the user program.  Instead, the DHCP client creates a
 child "helper" process to synchronously monitor the user program (this
 process is also used to send the aformentioned signals to the process,
-if necessary). The DHCP client and the helper process share a pipe
+if necessary).  The DHCP client and the helper process share a pipe
 which is included in the set of poll descriptors monitored by the DHCP
 client's event handler.  When the user program exits, the helper process
 passes the user program exit status to the DHCP client through the pipe,

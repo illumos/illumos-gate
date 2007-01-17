@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +28,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "interface.h"
+#include "common.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -61,7 +60,16 @@ enum { SCRIPT_OK, SCRIPT_KILLED, SCRIPT_FAILED };
 #define	EVENT_EXTEND	"EXTEND"
 #define	EVENT_EXPIRE	"EXPIRE"
 #define	EVENT_DROP	"DROP"
+#define	EVENT_INFORM	"INFORM"
 #define	EVENT_RELEASE	"RELEASE"
+
+#define	EVENT_BOUND6	"BOUND6"
+#define	EVENT_EXTEND6	"EXTEND6"
+#define	EVENT_EXPIRE6	"EXPIRE6"
+#define	EVENT_DROP6	"DROP6"
+#define	EVENT_INFORM6	"INFORM6"
+#define	EVENT_LOSS6	"LOSS6"
+#define	EVENT_RELEASE6	"RELEASE6"
 
 /*
  * script location.
@@ -73,9 +81,9 @@ enum { SCRIPT_OK, SCRIPT_KILLED, SCRIPT_FAILED };
  */
 extern unsigned int	script_count;
 
-int	script_start(struct ifslist *, const char *,
-		script_callback_t *, const char *, int *);
-void	script_stop(struct ifslist *);
+boolean_t	script_start(dhcp_smach_t *, const char *, script_callback_t *,
+		    void *, int *);
+void		script_stop(dhcp_smach_t *);
 
 #ifdef	__cplusplus
 }

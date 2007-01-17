@@ -19,10 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * ADOPTING state of the client state machine.
+ * ADOPTING state of the client state machine.  This is used only during
+ * diskless boot with IPv4.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,14 +33,16 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <signal.h>
-#include <sys/sockio.h>
 #include <sys/socket.h>
+#include <net/if_arp.h>
 #include <netinet/in.h>
 #include <sys/systeminfo.h>
 #include <netinet/inetutil.h>
 #include <netinet/dhcp.h>
 #include <dhcpmsg.h>
+#include <libdevinfo.h>
 
+#include "agent.h"
 #include "async.h"
 #include "util.h"
 #include "packet.h"
@@ -54,21 +57,26 @@ typedef struct {
 
 static int	get_dhcp_kcache(dhcp_kcache_t **, size_t *);
 
+static boolean_t	get_prom_prop(const char *, const char *, uchar_t **,
+			    uint_t *);
+
 /*
  * dhcp_adopt(): adopts the interface managed by the kernel for diskless boot
  *
  *   input: void
- *  output: int: nonzero on success, zero on failure
+ *  output: boolean_t: B_TRUE success, B_FALSE on failure
  */
 
-int
+boolean_t
 dhcp_adopt(void)
 {
 	int		retval;
 	dhcp_kcache_t	*kcache = NULL;
 	size_t		kcache_size;
 	PKT_LIST	*plp = NULL;
-	struct ifslist	*ifsp;
+	dhcp_lif_t	*lif;
+	dhcp_smach_t	*dsmp = NULL;
+	uint_t		client_id_len;
 
 	retval = get_dhcp_kcache(&kcache, &kcache_size);
 	if (retval == 0 || kcache_size < sizeof (dhcp_kcache_t)) {
@@ -82,19 +90,14 @@ dhcp_adopt(void)
 	 * convert the kernel's ACK into binary
 	 */
 
-	plp = calloc(1, sizeof (PKT_LIST));
+	plp = alloc_pkt_entry(strlen(kcache->dk_ack) / 2, B_FALSE);
 	if (plp == NULL)
-		goto failure;
-
-	plp->len = strlen(kcache->dk_ack) / 2;
-	plp->pkt = malloc(plp->len);
-	if (plp->pkt == NULL)
 		goto failure;
 
 	dhcpmsg(MSG_DEBUG, "dhcp_adopt: allocated ACK of %d bytes", plp->len);
 
-	if (hexascii_to_octet(kcache->dk_ack, plp->len * 2, plp->pkt, &plp->len)
-	    != 0) {
+	if (hexascii_to_octet(kcache->dk_ack, plp->len * 2, plp->pkt,
+	    &plp->len) != 0) {
 		dhcpmsg(MSG_CRIT, "dhcp_adopt: cannot convert kernel ACK");
 		goto failure;
 	}
@@ -120,60 +123,105 @@ dhcp_adopt(void)
 	 * totally hosed and can only bail out.
 	 */
 
-	ifsp = insert_ifs(kcache->dk_if_name, B_TRUE, &retval);
-	if (ifsp == NULL)
+	if ((lif = attach_lif(kcache->dk_if_name, B_FALSE, &retval)) == NULL) {
+		dhcpmsg(MSG_ERROR, "dhcp_adopt: unable to attach %s: %d",
+		    kcache->dk_if_name, retval);
+		goto failure;
+	}
+
+	if ((dsmp = insert_smach(lif, &retval)) == NULL) {
+		dhcpmsg(MSG_ERROR, "dhcp_adopt: unable to create state "
+		    "machine for %s: %d", kcache->dk_if_name, retval);
+		goto failure;
+	}
+
+	/*
+	 * If the agent is adopting a lease, then OBP is initially
+	 * searched for a client-id.
+	 */
+
+	dhcpmsg(MSG_DEBUG, "dhcp_adopt: getting /chosen:clientid property");
+
+	client_id_len = 0;
+	if (!get_prom_prop("chosen", "client-id", &dsmp->dsm_cid,
+	    &client_id_len)) {
+		/*
+		 * a failure occurred trying to acquire the client-id
+		 */
+
+		dhcpmsg(MSG_DEBUG,
+		    "dhcp_adopt: cannot allocate client id for %s",
+		    dsmp->dsm_name);
+		goto failure;
+	} else if (dsmp->dsm_hwtype == ARPHRD_IB && dsmp->dsm_cid == NULL) {
+		/*
+		 * when the interface is infiniband and the agent
+		 * is adopting the lease there must be an OBP
+		 * client-id.
+		 */
+
+		dhcpmsg(MSG_DEBUG, "dhcp_adopt: no /chosen:clientid id for %s",
+		    dsmp->dsm_name);
+		goto failure;
+	}
+
+	dsmp->dsm_cidlen = client_id_len;
+
+	if (set_lif_dhcp(lif, B_TRUE) != DHCP_IPC_SUCCESS)
 		goto failure;
 
-	ifsp->if_state   = ADOPTING;
-	ifsp->if_dflags |= DHCP_IF_PRIMARY;
+	if (!set_smach_state(dsmp, ADOPTING))
+		goto failure;
+	dsmp->dsm_dflags = DHCP_IF_PRIMARY;
 
 	/*
 	 * move to BOUND and use the information in our ACK packet.
 	 * adoption will continue after DAD via dhcp_adopt_complete.
 	 */
 
-	if (dhcp_bound(ifsp, plp) == 0) {
+	if (!dhcp_bound(dsmp, plp)) {
 		dhcpmsg(MSG_CRIT, "dhcp_adopt: cannot use cached packet");
 		goto failure;
 	}
 
 	free(kcache);
-	return (1);
+	return (B_TRUE);
 
 failure:
+	/* Note: no need to free lif; dsmp holds reference */
+	if (dsmp != NULL)
+		release_smach(dsmp);
 	free(kcache);
-	if (plp != NULL)
-		free(plp->pkt);
-	free(plp);
-	return (0);
+	free_pkt_entry(plp);
+	return (B_FALSE);
 }
 
 /*
  * dhcp_adopt_complete(): completes interface adoption process after kernel
  *			  duplicate address detection (DAD) is done.
  *
- *   input: struct ifslist *: the interface on which a lease is being adopted
+ *   input: dhcp_smach_t *: the state machine on which a lease is being adopted
  *  output: none
  */
 
 void
-dhcp_adopt_complete(struct ifslist *ifsp)
+dhcp_adopt_complete(dhcp_smach_t *dsmp)
 {
 	dhcpmsg(MSG_DEBUG, "dhcp_adopt_complete: completing adoption");
 
-	if (async_start(ifsp, DHCP_EXTEND, B_FALSE) == 0) {
+	if (async_start(dsmp, DHCP_EXTEND, B_FALSE) == 0) {
 		dhcpmsg(MSG_CRIT, "dhcp_adopt_complete: async_start failed");
 		return;
 	}
 
-	if (dhcp_extending(ifsp) == 0) {
+	if (dhcp_extending(dsmp) == 0) {
 		dhcpmsg(MSG_CRIT,
 		    "dhcp_adopt_complete: cannot send renew request");
 		return;
 	}
 
 	if (grandparent != (pid_t)0) {
-		dhcpmsg(MSG_DEBUG, "adoption complete, signalling parent (%i)"
+		dhcpmsg(MSG_DEBUG, "adoption complete, signalling parent (%ld)"
 		    " to exit.", grandparent);
 		(void) kill(grandparent, SIGALRM);
 	}
@@ -204,4 +252,147 @@ get_dhcp_kcache(dhcp_kcache_t **kernel_cachep, size_t *kcache_size)
 
 	(void) sysinfo(SI_DHCP_CACHE, (caddr_t)*kernel_cachep, size);
 	return (1);
+}
+
+/*
+ * get_prom_prop(): get the value of the named property on the named node in
+ *		    devinfo root.
+ *
+ *   input: const char *: The name of the node containing the property.
+ *	    const char *: The name of the property.
+ *	    uchar_t **: The property value, modified iff B_TRUE is returned.
+ *                      If no value is found the value is set to NULL.
+ *	    uint_t *: The length of the property value
+ *  output: boolean_t: Returns B_TRUE if successful (no problems),
+ *                     otherwise B_FALSE.
+ *    note: The memory allocated by this function must be freed by
+ *          the caller. This code is derived from
+ *          usr/src/lib/libwanboot/common/bootinfo_aux.c.
+ */
+
+static boolean_t
+get_prom_prop(const char *nodename, const char *propname, uchar_t **propvaluep,
+    uint_t *lenp)
+{
+	di_node_t		root_node;
+	di_node_t		node;
+	di_prom_handle_t	phdl = DI_PROM_HANDLE_NIL;
+	di_prom_prop_t		pp;
+	uchar_t			*value = NULL;
+	unsigned int		len = 0;
+	boolean_t		success = B_TRUE;
+
+	/*
+	 * locate root node
+	 */
+
+	if ((root_node = di_init("/", DINFOCPYALL)) == DI_NODE_NIL ||
+	    (phdl = di_prom_init()) == DI_PROM_HANDLE_NIL) {
+		dhcpmsg(MSG_DEBUG, "get_prom_prop: property root node "
+		    "not found");
+		goto get_prom_prop_cleanup;
+	}
+
+	/*
+	 * locate nodename within '/'
+	 */
+
+	for (node = di_child_node(root_node);
+	    node != DI_NODE_NIL;
+	    node = di_sibling_node(node)) {
+		if (strcmp(di_node_name(node), nodename) == 0) {
+			break;
+		}
+	}
+
+	if (node == DI_NODE_NIL) {
+		dhcpmsg(MSG_DEBUG, "get_prom_prop: node not found");
+		goto get_prom_prop_cleanup;
+	}
+
+	/*
+	 * scan all properties of /nodename for the 'propname' property
+	 */
+
+	for (pp = di_prom_prop_next(phdl, node, DI_PROM_PROP_NIL);
+	    pp != DI_PROM_PROP_NIL;
+	    pp = di_prom_prop_next(phdl, node, pp)) {
+
+		dhcpmsg(MSG_DEBUG, "get_prom_prop: property = %s",
+		    di_prom_prop_name(pp));
+
+		if (strcmp(propname, di_prom_prop_name(pp)) == 0) {
+			break;
+		}
+	}
+
+	if (pp == DI_PROM_PROP_NIL) {
+		dhcpmsg(MSG_DEBUG, "get_prom_prop: property not found");
+		goto get_prom_prop_cleanup;
+	}
+
+	/*
+	 * get the property; allocate some memory copy it out
+	 */
+
+	len = di_prom_prop_data(pp, (uchar_t **)&value);
+
+	if (value == NULL) {
+		/*
+		 * property data read problems
+		 */
+
+		success = B_FALSE;
+		dhcpmsg(MSG_ERR, "get_prom_prop: cannot read property data");
+		goto get_prom_prop_cleanup;
+	}
+
+	if (propvaluep != NULL) {
+		/*
+		 * allocate somewhere to copy the property value to
+		 */
+
+		*propvaluep = calloc(len, sizeof (uchar_t));
+
+		if (*propvaluep == NULL) {
+			/*
+			 * allocation problems
+			 */
+
+			success = B_FALSE;
+			dhcpmsg(MSG_ERR, "get_prom_prop: cannot allocate "
+			    "memory for property value");
+			goto get_prom_prop_cleanup;
+		}
+
+		/*
+		 * copy data out
+		 */
+
+		(void) memcpy(*propvaluep, value, len);
+
+		/*
+		 * copy out the length if a suitable pointer has
+		 * been supplied
+		 */
+
+		if (lenp != NULL) {
+			*lenp = len;
+		}
+
+		dhcpmsg(MSG_DEBUG, "get_prom_prop: property value "
+		    "length = %d", len);
+	}
+
+get_prom_prop_cleanup:
+
+	if (phdl != DI_PROM_HANDLE_NIL) {
+		di_prom_fini(phdl);
+	}
+
+	if (root_node != DI_NODE_NIL) {
+		di_fini(root_node);
+	}
+
+	return (success);
 }

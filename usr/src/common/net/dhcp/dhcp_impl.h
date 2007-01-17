@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +41,7 @@ extern "C" {
 #include <netinet/in.h>
 #include <netinet/udp.h>
 #include <netinet/dhcp.h>
+#include <netinet/dhcp6.h>
 #include <dhcp_symbol_common.h>
 #include <sys/sunos_dhcp_class.h>
 
@@ -94,19 +94,30 @@ typedef struct {
 	uint8_t    value[1];
 } DHCP_OPT;
 
+typedef union sockaddr46_s {
+	struct sockaddr_in v4;
+	struct sockaddr_in6 v6;
+} sockaddr46_t;
+
 /*
  * Generic DHCP packet list. Ensure that _REENTRANT bracketed code stays at
  * bottom of this definition - the client doesn't include it. Scan.c in
  * libdhcp isn't aware of it either...
+ *
+ * The PKT * pointer here actually points to a dhcpv6_message_t if the packet
+ * is DHCPv6.  We assume that PKT * the same or stricter alignment
+ * requirements, and that the unused elements are not a significant burden.
  */
 #define	MAX_PKT_LIST	5	/* maximum list size */
 typedef struct  dhcp_list {
+	struct dhcp_list 	*next;		/* keep first and in this */
+	struct dhcp_list 	*prev;		/* order for insque/remque */
+
 	PKT			*pkt;		/* client packet */
 	uint_t			len;		/* packet len */
 	int			rfc1048;	/* RFC1048 options - boolean */
-	struct dhcp_list 	*prev;
-	struct dhcp_list 	*next;
 	uint8_t			offset;		/* BOOTP packet offset */
+	uint8_t			isv6;		/* DHCPv6 packet - boolean */
 				/*
 				 * standard/site options
 				 */
@@ -119,11 +130,19 @@ typedef struct  dhcp_list {
 
 	struct in_addr		off_ip;		/* Address OFFERed */
 
+	uint_t			ifindex; /* received ifindex (if any) */
+	sockaddr46_t		pktfrom; /* source (peer) address on input */
+	sockaddr46_t		pktto;	/* destination (local) address */
+
 } PKT_LIST;
 
 extern int dhcp_options_scan(PKT_LIST *, boolean_t);
 extern boolean_t dhcp_getinfo_pl(PKT_LIST *, uchar_t, uint16_t, uint16_t,
     void *, size_t *);
+extern dhcpv6_option_t *dhcpv6_find_option(const void *, size_t,
+    const dhcpv6_option_t *, uint16_t, uint_t *);
+extern dhcpv6_option_t *dhcpv6_pkt_option(const PKT_LIST *,
+    const dhcpv6_option_t *, uint16_t, uint_t *);
 
 #ifdef	__cplusplus
 }

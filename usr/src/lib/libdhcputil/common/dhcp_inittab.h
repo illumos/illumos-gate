@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_DHCP_INITTAB_H
@@ -48,6 +47,7 @@ extern "C" {
  * On-disk inittab attributes and limits.
  */
 #define	ITAB_INITTAB_PATH	"/etc/dhcp/inittab"
+#define	ITAB_INITTAB6_PATH	"/etc/dhcp/inittab6"
 #define	ITAB_MAX_LINE_LEN	8192 		/* bytes */
 #define	ITAB_MAX_NUMBER_LEN	30		/* digits */
 #define	ITAB_COMMENT_CHAR	'#'
@@ -72,7 +72,8 @@ extern "C" {
 #define	ITAB_CAT_INTERNAL	0x04
 #define	ITAB_CAT_VENDOR		0x08
 #define	ITAB_CAT_SITE		0x10
-#define	ITAB_CAT_COUNT		5
+#define	ITAB_CAT_V6		0x20
+#define	ITAB_CAT_COUNT		6
 
 /*
  * Consumer which is using the inittab functions.
@@ -96,19 +97,22 @@ extern "C" {
 #define	ITAB_BAD_GRAN		(-8)
 #define	ITAB_NOMEM		(-9)
 
-extern uint8_t		inittab_type_to_size(dhcp_symbol_t *);
-extern int		inittab_verify(dhcp_symbol_t *, dhcp_symbol_t *);
+extern uint8_t		inittab_type_to_size(const dhcp_symbol_t *);
+extern int		inittab_verify(const dhcp_symbol_t *, dhcp_symbol_t *);
 extern dhcp_symbol_t	*inittab_load(uchar_t, char, size_t *);
 extern dhcp_symbol_t	*inittab_getbyname(uchar_t, char, const char *);
 extern dhcp_symbol_t	*inittab_getbycode(uchar_t, char, uint16_t);
-extern uchar_t		*inittab_encode(dhcp_symbol_t *, const char *,
+extern uchar_t		*inittab_encode(const dhcp_symbol_t *, const char *,
 			    uint16_t *, boolean_t);
-extern uchar_t		*inittab_encode_e(dhcp_symbol_t *, const char *,
+extern uchar_t		*inittab_encode_e(const dhcp_symbol_t *, const char *,
 			    uint16_t *, boolean_t, int *);
-extern char		*inittab_decode(dhcp_symbol_t *, uchar_t *,
+extern char		*inittab_decode(const dhcp_symbol_t *, const uchar_t *,
 			    uint16_t, boolean_t);
-extern char		*inittab_decode_e(dhcp_symbol_t *, uchar_t *,
-			    uint16_t, boolean_t, int *);
+extern char		*inittab_decode_e(const dhcp_symbol_t *,
+			    const uchar_t *, uint16_t, boolean_t, int *);
+
+/* temporary; should be in libdlpi */
+extern uint_t		dlpi_to_arp(uint_t);
 
 #ifdef	__cplusplus
 }

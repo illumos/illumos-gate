@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,6 +38,7 @@ SUNWprivate_1.1 {
 	dhcp_ipc_recv_request;
 	dhcp_ipc_send_reply;
 	dhcp_ipc_strerror;
+	dhcp_ipc_type_to_string;
 	dhcp_start_agent;
 	dhcp_state_to_string;
 	dhcp_status_hdr_string;
@@ -47,6 +48,12 @@ SUNWprivate_1.1 {
 	read_hostconf;
 	remove_hostconf;
 	write_hostconf;
+	read_stable_duid;
+	write_stable_duid;
+	make_stable_duid;
+	read_stable_iaid;
+	write_stable_iaid;
+	make_stable_iaid;
     local:
 	*;
 };

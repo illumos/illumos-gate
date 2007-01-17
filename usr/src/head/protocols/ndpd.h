@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,7 +75,8 @@ extern struct confvar ifdefaults[];
 #define	I_TmpPreferredLifetime		14	/* In seconds */
 #define	I_TmpRegenAdvance		15	/* In seconds */
 #define	I_TmpMaxDesyncFactor		16	/* In seconds */
-#define	I_IFSIZE			17	/* # of variables */
+#define	I_StatefulAddrConf		17
+#define	I_IFSIZE			18	/* # of variables */
 
 typedef struct ndpd_info_s {
 	uint_t	info_type;
@@ -137,6 +138,8 @@ typedef struct ndpd_phyint_info_s {
 #define	phyint_TmpRegenAdvance	phyint_config[I_TmpRegenAdvance].cf_value
 #define	phyint_TmpMaxDesyncFactor	\
 				phyint_config[I_TmpMaxDesyncFactor].cf_value
+#define	phyint_StatefulAddrConf	\
+				phyint_config[I_StatefulAddrConf].cf_value
 	uint_t 		phyint_num_of_prefixes;
 	uint_t 		phyint_num_of_routers;
 } ndpd_phyint_info_t;

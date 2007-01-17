@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -1671,15 +1671,28 @@ ip_addr_scope_v6(const in6_addr_t *addr)
 
 
 /*
- * Calculates the xor of a1 and a2, and stores the result in res.
+ * Returns the length of the common prefix of a1 and a2, as per
+ * CommonPrefixLen() defined in RFC 3484.
  */
-static void
-ip_addr_xor_v6(const in6_addr_t *a1, const in6_addr_t *a2, in6_addr_t *res)
+static int
+ip_common_prefix_v6(const in6_addr_t *a1, const in6_addr_t *a2)
 {
 	int i;
+	uint32_t a1val, a2val, mask;
 
-	for (i = 0; i < 4; i++)
-		res->s6_addr32[i] = a1->s6_addr32[i] ^ a2->s6_addr32[i];
+	for (i = 0; i < 4; i++) {
+		if ((a1val = a1->s6_addr32[i]) != (a2val = a2->s6_addr32[i])) {
+			a1val ^= a2val;
+			i *= 32;
+			mask = 0x80000000u;
+			while (!(a1val & mask)) {
+				mask >>= 1;
+				i++;
+			}
+			return (i);
+		}
+	}
+	return (IPV6_ABITS);
 }
 
 #define	IPIF_VALID_IPV6_SOURCE(ipif) \
@@ -1705,10 +1718,15 @@ typedef struct candidate {
 	boolean_t	cand_matchedlabel_set;
 	boolean_t	cand_istmp;
 	boolean_t	cand_istmp_set;
-	in6_addr_t	cand_xor;
-	boolean_t	cand_xor_set;
+	int		cand_common_pref;
+	boolean_t	cand_common_pref_set;
+	boolean_t	cand_pref_eq;
+	boolean_t	cand_pref_eq_set;
+	int		cand_pref_len;
+	boolean_t	cand_pref_len_set;
 } cand_t;
 #define	cand_srcaddr	cand_ipif->ipif_v6lcl_addr
+#define	cand_mask	cand_ipif->ipif_v6net_mask
 #define	cand_flags	cand_ipif->ipif_flags
 #define	cand_ill	cand_ipif->ipif_ill
 #define	cand_zoneid	cand_ipif->ipif_zoneid
@@ -1737,6 +1755,11 @@ typedef struct dstinfo {
  * destination address ordering.  The rules defined here implement the IPv6
  * source address selection.  Destination address ordering is done by
  * libnsl, and uses a similar set of rules to implement the sorting.
+ *
+ * Most of the rules are defined by the RFC and are not typically altered.  The
+ * last rule, number 8, has language that allows for local preferences.  In the
+ * scheme below, this means that new Solaris rules should normally go between
+ * rule_ifprefix and rule_prefix.
  */
 typedef enum {CAND_AVOID, CAND_TIE, CAND_PREFER} rule_res_t;
 typedef	rule_res_t (*rulef_t)(cand_t *, cand_t *, const dstinfo_t *);
@@ -1937,37 +1960,47 @@ rule_temporary(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo)
 }
 
 /*
- * Prefer source addresses with longer matching prefix with the
- * destination.  Since this is the last rule, it must not produce a tie.
- * We do the longest matching prefix calculation and the tie break in one
- * calculation by doing an xor of both addresses with the destination, and
- * pick the address with the smallest xor value.  That way, we're both
- * picking the address with the longest matching prefix, and breaking the
- * tie if they happen to have both have equal mathing prefixes.
+ * Prefer source addresses with longer matching prefix with the destination
+ * under the interface mask.  This gets us on the same subnet before applying
+ * any Solaris-specific rules.
  */
 static rule_res_t
-rule_prefix(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo)
+rule_ifprefix(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo)
 {
-	int i;
-
-	if (!bc->cand_xor_set) {
-		ip_addr_xor_v6(&bc->cand_srcaddr,
-		    dstinfo->dst_addr, &bc->cand_xor);
-		bc->cand_xor_set = B_TRUE;
+	if (!bc->cand_pref_eq_set) {
+		bc->cand_pref_eq = V6_MASK_EQ_2(bc->cand_srcaddr,
+		    bc->cand_mask, *dstinfo->dst_addr);
+		bc->cand_pref_eq_set = B_TRUE;
 	}
 
-	ip_addr_xor_v6(&cc->cand_srcaddr, dstinfo->dst_addr, &cc->cand_xor);
-	cc->cand_xor_set = B_TRUE;
+	cc->cand_pref_eq = V6_MASK_EQ_2(cc->cand_srcaddr, cc->cand_mask,
+	    *dstinfo->dst_addr);
+	cc->cand_pref_eq_set = B_TRUE;
 
-	for (i = 0; i < 4; i++) {
-		if (bc->cand_xor.s6_addr32[i] != cc->cand_xor.s6_addr32[i])
-			break;
+	if (bc->cand_pref_eq) {
+		if (cc->cand_pref_eq) {
+			if (!bc->cand_pref_len_set) {
+				bc->cand_pref_len =
+				    ip_mask_to_plen_v6(&bc->cand_mask);
+				bc->cand_pref_len_set = B_TRUE;
+			}
+			cc->cand_pref_len = ip_mask_to_plen_v6(&cc->cand_mask);
+			cc->cand_pref_len_set = B_TRUE;
+			if (bc->cand_pref_len == cc->cand_pref_len)
+				return (CAND_TIE);
+			else if (bc->cand_pref_len > cc->cand_pref_len)
+				return (CAND_AVOID);
+			else
+				return (CAND_PREFER);
+		} else {
+			return (CAND_AVOID);
+		}
+	} else {
+		if (cc->cand_pref_eq)
+			return (CAND_PREFER);
+		else
+			return (CAND_TIE);
 	}
-
-	if (cc->cand_xor.s6_addr32[i] < bc->cand_xor.s6_addr32[i])
-		return (CAND_PREFER);
-	else
-		return (CAND_AVOID);
 }
 
 /*
@@ -1985,6 +2018,73 @@ rule_zone_specific(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo)
 		return (CAND_AVOID);
 	else
 		return (CAND_PREFER);
+}
+
+/*
+ * Prefer to use DHCPv6 (first) and static addresses (second) when possible
+ * instead of statelessly autoconfigured addresses.
+ *
+ * This is done after trying all other preferences (and before the final tie
+ * breaker) so that, if all else is equal, we select addresses configured by
+ * DHCPv6 over other addresses.  We presume that DHCPv6 addresses, unlike
+ * stateless autoconfigured addresses, are deliberately configured by an
+ * administrator, and thus are correctly set up in DNS and network packet
+ * filters.
+ */
+/* ARGSUSED2 */
+static rule_res_t
+rule_addr_type(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo)
+{
+#define	ATYPE(x)	\
+	((x) & IPIF_DHCPRUNNING) ? 1 : ((x) & IPIF_ADDRCONF) ? 3 : 2
+	int bcval = ATYPE(bc->cand_flags);
+	int ccval = ATYPE(cc->cand_flags);
+#undef ATYPE
+
+	if (bcval == ccval)
+		return (CAND_TIE);
+	else if (ccval < bcval)
+		return (CAND_PREFER);
+	else
+		return (CAND_AVOID);
+}
+
+/*
+ * Prefer source addresses with longer matching prefix with the destination.
+ * We do the longest matching prefix calculation by doing an xor of both
+ * addresses with the destination, and pick the address with the longest string
+ * of leading zeros, as per CommonPrefixLen() defined in RFC 3484.
+ */
+static rule_res_t
+rule_prefix(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo)
+{
+	if (!bc->cand_common_pref_set) {
+		bc->cand_common_pref = ip_common_prefix_v6(&bc->cand_srcaddr,
+		    dstinfo->dst_addr);
+		bc->cand_common_pref_set = B_TRUE;
+	}
+
+	cc->cand_common_pref = ip_common_prefix_v6(&cc->cand_srcaddr,
+	    dstinfo->dst_addr);
+	cc->cand_common_pref_set = B_TRUE;
+
+	if (bc->cand_common_pref == cc->cand_common_pref)
+		return (CAND_TIE);
+	else if (bc->cand_common_pref > cc->cand_common_pref)
+		return (CAND_AVOID);
+	else
+		return (CAND_PREFER);
+}
+
+/*
+ * Last rule: we must pick something, so just prefer the current best
+ * candidate.
+ */
+/* ARGSUSED */
+static rule_res_t
+rule_must_be_last(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo)
+{
+	return (CAND_AVOID);
 }
 
 /*
@@ -2034,8 +2134,8 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 	 * The list of ordering rules.  They are applied in the order they
 	 * appear in the list.
 	 *
-	 * XXX rule_mipv6 will need to be implemented (the specification's
-	 * rules 4) if a mobile IPv6 node is ever implemented.
+	 * Solaris doesn't currently support Mobile IPv6, so there's no
+	 * rule_mipv6 corresponding to rule 4 in the specification.
 	 */
 	rulef_t	rules[] = {
 		rule_isdst,
@@ -2045,8 +2145,11 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 		rule_interface,
 		rule_label,
 		rule_temporary,
-		rule_prefix,
+		rule_ifprefix,			/* local rules after this */
 		rule_zone_specific,
+		rule_addr_type,
+		rule_prefix,			/* local rules before this */
+		rule_must_be_last,		/* must always be last */
 		NULL
 	};
 
