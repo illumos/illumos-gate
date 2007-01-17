@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,6 +125,7 @@ sctpparam_t	sctp_param_arr[] = {
  { 1,		16384,		4,		"sctp_slow_start_after_idle"},
  { 0,		1,		1,		"sctp_prsctp_enabled"},
  { 1,		10000,		3,		"sctp_fast_rxt_thresh"},
+ { 1,		16,		2,		"sctp_deferred_acks_max"},
 };
 /* END CSTYLED */
 

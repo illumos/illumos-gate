@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1621,19 +1621,21 @@ sctp_make_sack(sctp_t *sctp, sctp_faddr_t *sendto, mblk_t *dups)
 	size_t slen;
 	sctp_chunk_hdr_t *sch;
 	sctp_sack_chunk_t *sc;
+	int32_t acks_max;
 
 	if (sctp->sctp_force_sack) {
 		sctp->sctp_force_sack = 0;
 		goto checks_done;
 	}
 
+	acks_max = sctp_deferred_acks_max;
 	if (sctp->sctp_state == SCTPS_ESTABLISHED) {
-		if (sctp->sctp_sack_toggle < 2) {
+		if (sctp->sctp_sack_toggle < acks_max) {
 			/* no need to SACK right now */
 			dprint(2, ("sctp_make_sack: %p no sack (toggle)\n",
 			    (void *)sctp));
 			return (NULL);
-		} else if (sctp->sctp_sack_toggle >= 2) {
+		} else if (sctp->sctp_sack_toggle >= acks_max) {
 			sctp->sctp_sack_toggle = 0;
 		}
 	}

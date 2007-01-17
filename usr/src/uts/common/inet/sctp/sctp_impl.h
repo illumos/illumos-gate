@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,6 +148,7 @@ extern sctpparam_t sctp_param_arr[];
 #define	sctp_slow_start_after_idle	sctp_param_arr[34].sctp_param_val
 #define	sctp_prsctp_enabled		sctp_param_arr[35].sctp_param_val
 #define	sctp_fast_rxt_thresh		sctp_param_arr[36].sctp_param_val
+#define	sctp_deferred_acks_max		sctp_param_arr[37].sctp_param_val
 /*
  * sctp_wroff_xtra is the extra space in front of SCTP/IP header for link
  * layer header.  It has to be a multiple of 4.

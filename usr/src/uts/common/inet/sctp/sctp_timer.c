@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -365,7 +365,7 @@ void
 sctp_ack_timer(sctp_t *sctp)
 {
 	sctp->sctp_ack_timer_running = 0;
-	sctp->sctp_sack_toggle = 2;
+	sctp->sctp_sack_toggle = sctp_deferred_acks_max;
 	BUMP_MIB(&sctp_mib, sctpOutAckDelayed);
 	sctp_sack(sctp, NULL);
 }
