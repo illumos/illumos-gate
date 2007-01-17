@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -628,7 +628,7 @@ MODULEprop_set(tnode_t *tn, did_t *pd,
 
 	mp = did_mod(pd);
 	if ((mod = topo_mod_modfmri(mp, FM_MOD_SCHEME_VERSION, dnm)) == NULL)
-		return (-1); /* mod errno set */
+		return (0); /* driver maybe detached, return success */
 
 	if (topo_prop_set_fmri(tn, tpgrp, tpnm, TOPO_PROP_IMMUTABLE, mod,
 	    &err) < 0) {
