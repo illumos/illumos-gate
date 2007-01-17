@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * Copyright(c) 1995-2000 Intel Corporation. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"

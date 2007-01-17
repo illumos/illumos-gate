@@ -1,28 +1,8 @@
 /*
- * CDDL HEADER START
- *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
- *
- * File: algorithm.c
- *
  * Copyright (c) 1995-2000 Intel Corporation. All rights reserved.
- *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,7 +13,7 @@
 
 typedef struct _pkcs_key_type_map
 {
-	KMF_ALGORITHM_INDEX CssmAlgorithmId;
+	KMF_ALGORITHM_INDEX kmfAlgorithmId;
 	CK_KEY_TYPE ckKeyType;
 }
 PKCS_KEY_TYPE_MAP;
@@ -121,10 +101,10 @@ SUP(CKM_SHA_1, KMF_ALGID_SHA1, KMF_ALGCLASS_DIGEST, KMF_ALGMODE_NONE,
 #define	PKCS_ALGORITHM_NOT_FOUND    ((uint32_t)(~0))
 
 /*
- * Name: PKCSConv_GetMechanism
+ * Name: PKCS_GetAlgorithmMap
  *
  * Description:
- *  Searches the _PKCS2KMFMap table for a matching set of CSSM alg.
+ *  Searches the _PKCS2KMFMap table for a matching set of alg.
  *  description parameters.
  *
  * Parameters:
@@ -162,7 +142,7 @@ PKCS_ConvertAlgorithmId2PKCSKeyType(KMF_ALGORITHM_INDEX AlgId,
 		sizeof (PKCS_KEY_TYPE_MAP);
 
 	for (uIndex = 0; uIndex < uMapSize; uIndex++) {
-		if (_PKCS2KMFKeyTypeMap[uIndex].CssmAlgorithmId == AlgId) {
+		if (_PKCS2KMFKeyTypeMap[uIndex].kmfAlgorithmId == AlgId) {
 			*pckKeyType = _PKCS2KMFKeyTypeMap[uIndex].ckKeyType;
 			return (1);
 		}

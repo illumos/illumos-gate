@@ -1,42 +1,28 @@
 /*
- * CDDL HEADER START
- *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
- */
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * File: BER_DER.H
+ * Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4
  *
- * Copyright (c) 1995-2000 Intel Corporation. All rights reserved.
+ * The contents of this file are subject to the Netscape Public License
+ * Version 1.0(the "NPL"); you may not use this file except in
+ * compliance with the NPL.  You may obtain a copy of the NPL at
+ * http:/ /www.mozilla.org/NPL/
  *
- * Portions:
- * (C) COPYRIGHT International Business Machines Corp. 1996, 1997
- * All Rights Reserved
+ * Software distributed under the NPL is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the NPL
+ * for the specific language governing rights and limitations under the
+ * NPL.
  *
- * US Government Users Restricted Rights - Use, duplication or
- * disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
+ * The Initial Developer of this code under the NPL is Netscape
+ * Communications Corporation.  Portions created by Netscape are
+ * Copyright(C) 1998 Netscape Communications Corporation.  All Rights
+ * Reserved.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is the header file for some Basic Encoding Rules and Distinguished
