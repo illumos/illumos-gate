@@ -103,6 +103,8 @@ struct ldap_error {
 	char	*le_errmsg;
 };
 
+static struct ldap_error ldap_error_NULL = { LDAP_SUCCESS, NULL, NULL};
+
 /* destructor */
 void
 ns_tsd_cleanup(void *key) {
@@ -183,6 +185,11 @@ set_ld_error(int err, char *matched, char *errmsg, void *dummy)
 				" %d", errno);
 		return;
 	}
+
+	/* play safe, do nothing if TSD pointer is NULL */
+	if (le == NULL)
+		return;
+
 	le->le_errno = err;
 	if (le->le_matched != NULL) {
 		ldap_memfree(le->le_matched);
@@ -216,6 +223,11 @@ get_ld_error(char **matched, char **errmsg, void *dummy)
 				" %d", errno);
 		return (errno);
 	}
+
+	/* play safe, return NULL error data, if TSD pointer is NULL */
+	if (le == NULL)
+		le = &ldap_error_NULL;
+
 	if (matched != NULL) {
 		*matched = le->le_matched;
 	}
@@ -1477,15 +1489,6 @@ _DropConnection(ConnectionID cID, int flag, int fini)
 
 		if (use_lock)
 			(void) rw_unlock(&sessionPoolLock);
-	}
-
-	if (MTperConn) {
-		void	*tsd;
-		(void) thr_getspecific(ns_mtckey, &tsd);
-		if (tsd != NULL) {
-			ns_tsd_cleanup(tsd);
-			(void) thr_setspecific(ns_mtckey, NULL);
-		}
 	}
 }
 
