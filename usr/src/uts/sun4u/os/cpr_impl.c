@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -294,7 +294,8 @@ i_cpr_mp_setup(void)
 	 */
 	i_cpr_cif_setup(CIF_UNLINK);
 
-	(void) i_cpr_prom_pages(CPR_PROM_RESTORE);
+	if (!cpr_reusable_mode)
+		(void) i_cpr_prom_pages(CPR_PROM_RESTORE);
 
 	/* allow setting page size codes in MMU primary context register */
 	kcontextreg = kctx;
