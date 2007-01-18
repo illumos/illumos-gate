@@ -20,18 +20,17 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
 #include <pthread.h>
-#include <sip.h>
 
 #include "sip_hash.h"
-#include "sip_miscdefs.h"
 
 /*
  * This file implements functions that add, search or remove an object

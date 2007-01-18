@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,12 +29,8 @@
 /*
  * Simple implementation of timeout functionality. The granuality is a sec
  */
-#include <stdio.h>
 #include <pthread.h>
-#include <sys/errno.h>
 #include <stdlib.h>
-
-#include "sip_miscdefs.h"
 
 uint_t		sip_timeout(void *arg, void (*callback_func)(void *),
 		    struct timeval *timeout_time);
@@ -177,7 +173,8 @@ sip_timeout(void *arg, void (*callback_func)(void *),
     struct timeval *timeout_time)
 {
 	sip_timeout_t	*new_timeout;
-	sip_timeout_t	*current, *last;
+	sip_timeout_t	*current;
+	sip_timeout_t	*last;
 	hrtime_t	future_time;
 	uint_t		tid;
 #ifdef	__linux__
@@ -310,13 +307,21 @@ sip_timer_thr(void *arg)
 	hrtime_t	current_time;
 	hrtime_t	next_timeout;
 	hrtime_t	delta;
+	struct timeval tim;
 #ifdef	__linux__
 	struct timespec	tspec;
 #endif
-	to.tv_sec = time(NULL) + 5;
-	to.tv_nsec = 0;
+	delta = (hrtime_t)5 * NANOSEC;
 	(void) pthread_mutex_lock(&timeout_mutex);
 	for (;;) {
+		(void) gettimeofday(&tim, NULL);
+		to.tv_sec = tim.tv_sec + (delta / NANOSEC);
+		to.tv_nsec = (hrtime_t)(tim.tv_usec * MILLISEC) +
+		    (delta % NANOSEC);
+		if (to.tv_nsec > NANOSEC) {
+			to.tv_sec += (to.tv_nsec / NANOSEC);
+			to.tv_nsec %= NANOSEC;
+		}
 		(void) pthread_cond_timedwait(&timeout_cond_var,
 		    &timeout_mutex, &to);
 		/*
@@ -336,8 +341,6 @@ again:
 		delta = next_timeout - current_time;
 		if (delta <= 0)
 			goto again;
-		to.tv_sec = time(NULL) + (delta / NANOSEC);
-		to.tv_nsec = delta % NANOSEC;
 	}
 	/* NOTREACHED */
 	return ((void *)0);

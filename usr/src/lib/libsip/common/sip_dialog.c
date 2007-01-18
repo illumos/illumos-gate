@@ -20,16 +20,23 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "sip_parse_uri.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <errno.h>
+#include <pthread.h>
+#include <strings.h>
+#include <sip.h>
+
 #include "sip_msg.h"
-#include "sip_hash.h"
 #include "sip_miscdefs.h"
+#include "sip_hash.h"
 #include "sip_dialog.h"
 #include "sip_parse_generic.h"
 
@@ -961,21 +968,17 @@ sip_complete_dialog(_sip_msg_t *sip_msg, _sip_dialog_t *dialog)
 			    sip_dup_header(chdr)) == NULL) {
 				(void) pthread_mutex_unlock(
 				    &dialog->sip_dlg_mutex);
-				sip_dialog_terminate(dialog,
-				    (sip_msg_t)sip_msg);
 				if (alloc_thdr)
 					sip_free_header(thdr);
-				return (NULL);
+				goto terminate_new_dlg;
 			}
 			if (sip_dialog_get_route_set(dialog, sip_msg,
 			    dialog->sip_dlg_type) != 0) {
 				(void) pthread_mutex_unlock(
 				    &dialog->sip_dlg_mutex);
-				sip_dialog_terminate(dialog,
-				    (sip_msg_t)sip_msg);
 				if (alloc_thdr)
 					sip_free_header(thdr);
-				return (NULL);
+				goto terminate_new_dlg;
 			}
 		}
 		if (SIP_PROVISIONAL_RESP(resp_code)) {
@@ -993,11 +996,9 @@ sip_complete_dialog(_sip_msg_t *sip_msg, _sip_dialog_t *dialog)
 					sip_ulp_dlg_del_cb(dialog,
 					    (sip_msg_t)sip_msg, NULL);
 				}
-				sip_dialog_terminate(dialog,
-				    (sip_msg_t)sip_msg);
 				if (alloc_thdr)
 					sip_free_header(thdr);
-				return (NULL);
+				goto terminate_new_dlg;
 			}
 			dialog->sip_dlg_state = SIP_DLG_CONFIRMED;
 		} else {
@@ -1006,10 +1007,9 @@ sip_complete_dialog(_sip_msg_t *sip_msg, _sip_dialog_t *dialog)
 				sip_ulp_dlg_del_cb(dialog, (sip_msg_t)sip_msg,
 				    NULL);
 			}
-			sip_dialog_terminate(dialog, (sip_msg_t)sip_msg);
 			if (alloc_thdr)
 				sip_free_header(thdr);
-			return (NULL);
+			goto terminate_new_dlg;
 		}
 		if (dialog->sip_dlg_type == SIP_UAS_DIALOG) {
 			dialog->sip_dlg_local_uri_tag = thdr;
@@ -1018,9 +1018,7 @@ sip_complete_dialog(_sip_msg_t *sip_msg, _sip_dialog_t *dialog)
 			    sip_dup_header(thdr)) == NULL) {
 				(void) pthread_mutex_unlock(
 				    &dialog->sip_dlg_mutex);
-				sip_dialog_terminate(dialog,
-				    (sip_msg_t)sip_msg);
-				return (NULL);
+				goto terminate_new_dlg;
 			}
 		}
 	}
@@ -1067,17 +1065,22 @@ sip_complete_dialog(_sip_msg_t *sip_msg, _sip_dialog_t *dialog)
 	 */
 	if (sip_hash_add(sip_dialog_hash, (void *)dialog,
 	    SIP_DIGEST_TO_HASH(dialog->sip_dlg_id)) != 0) {
+	terminate_new_dlg:
 		/*
 		 * So that sip_dialog_delete() does not try to remove
 		 * this from the hash table.
 		 */
 		(void) pthread_mutex_lock(&dialog->sip_dlg_mutex);
 		if (dialog->sip_dlg_type == SIP_UAS_DIALOG) {
-			sip_free_header(dialog->sip_dlg_local_uri_tag);
-			dialog->sip_dlg_local_uri_tag = NULL;
+			if (dialog->sip_dlg_local_uri_tag != NULL) {
+				sip_free_header(dialog->sip_dlg_local_uri_tag);
+				dialog->sip_dlg_local_uri_tag = NULL;
+			}
 		} else {
-			sip_free_header(dialog->sip_dlg_remote_uri_tag);
-			dialog->sip_dlg_remote_uri_tag = NULL;
+			if (dialog->sip_dlg_remote_uri_tag != NULL) {
+				sip_free_header(dialog->sip_dlg_remote_uri_tag);
+				dialog->sip_dlg_remote_uri_tag = NULL;
+			}
 		}
 		(void) pthread_mutex_unlock(&dialog->sip_dlg_mutex);
 		sip_dialog_terminate(dialog, (sip_msg_t)sip_msg);
@@ -1630,6 +1633,8 @@ sip_update_dialog(sip_dialog_t dialog, _sip_msg_t *sip_msg)
 		(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
 		if ((dialog = sip_complete_dialog(sip_msg, _dialog)) ==
 		    NULL) {
+			if (_dialog->sip_dlg_type == SIP_UAC_DIALOG && decr_ref)
+				SIP_DLG_REFCNT_DECR(_dialog);
 			return (NULL);
 		}
 		if (decr_ref)

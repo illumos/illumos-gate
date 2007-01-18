@@ -20,14 +20,19 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <ctype.h>
+#include <pthread.h>
+#include <strings.h>
+#include <sip.h>
+
 #include "sip_miscdefs.h"
 
 /*

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,11 +30,16 @@
  * SIP Client/Server Invite/Non-Invite Transaction State machine.
  */
 
-#include "sip_parse_uri.h"
-#include "sip_msg.h"
-#include "sip_miscdefs.h"
-#include "sip_xaction.h"
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include <errno.h>
+#include <pthread.h>
+#include <sip.h>
 
+#include "sip_miscdefs.h"
+#include "sip_msg.h"
+#include "sip_xaction.h"
 
 /*
  * Some Timer related info from RFC 3261, page 265.

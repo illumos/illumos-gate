@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,11 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#include <sip.h>
+#include <sys/types.h>
+
+#include "sip_msg.h"
 
 extern int		sip_atoi(_sip_header_t	*, int *);
 extern int		sip_find_token(_sip_header_t  *, char);

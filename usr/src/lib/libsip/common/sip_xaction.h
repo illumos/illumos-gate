@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,9 +33,12 @@
 extern "C" {
 #endif
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <pthread.h>
+#include <sip.h>
+#include <sys/types.h>
+
+#include "sip_msg.h"
+#include "sip_miscdefs.h"
 
 /* Various transaction timers */
 typedef enum sip_timer_type_s {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,13 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#include <pthread.h>
+#include <sip.h>
+#include <sys/types.h>
+
+#include "sip_msg.h"
+#include "sip_miscdefs.h"
 
 /*
  * Dialogs are linked in their own list.

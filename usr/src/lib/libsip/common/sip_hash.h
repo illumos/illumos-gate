@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,9 +33,7 @@
 extern "C" {
 #endif
 
-#include <stdlib.h>
 #include <pthread.h>
-#include <sip.h>
 
 /* A prime number */
 #define	SIP_HASH_SZ	6037

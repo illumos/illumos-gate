@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,7 +40,9 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-lmd5 -lc
 
-CFLAGS +=	-v -DOS='"solaris"' -D__OS_solaris
+CFLAGS +=	-v -DOS='"solaris"' -D__OS_solaris -DNDEBUG
+
+CFLAGS64 +=	-v -DOS='"solaris"' -D__OS_solaris -DNDEBUG
 
 .KEEP_STATE:
 

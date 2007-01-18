@@ -20,11 +20,17 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <stdlib.h>
+#include <assert.h>
+#include <errno.h>
+#include <pthread.h>
+#include <strings.h>
 
 #include "sip_parse_uri.h"
 #include "sip_msg.h"

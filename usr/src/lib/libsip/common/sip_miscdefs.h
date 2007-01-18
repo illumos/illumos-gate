@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,8 +33,9 @@
 extern "C" {
 #endif
 
+#include <pthread.h>
 #include <sys/types.h>
-#include <sip.h>
+#include <sys/time.h>
 
 #define	SIP_CR			'\r'
 #define	SIP_SP			' '

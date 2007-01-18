@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,11 +30,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <unistd.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <time.h>
-#include <sys/errno.h>
+#include <sip.h>
 #ifdef	__linux__
 #include <sasl/sasl.h>
 #include <sasl/saslplug.h>
@@ -42,9 +40,8 @@
 #include <sys/md5.h>
 #endif
 
-#include "sip_parse_uri.h"
-#include "sip_msg.h"
 #include "sip_miscdefs.h"
+#include "sip_msg.h"
 
 void	sip_md5_hash(char *, int, char *, int, char *, int,  char *, int,
 	    char *, int, char *, int, uchar_t *);
