@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +53,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stropts.h>
+#include <libintl.h>
+#include <locale.h>
 
 #define	KBD_DEVICE	"/dev/kbd"		/* default keyboard device */
 #define	DEF_FILE	"/etc/default/kbd"	/* kbd defaults file	*/
@@ -104,6 +105,12 @@ main(int argc, char **argv)
 	rflag = tflag = cflag = dflag = aflag = iflag = errflag = lflag =
 	    Dflag = Rflag = sflag = 0;
 	copt = aopt = (char *)0;
+
+	(void) setlocale(LC_ALL, "");
+#if !defined(TEXT_DOMAIN)
+#define	TEXT_DOMAIN	"SYS_TEST"
+#endif
+	(void) textdomain(TEXT_DOMAIN);
 
 	while ((c = getopt(argc, argv, "rtlisc:a:d:D:R:")) != EOF) {
 		switch (c) {
@@ -275,14 +282,15 @@ set_kbd_layout(int kbd, char *layout_name)
 						    layout_names[j-1]);
 				}
 			}
-			(void) printf("\nTo select the keyboard layout, enter"
-				    " a number [default %d]:",
+			(void) printf(gettext("\nTo select the keyboard layout,"
+				    " enter a number [default %d]:"),
 				    default_layout_number+1);
 
 			for (;;) {
 				if (input_right == B_FALSE)
-					(void) printf("Invalid input. Please "
-					    "input a number (1,2,...):");
+					(void) printf(gettext("Invalid input. "
+					    "Please input a number "
+					    "(1,2,...):"));
 				(void) memset(input, 0, 8);
 				(void) fflush(stdin);
 				(void) fgets(input, 8, stdin);

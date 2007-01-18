@@ -568,6 +568,7 @@ MSGSUBDIRS=		\
 	isaexec		\
 	iscsi		\
 	join		\
+	kbd		\
 	krb5		\
 	kstat		\
 	last		\
