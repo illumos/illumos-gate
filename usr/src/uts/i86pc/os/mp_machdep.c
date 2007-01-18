@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@
 #include <sys/x86_archext.h>
 #include <sys/cpupart.h>
 #include <sys/cpuvar.h>
-#include <sys/chip.h>
+#include <sys/pghw.h>
 #include <sys/disp.h>
 #include <sys/cpu.h>
 #include <sys/archsystm.h>
@@ -86,6 +86,8 @@ extern uint64_t freq_tsc(uint32_t *);
 extern uint64_t freq_notsc(uint32_t *);
 #endif
 extern void pc_gethrestime(timestruc_t *);
+extern int cpuid_get_coreid(cpu_t *);
+extern int cpuid_get_chipid(cpu_t *);
 
 /*
  *	PSM functions initialization
@@ -164,35 +166,94 @@ int simulator_run = 0;	/* patch to non-zero if running under simics */
 
 #endif	/* _SIMULATOR_SUPPORT */
 
-/* ARGSUSED */
-void
-chip_plat_define_chip(cpu_t *cp, chip_def_t *cd)
-{
-	if ((x86_feature & (X86_HTT|X86_CMP)) == X86_HTT) {
-		/*
-		 * Single-core Pentiums with Hyper-Threading enabled.
-		 */
-		cd->chipd_type = CHIP_SMT;
-	} else if ((x86_feature & (X86_HTT|X86_CMP)) == X86_CMP) {
-		/*
-		 * Multi-core Opterons or Multi-core Pentiums with
-		 * Hyper-Threading disabled.
-		 */
-		cd->chipd_type = CHIP_CMP_SPLIT_CACHE;
-	} else if ((x86_feature & (X86_HTT|X86_CMP)) == (X86_HTT|X86_CMP)) {
-		/*
-		 * Multi-core Pentiums with Hyper-Threading enabled.
-		 */
-		cd->chipd_type = CHIP_CMT;
-	} else {
-		/*
-		 * Single-core/single-threaded chips.
-		 */
-		cd->chipd_type = CHIP_DEFAULT;
-	}
 
-	cd->chipd_rechoose_adj = 0;
-	cd->chipd_nosteal = 100000ULL; /* 100 usec */
+/*ARGSUSED*/
+int
+pg_plat_hw_shared(cpu_t *cp, pghw_type_t hw)
+{
+	switch (hw) {
+	case PGHW_IPIPE:
+		if (x86_feature & (X86_HTT)) {
+			/*
+			 * Hyper-threading is SMT
+			 */
+			return (1);
+		} else {
+			return (0);
+		}
+	case PGHW_CHIP:
+		if (x86_feature & (X86_CMP|X86_HTT))
+			return (1);
+		else
+			return (0);
+	default:
+		return (0);
+	}
+}
+
+/*
+ * Compare two CPUs and see if they have a pghw_type_t sharing relationship
+ * If pghw_type_t is an unsupported hardware type, then return -1
+ */
+int
+pg_plat_cpus_share(cpu_t *cpu_a, cpu_t *cpu_b, pghw_type_t hw)
+{
+	id_t pgp_a, pgp_b;
+
+	pgp_a = pg_plat_hw_instance_id(cpu_a, hw);
+	pgp_b = pg_plat_hw_instance_id(cpu_b, hw);
+
+	if (pgp_a == -1 || pgp_b == -1)
+		return (-1);
+
+	return (pgp_a == pgp_b);
+}
+
+/*
+ * Return a physical instance identifier for known hardware sharing
+ * relationships
+ */
+id_t
+pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
+{
+	switch (hw) {
+	case PGHW_IPIPE:
+		return (cpuid_get_coreid(cpu));
+	case PGHW_CHIP:
+		return (cpuid_get_chipid(cpu));
+	default:
+		return (-1);
+	}
+}
+
+int
+pg_plat_hw_level(pghw_type_t hw)
+{
+	int i;
+	static pghw_type_t hw_hier[] = {
+		PGHW_IPIPE,
+		PGHW_CHIP,
+		PGHW_NUM_COMPONENTS
+	};
+
+	for (i = 0; hw_hier[i] != PGHW_NUM_COMPONENTS; i++) {
+		if (hw_hier[i] == hw)
+			return (i);
+	}
+	return (-1);
+}
+
+id_t
+pg_plat_get_core_id(cpu_t *cpu)
+{
+	return ((id_t)cpuid_get_coreid(cpu));
+}
+
+void
+cmp_set_nosteal_interval(void)
+{
+	/* Set the nosteal interval (used by disp_getbest()) to 100us */
+	nosteal_nsec = 100000UL;
 }
 
 /*

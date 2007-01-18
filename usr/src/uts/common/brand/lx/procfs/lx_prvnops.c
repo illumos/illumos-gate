@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,7 @@
 #include <sys/pool_pset.h>
 #include <sys/pset.h>
 #include <sys/zone.h>
+#include <sys/pghw.h>
 
 /* Dependent on the Solaris procfs */
 extern kthread_t *prchoose(proc_t *);
@@ -1861,7 +1862,8 @@ lxpr_read_cpuinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			 */
 			lxpr_uiobuf_printf(uiobuf,
 			    "physical id\t: %lu\n"
-			    "siblings\t: %u\n",  chip_plat_get_chipid(cp),
+			    "siblings\t: %u\n",
+			    pg_plat_hw_instance_id(cp, PGHW_CHIP),
 			    cpuid_get_ncpu_per_chip(cp));
 		}
 

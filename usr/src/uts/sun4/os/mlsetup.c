@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,7 @@
 #include <sys/copyops.h>
 #include <sys/panic.h>
 #include <sys/bootconf.h>	/* for bootops */
-#include <sys/chip.h>
+#include <sys/pg.h>
 #include <sys/kdi.h>
 #include <sys/fpras.h>
 
@@ -274,15 +274,6 @@ mlsetup(struct regs *rp, void *cif, kfpu_t *fp)
 	setcputype();
 	map_wellknown_devices();
 	setcpudelay();
-
-	/*
-	 * Associate the boot cpu with a physical processor.
-	 * This needs to be done after devices are mapped, since
-	 * we need to know what type of physical processor this is.
-	 * (CMP for example)
-	 */
-	chip_cpu_init(CPU);
-	chip_cpu_assign(CPU);
 }
 
 /*

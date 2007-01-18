@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@
 #include <sys/cpupart.h>
 #include <sys/pset.h>
 #include <sys/copyops.h>
-#include <sys/chip.h>
+#include <sys/pg.h>
 #include <sys/disp.h>
 #include <sys/debug.h>
 #include <sys/sunddi.h>
@@ -122,7 +122,6 @@ void
 mlsetup(struct regs *rp)
 {
 	extern struct classfuncs sys_classfuncs;
-	extern struct chip cpu0_chip;
 	extern disp_t cpu0_disp;
 	extern char t0stack[];
 	int boot_ncpus;
@@ -327,16 +326,6 @@ mlsetup(struct regs *rp)
 	 * Initialize the lgrp framework
 	 */
 	lgrp_init();
-
-	/*
-	 * The lgroup code needs to at least know about a CPU's
-	 * chip association, but it's too early to fully initialize
-	 * cpu0_chip, since the device node for the boot CPU doesn't
-	 * exist yet. Initialize enough of it to get by until formal
-	 * initialization.
-	 */
-	CPU->cpu_rechoose = rechoose_interval;
-	CPU->cpu_chip = &cpu0_chip;
 
 	rp->r_fp = 0;	/* terminate kernel stack traces! */
 

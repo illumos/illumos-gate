@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,7 +40,7 @@
 #include <sys/cred.h>
 #include <sys/ksynch.h>
 #include <sys/rwlock.h>
-#include <sys/chip.h>
+#include <sys/pghw.h>
 #include <sys/open.h>
 #include <sys/policy.h>
 #include <sys/machsystm.h>
@@ -110,7 +110,7 @@ mc_lookup_by_chipid(int chipid)
 	ASSERT(RW_LOCK_HELD(&mc_lock));
 
 	for (mc = mc_list; mc != NULL; mc = mc->mc_next) {
-		if (mc->mc_chip->chip_id == chipid)
+		if (mc->mc_chip->pghw_instance == chipid)
 			return (mc);
 	}
 
@@ -595,7 +595,7 @@ mc_report_testfails(mc_t *mc)
 	for (mccs = mc->mc_cslist; mccs != NULL; mccs = mccs->mccs_next) {
 		if (mccs->mccs_props.csp_testfail) {
 			unum.unum_board = 0;
-			unum.unum_chip = mc->mc_chip->chip_id;
+			unum.unum_chip = mc->mc_chip->pghw_instance;
 			unum.unum_mc = 0;
 			unum.unum_cs = mccs->mccs_props.csp_num;
 			unum.unum_rank = mccs->mccs_props.csp_dimmrank;
@@ -672,7 +672,7 @@ mc_mkprops_addrmap(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 		 * base/limit pairs is overkill.
 		 */
 		if (MCREG_FIELD_CMN(&lim[i], DstNode) !=
-		    mc->mc_chip->chip_id)
+		    mc->mc_chip->pghw_instance)
 			continue;
 
 		/*
@@ -1272,8 +1272,9 @@ mc_fm_fini(dev_info_t *dip)
 static mc_t *
 mc_create(chipid_t chipid)
 {
-	chip_t *chp = chip_lookup(chipid);
+	pghw_t *chp = pghw_find_by_instance((id_t)chipid, PGHW_CHIP);
 	mc_t *mc;
+	cpu_t *cpu;
 
 	ASSERT(RW_WRITE_HELD(&mc_lock));
 
@@ -1283,17 +1284,18 @@ mc_create(chipid_t chipid)
 	mc = kmem_zalloc(sizeof (mc_t), KM_SLEEP);
 	mc->mc_hdr.mch_type = MC_NT_MC;
 	mc->mc_chip = chp;
-	mc->mc_props.mcp_num = mc->mc_chip->chip_id;
+	mc->mc_props.mcp_num = mc->mc_chip->pghw_instance;
 	mc->mc_props.mcp_sparecs = MC_INVALNUM;
 	mc->mc_props.mcp_badcs = MC_INVALNUM;
 
 	/*
-	 * We can use the first cpu in the chip_cpus list since all cores
+	 * We can use one of the chip's CPUs since all cores
 	 * of a chip share the same revision and socket type.
 	 */
-	mc->mc_props.mcp_rev = cpuid_getchiprev(chp->chip_cpus);
-	mc->mc_revname = cpuid_getchiprevstr(chp->chip_cpus);
-	mc->mc_socket = cpuid_getsockettype(chp->chip_cpus);
+	cpu = PG_CPU_GET_FIRST(chp);
+	mc->mc_props.mcp_rev = cpuid_getchiprev(cpu);
+	mc->mc_revname = cpuid_getchiprevstr(cpu);
+	mc->mc_socket = cpuid_getsockettype(cpu);
 
 	if (mc_list == NULL)
 		mc_list = mc;
@@ -1362,7 +1364,7 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rw_enter(&mc_lock, RW_WRITER);
 
 	for (mc = mc_list; mc != NULL; mc = mc->mc_next) {
-		if (mc->mc_chip->chip_id == chipid)
+		if (mc->mc_chip->pghw_instance == chipid)
 			break;
 	}
 
@@ -1405,7 +1407,7 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    dip, "model", (char *)bm->bm_model);
 
 	(void) ddi_prop_update_int(DDI_DEV_T_NONE,
-	    dip, "chip-id", mc->mc_chip->chip_id);
+	    dip, "chip-id", mc->mc_chip->pghw_instance);
 
 	if (bm->bm_mkprops != NULL &&
 	    mc_pcicfg_setup(mc, bm->bm_func, &cfghdl) == DDI_SUCCESS) {
@@ -1421,11 +1423,15 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (func == MC_FUNC_DEVIMAP) {
 		mc_props_t *mcp = &mc->mc_props;
 		int dram_present = 0;
+		pg_cpu_itr_t itr;
+		cpu_t *cpup;
 
 		if (ddi_create_minor_node(dip, "mc-amd", S_IFCHR,
-		    mc->mc_chip->chip_id, "ddi_mem_ctrl", 0) != DDI_SUCCESS) {
+		    mc->mc_chip->pghw_instance, "ddi_mem_ctrl",
+		    0) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "failed to create minor node for chip "
-			    "%u memory controller\n", mc->mc_chip->chip_id);
+			    "%u memory controller\n",
+			    mc->mc_chip->pghw_instance);
 		}
 
 		/*
@@ -1440,13 +1446,11 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		kpreempt_disable();	/* prevent cpu list from changing */
 
-		cpu = mc->mc_chip->chip_cpus;
-
+		PG_CPU_ITR_INIT(mc->mc_chip, itr);
+		cpup = cpu = pg_cpu_next(&itr);
 		do {
-			mcamd_mc_register(cpu);
-			cpu = cpu->cpu_next_chip;
-		} while (cpu != mc->mc_chip->chip_cpus);
-
+			mcamd_mc_register(cpup);
+		} while ((cpup = pg_cpu_next(&itr)) != NULL);
 
 		if (mc->mc_props.mcp_lim != mc->mc_props.mcp_base) {
 			/*

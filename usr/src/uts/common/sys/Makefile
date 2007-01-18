@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -97,6 +97,7 @@ CHKHDRS=			\
 	avl_impl.h		\
 	battery.h		\
 	bitmap.h		\
+	bitset.h		\
 	bl.h			\
 	bofi.h			\
 	bofi_impl.h		\
@@ -111,7 +112,6 @@ CHKHDRS=			\
 	callo.h			\
 	ccompile.h		\
 	cdio.h			\
-	chip.h			\
 	cladm.h			\
 	class.h			\
 	clconf.h		\
@@ -246,6 +246,7 @@ CHKHDRS=			\
 	gfs.h			\
 	gld.h			\
 	gldpriv.h		\
+	group.h			\
 	hdio.h			\
 	hook.h			\
 	hook_event.h		\
@@ -370,6 +371,8 @@ CHKHDRS=			\
 	pctypes.h		\
 	pem.h			\
 	pfmod.h			\
+	pg.h			\
+	pghw.h			\
 	physmem.h		\
 	pm.h			\
 	policy.h		\

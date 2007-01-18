@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -218,6 +218,7 @@ setup_exec_unit_mappings(md_t *mdp)
 	int idx, i, j;
 	processorid_t cpuid;
 	char *eunit_name = broken_md_flag ? "exec_unit" : "exec-unit";
+	enum eu_type { INTEGER, FPU } etype;
 
 	/*
 	 * Find the cpu integer exec units - and
@@ -236,7 +237,8 @@ setup_exec_unit_mappings(md_t *mdp)
 	num_eunits = md_alloc_scan_dag(mdp, cpus_node, eunit_name,
 	    "fwd", &eunit);
 	if (num_eunits > 0) {
-		char *match_type = broken_md_flag ? "int" : "integer";
+		char *int_str = broken_md_flag ? "int" : "integer";
+		char *fpu_str = "fp";
 
 		/* Spin through and find all the integer exec units */
 		for (i = 0; i < num_eunits; i++) {
@@ -245,13 +247,19 @@ setup_exec_unit_mappings(md_t *mdp)
 			int vallen;
 			uint64_t lcpuid;
 
-				/* ignore nodes with no type */
+			/* ignore nodes with no type */
 			if (md_get_prop_data(mdp, eunit[i], "type",
 				(uint8_t **)&val, &vallen)) continue;
 
 			for (p = val; *p != '\0'; p += strlen(p) + 1) {
-				if (strcmp(p, match_type) == 0)
+				if (strcmp(p, int_str) == 0) {
+					etype = INTEGER;
 					goto found;
+				}
+				if (strcmp(p, fpu_str) == 0) {
+					etype = FPU;
+					goto found;
+				}
 			}
 
 			continue;
@@ -275,7 +283,14 @@ found:
 				if (lcpuid >= NCPU)
 					continue;
 				cpuid = (processorid_t)lcpuid;
-				cpunodes[cpuid].exec_unit_mapping = idx;
+				switch (etype) {
+				case INTEGER:
+					cpunodes[cpuid].exec_unit_mapping = idx;
+					break;
+				case FPU:
+					cpunodes[cpuid].fpu_mapping = idx;
+					break;
+				}
 			}
 			md_free_scan_dag(mdp, &node);
 		}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,8 @@
 #include <sys/machsystm.h>
 #include <sys/x_call.h>
 #include <sys/cmp.h>
+#include <sys/pghw.h>
 #include <sys/debug.h>
-#include <sys/chip.h>
 #include <sys/disp.h>
 #include <sys/cheetahregs.h>
 
@@ -141,64 +141,107 @@ cmp_cpu_to_chip(processorid_t cpuid)
 	return (cpunodes[cpuid].portid);
 }
 
-/*
- * Return a chip "id" for the given cpu_t
- * cpu_t's residing on the same physical processor
- * should map to the same "id"
- */
-chipid_t
-chip_plat_get_chipid(cpu_t *cp)
-{
-	return (cmp_cpu_to_chip(cp->cpu_id));
-}
-
-/*
- * Return the "core id" for the given cpu_t
- * The "core id" space spans uniquely across all
- * cpu chips.
- */
-id_t
-chip_plat_get_coreid(cpu_t *cp)
+/* ARGSUSED */
+int
+pg_plat_hw_shared(cpu_t *cp, pghw_type_t hw)
 {
 	int impl;
 
 	impl = cpunodes[cp->cpu_id].implementation;
 
-	if (IS_OLYMPUS_C(impl)) {
-		/*
-		 * Currently only Fujitsu Olympus-c processor supports
-		 * multi-stranded cores. Return the cpu_id with
-		 * the strand bit masked out.
-		 */
-		return ((id_t)((uint_t)cp->cpu_id & ~(0x1)));
-	} else {
-		return (cp->cpu_id);
+	switch (hw) {
+	case PGHW_IPIPE:
+		if (IS_OLYMPUS_C(impl))
+			return (1);
+		break;
+	case PGHW_CHIP:
+		if (IS_JAGUAR(impl) || IS_PANTHER(impl))
+			return (1);
+		break;
+	case PGHW_CACHE:
+		if (IS_PANTHER(impl))
+			return (1);
+		break;
+	}
+	return (0);
+}
+
+int
+pg_plat_cpus_share(cpu_t *cpu_a, cpu_t *cpu_b, pghw_type_t hw)
+{
+	int impla, implb;
+
+	impla = cpunodes[cpu_a->cpu_id].implementation;
+	implb = cpunodes[cpu_b->cpu_id].implementation;
+
+	switch (hw) {
+	case PGHW_IPIPE:
+	case PGHW_CHIP:
+		return (pg_plat_hw_instance_id(cpu_a, hw) ==
+		    pg_plat_hw_instance_id(cpu_b, hw));
+	case PGHW_CACHE:
+		return (IS_PANTHER(impla) && IS_PANTHER(implb) &&
+		    pg_plat_cpus_share(cpu_a, cpu_b, PGHW_CHIP));
+	}
+	return (0);
+}
+
+id_t
+pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
+{
+	int impl;
+
+	switch (hw) {
+	case PGHW_IPIPE:
+		impl = cpunodes[cpu->cpu_id].implementation;
+
+		if (IS_OLYMPUS_C(impl)) {
+			/*
+			 * Currently only Fujitsu Olympus-c processor supports
+			 * multi-stranded cores. Return the cpu_id with
+			 * the strand bit masked out.
+			 */
+			return ((id_t)((uint_t)cpu->cpu_id & ~(0x1)));
+		} else {
+			return (cpu->cpu_id);
+		}
+	case PGHW_CHIP:
+		return (cmp_cpu_to_chip(cpu->cpu_id));
+	case PGHW_CACHE:
+		return (IS_PANTHER(impl) &&
+		    pg_plat_hw_instance_id(cpu, PGHW_CHIP));
+	default:
+		return (-1);
 	}
 }
 
-void
-chip_plat_define_chip(cpu_t *cp, chip_def_t *cd)
+int
+pg_plat_hw_level(pghw_type_t hw)
 {
-	int	impl;
+	int i;
+	static pghw_type_t hw_hier[] = {
+		PGHW_IPIPE,
+		PGHW_CHIP,
+		PGHW_CACHE,
+		PGHW_NUM_COMPONENTS
+	};
 
-	/*
-	 * Define the chip's type
-	 */
-	impl = cpunodes[cp->cpu_id].implementation;
-
-	if (IS_JAGUAR(impl)) {
-		cd->chipd_type = CHIP_CMP_SPLIT_CACHE;
-	} else if (IS_PANTHER(impl) || IS_OLYMPUS_C(impl)) {
-		cd->chipd_type = CHIP_CMP_SHARED_CACHE;
-	} else {
-		cd->chipd_type = CHIP_DEFAULT;
+	for (i = 0; hw_hier[i] != PGHW_NUM_COMPONENTS; i++) {
+		if (hw_hier[i] == hw)
+			return (i);
 	}
+	return (-1);
+}
 
-	/*
-	 * Define any needed adjustment of rechoose_interval
-	 * For now, all chips use the default. This
-	 * will change with future processors.
-	 */
-	cd->chipd_rechoose_adj = 0;
-	cd->chipd_nosteal = 100000ULL; /* 100 usecs */
+id_t
+pg_plat_get_core_id(cpu_t *cp)
+{
+	return (pg_plat_hw_instance_id(cp, PGHW_IPIPE));
+}
+
+void
+cmp_set_nosteal_interval(void)
+{
+	/* Set the nosteal interval (used by disp_getbest()) to 100us */
+	nosteal_nsec = 100000UL;
 }

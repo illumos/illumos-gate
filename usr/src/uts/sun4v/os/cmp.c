@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +28,7 @@
 #include <sys/types.h>
 #include <sys/machsystm.h>
 #include <sys/cmp.h>
-#include <sys/chip.h>
+#include <sys/pghw.h>
 
 /*
  * Note: For now assume the chip ID as 0 for all the cpus until additional
@@ -89,40 +88,80 @@ cmp_cpu_to_chip(processorid_t cpuid)
 	return (0);
 }
 
-/*
- * Return a chip "id" for the given cpu_t
- * cpu_t's residing on the same physical processor
- * should map to the same "id"
- */
-chipid_t
-chip_plat_get_chipid(cpu_t *cp)
-{
-	return (cmp_cpu_to_chip(cp->cpu_id));
-}
-
 /*ARGSUSED*/
-void
-chip_plat_define_chip(cpu_t *cp, chip_def_t *cd)
+int
+pg_plat_hw_shared(cpu_t *cp, pghw_type_t hw)
 {
-	cd->chipd_type = CHIP_CMT;
-
-	/*
-	 * Define any needed adjustment of rechoose_interval
-	 * For now, all chips use the default. This
-	 * will change with future processors.
-	 */
-	cd->chipd_rechoose_adj = 0;
-	cd->chipd_nosteal = 0;
+	switch (hw) {
+	case PGHW_IPIPE:
+		return (1);
+	case PGHW_FPU:
+		return (1);
+	case PGHW_CHIP:
+		return (1);
+	}
+	return (0);
 }
 
-/*
- * Return a pipeline "id" for the given cpu_t
- * cpu_t's sharing the same instruction pipeline
- * should map to the same "id"
- */
+int
+pg_plat_cpus_share(cpu_t *cpu_a, cpu_t *cpu_b, pghw_type_t hw)
+{
+	if (pg_plat_hw_shared(cpu_a, hw) == 0 ||
+	    pg_plat_hw_shared(cpu_b, hw) == 0)
+		return (0);
+
+	return (pg_plat_hw_instance_id(cpu_a, hw) ==
+	    pg_plat_hw_instance_id(cpu_b, hw));
+}
 
 id_t
-chip_plat_get_coreid(cpu_t *cp)
+pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
 {
-	return (cp->cpu_m.cpu_ipipe);
+	switch (hw) {
+	case PGHW_IPIPE:
+		return (cpu->cpu_m.cpu_ipipe);
+	case PGHW_CHIP:
+		return (cmp_cpu_to_chip(cpu->cpu_id));
+	case PGHW_FPU:
+		return (cpu->cpu_m.cpu_fpu);
+	default:
+		return (-1);
+	}
+}
+
+/*
+ * Order the relevant hw sharing relationships
+ * from least, to greatest physical scope.
+ *
+ * The hierarchy *must* be defined for all hw that
+ * pg_plat_hw_shared() returns non-zero.
+ */
+int
+pg_plat_hw_level(pghw_type_t hw)
+{
+	int i;
+	static pghw_type_t hw_hier[] = {
+		PGHW_IPIPE,
+		PGHW_FPU,
+		PGHW_CHIP,
+		PGHW_NUM_COMPONENTS
+	};
+
+	for (i = 0; hw_hier[i] != PGHW_NUM_COMPONENTS; i++) {
+		if (hw_hier[i] == hw)
+			return (i);
+	}
+	return (-1);
+}
+
+id_t
+pg_plat_get_core_id(cpu_t *cpu)
+{
+	return (cpu->cpu_m.cpu_core);
+}
+
+void
+cmp_set_nosteal_interval(void)
+{
+	nosteal_nsec = 0;
 }

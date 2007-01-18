@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -253,8 +253,6 @@ typedef struct lgrp {
 
 	struct cpu	*lgrp_cpu;	/* pointer to a cpu may be null */
 	uint_t		lgrp_cpucnt;	/* number of cpus in this lgrp	*/
-	uint_t		lgrp_chipcnt;
-	struct chip	*lgrp_chips;	/* pointer to chips in this lgrp */
 	kstat_t		*lgrp_kstat;	/* per-lgrp kstats */
 } lgrp_t;
 

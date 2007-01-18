@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,7 @@
 #include <sys/hypervisor_api.h>
 #endif
 #ifndef sun4v
-#include <sys/chip.h>
+#include <sys/pghw.h>
 #endif
 
 /* BEGIN CSTYLED */
@@ -1439,7 +1439,7 @@ trapstat_setup(processorid_t cpu)
 
 	cp = cpu_get(cpu);
 	ASSERT(cp != NULL);
-	if ((strand_idx = cpu ^ chip_plat_get_coreid(cp)) != 0) {
+	if ((strand_idx = cpu ^ pg_plat_hw_instance_id(cp, PGHW_IPIPE)) != 0) {
 		/*
 		 * On sun4u platforms with multiple CPUs sharing the MMU
 		 * (Olympus-C has 2 strands per core), each CPU uses a

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,8 +100,6 @@ typedef struct cpu {
 	klwp_id_t	cpu_fpowner;		/* currently loaded fpu owner */
 	struct cpupart	*cpu_part;		/* partition with this CPU */
 	struct lgrp_ld	*cpu_lpl;		/* pointer to this cpu's load */
-	struct chip	*cpu_chip;		/* cpu's chip data */
-	int		cpu_rechoose;		/* cpu's rechoose_interval */
 	int		cpu_cache_offset;	/* see kmem.c for details */
 
 	/*
@@ -121,10 +119,11 @@ typedef struct cpu {
 	struct cpu	*cpu_prev_part;		/* prev CPU in partition */
 	struct cpu	*cpu_next_lgrp;		/* next CPU in latency group */
 	struct cpu	*cpu_prev_lgrp;		/* prev CPU in latency group */
-	struct cpu	*cpu_next_chip;		/* next CPU on chip */
-	struct cpu	*cpu_prev_chip;		/* prev CPU on chip */
 	struct cpu	*cpu_next_lpl;		/* next CPU in lgrp partition */
 	struct cpu	*cpu_prev_lpl;
+
+	struct cpu_pg	*cpu_pg;		/* cpu's processor groups */
+
 	void		*cpu_reserved[4];	/* reserved for future use */
 
 	/*

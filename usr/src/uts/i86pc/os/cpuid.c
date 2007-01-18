@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,7 +40,7 @@
 #include <sys/sunndi.h>
 #include <sys/cpuvar.h>
 #include <sys/processor.h>
-#include <sys/chip.h>
+#include <sys/pg.h>
 #include <sys/fp.h>
 #include <sys/controlregs.h>
 #include <sys/auxv_386.h>
@@ -1886,8 +1886,8 @@ cpuid_getsockettype(struct cpu *cpu)
 	return (cpu->cpu_m.mcpu_cpi->cpi_socket);
 }
 
-chipid_t
-chip_plat_get_chipid(cpu_t *cpu)
+int
+cpuid_get_chipid(cpu_t *cpu)
 {
 	ASSERT(cpuid_checkpass(cpu, 1));
 
@@ -1897,14 +1897,14 @@ chip_plat_get_chipid(cpu_t *cpu)
 }
 
 id_t
-chip_plat_get_coreid(cpu_t *cpu)
+cpuid_get_coreid(cpu_t *cpu)
 {
 	ASSERT(cpuid_checkpass(cpu, 1));
 	return (cpu->cpu_m.mcpu_cpi->cpi_coreid);
 }
 
 int
-chip_plat_get_clogid(cpu_t *cpu)
+cpuid_get_clogid(cpu_t *cpu)
 {
 	ASSERT(cpuid_checkpass(cpu, 1));
 	return (cpu->cpu_m.mcpu_cpi->cpi_clogid);

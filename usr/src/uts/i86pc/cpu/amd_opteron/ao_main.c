@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,13 +37,14 @@
 #include <sys/cpuvar.h>
 #include <sys/x86_archext.h>
 #include <sys/kmem.h>
+#include <sys/pghw.h>
 #include <sys/modctl.h>
 #include <sys/mc.h>
 #include <sys/mca_x86.h>
 
 #include "ao.h"
 
-static struct ao_chipshared *ao_shared[CHIP_MAX_CHIPS];
+static struct ao_chipshared *ao_shared[NCPU];
 
 /*
  * This cpu module supports AMD family 0xf revisions B/C/D/E/F/G.  If
@@ -55,7 +56,7 @@ uint_t ao_model_limit = 0x6f;
 static int
 ao_init(cpu_t *cp, void **datap)
 {
-	uint_t chipid = chip_plat_get_chipid(CPU);
+	uint_t chipid = pg_plat_hw_instance_id(CPU, PGHW_CHIP);
 	struct ao_chipshared *sp, *osp;
 	ao_data_t *ao;
 	uint64_t cap;

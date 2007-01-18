@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,7 @@
 #include <sys/cpupart.h>
 #include <sys/lgrp.h>
 #include <sys/pset.h>
-#include <sys/chip.h>
+#include <sys/pghw.h>
 #include <sys/kmem.h>
 #include <sys/kmem_impl.h>	/* to set per-cpu kmem_cache offset */
 #include <sys/atomic.h>
@@ -1266,6 +1266,11 @@ cpu_offline(cpu_t *cp, int flags)
 	cpu_state_change_notify(cp->cpu_id, CPU_OFF);
 
 	/*
+	 * Tell the PG subsystem that the CPU is leaving the partition
+	 */
+	pg_cpupart_out(cp, pp);
+
+	/*
 	 * Take the CPU out of interrupt participation so we won't find
 	 * bound kernel threads.  If the architecture cannot completely
 	 * shut off interrupts on the CPU, don't quiesce it, but don't
@@ -1512,6 +1517,11 @@ out:
 		cyclic_online(cp);
 
 	/*
+	 * If we failed, tell the PG subsystem that the CPU is back
+	 */
+	pg_cpupart_in(cp, pp);
+
+	/*
 	 * If we failed, we need to notify everyone that this CPU is back on.
 	 */
 	if (error != 0)
@@ -1732,7 +1742,12 @@ cpu_del_unit(int cpuid)
 	ASSERT(cp->cpu_next_part == cp);
 	ASSERT(cp->cpu_prev_part == cp);
 
-	chip_cpu_fini(cp);
+	/*
+	 * Tear down the CPU's physical ID cache, and update any
+	 * processor groups
+	 */
+	pg_cpu_fini(cp);
+	pghw_physid_destroy(cp);
 
 	/*
 	 * Destroy kstat stuff.
@@ -1816,8 +1831,7 @@ cpu_add_active_internal(cpu_t *cp)
 		ASSERT(cp_numparts_nonempty != 0);
 	}
 
-	chip_cpu_assign(cp);
-
+	pg_cpu_active(cp);
 	lgrp_config(LGRP_CONFIG_CPU_ONLINE, (uintptr_t)cp, 0);
 
 	bzero(&cp->cpu_loadavg, sizeof (cp->cpu_loadavg));
@@ -1830,9 +1844,12 @@ cpu_add_active_internal(cpu_t *cp)
 void
 cpu_add_active(cpu_t *cp)
 {
+	pg_cpupart_in(cp, cp->cpu_part);
+
 	pause_cpus(NULL);
 	cpu_add_active_internal(cp);
 	start_cpus();
+
 	cpu_stats_kstat_create(cp);
 	cpu_create_intrstat(cp);
 	lgrp_kstat_create(cp);
@@ -1854,7 +1871,7 @@ cpu_remove_active(cpu_t *cp)
 	ASSERT(cp->cpu_next_onln != cp);	/* not the last one */
 	ASSERT(cp->cpu_prev_onln != cp);	/* not the last one */
 
-	chip_cpu_unassign(cp);
+	pg_cpu_inactive(cp);
 
 	lgrp_config(LGRP_CONFIG_CPU_OFFLINE, (uintptr_t)cp, 0);
 
@@ -2146,11 +2163,12 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	(void) strncpy(cpu_info_template.ci_fpu_type.value.c,
 	    cp->cpu_type_info.pi_fputypes, 15);
 	cpu_info_template.ci_clock_MHz.value.l = cp->cpu_type_info.pi_clock;
-	cpu_info_template.ci_chip_id.value.l = chip_plat_get_chipid(cp);
+	cpu_info_template.ci_chip_id.value.l =
+	    pg_plat_hw_instance_id(cp, PGHW_CHIP);
 	kstat_named_setstr(&cpu_info_template.ci_implementation,
 	    cp->cpu_idstr);
 	kstat_named_setstr(&cpu_info_template.ci_brandstr, cp->cpu_brandstr);
-	cpu_info_template.ci_core_id.value.l = chip_plat_get_coreid(cp);
+	cpu_info_template.ci_core_id.value.l = pg_plat_get_core_id(cp);
 
 #if defined(__sparcv9)
 	cpu_info_template.ci_device_ID.value.ui64 =
@@ -2163,7 +2181,7 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	cpu_info_template.ci_family.value.l = cpuid_getfamily(cp);
 	cpu_info_template.ci_model.value.l = cpuid_getmodel(cp);
 	cpu_info_template.ci_step.value.l = cpuid_getstep(cp);
-	cpu_info_template.ci_clogid.value.l = chip_plat_get_clogid(cp);
+	cpu_info_template.ci_clogid.value.l = cpuid_get_clogid(cp);
 #endif
 
 	return (0);
@@ -2215,11 +2233,13 @@ cpu_info_kstat_destroy(cpu_t *cp)
 void
 cpu_kstat_init(cpu_t *cp)
 {
+	/*
+	 * XXX need pg kstats for boot CPU
+	 */
 	mutex_enter(&cpu_lock);
 	cpu_info_kstat_create(cp);
 	cpu_stats_kstat_create(cp);
 	cpu_create_intrstat(cp);
-	chip_kstat_create(cp->cpu_chip);
 	cpu_set_state(cp);
 	mutex_exit(&cpu_lock);
 }

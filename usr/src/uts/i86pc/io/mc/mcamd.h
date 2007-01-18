@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,7 @@
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/chip.h>
+#include <sys/pghw.h>
 #include <sys/ksynch.h>
 #include <sys/mc_amd.h>
 #include <mcamd_api.h>
@@ -234,7 +234,7 @@ struct mc {
 	uint32_t mc_socket;			/* Package type */
 	uint_t mc_ref;				/* reference (attach) count */
 	mc_func_t mc_funcs[MC_FUNC_NUM];	/* Instance, devinfo, ... */
-	chip_t *mc_chip;			/* Associated chip */
+	pghw_t *mc_chip;			/* MC's associated chip PG */
 	mc_cs_t *mc_cslist;			/* All active chip-selects */
 	mc_cs_t *mc_cslast;			/* End of chip-select list */
 	mc_dimm_t *mc_dimmlist;			/* List of all logical DIMMs, */

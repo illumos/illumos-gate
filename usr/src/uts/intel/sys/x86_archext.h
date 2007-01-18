@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -531,6 +531,9 @@ extern uint_t cpuid_getmodel(struct cpu *);
 extern uint_t cpuid_getstep(struct cpu *);
 extern uint_t cpuid_get_ncpu_per_chip(struct cpu *);
 extern uint_t cpuid_get_ncore_per_chip(struct cpu *);
+extern int cpuid_get_chipid(struct cpu *);
+extern id_t cpuid_get_coreid(struct cpu *);
+extern int cpuid_get_clogid(struct cpu *);
 extern int cpuid_is_cmt(struct cpu *);
 extern int cpuid_syscall32_insn(struct cpu *);
 extern int getl2cacheinfo(struct cpu *, int *, int *, int *);

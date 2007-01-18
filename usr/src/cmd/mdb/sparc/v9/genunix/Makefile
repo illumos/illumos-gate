@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,6 +40,7 @@ COMMONSRCS = \
 	findstack.c \
 	fm.c \
 	genunix.c \
+	group.c \
 	kgrep.c \
 	kmem.c \
 	ldi.c \
@@ -55,6 +56,7 @@ COMMONSRCS = \
 	ndievents.c \
 	net.c \
 	nvpair.c \
+	pg.c \
 	rctl.c \
 	sobj.c \
 	streams.c \

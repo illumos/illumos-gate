@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,7 +107,7 @@
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
 #include <sys/cpc_impl.h>
-#include <sys/chip.h>
+#include <sys/pg.h>
 #include <sys/x86_archext.h>
 #include <sys/cpu_module.h>
 #include <sys/smbios.h>
@@ -1984,16 +1984,6 @@ post_startup(void)
 	maxmem = freemem;
 
 	add_cpunode2devtree(CPU->cpu_id, CPU->cpu_m.mcpu_cpi);
-
-	/*
-	 * Perform the formal initialization of the boot chip,
-	 * and associate the boot cpu with it.
-	 * This must be done after the cpu node for CPU has been
-	 * added to the device tree, when the necessary probing to
-	 * know the chip type and chip "id" is performed.
-	 */
-	chip_cpu_init(CPU);
-	chip_cpu_assign(CPU);
 }
 
 static int

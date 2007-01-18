@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,8 @@
 #include <sys/pset.h>
 #include <sys/lgrp.h>
 #include <sys/lgrp_user.h>
-#include <sys/chip.h>
+#include <sys/pg.h>
+#include <sys/bitset.h>
 #include <sys/time.h>
 
 #ifdef	__cplusplus
@@ -60,7 +61,6 @@ typedef int	cpupartid_t;
 #if defined(_MACHDEP)
 struct mach_cpupart {
 	cpuset_t	mc_haltset;
-	chip_set_t	mc_chipset;
 };
 
 extern struct mach_cpupart cp_default_mach;
@@ -102,6 +102,7 @@ typedef struct cpupart {
 	uint_t		cp_attr;	/* bitmask of attributes */
 	lgrp_gen_t	cp_gen;		/* generation number */
 	lgrp_id_t	cp_lgrp_hint;	/* last home lgroup chosen */
+	bitset_t	cp_cmt_pgs;	/* CMT PGs represented */
 
 	struct mach_cpupart *cp_mach;   /* mach-specific */
 } cpupart_t;

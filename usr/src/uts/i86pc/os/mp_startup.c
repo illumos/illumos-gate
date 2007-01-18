@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +54,8 @@
 #include <sys/traptrace.h>
 #include <sys/clock.h>
 #include <sys/cpc_impl.h>
-#include <sys/chip.h>
+#include <sys/pg.h>
+#include <sys/cmt.h>
 #include <sys/dtrace.h>
 #include <sys/archsystm.h>
 #include <sys/fp.h>
@@ -321,11 +322,9 @@ extern void *long_mode_64(void);
 	tp->t_disp_queue = cp->cpu_disp;
 
 	/*
-	 * Bootstrap the CPU for CMT aware scheduling
-	 * The rest of the initialization will happen from
-	 * mp_startup()
+	 * Bootstrap the CPU's PG data
 	 */
-	chip_bootstrap_cpu(cp);
+	pg_cpu_bootstrap(cp);
 
 	/*
 	 * Perform CPC intialization on the new CPU.
@@ -1171,15 +1170,13 @@ mp_startup(void)
 
 	mutex_enter(&cpu_lock);
 	/*
-	 * It's unfortunate that chip_cpu_init() has to be called here.
-	 * It really belongs in cpu_add_unit(), but unfortunately it is
-	 * dependent on the cpuid probing, which must be done in the
-	 * context of the current CPU. Care must be taken on x86 to ensure
-	 * that mp_startup can safely block even though chip_cpu_init() and
-	 * cpu_add_active() have not yet been called.
+	 * Processor group initialization for this CPU is dependent on the
+	 * cpuid probing, which must be done in the context of the current
+	 * CPU.
 	 */
-	chip_cpu_init(cp);
-	chip_cpu_startup(cp);
+	pghw_physid_create(cp);
+	pg_cpu_init(cp);
+	pg_cmt_cpu_startup(cp);
 
 	cp->cpu_flags |= CPU_RUNNING | CPU_READY | CPU_ENABLE | CPU_EXISTS;
 	cpu_add_active(cp);

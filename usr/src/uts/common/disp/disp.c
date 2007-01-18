@@ -50,7 +50,9 @@
 #include <sys/tnf.h>
 #include <sys/cpupart.h>
 #include <sys/lgrp.h>
-#include <sys/chip.h>
+#include <sys/pg.h>
+#include <sys/cmt.h>
+#include <sys/bitset.h>
 #include <sys/schedctl.h>
 #include <sys/atomic.h>
 #include <sys/dtrace.h>
@@ -117,12 +119,8 @@ static void setkpdq(kthread_t *tp, int borf);
  * Parameter that determines how recently a thread must have run
  * on the CPU to be considered loosely-bound to that CPU to reduce
  * cold cache effects.  The interval is in hertz.
- *
- * The platform may define a per physical processor adjustment of
- * this parameter. For efficiency, the effective rechoose interval
- * (rechoose_interval + per chip adjustment) is maintained in the
- * cpu structures. See cpu_choose()
  */
+#define	RECHOOSE_INTERVAL 3
 int	rechoose_interval = RECHOOSE_INTERVAL;
 static cpu_t	*cpu_choose(kthread_t *, pri_t);
 
@@ -132,14 +130,9 @@ static cpu_t	*cpu_choose(kthread_t *, pri_t);
  * to reduce migrations.  The interval is in nanoseconds.
  *
  * The nosteal_nsec should be set by a platform code to an appropriate value.
- *
+ * Setting it to 0 effectively disables the nosteal 'protection'
  */
-hrtime_t nosteal_nsec = 0;
-
-/*
- * Value of nosteal_nsec meaning that nosteal optimization should be disabled
- */
-#define	NOSTEAL_DISABLED 1
+hrtime_t nosteal_nsec = -1;
 
 id_t	defaultcid;	/* system "default" class; see dispadmin(1M) */
 
@@ -225,6 +218,7 @@ dispinit(void)
 	mutex_enter(&cpu_lock);
 	CPU->cpu_disp->disp_maxrunpri = -1;
 	CPU->cpu_disp->disp_max_unbound_pri = -1;
+
 	/*
 	 * Initialize the default CPU partition.
 	 */
@@ -874,9 +868,9 @@ swtch()
 
 		if (next != t) {
 			if (t == cp->cpu_idle_thread) {
-				CHIP_NRUNNING(cp->cpu_chip, 1);
+				PG_NRUN_UPDATE(cp, 1);
 			} else if (next == cp->cpu_idle_thread) {
-				CHIP_NRUNNING(cp->cpu_chip, -1);
+				PG_NRUN_UPDATE(cp, -1);
 			}
 
 			/*
@@ -944,7 +938,7 @@ swtch_from_zombie()
 	TRACE_0(TR_FAC_DISP, TR_RESUME_START, "resume_start");
 
 	if (next == cpu->cpu_idle_thread)
-		CHIP_NRUNNING(cpu->cpu_chip, -1);
+		PG_NRUN_UPDATE(cpu, -1);
 
 	restore_mstate(next);
 
@@ -1024,7 +1018,7 @@ swtch_to(kthread_t *next)
 	TRACE_0(TR_FAC_DISP, TR_RESUME_START, "resume_start");
 
 	if (curthread == cp->cpu_idle_thread)
-		CHIP_NRUNNING(cp->cpu_chip, 1);
+		PG_NRUN_UPDATE(cp, 1);
 
 	/* OK to steal anything left on run queue */
 	cp->cpu_disp_flags &= ~CPU_DISP_DONTSTEAL;
@@ -1092,68 +1086,113 @@ cpu_resched(cpu_t *cp, pri_t tpri)
 }
 
 /*
- * Routine used by setbackdq() to balance load across the physical
- * processors. Returns a CPU of a lesser loaded chip in the lgroup
- * if balancing is necessary, or the "hint" CPU if it's not.
- *
- * - tp is the thread being enqueued
- * - cp is a hint CPU (chosen by cpu_choose()).
- * - curchip (if not NULL) is the chip on which the current thread
- *   is running.
- *
- * The thread lock for "tp" must be held while calling this routine.
+ * Perform multi-level CMT load balancing of running threads.
+ * tp is the thread being enqueued
+ * cp is the hint CPU (chosen by cpu_choose()).
  */
 static cpu_t *
-chip_balance(kthread_t *tp, cpu_t *cp, chip_t *curchip)
+cmt_balance(kthread_t *tp, cpu_t *cp)
 {
-	int	chp_nrun, ochp_nrun;
-	chip_t	*chp, *nchp;
+	int		hint, i, cpu;
+	int		self = 0;
+	group_t		*cmt_pgs, *siblings;
+	pg_cmt_t	*pg, *pg_tmp, *tpg = NULL;
+	int		pg_nrun, tpg_nrun;
+	int		level = 0;
+	cpu_t		*newcp;
 
-	chp = cp->cpu_chip;
-	chp_nrun = chp->chip_nrunning;
+	ASSERT(THREAD_LOCK_HELD(tp));
 
-	if (chp == curchip)
-		chp_nrun--;	/* Ignore curthread */
+	cmt_pgs = &cp->cpu_pg->cmt_pgs;
+
+	if (GROUP_SIZE(cmt_pgs) == 0)
+		return (cp);	/* nothing to do */
+
+	if (tp == curthread)
+		self = 1;
 
 	/*
-	 * If this chip isn't at all idle, then let
-	 * run queue balancing do the work.
+	 * Balance across siblings in the CPUs CMT lineage
 	 */
-	if (chp_nrun == chp->chip_ncpu)
-		return (cp);
-
-	nchp = chp->chip_balance;
 	do {
-		if (nchp == chp ||
-		    !CHIP_IN_CPUPART(nchp, tp->t_cpupart))
-			continue;
+		pg = GROUP_ACCESS(cmt_pgs, level);
 
-		ochp_nrun = nchp->chip_nrunning;
+		pg_nrun = pg->cmt_nrunning;
+		if (self &&
+		    bitset_in_set(&pg->cmt_cpus_actv_set, CPU->cpu_seqid))
+			pg_nrun--;	/* Ignore curthread's effect */
+
+		siblings = pg->cmt_siblings;
+		hint = pg->cmt_hint;
 
 		/*
-		 * If the other chip is running less threads,
-		 * or if it's running the same number of threads, but
-		 * has more online logical CPUs, then choose to balance.
+		 * Check for validity of the hint
+		 * It should reference a valid sibling
 		 */
-		if (chp_nrun > ochp_nrun ||
-		    (chp_nrun == ochp_nrun &&
-		    nchp->chip_ncpu > chp->chip_ncpu)) {
-			cp = nchp->chip_cpus;
-			nchp->chip_cpus = cp->cpu_next_chip;
+		if (hint >= GROUP_SIZE(siblings))
+			hint = pg->cmt_hint = 0;
+		else
+			pg->cmt_hint++;
+
+		/*
+		 * Find a balancing candidate from among our siblings
+		 * "hint" is a hint for where to start looking
+		 */
+		i = hint;
+		do {
+			ASSERT(i < GROUP_SIZE(siblings));
+			pg_tmp = GROUP_ACCESS(siblings, i);
 
 			/*
-			 * Find a CPU on the chip in the correct
-			 * partition. We know at least one exists
-			 * because of the CHIP_IN_CPUPART() check above.
+			 * The candidate must not be us, and must
+			 * have some CPU resources in the thread's
+			 * partition
 			 */
-			while (cp->cpu_part != tp->t_cpupart)
-				cp = cp->cpu_next_chip;
-		}
-		chp->chip_balance = nchp->chip_next_lgrp;
-		break;
-	} while ((nchp = nchp->chip_next_lgrp) != chp->chip_balance);
+			if (pg_tmp != pg &&
+			    bitset_in_set(&tp->t_cpupart->cp_cmt_pgs,
+			    ((pg_t *)pg_tmp)->pg_id)) {
+				tpg = pg_tmp;
+				break;
+			}
 
-	ASSERT(CHIP_IN_CPUPART(cp->cpu_chip, tp->t_cpupart));
+			if (++i >= GROUP_SIZE(siblings))
+				i = 0;
+		} while (i != hint);
+
+		if (!tpg)
+			continue;	/* no candidates at this level */
+
+		/*
+		 * Check if the balancing target is underloaded
+		 * Decide to balance if the target is running fewer
+		 * threads, or if it's running the same number of threads
+		 * with more online CPUs
+		 */
+		tpg_nrun = tpg->cmt_nrunning;
+		if (pg_nrun > tpg_nrun ||
+		    (pg_nrun == tpg_nrun &&
+		    (GROUP_SIZE(&tpg->cmt_cpus_actv) >
+			GROUP_SIZE(&pg->cmt_cpus_actv)))) {
+			break;
+		}
+		tpg = NULL;
+	} while (++level < GROUP_SIZE(cmt_pgs));
+
+
+	if (tpg) {
+		/*
+		 * Select an idle CPU from the target PG
+		 */
+		for (cpu = 0; cpu < GROUP_SIZE(&tpg->cmt_cpus_actv); cpu++) {
+			newcp = GROUP_ACCESS(&tpg->cmt_cpus_actv, cpu);
+			if (newcp->cpu_part == tp->t_cpupart &&
+			    newcp->cpu_dispatch_pri == -1) {
+				cp = newcp;
+				break;
+			}
+		}
+	}
+
 	return (cp);
 }
 
@@ -1181,7 +1220,6 @@ setbackdq(kthread_t *tp)
 {
 	dispq_t	*dq;
 	disp_t		*dp;
-	chip_t		*curchip = NULL;
 	cpu_t		*cp;
 	pri_t		tpri;
 	int		bound;
@@ -1200,10 +1238,6 @@ setbackdq(kthread_t *tp)
 	}
 
 	tpri = DISP_PRIO(tp);
-	if (tp == curthread) {
-		curchip = CPU->cpu_chip;
-	}
-
 	if (ncpus == 1)
 		cp = tp->t_cpu;
 	else if (!tp->t_bound_cpu && !tp->t_weakbound_cpu) {
@@ -1220,12 +1254,9 @@ setbackdq(kthread_t *tp)
 			int	qlen;
 
 			/*
-			 * Select another CPU if we need
-			 * to do some load balancing across the
-			 * physical processors.
+			 * Perform any CMT load balancing
 			 */
-			if (CHIP_SHOULD_BALANCE(cp->cpu_chip))
-				cp = chip_balance(tp, cp, curchip);
+			cp = cmt_balance(tp, cp);
 
 			/*
 			 * Balance across the run queues
@@ -1960,8 +1991,8 @@ disp_getwork(cpu_t *cp)
 				if (pri > maxpri) {
 					/*
 					 * Don't steal threads that we attempted
-					 * to be stolen very recently until
-					 * they're ready to be stolen again.
+					 * to steal recently until they're ready
+					 * to be stolen again.
 					 */
 					stealtime = ocp->cpu_disp->disp_steal;
 					if (stealtime == 0 ||
@@ -2158,8 +2189,6 @@ disp_getbest(disp_t *dp)
 	allbound = B_TRUE;
 	for (tp = dq->dq_first; tp != NULL; tp = tp->t_link) {
 		hrtime_t now, nosteal, rqtime;
-		chip_type_t chtype;
-		chip_t *chip;
 
 		/*
 		 * Skip over bound threads which could be here even
@@ -2209,21 +2238,15 @@ disp_getbest(disp_t *dp)
 			break;
 
 		/*
-		 * Steal immediately if the chip has shared cache and we are
-		 * sharing the chip with the target thread's CPU.
+		 * Steal immediately if, due to CMT processor architecture
+		 * migraiton between cp and tcp would incur no performance
+		 * penalty.
 		 */
-		chip = tcp->cpu_chip;
-		chtype = chip->chip_type;
-		if ((chtype == CHIP_SMT || chtype == CHIP_CMP_SHARED_CACHE) &&
-		    chip == cp->cpu_chip)
+		if (pg_cmt_can_migrate(cp, tcp))
 			break;
 
-		/*
-		 * Get the value of nosteal interval either from nosteal_nsec
-		 * global variable or from a value specified by a chip
-		 */
-		nosteal = nosteal_nsec ? nosteal_nsec : chip->chip_nosteal;
-		if (nosteal == 0 || nosteal == NOSTEAL_DISABLED)
+		nosteal = nosteal_nsec;
+		if (nosteal == 0)
 			break;
 
 		/*
@@ -2643,7 +2666,7 @@ cpu_choose(kthread_t *t, pri_t tpri)
 {
 	ASSERT(tpri < kpqpri);
 
-	if ((((lbolt - t->t_disp_time) > t->t_cpu->cpu_rechoose) &&
+	if ((((lbolt - t->t_disp_time) > rechoose_interval) &&
 	    t != curthread) || t->t_cpu == cpu_inmotion) {
 		return (disp_lowpri_cpu(t->t_cpu, t->t_lpl, tpri, NULL));
 	}

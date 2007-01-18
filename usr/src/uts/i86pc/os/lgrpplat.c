@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_impl.h>
 #include <sys/param.h>
+#include <sys/pghw.h>
 #include <sys/promif.h>		/* for prom_printf() */
 #include <sys/systm.h>
 #include <sys/thread.h>
@@ -50,7 +51,6 @@
 #include <vm/vm_dep.h>
 
 
-
 /*
  * lgroup platform support for x86 platforms.
  */
@@ -58,7 +58,7 @@
 #define	MAX_NODES		8
 #define	NLGRP			(MAX_NODES * (MAX_NODES - 1) + 1)
 
-#define	LGRP_PLAT_CPU_TO_NODE(cpu)	(chip_plat_get_chipid(cpu))
+#define	LGRP_PLAT_CPU_TO_NODE(cpu) (pg_plat_hw_instance_id(cpu, PGHW_CHIP))
 
 #define	LGRP_PLAT_PROBE_NROUNDS		64	/* default laps for probing */
 #define	LGRP_PLAT_PROBE_NSAMPLES	1	/* default samples to take */

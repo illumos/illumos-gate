@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,6 @@
 #include <sys/cpupart.h>
 #include <sys/rctl.h>
 #include <sys/task.h>
-#include <sys/chip.h>
 #include <sys/sdt.h>
 
 #ifdef __sparc
@@ -260,13 +259,6 @@ cyclic_id_t deadman_cyclic;	/* deadman()'s cyclic_id */
 static int lgrp_ticks;		/* counter to schedule lgrp load calcs */
 
 /*
- * rechoose_interval_history is used to detect when rechoose_interval's
- * value has changed (via hotpatching for example), so that the
- * cached values in the cpu structures may be updated.
- */
-static int rechoose_interval_history = RECHOOSE_INTERVAL;
-
-/*
  * for tod fault detection
  */
 #define	TOD_REF_FREQ		((longlong_t)(NANOSEC))
@@ -345,8 +337,6 @@ clock(void)
 	int64_t lltemp;
 	int s;
 	int do_lgrp_load;
-	int rechoose_update = 0;
-	int rechoose;
 	int i;
 
 	if (panicstr)
@@ -430,20 +420,8 @@ clock(void)
 		do_lgrp_load = 1;
 	}
 
-	/*
-	 * The dispatcher tunable rechoose_interval may be hot-patched.
-	 * Note if it has a new value. If so, the effective rechoose_interval
-	 * cached in the cpu structures needs to be updated.
-	 * If needed we'll do this during the walk of the cpu_list below.
-	 */
-	if (rechoose_interval != rechoose_interval_history) {
-		rechoose_interval_history = rechoose_interval;
-		rechoose_update = 1;
-	}
-
 	if (one_sec)
 		loadavg_update();
-
 
 	/*
 	 * First count the threads waiting on kpreempt queues in each
@@ -521,19 +499,6 @@ clock(void)
 			}
 			lgrp_loadavg(cp->cpu_lpl,
 			    cpu_nrunnable * LGRP_LOADAVG_IN_THREAD_MAX, 1);
-		}
-		/*
-		 * The platform may define a per physical processor
-		 * adjustment of rechoose_interval. The effective
-		 * (base + adjustment) rechoose_interval is cached
-		 * in the cpu structures for efficiency. Above we detect
-		 * if the cached values need updating, and here is where
-		 * the update happens.
-		 */
-		if (rechoose_update) {
-			rechoose = rechoose_interval +
-				cp->cpu_chip->chip_rechoose_adj;
-			cp->cpu_rechoose = (rechoose < 0) ? 0 : rechoose;
 		}
 	} while ((cp = cp->cpu_next) != cpu_list);
 

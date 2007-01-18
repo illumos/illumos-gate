@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +42,7 @@
 #include <sys/cpc_impl.h>
 #include <sys/x_call.h>
 #include <sys/cmn_err.h>
-#include <sys/chip.h>
+#include <sys/cmt.h>
 #include <sys/spl.h>
 #include <io/pcplusmp/apic.h>
 
@@ -79,7 +78,8 @@ kcpc_hw_rem_ovf_intr(void)
 static int
 kcpc_cpu_setup(cpu_setup_t what, int cpuid, void *arg)
 {
-	chip_t *chp = cpu[cpuid]->cpu_chip;
+	pg_cmt_t	*chip_pg;
+	int		active_cpus_cnt;
 
 	if (what != CPU_ON)
 		return (0);
@@ -95,8 +95,12 @@ kcpc_cpu_setup(cpu_setup_t what, int cpuid, void *arg)
 	 * If this chip now has more than 1 active cpu, we must invalidate all
 	 * contexts in the system.
 	 */
-	if (chp->chip_ncpu > 1)
-		kcpc_invalidate_all();
+	chip_pg = (pg_cmt_t *)pghw_find_pg(cpu[cpuid], PGHW_CHIP);
+	if (chip_pg != NULL) {
+		active_cpus_cnt = GROUP_SIZE(&chip_pg->cmt_cpus_actv);
+		if (active_cpus_cnt > 1)
+			kcpc_invalidate_all();
+	}
 
 	return (0);
 }
@@ -177,7 +181,9 @@ kcpc_remote_stop(cpu_t *cp)
 int
 kcpc_hw_cpu_hook(processorid_t cpuid, ulong_t *kcpc_cpumap)
 {
-	cpu_t *p, *cpu;
+	cpu_t		*cpu, *p;
+	pg_t		*chip_pg;
+	pg_cpu_itr_t	itr;
 
 	if ((x86_feature & X86_HTT) == 0)
 		return (0);
@@ -187,8 +193,7 @@ kcpc_hw_cpu_hook(processorid_t cpuid, ulong_t *kcpc_cpumap)
 	 * once.
 	 *
 	 * This loop is protected by holding cpu_lock, in order to properly
-	 * access the cpu_t of the desired cpu. This also guarantees that the
-	 * per chip cpu lists will not change whilst we look at them.
+	 * access the cpu_t of the desired cpu.
 	 */
 	mutex_enter(&cpu_lock);
 	if ((cpu = cpu_get(cpuid)) == NULL) {
@@ -196,7 +201,12 @@ kcpc_hw_cpu_hook(processorid_t cpuid, ulong_t *kcpc_cpumap)
 		return (-1);
 	}
 
-	for (p = cpu->cpu_next_chip; p != cpu; p = p->cpu_next_chip) {
+	chip_pg = (pg_t *)pghw_find_pg(cpu, PGHW_CHIP);
+
+	PG_CPU_ITR_INIT(chip_pg, itr);
+	while ((p = pg_cpu_next(&itr)) != NULL) {
+		if (p == cpu)
+			continue;
 		if (BT_TEST(kcpc_cpumap, p->cpu_id)) {
 			mutex_exit(&cpu_lock);
 			return (-1);
@@ -213,7 +223,9 @@ kcpc_hw_cpu_hook(processorid_t cpuid, ulong_t *kcpc_cpumap)
 int
 kcpc_hw_lwp_hook(void)
 {
-	chip_t *p;
+	pg_cmt_t	*chip;
+	group_t		*chips;
+	group_iter_t	i;
 
 	if ((x86_feature & X86_HTT) == 0)
 		return (0);
@@ -222,14 +234,21 @@ kcpc_hw_lwp_hook(void)
 	 * Only one CPU per chip may be online.
 	 */
 	mutex_enter(&cpu_lock);
-	p = CPU->cpu_chip;
-	do {
-		if (p->chip_ncpu > 1) {
+
+	chips = pghw_set_lookup(PGHW_CHIP);
+	if (chips == NULL) {
+		mutex_exit(&cpu_lock);
+		return (0);
+	}
+
+	group_iter_init(&i);
+	while ((chip = group_iterate(chips, &i)) != NULL) {
+		if (GROUP_SIZE(&chip->cmt_cpus_actv) > 1) {
 			mutex_exit(&cpu_lock);
 			return (-1);
 		}
-		p = p->chip_next;
-	} while (p != CPU->cpu_chip);
+	}
+
 	mutex_exit(&cpu_lock);
 	return (0);
 }

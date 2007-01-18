@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +74,8 @@
 #include "devinfo.h"
 #include "leaky.h"
 #include "lgrp.h"
+#include "pg.h"
+#include "group.h"
 #include "list.h"
 #include "log.h"
 #include "kgrep.h"
@@ -3422,6 +3424,12 @@ static const mdb_dcmd_t dcmds[] = {
 	{ NVLIST_DCMD_NAME, NVLIST_DCMD_USAGE, NVLIST_DCMD_DESCR,
 		print_nvlist },
 
+	/* from pg.c */
+	{ "pg", "?[-q]", "display a pg", pg},
+	/* from group.c */
+	{ "group", "?[-q]", "display a group", group},
+
+	/* from log.c */
 	/* from rctl.c */
 	{ "rctl_dict", "?", "print systemwide default rctl definitions",
 		rctl_dict },
@@ -3713,6 +3721,10 @@ static const mdb_walker_t walkers[] = {
 		lgrp_rsrc_mem_walk_init, lgrp_set_walk_step, NULL },
 	{ "lgrp_rsrc_cpu", "walk lgroup CPU resources of given lgroup",
 		lgrp_rsrc_cpu_walk_init, lgrp_set_walk_step, NULL },
+
+	/* from group.c */
+	{ "group", "walk all elements of a group",
+		group_walk_init, group_walk_step, NULL },
 
 	/* from list.c */
 	{ LIST_WALK_NAME, LIST_WALK_DESC,

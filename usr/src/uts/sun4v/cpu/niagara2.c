@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,13 +161,22 @@ cpu_init_private(struct cpu *cp)
 	extern int niagara_kstat_init(void);
 
 	/*
-	 * The cpu_ipipe field is initialized based on the execution
-	 * unit sharing information from the MD. It defaults to the
-	 * virtual CPU id in the absence of such information.
+	 * The cpu_ipipe and cpu_fpu fields are initialized based on
+	 * the execution unit sharing information from the MD. They default
+	 * to the virtual CPU id in the absence of such information.
 	 */
 	cp->cpu_m.cpu_ipipe = cpunodes[cp->cpu_id].exec_unit_mapping;
 	if (cp->cpu_m.cpu_ipipe == NO_EU_MAPPING_FOUND)
 		cp->cpu_m.cpu_ipipe = (id_t)(cp->cpu_id);
+
+	cp->cpu_m.cpu_fpu = cpunodes[cp->cpu_id].fpu_mapping;
+	if (cp->cpu_m.cpu_fpu == NO_EU_MAPPING_FOUND)
+		cp->cpu_m.cpu_fpu = (id_t)(cp->cpu_id);
+
+	/*
+	 * Niagara 2 defines the core to be at the FPU level
+	 */
+	cp->cpu_m.cpu_core = cp->cpu_m.cpu_fpu;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	if ((niagara2_cpucnt++ == 0) && (niagara2_hsvc_available == B_TRUE))

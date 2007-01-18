@@ -40,13 +40,15 @@ sparc_CORE_OBJS +=
 
 COMMON_CORE_OBJS +=		\
 		atomic.o	\
+		bitset.o	\
 		bp_map.o	\
 		brand.o		\
-		chip.o		\
+		cmt.o		\
 		cpu.o		\
 		cpu_intr.o	\
 		cpupart.o	\
 		disp.o		\
+		group.o		\
 		kstat_fr.o	\
 		lgrp.o		\
 		lgrp_topo.o	\
@@ -55,6 +57,8 @@ COMMON_CORE_OBJS +=		\
 		page_retire.o	\
 		panic.o		\
 		param.o		\
+		pg.o		\
+		pghw.o		\
 		putnext.o	\
 		rctl_proc.o	\
 		rwlock.o	\

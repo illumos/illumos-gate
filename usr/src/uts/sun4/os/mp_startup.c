@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,8 @@
 #include <sys/machsystm.h>
 #include <sys/callb.h>
 #include <sys/cpu_module.h>
-#include <sys/chip.h>
+#include <sys/pg.h>
+#include <sys/cmt.h>
 #include <sys/dtrace.h>
 #include <sys/reboot.h>
 #include <sys/kdi.h>
@@ -77,6 +78,9 @@ static void	slave_startup(void);
  * or out of control.
  */
 #define	CPU_WAKEUP_GRACE_MSEC 1000
+
+extern hrtime_t nosteal_nsec;
+extern void cmp_set_nosteal_interval(void);
 
 #ifdef	TRAPTRACE
 /*
@@ -408,9 +412,13 @@ setup_cpu_common(int cpuid)
 	cpu_init_private(cp);
 
 	/*
-	 * Associate this CPU with a physical processor
+	 * Initialize the CPUs physical ID cache, and processor groups
 	 */
-	chip_cpu_init(cp);
+	pghw_physid_create(cp);
+	pg_cpu_init(cp);
+
+	if (nosteal_nsec == -1)
+		cmp_set_nosteal_interval();
 
 	cpu_intrq_setup(cp);
 
@@ -630,9 +638,9 @@ slave_startup(void)
 	kcpc_hw_startup_cpu(original_flags);
 
 	/*
-	 * Notify the CMT subsystem that the slave has started
+	 * Notify the PG subsystem that the CPU  has started
 	 */
-	chip_cpu_startup(CPU);
+	pg_cmt_cpu_startup(CPU);
 
 	/*
 	 * Now we are done with the startup thread, so free it up.

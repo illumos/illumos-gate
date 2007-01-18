@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +89,7 @@
 #include <sys/cmn_err.h>
 #include <sys/kstat.h>
 #include <sys/sysmacros.h>
-#include <sys/chip.h>
+#include <sys/pg.h>
 #include <sys/promif.h>
 #include <sys/sdt.h>
 
@@ -314,8 +314,6 @@ lgrp_root_init(void)
 	klgrpset_clear(lgrp_root->lgrp_children);
 	klgrpset_clear(lgrp_root->lgrp_leaves);
 	lgrp_root->lgrp_parent = NULL;
-	lgrp_root->lgrp_chips = NULL;
-	lgrp_root->lgrp_chipcnt = 0;
 	lgrp_root->lgrp_latency = lgrp_plat_latency(hand, hand);
 
 	for (i = 0; i < LGRP_RSRC_COUNT; i++)
@@ -679,7 +677,6 @@ lgrp_cpu_init(struct cpu *cp)
 	lgrp_t		*my_lgrp;
 	lgrp_id_t	lgrpid;
 	struct cpu	*cptr;
-	struct chip	*chp;
 
 	/*
 	 * This is the first time through if the resource set
@@ -795,33 +792,6 @@ lgrp_cpu_init(struct cpu *cp)
 		cptr->cpu_prev_lgrp = cp;
 	}
 	my_lgrp->lgrp_cpucnt++;
-
-	/*
-	 * Add this cpu's chip to the per lgroup list
-	 * if necessary
-	 */
-	if (cp->cpu_chip->chip_lgrp == NULL) {
-		struct chip *lcpr;
-
-		chp = cp->cpu_chip;
-
-		if (my_lgrp->lgrp_chipcnt == 0) {
-			my_lgrp->lgrp_chips = chp;
-			chp->chip_next_lgrp =
-			    chp->chip_prev_lgrp = chp;
-		} else {
-			lcpr = my_lgrp->lgrp_chips;
-			chp->chip_next_lgrp = lcpr;
-			chp->chip_prev_lgrp =
-			    lcpr->chip_prev_lgrp;
-			lcpr->chip_prev_lgrp->chip_next_lgrp =
-			    chp;
-			lcpr->chip_prev_lgrp = chp;
-		}
-		chp->chip_lgrp = my_lgrp;
-		chp->chip_balance = chp->chip_next_lgrp;
-		my_lgrp->lgrp_chipcnt++;
-	}
 }
 
 lgrp_t *
@@ -890,8 +860,6 @@ lgrp_create(void)
 
 	my_lgrp->lgrp_cpu = NULL;
 	my_lgrp->lgrp_cpucnt = 0;
-	my_lgrp->lgrp_chips = NULL;
-	my_lgrp->lgrp_chipcnt = 0;
 
 	if (my_lgrp->lgrp_kstat != NULL)
 		lgrp_kstat_reset(lgrpid);
@@ -945,8 +913,6 @@ lgrp_destroy(lgrp_t *lgrp)
 
 	lgrp->lgrp_cpu = NULL;
 	lgrp->lgrp_cpucnt = 0;
-	lgrp->lgrp_chipcnt = 0;
-	lgrp->lgrp_chips = NULL;
 
 	nlgrps--;
 }
@@ -1022,7 +988,6 @@ lgrp_cpu_fini(struct cpu *cp, lgrp_id_t lgrpid)
 	lgrp_t *my_lgrp;
 	struct cpu *prev;
 	struct cpu *next;
-	chip_t  *chp;
 
 	ASSERT(MUTEX_HELD(&cpu_lock) || !lgrp_initialized);
 
@@ -1040,42 +1005,6 @@ lgrp_cpu_fini(struct cpu *cp, lgrp_id_t lgrpid)
 
 	my_lgrp = lgrp_table[lgrpid];
 	my_lgrp->lgrp_cpucnt--;
-
-	/*
-	 * If the last CPU on it's chip is being offlined
-	 * then remove this chip from the per lgroup list.
-	 *
-	 * This is also done for the boot CPU when it needs
-	 * to move between lgroups as a consequence of
-	 * null proc lpa.
-	 */
-	chp = cp->cpu_chip;
-	if (chp->chip_ncpu == 0 || !lgrp_initialized) {
-
-		chip_t	*chpp;
-
-		if (--my_lgrp->lgrp_chipcnt == 0)
-			my_lgrp->lgrp_chips = NULL;
-		else if (my_lgrp->lgrp_chips == chp)
-			my_lgrp->lgrp_chips = chp->chip_next_lgrp;
-
-		/*
-		 * Walk this lgroup's chip list looking for chips that
-		 * may try to balance against the one that's leaving
-		 */
-		for (chpp = chp->chip_next_lgrp; chpp != chp;
-		    chpp = chpp->chip_next_lgrp) {
-			if (chpp->chip_balance == chp)
-				chpp->chip_balance = chp->chip_next_lgrp;
-		}
-
-		chp->chip_prev_lgrp->chip_next_lgrp = chp->chip_next_lgrp;
-		chp->chip_next_lgrp->chip_prev_lgrp = chp->chip_prev_lgrp;
-
-		chp->chip_next_lgrp = chp->chip_prev_lgrp = NULL;
-		chp->chip_lgrp = NULL;
-		chp->chip_balance = NULL;
-	}
 
 	/*
 	 * Removing last CPU in lgroup, so update lgroup topology
@@ -1661,7 +1590,7 @@ lgrp_phys_to_lgrp(u_longlong_t physaddr)
  * Return the leaf lgroup containing the given CPU
  *
  * The caller needs to take precautions necessary to prevent
- * "cpu" from going away across a call to this function.
+ * "cpu", and it's lpl from going away across a call to this function.
  * hint: kpreempt_disable()/kpreempt_enable()
  */
 static lgrp_t *

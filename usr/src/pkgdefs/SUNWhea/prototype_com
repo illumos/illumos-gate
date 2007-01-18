@@ -529,6 +529,7 @@ f none usr/include/sys/avl.h 644 root bin
 f none usr/include/sys/avl_impl.h 644 root bin
 f none usr/include/sys/battery.h 644 root bin
 f none usr/include/sys/bitmap.h 644 root bin
+f none usr/include/sys/bitset.h 644 root bin
 f none usr/include/sys/bl.h 644 root bin
 f none usr/include/sys/bofi.h 644 root bin
 f none usr/include/sys/bofi_impl.h 644 root bin
@@ -544,7 +545,6 @@ f none usr/include/sys/callb.h 644 root bin
 f none usr/include/sys/callo.h 644 root bin
 f none usr/include/sys/ccompile.h 644 root bin
 f none usr/include/sys/cdio.h 644 root bin
-f none usr/include/sys/chip.h 644 root bin
 f none usr/include/sys/cis.h 644 root bin
 f none usr/include/sys/cis_handlers.h 644 root bin
 f none usr/include/sys/cis_protos.h 644 root bin
@@ -756,6 +756,7 @@ f none usr/include/sys/fssnap_if.h 644 root bin
 f none usr/include/sys/fstyp.h 644 root bin
 f none usr/include/sys/ftrace.h 644 root bin
 f none usr/include/sys/gfs.h 644 root bin
+f none usr/include/sys/group.h 644 root bin
 f none usr/include/sys/hdio.h 644 root bin
 f none usr/include/sys/hook.h 644 root bin
 f none usr/include/sys/hook_event.h 644 root bin
@@ -938,6 +939,8 @@ f none usr/include/sys/pem.h 644 root bin
 f none usr/include/sys/physmem.h 644 root bin
 f none usr/include/sys/serializer.h 644 root bin
 f none usr/include/sys/pfmod.h 644 root bin
+f none usr/include/sys/pg.h 644 root bin
+f none usr/include/sys/pghw.h 644 root bin
 f none usr/include/sys/pm.h 0644 root bin
 f none usr/include/sys/pool.h 644 root bin
 f none usr/include/sys/pool_impl.h 644 root bin

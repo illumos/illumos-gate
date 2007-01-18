@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,7 @@
 #include <sys/cmn_err.h>
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
-#include <sys/chip.h>
+#include <sys/pghw.h>
 #include <sys/cyclic.h>
 #include <sys/cpu_module_impl.h>
 #include <sys/pci_cfgspace_impl.h>
@@ -475,7 +475,7 @@ static void
 ao_nb_cfg(ao_data_t *ao, uint32_t rev)
 {
 	const struct ao_nb_cfg *nbcp = &ao_cfg_extra[0];
-	uint_t chipid = chip_plat_get_chipid(CPU);
+	uint_t chipid = pg_plat_hw_instance_id(CPU, PGHW_CHIP);
 	uint32_t val;
 
 	/*
@@ -547,7 +547,7 @@ int ao_nb_cfg_sparectl_noseize = 0;
 static void
 ao_sparectl_cfg(ao_data_t *ao)
 {
-	uint_t chipid = chip_plat_get_chipid(CPU);
+	uint_t chipid = pg_plat_hw_instance_id(CPU, PGHW_CHIP);
 	union mcreg_sparectl sparectl;
 	int chan, cs;
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,14 +86,16 @@ mc_pcicfg_get32(mc_pcicfg_hdl_t cookie, off_t offset)
 uint32_t
 mc_pcicfg_get32_nohdl(mc_t *mc, enum mc_funcnum func, off_t offset)
 {
-	return (pci_mech1_getl(0, MC_AMD_DEV_OFFSET + mc->mc_chip->chip_id,
-	    func, offset));
+	return (pci_mech1_getl(0,
+		    MC_AMD_DEV_OFFSET + mc->mc_chip->pghw_instance,
+		    func, offset));
 }
 
 void
 mc_pcicfg_put32_nohdl(mc_t *mc, enum mc_funcnum func, off_t offset,
     uint32_t val)
 {
-	pci_mech1_putl(0, MC_AMD_DEV_OFFSET + mc->mc_chip->chip_id,
+	pci_mech1_putl(0,
+	    MC_AMD_DEV_OFFSET + mc->mc_chip->pghw_instance,
 	    func, offset, val);
 }

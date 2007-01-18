@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@
 #include <sys/var.h>
 #include <sys/cyclic.h>
 #include <sys/lgrp.h>
-#include <sys/chip.h>
+#include <sys/pghw.h>
 #include <sys/loadavg.h>
 #include <sys/class.h>
 #include <sys/fss.h>
@@ -267,6 +267,8 @@ cpupart_initialize_default(void)
 	 * Set t0's home
 	 */
 	t0.t_lpl = &cp_default.cp_lgrploads[LGRP_ROOTID];
+
+	bitset_init(&cp_default.cp_cmt_pgs);
 }
 
 
@@ -322,6 +324,15 @@ cpupart_move_cpu(cpu_t *cp, cpupart_t *newpp, int forced)
 	cpu_inmotion = cp;
 	membar_enter();
 
+	/*
+	 * Notify the Processor Groups subsystem that the CPU
+	 * will be moving cpu partitions. This is done before
+	 * CPUs are paused to provide an opportunity for any
+	 * needed memory allocations.
+	 */
+	pg_cpupart_out(cp, oldpp);
+	pg_cpupart_in(cp, newpp);
+
 again:
 	if (move_threads) {
 		int loop_count;
@@ -332,6 +343,8 @@ again:
 			if (loop_count >= 5) {
 				cpu_state_change_notify(cp->cpu_id,
 				    CPU_CPUPART_IN);
+				pg_cpupart_out(cp, newpp);
+				pg_cpupart_in(cp, oldpp);
 				cpu_inmotion = NULL;
 				return (EBUSY);	/* some threads still bound */
 			}
@@ -350,6 +363,8 @@ again:
 		 * a bound cyclic.
 		 */
 		cpu_state_change_notify(cp->cpu_id, CPU_CPUPART_IN);
+		pg_cpupart_out(cp, newpp);
+		pg_cpupart_in(cp, oldpp);
 		cpu_inmotion = NULL;
 		return (EBUSY);
 	}
@@ -370,9 +385,10 @@ again:
 	}
 
 	/*
-	 * Update the set of chip's being spanned
+	 * Now that CPUs are paused, let the PG subsystem perform
+	 * any necessary data structure updates.
 	 */
-	chip_cpu_move_part(cp, oldpp, newpp);
+	pg_cpupart_move(cp, oldpp, newpp);
 
 	/* save this cpu's lgroup -- it'll be the same in the new partition */
 	lgrpid = cp->cpu_lpl->lpl_lgrpid;
@@ -764,7 +780,7 @@ cpupart_create(psetid_t *psid)
 	for (i = 0; i < pp->cp_nlgrploads; i++) {
 		pp->cp_lgrploads[i].lpl_lgrpid = i;
 	}
-	CHIP_SET_ZERO(pp->cp_mach->mc_chipset);
+	bitset_init(&pp->cp_cmt_pgs);
 
 	/*
 	 * Pause all CPUs while changing the partition list, to make sure
@@ -859,8 +875,14 @@ again:			p = ttoproc(t);
 		}
 	}
 
-	ASSERT(CHIP_SET_ISNULL(pp->cp_mach->mc_chipset));
+	ASSERT(bitset_is_null(&pp->cp_cmt_pgs));
 	ASSERT(CPUSET_ISNULL(pp->cp_mach->mc_haltset));
+
+	/*
+	 * Teardown the partition's group of active CMT PGs now that
+	 * all of the CPUs have left.
+	 */
+	bitset_fini(&pp->cp_cmt_pgs);
 
 	/*
 	 * Reset the pointers in any offline processors so they won't

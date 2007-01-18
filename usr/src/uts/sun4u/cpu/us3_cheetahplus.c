@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,7 @@
 #include <sys/fm/protocol.h>
 #include <sys/fm/cpu/UltraSPARC-III.h>
 #include <sys/fm/util.h>
+#include <sys/pghw.h>
 
 #ifdef	CHEETAHPLUS_ERRATUM_25
 #include <sys/cyclic.h>
@@ -1331,13 +1332,27 @@ cpu_scrub_cpu_setup(cpu_setup_t what, int cpuid, void *arg)
 static cpu_t *
 cpu_get_sibling_core(cpu_t *cpup)
 {
-	cpu_t *nextp;
+	cpu_t		*nextp;
+	pg_t		*pg;
+	pg_cpu_itr_t	i;
 
 	if ((cpup == NULL) || (!cmp_cpu_is_cmp(cpup->cpu_id)))
 		return (NULL);
+	pg = (pg_t *)pghw_find_pg(cpup, PGHW_CHIP);
+	if (pg == NULL)
+		return (NULL);
 
-	nextp = cpup->cpu_next_chip;
-	if ((nextp == NULL) || (nextp == cpup))
+	/*
+	 * Iterate over the CPUs in the chip PG looking
+	 * for a CPU that isn't cpup
+	 */
+	PG_CPU_ITR_INIT(pg, i);
+	while ((nextp = pg_cpu_next(&i)) != NULL) {
+		if (nextp != cpup)
+			break;
+	}
+
+	if (nextp == NULL)
 		return (NULL);
 
 	return (nextp);

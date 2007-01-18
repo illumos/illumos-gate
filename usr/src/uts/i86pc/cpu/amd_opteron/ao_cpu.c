@@ -20,14 +20,14 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-#include <sys/chip.h>
+#include <sys/pghw.h>
 #include <sys/cmn_err.h>
 #include <sys/sysmacros.h>
 #include <sys/fm/protocol.h>
@@ -72,8 +72,8 @@ ao_fmri_create(ao_data_t *ao, nv_alloc_t *nva)
 
 	fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 3,
 	    "motherboard", 0,
-	    "chip", ao->ao_cpu->cpu_chip->chip_id,
-	    "cpu", chip_plat_get_clogid(ao->ao_cpu));
+	    "chip", pg_plat_hw_instance_id(ao->ao_cpu, PGHW_CHIP),
+	    "cpu", cpuid_get_clogid(ao->ao_cpu));
 
 	return (nvl);
 }
@@ -113,7 +113,7 @@ int
 ao_scrubber_enable(void *data, uint64_t base, uint64_t ilen, int csdiscontig)
 {
 	ao_data_t *ao = data;
-	chipid_t chipid = chip_plat_get_chipid(ao->ao_cpu);
+	chipid_t chipid = pg_plat_hw_instance_id(ao->ao_cpu, PGHW_CHIP);
 	uint32_t rev = cpuid_getchiprev(ao->ao_cpu);
 	uint32_t scrubctl, lo, hi;
 	int rv = 1;

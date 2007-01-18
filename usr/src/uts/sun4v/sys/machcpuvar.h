@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -159,7 +159,9 @@ struct	machcpu {
 	uint64_t	mondo_data_ra;		/* mono data pa */
 	uint16_t	*cpu_list;		/* uint16_t [NCPU] */
 	uint64_t	cpu_list_ra;		/* cpu list ra */
-	id_t		cpu_ipipe;		/* cpu exec unit id */
+	id_t		cpu_ipipe;		/* cpu int exec unit id */
+	id_t		cpu_fpu;		/* cpu fpu unit id */
+	id_t		cpu_core;		/* cpu core id */
 	kthread_t	*startup_thread;
 };
 
@@ -213,6 +215,7 @@ struct cpu_node {
 	int	ecache_setsize;
 	uint64_t	device_id;
 	id_t	exec_unit_mapping;
+	id_t	fpu_mapping;
 };
 
 extern struct cpu_node cpunodes[];

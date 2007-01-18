@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,7 @@
 #include <sys/cyclic.h>
 #include <sys/errorq.h>
 #include <sys/errclassify.h>
+#include <sys/pghw.h>
 
 #ifdef	CHEETAHPLUS_ERRATUM_25
 #include <sys/xc_impl.h>
@@ -2991,7 +2992,7 @@ ce_ptnr_select(struct async_flt *aflt, int flags, int *typep)
 		if (sp == NULL || sp->cpu_part != dtcr->cpu_part ||
 		    !cpu_flagged_active(sp->cpu_flags) ||
 		    (sp == dtcr && !(flags & PTNR_SELFOK)) ||
-		    (sp->cpu_chip->chip_id == dtcr->cpu_chip->chip_id &&
+		    (pg_plat_cpus_share(sp, dtcr, PGHW_CHIP) &&
 		    !(flags & PTNR_SIBLINGOK))) {
 			sp = dtcr->cpu_next_part;
 		} else {
@@ -2999,8 +3000,7 @@ ce_ptnr_select(struct async_flt *aflt, int flags, int *typep)
 				*typep = CE_XDIAG_PTNR_REMOTE;
 			} else if (sp == dtcr) {
 				*typep = CE_XDIAG_PTNR_SELF;
-			} else if (sp->cpu_chip->chip_id ==
-			    dtcr->cpu_chip->chip_id) {
+			} else if (pg_plat_cpus_share(sp, dtcr, PGHW_CHIP)) {
 				*typep = CE_XDIAG_PTNR_SIBLING;
 			} else {
 				*typep = CE_XDIAG_PTNR_LOCAL;
@@ -3051,7 +3051,7 @@ ce_ptnr_select(struct async_flt *aflt, int flags, int *typep)
 			*typep = CE_XDIAG_PTNR_REMOTE;
 			return (ptnr);
 		}
-		if (ptnr->cpu_chip->chip_id == dtcr->cpu_chip->chip_id) {
+		if (pg_plat_cpus_share(ptnr, dtcr, PGHW_CHIP)) {
 			if (sibptnr == NULL)
 				sibptnr = ptnr;
 			continue;
