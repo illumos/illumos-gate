@@ -33,7 +33,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "Broadcom Gb Ethernet v0.53";
+static char bge_ident[] = "Broadcom Gb Ethernet v0.54";
 
 /*
  * Property names
@@ -436,8 +436,7 @@ bge_restart(bge_t *bgep, boolean_t reset_phys)
 	if (bge_reset(bgep) != DDI_SUCCESS)
 		retval = DDI_FAILURE;
 #endif
-	if (bgep->bge_mac_state == BGE_MAC_STARTED &&
-			retval == DDI_SUCCESS) {
+	if (bgep->bge_mac_state == BGE_MAC_STARTED) {
 		if (bge_start(bgep, reset_phys) != DDI_SUCCESS)
 			retval = DDI_FAILURE;
 		bgep->watchdog = 0;

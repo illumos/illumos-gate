@@ -3057,14 +3057,11 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	 * NVRAM Corruption Workaround
 	 */
 	for (tries = 0; tries < MAX_TRY_NVMEM_ACQUIRE; tries++)
-		if (bge_nvmem_acquire(bgep) == 0)
+		if (bge_nvmem_acquire(bgep) == EAGAIN)
 			break;
-	if (tries >= MAX_TRY_NVMEM_ACQUIRE) {
+	if (tries >= MAX_TRY_NVMEM_ACQUIRE)
 		BGE_DEBUG(("%s: fail to acquire nvram lock",
 			bgep->ifname));
-		bge_fm_ereport(bgep, DDI_FM_DEVICE_NO_RESPONSE);
-		return (DDI_FAILURE);
-	}
 
 #ifdef BGE_IPMI_ASF
 	if (!bgep->asf_enabled) {
