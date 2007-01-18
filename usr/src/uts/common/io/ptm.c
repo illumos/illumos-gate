@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -560,7 +560,7 @@ ptmwput(queue_t *qp, mblk_t *mp)
 			miocack(qp, mp, 0, 0);
 			break;
 		}
-		case PT_OWNER:
+		case OWNERPT:
 		{
 			pt_own_t *ptop;
 			int error;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -164,7 +164,7 @@ typedef struct pt_own {
 #define	UNLKPT		(('P'<<8)|2)	/* unlock master/slave pair */
 #define	PTSSTTY		(('P'<<8)|3)	/* set tty flag */
 #define	ZONEPT		(('P'<<8)|4)	/* set zone of master/slave pair */
-#define	PT_OWNER	(('P'<<8)|5)	/* set owner/group for slave device */
+#define	OWNERPT		(('P'<<8)|5)	/* set owner/group for slave device */
 
 #ifdef _KERNEL
 /*

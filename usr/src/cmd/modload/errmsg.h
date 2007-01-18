@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +59,6 @@ extern "C" {
 #define	ERR_ALIAS_IN_NAM_MAJ	"Alias (%s) already in use as driver name.\n"
 #define	ERR_ALIAS_IN_USE	"(%s) already in use as a driver or alias.\n"
 #define	ERR_CANT_ACCESS_FILE	"Cannot access file (%s).\n"
-#define	ERR_REM_LOCK		"Cannot remove lockfile (%s). Remove by hand.\n"
 #define	ERR_BAD_PATH	"Bad syntax for pathname : (%s)\n"
 #define	ERR_FORK_FAIL	"Fork failed; cannot exec : %s\n"
 #define	ERR_PROG_IN_USE	"add_drv/rem_drv currently busy; try later\n"
@@ -95,7 +94,10 @@ extern "C" {
 "Warning: Major number (%d) inconsistent with /etc/name_to_major file.\n"
 #define	ERR_MAJ_TOOBIG	"Warning: Entry '%s %llu' in %s has a major number " \
 			"larger\nthan the maximum allowed value %u.\n"
-#define	ERR_LOCKFILE	"Failed to create lock file.\n"
+
+#define	ERR_CREAT_LOCK	"Failed to create lock file(%s): %s\n"
+#define	ERR_LOCK	"Failed to lock the lock file(%s): %s\n"
+#define	ERR_UNLOCK	"Failed to unlock the lock file(%s): %s\n"
 
 #define	ERR_LOCATION	\
 "Warning: %s-bit version of driver found at %s.\n"

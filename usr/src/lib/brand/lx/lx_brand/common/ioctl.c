@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1202,11 +1202,11 @@ ict_gptn(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
 	 * it assumes the fd node that's passed to it is a ptm node,
 	 * and in our case it's an lx_ptm node.  It also relies on
 	 * naming services to get the current process group name.
-	 * Hence we have to invoke the PT_OWNER ioctl directly here.
+	 * Hence we have to invoke the OWNERPT ioctl directly here.
 	 */
 	pto.pto_ruid = getuid();
 	pto.pto_rgid = getgid();
-	if (ioctl_istr(fd, PT_OWNER, "PT_OWNER", &pto, sizeof (pto)) != 0)
+	if (ioctl_istr(fd, OWNERPT, "OWNERPT", &pto, sizeof (pto)) != 0)
 		return (-EACCES);
 
 	/* Copy out the data. */

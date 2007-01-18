@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -818,6 +818,7 @@ const struct ioc {
 	{ (uint_t)UNLKPT,		"UNLKPT",		NULL},
 	{ (uint_t)PTSSTTY,		"PTSSTTY",		NULL},
 	{ (uint_t)ZONEPT,		"ZONEPT",		NULL},
+	{ (uint_t)OWNERPT,		"OWNERPT",		NULL},
 
 	/* aggr link aggregation pseudo driver ioctls */
 	{ (uint_t)LAIOC_CREATE,		"LAIOC_CREATE",		"laioc_create"},

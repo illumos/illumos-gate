@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,6 +45,7 @@
 
 static char *add_rem_lock;	/* lock file */
 static char *tmphold;		/* temperary file for updating */
+static int  add_rem_lock_fd = -1;
 
 static int get_cached_n_to_m_file(char *filename, char ***cache);
 static int get_name_to_major_entry(int *major_no, char *driver_name,
@@ -648,39 +649,36 @@ get_entry(
 	return (ptr);
 }
 
-/*ARGSUSED0*/
-static void
-signal_rtn(int sig)
-{
-	exit_unlock();
-}
-
 void
 enter_lock(void)
 {
-	int fd;
-
-	/*
-	 * Setup handler to clean lock file in case user terminates
-	 * the command.
-	 */
-	(void) sigset(SIGINT, signal_rtn);
-	(void) sigset(SIGHUP, signal_rtn);
-	(void) sigset(SIGTERM, signal_rtn);
+	struct flock lock;
 
 	/*
 	 * attempt to create the lock file
 	 */
-	if ((fd = open(add_rem_lock, O_CREAT | O_EXCL | O_WRONLY,
-	    S_IRUSR | S_IWUSR)) == -1) {
-		if (errno == EEXIST) {
+	add_rem_lock_fd = open(add_rem_lock, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
+	if (add_rem_lock_fd < 0) {
+		(void) fprintf(stderr, gettext(ERR_CREAT_LOCK),
+		    add_rem_lock, strerror(errno));
+		exit(1);
+	}
+
+	lock.l_type = F_WRLCK;
+	lock.l_whence = SEEK_SET;
+	lock.l_start = 0;
+	lock.l_len = 0;
+
+	/* Try for the lock but don't wait. */
+	if (fcntl(add_rem_lock_fd, F_SETLK, &lock) == -1) {
+		if (errno == EACCES || errno == EAGAIN) {
 			(void) fprintf(stderr, gettext(ERR_PROG_IN_USE));
 		} else {
-			perror(gettext(ERR_LOCKFILE));
+			(void) fprintf(stderr, gettext(ERR_LOCK),
+			    add_rem_lock, strerror(errno));
 		}
 		exit(1);
 	}
-	(void) close(fd);
 }
 
 void
@@ -709,13 +707,22 @@ cleanup_moddir(void)
 void
 exit_unlock(void)
 {
-	struct stat buf;
+	struct flock unlock;
 
-	if (stat(add_rem_lock, &buf) == NOERR) {
-		if (unlink(add_rem_lock) == -1) {
-			(void) fprintf(stderr, gettext(ERR_REM_LOCK),
-			    add_rem_lock);
-		}
+	if (add_rem_lock_fd < 0)
+		return;
+
+	unlock.l_type = F_UNLCK;
+	unlock.l_whence = SEEK_SET;
+	unlock.l_start = 0;
+	unlock.l_len = 0;
+
+	if (fcntl(add_rem_lock_fd, F_SETLK, &unlock) == -1) {
+		(void) fprintf(stderr, gettext(ERR_UNLOCK),
+		    add_rem_lock, strerror(errno));
+	} else {
+		(void) close(add_rem_lock_fd);
+		add_rem_lock_fd = -1;
 	}
 }
 

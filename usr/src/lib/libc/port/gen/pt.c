@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,7 +156,7 @@ grantpt(int fd)
 	else
 		pto.pto_rgid = getgid();
 
-	istr.ic_cmd = PT_OWNER;
+	istr.ic_cmd = OWNERPT;
 	istr.ic_len = sizeof (pt_own_t);
 	istr.ic_timout = 0;
 	istr.ic_dp = (char *)&pto;

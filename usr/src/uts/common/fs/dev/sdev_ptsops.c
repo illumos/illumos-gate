@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -274,6 +274,25 @@ devpts_prunedir(struct sdev_node *ddv)
  * Lookup for /dev/pts directory
  *	If the entry does not exist, the devpts_create_rvp() callback
  *	is invoked to create it. Nodes do not persist across reboot.
+ *
+ * There is a potential denial of service here via
+ * fattach on top of a /dev/pts node - any permission changes
+ * applied to the node, apply to the fattached file and not
+ * to the underlying pts node. As a result when the previous
+ * user fdetaches, the pts node is still owned by the previous
+ * owner. To prevent this we don't allow fattach() on top of a pts
+ * node. This is done by a modification in the namefs filesystem
+ * where we check if the underlying node has the /dev/pts vnodeops.
+ * We do this via VOP_REALVP() on the underlying specfs node.
+ * sdev_nodes currently don't have a realvp. If a realvp is ever
+ * created for sdev_nodes, then VOP_REALVP() will return the
+ * actual realvp (possibly a ufs vnode). This will defeat the check
+ * in namefs code which checks if VOP_REALVP() returns a devpts
+ * node. We add an ASSERT here in /dev/pts lookup() to check for
+ * this condition. If sdev_nodes ever get a VOP_REALVP() entry point,
+ * change the code in the namefs filesystem code (in nm_mount()) to
+ * access the realvp of the specfs node directly instead of using
+ * VOP_REALVP().
  */
 /*ARGSUSED3*/
 static int
@@ -282,6 +301,7 @@ devpts_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 {
 	struct sdev_node *sdvp = VTOSDEV(dvp);
 	struct sdev_node *dv;
+	struct vnode *rvp = NULL;
 	int error;
 
 	error = devname_lookup_func(sdvp, nm, vpp, cred, devpts_create_rvp,
@@ -291,6 +311,7 @@ devpts_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 		switch ((*vpp)->v_type) {
 		case VCHR:
 			dv = VTOSDEV(VTOS(*vpp)->s_realvp);
+			ASSERT(VOP_REALVP(SDEVTOV(dv), &rvp) == ENOSYS);
 			break;
 		case VDIR:
 			dv = VTOSDEV(*vpp);
@@ -378,6 +399,7 @@ devpts_setattr(struct vnode *vp, struct vattr *vap, int flags,
 	return (devname_setattr_func(vp, vap, flags, cred,
 		    devpts_set_id, AT_UID|AT_GID));
 }
+
 
 /*
  * We override lookup and readdir to build entries based on the
