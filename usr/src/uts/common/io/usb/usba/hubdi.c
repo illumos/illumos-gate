@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1970,7 +1970,7 @@ fail:
 	{
 		char *pathname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
-		USB_DPRINTF_L0(DPRINT_MASK_ATTA, hubdi_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubdi_log_handle,
 		    "cannot attach %s", ddi_pathname(dip, pathname));
 
 		kmem_free(pathname, MAXPATHLEN);
@@ -8073,7 +8073,7 @@ hubd_init_power_budget(hubd_t *hubd)
 			if (!phubd->h_ignore_pwr_budget) {
 				mutex_enter(HUBD_MUTEX(phubd));
 				if (phubd->h_local_pwr_on == B_FALSE) {
-					USB_DPRINTF_L0(DPRINT_MASK_HUB,
+					USB_DPRINTF_L1(DPRINT_MASK_HUB,
 					    hubd->h_log_handle,
 					    "two bus-powered hubs cannot "
 					    "be concatenated");
@@ -8177,7 +8177,7 @@ usba_hubdi_check_power_budget(dev_info_t *dip, usba_device_t *child_ud,
 	    pwr_required, config_index);
 
 	if (pwr_required > pwr_limit) {
-		USB_DPRINTF_L0(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "configuration %d for device %s %s at port %d "
 		    "exceeds power available for this port, please "
 		    "re-insert your device into another hub port which "

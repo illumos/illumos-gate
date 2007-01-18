@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -707,7 +707,7 @@ ehci_register_intrs_and_init_mutex(ehci_state_t	*ehcip)
 	if (ehci_is_polled(ehcip->ehci_dip)) {
 		extern pri_t maxclsyspri;
 
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 		    "ehci_register_intrs_and_init_mutex: "
 		    "running in simulated polled mode");
 
@@ -3707,7 +3707,7 @@ ehci_do_soft_reset(ehci_state_t	*ehcip)
 		Set_OpRegRetry(ehci_async_list_addr, (uint32_t)
 			ehci_save_regs->ehci_async_list_addr, retry);
 		if (retry >= EHCI_MAX_RETRY) {
-			USB_DPRINTF_L0(PRINT_MASK_ATTA,
+			USB_DPRINTF_L2(PRINT_MASK_ATTA,
 			    ehcip->ehci_log_hdl, "ehci_do_soft_reset:"
 			    " ASYNCLISTADDR write failed.");
 

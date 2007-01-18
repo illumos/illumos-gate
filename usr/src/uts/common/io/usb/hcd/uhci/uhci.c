@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -363,7 +363,7 @@ skip_intr:
 	if (polled) {
 		extern pri_t maxclsyspri;
 
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 		    "uhci_attach: running in simulated polled mode.");
 
 		/* create thread to poll */

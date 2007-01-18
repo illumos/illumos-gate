@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -417,7 +417,7 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", usb_bulk_req_t))
 /* print a panic sync message to the console */
 #define	SCSA2USB_PRINT_SYNC_MSG(m, s) \
 	if ((m) == B_TRUE) { \
-		USB_DPRINTF_L0(DPRINT_MASK_SCSA, (s)->scsa2usb_log_handle, \
+		USB_DPRINTF_L1(DPRINT_MASK_SCSA, (s)->scsa2usb_log_handle, \
 		    "syncing not supported"); \
 		(m) = B_FALSE; \
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1244,7 +1244,7 @@ ohci_register_intrs_and_init_mutex(ohci_state_t	*ohcip)
 	if (ohci_is_polled(ohcip->ohci_dip)) {
 		extern pri_t maxclsyspri;
 
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ohcip->ohci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, ohcip->ohci_log_hdl,
 		    "ohci_register_intrs_and_init_mutex: "
 		    "running in simulated polled mode");
 
@@ -1620,9 +1620,8 @@ ohci_init_ctlr(ohci_state_t	*ohcip)
 		    ohcip->ohci_frame_interval))) {
 			if (retry >= 10) {
 				USB_DPRINTF_L1(PRINT_MASK_ATTA,
-				    ohcip->ohci_log_hdl, "ohci_init_ctlr:"
-				    " Failed to program Frame"
-				    " Interval Register, giving up.");
+				    ohcip->ohci_log_hdl, "Failed to program"
+				    " Frame Interval Register.");
 
 				return (DDI_FAILURE);
 			}
