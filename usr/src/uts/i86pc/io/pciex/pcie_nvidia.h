@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,7 @@ void		add_nvidia_isa_bridge_props(dev_info_t *, uchar_t, uchar_t,
 #define	NVIDIA_CK804_DEFAULT_ISA_BRIDGE_DEVID	0x50	/* LPC Default Bridge */
 #define	NVIDIA_CK804_PRO_ISA_BRIDGE_DEVID	0x51	/* LPC Bridge */
 #define	NVIDIA_CK804_SLAVE_ISA_BRIDGE_DEVID	0xd3	/* Slave LPC Bridge */
+#define	NVIDIA_CK804_AER_VALID_REVID		0xa3	/* RID w/ AER enabled */
 
 #define	NVIDIA_CK804_LPC2PCI_DEVICE_ID(did) \
 	(((did) == NVIDIA_CK804_DEFAULT_ISA_BRIDGE_DEVID) || \

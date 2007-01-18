@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,15 +105,17 @@ npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl)
 {
 	ushort_t cya1;
 
-	if ((pci_config_get16(cfg_hdl, PCI_CONF_VENID) != NVIDIA_VENDOR_ID) &&
-	    (pci_config_get16(cfg_hdl, PCI_CONF_DEVID) !=
-	    NVIDIA_CK804_DEVICE_ID))
-		return;
-
-	cya1 =  pci_config_get16(cfg_hdl, NVIDIA_CK804_VEND_CYA1_OFF);
-	if (!(cya1 & ~NVIDIA_CK804_VEND_CYA1_ERPT_MASK))
-		(void) pci_config_put16(cfg_hdl, NVIDIA_CK804_VEND_CYA1_OFF,
-		    cya1 | NVIDIA_CK804_VEND_CYA1_ERPT_VAL);
+	if ((pci_config_get16(cfg_hdl, PCI_CONF_VENID) == NVIDIA_VENDOR_ID) &&
+	    (pci_config_get16(cfg_hdl, PCI_CONF_DEVID) ==
+	    NVIDIA_CK804_DEVICE_ID) &&
+	    (pci_config_get8(cfg_hdl, PCI_CONF_REVID) >=
+	    NVIDIA_CK804_AER_VALID_REVID)) {
+		cya1 =  pci_config_get16(cfg_hdl, NVIDIA_CK804_VEND_CYA1_OFF);
+		if (!(cya1 & ~NVIDIA_CK804_VEND_CYA1_ERPT_MASK))
+			(void) pci_config_put16(cfg_hdl,
+			    NVIDIA_CK804_VEND_CYA1_OFF,
+			    cya1 | NVIDIA_CK804_VEND_CYA1_ERPT_VAL);
+	}
 }
 
 

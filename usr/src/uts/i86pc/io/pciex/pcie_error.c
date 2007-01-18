@@ -195,6 +195,7 @@ pcie_error_enable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 	uint16_t	aer_ptr = 0;
 	uint16_t	device_ctl;
 	uint16_t	dev_type = 0;
+	uint16_t	vendor_id, device_id;
 	uint32_t	aer_reg;
 	uint32_t	uce_mask = pcie_aer_uce_mask;
 	boolean_t	empty_io_range = B_FALSE;
@@ -305,14 +306,25 @@ pcie_error_enable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 		device_ctl &= ~PCIE_DEVCTL_UR_REPORTING_EN;
 
 	/*
+	 * Disable AER for CK8-04 devices with revid < 0xA3
+	 */
+	vendor_id = pci_config_get16(cfg_hdl, PCI_CONF_VENID);
+	device_id = pci_config_get16(cfg_hdl, PCI_CONF_DEVID);
+	if ((vendor_id == NVIDIA_VENDOR_ID) &&
+	    (device_id == NVIDIA_CK804_DEVICE_ID) &&
+	    (pci_config_get8(cfg_hdl, PCI_CONF_REVID) <
+	    NVIDIA_CK804_AER_VALID_REVID)) {
+		aer_ptr = PCIE_EXT_CAP_NEXT_PTR_NULL;
+	}
+
+	/*
 	 * For Nvidia chipset, call pcie_nvidia_error_init().
 	 *
 	 * For non-Nvidia Root Ports, disable UR for all child devices by
 	 * changing the default ue mask (for AER devices) and the default
 	 * device control value (for non-AER device).
 	 */
-	if ((pci_config_get16(cfg_hdl, PCI_CONF_VENID) == NVIDIA_VENDOR_ID) &&
-	    NVIDIA_PCIE_RC_DEV_ID(pci_config_get16(cfg_hdl, PCI_CONF_DEVID)))
+	if ((vendor_id == NVIDIA_VENDOR_ID) && NVIDIA_PCIE_RC_DEV_ID(device_id))
 		pcie_nvidia_error_init(cdip, cfg_hdl, cap_ptr, aer_ptr);
 	else if (dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT) {
 		pcie_expected_ue_mask |= PCIE_AER_UCE_UR;
@@ -470,6 +482,7 @@ pcie_error_disable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 	uint8_t		header_type;
 	uint8_t		bcr;
 	uint16_t	command_reg, status_reg;
+	uint16_t	vendor_id, device_id;
 
 	if (pcie_error_disable_flag)
 		return;
@@ -514,10 +527,21 @@ pcie_error_disable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 	    "pcie-aer-pointer", PCIE_EXT_CAP_NEXT_PTR_NULL);
 
 	/*
+	 * Disable AER for CK8-04 devices with revid < 0xA3
+	 */
+	vendor_id = pci_config_get16(cfg_hdl, PCI_CONF_VENID);
+	device_id = pci_config_get16(cfg_hdl, PCI_CONF_DEVID);
+	if ((vendor_id == NVIDIA_VENDOR_ID) &&
+	    (device_id == NVIDIA_CK804_DEVICE_ID) &&
+	    (pci_config_get8(cfg_hdl, PCI_CONF_REVID) <
+	    NVIDIA_CK804_AER_VALID_REVID)) {
+		aer_ptr = PCIE_EXT_CAP_NEXT_PTR_NULL;
+	}
+
+	/*
 	 * Only disable these set of errors for CK8-04/IO-4 devices
 	 */
-	if ((pci_config_get16(cfg_hdl, PCI_CONF_VENID) == NVIDIA_VENDOR_ID) &&
-	    NVIDIA_PCIE_RC_DEV_ID(pci_config_get16(cfg_hdl, PCI_CONF_DEVID)))
+	if ((vendor_id == NVIDIA_VENDOR_ID) && NVIDIA_PCIE_RC_DEV_ID(device_id))
 		pcie_nvidia_error_fini(cfg_hdl, cap_ptr, aer_ptr);
 
 	if (aer_ptr == PCIE_EXT_CAP_NEXT_PTR_NULL)
