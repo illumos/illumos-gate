@@ -357,10 +357,11 @@ typedef enum zfs_ioc {
 	ZFS_IOC_INJECT_LIST_NEXT,
 	ZFS_IOC_ERROR_LOG,
 	ZFS_IOC_CLEAR,
-	ZFS_IOC_BOOKMARK_NAME,
 	ZFS_IOC_PROMOTE,
 	ZFS_IOC_DESTROY_SNAPS,
-	ZFS_IOC_SNAPSHOT
+	ZFS_IOC_SNAPSHOT,
+	ZFS_IOC_DSOBJ_TO_DSNAME,
+	ZFS_IOC_OBJ_TO_PATH
 } zfs_ioc_t;
 
 /*
@@ -376,9 +377,9 @@ typedef enum {
 /*
  * Bookmark name values.
  */
+#define	ZPOOL_ERR_LIST		"error list"
 #define	ZPOOL_ERR_DATASET	"dataset"
 #define	ZPOOL_ERR_OBJECT	"object"
-#define	ZPOOL_ERR_RANGE		"range"
 
 #define	HIS_MAX_RECORD_LEN	(MAXPATHLEN + MAXPATHLEN + 1)
 

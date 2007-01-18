@@ -2659,55 +2659,36 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 static void
 print_error_log(zpool_handle_t *zhp)
 {
-	nvlist_t **log;
-	size_t nelem;
-	size_t maxdsname = sizeof ("DATASET") - 1;
-	size_t maxobjname = sizeof ("OBJECT") - 1;
-	int i;
-	nvlist_t *nv;
-	size_t len;
-	char *dsname, *objname, *range;
+	nvlist_t *nverrlist;
+	nvpair_t *elem;
+	char *pathname;
+	size_t len = MAXPATHLEN * 2;
 
-	if (zpool_get_errlog(zhp, &log, &nelem) != 0) {
+	if (zpool_get_errlog(zhp, &nverrlist) != 0) {
 		(void) printf("errors: List of errors unavailable "
 		    "(insufficient privileges)\n");
 		return;
 	}
 
-	for (i = 0; i < nelem; i++) {
-		nv = log[i];
+	(void) printf("errors: Permanent errors have been "
+	    "detected in the following files:\n\n");
 
-		verify(nvlist_lookup_string(nv, ZPOOL_ERR_DATASET,
-		    &dsname) == 0);
-		len = strlen(dsname);
-		if (len > maxdsname)
-			maxdsname = len;
+	pathname = safe_malloc(len);
+	elem = NULL;
+	while ((elem = nvlist_next_nvpair(nverrlist, elem)) != NULL) {
+		nvlist_t *nv;
+		uint64_t dsobj, obj;
 
-		verify(nvlist_lookup_string(nv, ZPOOL_ERR_OBJECT,
-		    &objname) == 0);
-		len = strlen(objname);
-		if (len > maxobjname)
-			maxobjname = len;
+		verify(nvpair_value_nvlist(elem, &nv) == 0);
+		verify(nvlist_lookup_uint64(nv, ZPOOL_ERR_DATASET,
+		    &dsobj) == 0);
+		verify(nvlist_lookup_uint64(nv, ZPOOL_ERR_OBJECT,
+		    &obj) == 0);
+		zpool_obj_to_path(zhp, dsobj, obj, pathname, len);
+		(void) printf("%7s %s\n", "", pathname);
 	}
-
-	(void) printf("errors: The following persistent errors have been "
-	    "detected:\n\n");
-	(void) printf("%8s  %-*s  %-*s  %s\n", "", (int)maxdsname, "DATASET",
-	    (int)maxobjname, "OBJECT", "RANGE");
-
-	for (i = 0; i < nelem; i++) {
-		nv = log[i];
-
-		verify(nvlist_lookup_string(nv, ZPOOL_ERR_DATASET,
-		    &dsname) == 0);
-		verify(nvlist_lookup_string(nv, ZPOOL_ERR_OBJECT,
-		    &objname) == 0);
-		verify(nvlist_lookup_string(nv, ZPOOL_ERR_RANGE,
-		    &range) == 0);
-
-		(void) printf("%8s  %-*s  %-*s  %s\n", "", (int)maxdsname,
-		    dsname, (int)maxobjname, objname, range);
-	}
+	free(pathname);
+	nvlist_free(nverrlist);
 }
 
 static void
@@ -2896,7 +2877,6 @@ status_callback(zpool_handle_t *zhp, void *data)
 	if (config != NULL) {
 		int namewidth;
 		uint64_t nerr;
-		size_t realerr;
 		nvlist_t **spares;
 		uint_t nspares;
 
@@ -2922,14 +2902,25 @@ status_callback(zpool_handle_t *zhp, void *data)
 
 		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_ERRCOUNT,
 		    &nerr) == 0) {
+			nvlist_t *nverrlist = NULL;
+
 			/*
 			 * If the approximate error count is small, get a
 			 * precise count by fetching the entire log and
 			 * uniquifying the results.
 			 */
 			if (nerr < 100 && !cbp->cb_verbose &&
-			    zpool_get_errlog(zhp, NULL, &realerr) == 0)
-				nerr = realerr;
+			    zpool_get_errlog(zhp, &nverrlist) == 0) {
+				nvpair_t *elem;
+
+				elem = NULL;
+				nerr = 0;
+				while ((elem = nvlist_next_nvpair(nverrlist,
+				    elem)) != NULL) {
+					nerr++;
+				}
+			}
+			nvlist_free(nverrlist);
 
 			(void) printf("\n");
 

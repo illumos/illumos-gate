@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -530,6 +530,49 @@ zfs_ioc_pool_log_history(zfs_cmd_t *zc)
 
 	spa_close(spa, FTAG);
 	kmem_free(history_str, size);
+
+	return (error);
+}
+
+static int
+zfs_ioc_dsobj_to_dsname(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	dsl_pool_t *dp;
+	dsl_dataset_t *ds = NULL;
+	int error;
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+		return (error);
+	dp = spa_get_dsl(spa);
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	if ((error = dsl_dataset_open_obj(dp, zc->zc_obj,
+	    NULL, DS_MODE_NONE, FTAG, &ds)) != 0) {
+		rw_exit(&dp->dp_config_rwlock);
+		spa_close(spa, FTAG);
+		return (error);
+	}
+	dsl_dataset_name(ds, zc->zc_value);
+	dsl_dataset_close(ds, DS_MODE_NONE, FTAG);
+	rw_exit(&dp->dp_config_rwlock);
+	spa_close(spa, FTAG);
+
+	return (0);
+}
+
+static int
+zfs_ioc_obj_to_path(zfs_cmd_t *zc)
+{
+	objset_t *osp;
+	int error;
+
+	if ((error = dmu_objset_open(zc->zc_name, DMU_OST_ZFS,
+	    DS_MODE_NONE | DS_MODE_READONLY, &osp)) != 0)
+		return (error);
+
+	error = zfs_obj_to_path(osp, zc->zc_obj, zc->zc_value,
+	    sizeof (zc->zc_value));
+	dmu_objset_close(osp);
 
 	return (error);
 }
@@ -1379,28 +1422,6 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 }
 
 static int
-zfs_ioc_bookmark_name(zfs_cmd_t *zc)
-{
-	spa_t *spa;
-	int error;
-	nvlist_t *nvl;
-
-	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
-		return (error);
-
-	VERIFY(nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-
-	error = spa_bookmark_name(spa, &zc->zc_bookmark, nvl);
-	if (error == 0)
-		error = put_nvlist(zc, nvl);
-	nvlist_free(nvl);
-
-	spa_close(spa, FTAG);
-
-	return (error);
-}
-
-static int
 zfs_ioc_promote(zfs_cmd_t *zc)
 {
 	char *cp;
@@ -1454,10 +1475,11 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_inject_list_next,	zfs_secpolicy_inject,	no_name },
 	{ zfs_ioc_error_log,		zfs_secpolicy_inject,	pool_name },
 	{ zfs_ioc_clear,		zfs_secpolicy_config,	pool_name },
-	{ zfs_ioc_bookmark_name,	zfs_secpolicy_inject,	pool_name },
 	{ zfs_ioc_promote,		zfs_secpolicy_write,	dataset_name },
 	{ zfs_ioc_destroy_snaps,	zfs_secpolicy_write,	dataset_name },
-	{ zfs_ioc_snapshot,		zfs_secpolicy_write,	dataset_name }
+	{ zfs_ioc_snapshot,		zfs_secpolicy_write,	dataset_name },
+	{ zfs_ioc_dsobj_to_dsname,	zfs_secpolicy_config,	pool_name },
+	{ zfs_ioc_obj_to_path,		zfs_secpolicy_config,	no_name }
 };
 
 static int

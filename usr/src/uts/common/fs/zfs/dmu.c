@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -924,75 +924,6 @@ dmu_object_size_from_db(dmu_buf_t *db, uint32_t *blksize, u_longlong_t *nblk512)
 	/* add 1 for dnode space */
 	*nblk512 = ((DN_USED_BYTES(dn->dn_phys) + SPA_MINBLOCKSIZE/2) >>
 	    SPA_MINBLOCKSHIFT) + 1;
-}
-
-/*
- * Given a bookmark, return the name of the dataset, object, and range in
- * human-readable format.
- */
-int
-spa_bookmark_name(spa_t *spa, zbookmark_t *zb, nvlist_t *nvl)
-{
-	dsl_pool_t *dp;
-	dsl_dataset_t *ds = NULL;
-	objset_t *os = NULL;
-	dnode_t *dn = NULL;
-	int err, shift;
-	char dsname[MAXNAMELEN];
-	char objname[32];
-	char range[64];
-
-	dp = spa_get_dsl(spa);
-	if (zb->zb_objset != 0) {
-		rw_enter(&dp->dp_config_rwlock, RW_READER);
-		err = dsl_dataset_open_obj(dp, zb->zb_objset,
-		    NULL, DS_MODE_NONE, FTAG, &ds);
-		if (err) {
-			rw_exit(&dp->dp_config_rwlock);
-			return (err);
-		}
-		dsl_dataset_name(ds, dsname);
-		dsl_dataset_close(ds, DS_MODE_NONE, FTAG);
-		rw_exit(&dp->dp_config_rwlock);
-
-		err = dmu_objset_open(dsname, DMU_OST_ANY, DS_MODE_NONE, &os);
-		if (err)
-			goto out;
-
-	} else {
-		dsl_dataset_name(NULL, dsname);
-		os = dp->dp_meta_objset;
-	}
-
-
-	if (zb->zb_object == DMU_META_DNODE_OBJECT) {
-		(void) strncpy(objname, "mdn", sizeof (objname));
-	} else {
-		(void) snprintf(objname, sizeof (objname), "%lld",
-		    (longlong_t)zb->zb_object);
-	}
-
-	err = dnode_hold(os->os, zb->zb_object, FTAG, &dn);
-	if (err)
-		goto out;
-
-	shift = (dn->dn_datablkshift?dn->dn_datablkshift:SPA_MAXBLOCKSHIFT) +
-	    zb->zb_level * (dn->dn_indblkshift - SPA_BLKPTRSHIFT);
-	(void) snprintf(range, sizeof (range), "%llu-%llu",
-	    (u_longlong_t)(zb->zb_blkid << shift),
-	    (u_longlong_t)((zb->zb_blkid+1) << shift));
-
-	if ((err = nvlist_add_string(nvl, ZPOOL_ERR_DATASET, dsname)) != 0 ||
-	    (err = nvlist_add_string(nvl, ZPOOL_ERR_OBJECT, objname)) != 0 ||
-	    (err = nvlist_add_string(nvl, ZPOOL_ERR_RANGE, range)) != 0)
-		goto out;
-
-out:
-	if (dn)
-		dnode_rele(dn, FTAG);
-	if (os && os != dp->dp_meta_objset)
-		dmu_objset_close(os);
-	return (err);
 }
 
 void

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -203,7 +203,7 @@ extern zpool_status_t zpool_import_status(nvlist_t *, char **);
  */
 extern nvlist_t *zpool_get_config(zpool_handle_t *, nvlist_t **);
 extern int zpool_refresh_stats(zpool_handle_t *, boolean_t *);
-extern int zpool_get_errlog(zpool_handle_t *, nvlist_t ***, size_t *);
+extern int zpool_get_errlog(zpool_handle_t *, nvlist_t **);
 
 /*
  * Import and export functions
@@ -225,6 +225,8 @@ extern int zpool_upgrade(zpool_handle_t *);
 extern int zpool_get_history(zpool_handle_t *, nvlist_t **);
 extern void zpool_log_history(libzfs_handle_t *, int, char **, const char *,
     boolean_t, boolean_t);
+extern void zpool_obj_to_path(zpool_handle_t *, uint64_t, uint64_t, char *,
+    size_t len);
 
 /*
  * Basic handle manipulations.  These functions do not create or destroy the
@@ -321,6 +323,7 @@ extern int zfs_enable(zfs_handle_t *);
 /*
  * Mount support functions.
  */
+extern boolean_t is_mounted(libzfs_handle_t *, const char *special, char **);
 extern boolean_t zfs_is_mounted(zfs_handle_t *, char **);
 extern int zfs_mount(zfs_handle_t *, const char *, int);
 extern int zfs_unmount(zfs_handle_t *, const char *, int);

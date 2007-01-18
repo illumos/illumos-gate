@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,8 +82,6 @@ struct zpool_handle {
 	size_t zpool_config_size;
 	nvlist_t *zpool_config;
 	nvlist_t *zpool_old_config;
-	nvlist_t **zpool_error_log;
-	size_t zpool_error_count;
 };
 
 int zfs_error(libzfs_handle_t *, int, const char *);

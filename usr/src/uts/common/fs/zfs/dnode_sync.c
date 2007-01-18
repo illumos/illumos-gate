@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -449,6 +449,9 @@ dnode_sync_free(dnode_t *dn, dmu_tx_t *tx)
 	/*
 	 * XXX - It would be nice to assert this, but we may still
 	 * have residual holds from async evictions from the arc...
+	 *
+	 * zfs_obj_to_path() also depends on this being
+	 * commented out.
 	 *
 	 * ASSERT3U(refcount_count(&dn->dn_holds), ==, 1);
 	 */

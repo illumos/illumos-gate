@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,25 +45,25 @@ static dsl_syncfunc_t dsl_dataset_rollback_sync;
 static dsl_checkfunc_t dsl_dataset_destroy_check;
 static dsl_syncfunc_t dsl_dataset_destroy_sync;
 
-#define	DOS_REF_MAX	(1ULL << 62)
+#define	DS_REF_MAX	(1ULL << 62)
 
 #define	DSL_DEADLIST_BLOCKSIZE	SPA_MAXBLOCKSIZE
 
 /*
  * We use weighted reference counts to express the various forms of exclusion
  * between different open modes.  A STANDARD open is 1 point, an EXCLUSIVE open
- * is DOS_REF_MAX, and a PRIMARY open is little more than half of an EXCLUSIVE.
+ * is DS_REF_MAX, and a PRIMARY open is little more than half of an EXCLUSIVE.
  * This makes the exclusion logic simple: the total refcnt for all opens cannot
- * exceed DOS_REF_MAX.  For example, EXCLUSIVE opens are exclusive because their
- * weight (DOS_REF_MAX) consumes the entire refcnt space.  PRIMARY opens consume
+ * exceed DS_REF_MAX.  For example, EXCLUSIVE opens are exclusive because their
+ * weight (DS_REF_MAX) consumes the entire refcnt space.  PRIMARY opens consume
  * just over half of the refcnt space, so there can't be more than one, but it
  * can peacefully coexist with any number of STANDARD opens.
  */
 static uint64_t ds_refcnt_weight[DS_MODE_LEVELS] = {
-	0,			/* DOS_MODE_NONE - invalid		*/
-	1,			/* DOS_MODE_STANDARD - unlimited number	*/
-	(DOS_REF_MAX >> 1) + 1,	/* DOS_MODE_PRIMARY - only one of these	*/
-	DOS_REF_MAX		/* DOS_MODE_EXCLUSIVE - no other opens	*/
+	0,			/* DS_MODE_NONE - invalid		*/
+	1,			/* DS_MODE_STANDARD - unlimited number	*/
+	(DS_REF_MAX >> 1) + 1,	/* DS_MODE_PRIMARY - only one of these	*/
+	DS_REF_MAX		/* DS_MODE_EXCLUSIVE - no other opens	*/
 };
 
 
@@ -214,9 +214,9 @@ dsl_dataset_evict(dmu_buf_t *db, void *dsv)
 	dsl_dataset_t *ds = dsv;
 	dsl_pool_t *dp = ds->ds_dir->dd_pool;
 
-	/* open_refcount == DOS_REF_MAX when deleting */
+	/* open_refcount == DS_REF_MAX when deleting */
 	ASSERT(ds->ds_open_refcount == 0 ||
-	    ds->ds_open_refcount == DOS_REF_MAX);
+	    ds->ds_open_refcount == DS_REF_MAX);
 
 	dprintf_ds(ds, "evicting %s\n", "");
 
@@ -381,7 +381,7 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 	if ((DS_MODE_LEVEL(mode) == DS_MODE_PRIMARY &&
 	    (ds->ds_phys->ds_flags & DS_FLAG_INCONSISTENT) &&
 	    !DS_MODE_IS_INCONSISTENT(mode)) ||
-	    (ds->ds_open_refcount + weight > DOS_REF_MAX)) {
+	    (ds->ds_open_refcount + weight > DS_REF_MAX)) {
 		mutex_exit(&ds->ds_lock);
 		dsl_dataset_close(ds, DS_MODE_NONE, tag);
 		return (EBUSY);
@@ -800,7 +800,7 @@ dsl_dataset_destroy(const char *name)
 int
 dsl_dataset_rollback(dsl_dataset_t *ds)
 {
-	ASSERT3U(ds->ds_open_refcount, ==, DOS_REF_MAX);
+	ASSERT3U(ds->ds_open_refcount, ==, DS_REF_MAX);
 	return (dsl_sync_task_do(ds->ds_dir->dd_pool,
 	    dsl_dataset_rollback_check, dsl_dataset_rollback_sync,
 	    ds, NULL, 0));
@@ -1062,7 +1062,7 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 	dsl_dataset_t *ds_prev = NULL;
 	uint64_t obj;
 
-	ASSERT3U(ds->ds_open_refcount, ==, DOS_REF_MAX);
+	ASSERT3U(ds->ds_open_refcount, ==, DS_REF_MAX);
 	ASSERT3U(ds->ds_phys->ds_num_children, <=, 1);
 	ASSERT(ds->ds_prev == NULL ||
 	    ds->ds_prev->ds_phys->ds_next_snap_obj != ds->ds_object);

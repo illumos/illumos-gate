@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -264,7 +264,8 @@ usage(void)
 	    "\n"
 	    "\t-t <mos>\tInject errors into the MOS for objects of the given\n"
 	    "\t\t\ttype.  Valid types are: mos, mosdir, config, bplist,\n"
-	    "\t\t\tspacemap, metaslab, errlog\n");
+	    "\t\t\tspacemap, metaslab, errlog.  The only valid <object> is\n"
+	    "\t\t\tthe poolname.\n");
 }
 
 static int

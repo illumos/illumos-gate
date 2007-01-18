@@ -907,13 +907,15 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_CLEAR,		"ZFS_IOC_CLEAR",
 		"zfs_cmd_t" },
-	{ (uint_t)ZFS_IOC_BOOKMARK_NAME,	"ZFS_IOC_BOOKMARK_NAME",
-		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_PROMOTE,		"ZFS_IOC_PROMOTE",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_DESTROY_SNAPS,	"ZFS_IOC_DESTROY_SNAPS",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_SNAPSHOT,		"ZFS_IOC_SNAPSHOT",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_DSOBJ_TO_DSNAME,	"ZFS_IOC_DSOBJ_TO_DSNAME",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_OBJ_TO_PATH,		"ZFS_IOC_OBJ_TO_PATH",
 		"zfs_cmd_t" },
 
 	/* kssl ioctls */

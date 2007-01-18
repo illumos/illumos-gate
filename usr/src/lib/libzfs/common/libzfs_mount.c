@@ -162,7 +162,7 @@ dir_is_empty(const char *dirname)
  * 0.
  */
 boolean_t
-zfs_is_mounted(zfs_handle_t *zhp, char **where)
+is_mounted(libzfs_handle_t *zfs_hdl, const char *special, char **where)
 {
 	struct mnttab search = { 0 }, entry;
 
@@ -171,17 +171,23 @@ zfs_is_mounted(zfs_handle_t *zhp, char **where)
 	 * mountpoint, as we can just search for the special device.  This will
 	 * also let us find mounts when the mountpoint is 'legacy'.
 	 */
-	search.mnt_special = (char *)zfs_get_name(zhp);
+	search.mnt_special = (char *)special;
 	search.mnt_fstype = MNTTYPE_ZFS;
 
-	rewind(zhp->zfs_hdl->libzfs_mnttab);
-	if (getmntany(zhp->zfs_hdl->libzfs_mnttab, &entry, &search) != 0)
+	rewind(zfs_hdl->libzfs_mnttab);
+	if (getmntany(zfs_hdl->libzfs_mnttab, &entry, &search) != 0)
 		return (B_FALSE);
 
 	if (where != NULL)
-		*where = zfs_strdup(zhp->zfs_hdl, entry.mnt_mountp);
+		*where = zfs_strdup(zfs_hdl, entry.mnt_mountp);
 
 	return (B_TRUE);
+}
+
+boolean_t
+zfs_is_mounted(zfs_handle_t *zhp, char **where)
+{
+	return (is_mounted(zhp->zfs_hdl, zfs_get_name(zhp), where));
 }
 
 /*

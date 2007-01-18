@@ -942,6 +942,7 @@ ZFS_COMMON_OBJS +=		\
 	zap_micro.o		\
 	zfs_byteswap.o		\
 	zfs_fm.o		\
+	zfs_znode.o		\
 	zil.o			\
 	zio.o			\
 	zio_checksum.o		\
@@ -965,7 +966,6 @@ ZFS_OBJS +=			\
 	zfs_rlock.o		\
 	zfs_vfsops.o		\
 	zfs_vnops.o		\
-	zfs_znode.o		\
 	zvol.o
 
 #

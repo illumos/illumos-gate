@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -123,6 +123,7 @@ SUNWprivate_1.1 {
 	zpool_iter;
 	zpool_log_history;
 	zpool_mount_datasets;
+	zpool_obj_to_path;
 	zpool_open;
 	zpool_open_canfail;
 	zpool_read_label;

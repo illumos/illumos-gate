@@ -802,60 +802,6 @@ dump_bplist(objset_t *mos, uint64_t object, char *name)
 	bplist_close(&bpl);
 }
 
-static char *
-znode_path(objset_t *os, uint64_t object, char *pathbuf, size_t size)
-{
-	dmu_buf_t *db;
-	dmu_object_info_t doi;
-	znode_phys_t *zp;
-	uint64_t parent = 0;
-	size_t complen;
-	char component[MAXNAMELEN + 1];
-	char *path;
-	int error;
-
-	path = pathbuf + size;
-	*--path = '\0';
-
-	for (;;) {
-		error = dmu_bonus_hold(os, object, FTAG, &db);
-		if (error)
-			break;
-
-		dmu_object_info_from_db(db, &doi);
-		zp = db->db_data;
-		parent = zp->zp_parent;
-		dmu_buf_rele(db, FTAG);
-
-		if (doi.doi_bonus_type != DMU_OT_ZNODE)
-			break;
-
-		if (parent == object) {
-			if (path[0] != '/')
-				*--path = '/';
-			return (path);
-		}
-
-		if (zap_value_search(os, parent, object, component) != 0)
-			break;
-
-		complen = strlen(component);
-		path -= complen;
-		bcopy(component, path, complen);
-		*--path = '/';
-
-		object = parent;
-	}
-
-	(void) sprintf(component, "\?\?\?<object#%llu>", (u_longlong_t)object);
-
-	complen = strlen(component);
-	path -= complen;
-	bcopy(component, path, complen);
-
-	return (path);
-}
-
 /*ARGSUSED*/
 static void
 dump_znode(objset_t *os, uint64_t object, void *data, size_t size)
@@ -863,12 +809,18 @@ dump_znode(objset_t *os, uint64_t object, void *data, size_t size)
 	znode_phys_t *zp = data;
 	time_t z_crtime, z_atime, z_mtime, z_ctime;
 	char path[MAXPATHLEN * 2];	/* allow for xattr and failure prefix */
+	int error;
 
 	ASSERT(size >= sizeof (znode_phys_t));
 
+	error = zfs_obj_to_path(os, object, path, sizeof (path));
+	if (error != 0) {
+		(void) snprintf(path, sizeof (path), "\?\?\?<object#%llu>",
+		    (u_longlong_t)object);
+	}
+
 	if (dump_opt['d'] < 3) {
-		(void) printf("\t%s\n",
-		    znode_path(os, object, path, sizeof (path)));
+		(void) printf("\t%s\n", path);
 		return;
 	}
 
@@ -877,8 +829,7 @@ dump_znode(objset_t *os, uint64_t object, void *data, size_t size)
 	z_mtime = (time_t)zp->zp_mtime[0];
 	z_ctime = (time_t)zp->zp_ctime[0];
 
-	(void) printf("\tpath	%s\n",
-	    znode_path(os, object, path, sizeof (path)));
+	(void) printf("\tpath	%s\n", path);
 	(void) printf("\tatime	%s", ctime(&z_atime));
 	(void) printf("\tmtime	%s", ctime(&z_mtime));
 	(void) printf("\tctime	%s", ctime(&z_ctime));

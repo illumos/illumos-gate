@@ -19,12 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifdef _KERNEL
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -40,7 +41,6 @@
 #include <sys/cmn_err.h>
 #include <sys/errno.h>
 #include <sys/unistd.h>
-#include <sys/stat.h>
 #include <sys/mode.h>
 #include <sys/atomic.h>
 #include <vm/pvn.h>
@@ -48,12 +48,22 @@
 #include <sys/zfs_dir.h>
 #include <sys/zfs_acl.h>
 #include <sys/zfs_ioctl.h>
-#include <sys/zfs_znode.h>
 #include <sys/zfs_rlock.h>
-#include <sys/zap.h>
-#include <sys/dmu.h>
 #include <sys/fs/zfs.h>
+#endif /* _KERNEL */
 
+#include <sys/dmu.h>
+#include <sys/refcount.h>
+#include <sys/stat.h>
+#include <sys/zap.h>
+#include <sys/zfs_znode.h>
+
+/*
+ * Functions needed for userland (ie: libzpool) are not put under
+ * #ifdef_KERNEL; the rest of the functions have dependencies
+ * (such as VFS logic) that will not compile easily in userland.
+ */
+#ifdef _KERNEL
 struct kmem_cache *znode_cache = NULL;
 
 /*ARGSUSED*/
@@ -1125,4 +1135,81 @@ zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx)
 
 	ZTOV(rootzp)->v_count = 0;
 	kmem_cache_free(znode_cache, rootzp);
+}
+#endif /* _KERNEL */
+
+/*
+ * Given an object number, return its parent object number and whether
+ * or not the object is an extended attribute directory.
+ */
+static int
+zfs_obj_to_pobj(objset_t *osp, uint64_t obj, uint64_t *pobjp, int *is_xattrdir)
+{
+	dmu_buf_t *db;
+	dmu_object_info_t doi;
+	znode_phys_t *zp;
+	int error;
+
+	if ((error = dmu_bonus_hold(osp, obj, FTAG, &db)) != 0)
+		return (error);
+
+	dmu_object_info_from_db(db, &doi);
+	if (doi.doi_bonus_type != DMU_OT_ZNODE ||
+	    doi.doi_bonus_size < sizeof (znode_phys_t)) {
+		dmu_buf_rele(db, FTAG);
+		return (EINVAL);
+	}
+
+	zp = db->db_data;
+	*pobjp = zp->zp_parent;
+	*is_xattrdir = ((zp->zp_flags & ZFS_XATTR) != 0) &&
+	    S_ISDIR(zp->zp_mode);
+	dmu_buf_rele(db, FTAG);
+
+	return (0);
+}
+
+int
+zfs_obj_to_path(objset_t *osp, uint64_t obj, char *buf, int len)
+{
+	char *path = buf + len - 1;
+	int error;
+
+	*path = '\0';
+
+	for (;;) {
+		uint64_t pobj;
+		char component[MAXNAMELEN + 2];
+		size_t complen;
+		int is_xattrdir;
+
+		if ((error = zfs_obj_to_pobj(osp, obj, &pobj,
+		    &is_xattrdir)) != 0)
+			break;
+
+		if (pobj == obj) {
+			if (path[0] != '/')
+				*--path = '/';
+			break;
+		}
+
+		component[0] = '/';
+		if (is_xattrdir) {
+			(void) sprintf(component + 1, "<xattrdir>");
+		} else {
+			error = zap_value_search(osp, pobj, obj, component + 1);
+			if (error != 0)
+				break;
+		}
+
+		complen = strlen(component);
+		path -= complen;
+		ASSERT(path >= buf);
+		bcopy(component, path, complen);
+		obj = pobj;
+	}
+
+	if (error == 0)
+		(void) memmove(buf, path, buf + len - path);
+	return (error);
 }

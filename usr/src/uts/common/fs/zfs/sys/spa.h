@@ -457,8 +457,6 @@ extern int spa_get_errlog(spa_t *spa, void *uaddr, size_t *count);
 extern void spa_errlog_rotate(spa_t *spa);
 extern void spa_errlog_drain(spa_t *spa);
 extern void spa_errlog_sync(spa_t *spa, uint64_t txg);
-extern int spa_bookmark_name(spa_t *spa, struct zbookmark *zb,
-    nvlist_t *nvl);
 extern void spa_get_errlists(spa_t *spa, avl_tree_t *last, avl_tree_t *scrub);
 
 /* Initialization and termination */

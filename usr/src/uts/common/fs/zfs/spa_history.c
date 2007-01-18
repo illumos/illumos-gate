@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -235,7 +235,7 @@ spa_history_log_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 		VERIFY(shpp->sh_eof == shpp->sh_pool_create_len);
 
 	/* write out the packed length as little endian */
-	le_len = LE_64(reclen);
+	le_len = LE_64((uint64_t)reclen);
 	ret = spa_history_write(spa, &le_len, sizeof (le_len), shpp, tx);
 	if (!ret)
 		ret = spa_history_write(spa, record_packed, reclen, shpp, tx);

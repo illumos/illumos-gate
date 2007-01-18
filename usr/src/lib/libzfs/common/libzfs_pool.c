@@ -277,12 +277,6 @@ zpool_close(zpool_handle_t *zhp)
 		nvlist_free(zhp->zpool_config);
 	if (zhp->zpool_old_config)
 		nvlist_free(zhp->zpool_old_config);
-	if (zhp->zpool_error_log) {
-		int i;
-		for (i = 0; i < zhp->zpool_error_count; i++)
-			nvlist_free(zhp->zpool_error_log[i]);
-		free(zhp->zpool_error_log);
-	}
 	free(zhp);
 }
 
@@ -1573,19 +1567,12 @@ zbookmark_compare(const void *a, const void *b)
  * caller.
  */
 int
-zpool_get_errlog(zpool_handle_t *zhp, nvlist_t ***list, size_t *nelem)
+zpool_get_errlog(zpool_handle_t *zhp, nvlist_t **nverrlistp)
 {
 	zfs_cmd_t zc = { 0 };
 	uint64_t count;
 	zbookmark_t *zb = NULL;
-	libzfs_handle_t *hdl = zhp->zpool_hdl;
-	int i, j;
-
-	if (zhp->zpool_error_log != NULL) {
-		*list = zhp->zpool_error_log;
-		*nelem = zhp->zpool_error_count;
-		return (0);
-	}
+	int i;
 
 	/*
 	 * Retrieve the raw error list from the kernel.  If the number of errors
@@ -1626,123 +1613,45 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t ***list, size_t *nelem)
 	zb = ((zbookmark_t *)(uintptr_t)zc.zc_nvlist_dst) +
 	    zc.zc_nvlist_dst_size;
 	count -= zc.zc_nvlist_dst_size;
-	zc.zc_nvlist_dst = 0ULL;
 
 	qsort(zb, count, sizeof (zbookmark_t), zbookmark_compare);
 
+	verify(nvlist_alloc(nverrlistp, 0, KM_SLEEP) == 0);
+
 	/*
-	 * Count the number of unique elements
+	 * Fill in the nverrlistp with nvlist's of dataset and object numbers.
 	 */
-	j = 0;
 	for (i = 0; i < count; i++) {
-		if (i > 0 && memcmp(&zb[i - 1], &zb[i],
-		    sizeof (zbookmark_t)) == 0)
-			continue;
-		j++;
-	}
-
-	/*
-	 * If the user has only requested the number of items, return it now
-	 * without bothering with the extra work.
-	 */
-	if (list == NULL) {
-		*nelem = j;
-		free((void *)(uintptr_t)zc.zc_nvlist_dst);
-		return (0);
-	}
-
-	zhp->zpool_error_count = j;
-
-	/*
-	 * Allocate an array of nvlists to hold the results
-	 */
-	if ((zhp->zpool_error_log = zfs_alloc(zhp->zpool_hdl,
-	    j * sizeof (nvlist_t *))) == NULL) {
-		free((void *)(uintptr_t)zc.zc_nvlist_dst);
-		return (-1);
-	}
-
-	/*
-	 * Fill in the results with names from the kernel.
-	 */
-	j = 0;
-	for (i = 0; i < count; i++) {
-		char buf[64];
 		nvlist_t *nv;
 
 		if (i > 0 && memcmp(&zb[i - 1], &zb[i],
 		    sizeof (zbookmark_t)) == 0)
 			continue;
 
-		if (zcmd_alloc_dst_nvlist(hdl, &zc, 0) != 0)
+		if (nvlist_alloc(&nv, NV_UNIQUE_NAME, KM_SLEEP) != 0)
 			goto nomem;
-
-		zc.zc_bookmark = zb[i];
-		for (;;) {
-			if (ioctl(zhp->zpool_hdl->libzfs_fd,
-			    ZFS_IOC_BOOKMARK_NAME, &zc) != 0) {
-				if (errno == ENOMEM) {
-					if (zcmd_expand_dst_nvlist(hdl, &zc)
-					    != 0) {
-						zcmd_free_nvlists(&zc);
-						goto nomem;
-					}
-
-					continue;
-				} else {
-					if (nvlist_alloc(&nv, NV_UNIQUE_NAME,
-					    0) != 0)
-						goto nomem;
-
-					zhp->zpool_error_log[j] = nv;
-					(void) snprintf(buf, sizeof (buf),
-					    "%llx", (longlong_t)
-					    zb[i].zb_objset);
-					if (nvlist_add_string(nv,
-					    ZPOOL_ERR_DATASET, buf) != 0)
-						goto nomem;
-					(void) snprintf(buf, sizeof (buf),
-					    "%llx", (longlong_t)
-					    zb[i].zb_object);
-					if (nvlist_add_string(nv,
-					    ZPOOL_ERR_OBJECT, buf) != 0)
-						goto nomem;
-					(void) snprintf(buf, sizeof (buf),
-					    "lvl=%u blkid=%llu",
-					    (int)zb[i].zb_level,
-					    (long long)zb[i].zb_blkid);
-					if (nvlist_add_string(nv,
-					    ZPOOL_ERR_RANGE, buf) != 0)
-						goto nomem;
-				}
-			} else {
-				if (zcmd_read_dst_nvlist(hdl, &zc,
-				    &zhp->zpool_error_log[j]) != 0) {
-					zcmd_free_nvlists(&zc);
-					goto nomem;
-				}
-			}
-
-			break;
+		if (nvlist_add_uint64(nv, ZPOOL_ERR_DATASET,
+		    zb[i].zb_objset) != 0) {
+			nvlist_free(nv);
+			goto nomem;
 		}
-
-		zcmd_free_nvlists(&zc);
-
-		j++;
+		if (nvlist_add_uint64(nv, ZPOOL_ERR_OBJECT,
+		    zb[i].zb_object) != 0) {
+			nvlist_free(nv);
+			goto nomem;
+		}
+		if (nvlist_add_nvlist(*nverrlistp, "ejk", nv) != 0) {
+			nvlist_free(nv);
+			goto nomem;
+		}
+		nvlist_free(nv);
 	}
 
-	*list = zhp->zpool_error_log;
-	*nelem = zhp->zpool_error_count;
 	free((void *)(uintptr_t)zc.zc_nvlist_dst);
-
 	return (0);
 
 nomem:
 	free((void *)(uintptr_t)zc.zc_nvlist_dst);
-	for (i = 0; i < zhp->zpool_error_count; i++)
-		nvlist_free(zhp->zpool_error_log[i]);
-	free(zhp->zpool_error_log);
-	zhp->zpool_error_log = NULL;
 	return (no_memory(zhp->zpool_hdl));
 }
 
@@ -1937,4 +1846,52 @@ zpool_get_history(zpool_handle_t *zhp, nvlist_t **nvhisp)
 	free(records);
 
 	return (err);
+}
+
+void
+zpool_obj_to_path(zpool_handle_t *zhp, uint64_t dsobj, uint64_t obj,
+    char *pathname, size_t len)
+{
+	zfs_cmd_t zc = { 0 };
+	boolean_t mounted = B_FALSE;
+	char *mntpnt = NULL;
+	char dsname[MAXNAMELEN];
+
+	if (dsobj == 0) {
+		/* special case for the MOS */
+		(void) snprintf(pathname, len, "<metadata>:<0x%llx>", obj);
+		return;
+	}
+
+	/* get the dataset's name */
+	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+	zc.zc_obj = dsobj;
+	if (ioctl(zhp->zpool_hdl->libzfs_fd,
+	    ZFS_IOC_DSOBJ_TO_DSNAME, &zc) != 0) {
+		/* just write out a path of two object numbers */
+		(void) snprintf(pathname, len, "<0x%llx>:<0x%llx>",
+		    dsobj, obj);
+		return;
+	}
+	(void) strlcpy(dsname, zc.zc_value, sizeof (dsname));
+
+	/* find out if the dataset is mounted */
+	mounted = is_mounted(zhp->zpool_hdl, dsname, &mntpnt);
+
+	/* get the corrupted object's path */
+	(void) strlcpy(zc.zc_name, dsname, sizeof (zc.zc_name));
+	zc.zc_obj = obj;
+	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_OBJ_TO_PATH,
+	    &zc) == 0) {
+		if (mounted) {
+			(void) snprintf(pathname, len, "%s%s", mntpnt,
+			    zc.zc_value);
+		} else {
+			(void) snprintf(pathname, len, "%s:%s",
+			    dsname, zc.zc_value);
+		}
+	} else {
+		(void) snprintf(pathname, len, "%s:<0x%llx>", dsname, obj);
+	}
+	free(mntpnt);
 }
