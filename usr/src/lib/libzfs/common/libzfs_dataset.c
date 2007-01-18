@@ -1190,6 +1190,10 @@ zfs_prop_inherit(zfs_handle_t *zhp, const char *propname)
 	if (!zfs_prop_valid_for_type(prop, zhp->zfs_type))
 		return (zfs_error(hdl, EZFS_PROPTYPE, errbuf));
 
+	/*
+	 * Normalize the name, to get rid of shorthand abbrevations.
+	 */
+	propname = zfs_prop_to_name(prop);
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_value, propname, sizeof (zc.zc_value));
 
