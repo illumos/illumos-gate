@@ -421,7 +421,6 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 
 i386_SUBDIRS= \
 	cmd/biosdev \
-	cmd/fs.d/xmemfs \
 	cmd/rtc \
 	lib/brand/lx \
 	lib/cfgadm_plugins/sata

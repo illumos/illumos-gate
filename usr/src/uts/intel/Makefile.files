@@ -22,7 +22,7 @@
 #
 # uts/intel/Makefile.files
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -100,13 +100,6 @@ GENUNIX_OBJS +=		\
 #
 CORE_OBJS +=		\
 	prmachdep.o
-
-XMEMFS_OBJS +=		\
-	seg_xmem.o	\
-	xmem_dir.o	\
-	xmem_subr.o	\
-	xmem_vfsops.o	\
-	xmem_vnops.o
 
 LX_PROC_OBJS +=	\
 	lx_prsubr.o	\

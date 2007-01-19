@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -99,10 +99,6 @@ CLOSEDHDRS = \
 SUBHDRS	=			\
 	dktp/mscsi.h
 
-FSHDRS =			\
-	seg_xmem.h		\
-	xmem.h		
-
 ROOTDIR=	$(ROOT)/usr/include/sys
 SCSIDIR=	$(ROOTDIR)/scsi
 SCSIDIRS=	$(SCSIDIR) $(SCSIDIR)/conf $(SCSIDIR)/generic \
@@ -115,12 +111,9 @@ ROOTDIRS=	$(ROOTDIR) $(ROOTFSDIR)
 ROOTHDRS= $(HDRS:%=$(ROOTDIR)/%) $(SUBHDRS:%=$(ROOTDIR)/%)
 $(CLOSED_BUILD)ROOTHDRS += $(CLOSEDHDRS:%=$(ROOTDIR)/%)
 
-ROOTFSHDRS= $(FSHDRS:%=$(ROOTDIR)/fs/%)
-
 CHECKHDRS= 			\
 	$(HDRS:%.h=%.check)	\
-	$(SUBHDRS:%.h=%.check)	\
-	$(FSHDRS:%.h=fs/%.check)
+	$(SUBHDRS:%.h=%.check)
 
 $(CLOSED_BUILD)CHECKHDRS += $(CLOSEDHDRS:%.h=$(CLOSED)/uts/intel/sys/%.check)
 
@@ -133,9 +126,9 @@ $(ROOTDIR)/%:	$(CLOSED)/uts/intel/sys/%
 
 .KEEP_STATE:
 
-.PARALLEL: $(CHECKHDRS) $(ROOTHDRS) $(ROOTFSHDRS)
+.PARALLEL: $(CHECKHDRS) $(ROOTHDRS)
 
-install_h: $(ROOTDIRS) .WAIT $(ROOTHDRS) $(ROOTFSHDRS)
+install_h: $(ROOTDIRS) .WAIT $(ROOTHDRS)
 
 $(ROOTDIRS):
 	$(INS.dir)

@@ -6184,6 +6184,15 @@ mondo_loop() {
 	# Remove audit_record_attr. Moved to /usr/lib/security
 	rm -f $root/etc/security/audit_record_attr
 
+	#
+	# Remove xmemfs altogether.
+	#
+	rm -f $usr/include/sys/fs/xmem.h
+	rm -f $usr/include/sys/fs/seg_xmem.h
+	rm -f $usr/kernel/fs/xmemfs
+	rm -f $usr/kernel/fs/amd64/xmemfs
+	rm -rf $usr/lib/fs/xmemfs
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then

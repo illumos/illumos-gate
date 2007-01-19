@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,11 +46,8 @@ include ../Makefile.cmd
 
 SUBDIR1= lofs zfs
 SUBDIR2= dev fd pcfs nfs hsfs proc ctfs udfs ufs tmpfs cachefs autofs mntfs objfs
-i386_SUBDIRS= xmemfs
-i386_I18NDIRS= xmemfs
-SUBDIRS= $(SUBDIR1) $(SUBDIR2) $($(MACH)_SUBDIRS)
-ALL_SUBDIRS= $(SUBDIR1) $(SUBDIR2) $(i386_SUBDIRS)
-I18NDIRS= $(SUBDIR2) $(i386_I18NDIRS)
+SUBDIRS= $(SUBDIR1) $(SUBDIR2)
+I18NDIRS= $(SUBDIR2)
 
 CLOBBERFILES += $(POFILES_XPG4)
 
@@ -195,11 +192,11 @@ fs.dfl:
 $(ROOTUSRSBINFF):	$(ROOTUSRSBIN)/ff
 	-$(RM) $@; $(SYMLINK) ./ff $@
 
-clean: $(ALL_SUBDIRS) .WAIT clean_local
+clean: $(SUBDIRS) .WAIT clean_local
 
 clean_local:
 
-clobber: $(ALL_SUBDIRS) .WAIT clobber_local
+clobber: $(SUBDIRS) .WAIT clobber_local
 
 clobber_local:	clean_local
 	$(RM) $(PROG) $(ROOTFS_PROG) $(SPPROG) $(MNTTAB) $(DEFAULTFILES) \
@@ -207,7 +204,7 @@ clobber_local:	clean_local
 
 lint:
 
-$(ALL_SUBDIRS): FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
 
 FRC:

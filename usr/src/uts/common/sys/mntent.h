@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
@@ -54,7 +54,6 @@ extern "C" {
 #define	MNTTYPE_TMPFS	"tmpfs"		/* Tmp volatile file system */
 #define	MNTTYPE_AUTOFS	"autofs"	/* Automounter ``file'' system */
 #define	MNTTYPE_MNTFS	"mntfs"		/* In-kernel mnttab */
-#define	MNTTYPE_XMEMFS	"xmemfs"	/* Extended memory FS, IA32 only */
 #define	MNTTYPE_DEV	"dev"		/* /dev file system */
 #define	MNTTYPE_CTFS	"ctfs"		/* Contract file system */
 #define	MNTTYPE_OBJFS	"objfs"		/* Kernel object file system */

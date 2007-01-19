@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -69,7 +69,6 @@ f none usr/kernel/drv/pts 755 root sys
 f none usr/kernel/exec/javaexec 755 root sys
 f none usr/kernel/fs/fdfs 755 root sys
 f none usr/kernel/fs/pcfs 755 root sys
-f none usr/kernel/fs/xmemfs 755 root sys
 f none usr/kernel/sched/FX 755 root sys
 f none usr/kernel/sched/FX_DPTBL 755 root sys
 f none usr/kernel/sched/IA 755 root sys
@@ -82,8 +81,6 @@ f none usr/kernel/sys/acctctl 755 root sys
 f none usr/kernel/sys/exacctsys 755 root sys
 f none usr/kernel/sys/sysacct 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_misc_link_i386.so 755 root sys
-d none usr/lib/fs/xmemfs 755 root sys
-f none usr/lib/fs/xmemfs/mount 555 root bin
 s none usr/sbin/installgrub=../../sbin/installgrub
 f none usr/sbin/rtc 555 root bin
 d none usr/sbin/i86 755 root bin
@@ -126,7 +123,6 @@ f none usr/kernel/exec/amd64/javaexec 755 root sys
 d none usr/kernel/fs/amd64 755 root sys
 f none usr/kernel/fs/amd64/fdfs 755 root sys
 f none usr/kernel/fs/amd64/pcfs 755 root sys
-f none usr/kernel/fs/amd64/xmemfs 755 root sys
 d none usr/kernel/pcbe/amd64 755 root sys
 d none usr/kernel/sched/amd64 755 root sys
 f none usr/kernel/sched/amd64/FX 755 root sys

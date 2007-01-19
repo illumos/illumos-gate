@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -83,8 +83,6 @@ f none usr/include/sys/dktp/dadkio.h 644 root bin
 f none usr/include/sys/dktp/fdisk.h 644 root bin
 f none usr/include/sys/dma_engine.h 644 root bin
 f none usr/include/sys/fp.h 644 root bin
-f none usr/include/sys/fs/seg_xmem.h 644 root bin
-f none usr/include/sys/fs/xmem.h 644 root bin
 d none usr/include/sys/i2o 755 root bin
 f none usr/include/sys/i2o/i2omsg.h 644 root bin
 f none usr/include/sys/i2o/i2outil.h 644 root bin

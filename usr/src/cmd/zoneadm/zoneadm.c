@@ -926,8 +926,7 @@ validate_zonepath(char *path, int cmd_num)
 		    rpath);
 		return (Z_ERR);
 	}
-	if ((strcmp(stbuf.st_fstype, MNTTYPE_TMPFS) == 0) ||
-	    (strcmp(stbuf.st_fstype, MNTTYPE_XMEMFS) == 0)) {
+	if (strcmp(stbuf.st_fstype, MNTTYPE_TMPFS) == 0) {
 		(void) printf(gettext("WARNING: %s is on a temporary "
 		    "file system.\n"), rpath);
 	}
