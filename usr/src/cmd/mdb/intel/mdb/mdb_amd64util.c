@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,9 +64,6 @@ const mdb_tgt_regdesc_t mdb_amd64_kregs[] = {
 	{ "r13", KREG_R13, MDB_TGT_R_EXPORT },
 	{ "r14", KREG_R14, MDB_TGT_R_EXPORT },
 	{ "r15", KREG_R15, MDB_TGT_R_EXPORT },
-	{ "fsbase", KREG_FSBASE, MDB_TGT_R_EXPORT | MDB_TGT_R_PRIV },
-	{ "gsbase", KREG_GSBASE, MDB_TGT_R_EXPORT | MDB_TGT_R_PRIV },
-	{ "kgsbase", KREG_KGSBASE, MDB_TGT_R_EXPORT | MDB_TGT_R_PRIV },
 	{ "ds", KREG_DS, MDB_TGT_R_EXPORT },
 	{ "es", KREG_ES, MDB_TGT_R_EXPORT },
 	{ "fs", KREG_FS, MDB_TGT_R_EXPORT },
@@ -134,10 +131,10 @@ mdb_amd64_printregs(const mdb_tgt_gregset_t *gregs)
 	mdb_printf("%24s%%cs = 0x%04x\t%%ds = 0x%04x\t%%es = 0x%04x\n",
 	    " ", kregs[KREG_CS], kregs[KREG_DS], kregs[KREG_ES]);
 
-	mdb_printf("%%trapno = 0x%x\t\t%%fs = 0x%04x\tfsbase = 0x%0?p\n",
-	    kregs[KREG_TRAPNO], (kregs[KREG_FS] & 0xffff), kregs[KREG_FSBASE]);
-	mdb_printf("   %%err = 0x%x\t\t%%gs = 0x%04x\tgsbase = 0x%0?p\n",
-	    kregs[KREG_ERR], (kregs[KREG_GS] & 0xffff), kregs[KREG_GSBASE]);
+	mdb_printf("%%trapno = 0x%x\t\t%%fs = 0x%04x\t%%gs = 0x%04x\n",
+	    kregs[KREG_TRAPNO], (kregs[KREG_FS] & 0xffff),
+	    (kregs[KREG_GS] & 0xffff));
+	mdb_printf("   %%err = 0x%x\n", kregs[KREG_ERR]);
 }
 
 

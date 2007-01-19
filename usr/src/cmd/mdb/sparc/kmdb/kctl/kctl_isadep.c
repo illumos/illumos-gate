@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,18 +195,11 @@ kctl_depreactivate_isadep(void)
 	kdi_watchdog_restore();
 }
 
-int
+void
 kctl_activate_isadep(kdi_debugvec_t *dvec)
 {
 	dvec->dv_kctl_cpu_init = kctl_cpu_init;
 	dvec->dv_kctl_vmready = kctl_ttable_init;
-
-	return (0);
-}
-
-void
-kctl_deactivate_isadep(void)
-{
 }
 
 void

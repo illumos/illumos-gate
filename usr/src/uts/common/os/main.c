@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -394,6 +394,15 @@ main(void)
 	clock_init();
 
 	/*
+	 * On some platforms, clkinitf() changes the timing source that
+	 * gethrtime_unscaled() uses to generate timestamps.  cbe_init() calls
+	 * clkinitf(), so re-initialize the microstate counters after the
+	 * timesource has been chosen.
+	 */
+	init_mstate(&t0, LMS_SYSTEM);
+	init_cpu_mstate(CPU, CMS_SYSTEM);
+
+	/*
 	 * May need to probe to determine latencies from CPU 0 after
 	 * gethrtime() comes alive in cbe_init() and before enabling interrupts
 	 */
@@ -447,8 +456,8 @@ main(void)
 	if (netboot == 0)
 		(void) strplumb();
 
-	gethrestime(&u.u_start);
-	curthread->t_start = u.u_start.tv_sec;
+	gethrestime(&PTOU(curproc)->u_start);
+	curthread->t_start = PTOU(curproc)->u_start.tv_sec;
 	p->p_mstart = gethrtime();
 
 	/*
@@ -577,8 +586,8 @@ main(void)
 
 	pid_setmin();
 
-	bcopy("sched", u.u_psargs, 6);
-	bcopy("sched", u.u_comm, 5);
+	bcopy("sched", PTOU(curproc)->u_psargs, 6);
+	bcopy("sched", PTOU(curproc)->u_comm, 5);
 	sched();
 	/* NOTREACHED */
 }

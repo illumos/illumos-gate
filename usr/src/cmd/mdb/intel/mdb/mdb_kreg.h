@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +28,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/kdi_regs.h>
 #ifndef _ASM
 #include <sys/types.h>
 #endif
@@ -37,51 +37,51 @@
 extern "C" {
 #endif
 
-#ifdef __amd64
-#define	KREG_NGREG	31
 #ifndef _ASM
+#ifdef __amd64
 typedef uint64_t kreg_t;
-#endif	/* !_ASM */
 #else	/* __amd64 */
-#define	KREG_NGREG	21
-#ifndef	_ASM
 typedef uint32_t kreg_t;
-#endif	/* !_ASM */
 #endif	/* __amd64 */
+#endif	/* !_ASM */
+
+#define	KREG_NGREG	KDIREG_NGREG
+
+/*
+ * The order of these registers corresponds to a slightly altered struct regs,
+ * in the order kmdb entry pushes onto the stack.
+ */
 
 #ifdef __amd64
 
-#define	KREG_SAVFP	0
-#define	KREG_SAVPC	1
-#define	KREG_RDI	2
-#define	KREG_RSI	3
-#define	KREG_RDX	4
-#define	KREG_RCX	5
-#define	KREG_R8		6
-#define	KREG_R9		7
-#define	KREG_RAX	8
-#define	KREG_RBX	9
-#define	KREG_RBP	10
-#define	KREG_R10	11
-#define	KREG_R11	12
-#define	KREG_R12	13
-#define	KREG_R13	14
-#define	KREG_R14	15
-#define	KREG_R15	16
-#define	KREG_FSBASE	17
-#define	KREG_GSBASE	18
-#define	KREG_KGSBASE	19
-#define	KREG_DS		20
-#define	KREG_ES		21
-#define	KREG_FS		22
-#define	KREG_GS		23
-#define	KREG_TRAPNO	24
-#define	KREG_ERR	25
-#define	KREG_RIP	26
-#define	KREG_CS		27
-#define	KREG_RFLAGS	28
-#define	KREG_RSP	29
-#define	KREG_SS		30
+#define	KREG_SAVFP	KDIREG_SAVFP
+#define	KREG_SAVPC	KDIREG_SAVPC
+#define	KREG_RDI	KDIREG_RDI
+#define	KREG_RSI	KDIREG_RSI
+#define	KREG_RDX	KDIREG_RDX
+#define	KREG_RCX	KDIREG_RCX
+#define	KREG_R8		KDIREG_R8
+#define	KREG_R9		KDIREG_R9
+#define	KREG_RAX	KDIREG_RAX
+#define	KREG_RBX	KDIREG_RBX
+#define	KREG_RBP	KDIREG_RBP
+#define	KREG_R10	KDIREG_R10
+#define	KREG_R11	KDIREG_R11
+#define	KREG_R12	KDIREG_R12
+#define	KREG_R13	KDIREG_R13
+#define	KREG_R14	KDIREG_R14
+#define	KREG_R15	KDIREG_R15
+#define	KREG_DS		KDIREG_DS
+#define	KREG_ES		KDIREG_ES
+#define	KREG_FS		KDIREG_FS
+#define	KREG_GS		KDIREG_GS
+#define	KREG_TRAPNO	KDIREG_TRAPNO
+#define	KREG_ERR	KDIREG_ERR
+#define	KREG_RIP	KDIREG_RIP
+#define	KREG_CS		KDIREG_CS
+#define	KREG_RFLAGS	KDIREG_RFLAGS
+#define	KREG_RSP	KDIREG_RSP
+#define	KREG_SS		KDIREG_SS
 
 #define	KREG_PC		KREG_RIP
 #define	KREG_SP		KREG_RSP
@@ -89,33 +89,27 @@ typedef uint32_t kreg_t;
 
 #else	/* __amd64 */
 
-/*
- * The order of these registers corresponds to a slightly altered struct regs.
- * %ss appears first, and is followed by the remainder of the struct regs.  This
- * change is necessary to support kmdb state saving.
- */
-
-#define	KREG_SAVFP	0
-#define	KREG_SAVPC	1
-#define	KREG_SS		2
-#define	KREG_GS		3
-#define	KREG_FS		4
-#define	KREG_ES		5
-#define	KREG_DS		6
-#define	KREG_EDI	7
-#define	KREG_ESI	8
-#define	KREG_EBP	9
-#define	KREG_ESP	10
-#define	KREG_EBX	11
-#define	KREG_EDX	12
-#define	KREG_ECX	13
-#define	KREG_EAX	14
-#define	KREG_TRAPNO	15
-#define	KREG_ERR	16
-#define	KREG_EIP	17
-#define	KREG_CS		18
-#define	KREG_EFLAGS	19
-#define	KREG_UESP	20
+#define	KREG_SAVFP	KDIREG_SAVFP
+#define	KREG_SAVPC	KDIREG_SAVPC
+#define	KREG_SS		KDIREG_SS
+#define	KREG_GS		KDIREG_GS
+#define	KREG_FS		KDIREG_FS
+#define	KREG_ES		KDIREG_ES
+#define	KREG_DS		KDIREG_DS
+#define	KREG_EDI	KDIREG_EDI
+#define	KREG_ESI	KDIREG_ESI
+#define	KREG_EBP	KDIREG_EBP
+#define	KREG_ESP	KDIREG_ESP
+#define	KREG_EBX	KDIREG_EBX
+#define	KREG_EDX	KDIREG_EDX
+#define	KREG_ECX	KDIREG_ECX
+#define	KREG_EAX	KDIREG_EAX
+#define	KREG_TRAPNO	KDIREG_TRAPNO
+#define	KREG_ERR	KDIREG_ERR
+#define	KREG_EIP	KDIREG_EIP
+#define	KREG_CS		KDIREG_CS
+#define	KREG_EFLAGS	KDIREG_EFLAGS
+#define	KREG_UESP	KDIREG_UESP
 
 #define	KREG_PC		KREG_EIP
 #define	KREG_SP		KREG_ESP
@@ -174,8 +168,6 @@ typedef uint32_t kreg_t;
 #define	KREG_EFLAGS_CF_MASK	0x00000001
 #define	KREG_EFLAGS_CF_SHIFT	0
 
-#define	KREG_MAXWPIDX		3
-
 /* %dr7 */
 #define	KREG_DRCTL_WP_BASESHIFT	16
 #define	KREG_DRCTL_WP_INCRSHIFT	4
@@ -199,20 +191,12 @@ typedef uint32_t kreg_t;
 	(3 << (KREG_DRCTL_WPEN_INCRSHIFT * (n)))
 #define	KREG_DRCTL_WPEN(n)	KREG_DRCTL_WPEN_MASK(n)
 
-#define	KREG_DRCTL_WPALLEN_MASK	0x000000ff
-
-#define	KREG_DRCTL_GD_MASK	0x00002000
-
-#define	KREG_DRCTL_RESERVED	0x00000700
-
 /* %dr6 */
 #define	KREG_DRSTAT_BT_MASK	0x00008000
 #define	KREG_DRSTAT_BS_MASK	0x00004000
 #define	KREG_DRSTAT_BD_MASK	0x00002000
 
 #define	KREG_DRSTAT_WP_MASK(n)	(1 << (n))
-
-#define	KREG_DRSTAT_RESERVED	0xffff0ff0
 
 #ifdef	__cplusplus
 }

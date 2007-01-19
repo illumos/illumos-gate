@@ -73,14 +73,14 @@ extern "C" {
 #define	CPUID_INTC_EDX_SS	0x08000000	/* self-snoop */
 #define	CPUID_INTC_EDX_HTT	0x10000000	/* Hyper Thread Technology */
 #define	CPUID_INTC_EDX_TM	0x20000000	/* thermal monitoring */
-						/* 0x40000000 - reserved */
+#define	CPUID_INTC_EDX_IA64	0x40000000	/* Itanium emulating IA32 */
 #define	CPUID_INTC_EDX_PBE	0x80000000	/* Pending Break Enable */
 
-#define	FMT_CPUID_INTC_EDX				\
-	"\20"						\
-	"\40pbe\36tm\35htt\34ss\33sse2\32sse\31fxsr"	\
-	"\30mmx\27acpi\26ds\24clfsh\23psn\22pse36\21pat"\
-	"\20cmov\17mca\16pge\15mtrr\14sep\12apic\11cx8"	\
+#define	FMT_CPUID_INTC_EDX					\
+	"\20"							\
+	"\40pbe\37ia64\36tm\35htt\34ss\33sse2\32sse\31fxsr"	\
+	"\30mmx\27acpi\26ds\24clfsh\23psn\22pse36\21pat"	\
+	"\20cmov\17mca\16pge\15mtrr\14sep\12apic\11cx8"		\
 	"\10mce\7pae\6msr\5tsc\4pse\3de\2vme\1fpu"
 
 /*
@@ -92,22 +92,26 @@ extern "C" {
 						/* 0x00000004 - reserved */
 #define	CPUID_INTC_ECX_MON	0x00000008	/* MONITOR/MWAIT */
 #define	CPUID_INTC_ECX_DSCPL	0x00000010	/* CPL-qualified debug store */
-						/* 0x00000020 - reserved */
-						/* 0x00000040 - reserved */
+#define	CPUID_INTC_ECX_VMX	0x00000020	/* Hardware VM extensions */
+#define	CPUID_INTC_ECX_SMX	0x00000040	/* Secure mode extensions */
 #define	CPUID_INTC_ECX_EST	0x00000080	/* enhanced SpeedStep */
 #define	CPUID_INTC_ECX_TM2	0x00000100	/* thermal monitoring */
-						/* 0x00000200 - reserved */
+#define	CPUID_INTC_ECX_SSSE3	0x00000200	/* Supplemental SSE3 insns */
 #define	CPUID_INTC_ECX_CID	0x00000400	/* L1 context ID */
 						/* 0x00000800 - reserved */
 						/* 0x00001000 - reserved */
-						/* 0x00002000 - reserved */
-#define	CPUID_INTC_ECX_CX16	0x00002000	/* CMPXCHG16B */
-#define	CPUID_INTC_ECX_XTPR	0x00004000	/* disable task pri messages */
+#define	CPUID_INTC_ECX_CX16	0x00002000	/* cmpxchg16 */
+#define	CPUID_INTC_ECX_ETPRD	0x00004000	/* extended task pri messages */
+						/* 0x00008000 - reserved */
+						/* 0x00010000 - reserved */
+						/* 0x00020000 - reserved */
+#define	CPUID_INTC_ECX_DCA	0x00040000	/* direct cache access */
 
-#define	FMT_CPUID_INTC_ECX			\
-	"\20"					\
-	"\20\17xtpr\16cx16\13cid\11tm2"		\
-	"\10est\5dscpl\4monitor\1sse3"
+#define	FMT_CPUID_INTC_ECX					\
+	"\20"							\
+	"\30\23dca"						\
+	"\20\17etprd\16cx16\13cid\12ssse3\11tm2"		\
+	"\10est\7smx\6vmx\5dscpl\4mon\1sse3"
 
 /*
  * cpuid instruction feature flags in %edx (extended function 0x80000001)
@@ -129,7 +133,8 @@ extern "C" {
 #define	CPUID_AMD_EDX_PGE	0x00002000	/* page global enable */
 #define	CPUID_AMD_EDX_MCA	0x00004000	/* machine check arch */
 #define	CPUID_AMD_EDX_CMOV	0x00008000	/* conditional move insns */
-#define	CPUID_AMD_EDX_PAT	0x00010000	/* page attribute table */
+#define	CPUID_AMD_EDX_PAT	0x00010000	/* K7: page attribute table */
+#define	CPUID_AMD_EDX_FCMOV	0x00010000	/* FCMOVcc etc. */
 #define	CPUID_AMD_EDX_PSE36	0x00020000	/* 36-bit pagesize extension */
 				/* 0x00040000 - reserved */
 				/* 0x00080000 - reserved */
@@ -138,9 +143,9 @@ extern "C" {
 #define	CPUID_AMD_EDX_MMXamd	0x00400000	/* AMD: MMX extensions */
 #define	CPUID_AMD_EDX_MMX	0x00800000	/* MMX instructions */
 #define	CPUID_AMD_EDX_FXSR	0x01000000	/* fxsave and fxrstor */
-				/* 0x02000000 - reserved */
+#define	CPUID_AMD_EDX_FFXSR	0x02000000	/* fast fxsave/fxrstor */
 				/* 0x04000000 - reserved */
-				/* 0x08000000 - reserved */
+#define	CPUID_AMD_EDX_TSCP	0x08000000	/* rdtscp instruction */
 				/* 0x10000000 - reserved */
 #define	CPUID_AMD_EDX_LM	0x20000000	/* AMD: long mode */
 #define	CPUID_AMD_EDX_3DNowx	0x40000000	/* AMD: extensions to 3DNow! */
@@ -148,16 +153,30 @@ extern "C" {
 
 #define	FMT_CPUID_AMD_EDX					\
 	"\20"							\
-	"\40a3d\37a3d+\36lm\31fxsr"				\
+	"\40a3d\37a3d+\36lm\34tscp\32ffxsr\31fxsr"		\
 	"\30mmx\27mmxext\25nx\22pse\21pat"			\
 	"\20cmov\17mca\16pge\15mtrr\14syscall\12apic\11cx8"	\
 	"\10mce\7pae\6msr\5tsc\4pse\3de\2vme\1fpu"
 
-#define	CPUID_AMD_ECX_CMP_LEGACY 0x00000002	/* AMD: multi-core chip */
+#define	CPUID_AMD_ECX_AHF64	0x00000001	/* LAHF and SAHF in long mode */
+#define	CPUID_AMD_ECX_CMP_LGCY	0x00000002	/* AMD: multicore chip */
+#define	CPUID_AMD_ECX_SVM	0x00000004	/* AMD: secure VM */
+#define	CPUID_AMD_ECX_EAS	0x00000008	/* extended apic space */
+#define	CPUID_AMD_ECX_CR8D	0x00000010	/* AMD: 32-bit mov %cr8 */
 
 #define	FMT_CPUID_AMD_ECX					\
 	"\20"							\
-	"\1htvalid"
+	"\5cr8d\3svm\2lcmplgcy\1ahf64"
+
+/*
+ * Intel now seems to have claimed part of the "extended" function
+ * space that we previously for non-Intel implementors to use.
+ * More excitingly still, they've claimed bit 20 to mean LAHF/SAHF
+ * is available in long mode i.e. what AMD indicate using bit 0.
+ * On the other hand, everything else is labelled as reserved.
+ */
+#define	CPUID_INTC_ECX_AHF64	0x00100000	/* LAHF and SAHF in long mode */
+
 
 #define	P5_MCHADDR	0x0
 #define	P5_CESR		0x11
@@ -329,6 +348,7 @@ typedef	struct	mtrrvar {
 #define	X86_MSR		0x00000004
 #define	X86_MTRR	0x00000008
 #define	X86_PGE		0x00000010
+#define	X86_DE		0x00000020
 #define	X86_CMOV	0x00000040
 #define	X86_MMX 	0x00000080
 #define	X86_MCA		0x00000100
@@ -344,14 +364,15 @@ typedef	struct	mtrrvar {
 #define	X86_SSE3	0x00040000
 #define	X86_CX16	0x00080000
 #define	X86_CMP		0x00100000
+#define	X86_TSCP	0x00200000
 #define	X86_CPUID	0x01000000
 
 #define	FMT_X86_FEATURE						\
 	"\20"							\
 	"\31cpuid"						\
-	"\25cmp\24cx16\23sse3\22nx\21asysc"			\
+	"\26tscp\25cmp\24cx16\23sse3\22nx\21asysc"		\
 	"\20htt\17sse2\16sse\15sep\14pat\13cx8\12pae\11mca"	\
-	"\10mmx\7cmov\5pge\4mtrr\3msr\2tsc\1lgpg"
+	"\10mmx\7cmov\6de\5pge\4mtrr\3msr\2tsc\1lgpg"
 
 /*
  * x86_type is a legacy concept; this is supplanted
@@ -482,7 +503,6 @@ extern uint_t x86_feature;
 extern uint_t x86_type;
 extern uint_t x86_vendor;
 
-extern ulong_t cr4_value;
 extern uint_t pentiumpro_bug4046376;
 extern uint_t pentiumpro_bug4064495;
 
@@ -509,9 +529,13 @@ extern uint64_t rdmsr(uint_t);
 extern void wrmsr(uint_t, const uint64_t);
 extern uint64_t xrdmsr(uint_t);
 extern void xwrmsr(uint_t, const uint64_t);
+extern int checked_rdmsr(uint_t, uint64_t *);
+extern int checked_wrmsr(uint_t, uint64_t);
+
 extern void invalidate_cache(void);
 extern ulong_t getcr4(void);
 extern void setcr4(ulong_t);
+
 extern void mtrr_sync(void);
 
 extern void cpu_fast_syscall_enable(void *);
@@ -547,6 +571,8 @@ extern int cpuid_opteron_erratum(struct cpu *, uint_t);
 struct cpuid_info;
 
 extern void setx86isalist(void);
+extern void cpuid_alloc_space(struct cpu *);
+extern void cpuid_free_space(struct cpu *);
 extern uint_t cpuid_pass1(struct cpu *);
 extern void cpuid_pass2(struct cpu *);
 extern void cpuid_pass3(struct cpu *);

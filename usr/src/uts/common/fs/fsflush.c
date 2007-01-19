@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -352,8 +352,8 @@ fsflush()
 	proc_fsflush->p_stime =  0;
 	proc_fsflush->p_cutime =  0;
 	proc_fsflush->p_utime = 0;
-	bcopy("fsflush", u.u_psargs, 8);
-	bcopy("fsflush", u.u_comm, 7);
+	bcopy("fsflush", curproc->p_user.u_psargs, 8);
+	bcopy("fsflush", curproc->p_user.u_comm, 7);
 
 	mutex_init(&fsflush_lock, NULL, MUTEX_DEFAULT, NULL);
 	sema_init(&fsflush_sema, 0, NULL, SEMA_DEFAULT, NULL);

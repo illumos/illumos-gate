@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
 #include <sys/regset.h>
+#include <sys/privregs.h>
 #include <sys/psw.h>
 #include <sys/machbrand.h>
 
@@ -354,12 +355,12 @@ size_t _allsyscalls_size;
 #else	/* __lint */
 
 	ENTRY_NP2(brand_sys_syscall,_allsyscalls)
-	swapgs
+	SWAPGS
 	BRAND_CALLBACK(BRAND_CB_SYSCALL)
-	swapgs
+	SWAPGS
 	
 	ALTENTRY(sys_syscall)
-	swapgs
+	SWAPGS
 	movq	%rsp, %gs:CPU_RTMP_RSP
 	movq	%r15, %gs:CPU_RTMP_R15
 	movq	%gs:CPU_THREAD, %r15
@@ -428,7 +429,6 @@ size_t _allsyscalls_size;
 	
 	movq	T_LWP(%r15), %r14
 	ASSERT_NO_RUPDATE_PENDING(%r14)
-
 	ENABLE_INTR_FLAGS
 
 	MSTATE_TRANSITION(LMS_USER, LMS_SYSTEM)
@@ -489,7 +489,7 @@ _syscall_invoke:
 	 * lwp got in ahead of us, it could change the segment
 	 * registers without us noticing before we return to userland.
 	 */
-	cli
+	CLI(%r14)
 	CHECK_POSTSYS_NE(%r15, %r14, %ebx)
 	jne	_syscall_post
 	SIMPLE_SYSCALL_POSTSYS(%r15, %r14, %bx)
@@ -524,7 +524,7 @@ _syscall_invoke:
 	movq	REGOFF_RIP(%rsp), %rcx	
 	movl	REGOFF_RFL(%rsp), %r11d
 	movq	REGOFF_RSP(%rsp), %rsp
-	swapgs
+	SWAPGS
 	sysretq
 
 _syscall_pre:
@@ -545,7 +545,7 @@ _syscall_ill:
 	jmp	_syscall_post_call
 
 _syscall_post:
-	sti
+	STI
 	/*
 	 * Sigh, our optimism wasn't justified, put it back to LMS_SYSTEM
 	 * so that we can account for the extra work it takes us to finish.
@@ -556,7 +556,7 @@ _syscall_post_call:
 	movq	%r13, %rsi
 	call	post_syscall
 	MSTATE_TRANSITION(LMS_SYSTEM, LMS_USER)
-	jmp	sys_rtt_syscall
+	jmp	_sys_rtt
 	SET_SIZE(sys_syscall)
 	SET_SIZE(brand_sys_syscall)
 
@@ -572,12 +572,12 @@ sys_syscall32()
 #else	/* __lint */
 
 	ENTRY_NP(brand_sys_syscall32)
-	swapgs
+	SWAPGS
 	BRAND_CALLBACK(BRAND_CB_SYSCALL32)
-	swapgs
+	SWAPGS
 
 	ALTENTRY(sys_syscall32)
-	swapgs
+	SWAPGS
 	movl	%esp, %r10d
 	movq	%gs:CPU_THREAD, %r15
 	movq	T_STACK(%r15), %rsp
@@ -590,7 +590,6 @@ sys_syscall32()
 	movl	$UDS_SEL, REGOFF_SS(%rsp)
 
 _syscall32_save:
-	
 	movl	%edi, REGOFF_RDI(%rsp)
 	movl	%esi, REGOFF_RSI(%rsp)
 	movl	%ebp, REGOFF_RBP(%rsp)
@@ -711,7 +710,7 @@ _syscall32_save:
 	 * lwp got in ahead of us, it could change the segment
 	 * registers without us noticing before we return to userland.
 	 */
-	cli
+	CLI(%r14)
 	CHECK_POSTSYS_NE(%r15, %r14, %ebx)
 	jne	_full_syscall_postsys32
 	SIMPLE_SYSCALL_POSTSYS(%r15, %r14, %bx)
@@ -738,7 +737,7 @@ _syscall32_save:
 	sysretl
 
 _full_syscall_postsys32:
-	sti
+	STI
 	/*
 	 * Sigh, our optimism wasn't justified, put it back to LMS_SYSTEM
 	 * so that we can account for the extra work it takes us to finish.
@@ -749,7 +748,7 @@ _full_syscall_postsys32:
 	movq	%r13, %rdx			/* rval2 - %edx */
 	call	syscall_exit
 	MSTATE_TRANSITION(LMS_SYSTEM, LMS_USER)
-	jmp	sys_rtt_syscall32
+	jmp	_sys_rtt
 	SET_SIZE(sys_syscall32)
 	SET_SIZE(brand_sys_syscall32)
 
@@ -805,7 +804,7 @@ sys_sysenter()
 #else	/* __lint */
 
 	ENTRY_NP(brand_sys_sysenter)
-	swapgs
+	SWAPGS
 
 	ALTENTRY(_brand_sys_sysenter_post_swapgs)
 	BRAND_CALLBACK(BRAND_CB_SYSENTER)
@@ -816,7 +815,7 @@ sys_sysenter()
 	jmp	_sys_sysenter_post_swapgs
 
 	ALTENTRY(sys_sysenter)
-	swapgs
+	SWAPGS
 
 	ALTENTRY(_sys_sysenter_post_swapgs)
 	movq	%gs:CPU_THREAD, %r15
@@ -1052,7 +1051,7 @@ sys_syscall_int()
 #else	/* __lint */
 
 	ENTRY_NP(brand_sys_syscall_int)
-	swapgs
+	SWAPGS
 	BRAND_CALLBACK(BRAND_CB_INT91)
 	swapgs
 
@@ -1067,6 +1066,7 @@ sys_syscall_int()
 	 * and use a faster return mechanism.
 	 */
 	movb	$1, T_POST_SYS(%r15)
+	CLEAN_CS
 	jmp	_syscall32_save
 	SET_SIZE(sys_syscall_int)
 	SET_SIZE(brand_sys_syscall_int)
@@ -1097,7 +1097,7 @@ sys_lcall32()
 #else	/* __lint */
 
 	ENTRY_NP(sys_lcall32)
-	swapgs
+	SWAPGS
 	pushq	$0
 	pushq	%rbp
 	movq	%rsp, %rbp

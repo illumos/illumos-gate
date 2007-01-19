@@ -26,6 +26,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
+#include <sys/sysmacros.h>
 #include <sys/disp.h>
 #include <sys/promif.h>
 #include <sys/clock.h>
@@ -50,31 +51,13 @@
 #include <sys/machsystm.h>
 #include <sys/ontrap.h>
 #include <sys/bootconf.h>
-#include <sys/kdi.h>
+#include <sys/kdi_machimpl.h>
 #include <sys/archsystm.h>
 #include <sys/promif.h>
 #include <sys/bootconf.h>
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
 #include <sys/pci_cfgspace.h>
-#if defined(__amd64)
-#include <sys/bootsvcs.h>
-
-/*
- * XX64	This stuff deals with switching stacks in case a trapping
- *	thread wants to call back into boot -after- boot has lost track
- *	of the mappings but before the kernel owns the console.
- *
- *	(A better way to hide this would be to add a 'this' pointer to
- *	every boot syscall so that vmx could get at the resulting save
- *	area.)
- */
-
-struct boot_syscalls *_vmx_sysp;
-static struct boot_syscalls __kbootsvcs;
-extern struct boot_syscalls *sysp;
-extern void _stack_safe_putchar(int c);
-#endif
 
 /*
  * some globals for patching the result of cpuid
@@ -89,16 +72,10 @@ extern uint32_t cpuid_feature_edx_exclude;
 /*
  * Dummy spl priority masks
  */
-static unsigned char	dummy_cpu_pri[MAXIPL + 1] = {
+static unsigned char dummy_cpu_pri[MAXIPL + 1] = {
 	0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf,
 	0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf
 };
-
-/*
- * External Routines:
- */
-
-extern void init_tables(void);
 
 
 static uint32_t
@@ -128,29 +105,6 @@ mlsetup(struct regs *rp)
 
 	ASSERT_STACK_ALIGNED();
 
-#if defined(__amd64)
-
-#if (BS_VERSION > 4)
-	/*
-	 * When new boot_syscalls are added to the vector, this routine
-	 * must be modified to copy them into the kernel's copy of the
-	 * vector.
-	 */
-#error mlsetup() must be updated for amd64 to support new boot_syscalls
-#endif	/* (BS_VERSION > 4) */
-
-	/*
-	 * XX64	This remaps vmx's putchar to use the kernel's version
-	 *	that switches stacks before diving into vmx
-	 *	See explanation/complaints in commentary above.
-	 */
-	_vmx_sysp = sysp;
-	sysp = &__kbootsvcs;
-
-	sysp->bsvc_getchar = _vmx_sysp->bsvc_getchar;
-	sysp->bsvc_putchar = _stack_safe_putchar;
-	sysp->bsvc_ischar = _vmx_sysp->bsvc_ischar;
-#endif
 	/*
 	 * initialize cpu_self
 	 */
@@ -188,46 +142,15 @@ mlsetup(struct regs *rp)
 	 * want to set the feature bits to correspond to the feature
 	 * minimum) this value may be altered.
 	 */
-
 	x86_feature = cpuid_pass1(cpu[0]);
 
 	/*
 	 * Initialize idt0, gdt0, ldt0_default, ktss0 and dftss.
 	 */
-	init_tables();
+	init_desctbls();
 
-#if defined(__amd64)
-	/*CSTYLED*/
-	{
-		/*
-		 * setup %gs for the kernel
-		 */
-		wrmsr(MSR_AMD_GSBASE, (uint64_t)&cpus[0]);
-		/*
-		 * XX64 We should never dereference off "other gsbase" or
-		 * "fsbase".  So, we should arrange to point FSBASE and
-		 * KGSBASE somewhere truly awful e.g. point it at the last
-		 * valid address below the hole so that any attempts to index
-		 * off them cause an exception.
-		 *
-		 * For now, point it at 8G -- at least it should be unmapped
-		 * until some 64-bit processes run.
-		 */
-		wrmsr(MSR_AMD_FSBASE, 0x200000000UL);
-		wrmsr(MSR_AMD_KGSBASE, 0x200000000UL);
-	}
 
-#elif defined(__i386)
-	/*
-	 * enable large page support right here.
-	 */
-	if (x86_feature & X86_LARGEPAGE) {
-		cr4_value |= CR4_PSE;
-		if (x86_feature & X86_PGE)
-			cr4_value |= CR4_PGE;
-		setup_121_andcall(enable_big_page_support, cr4_value);
-	}
-
+#if defined(__i386)
 	/*
 	 * Some i386 processors do not implement the rdtsc instruction,
 	 * or at least they do not implement it correctly.
@@ -238,7 +161,22 @@ mlsetup(struct regs *rp)
 	 */
 	if (x86_feature & X86_TSC)
 		patch_tsc();
-#endif
+#endif	/* __i386 */
+
+	/*
+	 * While we're thinking about the TSC, let's set up %cr4 so that
+	 * userland can issue rdtsc, and initialize the TSC_AUX value
+	 * (the cpuid) for the rdtscp instruction on appropriately
+	 * capable hardware.
+	 */
+	if (x86_feature & X86_TSC)
+		setcr4(getcr4() & ~CR4_TSD);
+
+	if (x86_feature & X86_TSCP)
+		(void) wrmsr(MSR_AMD_TSCAUX, 0);
+
+	if (x86_feature & X86_DE)
+		setcr4(getcr4() | CR4_DE);
 
 	/*
 	 * initialize t0
@@ -264,7 +202,7 @@ mlsetup(struct regs *rp)
 	THREAD_ONPROC(&t0, CPU);
 
 	lwp0.lwp_thread = &t0;
-	lwp0.lwp_regs = (void *) rp;
+	lwp0.lwp_regs = (void *)rp;
 	lwp0.lwp_procp = &p0;
 	t0.t_tid = p0.p_lwpcnt = p0.p_lwprcnt = p0.p_lwpid = 1;
 
@@ -290,11 +228,7 @@ mlsetup(struct regs *rp)
 
 	CPU->cpu_id = 0;
 
-	CPU->cpu_tss = &ktss0;
-
 	CPU->cpu_pri = 12;		/* initial PIL for the boot CPU */
-
-	CPU->cpu_gdt = gdt0;
 
 	/*
 	 * The kernel doesn't use LDTs unless a process explicitly requests one.
@@ -302,12 +236,7 @@ mlsetup(struct regs *rp)
 	p0.p_ldt_desc = zero_sdesc;
 
 	/*
-	 * Kernel IDT.
-	 */
-	CPU->cpu_idt = idt0;
-
-	/*
-	 * Initialize thread/cpu microstate accounting here
+	 * Initialize thread/cpu microstate accounting
 	 */
 	init_mstate(&t0, LMS_SYSTEM);
 	init_cpu_mstate(CPU, CMS_SYSTEM);
@@ -316,6 +245,23 @@ mlsetup(struct regs *rp)
 	 * Initialize lists of available and active CPUs.
 	 */
 	cpu_list_init(CPU);
+
+	/*
+	 * Now that we have taken over the GDT, IDT and have initialized
+	 * active CPU list it's time to inform kmdb if present.
+	 */
+	if (boothowto & RB_DEBUG)
+		kdi_idt_sync();
+
+	/*
+	 * If requested (boot -d) drop into kmdb.
+	 *
+	 * This must be done after cpu_list_init() on the 64-bit kernel
+	 * since taking a trap requires that we re-compute gsbase based
+	 * on the cpu list.
+	 */
+	if (boothowto & RB_DEBUGENTER)
+		kmdb_enter();
 
 	cpu_vm_data_init(CPU);
 
@@ -333,16 +279,8 @@ mlsetup(struct regs *rp)
 
 	boot_ncpus = bootprop_getval("boot-ncpus");
 
-	/*
-	 * To avoid wasting kernel memory, we're temporarily limiting the
-	 * total number of processors to 32 by default until we get the
-	 * capability to scan ACPI tables early on boot to detect how many
-	 * processors are actually present.  However, 64-bit systems
-	 * can be booted with up to 64 processors by setting "boot-ncpus"
-	 * boot property to 64.
-	 */
 	if (boot_ncpus <= 0 || boot_ncpus > NCPU)
-		boot_ncpus = 32;
+		boot_ncpus = NCPU;
 
 	max_ncpus = boot_max_ncpus = boot_ncpus;
 

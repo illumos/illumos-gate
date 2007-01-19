@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -132,6 +132,8 @@ SFWLIBDIR64=	$(SFW_ROOT)/lib/$(MACH64)
 
 RPCGEN=		/usr/bin/rpcgen
 STABS=		$(ONBLD_TOOLS)/bin/$(MACH)/stabs
+ELFEXTRACT=	$(ONBLD_TOOLS)/bin/$(MACH)/elfextract
+MBH_PATCH=	$(ONBLD_TOOLS)/bin/$(MACH)/mbh_patch
 ECHO=		echo
 INS=		install
 TRUE=		true

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -377,7 +377,7 @@ kmt_wrmsr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 int
-kmt_msr_validate(const kmdb_msr_t *msr)
+kmt_msr_validate(const kdi_msr_t *msr)
 {
 	uint64_t val;
 

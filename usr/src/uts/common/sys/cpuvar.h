@@ -301,6 +301,10 @@ extern cpu_core_t cpu_core[];
 #define	CPU_SPARE	0x100		/* CPU offline available for use */
 #define	CPU_FAULTED	0x200		/* CPU offline diagnosed faulty */
 
+#define	FMT_CPU_FLAGS							\
+	"\20\12fault\11spare\10frozen"					\
+	"\7poweroff\6offline\5enable\4exist\3quiesced\2ready\1run"
+
 #define	CPU_ACTIVE(cpu)	(((cpu)->cpu_flags & CPU_OFFLINE) == 0)
 
 /*
@@ -574,6 +578,17 @@ void	cpu_intr_swtch_exit(kthread_t *);
 void	mbox_lock_init(void);	 /* initialize cross-call locks */
 void	mbox_init(int cpun);	 /* initialize cross-calls */
 void	poke_cpu(int cpun);	 /* interrupt another CPU (to preempt) */
+
+/*
+ * values for safe_list.  Pause state that CPUs are in.
+ */
+#define	PAUSE_IDLE	0		/* normal state */
+#define	PAUSE_READY	1		/* paused thread ready to spl */
+#define	PAUSE_WAIT	2		/* paused thread is spl-ed high */
+#define	PAUSE_DIE	3		/* tell pause thread to leave */
+#define	PAUSE_DEAD	4		/* pause thread has left */
+
+void	mach_cpu_pause(volatile char *);
 
 void	pause_cpus(cpu_t *off_cp);
 void	start_cpus(void);

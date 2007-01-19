@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -466,6 +466,32 @@ lock_clear_splx(lock_t *lp, int s)
 	jmp	lockstat_wrapper
 	SET_SIZE(lock_clear_splx)
 
+#else
+
+	ENTRY(lock_clear_splx)
+	movl	4(%esp), %eax		/* eax = lock addr */
+	movb	$0, (%eax)		/* clear lock */
+.lock_clear_splx_lockstat_patch_point:
+	jmp	0f
+0:
+	movl	8(%esp), %edx		/* edx = desired pil */
+	movl	%edx, 4(%esp)		/* set spl arg up for splx */
+	jmp	splx			/* let splx do it's thing */
+.lock_clear_splx_lockstat:
+	movl	8(%esp), %edx		/* edx = desired pil */
+	pushl	%ebp			/* set up stack frame */
+	movl	%esp, %ebp
+	pushl	%edx
+	call	splx
+	leave				/* unwind stack */
+	movl	4(%esp), %ecx		/* ecx = lock pointer */
+	movl	%gs:CPU_THREAD, %edx	/* edx = thread addr */
+	movl	$LS_LOCK_CLEAR_SPLX_RELEASE, %eax
+	jmp	lockstat_wrapper
+	SET_SIZE(lock_clear_splx)
+
+#endif	/* !__amd64 */
+
 #if defined(__GNUC_AS__)
 #define	LOCK_CLEAR_SPLX_LOCKSTAT_PATCH_VAL	\
 	(.lock_clear_splx_lockstat - .lock_clear_splx_lockstat_patch_point - 2)
@@ -479,25 +505,6 @@ lock_clear_splx(lock_t *lp, int s)
 #define LOCK_CLEAR_SPLX_LOCKSTAT_PATCH_POINT	\
 	[.lock_clear_splx_lockstat_patch_point + 1]
 #endif
-
-#else
-
-	ENTRY(lock_clear_splx)
-	LOADCPU(%ecx)			/* ecx = cpu pointer */
-	movl	4(%esp), %eax		/* eax = lock addr */
-	movl	8(%esp), %edx		/* edx = desired pil */
-	movb	$0, (%eax)		/* clear lock */
-	cli				/* disable interrupts */
-	call	spl			/* magic calling sequence */
-.lock_clear_splx_lockstat_patch_point:
-	ret
-	movl	4(%esp), %ecx		/* ecx = lock pointer */
-	movl	%gs:CPU_THREAD, %edx	/* edx = thread addr */
-	movl	$LS_LOCK_CLEAR_SPLX_RELEASE, %eax
-	jmp	lockstat_wrapper
-	SET_SIZE(lock_clear_splx)
-
-#endif	/* !__amd64 */
 
 #endif	/* __lint */
 
@@ -1255,15 +1262,9 @@ lockstat_hot_patch(void)
 	HOT_PATCH(.lock_set_spl_lockstat_patch_point,
 		LS_LOCK_SET_SPL_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
 
-#if defined(__amd64)
 	HOT_PATCH(LOCK_CLEAR_SPLX_LOCKSTAT_PATCH_POINT,
 		LS_LOCK_CLEAR_SPLX_RELEASE,
 		LOCK_CLEAR_SPLX_LOCKSTAT_PATCH_VAL, 0, 1);
-#else
-	HOT_PATCH(.lock_clear_splx_lockstat_patch_point,
-		LS_LOCK_CLEAR_SPLX_RELEASE, NOP_INSTR, RET_INSTR, 1)
-#endif	/* !__amd64 */
-
 #if defined(__amd64)
 	leave			/* unwind stack */
 #endif	/* __amd64 */

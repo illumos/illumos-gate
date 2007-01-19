@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,7 +30,7 @@
 MANIFEST= boot-archive-update.xml
 SVCMETHOD= boot-archive-update
 
-PROG= create_ramdisk create_diskmap
+PROG= create_ramdisk create_diskmap update_grub
 METHODPROG= boot-archive-update
 SBINPROG= root_archive
 

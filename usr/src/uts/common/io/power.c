@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,11 +54,14 @@
 #include <sys/cmn_err.h>
 #include <sys/errno.h>
 #include <sys/modctl.h>
-#include <sys/machsystm.h>
 #include <sys/open.h>
 #include <sys/stat.h>
 #include <sys/poll.h>
 #include <sys/pbio.h>
+
+#if defined(__sparc)
+#include <sys/machsystm.h>
+#endif
 
 #ifdef	ACPI_POWER_BUTTON
 

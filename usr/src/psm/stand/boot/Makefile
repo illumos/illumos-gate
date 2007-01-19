@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,7 +29,6 @@ include		../../../Makefile.master
 
 sparcv9_ARCHITECTURES = sparcv9
 sparc_ARCHITECTURES = $(sparcv9_ARCHITECTURES)
-i386_ARCHITECTURES = i386
 
 SUBDIRS = $($(MACH)_ARCHITECTURES)
 
@@ -56,7 +55,7 @@ UTSDIR =	../../../uts
 UTSCLOSED =	../../../../closed/uts
 STANDLIBDIR =	../../../stand/lib
 STANDSYSDIRS =	../../../stand/sys
-PROMDIRS =	../../promif $(UTSDIR)/intel/promif
+PROMDIRS =	../../promif
 NAMESDIRS =	../lib/names
 XRDIRS += 	$(STANDLIBDIR) $(STANDSYSDIRS) $(PROMDIRS) $(NAMESDIRS)
 
@@ -64,8 +63,7 @@ XRDIRS += 	$(STANDLIBDIR) $(STANDSYSDIRS) $(PROMDIRS) $(NAMESDIRS)
 # Components beginning with B! are in the open and closed trees; those
 # beginning with O! are just in the open tree.
 #
-XRINCCOMP = B!sun4u O!sfmmu O!sparc/v7 O!sparc/v9 B!sparc B!sun \
-	B!common B!intel B!i86pc
+XRINCCOMP = B!sun4u O!sfmmu O!sparc/v7 O!sparc/v9 B!sparc B!sun B!common
 XRINC_TMP = $(XRINCCOMP:B!%=$(UTSDIR)/%)
 XRINCDIRS = $(XRINC_TMP:O!%=$(UTSDIR)/%)
 $(CLOSED_BUILD)XRINC_TMP = $(XRINCCOMP:B!%=$(UTSDIR)/% $(UTSCLOSED)/%)

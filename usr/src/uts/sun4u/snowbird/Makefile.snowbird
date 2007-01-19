@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -66,7 +66,6 @@ ROOT_SNOWBIRD_DRV_LINK		= $(ROOT_SNOWBIRD_DRV_LINK_$(CLASS))
 USR_SNOWBIRD_DIR		= $(USR_PLAT_DIR)/SUNW,Netra-CP2300
 USR_SNOWBIRD_INC_DIR		= $(USR_SNOWBIRD_DIR)/include
 USR_SNOWBIRD_SBIN_DIR		= $(USR_SNOWBIRD_DIR)/sbin
-USR_SNOWBIRD_SBIN_EEPROM	= $(USR_SNOWBIRD_SBIN_DIR)/eeprom
 USR_SNOWBIRD_SBIN_PRTDIAG	= $(USR_SNOWBIRD_SBIN_DIR)/prtdiag
 USR_SNOWBIRD_SBIN_TRAPSTAT	= $(USR_SNOWBIRD_SBIN_DIR)/trapstat
 USR_SNOWBIRD_SBIN_FRUADM	= $(USR_SNOWBIRD_SBIN_DIR)/fruadm

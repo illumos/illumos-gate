@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -346,7 +346,8 @@ isjobstop(int sig)
 
 	ASSERT(MUTEX_HELD(&p->p_lock));
 
-	if (u.u_signal[sig-1] == SIG_DFL && sigismember(&stopdefault, sig)) {
+	if (PTOU(curproc)->u_signal[sig-1] == SIG_DFL &&
+	    sigismember(&stopdefault, sig)) {
 		/*
 		 * If SIGCONT has been posted since we promoted this signal
 		 * from pending to current, then don't do a jobcontrol stop.
@@ -476,7 +477,7 @@ issig_justlooking(void)
 				 * the process when lwp_nostop is set.
 				 */
 				if (!lwp->lwp_nostop ||
-				    u.u_signal[sig-1] != SIG_DFL ||
+				    PTOU(curproc)->u_signal[sig-1] != SIG_DFL ||
 				    !sigismember(&stopdefault, sig))
 					return (1);
 			}
@@ -768,7 +769,8 @@ issig_forreal(void)
 	 * signal() interface for setting the signal handler.
 	 */
 	if (sigcld_found &&
-	    (sig != SIGCLD || !sigismember(&u.u_sigresethand, SIGCLD)))
+	    (sig != SIGCLD || !sigismember(&PTOU(curproc)->u_sigresethand,
+	    SIGCLD)))
 		sigcld_repost();
 
 	if (sig != 0)
@@ -1295,7 +1297,7 @@ psig(void)
 		mutex_exit(&p->p_lock);
 		return;
 	}
-	func = u.u_signal[sig-1];
+	func = PTOU(curproc)->u_signal[sig-1];
 
 	/*
 	 * The signal disposition could have changed since we promoted
@@ -1386,10 +1388,10 @@ psig(void)
 			t->t_flag &= ~T_TOMASK;
 		else
 			lwp->lwp_sigoldmask = t->t_hold;
-		sigorset(&t->t_hold, &u.u_sigmask[sig-1]);
-		if (!sigismember(&u.u_signodefer, sig))
+		sigorset(&t->t_hold, &PTOU(curproc)->u_sigmask[sig-1]);
+		if (!sigismember(&PTOU(curproc)->u_signodefer, sig))
 			sigaddset(&t->t_hold, sig);
-		if (sigismember(&u.u_sigresethand, sig))
+		if (sigismember(&PTOU(curproc)->u_sigresethand, sig))
 			setsigact(sig, SIG_DFL, nullsmask, 0);
 
 		DTRACE_PROC3(signal__handle, int, sig, k_siginfo_t *,
@@ -1526,7 +1528,7 @@ setsigact(int sig, void (*disp)(), k_sigset_t mask, int flags)
 
 	ASSERT(MUTEX_HELD(&p->p_lock));
 
-	u.u_signal[sig - 1] = disp;
+	PTOU(curproc)->u_signal[sig - 1] = disp;
 
 	/*
 	 * Honor the SA_SIGINFO flag if the signal is being caught.
@@ -1542,25 +1544,25 @@ setsigact(int sig, void (*disp)(), k_sigset_t mask, int flags)
 
 	if (disp != SIG_DFL && disp != SIG_IGN) {
 		sigdelset(&p->p_ignore, sig);
-		u.u_sigmask[sig - 1] = mask;
+		PTOU(curproc)->u_sigmask[sig - 1] = mask;
 		if (!sigismember(&cantreset, sig)) {
 			if (flags & SA_RESETHAND)
-				sigaddset(&u.u_sigresethand, sig);
+				sigaddset(&PTOU(curproc)->u_sigresethand, sig);
 			else
-				sigdelset(&u.u_sigresethand, sig);
+				sigdelset(&PTOU(curproc)->u_sigresethand, sig);
 		}
 		if (flags & SA_NODEFER)
-			sigaddset(&u.u_signodefer, sig);
+			sigaddset(&PTOU(curproc)->u_signodefer, sig);
 		else
-			sigdelset(&u.u_signodefer, sig);
+			sigdelset(&PTOU(curproc)->u_signodefer, sig);
 		if (flags & SA_RESTART)
-			sigaddset(&u.u_sigrestart, sig);
+			sigaddset(&PTOU(curproc)->u_sigrestart, sig);
 		else
-			sigdelset(&u.u_sigrestart, sig);
+			sigdelset(&PTOU(curproc)->u_sigrestart, sig);
 		if (flags & SA_ONSTACK)
-			sigaddset(&u.u_sigonstack, sig);
+			sigaddset(&PTOU(curproc)->u_sigonstack, sig);
 		else
-			sigdelset(&u.u_sigonstack, sig);
+			sigdelset(&PTOU(curproc)->u_sigonstack, sig);
 
 	} else if (disp == SIG_IGN ||
 	    (disp == SIG_DFL && sigismember(&ignoredefault, sig))) {

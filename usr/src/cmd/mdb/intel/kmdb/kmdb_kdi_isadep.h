@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +29,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
+#include <sys/kdi_machimpl.h>
 
 #include <mdb/mdb_target.h>
 
@@ -39,24 +39,21 @@ extern "C" {
 
 struct gate_desc;
 
-extern void (**kdi_shutdownp)(int, int);
+extern void kmdb_kdi_activate(kdi_main_t, kdi_cpusave_t *, int);
+extern void kmdb_kdi_deactivate(void);
+
+extern void kmdb_kdi_idt_switch(kdi_cpusave_t *);
+
+extern void kmdb_kdi_update_drreg(kdi_drreg_t *);
+extern void kmdb_kdi_set_debug_msrs(kdi_msr_t *);
 
 extern uintptr_t kmdb_kdi_get_userlimit(void);
-extern int kmdb_kdi_xc_initialized(void);
-
-extern void kmdb_kdi_idt_init_gate(struct gate_desc *, void (*)(void), uint_t,
-    int);
-extern void kmdb_kdi_idt_read(struct gate_desc *, struct gate_desc *, uint_t);
-extern void kmdb_kdi_idt_write(struct gate_desc *, struct gate_desc *, uint_t);
-extern struct gate_desc *kmdb_kdi_cpu2idt(struct cpu *);
 
 extern int kmdb_kdi_get_cpuinfo(uint_t *, uint_t *, uint_t *);
 
-/*
- * To be used only when the kernel is running
- */
-extern void kmdb_kdi_cpu_iter(void (*)(struct cpu *, uint_t),
-    uint_t);
+extern void kmdb_kdi_memrange_add(caddr_t, size_t);
+
+extern void kmdb_kdi_reboot(void);
 
 #ifdef __cplusplus
 }

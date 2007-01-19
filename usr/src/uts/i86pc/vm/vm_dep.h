@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@ extern "C" {
 
 #include <sys/clock.h>
 #include <vm/hat_pte.h>
+#include <sys/param.h>
 
 /*
  * WARNING: vm_dep.h is included by files in common. As such, macros
@@ -333,7 +334,7 @@ extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 #define	PP_2_BIN(pp)		(PP_2_BIN_SZC(pp, pp->p_szc))
 
 #define	PP_2_MEM_NODE(pp)	(PFN_2_MEM_NODE(pp->p_pagenum))
-#define	PP_2_MTYPE(pp)		(pfn_2_mtype(pp->p_pagenum))
+#define	PP_2_MTYPE(pp)		(pfn_2_mtype(pfn_to_mfn(pp->p_pagenum)))
 #define	PP_2_SZC(pp)		(pp->p_szc)
 
 #define	SZCPAGES(szc)		(1 << PAGE_BSZS_SHIFT(szc))

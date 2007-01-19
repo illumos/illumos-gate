@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -531,9 +531,9 @@ _private_setcontext(const ucontext_t *ucp)
 #if defined(__sparc)
 		uc.uc_mcontext.gregs[REG_G7] = (greg_t)self;
 #elif defined(__amd64)
-		uc.uc_mcontext.gregs[REG_FS] = (greg_t)self->ul_gs;
+		uc.uc_mcontext.gregs[REG_FS] = (greg_t)0; /* null for fsbase */
 #elif defined(__i386)
-		uc.uc_mcontext.gregs[GS] = (greg_t)self->ul_gs;
+		uc.uc_mcontext.gregs[GS] = (greg_t)LWPGS_SEL;
 #else
 #error "none of __sparc, __amd64, __i386 defined"
 #endif

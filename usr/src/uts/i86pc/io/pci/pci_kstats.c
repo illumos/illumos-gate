@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,7 @@
 #include <sys/mach_intr.h>
 #include <sys/psm.h>
 #include <sys/clock.h>
-#include <io/pcplusmp/apic.h>
+#include <sys/apic.h>
 #include <io/pci/pci_var.h>
 
 typedef struct pci_kstat_private {

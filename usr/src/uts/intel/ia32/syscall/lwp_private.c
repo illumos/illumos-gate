@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,13 +64,14 @@ lwp_setprivate(klwp_t *lwp, int which, uintptr_t base)
 	 * to work, which is needed by emulators for legacy application
 	 * environments ..
 	 *
-	 * 64-bit processes also point to a per-cpu GDT segment descriptor
+	 * 64-bit processes may also point to a per-cpu GDT segment descriptor
 	 * virtualized to the lwp.  However the descriptor base is forced
 	 * to zero (because we can't express the full 64-bit address range
 	 * in a long mode descriptor), so don't reload segment registers
-	 * in a 64-bit program!
+	 * in a 64-bit program! 64-bit processes must have selector values
+	 * of zero for %fs and %gs to use the 64-bit fs_base and gs_base
+	 * respectively.
 	 */
-
 	if ((pcb->pcb_flags & RUPDATE_PENDING) == 0) {
 		pcb->pcb_ds = rp->r_ds;
 		pcb->pcb_es = rp->r_es;
@@ -84,28 +84,32 @@ lwp_setprivate(klwp_t *lwp, int which, uintptr_t base)
 
 	switch (which) {
 	case _LWP_FSBASE:
-		if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE)
+		if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE) {
 			set_usegd(&pcb->pcb_fsdesc, SDP_LONG, 0, 0,
 			    SDT_MEMRWA, SEL_UPL, SDP_BYTES, SDP_OP32);
-		else
+			rval = pcb->pcb_fs = 0;	/* null gdt descriptor */
+		} else {
 			set_usegd(&pcb->pcb_fsdesc, SDP_SHORT, (void *)base, -1,
 			    SDT_MEMRWA, SEL_UPL, SDP_PAGES, SDP_OP32);
+			rval = pcb->pcb_fs = LWPFS_SEL;
+		}
 		if (thisthread)
 			CPU->cpu_gdt[GDT_LWPFS] = pcb->pcb_fsdesc;
 		pcb->pcb_fsbase = base;
-		rval = pcb->pcb_fs = LWPFS_SEL;
 		break;
 	case _LWP_GSBASE:
-		if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE)
+		if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE) {
 			set_usegd(&pcb->pcb_gsdesc, SDP_LONG, 0, 0,
 			    SDT_MEMRWA, SEL_UPL, SDP_BYTES, SDP_OP32);
-		else
+			rval = pcb->pcb_gs = 0;	/* null gdt descriptor */
+		} else {
 			set_usegd(&pcb->pcb_gsdesc, SDP_SHORT, (void *)base, -1,
 			    SDT_MEMRWA, SEL_UPL, SDP_PAGES, SDP_OP32);
+			rval = pcb->pcb_gs = LWPGS_SEL;
+		}
 		if (thisthread)
 			CPU->cpu_gdt[GDT_LWPGS] = pcb->pcb_gsdesc;
 		pcb->pcb_gsbase = base;
-		rval = pcb->pcb_gs = LWPGS_SEL;
 		break;
 	default:
 		rval = -1;
@@ -115,7 +119,7 @@ lwp_setprivate(klwp_t *lwp, int which, uintptr_t base)
 #elif defined(__i386)
 
 	/*
-	 * 32-bit compatibility processes point to the per-cpu GDT segment
+	 * 32-bit processes point to the per-cpu GDT segment
 	 * descriptors that are virtualized to the lwp.
 	 */
 
@@ -162,24 +166,44 @@ lwp_getprivate(klwp_t *lwp, int which, uintptr_t base)
 
 	case _LWP_FSBASE:
 		if ((sbase = pcb->pcb_fsbase) != 0) {
-			if (pcb->pcb_flags & RUPDATE_PENDING) {
-				if (pcb->pcb_fs == LWPFS_SEL)
-					break;
+			if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE) {
+				if (pcb->pcb_flags & RUPDATE_PENDING) {
+					if (pcb->pcb_fs == 0)
+						break;
+				} else {
+					if (rp->r_fs == 0)
+						break;
+				}
 			} else {
-				if (rp->r_fs == LWPFS_SEL)
-					break;
+				if (pcb->pcb_flags & RUPDATE_PENDING) {
+					if (pcb->pcb_fs == LWPFS_SEL)
+						break;
+				} else {
+					if (rp->r_fs == LWPFS_SEL)
+						break;
+				}
 			}
 		}
 		error = EINVAL;
 		break;
 	case _LWP_GSBASE:
 		if ((sbase = pcb->pcb_gsbase) != 0) {
-			if (pcb->pcb_flags & RUPDATE_PENDING) {
-				if (pcb->pcb_gs == LWPGS_SEL)
-					break;
+			if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE) {
+				if (pcb->pcb_flags & RUPDATE_PENDING) {
+					if (pcb->pcb_gs == 0)
+						break;
+				} else {
+					if (rp->r_gs == 0)
+						break;
+				}
 			} else {
-				if (rp->r_gs == LWPGS_SEL)
-					break;
+				if (pcb->pcb_flags & RUPDATE_PENDING) {
+					if (pcb->pcb_gs == LWPGS_SEL)
+						break;
+				} else {
+					if (rp->r_gs == LWPGS_SEL)
+						break;
+				}
 			}
 		}
 		error = EINVAL;

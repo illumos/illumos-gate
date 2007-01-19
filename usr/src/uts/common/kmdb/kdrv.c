@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,7 @@ kdrv_activate(intptr_t arg)
 	size_t got;
 	int i, rc;
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	if (cons_polledio == NULL) {
 		cmn_err(CE_NOTE, "kmdb not supported: no console polled I/O");
 		return (ENOTSUP);

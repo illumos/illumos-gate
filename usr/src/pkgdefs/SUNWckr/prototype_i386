@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,11 +56,16 @@ f none kernel/crypto/rsa 755 root sys
 f none kernel/crypto/sha1 755 root sys
 f none kernel/crypto/sha2 755 root sys
 f none kernel/crypto/swrand 755 root sys
-f none kernel/dacf/consconfig_dacf 755 root sys
 f none kernel/devname/sdev_nsconfig_mod 755 root sys
 f none kernel/drv/aggr 755 root sys
 f none kernel/drv/arp 755 root sys
 f none kernel/drv/bl 755 root sys
+f none kernel/drv/bmc 755 root sys
+f none kernel/drv/bmc.conf 644 root sys
+f none kernel/drv/bscbus 755 root sys
+f none kernel/drv/bscbus.conf 644 root sys
+f none kernel/drv/bscv 755 root sys
+f none kernel/drv/bscv.conf 644 root sys
 f none kernel/drv/clone 755 root sys
 f none kernel/drv/cn 755 root sys
 f none kernel/drv/conskbd 755 root sys
@@ -83,6 +88,7 @@ f none kernel/drv/ippctl 755 root sys
 f none kernel/drv/ipsecah 755 root sys
 f none kernel/drv/ipsecesp 755 root sys
 f none kernel/drv/iwscn 755 root sys
+f none kernel/drv/kb8042 755 root sys
 f none kernel/drv/keysock 755 root sys
 f none kernel/drv/kmdb 755 root sys
 f none kernel/drv/kssl 755 root sys
@@ -95,10 +101,15 @@ f none kernel/drv/mpt.conf 644 root sys
 f none kernel/drv/mouse8042 755 root sys
 f none kernel/drv/openeepr 755 root sys
 f none kernel/drv/options 755 root sys
+f none kernel/drv/pci_pci 755 root sys
 f none kernel/drv/pci_to_i2o 755 root sys
 f none kernel/drv/pci_to_i2o.conf 644 root sys
+f none kernel/drv/pcie_pci 755 root sys
+f none kernel/drv/pcie_pci.conf 644 root sys
 f none kernel/drv/physmem 755 root sys
 f none kernel/drv/poll 755 root sys
+f none kernel/drv/power 755 root sys
+f none kernel/drv/power.conf 644 root sys
 f none kernel/drv/pseudo 755 root sys
 f none kernel/drv/ptc 755 root sys
 f none kernel/drv/ptsl 755 root sys
@@ -152,6 +163,8 @@ d none boot/acpi/tables 755 root sys
 f none kernel/mac/mac_ether 755 root sys
 f none kernel/mac/mac_wifi 755 root sys
 f none kernel/misc/acpica 755 root sys
+f none kernel/misc/agpmaster 755 root sys
+f none kernel/misc/bootdev 755 root sys
 f none kernel/misc/busra 755 root sys
 f none kernel/misc/cardbus 755 root sys
 f none kernel/misc/cmlb 755 root sys
@@ -168,13 +181,14 @@ f none kernel/misc/ipc 755 root sys
 f none kernel/misc/kbtrans 755 root sys
 f none kernel/misc/kcf 755 root sys
 f none kernel/misc/kmdbmod 755 root sys
-f none kernel/misc/krtld 755 root sys
 f none kernel/misc/mac 755 root sys
 l none kernel/misc/md5=../../kernel/crypto/md5
 f none kernel/misc/net80211 755 root sys
 f none kernel/misc/neti 755 root sys
 f none kernel/misc/pcicfg 755 root sys
+f none kernel/misc/pciehpc 755 root sys
 f none kernel/misc/pcihp 755 root sys
+f none kernel/misc/pci_autoconfig 755 root sys
 f none kernel/misc/pcmcia 755 root sys
 f none kernel/misc/rpcsec 755 root sys
 f none kernel/misc/sata 755 root sys
@@ -184,7 +198,6 @@ l none kernel/misc/sha2=../../kernel/crypto/sha2
 f none kernel/misc/strplumb 755 root sys
 f none kernel/misc/tem 755 root sys
 f none kernel/misc/tlimod 755 root sys
-f none kernel/misc/zmod 755 root sys
 f none kernel/sched/TS 755 root sys
 f none kernel/sched/TS_DPTBL 755 root sys
 f none kernel/strmod/6to4tun 755 root sys
@@ -238,14 +251,15 @@ f none kernel/crypto/amd64/rsa 755 root sys
 f none kernel/crypto/amd64/sha1 755 root sys
 f none kernel/crypto/amd64/sha2 755 root sys
 f none kernel/crypto/amd64/swrand 755 root sys
-d none kernel/dacf/amd64 755 root sys
-f none kernel/dacf/amd64/consconfig_dacf 755 root sys
 d none kernel/devname/amd64 755 root sys
 f none kernel/devname/amd64/sdev_nsconfig_mod 755 root sys
 d none kernel/drv/amd64 755 root sys
 f none kernel/drv/amd64/aggr 755 root sys
 f none kernel/drv/amd64/arp 755 root sys
 f none kernel/drv/amd64/bl 755 root sys
+f none kernel/drv/amd64/bmc 755 root sys
+f none kernel/drv/amd64/bscbus 755 root sys
+f none kernel/drv/amd64/bscv 755 root sys
 f none kernel/drv/amd64/clone 755 root sys
 f none kernel/drv/amd64/cn 755 root sys
 f none kernel/drv/amd64/conskbd 755 root sys
@@ -264,6 +278,7 @@ f none kernel/drv/amd64/ippctl 755 root sys
 f none kernel/drv/amd64/ipsecah 755 root sys
 f none kernel/drv/amd64/ipsecesp 755 root sys
 f none kernel/drv/amd64/iwscn 755 root sys
+f none kernel/drv/amd64/kb8042 755 root sys
 f none kernel/drv/amd64/keysock 755 root sys
 f none kernel/drv/amd64/kmdb 755 root sys
 f none kernel/drv/amd64/kssl 755 root sys
@@ -275,8 +290,11 @@ f none kernel/drv/amd64/mpt 755 root sys
 f none kernel/drv/amd64/mouse8042 755 root sys
 f none kernel/drv/amd64/openeepr 755 root sys
 f none kernel/drv/amd64/options 755 root sys
+f none kernel/drv/amd64/pci_pci 755 root sys
+f none kernel/drv/amd64/pcie_pci 755 root sys
 f none kernel/drv/amd64/physmem 755 root sys
 f none kernel/drv/amd64/poll 755 root sys
+f none kernel/drv/amd64/power 755 root sys
 f none kernel/drv/amd64/pseudo 755 root sys
 f none kernel/drv/amd64/ptc 755 root sys
 f none kernel/drv/amd64/ptsl 755 root sys
@@ -331,6 +349,8 @@ f none kernel/mac/amd64/mac_ether 755 root sys
 f none kernel/mac/amd64/mac_wifi 755 root sys
 d none kernel/misc/amd64 755 root sys
 f none kernel/misc/amd64/acpica 755 root sys
+f none kernel/misc/amd64/agpmaster 755 root sys
+f none kernel/misc/amd64/bootdev 755 root sys
 f none kernel/misc/amd64/busra 755 root sys
 f none kernel/misc/amd64/cardbus 755 root sys
 f none kernel/misc/amd64/cmlb 755 root sys
@@ -346,13 +366,14 @@ f none kernel/misc/amd64/ipc 755 root sys
 f none kernel/misc/amd64/kbtrans 755 root sys
 f none kernel/misc/amd64/kcf 755 root sys
 f none kernel/misc/amd64/kmdbmod 755 root sys
-f none kernel/misc/amd64/krtld 755 root sys
 f none kernel/misc/amd64/mac 755 root sys
 l none kernel/misc/amd64/md5=../../../kernel/crypto/amd64/md5
 f none kernel/misc/amd64/net80211 755 root sys
 f none kernel/misc/amd64/neti 755 root sys
 f none kernel/misc/amd64/pcicfg 755 root sys
+f none kernel/misc/amd64/pciehpc 755 root sys
 f none kernel/misc/amd64/pcihp 755 root sys
+f none kernel/misc/amd64/pci_autoconfig 755 root sys
 f none kernel/misc/amd64/pcmcia 755 root sys
 f none kernel/misc/amd64/rpcsec 755 root sys
 f none kernel/misc/amd64/sata 755 root sys
@@ -362,7 +383,6 @@ l none kernel/misc/amd64/sha2=../../../kernel/crypto/amd64/sha2
 f none kernel/misc/amd64/strplumb 755 root sys
 f none kernel/misc/amd64/tem 755 root sys
 f none kernel/misc/amd64/tlimod 755 root sys
-f none kernel/misc/amd64/zmod 755 root sys
 d none kernel/sched/amd64 755 root sys
 f none kernel/sched/amd64/TS 755 root sys
 f none kernel/sched/amd64/TS_DPTBL 755 root sys

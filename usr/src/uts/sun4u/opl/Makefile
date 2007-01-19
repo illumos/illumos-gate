@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -82,7 +82,6 @@ OPL_CRYPTO_LINKS	+= aes256
 install: $(ROOT_OPL_DIR) $(USR_OPL_DIR) \
 	$(USR_OPL_INC_DIR) \
 	$(USR_OPL_SBIN_DIR) \
-	$(USR_OPL_SBIN_EEPROM) \
 	$(USR_OPL_SBIN_PRTDIAG) \
 	$(USR_OPL_SBIN_TRAPSTAT) \
 	$(USR_OPL_SBIN_FRUADM) \

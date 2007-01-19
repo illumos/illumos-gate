@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,12 +49,11 @@ extern "C" {
 /*
  * Machine dependent parameters and limits.
  */
+
 #if defined(__amd64)
-#define	NCPU	64	/* NBBY * sizeof (ulong_t) for simple cpuset_t */
+#define	NCPU 	64 	/* NBBY * sizeof (ulong_t) for simple cpuset_t */
 #elif defined(__i386)
 #define	NCPU	32
-#else
-#error	"port me"
 #endif
 
 /*
@@ -86,9 +85,9 @@ extern "C" {
 
 #if !defined(_ASM)
 #define	MMU_PAGEOFFSET	(MMU_PAGESIZE-1) /* Mask of address bits in page */
-#else	/* !_ASM */
-#define	MMU_PAGEOFFSET	_CONST(MMU_PAGESIZE-1)  /* assembler lameness */
-#endif	/* !_ASM */
+#else	/* _ASM */
+#define	MMU_PAGEOFFSET	_CONST(MMU_PAGESIZE-1)	/* assembler lameness */
+#endif	/* _ASM */
 
 #define	MMU_PAGEMASK	(~MMU_PAGEOFFSET)
 
@@ -133,6 +132,8 @@ extern "C" {
  * i86 and i86pc files use kernelbase instead of KERNELBASE, which is
  * initialized in i86pc/os/startup.c.
  */
+#define	KERNEL_TEXT_amd64	UINT64_C(0xfffffffffb800000)
+#define	KERNEL_TEXT_i386	ADDRESS_C(0xfe800000)
 
 #if defined(__amd64)
 
@@ -160,6 +161,11 @@ extern "C" {
 #define	SEGKPM_BASE	ADDRESS_C(0xfffffe0000000000)
 
 /*
+ * This is valloc_base, above seg_kpm, but below everything else
+ */
+#define	VALLOC_BASE	ADDRESS_C(0xffffff0000000000)
+
+/*
  * default and boundary sizes for segkp
  */
 #define	SEGKPDEFSIZE	(2L * 1024L * 1024L * 1024L)		/*   2G */
@@ -172,20 +178,22 @@ extern "C" {
 #define	SEGZIOMINSIZE	(400L * 1024 * 1024L)			/* 400M */
 
 /*
- * Boot (or, more precisely, vmx) maps most pages twice - once in the
- * bottom 2GB of memory and once in the bottom 2GB of the topmost 4GB.
- * When boot is unmapped this range is available to the kernel, but until
- * then we have to leave it untouched.
+ * During intial boot we limit heap to the top 4Gig.
  */
-#define	BOOT_DOUBLEMAP_BASE	ADDRESS_C(0xffffffff00000000)
-#define	BOOT_DOUBLEMAP_SIZE	ADDRESS_C(0x80000000)
+#define	BOOT_KERNELHEAP_BASE	ADDRESS_C(0xffffffff00000000)
 
 /*
  * VMWare works best if we don't use the top 64Meg of memory for amd64.
  * Set KERNEL_TEXT to top_o_memory - 64Meg - 8 Meg for 8Meg of nucleus pages.
  */
 #define	PROMSTART	ADDRESS_C(0xffc00000)
-#define	KERNEL_TEXT	ADDRESS_C(0xfffffffffb800000)
+#define	KERNEL_TEXT	KERNEL_TEXT_amd64
+
+/*
+ * Virtual address range available to the debugger
+ */
+#define	SEGDEBUGBASE	ADDRESS_C(0xffffffffff800000)
+#define	SEGDEBUGSIZE	ADDRESS_C(0x400000)
 
 /*
  * Define upper limit on user address space
@@ -233,7 +241,14 @@ extern "C" {
  * need this region of virtual address space mapped 1-1
  */
 #define	PROMSTART	ADDRESS_C(0xffc00000)
-#define	KERNEL_TEXT	ADDRESS_C(0xfe800000)
+#define	KERNEL_TEXT	KERNEL_TEXT_i386
+
+/*
+ * Virtual address range available to the debugger
+ * We place it just above the kernel text (4M) and kernel data (4M).
+ */
+#define	SEGDEBUGBASE	(KERNEL_TEXT + ADDRESS_C(0x800000))
+#define	SEGDEBUGSIZE	ADDRESS_C(0x400000)
 
 /*
  * Define upper limit on user address space
@@ -243,8 +258,17 @@ extern "C" {
 
 #endif	/* __i386 */
 
-#if !defined(_ASM) && !defined(_KADB)
-extern uintptr_t kernelbase, segkmap_start, segmapsize;
+/*
+ * Reserve two pages just below KERNEL_TEXT for the GDT and debug info page.
+ */
+#if !defined(_ASM)
+#define	MISC_VA_BASE (KERNEL_TEXT - MMU_PAGESIZE * 2)
+#define	GDT_VA	(MISC_VA_BASE)
+#define	DEBUG_INFO_VA (MISC_VA_BASE + MMU_PAGESIZE)
+#endif /* !_ASM */
+
+#if !defined(_ASM) && !defined(_KMDB)
+extern uintptr_t kernelbase, segmap_start, segmapsize;
 #endif
 
 /*

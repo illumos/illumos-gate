@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -56,9 +55,9 @@ find_files "s.*"	\
 # to compile the drivers/modules
 find_files "s.*"	\
 	usr/src/uts/i86pc/npe			\
-	usr/src/uts/i86pc/pcie_pci		\
-	usr/src/uts/i86pc/pciehpc		\
-	usr/src/uts/i86pc/pci_autoconfig	\
+	usr/src/uts/intel/pci_autoconfig	\
+	usr/src/uts/intel/pcie_pci		\
+	usr/src/uts/intel/pciehpc		\
 	usr/src/uts/intel/pcicfg
 
 # packaging files
@@ -75,9 +74,11 @@ find_files "s.*"	\
 	usr/src/uts/common/rpc		\
 	usr/src/uts/intel/asm		\
 	usr/src/uts/intel/amd64		\
+	usr/src/uts/intel/io/pci	\
+	usr/src/uts/intel/io/pciex	\
 	usr/src/uts/i86pc/io/pci	\
 	usr/src/uts/i86pc/io/pcplusmp	\
-	usr/src/uts/i86pc/io/acpica
+	usr/src/uts/intel/io/acpica
 
 # makefiles
 echo_file  usr/src/Makefile.master

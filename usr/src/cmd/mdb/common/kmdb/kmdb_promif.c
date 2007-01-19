@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,24 +52,31 @@ static char kmdb_prom_readbuf[KMDB_PROM_READBUF_SIZE];
 static int kmdb_prom_readbuf_head;
 static int kmdb_prom_readbuf_tail;
 
-static ssize_t
-kmdb_prom_polled_read(caddr_t buf, size_t len)
+static int
+kmdb_prom_getchar(int wait)
 {
-	uintptr_t arg = (uintptr_t)mdb.m_pio->cons_polledio_argument;
-	uintptr_t ischar = (uintptr_t)mdb.m_pio->cons_polledio_ischar;
-	int nread = 0;
-	int c;
+	struct cons_polledio *pio = mdb.m_pio;
+	uintptr_t ischar;
+	uintptr_t getchar;
+	uintptr_t arg;
 
-	while ((ischar == NULL || kmdb_dpi_call(ischar, 1, &arg)) &&
-	    nread < len) {
-		c = kmdb_dpi_call((uintptr_t)mdb.m_pio->cons_polledio_getchar,
-		    1, &arg);
-
-		*buf++ = (char)c;
-		nread++;
+	if (pio == NULL || pio->cons_polledio_getchar == NULL) {
+		int c;
+		while ((c = prom_mayget()) == -1) {
+			if (!wait)
+				return (-1);
+		}
+		return (c);
 	}
 
-	return (nread);
+	ischar = (uintptr_t)pio->cons_polledio_ischar;
+	getchar = (uintptr_t)pio->cons_polledio_getchar;
+	arg = (uintptr_t)pio->cons_polledio_argument;
+
+	if (!wait && ischar != NULL && !kmdb_dpi_call(ischar, 1, &arg))
+		return (-1);
+
+	return ((int)kmdb_dpi_call(getchar, 1, &arg));
 }
 
 static ssize_t
@@ -90,17 +97,18 @@ kmdb_prom_polled_write(caddr_t buf, size_t len)
 }
 
 static ssize_t
-kmdb_prom_reader(caddr_t buf, size_t len)
+kmdb_prom_reader(caddr_t buf, size_t len, int wait)
 {
 	int nread = 0;
 	int c;
 
-	if (mdb.m_pio != NULL && mdb.m_pio->cons_polledio_getchar != NULL)
-		return (kmdb_prom_polled_read(buf, len));
+	while (nread < len) {
+		if ((c = kmdb_prom_getchar(wait)) == -1)
+			break;
 
-	while (nread < len && (c = prom_mayget()) != -1) {
 		*buf++ = (char)c;
 		nread++;
+		wait = 0;
 	}
 
 	return (nread);
@@ -217,7 +225,7 @@ check_int(char *buf, size_t len)
  * delivering an interrupt directly if we find one.
  */
 static void
-kmdb_prom_fill_readbuf(int check_for_int)
+kmdb_prom_fill_readbuf(int check_for_int, int wait)
 {
 	int oldhead, left, n;
 
@@ -238,7 +246,7 @@ kmdb_prom_fill_readbuf(int check_for_int)
 		 * the common code handle the second.
 		 */
 		if ((n = kmdb_prom_reader(kmdb_prom_readbuf +
-		    kmdb_prom_readbuf_head, left)) <= 0)
+		    kmdb_prom_readbuf_head, left, wait)) <= 0)
 			return;
 
 		oldhead = kmdb_prom_readbuf_head;
@@ -255,7 +263,7 @@ kmdb_prom_fill_readbuf(int check_for_int)
 	left = kmdb_prom_readbuf_tail - kmdb_prom_readbuf_head - 1;
 	if (left > 0) {
 		if ((n = kmdb_prom_reader(kmdb_prom_readbuf +
-		    kmdb_prom_readbuf_head, left)) <= 0)
+		    kmdb_prom_readbuf_head, left, wait)) <= 0)
 			return;
 
 		oldhead = kmdb_prom_readbuf_head;
@@ -272,7 +280,7 @@ kmdb_prom_fill_readbuf(int check_for_int)
 	if (check_for_int) {
 		char c;
 
-		while (kmdb_prom_reader(&c, 1) == 1)
+		while (kmdb_prom_reader(&c, 1, 0) == 1)
 			check_int(&c, 1);
 	}
 }
@@ -280,7 +288,7 @@ kmdb_prom_fill_readbuf(int check_for_int)
 void
 kmdb_prom_check_interrupt(void)
 {
-	kmdb_prom_fill_readbuf(1);
+	kmdb_prom_fill_readbuf(1, 0);
 }
 
 /*
@@ -294,9 +302,10 @@ kmdb_prom_read(void *buf, size_t len, struct termios *tio)
 	size_t totread = 0;
 	size_t thisread;
 	char *c = (char *)buf;
+	int wait = 1;
 
 	for (;;) {
-		kmdb_prom_fill_readbuf(0);
+		kmdb_prom_fill_readbuf(0, wait);
 		thisread = kmdb_prom_drain_readbuf(c, len);
 		len -= thisread;
 		totread += thisread;
@@ -305,6 +314,8 @@ kmdb_prom_read(void *buf, size_t len, struct termios *tio)
 		/* wait until something shows up */
 		if (totread == 0)
 			continue;
+
+		wait = 0;
 
 		/*
 		 * We're done if we've exhausted available input or if we've

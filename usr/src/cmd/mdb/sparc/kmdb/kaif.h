@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,15 +41,9 @@
 extern "C" {
 #endif
 
-#define	KAIF_MASTER_CPUID_UNSET		-1
-
 #define	KAIF_CPU_STATE_NONE		0
 #define	KAIF_CPU_STATE_MASTER		1
 #define	KAIF_CPU_STATE_SLAVE		2
-
-#define	KAIF_CPU_CMD_RESUME		0
-#define	KAIF_CPU_CMD_RESUME_MASTER	1
-#define	KAIF_CPU_CMD_SWITCH		2
 
 #define	KAIF_LSUCTL_VWAPT_MASK	(LSU_VM|LSU_VR|LSU_VW)
 #define	KAIF_LSUCTL_PWAPT_MASK	(LSU_PM|LSU_PR|LSU_PW)
@@ -110,8 +104,6 @@ extern void kaif_resume(int);
 extern void kaif_slave_entry(void);
 extern void kaif_prom_rearm(void);
 extern void kaif_debugger_entry(kaif_cpusave_t *);
-
-extern int kaif_memrange_add(caddr_t, size_t);
 
 extern void kaif_slave_loop_barrier(void);
 

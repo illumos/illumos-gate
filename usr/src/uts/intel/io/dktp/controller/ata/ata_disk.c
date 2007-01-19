@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2471,10 +2471,6 @@ ata_disk_initialize_device_parameters(
 {
 	int		 rc;
 
-#ifdef	_SIMULATOR_SUPPORT
-	extern int simulator_run;	/* running under simulator ? */
-#endif	/* _SIMULATOR_SUPPORT */
-
 	rc = ata_command(ata_ctlp, ata_drvp, FALSE, FALSE,
 			ata_disk_init_dev_parm_wait,
 			ATC_SETPARAM,
@@ -2485,15 +2481,8 @@ ata_disk_initialize_device_parameters(
 			0,			/* cyl_low n/a */
 			0);			/* cyl_hi n/a */
 
-#ifdef	_SIMULATOR_SUPPORT
-	if (rc || simulator_run) {
+	if (rc)
 		return (TRUE);
-	}
-#else
-	if (rc) {
-		return (TRUE);
-	}
-#endif	/* _SIMULATOR_SUPPORT */
 
 	ADBG_ERROR(("ata_init_dev_parms: failed\n"));
 	return (FALSE);

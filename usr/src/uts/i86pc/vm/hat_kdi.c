@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,39 +42,26 @@
 #include <sys/cmn_err.h>
 #include <vm/seg_kmem.h>
 #include <vm/hat_i86.h>
+#include <sys/bootinfo.h>
+#include <vm/kboot_mmu.h>
 #include <sys/machsystm.h>
 
 /*
  * The debugger needs direct access to the PTE of one page table entry
  * in order to implement vtop and physical read/writes
  */
-extern uintptr_t ptable_va;
 static uintptr_t hat_kdi_page = 0;	/* vaddr for phsical page accesses */
 static x86pte_t *hat_kdi_pte = NULL;	/* vaddr of pte for hat_kdi_page */
+static uint_t use_kbm = 1;
 uint_t hat_kdi_use_pae;			/* if 0, use x86pte32_t for pte type */
 
 /*
- * Allocate virtual page to use for kernel debugger accesses to physical memory.
- * This is done very early in boot - before vmem allocator is available, so
- * we use a special hand picked address. (blech) The address is one page
- * above where the hat will put pages for pagetables -- see ptable_alloc() --
- * and is outside of the kernel's address space.
- *
- * We'll pick a new VA after the kernel's hat has been initialized.
+ * Get the address for remapping physical pages during boot
  */
 void
 hat_boot_kdi_init(void)
 {
-
-	/*
-	 * The 1st ptable_va page is for the HAT, we use the 2nd.
-	 */
-	hat_kdi_page = ptable_va + MMU_PAGESIZE;
-#if defined(__amd64)
-	hat_kdi_use_pae = 1;
-#elif defined(__i386)
-	hat_kdi_use_pae = 0;
-#endif
+	hat_kdi_page = (uintptr_t)kbm_push(0);	/* first call gets address... */
 }
 
 /*
@@ -86,6 +72,7 @@ hat_boot_kdi_init(void)
 void
 hat_kdi_init(void)
 {
+	/*LINTED:set but not used in function*/
 	htable_t *ht;
 
 	/*
@@ -95,6 +82,7 @@ hat_kdi_init(void)
 	hat_kdi_use_pae = mmu.pae_hat;
 	hat_kdi_page = (uintptr_t)vmem_alloc(heap_arena, PAGESIZE, VM_SLEEP);
 	ht = htable_create(kas.a_hat, hat_kdi_page, 0, NULL);
+	use_kbm = 0;
 
 	/*
 	 * Get an address at which to put the pagetable and devload it.
@@ -104,12 +92,14 @@ hat_kdi_init(void)
 	hat_devload(kas.a_hat, (caddr_t)hat_kdi_pte, MMU_PAGESIZE, ht->ht_pfn,
 	    PROT_READ | PROT_WRITE | HAT_NOSYNC | HAT_UNORDERED_OK,
 	    HAT_LOAD | HAT_LOAD_NOCONSIST);
-	hat_kdi_pte = (x86pte_t *)((uintptr_t)hat_kdi_pte +
-	    (htable_va2entry(hat_kdi_page, ht) << mmu.pte_size_shift));
+	hat_kdi_pte =
+	    PT_INDEX_PTR(hat_kdi_pte, htable_va2entry(hat_kdi_page, ht));
 
 	HTABLE_INC(ht->ht_valid_cnt);
 	htable_release(ht);
 }
+#define	kdi_mtop(m)	(m)
+#define	kdi_ptom(p)	(p)
 
 /*ARGSUSED*/
 int
@@ -128,13 +118,13 @@ kdi_vtop(uintptr_t va, uint64_t *pap)
 	 * the boot loader's pagetables.
 	 */
 	if (!khat_running) {
-		if (hat_boot_probe(&vaddr, &len, &pfn, &prot) == 0)
+		if (kbm_probe(&vaddr, &len, &pfn, &prot) == 0)
 			return (ENOENT);
 		if (vaddr > va)
 			return (ENOENT);
 		if (vaddr < va)
 			pfn += mmu_btop(va - vaddr);
-		*pap = (uint64_t)mmu_ptob(pfn) + (vaddr & MMU_PAGEOFFSET);
+		*pap = pfn_to_pa(pfn) + (vaddr & MMU_PAGEOFFSET);
 		return (0);
 	}
 
@@ -153,10 +143,10 @@ kdi_vtop(uintptr_t va, uint64_t *pap)
 			return (ENOENT);
 		if (level > 0 && level <= mmu.max_page_level &&
 		    (pte & PT_PAGESIZE)) {
-			*pap = pte & PT_PADDR_LGPG;
+			*pap = kdi_mtop(pte & PT_PADDR_LGPG);
 			break;
 		} else {
-			*pap = pte & PT_PADDR;
+			*pap = kdi_mtop(pte & PT_PADDR);
 			if (level == 0)
 				break;
 		}
@@ -189,7 +179,7 @@ kdi_prw(caddr_t buf, size_t nbytes, uint64_t pa, size_t *ncopiedp, int doread)
 		pgoff = pa & MMU_PAGEOFFSET;
 		sz = MIN(nbytes, MMU_PAGESIZE - pgoff);
 		va = (caddr_t)hat_kdi_page + pgoff;
-		pte = MAKEPTE(btop(pa), 0);
+		pte = mmu_ptob(mmu_btop(pa)) | PT_VALID;
 		if (doread) {
 			from = va;
 			to = buf;
@@ -202,8 +192,8 @@ kdi_prw(caddr_t buf, size_t nbytes, uint64_t pa, size_t *ncopiedp, int doread)
 		/*
 		 * map the physical page
 		 */
-		if (hat_kdi_pte == NULL)
-			(void) hat_boot_remap(hat_kdi_page, btop(pa));
+		if (use_kbm)
+			(void) kbm_push(pa);
 		else if (hat_kdi_use_pae)
 			*hat_kdi_pte = pte;
 		else
@@ -215,8 +205,8 @@ kdi_prw(caddr_t buf, size_t nbytes, uint64_t pa, size_t *ncopiedp, int doread)
 		/*
 		 * erase the mapping
 		 */
-		if (hat_kdi_pte == NULL)
-			hat_boot_demap(hat_kdi_page);
+		if (use_kbm)
+			kbm_pop();
 		else if (hat_kdi_use_pae)
 			*hat_kdi_pte = 0;
 		else
@@ -257,7 +247,7 @@ kdi_pwrite(caddr_t buf, size_t nbytes, uint64_t addr, size_t *ncopiedp)
 size_t
 kdi_range_is_nontoxic(uintptr_t va, size_t sz, int write)
 {
-#ifdef __amd64
+#if defined(__amd64)
 	extern uintptr_t toxic_addr;
 	extern size_t	toxic_size;
 
@@ -277,7 +267,7 @@ kdi_range_is_nontoxic(uintptr_t va, size_t sz, int write)
 
 	return (sz);
 
-#else
+#elif defined(__i386)
 	extern void *device_arena_contains(void *, size_t, size_t *);
 	uintptr_t v;
 
@@ -289,10 +279,5 @@ kdi_range_is_nontoxic(uintptr_t va, size_t sz, int write)
 	else
 		return (v - va);
 
-#endif
-}
-
-void
-hat_kdi_fini(void)
-{
+#endif	/* __i386 */
 }

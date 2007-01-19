@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,11 +58,6 @@
 #include <sys/lgrp.h>
 #include <sys/ddi.h>
 #include <sys/modctl.h>
-
-extern void memlist_read_lock(void);
-extern void memlist_read_unlock(void);
-extern void memlist_write_lock(void);
-extern void memlist_write_unlock(void);
 
 extern struct memlist *phys_avail;
 
@@ -3125,60 +3120,6 @@ kphysm_split_memseg(
 	mutex_exit(&memseg_lists_lock);
 
 	return (1);
-}
-
-/*
- * The memsegs lock is only taken when modifying the memsegs list
- * and rebuilding the pfn hash table (after boot).
- * No lock is needed for read as memseg structure are never de-allocated
- * and the pointer linkage is never updated until the memseg is ready.
- */
-krwlock_t memsegslock;
-
-void
-memsegs_lock(int writer)
-{
-	rw_enter(&memsegslock, writer ? RW_WRITER : RW_READER);
-}
-
-/*ARGSUSED*/
-void
-memsegs_unlock(int writer)
-{
-	rw_exit(&memsegslock);
-}
-
-/*
- * memlist (phys_install, phys_avail) locking.
- */
-
-/*
- * A read/write lock might be better here.
- */
-static kmutex_t memlists_mutex;
-
-void
-memlist_read_lock()
-{
-	mutex_enter(&memlists_mutex);
-}
-
-void
-memlist_read_unlock()
-{
-	mutex_exit(&memlists_mutex);
-}
-
-void
-memlist_write_lock()
-{
-	mutex_enter(&memlists_mutex);
-}
-
-void
-memlist_write_unlock()
-{
-	mutex_exit(&memlists_mutex);
 }
 
 /*

@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -87,9 +87,9 @@ WORKAROUND_DEFS += -DOPTERON_ERRATUM_122
 # Processors
 #
 # Solaris does not currently support PowerNow which is required for this
-# Erratum. Disable for now.
+# Erratum. Check anyway.
 #
-#WORKAROUND_DEFS += -DOPTERON_ERRATUM_123
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_123
 
 #
 # Multiprocessor Systems with Four or More Cores May Deadlock Waiting for a

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,14 +38,9 @@
 #include <sys/pit.h>
 #include <sys/psm_common.h>
 #include <sys/atomic.h>
+#include <sys/archsystm.h>
 
 #define	NSEC_IN_SEC		1000000000
-
-/*
- * External References
- */
-extern int intr_clear(void);
-extern void intr_restore(uint_t);
 
 /*
  * Local Function Prototypes
@@ -158,16 +153,13 @@ static struct	psm_ops uppc_ops = {
 	uppc_gethrtime,				/* psm_gethrtime	*/
 
 	uppc_get_next_processorid,		/* psm_get_next_processorid */
-	(void (*)(processorid_t, caddr_t))NULL,	/* psm_cpu_start	*/
+	(int (*)(processorid_t, caddr_t))NULL,	/* psm_cpu_start	*/
 	(int (*)(void))NULL,			/* psm_post_cpu_start	*/
 	uppc_shutdown,				/* psm_shutdown		*/
 	(int (*)(int, int))NULL,		/* psm_get_ipivect	*/
 	(void (*)(processorid_t, int))NULL,	/* psm_send_ipi		*/
 
 	uppc_translate_irq,			/* psm_translate_irq	*/
-
-	(int (*)(todinfo_t *))NULL,		/* psm_tod_get		*/
-	(int (*)(todinfo_t *))NULL,		/* psm_tod_set		*/
 
 	(void (*)(int, char *))NULL,		/* psm_notify_error	*/
 	(void (*)(int msg))NULL,		/* psm_notify_func	*/
@@ -801,7 +793,6 @@ uppc_translate_irq(dev_info_t *dip, int irqno)
 		UPPC_VERBOSE_IRQ((CE_CONT, "!uppc: non-pci,"
 		    "irqno %d device %s instance %d\n", irqno,
 		    ddi_get_name(dip), ddi_get_instance(dip)));
-
 	}
 
 	return (irqno);
@@ -922,7 +913,8 @@ static hrtime_t
 uppc_gethrtime()
 {
 	hrtime_t timeval, temp;
-	unsigned int oflags, ctr0;
+	unsigned int ctr0;
+	ulong_t oflags;
 
 	oflags = intr_clear(); /* disable ints */
 	lock_set(&uppc_gethrtime_lock);

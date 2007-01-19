@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,6 +201,11 @@
  * _RTC_CONFIG
  *	This indicates whether or not the implementation uses /etc/rtc_config
  *	to configure the real-time clock in the kernel.
+ *
+ * _UNIX_KRTLD
+ *	This indicates that the implementation uses a dynamically
+ *	linked unix + krtld to form the core kernel image at boot
+ *	time, or (in the absence of this symbol) a prelinked kernel image.
  */
 
 #ifdef	__cplusplus
@@ -397,6 +402,7 @@ extern "C" {
 #define	_DMA_USES_VIRTADDR
 #define	_NO_FDISK_PRESENT
 #define	_HAVE_TEM_FIRMWARE
+#define	_UNIX_KRTLD
 
 /*
  * The following set of definitions characterize the implementation of

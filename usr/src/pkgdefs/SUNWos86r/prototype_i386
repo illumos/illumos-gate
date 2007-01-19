@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -81,8 +81,6 @@ f none kernel/drv/elxl 755 root sys
 f none kernel/drv/elxl.conf 644 root sys
 f none kernel/drv/iprb 755 root sys
 f none kernel/drv/iprb.conf 644 root sys
-f none kernel/drv/ncrs 755 root sys
-f none kernel/drv/ncrs.conf 644 root sys
 f none kernel/drv/pcn 755 root sys
 f none kernel/drv/pcn.conf 644 root sys
 # EXPORT DELETE START
@@ -93,14 +91,3 @@ d none kernel/drv/amd64 755 root sys
 f none kernel/drv/amd64/elxl 755 root sys
 f none kernel/drv/amd64/iprb 755 root sys
 f none kernel/drv/amd64/pcn 755 root sys
-d none kernel/mach 755 root sys
-f none kernel/mach/pcplusmp 755 root sys
-d none kernel/mach/amd64 755 root sys
-f none kernel/mach/amd64/pcplusmp 755 root sys
-d none kernel/misc 755 root sys
-d none var 755 root sys
-d none var/svc 755 root sys
-d none var/svc/manifest 755 root sys
-d none var/svc/manifest/platform 755 root sys
-d none var/svc/manifest/platform/i86pc 755 root sys
-f manifest var/svc/manifest/platform/i86pc/eeprom.xml 0444 root sys

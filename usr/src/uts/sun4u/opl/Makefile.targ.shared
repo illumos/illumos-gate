@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,9 +72,6 @@ $(USR_OPL_INC_DIR): $(USR_OPL_DIR) $(USR_PSM_INCL_DIR)
 
 $(USR_OPL_SBIN_DIR):	$(USR_OPL_DIR) $(USR_PSM_SBIN_DIR)
 	$(INS.dir.root.bin)
-
-$(USR_OPL_SBIN_EEPROM): $(USR_OPL_SBIN_DIR)
-	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/eeprom $@ $(CHOWNLINK) $(CHGRPLINK)
 
 $(USR_OPL_SBIN_PRTDIAG): $(USR_OPL_SBIN_DIR)
 	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/prtdiag $@ $(CHOWNLINK) $(CHGRPLINK)

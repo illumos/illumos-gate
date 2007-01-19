@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -372,4 +372,14 @@ dtrace_safe_defer_signal(void)
 	t->t_dtrace_ast = 1;
 
 	return (1);
+}
+
+/*
+ * Additional artificial frames for the machine type. For i86pc, we're already
+ * accounted for, so return 0.
+ */
+int
+dtrace_mach_aframes(void)
+{
+	return (0);
 }

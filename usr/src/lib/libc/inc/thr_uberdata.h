@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -522,7 +522,7 @@ typedef struct ulwp {
 	uberflags_t *volatile ul_schedctl_called; /* ul_schedctl is set up */
 	volatile sc_shared_t *volatile ul_schedctl;	/* schedctl data */
 	int		ul_bindflags;	/* bind_guard() interface to ld.so.1 */
-	int		ul_gs;		/* x86 only: value of %gs/%fs */
+	int		ul_pad2;
 	tsd_t		*ul_stsd;	/* slow TLS for keys >= TSD_NFAST */
 	void		*ul_ftsd[TSD_NFAST]; /* fast TLS for keys < TSD_NFAST */
 	td_evbuf_t	ul_td_evbuf;	/* event buffer */
@@ -892,7 +892,7 @@ typedef struct ulwp32 {
 	caddr32_t	ul_schedctl_called; /* ul_schedctl is set up */
 	caddr32_t	ul_schedctl;	/* schedctl data */
 	int		ul_bindflags;	/* bind_guard() interface to ld.so.1 */
-	int		ul_gs;		/* x86 only: value of %gs/%fs */
+	int		ul_pad2;
 	caddr32_t	ul_stsd;	/* slow TLS for keys >= TSD_NFAST */
 	caddr32_t	ul_ftsd[TSD_NFAST]; /* fast TLS for keys < TSD_NFAST */
 	td_evbuf32_t	ul_td_evbuf;	/* event buffer */

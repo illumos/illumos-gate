@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <sys/regset.h>
 #include <sys/privregs.h>
 #include <sys/segments.h>
+#include <sys/x86_archext.h>
 #include <sys/sysmacros.h>
 #include <sys/trap.h>
 #include <sys/archsystm.h>
@@ -1711,8 +1712,8 @@ fasttrap_getreg(struct regs *rp, uint_t reg)
 	case REG_GS:		return (rp->r_gs);
 	case REG_DS:		return (rp->r_ds);
 	case REG_ES:		return (rp->r_es);
-	case REG_FSBASE:	return (rp->r_fsbase);
-	case REG_GSBASE:	return (rp->r_gsbase);
+	case REG_FSBASE:	return (rdmsr(MSR_AMD_FSBASE));
+	case REG_GSBASE:	return (rdmsr(MSR_AMD_GSBASE));
 	}
 
 	panic("dtrace: illegal register constant");

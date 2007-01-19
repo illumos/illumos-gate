@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -442,6 +442,22 @@ kdi_cpu_index(void)
 	jmp	%g7
 	nop
 	SET_SIZE(kdi_cpu_index)
+
+#endif	/* lint */
+
+#if defined(lint) || defined(__lint)
+void
+kmdb_enter(void)
+{
+}
+
+#else	/* lint */
+
+	ENTRY_NP(kmdb_enter)
+	t	ST_KMDB_TRAP
+	retl
+	nop
+	SET_SIZE(kmdb_enter)
 
 #endif	/* lint */
 

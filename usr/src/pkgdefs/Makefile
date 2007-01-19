@@ -121,9 +121,10 @@ i386_SUBDIRS= \
 	SUNWdrmr \
 	SUNWgrub \
 	SUNWgrubS \
-	SUNWkvm.i  \
+	SUNWkvm.i \
 	SUNWlxr \
 	SUNWlxu \
+	SUNWmv88sx \
 	SUNWonmtst.i \
 	SUNWos86r  \
 	SUNWpsdcr  \
@@ -134,7 +135,7 @@ i386_SUBDIRS= \
 	SUNWrtls \
 	SUNWsi3124 \
 	SUNWvia823x \
-	SUNWmv88sx
+	SUNWxsvc
 
 i386_XMODS= \
 	SUNWadpu320 \

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,7 @@ kcopy(const void *from, void *to, size_t count)
 #else	/* __lint */
 
 	.globl	kernelbase
+	.globl	postbootkernelbase
 
 #if defined(__amd64)
 
@@ -75,10 +76,9 @@ kcopy(const void *from, void *to, size_t count)
 	pushq	%rbp
 	movq	%rsp, %rbp
 #ifdef DEBUG
-	movq	kernelbase(%rip), %rax
-	cmpq	%rax, %rdi 		/* %rdi = from */
+	cmpq	postbootkernelbase(%rip), %rdi 		/* %rdi = from */
 	jb	0f
-	cmpq	%rax, %rsi		/* %rsi = to */
+	cmpq	postbootkernelbase(%rip), %rsi		/* %rsi = to */
 	jnb	1f
 0:	leaq	.kcopy_panic_msg(%rip), %rdi
 	xorl	%eax, %eax
@@ -127,7 +127,7 @@ _kcopy_copyerr:
 #ifdef DEBUG
 	pushl	%ebp
 	movl	%esp, %ebp
-	movl	kernelbase, %eax
+	movl	postbootkernelbase, %eax
 	cmpl	%eax, ARG_FROM(%ebp)
 	jb	0f
 	cmpl	%eax, ARG_TO(%ebp)
@@ -216,10 +216,9 @@ kcopy_nta(const void *from, void *to, size_t count, int copy_cached)
 	pushq	%rbp
 	movq	%rsp, %rbp
 #ifdef DEBUG
-	movq	kernelbase(%rip), %rax
-	cmpq	%rax, %rdi 		/* %rdi = from */
+	cmpq	postbootkernelbase(%rip), %rdi 		/* %rdi = from */
 	jb	0f
-	cmpq	%rax, %rsi		/* %rsi = to */
+	cmpq	postbootkernelbase(%rip), %rsi		/* %rsi = to */
 	jnb	1f
 0:	leaq	.kcopy_panic_msg(%rip), %rdi
 	xorl	%eax, %eax
@@ -359,10 +358,9 @@ bcopy(const void *from, void *to, size_t count)
 #ifdef DEBUG
 	orq	%rdx, %rdx		/* %rdx = count */
 	jz	1f
-	movq	kernelbase(%rip), %rax
-	cmpq	%rax, %rdi		/* %rdi = from */
+	cmpq	postbootkernelbase(%rip), %rdi		/* %rdi = from */
 	jb	0f
-	cmpq	%rax, %rsi		/* %rsi = to */		
+	cmpq	postbootkernelbase(%rip), %rsi		/* %rsi = to */		
 	jnb	1f
 0:	leaq	.bcopy_panic_msg(%rip), %rdi
 	jmp	call_panic		/* setup stack and call panic */
@@ -410,7 +408,7 @@ call_panic:
 	movl	ARG_COUNT(%esp), %eax
 	orl	%eax, %eax
 	jz	1f
-	movl	kernelbase, %eax
+	movl	postbootkernelbase, %eax
 	cmpl	%eax, ARG_FROM(%esp)
 	jb	0f
 	cmpl	%eax, ARG_TO(%esp)
@@ -467,7 +465,7 @@ kzero(void *addr, size_t count)
 
 	ENTRY(kzero)
 #ifdef DEBUG
-        cmpq	kernelbase(%rip), %rdi	/* %rdi = addr */
+        cmpq	postbootkernelbase(%rip), %rdi	/* %rdi = addr */
         jnb	0f
         leaq	.kzero_panic_msg(%rip), %rdi
 	jmp	call_panic		/* setup stack and call panic */
@@ -512,7 +510,7 @@ _kzeroerr:
 #ifdef DEBUG
 	pushl	%ebp
 	movl	%esp, %ebp
-	movl	kernelbase, %eax
+	movl	postbootkernelbase, %eax
         cmpl	%eax, ARG_ADDR(%ebp)
         jnb	0f
         pushl   $.kzero_panic_msg
@@ -578,7 +576,7 @@ bzero(void *addr, size_t count)
 
 	ENTRY(bzero)
 #ifdef DEBUG
-	cmpq	kernelbase(%rip), %rdi	/* %rdi = addr */
+	cmpq	postbootkernelbase(%rip), %rdi	/* %rdi = addr */
 	jnb	0f
 	leaq	.bzero_panic_msg(%rip), %rdi
 	jmp	call_panic		/* setup stack and call panic */
@@ -605,7 +603,7 @@ do_zero:
 
 	ENTRY(bzero)
 #ifdef DEBUG
-	movl	kernelbase, %eax
+	movl	postbootkernelbase, %eax
 	cmpl	%eax, ARG_ADDR(%esp)
 	jnb	0f
 	pushl	%ebp

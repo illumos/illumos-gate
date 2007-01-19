@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -192,17 +191,13 @@ kctl_memavail(void)
 		 * If we're going to wedge the machine during debugger startup,
 		 * at least let them know why it's going to wedge.
 		 */
-		cmn_err(CE_WARN, "retrying of kmdb allocation of 0x%lx bytes\n",
+		cmn_err(CE_WARN, "retrying of kmdb allocation of 0x%lx bytes",
 		    (ulong_t)needed);
 
 		base = kmem_zalloc(needed, KM_SLEEP);
 	}
 
-	if (kdi_dvec->dv_memavail(base, needed) < 0) {
-		cmn_err(CE_WARN, "failed to add memory to debugger\n");
-		kmem_free(base, needed);
-	}
-
+	kdi_dvec->dv_memavail(base, needed);
 	kctl.kctl_mrbase = base;
 	kctl.kctl_mrsize = needed;
 }
@@ -221,10 +216,6 @@ kctl_cleanup(void)
 		boothowto &= ~RB_DEBUG;
 		/* XXX there's a race here */
 		kdi_dvec = NULL;
-		/*FALLTHROUGH*/
-
-	case KCTL_ST_KCTL_ACTIVATED:
-		kctl_deactivate_isadep();
 		/*FALLTHROUGH*/
 
 	case KCTL_ST_DBG_ACTIVATED:
@@ -375,10 +366,7 @@ kctl_startup_activate(uint_t flags)
 	dvec->dv_kctl_thravail = kctl_startup_thread;
 	dvec->dv_kctl_memavail = kctl_memavail;
 
-	if (kctl_activate_isadep(dvec) != 0)
-		return (EIO);
-
-	(void) kctl_set_state(KCTL_ST_KCTL_ACTIVATED);
+	kctl_activate_isadep(dvec);
 
 	kdi_dvec = dvec;
 	membar_producer();
@@ -425,7 +413,7 @@ kctl_deactivate(void)
 		goto deactivate_done;
 
 	kmdb_kdi_set_unload_request();
-	kdi_dvec_enter();
+	kmdb_kdi_kmdb_enter();
 
 	/*
 	 * The debugger will pass the request to the work thread, which will
@@ -487,13 +475,14 @@ kctl_boot_activate(struct bootops *ops, void *romp, size_t memsz,
 	if (memsz == 0)
 		memsz = KCTL_MEM_GOALSZ;
 
-	kctl.kctl_dseg = (caddr_t)SEGDEBUGBASE;
-	kctl.kctl_dseg_size = (memsz > SEGDEBUGSIZE ? SEGDEBUGSIZE : memsz);
+	kctl.kctl_dseg = kdi_segdebugbase;
+	kctl.kctl_dseg_size =
+	    memsz > kdi_segdebugsize ? kdi_segdebugsize : memsz;
 	kctl.kctl_memgoalsz = memsz;
 
 	if (kctl_boot_dseg_alloc(kctl.kctl_dseg, kctl.kctl_dseg_size) < 0) {
-		kctl_warn("kmdb: failed to allocate %d-byte debugger area at "
-		    "%x", kctl.kctl_dseg_size, kctl.kctl_dseg);
+		kctl_warn("kmdb: failed to allocate %lu-byte debugger area at "
+		    "%p", kctl.kctl_dseg_size, (void *)kctl.kctl_dseg);
 		return (-1);
 	}
 
@@ -510,8 +499,9 @@ kctl_boot_activate(struct bootops *ops, void *romp, size_t memsz,
 
 	kctl_dprintf("finished with kmdb initialization");
 
-	kctl.kctl_boot_ops = NULL;
 	kctl_boot_tmpfini(old);
+
+	kctl.kctl_boot_ops = NULL;
 
 	return (0);
 }
@@ -525,7 +515,7 @@ kctl_modload_activate(size_t memsz, const char *cfg, uint_t flags)
 
 	if ((rc = kctl_state_check(kctl.kctl_state, KCTL_ST_INACTIVE)) != 0) {
 		if ((flags & KMDB_F_AUTO_ENTRY) && rc == EMDB_KACTIVE) {
-			kdi_dvec_enter();
+			kmdb_kdi_kmdb_enter();
 			rc = 0;
 		}
 
@@ -538,8 +528,9 @@ kctl_modload_activate(size_t memsz, const char *cfg, uint_t flags)
 	if (memsz == 0)
 		memsz = KCTL_MEM_GOALSZ;
 
-	kctl.kctl_dseg = (caddr_t)SEGDEBUGBASE;
-	kctl.kctl_dseg_size = (memsz > SEGDEBUGSIZE ? SEGDEBUGSIZE : memsz);
+	kctl.kctl_dseg = kdi_segdebugbase;
+	kctl.kctl_dseg_size =
+	    memsz > kdi_segdebugsize ? kdi_segdebugsize : memsz;
 	kctl.kctl_memgoalsz = memsz;
 
 	if ((rc = kctl_dseg_alloc(kctl.kctl_dseg, kctl.kctl_dseg_size)) != 0)
@@ -559,7 +550,7 @@ kctl_modload_activate(size_t memsz, const char *cfg, uint_t flags)
 	kctl_memavail();	/* Must be after kdi_dvec is set */
 
 	if (kctl.kctl_flags & KMDB_F_AUTO_ENTRY)
-		kdi_dvec_enter();
+		kmdb_kdi_kmdb_enter();
 
 	mutex_exit(&kctl.kctl_lock);
 	return (0);

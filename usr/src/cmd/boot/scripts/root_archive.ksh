@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved. 
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved. 
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -111,7 +111,7 @@ packmedia()
 	RELEASE=`basename "$RELEASE"`
 
 	mkdir -p "$MEDIA/$RELEASE/Tools/Boot"
-	mkdir -p "$MEDIA/boot"
+	mkdir -p "$MEDIA/boot/platform/i86pc/kernel"
 
 	# archive package databases to conserve memory
 	#
@@ -134,6 +134,8 @@ packmedia()
 	archive_X "$MEDIA" "$MINIROOT"
 
 	cp "$MINIROOT/platform/i86pc/multiboot" "$MEDIA/boot"
+	cp "$MINIROOT/platform/i86pc/kernel/unix" \
+	    "$MEDIA/boot/platform/i86pc/kernel/unix"
 
 	# copy the install menu to menu.lst so we have a menu
 	# on the install media

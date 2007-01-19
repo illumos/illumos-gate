@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +40,7 @@
 
 typedef struct kmt_cpu_amd {
 	uint64_t amd_debugctl;		/* value for debugctl MSR */
-	const kmdb_msr_t *amd_msrs;	/* MSR r/w list */
+	const kdi_msr_t *amd_msrs;	/* MSR r/w list */
 	uint_t amd_family;		/* CPUID family */
 	uint_t amd_model;		/* CPUID model */
 } kmt_cpu_amd_t;
@@ -72,22 +71,22 @@ kmt_amd_branch(uint_t cpuid, const char *label, uint_t msr)
  * MSRs for AMD processors with simple branch tracing facilities.  We'll use
  * this array if we can access listed LBR/LEX MSRs.
  */
-static const kmdb_msr_t kmt_amd_msrs[] = {
-	{ MSR_DEBUGCTL,	KMDB_MSR_CLEARENTRY },
-	{ MSR_DEBUGCTL,	KMDB_MSR_WRITEDELAY, &kmt_cpu_amd.amd_debugctl },
-	{ MSR_LBR_TO,	KMDB_MSR_READ },
-	{ MSR_LBR_FROM,	KMDB_MSR_READ },
-	{ MSR_LEX_TO,	KMDB_MSR_READ },
-	{ MSR_LEX_FROM,	KMDB_MSR_READ },
+static const kdi_msr_t kmt_amd_msrs[] = {
+	{ MSR_DEBUGCTL,	KDI_MSR_CLEARENTRY },
+	{ MSR_DEBUGCTL,	KDI_MSR_WRITEDELAY, &kmt_cpu_amd.amd_debugctl },
+	{ MSR_LBR_TO,	KDI_MSR_READ },
+	{ MSR_LBR_FROM,	KDI_MSR_READ },
+	{ MSR_LEX_TO,	KDI_MSR_READ },
+	{ MSR_LEX_FROM,	KDI_MSR_READ },
 	{ NULL }
 };
 
 /*
  * Fallback MSR list for use if we can't read the LBR/LEX MSRs.
  */
-static const kmdb_msr_t kmt_amdunk_msrs[] = {
-	{ MSR_DEBUGCTL,	KMDB_MSR_CLEARENTRY },
-	{ MSR_DEBUGCTL,	KMDB_MSR_WRITEDELAY, &kmt_cpu_amd.amd_debugctl },
+static const kdi_msr_t kmt_amdunk_msrs[] = {
+	{ MSR_DEBUGCTL,	KDI_MSR_CLEARENTRY },
+	{ MSR_DEBUGCTL,	KDI_MSR_WRITEDELAY, &kmt_cpu_amd.amd_debugctl },
 	{ NULL }
 };
 

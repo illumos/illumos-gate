@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -209,12 +209,13 @@ static char *consconfig_usb_ms_path = NULL;
  * Internal variables
  */
 static dev_t		stdoutdev;
+static cons_state_t	*consconfig_sp;
 
 /*
  * consconfig_errlevel:  debug verbosity; smaller numbers are more
  * verbose.
  */
-static int consconfig_errlevel = DPRINT_L3;
+int consconfig_errlevel = DPRINT_L3;
 
 /*
  * Baud rate table
@@ -733,18 +734,20 @@ cons_build_upper_layer(cons_state_t *sp)
 	 */
 
 	/* open the console keyboard device.  will never be closed */
-	if (ldi_open_by_name(CONSKBD_PATH, FREAD|FWRITE|FNOCTTY, kcred,
-	    &sp->conskbd_lh, sp->cons_li) != 0)
-		cmn_err(CE_PANIC, "consconfig: "
-		    "unable to open conskbd device");
+	if (ldi_open_by_name(CONSKBD_PATH, FREAD|FWRITE|FNOCTTY,
+	    kcred, &sp->conskbd_lh, sp->cons_li) != 0) {
+		panic("consconfig: unable to open conskbd device");
+		/*NOTREACHED*/
+	}
 
 	DPRINTF(DPRINT_L0, "conskbd_lh = %p\n", sp->conskbd_lh);
 
 	/* open the console mouse device.  will never be closed */
-	if (ldi_open_by_name(CONSMS_PATH, FREAD|FWRITE|FNOCTTY, kcred,
-	    &sp->consms_lh, sp->cons_li) != 0)
-		cmn_err(CE_PANIC, "consconfig: "
-		    "unable to open consms device");
+	if (ldi_open_by_name(CONSMS_PATH, FREAD|FWRITE|FNOCTTY,
+	    kcred, &sp->consms_lh, sp->cons_li) != 0) {
+		panic("consconfig: unable to open consms device");
+		/*NOTREACHED*/
+	}
 
 	DPRINTF(DPRINT_L0, "consms_lh = %p\n", sp->consms_lh);
 
@@ -789,17 +792,19 @@ cons_build_upper_layer(cons_state_t *sp)
 	 * here.)
 	 */
 	wsconsvp = i_consconfig_createvp(IWSCN_PATH);
-	if (wsconsvp == NULL)
-		cmn_err(CE_PANIC, "consconfig: "
-		    "unable to find iwscn device");
+	if (wsconsvp == NULL) {
+		panic("consconfig: unable to find iwscn device");
+		/*NOTREACHED*/
+	}
 
 	if (cons_tem_disable)
 		return;
 
 	if (sp->cons_fb_path == NULL) {
-#if defined(i386) || defined(__i386) || defined(__ia64)
-		cmn_err(CE_WARN, "consconfig: no screen found");
-#endif /* defined(i386) || defined(__i386) || defined(__ia64) */
+#if defined(__x86)
+		if (plat_stdout_is_framebuffer())
+			cmn_err(CE_WARN, "consconfig: no screen found");
+#endif
 		return;
 	}
 
@@ -897,6 +902,17 @@ consconfig_load_drivers(cons_state_t *sp)
 		kbddev = ddi_pathname_to_dev_t(sp->cons_keyboard_path);
 	if (sp->cons_mouse_path != NULL)
 		mousedev =  ddi_pathname_to_dev_t(sp->cons_mouse_path);
+
+	/*
+	 * On x86, make sure the fb driver is loaded even if we don't use it
+	 * for the console. This will ensure that we create a /dev/fb link
+	 * which is required to start Xorg.
+	 */
+#if defined(__x86)
+	if (sp->cons_fb_path != NULL)
+		fbdev = ddi_pathname_to_dev_t(sp->cons_fb_path);
+#endif
+
 	DPRINTF(DPRINT_L0, "stdindev %lx, stdoutdev %lx, kbddev %lx, "
 	    "mousedev %lx\n", stdindev, stdoutdev, kbddev, mousedev);
 }
@@ -1221,10 +1237,12 @@ consconfig_init_input(cons_state_t *sp)
 		 * after being closed.
 		 */
 		rconsvp = i_consconfig_createvp(sp->cons_stdin_path);
-		if (rconsvp == NULL)
-			cmn_err(CE_PANIC, "consconfig_init_input: "
+		if (rconsvp == NULL) {
+			panic("consconfig_init_input: "
 			    "unable to find stdin device (%s)",
 			    sp->cons_stdin_path);
+			/*NOTREACHED*/
+		}
 		rconsdev = rconsvp->v_rdev;
 
 		ASSERT(rconsdev == stdindev);
@@ -1349,8 +1367,6 @@ consconfig_init_input(cons_state_t *sp)
 void
 dynamic_console_config(void)
 {
-	cons_state_t *sp;
-
 	/* initialize space.c globals */
 	stdindev = NODEV;
 	mousedev = NODEV;
@@ -1365,11 +1381,11 @@ dynamic_console_config(void)
 	rconsdev = NODEV;
 
 	/* Initialize cons_state_t structure and console device paths */
-	sp = consconfig_state_init();
-	ASSERT(sp);
+	consconfig_sp = consconfig_state_init();
+	ASSERT(consconfig_sp);
 
 	/* Build upper layer of console stream */
-	cons_build_upper_layer(sp);
+	cons_build_upper_layer(consconfig_sp);
 
 	/*
 	 * Load keyboard/mouse drivers. The dacf routines will
@@ -1379,16 +1395,16 @@ dynamic_console_config(void)
 	 * and mouse drivers are linked into their respective console
 	 * streams if the pathnames are valid.
 	 */
-	consconfig_load_drivers(sp);
-	sp->cons_input_type = cons_get_input_type();
+	consconfig_load_drivers(consconfig_sp);
+	consconfig_sp->cons_input_type = cons_get_input_type();
 
 	/*
 	 * This is legacy special case code for the "cool" virtual console
 	 * for the Starfire project.  Starfire has a dummy "ssp-serial"
 	 * node in the OBP device tree and cvc is a pseudo driver.
 	 */
-	if (sp->cons_stdout_path != NULL && stdindev == NODEV &&
-	    strstr(sp->cons_stdout_path, "ssp-serial")) {
+	if (consconfig_sp->cons_stdout_path != NULL && stdindev == NODEV &&
+	    strstr(consconfig_sp->cons_stdout_path, "ssp-serial")) {
 		/*
 		 * Setup the virtual console driver for Starfire
 		 * Note that console I/O will still go through prom for now
@@ -1405,13 +1421,13 @@ dynamic_console_config(void)
 		return;
 	}
 
-	rwsconsvp = sp->cons_wc_vp;
-	rwsconsdev = sp->cons_wc_vp->v_rdev;
+	rwsconsvp = consconfig_sp->cons_wc_vp;
+	rwsconsdev = consconfig_sp->cons_wc_vp->v_rdev;
 
 
 	/* initialize framebuffer, console input, and redirection device  */
-	consconfig_init_framebuffer(sp);
-	consconfig_init_input(sp);
+	consconfig_init_framebuffer(consconfig_sp);
+	consconfig_init_input(consconfig_sp);
 
 	DPRINTF(DPRINT_L0,
 		"mousedev %lx, kbddev %lx, fbdev %lx, rconsdev %lx\n",

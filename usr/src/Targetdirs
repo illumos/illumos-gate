@@ -54,7 +54,8 @@ i386_ROOT.SYS= \
 	/boot/grub \
 	/boot/grub/bin \
 	/boot/solaris \
-	/boot/solaris/bin
+	/boot/solaris/bin \
+	/platform/i86pc
 
 sparc_ROOT.SYS=
 
@@ -173,7 +174,6 @@ ROOT.SYS= \
 	/var/svc/manifest/application/security \
 	/var/svc/manifest/application/print \
 	/var/svc/manifest/platform \
-	/var/svc/manifest/platform/i86pc \
 	/var/svc/manifest/platform/sun4u \
 	/var/svc/manifest/platform/sun4v \
 	/var/svc/manifest/site \
@@ -320,7 +320,8 @@ sparcv9_ROOT.BIN64= \
 	/usr/platform/sun4u-us3/lib \
 	/usr/platform/sun4u-opl/lib
 
-amd64_ROOT.BIN64=
+amd64_ROOT.BIN64= \
+	/platform/i86pc/amd64
 
 ROOT.BIN64= \
 	$($(MACH64)_ROOT.BIN64) \

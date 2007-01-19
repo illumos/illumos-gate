@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,10 +42,13 @@ extern "C" {
 #if defined(__GNUC__) && defined(_ASM_INLINES)
 #include <asm/clock.h>
 #endif
+#include <sys/machclock.h>
+
+extern time_t ggmtl(void);
+extern void sgmtl(time_t);
+extern void rtcsync(void);
 
 extern void unlock_hres_lock(void);
-extern timestruc_t pc_tod_get(void);
-extern void pc_tod_set(timestruc_t);
 extern void hres_tick(void);
 extern void (*hrtime_tick)(void);
 
@@ -60,7 +62,7 @@ extern void tsc_tick(void);
 extern void tsc_sync_master(processorid_t);
 extern void tsc_sync_slave(void);
 extern hrtime_t tsc_read(void);
-
+extern hrtime_t __rdtsc_insn(void);
 
 #define	ADJ_SHIFT 4		/* used in get_hrestime */
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #include <sys/regset.h>
 #include <sys/privregs.h>
 #include <sys/dtrace.h>
+#include <sys/x86_archext.h>
 #include <sys/traptrace.h>
 #include <sys/machparam.h>
 
@@ -71,9 +72,12 @@ ndptrap_frstor(void)
  * of the kernel can expect a consistent stack
  * from from any exception.
  */
+
 #define	TRAP_NOERR(trapno)	\
 	push	$0;		\
 	push	$trapno	
+
+#define	NPTRAP_NOERR(trapno) TRAP_NOERR(trapno)
 
 /*
  * error code already pushed by hw
@@ -81,6 +85,7 @@ ndptrap_frstor(void)
  */
 #define	TRAP_ERR(trapno)	\
 	push	$trapno	
+
 
 	/*
 	 * #DE
@@ -90,10 +95,17 @@ ndptrap_frstor(void)
 	jmp	cmntrap
 	SET_SIZE(div0trap)
 
-#if defined(__amd64)
 	/*
 	 * #DB
 	 *
+	 * Fetch %dr6 and clear it, handing off the value to the
+	 * cmntrap code in %r15/%esi
+	 */
+	ENTRY_NP(dbgtrap)
+	TRAP_NOERR(T_SGLSTP)	/* $1 */
+
+#if defined(__amd64)
+	/*
 	 * If we get here as a result of single-stepping a sysenter
 	 * instruction, we suddenly find ourselves taking a #db
 	 * in kernel mode -before- we've swapgs'ed.  So before we can
@@ -104,36 +116,38 @@ ndptrap_frstor(void)
 	 * Nobody said that the design of sysenter was particularly
 	 * elegant, did they?
 	 */
-	ENTRY_NP(dbgtrap)
 	pushq	%r11
 	leaq	sys_sysenter(%rip), %r11
 	cmpq	%r11, 8(%rsp)
 	jne	1f
-	swapgs
+	SWAPGS
 1:	popq	%r11
-	TRAP_NOERR(T_SGLSTP)	/* $1 */
-	jmp	cmntrap
-	SET_SIZE(dbgtrap)
+
+	INTR_PUSH
+	movq	%db6, %r15
+	xorl	%eax, %eax
+	movq	%rax, %db6
 
 #elif defined(__i386)
-	/*
-	 * #DB
-	 */
-	ENTRY_NP(dbgtrap)
-	TRAP_NOERR(T_SGLSTP)	/* $1 */
-	jmp	cmntrap
+
+	INTR_PUSH
+	movl	%db6, %esi
+	xorl	%eax, %eax
+	movl	%eax, %db6
+#endif	/* __i386 */
+
+	jmp	cmntrap_pushed
 	SET_SIZE(dbgtrap)
-#endif
 
 #if defined(__amd64)
 
 /*
  * Macro to set the gsbase or kgsbase to the address of the struct cpu
- * for this processor.  If we came from userland, set kgsbase else clear
- * gs and set gsbase.  We find the proper cpu struct by looping through
+ * for this processor.  If we came from userland, set kgsbase else
+ * set gsbase.  We find the proper cpu struct by looping through
  * the cpu structs for all processors till we find a match for the gdt
  * of the trapping processor.  The stack is expected to be pointing at
- * The standard regs pushed by hardware on a trap (plus error code and trapno).
+ * the standard regs pushed by hardware on a trap (plus error code and trapno).
  */
 #define	SET_CPU_GSBASE							\
 	subq	$REGOFF_TRAPNO, %rsp;	/* save regs */			\
@@ -176,13 +190,9 @@ ndptrap_frstor(void)
 	movq	%rbp, %rsp;						\
 	movq	REGOFF_RBP(%rsp), %rbp;					\
 	addq	$REGOFF_TRAPNO, %rsp	/* pop stack */
+
 #endif	/* __amd64 */
-	
-	
-	
-	
-	.globl	nmivect
-	.globl	idt0_default_r
+
 
 #if defined(__amd64)
 
@@ -199,11 +209,9 @@ ndptrap_frstor(void)
 	 * with kernel selectors.
 	 */
 	INTR_PUSH
-
-	DISABLE_INTR_FLAGS		/* and set the kernel flags */
+	INTGATE_INIT_KERNEL_FLAGS
 
 	TRACE_PTR(%r12, %rax, %eax, %rdx, $TT_TRAP)
-
 	TRACE_REGS(%r12, %rsp, %rax, %rbx)
 	TRACE_STAMP(%r12)
 
@@ -213,7 +221,8 @@ ndptrap_frstor(void)
 	call	av_dispatch_nmivect
 
 	INTR_POP
-	iretq
+	IRET
+	/*NOTREACHED*/
 	SET_SIZE(nmiint)
 
 #elif defined(__i386)
@@ -229,30 +238,20 @@ ndptrap_frstor(void)
 	 * with kernel selectors.
 	 */
 	INTR_PUSH
+	INTGATE_INIT_KERNEL_FLAGS
 
-	/*
-	 * setup pointer to reg struct as 2nd argument.
-	 */
+	TRACE_PTR(%edi, %ebx, %ebx, %ecx, $TT_TRAP)
+	TRACE_REGS(%edi, %esp, %ebx, %ecx)
+	TRACE_STAMP(%edi)
+
 	movl	%esp, %ebp
+
 	pushl	%ebp	
-	
-	DISABLE_INTR_FLAGS
-
-	movl	nmivect, %esi		/* get autovect structure */
-loop1:
-	cmpl	$0, %esi		/* if pointer is null  */
-	je	.intr_ret		/* 	we're done */
-	movl	AV_VECTOR(%esi), %edx	/* get the interrupt routine */
-	pushl	AV_INTARG1(%esi)	/* get argument to interrupt routine */
-	call	*%edx			/* call interrupt routine with arg */
+	call	av_dispatch_nmivect	
 	addl	$4, %esp
-	movl	AV_LINK(%esi), %esi	/* get next routine on list */
-	jmp	loop1			/* keep looping until end of list */
 
-.intr_ret:
-	addl	$4, %esp		/* 'pop' %ebp */
 	INTR_POP_USER
-	iret
+	IRET
 	SET_SIZE(nmiint)
 
 #endif	/* __i386 */
@@ -261,16 +260,11 @@ loop1:
 	 * #BP
 	 */
 	ENTRY_NP(brktrap)
+
 #if defined(__amd64)
 	cmpw	$KCS_SEL, 8(%rsp)
-	je	bp_jmpud
-#endif
+	jne	bp_user
 
-	TRAP_NOERR(T_BPTFLT)	/* $3 */
-	jmp	dtrace_trap
-
-#if defined(__amd64)
-bp_jmpud:
 	/*
 	 * This is a breakpoint in the kernel -- it is very likely that this
 	 * is DTrace-induced.  To unify DTrace handling, we spoof this as an
@@ -282,8 +276,13 @@ bp_jmpud:
 	decq	(%rsp)
 	push	$1			/* error code -- non-zero for #BP */
 	jmp	ud_kernel
-#endif
-	
+
+bp_user:
+#endif /* __amd64 */
+
+	NPTRAP_NOERR(T_BPTFLT)	/* $3 */
+	jmp	dtrace_trap
+
 	SET_SIZE(brktrap)
 
 	/*
@@ -305,13 +304,14 @@ bp_jmpud:
 #if defined(__amd64)
 
 	ENTRY_NP(invoptrap)
+
 	cmpw	$KCS_SEL, 8(%rsp)
 	jne	ud_user
 
 	push	$0			/* error code -- zero for #UD */
 ud_kernel:
 	push	$0xdddd			/* a dummy trap number */
-	TRAP_PUSH
+	INTR_PUSH
 	movq	REGOFF_RIP(%rsp), %rdi
 	movq	REGOFF_RSP(%rsp), %rsi
 	movq	REGOFF_RAX(%rsp), %rdx
@@ -353,7 +353,8 @@ ud_push:
 	movq	32(%rsp), %rax		/* reload calling RSP */
 	movq	%rbp, (%rax)		/* store %rbp there */
 	popq	%rax			/* pop off temp */
-	iretq				/* return from interrupt */
+	IRET				/* return from interrupt */
+	/*NOTREACHED*/
 
 ud_leave:
 	/*
@@ -373,7 +374,8 @@ ud_leave:
 	movq	%rbp, 32(%rsp)		/* store new %rsp */
 	movq	%rax, %rbp		/* set new %rbp */
 	popq	%rax			/* pop off temp */
-	iretq				/* return from interrupt */
+	IRET				/* return from interrupt */
+	/*NOTREACHED*/
 
 ud_nop:
 	/*
@@ -382,7 +384,8 @@ ud_nop:
 	 */
 	INTR_POP
 	incq	(%rsp)
-	iretq
+	IRET
+	/*NOTREACHED*/
 
 ud_ret:
 	INTR_POP
@@ -392,7 +395,8 @@ ud_ret:
 	movq	%rax, 8(%rsp)		/* store calling RIP */
 	addq	$8, 32(%rsp)		/* adjust new %rsp */
 	popq	%rax			/* pop off temp */
-	iretq				/* return from interrupt */
+	IRET				/* return from interrupt */
+	/*NOTREACHED*/
 
 ud_trap:
 	/*
@@ -405,13 +409,13 @@ ud_trap:
 	je	ud_ud
 	incq	REGOFF_RIP(%rsp)
 	addq	$REGOFF_RIP, %rsp
-	TRAP_NOERR(T_BPTFLT)	/* $3 */
+	NPTRAP_NOERR(T_BPTFLT)	/* $3 */
 	jmp	cmntrap
 
 ud_ud:
 	addq	$REGOFF_RIP, %rsp
 ud_user:
-	TRAP_NOERR(T_ILLINST)
+	NPTRAP_NOERR(T_ILLINST)
 	jmp	cmntrap
 	SET_SIZE(invoptrap)
 
@@ -428,6 +432,7 @@ ud_user:
 	pushl   %gs
 	cmpw	$KGS_SEL, (%esp)
 	jne	8f
+
 	addl	$4, %esp
 	pusha
 	pushl	%eax			/* push %eax -- may be return value */
@@ -446,7 +451,6 @@ ud_user:
 	cmpl	$DTRACE_INVOP_NOP, %eax
 	je	4f
 	jmp	7f
-
 1:
 	/*
 	 * We must emulate a "pushl %ebp".  To do this, we pull the stack
@@ -464,8 +468,7 @@ ud_user:
 	movl	%eax, 12(%esp)		/* store calling EFLAGS */
 	movl	%ebp, 16(%esp)		/* push %ebp */
 	popl	%eax			/* pop off temp */
-	iret				/* return from interrupt */
-
+	jmp	_emul_done
 2:
 	/*
 	 * We must emulate a "popl %ebp".  To do this, we do the opposite of
@@ -484,8 +487,7 @@ ud_user:
 	movl	%eax, 8(%esp)		/* store calling EIP */
 	popl	%eax			/* pop off temp */
 	addl	$4, %esp		/* adjust stack pointer */
-	iret				/* return from interrupt */
-
+	jmp	_emul_done
 3:
 	/*
 	 * We must emulate a "leave", which is the same as a "movl %ebp, %esp"
@@ -510,8 +512,7 @@ ud_user:
 	popl	%eax			/* pop off temp */
 	movl	-12(%esp), %esp		/* set stack pointer */
 	subl	$8, %esp		/* adjust for three pushes, one pop */
-	iret				/* return from interrupt */
-
+	jmp	_emul_done
 4:
 	/*
 	 * We must emulate a "nop".  This is obviously not hard:  we need only
@@ -519,8 +520,8 @@ ud_user:
 	 */
 	popa
 	incl	(%esp)
-	iret
-
+_emul_done:
+	IRET				/* return from interrupt */
 7:
 	popa
 	pushl	$0
@@ -553,9 +554,9 @@ ud_user:
 	LOADCPU(%rbx)			/* if yes, don't swapgs */
 	jmp	2f
 1:	
-	swapgs				/* if from user, need swapgs */
+	SWAPGS				/* if from user, need swapgs */
 	LOADCPU(%rbx)
-	swapgs
+	SWAPGS
 2:				
 	cmpl	$0, fpu_exists(%rip)
 	je	.handle_in_trap		/* let trap handle no fp case */
@@ -582,7 +583,8 @@ ud_user:
 	fxrstor	(%rax)
 	popq	%rbx
 	popq	%rax
-	iretq
+	IRET
+	/*NOTREACHED*/
 
 .handle_in_trap:
 	popq	%rbx
@@ -608,46 +610,45 @@ ud_user:
 	movw	%bx, %ds
 	movl	$KGS_SEL, %eax
 	movw	%ax, %gs
-	LOADCPU(%ebx)
+	LOADCPU(%eax)
 	cmpl	$0, fpu_exists
 	je	.handle_in_trap		/* let trap handle no fp case */
-	movl	CPU_THREAD(%ebx), %eax	/* %eax = curthread */
-	movl	$FPU_EN, %ebx
-	movl	T_LWP(%eax), %eax	/* %eax = lwp */
-	testl	%eax, %eax
+	movl	CPU_THREAD(%eax), %ebx	/* %ebx = curthread */
+	movl	$FPU_EN, %eax
+	movl	T_LWP(%ebx), %ebx	/* %ebx = lwp */
+	testl	%ebx, %ebx
 	jz	.handle_in_trap		/* should not happen? */
 #if LWP_PCB_FPU != 0
-	addl	$LWP_PCB_FPU, %eax 	/* &lwp->lwp_pcb.pcb_fpu */
+	addl	$LWP_PCB_FPU, %ebx 	/* &lwp->lwp_pcb.pcb_fpu */
 #endif
-	testl	%ebx, PCB_FPU_FLAGS(%eax)
+	testl	%eax, PCB_FPU_FLAGS(%ebx)
 	jz	.handle_in_trap		/* must be the first fault */
-	clts
-	andl	$_BITNOT(FPU_VALID), PCB_FPU_FLAGS(%eax)
+	CLTS
+	andl	$_BITNOT(FPU_VALID), PCB_FPU_FLAGS(%ebx)
 #if FPU_CTX_FPU_REGS != 0
-	addl	$FPU_CTX_FPU_REGS, %eax
+	addl	$FPU_CTX_FPU_REGS, %ebx
 #endif
 	/*
 	 * the label below is used in trap.c to detect FP faults in kernel
 	 * due to user fault.
 	 */
 	ALTENTRY(ndptrap_frstor)
-	.globl	_patch_fxrstor_eax
-_patch_fxrstor_eax:
-	frstor	(%eax)		/* may be patched to fxrstor */
+	.globl	_patch_fxrstor_ebx
+_patch_fxrstor_ebx:
+	frstor	(%ebx)		/* may be patched to fxrstor */
 	nop			/* (including this byte) */
 	popl	%gs
 	popl	%ds
 	popl	%ebx
 	popl	%eax
-	iret
+	IRET
 
 .handle_in_trap:
 	popl	%gs
 	popl	%ds
 	popl	%ebx
 	popl	%eax
-	pushl	$0
-	pushl	$T_NOEXTFLT	/* $7 */
+	TRAP_NOERR(T_NOEXTFLT)	/* $7 */
 	jmp	cmninttrap
 	SET_SIZE(ndptrap_frstor)
 	SET_SIZE(ndptrap)
@@ -880,10 +881,20 @@ make_frame:
 	 */
 	ENTRY_NP(pftrap)
 	TRAP_ERR(T_PGFLT)	/* $14 already have error code on stack */
-	jmp	cmntrap
+	INTR_PUSH
+
+#if defined(__amd64)
+	movq	%cr2, %r15
+#elif defined(__i386)
+	movl	%cr2, %esi
+#endif	/* __i386 */
+
+	jmp	cmntrap_pushed
 	SET_SIZE(pftrap)
 
 #if !defined(__amd64)
+
+	.globl	idt0_default_r
 
 	/*
 	 * #PF pentium bug workaround
@@ -950,14 +961,16 @@ check_for_user_address:
 
 	ENTRY_NP(mcetrap)
 	TRAP_NOERR(T_MCE)	/* $18 */
+
 	SET_CPU_GSBASE
+
 	INTR_PUSH
+	INTGATE_INIT_KERNEL_FLAGS
 
 	TRACE_PTR(%rdi, %rbx, %ebx, %rcx, $TT_TRAP)
 	TRACE_REGS(%rdi, %rsp, %rbx, %rcx)
 	TRACE_STAMP(%rdi)
 
-	DISABLE_INTR_FLAGS
 	movq	%rsp, %rbp
 
 	movq	%rsp, %rdi	/* arg0 = struct regs *rp */
@@ -970,9 +983,14 @@ check_for_user_address:
 
 	ENTRY_NP(mcetrap)
 	TRAP_NOERR(T_MCE)	/* $18 */
-	INTR_PUSH
 
-	DISABLE_INTR_FLAGS
+	INTR_PUSH
+	INTGATE_INIT_KERNEL_FLAGS
+
+	TRACE_PTR(%edi, %ebx, %ebx, %ecx, $TT_TRAP)
+	TRACE_REGS(%edi, %esp, %ebx, %ecx)
+	TRACE_STAMP(%edi)
+
 	movl	%esp, %ebp
 
 	movl	%esp, %ecx
@@ -1065,14 +1083,15 @@ check_for_user_address:
 	 */
 	ENTRY_NP(fast_null)
 	orq	$PS_C, 24(%rsp)	/* set carry bit in user flags */
-	iretq
+	IRET
+	/*NOTREACHED*/
 	SET_SIZE(fast_null)
 
 #elif defined(__i386)
 
 	ENTRY_NP(fast_null)
 	orw	$PS_C, 8(%esp)	/* set carry bit in user flags */
-	iret
+	IRET
 	SET_SIZE(fast_null)
 
 #endif	/* __i386 */

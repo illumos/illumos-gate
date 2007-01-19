@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -342,7 +342,7 @@ priv_policy(const cred_t *cr, int priv, boolean_t allzone, int err,
 		if ((allzone || priv == PRIV_ALL ||
 		    !PRIV_ISASSERT(priv_basic, priv)) &&
 		    !servicing_interrupt()) {
-			u.u_acflag |= ASU;		/* Needed for SVVS */
+			PTOU(curproc)->u_acflag |= ASU; /* Needed for SVVS */
 #ifdef C2_AUDIT
 			if (audit_active)
 				audit_priv(priv,

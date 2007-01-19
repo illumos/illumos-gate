@@ -58,7 +58,7 @@
 #include <sys/msacct.h>
 #include <sys/time.h>
 #include <sys/archsystm.h>
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 #include <sys/x86_archext.h>
 #endif
 
@@ -143,15 +143,6 @@ cpu_t *cpu_inmotion;
  * lock.
  */
 int weakbindingbarrier;
-
-/*
- * values for safe_list.  Pause state that CPUs are in.
- */
-#define	PAUSE_IDLE	0		/* normal state */
-#define	PAUSE_READY	1		/* paused thread ready to spl */
-#define	PAUSE_WAIT	2		/* paused thread is spl-ed high */
-#define	PAUSE_DIE	3		/* tell pause thread to leave */
-#define	PAUSE_DEAD	4		/* pause thread has left */
 
 /*
  * Variables used in pause_cpus().
@@ -770,18 +761,8 @@ cpu_pause(volatile char *safe)
 		 * setbackdq/setfrontdq.
 		 */
 		s = splhigh();
-		/*
-		 * This cpu is now safe.
-		 */
-		*safe = PAUSE_WAIT;
-		membar_enter();		/* make sure stores are flushed */
 
-		/*
-		 * Now we wait.  When we are allowed to continue, safe will
-		 * be set to PAUSE_IDLE.
-		 */
-		while (*safe != PAUSE_IDLE)
-			;
+		mach_cpu_pause(safe);
 
 		splx(s);
 		/*
@@ -1198,6 +1179,7 @@ cpu_online(cpu_t *cp)
 		lgrp_kstat_create(cp);
 		cpu_state_change_notify(cp->cpu_id, CPU_ON);
 		cpu_intr_enable(cp);	/* arch-dep hook */
+		cpu_set_state(cp);
 		cyclic_online(cp);
 		poke_cpu(cp->cpu_id);
 	}
@@ -2093,7 +2075,7 @@ static struct {
 	kstat_named_t ci_device_ID;
 	kstat_named_t ci_cpu_fru;
 #endif
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	kstat_named_t ci_vendorstr;
 	kstat_named_t ci_family;
 	kstat_named_t ci_model;
@@ -2114,7 +2096,7 @@ static struct {
 	{ "device_ID",		KSTAT_DATA_UINT64 },
 	{ "cpu_fru",		KSTAT_DATA_STRING },
 #endif
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	{ "vendor_id",		KSTAT_DATA_STRING },
 	{ "family",		KSTAT_DATA_INT32 },
 	{ "model",		KSTAT_DATA_INT32 },
@@ -2175,7 +2157,7 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	    cpunodes[cp->cpu_id].device_id;
 	kstat_named_setstr(&cpu_info_template.ci_cpu_fru, cpu_fru_fmri(cp));
 #endif
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	kstat_named_setstr(&cpu_info_template.ci_vendorstr,
 	    cpuid_getvendorstr(cp));
 	cpu_info_template.ci_family.value.l = cpuid_getfamily(cp);
@@ -2207,7 +2189,7 @@ cpu_info_kstat_create(cpu_t *cp)
 		cp->cpu_info_kstat->ks_data_size +=
 		    strlen(cpu_fru_fmri(cp)) + 1;
 #endif
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 		cp->cpu_info_kstat->ks_data_size += X86_VENDOR_STRLEN;
 #endif
 		cp->cpu_info_kstat->ks_lock = &cpu_info_template_lock;
@@ -3020,7 +3002,7 @@ cpu_sys_stats_ks_update(kstat_t *ksp, int rw)
 	csskd->modload.value.ui64 = css->modload;
 	csskd->modunload.value.ui64 = css->modunload;
 	csskd->bawrite.value.ui64 = css->bawrite;
-	csskd->iowait.value.ui64 = 0;
+	csskd->iowait.value.ui64 = css->iowait;
 
 	return (0);
 }
@@ -3166,7 +3148,7 @@ cpu_stat_ks_update(kstat_t *ksp, int rw)
 	cso->cpu_sysinfo.win_su_cnt	= 0;
 	cso->cpu_sysinfo.win_suo_cnt	= 0;
 
-	cso->cpu_syswait.iowait		= 0;
+	cso->cpu_syswait.iowait		= CPU_STATS(cp, sys.iowait);
 	cso->cpu_syswait.swap		= 0;
 	cso->cpu_syswait.physio		= 0;
 

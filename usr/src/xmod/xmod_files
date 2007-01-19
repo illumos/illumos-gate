@@ -28,8 +28,8 @@
 ../closed/uts/intel/adpu320
 ../closed/uts/intel/io/lsimega
 ../closed/uts/intel/lsimega
-../closed/uts/i86pc/spwr
-../closed/uts/i86pc/io/spwr
+../closed/uts/intel/spwr
+../closed/uts/intel/io/spwr
 cmd/openssl
 cmd/ssh
 common/net/wanboot

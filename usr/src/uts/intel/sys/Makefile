@@ -46,10 +46,10 @@ HDRS	=			\
 	fasttrap_isa.h		\
 	fp.h			\
 	frame.h			\
-	immu.h			\
 	inline.h		\
 	kd.h			\
 	kdi_machimpl.h		\
+	kdi_regs.h		\
 	machelf.h		\
 	machlock.h		\
 	machsig.h		\
@@ -61,11 +61,11 @@ HDRS	=			\
 	memtest.h		\
 	mii.h			\
 	miipriv.h		\
-	mmu.h			\
 	mutex_impl.h		\
 	obpdefs.h		\
 	old_procfs.h		\
 	pcb.h			\
+	pmem.h			\
 	privregs.h		\
 	procfs_isa.h		\
 	prom_emul.h		\

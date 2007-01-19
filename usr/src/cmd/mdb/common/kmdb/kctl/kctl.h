@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,6 @@ typedef enum {
 	KCTL_ST_MOD_NOTIFIERS,		/* krtld module notifiers registered */
 	KCTL_ST_THREAD_STARTED,		/* WR queue thread started */
 	KCTL_ST_DBG_ACTIVATED,		/* kmdb activated */
-	KCTL_ST_KCTL_ACTIVATED,		/* kctl activated */
 	KCTL_ST_ACTIVE,			/* kernel is aware of kmdb activation */
 	KCTL_ST_DEACTIVATING		/* debugger is being deactivated */
 } kctl_state_t;
@@ -93,9 +92,8 @@ extern void kctl_dprintf(const char *, ...);
 extern void kctl_warn(const char *, ...);
 
 extern int kctl_preactivate_isadep(void);
-extern int kctl_activate_isadep(kdi_debugvec_t *);
+extern void kctl_activate_isadep(kdi_debugvec_t *);
 extern void kctl_depreactivate_isadep(void);
-extern void kctl_deactivate_isadep(void);
 extern void kctl_cleanup(void);
 
 extern void *kctl_boot_tmpinit(void);

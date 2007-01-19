@@ -48,6 +48,8 @@
 # include <md5.h>
 #endif
 
+#include <cpu.h>
+
 /* The type of kernel loaded.  */
 kernel_t kernel_type;
 /* The boot device.  */
@@ -989,7 +991,7 @@ static int verbose_func(char *arg, int flags) {
 
   silent.status = VERBOSE;
 
-  /* get back to text console XXX setje -- tty??? */
+  /* get back to text console */
   if (current_term->shutdown) {
     (*current_term->shutdown)();
     current_term = term_table; /* assumption: console is first */
@@ -2716,6 +2718,280 @@ static struct builtin builtin_kernel =
   " Linux's mem option automatically."
 };
 
+
+static int detect_target_operating_mode();
+
+int
+amd64_config_cpu(void)
+{
+        struct amd64_cpuid_regs __vcr, *vcr = &__vcr;
+        uint32_t maxeax;
+        uint32_t max_maxeax = 0x100;
+        char vendor[13];
+        int isamd64 = 0;
+        uint32_t stdfeatures = 0, xtdfeatures = 0;
+        uint64_t efer;
+
+        /*
+         * This check may seem silly, but if the C preprocesor symbol __amd64
+         * is #defined during compilation, something that may outwardly seem
+         * like a good idea, uts/common/sys/isa_defs.h will #define _LP64,
+         * which will cause uts/common/sys/int_types.h to typedef uint64_t as
+         * an unsigned long - which is only 4 bytes in size when using a 32-bit
+         * compiler.
+         *
+         * If that happens, all the page table translation routines will fail
+         * horribly, so check the size of uint64_t just to insure some degree
+         * of sanity in future operations.
+         */
+        /*LINTED [sizeof result is invarient]*/
+        if (sizeof (uint64_t) != 8)
+                prom_panic("grub compiled improperly, unable to boot "
+                    "64-bit AMD64 executables");
+
+        /*
+         * If the CPU doesn't support the CPUID instruction, it's definitely
+         * not an AMD64.
+         */
+        if (amd64_cpuid_supported() == 0)
+                return (0);
+
+        amd64_cpuid_insn(0, vcr);
+
+        maxeax = vcr->r_eax;
+        {
+                /*LINTED [vendor string from cpuid data]*/
+                uint32_t *iptr = (uint32_t *)vendor;
+
+                *iptr++ = vcr->r_ebx;
+                *iptr++ = vcr->r_edx;
+                *iptr++ = vcr->r_ecx;
+
+                vendor[12] = '\0';
+        }
+
+        if (maxeax > max_maxeax) {
+                grub_printf("cpu: warning, maxeax was 0x%x -> 0x%x\n",
+                    maxeax, max_maxeax);
+                maxeax = max_maxeax;
+        }
+
+        if (maxeax < 1)
+                return (0);     /* no additional functions, not an AMD64 */
+        else {
+                uint_t family, model, step;
+
+                amd64_cpuid_insn(1, vcr);
+
+                /*
+                 * All AMD64/IA32e processors technically SHOULD report
+                 * themselves as being in family 0xf, but for some reason
+                 * Simics doesn't, and this may change in the future, so
+                 * don't error out if it's not true.
+                 */
+                if ((family = BITX(vcr->r_eax, 11, 8)) == 0xf)
+                        family += BITX(vcr->r_eax, 27, 20);
+
+                if ((model = BITX(vcr->r_eax, 7, 4)) == 0xf)
+                        model += BITX(vcr->r_eax, 19, 16) << 4;
+                step = BITX(vcr->r_eax, 3, 0);
+
+                grub_printf("cpu: '%s' family %d model %d step %d\n",
+                    vendor, family, model, step);
+                stdfeatures = vcr->r_edx;
+        }
+
+        amd64_cpuid_insn(0x80000000, vcr);
+
+        if (vcr->r_eax & 0x80000000) {
+                uint32_t xmaxeax = vcr->r_eax;
+                const uint32_t max_xmaxeax = 0x80000100;
+
+                if (xmaxeax > max_xmaxeax) {
+                        grub_printf("amd64: warning, xmaxeax was "
+			    "0x%x -> 0x%x\n", xmaxeax, max_xmaxeax);
+                        xmaxeax = max_xmaxeax;
+                }
+
+                if (xmaxeax >= 0x80000001) {
+                        amd64_cpuid_insn(0x80000001, vcr);
+                        xtdfeatures = vcr->r_edx;
+                }
+        }
+
+        if (BITX(xtdfeatures, 29, 29))          /* long mode */
+                isamd64++;
+        else
+                grub_printf("amd64: CPU does NOT support long mode\n");
+
+        if (!BITX(stdfeatures, 0, 0)) {
+                grub_printf("amd64: CPU does NOT support FPU\n");
+                isamd64--;
+        }
+
+        if (!BITX(stdfeatures, 4, 4)) {
+                grub_printf("amd64: CPU does NOT support TSC\n");
+                isamd64--;
+        }
+
+        if (!BITX(stdfeatures, 5, 5)) {
+                grub_printf("amd64: CPU does NOT support MSRs\n");
+                isamd64--;
+        }
+
+        if (!BITX(stdfeatures, 6, 6)) {
+                grub_printf("amd64: CPU does NOT support PAE\n");
+                isamd64--;
+        }
+
+        if (!BITX(stdfeatures, 8, 8)) {
+                grub_printf("amd64: CPU does NOT support CX8\n");
+                isamd64--;
+        }
+
+        if (!BITX(stdfeatures, 13, 13)) {
+                grub_printf("amd64: CPU does NOT support PGE\n");
+                isamd64--;
+        }
+
+        if (!BITX(stdfeatures, 17, 17)) {
+                grub_printf("amd64: CPU does NOT support PSE\n");
+                isamd64--;
+        }
+
+        if (!BITX(stdfeatures, 19, 19)) {
+                grub_printf("amd64: CPU does NOT support CLFSH\n");
+                isamd64--;
+        }
+
+        if (!BITX(stdfeatures, 23, 23)) {
+                grub_printf("amd64: CPU does NOT support MMX\n");
+                isamd64--;
+        }
+
+        if (!BITX(stdfeatures, 24, 24)) {
+                grub_printf("amd64: CPU does NOT support FXSR\n");
+                isamd64--;
+        }
+
+        if (!BITX(stdfeatures, 25, 25)) {
+                grub_printf("amd64: CPU does NOT support SSE\n");
+                isamd64--;
+        }
+
+        if (!BITX(stdfeatures, 26, 26)) {
+                grub_printf("amd64: CPU does NOT support SSE2\n");
+                isamd64--;
+        }
+
+        if (isamd64 < 1) {
+                grub_printf("amd64: CPU does not support amd64 executables.\n");
+                return (0);
+        }
+
+        amd64_rdmsr(MSR_AMD_EFER, &efer);
+        if (efer & AMD_EFER_SCE)
+                grub_printf("amd64: EFER_SCE (syscall/sysret) already "
+		    "enabled\n");
+        if (efer & AMD_EFER_NXE)
+                grub_printf("amd64: EFER_NXE (no-exec prot) already enabled\n");
+        if (efer & AMD_EFER_LME)
+                grub_printf("amd64: EFER_LME (long mode) already enabled\n");
+
+        return (detect_target_operating_mode());
+}
+
+static int
+detect_target_operating_mode()
+{
+        int ret, ah;
+
+	ah = get_target_operating_mode();
+
+        ah = ah >> 8;
+
+	/* XXX still need to pass back the return from the call  */
+	ret = 0;
+
+        if (ah == 0x86 && (ret & CB) != 0) {
+                grub_printf("[BIOS 'Detect Target Operating Mode' "
+                    "callback unsupported on this platform]\n");
+                return (1);     /* unsupported, ignore */
+        }
+
+        if (ah == 0x0 && (ret & CB) == 0) {
+                grub_printf("[BIOS accepted mixed-mode target setting!]\n");
+                return (1);     /* told the bios what we're up to */
+        }
+
+        if (ah == 0 && ret & CB) {
+                grub_printf("fatal: BIOS reports this machine CANNOT run in "
+		    "mixed 32/64-bit mode!\n");
+                return (0);
+        }
+
+        grub_printf("warning: BIOS Detect Target Operating Mode callback "
+            "confused.\n         %%ax >> 8 = 0x%x, carry = %d\n", ah,
+            ret & CB ? 1 : 0);
+
+        return (1);
+}
+
+
+int
+isamd64()
+{
+	static int ret = -1;
+
+	if (ret == -1)
+		ret = amd64_config_cpu();
+
+	return (ret);
+}
+
+static int
+expand_arch (char *arg, int flags, int func())
+{
+  char newarg[MAX_CMDLINE];	/* everything boils down to MAX_CMDLINE */
+  char *index;
+
+  newarg[0] = '\0';
+
+  while ((index = strstr(arg, "$ISADIR")) != NULL) {
+
+    index[0] = '\0';
+    strncat(newarg, arg, MAX_CMDLINE);
+    index[0] = '$';
+
+    if (isamd64())
+      strncat(newarg, "amd64", MAX_CMDLINE);
+
+    arg = index + 7;
+  }
+
+  strncat(newarg, arg, MAX_CMDLINE);
+
+  grub_printf("loading %s\n", newarg);
+
+  return (func(newarg, flags));
+}
+
+/* kernel$ */
+static int
+kernel_dollar_func (char *arg, int flags)
+{
+  return (expand_arch(arg, flags, (void *)&kernel_func));
+}
+
+static struct builtin builtin_kernel_dollar =
+{
+  "kernel$",
+  kernel_dollar_func,
+  BUILTIN_CMDLINE | BUILTIN_HELP_LIST,
+  "kernel$ [--no-mem-option] [--type=TYPE] FILE [ARG ...]",
+  " Just like kernel, but with $ISADIR expansion."
+};
+
 
 /* lock */
 static int
@@ -2929,6 +3205,22 @@ static struct builtin builtin_module =
   " command must know what the kernel in question expects). The"
   " rest of the line is passed as the \"module command line\", like"
   " the `kernel' command."
+};
+
+/* module$ */
+static int
+module_dollar_func (char *arg, int flags)
+{
+  return (expand_arch(arg, flags, (void *)&module_func));
+}
+
+static struct builtin builtin_module_dollar =
+{
+  "module$",
+  module_dollar_func,
+  BUILTIN_CMDLINE | BUILTIN_HELP_LIST,
+  "module FILE [ARG ...]",
+  " Just like module, but with $ISADIR expansion."
 };
 
 
@@ -5148,6 +5440,7 @@ struct builtin *builtin_table[] =
   &builtin_install,
   &builtin_ioprobe,
   &builtin_kernel,
+  &builtin_kernel_dollar,
   &builtin_lock,
   &builtin_makeactive,
   &builtin_map,
@@ -5155,6 +5448,7 @@ struct builtin *builtin_table[] =
   &builtin_md5crypt,
 #endif /* USE_MD5_PASSWORDS */
   &builtin_module,
+  &builtin_module_dollar,
   &builtin_modulenounzip,
   &builtin_pager,
   &builtin_partnew,

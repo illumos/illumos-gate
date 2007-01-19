@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,6 +80,7 @@ typedef struct kmt_data {
 	const mdb_tgt_regdesc_t	*kmt_rds;	/* Register description table */
 	mdb_nv_t	kmt_modules;		/* Hash table of modules */
 	mdb_list_t	kmt_modlist;		/* List of mods in load order */
+	const char	*kmt_rtld_name;		/* Module containing krtld */
 	caddr_t		kmt_writemap;		/* Used to map PAs for writes */
 	size_t		kmt_writemapsz;		/* Size of same */
 	mdb_map_t	kmt_map;		/* Persistant map for callers */

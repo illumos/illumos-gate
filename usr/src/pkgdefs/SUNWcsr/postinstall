@@ -124,6 +124,21 @@ if [ -x /usr/sbin/svcadm -a -x /usr/sbin/svccfg -a \
 fi
 
 #
+# If the eeprom service is present, remove it. We can't use
+# /var/svc/profile/upgrade as it runs before manifest-import.
+#
+/usr/sbin/svccfg -s svc:/platform/i86pc/eeprom:default end >/dev/null 2>&1
+if [ "$?" = 0 ]; then
+	if [ -r $PKG_INSTALL_ROOT/etc/svc/volatile/repository_door ]; then
+		svcadm disable -s svc:/platform/i86pc/eeprom:default \
+		    >/dev/null 2>&1
+	fi
+	svccfg delete svc:/platform/i86pc/eeprom >/dev/null 2>&1
+	rm -f $PKG_INSTALL_ROOT/var/svc/profile/platform_i86pc.xml
+	rm -f $PKG_INSTALL_ROOT/var/svc/profile/platform.xml
+fi
+
+#
 # svc:/network/rpc/keyserv is expected to be off on systems that don't
 # set domainname.  On systems that do define a default domain, leave the
 # setting as previously set.

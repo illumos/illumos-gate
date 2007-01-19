@@ -20,7 +20,7 @@
 #
 # uts/intel/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,9 +39,10 @@ LINT_LIBS	= $(LINT_LIB) $(GEN_LINT_LIB) \
 
 # EXPORT DELETE START
 $(CLOSED_BUILD)LINT_LIBS	+= $(SVVS_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
-$(CLOSED_BUILD)LINT_CLOSED_XMOD3	 = $(CLOSED_XMODS:lsimega=)
-$(CLOSED_BUILD)LINT_CLOSED_XMOD2	 = $(LINT_CLOSED_XMOD3:adpu320=)
-$(CLOSED_BUILD)LINT_CLOSED_XMOD1	 = $(LINT_CLOSED_XMOD2:e1000g=)
+$(CLOSED_BUILD)LINT_CLOSED_XMOD4	= $(CLOSED_XMODS:lsimega=)
+$(CLOSED_BUILD)LINT_CLOSED_XMOD3	= $(LINT_CLOSED_XMOD4:spwr=)
+$(CLOSED_BUILD)LINT_CLOSED_XMOD2	= $(LINT_CLOSED_XMOD3:adpu320=)
+$(CLOSED_BUILD)LINT_CLOSED_XMOD1	= $(LINT_CLOSED_XMOD2:e1000g=)
 $(CLOSED_BUILD)LINT_XMODLIBS	= $(LINT_CLOSED_XMOD1:nge=)
 $(CLOSED_BUILD)LINT_LIBS	+= $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
@@ -82,8 +83,8 @@ install_h	:=	TARGET= install_h
 
 .KEEP_STATE:
 
-.PARALLEL:	$(KMODS) $(CLOSED_KMODS) $(SVVS) $(XMODS) $(CLOSED_XMODS) \
-		config $(LINT_DEPS)
+.PARALLEL:	$(PARALLEL_KMODS) $(CLOSED_KMODS) $(SVVS) $(XMODS) \
+		$(CLOSED_XMODS) config $(LINT_DEPS)
 
 def all install clean clobber modlist: genassym $(KMODS) $(CLOSED_KMODS) \
 	$(SVVS) $(XMODS) $(CLOSED_XMODS) config
@@ -119,13 +120,21 @@ install_h check:	FRC
 	@cd amd64/sys; pwd; $(MAKE) $(TARGET)
 
 #
+# Work-around to disable acpica global crosscheck lint warnings
+#
+LGREP.intel =	grep -v 'intel/io/acpica'
+
+#
 #	Full kernel lint target.
 #
 LINT_TARGET	= globallint
 
+# workaround for multiply defined errors
+globallint := LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
+
 globallint:
 	@-$(ECHO) "\nFULL KERNEL: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
+	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2) | $(LGREP.intel)
 
 lint:	modlintlib .WAIT $(LINT_DEPS)
 

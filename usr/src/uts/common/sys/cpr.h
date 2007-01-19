@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,7 @@ extern "C" {
 #include <sys/mutex.h>
 #include <sys/uadmin.h>
 #include <sys/compress.h>
+#include <sys/archsystm.h>
 
 /*
  * definitions for kernel, cprboot, pmconfig
@@ -178,36 +178,27 @@ struct cprconfig {
 
 extern int	cpr_debug;
 
-#define	errp	prom_printf
-#define	DPRINT
-
 /*
- * DEBUG1 displays the main flow of CPR. Use it to identify which sub-module
- *	of CPR causes problems.
- * DEBUG2 displays minor stuff that normally won't matter.
- * DEBUG3 displays some big loops (cpr_dump); requires much longer runtime.
- * DEBUG4 displays lots of cprboot output, cpr_read and page handling.
- * DEBUG5 various, mostly unique stuff
- * DEBUG9 displays statistical data for CPR on console (by using printf),
+ * CPR_DEBUG1 displays the main flow of CPR. Use it to identify which
+ * sub-module of CPR causes problems.
+ * CPR_DEBUG2 displays minor stuff that normally won't matter.
+ * CPR_DEBUG3 displays some big loops (cpr_dump); requires much longer runtime.
+ * CPR_DEBUG4 displays lots of cprboot output, cpr_read and page handling.
+ * CPR_DEBUG5 various, mostly unique stuff
+ * CPR_DEBUG9 displays statistical data for CPR on console (by using printf),
  *	such as num page invalidated, etc.
  */
-#define	LEVEL1		0x1
-#define	LEVEL2		0x2
-#define	LEVEL3		0x4
-#define	LEVEL4		0x8
-#define	LEVEL5		0x10
-#define	LEVEL6		0x20
-#define	LEVEL7		0x40
-#define	LEVEL8		0x80
+#define	CPR_DEBUG1	0x1
+#define	CPR_DEBUG2	0x2
+#define	CPR_DEBUG3	0x4
+#define	CPR_DEBUG4	0x8
+#define	CPR_DEBUG5	0x10
+#define	CPR_DEBUG6	0x20
+#define	CPR_DEBUG7	0x40
+#define	CPR_DEBUG8	0x80
+#define	CPR_DEBUG9	CPR_DEBUG6
 
-#define	DEBUG1(p)	{if (cpr_debug & LEVEL1) p; }
-#define	DEBUG2(p)	{if (cpr_debug & LEVEL2) p; }
-#define	DEBUG3(p)	{if (cpr_debug & LEVEL3) p; }
-#define	DEBUG4(p)	{if (cpr_debug & LEVEL4) p; }
-#define	DEBUG5(p)	{if (cpr_debug & LEVEL5) p; }
-#define	DEBUG7(p)	{if (cpr_debug & LEVEL7) p; }
-#define	DEBUG8(p)	{if (cpr_debug & LEVEL8) p; }
-#define	DEBUG9(p)	{if (cpr_debug & LEVEL6) p; }
+#define	CPR_DEBUG(level, ...) if (cpr_debug & level) cpr_dprintf(__VA_ARGS__)
 
 #define	CPR_DEBUG_BIT(dval)	(1 << (dval - AD_CPR_DEBUG0 - 1))
 #define	DBG_DONTSHOWRANGE	0

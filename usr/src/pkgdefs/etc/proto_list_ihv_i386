@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,13 +32,10 @@
 #
 f kernel/drv/adp                 -                     755 root  sys        0  1  -  -
 f kernel/drv/adp.conf            -                     644 root  sys        0  1  -  -
-f kernel/drv/amd64/xsvc          -                     755 root  sys        0  1  -  -
 f kernel/drv/cadp                -                     755 root  sys        0  1  -  -
 f kernel/drv/cadp.conf           -                     644 root  sys        0  1  -  -
 f kernel/drv/cpqhpc              -                     755 root  sys        0  1  -  -
 f kernel/drv/cpqhpc.conf         -                     644 root  sys        0  1  -  -
-f kernel/drv/xsvc                -                     755 root  sys        0  1  -  -
-f kernel/drv/xsvc.conf           -                     644 root  sys        0  1  -  -
 f platform/i86pc/kernel/drv/amd64/cadp160 -            755 root  sys        0  1  -  -
 f platform/i86pc/kernel/drv/cadp160 -                  755 root  sys        0  1  -  -
 f platform/i86pc/kernel/drv/cadp160.conf -             644 root  sys        0  1  -  -

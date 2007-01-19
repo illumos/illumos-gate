@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,6 @@ extern "C" {
 #include <sys/segments.h>
 #include <sys/rm_platter.h>
 #include <sys/avintr.h>
-#include <sys/mmu.h>
 #include <sys/pte.h>
 
 #ifndef	_ASM
@@ -73,34 +72,42 @@ struct	machcpu {
 	struct hat_cpu_info	*mcpu_hat_info;
 
 	/* i86 hardware table addresses that cannot be shared */
+
 	user_desc_t	*mcpu_gdt;	/* GDT */
-	gate_desc_t	*mcpu_idt;	/* IDT */
+	gate_desc_t	*mcpu_idt;	/* current IDT */
+
 	struct tss	*mcpu_tss;	/* TSS */
 
-	struct	cpu_tables *mcpu_cp_tables;	/* pointer to space acquired */
-						/* while starting up */
-						/* auxillary processors */
 	kmutex_t	mcpu_ppaddr_mutex;
-
 	caddr_t		mcpu_caddr1;	/* per cpu CADDR1 */
 	caddr_t		mcpu_caddr2;	/* per cpu CADDR2 */
-	void		*mcpu_caddr1pte;
-	void		*mcpu_caddr2pte;
-	struct softint mcpu_softinfo;
+	uint64_t	mcpu_caddr1pte;
+	uint64_t	mcpu_caddr2pte;
+
+	struct softint	mcpu_softinfo;
 	uint64_t	pil_high_start[HIGH_LEVELS];
 	uint64_t	intrstat[PIL_MAX + 1][2];
+
 	struct cpuid_info	 *mcpu_cpi;
+
 	struct cmi	*mcpu_cmi;	/* CPU module state */
 	void		*mcpu_cmidata;
 #if defined(__amd64)
 	greg_t	mcpu_rtmp_rsp;		/* syscall: temporary %rsp stash */
 	greg_t	mcpu_rtmp_r15;		/* syscall: temporary %r15 stash */
 #endif
+
+	struct vcpu_info *mcpu_vcpu_info;
+	uint64_t	mcpu_gdtpa;	/* xen: GDT in physical address */
+
+	uint16_t mcpu_intr_pending;	/* xen: pending interrupt levels */
 };
 
 #define	NINTR_THREADS	(LOCK_LEVEL-1)	/* number of interrupt threads */
 
 #endif	/* _ASM */
+
+/* Please DON'T add any more of this namespace-poisoning sewage here */
 
 #define	cpu_nodeid cpu_m.mcpu_nodeid
 #define	cpu_pri cpu_m.mcpu_pri

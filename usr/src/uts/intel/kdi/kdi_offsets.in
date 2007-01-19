@@ -1,0 +1,85 @@
+\
+\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+\ Use is subject to license terms.
+\
+\ CDDL HEADER START
+\
+\ The contents of this file are subject to the terms of the
+\ Common Development and Distribution License (the "License").
+\ You may not use this file except in compliance with the License.
+\
+\ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+\ or http://www.opensolaris.org/os/licensing.
+\ See the License for the specific language governing permissions
+\ and limitations under the License.
+\
+\ When distributing Covered Code, include this CDDL HEADER in each
+\ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+\ If applicable, add the following below this CDDL HEADER, with the
+\ fields enclosed by brackets "[]" replaced with your own identifying
+\ information: Portions Copyright [yyyy] [name of copyright owner]
+\
+\ CDDL HEADER END
+\
+\ ident	"%Z%%M%	%I%	%E% SMI"
+\
+\ CPU-save structure offsets for use in assembly code.
+\
+\ Keep in sync with kdi_state.h
+\
+
+#include <sys/cpuvar.h>
+#include <sys/kdi_impl.h>
+
+kdi_memrange_t	MR_SIZE
+		mr_base
+		mr_lim
+
+kdi_crumb_t	KRM_SIZE
+		krm_cpu_state
+		krm_pc
+		krm_sp
+		krm_trapno
+		krm_flag
+
+kdi_drreg_t
+		dr_ctl
+		dr_stat
+		dr_addr
+
+kdi_msr_t	MSR_SIZE
+		msr_num
+		msr_type
+		_u._msr_valp			MSR_VALP
+		_u._msr_val			MSR_VAL
+
+kdi_cpusave_t	KRS_SIZE
+		krs_gregs
+		krs_dr
+		krs_dr.dr_ctl			KRS_DRCTL
+		krs_dr.dr_stat			KRS_DRSTAT
+		krs_gdt
+		krs_idt
+		krs_cr0
+		krs_msr
+		krs_cpu_state
+		krs_curcrumbidx
+		krs_curcrumb
+		krs_crumbs
+
+cpu
+		cpu_id
+
+greg_t		KREG_SIZE
+
+#if defined(__amd64)
+\#define	REG_SHIFT		3
+#else
+\#define	REG_SHIFT		2
+#endif
+
+\#define	DRADDR_IDX(num)		_CONST(_MUL(num, DR_ADDR_INCR))
+\#define	DRADDR_OFF(num)		_CONST(DRADDR_IDX(num) + DR_ADDR)
+\#define	KRS_DROFF(num)		_CONST(DRADDR_OFF(num) + KRS_DR)
+\#define	REG_OFF(reg)		_CONST(_CONST(reg) << REG_SHIFT)
+\#define	KDIREG_OFF(reg)		_CONST(_MUL(KREG_SIZE, reg) + KRS_GREGS)

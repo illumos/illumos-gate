@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,16 +38,11 @@
 #include <sys/controlregs.h>
 #include <sys/archsystm.h>
 
-#if defined(__i386)
-/* Copied from stand/i386/sys/bootdef.h */
-#define	GS_GDT		0x38	/* dummy cpu_t pointer descriptor	*/
-#endif
-
 static int
 kctl_boot_prop_read(char *pname, char *prop_buf, int buf_len)
 {
-	int len;
 	struct bootops *ops = kctl.kctl_boot_ops;
+	int len;
 
 	len = BOP_GETPROPLEN(ops, pname);
 	if (len > 0 && len <= buf_len) {
@@ -144,12 +139,6 @@ kctl_pcache_destroy(kmdb_auxv_nv_t *pnv)
 	kobj_free(pnv, sizeof (kmdb_auxv_nv_t) * KCTL_PROPNV_NENT);
 }
 
-/*ARGSUSED*/
-static void
-kctl_cpu_init(void)
-{
-}
-
 void
 kctl_auxv_init_isadep(kmdb_auxv_t *kav, void *romp)
 {
@@ -171,16 +160,13 @@ kctl_preactivate_isadep(void)
 }
 
 /*ARGSUSED*/
-int
+void
 kctl_activate_isadep(kdi_debugvec_t *dvec)
 {
-	dvec->dv_kctl_cpu_init = kctl_cpu_init;
 	dvec->dv_kctl_vmready = hat_kdi_init;
 
 	if (!kctl.kctl_boot_loaded)
 		hat_kdi_init();
-
-	return (0);
 }
 
 void
@@ -188,64 +174,20 @@ kctl_depreactivate_isadep(void)
 {
 }
 
-void
-kctl_deactivate_isadep(void)
-{
-	hat_kdi_fini();
-}
-
-#if defined(__amd64)
+/*
+ * Many common kernel functions assume that %gs can be deferenced, and
+ * fail horribly if it cannot.  Ask the kernel to set up a temporary
+ * mapping to a fake cpu_t so that we can call such functions during
+ * initialization.
+ */
 void *
 kctl_boot_tmpinit(void)
 {
-	/*
-	 * Many common kernel functions assume that GSBASE has been initialized,
-	 * and fail horribly if it hasn't.  We'll install a pointer to a dummy
-	 * cpu_t for use during our initialization.
-	 */
-	cpu_t *old = (cpu_t *)rdmsr(MSR_AMD_GSBASE);
-
-	wrmsr(MSR_AMD_GSBASE, (uint64_t)kobj_zalloc(sizeof (cpu_t), KM_TMP));
-	return (old);
+	return (boot_kdi_tmpinit());
 }
 
 void
 kctl_boot_tmpfini(void *old)
 {
-	wrmsr(MSR_AMD_GSBASE, (uint64_t)old);
+	boot_kdi_tmpfini(old);
 }
-
-#else
-
-void *
-kctl_boot_tmpinit(void)
-{
-	/*
-	 * Many common kernel functions assume that %gs has been initialized,
-	 * and fail horribly if it hasn't.  Boot has reserved a descriptor for
-	 * us (GS_GDT) in its GDT, a descriptor which we'll use to describe our
-	 * dummy cpu_t.  We then set %gs to refer to this descriptor.
-	 */
-	cpu_t *cpu = kobj_zalloc(sizeof (cpu_t), KM_TMP);
-	uintptr_t old;
-	desctbr_t bgdt;
-	user_desc_t *gsdesc;
-
-	rd_gdtr(&bgdt);
-	gsdesc = (user_desc_t *)(bgdt.dtr_base + GS_GDT);
-
-	USEGD_SETBASE(gsdesc, (uintptr_t)cpu);
-	USEGD_SETLIMIT(gsdesc, sizeof (cpu_t));
-
-	old = getgs();
-	setgs(GS_GDT);
-
-	return ((void *)old);
-}
-
-void
-kctl_boot_tmpfini(void *old)
-{
-	setgs((uintptr_t)old);
-}
-#endif

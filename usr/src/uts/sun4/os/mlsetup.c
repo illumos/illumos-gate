@@ -191,7 +191,7 @@ mlsetup(struct regs *rp, void *cif, kfpu_t *fp)
 	CPU->cpu_dispatch_pri = t0.t_pri;
 
 	/*
-	 * Initialize thread/cpu microstate accounting here
+	 * Initialize thread/cpu microstate accounting
 	 */
 	init_mstate(&t0, LMS_SYSTEM);
 	init_cpu_mstate(CPU, CMS_SYSTEM);

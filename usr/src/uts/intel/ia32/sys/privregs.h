@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,11 +88,15 @@ struct regs {
 
 #define	GREG_NUM	8	/* Number of regs between %edi and %eax */
 
-#endif	/* !_ASM */
-
 #ifdef _KERNEL
 #define	lwptoregs(lwp)	((struct regs *)((lwp)->lwp_regs))
 #endif /* _KERNEL */
+
+#else	/* !_ASM */
+
+#if defined(_MACHDEP)
+
+#include <sys/machprivregs.h>
 
 /*
  * Save current frame on the stack.  Uses %eax.
@@ -149,52 +153,34 @@ struct regs {
  * and restoring them on exit.
  */
 #define	INTR_PUSH			\
+	cld;				\
 	pusha;				\
 	__SEGREGS_PUSH			\
 	__FRAME_PUSH			\
-	cmpw	$KGS_SEL, REGOFF_GS(%esp);	\
-	je	7f;			\
+	cmpw	$KGS_SEL, REGOFF_GS(%esp); \
+	je	8f;			\
 	movl	$0, REGOFF_SAVFP(%esp);	\
 	__SEGREGS_LOAD_KERNEL		\
-7:
+8:	CLEAN_CS
 
-#define	INTR_POP			\
+#define	__INTR_POP			\
 	popa;				\
 	addl	$8, %esp;	/* get TRAPNO and ERR off the stack */
 
 #define	INTR_POP_USER			\
 	addl	$8, %esp;	/* get extra frame off the stack */ \
 	__SEGREGS_POP			\
-	INTR_POP
+	__INTR_POP
 
-#define	INTR_POP_KERNEL			\
+#define	INTR_POP_KERNEL					\
 	addl	$24, %esp;	/* skip extra frame and segment registers */ \
-	INTR_POP
-
-/*
- * Macros for saving the original segment registers and restoring them
- * for fast traps.
- */
-#define	FAST_INTR_PUSH	\
-	__SEGREGS_PUSH	\
-	__SEGREGS_LOAD_KERNEL
-
-#define	FAST_INTR_POP	\
-	__SEGREGS_POP
-
-#define	DISABLE_INTR_FLAGS		\
-	pushl	$F_OFF;			\
-	popfl;
-
-#define	ENABLE_INTR_FLAGS		\
-	pushl	$F_ON;			\
-	popfl;
-
+	__INTR_POP
 /*
  * Macros for saving all registers necessary on system call entry,
  * and restoring them on exit.
  */
 #define	SYSCALL_PUSH			\
+	cld;				\
 	pusha;				\
 	__SEGREGS_PUSH			\
 	subl	$8, %esp;		\
@@ -204,9 +190,10 @@ struct regs {
 	movl	%ecx, REGOFF_EFL(%esp);	\
 	movl	$0, REGOFF_SAVPC(%esp);	\
 	movl	$0, REGOFF_SAVFP(%esp);	\
-	__SEGREGS_LOAD_KERNEL
+	__SEGREGS_LOAD_KERNEL;		\
 
 #define	SYSENTER_PUSH			\
+	cld;				\
 	pusha;				\
 	__SEGREGS_PUSH			\
 	subl	$8, %esp;		\
@@ -217,7 +204,17 @@ struct regs {
 #define	SYSCALL_POP			\
 	INTR_POP_USER
 
+#endif	/* _MACHDEP */
 
+/*
+ * This is used to set eflags to known values at the head of an
+ * interrupt gate handler, i.e. interrupts are -already- disabled.
+ */
+#define	INTGATE_INIT_KERNEL_FLAGS	\
+	pushl	$F_OFF;			\
+	popfl
+
+#endif	/* !_ASM */
 
 #include <sys/controlregs.h>
 

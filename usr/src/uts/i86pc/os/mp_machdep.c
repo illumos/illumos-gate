@@ -40,8 +40,10 @@
 #include <sys/cpuvar.h>
 #include <sys/pghw.h>
 #include <sys/disp.h>
-#include <sys/cpu.h>
 #include <sys/archsystm.h>
+#include <sys/machsystm.h>
+#include <sys/param.h>
+#include <sys/promif.h>
 #include <sys/mach_intr.h>
 
 #define	OFFSETOF(s, m)		(size_t)(&(((s *)0)->m))
@@ -60,27 +62,21 @@ static void mach_fixcpufreq(void);
 static int mach_clkinit(int, int *);
 static void mach_smpinit(void);
 static void mach_set_softintr(int ipl, struct av_softinfo *);
-static void mach_cpu_start(int cpun);
 static int mach_softlvl_to_vect(int ipl);
 static void mach_get_platform(int owner);
 static void mach_construct_info();
 static int mach_translate_irq(dev_info_t *dip, int irqno);
 static int mach_intr_ops(dev_info_t *, ddi_intr_handle_impl_t *,
     psm_intr_op_t, int *);
-static timestruc_t mach_tod_get(void);
-static void mach_tod_set(timestruc_t ts);
 static void mach_notify_error(int level, char *errmsg);
 static hrtime_t dummy_hrtime(void);
 static void dummy_scalehrtime(hrtime_t *);
-static void cpu_halt(void);
+static void cpu_idle(void);
 static void cpu_wakeup(cpu_t *, int);
 /*
  *	External reference functions
  */
 extern void return_instr();
-extern timestruc_t (*todgetf)(void);
-extern void (*todsetf)(timestruc_t);
-extern long gmt_lag;
 extern uint64_t freq_tsc(uint32_t *);
 #if defined(__i386)
 extern uint64_t freq_notsc(uint32_t *);
@@ -92,18 +88,17 @@ extern int cpuid_get_chipid(cpu_t *);
 /*
  *	PSM functions initialization
  */
-void (*psm_shutdownf)(int, int)	= return_instr;
-void (*psm_preshutdownf)(int, int) = return_instr;
-void (*psm_notifyf)(int)	= return_instr;
-void (*psm_set_idle_cpuf)(int)	= return_instr;
-void (*psm_unset_idle_cpuf)(int) = return_instr;
+void (*psm_shutdownf)(int, int)	= (void (*)(int, int))return_instr;
+void (*psm_preshutdownf)(int, int) = (void (*)(int, int))return_instr;
+void (*psm_notifyf)(int)	= (void (*)(int))return_instr;
+void (*psm_set_idle_cpuf)(int)	= (void (*)(int))return_instr;
+void (*psm_unset_idle_cpuf)(int) = (void (*)(int))return_instr;
 void (*psminitf)()		= mach_init;
 void (*picinitf)() 		= return_instr;
 int (*clkinitf)(int, int *) 	= (int (*)(int, int *))return_instr;
-void (*cpu_startf)() 		= return_instr;
 int (*ap_mlsetup)() 		= (int (*)(void))return_instr;
 void (*send_dirintf)() 		= return_instr;
-void (*setspl)(int)		= return_instr;
+void (*setspl)(int)		= (void (*)(int))return_instr;
 int (*addspl)(int, int, int, int) = (int (*)(int, int, int, int))return_instr;
 int (*delspl)(int, int, int, int) = (int (*)(int, int, int, int))return_instr;
 void (*setsoftint)(int, struct av_softinfo *)=
@@ -118,8 +113,6 @@ hrtime_t (*gethrtimeunscaledf)(void)	= dummy_hrtime;
 void (*scalehrtimef)(hrtime_t *)	= dummy_scalehrtime;
 int (*psm_translate_irq)(dev_info_t *, int) = mach_translate_irq;
 void (*gethrestimef)(timestruc_t *) = pc_gethrestime;
-int (*psm_todgetf)(todinfo_t *) = (int (*)(todinfo_t *))return_instr;
-int (*psm_todsetf)(todinfo_t *) = (int (*)(todinfo_t *))return_instr;
 void (*psm_notify_error)(int, char *) = (void (*)(int, char *))NULL;
 int (*psm_get_clockirq)(int) = NULL;
 int (*psm_get_ipivect)(int, int) = NULL;
@@ -146,25 +139,10 @@ static struct psm_ops *mach_set[4] = {&mach_ops, NULL, NULL, NULL};
 static ushort_t mach_ver[4] = {0, 0, 0, 0};
 
 /*
- * If non-zero, idle cpus will "halted" when there's
+ * If non-zero, idle cpus will become "halted" when there's
  * no work to do.
  */
-int	halt_idle_cpus = 1;
-
-#if defined(__amd64)
-/*
- * If non-zero, will use cr8 for interrupt priority masking
- * We declare this here since install_spl is called from here
- * (where this is checked).
- */
-int	intpri_use_cr8 = 0;
-#endif	/* __amd64 */
-
-#ifdef	_SIMULATOR_SUPPORT
-
-int simulator_run = 0;	/* patch to non-zero if running under simics */
-
-#endif	/* _SIMULATOR_SUPPORT */
+int	idle_cpu_use_hlt = 1;
 
 
 /*ARGSUSED*/
@@ -271,10 +249,10 @@ dummy_scalehrtime(hrtime_t *ticks)
 {}
 
 /*
- * Halt the present CPU until awoken via an interrupt
+ * Idle the present CPU until awoken via an interrupt
  */
 static void
-cpu_halt(void)
+cpu_idle(void)
 {
 	cpu_t		*cpup = CPU;
 	processorid_t	cpun = cpup->cpu_id;
@@ -339,7 +317,7 @@ cpu_halt(void)
 	 * This means that the ordering of the poke and the clearing
 	 * of the bit by cpu_wakeup is important.
 	 * cpu_wakeup() must clear, then poke.
-	 * cpu_halt() must disable interrupts, then check for the bit.
+	 * cpu_idle() must disable interrupts, then check for the bit.
 	 */
 	cli();
 
@@ -364,12 +342,7 @@ cpu_halt(void)
 		return;
 	}
 
-	/*
-	 * Call the halt sequence:
-	 * sti
-	 * hlt
-	 */
-	i86_halt();
+	mach_cpu_idle();
 
 	/*
 	 * We're no longer halted
@@ -404,7 +377,7 @@ cpu_wakeup(cpu_t *cpu, int bound)
 		/*
 		 * We may find the current CPU present in the halted cpuset
 		 * if we're in the context of an interrupt that occurred
-		 * before we had a chance to clear our bit in cpu_halt().
+		 * before we had a chance to clear our bit in cpu_idle().
 		 * Poking ourself is obviously unnecessary, since if
 		 * we're here, we're not halted.
 		 */
@@ -448,6 +421,8 @@ cpu_wakeup(cpu_t *cpu, int bound)
 	if (cpu_found != CPU->cpu_id)
 		poke_cpu(cpu_found);
 }
+
+void (*cpu_pause_handler)(volatile char *) = NULL;
 
 static int
 mp_disable_intr(int cpun)
@@ -533,7 +508,7 @@ mach_get_platform(int owner)
 static void
 mach_construct_info()
 {
-	register struct psm_sw *swp;
+	struct psm_sw *swp;
 	int	mach_cnt[PSM_OWN_OVERRIDE+1] = {0};
 	int	conflict_owner = 0;
 
@@ -584,7 +559,7 @@ mach_construct_info()
 static void
 mach_init()
 {
-	register struct psm_ops  *pops;
+	struct psm_ops  *pops;
 
 	mach_construct_info();
 
@@ -604,14 +579,22 @@ mach_init()
 		psm_translate_irq = pops->psm_translate_irq;
 	if (pops->psm_intr_ops)
 		psm_intr_ops = pops->psm_intr_ops;
-	if (pops->psm_tod_get) {
-		todgetf = mach_tod_get;
-		psm_todgetf = pops->psm_tod_get;
-	}
-	if (pops->psm_tod_set) {
-		todsetf = mach_tod_set;
-		psm_todsetf = pops->psm_tod_set;
-	}
+
+#if defined(PSMI_1_2) || defined(PSMI_1_3) || defined(PSMI_1_4)
+	/*
+	 * Time-of-day functionality now handled in TOD modules.
+	 * (Warn about PSM modules that think that we're going to use
+	 * their ops vectors.)
+	 */
+	if (pops->psm_tod_get)
+		cmn_err(CE_WARN, "obsolete psm_tod_get op %p",
+		    (void *)pops->psm_tod_get);
+
+	if (pops->psm_tod_set)
+		cmn_err(CE_WARN, "obsolete psm_tod_set op %p",
+		    (void *)pops->psm_tod_set);
+#endif
+
 	if (pops->psm_notify_error) {
 		psm_notify_error = mach_notify_error;
 		notify_error = pops->psm_notify_error;
@@ -623,13 +606,8 @@ mach_init()
 	 * Initialize the dispatcher's function hooks
 	 * to enable CPU halting when idle
 	 */
-#if defined(_SIMULATOR_SUPPORT)
-	if (halt_idle_cpus && !simulator_run)
-		idle_cpu = cpu_halt;
-#else
-	if (halt_idle_cpus)
-		idle_cpu = cpu_halt;
-#endif	/* _SIMULATOR_SUPPORT */
+	if (idle_cpu_use_hlt)
+		idle_cpu = cpu_idle;
 
 	mach_smpinit();
 }
@@ -654,7 +632,6 @@ mach_smpinit(void)
 	mp_cpus = cpumask;
 
 	/* MP related routines */
-	cpu_startf = mach_cpu_start;
 	ap_mlsetup = pops->psm_post_cpu_start;
 	send_dirintf = pops->psm_send_ipi;
 
@@ -696,15 +673,8 @@ mach_smpinit(void)
 	 * Set the dispatcher hook to enable cpu "wake up"
 	 * when a thread becomes runnable.
 	 */
-#if defined(_SIMULATOR_SUPPORT)
-	if (halt_idle_cpus && !simulator_run) {
+	if (idle_cpu_use_hlt)
 		disp_enq_thread = cpu_wakeup;
-	}
-#else
-	if (halt_idle_cpus) {
-		disp_enq_thread = cpu_wakeup;
-	}
-#endif	/* _SIMULATOR_SUPPORT */
 
 	if (pops->psm_disable_intr)
 		psm_disable_intr = pops->psm_disable_intr;
@@ -727,10 +697,6 @@ static void
 mach_picinit()
 {
 	struct psm_ops  *pops;
-	extern void install_spl(void);	/* XXX: belongs in a header file */
-#if defined(__amd64) && defined(DEBUG)
-	extern void *spl_patch, *slow_spl, *setsplhi_patch, *slow_setsplhi;
-#endif
 
 	pops = mach_set[0];
 
@@ -743,17 +709,8 @@ mach_picinit()
 
 	/* set interrupt mask for current ipl */
 	setspl = pops->psm_setspl;
+	cli();
 	setspl(CPU->cpu_pri);
-
-	/* Install proper spl routine now that we can Program the PIC   */
-#if defined(__amd64)
-	/*
-	 * It would be better if we could check this at compile time
-	 */
-	ASSERT(((uintptr_t)&slow_setsplhi - (uintptr_t)&setsplhi_patch < 128) &&
-		((uintptr_t)&slow_spl - (uintptr_t)&spl_patch < 128));
-#endif
-	install_spl();
 }
 
 uint_t	cpu_freq;	/* MHz */
@@ -786,7 +743,9 @@ mach_getcpufreq(void)
 		 * We have a TSC. freq_tsc() knows how to measure the number
 		 * of clock cycles sampled against the PIT.
 		 */
+		ulong_t flags = clear_int_flag();
 		processor_clks = freq_tsc(&pit_counter);
+		restore_int_flag(flags);
 		return (mach_calchz(pit_counter, &processor_clks));
 	} else if (x86_vendor == X86_VENDOR_Cyrix || x86_type == X86_TYPE_P5) {
 #if defined(__amd64)
@@ -797,7 +756,9 @@ mach_getcpufreq(void)
 		 * for which freq_notsc() knows how to measure the number of
 		 * elapsed clock cycles sampled against the PIT
 		 */
+		ulong_t flags = clear_int_flag();
 		processor_clks = freq_notsc(&pit_counter);
+		restore_int_flag(flags);
 		return (mach_calchz(pit_counter, &processor_clks));
 #endif	/* __i386 */
 	}
@@ -939,19 +900,12 @@ machhztomhz(uint64_t cpu_freq_hz)
 static int
 mach_clkinit(int preferred_mode, int *set_mode)
 {
-	register struct psm_ops  *pops;
+	struct psm_ops  *pops;
 	int resolution;
 
 	pops = mach_set[0];
 
-#ifdef	_SIMULATOR_SUPPORT
-	if (!simulator_run)
-		cpu_freq_hz = mach_getcpufreq();
-	else
-		cpu_freq_hz = 40000000; /* use 40 Mhz (hack for simulator) */
-#else
 	cpu_freq_hz = mach_getcpufreq();
-#endif	/* _SIMULATOR_SUPPORT */
 
 	cpu_freq = machhztomhz(cpu_freq_hz);
 
@@ -1013,7 +967,7 @@ mach_clkinit(int preferred_mode, int *set_mode)
 static void
 mach_psm_set_softintr(int ipl, struct av_softinfo *pending)
 {
-	register struct psm_ops  *pops;
+	struct psm_ops  *pops;
 
 	/* invoke hardware interrupt					*/
 	pops = mach_set[0];
@@ -1021,10 +975,10 @@ mach_psm_set_softintr(int ipl, struct av_softinfo *pending)
 }
 
 static int
-mach_softlvl_to_vect(register int ipl)
+mach_softlvl_to_vect(int ipl)
 {
-	register int softvect;
-	register struct psm_ops  *pops;
+	int softvect;
+	struct psm_ops  *pops;
 
 	pops = mach_set[0];
 
@@ -1050,9 +1004,9 @@ mach_softlvl_to_vect(register int ipl)
 }
 
 static void
-mach_set_softintr(register int ipl, struct av_softinfo *pending)
+mach_set_softintr(int ipl, struct av_softinfo *pending)
 {
-	register struct psm_ops  *pops;
+	struct psm_ops  *pops;
 
 	/* set software pending bits					*/
 	av_set_softint_pending(ipl, pending);
@@ -1066,14 +1020,24 @@ mach_set_softintr(register int ipl, struct av_softinfo *pending)
 	(*pops->psm_set_softintr)(ipl);
 }
 
-static void
-mach_cpu_start(register int cpun)
+#ifdef DEBUG
+/*
+ * This is here to allow us to simulate cpus that refuse to start.
+ */
+cpuset_t cpufailset;
+#endif
+
+int
+mach_cpu_start(struct cpu *cp, void *ctx)
 {
-	struct psm_ops  *pops;
+	struct psm_ops *pops = mach_set[0];
+	processorid_t id = cp->cpu_id;
 
-	pops = mach_set[0];
-
-	(*pops->psm_cpu_start)(cpun, rm_platter_va);
+#ifdef DEBUG
+	if (CPU_IN_SET(cpufailset, id))
+		return (0);
+#endif
+	return ((*pops->psm_cpu_start)(id, ctx));
 }
 
 /*ARGSUSED*/
@@ -1081,53 +1045,6 @@ static int
 mach_translate_irq(dev_info_t *dip, int irqno)
 {
 	return (irqno);	/* default to NO translation */
-}
-
-static timestruc_t
-mach_tod_get(void)
-{
-	timestruc_t ts;
-	todinfo_t tod;
-	static int mach_range_warn = 1;	/* warn only once */
-
-	ASSERT(MUTEX_HELD(&tod_lock));
-
-	/* The year returned from is the last 2 digit only */
-	if ((*psm_todgetf)(&tod)) {
-		ts.tv_sec = 0;
-		ts.tv_nsec = 0;
-		tod_fault_reset();
-		return (ts);
-	}
-
-	/* assume that we wrap the rtc year back to zero at 2000 */
-	if (tod.tod_year < 69) {
-		if (mach_range_warn && tod.tod_year > 38) {
-			cmn_err(CE_WARN, "hardware real-time clock is out "
-				"of range -- time needs to be reset");
-			mach_range_warn = 0;
-		}
-		tod.tod_year += 100;
-	}
-
-	/* tod_to_utc uses 1900 as base for the year */
-	ts.tv_sec = tod_to_utc(tod) + gmt_lag;
-	ts.tv_nsec = 0;
-
-	return (ts);
-}
-
-static void
-mach_tod_set(timestruc_t ts)
-{
-	todinfo_t tod = utc_to_tod(ts.tv_sec - gmt_lag);
-
-	ASSERT(MUTEX_HELD(&tod_lock));
-
-	if (tod.tod_year >= 100)
-		tod.tod_year -= 100;
-
-	(*psm_todsetf)(&tod);
 }
 
 static void

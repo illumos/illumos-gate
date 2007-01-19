@@ -2595,7 +2595,81 @@ ENTRY(currticks)
 	popl	%ebp
 	ret
 
-#endif /* STAGE1_5 */
+ENTRY(amd64_rdmsr)
+	movl	4(%esp), %ecx
+	rdmsr
+	movl	8(%esp), %ecx
+	movl	%eax, (%ecx)
+	movl	%edx, 4(%ecx)
+	ret
+
+ENTRY(amd64_wrmsr)
+	movl	8(%esp), %ecx
+	movl	(%ecx), %eax
+	movl	4(%ecx), %edx
+	movl	4(%esp), %ecx
+	wrmsr
+	ret
+
+ENTRY(amd64_cpuid_insn)
+	pushl	%ebp
+	movl	%esp, %ebp
+	pushl	%ebx
+	pushl	%esi
+	movl	0x8(%ebp), %eax
+	movl	0xc(%ebp), %esi
+	cpuid
+	movl	%eax, 0x0(%esi)
+	movl	%ebx, 0x4(%esi)
+	movl	%ecx, 0x8(%esi)
+	movl	%edx, 0xc(%esi)
+	popl	%esi
+	popl	%ebx
+	popl	%ebp
+	ret
+
+	/*
+	 * Based on code from AMD64 Volume 3
+	 */
+ENTRY(amd64_cpuid_supported)
+	pushf
+	popl	%eax
+	mov	%eax, %edx		/* save %eax for later */
+	xorl	%eax, 0x200000		/* toggle bit 21 */
+	pushl	%eax
+	popf				/* save new %eax to EFLAGS */
+	pushf				/* save new EFLAGS */
+	popl	%ecx			/* copy EFLAGS to %eax */
+	xorl	%eax, %eax
+	cmpl	%ecx, %edx		/* see if bit 21 has changes */
+	jne	1f
+	incl	%eax
+1:
+	ret
+
+ENTRY(get_target_operating_mode)
+	pusha
+
+	call	EXT_C(prot_to_real)
+	.code16
+
+	movw	$0xec00, %ax
+	movw	$0x03, %bx
+	int	$0x15
+/* XXX still need to pass back return */
+
+	movw	%ax, %cx
+
+	DATA32	call	EXT_C(real_to_prot)
+	.code32
+
+	xorl	%eax, %eax
+	movw	%cx, %ax
+
+	popa
+	ret
+
+#endif /* ! STAGE1_5 */
 
 /*
  *  This is the area for all of the special variables.

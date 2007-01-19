@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,6 @@
  */
 
 #include <sys/types.h>
-
 #include <sys/param.h>
 #include <sys/t_lock.h>
 #include <sys/thread.h>
@@ -40,11 +39,13 @@
 #include <sys/cpu.h>
 #include <sys/psw.h>
 #include <sys/sunddi.h>
-#include <sys/mmu.h>
 #include <sys/debug.h>
 #include <sys/systm.h>
+#include <sys/archsystm.h>
 #include <sys/machsystm.h>
 #include <sys/mutex_impl.h>
+#include <sys/traptrace.h>
+
 
 static struct	xc_mbox xc_mboxes[X_CALL_LEVELS];
 static kmutex_t xc_mbox_lock[X_CALL_LEVELS];
@@ -58,7 +59,6 @@ static void xc_common(xc_func_t, xc_arg_t, xc_arg_t, xc_arg_t,
     int, cpuset_t, int);
 
 static int	xc_initialized = 0;
-extern cpuset_t	cpu_ready_set;
 
 void
 xc_init()
@@ -78,15 +78,41 @@ xc_init()
 	xc_initialized = 1;
 }
 
+#if defined(TRAPTRACE)
+
 /*
- * Used by the debugger to determine whether or not cross calls have been
- * initialized and are safe to use.
+ * When xc_traptrace is on, put x-call records into the trap trace buffer.
  */
-int
-kdi_xc_initialized(void)
+int xc_traptrace;
+
+void
+xc_make_trap_trace_entry(uint8_t marker, int pri, ulong_t arg)
 {
-	return (xc_initialized);
+	trap_trace_rec_t *ttr;
+	struct _xc_entry *xce;
+
+	if (xc_traptrace == 0)
+		return;
+
+	ttr = trap_trace_get_traceptr(TT_XCALL,
+	    (ulong_t)caller(), (ulong_t)getfp());
+	xce = &(ttr->ttr_info.xc_entry);
+
+	xce->xce_marker = marker;
+	xce->xce_pri = pri;
+	xce->xce_arg = arg;
+
+	if ((uint_t)pri < X_CALL_LEVELS) {
+		struct machcpu *mcpu = &CPU->cpu_m;
+
+		xce->xce_pend = mcpu->xc_pend[pri];
+		xce->xce_ack = mcpu->xc_ack[pri];
+		xce->xce_state = mcpu->xc_state[pri];
+		xce->xce_retval = mcpu->xc_retval[pri];
+		xce->xce_func = (uintptr_t)xc_mboxes[pri].func;
+	}
 }
+#endif
 
 #define	CAPTURE_CPU_ARG	~0UL
 
@@ -101,58 +127,53 @@ kdi_xc_initialized(void)
 uint_t
 xc_serv(caddr_t arg1, caddr_t arg2)
 {
-	int	op;
-	int	pri = (int)(uintptr_t)arg1;
+	int op;
+	int pri = (int)(uintptr_t)arg1;
 	struct cpu *cpup = CPU;
-	xc_arg_t *argp;
 	xc_arg_t arg2val;
-	uint_t	tlbflush;
+
+	XC_TRACE(TT_XC_SVC_BEGIN, pri, (ulong_t)arg2);
 
 	if (pri == X_CALL_MEDPRI) {
 
-		argp = &xc_mboxes[X_CALL_MEDPRI].arg2;
-		arg2val = *argp;
+		arg2val = xc_mboxes[X_CALL_MEDPRI].arg2;
+
 		if (arg2val != CAPTURE_CPU_ARG &&
 		    !CPU_IN_SET((cpuset_t)arg2val, cpup->cpu_id))
-			return (DDI_INTR_UNCLAIMED);
+			goto unclaimed;
+
 		ASSERT(arg2val == CAPTURE_CPU_ARG);
+
 		if (cpup->cpu_m.xc_pend[pri] == 0)
-			return (DDI_INTR_UNCLAIMED);
+			goto unclaimed;
 
 		cpup->cpu_m.xc_pend[X_CALL_MEDPRI] = 0;
 		cpup->cpu_m.xc_ack[X_CALL_MEDPRI] = 1;
 
 		for (;;) {
 			if ((cpup->cpu_m.xc_state[X_CALL_MEDPRI] == XC_DONE) ||
-				(cpup->cpu_m.xc_pend[X_CALL_MEDPRI]))
+			    (cpup->cpu_m.xc_pend[X_CALL_MEDPRI]))
 				break;
-			ht_pause();
+			SMT_PAUSE();
 		}
+		XC_TRACE(TT_XC_SVC_END, pri, DDI_INTR_CLAIMED);
 		return (DDI_INTR_CLAIMED);
 	}
+
 	if (cpup->cpu_m.xc_pend[pri] == 0)
-		return (DDI_INTR_UNCLAIMED);
+		goto unclaimed;
 
 	cpup->cpu_m.xc_pend[pri] = 0;
 	op = cpup->cpu_m.xc_state[pri];
 
 	/*
-	 * When invalidating TLB entries, wait until the initiator changes the
-	 * memory PTE before doing any INVLPG. Otherwise, if the PTE in memory
-	 * hasn't been changed, the processor's TLB Flush filter may ignore
-	 * the INVLPG instruction.
-	 */
-	tlbflush = (cpup->cpu_m.xc_wait[pri] == 2);
-
-	/*
 	 * Don't invoke a null function.
 	 */
-	if (xc_mboxes[pri].func != NULL) {
-		if (!tlbflush)
-			cpup->cpu_m.xc_retval[pri] = (*xc_mboxes[pri].func)
-			    (xc_mboxes[pri].arg1, xc_mboxes[pri].arg2,
-				xc_mboxes[pri].arg3);
-	} else
+	if (xc_mboxes[pri].func != NULL)
+		cpup->cpu_m.xc_retval[pri] = (*xc_mboxes[pri].func)
+		    (xc_mboxes[pri].arg1, xc_mboxes[pri].arg2,
+		    xc_mboxes[pri].arg3);
+	else
 		cpup->cpu_m.xc_retval[pri] = 0;
 
 	/*
@@ -160,36 +181,31 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 	 */
 	cpup->cpu_m.xc_ack[pri] = 1;
 
-	if (op == XC_CALL_OP)
-		return (DDI_INTR_CLAIMED);
+	if (op != XC_CALL_OP) {
+		/*
+		 * for (op == XC_SYNC_OP)
+		 * Wait for the initiator of the x-call to indicate
+		 * that all CPUs involved can proceed.
+		 */
+		while (cpup->cpu_m.xc_wait[pri])
+			SMT_PAUSE();
 
-	/*
-	 * for (op == XC_SYNC_OP)
-	 * Wait for the initiator of the x-call to indicate
-	 * that all CPUs involved can proceed.
-	 */
-	while (cpup->cpu_m.xc_wait[pri])
-		ht_pause();
+		while (cpup->cpu_m.xc_state[pri] != XC_DONE)
+			SMT_PAUSE();
 
-	while (cpup->cpu_m.xc_state[pri] != XC_DONE)
-		ht_pause();
-
-	/*
-	 * Flush the TLB, if that's what is requested.
-	 */
-	if (xc_mboxes[pri].func != NULL && tlbflush) {
-		cpup->cpu_m.xc_retval[pri] = (*xc_mboxes[pri].func)
-		    (xc_mboxes[pri].arg1, xc_mboxes[pri].arg2,
-			xc_mboxes[pri].arg3);
+		/*
+		 * Acknowledge that we have received the directive to continue.
+		 */
+		ASSERT(cpup->cpu_m.xc_ack[pri] == 0);
+		cpup->cpu_m.xc_ack[pri] = 1;
 	}
 
-	/*
-	 * Acknowledge that we have received the directive to continue.
-	 */
-	ASSERT(cpup->cpu_m.xc_ack[pri] == 0);
-	cpup->cpu_m.xc_ack[pri] = 1;
-
+	XC_TRACE(TT_XC_SVC_END, pri, DDI_INTR_CLAIMED);
 	return (DDI_INTR_CLAIMED);
+
+unclaimed:
+	XC_TRACE(TT_XC_SVC_END, pri, DDI_INTR_UNCLAIMED);
+	return (DDI_INTR_UNCLAIMED);
 }
 
 
@@ -261,23 +277,6 @@ xc_sync(
 	xc_do_call(arg1, arg2, arg3, pri, set, func, 1);
 }
 
-/*
- * xc_sync_wait: similar to xc_sync(), except that the starting
- * cpu waits for all other cpus to check in before running its
- * service locally.
- */
-void
-xc_wait_sync(
-	xc_arg_t arg1,
-	xc_arg_t arg2,
-	xc_arg_t arg3,
-	int pri,
-	cpuset_t set,
-	xc_func_t func)
-{
-	xc_do_call(arg1, arg2, arg3, pri, set, func, 2);
-}
-
 
 /*
  * The routines xc_capture_cpus and xc_release_cpus
@@ -329,7 +328,7 @@ xc_capture_cpus(cpuset_t set)
 		CPUSET_AND(c, cpu_ready_set);
 		if (CPUSET_ISNULL(c))
 			break;
-		ht_pause();
+		SMT_PAUSE();
 	}
 
 	/*
@@ -358,6 +357,7 @@ xc_capture_cpus(cpuset_t set)
 			cpup->cpu_m.xc_ack[X_CALL_MEDPRI] = 0;
 			cpup->cpu_m.xc_state[X_CALL_MEDPRI] = XC_HOLD;
 			cpup->cpu_m.xc_pend[X_CALL_MEDPRI] = 1;
+			XC_TRACE(TT_XC_CAPTURE, X_CALL_MEDPRI, cix);
 			send_dirint(cix, XC_MED_PIL);
 		}
 		i++;
@@ -366,14 +366,14 @@ xc_capture_cpus(cpuset_t set)
 	}
 
 	/*
-	 * Wait here until all remote calls to complete.
+	 * Wait here until all remote calls to acknowledge.
 	 */
 	i = 0;
 	for (cix = 0; cix < NCPU; cix++) {
 		if (lcx != cix && CPU_IN_SET(set, cix)) {
 			cpup = cpu[cix];
 			while (cpup->cpu_m.xc_ack[X_CALL_MEDPRI] == 0)
-				ht_pause();
+				SMT_PAUSE();
 			cpup->cpu_m.xc_ack[X_CALL_MEDPRI] = 0;
 		}
 		i++;
@@ -411,6 +411,7 @@ xc_release_cpus(void)
 			 * Clear xc_ack since we will be waiting for it
 			 * to be set again after we set XC_DONE.
 			 */
+			XC_TRACE(TT_XC_RELEASE, X_CALL_MEDPRI, cix);
 			cpup->cpu_m.xc_state[X_CALL_MEDPRI] = XC_DONE;
 		}
 		i++;
@@ -428,7 +429,6 @@ xc_release_cpus(void)
  *	-1 - no waiting, don't release remotes
  *	0 - no waiting, release remotes immediately
  *	1 - run service locally w/o waiting for remotes.
- *	2 - wait for remotes before running locally
  */
 static void
 xc_common(
@@ -480,36 +480,34 @@ xc_common(
 			else
 				cpup->cpu_m.xc_state[pri] = XC_CALL_OP;
 			cpup->cpu_m.xc_pend[pri] = 1;
+			XC_TRACE(TT_XC_START, pri, cix);
 			send_dirint(cix, xc_xlat_xcptoipl[pri]);
 		}
 	}
 
 	/*
-	 * Run service locally if not waiting for remotes.
+	 * Run service locally.
 	 */
-	if (sync != 2 && CPU_IN_SET(set, lcx) && func != NULL)
+	if (CPU_IN_SET(set, lcx) && func != NULL) {
+		XC_TRACE(TT_XC_START, pri, CPU->cpu_id);
 		CPU->cpu_m.xc_retval[pri] = (*func)(arg1, arg2, arg3);
+	}
 
 	if (sync == -1)
 		return;
 
 	/*
-	 * Wait here until all remote calls complete.
+	 * Wait here until all remote calls acknowledge.
 	 */
 	for (cix = 0; cix < NCPU; cix++) {
 		if (lcx != cix && CPU_IN_SET(set, cix)) {
 			cpup = cpu[cix];
 			while (cpup->cpu_m.xc_ack[pri] == 0)
-				ht_pause();
+				SMT_PAUSE();
+			XC_TRACE(TT_XC_WAIT, pri, cix);
 			cpup->cpu_m.xc_ack[pri] = 0;
 		}
 	}
-
-	/*
-	 * Run service locally if waiting for remotes.
-	 */
-	if (sync == 2 && CPU_IN_SET(set, lcx) && func != NULL)
-		CPU->cpu_m.xc_retval[pri] = (*func)(arg1, arg2, arg3);
 
 	if (sync == 0)
 		return;
@@ -540,7 +538,8 @@ xc_common(
 			cpup = cpu[cix];
 			if (cpup != NULL && (cpup->cpu_flags & CPU_READY)) {
 				while (cpup->cpu_m.xc_ack[pri] == 0)
-					ht_pause();
+					SMT_PAUSE();
+				XC_TRACE(TT_XC_ACK, pri, cix);
 				cpup->cpu_m.xc_ack[pri] = 0;
 			}
 		}
@@ -591,6 +590,9 @@ kdi_xc_others(int this_cpu, void (*func)(void))
 	mutex_impl_t *lp;
 	cpuset_t set;
 	int x;
+
+	if (!xc_initialized)
+		return;
 
 	CPUSET_ALL_BUT(set, this_cpu);
 

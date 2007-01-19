@@ -20,33 +20,39 @@
 # CDDL HEADER END
 #
 
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 # ident	"%Z%%M%	%I%	%E% SMI"
 
 format=ufs
 ALT_ROOT=
-NO_AMD64=
+compress=yes
+SPLIT=unknown
+ERROR=0
 
 BOOT_ARCHIVE=platform/i86pc/boot_archive
+BOOT_ARCHIVE_64=platform/i86pc/amd64/boot_archive
 
 export PATH=$PATH:/usr/sbin:/usr/bin:/sbin
 
 #
 # Parse options
 #
-while getopts R: OPT 2> /dev/null
+while [ "$1" != "" ]
 do
-        case $OPT in
-        R)      ALT_ROOT="$OPTARG"
+        case $1 in
+        -R)	shift
+		ALT_ROOT="$1"
 		if [ "$ALT_ROOT" != "/" ]; then
 			echo "Creating ram disk for $ALT_ROOT"
 		fi
 		;;
-        ?)      echo Usage: ${0##*/}: [-R \<root\>]
+	-n|--nocompress) compress=no ;;
+        *)      echo Usage: ${0##*/}: [-R \<root\>] [--nocompress]
 		exit ;;
         esac
+	shift
 done
 
 if [ -x /usr/bin/mkisofs -o -x /tmp/bfubin/mkisofs ] ; then
@@ -59,7 +65,7 @@ fi
 #
 release=`uname -r`
 if [ "$release" = "5.8" ]; then
-   format=ufs
+	format=ufs
 fi
 
 shift `expr $OPTIND - 1`
@@ -69,18 +75,34 @@ if [ $# -eq 1 ]; then
 	echo "Creating ram disk for $ALT_ROOT"
 fi
 
+rundir=`dirname $0`
+if [ ! -x $rundir/symdef ]; then
+	# Shouldn't happen
+	echo "Warning: $rundir/symdef not present."
+	echo "Creating single archive at $ALT_ROOT/platform/i86pc/boot_archive"
+	SPLIT=no
+	compress=no
+elif $rundir/symdef "$ALT_ROOT"/platform/i86pc/kernel/unix \
+    dboot_image 2>/dev/null; then
+	SPLIT=yes
+else
+	SPLIT=no
+	compress=no
+fi
+
+[ -x /usr/bin/gzip ] || compress=no
+
 function cleanup
 {
-	umount -f "$rdmnt" 2>/dev/null
-	lofiadm -d "$rdfile" 2>/dev/null
+	umount -f "$rdmnt32" 2>/dev/null
+	umount -f "$rdmnt64" 2>/dev/null
+	lofiadm -d "$rdfile32" 2>/dev/null
+	lofiadm -d "$rdfile64" 2>/dev/null
 	rm -fr "$rddir" 2> /dev/null
 }
 
 function getsize
 {
-	# should we exclude amd64 binaries?
-	[ $is_amd64 -eq 0 ] && NO_AMD64="-type d -name amd64 -prune -o"
-
 	# Estimate image size and add %10 overhead for ufs stuff.
 	# Note, we can't use du here in case we're on a filesystem, e.g. zfs,
 	# in which the disk usage is less than the sum of the file sizes.
@@ -93,85 +115,223 @@ function getsize
 	# with directories.  This results in a total size that's slightly
 	# bigger than if du was called on a ufs directory.
 	total_size=$(cd "/$ALT_ROOT"
-		find $filelist $NO_AMD64 -ls 2>/dev/null | nawk '
+		find $filelist -ls 2>/dev/null | nawk '
 			{t += ($7 % 1024) ? (int($7 / 1024) + 1) * 1024 : $7}
 			END {print int(t * 1.10 / 1024)}')
 }
 
+#
+# The first argument can be:
+#
+# "both" - create an archive with both 32-bit and 64-bit binaries
+# "32-bit" - create an archive with only 32-bit binaries
+# "64-bit" - create an archive with only 64-bit binaries
+#
 function create_ufs
 {
-	# should we exclude amd64 binaries?
-	[ $is_amd64 -eq 0 ] && NO_AMD64="-type d -name amd64 -prune -o"
+	which=$1
+	archive=$2
+	lofidev=$3
 
-	mkfile ${total_size}k "$rdfile"
-	lofidev=`lofiadm -a "$rdfile"`
+	# should we exclude amd64 binaries?
+	if [ "$which" = "32-bit" ]; then
+		NO_AMD64="-type d -name amd64 -prune -o"
+		rdfile="$rdfile32"
+		rdmnt="$rdmnt32"
+	elif [ "$which" = "64-bit" ]; then
+		NO_AMD64=""
+		rdfile="$rdfile64"
+		rdmnt="$rdmnt64"
+	else
+		NO_AMD64=""
+		rdfile="$rdfile32"
+		rdmnt="$rdmnt32"
+	fi
+
 	newfs $lofidev < /dev/null 2> /dev/null
 	mkdir "$rdmnt"
 	mount -F mntfs mnttab /etc/mnttab > /dev/null 2>&1
 	mount -o nologging $lofidev "$rdmnt"
+	files=
 
 	# do the actual copy
 	cd "/$ALT_ROOT"
 
-	find $filelist $NO_AMD64 -print 2> /dev/null | \
-	     cpio -pdum "$rdmnt" 2> /dev/null
+	for path in `find $filelist $NO_AMD64 -type f -print 2> /dev/null`
+	do
+		if [ "$which" = "both" ]; then
+			files="$files $path"
+		else
+			filetype=`file $path 2>/dev/null |\
+			    awk '/ELF/ { print \$3 }'`
+			if [ -z "$filetype" ] || [ "$filetype" = "$which" ]
+			then
+				files="$files $path"
+			fi
+		fi
+	done
+	if [ $compress = yes ]; then
+		ls $files | while read path
+		do
+			dir="${path%/*}"
+			mkdir -p "$rdmnt/$dir"
+			/usr/bin/gzip -c "$path" > "$rdmnt/$path"
+		done
+	else
+		ls $files | cpio -pdum "$rdmnt" 2> /dev/null
+	fi
 	umount "$rdmnt"
-	lofiadm -d "$rdfile"
 	rmdir "$rdmnt"
 
+	#
 	# Check if gzip exists in /usr/bin, so we only try to run gzip
 	# on systems that have gzip. Then run gzip out of the patch to
 	# pick it up from bfubin or something like that if needed.
 	#
-	if [ -x /usr/bin/gzip ] ; then
-		gzip -c "$rdfile" > "$ALT_ROOT/$BOOT_ARCHIVE-new"
+	# If compress is set, the individual files in the archive are
+	# compressed, and the final compression will accomplish very
+	# little.  To save time, we skip the gzip in this case.
+	#
+	if [ $compress = no ] && [ -x /usr/bin/gzip ] ; then
+		gzip -c "$rdfile" > "${archive}-new"
 	else
-		cat "$rdfile" > "$ALT_ROOT/$BOOT_ARCHIVE-new"
+		cat "$rdfile" > "${archive}-new"
 	fi
 }
 
+#
+# The first argument can be:
+#
+# "both" - create an archive with both 32-bit and 64-bit binaries
+# "32-bit" - create an archive with only 32-bit binaries
+# "64-bit" - create an archive with only 64-bit binaries
+#
 function create_isofs
 {
+	which=$1
+	archive=$2
+
 	# should we exclude amd64 binaries?
-	[ $is_amd64 = 0 ] && NO_AMD64="-m amd64"
+	if [ "$which" = "32-bit" ]; then
+		NO_AMD64="-type d -name amd64 -prune -o"
+		rdmnt="$rdmnt32"
+		errlog="$errlog32"
+	elif [ "$which" = "64-bit" ]; then
+		NO_AMD64=""
+		rdmnt="$rdmnt64"
+		errlog="$errlog64"
+	else
+		NO_AMD64=""
+		rdmnt="$rdmnt32"
+		errlog="$errlog32"
+	fi
 
 	# create image directory seed with graft points
 	mkdir "$rdmnt"
 	files=
-	isocmd="mkisofs -quiet -graft-points -dlrDJN -relaxed-filenames $NO_AMD64"
-	for path in $filelist
+	isocmd="mkisofs -quiet -graft-points -dlrDJN -relaxed-filenames"
+
+	cd "/$ALT_ROOT"
+	for path in `find $filelist $NO_AMD64 -type f -print 2> /dev/null`
 	do
-		if [ -d "$ALT_ROOT/$path" ]; then
-			isocmd="$isocmd $path/=\"$ALT_ROOT/$path\""
-			mkdir -p "$rdmnt/$path"
-		elif [ -f "$ALT_ROOT/$path" ]; then
+		if [ "$which" = "both" ]; then
 			files="$files $path"
+		else
+			filetype=`file $path 2>/dev/null |\
+			    awk '/ELF/ { print \$3 }'`
+			if [ -z "$filetype" ] || [ "$filetype" = "$which" ]
+			then
+				files="$files $path"
+			fi
 		fi
 	done
-	cd "/$ALT_ROOT"
-	find $files 2> /dev/null | cpio -pdum "$rdmnt" 2> /dev/null
+	if [ $compress = yes ]; then
+		ls $files | while read path
+		do
+			dir="${path%/*}"
+			mkdir -p "$rdmnt/$dir"
+			/usr/bin/gzip -c "$path" > "$rdmnt/$path"
+		done
+	else
+		ls $files | cpio -pdum "$rdmnt" 2> /dev/null
+	fi
 	isocmd="$isocmd \"$rdmnt\""
 	rm -f "$errlog"
 
+	#
 	# Check if gzip exists in /usr/bin, so we only try to run gzip
 	# on systems that have gzip. Then run gzip out of the patch to
 	# pick it up from bfubin or something like that if needed.
 	#
-	if [ -x /usr/bin/gzip ] ; then
+	# If compress is set, the individual files in the archive are
+	# compressed, and the final compression will accomplish very
+	# little.  To save time, we skip the gzip in this case.
+	#
+	if [ $compress = no ] && [ -x /usr/bin/gzip ] ; then
 		ksh -c "$isocmd" 2> "$errlog" | \
-		    gzip > "$ALT_ROOT/$BOOT_ARCHIVE-new"
+		    gzip > "${archive}-new"
 	else
-		ksh -c "$isocmd" 2> "$errlog" > "$ALT_ROOT/$BOOT_ARCHIVE-new"
+		ksh -c "$isocmd" 2> "$errlog" > "${archive}-new"
 	fi
 
 	if [ -s "$errlog" ]; then
 		grep Error: "$errlog" >/dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			grep Error: "$errlog"
-			rm -f "$ALT_ROOT/$BOOT_ARCHIVE-new"
+			rm -f "${archive}-new"
 		fi
 	fi
 	rm -f "$errlog"
+}
+
+function create_archive
+{
+	which=$1
+	archive=$2
+	lofidev=$3
+
+	echo "updating $archive...this may take a minute"
+
+	if [ "$format" = "ufs" ]; then
+		create_ufs "$which" "$archive" "$lofidev"
+	else
+		create_isofs "$which" "$archive"
+	fi
+
+	# sanity check the archive before moving it into place
+	#
+	ARCHIVE_SIZE=`du -k "${archive}-new" | cut -f 1`
+	if [ $compress = yes ]
+	then
+		#
+		# 'file' will report "English text" for uncompressed
+		# boot_archives.  Checking for that doesn't seem stable,
+		# so we just check that the file exists.
+		#
+		ls "${archive}-new" >/dev/null 2>&1
+	else
+		#
+		# the file type check also establishes that the
+		# file exists at all
+		#
+		file "${archive}-new" | grep gzip > /dev/null
+	fi
+
+	if [ $? = 1 ] && [ -x /usr/bin/gzip ] || [ $ARCHIVE_SIZE -lt 5000 ]
+	then
+		#
+		# Two of these functions may be run in parallel.  We
+		# need to allow the other to clean up, so we can't
+		# exit immediately.  Instead, we set a flag.
+		#
+		echo "update of $archive failed"
+		ERROR=1
+	else
+		lockfs -f "/$ALT_ROOT" 2>/dev/null
+		mv "${archive}-new" "$archive"
+		lockfs -f "/$ALT_ROOT" 2>/dev/null
+	fi
+
 }
 
 #
@@ -186,33 +346,35 @@ then
 fi
 filelist=$(sort -u $files)
 
-#
-# decide if cpu is amd64 capable
-#
-prtconf -v /devices | grep CPU_not_amd64 > /dev/null 2>&1
-is_amd64=$?
-
 scratch=tmp
 
 if [ $format = ufs ] ; then
 	# calculate image size
 	getsize
 
+	# We do two mkfile's of total_size, so double the space
+	(( tmp_needed = total_size * 2 ))
+
 	# check to see if there is sufficient space in tmpfs 
 	#
 	tmp_free=`df -b /tmp | tail -1 | awk '{ printf ($2) }'`
 	(( tmp_free = tmp_free / 2 ))
 
-	if [ $total_size -gt $tmp_free  ] ; then
+	if [ $tmp_needed -gt $tmp_free  ] ; then
 		# assumes we have enough scratch space on $ALT_ROOT
         	scratch="$ALT_ROOT"
 	fi
 fi
 
 rddir="/$scratch/create_ramdisk.$$.tmp"
-rdfile="$rddir/rd.file"
-rdmnt="$rddir/rd.mount"
-errlog="$rddir/rd.errlog"
+rdfile32="$rddir/rd.file.32"
+rdfile64="$rddir/rd.file.64"
+rdmnt32="$rddir/rd.mount.32"
+rdmnt64="$rddir/rd.mount.64"
+errlog32="$rddir/rd.errlog.32"
+errlog64="$rddir/rd.errlog.64"
+lofidev32=""
+lofidev64=""
 
 # make directory for temp files safely
 rm -rf "$rddir"
@@ -221,46 +383,46 @@ mkdir "$rddir"
 # Clean up upon exit.
 trap 'cleanup' EXIT
 
-echo "updating $ALT_ROOT/$BOOT_ARCHIVE...this may take a minute"
-
-if [ $format = "ufs" ]; then
-	create_ufs
+if [ $SPLIT = yes ]; then
+	#
+	# We can't run lofiadm commands in parallel, so we have to do
+	# them here.
+	#
+	if [ "$format" = "ufs" ]; then
+		mkfile ${total_size}k "$rdfile32"
+		lofidev32=`lofiadm -a "$rdfile32"`
+		mkfile ${total_size}k "$rdfile64"
+		lofidev64=`lofiadm -a "$rdfile64"`
+	fi
+	create_archive "32-bit" "$ALT_ROOT/$BOOT_ARCHIVE" $lofidev32 &
+	create_archive "64-bit" "$ALT_ROOT/$BOOT_ARCHIVE_64" $lofidev64
+	wait
+	if [ "$format" = "ufs" ]; then
+		lofiadm -d "$rdfile32"
+		lofiadm -d "$rdfile64"
+	fi
 else
-	create_isofs
+	if [ "$format" = "ufs" ]; then
+		mkfile ${total_size}k "$rdfile32"
+		lofidev32=`lofiadm -a "$rdfile32"`
+	fi
+	create_archive "both" "$ALT_ROOT/$BOOT_ARCHIVE" $lofidev32
+	[ "$format" = "ufs" ] && lofiadm -d "$rdfile32"
 fi
-
-# Make sure $BOOT_ARCHIVE-new created by either create_ufs or creat_isofs
-# above is flushed to the backing store before we do anything with it.
-lockfs -f "/$ALT_ROOT"
-
-# sanity check the archive before moving it into place
-# the file type check also establishes that the file exists at all
-#
-ARCHIVE_SIZE=$(/bin/ls -l "$ALT_ROOT/$BOOT_ARCHIVE-new" |
-	nawk '{print int($5 / 1024)}')
-file "$ALT_ROOT/$BOOT_ARCHIVE-new" | grep gzip > /dev/null
-
-if [ $? = 1 ] && [ -x /usr/bin/gzip ] || [ $ARCHIVE_SIZE -lt 5000 ]; then
-	echo "update of $ALT_ROOT/$BOOT_ARCHIVE failed"
-	rm -rf "$rddir"
+if [ $ERROR = 1 ]; then
+	cleanup
 	exit 1
 fi
 
 #
 # For the diskless case, hardlink archive to /boot to make it
 # visible via tftp. /boot is lofs mounted under /tftpboot/<hostname>.
-# NOTE: this script must work on both client and server
+# NOTE: this script must work on both client and server.
 #
 grep "[	 ]/[	 ]*nfs[	 ]" "$ALT_ROOT/etc/vfstab" > /dev/null
 if [ $? = 0 ]; then
-	mv "$ALT_ROOT/$BOOT_ARCHIVE-new" "$ALT_ROOT/$BOOT_ARCHIVE"
-	rm -f "$ALT_ROOT/boot/boot_archive"
+	rm -f "$ALT_ROOT/boot/boot_archive" "$ALT_ROOT/boot/amd64/boot_archive"
 	ln "$ALT_ROOT/$BOOT_ARCHIVE" "$ALT_ROOT/boot/boot_archive"
-	rm -rf "$rddir"
-	exit
+	ln "$ALT_ROOT/$BOOT_ARCHIVE_64" "$ALT_ROOT/boot/amd64/boot_archive"
 fi
-
-mv "$ALT_ROOT/$BOOT_ARCHIVE-new" "$ALT_ROOT/$BOOT_ARCHIVE"
-lockfs -f "/$ALT_ROOT"
-
 rm -rf "$rddir"

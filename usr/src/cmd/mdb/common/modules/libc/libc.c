@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -566,13 +566,12 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		prt_addr(ulwp.ul_schedctl_called, 1),
 		prt_addr((void *)ulwp.ul_schedctl, 0));
 
-	HD("bindflags  gs         stsd                  &ftsd");
+	HD("bindflags  pad2       stsd                  &ftsd");
 	mdb_printf(OFFSTR,
 		OFFSET(ul_bindflags));
 	mdb_printf(ulwp.ul_bindflags? "0x%-8x " : "%-10d ",
 		ulwp.ul_bindflags);
-	mdb_printf(ulwp.ul_gs? "0x%-8x " : "%-10d ",
-		ulwp.ul_gs);
+	mdb_printf("%-10d ", ulwp.ul_pad2);
 	mdb_printf("%s %s\n",
 		prt_addr(ulwp.ul_stsd, 1),
 		prt_addr((void *)(addr + OFFSET(ul_ftsd[0])), 0));

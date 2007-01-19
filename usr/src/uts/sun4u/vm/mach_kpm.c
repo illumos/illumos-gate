@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -299,8 +299,6 @@ hat_kpm_fault(struct hat *hat, caddr_t vaddr)
 	return (error);
 }
 
-extern  krwlock_t memsegslock;
-
 /*
  * memseg_hash[] was cleared, need to clear memseg_phash[] too.
  */
@@ -356,7 +354,7 @@ hat_kpm_addmem_mseg_insert(struct memseg *msp)
 	if (kpm_enable == 0)
 		return;
 
-	ASSERT(RW_LOCK_HELD(&memsegslock));
+	ASSERT(memsegs_lock_held());
 	msp->nextpa = (memsegs) ? va_to_pa(memsegs) : MSEG_NULLPTR_PA;
 }
 
@@ -372,7 +370,7 @@ hat_kpm_addmem_memsegs_update(struct memseg *msp)
 	if (kpm_enable == 0)
 		return;
 
-	ASSERT(RW_LOCK_HELD(&memsegslock));
+	ASSERT(memsegs_lock_held());
 	ASSERT(memsegs);
 	memsegspa = va_to_pa(msp);
 }
@@ -411,7 +409,7 @@ hat_kpm_delmem_mseg_update(struct memseg *msp, struct memseg **mspp)
 	if (kpm_enable == 0)
 		return;
 
-	ASSERT(RW_LOCK_HELD(&memsegslock));
+	ASSERT(memsegs_lock_held());
 
 	if (mspp == &memsegs) {
 		memsegspa = (msp->next) ?
@@ -447,7 +445,7 @@ hat_kpm_split_mseg_update(struct memseg *msp, struct memseg **mspp,
 	if (kpm_enable == 0)
 		return;
 
-	ASSERT(RW_LOCK_HELD(&memsegslock));
+	ASSERT(memsegs_lock_held());
 	ASSERT(msp && mid && msp->kpm_pages);
 
 	kbase = ptokpmp(msp->kpm_pbase);

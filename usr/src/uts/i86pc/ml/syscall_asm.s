@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <sys/psw.h>
 #include <sys/x86_archext.h>
 #include <sys/machbrand.h>
+#include <sys/privregs.h>
 
 #if defined(__lint)
 
@@ -383,20 +384,23 @@ size_t _allsyscalls_size;
 _watch_do_syscall:
 	movl	%esp, %ebp
 
+	/ Interrupts may be enabled here, so we must make sure this thread
+	/ doesn't migrate off the CPU while it updates the CPU stats.
+	/
+	/ XXX This is only true if we got here via call gate thru the LDT for
+	/ old style syscalls. Perhaps this preempt++-- will go away soon?
+	movl	%gs:CPU_THREAD, %ebx
+	addb	$1, T_PREEMPT(%ebx)
+	CPU_STATS_SYS_SYSCALL_INC
+	subb	$1, T_PREEMPT(%ebx)
+
+	ENABLE_INTR_FLAGS
+
 	pushl	%eax				/ preserve across mstate call
 	MSTATE_TRANSITION(LMS_USER, LMS_SYSTEM)
 	popl	%eax
 
 	movl	%gs:CPU_THREAD, %ebx
-
-	/ Interrupts are enabled here, so we must make sure this thread doesn't
-	/ migrate off the CPU while it updates the CPU stats.
-	addb	$1, T_PREEMPT(%ebx)
-	CPU_STATS_SYS_SYSCALL_INC
-	subb	$1, T_PREEMPT(%ebx)
-
-	/ Set EFLAGS to standard kernel settings.
-	ENABLE_INTR_FLAGS
 	
 	ASSERT_LWPTOREGS(%ebx, %esp)
 
@@ -419,8 +423,8 @@ _syslcall_done:
 	/
 	/ get back via iret
 	/
-	cli
-	jmp	set_user_regs
+	CLI(%edx)
+	jmp	sys_rtt_syscall
 
 _full_syscall_presys:
 	movl	T_LWP(%ebx), %esi
@@ -440,7 +444,7 @@ _full_syscall_postsys:
 	call	syscall_exit
 	addl	$12, %esp
 	MSTATE_TRANSITION(LMS_SYSTEM, LMS_USER)
-	jmp	sys_rtt_syscall
+	jmp	_sys_rtt
 
 _syscall_fault:
 	push	$0xe			/ EFAULT
@@ -729,6 +733,7 @@ watch_syscall(void)
 #else	/* __lint */
 
 	ENTRY_NP(watch_syscall)
+	CLI(%eax)
 	movl	%gs:CPU_THREAD, %ebx
 	movl	T_STACK(%ebx), %esp		/ switch to the thread stack
 	movl	REGOFF_EAX(%esp), %eax		/ recover original syscall#

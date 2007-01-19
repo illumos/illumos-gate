@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -256,7 +255,7 @@ create_core_file(char *fp, enum core_types core_type, vnode_t **vpp)
 		file = pn.pn_path;
 	}
 	error =  vn_openat(file, UIO_SYSSPACE, FWRITE | FTRUNC | FEXCL |
-	    FCREAT | FOFFMAX, perms, &vp, CRCREAT, u.u_cmask, dvp);
+	    FCREAT | FOFFMAX, perms, &vp, CRCREAT, PTOU(curproc)->u_cmask, dvp);
 	if (core_type != CORE_PROC) {
 		VN_RELE(dvp);
 		pn_free(&pn);
@@ -438,9 +437,9 @@ do_core(char *fp, int sig, enum core_types core_type, struct core_globals *cg)
 		(void) flush_user_windows_to_stack(NULL);
 #endif
 #ifdef SUN_SRC_COMPAT
-		u.u_acflag |= ACORE;
+		PTOU(curproc)->u_acflag |= ACORE;
 #endif
-		if ((eswp = u.u_execsw) == NULL ||
+		if ((eswp = PTOU(curproc)->u_execsw) == NULL ||
 		    (eswp = findexec_by_magic(eswp->exec_magic)) == NULL) {
 			error = ENOSYS;
 		} else {

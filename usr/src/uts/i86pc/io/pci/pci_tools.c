@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,7 @@
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_tools.h>
 #include <io/pci/pci_tools_ext.h>
-#include <io/pcplusmp/apic.h>
+#include <sys/apic.h>
 #include <io/pci/pci_var.h>
 #include <sys/promif.h>
 #include <sys/x86_archext.h>
@@ -741,6 +741,7 @@ pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages)
 	uint64_t offset = phys_addr & MMU_PAGEOFFSET;
 	void *virt_base;
 	uint64_t returned_addr;
+	pfn_t pfn;
 
 	if (pcitool_debug)
 		prom_printf("pcitool_map: Called with PA:0x%p\n",
@@ -771,9 +772,11 @@ pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages)
 	if (pcitool_debug)
 		prom_printf("Got base virtual address:0x%p\n", virt_base);
 
+	pfn = btop(page_base);
+
 	/* Now map the allocated virtual space to the physical address. */
-	hat_devload(kas.a_hat, virt_base, mmu_ptob(*num_pages),
-	    mmu_btop(page_base), PROT_READ | PROT_WRITE | HAT_STRICTORDER,
+	hat_devload(kas.a_hat, virt_base, mmu_ptob(*num_pages), pfn,
+	    PROT_READ | PROT_WRITE | HAT_STRICTORDER,
 	    HAT_LOAD_LOCK);
 
 	returned_addr = ((uintptr_t)(virt_base)) + offset;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -618,7 +618,7 @@ vfs_mountdevices(void)
 	 * _init devfs module to fill in the vfssw
 	 */
 	if (modload("fs", "devfs") == -1)
-		cmn_err(CE_PANIC, "Cannot _init devfs module\n");
+		panic("Cannot _init devfs module");
 
 	/*
 	 * Hold vfs
@@ -632,13 +632,13 @@ vfs_mountdevices(void)
 	 * Locate mount point
 	 */
 	if (lookupname("/devices", UIO_SYSSPACE, FOLLOW, NULLVPP, &mvp))
-		cmn_err(CE_PANIC, "Cannot find /devices\n");
+		panic("Cannot find /devices");
 
 	/*
 	 * Perform the mount of /devices
 	 */
 	if (VFS_MOUNT(&devices, mvp, &mounta, CRED()))
-		cmn_err(CE_PANIC, "Cannot mount /devices\n");
+		panic("Cannot mount /devices");
 
 	RUNLOCK_VFSSW();
 
@@ -652,7 +652,7 @@ vfs_mountdevices(void)
 	 * Hold the root of /devices so it won't go away
 	 */
 	if (VFS_ROOT(&devices, &devicesdir))
-		cmn_err(CE_PANIC, "vfs_mountdevices: not devices root");
+		panic("vfs_mountdevices: not devices root");
 
 	if (vfs_lock(&devices) != 0) {
 		VN_RELE(devicesdir);
@@ -766,11 +766,11 @@ vfs_mountfs(char *module, char *spec, char *path)
 	mounta.spec = spec;
 	mounta.dir = path;
 	if (lookupname(path, UIO_SYSSPACE, FOLLOW, NULLVPP, &mvp)) {
-		cmn_err(CE_WARN, "Cannot find %s\n", path);
+		cmn_err(CE_WARN, "Cannot find %s", path);
 		return;
 	}
 	if (domount(NULL, &mounta, mvp, CRED(), &vfsp))
-		cmn_err(CE_WARN, "Cannot mount %s\n", path);
+		cmn_err(CE_WARN, "Cannot mount %s", path);
 	else
 		VFS_RELE(vfsp);
 	VN_RELE(mvp);
@@ -800,7 +800,7 @@ vfs_mountroot(void)
 	 * file system type.
 	 */
 	if (rootconf())
-		cmn_err(CE_PANIC, "vfs_mountroot: cannot mount root");
+		panic("vfs_mountroot: cannot mount root");
 	/*
 	 * Get vnode for '/'.  Set up rootdir, u.u_rdir and u.u_cdir
 	 * to point to it.  These are used by lookuppn() so that it
@@ -808,10 +808,10 @@ vfs_mountroot(void)
 	 */
 	vfs_setmntpoint(rootvfs, "/");
 	if (VFS_ROOT(rootvfs, &rootdir))
-		cmn_err(CE_PANIC, "vfs_mountroot: no root vnode");
-	u.u_cdir = rootdir;
-	VN_HOLD(u.u_cdir);
-	u.u_rdir = NULL;
+		panic("vfs_mountroot: no root vnode");
+	PTOU(curproc)->u_cdir = rootdir;
+	VN_HOLD(PTOU(curproc)->u_cdir);
+	PTOU(curproc)->u_rdir = NULL;
 
 	/*
 	 * Setup the global zone's rootvp, now that it exists.
@@ -874,7 +874,7 @@ vfs_mountroot(void)
 	 */
 	if (root_is_svm) {
 		if (svm_rootconf()) {
-			cmn_err(CE_PANIC, "vfs_mountroot: cannot remount root");
+			panic("vfs_mountroot: cannot remount root");
 		}
 
 		/*
@@ -1325,7 +1325,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	if ((sema_tryp(&vfsp->vfs_reflock) == 0) &&
 	    !(vfsp->vfs_flag & VFS_REMOUNT))
 		cmn_err(CE_WARN,
-		    "mount type %s couldn't get vfs_reflock\n", vswp->vsw_name);
+		    "mount type %s couldn't get vfs_reflock", vswp->vsw_name);
 
 	/*
 	 * Lock the vfs. If this is a remount we want to avoid spurious umount
@@ -2860,7 +2860,7 @@ vfs_remove(struct vfs *vfsp)
 	 * be busy.
 	 */
 	if (vfsp == rootvfs)
-		cmn_err(CE_PANIC, "vfs_remove: unmounting root");
+		panic("vfs_remove: unmounting root");
 
 	vfs_list_remove(vfsp);
 
@@ -4105,7 +4105,7 @@ rootconf()
 		return (error);
 
 	if (modload("fs", fstyp) == -1)
-		cmn_err(CE_PANIC, "Cannot _init %s module\n", fstyp);
+		panic("Cannot _init %s module", fstyp);
 
 	RLOCK_VFSSW();
 	vsw = vfs_getvfsswbyname(fstyp);
@@ -4126,7 +4126,7 @@ rootconf()
 	rootdev = rootvfs->vfs_dev;
 
 	if (error)
-		cmn_err(CE_PANIC, "cannot mount root path %s", svm_bootpath);
+		panic("cannot mount root path %s", rootfs.bo_name);
 	return (error);
 }
 
@@ -4177,8 +4177,7 @@ getrootfs(void)
 		/* attempt to determine netdev_path via boot_mac address */
 		netdev_path = strplumb_get_netdev_path();
 		if (netdev_path == NULL)
-			cmn_err(CE_PANIC,
-			    "Cannot find boot network interface\n");
+			panic("cannot find boot network interface");
 		(void) strncpy(rootfs.bo_name, netdev_path, BO_MAXOBJNAME);
 	}
 	return ("nfs");

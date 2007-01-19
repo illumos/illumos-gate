@@ -98,6 +98,7 @@ d none usr/lib/secure/sparcv9 755 root bin
 s none usr/lib/secure/64=sparcv9
 d none usr/lib/sparcv9 755 root bin
 s none usr/lib/sparcv9/ld.so.1=../../../lib/sparcv9/ld.so.1
+l none usr/sbin/prtdiag=../../usr/lib/platexec
 d none usr/sbin/sparcv9 755 root bin
 f none usr/sbin/sparcv9/add_drv 555 root sys
 f none usr/sbin/sparcv9/modinfo 555 root sys

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,7 @@ extern int mdb_devinfo2statep(uintptr_t, char *, uintptr_t *);
 
 extern int mdb_cpu2cpuid(uintptr_t);
 
-extern int mdb_cpuset_find(uintptr_t cpusetp);
+extern int mdb_cpuset_find(uintptr_t);
 
 /*
  * Returns a pointer to the top of the soft state struct for the instance

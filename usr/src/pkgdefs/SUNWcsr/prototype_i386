@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,7 +40,7 @@
 #
 !include prototype_com
 #
-# List files which are I386 specific here
+# List files which are i386 specific here
 #
 # source locations relative to the prototype file
 #
@@ -51,6 +51,4 @@ f none sbin/biosdev 555 root bin
 f none sbin/installgrub 0555 root sys
 d none var/ld/amd64 755 root bin
 s none var/ld/64=amd64
-d none var/svc/manifest/platform/i86pc 755 root sys
 f none var/svc/manifest/system/boot-archive-update.xml 0444 root sys
-f none var/svc/profile/platform_i86pc.xml 444 root sys

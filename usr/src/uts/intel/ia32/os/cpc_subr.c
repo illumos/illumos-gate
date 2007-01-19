@@ -44,7 +44,7 @@
 #include <sys/cmn_err.h>
 #include <sys/cmt.h>
 #include <sys/spl.h>
-#include <io/pcplusmp/apic.h>
+#include <sys/apic.h>
 
 static const uint64_t allstopped = 0;
 static kcpc_ctx_t *(*overflow_intr_handler)(caddr_t);
@@ -111,7 +111,7 @@ static int setup_registered;
 void
 kcpc_hw_init(cpu_t *cp)
 {
-	kthread_t		*t = cp->cpu_idle_thread;
+	kthread_t *t = cp->cpu_idle_thread;
 
 	if (x86_feature & X86_HTT) {
 		mutex_enter(&cpu_setup_lock);
@@ -131,6 +131,14 @@ kcpc_hw_init(cpu_t *cp)
 
 	installctx(t, cp, kcpc_idle_save, kcpc_idle_restore,
 	    NULL, NULL, NULL, NULL);
+}
+
+void
+kcpc_hw_fini(cpu_t *cp)
+{
+	ASSERT(cp->cpu_idle_thread == NULL);
+
+	mutex_destroy(&cp->cpu_cpc_ctxlock);
 }
 
 #define	BITS(v, u, l)	\

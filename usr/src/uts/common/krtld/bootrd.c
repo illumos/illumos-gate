@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,9 +44,7 @@ static uint64_t rd_start, rd_end;
 struct boot_fs_ops *bfs_ops;
 struct boot_fs_ops *bfs_tab[] = {&bufs_ops, &bhsfs_ops, NULL};
 
-#ifdef	DEBUG
-static uint64_t scratch_max;
-#endif
+static uintptr_t scratch_max;
 
 #define	_kmem_ready	get_weakish_int(&kmem_ready)
 
@@ -115,12 +112,17 @@ kobj_boot_unmountroot()
 {
 #ifdef	DEBUG
 	if (boothowto & RB_VERBOSE)
-		_kobj_printf(ops, "boot scratch memory used: 0x%llx\n",
+		_kobj_printf(ops, "boot scratch memory used: 0x%lx\n",
 		    scratch_max);
 #endif
 	(void) BRD_UNMOUNTROOT(bfs_ops);
 }
 
+/*
+ * Boot time wrappers for memory allocators. Called for both permanent
+ * and temporary boot memory allocations. We have to track which allocator
+ * (boot or kmem) was used so that we know how to free.
+ */
 void *
 bkmem_alloc(size_t size)
 {
@@ -130,11 +132,13 @@ bkmem_alloc(size_t size)
 	if (_kmem_ready)
 		return (kobj_alloc(size, 0));
 
+	/*
+	 * Remember the highest BOP_ALLOC allocated address and don't free
+	 * anything below it.
+	 */
 	addr = BOP_ALLOC(ops, 0, size, 0);
-#ifdef	DEBUG
 	if (scratch_max < (uintptr_t)addr + size)
 		scratch_max = (uintptr_t)addr + size;
-#endif
 	return (addr);
 }
 
@@ -143,12 +147,9 @@ void
 bkmem_free(void *p, size_t size)
 {
 	/*
-	 * Don't bother freeing scratch memory
-	 * Note that in amd64, BOP_ALLOC returns address
-	 * prepended with 0xffffffff, so we cast to 32-bit
-	 * before comparing.
+	 * Free only if it's not boot scratch memory.
 	 */
-	if ((uint32_t)(uintptr_t)p > MAGIC_PHYS)
+	if ((uintptr_t)p >= scratch_max)
 		kobj_free(p, size);
 }
 

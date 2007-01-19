@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -652,8 +652,8 @@ pageout()
 	proc_pageout->p_stime =  0;
 	proc_pageout->p_cutime =  0;
 	proc_pageout->p_utime = 0;
-	bcopy("pageout", u.u_psargs, 8);
-	bcopy("pageout", u.u_comm, 7);
+	bcopy("pageout", PTOU(curproc)->u_psargs, 8);
+	bcopy("pageout", PTOU(curproc)->u_comm, 7);
 
 	/*
 	 * Create pageout scanner thread

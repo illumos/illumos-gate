@@ -21,7 +21,7 @@
 #
 # uts/i86pc/pcplusmp/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,7 +43,7 @@ UTSBASE	= ../..
 MODULE		= pcplusmp
 OBJECTS		= $(PCPLUSMP_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(PCPLUSMP_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_MACH_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_PSM_MACH_DIR)/$(MODULE)
 
 #
 #	Include common rules.

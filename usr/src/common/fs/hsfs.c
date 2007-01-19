@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,10 @@ extern void kobj_printf(char *, ...);
 extern int bootrd_debug;
 extern void *bkmem_alloc(size_t);
 extern void bkmem_free(void *, size_t);
+extern int cf_check_compressed(fileid_t *);
+extern void cf_close(fileid_t *);
+extern void cf_seek(fileid_t *, off_t, int);
+extern int cf_read(fileid_t *, caddr_t, size_t);
 
 struct dirstuff {
 	int loc;
@@ -353,30 +357,39 @@ bhsfs_read(int fd, caddr_t buf, size_t count)
 	struct inode *ip;
 	caddr_t n;
 
-	dprintf("bhsfs_read %d, count 0x%lx\n", fd, count);
+	dprintf("bhsfs_read %d, ", fd);
+	dprintf("count 0x%lx\n", count);
 	filep = find_fp(fd);
 	if (filep == NULL)
 		return (-1);
 
 	ip = filep->fi_inode;
 	n = buf;
-	if (filep->fi_offset + count > ip->i_size)
+	if ((filep->fi_flags & FI_COMPRESSED) == 0 &&
+	    filep->fi_offset + count > ip->i_size)
 		count = ip->i_size - filep->fi_offset;
 
 	if ((i = count) <= 0)
 		return (0);
 
 	while (i > 0) {
-		if (filep->fi_count == 0) {
-			if (getblock(filep) == -1)
-				return (0);
+		if (filep->fi_flags & FI_COMPRESSED) {
+			if ((j = cf_read(filep, buf, count)) < 0)
+				return (0); /* encountered an error */
+			if (j < i)
+				i = j; /* short read, must have hit EOF */
+		} else {
+			if (filep->fi_count == 0) {
+				if (getblock(filep) == -1)
+					return (0);
+			}
+			j = MIN(i, filep->fi_count);
+			bcopy(filep->fi_memp, buf, (uint_t)j);
 		}
-		j = MIN(i, filep->fi_count);
-		bcopy(filep->fi_memp, buf, (uint_t)j);
-		buf += j;
 		filep->fi_memp += j;
 		filep->fi_offset += j;
 		filep->fi_count -= j;
+		buf += j;
 		i -= j;
 	}
 
@@ -477,6 +490,8 @@ bhsfs_open(char *str, int flags)
 	(void) strcpy(filep->fi_path, str);
 	filep->fi_inode = NULL;
 	bzero(filep->fi_buf, MAXBSIZE);
+	filep->fi_getblock = getblock;
+	filep->fi_flags = 0;
 
 	ino = find(str, filep);
 	if (ino == 0) {
@@ -489,6 +504,8 @@ bhsfs_open(char *str, int flags)
 	filep->fi_count = 0;
 	filep->fi_memp = 0;
 
+	if (cf_check_compressed(filep) != 0)
+		return (-1);
 	dprintf("open done\n");
 	return (filep->fi_filedes);
 }
@@ -503,10 +520,11 @@ bhsfs_close(int fd)
 		return (-1);
 
 	if (filep->fi_taken == 0 || filep == head) {
-		printf("File descripter %d no allocated!\n", fd);
+		printf("File descripter %d not allocated!\n", fd);
 		return (-1);
 	}
 
+	cf_close(filep);
 	/* unlink and deallocate node */
 	filep->fi_forw->fi_back = filep->fi_back;
 	filep->fi_back->fi_forw = filep->fi_forw;
@@ -541,24 +559,29 @@ bhsfs_lseek(int fd, off_t addr, int whence)
 {
 	fileid_t *filep;
 
-	dprintf("lseek %d, off = %lx\n", fd, addr);
+	dprintf("lseek %d, ", fd);
+	dprintf("off = %lx\n", addr);
 	if (!(filep = find_fp(fd)))
 		return (-1);
 
-	switch (whence) {
-	case SEEK_CUR:
-		filep->fi_offset += addr;
-		break;
-	case SEEK_SET:
-		filep->fi_offset = addr;
-		break;
-	default:
-	case SEEK_END:
-		printf("lseek(): invalid whence value %d\n", whence);
-		break;
+	if (filep->fi_flags & FI_COMPRESSED) {
+		cf_seek(filep, addr, whence);
+	} else {
+		switch (whence) {
+		case SEEK_CUR:
+			filep->fi_offset += addr;
+			break;
+		case SEEK_SET:
+			filep->fi_offset = addr;
+			break;
+		default:
+		case SEEK_END:
+			printf("lseek(): invalid whence value %d\n", whence);
+			break;
+		}
+		filep->fi_blocknum = addr / DEV_BSIZE;
 	}
 
-	filep->fi_blocknum = addr / DEV_BSIZE;
 	filep->fi_count = 0;
 	return (0);
 }
@@ -590,6 +613,11 @@ bhsfs_fstat(int fd, struct bootstat *stp)
 	default:
 		break;
 	}
+	/*
+	 * NOTE: this size will be the compressed size for a compressed file
+	 * This could confuse the caller since we decompress the file behind
+	 * the scenes when the file is read.
+	 */
 	stp->st_size = ip->i_size;
 
 	/* file times */

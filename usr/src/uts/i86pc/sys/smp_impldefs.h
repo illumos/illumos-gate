@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +54,6 @@ extern void (*picinitf)();	/* pic init entry point			*/
 extern int (*clkinitf)(int, int *);	/* clock init entry point	*/
 extern int (*ap_mlsetup)(); 	/* completes init of starting cpu	*/
 extern void (*send_dirintf)();	/* send interprocessor intr		*/
-extern void (*cpu_startf)();	/* start running a given processor	*/
 extern hrtime_t (*gethrtimef)(); /* get high resolution timer value	*/
 extern hrtime_t (*gethrtimeunscaledf)(); /* get high res timer unscaled value */
 extern void (*psm_shutdownf)(int, int);	/* machine dependent shutdown	*/

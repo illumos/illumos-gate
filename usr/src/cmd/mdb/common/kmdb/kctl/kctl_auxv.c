@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,28 +82,15 @@ kctl_auxv_init(kmdb_auxv_t *kav, const char *cfg, const char **argv, void *romp)
 
 	kav->kav_config = cfg;
 	kav->kav_argv = argv;
+	kav->kav_modpath = kobj_module_path;
+
+	kctl_dprintf("kctl_auxv_init: modpath '%s'", kav->kav_modpath);
 
 	if (kctl.kctl_boot_loaded) {
-		/*
-		 * default_path hasn't been set yet, so we have to fetch the
-		 * path from OBP.
-		 */
-		ssize_t sz;
-
-		if ((sz = BOP_GETPROPLEN(kctl.kctl_boot_ops,
-		    "module-path")) != -1) {
-			kav->kav_modpath = kobj_alloc(sz, KM_TMP);
-			(void) BOP_GETPROP(kctl.kctl_boot_ops, "module-path",
-			    (char *)kav->kav_modpath);
-		}
-
 		kav->kav_lookup_by_name = kctl_boot_lookup_by_name;
 		kav->kav_flags |= KMDB_AUXV_FL_NOUNLOAD;
-	} else {
-		kav->kav_modpath = default_path;
-
+	} else
 		kav->kav_lookup_by_name = kctl_lookup_by_name;
-	}
 
 	if (kctl.kctl_flags & KMDB_F_TRAP_NOSWITCH)
 		kav->kav_flags |= KMDB_AUXV_FL_NOTRPSWTCH;

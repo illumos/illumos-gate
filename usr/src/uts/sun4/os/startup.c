@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -200,6 +200,12 @@ pgcnt_t segziosize = 0;		/* size of zio segment in pages */
  * debugger pages (if allocated)
  */
 struct vnode kdebugvp;
+
+/*
+ * VA range available to the debugger
+ */
+const caddr_t kdi_segdebugbase = (const caddr_t)SEGDEBUGBASE;
+const size_t kdi_segdebugsize = SEGDEBUGSIZE;
 
 /*
  * Segment for relocated kernel structures in 64-bit large RAM kernels
@@ -1610,8 +1616,8 @@ startup_modules(void)
 	maxmem = physmem;
 
 	/* Set segkp limits. */
-	ncbase = (caddr_t)SEGDEBUGBASE;
-	ncend = (caddr_t)SEGDEBUGBASE;
+	ncbase = kdi_segdebugbase;
+	ncend = kdi_segdebugbase;
 
 	/*
 	 * Initialize the hat layer.
@@ -2710,8 +2716,7 @@ kvm_init(void)
 	/*
 	 * Create a segment for the debugger.
 	 */
-	(void) seg_attach(&kas, (caddr_t)SEGDEBUGBASE, (size_t)SEGDEBUGSIZE,
-	    &kdebugseg);
+	(void) seg_attach(&kas, kdi_segdebugbase, kdi_segdebugsize, &kdebugseg);
 	(void) segkmem_create(&kdebugseg);
 
 	rw_exit(&kas.a_lock);

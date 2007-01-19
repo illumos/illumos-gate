@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,8 +192,8 @@ cpr_check_user_threads()
 			mutex_exit(&pidlock);
 
 			if (count == CPR_UTSTOP_RETRY) {
-			DEBUG1(errp("Suspend failed: cannt stop "
-				"uthread\n"));
+			CPR_DEBUG(CPR_DEBUG1, "Suspend failed: "
+			    "cannot stop uthread\n");
 			cpr_err(CE_WARN, "Suspend cannot stop "
 				"process %s (%p:%x).",
 				ttoproc(tp)->p_user.u_psargs, (void *)tp,
@@ -203,11 +202,12 @@ cpr_check_user_threads()
 				" network request, please try again.");
 			}
 
-			DEBUG2(errp("cant stop t=%p state=%x pfg=%x sched=%x\n",
-			tp, tp->t_state, tp->t_proc_flag, tp->t_schedflag));
-			DEBUG2(errp("proc %p state=%x pid=%d\n",
-				ttoproc(tp), ttoproc(tp)->p_stat,
-				ttoproc(tp)->p_pidp->pid_id));
+			CPR_DEBUG(CPR_DEBUG2, "cant stop t=%p state=%x pfg=%x "
+			    "sched=%x\n", tp, tp->t_state, tp->t_proc_flag,
+			    tp->t_schedflag);
+			CPR_DEBUG(CPR_DEBUG2, "proc %p state=%x pid=%d\n",
+			    ttoproc(tp), ttoproc(tp)->p_stat,
+			    ttoproc(tp)->p_pidp->pid_id);
 			return (1);
 		}
 		thread_unlock(tp);
@@ -268,9 +268,9 @@ cpr_start_user_threads()
 void
 cpr_start_kernel_threads(void)
 {
-	DEBUG1(errp("starting kernel daemons..."));
+	CPR_DEBUG(CPR_DEBUG1, "starting kernel daemons...");
 	(void) callb_execute_class(CB_CL_CPR_DAEMON, CB_CODE_CPR_RESUME);
-	DEBUG1(errp("done\n"));
+	CPR_DEBUG(CPR_DEBUG1, "done\n");
 
 	/* see table lock below */
 	callb_unlock_table();
@@ -290,7 +290,7 @@ cpr_stop_kernel_threads(void)
 
 	callb_lock_table();	/* Note: we unlock the table in resume. */
 
-	DEBUG1(errp("stopping kernel daemons..."));
+	CPR_DEBUG(CPR_DEBUG1, "stopping kernel daemons...");
 	if ((name = callb_execute_class(CB_CL_CPR_DAEMON,
 	    CB_CODE_CPR_CHKPT)) != (caddr_t)NULL) {
 		cpr_err(CE_WARN,
@@ -323,6 +323,6 @@ cpr_stop_kernel_threads(void)
 	} while ((tp = tp->t_next) != curthread);
 	mutex_exit(&pidlock);
 
-	DEBUG1(errp("done\n"));
+	CPR_DEBUG(CPR_DEBUG1, "done\n");
 	return (0);
 }

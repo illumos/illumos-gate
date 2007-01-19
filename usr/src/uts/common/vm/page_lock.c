@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -982,4 +982,57 @@ page_szc_lock_assert(page_t *pp)
 	kmutex_t *mtx = PAGE_SZC_MUTEX(rootpp);
 
 	return (MUTEX_HELD(mtx));
+}
+
+/*
+ * memseg locking
+ */
+static krwlock_t memsegslock;
+
+/*
+ * memlist (phys_install, phys_avail) locking.
+ */
+static krwlock_t memlists_lock;
+
+void
+memsegs_lock(int writer)
+{
+	rw_enter(&memsegslock, writer ? RW_WRITER : RW_READER);
+}
+
+/*ARGSUSED*/
+void
+memsegs_unlock(int writer)
+{
+	rw_exit(&memsegslock);
+}
+
+int
+memsegs_lock_held(void)
+{
+	return (RW_LOCK_HELD(&memsegslock));
+}
+
+void
+memlist_read_lock(void)
+{
+	rw_enter(&memlists_lock, RW_READER);
+}
+
+void
+memlist_read_unlock(void)
+{
+	rw_exit(&memlists_lock);
+}
+
+void
+memlist_write_lock(void)
+{
+	rw_enter(&memlists_lock, RW_WRITER);
+}
+
+void
+memlist_write_unlock(void)
+{
+	rw_exit(&memlists_lock);
 }

@@ -18,10 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* LINTLIBRARY */
@@ -144,6 +146,8 @@ static const char Hw1_i_pause[] =	"PAUSE";
 static const char Hw1_i_sse3[] =	"SSE3";
 static const char Hw1_i_mon[] =		"MON";
 static const char Hw1_i_cx16[] =	"CX16";
+static const char Hw1_i_ahf[] =		"AHF";
+static const char Hw1_i_tscp[] =	"TSCP";
 #elif	CAP_LOWERCASE
 static const char Hw1_i_fpu[] =		"fpu";
 static const char Hw1_i_tsc[] =		"tsc";
@@ -162,6 +166,8 @@ static const char Hw1_i_pause[] =	"pause";
 static const char Hw1_i_sse3[] =	"sse3";
 static const char Hw1_i_mon[] =		"mon";
 static const char Hw1_i_cx16[] =	"cx16";
+static const char Hw1_i_ahf[] =		"ahf";
+static const char Hw1_i_tscp[] = 	"tscp";
 #else
 #error	"Hardware Capabilities (intel) - what case do you want?"
 #endif
@@ -189,12 +195,14 @@ static const Cap_desc hw1_i[] = {
 	{ AV_386_PAUSE,		Hw1_i_pause,	sizeof (Hw1_i_pause) - 1 },
 	{ AV_386_SSE3,		Hw1_i_sse3,	sizeof (Hw1_i_sse3) - 1 },
 	{ AV_386_MON,		Hw1_i_mon,	sizeof (Hw1_i_mon) - 1 },
-	{ AV_386_CX16,		Hw1_i_cx16,	sizeof (Hw1_i_cx16) - 1 }
+	{ AV_386_CX16,		Hw1_i_cx16,	sizeof (Hw1_i_cx16) - 1 },
+	{ AV_386_AHF,		Hw1_i_ahf,	sizeof (Hw1_i_ahf) - 1 },
+	{ AV_386_TSCP,		Hw1_i_tscp,	sizeof (Hw1_i_tscp) - 1 }
 };
 static const uint_t hw1_i_num = sizeof (hw1_i) / sizeof (Cap_desc);
 
 /*
- * Concatenate a token to the string buffer.  This can be a capailities token
+ * Concatenate a token to the string buffer.  This can be a capabilities token
  * or a separator token.
  */
 static int

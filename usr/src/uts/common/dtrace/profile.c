@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,20 +43,18 @@ static dev_info_t *profile_devi;
 static dtrace_provider_id_t profile_id;
 
 /*
- * Regardless of platform, there are five artificial frames in the case of the
+ * Regardless of platform, the stack frames look like this in the case of the
  * profile provider:
  *
  *	profile_fire
  *	cyclic_expire
  *	cyclic_fire
  *	[ cbe ]
- *	[ locore ]
+ *	[ interrupt code ]
  *
- * On amd64, there are two frames associated with locore:  one in locore, and
- * another in common interrupt dispatch code.  (i386 has not been modified to
- * use this common layer.)  Further, on i386, the interrupted instruction
- * appears as its own stack frame.  All of this means that we need to add one
- * frame for amd64, and then take one away for both amd64 and i386.
+ * On x86, there are five frames from the generic interrupt code; further, the
+ * interrupted instruction appears as its own stack frame, giving us a total of
+ * 10.
  *
  * On SPARC, the picture is further complicated because the compiler
  * optimizes away tail-calls -- so the following frames are optimized away:
@@ -68,23 +66,19 @@ static dtrace_provider_id_t profile_id;
  * frame cannot be tail-call eliminated, yielding four frames in this case.
  *
  * All of the above constraints lead to the mess below.  Yes, the profile
- * provider should ideally figure this out on-the-fly by hiting one of its own
+ * provider should ideally figure this out on-the-fly by hitting one of its own
  * probes and then walking its own stack trace.  This is complicated, however,
  * and the static definition doesn't seem to be overly brittle.  Still, we
  * allow for a manual override in case we get it completely wrong.
  */
-#ifdef __amd64
-#define	PROF_ARTIFICIAL_FRAMES	7
-#else
-#ifdef __i386
-#define	PROF_ARTIFICIAL_FRAMES	6
+#ifdef __x86
+#define	PROF_ARTIFICIAL_FRAMES	10
 #else
 #ifdef __sparc
 #ifdef DEBUG
 #define	PROF_ARTIFICIAL_FRAMES	4
 #else
 #define	PROF_ARTIFICIAL_FRAMES	3
-#endif
 #endif
 #endif
 #endif
@@ -164,6 +158,10 @@ static void
 profile_create(hrtime_t interval, const char *name, int kind)
 {
 	profile_probe_t *prof;
+	int nr_frames = PROF_ARTIFICIAL_FRAMES + dtrace_mach_aframes();
+
+	if (profile_aframes)
+		nr_frames = profile_aframes;
 
 	if (interval < profile_interval_min)
 		return;
@@ -183,8 +181,7 @@ profile_create(hrtime_t interval, const char *name, int kind)
 	prof->prof_cyclic = CYCLIC_NONE;
 	prof->prof_kind = kind;
 	prof->prof_id = dtrace_probe_create(profile_id,
-	    NULL, NULL, name,
-	    profile_aframes ? profile_aframes : PROF_ARTIFICIAL_FRAMES, prof);
+	    NULL, NULL, name, nr_frames, prof);
 }
 
 /*ARGSUSED*/

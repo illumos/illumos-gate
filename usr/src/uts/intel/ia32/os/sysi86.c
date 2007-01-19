@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,14 +61,12 @@
 #include <vm/faultcode.h>
 #include <sys/fp.h>
 #include <sys/cmn_err.h>
+#include <sys/segments.h>
+#include <sys/clock.h>
 
 static void setup_ldt(proc_t *pp);
 static void *ldt_map(proc_t *pp, uint_t seli);
 static void ldt_free(proc_t *pp);
-
-extern void rtcsync(void);
-extern long ggmtl(void);
-extern void sgmtl(long);
 
 /*
  * sysi86 System Call

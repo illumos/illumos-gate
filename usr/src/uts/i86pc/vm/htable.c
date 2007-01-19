@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +46,7 @@
 #include <sys/promif.h>
 #include <sys/var.h>
 #include <sys/x86_archext.h>
+#include <sys/archsystm.h>
 #include <sys/bootconf.h>
 #include <sys/dumphdr.h>
 #include <vm/seg_kmem.h>
@@ -53,8 +55,12 @@
 #include <vm/hat_i86.h>
 #include <sys/cmn_err.h>
 
+#include <sys/bootinfo.h>
+#include <vm/kboot_mmu.h>
+
+static void x86pte_zero(htable_t *dest, uint_t entry, uint_t count);
+
 kmem_cache_t *htable_cache;
-extern cpuset_t khat_cpuset;
 
 /*
  * The variable htable_reserve_amount, rather than HTABLE_RESERVE_AMOUNT,
@@ -98,16 +104,10 @@ kmutex_t htable_mutex[NUM_HTABLE_MUTEX];
 static void link_ptp(htable_t *higher, htable_t *new, uintptr_t vaddr);
 static void unlink_ptp(htable_t *higher, htable_t *old, uintptr_t vaddr);
 static void htable_free(htable_t *ht);
-static x86pte_t *x86pte_access_pagetable(htable_t *ht);
+static x86pte_t *x86pte_access_pagetable(htable_t *ht, uint_t index);
 static void x86pte_release_pagetable(htable_t *ht);
 static x86pte_t x86pte_cas(htable_t *ht, uint_t entry, x86pte_t old,
 	x86pte_t new);
-
-/*
- * Address used for kernel page tables. See ptable_alloc() below.
- */
-uintptr_t ptable_va = 0;
-size_t	ptable_sz = 2 * MMU_PAGESIZE;
 
 /*
  * A counter to track if we are stealing or reaping htables. When non-zero
@@ -124,142 +124,54 @@ static uint32_t active_ptables = 0;
 /*
  * Allocate a memory page for a hardware page table.
  *
- * The pages allocated for page tables are currently gotten in a hacked up
- * way. It works for now, but really needs to be fixed up a bit.
- *
- * During boot: The boot loader controls physical memory allocation via
- * boot_alloc(). To avoid conflict with vmem, we just do boot_alloc()s with
- * addresses less than kernelbase. These addresses are ignored when we take
- * over mappings from the boot loader.
- *
- * Post-boot: we currently use page_create_va() on the kvp with fake offsets,
- * segments and virt address. This is pretty bogus, but was copied from the
- * old hat_i86.c code. A better approach would be to have a custom
- * page_get_physical() interface that can specify either mnode random or
- * mnode local and takes a page from whatever color has the MOST available -
- * this would have a minimal impact on page coloring.
- *
- * For now the htable pointer in ht is only used to compute a unique vnode
- * offset for the page.
+ * A wrapper around page_get_physical(), with some extra checks.
  */
-static void
-ptable_alloc(htable_t *ht)
+static pfn_t
+ptable_alloc(uintptr_t seed)
 {
 	pfn_t pfn;
 	page_t *pp;
-	u_offset_t offset;
-	static struct seg tmpseg;
-	static int first_time = 1;
 
-	/*
-	 * Allocating the associated hardware page table is very different
-	 * before boot has finished.  We get a physical page to from boot
-	 * w/o eating up any kernel address space.
-	 */
-	ht->ht_pfn = PFN_INVALID;
+	pfn = PFN_INVALID;
 	atomic_add_32(&active_ptables, 1);
 
-	if (use_boot_reserve) {
-		ASSERT(ptable_va != 0);
-
-		/*
-		 * Allocate, then demap the ptable_va, so that we're
-		 * sure there exist page table entries for the addresses
-		 */
-		if (first_time) {
-			first_time = 0;
-			if ((uintptr_t)BOP_ALLOC(bootops, (caddr_t)ptable_va,
-			    ptable_sz, BO_NO_ALIGN) != ptable_va)
-				panic("BOP_ALLOC failed");
-
-			hat_boot_demap(ptable_va);
-			hat_boot_demap(ptable_va + MMU_PAGESIZE);
-		}
-
-		pfn = ((uintptr_t)BOP_EALLOC(bootops, 0, MMU_PAGESIZE,
-		    BO_NO_ALIGN, BOPF_X86_ALLOC_PHYS)) >> MMU_PAGESHIFT;
-		if (page_resv(1, KM_NOSLEEP) == 0)
-			panic("page_resv() failed in ptable alloc");
-
-		pp = page_numtopp_nolock(pfn);
-		ASSERT(pp != NULL);
-		if (pp->p_szc != 0)
-			page_boot_demote(pp);
-		pp = page_numtopp(pfn, SE_EXCL);
-		ASSERT(pp != NULL);
-
-	} else {
-		/*
-		 * Post boot get a page for the table.
-		 *
-		 * The first check is to see if there is memory in
-		 * the system. If we drop to throttlefree, then fail
-		 * the ptable_alloc() and let the stealing code kick in.
-		 * Note that we have to do this test here, since the test in
-		 * page_create_throttle() would let the NOSLEEP allocation
-		 * go through and deplete the page reserves.
-		 *
-		 * The !NOMEMWAIT() lets pageout, fsflush, etc. skip this check.
-		 */
-		if (!NOMEMWAIT() && freemem <= throttlefree + 1)
-			return;
+	/*
+	 * The first check is to see if there is memory in the system. If we
+	 * drop to throttlefree, then fail the ptable_alloc() and let the
+	 * stealing code kick in. Note that we have to do this test here,
+	 * since the test in page_create_throttle() would let the NOSLEEP
+	 * allocation go through and deplete the page reserves.
+	 *
+	 * The !NOMEMWAIT() lets pageout, fsflush, etc. skip this check.
+	 */
+	if (!NOMEMWAIT() && freemem <= throttlefree + 1)
+		return (PFN_INVALID);
 
 #ifdef DEBUG
-		/*
-		 * This code makes htable_ steal() easier to test. By setting
-		 * force_steal we force pagetable allocations to fall
-		 * into the stealing code. Roughly 1 in ever "force_steal"
-		 * page table allocations will fail.
-		 */
-		if (ht->ht_hat != kas.a_hat && force_steal > 1 &&
-		    ++ptable_cnt > force_steal) {
-			ptable_cnt = 0;
-			return;
-		}
+	/*
+	 * This code makes htable_steal() easier to test. By setting
+	 * force_steal we force pagetable allocations to fall
+	 * into the stealing code. Roughly 1 in ever "force_steal"
+	 * page table allocations will fail.
+	 */
+	if (proc_pageout != NULL && force_steal > 1 &&
+	    ++ptable_cnt > force_steal) {
+		ptable_cnt = 0;
+		return (PFN_INVALID);
+	}
 #endif /* DEBUG */
 
-		/*
-		 * This code is temporary, so don't review too critically.
-		 * I'm awaiting a new phys page allocator from Kit -- Joe
-		 *
-		 * We need assign an offset for the page to call
-		 * page_create_va. To avoid conflicts with other pages,
-		 * we get creative with the offset.
-		 * for 32 bits, we pic an offset > 4Gig
-		 * for 64 bits, pic an offset somewhere in the VA hole.
-		 */
-		offset = (uintptr_t)ht - kernelbase;
-		offset <<= MMU_PAGESHIFT;
-#if defined(__amd64)
-		offset += mmu.hole_start;	/* something in VA hole */
-#else
-		offset += 1ULL << 40;		/* something > 4 Gig */
-#endif
-
-		if (page_resv(1, KM_NOSLEEP) == 0)
-			return;
-
-#ifdef DEBUG
-		pp = page_exists(&kvp, offset);
-		if (pp != NULL)
-			panic("ptable already exists %p", pp);
-#endif
-		pp = page_create_va(&kvp, offset, MMU_PAGESIZE,
-		    PG_EXCL | PG_NORELOC, &tmpseg,
-		    (void *)((uintptr_t)ht << MMU_PAGESHIFT));
-		if (pp == NULL)
-			return;
-		page_io_unlock(pp);
-		page_hashout(pp, NULL);
-		pfn = pp->p_pagenum;
-	}
+	pp = page_get_physical(seed);
+	if (pp == NULL)
+		return (PFN_INVALID);
+	pfn = pp->p_pagenum;
 	page_downgrade(pp);
 	ASSERT(PAGE_SHARED(pp));
 
 	if (pfn == PFN_INVALID)
 		panic("ptable_alloc(): Invalid PFN!!");
-	ht->ht_pfn = pfn;
 	HATSTAT_INC(hs_ptable_allocs);
+	return (pfn);
 }
 
 /*
@@ -267,10 +179,9 @@ ptable_alloc(htable_t *ht)
  * for ptable_alloc().
  */
 static void
-ptable_free(htable_t *ht)
+ptable_free(pfn_t pfn)
 {
-	pfn_t pfn = ht->ht_pfn;
-	page_t *pp;
+	page_t *pp = page_numtopp_nolock(pfn);
 
 	/*
 	 * need to destroy the page used for the pagetable
@@ -278,7 +189,6 @@ ptable_free(htable_t *ht)
 	ASSERT(pfn != PFN_INVALID);
 	HATSTAT_INC(hs_ptable_frees);
 	atomic_add_32(&active_ptables, -1);
-	pp = page_numtopp_nolock(pfn);
 	if (pp == NULL)
 		panic("ptable_free(): no page for pfn!");
 	ASSERT(PAGE_SHARED(pp));
@@ -299,7 +209,6 @@ ptable_free(htable_t *ht)
 	}
 	page_free(pp, 1);
 	page_unresv(1);
-	ht->ht_pfn = PFN_INVALID;
 }
 
 /*
@@ -340,14 +249,12 @@ htable_get_reserve(void)
 }
 
 /*
- * Allocate initial htables with page tables and put them on the kernel hat's
- * cache list.
+ * Allocate initial htables and put them on the reserve list
  */
 void
 htable_initial_reserve(uint_t count)
 {
 	htable_t *ht;
-	hat_t *hat = kas.a_hat;
 
 	count += HTABLE_RESERVE_AMOUNT;
 	while (count > 0) {
@@ -355,49 +262,21 @@ htable_initial_reserve(uint_t count)
 		ASSERT(ht != NULL);
 
 		ASSERT(use_boot_reserve);
-		ht->ht_hat = kas.a_hat;	/* so htable_free() works */
-		ht->ht_flags = 0;	/* so x86pte_zero works */
-		ptable_alloc(ht);
-		if (ht->ht_pfn == PFN_INVALID)
-			panic("ptable_alloc() failed");
-
-		x86pte_zero(ht, 0, mmu.ptes_per_table);
-
-		ht->ht_next = hat->hat_ht_cached;
-		hat->hat_ht_cached = ht;
+		ht->ht_pfn = PFN_INVALID;
+		htable_put_reserve(ht);
 		--count;
 	}
 }
 
 /*
  * Readjust the reserves after a thread finishes using them.
- *
- * The first time this is called post boot, we'll also clear out the
- * extra boot htables that were put in the kernel hat's cache list.
  */
 void
 htable_adjust_reserve()
 {
-	static int first_time = 1;
 	htable_t *ht;
 
 	ASSERT(curthread != hat_reserves_thread);
-
-	/*
-	 * The first time this is called after we can steal, we free up the
-	 * the kernel's cache htable list. It has lots of extra htable/page
-	 * tables that were allocated for boot up.
-	 */
-	if (first_time) {
-		first_time = 0;
-		while ((ht = kas.a_hat->hat_ht_cached) != NULL) {
-			kas.a_hat->hat_ht_cached = ht->ht_next;
-			ASSERT(ht->ht_hat == kas.a_hat);
-			ptable_free(ht);
-			htable_put_reserve(ht);
-		}
-		return;
-	}
 
 	/*
 	 * Free any excess htables in the reserve list
@@ -586,7 +465,7 @@ htable_steal(uint_t cnt)
 					 * - unload and invalidate all PTEs
 					 */
 					for (e = 0, va = ht->ht_vaddr;
-					    e < ht->ht_num_ptes &&
+					    e < HTABLE_NUM_PTES(ht) &&
 					    ht->ht_valid_cnt > 0 &&
 					    ht->ht_busy == 1 &&
 					    ht->ht_lock_cnt == 0;
@@ -637,7 +516,7 @@ htable_steal(uint_t cnt)
 
 					/*
 					 * Break to outer loop to release the
-					 * higher (ht_parent) pagtable. This
+					 * higher (ht_parent) pagetable. This
 					 * spreads out the pain caused by
 					 * pagefaults.
 					 */
@@ -699,7 +578,7 @@ htable_reap(void *handle)
 }
 
 /*
- * allocate an htable, stealing one or using the reserve if necessary
+ * Allocate an htable, stealing one or using the reserve if necessary
  */
 static htable_t *
 htable_alloc(
@@ -723,8 +602,7 @@ htable_alloc(
 
 	/*
 	 * First reuse a cached htable from the hat_ht_cached field, this
-	 * avoids unnecessary trips through kmem/page allocators. This is also
-	 * what happens during use_boot_reserve.
+	 * avoids unnecessary trips through kmem/page allocators.
 	 */
 	if (hat->hat_ht_cached != NULL && !is_bare) {
 		hat_enter(hat);
@@ -739,15 +617,12 @@ htable_alloc(
 	}
 
 	if (ht == NULL) {
-		ASSERT(!use_boot_reserve);
 		/*
 		 * When allocating for hat_memload_arena, we use the reserve.
 		 * Also use reserves if we are in a panic().
 		 */
-		if (curthread == hat_reserves_thread || panicstr != NULL) {
-			ASSERT(panicstr != NULL || !is_bare);
-			ASSERT(panicstr != NULL ||
-			    curthread == hat_reserves_thread);
+		if (use_boot_reserve || curthread == hat_reserves_thread ||
+		    panicstr != NULL) {
 			ht = htable_get_reserve();
 		} else {
 			/*
@@ -772,7 +647,7 @@ htable_alloc(
 		 */
 		if (ht != NULL && !is_bare) {
 			ht->ht_hat = hat;
-			ptable_alloc(ht);
+			ht->ht_pfn = ptable_alloc((uintptr_t)ht);
 			if (ht->ht_pfn == PFN_INVALID) {
 				kmem_cache_free(htable_cache, ht);
 				ht = NULL;
@@ -796,8 +671,12 @@ htable_alloc(
 		/*
 		 * If we stole for a bare htable, release the pagetable page.
 		 */
-		if (ht != NULL && is_bare)
-			ptable_free(ht);
+		if (ht != NULL) {
+			if (is_bare) {
+				ptable_free(ht->ht_pfn);
+				ht->ht_pfn = PFN_INVALID;
+			}
+		}
 	}
 
 	/*
@@ -833,13 +712,8 @@ htable_alloc(
 	 */
 	if (is_vlp) {
 		ht->ht_flags |= HTABLE_VLP;
-		ht->ht_num_ptes = VLP_NUM_PTES;
 		ASSERT(ht->ht_pfn == PFN_INVALID);
 		need_to_zero = 0;
-	} else if (level == mmu.max_level) {
-		ht->ht_num_ptes = mmu.top_level_count;
-	} else {
-		ht->ht_num_ptes = mmu.ptes_per_table;
 	}
 
 	/*
@@ -858,6 +732,7 @@ htable_alloc(
 	 */
 	if (need_to_zero)
 		x86pte_zero(ht, 0, mmu.ptes_per_table);
+
 	return (ht);
 }
 
@@ -890,14 +765,14 @@ htable_free(htable_t *ht)
 
 	/*
 	 * If we have a hardware page table, free it.
-	 * We don't free page tables that are accessed by sharing someone else.
+	 * We don't free page tables that are accessed by sharing.
 	 */
 	if (ht->ht_flags & HTABLE_SHARED_PFN) {
 		ASSERT(ht->ht_pfn != PFN_INVALID);
-		ht->ht_pfn = PFN_INVALID;
 	} else if (!(ht->ht_flags & HTABLE_VLP)) {
-		ptable_free(ht);
+		ptable_free(ht->ht_pfn);
 	}
+	ht->ht_pfn = PFN_INVALID;
 
 	/*
 	 * If we are the thread using the reserves, put free htables
@@ -1015,12 +890,9 @@ link_ptp(htable_t *higher, htable_t *new, uintptr_t vaddr)
 }
 
 /*
- * Release of an htable.
- *
- * During process exit, some empty page tables are not unlinked - hat_free_end()
- * cleans them up. Upper level pagetable (mmu.max_page_level and higher) are
- * only released during hat_free_end() or by htable_steal(). We always
- * release SHARED page tables.
+ * Release of hold on an htable. If this is the last use and the pagetable
+ * is empty we may want to free it, then recursively look at the pagetable
+ * above it. The recursion is handled by the outer while() loop.
  */
 void
 htable_release(htable_t *ht)
@@ -1074,8 +946,8 @@ htable_release(htable_t *ht)
 			}
 
 			/*
-			 * remember if we destroy an htable that shares its PFN
-			 * from elsewhere
+			 * Remember if we destroy an htable that shares its PFN
+			 * from elsewhere.
 			 */
 			if (ht->ht_flags & HTABLE_SHARED_PFN) {
 				ASSERT(ht->ht_level == 0);
@@ -1103,7 +975,7 @@ htable_release(htable_t *ht)
 			 */
 			if ((hat->hat_flags & HAT_VLP) &&
 			    level == VLP_LEVEL - 1)
-				hat_demap(hat, DEMAP_ALL_ADDR);
+				hat_tlb_inval(hat, DEMAP_ALL_ADDR);
 
 			/*
 			 * remove this htable from its hash list
@@ -1303,7 +1175,7 @@ try_again:
 				if ((hat->hat_flags & HAT_VLP) &&
 #endif /* __i386 */
 				    l == VLP_LEVEL - 1)
-					hat_demap(hat, DEMAP_ALL_ADDR);
+					hat_tlb_inval(hat, DEMAP_ALL_ADDR);
 			}
 			ht->ht_next = hat->hat_ht_hash[h];
 			ASSERT(ht->ht_prev == NULL);
@@ -1336,6 +1208,96 @@ try_again:
 }
 
 /*
+ * Inherit initial pagetables from the boot program.
+ */
+void
+htable_attach(
+	hat_t *hat,
+	uintptr_t base,
+	level_t level,
+	htable_t *parent,
+	pfn_t pfn)
+{
+	htable_t	*ht;
+	uint_t		h;
+	uint_t		i;
+	x86pte_t	pte;
+	x86pte_t	*ptep;
+	page_t		*pp;
+	extern page_t	*boot_claim_page(pfn_t);
+
+	ht = htable_get_reserve();
+	if (level == mmu.max_level)
+		kas.a_hat->hat_htable = ht;
+	ht->ht_hat = hat;
+	ht->ht_parent = parent;
+	ht->ht_vaddr = base;
+	ht->ht_level = level;
+	ht->ht_busy = 1;
+	ht->ht_next = NULL;
+	ht->ht_prev = NULL;
+	ht->ht_flags = 0;
+	ht->ht_pfn = pfn;
+	ht->ht_lock_cnt = 0;
+	ht->ht_valid_cnt = 0;
+	if (parent != NULL)
+		++parent->ht_busy;
+
+	h = HTABLE_HASH(hat, base, level);
+	HTABLE_ENTER(h);
+	ht->ht_next = hat->hat_ht_hash[h];
+	ASSERT(ht->ht_prev == NULL);
+	if (hat->hat_ht_hash[h])
+		hat->hat_ht_hash[h]->ht_prev = ht;
+	hat->hat_ht_hash[h] = ht;
+	HTABLE_EXIT(h);
+
+	/*
+	 * make sure the page table physical page is not FREE
+	 */
+	if (page_resv(1, KM_NOSLEEP) == 0)
+		panic("page_resv() failed in ptable alloc");
+
+	pp = boot_claim_page(pfn);
+	ASSERT(pp != NULL);
+	page_downgrade(pp);
+	/*
+	 * Record in the page_t that is a pagetable for segkpm setup.
+	 */
+	if (kpm_vbase)
+		pp->p_index = 1;
+
+	/*
+	 * Count valid mappings and recursively attach lower level pagetables.
+	 */
+	ptep = kbm_remap_window(pfn_to_pa(pfn), 0);
+	for (i = 0; i < HTABLE_NUM_PTES(ht); ++i) {
+		if (mmu.pae_hat)
+			pte = ptep[i];
+		else
+			pte = ((x86pte32_t *)ptep)[i];
+		if (!IN_HYPERVISOR_VA(base) && PTE_ISVALID(pte)) {
+			++ht->ht_valid_cnt;
+			if (!PTE_ISPAGE(pte, level)) {
+				htable_attach(hat, base, level - 1,
+				    ht, PTE2PFN(pte, level));
+				ptep = kbm_remap_window(pfn_to_pa(pfn), 0);
+			}
+		}
+		base += LEVEL_SIZE(level);
+		if (base == mmu.hole_start)
+			base = (mmu.hole_end + MMU_PAGEOFFSET) & MMU_PAGEMASK;
+	}
+
+	/*
+	 * As long as all the mappings we had were below kernel base
+	 * we can release the htable.
+	 */
+	if (base < kernelbase)
+		htable_release(ht);
+}
+
+/*
  * Walk through a given htable looking for the first valid entry.  This
  * routine takes both a starting and ending address.  The starting address
  * is required to be within the htable provided by the caller, but there is
@@ -1355,8 +1317,8 @@ htable_scan(htable_t *ht, uintptr_t *vap, uintptr_t eaddr)
 {
 	uint_t e;
 	x86pte_t found_pte = (x86pte_t)0;
-	char *pte_ptr;
-	char *end_pte_ptr;
+	caddr_t pte_ptr;
+	caddr_t end_pte_ptr;
 	int l = ht->ht_level;
 	uintptr_t va = *vap & LEVEL_MASK(l);
 	size_t pgsize = LEVEL_SIZE(l);
@@ -1373,9 +1335,9 @@ htable_scan(htable_t *ht, uintptr_t *vap, uintptr_t eaddr)
 	 * The following page table scan code knows that the valid
 	 * bit of a PTE is in the lowest byte AND that x86 is little endian!!
 	 */
-	pte_ptr = (char *)x86pte_access_pagetable(ht);
-	end_pte_ptr = pte_ptr + (ht->ht_num_ptes << mmu.pte_size_shift);
-	pte_ptr += e << mmu.pte_size_shift;
+	pte_ptr = (caddr_t)x86pte_access_pagetable(ht, 0);
+	end_pte_ptr = (caddr_t)PT_INDEX_PTR(pte_ptr, HTABLE_NUM_PTES(ht));
+	pte_ptr = (caddr_t)PT_INDEX_PTR((x86pte_t *)pte_ptr, e);
 	while (!PTE_ISVALID(*pte_ptr)) {
 		va += pgsize;
 		if (va >= eaddr)
@@ -1389,13 +1351,8 @@ htable_scan(htable_t *ht, uintptr_t *vap, uintptr_t eaddr)
 	/*
 	 * if we found a valid PTE, load the entire PTE
 	 */
-	if (va < eaddr && pte_ptr != end_pte_ptr) {
-		if (mmu.pae_hat) {
-			ATOMIC_LOAD64((x86pte_t *)pte_ptr, found_pte);
-		} else {
-			found_pte = *(x86pte32_t *)pte_ptr;
-		}
-	}
+	if (va < eaddr && pte_ptr != end_pte_ptr)
+		found_pte = GET_PTE((x86pte_t *)pte_ptr);
 	x86pte_release_pagetable(ht);
 
 #if defined(__amd64)
@@ -1611,7 +1568,7 @@ htable_va2entry(uintptr_t va, htable_t *ht)
 
 	ASSERT(va >= ht->ht_vaddr);
 	ASSERT(va <= HTABLE_LAST_PAGE(ht));
-	return ((va >> LEVEL_SHIFT(l)) & (ht->ht_num_ptes - 1));
+	return ((va >> LEVEL_SHIFT(l)) & (HTABLE_NUM_PTES(ht) - 1));
 }
 
 /*
@@ -1624,7 +1581,7 @@ htable_e2va(htable_t *ht, uint_t entry)
 	level_t	l = ht->ht_level;
 	uintptr_t va;
 
-	ASSERT(entry < ht->ht_num_ptes);
+	ASSERT(entry < HTABLE_NUM_PTES(ht));
 	va = ht->ht_vaddr + ((uintptr_t)entry << LEVEL_SHIFT(l));
 
 	/*
@@ -1641,7 +1598,6 @@ htable_e2va(htable_t *ht, uint_t entry)
 /*
  * The code uses compare and swap instructions to read/write PTE's to
  * avoid atomicity problems, since PTEs can be 8 bytes on 32 bit systems.
- * Again this can be optimized on 64 bit systems, since aligned load/store
  * will naturally be atomic.
  *
  * The combination of using kpreempt_disable()/_enable() and the hci_mutex
@@ -1649,69 +1605,44 @@ htable_e2va(htable_t *ht, uint_t entry)
  * while it's in use. If an interrupt thread tries to access a PTE, it will
  * yield briefly back to the pinned thread which holds the cpu's hci_mutex.
  */
-
-static struct hat_cpu_info init_hci;	/* used for cpu 0 */
-
-/*
- * Initialize a CPU private window for mapping page tables.
- * There will be 3 total pages of addressing needed:
- *
- *	1 for r/w access to pagetables
- *	1 for r access when copying pagetables (hat_alloc)
- *	1 that will map the PTEs for the 1st 2, so we can access them quickly
- *
- * We use vmem_xalloc() to get a correct alignment so that only one
- * hat_mempte_setup() is needed.
- */
 void
-x86pte_cpu_init(cpu_t *cpu, void *pages)
+x86pte_cpu_init(cpu_t *cpu)
 {
 	struct hat_cpu_info *hci;
-	caddr_t va;
 
-	/*
-	 * We can't use kmem_alloc/vmem_alloc for the 1st CPU, as this is
-	 * called before we've activated our own HAT
-	 */
-	if (pages != NULL) {
-		hci = &init_hci;
-		va = pages;
-	} else {
-		hci = kmem_alloc(sizeof (struct hat_cpu_info), KM_SLEEP);
-		va = vmem_xalloc(heap_arena, 3 * MMU_PAGESIZE, MMU_PAGESIZE, 0,
-		    LEVEL_SIZE(1), NULL, NULL, VM_SLEEP);
-	}
+	hci = kmem_zalloc(sizeof (*hci), KM_SLEEP);
 	mutex_init(&hci->hci_mutex, NULL, MUTEX_DEFAULT, NULL);
-
-	/*
-	 * If we are using segkpm, then there is no need for any of the
-	 * mempte support.  We can access the desired memory through a kpm
-	 * mapping rather than setting up a temporary mempte mapping.
-	 */
-	if (kpm_enable == 0) {
-		hci->hci_mapped_pfn = PFN_INVALID;
-
-		hci->hci_kernel_pte =
-		    hat_mempte_kern_setup(va, va + (2 * MMU_PAGESIZE));
-		hci->hci_pagetable_va = (void *)va;
-	}
-
 	cpu->cpu_hat_info = hci;
 }
 
-/*
- * Macro to establish temporary mappings for x86pte_XXX routines.
- */
-#define	X86PTE_REMAP(addr, pte, index, perm, pfn)	{		\
-		x86pte_t t;						\
-									\
-		t = MAKEPTE((pfn), 0) | (perm) | mmu.pt_global | mmu.pt_nx;\
-		if (mmu.pae_hat)					\
-			pte[index] = t;					\
-		else							\
-			((x86pte32_t *)(pte))[index] = t;		\
-		mmu_tlbflush_entry((caddr_t)(addr));			\
+void
+x86pte_cpu_fini(cpu_t *cpu)
+{
+	struct hat_cpu_info *hci = cpu->cpu_hat_info;
+
+	kmem_free(hci, sizeof (*hci));
+	cpu->cpu_hat_info = NULL;
 }
+
+#ifdef __i386
+/*
+ * On 32 bit kernels, loading a 64 bit PTE is a little tricky
+ */
+x86pte_t
+get_pte64(x86pte_t *ptr)
+{
+	volatile uint32_t *p = (uint32_t *)ptr;
+	x86pte_t t;
+
+	ASSERT(mmu.pae_hat != 0);
+	for (;;) {
+		t = p[0];
+		t |= (uint64_t)p[1] << 32;
+		if ((t & 0xffffffff) == p[0])
+			return (t);
+	}
+}
+#endif /* __i386 */
 
 /*
  * Disable preemption and establish a mapping to the pagetable with the
@@ -1719,47 +1650,65 @@ x86pte_cpu_init(cpu_t *cpu, void *pages)
  * pfn as we last used referenced from this CPU.
  */
 static x86pte_t *
-x86pte_access_pagetable(htable_t *ht)
+x86pte_access_pagetable(htable_t *ht, uint_t index)
 {
-	pfn_t pfn;
-	struct hat_cpu_info *hci;
-
 	/*
 	 * VLP pagetables are contained in the hat_t
 	 */
 	if (ht->ht_flags & HTABLE_VLP)
-		return (ht->ht_hat->hat_vlp_ptes);
+		return (PT_INDEX_PTR(ht->ht_hat->hat_vlp_ptes, index));
+	return (x86pte_mapin(ht->ht_pfn, index, ht));
+}
 
-	/*
-	 * During early boot, use hat_boot_remap() of a page table adddress.
-	 */
-	pfn = ht->ht_pfn;
+/*
+ * map the given pfn into the page table window.
+ */
+/*ARGSUSED*/
+x86pte_t *
+x86pte_mapin(pfn_t pfn, uint_t index, htable_t *ht)
+{
+	x86pte_t *pteptr;
+	x86pte_t pte;
+	x86pte_t newpte;
+	int x;
+
 	ASSERT(pfn != PFN_INVALID);
-	if (kpm_enable)
-		return ((x86pte_t *)hat_kpm_pfn2va(pfn));
 
 	if (!khat_running) {
-		(void) hat_boot_remap(ptable_va, pfn);
-		return ((x86pte_t *)ptable_va);
+		caddr_t va = kbm_remap_window(pfn_to_pa(pfn), 1);
+		return (PT_INDEX_PTR(va, index));
 	}
 
 	/*
-	 * Normally, disable preemption and grab the CPU's hci_mutex
+	 * If kpm is available, use it.
+	 */
+	if (kpm_vbase)
+		return (PT_INDEX_PTR(hat_kpm_pfn2va(pfn), index));
+
+	/*
+	 * Disable preemption and grab the CPU's hci_mutex
 	 */
 	kpreempt_disable();
-	hci = CPU->cpu_hat_info;
-	ASSERT(hci != NULL);
-	mutex_enter(&hci->hci_mutex);
-	if (hci->hci_mapped_pfn != pfn) {
-		/*
-		 * The current mapping doesn't already point to this page.
-		 * Update the CPU specific pagetable mapping to map the pfn.
-		 */
-		X86PTE_REMAP(hci->hci_pagetable_va, hci->hci_kernel_pte, 0,
-		    PT_WRITABLE, pfn);
-		hci->hci_mapped_pfn = pfn;
+	ASSERT(CPU->cpu_hat_info != NULL);
+	mutex_enter(&CPU->cpu_hat_info->hci_mutex);
+	x = PWIN_TABLE(CPU->cpu_id);
+	pteptr = (x86pte_t *)PWIN_PTE_VA(x);
+	if (mmu.pae_hat)
+		pte = *pteptr;
+	else
+		pte = *(x86pte32_t *)pteptr;
+
+	newpte = MAKEPTE(pfn, 0) | mmu.pt_global | mmu.pt_nx;
+	newpte |= PT_WRITABLE;
+
+	if (!PTE_EQUIV(newpte, pte)) {
+		if (mmu.pae_hat)
+			*pteptr = newpte;
+		else
+			*(x86pte32_t *)pteptr = newpte;
+		mmu_tlbflush_entry((caddr_t)(PWIN_VA(x)));
 	}
-	return (hci->hci_pagetable_va);
+	return (PT_INDEX_PTR(PWIN_VA(x), index));
 }
 
 /*
@@ -1768,31 +1717,25 @@ x86pte_access_pagetable(htable_t *ht)
 static void
 x86pte_release_pagetable(htable_t *ht)
 {
-	struct hat_cpu_info *hci;
-
-	if (kpm_enable)
-		return;
-
 	/*
 	 * nothing to do for VLP htables
 	 */
 	if (ht->ht_flags & HTABLE_VLP)
 		return;
 
-	/*
-	 * During boot-up hat_kern_setup(), erase the boot loader remapping.
-	 */
-	if (!khat_running) {
-		hat_boot_demap(ptable_va);
+	x86pte_mapout();
+}
+
+void
+x86pte_mapout(void)
+{
+	if (mmu.pwin_base == NULL || !khat_running)
 		return;
-	}
 
 	/*
-	 * Normal Operation: drop the CPU's hci_mutex and restore preemption
+	 * Drop the CPU's hci_mutex and restore preemption.
 	 */
-	hci = CPU->cpu_hat_info;
-	ASSERT(hci != NULL);
-	mutex_exit(&hci->hci_mutex);
+	mutex_exit(&CPU->cpu_hat_info->hci_mutex);
 	kpreempt_enable();
 }
 
@@ -1803,362 +1746,267 @@ x86pte_t
 x86pte_get(htable_t *ht, uint_t entry)
 {
 	x86pte_t	pte;
-	x86pte32_t	*pte32p;
 	x86pte_t	*ptep;
 
 	/*
 	 * Be careful that loading PAE entries in 32 bit kernel is atomic.
 	 */
-	ptep = x86pte_access_pagetable(ht);
-	if (mmu.pae_hat) {
-		ATOMIC_LOAD64(ptep + entry, pte);
-	} else {
-		pte32p = (x86pte32_t *)ptep;
-		pte = pte32p[entry];
-	}
+	ASSERT(entry < mmu.ptes_per_table);
+	ptep = x86pte_access_pagetable(ht, entry);
+	pte = GET_PTE(ptep);
 	x86pte_release_pagetable(ht);
 	return (pte);
 }
 
 /*
  * Atomic unconditional set of a page table entry, it returns the previous
- * value.
+ * value. For pre-existing mappings if the PFN changes, then we don't care
+ * about the old pte's REF / MOD bits. If the PFN remains the same, we leave
+ * the MOD/REF bits unchanged.
+ *
+ * If asked to overwrite a link to a lower page table with a large page
+ * mapping, this routine returns the special value of LPAGE_ERROR. This
+ * allows the upper HAT layers to retry with a smaller mapping size.
  */
 x86pte_t
 x86pte_set(htable_t *ht, uint_t entry, x86pte_t new, void *ptr)
 {
 	x86pte_t	old;
-	x86pte_t	prev, n;
+	x86pte_t	prev;
 	x86pte_t	*ptep;
-	x86pte32_t	*pte32p;
-	x86pte32_t	n32, p32;
+	level_t		l = ht->ht_level;
+	x86pte_t	pfn_mask = (l != 0) ? PT_PADDR_LGPG : PT_PADDR;
+	x86pte_t	n;
+	uintptr_t	addr = htable_e2va(ht, entry);
+	hat_t		*hat = ht->ht_hat;
 
+	ASSERT(new != 0); /* don't use to invalidate a PTE, see x86pte_update */
 	ASSERT(!(ht->ht_flags & HTABLE_SHARED_PFN));
-	if (ptr == NULL) {
-		ptep = x86pte_access_pagetable(ht);
-		ptep = (void *)((caddr_t)ptep + (entry << mmu.pte_size_shift));
-	} else {
+	if (ptr == NULL)
+		ptep = x86pte_access_pagetable(ht, entry);
+	else
 		ptep = ptr;
-	}
 
-	if (mmu.pae_hat) {
-		for (;;) {
-			prev = *ptep;
-			n = new;
-			/*
-			 * prevent potential data loss by preserving the
-			 * MOD/REF bits if set in the current PTE, the pfns are
-			 * the same and the 'new' pte is non-zero. For example,
-			 * segmap can reissue a read-only hat_memload on top
-			 * of a dirty page.
-			 *
-			 * 'new' is required to be non-zero on a remap as at
-			 * least the valid bit should be non-zero. The 'new'
-			 * check also avoids incorrectly preserving the REF/MOD
-			 * bit when unmapping pfn 0.
-			 */
-			if (new != 0 && PTE_ISVALID(prev) &&
-			    PTE2PFN(prev, ht->ht_level) ==
-			    PTE2PFN(n, ht->ht_level)) {
-				n |= prev & (PT_REF | PT_MOD);
-			}
-			if (prev == n) {
-				old = new;
-				break;
-			}
-			old = cas64(ptep, prev, n);
-			if (old == prev)
-				break;
+	/*
+	 * Install the new PTE. If remapping the same PFN, then
+	 * copy existing REF/MOD bits to new mapping.
+	 */
+	do {
+		prev = GET_PTE(ptep);
+		n = new;
+		if (PTE_ISVALID(n) && (prev & pfn_mask) == (new & pfn_mask))
+			n |= prev & (PT_REF | PT_MOD);
+
+		/*
+		 * Another thread may have installed this mapping already,
+		 * flush the local TLB and be done.
+		 */
+		if (prev == n) {
+			old = new;
+			mmu_tlbflush_entry((caddr_t)addr);
+			goto done;
 		}
-	} else {
-		pte32p = (x86pte32_t *)ptep;
-		for (;;) {
-			p32 = *pte32p;
-			n32 = new;
-			if (new != 0 && PTE_ISVALID(p32) &&
-			    PTE2PFN(p32, ht->ht_level) ==
-			    PTE2PFN(n32, ht->ht_level)) {
-				n32 |= p32 & (PT_REF | PT_MOD);
-			}
-			if (p32 == n32) {
-				old = new;
-				break;
-			}
-			old = cas32(pte32p, p32, n32);
-			if (old == p32)
-				break;
-		}
-	}
+
+		/*
+		 * Detect if we have a collision of installing a large
+		 * page mapping where there already is a lower page table.
+		 */
+		if (l > 0 && (prev & PT_VALID) && !(prev & PT_PAGESIZE))
+			return (LPAGE_ERROR);
+
+		old = CAS_PTE(ptep, prev, n);
+	} while (old != prev);
+
+	/*
+	 * Do a TLB demap if needed, ie. the old pte was valid.
+	 *
+	 * Note that a stale TLB writeback to the PTE here either can't happen
+	 * or doesn't matter. The PFN can only change for NOSYNC|NOCONSIST
+	 * mappings, but they were created with REF and MOD already set, so
+	 * no stale writeback will happen.
+	 *
+	 * Segmap is the only place where remaps happen on the same pfn and for
+	 * that we want to preserve the stale REF/MOD bits.
+	 */
+	if (old & PT_REF)
+		hat_tlb_inval(hat, addr);
+
+done:
 	if (ptr == NULL)
 		x86pte_release_pagetable(ht);
 	return (old);
 }
 
 /*
- * Atomic compare and swap of a page table entry.
+ * Atomic compare and swap of a page table entry. No TLB invalidates are done.
+ * This is used for links between pagetables of different levels.
+ * Note we always create these links with dirty/access set, so they should
+ * never change.
  */
-static x86pte_t
+x86pte_t
 x86pte_cas(htable_t *ht, uint_t entry, x86pte_t old, x86pte_t new)
 {
 	x86pte_t	pte;
 	x86pte_t	*ptep;
-	x86pte32_t	pte32, o32, n32;
-	x86pte32_t	*pte32p;
 
-	ASSERT(!(ht->ht_flags & HTABLE_SHARED_PFN));
-	ptep = x86pte_access_pagetable(ht);
-	if (mmu.pae_hat) {
-		pte = cas64(&ptep[entry], old, new);
-	} else {
-		o32 = old;
-		n32 = new;
-		pte32p = (x86pte32_t *)ptep;
-		pte32 = cas32(&pte32p[entry], o32, n32);
-		pte = pte32;
-	}
+	ptep = x86pte_access_pagetable(ht, entry);
+	pte = CAS_PTE(ptep, old, new);
 	x86pte_release_pagetable(ht);
-
 	return (pte);
 }
 
 /*
- * data structure for cross call information
+ * Make sure the zero we wrote to a page table entry sticks in memory
+ * after invalidating all TLB entries on all CPUs.
  */
-typedef struct xcall_info {
-	x86pte_t	xi_pte;
-	x86pte_t	xi_old;
-	x86pte_t	*xi_pteptr;
-	pfn_t		xi_pfn;
-	processorid_t	xi_cpuid;
-	level_t		xi_level;
-	xc_func_t	xi_func;
-} xcall_info_t;
-
-/*
- * Cross call service function to atomically invalidate a PTE and flush TLBs
- */
-/*ARGSUSED*/
-static int
-x86pte_inval_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
+static x86pte_t
+handle_tlbs(x86pte_t oldpte, x86pte_t *ptep, htable_t *ht, uint_t entry)
 {
-	xcall_info_t	*xi = (xcall_info_t *)a1;
-	caddr_t		addr = (caddr_t)a2;
+	hat_t		*hat = ht->ht_hat;
+	uintptr_t	addr = htable_e2va(ht, entry);
+	x86pte_t	found;
 
 	/*
-	 * Only the initiating cpu invalidates the page table entry.
-	 * It returns the previous PTE value to the caller.
+	 * Was the PTE ever used? If not there can't be any TLB entries.
 	 */
-	if (CPU->cpu_id == xi->xi_cpuid) {
-		x86pte_t	*ptep = xi->xi_pteptr;
-		pfn_t		pfn = xi->xi_pfn;
-		level_t		level = xi->xi_level;
-		x86pte_t	old;
-		x86pte_t	prev;
-		x86pte32_t	*pte32p;
-		x86pte32_t	p32;
+	if ((oldpte & PT_REF) == 0)
+		return (oldpte);
 
-		if (mmu.pae_hat) {
-			for (;;) {
-				prev = *ptep;
-				if (PTE2PFN(prev, level) != pfn)
-					break;
-				old = cas64(ptep, prev, 0);
-				if (old == prev)
-					break;
-			}
-		} else {
-			pte32p = (x86pte32_t *)ptep;
-			for (;;) {
-				p32 = *pte32p;
-				if (PTE2PFN(p32, level) != pfn)
-					break;
-				old = cas32(pte32p, p32, 0);
-				if (old == p32)
-					break;
-			}
-			prev = p32;
-		}
-		xi->xi_pte = prev;
+	/*
+	 * Do a full global TLB invalidation.
+	 * We may have to loop until the new PTE in memory stays zero.
+	 * Why? Because Intel/AMD don't document how the REF/MOD bits are
+	 * copied back from the TLB to the PTE, sigh. We're protecting
+	 * here against a blind write back of the MOD (and other) bits.
+	 */
+	for (;;) {
+		hat_tlb_inval(hat, addr);
+
+		/*
+		 * Check for a stale writeback of a oldpte TLB entry.
+		 * Done when the PTE stays zero.
+		 */
+		found = GET_PTE(ptep);
+		if (found == 0)
+			return (oldpte);
+
+		/*
+		 * The only acceptable PTE change must be from a TLB
+		 * flush setting the MOD bit in, hence oldpte must
+		 * have been writable.
+		 */
+		if (!(oldpte & PT_WRITABLE) || !(found & PT_MOD))
+			break;
+
+		/*
+		 * Did we see a complete writeback of oldpte?
+		 * or
+		 * Did we see the MOD bit set (plus possibly other
+		 * bits rewritten) in a still invalid mapping?
+		 */
+		if (found == (oldpte | PT_MOD) ||
+		    (!(found & PT_VALID) &&
+		    (oldpte | found) == (oldpte | PT_MOD)))
+			oldpte |= PT_MOD;
+		else
+			break;
+
+		(void) CAS_PTE(ptep, found, 0);
 	}
 
 	/*
-	 * For a normal address, we just flush one page mapping
-	 * Otherwise reload cr3 to effect a complete TLB flush.
-	 *
-	 * Note we don't reload VLP pte's -- this assume we never have a
-	 * large page size at VLP_LEVEL for VLP processes.
+	 * If we hit this, a processor attempted to set the DIRTY bit
+	 * of a page table entry happened in a way we didn't anticipate
 	 */
-	if ((uintptr_t)addr != DEMAP_ALL_ADDR) {
-		mmu_tlbflush_entry(addr);
-	} else {
-		reload_cr3();
-	}
-	return (0);
+	panic("handle_tlbs(): unanticipated TLB shootdown scenario"
+	    " oldpte=" FMT_PTE " found=" FMT_PTE, oldpte, found);
+	/*LINTED*/
 }
 
 /*
- * Cross call service function to atomically change a PTE and flush TLBs
- */
-/*ARGSUSED*/
-static int
-x86pte_update_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
-{
-	xcall_info_t	*xi = (xcall_info_t *)a1;
-	caddr_t		addr = (caddr_t)a2;
-
-	/*
-	 * Only the initiating cpu changes the page table entry.
-	 * It returns the previous PTE value to the caller.
-	 */
-	if (CPU->cpu_id == xi->xi_cpuid) {
-		x86pte_t	*ptep = xi->xi_pteptr;
-		x86pte_t	new = xi->xi_pte;
-		x86pte_t	old = xi->xi_old;
-		x86pte_t	prev;
-
-		if (mmu.pae_hat) {
-			prev = cas64(ptep, old, new);
-		} else {
-			x86pte32_t o32 = old;
-			x86pte32_t n32 = new;
-			x86pte32_t *pte32p = (x86pte32_t *)ptep;
-			prev = cas32(pte32p, o32, n32);
-		}
-
-		xi->xi_pte = prev;
-	}
-
-	/*
-	 * Flush the TLB entry
-	 */
-	if ((uintptr_t)addr != DEMAP_ALL_ADDR)
-		mmu_tlbflush_entry(addr);
-	else
-		reload_cr3();
-	return (0);
-}
-
-/*
- * Use cross calls to change a page table entry and invalidate TLBs.
- */
-void
-x86pte_xcall(hat_t *hat, xcall_info_t *xi, uintptr_t addr)
-{
-	cpuset_t	cpus;
-
-	/*
-	 * Given the current implementation of hat_share(), doing a
-	 * hat_pageunload() on a shared page table requries invalidating
-	 * all user TLB entries on all CPUs.
-	 */
-	if (hat->hat_flags & HAT_SHARED) {
-		hat = kas.a_hat;
-		addr = DEMAP_ALL_ADDR;
-	}
-
-	/*
-	 * Use a cross call to do the invalidations.
-	 * Note the current CPU always has to be in the cross call CPU set.
-	 */
-	kpreempt_disable();
-	xi->xi_cpuid = CPU->cpu_id;
-	CPUSET_ZERO(cpus);
-	if (hat == kas.a_hat) {
-		CPUSET_OR(cpus, khat_cpuset);
-	} else {
-		mutex_enter(&hat->hat_switch_mutex);
-		CPUSET_OR(cpus, hat->hat_cpus);
-		CPUSET_ADD(cpus, CPU->cpu_id);
-	}
-
-	/*
-	 * Use a cross call to modify the page table entry and invalidate TLBs.
-	 * If we're panic'ing, don't bother with the cross call.
-	 * Note the panicstr check isn't bullet proof and the panic system
-	 * ought to be made tighter.
-	 */
-	if (panicstr == NULL)
-		xc_wait_sync((xc_arg_t)xi, addr, NULL, X_CALL_HIPRI,
-			    cpus, xi->xi_func);
-	else
-		(void) xi->xi_func((xc_arg_t)xi, (xc_arg_t)addr, NULL);
-	if (hat != kas.a_hat)
-		mutex_exit(&hat->hat_switch_mutex);
-	kpreempt_enable();
-}
-
-/*
- * Invalidate a page table entry if it currently maps the given pfn.
- * This returns the previous value of the PTE.
+ * Invalidate a page table entry as long as it currently maps something that
+ * matches the value determined by expect.
+ *
+ * Also invalidates any TLB entries and returns the previous value of the PTE.
  */
 x86pte_t
-x86pte_invalidate_pfn(htable_t *ht, uint_t entry, pfn_t pfn, void *pte_ptr)
+x86pte_inval(
+	htable_t *ht,
+	uint_t entry,
+	x86pte_t expect,
+	x86pte_t *pte_ptr)
 {
-	xcall_info_t	xi;
 	x86pte_t	*ptep;
-	hat_t		*hat;
-	uintptr_t	addr;
+	x86pte_t	oldpte;
+	x86pte_t	found;
 
 	ASSERT(!(ht->ht_flags & HTABLE_SHARED_PFN));
-	if (pte_ptr != NULL) {
+	ASSERT(ht->ht_level != VLP_LEVEL);
+	if (pte_ptr != NULL)
 		ptep = pte_ptr;
-	} else {
-		ptep = x86pte_access_pagetable(ht);
-		ptep = (void *)((caddr_t)ptep + (entry << mmu.pte_size_shift));
-	}
+	else
+		ptep = x86pte_access_pagetable(ht, entry);
 
 	/*
-	 * Fill in the structure used by the cross call function to do the
-	 * invalidation.
+	 * This loop deals with REF/MOD bits changing between the
+	 * GET_PTE() and the CAS_PTE().
 	 */
-	xi.xi_pte = 0;
-	xi.xi_pteptr = ptep;
-	xi.xi_pfn = pfn;
-	xi.xi_level = ht->ht_level;
-	xi.xi_func = x86pte_inval_func;
-	ASSERT(xi.xi_level != VLP_LEVEL);
+	do {
+		oldpte = GET_PTE(ptep);
+		if (expect != 0 && (oldpte & PT_PADDR) != (expect & PT_PADDR))
+			goto give_up;
+		found = CAS_PTE(ptep, oldpte, 0);
+	} while (found != oldpte);
+	oldpte = handle_tlbs(oldpte, ptep, ht, entry);
 
-	hat = ht->ht_hat;
-	addr = htable_e2va(ht, entry);
-
-	x86pte_xcall(hat, &xi, addr);
-
+give_up:
 	if (pte_ptr == NULL)
 		x86pte_release_pagetable(ht);
-	return (xi.xi_pte);
+	return (oldpte);
 }
 
 /*
- * update a PTE and invalidate any stale TLB entries.
+ * Change a page table entry af it currently matches the value in expect.
  */
 x86pte_t
-x86pte_update(htable_t *ht, uint_t entry, x86pte_t expected, x86pte_t new)
+x86pte_update(
+	htable_t *ht,
+	uint_t entry,
+	x86pte_t expect,
+	x86pte_t new)
 {
-	xcall_info_t	xi;
 	x86pte_t	*ptep;
-	hat_t		*hat;
-	uintptr_t	addr;
+	x86pte_t	found;
 
+	ASSERT(new != 0);
 	ASSERT(!(ht->ht_flags & HTABLE_SHARED_PFN));
-	ptep = x86pte_access_pagetable(ht);
-	ptep = (void *)((caddr_t)ptep + (entry << mmu.pte_size_shift));
+	ASSERT(ht->ht_level != VLP_LEVEL);
 
-	/*
-	 * Fill in the structure used by the cross call function to do the
-	 * invalidation.
-	 */
-	xi.xi_pte = new;
-	xi.xi_old = expected;
-	xi.xi_pteptr = ptep;
-	xi.xi_func = x86pte_update_func;
+	ptep = x86pte_access_pagetable(ht, entry);
+	found = CAS_PTE(ptep, expect, new);
+	if (found == expect) {
+		hat_tlb_inval(ht->ht_hat, htable_e2va(ht, entry));
 
-	hat = ht->ht_hat;
-	addr = htable_e2va(ht, entry);
-
-	x86pte_xcall(hat, &xi, addr);
-
+		/*
+		 * When removing write permission *and* clearing the
+		 * MOD bit, check if a write happened via a stale
+		 * TLB entry before the TLB shootdown finished.
+		 *
+		 * If it did happen, simply re-enable write permission and
+		 * act like the original CAS failed.
+		 */
+		if ((expect & (PT_WRITABLE | PT_MOD)) == PT_WRITABLE &&
+		    (new & (PT_WRITABLE | PT_MOD)) == 0 &&
+		    (GET_PTE(ptep) & PT_MOD) != 0) {
+			do {
+				found = GET_PTE(ptep);
+				found =
+				    CAS_PTE(ptep, found, found | PT_WRITABLE);
+			} while ((found & PT_WRITABLE) == 0);
+		}
+	}
 	x86pte_release_pagetable(ht);
-	return (xi.xi_pte);
+	return (found);
 }
 
 /*
@@ -2169,10 +2017,11 @@ x86pte_update(htable_t *ht, uint_t entry, x86pte_t expected, x86pte_t new)
 void
 x86pte_copy(htable_t *src, htable_t *dest, uint_t entry, uint_t count)
 {
-	struct hat_cpu_info *hci;
 	caddr_t	src_va;
 	caddr_t dst_va;
 	size_t size;
+	x86pte_t *pteptr;
+	x86pte_t pte;
 
 	ASSERT(khat_running);
 	ASSERT(!(dest->ht_flags & HTABLE_VLP));
@@ -2181,27 +2030,31 @@ x86pte_copy(htable_t *src, htable_t *dest, uint_t entry, uint_t count)
 	ASSERT(!(dest->ht_flags & HTABLE_SHARED_PFN));
 
 	/*
-	 * Acquire access to the CPU pagetable window for the destination.
+	 * Acquire access to the CPU pagetable windows for the dest and source.
 	 */
-	dst_va = (caddr_t)x86pte_access_pagetable(dest);
-	if (kpm_enable) {
-		src_va = (caddr_t)x86pte_access_pagetable(src);
+	dst_va = (caddr_t)x86pte_access_pagetable(dest, entry);
+	if (kpm_vbase) {
+		src_va = (caddr_t)
+		    PT_INDEX_PTR(hat_kpm_pfn2va(src->ht_pfn), entry);
 	} else {
-		hci = CPU->cpu_hat_info;
+		uint_t x = PWIN_SRC(CPU->cpu_id);
 
 		/*
 		 * Finish defining the src pagetable mapping
 		 */
-		src_va = dst_va + MMU_PAGESIZE;
-		X86PTE_REMAP(src_va, hci->hci_kernel_pte, 1, 0, src->ht_pfn);
+		src_va = (caddr_t)PT_INDEX_PTR(PWIN_VA(x), entry);
+		pte = MAKEPTE(src->ht_pfn, 0) | mmu.pt_global | mmu.pt_nx;
+		pteptr = (x86pte_t *)PWIN_PTE_VA(x);
+		if (mmu.pae_hat)
+			*pteptr = pte;
+		else
+			*(x86pte32_t *)pteptr = pte;
+		mmu_tlbflush_entry((caddr_t)(PWIN_VA(x)));
 	}
 
 	/*
 	 * now do the copy
 	 */
-
-	dst_va += entry << mmu.pte_size_shift;
-	src_va += entry << mmu.pte_size_shift;
 	size = count << mmu.pte_size_shift;
 	bcopy(src_va, dst_va, size);
 
@@ -2211,42 +2064,29 @@ x86pte_copy(htable_t *src, htable_t *dest, uint_t entry, uint_t count)
 /*
  * Zero page table entries - Note this doesn't use atomic stores!
  */
-void
+static void
 x86pte_zero(htable_t *dest, uint_t entry, uint_t count)
 {
 	caddr_t dst_va;
-	x86pte_t *p;
-	x86pte32_t *p32;
 	size_t size;
-	extern void hat_pte_zero(void *, size_t);
 
 	/*
 	 * Map in the page table to be zeroed.
 	 */
 	ASSERT(!(dest->ht_flags & HTABLE_SHARED_PFN));
 	ASSERT(!(dest->ht_flags & HTABLE_VLP));
-	dst_va = (caddr_t)x86pte_access_pagetable(dest);
-	dst_va += entry << mmu.pte_size_shift;
+
+	dst_va = (caddr_t)x86pte_access_pagetable(dest, entry);
+
 	size = count << mmu.pte_size_shift;
-	if (x86_feature & X86_SSE2) {
-		hat_pte_zero(dst_va, size);
-	} else if (khat_running) {
+	ASSERT(size > BLOCKZEROALIGN);
+#ifdef __i386
+	if ((x86_feature & X86_SSE2) == 0)
 		bzero(dst_va, size);
-	} else {
-		/*
-		 * Can't just use bzero during boot because it checks the
-		 * address against kernelbase. Instead just use a zero loop.
-		 */
-		if (mmu.pae_hat) {
-			p = (x86pte_t *)dst_va;
-			while (count-- > 0)
-				*p++ = 0;
-		} else {
-			p32 = (x86pte32_t *)dst_va;
-			while (count-- > 0)
-				*p32++ = 0;
-		}
-	}
+	else
+#endif
+		block_zero_no_xmm(dst_va, size);
+
 	x86pte_release_pagetable(dest);
 }
 

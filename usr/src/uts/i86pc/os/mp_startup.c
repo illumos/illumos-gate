@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -32,7 +33,6 @@
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/disp.h>
-#include <sys/mmu.h>
 #include <sys/class.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
@@ -42,9 +42,9 @@
 #include <sys/var.h>
 #include <sys/vtrace.h>
 #include <vm/hat.h>
-#include <sys/mmu.h>
 #include <vm/as.h>
 #include <vm/seg_kmem.h>
+#include <vm/seg_kp.h>
 #include <sys/segments.h>
 #include <sys/kmem.h>
 #include <sys/stack.h>
@@ -60,10 +60,12 @@
 #include <sys/archsystm.h>
 #include <sys/fp.h>
 #include <sys/reboot.h>
-#include <sys/kdi.h>
+#include <sys/kdi_machimpl.h>
 #include <vm/hat_i86.h>
 #include <sys/memnode.h>
 #include <sys/pci_cfgspace.h>
+#include <sys/mach_mmu.h>
+#include <sys/sysmacros.h>
 #include <sys/cpu_module.h>
 
 struct cpu	cpus[1];			/* CPU data */
@@ -71,15 +73,15 @@ struct cpu	*cpu[NCPU] = {&cpus[0]};	/* pointers to all CPUs */
 cpu_core_t	cpu_core[NCPU];			/* cpu_core structures */
 
 /*
- * Useful for disabling MP bring-up for an MP capable kernel
- * (a kernel that was built with MP defined)
+ * Useful for disabling MP bring-up on a MP capable system.
  */
 int use_mp = 1;
 
 /*
- * To be set by a PSM to indicate what CPUs are available on the system.
+ * to be set by a PSM to indicate what cpus
+ * are sitting around on the system.
  */
-cpuset_t mp_cpus = 1;
+cpuset_t mp_cpus;
 
 /*
  * This variable is used by the hat layer to decide whether or not
@@ -87,11 +89,9 @@ cpuset_t mp_cpus = 1;
  * this variable is set once enough MP initialization has been done in
  * order to allow cross calls.
  */
-int flushes_require_xcalls = 0;
-cpuset_t	cpu_ready_set = 1;
+int flushes_require_xcalls;
+cpuset_t cpu_ready_set = 1;
 
-extern	void	real_mode_start(void);
-extern	void	real_mode_end(void);
 static 	void	mp_startup(void);
 
 static void cpu_sep_enable(void);
@@ -143,7 +143,7 @@ init_cpu_syscall(struct cpu *cp)
 	kpreempt_disable();
 
 #if defined(__amd64)
-	if (x86_feature & X86_ASYSC) {
+	if ((x86_feature & (X86_MSR | X86_ASYSC)) == (X86_MSR | X86_ASYSC)) {
 
 #if !defined(__lint)
 		/*
@@ -163,8 +163,8 @@ init_cpu_syscall(struct cpu *cp)
 		/*
 		 * Program the magic registers ..
 		 */
-		wrmsr(MSR_AMD_STAR, ((uint64_t)(U32CS_SEL << 16 | KCS_SEL)) <<
-		    32);
+		wrmsr(MSR_AMD_STAR,
+		    ((uint64_t)(U32CS_SEL << 16 | KCS_SEL)) << 32);
 		wrmsr(MSR_AMD_LSTAR, (uint64_t)(uintptr_t)sys_syscall);
 		wrmsr(MSR_AMD_CSTAR, (uint64_t)(uintptr_t)sys_syscall32);
 
@@ -183,7 +183,7 @@ init_cpu_syscall(struct cpu *cp)
 	 * On 64-bit kernels on Nocona machines, the 32-bit syscall
 	 * variant isn't available to 32-bit applications, but sysenter is.
 	 */
-	if (x86_feature & X86_SEP) {
+	if ((x86_feature & (X86_MSR | X86_SEP)) == (X86_MSR | X86_SEP)) {
 
 #if !defined(__lint)
 		/*
@@ -208,7 +208,7 @@ init_cpu_syscall(struct cpu *cp)
 		 * resume() sets this value to the base of the threads stack
 		 * via a context handler.
 		 */
-		wrmsr(MSR_INTC_SEP_ESP, 0ULL);
+		wrmsr(MSR_INTC_SEP_ESP, 0);
 		wrmsr(MSR_INTC_SEP_EIP, (uint64_t)(uintptr_t)sys_sysenter);
 	}
 
@@ -221,23 +221,14 @@ init_cpu_syscall(struct cpu *cp)
  * Allocate and initialize the cpu structure, TRAPTRACE buffer, and the
  * startup and idle threads for the specified CPU.
  */
-static void
+struct cpu *
 mp_startup_init(int cpun)
 {
-#if defined(__amd64)
-extern void *long_mode_64(void);
-#endif	/* __amd64 */
-
 	struct cpu *cp;
-	struct tss *ntss;
 	kthread_id_t tp;
 	caddr_t	sp;
-	int size;
 	proc_t *procp;
 	extern void idle();
-
-	struct cpu_tables *tablesp;
-	rm_platter_t *real_mode_platter = (rm_platter_t *)rm_platter_va;
 
 #ifdef TRAPTRACE
 	trap_trace_ctl_t *ttc = &trap_trace_ctl[cpun];
@@ -245,11 +236,7 @@ extern void *long_mode_64(void);
 
 	ASSERT(cpun < NCPU && cpu[cpun] == NULL);
 
-	if ((cp = kmem_zalloc(sizeof (*cp), KM_NOSLEEP)) == NULL) {
-		panic("mp_startup_init: cpu%d: "
-		    "no memory for cpu structure", cpun);
-		/*NOTREACHED*/
-	}
+	cp = kmem_zalloc(sizeof (*cp), KM_SLEEP);
 	procp = curthread->t_procp;
 
 	mutex_enter(&cpu_lock);
@@ -289,6 +276,9 @@ extern void *long_mode_64(void);
 	sp = tp->t_stk;
 	tp->t_pc = (uintptr_t)mp_startup;
 	tp->t_sp = (uintptr_t)(sp - MINFRAME);
+#if defined(__amd64)
+	tp->t_sp -= STACK_ENTRY_ALIGN;		/* fake a call */
+#endif
 
 	cp->cpu_id = cpun;
 	cp->cpu_self = cp;
@@ -327,7 +317,7 @@ extern void *long_mode_64(void);
 	pg_cpu_bootstrap(cp);
 
 	/*
-	 * Perform CPC intialization on the new CPU.
+	 * Perform CPC initialization on the new CPU.
 	 */
 	kcpc_hw_init(cp);
 
@@ -335,77 +325,25 @@ extern void *long_mode_64(void);
 	 * Allocate virtual addresses for cpu_caddr1 and cpu_caddr2
 	 * for each CPU.
 	 */
-
 	setup_vaddr_for_ppcopy(cp);
 
 	/*
-	 * Allocate space for page directory, stack, tss, gdt and idt.
-	 * This assumes that kmem_alloc will return memory which is aligned
-	 * to the next higher power of 2 or a page(if size > MAXABIG)
-	 * If this assumption goes wrong at any time due to change in
-	 * kmem alloc, things may not work as the page directory has to be
-	 * page aligned
+	 * Allocate page for new GDT and initialize from current GDT.
 	 */
-	if ((tablesp = kmem_zalloc(sizeof (*tablesp), KM_NOSLEEP)) == NULL)
-		panic("mp_startup_init: cpu%d cannot allocate tables", cpun);
+#if !defined(__lint)
+	ASSERT((sizeof (*cp->cpu_gdt) * NGDT) <= PAGESIZE);
+#endif
+	cp->cpu_m.mcpu_gdt = kmem_zalloc(PAGESIZE, KM_SLEEP);
+	bcopy(CPU->cpu_m.mcpu_gdt, cp->cpu_m.mcpu_gdt,
+	    (sizeof (*cp->cpu_m.mcpu_gdt) * NGDT));
 
-	if ((uintptr_t)tablesp & ~MMU_STD_PAGEMASK) {
-		kmem_free(tablesp, sizeof (struct cpu_tables));
-		size = sizeof (struct cpu_tables) + MMU_STD_PAGESIZE;
-		tablesp = kmem_zalloc(size, KM_NOSLEEP);
-		tablesp = (struct cpu_tables *)
-		    (((uintptr_t)tablesp + MMU_STD_PAGESIZE) &
-		    MMU_STD_PAGEMASK);
-	}
-
-	ntss = cp->cpu_tss = &tablesp->ct_tss;
-
-	if ((tablesp->ct_gdt = kmem_zalloc(PAGESIZE, KM_NOSLEEP)) == NULL)
-		panic("mp_startup_init: cpu%d cannot allocate GDT", cpun);
-	cp->cpu_gdt = tablesp->ct_gdt;
-	bcopy(CPU->cpu_gdt, cp->cpu_gdt, NGDT * (sizeof (user_desc_t)));
-
-#if defined(__amd64)
-
-	/*
-	 * #DF (double fault).
-	 */
-	ntss->tss_ist1 =
-	    (uint64_t)&tablesp->ct_stack[sizeof (tablesp->ct_stack)];
-
-#elif defined(__i386)
-
-	ntss->tss_esp0 = ntss->tss_esp1 = ntss->tss_esp2 = ntss->tss_esp =
-	    (uint32_t)&tablesp->ct_stack[sizeof (tablesp->ct_stack)];
-
-	ntss->tss_ss0 = ntss->tss_ss1 = ntss->tss_ss2 = ntss->tss_ss = KDS_SEL;
-
-	ntss->tss_eip = (uint32_t)mp_startup;
-
-	ntss->tss_cs = KCS_SEL;
-	ntss->tss_fs = KFS_SEL;
-	ntss->tss_gs = KGS_SEL;
-
+#if defined(__i386)
 	/*
 	 * setup kernel %gs.
 	 */
 	set_usegd(&cp->cpu_gdt[GDT_GS], cp, sizeof (struct cpu) -1, SDT_MEMRWA,
 	    SEL_KPL, 0, 1);
-
-#endif	/* __i386 */
-
-	/*
-	 * Set I/O bit map offset equal to size of TSS segment limit
-	 * for no I/O permission map. This will cause all user I/O
-	 * instructions to generate #gp fault.
-	 */
-	ntss->tss_bitmapbase = sizeof (*ntss);
-
-	/*
-	 * setup kernel tss.
-	 */
-	set_syssegd((system_desc_t *)&cp->cpu_gdt[GDT_KTSS], cp->cpu_tss,
-	    sizeof (*cp->cpu_tss) -1, SDT_SYSTSS, SEL_KPL);
+#endif
 
 	/*
 	 * If we have more than one node, each cpu gets a copy of IDT
@@ -413,83 +351,35 @@ extern void *long_mode_64(void);
 	 * IDT. cpu 0's IDT has been made read-only to workaround the
 	 * cmpxchgl register bug
 	 */
-	cp->cpu_idt = CPU->cpu_idt;
 	if (system_hardware.hd_nodes && x86_type != X86_TYPE_P5) {
-		cp->cpu_idt = kmem_alloc(sizeof (idt0), KM_SLEEP);
-		bcopy(idt0, cp->cpu_idt, sizeof (idt0));
+		struct machcpu *mcpu = &cp->cpu_m;
+
+		mcpu->mcpu_idt = kmem_alloc(sizeof (idt0), KM_SLEEP);
+		bcopy(idt0, mcpu->mcpu_idt, sizeof (idt0));
+	} else {
+		cp->cpu_m.mcpu_idt = CPU->cpu_m.mcpu_idt;
 	}
 
 	/*
-	 * Get interrupt priority data from cpu 0
+	 * Get interrupt priority data from cpu 0.
 	 */
 	cp->cpu_pri_data = CPU->cpu_pri_data;
 
+	/*
+	 * alloc space for cpuid info
+	 */
+	cpuid_alloc_space(cp);
+
 	hat_cpu_online(cp);
-
-	/* Should remove all entries for the current process/thread here */
-
-	/*
-	 * Fill up the real mode platter to make it easy for real mode code to
-	 * kick it off. This area should really be one passed by boot to kernel
-	 * and guaranteed to be below 1MB and aligned to 16 bytes. Should also
-	 * have identical physical and virtual address in paged mode.
-	 */
-	real_mode_platter->rm_idt_base = cp->cpu_idt;
-	real_mode_platter->rm_idt_lim = sizeof (idt0) - 1;
-	real_mode_platter->rm_gdt_base = cp->cpu_gdt;
-	real_mode_platter->rm_gdt_lim = sizeof (gdt0) -1;
-	real_mode_platter->rm_pdbr = getcr3();
-	real_mode_platter->rm_cpu = cpun;
-	real_mode_platter->rm_x86feature = x86_feature;
-	real_mode_platter->rm_cr4 = cr4_value;
-
-#if defined(__amd64)
-	if (getcr3() > 0xffffffffUL)
-		panic("Cannot initialize CPUs; kernel's 64-bit page tables\n"
-			"located above 4G in physical memory (@ 0x%llx).",
-			(unsigned long long)getcr3());
-
-	/*
-	 * Setup pseudo-descriptors for temporary GDT and IDT for use ONLY
-	 * by code in real_mode_start():
-	 *
-	 * GDT[0]:  NULL selector
-	 * GDT[1]:  64-bit CS: Long = 1, Present = 1, bits 12, 11 = 1
-	 *
-	 * Clear the IDT as interrupts will be off and a limit of 0 will cause
-	 * the CPU to triple fault and reset on an NMI, seemingly as reasonable
-	 * a course of action as any other, though it may cause the entire
-	 * platform to reset in some cases...
-	 */
-	real_mode_platter->rm_temp_gdt[0] = 0ULL;
-	real_mode_platter->rm_temp_gdt[TEMPGDT_KCODE64] = 0x20980000000000ULL;
-
-	real_mode_platter->rm_temp_gdt_lim = (ushort_t)
-	    (sizeof (real_mode_platter->rm_temp_gdt) - 1);
-	real_mode_platter->rm_temp_gdt_base = rm_platter_pa +
-	    (uint32_t)(&((rm_platter_t *)0)->rm_temp_gdt);
-
-	real_mode_platter->rm_temp_idt_lim = 0;
-	real_mode_platter->rm_temp_idt_base = 0;
-
-	/*
-	 * Since the CPU needs to jump to protected mode using an identity
-	 * mapped address, we need to calculate it here.
-	 */
-	real_mode_platter->rm_longmode64_addr = rm_platter_pa +
-	    ((uint32_t)long_mode_64 - (uint32_t)real_mode_start);
-#endif	/* __amd64 */
 
 #ifdef TRAPTRACE
 	/*
-	 * If this is a TRAPTRACE kernel, allocate TRAPTRACE buffers for this
-	 * CPU.
+	 * If this is a TRAPTRACE kernel, allocate TRAPTRACE buffers
 	 */
 	ttc->ttc_first = (uintptr_t)kmem_zalloc(trap_trace_bufsize, KM_SLEEP);
 	ttc->ttc_next = ttc->ttc_first;
 	ttc->ttc_limit = ttc->ttc_first + trap_trace_bufsize;
 #endif
-
 	/*
 	 * Record that we have another CPU.
 	 */
@@ -504,6 +394,92 @@ extern void *long_mode_64(void);
 	 */
 	cpu_add_unit(cp);
 	mutex_exit(&cpu_lock);
+
+	return (cp);
+}
+
+/*
+ * Undo what was done in mp_startup_init
+ */
+static void
+mp_startup_fini(struct cpu *cp, int error)
+{
+	mutex_enter(&cpu_lock);
+
+	/*
+	 * Remove the CPU from the list of available CPUs.
+	 */
+	cpu_del_unit(cp->cpu_id);
+
+	if (error == ETIMEDOUT) {
+		/*
+		 * The cpu was started, but never *seemed* to run any
+		 * code in the kernel; it's probably off spinning in its
+		 * own private world, though with potential references to
+		 * our kmem-allocated IDTs and GDTs (for example).
+		 *
+		 * Worse still, it may actually wake up some time later,
+		 * so rather than guess what it might or might not do, we
+		 * leave the fundamental data structures intact.
+		 */
+		cp->cpu_flags = 0;
+		mutex_exit(&cpu_lock);
+		return;
+	}
+
+	/*
+	 * At this point, the only threads bound to this CPU should
+	 * special per-cpu threads: it's idle thread, it's pause threads,
+	 * and it's interrupt threads.  Clean these up.
+	 */
+	cpu_destroy_bound_threads(cp);
+	cp->cpu_idle_thread = NULL;
+
+	/*
+	 * Free the interrupt stack.
+	 */
+	segkp_release(segkp,
+	    cp->cpu_intr_stack - (INTR_STACK_SIZE - SA(MINFRAME)));
+
+	mutex_exit(&cpu_lock);
+
+#ifdef TRAPTRACE
+	/*
+	 * Discard the trap trace buffer
+	 */
+	{
+		trap_trace_ctl_t *ttc = &trap_trace_ctl[cp->cpu_id];
+
+		kmem_free((void *)ttc->ttc_first, trap_trace_bufsize);
+		ttc->ttc_first = NULL;
+	}
+#endif
+
+	hat_cpu_offline(cp);
+
+	cpuid_free_space(cp);
+
+	if (cp->cpu_m.mcpu_idt != CPU->cpu_m.mcpu_idt)
+		kmem_free(cp->cpu_m.mcpu_idt, sizeof (idt0));
+	cp->cpu_m.mcpu_idt = NULL;
+
+	kmem_free(cp->cpu_m.mcpu_gdt, PAGESIZE);
+	cp->cpu_m.mcpu_gdt = NULL;
+
+	teardown_vaddr_for_ppcopy(cp);
+
+	kcpc_hw_fini(cp);
+
+	cp->cpu_dispthread = NULL;
+	cp->cpu_thread = NULL;	/* discarded by cpu_destroy_bound_threads() */
+
+	cpu_vm_data_destroy(cp);
+
+	mutex_enter(&cpu_lock);
+	disp_cpu_fini(cp);
+	mutex_exit(&cpu_lock);
+
+	kmem_free(cp, sizeof (*cp));
 }
 
 /*
@@ -528,6 +504,10 @@ extern void *long_mode_64(void);
  * AMD Athlon(tm) 64 and AMD Opteron(tm) Processors, August 2005.
  */
 
+#if defined(OPTERON_ERRATUM_88)
+int opteron_erratum_88;		/* if non-zero -> at least one cpu has it */
+#endif
+
 #if defined(OPTERON_ERRATUM_91)
 int opteron_erratum_91;		/* if non-zero -> at least one cpu has it */
 #endif
@@ -536,8 +516,16 @@ int opteron_erratum_91;		/* if non-zero -> at least one cpu has it */
 int opteron_erratum_93;		/* if non-zero -> at least one cpu has it */
 #endif
 
+#if defined(OPTERON_ERRATUM_95)
+int opteron_erratum_95;		/* if non-zero -> at least one cpu has it */
+#endif
+
 #if defined(OPTERON_ERRATUM_100)
 int opteron_erratum_100;	/* if non-zero -> at least one cpu has it */
+#endif
+
+#if defined(OPTERON_ERRATUM_108)
+int opteron_erratum_108;	/* if non-zero -> at least one cpu has it */
 #endif
 
 #if defined(OPTERON_ERRATUM_109)
@@ -569,9 +557,30 @@ int opteron_workaround_6336786_UP = 0;	/* Not needed for UP */
 int opteron_workaround_6323525;	/* if non-zero -> at least one cpu has it */
 #endif
 
-#define	WARNING(cpu, n)						\
-	cmn_err(CE_WARN, "cpu%d: no workaround for erratum %d",	\
-	    (cpu)->cpu_id, (n))
+static void
+workaround_warning(cpu_t *cp, uint_t erratum)
+{
+	cmn_err(CE_WARN, "cpu%d: no workaround for erratum %u",
+	    cp->cpu_id, erratum);
+}
+
+static void
+workaround_applied(uint_t erratum)
+{
+	if (erratum > 1000000)
+		cmn_err(CE_CONT, "?workaround applied for cpu issue #%d\n",
+		    erratum);
+	else
+		cmn_err(CE_CONT, "?workaround applied for cpu erratum #%d\n",
+		    erratum);
+}
+
+static void
+msr_warning(cpu_t *cp, const char *rw, uint_t msr, int error)
+{
+	cmn_err(CE_WARN, "cpu%d: couldn't %smsr 0x%x, error %d",
+	    cp->cpu_id, rw, msr, error);
+}
 
 uint_t
 workaround_errata(struct cpu *cpu)
@@ -589,8 +598,9 @@ workaround_errata(struct cpu *cpu)
 		/*
 		 * The workaround is an mfence in the relevant assembler code
 		 */
+		opteron_erratum_88++;
 #else
-		WARNING(cpu, 88);
+		workaround_warning(cpu, 88);
 		missing++;
 #endif
 	}
@@ -605,7 +615,7 @@ workaround_errata(struct cpu *cpu)
 		 */
 		opteron_erratum_91++;
 #else
-		WARNING(cpu, 91);
+		workaround_warning(cpu, 91);
 		missing++;
 #endif
 	}
@@ -620,7 +630,7 @@ workaround_errata(struct cpu *cpu)
 		 */
 		opteron_erratum_93++;
 #else
-		WARNING(cpu, 93);
+		workaround_warning(cpu, 93);
 		missing++;
 #endif
 	}
@@ -642,11 +652,12 @@ workaround_errata(struct cpu *cpu)
 
 		/*LINTED*/
 		ASSERT((uint32_t)COREHEAP_BASE == 0xc0000000u);
+		opteron_erratum_95++;
 #endif	/* _LP64 */
 #else
-		WARNING(cpu, 95);
+		workaround_warning(cpu, 95);
 		missing++;
-#endif	/* OPTERON_ERRATUM_95 */
+#endif
 	}
 
 	if (cpuid_opteron_erratum(cpu, 100) > 0) {
@@ -659,7 +670,7 @@ workaround_errata(struct cpu *cpu)
 		 */
 		opteron_erratum_100++;
 #else
-		WARNING(cpu, 100);
+		workaround_warning(cpu, 100);
 		missing++;
 #endif
 	}
@@ -676,26 +687,38 @@ workaround_errata(struct cpu *cpu)
 		 * those processors)
 		 */
 #else
-		WARNING(cpu, 108);
+		workaround_warning(cpu, 108);
 		missing++;
 #endif
 	}
 
 	/*LINTED*/
-	if (cpuid_opteron_erratum(cpu, 109) > 0) {
+	if (cpuid_opteron_erratum(cpu, 109) > 0) do {
 		/*
 		 * Certain Reverse REP MOVS May Produce Unpredictable Behaviour
 		 */
 #if defined(OPTERON_ERRATUM_109)
+		/*
+		 * The "workaround" is to print a warning to upgrade the BIOS
+		 */
+		uint64_t value;
+		const uint_t msr = MSR_AMD_PATCHLEVEL;
+		int err;
 
-		/* workaround is to print a warning to upgrade BIOS */
-		if (rdmsr(MSR_AMD_PATCHLEVEL) == 0)
+		if ((err = checked_rdmsr(msr, &value)) != 0) {
+			msr_warning(cpu, "rd", msr, err);
+			workaround_warning(cpu, 109);
+			missing++;
+		}
+		if (value == 0)
 			opteron_erratum_109++;
 #else
-		WARNING(cpu, 109);
+		workaround_warning(cpu, 109);
 		missing++;
 #endif
-	}
+	/*CONSTANTCONDITION*/
+	} while (0);
+
 	/*LINTED*/
 	if (cpuid_opteron_erratum(cpu, 121) > 0) {
 		/*
@@ -703,132 +726,160 @@ workaround_errata(struct cpu *cpu)
 		 * Processor Hang
 		 */
 #if defined(OPTERON_ERRATUM_121)
-		static int	lma;
-
-		if (opteron_erratum_121)
-			opteron_erratum_121++;
-
+#if defined(_LP64)
 		/*
 		 * Erratum 121 is only present in long (64 bit) mode.
 		 * Workaround is to include the page immediately before the
 		 * va hole to eliminate the possibility of system hangs due to
 		 * sequential execution across the va hole boundary.
 		 */
-		if (lma == 0) {
-			/*
-			 * check LMA once: assume all cpus are in long mode
-			 * or not.
-			 */
-			lma = 1;
-
-			if (rdmsr(MSR_AMD_EFER) & AMD_EFER_LMA) {
-				if (hole_start) {
-					hole_start -= PAGESIZE;
-				} else {
-					/*
-					 * hole_start not yet initialized by
-					 * mmu_init. Initialize hole_start
-					 * with value to be subtracted.
-					 */
-					hole_start = PAGESIZE;
-				}
-				opteron_erratum_121++;
+		if (opteron_erratum_121)
+			opteron_erratum_121++;
+		else {
+			if (hole_start) {
+				hole_start -= PAGESIZE;
+			} else {
+				/*
+				 * hole_start not yet initialized by
+				 * mmu_init. Initialize hole_start
+				 * with value to be subtracted.
+				 */
+				hole_start = PAGESIZE;
 			}
+			opteron_erratum_121++;
 		}
+#endif	/* _LP64 */
 #else
-		WARNING(cpu, 121);
+		workaround_warning(cpu, 121);
 		missing++;
 #endif
 	}
 
 	/*LINTED*/
-	if (cpuid_opteron_erratum(cpu, 122) > 0) {
+	if (cpuid_opteron_erratum(cpu, 122) > 0) do {
 		/*
-		 * TLB Flush Filter May Cause Cohenrency Problem in
+		 * TLB Flush Filter May Cause Coherency Problem in
 		 * Multiprocessor Systems
 		 */
 #if defined(OPTERON_ERRATUM_122)
+		uint64_t value;
+		const uint_t msr = MSR_AMD_HWCR;
+		int error;
+
 		/*
 		 * Erratum 122 is only present in MP configurations (multi-core
 		 * or multi-processor).
 		 */
+		if (!opteron_erratum_122 && lgrp_plat_node_cnt == 1 &&
+		    cpuid_get_ncpu_per_chip(cpu) == 1)
+			break;
 
-		if (opteron_erratum_122 || lgrp_plat_node_cnt > 1 ||
-		    cpuid_get_ncpu_per_chip(cpu) > 1) {
-			/* disable TLB Flush Filter */
-			wrmsr(MSR_AMD_HWCR, rdmsr(MSR_AMD_HWCR) |
-			    (uint64_t)(uintptr_t)AMD_HWCR_FFDIS);
-			opteron_erratum_122++;
+		/* disable TLB Flush Filter */
+
+		if ((error = checked_rdmsr(msr, &value)) != 0) {
+			msr_warning(cpu, "rd", msr, error);
+			workaround_warning(cpu, 122);
+			missing++;
+		} else {
+			value |= (uint64_t)AMD_HWCR_FFDIS;
+			if ((error = checked_wrmsr(msr, value)) != 0) {
+				msr_warning(cpu, "wr", msr, error);
+				workaround_warning(cpu, 122);
+				missing++;
+			}
 		}
-
+		opteron_erratum_122++;
 #else
-		WARNING(cpu, 122);
+		workaround_warning(cpu, 122);
 		missing++;
 #endif
-	}
+	/*CONSTANTCONDITION*/
+	} while (0);
 
-#if defined(OPTERON_ERRATUM_123)
 	/*LINTED*/
-	if (cpuid_opteron_erratum(cpu, 123) > 0) {
+	if (cpuid_opteron_erratum(cpu, 123) > 0) do {
 		/*
 		 * Bypassed Reads May Cause Data Corruption of System Hang in
 		 * Dual Core Processors
 		 */
+#if defined(OPTERON_ERRATUM_123)
+		uint64_t value;
+		const uint_t msr = MSR_AMD_PATCHLEVEL;
+		int err;
+
 		/*
 		 * Erratum 123 applies only to multi-core cpus.
 		 */
+		if (cpuid_get_ncpu_per_chip(cpu) < 2)
+			break;
 
-		if (cpuid_get_ncpu_per_chip(cpu) > 1) {
-			/* workaround is to print a warning to upgrade BIOS */
-			if (rdmsr(MSR_AMD_PATCHLEVEL) == 0)
-				opteron_erratum_123++;
+		/*
+		 * The "workaround" is to print a warning to upgrade the BIOS
+		 */
+		if ((err = checked_rdmsr(msr, &value)) != 0) {
+			msr_warning(cpu, "rd", msr, err);
+			workaround_warning(cpu, 123);
+			missing++;
 		}
-	}
-#endif
+		if (value == 0)
+			opteron_erratum_123++;
+#else
+		workaround_warning(cpu, 123);
+		missing++;
 
-#if defined(OPTERON_ERRATUM_131)
+#endif
+	/*CONSTANTCONDITION*/
+	} while (0);
+
 	/*LINTED*/
-	if (cpuid_opteron_erratum(cpu, 131) > 0) {
+	if (cpuid_opteron_erratum(cpu, 131) > 0) do {
 		/*
 		 * Multiprocessor Systems with Four or More Cores May Deadlock
 		 * Waiting for a Probe Response
 		 */
+#if defined(OPTERON_ERRATUM_131)
+		uint64_t nbcfg;
+		const uint_t msr = MSR_AMD_NB_CFG;
+		const uint64_t wabits =
+		    AMD_NB_CFG_SRQ_HEARTBEAT | AMD_NB_CFG_SRQ_SPR;
+		int error;
+
 		/*
 		 * Erratum 131 applies to any system with four or more cores.
 		 */
-		if ((opteron_erratum_131 == 0) && ((lgrp_plat_node_cnt *
-		    cpuid_get_ncpu_per_chip(cpu)) >= 4)) {
-			uint64_t nbcfg;
-			uint64_t wabits;
+		if (opteron_erratum_131)
+			break;
 
-			/*
-			 * Print a warning if neither of the workarounds
-			 * for Erratum 131 is present.
-			 */
+		if (lgrp_plat_node_cnt * cpuid_get_ncpu_per_chip(cpu) < 4)
+			break;
 
-			wabits = AMD_NB_CFG_SRQ_HEARTBEAT |
-			    AMD_NB_CFG_SRQ_SPR;
-
-			nbcfg = rdmsr(MSR_AMD_NB_CFG);
-			if ((nbcfg & wabits) == 0) {
-				opteron_erratum_131++;
-			} else {
-				/* cannot have both workarounds set */
-				ASSERT((nbcfg & wabits) != wabits);
-			}
+		/*
+		 * Print a warning if neither of the workarounds for
+		 * erratum 131 is present.
+		 */
+		if ((error = checked_rdmsr(msr, &nbcfg)) != 0) {
+			msr_warning(cpu, "rd", msr, error);
+			workaround_warning(cpu, 131);
+			missing++;
+		} else if ((nbcfg & wabits) == 0) {
+			opteron_erratum_131++;
+		} else {
+			/* cannot have both workarounds set */
+			ASSERT((nbcfg & wabits) != wabits);
 		}
-	}
+#else
+		workaround_warning(cpu, 131);
+		missing++;
 #endif
+	/*CONSTANTCONDITION*/
+	} while (0);
 
-#if defined(OPTERON_WORKAROUND_6336786)
 	/*
-	 * This isn't really erratum, but for convenience the
+	 * This isn't really an erratum, but for convenience the
 	 * detection/workaround code lives here and in cpuid_opteron_erratum.
 	 */
 	if (cpuid_opteron_erratum(cpu, 6336786) > 0) {
-		int	node;
-		uint8_t data;
-
+#if defined(OPTERON_WORKAROUND_6336786)
 		/*
 		 * Disable C1-Clock ramping on multi-core/multi-processor
 		 * K8 platforms to guard against TSC drift.
@@ -836,8 +887,11 @@ workaround_errata(struct cpu *cpu)
 		if (opteron_workaround_6336786) {
 			opteron_workaround_6336786++;
 		} else if ((lgrp_plat_node_cnt *
-		    cpuid_get_ncpu_per_chip(cpu) >= 2) ||
+		    cpuid_get_ncpu_per_chip(cpu) > 1) ||
 		    opteron_workaround_6336786_UP) {
+			int	node;
+			uint8_t data;
+
 			for (node = 0; node < lgrp_plat_node_cnt; node++) {
 				/*
 				 * Clear PMM7[1:0] (function 3, offset 0x87)
@@ -849,18 +903,20 @@ workaround_errata(struct cpu *cpu)
 			}
 			opteron_workaround_6336786++;
 		}
-	}
+#else
+		workaround_warning(cpu, 6336786);
+		missing++;
 #endif
+	}
 
-#if defined(OPTERON_WORKAROUND_6323525)
 	/*LINTED*/
 	/*
 	 * Mutex primitives don't work as expected.
 	 */
 	if (cpuid_opteron_erratum(cpu, 6323525) > 0) {
-
+#if defined(OPTERON_WORKAROUND_6323525)
 		/*
-		 * problem only occurs with 2 or more cores. If bit in
+		 * This problem only occurs with 2 or more cores. If bit in
 		 * MSR_BU_CFG set, then not applicable. The workaround
 		 * is to patch the semaphone routines with the lfence
 		 * instruction to provide necessary load memory barrier with
@@ -872,18 +928,46 @@ workaround_errata(struct cpu *cpu)
 		if (opteron_workaround_6323525) {
 			opteron_workaround_6323525++;
 		} else if ((x86_feature & X86_SSE2) && ((lgrp_plat_node_cnt *
-		    cpuid_get_ncpu_per_chip(cpu)) >= 2)) {
+		    cpuid_get_ncpu_per_chip(cpu)) > 1)) {
 			if ((xrdmsr(MSR_BU_CFG) & 0x02) == 0)
 				opteron_workaround_6323525++;
 		}
-	}
+#else
+		workaround_warning(cpu, 6323525);
+		missing++;
 #endif
+	}
+
 	return (missing);
 }
 
 void
 workaround_errata_end()
 {
+#if defined(OPTERON_ERRATUM_88)
+	if (opteron_erratum_88)
+		workaround_applied(88);
+#endif
+#if defined(OPTERON_ERRATUM_91)
+	if (opteron_erratum_91)
+		workaround_applied(91);
+#endif
+#if defined(OPTERON_ERRATUM_93)
+	if (opteron_erratum_93)
+		workaround_applied(93);
+#endif
+#if defined(OPTERON_ERRATUM_95)
+	if (opteron_erratum_95)
+		workaround_applied(95);
+#endif
+#if defined(OPTERON_ERRATUM_100)
+	if (opteron_erratum_100)
+		workaround_applied(100);
+#endif
+#if defined(OPTERON_ERRATUM_108)
+	if (opteron_erratum_108)
+		workaround_applied(108);
+#endif
 #if defined(OPTERON_ERRATUM_109)
 	if (opteron_erratum_109) {
 		cmn_err(CE_WARN,
@@ -893,7 +977,15 @@ workaround_errata_end()
 		    " microcode patch is HIGHLY recommended or erroneous"
 		    " system\noperation may occur.\n");
 	}
-#endif	/* OPTERON_ERRATUM_109 */
+#endif
+#if defined(OPTERON_ERRATUM_121)
+	if (opteron_erratum_121)
+		workaround_applied(121);
+#endif
+#if defined(OPTERON_ERRATUM_122)
+	if (opteron_erratum_122)
+		workaround_applied(122);
+#endif
 #if defined(OPTERON_ERRATUM_123)
 	if (opteron_erratum_123) {
 		cmn_err(CE_WARN,
@@ -903,7 +995,7 @@ workaround_errata_end()
 		    " microcode patch is HIGHLY recommended or erroneous"
 		    " system\noperation may occur.\n");
 	}
-#endif	/* OPTERON_ERRATUM_123 */
+#endif
 #if defined(OPTERON_ERRATUM_131)
 	if (opteron_erratum_131) {
 		cmn_err(CE_WARN,
@@ -913,24 +1005,125 @@ workaround_errata_end()
 		    " microcode patch is HIGHLY recommended or erroneous"
 		    " system\noperation may occur.\n");
 	}
-#endif	/* OPTERON_ERRATUM_131 */
+#endif
+#if defined(OPTERON_WORKAROUND_6336786)
+	if (opteron_workaround_6336786)
+		workaround_applied(6336786);
+#endif
+#if defined(OPTERON_WORKAROUND_6323525)
+	if (opteron_workaround_6323525)
+		workaround_applied(6323525);
+#endif
 }
 
-static ushort_t *mp_map_warm_reset_vector();
-static void mp_unmap_warm_reset_vector(ushort_t *warm_reset_vector);
+static cpuset_t procset;
 
-static cpuset_t procset = 1;
+/*
+ * Start a single cpu, assuming that the kernel context is available
+ * to successfully start another cpu.
+ *
+ * (For example, real mode code is mapped into the right place
+ * in memory and is ready to be run.)
+ */
+int
+start_cpu(processorid_t who)
+{
+	void *ctx;
+	cpu_t *cp;
+	int delays;
+	int error = 0;
+
+	ASSERT(who != 0);
+
+	/*
+	 * Check if there's at least a Mbyte of kmem available
+	 * before attempting to start the cpu.
+	 */
+	if (kmem_avail() < 1024 * 1024) {
+		/*
+		 * Kick off a reap in case that helps us with
+		 * later attempts ..
+		 */
+		kmem_reap();
+		return (ENOMEM);
+	}
+
+	cp = mp_startup_init(who);
+	if ((ctx = mach_cpucontext_alloc(cp)) == NULL ||
+	    (error = mach_cpu_start(cp, ctx)) != 0) {
+
+		/*
+		 * Something went wrong before we even started it
+		 */
+		if (ctx)
+			cmn_err(CE_WARN,
+			    "cpu%d: failed to start error %d",
+			    cp->cpu_id, error);
+		else
+			cmn_err(CE_WARN,
+			    "cpu%d: failed to allocate context", cp->cpu_id);
+
+		if (ctx)
+			mach_cpucontext_free(cp, ctx, error);
+		else
+			error = EAGAIN;		/* hmm. */
+		mp_startup_fini(cp, error);
+		return (error);
+	}
+
+	for (delays = 0; !CPU_IN_SET(procset, who); delays++) {
+		if (delays == 500) {
+			/*
+			 * After five seconds, things are probably looking
+			 * a bit bleak - explain the hang.
+			 */
+			cmn_err(CE_NOTE, "cpu%d: started, "
+			    "but not running in the kernel yet", who);
+		} else if (delays > 2000) {
+			/*
+			 * We waited at least 20 seconds, bail ..
+			 */
+			error = ETIMEDOUT;
+			cmn_err(CE_WARN, "cpu%d: timed out", who);
+			mach_cpucontext_free(cp, ctx, error);
+			mp_startup_fini(cp, error);
+			return (error);
+		}
+
+		/*
+		 * wait at least 10ms, then check again..
+		 */
+		delay(USEC_TO_TICK_ROUNDUP(10000));
+	}
+
+	mach_cpucontext_free(cp, ctx, 0);
+
+	if (tsc_gethrtime_enable)
+		tsc_sync_master(who);
+
+	if (dtrace_cpu_init != NULL) {
+		/*
+		 * DTrace CPU initialization expects cpu_lock to be held.
+		 */
+		mutex_enter(&cpu_lock);
+		(*dtrace_cpu_init)(who);
+		mutex_exit(&cpu_lock);
+	}
+
+	while (!CPU_IN_SET(cpu_ready_set, who))
+		delay(1);
+
+	return (0);
+}
+
 
 /*ARGSUSED*/
 void
 start_other_cpus(int cprboot)
 {
-	unsigned int who;
-	int skipped = 0;
-	int cpuid = 0;
-	int delays = 0;
-	int started_cpu;
-	ushort_t *warm_reset_vector = NULL;
+	uint_t who;
+	uint_t skipped = 0;
+	uint_t bootcpuid = 0;
 
 	/*
 	 * Initialize our own cpu_info.
@@ -943,9 +1136,17 @@ start_other_cpus(int cprboot)
 	init_cpu_syscall(CPU);
 
 	/*
+	 * Take the boot cpu out of the mp_cpus set because we know
+	 * it's already running.  Add it to the cpu_ready_set for
+	 * precisely the same reason.
+	 */
+	CPUSET_DEL(mp_cpus, bootcpuid);
+	CPUSET_ADD(cpu_ready_set, bootcpuid);
+
+	/*
 	 * if only 1 cpu or not using MP, skip the rest of this
 	 */
-	if (CPUSET_ISEQUAL(mp_cpus, cpu_ready_set) || use_mp == 0) {
+	if (CPUSET_ISNULL(mp_cpus) || use_mp == 0) {
 		if (use_mp == 0)
 			cmn_err(CE_CONT, "?***** Not in MP mode\n");
 		goto done;
@@ -959,22 +1160,10 @@ start_other_cpus(int cprboot)
 
 	xc_init();		/* initialize processor crosscalls */
 
-	/*
-	 * Copy the real mode code at "real_mode_start" to the
-	 * page at rm_platter_va.
-	 */
-	warm_reset_vector = mp_map_warm_reset_vector();
-	if (warm_reset_vector == NULL)
+	if (mach_cpucontext_init() != 0)
 		goto done;
 
-	bcopy((caddr_t)real_mode_start,
-	    (caddr_t)((rm_platter_t *)rm_platter_va)->rm_code,
-	    (size_t)real_mode_end - (size_t)real_mode_start);
-
 	flushes_require_xcalls = 1;
-
-	ASSERT(CPU_IN_SET(procset, cpuid));
-	ASSERT(CPU_IN_SET(cpu_ready_set, cpuid));
 
 	/*
 	 * We lock our affinity to the master CPU to ensure that all slave CPUs
@@ -983,67 +1172,24 @@ start_other_cpus(int cprboot)
 	affinity_set(CPU_CURRENT);
 
 	for (who = 0; who < NCPU; who++) {
-		if (who == cpuid)
-			continue;
-
-		delays = 0;
 
 		if (!CPU_IN_SET(mp_cpus, who))
 			continue;
-
+		ASSERT(who != bootcpuid);
 		if (ncpus >= max_ncpus) {
 			skipped = who;
 			continue;
 		}
-
-		mp_startup_init(who);
-		started_cpu = 1;
-		(*cpu_startf)(who, rm_platter_pa);
-
-		while (!CPU_IN_SET(procset, who)) {
-			delay(1);
-			if (++delays > (20 * hz)) {
-
-				cmn_err(CE_WARN,
-				    "cpu%d failed to start", who);
-
-				mutex_enter(&cpu_lock);
-				cpu[who]->cpu_flags = 0;
-				cpu_vm_data_destroy(cpu[who]);
-				cpu_del_unit(who);
-				mutex_exit(&cpu_lock);
-
-				started_cpu = 0;
-				break;
-			}
-		}
-		if (!started_cpu)
-			continue;
-		if (tsc_gethrtime_enable)
-			tsc_sync_master(who);
-
+		if (start_cpu(who) != 0)
+			CPUSET_DEL(mp_cpus, who);
 	}
 
 	affinity_clear();
 
-	/*
-	 * Wait for all CPUs that booted (have presence in procset)
-	 * to come online (have presence in cpu_ready_set).  Note
-	 * that the start CPU already satisfies both of these, so no
-	 * special case is needed.
-	 */
-	for (who = 0; who < NCPU; who++) {
-		if (!CPU_IN_SET(procset, who))
-			continue;
-
-		while (!CPU_IN_SET(cpu_ready_set, who))
-			delay(1);
-	}
-
 	if (skipped) {
 		cmn_err(CE_NOTE,
-		    "System detected %d CPU(s), but "
-		    "only %d CPU(s) were enabled during boot.",
+		    "System detected %d cpus, but "
+		    "only %d cpu(s) were enabled during boot.",
 		    skipped + 1, ncpus);
 		cmn_err(CE_NOTE,
 		    "Use \"boot-ncpus\" parameter to enable more CPU(s). "
@@ -1052,11 +1198,7 @@ start_other_cpus(int cprboot)
 
 done:
 	workaround_errata_end();
-
-	if (warm_reset_vector != NULL)
-		mp_unmap_warm_reset_vector(warm_reset_vector);
-	hat_unload(kas.a_hat, (caddr_t)(uintptr_t)rm_platter_pa, MMU_PAGESIZE,
-	    HAT_UNLOAD);
+	mach_cpucontext_fini();
 
 	cmi_post_mpstartup();
 }
@@ -1124,6 +1266,13 @@ mp_startup(void)
 		mtrr_sync();
 
 	/*
+	 * Set up TSC_AUX to contain the cpuid for this processor
+	 * for the rdtscp instruction.
+	 */
+	if (x86_feature & X86_TSCP)
+		(void) wrmsr(MSR_AMD_TSCAUX, cp->cpu_id);
+
+	/*
 	 * Initialize this CPU's syscall handlers
 	 */
 	init_cpu_syscall(cp);
@@ -1136,7 +1285,8 @@ mp_startup(void)
 	 * device interrupts that may end up in the hat layer issuing cross
 	 * calls before CPU_READY is set.
 	 */
-	(void) splx(ipltospl(LOCK_LEVEL));
+	splx(ipltospl(LOCK_LEVEL));
+	sti();
 
 	/*
 	 * Do a sanity check to make sure this new CPU is a sane thing
@@ -1218,7 +1368,7 @@ mp_startup(void)
 		cmi_mca_init();
 
 	if (boothowto & RB_DEBUG)
-		kdi_dvec_cpu_init(cp);
+		kdi_cpu_init();
 
 	/*
 	 * Setting the bit in cpu_ready_set must be the last operation in
@@ -1277,29 +1427,6 @@ mp_cpu_stop(struct cpu *cp)
 }
 
 /*
- * Power on CPU.
- */
-/* ARGSUSED */
-int
-mp_cpu_poweron(struct cpu *cp)
-{
-	ASSERT(MUTEX_HELD(&cpu_lock));
-	return (ENOTSUP);		/* not supported */
-}
-
-/*
- * Power off CPU.
- */
-/* ARGSUSED */
-int
-mp_cpu_poweroff(struct cpu *cp)
-{
-	ASSERT(MUTEX_HELD(&cpu_lock));
-	return (ENOTSUP);		/* not supported */
-}
-
-
-/*
  * Take the specified CPU out of participation in interrupts.
  */
 int
@@ -1324,34 +1451,6 @@ cpu_enable_intr(struct cpu *cp)
 }
 
 
-
-static ushort_t *
-mp_map_warm_reset_vector()
-{
-	ushort_t *warm_reset_vector;
-
-	if (!(warm_reset_vector = (ushort_t *)psm_map_phys(WARM_RESET_VECTOR,
-	    sizeof (ushort_t *), PROT_READ|PROT_WRITE)))
-		return (NULL);
-
-	/*
-	 * setup secondary cpu bios boot up vector
-	 */
-	*warm_reset_vector = (ushort_t)((caddr_t)
-		((struct rm_platter *)rm_platter_va)->rm_code - rm_platter_va
-		+ ((ulong_t)rm_platter_va & 0xf));
-	warm_reset_vector++;
-	*warm_reset_vector = (ushort_t)(rm_platter_pa >> 4);
-
-	--warm_reset_vector;
-	return (warm_reset_vector);
-}
-
-static void
-mp_unmap_warm_reset_vector(ushort_t *warm_reset_vector)
-{
-	psm_unmap_phys((caddr_t)warm_reset_vector, sizeof (ushort_t *));
-}
 
 void
 mp_cpu_faulted_enter(struct cpu *cp)
@@ -1379,9 +1478,9 @@ mp_cpu_faulted_exit(struct cpu *cp)
 void
 cpu_fast_syscall_disable(void *arg)
 {
-	if (x86_feature & X86_SEP)
+	if ((x86_feature & (X86_MSR | X86_SEP)) == (X86_MSR | X86_SEP))
 		cpu_sep_disable();
-	if (x86_feature & X86_ASYSC)
+	if ((x86_feature & (X86_MSR | X86_ASYSC)) == (X86_MSR | X86_ASYSC))
 		cpu_asysc_disable();
 }
 
@@ -1389,9 +1488,9 @@ cpu_fast_syscall_disable(void *arg)
 void
 cpu_fast_syscall_enable(void *arg)
 {
-	if (x86_feature & X86_SEP)
+	if ((x86_feature & (X86_MSR | X86_SEP)) == (X86_MSR | X86_SEP))
 		cpu_sep_enable();
-	if (x86_feature & X86_ASYSC)
+	if ((x86_feature & (X86_MSR | X86_ASYSC)) == (X86_MSR | X86_ASYSC))
 		cpu_asysc_enable();
 }
 
@@ -1414,7 +1513,7 @@ cpu_sep_disable(void)
 	 * Setting the SYSENTER_CS_MSR register to 0 causes software executing
 	 * the sysenter or sysexit instruction to trigger a #gp fault.
 	 */
-	wrmsr(MSR_INTC_SEP_CS, 0ULL);
+	wrmsr(MSR_INTC_SEP_CS, 0);
 }
 
 static void

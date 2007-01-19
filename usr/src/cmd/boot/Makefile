@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,7 +35,8 @@ COMMON_SUBDIRS=		\
 
 i386_SUBDIRS=		\
 	installgrub	\
-	mbr
+	mbr		\
+	symdef
 
 sparc_SUBDIRS=
 
@@ -43,7 +44,8 @@ COMMON_LINTSUBDIRS=	\
 	bootadm	
 
 i386_LINTSUBDIRS=	\
-	installgrub
+	installgrub	\
+	symdef
 
 sparc_LINTSUBDIRS=
 

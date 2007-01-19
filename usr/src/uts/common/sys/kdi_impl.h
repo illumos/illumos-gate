@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +30,7 @@
 
 #include <sys/kdi.h>
 #include <sys/kdi_machimpl.h>
+#include <sys/privregs.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,29 +43,24 @@ struct gdscr;
  * The debugvec is used by the kernel to interact with the debugger.
  */
 struct kdi_debugvec {
-	void	(*dv_enter)(void);
-
-	void	(*dv_cpu_init)(struct cpu *);
-	void	(*dv_kctl_cpu_init)(void);
-
-#if defined(__i386) || defined(__amd64)
-	void	(*dv_idt_sync)(gate_desc_t *);
-#endif	/* __i386 || __amd64 */
-
-	void	(*dv_vmready)(void);
 	void	(*dv_kctl_vmready)(void);
-
 	void	(*dv_kctl_memavail)(void);
-	int	(*dv_memavail)(caddr_t, size_t);
-
-#if defined(__sparc)
-	void	(*dv_cpr_restart)(void);
-#endif
-
 	void	(*dv_kctl_modavail)(void);
 	void	(*dv_kctl_thravail)(void);
+
+	void	(*dv_vmready)(void);
+	void	(*dv_memavail)(caddr_t, size_t);
 	void	(*dv_mod_loaded)(struct modctl *);
 	void	(*dv_mod_unloading)(struct modctl *);
+
+#if defined(__i386) || defined(__amd64)
+	void	(*dv_handle_fault)(greg_t, greg_t, greg_t, int);
+#endif
+#if defined(__sparc)
+	void	(*dv_kctl_cpu_init)(void);
+	void	(*dv_cpu_init)(struct cpu *);
+	void	(*dv_cpr_restart)(void);
+#endif
 };
 
 typedef struct kdi_plat {
@@ -88,6 +83,7 @@ typedef struct kdi_plat {
  * have been stopped.  In such an environment, blocking services such as memory
  * allocation or synchronization primitives are not available.
  */
+
 struct kdi {
 	int kdi_version;
 
@@ -139,6 +135,8 @@ struct kdi {
 
 	void (*kdi_plat_call)(void (*)(void));
 
+	void (*kdi_kmdb_enter)(void);
+
 	kdi_mach_t kdi_mach;
 	kdi_plat_t kdi_plat;
 };
@@ -154,6 +152,9 @@ extern int kdi_vtop(uintptr_t, uint64_t *);
 extern void cpu_kdi_init(kdi_t *);
 extern void mach_kdi_init(kdi_t *);
 extern void plat_kdi_init(kdi_t *);
+
+extern void *boot_kdi_tmpinit(void);
+extern void boot_kdi_tmpfini(void *);
 
 #ifdef __cplusplus
 }

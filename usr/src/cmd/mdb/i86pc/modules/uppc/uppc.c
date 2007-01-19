@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,7 @@ uppc_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
 
 	/* Print the header first */
 	if (option_flags & INTR_DISPLAY_INTRSTAT)
-		mdb_printf("%<u>CPU\t ");
+		mdb_printf("%<u>CPU ");
 	else
 		mdb_printf("%<u>IRQ  Vector IPL(lo/hi) Bus Share ");
 	mdb_printf("%s %</u>\n", option_flags & INTR_DISPLAY_DRVR_INST ?

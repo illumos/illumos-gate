@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,6 +164,12 @@ extern "C" {
  * the kernel text/data mapping starts in all contexts.
  */
 #define	KERNELBASE	ADDRESS_C(0x01000000)
+
+/*
+ * Virtual address range available to the debugger
+ */
+#define	SEGDEBUGBASE	ADDRESS_C(0xedd00000)
+#define	SEGDEBUGSIZE	(ADDRESS_C(0xf0000000) - SEGDEBUGBASE)
 
 /*
  * Define the userlimits

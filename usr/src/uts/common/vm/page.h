@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -872,6 +872,7 @@ int	page_szc_user_filtered(size_t);
 #define	P_NORELOC	0x40		/* Page is non-relocatable */
 #define	P_MIGRATE	0x20		/* Migrate page on next touch */
 #define	P_SWAP		0x10		/* belongs to vnode that is V_ISSWAP */
+#define	P_BOOTPAGES	0x08		/* member of bootpages list */
 
 #define	PP_ISFREE(pp)		((pp)->p_state & P_FREE)
 #define	PP_ISAGED(pp)		(((pp)->p_state & P_FREE) && \
@@ -882,6 +883,7 @@ int	page_szc_user_filtered(size_t);
 #define	PP_ISNORELOCKERNEL(pp)	(PP_ISNORELOC(pp) && PP_ISKAS(pp))
 #define	PP_ISMIGRATE(pp)	((pp)->p_state & P_MIGRATE)
 #define	PP_ISSWAP(pp)		((pp)->p_state & P_SWAP)
+#define	PP_ISBOOTPAGES(pp)	((pp)->p_state & P_BOOTPAGES)
 
 #define	PP_SETFREE(pp)		((pp)->p_state = ((pp)->p_state & ~P_MIGRATE) \
 				| P_FREE)
@@ -889,12 +891,14 @@ int	page_szc_user_filtered(size_t);
 #define	PP_SETNORELOC(pp)	((pp)->p_state |= P_NORELOC)
 #define	PP_SETMIGRATE(pp)	((pp)->p_state |= P_MIGRATE)
 #define	PP_SETSWAP(pp)		((pp)->p_state |= P_SWAP)
+#define	PP_SETBOOTPAGES(pp)	((pp)->p_state |= P_BOOTPAGES)
 
 #define	PP_CLRFREE(pp)		((pp)->p_state &= ~P_FREE)
 #define	PP_CLRAGED(pp)		ASSERT(!PP_ISAGED(pp))
 #define	PP_CLRNORELOC(pp)	((pp)->p_state &= ~P_NORELOC)
 #define	PP_CLRMIGRATE(pp)	((pp)->p_state &= ~P_MIGRATE)
 #define	PP_CLRSWAP(pp)		((pp)->p_state &= ~P_SWAP)
+#define	PP_CLRBOOTPAGES(pp)	((pp)->p_state &= ~P_BOOTPAGES)
 
 /*
  * Flags for page_t p_toxic, for tracking memory hardware errors.
@@ -1132,6 +1136,14 @@ void page_capture_unregister_callback(uint_t index);
 int page_trycapture(page_t *pp, uint_t szc, uint_t flags, void *datap);
 void page_unlock_capture(page_t *pp);
 int page_capture_unretire_pp(page_t *);
+
+extern void memsegs_lock(int);
+extern void memsegs_unlock(int);
+extern int memsegs_lock_held(void);
+extern void memlist_read_lock(void);
+extern void memlist_read_unlock(void);
+extern void memlist_write_lock(void);
+extern void memlist_write_unlock(void);
 
 #ifdef	__cplusplus
 }

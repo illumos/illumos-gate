@@ -2,7 +2,7 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").  
+ * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,7 +164,7 @@ atapi_detach(
 	ADBG_TRACE(("atapi_detach entered\n"));
 
 	if (ata_ctlp->ac_flags & AC_SCSI_HBA_ATTACH)
-		scsi_hba_detach(ata_ctlp->ac_dip);
+		(void) scsi_hba_detach(ata_ctlp->ac_dip);
 
 	if (ata_ctlp->ac_flags & AC_SCSI_HBA_TRAN_ALLOC)
 		scsi_hba_tran_free(ata_ctlp->ac_atapi_tran);

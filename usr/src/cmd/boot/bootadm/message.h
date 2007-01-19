@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,8 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#include <libintl.h>
 
 #define	FILE_MISS gettext("file not found: %s\n")
 
@@ -130,6 +132,8 @@ extern "C" {
 
 #define	INVALID_ROOT gettext("invalid root entry: %s\n")
 
+#define	NO_KERNEL gettext("No kernel line found in entry %d\n")
+
 #define	INVALID_KERNEL gettext("invalid kernel entry: %s\n")
 
 #define	INVALID_MODULE gettext("invalid module entry: %s\n")
@@ -179,6 +183,8 @@ extern "C" {
 
 #define	UNLOCK_FAIL gettext("failed to unlock file: %s: %s\n")
 
+#define	MMAP_FAIL gettext("failed to mmap file: %s: %s\n")
+
 #define	FILE_LOCKED gettext("Another instance of bootadm (pid %u) is running\n")
 
 #define	FLIST_FAIL \
@@ -198,7 +204,7 @@ extern "C" {
 
 #define	RDONLY_FS gettext("read-only filesystem: %s\n")
 
-#define	ARCHIVE_FAIL gettext("failed to create boot archive: %s\n")
+#define	ARCHIVE_FAIL gettext("Command '%s' failed to create boot archive\n")
 
 #define	ARCHIVE_NOT_CREATED gettext("couldn't create boot archive: %s\n")
 
@@ -320,6 +326,44 @@ the failsafe archive unbootable\n")
 
 #define	FILE_REMOVE_FAILED \
 	gettext("Failed to delete one or more of (%s,%s). Remove manually.\n")
+
+#define	UNKNOWN_KERNEL	gettext("Unable to expand %s to a full file path.\n")
+
+#define	NOT_DBOOT \
+	gettext("bootadm set-menu %s may only be run on directboot kernels.\n")
+
+#define	DEFAULT_NOT_BAM	\
+gettext("Default menu.lst entry is not controlled by bootadm.  Exiting\n")
+
+#define	NO_KERNEL_MATCH	\
+gettext("Unexpected kernel command on line %d.\n\
+** YOU MUST MANUALLY CORRECT menu.lst BEFORE REBOOT! **\n\
+For details, see %s\n")
+
+#define	NO_MODULE_MATCH	\
+gettext("Unexpected module command on line %d.\n\
+** YOU MUST MANUALLY CORRECT menu.lst BEFORE REBOOT! **\n\
+For details, see %s\n")
+
+#define	NO_KERNELS_FOUND	\
+gettext("Could not find any kernel lines to update.  Only entries created by\n\
+bootadm(1M) and lu(1M) can be updated.  All other must be manually changed.\n\
+** YOU MUST MANUALLY CORRECT menu.lst BEFORE REBOOT! **\n\
+For details on updating entries, see %s\n")
+
+#define	HAND_ADDED_ENTRY	\
+gettext("On upgrades, bootadm(1M) will only upgrade entries added by\n\
+bootadm(1M) or lu(1M).  The following entry or entries in menu.lst will\n\
+not be upgraded.  For details on updating entries, see\n\
+%s\n")
+
+#define	NOT_ELF_FILE gettext("%s is not an ELF file.\n")
+
+#define	WRONG_ELF_CLASS gettext("%s is wrong ELF class 0x%x\n")
+
+#define	FAILSAFE_MISSING \
+gettext("bootadm -m upgrade run, but the failsafe archives have not been\n\
+updated.  Not updating line %d\n")
 
 #ifdef	__cplusplus
 }

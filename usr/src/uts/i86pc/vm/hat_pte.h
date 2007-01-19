@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,68 +32,8 @@
 extern "C" {
 #endif
 
-
 #include <sys/types.h>
-
-/*
- * Defines for the bits in X86 and AMD64 Page Tables
- *
- * Notes:
- *
- * Largepages and PAT bits:
- *
- * bit 7 at level 0 is the PAT bit
- * bit 7 above level 0 is the Pagesize bit (set for large page)
- * bit 12 (when a large page) is the PAT bit
- *
- * In Solaris the PAT/PWT/PCD values are set up so that:
- *
- * PAT & PWT -> Write Protected
- * PAT & PCD -> Write Combining
- * PAT by itself (PWT == 0 && PCD == 0) yields uncacheable (same as PCD == 1)
- *
- *
- * Permission bits:
- *
- * - PT_USER must be set in all levels for user pages
- * - PT_WRITE must be set in all levels for user writable pages
- * - PT_NX applies if set at any level
- *
- * For these, we use the "allow" settings in all tables above level 0 and only
- * ever disable things in PTEs.
- *
- * The use of PT_GLOBAL and PT_NX depend on being enabled in processor
- * control registers. Hence, we use a variable to reference these bit
- * masks. During hat_kern_setup() if the feature isn't enabled we
- * clear out the variables.
- */
-#define	PT_VALID	(0x001)	/* a valid translation is present */
-#define	PT_WRITABLE	(0x002)	/* the page is writable */
-#define	PT_USER		(0x004)	/* the page is accessible by user mode */
-#define	PT_WRITETHRU	(0x008)	/* write back caching is disabled (non-PAT) */
-#define	PT_NOCACHE	(0x010)	/* page is not cacheable (non-PAT) */
-#define	PT_REF		(0x020)	/* page was referenced */
-#define	PT_MOD		(0x040)	/* page was modified */
-#define	PT_PAGESIZE	(0x080)	/* above level 0, indicates a large page */
-#define	PT_PAT_4K	(0x080) /* at level 0, used for write combining */
-#define	PT_GLOBAL	(0x100)	/* the mapping is global */
-#define	PT_SOFTWARE	(0xe00)	/* available for software */
-
-#define	PT_PAT_LARGE	(0x1000)	/* PAT bit for large pages */
-
-#define	PT_PTPBITS	(PT_VALID | PT_USER | PT_WRITABLE | PT_REF)
-#define	PT_FLAGBITS	(0xfff)	/* for masking off flag bits */
-
-/*
- * The software bits are used by the HAT to track attributes.
- *
- * PT_NOSYNC - The PT_REF/PT_MOD bits are not sync'd to page_t.
- *             The hat will install them as always set.
- *
- * PT_NOCONSIST - There is no entry for this hment for this mapping.
- */
-#define	PT_NOSYNC	(0x200)	/* PTE was created with HAT_NOSYNC */
-#define	PT_NOCONSIST	(0x400)	/* PTE was created with HAT_LOAD_NOCONSIST */
+#include <sys/mach_mmu.h>
 
 /*
  * macros to get/set/clear the PTE fields
@@ -127,27 +66,21 @@ extern "C" {
 /*
  * Shorthand for converting a PTE to it's pfn.
  */
-#define	PTE2PFN(p, l)	\
+#define	PTE2MFN(p, l)	\
 	mmu_btop(PTE_GET((p), PTE_IS_LGPG((p), (l)) ? PT_PADDR_LGPG : PT_PADDR))
+#define	PTE2PFN(p, l) PTE2MFN(p, l)
 
-/*
- * The software extraction for a single Page Table Entry will always
- * be a 64 bit unsigned int. If running a non-PAE hat, the page table
- * access routines know to extend/shorten it to 32 bits.
- */
-typedef uint64_t x86pte_t;
-typedef uint32_t x86pte32_t;
 #define	PT_NX		(0x8000000000000000ull)
-#define	PT_PADDR	(0x00fffffffffff000ull)
-#define	PT_PADDR_LGPG	(0x00ffffffffffe000ull)	/* phys addr for large pages */
+#define	PT_PADDR	(0x000ffffffffff000ull)
+#define	PT_PADDR_LGPG	(0x000fffffffffe000ull)	/* phys addr for large pages */
 
 /*
  * Macros to create a PTP or PTE from the pfn and level
  */
 #define	MAKEPTP(pfn, l)	\
-	(((x86pte_t)(pfn) << MMU_PAGESHIFT) | mmu.ptp_bits[(l) + 1])
+	(pfn_to_pa(pfn) | mmu.ptp_bits[(l) + 1])
 #define	MAKEPTE(pfn, l)	\
-	(((x86pte_t)(pfn) << MMU_PAGESHIFT) | mmu.pte_bits[l])
+	(pfn_to_pa(pfn) | mmu.pte_bits[l])
 
 /*
  * The idea of "level" refers to the level where the page table is used in the
@@ -174,7 +107,7 @@ typedef uint32_t x86pte32_t;
  */
 #define	MAX_NUM_LEVEL		4
 #define	MAX_PAGE_LEVEL		1			/* for now.. sigh */
-typedef	int16_t level_t;
+typedef	int8_t level_t;
 #define	LEVEL_SHIFT(l)	(mmu.level_shift[l])
 #define	LEVEL_SIZE(l)	(mmu.level_size[l])
 #define	LEVEL_OFFSET(l)	(mmu.level_offset[l])
@@ -192,7 +125,7 @@ typedef	int16_t level_t;
 /*
  * The CR3 register holds the physical address of the top level page table.
  */
-#define	MAKECR3(pfn)    mmu_ptob(pfn)
+#define	MAKECR3(pfn)	mmu_ptob(pfn)
 
 /*
  * HAT/MMU parameters that depend on kernel mode and/or processor type
@@ -229,6 +162,14 @@ struct hat_mmu_info {
 	x86pte_t pte_bits[MAX_NUM_LEVEL];	/* bits set for leaf PTE */
 
 	/*
+	 * A range of VA used to window pages in the i86pc/vm code.
+	 * See PWIN_XXX macros.
+	 */
+	caddr_t	pwin_base;
+	caddr_t	pwin_pte_va;
+	paddr_t	pwin_pte_pa;
+
+	/*
 	 * The following tables are equivalent to PAGEXXXXX at different levels
 	 * in the page table hierarchy.
 	 */
@@ -236,12 +177,26 @@ struct hat_mmu_info {
 	uintptr_t level_size[MAX_NUM_LEVEL];	/* PAGESIZE for given level */
 	uintptr_t level_offset[MAX_NUM_LEVEL];	/* PAGEOFFSET for given level */
 	uintptr_t level_mask[MAX_NUM_LEVEL];	/* PAGEMASK for given level */
-
-	uint_t tlb_entries[MAX_NUM_LEVEL];	/* tlb entries per pagesize */
 };
 
 
 #if defined(_KERNEL)
+
+/*
+ * Macros to access the HAT's private page windows. They're used for
+ * accessing pagetables, ppcopy() and page_zero().
+ * The 1st two macros are used to get an index for the particular use.
+ * The next three give you:
+ * - the virtual address of the window
+ * - the virtual address of the pte that maps the window
+ * - the physical address of the pte that map the window
+ */
+#define	PWIN_TABLE(cpuid)	((cpuid) * 2)
+#define	PWIN_SRC(cpuid)		((cpuid) * 2 + 1)	/* for x86pte_copy() */
+#define	PWIN_VA(x)		(mmu.pwin_base + ((x) << MMU_PAGESHIFT))
+#define	PWIN_PTE_VA(x)		(mmu.pwin_pte_va + ((x) << mmu.pte_size_shift))
+#define	PWIN_PTE_PA(x)		(mmu.pwin_pte_pa + ((x) << mmu.pte_size_shift))
+
 /*
  * The concept of a VA hole exists in AMD64. This might need to be made
  * model specific eventually.
@@ -256,23 +211,46 @@ struct hat_mmu_info {
 #define	IN_VA_HOLE(va)	(mmu.hole_start <= (va) && (va) < mmu.hole_end)
 #endif
 
-#define	FMT_PTE "%lx"
-#define	ATOMIC_LOAD64(ptr, pte) ((pte) = *(ptr))
+#define	FMT_PTE "0x%lx"
+#define	GET_PTE(ptr)		(*(x86pte_t *)(ptr))
+#define	SET_PTE(ptr, pte)	(*(x86pte_t *)(ptr) = pte)
+#define	CAS_PTE(ptr, x, y)	cas64(ptr, x, y)
 
 #elif defined(__i386)
 
-#ifdef lint
 #define	IN_VA_HOLE(va)	(__lintzero)
-#else
-#define	IN_VA_HOLE(va)	(0)
-#endif
 
-#define	FMT_PTE "%llx"
-#define	ATOMIC_LOAD64(ptr, pte) (((pte) = *(ptr)),			\
-	((pte) = cas64(ptr, pte, pte)))
+#define	FMT_PTE "0x%llx"
+
+/* on 32 bit kernels, 64 bit loads aren't atomic, use get_pte64() */
+extern x86pte_t get_pte64(x86pte_t *ptr);
+#define	GET_PTE(ptr)	(mmu.pae_hat ? get_pte64(ptr) : *(x86pte32_t *)(ptr))
+#define	SET_PTE(ptr, pte)						\
+	((mmu.pae_hat ? ((x86pte32_t *)(ptr))[1] = (pte >> 32) : 0),	\
+	*(x86pte32_t *)(ptr) = pte)
+#define	CAS_PTE(ptr, x, y)			\
+	(mmu.pae_hat ? cas64(ptr, x, y) :	\
+	cas32((uint32_t *)(ptr), (uint32_t)(x), (uint32_t)(y)))
 
 #endif	/* __i386 */
 
+/*
+ * Return a pointer to the pte entry at the given index within a page table.
+ */
+#define	PT_INDEX_PTR(p, x) \
+	((x86pte_t *)((uintptr_t)(p) + ((x) << mmu.pte_size_shift)))
+
+/*
+ * Return the physical address of the pte entry at the given index within a
+ * page table.
+ */
+#define	PT_INDEX_PHYSADDR(p, x) \
+	((paddr_t)(p) + ((x) << mmu.pte_size_shift))
+
+/*
+ * From pfn to bytes, careful not to lose bits on PAE.
+ */
+#define	pfn_to_pa(pfn) (mmu_ptob((paddr_t)(pfn)))
 
 extern struct hat_mmu_info mmu;
 

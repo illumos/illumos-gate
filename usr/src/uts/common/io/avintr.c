@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -570,7 +569,6 @@ av_dispatch_autovect(uint_t vec)
 			caddr_t arg2 = av->av_intarg2;
 			dev_info_t *dip = av->av_dip;
 
-			numcalled++;
 			if (intr == NULL)
 				break;
 
@@ -579,6 +577,7 @@ av_dispatch_autovect(uint_t vec)
 			r = (*intr)(arg1, arg2);
 			DTRACE_PROBE4(interrupt__complete, dev_info_t *, dip,
 			    void *, intr, caddr_t, arg1, uint_t, r);
+			numcalled++;
 			claimed |= r;
 			if (av->av_ticksp && av->av_prilevel <= LOCK_LEVEL)
 				atomic_add_64(av->av_ticksp, intr_get_time());

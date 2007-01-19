@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,57 +28,42 @@
 /*
  * The debugger/"PROM" interface layer
  *
- * (it makes more sense on SPARC)
+ * It makes more sense on SPARC. In reality, these interfaces deal with three
+ * things: setting break/watchpoints, stepping, and interfacing with the KDI to
+ * set up kmdb's IDT handlers.
  */
 
 #include <kmdb/kmdb_dpi_impl.h>
 #include <kmdb/kmdb_kdi.h>
 #include <kmdb/kmdb_umemglue.h>
 #include <kmdb/kaif.h>
-#include <kmdb/kaif_asmutil.h>
 #include <kmdb/kmdb_io.h>
+#include <kmdb/kaif_start.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_isautil.h>
 #include <mdb/mdb_io_impl.h>
-#include <mdb/mdb_kreg.h>
+#include <mdb/mdb_kreg_impl.h>
 #include <mdb/mdb.h>
 
 #include <sys/types.h>
-#include <sys/segments.h>
 #include <sys/bitmap.h>
 #include <sys/termios.h>
+#include <sys/kdi_impl.h>
 
-kaif_cpusave_t	*kaif_cpusave;
+/*
+ * This is the area containing the saved state when we enter
+ * via kmdb's IDT entries.
+ */
+kdi_cpusave_t	*kaif_cpusave;
 int		kaif_ncpusave;
-
-kaif_drreg_t	kaif_drreg;
+kdi_drreg_t	kaif_drreg;
 
 uint32_t	kaif_waptmap;
-
-#ifndef __amd64
-/* Used to track the current set of valid kernel selectors. */
-uint32_t	kaif_cs;
-uint32_t	kaif_ds;
-uint32_t	kaif_fs;
-uint32_t	kaif_gs;
-#endif
-
-uint_t		kaif_msr_wrexit_msr;
-uint64_t	*kaif_msr_wrexit_valp;
-
-uintptr_t	kaif_kernel_handler;
-uintptr_t	kaif_sys_sysenter;
-uintptr_t	kaif_brand_sys_sysenter;
 
 int		kaif_trap_switch;
 
 void (*kaif_modchg_cb)(struct modctl *, int);
-
-#define	KAIF_MEMRANGES_MAX	2
-
-kaif_memrange_t	kaif_memranges[KAIF_MEMRANGES_MAX];
-int		kaif_nmemranges;
 
 enum {
 	M_SYSRET	= 0x07, /* after M_ESC */
@@ -181,15 +166,25 @@ kaif_get_master_cpuid(void)
 	return (kaif_master_cpuid);
 }
 
-static const mdb_tgt_gregset_t *
-kaif_get_gregs(int cpuid)
+static mdb_tgt_gregset_t *
+kaif_kdi_to_gregs(int cpuid)
 {
 	kaif_cpusave_t *save;
 
 	if ((save = kaif_cpuid2save(cpuid)) == NULL)
 		return (NULL); /* errno is set for us */
 
-	return (save->krs_gregs);
+	/*
+	 * The saved registers are actually identical to an mdb_tgt_gregset,
+	 * so we can directly cast here.
+	 */
+	return ((mdb_tgt_gregset_t *)save->krs_gregs);
+}
+
+static const mdb_tgt_gregset_t *
+kaif_get_gregs(int cpuid)
+{
+	return (kaif_kdi_to_gregs(cpuid));
 }
 
 typedef struct kaif_reg_synonyms {
@@ -212,11 +207,11 @@ kaif_find_regp(const char *regname)
 #endif
 	    { "tt", "trapno" }
 	};
-
-	kaif_cpusave_t *save;
+	mdb_tgt_gregset_t *regs;
 	int i;
 
-	save = kaif_cpuid2save(DPI_MASTER_CPUID);
+	if ((regs = kaif_kdi_to_gregs(DPI_MASTER_CPUID)) == NULL)
+		return (NULL);
 
 	for (i = 0; i < sizeof (synonyms) / sizeof (synonyms[0]); i++) {
 		if (strcmp(synonyms[i].rs_syn, regname) == 0)
@@ -227,7 +222,7 @@ kaif_find_regp(const char *regname)
 		const mdb_tgt_regdesc_t *rd = &mdb_isa_kregs[i];
 
 		if (strcmp(rd->rd_name, regname) == 0)
-			return (&save->krs_gregs->kregs[rd->rd_num]);
+			return (&regs->kregs[rd->rd_num]);
 	}
 
 	(void) set_errno(ENOENT);
@@ -361,7 +356,7 @@ kaif_wapt_reserve(kmdb_wapt_t *wp)
 {
 	int id;
 
-	for (id = 0; id <= KREG_MAXWPIDX; id++) {
+	for (id = 0; id <= KDI_MAXWPIDX; id++) {
 		if (!BT_TEST(&kaif_waptmap, id)) {
 			/* found one */
 			BT_SET(&kaif_waptmap, id);
@@ -405,6 +400,7 @@ kaif_wapt_arm(kmdb_wapt_t *wp)
 	kaif_drreg.dr_ctl &= ~KREG_DRCTL_WP_MASK(hwid);
 	kaif_drreg.dr_ctl |= KREG_DRCTL_WP_LENRW(hwid, wp->wp_size - 1, rw);
 	kaif_drreg.dr_ctl |= KREG_DRCTL_WPEN(hwid);
+	kmdb_kdi_update_drreg(&kaif_drreg);
 }
 
 /*ARGSUSED*/
@@ -418,6 +414,7 @@ kaif_wapt_disarm(kmdb_wapt_t *wp)
 	kaif_drreg.dr_addr[hwid] = 0;
 	kaif_drreg.dr_ctl &= ~(KREG_DRCTL_WP_MASK(hwid) |
 	    KREG_DRCTL_WPEN_MASK(hwid));
+	kmdb_kdi_update_drreg(&kaif_drreg);
 }
 
 /*ARGSUSED*/
@@ -523,7 +520,7 @@ kaif_step(void)
 	case M_POPF:
 		/*
 		 * popfl will restore a pushed EFLAGS from the stack, and could
-		 * in so doing cause IF to be turned on, if only for a a brief
+		 * in so doing cause IF to be turned on, if only for a brief
 		 * period.  To avoid this, we'll secretly replace the stack's
 		 * EFLAGS with our decaffeinated brand.  We'll then manually
 		 * load our EFLAGS copy with the real verion after the step.
@@ -646,12 +643,12 @@ kaif_call(uintptr_t funcva, uint_t argc, const uintptr_t argv[])
 }
 
 static void
-dump_crumb(kaif_crumb_t *krmp)
+dump_crumb(kdi_crumb_t *krmp)
 {
-	kaif_crumb_t krm;
+	kdi_crumb_t krm;
 
-	if (mdb_vread(&krm, sizeof (kaif_crumb_t), (uintptr_t)krmp) !=
-	    sizeof (kaif_crumb_t)) {
+	if (mdb_vread(&krm, sizeof (kdi_crumb_t), (uintptr_t)krmp) !=
+	    sizeof (kdi_crumb_t)) {
 		warn("failed to read crumb at %p", krmp);
 		return;
 	}
@@ -677,8 +674,8 @@ dump_crumbs(kaif_cpusave_t *save)
 {
 	int i;
 
-	for (i = KAIF_NCRUMBS; i > 0; i--) {
-		uint_t idx = (save->krs_curcrumbidx + i) % KAIF_NCRUMBS;
+	for (i = KDI_NCRUMBS; i > 0; i--) {
+		uint_t idx = (save->krs_curcrumbidx + i) % KDI_NCRUMBS;
 		dump_crumb(&save->krs_crumbs[idx]);
 	}
 }
@@ -690,7 +687,7 @@ kaif_dump_crumbs(uintptr_t addr, int cpuid)
 
 	if (addr != NULL) {
 		/* dump_crumb will protect us against bogus addresses */
-		dump_crumb((kaif_crumb_t *)addr);
+		dump_crumb((kdi_crumb_t *)addr);
 
 	} else if (cpuid != -1) {
 		if (cpuid < 0 || cpuid >= kaif_ncpusave)
@@ -727,6 +724,79 @@ kaif_modchg_cancel(void)
 	kaif_modchg_cb = NULL;
 }
 
+static void
+kaif_msr_add(const kdi_msr_t *msrs)
+{
+	kdi_msr_t *save;
+	size_t nr_msrs = 0;
+	size_t i;
+
+	while (msrs[nr_msrs].msr_num != 0)
+		nr_msrs++;
+	/* we want to copy the terminating kdi_msr_t too */
+	nr_msrs++;
+
+	save = mdb_zalloc(sizeof (kdi_msr_t) * nr_msrs * kaif_ncpusave,
+	    UM_SLEEP);
+
+	for (i = 0; i < kaif_ncpusave; i++)
+		bcopy(msrs, &save[nr_msrs * i], sizeof (kdi_msr_t) * nr_msrs);
+
+	kmdb_kdi_set_debug_msrs(save);
+}
+
+static uint64_t
+kaif_msr_get(int cpuid, uint_t num)
+{
+	kdi_cpusave_t *save;
+	kdi_msr_t *msr;
+	int i;
+
+	if ((save = kaif_cpuid2save(cpuid)) == NULL)
+		return (-1); /* errno is set for us */
+
+	msr = save->krs_msr;
+
+	for (i = 0; msr[i].msr_num != 0; i++) {
+		if (msr[i].msr_num == num && (msr[i].msr_type & KDI_MSR_READ))
+			return (msr[i].kdi_msr_val);
+	}
+
+	return (0);
+}
+
+void
+kaif_trap_set_debugger(void)
+{
+	kmdb_kdi_idt_switch(NULL);
+}
+
+void
+kaif_trap_set_saved(kaif_cpusave_t *cpusave)
+{
+	kmdb_kdi_idt_switch(cpusave);
+}
+
+static void
+kaif_vmready(void)
+{
+}
+
+void
+kaif_memavail(caddr_t base, size_t len)
+{
+	int ret;
+	/*
+	 * In the unlikely event that someone is stepping through this routine,
+	 * we need to make sure that the KDI knows about the new range before
+	 * umem gets it.  That way the entry code can recognize stacks
+	 * allocated from the new region.
+	 */
+	kmdb_kdi_memrange_add(base, len);
+	ret = mdb_umem_add(base, len);
+	ASSERT(ret == 0);
+}
+
 void
 kaif_mod_loaded(struct modctl *modp)
 {
@@ -741,190 +811,54 @@ kaif_mod_unloading(struct modctl *modp)
 		kaif_modchg_cb(modp, 0);
 }
 
-/*
- * On some processors, we'll need to clear a certain MSR before proceeding into
- * the debugger.  Complicating matters, this MSR must be cleared before we take
- * any branches.  We have patch points in every trap handler, which will cover
- * all entry paths for master CPUs.  We also have a patch point in the slave
- * entry code.
- */
-static void
-kaif_msr_add_clrentry(uint_t msr)
+void
+kaif_handle_fault(greg_t trapno, greg_t pc, greg_t sp, int cpuid)
 {
-#ifdef __amd64
-	uchar_t code[] = {
-		0x51, 0x50, 0x52,		/* pushq %rcx, %rax, %rdx */
-		0xb9, 0x00, 0x00, 0x00, 0x00,	/* movl $MSRNUM, %ecx */
-		0x31, 0xc0,			/* clr %eax */
-		0x31, 0xd2,			/* clr %edx */
-		0x0f, 0x30,			/* wrmsr */
-		0x5a, 0x58, 0x59		/* popq %rdx, %rax, %rcx */
-	};
-	uchar_t *patch = &code[4];
-#else
-	uchar_t code[] = {
-		0x60,				/* pushal */
-		0xb9, 0x00, 0x00, 0x00, 0x00,	/* movl $MSRNUM, %ecx */
-		0x31, 0xc0,			/* clr %eax */
-		0x31, 0xd2,			/* clr %edx */
-		0x0f, 0x30,			/* wrmsr */
-		0x61				/* popal */
-	};
-	uchar_t *patch = &code[2];
-#endif
-
-	bcopy(&msr, patch, sizeof (uint32_t));
-
-	kaif_idt_patch((caddr_t)code, sizeof (code));
-
-	bcopy(code, &kaif_slave_entry_patch, sizeof (code));
+	kmdb_dpi_handle_fault((kreg_t)trapno, (kreg_t)pc,
+	    (kreg_t)sp, cpuid);
 }
 
-static void
-kaif_msr_add_wrexit(uint_t msr, uint64_t *valp)
-{
-	kaif_msr_wrexit_msr = msr;
-	kaif_msr_wrexit_valp = valp;
-}
-
-static void
-kaif_msr_add(const kmdb_msr_t *msrs)
-{
-	kmdb_msr_t *save;
-	int nmsrs, i;
-
-	ASSERT(kaif_cpusave[0].krs_msr == NULL);
-
-	for (i = 0; msrs[i].msr_num != 0; i++) {
-		switch (msrs[i].msr_type) {
-		case KMDB_MSR_CLEARENTRY:
-			kaif_msr_add_clrentry(msrs[i].msr_num);
-			break;
-
-		case KMDB_MSR_WRITEDELAY:
-			kaif_msr_add_wrexit(msrs[i].msr_num, msrs[i].msr_valp);
-			break;
-		}
-	}
-	nmsrs = i + 1; /* we want to copy the terminating kmdb_msr_t too */
-
-	save = mdb_zalloc(sizeof (kmdb_msr_t) * nmsrs * kaif_ncpusave,
-	    UM_SLEEP);
-
-	for (i = 0; i < kaif_ncpusave; i++) {
-		bcopy(msrs, &save[nmsrs * i], sizeof (kmdb_msr_t) * nmsrs);
-		kaif_cpusave[i].krs_msr = &save[nmsrs * i];
-	}
-}
-
-static uint64_t
-kaif_msr_get(int cpuid, uint_t num)
-{
-	kaif_cpusave_t *save;
-	kmdb_msr_t *msr;
-	int i;
-
-	if ((save = kaif_cpuid2save(cpuid)) == NULL)
-		return (-1); /* errno is set for us */
-
-	msr = save->krs_msr;
-
-	for (i = 0; msr[i].msr_num != 0; i++) {
-		if (msr[i].msr_num == num &&
-		    (msr[i].msr_type & KMDB_MSR_READ))
-			return (msr[i].msr_val);
-	}
-
-	return (0);
-}
-
-int
-kaif_memrange_add(caddr_t base, size_t len)
-{
-	kaif_memrange_t *mr = &kaif_memranges[kaif_nmemranges];
-
-	if (kaif_nmemranges == KAIF_MEMRANGES_MAX)
-		return (set_errno(ENOSPC));
-
-	/*
-	 * In the unlikely event that someone is stepping through this routine,
-	 * we need to make sure that kaif_memranges knows about the new range
-	 * before umem gets it.  That way the entry code can recognize stacks
-	 * allocated from the new region.
-	 */
-	mr->mr_base = base;
-	mr->mr_lim = base + len - 1;
-	kaif_nmemranges++;
-
-	if (mdb_umem_add(base, len) < 0) {
-		kaif_nmemranges--;
-		return (-1); /* errno is set for us */
-	}
-
-	return (0);
-}
+static kdi_debugvec_t kaif_dvec = {
+	NULL,			/* dv_kctl_vmready */
+	NULL,			/* dv_kctl_memavail */
+	NULL,			/* dv_kctl_modavail */
+	NULL,			/* dv_kctl_thravail */
+	kaif_vmready,
+	kaif_memavail,
+	kaif_mod_loaded,
+	kaif_mod_unloading,
+	kaif_handle_fault
+};
 
 void
-kaif_trap_set_debugger(void)
+kaif_kdi_entry(kdi_cpusave_t *cpusave)
 {
-	set_idt(&kaif_idtr);
+	int ret = kaif_main_loop(cpusave);
+	ASSERT(ret == KAIF_CPU_CMD_RESUME ||
+	    ret == KAIF_CPU_CMD_RESUME_MASTER);
 }
 
+/*ARGSUSED*/
 void
-kaif_trap_set_saved(kaif_cpusave_t *cpusave)
+kaif_activate(kdi_debugvec_t **dvecp, uint_t flags)
 {
-	set_idt(&cpusave->krs_idtr);
+	kmdb_kdi_activate(kaif_kdi_entry, kaif_cpusave, kaif_ncpusave);
+	*dvecp = &kaif_dvec;
 }
 
 static int
 kaif_init(kmdb_auxv_t *kav)
 {
-	int i;
-
 	/* Allocate the per-CPU save areas */
 	kaif_cpusave = mdb_zalloc(sizeof (kaif_cpusave_t) * kav->kav_ncpu,
 	    UM_SLEEP);
 	kaif_ncpusave = kav->kav_ncpu;
 
-	for (i = 0; i < kaif_ncpusave; i++) {
-		kaif_cpusave_t *save = &kaif_cpusave[i];
-
-		save->krs_cpu_id = i;
-		save->krs_curcrumbidx = KAIF_NCRUMBS - 1;
-		save->krs_curcrumb = &save->krs_crumbs[save->krs_curcrumbidx];
-	}
-
-	kaif_idt_init();
-
-	/* The initial selector set.  Updated by the debugger-entry code */
-#ifndef __amd64
-	kaif_cs = BOOTCODE_SEL;
-	kaif_ds = kaif_fs = kaif_gs = BOOTFLAT_SEL;
-#endif
-
-	kaif_memranges[0].mr_base = kav->kav_dseg;
-	kaif_memranges[0].mr_lim = kav->kav_dseg + kav->kav_dseg_size - 1;
-	kaif_nmemranges = 1;
-
 	kaif_modchg_cb = NULL;
 
 	kaif_waptmap = 0;
 
-	kaif_drreg.dr_ctl = KREG_DRCTL_RESERVED;
-	kaif_drreg.dr_stat = KREG_DRSTAT_RESERVED;
-
-	kaif_msr_wrexit_msr = 0;
-	kaif_msr_wrexit_valp = NULL;
-
 	kaif_trap_switch = (kav->kav_flags & KMDB_AUXV_FL_NOTRPSWTCH) == 0;
-
-	if ((kaif_sys_sysenter = kmdb_kdi_lookup_by_name("unix",
-	    "sys_sysenter")) == NULL)
-		return (set_errno(ENOENT));
-
-	if ((kaif_brand_sys_sysenter = kmdb_kdi_lookup_by_name("unix",
-	    "brand_sys_sysenter")) == NULL)
-		return (set_errno(ENOENT));
 
 	return (0);
 }
@@ -932,7 +866,7 @@ kaif_init(kmdb_auxv_t *kav)
 dpi_ops_t kmdb_dpi_ops = {
 	kaif_init,
 	kaif_activate,
-	kaif_deactivate,
+	kmdb_kdi_deactivate,
 	kaif_enter_mon,
 	kaif_modchg_register,
 	kaif_modchg_cancel,
@@ -953,7 +887,6 @@ dpi_ops_t kmdb_dpi_ops = {
 	kaif_step_branch,
 	kaif_call,
 	kaif_dump_crumbs,
-	kaif_memrange_add,
 	kaif_msr_add,
 	kaif_msr_get,
 };

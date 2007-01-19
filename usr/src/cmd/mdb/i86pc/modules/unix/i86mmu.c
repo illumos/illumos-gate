@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -37,6 +36,7 @@
 #include <sys/types.h>
 #include <sys/machparam.h>
 #include <sys/controlregs.h>
+#include <sys/mach_mmu.h>
 #include <vm/as.h>
 
 #include <mdb/mdb_modapi.h>
@@ -50,7 +50,7 @@ struct pfn2pp {
 	page_t *pp;
 };
 
-static int do_va2pfn(uintptr_t, struct as *, int, physaddr_t *);
+static int do_va2pa(uintptr_t, struct as *, int, physaddr_t *, pfn_t *);
 static void get_mmu(void);
 
 int
@@ -66,7 +66,7 @@ platform_vtop(uintptr_t addr, struct as *asp, physaddr_t *pap)
 	if (mmu.num_level == 0)
 		return (DCMD_ERR);
 
-	return (do_va2pfn(addr, asp, 0, pap));
+	return (do_va2pa(addr, asp, 0, pap, NULL));
 }
 
 
@@ -132,9 +132,6 @@ page_num2pp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	return (DCMD_OK);
 }
-
-
-
 
 
 /*
@@ -221,20 +218,7 @@ memseg_walk_fini(mdb_walk_state_t *wsp)
 }
 
 /*
- * HAT related dcmds:
- *
- * ::pte [-p XXXXXXXX] [-l 0/1/2/3]
- *
- * dcmd that interprets the -p argument as a page table entry and
- * prints it in more human readable form. The PTE is assumed to be in
- * a level 0 page table, unless -l specifies another level.
- *
- * ::vatopfn [-v] [-a as]
- *
- * Given a virtual address, returns the PFN, if any, mapped at the address.
- * -v shows the intermediate htable/page table entries used to resolve the
- * mapping. By default the virtual address is assumed to be in the kernel's
- * address space.  -a is used to specify a different address space.
+ * Now HAT related dcmds.
  */
 
 struct hat *khat;		/* value of kas.a_hat */
@@ -261,6 +245,21 @@ get_mmu(void)
 	khat = kas.a_hat;
 }
 
+#define	mdb_ma_to_pa(ma) (ma)
+#define	mdb_mfn_to_pfn(mfn) (mfn)
+#define	mdb_pfn_to_mfn(pfn) (pfn)
+
+static pfn_t
+pte2mfn(x86pte_t pte, uint_t level)
+{
+	pfn_t mfn;
+	if (level > 0 && (pte & PT_PAGESIZE))
+		mfn = mmu_btop(pte & PT_PADDR_LGPG);
+	else
+		mfn = mmu_btop(pte & PT_PADDR);
+	return (mfn);
+}
+
 /*
  * Print a PTE in more human friendly way. The PTE is assumed to be in
  * a level 0 page table, unless -l specifies another level.
@@ -275,12 +274,14 @@ do_pte_dcmd(int level, uint64_t pte)
 	    "wrback", "wrthru", "uncached", "uncached",
 	    "wrback", "wrthru", "wrcombine", "uncached"};
 	int pat_index = 0;
+	pfn_t mfn;
 
-	mdb_printf("PTE=%llx: ", pte);
+	mdb_printf("pte=%llr: ", pte);
 	if (PTE_GET(pte, mmu.pt_nx))
 		mdb_printf("noexec ");
 
-	mdb_printf("page=0x%llx ", PTE2PFN(pte, level));
+	mfn = pte2mfn(pte, level);
+	mdb_printf("%s=0x%lr ", "pfn", mfn);
 
 	if (PTE_GET(pte, PT_NOCONSIST))
 		mdb_printf("noconsist ");
@@ -387,8 +388,43 @@ pte_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (do_pte_dcmd(level, pte));
 }
 
+static size_t
+va2entry(htable_t *htable, uintptr_t addr)
+{
+	size_t entry = (addr - htable->ht_vaddr);
+
+	entry >>= mmu.level_shift[htable->ht_level];
+	return (entry & HTABLE_NUM_PTES(htable) - 1);
+}
+
+static x86pte_t
+get_pte(hat_t *hat, htable_t *htable, uintptr_t addr)
+{
+	x86pte_t buf;
+	x86pte32_t *pte32 = (x86pte32_t *)&buf;
+	size_t len;
+
+	if (htable->ht_flags & HTABLE_VLP) {
+		uintptr_t ptr = (uintptr_t)hat->hat_vlp_ptes;
+		ptr += va2entry(htable, addr) << mmu.pte_size_shift;
+		len = mdb_vread(&buf, mmu.pte_size, ptr);
+	} else {
+		paddr_t paddr = mmu_ptob((paddr_t)htable->ht_pfn);
+		paddr += va2entry(htable, addr) << mmu.pte_size_shift;
+		len = mdb_pread(&buf, mmu.pte_size, paddr);
+	}
+
+	if (len != mmu.pte_size)
+		return (0);
+
+	if (mmu.pte_size == sizeof (x86pte_t))
+		return (buf);
+	return (*pte32);
+}
+
 static int
-do_va2pfn(uintptr_t addr, struct as *asp, int print_level, physaddr_t *pap)
+do_va2pa(uintptr_t addr, struct as *asp, int print_level, physaddr_t *pap,
+    pfn_t *mfnp)
 {
 	struct as as;
 	struct hat *hatp;
@@ -400,10 +436,7 @@ do_va2pfn(uintptr_t addr, struct as *asp, int print_level, physaddr_t *pap)
 	int level;
 	int found = 0;
 	x86pte_t pte;
-	x86pte_t buf;
-	x86pte32_t *pte32 = (x86pte32_t *)&buf;
 	physaddr_t paddr;
-	size_t len;
 
 	if (asp != NULL) {
 		if (mdb_vread(&as, sizeof (as), (uintptr_t)asp) == -1) {
@@ -426,9 +459,8 @@ do_va2pfn(uintptr_t addr, struct as *asp, int print_level, physaddr_t *pap)
 	/*
 	 * read the htable hashtable
 	 */
-	*pap = 0;
 	for (level = 0; level <= mmu.max_level; ++level) {
-		if (level == mmu.max_level)
+		if (level == TOP_LEVEL(&hat))
 			base = 0;
 		else
 			base = addr & mmu.level_mask[level + 1];
@@ -445,38 +477,38 @@ do_va2pfn(uintptr_t addr, struct as *asp, int print_level, physaddr_t *pap)
 					mdb_warn("Couldn't read htable\n");
 					return (DCMD_ERR);
 				}
+
 				if (htable.ht_vaddr != base ||
 				    htable.ht_level != level)
 					continue;
 
-				/*
-				 * found - read the page table entry
-				 */
-				paddr = htable.ht_pfn << MMU_PAGESHIFT;
-				paddr += ((addr - base) >>
-				    mmu.level_shift[level]) <<
-				    mmu.pte_size_shift;
-				len = mdb_pread(&buf, mmu.pte_size, paddr);
-				if (len != mmu.pte_size)
-					return (DCMD_ERR);
-				if (mmu.pte_size == sizeof (x86pte_t))
-					pte = buf;
-				else
-					pte = *pte32;
+				pte = get_pte(&hat, &htable, addr);
 
-				if (!found) {
-					if (PTE_IS_LGPG(pte, level))
-						paddr = pte & PT_PADDR_LGPG;
-					else
-						paddr = pte & PT_PADDR;
-					paddr += addr & mmu.level_offset[level];
-					*pap = paddr;
-					found = 1;
+				if (print_level) {
+					mdb_printf("\tlevel=%d htable=%p "
+					    "pte=%llr\n", level, ht, pte);
 				}
-				if (print_level == 0)
+
+				if (!PTE_ISVALID(pte)) {
+					mdb_printf("Address %p is unmapped.\n",
+					    addr);
+					return (DCMD_ERR);
+				}
+
+				if (found)
 					continue;
-				mdb_printf("\tlevel=%d htable=%p pte=%llx\n",
-				    level, ht, pte);
+
+				if (PTE_IS_LGPG(pte, level))
+					paddr = mdb_ma_to_pa(pte &
+					    PT_PADDR_LGPG);
+				else
+					paddr = mdb_ma_to_pa(pte & PT_PADDR);
+				paddr += addr & mmu.level_offset[level];
+				if (pap != NULL)
+					*pap = paddr;
+				if (mfnp != NULL)
+					*mfnp = pte2mfn(pte, level);
+				found = 1;
 			}
 		}
 	}
@@ -492,7 +524,9 @@ va2pfn_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uintptr_t addrspace;
 	char *addrspace_str = NULL;
-	uint64_t physaddr;
+	int piped = flags & DCMD_PIPE_OUT;
+	pfn_t pfn;
+	pfn_t mfn;
 	int rc;
 
 	/*
@@ -517,12 +551,26 @@ va2pfn_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	else
 		addrspace = 0;
 
-	rc = do_va2pfn(addr, (struct as *)addrspace, 1, &physaddr);
+	rc = do_va2pa(addr, (struct as *)addrspace, !piped, NULL, &mfn);
 
-	if (rc == DCMD_OK)
-		mdb_printf("Virtual %p maps Physical %llx\n", addr, physaddr);
+	if (rc != DCMD_OK)
+		return (rc);
 
-	return (rc);
+	if ((pfn = mdb_mfn_to_pfn(mfn)) == -(pfn_t)1) {
+		mdb_warn("Invalid mfn %lr\n", mfn);
+		return (DCMD_ERR);
+	}
+
+	if (piped) {
+		mdb_printf("0x%lr\n", pfn);
+		return (DCMD_OK);
+	}
+
+	mdb_printf("Virtual address 0x%p maps pfn 0x%lr", addr, pfn);
+
+	mdb_printf("\n");
+
+	return (DCMD_OK);
 }
 
 /*
@@ -596,8 +644,9 @@ do_report_maps(pfn_t pfn)
 				level = htable.ht_level;
 				if (level > mmu.max_page_level)
 					continue;
-				paddr = htable.ht_pfn << MMU_PAGESHIFT;
-				for (entry = 0; entry < htable.ht_num_ptes;
+				paddr = mmu_ptob((physaddr_t)htable.ht_pfn);
+				for (entry = 0;
+				    entry < HTABLE_NUM_PTES(&htable);
 				    ++entry) {
 
 					base = htable.ht_vaddr + entry *
@@ -625,7 +674,7 @@ do_report_maps(pfn_t pfn)
 						pte &= PT_PADDR;
 					else
 						pte &= PT_PADDR_LGPG;
-					if ((pte >> MMU_PAGESHIFT) != pfn)
+					if (mmu_btop(mdb_ma_to_pa(pte)) != pfn)
 						continue;
 					mdb_printf("hat=%p maps addr=%p\n",
 						hatp, (caddr_t)base);
@@ -645,6 +694,9 @@ done:
 int
 report_maps_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
+	pfn_t pfn;
+	uint_t mflag = 0;
+
 	/*
 	 * The kernel has to at least have made it thru mmu_init()
 	 */
@@ -655,12 +707,17 @@ report_maps_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if ((flags & DCMD_ADDRSPEC) == 0)
 		return (DCMD_USAGE);
 
-	return (do_report_maps((pfn_t)addr));
+	if (mdb_getopts(argc, argv,
+	    'm', MDB_OPT_SETBITS, TRUE, &mflag, NULL) != argc)
+		return (DCMD_USAGE);
+
+	pfn = (pfn_t)addr;
+	if (mflag)
+		pfn = mdb_mfn_to_pfn(pfn);
+
+	return (do_report_maps(pfn));
 }
 
-/*
- * Dump the page table at the given PFN
- */
 static int
 do_ptable_dcmd(pfn_t pfn)
 {
@@ -730,7 +787,7 @@ found_it:
 		pagesize = MMU_PAGESIZE;
 	}
 
-	paddr = pfn << MMU_PAGESHIFT;
+	paddr = mmu_ptob((physaddr_t)pfn);
 	for (entry = 0; entry < mmu.ptes_per_table; ++entry) {
 		len = mdb_pread(&buf, mmu.pte_size,
 		    paddr + entry * mmu.pte_size);
@@ -753,12 +810,15 @@ done:
 }
 
 /*
- * given a PFN as its address argument, prints out the uses of it
+ * Dump the page table at the given PFN
  */
 /*ARGSUSED*/
 int
 ptable_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
+	pfn_t pfn;
+	uint_t mflag = 0;
+
 	/*
 	 * The kernel has to at least have made it thru mmu_init()
 	 */
@@ -769,5 +829,74 @@ ptable_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if ((flags & DCMD_ADDRSPEC) == 0)
 		return (DCMD_USAGE);
 
-	return (do_ptable_dcmd((pfn_t)addr));
+	if (mdb_getopts(argc, argv,
+	    'm', MDB_OPT_SETBITS, TRUE, &mflag, NULL) != argc)
+		return (DCMD_USAGE);
+
+	pfn = (pfn_t)addr;
+	if (mflag)
+		pfn = mdb_mfn_to_pfn(pfn);
+
+	return (do_ptable_dcmd(pfn));
+}
+
+static int
+do_htables_dcmd(hat_t *hatp)
+{
+	struct hat hat;
+	htable_t *ht;
+	htable_t htable;
+	int h;
+
+	/*
+	 * read the hat and its hash table
+	 */
+	if (mdb_vread(&hat, sizeof (hat), (uintptr_t)hatp) == -1) {
+		mdb_warn("Couldn't read struct hat\n");
+		return (DCMD_ERR);
+	}
+
+	/*
+	 * read the htable hashtable
+	 */
+	for (h = 0; h < hat.hat_num_hash; ++h) {
+		if (mdb_vread(&ht, sizeof (htable_t *),
+		    (uintptr_t)(hat.hat_ht_hash + h)) == -1) {
+			mdb_warn("Couldn't read htable ptr\\n");
+			return (DCMD_ERR);
+		}
+		for (; ht != NULL; ht = htable.ht_next) {
+			mdb_printf("%p\n", ht);
+			if (mdb_vread(&htable, sizeof (htable_t),
+			    (uintptr_t)ht) == -1) {
+				mdb_warn("Couldn't read htable\n");
+				return (DCMD_ERR);
+			}
+		}
+	}
+	return (DCMD_OK);
+}
+
+/*
+ * Dump the htables for the given hat
+ */
+/*ARGSUSED*/
+int
+htables_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	hat_t *hat;
+
+	/*
+	 * The kernel has to at least have made it thru mmu_init()
+	 */
+	get_mmu();
+	if (mmu.num_level == 0)
+		return (DCMD_ERR);
+
+	if ((flags & DCMD_ADDRSPEC) == 0)
+		return (DCMD_USAGE);
+
+	hat = (hat_t *)addr;
+
+	return (do_htables_dcmd(hat));
 }

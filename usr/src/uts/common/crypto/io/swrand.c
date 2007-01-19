@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,7 @@
 #include <sys/sha1.h>
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
+#include <sys/hold_page.h>
 
 #define	RNDPOOLSIZE		1024	/* Pool size in bytes */
 #define	HASHBUFSIZE		64	/* Buffer size used for pool mixing */
@@ -635,6 +636,7 @@ physmem_ent_gen(physmem_entsrc_t *entsrc)
 	hrtime_t ts1, ts2, diff, delta, delta2, delta3;
 	uint8_t digest[HASHSIZE];
 	HASH_CTX ctx;
+	page_t *pp;
 
 	/*
 	 * Use each 32-bit quantity in the pool to pick a memory
@@ -678,6 +680,15 @@ physmem_ent_gen(physmem_entsrc_t *entsrc)
 		}
 
 		/*
+		 * Do an initial check to see if the address is safe
+		 */
+		if (plat_hold_page(offset >> PAGESHIFT, PLAT_HOLD_NO_LOCK, NULL)
+		    == PLAT_HOLD_FAIL) {
+			memlist_read_unlock();
+			continue;
+		}
+
+		/*
 		 * Figure out which page to load to read the
 		 * memory block.  Load the page and compute the
 		 * hash of the memory block.
@@ -691,6 +702,15 @@ physmem_ent_gen(physmem_entsrc_t *entsrc)
 			nbytes = PAGESIZE - poffset < len ?
 			    PAGESIZE - poffset : len;
 
+			/*
+			 * Re-check the offset, and lock the frame.  If the
+			 * page was given away after the above check, we'll
+			 * just bail out.
+			 */
+			if (plat_hold_page(pfn, PLAT_HOLD_LOCK, &pp) ==
+			    PLAT_HOLD_FAIL)
+				break;
+
 			hat_devload(kas.a_hat, entsrc->pmbuf,
 			    PAGESIZE, pfn, PROT_READ,
 			    HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
@@ -701,11 +721,17 @@ physmem_ent_gen(physmem_entsrc_t *entsrc)
 			hat_unload(kas.a_hat, entsrc->pmbuf, PAGESIZE,
 			    HAT_UNLOAD_UNLOCK);
 
+			plat_release_page(pp);
+
 			len -= nbytes;
 			offset += nbytes;
 		}
 		/* We got our pages. Let the DR roll */
 		memlist_read_unlock();
+
+		/* See if we had to bail out due to a page being given away */
+		if (len)
+			continue;
 
 		HashFinal(digest, &ctx);
 		ts2 = gethrtime();

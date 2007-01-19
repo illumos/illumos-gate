@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,7 @@
 #include <sys/policy.h>
 #include <sys/sysmacros.h>
 #include <sys/clock.h>
-#include <io/pcplusmp/apic.h>
+#include <sys/apic.h>
 #include <sys/pci_tools.h>
 #include <io/pci/pci_var.h>
 #include <io/pci/pci_tools_ext.h>

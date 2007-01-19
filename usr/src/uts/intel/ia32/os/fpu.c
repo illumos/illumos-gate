@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,13 +103,13 @@ const struct fnsave_state x87_initial = {
 };
 
 #if defined(__amd64)
-#define	fpsave_begin	fpxsave_begin
+#define	fpsave_ctxt	fpxsave_ctxt
 #elif defined(__i386)
 /*
- * This vector is patched to fpxsave_begin() if we discover
+ * This vector is patched to fpxsave_ctxt() if we discover
  * we have an SSE-capable chip in fpu_probe().
  */
-void (*fpsave_begin)(void *) = fpnsave_begin;
+void (*fpsave_ctxt)(void *) = fpnsave_ctxt;
 #endif
 
 static int fpe_sicode(uint_t);
@@ -168,7 +167,7 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 	}
 #endif
 	installctx(ct, cfp,
-	    fpsave_begin, NULL, fp_new_lwp, fp_new_lwp, NULL, fp_free);
+	    fpsave_ctxt, NULL, fp_new_lwp, fp_new_lwp, NULL, fp_free);
 	/*
 	 * Now, when the new lwp starts running, it will take a trap
 	 * that will be handled inline in the trap table to cause
@@ -291,7 +290,7 @@ fp_seed(void)
 	 * Always initialize a new context and initialize the hardware.
 	 */
 	installctx(curthread, fp,
-	    fpsave_begin, NULL, fp_new_lwp, fp_new_lwp, NULL, fp_free);
+	    fpsave_ctxt, NULL, fp_new_lwp, fp_new_lwp, NULL, fp_free);
 	fpinit();
 
 	/*
@@ -394,6 +393,9 @@ fpnoextflt(struct regs *rp)
 /*
  * Handle a processor extension overrun fault
  * Returns non zero for error.
+ *
+ * XXX	Shouldn't this just be abolished given that we're not supporting
+ *	anything prior to Pentium?
  */
 
 /* ARGSUSED */
@@ -408,7 +410,6 @@ fpextovrflt(struct regs *rp)
 	fpinit();		/* initialize the FPU hardware */
 	setcr0(cur_cr0);
 	sti();
-
 	return (1); 		/* error, send SIGSEGV signal to the thread */
 }
 

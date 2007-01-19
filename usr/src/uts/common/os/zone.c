@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2661,11 +2661,11 @@ zsched(void *arg)
 	nvlist_t *nvl = za->nvlist;
 	nvpair_t *nvp = NULL;
 
-	bcopy("zsched", u.u_psargs, sizeof ("zsched"));
-	bcopy("zsched", u.u_comm, sizeof ("zsched"));
-	u.u_argc = 0;
-	u.u_argv = NULL;
-	u.u_envp = NULL;
+	bcopy("zsched", PTOU(pp)->u_psargs, sizeof ("zsched"));
+	bcopy("zsched", PTOU(pp)->u_comm, sizeof ("zsched"));
+	PTOU(pp)->u_argc = 0;
+	PTOU(pp)->u_argv = NULL;
+	PTOU(pp)->u_envp = NULL;
 	closeall(P_FINFO(pp));
 
 	/*

@@ -18,13 +18,14 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of /unix (and unix.o).
+#	This makefile drives the production of unix (and unix.o).
 #
 #	i86pc implementation architecture dependent
 #
@@ -38,24 +39,26 @@ UTSBASE	= ../..
 #	Define the module and object file sets.
 #
 UNIX		= unix
+DBOOT		= dboot
+MULTIBOOT	= multiboot
 
 OBJECTS		= $(SPECIAL_OBJS:%=$(OBJS_DIR)/%) \
 		  $(CORE_OBJS:%=$(OBJS_DIR)/%) \
+		  $(KRTLD_OBJS:%=$(OBJS_DIR)/%) \
 		  $(MACH_NOT_YET_KMODS:%=$(OBJS_DIR)/%)
 
 LINTS		= $(SPECIAL_OBJS:%.o=$(LINTS_DIR)/%.ln) \
 		  $(CORE_OBJS:%.o=$(LINTS_DIR)/%.ln) \
+		  $(KRTLD_OBJS:%.o=$(LINTS_DIR)/%.ln) \
 		  $(MACH_NOT_YET_KMODS:%.o=$(LINTS_DIR)/%.ln) \
 		  $(LINTS_DIR)/vers.ln \
 		  $(LINTS_DIR)/modstubs.ln
 
 ROOTMODULE	= $(ROOT_PSM_KERN_DIR)/$(UNIX)
+ROOT_MULTIBOOT	= $(ROOT_PSM_DIR)/$(MULTIBOOT)
+BOOT_KERNEL	= $(ROOT_BOOT_PSM_KERN_DIR)/$(UNIX)
 
 UNIX_BIN	= $(OBJS_DIR)/$(UNIX)
-
-KRTLD_32	= misc/krtld
-KRTLD_64	= misc/$(SUBDIR64)/krtld
-KRTLD		= $(KRTLD_$(CLASS))
 
 LIBS		= $(GENLIB)
 
@@ -66,6 +69,13 @@ LIBOPTS		= -L $(GENUNIX_DIR)/$(OBJS_DIR) -l $(GENUNIX)
 
 CTFEXTRAOBJS	= $(OBJS_DIR)/vers.o
 
+DBOOT_OBJS_DIR	= dboot/$(OBJS_DIR)
+DBOOT_OBJECTS	= $(DBOOT_OBJS:%=$(DBOOT_OBJS_DIR)/%)
+DBOOT_O		= $(OBJS_DIR)/$(DBOOT).o
+DBOOT_S		= $(DBOOT_O:%.o=%.s)
+DBOOT_LINTS	= $(DBOOT_OBJS:%.o=$(DBOOT_OBJS_DIR)/%.ln)
+DBOOT_LINT	= $(i386_LINT)
+
 #
 #	Include common rules.
 #
@@ -74,9 +84,9 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #
 #	Define targets
 #
-ALL_TARGET	= $(UNIX_BIN)
-LINT_TARGET	= $(LINT_LIB)
-INSTALL_TARGET	= $(UNIX_BIN) $(ROOTMODULE)
+ALL_TARGET	= $(UNIX_BIN) $(MULTIBOOT)
+LINT_TARGET	= $(LINT_LIB) $(DBOOT_LINT_LIB)
+INSTALL_TARGET	= $(UNIX_BIN) $(MULTIBOOT) $(ROOTMODULE) $(ROOT_MULTIBOOT) $(BOOT_KERNEL)
 
 #
 #	This is UNIX_DIR. Use a short path.
@@ -86,12 +96,21 @@ UNIX_DIR	= .
 #
 #	Overrides
 #
-CLEANFILES	+= $(UNIX_O) $(MODSTUBS_O) $(OBJS_DIR)/vers.c \
-		   $(OBJS_DIR)/vers.o \
-		   $(DTRACESTUBS_O) $(DTRACESTUBS)
+CLEANFILES	+=		\
+	$(UNIX_O) $(MODSTUBS_O)	\
+	$(OBJS_DIR)/vers.c $(OBJS_DIR)/vers.o \
+	$(DTRACESTUBS_O) $(DTRACESTUBS)
 
-CLOBBERFILES	= $(CLEANFILES) $(UNIX_BIN)
-CLEANLINTFILES	+= $(LINT_LIB)
+CLEANFILES	+=		\
+	$(DBOOT_O) $(DBOOT_S)	\
+	$(DBOOT_OBJECTS)	\
+	$(OBJS_DIR)/bios_call_src.o \
+	$(OBJS_DIR)/bios_call_src \
+	$(OBJS_DIR)/bios_call.s \
+	$(DBOOT_OBJS_DIR)/$(DBOOT)
+
+CLOBBERFILES	= $(CLEANFILES) $(UNIX_BIN) $(MULTIBOOT)
+CLEANLINTFILES	+= $(LINT_LIB) $(DBOOT_LINT_LIB) $(DBOOT_LINTS)
 
 # instr_size needs a special header
 $(OBJS_DIR)/instr_size.o :=	EXTRA_OPTIONS	= -I$(SRC)/common/dis/i386
@@ -136,19 +155,48 @@ MAPFILE_64 = $(MAPFILE).amd64
 MAPFILE_NAME = $(MAPFILE_$(CLASS))
 
 $(UNIX_BIN):	$(UNIX_O) $(MODSTUBS_O) $(MAPFILE_NAME) \
-		$(GENLIB) $(DTRACESTUBS)
-	$(LD) -dy -b -o $@ -e _start -I $(KRTLD) -M $(MAPFILE_NAME) \
-	    $(UNIX_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS)
+		$(GENLIB) $(DTRACESTUBS) $(DBOOT_O)
+	$(LD) -dy -b -o $@ -e dboot_image -znointerp -M $(MAPFILE_NAME) \
+	    $(UNIX_O) $(DBOOT_O) $(MODSTUBS_O) $(LIBOPTS) \
+	    $(DTRACESTUBS)
+	$(MBH_PATCH) $(UNIX_BIN)
 	$(CTFMERGE_UNIQUIFY_AGAINST_GENUNIX)
 	$(POST_PROCESS)
 
 $(UNIX_O):	$(OBJECTS) $(OBJS_DIR)/vers.o
 	$(LD) -r -o $@ $(OBJECTS) $(OBJS_DIR)/vers.o
 
+$(DBOOT_O):	$(DBOOT_OBJS_DIR) $(DBOOT_OBJECTS)
+	$(LD) -dn -M dboot/Mapfile.dboot \
+		-o $(DBOOT_OBJS_DIR)/$(DBOOT) $(DBOOT_OBJECTS)
+	@echo "	.data"					> $(DBOOT_S)
+	@echo "	.globl	dboot_image"			>> $(DBOOT_S)
+	@echo "dboot_image:"				>> $(DBOOT_S)
+	$(ELFEXTRACT) $(DBOOT_OBJS_DIR)/$(DBOOT)	>> $(DBOOT_S)
+	$(COMPILE.s) -o $(DBOOT_O) $(DBOOT_S)
+
+$(DBOOT_OBJS_DIR):
+	-@mkdir -p $@ 2> /dev/null
+
+#
+# dboot is built as an intermediate target in dboot.o, so just make
+# dboot.o the dependency here.
+#
+$(MULTIBOOT):	$(DBOOT_O)
+	$(CP)	$(DBOOT_OBJS_DIR)/$(DBOOT) $(MULTIBOOT)
+	$(POST_PROCESS)
+
+#
+# The boot kernel is a copy of the 32-bit kernel paired with the
+# install/failsafe miniroot
+$(BOOT_KERNEL):	$(ROOTMODULE) $(ROOT_BOOT_PSM_KERN_DIR)
+	$(CP)	$(ROOTMODULE) $(BOOT_KERNEL)
+	$(POST_PROCESS)
+
 #
 #	Special rules for generating assym.h for inclusion in assembly files.
 #
-$(DSF_DIR)/$(OBJS_DIR)/assym.h:	FRC
+$(DSF_DIR)/$(OBJS_DIR)/assym.h $(DSF_DIR)/$(OBJS_DIR)/kdi_assym.h:	FRC
 	@cd $(DSF_DIR); $(MAKE) all.targ
 
 $(GENLIB): FRC
@@ -168,6 +216,11 @@ $(GENLIB): FRC
 $(LINT_LIB):	$(LINT_LIB_DIR) $(LINTS)
 	@-$(ECHO) "\n$(UNIX): (library construction):"
 	@$(LINT) -o$(UNIX) $(LINTFLAGS) $(LINTS)
+	@$(MV) $(@F) $@
+
+$(DBOOT_LINT_LIB):	$(LINT_LIB_DIR) $(DBOOT_LINTS)
+	@-$(ECHO) "\n$(DBOOT): (library construction):"
+	@$(LINT) -o$(DBOOT) $(DBOOT_LINTFLAGS) $(DBOOT_LINTS)
 	@$(MV) $(@F) $@
 
 lintlib:	$(LINT_DEPS)

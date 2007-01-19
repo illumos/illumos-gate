@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,7 +51,6 @@ d none usr/platform/sun4v 755 root sys
 d none usr/platform/sun4v/sbin 755 root bin
 #
 f none usr/platform/sun4v/sbin/trapstat 555 root bin
-f none usr/platform/sun4v/sbin/eeprom 2555 root sys
 #
 # create lib directory for sun4v 
 #

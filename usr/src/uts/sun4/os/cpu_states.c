@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <sys/cpu_sgnblk_defs.h>
 #include <sys/ivintr.h>
 #include <sys/kdi.h>
+#include <sys/kdi_machimpl.h>
 #include <sys/callb.h>
 #include <sys/wdt.h>
 
@@ -259,7 +260,7 @@ debug_enter(char *msg)
 	(void) setjmp(&curthread->t_pcb);
 
 	if (boothowto & RB_DEBUG)
-		kdi_dvec_enter();
+		kmdb_enter();
 	else
 		prom_enter_mon();
 

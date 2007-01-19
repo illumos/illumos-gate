@@ -376,7 +376,6 @@ MISC_KMODS	+= ibtl
 MISC_KMODS	+= hook
 MISC_KMODS	+= neti
 MISC_KMODS	+= ctf 
-MISC_KMODS	+= zmod
 MISC_KMODS	+= mac dls
 MISC_KMODS	+= cmlb
 MISC_KMODS	+= tem

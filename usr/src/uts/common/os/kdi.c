@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,30 +38,6 @@ struct modctl	*kdi_dmods;
 static kdi_dtrace_state_t kdi_dtrace_state = KDI_DTSTATE_IDLE;
 
 void
-kdi_dvec_enter(void)
-{
-	kdi_dvec->dv_enter();
-}
-
-/*
- * Called on the CPU being initialized
- */
-void
-kdi_dvec_cpu_init(struct cpu *cp)
-{
-	kdi_dvec->dv_kctl_cpu_init();
-	kdi_dvec->dv_cpu_init(cp);
-}
-
-#if defined(__i386) || defined(__amd64)
-void
-kdi_dvec_idt_sync(gate_desc_t *idt)
-{
-	kdi_dvec->dv_idt_sync(idt);
-}
-#endif	/* __i386 || __amd64 */
-
-void
 kdi_dvec_vmready(void)
 {
 	kdi_dvec->dv_kctl_vmready();
@@ -79,7 +54,25 @@ kdi_dvec_memavail(void)
 	kdi_dvec->dv_kctl_memavail();
 }
 
+#if defined(__x86)
+void
+kdi_dvec_handle_fault(greg_t trapno, greg_t pc, greg_t sp, int cpuid)
+{
+	kdi_dvec->dv_handle_fault(trapno, pc, sp, cpuid);
+}
+#endif
+
 #if defined(__sparc)
+/*
+ * Called on the CPU being initialized
+ */
+void
+kdi_dvec_cpu_init(struct cpu *cp)
+{
+	kdi_dvec->dv_kctl_cpu_init();
+	kdi_dvec->dv_cpu_init(cp);
+}
+
 void
 kdi_dvec_cpr_restart(void)
 {

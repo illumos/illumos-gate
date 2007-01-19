@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,10 +59,12 @@ extern "C" {
 #define	AV_386_SSE3		0x04000	/* SSE3 insns and regs */
 #define	AV_386_MON		0x08000	/* monitor/mwait insns */
 #define	AV_386_CX16		0x10000	/* cmpxchg16b insn */
+#define	AV_386_AHF		0x20000	/* lahf/sahf insns */
+#define	AV_386_TSCP		0x40000	/* rdtscp instruction */
 
 #define	FMT_AV_386							\
 	"\20"								\
-	"\21cx16"							\
+	"\23tscp\22ahf\21cx16"						\
 	"\20mon\17sse3\16pause\15sse2\14sse\13fxsr\12amd3dx\11amd3d"	\
 	"\10amdmmx\7mmx\6cmov\5amdsysc\4sep\3cx8\2tsc\1fpu"
 

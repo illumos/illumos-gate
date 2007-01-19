@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,10 +68,9 @@ struct htable {
 	struct htable	*ht_next;	/* forward link for hash table */
 	struct hat	*ht_hat;	/* hat this mapping comes from */
 	uintptr_t	ht_vaddr;	/* virt addr at start of this table */
-	level_t		ht_level;	/* page table level: 0=4K, 1=2M, ... */
-	uint16_t	ht_flags;	/* see below */
+	int8_t		ht_level;	/* page table level: 0=4K, 1=2M, ... */
+	uint8_t		ht_flags;	/* see below */
 	int16_t		ht_busy;	/* implements locking protocol */
-	uint16_t	ht_num_ptes;	/* # of PTEs in page table */
 	int16_t		ht_valid_cnt;	/* # of valid entries in this table */
 	uint32_t	ht_lock_cnt;	/* # of locked entries in this table */
 					/* never used for kernel hat */
@@ -88,11 +86,11 @@ typedef struct htable htable_t;
  *
  * HTABLE_VLP - this is the top level htable of a VLP HAT.
  *
- * HTABLE_SHARED_PFN - this htable had it's PFN assigned from sharing another
+ * HTABLE_SHARED_PFN - this htable had its PFN assigned from sharing another
  * 	htable. Used by hat_share() for ISM.
  */
-#define	HTABLE_VLP		(0x0001)
-#define	HTABLE_SHARED_PFN	(0x0002)
+#define	HTABLE_VLP		(0x01)
+#define	HTABLE_SHARED_PFN	(0x02)
 
 /*
  * The htable hash table hashing function.  The 28 is so that high
@@ -107,23 +105,9 @@ typedef struct htable htable_t;
 	((uintptr_t)(hat) >> 4)) & ((hat)->hat_num_hash - 1))
 
 /*
- * For 32 bit, access to page table entries is done via the page table's PFN and
- * the index of the PTE. We use a CPU specific mapping (a la ppcopy) to map
- * in page tables on an "as needed" basis.
- *
- * 64 bit kernels will use seg_kpm style mappings and avoid any overhead.
- *
- * The code uses compare and swap instructions to read/write PTE's to
- * avoid atomicity problems, since PTEs can be 8 bytes on 32 bit systems.
- * Again this can be optimized on 64 bit systems, since aligned load/store
- * will naturally be atomic.
- *
  * Each CPU gets a unique hat_cpu_info structure in cpu_hat_info.
  */
 struct hat_cpu_info {
-	pfn_t hci_mapped_pfn;		/* pfn of currently mapped page table */
-	x86pte_t *hci_pagetable_va;	/* VA to use for mappings */
-	x86pte_t *hci_kernel_pte;	/* kernel PTE for cpu_pagetable_va */
 	kmutex_t hci_mutex;		/* mutex to ensure sequential usage */
 #if defined(__amd64)
 	pfn_t	hci_vlp_pfn;		/* pfn of hci_vlp_l3ptes */
@@ -141,12 +125,15 @@ struct hat_cpu_info {
  *
  * XX64 - The check for the VA hole needs to be better generalized.
  */
+#define	HTABLE_NUM_PTES_PAE(ht)		\
+	(((ht)->ht_flags & HTABLE_VLP) ? 4 : 512)
 #if defined(__amd64)
+#define	HTABLE_NUM_PTES(ht)	HTABLE_NUM_PTES_PAE(ht)
 
 #define	HTABLE_LAST_PAGE(ht)						\
 	((ht)->ht_level == mmu.max_level ? ((uintptr_t)0UL - MMU_PAGESIZE) :\
 	((ht)->ht_vaddr - MMU_PAGESIZE +				\
-	((uintptr_t)((ht)->ht_num_ptes) << LEVEL_SHIFT((ht)->ht_level))))
+	((uintptr_t)HTABLE_NUM_PTES(ht) << LEVEL_SHIFT((ht)->ht_level))))
 
 #define	NEXT_ENTRY_VA(va, l)	\
 	((va & LEVEL_MASK(l)) + LEVEL_SIZE(l) == mmu.hole_start ?	\
@@ -154,8 +141,10 @@ struct hat_cpu_info {
 
 #elif defined(__i386)
 
+#define	HTABLE_NUM_PTES(ht)	(!mmu.pae_hat ? 1024 : HTABLE_NUM_PTES_PAE(ht))
+
 #define	HTABLE_LAST_PAGE(ht)	((ht)->ht_vaddr - MMU_PAGESIZE + \
-	((uintptr_t)((ht)->ht_num_ptes) << LEVEL_SHIFT((ht)->ht_level)))
+	((uintptr_t)HTABLE_NUM_PTES(ht) << LEVEL_SHIFT((ht)->ht_level)))
 
 #define	NEXT_ENTRY_VA(va, l) ((va & LEVEL_MASK(l)) + LEVEL_SIZE(l))
 
@@ -188,6 +177,7 @@ extern htable_t *htable_create(struct hat *hat, uintptr_t vaddr, level_t level,
 extern void htable_acquire(htable_t *);
 
 extern void htable_release(htable_t *ht);
+extern void htable_destroy(htable_t *ht);
 
 /*
  * Code to free all remaining htables for a hat. Called after the hat is no
@@ -220,6 +210,17 @@ extern void htable_reserve(uint_t);
  * Also called after boot to release left over boot reserves.
  */
 extern void htable_adjust_reserve(void);
+
+/*
+ * Attach initial pagetables as htables
+ */
+extern void htable_attach(struct hat *, uintptr_t, level_t, struct htable *,
+    pfn_t);
+
+/*
+ * return the number of pages mapped by a hat
+ */
+extern pgcnt_t htable_count_pages(struct hat *);
 
 /*
  * Routine to find the next populated htable at or above a given virtual
@@ -259,14 +260,20 @@ extern uintptr_t htable_e2va(htable_t *ht, uint_t entry);
  *
  * Note that all accesses except x86pte_copy() and x86pte_zero() are atomic.
  */
-extern void	x86pte_cpu_init(cpu_t *, void *);
+extern void	x86pte_cpu_init(cpu_t *);
+extern void	x86pte_cpu_fini(cpu_t *);
 
 extern x86pte_t	x86pte_get(htable_t *, uint_t entry);
 
+/*
+ * x86pte_set returns LPAGE_ERROR if it's asked to overwrite a page table
+ * link with a large page mapping.
+ */
+#define	LPAGE_ERROR (-(x86pte_t)1)
 extern x86pte_t	x86pte_set(htable_t *, uint_t entry, x86pte_t new, void *);
 
-extern x86pte_t x86pte_invalidate_pfn(htable_t *ht, uint_t entry, pfn_t pfn,
-	void *pte_ptr);
+extern x86pte_t x86pte_inval(htable_t *ht, uint_t entry,
+	x86pte_t old, x86pte_t *ptr);
 
 extern x86pte_t x86pte_update(htable_t *ht, uint_t entry,
 	x86pte_t old, x86pte_t new);
@@ -274,8 +281,11 @@ extern x86pte_t x86pte_update(htable_t *ht, uint_t entry,
 extern void	x86pte_copy(htable_t *src, htable_t *dest, uint_t entry,
 	uint_t cnt);
 
-extern void	x86pte_zero(htable_t *ht, uint_t entry, uint_t cnt);
-
+/*
+ * access to a pagetable knowing only the pfn
+ */
+extern x86pte_t *x86pte_mapin(pfn_t, uint_t, htable_t *);
+extern void x86pte_mapout(void);
 
 /*
  * these are actually inlines for "lock; incw", "lock; decw", etc. instructions.

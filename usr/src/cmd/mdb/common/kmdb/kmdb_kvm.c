@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -977,7 +976,7 @@ kmt_lookup_by_name(mdb_tgt_t *t, const char *obj, const char *name,
 		break;
 
 	case (uintptr_t)MDB_TGT_OBJ_RTLD:
-		obj = KMT_RTLD_NAME;
+		obj = kmt->kmt_rtld_name;
 		/*FALLTHROUGH*/
 
 	default:
@@ -1081,7 +1080,7 @@ kmt_symbol_iter(mdb_tgt_t *t, const char *obj, uint_t which, uint_t type,
 		return (0);
 
 	case (uintptr_t)MDB_TGT_OBJ_RTLD:
-		obj = KMT_RTLD_NAME;
+		obj = kmt->kmt_rtld_name;
 		/*FALLTHROUGH*/
 
 	default:
@@ -1197,6 +1196,20 @@ kmt_addr_to_map(mdb_tgt_t *t, uintptr_t addr)
 	return (NULL);
 }
 
+static kmt_module_t *
+kmt_module_by_name(kmt_data_t *kmt, const char *name)
+{
+	kmt_module_t *km;
+
+	for (km = mdb_list_next(&kmt->kmt_modlist); km != NULL;
+	    km = mdb_list_next(km)) {
+		if (strcmp(name, km->km_name) == 0)
+			return (km);
+	}
+
+	return (NULL);
+}
+
 static const mdb_map_t *
 kmt_name_to_map(mdb_tgt_t *t, const char *name)
 {
@@ -1214,13 +1227,10 @@ kmt_name_to_map(mdb_tgt_t *t, const char *name)
 	}
 
 	if (name == MDB_TGT_OBJ_RTLD)
-		name = KMT_RTLD_NAME; /* replace MDB_TGT_OBJ_RTLD with krtld */
+		name = kmt->kmt_rtld_name;
 
-	for (km = mdb_list_next(&kmt->kmt_modlist); km != NULL;
-	    km = mdb_list_next(km)) {
-		if (strcmp(name, km->km_name) == 0)
-			return (kmt_mod_to_map(km, &m));
-	}
+	if ((km = kmt_module_by_name(kmt, name)) != NULL)
+		return (kmt_mod_to_map(km, &m));
 
 	(void) set_errno(EMDB_NOOBJ);
 	return (NULL);
@@ -1300,19 +1310,16 @@ kmt_name_to_ctf(mdb_tgt_t *t, const char *name)
 	kmt_module_t *km;
 
 	if (name == MDB_TGT_OBJ_EXEC) {
-		name = KMT_CTFPARENT; /* base CTF data is kept in genunix */
+		name = KMT_CTFPARENT;
 	} else if (name == MDB_TGT_OBJ_RTLD) {
-		name = KMT_RTLD_NAME; /* replace with krtld */
+		name = kt->kmt_rtld_name;
 	} else if (strncmp(name, "DMOD`", 5) == 0) {
 		/* Request for CTF data for a DMOD symbol */
 		return (kmdb_module_name_to_ctf(name + 5));
 	}
 
-	for (km = mdb_list_next(&kt->kmt_modlist); km != NULL;
-	    km = mdb_list_next(km)) {
-		if (strcmp(name, km->km_name) == 0)
-			return (kmt_load_ctfdata(t, km));
-	}
+	if ((km = kmt_module_by_name(kt, name)) != NULL)
+		return (kmt_load_ctfdata(t, km));
 
 	(void) set_errno(EMDB_NOOBJ);
 	return (NULL);
@@ -2344,6 +2351,12 @@ kmt_activate(mdb_tgt_t *t)
 
 	(void) mdb_tgt_register_dcmds(t, &kmt_dcmds[0], MDB_MOD_FORCE);
 	mdb_tgt_register_regvars(t, kmt->kmt_rds, &kmt_reg_disc, 0);
+
+	/*
+	 * Force load of the MDB krtld module, in case it's been rolled into
+	 * unix.
+	 */
+	(void) mdb_module_load(KMT_RTLD_NAME, MDB_MOD_SILENT | MDB_MOD_DEFER);
 }
 
 static void
@@ -2525,6 +2538,8 @@ create_err:
 void
 kmdb_kvm_startup(void)
 {
+	kmt_data_t *kmt = mdb.m_target->t_data;
+
 	mdb_dprintf(MDB_DBG_KMOD, "kmdb_kvm startup\n");
 
 	kmt_sync(mdb.m_target);
@@ -2538,6 +2553,11 @@ kmdb_kvm_startup(void)
 	 * startup.
 	 */
 	(void) mdb_tgt_sespec_activate_all(mdb.m_target);
+
+	kmt->kmt_rtld_name = KMT_RTLD_NAME;
+
+	if (kmt_module_by_name(kmt, KMT_RTLD_NAME) == NULL)
+		kmt->kmt_rtld_name = "unix";
 }
 
 /*

@@ -635,9 +635,6 @@ usr/lib/sparcv9/librestart.so		sparc
 usr/include/librestart.h		sparc
 usr/include/librestart_priv.h		sparc
 usr/include/libcontract_priv.h		sparc
-var/svc/manifest/platform/i86pc		sparc
-var/svc/manifest/platform/i86pc/eeprom.xml	sparc
-var/svc/profile/platform_i86pc.xml	sparc
 #
 # Private libuutil files
 #

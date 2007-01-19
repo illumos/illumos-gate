@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,10 +75,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/pciex/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/pciex/hotplug/pciehpc/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/pcplusmp/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -104,6 +100,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/os/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/boot/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/vm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -120,24 +120,69 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/dis/i386/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/agpgart/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/gfx_private/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/agpmaster/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/xsvc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/drm/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
+#
+# dboot stuff is always 32 bit, linked to run with phys_addr == virt_addr
+#
+DBOOT_OBJS_DIR	= dboot/$(OBJS_DIR)
+DBOOT_MACH_32	= -D_BOOT_TARGET_i386
+DBOOT_MACH_64	= -D_BOOT_TARGET_amd64
+DBOOT_DEFS	= -D_BOOT $(DBOOT_MACH_$(CLASS))
+DBOOT_DEFS	+= -D_MACHDEP -D_KMEMUSER -U_KERNEL -D_I32LPx
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/drm/%.s
-	$(COMPILE.s) -o $@ $<
+DBOOT_CC_INCL	= -I$(SRC)/common $(INCLUDE_PATH)
+DBOOT_AS_INCL	= $(AS_INC_PATH)
+
+DBOOT_AS	= $(ONBLD_TOOLS)/bin/$(MACH)/aw
+
+DBOOT_LINTS_DIR	= $(DBOOT_OBJS_DIR)
+DBOOT_LINTFLAGS_i86pc	= $(LINTFLAGS_i386_32) $(LINTTAGS_i386_32)
+
+DBOOT_LINTFLAGS = $(DBOOT_LINTFLAGS_$(PLATFORM)) $(C99LMODE) $(CPPFLAGS) \
+	$(DBOOT_DEFS)
+DBOOT_LOCAL_LINTFLAGS   = -c -dirout=$(DBOOT_LINTS_DIR) -I$(SRC)/common \
+	$(DBOOT_LINTFLAGS)
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/boot/%.c
+	$(i386_CC) $(CERRWARN) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.c
+	$(i386_CC) $(CERRWARN) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/%.c
+	$(i386_CC) $(CERRWARN) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/i386/%.s
+	$(DBOOT_AS) -P -D_ASM $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.s
+	$(DBOOT_AS) -P -D_ASM $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
+
+#
+# Stuff to build bios_call.o for the kernel.
+#
+MAPFILE_BIOS	= $(UTSBASE)/i86pc/conf/Mapfile.bios
+$(OBJS_DIR)/bios_call.o:    $(UTSBASE)/i86pc/ml/bios_call_src.s
+	$(COMPILE.s) -o $(OBJS_DIR)/bios_call_src.o \
+		$(UTSBASE)/i86pc/ml/bios_call_src.s
+	$(LD) -dn -M $(MAPFILE_BIOS)  \
+		-o $(OBJS_DIR)/bios_call_src $(OBJS_DIR)/bios_call_src.o
+	@echo "  .data"				> $(OBJS_DIR)/bios_call.s
+	@echo "  .globl bios_image"		>> $(OBJS_DIR)/bios_call.s
+	@echo "bios_image:"			>> $(OBJS_DIR)/bios_call.s
+	$(ELFEXTRACT) $(OBJS_DIR)/bios_call_src	>> $(OBJS_DIR)/bios_call.s
+	@echo "  .align 4"			>> $(OBJS_DIR)/bios_call.s
+	@echo "  .globl bios_size"		>> $(OBJS_DIR)/bios_call.s
+	@echo "bios_size:"			>> $(OBJS_DIR)/bios_call.s
+	@echo "  .long . - bios_image"		>> $(OBJS_DIR)/bios_call.s
+	$(COMPILE.s) -o $@ $(OBJS_DIR)/bios_call.s
 
 # ridiculous contortions ---
 ATOMIC_SUBDIR_32	= i386
@@ -147,64 +192,13 @@ ATOMIC_SUBDIR		= $(ATOMIC_SUBDIR_$(CLASS))
 $(OBJS_DIR)/%.o:		$(SRC)/common/atomic/$(ATOMIC_SUBDIR)/%.s
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/power/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(SRC)/common/mc/mc-amd/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/%.s
-	$(COMPILE.s) -o $@ $<
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/debugger/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/events/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/hardware/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/interpreter/dispatcher/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/interpreter/executer/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/interpreter/parser/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/namespace/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/resources/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/tables/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/utilities/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/disassembler/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
+#
+# dtrace stubs
+#
 
 $(OBJS_DIR)/dtracestubs.s:	$(UNIX_O) $(LIBS)
 	nm -u $(UNIX_O) $(LIBS) | grep __dtrace_probe_ | sort | uniq | nawk '{ \
@@ -244,9 +238,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pci/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pciex/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pciex/hotplug/pciehpc/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pcplusmp/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -268,6 +259,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/ml/%.s
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/os/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/boot/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/vm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -280,63 +274,40 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/os/%.c
 $(LINTS_DIR)/%.ln:		$(SRC)/common/dis/i386/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/agpgart/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(SRC)/common/atomic/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(SRC)/common/mc/mc-amd/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/debugger/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/events/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/hardware/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/interpreter/dispatcher/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/interpreter/executer/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/interpreter/parser/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/namespace/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/resources/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/tables/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/utilities/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/disassembler/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/gfx_private/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/agpmaster/%.c
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/xsvc/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/drm/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+#
+# bios call has a funky name change while building
+#
+$(LINTS_DIR)/bios_call.ln:	$(UTSBASE)/i86pc/ml/bios_call_src.s
+	@($(LHEAD) $(LINT.s) $(UTSBASE)/i86pc/ml/bios_call_src.s  $(LTAIL))
+	@mv $(LINTS_DIR)/bios_call_src.ln $(LINTS_DIR)/bios_call.ln
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/drm/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+#
+# dboot always compiles in 32-bit mode, so force lint to be 32-bit mode too.
+#
+$(DBOOT_LINTS_DIR)/%.ln: $(UTSBASE)/i86pc/dboot/%.c
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln: $(UTSBASE)/i86pc/dboot/%.s
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln: $(UTSBASE)/i86pc/boot/%.c
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln: $(COMMONBASE)/util/%.c
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln: $(COMMONBASE)/util/i386/%.s
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
 

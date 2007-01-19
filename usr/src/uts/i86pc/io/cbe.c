@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
@@ -34,6 +35,7 @@
 #include <sys/machsystm.h>
 #include <sys/smp_impldefs.h>
 #include <sys/psm_types.h>
+#include <sys/psm.h>
 #include <sys/atomic.h>
 #include <sys/clock.h>
 #include <sys/ddi_impldefs.h>
@@ -79,7 +81,6 @@ cbe_low_level(void)
  * to the timer firing at level-14.  Because cyclic_fire() can tolerate
  * spurious calls, it would not matter if we called cyclic_fire() in both
  * cases.
- *
  */
 int
 cbe_fire(void)
@@ -92,8 +93,10 @@ cbe_fire(void)
 
 	if (cbe_psm_timer_mode != TIMER_ONESHOT && me == 0 && !cross_call) {
 		for (i = 1; i < NCPU; i++) {
-			if (CPU_IN_SET(cbe_enabled, i))
+			if (CPU_IN_SET(cbe_enabled, i)) {
+				XC_TRACE(TT_XC_CBE_FIRE, -1, i);
 				send_dirint(i, CBE_HIGH_PIL);
+			}
 		}
 	}
 
@@ -180,6 +183,7 @@ cbe_xcall(void *arg, cpu_t *dest, cyc_func_t func, void *farg)
 	cbe_xcall_cpu = dest;
 	cbe_xcall_func = func;
 
+	XC_TRACE(TT_XC_CBE_XCALL, -1, dest->cpu_id);
 	send_dirint(dest->cpu_id, CBE_HIGH_PIL);
 
 	while (cbe_xcall_func != NULL || cbe_xcall_cpu != NULL)
@@ -312,5 +316,4 @@ cbe_init(void)
 		(*psm_post_cyclic_setup)(NULL);
 
 	mutex_exit(&cpu_lock);
-
 }

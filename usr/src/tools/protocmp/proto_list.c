@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,7 +194,7 @@ parse_line(char **v, elem *e)
 		e->symsrc = malloc(strlen(v[SYM]) + 1);
 		(void) strcpy(e->symsrc, v[SYM]);
 			if (e->file_type != SYM_LINK_T)
-#if defined(sparc)
+#if defined(__sparc)
 			if (strncmp(e->symsrc, "sun4/", 5) == 0)
 				e->arch = P_SUN4;
 			else if (strncmp(e->symsrc, "sun4c/", 6) == 0)
@@ -210,7 +209,7 @@ parse_line(char **v, elem *e)
 				e->arch = P_SUN4m;
 			else if (strncmp(e->symsrc, "sun4v/", 6) == 0)
 				e->arch = P_SUN4v;
-#elif defined(i386)
+#elif defined(__i386)
 			if (strncmp(e->symsrc, "i86pc/", 6) == 0)
 				e->arch = P_I86PC;
 #elif defined(__ppc)

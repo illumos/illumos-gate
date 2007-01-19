@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,10 +88,10 @@ extern u_longlong_t gettick(void);
 extern uint64_t	gettick_counter(void);
 extern int xcopyin_little(const void *, void *, size_t);
 extern int xcopyout_little(const void *, void *, size_t);
-extern void xregs_getgfiller(klwp_id_t lwp, caddr_t xrp);
-extern void xregs_setgfiller(klwp_id_t lwp, caddr_t xrp);
-extern void xregs_getfpfiller(klwp_id_t lwp, caddr_t xrp);
-extern void xregs_setfpfiller(klwp_id_t lwp, caddr_t xrp);
+extern void xregs_getgfiller(struct _klwp *lwp, caddr_t xrp);
+extern void xregs_setgfiller(struct _klwp *lwp, caddr_t xrp);
+extern void xregs_getfpfiller(struct _klwp *lwp, caddr_t xrp);
+extern void xregs_setfpfiller(struct _klwp *lwp, caddr_t xrp);
 
 struct ucontext;
 extern	void	xregs_clrptr(struct _klwp *, struct ucontext *);
@@ -118,6 +118,8 @@ extern	int	xregs_getsize(struct proc *);
 extern void doflush(void *);
 
 extern uint_t cpu_hwcap_flags;
+
+#define	cpr_dprintf prom_printf
 
 #endif /* _KERNEL && !_ASM */
 

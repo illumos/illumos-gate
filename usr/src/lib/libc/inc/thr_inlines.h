@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,28 +56,14 @@ __curthread(void)
 	ulwp_t *__value;
 	__asm__ __volatile__(
 #if defined(__amd64)
-		"xorq %0, %0\n\t"
-		"mov %%fs, %0\n\t"
-		"andq %0, %0\n\t"
-		"je 1f\n\t"
 		"movq %%fs:0, %0\n\t"
 #elif defined(__i386)
-		"xorl %0, %0\n\t"
-		"mov %%gs, %0\n\t"
-		"andl %0, %0\n\t"
-		"je 1f\n\t"
 		"movl %%gs:0, %0\n\t"
 #elif defined(__sparcv9)
 		".register %%g7, #scratch\n\t"
-		"tst %%g7\n\t"
-		"be,a,pn %%xcc, 1f\n\t"
-		"  mov %%g0, %0\n\t"
 		"ldx [%%g7 + 80], %0\n\t"
 #elif defined(__sparc)
 		".register %%g7, #scratch\n\t"
-		"tst %%g7\n\t"
-		"be,a 1f\n\t"
-		"  mov %%g0, %0\n\t"
 		"ld [%%g7 + 80], %0\n\t"
 #else
 #error	"port me"

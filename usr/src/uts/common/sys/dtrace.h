@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2195,6 +2195,8 @@ extern void dtrace_panic(const char *, ...);
 
 extern int dtrace_safe_defer_signal(void);
 extern void dtrace_safe_synchronous_signal(void);
+
+extern int dtrace_mach_aframes(void);
 
 #if defined(__i386) || defined(__amd64)
 extern int dtrace_instr_size(uchar_t *instr);

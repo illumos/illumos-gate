@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -295,17 +295,6 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 #endif
 		fpu->fpu_regs.kfpu_status = fp->fp_reg_set.fpchip_state.status;
 		fpu->fpu_flags |= FPU_VALID;
-
-		/*
-		 * If we are changing the fpu_flags in the current context,
-		 * disable floating point (turn on CR0_TS bit) to track
-		 * FPU_VALID after clearing any errors (frstor chokes
-		 * otherwise)
-		 */
-		if (lwp == ttolwp(curthread)) {
-			(void) fperr_reset();
-			fpdisable();
-		}
 	} else {
 		/*
 		 * If we are trying to change the FPU state of a thread which
@@ -934,6 +923,11 @@ bind_hwcap(void)
 	 * 32-bit lwp ...
 	 */
 	auxv_hwcap &= ~AV_386_SEP;
+#else
+	/*
+	 * 32-bit processes can -always- use the lahf/sahf instructions
+	 */
+	auxv_hwcap |= AV_386_AHF;
 #endif
 
 	if (auxv_hwcap_include || auxv_hwcap_exclude)
@@ -953,6 +947,11 @@ bind_hwcap(void)
 	 */
 	if (!cpuid_syscall32_insn(NULL))
 		auxv_hwcap32 &= ~AV_386_AMD_SYSC;
+
+	/*
+	 * 32-bit processes can -always- use the lahf/sahf instructions
+	 */
+	auxv_hwcap32 |= AV_386_AHF;
 #endif
 
 	if (auxv_hwcap32_include || auxv_hwcap32_exclude)
@@ -1016,8 +1015,8 @@ panic_saveregs(panic_data_t *pdp, struct regs *rp)
 	PANICNVADD(pnv, "r13", rp->r_r13);
 	PANICNVADD(pnv, "r14", rp->r_r14);
 	PANICNVADD(pnv, "r15", rp->r_r15);
-	PANICNVADD(pnv, "fsbase", rp->r_fsbase);
-	PANICNVADD(pnv, "gsbase", rp->r_gsbase);
+	PANICNVADD(pnv, "fsbase", rdmsr(MSR_AMD_FSBASE));
+	PANICNVADD(pnv, "gsbase", rdmsr(MSR_AMD_GSBASE));
 	PANICNVADD(pnv, "ds", rp->r_ds);
 	PANICNVADD(pnv, "es", rp->r_es);
 	PANICNVADD(pnv, "fs", rp->r_fs);

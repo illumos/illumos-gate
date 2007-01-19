@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -191,7 +191,6 @@ f none kernel/misc/sparcv9/strplumb 755 root sys
 f none kernel/misc/sparcv9/swapgeneric 755 root sys
 f none kernel/misc/sparcv9/tlimod 755 root sys
 f none kernel/misc/sparcv9/tem 755 root sys
-f none kernel/misc/sparcv9/zmod 755 root sys
 d none kernel/sched/sparcv9 755 root sys
 f none kernel/sched/sparcv9/TS 755 root sys
 f none kernel/sched/sparcv9/TS_DPTBL 755 root sys

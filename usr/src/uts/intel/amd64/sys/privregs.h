@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,17 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _AMD64_SYS_PRIVREGS_H
+#ifndef	_AMD64_SYS_PRIVREGS_H
 #define	_AMD64_SYS_PRIVREGS_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -42,7 +42,7 @@ extern "C" {
 #error	"non-amd64 code depends on amd64 privileged header!"
 #endif
 
-#ifndef	_ASM
+#ifndef _ASM
 
 /*
  * This is NOT the structure to use for general purpose debugging;
@@ -77,8 +77,16 @@ struct regs {
 	greg_t	r_r14;		/* callee-saved */
 	greg_t	r_r15;		/* callee-saved */
 
-	greg_t	r_fsbase;
-	greg_t	r_gsbase;
+	/*
+	 * XX64
+	 * We used to sample fsbase and gsbase on every exception
+	 * with expensive rdmsr's. Yet this was only useful at
+	 * best for debugging during amd64 bringup. We should take
+	 * these away but for now simply rename them to avoid any
+	 * flag days.
+	 */
+	greg_t	__r_fsbase;	/* XX64 no longer used by the kernel */
+	greg_t	__r_gsbase;	/* XX64 no longer used by the kernel */
 	greg_t	r_ds;
 	greg_t	r_es;
 	greg_t	r_fs;		/* %fs is *never* used by the kernel */
@@ -106,21 +114,18 @@ struct regs {
 
 #ifdef _KERNEL
 #define	lwptoregs(lwp)	((struct regs *)((lwp)->lwp_regs))
-#endif	/* _KERNEL */
+#endif /* _KERNEL */
 
 #else	/* !_ASM */
 
-#define	TRAPERR_PUSH(err, trapno)	\
-	pushq	$err;			\
-	pushq	$trapno
+#if defined(_MACHDEP)
+
+#include <sys/machprivregs.h>
+#include <sys/pcb.h>
 
 /*
  * Create a struct regs on the stack suitable for an
  * interrupt trap.
- *
- * The swapgs instruction is conditionalized to make sure that
- * interrupts in kernel mode don't cause us to switch back to
- * the user's gsbase!
  *
  * Assumes that the trap handler has already pushed an
  * appropriate r_err and r_trapno
@@ -152,44 +157,9 @@ struct regs {
 	movw	%es, %cx;			\
 	movq	%rcx, REGOFF_ES(%rsp);		\
 	movw	%ds, %cx;			\
-	movq	%rcx, REGOFF_DS(%rsp);		\
-	movl	$MSR_AMD_FSBASE, %ecx;		\
-	rdmsr;					\
-	movl	%eax, REGOFF_FSBASE(%rsp);	\
-	movl	%edx, REGOFF_FSBASE+4(%rsp);	\
-	movl	$MSR_AMD_GSBASE, %ecx;		\
-	rdmsr;					\
-	movl	%eax, REGOFF_GSBASE(%rsp);	\
-	movl	%edx, REGOFF_GSBASE+4(%rsp)
+	movq	%rcx, REGOFF_DS(%rsp)
 
-/*
- * Push register state onto the stack. If we've
- * interrupted userland, do a swapgs as well.
- */
-
-#define	INTR_PUSH				\
-	subq	$REGOFF_TRAPNO, %rsp;		\
-	__SAVE_REGS;				\
-	cmpw	$KCS_SEL, REGOFF_CS(%rsp);	\
-	je	6f;				\
-	movq	$0, REGOFF_SAVFP(%rsp);		\
-	swapgs;					\
-6:
-
-#define	TRAP_PUSH				\
-	subq	$REGOFF_TRAPNO, %rsp;		\
-	__SAVE_REGS;				\
-	cmpw	$KCS_SEL, REGOFF_CS(%rsp);	\
-	je	6f;				\
-	movq	$0, REGOFF_SAVFP(%rsp);		\
-	swapgs;					\
-6:
-
-#define	DFTRAP_PUSH				\
-	subq	$REGOFF_TRAPNO, %rsp;		\
-	__SAVE_REGS
-
-#define	__RESTORE_REGS			\
+#define	__RESTORE_REGS				\
 	movq	REGOFF_RDI(%rsp),	%rdi;	\
 	movq	REGOFF_RSI(%rsp),	%rsi;	\
 	movq	REGOFF_RDX(%rsp),	%rdx;	\
@@ -206,6 +176,19 @@ struct regs {
 	movq	REGOFF_R14(%rsp),	%r14;	\
 	movq	REGOFF_R15(%rsp),	%r15
 
+/*
+ * Push register state onto the stack. If we've
+ * interrupted userland, do a swapgs as well.
+ */
+#define	INTR_PUSH				\
+	subq	$REGOFF_TRAPNO, %rsp;		\
+	__SAVE_REGS;				\
+	cmpw	$KCS_SEL, REGOFF_CS(%rsp);	\
+	je	6f;				\
+	movq	$0, REGOFF_SAVFP(%rsp);		\
+	SWAPGS;					\
+6:	CLEAN_CS
+
 #define	INTR_POP			\
 	leaq	sys_lcall32(%rip), %r11;\
 	cmpq	%r11, REGOFF_RIP(%rsp);	\
@@ -213,12 +196,12 @@ struct regs {
 	je	5f;			\
 	cmpw	$KCS_SEL, REGOFF_CS(%rsp);\
 	je	8f;			\
-5:	swapgs;				\
+5:	SWAPGS;				\
 8:	addq	$REGOFF_RIP, %rsp
 
 #define	USER_POP			\
 	__RESTORE_REGS;			\
-	swapgs;				\
+	SWAPGS;				\
 	addq	$REGOFF_RIP, %rsp	/* Adjust %rsp to prepare for iretq */
 
 #define	USER32_POP			\
@@ -229,49 +212,21 @@ struct regs {
 	movl	REGOFF_RAX(%rsp), %eax;	\
 	movl	REGOFF_RBX(%rsp), %ebx;	\
 	movl	REGOFF_RBP(%rsp), %ebp;	\
-	swapgs;				\
+	SWAPGS;				\
 	addq	$REGOFF_RIP, %rsp	/* Adjust %rsp to prepare for iretq */
 
+#define	DFTRAP_PUSH				\
+	subq	$REGOFF_TRAPNO, %rsp;		\
+	__SAVE_REGS
+
+#endif	/* _MACHDEP */
 
 /*
- * Smaller versions of INTR_PUSH and INTR_POP for fast traps.
- * The following registers have been pushed onto the stack by
- * hardware at this point:
- *
- *	greg_t	r_rip;
- *	greg_t	r_cs;
- *	greg_t	r_rfl;
- *	greg_t	r_rsp;
- *	greg_t	r_ss;
- *
- * This handler is executed both by 32-bit and 64-bit applications.
- * 64-bit applications allow us to treat the set (%rdi, %rsi, %rdx,
- * %rcx, %r8, %r9, %r10, %r11, %rax) as volatile across function calls.
- * However, 32-bit applications only expect (%eax, %edx, %ecx) to be volatile
- * across a function call -- in particular, %esi and %edi MUST be saved!
- *
- * We could do this differently by making a FAST_INTR_PUSH32 for 32-bit
- * programs, and FAST_INTR_PUSH for 64-bit programs, but it doesn't seem
- * particularly worth it.
+ * Used to set rflags to known values at the head of an
+ * interrupt gate handler, i.e. interrupts are -already- disabled.
  */
-#define	FAST_INTR_PUSH			\
-	subq	$REGOFF_RIP, %rsp;	\
-	movq	%rsi, REGOFF_RSI(%rsp);	\
-	movq	%rdi, REGOFF_RDI(%rsp);	\
-	swapgs
-
-#define	FAST_INTR_POP			\
-	swapgs;				\
-	movq	REGOFF_RSI(%rsp), %rsi;	\
-	movq	REGOFF_RDI(%rsp), %rdi;	\
-	addq	$REGOFF_RIP, %rsp
-
-#define	DISABLE_INTR_FLAGS		\
+#define	INTGATE_INIT_KERNEL_FLAGS	\
 	pushq	$F_OFF;			\
-	popfq
-
-#define	ENABLE_INTR_FLAGS		\
-	pushq	$F_ON;			\
 	popfq
 
 #endif	/* !_ASM */
@@ -322,7 +277,7 @@ extern void setcr8(ulong_t);
 #define	CREG_KGSBASE	0x58
 #define	CREG_EFER	0x60
 
-#if !defined(_ASM)
+#if !defined(_ASM) && defined(_INT64_TYPE)
 
 typedef	uint64_t	creg64_t;
 typedef	upad128_t	creg128_t;
@@ -345,10 +300,10 @@ struct cregs {
 extern void getcregs(struct cregs *);
 #endif	/* _KERNEL */
 
-#endif	/* _ASM */
+#endif	/* !_ASM && _INT64_TYPE */
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 
-#endif	/* _AMD64_SYS_PRIVREGS_H */
+#endif	/* !_AMD64_SYS_PRIVREGS_H */

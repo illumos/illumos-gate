@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +49,7 @@ sigaction(int sig, struct sigaction *actp, struct sigaction *oactp)
 	struct sigaction oact;
 	k_sigset_t set;
 	proc_t *p;
+	user_t *ua;
 	int sigcld_look = 0;
 
 	if (sig <= 0 || sig >= NSIG ||
@@ -77,26 +77,27 @@ sigaction(int sig, struct sigaction *actp, struct sigaction *oactp)
 	}
 
 	p = curproc;
+	ua = PTOU(p);
 	mutex_enter(&p->p_lock);
 
 	if (oactp) {
 		int flags;
 		void (*disp)();
 
-		disp = u.u_signal[sig - 1];
+		disp = ua->u_signal[sig - 1];
 
 		flags = 0;
 		if (disp != SIG_DFL && disp != SIG_IGN) {
-			set = u.u_sigmask[sig-1];
+			set = ua->u_sigmask[sig-1];
 			if (sigismember(&p->p_siginfo, sig))
 				flags |= SA_SIGINFO;
-			if (sigismember(&u.u_sigrestart, sig))
+			if (sigismember(&ua->u_sigrestart, sig))
 				flags |= SA_RESTART;
-			if (sigismember(&u.u_sigonstack, sig))
+			if (sigismember(&ua->u_sigonstack, sig))
 				flags |= SA_ONSTACK;
-			if (sigismember(&u.u_sigresethand, sig))
+			if (sigismember(&ua->u_sigresethand, sig))
 				flags |= SA_RESETHAND;
-			if (sigismember(&u.u_signodefer, sig))
+			if (sigismember(&ua->u_signodefer, sig))
 				flags |= SA_NODEFER;
 		} else
 			sigemptyset(&set);
@@ -144,6 +145,7 @@ sigaction32(int sig, struct sigaction32 *actp, struct sigaction32 *oactp)
 	struct sigaction32 oact32;
 	k_sigset_t set;
 	proc_t *p;
+	user_t *ua;
 	int sigcld_look = 0;
 
 	if (sig <= 0 || sig >= NSIG ||
@@ -171,26 +173,27 @@ sigaction32(int sig, struct sigaction32 *actp, struct sigaction32 *oactp)
 	}
 
 	p = curproc;
+	ua = PTOU(p);
 	mutex_enter(&p->p_lock);
 
 	if (oactp) {
 		int flags;
 		void (*disp)();
 
-		disp = u.u_signal[sig - 1];
+		disp = ua->u_signal[sig - 1];
 
 		flags = 0;
 		if (disp != SIG_DFL && disp != SIG_IGN) {
-			set = u.u_sigmask[sig-1];
+			set = ua->u_sigmask[sig-1];
 			if (sigismember(&p->p_siginfo, sig))
 				flags |= SA_SIGINFO;
-			if (sigismember(&u.u_sigrestart, sig))
+			if (sigismember(&ua->u_sigrestart, sig))
 				flags |= SA_RESTART;
-			if (sigismember(&u.u_sigonstack, sig))
+			if (sigismember(&ua->u_sigonstack, sig))
 				flags |= SA_ONSTACK;
-			if (sigismember(&u.u_sigresethand, sig))
+			if (sigismember(&ua->u_sigresethand, sig))
 				flags |= SA_RESETHAND;
-			if (sigismember(&u.u_signodefer, sig))
+			if (sigismember(&ua->u_signodefer, sig))
 				flags |= SA_NODEFER;
 		} else
 			sigemptyset(&set);

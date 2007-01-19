@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -246,7 +246,6 @@ typedef	struct	user {
 #include <sys/proc.h>			/* cannot include before user defined */
 
 #ifdef	_KERNEL
-#define	u	(curproc->p_user)	/* user is now part of proc structure */
 #define	P_FINFO(p)	(&(p)->p_user.u_finfo)
 #endif	/* _KERNEL */
 

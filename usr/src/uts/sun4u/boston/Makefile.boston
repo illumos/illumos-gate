@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,7 +53,6 @@ USR_BOSTON_LINKED_DIR = $(USR_PLAT_DIR)/$(LINKED_PLATFORM)
 USR_BOSTON_INC_DIR	= $(USR_BOSTON_DIR)/include
 USR_BOSTON_ISYS_DIR	= $(USR_BOSTON_INC_DIR)/sys
 USR_BOSTON_SBIN_DIR	= $(USR_BOSTON_DIR)/sbin
-USR_BOSTON_SBIN_EEPROM	= $(USR_BOSTON_SBIN_DIR)/eeprom
 USR_BOSTON_SBIN_PRTDIAG	= $(USR_BOSTON_SBIN_DIR)/prtdiag
 USR_BOSTON_SBIN_FRUADM	= $(USR_BOSTON_SBIN_DIR)/fruadm
 USR_BOSTON_SBIN_TRAPSTAT = $(USR_BOSTON_SBIN_DIR)/trapstat

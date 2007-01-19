@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,6 +36,12 @@
 CORE_OBJS +=	ddi_arch.o	\
 		polled_io.o	\
 		sparc_ddi.o
+#
+#	decompression support
+#
+CORE_OBJS += adler32.o infblock.o infcodes.o inffast.o \
+		inflate.o inftrees.o infutil.o zutil.o zmod.o
+
 
 #
 #	generic-unix module

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 	
@@ -29,6 +29,7 @@
 #include <sys/asm_misc.h>
 #include <sys/regset.h>
 #include <sys/privregs.h>
+#include <sys/x86_archext.h>
 
 #if !defined(__lint)
 #include <sys/segments.h>
@@ -53,13 +54,13 @@
  *
  */
 
-#if defined(lint) || defined(__lint)
+#if defined(__lint)
 
 void
 real_mode_start(void)
 {}
 
-#else	/* lint */
+#else	/* __lint */
 
 #if defined(__amd64)
 
@@ -299,10 +300,17 @@ kernel_cs_code:
 	movq    %rax, %cr0			/* set machine status word */
 
 	/*
-	 * Before proceeding, enable usage of the page table NX bit if that's
-	 * how the page tables are set up.
+	 * Before going any further, enable usage of page table NX bit if 
+	 * that's how our page tables are set up.
 	 */
-	call	*set_nxe_func
+	movl	x86_feature, %ecx
+	andl	$X86_NX, %ecx
+	jz	1f
+	movl	$MSR_AMD_EFER, %ecx
+	rdmsr
+	orl	$AMD_EFER_NXE, %eax
+	wrmsr
+1:
 
 	/*
 	 * Complete the rest of the setup and call mp_startup().
@@ -546,10 +554,17 @@ kernel_cs_code:
 	movq    %rax, %cr0		/* set machine status word */
 
 	/*
-	 * Before proceeding, enable usage of the page table NX bit if that's
-	 * how the page tables are set up.
+	 * Before going any further, enable usage of page table NX bit if 
+	 * that's how our page tables are set up.
 	 */
-	call	*set_nxe_func
+	movl	x86_feature, %ecx
+	andl	$X86_NX, %ecx
+	jz	1f
+	movl	$MSR_AMD_EFER, %ecx
+	rdmsr
+	orl	$AMD_EFER_NXE, %eax
+	wrmsr
+1:
 
 	/*
 	 * Complete the rest of the setup and call mp_startup().
@@ -643,7 +658,17 @@ kernel_cs_code:
 	 * Before going any further, enable usage of page table NX bit if 
 	 * that's how our page tables are set up.
 	 */
-	call	*set_nxe_func
+	movl	x86_feature, %ecx
+	andl	$X86_NX, %ecx
+	jz	1f
+	movl	%cr4, %ecx
+	andl	$CR4_PAE, %ecx
+	jz	1f
+	movl	$MSR_AMD_EFER, %ecx
+	rdmsr
+	orl	$AMD_EFER_NXE, %eax
+	wrmsr
+1:
 	movl	%gs:CPU_THREAD, %eax	/* get thread ptr */
 	call	*T_PC(%eax)		/* call mp_startup */
 	/* not reached */
@@ -725,7 +750,17 @@ kernel_cs_code:
 	 * Before going any farther, enable usage of page table NX bit if 
 	 * that's how our page tables are set up.
 	 */
-	call	*set_nxe_func
+	movl	x86_feature, %ecx
+	andl	$X86_NX, %ecx
+	jz	1f
+	movl	%cr4, %ecx
+	andl	$CR4_PAE, %ecx
+	jz	1f
+	movl	$MSR_AMD_EFER, %ecx
+	rdmsr
+	orl	$AMD_EFER_NXE, %eax
+	wrmsr
+1:
 	mov	%gs:CPU_THREAD, %eax	/* get thread ptr */
 	call	*T_PC(%eax)		/* call mp_startup */
 	/* not reached */
@@ -735,48 +770,4 @@ kernel_cs_code:
 	SET_SIZE(real_mode_start)
 
 #endif	/* __amd64 */
-
-#endif /* lint */
-
-
-#if defined(lint) || defined(__lint)
-
-void
-return_instr(void)
-{}
-
-/*ARGSUSED*/
-void
-send_dirint(int cpuix, int int_level)
-{}
-
-#else	/* lint */
-
-	/*
-	 * Same for amd64 and i386.
-	 */
-	ENTRY_NP(return_instr)
-	rep;	ret	/* use 2 byte return instruction when branch target */
-			/* AMD Software Optimization Guide - Section 6.2 */
-	SET_SIZE(return_instr)
-
-#if defined(__amd64)
-
-	/*
-	 * jump indirect to the send_dirint
-	 * function. Set to return if machine
-	 * type module doesnt redirect it.
-	 */
-	ENTRY_NP(send_dirint)
-	jmp	*send_dirintf(%rip)
-	SET_SIZE(send_dirint)
-
-#elif defined(__i386)
-
-	ENTRY_NP(send_dirint)
-	jmp	*send_dirintf
-	SET_SIZE(send_dirint)
-
-#endif	/* __amd64 */
-
-#endif /* lint */
+#endif	/* __lint */

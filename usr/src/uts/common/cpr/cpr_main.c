@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -172,19 +171,20 @@ cpr_log_status(int enable, int *svstat, vnode_t *vp)
 		if (error = VOP_IOCTL(vp, _FIOISLOG,
 		    (uintptr_t)&status, FKIOCTL, CRED(), NULL)) {
 			mntpt = vfs_getmntpoint(vp->v_vfsp);
-			errp("%s: \"%s\", cant get logging status, error %d\n",
-			    str, refstr_value(mntpt), error);
+			prom_printf("%s: \"%s\", cant get logging "
+			    "status, error %d\n", str, refstr_value(mntpt),
+			    error);
 			refstr_rele(mntpt);
 			return;
 		}
 		*svstat = status;
-		DEBUG5(
-		{
+		if (cpr_debug & CPR_DEBUG5) {
 			mntpt = vfs_getmntpoint(vp->v_vfsp);
-			errp("%s: \"%s\", logging status = %d\n",
+			CPR_DEBUG(CPR_DEBUG5,
+			    "%s: \"%s\", logging status = %d\n",
 			    str, refstr_value(mntpt), status);
 			refstr_rele(mntpt);
-		});
+		};
 
 		able = "disable";
 		cmd = _FIOLOGDISABLE;
@@ -201,17 +201,17 @@ cpr_log_status(int enable, int *svstat, vnode_t *vp)
 		    FKIOCTL, CRED(), NULL);
 		if (error) {
 			mntpt = vfs_getmntpoint(vp->v_vfsp);
-			errp("%s: \"%s\", cant %s logging, error %d\n",
+			prom_printf("%s: \"%s\", cant %s logging, error %d\n",
 			    str, refstr_value(mntpt), able, error);
 			refstr_rele(mntpt);
 		} else {
-			DEBUG5(
-			{
+			if (cpr_debug & CPR_DEBUG5) {
 				mntpt = vfs_getmntpoint(vp->v_vfsp);
-				errp("%s: \"%s\", logging is now %sd\n",
+				CPR_DEBUG(CPR_DEBUG5,
+				    "%s: \"%s\", logging is now %sd\n",
 				    str, refstr_value(mntpt), able);
 				refstr_rele(mntpt);
-			});
+			}
 		}
 	}
 
@@ -258,8 +258,8 @@ cpr_ufs_logging(int enable)
 		return (ENOENT);
 	if (error = vn_open(fname, UIO_SYSSPACE, FCREAT|FWRITE,
 	    0600, &vp, CRCREAT, 0)) {
-		errp("cpr_ufs_logging: cant open/create \"%s\", error %d\n",
-		    fname, error);
+		prom_printf("cpr_ufs_logging: cant open/create \"%s\", "
+		    "error %d\n", fname, error);
 		return (error);
 	}
 
@@ -343,13 +343,13 @@ cpr_suspend(void)
 	 * The 3 retry is not a random number because 2 is possible if
 	 * a thread has been forked before the parent thread is stopped.
 	 */
-	DEBUG1(errp("\nstopping user threads..."));
+	CPR_DEBUG(CPR_DEBUG1, "\nstopping user threads...");
 	CPR_STAT_EVENT_START("  stop users");
 	cpr_set_substate(C_ST_STOP_USER_THREADS);
 	if (rc = cpr_stop_user_threads())
 		return (rc);
 	CPR_STAT_EVENT_END("  stop users");
-	DEBUG1(errp("done\n"));
+	CPR_DEBUG(CPR_DEBUG1, "done\n");
 
 	pm_save_direct_levels();
 
@@ -362,7 +362,7 @@ cpr_suspend(void)
 
 	cpr_send_notice();
 	if (cpr_debug)
-		errp("\n");
+		prom_printf("\n");
 
 	(void) callb_execute_class(CB_CL_CPR_POST_USER, CB_CODE_CPR_CHKPT);
 
@@ -407,7 +407,7 @@ alloc_statefile:
 	cpr_set_substate(C_ST_STATEF_ALLOC);
 	if (rc = cpr_alloc_statefile(sf_realloc)) {
 		if (sf_realloc)
-			errp("realloc failed\n");
+			prom_printf("realloc failed\n");
 		return (rc);
 	}
 	CPR_STAT_EVENT_END("  alloc statefile");
@@ -425,9 +425,9 @@ alloc_statefile:
 	 * destroy all clean file mapped kernel pages
 	 */
 	CPR_STAT_EVENT_START("  clean pages");
-	DEBUG1(errp("cleaning up mapped pages..."));
+	CPR_DEBUG(CPR_DEBUG1, "cleaning up mapped pages...");
 	(void) callb_execute_class(CB_CL_CPR_VM, CB_CODE_CPR_CHKPT);
-	DEBUG1(errp("done\n"));
+	CPR_DEBUG(CPR_DEBUG1, "done\n");
 	CPR_STAT_EVENT_END("  clean pages");
 
 
@@ -441,14 +441,14 @@ alloc_statefile:
 	 * Now suspend all the devices
 	 */
 	CPR_STAT_EVENT_START("  stop drivers");
-	DEBUG1(errp("suspending drivers..."));
+	CPR_DEBUG(CPR_DEBUG1, "suspending drivers...");
 	cpr_set_substate(C_ST_SUSPEND_DEVICES);
 	pm_powering_down = 1;
 	rc = cpr_suspend_devices(ddi_root_node());
 	pm_powering_down = 0;
 	if (rc)
 		return (rc);
-	DEBUG1(errp("done\n"));
+	CPR_DEBUG(CPR_DEBUG1, "done\n");
 	CPR_STAT_EVENT_END("  stop drivers");
 
 	/*
@@ -486,7 +486,7 @@ alloc_statefile:
 	mon_clock_start();
 
 	i_cpr_stop_intr();
-	DEBUG1(errp("interrupt is stopped\n"));
+	CPR_DEBUG(CPR_DEBUG1, "interrupt is stopped\n");
 
 	/*
 	 * Since we will now disable the mechanism that causes prom_printfs
@@ -569,7 +569,7 @@ cpr_resume(void)
 	 * The following switch is used to resume the system
 	 * that was suspended to a different level.
 	 */
-	DEBUG1(errp("\nEntering cpr_resume...\n"));
+	CPR_DEBUG(CPR_DEBUG1, "\nEntering cpr_resume...\n");
 
 	/*
 	 * Note:
@@ -730,7 +730,7 @@ rb_stop_kernel_threads:
 	cpr_start_kernel_threads();
 
 rb_suspend_devices:
-	DEBUG1(errp("resuming devices..."));
+	CPR_DEBUG(CPR_DEBUG1, "resuming devices...");
 	CPR_STAT_EVENT_START("  start drivers");
 
 	/*
@@ -748,7 +748,7 @@ rb_suspend_devices:
 	else if (rc)
 		cpr_err(CE_WARN, str);
 	CPR_STAT_EVENT_END("  start drivers");
-	DEBUG1(errp("done\n"));
+	CPR_DEBUG(CPR_DEBUG1, "done\n");
 
 	/*
 	 * If we had disabled modunloading in this cpr resume cycle (i.e. we
@@ -804,9 +804,9 @@ rb_pm_reattach_noinvol:
 	pm_restore_direct_levels();
 
 rb_stop_user_threads:
-	DEBUG1(errp("starting user threads..."));
+	CPR_DEBUG(CPR_DEBUG1, "starting user threads...");
 	cpr_start_user_threads();
-	DEBUG1(errp("done\n"));
+	CPR_DEBUG(CPR_DEBUG1, "done\n");
 
 rb_mp_offline:
 	if (cpr_mp_online())
@@ -832,16 +832,17 @@ rb_others:
 	if (!cpr_reusable_mode)
 		cpr_clear_definfo();
 
-	DEBUG1(errp("Sending SIGTHAW..."));
+	CPR_DEBUG(CPR_DEBUG1, "Sending SIGTHAW...");
 	cpr_signal_user(SIGTHAW);
-	DEBUG1(errp("done\n"));
+	CPR_DEBUG(CPR_DEBUG1, "done\n");
 
 	CPR_STAT_EVENT_END("Resume Total");
 
 	CPR_STAT_EVENT_START_TMZ("WHOLE CYCLE", &wholecycle_tv);
 	CPR_STAT_EVENT_END("WHOLE CYCLE");
 
-	DEBUG1(cmn_err(CE_CONT, "\nThe system is back where you left!\n"));
+	if (cpr_debug & CPR_DEBUG1)
+		cmn_err(CE_CONT, "\nThe system is back where you left!\n");
 
 	CPR_STAT_EVENT_START("POST CPR DELAY");
 

@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -44,6 +44,7 @@
 		kobj_load_primary_module;
 		kobj_lookup;
 		kobj_lookup_all;
+		kobj_module_path;
 		kobj_notify_add;
 		kobj_notify_remove;
 		kobj_open;

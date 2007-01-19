@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +30,7 @@
 #include <sys/cpuvar.h>
 #include <sys/systm.h>
 #include <sys/traptrace.h>
+#include <sys/x_call.h>
 #include <sys/avintr.h>
 #include <sys/systm.h>
 #include <sys/trap.h>
@@ -186,11 +186,10 @@ ttrace_syscall(trap_trace_rec_t *rec)
 	uintptr_t addr;
 	struct sysent sys;
 
-	mdb_printf("%s%-*x", sysnum < 0x10 ? " " : "",
-	    sysnum < 0x10 ? 2 : 3, sysnum);
+	mdb_printf("%-3x", sysnum);
 
 	if (rec->ttr_sysnum > NSYSCALL) {
-		mdb_printf("%-*d", TT_HDLR_WIDTH, rec->ttr_sysnum);
+		mdb_printf(" %-*d", TT_HDLR_WIDTH, rec->ttr_sysnum);
 		return (0);
 	}
 
@@ -211,7 +210,7 @@ ttrace_syscall(trap_trace_rec_t *rec)
 		return (-1);
 	}
 
-	mdb_printf("%-*a", TT_HDLR_WIDTH, sys.sy_callc);
+	mdb_printf(" %-*a", TT_HDLR_WIDTH, sys.sy_callc);
 
 	return (0);
 }
@@ -224,12 +223,15 @@ ttrace_interrupt(trap_trace_rec_t *rec)
 	struct av_head hd;
 	struct autovec av;
 
-	if (rec->ttr_regs.r_trapno == T_SOFTINT) {
-		mdb_printf("%2s %-*s", "-", TT_HDLR_WIDTH, "(fakesoftint)");
+	switch (rec->ttr_regs.r_trapno) {
+	case T_SOFTINT:
+		mdb_printf("%-3s %-*s", "-", TT_HDLR_WIDTH, "(fakesoftint)");
 		return (0);
+	default:
+		break;
 	}
 
-	mdb_printf("%2x ", rec->ttr_vector);
+	mdb_printf("%-3x ", rec->ttr_vector);
 
 	if (mdb_lookup_by_name("autovect", &sym) == -1) {
 		mdb_warn("\ncouldn't find 'autovect'");
@@ -250,7 +252,10 @@ ttrace_interrupt(trap_trace_rec_t *rec)
 	}
 
 	if (hd.avh_link == NULL) {
-		mdb_printf("%-*s", TT_HDLR_WIDTH, "(spurious)");
+		if (rec->ttr_ipl == XC_CPUPOKE_PIL)
+			mdb_printf("%-*s", TT_HDLR_WIDTH, "(cpupoke)");
+		else
+			mdb_printf("%-*s", TT_HDLR_WIDTH, "(spurious)");
 	} else {
 		if (mdb_vread(&av, sizeof (av), (uintptr_t)hd.avh_link) == -1) {
 			mdb_warn("couldn't read autovec at %p",
@@ -286,6 +291,17 @@ static struct {
 	{ T_ALIGNMENT,	"alignment-check" },
 	{ T_MCE,	"machine-check" },
 	{ T_SIMDFPE,	"sse-exception" },
+
+	{ T_DBGENTR,	"debug-enter" },
+	{ T_FASTTRAP,	"fasttrap-0xd2" },
+	{ T_SYSCALLINT,	"syscall-0x91" },
+	{ T_DTRACE_RET,	"dtrace-ret" },
+	{ T_SOFTINT,	"softint" },
+	{ T_INTERRUPT,	"interrupt" },
+	{ T_FAULT,	"fault" },
+	{ T_AST,	"ast" },
+	{ T_SYSCALL,	"syscall" },
+
 	{ 0,		NULL }
 };
 
@@ -294,7 +310,10 @@ ttrace_trap(trap_trace_rec_t *rec)
 {
 	int i;
 
-	mdb_printf("%2x ", rec->ttr_regs.r_trapno);
+	if (rec->ttr_regs.r_trapno == T_AST)
+		mdb_printf("%-3s ", "-");
+	else
+		mdb_printf("%-3x ", rec->ttr_regs.r_trapno);
 
 	for (i = 0; ttrace_traps[i].tt_name != NULL; i++) {
 		if (rec->ttr_regs.r_trapno == ttrace_traps[i].tt_trapno)
@@ -310,6 +329,137 @@ ttrace_trap(trap_trace_rec_t *rec)
 }
 
 static struct {
+	int	tt_type;
+	char	*tt_name;
+} ttrace_xcalls[] = {
+	{ TT_XC_SVC_BEGIN,	"<svc-begin>" },
+	{ TT_XC_SVC_END,	"<svc-end>" },
+	{ TT_XC_START,		"<start>" },
+	{ TT_XC_WAIT,		"<wait>" },
+	{ TT_XC_ACK,		"<ack>" },
+	{ TT_XC_CAPTURE,	"<capture>" },
+	{ TT_XC_RELEASE,	"<release>" },
+	{ TT_XC_POKE_CPU,	"<poke-cpu>" },
+	{ TT_XC_CBE_FIRE,	"<cbe-fire>" },
+	{ TT_XC_CBE_XCALL,	"<cbe-xcall>" },
+	{ 0,			NULL }
+};
+
+static int
+ttrace_xcall(trap_trace_rec_t *rec)
+{
+	struct _xc_entry *xce = &(rec->ttr_info.xc_entry);
+	int i;
+
+	for (i = 0; ttrace_xcalls[i].tt_name != NULL; i++)
+		if (ttrace_xcalls[i].tt_type == xce->xce_marker)
+			break;
+
+	switch (xce->xce_marker) {
+	case TT_XC_SVC_BEGIN:
+	case TT_XC_SVC_END:
+		mdb_printf("%3s ", "-");
+		break;
+	default:
+		mdb_printf("%3x ", (int)xce->xce_arg);
+		break;
+	}
+
+	if (ttrace_xcalls[i].tt_name == NULL)
+		mdb_printf("%-*s", TT_HDLR_WIDTH, "(unknown)");
+	else
+		mdb_printf("%-*s", TT_HDLR_WIDTH, ttrace_xcalls[i].tt_name);
+	return (0);
+}
+
+static char *
+xc_pri_to_str(int pri)
+{
+	switch (pri) {
+	case X_CALL_LOPRI:
+		return (" low");
+	case X_CALL_MEDPRI:
+		return (" med");
+	case X_CALL_HIPRI:
+		return ("high");
+	default:
+		return ("bad?");
+	}
+}
+
+static char *
+xc_state_to_str(uint8_t state)
+{
+	switch (state) {
+	case XC_DONE:
+		return ("done");
+	case XC_HOLD:
+		return ("hold");
+	case XC_SYNC_OP:
+		return ("sync");
+	case XC_CALL_OP:
+		return ("call");
+	case XC_WAIT:
+		return ("wait");
+	default:
+		return ("bad?");
+	}
+}
+
+static void
+ttrace_intr_detail(trap_trace_rec_t *rec)
+{
+	mdb_printf("\tirq %x ipl %d oldpri %d basepri %d\n", rec->ttr_vector,
+	    rec->ttr_ipl, rec->ttr_pri, rec->ttr_spl);
+}
+
+static void
+ttrace_xcall_detail(trap_trace_rec_t *rec)
+{
+	struct _xc_entry *xce = &(rec->ttr_info.xc_entry);
+
+	if ((uint_t)xce->xce_pri < X_CALL_LEVELS)
+		mdb_printf("\t%s pri [%s] ", xc_pri_to_str(xce->xce_pri),
+		    xc_state_to_str(xce->xce_state));
+	else
+		mdb_printf("\t");
+
+	switch (xce->xce_marker) {
+	case TT_XC_SVC_BEGIN:
+		if (xce->xce_pri != X_CALL_MEDPRI && xce->xce_func != NULL)
+			mdb_printf("call %a() ..", xce->xce_func);
+		break;
+	case TT_XC_SVC_END:
+		if (xce->xce_arg == DDI_INTR_UNCLAIMED)
+			mdb_printf("[spurious]");
+		else if (xce->xce_pri != X_CALL_MEDPRI &&
+		    xce->xce_func != NULL)
+			mdb_printf(".. called %a() returned %d",
+			    xce->xce_func, xce->xce_retval);
+		break;
+	case TT_XC_START:
+	case TT_XC_CAPTURE:
+		mdb_printf("--> cpu%d", (int)xce->xce_arg);
+		break;
+	case TT_XC_RELEASE:
+	case TT_XC_WAIT:
+	case TT_XC_ACK:
+		mdb_printf("<-- cpu%d", (int)xce->xce_arg);
+		break;
+	case TT_XC_POKE_CPU:
+	case TT_XC_CBE_FIRE:
+	case TT_XC_CBE_XCALL:
+		mdb_printf("--> cpu%d", (int)xce->xce_arg);
+		break;
+	default:
+		mdb_printf("tag %d? arg 0x%lx",
+		    xce->xce_marker, xce->xce_arg);
+		break;
+	}
+	mdb_printf("\n\n");
+}
+
+static struct {
 	uchar_t t_marker;
 	char *t_name;
 	int (*t_hdlr)(trap_trace_rec_t *);
@@ -320,6 +470,8 @@ static struct {
 	{ TT_SYSC64, "sc64", ttrace_syscall },
 	{ TT_INTERRUPT, "intr", ttrace_interrupt },
 	{ TT_TRAP, "trap", ttrace_trap },
+	{ TT_EVENT, "evnt", ttrace_trap },
+	{ TT_XCALL, "xcal", ttrace_xcall },
 	{ 0, NULL, NULL }
 };
 
@@ -333,7 +485,6 @@ typedef struct ttrace_dcmd {
 
 #define	DUMP(reg) #reg, regs->r_##reg
 #define	THREEREGS	"         %3s: %16lx %3s: %16lx %3s: %16lx\n"
-#define	TWOREGS		"         %3s: %16lx %3s: %16lx\n"
 
 static void
 ttrace_dumpregs(trap_trace_rec_t *rec)
@@ -345,12 +496,10 @@ ttrace_dumpregs(trap_trace_rec_t *rec)
 	mdb_printf(THREEREGS, DUMP(rax), DUMP(rbx), DUMP(rbp));
 	mdb_printf(THREEREGS, DUMP(r10), DUMP(r11), DUMP(r12));
 	mdb_printf(THREEREGS, DUMP(r13), DUMP(r14), DUMP(r15));
-	mdb_printf(THREEREGS, "fsb", regs->r_fsbase, "gsb", regs->r_gsbase,
-	    DUMP(ds));
-	mdb_printf(THREEREGS, DUMP(es), DUMP(fs), DUMP(gs));
-	mdb_printf(THREEREGS, "trp", regs->r_trapno, DUMP(err), DUMP(rip));
-	mdb_printf(THREEREGS, DUMP(cs), DUMP(rfl), DUMP(rsp));
-	mdb_printf(TWOREGS, DUMP(ss), "cr2", rec->ttr_cr2);
+	mdb_printf(THREEREGS, DUMP(ds), DUMP(es), DUMP(fs));
+	mdb_printf(THREEREGS, DUMP(gs), "trp", regs->r_trapno, DUMP(err));
+	mdb_printf(THREEREGS, DUMP(rip), DUMP(cs), DUMP(rfl));
+	mdb_printf(THREEREGS, DUMP(rsp), DUMP(ss), "cr2", rec->ttr_cr2);
 	mdb_printf("\n");
 }
 
@@ -408,12 +557,17 @@ ttrace_walk(uintptr_t addr, trap_trace_rec_t *rec, ttrace_dcmd_t *dcmd)
 			return (WALK_ERR);
 	}
 
-	mdb_printf("%a\n", regs->r_pc);
+	mdb_printf(" %a\n", regs->r_pc);
 
 	if (dcmd->ttd_extended == FALSE)
 		return (WALK_NEXT);
 
-	ttrace_dumpregs(rec);
+	if (rec->ttr_marker == TT_XCALL)
+		ttrace_xcall_detail(rec);
+	else if (rec->ttr_marker == TT_INTERRUPT)
+		ttrace_intr_detail(rec);
+	else
+		ttrace_dumpregs(rec);
 
 	if (rec->ttr_sdepth > 0) {
 		for (i = 0; i < rec->ttr_sdepth; i++) {
@@ -459,8 +613,8 @@ ttrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (DCMD_HDRSPEC(flags)) {
 		mdb_printf("%3s %15s %4s %2s %-*s%s\n", "CPU",
-		    "TIMESTAMP", "TYPE", "VC", TT_HDLR_WIDTH, "HANDLER",
-		    "EIP");
+		    "TIMESTAMP", "TYPE", "Vec", TT_HDLR_WIDTH, "HANDLER",
+		    " EIP");
 	}
 
 	if (flags & DCMD_ADDRSPEC) {
@@ -618,15 +772,47 @@ idt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static void
+htables_help(void)
+{
+	mdb_printf(
+	    "Given a (hat_t *), generates the list of all (htable_t *)s\n"
+	    "that correspond to that address space\n");
+}
+
+static void
+report_maps_help(void)
+{
+	mdb_printf(
+	    "Given a PFN, report HAT structures that map the page, or use\n"
+	    "the page as a pagetable.\n"
+	    "\n"
+	    "-m Interpret the PFN as a Xen MFN (machine frame number)\n");
+}
+
+static void
+ptable_help(void)
+{
+	mdb_printf(
+	    "Given a PFN holding a page table, print its contents, and\n"
+	    "the address of the corresponding htable structure.\n"
+	    "\n"
+	    "-m Interpret the PFN as a Xen MFN (machine frame number)\n");
+}
+
 static const mdb_dcmd_t dcmds[] = {
 	{ "gate_desc", ":", "dump a gate descriptor", gate_desc },
 	{ "idt", ":[-v]", "dump an IDT", idt },
 	{ "ttrace", "[-x]", "dump trap trace buffers", ttrace },
 	{ "vatopfn", ":[-a as]", "translate address to physical page",
 	    va2pfn_dcmd },
-	{ "report_maps", "", "Given PFN, report mappings / page table usage",
-	    report_maps_dcmd },
-	{ "ptable", "", "Dump contents of a page table", ptable_dcmd },
+	{ "report_maps", ":[-m]",
+	    "Given PFN, report mappings / page table usage",
+	    report_maps_dcmd, report_maps_help },
+	{ "htables", "", "Given hat_t *, lists all its htable_t * values",
+	    htables_dcmd, htables_help },
+	{ "ptable", ":[-m]", "Given PFN, dump contents of a page table",
+	    ptable_dcmd, ptable_help },
 	{ "pte", ":[-p XXXXX] [-l N]", "print human readable page table entry",
 	    pte_dcmd },
 	{ "page_num2pp", ":", "page frame number to page structure",

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #From: "@(#)Install	1.56	96/10/11 SMI"
@@ -391,7 +391,7 @@ copy_kernel() {
 
 	case $KARCH in
 		sun4*)		ISA=sparc;	MACH=sparc	;;
-		i86pc)		ISA=intel;	MACH=i386	;;
+		i86*)		ISA=intel;	MACH=i386	;;
 		*)		fail "${KARCH}: invalid kernel architecture";;
 	esac
 	export MACH
@@ -491,7 +491,8 @@ copy_kernel() {
 	#
 	# on x86, add the glommed kernel name to the root archive
 	#
-	if [[ $KARCH = "i86pc" && $GLOM == "yes" ]]; then
+	if [[ $MACH = "i386" && $GLOM == "yes" ]];
+	then
 		filelist="$INSTALL_FILES/etc/boot/solaris/filelist.ramdisk"
 		mkdir -p `dirname $filelist`
 		echo "platform/$KARCH/$GLOMNAME" >$filelist

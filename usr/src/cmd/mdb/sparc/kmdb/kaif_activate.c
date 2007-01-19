@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -278,18 +278,17 @@ kaif_cpr_restart(void)
 }
 
 static kdi_debugvec_t kaif_dvec = {
-	kaif_enter,
-	kaif_cpu_init,
-	NULL,			/* dv_kctl_cpu_init */
-	kaif_vmready,
 	NULL,			/* dv_kctl_vmready */
 	NULL,			/* dv_kctl_memavail */
-	kaif_memrange_add,
-	kaif_cpr_restart,
 	NULL,			/* dv_kctl_modavail */
 	NULL,			/* dv_kctl_thravail */
+	kaif_vmready,
+	NULL,			/* dv_memavail */
 	kaif_mod_loaded,
-	kaif_mod_unloading
+	kaif_mod_unloading,
+	NULL,			/* dv_kctl_cpu_init */
+	kaif_cpu_init,
+	kaif_cpr_restart
 };
 
 /*ARGSUSED1*/

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -515,19 +516,19 @@ setcr8(ulong_t val)
 	ret
 	SET_SIZE(setcr0)
 
-	ENTRY(getcr2)
-	movq	%cr2, %rax
-	ret
+        ENTRY(getcr2)
+        movq    %cr2, %rax
+        ret
 	SET_SIZE(getcr2)
 
 	ENTRY(getcr3)
-	movq	%cr3, %rax
+	movq    %cr3, %rax
 	ret
 	SET_SIZE(getcr3)
 
-	ENTRY(setcr3)
-	movq	%rdi, %cr3
-	ret
+        ENTRY(setcr3)
+        movq    %rdi, %cr3
+        ret
 	SET_SIZE(setcr3)
 
 	ENTRY(reload_cr3)
@@ -662,6 +663,28 @@ __cpuid_insn(struct cpuid_regs *regs)
 #endif	/* __i386 */
 #endif	/* __lint */
 
+
+#if defined(__lint)
+
+hrtime_t
+tsc_read(void)
+{
+	return (0);
+}
+
+#else	/* __lint */
+
+	ENTRY_NP(tsc_read)
+	rdtsc
+#if defined(__amd64)
+	shlq	$32, %rdx
+	orq	%rdx, %rax
+#endif
+	ret
+	SET_SIZE(tsc_read)
+
+#endif	/* __lint */
+
 /*
  * Insert entryp after predp in a doubly linked list.
  */
@@ -776,7 +799,7 @@ strlen(const char *str)
 
 	ENTRY(strlen)
 #ifdef DEBUG
-	movq	kernelbase(%rip), %rax
+	movq	postbootkernelbase(%rip), %rax
 	cmpq	%rax, %rdi
 	jae	str_valid
 	pushq	%rbp
@@ -804,7 +827,7 @@ str_valid:
 
 	ENTRY(strlen)
 #ifdef DEBUG
-	movl	kernelbase, %eax
+	movl	postbootkernelbase, %eax
 	cmpl	%eax, 4(%esp)
 	jae	str_valid
 	pushl	%ebp
@@ -900,73 +923,36 @@ int splhigh(void)	{ return (0); }
 int splhi(void)		{ return (0); }
 int splzs(void)		{ return (0); }
 
+/* ARGSUSED */
+void
+splx(int level)
+{}
+
 #else	/* __lint */
 
-/* reg = cpu->cpu_m.cpu_pri; */
-#define	GETIPL_NOGS(reg, cpup)	\
-	movl	CPU_PRI(cpup), reg;
-
-/* cpu->cpu_m.cpu_pri; */
-#define	SETIPL_NOGS(val, cpup)	\
-	movl	val, CPU_PRI(cpup);
-
-/* reg = cpu->cpu_m.cpu_pri; */
-#define	GETIPL(reg)	\
-	movl	%gs:CPU_PRI, reg;
-
-/* cpu->cpu_m.cpu_pri; */
-#define	SETIPL(val)	\
-	movl	val, %gs:CPU_PRI;
-
-/*
- * Macro to raise processor priority level.
- * Avoid dropping processor priority if already at high level.
- * Also avoid going below CPU->cpu_base_spl, which could've just been set by
- * a higher-level interrupt thread that just blocked.
- */
-#if defined(__amd64)
-
-#define	RAISE(level) \
-	cli;			\
-	LOADCPU(%rcx);		\
-	movl	$/**/level, %edi;\
-	GETIPL_NOGS(%eax, %rcx);\
-	cmpl 	%eax, %edi;	\
-	jg	spl;		\
-	jmp	setsplhisti
-
-#elif defined(__i386)
-
-#define	RAISE(level) \
-	cli;			\
-	LOADCPU(%ecx);		\
-	movl	$/**/level, %edx;\
-	GETIPL_NOGS(%eax, %ecx);\
-	cmpl 	%eax, %edx;	\
-	jg	spl;		\
-	jmp	setsplhisti
-
-#endif	/* __i386 */
-
-/*
- * Macro to set the priority to a specified level.
- * Avoid dropping the priority below CPU->cpu_base_spl.
- */
 #if defined(__amd64)
 
 #define	SETPRI(level) \
-	cli;				\
-	LOADCPU(%rcx);			\
-	movl	$/**/level, %edi;	\
-	jmp	spl
+	movl	$/**/level, %edi;	/* new priority */		\
+	jmp	do_splx			/* redirect to do_splx */
+
+#define	RAISE(level) \
+	movl	$/**/level, %edi;	/* new priority */		\
+	jmp	splr			/* redirect to splr */
 
 #elif defined(__i386)
 
-#define SETPRI(level) \
-	cli;				\
-	LOADCPU(%ecx);			\
-	movl	$/**/level, %edx;	\
-	jmp	spl
+#define	SETPRI(level) \
+	pushl	$/**/level;	/* new priority */			\
+	call	do_splx;	/* invoke common splx code */		\
+	addl	$4, %esp;	/* unstack arg */			\
+	ret
+
+#define	RAISE(level) \
+	pushl	$/**/level;	/* new priority */			\
+	call	splr;		/* invoke common splr code */		\
+	addl	$4, %esp;	/* unstack args */			\
+	ret
 
 #endif	/* __i386 */
 
@@ -985,413 +971,29 @@ int splzs(void)		{ return (0); }
 	SETPRI(12)	/* Can't be a RAISE, as it's used to lower us */
 	SET_SIZE(splzs)
 
-	/*
-	 * should lock out clocks and all interrupts,
-	 * as you can see, there are exceptions
-	 */
-
-#if defined(__amd64)
-
-	.align	16
 	ENTRY(splhi)
 	ALTENTRY(splhigh)
 	ALTENTRY(spl6)
 	ALTENTRY(i_ddi_splhigh)
-	cli
-	LOADCPU(%rcx)
-	movl	$DISP_LEVEL, %edi
-	movl	CPU_PRI(%rcx), %eax
-	cmpl	%eax, %edi
-	jle	setsplhisti
-	SETIPL_NOGS(%edi, %rcx)
-	/*
-	 * If we aren't using cr8 to control ipl then we patch this
-	 * with a jump to slow_setsplhi
-	 */
-	ALTENTRY(setsplhi_patch)
-	movq	CPU_PRI_DATA(%rcx), %r11 /* get pri data ptr */
-	movzb	(%r11, %rdi, 1), %rdx	/* get apic mask for this ipl */
-	movq	%rdx, %cr8		/* set new apic priority */
-	/*
-	 * enable interrupts
-	 */
-setsplhisti:
-	nop	/* patch this to a sti when a proper setspl routine appears */
-	ret
 
-	ALTENTRY(slow_setsplhi)
-	pushq	%rbp
-	movq	%rsp, %rbp
-	subq	$16, %rsp
-	movl	%eax, -4(%rbp)		/* save old ipl */
-	call	*setspl(%rip)
-	movl	-4(%rbp), %eax		/* return old ipl */
-	leave
-	jmp	setsplhisti
+	RAISE(DISP_LEVEL)
 
 	SET_SIZE(i_ddi_splhigh)
 	SET_SIZE(spl6)
 	SET_SIZE(splhigh)
 	SET_SIZE(splhi)
-
-#elif defined(__i386)
-
-	.align	16
-	ENTRY(splhi)
-	ALTENTRY(splhigh)
-	ALTENTRY(spl6)
-	ALTENTRY(i_ddi_splhigh)
-	cli
-	LOADCPU(%ecx)
-	movl	$DISP_LEVEL, %edx
-	movl	CPU_PRI(%ecx), %eax
-	cmpl	%eax, %edx
-	jle	setsplhisti
-	SETIPL_NOGS(%edx, %ecx)		/* set new ipl */
-
-	pushl   %eax                    /* save old ipl */
-	pushl	%edx			/* pass new ipl */
-	call	*setspl
-	popl	%ecx			/* dummy pop */
-	popl    %eax                    /* return old ipl */
-	/*
-	 * enable interrupts
-	 *
-	 * (we patch this to an sti once a proper setspl routine
-	 * is installed)
-	 */
-setsplhisti:
-	nop	/* patch this to a sti when a proper setspl routine appears */
-	ret
-	SET_SIZE(i_ddi_splhigh)
-	SET_SIZE(spl6)
-	SET_SIZE(splhigh)
-	SET_SIZE(splhi)
-
-#endif	/* __i386 */
 
 	/* allow all interrupts */
 	ENTRY(spl0)
 	SETPRI(0)
 	SET_SIZE(spl0)
 
-#endif	/* __lint */
 
-/*
- * splr is like splx but will only raise the priority and never drop it
- */
-#if defined(__lint)
-
-/* ARGSUSED */
-int
-splr(int level)
-{ return (0); }
-
-#else	/* __lint */
-
-#if defined(__amd64)
-
-	ENTRY(splr)
-	cli
-	LOADCPU(%rcx)
-	GETIPL_NOGS(%eax, %rcx)
-	cmpl	%eax, %edi		/* if new level > current level */
-	jg	spl			/* then set ipl to new level */
-splr_setsti:
-	nop	/* patch this to a sti when a proper setspl routine appears */
-	ret				/* else return the current level */
-	SET_SIZE(splr)
-
-#elif defined(__i386)
-	
-	ENTRY(splr)
-	cli
-	LOADCPU(%ecx)
-	movl	4(%esp), %edx		/* get new spl level */
-	GETIPL_NOGS(%eax, %ecx)
-	cmpl 	%eax, %edx		/* if new level > current level */
-	jg	spl			/* then set ipl to new level */
-splr_setsti:
-	nop	/* patch this to a sti when a proper setspl routine appears */
-	ret				/* else return the current level */
-	SET_SIZE(splr)
-
-#endif	/* __i386 */ 
-#endif	/* __lint */
-
-
-
-/*
- * splx - set PIL back to that indicated by the level passed as an argument,
- * or to the CPU's base priority, whichever is higher.
- * Needs to be fall through to spl to save cycles.
- * Algorithm for spl:
- *
- *      turn off interrupts
- *
- *	if (CPU->cpu_base_spl > newipl)
- *		newipl = CPU->cpu_base_spl;
- *      oldipl = CPU->cpu_pridata->c_ipl;
- *      CPU->cpu_pridata->c_ipl = newipl;
- *
- *	/indirectly call function to set spl values (usually setpicmasks)
- *      setspl();  // load new masks into pics
- *
- * Be careful not to set priority lower than CPU->cpu_base_pri,
- * even though it seems we're raising the priority, it could be set
- * higher at any time by an interrupt routine, so we must block interrupts
- * and look at CPU->cpu_base_pri
- */
-#if defined(__lint)
-
-/* ARGSUSED */
-void
-splx(int level)
-{}
-
-#else	/* __lint */
-
-#if defined(__amd64)
-
+	/* splx implentation */
 	ENTRY(splx)
-	ALTENTRY(i_ddi_splx)
-	cli				/* disable interrupts */
-	LOADCPU(%rcx)
-	/*FALLTHRU*/
-	.align	4
-spl:
-	/*
-	 * New priority level is in %edi, cpu struct pointer is in %rcx
-	 */
-	GETIPL_NOGS(%eax, %rcx)		/* get current ipl */
-	cmpl   %edi, CPU_BASE_SPL(%rcx) /* if (base spl > new ipl) */
-	ja     set_to_base_spl		/* then use base_spl */ 
-
-setprilev:
-	SETIPL_NOGS(%edi, %rcx)		/* set new ipl */
-	/*
-	 * If we aren't using cr8 to control ipl then we patch this
-	 * with a jump to slow_spl
-	 */
-	ALTENTRY(spl_patch)	
-	movq	CPU_PRI_DATA(%rcx), %r11 /* get pri data ptr */
-	movzb	(%r11, %rdi, 1), %rdx	/* get apic mask for this ipl */
-	movq	%rdx, %cr8		/* set new apic priority */
-	xorl	%edx, %edx
-	bsrl	CPU_SOFTINFO(%rcx), %edx /* fls(cpu->cpu_softinfo.st_pending) */
-	cmpl	%edi, %edx		/* new ipl vs. st_pending */
-	jle	setsplsti
-
-	pushq	%rbp
-	movq	%rsp, %rbp
-	/* stack now 16-byte aligned */
-	pushq	%rax			/* save old spl */	  
-	pushq	%rdi			/* save new ipl too */	  
-	jmp	fakesoftint
-
-setsplsti:
-	nop	/* patch this to a sti when a proper setspl routine appears */
-	ret
-
-	ALTENTRY(slow_spl)
-	pushq	%rbp
-	movq	%rsp, %rbp
-	/* stack now 16-byte aligned */
-
-	pushq	%rax			/* save old spl */	  
-	pushq	%rdi			/* save new ipl too */	  
-
-	call	*setspl(%rip)
-
-	LOADCPU(%rcx)
-	movl	CPU_SOFTINFO(%rcx), %eax
-	orl	%eax, %eax
-	jz	slow_setsplsti
-
-	bsrl	%eax, %edx		/* fls(cpu->cpu_softinfo.st_pending) */
-	cmpl	0(%rsp), %edx		/* new ipl vs. st_pending */
-	jg	fakesoftint
-
-	ALTENTRY(fakesoftint_return)
-	/*
-	 * enable interrupts
-	 */
-slow_setsplsti:
-	nop	/* patch this to a sti when a proper setspl routine appears */
-	popq	%rdi
-	popq	%rax			/* return old ipl */
-	leave
-	ret
-	SET_SIZE(fakesoftint_return)
-
-set_to_base_spl:
-	movl	CPU_BASE_SPL(%rcx), %edi
-	jmp	setprilev
-	SET_SIZE(spl)
-	SET_SIZE(i_ddi_splx)
+	jmp	do_splx		/* redirect to common splx code */
 	SET_SIZE(splx)
 
-#elif defined(__i386)
-
-	ENTRY(splx)
-	ALTENTRY(i_ddi_splx)
-	cli                             /* disable interrupts */
-	LOADCPU(%ecx)
-	movl	4(%esp), %edx		/* get new spl level */
-	/*FALLTHRU*/
-
-	.align	4
-	ALTENTRY(spl)
-	/*
-	 * New priority level is in %edx
-	 * (doing this early to avoid an AGI in the next instruction)
-	 */
-	GETIPL_NOGS(%eax, %ecx)		/* get current ipl */
-	cmpl	%edx, CPU_BASE_SPL(%ecx) /* if ( base spl > new ipl) */
-	ja	set_to_base_spl		/* then use base_spl */
-
-setprilev:
-	SETIPL_NOGS(%edx, %ecx)		/* set new ipl */
-
-	pushl   %eax                    /* save old ipl */
-	pushl	%edx			/* pass new ipl */
-	call	*setspl
-
-	LOADCPU(%ecx)
-	movl	CPU_SOFTINFO(%ecx), %eax
-	orl	%eax, %eax
-	jz	setsplsti
-
-	/*
-	 * Before dashing off, check that setsplsti has been patched.
-	 */
-	cmpl	$NOP_INSTR, setsplsti
-	je	setsplsti
-
-	bsrl	%eax, %edx
-	cmpl	0(%esp), %edx
-	jg	fakesoftint
-
-	ALTENTRY(fakesoftint_return)
-	/*
-	 * enable interrupts
-	 */
-setsplsti:
-	nop	/* patch this to a sti when a proper setspl routine appears */
-	popl	%eax
-	popl    %eax			/ return old ipl
-	ret
-	SET_SIZE(fakesoftint_return)
-
-set_to_base_spl:
-	movl	CPU_BASE_SPL(%ecx), %edx
-	jmp	setprilev
-	SET_SIZE(spl)
-	SET_SIZE(i_ddi_splx)
-	SET_SIZE(splx)
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
-#if defined(__lint)
-
-void
-install_spl(void)
-{}
-
-#else	/* __lint */
-
-#if defined(__amd64)
-
-	ENTRY_NP(install_spl)
-	movq	%cr0, %rax
-	movq	%rax, %rdx
-	movl	$_BITNOT(CR0_WP), %ecx
-	movslq	%ecx, %rcx
-	andq	%rcx, %rax		/* we don't want to take a fault */
-	movq	%rax, %cr0
-	jmp	1f
-1:	movb	$STI_INSTR, setsplsti(%rip)
-	movb	$STI_INSTR, slow_setsplsti(%rip)
-	movb	$STI_INSTR, setsplhisti(%rip)
-	movb	$STI_INSTR, splr_setsti(%rip)
-	testl	$1, intpri_use_cr8(%rip)	/* are using %cr8 ? */
-	jz	2f				/* no, go patch more */
-	movq	%rdx, %cr0
-	ret
-2:
-	/*
-	 * Patch spl functions to use slow spl method
-	 */
-	leaq	setsplhi_patch(%rip), %rdi	/* get patch point addr */
-	leaq	slow_setsplhi(%rip), %rax	/* jmp target */
-	subq	%rdi, %rax			/* calculate jmp distance */
-	subq	$2, %rax			/* minus size of jmp instr */
-	shlq	$8, %rax			/* construct jmp instr */
-	addq	$JMP_INSTR, %rax
-	movw	%ax, setsplhi_patch(%rip)	/* patch in the jmp */
-	leaq	spl_patch(%rip), %rdi		/* get patch point addr */
-	leaq	slow_spl(%rip), %rax		/* jmp target */
-	subq	%rdi, %rax			/* calculate jmp distance */
-	subq	$2, %rax			/* minus size of jmp instr */
-	shlq	$8, %rax			/* construct jmp instr */
-	addq	$JMP_INSTR, %rax
-	movw	%ax, spl_patch(%rip)		/* patch in the jmp */
-	/*
-	 * Ensure %cr8 is zero since we aren't using it
-	 */
-	xorl	%eax, %eax
-	movq	%rax, %cr8
-	movq	%rdx, %cr0
-	ret
-	SET_SIZE(install_spl)
-
-#elif defined(__i386)
-
-	ENTRY_NP(install_spl)
-	movl	%cr0, %eax
-	movl	%eax, %edx
-	andl	$_BITNOT(CR0_WP), %eax	/* we don't want to take a fault */
-	movl	%eax, %cr0
-	jmp	1f
-1:	movb	$STI_INSTR, setsplsti
-	movb	$STI_INSTR, setsplhisti
-	movb	$STI_INSTR, splr_setsti
-	movl	%edx, %cr0
-	ret
-	SET_SIZE(install_spl)
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
-
-/*
- * Get current processor interrupt level
- */
-
-#if defined(__lint)
-
-int
-getpil(void)
-{ return (0); }
-
-#else	/* __lint */
-
-#if defined(__amd64)
-
-	ENTRY(getpil)
-	GETIPL(%eax)			/* priority level into %eax */
-	ret
-	SET_SIZE(getpil)
-
-#elif defined(__i386)
-
-	ENTRY(getpil)
-	GETIPL(%eax)			/* priority level into %eax */
-	ret
-	SET_SIZE(getpil)
-
-#endif	/* __i386 */
 #endif	/* __lint */
 
 #if defined(__i386)
@@ -2117,13 +1719,13 @@ scanc(size_t size, uchar_t *cp, uchar_t *table, uchar_t mask)
 
 #if defined(__lint)
 
-int
+ulong_t
 intr_clear(void)
-{ return 0; }
+{ return (0); }
 
-int
+ulong_t
 clear_int_flag(void)
-{ return 0; }
+{ return (0); }
 
 #else	/* __lint */
 
@@ -2132,8 +1734,8 @@ clear_int_flag(void)
 	ENTRY(intr_clear)
 	ENTRY(clear_int_flag)
 	pushfq
-	cli
 	popq	%rax
+	CLI(%rdi)
 	ret
 	SET_SIZE(clear_int_flag)
 	SET_SIZE(intr_clear)
@@ -2143,8 +1745,8 @@ clear_int_flag(void)
 	ENTRY(intr_clear)
 	ENTRY(clear_int_flag)
 	pushfl
-	cli
 	popl	%eax
+	CLI(%edx)
 	ret
 	SET_SIZE(clear_int_flag)
 	SET_SIZE(intr_clear)
@@ -2261,12 +1863,12 @@ ntohs(uint16_t i)
 
 /* ARGSUSED */
 void
-intr_restore(uint_t i)
+intr_restore(ulong_t i)
 { return; }
 
 /* ARGSUSED */
 void
-restore_int_flag(int i)
+restore_int_flag(ulong_t i)
 { return; }
 
 #else	/* __lint */
@@ -2285,7 +1887,8 @@ restore_int_flag(int i)
 
 	ENTRY(intr_restore)
 	ENTRY(restore_int_flag)
-	pushl	4(%esp)
+	movl	4(%esp), %eax
+	pushl	%eax
 	popfl
 	ret
 	SET_SIZE(restore_int_flag)
@@ -2300,12 +1903,25 @@ void
 sti(void)
 {}
 
+void
+cli(void)
+{}
+
 #else	/* __lint */
 
 	ENTRY(sti)
-	sti
+	STI
 	ret
 	SET_SIZE(sti)
+
+	ENTRY(cli)
+#if defined(__amd64)
+	CLI(%rax)
+#elif defined(__i386)
+	CLI(%eax)
+#endif	/* __i386 */
+	ret
+	SET_SIZE(cli)
 
 #endif	/* __lint */
 
@@ -2322,7 +1938,7 @@ dtrace_interrupt_disable(void)
 	ENTRY(dtrace_interrupt_disable)
 	pushfq
 	popq	%rax
-	cli
+	CLI(%rdx)
 	ret
 	SET_SIZE(dtrace_interrupt_disable)
 
@@ -2331,7 +1947,7 @@ dtrace_interrupt_disable(void)
 	ENTRY(dtrace_interrupt_disable)
 	pushfl
 	popl	%eax
-	cli
+	CLI(%edx)
 	ret
 	SET_SIZE(dtrace_interrupt_disable)
 
@@ -2458,7 +2074,7 @@ ip_ocsum(
 	pushq	%rbp
 	movq	%rsp, %rbp
 #ifdef DEBUG
-	movq	kernelbase(%rip), %rax
+	movq	postbootkernelbase(%rip), %rax
 	cmpq	%rax, %rdi
 	jnb	1f
 	xorl	%eax, %eax
@@ -2878,6 +2494,7 @@ invalidate_cache(void)
 #define	XMSR_ACCESS_VAL		$0x9c5a203a
 
 #if defined(__amd64)
+	
 	ENTRY(rdmsr)
 	movl	%edi, %ecx
 	rdmsr
@@ -2896,21 +2513,27 @@ invalidate_cache(void)
 	SET_SIZE(wrmsr)
 
 	ENTRY(xrdmsr)
+	pushq	%rbp
+	movq	%rsp, %rbp
 	movl	%edi, %ecx
 	movl	XMSR_ACCESS_VAL, %edi	/* this value is needed to access MSR */
 	rdmsr
 	shlq	$32, %rdx
 	orq	%rdx, %rax
+	leave
 	ret
 	SET_SIZE(xrdmsr)
 
 	ENTRY(xwrmsr)
+	pushq	%rbp
+	movq	%rsp, %rbp
 	movl	%edi, %ecx
 	movl	XMSR_ACCESS_VAL, %edi	/* this value is needed to access MSR */
 	movq	%rsi, %rdx
 	shrq	$32, %rdx
 	movl	%esi, %eax
 	wrmsr
+	leave
 	ret
 	SET_SIZE(xwrmsr)
 	
@@ -2931,18 +2554,28 @@ invalidate_cache(void)
 	SET_SIZE(wrmsr)
 
 	ENTRY(xrdmsr)
-	movl	4(%esp), %ecx
+	pushl	%ebp
+	movl	%esp, %ebp
+	movl	8(%esp), %ecx
+	pushl	%edi
 	movl	XMSR_ACCESS_VAL, %edi	/* this value is needed to access MSR */
 	rdmsr
+	popl	%edi
+	leave
 	ret
 	SET_SIZE(xrdmsr)
 
 	ENTRY(xwrmsr)
-	movl	4(%esp), %ecx
-	movl	8(%esp), %eax
-	movl	12(%esp), %edx 
+	pushl	%ebp
+	movl	%esp, %ebp
+	movl	8(%esp), %ecx
+	movl	12(%esp), %eax
+	movl	16(%esp), %edx 
+	pushl	%edi
 	movl	XMSR_ACCESS_VAL, %edi	/* this value is needed to access MSR */
 	wrmsr
+	popl	%edi
+	leave
 	ret
 	SET_SIZE(xwrmsr)
 
@@ -2958,12 +2591,15 @@ invalidate_cache(void)
 #if defined(__lint)
 
 /*ARGSUSED*/
-void getcregs(struct cregs *crp)
+void
+getcregs(struct cregs *crp)
 {}
 
 #else	/* __lint */
 
 #if defined(__amd64)
+
+	ENTRY_NP(getcregs)
 
 #define	GETMSR(r, off, d)	\
 	movl	$r, %ecx;	\
@@ -2971,7 +2607,6 @@ void getcregs(struct cregs *crp)
 	movl	%eax, off(d);	\
 	movl	%edx, off+4(d)
 
-	ENTRY_NP(getcregs)
 	xorl	%eax, %eax
 	movq	%rax, CREG_GDT+8(%rdi)
 	sgdt	CREG_GDT(%rdi)		/* 10 bytes */
@@ -2988,11 +2623,12 @@ void getcregs(struct cregs *crp)
 	movq	%cr3, %rax
 	movq	%rax, CREG_CR3(%rdi)	/* cr3 */
 	movq	%cr4, %rax
-	movq	%rax, CREG_CR8(%rdi)	/* cr4 */
+	movq	%rax, CREG_CR4(%rdi)	/* cr4 */
 	movq	%cr8, %rax
 	movq	%rax, CREG_CR8(%rdi)	/* cr8 */
 	GETMSR(MSR_AMD_KGSBASE, CREG_KGSBASE, %rdi)
 	GETMSR(MSR_AMD_EFER, CREG_EFER, %rdi)
+	ret
 	SET_SIZE(getcregs)
 
 #undef GETMSR
@@ -3021,8 +2657,7 @@ void getcregs(struct cregs *crp)
 .nocr4:
 	movl	$0, CREG_CR4(%edx)
 .skip:
-	rep;	ret	/* use 2 byte return instruction when branch target */
-			/* AMD Software Optimization Guide - Section 6.2 */
+	ret
 	SET_SIZE(getcregs)
 
 #endif	/* __i386 */
@@ -3213,16 +2848,6 @@ vpanic_common:
 	movq	%r13, REGOFF_R13(%rsp)
 	movq	%r14, REGOFF_R14(%rsp)
 	movq	%r15, REGOFF_R15(%rsp)
-
-	movl	$MSR_AMD_FSBASE, %ecx
-	rdmsr
-	movl	%eax, REGOFF_FSBASE(%rsp)
-	movl	%edx, REGOFF_FSBASE+4(%rsp)
-
-	movl	$MSR_AMD_GSBASE, %ecx
-	rdmsr
-	movl	%eax, REGOFF_GSBASE(%rsp)
-	movl	%edx, REGOFF_GSBASE+4(%rsp)
 
 	xorl	%ecx, %ecx
 	movw	%ds, %cx
@@ -3442,7 +3067,6 @@ hrtime_t hres_last_tick;
 timestruc_t hrestime;
 int64_t hrestime_adj;
 volatile int hres_lock;
-uint_t nsec_scale;
 hrtime_t hrtime_base;
 
 #else	/* __lint */
@@ -3788,7 +3412,7 @@ bcmp(const void *s1, const void *s2, size_t count)
 	pushq	%rbp
 	movq	%rsp, %rbp
 #ifdef DEBUG
-	movq	kernelbase(%rip), %r11
+	movq	postbootkernelbase(%rip), %r11
 	cmpq	%r11, %rdi
 	jb	0f
 	cmpq	%r11, %rsi
@@ -3816,7 +3440,7 @@ bcmp(const void *s1, const void *s2, size_t count)
 	pushl	%ebp
 	movl	%esp, %ebp	/ create new stack frame
 #ifdef DEBUG
-	movl    kernelbase, %eax
+	movl    postbootkernelbase, %eax
 	cmpl    %eax, ARG_S1(%ebp)
 	jb	0f
 	cmpl    %eax, ARG_S2(%ebp)
@@ -3879,5 +3503,208 @@ bcmp(const void *s1, const void *s2, size_t count)
 .bcmp_panic_msg:
 	.string "bcmp: arguments below kernelbase"
 #endif	/* DEBUG */
+
+#endif	/* __lint */
+
+#if defined(__lint)
+
+uint_t
+bsrw_insn(uint16_t mask)
+{
+	uint_t index = sizeof (mask) * NBBY - 1;
+
+	while ((mask & (1 << index)) == 0)
+		index--;
+	return (index);
+}
+
+#else	/* __lint */
+
+#if defined(__amd64)
+
+	ENTRY_NP(bsrw_insn)
+	xorl	%eax, %eax
+	bsrw	%di, %ax
+	ret
+	SET_SIZE(bsrw_insn)
+
+#elif defined(__i386)
+
+	ENTRY_NP(bsrw_insn)
+	movw	4(%esp), %cx
+	xorl	%eax, %eax
+	bsrw	%cx, %ax
+	ret
+	SET_SIZE(bsrw_insn)
+
+#endif	/* __i386 */
+#endif	/* __lint */
+
+#if defined(__lint)
+
+uint_t
+atomic_btr32(uint32_t *pending, uint_t pil)
+{
+	return (*pending &= ~(1 << pil));
+}
+
+#else	/* __lint */
+
+#if defined(__i386)
+
+	ENTRY_NP(atomic_btr32)
+	movl	4(%esp), %ecx
+	movl	8(%esp), %edx
+	xorl	%eax, %eax
+	lock
+	btrl	%edx, (%ecx)
+	setc	%al
+	ret
+	SET_SIZE(atomic_btr32)
+
+#endif	/* __i386 */
+#endif	/* __lint */
+
+#if defined(__lint)
+
+/*ARGSUSED*/
+void
+switch_sp_and_call(void *newsp, void (*func)(uint_t, uint_t), uint_t arg1,
+	    uint_t arg2)
+{}
+
+#else	/* __lint */
+
+#if defined(__amd64)
+
+	ENTRY_NP(switch_sp_and_call)
+	pushq	%rbp
+	movq	%rsp, %rbp		/* set up stack frame */
+	movq	%rdi, %rsp		/* switch stack pointer */
+	movq	%rdx, %rdi		/* pass func arg 1 */
+	movq	%rsi, %r11		/* save function to call */
+	movq	%rcx, %rsi		/* pass func arg 2 */
+	call	*%r11			/* call function */
+	leave				/* restore stack */
+	ret
+	SET_SIZE(switch_sp_and_call)
+
+#elif defined(__i386)
+
+	ENTRY_NP(switch_sp_and_call)
+	pushl	%ebp
+	mov	%esp, %ebp		/* set up stack frame */
+	movl	8(%ebp), %esp		/* switch stack pointer */
+	pushl	20(%ebp)		/* push func arg 2 */
+	pushl	16(%ebp)		/* push func arg 1 */
+	call	*12(%ebp)		/* call function */
+	addl	$8, %esp		/* pop arguments */
+	leave				/* restore stack */
+	ret
+	SET_SIZE(switch_sp_and_call)
+
+#endif	/* __i386 */
+#endif	/* __lint */
+
+#if defined(__lint)
+
+void
+kmdb_enter(void)
+{}
+
+#else	/* __lint */
+
+#if defined(__amd64)
+
+	ENTRY_NP(kmdb_enter)
+	pushq	%rbp
+	movq	%rsp, %rbp
+
+	/*
+	 * Save flags, do a 'cli' then return the saved flags
+	 */
+	call	intr_clear
+
+	int	$T_DBGENTR
+
+	/*
+	 * Restore the saved flags
+	 */
+	movq	%rax, %rdi
+	call	intr_restore
+
+	leave
+	ret	
+	SET_SIZE(kmdb_enter)
+
+#elif defined(__i386)
+
+	ENTRY_NP(kmdb_enter)
+	pushl	%ebp
+	movl	%esp, %ebp
+
+	/*
+	 * Save flags, do a 'cli' then return the saved flags
+	 */
+	call	intr_clear
+
+	int	$T_DBGENTR
+
+	/*
+	 * Restore the saved flags
+	 */
+	pushl	%eax
+	call	intr_restore
+	addl	$4, %esp
+
+	leave
+	ret	
+	SET_SIZE(kmdb_enter)
+
+#endif	/* __i386 */
+#endif	/* __lint */
+
+#if defined(__lint)
+
+void
+return_instr(void)
+{}
+
+#else	/* __lint */
+
+	ENTRY_NP(return_instr)
+	rep;	ret	/* use 2 byte instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
+	SET_SIZE(return_instr)
+
+#endif	/* __lint */
+
+#if defined(__lint)
+
+ulong_t
+getflags(void)
+{
+	return (0);
+}
+
+#else	/* __lint */
+
+#if defined(__amd64)
+
+	ENTRY(getflags)
+	pushfq
+	popq	%rax
+	ret
+	SET_SIZE(getflags)
+
+#elif defined(__i386)
+
+	ENTRY(getflags)
+	pushfl
+	popl	%eax
+	ret
+	SET_SIZE(getflags)
+
+#endif	/* __i386 */
 
 #endif	/* __lint */

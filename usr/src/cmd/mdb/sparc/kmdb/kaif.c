@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -875,14 +875,6 @@ kaif_mod_unloading(struct modctl *modp)
 		kaif_modchg_cb(modp, 0);
 }
 
-/*ARGSUSED*/
-int
-kaif_memrange_add(caddr_t base, size_t len)
-{
-	/* We don't support multiple memory ranges on SPARC */
-	return (set_errno(ENOTSUP));
-}
-
 void
 kaif_trap_set_debugger(void)
 {
@@ -1017,6 +1009,5 @@ dpi_ops_t kmdb_dpi_ops = {
 	kaif_step,
 	kaif_call,
 	kaif_dump_crumbs,
-	kaif_memrange_add,
 	kaif_kernpanic
 };

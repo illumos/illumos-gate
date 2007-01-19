@@ -45,7 +45,6 @@
 #include <sys/controlregs.h>
 #include <sys/auxv_386.h>
 #include <sys/bitmap.h>
-#include <sys/controlregs.h>
 #include <sys/memnode.h>
 
 /*
@@ -104,7 +103,6 @@ uint_t x86_feature = 0;
 uint_t x86_vendor = X86_VENDOR_IntelClone;
 uint_t x86_type = X86_TYPE_OTHER;
 
-ulong_t cr4_value;
 uint_t pentiumpro_bug4046376;
 uint_t pentiumpro_bug4064495;
 
@@ -158,12 +156,12 @@ struct cpuid_info {
 	/*
 	 * supported feature information
 	 */
-	uint32_t cpi_support[4];
+	uint32_t cpi_support[5];
 #define	STD_EDX_FEATURES	0
 #define	AMD_EDX_FEATURES	1
 #define	TM_EDX_FEATURES		2
 #define	STD_ECX_FEATURES	3
-
+#define	AMD_ECX_FEATURES	4
 	/*
 	 * Synthesized information, where known.
 	 */
@@ -342,6 +340,14 @@ synth_info(struct cpuid_info *cpi)
 }
 
 /*
+ * Apply up various platform-dependent restrictions where the
+ * underlying platform restrictions mean the CPU can be marked
+ * as less capable than its cpuid instruction would imply.
+ */
+
+#define	platform_cpuid_mangle(vendor, eax, cp)	/* nothing */
+
+/*
  *  Some undocumented ways of patching the results of the cpuid
  *  instruction to permit running Solaris 10 on future cpus that
  *  we don't currently support.  Could be set to non-zero values
@@ -353,6 +359,26 @@ uint32_t cpuid_feature_ecx_exclude;
 uint32_t cpuid_feature_edx_include;
 uint32_t cpuid_feature_edx_exclude;
 
+void
+cpuid_alloc_space(cpu_t *cpu)
+{
+	/*
+	 * By convention, cpu0 is the boot cpu, which is set up
+	 * before memory allocation is available.  All other cpus get
+	 * their cpuid_info struct allocated here.
+	 */
+	ASSERT(cpu->cpu_id != 0);
+	cpu->cpu_m.mcpu_cpi =
+	    kmem_zalloc(sizeof (*cpu->cpu_m.mcpu_cpi), KM_SLEEP);
+}
+
+void
+cpuid_free_space(cpu_t *cpu)
+{
+	ASSERT(cpu->cpu_id != 0);
+	kmem_free(cpu->cpu_m.mcpu_cpi, sizeof (*cpu->cpu_m.mcpu_cpi));
+}
+
 uint_t
 cpuid_pass1(cpu_t *cpu)
 {
@@ -362,17 +388,14 @@ cpuid_pass1(cpu_t *cpu)
 	struct cpuid_regs *cp;
 	int xcpuid;
 
+
 	/*
-	 * By convention, cpu0 is the boot cpu, which is called
-	 * before memory allocation is available.  Other cpus are
-	 * initialized when memory becomes available.
+	 * Space statically allocated for cpu0, ensure pointer is set
 	 */
 	if (cpu->cpu_id == 0)
-		cpu->cpu_m.mcpu_cpi = cpi = &cpuid_info0;
-	else
-		cpu->cpu_m.mcpu_cpi = cpi =
-		    kmem_zalloc(sizeof (*cpi), KM_SLEEP);
-
+		cpu->cpu_m.mcpu_cpi = &cpuid_info0;
+	cpi = cpu->cpu_m.mcpu_cpi;
+	ASSERT(cpi != NULL);
 	cp = &cpi->cpi_std[0];
 	cp->cp_eax = 0;
 	cpi->cpi_maxeax = __cpuid_insn(cp);
@@ -615,12 +638,17 @@ cpuid_pass1(cpu_t *cpu)
 	cp->cp_ecx &= mask_ecx;
 
 	/*
-	 * fold in fix ups
+	 * apply any platform restrictions (we don't call this
+	 * immediately after __cpuid_insn here, because we need the
+	 * workarounds applied above first)
 	 */
+	platform_cpuid_mangle(cpi->cpi_vendor, 1, cp);
 
+	/*
+	 * fold in overrides from the "eeprom" mechanism
+	 */
 	cp->cp_edx |= cpuid_feature_edx_include;
 	cp->cp_edx &= ~cpuid_feature_edx_exclude;
-
 
 	cp->cp_ecx |= cpuid_feature_ecx_include;
 	cp->cp_ecx &= ~cpuid_feature_ecx_exclude;
@@ -646,10 +674,6 @@ cpuid_pass1(cpu_t *cpu)
 		feature |= X86_PAE;
 	if (cp->cp_edx & CPUID_INTC_EDX_CX8)
 		feature |= X86_CX8;
-	/*
-	 * Once this bit was thought questionable, but it looks like it's
-	 * back, as of Application Note 485 March 2005 (24161829.pdf)
-	 */
 	if (cp->cp_ecx & CPUID_INTC_ECX_CX16)
 		feature |= X86_CX16;
 	if (cp->cp_edx & CPUID_INTC_EDX_PAT)
@@ -670,7 +694,7 @@ cpuid_pass1(cpu_t *cpu)
 			feature |= X86_SSE3;
 	}
 	if (cp->cp_edx & CPUID_INTC_EDX_DE)
-		cr4_value |= CR4_DE;
+		feature |= X86_DE;
 
 	if (feature & X86_PAE)
 		cpi->cpi_pabits = 36;
@@ -682,7 +706,7 @@ cpuid_pass1(cpu_t *cpu)
 	 * (AMD chose to set the HTT bit on their CMP processors,
 	 * even though they're not actually hyperthreaded.  Thus it
 	 * takes a bit more work to figure out what's really going
-	 * on ... see the handling of the CMP_LEGACY bit below)
+	 * on ... see the handling of the CMP_LGCY bit below)
 	 */
 	if (cp->cp_edx & CPUID_INTC_EDX_HTT) {
 		cpi->cpi_ncpu_per_chip = CPI_CPU_COUNT(cpi);
@@ -742,6 +766,7 @@ cpuid_pass1(cpu_t *cpu)
 			cp = &cpi->cpi_extd[1];
 			cp->cp_eax = 0x80000001;
 			(void) __cpuid_insn(cp);
+
 			if (cpi->cpi_vendor == X86_VENDOR_AMD &&
 			    cpi->cpi_family == 5 &&
 			    cpi->cpi_model == 6 &&
@@ -756,6 +781,8 @@ cpuid_pass1(cpu_t *cpu)
 				}
 			}
 
+			platform_cpuid_mangle(cpi->cpi_vendor, 0x80000001, cp);
+
 			/*
 			 * Compute the additions to the kernel's feature word.
 			 */
@@ -763,17 +790,17 @@ cpuid_pass1(cpu_t *cpu)
 				feature |= X86_NX;
 
 			/*
-			 * If both the HTT and CMP_LEGACY bits are set,
+			 * If both the HTT and CMP_LGCY bits are set,
 			 * then we're not actually HyperThreaded.  Read
 			 * "AMD CPUID Specification" for more details.
 			 */
 			if (cpi->cpi_vendor == X86_VENDOR_AMD &&
 			    (feature & X86_HTT) &&
-			    (cp->cp_ecx & CPUID_AMD_ECX_CMP_LEGACY)) {
+			    (cp->cp_ecx & CPUID_AMD_ECX_CMP_LGCY)) {
 				feature &= ~X86_HTT;
 				feature |= X86_CMP;
 			}
-#if defined(_LP64)
+#if defined(__amd64)
 			/*
 			 * It's really tricky to support syscall/sysret in
 			 * the i386 kernel; we rely on sysenter/sysexit
@@ -791,6 +818,8 @@ cpuid_pass1(cpu_t *cpu)
 			if (x86_vendor == X86_VENDOR_AMD)
 				feature &= ~X86_SEP;
 #endif
+			if (cp->cp_edx & CPUID_AMD_EDX_TSCP)
+				feature |= X86_TSCP;
 			break;
 		default:
 			break;
@@ -806,6 +835,7 @@ cpuid_pass1(cpu_t *cpu)
 				cp->cp_eax = 4;
 				cp->cp_ecx = 0;
 				(void) __cpuid_insn(cp);
+				platform_cpuid_mangle(cpi->cpi_vendor, 4, cp);
 			}
 			/*FALLTHROUGH*/
 		case X86_VENDOR_AMD:
@@ -814,6 +844,8 @@ cpuid_pass1(cpu_t *cpu)
 			cp = &cpi->cpi_extd[8];
 			cp->cp_eax = 0x80000008;
 			(void) __cpuid_insn(cp);
+			platform_cpuid_mangle(cpi->cpi_vendor, 0x80000008, cp);
+
 			/*
 			 * Virtual and physical address limits from
 			 * cpuid override previously guessed values.
@@ -848,7 +880,6 @@ cpuid_pass1(cpu_t *cpu)
 			cpi->cpi_ncore_per_chip = 1;
 			break;
 		}
-
 	}
 
 	/*
@@ -856,6 +887,7 @@ cpuid_pass1(cpu_t *cpu)
 	 */
 	if (cpi->cpi_ncore_per_chip > 1)
 		feature |= X86_CMP;
+
 	/*
 	 * If the number of cores is the same as the number
 	 * of CPUs, then we cannot have HyperThreading.
@@ -980,6 +1012,7 @@ cpuid_pass2(cpu_t *cpu)
 	for (n = 2, cp = &cpi->cpi_std[2]; n < nmax; n++, cp++) {
 		cp->cp_eax = n;
 		(void) __cpuid_insn(cp);
+		platform_cpuid_mangle(cpi->cpi_vendor, n, cp);
 		switch (n) {
 		case 2:
 			/*
@@ -1052,6 +1085,7 @@ cpuid_pass2(cpu_t *cpu)
 	for (n = 2, cp = &cpi->cpi_extd[2]; n < nmax; cp++, n++) {
 		cp->cp_eax = 0x80000000 + n;
 		(void) __cpuid_insn(cp);
+		platform_cpuid_mangle(cpi->cpi_vendor, 0x80000000 + n, cp);
 		switch (n) {
 		case 2:
 		case 3:
@@ -1641,10 +1675,8 @@ cpuid_pass4(cpu_t *cpu)
 			hwcap_flags |= AV_386_CMOV;
 		if (*ecx & CPUID_INTC_ECX_MON)
 			hwcap_flags |= AV_386_MON;
-#if defined(CPUID_INTC_ECX_CX16)
 		if (*ecx & CPUID_INTC_ECX_CX16)
 			hwcap_flags |= AV_386_CX16;
-#endif
 	}
 
 	if (x86_feature & X86_HTT)
@@ -1655,13 +1687,39 @@ cpuid_pass4(cpu_t *cpu)
 
 	switch (cpi->cpi_vendor) {
 		struct cpuid_regs cp;
-		uint32_t *edx;
+		uint32_t *edx, *ecx;
 
-	case X86_VENDOR_Intel:	/* sigh */
+	case X86_VENDOR_Intel:
+		/*
+		 * Seems like Intel duplicated what we necessary
+		 * here to make the initial crop of 64-bit OS's work.
+		 * Hopefully, those are the only "extended" bits
+		 * they'll add.
+		 */
+		/*FALLTHROUGH*/
+
 	case X86_VENDOR_AMD:
 		edx = &cpi->cpi_support[AMD_EDX_FEATURES];
+		ecx = &cpi->cpi_support[AMD_ECX_FEATURES];
 
 		*edx = CPI_FEATURES_XTD_EDX(cpi);
+		*ecx = CPI_FEATURES_XTD_ECX(cpi);
+
+		/*
+		 * [these features require explicit kernel support]
+		 */
+		switch (cpi->cpi_vendor) {
+		case X86_VENDOR_Intel:
+			break;
+
+		case X86_VENDOR_AMD:
+			if ((x86_feature & X86_TSCP) == 0)
+				*edx &= ~CPUID_AMD_EDX_TSCP;
+			break;
+
+		default:
+			break;
+		}
 
 		/*
 		 * [no explicit support required beyond
@@ -1671,25 +1729,46 @@ cpuid_pass4(cpu_t *cpu)
 			*edx &= ~(CPUID_AMD_EDX_MMXamd |
 			    CPUID_AMD_EDX_3DNow | CPUID_AMD_EDX_3DNowx);
 
-		if ((x86_feature & X86_ASYSC) == 0)
-			*edx &= ~CPUID_AMD_EDX_SYSC;
 		if ((x86_feature & X86_NX) == 0)
 			*edx &= ~CPUID_AMD_EDX_NX;
-#if !defined(_LP64)
+#if !defined(__amd64)
 		*edx &= ~CPUID_AMD_EDX_LM;
 #endif
 		/*
 		 * Now map the supported feature vector to
 		 * things that we think userland will care about.
 		 */
+#if defined(__amd64)
 		if (*edx & CPUID_AMD_EDX_SYSC)
 			hwcap_flags |= AV_386_AMD_SYSC;
+#endif
 		if (*edx & CPUID_AMD_EDX_MMXamd)
 			hwcap_flags |= AV_386_AMD_MMX;
 		if (*edx & CPUID_AMD_EDX_3DNow)
 			hwcap_flags |= AV_386_AMD_3DNow;
 		if (*edx & CPUID_AMD_EDX_3DNowx)
 			hwcap_flags |= AV_386_AMD_3DNowx;
+
+		switch (cpi->cpi_vendor) {
+		case X86_VENDOR_AMD:
+			if (*edx & CPUID_AMD_EDX_TSCP)
+				hwcap_flags |= AV_386_TSCP;
+			if (*ecx & CPUID_AMD_ECX_AHF64)
+				hwcap_flags |= AV_386_AHF;
+			break;
+
+		case X86_VENDOR_Intel:
+			/*
+			 * Aarrgh.
+			 * Intel uses a different bit in the same word.
+			 */
+			if (*ecx & CPUID_INTC_ECX_AHF64)
+				hwcap_flags |= AV_386_AHF;
+			break;
+
+		default:
+			break;
+		}
 		break;
 
 	case X86_VENDOR_TM:
@@ -1790,8 +1869,18 @@ cpuid_syscall32_insn(cpu_t *cpu)
 {
 	ASSERT(cpuid_checkpass((cpu == NULL ? CPU : cpu), 1));
 
-	if (x86_feature & X86_ASYSC)
-		return (x86_vendor != X86_VENDOR_Intel);
+	if (cpu == NULL)
+		cpu = CPU;
+
+	/*CSTYLED*/
+	{
+		struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+
+		if (cpi->cpi_vendor == X86_VENDOR_AMD &&
+		    cpi->cpi_xmaxeax >= 0x80000001 &&
+		    (CPI_FEATURES_XTD_EDX(cpi) & CPUID_AMD_EDX_SYSC))
+			return (1);
+	}
 	return (0);
 }
 
@@ -2226,6 +2315,7 @@ add_cache_prop(dev_info_t *devi, const char *label, const char *type,
 static const char l1_icache_str[] = "l1-icache";
 static const char l1_dcache_str[] = "l1-dcache";
 static const char l2_cache_str[] = "l2-cache";
+static const char l3_cache_str[] = "l3-cache";
 static const char itlb4k_str[] = "itlb-4K";
 static const char dtlb4k_str[] = "dtlb-4K";
 static const char itlb4M_str[] = "itlb-4M";
@@ -2245,6 +2335,7 @@ static const struct cachetab {
 	const char	*ct_label;
 } intel_ctab[] = {
 	/* maintain descending order! */
+	{ 0xb4, 4, 0, 256, dtlb4k_str },
 	{ 0xb3, 4, 0, 128, dtlb4k_str },
 	{ 0xb0, 4, 0, 128, itlb4k_str },
 	{ 0x87, 8, 64, 1024*1024, l2_cache_str},
@@ -2253,7 +2344,6 @@ static const struct cachetab {
 	{ 0x84, 8, 32, 1024*1024, l2_cache_str},
 	{ 0x83, 8, 32, 512*1024, l2_cache_str},
 	{ 0x82, 8, 32, 256*1024, l2_cache_str},
-	{ 0x81, 8, 32, 128*1024, l2_cache_str},		/* suspect! */
 	{ 0x7f, 2, 64, 512*1024, l2_cache_str},
 	{ 0x7d, 8, 64, 2*1024*1024, sl2_cache_str},
 	{ 0x7c, 8, 64, 1024*1024, sl2_cache_str},
@@ -2261,6 +2351,7 @@ static const struct cachetab {
 	{ 0x7a, 8, 64, 256*1024, sl2_cache_str},
 	{ 0x79, 8, 64, 128*1024, sl2_cache_str},
 	{ 0x78, 8, 64, 1024*1024, l2_cache_str},
+	{ 0x73, 8, 0, 64*1024, itrace_str},
 	{ 0x72, 8, 0, 32*1024, itrace_str},
 	{ 0x71, 8, 0, 16*1024, itrace_str},
 	{ 0x70, 8, 0, 12*1024, itrace_str},
@@ -2274,13 +2365,23 @@ static const struct cachetab {
 	{ 0x52, 0, 0, 256, itlb424_str},
 	{ 0x51, 0, 0, 128, itlb424_str},
 	{ 0x50, 0, 0, 64, itlb424_str},
+	{ 0x4d, 16, 64, 16*1024*1024, l3_cache_str},
+	{ 0x4c, 12, 64, 12*1024*1024, l3_cache_str},
+	{ 0x4b, 16, 64, 8*1024*1024, l3_cache_str},
+	{ 0x4a, 12, 64, 6*1024*1024, l3_cache_str},
+	{ 0x49, 16, 64, 4*1024*1024, l3_cache_str},
+	{ 0x47, 8, 64, 8*1024*1024, l3_cache_str},
+	{ 0x46, 4, 64, 4*1024*1024, l3_cache_str},
 	{ 0x45, 4, 32, 2*1024*1024, l2_cache_str},
 	{ 0x44, 4, 32, 1024*1024, l2_cache_str},
 	{ 0x43, 4, 32, 512*1024, l2_cache_str},
 	{ 0x42, 4, 32, 256*1024, l2_cache_str},
 	{ 0x41, 4, 32, 128*1024, l2_cache_str},
+	{ 0x3e, 4, 64, 512*1024, sl2_cache_str},
+	{ 0x3d, 6, 64, 384*1024, sl2_cache_str},
 	{ 0x3c, 4, 64, 256*1024, sl2_cache_str},
 	{ 0x3b, 2, 64, 128*1024, sl2_cache_str},
+	{ 0x3a, 6, 64, 192*1024, sl2_cache_str},
 	{ 0x39, 4, 64, 128*1024, sl2_cache_str},
 	{ 0x30, 8, 64, 32*1024, l1_icache_str},
 	{ 0x2c, 8, 64, 32*1024, l1_dcache_str},
@@ -2289,6 +2390,7 @@ static const struct cachetab {
 	{ 0x23, 8, 64, 1024*1024, sl3_cache_str},
 	{ 0x22, 4, 64, 512*1024, sl3_cache_str},
 	{ 0x0c, 4, 32, 16*1024, l1_dcache_str},
+	{ 0x0b, 4, 0, 4, itlb4M_str},
 	{ 0x0a, 2, 32, 8*1024, l1_dcache_str},
 	{ 0x08, 4, 32, 16*1024, l1_icache_str},
 	{ 0x06, 4, 32, 8*1024, l1_icache_str},

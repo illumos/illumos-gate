@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +74,7 @@ extern int cpu_get_mem_info(uint64_t, uint64_t, uint64_t *, uint64_t *,
 extern size_t cpu_get_name_bufsize(void);
 extern int cpu_get_mem_sid(char *, char *, int, int *);
 extern int cpu_get_mem_addr(char *, char *, uint64_t, uint64_t *);
-#elif defined(__i386) || defined(__amd64)
+#elif defined(__x86)
 #include <sys/cpu_module.h>
 #endif	/* __sparc */
 
@@ -262,6 +262,24 @@ mmio(struct uio *uio, enum uio_rw rw, pfn_t pfn, off_t pageoff, int allowio)
 	return (error);
 }
 
+/*
+ * Some platforms have permanently-mapped areas without PFNs, so we check
+ * specially here.
+ */
+static int
+mmplatio(struct uio *uio, enum uio_rw rw)
+{
+	uintptr_t pageaddr = (uintptr_t)uio->uio_loffset & PAGEMASK;
+	off_t pageoff = uio->uio_loffset & PAGEOFFSET;
+	size_t nbytes = MIN((size_t)(PAGESIZE - pageoff),
+	    (size_t)uio->uio_iov->iov_len);
+
+	if (!plat_mem_valid_page(pageaddr, rw))
+		return (ENOTSUP);
+
+	return (uiomove((void *)(pageaddr + pageoff), nbytes, rw, uio));
+}
+
 #ifdef	__sparc
 
 static int
@@ -330,6 +348,9 @@ mmrw(dev_t dev, struct uio *uio, enum uio_rw rw, cred_t *cred)
 			caddr_t vaddr = (caddr_t)uio->uio_offset;
 			int try_lock = NEED_LOCK_KVADDR(vaddr);
 			int locked = 0;
+
+			if ((error = mmplatio(uio, rw)) != ENOTSUP)
+				break;
 
 			/*
 			 * If vaddr does not map a valid page, as_pagelock()
@@ -1179,7 +1200,7 @@ mm_get_paddr(nvlist_t *nvl, uint64_t *paddr)
 				return (err);
 		}
 	}
-#elif defined(__i386) || defined(__amd64)
+#elif defined(__x86)
 	if (cmi_mc_unumtopa(NULL, nvl, &pa) == 0)
 		return (EINVAL);
 #else

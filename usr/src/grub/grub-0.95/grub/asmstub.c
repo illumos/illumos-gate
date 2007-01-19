@@ -1281,3 +1281,30 @@ hercules_setcursor (int on)
 {
   return 1;
 }
+
+uint32_t amd64_cpuid_supported(void)
+{
+  /* Nothing to do in the simulator. */
+	return (1);
+}
+
+void amd64_cpuid_insn(uint32_t i, void * r)
+{
+  /* Nothing to do in the simulator. */
+}
+
+void amd64_rdmsr(uint32_t i, uint64_t * p)
+{
+  /* Nothing to do in the simulator. */
+}
+
+void amd64_wrmsr(uint32_t i, const uint64_t * p)
+{
+  /* Nothing to do in the simulator. */
+}
+
+int get_target_operating_mode(void)
+{
+  /* Nothing to do in the simulator. */
+	return (1);
+}

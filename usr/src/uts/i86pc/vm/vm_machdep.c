@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,8 +91,10 @@ extern uint_t page_create_new;
 extern uint_t page_create_exists;
 extern uint_t page_create_putbacks;
 extern uint_t page_create_putbacks;
-extern uintptr_t eprom_kernelbase;
-extern int use_sse_pagecopy, use_sse_pagezero;	/* in ml/float.s */
+/*
+ * Allow users to disable the kernel's use of SSE.
+ */
+extern int use_sse_pagecopy, use_sse_pagezero;
 
 /* 4g memory management */
 pgcnt_t		maxmem4g;
@@ -425,7 +427,7 @@ map_addr_vacalign_check(caddr_t addr, u_offset_t off)
 /*
  * map_addr_proc() is the routine called when the system is to
  * choose an address for the user.  We will pick an address
- * range which is the highest available below kernelbase.
+ * range which is the highest available below userlimit.
  *
  * addrp is a value/result parameter.
  *	On input it is a hint from the user to be used in a completely
@@ -667,7 +669,9 @@ valid_usr_range(caddr_t addr, size_t len, uint_t prot, struct as *as,
 int
 pf_is_memory(pfn_t pf)
 {
-	return (address_in_memlist(phys_install, mmu_ptob((uint64_t)pf), 1));
+	if (pfn_is_foreign(pf))
+		return (0);
+	return (address_in_memlist(phys_install, pfn_to_pa(pf), 1));
 }
 
 
@@ -872,10 +876,10 @@ check_dma(ddi_dma_attr_t *dma_attr, page_t *pp, int cnt)
 		return;
 
 	while (cnt-- > 0) {
-		if (mmu_ptob((uint64_t)pp->p_pagenum) <
+		if (pa_to_ma(pfn_to_pa(pp->p_pagenum)) <
 		    dma_attr->dma_attr_addr_lo)
 			panic("PFN (pp=%p) below dma_attr_addr_lo", pp);
-		if (mmu_ptob((uint64_t)pp->p_pagenum) >=
+		if (pa_to_ma(pfn_to_pa(pp->p_pagenum)) >=
 		    dma_attr->dma_attr_addr_hi)
 			panic("PFN (pp=%p) above dma_attr_addr_hi", pp);
 		pp = pp->p_next;
@@ -1430,8 +1434,7 @@ page_get_mnode_anylist(ulong_t origbin, uchar_t szc, uint_t flags,
 				ASSERT(pp->p_szc == szc);
 				ASSERT(PFN_2_MEM_NODE(pp->p_pagenum) == mnode);
 				/* check if page within DMA attributes */
-				pgaddr = mmu_ptob((uint64_t)(pp->p_pagenum));
-
+				pgaddr = pa_to_ma(pfn_to_pa(pp->p_pagenum));
 				if ((pgaddr >= dma_attr->dma_attr_addr_lo) &&
 				    (pgaddr + MMU_PAGESIZE - 1 <=
 				    dma_attr->dma_attr_addr_hi)) {
@@ -1519,8 +1522,7 @@ nextfreebin:
 
 				/* check if page within DMA attributes */
 
-				pgaddr = ptob((uint64_t)(pp->p_pagenum));
-
+				pgaddr = pa_to_ma(pfn_to_pa(pp->p_pagenum));
 				if ((pgaddr >= dma_attr->dma_attr_addr_lo) &&
 				    (pgaddr + MMU_PAGESIZE - 1 <=
 				    dma_attr->dma_attr_addr_hi)) {
@@ -1844,7 +1846,6 @@ top:
 					delay(10);
 					goto top;
 				}
-
 				goto fail; /* undo accounting stuff */
 			}
 
@@ -1997,8 +1998,8 @@ ppcopy(page_t *frompp, page_t *topp)
 {
 	caddr_t		pp_addr1;
 	caddr_t		pp_addr2;
-	void		*pte1;
-	void		*pte2;
+	hat_mempte_t	pte1;
+	hat_mempte_t	pte2;
 	kmutex_t	*ppaddr_mutex;
 	label_t		ljb;
 	int		ret = 1;
@@ -2019,8 +2020,8 @@ ppcopy(page_t *frompp, page_t *topp)
 
 		pp_addr1 = CPU->cpu_caddr1;
 		pp_addr2 = CPU->cpu_caddr2;
-		pte1 = (void *)CPU->cpu_caddr1pte;
-		pte2 = (void *)CPU->cpu_caddr2pte;
+		pte1 = CPU->cpu_caddr1pte;
+		pte2 = CPU->cpu_caddr2pte;
 
 		ppaddr_mutex = &CPU->cpu_ppaddr_mutex;
 		mutex_enter(ppaddr_mutex);
@@ -2043,8 +2044,9 @@ ppcopy(page_t *frompp, page_t *topp)
 
 	no_fault();
 faulted:
-	if (!kpm_enable)
+	if (!kpm_enable) {
 		mutex_exit(ppaddr_mutex);
+	}
 	kpreempt_enable();
 	return (ret);
 }
@@ -2060,7 +2062,7 @@ void
 pagezero(page_t *pp, uint_t off, uint_t len)
 {
 	caddr_t		pp_addr2;
-	void		*pte2;
+	hat_mempte_t	pte2;
 	kmutex_t	*ppaddr_mutex;
 
 	ASSERT_STACK_ALIGNED();
@@ -2076,7 +2078,7 @@ pagezero(page_t *pp, uint_t off, uint_t len)
 		kpreempt_disable();
 
 		pp_addr2 = CPU->cpu_caddr2;
-		pte2 = (void *)CPU->cpu_caddr2pte;
+		pte2 = CPU->cpu_caddr2pte;
 
 		ppaddr_mutex = &CPU->cpu_ppaddr_mutex;
 		mutex_enter(ppaddr_mutex);
@@ -2086,10 +2088,11 @@ pagezero(page_t *pp, uint_t off, uint_t len)
 		    HAT_LOAD_NOCONSIST);
 	}
 
-	if (use_sse_pagezero)
+	if (use_sse_pagezero) {
 		hwblkclr(pp_addr2 + off, len);
-	else
+	} else {
 		bzero(pp_addr2 + off, len);
+	}
 
 	if (!kpm_enable)
 		mutex_exit(ppaddr_mutex);
@@ -2116,21 +2119,39 @@ void
 setup_vaddr_for_ppcopy(struct cpu *cpup)
 {
 	void *addr;
-	void *pte;
+	hat_mempte_t pte_pa;
 
 	addr = vmem_alloc(heap_arena, mmu_ptob(1), VM_SLEEP);
-	pte = hat_mempte_setup(addr);
+	pte_pa = hat_mempte_setup(addr);
 	cpup->cpu_caddr1 = addr;
-	cpup->cpu_caddr1pte = (pteptr_t)pte;
+	cpup->cpu_caddr1pte = pte_pa;
 
 	addr = vmem_alloc(heap_arena, mmu_ptob(1), VM_SLEEP);
-	pte = hat_mempte_setup(addr);
+	pte_pa = hat_mempte_setup(addr);
 	cpup->cpu_caddr2 = addr;
-	cpup->cpu_caddr2pte = (pteptr_t)pte;
+	cpup->cpu_caddr2pte = pte_pa;
 
 	mutex_init(&cpup->cpu_ppaddr_mutex, NULL, MUTEX_DEFAULT, NULL);
 }
 
+/*
+ * Undo setup_vaddr_for_ppcopy
+ */
+void
+teardown_vaddr_for_ppcopy(struct cpu *cpup)
+{
+	mutex_destroy(&cpup->cpu_ppaddr_mutex);
+
+	hat_mempte_release(cpup->cpu_caddr2, cpup->cpu_caddr2pte);
+	cpup->cpu_caddr2pte = 0;
+	vmem_free(heap_arena, cpup->cpu_caddr2, mmu_ptob(1));
+	cpup->cpu_caddr2 = 0;
+
+	hat_mempte_release(cpup->cpu_caddr1, cpup->cpu_caddr1pte);
+	cpup->cpu_caddr1pte = 0;
+	vmem_free(heap_arena, cpup->cpu_caddr1, mmu_ptob(1));
+	cpup->cpu_caddr1 = 0;
+}
 
 /*
  * Create the pageout scanner thread. The thread has to
@@ -2154,4 +2175,59 @@ size_t
 exec_get_spslew(void)
 {
 	return (0);
+}
+
+/*
+ * Allocate a memory page.  The argument 'seed' can be any pseudo-random
+ * number to vary where the pages come from.  This is quite a hacked up
+ * method -- it works for now, but really needs to be fixed up a bit.
+ *
+ * We currently use page_create_va() on the kvp with fake offsets,
+ * segments and virt address.  This is pretty bogus, but was copied from the
+ * old hat_i86.c code.  A better approach would be to specify either mnode
+ * random or mnode local and takes a page from whatever color has the MOST
+ * available - this would have a minimal impact on page coloring.
+ */
+page_t *
+page_get_physical(uintptr_t seed)
+{
+	page_t *pp;
+	u_offset_t offset;
+	static struct seg tmpseg;
+	static uintptr_t ctr = 0;
+
+	/*
+	 * This code is gross, we really need a simpler page allocator.
+	 *
+	 * We need assign an offset for the page to call page_create_va().
+	 * To avoid conflicts with other pages, we get creative with the offset.
+	 * For 32 bits, we pick an offset > 4Gig
+	 * For 64 bits, pick an offset somewhere in the VA hole.
+	 */
+	offset = seed;
+	if (offset > kernelbase)
+		offset -= kernelbase;
+	offset <<= MMU_PAGESHIFT;
+#if defined(__amd64)
+	offset += mmu.hole_start;	/* something in VA hole */
+#else
+	offset += 1ULL << 40;		/* something > 4 Gig */
+#endif
+
+	if (page_resv(1, KM_NOSLEEP) == 0)
+		return (NULL);
+
+#ifdef	DEBUG
+	pp = page_exists(&kvp, offset);
+	if (pp != NULL)
+		panic("page already exists %p", pp);
+#endif
+
+	pp = page_create_va(&kvp, offset, MMU_PAGESIZE, PG_EXCL | PG_NORELOC,
+	    &tmpseg, (caddr_t)(ctr += MMU_PAGESIZE));	/* changing VA usage */
+	if (pp == NULL)
+		return (NULL);
+	page_io_unlock(pp);
+	page_hashout(pp, NULL);
+	return (pp);
 }

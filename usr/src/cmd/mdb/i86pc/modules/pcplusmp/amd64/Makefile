@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,10 +35,10 @@ include ../../../../intel/Makefile.amd64
 include ../../../Makefile.i86pc
 include ../../../../Makefile.module
 
-MODSRCS_DIR = ../../uppc
+MODSRCS_DIR = ../../common
 
 CPPFLAGS += -DMP -D_MACHDEP
 CPPFLAGS += -I../../../../common
-CPPFLAGS += -I../../uppc
+CPPFLAGS += -I../../common
 CPPFLAGS += -I$(SRC)/uts/intel
 CPPFLAGS += -I$(SRC)/uts/i86pc

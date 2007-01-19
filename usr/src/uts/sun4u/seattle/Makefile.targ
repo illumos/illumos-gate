@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -66,9 +66,6 @@ $(USR_SEATTLE_INC_DIR): $(USR_SEATTLE_DIR)
 
 $(USR_SEATTLE_SBIN_DIR): $(USR_SEATTLE_DIR)
 	$(INS.dir.root.bin)
-
-$(USR_SEATTLE_SBIN_EEPROM): $(USR_SEATTLE_SBIN_DIR)
-	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/eeprom $@ $(CHOWNLINK) $(CHGRPLINK)
 
 $(USR_SEATTLE_SBIN_PRTDIAG): $(USR_SEATTLE_SBIN_DIR)
 	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/prtdiag $@ $(CHOWNLINK) $(CHGRPLINK)

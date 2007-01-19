@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,7 +31,7 @@ i386_DATA= filelist.ramdisk filelist.safe
 
 SBINLINKS= $(PROG)
 
-OBJS = bootadm.o
+OBJS= bootadm.o bootadm_upgrade.o
 SRCS = $(OBJS:.o=.c)
 
 include ../Makefile.com
@@ -52,9 +52,13 @@ LDLIBS +=	-lnvpair
 CFLAGS +=	$(XSTRCONST)
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 
+# Add paths to pick up headers
+CFLAGS +=	-I../../../uts/common
+LINTFLAGS +=	-I../../../uts/common
+
 all: $(PROG)
 
-$(PROG): $(OBJS)
+$(PROG): $(OBJS) bootadm.h
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -64,9 +68,10 @@ $(ROOTUSRSBINLINKS):
 install: all $(ROOTSBINPROG) $(ROOTBOOTSOLARISDATA) .WAIT $(ROOTUSRSBINLINKS)
 
 clean:
+	-$(RM) $(OBJS)
 
 _msg:
 
-lint:	lint_PROG
+lint:	lint_SRCS
 
 include ../Makefile.targ

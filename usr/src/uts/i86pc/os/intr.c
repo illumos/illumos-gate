@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,49 +48,23 @@
 #include <sys/pool_pset.h>
 #include <sys/zone.h>
 #include <sys/bitmap.h>
+#include <sys/archsystm.h>
+#include <sys/machsystm.h>
+#include <sys/ontrap.h>
+#include <sys/x86_archext.h>
+#include <sys/promif.h>
 
-#if defined(__amd64)
 
-#if defined(__lint)
 /*
- * atomic_btr32() is a gcc __inline__ function, defined in <asm/bitmap.h>
- * For lint purposes, define it here.
+ * Set cpu's base SPL level to the highest active interrupt level
  */
-uint_t
-atomic_btr32(uint32_t *pending, uint_t pil)
+void
+set_base_spl(void)
 {
-	return (*pending &= ~(1 << pil));
-}
-#else
+	struct cpu *cpu = CPU;
+	uint16_t active = (uint16_t)cpu->cpu_intr_actv;
 
-extern uint_t atomic_btr32(uint32_t *pending, uint_t pil);
-
-#endif
-
-/*
- * This code is amd64-only for now, but as time permits, we should
- * use this on i386 too.
- */
-
-/*
- * Some questions to ponder:
- * -	in several of these routines, we make multiple calls to tsc_read()
- *	without invoking functions .. couldn't we just reuse the same
- *	timestamp sometimes?
- * -	if we have the inline, we can probably make set_base_spl be a
- *	C routine too.
- */
-
-static uint_t
-bsrw_insn(uint16_t mask)
-{
-	uint_t index = sizeof (mask) * NBBY - 1;
-
-	ASSERT(mask != 0);
-
-	while ((mask & (1 << index)) == 0)
-		index--;
-	return (index);
+	cpu->cpu_base_spl = active == 0 ? 0 : bsrw_insn(active);
 }
 
 /*
@@ -103,12 +77,13 @@ bsrw_insn(uint16_t mask)
  * Called with interrupts masked.
  * The 'pil' is already set to the appropriate level for rp->r_trapno.
  */
-int
+static int
 hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil, struct regs *rp)
 {
 	struct machcpu *mcpu = &cpu->cpu_m;
 	uint_t mask;
 	hrtime_t intrtime;
+	hrtime_t now = tsc_read();
 
 	ASSERT(pil > LOCK_LEVEL);
 
@@ -134,7 +109,7 @@ hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil, struct regs *rp)
 		 */
 		nestpil = bsrw_insn((uint16_t)mask);
 		ASSERT(nestpil < pil);
-		intrtime = tsc_read() -
+		intrtime = now -
 		    mcpu->pil_high_start[nestpil - (LOCK_LEVEL + 1)];
 		mcpu->intrstat[nestpil][0] += intrtime;
 		cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
@@ -153,7 +128,7 @@ hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil, struct regs *rp)
 		 * is non-zero.
 		 */
 		if ((t->t_flag & T_INTR_THREAD) != 0 && t->t_intr_start != 0) {
-			intrtime = tsc_read() - t->t_intr_start;
+			intrtime = now - t->t_intr_start;
 			mcpu->intrstat[t->t_pil][0] += intrtime;
 			cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 			t->t_intr_start = 0;
@@ -163,7 +138,7 @@ hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil, struct regs *rp)
 	/*
 	 * Store starting timestamp in CPU structure for this PIL.
 	 */
-	mcpu->pil_high_start[pil - (LOCK_LEVEL + 1)] = tsc_read();
+	mcpu->pil_high_start[pil - (LOCK_LEVEL + 1)] = now;
 
 	ASSERT((cpu->cpu_intr_actv & (1 << pil)) == 0);
 
@@ -194,12 +169,13 @@ hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil, struct regs *rp)
  *
  * Called with interrupts masked
  */
-int
+static int
 hilevel_intr_epilog(struct cpu *cpu, uint_t pil, uint_t oldpil, uint_t vecnum)
 {
 	struct machcpu *mcpu = &cpu->cpu_m;
 	uint_t mask;
 	hrtime_t intrtime;
+	hrtime_t now = tsc_read();
 
 	ASSERT(mcpu->mcpu_pri == pil);
 
@@ -226,7 +202,7 @@ hilevel_intr_epilog(struct cpu *cpu, uint_t pil, uint_t oldpil, uint_t vecnum)
 
 	ASSERT(mcpu->pil_high_start[pil - (LOCK_LEVEL + 1)] != 0);
 
-	intrtime = tsc_read() - mcpu->pil_high_start[pil - (LOCK_LEVEL + 1)];
+	intrtime = now - mcpu->pil_high_start[pil - (LOCK_LEVEL + 1)];
 	mcpu->intrstat[pil][0] += intrtime;
 	cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 
@@ -244,7 +220,7 @@ hilevel_intr_epilog(struct cpu *cpu, uint_t pil, uint_t oldpil, uint_t vecnum)
 		 */
 		nestpil = bsrw_insn((uint16_t)mask);
 		ASSERT(nestpil < pil);
-		mcpu->pil_high_start[nestpil - (LOCK_LEVEL + 1)] = tsc_read();
+		mcpu->pil_high_start[nestpil - (LOCK_LEVEL + 1)] = now;
 		/*
 		 * (Another high-level interrupt is active below this one,
 		 * so there is no need to check for an interrupt
@@ -260,7 +236,7 @@ hilevel_intr_epilog(struct cpu *cpu, uint_t pil, uint_t oldpil, uint_t vecnum)
 		kthread_t *t = cpu->cpu_thread;
 
 		if (t->t_flag & T_INTR_THREAD)
-			t->t_intr_start = tsc_read();
+			t->t_intr_start = now;
 	}
 
 	mcpu->mcpu_pri = oldpil;
@@ -274,11 +250,12 @@ hilevel_intr_epilog(struct cpu *cpu, uint_t pil, uint_t oldpil, uint_t vecnum)
  * executing an interrupt thread.  The new stack pointer of the
  * interrupt thread (which *must* be switched to) is returned.
  */
-caddr_t
+static caddr_t
 intr_thread_prolog(struct cpu *cpu, caddr_t stackptr, uint_t pil)
 {
 	struct machcpu *mcpu = &cpu->cpu_m;
 	kthread_t *t, *volatile it;
+	hrtime_t now = tsc_read();
 
 	ASSERT(pil > 0);
 	ASSERT((cpu->cpu_intr_actv & (1 << pil)) == 0);
@@ -293,7 +270,7 @@ intr_thread_prolog(struct cpu *cpu, caddr_t stackptr, uint_t pil)
 	 */
 	t = cpu->cpu_thread;
 	if ((t->t_flag & T_INTR_THREAD) && t->t_intr_start != 0) {
-		hrtime_t intrtime = tsc_read() - t->t_intr_start;
+		hrtime_t intrtime = now - t->t_intr_start;
 		mcpu->intrstat[t->t_pil][0] += intrtime;
 		cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 		t->t_intr_start = 0;
@@ -326,7 +303,7 @@ intr_thread_prolog(struct cpu *cpu, caddr_t stackptr, uint_t pil)
 	cpu->cpu_thread = it;		/* new curthread on this cpu */
 	it->t_pil = (uchar_t)pil;
 	it->t_pri = intr_pri + (pri_t)pil;
-	it->t_intr_start = tsc_read();
+	it->t_intr_start = now;
 
 	return (it->t_stk);
 }
@@ -339,7 +316,7 @@ int intr_thread_cnt;
 /*
  * Called with interrupts disabled
  */
-void
+static void
 intr_thread_epilog(struct cpu *cpu, uint_t vec, uint_t oldpil)
 {
 	struct machcpu *mcpu = &cpu->cpu_m;
@@ -347,12 +324,13 @@ intr_thread_epilog(struct cpu *cpu, uint_t vec, uint_t oldpil)
 	kthread_t *it = cpu->cpu_thread;	/* curthread */
 	uint_t pil, basespl;
 	hrtime_t intrtime;
+	hrtime_t now = tsc_read();
 
 	pil = it->t_pil;
 	cpu->cpu_stats.sys.intr[pil - 1]++;
 
 	ASSERT(it->t_intr_start != 0);
-	intrtime = tsc_read() - it->t_intr_start;
+	intrtime = now - it->t_intr_start;
 	mcpu->intrstat[pil][0] += intrtime;
 	cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 
@@ -389,6 +367,7 @@ intr_thread_epilog(struct cpu *cpu, uint_t vec, uint_t oldpil)
 		mcpu->mcpu_pri = basespl;
 		(*setlvlx)(basespl, vec);
 		(void) splhigh();
+		sti();
 		it->t_state = TS_FREE;
 		/*
 		 * Return interrupt thread to pool
@@ -396,6 +375,7 @@ intr_thread_epilog(struct cpu *cpu, uint_t vec, uint_t oldpil)
 		it->t_link = cpu->cpu_intr_thread;
 		cpu->cpu_intr_thread = it;
 		swtch();
+		panic("intr_thread_epilog: swtch returned");
 		/*NOTREACHED*/
 	}
 
@@ -410,23 +390,81 @@ intr_thread_epilog(struct cpu *cpu, uint_t vec, uint_t oldpil)
 	pil = MAX(oldpil, basespl);
 	mcpu->mcpu_pri = pil;
 	(*setlvlx)(pil, vec);
-	t->t_intr_start = tsc_read();
+	t->t_intr_start = now;
 	cpu->cpu_thread = t;
 }
 
 /*
- * Called with interrupts disabled by an interrupt thread to determine
- * how much time has elapsed. See interrupt.s:intr_get_time() for detailed
- * theory of operation.
+ * intr_get_time() is a resource for interrupt handlers to determine how
+ * much time has been spent handling the current interrupt. Such a function
+ * is needed because higher level interrupts can arrive during the
+ * processing of an interrupt.  intr_get_time() only returns time spent in the
+ * current interrupt handler.
+ *
+ * The caller must be calling from an interrupt handler running at a pil
+ * below or at lock level. Timings are not provided for high-level
+ * interrupts.
+ *
+ * The first time intr_get_time() is called while handling an interrupt,
+ * it returns the time since the interrupt handler was invoked. Subsequent
+ * calls will return the time since the prior call to intr_get_time(). Time
+ * is returned as ticks. Use tsc_scalehrtime() to convert ticks to nsec.
+ *
+ * Theory Of Intrstat[][]:
+ *
+ * uint64_t intrstat[pil][0..1] is an array indexed by pil level, with two
+ * uint64_ts per pil.
+ *
+ * intrstat[pil][0] is a cumulative count of the number of ticks spent
+ * handling all interrupts at the specified pil on this CPU. It is
+ * exported via kstats to the user.
+ *
+ * intrstat[pil][1] is always a count of ticks less than or equal to the
+ * value in [0]. The difference between [1] and [0] is the value returned
+ * by a call to intr_get_time(). At the start of interrupt processing,
+ * [0] and [1] will be equal (or nearly so). As the interrupt consumes
+ * time, [0] will increase, but [1] will remain the same. A call to
+ * intr_get_time() will return the difference, then update [1] to be the
+ * same as [0]. Future calls will return the time since the last call.
+ * Finally, when the interrupt completes, [1] is updated to the same as [0].
+ *
+ * Implementation:
+ *
+ * intr_get_time() works much like a higher level interrupt arriving. It
+ * "checkpoints" the timing information by incrementing intrstat[pil][0]
+ * to include elapsed running time, and by setting t_intr_start to rdtsc.
+ * It then sets the return value to intrstat[pil][0] - intrstat[pil][1],
+ * and updates intrstat[pil][1] to be the same as the new value of
+ * intrstat[pil][0].
+ *
+ * In the normal handling of interrupts, after an interrupt handler returns
+ * and the code in intr_thread() updates intrstat[pil][0], it then sets
+ * intrstat[pil][1] to the new value of intrstat[pil][0]. When [0] == [1],
+ * the timings are reset, i.e. intr_get_time() will return [0] - [1] which
+ * is 0.
+ *
+ * Whenever interrupts arrive on a CPU which is handling a lower pil
+ * interrupt, they update the lower pil's [0] to show time spent in the
+ * handler that they've interrupted. This results in a growing discrepancy
+ * between [0] and [1], which is returned the next time intr_get_time() is
+ * called. Time spent in the higher-pil interrupt will not be returned in
+ * the next intr_get_time() call from the original interrupt, because
+ * the higher-pil interrupt's time is accumulated in intrstat[higherpil][].
  */
 uint64_t
-intr_thread_get_time(struct cpu *cpu)
+intr_get_time(void)
 {
-	struct machcpu *mcpu = &cpu->cpu_m;
-	kthread_t *t = cpu->cpu_thread;
+	struct cpu *cpu;
+	struct machcpu *mcpu;
+	kthread_t *t;
 	uint64_t time, delta, ret;
-	uint_t pil = t->t_pil;
+	uint_t pil;
 
+	cli();
+	cpu = CPU;
+	mcpu = &cpu->cpu_m;
+	t = cpu->cpu_thread;
+	pil = t->t_pil;
 	ASSERT((cpu->cpu_intr_actv & CPU_INTR_ACTV_HIGH_LEVEL_MASK) == 0);
 	ASSERT(t->t_flag & T_INTR_THREAD);
 	ASSERT(pil != 0);
@@ -442,10 +480,11 @@ intr_thread_get_time(struct cpu *cpu)
 	mcpu->intrstat[pil][1] = time;
 	cpu->cpu_intracct[cpu->cpu_mstate] += delta;
 
+	sti();
 	return (ret);
 }
 
-caddr_t
+static caddr_t
 dosoftint_prolog(
 	struct cpu *cpu,
 	caddr_t stackptr,
@@ -455,6 +494,7 @@ dosoftint_prolog(
 	kthread_t *t, *volatile it;
 	struct machcpu *mcpu = &cpu->cpu_m;
 	uint_t pil;
+	hrtime_t now;
 
 top:
 	ASSERT(st_pending == mcpu->mcpu_softinfo.st_pending);
@@ -489,14 +529,16 @@ top:
 	 * but at this point, correctness is critical, so we slavishly
 	 * emulate the i386 port.
 	 */
-	if (atomic_btr32((uint32_t *)&mcpu->mcpu_softinfo.st_pending, pil)
-	    == 0) {
+	if (atomic_btr32((uint32_t *)
+	    &mcpu->mcpu_softinfo.st_pending, pil) == 0) {
 		st_pending = mcpu->mcpu_softinfo.st_pending;
 		goto top;
 	}
 
 	mcpu->mcpu_pri = pil;
 	(*setspl)(pil);
+
+	now = tsc_read();
 
 	/*
 	 * Get set to run interrupt thread.
@@ -509,7 +551,7 @@ top:
 	/* t_intr_start could be zero due to cpu_intr_swtch_enter. */
 	t = cpu->cpu_thread;
 	if ((t->t_flag & T_INTR_THREAD) && t->t_intr_start != 0) {
-		hrtime_t intrtime = tsc_read() - t->t_intr_start;
+		hrtime_t intrtime = now - t->t_intr_start;
 		mcpu->intrstat[pil][0] += intrtime;
 		cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 		t->t_intr_start = 0;
@@ -548,18 +590,19 @@ top:
 	 */
 	it->t_pil = (uchar_t)pil;
 	it->t_pri = (pri_t)pil + intr_pri;
-	it->t_intr_start = tsc_read();
+	it->t_intr_start = now;
 
 	return (it->t_stk);
 }
 
-void
+static void
 dosoftint_epilog(struct cpu *cpu, uint_t oldpil)
 {
 	struct machcpu *mcpu = &cpu->cpu_m;
 	kthread_t *t, *it;
 	uint_t pil, basespl;
 	hrtime_t intrtime;
+	hrtime_t now = tsc_read();
 
 	it = cpu->cpu_thread;
 	pil = it->t_pil;
@@ -568,7 +611,7 @@ dosoftint_epilog(struct cpu *cpu, uint_t oldpil)
 
 	ASSERT(cpu->cpu_intr_actv & (1 << pil));
 	cpu->cpu_intr_actv &= ~(1 << pil);
-	intrtime = tsc_read() - it->t_intr_start;
+	intrtime = now - it->t_intr_start;
 	mcpu->intrstat[pil][0] += intrtime;
 	cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 
@@ -587,20 +630,23 @@ dosoftint_epilog(struct cpu *cpu, uint_t oldpil)
 		it->t_link = cpu->cpu_intr_thread;
 		cpu->cpu_intr_thread = it;
 		(void) splhigh();
+		sti();
 		swtch();
 		/*NOTREACHED*/
+		panic("dosoftint_epilog: swtch returned");
 	}
 	it->t_link = cpu->cpu_intr_thread;
 	cpu->cpu_intr_thread = it;
 	it->t_state = TS_FREE;
 	cpu->cpu_thread = t;
 	if (t->t_flag & T_INTR_THREAD)
-		t->t_intr_start = tsc_read();
+		t->t_intr_start = now;
 	basespl = cpu->cpu_base_spl;
 	pil = MAX(oldpil, basespl);
 	mcpu->mcpu_pri = pil;
 	(*setspl)(pil);
 }
+
 
 /*
  * Make the interrupted thread 'to' be runnable.
@@ -623,8 +669,6 @@ intr_passivate(
 	t->t_pc = (uintptr_t)_sys_rtt;
 	return (it->t_pil);
 }
-
-#endif	/* __amd64 */
 
 /*
  * Create interrupt kstats for this CPU.
@@ -758,3 +802,341 @@ cpu_intr_swtch_exit(kthread_id_t t)
 		ts = t->t_intr_start;
 	} while (cas64(&t->t_intr_start, ts, tsc_read()) != ts);
 }
+
+/*
+ * Dispatch a hilevel interrupt (one above LOCK_LEVEL)
+ */
+/*ARGSUSED*/
+static void
+dispatch_hilevel(uint_t vector, uint_t arg2)
+{
+	sti();
+	av_dispatch_autovect(vector);
+	cli();
+}
+
+/*
+ * Dispatch a soft interrupt
+ */
+/*ARGSUSED*/
+static void
+dispatch_softint(uint_t oldpil, uint_t arg2)
+{
+	struct cpu *cpu = CPU;
+
+	sti();
+	av_dispatch_softvect((int)cpu->cpu_thread->t_pil);
+	cli();
+
+	/*
+	 * Must run softint_epilog() on the interrupt thread stack, since
+	 * there may not be a return from it if the interrupt thread blocked.
+	 */
+	dosoftint_epilog(cpu, oldpil);
+}
+
+/*
+ * Dispatch a normal interrupt
+ */
+static void
+dispatch_hardint(uint_t vector, uint_t oldipl)
+{
+	struct cpu *cpu = CPU;
+
+	sti();
+	av_dispatch_autovect(vector);
+	cli();
+
+	/*
+	 * Must run intr_thread_epilog() on the interrupt thread stack, since
+	 * there may not be a return from it if the interrupt thread blocked.
+	 */
+	intr_thread_epilog(cpu, vector, oldipl);
+}
+
+/*
+ * Deliver any softints the current interrupt priority allows.
+ * Called with interrupts disabled.
+ */
+void
+dosoftint(struct regs *regs)
+{
+	struct cpu *cpu = CPU;
+	int oldipl;
+	caddr_t newsp;
+
+	while (cpu->cpu_softinfo.st_pending) {
+		oldipl = cpu->cpu_pri;
+		newsp = dosoftint_prolog(cpu, (caddr_t)regs,
+			cpu->cpu_softinfo.st_pending, oldipl);
+		/*
+		 * If returned stack pointer is NULL, priority is too high
+		 * to run any of the pending softints now.
+		 * Break out and they will be run later.
+		 */
+		if (newsp == NULL)
+			break;
+		switch_sp_and_call(newsp, dispatch_softint, oldipl, 0);
+	}
+}
+
+/*
+ * Interrupt service routine, called with interrupts disabled.
+ */
+/*ARGSUSED*/
+void
+do_interrupt(struct regs *rp, trap_trace_rec_t *ttp)
+{
+	struct cpu *cpu = CPU;
+	int newipl, oldipl = cpu->cpu_pri;
+	uint_t vector;
+	caddr_t newsp;
+
+#ifdef TRAPTRACE
+	ttp->ttr_marker = TT_INTERRUPT;
+	ttp->ttr_ipl = 0xff;
+	ttp->ttr_pri = oldipl;
+	ttp->ttr_spl = cpu->cpu_base_spl;
+	ttp->ttr_vector = 0xff;
+#endif	/* TRAPTRACE */
+
+	/*
+	 * If it's a softint go do it now.
+	 */
+	if (rp->r_trapno == T_SOFTINT) {
+		dosoftint(rp);
+		ASSERT(!interrupts_enabled());
+		return;
+	}
+
+	/*
+	 * Raise the interrupt priority.
+	 */
+	newipl = (*setlvl)(oldipl, (int *)&rp->r_trapno);
+#ifdef TRAPTRACE
+	ttp->ttr_ipl = newipl;
+#endif	/* TRAPTRACE */
+
+	/*
+	 * Bail if it is a spurious interrupt
+	 */
+	if (newipl == -1)
+		return;
+	cpu->cpu_pri = newipl;
+	vector = rp->r_trapno;
+#ifdef TRAPTRACE
+	ttp->ttr_vector = vector;
+#endif	/* TRAPTRACE */
+	if (newipl > LOCK_LEVEL) {
+		/*
+		 * High priority interrupts run on this cpu's interrupt stack.
+		 */
+		if (hilevel_intr_prolog(cpu, newipl, oldipl, rp) == 0) {
+			newsp = cpu->cpu_intr_stack;
+			switch_sp_and_call(newsp, dispatch_hilevel, vector, 0);
+		} else { /* already on the interrupt stack */
+			dispatch_hilevel(vector, 0);
+		}
+		(void) hilevel_intr_epilog(cpu, newipl, oldipl, vector);
+	} else {
+		/*
+		 * Run this interrupt in a separate thread.
+		 */
+		newsp = intr_thread_prolog(cpu, (caddr_t)rp, newipl);
+		switch_sp_and_call(newsp, dispatch_hardint, vector, oldipl);
+	}
+
+	/*
+	 * Deliver any pending soft interrupts.
+	 */
+	if (cpu->cpu_softinfo.st_pending)
+		dosoftint(rp);
+}
+
+/*
+ * Common tasks always done by _sys_rtt, called with interrupts disabled.
+ * Returns 1 if returning to userland, 0 if returning to system mode.
+ */
+int
+sys_rtt_common(struct regs *rp)
+{
+	kthread_t *tp;
+	extern void mutex_exit_critical_start();
+	extern long mutex_exit_critical_size;
+
+loop:
+
+	/*
+	 * Check if returning to user
+	 */
+	tp = CPU->cpu_thread;
+	if (USERMODE(rp->r_cs)) {
+		/*
+		 * Check if AST pending.
+		 */
+		if (tp->t_astflag) {
+			/*
+			 * Let trap() handle the AST
+			 */
+			sti();
+			rp->r_trapno = T_AST;
+			trap(rp, (caddr_t)0, CPU->cpu_id);
+			cli();
+			goto loop;
+		}
+
+#if defined(__amd64)
+		/*
+		 * We are done if segment registers do not need updating.
+		 */
+		if ((tp->t_lwp->lwp_pcb.pcb_flags & RUPDATE_PENDING) == 0)
+			return (1);
+
+		if (update_sregs(rp, tp->t_lwp)) {
+			/*
+			 * 1 or more of the selectors is bad.
+			 * Deliver a SIGSEGV.
+			 */
+			proc_t *p = ttoproc(tp);
+
+			sti();
+			mutex_enter(&p->p_lock);
+			tp->t_lwp->lwp_cursig = SIGSEGV;
+			mutex_exit(&p->p_lock);
+			psig();
+			tp->t_sig_check = 1;
+			cli();
+		}
+		tp->t_lwp->lwp_pcb.pcb_flags &= ~RUPDATE_PENDING;
+
+#endif	/* __amd64 */
+		return (1);
+	}
+
+	/*
+	 * Here if we are returning to supervisor mode.
+	 * Check for a kernel preemption request.
+	 */
+	if (CPU->cpu_kprunrun && (rp->r_ps & PS_IE)) {
+
+		/*
+		 * Do nothing if already in kpreempt
+		 */
+		if (!tp->t_preempt_lk) {
+			tp->t_preempt_lk = 1;
+			sti();
+			kpreempt(1); /* asynchronous kpreempt call */
+			cli();
+			tp->t_preempt_lk = 0;
+		}
+	}
+
+	/*
+	 * If we interrupted the mutex_exit() critical region we must
+	 * reset the PC back to the beginning to prevent missed wakeups
+	 * See the comments in mutex_exit() for details.
+	 */
+	if ((uintptr_t)rp->r_pc - (uintptr_t)mutex_exit_critical_start <
+	    mutex_exit_critical_size) {
+		rp->r_pc = (greg_t)mutex_exit_critical_start;
+	}
+	return (0);
+}
+
+void
+send_dirint(int cpuid, int int_level)
+{
+	(*send_dirintf)(cpuid, int_level);
+}
+
+/*
+ * do_splx routine, takes new ipl to set
+ * returns the old ipl.
+ * We are careful not to set priority lower than CPU->cpu_base_pri,
+ * even though it seems we're raising the priority, it could be set
+ * higher at any time by an interrupt routine, so we must block interrupts
+ * and look at CPU->cpu_base_pri
+ */
+int
+do_splx(int newpri)
+{
+	ulong_t	flag;
+	cpu_t	*cpu;
+	int	curpri, basepri;
+
+	flag = intr_clear();
+	cpu = CPU; /* ints are disabled, now safe to cache cpu ptr */
+	curpri = cpu->cpu_m.mcpu_pri;
+	basepri = cpu->cpu_base_spl;
+	if (newpri < basepri)
+		newpri = basepri;
+	cpu->cpu_m.mcpu_pri = newpri;
+	(*setspl)(newpri);
+	/*
+	 * If we are going to reenable interrupts see if new priority level
+	 * allows pending softint delivery.
+	 */
+	if ((flag & PS_IE) &&
+	    bsrw_insn((uint16_t)cpu->cpu_softinfo.st_pending) > newpri)
+		fakesoftint();
+	ASSERT(!interrupts_enabled());
+	intr_restore(flag);
+	return (curpri);
+}
+
+/*
+ * Common spl raise routine, takes new ipl to set
+ * returns the old ipl, will not lower ipl.
+ */
+int
+splr(int newpri)
+{
+	ulong_t	flag;
+	cpu_t	*cpu;
+	int	curpri, basepri;
+
+	flag = intr_clear();
+	cpu = CPU; /* ints are disabled, now safe to cache cpu ptr */
+	curpri = cpu->cpu_m.mcpu_pri;
+	/*
+	 * Only do something if new priority is larger
+	 */
+	if (newpri > curpri) {
+		basepri = cpu->cpu_base_spl;
+		if (newpri < basepri)
+			newpri = basepri;
+		cpu->cpu_m.mcpu_pri = newpri;
+		(*setspl)(newpri);
+		/*
+		 * See if new priority level allows pending softint delivery
+		 */
+		if ((flag & PS_IE) &&
+		    bsrw_insn((uint16_t)cpu->cpu_softinfo.st_pending) > newpri)
+			fakesoftint();
+	}
+	intr_restore(flag);
+	return (curpri);
+}
+
+int
+getpil(void)
+{
+	return (CPU->cpu_m.mcpu_pri);
+}
+
+int
+interrupts_enabled(void)
+{
+	ulong_t	flag;
+
+	flag = getflags();
+	return ((flag & PS_IE) == PS_IE);
+}
+
+#ifdef DEBUG
+void
+assert_ints_enabled(void)
+{
+	ASSERT(!interrupts_unleashed || interrupts_enabled());
+}
+#endif	/* DEBUG */

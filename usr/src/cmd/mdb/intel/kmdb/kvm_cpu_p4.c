@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +50,7 @@
  */
 typedef struct kmt_p4_flavor {
 	const char *p4f_name;			/* name for CPU support */
-	const kmdb_msr_t *p4f_msrs;		/* MSR r/w list */
+	const kdi_msr_t *p4f_msrs;		/* MSR r/w list */
 	int (*p4f_branches)(const struct kmt_p4_flavor *, uint_t,
 	    intptr_t, int);			/* dumper for CPU branch stk */
 	uint_t p4f_msr_tos;			/* branch stk index MSR */
@@ -164,14 +163,14 @@ kmt_p4_branches_split(const kmt_p4_flavor_t *p4f, uint_t tos, intptr_t cpuid,
 }
 
 #ifndef __amd64
-static const kmdb_msr_t kmt_p4orig_msrs[] = {
-	{ MSR_DEBUGCTL,		KMDB_MSR_CLEARENTRY },
-	{ MSR_DEBUGCTL,		KMDB_MSR_WRITEDELAY, &kmt_cpu_p4.p4_debugctl },
-	{ MSR_P4_LBSTK_TOS,	KMDB_MSR_READ },
-	{ MSR_P4_LBSTK_0,	KMDB_MSR_READ },
-	{ MSR_P4_LBSTK_1,	KMDB_MSR_READ },
-	{ MSR_P4_LBSTK_2,	KMDB_MSR_READ },
-	{ MSR_P4_LBSTK_3,	KMDB_MSR_READ },
+static const kdi_msr_t kmt_p4orig_msrs[] = {
+	{ MSR_DEBUGCTL,		KDI_MSR_CLEARENTRY },
+	{ MSR_DEBUGCTL,		KDI_MSR_WRITEDELAY, &kmt_cpu_p4.p4_debugctl },
+	{ MSR_P4_LBSTK_TOS,	KDI_MSR_READ },
+	{ MSR_P4_LBSTK_0,	KDI_MSR_READ },
+	{ MSR_P4_LBSTK_1,	KDI_MSR_READ },
+	{ MSR_P4_LBSTK_2,	KDI_MSR_READ },
+	{ MSR_P4_LBSTK_3,	KDI_MSR_READ },
 	{ NULL }
 };
 
@@ -181,18 +180,18 @@ static const kmt_p4_flavor_t kmt_p4_original = {
 	MSR_P4_LBSTK_0, MSR_P4_LBSTK_0, 4
 };
 
-static const kmdb_msr_t kmt_p6m_msrs[] = {
-	{ MSR_DEBUGCTL,		KMDB_MSR_CLEARENTRY },
-	{ MSR_DEBUGCTL,		KMDB_MSR_WRITEDELAY, &kmt_cpu_p4.p4_debugctl },
-	{ MSR_P6M_LBSTK_TOS,	KMDB_MSR_READ },
-	{ MSR_P6M_LBSTK_0,	KMDB_MSR_READ },
-	{ MSR_P6M_LBSTK_1,	KMDB_MSR_READ },
-	{ MSR_P6M_LBSTK_2,	KMDB_MSR_READ },
-	{ MSR_P6M_LBSTK_3,	KMDB_MSR_READ },
-	{ MSR_P6M_LBSTK_4,	KMDB_MSR_READ },
-	{ MSR_P6M_LBSTK_5,	KMDB_MSR_READ },
-	{ MSR_P6M_LBSTK_6,	KMDB_MSR_READ },
-	{ MSR_P6M_LBSTK_7,	KMDB_MSR_READ },
+static const kdi_msr_t kmt_p6m_msrs[] = {
+	{ MSR_DEBUGCTL,		KDI_MSR_CLEARENTRY },
+	{ MSR_DEBUGCTL,		KDI_MSR_WRITEDELAY, &kmt_cpu_p4.p4_debugctl },
+	{ MSR_P6M_LBSTK_TOS,	KDI_MSR_READ },
+	{ MSR_P6M_LBSTK_0,	KDI_MSR_READ },
+	{ MSR_P6M_LBSTK_1,	KDI_MSR_READ },
+	{ MSR_P6M_LBSTK_2,	KDI_MSR_READ },
+	{ MSR_P6M_LBSTK_3,	KDI_MSR_READ },
+	{ MSR_P6M_LBSTK_4,	KDI_MSR_READ },
+	{ MSR_P6M_LBSTK_5,	KDI_MSR_READ },
+	{ MSR_P6M_LBSTK_6,	KDI_MSR_READ },
+	{ MSR_P6M_LBSTK_7,	KDI_MSR_READ },
 	{ NULL }
 };
 
@@ -203,42 +202,42 @@ static const kmt_p4_flavor_t kmt_p6_m = {
 };
 #endif	/* __amd64 */
 
-static const kmdb_msr_t kmt_prp4_msrs[] = {
-	{ MSR_DEBUGCTL,		KMDB_MSR_CLEARENTRY },
-	{ MSR_DEBUGCTL,		KMDB_MSR_WRITEDELAY, &kmt_cpu_p4.p4_debugctl },
-	{ MSR_PRP4_LBSTK_TOS,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_0, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_1, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_2, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_3, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_4, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_5, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_6, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_7, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_8, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_9, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_10, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_11, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_12, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_13, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_14, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_FROM_15, KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_0,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_1,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_2,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_3,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_4,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_5,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_6,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_7,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_8,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_9,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_10,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_11,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_12,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_13,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_14,	KMDB_MSR_READ },
-	{ MSR_PRP4_LBSTK_TO_15,	KMDB_MSR_READ },
+static const kdi_msr_t kmt_prp4_msrs[] = {
+	{ MSR_DEBUGCTL,		KDI_MSR_CLEARENTRY },
+	{ MSR_DEBUGCTL,		KDI_MSR_WRITEDELAY, &kmt_cpu_p4.p4_debugctl },
+	{ MSR_PRP4_LBSTK_TOS,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_0, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_1, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_2, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_3, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_4, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_5, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_6, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_7, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_8, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_9, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_10, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_11, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_12, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_13, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_14, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_FROM_15, KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_0,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_1,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_2,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_3,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_4,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_5,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_6,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_7,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_8,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_9,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_10,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_11,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_12,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_13,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_14,	KDI_MSR_READ },
+	{ MSR_PRP4_LBSTK_TO_15,	KDI_MSR_READ },
 	{ NULL }
 };
 
@@ -248,9 +247,9 @@ static const kmt_p4_flavor_t kmt_p4_prescott = {
 	MSR_PRP4_LBSTK_FROM_0, MSR_PRP4_LBSTK_TO_0, 16
 };
 
-static const kmdb_msr_t kmt_p4unk_msrs[] = {
-	{ MSR_DEBUGCTL,		KMDB_MSR_CLEARENTRY },
-	{ MSR_DEBUGCTL,		KMDB_MSR_WRITEDELAY, &kmt_cpu_p4.p4_debugctl },
+static const kdi_msr_t kmt_p4unk_msrs[] = {
+	{ MSR_DEBUGCTL,		KDI_MSR_CLEARENTRY },
+	{ MSR_DEBUGCTL,		KDI_MSR_WRITEDELAY, &kmt_cpu_p4.p4_debugctl },
 	{ NULL }
 };
 

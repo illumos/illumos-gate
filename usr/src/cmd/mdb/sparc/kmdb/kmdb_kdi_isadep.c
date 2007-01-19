@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,7 @@
 #include <sys/types.h>
 #include <sys/kdi_impl.h>
 
-#include <kmdb/kmdb_kdi_impl.h>
+#include <kmdb/kaif.h>
 #include <kmdb/kmdb_dpi.h>
 #include <kmdb/kmdb_promif.h>
 #include <mdb/mdb_debug.h>
@@ -48,6 +48,8 @@ static size_t kdi_icache_linesize;
 
 static uint_t kdi_max_cpu_freq;
 static uint_t kdi_sticks_per_usec;
+
+/* XXX	needs to go into a header */
 
 void
 kdi_usecwait(clock_t n)
@@ -139,36 +141,6 @@ kdi_init_cpus_cb(pnode_t node, void *arg, void *result)
 	return (0);
 }
 
-void
-kdi_cpu_init(void)
-{
-	kdi_dcache_size = kdi_dcache_linesize =
-	    kdi_icache_size = kdi_icache_linesize = 0;
-
-	kdi_max_cpu_freq = kdi_sticks_per_usec = 0;
-
-	mdb_dprintf(MDB_DBG_KDI, "Initializing CPUs\n");
-
-	kmdb_prom_walk_cpus(kdi_init_cpus_cb, NULL, NULL);
-
-	/*
-	 * If we can't find one, guess high.  The CPU frequency is going to be
-	 * used to determine the length of various delays, such as the mondo
-	 * interrupt retry delay.  Too long is generally better than too short.
-	 */
-	if (kdi_max_cpu_freq == 0) {
-		mdb_dprintf(MDB_DBG_KDI, "No CPU freq found - assuming "
-		    "500MHz\n");
-		kdi_max_cpu_freq = 500 * MICROSEC;
-	}
-
-	kdi_sticks_per_usec =
-	    MAX((kdi_max_cpu_freq + (MICROSEC - 1)) / MICROSEC, 1);
-
-	mdb.m_kdi->mkdi_cpu_init(kdi_dcache_size, kdi_dcache_linesize,
-	    kdi_icache_size, kdi_icache_linesize);
-}
-
 /*
  * Called on an individual CPU.  Tries to send it off to the state saver if it
  * hasn't already entered the debugger.  Returns non-zero if it *fails* to stop
@@ -217,17 +189,28 @@ kdi_report_unhalted(int cpuid, void *junk)
 
 /*ARGSUSED*/
 void
-kmdb_kdi_stop_other_cpus(int my_cpuid, void (*slave_saver)(void))
+kmdb_kdi_stop_slaves(int my_cpuid, int doxc)
 {
 	int i;
 
 	for (i = 0; i < KDI_XC_RETRIES; i++) {
-		if (kdi_cpu_ready_iter(kdi_halt_cpu, (void *)slave_saver) == 0)
+		if (kdi_cpu_ready_iter(kdi_halt_cpu,
+		    (void *)kaif_slave_entry) == 0)
 			break;
 
 		kdi_usecwait(2000);
 	}
 	(void) kdi_cpu_ready_iter(kdi_report_unhalted, NULL);
+}
+
+void
+kmdb_kdi_start_slaves(void)
+{
+}
+
+void
+kmdb_kdi_slave_wait(void)
+{
 }
 
 int
@@ -257,4 +240,29 @@ kmdb_kdi_kernpanic(struct regs *regs, uint_t tt)
 void
 kmdb_kdi_init_isadep(kdi_t *kdi, kmdb_auxv_t *kav)
 {
+	kdi_dcache_size = kdi_dcache_linesize =
+	    kdi_icache_size = kdi_icache_linesize = 0;
+
+	kdi_max_cpu_freq = kdi_sticks_per_usec = 0;
+
+	mdb_dprintf(MDB_DBG_KDI, "Initializing CPUs\n");
+
+	kmdb_prom_walk_cpus(kdi_init_cpus_cb, NULL, NULL);
+
+	/*
+	 * If we can't find one, guess high.  The CPU frequency is going to be
+	 * used to determine the length of various delays, such as the mondo
+	 * interrupt retry delay.  Too long is generally better than too short.
+	 */
+	if (kdi_max_cpu_freq == 0) {
+		mdb_dprintf(MDB_DBG_KDI, "No CPU freq found - assuming "
+		    "500MHz\n");
+		kdi_max_cpu_freq = 500 * MICROSEC;
+	}
+
+	kdi_sticks_per_usec =
+	    MAX((kdi_max_cpu_freq + (MICROSEC - 1)) / MICROSEC, 1);
+
+	mdb.m_kdi->mkdi_cpu_init(kdi_dcache_size, kdi_dcache_linesize,
+	    kdi_icache_size, kdi_icache_linesize);
 }

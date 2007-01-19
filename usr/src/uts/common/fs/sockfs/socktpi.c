@@ -696,7 +696,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 				goto done;
 			}
 			vattr.va_type = VSOCK;
-			vattr.va_mode = 0777 & ~u.u_cmask;
+			vattr.va_mode = 0777 & ~PTOU(curproc)->u_cmask;
 			vattr.va_mask = AT_TYPE|AT_MODE;
 			/* NOTE: holding so_lock */
 			error = vn_create(soun->sun_path, UIO_SYSSPACE, &vattr,

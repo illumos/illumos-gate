@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -927,11 +926,14 @@ dtrace_update(dtrace_hdl_t *dtp)
 
 	/*
 	 * Cache the pointers to the modules representing the base executable
-	 * and the run-time linker in the dtrace client handle.  We should
-	 * probably have a more generic way of inquiring as to their names.
+	 * and the run-time linker in the dtrace client handle. Note that on
+	 * x86 krtld is folded into unix, so if we don't find it, use unix
+	 * instead.
 	 */
 	dtp->dt_exec = dt_module_lookup_by_name(dtp, "genunix");
 	dtp->dt_rtld = dt_module_lookup_by_name(dtp, "krtld");
+	if (dtp->dt_rtld == NULL)
+		dtp->dt_rtld = dt_module_lookup_by_name(dtp, "unix");
 
 	/*
 	 * If this is the first time we are initializing the module list,

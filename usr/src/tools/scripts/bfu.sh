@@ -437,7 +437,6 @@ fail() {
 	print "$*" >& 2
 	print "bfu aborting" >& 2
 	rm -f "$local_zone_info_file"
-	prun 1
 	exit 1
 }
 
@@ -1394,6 +1393,54 @@ smf_bkbfu_repair_sysconfig() {
 	EOF
 }
 
+#
+# Return true if $file exists in $archive.  $file may also be a pattern.
+#
+archive_file_exists()
+{
+	archive=$1
+	file=$2
+
+	$ZCAT $cpiodir/${archive}${ZFIX} | cpio -it 2>/dev/null | \
+	    egrep -s "$file"
+}
+
+#
+# If we're no longer delivering the eeprom service, remove it from the system,
+# as eeprom -I is removed as well.
+#
+smf_fix_i86pc_profile () {
+	mfst="var/svc/manifest/platform/i86pc/eeprom.xml"
+	profile="var/svc/profile/platform_i86pc.xml"
+
+	if [ ! "$karch" = "i86pc" ]; then
+		return
+	fi
+
+	if ! archive_file_exists generic.root "^$profile"; then
+		rm -f $rootprefix/$profile
+	fi
+
+	if [ ! -f $rootprefix/$mfst ]; then
+		return
+	fi
+
+	if archive_file_exists generic.root "^$mfst"; then
+		return
+	fi
+
+	rm -f $rootprefix/$mfst
+
+	#
+	# we must disable via svccfg directly, as manifest-import runs after
+	# this service tries to run
+	#
+	[[ -n "$rootprefix" ]] &&
+	    export SVCCFG_REPOSITORY=$rootprefix/etc/svc/repository.db
+	/tmp/bfubin/svccfg delete -f platform/i86pc/eeprom
+	[[ -n "$rootprefix" ]] && unset SVCCFG_REPOSITORY
+}
+
 smf_apply_conf () {
 	#
 	# Go thru the original manifests and move any that were unchanged
@@ -1854,6 +1901,7 @@ EOF
 	esac
 EOF
 
+	smf_fix_i86pc_profile
 }
 
 EXTRACT_LOG=/tmp/bfu-extract-log.$$
@@ -1907,13 +1955,26 @@ while [ $# -gt 0 ]; do
 	shift
 done
 
+# Variables for x86 platforms
 boot_is_pcfs=no
 have_realmode=no
-multiboot_archives=no
-dca_to_multi=no
 is_pcfs_boot=no
 need_datalink=no
 new_dladm=no
+
+# Set when moving to either directboot or multiboot
+multi_or_direct=no
+
+#
+# Shows which type of archives we have, which type of system we are
+# running on (before the bfu), and what the failsafe archives are
+# (again, before the bfu).  failsafe_type is only needed on diskful
+# bfu's, so it's not set in the diskless case.
+# Possible values: unknown, dca, multiboot, directboot
+#
+archive_type=unknown
+system_type=unknown
+failsafe_type=unknown
 
 test $# -ge 1 || usage
 
@@ -1952,6 +2013,27 @@ case `echo generic.root*` in
 	*) fail "generic.root missing or in unknown compression format";;
 esac
 
+#
+# Determine what kind of archives we're installing, using the following rules:
+#
+# 1. If strap.com is present, the archives are pre-multiboot
+# 2. If symdef is present, the archives are directboot
+# 3. Otherwise, the archives are multiboot
+#
+if [ $target_isa = i386 ]; then
+	if [ -f $cpiodir/i86pc.boot$ZFIX ] && \
+	    archive_file_exists i86pc.boot "strap.com"; then
+		archive_type=dca
+	elif [ -f $cpiodir/i86pc.root$ZFIX ] && \
+	    archive_file_exists i86pc.boot symdef; then
+		archive_type=directboot
+		multi_or_direct=yes
+	else
+		archive_type=multiboot
+		multi_or_direct=yes
+	fi
+fi
+
 if [ $diskless = no ]; then
 	root=${2:-/}
 	[[ "$root" = /* ]] || fail "root-dir must be an absolute path"
@@ -1961,6 +2043,12 @@ if [ $diskless = no ]; then
 
 	[[ -f $root/etc/system ]] || \
 	    fail "$root/etc/system not found; local zone target not allowed"
+
+	if [ -f $root/boot/platform/i86pc/kernel/unix ]; then
+		failsafe_type=directboot
+	elif [ -f $root/boot/multiboot ]; then
+		failsafe_type=multiboot
+	fi
 
 	# Make sure we extract the sun4u-us3 libc_psr.so.1
 	if [ -d $root/platform/sun4u -a \
@@ -2116,10 +2204,12 @@ if [ ! -x $usr/lib/dbus-daemon ]; then
 	fail "Run $update_script to update D-Bus."
 fi
 
-if [[ $target_isa = i386 && -f $cpiodir/i86pc.root$ZFIX ]] && \
-    $ZCAT $cpiodir/i86pc.root$ZFIX | cpio -it 2>/dev/null | \
-    grep multiboot >/dev/null 2>&1 ; then
-	multiboot_archives=yes
+#
+# We need biosdev if we're moving from pre-multiboot to multiboot or directboot
+# kernels.
+#
+if [ $target_isa = i386 ] && [ $multi_or_direct = yes ] && [ $diskless = no ]
+then
 	prtconf -v | grep biosdev >/dev/null 2>&1
 	if [ $? -ne 0 ] && [ ! -f $rootprefix/platform/i86pc/multiboot ]; then
 		echo "biosdev cannot be run on this machine."
@@ -2199,9 +2289,7 @@ bfucmd="
 	/usr/bin/pkginfo
 	/usr/bin/pkill
 	/usr/bin/printf
-	/usr/bin/prun
 	/usr/bin/ps
-	/usr/bin/pstop
 	/usr/bin/ptree
 	/usr/bin/rm
 	/usr/bin/rmdir
@@ -2319,24 +2407,101 @@ do
 done
 
 #
-# set up installgrub and friends if transitioning to multiboot
+# set up installgrub and friends if transitioning to multiboot or directboot
 # do this now so ldd can determine library dependencies
 #
+# We split the binaries into two groups: the type where we want to make any
+# effort to get the newest version (like symdef and bootadm), and the type
+# where any old version will do (like installgrub and biosdev).
+#
+# If we're bfu'ing across the directboot/multiboot boundary, we need the new
+# bootadm and symdef to properly handle menu.lst changes.  If the system is
+# directboot, we can use the local copies.  If the system is multiboot but
+# the archives are directboot, we extract the binaries early.  Otherwise,
+# we're not crossing the boundary, and which one we use doesn't matter.
+#
+# NB - if bootadm or symdef is ever changed to require a new library, the
+# early extraction will blow up horribly.
+#
+# For testing purposes, a user can set DIRECTBOOT_BIN_DIR in the environment,
+# and we'll use that instead.
+#
 MULTIBOOT_BIN_DIR=${MULTIBOOT_BIN_DIR:=${GATE}/public/multiboot}
+have_new_bootadm=unknown
+
+if [ -x $root/boot/solaris/bin/symdef ] && \
+    $root/boot/solaris/bin/symdef $root/platform/i86pc/kernel/unix dboot_image
+then
+	root_is_directboot=yes
+else
+	root_is_directboot=no
+fi
+
+#
+# A comma-separated list of the command and the archive it's in
+#
+multiboot_new_cmds="
+	sbin/bootadm,generic.sbin
+	boot/solaris/bin/symdef,i86pc.boot
+"
+
+if [ $multi_or_direct = yes ]; then
+	for line in $multiboot_new_cmds
+	do
+		cmd=${line%,*}
+		file=${cmd##*/}
+		archive=${line#*,}
+		if [ -n "$DIRECTBOOT_BIN_DIR" ] && \
+		    [ -f $DIRECTBOOT_BIN_DIR/$file ]; then
+			cp $DIRECTBOOT_BIN_DIR/$file /tmp/bfubin/
+		else
+			if [ $root_is_directboot = yes ]; then
+				cp $root/$cmd /tmp/bfubin/
+				have_new_bootadm=yes
+			elif [ $archive_type = directboot ]; then
+				DBOOT_TMPDIR=/tmp/dboot.$$
+				trap "rm -rf $DBOOT_TMPDIR" EXIT
+				OLD_PWD=$(pwd)
+				rm -rf $DBOOT_TMPDIR
+				mkdir $DBOOT_TMPDIR
+				cd $DBOOT_TMPDIR
+				$ZCAT $cpiodir/${archive}$ZFIX | \
+				    cpio -id "$cmd" 2>/dev/null
+				if [ -x $cmd ]; then
+					cp $cmd /tmp/bfubin/
+					have_new_bootadm=yes
+				fi
+				cd $OLD_PWD
+				rm -rf $DBOOT_TMPDIR
+				trap - EXIT
+			fi
+		fi
+
+		#
+		# If all else fails, grab the local version
+		#
+		if [ ! -x /tmp/bfubin/$file ]; then
+			[ -x /$cmd ] && cp /$cmd /tmp/bfubin
+		fi
+	done
+fi
 
 multiboot_cmds="
 	/sbin/biosdev
 	/sbin/installgrub
-	/sbin/bootadm
 "
 copying_mboot_cmds=no
-if [ $multiboot_archives = yes ]; then
+if [ $multi_or_direct = yes ]; then
 	for cmd in $multiboot_cmds
 	do
+		file=`basename $cmd`
 		if [ -f $cmd ]; then
 			cp $cmd /tmp/bfubin
+		elif [ -n "$DIRECTBOOT_BIN_DIR" ] &&
+		    [ -d $DIRECTBOOT_BIN_DIR ] &&
+		    [ -x $DIRECTBOOT_BIN_DIR/$file ]; then
+			cp $DIRECTBOOT_BIN_DIR/$file /tmp/bfubin/
 		else
-			file=`basename $cmd`
 			if [ ! -d $MULTIBOOT_BIN_DIR ]; then
 				echo "$MULTIBOOT_BIN_DIR: not found"
 			elif [ ! -f $MULTIBOOT_BIN_DIR/$file ]; then
@@ -2452,9 +2617,10 @@ multiboot_scr="
 	/boot/solaris/bin/root_archive
 "
 
-if [ $multiboot_archives = yes ]; then
+if [ $multi_or_direct = yes ]; then
 	for cmd in $multiboot_scr
 	do
+		file=`basename $cmd`
 		if [ -f $cmd ]; then
 			cp $cmd /tmp/bfubin
 		else
@@ -2463,7 +2629,6 @@ if [ $multiboot_archives = yes ]; then
 				fail ""
 			fi
 
-			file=`basename $cmd`
 			if [ ! -f $MULTIBOOT_BIN_DIR/$file ]; then
 				echo "$MULTIBOOT_BIN_DIR/$file: not found"
 				fail ""
@@ -2472,9 +2637,13 @@ if [ $multiboot_archives = yes ]; then
 			cp $MULTIBOOT_BIN_DIR/$file /tmp/bfubin
 		fi
 
-		file=`basename $cmd`
+		#
+		# We do two substitutions here to replace references to
+		# both /usr/bin/ and /bin/ with /tmp/bfubin/
+		#
 		mv /tmp/bfubin/${file} /tmp/bfubin/${file}-
-		sed 's/\/usr\/bin\//\/tmp\/bfubin\//g' \
+		sed -e 's/\/usr\/bin\//\/tmp\/bfubin\//g' \
+		    -e 's/\/bin\//\/tmp\/bfubin\//g' \
 		    < /tmp/bfubin/${file}- > /tmp/bfubin/${file}
 		chmod +x /tmp/bfubin/${file}
 	done
@@ -3702,7 +3871,7 @@ do
 	smf_check_repository
 done
 
-MINIMUM_OS_REV=9
+MINIMUM_OS_REV=10
 
 #
 # Perform additional sanity checks if we are upgrading the live system.
@@ -3715,6 +3884,10 @@ then
 	os_rev=`uname -r | sed -e s/5.//`
 	if [ $os_rev -lt $MINIMUM_OS_REV -a "$force_override" = "no" ]; then
 		fail "Cannot bfu from pre-Solaris $MINIMUM_OS_REV"
+	fi
+	if [ ! -x /usr/sbin/svcadm ]; then
+		fail "This version of bfu cannot run on pre-Greenline " \
+		    "(s10_64) systems"
 	fi
 
 	#
@@ -3747,12 +3920,6 @@ then
 	# exec/intpexec and sys/kaio are needed by lofi
 	modload -p exec/intpexec >/dev/null 2>&1
 	modload -p sys/kaio >/dev/null 2>&1
-
-	#
-	# Stop init(1M) so extraction/manipulation of inittab is safe.
-	#
-	print "Quiescing init ..."
-	pstop 1
 
 	# umount /lib/libc.so.1 if necessary
 	if [ -n "`mount | grep '^/lib/libc.so.1'`" ]
@@ -3928,6 +4095,10 @@ else
 		awk '{print $1}' | sed -e s/5.//`
 	if [ $os_rev -lt $MINIMUM_OS_REV -a "$force_override" = "no" ]; then
 		fail "Cannot bfu from pre-Solaris $MINIMUM_OS_REV"
+	fi
+	if [ ! -x /usr/sbin/svcadm ]; then
+		fail "This version of bfu cannot run on pre-Greenline " \
+		    "(s10_64) systems"
 	fi
 fi
 
@@ -4163,6 +4334,15 @@ check_multi_to_dca_boot()
 
 check_dca_to_multiboot()
 {
+	bootdev=`grep p0:boot $rootprefix/etc/vfstab | \
+	    grep pcfs | nawk '{print $1}'`
+	if [ "$bootdev" != "" ]; then
+		is_pcfs_boot=yes
+	fi
+	if [ $system_type != dca ]; then
+		return
+	fi
+
 	# ensure bootpath is in $rootprefix/boot/solaris/bootenv.rc
 	# It's ok to put a meta device path in there
 	bootenvrc=$rootprefix/boot/solaris/bootenv.rc
@@ -4175,16 +4355,28 @@ check_dca_to_multiboot()
 		echo "setprop bootpath '$bootpath'" >> $bootenvrc
 	fi
 
-	bootdev=`grep p0:boot $rootprefix/etc/vfstab | \
-	    grep pcfs | nawk '{print $1}'`
-	if [ "$bootdev" != "" ]; then
-		is_pcfs_boot=yes
-	fi
-	if [ ! -f $rootprefix/boot/mdboot ]; then
-		return
-	fi
-	dca_to_multi=yes
 	rm -f $rootprefix/boot/mdboot
+}
+
+#
+# Figure out the boot architecture of the current system:
+# 1. If dboot_image is in unix, it's a dboot system
+# 2. Otherwise, if multiboot is present, it's a multiboot system
+# 3. Otherwise, it's a pre-multiboot system
+#
+# This is called before we lay down the new archives.
+#
+check_system_type()
+{
+	if [ -x $root/boot/solaris/bin/symdef ] && \
+	    $root/boot/solaris/bin/symdef $root/platform/i86pc/kernel/unix \
+	    dboot_image; then
+		system_type=directboot
+	elif [ -x $root/platform/i86pc/multiboot ]; then
+		system_type=multiboot
+	else
+		system_type=dca
+	fi
 }
 
 #
@@ -4192,19 +4384,23 @@ check_dca_to_multiboot()
 #
 get_rootdev_list()
 {
-	metadev=`grep -v "^#" $rootprefix/etc/vfstab | \
-		grep "[	 ]/[ 	]" | nawk '{print $2}'`
-	if [[ $metadev = /dev/rdsk/* ]]; then
-        	rootdevlist=`echo "$metadev" | sed -e "s#/dev/rdsk/##"`
-	elif [[ $metadev = /dev/md/rdsk/* ]]; then
-        	metavol=`echo "$metadev" | sed -e "s#/dev/md/rdsk/##"`
-		rootdevlist=`metastat -p $metavol |\
-		    grep -v "^$metavol[ 	]" | nawk '{print $4}'`
+	if [ -f $rootprefix/etc/lu/GRUB_slice ]; then
+		grep '^PHYS_SLICE' $rootprefix/etc/lu/GRUB_slice | cut -d= -f2
+	else
+		metadev=`grep -v "^#" $rootprefix/etc/vfstab | \
+			grep "[	 ]/[ 	]" | nawk '{print $2}'`
+		if [[ $metadev = /dev/rdsk/* ]]; then
+       		 	rootdevlist=`echo "$metadev" | sed -e "s#/dev/rdsk/##"`
+		elif [[ $metadev = /dev/md/rdsk/* ]]; then
+       		 	metavol=`echo "$metadev" | sed -e "s#/dev/md/rdsk/##"`
+			rootdevlist=`metastat -p $metavol |\
+			    grep -v "^$metavol[ 	]" | nawk '{print $4}'`
+		fi
+		for rootdev in $rootdevlist
+		do
+			echo /dev/rdsk/$rootdev
+		done
 	fi
-	for rootdev in $rootdevlist
-	do
-		echo /dev/rdsk/$rootdev
-	done
 }
 
 #
@@ -4256,10 +4452,13 @@ setup_stubboot()
 #
 install_grub()
 {
-	STAGE1=$root/boot/grub/stage1
-	STAGE2=$root/boot/grub/stage2
+	STAGE1=$rootprefix/boot/grub/stage1
+	STAGE2=$rootprefix/boot/grub/stage2
 
-	if [ $is_pcfs_boot = no ]; then
+	if [ -x $rootprefix/boot/solaris/bin/update_grub ]; then
+		/tmp/bfubin/ksh $rootprefix/boot/solaris/bin/update_grub \
+		    -R $root
+	elif [ $is_pcfs_boot = no ]; then
 		get_rootdev_list | while read rootdev
 		do 
 			print "Install grub on $rootdev"
@@ -4291,6 +4490,79 @@ install_grub()
 	fi
 }
 
+#
+# We check for several possibilites of a bootenv.rc line:
+#
+# 1. setprop name 'value'
+# 2. setprop name "value"
+# 3. setprop name value
+#
+parse_bootenv_line()
+{
+	line=$1
+	value=`echo $line | grep "'" | cut -d\' -f2`
+	if [ -z "$value" ]; then
+		value=`echo $line | grep "\"" | cut -d\" -f2`
+		if [ -z "$value" ]; then
+			value=`echo $line | cut -d' ' -f3-`
+		fi
+	fi
+	echo $value
+}
+
+update_bootenv()
+{
+	bootenvrc=$rootprefix/boot/solaris/bootenv.rc
+	bootenvrc_updated=0
+
+	# Note: the big space below is actually a space and tab
+	boot_file=`grep '^setprop[ 	]\{1,\}boot-file\>' $bootenvrc`
+	if [ -n "$boot_file" ]; then
+		file=`parse_bootenv_line "$boot_file"`
+		if [ -n "$file" ]; then
+			PATH=/tmp/bfubin /tmp/bfubin/bootadm set-menu kernel="$file"
+			bootenvrc_updated=1
+		fi
+	fi
+
+	console=`grep '^setprop[ 	]\{1,\}console\>' $bootenvrc`
+	if [ -z "$console" ]; then
+		console=`grep '^setprop[ 	]\{1,\}input-device\>' \
+		    $bootenvrc`
+	fi
+	if [ -n "$console" ]; then
+		cons=`parse_bootenv_line "$console"`
+	fi
+	boot_args=`grep '^setprop[ 	]\{1,\}boot-args\>' $bootenvrc`
+	if [ -n "boot_args" ]; then
+		args=`parse_bootenv_line "$boot_args"`
+	fi
+	if [ -n "$cons" ] && [ -n "$args" ]; then
+		# If args starts with a -B, remove it and add a comma instead
+		if echo $args | grep '^-B ' >/dev/null; then
+			new_args=`echo $args | sed 's/^-B //'`
+			args_line="-B console=$cons,$new_args"
+		else
+			args_line="-B console=$cons $args"
+		fi
+	elif [ -n "$cons" ]; then
+		args_line="-B console=$cons"
+	elif [ -n "$args" ]; then
+		args_line="$args"
+	else
+		args_line=""
+	fi
+	if [ -n "$args_line" ]; then
+		PATH=/tmp/bfubin /tmp/bfubin/bootadm set-menu args="$args_line"
+		bootenvrc_updated=1
+	fi
+
+	if [ $bootenvrc_updated = 1 ]; then
+		egrep -v '^setprop[ 	]+(console|boot-file|boot-args|input-device)[ 	]' $bootenvrc > ${bootenvrc}.new
+		[ -s ${bootenvrc}.new ] && mv ${bootenvrc}.new $bootenvrc
+	fi
+}
+
 get_biosdisk()
 {
 	rootdev=$1
@@ -4310,11 +4582,31 @@ get_biosdisk()
 #
 update_grub_menu()
 {
-	BOOT_PROG=/platform/i86pc/multiboot
-	BOOT_ARCHIVE=/platform/i86pc/boot_archive
 	MENU=$rootprefix/boot/grub/menu.lst
 
 	grubhd=$1
+
+	if [ $archive_type = multiboot ]; then
+		BOOT_PROG="kernel /platform/i86pc/multiboot"
+		BOOT_ARCHIVE="module /platform/i86pc/boot_archive"
+	else
+		#
+		# directboot archives
+		#
+		BOOT_PROG="kernel\$ /platform/i86pc/kernel/\$ISADIR/unix"
+		BOOT_ARCHIVE="module\$ /platform/i86pc/\$ISADIR/boot_archive"
+	fi
+
+	#
+	# The failsafe archives may be different than the boot archives
+	#
+	if [ -x /boot/platform/i86pc/kernel/unix ]; then
+		BOOT_FAILSAFE_FILE="/boot/platform/i86pc/kernel/unix"
+		BOOT_FAILSAFE_SUFFIX=""
+	else
+		BOOT_FAILSAFE_FILE="/boot/multiboot"
+		BOOT_FAILSAFE_SUFFIX="kernel/unix"
+	fi
 
 	#
 	# Append some useful entries to the existing menu
@@ -4331,12 +4623,12 @@ update_grub_menu()
 	echo "#splashimage=$grubhd/boot/grub/splash.xpm.gz" >> $MENU
 	echo "title Solaris" >> $MENU
 	echo "	root $grubhd" >> $MENU
-	echo "	kernel ${BOOT_PROG}" >> $MENU
-	echo "	module ${BOOT_ARCHIVE}" >> $MENU
+	echo "	${BOOT_PROG}" >> $MENU
+	echo "	${BOOT_ARCHIVE}" >> $MENU
 
 	echo "GRUB menu entry 'Solaris' boots to eeprom(1m) settings"
 
-	if [ -f ${rootprefix}/boot/multiboot ] &&
+	if [ -f ${rootprefix}/$BOOT_FAILSAFE_FILE ] &&
 	    [ -f ${rootprefix}/boot/x86.miniroot-safe ] ; then
 
 		TTY=`grep "^setprop input-device" \
@@ -4351,27 +4643,42 @@ update_grub_menu()
 			FS_CONSOLE="-B console=${TTY}"
 		fi
 
-		echo "title Solaris failsafe" >> $MENU
-		echo "	root $grubhd" >> $MENU
-		echo "	kernel /boot/multiboot kernel/unix $FS_CONSOLE -s" \
-		    >> $MENU
-		echo "	module /boot/x86.miniroot-safe" >> $MENU
+cat >>$MENU <<EOF
+title Solaris failsafe
+  root $grubhd
+  kernel $BOOT_FAILSAFE_FILE $BOOT_FAILSAFE_SUFFIX $FS_CONSOLE -s
+  module /boot/x86.miniroot-safe
+EOF
 	fi
 }
 
+bootadm_f_flag=""
+
 install_failsafe()
 {
-	if [ ! -f /boot/multiboot -o ! -f /boot/x86.miniroot-safe ] && \
-	    [ -x ${GATEPATH}/public/bin/update_failsafe ] ; then
-		echo Updating boot/multiboot and boot/x86.miniroot-safe
+	if [ "$root" != "/" ] || \
+	    [ -f /boot/x86.miniroot-safe ] || \
+	    [ -x ${GATEPATH}/public/bin/update_failsafe ]; then
+		#
+		# Either we're not bfu'ing /, or the failsafe archives were
+		# already installed, or update_failsafe is not available.
+		# If the old failsafe archives were multiboot, clear out the
+		# directboot kernel.
+		# 
+		if [ $failsafe_type = multiboot ]; then
+			rm -f $rootprefix/boot/platform/i86pc/kernel/unix
+		fi
+	else
+		echo "Updating failsafe archives"
 		${GATEPATH}/public/bin/update_failsafe
+
+		# Force bootadm to update the failsafe entry
+		bootadm_f_flag="-f"
 	fi
 }
 
 setup_grub_menu()
 {
-	BOOT_PROG=/platform/i86pc/multiboot
-	BOOT_ARCHIVE=/platform/i86pc/boot_archive
 	MENU=$rootprefix/boot/grub/menu.lst
 
 	get_rootdev_list | while read rootdev
@@ -4420,8 +4727,6 @@ setup_grub_menu()
 #
 build_boot_archive()
 {
-	echo "Create ${rootprefix}/platform/i86pc/boot_archive"
-
 	#
 	# We should be able to run bootadm here but that's a
 	# little more complicated than one would think
@@ -4430,7 +4735,7 @@ build_boot_archive()
 
 	cr_args=${rootprefix:+ -R $rootprefix}
 	LD_LIBRARY_PATH=/tmp/bfulib PATH=/tmp/bfubin \
-	    /tmp/bfubin/ksh /tmp/bfubin/create_ramdisk $cr_args
+	    /tmp/bfubin/ksh $rootprefix/boot/solaris/bin/create_ramdisk $cr_args
 
 	#
 	# Disable the boot-archive service on the first boot
@@ -4484,6 +4789,58 @@ dir_is_inherited() {
 	[ "$3" = "/$dir" ] && return 0 || return 1
 }
 
+check_boot_env()
+{
+	if [ $multi_or_direct = yes ]; then
+		if [ $archive_type != $system_type ]; then
+			install_failsafe
+			[ $system_type = dca ] && setup_grub_menu
+
+			if [ $have_new_bootadm = yes ] || \
+			    [ -x /tmp/bfubin/symdef ] && \
+			    [ -x /tmp/bfubin/bootadm ] && \
+			    /tmp/bfubin/symdef /tmp/bfubin/bootadm \
+			    dboot_or_multiboot; then
+				if [[ -z $rootprefix ]]; then
+					PATH=/tmp/bfubin /tmp/bfubin/bootadm \
+					    -m upgrade $bootadm_f_flag
+				else
+					PATH=/tmp/bfubin /tmp/bfubin/bootadm \
+					    -m upgrade -R $rootprefix \
+					    $bootadm_f_flag
+				fi
+				install_grub
+				[ $archive_type = directboot ] && update_bootenv
+			else
+				install_grub
+				cat >&2 <<EOF
+
+WARNING: Cannot find new bootadm.  If bfu'ing across the multiboot/directboot
+boundary, you will need to manually change menu.lst.  See
+http://www.sun.com/msg/SUNOS-8000-CF for details.
+
+EOF
+			fi
+
+			#
+			# If we're going backwards, we need to remove the
+			# symdef binary.
+			#
+			if [ -f $rootprefix/boot/solaris/bin/symdef ] && \
+			    [ $archive_type = multiboot ]
+			then
+				rm -f $rootprefix/boot/solaris/bin/symdef \
+				    $rootprefix/boot/solaris/bin/update_grub
+			fi
+		elif [ $failsafe_type = multiboot ]; then
+			rm -f $rootprefix/boot/platform/i86pc/kernel/unix
+		fi
+		build_boot_archive
+	else
+		disable_boot_service
+	fi
+}
+
 mondo_loop() {
 	typeset pkgroot
 	typeset pkg
@@ -4512,16 +4869,15 @@ mondo_loop() {
 	if [ "$karch" = "i86pc" -a "$diskless" = "no" -a "$zone" = "global" ]
 	then
 		remove_properties
+		check_system_type
 		if boot_is_upgradeable $root && \
-		    [ -f $cpiodir/i86pc.boot$ZFIX ] && \
-		    $ZCAT $cpiodir/i86pc.boot$ZFIX | cpio -it | \
-		    grep strap.com >/dev/null 2>&1 ; then
+		    [ $archive_type = dca ]; then
 			check_multi_to_dca_boot
 			print "\nUpdating realmode boot loaders\n"
 			update_realmode_booters $root
 			setup_pboot
 		fi
-		if [ $multiboot_archives = yes ]; then
+		if [ $multi_or_direct = yes ]; then
 			check_dca_to_multiboot
 			if [ $is_pcfs_boot = yes ]; then
 				setup_stubboot
@@ -6343,7 +6699,7 @@ mondo_loop() {
 	print "Restoring configuration files ... \c" >> $EXTRACT_LOG
 	filelist $zone | cpio -pdmu bfu.parent 2>>$EXTRACT_LOG || \
 	    extraction_error "restoring configuration files"
-	if [ $multiboot_archives = no ]; then
+	if [ $multi_or_direct = no ]; then
 		if [ $have_realmode = yes ]; then
 			if [ -d bfu.realmode ]; then
 				( cd bfu.realmode ; realmode_filelist | \
@@ -6508,16 +6864,7 @@ mondo_loop() {
 
 		if [ $target_isa = i386 ] && [[ $rootslice = /dev/rdsk/* || \
 		    $rootslice = /dev/md/rdsk/* ]]; then
-			if [ $multiboot_archives = yes ]; then
-				if [ $dca_to_multi = yes ]; then
-					install_failsafe
-					setup_grub_menu
-					install_grub
-				fi
-				build_boot_archive
-			else
-				disable_boot_service
-			fi
+			check_boot_env
 		fi
 
 		# Check for damage due to CR 6379341.  This was actually fixed
@@ -6575,7 +6922,7 @@ mondo_loop() {
 	print "\nFor each file in conflict, your version has been restored."
 	print "The new versions are under $rootprefix/bfu.conflicts."
 	print "\nMAKE SURE YOU RESOLVE ALL CONFLICTS BEFORE REBOOTING.\n"
-	if [ $multiboot_archives = yes ]; then
+	if [ $multi_or_direct = yes ]; then
 		print "To install resolved changes required for reboot in the boot"
 		print "archive, invoke 'bootadm update-archive${cr_args}'\n"
 	fi
@@ -6706,9 +7053,5 @@ fi
 print "Exiting post-bfu protected environment.  To reenter, type:"
 print LD_NOAUXFLTR=1 LD_LIBRARY_PATH=/tmp/bfulib $ldlib64 PATH=/tmp/bfubin \
     /tmp/bfubin/ksh
-
-# Allow init(1M) to continue, if we're leaving.
-print "Reactivating init ..."
-prun 1
 
 exit 0

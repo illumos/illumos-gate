@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +89,6 @@ typedef struct kt_maparg {
 	void *map_data;			/* Callback function argument */
 } kt_maparg_t;
 
-static const char KT_RTLD_NAME[] = "krtld";
 static const char KT_MODULE[] = "mdb_ks";
 static const char KT_CTFPARENT[] = "genunix";
 
@@ -491,6 +489,19 @@ reg_disc_get(const mdb_var_t *v)
 	return (r);
 }
 
+static kt_module_t *
+kt_module_by_name(kt_data_t *kt, const char *name)
+{
+	kt_module_t *km;
+
+	for (km = mdb_list_next(&kt->k_modlist); km; km = mdb_list_next(km)) {
+		if (strcmp(name, km->km_name) == 0)
+			return (km);
+	}
+
+	return (NULL);
+}
+
 void
 kt_activate(mdb_tgt_t *t)
 {
@@ -546,8 +557,22 @@ kt_activate(mdb_tgt_t *t)
 			mdb_iob_flush(mdb.m_out);
 		}
 
-		if (!(t->t_flags & MDB_TGT_F_NOLOAD))
+		if (!(t->t_flags & MDB_TGT_F_NOLOAD)) {
 			kt_load_modules(kt, t);
+
+			/*
+			 * Determine where the CTF data for krtld is. If krtld
+			 * is rolled into unix, force load the MDB krtld
+			 * module.
+			 */
+			kt->k_rtld_name = "krtld";
+
+			if (kt_module_by_name(kt, "krtld") == NULL) {
+				(void) mdb_module_load("krtld", MDB_MOD_SILENT);
+				kt->k_rtld_name = "unix";
+			}
+		}
+
 
 		if (t->t_flags & MDB_TGT_F_PRELOAD) {
 			mdb_iob_puts(mdb.m_out, " ]\n");
@@ -778,7 +803,7 @@ kt_lookup_by_name(mdb_tgt_t *t, const char *obj, const char *name,
 		break;
 
 	case (uintptr_t)MDB_TGT_OBJ_RTLD:
-		obj = KT_RTLD_NAME;
+		obj = kt->k_rtld_name;
 		/*FALLTHRU*/
 
 	default:
@@ -964,7 +989,7 @@ kt_symbol_iter(mdb_tgt_t *t, const char *obj, uint_t which, uint_t type,
 		break;
 
 	case (uintptr_t)MDB_TGT_OBJ_RTLD:
-		obj = KT_RTLD_NAME;
+		obj = kt->k_rtld_name;
 		/*FALLTHRU*/
 
 	default:
@@ -1092,12 +1117,10 @@ kt_name_to_map(mdb_tgt_t *t, const char *name)
 		return (kt_module_to_map(mdb_list_next(&kt->k_modlist), &m));
 
 	if (name == MDB_TGT_OBJ_RTLD)
-		name = KT_RTLD_NAME; /* replace MDB_TGT_OBJ_RTLD with krtld */
+		name = kt->k_rtld_name;
 
-	for (km = mdb_list_next(&kt->k_modlist); km; km = mdb_list_next(km)) {
-		if (strcmp(name, km->km_name) == 0)
-			return (kt_module_to_map(km, &m));
-	}
+	if ((km = kt_module_by_name(kt, name)) != NULL)
+		return (kt_module_to_map(km, &m));
 
 	(void) set_errno(EMDB_NOOBJ);
 	return (NULL);
@@ -1200,14 +1223,12 @@ kt_name_to_ctf(mdb_tgt_t *t, const char *name)
 	kt_module_t *km;
 
 	if (name == MDB_TGT_OBJ_EXEC)
-		name = KT_CTFPARENT; /* base CTF data is kept in genunix */
+		name = KT_CTFPARENT;
 	else if (name == MDB_TGT_OBJ_RTLD)
-		name = KT_RTLD_NAME; /* replace MDB_TGT_OBJ_RTLD with krtld */
+		name = kt->k_rtld_name;
 
-	for (km = mdb_list_next(&kt->k_modlist); km; km = mdb_list_next(km)) {
-		if (strcmp(name, km->km_name) == 0)
-			return (kt_load_ctfdata(t, km));
-	}
+	if ((km = kt_module_by_name(kt, name)) != NULL)
+		return (kt_load_ctfdata(t, km));
 
 	(void) set_errno(EMDB_NOOBJ);
 	return (NULL);

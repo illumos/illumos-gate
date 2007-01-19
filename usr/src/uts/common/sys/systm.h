@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,64 +168,6 @@ dev_t expldev(dev32_t);
 int bcmp(const void *, const void *, size_t) __PURE;
 int stoi(char **);
 void numtos(ulong_t, char *);
-size_t strlen(const char *) __PURE;
-char *strcat(char *, const char *);
-char *strncat(char *, const char *, size_t);
-char *strcpy(char *, const char *);
-char *strncpy(char *, const char *, size_t);
-/* Need to be consistent with <string.h> C++ definitions */
-#if __cplusplus >= 199711L
-extern const char *strchr(const char *, int);
-#ifndef _STRCHR_INLINE
-#define	_STRCHR_INLINE
-extern "C++" {
-	inline char *strchr(char *__s, int __c) {
-		return (char *)strchr((const char *)__s, __c);
-	}
-}
-#endif /* _STRCHR_INLINE */
-extern const char *strrchr(const char *, int);
-#ifndef	_STRRCHR_INLINE
-#define	_STRRCHR_INLINE
-extern "C++" {
-	inline char *strrchr(char *__s, int __c) {
-		return (char *)strrchr((const char *)__s, __c);
-	}
-}
-#endif	/* _STRRCHR_INLINE */
-extern const char *strstr(const char *, const char *);
-#ifndef	_STRSTR_INLINE
-#define	_STRSTR_INLINE
-extern "C++" {
-	inline char *strstr(char *__s1, const char *__s2) {
-		return (char *)strstr((const char *)__s1, __s2);
-	}
-}
-#endif  /* _STRSTR_INLINE */
-#else	/* __cplusplus >= 199711L */
-char *strchr(const char *, int);
-char *strrchr(const char *, int);
-char *strstr(const char *, const char *);
-#endif	/* __cplusplus >= 199711L */
-char *strnrchr(const char *, int, size_t);
-int strcmp(const char *, const char *) __PURE;
-int strncmp(const char *, const char *, size_t) __PURE;
-int strcasecmp(const char *, const char *) __PURE;
-int strncasecmp(const char *, const char *, size_t) __PURE;
-/* Need to be consistent with <string.h> C++ definitions */
-#if __cplusplus >= 199711L
-extern const char *strpbrk(const char *, const char *);
-#ifndef _STRPBRK_INLINE
-#define	_STRPBRK_INLINE
-extern "C++" {
-	inline char *strpbrk(char *__s1, const char *__s2) {
-		return (char *)strpbrk((const char *)__s1, __s2);
-	}
-}
-#endif /* _STRPBRK_INLINE */
-#else /* __cplusplus >= 199711L */
-char *strpbrk(const char *, const char *);
-#endif /* __cplusplus >= 199711L */
 int strident_valid(const char *);
 void strident_canon(char *, size_t);
 int getsubopt(char **optionsp, char * const *tokens, char **valuep);
@@ -244,21 +186,14 @@ int copyinstr_noerr(const char *, char *, size_t, size_t *);
 int copyoutstr(const char *, char *, size_t, size_t *);
 int copyoutstr_noerr(const char *, char *, size_t, size_t *);
 int copystr(const char *, char *, size_t, size_t *);
-void bcopy(const void *, void *, size_t);
 void ucopy(const void *, void *, size_t);
 void ucopystr(const char *, char *, size_t, size_t *);
 void pgcopy(const void *, void *, size_t);
 void ovbcopy(const void *, void *, size_t);
-void bzero(void *, size_t);
 void uzero(void *, size_t);
 int kcopy(const void *, void *, size_t);
 int kcopy_nta(const void *, void *, size_t, int);
 int kzero(void *, size_t);
-
-extern void *memset(void *, int, size_t);
-extern void *memcpy(void *, const void *, size_t);
-extern void *memmove(void *, const void *, size_t);
-extern int memcmp(const void *, const void *, size_t);
 
 int fuword8(const void *, uint8_t *);
 int fuword16(const void *, uint16_t *);
@@ -441,11 +376,6 @@ extern void swtch(void);
 
 extern uint_t	kcpc_key;	/* TSD key for performance counter context */
 
-#ifdef __lint
-extern	int	__lintzero;	/* for spoofing lint */
-#endif
-
-
 /*
  * initname holds the path to init and is used as a point of rendezvous
  * between krtld (which processes the boot arguments) and the kernel.
@@ -464,6 +394,82 @@ extern int exec_init(const char *, const char *);
 extern int start_init_common(void);
 
 #endif	/* _KERNEL */
+
+#if defined(_KERNEL) || defined(_BOOT)
+
+size_t strlcat(char *, const char *, size_t);
+size_t strlen(const char *) __PURE;
+char *strcat(char *, const char *);
+char *strncat(char *, const char *, size_t);
+char *strcpy(char *, const char *);
+char *strncpy(char *, const char *, size_t);
+/* Need to be consistent with <string.h> C++ definitions */
+#if __cplusplus >= 199711L
+extern const char *strchr(const char *, int);
+#ifndef _STRCHR_INLINE
+#define	_STRCHR_INLINE
+extern "C++" {
+	inline char *strchr(char *__s, int __c) {
+		return (char *)strchr((const char *)__s, __c);
+	}
+}
+#endif /* _STRCHR_INLINE */
+extern const char *strrchr(const char *, int);
+#ifndef	_STRRCHR_INLINE
+#define	_STRRCHR_INLINE
+extern "C++" {
+	inline char *strrchr(char *__s, int __c) {
+		return (char *)strrchr((const char *)__s, __c);
+	}
+}
+#endif	/* _STRRCHR_INLINE */
+extern const char *strstr(const char *, const char *);
+#ifndef	_STRSTR_INLINE
+#define	_STRSTR_INLINE
+extern "C++" {
+	inline char *strstr(char *__s1, const char *__s2) {
+		return (char *)strstr((const char *)__s1, __s2);
+	}
+}
+#endif  /* _STRSTR_INLINE */
+#else	/* __cplusplus >= 199711L */
+char *strchr(const char *, int);
+char *strrchr(const char *, int);
+char *strstr(const char *, const char *);
+#endif	/* __cplusplus >= 199711L */
+char *strnrchr(const char *, int, size_t);
+int strcmp(const char *, const char *) __PURE;
+int strncmp(const char *, const char *, size_t) __PURE;
+int strcasecmp(const char *, const char *) __PURE;
+int strncasecmp(const char *, const char *, size_t) __PURE;
+/* Need to be consistent with <string.h> C++ definitions */
+#if __cplusplus >= 199711L
+extern const char *strpbrk(const char *, const char *);
+#ifndef _STRPBRK_INLINE
+#define	_STRPBRK_INLINE
+extern "C++" {
+	inline char *strpbrk(char *__s1, const char *__s2) {
+		return (char *)strpbrk((const char *)__s1, __s2);
+	}
+}
+#endif /* _STRPBRK_INLINE */
+#else /* __cplusplus >= 199711L */
+char *strpbrk(const char *, const char *);
+#endif /* __cplusplus >= 199711L */
+void bcopy(const void *, void *, size_t);
+void bzero(void *, size_t);
+
+extern void *memset(void *, int, size_t);
+extern void *memcpy(void *, const void *, size_t);
+extern void *memmove(void *, const void *, size_t);
+extern int memcmp(const void *, const void *, size_t);
+
+#ifdef __lint
+extern	int	__lintzero;	/* for spoofing lint */
+#else	/* __lint */
+#define	__lintzero 0
+#endif	/* __lint */
+#endif /* _KERNEL || _BOOT */
 
 #ifdef	__cplusplus
 }

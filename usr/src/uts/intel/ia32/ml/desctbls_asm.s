@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <sys/ontrap.h>
 #include <sys/privregs.h>
 #include <sys/segments.h>
+#include <sys/trap.h>
 
 #if defined(__lint)
 #include <sys/types.h>
@@ -45,19 +46,16 @@
 #include "assym.h"
 #endif  /* __lint */
 
-#if !defined(__lint)
-	DGDEF3(gdt0, MMU_STD_PAGESIZE, MMU_STD_PAGESIZE)
-	.zero MMU_STD_PAGESIZE
-#endif /* __lint */
-
 #if defined(__lint)
 
 /*ARGSUSED*/
-void rd_idtr(desctbr_t *idtr)
+void
+rd_idtr(desctbr_t *idtr)
 {}
 
 /*ARGSUSED*/
-void wr_idtr(desctbr_t *idtr)
+void
+wr_idtr(desctbr_t *idtr)
 {}
 
 #else	/* __lint */
@@ -100,11 +98,13 @@ void wr_idtr(desctbr_t *idtr)
 #if defined(__lint)
 
 /*ARGSUSED*/
-void rd_gdtr(desctbr_t *gdtr)
+void
+rd_gdtr(desctbr_t *gdtr)
 {}
 
 /*ARGSUSED*/
-void wr_gdtr(desctbr_t *gdtr)
+void
+wr_gdtr(desctbr_t *gdtr)
 {}
 
 #else	/* __lint */
@@ -112,34 +112,22 @@ void wr_gdtr(desctbr_t *gdtr)
 #if defined(__amd64)
 
 	ENTRY_NP(rd_gdtr)
+	pushq	%rbp
+	movq	%rsp, %rbp
 	sgdt	(%rdi)
+	leave
 	ret
 	SET_SIZE(rd_gdtr)
 
 	ENTRY_NP(wr_gdtr)
+	pushq	%rbp
+	movq	%rsp, %rbp
 	lgdt	(%rdi)
 	jmp	1f
 	nop
 1:
-	movl	$KDS_SEL, %eax
-	movw	%ax, %ss
-	/*
-	 * zero %ds and %es - they're ignored anyway
-	 */
-	xorl	%eax, %eax
-	movw	%ax, %ds
-	movw	%ax, %es
-	/*
-	 * set %fs and %gs (probably to zero also)
-	 */
-	movl	$KFS_SEL, %eax
-	movw	%ax, %fs
-	movl	$KGS_SEL, %eax
-	movw	%ax, %gs
-	popq	%rax
-	pushq	$KCS_SEL
-	pushq	%rax
-	lretq
+	leave
+	ret
 	SET_SIZE(wr_gdtr)
 
 #elif defined(__i386)
@@ -158,17 +146,9 @@ void wr_gdtr(desctbr_t *gdtr)
 	movl	%esp, %ebp
 	movl	8(%ebp), %edx
 	lgdt	(%edx)
+	jmp	1f
 	nop
-	ljmp	$KCS_SEL, $.next
-.next:
-	movl	$KDS_SEL, %eax
-	movw	%ax, %ds	
-	movw	%ax, %es	
-	movw	%ax, %ss	
-	movl	$KFS_SEL, %eax
-	movw	%ax, %fs	
-	movl	$KGS_SEL, %eax
-	movw	%ax, %gs	
+1:
 	leave
 	ret
 	SET_SIZE(wr_gdtr)
@@ -176,17 +156,96 @@ void wr_gdtr(desctbr_t *gdtr)
 #endif	/* __i386 */
 #endif	/* __lint */
 
+#if defined(__amd64)
 #if defined(__lint)
 
 /*ARGSUSED*/
-void wr_ldtr(selector_t ldtsel)
+void
+load_segment_registers(selector_t cs, selector_t fs, selector_t gs,
+    selector_t ss)
 {}
 
-selector_t rd_ldtr(void)
+#else	/* __lint */
+
+	/*
+	 * loads zero selector for ds and es.
+	 */
+	ENTRY_NP(load_segment_registers)
+	pushq	%rbp
+	movq	%rsp, %rbp
+	pushq	%rdi
+	pushq	$.newcs
+	lretq
+.newcs:
+	/*
+	 * zero %ds and %es - they're ignored anyway
+	 */
+	xorl	%eax, %eax
+	movw	%ax, %ds
+	movw	%ax, %es
+	movl	%esi, %eax
+	movw	%ax, %fs
+	movl	%edx, %eax
+	movw	%ax, %gs
+	movl	%ecx, %eax
+	movw	%ax, %ss
+	leave
+	ret
+	SET_SIZE(load_segment_registers)
+
+#endif	/* __lint */
+#elif defined(__i386)
+
+#if defined(__lint)
+
+/*ARGSUSED*/
+void
+load_segment_registers(
+    selector_t cs, selector_t ds, selector_t es,
+    selector_t fs, selector_t gs, selector_t ss)
+{}
+
+#else	/* __lint */
+
+	ENTRY_NP(load_segment_registers)
+	pushl	%ebp
+	movl	%esp, %ebp
+
+	pushl	0x8(%ebp)
+	pushl	$.newcs
+	lret
+.newcs:
+	movw	0xc(%ebp), %ax
+	movw	%ax, %ds
+	movw	0x10(%ebp), %ax
+	movw	%ax, %es
+	movw	0x14(%ebp), %ax
+	movw	%ax, %fs
+	movw	0x18(%ebp), %ax
+	movw	%ax, %gs
+	movw	0x1c(%ebp), %ax
+	movw	%ax, %ss
+	leave
+	ret
+	SET_SIZE(load_segment_registers)
+
+#endif	/* __lint */
+#endif	/* __i386 */
+
+#if defined(__lint)
+
+/*ARGSUSED*/
+void
+wr_ldtr(selector_t ldtsel)
+{}
+
+selector_t
+rd_ldtr(void)
 { return (0); }
 
 #if defined(__amd64)
-void clr_ldt_sregs(void)
+void
+clr_ldt_sregs(void)
 {}
 #endif
 
@@ -264,7 +323,8 @@ void clr_ldt_sregs(void)
 #if defined(__lint)
 
 /*ARGSUSED*/
-void wr_tsr(selector_t tsssel)
+void
+wr_tsr(selector_t tsssel)
 {}
 
 #else	/* __lint */

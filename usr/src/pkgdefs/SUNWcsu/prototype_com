@@ -733,7 +733,7 @@ f none usr/sbin/dminfo 555 root bin
 l none usr/sbin/drvconfig=./devfsadm
 f none usr/sbin/dumpadm 555 root bin
 s none usr/sbin/edquota=../lib/fs/ufs/edquota
-l none usr/sbin/eeprom=../../usr/lib/platexec
+f none usr/sbin/eeprom 2555 root bin
 s none usr/sbin/fdisk=../../sbin/fdisk
 f none usr/sbin/ff 555 root bin
 f none usr/sbin/fmthard 555 root sys
@@ -802,7 +802,6 @@ l none usr/sbin/ports=./devfsadm
 l none usr/sbin/poweroff=./halt
 f none usr/sbin/praudit 555 root bin
 l none usr/sbin/prtconf=../../usr/lib/isaexec
-l none usr/sbin/prtdiag=../../usr/lib/platexec
 f none usr/sbin/prtvtoc 555 root sys
 f none usr/sbin/psradm 555 root sys
 f none usr/sbin/psrinfo 555 root sys

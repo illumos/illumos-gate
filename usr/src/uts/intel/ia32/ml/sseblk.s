@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -377,46 +376,133 @@ hwblkpagecopy(const void *src, void *dst)
 #endif	/* __i386 */
 #endif	/* __lint */
 
-
 #if defined(__lint)
 
+/*
+ * Version of hwblkclr which doesn't use XMM registers.
+ * Note that it requires aligned dst and len.
+ *
+ * XXPV This needs to be performance tuned at some point.
+ *	Is 4 the best number of iterations to unroll?
+ */
 /*ARGSUSED*/
 void
-hat_pte_zero(void *dst, size_t len)
+block_zero_no_xmm(void *dst, int len)
 {}
 
-#else
+#else	/* __lint */
 
 #if defined(__amd64)
 
-	ENTRY(hat_pte_zero)
+	ENTRY(block_zero_no_xmm)
+	pushq	%rbp
+	movq	%rsp, %rbp
 	xorl	%eax, %eax
+	addq	%rsi, %rdi
+	negq	%rsi
 1:
-	movnti	%rax, (%rdi)
-	addq	$8, %rdi
-	subq	$8, %rsi
+	movnti	%rax, (%rdi, %rsi)
+	movnti	%rax, 8(%rdi, %rsi)
+	movnti	%rax, 16(%rdi, %rsi)
+	movnti	%rax, 24(%rdi, %rsi)
+	addq	$32, %rsi
 	jnz	1b
 	mfence
+	leave
 	ret
-	SET_SIZE(hat_pte_zero)
+	SET_SIZE(block_zero_no_xmm)
 
 #elif defined(__i386)
 
-	ENTRY(hat_pte_zero)
+	ENTRY(block_zero_no_xmm)
+	pushl	%ebp
+	movl	%esp, %ebp
 	xorl	%eax, %eax
-	movl	4(%esp), %edx
-	movl	8(%esp), %ecx
+	movl	8(%ebp), %edx
+	movl	12(%ebp), %ecx
+	addl	%ecx, %edx
+	negl	%ecx
 1:
-	movnti	%eax, (%edx)
-	addl	$4, %edx
-	subl	$4, %ecx
+	movnti	%eax, (%edx, %ecx)
+	movnti	%eax, 4(%edx, %ecx)
+	movnti	%eax, 8(%edx, %ecx)
+	movnti	%eax, 12(%edx, %ecx)
+	addl	$16, %ecx
+	jnz	1b
+	mfence
+	leave
+	ret
+	SET_SIZE(block_zero_no_xmm)
+
+#endif	/* __i386 */
+#endif	/* __lint */
+
+
+#if defined(__lint)
+
+/*
+ * Version of page copy which doesn't use XMM registers.
+ *
+ * XXPV	This needs to be performance tuned at some point.
+ *	Is 4 the right number of iterations to unroll?
+ *	Is the load/store order optimal? Should it use prefetch?
+ */
+/*ARGSUSED*/
+void
+page_copy_no_xmm(void *dst, void *src)
+{}
+
+#else	/* __lint */
+
+#if defined(__amd64)
+
+	ENTRY(page_copy_no_xmm)
+	movq	$MMU_STD_PAGESIZE, %rcx
+	addq	%rcx, %rdi
+	addq	%rcx, %rsi
+	negq	%rcx
+1:
+	movq	(%rsi, %rcx), %rax
+	movnti	%rax, (%rdi, %rcx)
+	movq	8(%rsi, %rcx), %rax
+	movnti	%rax, 8(%rdi, %rcx)
+	movq	16(%rsi, %rcx), %rax
+	movnti	%rax, 16(%rdi, %rcx)
+	movq	24(%rsi, %rcx), %rax
+	movnti	%rax, 24(%rdi, %rcx)
+	addq	$32, %rcx
 	jnz	1b
 	mfence
 	ret
-	SET_SIZE(hat_pte_zero)
+	SET_SIZE(page_copy_no_xmm)
+
+#elif defined(__i386)
+
+	ENTRY(page_copy_no_xmm)
+	pushl	%esi
+	movl	$MMU_STD_PAGESIZE, %ecx
+	movl	8(%esp), %edx
+	movl	12(%esp), %esi
+	addl	%ecx, %edx
+	addl	%ecx, %esi
+	negl	%ecx
+1:
+	movl	(%esi, %ecx), %eax
+	movnti	%eax, (%edx, %ecx)
+	movl	4(%esi, %ecx), %eax
+	movnti	%eax, 4(%edx, %ecx)
+	movl	8(%esi, %ecx), %eax
+	movnti	%eax, 8(%edx, %ecx)
+	movl	12(%esi, %ecx), %eax
+	movnti	%eax, 12(%edx, %ecx)
+	addl	$16, %ecx
+	jnz	1b
+	mfence
+	popl	%esi
+	ret
+	SET_SIZE(page_copy_no_xmm)
 
 #endif	/* __i386 */
-
 #endif	/* __lint */
 
 #if defined(DEBUG) && !defined(__lint)

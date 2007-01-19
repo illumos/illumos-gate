@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,8 +87,8 @@ cmi_load_modctl(modctl_t *modp)
 	}
 
 	if ((ops = modlookup_by_modctl(modp, "_cmi_ops")) == NULL) {
-		cmn_err(CE_WARN, "CPU module %s is invalid: no _cmi_ops "
-		    "found\n", modp->mod_modname);
+		cmn_err(CE_WARN, "cpu module '%s' is invalid: no _cmi_ops "
+		    "found", modp->mod_modname);
 		return (NULL);
 	}
 
@@ -197,8 +197,9 @@ cmi_load(cpu_t *cp)
 	    ((cmi = cmi_load_module(cp)) == NULL) ||
 	    ((err = cmi->cmi_ops->cmi_init(cp, &data)) != 0 &&
 	    err != ENOTSUP))) {
-		cmn_err(CE_WARN, "CPU module %s failed to init CPU %d: err=%d",
-		    cmi ? cmi->cmi_modp->mod_modname : "<>", cp->cpu_id, err);
+		cmn_err(CE_WARN,
+		    "cpu%d: failed to init cpu module '%s': err=%d",
+		    cp->cpu_id, cmi ? cmi->cmi_modp->mod_modname : "<>", err);
 		mutex_exit(&cmi_load_lock);
 		return (-1);
 	}
@@ -206,8 +207,9 @@ cmi_load(cpu_t *cp)
 	if ((cmi_force_generic || err != 0) &&
 	    ((cmi = cmi_load_generic()) == NULL ||
 	    (err = cmi->cmi_ops->cmi_init(cp, &data)) != 0)) {
-		cmn_err(CE_WARN, "CPU module %s failed to init CPU %d: err=%d",
-		    cmi ? cmi->cmi_modp->mod_modname : "<>", cp->cpu_id, err);
+		cmn_err(CE_WARN,
+		    "cpu%d: failed to init cpu module '%s': err=%d",
+		    cp->cpu_id, cmi ? cmi->cmi_modp->mod_modname : "<>", err);
 		mutex_exit(&cmi_load_lock);
 		return (-1);
 	}
@@ -220,7 +222,7 @@ cmi_load(cpu_t *cp)
 	mutex_exit(&cmi_load_lock);
 
 	if (boothowto & RB_VERBOSE) {
-		printf("cpuid %d: initialized cpumod: %s\n",
+		printf("cpu%d: initialized cpu module '%s'\n",
 		    cp->cpu_id, cmi->cmi_modp->mod_modname);
 	}
 
@@ -231,7 +233,7 @@ void
 cmi_init(void)
 {
 	if (cmi_load(CPU) < 0)
-		panic("failed to load module for CPU %u", CPU->cpu_id);
+		panic("failed to load module for cpu%d", CPU->cpu_id);
 }
 
 void

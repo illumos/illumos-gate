@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -219,10 +219,28 @@ extern int netboot;
 extern int swaploaded;
 extern int modrootloaded;
 extern char kern_bootargs[];
+extern char *kobj_module_path;
 extern char *default_path;
 extern char *dhcack;
 extern int dhcacklen;
 extern char *netdev_path;
+
+extern void bop_no_more_mem(void);
+
+/*PRINTFLIKE2*/
+extern void bop_printf(struct bootops *, char *, ...)
+    __KPRINTFLIKE(2);
+/*PRINTFLIKE1*/
+extern void bop_panic(char *, ...)
+    __KPRINTFLIKE(1);
+extern void boot_prop_finish(void);
+
+/*
+ * Back door to fakebop.c to get physical memory allocated.
+ * 64 bit data types are fixed for 32 bit PAE use.
+ */
+extern paddr_t do_bop_phys_alloc(uint64_t, uint64_t);
+
 
 #endif /* _KERNEL && !_BOOT */
 

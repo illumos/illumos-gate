@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -935,8 +935,11 @@ die_sou_create(dwarf_t *dw, Dwarf_Die str, Dwarf_Off off, tdesc_t *tdp,
 	(void) die_unsigned(dw, str, DW_AT_byte_size, &sz, DW_ATTR_REQ);
 	tdp->t_size = sz;
 
+	/*
+	 * GCC allows empty SOUs as an extension.
+	 */
 	if ((mem = die_child(dw, str)) == NULL)
-		terminate("die %llu: %s has no members", off, typename);
+		goto out;
 
 	mlastp = &tdp->t_members;
 
@@ -1026,10 +1029,11 @@ die_sou_create(dwarf_t *dw, Dwarf_Die str, Dwarf_Off off, tdesc_t *tdp,
 		if (tdp->t_name != NULL)
 			free(tdp->t_name);
 		tdp->t_name = new;
-
+		return;
 	}
 
-	if (tdp->t_name != NULL && tdp->t_members != NULL) {
+out:
+	if (tdp->t_name != NULL) {
 		ii = xcalloc(sizeof (iidesc_t));
 		ii->ii_type = II_SOU;
 		ii->ii_name = xstrdup(tdp->t_name);
@@ -1066,10 +1070,22 @@ die_sou_resolve(tdesc_t *tdp, tdesc_t **tdpp, void *private)
 
 	for (ml = tdp->t_members; ml != NULL; ml = ml->ml_next) {
 		if (ml->ml_size == 0) {
-			if ((ml->ml_size = tdesc_bitsize(ml->ml_type)) == 0) {
-				dw->dw_nunres++;
-				return (1);
-			}
+			mt = tdesc_basetype(ml->ml_type);
+
+			if ((ml->ml_size = tdesc_bitsize(mt)) != 0)
+				continue;
+
+			/*
+			 * For empty members, or GCC/C99 flexible array
+			 * members, a size of 0 is correct.
+			 */
+			if (mt->t_members == NULL)
+				continue;
+			if (mt->t_type == ARRAY && mt->t_ardef->ad_nelems == 0)
+				continue;
+
+			dw->dw_nunres++;
+			return (1);
 		}
 
 		if ((mt = tdesc_basetype(ml->ml_type)) == NULL) {

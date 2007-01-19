@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +79,6 @@ extern "C" {
  */
 struct hat {
 	kmutex_t	hat_mutex;
-	kmutex_t	hat_switch_mutex;
 	struct as	*hat_as;
 	uint_t		hat_stats;
 	pgcnt_t		hat_pages_mapped[MAX_PAGE_LEVEL + 1];
@@ -173,10 +171,11 @@ extern kcondvar_t hat_list_cv;
  *
  * Used by ppcopy(), page_zero(), the memscrubber, and the kernel debugger.
  */
-extern void *hat_mempte_kern_setup(caddr_t addr, void *);
-extern void *hat_mempte_setup(caddr_t addr);
-extern void hat_mempte_remap(pfn_t, caddr_t, void *, uint_t attr, uint_t flags);
-extern void hat_mempte_release(caddr_t addr, void *);
+typedef paddr_t hat_mempte_t;				/* phys addr of PTE */
+extern hat_mempte_t hat_mempte_setup(caddr_t addr);
+extern void hat_mempte_remap(pfn_t, caddr_t, hat_mempte_t,
+	uint_t attr, uint_t flags);
+extern void hat_mempte_release(caddr_t addr, hat_mempte_t);
 
 /*
  * interfaces to manage which thread has access to htable and hment reserves
@@ -189,9 +188,10 @@ extern kthread_t *hat_reserves_thread;
  * initialization stuff needed by by startup, mp_startup...
  */
 extern void hat_cpu_online(struct cpu *);
+extern void hat_cpu_offline(struct cpu *);
 extern void setup_vaddr_for_ppcopy(struct cpu *);
+extern void teardown_vaddr_for_ppcopy(struct cpu *);
 extern void clear_boot_mappings(uintptr_t, uintptr_t);
-extern int hat_boot_probe(uintptr_t *va, size_t *len, pfn_t *pfn, uint_t *prot);
 
 /*
  * magic value to indicate that all TLB entries should be demapped.
@@ -206,26 +206,26 @@ extern void halt(char *fmt);
 /*
  * x86 specific routines for use online in setup or i86pc/vm files
  */
-extern void hat_kern_alloc(void);
-extern void hati_kern_setup_load(uintptr_t, size_t, pfn_t, pgcnt_t, uint_t);
-extern void hat_demap(struct hat *hat, uintptr_t va);
+extern void hat_kern_alloc(caddr_t segmap_base, size_t segmap_size,
+	caddr_t ekernelheap);
+extern void hat_kern_setup(void);
+extern void hat_tlb_inval(struct hat *hat, uintptr_t va);
 extern void hat_pte_unmap(htable_t *ht, uint_t entry, uint_t flags,
 	x86pte_t old_pte, void *pte_ptr);
 extern void hat_init_finish(void);
-extern void hat_kmap_init(uintptr_t base, size_t len);
 extern caddr_t hat_kpm_pfn2va(pfn_t pfn);
 extern pfn_t hat_kpm_va2pfn(caddr_t);
 extern page_t *hat_kpm_vaddr2page(caddr_t);
 extern uintptr_t hat_kernelbase(uintptr_t);
+extern void hat_kmap_init(uintptr_t base, size_t len);
 
-extern pfn_t hat_boot_remap(uintptr_t, pfn_t);
-extern void hat_boot_demap(uintptr_t);
 extern hment_t *hati_page_unmap(page_t *pp, htable_t *ht, uint_t entry);
 /*
  * Hat switch function invoked to load a new context into %cr3
  */
 extern void hat_switch(struct hat *hat);
 
+#define	pfn_is_foreign(pfn)	__lintzero
 
 #endif	/* _KERNEL */
 

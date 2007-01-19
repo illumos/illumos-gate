@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -363,7 +362,7 @@ cb_read_statefile(void)
 	cb_nbitmaps = cdump.cdd_bitmaprec;
 	cpr_test_mode = cdump.cdd_test_mode;
 	sfile.kpages = cdump.cdd_dumppgsize;
-	DEBUG4(prom_printf("%s: total kpages %d\n", prog, sfile.kpages));
+	CPR_DEBUG(CPR_DEBUG4, "%s: total kpages %d\n", prog, sfile.kpages);
 
 	/*
 	 * alloc virt and phys space with 512K alignment;
@@ -401,7 +400,7 @@ cb_read_statefile(void)
 	cnt = 0;
 	dtlb_index = cb_dents - 1;
 	(void) prom_seek(sfile.fd, specialstate ? CPR_SPEC_OFFSET : 0);
-	DEBUG1(prom_printf("%s: reading statefile... ", prog));
+	CPR_DEBUG(CPR_DEBUG1, "%s: reading statefile... ", prog);
 	for (resid = cdump.cdd_filesize; resid; resid -= len) {
 		/*
 		 * do a full spin (4 spin chars)
@@ -432,7 +431,7 @@ cb_read_statefile(void)
 		dst_virt += len;
 		dst_phys += len;
 	}
-	DEBUG1(prom_printf(" \b\n"));
+	CPR_DEBUG(CPR_DEBUG1, " \b\n");
 
 	/*
 	 * free up any unused phys pages trailing the statefile buffer;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1990-1993, 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,6 +32,8 @@
 #include <sys/cpuvar.h>
 #include <sys/machsystm.h>
 #include <sys/systm.h>
+#include <sys/promif.h>
+#include <sys/x_call.h>
 
 /*
  * Interrupt another CPU.
@@ -46,10 +48,12 @@
 void
 poke_cpu(int cpun)
 {
+	if (panicstr)
+		return;
 	/*
 	 * We don't need to receive an ACK from the CPU being poked,
 	 * so just send out a directed interrupt.
 	 */
-	if (!panicstr)
-		send_dirint(cpun, XC_CPUPOKE_PIL);
+	XC_TRACE(TT_XC_POKE_CPU, -1, cpun);
+	send_dirint(cpun, XC_CPUPOKE_PIL);
 }

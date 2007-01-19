@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,6 +41,7 @@ MODULE		= swrand
 OBJECTS		= $(SWRANDPROV_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SWRANDPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
+INC_PATH	+= -I../../i86pc
 
 #
 #	Include common rules.

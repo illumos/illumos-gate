@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,19 +33,25 @@
 
 #include <sys/types.h>
 #include <sys/varargs.h>
-#if defined(_BOOT) || defined(_KMDB)
-#include <string.h>
-#else
+
+#if defined(_KERNEL)
 #include <sys/systm.h>
-#endif
-#ifdef _KERNEL
 #include <sys/debug.h>
-#endif	/* _KERNEL */
+#elif !defined(_BOOT)
+#include <string.h>
+#endif
+
+#ifndef	NULL
+#define	NULL	0l
+#endif
+
+#include "memcpy.h"
+#include "string.h"
 
 /*
- * kmdb has its own *printf routines, and thus doesn't need these versions too.
+ * We don't need these for x86 boot or kmdb.
  */
-#if !defined(_KMDB)
+#if !defined(_KMDB) && (!defined(_BOOT) || defined(__sparc))
 
 #define	ADDCHAR(c)	if (bufp++ - buf < buflen) bufp[-1] = (c)
 
@@ -322,7 +328,7 @@ snprintf(char *buf, size_t buflen, const char *fmt, ...)
 	return (buflen);
 }
 
-#if defined(_BOOT)
+#if defined(_BOOT) && defined(__sparc)
 /*
  * The sprintf() and vsprintf() routines aren't shared with the kernel because
  * the DDI mandates that they return the buffer rather than its length.
@@ -346,9 +352,9 @@ vsprintf(char *buf, const char *fmt, va_list args)
 	(void) vsnprintf(buf, INT_MAX, fmt, args);
 	return (strlen(buf));
 }
-#endif
+#endif /* _BOOT && __sparc */
 
-#endif /* !_KMDB */
+#endif /* !_KMDB && (!_BOOT || __sparc) */
 
 char *
 strcat(char *s1, const char *s2)
@@ -571,7 +577,8 @@ strlcat(char *dst, const char *src, size_t dstsize)
 
 	while (left-- != 0 && *df != '\0')
 		df++;
-	l1 = df - dst;
+	/*LINTED: possible ptrdiff_t overflow*/
+	l1 = (size_t)(df - dst);
 	if (dstsize == l1)
 		return (l1 + l2);
 
@@ -611,7 +618,8 @@ strspn(const char *string, const char *charset)
 			break;
 	}
 
-	return (q - string);
+	/*LINTED: possible ptrdiff_t overflow*/
+	return ((size_t)(q - string));
 }
 
 /*

@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -81,8 +81,8 @@ find_files "s.*"	\
 	usr/src/uts/sparc/mixer		\
 	usr/src/uts/sparc/amsrc2	\
 	usr/src/uts/sparc/diaudio	\
-	usr/src/uts/i86pc/audio810	\
-	usr/src/uts/i86pc/audiohd	\
+	usr/src/uts/intel/audio810	\
+	usr/src/uts/intel/audiohd	\
 	usr/src/uts/intel/audiosup	\
 	usr/src/uts/intel/mixer		\
 	usr/src/uts/intel/diaudio
@@ -128,5 +128,3 @@ echo_file  usr/src/uts/intel/Makefile.intel
 echo_file  usr/src/uts/intel/Makefile.intel.shared
 echo_file  usr/src/uts/intel/Makefile.targ
 echo_file  usr/src/uts/intel/Makefile.targ.shared
-echo_file  usr/src/uts/intel/ia32/Makefile.rules
-echo_file  usr/src/uts/intel/amd64/Makefile.rules

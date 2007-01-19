@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -480,7 +480,7 @@ grow_internal(caddr_t sp, uint_t growszc)
 	    segvn_create, &crargs)) != 0) {
 		if (error == EAGAIN) {
 			cmn_err(CE_WARN, "Sorry, no swap space to grow stack "
-			    "for pid %d (%s)", p->p_pid, u.u_comm);
+			    "for pid %d (%s)", p->p_pid, PTOU(p)->u_comm);
 		}
 		return (error);
 	}

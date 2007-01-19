@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,19 +35,20 @@ extern "C" {
 #include <sys/privregs.h>
 
 /*
- * XX64 Need to fix the following comment.
- *
  * Trap tracing.  If TRAPTRACE is defined, an entry is recorded every time
  * the CPU jumps through the Interrupt Descriptor Table (IDT).  One exception
  * is the Double Fault handler, which does not record a traptrace entry.
+ *
+ * There are facilities to (conditionally) interleave tracing of related
+ * facilities e.h. x-calls.
  */
 
 /*
- * XX64 -- non-assembler files that include this file must include
+ * Note: non-assembler files that include this file must include
  * <sys/systm.h> before it, for the typedef of pc_t to be visible.
  */
 
-#define	TTR_STACK_DEPTH	15
+#define	TTR_STACK_DEPTH	10
 
 #ifndef	_ASM
 
@@ -66,7 +66,7 @@ typedef struct {
 	greg_t		ttr_cr2;
 	union _ttr_info {
 		struct _idt_entry {
-			uchar_t	vector;
+			short	vector;
 			uchar_t	ipl;
 			uchar_t	spl;
 			uchar_t	pri;
@@ -74,6 +74,17 @@ typedef struct {
 		struct _gate_entry {
 			int	sysnum;
 		} gate_entry;
+		struct _xc_entry {
+			ulong_t xce_arg;
+			ulong_t xce_func;
+			int8_t	xce_pri;
+			uint8_t	xce_marker,
+				xce_pend,
+				xce_wait,
+				xce_ack,
+				xce_state;
+			uint_t	xce_retval;
+		} xc_entry;
 	} ttr_info;
 	uintptr_t	ttr_curthread;
 	uchar_t		ttr_pad[TTR_PAD1_SIZE];
@@ -95,6 +106,8 @@ extern trap_trace_ctl_t	trap_trace_ctl[NCPU];	/* Allocated in locore.s */
 extern size_t		trap_trace_bufsize;
 extern int		trap_trace_freeze;
 extern trap_trace_rec_t	trap_trace_postmort;	/* Entry used after death */
+
+extern trap_trace_rec_t *trap_trace_get_traceptr(uint8_t, ulong_t, ulong_t);
 
 #define	TRAPTRACE_FREEZE	trap_trace_freeze = 1;
 #define	TRAPTRACE_UNFREEZE	trap_trace_freeze = 0;
@@ -160,6 +173,8 @@ extern trap_trace_rec_t	trap_trace_postmort;	/* Entry used after death */
  * Note that this macro defines label "9".
  * Also captures curthread on exit of loop.
  */
+#define	__GETCR2(_mov, reg)			\
+	_mov	%cr2, reg
 
 #if defined(__amd64)
 
@@ -173,7 +188,7 @@ extern trap_trace_rec_t	trap_trace_postmort;	/* Entry used after death */
 	jl	9b;				\
 	movq	%gs:CPU_THREAD, scr2;		\
 	movq	scr2, TTR_CURTHREAD(ptr);	\
-	movq	%cr2, scr2;			\
+	__GETCR2(movq, scr2);			\
 	movq	scr2, TTR_CR2(ptr)
 
 #elif defined(__i386)
@@ -188,7 +203,7 @@ extern trap_trace_rec_t	trap_trace_postmort;	/* Entry used after death */
 	jl	9b;				\
 	movl	%gs:CPU_THREAD, scr2;		\
 	movl	scr2, TTR_CURTHREAD(ptr);	\
-	movl	%cr2, scr2;			\
+	__GETCR2(movl, scr2);			\
 	movl	scr2, TTR_CR2(ptr)
 
 #endif	/* __i386 */
@@ -244,6 +259,23 @@ extern trap_trace_rec_t	trap_trace_postmort;	/* Entry used after death */
 9:	movl	%eax, TTR_STAMP(reg);		\
 	movl	%edx, TTR_STAMP+4(reg)
 
+#define	TRACE_STACK(tt)				\
+	pushl	%eax;				\
+	pushl	%ecx;				\
+	pushl	%edx;				\
+	pushl	%ebx;				\
+	pushl	$TTR_STACK_DEPTH;		\
+	movl	tt, %ebx;			\
+	leal	TTR_STACK(%ebx), %eax;		\
+	pushl	%eax;				\
+	call	getpcstack;			\
+	addl	$8, %esp;			\
+	movl	%eax, TTR_SDEPTH(%ebx);		\
+	popl	%ebx;				\
+	popl	%edx;				\
+	popl	%ecx;				\
+	popl	%eax
+
 #endif	/* __i386 */
 
 #else
@@ -264,6 +296,22 @@ extern trap_trace_rec_t	trap_trace_postmort;	/* Entry used after death */
 #define	TT_INTERRUPT	0xbb
 #define	TT_TRAP		0xcc
 #define	TT_INTTRAP	0xdd
+#define	TT_EVENT	0xee	/* hypervisor event */
+#define	TT_XCALL	0xf0	/* x-call handling */
+
+/*
+ * TT_XCALL subcodes:
+ */
+#define	TT_XC_SVC_BEGIN 0	/* xc_serv() entry */
+#define	TT_XC_SVC_END	1	/* xc_serv() return */
+#define	TT_XC_START	2	/* xc_common() - pre-dirint */
+#define	TT_XC_WAIT	3	/* xc_common() - wait for completion */
+#define	TT_XC_ACK	4	/* xc_common() - ack completion */
+#define	TT_XC_CAPTURE	5	/* xc_capture() */
+#define	TT_XC_RELEASE	6	/* xc_release() */
+#define	TT_XC_POKE_CPU	7	/* poke_cpu() */
+#define	TT_XC_CBE_FIRE	8	/* cbe_fire() */
+#define	TT_XC_CBE_XCALL	9	/* cbe_xcall() */
 
 #ifdef	__cplusplus
 }

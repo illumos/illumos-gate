@@ -58,12 +58,13 @@ f none usr/include/asm/htable.h 644 root bin
 f none usr/include/asm/mmu.h 644 root bin
 d none usr/include/amd64 755 root bin
 d none usr/include/amd64/sys 755 root bin
+f none usr/include/amd64/sys/kdi_regs.h 644 root bin
 f none usr/include/amd64/sys/privregs.h 644 root bin
 d none usr/include/ia32 755 root bin
 d none usr/include/ia32/sys 755 root bin
 f none usr/include/ia32/sys/asm_linkage.h 644 root bin
+f none usr/include/ia32/sys/kdi_regs.h 644 root bin
 f none usr/include/ia32/sys/machtypes.h 644 root bin
-f none usr/include/ia32/sys/mmu.h 644 root bin
 f none usr/include/ia32/sys/privregs.h 644 root bin
 f none usr/include/ia32/sys/psw.h 644 root bin
 f none usr/include/ia32/sys/pte.h 644 root bin
@@ -71,6 +72,7 @@ f none usr/include/ia32/sys/reg.h 644 root bin
 f none usr/include/ia32/sys/stack.h 644 root bin
 f none usr/include/ia32/sys/trap.h 644 root bin
 f none usr/include/ia32/sys/traptrace.h 644 root bin
+f none usr/include/sys/kdi_regs.h 644 root bin
 f none usr/include/stack_unwind.h 644 root bin
 f none usr/include/sys/bootregs.h 644 root bin
 f none usr/include/sys/bootsvcs.h 644 root bin
@@ -91,19 +93,18 @@ f none usr/include/sys/i2o/i2oadptr.h 644 root bin
 f none usr/include/sys/i2o/i2obscsi.h 644 root bin
 f none usr/include/sys/i2o/i2omstr.h 644 root bin
 f none usr/include/sys/i8272A.h 644 root bin
-f none usr/include/sys/immu.h 644 root bin
 f none usr/include/sys/kd.h 644 root bin
 f none usr/include/sys/mc.h 644 root bin
 f none usr/include/sys/mc_amd.h 644 root bin
 f none usr/include/sys/mca_amd.h 644 root bin
 f none usr/include/sys/mca_x86.h 644 root bin
-f none usr/include/sys/mmu.h 644 root bin
 f none usr/include/sys/mutex_impl.h 644 root bin
 f none usr/include/sys/obpdefs.h 644 root bin
 f none usr/include/sys/pcic_reg.h 644 root bin
 f none usr/include/sys/pcic_var.h 644 root bin
 f none usr/include/sys/pic.h 644 root bin
 f none usr/include/sys/pit.h 644 root bin
+f none usr/include/sys/pmem.h 644 root bin
 f none usr/include/sys/privregs.h 644 root bin
 f none usr/include/sys/prom_emul.h 644 root bin
 f none usr/include/sys/prom_isa.h 644 root bin
@@ -128,13 +129,15 @@ d none usr/platform/i86pc/include/sys 755 root bin
 f none usr/platform/i86pc/include/sys/asm_misc.h 644 root bin
 f none usr/platform/i86pc/include/sys/clock.h 644 root bin
 f none usr/platform/i86pc/include/sys/cram.h 644 root bin
+f none usr/platform/i86pc/include/sys/debug_info.h 644 root bin
 f none usr/platform/i86pc/include/sys/ddi_subrdefs.h 644 root bin
+f none usr/platform/i86pc/include/sys/mach_mmu.h 644 root bin
 f none usr/platform/i86pc/include/sys/machcpuvar.h 644 root bin
 f none usr/platform/i86pc/include/sys/machparam.h 644 root bin
 f none usr/platform/i86pc/include/sys/machsystm.h 644 root bin
 f none usr/platform/i86pc/include/sys/machthread.h 644 root bin
 f none usr/platform/i86pc/include/sys/memnode.h 644 root bin
-f none usr/platform/i86pc/include/sys/pmem.h 644 root bin
+f none usr/platform/i86pc/include/sys/pc_mmu.h 644 root bin
 f none usr/platform/i86pc/include/sys/psm.h 644 root bin
 f none usr/platform/i86pc/include/sys/psm_defs.h 644 root bin
 f none usr/platform/i86pc/include/sys/psm_modctl.h 644 root bin
@@ -142,6 +145,7 @@ f none usr/platform/i86pc/include/sys/psm_types.h 644 root bin
 f none usr/platform/i86pc/include/sys/rm_platter.h 644 root bin
 f none usr/platform/i86pc/include/sys/smp_impldefs.h 644 root bin
 f none usr/platform/i86pc/include/sys/vm_machparam.h 644 root bin
+f none usr/platform/i86pc/include/sys/xsvc.h 644 root bin
 f none usr/platform/i86pc/include/sys/x_call.h 644 root bin
 f none usr/platform/i86pc/include/sys/xc_levels.h 644 root bin
 d none usr/platform/i86pc/include/vm 755 root bin
@@ -149,6 +153,7 @@ f none usr/platform/i86pc/include/vm/hat_i86.h 644 root bin
 f none usr/platform/i86pc/include/vm/hat_pte.h 644 root bin
 f none usr/platform/i86pc/include/vm/htable.h 644 root bin
 f none usr/platform/i86pc/include/vm/hment.h 644 root bin
+f none usr/platform/i86pc/include/vm/kboot_mmu.h 644 root bin
 d none usr/share/src/uts/i86pc 755 root bin
 s none usr/share/src/uts/i86pc/sys=../../../../platform/i86pc/include/sys
 s none usr/share/src/uts/i86pc/vm=../../../../platform/i86pc/include/vm

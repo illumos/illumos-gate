@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,31 +27,18 @@
 #
 SUBDIRS= $(MACH)
 
-MANIFEST=eeprom.xml
-
 include ../Makefile.cmd
 
-ROOTMANIFESTDIR = $(ROOTSVCPLATFORMI86PC)
-
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-
-PROG		= eeprom
-FILEMODE	= 555
-GROUP		= sys
+all :=		TARGET= all
+install :=	TARGET= install
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+lint :=		TARGET= lint
+check :=	TARGET= check
 
 .KEEP_STATE:
 
-all install clean clobber lint : $(SUBDIRS)
-
-install:	$(SUBDIRS) $(ROOTMANIFEST)
-	$(RM) $(ROOTUSRSBINPROG)
-	$(LN) $(PLATEXEC) $(ROOTUSRSBINPROG)
-
-check:	$(CHKMANIFEST)
+all install clean clobber lint check: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

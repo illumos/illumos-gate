@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,6 +36,7 @@
 CORE_OBJS +=			\
 	beeper.o		\
 	biosdisk.o		\
+	bios_call.o		\
 	cbe.o			\
 	cmi.o			\
 	confunix.o		\
@@ -44,16 +45,26 @@ CORE_OBJS +=			\
 	ddi_impl.o		\
 	dtrace_subr.o		\
 	dvma.o			\
+	fpu_subr.o		\
+	fakebop.o		\
 	graphics.o		\
+	hardclk.o		\
 	hat_i86.o		\
 	hat_kdi.o		\
 	hment.o			\
+	hold_page.o		\
 	hrtimers.o		\
 	htable.o		\
+	i8254.o			\
+	i86_mmu.o		\
 	instr_size.o		\
 	intr.o			\
+	kboot_mmu.o		\
+	kdi_subr.o		\
+	kdi_idt.o		\
+	kdi_idthdl.o		\
+	kdi_asm.o		\
 	lgrpplat.o		\
-	mach_i86mmu.o		\
 	mach_kdi.o		\
 	mach_sysconfig.o	\
 	machdep.o		\
@@ -63,6 +74,7 @@ CORE_OBJS +=			\
 	mp_call.o		\
 	mp_implfuncs.o		\
 	mp_machdep.o		\
+	mp_pc.o			\
 	mp_startup.o		\
 	memscrub.o		\
 	mpcore.o		\
@@ -77,6 +89,7 @@ CORE_OBJS +=			\
 	ppage.o			\
 	startup.o		\
 	timestamp.o		\
+	todpc_subr.o		\
 	trap.o			\
 	vm_machdep.o		\
 	x_call.o
@@ -86,6 +99,20 @@ CORE_OBJS +=			\
 #	built into unix itself; this is all common code except for smb_dev.c.
 #
 CORE_OBJS += $(SMBIOS_OBJS)
+
+#
+# These get compiled twice:
+# - once in the dboot (direct boot) identity mapped code 
+# - once for use during early startup in unix
+#
+BOOT_DRIVER_OBJS =		\
+	boot_console.o		\
+	boot_keyboard.o		\
+	boot_keyboard_table.o	\
+	boot_vga.o		\
+	boot_mmu.o
+
+CORE_OBJS += $(BOOT_DRIVER_OBJS)
 
 #
 #	locore.o is special. It must be the first file relocated so that it
@@ -106,37 +133,35 @@ SPECIAL_OBJS_64 +=		\
 SPECIAL_OBJS += $(SPECIAL_OBJS_$(CLASS))
 
 #
-#			driver modules
+# Objects that get compiled into the identity mapped PT_LOAD section of unix
+# to handle the earliest part of booting.
 #
-ROOTNEX_OBJS += rootnex.o
+DBOOT_OBJS_32 =
+
+DBOOT_OBJS_64 += dboot_elfload.o
+
+DBOOT_OBJS +=			\
+	dboot_grub.o		\
+	dboot_startkern.o	\
+	dboot_printf.o		\
+	memcpy.o		\
+	memset.o		\
+	muldiv.o		\
+	string.o		\
+	$(BOOT_DRIVER_OBJS)	\
+	$(DBOOT_OBJS_$(CLASS))
+
+#
+#			driver and misc modules
+#
+GFX_PRIVATE_OBJS	+= gfx_private.o gfxp_pci.o gfxp_segmap.o \
+			   gfxp_devmap.o gfxp_vgatext.o gfxp_vm.o vgasubr.o
 ISANEXUS_OBJS += isa.o dma_engine.o i8237A.o
+PCI_E_MISC_OBJS += pcie_error.o
+PCI_E_NEXUS_OBJS += npe.o npe_misc.o 
+PCI_E_NEXUS_OBJS += pci_common.o pci_kstats.o pci_tools.o
 PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o
-PCI_PCINEXUS_OBJS += pci_pci.o
-
-TCIC_OBJS +=	tcic.o
-
-FD_OBJS		+= fd.o
-
-PCN_OBJS	+= mii.o
-
-DNET_OBJS	+= dnet.o mii.o
-LOGI_OBJS	+= logi.o
-MSCSI_OBJS	+= mscsi.o
-MSMOUSE_OBJS	+= msm.o
-PCPLUSMP_OBJS	+= apic.o psm_common.o apic_introp.o
-RTLS_OBJS	+= rtls.o
-AGPGART_OBJS	+=	agpgart.o \
-			agp_kstat.o
-AGPTARGET_OBJS	+=	agptarget.o
-AMD64GART_OBJS	+=	amd64_gart.o
-TZMON_OBJS	+= tzmon.o
-
-GHD_OBJS +=	ghd.o ghd_debug.o ghd_dma.o ghd_queue.o ghd_scsa.o \
-		ghd_scsi.o ghd_timer.o ghd_waitq.o ghd_gcmd.o
-
-ATA_OBJS +=	$(GHD_OBJS) ata_blacklist.o ata_common.o ata_disk.o \
-		ata_dma.o atapi.o atapi_fsm.o ata_debug.o \
-		sil3xxx.o
+PCPLUSMP_OBJS += apic.o psm_common.o apic_introp.o mp_platform_common.o
 
 include $(SRC)/common/mc/mc-amd/Makefile.mcamd
 MCAMD_OBJS	+= \
@@ -146,77 +171,25 @@ MCAMD_OBJS	+= \
 	mcamd_subr.o \
 	mcamd_pcicfg.o
 
-#
-#	PCI-Express driver modules
-#
-PCI_E_MISC_OBJS += pcie_error.o
-PCI_E_NEXUS_OBJS += npe.o npe_misc.o 
-PCI_E_NEXUS_OBJS += pci_common.o pci_kstats.o pci_tools.o
-PCI_E_PCINEXUS_OBJS += pcie_pci.o
-PCIEHPCNEXUS_OBJS += pciehpc_x86.o pciehpc_acpi.o pciehpc_nvidia.o
-
-#
-#	platform specific modules
-#
+ROOTNEX_OBJS += rootnex.o
+TZMON_OBJS	+= tzmon.o
 UPPC_OBJS += uppc.o psm_common.o
-PCI_AUTOCONFIG_OBJS += \
-	pci_autoconfig.o \
-	pci_boot.o	\
-	pcie_nvidia.o	\
-	pci_memlist.o	\
-	pci_resource.o
-
-ACPICA_OBJS	+= dbcmds.o dbdisply.o \
-		   dbexec.o dbfileio.o dbhistry.o dbinput.o dbstats.o \
-		   dbutils.o dbxface.o evevent.o evgpe.o evgpeblk.o \
-		   evmisc.o evregion.o evrgnini.o evsci.o evxface.o \
-		   evxfevnt.o evxfregn.o hwacpi.o hwgpe.o hwregs.o \
-		   hwsleep.o hwtimer.o dsfield.o dsinit.o dsmethod.o \
-		   dsmthdat.o dsobject.o dsopcode.o dsutils.o dswexec.o \
-		   dswload.o dswscope.o dswstate.o exconfig.o exconvrt.o \
-		   excreate.o exdump.o exfield.o exfldio.o exmisc.o \
-		   exmutex.o exnames.o exoparg1.o exoparg2.o exoparg3.o \
-		   exoparg6.o exprep.o exregion.o exresnte.o exresolv.o \
-		   exresop.o exstore.o exstoren.o exstorob.o exsystem.o \
-		   exutils.o psargs.o psopcode.o psparse.o psscope.o \
-		   pstree.o psutils.o pswalk.o psxface.o nsaccess.o \
-		   nsalloc.o nsdump.o nsdumpdv.o nseval.o nsinit.o \
-		   nsload.o nsnames.o nsobject.o nsparse.o nssearch.o \
-		   nsutils.o nswalk.o nsxfeval.o nsxfname.o nsxfobj.o \
-		   rsaddr.o rscalc.o rscreate.o rsdump.o \
-		   rsinfo.o rsio.o rsirq.o rslist.o rsmemory.o rsmisc.o \
-		   rsutils.o rsxface.o tbconvrt.o tbget.o tbgetall.o \
-		   tbinstal.o tbrsdt.o tbutils.o tbxface.o tbxfroot.o \
-		   utalloc.o utclib.o utcopy.o utdebug.o utdelete.o \
-		   uteval.o utglobal.o utinit.o utmath.o utmisc.o \
-		   utobject.o utresrc.o utxface.o acpica.o acpi_enum.o \
-		   master_ops.o osl.o osl_ml.o acpica_ec.o utcache.o \
-		   utmutex.o utstate.o dmbuffer.o dmnames.o dmobject.o \
-		   dmopcode.o dmresrc.o dmresrcl.o dmresrcs.o dmutils.o \
-		   dmwalk.o psloop.o uttrack.o
-
-POWER_OBJS	+= power.o
-
-GFX_PRIVATE_OBJS	+= gfx_private.o gfxp_pci.o gfxp_segmap.o \
-			   gfxp_devmap.o gfxp_vgatext.o gfxp_vm.o vgasubr.o
-AGP_OBJS	+= agpmaster.o
-
-#	DRM Intel integrated chipsets (i915) codes
-I915_OBJS	+= i915_sundrv.o i915_dma.o i915_drv.o i915_irq.o i915_mem.o
+XSVC_OBJS += xsvc.o
 
 #
 #	Build up defines and paths.
 #
 ALL_DEFS	+= -Di86pc
-INC_PATH	+= -I$(UTSBASE)/i86pc
+INC_PATH	+= -I$(UTSBASE)/i86pc -I$(SRC)/common
 
 #
-# Since assym.h is a derived file, the dependency must be explicit for
+# Since the assym files are derived, the dependencies must be explicit for
 # all files including this file. (This is only actually required in the
 # instance when the .nse_depinfo file does not exist.) It may seem that
 # the lint targets should also have a similar dependency, but they don't
 # since only C headers are included when #defined(__lint) is true.
 #
+
 ASSYM_DEPS      += 		\
 	copy.o			\
 	desctbls_asm.o		\
@@ -233,3 +206,7 @@ ASSYM_DEPS      += 		\
 	swtch.o			\
 	syscall_asm.o		\
 	syscall_asm_amd64.o
+
+$(KDI_ASSYM_DEPS:%=$(OBJS_DIR)/%):	$(DSF_DIR)/$(OBJS_DIR)/kdi_assym.h
+
+ASSYM_DEPS += kdi_asm.o

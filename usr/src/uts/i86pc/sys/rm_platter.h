@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,18 +98,14 @@ typedef	struct rm_platter {
 } rm_platter_t;
 
 /*
- * cpu tables put within a single structure all the tables which need to be
- * allocated when a CPU starts up. Makes it more memory efficient and easier
- * to allocate/release
+ * cpu tables put within a single structure two of the tables which need to be
+ * allocated when a CPU starts up.
  *
- * Note: gdt and tss should be 16 byte aligned for best performance on
- * amd64.  Since DEFAULTSTKSIZE is a multiple of pagesize gdt will be aligned.
- * We test below that the tss is properly aligned.
+ * Note: the tss should be 16 byte aligned for best performance on amd64
+ * Since DEFAULTSTKSIZE is a multiple of PAGESIZE tss will be aligned.
  */
-
 struct cpu_tables {
 	char		ct_stack[DEFAULTSTKSZ];
-	user_desc_t	*ct_gdt;
 	struct tss	ct_tss;
 };
 

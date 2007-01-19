@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,7 @@ extern "C" {
 #endif
 
 #define	SELTOIDX(s)	((s) >> 3)	/* selector to index */
-#define	SEL_KPL		0		/* kernel priority level */
+#define	SEL_KPL		0		/* kernel privilege level */
 #define	SEL_UPL		3		/* user priority level */
 #define	SEL_TI_LDT	4		/* local descriptor table */
 #define	SEL_LDT(s)	(IDXTOSEL(s) | SEL_TI_LDT | SEL_UPL)	/* local sel */
@@ -126,10 +126,28 @@ extern void wr_gdtr(desctbr_t *);
 extern void wr_ldtr(selector_t);
 extern selector_t rd_ldtr(void);
 extern void wr_tsr(selector_t);
+extern void kmdb_enter(void);
 
 #if defined(__amd64)
 extern void clr_ldt_sregs(void);
-#endif
+
+/*
+ * inlines for update_segregs
+ */
+extern void __set_ds(selector_t);
+extern void __set_es(selector_t);
+extern void __set_fs(selector_t);
+extern void __set_gs(selector_t);
+extern void __swapgs(void);
+#endif	/* __amd64 */
+
+#if defined(__amd64)
+extern void load_segment_registers(selector_t, selector_t, selector_t,
+    selector_t);	/* (alphabetical) */
+#elif defined(__i386)
+extern void load_segment_registers(selector_t, selector_t, selector_t,
+    selector_t, selector_t, selector_t);	/* (alphabetical) */
+#endif	/* __i386 */
 
 #if !defined(__amd64)
 
@@ -329,19 +347,20 @@ typedef struct gate_desc {
 
 extern void set_usegd(user_desc_t *, uint_t, void *, size_t, uint_t, uint_t,
     uint_t, uint_t);
-extern void set_gatesegd(gate_desc_t *, void (*)(void), selector_t, uint_t,
-    uint_t, uint_t);
 
 #elif defined(__i386)
 
 extern void set_usegd(user_desc_t *, void *, size_t, uint_t, uint_t,
     uint_t, uint_t);
-extern void set_gatesegd(gate_desc_t *, void (*)(void), selector_t,
-    uint_t, uint_t, uint_t);
 
 #endif	/* __i386 */
 
+extern void set_gatesegd(gate_desc_t *, void (*)(void), selector_t,
+    uint_t, uint_t);
+
 void set_syssegd(system_desc_t *, void *, size_t, uint_t, uint_t);
+
+void init_boot_gdt(user_desc_t *);
 
 #endif	/* _ASM */
 
@@ -433,26 +452,31 @@ void set_syssegd(system_desc_t *, void *, size_t, uint_t, uint_t);
  * in long mode system segment decriptors expand to 128 bits.
  *
  * GDT_LWPFS and GDT_LWPGS must be the same for both 32 and 64-bit
- * kernels. See setup_context in libc.
+ * kernels. See setup_context in libc. 64-bit processes must set
+ * %fs or %gs to null selector to use 64-bit fsbase or gsbase
+ * respectively.
  */
+#define	GDT_NULL	0	/* null */
+#define	GDT_B32DATA	1	/* dboot 32 bit data descriptor */
+#define	GDT_B32CODE	2	/* dboot 32 bit code descriptor */
+#define	GDT_B16CODE	3	/* bios call 16 bit code descriptor */
+#define	GDT_B16DATA	4	/* bios call 16 bit data descriptor */
+#define	GDT_B64CODE	5	/* dboot 64 bit code descriptor */
+#define	GDT_BGSTMP	7	/* kmdb descriptor only used early in boot */
+
 #if defined(__amd64)
 
-#define	GDT_NULL	0	/* null */
-#define	GDT_B32DATA	1	/* copied from boot */
-#define	GDT_B32CODE	2	/* copied from boot */
-#define	GDT_B64DATA	3	/* copied from boot */
-#define	GDT_B64CODE	4	/* copied from boot */
-#define	GDT_KCODE	5	/* kernel code seg %cs */
-#define	GDT_KDATA	6	/* kernel data seg %ds */
-#define	GDT_U32CODE	7	/* 32-bit process on 64-bit kernel %cs */
-#define	GDT_UDATA	8	/* user data seg %ds (32 and 64 bit) */
-#define	GDT_UCODE	9	/* native user code  seg %cs */
-#define	GDT_LDT		10	/* LDT for current process */
-#define	GDT_KTSS	12	/* kernel tss */
+#define	GDT_KCODE	6	/* kernel code seg %cs */
+#define	GDT_KDATA	7	/* kernel data seg %ds */
+#define	GDT_U32CODE	8	/* 32-bit process on 64-bit kernel %cs */
+#define	GDT_UDATA	9	/* user data seg %ds (32 and 64 bit) */
+#define	GDT_UCODE	10	/* native user code  seg %cs */
+#define	GDT_LDT		12	/* LDT for current process */
+#define	GDT_KTSS	14	/* kernel tss */
 #define	GDT_FS		GDT_NULL /* kernel %fs segment selector */
 #define	GDT_GS		GDT_NULL /* kernel %gs segment selector */
-#define	GDT_LWPFS	55	/* lwp private %fs segment selector */
-#define	GDT_LWPGS	56	/* lwp private %gs segment selector */
+#define	GDT_LWPFS	55	/* lwp private %fs segment selector (32-bit) */
+#define	GDT_LWPGS	56	/* lwp private %gs segment selector (32-bit) */
 #define	GDT_BRANDMIN	57	/* first entry in GDT for brand usage */
 #define	GDT_BRANDMAX	61	/* last entry in GDT for brand usage */
 #define	NGDT		62	/* number of entries in GDT */
@@ -465,11 +489,6 @@ void set_syssegd(system_desc_t *, void *, size_t, uint_t, uint_t);
 
 #elif defined(__i386)
 
-#define	GDT_NULL	0	/* null */
-#define	GDT_BOOTFLAT	1	/* copied from boot */
-#define	GDT_BOOTCODE	2	/* copied from boot */
-#define	GDT_BOOTCODE16	3	/* copied from boot */
-#define	GDT_BOOTDATA	4	/* copied from boot */
 #define	GDT_LDT		40	/* LDT for current process */
 #define	GDT_KTSS	42	/* kernel tss */
 #define	GDT_KCODE	43	/* kernel code seg %cs */
@@ -501,17 +520,32 @@ void set_syssegd(system_desc_t *, void *, size_t, uint_t, uint_t);
 #define	ULDT_SEL	SEL_GDT(GDT_LDT, SEL_KPL)
 #define	KTSS_SEL	SEL_GDT(GDT_KTSS, SEL_KPL)
 #define	DFTSS_SEL	SEL_GDT(GDT_DBFLT, SEL_KPL)
-#define	KFS_SEL		SEL_GDT(GDT_NULL, SEL_KPL)
+#define	KFS_SEL		0
 #define	KGS_SEL		SEL_GDT(GDT_GS, SEL_KPL)
 #define	LWPFS_SEL	SEL_GDT(GDT_LWPFS, SEL_UPL)
 #define	LWPGS_SEL	SEL_GDT(GDT_LWPGS, SEL_UPL)
 #define	BRANDMIN_SEL	SEL_GDT(GDT_BRANDMIN, SEL_UPL)
 #define	BRANDMAX_SEL	SEL_GDT(GDT_BRANDMAX, SEL_UPL)
-#if defined(__amd64)
+
 #define	B64CODE_SEL	SEL_GDT(GDT_B64CODE, SEL_KPL)
+#define	B32CODE_SEL	SEL_GDT(GDT_B32CODE, SEL_KPL)
+#define	B32DATA_SEL	SEL_GDT(GDT_B32DATA, SEL_KPL)
+#define	B16CODE_SEL	SEL_GDT(GDT_B16CODE, SEL_KPL)
+#define	B16DATA_SEL	SEL_GDT(GDT_B16DATA, SEL_KPL)
+
+/*
+ * Temporary %gs descriptor used by kmdb with -d option. Only lives
+ * in boot's GDT and is not copied into kernel's GDT from boot.
+ */
+#define	KMDBGS_SEL	SEL_GDT(GDT_BGSTMP, SEL_KPL)
+
+/*
+ * Selector used for kdi_idt when kmdb has taken over the IDT.
+ */
+#if defined(__amd64)
+#define	KMDBCODE_SEL	B64CODE_SEL
 #else
-#define	BOOTCODE_SEL	SEL_GDT(GDT_BOOTCODE, SEL_KPL)
-#define	BOOTFLAT_SEL	SEL_GDT(GDT_BOOTFLAT, SEL_KPL)
+#define	KMDBCODE_SEL	B32CODE_SEL
 #endif
 
 /*
@@ -532,7 +566,7 @@ void set_syssegd(system_desc_t *, void *, size_t, uint_t, uint_t);
 #pragma	align	16(idt0)
 extern	gate_desc_t	idt0[NIDT];
 extern	desctbr_t	idt0_default_reg;
-extern	user_desc_t	gdt0[NGDT];
+extern	user_desc_t	*gdt0;
 
 extern user_desc_t	zero_udesc;
 extern system_desc_t	zero_sdesc;

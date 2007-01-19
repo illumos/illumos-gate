@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/Makefile
@@ -80,8 +80,8 @@ install_h	:=	TARGET= install_h
 
 .KEEP_STATE:
 
-.PARALLEL:	$(KMODS) $(CLOSED_KMODS) $(SVVS) $(XMODS) $(CLOSED_XMODS) \
-		config $(LINT_DEPS)
+.PARALLEL:	$(PARALLEL_KMODS) $(CLOSED_KMODS) $(SVVS) $(XMODS) \
+		$(CLOSED_XMODS) config $(LINT_DEPS)
 
 def all install clean clobber modlist: $(KMODS) $(CLOSED_KMODS) $(SVVS) \
 	$(XMODS) $(CLOSED_XMODS) config

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -97,24 +97,19 @@ s none usr/platform/SUNW,Sun-Blade-1500/sbin=../sun4u/sbin
 s none usr/platform/SUNW,Sun-Blade-2500/sbin=../sun4u/sbin
 s none usr/platform/SUNW,A70/sbin=../sun4u/sbin
 d none usr/platform/SUNW,SPARC-Enterprise/sbin 755 root bin
-s none usr/platform/SUNW,SPARC-Enterprise/sbin/eeprom=../../sun4u/sbin/eeprom
 s none usr/platform/SUNW,SPARC-Enterprise/sbin/prtdiag=../../sun4u/sbin/prtdiag
 s none usr/platform/SUNW,SPARC-Enterprise/sbin/trapstat=../../sun4u/sbin/trapstat
 d none usr/platform/SUNW,Sun-Fire-V445/sbin 755 root bin
-s none usr/platform/SUNW,Sun-Fire-V445/sbin/eeprom=../../sun4u/sbin/eeprom
 s none usr/platform/SUNW,Sun-Fire-V445/sbin/prtdiag=../../sun4u/sbin/prtdiag
 s none usr/platform/SUNW,Sun-Fire-V445/sbin/trapstat=../../sun4u/sbin/trapstat
 d none usr/platform/SUNW,Sun-Fire-V215/sbin 755 root bin
-s none usr/platform/SUNW,Sun-Fire-V215/sbin/eeprom=../../sun4u/sbin/eeprom
 s none usr/platform/SUNW,Sun-Fire-V215/sbin/prtdiag=../../sun4u/sbin/prtdiag
 s none usr/platform/SUNW,Sun-Fire-V215/sbin/trapstat=../../sun4u/sbin/trapstat
 s none usr/platform/SUNW,Sun-Fire/sbin=../sun4u/sbin
 d none usr/platform/SUNW,Sun-Fire-V240/sbin 755 root bin
-s none usr/platform/SUNW,Sun-Fire-V240/sbin/eeprom=../../sun4u/sbin/eeprom
 s none usr/platform/SUNW,Sun-Fire-V240/sbin/prtdiag=../../sun4u/sbin/prtdiag
 s none usr/platform/SUNW,Sun-Fire-V240/sbin/trapstat=../../sun4u/sbin/trapstat
 d none usr/platform/SUNW,Sun-Fire-V250/sbin 755 root bin
-s none usr/platform/SUNW,Sun-Fire-V250/sbin/eeprom=../../sun4u/sbin/eeprom
 s none usr/platform/SUNW,Sun-Fire-V250/sbin/prtdiag=../../sun4u/sbin/prtdiag
 s none usr/platform/SUNW,Sun-Fire-V250/sbin/trapstat=../../sun4u/sbin/trapstat
 s none usr/platform/SUNW,Sun-Fire-V440/sbin=../SUNW,Sun-Fire-V240/sbin
@@ -131,15 +126,12 @@ s none usr/platform/SUNW,UltraSPARC-IIi-Netract/sbin=../sun4u/sbin
 s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/sbin=../sun4u/sbin
 s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/sbin=../sun4u/sbin
 d none usr/platform/SUNW,Netra-CP2300/sbin 755 root bin
-s none usr/platform/SUNW,Netra-CP2300/sbin/eeprom=../../sun4u/sbin/eeprom
 s none usr/platform/SUNW,Netra-CP2300/sbin/prtdiag=../../sun4u/sbin/prtdiag
 s none usr/platform/SUNW,Netra-CP2300/sbin/trapstat=../../sun4u/sbin/trapstat
 d none usr/platform/SUNW,Netra-CP3010/sbin 755 root bin
-s none usr/platform/SUNW,Netra-CP3010/sbin/eeprom=../../sun4u/sbin/eeprom
 s none usr/platform/SUNW,Netra-CP3010/sbin/prtdiag=../../sun4u/sbin/prtdiag
 s none usr/platform/SUNW,Netra-CP3010/sbin/trapstat=../../sun4u/sbin/trapstat
 #
-f none usr/platform/sun4u/sbin/eeprom 2555 root sys
 f none usr/platform/sun4u/sbin/trapstat 555 root bin
 
 #

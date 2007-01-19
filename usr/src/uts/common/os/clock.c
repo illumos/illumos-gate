@@ -450,8 +450,17 @@ clock(void)
 		nrunnable += cpu_nrunnable;
 		cpupart = cp->cpu_part;
 		cpupart->cp_nrunnable_cum += cpu_nrunnable;
-		if (one_sec)
+		if (one_sec) {
 			cpupart->cp_nrunnable += cpu_nrunnable;
+			/*
+			 * w_io is used to update sysinfo.waiting during
+			 * one_second processing below.  Only gather w_io
+			 * information when we walk the list of cpus if we're
+			 * going to perform one_second processing.
+			 */
+			w_io += CPU_STATS(cp, sys.iowait);
+
+		}
 		if (do_lgrp_load &&
 		    (cp->cpu_flags & CPU_EXISTS)) {
 			/*

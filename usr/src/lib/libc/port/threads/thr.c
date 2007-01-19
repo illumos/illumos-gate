@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -838,7 +838,6 @@ _thrp_exit()
 		int ix = self->ul_ix;		/* the hash index */
 		(void) _private_memcpy(replace, self, REPLACEMENT_SIZE);
 		replace->ul_self = replace;
-		replace->ul_gs = 0;		/* clone does not carry %gs */
 		replace->ul_next = NULL;	/* clone not on stack list */
 		replace->ul_mapsiz = 0;		/* allows clone to be freed */
 		replace->ul_replace = 1;	/* requires clone to be freed */
@@ -1417,9 +1416,9 @@ libc_init(void)
 	self->ul_nocancel = 1;
 
 #if defined(__amd64)
-	self->ul_gs = ___lwp_private(_LWP_SETPRIVATE, _LWP_FSBASE, self);
+	(void) ___lwp_private(_LWP_SETPRIVATE, _LWP_FSBASE, self);
 #elif defined(__i386)
-	self->ul_gs = ___lwp_private(_LWP_SETPRIVATE, _LWP_GSBASE, self);
+	(void) ___lwp_private(_LWP_SETPRIVATE, _LWP_GSBASE, self);
 #endif	/* __i386 || __amd64 */
 	set_curthread(self);		/* redundant on i386 */
 	/*

@@ -29,43 +29,10 @@
 MODULE = genunix.so
 MDBTGT = kvm
 
+include	../../../common/modules/genunix/Makefile.files
+
 COMMONSRCS = \
-	avl.c \
-	bio.c \
-	contract.c \
-	cpupart.c \
-	ctxop.c \
-	cyclic.c \
-	devinfo.c \
-	findstack.c \
-	fm.c \
-	genunix.c \
-	group.c \
-	kgrep.c \
-	kmem.c \
-	ldi.c \
-	leaky.c \
-	leaky_subr.c \
-	lgrp.c \
-	list.c \
-	log.c \
-	mdi.c \
-	memory.c \
-	mmd.c \
-	modhash.c \
-	ndievents.c \
-	net.c \
-	nvpair.c \
-	pg.c \
-	rctl.c \
-	sobj.c \
-	streams.c \
-	sysevent.c \
-	thread.c \
-	tsd.c \
-	tsol.c \
-	vfs.c \
-	zone.c
+	$(GENUNIX_SRCS)
 
 KMODSRCS = \
 	$(COMMONSRCS)

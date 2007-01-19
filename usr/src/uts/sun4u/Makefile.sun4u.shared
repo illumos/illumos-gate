@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,6 +35,11 @@
 PLATFORM	 = sun4u
 PROMIF		 = ieee1275
 PSMBASE		 = $(UTSBASE)/../psm
+
+#
+#	uname -m value
+#
+UNAME_M		= $(PLATFORM)
 
 #
 # Definitions for the platform-specific /platform directories.

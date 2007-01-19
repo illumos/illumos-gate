@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -607,22 +607,26 @@ fbt_getargdesc(void *arg, dtrace_id_t id, void *parg, dtrace_argdesc_t *desc)
 	 * If we have a parent container, we must manually import it.
 	 */
 	if ((parent = ctf_parent_name(fp)) != NULL) {
-		struct modctl *mod;
+		struct modctl *mp = &modules;
+		struct modctl *mod = NULL;
 
 		/*
 		 * We must iterate over all modules to find the module that
 		 * is our parent.
 		 */
-		for (mod = &modules; mod != NULL; mod = mod->mod_next) {
-			if (strcmp(mod->mod_filename, parent) == 0)
+		do {
+			if (strcmp(mp->mod_modname, parent) == 0) {
+				mod = mp;
 				break;
-		}
+			}
+		} while ((mp = mp->mod_next) != &modules);
 
 		if (mod == NULL)
 			goto err;
 
-		if ((pfp = ctf_modopen(mod->mod_mp, &error)) == NULL)
+		if ((pfp = ctf_modopen(mod->mod_mp, &error)) == NULL) {
 			goto err;
+		}
 
 		if (ctf_import(fp, pfp) != 0) {
 			ctf_close(pfp);

@@ -36,6 +36,7 @@
 #	Core (unix) objects
 #
 CORE_OBJS +=		\
+	arch_kdi.o	\
 	copy.o		\
 	copy_subr.o	\
 	cpc_subr.o	\
@@ -70,7 +71,6 @@ SPECIAL_OBJS_32 +=	\
 #
 GENUNIX_OBJS +=		\
 	archdep.o	\
-	arch_kdi.o	\
 	getcontext.o	\
 	install_utrap.o	\
 	prom_enter.o	\
@@ -110,33 +110,52 @@ LX_AUTOFS_OBJS +=	\
 	lx_autofs.o
 
 #
+#	Decompression code
+#
+CORE_OBJS += decompress.o adler32.o infblock.o infcodes.o inffast.o \
+		inflate.o inftrees.o infutil.o zutil.o zmod.o
+
+#
 #	Driver modules
 #
-CMDK_OBJS +=	cmdk.o
-
+AGPGART_OBJS +=	agpgart.o agp_kstat.o
+AGPTARGET_OBJS += agptarget.o
+AMD64GART_OBJS += amd64_gart.o
+ATA_OBJS += $(GHD_OBJS) ata_blacklist.o ata_common.o ata_disk.o \
+	ata_dma.o atapi.o atapi_fsm.o ata_debug.o \
+	sil3xxx.o
+CMDK_OBJS += cmdk.o
 CMLB_OBJS += cmlb.o
-
-DADK_OBJS +=	dadk.o
-
-GDA_OBJS +=	gda.o
-
+DADK_OBJS += dadk.o
+DNET_OBJS += dnet.o mii.o
+FD_OBJS += fd.o
+GDA_OBJS += gda.o
+GHD_OBJS += ghd.o ghd_debug.o ghd_dma.o ghd_queue.o ghd_scsa.o \
+	ghd_scsi.o ghd_timer.o ghd_waitq.o ghd_gcmd.o
+I915_OBJS += i915_sundrv.o i915_dma.o i915_drv.o i915_irq.o i915_mem.o
+LOGI_OBJS += logi.o
+MSMOUSE_OBJS += msm.o
+MSCSI_OBJS += mscsi.o
+PCI_E_PCINEXUS_OBJS += pcie_pci.o
+PCI_PCINEXUS_OBJS += pci_pci.o
+PCIEHPCNEXUS_OBJS += pciehpc_x86.o pciehpc_acpi.o pciehpc_nvidia.o
+PCN_OBJS += mii.o
+POWER_OBJS += power.o
+PCI_AUTOCONFIG_OBJS += pci_autoconfig.o pci_boot.o pcie_nvidia.o \
+			pci_memlist.o pci_resource.o
 SD_OBJS += sd.o sd_xbuf.o
-
 STRATEGY_OBJS += strategy.o
-
 VGATEXT_OBJS += vgatext.o vgasubr.o
 
 #
-#	misc. modules
+#	Kernel linker
 #
-KRTLD_BOOT_OBJS +=	\
-	kobj_boot.o
-
 KRTLD_OBJS +=		\
 	bootrd.o	\
 	ufsops.o	\
 	hsfs.o		\
 	doreloc.o	\
+	kobj_boot.o	\
 	kobj_convrelstr.o \
 	kobj_crt.o	\
 	kobj_isa.o	\
@@ -145,12 +164,42 @@ KRTLD_OBJS +=		\
 #
 #	misc. modules
 #
+ACPICA_OBJS	+= dbcmds.o dbdisply.o \
+		   dbexec.o dbfileio.o dbhistry.o dbinput.o dbstats.o \
+		   dbutils.o dbxface.o evevent.o evgpe.o evgpeblk.o \
+		   evmisc.o evregion.o evrgnini.o evsci.o evxface.o \
+		   evxfevnt.o evxfregn.o hwacpi.o hwgpe.o hwregs.o \
+		   hwsleep.o hwtimer.o dsfield.o dsinit.o dsmethod.o \
+		   dsmthdat.o dsobject.o dsopcode.o dsutils.o dswexec.o \
+		   dswload.o dswscope.o dswstate.o exconfig.o exconvrt.o \
+		   excreate.o exdump.o exfield.o exfldio.o exmisc.o \
+		   exmutex.o exnames.o exoparg1.o exoparg2.o exoparg3.o \
+		   exoparg6.o exprep.o exregion.o exresnte.o exresolv.o \
+		   exresop.o exstore.o exstoren.o exstorob.o exsystem.o \
+		   exutils.o psargs.o psopcode.o psparse.o psscope.o \
+		   pstree.o psutils.o pswalk.o psxface.o nsaccess.o \
+		   nsalloc.o nsdump.o nsdumpdv.o nseval.o nsinit.o \
+		   nsload.o nsnames.o nsobject.o nsparse.o nssearch.o \
+		   nsutils.o nswalk.o nsxfeval.o nsxfname.o nsxfobj.o \
+		   rsaddr.o rscalc.o rscreate.o rsdump.o \
+		   rsinfo.o rsio.o rsirq.o rslist.o rsmemory.o rsmisc.o \
+		   rsutils.o rsxface.o tbconvrt.o tbget.o tbgetall.o \
+		   tbinstal.o tbrsdt.o tbutils.o tbxface.o tbxfroot.o \
+		   utalloc.o utclib.o utcopy.o utdebug.o utdelete.o \
+		   uteval.o utglobal.o utinit.o utmath.o utmisc.o \
+		   utobject.o utresrc.o utxface.o acpica.o acpi_enum.o \
+		   master_ops.o osl.o osl_ml.o acpica_ec.o utcache.o \
+		   utmutex.o utstate.o dmbuffer.o dmnames.o dmobject.o \
+		   dmopcode.o dmresrc.o dmresrcl.o dmresrcs.o dmutils.o \
+		   dmwalk.o psloop.o uttrack.o
+
 ACPI_INTP_OBJS += acpi_inf.o acpi_mod.o  acpi_ml.o \
 	acpi_decl.o acpi_exe.o acpi_gram.o acpi_io.o acpi_lex.o \
 	acpi_name.o acpi_ns.o acpi_op1.o acpi_op2.o acpi_rule.o \
 	acpi_tab.o acpi_thr.o acpi_val.o \
 	acpi_exc.o acpi_bst.o acpi_node.o acpi_stk.o acpi_par.o
 
+AGP_OBJS += agpmaster.o
 FBT_OBJS += fbt.o
 SDT_OBJS += sdt.o
 

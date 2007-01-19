@@ -1,5 +1,26 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,30 +66,37 @@
  */
 
 #include <sys/types.h>
+#include <sys/sysmacros.h>
 #include <sys/tss.h>
 #include <sys/segments.h>
 #include <sys/trap.h>
 #include <sys/cpuvar.h>
+#include <sys/bootconf.h>
 #include <sys/x86_archext.h>
+#include <sys/controlregs.h>
 #include <sys/archsystm.h>
 #include <sys/machsystm.h>
 #include <sys/kobj.h>
 #include <sys/cmn_err.h>
 #include <sys/reboot.h>
 #include <sys/kdi.h>
+#include <sys/mach_mmu.h>
 #include <sys/systm.h>
-#include <sys/controlregs.h>
-
-extern void syscall_int(void);
+#include <sys/promif.h>
+#include <sys/bootinfo.h>
+#include <vm/kboot_mmu.h>
 
 /*
  * cpu0 and default tables and structures.
  */
+user_desc_t	*gdt0;
 desctbr_t	gdt0_default_r;
 
 #pragma	align	16(idt0)
 gate_desc_t	idt0[NIDT]; 		/* interrupt descriptor table */
+#if defined(__i386)
 desctbr_t	idt0_default_r;		/* describes idt0 in IDTR format */
+#endif
 
 #pragma align	16(ktss0)
 struct tss	ktss0;			/* kernel task state structure */
@@ -248,11 +276,8 @@ set_syssegd(system_desc_t *dp, void *base, size_t size, uint_t type,
 
 #if defined(__amd64)
 
-/*
- * Note stkcpy is replaced with ist. Read the PRM for details on this.
- */
 void
-set_gatesegd(gate_desc_t *dp, void (*func)(void), selector_t sel, uint_t ist,
+set_gatesegd(gate_desc_t *dp, void (*func)(void), selector_t sel,
     uint_t type, uint_t dpl)
 {
 	dp->sgd_looffset = (uintptr_t)func;
@@ -260,7 +285,17 @@ set_gatesegd(gate_desc_t *dp, void (*func)(void), selector_t sel, uint_t ist,
 	dp->sgd_hi64offset = (uintptr_t)func >> (16 + 16);
 
 	dp->sgd_selector =  (uint16_t)sel;
-	dp->sgd_ist = ist;
+
+	/*
+	 * For 64 bit native we use the IST stack mechanism
+	 * for double faults. All other traps use the CPL = 0
+	 * (tss_rsp0) stack.
+	 */
+	if (type == T_DBLFLT)
+		dp->sgd_ist = 1;
+	else
+		dp->sgd_ist = 0;
+
 	dp->sgd_type = type;
 	dp->sgd_dpl = dpl;
 	dp->sgd_p = 1;
@@ -270,52 +305,35 @@ set_gatesegd(gate_desc_t *dp, void (*func)(void), selector_t sel, uint_t ist,
 
 void
 set_gatesegd(gate_desc_t *dp, void (*func)(void), selector_t sel,
-    uint_t wcount, uint_t type, uint_t dpl)
+    uint_t type, uint_t dpl)
 {
 	dp->sgd_looffset = (uintptr_t)func;
 	dp->sgd_hioffset = (uintptr_t)func >> 16;
 
 	dp->sgd_selector =  (uint16_t)sel;
-	dp->sgd_stkcpy = wcount;
+	dp->sgd_stkcpy = 0;	/* always zero bytes */
 	dp->sgd_type = type;
 	dp->sgd_dpl = dpl;
 	dp->sgd_p = 1;
 }
 
-#endif /* __i386 */
+#endif	/* __i386 */
+
+#if defined(__amd64)
 
 /*
  * Build kernel GDT.
  */
 
-#if defined(__amd64)
-
 static void
-init_gdt(void)
+init_gdt_common(user_desc_t *gdt)
 {
-	desctbr_t	r_bgdt, r_gdt;
-	user_desc_t	*bgdt;
-	size_t		alen = 0xfffff;	/* entire 32-bit address space */
-	int		i;
-
-	/*
-	 * Copy in from boot's gdt to our gdt entries 1 - 4.
-	 * Entry 0 is the null descriptor by definition.
-	 */
-	rd_gdtr(&r_bgdt);
-	bgdt = (user_desc_t *)r_bgdt.dtr_base;
-	if (bgdt == NULL)
-		panic("null boot gdt");
-
-	gdt0[GDT_B32DATA] = bgdt[GDT_B32DATA];
-	gdt0[GDT_B32CODE] = bgdt[GDT_B32CODE];
-	gdt0[GDT_B64DATA] = bgdt[GDT_B64DATA];
-	gdt0[GDT_B64CODE] = bgdt[GDT_B64CODE];
+	int i;
 
 	/*
 	 * 64-bit kernel code segment.
 	 */
-	set_usegd(&gdt0[GDT_KCODE], SDP_LONG, NULL, 0, SDT_MEMERA, SEL_KPL,
+	set_usegd(&gdt[GDT_KCODE], SDP_LONG, NULL, 0, SDT_MEMERA, SEL_KPL,
 	    SDP_PAGES, SDP_OP32);
 
 	/*
@@ -328,20 +346,20 @@ init_gdt(void)
 	 * apps. For the same reason we must set the default op size of this
 	 * descriptor to 32-bit operands.
 	 */
-	set_usegd(&gdt0[GDT_KDATA], SDP_LONG, NULL, alen, SDT_MEMRWA,
+	set_usegd(&gdt[GDT_KDATA], SDP_LONG, NULL, -1, SDT_MEMRWA,
 	    SEL_KPL, SDP_PAGES, SDP_OP32);
-	gdt0[GDT_KDATA].usd_def32 = 1;
+	gdt[GDT_KDATA].usd_def32 = 1;
 
 	/*
 	 * 64-bit user code segment.
 	 */
-	set_usegd(&gdt0[GDT_UCODE], SDP_LONG, NULL, 0, SDT_MEMERA, SEL_UPL,
+	set_usegd(&gdt[GDT_UCODE], SDP_LONG, NULL, 0, SDT_MEMERA, SEL_UPL,
 	    SDP_PAGES, SDP_OP32);
 
 	/*
 	 * 32-bit user code segment.
 	 */
-	set_usegd(&gdt0[GDT_U32CODE], SDP_SHORT, NULL, alen, SDT_MEMERA,
+	set_usegd(&gdt[GDT_U32CODE], SDP_SHORT, NULL, -1, SDT_MEMERA,
 	    SEL_UPL, SDP_PAGES, SDP_OP32);
 
 	/*
@@ -351,7 +369,7 @@ init_gdt(void)
 	 * as in legacy mode so they must be set correctly for a 32-bit data
 	 * segment.
 	 */
-	set_usegd(&gdt0[GDT_UDATA], SDP_SHORT, NULL, alen, SDT_MEMRWA, SEL_UPL,
+	set_usegd(&gdt[GDT_UDATA], SDP_SHORT, NULL, -1, SDT_MEMRWA, SEL_UPL,
 	    SDP_PAGES, SDP_OP32);
 
 	/*
@@ -362,7 +380,7 @@ init_gdt(void)
 	/*
 	 * Kernel TSS
 	 */
-	set_syssegd((system_desc_t *)&gdt0[GDT_KTSS], &ktss0,
+	set_syssegd((system_desc_t *)&gdt[GDT_KTSS], &ktss0,
 	    sizeof (ktss0) - 1, SDT_SYSTSS, SEL_KPL);
 
 	/*
@@ -370,9 +388,9 @@ init_gdt(void)
 	 * Only attributes and limits are initialized, the effective
 	 * base address is programmed via fsbase/gsbase.
 	 */
-	set_usegd(&gdt0[GDT_LWPFS], SDP_SHORT, NULL, alen, SDT_MEMRWA,
+	set_usegd(&gdt[GDT_LWPFS], SDP_SHORT, NULL, -1, SDT_MEMRWA,
 	    SEL_UPL, SDP_PAGES, SDP_OP32);
-	set_usegd(&gdt0[GDT_LWPGS], SDP_SHORT, NULL, alen, SDT_MEMRWA,
+	set_usegd(&gdt[GDT_LWPGS], SDP_SHORT, NULL, -1, SDT_MEMRWA,
 	    SEL_UPL, SDP_PAGES, SDP_OP32);
 
 	/*
@@ -380,15 +398,8 @@ init_gdt(void)
 	 * Only attributes and limits are initialized.
 	 */
 	for (i = GDT_BRANDMIN; i <= GDT_BRANDMAX; i++)
-		set_usegd(&gdt0[i], SDP_SHORT, NULL, alen, SDT_MEMRWA,
+		set_usegd(&gdt0[i], SDP_SHORT, NULL, -1, SDT_MEMRWA,
 		    SEL_UPL, SDP_PAGES, SDP_OP32);
-
-	/*
-	 * Install our new GDT
-	 */
-	r_gdt.dtr_limit = sizeof (gdt0) - 1;
-	r_gdt.dtr_base = (uintptr_t)gdt0;
-	wr_gdtr(&r_gdt);
 
 	/*
 	 * Initialize convenient zero base user descriptors for clearing
@@ -401,28 +412,79 @@ init_gdt(void)
 	    SDP_PAGES, SDP_OP32);
 }
 
-#elif defined(__i386)
-
-static void
+static user_desc_t *
 init_gdt(void)
 {
 	desctbr_t	r_bgdt, r_gdt;
 	user_desc_t	*bgdt;
-	int		i;
+
+#if !defined(__lint)
+	/*
+	 * Our gdt is never larger than a single page.
+	 */
+	ASSERT((sizeof (*gdt0) * NGDT) <= PAGESIZE);
+#endif
+	gdt0 = (user_desc_t *)BOP_ALLOC(bootops, (caddr_t)GDT_VA,
+	    PAGESIZE, PAGESIZE);
+	if (gdt0 == NULL)
+		panic("init_gdt: BOP_ALLOC failed");
+	bzero(gdt0, PAGESIZE);
+
+	init_gdt_common(gdt0);
 
 	/*
-	 * Copy in from boot's gdt to our gdt entries 1 - 4.
-	 * Entry 0 is null descriptor by definition.
+	 * Copy in from boot's gdt to our gdt.
+	 * Entry 0 is the null descriptor by definition.
 	 */
 	rd_gdtr(&r_bgdt);
 	bgdt = (user_desc_t *)r_bgdt.dtr_base;
 	if (bgdt == NULL)
 		panic("null boot gdt");
 
-	gdt0[GDT_BOOTFLAT] = bgdt[GDT_BOOTFLAT];
-	gdt0[GDT_BOOTCODE] = bgdt[GDT_BOOTCODE];
-	gdt0[GDT_BOOTCODE16] = bgdt[GDT_BOOTCODE16];
-	gdt0[GDT_BOOTDATA] = bgdt[GDT_BOOTDATA];
+	gdt0[GDT_B32DATA] = bgdt[GDT_B32DATA];
+	gdt0[GDT_B32CODE] = bgdt[GDT_B32CODE];
+	gdt0[GDT_B16CODE] = bgdt[GDT_B16CODE];
+	gdt0[GDT_B16DATA] = bgdt[GDT_B16DATA];
+	gdt0[GDT_B64CODE] = bgdt[GDT_B64CODE];
+
+	/*
+	 * Install our new GDT
+	 */
+	r_gdt.dtr_limit = (sizeof (*gdt0) * NGDT) - 1;
+	r_gdt.dtr_base = (uintptr_t)gdt0;
+	wr_gdtr(&r_gdt);
+
+	/*
+	 * Reload the segment registers to use the new GDT
+	 */
+	load_segment_registers(KCS_SEL, KFS_SEL, KGS_SEL, KDS_SEL);
+
+	/*
+	 *  setup %gs for kernel
+	 */
+	wrmsr(MSR_AMD_GSBASE, (uint64_t)&cpus[0]);
+
+	/*
+	 * XX64 We should never dereference off "other gsbase" or
+	 * "fsbase".  So, we should arrange to point FSBASE and
+	 * KGSBASE somewhere truly awful e.g. point it at the last
+	 * valid address below the hole so that any attempts to index
+	 * off them cause an exception.
+	 *
+	 * For now, point it at 8G -- at least it should be unmapped
+	 * until some 64-bit processes run.
+	 */
+	wrmsr(MSR_AMD_FSBASE, 0x200000000ul);
+	wrmsr(MSR_AMD_KGSBASE, 0x200000000ul);
+	return (gdt0);
+}
+
+#elif defined(__i386)
+
+static void
+init_gdt_common(user_desc_t *gdt)
+{
+	int i;
 
 	/*
 	 * Text and data for both kernel and user span entire 32 bit
@@ -432,43 +494,43 @@ init_gdt(void)
 	/*
 	 * kernel code segment.
 	 */
-	set_usegd(&gdt0[GDT_KCODE], NULL, -1, SDT_MEMERA, SEL_KPL, SDP_PAGES,
+	set_usegd(&gdt[GDT_KCODE], NULL, -1, SDT_MEMERA, SEL_KPL, SDP_PAGES,
 	    SDP_OP32);
 
 	/*
 	 * kernel data segment.
 	 */
-	set_usegd(&gdt0[GDT_KDATA], NULL, -1, SDT_MEMRWA, SEL_KPL, SDP_PAGES,
+	set_usegd(&gdt[GDT_KDATA], NULL, -1, SDT_MEMRWA, SEL_KPL, SDP_PAGES,
 	    SDP_OP32);
 
 	/*
 	 * user code segment.
 	 */
-	set_usegd(&gdt0[GDT_UCODE], NULL, -1, SDT_MEMERA, SEL_UPL, SDP_PAGES,
+	set_usegd(&gdt[GDT_UCODE], NULL, -1, SDT_MEMERA, SEL_UPL, SDP_PAGES,
 	    SDP_OP32);
 
 	/*
 	 * user data segment.
 	 */
-	set_usegd(&gdt0[GDT_UDATA], NULL, -1, SDT_MEMRWA, SEL_UPL, SDP_PAGES,
+	set_usegd(&gdt[GDT_UDATA], NULL, -1, SDT_MEMRWA, SEL_UPL, SDP_PAGES,
 	    SDP_OP32);
 
 	/*
 	 * TSS for T_DBLFLT (double fault) handler
 	 */
-	set_syssegd((system_desc_t *)&gdt0[GDT_DBFLT], &dftss0,
+	set_syssegd((system_desc_t *)&gdt[GDT_DBFLT], &dftss0,
 	    sizeof (dftss0) - 1, SDT_SYSTSS, SEL_KPL);
 
 	/*
 	 * TSS for kernel
 	 */
-	set_syssegd((system_desc_t *)&gdt0[GDT_KTSS], &ktss0,
+	set_syssegd((system_desc_t *)&gdt[GDT_KTSS], &ktss0,
 	    sizeof (ktss0) - 1, SDT_SYSTSS, SEL_KPL);
 
 	/*
 	 * %gs selector for kernel
 	 */
-	set_usegd(&gdt0[GDT_GS], &cpus[0], sizeof (struct cpu) -1, SDT_MEMRWA,
+	set_usegd(&gdt[GDT_GS], &cpus[0], sizeof (struct cpu) -1, SDT_MEMRWA,
 	    SEL_KPL, SDP_BYTES, SDP_OP32);
 
 	/*
@@ -476,9 +538,9 @@ init_gdt(void)
 	 * Only attributes and limits are initialized, the effective
 	 * base address is programmed via fsbase/gsbase.
 	 */
-	set_usegd(&gdt0[GDT_LWPFS], NULL, (size_t)-1, SDT_MEMRWA, SEL_UPL,
+	set_usegd(&gdt[GDT_LWPFS], NULL, (size_t)-1, SDT_MEMRWA, SEL_UPL,
 	    SDP_PAGES, SDP_OP32);
-	set_usegd(&gdt0[GDT_LWPGS], NULL, (size_t)-1, SDT_MEMRWA, SEL_UPL,
+	set_usegd(&gdt[GDT_LWPGS], NULL, (size_t)-1, SDT_MEMRWA, SEL_UPL,
 	    SDP_PAGES, SDP_OP32);
 
 	/*
@@ -488,167 +550,152 @@ init_gdt(void)
 	for (i = GDT_BRANDMIN; i <= GDT_BRANDMAX; i++)
 		set_usegd(&gdt0[i], NULL, (size_t)-1, SDT_MEMRWA, SEL_UPL,
 		    SDP_PAGES, SDP_OP32);
+	/*
+	 * Initialize convenient zero base user descriptor for clearing
+	 * lwp  private %fs and %gs descriptors in GDT. See setregs() for
+	 * an example.
+	 */
+	set_usegd(&zero_udesc, NULL, -1, SDT_MEMRWA, SEL_UPL,
+	    SDP_BYTES, SDP_OP32);
+}
+
+static user_desc_t *
+init_gdt(void)
+{
+	desctbr_t	r_bgdt, r_gdt;
+	user_desc_t	*bgdt;
+
+#if !defined(__lint)
+	/*
+	 * Our gdt is never larger than a single page.
+	 */
+	ASSERT((sizeof (*gdt0) * NGDT) <= PAGESIZE);
+#endif
+	/*
+	 * XXX this allocation belongs in our caller, not here.
+	 */
+	gdt0 = (user_desc_t *)BOP_ALLOC(bootops, (caddr_t)GDT_VA,
+	    PAGESIZE, PAGESIZE);
+	if (gdt0 == NULL)
+		panic("init_gdt: BOP_ALLOC failed");
+	bzero(gdt0, PAGESIZE);
+
+	init_gdt_common(gdt0);
+
+	/*
+	 * Copy in from boot's gdt to our gdt entries.
+	 * Entry 0 is null descriptor by definition.
+	 */
+	rd_gdtr(&r_bgdt);
+	bgdt = (user_desc_t *)r_bgdt.dtr_base;
+	if (bgdt == NULL)
+		panic("null boot gdt");
+
+	gdt0[GDT_B32DATA] = bgdt[GDT_B32DATA];
+	gdt0[GDT_B32CODE] = bgdt[GDT_B32CODE];
+	gdt0[GDT_B16CODE] = bgdt[GDT_B16CODE];
+	gdt0[GDT_B16DATA] = bgdt[GDT_B16DATA];
 
 	/*
 	 * Install our new GDT
 	 */
-	r_gdt.dtr_limit = sizeof (gdt0) - 1;
+	r_gdt.dtr_limit = (sizeof (*gdt0) * NGDT) - 1;
 	r_gdt.dtr_base = (uintptr_t)gdt0;
 	wr_gdtr(&r_gdt);
 
 	/*
-	 * Initialize convenient zero base user descriptors for clearing
-	 * lwp private %fs and %gs descriptors in GDT. See setregs() for
-	 * an example.
+	 * Reload the segment registers to use the new GDT
 	 */
-	set_usegd(&zero_udesc, 0, -1, SDT_MEMRWA, SEL_UPL, SDP_PAGES, SDP_OP32);
+	load_segment_registers(
+	    KCS_SEL, KDS_SEL, KDS_SEL, KFS_SEL, KGS_SEL, KDS_SEL);
+
+	return (gdt0);
 }
 
 #endif	/* __i386 */
 
-#if defined(__amd64)
-
 /*
  * Build kernel IDT.
  *
- * Note that we pretty much require every gate to be an interrupt gate;
- * that's because of our dependency on using 'swapgs' every time we come
- * into the kernel to find the cpu structure - if we get interrupted just
- * before doing that, so that %cs is in kernel mode (so that the trap prolog
- * doesn't do a swapgs), but %gsbase is really still pointing at something
- * in userland, bad things ensue.
+ * Note that for amd64 we pretty much require every gate to be an interrupt
+ * gate which blocks interrupts atomically on entry; that's because of our
+ * dependency on using 'swapgs' every time we come into the kernel to find
+ * the cpu structure. If we get interrupted just before doing that, %cs could
+ * be in kernel mode (so that the trap prolog doesn't do a swapgs), but
+ * %gsbase is really still pointing at something in userland. Bad things will
+ * ensue. We also use interrupt gates for i386 as well even though this is not
+ * required for some traps.
  *
  * Perhaps they should have invented a trap gate that does an atomic swapgs?
- *
- * XX64	We do need to think further about the follow-on impact of this.
- *	Most of the kernel handlers re-enable interrupts as soon as they've
- *	saved register state and done the swapgs, but there may be something
- *	more subtle going on.
  */
 static void
-init_idt(void)
+init_idt_common(gate_desc_t *idt)
 {
-	char	ivctname[80];
-	void	(*ivctptr)(void);
-	int	i;
-
-	/*
-	 * Initialize entire table with 'reserved' trap and then overwrite
-	 * specific entries. T_EXTOVRFLT (9) is unsupported and reserved
-	 * since it can only be generated on a 386 processor. 15 is also
-	 * unsupported and reserved.
-	 */
-	for (i = 0; i < NIDT; i++)
-		set_gatesegd(&idt0[i], &resvtrap, KCS_SEL, 0, SDT_SYSIGT,
-		    SEL_KPL);
-
-	set_gatesegd(&idt0[T_ZERODIV], &div0trap, KCS_SEL, 0, SDT_SYSIGT,
+	set_gatesegd(&idt[T_ZERODIV], &div0trap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
+	set_gatesegd(&idt[T_SGLSTP], &dbgtrap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
+	set_gatesegd(&idt[T_NMIFLT], &nmiint, KCS_SEL, SDT_SYSIGT, SEL_KPL);
+	set_gatesegd(&idt[T_BPTFLT], &brktrap, KCS_SEL, SDT_SYSIGT, SEL_UPL);
+	set_gatesegd(&idt[T_OVFLW], &ovflotrap, KCS_SEL, SDT_SYSIGT, SEL_UPL);
+	set_gatesegd(&idt[T_BOUNDFLT], &boundstrap, KCS_SEL, SDT_SYSIGT,
 	    SEL_KPL);
-	set_gatesegd(&idt0[T_SGLSTP], &dbgtrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_NMIFLT], &nmiint, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_BPTFLT], &brktrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_UPL);
-	set_gatesegd(&idt0[T_OVFLW], &ovflotrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_UPL);
-	set_gatesegd(&idt0[T_BOUNDFLT], &boundstrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_ILLINST], &invoptrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_NOEXTFLT], &ndptrap,  KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
+	set_gatesegd(&idt[T_ILLINST], &invoptrap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
+	set_gatesegd(&idt[T_NOEXTFLT], &ndptrap,  KCS_SEL, SDT_SYSIGT, SEL_KPL);
 
 	/*
 	 * double fault handler.
 	 */
-	set_gatesegd(&idt0[T_DBLFLT], &syserrtrap, KCS_SEL, 1, SDT_SYSIGT,
-	    SEL_KPL);
+#if defined(__amd64)
+	set_gatesegd(&idt[T_DBLFLT], &syserrtrap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
+#elif defined(__i386)
+	/*
+	 * task gate required.
+	 */
+	set_gatesegd(&idt[T_DBLFLT], NULL, DFTSS_SEL, SDT_SYSTASKGT, SEL_KPL);
+
+#endif	/* __i386 */
 
 	/*
 	 * T_EXTOVRFLT coprocessor-segment-overrun not supported.
 	 */
 
-	set_gatesegd(&idt0[T_TSSFLT], &invtsstrap, KCS_SEL, 0, SDT_SYSIGT,
+	set_gatesegd(&idt[T_TSSFLT], &invtsstrap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
+	set_gatesegd(&idt[T_SEGFLT], &segnptrap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
+	set_gatesegd(&idt[T_STKFLT], &stktrap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
+	set_gatesegd(&idt[T_GPFLT], &gptrap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
+	set_gatesegd(&idt[T_PGFLT], &pftrap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
+	set_gatesegd(&idt[T_EXTERRFLT], &ndperr, KCS_SEL, SDT_SYSIGT, SEL_KPL);
+	set_gatesegd(&idt[T_ALIGNMENT], &achktrap, KCS_SEL, SDT_SYSIGT,
 	    SEL_KPL);
-	set_gatesegd(&idt0[T_SEGFLT], &segnptrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_STKFLT], &stktrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_GPFLT], &gptrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_PGFLT], &pftrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-
-	/*
-	 * 15 reserved.
-	 */
-	set_gatesegd(&idt0[15], &resvtrap, KCS_SEL, 0, SDT_SYSIGT, SEL_KPL);
-
-	set_gatesegd(&idt0[T_EXTERRFLT], &ndperr, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_ALIGNMENT], &achktrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_MCE], &mcetrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_SIMDFPE], &xmtrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-
-	/*
-	 * 20-31 reserved
-	 */
-	for (i = 20; i < 32; i++)
-		set_gatesegd(&idt0[i], &invaltrap, KCS_SEL, 0, SDT_SYSIGT,
-		    SEL_KPL);
-
-	/*
-	 * interrupts 32 - 255
-	 */
-	for (i = 32; i < 256; i++) {
-		(void) snprintf(ivctname, sizeof (ivctname), "ivct%d", i);
-		ivctptr = (void (*)(void))kobj_getsymvalue(ivctname, 0);
-		if (ivctptr == NULL)
-			panic("kobj_getsymvalue(%s) failed", ivctname);
-
-		set_gatesegd(&idt0[i], ivctptr, KCS_SEL, 0, SDT_SYSIGT,
-		    SEL_KPL);
-	}
+	set_gatesegd(&idt[T_MCE], &mcetrap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
+	set_gatesegd(&idt[T_SIMDFPE], &xmtrap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
 
 	/*
 	 * install "int80" handler at, well, 0x80.
 	 */
-	set_gatesegd(&idt0[T_INT80], &sys_int80, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_UPL);
+	set_gatesegd(&idt0[T_INT80], &sys_int80, KCS_SEL, SDT_SYSIGT, SEL_UPL);
 
 	/*
 	 * install fast trap handler at 210.
 	 */
-	set_gatesegd(&idt0[T_FASTTRAP], &fasttrap, KCS_SEL, 0,
-	    SDT_SYSIGT, SEL_UPL);
+	set_gatesegd(&idt[T_FASTTRAP], &fasttrap, KCS_SEL, SDT_SYSIGT, SEL_UPL);
 
 	/*
 	 * System call handler.
 	 */
-	set_gatesegd(&idt0[T_SYSCALLINT], &sys_syscall_int, KCS_SEL, 0,
-	    SDT_SYSIGT, SEL_UPL);
+#if defined(__amd64)
+	set_gatesegd(&idt[T_SYSCALLINT], &sys_syscall_int, KCS_SEL, SDT_SYSIGT,
+	    SEL_UPL);
+
+#elif defined(__i386)
+	set_gatesegd(&idt[T_SYSCALLINT], &sys_call, KCS_SEL, SDT_SYSIGT,
+	    SEL_UPL);
+#endif	/* __i386 */
 
 	/*
 	 * Install the DTrace interrupt handler for the pid provider.
 	 */
-	set_gatesegd(&idt0[T_DTRACE_RET], &dtrace_ret, KCS_SEL, 0,
+	set_gatesegd(&idt[T_DTRACE_RET], &dtrace_ret, KCS_SEL,
 	    SDT_SYSIGT, SEL_UPL);
-
-	if (boothowto & RB_DEBUG)
-		kdi_dvec_idt_sync(idt0);
-
-	/*
-	 * We must maintain a description of idt0 in convenient IDTR format
-	 * for use by T_NMIFLT and T_PGFLT (nmiint() and pentium_pftrap())
-	 * handlers.
-	 */
-	idt0_default_r.dtr_limit = sizeof (idt0) - 1;
-	idt0_default_r.dtr_base = (uintptr_t)idt0;
-	wr_idtr(&idt0_default_r);
 
 	/*
 	 * Prepare interposing descriptors for the branded "int80"
@@ -658,23 +705,24 @@ init_idt(void)
 	brand_tbl[0].ih_inum = T_INT80;
 	brand_tbl[0].ih_default_desc = idt0[T_INT80];
 	set_gatesegd(&(brand_tbl[0].ih_interp_desc), &brand_sys_int80, KCS_SEL,
-	    0, SDT_SYSIGT, SEL_UPL);
+	    SDT_SYSIGT, SEL_UPL);
 
 	brand_tbl[1].ih_inum = T_SYSCALLINT;
 	brand_tbl[1].ih_default_desc = idt0[T_SYSCALLINT];
+
+#if defined(__amd64)
 	set_gatesegd(&(brand_tbl[1].ih_interp_desc), &brand_sys_syscall_int,
-	    KCS_SEL, 0, SDT_SYSIGT, SEL_UPL);
+	    KCS_SEL, SDT_SYSIGT, SEL_UPL);
+#elif defined(__i386)
+	set_gatesegd(&(brand_tbl[1].ih_interp_desc), &brand_sys_call,
+	    KCS_SEL, SDT_SYSIGT, SEL_UPL);
+#endif	/* __i386 */
 
 	brand_tbl[2].ih_inum = 0;
 }
 
-#elif defined(__i386)
-
-/*
- * Build kernel IDT.
- */
 static void
-init_idt(void)
+init_idt(gate_desc_t *idt)
 {
 	char	ivctname[80];
 	void	(*ivctptr)(void);
@@ -687,67 +735,13 @@ init_idt(void)
 	 * unsupported and reserved.
 	 */
 	for (i = 0; i < NIDT; i++)
-		set_gatesegd(&idt0[i], &resvtrap, KCS_SEL, 0, SDT_SYSTGT,
-		    SEL_KPL);
-
-	set_gatesegd(&idt0[T_ZERODIV], &div0trap, KCS_SEL, 0, SDT_SYSTGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_SGLSTP], &dbgtrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_NMIFLT], &nmiint, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_BPTFLT], &brktrap, KCS_SEL, 0, SDT_SYSTGT,
-	    SEL_UPL);
-	set_gatesegd(&idt0[T_OVFLW], &ovflotrap, KCS_SEL, 0, SDT_SYSTGT,
-	    SEL_UPL);
-	set_gatesegd(&idt0[T_BOUNDFLT], &boundstrap, KCS_SEL, 0, SDT_SYSTGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_ILLINST], &invoptrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_NOEXTFLT], &ndptrap,  KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-
-	/*
-	 * Install TSS for T_DBLFLT handler.
-	 */
-	set_gatesegd(&idt0[T_DBLFLT], NULL, DFTSS_SEL, 0, SDT_SYSTASKGT,
-	    SEL_KPL);
-
-	/*
-	 * T_EXTOVRFLT coprocessor-segment-overrun not supported.
-	 */
-
-	set_gatesegd(&idt0[T_TSSFLT], &invtsstrap, KCS_SEL, 0, SDT_SYSTGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_SEGFLT], &segnptrap, KCS_SEL, 0, SDT_SYSTGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_STKFLT], &stktrap, KCS_SEL, 0, SDT_SYSTGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_GPFLT], &gptrap, KCS_SEL, 0, SDT_SYSTGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_PGFLT], &pftrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-
-	/*
-	 * 15 reserved.
-	 */
-	set_gatesegd(&idt0[15], &resvtrap, KCS_SEL, 0, SDT_SYSTGT, SEL_KPL);
-
-	set_gatesegd(&idt0[T_EXTERRFLT], &ndperr, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_ALIGNMENT], &achktrap, KCS_SEL, 0, SDT_SYSTGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_MCE], &mcetrap, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_KPL);
-	set_gatesegd(&idt0[T_SIMDFPE], &xmtrap, KCS_SEL, 0, SDT_SYSTGT,
-	    SEL_KPL);
+		set_gatesegd(&idt[i], &resvtrap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
 
 	/*
 	 * 20-31 reserved
 	 */
 	for (i = 20; i < 32; i++)
-		set_gatesegd(&idt0[i], &invaltrap, KCS_SEL, 0, SDT_SYSTGT,
-		    SEL_KPL);
+		set_gatesegd(&idt[i], &invaltrap, KCS_SEL, SDT_SYSIGT, SEL_KPL);
 
 	/*
 	 * interrupts 32 - 255
@@ -758,66 +752,15 @@ init_idt(void)
 		if (ivctptr == NULL)
 			panic("kobj_getsymvalue(%s) failed", ivctname);
 
-		set_gatesegd(&idt0[i], ivctptr, KCS_SEL, 0, SDT_SYSIGT,
-		    SEL_KPL);
+		set_gatesegd(&idt[i], ivctptr, KCS_SEL, SDT_SYSIGT, SEL_KPL);
 	}
 
 	/*
-	 * install "int80" handler at, well, 0x80.
+	 * Now install the common ones. Note that it will overlay some
+	 * entries installed above like T_SYSCALLINT, T_FASTTRAP etc.
 	 */
-	set_gatesegd(&idt0[T_INT80], &sys_int80, KCS_SEL, 0, SDT_SYSIGT,
-	    SEL_UPL);
-
-	/*
-	 * install fast trap handler at 210.
-	 */
-	set_gatesegd(&idt0[T_FASTTRAP], &fasttrap, KCS_SEL, 0,
-	    SDT_SYSIGT, SEL_UPL);
-
-	/*
-	 * System call handler. Note that we don't use the hardware's parameter
-	 * copying mechanism here; see the comment above sys_call() for details.
-	 */
-	set_gatesegd(&idt0[T_SYSCALLINT], &sys_call, KCS_SEL, 0,
-	    SDT_SYSIGT, SEL_UPL);
-
-	/*
-	 * Install the DTrace interrupt handler for the pid provider.
-	 */
-	set_gatesegd(&idt0[T_DTRACE_RET], &dtrace_ret, KCS_SEL, 0,
-	    SDT_SYSIGT, SEL_UPL);
-
-	if (boothowto & RB_DEBUG)
-		kdi_dvec_idt_sync(idt0);
-
-	/*
-	 * We must maintain a description of idt0 in convenient IDTR format
-	 * for use by T_NMIFLT and T_PGFLT (nmiint() and pentium_pftrap())
-	 * handlers.
-	 */
-	idt0_default_r.dtr_limit = sizeof (idt0) - 1;
-	idt0_default_r.dtr_base = (uintptr_t)idt0;
-	wr_idtr(&idt0_default_r);
-
-	/*
-	 * Prepare interposing descriptors for the branded "int80"
-	 * and syscall handlers and cache copies of the default
-	 * descriptors.
-	 */
-	brand_tbl[0].ih_inum = T_INT80;
-	brand_tbl[0].ih_default_desc = idt0[T_INT80];
-	set_gatesegd(&(brand_tbl[0].ih_interp_desc), &brand_sys_int80, KCS_SEL,
-	    0, SDT_SYSIGT, SEL_UPL);
-
-	brand_tbl[1].ih_inum = T_SYSCALLINT;
-	brand_tbl[1].ih_default_desc = idt0[T_SYSCALLINT];
-	set_gatesegd(&(brand_tbl[1].ih_interp_desc), &brand_sys_call,
-	    KCS_SEL, 0, SDT_SYSIGT, SEL_UPL);
-
-	brand_tbl[2].ih_inum = 0;
+	init_idt_common(idt);
 }
-
-#endif	/* __i386 */
 
 /*
  * The kernel does not deal with LDTs unless a user explicitly creates
@@ -909,12 +852,58 @@ init_tss(void)
 #endif	/* __i386 */
 
 void
-init_tables(void)
+init_desctbls(void)
 {
-	init_gdt();
+	user_desc_t *gdt;
+	desctbr_t idtr;
+
+	/*
+	 * Setup and install our GDT.
+	 */
+	gdt = init_gdt();
+	ASSERT(IS_P2ALIGNED((uintptr_t)gdt, PAGESIZE));
+	CPU->cpu_m.mcpu_gdt = gdt;
+
+	/*
+	 * Setup and install our IDT.
+	 */
+	init_idt(&idt0[0]);
+
+	idtr.dtr_base = (uintptr_t)idt0;
+	idtr.dtr_limit = sizeof (idt0) - 1;
+	wr_idtr(&idtr);
+	CPU->cpu_m.mcpu_idt = idt0;
+
+#if defined(__i386)
+	/*
+	 * We maintain a description of idt0 in convenient IDTR format
+	 * for #pf's on some older pentium processors. See pentium_pftrap().
+	 */
+	idt0_default_r = idtr;
+#endif	/* __i386 */
+
 	init_tss();
-	init_idt();
+	CPU->cpu_tss = &ktss0;
 	init_ldt();
+}
+
+/*
+ * In the early kernel, we need to set up a simple GDT to run on.
+ */
+void
+init_boot_gdt(user_desc_t *bgdt)
+{
+#if defined(__amd64)
+	set_usegd(&bgdt[GDT_B32DATA], SDP_LONG, NULL, -1, SDT_MEMRWA, SEL_KPL,
+	    SDP_PAGES, SDP_OP32);
+	set_usegd(&bgdt[GDT_B64CODE], SDP_LONG, NULL, -1, SDT_MEMERA, SEL_KPL,
+	    SDP_PAGES, SDP_OP32);
+#elif defined(__i386)
+	set_usegd(&bgdt[GDT_B32DATA], NULL, -1, SDT_MEMRWA, SEL_KPL,
+	    SDP_PAGES, SDP_OP32);
+	set_usegd(&bgdt[GDT_B32CODE], NULL, -1, SDT_MEMERA, SEL_KPL,
+	    SDP_PAGES, SDP_OP32);
+#endif	/* __i386 */
 }
 
 /*

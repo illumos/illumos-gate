@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 #define	_SYS_X_CALL_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * For x86, we only have three cross call levels:
@@ -66,6 +65,10 @@ struct	xc_mbox {
 	int		saved_pri;
 };
 
+#if defined(_MACHDEP)
+extern cpuset_t cpu_ready_set;
+#endif
+
 /*
  * Cross-call routines.
  */
@@ -76,10 +79,22 @@ extern uint_t	xc_serv(caddr_t, caddr_t);
 extern void	xc_call(xc_arg_t, xc_arg_t, xc_arg_t, int, cpuset_t, xc_func_t);
 extern void	xc_trycall(xc_arg_t, xc_arg_t, xc_arg_t, cpuset_t, xc_func_t);
 extern void	xc_sync(xc_arg_t, xc_arg_t, xc_arg_t, int, cpuset_t, xc_func_t);
-extern void	xc_wait_sync(xc_arg_t, xc_arg_t, xc_arg_t, int, cpuset_t,
-    xc_func_t);
 extern void	xc_capture_cpus(cpuset_t);
 extern void	xc_release_cpus(void);
+
+#if defined(TRAPTRACE)
+
+/*
+ * X-call tracing can be interleaved with trap tracing
+ */
+extern void xc_make_trap_trace_entry(uint8_t, int, ulong_t);
+#define	XC_TRACE(m, pri, arg)	xc_make_trap_trace_entry(m, pri, arg)
+
+#else	/* TRAPTRACE */
+
+#define	XC_TRACE(m, pri, arg)	/* nothing */
+
+#endif	/* TRAPTRACE */
 
 #endif	/* _KERNEL */
 

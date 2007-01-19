@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,10 +51,12 @@
 
 #if defined(_KERNEL)
 #include <sys/systm.h>
-#else
+#elif !defined(_BOOT)
 #include <stddef.h>
 #include <string.h>
-#endif	/* !_KERNEL */
+#endif
+
+#include "memcpy.h"
 
 /*
  * Copy s0 to s, always copy n bytes.

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,6 +80,13 @@ kaif_lock_exit(uintptr_t *lock)
 	membar_producer();
 }
 
+static void
+kaif_start_slaves(int cmd)
+{
+	kaif_slave_cmd = cmd;
+	kmdb_kdi_start_slaves();
+}
+
 static int
 kaif_master_loop(kaif_cpusave_t *cpusave)
 {
@@ -89,6 +96,12 @@ kaif_master_loop(kaif_cpusave_t *cpusave)
 	kaif_prom_rearm();
 #endif
 	kaif_trap_set_debugger();
+
+	/*
+	 * If we re-entered due to a ::switch, we need to tell the slave CPUs
+	 * to sleep again.
+	 */
+	kmdb_kdi_stop_slaves(cpusave->krs_cpu_id, 0);
 
 master_loop:
 	switch (kmdb_dpi_reenter()) {
@@ -112,7 +125,7 @@ master_loop:
 		 */
 		kaif_trap_set_saved(cpusave);
 
-		kaif_slave_cmd = KAIF_SLAVE_CMD_SWITCH;
+		kaif_start_slaves(KAIF_SLAVE_CMD_SWITCH);
 
 		/* The new master is now awake */
 		return (KAIF_CPU_CMD_SWITCH);
@@ -124,7 +137,7 @@ master_loop:
 		 */
 		kaif_master_cpuid = KAIF_MASTER_CPUID_UNSET;
 		membar_producer();
-		kaif_slave_cmd = KAIF_SLAVE_CMD_RESUME;
+		kaif_start_slaves(KAIF_SLAVE_CMD_RESUME);
 
 		if (kmdb_dpi_work_required())
 			kmdb_dpi_wrintr_fire();
@@ -141,7 +154,7 @@ master_loop:
 		return (KAIF_CPU_CMD_RESUME_MASTER);
 
 	case KMDB_DPI_CMD_FLUSH_CACHES:
-		kaif_slave_cmd = KAIF_SLAVE_CMD_FLUSH;
+		kaif_start_slaves(KAIF_SLAVE_CMD_FLUSH);
 
 		/*
 		 * Wait for the other cpus to finish flushing their caches.
@@ -170,9 +183,9 @@ master_loop:
 		 * afraid that I don't want to know the answer.
 		 */
 		if (cpusave->krs_cpu_id == 0)
-			return (KAIF_CPU_CMD_REBOOT);
+			kmdb_kdi_reboot();
 
-		kaif_slave_cmd = KAIF_SLAVE_CMD_REBOOT;
+		kaif_start_slaves(KAIF_SLAVE_CMD_REBOOT);
 
 		/*
 		 * Spin forever, waiting for CPU 0 (apparently a slave) to
@@ -223,7 +236,8 @@ kaif_slave_loop(kaif_cpusave_t *cpusave)
 #if defined(__i386) || defined(__amd64)
 		} else if (slavecmd == KAIF_SLAVE_CMD_REBOOT &&
 		    cpusave->krs_cpu_id == 0) {
-			rv = KAIF_CPU_CMD_REBOOT;
+			rv = 0;
+			kmdb_kdi_reboot();
 			break;
 #endif
 
@@ -238,6 +252,8 @@ kaif_slave_loop(kaif_cpusave_t *cpusave)
 			cpusave->krs_cpu_acked = 0;
 #endif
 		}
+
+		kmdb_kdi_slave_wait();
 	}
 
 #if defined(__sparc)
@@ -260,9 +276,7 @@ kaif_select_master(kaif_cpusave_t *cpusave)
 
 		membar_producer();
 
-		kmdb_kdi_stop_other_cpus(cpusave->krs_cpu_id,
-		    kaif_slave_entry);
-
+		kmdb_kdi_stop_slaves(cpusave->krs_cpu_id, 1);
 	} else {
 		/* The master was already chosen - go be a slave */
 		cpusave->krs_cpu_state = KAIF_CPU_STATE_SLAVE;
@@ -405,7 +419,7 @@ kaif_slave_loop_barrier(void)
 	int not_acked;
 	int timeout_count = 0;
 
-	kaif_slave_cmd = KAIF_SLAVE_CMD_ACK;
+	kaif_start_slaves(KAIF_SLAVE_CMD_ACK);
 
 	/*
 	 * Wait for slave cpus to explicitly acknowledge

@@ -1,5 +1,5 @@
 \
-\ Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 \ CDDL HEADER START
@@ -166,6 +166,7 @@ fpu_ctx
 	fpu_flags		FPU_CTX_FPU_FLAGS
 
 fxsave_state	FXSAVE_STATE_SIZE
+	fx_fsw			FXSAVE_STATE_FSW
 	fx_mxcsr_mask		FXSAVE_STATE_MXCSR_MASK
 
 
@@ -289,10 +290,6 @@ rm_platter
 	rm_cpu			CPUNOFF
 	rm_cr4			CR4OFF
 	rm_x86feature		X86FEATURE
-
-cpu_tables
-	ct_stack
-	ct_gdt
 
 ddi_acc_impl
 	ahi_acc_attr	ACC_ATTR

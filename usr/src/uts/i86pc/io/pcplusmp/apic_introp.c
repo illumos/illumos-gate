@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,8 @@
 
 #include <sys/cpuvar.h>
 #include <sys/psm.h>
-#include "apic.h"
+#include <sys/archsystm.h>
+#include <sys/apic.h>
 #include <sys/sunddi.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/mach_intr.h>
@@ -52,15 +53,6 @@ apic_irq_t	*apic_find_irq(dev_info_t *, struct intrspec *, int);
 static int	apic_get_pending(apic_irq_t *, int);
 static void	apic_clear_mask(apic_irq_t *);
 static void	apic_set_mask(apic_irq_t *);
-static uchar_t	apic_find_multi_vectors(int, int);
-int		apic_navail_vector(dev_info_t *, int);
-int		apic_alloc_vectors(dev_info_t *, int, int, int, int, int);
-void		apic_free_vectors(dev_info_t *, int, int, int, int);
-int		apic_intr_ops(dev_info_t *, ddi_intr_handle_impl_t *,
-		    psm_intr_op_t, int *);
-
-extern int	intr_clear(void);
-extern void	intr_restore(uint_t);
 
 /*
  * MSI support flag:
@@ -77,19 +69,6 @@ int	apic_support_msi = 0;
 /* Multiple vector support for MSI */
 int	apic_multi_msi_enable = 1;
 int	apic_multi_msi_max = 2;
-
-extern uchar_t		apic_ipltopri[MAXIPL+1];
-extern uchar_t		apic_vector_to_irq[APIC_MAX_VECTOR+1];
-extern int		apic_max_device_irq;
-extern int		apic_min_device_irq;
-extern apic_irq_t	*apic_irq_table[APIC_MAX_VECTOR+1];
-extern volatile uint32_t *apicadr; /* virtual addr of local APIC */
-extern volatile int32_t	*apicioadr[MAX_IO_APIC];
-extern lock_t		apic_ioapic_lock;
-extern kmutex_t		airq_mutex;
-extern apic_cpus_info_t	*apic_cpus;
-extern int apic_first_avail_irq;
-
 
 /*
  * apic_pci_msi_enable_vector:
@@ -202,7 +181,7 @@ apic_navail_vector(dev_info_t *dip, int pri)
  * Caller needs to make sure that count has to be power of 2 and should not
  * be < 1.
  */
-static uchar_t
+uchar_t
 apic_find_multi_vectors(int pri, int count)
 {
 	int	lowest, highest, i, navail, start, msibits;
@@ -244,6 +223,7 @@ apic_find_multi_vectors(int pri, int count)
 	}
 	return (0);
 }
+
 
 /*
  * It finds the apic_irq_t associates with the dip, ispec and type.
@@ -288,7 +268,7 @@ apic_get_pending(apic_irq_t *irqp, int type)
 {
 	int			bit, index, irr, pending;
 	int			intin_no;
-	volatile int32_t 	*ioapic;
+	int			apic_ix;
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_get_pending: irqp: %p, cpuid: %x "
 	    "type: %x\n", (void *)irqp, irqp->airq_cpu & ~IRQ_USER_BOUND,
@@ -309,8 +289,8 @@ apic_get_pending(apic_irq_t *irqp, int type)
 	if (!pending && (type == DDI_INTR_TYPE_FIXED)) {
 		/* check I/O APIC for fixed interrupt */
 		intin_no = irqp->airq_intin_no;
-		ioapic = apicioadr[irqp->airq_ioapicindex];
-		pending = (READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no) &
+		apic_ix = irqp->airq_ioapicindex;
+		pending = (READ_IOAPIC_RDT_ENTRY_LOW_DWORD(apic_ix, intin_no) &
 		    AV_PENDING) ? 1 : 0;
 	}
 	return (pending);
@@ -324,23 +304,23 @@ static void
 apic_clear_mask(apic_irq_t *irqp)
 {
 	int			intin_no;
-	int			iflag;
+	ulong_t			iflag;
 	int32_t			rdt_entry;
-	volatile int32_t 	*ioapic;
+	int 			apic_ix;
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_clear_mask: irqp: %p\n",
 	    (void *)irqp));
 
 	intin_no = irqp->airq_intin_no;
-	ioapic = apicioadr[irqp->airq_ioapicindex];
+	apic_ix = irqp->airq_ioapicindex;
 
 	iflag = intr_clear();
 	lock_set(&apic_ioapic_lock);
 
-	rdt_entry = READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no);
+	rdt_entry = READ_IOAPIC_RDT_ENTRY_LOW_DWORD(apic_ix, intin_no);
 
 	/* clear mask */
-	WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no,
+	WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(apic_ix, intin_no,
 	    ((~AV_MASK) & rdt_entry));
 
 	lock_clear(&apic_ioapic_lock);
@@ -355,126 +335,27 @@ static void
 apic_set_mask(apic_irq_t *irqp)
 {
 	int			intin_no;
-	volatile int32_t 	*ioapic;
-	int			iflag;
+	int 			apic_ix;
+	ulong_t			iflag;
 	int32_t			rdt_entry;
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_set_mask: irqp: %p\n", (void *)irqp));
 
 	intin_no = irqp->airq_intin_no;
-	ioapic = apicioadr[irqp->airq_ioapicindex];
+	apic_ix = irqp->airq_ioapicindex;
 
 	iflag = intr_clear();
 
 	lock_set(&apic_ioapic_lock);
 
-	rdt_entry = READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no);
+	rdt_entry = READ_IOAPIC_RDT_ENTRY_LOW_DWORD(apic_ix, intin_no);
 
 	/* mask it */
-	WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no,
+	WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(apic_ix, intin_no,
 	    (AV_MASK | rdt_entry));
 
 	lock_clear(&apic_ioapic_lock);
 	intr_restore(iflag);
-}
-
-
-/*
- * This function allocate "count" vector(s) for the given "dip/pri/type"
- */
-int
-apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
-    int behavior)
-{
-	int	rcount, i;
-	uchar_t	start, irqno, cpu;
-	major_t	major;
-	apic_irq_t	*irqptr;
-
-	/* only supports MSI at the moment, will add MSI-X support later */
-	if (type != DDI_INTR_TYPE_MSI)
-		return (0);
-
-	DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: dip=0x%p type=%d "
-	    "inum=0x%x  pri=0x%x count=0x%x behavior=%d\n",
-	    (void *)dip, type, inum, pri, count, behavior));
-
-	if (count > 1) {
-		if (behavior == DDI_INTR_ALLOC_STRICT &&
-		    (apic_multi_msi_enable == 0 || count > apic_multi_msi_max))
-			return (0);
-
-		if (apic_multi_msi_enable == 0)
-			count = 1;
-		else if (count > apic_multi_msi_max)
-			count = apic_multi_msi_max;
-	}
-
-	if ((rcount = apic_navail_vector(dip, pri)) > count)
-		rcount = count;
-	else if (rcount == 0 || (rcount < count &&
-	    behavior == DDI_INTR_ALLOC_STRICT))
-		return (0);
-
-	/* if not ISP2, then round it down */
-	if (!ISP2(rcount))
-		rcount = 1 << (highbit(rcount) - 1);
-
-	mutex_enter(&airq_mutex);
-
-	for (start = 0; rcount > 0; rcount >>= 1) {
-		if ((start = apic_find_multi_vectors(pri, rcount)) != 0 ||
-		    behavior == DDI_INTR_ALLOC_STRICT)
-			break;
-	}
-
-	if (start == 0) {
-		/* no vector available */
-		mutex_exit(&airq_mutex);
-		return (0);
-	}
-
-	major = (dip != NULL) ? ddi_name_to_major(ddi_get_name(dip)) : 0;
-	for (i = 0; i < rcount; i++) {
-		if ((irqno = apic_allocate_irq(apic_first_avail_irq)) ==
-		    (uchar_t)-1) {
-			mutex_exit(&airq_mutex);
-			DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: "
-			    "apic_allocate_irq failed\n"));
-			return (i);
-		}
-		apic_max_device_irq = max(irqno, apic_max_device_irq);
-		apic_min_device_irq = min(irqno, apic_min_device_irq);
-		irqptr = apic_irq_table[irqno];
-#ifdef	DEBUG
-		if (apic_vector_to_irq[start + i] != APIC_RESV_IRQ)
-			DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: "
-			    "apic_vector_to_irq is not APIC_RESV_IRQ\n"));
-#endif
-		apic_vector_to_irq[start + i] = (uchar_t)irqno;
-
-		irqptr->airq_vector = (uchar_t)(start + i);
-		irqptr->airq_ioapicindex = (uchar_t)inum;	/* start */
-		irqptr->airq_intin_no = (uchar_t)rcount;
-		irqptr->airq_ipl = pri;
-		irqptr->airq_vector = start + i;
-		irqptr->airq_origirq = (uchar_t)(inum + i);
-		irqptr->airq_share_id = 0;
-		irqptr->airq_mps_intr_index = MSI_INDEX;
-		irqptr->airq_dip = dip;
-		irqptr->airq_major = major;
-		if (i == 0) /* they all bound to the same cpu */
-			cpu = irqptr->airq_cpu = apic_bind_intr(dip, irqno,
-				0xff, 0xff);
-		else
-			irqptr->airq_cpu = cpu;
-		DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: irq=0x%x "
-		    "dip=0x%p vector=0x%x origirq=0x%x pri=0x%x\n", irqno,
-		    (void *)irqptr->airq_dip, irqptr->airq_vector,
-		    irqptr->airq_origirq, pri));
-	}
-	mutex_exit(&airq_mutex);
-	return (rcount);
 }
 
 
@@ -794,6 +675,7 @@ apic_pci_msi_disable_mode(dev_info_t *rdip, int type, int inum)
 	return (PSM_SUCCESS);
 }
 
+
 /*
  * This function provides external interface to the nexus for all
  * functionalities related to the new DDI interrupt framework.
@@ -920,7 +802,7 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 		    hdlp->ih_scratch1, new_priority, hdlp->ih_type,
 		    DDI_INTR_ALLOC_STRICT);
 
-		/* Did we get the new vectors? */
+		/* Did we get new vectors? */
 		if (!count_vec)
 			return (PSM_FAILURE);
 

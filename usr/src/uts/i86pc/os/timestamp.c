@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,19 +134,20 @@ static volatile int tsc_sync_go;
 /*
  * XX64	Is the faster way to do this with a 64-bit ABI?
  */
-#define	TSC_CONVERT_AND_ADD(tsc, hrt, scale) { \
-	unsigned int *_l = (unsigned int *)&(tsc); \
-	(hrt) += mul32(_l[1], scale) << NSEC_SHIFT; \
+
+#define	TSC_CONVERT_AND_ADD(tsc, hrt, scale) { 		\
+	unsigned int *_l = (unsigned int *)&(tsc); 	\
+	(hrt) += mul32(_l[1], scale) << NSEC_SHIFT; 	\
 	(hrt) += mul32(_l[0], scale) >> (32 - NSEC_SHIFT); \
 }
 
-#define	TSC_CONVERT(tsc, hrt, scale) { \
-	unsigned int *_l = (unsigned int *)&(tsc); \
-	(hrt) = mul32(_l[1], scale) << NSEC_SHIFT; \
+#define	TSC_CONVERT(tsc, hrt, scale) { 			\
+	unsigned int *_l = (unsigned int *)&(tsc); 	\
+	(hrt) = mul32(_l[1], scale) << NSEC_SHIFT; 	\
 	(hrt) += mul32(_l[0], scale) >> (32 - NSEC_SHIFT); \
 }
 
-
+int tsc_master_slave_sync_needed = 1;
 
 static int	tsc_max_delta;
 static hrtime_t tsc_sync_snaps[2];
@@ -211,8 +211,11 @@ tsc_digest(processorid_t target)
 void
 tsc_sync_master(processorid_t slave)
 {
-	int flags;
+	ulong_t flags;
 	hrtime_t hrt;
+
+	if (!tsc_master_slave_sync_needed)
+		return;
 
 	ASSERT(tsc_sync_go != TSC_SYNC_GO);
 
@@ -264,8 +267,11 @@ tsc_sync_master(processorid_t slave)
 void
 tsc_sync_slave(void)
 {
-	int flags;
+	ulong_t flags;
 	hrtime_t hrt;
+
+	if (!tsc_master_slave_sync_needed)
+		return;
 
 	ASSERT(tsc_sync_go != TSC_SYNC_GO);
 
@@ -311,7 +317,7 @@ void
 tsc_hrtimeinit(uint64_t cpu_freq_hz)
 {
 	longlong_t tsc;
-	int flags;
+	ulong_t flags;
 
 	/*
 	 * cpu_freq_hz is the measured cpu frequency in hertz
@@ -333,8 +339,8 @@ tsc_hrtimeinit(uint64_t cpu_freq_hz)
 }
 
 /*
- * Called once per second on some CPU from the cyclic subsystem's
- * CY_HIGH_LEVEL interrupt.  (no longer CPU0-only)
+ * Called once per second on a CPU from the cyclic subsystem's
+ * CY_HIGH_LEVEL interrupt.  (No longer just cpu0-only)
  */
 void
 tsc_tick(void)
@@ -418,7 +424,6 @@ tsc_gethrtime(void)
 			 */
 			tsc = 0;
 		}
-
 		hrt = tsc_hrtime_base;
 
 		TSC_CONVERT_AND_ADD(tsc, hrt, nsec_scale);
@@ -581,13 +586,8 @@ tsc_gethrtimeunscaled(void)
 	do {
 		old_hres_lock = hres_lock;
 
-		if ((tsc = tsc_read()) < tsc_last) {
-			/*
-			 * see comments in tsc_gethrtime
-			 */
-			tsc += tsc_last_jumped;
-		}
-
+		/* See tsc_tick(). */
+		tsc = tsc_read() + tsc_last_jumped;
 	} while ((old_hres_lock & ~1) != hres_lock);
 
 	return (tsc);

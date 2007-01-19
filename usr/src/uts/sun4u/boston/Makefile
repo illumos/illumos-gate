@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -77,7 +77,6 @@ BOSTON_CRYPTO_LINKS	+= aes256
 install:	$(ROOT_BOSTON_DIR) \
 		$(USR_BOSTON_DIR) \
 		$(USR_BOSTON_INC_DIR) \
-		$(USR_BOSTON_SBIN_EEPROM) \
 		$(USR_BOSTON_SBIN_PRTDIAG) \
 		$(USR_BOSTON_SBIN_FRUADM) \
 		$(USR_BOSTON_SBIN_TRAPSTAT) \

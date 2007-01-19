@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,10 @@
 #include <sys/x86_archext.h>
 #include <sys/atomic.h>
 #include <sys/bitmap.h>
+#include <sys/controlregs.h>
+#include <sys/bootconf.h>
+#include <sys/bootsvcs.h>
+#include <sys/bootinfo.h>
 
 #include <vm/seg_kmem.h>
 #include <vm/hat_i86.h>
@@ -67,16 +71,14 @@
 #include <vm/seg_kp.h>
 #include <vm/seg_kpm.h>
 #include <vm/vm_dep.h>
+#include <vm/kboot_mmu.h>
 
 #include <sys/cmn_err.h>
-
 
 /*
  * Basic parameters for hat operation.
  */
 struct hat_mmu_info mmu;
-uint_t force_pae_off = 0;	/* for testing, change with kernel debugger */
-uint_t force_pae_on = 0;	/* for testing, change with kernel debugger */
 
 /*
  * The page that is the kernel's top level pagetable.
@@ -168,21 +170,6 @@ kmem_cache_t	*vlp_hash_cache;
 struct hatstats hatstat;
 
 /*
- * macros to detect addresses in use by kernel only during boot
- */
-#if defined(__amd64)
-
-#define	BOOT_VA(va) ((va) < kernelbase ||			\
-	((va) >= BOOT_DOUBLEMAP_BASE &&				\
-	(va) < BOOT_DOUBLEMAP_BASE + BOOT_DOUBLEMAP_SIZE))
-
-#elif defined(__i386)
-
-#define	BOOT_VA(va) ((va) < kernelbase)
-
-#endif	/* __i386 */
-
-/*
  * useful stuff for atomic access/clearing/setting REF/MOD/RO bits in page_t's.
  */
 extern void atomic_orb(uchar_t *addr, uchar_t val);
@@ -238,8 +225,6 @@ hati_constructor(void *buf, void *handle, int kmflags)
 	    sizeof (pgcnt_t) * (mmu.max_page_level + 1));
 	hat->hat_stats = 0;
 	hat->hat_flags = 0;
-	mutex_init(&hat->hat_switch_mutex, NULL, MUTEX_DRIVER,
-	    (void *)ipltospl(DISP_LEVEL));
 	CPUSET_ZERO(hat->hat_cpus);
 	hat->hat_htable = NULL;
 	hat->hat_ht_hash = NULL;
@@ -305,6 +290,7 @@ hat_alloc(struct as *as)
 	hat->hat_htable = NULL;
 	hat->hat_ht_cached = NULL;
 	ht = htable_create(hat, (uintptr_t)0, TOP_LEVEL(hat), NULL);
+
 	if (!(hat->hat_flags & HAT_VLP))
 		x86pte_copy(kas.a_hat->hat_htable, ht, khat_start,
 		    khat_entries);
@@ -461,39 +447,20 @@ mmu_init(void)
 	int i;
 
 	/*
-	 * if CPU enabled the page table global bit, use it for the kernel
-	 * This is bit 7 in CR4 (PGE - Page Global Enable)
+	 * If CPU enabled the page table global bit, use it for the kernel
+	 * This is bit 7 in CR4 (PGE - Page Global Enable).
 	 */
-	if ((x86_feature & X86_PGE) != 0 && (getcr4() & 0x80) != 0)
+	if ((x86_feature & X86_PGE) != 0 && (getcr4() & CR4_PGE) != 0)
 		mmu.pt_global = PT_GLOBAL;
 
 	/*
-	 * We use PAE except when we aren't on an AMD64 and this is
-	 * a 32 bit kernel with all physical addresses less than 4 Gig.
+	 * Detect NX and PAE usage.
 	 */
-	mmu.pae_hat = 1;
-	if (x86_feature & X86_NX) {
+	mmu.pae_hat = kbm_pae_support;
+	if (kbm_nx_support)
 		mmu.pt_nx = PT_NX;
-	} else {
+	else
 		mmu.pt_nx = 0;
-#if defined(__i386)
-		if (!PFN_ABOVE4G(physmax))
-			mmu.pae_hat = 0;
-#endif
-	}
-
-#if defined(__i386)
-	/*
-	 * Setting one of these two lets you force testing of the different
-	 * hat modes for 32 bit, regardless of the hardware setup.
-	 */
-	if (force_pae_on) {
-		mmu.pae_hat = 1;
-	} else if (force_pae_off) {
-		mmu.pae_hat = 0;
-		mmu.pt_nx = 0;
-	}
-#endif
 
 	/*
 	 * Use CPU info to set various MMU parameters
@@ -541,7 +508,7 @@ mmu_init(void)
 	 * Initialize parameters based on the 64 or 32 bit kernels and
 	 * for the 32 bit kernel decide if we should use PAE.
 	 */
-	if (x86_feature & X86_LARGEPAGE)
+	if (kbm_largepage_support)
 		mmu.max_page_level = 1;
 	else
 		mmu.max_page_level = 0;
@@ -590,15 +557,18 @@ mmu_init(void)
 		mmu.level_mask[i] = ~mmu.level_offset[i];
 	}
 
-	mmu.pte_bits[0] = PT_VALID;
-	for (i = 1; i <= mmu.max_page_level; ++i)
-		mmu.pte_bits[i] = PT_VALID | PT_PAGESIZE;
+	for (i = 0; i <= mmu.max_page_level; ++i) {
+		mmu.pte_bits[i] = PT_VALID;
+		if (i > 0)
+			mmu.pte_bits[i] |= PT_PAGESIZE;
+	}
 
 	/*
 	 * NOTE Legacy 32 bit PAE mode only has the P_VALID bit at top level.
 	 */
 	for (i = 1; i < mmu.num_level; ++i)
 		mmu.ptp_bits[i] = PT_PTPBITS;
+
 #if defined(__i386)
 	mmu.ptp_bits[2] = PT_VALID;
 #endif
@@ -625,15 +595,6 @@ mmu_init(void)
 	while (mmu.hash_cnt * HASH_MAX_LENGTH < max_htables)
 		mmu.hash_cnt <<= 1;
 #endif
-
-	/*
-	 * This code knows that there are only 2 pagesizes.
-	 * We ignore 4MB (non-PAE) for now. The value is only used
-	 * for optimizing demaps across large ranges.
-	 * These return zero if no information is known.
-	 */
-	mmu.tlb_entries[0] = cpuid_get_dtlb_nent(NULL, MMU_PAGESIZE);
-	mmu.tlb_entries[1] = cpuid_get_dtlb_nent(NULL, 2 * 1024 * 1024);
 }
 
 
@@ -765,11 +726,29 @@ hat_vlp_setup(struct cpu *cpu)
 #endif /* __amd64 */
 }
 
+/*ARGSUSED*/
+static void
+hat_vlp_teardown(cpu_t *cpu)
+{
+#if defined(__amd64)
+	struct hat_cpu_info *hci;
+
+	if ((hci = cpu->cpu_hat_info) == NULL)
+		return;
+	if (hci->hci_vlp_l2ptes)
+		kmem_free(hci->hci_vlp_l2ptes, MMU_PAGESIZE);
+	if (hci->hci_vlp_l3ptes)
+		kmem_free(hci->hci_vlp_l3ptes, MMU_PAGESIZE);
+#endif	/* __amd64 */
+}
+
 /*
  * Finish filling in the kernel hat.
  * Pre fill in all top level kernel page table entries for the kernel's
  * part of the address range.  From this point on we can't use any new
  * kernel large pages if they need PTE's at max_level
+ *
+ * create the kmap mappings.
  */
 void
 hat_init_finish(void)
@@ -779,6 +758,7 @@ hat_init_finish(void)
 	uint_t		e;
 	x86pte_t	pte;
 	uintptr_t	va = kernelbase;
+	size_t		size;
 
 
 #if defined(__i386)
@@ -826,6 +806,8 @@ hat_init_finish(void)
 	khat_entries = mmu.top_level_count - khat_start;
 	for (e = khat_start; e < mmu.top_level_count;
 	    ++e, va += LEVEL_SIZE(mmu.max_level)) {
+		if (IN_HYPERVISOR_VA(va))
+			continue;
 		pte = x86pte_get(top, e);
 		if (PTE_ISVALID(pte))
 			continue;
@@ -847,20 +829,30 @@ hat_init_finish(void)
 	 * pagetable. We'll use the remainder for the "per CPU" page tables
 	 * for VLP processes.
 	 *
-	 * We map the top level kernel pagetable into the kernel's AS to make
-	 * it easy to use bcopy for kernel entry PTEs.
-	 *
-	 * We were guaranteed to get a physical address < 4Gig, since the 32 bit
-	 * boot loader uses non-PAE page tables.
+	 * We also map the top level kernel pagetable into the kernel to make
+	 * it easy to use bcopy to initialize new address spaces.
 	 */
 	if (mmu.pae_hat) {
 		vlp_page = vmem_alloc(heap_arena, MMU_PAGESIZE, VM_SLEEP);
 		hat_devload(kas.a_hat, (caddr_t)vlp_page, MMU_PAGESIZE,
 		    kas.a_hat->hat_htable->ht_pfn,
-		    PROT_READ | PROT_WRITE | HAT_NOSYNC | HAT_UNORDERED_OK,
+		    PROT_WRITE |
+		    PROT_READ | HAT_NOSYNC | HAT_UNORDERED_OK,
 		    HAT_LOAD | HAT_LOAD_NOCONSIST);
 	}
 	hat_vlp_setup(CPU);
+
+	/*
+	 * Create kmap (cached mappings of kernel PTEs)
+	 * for 32 bit we map from segmap_start .. ekernelheap
+	 * for 64 bit we map from segmap_start .. segmap_start + segmapsize;
+	 */
+#if defined(__i386)
+	size = (uintptr_t)ekernelheap - segmap_start;
+#elif defined(__amd64)
+	size = segmapsize;
+#endif
+	hat_kmap_init((uintptr_t)segmap_start, size);
 }
 
 /*
@@ -920,9 +912,7 @@ hat_switch(hat_t *hat)
 	 * This is a spin lock at DISP_LEVEL
 	 */
 	if (hat != kas.a_hat) {
-		mutex_enter(&hat->hat_switch_mutex);
 		CPUSET_ATOMIC_ADD(hat->hat_cpus, cpu->cpu_id);
-		mutex_exit(&hat->hat_switch_mutex);
 	}
 	cpu->cpu_current_hat = hat;
 
@@ -968,12 +958,13 @@ hati_mkpte(pfn_t pfn, uint_t attr, level_t level, uint_t flags)
 		PTE_SET(pte, mmu.pt_nx);
 
 	/*
-	 * set the software bits used track ref/mod sync's and hments
+	 * Set the software bits used track ref/mod sync's and hments.
+	 * If not using REF/MOD, set them to avoid h/w rewriting PTEs.
 	 */
-	if (attr & HAT_NOSYNC)
-		PTE_SET(pte, PT_NOSYNC);
 	if (flags & HAT_LOAD_NOCONSIST)
-		PTE_SET(pte, PT_NOCONSIST | PT_NOSYNC);
+		PTE_SET(pte, PT_NOCONSIST | PT_REF | PT_MOD);
+	else if (attr & HAT_NOSYNC)
+		PTE_SET(pte, PT_NOSYNC | PT_REF | PT_MOD);
 
 	/*
 	 * Set the caching attributes in the PTE. The combination
@@ -1138,7 +1129,7 @@ hati_sync_pte_to_page(page_t *pp, x86pte_t pte, level_t level)
 	uint_t	rm = 0;
 	pgcnt_t	pgcnt;
 
-	if (PTE_GET(pte, PT_NOSYNC))
+	if (PTE_GET(pte, PT_SOFTWARE) >= PT_NOSYNC)
 		return;
 
 	if (PTE_GET(pte, PT_REF))
@@ -1171,7 +1162,7 @@ hati_sync_pte_to_page(page_t *pp, x86pte_t pte, level_t level)
 
 /*
  * This the set of PTE bits for PFN, permissions and caching
- * that require a TLB flush (hat_demap) if changed on a HAT_LOAD_REMAP
+ * that require a TLB flush (hat_tlb_inval) if changed on a HAT_LOAD_REMAP
  */
 #define	PT_REMAP_BITS							\
 	(PT_PADDR | PT_NX | PT_WRITABLE | PT_WRITETHRU |		\
@@ -1182,7 +1173,7 @@ hati_sync_pte_to_page(page_t *pp, x86pte_t pte, level_t level)
  * Do the low-level work to get a mapping entered into a HAT's pagetables
  * and in the mapping list of the associated page_t.
  */
-static void
+static int
 hati_pte_map(
 	htable_t	*ht,
 	uint_t		entry,
@@ -1196,6 +1187,7 @@ hati_pte_map(
 	level_t		l = ht->ht_level;
 	hment_t		*hm;
 	uint_t		is_consist;
+	int		rv = 0;
 
 	/*
 	 * Is this a consistant (ie. need mapping list lock) mapping?
@@ -1224,16 +1216,18 @@ hati_pte_map(
 	old_pte = x86pte_set(ht, entry, pte, pte_ptr);
 
 	/*
+	 * did we get a large page / page table collision?
+	 */
+	if (old_pte == LPAGE_ERROR) {
+		rv = -1;
+		goto done;
+	}
+
+	/*
 	 * If the mapping didn't change there is nothing more to do.
 	 */
-	if (PTE_EQUIV(pte, old_pte)) {
-		if (is_consist) {
-			x86_hm_exit(pp);
-			if (hm != NULL)
-				hment_free(hm);
-		}
-		return;
-	}
+	if (PTE_EQUIV(pte, old_pte))
+		goto done;
 
 	/*
 	 * Install a new mapping in the page's mapping list
@@ -1247,7 +1241,7 @@ hati_pte_map(
 		}
 		HTABLE_INC(ht->ht_valid_cnt);
 		PGCNT_INC(hat, l);
-		return;
+		return (rv);
 	}
 
 	/*
@@ -1262,7 +1256,7 @@ hati_pte_map(
 	if (PTE2PFN(old_pte, l) != PTE2PFN(pte, l)) {
 		REMAPASSERT(flags & HAT_LOAD_REMAP);
 		REMAPASSERT(flags & HAT_LOAD_NOCONSIST);
-		REMAPASSERT(PTE_GET(old_pte, PT_NOCONSIST));
+		REMAPASSERT(PTE_GET(old_pte, PT_SOFTWARE) >= PT_NOCONSIST);
 		REMAPASSERT(pf_is_memory(PTE2PFN(old_pte, l)) ==
 		    pf_is_memory(PTE2PFN(pte, l)));
 		REMAPASSERT(!is_consist);
@@ -1276,20 +1270,16 @@ hati_pte_map(
 	    PTE_GET(pte, ~PT_REMAP_BITS));
 
 	/*
-	 * A remap requires invalidating the TLBs, since remapping the
-	 * same PFN requires NOCONSIST, we don't have to sync R/M bits.
-	 */
-	hat_demap(hat, htable_e2va(ht, entry));
-
-	/*
 	 * We don't create any mapping list entries on a remap, so release
 	 * any allocated hment after we drop the mapping list lock.
 	 */
+done:
 	if (is_consist) {
 		x86_hm_exit(pp);
 		if (hm != NULL)
 			hment_free(hm);
 	}
+	return (rv);
 }
 
 /*
@@ -1402,9 +1392,10 @@ hati_reserves_exit(uint_t kmem_for_hat)
 }
 
 /*
- * Internal routine to load a single page table entry.
+ * Internal routine to load a single page table entry. This only fails if
+ * we attempt to overwrite a page table link with a large page.
  */
-static void
+static int
 hati_load_common(
 	hat_t		*hat,
 	uintptr_t	va,
@@ -1418,6 +1409,7 @@ hati_load_common(
 	uint_t		entry;
 	x86pte_t	pte;
 	uint_t		kmem_for_hat = (flags & HAT_NO_KALLOC) ? 1 : 0;
+	int		rv = 0;
 
 	ASSERT(hat == kas.a_hat ||
 	    AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
@@ -1476,13 +1468,14 @@ hati_load_common(
 	/*
 	 * establish the mapping
 	 */
-	hati_pte_map(ht, entry, pp, pte, flags, NULL);
+	rv = hati_pte_map(ht, entry, pp, pte, flags, NULL);
 
 	/*
 	 * release the htable and any reserves
 	 */
 	htable_release(ht);
 	hati_reserves_exit(kmem_for_hat);
+	return (rv);
 }
 
 /*
@@ -1521,7 +1514,7 @@ hat_kmap_load(
 	ht = mmu.kmap_htables[(va - mmu.kmap_htables[0]->ht_vaddr) >>
 	    LEVEL_SHIFT(1)];
 	entry = htable_va2entry(va, ht);
-	hati_pte_map(ht, entry, pp, pte, flags, pte_ptr);
+	(void) hati_pte_map(ht, entry, pp, pte, flags, pte_ptr);
 }
 
 /*
@@ -1535,7 +1528,7 @@ hat_kmap_load(
  *			and hat_devload().
  *
  *	HAT_LOAD_NOCONSIST Do not add mapping to page_t mapping list.
- *			sets PT_NOCONSIST (soft bit)
+ *			sets PT_NOCONSIST
  *
  *	HAT_LOAD_SHARE	A flag to hat_memload() to indicate h/w page tables
  *			that map some user pages (not kas) is shared by more
@@ -1551,7 +1544,7 @@ hat_kmap_load(
  *
  * The following is a protection attribute (like PROT_READ, etc.)
  *
- *	HAT_NOSYNC	set PT_NOSYNC (soft bit) - this mapping's ref/mod bits
+ *	HAT_NOSYNC	set PT_NOSYNC - this mapping's ref/mod bits
  *			are never cleared.
  *
  * Installing new valid PTE's and creation of the mapping list
@@ -1576,7 +1569,7 @@ hat_memload(
 
 	HATIN(hat_memload, hat, addr, (size_t)MMU_PAGESIZE);
 	ASSERT(IS_PAGEALIGNED(va));
-	ASSERT(hat == kas.a_hat || va <= kernelbase);
+	ASSERT(hat == kas.a_hat || va < _userlimit);
 	ASSERT(hat == kas.a_hat ||
 	    AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
 	ASSERT((flags & supported_memload_flags) == flags);
@@ -1598,7 +1591,8 @@ hat_memload(
 	 * always set HAT_STORECACHING_OK.
 	 */
 	attr |= HAT_STORECACHING_OK;
-	hati_load_common(hat, va, pp, attr, flags, level, pfn);
+	if (hati_load_common(hat, va, pp, attr, flags, level, pfn) != 0)
+		panic("unexpected hati_load_common() failure");
 	HATOUT(hat_memload, hat, addr);
 }
 
@@ -1624,7 +1618,7 @@ hat_memload_array(
 
 	HATIN(hat_memload_array, hat, addr, len);
 	ASSERT(IS_PAGEALIGNED(va));
-	ASSERT(hat == kas.a_hat || va + len <= kernelbase);
+	ASSERT(hat == kas.a_hat || va + len <= _userlimit);
 	ASSERT(hat == kas.a_hat ||
 	    AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
 	ASSERT((flags & supported_memload_flags) == flags);
@@ -1647,9 +1641,10 @@ hat_memload_array(
 			pgsize = LEVEL_SIZE(level);
 			if (level == 0)
 				break;
+
 			if (!IS_P2ALIGNED(va, pgsize) ||
 			    (eaddr - va) < pgsize ||
-			    !IS_P2ALIGNED(pfn << MMU_PAGESHIFT, pgsize))
+			    !IS_P2ALIGNED(pfn_to_pa(pfn), pgsize))
 				continue;
 
 			/*
@@ -1675,36 +1670,17 @@ hat_memload_array(
 		}
 
 		/*
-		 * Shared page tables for DISM might have a pre-existing
-		 * level 0 page table that wasn't unlinked from all the
-		 * sharing hats. If we hit this for a large page, back off
-		 * to using level 0 pages.
-		 *
-		 * This can't be made better (ie. use large pages) until we
-		 * track all the htable's sharing and rewrite hat_pageunload().
-		 * Note that would cost a pointer in htable_t for a rare case.
-		 *
-		 * Since the 32 bit kernel caches empty page tables, check
-		 * the kernel too.
-		 */
-		if ((hat == kas.a_hat || (hat->hat_flags & HAT_SHARED)) &&
-		    level > 0) {
-			htable_t *lower;
-
-			lower = htable_getpte(hat, va, NULL, NULL, level - 1);
-			if (lower != NULL) {
-				level = 0;
-				pgsize = LEVEL_SIZE(0);
-				htable_release(lower);
-			}
-		}
-
-		/*
-		 * load this page mapping
+		 * Load this page mapping. If the load fails, try a smaller
+		 * pagesize.
 		 */
 		ASSERT(!IN_VA_HOLE(va));
-		hati_load_common(hat, va, pages[pgindx], attr, flags,
-		    level, pfn);
+		while (hati_load_common(hat, va, pages[pgindx], attr,
+			    flags, level, pfn) != 0) {
+			if (level == 0)
+				panic("unexpected hati_load_common() failure");
+			--level;
+			pgsize = LEVEL_SIZE(level);
+		}
 
 		/*
 		 * move to next page
@@ -1764,7 +1740,7 @@ hat_devload(
 
 	HATIN(hat_devload, hat, addr, len);
 	ASSERT(IS_PAGEALIGNED(va));
-	ASSERT(hat == kas.a_hat || eva <= kernelbase);
+	ASSERT(hat == kas.a_hat || eva <= _userlimit);
 	ASSERT(hat == kas.a_hat ||
 	    AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
 	ASSERT((flags & supported_devload_flags) == flags);
@@ -1788,24 +1764,9 @@ hat_devload(
 		}
 
 		/*
-		 * Some kernel addresses have permanently existing page tables,
-		 * so be sure to use a compatible pagesize.
-		 */
-		if (hat == kas.a_hat && level > 0) {
-			htable_t *lower;
-
-			lower = htable_getpte(hat, va, NULL, NULL, level - 1);
-			if (lower != NULL) {
-				level = 0;
-				pgsize = LEVEL_SIZE(0);
-				htable_release(lower);
-			}
-		}
-
-		/*
-		 * If it is memory get page_t and allow caching (this happens
+		 * If this is just memory then allow caching (this happens
 		 * for the nucleus pages) - though HAT_PLAT_NOCACHE can be used
-		 * to override that. If we don't have a page_t, make sure
+		 * to override that. If we don't have a page_t then make sure
 		 * NOCONSIST is set.
 		 */
 		a = attr;
@@ -1827,7 +1788,12 @@ hat_devload(
 		 * load this page mapping
 		 */
 		ASSERT(!IN_VA_HOLE(va));
-		hati_load_common(hat, va, pp, a, f, level, pfn);
+		while (hati_load_common(hat, va, pp, a, f, level, pfn) != 0) {
+			if (level == 0)
+				panic("unexpected hati_load_common() failure");
+			--level;
+			pgsize = LEVEL_SIZE(level);
+		}
 
 		/*
 		 * move to next page
@@ -1854,7 +1820,7 @@ hat_unlock(hat_t *hat, caddr_t addr, size_t len)
 	/*
 	 * kernel entries are always locked, we don't track lock counts
 	 */
-	ASSERT(hat == kas.a_hat || eaddr <= kernelbase);
+	ASSERT(hat == kas.a_hat || eaddr <= _userlimit);
 	ASSERT(IS_PAGEALIGNED(vaddr));
 	ASSERT(IS_PAGEALIGNED(eaddr));
 	if (hat == kas.a_hat)
@@ -1903,7 +1869,7 @@ hati_demap_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
 	 * For a normal address, we just flush one page mapping
 	 */
 	if ((uintptr_t)addr != DEMAP_ALL_ADDR) {
-		mmu_tlbflush_entry((caddr_t)addr);
+		mmu_tlbflush_entry(addr);
 		return (0);
 	}
 
@@ -1931,10 +1897,11 @@ hati_demap_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
  * all CPUs using a given hat.
  */
 void
-hat_demap(hat_t *hat, uintptr_t va)
+hat_tlb_inval(hat_t *hat, uintptr_t va)
 {
 	extern int	flushes_require_xcalls;	/* from mp_startup.c */
 	cpuset_t	justme;
+	cpuset_t	cpus_to_shootdown;
 
 	/*
 	 * If the hat is being destroyed, there are no more users, so
@@ -1963,29 +1930,29 @@ hat_demap(hat_t *hat, uintptr_t va)
 
 
 	/*
-	 * All CPUs must see kernel hat changes.
+	 * Determine CPUs to shootdown. Kernel changes always do all CPUs.
+	 * Otherwise it's just CPUs currently executing in this hat.
 	 */
-	if (hat == kas.a_hat) {
-		kpreempt_disable();
-		xc_call((xc_arg_t)hat, (xc_arg_t)va, NULL,
-		    X_CALL_HIPRI, khat_cpuset, hati_demap_func);
-		kpreempt_enable();
-		return;
-	}
-
-	/*
-	 * Otherwise we notify CPUs currently running in this HAT
-	 */
-	mutex_enter(&hat->hat_switch_mutex);
 	kpreempt_disable();
 	CPUSET_ONLY(justme, CPU->cpu_id);
-	if (CPUSET_ISEQUAL(hat->hat_cpus, justme))
-		(void) hati_demap_func((xc_arg_t)hat, (xc_arg_t)va, NULL);
+	if (hat == kas.a_hat)
+		cpus_to_shootdown = khat_cpuset;
 	else
-		xc_call((xc_arg_t)hat, (xc_arg_t)va, NULL,
-		    X_CALL_HIPRI, hat->hat_cpus, hati_demap_func);
+		cpus_to_shootdown = hat->hat_cpus;
+
+	if (CPUSET_ISNULL(cpus_to_shootdown) ||
+	    CPUSET_ISEQUAL(cpus_to_shootdown, justme)) {
+
+		(void) hati_demap_func((xc_arg_t)hat, (xc_arg_t)va, NULL);
+
+	} else {
+
+		CPUSET_ADD(cpus_to_shootdown, CPU->cpu_id);
+		xc_call((xc_arg_t)hat, (xc_arg_t)va, NULL, X_CALL_HIPRI,
+		    cpus_to_shootdown, hati_demap_func);
+
+	}
 	kpreempt_enable();
-	mutex_exit(&hat->hat_switch_mutex);
 }
 
 /*
@@ -2024,7 +1991,7 @@ hat_pte_unmap(
 	ASSERT(ht->ht_busy > 0);
 	while (PTE_ISVALID(old_pte)) {
 		pfn = PTE2PFN(old_pte, l);
-		if (PTE_GET(old_pte, PT_NOCONSIST)) {
+		if (PTE_GET(old_pte, PT_SOFTWARE) >= PT_NOCONSIST) {
 			pp = NULL;
 		} else {
 			pp = page_numtopp_nolock(pfn);
@@ -2046,8 +2013,7 @@ hat_pte_unmap(
 		if (hat->hat_flags & HAT_FREEING)
 			old_pte = x86pte_get(ht, entry);
 		else
-			old_pte =
-			    x86pte_invalidate_pfn(ht, entry, pfn, pte_ptr);
+			old_pte = x86pte_inval(ht, entry, old_pte, pte_ptr);
 
 		/*
 		 * If the page hadn't changed we've unmapped it and can proceed
@@ -2063,7 +2029,7 @@ hat_pte_unmap(
 			x86_hm_exit(pp);
 			pp = NULL;
 		} else {
-			ASSERT(PTE_GET(old_pte, PT_NOCONSIST));
+			ASSERT(PTE_GET(old_pte, PT_SOFTWARE) >= PT_NOCONSIST);
 		}
 	}
 
@@ -2104,24 +2070,19 @@ hat_kmap_unload(caddr_t addr, size_t len, uint_t flags)
 {
 	uintptr_t	va = (uintptr_t)addr;
 	uintptr_t	eva = va + len;
-	pgcnt_t		pg_off;
+	pgcnt_t		pg_index;
 	htable_t	*ht;
 	uint_t		entry;
-	void		*pte_ptr;
+	x86pte_t	*pte_ptr;
 	x86pte_t	old_pte;
 
 	for (; va < eva; va += MMU_PAGESIZE) {
 		/*
 		 * Get the PTE
 		 */
-		pg_off = mmu_btop(va - mmu.kmap_addr);
-		if (mmu.pae_hat) {
-			pte_ptr = mmu.kmap_ptes + pg_off;
-			ATOMIC_LOAD64((x86pte_t *)pte_ptr, old_pte);
-		} else {
-			pte_ptr = (x86pte32_t *)mmu.kmap_ptes + pg_off;
-			old_pte = *(x86pte32_t *)pte_ptr;
-		}
+		pg_index = mmu_btop(va - mmu.kmap_addr);
+		pte_ptr = PT_INDEX_PTR(mmu.kmap_ptes, pg_index);
+		old_pte = GET_PTE(pte_ptr);
 
 		/*
 		 * get the htable / entry
@@ -2145,7 +2106,8 @@ void
 hat_unload(hat_t *hat, caddr_t addr, size_t len, uint_t flags)
 {
 	uintptr_t va = (uintptr_t)addr;
-	ASSERT(hat == kas.a_hat || va + len <= kernelbase);
+
+	ASSERT(hat == kas.a_hat || va + len <= _userlimit);
 
 	/*
 	 * special case for performance.
@@ -2153,9 +2115,9 @@ hat_unload(hat_t *hat, caddr_t addr, size_t len, uint_t flags)
 	if (mmu.kmap_addr <= va && va < mmu.kmap_eaddr) {
 		ASSERT(hat == kas.a_hat);
 		hat_kmap_unload(addr, len, flags);
-		return;
+	} else {
+		hat_unload_callback(hat, addr, len, flags, NULL);
 	}
-	hat_unload_callback(hat, addr, len, flags, NULL);
 }
 
 /*
@@ -2212,9 +2174,23 @@ hat_unload_callback(
 	x86pte_t	old_pte;
 
 	HATIN(hat_unload_callback, hat, addr, len);
-	ASSERT(hat == kas.a_hat || eaddr <= kernelbase);
+	ASSERT(hat == kas.a_hat || eaddr <= _userlimit);
 	ASSERT(IS_PAGEALIGNED(vaddr));
 	ASSERT(IS_PAGEALIGNED(eaddr));
+
+	/*
+	 * Special case a single page being unloaded for speed. This happens
+	 * quite frequently, COW faults after a fork() for example.
+	 */
+	if (cb == NULL && len == MMU_PAGESIZE) {
+		ht = htable_getpte(hat, vaddr, &entry, &old_pte, 0);
+		if (ht != NULL) {
+			if (PTE_ISVALID(old_pte))
+				hat_pte_unmap(ht, entry, flags, old_pte, NULL);
+			htable_release(ht);
+		}
+		return;
+	}
 
 	while (vaddr < eaddr) {
 		old_pte = htable_walk(hat, &ht, &vaddr, eaddr);
@@ -2246,7 +2222,6 @@ hat_unload_callback(
 		 */
 		entry = htable_va2entry(vaddr, ht);
 		hat_pte_unmap(ht, entry, flags, old_pte, NULL);
-
 		ASSERT(ht->ht_level <= mmu.max_page_level);
 		vaddr += LEVEL_SIZE(ht->ht_level);
 		contig_va = vaddr;
@@ -2286,7 +2261,7 @@ hat_sync(hat_t *hat, caddr_t addr, size_t len, uint_t flags)
 	ASSERT(!IN_VA_HOLE(vaddr));
 	ASSERT(IS_PAGEALIGNED(vaddr));
 	ASSERT(IS_PAGEALIGNED(eaddr));
-	ASSERT(hat == kas.a_hat || eaddr <= kernelbase);
+	ASSERT(hat == kas.a_hat || eaddr <= _userlimit);
 
 	for (; vaddr < eaddr; vaddr += LEVEL_SIZE(ht->ht_level)) {
 try_again:
@@ -2295,7 +2270,7 @@ try_again:
 			break;
 		entry = htable_va2entry(vaddr, ht);
 
-		if (PTE_GET(pte, PT_NOSYNC) ||
+		if (PTE_GET(pte, PT_SOFTWARE) >= PT_NOSYNC ||
 		    PTE_GET(pte, PT_REF | PT_MOD) == 0)
 			continue;
 
@@ -2313,7 +2288,7 @@ try_again:
 			x86_hm_exit(pp);
 			goto try_again;
 		}
-		if (PTE_GET(pte, PT_NOSYNC) ||
+		if (PTE_GET(pte, PT_SOFTWARE) >= PT_NOSYNC ||
 		    PTE_GET(pte, PT_REF | PT_MOD) == 0) {
 			x86_hm_exit(pp);
 			continue;
@@ -2366,12 +2341,12 @@ hat_getattr(hat_t *hat, caddr_t addr, uint_t *attr)
 	htable_t	*ht = NULL;
 	x86pte_t	pte;
 
-	ASSERT(hat == kas.a_hat || vaddr < kernelbase);
+	ASSERT(hat == kas.a_hat || vaddr <= _userlimit);
 
 	if (IN_VA_HOLE(vaddr))
 		return ((uint_t)-1);
 
-	ht = htable_getpte(hat, vaddr, NULL, &pte, MAX_PAGE_LEVEL);
+	ht = htable_getpte(hat, vaddr, NULL, &pte, mmu.max_page_level);
 	if (ht == NULL)
 		return ((uint_t)-1);
 
@@ -2387,7 +2362,7 @@ hat_getattr(hat_t *hat, caddr_t addr, uint_t *attr)
 		*attr |= PROT_USER;
 	if (!PTE_GET(pte, mmu.pt_nx))
 		*attr |= PROT_EXEC;
-	if (PTE_GET(pte, PT_NOSYNC))
+	if (PTE_GET(pte, PT_SOFTWARE) >= PT_NOSYNC)
 		*attr |= HAT_NOSYNC;
 	htable_release(ht);
 	return (0);
@@ -2419,7 +2394,7 @@ try_again:
 		oldpte = htable_walk(hat, &ht, &vaddr, eaddr);
 		if (ht == NULL)
 			break;
-		if (PTE_GET(oldpte, PT_NOCONSIST))
+		if (PTE_GET(oldpte, PT_SOFTWARE) >= PT_NOCONSIST)
 			continue;
 
 		pp = page_numtopp_nolock(PTE2PFN(oldpte, ht->ht_level));
@@ -2437,7 +2412,8 @@ try_again:
 			    !PTE_GET(oldpte, PT_WRITABLE))
 				newpte |= PT_WRITABLE;
 
-			if ((attr & HAT_NOSYNC) && !PTE_GET(oldpte, PT_NOSYNC))
+			if ((attr & HAT_NOSYNC) &&
+			    PTE_GET(oldpte, PT_SOFTWARE) < PT_NOSYNC)
 				newpte |= PT_NOSYNC;
 
 			if ((attr & PROT_EXEC) && PTE_GET(oldpte, mmu.pt_nx))
@@ -2449,8 +2425,9 @@ try_again:
 			    PTE_GET(oldpte, PT_WRITABLE))
 				newpte &= ~PT_WRITABLE;
 
-			if (!(attr & HAT_NOSYNC) && PTE_GET(oldpte, PT_NOSYNC))
-				newpte &= ~PT_NOSYNC;
+			if (!(attr & HAT_NOSYNC) &&
+			    PTE_GET(oldpte, PT_SOFTWARE) >= PT_NOSYNC)
+				newpte &= ~PT_SOFTWARE;
 
 			if (!(attr & PROT_EXEC) && !PTE_GET(oldpte, mmu.pt_nx))
 				newpte |= mmu.pt_nx;
@@ -2460,12 +2437,20 @@ try_again:
 			if ((attr & PROT_WRITE) && PTE_GET(oldpte, PT_WRITABLE))
 				newpte &= ~PT_WRITABLE;
 
-			if ((attr & HAT_NOSYNC) && PTE_GET(oldpte, PT_NOSYNC))
-				newpte &= ~PT_NOSYNC;
+			if ((attr & HAT_NOSYNC) &&
+			    PTE_GET(oldpte, PT_SOFTWARE) >= PT_NOSYNC)
+				newpte &= ~PT_SOFTWARE;
 
 			if ((attr & PROT_EXEC) && !PTE_GET(oldpte, mmu.pt_nx))
 				newpte |= mmu.pt_nx;
 		}
+
+		/*
+		 * Ensure NOSYNC/NOCONSIST mappings have REF and MOD set.
+		 * x86pte_set() depends on this.
+		 */
+		if (PTE_GET(newpte, PT_SOFTWARE) >= PT_NOSYNC)
+			newpte |= PT_REF | PT_MOD;
 
 		/*
 		 * what about PROT_READ or others? this code only handles:
@@ -2495,36 +2480,29 @@ try_again:
 void
 hat_setattr(hat_t *hat, caddr_t addr, size_t len, uint_t attr)
 {
-	ASSERT(hat == kas.a_hat || (uintptr_t)addr + len <= kernelbase);
+	ASSERT(hat == kas.a_hat || (uintptr_t)addr + len <= _userlimit);
 	hat_updateattr(hat, addr, len, attr, HAT_SET_ATTR);
 }
 
 void
 hat_clrattr(hat_t *hat, caddr_t addr, size_t len, uint_t attr)
 {
-	ASSERT(hat == kas.a_hat || (uintptr_t)addr + len <= kernelbase);
+	ASSERT(hat == kas.a_hat || (uintptr_t)addr + len <= _userlimit);
 	hat_updateattr(hat, addr, len, attr, HAT_CLR_ATTR);
 }
 
 void
 hat_chgattr(hat_t *hat, caddr_t addr, size_t len, uint_t attr)
 {
-	ASSERT(hat == kas.a_hat || (uintptr_t)addr + len <= kernelbase);
+	ASSERT(hat == kas.a_hat || (uintptr_t)addr + len <= _userlimit);
 	hat_updateattr(hat, addr, len, attr, HAT_LOAD_ATTR);
 }
 
 void
 hat_chgprot(hat_t *hat, caddr_t addr, size_t len, uint_t vprot)
 {
-	ASSERT(hat == kas.a_hat || (uintptr_t)addr + len <= kernelbase);
+	ASSERT(hat == kas.a_hat || (uintptr_t)addr + len <= _userlimit);
 	hat_updateattr(hat, addr, len, vprot & HAT_PROT_MASK, HAT_LOAD_ATTR);
-}
-
-/*ARGSUSED*/
-void
-hat_chgattr_pagedir(hat_t *hat, caddr_t addr, size_t len, uint_t attr)
-{
-	panic("hat_chgattr_pgdir() not supported - used by 80387 emulation");
 }
 
 /*
@@ -2539,7 +2517,7 @@ hat_getpagesize(hat_t *hat, caddr_t addr)
 	htable_t	*ht;
 	size_t		pagesize;
 
-	ASSERT(hat == kas.a_hat || vaddr < kernelbase);
+	ASSERT(hat == kas.a_hat || vaddr <= _userlimit);
 	if (IN_VA_HOLE(vaddr))
 		return (-1);
 	ht = htable_getpage(hat, vaddr, NULL);
@@ -2564,9 +2542,9 @@ hat_getpfnum(hat_t *hat, caddr_t addr)
 	uint_t		entry;
 	pfn_t		pfn = PFN_INVALID;
 
-	ASSERT(hat == kas.a_hat || vaddr < kernelbase);
+	ASSERT(hat == kas.a_hat || vaddr <= _userlimit);
 	if (khat_running == 0)
-		panic("hat_getpfnum(): called too early\n");
+		return (PFN_INVALID);
 
 	if (IN_VA_HOLE(vaddr))
 		return (PFN_INVALID);
@@ -2578,14 +2556,10 @@ hat_getpfnum(hat_t *hat, caddr_t addr)
 	 */
 	if (mmu.kmap_addr <= vaddr && vaddr < mmu.kmap_eaddr) {
 		x86pte_t pte;
-		pgcnt_t pg_off;
+		pgcnt_t pg_index;
 
-		pg_off = mmu_btop(vaddr - mmu.kmap_addr);
-		if (mmu.pae_hat) {
-			ATOMIC_LOAD64(mmu.kmap_ptes + pg_off, pte);
-		} else {
-			pte = ((x86pte32_t *)mmu.kmap_ptes)[pg_off];
-		}
+		pg_index = mmu_btop(vaddr - mmu.kmap_addr);
+		pte = GET_PTE(PT_INDEX_PTR(mmu.kmap_ptes, pg_index));
 		if (!PTE_ISVALID(pte))
 			return (PFN_INVALID);
 		/*LINTED [use of constant 0 causes a silly lint warning] */
@@ -2623,7 +2597,6 @@ hat_getkpfnum(caddr_t addr)
 	pfn_t	pfn;
 	int badcaller = 0;
 
-
 	if (khat_running == 0)
 		panic("hat_getkpfnum(): called too early\n");
 	if ((uintptr_t)addr < kernelbase)
@@ -2657,7 +2630,7 @@ hat_probe(hat_t *hat, caddr_t addr)
 	htable_t	*ht;
 	pgcnt_t		pg_off;
 
-	ASSERT(hat == kas.a_hat || vaddr < kernelbase);
+	ASSERT(hat == kas.a_hat || vaddr <= _userlimit);
 	ASSERT(hat == kas.a_hat ||
 	    AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
 	if (IN_VA_HOLE(vaddr))
@@ -2721,7 +2694,7 @@ hat_share(
 	 * We might be asked to share an empty DISM hat by as_dup()
 	 */
 	ASSERT(hat != kas.a_hat);
-	ASSERT(eaddr <= kernelbase);
+	ASSERT(eaddr <= _userlimit);
 	if (!(ism_hat->hat_flags & HAT_SHARED)) {
 		ASSERT(hat_get_mapped_size(ism_hat) == 0);
 		return (0);
@@ -2833,8 +2806,12 @@ hat_share(
 			 * XX64 -- can shm ever be written to swap?
 			 * if not we could use HAT_NOSYNC here.
 			 */
-			hati_load_common(hat, vaddr, pp, prot,
-			    HAT_LOAD, l, pfn);
+			while (hati_load_common(hat, vaddr, pp, prot, HAT_LOAD,
+			    l, pfn) != 0) {
+				if (l == 0)
+					panic("hati_load_common() failure");
+				--l;
+			}
 
 			vaddr += LEVEL_SIZE(l);
 			ism_addr += LEVEL_SIZE(l);
@@ -2865,7 +2842,7 @@ hat_unshare(hat_t *hat, caddr_t addr, size_t len, uint_t ismszc)
 	uint_t		need_demaps = 0;
 
 	ASSERT(hat != kas.a_hat);
-	ASSERT(eaddr <= kernelbase);
+	ASSERT(eaddr <= _userlimit);
 	HATIN(hat_unshare, hat, addr, len);
 	ASSERT(IS_PAGEALIGNED(vaddr));
 	ASSERT(IS_PAGEALIGNED(eaddr));
@@ -2873,9 +2850,9 @@ hat_unshare(hat_t *hat, caddr_t addr, size_t len, uint_t ismszc)
 	/*
 	 * First go through and remove any shared pagetables.
 	 *
-	 * Note that it's ok to delay the demap until the entire range is
+	 * Note that it's ok to delay the TLB shootdown till the entire range is
 	 * finished, because if hat_pageunload() were to unload a shared
-	 * pagetable page, its hat_demap() will do a global user TLB invalidate.
+	 * pagetable page, its hat_tlb_inval() will do a global TLB invalidate.
 	 */
 	while (vaddr < eaddr) {
 		ASSERT(!IN_VA_HOLE(vaddr));
@@ -2904,7 +2881,7 @@ hat_unshare(hat_t *hat, caddr_t addr, size_t len, uint_t ismszc)
 	 * we do just one CR3 reload.
 	 */
 	if (!(hat->hat_flags & HAT_FREEING) && need_demaps)
-		hat_demap(hat, DEMAP_ALL_ADDR);
+		hat_tlb_inval(hat, DEMAP_ALL_ADDR);
 
 	/*
 	 * Now go back and clean up any unaligned mappings that
@@ -3086,9 +3063,9 @@ hati_page_unmap(page_t *pp, htable_t *ht, uint_t entry)
 	/*
 	 * Invalidate the PTE and remove the hment.
 	 */
-	old_pte = x86pte_invalidate_pfn(ht, entry, pfn, NULL);
+	old_pte = x86pte_inval(ht, entry, 0, NULL);
 	if (PTE2PFN(old_pte, ht->ht_level) != pfn) {
-		panic("x86pte_invalidate_pfn() failure found PTE = " FMT_PTE
+		panic("x86pte_inval() failure found PTE = " FMT_PTE
 		    " pfn being unmapped is %lx ht=0x%lx entry=0x%x",
 		    old_pte, pfn, (uintptr_t)ht, entry);
 	}
@@ -3103,7 +3080,7 @@ hati_page_unmap(page_t *pp, htable_t *ht, uint_t entry)
 	/*
 	 * sync ref/mod bits to the page_t
 	 */
-	if (PTE_GET(old_pte, PT_NOSYNC) == 0)
+	if (PTE_GET(old_pte, PT_SOFTWARE) < PT_NOSYNC)
 		hati_sync_pte_to_page(pp, old_pte, ht->ht_level);
 
 	/*
@@ -3165,8 +3142,9 @@ next_size:
 				/*
 				 * If not part of a larger page, we're done.
 				 */
-				if (cur_pp->p_szc <= pg_szcd)
+				if (cur_pp->p_szc <= pg_szcd) {
 					return (0);
+				}
 
 				/*
 				 * Else check the next larger page size.
@@ -3459,7 +3437,8 @@ try_again:
 		/*
 		 * Sync the PTE
 		 */
-		if (!(flags & HAT_SYNC_ZERORM) && PTE_GET(old, PT_NOSYNC) == 0)
+		if (!(flags & HAT_SYNC_ZERORM) &&
+		    PTE_GET(old, PT_SOFTWARE) <= PT_NOSYNC)
 			hati_sync_pte_to_page(pp, old, ht->ht_level);
 
 		/*
@@ -3468,7 +3447,7 @@ try_again:
 		if ((flags & HAT_SYNC_STOPON_MOD) && PP_ISMOD(save_pp) ||
 		    (flags & HAT_SYNC_STOPON_REF) && PP_ISREF(save_pp)) {
 			x86_hm_exit(pp);
-			return (save_pp->p_nrm & nrmbits);
+			goto done;
 		}
 	}
 	x86_hm_exit(pp);
@@ -3481,6 +3460,7 @@ try_again:
 			goto next_size;
 		}
 	}
+done:
 	return (save_pp->p_nrm & nrmbits);
 }
 
@@ -3576,28 +3556,25 @@ hat_setup(hat_t *hat, int flags)
  * the htable can't disappear.  We also hat_devload() the page table into
  * kernel so that the PTE is quickly accessed.
  */
-void *
-hat_mempte_kern_setup(caddr_t addr, void *pt)
+hat_mempte_t
+hat_mempte_setup(caddr_t addr)
 {
 	uintptr_t	va = (uintptr_t)addr;
 	htable_t	*ht;
 	uint_t		entry;
 	x86pte_t	oldpte;
-	caddr_t		p = (caddr_t)pt;
+	hat_mempte_t	p;
+	uint_t		created = 0;
 
 	ASSERT(IS_PAGEALIGNED(va));
 	ASSERT(!IN_VA_HOLE(va));
 	ht = htable_getpte(kas.a_hat, va, &entry, &oldpte, 0);
 	if (ht == NULL) {
-		/*
-		 * Note that we don't need a hat_reserves_exit() check
-		 * for this htable_create(), since that'll be done by the
-		 * hat_devload() just below.
-		 */
 		ht = htable_create(kas.a_hat, va, 0, NULL);
 		entry = htable_va2entry(va, ht);
 		ASSERT(ht->ht_level == 0);
 		oldpte = x86pte_get(ht, entry);
+		created = 1;
 	}
 	if (PTE_ISVALID(oldpte))
 		panic("hat_mempte_setup(): address already mapped"
@@ -3609,65 +3586,47 @@ hat_mempte_kern_setup(caddr_t addr, void *pt)
 	HTABLE_INC(ht->ht_valid_cnt);
 
 	/*
-	 * now we need to map the page holding the pagetable for va into
-	 * the kernel's address space.
-	 */
-	hat_devload(kas.a_hat, p, MMU_PAGESIZE, ht->ht_pfn,
-	    PROT_READ | PROT_WRITE | HAT_NOSYNC | HAT_UNORDERED_OK,
-	    HAT_LOAD | HAT_LOAD_NOCONSIST);
-
-	/*
-	 * return the PTE address to the caller.
+	 * return the PTE physical address to the caller.
 	 */
 	htable_release(ht);
-	p += entry << mmu.pte_size_shift;
-	return ((void *)p);
-}
-
-/*
- * Prepare for a CPU private mapping for the given address.
- */
-void *
-hat_mempte_setup(caddr_t addr)
-{
-	x86pte_t	*p;
-
-	p = vmem_alloc(heap_arena, MMU_PAGESIZE, VM_SLEEP);
-	return (hat_mempte_kern_setup(addr, p));
+	p = PT_INDEX_PHYSADDR(pfn_to_pa(ht->ht_pfn), entry);
+	if (created)
+		hati_reserves_exit(0);
+	return (p);
 }
 
 /*
  * Release a CPU private mapping for the given address.
  * We decrement the htable valid count so it might be destroyed.
  */
+/*ARGSUSED1*/
 void
-hat_mempte_release(caddr_t addr, void *pteptr)
+hat_mempte_release(caddr_t addr, hat_mempte_t pte_pa)
 {
 	htable_t	*ht;
-	uintptr_t	va = ALIGN2PAGE(pteptr);
 
 	/*
-	 * first invalidate any left over mapping and decrement the
-	 * htable's mapping count
+	 * invalidate any left over mapping and decrement the htable valid count
 	 */
-	if (mmu.pae_hat)
-		*(x86pte_t *)pteptr = 0;
-	else
-		*(x86pte32_t *)pteptr = 0;
-	mmu_tlbflush_entry(addr);
+	{
+		x86pte_t *pteptr;
+
+		pteptr = x86pte_mapin(mmu_btop(pte_pa),
+		    (pte_pa & MMU_PAGEOFFSET) >> mmu.pte_size_shift, NULL);
+		if (mmu.pae_hat)
+			*pteptr = 0;
+		else
+			*(x86pte32_t *)pteptr = 0;
+		mmu_tlbflush_entry(addr);
+		x86pte_mapout();
+	}
+
 	ht = htable_getpte(kas.a_hat, ALIGN2PAGE(addr), NULL, NULL, 0);
 	if (ht == NULL)
 		panic("hat_mempte_release(): invalid address");
 	ASSERT(ht->ht_level == 0);
 	HTABLE_DEC(ht->ht_valid_cnt);
 	htable_release(ht);
-
-	/*
-	 * now blow away the kernel mapping to the page table page
-	 * XX64 -- see comment in hat_mempte_setup()
-	 */
-	hat_unload_callback(kas.a_hat, (caddr_t)va, MMU_PAGESIZE,
-	    HAT_UNLOAD, NULL);
 }
 
 /*
@@ -3676,11 +3635,11 @@ hat_mempte_release(caddr_t addr, void *pteptr)
  */
 void
 hat_mempte_remap(
-	pfn_t pfn,
-	caddr_t addr,
-	void *pteptr,
-	uint_t attr,
-	uint_t flags)
+	pfn_t		pfn,
+	caddr_t		addr,
+	hat_mempte_t	pte_pa,
+	uint_t		attr,
+	uint_t		flags)
 {
 	uintptr_t	va = (uintptr_t)addr;
 	x86pte_t	pte;
@@ -3699,14 +3658,22 @@ hat_mempte_remap(
 	ASSERT(ht != NULL);
 	ASSERT(ht->ht_level == 0);
 	ASSERT(ht->ht_valid_cnt > 0);
+	ASSERT(ht->ht_pfn == mmu_btop(pte_pa));
 	htable_release(ht);
 #endif
 	pte = hati_mkpte(pfn, attr, 0, flags);
-	if (mmu.pae_hat)
-		*(x86pte_t *)pteptr = pte;
-	else
-		*(x86pte32_t *)pteptr = (x86pte32_t)pte;
-	mmu_tlbflush_entry(addr);
+	{
+		x86pte_t *pteptr;
+
+		pteptr = x86pte_mapin(mmu_btop(pte_pa),
+		    (pte_pa & MMU_PAGEOFFSET) >> mmu.pte_size_shift, NULL);
+		if (mmu.pae_hat)
+			*(x86pte_t *)pteptr = pte;
+		else
+			*(x86pte32_t *)pteptr = (x86pte32_t)pte;
+		mmu_tlbflush_entry(addr);
+		x86pte_mapout();
+	}
 }
 
 
@@ -3728,64 +3695,31 @@ hat_exit(hat_t *hat)
 	mutex_exit(&hat->hat_mutex);
 }
 
-
 /*
- * Used by hat_kern_setup() to create initial kernel HAT mappings from
- * the boot loader's mappings.
- *
- * - size is either PAGESIZE or some multiple of a level one pagesize
- * - there may not be page_t's for every pfn. (ie. the nucleus pages)
- * - pfn's are continguous for the given va range (va to va + size * cnt)
- */
-void
-hati_kern_setup_load(
-	uintptr_t va,	/* starting va of range to map */
-	size_t size,	/* either PAGESIZE or multiple of large page size */
-	pfn_t pfn,	/* starting PFN */
-	pgcnt_t cnt,	/* number of mappings, (cnt * size) == total size */
-	uint_t prot)	/* protections (PROT_READ, PROT_WRITE, PROT_EXEC) */
-{
-	level_t level = (size == MMU_PAGESIZE ? 0 : 1);
-	size_t bytes = size * cnt;
-	size_t pgsize = LEVEL_SIZE(level);
-	page_t *pp;
-	uint_t flags = HAT_LOAD;
-
-	/*
-	 * We're only going to throw away mappings below kernelbase or in
-	 * boot's special double-mapping region, so set noconsist to avoid
-	 * using hments
-	 */
-	if (BOOT_VA(va))
-		flags |= HAT_LOAD_NOCONSIST;
-
-	prot |= HAT_STORECACHING_OK;
-	while (bytes != 0) {
-		ASSERT(bytes >= pgsize);
-
-		pp = NULL;
-		if (pf_is_memory(pfn) && !BOOT_VA(va) && level == 0)
-			pp = page_numtopp_nolock(pfn);
-
-		hati_load_common(kas.a_hat, va, pp, prot, flags, level, pfn);
-
-		va += pgsize;
-		pfn += mmu_btop(pgsize);
-		bytes -= pgsize;
-	}
-}
-
-/*
- * HAT part of cpu intialization.
+ * HAT part of cpu initialization.
  */
 void
 hat_cpu_online(struct cpu *cpup)
 {
 	if (cpup != CPU) {
-		x86pte_cpu_init(cpup, NULL);
+		x86pte_cpu_init(cpup);
 		hat_vlp_setup(cpup);
 	}
 	CPUSET_ATOMIC_ADD(khat_cpuset, cpup->cpu_id);
+}
+
+/*
+ * HAT part of cpu deletion.
+ * (currently, we only call this after the cpu is safely passivated.)
+ */
+void
+hat_cpu_offline(struct cpu *cpup)
+{
+	ASSERT(cpup != CPU);
+
+	CPUSET_ATOMIC_DEL(khat_cpuset, cpup->cpu_id);
+	x86pte_cpu_fini(cpup);
+	hat_vlp_teardown(cpup);
 }
 
 /*
@@ -3803,7 +3737,7 @@ clear_boot_mappings(uintptr_t low, uintptr_t high)
 
 	/*
 	 * On 1st CPU we can unload the prom mappings, basically we blow away
-	 * all virtual mappings under kernelbase.
+	 * all virtual mappings under _userlimit.
 	 */
 	while (vaddr < high) {
 		pte = htable_walk(kas.a_hat, &ht, &vaddr, high);
@@ -3818,7 +3752,7 @@ clear_boot_mappings(uintptr_t low, uintptr_t high)
 		/*
 		 * Unload the mapping from the page tables.
 		 */
-		(void) x86pte_set(ht, entry, 0, NULL);
+		(void) x86pte_inval(ht, entry, 0, NULL);
 		ASSERT(ht->ht_valid_cnt > 0);
 		HTABLE_DEC(ht->ht_valid_cnt);
 		PGCNT_DEC(ht->ht_hat, ht->ht_level);
@@ -3827,71 +3761,6 @@ clear_boot_mappings(uintptr_t low, uintptr_t high)
 	}
 	if (ht)
 		htable_release(ht);
-
-	/*
-	 * cross call for a complete invalidate.
-	 */
-	hat_demap(kas.a_hat, DEMAP_ALL_ADDR);
-}
-
-/*
- * Initialize a special area in the kernel that always holds some PTEs for
- * faster performance. This always holds segmap's PTEs.
- * In the 32 bit kernel this maps the kernel heap too.
- */
-void
-hat_kmap_init(uintptr_t base, size_t len)
-{
-	uintptr_t map_addr;	/* base rounded down to large page size */
-	uintptr_t map_eaddr;	/* base + len rounded up */
-	size_t map_len;
-	caddr_t ptes;		/* mapping area in kernel as for ptes */
-	size_t window_size;	/* size of mapping area for ptes */
-	ulong_t htable_cnt;	/* # of page tables to cover map_len */
-	ulong_t i;
-	htable_t *ht;
-
-	/*
-	 * we have to map in an area that matches an entire page table
-	 */
-	map_addr = base & LEVEL_MASK(1);
-	map_eaddr = (base + len + LEVEL_SIZE(1) - 1) & LEVEL_MASK(1);
-	map_len = map_eaddr - map_addr;
-	window_size = mmu_btop(map_len) * mmu.pte_size;
-	htable_cnt = mmu_btop(map_len) / mmu.ptes_per_table;
-
-	/*
-	 * allocate vmem for the kmap_ptes
-	 */
-	ptes = vmem_xalloc(heap_arena, window_size, MMU_PAGESIZE, 0,
-	    0, NULL, NULL, VM_SLEEP);
-	mmu.kmap_htables =
-	    kmem_alloc(htable_cnt * sizeof (htable_t *), KM_SLEEP);
-
-	/*
-	 * Map the page tables that cover kmap into the allocated range.
-	 * Note we don't ever htable_release() the kmap page tables - they
-	 * can't ever be stolen, freed, etc.
-	 */
-	for (i = 0; i < htable_cnt; ++i) {
-		ht = htable_create(kas.a_hat, map_addr + i * LEVEL_SIZE(1),
-		    0, NULL);
-		mmu.kmap_htables[i] = ht;
-
-		hat_devload(kas.a_hat, ptes + i * MMU_PAGESIZE, MMU_PAGESIZE,
-		    ht->ht_pfn,
-		    PROT_READ | PROT_WRITE | HAT_NOSYNC | HAT_UNORDERED_OK,
-		    HAT_LOAD | HAT_LOAD_NOCONSIST);
-
-	}
-
-	/*
-	 * set information in mmu to activate handling of kmap
-	 */
-	mmu.kmap_addr = base;
-	mmu.kmap_eaddr = base + len;
-	mmu.kmap_ptes =
-	    (x86pte_t *)(ptes + mmu.pte_size * mmu_btop(base - map_addr));
 }
 
 /*
@@ -3909,11 +3778,12 @@ hati_update_pte(htable_t *ht, uint_t entry, x86pte_t expected, x86pte_t new)
 	uint_t		rm = 0;
 	x86pte_t	replaced;
 
-	if (!PTE_GET(expected, PT_NOSYNC | PT_NOCONSIST) &&
+	if (PTE_GET(expected, PT_SOFTWARE) < PT_NOSYNC &&
 	    PTE_GET(expected, PT_MOD | PT_REF) &&
 	    (PTE_GET(new, PT_NOSYNC) || !PTE_GET(new, PT_WRITABLE) ||
 		!PTE_GET(new, PT_MOD | PT_REF))) {
 
+		ASSERT(!pfn_is_foreign(PTE2PFN(expected, ht->ht_level)));
 		pp = page_numtopp_nolock(PTE2PFN(expected, ht->ht_level));
 		ASSERT(pp != NULL);
 		if (PTE_GET(expected, PT_MOD))
@@ -4022,11 +3892,7 @@ hat_kpm_mapout(struct page *pp, struct kpme *kpme, caddr_t vaddr)
 caddr_t
 hat_kpm_pfn2va(pfn_t pfn)
 {
-	uintptr_t vaddr;
-
-	ASSERT(kpm_enable);
-
-	vaddr = (uintptr_t)kpm_vbase + mmu_ptob(pfn);
+	uintptr_t vaddr = (uintptr_t)kpm_vbase + mmu_ptob(pfn);
 
 	return ((caddr_t)vaddr);
 }

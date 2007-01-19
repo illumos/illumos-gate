@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -81,7 +81,7 @@ check		:=	TARGET= check
 
 .KEEP_STATE:
 
-.PARALLEL:	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) \
+.PARALLEL:	$(PARALLEL_KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) \
 		modlist modlist.sparc
 
 # Override for CPU_KMODS... they cannot be built

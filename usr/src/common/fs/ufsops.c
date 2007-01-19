@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,10 @@
 
 extern void *bkmem_alloc(size_t);
 extern void bkmem_free(void *, size_t);
+extern int cf_check_compressed(fileid_t *);
+extern void cf_close(fileid_t *);
+extern void cf_seek(fileid_t *, off_t, int);
+extern int cf_read(fileid_t *, caddr_t, size_t);
 
 int bootrd_debug;
 #ifdef _BOOT
@@ -419,6 +423,59 @@ getblock(fileid_t *filep, caddr_t buf, int count, int *rcount)
 	return (0);
 }
 
+/*
+ * Get the next block of data from the file.  Don't attempt to go directly
+ * to user's buffer.
+ */
+static int
+getblock_noopt(fileid_t *filep)
+{
+	struct fs *fs;
+	caddr_t p;
+	int off, size, diff;
+	daddr32_t lbn;
+	devid_t	*devp;
+
+	dprintf("getblock_noopt: start\n");
+
+	devp = filep->fi_devp;
+	p = filep->fi_memp;
+	if ((signed)filep->fi_count <= 0) {
+
+		/* find the amt left to be read in the file */
+		diff = filep->fi_inode->i_size - filep->fi_offset;
+		if (diff <= 0) {
+			printf("Short read\n");
+			return (-1);
+		}
+
+		fs = &devp->un_fs.di_fs;
+		/* which block (or frag) in the file do we read? */
+		lbn = lblkno(fs, filep->fi_offset);
+
+		/* which physical block on the device do we read? */
+		filep->fi_blocknum = fsbtodb(fs, sbmap(filep, lbn));
+
+		off = blkoff(fs, filep->fi_offset);
+
+		/* either blksize or fragsize */
+		size = blksize(fs, filep->fi_inode, lbn);
+		filep->fi_count = size;
+		/* reading on a ramdisk, just get a pointer to the data */
+		filep->fi_memp = NULL;
+
+		if (diskread(filep))
+			return (-1);
+
+		if (filep->fi_offset - off + size >= filep->fi_inode->i_size)
+			filep->fi_count = diff + off;
+		filep->fi_count -= off;
+		p = &filep->fi_memp[off];
+	}
+	filep->fi_memp = p;
+	return (0);
+}
+
 
 /*
  *  This is the high-level read function.  It works like this.
@@ -441,7 +498,8 @@ bufs_read(int fd, caddr_t buf, size_t count)
 		return (-1);
 	}
 
-	if (filep->fi_offset + count > filep->fi_inode->i_size)
+	if ((filep->fi_flags & FI_COMPRESSED) == 0 &&
+	    filep->fi_offset + count > filep->fi_inode->i_size)
 		count = filep->fi_inode->i_size - filep->fi_offset;
 
 	/* that was easy */
@@ -450,22 +508,30 @@ bufs_read(int fd, caddr_t buf, size_t count)
 
 	n = buf;
 	while (i > 0) {
-		/* If we need to reload the buffer, do so */
-		if ((j = filep->fi_count) == 0) {
-			(void) getblock(filep, buf, i, &rcount);
-			i -= rcount;
-			buf += rcount;
-			filep->fi_offset += rcount;
+		if (filep->fi_flags & FI_COMPRESSED) {
+			if ((j = cf_read(filep, buf, count)) < 0)
+				return (0); /* encountered an error */
+			if (j < i)
+				i = j; /* short read, must have hit EOF */
 		} else {
-			/* else just bcopy from our buffer */
-			j = MIN(i, j);
-			bcopy(filep->fi_memp, buf, (unsigned)j);
-			buf += j;
-			filep->fi_memp += j;
-			filep->fi_offset += j;
-			filep->fi_count -= j;
-			i -= j;
+			/* If we need to reload the buffer, do so */
+			if ((j = filep->fi_count) == 0) {
+				(void) getblock(filep, buf, i, &rcount);
+				i -= rcount;
+				buf += rcount;
+				filep->fi_offset += rcount;
+				continue;
+			} else {
+				/* else just bcopy from our buffer */
+				j = MIN(i, j);
+				bcopy(filep->fi_memp, buf, (unsigned)j);
+			}
 		}
+		buf += j;
+		filep->fi_memp += j;
+		filep->fi_offset += j;
+		filep->fi_count -= j;
+		i -= j;
 	}
 	return (buf - n);
 }
@@ -564,6 +630,8 @@ bufs_open(char *filename, int flags)
 	filep->fi_devp = ufs_devp; /* dev is already "mounted" */
 	filep->fi_inode = NULL;
 	bzero(filep->fi_buf, MAXBSIZE);
+	filep->fi_getblock = getblock_noopt;
+	filep->fi_flags = 0;
 
 	inode = find(filep, (char *)filename);
 	if (inode == (ino_t)0) {
@@ -579,6 +647,8 @@ bufs_open(char *filename, int flags)
 
 	filep->fi_offset = filep->fi_count = 0;
 
+	if (cf_check_compressed(filep) != 0)
+		return (-1);
 	return (filep->fi_filedes);
 }
 
@@ -596,20 +666,24 @@ bufs_lseek(int fd, off_t addr, int whence)
 	if (!(filep = find_fp(fd)))
 		return (-1);
 
-	switch (whence) {
-	case SEEK_CUR:
-		filep->fi_offset += addr;
-		break;
-	case SEEK_SET:
-		filep->fi_offset = addr;
-		break;
-	default:
-	case SEEK_END:
-		printf("lseek(): invalid whence value %d\n", whence);
-		break;
+	if (filep->fi_flags & FI_COMPRESSED) {
+		cf_seek(filep, addr, whence);
+	} else {
+		switch (whence) {
+		case SEEK_CUR:
+			filep->fi_offset += addr;
+			break;
+		case SEEK_SET:
+			filep->fi_offset = addr;
+			break;
+		default:
+		case SEEK_END:
+			printf("lseek(): invalid whence value %d\n", whence);
+			break;
+		}
+		filep->fi_blocknum = addr / DEV_BSIZE;
 	}
 
-	filep->fi_blocknum = addr / DEV_BSIZE;
 	filep->fi_count = 0;
 
 	return (0);
@@ -643,6 +717,11 @@ bufs_fstat(int fd, struct bootstat *stp)
 	default:
 		break;
 	}
+	/*
+	 * NOTE: this size will be the compressed size for a compressed file
+	 * This could confuse the caller since we decompress the file behind
+	 * the scenes when the file is read.
+	 */
 	stp->st_size = ip->i_size;
 	stp->st_atim.tv_sec = ip->i_atime.tv_sec;
 	stp->st_atim.tv_nsec = ip->i_atime.tv_usec * 1000;
@@ -675,6 +754,7 @@ bufs_close(int fd)
 		/* unlink and deallocate node */
 		filep->fi_forw->fi_back = filep->fi_back;
 		filep->fi_back->fi_forw = filep->fi_forw;
+		cf_close(filep);
 		bkmem_free((char *)filep, sizeof (fileid_t));
 
 		return (0);

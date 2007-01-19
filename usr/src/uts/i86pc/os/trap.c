@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,6 @@
 #include <sys/sysinfo.h>
 #include <sys/fault.h>
 #include <sys/stack.h>
-#include <sys/mmu.h>
 #include <sys/psw.h>
 #include <sys/regset.h>
 #include <sys/fp.h>
@@ -72,6 +71,7 @@
 #include <vm/as.h>
 #include <vm/seg.h>
 #include <vm/hat_pte.h>
+#include <vm/hat_i86.h>
 
 #include <sys/procfs.h>
 
@@ -92,6 +92,10 @@
 #include <sys/traptrace.h>
 #include <sys/ontrap.h>
 #include <sys/cpc_impl.h>
+#include <sys/bootconf.h>
+#include <sys/bootinfo.h>
+#include <sys/promif.h>
+#include <sys/mach_mmu.h>
 
 #define	USER	0x10000		/* user-mode flag added to trap type */
 
@@ -276,11 +280,11 @@ instr_is_syscall(caddr_t pc)
 #ifdef __amd64
 
 /*
- * In the first revisions of AMD64 CPUs produced by AMD, the LAHF and
- * SAHF instructions were not implemented in 64bit mode. Later revisions
+ * In the first revisions of amd64 CPUs produced by AMD, the LAHF and
+ * SAHF instructions were not implemented in 64-bit mode. Later revisions
  * did implement these instructions. An extension to the cpuid instruction
  * was added to check for the capability of executing these instructions
- * in 64bit mode.
+ * in 64-bit mode.
  *
  * Intel originally did not implement these instructions in EM64T either,
  * but added them in later revisions.
@@ -367,15 +371,18 @@ instr_is_prefetch(caddr_t pc)
  *
  * Note: All user-level traps that might call stop() must exit
  * trap() by 'goto out' or by falling through.
+ * Note Also: trap() is usually called with interrupts enabled, (PS_IE == 1)
+ * however, there are paths that arrive here with PS_IE == 0 so special care
+ * must be taken in those cases.
  */
 void
 trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 {
-	kthread_t *cur_thread = curthread;
+	kthread_t *ct = curthread;
 	enum seg_rw rw;
 	unsigned type;
-	proc_t *p = ttoproc(cur_thread);
-	klwp_t *lwp = ttolwp(cur_thread);
+	proc_t *p = ttoproc(ct);
+	klwp_t *lwp = ttolwp(ct);
 	uintptr_t lofault;
 	faultcode_t pagefault(), res, errcode;
 	enum fault_type fault_type;
@@ -397,8 +404,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 
 	type = rp->r_trapno;
 	CPU_STATS_ADDQ(CPU, sys, trap, 1);
-
-	ASSERT(cur_thread->t_schedflag & TS_DONT_SWAP);
+	ASSERT(ct->t_schedflag & TS_DONT_SWAP);
 
 	if (type == T_PGFLT) {
 
@@ -435,7 +441,8 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		}
 #endif /* __i386 */
 
-	}
+	} else if (type == T_SGLSTP && lwp != NULL)
+		lwp->lwp_pcb.pcb_drstat = (uintptr_t)addr;
 
 	if (tdebug)
 		showregs(type, rp, addr);
@@ -448,14 +455,14 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		 * the entire trap.  If trapping from the kernel, this
 		 * should already be set up.
 		 */
-		if (cur_thread->t_cred != p->p_cred) {
-			cred_t *oldcred = cur_thread->t_cred;
+		if (ct->t_cred != p->p_cred) {
+			cred_t *oldcred = ct->t_cred;
 			/*
 			 * DTrace accesses t_cred in probe context.  t_cred
 			 * must always be either NULL, or point to a valid,
 			 * allocated cred structure.
 			 */
-			cur_thread->t_cred = crgetcred();
+			ct->t_cred = crgetcred();
 			crfree(oldcred);
 		}
 		ASSERT(lwp != NULL);
@@ -477,7 +484,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		/* Kernel probe */
 		TNF_PROBE_1(thread_state, "thread", /* CSTYLED */,
 		    tnf_microstate, state, mstate);
-		mstate = new_mstate(cur_thread, mstate);
+		mstate = new_mstate(ct, mstate);
 
 		bzero(&siginfo, sizeof (siginfo));
 	}
@@ -518,9 +525,9 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		 * If we're under on_trap() protection (see <sys/ontrap.h>),
 		 * set ot_trap and longjmp back to the on_trap() call site.
 		 */
-		if ((cur_thread->t_ontrap != NULL) &&
-		    (cur_thread->t_ontrap->ot_prot & OT_DATA_ACCESS)) {
-			curthread->t_ontrap->ot_trap |= OT_DATA_ACCESS;
+		if ((ct->t_ontrap != NULL) &&
+		    (ct->t_ontrap->ot_prot & OT_DATA_ACCESS)) {
+			ct->t_ontrap->ot_trap |= OT_DATA_ACCESS;
 			longjmp(&curthread->t_ontrap->ot_jmpbuf);
 		}
 
@@ -533,10 +540,10 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		 * starting and because we know that we always have
 		 * KERNELBASE mapped as invalid to serve as a "barrier".
 		 */
-		lofault = cur_thread->t_lofault;
-		cur_thread->t_lofault = 0;
+		lofault = ct->t_lofault;
+		ct->t_lofault = 0;
 
-		mstate = new_mstate(cur_thread, LMS_KFAULT);
+		mstate = new_mstate(ct, LMS_KFAULT);
 
 		if (addr < (caddr_t)kernelbase) {
 			res = pagefault(addr,
@@ -549,13 +556,13 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 			res = pagefault(addr,
 			    (errcode & PF_ERR_PROT)? F_PROT: F_INVAL, rw, 1);
 		}
-		(void) new_mstate(cur_thread, mstate);
+		(void) new_mstate(ct, mstate);
 
 		/*
 		 * Restore lofault. If we resolved the fault, exit.
 		 * If we didn't and lofault wasn't set, die.
 		 */
-		cur_thread->t_lofault = lofault;
+		ct->t_lofault = lofault;
 		if (res == 0)
 			goto cleanup;
 
@@ -630,7 +637,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		else
 			res = EFAULT;
 		rp->r_r0 = res;
-		rp->r_pc = cur_thread->t_lofault;
+		rp->r_pc = ct->t_lofault;
 		goto cleanup;
 
 	case T_PGFLT + USER:	/* user page fault */
@@ -1008,7 +1015,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 			if (singlestep_twiddle) {
 				rp->r_ps &= ~PS_T; /* turn off trace */
 				lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
-				cur_thread->t_post_sys = 1;
+				ct->t_post_sys = 1;
 				aston(curthread);
 				goto cleanup;
 			}
@@ -1032,16 +1039,20 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 #if defined(__amd64)
 		/*
 		 * On amd64, we can get a #gp from referencing addresses
-		 * in the virtual address hole e.g. from a copyin.
+		 * in the virtual address hole e.g. from a copyin
+		 * or in update_sregs while updating user semgent registers.
 		 */
 
 		/*
 		 * If we're under on_trap() protection (see <sys/ontrap.h>),
 		 * set ot_trap and longjmp back to the on_trap() call site.
 		 */
-		if ((cur_thread->t_ontrap != NULL) &&
-		    (cur_thread->t_ontrap->ot_prot & OT_DATA_ACCESS)) {
-			curthread->t_ontrap->ot_trap |= OT_DATA_ACCESS;
+		if (ct->t_ontrap != NULL) {
+			if (ct->t_ontrap->ot_prot & OT_DATA_ACCESS)
+				ct->t_ontrap->ot_trap |= OT_DATA_ACCESS;
+
+			if (ct->t_ontrap->ot_prot & OT_SEGMENT_ACCESS)
+				ct->t_ontrap->ot_trap |= OT_SEGMENT_ACCESS;
 			longjmp(&curthread->t_ontrap->ot_jmpbuf);
 		}
 
@@ -1049,7 +1060,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		 * If we're under lofault protection (copyin etc.),
 		 * longjmp back to lofault with an EFAULT.
 		 */
-		if (cur_thread->t_lofault) {
+		if (ct->t_lofault) {
 			/*
 			 * Fault is not resolvable, so just return to lofault
 			 */
@@ -1058,14 +1069,28 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 				traceregs(rp);
 			}
 			rp->r_r0 = EFAULT;
-			rp->r_pc = cur_thread->t_lofault;
+			rp->r_pc = ct->t_lofault;
 			goto cleanup;
 		}
 		/*FALLTHROUGH*/
 #endif
+	case T_SEGFLT:	/* segment not present fault */
+#if defined(__amd64)
+		/*
+		 * One example of this is #NP in update_sregs while
+		 * attempting to update a user segment register
+		 * that points to a descriptor that is marked not
+		 * present.
+		 */
+		if (ct->t_ontrap != NULL &&
+		    ct->t_ontrap->ot_prot & OT_SEGMENT_ACCESS) {
+			ct->t_ontrap->ot_trap |= OT_SEGMENT_ACCESS;
+			longjmp(&curthread->t_ontrap->ot_jmpbuf);
+		}
+#endif	/* __amd64 */
+		/*FALLTHROUGH*/
 	case T_STKFLT:	/* stack fault */
 	case T_TSSFLT:	/* invalid TSS fault */
-	case T_SEGFLT:	/* segment not present fault */
 		if (tudebug)
 			showregs(type, rp, (caddr_t)0);
 		if (kern_gpfault(rp))
@@ -1073,16 +1098,17 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		goto cleanup;
 		/*FALLTHROUGH*/
 
-/*
- * ONLY 32-bit PROCESSES can USE a PRIVATE LDT! 64-bit apps should have
- * no legacy need for them, so we put a stop to it here.
- *
- * So: not-present fault is ONLY valid for 32-bit processes with a private LDT
- * trying to do a system call. Emulate it.
- *
- * #gp fault is ONLY valid for 32-bit processes also, which DO NOT have private
- * LDT, and are trying to do a system call. Emulate it.
- */
+	/*
+	 * ONLY 32-bit PROCESSES can USE a PRIVATE LDT! 64-bit apps
+	 * should have no need for them, so we put a stop to it here.
+	 *
+	 * So: not-present fault is ONLY valid for 32-bit processes with
+	 * a private LDT trying to do a system call. Emulate it.
+	 *
+	 * #gp fault is ONLY valid for 32-bit processes also, which DO NOT
+	 * have a private LDT, and are trying to do a system call. Emulate it.
+	 */
+
 	case T_SEGFLT + USER:	/* segment not present fault */
 	case T_GPFLT + USER:	/* general protection violation */
 #ifdef _SYSCALL32_IMPL
@@ -1278,14 +1304,14 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	if (lwp->lwp_oweupc)
 		profil_tick(rp->r_pc);
 
-	if (cur_thread->t_astflag | cur_thread->t_sig_check) {
+	if (ct->t_astflag | ct->t_sig_check) {
 		/*
 		 * Turn off the AST flag before checking all the conditions that
 		 * may have caused an AST.  This flag is on whenever a signal or
 		 * unusual condition should be handled after the next trap or
 		 * syscall.
 		 */
-		astoff(cur_thread);
+		astoff(ct);
 		/*
 		 * If a single-step trap occurred on a syscall (see above)
 		 * recognize it now.  Do this before checking for signals
@@ -1295,7 +1321,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		if (lwp->lwp_pcb.pcb_flags & DEBUG_PENDING)
 			deferred_singlestep_trap((caddr_t)rp->r_pc);
 
-		cur_thread->t_sig_check = 0;
+		ct->t_sig_check = 0;
 
 		mutex_enter(&p->p_lock);
 		if (curthread->t_proc_flag & TP_CHANGEBIND) {
@@ -1329,15 +1355,15 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		 * All code that sets signals and makes ISSIG evaluate true must
 		 * set t_astflag afterwards.
 		 */
-		if (ISSIG_PENDING(cur_thread, lwp, p)) {
+		if (ISSIG_PENDING(ct, lwp, p)) {
 			if (issig(FORREAL))
 				psig();
-			cur_thread->t_sig_check = 1;
+			ct->t_sig_check = 1;
 		}
 
-		if (cur_thread->t_rprof != NULL) {
+		if (ct->t_rprof != NULL) {
 			realsigprof(0, 0);
-			cur_thread->t_sig_check = 1;
+			ct->t_sig_check = 1;
 		}
 
 		/*
@@ -1374,15 +1400,15 @@ out:	/* We can't get here from a system trap */
 	 */
 	lwp->lwp_state = LWP_USER;
 
-	if (cur_thread->t_trapret) {
-		cur_thread->t_trapret = 0;
-		thread_lock(cur_thread);
-		CL_TRAPRET(cur_thread);
-		thread_unlock(cur_thread);
+	if (ct->t_trapret) {
+		ct->t_trapret = 0;
+		thread_lock(ct);
+		CL_TRAPRET(ct);
+		thread_unlock(ct);
 	}
 	if (CPU->cpu_runrun)
 		preempt();
-	(void) new_mstate(cur_thread, mstate);
+	(void) new_mstate(ct, mstate);
 
 	/* Kernel probe */
 	TNF_PROBE_1(thread_state, "thread", /* CSTYLED */,
@@ -1419,7 +1445,7 @@ struct kpreempt_cnts {		/* kernel preemption statistics */
 void
 kpreempt(int asyncspl)
 {
-	kthread_t *cur_thread = curthread;
+	kthread_t *ct = curthread;
 
 	if (IGNORE_KERNEL_PREEMPTION) {
 		aston(CPU->cpu_dispthread);
@@ -1430,24 +1456,24 @@ kpreempt(int asyncspl)
 	 * Check that conditions are right for kernel preemption
 	 */
 	do {
-		if (cur_thread->t_preempt) {
+		if (ct->t_preempt) {
 			/*
 			 * either a privileged thread (idle, panic, interrupt)
 			 *	or will check when t_preempt is lowered
 			 */
-			if (cur_thread->t_pri < 0)
+			if (ct->t_pri < 0)
 				kpreempt_cnts.kpc_idle++;
-			else if (cur_thread->t_flag & T_INTR_THREAD) {
+			else if (ct->t_flag & T_INTR_THREAD) {
 				kpreempt_cnts.kpc_intr++;
-				if (cur_thread->t_pil == CLOCK_LEVEL)
+				if (ct->t_pil == CLOCK_LEVEL)
 					kpreempt_cnts.kpc_clock++;
 			} else
 				kpreempt_cnts.kpc_blocked++;
 			aston(CPU->cpu_dispthread);
 			return;
 		}
-		if (cur_thread->t_state != TS_ONPROC ||
-		    cur_thread->t_disp_queue != CPU->cpu_disp) {
+		if (ct->t_state != TS_ONPROC ||
+		    ct->t_disp_queue != CPU->cpu_disp) {
 			/* this thread will be calling swtch() shortly */
 			kpreempt_cnts.kpc_notonproc++;
 			if (CPU->cpu_thread != CPU->cpu_dispthread) {
@@ -1467,15 +1493,21 @@ kpreempt(int asyncspl)
 			kpreempt_cnts.kpc_prilevel++;
 			return;
 		}
-
+		if (!interrupts_enabled()) {
+			/*
+			 * Can't preempt while running with ints disabled
+			 */
+			kpreempt_cnts.kpc_prilevel++;
+			return;
+		}
 		if (asyncspl != KPREEMPT_SYNC)
 			kpreempt_cnts.kpc_apreempt++;
 		else
 			kpreempt_cnts.kpc_spreempt++;
 
-		cur_thread->t_preempt++;
+		ct->t_preempt++;
 		preempt();
-		cur_thread->t_preempt--;
+		ct->t_preempt--;
 	} while (CPU->cpu_kprunrun);
 }
 
@@ -1489,8 +1521,8 @@ showregs(uint_t type, struct regs *rp, caddr_t addr)
 
 	s = spl7();
 	type &= ~USER;
-	if (u.u_comm[0])
-		printf("%s: ", u.u_comm);
+	if (PTOU(curproc)->u_comm[0])
+		printf("%s: ", PTOU(curproc)->u_comm);
 	if (type < TRAP_TYPES)
 		printf("#%s %s\n", trap_type_mnemonic[type], trap_type[type]);
 	else
@@ -1526,7 +1558,7 @@ showregs(uint_t type, struct regs *rp, caddr_t addr)
 #else
 	printf("cr0: %b cr4: %b\n",
 	    (uint_t)getcr0(), FMT_CR0, (uint_t)getcr4(), FMT_CR4);
-#endif
+#endif	/* __lint */
 
 #if defined(__amd64)
 	printf("cr2: %lx cr3: %lx cr8: %lx\n", getcr2(), getcr3(), getcr8());
@@ -1550,7 +1582,8 @@ dumpregs(struct regs *rp)
 	printf(fmt, "r10", rp->r_r10, "r11", rp->r_r11, "r12", rp->r_r12);
 	printf(fmt, "r13", rp->r_r13, "r14", rp->r_r14, "r15", rp->r_r15);
 
-	printf(fmt, "fsb", rp->r_fsbase, "gsb", rp->r_gsbase, " ds", rp->r_ds);
+	printf(fmt, "fsb", rdmsr(MSR_AMD_FSBASE), "gsb", rdmsr(MSR_AMD_GSBASE),
+	    " ds", rp->r_ds);
 	printf(fmt, " es", rp->r_es, " fs", rp->r_fs, " gs", rp->r_gs);
 
 	printf(fmt, "trp", rp->r_trapno, "err", rp->r_err, "rip", rp->r_rip);
@@ -1610,7 +1643,6 @@ kern_gpfault(struct regs *rp)
 	extern void _sys_rtt(), sr_sup();
 
 #if defined(__amd64)
-	extern void _update_sregs(), _update_sregs_done();
 	static const uint8_t iretq_insn[2] = { 0x48, 0xcf };
 
 #elif defined(__i386)
@@ -1678,23 +1710,6 @@ kern_gpfault(struct regs *rp)
 		ASSERT(trp->r_pc == lwptoregs(lwp)->r_pc);
 		ASSERT(trp->r_err == rp->r_err);
 
-	} else if ((lwp->lwp_pcb.pcb_flags & RUPDATE_PENDING) != 0 &&
-	    pc >= (caddr_t)_update_sregs &&
-	    pc < (caddr_t)_update_sregs_done) {
-		/*
-		 * This is the common case -- we're trying to load
-		 * a bad segment register value in the only section
-		 * of kernel code that ever loads segment registers.
-		 *
-		 * We don't need to do anything at this point because
-		 * the pcb contains all the pending segment register
-		 * state, and the regs are still intact because we
-		 * didn't adjust the stack pointer yet.  Given the fidelity
-		 * of all this, we could conceivably send a signal
-		 * to the lwp, rather than core-ing.
-		 */
-		trp = lwptoregs(lwp);
-		ASSERT((caddr_t)trp == (caddr_t)rp->r_sp);
 	}
 
 #elif defined(__i386)
@@ -1870,7 +1885,7 @@ dump_ttrace(void)
 	const char fmt1[] = "%3d %016lx %12llx ";
 #elif defined(__i386)
 	const char banner[] =
-		"\ncpu address     timestamp type  vc  handler   pc\n";
+		"\ncpu  address     timestamp type  vc  handler   pc\n";
 	const char fmt1[] = "%3d %08lx %12llx ";
 #endif
 	const char fmt2[] = "%4s %3x ";
@@ -1943,11 +1958,11 @@ dump_ttrace(void)
 					    (uintptr_t)sys->sy_callc,
 					    &off);
 					if (sym != NULL)
-						printf("%s ", sym);
+						printf(fmt3, sym);
 					else
 						printf("%p ", sys->sy_callc);
 				} else {
-					printf("unknown ");
+					printf(fmt3, "unknown");
 				}
 				break;
 
@@ -1958,19 +1973,36 @@ dump_ttrace(void)
 					sym = kobj_getsymname(
 					    (uintptr_t)vec->av_vector, &off);
 					if (sym != NULL)
-						printf("%s ", sym);
+						printf(fmt3, sym);
 					else
 						printf("%p ", vec->av_vector);
 				} else {
-					printf("unknown ");
+					printf(fmt3, "unknown ");
 				}
 				break;
 
 			case TT_TRAP:
+			case TT_EVENT:
 				type = rec->ttr_regs.r_trapno;
 				printf(fmt2, "trap", type);
-				printf("#%s ", type < TRAP_TYPES ?
-				    trap_type_mnemonic[type] : "trap");
+				if (type < TRAP_TYPES)
+					printf("     #%s ",
+					    trap_type_mnemonic[type]);
+				else
+					switch (type) {
+					case T_AST:
+						printf(fmt3, "ast");
+						break;
+					default:
+						printf(fmt3, "");
+						break;
+					}
+				break;
+
+			case TT_XCALL:
+				printf(fmt2, "xcal",
+				    rec->ttr_info.xc_entry.xce_marker);
+				printf(fmt3, "");
 				break;
 
 			default:
@@ -2024,6 +2056,36 @@ dump_ttrace(void)
 			current -= sizeof (trap_trace_rec_t);
 		}
 	}
+}
+
+/*
+ * Help with constructing traptrace records in C
+ */
+trap_trace_rec_t *
+trap_trace_get_traceptr(uint8_t marker, ulong_t pc, ulong_t sp)
+{
+	trap_trace_rec_t *ttr;
+
+	if (trap_trace_freeze)
+		ttr = &trap_trace_postmort;
+	else {
+		trap_trace_ctl_t *ttc = &trap_trace_ctl[CPU->cpu_id];
+
+		ttr = (void *)ttc->ttc_next;
+
+		if (ttc->ttc_next >= ttc->ttc_limit)
+			ttc->ttc_next = ttc->ttc_first;
+		else
+			ttc->ttc_next += sizeof (trap_trace_rec_t);
+	}
+
+	ttr->ttr_regs.r_sp = sp;
+	ttr->ttr_regs.r_pc = pc;
+	ttr->ttr_cr2 = getcr2();
+	ttr->ttr_curthread = (uintptr_t)curthread;
+	ttr->ttr_stamp = tsc_read();
+	ttr->ttr_marker = marker;
+	return (ttr);
 }
 
 #endif	/* TRAPTRACE */

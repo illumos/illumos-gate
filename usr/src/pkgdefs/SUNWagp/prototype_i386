@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -25,15 +25,13 @@
 #
 # SUNWagp
 #
-d none platform 0755 root sys
-d none platform/i86pc 0755 root sys
-d none platform/i86pc/kernel 0755 root sys
-d none platform/i86pc/kernel/drv 0755 root sys
-f none platform/i86pc/kernel/drv/agpgart 0755 root sys
-f none platform/i86pc/kernel/drv/agpgart.conf 0644 root sys
-f none platform/i86pc/kernel/drv/amd64_gart 0755 root sys
-f none platform/i86pc/kernel/drv/agptarget 0755 root sys
-d none platform/i86pc/kernel/drv/amd64 0755 root sys
-f none platform/i86pc/kernel/drv/amd64/agpgart 0755 root sys
-f none platform/i86pc/kernel/drv/amd64/amd64_gart 0755 root sys
-f none platform/i86pc/kernel/drv/amd64/agptarget 0755 root sys
+d none kernel 0755 root sys
+d none kernel/drv 0755 root sys
+f none kernel/drv/agpgart 0755 root sys
+f none kernel/drv/agpgart.conf 0644 root sys
+f none kernel/drv/amd64_gart 0755 root sys
+f none kernel/drv/agptarget 0755 root sys
+d none kernel/drv/amd64 0755 root sys
+f none kernel/drv/amd64/agpgart 0755 root sys
+f none kernel/drv/amd64/amd64_gart 0755 root sys
+f none kernel/drv/amd64/agptarget 0755 root sys

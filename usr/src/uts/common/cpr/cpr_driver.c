@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,7 +66,8 @@ cpr_suspend_devices(dev_info_t *dip)
 			return (ENXIO);
 		if (!cpr_is_real_device(dip))
 			continue;
-		DEBUG2(errp("Suspending device %s\n", devi_string(dip, buf)));
+		CPR_DEBUG(CPR_DEBUG2, "Suspending device %s\n",
+		    devi_string(dip, buf));
 		ASSERT((DEVI(dip)->devi_cpr_flags & DCF_CPR_SUSPENDED) == 0);
 
 		if (!i_ddi_devi_attached(dip))
@@ -78,8 +78,9 @@ cpr_suspend_devices(dev_info_t *dip)
 		if (error == DDI_SUCCESS)
 			DEVI(dip)->devi_cpr_flags |= DCF_CPR_SUSPENDED;
 		else {
-			DEBUG2(errp("WARNING: Unable to suspend device %s\n",
-				devi_string(dip, buf)));
+			CPR_DEBUG(CPR_DEBUG2,
+			    "WARNING: Unable to suspend device %s\n",
+			    devi_string(dip, buf));
 			cpr_err(CE_WARN, "Unable to suspend device %s.",
 				devi_string(dip, buf));
 			cpr_err(CE_WARN, "Device is busy or does not "
@@ -130,8 +131,8 @@ cpr_resume_devices(dev_info_t *start, int resume_failed)
 		 * the entire tree to clear the suspend flag.
 		 */
 		if (did_suspend && !error) {
-			DEBUG2(errp("Resuming device %s\n",
-			    devi_string(dip, buf)));
+			CPR_DEBUG(CPR_DEBUG2, "Resuming device %s\n",
+			    devi_string(dip, buf));
 			/*
 			 * If a device suspended by cpr gets detached during
 			 * the resume process (for example, due to hotplugging)
@@ -139,17 +140,17 @@ cpr_resume_devices(dev_info_t *start, int resume_failed)
 			 * we'll have problems.
 			 */
 			if (!i_ddi_devi_attached(dip)) {
-				DEBUG2(errp("WARNING: Skipping %s, device "
-				    "not ready for resume\n",
-				    devi_string(dip, buf)));
+				CPR_DEBUG(CPR_DEBUG2, "WARNING: Skipping "
+				    "%s, device not ready for resume\n",
+				    devi_string(dip, buf));
 				cpr_err(CE_WARN, "Skipping %s, device "
 				    "not ready for resume",
 				    devi_string(dip, buf));
 			} else if (devi_attach(dip, DDI_RESUME) !=
 			    DDI_SUCCESS) {
-				DEBUG2(errp(
+				CPR_DEBUG(CPR_DEBUG2,
 				    "WARNING: Unable to resume device %s\n",
-				    devi_string(dip, buf)));
+				    devi_string(dip, buf));
 				cpr_err(CE_WARN, "Unable to resume device %s",
 				    devi_string(dip, buf));
 				error = ENXIO;
@@ -243,6 +244,11 @@ cpr_is_real_device(dev_info_t *dip)
 void
 cpr_power_down(void)
 {
+#if defined(__sparc)
+	/*
+	 * XXX	This platform firmware implementation dependency
+	 *	doesn't belong in common code!
+	 */
 	int is_defined = 0;
 	char *wordexists = "p\" power-off\" find nip swap l! ";
 	char *req = "power-off";
@@ -252,7 +258,8 @@ cpr_power_down(void)
 	 */
 	prom_interpret(wordexists, (uintptr_t)&is_defined, 0, 0, 0, 0);
 	if (is_defined) {
-		DEBUG1(errp("\ncpr: %s...\n", req));
+		CPR_DEBUG(CPR_DEBUG1, "\ncpr: %s...\n", req);
 		prom_interpret(req, 0, 0, 0, 0, 0);
 	}
+#endif
 }

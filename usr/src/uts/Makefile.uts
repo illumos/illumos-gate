@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -213,6 +213,8 @@ AS_CPPFLAGS	= $(ALWAYS_DEFS) $(ALL_DEFS) $(CONFIG_DEFS) $(AS_DEFS) \
 # Override the default, the kernel is squeaky clean
 CERRWARN = -errtags=yes -errwarn=%all
 
+C99MODE = $(C99_ENABLE)
+
 CFLAGS_uts		=
 CFLAGS_uts		+= $(STAND_FLAGS_$(CLASS))
 CFLAGS_uts		+= $(CCVERBOSE)
@@ -220,7 +222,6 @@ CFLAGS_uts		+= $(ILDOFF)
 CFLAGS_uts		+= $(XAOPT)
 CFLAGS_uts		+= $(CTF_FLAGS)
 CFLAGS_uts		+= $(CERRWARN)
-CFLAGS_uts		+= $(C99_ENABLE)
 CFLAGS_uts		+= $(CGLOBALSTATIC)
 CFLAGS_uts		+= $(EXTRA_CFLAGS)
 
@@ -373,29 +374,12 @@ CTFMERGE_GENUNIX_MERGE		= \
 	$$cmd $(OBJECTS) $(CTFEXTRAOBJS) $(IPCTF_TARGET)
 
 #
-# Used to copy CTF data from the sun4u genunix to the sun4m genunix.  While
-# we may lose some genunix-specific sun4m-only data, there really isn't any
-# other way, since individual ctfmerges on the sun4u and sun4m genunix
-# modules will result in differing type indices for the same types, and we
-# can't uniquify a given non-genunix module against two genunix modules.
-#
-CTFMERGE_COPY_CTF_DATA		= \
-	@if [ -f $(CTFMERGE_GENUNIX) ] ; then \
-		cmd="$(CTFMERGE) $(CTFMRGFLAGS) -c $(CTFMERGE_GENUNIX) $@" ; \
-		echo $$cmd ; \
-		$$cmd ; \
-	else \
-		echo "WARNING: $(CTFMERGE_GENUNIX) not built. " \
-		    "CTF data will be incomplete" ; \
-	fi
-
-#
 # We ctfmerge the ip objects into genunix to maximize the number of common types
 # found there, thus maximizing the effectiveness of uniquification.  We don't
 # want the genunix build to have to know about the individual ip objects, so we
 # put them in an archive.  The genunix ctfmerge then includes this archive.
 #
-IPCTF			= $(IPDRV_DIR)/$(OBJS_DIR)/ipctf.a
+IPCTF		= $(IPDRV_DIR)/$(OBJS_DIR)/ipctf.a
 
 #
 # Rule for building fake shared libraries used for symbol resolution
@@ -578,15 +562,28 @@ USR_PLAT_LINKS		 = $(PLAT_LINKS:%=$(USR_PLAT_DIR)/%)
 USR_PLAT_LINKS_2	 = $(PLAT_LINKS_2:%=$(USR_PLAT_DIR)/%)
 
 #
-#	Collection of all relevant, delivered kernel modules.
+# Collection of all relevant, delivered kernel modules.
 #
-KMODS	= $(DRV_KMODS) $(EXEC_KMODS) $(FS_KMODS) $(SCHED_KMODS) $(TOD_KMODS) \
-	  $(STRMOD_KMODS) $(SYS_KMODS) $(MISC_KMODS) $(NLMISC_KMODS) \
-	  $(MACH_KMODS) $(CPU_KMODS) $(GENUNIX_KMODS) \
-	  $(GSS_KMODS) $(MMU_KMODS) $(DACF_KMODS) $(EXPORT_KMODS) \
-	  $(IPP_KMODS) $(CRYPTO_KMODS) $(CRYPTO_EK_KMODS) $(PCBE_KMODS) \
-	  $(DRV_KMODS_$(CLASS)) $(MISC_KMODS_$(CLASS)) $(MAC_KMODS) \
-	  $(DEVNAME_KMODS)
+# Note that we insist on building genunix first, because everything else
+# uniquifies against it.  When doing a 'make' from usr/src/uts/, we'll enter
+# the platform directories first.  These will cd into the corresponding genunix
+# directory and build it.  So genunix /shouldn't/ get rebuilt when we get to
+# building all the kernel modules.  However, due to an as-yet-unexplained
+# problem with dependencies, sometimes it does get rebuilt, which then messes
+# up the other modules.  So we always force the issue here rather than try to
+# build genunix in parallel with everything else.
+#
+PARALLEL_KMODS = $(DRV_KMODS) $(EXEC_KMODS) $(FS_KMODS) $(SCHED_KMODS) \
+		 $(TOD_KMODS) $(STRMOD_KMODS) $(SYS_KMODS) $(MISC_KMODS) \
+		 $(NLMISC_KMODS) $(MACH_KMODS) $(CPU_KMODS) $(GSS_KMODS) \
+		 $(MMU_KMODS) $(DACF_KMODS) $(EXPORT_KMODS) $(IPP_KMODS) \
+		 $(CRYPTO_KMODS) $(CRYPTO_EK_KMODS) $(PCBE_KMODS) \
+		 $(DRV_KMODS_$(CLASS)) $(MISC_KMODS_$(CLASS)) $(MAC_KMODS) \
+		 $(DEVNAME_KMODS)
+
+KMODS = $(GENUNIX_KMODS) $(PARALLEL_KMODS)
+
+$(PARALLEL_KMODS): $(GENUNIX_KMODS)
 
 $(CLOSED_BUILD)CLOSED_KMODS = $(CLOSED_DRV_KMODS) $(CLOSED_TOD_KMODS) \
 	$(CLOSED_MISC_KMODS) \
@@ -596,8 +593,7 @@ LINT_KMODS = $(DRV_KMODS) $(EXEC_KMODS) $(FS_KMODS) $(SCHED_KMODS) \
 	  $(TOD_KMODS) $(STRMOD_KMODS) $(SYS_KMODS) $(MISC_KMODS) \
 	  $(MACH_KMODS) $(GSS_KMODS) $(DACF_KMODS) $(IPP_KMODS) \
 	  $(CRYPTO_KMODS) $(PCBE_KMODS) $(DEVNAME_KMODS) \
-	  $(DRV_KMODS_$(CLASS)) $(MISC_KMODS_$(CLASS)) $(MAC_KMODS) \
-	  $(DEVNAME_KMODS)
+	  $(DRV_KMODS_$(CLASS)) $(MISC_KMODS_$(CLASS)) $(MAC_KMODS)
 
 $(CLOSED_BUILD)CLOSED_LINT_KMODS = $(CLOSED_DRV_KMODS) $(CLOSED_TOD_KMODS) \
 	  $(CLOSED_MISC_KMODS) $(CLOSED_DRV_KMODS_$(CLASS))

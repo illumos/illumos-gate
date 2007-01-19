@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -214,8 +213,8 @@ resume(kthread_t *t)
 
 	movq	%r13, %rdi		/* arg = thread pointer */
 	call	savectx			/* call ctx ops */
-
 .nosavectx:
+
         /*
          * Call savepctx if process has installed context ops.
          */
@@ -245,14 +244,6 @@ resume(kthread_t *t)
 	GET_THREAD_HATP(%rdi, %r12, %r11)
 	call	hat_switch
 
-	movq	T_LWP(%r13), %r14
-	testq	%r14, %r14
-	jz	.disabled_fpu2
-
-	cmpl	$FPU_EN, PCB_FPU_FLAGS(%r14)
-	je	.wait_for_fpusave
-
-.disabled_fpu2:
 	/* 
 	 * Clear and unlock previous thread's t_lock
 	 * to allow it to be dispatched by another processor.
@@ -384,16 +375,6 @@ resume_return:
 	 */
 	addq	$CLONGSIZE, %rsp
 	ret
-
-.wait_for_fpusave:
-	/* mark copy in pcb as valid */
-	movq	%cr0, %rax
-	movl	$_CONST(FPU_VALID|FPU_EN), PCB_FPU_FLAGS(%r14)
-	orl	$CR0_TS, %eax	/* set to trap on next switch */
-	fwait			/* ensure save is done before we unlock */
-	finit			/* (ensure x87 tags cleared for fxsave case) */
-	movq	%rax, %cr0
-	jmp	.disabled_fpu2
 	SET_SIZE(_resume_from_idle)
 	SET_SIZE(resume)
 
@@ -414,6 +395,9 @@ resume_return:
 	LOADCPU(%ebx)			/* %ebx = CPU */
 	movl	CPU_THREAD(%ebx), %esi	/* %esi = curthread */
 
+#ifdef DEBUG
+	call	assert_ints_enabled	/* panics if we are cli'd */
+#endif
 	/*
 	 * Call savectx if thread has installed context ops.
 	 *
@@ -428,8 +412,8 @@ resume_return:
 	pushl	%esi			/* arg = thread pointer */
 	call	savectx			/* call ctx ops */
 	addl	$4, %esp		/* restore stack pointer */
-
 .nosavectx:
+
         /*
          * Call savepctx if process has installed context ops.
          */
@@ -439,7 +423,7 @@ resume_return:
 	pushl	%eax			/* arg = proc pointer */
 	call	savepctx		/* call ctx ops */
 	addl	$4, %esp
-.nosavepctx:	
+.nosavepctx:
 
 	/* 
 	 * Temporarily switch to the idle thread's stack
@@ -451,8 +435,6 @@ resume_return:
 	 */
 	movl	T_SP(%eax), %esp	/* It is safe to set esp */
 	movl	%eax, CPU_THREAD(%ebx)
-	movl	T_LWP(%esi), %ecx	/* load pointer to pcb_fpu */
-	movl	%ecx, %ebx		/* save pcb_fpu pointer in %ebx */
 
 	/* switch in the hat context for the new thread */
 	GET_THREAD_HATP(%ecx, %edi, %ecx)
@@ -460,17 +442,11 @@ resume_return:
 	call	hat_switch
 	addl	$4, %esp
 	
-	xorl	%ecx, %ecx
-	testl	%ebx, %ebx			/* check pcb_fpu pointer */
-	jz	.disabled_fpu2
-	cmpl	$FPU_EN, PCB_FPU_FLAGS(%ebx)	/* is PCB_FPU_FLAGS FPU_EN? */
-	je	.wait_for_fpusave
-.disabled_fpu2:
 	/* 
 	 * Clear and unlock previous thread's t_lock
 	 * to allow it to be dispatched by another processor.
 	 */
-	movb	%cl, T_LOCK(%esi)
+	movb	$0, T_LOCK(%esi)
 
 	/*
 	 * IMPORTANT: Registers at this point must be:
@@ -586,18 +562,6 @@ resume_return:
 	addl	$CLONGSIZE, %esp
 	ret
 
-.wait_for_fpusave:
-	mov	%cr0, %eax
-
-	/* mark copy in pcb as valid */
-	movl	$_CONST(FPU_VALID|FPU_EN), PCB_FPU_FLAGS(%ebx)
-
-	orl	$CR0_TS, %eax			/* set to trap on next switch */
-	fwait			/* ensure save is done before we unlock */
-	finit			/* (ensure x87 tags cleared for fxsave case) */
-	movl	%eax, %cr0
-	jmp	.disabled_fpu2
-
 .L4_2:
 	pause
 	cmpb	$0, T_LOCK(%edi)
@@ -647,15 +611,6 @@ resume_from_zombie(kthread_t *t)
 	testq	$CR0_TS, %rax
 	jnz	.zfpu_disabled		/* if TS already set, nothing to do */
 	fninit				/* init fpu & discard pending error */
-
-	/*
-	 * Store a zero word into the mxcsr register to disable any sse
-	 * floating point exceptions
-	 */
-	pushq	$0
-	movq	%rsp, %rdi
-	ldmxcsr	(%rdi)
-	addq	$CLONGSIZE, %rsp
 	orq	$CR0_TS, %rax
 	movq	%rax, %cr0
 .zfpu_disabled:
@@ -715,28 +670,21 @@ resume_from_zombie_return:
 	 */
 	SAVE_REGS(%eax, %ecx)
 
+#ifdef DEBUG
+	call	assert_ints_enabled	/* panics if we are cli'd */
+#endif
 	movl	%gs:CPU_THREAD, %esi	/* %esi = curthread */
 
 	/* clean up the fp unit. It might be left enabled */
+
 	movl	%cr0, %eax
 	testl	$CR0_TS, %eax
 	jnz	.zfpu_disabled		/* if TS already set, nothing to do */
 	fninit				/* init fpu & discard pending error */
-
-	/*
-	 * If this machine supports fxsave/fxrstor, the next string of
-	 * nops may be patched to store a zero word off the stack into
-	 * the mxcsr register to disable any sse floating point exceptions
-	 */
-	pushl	$0
-	mov	%esp, %ebx
-	.globl	_patch_ldmxcsr_ebx
-_patch_ldmxcsr_ebx:
-	nop; nop; nop			/* ldmxcsr (%ebx) */
-	addl	$4, %esp
 	orl	$CR0_TS, %eax
 	movl	%eax, %cr0
 .zfpu_disabled:
+
 	/* 
 	 * Temporarily switch to the idle thread's stack so that the zombie
 	 * thread's stack can be reclaimed by the reaper.
@@ -749,11 +697,14 @@ _patch_ldmxcsr_ebx:
 	 */
 	movl	%eax, %gs:CPU_THREAD
 
-	/* switch in the hat context for the new thread */
+	/*
+	 * switch in the hat context for the new thread
+	 */
 	GET_THREAD_HATP(%ecx, %edi, %ecx)
 	pushl	%ecx
 	call	hat_switch
 	addl	$4, %esp
+
 	/* 
 	 * Put the zombie on death-row.
 	 */
@@ -872,6 +823,9 @@ resume_from_intr_return:
 	 */
 	SAVE_REGS(%eax, %ecx)
 
+#ifdef DEBUG
+	call	assert_ints_enabled	/* panics if we are cli'd */
+#endif
 	movl	%gs:CPU_THREAD, %esi	/* %esi = curthread */
 	movl	%edi, %gs:CPU_THREAD	/* set CPU's thread pointer */
 	movl	T_SP(%edi), %esp	/* restore resuming thread's sp */

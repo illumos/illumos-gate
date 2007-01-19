@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -112,7 +112,7 @@
 ./src/prototypes
 */tools
 ./src/cmd/pools/poold/com/sun/solaris/*/*/package.html
-./src/uts/i86pc/io/acpica/cmp_ca.sh
+./src/uts/intel/io/acpica/cmp_ca.sh
 
 #
 # Ignore files that are only used by internal packages.

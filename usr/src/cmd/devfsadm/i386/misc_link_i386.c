@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@ static int smbios(di_minor_t minor, di_node_t node);
 static int agp_process(di_minor_t minor, di_node_t node);
 static int drm_node(di_minor_t minor, di_node_t node);
 static int mc_node(di_minor_t minor, di_node_t node);
+static int xsvc(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t misc_cbt[] = {
 	{ "vt00", "ddi_display", NULL,
@@ -88,6 +89,9 @@ static devfsadm_create_t misc_cbt[] = {
 	},
 	{ "agp", "ddi_agp:master", NULL,
 	    TYPE_EXACT, ILEVEL_0, agp_process
+	},
+	{ "pseudo", "ddi_pseudo", NULL,
+	    TYPE_EXACT, ILEVEL_0, xsvc
 	},
 	{ "memory-controller", "ddi_mem_ctrl", NULL,
 	    TYPE_EXACT, ILEVEL_0, mc_node
@@ -546,5 +550,24 @@ mc_node(di_minor_t minor, di_node_t node)
 	(void) snprintf(linkpath, sizeof (linkpath), "mc/mc%u",
 	    unitaddr - MC_AMD_DEV_OFFSET);
 	(void) devfsadm_mklink(linkpath, node, minor, 0);
+	return (DEVFSADM_CONTINUE);
+}
+
+/*
+ * Creates \M0 devlink for xsvc node
+ */
+static int
+xsvc(di_minor_t minor, di_node_t node)
+{
+	char *mn;
+
+	if (strcmp(di_node_name(node), "xsvc") != 0)
+		return (DEVFSADM_CONTINUE);
+
+	mn = di_minor_name(minor);
+	if (mn == NULL)
+		return (DEVFSADM_CONTINUE);
+
+	(void) devfsadm_mklink(mn, node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }

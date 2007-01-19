@@ -31,14 +31,17 @@ timeout 10
 #	makeactive
 #
 # To load a Solaris instance based on grub
+# If GRUB determines if the booting system is 64-bit capable,
+# the kernel$ and module$ commands expand $ISADIR to "amd64"
 #
 # title Solaris <version>
 #	root (hd<disk no>,<partition no>,x)	--x = Solaris root slice
-#	kernel /platform/i86pc/multiboot
-#	module /platform/i86pc/boot_archive
+#	kernel$ /platform/i86pc/kernel/$ISADIR/unix
+#	module$ /platform/i86pc/$ISADIR/boot_archive
+
 #
 # To override Solaris boot args (see kernel(1M)), console device and
 # properties set via eeprom(1M) edit the "kernel" line to:
 #
-#   kernel /platform/i86pc/multiboot <boot-args> -B prop1=val1,prop2=val2,...
+#   kernel /platform/i86pc/kernel/unix <boot-args> -B prop1=val1,prop2=val2,...
 #

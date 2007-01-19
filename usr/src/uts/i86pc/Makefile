@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,7 +43,8 @@ INTEL_LIB_DIR	 = $(UTSBASE)/intel/lint-libs/$(OBJS_DIR)
 INTEL_LINTS	 = genunix
 
 LINT_LIBS	 = $(LINT_LIB) \
-		   $(KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
+		   $(GENUNIX_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
+		   $(PARALLEL_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(CLOSED_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(INTEL_LINTS:%=$(INTEL_LIB_DIR)/llib-l%.ln)
 
@@ -65,7 +66,7 @@ check		:=	TARGET= check
 
 .KEEP_STATE:
 
-.PARALLEL:	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) \
+.PARALLEL:	$(PARALLEL_KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) \
 		modlist modlist.intel
 
 INITIAL_TARGETS = \
@@ -120,18 +121,6 @@ install_h check:	FRC
 	@cd sys; pwd; $(MAKE) $(TARGET)
 
 #
-# For some x86 OEMs that deliver their own platform kernel modules but
-# will not deliver anything in usr/platform, they should add their platforms 
-# here so a symlink will be created to the standard usr/platform/i86pc.
-# 
-OEM_LINKS	= ncri86pc
-
-OEM_USR_PLAT_LINKS	= $(OEM_LINKS:%=$(USR_PLAT_DIR)/%)
-
-$(OEM_USR_PLAT_LINKS):
-	$(INS.slink1)
-
-#
 # Definitions for the /platform directory aliases.
 # Currently none for i86pc.
 #
@@ -148,11 +137,6 @@ install_platforms:	$(ROOT_PSM_DIR) $(USR_PSM_DIR) \
 			$(OEM_USR_PLAT_LINKS)
 
 #
-# Work-around to disable acpica global crosscheck lint warnings
-#
-LGREP.i86pc =	grep -v 'i86pc/io/acpica'
-
-#
 #	Full kernel lint target.
 #
 LINT_TARGET	= globallint
@@ -162,14 +146,12 @@ globallint := LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
 
 globallint:
 	@-$(ECHO) "\nFULL KERNEL: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.i86pc) | $(LGREP.2)
+	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 lint:	lintlib .WAIT modlintlib .WAIT $(INTEL_LINTS) $(LINT_DEPS)
 
 $(INTEL_LINTS):	FRC
 	@cd $(UTSBASE)/intel/$@; pwd; $(MAKE) modlintlib
-
-FRC:
 
 include ../Makefile.targ
 

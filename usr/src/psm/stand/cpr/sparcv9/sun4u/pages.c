@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -285,7 +284,7 @@ cb_restore_kpages(void)
 	str = "cb_restore_kpages";
 	CB_VPRINTF((ent_fmt, str, entry));
 
-	DEBUG1(prom_printf("%s: restoring kpages... ", prog));
+	CPR_DEBUG(CPR_DEBUG1, "%s: restoring kpages... ", prog);
 	npages = compressed = regular = 0;
 	while (npages < sfile.kpages) {
 		get_phys_data(&desc, sizeof (desc));
@@ -310,7 +309,7 @@ cb_restore_kpages(void)
 		if ((sfile.ngroups++ & 0x1f) == 0)
 			cb_spin();
 	}
-	DEBUG1(prom_printf(" \b\n"));
+	CPR_DEBUG(CPR_DEBUG1, " \b\n");
 
 	dtlb_cleanup();
 
@@ -322,9 +321,9 @@ cb_restore_kpages(void)
 		    sfile.ngroups, sfile.recycle);
 	}
 
-	DEBUG4(prom_printf(
+	CPR_DEBUG(CPR_DEBUG4,
 	    "%s: total=%d, npages=%d, compressed=%d, regular=%d\n",
-	    str, sfile.kpages, npages, compressed, regular));
+	    str, sfile.kpages, npages, compressed, regular);
 
 	/*
 	 * sanity check

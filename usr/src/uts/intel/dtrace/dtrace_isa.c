@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,17 +32,6 @@
 #include <sys/cmn_err.h>
 #include <sys/privregs.h>
 #include <sys/sysmacros.h>
-
-/*
- * This is gross knowledge to have to encode here...
- */
-extern void _interrupt();
-extern void _cmntrap();
-extern void _allsyscalls();
-
-extern size_t _interrupt_size;
-extern size_t _cmntrap_size;
-extern size_t _allsyscalls_size;
 
 extern uintptr_t kernelbase;
 

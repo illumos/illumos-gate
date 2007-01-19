@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -76,8 +76,8 @@ MOD_LINT_LIB	= $(LINT_LIB_DIR)/llib-l$(LINT_MODULE).ln
 
 $(MOD_LINT_LIB):	$(LINT_LIB_DIR) $(LINTS)
 	@-$(ECHO) "\n$(OBJS_DIR)/$(MODULE): (library construction):"
-	@$(LINT) -o $(LINT_MODULE) $(LINTFLAGS) $(LINTS)
-	@$(MV) $(@F) $@
+	@$(LINT) -o $(LINT_MODULE)-$(OBJS_DIR) $(LINTFLAGS) $(LINTS)
+	@$(MV) llib-l$(LINT_MODULE)-$(OBJS_DIR).ln $@
 
 $(LINT_MODULE).lint:	$(MOD_LINT_LIB) $(LINT_LIB) $(GEN_LINT_LIB)
 	@-$(ECHO) "\n$(OBJS_DIR)/$(LINT_MODULE): global crosschecks:"
@@ -109,7 +109,7 @@ $(LINTS_DIR)/modstubs.ln:	$(MODSTUBS)
 #
 #	release: contents of $(RELEASE) (Spaces replaced by '_')
 #	version: contents of $(PATCHID) (Spaces replaced by '_')
-#	machine: contents of $(PLATFORM)
+#	machine: contents of $(UNAME_M)
 #
 # Build environment information is only contained in the comment section.
 #
@@ -123,7 +123,7 @@ $(INTERNAL_RELEASE_BUILD)VERSION_STRING = $(ECHO) $(PATCHID)
 $(OBJS_DIR)/vers.o: $(OBJECTS)
 	$(COMPILE.c) -DUTS_RELEASE=\"`$(ECHO) $(RELEASE) | sed -e 's/ /_/g'`\" \
 	    -DUTS_VERSION=\"`$(VERSION_STRING) | sed -e 's/ /_/g'`\" \
-	    -DUTS_PLATFORM=\"$(PLATFORM)\" -o $@ $(SRC)/uts/common/os/vers.c
+	    -DUTS_PLATFORM=\"$(UNAME_M)\" -o $@ $(SRC)/uts/common/os/vers.c
 	$(CTFCONVERT_O)
 	$(POST_PROCESS_O)
 
@@ -444,4 +444,5 @@ lint32:
 	@for file in $(LINT32_FILES); do \
 		if [ ! -f $$file ]; then touch $$file; fi \
 	done
+
 FRC:

@@ -58,12 +58,12 @@
 #include <grp.h>
 #include <device_info.h>
 
-#include <libintl.h>
 #include <locale.h>
 
 #include <assert.h>
 
 #include "message.h"
+#include "bootadm.h"
 
 #ifndef TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
@@ -77,55 +77,11 @@ typedef enum {
 	BAM_ARCHIVE
 } subcmd_t;
 
-/* GRUB menu per-line classification */
-typedef enum {
-	BAM_INVALID = 0,
-	BAM_EMPTY,
-	BAM_COMMENT,
-	BAM_GLOBAL,
-	BAM_ENTRY,
-	BAM_TITLE
-} menu_flag_t;
-
-/* struct for menu.lst contents */
-typedef struct line {
-	int  lineNum;	/* Line number in menu.lst */
-	int  entryNum;	/* menu boot entry #. ENTRY_INIT if not applicable */
-	char *cmd;
-	char *sep;
-	char *arg;
-	char *line;
-	menu_flag_t flags;
-	struct line *next;
-	struct line *prev;
-} line_t;
-
-typedef struct entry {
-	struct entry *next;
-	struct entry *prev;
-	line_t *start;
-	line_t *end;
-} entry_t;
-
-typedef struct {
-	line_t *start;
-	line_t *end;
-	line_t *curdefault;	/* line containing default */
-	line_t *olddefault;	/* old default line (commented) */
-	entry_t *entries;	/* os entries */
-} menu_t;
-
 typedef enum {
     OPT_ABSENT = 0,	/* No option */
     OPT_REQ,		/* option required */
     OPT_OPTIONAL	/* option may or may not be present */
 } option_t;
-
-typedef enum {
-    BAM_ERROR = -1,	/* Must be negative. add_boot_entry() depends on it */
-    BAM_SUCCESS = 0,
-    BAM_WRITE = 2
-} error_t;
 
 typedef struct {
 	char	*subcmd;
@@ -134,16 +90,11 @@ typedef struct {
 	int	unpriv;			/* is this an unprivileged command */
 } subcmd_defn_t;
 
-
-#define	BAM_MAXLINE	8192
-
 #define	LINE_INIT	0	/* lineNum initial value */
 #define	ENTRY_INIT	-1	/* entryNum initial value */
 #define	ALL_ENTRIES	-2	/* selects all boot entries */
 
 #define	GRUB_DIR		"/boot/grub"
-#define	MULTI_BOOT		"/platform/i86pc/multiboot"
-#define	BOOT_ARCHIVE		"/platform/i86pc/boot_archive"
 #define	GRUB_MENU		"/boot/grub/menu.lst"
 #define	MENU_TMP		"/boot/grub/menu.lst.tmp"
 #define	RAMDISK_SPECIAL		"/ramdisk"
@@ -180,26 +131,19 @@ typedef struct {
  * Menu related
  * menu_cmd_t and menu_cmds must be kept in sync
  */
-typedef enum {
-	DEFAULT_CMD = 0,
-	TIMEOUT_CMD,
-	TITLE_CMD,
-	ROOT_CMD,
-	KERNEL_CMD,
-	MODULE_CMD,
-	SEP_CMD,
-	COMMENT_CMD
-} menu_cmd_t;
-
-static char *menu_cmds[] = {
+char *menu_cmds[] = {
 	"default",	/* DEFAULT_CMD */
 	"timeout",	/* TIMEOUT_CMD */
 	"title",	/* TITLE_CMD */
 	"root",		/* ROOT_CMD */
 	"kernel",	/* KERNEL_CMD */
+	"kernel$",	/* KERNEL_DOLLAR_CMD */
 	"module",	/* MODULE_CMD */
+	"module$",	/* MODULE_DOLLAR_CMD */
 	" ",		/* SEP_CMD */
 	"#",		/* COMMENT_CMD */
+	"chainloader",	/* CHAINLOADER_CMD */
+	"args",		/* ARGS_CMD */
 	NULL
 };
 
@@ -221,11 +165,9 @@ typedef struct {
 #define	DIR_PERMS	(S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)
 #define	FILE_STAT_MODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
 
-#define	BAM_HDR		"---------- ADDED BY BOOTADM - DO NOT EDIT ----------"
-#define	BAM_FTR		"---------------------END BOOTADM--------------------"
-#define	BAM_OLDDEF	"BOOTADM SAVED DEFAULT: "
-
 /* Globals */
+int bam_verbose;
+int bam_force;
 static char *prog;
 static subcmd_t bam_cmd;
 static char *bam_root;
@@ -237,8 +179,6 @@ static char *bam_opt;
 static int bam_debug;
 static char **bam_argv;
 static int bam_argc;
-static int bam_force;
-static int bam_verbose;
 static int bam_check;
 static int bam_smf_check;
 static int bam_lock_fd = -1;
@@ -251,7 +191,6 @@ static void parse_args(int argc, char *argv[]);
 static error_t bam_menu(char *subcmd, char *opt, int argc, char *argv[]);
 static error_t bam_archive(char *subcmd, char *opt);
 
-static void bam_error(char *format, ...);
 static void bam_print(char *format, ...);
 static void bam_exit(int excode);
 static void bam_lock(void);
@@ -280,12 +219,13 @@ static error_t update_all(char *root, char *opt);
 static error_t read_list(char *root, filelist_t  *flistp);
 static error_t set_global(menu_t *mp, char *globalcmd, int val);
 static error_t set_option(menu_t *mp, char *globalcmd, char *opt);
+static error_t set_kernel(menu_t *mp, menu_cmd_t optnum, char *path,
+    char *buf, size_t bufsize);
+static char *expand_path(const char *partial_path);
 
 static long s_strtol(char *str);
-static char *s_fgets(char *buf, int n, FILE *fp);
 static int s_fputs(char *str, FILE *fp);
 
-static void *s_calloc(size_t nelem, size_t sz);
 static char *s_strdup(char *str);
 static int is_readonly(char *);
 static int is_amd64(void);
@@ -302,6 +242,7 @@ static subcmd_defn_t menu_subcmds[] = {
 	"delete_all_entries",	OPT_ABSENT,	delete_all_entries, 0, /* PVT */
 	"update_entry",		OPT_REQ,	update_entry, 0, /* menu */
 	"update_temp",		OPT_OPTIONAL,	update_temp, 0,	/* reboot */
+	"upgrade",		OPT_ABSENT,	upgrade_menu, 0, /* menu */
 	NULL,			0,		NULL, 0	/* must be last */
 };
 
@@ -325,7 +266,7 @@ struct safefile {
 	struct safefile *next;
 };
 
-struct safefile *safefiles = NULL;
+static struct safefile *safefiles = NULL;
 #define	NEED_UPDATE_FILE "/etc/svc/volatile/boot_archive_needs_update"
 
 static void
@@ -487,7 +428,7 @@ parse_args_internal(int argc, char *argv[])
 	opterr = 0;
 
 	error = 0;
-	while ((c = getopt(argc, argv, "a:d:fm:no:vCR:")) != -1) {
+	while ((c = getopt(argc, argv, "a:d:fm:no:vCR:xX")) != -1) {
 		switch (c) {
 		case 'a':
 			if (bam_cmd) {
@@ -942,6 +883,7 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 {
 	error_t ret;
 	char menu_path[PATH_MAX];
+	char path[PATH_MAX];
 	menu_t *menu;
 	char *mntpt, *menu_root, *logslice, *fstype;
 	struct stat sb;
@@ -961,17 +903,26 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 	logslice = fstype = NULL;
 
 	/*
-	 * If the user provides an alternate root, we
-	 * assume they know what they are doing and we
-	 * use it. Else we check if there is an
-	 * alternate location (other than /boot/grub)
-	 * for the GRUB menu
+	 * Check for the menu.list file:
+	 *
+	 * 1. Check for a GRUB_slice file, be it on / or
+	 *    on the user-provided alternate root.
+	 * 2. Use the alternate root, if given.
+	 * 3. Check /stubboot
+	 * 4. Use /
 	 */
 	if (bam_alt_root) {
-		menu_root = bam_root;
-	} else if (stat(GRUB_slice, &sb) == 0) {
+		(void) snprintf(path, sizeof (path), "%s%s", bam_root,
+		    GRUB_slice);
+	} else {
+		(void) snprintf(path, sizeof (path), "%s", GRUB_slice);
+	}
+
+	if (stat(path, &sb) == 0) {
 		mntpt = mount_grub_slice(&mnted, NULL, &logslice, &fstype);
 		menu_root = mntpt;
+	} else if (bam_alt_root) {
+		menu_root = bam_root;
 	} else if (stat(STUBBOOT, &sb) == 0) {
 		menu_root = use_stubboot();
 	} else {
@@ -1015,11 +966,16 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 		return (BAM_ERROR);
 	}
 
+	ret = dboot_or_multiboot(bam_root);
+	if (ret != BAM_SUCCESS)
+		return (ret);
+
 	/*
 	 * Once the sub-cmd handler has run
 	 * only the line field is guaranteed to have valid values
 	 */
-	if (strcmp(subcmd, "update_entry") == 0)
+	if ((strcmp(subcmd, "update_entry") == 0) ||
+	    (strcmp(subcmd, "upgrade") == 0))
 		ret = f(menu, bam_root, opt);
 	else
 		ret = f(menu, menu_path, opt);
@@ -1068,6 +1024,10 @@ bam_archive(
 		sparc_abort();
 #endif
 
+	ret = dboot_or_multiboot(rootbuf);
+	if (ret != BAM_SUCCESS)
+		return (ret);
+
 	/*
 	 * Check archive not supported with update_all
 	 * since it is awkward to display out-of-sync
@@ -1089,7 +1049,7 @@ bam_archive(
 }
 
 /*PRINTFLIKE1*/
-static void
+void
 bam_error(char *format, ...)
 {
 	va_list ap;
@@ -1108,6 +1068,17 @@ bam_print(char *format, ...)
 
 	va_start(ap, format);
 	(void) vfprintf(stdout, format, ap);
+	va_end(ap);
+}
+
+/*PRINTFLIKE1*/
+void
+bam_print_stderr(char *format, ...)
+{
+	va_list ap;
+
+	va_start(ap, format);
+	(void) vfprintf(stderr, format, ap);
 	va_end(ap);
 }
 
@@ -1501,12 +1472,23 @@ check_flags_and_files(char *root)
 	/*
 	 * If archive is missing, create archive
 	 */
-	(void) snprintf(path, sizeof (path), "%s%s", root, BOOT_ARCHIVE);
+	(void) snprintf(path, sizeof (path), "%s%s", root,
+	    DIRECT_BOOT_ARCHIVE_32);
 	if (stat(path, &sb) != 0) {
 		if (bam_verbose && !bam_check)
 			bam_print(UPDATE_ARCH_MISS, path);
 		walk_arg.need_update = 1;
 		return;
+	}
+	if (bam_direct == BAM_DIRECT_DBOOT) {
+		(void) snprintf(path, sizeof (path), "%s%s", root,
+		    DIRECT_BOOT_ARCHIVE_64);
+		if (stat(path, &sb) != 0) {
+			if (bam_verbose && !bam_check)
+				bam_print(UPDATE_ARCH_MISS, path);
+			walk_arg.need_update = 1;
+			return;
+		}
 	}
 }
 
@@ -1891,10 +1873,19 @@ create_ramdisk(char *root)
 	/*
 	 * Verify that the archive has been created
 	 */
-	(void) snprintf(path, sizeof (path), "%s%s", root, BOOT_ARCHIVE);
+	(void) snprintf(path, sizeof (path), "%s%s", root,
+	    DIRECT_BOOT_ARCHIVE_32);
 	if (stat(path, &sb) != 0) {
 		bam_error(ARCHIVE_NOT_CREATED, path);
 		return (BAM_ERROR);
+	}
+	if (bam_direct == BAM_DIRECT_DBOOT) {
+		(void) snprintf(path, sizeof (path), "%s%s", root,
+		    DIRECT_BOOT_ARCHIVE_64);
+		if (stat(path, &sb) != 0) {
+			bam_error(ARCHIVE_NOT_CREATED, path);
+			return (BAM_ERROR);
+		}
 	}
 
 	return (BAM_SUCCESS);
@@ -2248,7 +2239,13 @@ update_all(char *root, char *opt)
 		(void) snprintf(rootbuf, sizeof (rootbuf), "%s/",
 		    mnt.mnt_mountp);
 		bam_rootlen = strlen(rootbuf);
-		if (update_archive(rootbuf, opt) != BAM_SUCCESS)
+
+		/*
+		 * It's possible that other mounts may be an alternate boot
+		 * architecture, so check it again.
+		 */
+		if ((dboot_or_multiboot(rootbuf) != BAM_SUCCESS) ||
+		    (update_archive(rootbuf, opt) != BAM_SUCCESS))
 			ret = BAM_ERROR;
 	}
 
@@ -2352,6 +2349,7 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 	 */
 	static line_t *prev = NULL;
 	static entry_t *curr_ent = NULL;
+	static int in_liveupgrade = 0;
 
 	line_t	*lp;
 	char *cmd, *sep, *arg;
@@ -2377,6 +2375,11 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 		sep = NULL;
 		arg = s_strdup(str + 1);
 		flag = BAM_COMMENT;
+		if (strstr(arg, BAM_LU_HDR) != NULL) {
+			in_liveupgrade = 1;
+		} else if (strstr(arg, BAM_LU_FTR) != NULL) {
+			in_liveupgrade = 0;
+		}
 	} else if (*str == '\0') {	/* blank line */
 		cmd = sep = arg = NULL;
 		flag = BAM_EMPTY;
@@ -2429,12 +2432,17 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 		lp->entryNum = ++(*entryNum);
 		lp->flags = BAM_TITLE;
 		if (prev && prev->flags == BAM_COMMENT &&
-		    prev->arg && strcmp(prev->arg, BAM_HDR) == 0) {
+		    prev->arg && strcmp(prev->arg, BAM_BOOTADM_HDR) == 0) {
 			prev->entryNum = lp->entryNum;
 			curr_ent = boot_entry_new(mp, prev, lp);
+			curr_ent->flags = BAM_ENTRY_BOOTADM;
 		} else {
 			curr_ent = boot_entry_new(mp, lp, lp);
+			if (in_liveupgrade) {
+				curr_ent->flags = BAM_ENTRY_LU;
+			}
 		}
+		curr_ent->entryNum = *entryNum;
 	} else if (flag != BAM_INVALID) {
 		/*
 		 * For header comments, the entry# is "fixed up"
@@ -2444,7 +2452,29 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 		lp->flags = flag;
 	} else {
 		lp->entryNum = *entryNum;
-		lp->flags = (*entryNum == ENTRY_INIT) ? BAM_GLOBAL : BAM_ENTRY;
+
+		if (*entryNum == ENTRY_INIT) {
+			lp->flags = BAM_GLOBAL;
+		} else {
+			lp->flags = BAM_ENTRY;
+
+			if (cmd && arg) {
+				/*
+				 * We only compare for the length of "module"
+				 * so that "module$" will also match.
+				 */
+				if ((strncmp(cmd, menu_cmds[MODULE_CMD],
+				    strlen(menu_cmds[MODULE_CMD])) == 0) &&
+				    (strcmp(arg, MINIROOT) == 0))
+					curr_ent->flags |= BAM_ENTRY_MINIROOT;
+				else if (strcmp(cmd, menu_cmds[ROOT_CMD]) == 0)
+					curr_ent->flags |= BAM_ENTRY_ROOT;
+				else if (strcmp(cmd,
+				    menu_cmds[CHAINLOADER_CMD]) == 0)
+					curr_ent->flags |=
+					    BAM_ENTRY_CHAINLOADER;
+			}
+		}
 	}
 
 	/* record default, old default, and entry line ranges */
@@ -2454,8 +2484,12 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 	} else if (lp->flags == BAM_COMMENT &&
 	    strncmp(lp->arg, BAM_OLDDEF, strlen(BAM_OLDDEF)) == 0) {
 		mp->olddefault = lp;
+	} else if (lp->flags == BAM_COMMENT &&
+	    strncmp(lp->arg, BAM_OLD_RC_DEF, strlen(BAM_OLD_RC_DEF)) == 0) {
+		mp->old_rc_default = lp;
 	} else if (lp->flags == BAM_ENTRY ||
-	    (lp->flags == BAM_COMMENT && strcmp(lp->arg, BAM_FTR) == 0)) {
+	    (lp->flags == BAM_COMMENT &&
+	    strcmp(lp->arg, BAM_BOOTADM_FTR) == 0)) {
 		boot_entry_addline(curr_ent, lp);
 	}
 	append_line(mp, lp);
@@ -2522,7 +2556,8 @@ update_numbering(menu_t *mp)
 			lp->entryNum = ++entryNum;
 			/* fixup the bootadm header */
 			if (prev && prev->flags == BAM_COMMENT &&
-			    prev->arg && strcmp(prev->arg, BAM_HDR) == 0) {
+			    prev->arg &&
+			    strcmp(prev->arg, BAM_BOOTADM_HDR) == 0) {
 				prev->entryNum = lp->entryNum;
 			}
 		} else {
@@ -2727,6 +2762,7 @@ add_boot_entry(menu_t *mp,
 {
 	int lineNum, entryNum;
 	char linebuf[BAM_MAXLINE];
+	menu_cmd_t k_cmd, m_cmd;
 
 	assert(mp);
 
@@ -2738,8 +2774,36 @@ add_boot_entry(menu_t *mp,
 		return (BAM_ERROR);
 	}
 	if (module == NULL) {
-		bam_error(SUBOPT_MISS, menu_cmds[MODULE_CMD]);
-		return (BAM_ERROR);
+		if (bam_direct != BAM_DIRECT_DBOOT) {
+			bam_error(SUBOPT_MISS, menu_cmds[MODULE_CMD]);
+			return (BAM_ERROR);
+		}
+
+		/* Figure the commands out from the kernel line */
+		if (strstr(kernel, "$ISADIR") != NULL) {
+			module = DIRECT_BOOT_ARCHIVE;
+			k_cmd = KERNEL_DOLLAR_CMD;
+			m_cmd = MODULE_DOLLAR_CMD;
+		} else if (strstr(kernel, "amd64") != NULL) {
+			module = DIRECT_BOOT_ARCHIVE_64;
+			k_cmd = KERNEL_CMD;
+			m_cmd = MODULE_CMD;
+		} else {
+			module = DIRECT_BOOT_ARCHIVE_32;
+			k_cmd = KERNEL_CMD;
+			m_cmd = MODULE_CMD;
+		}
+	} else if ((bam_direct == BAM_DIRECT_DBOOT) &&
+	    (strstr(kernel, "$ISADIR") != NULL)) {
+		/*
+		 * If it's a non-failsafe dboot kernel, use the "kernel$"
+		 * command.  Otherwise, use "kernel".
+		 */
+		k_cmd = KERNEL_DOLLAR_CMD;
+		m_cmd = MODULE_DOLLAR_CMD;
+	} else {
+		k_cmd = KERNEL_CMD;
+		m_cmd = MODULE_CMD;
 	}
 
 	if (mp->start) {
@@ -2755,7 +2819,7 @@ add_boot_entry(menu_t *mp,
 	 * The syntax for comments is #<comment>
 	 */
 	(void) snprintf(linebuf, sizeof (linebuf), "%s%s",
-	    menu_cmds[COMMENT_CMD], BAM_HDR);
+	    menu_cmds[COMMENT_CMD], BAM_BOOTADM_HDR);
 	line_parser(mp, linebuf, &lineNum, &entryNum);
 
 	(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
@@ -2769,15 +2833,15 @@ add_boot_entry(menu_t *mp,
 	}
 
 	(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
-	    menu_cmds[KERNEL_CMD], menu_cmds[SEP_CMD], kernel);
+	    menu_cmds[k_cmd], menu_cmds[SEP_CMD], kernel);
 	line_parser(mp, linebuf, &lineNum, &entryNum);
 
 	(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
-	    menu_cmds[MODULE_CMD], menu_cmds[SEP_CMD], module);
+	    menu_cmds[m_cmd], menu_cmds[SEP_CMD], module);
 	line_parser(mp, linebuf, &lineNum, &entryNum);
 
 	(void) snprintf(linebuf, sizeof (linebuf), "%s%s",
-	    menu_cmds[COMMENT_CMD], BAM_FTR);
+	    menu_cmds[COMMENT_CMD], BAM_BOOTADM_FTR);
 	line_parser(mp, linebuf, &lineNum, &entryNum);
 
 	return (entryNum);
@@ -2797,7 +2861,7 @@ do_delete(menu_t *mp, int entryNum)
 		lp = ent->start;
 		/* check entry number and make sure it's a bootadm entry */
 		if (lp->flags != BAM_COMMENT ||
-		    strcmp(lp->arg, BAM_HDR) != 0 ||
+		    strcmp(lp->arg, BAM_BOOTADM_HDR) != 0 ||
 		    (entryNum != ALL_ENTRIES && lp->entryNum != entryNum)) {
 			ent = ent->next;
 			continue;
@@ -3003,7 +3067,7 @@ get_title(char *rootdir)
 	return (cp == NULL ? "Solaris" : cp);
 }
 
-static char *
+char *
 get_special(char *mountp)
 {
 	FILE *mntfp;
@@ -3027,7 +3091,7 @@ get_special(char *mountp)
 	return (s_strdup(mp.mnt_special));
 }
 
-static char *
+char *
 os_to_grubdisk(char *osdisk, int on_bootdev)
 {
 	FILE *fp;
@@ -3092,7 +3156,8 @@ find_boot_entry(menu_t *mp, char *title, char *root, char *module,
 
 		/* first line of entry must be bootadm comment */
 		lp = ent->start;
-		if (lp->flags != BAM_COMMENT || strcmp(lp->arg, BAM_HDR) != 0) {
+		if (lp->flags != BAM_COMMENT ||
+		    strcmp(lp->arg, BAM_BOOTADM_HDR) != 0) {
 			continue;
 		}
 
@@ -3125,8 +3190,9 @@ find_boot_entry(menu_t *mp, char *title, char *root, char *module,
 
 		/* check for matching module entry (failsafe or normal) */
 		lp = lp->next;	/* advance to module line */
-		if (strcmp(lp->cmd, menu_cmds[MODULE_CMD]) != 0 ||
-		    strcmp(lp->arg, module) != 0) {
+		if ((strncmp(lp->cmd, menu_cmds[MODULE_CMD],
+		    strlen(menu_cmds[MODULE_CMD])) != 0) ||
+		    (strcmp(lp->arg, module) != 0)) {
 			continue;
 		}
 		break;	/* match found */
@@ -3140,13 +3206,24 @@ static int
 update_boot_entry(menu_t *mp, char *title, char *root, char *kernel,
     char *module, int root_opt)
 {
-	int i;
+	int i, change_kernel = 0;
 	entry_t *ent;
 	line_t *lp;
 	char linebuf[BAM_MAXLINE];
 
 	/* note: don't match on title, it's updated on upgrade */
 	ent = find_boot_entry(mp, NULL, root, module, root_opt, &i);
+	if ((ent == NULL) && (bam_direct == BAM_DIRECT_DBOOT)) {
+		/*
+		 * We may be upgrading a kernel from multiboot to
+		 * directboot.  Look for a multiboot entry.
+		 */
+		ent = find_boot_entry(mp, NULL, root, MULTI_BOOT_ARCHIVE,
+		    root_opt, &i);
+		if (ent != NULL) {
+			change_kernel = 1;
+		}
+	}
 	if (ent == NULL)
 		return (add_boot_entry(mp, title, root_opt ? NULL : root,
 		    kernel, module));
@@ -3170,6 +3247,32 @@ update_boot_entry(menu_t *mp, char *title, char *root, char *kernel,
 			line_free(tmp);
 		} else
 			lp = lp->next;
+	}
+
+	if (change_kernel) {
+		/*
+		 * We're upgrading from multiboot to directboot.
+		 */
+		if (strcmp(lp->cmd, menu_cmds[KERNEL_CMD]) == 0) {
+			(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
+			    menu_cmds[KERNEL_DOLLAR_CMD], menu_cmds[SEP_CMD],
+			    kernel);
+			free(lp->arg);
+			free(lp->line);
+			lp->arg = s_strdup(kernel);
+			lp->line = s_strdup(linebuf);
+			lp = lp->next;
+		}
+		if (strcmp(lp->cmd, menu_cmds[MODULE_CMD]) == 0) {
+			(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
+			    menu_cmds[MODULE_DOLLAR_CMD], menu_cmds[SEP_CMD],
+			    module);
+			free(lp->arg);
+			free(lp->line);
+			lp->arg = s_strdup(module);
+			lp->line = s_strdup(linebuf);
+			lp = lp->next;
+		}
 	}
 	return (i);
 }
@@ -3207,19 +3310,24 @@ update_entry(menu_t *mp, char *menu_root, char *opt)
 	}
 
 	/* add the entry for normal Solaris */
-	entry = update_boot_entry(mp, title, grubdisk,
-	    "/platform/i86pc/multiboot",
-	    "/platform/i86pc/boot_archive",
-	    osroot == menu_root);
+	if (bam_direct == BAM_DIRECT_DBOOT) {
+		entry = update_boot_entry(mp, title, grubdisk,
+		    DIRECT_BOOT_KERNEL, DIRECT_BOOT_ARCHIVE,
+		    osroot == menu_root);
+	} else {
+		entry = update_boot_entry(mp, title, grubdisk,
+		    MULTI_BOOT, MULTI_BOOT_ARCHIVE,
+		    osroot == menu_root);
+	}
 
 	/* add the entry for failsafe archive */
-	(void) snprintf(failsafe, sizeof (failsafe),
-	    "%s/boot/x86.miniroot-safe", osroot);
-	if (stat(failsafe, &sbuf) == 0)
-		(void) update_boot_entry(mp, "Solaris failsafe", grubdisk,
-		    "/boot/multiboot kernel/unix -s",
-		    "/boot/x86.miniroot-safe",
-		    osroot == menu_root);
+	(void) snprintf(failsafe, sizeof (failsafe), "%s%s", osroot, MINIROOT);
+	if (stat(failsafe, &sbuf) == 0) {
+		(void) update_boot_entry(mp, FAILSAFE_TITLE, grubdisk,
+		    (bam_direct == BAM_DIRECT_DBOOT) ?
+		    DIRECT_BOOT_FAILSAFE_LINE : MULTI_BOOT_FAILSAFE_LINE,
+		    MINIROOT, osroot == menu_root);
+	}
 	free(grubdisk);
 
 	if (entry == BAM_ERROR) {
@@ -3276,7 +3384,7 @@ read_grub_root(void)
 }
 
 static void
-save_default_entry(menu_t *mp)
+save_default_entry(menu_t *mp, const char *which)
 {
 	int lineNum, entryNum;
 	int entry = 0;	/* default is 0 */
@@ -3294,26 +3402,24 @@ save_default_entry(menu_t *mp)
 	if (lp)
 		entry = s_strtol(lp->arg);
 
-	(void) snprintf(linebuf, sizeof (linebuf), "#%s%d", BAM_OLDDEF, entry);
+	(void) snprintf(linebuf, sizeof (linebuf), "#%s%d", which, entry);
 	line_parser(mp, linebuf, &lineNum, &entryNum);
 }
 
 static void
-restore_default_entry(menu_t *mp)
+restore_default_entry(menu_t *mp, const char *which, line_t *lp)
 {
 	int entry;
 	char *str;
-	line_t *lp = mp->olddefault;
 
 	if (lp == NULL)
 		return;		/* nothing to restore */
 
-	str = lp->arg + strlen(BAM_OLDDEF);
+	str = lp->arg + strlen(which);
 	entry = s_strtol(str);
 	(void) set_global(mp, menu_cmds[DEFAULT_CMD], entry);
 
 	/* delete saved old default line */
-	mp->olddefault = NULL;
 	unlink_line(mp, lp);
 	line_free(lp);
 }
@@ -3333,8 +3439,9 @@ static error_t
 update_temp(menu_t *mp, char *menupath, char *opt)
 {
 	int entry;
-	char *grubdisk, *rootdev;
-	char kernbuf[1024];
+	char *grubdisk, *rootdev, *path;
+	char kernbuf[BUFSIZ];
+	char args_buf[BUFSIZ];
 	struct stat sb;
 
 	assert(mp);
@@ -3346,7 +3453,8 @@ update_temp(menu_t *mp, char *menupath, char *opt)
 		if (ent == NULL)	/* not found is ok */
 			return (BAM_SUCCESS);
 		(void) do_delete(mp, entry);
-		restore_default_entry(mp);
+		restore_default_entry(mp, BAM_OLDDEF, mp->olddefault);
+		mp->olddefault = NULL;
 		return (BAM_WRITE);
 	}
 
@@ -3385,10 +3493,47 @@ update_temp(menu_t *mp, char *menupath, char *opt)
 	}
 
 	/* add an entry for Solaris reboot */
-	(void) snprintf(kernbuf, sizeof (kernbuf),
-	    "/platform/i86pc/multiboot %s", opt);
-	entry = add_boot_entry(mp, REBOOT_TITLE, grubdisk, kernbuf,
-	    "/platform/i86pc/boot_archive");
+	if (bam_direct == BAM_DIRECT_DBOOT) {
+		if (opt[0] == '-') {
+			/* It's an option - first see if boot-file is set */
+			if (set_kernel(mp, KERNEL_CMD, NULL, kernbuf, BUFSIZ)
+			    != BAM_SUCCESS)
+				return (BAM_ERROR);
+			if (kernbuf[0] == '\0')
+				(void) strncpy(kernbuf, DIRECT_BOOT_KERNEL,
+				    BUFSIZ);
+			(void) strlcat(kernbuf, " ", BUFSIZ);
+			(void) strlcat(kernbuf, opt, BUFSIZ);
+		} else if (opt[0] == '/') {
+			/* It's a full path - write it out and go home */
+			(void) strlcpy(kernbuf, opt, BUFSIZ);
+		} else {
+			path = expand_path(opt);
+			if (path != NULL) {
+				(void) strlcpy(kernbuf, path, BUFSIZ);
+				free(path);
+				if (strcmp(opt, "kmdb") == 0) {
+					if (set_kernel(mp, ARGS_CMD, NULL,
+					    args_buf, BUFSIZ) != BAM_SUCCESS)
+						return (BAM_ERROR);
+
+					if (args_buf[0] != '\0') {
+						(void) strlcat(kernbuf, " ",
+						    BUFSIZ);
+						(void) strlcat(kernbuf,
+						    args_buf, BUFSIZ);
+					}
+				}
+			}
+		}
+		entry = add_boot_entry(mp, REBOOT_TITLE, grubdisk, kernbuf,
+		    NULL);
+	} else {
+		(void) snprintf(kernbuf, sizeof (kernbuf), "%s %s",
+		    MULTI_BOOT, opt);
+		entry = add_boot_entry(mp, REBOOT_TITLE, grubdisk, kernbuf,
+		    MULTI_BOOT_ARCHIVE);
+	}
 	free(grubdisk);
 
 	if (entry == BAM_ERROR) {
@@ -3396,7 +3541,7 @@ update_temp(menu_t *mp, char *menupath, char *opt)
 		return (BAM_ERROR);
 	}
 
-	save_default_entry(mp);
+	save_default_entry(mp, BAM_OLDDEF);
 	(void) set_global(mp, menu_cmds[DEFAULT_CMD], entry);
 	return (BAM_WRITE);
 }
@@ -3482,35 +3627,418 @@ set_global(menu_t *mp, char *globalcmd, int val)
 	return (BAM_WRITE); /* need a write to menu */
 }
 
+/*
+ * partial_path may be anything like "kernel/unix" or "kmdb".  Try to
+ * expand it to a full unix path.
+ */
+static char *
+expand_path(const char *partial_path)
+{
+	int new_path_len;
+	char *new_path, new_path2[PATH_MAX];
+	struct stat sb;
+
+	new_path_len = strlen(partial_path) + 64;
+	new_path = s_calloc(1, new_path_len);
+
+	/* First, try the simplest case - something like "kernel/unix" */
+	(void) snprintf(new_path, new_path_len, "/platform/i86pc/%s",
+	    partial_path);
+	if (stat(new_path, &sb) == 0) {
+		return (new_path);
+	}
+
+	if (strcmp(partial_path, "kmdb") == 0) {
+		(void) snprintf(new_path, new_path_len, "%s -k",
+		    DIRECT_BOOT_KERNEL);
+		return (new_path);
+	}
+
+	/*
+	 * We've quickly reached unsupported usage.  Try once more to
+	 * see if we were just given a glom name.
+	 */
+	(void) snprintf(new_path, new_path_len, "/platform/i86pc/%s/unix",
+	    partial_path);
+	(void) snprintf(new_path2, PATH_MAX, "/platform/i86pc/%s/amd64/unix",
+	    partial_path);
+	if (stat(new_path, &sb) == 0) {
+		if (stat(new_path2, &sb) == 0) {
+			/*
+			 * We matched both, so we actually
+			 * want to write the $ISADIR version.
+			 */
+			(void) snprintf(new_path, new_path_len,
+			    "/platform/i86pc/kernel/%s/$ISADIR/unix",
+			    partial_path);
+		}
+		return (new_path);
+	}
+
+	bam_error(UNKNOWN_KERNEL, partial_path);
+	free(new_path);
+	return (NULL);
+}
+
+/*
+ * The kernel cmd and arg have been changed, so
+ * check whether the archive line needs to change.
+ */
+static void
+set_archive_line(entry_t *entryp, line_t *kernelp)
+{
+	line_t *lp = entryp->start;
+	char *new_archive;
+	menu_cmd_t m_cmd;
+
+	for (; lp != NULL; lp = lp->next) {
+		if (strncmp(lp->cmd, menu_cmds[MODULE_CMD],
+		    sizeof (menu_cmds[MODULE_CMD]) - 1) == 0) {
+			break;
+		}
+		if (lp == entryp->end)
+			return;
+	}
+	if (lp == NULL)
+		return;
+
+	if (strstr(kernelp->arg, "$ISADIR") != NULL) {
+		new_archive = DIRECT_BOOT_ARCHIVE;
+		m_cmd = MODULE_DOLLAR_CMD;
+	} else if (strstr(kernelp->arg, "amd64") != NULL) {
+		new_archive = DIRECT_BOOT_ARCHIVE_64;
+		m_cmd = MODULE_CMD;
+	} else {
+		new_archive = DIRECT_BOOT_ARCHIVE_32;
+		m_cmd = MODULE_CMD;
+	}
+
+	if (strcmp(lp->arg, new_archive) == 0)
+		return;
+
+	if (strcmp(lp->cmd, menu_cmds[m_cmd]) != 0) {
+		free(lp->cmd);
+		lp->cmd = s_strdup(menu_cmds[m_cmd]);
+	}
+
+	free(lp->arg);
+	lp->arg = s_strdup(new_archive);
+	update_line(lp);
+}
+
+/*
+ * Title for an entry to set properties that once went in bootenv.rc.
+ */
+#define	BOOTENV_RC_TITLE	"Solaris bootenv rc"
+
+/*
+ * If path is NULL, return the kernel (optnum == KERNEL_CMD) or arguments
+ * (optnum == ARGS_CMD) in the argument buf.  If path is a zero-length
+ * string, reset the value to the default.  If path is a non-zero-length
+ * string, set the kernel or arguments.
+ */
+static error_t
+set_kernel(menu_t *mp, menu_cmd_t optnum, char *path, char *buf, size_t bufsize)
+{
+	int entryNum, rv = BAM_SUCCESS, free_new_path = 0;
+	entry_t *entryp;
+	line_t *ptr, *kernelp;
+	char *new_arg, *old_args, *space;
+	char *grubdisk, *rootdev, *new_path;
+	char old_space;
+	size_t old_kernel_len, new_str_len;
+	struct stat sb;
+
+	assert(bufsize > 0);
+
+	ptr = kernelp = NULL;
+	new_arg = old_args = space = NULL;
+	grubdisk = rootdev = new_path = NULL;
+	buf[0] = '\0';
+
+	if (bam_direct != BAM_DIRECT_DBOOT) {
+		bam_error(NOT_DBOOT, optnum == KERNEL_CMD ? "kernel" : "args");
+		return (BAM_ERROR);
+	}
+
+	/*
+	 * If a user changed the default entry to a non-bootadm controlled
+	 * one, we don't want to mess with it.  Just print an error and
+	 * return.
+	 */
+	if (mp->curdefault) {
+		entryNum = s_strtol(mp->curdefault->arg);
+		for (entryp = mp->entries; entryp; entryp = entryp->next) {
+			if (entryp->entryNum == entryNum)
+				break;
+		}
+		if ((entryp != NULL) &&
+		    ((entryp->flags & (BAM_ENTRY_BOOTADM|BAM_ENTRY_LU)) == 0)) {
+			bam_error(DEFAULT_NOT_BAM);
+			return (BAM_ERROR);
+		}
+	}
+
+	entryNum = -1;
+	entryp = find_boot_entry(mp, BOOTENV_RC_TITLE, NULL, NULL, 0,
+	    &entryNum);
+
+	if (entryp != NULL) {
+		for (ptr = entryp->start; ptr && ptr != entryp->end;
+		    ptr = ptr->next) {
+			if (strncmp(ptr->cmd, menu_cmds[KERNEL_CMD],
+			    sizeof (menu_cmds[KERNEL_CMD]) - 1) == 0) {
+				kernelp = ptr;
+				break;
+			}
+		}
+		if (kernelp == NULL) {
+			bam_error(NO_KERNEL, entryNum);
+			return (BAM_ERROR);
+		}
+
+		old_kernel_len = strcspn(kernelp->arg, " \t");
+		space = old_args = kernelp->arg + old_kernel_len;
+		while ((*old_args == ' ') || (*old_args == '\t'))
+			old_args++;
+	}
+
+	if (path == NULL) {
+		/* Simply report what was found */
+		if (kernelp == NULL)
+			return (BAM_SUCCESS);
+
+		if (optnum == ARGS_CMD) {
+			if (old_args[0] != '\0')
+				(void) strlcpy(buf, old_args, bufsize);
+		} else {
+			/*
+			 * We need to print the kernel, so we just turn the
+			 * first space into a '\0' and print the beginning.
+			 * We don't print anything if it's the default kernel.
+			 */
+			old_space = *space;
+			*space = '\0';
+			if (strcmp(kernelp->arg, DIRECT_BOOT_KERNEL) != 0)
+				(void) strlcpy(buf, kernelp->arg, bufsize);
+			*space = old_space;
+		}
+		return (BAM_SUCCESS);
+	}
+
+	/*
+	 * First, check if we're resetting an entry to the default.
+	 */
+	if ((path[0] == '\0') ||
+	    ((optnum == KERNEL_CMD) &&
+	    (strcmp(path, DIRECT_BOOT_KERNEL) == 0))) {
+		if ((entryp == NULL) || (kernelp == NULL)) {
+			/* No previous entry, it's already the default */
+			return (BAM_SUCCESS);
+		}
+
+		/*
+		 * Check if we can delete the entry.  If we're resetting the
+		 * kernel command, and the args is already empty, or if we're
+		 * resetting the args command, and the kernel is already the
+		 * default, we can restore the old default and delete the entry.
+		 */
+		if (((optnum == KERNEL_CMD) &&
+		    ((old_args == NULL) || (old_args[0] == '\0'))) ||
+		    ((optnum == ARGS_CMD) &&
+		    (strncmp(kernelp->arg, DIRECT_BOOT_KERNEL,
+		    sizeof (DIRECT_BOOT_KERNEL) - 1) == 0))) {
+			kernelp = NULL;
+			(void) do_delete(mp, entryNum);
+			restore_default_entry(mp, BAM_OLD_RC_DEF,
+			    mp->old_rc_default);
+			mp->old_rc_default = NULL;
+			rv = BAM_WRITE;
+			goto done;
+		}
+
+		if (optnum == KERNEL_CMD) {
+			/*
+			 * At this point, we've already checked that old_args
+			 * and entryp are valid pointers.  The "+ 2" is for
+			 * a space a the string termination character.
+			 */
+			new_str_len = (sizeof (DIRECT_BOOT_KERNEL) - 1) +
+			    strlen(old_args) + 2;
+			new_arg = s_calloc(1, new_str_len);
+			(void) snprintf(new_arg, new_str_len, "%s %s",
+			    DIRECT_BOOT_KERNEL, old_args);
+			free(kernelp->arg);
+			kernelp->arg = new_arg;
+
+			/*
+			 * We have changed the kernel line, so we may need
+			 * to update the archive line as well.
+			 */
+			set_archive_line(entryp, kernelp);
+		} else {
+			/*
+			 * We're resetting the boot args to nothing, so
+			 * we only need to copy the kernel.  We've already
+			 * checked that the kernel is not the default.
+			 */
+			new_arg = s_calloc(1, old_kernel_len + 1);
+			(void) snprintf(new_arg, old_kernel_len + 1, "%s",
+			    kernelp->arg);
+			free(kernelp->arg);
+			kernelp->arg = new_arg;
+		}
+		rv = BAM_WRITE;
+		goto done;
+	}
+
+	/*
+	 * Expand the kernel file to a full path, if necessary
+	 */
+	if ((optnum == KERNEL_CMD) && (path[0] != '/')) {
+		new_path = expand_path(path);
+		if (new_path == NULL) {
+			return (BAM_ERROR);
+		}
+		free_new_path = 1;
+	} else {
+		new_path = path;
+		free_new_path = 0;
+	}
+
+	/*
+	 * At this point, we know we're setting a new value.  First, take care
+	 * of the case where there was no previous entry.
+	 */
+	if (entryp == NULL) {
+		/* Similar to code in update_temp */
+		if (stat(GRUB_slice, &sb) != 0) {
+			/*
+			 * 1. First get root disk name from mnttab
+			 * 2. Translate disk name to grub name
+			 * 3. Add the new menu entry
+			 */
+			rootdev = get_special("/");
+			if (rootdev) {
+				grubdisk = os_to_grubdisk(rootdev, 1);
+				free(rootdev);
+			}
+		} else {
+			/*
+			 * This is an LU BE. The GRUB_root file
+			 * contains entry for GRUB's "root" cmd.
+			 */
+			grubdisk = read_grub_root();
+		}
+		if (grubdisk == NULL) {
+			bam_error(REBOOT_WITH_ARGS_FAILED);
+			rv = BAM_ERROR;
+			goto done;
+		}
+		if (optnum == KERNEL_CMD) {
+			entryNum = add_boot_entry(mp, BOOTENV_RC_TITLE,
+			    grubdisk, new_path, NULL);
+		} else {
+			new_str_len = strlen(DIRECT_BOOT_KERNEL) +
+			    strlen(path) + 8;
+			new_arg = s_calloc(1, new_str_len);
+
+			(void) snprintf(new_arg, new_str_len, "%s %s",
+			    DIRECT_BOOT_KERNEL, path);
+			entryNum = add_boot_entry(mp, BOOTENV_RC_TITLE,
+			    grubdisk, new_arg, DIRECT_BOOT_ARCHIVE);
+		}
+		save_default_entry(mp, BAM_OLD_RC_DEF);
+		(void) set_global(mp, menu_cmds[DEFAULT_CMD], entryNum);
+		rv = BAM_WRITE;
+		goto done;
+	}
+
+	/*
+	 * There was already an bootenv entry which we need to edit.
+	 */
+	if (optnum == KERNEL_CMD) {
+		new_str_len = strlen(new_path) + strlen(old_args) + 2;
+		new_arg = s_calloc(1, new_str_len);
+		(void) snprintf(new_arg, new_str_len, "%s %s", new_path,
+		    old_args);
+		free(kernelp->arg);
+		kernelp->arg = new_arg;
+
+		/*
+		 * If we have changed the kernel line, we may need to update
+		 * the archive line as well.
+		 */
+		set_archive_line(entryp, kernelp);
+	} else {
+		new_str_len = old_kernel_len + strlen(path) + 8;
+		new_arg = s_calloc(1, new_str_len);
+		(void) strncpy(new_arg, kernelp->arg, old_kernel_len);
+		(void) strlcat(new_arg, " ", new_str_len);
+		(void) strlcat(new_arg, path, new_str_len);
+		free(kernelp->arg);
+		kernelp->arg = new_arg;
+	}
+	rv = BAM_WRITE;
+
+done:
+	if ((rv == BAM_WRITE) && kernelp)
+		update_line(kernelp);
+	if (free_new_path)
+		free(new_path);
+	return (rv);
+}
+
 /*ARGSUSED*/
 static error_t
 set_option(menu_t *mp, char *menu_path, char *opt)
 {
 	int optnum, optval;
 	char *val;
+	char buf[BUFSIZ] = "";
+	error_t rv;
 
 	assert(mp);
 	assert(opt);
 
 	val = strchr(opt, '=');
-	if (val == NULL) {
-		bam_error(INVALID_ENTRY, opt);
-		return (BAM_ERROR);
+	if (val != NULL) {
+		*val = '\0';
 	}
 
-	*val = '\0';
 	if (strcmp(opt, "default") == 0) {
 		optnum = DEFAULT_CMD;
 	} else if (strcmp(opt, "timeout") == 0) {
 		optnum = TIMEOUT_CMD;
+	} else if (strcmp(opt, menu_cmds[KERNEL_CMD]) == 0) {
+		optnum = KERNEL_CMD;
+	} else if (strcmp(opt, menu_cmds[ARGS_CMD]) == 0) {
+		optnum = ARGS_CMD;
 	} else {
 		bam_error(INVALID_ENTRY, opt);
 		return (BAM_ERROR);
 	}
 
-	optval = s_strtol(val + 1);
-	*val = '=';
-	return (set_global(mp, menu_cmds[optnum], optval));
+	/*
+	 * kernel and args are allowed without "=new_value" strings.  All
+	 * others cause errors
+	 */
+	if ((val == NULL) && (optnum != KERNEL_CMD) && (optnum != ARGS_CMD)) {
+		bam_error(INVALID_ENTRY, opt);
+		return (BAM_ERROR);
+	} else if (val != NULL) {
+		*val = '=';
+	}
+
+	if ((optnum == KERNEL_CMD) || (optnum == ARGS_CMD)) {
+		rv = set_kernel(mp, optnum, val ? val + 1 : NULL, buf, BUFSIZ);
+		if ((rv == BAM_SUCCESS) && (buf[0] != '\0'))
+			(void) printf("%s\n", buf);
+		return (rv);
+	} else {
+		optval = s_strtol(val + 1);
+		return (set_global(mp, menu_cmds[optnum], optval));
+	}
 }
 
 /*
@@ -3766,7 +4294,7 @@ s_fputs(char *str, FILE *fp)
 /*
  * Wrapper around fgets, that strips newlines returned by fgets
  */
-static char *
+char *
 s_fgets(char *buf, int buflen, FILE *fp)
 {
 	int n;
@@ -3782,7 +4310,7 @@ s_fgets(char *buf, int buflen, FILE *fp)
 	return (buf);
 }
 
-static void *
+void *
 s_calloc(size_t nelem, size_t sz)
 {
 	void *ptr;
@@ -3790,6 +4318,17 @@ s_calloc(size_t nelem, size_t sz)
 	ptr = calloc(nelem, sz);
 	if (ptr == NULL) {
 		bam_error(NO_MEM, nelem*sz);
+		bam_exit(1);
+	}
+	return (ptr);
+}
+
+void *
+s_realloc(void *ptr, size_t sz)
+{
+	ptr = realloc(ptr, sz);
+	if (ptr == NULL) {
+		bam_error(NO_MEM, sz);
 		bam_exit(1);
 	}
 	return (ptr);

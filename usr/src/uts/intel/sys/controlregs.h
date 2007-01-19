@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,26 @@ extern "C" {
 #define	FMT_CR0	\
 	"\20\40pg\37cd\36nw\35am\21wp\6ne\5et\4ts\3em\2mp\1pe"
 
+/*
+ * Set the FPU-related control bits to explain to the processor that
+ * we're managing FPU state:
+ * - set monitor coprocessor (allow TS bit to control FPU)
+ * - set numeric exception (disable IGNNE# mechanism)
+ * - set task switch (#nm on first fp instruction)
+ * - clear emulate math bit (cause we're not emulating!)
+ */
+#define	CR0_ENABLE_FPU_FLAGS(cr)	\
+	(((cr) | CR0_MP | CR0_NE | CR0_TS) & (uint32_t)~CR0_EM)
+
+/*
+ * Set the FPU-related control bits to explain to the processor that
+ * we're -not- managing FPU state:
+ * - set emulate (all fp instructions cause #nm)
+ * - clear monitor coprocessor (so fwait/wait doesn't #nm)
+ */
+#define	CR0_DISABLE_FPU_FLAGS(cr)	\
+	(((cr) | CR0_EM) & (uint32_t)~CR0_MP)
+
 /* CR3 Register */
 
 #define	CR3_PCD	0x00000010		/* cache disable 		*/
@@ -86,9 +106,28 @@ extern "C" {
 #define	CR4_PCE		0x0100		/* perf-monitoring counter enable */
 #define	CR4_OSFXSR	0x0200		/* OS fxsave/fxrstor support	*/
 #define	CR4_OSXMMEXCPT	0x0400		/* OS unmasked exception support */
+					/* 0x0800 reserved */
+					/* 0x1000 reserved */
+#define	CR4_VMXE	0x2000
+#define	CR4_SMXE	0x4000
 
-#define	FMT_CR4	\
-	"\20\13xmme\12fxsr\11pce\10pge\7mce\6pae\5pse\4de\3tsd\2pvi\1vme"
+#define	FMT_CR4							\
+	"\20\17smxe\16vmxe\13xmme\12fxsr\11pce\10pge"		\
+	"\7mce\6pae\5pse\4de\3tsd\2pvi\1vme"
+
+/*
+ * Enable the SSE-related control bits to explain to the processor that
+ * we're managing XMM state and exceptions
+ */
+#define	CR4_ENABLE_SSE_FLAGS(cr)	\
+	((cr) | CR4_OSFXSR | CR4_OSXMMEXCPT)
+
+/*
+ * Disable the SSE-related control bits to explain to the processor
+ * that we're NOT managing XMM state
+ */
+#define	CR4_DISABLE_SSE_FLAGS(cr)	\
+	((cr) & ~(uint32_t)(CR4_OSFXSR | CR4_OSXMMEXCPT))
 
 /* Intel's SYSENTER configuration registers */
 
@@ -100,13 +139,15 @@ extern "C" {
 
 #define	MSR_AMD_EFER	0xc0000080	/* extended feature enable MSR */
 
-#define	AMD_EFER_NXE	0x800		/* no-execute enable		*/
-#define	AMD_EFER_LMA	0x400		/* long mode active (read-only)	*/
-#define	AMD_EFER_LME	0x100		/* long mode enable		*/
-#define	AMD_EFER_SCE	0x001		/* system call extensions	*/
+#define	AMD_EFER_FFXSR	0x4000		/* fast fxsave/fxrstor		*/
+#define	AMD_EFER_SVME	0x1000		/* svm enable			*/
+#define	AMD_EFER_NXE	0x0800		/* no-execute enable		*/
+#define	AMD_EFER_LMA	0x0400		/* long mode active (read-only)	*/
+#define	AMD_EFER_LME	0x0100		/* long mode enable		*/
+#define	AMD_EFER_SCE	0x0001		/* system call extensions	*/
 
 #define	FMT_AMD_EFER \
-	"\20\14nxe\13lma\11lme\1sce"
+	"\20\17ffxsr\15svme\14nxe\13lma\11lme\1sce"
 
 /* AMD's SYSCFG register */
 
@@ -132,6 +173,7 @@ extern "C" {
 #define	MSR_AMD_FSBASE	0xc0000100	/* 64-bit base address for %fs */
 #define	MSR_AMD_GSBASE	0xc0000101	/* 64-bit base address for %gs */
 #define	MSR_AMD_KGSBASE	0xc0000102	/* swapgs swaps this with gsbase */
+#define	MSR_AMD_TSCAUX	0xc0000103	/* %ecx value on rdtscp insn */
 
 /* AMD's configuration MSRs, weakly documented in the revision guide */
 

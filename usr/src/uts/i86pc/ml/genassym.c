@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,8 +48,11 @@
 #include <sys/pic.h>
 #include <sys/pit.h>
 #include <sys/fp.h>
+#include <sys/disp.h>
 #include <sys/archsystm.h>
+#include <sys/x86_archext.h>
 #include <sys/sunddi.h>
+#include <sys/mach_mmu.h>
 
 #undef	exit		/* unhide exit, see comment above */
 extern void exit(int);
@@ -111,9 +114,6 @@ main(int argc, char *argv[])
 	printf("#define\tFPU_EN 0x%x\n", FPU_EN);
 	printf("#define\tFPU_VALID 0x%x\n", FPU_VALID);
 
-	printf("#define\tELF_NOTE_PAGESIZE_HINT 0x%x\n",
-	    ELF_NOTE_PAGESIZE_HINT);
-
 	printf("#define\tFP_NO 0x%x\n", FP_NO);
 	printf("#define\tFP_SW 0x%x\n", FP_SW);
 	printf("#define\tFP_HW 0x%x\n", FP_HW);
@@ -162,15 +162,8 @@ main(int argc, char *argv[])
 	printf("#define\tDDI_DEV_AUTOINCR 0x%x\n", DDI_DEV_AUTOINCR);
 
 	printf("#define\tMMU_STD_PAGESIZE 0x%x\n", (uint_t)MMU_STD_PAGESIZE);
-	printf("#define\tMMU_STD_PAGESHIFT 0x%x\n", (uint_t)MMU_STD_PAGESHIFT);
 	printf("#define\tMMU_STD_PAGEMASK 0x%x\n", (uint_t)MMU_STD_PAGEMASK);
-	printf("#define\tMMU_L2_MASK 0x%x\n", (uint_t)(NPTEPERPT - 1));
-	printf("#define\tNPTESHIFT 0x%x\n", (uint_t)NPTESHIFT);
-	printf("#define\tFOURMB_PAGEOFFSET 0x%x\n", (uint_t)FOURMB_PAGEOFFSET);
-	printf("#define\tFOURMB_PAGESIZE 0x%x\n", (uint_t)FOURMB_PAGESIZE);
-	printf("#define\tPTE_LARGEPAGE 0x%x\n", (uint_t)PTE_LARGEPAGE);
-	printf("#define\tPTE_VALID 0x%x\n", (uint_t)PTE_VALID);
-	printf("#define\tPTE_SRWX 0x%x\n", (uint_t)PTE_SRWX);
+	printf("#define\tFOUR_MEG 0x%x\n", (uint_t)FOUR_MEG);
 
 	printf("#define\tTRAPTR_NENT 0x%x\n", TRAPTR_NENT);
 
@@ -181,6 +174,8 @@ main(int argc, char *argv[])
 	printf("#define\tMODS_NOUNLOAD 0x%x\n", MODS_NOUNLOAD);
 	printf("#define\tMODS_WEAK 0x%x\n", MODS_WEAK);
 	printf("#define\tMODS_INSTALLED 0x%x\n", MODS_INSTALLED);
+
+	printf("#define\tKPREEMPT_SYNC 0x%x\n", KPREEMPT_SYNC);
 
 	return (0);
 }

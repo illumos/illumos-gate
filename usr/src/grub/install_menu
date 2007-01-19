@@ -4,14 +4,14 @@
 default=0
 timeout=60
 title Solaris Express, Developer Edition
-	kernel /boot/multiboot kernel/unix -B install_media=cdrom,soldevx=true
+	kernel /boot/platform/i86pc/kernel/unix -B install_media=cdrom,soldevx=true
 	module /boot/x86.miniroot
 title Solaris Express
-	kernel /boot/multiboot kernel/unix -B install_media=cdrom
+	kernel /boot/platform/i86pc/kernel/unix -B install_media=cdrom
 	module /boot/x86.miniroot
 title Solaris Express Serial Console ttya
-        kernel /boot/multiboot kernel/unix -B install_media=cdrom,console=ttya
+        kernel /boot/platform/i86pc/kernel/unix -B install_media=cdrom,console=ttya
         module /boot/x86.miniroot
 title Solaris Express Serial Console ttyb (for lx50, v60x and v65x)
-        kernel /boot/multiboot kernel/unix -B install_media=cdrom,console=ttyb
+        kernel /boot/platform/i86pc/kernel/unix -B install_media=cdrom,console=ttyb
         module /boot/x86.miniroot

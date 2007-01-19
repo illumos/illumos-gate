@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2179,7 +2179,7 @@ spec_map(
 		cvp = sp->s_commonvp;
 		ASSERT(cvp != NULL);
 
-		if (off < 0 || (off + len) < 0)
+		if (off < 0 || ((offset_t)(off + len) < 0))
 			return (ENXIO);
 
 		as_rangelock(as);

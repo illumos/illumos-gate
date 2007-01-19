@@ -80,8 +80,10 @@ f none usr/kernel/strmod/cryptmod 755 root sys
 f none usr/kernel/sys/acctctl 755 root sys
 f none usr/kernel/sys/exacctsys 755 root sys
 f none usr/kernel/sys/sysacct 755 root sys
+f none usr/lib/devfsadm/linkmod/SUNW_ieee1394_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_misc_link_i386.so 755 root sys
 s none usr/sbin/installgrub=../../sbin/installgrub
+f none usr/sbin/prtdiag 2755 root sys
 f none usr/sbin/rtc 555 root bin
 d none usr/sbin/i86 755 root bin
 f none usr/sbin/i86/add_drv 555 root sys
@@ -138,7 +140,6 @@ d none usr/kernel/sys/amd64 755 root sys
 f none usr/kernel/sys/amd64/acctctl 755 root sys
 f none usr/kernel/sys/amd64/exacctsys 755 root sys
 f none usr/kernel/sys/amd64/sysacct 755 root sys
-f none usr/lib/devfsadm/linkmod/SUNW_ieee1394_link.so 755 root sys
 d none usr/lib/secure/amd64 755 root bin
 s none usr/lib/secure/64=amd64
 d none usr/lib/amd64 755 root bin

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,9 +34,6 @@ PROMSRCS += \
 
 KMDBSRCS += \
 	kaif.c \
-	kaif_activate.c \
-	kaif_idt.c \
-	kaif_start_isadep.c \
 	kmdb_dpi_isadep.c \
 	kmdb_fault_isadep.c \
 	kmdb_kdi_isadep.c \
@@ -46,7 +43,6 @@ KMDBSRCS += \
 	kvm_isadep.c
 
 KMDBML += \
-	kaif_idthdl.s \
 	kmdb_asmutil.s \
 	kmdb_setcontext.s
 

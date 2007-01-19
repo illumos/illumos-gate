@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -214,9 +214,9 @@ cpr_write_header(vnode_t *vp)
 	upages = cpr_count_upages(REGULAR_BITMAP, cpr_setbit);
 	cdump.cdd_dumppgsize = kpages - vpages + upages;
 	cpr_pages_tobe_dumped = cdump.cdd_dumppgsize;
-	DEBUG7(errp(
+	CPR_DEBUG(CPR_DEBUG7,
 	    "\ncpr_write_header: kpages %ld - vpages %ld + upages %ld = %d\n",
-	    kpages, vpages, upages, cdump.cdd_dumppgsize));
+	    kpages, vpages, upages, cdump.cdd_dumppgsize);
 
 	/*
 	 * Some pages contain volatile data (cpr_buf and storage area for
@@ -247,8 +247,8 @@ cpr_write_header(vnode_t *vp)
 	 */
 	if (!(CPR->c_flags & C_COMPRESSING) &&
 		(STAT->cs_nocomp_statefsz > STAT->cs_est_statefsz)) {
-		if (cpr_debug & (LEVEL1 | LEVEL7))
-		    errp("cpr_write_header: STAT->cs_nocomp_statefsz > "
+		if (cpr_debug & (CPR_DEBUG1 | CPR_DEBUG7))
+		    prom_printf("cpr_write_header: STAT->cs_nocomp_statefsz > "
 			"STAT->cs_est_statefsz\n");
 		return (ENOSPC);
 	}
@@ -274,8 +274,8 @@ cpr_write_terminator(vnode_t *vp)
 	cpr_term.real_statef_size = STAT->cs_real_statefsz +
 		btod(cpr_wptr - cpr_buf) * DEV_BSIZE;
 
-	DEBUG9(errp("cpr_dump: Real Statefile Size: %ld\n",
-		STAT->cs_real_statefsz));
+	CPR_DEBUG(CPR_DEBUG9, "cpr_dump: Real Statefile Size: %ld\n",
+		STAT->cs_real_statefsz);
 
 	cpr_tod_get(&cpr_term.tm_shutdown);
 
@@ -338,7 +338,7 @@ cpr_write_statefile(vnode_t *vp)
 	 */
 	str = "cpr_write_statefile:";
 	spages = i_cpr_count_sensitive_kpages(REGULAR_BITMAP, cpr_clrbit);
-	DEBUG7(errp("%s untag %ld sens pages\n", str, spages));
+	CPR_DEBUG(CPR_DEBUG7, "%s untag %ld sens pages\n", str, spages);
 
 	/*
 	 * now it's OK to call a driver that makes allocations
@@ -351,7 +351,8 @@ cpr_write_statefile(vnode_t *vp)
 	 */
 	error = i_cpr_dump_sensitive_kpages(vp);
 	if (error) {
-		DEBUG7(errp("%s cpr_dump_sensitive_kpages() failed!\n", str));
+		CPR_DEBUG(CPR_DEBUG7,
+		    "%s cpr_dump_sensitive_kpages() failed!\n", str);
 		return (error);
 	}
 
@@ -360,7 +361,8 @@ cpr_write_statefile(vnode_t *vp)
 	 */
 	error = cpr_dump_regular_pages(vp);
 	if (error) {
-		DEBUG7(errp("%s cpr_dump_regular_pages() failed!\n", str));
+		CPR_DEBUG(CPR_DEBUG7,
+		    "%s cpr_dump_regular_pages() failed!\n", str);
 		return (error);
 	}
 
@@ -371,7 +373,7 @@ cpr_write_statefile(vnode_t *vp)
 	    cpr_regular_pgs_dumped);
 
 	if (error) {
-		errp("\n%s page count mismatch!\n", str);
+		prom_printf("\n%s page count mismatch!\n", str);
 #ifdef DEBUG
 		if (cpr_test_mode)
 			debug_enter(NULL);
@@ -443,7 +445,8 @@ cpr_dump(vnode_t *vp)
 	 * compressed before they are saved into the storage area.
 	 */
 	if (error = i_cpr_save_sensitive_kpages()) {
-		DEBUG7(errp("cpr_dump: save_sensitive_kpages failed!\n"));
+		CPR_DEBUG(CPR_DEBUG7,
+		    "cpr_dump: save_sensitive_kpages failed!\n");
 		return (error);
 	}
 
@@ -453,7 +456,8 @@ cpr_dump(vnode_t *vp)
 	 * count regular and sensitive kpages.
 	 */
 	if (error = cpr_write_header(vp)) {
-		DEBUG7(errp("cpr_dump: cpr_write_header() failed!\n"));
+		CPR_DEBUG(CPR_DEBUG7,
+		    "cpr_dump: cpr_write_header() failed!\n");
 		return (error);
 	}
 
@@ -467,7 +471,8 @@ cpr_dump(vnode_t *vp)
 		return (error);
 
 	if (error = cpr_write_statefile(vp)) {
-		DEBUG7(errp("cpr_dump: cpr_write_statefile() failed!\n"));
+		CPR_DEBUG(CPR_DEBUG7,
+		    "cpr_dump: cpr_write_statefile() failed!\n");
 		return (error);
 	}
 
@@ -539,8 +544,8 @@ cpr_scan_kvseg(int mapflag, bitfunc_t bitfunc, struct seg *seg)
 
 	vmem_walk(heap_arena, VMEM_ALLOC, cpr_walk, &cwinfo);
 
-	if (cpr_debug & LEVEL7) {
-		errp("walked %d sub-ranges, total pages %ld\n",
+	if (cpr_debug & CPR_DEBUG7) {
+		prom_printf("walked %d sub-ranges, total pages %ld\n",
 		    cwinfo.ranges, mmu_btop(cwinfo.size));
 		cpr_show_range(seg->s_base, seg->s_size,
 		    mapflag, bitfunc, cwinfo.pages);
@@ -584,8 +589,8 @@ cpr_scan_segkpm(int mapflag, bitfunc_t bitfunc, struct seg *seg)
 	cwinfo.bitfunc = bitfunc;
 	hat_kpm_walk(cpr_walk_kpm, &cwinfo);
 
-	if (cpr_debug & LEVEL7) {
-		errp("walked %d sub-ranges, total pages %ld\n",
+	if (cpr_debug & CPR_DEBUG7) {
+		prom_printf("walked %d sub-ranges, total pages %ld\n",
 		    cwinfo.ranges, mmu_btop(cwinfo.size));
 		cpr_show_range(segkpm->s_base, segkpm->s_size,
 		    mapflag, bitfunc, cwinfo.pages);
@@ -683,9 +688,9 @@ cpr_count_kpages(int mapflag, bitfunc_t bitfunc)
 	kas_cnt = i_cpr_count_special_kpages(mapflag, bitfunc);
 	kas_cnt += cpr_count_seg_pages(mapflag, bitfunc);
 
-	DEBUG9(errp("cpr_count_kpages: kas_cnt=%ld\n", kas_cnt));
-	DEBUG7(errp("\ncpr_count_kpages: %ld pages, 0x%lx bytes\n",
-		kas_cnt, mmu_ptob(kas_cnt)));
+	CPR_DEBUG(CPR_DEBUG9, "cpr_count_kpages: kas_cnt=%ld\n", kas_cnt);
+	CPR_DEBUG(CPR_DEBUG7, "\ncpr_count_kpages: %ld pages, 0x%lx bytes\n",
+		kas_cnt, mmu_ptob(kas_cnt));
 	return (kas_cnt);
 }
 
@@ -807,10 +812,10 @@ cpr_count_upages(int mapflag, bitfunc_t bitfunc)
 	} while ((pp = page_next(pp)) != page0);
 
 	STAT->cs_upage2statef = dcnt;
-	DEBUG9(errp("cpr_count_upages: dirty=%ld total=%ld\n",
-		dcnt, tcnt));
-	DEBUG7(errp("cpr_count_upages: %ld pages, 0x%lx bytes\n",
-		dcnt, mmu_ptob(dcnt)));
+	CPR_DEBUG(CPR_DEBUG9, "cpr_count_upages: dirty=%ld total=%ld\n",
+		dcnt, tcnt);
+	CPR_DEBUG(CPR_DEBUG7, "cpr_count_upages: %ld pages, 0x%lx bytes\n",
+		dcnt, mmu_ptob(dcnt));
 	return (dcnt);
 }
 
@@ -901,8 +906,8 @@ cpr_compress_and_write(vnode_t *vp, uint_t va, pfn_t pfn, pgcnt_t npg)
 
 	i_cpr_mapin(CPR->c_mapping_area, npg, pfn);
 
-	DEBUG3(errp("mapped-in %ld pages, vaddr 0x%p, pfn 0x%lx\n",
-		npg, CPR->c_mapping_area, pfn));
+	CPR_DEBUG(CPR_DEBUG3, "mapped-in %ld pages, vaddr 0x%p, pfn 0x%lx\n",
+		npg, CPR->c_mapping_area, pfn);
 
 	/*
 	 * Fill cpr page descriptor.
@@ -927,10 +932,10 @@ cpr_compress_and_write(vnode_t *vp, uint_t va, pfn_t pfn, pgcnt_t npg)
 	i_cpr_mapout(CPR->c_mapping_area, npg);
 
 	if (error) {
-		DEBUG1(errp("cpr_compress_and_write: vp 0x%p va 0x%x ",
-		    vp, va));
-		DEBUG1(errp("pfn 0x%lx blk %d err %d\n",
-		    pfn, cpr_file_bn, error));
+		CPR_DEBUG(CPR_DEBUG1,
+		    "cpr_compress_and_write: vp 0x%p va 0x%x ", vp, va);
+		CPR_DEBUG(CPR_DEBUG1, "pfn 0x%lx blk %d err %d\n",
+		    pfn, cpr_file_bn, error);
 	} else {
 		cpr_regular_pgs_dumped += npg;
 	}
@@ -978,20 +983,21 @@ cpr_write(vnode_t *vp, caddr_t buffer, size_t size)
 				return (ENOSPC);
 		}
 
-		DEBUG3(errp("cpr_write: frmp=%p wptr=%p cnt=%lx...",
-			fromp, cpr_wptr, bytes));
+		CPR_DEBUG(CPR_DEBUG3,
+		    "cpr_write: frmp=%p wptr=%p cnt=%lx...",
+		    fromp, cpr_wptr, bytes);
 		/*
 		 * cross check, this should not happen!
 		 */
 		if (cpr_disk_writes_ok == 0) {
-			errp("cpr_write: disk write too early!\n");
+			prom_printf("cpr_write: disk write too early!\n");
 			return (EINVAL);
 		}
 
 		do_polled_io = 1;
 		error = VOP_DUMP(vp, cpr_buf, cpr_file_bn, cpr_buf_blocks);
 		do_polled_io = 0;
-		DEBUG3(errp("done\n"));
+		CPR_DEBUG(CPR_DEBUG3, "done\n");
 
 		STAT->cs_real_statefsz += cpr_buf_size;
 
@@ -1024,7 +1030,8 @@ cpr_flush_write(vnode_t *vp)
 
 	cpr_file_bn += nblk;
 	if (error)
-		DEBUG2(errp("cpr_flush_write: error (%d)\n", error));
+		CPR_DEBUG(CPR_DEBUG2, "cpr_flush_write: error (%d)\n",
+		    error);
 	return (error);
 }
 
@@ -1037,7 +1044,7 @@ cpr_clear_bitmaps(void)
 		bzero((void *)dp->cbd_reg_bitmap,
 		    (size_t)dp->cbd_size * 2);
 	}
-	DEBUG7(errp("\ncleared reg and vlt bitmaps\n"));
+	CPR_DEBUG(CPR_DEBUG7, "\ncleared reg and vlt bitmaps\n");
 }
 
 int
@@ -1113,7 +1120,7 @@ cpr_show_range(caddr_t vaddr, size_t size,
 		action = "untag";
 	else
 		action = "none";
-	errp("range (0x%p, 0x%p), %s bitmap, %s %ld\n",
+	prom_printf("range (0x%p, 0x%p), %s bitmap, %s %ld\n",
 	    vaddr, vaddr + size, bname, action, count);
 }
 
@@ -1135,7 +1142,7 @@ cpr_count_pages(caddr_t sva, size_t size,
 		}
 	}
 
-	if ((cpr_debug & LEVEL7) && showrange == DBG_SHOWRANGE)
+	if ((cpr_debug & CPR_DEBUG7) && showrange == DBG_SHOWRANGE)
 		cpr_show_range(sva, size, mapflag, bitfunc, count);
 
 	return (count);
@@ -1157,8 +1164,8 @@ cpr_count_volatile_pages(int mapflag, bitfunc_t bitfunc)
 	}
 	count += i_cpr_count_storage_pages(mapflag, bitfunc);
 
-	DEBUG7(errp("cpr_count_vpages: %ld pages, 0x%lx bytes\n",
-	    count, mmu_ptob(count)));
+	CPR_DEBUG(CPR_DEBUG7, "cpr_count_vpages: %ld pages, 0x%lx bytes\n",
+	    count, mmu_ptob(count));
 	return (count);
 }
 
@@ -1171,6 +1178,6 @@ cpr_dump_regular_pages(vnode_t *vp)
 	cpr_regular_pgs_dumped = 0;
 	error = cpr_contig_pages(vp, WRITE_TO_STATEFILE);
 	if (!error)
-		DEBUG7(errp("cpr_dump_regular_pages() done.\n"));
+		CPR_DEBUG(CPR_DEBUG7, "cpr_dump_regular_pages() done.\n");
 	return (error);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,53 +59,10 @@
 	.end
 
 /
-/ return value of cr3 register
-/
-	.inline	getcr3,0
-	movq	%cr3, %rax
-	.end
-
-/
-/ reload cr3 register with its current value
-/
-	.inline	reload_cr3,0
-	movq	%cr3, %rdi
-	movq	%rdi, %cr3
-	.end
-
-/
-/ return value of cr8 register
-/
-	.inline	getcr8,0
-	movq	%cr8, %rax
-	.end
-
-/
-/ set cr8 register
-/
-	.inline	setcr8,0
-	movq	%rdi, %cr8
-	.end
-
-/
 / convert ipl to spl.  This is the identity function for i86
 /
 	.inline	ipltospl,0
 	movq	%rdi, %rax
-	.end
-
-/
-/ enable interrupts
-/
-	.inline	sti,0
-	sti
-	.end
-
-/
-/ disable interrupts
-/
-	.inline cli,0
-	cli
 	.end
 
 /
@@ -116,77 +72,6 @@
 	movq	$-1, %rax
 	bsfq	%rdi, %rax
 	incq	%rax
-	.end
-
-/
-/ disable interrupts and return value describing if interrupts were enabled
-/
-	/* XX64 These don't work correctly with SOS9 build 13.0 yet
-	.inline	clear_int_flag,0
-	pushfq
-	cli
-	popq	%rax
-	.end
-
-	.inline	intr_clear,0
-	pushfq
-	cli
-	popq	%rax
-	.end
-	*/
-
-/
-/ restore interrupt enable flag to value returned from 'clear_int_flag' above
-/
-	/* XX64 These don't work correctly with SOS9 build 13.0 yet
-	.inline restore_int_flag,4
-	pushq	%rdi
-	popfq
-	.end
-
-	.inline intr_restore,4
-	pushq	%rdi
-	popfq
-	.end
-	*/
-
-/
-/ in and out
-/
-	.inline	inb,4
-	movq	%rdi, %rdx
-	xorq    %rax, %rax
-	inb	(%dx)
-	.end
-
-	.inline	inw,4
-	movq	%rdi, %rdx
-	xorq    %rax, %rax
-	inw	(%dx)
-	.end
-
-	.inline	inl,4
-	movq	%rdi, %rdx
-	xorq    %rax, %rax
-	inl	(%dx)
-	.end
-
-	.inline	outb,8
-	movq	%rdi, %rdx
-	movq	%rsi, %rax
-	outb	(%dx)
-	.end
-
-	.inline	outw,8
-	movq	%rdi, %rdx
-	movq	%rsi, %rax
-	outw	(%dx)
-	.end
-
-	.inline	outl,8
-	movq	%rdi, %rdx
-	movq	%rsi, %rax
-	outl	(%dx)
 	.end
 
 /
@@ -274,22 +159,6 @@
 	.end
 
 /*
- * Read Time Stamp Counter
- * uint64_t tsc_read();
- *
- * usage:
- * uint64_t cycles = tsc_read();
- *
- * PPro & PII take no less than 34 cycles to execute rdtsc + stores.
- * Pentium takes about 16 cycles.
- */
-	.inline	tsc_read, 0
-	rdtsc				/ %edx:%eax = RDTSC
-	shlq	$32, %rdx
-	orq	%rdx, %rax
-	.end
-
-/*
  * Call the pause instruction.  To the Pentium 4 Xeon processor, it acts as
  * a hint that the code sequence is a busy spin-wait loop.  Without a pause
  * instruction in these loops, the P4 Xeon processor may suffer a severe
@@ -303,14 +172,28 @@
 	.end
 
 /*
- * Call the halt instruction. This will put the CPU to sleep until
- * it is again awoken via an interrupt.
- * This function should be called with interrupts already disabled
- * for the CPU.
- * Note that "sti" will only enable interrupts at the end of the
- * subsequent instruction...in this case: "hlt".
+ * inlines for update_sregs().
  */
-	.inline i86_halt,0
-	sti
-	hlt
+        .inline __set_ds, 0
+        movw    %di, %ds
+        .end
+
+        .inline __set_es, 0
+        movw    %di, %es
+        .end
+
+        .inline __set_fs, 0
+        movw    %di, %fs
+        .end
+
+        .inline __set_gs, 0
+        movw    %di, %gs
+        .end
+
+	/*
+	 * OPTERON_ERRATUM_88 requires mfence
+	 */
+        .inline __swapgs, 0
+        mfence
+        swapgs
 	.end

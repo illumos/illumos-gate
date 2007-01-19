@@ -9,7 +9,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -411,7 +411,8 @@ int gettimeofday();
  * non-X/Open applications, including this header will still make
  * visible these definitions.
  */
-#if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+#if !defined(_BOOT) && !defined(_KERNEL) && \
+	!defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 #include <time.h>
 #endif
 

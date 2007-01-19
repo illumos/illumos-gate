@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +42,9 @@
 #include <sys/varargs.h>
 #include <sys/thread.h>
 #include <sys/cpuvar.h>
+#include <sys/privregs.h>
+#include <sys/systm.h>
+#include <sys/traptrace.h>
 #include <vm/page.h>
 
 #ifdef __cplusplus
@@ -49,7 +53,9 @@ extern "C" {
 
 #ifdef _KERNEL
 
-extern void mp_halt(char *);
+extern void mach_cpu_idle(void);
+extern void mach_cpu_halt(char *);
+extern int mach_cpu_start(cpu_t *, void *);
 
 extern int Cpudelay;
 extern void setcpudelay(void);
@@ -61,10 +67,11 @@ extern void return_instr(void);
 
 extern int kcpc_hw_load_pcbe(void);
 extern void kcpc_hw_init(cpu_t *cp);
+extern void kcpc_hw_fini(cpu_t *cp);
 extern int kcpc_hw_overflow_intr_installed;
 
 struct memconf {
-	pfn_t	mcf_spfn;	/* begin page fram number */
+	pfn_t	mcf_spfn;	/* begin page frame number */
 	pfn_t	mcf_epfn;	/* end page frame number */
 };
 
@@ -84,6 +91,9 @@ extern int cpuid2nodeid(int);
 extern void map_kaddr(caddr_t, pfn_t, int, int);
 
 extern void memscrub_init(void);
+extern void trap(struct regs *, caddr_t, processorid_t);
+
+extern void do_interrupt(struct regs *, trap_trace_rec_t *);
 extern void memscrub_disable(void);
 
 extern unsigned int microdata;
@@ -91,6 +101,11 @@ extern int use_mp;
 
 extern struct cpu	cpus[];		/* pointer to other cpus */
 extern struct cpu	*cpu[];		/* pointer to all cpus */
+
+extern int mach_cpucontext_init(void);
+extern void mach_cpucontext_fini(void);
+extern void *mach_cpucontext_alloc(struct cpu *);
+extern void mach_cpucontext_free(struct cpu *, void *, int);
 
 extern uintptr_t hole_start, hole_end;
 
@@ -101,6 +116,11 @@ extern uintptr_t hole_start, hole_end;
 extern size_t   kpm_size;
 extern uchar_t  kpm_size_shift;
 extern caddr_t  kpm_vbase;
+
+struct memlist;
+extern void memlist_add(uint64_t, uint64_t, struct memlist *,
+    struct memlist **);
+extern page_t *page_get_physical(uintptr_t);
 
 #endif /* _KERNEL */
 

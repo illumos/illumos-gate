@@ -317,17 +317,10 @@ shmat(int shmid, caddr_t uaddr, int uflags, uintptr_t *rvp)
 		/*
 		 * Handle ISM
 		 */
-		uint_t	n, share_szc;
+		uint_t	share_szc;
 		size_t	share_size;
 		struct	shm_data ssd;
 		uintptr_t align_hint;
-
-		n = page_num_pagesizes();
-		if (n < 2) { /* large pages aren't supported */
-			as_rangeunlock(as);
-			error = EINVAL;
-			goto errret;
-		}
 
 		/*
 		 * Pick a share pagesize to use, if (!isspt(sp)).
@@ -357,15 +350,22 @@ shmat(int shmid, caddr_t uaddr, int uflags, uintptr_t *rvp)
 		align_hint = share_size;
 #if defined(__i386) || defined(__amd64)
 		/*
-		 * For 64 bit amd64, we want to share an entire page table
-		 * if possible. We know (ugh) that there are 512 entries in
-		 * in a page table. The number for 32 bit non-PAE should be
-		 * 1024, but I'm not going to special case that. Note using 512
-		 * won't cause a failure below. It retries with align_hint set
-		 * to share_size
+		 * For x86, we want to share as much of the page table tree
+		 * as possible. We use a large align_hint at first, but
+		 * if that fails, then the code below retries with align_hint
+		 * set to share_size.
+		 *
+		 * The explicit extern here is due to the difficulties
+		 * of getting to platform dependent includes. When/if the
+		 * platform dependent bits of this function are cleaned up,
+		 * another way of doing this should found.
 		 */
-		while (size >= 512 * (uint64_t)align_hint)
-			align_hint *= 512;
+		{
+			extern uint_t ptes_per_table;
+
+			while (size >= ptes_per_table * (uint64_t)align_hint)
+				align_hint *= ptes_per_table;
+		}
 #endif /* __i386 || __amd64 */
 
 #if defined(__sparcv9)

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +88,7 @@
 #include <sys/contract_impl.h>
 #include <sys/x86_archext.h>
 #include <sys/segments.h>
+#include <sys/ontrap.h>
 
 /*
  * Compare the version of boot that boot says it is against
@@ -219,7 +220,7 @@ kern_setup1(void)
 	 * XXX - we asssume that the u-area is zeroed out except for
 	 * ttolwp(curthread)->lwp_regs.
 	 */
-	u.u_cmask = (mode_t)CMASK;
+	PTOU(curproc)->u_cmask = (mode_t)CMASK;
 
 	thread_init();		/* init thread_free list */
 	pid_init();		/* initialize pid (proc) table */
@@ -292,8 +293,8 @@ lwp_load(klwp_t *lwp, gregset_t grp, uintptr_t thrptr)
 	rp->r_ps = PSL_USER;
 
 	/*
-	 * For 64-bit lwps, we allow one magic %fs selector value, and one
-	 * magic %gs selector to point anywhere in the address space using
+	 * For 64-bit lwps, we allow null %fs selector value, and null
+	 * %gs selector to point anywhere in the address space using
 	 * %fsbase and %gsbase behind the scenes.  libc uses %fs to point
 	 * at the ulwp_t structure.
 	 *
@@ -308,6 +309,31 @@ lwp_load(klwp_t *lwp, gregset_t grp, uintptr_t thrptr)
 	if (lwp_getdatamodel(lwp) == DATAMODEL_ILP32) {
 		if (grp[REG_GS] == LWPGS_SEL)
 			(void) lwp_setprivate(lwp, _LWP_GSBASE, thrptr);
+	} else {
+		/*
+		 * See lwp_setprivate in kernel and setup_context in libc.
+		 *
+		 * Currently libc constructs a ucontext from whole cloth for
+		 * every new (not main) lwp created.  For 64 bit processes
+		 * %fsbase is directly set to point to current thread pointer.
+		 * In the past (solaris 10) %fs was also set LWPFS_SEL to
+		 * indicate %fsbase. Now we use the null GDT selector for
+		 * this purpose. LWP[FS|GS]_SEL are only intended for 32 bit
+		 * processes. To ease transition we support older libcs in
+		 * the newer kernel by forcing %fs or %gs selector to null
+		 * by calling lwp_setprivate if LWP[FS|GS]_SEL is passed in
+		 * the ucontext.  This is should be ripped out at some future
+		 * date.  Another fix would be for libc to do a getcontext
+		 * and inherit the null %fs/%gs from the current context but
+		 * that means an extra system call and could hurt performance.
+		 */
+		if (grp[REG_FS] == 0x1bb) /* hard code legacy LWPFS_SEL */
+		    (void) lwp_setprivate(lwp, _LWP_FSBASE,
+		    (uintptr_t)grp[REG_FSBASE]);
+
+		if (grp[REG_GS] == 0x1c3) /* hard code legacy LWPGS_SEL */
+		    (void) lwp_setprivate(lwp, _LWP_GSBASE,
+		    (uintptr_t)grp[REG_GSBASE]);
 	}
 #else
 	if (grp[GS] == LWPGS_SEL)
@@ -445,6 +471,125 @@ lwp_segregs_save(klwp_t *lwp)
 	    sizeof (lwp->lwp_pcb.pcb_gsdesc)) == 0);
 }
 
+#if defined(__amd64)
+
+/*
+ * Update the segment registers with new values from the pcb
+ *
+ * We have to do this carefully, and in the following order,
+ * in case any of the selectors points at a bogus descriptor.
+ * If they do, we'll catch trap with on_trap and return 1.
+ * returns 0 on success.
+ *
+ * This is particularly tricky for %gs.
+ * This routine must be executed under a cli.
+ */
+int
+update_sregs(struct regs *rp,  klwp_t *lwp)
+{
+	pcb_t *pcb = &lwp->lwp_pcb;
+	ulong_t	kgsbase;
+	on_trap_data_t	otd;
+	int rc = 0;
+
+	if (!on_trap(&otd, OT_SEGMENT_ACCESS)) {
+
+		kgsbase = (ulong_t)CPU;
+		__set_gs(pcb->pcb_gs);
+
+		/*
+		 * If __set_gs fails it's because the new %gs is a bad %gs,
+		 * we'll be taking a trap but with the original %gs and %gsbase
+		 * undamaged (i.e. pointing at curcpu).
+		 *
+		 * We've just mucked up the kernel's gsbase.  Oops.  In
+		 * particular we can't take any traps at all.  Make the newly
+		 * computed gsbase be the hidden gs via __swapgs , and fix
+		 * the kernel's gsbase back again. Later, when we return to
+		 * userland we'll swapgs again restoring gsbase just loaded
+		 * above.
+		 */
+		__swapgs();
+		rp->r_gs = pcb->pcb_gs;
+
+		/*
+		 * restore kernel's gsbase
+		 */
+		wrmsr(MSR_AMD_GSBASE, kgsbase);
+
+		/*
+		 * Only override the descriptor base address if
+		 * r_gs == LWPGS_SEL or if r_gs == NULL. A note on
+		 * NULL descriptors -- 32-bit programs take faults
+		 * if they deference NULL descriptors; however,
+		 * when 64-bit programs load them into %fs or %gs,
+		 * they DONT fault -- only the base address remains
+		 * whatever it was from the last load.   Urk.
+		 *
+		 * XXX - note that lwp_setprivate now sets %fs/%gs to the
+		 * null selector for 64 bit processes. Whereas before
+		 * %fs/%gs were set to LWP(FS|GS)_SEL regardless of
+		 * the process's data model. For now we check for both
+		 * values so that the kernel can also support the older
+		 * libc. This should be ripped out at some point in the
+		 * future.
+		 */
+		if (pcb->pcb_gs == LWPGS_SEL || pcb->pcb_gs == 0)
+			wrmsr(MSR_AMD_KGSBASE, pcb->pcb_gsbase);
+
+		__set_ds(pcb->pcb_ds);
+		rp->r_ds = pcb->pcb_ds;
+
+		__set_es(pcb->pcb_es);
+		rp->r_es = pcb->pcb_es;
+
+		__set_fs(pcb->pcb_fs);
+		rp->r_fs = pcb->pcb_fs;
+
+		/*
+		 * Same as for %gs
+		 */
+		if (pcb->pcb_fs == LWPFS_SEL || pcb->pcb_fs == 0)
+			wrmsr(MSR_AMD_FSBASE, pcb->pcb_fsbase);
+
+	} else {
+		cli();
+		rc = 1;
+	}
+	no_trap();
+	return (rc);
+}
+#endif	/* __amd64 */
+
+#ifdef _SYSCALL32_IMPL
+
+/*
+ * Make it impossible for a process to change its data model.
+ * We do this by toggling the present bits for the 32 and
+ * 64-bit user code descriptors. That way if a user lwp attempts
+ * to change its data model (by using the wrong code descriptor in
+ * %cs) it will fault immediately. This also allows us to simplify
+ * assertions and checks in the kernel.
+ */
+static void
+gdt_ucode_model(model_t model)
+{
+	cpu_t *cpu;
+
+	kpreempt_disable();
+	cpu = CPU;
+	if (model == DATAMODEL_NATIVE) {
+		cpu->cpu_gdt[GDT_UCODE].usd_p = 1;
+		cpu->cpu_gdt[GDT_U32CODE].usd_p = 0;
+	} else {
+		cpu->cpu_gdt[GDT_U32CODE].usd_p = 1;
+		cpu->cpu_gdt[GDT_UCODE].usd_p = 0;
+	}
+	kpreempt_enable();
+}
+
+#endif	/* _SYSCALL32_IMPL */
+
 /*
  * Restore lwp private fs and gs segment descriptors
  * on current cpu's GDT.
@@ -452,27 +597,19 @@ lwp_segregs_save(klwp_t *lwp)
 static void
 lwp_segregs_restore(klwp_t *lwp)
 {
-	cpu_t *cpu = CPU;
 	pcb_t *pcb = &lwp->lwp_pcb;
+	cpu_t *cpu = CPU;
 
 	ASSERT(VALID_LWP_DESC(&pcb->pcb_fsdesc));
 	ASSERT(VALID_LWP_DESC(&pcb->pcb_gsdesc));
 
+#ifdef	_SYSCALL32_IMPL
+	gdt_ucode_model(DATAMODEL_NATIVE);
+#endif
+
 	cpu->cpu_gdt[GDT_LWPFS] = pcb->pcb_fsdesc;
 	cpu->cpu_gdt[GDT_LWPGS] = pcb->pcb_gsdesc;
 
-#if defined(__amd64)
-	/*
-	 * Make it impossible for a process to change its data model.
-	 * We do this by toggling the present bits for the 32 and
-	 * 64-bit user code descriptors. That way if a user lwp attempts
-	 * to change its data model (by using the wrong code descriptor in
-	 * %cs) it will fault immediately. This also allows us to simplify
-	 * assertions and checks in the kernel.
-	 */
-	cpu->cpu_gdt[GDT_UCODE].usd_p = 1;
-	cpu->cpu_gdt[GDT_U32CODE].usd_p = 0;
-#endif	/* __amd64 */
 }
 
 #ifdef _SYSCALL32_IMPL
@@ -480,16 +617,16 @@ lwp_segregs_restore(klwp_t *lwp)
 static void
 lwp_segregs_restore32(klwp_t *lwp)
 {
+	/*LINTED*/
 	cpu_t *cpu = CPU;
 	pcb_t *pcb = &lwp->lwp_pcb;
 
-	ASSERT(VALID_LWP_DESC(&pcb->pcb_fsdesc));
-	ASSERT(VALID_LWP_DESC(&pcb->pcb_gsdesc));
+	ASSERT(VALID_LWP_DESC(&lwp->lwp_pcb.pcb_fsdesc));
+	ASSERT(VALID_LWP_DESC(&lwp->lwp_pcb.pcb_gsdesc));
 
+	gdt_ucode_model(DATAMODEL_ILP32);
 	cpu->cpu_gdt[GDT_LWPFS] = pcb->pcb_fsdesc;
 	cpu->cpu_gdt[GDT_LWPGS] = pcb->pcb_gsdesc;
-	cpu->cpu_gdt[GDT_UCODE].usd_p = 0;
-	cpu->cpu_gdt[GDT_U32CODE].usd_p = 1;
 }
 
 #endif	/* _SYSCALL32_IMPL */
@@ -644,18 +781,13 @@ setregs(uarg_t *args)
 	pcb->pcb_fsbase = pcb->pcb_gsbase = 0;
 
 	if (ttoproc(t)->p_model == DATAMODEL_NATIVE) {
-		cpu_t *cpu;
 
 		rp->r_cs = UCS_SEL;
 
 		/*
 		 * Only allow 64-bit user code descriptor to be present.
 		 */
-		kpreempt_disable();
-		cpu = CPU;
-		cpu->cpu_gdt[GDT_UCODE].usd_p = 1;
-		cpu->cpu_gdt[GDT_U32CODE].usd_p = 0;
-		kpreempt_enable();
+		gdt_ucode_model(DATAMODEL_NATIVE);
 
 		/*
 		 * Arrange that the virtualized %fs and %gs GDT descriptors
@@ -672,7 +804,6 @@ setregs(uarg_t *args)
 			(void) lwp_setprivate(lwp, _LWP_FSBASE, args->thrptr);
 
 	} else {
-		cpu_t *cpu;
 
 		rp->r_cs = U32CS_SEL;
 		rp->r_ds = rp->r_es = UDS_SEL;
@@ -680,11 +811,7 @@ setregs(uarg_t *args)
 		/*
 		 * only allow 32-bit user code selector to be present.
 		 */
-		kpreempt_disable();
-		cpu = CPU;
-		cpu->cpu_gdt[GDT_UCODE].usd_p = 0;
-		cpu->cpu_gdt[GDT_U32CODE].usd_p = 1;
-		kpreempt_enable();
+		gdt_ucode_model(DATAMODEL_ILP32);
 
 		pcb->pcb_fsdesc = pcb->pcb_gsdesc = zero_u32desc;
 
@@ -696,7 +823,6 @@ setregs(uarg_t *args)
 			(void) lwp_setprivate(lwp, _LWP_GSBASE, args->thrptr);
 
 	}
-
 
 	pcb->pcb_ds = rp->r_ds;
 	pcb->pcb_es = rp->r_es;
@@ -713,7 +839,6 @@ setregs(uarg_t *args)
 	 * and of type data).
 	 */
 	pcb->pcb_fsdesc = pcb->pcb_gsdesc = zero_udesc;
-
 
 	/*
 	 * For %gs we need to reset LWP_GSBASE in pcb and the

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,7 +96,7 @@ extern "C" {
  */
 #define	FPS_IE	0x00000001	/* invalid operation			*/
 #define	FPS_DE	0x00000002	/* denormalized operand			*/
-#define	FPS_ZE	0x00000004	/* zero devide				*/
+#define	FPS_ZE	0x00000004	/* zero divide				*/
 #define	FPS_OE	0x00000008	/* overflow				*/
 #define	FPS_UE	0x00000010	/* underflow				*/
 #define	FPS_PE	0x00000020	/* precision				*/
@@ -164,14 +163,22 @@ extern int fpu_exists;		/* FPU hw exists			*/
 
 #ifdef _KERNEL
 
+extern int fpu_ignored;
+extern int fpu_pentium_fdivbug;
+
 extern uint32_t sse_mxcsr_mask;
 
 extern void fpu_probe(void);
+extern uint_t fpu_initial_probe(void);
+extern int fpu_probe_pentium_fdivbug(void);
 
-extern void fpnsave_begin(void *);
-extern void fpxsave_begin(void *);
-extern void (*fpsave_begin)(void *);
+extern void fpnsave_ctxt(void *);
+extern void fpxsave_ctxt(void *);
+extern void (*fpsave_ctxt)(void *);
 
+struct fnsave_state;
+struct fxsave_state;
+extern void fxsave_insn(struct fxsave_state *);
 extern void fpsave(struct fnsave_state *);
 extern void fprestore(struct fnsave_state *);
 extern void fpxsave(struct fxsave_state *);

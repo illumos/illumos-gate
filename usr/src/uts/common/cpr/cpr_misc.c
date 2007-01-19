@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,8 +123,9 @@ cpr_init(int fcn)
 		mutex_exit(&cpr_slock);
 		return (EAGAIN);
 	}
-	DEBUG3(cpr_err(CE_CONT, "Reserved virtual range from 0x%p for writing "
-	    "kas\n", (void *)CPR->c_mapping_area));
+	if (cpr_debug & CPR_DEBUG3)
+		cpr_err(CE_CONT, "Reserved virtual range from 0x%p for writing "
+		    "kas\n", (void *)CPR->c_mapping_area);
 
 	return (0);
 }
@@ -441,8 +442,8 @@ cpr_alloc_statefile(int alloc_retry)
 	 */
 	if (alloc_retry) {
 		str = "\n-->Retrying statefile allocation...";
-		if (cpr_debug & (LEVEL1 | LEVEL7))
-			errp(str);
+		if (cpr_debug & (CPR_DEBUG1 | CPR_DEBUG7))
+			prom_printf(str);
 		if (C_VP->v_type != VBLK)
 			(void) VOP_DUMPCTL(C_VP, DUMP_FREE, NULL);
 	} else {
@@ -598,13 +599,13 @@ cpr_statefile_ok(vnode_t *vp, int alloc_retry)
 
 	str = "cpr_statefile_ok:";
 
-	DEBUG9(errp("Phys swap: max=%lu resv=%lu\n",
-	    k_anoninfo.ani_max, k_anoninfo.ani_phys_resv));
-	DEBUG9(errp("Mem swap: max=%ld resv=%lu\n",
+	CPR_DEBUG(CPR_DEBUG9, "Phys swap: max=%lu resv=%lu\n",
+	    k_anoninfo.ani_max, k_anoninfo.ani_phys_resv);
+	CPR_DEBUG(CPR_DEBUG9, "Mem swap: max=%ld resv=%lu\n",
 	    MAX(availrmem - swapfs_minfree, 0),
-	    k_anoninfo.ani_mem_resv));
-	DEBUG9(errp("Total available swap: %ld\n",
-		CURRENT_TOTAL_AVAILABLE_SWAP));
+	    k_anoninfo.ani_mem_resv);
+	CPR_DEBUG(CPR_DEBUG9, "Total available swap: %ld\n",
+		CURRENT_TOTAL_AVAILABLE_SWAP);
 
 	/*
 	 * try increasing filesize by 15%
@@ -614,16 +615,17 @@ cpr_statefile_ok(vnode_t *vp, int alloc_retry)
 		 * block device doesn't get any bigger
 		 */
 		if (vp->v_type == VBLK) {
-			if (cpr_debug & (LEVEL1 | LEVEL6))
-				errp("Retry statefile on special file\n");
+			if (cpr_debug & (CPR_DEBUG1 | CPR_DEBUG6))
+				prom_printf(
+				    "Retry statefile on special file\n");
 			return (ENOMEM);
 		} else {
 			rw_enter(&ip->i_contents, RW_READER);
 			size = (ip->i_size * SIZE_RATE) / INTEGRAL;
 			rw_exit(&ip->i_contents);
 		}
-		if (cpr_debug & (LEVEL1 | LEVEL6))
-			errp("Retry statefile size = %lld\n", size);
+		if (cpr_debug & (CPR_DEBUG1 | CPR_DEBUG6))
+			prom_printf("Retry statefile size = %lld\n", size);
 	} else {
 		u_longlong_t cpd_size;
 		pgcnt_t npages, nback;
@@ -632,8 +634,8 @@ cpr_statefile_ok(vnode_t *vp, int alloc_retry)
 		ndvram = 0;
 		(void) callb_execute_class(CB_CL_CPR_FB,
 		    (int)(uintptr_t)&ndvram);
-		if (cpr_debug & (LEVEL1 | LEVEL6))
-			errp("ndvram size = %d\n", ndvram);
+		if (cpr_debug & (CPR_DEBUG1 | CPR_DEBUG6))
+			prom_printf("ndvram size = %d\n", ndvram);
 
 		/*
 		 * estimate 1 cpd_t for every (CPR_MAXCONTIG / 2) pages
@@ -649,10 +651,11 @@ cpr_statefile_ok(vnode_t *vp, int alloc_retry)
 		if (CPR->c_flags & C_COMPRESSING) {
 			size = ((ksize * COMPRESS_PERCENT) / INTEGRAL) +
 			    raw_data + ((nback * 10) / UCOMP_RATE);
-			DEBUG1(errp(est_fmt, str, "", size, ksize));
+			CPR_DEBUG(CPR_DEBUG1, est_fmt, str, "", size, ksize);
 		} else {
 			size = ksize + raw_data + nback;
-			DEBUG1(errp(est_fmt, str, "no ", size, ksize));
+			CPR_DEBUG(CPR_DEBUG1, est_fmt, str, "no ",
+			    size, ksize);
 		}
 	}
 
@@ -661,8 +664,8 @@ cpr_statefile_ok(vnode_t *vp, int alloc_retry)
 	 */
 	if (vp->v_type == VBLK) {
 		space = cpr_get_devsize(vp->v_rdev);
-		if (cpr_debug & (LEVEL1 | LEVEL6))
-			errp("statefile dev size %lu\n", space);
+		if (cpr_debug & (CPR_DEBUG1 | CPR_DEBUG6))
+			prom_printf("statefile dev size %lu\n", space);
 
 		/*
 		 * Export the estimated filesize info, this value will be
@@ -670,9 +673,9 @@ cpr_statefile_ok(vnode_t *vp, int alloc_retry)
 		 * no compression.
 		 */
 		STAT->cs_est_statefsz = size;
-		if (cpr_debug & (LEVEL1 | LEVEL6))
-			errp("%s Estimated statefile size %llu, space %lu\n",
-			    str, size, space);
+		if (cpr_debug & (CPR_DEBUG1 | CPR_DEBUG6))
+			prom_printf("%s Estimated statefile size %llu, "
+			    "space %lu\n", str, size, space);
 		if (size > space) {
 			cpr_err(CE_CONT, "Statefile partition too small.");
 			return (ENOMEM);
@@ -701,12 +704,12 @@ cpr_statefile_ok(vnode_t *vp, int alloc_retry)
 		 */
 		STAT->cs_est_statefsz = size;
 		error = cpr_grow_statefile(vp, size);
-		if (cpr_debug & (LEVEL1 | LEVEL6)) {
+		if (cpr_debug & (CPR_DEBUG1 | CPR_DEBUG6)) {
 			rw_enter(&ip->i_contents, RW_READER);
 			isize = ip->i_size;
 			rw_exit(&ip->i_contents);
-			errp("%s Estimated statefile size %lld, i_size %lld\n",
-			    str, size, isize);
+			prom_printf("%s Estimated statefile size %lld, "
+			    "i_size %lld\n", str, size, isize);
 		}
 
 		return (error);
@@ -896,8 +899,9 @@ cpr_mp_offline(void)
 			return (rc);
 		}
 	} while ((cp = cp->cpu_next) != cpu_list);
-	if (brought_up_boot && (cpr_debug & (LEVEL1 | LEVEL6)))
-		errp("changed cpu %p to state %d\n", bootcpu, CPU_CPR_ONLINE);
+	if (brought_up_boot && (cpr_debug & (CPR_DEBUG1 | CPR_DEBUG6)))
+		prom_printf("changed cpu %p to state %d\n",
+		    bootcpu, CPU_CPR_ONLINE);
 	mutex_exit(&cpu_lock);
 
 	return (rc);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,6 @@
 #include <sys/cmn_err.h>
 #include <sys/utsname.h>
 #include <sys/debug.h>
-#include <sys/kdi_impl.h>
 
 #include <sys/dumphdr.h>
 #include <sys/bootconf.h>
@@ -82,7 +81,6 @@
 #include <sys/stack.h>
 #include <sys/trap.h>
 #include <sys/pic.h>
-#include <sys/mmu.h>
 #include <vm/hat.h>
 #include <vm/anon.h>
 #include <vm/as.h>
@@ -115,7 +113,9 @@
 #include <sys/x86_archext.h>
 #include <sys/pool_pset.h>
 #include <sys/autoconf.h>
-#include <sys/kdi.h>
+#include <sys/mem.h>
+#include <sys/dumphdr.h>
+#include <sys/compress.h>
 
 #ifdef	TRAPTRACE
 #include <sys/traptrace.h>
@@ -264,8 +264,6 @@ resume_other_cpus()
 	xc_release_cpus();
 }
 
-extern void	mp_halt(char *);
-
 void
 stop_other_cpus()
 {
@@ -275,12 +273,12 @@ stop_other_cpus()
 	ASSERT(cpuid < NCPU);
 
 	/*
-	 * xc_trycall will attempt to make all other CPUs execute mp_halt,
+	 * xc_trycall will attempt to make all other CPUs execute mach_cpu_halt,
 	 * and will return immediately regardless of whether or not it was
 	 * able to make them do it.
 	 */
 	CPUSET_ALL_BUT(xcset, cpuid);
-	xc_trycall(NULL, NULL, NULL, xcset, (int (*)())mp_halt);
+	xc_trycall(NULL, NULL, NULL, xcset, (int (*)())mach_cpu_halt);
 }
 
 /*
@@ -322,7 +320,7 @@ debug_enter(
 		prom_printf("%s\n", msg);
 
 	if (boothowto & RB_DEBUG)
-		kdi_dvec_enter();
+		kmdb_enter();
 
 	if (dtrace_debugger_fini != NULL)
 		(*dtrace_debugger_fini)();
@@ -360,20 +358,6 @@ halt(char *s)
 		prom_printf("(%s) \n", s);
 	prom_exit_to_mon();
 	/*NOTREACHED*/
-}
-
-/*
- * Enter monitor.  Called via cross-call from stop_other_cpus().
- */
-void
-mp_halt(char *msg)
-{
-	if (msg)
-		prom_printf("%s\n", msg);
-
-	/*CONSTANTCONDITION*/
-	while (1)
-		;
 }
 
 /*
@@ -431,7 +415,7 @@ int
 sysp_getchar()
 {
 	int i;
-	int s;
+	ulong_t s;
 
 	if (cons_polledio == NULL) {
 		/* Uh oh */
@@ -450,7 +434,7 @@ sysp_getchar()
 void
 sysp_putchar(int c)
 {
-	int s;
+	ulong_t s;
 
 	/*
 	 * We have no alternative but to drop the output on the floor.
@@ -469,7 +453,7 @@ int
 sysp_ischar()
 {
 	int i;
-	int s;
+	ulong_t s;
 
 	if (cons_polledio == NULL ||
 	    cons_polledio->cons_polledio_ischar == NULL)
@@ -759,7 +743,8 @@ panic_idle(void)
 	splx(ipltospl(CLOCK_LEVEL));
 	(void) setjmp(&curthread->t_pcb);
 
-	for (;;);
+	for (;;)
+		;
 }
 
 /*
@@ -826,8 +811,7 @@ panic_dump_hw(int spl)
 /*ARGSUSED*/
 void
 plat_tod_fault(enum tod_fault_type tod_bad)
-{
-}
+{}
 
 /*ARGSUSED*/
 int
@@ -874,7 +858,6 @@ void
 tenmicrosec(void)
 {
 	extern int	tsc_gethrtime_initted;
-	int		i;
 
 	if (tsc_gethrtime_initted) {
 		hrtime_t start, end;
@@ -884,6 +867,8 @@ tenmicrosec(void)
 			end = gethrtime();
 		}
 	} else {
+		int i;
+
 		/*
 		 * Artificial loop to induce delay.
 		 */
@@ -978,4 +963,59 @@ get_cpu_mstate(cpu_t *cpu, hrtime_t *times)
 		scalehrtime(&times[i]);
 	}
 	scalehrtime(&times[CMS_SYSTEM]);
+}
+
+
+/*
+ * This is a version of the rdmsr instruction that allows
+ * an error code to be returned in the case of failure.
+ */
+int
+checked_rdmsr(uint_t msr, uint64_t *value)
+{
+	if ((x86_feature & X86_MSR) == 0)
+		return (ENOTSUP);
+	*value = rdmsr(msr);
+	return (0);
+}
+
+/*
+ * This is a version of the wrmsr instruction that allows
+ * an error code to be returned in the case of failure.
+ */
+int
+checked_wrmsr(uint_t msr, uint64_t value)
+{
+	if ((x86_feature & X86_MSR) == 0)
+		return (ENOTSUP);
+	wrmsr(msr, value);
+	return (0);
+}
+
+/*
+ * Return true if the given page VA can be read via /dev/kmem.
+ */
+/*ARGSUSED*/
+int
+plat_mem_valid_page(uintptr_t pageaddr, uio_rw_t rw)
+{
+	return (0);
+}
+
+int
+dump_plat_addr()
+{
+	return (0);
+}
+
+void
+dump_plat_pfn()
+{
+}
+
+/*ARGSUSED*/
+int
+dump_plat_data(void *dump_cbuf)
+{
+	return (0);
 }

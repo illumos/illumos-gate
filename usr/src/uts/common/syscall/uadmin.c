@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,15 +217,15 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 		 * do not release these resources.
 		 */
 		if (ttoproc(curthread) != &p0) {
-			VN_RELE(u.u_cdir);
-			if (u.u_rdir)
-				VN_RELE(u.u_rdir);
-			if (u.u_cwd)
-				refstr_rele(u.u_cwd);
+			VN_RELE(PTOU(curproc)->u_cdir);
+			if (PTOU(curproc)->u_rdir)
+				VN_RELE(PTOU(curproc)->u_rdir);
+			if (PTOU(curproc)->u_cwd)
+				refstr_rele(PTOU(curproc)->u_cwd);
 
-			u.u_cdir = rootdir;
-			u.u_rdir = NULL;
-			u.u_cwd = NULL;
+			PTOU(curproc)->u_cdir = rootdir;
+			PTOU(curproc)->u_rdir = NULL;
+			PTOU(curproc)->u_cwd = NULL;
 		}
 
 		/*

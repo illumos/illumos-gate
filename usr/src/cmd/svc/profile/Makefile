@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,7 +50,6 @@ PROFILESRCS = \
 	platform_SUNW,Sun-Fire.xml \
 	platform_SUNW,Ultra-Enterprise-10000.xml \
 	platform_SUNW,UltraSPARC-IIi-Netract.xml \
-	platform_i86pc.xml \
 	platform_none.xml \
 	platform_sun4v.xml
 

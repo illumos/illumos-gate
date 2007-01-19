@@ -42,6 +42,11 @@ PROMIF		 = ieee1275
 PSMBASE		 = $(UTSBASE)/../psm
 
 #
+#	uname -m value
+#
+UNAME_M		= $(PLATFORM)
+
+#
 # Definitions for the platform-specific /platform directories.
 #
 # PLATFORMS designates those sun4v machines which have no platform

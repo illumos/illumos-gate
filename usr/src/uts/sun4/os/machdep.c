@@ -56,7 +56,11 @@
 #include <sys/sysmacros.h>
 #include <sys/promif.h>
 #include <sys/pool_pset.h>
+#include <sys/mem.h>
+#include <sys/dumphdr.h>
 #include <vm/seg_kmem.h>
+#include <sys/hold_page.h>
+#include <sys/cpu.h>
 
 int maxphys = MMU_PAGESIZE * 16;	/* 128k */
 int klustsize = MMU_PAGESIZE * 16;	/* 128k */
@@ -676,6 +680,7 @@ void
 mach_kdi_init(kdi_t *kdi)
 {
 	kdi->kdi_plat_call = kdi_plat_call;
+	kdi->kdi_kmdb_enter = kmdb_enter;
 	kdi->mkdi_cpu_index = kdi_cpu_index;
 	kdi->mkdi_trap_vatotte = kdi_trap_vatotte;
 	kdi->mkdi_kernpanic = kdi_kernpanic;
@@ -773,4 +778,59 @@ get_cpu_mstate(cpu_t *cpu, hrtime_t *times)
 		}
 		times[CMS_SYSTEM] += intracct[i];
 	}
+}
+
+void
+mach_cpu_pause(volatile char *safe)
+{
+	/*
+	 * This cpu is now safe.
+	 */
+	*safe = PAUSE_WAIT;
+	membar_enter(); /* make sure stores are flushed */
+
+	/*
+	 * Now we wait.  When we are allowed to continue, safe
+	 * will be set to PAUSE_IDLE.
+	 */
+	while (*safe != PAUSE_IDLE)
+		SMT_PAUSE();
+}
+
+/*ARGSUSED*/
+int
+plat_mem_valid_page(uintptr_t pageaddr, uio_rw_t rw)
+{
+	return (0);
+}
+
+int
+dump_plat_addr()
+{
+	return (0);
+}
+
+void
+dump_plat_pfn()
+{
+}
+
+/* ARGSUSED */
+int
+dump_plat_data(void *dump_cdata)
+{
+	return (0);
+}
+
+/* ARGSUSED */
+int
+plat_hold_page(pfn_t pfn, int lock, page_t **pp_ret)
+{
+	return (PLAT_HOLD_OK);
+}
+
+/* ARGSUSED */
+void
+plat_release_page(page_t *pp)
+{
 }

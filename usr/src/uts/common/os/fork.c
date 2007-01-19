@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -687,15 +687,15 @@ fork_fail(proc_t *cp)
 
 	kmem_free(fip->fi_list, fip->fi_nfiles * sizeof (uf_entry_t));
 
-	VN_RELE(u.u_cdir);
-	if (u.u_rdir)
-		VN_RELE(u.u_rdir);
+	VN_RELE(PTOU(curproc)->u_cdir);
+	if (PTOU(curproc)->u_rdir)
+		VN_RELE(PTOU(curproc)->u_rdir);
 	if (cp->p_exec)
 		VN_RELE(cp->p_exec);
 	if (cp->p_execdir)
 		VN_RELE(cp->p_execdir);
-	if (u.u_cwd)
-		refstr_rele(u.u_cwd);
+	if (PTOU(curproc)->u_cwd)
+		refstr_rele(PTOU(curproc)->u_cwd);
 }
 
 /*
@@ -1086,17 +1086,17 @@ getproc(proc_t **cpp, int kernel)
 	 */
 	fcnt_add(P_FINFO(pp), 1);
 
-	VN_HOLD(u.u_cdir);
-	if (u.u_rdir)
-		VN_HOLD(u.u_rdir);
-	if (u.u_cwd)
-		refstr_hold(u.u_cwd);
+	VN_HOLD(PTOU(pp)->u_cdir);
+	if (PTOU(pp)->u_rdir)
+		VN_HOLD(PTOU(pp)->u_rdir);
+	if (PTOU(pp)->u_cwd)
+		refstr_hold(PTOU(pp)->u_cwd);
 
 	/*
 	 * copy the parent's uarea.
 	 */
 	uarea = PTOU(cp);
-	bcopy(PTOU(pp), uarea, sizeof (user_t));
+	bcopy(PTOU(pp), uarea, sizeof (*uarea));
 	flist_fork(P_FINFO(pp), P_FINFO(cp));
 
 	gethrestime(&uarea->u_start);

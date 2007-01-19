@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,61 +34,32 @@
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_umem.h>
 #include <kmdb/kmdb_dpi.h>
-#include <kmdb/kmdb_kdi_impl.h>
 #include <mdb/mdb.h>
-
-void (**kmdb_kdi_shutdownp)(int, int);
-
-int
-kmdb_kdi_xc_initialized(void)
-{
-	return (mdb.m_kdi->mkdi_xc_initialized());
-}
 
 /*ARGSUSED*/
 void
-kmdb_kdi_stop_other_cpus(int my_cpuid, void (*slave_saver)(void))
+kmdb_kdi_stop_slaves(int my_cpuid, int doxc)
 {
 	/* Stop other CPUs if there are CPUs to stop */
-	if (mdb.m_kdi->mkdi_xc_initialized())
-		mdb.m_kdi->mkdi_xc_others(my_cpuid, slave_saver);
+	mdb.m_kdi->mkdi_stop_slaves(my_cpuid, doxc);
 }
 
 void
-kmdb_kdi_cpu_iter(void (*iter)(struct cpu *, uint_t), uint_t arg)
+kmdb_kdi_start_slaves(void)
 {
-	mdb.m_kdi->mkdi_cpu_iter(iter, arg);
+	mdb.m_kdi->mkdi_start_slaves();
+}
+
+void
+kmdb_kdi_slave_wait(void)
+{
+	mdb.m_kdi->mkdi_slave_wait();
 }
 
 uintptr_t
 kmdb_kdi_get_userlimit(void)
 {
 	return (mdb.m_kdi->mkdi_get_userlimit());
-}
-
-void
-kmdb_kdi_idt_init_gate(gate_desc_t *gate, void (*hdlr)(void), uint_t dpl,
-    int useboot)
-{
-	mdb.m_kdi->mkdi_idt_init_gate(gate, hdlr, dpl, useboot);
-}
-
-void
-kmdb_kdi_idt_read(gate_desc_t *idt, gate_desc_t *gatep, uint_t vec)
-{
-	mdb.m_kdi->mkdi_idt_read(idt, gatep, vec);
-}
-
-void
-kmdb_kdi_idt_write(gate_desc_t *idt, gate_desc_t *gate, uint_t vec)
-{
-	mdb.m_kdi->mkdi_idt_write(idt, gate, vec);
-}
-
-gate_desc_t *
-kmdb_kdi_cpu2idt(cpu_t *cp)
-{
-	return (mdb.m_kdi->mkdi_cpu2idt(cp));
 }
 
 int
@@ -105,13 +75,48 @@ kmdb_kdi_get_cpuinfo(uint_t *vendorp, uint_t *familyp, uint_t *modelp)
 
 /*ARGSUSED*/
 void
-kdi_cpu_init(void)
+kmdb_kdi_init_isadep(kdi_t *kdi, kmdb_auxv_t *kav)
 {
 }
 
-/*ARGSUSED1*/
 void
-kmdb_kdi_init_isadep(kdi_t *kdi, kmdb_auxv_t *kav)
+kmdb_kdi_activate(kdi_main_t main, kdi_cpusave_t *cpusave, int ncpusave)
 {
-	kmdb_kdi_shutdownp = kdi->mkdi_shutdownp;
+	mdb.m_kdi->mkdi_activate(main, cpusave, ncpusave);
+}
+
+void
+kmdb_kdi_deactivate(void)
+{
+	mdb.m_kdi->mkdi_deactivate();
+}
+
+void
+kmdb_kdi_idt_switch(kdi_cpusave_t *cpusave)
+{
+	mdb.m_kdi->mkdi_idt_switch(cpusave);
+}
+
+void
+kmdb_kdi_update_drreg(kdi_drreg_t *drreg)
+{
+	mdb.m_kdi->mkdi_update_drreg(drreg);
+}
+
+void
+kmdb_kdi_set_debug_msrs(kdi_msr_t *msrs)
+{
+	mdb.m_kdi->mkdi_set_debug_msrs(msrs);
+}
+
+void
+kmdb_kdi_memrange_add(caddr_t base, size_t len)
+{
+	mdb.m_kdi->mkdi_memrange_add(base, len);
+}
+
+void
+kmdb_kdi_reboot(void)
+{
+	mdb.m_kdi->mkdi_reboot();
 }

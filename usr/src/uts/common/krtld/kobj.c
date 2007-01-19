@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,9 +80,10 @@
 #define	DOSYM_UNDEF		-1	/* undefined symbol */
 #define	DOSYM_UNSAFE		-2	/* MT-unsafe driver symbol */
 
-static struct module *load_exec(val_t *);
+static void synthetic_bootaux(char *, val_t *);
+static struct module *load_exec(val_t *, char *);
 static void load_linker(val_t *);
-static struct modctl *add_primary(char *filename, int);
+static struct modctl *add_primary(const char *filename, int);
 static int bind_primary(val_t *, int);
 static int load_primary(struct module *, int);
 static int load_kmdb(val_t *);
@@ -97,7 +98,7 @@ static int do_symbols(struct module *, Elf64_Addr);
 static void module_assign(struct modctl *, struct module *);
 static void free_module_data(struct module *);
 static char *depends_on(struct module *);
-static char *getmodpath(void);
+static char *getmodpath(const char *);
 static char *basename(char *);
 static void attr_val(val_t *);
 static char *find_libmacro(char *);
@@ -143,6 +144,11 @@ extern int last_module_id;
  *			  is loaded.
  */
 int kobj_debug = 0;
+
+#define	KOBJ_MARK(s)	if (kobj_debug & D_DEBUG)	\
+	(_kobj_printf(ops, "%d", __LINE__), _kobj_printf(ops, ": %s\n", s))
+#else
+#define	KOBJ_MARK(s)	/* discard */
 #endif
 
 #define	MODPATH_PROPNAME	"module-path"
@@ -197,11 +203,11 @@ void	sas_prisyms(struct modctl_list *);
 void	sas_syms(struct module *);
 #endif
 
+char *kobj_module_path;				/* module search path */
 vmem_t	*text_arena;				/* module text arena */
 static vmem_t *data_arena;			/* module data & bss arena */
 static vmem_t *ctf_arena;			/* CTF debug data arena */
 static struct modctl *kobj_modules = NULL;	/* modules loaded */
-static char *module_path;			/* module search path */
 int kobj_mmu_pagesize;				/* system pagesize */
 static int lg_pagesize;				/* "large" pagesize */
 static int kobj_last_module_id = 0;		/* id assignment */
@@ -262,12 +268,18 @@ const char		*ultra_2 = "SUNW,UltraSPARC-II";
 #endif
 
 /*
- * Beginning and end of the kernel's
- * dynamic text/data segments.
+ * Beginning and end of the kernel's dynamic text/data segments.
  */
 static caddr_t _text;
 static caddr_t _etext;
-static caddr_t	_data;
+static caddr_t _data;
+
+/*
+ * XXX Hmm. The sparc linker fails to define this symbol.
+ */
+#if !defined(__sparc)
+extern
+#endif
 caddr_t _edata;
 
 static Addr dynseg = 0;	/* load address of "dynamic" segment */
@@ -337,6 +349,7 @@ kobj_init(
 	struct module *mp;
 	struct modctl *modp;
 	Addr entry;
+	char filename[MAXPATHLEN];
 
 	/*
 	 * Save these to pass on to
@@ -351,6 +364,7 @@ kobj_init(
 #else
 	_kobj_printf = (void (*)(void *, const char *, ...))bop_putsarg;
 #endif
+	KOBJ_MARK("Entered kobj_init()");
 
 #if defined(__sparc)
 	/* XXXQ should suppress this test on sun4v */
@@ -360,11 +374,6 @@ kobj_init(
 		}
 	}
 #endif
-	/*
-	 * Save the interesting attribute-values
-	 * (scanned by kobj_boot).
-	 */
-	attr_val(bootaux);
 
 	/*
 	 * Check bootops version.
@@ -374,6 +383,17 @@ kobj_init(
 		    BOP_GETVERSION(ops));
 		_kobj_printf(ops, "expected %d\n", BO_VERSION);
 	}
+#ifdef KOBJ_DEBUG
+	else if (kobj_debug & D_DEBUG) {
+		/*
+		 * Say -something- so we know we got this far ..
+		 */
+		_kobj_printf(ops, "krtld: Using boot version %d.\n",
+		    BOP_GETVERSION(ops));
+	}
+#endif
+
+	(void) BOP_GETPROP(ops, "whoami", filename);
 
 	/*
 	 * We don't support standalone debuggers anymore.  The use of kadb
@@ -395,13 +415,40 @@ kobj_init(
 		/* on x86, we always boot with a ramdisk */
 		extern int kobj_boot_mountroot(void);
 		(void) kobj_boot_mountroot();
+
+		/*
+		 * Now that the ramdisk is mounted, finish boot property
+		 * initialization.
+		 */
+		boot_prop_finish();
 	}
 #endif
+
+#if !defined(_UNIX_KRTLD)
+	/*
+	 * If 'unix' is linked together with 'krtld' into one executable,
+	 * the early boot code does -not- hand us any of the dynamic metadata
+	 * about the executable. In particular, it does not read in, map or
+	 * otherwise look at the program headers. We fake all that up now.
+	 *
+	 * We do this early as DTrace static probes and tnf probes both call
+	 * undefined references.  We have to process those relocations before
+	 * calling any of them.
+	 */
+	if (bootaux[BA_PHDR].ba_ptr == NULL)
+		synthetic_bootaux(filename, bootaux);
+#endif
+
+	/*
+	 * Save the interesting attribute-values
+	 * (scanned by kobj_boot).
+	 */
+	attr_val(bootaux);
 
 	/*
 	 * Set the module search path.
 	 */
-	module_path = getmodpath();
+	kobj_module_path = getmodpath(filename);
 
 	boot_cpu_compatible_list = find_libmacro("CPU");
 
@@ -412,7 +459,7 @@ kobj_init(
 	 * loadable modules.
 	 */
 
-	mp = load_exec(bootaux);
+	mp = load_exec(bootaux, filename);
 	load_linker(bootaux);
 
 	/*
@@ -503,6 +550,72 @@ fail:
 	_kobj_printf(ops, "krtld: error during initial load/link phase\n");
 }
 
+#if !defined(_UNIX_KRTLD)
+/*
+ * Synthesize additional metadata that describes the executable.
+ *
+ * (When the dynamic executable has an interpreter, the boot program
+ * does all this for us.  Where we don't have an interpreter, (or a
+ * even a boot program, perhaps) we have to do this for ourselves.)
+ */
+static void
+synthetic_bootaux(char *filename, val_t *bootaux)
+{
+	Ehdr ehdr;
+	caddr_t phdrbase;
+	struct _buf *file;
+	int i, n;
+
+	/*
+	 * Elf header
+	 */
+	KOBJ_MARK("synthetic_bootaux()");
+	KOBJ_MARK(filename);
+	file = kobj_open_file(filename);
+	if (file == (struct _buf *)-1) {
+		_kobj_printf(ops, "krtld: failed to open '%s'\n", filename);
+		return;
+	}
+	KOBJ_MARK("reading program headers");
+	if (kobj_read_file(file, (char *)&ehdr, sizeof (ehdr), 0) < 0) {
+		_kobj_printf(ops, "krtld: %s: failed to read ehder\n",
+		    filename);
+		return;
+	}
+
+	/*
+	 * Program headers
+	 */
+	bootaux[BA_PHNUM].ba_val = ehdr.e_phnum;
+	bootaux[BA_PHENT].ba_val = ehdr.e_phentsize;
+	n = ehdr.e_phentsize * ehdr.e_phnum;
+
+	phdrbase = kobj_alloc(n, KM_WAIT | KM_TMP);
+
+	if (kobj_read_file(file, phdrbase, n, ehdr.e_phoff) < 0) {
+		_kobj_printf(ops, "krtld: %s: failed to read phdrs\n",
+		    filename);
+		return;
+	}
+	bootaux[BA_PHDR].ba_ptr = phdrbase;
+	kobj_close_file(file);
+	KOBJ_MARK("closed file");
+
+	/*
+	 * Find the dynamic section address
+	 */
+	for (i = 0; i < ehdr.e_phnum; i++) {
+		Phdr *phdr = (Phdr *)(phdrbase + ehdr.e_phentsize * i);
+
+		if (phdr->p_type == PT_DYNAMIC) {
+			bootaux[BA_DYNAMIC].ba_ptr = (void *)phdr->p_vaddr;
+			break;
+		}
+	}
+	KOBJ_MARK("synthetic_bootaux() done");
+}
+#endif
+
 /*
  * Set up any global information derived
  * from attribute/values in the boot or
@@ -515,6 +628,7 @@ attr_val(val_t *bootaux)
 	int phnum, phsize;
 	int i;
 
+	KOBJ_MARK("attr_val()");
 	kobj_mmu_pagesize = bootaux[BA_PAGESZ].ba_val;
 	lg_pagesize = bootaux[BA_LPAGESZ].ba_val;
 	use_iflush = bootaux[BA_IFLUSH].ba_val;
@@ -531,11 +645,15 @@ attr_val(val_t *bootaux)
 		 * Bounds of the various segments.
 		 */
 		if (!(phdr->p_flags & PF_X)) {
+#if defined(_UNIX_KRTLD)
 			dynseg = phdr->p_vaddr;
+#else
+			ASSERT(phdr->p_vaddr == 0);
+#endif
 		} else {
 			if (phdr->p_flags & PF_W) {
-					_data = (caddr_t)phdr->p_vaddr;
-					_edata = _data + phdr->p_memsz;
+				_data = (caddr_t)phdr->p_vaddr;
+				_edata = _data + phdr->p_memsz;
 			} else {
 				_text = (caddr_t)phdr->p_vaddr;
 				_etext = _text + phdr->p_memsz;
@@ -560,9 +678,8 @@ attr_val(val_t *bootaux)
  * Set up the booted executable.
  */
 static struct module *
-load_exec(val_t *bootaux)
+load_exec(val_t *bootaux, char *filename)
 {
-	char filename[MAXPATHLEN];
 	struct modctl *cp;
 	struct module *mp;
 	Dyn *dyn;
@@ -570,10 +687,20 @@ load_exec(val_t *bootaux)
 	int i, lsize, osize, nsize, allocsize;
 	char *libname, *tmp;
 
-	(void) BOP_GETPROP(ops, "whoami", filename);
+	/*
+	 * Set the module search path.
+	 */
+	kobj_module_path = getmodpath(filename);
 
+#ifdef KOBJ_DEBUG
+	if (kobj_debug & D_DEBUG)
+		_kobj_printf(ops, "module path '%s'\n", kobj_module_path);
+#endif
+
+	KOBJ_MARK("add_primary");
 	cp = add_primary(filename, KOBJ_LM_PRIMARY);
 
+	KOBJ_MARK("struct module");
 	mp = kobj_zalloc(sizeof (struct module), KM_WAIT);
 	cp->mod_mp = mp;
 
@@ -590,7 +717,10 @@ load_exec(val_t *bootaux)
 	 * Since this module is the only exception,
 	 * we cons up some section headers.
 	 */
+	KOBJ_MARK("symhdr");
 	mp->symhdr = kobj_zalloc(sizeof (Shdr), KM_WAIT);
+
+	KOBJ_MARK("strhdr");
 	mp->strhdr = kobj_zalloc(sizeof (Shdr), KM_WAIT);
 
 	mp->symhdr->sh_type = SHT_SYMTAB;
@@ -631,6 +761,7 @@ load_exec(val_t *bootaux)
 	nsize = osize = 0;
 	allocsize = MAXPATHLEN;
 
+	KOBJ_MARK("depends_on");
 	mp->depends_on = kobj_alloc(allocsize, KM_WAIT);
 
 	for (dyn = (Dyn *) bootaux[BA_DYNAMIC].ba_ptr;
@@ -651,6 +782,7 @@ load_exec(val_t *bootaux)
 			lsize = strlen(libname);
 			nsize += lsize;
 			if (nsize + 1 > allocsize) {
+				KOBJ_MARK("grow depends_on");
 				tmp = kobj_alloc(allocsize + MAXPATHLEN,
 				    KM_WAIT);
 				bcopy(mp->depends_on, tmp, osize);
@@ -668,6 +800,7 @@ load_exec(val_t *bootaux)
 		/*
 		 * alloc with exact size and copy whatever it got over
 		 */
+		KOBJ_MARK("realloc depends_on");
 		tmp = kobj_alloc(nsize, KM_WAIT);
 		bcopy(mp->depends_on, tmp, nsize);
 		kobj_free(mp->depends_on, allocsize);
@@ -683,11 +816,17 @@ load_exec(val_t *bootaux)
 	 * We allocate our own table since we don't
 	 * hash undefined references.
 	 */
+	KOBJ_MARK("chains");
 	mp->chains = kobj_zalloc(mp->nsyms * sizeof (symid_t), KM_WAIT);
+	KOBJ_MARK("buckets");
 	mp->buckets = kobj_zalloc(mp->hashsize * sizeof (symid_t), KM_WAIT);
 
 	mp->text = _text;
 	mp->data = _data;
+
+	mp->text_size = _etext - _text;
+	mp->data_size = _edata - _data;
+
 	cp->mod_text = mp->text;
 	cp->mod_text_size = mp->text_size;
 
@@ -722,11 +861,12 @@ load_exec(val_t *bootaux)
 		sym_insert(mp, mp->strings + sp->st_name, i);
 	}
 
+	KOBJ_MARK("load_exec done");
 	return (mp);
 }
 
 /*
- * Set up the linker module.
+ * Set up the linker module (if it's compiled in, LDNAME is NULL)
  */
 static void
 load_linker(val_t *bootaux)
@@ -739,6 +879,12 @@ load_linker(val_t *bootaux)
 	Sym *sp;
 	int shsize;
 	char *dlname = (char *)bootaux[BA_LDNAME].ba_ptr;
+
+	/*
+	 * On some architectures, krtld is compiled into the kernel.
+	 */
+	if (dlname == NULL)
+		return;
 
 	cp = add_primary(dlname, KOBJ_LM_PRIMARY);
 
@@ -906,12 +1052,19 @@ kobj_notify(int type, struct modctl *modp)
 /*
  * Ask boot for the module path.
  */
+/*ARGSUSED*/
 static char *
-getmodpath(void)
+getmodpath(const char *filename)
 {
 	char *path;
 	int len;
 
+#if defined(_UNIX_KRTLD)
+	/*
+	 * The boot program provides the module name when it detects
+	 * that the executable has an interpreter, thus we can ask
+	 * it directly in this case.
+	 */
 	if ((len = BOP_GETPROPLEN(ops, MODPATH_PROPNAME)) == -1)
 		return (MOD_DEFPATH);
 
@@ -920,10 +1073,48 @@ getmodpath(void)
 	(void) BOP_GETPROP(ops, MODPATH_PROPNAME, path);
 
 	return (*path ? path : MOD_DEFPATH);
+
+#else
+
+	/*
+	 * Construct the directory path from the filename.
+	 */
+
+	char *p;
+	const char isastr[] = "/amd64";
+	size_t isalen = strlen(isastr);
+
+	if ((p = strrchr(filename, '/')) == NULL)
+		return (MOD_DEFPATH);
+
+	while (p > filename && *(p - 1) == '/')
+		p--;	/* remove trailing '/' characters */
+	if (p == filename)
+		p++;	/* so "/" -is- the modpath in this case */
+
+	/*
+	 * Remove optional isa-dependent directory name - the module
+	 * subsystem will put this back again (!)
+	 */
+	len = p - filename;
+	if (len > isalen &&
+	    strncmp(&filename[len - isalen], isastr, isalen) == 0)
+		p -= isalen;
+
+	/*
+	 * "/platform/mumblefrotz" + " " + MOD_DEFPATH
+	 */
+	len += (p - filename) + 1 + strlen(MOD_DEFPATH) + 1;
+
+	path = kobj_zalloc(len, KM_WAIT);
+	(void) strncpy(path, filename, p - filename);
+	(void) strcat(path, " ");
+	return (strcat(path, MOD_DEFPATH));
+#endif
 }
 
 static struct modctl *
-add_primary(char *filename, int lmid)
+add_primary(const char *filename, int lmid)
 {
 	struct modctl *cp;
 
@@ -973,10 +1164,6 @@ bind_primary(val_t *bootaux, int lmid)
 	struct modctl_list *linkmap = kobj_lm_lookup(lmid);
 	struct modctl_list *lp;
 	struct module *mp;
-	Dyn *dyn;
-	Word relasz;
-	Word relaent;
-	char *rela;
 
 	/*
 	 * Do common symbols.
@@ -1012,11 +1199,10 @@ bind_primary(val_t *bootaux, int lmid)
 		mp = mod(lp);
 
 		if (mp->flags & KOBJ_EXEC) {
-			Word	shtype;
-
-			relasz = 0;
-			relaent = 0;
-			rela = NULL;
+			Dyn *dyn;
+			Word relasz = 0, relaent = 0;
+			Word shtype;
+			char *rela = NULL;
 
 			for (dyn = (Dyn *)bootaux[BA_DYNAMIC].ba_ptr;
 			    dyn->d_tag != DT_NULL; dyn++) {
@@ -1048,7 +1234,6 @@ bind_primary(val_t *bootaux, int lmid)
 				    "module %s\n", mp->filename);
 				return (-1);
 			}
-
 #ifdef	KOBJ_DEBUG
 			if (kobj_debug & D_RELOCATIONS)
 				_kobj_printf(ops, "krtld: relocating: file=%s "
@@ -1062,7 +1247,6 @@ bind_primary(val_t *bootaux, int lmid)
 				return (-1);
 		}
 
-		/* sync_instruction_memory */
 		kobj_sync_instruction_memory(mp->text, mp->text_size);
 	}
 
@@ -1258,6 +1442,15 @@ load_kmdb(val_t *bootaux)
 
 	if ((sym = lookup_one(mctl->mod_mp, "kctl_boot_activate")) == NULL)
 		return (-1);
+
+#ifdef	KOBJ_DEBUG
+	if (kobj_debug & D_DEBUG) {
+		_kobj_printf(ops, "calling kctl_boot_activate() @ 0x%lx\n",
+		    sym->st_value);
+		_kobj_printf(ops, "\tops 0x%p\n", ops);
+		_kobj_printf(ops, "\tromp 0x%p\n", romp);
+	}
+#endif
 
 	if (((kctl_boot_activate_f *)sym->st_value)(ops, romp, 0,
 	    (const char **)kobj_kmdb_argv) < 0)
@@ -2104,8 +2297,13 @@ get_progbits(struct module *mp, struct _buf *file)
 	mp->data_size = dp->size;
 
 	if (standalone) {
+		caddr_t limit = _data;
+
+		if (lg_pagesize && _text + lg_pagesize < limit)
+			limit = _text + lg_pagesize;
+
 		mp->text = kobj_segbrk(&_etext, mp->text_size,
-			tp->align, _data);
+			tp->align, limit);
 		/*
 		 * If we can't grow the text segment, try the
 		 * data segment before failing.
@@ -2422,6 +2620,7 @@ get_syms(struct module *mp, struct _buf *file)
 				}
 			}
 		}
+
 		sym_insert(mp, symname, i);
 	}
 
@@ -3258,7 +3457,8 @@ kobj_open_path(char *name, int use_path, int use_moddir_suffix)
 	if (!use_path)
 		pathp = "";		/* use name as specified */
 	else
-		pathp = module_path;	/* use configured default path */
+		pathp = kobj_module_path;
+					/* use configured default path */
 
 	pathpsave = pathp;		/* keep this for error reporting */
 
@@ -3701,7 +3901,7 @@ kobj_alloc(size_t size, int flag)
 #ifdef	KOBJ_DEBUG
 			if (kobj_debug & D_DEBUG) {
 				_kobj_printf(ops, "krtld: failed scratch alloc "
-				    "of %u bytes -- falling back\n", size);
+				    "of %lu bytes -- falling back\n", size);
 			}
 #endif
 		}
@@ -3730,15 +3930,13 @@ kobj_sync(void)
 {
 	struct modctl_list *lp, **lpp;
 
-	extern char *default_path;
-
 	/*
-	 * module_path can be set in /etc/system
+	 * The module path can be set in /etc/system via 'moddir' commands
 	 */
 	if (default_path != NULL)
-		module_path = default_path;
+		kobj_module_path = default_path;
 	else
-		default_path = module_path;
+		default_path = kobj_module_path;
 
 	ksyms_arena = vmem_create("ksyms", NULL, 0, sizeof (uint64_t),
 	    segkmem_alloc, segkmem_free, heap_arena, 0, VM_SLEEP);
@@ -3778,19 +3976,25 @@ kobj_segbrk(caddr_t *spp, size_t size, size_t align, caddr_t limit)
 	 * Need more pages?
 	 */
 	if (va + size > pva) {
+		uintptr_t npva;
+
 		alloc_size = P2ROUNDUP(size - (pva - va), alloc_pgsz);
 		/*
 		 * Check for overlapping segments.
 		 */
-		if (limit && limit <= *spp + alloc_size)
+		if (limit && limit <= *spp + alloc_size) {
 			return ((caddr_t)0);
+		}
 
-		pva = (uintptr_t)BOP_ALLOC(ops, (caddr_t)pva,
+		npva = (uintptr_t)BOP_ALLOC(ops, (caddr_t)pva,
 					alloc_size, alloc_align);
-		if (pva == NULL) {
-			_kobj_printf(ops, "BOP_ALLOC refused, 0x%x bytes ",
+
+		if (npva == NULL) {
+			_kobj_printf(ops, "BOP_ALLOC failed, 0x%lx bytes",
 			    alloc_size);
+			_kobj_printf(ops, " aligned %lx", alloc_align);
 			_kobj_printf(ops, " at 0x%lx\n", pva);
+			return (NULL);
 		}
 	}
 	*spp = (caddr_t)(va + size);

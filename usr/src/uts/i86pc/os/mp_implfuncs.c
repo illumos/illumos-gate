@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,7 +211,7 @@ psm_map_phys_new(paddr_t addr, size_t len, int prot)
 		return (0);
 
 	pgoffset = addr & MMU_PAGEOFFSET;
-	base = addr - pgoffset;
+	base = addr;
 	npages = mmu_btopr(len + pgoffset);
 	cvaddr = device_arena_alloc(ptob(npages), VM_NOSLEEP);
 	if (cvaddr == NULL)
@@ -331,12 +330,14 @@ mod_infopsm(struct modlpsm *modl, struct modlinkage *modlp, int *p0)
 	return (0);
 }
 
+#define	DEFAULT_PSM_MODULE	"uppc"
+
 static char *
 psm_get_impl_module(int first)
 {
 	static char **pnamep;
 	static char *psm_impl_module_list[] = {
-		"uppc",
+		DEFAULT_PSM_MODULE,
 		(char *)0
 	};
 	static void *mhdl = NULL;

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -118,7 +118,15 @@ modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
+#
+# if test is an ugly hack for race where genunix
+# doesn't install sometimes
+#
 install:	$(INSTALL_DEPS)
+	if [ ! -f "$(ROOT_KERN_DIR)/$(MODULE)" -o \
+	     ! -f "$(ROOT_KERN_DIR)/amd64/$(MODULE)" ]; then \
+		$(MAKE) install; \
+	fi;
 
 $(LIBGEN):	$(GENUNIX) $(LIBSTUBS)
 	$(BUILD.SO) $(GENUNIX) $(LIBSTUBS)

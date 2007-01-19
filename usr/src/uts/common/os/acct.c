@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -380,6 +379,7 @@ acct(char st)
 	struct vnode *vp;
 	struct cred *cr;
 	struct proc *p;
+	user_t *ua;
 	struct vattr va;
 	ssize_t resid = 0;
 	int error;
@@ -398,13 +398,14 @@ acct(char st)
 	 * cred locking is needed.
 	 */
 	p = curproc;
-	bcopy(u.u_comm, ag->acctbuf.ac_comm, sizeof (ag->acctbuf.ac_comm));
-	ag->acctbuf.ac_btime = u.u_start.tv_sec;
+	ua = PTOU(p);
+	bcopy(ua->u_comm, ag->acctbuf.ac_comm, sizeof (ag->acctbuf.ac_comm));
+	ag->acctbuf.ac_btime = ua->u_start.tv_sec;
 	ag->acctbuf.ac_utime = acct_compress(NSEC_TO_TICK(p->p_acct[LMS_USER]));
 	ag->acctbuf.ac_stime = acct_compress(
 	    NSEC_TO_TICK(p->p_acct[LMS_SYSTEM] + p->p_acct[LMS_TRAP]));
-	ag->acctbuf.ac_etime = acct_compress(lbolt - u.u_ticks);
-	ag->acctbuf.ac_mem = acct_compress((ulong_t)u.u_mem);
+	ag->acctbuf.ac_etime = acct_compress(lbolt - ua->u_ticks);
+	ag->acctbuf.ac_mem = acct_compress((ulong_t)ua->u_mem);
 	ag->acctbuf.ac_io = acct_compress((ulong_t)p->p_ru.ioch);
 	ag->acctbuf.ac_rw = acct_compress((ulong_t)(p->p_ru.inblock +
 	    p->p_ru.oublock));
@@ -413,7 +414,7 @@ acct(char st)
 	ag->acctbuf.ac_gid = crgetrgid(cr);
 	(void) cmpldev(&ag->acctbuf.ac_tty, cttydev(p));
 	ag->acctbuf.ac_stat = st;
-	ag->acctbuf.ac_flag = (u.u_acflag | AEXPND);
+	ag->acctbuf.ac_flag = (ua->u_acflag | AEXPND);
 
 	/*
 	 * Save the size. If the write fails, reset the size to avoid

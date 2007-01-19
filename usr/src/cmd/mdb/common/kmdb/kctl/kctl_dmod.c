@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +76,7 @@ kctl_find_module(char *modname, char *fullname, size_t fullnamelen)
 	/* If they gave us an absolute path, we don't need to search */
 	if (modname[0] == '/') {
 		if (strlen(modname) + 1 > fullnamelen) {
-			cmn_err(CE_WARN, "Can't load dmod %s - name too long\n",
+			cmn_err(CE_WARN, "Can't load dmod %s - name too long",
 			    modname);
 			return (0);
 		}
@@ -343,7 +343,7 @@ kctl_dmod_unload(kmdb_wr_unload_t *dur)
 	int rc;
 
 	if ((rc = kctl_dmod_unload_common(dur->dur_modctl)) != 0) {
-		cmn_err(CE_WARN, "unexpected dmod unload failure: %d\n", rc);
+		cmn_err(CE_WARN, "unexpected dmod unload failure: %d", rc);
 		dur->dur_errno = rc;
 	}
 }

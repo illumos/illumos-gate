@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -241,6 +241,7 @@ extern int netboot;
 extern int swaploaded;
 extern int modrootloaded;
 extern char kern_bootargs[];
+extern char *kobj_module_path;
 extern char *default_path;
 extern char *dhcack;
 extern char *netdev_path;

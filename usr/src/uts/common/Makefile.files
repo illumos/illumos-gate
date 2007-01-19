@@ -31,10 +31,7 @@
 
 i386_CORE_OBJS += \
 		avintr.o	\
-		pit.o		\
-		pic.o		\
-		hardclk.o	\
-		i8254.o
+		pic.o
 
 sparc_CORE_OBJS +=
 
@@ -63,6 +60,7 @@ COMMON_CORE_OBJS +=		\
 		rctl_proc.o	\
 		rwlock.o	\
 		seg_kmem.o	\
+		string.o	\
 		thread_intr.o	\
 		vm_page.o	\
 		vm_pagelist.o
@@ -272,6 +270,7 @@ GENUNIX_OBJS +=	\
 		sleepq.o	\
 		softint.o	\
 		space.o		\
+		sscanf.o	\
 		ssig.o		\
 		stat.o		\
 		statfs.o	\
@@ -281,7 +280,6 @@ GENUNIX_OBJS +=	\
 		stream.o	\
 		streamio.o	\
 		strext.o	\
-		string.o	\
 		strsubr.o	\
 		strsun.o	\
 		subr.o		\
@@ -356,7 +354,14 @@ GENUNIX_OBJS +=	\
 #
 #	Stubs for the stand-alone linker/loader
 #
-GENSTUBS_OBJS +=	kobj_stubs.o
+sparc_GENSTUBS_OBJS =	\
+	kobj_stubs.o
+
+i386_GENSTUBS_OBJS =
+
+COMMON_GENSTUBS_OBJS =
+
+GENSTUBS_OBJS += $(COMMON_GENSTUBS_OBJS) $($(MACH)_GENSTUBS_OBJS)
 
 #
 #	DTrace and DTrace Providers
@@ -1203,13 +1208,19 @@ DES_OBJS +=	des_crypt.o des_cbc_crypt.o des_impl.o des_ks.o des_soft.o
 
 DLBOOT_OBJS +=	bootparam_xdr.o nfs_dlinet.o scan.o
 
-KRTLD_OBJS +=	\
-	kobj_bootflags.o \
-	getoptstr.o \
-	kobj.o \
-	kobj_kdi.o \
-	kobj_lm.o \
+sparc_KRTLD_OBJS =	\
 	kobj_subr.o
+
+i386_KRTLD_OBJS =
+
+COMMON_KRTLD_OBJS =	\
+	kobj_bootflags.o \
+	getoptstr.o	\
+	kobj.o		\
+	kobj_kdi.o	\
+	kobj_lm.o
+
+KRTLD_OBJS +=	$(COMMON_KRTLD_OBJS) $($(MACH)_KRTLD_OBJS)
 
 MOD_OBJS +=	modctl.o modsubr.o modsysfile.o modconf.o modhash.o
 

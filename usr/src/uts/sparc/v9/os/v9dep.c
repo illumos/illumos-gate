@@ -23,7 +23,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -961,7 +961,7 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	 * and validate the stack requirements for the signal handler
 	 * context. on_fault will catch any faults.
 	 */
-	newstack = (sigismember(&u.u_sigonstack, sig) &&
+	newstack = (sigismember(&PTOU(curproc)->u_sigonstack, sig) &&
 	    !(lwp->lwp_sigaltstack.ss_flags & (SS_ONSTACK|SS_DISABLE)));
 
 	tos = (caddr_t)rp->r_sp + STACK_BIAS;
@@ -1290,7 +1290,7 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 	 * and validate the stack requirements for the signal handler
 	 * context. on_fault will catch any faults.
 	 */
-	newstack = (sigismember(&u.u_sigonstack, sig) &&
+	newstack = (sigismember(&PTOU(curproc)->u_sigonstack, sig) &&
 	    !(lwp->lwp_sigaltstack.ss_flags & (SS_ONSTACK|SS_DISABLE)));
 
 	tos = (void *)(uintptr_t)(uint32_t)rp->r_sp;

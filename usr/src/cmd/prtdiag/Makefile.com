@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,13 +37,13 @@ DIRMODE		= 755
 OWNER		= root
 GROUP		= sys
 
-LINTFILES	= $(OBJS:%.o=%.ln)
-POFILE		= prtdiag_$(PLATFORM).po
+LINT_OBJS	= $(OBJS:%.o=%.ln)
+POFILE		= prtdiag.po
 POFILES		= $(OBJS:%.o=%.po)
 
 LIBPRTDIAG	= $(SRC)/lib/libprtdiag
 
-.PARALLEL: $(OBJS) $(LINTFILES)
+.PARALLEL: $(OBJS) $(LINT_OBJS)
 
 %.o: %.c
 	$(COMPILE.c) -o $@ $<

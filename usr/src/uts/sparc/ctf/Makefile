@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,7 +39,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CFLAGS		+= $(CCVERBOSE)
 CPPFLAGS	+= -I$(SRC)/common/ctf -DCTF_OLD_VERSIONS
-LDFLAGS		+= -Breduce -M$(UTSBASE)/common/ctf/mapfile -dy -Nmisc/zmod
+LDFLAGS		+= -Breduce -M$(UTSBASE)/common/ctf/mapfile -dy
 
 #
 # For now, disable these lint checks; maintainers should endeavor
