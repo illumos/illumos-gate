@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -934,6 +934,8 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	char			*np;
 	disk_params_t		*d;
 	disk_io_t		*io;
+	int			rtn_len;
+	struct block_descriptor	bd;
 
 	if ((d = (disk_params_t *)T10_PARAMS_AREA(cmd)) == NULL)
 		return;
@@ -977,6 +979,27 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	io->da_clear_overlap	= False;
 	io->da_data_alloc	= True;
 	mode_hdr		= (struct mode_header *)io->da_data;
+	/*
+	 * We subtract one from the length because this value is not supposed
+	 * to contain it's size.
+	 */
+	mode_hdr->length = sizeof (struct mode_header) - 1 +
+		MODE_BLK_DESC_LENGTH;
+	mode_hdr->bdesc_length	= MODE_BLK_DESC_LENGTH;
+
+	/*
+	 * Need to fill in the block size. Some initiators are starting
+	 * to use this value, which is correct, instead of looking at
+	 * the page3 data which is starting to become obsolete.
+	 *
+	 * We define the space for the structure on the stack and then
+	 * copy it into the return area to avoid structure alignment issues.
+	 */
+	bzero(&bd, sizeof (bd));
+	bd.blksize_hi	= lobyte(hiword(d->d_bytes_sect));
+	bd.blksize_mid	= hibyte(loword(d->d_bytes_sect));
+	bd.blksize_lo	= lobyte(loword(d->d_bytes_sect));
+	bcopy(&bd, io->da_data + sizeof (*mode_hdr), sizeof (bd));
 
 	switch (cdb[2]) {
 	case MODE_SENSE_PAGE3_CODE:
@@ -985,11 +1008,9 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			spc_unsupported(cmd, cdb, cdb_len);
 			return;
 		}
-		mode_hdr->length	= sizeof (struct mode_format);
-		mode_hdr->bdesc_length	= MODE_BLK_DESC_LENGTH;
+		mode_hdr->length += sizeof (struct mode_format);
 		(void) sense_page3(d,
 		    io->da_data + sizeof (*mode_hdr) + mode_hdr->bdesc_length);
-
 		break;
 
 	case MODE_SENSE_PAGE4_CODE:
@@ -998,28 +1019,27 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			spc_unsupported(cmd, cdb, cdb_len);
 			return;
 		}
-		mode_hdr->length	= sizeof (struct mode_geometry);
-		mode_hdr->bdesc_length	= MODE_BLK_DESC_LENGTH;
+		mode_hdr->length += sizeof (struct mode_geometry);
 		(void) sense_page4(d,
 		    io->da_data + sizeof (*mode_hdr) + mode_hdr->bdesc_length);
 		break;
 
 	case MODE_SENSE_CACHE:
-		mode_hdr->length	= sizeof (struct mode_cache_scsi3);
-		mode_hdr->bdesc_length	= MODE_BLK_DESC_LENGTH;
+		mode_hdr->length += sizeof (struct mode_cache_scsi3);
 		(void) sense_cache(d,
 		    io->da_data + sizeof (*mode_hdr) + mode_hdr->bdesc_length);
 		break;
 
 	case MODE_SENSE_CONTROL:
-		mode_hdr->length	= sizeof (struct mode_control_scsi3);
-		mode_hdr->bdesc_length	= MODE_BLK_DESC_LENGTH;
+		mode_hdr->length += sizeof (struct mode_control_scsi3);
 		(void) sense_mode_control(cmd->c_lu,
 		    io->da_data + sizeof (*mode_hdr) + mode_hdr->bdesc_length);
 		break;
 
 	case MODE_SENSE_INFO_CTRL:
-		(void) sense_info_ctrl(io->da_data);
+		mode_hdr->length += sizeof (struct mode_info_ctrl);
+		(void) sense_info_ctrl(io->da_data + sizeof (*mode_hdr) +
+		    mode_hdr->bdesc_length);
 		break;
 
 	case MODE_SENSE_SEND_ALL:
@@ -1028,8 +1048,19 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		 * Section 6.9.1 Table 97
 		 * "Return all subpage 00h mode pages in page_0 format"
 		 */
+		mode_hdr->length += sizeof (struct mode_cache_scsi3) +
+		    sizeof (struct mode_control_scsi3) +
+		    sizeof (struct mode_info_ctrl);
+
+		if (d->d_heads && d->d_cyl && d->d_spt)
+			mode_hdr->length += sizeof (struct mode_format) +
+			    sizeof (struct mode_geometry);
+
+		np = io->da_data + sizeof (*mode_hdr) +
+			mode_hdr->bdesc_length;
 		if (io->da_data_len < (sizeof (struct mode_format) +
 		    sizeof (struct mode_geometry) +
+		    sizeof (struct mode_cache_scsi3) +
 		    sizeof (struct mode_control_scsi3) +
 		    sizeof (struct mode_info_ctrl))) {
 
@@ -1050,14 +1081,14 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			 * If we don't have geometry then don't attempt
 			 * report that information.
 			 */
+			rtn_len = sizeof (*mode_hdr) + mode_hdr->bdesc_length;
 			if (d->d_heads && d->d_cyl && d->d_spt) {
-				np = sense_page3(d, io->da_data);
+				np = sense_page3(d, np);
 				np = sense_page4(d, np);
 			}
 			np = sense_cache(d, np);
 			np = sense_mode_control(cmd->c_lu, np);
 			(void) sense_info_ctrl(np);
-
 		}
 		break;
 
@@ -1082,7 +1113,9 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		break;
 	}
 
-	if (trans_send_datain(cmd, io->da_data, cdb[4], 0, sbc_io_free,
+	rtn_len = mode_hdr->length + 1;
+	rtn_len = MIN(rtn_len, cdb[4]);
+	if (trans_send_datain(cmd, io->da_data, rtn_len, 0, sbc_io_free,
 	    True, io) == False) {
 		trans_send_complete(cmd, STATUS_BUSY);
 	}

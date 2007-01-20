@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -592,8 +592,28 @@ iscsi_conn_data_in(t10_cmd_t *t)
 	while (t != NULL) {
 		cmd->c_offset_in += T10_DATA_LEN(t);
 		if (T10_CMD_LAST(t) == True) {
-			send_datain_pdu(c, t,
-			    ISCSI_FLAG_FINAL | ISCSI_FLAG_DATA_STATUS);
+			if (cmd->c_offset_in == cmd->c_dlen_expected) {
+				send_datain_pdu(c, t,
+				    ISCSI_FLAG_FINAL | ISCSI_FLAG_DATA_STATUS);
+			} else {
+				/*
+				 * Normally the target only sends a SCSI
+				 * Response PDU for DataOut operations since
+				 * the it indicates successful completion
+				 * in the last DataIn PDU per the spec.
+				 * There are cases where the initiator asks
+				 * for more data then we send, for example
+				 * an INQUIRY command usually returns less
+				 * data then asked for. So, in this case we
+				 * send the DataIn PDU with the appropriate
+				 * amount, followed by a SCSI Response
+				 * indicating the difference between what the
+				 * initiator expected and we're sending.
+				 */
+
+				send_datain_pdu(c, t, 0);
+				send_scsi_rsp(c, t);
+			}
 			iscsi_cmd_free(c, cmd);
 		} else {
 			send_datain_pdu(c, t, 0);
@@ -696,14 +716,16 @@ send_datain_pdu(iscsi_conn_t *c, t10_cmd_t *t, uint8_t final_flag)
 
 	hton24(rsp.dlength, T10_DATA_LEN(t));
 
-	rsp.statsn	= htonl(c->c_statsn);
 	/*
 	 * The statsn is only incremented when the Status bit is set
 	 * for a DataIn PDU. This must be done *after* the value
 	 * was stored in the PDU.
 	 */
-	if (final_flag & ISCSI_FLAG_DATA_STATUS)
+	if (final_flag & ISCSI_FLAG_DATA_STATUS) {
+		rsp.statsn	= htonl(c->c_statsn);
 		c->c_statsn++;
+	} else
+		rsp.statsn	= 0;
 
 	(void) pthread_mutex_lock(&c->c_sess->s_mutex);
 	rsp.maxcmdsn = htonl(iscsi_cmd_window(c) + c->c_sess->s_seencmdsn);
@@ -762,6 +784,16 @@ send_scsi_rsp(iscsi_conn_t *c, t10_cmd_t *t)
 	} else {
 		rsp.response	= ISCSI_STATUS_CMD_COMPLETED;
 		rsp.expdatasn	= htonl(cmd->c_datasn);
+		if (cmd->c_writeop == True) {
+			if (cmd->c_offset_out != cmd->c_dlen_expected)
+				rsp.flags |= ISCSI_FLAG_CMD_OVERFLOW;
+			rsp.residual_count = htonl(cmd->c_dlen_expected -
+			    cmd->c_offset_out);
+		} else {
+			rsp.flags |= ISCSI_FLAG_CMD_UNDERFLOW;
+			rsp.residual_count = htonl(cmd->c_dlen_expected -
+			    cmd->c_offset_in);
+		}
 	}
 
 	send_iscsi_pkt(c, (iscsi_hdr_t *)&rsp, auto_sense);

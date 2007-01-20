@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,7 +170,8 @@ iscsi_handle_login_pkt(iscsi_conn_t *c)
 
 	connection_parameters_default(c);
 
-	c->c_cid = ntohl(lh.cid);
+	c->c_cid	= ntohl(lh.cid);
+	c->c_statsn	= ntohl(lh.expstatsn);
 
 	(void) pthread_mutex_lock(&c->c_sess->s_mutex);
 	c->c_sess->s_cmdsn	= ntohl(lh.cmdsn);

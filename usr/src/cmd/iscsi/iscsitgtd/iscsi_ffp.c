@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -520,6 +520,7 @@ handle_scsi_cmd(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 
 	cmd->c_itt		= hp->itt;
 	cmd->c_cmdsn		= ntohl(hp->cmdsn);
+	cmd->c_dlen_expected	= ntohl(hp->data_length);
 	cmd->c_writeop		= hp->flags & ISCSI_FLAG_CMD_WRITE ?
 	    True : False;
 
@@ -690,7 +691,7 @@ handle_logout_msg(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 		(void) pthread_mutex_lock(&c->c_mutex);
 		(void) pthread_mutex_lock(&c->c_sess->s_mutex);
 		if (hp->cmdsn > c->c_sess->s_seencmdsn)
-			c->c_sess->s_seencmdsn = hp->cmdsn;
+			c->c_sess->s_seencmdsn = htonl(hp->cmdsn);
 		rsp->expcmdsn = htonl(c->c_sess->s_seencmdsn + 1);
 		rsp->maxcmdsn = htonl(iscsi_cmd_window(c) +
 		    c->c_sess->s_seencmdsn);
@@ -855,6 +856,13 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 			return (True);
 		}
 	}
+
+	/*
+	 * We'll update the offset with the amount of data that
+	 * has been received. During a SCSI response PDU this value
+	 * will be used to determine if there's an overrun condition.
+	 */
+	cmd->c_offset_out += dlen;
 
 	(void) pthread_mutex_lock(&c->c_mutex);
 	(void) pthread_mutex_lock(&c->c_state_mutex);

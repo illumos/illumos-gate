@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,7 @@ typedef struct iscsi_cmd {
 	uint32_t		c_cmdsn;
 	uint32_t		c_datasn;
 	uint32_t		c_statsn;
+	uint32_t		c_dlen_expected;
 
 	Boolean_t		c_writeop;
 	uint32_t		c_lun;
