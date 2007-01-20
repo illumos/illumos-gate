@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -1585,7 +1585,7 @@ iterate_media()
 		# modify the "err_media" string accordingly.
 		#
 		if [[ "$install_media" = "disc" ]]; then
-			if [["$rd_disctype" = "DVD" ]]; then
+			if [[ "$rd_disctype" = "DVD" ]]; then
 				err_media="$release_name DVD"
 			else
 				err_media="$release_name, CD ${cds[$cdnum]}"
@@ -1777,7 +1777,7 @@ validate_iso_distros()
 
 			verbose "  ISO \"$iso\":"
 			verbose "    Serial #${iso_serial[$index]}"
-			verbose "    Release Name \"${iso_release[$index]}"
+			verbose "    Release Name \"${iso_release[$index]}\""
 
 			if [[ "${iso_disctype[$index]}" = "CD" ]]; then
 				disctype="CD"
