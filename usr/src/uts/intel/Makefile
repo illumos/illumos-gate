@@ -134,7 +134,7 @@ globallint := LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
 
 globallint:
 	@-$(ECHO) "\nFULL KERNEL: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2) | $(LGREP.intel)
+	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.intel) | $(LGREP.2)
 
 lint:	modlintlib .WAIT $(LINT_DEPS)
 

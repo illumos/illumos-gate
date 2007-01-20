@@ -62,6 +62,7 @@
 #include <sys/psw.h>
 #include <sys/regset.h>
 #include <sys/privregs.h>
+#include <sys/cpu.h>
 #include <sys/stack.h>
 #include <sys/swap.h>
 #include <vm/hat.h>

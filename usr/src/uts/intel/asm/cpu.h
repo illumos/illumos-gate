@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +61,48 @@ extern __inline__ void i86_halt(void)
 }
 
 #endif	/* __i386 || defined(__amd64) */
+
+#if defined(__amd64)
+
+extern __inline__ void __set_ds(selector_t value)
+{
+	__asm__ __volatile__(
+	"movw	%0, %%ds"
+	: /* no output */
+	: "r" (value));
+}
+
+extern __inline__ void __set_es(selector_t value)
+{
+	__asm__ __volatile__(
+	"movw	%0, %%es"
+	: /* no output */
+	: "r" (value));
+}
+
+extern __inline__ void __set_fs(selector_t value)
+{
+	__asm__ __volatile__(
+	"movw	%0, %%fs"
+	: /* no output */
+	: "r" (value));
+}
+
+extern __inline__ void __set_gs(selector_t value)
+{
+	__asm__ __volatile__(
+	"movw	%0, %%gs"
+	: /* no output */
+	: "r" (value));
+}
+
+extern __inline__ void __swapgs(void)
+{
+	__asm__ __volatile__(
+	"mfence; swapgs");
+}
+
+#endif	/* __amd64 */
 
 #endif	/* !__lint && __GNUC__ */
 
