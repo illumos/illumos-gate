@@ -3283,7 +3283,7 @@ update_entry(menu_t *mp, char *menu_root, char *opt)
 {
 	FILE *fp;
 	int entry;
-	char *grubdisk, *title, *osdev, *osroot;
+	char *grubdisk, *title, *osdev, *osroot, *failsafe_kernel = NULL;
 	struct stat sbuf;
 	char failsafe[256];
 
@@ -3323,10 +3323,25 @@ update_entry(menu_t *mp, char *menu_root, char *opt)
 	/* add the entry for failsafe archive */
 	(void) snprintf(failsafe, sizeof (failsafe), "%s%s", osroot, MINIROOT);
 	if (stat(failsafe, &sbuf) == 0) {
-		(void) update_boot_entry(mp, FAILSAFE_TITLE, grubdisk,
-		    (bam_direct == BAM_DIRECT_DBOOT) ?
-		    DIRECT_BOOT_FAILSAFE_LINE : MULTI_BOOT_FAILSAFE_LINE,
-		    MINIROOT, osroot == menu_root);
+
+		/* Figure out where the kernel line should point */
+		(void) snprintf(failsafe, sizeof (failsafe), "%s%s", osroot,
+		    DIRECT_BOOT_FAILSAFE_KERNEL);
+		if (stat(failsafe, &sbuf) == 0) {
+			failsafe_kernel = DIRECT_BOOT_FAILSAFE_LINE;
+		} else {
+			(void) snprintf(failsafe, sizeof (failsafe), "%s%s",
+			    osroot, MULTI_BOOT_FAILSAFE);
+			if (stat(failsafe, &sbuf) == 0) {
+				failsafe_kernel = MULTI_BOOT_FAILSAFE_LINE;
+			}
+		}
+		if (failsafe_kernel != NULL) {
+			(void) update_boot_entry(mp, FAILSAFE_TITLE, grubdisk,
+			    failsafe_kernel, MINIROOT, osroot == menu_root);
+		} else {
+			bam_error(NO_FAILSAFE_KERNEL);
+		}
 	}
 	free(grubdisk);
 
