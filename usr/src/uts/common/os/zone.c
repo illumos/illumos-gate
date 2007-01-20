@@ -239,8 +239,7 @@
 #include <sys/fss.h>
 #include <sys/brand.h>
 #include <sys/zone.h>
-#include <sys/tsol/label.h>
-
+#include <net/if.h>
 #include <vm/seg.h>
 
 /*
@@ -345,6 +344,10 @@ static kmutex_t mount_lock;
 const char * const zone_default_initname = "/sbin/init";
 static char * const zone_prefix = "/zone/";
 static int zone_shutdown(zoneid_t zoneid);
+static int zone_add_datalink(zoneid_t, char *);
+static int zone_remove_datalink(zoneid_t, char *);
+static int zone_check_datalink(zoneid_t *, char *);
+static int zone_list_datalink(zoneid_t, int *, char *);
 
 /*
  * Bump this number when you alter the zone syscall interfaces; this is
@@ -361,8 +364,9 @@ static int zone_shutdown(zoneid_t zoneid);
  *     Trusted Extensions.
  * Version 5 alters the zone_boot system call, and converts its old
  *     bootargs parameter to be set by the zone_setattr API instead.
+ * Version 6 adds the flag argument to zone_create.
  */
-static const int ZONE_SYSCALL_API_VERSION = 5;
+static const int ZONE_SYSCALL_API_VERSION = 6;
 
 /*
  * Certain filesystems (such as NFS and autofs) need to know which zone
@@ -3196,7 +3200,8 @@ zone_create(const char *zone_name, const char *zone_root,
     const priv_set_t *zone_privs, size_t zone_privssz,
     caddr_t rctlbuf, size_t rctlbufsz,
     caddr_t zfsbuf, size_t zfsbufsz, int *extended_error,
-    int match, uint32_t doi, const bslabel_t *label)
+    int match, uint32_t doi, const bslabel_t *label,
+    int flags)
 {
 	struct zsched_arg zarg;
 	nvlist_t *rctls = NULL;
@@ -3237,6 +3242,10 @@ zone_create(const char *zone_name, const char *zone_root,
 	list_create(&zone->zone_datasets, sizeof (zone_dataset_t),
 	    offsetof(zone_dataset_t, zd_linkage));
 	rw_init(&zone->zone_mlps.mlpl_rwlock, NULL, RW_DEFAULT, NULL);
+
+	if (flags & ZCF_NET_EXCL) {
+		zone->zone_flags |= ZF_NET_EXCL;
+	}
 
 	if ((error = zone_set_name(zone, zone_name)) != 0) {
 		zone_free(zone);
@@ -3826,6 +3835,7 @@ zone_destroy(zoneid_t zoneid)
 	 */
 	zone_status_wait(zone, ZONE_IS_DEAD);
 	zone_zsd_callbacks(zone, ZSD_DESTROY);
+	zone->zone_netstack = NULL;
 	uniqid = zone->zone_uniqid;
 	zone_rele(zone);
 	zone = NULL;	/* potentially free'd */
@@ -3923,6 +3933,7 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	pid_t initpid;
 	boolean_t global = (curproc->p_zone == global_zone);
 	boolean_t curzone = (curproc->p_zone->zone_id == zoneid);
+	ushort_t flags;
 
 	mutex_enter(&zonehash_lock);
 	if ((zone = zone_find_all_by_id(zoneid)) == NULL) {
@@ -4019,6 +4030,15 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		zone_status = zone_status_get(zone);
 		if (buf != NULL &&
 		    copyout(&zone_status, buf, bufsize) != 0)
+			error = EFAULT;
+		break;
+	case ZONE_ATTR_FLAGS:
+		size = sizeof (zone->zone_flags);
+		if (bufsize > size)
+			bufsize = size;
+		flags = zone->zone_flags;
+		if (buf != NULL &&
+		    copyout(&flags, buf, bufsize) != 0)
 			error = EFAULT;
 		break;
 	case ZONE_ATTR_PRIVSET:
@@ -4877,6 +4897,7 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 			zs.match = zs32.match;
 			zs.doi = zs32.doi;
 			zs.label = (const bslabel_t *)(uintptr_t)zs32.label;
+			zs.flags = zs32.flags;
 #else
 			panic("get_udatamodel() returned bogus result\n");
 #endif
@@ -4887,7 +4908,7 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 		    (caddr_t)zs.rctlbuf, zs.rctlbufsz,
 		    (caddr_t)zs.zfsbuf, zs.zfsbufsz,
 		    zs.extended_error, zs.match, zs.doi,
-		    zs.label));
+		    zs.label, zs.flags));
 	case ZONE_BOOT:
 		return (zone_boot((zoneid_t)(uintptr_t)arg1));
 	case ZONE_DESTROY:
@@ -4908,6 +4929,17 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 		return (zone_lookup((const char *)arg1));
 	case ZONE_VERSION:
 		return (zone_version((int *)arg1));
+	case ZONE_ADD_DATALINK:
+		return (zone_add_datalink((zoneid_t)(uintptr_t)arg1,
+		    (char *)arg2));
+	case ZONE_DEL_DATALINK:
+		return (zone_remove_datalink((zoneid_t)(uintptr_t)arg1,
+		    (char *)arg2));
+	case ZONE_CHECK_DATALINK:
+		return (zone_check_datalink((zoneid_t *)arg1, (char *)arg2));
+	case ZONE_LIST_DATALINK:
+		return (zone_list_datalink((zoneid_t)(uintptr_t)arg1,
+		    (int *)arg2, (char *)arg3));
 	default:
 		return (set_errno(EINVAL));
 	}
@@ -5297,4 +5329,252 @@ zone_find_by_any_path(const char *path, boolean_t treat_abs)
 	zone_hold(zone);
 	mutex_exit(&zonehash_lock);
 	return (zone);
+}
+
+/* List of data link names which are accessible from the zone */
+struct dlnamelist {
+	char			dlnl_name[LIFNAMSIZ];
+	struct dlnamelist	*dlnl_next;
+};
+
+
+/*
+ * Check whether the datalink name (dlname) itself is present.
+ * Return true if found.
+ */
+static boolean_t
+zone_dlname(zone_t *zone, char *dlname)
+{
+	struct dlnamelist *dlnl;
+	boolean_t found = B_FALSE;
+
+	mutex_enter(&zone->zone_lock);
+	for (dlnl = zone->zone_dl_list; dlnl != NULL; dlnl = dlnl->dlnl_next) {
+		if (strncmp(dlnl->dlnl_name, dlname, LIFNAMSIZ) == 0) {
+			found = B_TRUE;
+			break;
+		}
+	}
+	mutex_exit(&zone->zone_lock);
+	return (found);
+}
+
+/*
+ * Add an data link name for the zone. Does not check for duplicates.
+ */
+static int
+zone_add_datalink(zoneid_t zoneid, char *dlname)
+{
+	struct dlnamelist *dlnl;
+	zone_t *zone;
+	zone_t *thiszone;
+	int err;
+
+	dlnl = kmem_zalloc(sizeof (struct dlnamelist), KM_SLEEP);
+	if ((err = copyinstr(dlname, dlnl->dlnl_name, LIFNAMSIZ, NULL)) != 0) {
+		kmem_free(dlnl, sizeof (struct dlnamelist));
+		return (set_errno(err));
+	}
+
+	thiszone = zone_find_by_id(zoneid);
+	if (thiszone == NULL) {
+		kmem_free(dlnl, sizeof (struct dlnamelist));
+		return (set_errno(ENXIO));
+	}
+
+	/*
+	 * Verify that the datalink name isn't already used by a different
+	 * zone while allowing duplicate entries for the same zone (e.g. due
+	 * to both using IPv4 and IPv6 on an interface)
+	 */
+	mutex_enter(&zonehash_lock);
+	for (zone = list_head(&zone_active); zone != NULL;
+	    zone = list_next(&zone_active, zone)) {
+		if (zone->zone_id == zoneid)
+			continue;
+
+		if (zone_dlname(zone, dlnl->dlnl_name)) {
+			mutex_exit(&zonehash_lock);
+			zone_rele(thiszone);
+			kmem_free(dlnl, sizeof (struct dlnamelist));
+			return (set_errno(EPERM));
+		}
+	}
+	mutex_enter(&thiszone->zone_lock);
+	dlnl->dlnl_next = thiszone->zone_dl_list;
+	thiszone->zone_dl_list = dlnl;
+	mutex_exit(&thiszone->zone_lock);
+	mutex_exit(&zonehash_lock);
+	zone_rele(thiszone);
+	return (0);
+}
+
+static int
+zone_remove_datalink(zoneid_t zoneid, char *dlname)
+{
+	struct dlnamelist *dlnl, *odlnl, **dlnlp;
+	zone_t *zone;
+	int err;
+
+	dlnl = kmem_zalloc(sizeof (struct dlnamelist), KM_SLEEP);
+	if ((err = copyinstr(dlname, dlnl->dlnl_name, LIFNAMSIZ, NULL)) != 0) {
+		kmem_free(dlnl, sizeof (struct dlnamelist));
+		return (set_errno(err));
+	}
+	zone = zone_find_by_id(zoneid);
+	if (zone == NULL) {
+		kmem_free(dlnl, sizeof (struct dlnamelist));
+		return (set_errno(EINVAL));
+	}
+
+	mutex_enter(&zone->zone_lock);
+	/* Look for match */
+	dlnlp = &zone->zone_dl_list;
+	while (*dlnlp != NULL) {
+		if (strncmp(dlnl->dlnl_name, (*dlnlp)->dlnl_name,
+		    LIFNAMSIZ) == 0)
+			goto found;
+		dlnlp = &((*dlnlp)->dlnl_next);
+	}
+	mutex_exit(&zone->zone_lock);
+	zone_rele(zone);
+	kmem_free(dlnl, sizeof (struct dlnamelist));
+	return (set_errno(ENXIO));
+
+found:
+	odlnl = *dlnlp;
+	*dlnlp = (*dlnlp)->dlnl_next;
+	kmem_free(odlnl, sizeof (struct dlnamelist));
+
+	mutex_exit(&zone->zone_lock);
+	zone_rele(zone);
+	kmem_free(dlnl, sizeof (struct dlnamelist));
+	return (0);
+}
+
+/*
+ * Using the zoneidp as ALL_ZONES, we can lookup which zone is using datalink
+ * name (dlname); otherwise we just check if the specified zoneidp has access
+ * to the datalink name.
+ */
+static int
+zone_check_datalink(zoneid_t *zoneidp, char *dlname)
+{
+	zoneid_t id;
+	char *dln;
+	zone_t *zone;
+	int err = 0;
+	boolean_t allzones = B_FALSE;
+
+	if (copyin(zoneidp, &id, sizeof (id)) != 0) {
+		return (set_errno(EFAULT));
+	}
+	dln = kmem_zalloc(LIFNAMSIZ, KM_SLEEP);
+	if ((err = copyinstr(dlname, dln, LIFNAMSIZ, NULL)) != 0) {
+		kmem_free(dln, LIFNAMSIZ);
+		return (set_errno(err));
+	}
+
+	if (id == ALL_ZONES)
+		allzones = B_TRUE;
+
+	/*
+	 * Check whether datalink name is already used.
+	 */
+	mutex_enter(&zonehash_lock);
+	for (zone = list_head(&zone_active); zone != NULL;
+	    zone = list_next(&zone_active, zone)) {
+		if (allzones || (id == zone->zone_id)) {
+			if (!zone_dlname(zone, dln))
+				continue;
+			if (allzones)
+				err = copyout(&zone->zone_id, zoneidp,
+				    sizeof (*zoneidp));
+
+			mutex_exit(&zonehash_lock);
+			kmem_free(dln, LIFNAMSIZ);
+			return (err ? set_errno(EFAULT) : 0);
+		}
+	}
+
+	/* datalink name is not found in any active zone. */
+	mutex_exit(&zonehash_lock);
+	kmem_free(dln, LIFNAMSIZ);
+	return (set_errno(ENXIO));
+}
+
+/*
+ * Get the names of the datalinks assigned to a zone.
+ * Here *nump is the number of datalinks, and the assumption
+ * is that the caller will gurantee that the the supplied buffer is
+ * big enough to hold at least #*nump datalink names, that is,
+ * LIFNAMSIZ X *nump
+ * On return, *nump will be the "new" number of datalinks, if it
+ * ever changed.
+ */
+static int
+zone_list_datalink(zoneid_t zoneid, int *nump, char *buf)
+{
+	int num, dlcount;
+	zone_t *zone;
+	struct dlnamelist *dlnl;
+	char *ptr;
+
+	if (copyin(nump, &dlcount, sizeof (dlcount)) != 0)
+		return (set_errno(EFAULT));
+
+	zone = zone_find_by_id(zoneid);
+	if (zone == NULL) {
+		return (set_errno(ENXIO));
+	}
+
+	num = 0;
+	mutex_enter(&zone->zone_lock);
+	ptr = buf;
+	for (dlnl = zone->zone_dl_list; dlnl != NULL; dlnl = dlnl->dlnl_next) {
+		/*
+		 * If the list changed and the new number is bigger
+		 * than what the caller supplied, just count, don't
+		 * do copyout
+		 */
+		if (++num > dlcount)
+			continue;
+		if (copyout(dlnl->dlnl_name, ptr, LIFNAMSIZ) != 0) {
+			mutex_exit(&zone->zone_lock);
+			zone_rele(zone);
+			return (set_errno(EFAULT));
+		}
+		ptr += LIFNAMSIZ;
+	}
+	mutex_exit(&zone->zone_lock);
+	zone_rele(zone);
+
+	/* Increased or decreased, caller should be notified. */
+	if (num != dlcount) {
+		if (copyout(&num, nump, sizeof (num)) != 0) {
+			return (set_errno(EFAULT));
+		}
+	}
+	return (0);
+}
+
+/*
+ * Public interface for looking up a zone by zoneid. It's a customized version
+ * for netstack_zone_create(), it:
+ * 1. Doesn't acquire the zonehash_lock, since it is called from
+ *    zone_key_create() or zone_zsd_configure(), lock already held.
+ * 2. Doesn't check the status of the zone.
+ * 3. It will be called even before zone_init is called, in that case the
+ *    address of zone0 is returned directly, and netstack_zone_create()
+ *    will only assign a value to zone0.zone_netstack, won't break anything.
+ */
+zone_t *
+zone_find_by_id_nolock(zoneid_t zoneid)
+{
+	ASSERT(MUTEX_HELD(&zonehash_lock));
+
+	if (zonehashbyid == NULL)
+		return (&zone0);
+	else
+		return (zone_find_all_by_id(zoneid));
 }

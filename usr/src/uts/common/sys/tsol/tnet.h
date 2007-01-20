@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * from "tnet.h	7.44	02/10/09 SMI; TSOL 2.x"
@@ -48,11 +48,14 @@ extern "C" {
 
 extern int tsol_tnrh_chk(tsol_tpent_t *, bslabel_t *, int);
 extern tsol_tnrhc_t *find_rhc(const void *, uchar_t, boolean_t);
-extern int tsol_compute_label(const cred_t *, ipaddr_t, uchar_t *, boolean_t);
+extern int tsol_compute_label(const cred_t *, ipaddr_t, uchar_t *, boolean_t,
+    ip_stack_t *);
 extern int tsol_compute_label_v6(const cred_t *, const in6_addr_t *, uchar_t *,
-    boolean_t);
-extern int tsol_check_label(const cred_t *, mblk_t **, int *, boolean_t);
-extern int tsol_check_label_v6(const cred_t *, mblk_t **, int *, boolean_t);
+    boolean_t, ip_stack_t *);
+extern int tsol_check_label(const cred_t *, mblk_t **, int *, boolean_t,
+    ip_stack_t *);
+extern int tsol_check_label_v6(const cred_t *, mblk_t **, int *, boolean_t,
+    ip_stack_t *);
 extern int tsol_prepend_option(uchar_t *, ipha_t *, int);
 extern int tsol_prepend_option_v6(uchar_t *, ip6_t *, int);
 extern int tsol_remove_secopt(ipha_t *, int);
@@ -82,7 +85,8 @@ extern int tsol_rtsa_init(rt_msghdr_t *, tsol_rtsecattr_t *, caddr_t);
 extern int tsol_ire_init_gwattr(ire_t *, uchar_t, tsol_gc_t *, tsol_gcgrp_t *);
 extern mblk_t *tsol_ip_forward(ire_t *, mblk_t *);
 
-extern mlp_type_t tsol_mlp_addr_type(zoneid_t, uchar_t, const void *);
+extern mlp_type_t tsol_mlp_addr_type(zoneid_t, uchar_t, const void *,
+    ip_stack_t *);
 extern boolean_t tsol_check_interface_address(const ipif_t *);
 
 #endif /* _KERNEL */

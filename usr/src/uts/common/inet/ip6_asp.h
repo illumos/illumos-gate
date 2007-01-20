@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,19 +77,19 @@ typedef struct ip6_asp32 {
 
 #endif	/* _SYSCALL32 && _LONG_LONG_ALIGNMENT_32 == 4 */
 
-#define	IP6_ASP_TABLE_REFHOLD() {			\
-	ip6_asp_refcnt++;				\
-	ASSERT(ip6_asp_refcnt != 0);			\
+#define	IP6_ASP_TABLE_REFHOLD(ipst) {			\
+	ipst->ips_ip6_asp_refcnt++;			\
+	ASSERT(ipst->ips_ip6_asp_refcnt != 0);		\
 }
 
-#define	IP6_ASP_TABLE_REFRELE()	{			\
-	mutex_enter(&ip6_asp_lock);			\
-	ASSERT(ip6_asp_refcnt != 0);			\
-	if (--ip6_asp_refcnt == 0) {			\
-		mutex_exit(&ip6_asp_lock);		\
-		ip6_asp_check_for_updates();		\
+#define	IP6_ASP_TABLE_REFRELE(ipst)	{		\
+	mutex_enter(&ipst->ips_ip6_asp_lock);		\
+	ASSERT(ipst->ips_ip6_asp_refcnt != 0);		\
+	if (--ipst->ips_ip6_asp_refcnt == 0) {		\
+		mutex_exit(&ipst->ips_ip6_asp_lock);	\
+		ip6_asp_check_for_updates(ipst);		\
 	} else {					\
-		mutex_exit(&ip6_asp_lock);		\
+		mutex_exit(&ipst->ips_ip6_asp_lock);	\
 	}						\
 }
 
@@ -117,14 +116,14 @@ struct dstinforeq {
 
 typedef void (*aspfunc_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 
-extern void	ip6_asp_free(void);
-extern void	ip6_asp_init(void);
-extern boolean_t	ip6_asp_can_lookup();
-extern void	ip6_asp_table_refrele();
-extern char	*ip6_asp_lookup(const in6_addr_t *, uint32_t *);
-extern void	ip6_asp_replace(mblk_t *mp,
-    ip6_asp_t *, size_t, boolean_t, model_t);
-extern int	ip6_asp_get(ip6_asp_t *, size_t);
+extern void	ip6_asp_free(ip_stack_t *);
+extern void	ip6_asp_init(ip_stack_t *);
+extern boolean_t	ip6_asp_can_lookup(ip_stack_t *);
+extern void	ip6_asp_table_refrele(ip_stack_t *);
+extern char	*ip6_asp_lookup(const in6_addr_t *, uint32_t *, ip_stack_t *);
+extern void	ip6_asp_replace(mblk_t *mp, ip6_asp_t *, size_t, boolean_t,
+    ip_stack_t *, model_t);
+extern int	ip6_asp_get(ip6_asp_t *, size_t, ip_stack_t *);
 extern boolean_t	ip6_asp_labelcmp(const char *, const char *);
 extern void	ip6_asp_pending_op(queue_t *, mblk_t *, aspfunc_t);
 

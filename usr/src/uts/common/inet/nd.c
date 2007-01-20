@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -141,7 +140,7 @@ nd_getset(queue_t *q, caddr_t nd_param, MBLKP mp)
 	case ND_SET:
 		if (valp) {
 			if ((iocp->ioc_cr != NULL) &&
-			    ((err = secpolicy_net_config(iocp->ioc_cr, B_FALSE))
+			    ((err = secpolicy_ip_config(iocp->ioc_cr, B_FALSE))
 				    == 0)) {
 				err = (*nde->nde_set_pfi)(q, mp1, valp,
 				    nde->nde_data, iocp->ioc_cr);
@@ -221,6 +220,7 @@ nd_get_names(queue_t *q, MBLKP mp, caddr_t nd_param, cred_t *ioc_cr)
  * does not exist (*ndp == 0), a new table is allocated and 'ndp'
  * is stuffed.  If there is not enough space in the table for a new
  * entry, more space is allocated.
+ * Never fails due to memory allocation failures.
  */
 boolean_t
 nd_load(caddr_t *nd_pparam, char *name, ndgetf_t get_pfi, ndsetf_t set_pfi,
@@ -232,8 +232,7 @@ nd_load(caddr_t *nd_pparam, char *name, ndgetf_t get_pfi, ndsetf_t set_pfi,
 	if (!nd_pparam)
 		return (B_FALSE);
 	if ((nd = (ND *)(*nd_pparam)) == NULL) {
-		if ((nd = (ND *)mi_alloc(sizeof (ND), BPRI_MED)) == NULL)
-			return (B_FALSE);
+		nd = (ND *)mi_alloc_sleep(sizeof (ND), BPRI_MED);
 		bzero((caddr_t)nd, sizeof (ND));
 		*nd_pparam = (caddr_t)nd;
 	}
@@ -244,9 +243,8 @@ nd_load(caddr_t *nd_pparam, char *name, ndgetf_t get_pfi, ndsetf_t set_pfi,
 		}
 	}
 	if (nd->nd_free_count <= 1) {
-		if ((nde = (NDE *)mi_alloc(nd->nd_size +
-					NDE_ALLOC_SIZE, BPRI_MED)) == NULL)
-			return (B_FALSE);
+		nde = (NDE *)mi_alloc_sleep(nd->nd_size +
+		    NDE_ALLOC_SIZE, BPRI_MED);
 		bzero((char *)nde, nd->nd_size + NDE_ALLOC_SIZE);
 		nd->nd_free_count += NDE_ALLOC_COUNT;
 		if (nd->nd_tbl) {

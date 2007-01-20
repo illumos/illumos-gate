@@ -21,7 +21,7 @@
 #
 # uts/intel/rts/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -102,6 +102,14 @@ install:	$(INSTALL_DEPS)
 
 $(ROOTLINK):	$(ROOT_STRMOD_DIR) $(ROOTMODULE)
 	-$(RM) $@; ln $(ROOTMODULE) $@
+
+sis_check:	sis_check.obj
+sis_check.obj: $(ALL_DEPS)
+	@$(GREP) -v '#' $(MODULE).objt-symbols.obj64 |$(GREP) . |$(SORT) -u \
+	    > $(MODULE).symbols.tmp
+	@$(NM) obj64/$(MODULE) |$(GREP) OBJT |$(GREP) -v UNDEF | \
+	    $(CUT) -d'|' -f8 |$(SORT) -u > $(MODULE).symbols.tmp.new
+	-@$(DIFF) $(MODULE).symbols.tmp $(MODULE).symbols.tmp.new
 
 #
 #	Include common targets.

@@ -29,10 +29,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ifdef	__cplusplus
-extern "C" {
-#endif
-
 #include <sys/inttypes.h>
 #include <sys/taskq.h>
 #include <sys/list.h>
@@ -42,6 +38,11 @@ extern "C" {
 #include <inet/optcom.h>
 #include <netinet/sctp.h>
 #include <inet/sctp_itf.h>
+#include "sctp_stack.h"
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 /* Streams device identifying info and version */
 #define	SCTP_DEV_IDINFO	"SCTP Streams device 1.0"
@@ -74,11 +75,6 @@ typedef struct sctpt_s {
 	((isv4) ? IN6_IS_ADDR_V4MAPPED_ANY(&(addr)) :	\
 	IN6_IS_ADDR_UNSPECIFIED(&(addr)))
 
-extern int	sctp_g_num_epriv_ports;
-extern uint16_t	sctp_g_epriv_ports[];
-extern kmutex_t	sctp_epriv_port_lock;
-
-extern uint_t	sctp_next_port_to_try;
 /*
  * SCTP parameters
  */
@@ -90,71 +86,70 @@ typedef struct sctpparam_s {
 	char		*sctp_param_name;
 } sctpparam_t;
 
-extern sctpparam_t sctp_param_arr[];
-#define	sctp_max_init_retr		sctp_param_arr[0].sctp_param_val
-#define	sctp_max_init_retr_high		sctp_param_arr[0].sctp_param_max
-#define	sctp_max_init_retr_low		sctp_param_arr[0].sctp_param_min
-#define	sctp_pa_max_retr		sctp_param_arr[1].sctp_param_val
-#define	sctp_pa_max_retr_high		sctp_param_arr[1].sctp_param_max
-#define	sctp_pa_max_retr_low		sctp_param_arr[1].sctp_param_min
-#define	sctp_pp_max_retr		sctp_param_arr[2].sctp_param_val
-#define	sctp_pp_max_retr_high		sctp_param_arr[2].sctp_param_max
-#define	sctp_pp_max_retr_low		sctp_param_arr[2].sctp_param_min
-#define	sctp_cwnd_max_			sctp_param_arr[3].sctp_param_val
-#define	sctp_dbg			sctp_param_arr[4].sctp_param_val
-#define	sctp_smallest_nonpriv_port	sctp_param_arr[5].sctp_param_val
-#define	sctp_ipv4_ttl			sctp_param_arr[6].sctp_param_val
-#define	sctp_heartbeat_interval		sctp_param_arr[7].sctp_param_val
-#define	sctp_heartbeat_interval_high	sctp_param_arr[7].sctp_param_max
-#define	sctp_heartbeat_interval_low	sctp_param_arr[7].sctp_param_min
-#define	sctp_initial_mtu		sctp_param_arr[8].sctp_param_val
-#define	sctp_mtu_probe_interval		sctp_param_arr[9].sctp_param_val
-#define	sctp_new_secret_interval	sctp_param_arr[10].sctp_param_val
-#define	sctp_deferred_ack_interval	sctp_param_arr[11].sctp_param_val
-#define	sctp_snd_lowat_fraction		sctp_param_arr[12].sctp_param_val
-#define	sctp_ignore_path_mtu		sctp_param_arr[13].sctp_param_val
-#define	sctp_initial_ssthresh		sctp_param_arr[14].sctp_param_val
-#define	sctp_smallest_anon_port		sctp_param_arr[15].sctp_param_val
-#define	sctp_largest_anon_port		sctp_param_arr[16].sctp_param_val
-#define	sctp_xmit_hiwat			sctp_param_arr[17].sctp_param_val
-#define	sctp_xmit_lowat			sctp_param_arr[18].sctp_param_val
-#define	sctp_recv_hiwat			sctp_param_arr[19].sctp_param_val
-#define	sctp_max_buf			sctp_param_arr[20].sctp_param_val
-#define	sctp_rtt_updates		sctp_param_arr[21].sctp_param_val
-#define	sctp_ipv6_hoplimit		sctp_param_arr[22].sctp_param_val
-#define	sctp_rto_ming			sctp_param_arr[23].sctp_param_val
-#define	sctp_rto_ming_high		sctp_param_arr[23].sctp_param_max
-#define	sctp_rto_ming_low		sctp_param_arr[23].sctp_param_min
-#define	sctp_rto_maxg			sctp_param_arr[24].sctp_param_val
-#define	sctp_rto_maxg_high		sctp_param_arr[24].sctp_param_max
-#define	sctp_rto_maxg_low		sctp_param_arr[24].sctp_param_min
-#define	sctp_rto_initialg		sctp_param_arr[25].sctp_param_val
-#define	sctp_rto_initialg_high		sctp_param_arr[25].sctp_param_max
-#define	sctp_rto_initialg_low		sctp_param_arr[25].sctp_param_min
-#define	sctp_cookie_life		sctp_param_arr[26].sctp_param_val
-#define	sctp_cookie_life_high		sctp_param_arr[26].sctp_param_max
-#define	sctp_cookie_life_low		sctp_param_arr[26].sctp_param_min
-#define	sctp_max_in_streams		sctp_param_arr[27].sctp_param_val
-#define	sctp_max_in_streams_high	sctp_param_arr[27].sctp_param_max
-#define	sctp_max_in_streams_low		sctp_param_arr[27].sctp_param_min
-#define	sctp_initial_out_streams	sctp_param_arr[28].sctp_param_val
-#define	sctp_initial_out_streams_high	sctp_param_arr[28].sctp_param_max
-#define	sctp_initial_out_streams_low	sctp_param_arr[28].sctp_param_min
-#define	sctp_shutack_wait_bound		sctp_param_arr[29].sctp_param_val
-#define	sctp_maxburst			sctp_param_arr[30].sctp_param_val
-#define	sctp_addip_enabled		sctp_param_arr[31].sctp_param_val
-#define	sctp_recv_hiwat_minmss		sctp_param_arr[32].sctp_param_val
-#define	sctp_slow_start_initial		sctp_param_arr[33].sctp_param_val
-#define	sctp_slow_start_after_idle	sctp_param_arr[34].sctp_param_val
-#define	sctp_prsctp_enabled		sctp_param_arr[35].sctp_param_val
-#define	sctp_fast_rxt_thresh		sctp_param_arr[36].sctp_param_val
-#define	sctp_deferred_acks_max		sctp_param_arr[37].sctp_param_val
+#define	sctps_max_init_retr		sctps_params[0].sctp_param_val
+#define	sctps_max_init_retr_high	sctps_params[0].sctp_param_max
+#define	sctps_max_init_retr_low		sctps_params[0].sctp_param_min
+#define	sctps_pa_max_retr		sctps_params[1].sctp_param_val
+#define	sctps_pa_max_retr_high		sctps_params[1].sctp_param_max
+#define	sctps_pa_max_retr_low		sctps_params[1].sctp_param_min
+#define	sctps_pp_max_retr		sctps_params[2].sctp_param_val
+#define	sctps_pp_max_retr_high		sctps_params[2].sctp_param_max
+#define	sctps_pp_max_retr_low		sctps_params[2].sctp_param_min
+#define	sctps_cwnd_max_			sctps_params[3].sctp_param_val
+#define	__sctps_not_used1		sctps_params[4].sctp_param_val
+#define	sctps_smallest_nonpriv_port	sctps_params[5].sctp_param_val
+#define	sctps_ipv4_ttl			sctps_params[6].sctp_param_val
+#define	sctps_heartbeat_interval	sctps_params[7].sctp_param_val
+#define	sctps_heartbeat_interval_high	sctps_params[7].sctp_param_max
+#define	sctps_heartbeat_interval_low	sctps_params[7].sctp_param_min
+#define	sctps_initial_mtu		sctps_params[8].sctp_param_val
+#define	sctps_mtu_probe_interval	sctps_params[9].sctp_param_val
+#define	sctps_new_secret_interval	sctps_params[10].sctp_param_val
+#define	sctps_deferred_ack_interval	sctps_params[11].sctp_param_val
+#define	sctps_snd_lowat_fraction	sctps_params[12].sctp_param_val
+#define	sctps_ignore_path_mtu		sctps_params[13].sctp_param_val
+#define	sctps_initial_ssthresh		sctps_params[14].sctp_param_val
+#define	sctps_smallest_anon_port	sctps_params[15].sctp_param_val
+#define	sctps_largest_anon_port		sctps_params[16].sctp_param_val
+#define	sctps_xmit_hiwat		sctps_params[17].sctp_param_val
+#define	sctps_xmit_lowat		sctps_params[18].sctp_param_val
+#define	sctps_recv_hiwat		sctps_params[19].sctp_param_val
+#define	sctps_max_buf			sctps_params[20].sctp_param_val
+#define	sctps_rtt_updates		sctps_params[21].sctp_param_val
+#define	sctps_ipv6_hoplimit		sctps_params[22].sctp_param_val
+#define	sctps_rto_ming			sctps_params[23].sctp_param_val
+#define	sctps_rto_ming_high		sctps_params[23].sctp_param_max
+#define	sctps_rto_ming_low		sctps_params[23].sctp_param_min
+#define	sctps_rto_maxg			sctps_params[24].sctp_param_val
+#define	sctps_rto_maxg_high		sctps_params[24].sctp_param_max
+#define	sctps_rto_maxg_low		sctps_params[24].sctp_param_min
+#define	sctps_rto_initialg		sctps_params[25].sctp_param_val
+#define	sctps_rto_initialg_high		sctps_params[25].sctp_param_max
+#define	sctps_rto_initialg_low		sctps_params[25].sctp_param_min
+#define	sctps_cookie_life		sctps_params[26].sctp_param_val
+#define	sctps_cookie_life_high		sctps_params[26].sctp_param_max
+#define	sctps_cookie_life_low		sctps_params[26].sctp_param_min
+#define	sctps_max_in_streams		sctps_params[27].sctp_param_val
+#define	sctps_max_in_streams_high	sctps_params[27].sctp_param_max
+#define	sctps_max_in_streams_low	sctps_params[27].sctp_param_min
+#define	sctps_initial_out_streams	sctps_params[28].sctp_param_val
+#define	sctps_initial_out_streams_high	sctps_params[28].sctp_param_max
+#define	sctps_initial_out_streams_low	sctps_params[28].sctp_param_min
+#define	sctps_shutack_wait_bound	sctps_params[29].sctp_param_val
+#define	sctps_maxburst			sctps_params[30].sctp_param_val
+#define	sctps_addip_enabled		sctps_params[31].sctp_param_val
+#define	sctps_recv_hiwat_minmss		sctps_params[32].sctp_param_val
+#define	sctps_slow_start_initial	sctps_params[33].sctp_param_val
+#define	sctps_slow_start_after_idle	sctps_params[34].sctp_param_val
+#define	sctps_prsctp_enabled		sctps_params[35].sctp_param_val
+#define	sctps_fast_rxt_thresh		sctps_params[36].sctp_param_val
+#define	sctps_deferred_acks_max		sctps_params[37].sctp_param_val
+
 /*
  * sctp_wroff_xtra is the extra space in front of SCTP/IP header for link
  * layer header.  It has to be a multiple of 4.
  */
-extern sctpparam_t sctp_wroff_xtra_param;
-#define	sctp_wroff_xtra	sctp_wroff_xtra_param.sctp_param_val
+#define	sctps_wroff_xtra	sctps_wroff_xtra_param->sctp_param_val
 
 /*
  * Retransmission timer start and stop macro for a given faddr.
@@ -203,6 +198,27 @@ extern sctpparam_t sctp_wroff_xtra_param;
 	} else {					\
 		mutex_exit(&(sctp)->sctp_reflock);	\
 	}						\
+}
+
+#define	SCTP_G_Q_REFHOLD(sctps) {					\
+	atomic_add_32(&(sctps)->sctps_g_q_ref, 1);			\
+	ASSERT((sctps)->sctps_g_q_ref != 0);				\
+	DTRACE_PROBE1(sctp__g__q__refhold, sctp_stack_t, sctps);	\
+}
+
+/*
+ * Decrement the reference count on sctp_g_q
+ * In architectures e.g sun4u, where atomic_add_32_nv is just
+ * a cas, we need to maintain the right memory barrier semantics
+ * as that of mutex_exit i.e all the loads and stores should complete
+ * before the cas is executed. membar_exit() does that here.
+ */
+#define	SCTP_G_Q_REFRELE(sctps) {					\
+	ASSERT((sctps)->sctps_g_q_ref != 0);				\
+	membar_exit();							\
+	DTRACE_PROBE1(sctp__g__q__refrele, sctp_stack_t, sctps);	\
+	if (atomic_add_32_nv(&(sctps)->sctps_g_q_ref, -1) == 0)		\
+		sctp_g_q_inactive(sctps);				\
 }
 
 #define	SCTP_PRINTADDR(a)	(a).s6_addr32[0], (a).s6_addr32[1],\
@@ -336,8 +352,9 @@ typedef struct {
 	((lbolt64 - (mhdr)->smh_tob) > (mhdr)->smh_ttl))
 
 /* SCTP association hash function. */
-#define	SCTP_CONN_HASH(ports)	\
-	((((ports) ^ ((ports) >> 16)) * 31) & (sctp_conn_hash_size - 1))
+#define	SCTP_CONN_HASH(sctps, ports)			\
+	((((ports) ^ ((ports) >> 16)) * 31) & 		\
+	    ((sctps)->sctps_conn_hash_size - 1))
 
 /*
  * Bind hash array size and hash function.  The size must be a power
@@ -361,17 +378,6 @@ typedef struct sctp_tf_s {
 	kmutex_t	tf_lock;
 } sctp_tf_t;
 
-/* SCTP association hash list */
-extern sctp_tf_t	*sctp_conn_fanout;
-/* Size of sctp_conn_fanout */
-extern uint_t	sctp_conn_hash_size;
-
-/* SCTP bind hash list - all sctp_t with state >= BOUND. */
-extern sctp_tf_t	sctp_bind_fanout[];
-
-/* SCTP listener hash list - all sctp_t with state == LISTEN. */
-extern sctp_tf_t	sctp_listen_fanout[];
-
 /* Round up the value to the nearest mss. */
 #define	MSS_ROUNDUP(value, mss)		((((value) - 1) / (mss) + 1) * (mss))
 
@@ -379,42 +385,6 @@ extern sin_t	sctp_sin_null;	/* Zero address for quick clears */
 extern sin6_t	sctp_sin6_null;	/* Zero address for quick clears */
 
 #define	SCTP_IS_DETACHED(sctp)		((sctp)->sctp_detached)
-
-extern mib2_sctp_t	sctp_mib;	/* SNMP fixed size info */
-
-/* SCTP kstat */
-typedef struct sctp_kstat_s {
-	kstat_named_t	sctp_add_faddr;
-	kstat_named_t	sctp_add_timer;
-	kstat_named_t	sctp_conn_create;
-	kstat_named_t	sctp_find_next_tq;
-	kstat_named_t	sctp_fr_add_hdr;
-	kstat_named_t	sctp_fr_not_found;
-	kstat_named_t	sctp_output_failed;
-	kstat_named_t	sctp_rexmit_failed;
-	kstat_named_t	sctp_send_init_failed;
-	kstat_named_t	sctp_send_cookie_failed;
-	kstat_named_t	sctp_send_cookie_ack_failed;
-	kstat_named_t	sctp_send_err_failed;
-	kstat_named_t	sctp_send_sack_failed;
-	kstat_named_t	sctp_send_shutdown_failed;
-	kstat_named_t	sctp_send_shutdown_ack_failed;
-	kstat_named_t	sctp_send_shutdown_comp_failed;
-	kstat_named_t	sctp_send_user_abort_failed;
-	kstat_named_t	sctp_send_asconf_failed;
-	kstat_named_t	sctp_send_asconf_ack_failed;
-	kstat_named_t	sctp_send_ftsn_failed;
-	kstat_named_t	sctp_send_hb_failed;
-	kstat_named_t	sctp_return_hb_failed;
-	kstat_named_t	sctp_ss_rexmit_failed;
-	kstat_named_t	sctp_cl_connect;
-	kstat_named_t	sctp_cl_assoc_change;
-	kstat_named_t	sctp_cl_check_addrs;
-} sctp_kstat_t;
-
-extern sctp_kstat_t sctp_statistics;
-
-#define	SCTP_KSTAT(x)		(sctp_statistics.x.value.ui64++)
 
 /*
  * Object to represent database of options to search passed to
@@ -638,6 +608,8 @@ typedef struct sctp_s {
 #define	sctp_mac_exempt	sctp_connp->conn_mac_exempt
 #define	sctp_credp	sctp_connp->conn_cred
 #define	sctp_reuseaddr	sctp_connp->conn_reuseaddr
+
+	sctp_stack_t	*sctp_sctps;
 
 	/* Peer address tracking */
 	sctp_faddr_t	*sctp_lastfaddr;	/* last faddr in list */
@@ -936,16 +908,7 @@ typedef struct sctp_s {
 	uint32_t	sctp_rxt_maxtsn;	/* Max TSN sent at time out */
 } sctp_t;
 
-extern list_t	sctp_g_list;	/* Head of SCTP instance data chain */
-extern kmutex_t sctp_g_lock;
-
 #endif	/* (defined(_KERNEL) || defined(_KMEMUSER)) */
-
-extern queue_t *sctp_g_q;	/* Default queue used during detached closes */
-extern sctp_t *gsctp;
-
-/* Padding mblk for SCTP chunks. */
-extern mblk_t *sctp_pad_mp;
 
 extern void	sctp_ack_timer(sctp_t *);
 extern size_t	sctp_adaption_code_param(sctp_t *, uchar_t *);
@@ -962,7 +925,7 @@ extern mblk_t	*sctp_add_proto_hdr(sctp_t *, sctp_faddr_t *, mblk_t *, int,
 		    int *);
 extern void	sctp_addr_req(sctp_t *, mblk_t *);
 extern sctp_t	*sctp_addrlist2sctp(mblk_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
-		    uint_t, zoneid_t);
+		    uint_t, zoneid_t, sctp_stack_t *);
 extern void	sctp_add_hdr(sctp_t *, uchar_t *, size_t);
 extern void	sctp_check_adv_ack_pt(sctp_t *, mblk_t *, mblk_t *);
 extern void	sctp_assoc_event(sctp_t *, uint16_t, uint16_t,
@@ -985,7 +948,7 @@ extern void	sctp_congest_reset(sctp_t *);
 extern void	sctp_conn_hash_insert(sctp_tf_t *, sctp_t *, int);
 extern void	sctp_conn_hash_remove(sctp_t *);
 extern sctp_t	*sctp_conn_match(in6_addr_t *, in6_addr_t *, uint32_t, uint_t,
-		    zoneid_t);
+		    zoneid_t, sctp_stack_t *);
 extern sctp_t	*sctp_conn_request(sctp_t *, mblk_t *, uint_t, uint_t,
 		    sctp_init_chunk_t *, mblk_t *);
 extern int	sctp_conprim_opt_process(queue_t *, mblk_t *, int *, int *,
@@ -996,7 +959,7 @@ extern sctp_t	*sctp_create_eager(sctp_t *);
 extern void	sctp_dispatch_rput(queue_t *, sctp_t *, sctp_hdr_t *, mblk_t *,
 		    uint_t, uint_t, in6_addr_t);
 extern char	*sctp_display(sctp_t *, char *);
-extern void	sctp_display_all(void);
+extern void	sctp_display_all(sctp_stack_t *);
 
 extern void	sctp_error_event(sctp_t *, sctp_chunk_hdr_t *);
 
@@ -1016,6 +979,7 @@ extern void	sctp_ftsn_sets_init(void);
 
 extern int	sctp_get_addrlist(sctp_t *, const void *, uint32_t *,
 		    uchar_t **, int *, size_t *);
+extern void	sctp_g_q_inactive(sctp_stack_t *);
 extern int	sctp_get_addrparams(sctp_t *, sctp_t *, mblk_t *,
 		    sctp_chunk_hdr_t *, uint_t *);
 extern void	sctp_get_ire(sctp_t *, sctp_faddr_t *);
@@ -1027,14 +991,14 @@ extern void	sctp_get_saddr_list(sctp_t *, uchar_t *, size_t);
 
 extern int	sctp_handle_error(sctp_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
 		    mblk_t *);
-extern void	sctp_hash_destroy(void);
-extern void	sctp_hash_init(void);
+extern void	sctp_hash_destroy(sctp_stack_t *);
+extern void	sctp_hash_init(sctp_stack_t *);
 extern int	sctp_header_init_ipv4(sctp_t *, int);
 extern int	sctp_header_init_ipv6(sctp_t *, int);
 extern void	sctp_heartbeat_timer(sctp_t *);
 
 extern void	sctp_icmp_error(sctp_t *, mblk_t *);
-extern void	sctp_inc_taskq(void);
+extern void	sctp_inc_taskq(sctp_stack_t *);
 extern void	sctp_info_req(sctp_t *, mblk_t *);
 extern mblk_t	*sctp_init_mp(sctp_t *);
 extern boolean_t sctp_initialize_params(sctp_t *, sctp_init_chunk_t *,
@@ -1045,8 +1009,10 @@ extern void	sctp_input_data(sctp_t *, mblk_t *, mblk_t *);
 extern void	sctp_instream_cleanup(sctp_t *, boolean_t);
 extern int	sctp_is_a_faddr_clean(sctp_t *);
 
-extern void	sctp_kstat_init(void);
-extern void	sctp_kstat_fini(void);
+extern void	*sctp_kstat_init(netstackid_t);
+extern void	sctp_kstat_fini(netstackid_t, kstat_t *);
+extern void	*sctp_kstat2_init(netstackid_t, sctp_kstat_t *);
+extern void	sctp_kstat2_fini(netstackid_t, kstat_t *);
 
 extern ssize_t	sctp_link_abort(mblk_t *, uint16_t, char *, size_t, int,
 		    boolean_t);
@@ -1066,9 +1032,9 @@ extern mblk_t	*sctp_make_sack(sctp_t *, sctp_faddr_t *, mblk_t *);
 extern void	sctp_maxpsz_set(sctp_t *);
 extern void	sctp_move_faddr_timers(queue_t *, sctp_t *);
 
-extern void	sctp_nd_free(void);
+extern void	sctp_nd_free(sctp_stack_t *);
 extern int	sctp_nd_getset(queue_t *, MBLKP);
-extern boolean_t sctp_nd_init(void);
+extern boolean_t sctp_nd_init(sctp_stack_t *);
 extern sctp_parm_hdr_t *sctp_next_parm(sctp_parm_hdr_t *, ssize_t *);
 
 extern void	sctp_ootb_shutdown_ack(sctp_t *, mblk_t *, uint_t);
@@ -1076,7 +1042,7 @@ extern size_t	sctp_options_param(const sctp_t *, void *, int);
 extern size_t	sctp_options_param_len(const sctp_t *, int);
 extern void	sctp_output(sctp_t *sctp);
 
-extern boolean_t sctp_param_register(sctpparam_t *, int);
+extern boolean_t sctp_param_register(IDP *, sctpparam_t *, int, sctp_stack_t *);
 extern void	sctp_partial_delivery_event(sctp_t *);
 extern int	sctp_process_cookie(sctp_t *, sctp_chunk_hdr_t *, mblk_t *,
 		    sctp_init_chunk_t **, sctp_hdr_t *, int *, in6_addr_t *);
@@ -1095,7 +1061,7 @@ extern sctp_faddr_t *sctp_rotate_faddr(sctp_t *, sctp_faddr_t *);
 
 extern void	sctp_sack(sctp_t *, mblk_t *);
 extern int	sctp_secure_restart_check(mblk_t *, sctp_chunk_hdr_t *,
-		    uint32_t, int);
+		    uint32_t, int, sctp_stack_t *);
 extern void	sctp_send_abort(sctp_t *, uint32_t, uint16_t, char *, size_t,
 		    mblk_t *, int, boolean_t);
 extern void	sctp_send_cookie_ack(sctp_t *);
@@ -1131,7 +1097,7 @@ extern void	sctp_timer_stop(mblk_t *);
 extern void	sctp_unlink_faddr(sctp_t *, sctp_faddr_t *);
 
 extern void	sctp_update_ire(sctp_t *sctp);
-extern in_port_t sctp_update_next_port(in_port_t, zone_t *zone);
+extern in_port_t sctp_update_next_port(in_port_t, zone_t *zone, sctp_stack_t *);
 extern void	sctp_update_rtt(sctp_t *, sctp_faddr_t *, clock_t);
 extern void	sctp_user_abort(sctp_t *, mblk_t *, boolean_t);
 
@@ -1159,10 +1125,12 @@ extern void	(*cl_sctp_check_addrs)(sa_family_t, in_port_t, uchar_t **,
 /* Send a mp to IP. */
 #define	IP_PUT(mp, conn, isv4)						\
 {									\
+	sctp_stack_t	*sctps = conn->conn_netstack->netstack_sctp;	\
+									\
 	if ((isv4))							\
-		ip_output((conn), (mp), WR(sctp_g_q), IP_WPUT);		\
+		ip_output((conn), (mp), WR(sctps->sctps_g_q), IP_WPUT);	\
 	else								\
-		ip_output_v6((conn), (mp), WR(sctp_g_q), IP_WPUT);	\
+		ip_output_v6((conn), (mp), WR(sctps->sctps_g_q), IP_WPUT);\
 }
 
 #define	RUN_SCTP(sctp)						\

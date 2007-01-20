@@ -6,7 +6,7 @@
  * @(#)ip_state.h	1.3 1/12/96 (C) 1995 Darren Reed
  * $Id: ip_state.h,v 2.68.2.5 2005/08/11 19:58:04 darrenr Exp $
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -223,45 +223,24 @@ typedef	struct	ips_stat {
 	u_long	*iss_bucketlen;
 } ips_stat_t;
 
-
-extern	u_long	fr_tcpidletimeout;
-extern	u_long	fr_tcpclosewait;
-extern	u_long	fr_tcplastack;
-extern	u_long	fr_tcptimeout;
-extern	u_long	fr_tcpclosed;
-extern	u_long	fr_tcphalfclosed;
-extern	u_long	fr_udptimeout;
-extern	u_long	fr_udpacktimeout;
-extern	u_long	fr_icmptimeout;
-extern	u_long	fr_icmpacktimeout;
-extern	u_long	fr_iptimeout;
-extern	int	fr_statemax;
-extern	int	fr_statesize;
-extern	int	fr_state_lock;
-extern	int	fr_state_maxbucket;
-extern	int	fr_state_maxbucket_reset;
-extern	ipstate_t	*ips_list;
-extern	ipftq_t	*ips_utqe;
-extern	ipftq_t	ips_tqtqb[IPF_TCP_NSTATES];
-
-extern	int	fr_stateinit __P((void));
+extern	int	fr_stateinit __P((ipf_stack_t *));
 extern	ipstate_t *fr_addstate __P((fr_info_t *, ipstate_t **, u_int));
 extern	frentry_t *fr_checkstate __P((struct fr_info *, u_32_t *));
 extern	ipstate_t *fr_stlookup __P((fr_info_t *, tcphdr_t *, ipftq_t **));
-extern	void	fr_statesync __P((int, int, void *, char *));
-extern	void	fr_timeoutstate __P((void));
+extern	void	fr_statesync __P((int, int, void *, char *, ipf_stack_t *));
+extern	void	fr_timeoutstate __P((ipf_stack_t *));
 extern	int	fr_tcp_age __P((struct ipftqent *, struct fr_info *,
 				struct ipftq *, int));
 extern	int	fr_tcpinwindow __P((struct fr_info *, struct tcpdata *,
 				    struct tcpdata *, tcphdr_t *, int));
-extern	void	fr_stateunload __P((void));
-extern	void	ipstate_log __P((struct ipstate *, u_int));
-extern	int	fr_state_ioctl __P((caddr_t, ioctlcmd_t, int));
-extern	void	fr_stinsert __P((struct ipstate *, int));
-extern	void	fr_sttab_init __P((struct ipftq *));
+extern	void	fr_stateunload __P((ipf_stack_t *));
+extern	void	ipstate_log __P((struct ipstate *, u_int, ipf_stack_t *));
+extern	int	fr_state_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *, ipf_stack_t *));
+extern	void	fr_stinsert __P((struct ipstate *, int, ipf_stack_t *));
+extern	void	fr_sttab_init __P((struct ipftq *, ipf_stack_t *));
 extern	void	fr_sttab_destroy __P((struct ipftq *));
 extern	void	fr_updatestate __P((fr_info_t *, ipstate_t *, ipftq_t *));
-extern	void	fr_statederef __P((fr_info_t *, ipstate_t **));
-extern	void	fr_setstatequeue __P((ipstate_t *, int));
+extern	void	fr_statederef __P((fr_info_t *, ipstate_t **, ipf_stack_t *));
+extern	void	fr_setstatequeue __P((ipstate_t *, int, ipf_stack_t *));
 
 #endif /* __IP_STATE_H__ */

@@ -1,7 +1,12 @@
 /*
  * Copyright (C) 1993-2005  by Darren Reed.
  * See the IPFILTER.LICENCE file for details on licencing.
- */ 
+ *
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef __IP_LOOKUP_H__
 #define __IP_LOOKUP_H__
@@ -59,9 +64,38 @@ typedef	struct	iplookuplink	{
 
 #define	IPLT_ANON	0x80000000
 
-extern int ip_lookup_init __P((void));
-extern int ip_lookup_ioctl __P((caddr_t, ioctlcmd_t, int));
-extern void ip_lookup_unload __P((void));
-extern void ip_lookup_deref __P((int, void *));
+
+typedef	union	{
+	struct	iplookupiterkey {
+		char	ilik_ival;
+		u_char	ilik_type;	/* IPLT_* */
+		u_char	ilik_otype;
+		char	ilik_unit;	/* IPL_LOG* */
+	} ilik_unstr;
+	u_32_t	ilik_key;
+} iplookupiterkey_t;
+
+typedef	struct	ipflookupiter	{
+	void			*ili_data;
+	iplookupiterkey_t	ili_lkey;
+	char			ili_name[FR_GROUPLEN];
+} ipflookupiter_t;
+
+#define	ili_key		ili_lkey.ilik_key
+#define	ili_ival	ili_lkey.ilik_unstr.ilik_ival
+#define	ili_unit	ili_lkey.ilik_unstr.ilik_unit
+#define	ili_type	ili_lkey.ilik_unstr.ilik_type
+#define	ili_otype	ili_lkey.ilik_unstr.ilik_otype
+
+#define	IPFLOOKUPITER_LIST	0
+#define	IPFLOOKUPITER_NODE	1
+
+
+extern int ip_lookup_init __P((ipf_stack_t *));
+extern int ip_lookup_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *, ipf_stack_t *));
+extern void ip_lookup_unload __P((ipf_stack_t *));
+extern void ip_lookup_deref __P((int, void *, ipf_stack_t *));
+extern int ip_lookup_iterate __P((void *, int, void *, ipf_stack_t *));
+extern void ip_lookup_iterderef __P((u_32_t, void *, ipf_stack_t  *));
 
 #endif /* __IP_LOOKUP_H__ */

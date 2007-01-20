@@ -5,7 +5,7 @@
  *
  * $Id: ip_irc_pxy.c,v 2.39.2.4 2005/02/04 10:22:55 darrenr Exp $
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -15,45 +15,64 @@
 
 #define	IPF_IRCBUFSZ	96	/* This *MUST* be >= 64! */
 
+typedef struct ifs_ircpxy {
+	frentry_t	ircnatfr;
+	int		irc_proxy_init;
+} ifs_ircpxy_t;
 
-int ippr_irc_init __P((void));
-void ippr_irc_fini __P((void));
-int ippr_irc_new __P((fr_info_t *, ap_session_t *, nat_t *));
-int ippr_irc_out __P((fr_info_t *, ap_session_t *, nat_t *));
-int ippr_irc_send __P((fr_info_t *, nat_t *));
+
+int ippr_irc_init __P((void **, ipf_stack_t *));
+void ippr_irc_fini __P((void **, ipf_stack_t *));
+int ippr_irc_new __P((fr_info_t *, ap_session_t *, nat_t *, void *));
+int ippr_irc_out __P((fr_info_t *, ap_session_t *, nat_t *, void *));
+int ippr_irc_send __P((fr_info_t *, nat_t *, ifs_ircpxy_t *));
 int ippr_irc_complete __P((ircinfo_t *, char *, size_t));
 u_short ipf_irc_atoi __P((char **));
-
-static	frentry_t	ircnatfr;
-
-int	irc_proxy_init = 0;
-
 
 /*
  * Initialize local structures.
  */
-int ippr_irc_init()
+/*ARGSUSED*/
+int ippr_irc_init(private, ifs)
+void **private;
+ipf_stack_t *ifs;
 {
-	bzero((char *)&ircnatfr, sizeof(ircnatfr));
-	ircnatfr.fr_ref = 1;
-	ircnatfr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
-	MUTEX_INIT(&ircnatfr.fr_lock, "IRC proxy rule lock");
-	irc_proxy_init = 1;
+	ifs_ircpxy_t *ifsirc;
+
+	KMALLOC(ifsirc, ifs_ircpxy_t *);
+	if (ifsirc == NULL)
+		return -1;
+
+	bzero((char *)&ifsirc->ircnatfr, sizeof(ifsirc->ircnatfr));
+	ifsirc->ircnatfr.fr_ref = 1;
+	ifsirc->ircnatfr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
+	MUTEX_INIT(&ifsirc->ircnatfr.fr_lock, "IRC proxy rule lock");
+	ifsirc->irc_proxy_init = 1;
+
+	*private = (void *)ifsirc;
 
 	return 0;
 }
 
 
-void ippr_irc_fini()
+/*ARGSUSED*/
+void ippr_irc_fini(private, ifs)
+void **private;
+ipf_stack_t *ifs;
 {
-	if (irc_proxy_init == 1) {
-		MUTEX_DESTROY(&ircnatfr.fr_lock);
-		irc_proxy_init = 0;
+	ifs_ircpxy_t *ifsirc = *((ifs_ircpxy_t **)private);
+
+	if (ifsirc->irc_proxy_init == 1) {
+		MUTEX_DESTROY(&ifsirc->ircnatfr.fr_lock);
+		ifsirc->irc_proxy_init = 0;
 	}
+
+	KFREE(ifsirc);
+	*private = NULL;
 }
 
 
-char *ippr_irc_dcctypes[] = {
+static char *ippr_irc_dcctypes[] = {
 	"CHAT ",	/* CHAT chat ipnumber portnumber */
 	"SEND ",	/* SEND filename ipnumber portnumber */
 	"MOVE ",
@@ -227,10 +246,12 @@ size_t len;
 }
 
 
-int ippr_irc_new(fin, aps, nat)
+/*ARGSUSED*/
+int ippr_irc_new(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	ircinfo_t *irc;
 
@@ -249,9 +270,10 @@ nat_t *nat;
 }
 
 
-int ippr_irc_send(fin, nat)
+int ippr_irc_send(fin, nat, ifsirc)
 fr_info_t *fin;
 nat_t *nat;
+ifs_ircpxy_t *ifsirc;
 {
 	char ctcpbuf[IPF_IRCBUFSZ], newbuf[IPF_IRCBUFSZ];
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
@@ -268,6 +290,7 @@ nat_t *nat;
 #ifdef	MENTAT
 	mb_t *m1;
 #endif
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	m = fin->fin_m;
 	ip = fin->fin_ip;
@@ -407,7 +430,7 @@ nat_t *nat;
 		fi.fin_data[0] = ntohs(sp);
 		fi.fin_data[1] = 0;
 		fi.fin_dp = (char *)tcp2;
-		fi.fin_fr = &ircnatfr;
+		fi.fin_fr = &ifsirc->ircnatfr;
 		fi.fin_dlen = sizeof(*tcp2);
 		fi.fin_plen = fi.fin_hlen + sizeof(*tcp2);
 		swip = ip->ip_src;
@@ -420,7 +443,7 @@ nat_t *nat;
 
 			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
 			if (fi.fin_state != NULL)
-				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+				fr_statederef(&fi, (ipstate_t **)&fi.fin_state, ifs);
 		}
 		ip->ip_src = swip;
 	}
@@ -428,11 +451,12 @@ nat_t *nat;
 }
 
 
-int ippr_irc_out(fin, aps, nat)
+int ippr_irc_out(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	aps = aps;	/* LINT */
-	return ippr_irc_send(fin, nat);
+	return ippr_irc_send(fin, nat, (ifs_ircpxy_t *)private);
 }

@@ -193,6 +193,10 @@ static int	get_lun(char *);
 static void	selectifs(int argc, char *argv[], int af,
 			struct lifreq *lifrp);
 static int	updownifs(iface_t *ifs, int up);
+static int	find_all_global_interfaces(struct lifconf *lifcp, char **buf,
+		    int64_t lifc_flags);
+static int	find_all_zone_interfaces(struct lifconf *lifcp, char **buf,
+		    int64_t lifc_flags);
 
 #define	max(a, b)	((a) < (b) ? (b) : (a))
 
@@ -484,59 +488,30 @@ foreachinterface(void (*func)(), int argc, char *argv[], int af,
 	struct lifreq lifrl;	/* Local lifreq struct */
 	int numifs;
 	unsigned bufsize;
-	ni_t *nip;
 	int plumball = 0;
 	int save_af = af;
 
+	buf = NULL;
 	/*
 	 * Special case:
 	 * ifconfig -a plumb should find all network interfaces
-	 * in the machine by traversing the devinfo tree.
+	 * in the machine by traversing the devinfo tree for global zone.
+	 * For non-global zones, only find the assigned interfaces.
 	 * Also, there is no need to  SIOCGLIF* ioctls, since
 	 * those interfaces have already been plumbed
 	 */
 	if (argc > 0 && (strcmp(*argv, "plumb") == 0)) {
-		/*
-		 * Look through the kernel's devinfo tree for
-		 * network devices
-		 */
-		di_node_t root;
-
-		/*
-		 * DINFOCACHE is equivalent to DINFOSUBTREE | DINFOMINOR |
-		 * DINFOPROP | DINFOFORCE.
-		 */
-		if ((root = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
-			(void) fprintf(stderr, "ifconfig: di_init failed;"
-			    " check the devinfo driver.\n");
-			exit(1);
+		if (getzoneid() == GLOBAL_ZONEID) {
+			if (find_all_global_interfaces(&lifc, &buf,
+			    lifc_flags) != 0)
+				return;
+		} else {
+			if (find_all_zone_interfaces(&lifc, &buf,
+			    lifc_flags) != 0)
+				return;
 		}
-
-		(void) di_walk_minor(root, DDI_NT_NET, DI_CHECK_ALIAS, NULL,
-		    devfs_entry);
-		di_fini(root);
-
-		/*
-		 * Now, translate the linked list into
-		 * a struct lifreq buffer
-		 */
-		bufsize = num_ni * sizeof (struct lifreq);
-		if ((buf = malloc(bufsize)) == NULL)
-			Perror0_exit("foreachinterface: malloc failed");
-
-		lifc.lifc_family = AF_UNSPEC;
-		lifc.lifc_flags = lifc_flags;
-		lifc.lifc_len = bufsize;
-		lifc.lifc_buf = buf;
-
-		for (n = 0, lifrp = lifc.lifc_req; n < num_ni; n++, lifrp++) {
-			nip = ni_list;
-			(void) strncpy(lifrp->lifr_name, nip->ni_name,
-			    sizeof (lifr.lifr_name));
-			ni_list = nip->ni_next;
-			free(nip);
-		}
-
+		if (lifc.lifc_len == 0)
+			return;
 		plumball = 1;
 	} else {
 		lifn.lifn_family = AF_UNSPEC;
@@ -664,7 +639,8 @@ foreachinterface(void (*func)(), int argc, char *argv[], int af,
 		/* the func could have overwritten origname, so restore */
 		(void) strncpy(name, origname, sizeof (name));
 	}
-	free(buf);
+	if (buf != NULL)
+		free(buf);
 }
 
 static void
@@ -1781,6 +1757,161 @@ updownifs(iface_t *ifs, int up)
 }
 
 /*
+ * static int find_all_global_interfaces(struct lifconf *lifcp, char **buf,
+ *     int64_t lifc_flags)
+ *
+ * It finds all interfaces for the global zone, that is all
+ * the physical interfaces, using the kernel's devinfo tree.
+ *
+ * It takes in input a pointer to struct lifconf to receive interfaces
+ * informations, a **char to hold allocated buffer, and a lifc_flags.
+ *
+ * Return values:
+ *  0 = everything OK
+ * -1 = problem
+ */
+static int
+find_all_global_interfaces(struct lifconf *lifcp, char **buf,
+    int64_t lifc_flags)
+{
+	unsigned bufsize;
+	int n;
+	di_node_t root;
+	ni_t *nip;
+	struct lifreq *lifrp;
+
+	/*
+	 * DINFOCACHE is equivalent to DINFOSUBTREE | DINFOMINOR |
+	 * DINFOPROP | DINFOFORCE.
+	 */
+	if ((root = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
+		(void) fprintf(stderr, "ifconfig: di_init "
+		    "failed; check the devinfo driver.\n");
+		exit(1);
+	}
+
+	(void) di_walk_minor(root, DDI_NT_NET, DI_CHECK_ALIAS,
+	    NULL, devfs_entry);
+	di_fini(root);
+
+	/*
+	 * Now, translate the linked list into
+	 * a struct lifreq buffer
+	 */
+	if (num_ni == 0) {
+		lifcp->lifc_family = AF_UNSPEC;
+		lifcp->lifc_flags = lifc_flags;
+		lifcp->lifc_len = 0;
+		lifcp->lifc_buf = NULL;
+		return (0);
+	}
+
+	bufsize = num_ni * sizeof (struct lifreq);
+	if ((*buf = malloc(bufsize)) == NULL)
+		Perror0_exit("find_all_interfaces: malloc failed");
+
+	lifcp->lifc_family = AF_UNSPEC;
+	lifcp->lifc_flags = lifc_flags;
+	lifcp->lifc_len = bufsize;
+	lifcp->lifc_buf = *buf;
+
+	for (n = 0, lifrp = lifcp->lifc_req; n < num_ni; n++, lifrp++) {
+		nip = ni_list;
+		(void) strncpy(lifrp->lifr_name, nip->ni_name,
+		    sizeof (lifr.lifr_name));
+		ni_list = nip->ni_next;
+		free(nip);
+	}
+	return (0);
+}
+
+/*
+ * static int find_all_zone_interfaces(struct lifconf *lifcp, char **buf,
+ *     int64_t lifc_flags)
+ *
+ * It finds all interfaces for an exclusive-IP zone, that is all the interfaces
+ * assigned to it.
+ *
+ * It takes in input a pointer to struct lifconf to receive interfaces
+ * informations, a **char to hold allocated buffer, and a lifc_flags.
+ *
+ * Return values:
+ *  0 = everything OK
+ * -1 = problem
+ */
+static int
+find_all_zone_interfaces(struct lifconf *lifcp, char **buf, int64_t lifc_flags)
+{
+	zoneid_t zoneid;
+	unsigned bufsize;
+	char *dlnames, *ptr;
+	struct lifreq *lifrp;
+	int num_ni_saved, i;
+
+	zoneid = getzoneid();
+
+	num_ni = 0;
+	if (zone_list_datalink(zoneid, &num_ni, NULL) != 0)
+		Perror0_exit("find_all_interfaces: list interfaces failed");
+again:
+	/* this zone doesn't have any data-links */
+	if (num_ni == 0) {
+		lifcp->lifc_family = AF_UNSPEC;
+		lifcp->lifc_flags = lifc_flags;
+		lifcp->lifc_len = 0;
+		lifcp->lifc_buf = NULL;
+		return (0);
+	}
+
+	dlnames = malloc(num_ni * LIFNAMSIZ);
+	if (dlnames == NULL)
+		Perror0_exit("find_all_interfaces: out of memory");
+	num_ni_saved = num_ni;
+
+	if (zone_list_datalink(zoneid, &num_ni, dlnames) != 0)
+		Perror0_exit("find_all_interfaces: list interfaces failed");
+
+	if (num_ni_saved < num_ni) {
+		/* list increased, try again */
+		free(dlnames);
+		goto again;
+	}
+
+	/* this zone doesn't have any data-links now */
+	if (num_ni == 0) {
+		free(dlnames);
+		lifcp->lifc_family = AF_UNSPEC;
+		lifcp->lifc_flags = lifc_flags;
+		lifcp->lifc_len = 0;
+		lifcp->lifc_buf = NULL;
+		return (0);
+	}
+
+	bufsize = num_ni * sizeof (struct lifreq);
+	if ((*buf = malloc(bufsize)) == NULL) {
+		free(dlnames);
+		Perror0_exit("find_all_interfaces: malloc failed");
+	}
+
+	lifrp = (struct lifreq *)*buf;
+	ptr = dlnames;
+	for (i = 0; i < num_ni; i++) {
+		if (strlcpy(lifrp->lifr_name, ptr, LIFNAMSIZ) >=
+		    LIFNAMSIZ)
+			Perror0_exit("find_all_interfaces: overflow");
+		ptr += LIFNAMSIZ;
+		lifrp++;
+	}
+
+	free(dlnames);
+	lifcp->lifc_family = AF_UNSPEC;
+	lifcp->lifc_flags = lifc_flags;
+	lifcp->lifc_len = bufsize;
+	lifcp->lifc_buf = *buf;
+	return (0);
+}
+
+/*
  * Create the next unused logical interface using the original name
  * and assign the address (and mask if '/<n>' is part of the address).
  * Use the new logical interface for subsequent subcommands by updating
@@ -2760,8 +2891,13 @@ ifstatus(const char *ifname)
 	if (!v4compat) {
 		if (ioctl(s, SIOCGLIFINDEX, (caddr_t)&lifr) >= 0)
 			(void) printf(" index %d", lifr.lifr_index);
+		/*
+		 * Stack instances use GLOBAL_ZONEID for IP data structures
+		 * even in the non-global zone.
+		 */
 		if (ioctl(s, SIOCGLIFZONE, (caddr_t)&lifr) >= 0 &&
-		    lifr.lifr_zoneid != getzoneid()) {
+		    lifr.lifr_zoneid != getzoneid() &&
+		    lifr.lifr_zoneid != GLOBAL_ZONEID) {
 			char zone_name[ZONENAME_MAX];
 
 			if (lifr.lifr_zoneid == ALL_ZONES) {
@@ -3928,6 +4064,7 @@ inetplumb(char *arg, int64_t param)
 	int		dev_fd;
 	dlpi_if_attr_t	dia;
 	boolean_t	islo;
+	zoneid_t	zoneid;
 
 	strptr = strchr(name, ':');
 	islo = (strcmp(name, LOOPBACK_IF) == 0);
@@ -3960,6 +4097,27 @@ inetplumb(char *arg, int64_t param)
 		 */
 		(void) strncpy(name, lifr.lifr_name, sizeof (name));
 		return (0);
+	}
+
+	/*
+	 * For global zone, check if the interface is used by a non-global
+	 * zone, note that the non-global zones doesn't need this check,
+	 * because zoneadm has taken care of this when the zone boots.
+	 */
+	zoneid = getzoneid();
+	if (zoneid == GLOBAL_ZONEID) {
+		int ret;
+
+		zoneid = ALL_ZONES;
+		ret = zone_check_datalink(&zoneid, name);
+		if (ret == 0) {
+			char zonename[ZONENAME_MAX];
+
+			(void) getzonenamebyid(zoneid, zonename, ZONENAME_MAX);
+			(void) fprintf(stderr, "%s is used by non-global"
+			    "zone: %s\n", name, zonename);
+			return (1);
+		}
 	}
 
 	if (debug)

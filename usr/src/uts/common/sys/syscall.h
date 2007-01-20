@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -471,8 +471,13 @@ extern "C" {
 	 *	zone_list(...) :: zone(ZONE_LIST, ...)
 	 *	zone_shutdown(...) :: zone(ZONE_SHUTDOWN, ...)
 	 *	zone_lookup(...) :: zone(ZONE_LOOKUP, ...)
+	 *	zone_boot(...) :: zone(ZONE_BOOT, ...)
+	 *	zone_version(...) :: zone(ZONE_VERSION, ...)
 	 *	zone_setattr(...) :: zone(ZONE_SETATTR, ...)
-	 *	zone_getattr(...) :: zone(ZONE_GETATTR, ...)
+	 *	zone_add_datalink(...) :: zone(ZONE_ADD_DATALINK, ...)
+	 *	zone_remove_datalink(...) :: zone(ZONE_DEL_DATALINK, ...)
+	 *	zone_check_datalink(...) :: zone(ZONE_CHECK_DATALINK, ...)
+	 *	zone_list_datalink(...) :: zone(ZONE_LIST_DATALINK, ...)
 	 */
 #define	SYS_autofssys		228
 #define	SYS_getcwd		229

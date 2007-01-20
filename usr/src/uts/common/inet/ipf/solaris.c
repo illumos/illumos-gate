@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* #pragma ident   "@(#)solaris.c	1.12 6/5/96 (C) 1995 Darren Reed"*/
@@ -39,6 +39,7 @@
 #if SOLARIS2 >= 6
 # include <net/if_types.h>
 #endif
+#include <sys/netstack.h>
 #include <net/af.h>
 #include <net/route.h>
 #include <netinet/in.h>
@@ -59,13 +60,9 @@
 #include "netinet/ip_frag.h"
 #include "netinet/ip_auth.h"
 #include "netinet/ip_state.h"
+#include "netinet/ipf_stack.h"
 
-extern	struct	filterstats	frstats[];
-extern	int	fr_running;
-extern	int	fr_flags;
 extern	int	iplwrite __P((dev_t, struct uio *, cred_t *));
-
-extern ipnat_t *nat_list;
 
 static	int	ipf_getinfo __P((dev_info_t *, ddi_info_cmd_t,
 				 void *, void **));
@@ -74,17 +71,11 @@ static	int	ipf_identify __P((dev_info_t *));
 #endif
 static	int	ipf_attach __P((dev_info_t *, ddi_attach_cmd_t));
 static	int	ipf_detach __P((dev_info_t *, ddi_detach_cmd_t));
-static	int	ipf_property_update __P((dev_info_t *));
+static	int	ipf_property_g_update __P((dev_info_t *));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
 
-
-#if SOLARIS2 >= 7
-extern	timeout_id_t	fr_timer_id;
-#else
-extern	int		fr_timer_id;
-#endif
 
 static struct cb_ops ipf_cb_ops = {
 	iplopen,
@@ -191,7 +182,7 @@ static	size_t	hdrsizes[57][2] = {
 };
 #endif /* SOLARIS2 >= 6 */
 
-static dev_info_t *ipf_dev_info = NULL;
+dev_info_t *ipf_dev_info = NULL;
 
 static const filter_kstats_t ipf_kstat_tmp = {
 	{ "pass",			KSTAT_DATA_ULONG },
@@ -222,47 +213,45 @@ static const filter_kstats_t ipf_kstat_tmp = {
 	{ "ip upd. fail",		KSTAT_DATA_ULONG }
 };
 
-net_data_t ipf_ipv4;
-net_data_t ipf_ipv6;
 
-kstat_t		*ipf_kstatp[2] = {NULL, NULL};
 static int	ipf_kstat_update(kstat_t *ksp, int rwflag);
 
 static void
-ipf_kstat_init(void)
+ipf_kstat_init(ipf_stack_t *ifs, netstackid_t stackid)
 {
 	int 	i;
 
 	for (i = 0; i < 2; i++) {
-		ipf_kstatp[i] = kstat_create("ipf", 0,
+		ifs->ifs_kstatp[i] = kstat_create_netstack("ipf", 0,
 			(i==0)?"inbound":"outbound",
 			"net",
 			KSTAT_TYPE_NAMED,
 			sizeof (filter_kstats_t) / sizeof (kstat_named_t),
-			0);
-		if (ipf_kstatp[i] != NULL) {
-			bcopy(&ipf_kstat_tmp, ipf_kstatp[i]->ks_data,
+			0, stackid);
+		if (ifs->ifs_kstatp[i] != NULL) {
+			bcopy(&ipf_kstat_tmp, ifs->ifs_kstatp[i]->ks_data,
 				sizeof (filter_kstats_t));
-			ipf_kstatp[i]->ks_update = ipf_kstat_update;
-			ipf_kstatp[i]->ks_private = &frstats[i];
-			kstat_install(ipf_kstatp[i]);
+			ifs->ifs_kstatp[i]->ks_update = ipf_kstat_update;
+			ifs->ifs_kstatp[i]->ks_private = &ifs->ifs_frstats[i];
+			kstat_install(ifs->ifs_kstatp[i]);
 		}
 	}
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_kstat_init() installed 0x%x, 0x%x",
-		ipf_kstatp[0], ipf_kstatp[1]);
+		ifs->ifs_kstatp[0], ifs->ifs_kstatp[1]);
 #endif
 }
 
 static void
-ipf_kstat_fini(void)
+ipf_kstat_fini(ipf_stack_t *ifs, netstackid_t stackid)
 {
 	int i;
+
 	for (i = 0; i < 2; i++) {
-		if (ipf_kstatp[i] != NULL) {
-			kstat_delete(ipf_kstatp[i]);
-			ipf_kstatp[i] = NULL;
+		if (ifs->ifs_kstatp[i] != NULL) {
+			kstat_delete_netstack(ifs->ifs_kstatp[i], stackid);
+			ifs->ifs_kstatp[i] = NULL;
 		}
 	}
 }
@@ -272,6 +261,9 @@ ipf_kstat_update(kstat_t *ksp, int rwflag)
 {
 	filter_kstats_t	*fkp;
 	filterstats_t	*fsp;
+
+	if (ksp == NULL || ksp->ks_data == NULL)
+		return (EIO);
 
 	if (rwflag == KSTAT_WRITE)
 		return (EACCES);
@@ -313,12 +305,7 @@ int _init()
 {
 	int ipfinst;
 
-	ipf_kstat_init();
-
 	ipfinst = mod_install(&modlink1);
-	
-	if (ipfinst != 0)
-		ipf_kstat_fini();
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: _init() = %d", ipfinst);
 #endif
@@ -334,9 +321,6 @@ int _fini(void)
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: _fini() = %d", ipfinst);
 #endif
-	if (ipfinst == 0)
-		ipf_kstat_fini();
-
 	return ipfinst;
 }
 
@@ -367,6 +351,154 @@ dev_info_t *dip;
 }
 #endif
 
+/*
+ * Initialize things for IPF for each stack instance
+ */
+static void *
+ipf_stack_init(netstackid_t stackid, netstack_t *ns)
+{
+	ipf_stack_t	*ifs;
+
+#ifdef NS_DEBUG
+	(void) printf("ipf_stack_init(%d)\n", stackid);
+#endif
+
+	KMALLOCS(ifs, ipf_stack_t *, sizeof (*ifs));
+	bzero(ifs, sizeof (*ifs));
+
+	ifs->ifs_netstack = ns;
+
+	ifs->ifs_hook4_physical_in	= B_FALSE;
+	ifs->ifs_hook4_physical_out	= B_FALSE;
+	ifs->ifs_hook4_nic_events	= B_FALSE;
+	ifs->ifs_hook4_loopback_in	= B_FALSE;
+	ifs->ifs_hook4_loopback_out	= B_FALSE;
+	ifs->ifs_hook6_physical_in	= B_FALSE;
+	ifs->ifs_hook6_physical_out	= B_FALSE;
+	ifs->ifs_hook6_nic_events	= B_FALSE;
+	ifs->ifs_hook6_loopback_in	= B_FALSE;
+	ifs->ifs_hook6_loopback_out	= B_FALSE;
+
+	/*
+	 * Initialize mutex's
+	 */
+	RWLOCK_INIT(&ifs->ifs_ipf_global, "ipf filter load/unload mutex");
+	RWLOCK_INIT(&ifs->ifs_ipf_mutex, "ipf filter rwlock");
+	RWLOCK_INIT(&ifs->ifs_ipf_frcache, "ipf cache rwlock");
+#ifdef KERNEL
+	ipf_kstat_init(ifs, stackid);
+#endif
+
+	/*
+	 * Lock people out while we set things up.
+	 */
+	WRITE_ENTER(&ifs->ifs_ipf_global);
+	ipftuneable_alloc(ifs);
+	ifs->ifs_fr_timer_id = timeout(fr_slowtimer, (void *)ifs,
+	    drv_usectohz(500000));
+
+	RWLOCK_EXIT(&ifs->ifs_ipf_global);
+
+	cmn_err(CE_CONT, "!%s, running.\n", ipfilter_version);
+	return (ifs);
+}
+
+static int ipf_detach_check_zone(ipf_stack_t *ifs)
+{
+	/*
+	 * Make sure we're the only one's modifying things.  With
+	 * this lock others should just fall out of the loop.
+	 */
+	READ_ENTER(&ifs->ifs_ipf_global);
+	if (ifs->ifs_fr_running == 1) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
+		return (-1);
+	}
+	
+	/*
+	 * Make sure there is no active filter rule.
+	 */
+	if (ifs->ifs_ipfilter[0][ifs->ifs_fr_active] ||
+	    ifs->ifs_ipfilter[1][ifs->ifs_fr_active] ||
+	    ifs->ifs_ipfilter6[0][ifs->ifs_fr_active] ||
+	    ifs->ifs_ipfilter6[1][ifs->ifs_fr_active]) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
+		return (-1);
+	}
+
+	RWLOCK_EXIT(&ifs->ifs_ipf_global);
+
+	return (0);
+}
+
+static int ipf_detach_check_all()
+{
+	netstack_handle_t nh;
+	netstack_t *ns;
+	int ret;
+
+	netstack_next_init(&nh);
+	while ((ns = netstack_next(&nh)) != NULL) {
+		ret = ipf_detach_check_zone(ns->netstack_ipf);
+		netstack_rele(ns);
+		if (ret != 0) {
+			netstack_next_fini(&nh);
+			return (-1);
+		}
+	}
+
+	netstack_next_fini(&nh);
+	return (0);
+}
+
+/*
+ * Destroy things for ipf for one stack.
+ */
+/* ARGSUSED */
+static void
+ipf_stack_fini(netstackid_t stackid, void *arg)
+{
+	ipf_stack_t *ifs = (ipf_stack_t *)arg;
+
+#ifdef NS_DEBUG
+	(void) printf("ipf_stack_destroy(%p, stackid %d)\n",
+	    (void *)ifs, stackid);
+#endif
+
+	/*
+	 * Make sure we're the only one's modifying things.  With
+	 * this lock others should just fall out of the loop.
+	 */
+	WRITE_ENTER(&ifs->ifs_ipf_global);
+	if (ifs->ifs_fr_running == -2) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
+		return;
+	}
+	ifs->ifs_fr_running = -2;
+	RWLOCK_EXIT(&ifs->ifs_ipf_global);
+
+#ifdef KERNEL
+	ipf_kstat_fini(ifs, stackid);
+#endif
+	if (ifs->ifs_fr_timer_id != 0) {
+		(void) untimeout(ifs->ifs_fr_timer_id);
+		ifs->ifs_fr_timer_id = 0;
+	}
+
+	WRITE_ENTER(&ifs->ifs_ipf_global);
+	if (ipldetach(ifs) != 0) {
+		printf("ipf_stack_fini: ipldetach failed\n");
+	}
+
+	ipftuneable_free(ifs);
+
+	RWLOCK_EXIT(&ifs->ifs_ipf_global);
+	RW_DESTROY(&ifs->ifs_ipf_mutex);
+	RW_DESTROY(&ifs->ifs_ipf_frcache);
+	RW_DESTROY(&ifs->ifs_ipf_global);
+
+	KFREE(ifs);
+}
 
 static int ipf_attach(dip, cmd)
 dev_info_t *dip;
@@ -387,14 +519,12 @@ ddi_attach_cmd_t cmd;
 		/* Only one instance of ipf (instance 0) can be attached. */
 		if (instance > 0)
 			return DDI_FAILURE;
-		if (fr_running != 0)
-			return DDI_FAILURE;
 
 #ifdef	IPFDEBUG
 		cmn_err(CE_NOTE, "IP Filter: attach ipf instance %d", instance);
 #endif
 
-		(void) ipf_property_update(dip);
+		(void) ipf_property_g_update(dip);
 
 		for (i = 0; ((s = ipf_devfiles[i]) != NULL); i++) {
 			s = strrchr(s, '/');
@@ -410,25 +540,8 @@ ddi_attach_cmd_t cmd;
 		}
 
 		ipf_dev_info = dip;
-		/*
-		 * Initialize mutex's
-		 */
-		RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
-		RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
-		RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
-
-		/*
-		 * Lock people out while we set things up.
-		 */
-		WRITE_ENTER(&ipf_global);
-
-		fr_timer_id = timeout(fr_slowtimer, NULL,
-				      drv_usectohz(500000));
-
-		RWLOCK_EXIT(&ipf_global);
-
-		cmn_err(CE_CONT, "!%s, running.\n", ipfilter_version);
-
+		netstack_register(NS_IPF, ipf_stack_init, NULL,
+		    ipf_stack_fini);
 		return DDI_SUCCESS;
 		/* NOTREACHED */
 	default:
@@ -436,14 +549,7 @@ ddi_attach_cmd_t cmd;
 	}
 
 attach_failed:
-#ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: failed to attach\n");
-#endif
-	/*
-	 * Use our own detach routine to toss
-	 * away any stuff we allocated above.
-	 */
-	(void) ipf_detach(dip, DDI_DETACH);
+	ddi_prop_remove_all(dip);
 	return DDI_FAILURE;
 }
 
@@ -459,37 +565,10 @@ ddi_detach_cmd_t cmd;
 #endif
 	switch (cmd) {
 	case DDI_DETACH:
-		if (fr_refcnt != 0)
+		if (ipf_detach_check_all() != 0)
 			return DDI_FAILURE;
 
-		/*
-		 * Make sure we're the only one's modifying things.  With
-		 * this lock others should just fall out of the loop.
-		 */
-		WRITE_ENTER(&ipf_global);
-		if (fr_running == -2) {
-			RWLOCK_EXIT(&ipf_global);
-			return DDI_FAILURE;
-		}
-		/*
-		 * Make sure there is no active filter rule.
-		 */
-		if (ipfilter[0][fr_active] || ipfilter[1][fr_active] ||
-		    ipfilter6[0][fr_active] || ipfilter6[1][fr_active]) {
-			RWLOCK_EXIT(&ipf_global);
-			return DDI_FAILURE;
-		}
-		fr_running = -2;
-
-		RWLOCK_EXIT(&ipf_global);
-
-		if (fr_timer_id != 0) {
-			(void) untimeout(fr_timer_id);
-			fr_timer_id = 0;
-		}
-
-		/*
-		 * Undo what we did in ipf_attach, freeing resources
+		/* Undo what we did in ipf_attach, freeing resources
 		 * and removing things we installed.  The system
 		 * framework guarantees we are not active with this devinfo
 		 * node in any other entry points at this time.
@@ -499,26 +578,16 @@ ddi_detach_cmd_t cmd;
 		ddi_remove_minor_node(dip, NULL);
 		if (i > 0) {
 			cmn_err(CE_CONT, "IP Filter: still attached (%d)\n", i);
-			fr_running = -1;
 			return DDI_FAILURE;
 		}
 
-		WRITE_ENTER(&ipf_global);
-		if (!ipldetach()) {
-			RWLOCK_EXIT(&ipf_global);
-			RW_DESTROY(&ipf_mutex);
-			RW_DESTROY(&ipf_frcache);
-			RW_DESTROY(&ipf_global);
-			cmn_err(CE_CONT, "!%s detached.\n", ipfilter_version);
-			return (DDI_SUCCESS);
-		}
-		RWLOCK_EXIT(&ipf_global);
-		break;
+		netstack_unregister(NS_IPF);
+		return DDI_SUCCESS;
+		/* NOTREACHED */
 	default:
 		break;
 	}
 	cmn_err(CE_NOTE, "IP Filter: failed to detach\n");
-	fr_running = -1;
 	return DDI_FAILURE;
 }
 
@@ -531,8 +600,6 @@ void *arg, **result;
 {
 	int error;
 
-	if (fr_running <= 0)
-		return DDI_FAILURE;
 	error = DDI_FAILURE;
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_getinfo(%x,%x,%x)", dip, infocmd, arg);
@@ -557,16 +624,9 @@ void *arg, **result;
  * Fetch configuration file values that have been entered into the ipf.conf
  * driver file.
  */
-static int ipf_property_update(dip)
+static int ipf_property_g_update(dip)
 dev_info_t *dip;
 {
-	ipftuneable_t *ipft;
-	int64_t *i64p;
-	char *name;
-	u_int one;
-	int *i32p;
-	int err;
-
 #ifdef DDI_NO_AUTODETACH
 	if (ddi_prop_update_int(DDI_DEV_T_NONE, dip,
 				DDI_NO_AUTODETACH, 1) != DDI_PROP_SUCCESS) {
@@ -581,9 +641,21 @@ dev_info_t *dip;
 	}
 #endif
 
-	err = DDI_SUCCESS;
-	ipft = ipf_tuneables;
-	for (ipft = ipf_tuneables; (name = ipft->ipft_name) != NULL; ipft++) {
+	return DDI_SUCCESS;
+}
+
+int ipf_property_update(dip, ifs)
+dev_info_t *dip;
+ipf_stack_t *ifs;
+{
+	ipftuneable_t *ipft;
+	int64_t *i64p;
+	char *name;
+	u_int one;
+	int *i32p;
+	int err;
+
+	for (ipft = ifs->ifs_ipf_tuneables; (name = ipft->ipft_name) != NULL; ipft++) {
 		one = 1;
 		switch (ipft->ipft_sz)
 		{
@@ -626,13 +698,11 @@ dev_info_t *dip;
 			ddi_prop_free(i64p);
 			break;
 #endif
-
 		default :
 			break;
 		}
 		if (err != DDI_SUCCESS)
 			break;
 	}
-
 	return err;
 }

@@ -43,6 +43,8 @@
 #include <sys/kstat.h>
 #include <sys/debug.h>
 #include <sys/zone.h>
+#include <sys/sunldi.h>
+#include <sys/file.h>
 
 #include <sys/kmem.h>
 #include <sys/systm.h>
@@ -144,7 +146,7 @@ static int	ip_sioctl_subnet_tail(ipif_t *ipif, in6_addr_t, in6_addr_t,
     queue_t *q, mblk_t *mp, boolean_t need_up);
 static int	ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp,
     sin_t *sin, boolean_t x_arp_ioctl, boolean_t if_arp_ioctl);
-static ipaddr_t	ip_subnet_mask(ipaddr_t addr, ipif_t **);
+static ipaddr_t	ip_subnet_mask(ipaddr_t addr, ipif_t **, ip_stack_t *);
 static void	ip_wput_ioctl(queue_t *q, mblk_t *mp);
 static void	ipsq_flush(ill_t *ill);
 static void	ipsq_clean_all(ill_t *ill);
@@ -171,7 +173,7 @@ static int	ipif_set_values_tail(ill_t *ill, ipif_t *ipif, mblk_t *mp,
     queue_t *q);
 static ipif_t	*ipif_lookup_on_name(char *name, size_t namelen,
     boolean_t do_alloc, boolean_t *exists, boolean_t isv6, zoneid_t zoneid,
-    queue_t *q, mblk_t *mp, ipsq_func_t func, int *error);
+    queue_t *q, mblk_t *mp, ipsq_func_t func, int *error, ip_stack_t *);
 static int	ipif_up(ipif_t *ipif, queue_t *q, mblk_t *mp);
 static void	ipif_update_other_ipifs(ipif_t *old_ipif, ill_group_t *illgrp);
 
@@ -212,8 +214,8 @@ static boolean_t ip_ib_v4mapinfo(uint_t, uint8_t *, uint8_t *, uint32_t *,
 
 static void	ipif_save_ire(ipif_t *, ire_t *);
 static void	ipif_remove_ire(ipif_t *, ire_t *);
-static void 	ip_cgtp_bcast_add(ire_t *, ire_t *);
-static void 	ip_cgtp_bcast_delete(ire_t *);
+static void 	ip_cgtp_bcast_add(ire_t *, ire_t *, ip_stack_t *);
+static void 	ip_cgtp_bcast_delete(ire_t *, ip_stack_t *);
 
 /*
  * Per-ill IPsec capabilities management.
@@ -240,8 +242,8 @@ static void ill_capability_lso_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
 static void ill_capability_lso_reset(ill_t *, mblk_t **);
 static void ill_capability_dls_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
 static mac_resource_handle_t ill_ring_add(void *, mac_resource_t *);
-static void ill_capability_dls_reset(ill_t *, mblk_t **);
-static void ill_capability_dls_disable(ill_t *);
+static void	ill_capability_dls_reset(ill_t *, mblk_t **);
+static void	ill_capability_dls_disable(ill_t *);
 
 static void	illgrp_cache_delete(ire_t *, char *);
 static void	illgrp_delete(ill_t *ill);
@@ -303,19 +305,6 @@ struct ill_ipsec_capab_s {
 	uint32_t encr_algparm_size;
 	uint32_t encr_algparm_end;
 };
-
-/*
- * List of AH and ESP IPsec acceleration capable ills
- */
-typedef struct ipsec_capab_ill_s {
-	uint_t ill_index;
-	boolean_t ill_isv6;
-	struct ipsec_capab_ill_s *next;
-} ipsec_capab_ill_t;
-
-static ipsec_capab_ill_t *ipsec_capab_ills_ah;
-static ipsec_capab_ill_t *ipsec_capab_ills_esp;
-krwlock_t ipsec_capab_ills_lock;
 
 /*
  * The field values are larger than strictly necessary for simple
@@ -519,50 +508,17 @@ static ill_t	ill_null;		/* Empty ILL for init. */
 char	ipif_loopback_name[] = "lo0";
 static char *ipv4_forward_suffix = ":ip_forwarding";
 static char *ipv6_forward_suffix = ":ip6_forwarding";
-static kstat_t *loopback_ksp = NULL;
 static	sin6_t	sin6_null;	/* Zero address for quick clears */
 static	sin_t	sin_null;	/* Zero address for quick clears */
-static	uint_t	ill_index = 1;	/* Used to assign interface indicies */
-/* When set search for unused index */
-static boolean_t ill_index_wrap = B_FALSE;
+
 /* When set search for unused ipif_seqid */
 static ipif_t	ipif_zero;
-uint_t	ipif_src_random;
-
-/*
- * For details on the protection offered by these locks please refer
- * to the notes under the Synchronization section at the start of ip.c
- */
-krwlock_t	ill_g_lock;		/* The global ill_g_lock */
-kmutex_t	ip_addr_avail_lock;	/* Address availability check lock */
-ipsq_t		*ipsq_g_head;		/* List of all ipsq's on the system */
-
-krwlock_t	ill_g_usesrc_lock;	/* Protects usesrc related fields */
-
-/*
- * illgrp_head/ifgrp_head is protected by IP's perimeter.
- */
-static  ill_group_t *illgrp_head_v4;	/* Head of IPv4 ill groups */
-ill_group_t *illgrp_head_v6;		/* Head of IPv6 ill groups */
-
-ill_g_head_t	ill_g_heads[MAX_G_HEADS];   /* ILL List Head */
 
 /*
  * ppa arena is created after these many
  * interfaces have been plumbed.
  */
-uint_t	ill_no_arena = 12;
-
-#pragma align CACHE_ALIGN_SIZE(phyint_g_list)
-static phyint_list_t phyint_g_list;	/* start of phyint list */
-
-/*
- * Reflects value of FAILBACK variable in IPMP config file
- * /etc/default/mpathd. Default value is B_TRUE.
- * Set to B_FALSE if user disabled failback by configuring "FAILBACK=no"
- * in.mpathd uses SIOCSIPMPFAILBACK ioctl to pass this information to kernel.
- */
-static boolean_t ipmp_enable_failback = B_TRUE;
+uint_t	ill_no_arena = 12;	/* Setable in /etc/system */
 
 /*
  * Enable soft rings if ip_squeue_soft_ring or ip_squeue_fanout
@@ -575,10 +531,11 @@ static boolean_t ipmp_enable_failback = B_TRUE;
 #define	ILL_CAPAB_DLS	(ILL_CAPAB_SOFT_RING | ILL_CAPAB_POLL)
 
 static uint_t
-ipif_rand(void)
+ipif_rand(ip_stack_t *ipst)
 {
-	ipif_src_random = ipif_src_random * 1103515245 + 12345;
-	return ((ipif_src_random >> 16) & 0x7fff);
+	ipst->ips_ipif_src_random = ipst->ips_ipif_src_random * 1103515245 +
+	    12345;
+	return ((ipst->ips_ipif_src_random >> 16) & 0x7fff);
 }
 
 /*
@@ -743,6 +700,7 @@ ill_delete(ill_t *ill)
 {
 	ipif_t	*ipif;
 	ill_t	*prev_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	/*
 	 * ill_delete may be forcibly entering the ipsq. The previous
@@ -800,7 +758,7 @@ ill_delete(ill_t *ill)
 	 * If an address on this ILL is being used as a source address then
 	 * clear out the pointers in other ILLs that point to this ILL.
 	 */
-	rw_enter(&ill_g_usesrc_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_usesrc_lock, RW_WRITER);
 	if (ill->ill_usesrc_grp_next != NULL) {
 		if (ill->ill_usesrc_ifindex == 0) { /* usesrc ILL ? */
 			ill_disband_usesrc_group(ill);
@@ -810,7 +768,7 @@ ill_delete(ill_t *ill)
 			    ill->ill_usesrc_grp_next;
 		}
 	}
-	rw_exit(&ill_g_usesrc_lock);
+	rw_exit(&ipst->ips_ill_g_usesrc_lock);
 }
 
 static void
@@ -857,6 +815,7 @@ ill_delete_tail(ill_t *ill)
 {
 	mblk_t	**mpp;
 	ipif_t	*ipif;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
 		ipif_non_duplicate(ipif);
@@ -976,10 +935,10 @@ ill_delete_tail(ill_t *ill)
 	 */
 	(void) ill_glist_delete(ill);
 
-	rw_enter(&ip_g_nd_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ip_g_nd_lock, RW_WRITER);
 	if (ill->ill_ndd_name != NULL)
-		nd_unload(&ip_g_nd, ill->ill_ndd_name);
-	rw_exit(&ip_g_nd_lock);
+		nd_unload(&ipst->ips_ip_g_nd, ill->ill_ndd_name);
+	rw_exit(&ipst->ips_ip_g_nd_lock);
 
 
 	if (ill->ill_frag_ptr != NULL) {
@@ -1012,28 +971,38 @@ ill_delete_tail(ill_t *ill)
 	} while (mpp++ != &ill->ill_last_mp_to_free);
 
 	ill_free_mib(ill);
+	/* Drop refcnt here */
+	netstack_rele(ill->ill_ipst->ips_netstack);
+	ill->ill_ipst = NULL;
+
 	ILL_TRACE_CLEANUP(ill);
 }
 
 static void
 ill_free_mib(ill_t *ill)
 {
+	ip_stack_t *ipst = ill->ill_ipst;
+
 	/*
 	 * MIB statistics must not be lost, so when an interface
 	 * goes away the counter values will be added to the global
 	 * MIBs.
 	 */
 	if (ill->ill_ip_mib != NULL) {
-		if (ill->ill_isv6)
-			ip_mib2_add_ip_stats(&ip6_mib, ill->ill_ip_mib);
-		else
-			ip_mib2_add_ip_stats(&ip_mib, ill->ill_ip_mib);
+		if (ill->ill_isv6) {
+			ip_mib2_add_ip_stats(&ipst->ips_ip6_mib,
+			    ill->ill_ip_mib);
+		} else {
+			ip_mib2_add_ip_stats(&ipst->ips_ip_mib,
+			    ill->ill_ip_mib);
+		}
 
 		kmem_free(ill->ill_ip_mib, sizeof (*ill->ill_ip_mib));
 		ill->ill_ip_mib = NULL;
 	}
 	if (ill->ill_icmp6_mib != NULL) {
-		ip_mib2_add_icmp6_stats(&icmp6_mib, ill->ill_icmp6_mib);
+		ip_mib2_add_icmp6_stats(&ipst->ips_icmp6_mib,
+		    ill->ill_icmp6_mib);
 		kmem_free(ill->ill_icmp6_mib, sizeof (*ill->ill_icmp6_mib));
 		ill->ill_icmp6_mib = NULL;
 	}
@@ -1663,37 +1632,39 @@ ill_down_start(queue_t *q, mblk_t *mp)
 static void
 ill_down(ill_t *ill)
 {
-	/* Blow off any IREs dependent on this ILL. */
-	ire_walk(ill_downi, (char *)ill);
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	mutex_enter(&ire_mrtun_lock);
-	if (ire_mrtun_count != 0) {
-		mutex_exit(&ire_mrtun_lock);
+	/* Blow off any IREs dependent on this ILL. */
+	ire_walk(ill_downi, (char *)ill, ipst);
+
+	mutex_enter(&ipst->ips_ire_mrtun_lock);
+	if (ipst->ips_ire_mrtun_count != 0) {
+		mutex_exit(&ipst->ips_ire_mrtun_lock);
 		ire_walk_ill_mrtun(0, 0, ill_downi_mrtun_srcif,
-		    (char *)ill, NULL);
+		    (char *)ill, NULL, ipst);
 	} else {
-		mutex_exit(&ire_mrtun_lock);
+		mutex_exit(&ipst->ips_ire_mrtun_lock);
 	}
 
 	/*
 	 * If any interface based forwarding table exists
 	 * Blow off the ires there dependent on this ill
 	 */
-	mutex_enter(&ire_srcif_table_lock);
-	if (ire_srcif_table_count > 0) {
-		mutex_exit(&ire_srcif_table_lock);
-		ire_walk_srcif_table_v4(ill_downi_mrtun_srcif, (char *)ill);
+	mutex_enter(&ipst->ips_ire_srcif_table_lock);
+	if (ipst->ips_ire_srcif_table_count > 0) {
+		mutex_exit(&ipst->ips_ire_srcif_table_lock);
+		ire_walk_srcif_table_v4(ill_downi_mrtun_srcif, (char *)ill,
+		    ipst);
 	} else {
-		mutex_exit(&ire_srcif_table_lock);
+		mutex_exit(&ipst->ips_ire_srcif_table_lock);
 	}
 
 	/* Remove any conn_*_ill depending on this ill */
-	ipcl_walk(conn_cleanup_ill, (caddr_t)ill);
+	ipcl_walk(conn_cleanup_ill, (caddr_t)ill, ipst);
 
 	if (ill->ill_group != NULL) {
 		illgrp_delete(ill);
 	}
-
 }
 
 static void
@@ -2797,13 +2768,13 @@ ill_ring_add(void *arg, mac_resource_t *mrp)
 			uint_t normal_pkt_cnt =
 			    mrfp->mrf_normal_pkt_count;
 
-			bzero(rx_ring, sizeof (ill_rx_ring_t));
+	bzero(rx_ring, sizeof (ill_rx_ring_t));
 
-			rx_ring->rr_blank = mrfp->mrf_blank;
-			rx_ring->rr_handle = mrfp->mrf_arg;
-			rx_ring->rr_ill = ill;
-			rx_ring->rr_normal_blank_time = normal_blank_time;
-			rx_ring->rr_normal_pkt_cnt = normal_pkt_cnt;
+	rx_ring->rr_blank = mrfp->mrf_blank;
+	rx_ring->rr_handle = mrfp->mrf_arg;
+	rx_ring->rr_ill = ill;
+	rx_ring->rr_normal_blank_time = normal_blank_time;
+	rx_ring->rr_normal_pkt_cnt = normal_pkt_cnt;
 
 			rx_ring->rr_max_blank_time =
 			    normal_blank_time * rr_max_blank_ratio;
@@ -2814,12 +2785,12 @@ ill_ring_add(void *arg, mac_resource_t *mrp)
 			rx_ring->rr_min_pkt_cnt =
 			    normal_pkt_cnt * rr_min_pkt_cnt_ratio;
 
-			rx_ring->rr_ring_state = ILL_RING_INUSE;
-			mutex_exit(&ill->ill_lock);
+	rx_ring->rr_ring_state = ILL_RING_INUSE;
+	mutex_exit(&ill->ill_lock);
 
 			DTRACE_PROBE2(ill__ring__add, (void *), ill,
 			    (int), ip_rx_index);
-			return ((mac_resource_handle_t)rx_ring);
+	return ((mac_resource_handle_t)rx_ring);
 		}
 	}
 
@@ -2844,6 +2815,7 @@ ill_capability_dls_init(ill_t *ill)
 	ill_dls_capab_t	*ill_dls = ill->ill_dls_capab;
 	conn_t 			*connp;
 	size_t			sz;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	if (ill->ill_capabilities & ILL_CAPAB_SOFT_RING) {
 		if (ill_dls == NULL) {
@@ -2877,7 +2849,8 @@ ill_capability_dls_init(ill_t *ill)
 		return (B_TRUE);
 	}
 
-	if ((connp = ipcl_conn_create(IPCL_TCPCONN, KM_NOSLEEP)) == NULL)
+	if ((connp = ipcl_conn_create(IPCL_TCPCONN, KM_NOSLEEP,
+	    ipst->ips_netstack)) == NULL)
 		return (B_FALSE);
 
 	sz = sizeof (ill_dls_capab_t);
@@ -3729,6 +3702,7 @@ ill_frag_timeout(ill_t *ill, time_t dead_interval)
 	mblk_t	*send_icmp_head;
 	mblk_t	*send_icmp_head_v6;
 	zoneid_t zoneid;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	ipfb = ill->ill_frag_hash_tbl;
 	if (ipfb == NULL)
@@ -3818,13 +3792,13 @@ ill_frag_timeout(ill_t *ill, time_t dead_interval)
 			else
 				ip6h = (ip6_t *)mp->b_rptr;
 			zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst,
-			    ill);
+			    ill, ipst);
 			if (zoneid == ALL_ZONES) {
 				freemsg(mp);
 			} else {
 				icmp_time_exceeded_v6(ill->ill_wq, mp,
 				    ICMP_REASSEMBLY_TIME_EXCEEDED, B_FALSE,
-				    B_FALSE, zoneid);
+				    B_FALSE, zoneid, ipst);
 			}
 		}
 		while (send_icmp_head != NULL) {
@@ -3839,12 +3813,13 @@ ill_frag_timeout(ill_t *ill, time_t dead_interval)
 			else
 				dst = ((ipha_t *)mp->b_rptr)->ipha_dst;
 
-			zoneid = ipif_lookup_addr_zoneid(dst, ill);
+			zoneid = ipif_lookup_addr_zoneid(dst, ill, ipst);
 			if (zoneid == ALL_ZONES) {
 				freemsg(mp);
 			} else {
 				icmp_time_exceeded(ill->ill_wq, mp,
-				    ICMP_REASSEMBLY_TIME_EXCEEDED, zoneid);
+				    ICMP_REASSEMBLY_TIME_EXCEEDED, zoneid,
+				    ipst);
 			}
 		}
 	}
@@ -4007,6 +3982,7 @@ nd_ill_forward_set(queue_t *q, mblk_t *mp, char *valuestr, caddr_t cp,
 {
 	long value;
 	int retval;
+	ip_stack_t *ipst = CONNQ_TO_IPST(q);
 
 	cmn_err(CE_WARN, ND_FORWARD_WARNING);
 
@@ -4015,9 +3991,9 @@ nd_ill_forward_set(queue_t *q, mblk_t *mp, char *valuestr, caddr_t cp,
 		return (EINVAL);
 	}
 
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	retval = ill_forward_set(q, mp, (value != 0), cp);
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	return (retval);
 }
 
@@ -4033,8 +4009,9 @@ ill_forward_set(queue_t *q, mblk_t *mp, boolean_t enable, caddr_t cp)
 {
 	ill_t *ill = (ill_t *)cp;
 	ill_group_t *illgrp;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	ASSERT(IAM_WRITER_ILL(ill) || RW_READ_HELD(&ill_g_lock));
+	ASSERT(IAM_WRITER_ILL(ill) || RW_READ_HELD(&ipst->ips_ill_g_lock));
 
 	if ((enable && (ill->ill_flags & ILLF_ROUTER)) ||
 	    (!enable && !(ill->ill_flags & ILLF_ROUTER)) ||
@@ -4121,6 +4098,7 @@ static int
 ill_set_ndd_name(ill_t *ill)
 {
 	char *suffix;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
@@ -4143,8 +4121,8 @@ ill_set_ndd_name(ill_t *ill)
 	 * Modifying the nd table thru nd_load/nd_unload requires
 	 * the writer lock.
 	 */
-	rw_enter(&ip_g_nd_lock, RW_WRITER);
-	if (!nd_load(&ip_g_nd, ill->ill_ndd_name, nd_ill_forward_get,
+	rw_enter(&ipst->ips_ip_g_nd_lock, RW_WRITER);
+	if (!nd_load(&ipst->ips_ip_g_nd, ill->ill_ndd_name, nd_ill_forward_get,
 	    nd_ill_forward_set, (caddr_t)ill)) {
 		/*
 		 * If the nd_load failed, it only meant that it could not
@@ -4153,11 +4131,11 @@ ill_set_ndd_name(ill_t *ill)
 		 * this interface is at the mercy of the global ip_forwarding
 		 * variable.
 		 */
-		rw_exit(&ip_g_nd_lock);
+		rw_exit(&ipst->ips_ip_g_nd_lock);
 		ill->ill_ndd_name = NULL;
 		return (ENOMEM);
 	}
-	rw_exit(&ip_g_nd_lock);
+	rw_exit(&ipst->ips_ip_g_nd_lock);
 	return (0);
 }
 
@@ -4174,13 +4152,14 @@ ill_set_ndd_name(ill_t *ill)
  * necessary under the ill lock.
  */
 ill_t *
-ill_first(int start_list, int end_list, ill_walk_context_t *ctx)
+ill_first(int start_list, int end_list, ill_walk_context_t *ctx,
+    ip_stack_t *ipst)
 {
 	ill_if_t *ifp;
 	ill_t *ill;
 	avl_tree_t *avl_tree;
 
-	ASSERT(RW_LOCK_HELD(&ill_g_lock));
+	ASSERT(RW_LOCK_HELD(&ipst->ips_ill_g_lock));
 	ASSERT(end_list <= MAX_G_HEADS && start_list >= 0);
 
 	/*
@@ -4195,9 +4174,9 @@ ill_first(int start_list, int end_list, ill_walk_context_t *ctx)
 	}
 
 	while (ctx->ctx_current_list <= ctx->ctx_last_list) {
-		ifp = IP_VX_ILL_G_LIST(ctx->ctx_current_list);
+		ifp = IP_VX_ILL_G_LIST(ctx->ctx_current_list, ipst);
 		if (ifp != (ill_if_t *)
-		    &IP_VX_ILL_G_LIST(ctx->ctx_current_list)) {
+		    &IP_VX_ILL_G_LIST(ctx->ctx_current_list, ipst)) {
 			avl_tree = &ifp->illif_avl_by_ppa;
 			ill = avl_first(avl_tree);
 			/*
@@ -4227,11 +4206,10 @@ ill_next(ill_walk_context_t *ctx, ill_t *lastill)
 {
 	ill_if_t *ifp;
 	ill_t *ill;
+	ip_stack_t	*ipst = lastill->ill_ipst;
 
-
-	ASSERT(RW_LOCK_HELD(&ill_g_lock));
 	ASSERT(lastill->ill_ifptr != (ill_if_t *)
-	    &IP_VX_ILL_G_LIST(ctx->ctx_current_list));
+	    &IP_VX_ILL_G_LIST(ctx->ctx_current_list, ipst));
 	if ((ill = avl_walk(&lastill->ill_ifptr->illif_avl_by_ppa, lastill,
 	    AVL_AFTER)) != NULL) {
 		return (ill);
@@ -4241,10 +4219,11 @@ ill_next(ill_walk_context_t *ctx, ill_t *lastill)
 	ifp = lastill->ill_ifptr->illif_next;
 
 	/* make sure not at end of circular list */
-	while (ifp == (ill_if_t *)&IP_VX_ILL_G_LIST(ctx->ctx_current_list)) {
+	while (ifp ==
+	    (ill_if_t *)&IP_VX_ILL_G_LIST(ctx->ctx_current_list, ipst)) {
 		if (++ctx->ctx_current_list > ctx->ctx_last_list)
 			return (NULL);
-		ifp = IP_VX_ILL_G_LIST(ctx->ctx_current_list);
+		ifp = IP_VX_ILL_G_LIST(ctx->ctx_current_list, ipst);
 	}
 
 	return (avl_first(&ifp->illif_avl_by_ppa));
@@ -4288,7 +4267,7 @@ ill_get_ppa_ptr(char *name)
  */
 static ill_t *
 ill_find_by_name(char *name, boolean_t isv6, queue_t *q, mblk_t *mp,
-    ipsq_func_t func, int *error)
+    ipsq_func_t func, int *error, ip_stack_t *ipst)
 {
 	char *ppa_ptr = NULL;
 	int len;
@@ -4319,9 +4298,9 @@ ill_find_by_name(char *name, boolean_t isv6, queue_t *q, mblk_t *mp,
 
 	ppa = stoi(&ppa_ptr);
 
-	ifp = IP_VX_ILL_G_LIST(list);
+	ifp = IP_VX_ILL_G_LIST(list, ipst);
 
-	while (ifp != (ill_if_t *)&IP_VX_ILL_G_LIST(list)) {
+	while (ifp != (ill_if_t *)&IP_VX_ILL_G_LIST(list, ipst)) {
 		/*
 		 * match is done on len - 1 as the name is not null
 		 * terminated it contains ppa in addition to the interface
@@ -4336,7 +4315,7 @@ ill_find_by_name(char *name, boolean_t isv6, queue_t *q, mblk_t *mp,
 	}
 
 
-	if (ifp == (ill_if_t *)&IP_VX_ILL_G_LIST(list)) {
+	if (ifp == (ill_if_t *)&IP_VX_ILL_G_LIST(list, ipst)) {
 		/*
 		 * Even the interface type does not exist.
 		 */
@@ -4406,8 +4385,6 @@ ill_compare_ppa(const void *ppa_ptr, const void *ill_ptr)
 static void
 ill_delete_interface_type(ill_if_t *interface)
 {
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));
-
 	ASSERT(interface != NULL);
 	ASSERT(avl_numnodes(&interface->illif_avl_by_ppa) == 0);
 
@@ -4432,11 +4409,12 @@ ill_glist_delete(ill_t *ill)
 	char *nicname;
 	size_t nicnamelen;
 	hook_nic_event_t *info;
+	ip_stack_t	*ipst;
 
 	if (ill == NULL)
 		return;
-
-	rw_enter(&ill_g_lock, RW_WRITER);
+	ipst = ill->ill_ipst;
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 
 	if (ill->ill_name != NULL) {
 		nicname = kmem_alloc(ill->ill_name_length, KM_NOSLEEP);
@@ -4513,7 +4491,8 @@ ill_glist_delete(ill_t *ill)
 		info->hne_event = NE_UNPLUMB;
 		info->hne_data = nicname;
 		info->hne_datalen = nicnamelen;
-		info->hne_family = ill->ill_isv6 ? ipv6 : ipv4;
+		info->hne_family = ill->ill_isv6 ?
+		    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
 	} else {
 		ip2dbg(("ill_glist_delete: could not attach UNPLUMB nic event "
 		    "information for %s (ENOMEM)\n", ill->ill_name));
@@ -4524,8 +4503,7 @@ ill_glist_delete(ill_t *ill)
 	ill->ill_nic_event_info = info;
 
 	ill_phyint_free(ill);
-
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 }
 
 /*
@@ -4638,8 +4616,9 @@ ill_glist_insert(ill_t *ill, char *name, boolean_t isv6)
 	int name_length;
 	int index;
 	boolean_t check_length = B_FALSE;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_lock));
 
 	name_length = mi_strlen(name) + 1;
 
@@ -4648,11 +4627,11 @@ ill_glist_insert(ill_t *ill, char *name, boolean_t isv6)
 	else
 		index = IP_V4_G_HEAD;
 
-	ill_interface = IP_VX_ILL_G_LIST(index);
+	ill_interface = IP_VX_ILL_G_LIST(index, ipst);
 	/*
 	 * Search for interface type based on name
 	 */
-	while (ill_interface != (ill_if_t *)&IP_VX_ILL_G_LIST(index)) {
+	while (ill_interface != (ill_if_t *)&IP_VX_ILL_G_LIST(index, ipst)) {
 		if ((ill_interface->illif_name_len == name_length) &&
 		    (strcmp(ill_interface->illif_name, name) == 0)) {
 			break;
@@ -4663,7 +4642,7 @@ ill_glist_insert(ill_t *ill, char *name, boolean_t isv6)
 	/*
 	 * Interface type not found, create one.
 	 */
-	if (ill_interface == (ill_if_t *)&IP_VX_ILL_G_LIST(index)) {
+	if (ill_interface == (ill_if_t *)&IP_VX_ILL_G_LIST(index, ipst)) {
 
 		ill_g_head_t ghead;
 
@@ -4689,7 +4668,7 @@ ill_glist_insert(ill_t *ill, char *name, boolean_t isv6)
 		 * link the structure in the back to maintain order
 		 * of configuration for ifconfig output.
 		 */
-		ghead = ill_g_heads[index];
+		ghead = ipst->ips_ill_g_heads[index];
 		insque(ill_interface, ghead.ill_g_list_tail);
 
 	}
@@ -4769,6 +4748,7 @@ ipsq_init(ill_t *ill)
 	ipsq->ipsq_refs = 1;
 	ipsq->ipsq_writer = curthread;
 	ipsq->ipsq_reentry_cnt = 1;
+	ipsq->ipsq_ipst = ill->ill_ipst;	/* No netstack_hold */
 #ifdef ILL_DEBUG
 	ipsq->ipsq_depth = getpcstack((pc_t *)ipsq->ipsq_stack, IP_STACK_DEPTH);
 #endif
@@ -4944,12 +4924,32 @@ ill_xarp_info(struct sockaddr_dl *sdl, ill_t *ill)
 static int
 loopback_kstat_update(kstat_t *ksp, int rw)
 {
-	kstat_named_t *kn = KSTAT_NAMED_PTR(ksp);
+	kstat_named_t *kn;
+	netstackid_t	stackid;
+	netstack_t	*ns;
+	ip_stack_t	*ipst;
+
+	if (ksp == NULL || ksp->ks_data == NULL)
+		return (EIO);
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
-	kn[0].value.ui32 = loopback_packets;
-	kn[1].value.ui32 = loopback_packets;
+
+	kn = KSTAT_NAMED_PTR(ksp);
+	stackid = (zoneid_t)(uintptr_t)ksp->ks_private;
+
+	ns = netstack_find_by_stackid(stackid);
+	if (ns == NULL)
+		return (-1);
+
+	ipst = ns->netstack_ip;
+	if (ipst == NULL) {
+		netstack_rele(ns);
+		return (-1);
+	}
+	kn[0].value.ui32 = ipst->ips_loopback_packets;
+	kn[1].value.ui32 = ipst->ips_loopback_packets;
+	netstack_rele(ns);
 	return (0);
 }
 
@@ -4958,16 +4958,16 @@ loopback_kstat_update(kstat_t *ksp, int rw)
  * Has ifindex been plumbed already.
  */
 static boolean_t
-phyint_exists(uint_t index)
+phyint_exists(uint_t index, ip_stack_t *ipst)
 {
 	phyint_t *phyi;
 
-	ASSERT(RW_LOCK_HELD(&ill_g_lock));
+	ASSERT(RW_LOCK_HELD(&ipst->ips_ill_g_lock));
 	/*
 	 * Indexes are stored in the phyint - a common structure
 	 * to both IPv4 and IPv6.
 	 */
-	phyi = avl_find(&phyint_g_list.phyint_list_avl_by_index,
+	phyi = avl_find(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
 	    (void *) &index, NULL);
 	return (phyi != NULL);
 }
@@ -4976,16 +4976,16 @@ phyint_exists(uint_t index)
  * Assign a unique interface index for the phyint.
  */
 static boolean_t
-phyint_assign_ifindex(phyint_t *phyi)
+phyint_assign_ifindex(phyint_t *phyi, ip_stack_t *ipst)
 {
 	uint_t starting_index;
 
 	ASSERT(phyi->phyint_ifindex == 0);
-	if (!ill_index_wrap) {
-		phyi->phyint_ifindex = ill_index++;
-		if (ill_index == 0) {
+	if (!ipst->ips_ill_index_wrap) {
+		phyi->phyint_ifindex = ipst->ips_ill_index++;
+		if (ipst->ips_ill_index == 0) {
 			/* Reached the uint_t limit Next time wrap  */
-			ill_index_wrap = B_TRUE;
+			ipst->ips_ill_index_wrap = B_TRUE;
 		}
 		return (B_TRUE);
 	}
@@ -4995,11 +4995,12 @@ phyint_assign_ifindex(phyint_t *phyi)
 	 * at this point and don't want to call any function that attempts
 	 * to get the lock again.
 	 */
-	starting_index = ill_index++;
-	for (; ill_index != starting_index; ill_index++) {
-		if (ill_index != 0 && !phyint_exists(ill_index)) {
+	starting_index = ipst->ips_ill_index++;
+	for (; ipst->ips_ill_index != starting_index; ipst->ips_ill_index++) {
+		if (ipst->ips_ill_index != 0 &&
+		    !phyint_exists(ipst->ips_ill_index, ipst)) {
 			/* found unused index - use it */
-			phyi->phyint_ifindex = ill_index;
+			phyi->phyint_ifindex = ipst->ips_ill_index;
 			return (B_TRUE);
 		}
 	}
@@ -5020,7 +5021,8 @@ phyint_assign_ifindex(phyint_t *phyi)
  */
 ill_t *
 ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
-    queue_t *q, mblk_t *mp, ipsq_func_t func, int *error, boolean_t *did_alloc)
+    queue_t *q, mblk_t *mp, ipsq_func_t func, int *error, boolean_t *did_alloc,
+    ip_stack_t *ipst)
 {
 	ill_t	*ill;
 	ipif_t	*ipif;
@@ -5030,9 +5032,9 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 
 	isloopback = mi_strcmp(name, ipif_loopback_name) == 0;
 
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ill_find_by_name(name, isv6, q, mp, func, error);
-	rw_exit(&ill_g_lock);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ill_find_by_name(name, isv6, q, mp, func, error, ipst);
+	rw_exit(&ipst->ips_ill_g_lock);
 	if (ill != NULL || (error != NULL && *error == EINPROGRESS))
 		return (ill);
 
@@ -5043,11 +5045,11 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 	if (!isloopback || !do_alloc)
 		return (NULL);
 
-	rw_enter(&ill_g_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 
-	ill = ill_find_by_name(name, isv6, q, mp, func, error);
+	ill = ill_find_by_name(name, isv6, q, mp, func, error, ipst);
 	if (ill != NULL || (error != NULL && *error == EINPROGRESS)) {
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		return (ill);
 	}
 
@@ -5059,6 +5061,14 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 
 	*ill = ill_null;
 	mutex_init(&ill->ill_lock, NULL, MUTEX_DEFAULT, NULL);
+	ill->ill_ipst = ipst;
+	netstack_hold(ipst->ips_netstack);
+	/*
+	 * For exclusive stacks we set the zoneid to zero
+	 * to make IP operate as if in the global zone.
+	 */
+	ill->ill_zoneid = GLOBAL_ZONEID;
+
 	ill->ill_phyint = (phyint_t *)mi_zalloc(sizeof (phyint_t));
 	if (ill->ill_phyint == NULL)
 		goto done;
@@ -5176,23 +5186,29 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 	ill->ill_phyint->phyint_flags |= PHYI_LOOPBACK | PHYI_VIRTUAL;
 	mutex_exit(&ill->ill_phyint->phyint_lock);
 
-	if (loopback_ksp == NULL) {
+	if (ipst->ips_loopback_ksp == NULL) {
 		/* Export loopback interface statistics */
-		loopback_ksp = kstat_create("lo", 0, ipif_loopback_name, "net",
-		    KSTAT_TYPE_NAMED, 2, 0);
-		if (loopback_ksp != NULL) {
-			loopback_ksp->ks_update = loopback_kstat_update;
-			kn = KSTAT_NAMED_PTR(loopback_ksp);
+		ipst->ips_loopback_ksp = kstat_create_netstack("lo", 0,
+		    ipif_loopback_name, "net",
+		    KSTAT_TYPE_NAMED, 2, 0,
+		    ipst->ips_netstack->netstack_stackid);
+		if (ipst->ips_loopback_ksp != NULL) {
+			ipst->ips_loopback_ksp->ks_update =
+			    loopback_kstat_update;
+			kn = KSTAT_NAMED_PTR(ipst->ips_loopback_ksp);
 			kstat_named_init(&kn[0], "ipackets", KSTAT_DATA_UINT32);
 			kstat_named_init(&kn[1], "opackets", KSTAT_DATA_UINT32);
-			kstat_install(loopback_ksp);
+			ipst->ips_loopback_ksp->ks_private =
+			    (void *)(uintptr_t)ipst->ips_netstack->
+			    netstack_stackid;
+			kstat_install(ipst->ips_loopback_ksp);
 		}
 	}
 
 	if (error != NULL)
 		*error = 0;
 	*did_alloc = B_TRUE;
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	return (ill);
 done:
 	if (ill != NULL) {
@@ -5200,17 +5216,42 @@ done:
 			ipsq_t	*ipsq;
 
 			ipsq = ill->ill_phyint->phyint_ipsq;
-			if (ipsq != NULL)
+			if (ipsq != NULL) {
+				ipsq->ipsq_ipst = NULL;
 				kmem_free(ipsq, sizeof (ipsq_t));
+			}
 			mi_free(ill->ill_phyint);
 		}
 		ill_free_mib(ill);
+		if (ill->ill_ipst != NULL)
+			netstack_rele(ill->ill_ipst->ips_netstack);
 		mi_free(ill);
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	if (error != NULL)
 		*error = ENOMEM;
 	return (NULL);
+}
+
+/*
+ * For IPP calls - use the ip_stack_t for global stack.
+ */
+ill_t *
+ill_lookup_on_ifindex_global_instance(uint_t index, boolean_t isv6,
+    queue_t *q, mblk_t *mp, ipsq_func_t func, int *err)
+{
+	ip_stack_t	*ipst;
+	ill_t		*ill;
+
+	ipst = netstack_find_by_stackid(GLOBAL_NETSTACKID)->netstack_ip;
+	if (ipst == NULL) {
+		cmn_err(CE_WARN, "No ip_stack_t for zoneid zero!\n");
+		return (NULL);
+	}
+
+	ill = ill_lookup_on_ifindex(index, isv6, q, mp, func, err, ipst);
+	netstack_rele(ipst->ips_netstack);
+	return (ill);
 }
 
 /*
@@ -5218,7 +5259,7 @@ done:
  */
 ill_t *
 ill_lookup_on_ifindex(uint_t index, boolean_t isv6, queue_t *q, mblk_t *mp,
-    ipsq_func_t func, int *err)
+    ipsq_func_t func, int *err, ip_stack_t *ipst)
 {
 	ill_t	*ill;
 	ipsq_t  *ipsq;
@@ -5234,8 +5275,8 @@ ill_lookup_on_ifindex(uint_t index, boolean_t isv6, queue_t *q, mblk_t *mp,
 	 * Indexes are stored in the phyint - a common structure
 	 * to both IPv4 and IPv6.
 	 */
-	rw_enter(&ill_g_lock, RW_READER);
-	phyi = avl_find(&phyint_g_list.phyint_list_avl_by_index,
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	phyi = avl_find(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
 	    (void *) &index, NULL);
 	if (phyi != NULL) {
 		ill = isv6 ? phyi->phyint_illv6: phyi->phyint_illv4;
@@ -5250,12 +5291,12 @@ ill_lookup_on_ifindex(uint_t index, boolean_t isv6, queue_t *q, mblk_t *mp,
 				ill_refhold_locked(ill);
 				mutex_exit(&ill->ill_lock);
 				RELEASE_CONN_LOCK(q);
-				rw_exit(&ill_g_lock);
+				rw_exit(&ipst->ips_ill_g_lock);
 				return (ill);
 			} else if (ILL_CAN_WAIT(ill, q)) {
 				ipsq = ill->ill_phyint->phyint_ipsq;
 				mutex_enter(&ipsq->ipsq_lock);
-				rw_exit(&ill_g_lock);
+				rw_exit(&ipst->ips_ill_g_lock);
 				mutex_exit(&ill->ill_lock);
 				ipsq_enq(ipsq, q, mp, func, NEW_OP, ill);
 				mutex_exit(&ipsq->ipsq_lock);
@@ -5267,7 +5308,7 @@ ill_lookup_on_ifindex(uint_t index, boolean_t isv6, queue_t *q, mblk_t *mp,
 			mutex_exit(&ill->ill_lock);
 		}
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	if (err != NULL)
 		*err = ENXIO;
 	return (NULL);
@@ -5278,24 +5319,25 @@ ill_lookup_on_ifindex(uint_t index, boolean_t isv6, queue_t *q, mblk_t *mp,
  * If there is no next ifindex for the given protocol, return 0.
  */
 uint_t
-ill_get_next_ifindex(uint_t index, boolean_t isv6)
+ill_get_next_ifindex(uint_t index, boolean_t isv6, ip_stack_t *ipst)
 {
 	phyint_t *phyi;
 	phyint_t *phyi_initial;
 	uint_t   ifindex;
 
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 
 	if (index == 0) {
-		phyi = avl_first(&phyint_g_list.phyint_list_avl_by_index);
+		phyi = avl_first(
+		    &ipst->ips_phyint_g_list->phyint_list_avl_by_index);
 	} else {
 		phyi = phyi_initial = avl_find(
-		    &phyint_g_list.phyint_list_avl_by_index,
+		    &ipst->ips_phyint_g_list->phyint_list_avl_by_index,
 		    (void *) &index, NULL);
 	}
 
 	for (; phyi != NULL;
-	    phyi = avl_walk(&phyint_g_list.phyint_list_avl_by_index,
+	    phyi = avl_walk(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
 	    phyi, AVL_AFTER)) {
 		/*
 		 * If we're not returning the first interface in the tree
@@ -5317,7 +5359,7 @@ ill_get_next_ifindex(uint_t index, boolean_t isv6)
 		}
 	}
 
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	if (phyi != NULL)
 		ifindex = phyi->phyint_ifindex;
@@ -5333,23 +5375,23 @@ ill_get_next_ifindex(uint_t index, boolean_t isv6)
  * If there is no next ifindex for the interface, return 0.
  */
 uint_t
-ill_get_ifindex_by_name(char *name)
+ill_get_ifindex_by_name(char *name, ip_stack_t *ipst)
 {
 	phyint_t	*phyi;
 	avl_index_t	where = 0;
 	uint_t		ifindex;
 
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 
-	if ((phyi = avl_find(&phyint_g_list.phyint_list_avl_by_name,
+	if ((phyi = avl_find(&ipst->ips_phyint_g_list->phyint_list_avl_by_name,
 	    name, &where)) == NULL) {
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		return (0);
 	}
 
 	ifindex = phyi->phyint_ifindex;
 
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	return (ifindex);
 }
@@ -5459,6 +5501,9 @@ ip_ill_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 {
 	ill_t		*ill;
 	ill_walk_context_t ctx;
+	ip_stack_t	*ipst;
+
+	ipst = CONNQ_TO_IPST(q);
 
 	(void) mi_mpprintf(mp,
 	    "ILL      " MI_COL_HDRPAD_STR
@@ -5470,8 +5515,8 @@ ip_ill_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 	    "upcnt mxfrg err name");
 	/*   12345 12345 123 xxxxxxxx  */
 
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_ALL(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_ALL(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		(void) mi_mpprintf(mp,
 		    MI_COL_PTRFMT_STR MI_COL_PTRFMT_STR MI_COL_PTRFMT_STR
@@ -5480,7 +5525,7 @@ ip_ill_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 		    ill->ill_ipif_up_count,
 		    ill->ill_max_frag, ill->ill_error, ill->ill_name);
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	return (0);
 }
@@ -5507,6 +5552,7 @@ ip_ipif_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 	uint64_t flags;
 	zoneid_t zoneid;
 	ill_walk_context_t ctx;
+	ip_stack_t *ipst = CONNQ_TO_IPST(q);
 
 	(void) mi_mpprintf(mp,
 	    "IPIF metric mtu in/out/forward name zone flags...\n"
@@ -5520,8 +5566,8 @@ ip_ipif_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 	ASSERT(q->q_next == NULL);
 	zoneid = Q_TO_CONN(q)->conn_zoneid;	/* IP is a driver */
 
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_ALL(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_ALL(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		for (ipif = ill->ill_ipif; ipif != NULL;
 		    ipif = ipif->ipif_next) {
@@ -5567,7 +5613,7 @@ ip_ipif_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 			buf6, sizeof (buf6)));
 		}
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	return (0);
 }
 
@@ -5798,12 +5844,12 @@ ip_addr_ok_v4(ipaddr_t addr, ipaddr_t subnet_mask)
  * Returns held ipif
  */
 ipif_t *
-ipif_lookup_group(ipaddr_t group, zoneid_t zoneid)
+ipif_lookup_group(ipaddr_t group, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	ire_t	*ire;
 	ipif_t	*ipif;
 
-	ire = ire_lookup_multi(group, zoneid);
+	ire = ire_lookup_multi(group, zoneid, ipst);
 	if (ire == NULL)
 		return (NULL);
 	ipif = ire->ire_ipif;
@@ -5818,7 +5864,7 @@ ipif_lookup_group(ipaddr_t group, zoneid_t zoneid)
  */
 ipif_t *
 ipif_lookup_interface(ipaddr_t if_addr, ipaddr_t dst, queue_t *q, mblk_t *mp,
-    ipsq_func_t func, int *error)
+    ipsq_func_t func, int *error, ip_stack_t *ipst)
 {
 	ipif_t	*ipif;
 	ill_t	*ill;
@@ -5834,8 +5880,8 @@ ipif_lookup_interface(ipaddr_t if_addr, ipaddr_t dst, queue_t *q, mblk_t *mp,
 	 * This is done to avoid returning non-point-to-point
 	 * ipif instead of unnumbered point-to-point ipif.
 	 */
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_V4(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_V4(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		GRAB_CONN_LOCK(q);
 		mutex_enter(&ill->ill_lock);
@@ -5853,13 +5899,13 @@ ipif_lookup_interface(ipaddr_t if_addr, ipaddr_t dst, queue_t *q, mblk_t *mp,
 					ipif_refhold_locked(ipif);
 					mutex_exit(&ill->ill_lock);
 					RELEASE_CONN_LOCK(q);
-					rw_exit(&ill_g_lock);
+					rw_exit(&ipst->ips_ill_g_lock);
 					return (ipif);
 				} else if (IPIF_CAN_WAIT(ipif, q)) {
 					ipsq = ill->ill_phyint->phyint_ipsq;
 					mutex_enter(&ipsq->ipsq_lock);
 					mutex_exit(&ill->ill_lock);
-					rw_exit(&ill_g_lock);
+					rw_exit(&ipst->ips_ill_g_lock);
 					ipsq_enq(ipsq, q, mp, func, NEW_OP,
 						ill);
 					mutex_exit(&ipsq->ipsq_lock);
@@ -5872,10 +5918,11 @@ ipif_lookup_interface(ipaddr_t if_addr, ipaddr_t dst, queue_t *q, mblk_t *mp,
 		mutex_exit(&ill->ill_lock);
 		RELEASE_CONN_LOCK(q);
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	/* lookup the ipif based on interface address */
-	ipif = ipif_lookup_addr(if_addr, NULL, ALL_ZONES, q, mp, func, error);
+	ipif = ipif_lookup_addr(if_addr, NULL, ALL_ZONES, q, mp, func, error,
+	    ipst);
 	ASSERT(ipif == NULL || !ipif->ipif_isv6);
 	return (ipif);
 }
@@ -5889,7 +5936,7 @@ ipif_lookup_interface(ipaddr_t if_addr, ipaddr_t dst, queue_t *q, mblk_t *mp,
  */
 ipif_t *
 ipif_lookup_addr(ipaddr_t addr, ill_t *match_ill, zoneid_t zoneid, queue_t *q,
-    mblk_t *mp, ipsq_func_t func, int *error)
+    mblk_t *mp, ipsq_func_t func, int *error, ip_stack_t *ipst)
 {
 	ipif_t  *ipif;
 	ill_t   *ill;
@@ -5900,13 +5947,13 @@ ipif_lookup_addr(ipaddr_t addr, ill_t *match_ill, zoneid_t zoneid, queue_t *q,
 	if (error != NULL)
 		*error = 0;
 
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	/*
 	 * Repeat twice, first based on local addresses and
 	 * next time for pointopoint.
 	 */
 repeat:
-	ill = ILL_START_WALK_V4(&ctx);
+	ill = ILL_START_WALK_V4(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		if (match_ill != NULL && ill != match_ill) {
 			continue;
@@ -5932,13 +5979,13 @@ repeat:
 					ipif_refhold_locked(ipif);
 					mutex_exit(&ill->ill_lock);
 					RELEASE_CONN_LOCK(q);
-					rw_exit(&ill_g_lock);
+					rw_exit(&ipst->ips_ill_g_lock);
 					return (ipif);
 				} else if (IPIF_CAN_WAIT(ipif, q)) {
 					ipsq = ill->ill_phyint->phyint_ipsq;
 					mutex_enter(&ipsq->ipsq_lock);
 					mutex_exit(&ill->ill_lock);
-					rw_exit(&ill_g_lock);
+					rw_exit(&ipst->ips_ill_g_lock);
 					ipsq_enq(ipsq, q, mp, func, NEW_OP,
 						ill);
 					mutex_exit(&ipsq->ipsq_lock);
@@ -5954,7 +6001,7 @@ repeat:
 
 	/* If we already did the ptp case, then we are done */
 	if (ptp) {
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		if (error != NULL)
 			*error = ENXIO;
 		return (NULL);
@@ -5972,7 +6019,7 @@ repeat:
  * Return the zoneid for the ipif which matches. ALL_ZONES if no match.
  */
 zoneid_t
-ipif_lookup_addr_zoneid(ipaddr_t addr, ill_t *match_ill)
+ipif_lookup_addr_zoneid(ipaddr_t addr, ill_t *match_ill, ip_stack_t *ipst)
 {
 	zoneid_t zoneid;
 	ipif_t  *ipif;
@@ -5980,13 +6027,13 @@ ipif_lookup_addr_zoneid(ipaddr_t addr, ill_t *match_ill)
 	boolean_t ptp = B_FALSE;
 	ill_walk_context_t	ctx;
 
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	/*
 	 * Repeat twice, first based on local addresses and
 	 * next time for pointopoint.
 	 */
 repeat:
-	ill = ILL_START_WALK_V4(&ctx);
+	ill = ILL_START_WALK_V4(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		if (match_ill != NULL && ill != match_ill) {
 			continue;
@@ -6002,7 +6049,7 @@ repeat:
 			    !(ipif->ipif_state_flags & IPIF_CONDEMNED)) {
 				zoneid = ipif->ipif_zoneid;
 				mutex_exit(&ill->ill_lock);
-				rw_exit(&ill_g_lock);
+				rw_exit(&ipst->ips_ill_g_lock);
 				/*
 				 * If ipif_zoneid was ALL_ZONES then we have
 				 * a trusted extensions shared IP address.
@@ -6018,7 +6065,7 @@ repeat:
 
 	/* If we already did the ptp case, then we are done */
 	if (ptp) {
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		return (ALL_ZONES);
 	}
 	ptp = B_TRUE;
@@ -6038,6 +6085,7 @@ ipif_lookup_remote(ill_t *ill, ipaddr_t addr, zoneid_t zoneid)
 {
 	ipif_t	*ipif;
 	ire_t	*ire;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(!ill->ill_isv6);
 
@@ -6072,7 +6120,7 @@ ipif_lookup_remote(ill_t *ill, ipaddr_t addr, zoneid_t zoneid)
 	}
 	mutex_exit(&ill->ill_lock);
 	ire = ire_route_lookup(addr, 0, 0, 0, NULL, NULL, zoneid,
-	    NULL, MATCH_IRE_RECURSIVE);
+	    NULL, MATCH_IRE_RECURSIVE, ipst);
 	if (ire != NULL) {
 		/*
 		 * The callers of this function wants to know the
@@ -6525,14 +6573,14 @@ ill_thread_exit(ill_t *ill, void *dummy)
 
 #ifdef ILL_DEBUG
 void
-ip_thread_exit(void)
+ip_thread_exit(ip_stack_t *ipst)
 {
 	ill_t	*ill;
 	ipif_t	*ipif;
 	ill_walk_context_t	ctx;
 
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_ALL(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_ALL(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		for (ipif = ill->ill_ipif; ipif != NULL;
 		    ipif = ipif->ipif_next) {
@@ -6540,11 +6588,11 @@ ip_thread_exit(void)
 		}
 		ill_thread_exit(ill, NULL);
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
-	ire_walk(ire_thread_exit, NULL);
-	ndp_walk_common(&ndp4, NULL, nce_thread_exit, NULL, B_FALSE);
-	ndp_walk_common(&ndp6, NULL, nce_thread_exit, NULL, B_FALSE);
+	ire_walk(ire_thread_exit, NULL, ipst);
+	ndp_walk_common(ipst->ips_ndp4, NULL, nce_thread_exit, NULL, B_FALSE);
+	ndp_walk_common(ipst->ips_ndp6, NULL, nce_thread_exit, NULL, B_FALSE);
 }
 
 /*
@@ -6681,7 +6729,7 @@ int
 ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
     ipaddr_t src_addr, int flags, ipif_t *ipif_arg, ipif_t *src_ipif,
     ire_t **ire_arg, boolean_t ioctl_msg, queue_t *q, mblk_t *mp,
-    ipsq_func_t func, struct rtsa_s *sp)
+    ipsq_func_t func, struct rtsa_s *sp, ip_stack_t *ipst)
 {
 	ire_t	*ire;
 	ire_t	*gw_ire = NULL;
@@ -6719,7 +6767,7 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	 */
 	if (gw_addr != 0) {
 		ipif = ipif_lookup_interface(gw_addr, dst_addr, q, mp, func,
-		    &error);
+		    &error, ipst);
 		if (ipif != NULL) {
 			if (IS_VNI(ipif->ipif_ill)) {
 				ipif_refrele(ipif);
@@ -6752,7 +6800,7 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		if (gw_addr == INADDR_LOOPBACK && dst_addr == INADDR_LOOPBACK &&
 		    mask == IP_HOST_MASK) {
 			ire = ire_ctable_lookup(dst_addr, 0, IRE_LOOPBACK, ipif,
-			    ALL_ZONES, NULL, match_flags);
+			    ALL_ZONES, NULL, match_flags, ipst);
 			if (ire != NULL) {
 				ire_refrele(ire);
 				if (ipif_refheld)
@@ -6784,7 +6832,8 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 			    RTF_PRIVATE : 0,
 			    &ire_uinfo_null,
 			    NULL,
-			    NULL);
+			    NULL,
+			    ipst);
 
 			if (ire == NULL) {
 				if (ipif_refheld)
@@ -6918,7 +6967,7 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		} else {
 			ire = ire_ftable_lookup(dst_addr, mask, 0,
 			    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0,
-			    NULL, match_flags);
+			    NULL, match_flags, ipst);
 		}
 		if (ire != NULL) {
 			ire_refrele(ire);
@@ -6966,7 +7015,8 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		    flags,
 		    &ire_uinfo_null,
 		    NULL,
-		    NULL);
+		    NULL,
+		    ipst);
 		if (ire == NULL) {
 			if (ipif_refheld)
 				ipif_refrele(ipif);
@@ -7024,7 +7074,7 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	if (ipif_arg != NULL)
 		match_flags |= MATCH_IRE_ILL;
 	gw_ire = ire_ftable_lookup(gw_addr, 0, 0, IRE_INTERFACE, ipif_arg, NULL,
-	    ALL_ZONES, 0, NULL, match_flags);
+	    ALL_ZONES, 0, NULL, match_flags, ipst);
 	if (gw_ire == NULL)
 		return (ENETUNREACH);
 
@@ -7046,7 +7096,7 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	/* check for a duplicate entry */
 	ire = ire_ftable_lookup(dst_addr, mask, gw_addr, type, ipif_arg,
 	    NULL, ALL_ZONES, 0, NULL,
-	    match_flags | MATCH_IRE_MASK | MATCH_IRE_GW);
+	    match_flags | MATCH_IRE_MASK | MATCH_IRE_GW, ipst);
 	if (ire != NULL) {
 		ire_refrele(gw_ire);
 		ire_refrele(ire);
@@ -7107,7 +7157,9 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	    flags,
 	    &gw_ire->ire_uinfo,			/* Inherit ULP info from gw */
 	    gc,					/* security attribute */
-	    NULL);
+	    NULL,
+	    ipst);
+
 	/*
 	 * The ire holds a reference to the 'gc' and the 'gc' holds a
 	 * reference to the 'gcgrp'. We can now release the extra reference
@@ -7151,13 +7203,14 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		 * or a multicast.
 		 */
 		ire_t *ire_dst = ire_ctable_lookup(ire->ire_addr, 0,
-		    IRE_BROADCAST, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE);
+		    IRE_BROADCAST, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
 		if (ire_dst != NULL) {
-			ip_cgtp_bcast_add(ire, ire_dst);
+			ip_cgtp_bcast_add(ire, ire_dst, ipst);
 			ire_refrele(ire_dst);
 			goto save_ire;
 		}
-		if ((ip_cgtp_filter_ops != NULL) && !CLASSD(ire->ire_addr)) {
+		if ((ip_cgtp_filter_ops != NULL) && !CLASSD(ire->ire_addr) &&
+		    ipst->ips_netstack->netstack_stackid == GLOBAL_NETSTACKID) {
 			int res = ip_cgtp_filter_ops->cfo_add_dest_v4(
 			    ire->ire_addr,
 			    ire->ire_gateway_addr,
@@ -7179,7 +7232,7 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	 */
 	if (gc != NULL) {
 		ASSERT(gcgrp != NULL);
-		ire_clookup_delete_cache_gw(gw_addr, ALL_ZONES);
+		ire_clookup_delete_cache_gw(gw_addr, ALL_ZONES, ipst);
 	}
 
 save_ire:
@@ -7205,7 +7258,7 @@ save_ire:
 		ipif_save_ire(ipif, ire);
 	}
 	if (ioctl_msg)
-		ip_rts_rtmsg(RTM_OLDADD, ire, 0);
+		ip_rts_rtmsg(RTM_OLDADD, ire, 0, ipst);
 	if (ire_arg != NULL) {
 		/*
 		 * Store the ire that was successfully added into where ire_arg
@@ -7234,7 +7287,8 @@ save_ire:
 int
 ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
     uint_t rtm_addrs, int flags, ipif_t *ipif_arg, ipif_t *src_ipif,
-    boolean_t ioctl_msg, queue_t *q, mblk_t *mp, ipsq_func_t func)
+    boolean_t ioctl_msg, queue_t *q, mblk_t *mp, ipsq_func_t func,
+    ip_stack_t *ipst)
 {
 	ire_t	*ire = NULL;
 	ipif_t	*ipif;
@@ -7287,7 +7341,7 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	if (src_ipif != NULL) {
 		if (ipif_arg == NULL && gw_addr != 0) {
 			ipif_arg = ipif_lookup_interface(gw_addr, dst_addr,
-			    q, mp, func, &err);
+			    q, mp, func, &err, ipst);
 			if (ipif_arg != NULL)
 				ipif_refheld = B_TRUE;
 		}
@@ -7298,7 +7352,7 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		ipif = ipif_arg;
 	} else {
 		ipif = ipif_lookup_interface(gw_addr, dst_addr,
-			    q, mp, func, &err);
+			    q, mp, func, &err, ipst);
 		if (ipif != NULL)
 			ipif_refheld = B_TRUE;
 		else if (err == EINPROGRESS)
@@ -7324,12 +7378,12 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 			if (ipif->ipif_ire_type == IRE_LOOPBACK) {
 				ire = ire_ctable_lookup(dst_addr, 0,
 				    IRE_LOOPBACK, ipif, ALL_ZONES, NULL,
-				    match_flags);
+				    match_flags, ipst);
 			}
 			if (ire == NULL) {
 				ire = ire_ftable_lookup(dst_addr, mask, 0,
 				    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0,
-				    NULL, match_flags);
+				    NULL, match_flags, ipst);
 			}
 		}
 	}
@@ -7365,7 +7419,8 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 			else
 				type = IRE_PREFIX;
 			ire = ire_ftable_lookup(dst_addr, mask, gw_addr, type,
-			    ipif_arg, NULL, ALL_ZONES, 0, NULL, match_flags);
+			    ipif_arg, NULL, ALL_ZONES, 0, NULL, match_flags,
+			    ipst);
 		}
 	}
 
@@ -7383,11 +7438,12 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		 * Packets coming from that address will no longer be
 		 * filtered to remove duplicates.
 		 */
-		if (ip_cgtp_filter_ops != NULL) {
-			err = ip_cgtp_filter_ops->cfo_del_dest_v4(ire->ire_addr,
-			    ire->ire_gateway_addr);
+		if (ip_cgtp_filter_ops != NULL &&
+		    ipst->ips_netstack->netstack_stackid == GLOBAL_NETSTACKID) {
+			err = ip_cgtp_filter_ops->cfo_del_dest_v4(
+			    ire->ire_addr, ire->ire_gateway_addr);
 		}
-		ip_cgtp_bcast_delete(ire);
+		ip_cgtp_bcast_delete(ire, ipst);
 	}
 
 	ipif = ire->ire_ipif;
@@ -7400,7 +7456,7 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		ipif_remove_ire(ipif, ire);
 	}
 	if (ioctl_msg)
-		ip_rts_rtmsg(RTM_OLDDEL, ire, 0);
+		ip_rts_rtmsg(RTM_OLDDEL, ire, 0, ipst);
 	ire_delete(ire);
 	ire_refrele(ire);
 	return (err);
@@ -7421,6 +7477,10 @@ ip_siocaddrt(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	mblk_t *mp1;
 	struct rtentry *rt;
 	ipif_t *ipif = NULL;
+	ip_stack_t	*ipst;
+
+	ASSERT(q->q_next == NULL);
+	ipst = CONNQ_TO_IPST(q);
 
 	ip1dbg(("ip_siocaddrt:"));
 	/* Existence of mp1 verified in ip_wput_nondata */
@@ -7444,11 +7504,11 @@ ip_siocaddrt(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 		 * Note that ip_subnet_mask returns a zero mask in the case of
 		 * default (an all-zeroes address).
 		 */
-		mask = ip_subnet_mask(dst_addr, &ipif);
+		mask = ip_subnet_mask(dst_addr, &ipif, ipst);
 	}
 
 	error = ip_rt_add(dst_addr, mask, gw_addr, 0, rt->rt_flags, NULL, NULL,
-	    NULL, B_TRUE, q, mp, ip_process_ioctl, NULL);
+	    NULL, B_TRUE, q, mp, ip_process_ioctl, NULL, ipst);
 	if (ipif != NULL)
 		ipif_refrele(ipif);
 	return (error);
@@ -7469,6 +7529,10 @@ ip_siocdelrt(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	mblk_t *mp1;
 	struct rtentry *rt;
 	ipif_t *ipif = NULL;
+	ip_stack_t	*ipst;
+
+	ASSERT(q->q_next == NULL);
+	ipst = CONNQ_TO_IPST(q);
 
 	ip1dbg(("ip_siocdelrt:"));
 	/* Existence of mp1 verified in ip_wput_nondata */
@@ -7492,12 +7556,12 @@ ip_siocdelrt(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 		 * Note that ip_subnet_mask returns a zero mask in the case of
 		 * default (an all-zeroes address).
 		 */
-		mask = ip_subnet_mask(dst_addr, &ipif);
+		mask = ip_subnet_mask(dst_addr, &ipif, ipst);
 	}
 
 	error = ip_rt_delete(dst_addr, mask, gw_addr,
 	    RTA_DST | RTA_GATEWAY | RTA_NETMASK, rt->rt_flags, NULL, NULL,
-	    B_TRUE, q, mp, ip_process_ioctl);
+	    B_TRUE, q, mp, ip_process_ioctl, ipst);
 	if (ipif != NULL)
 		ipif_refrele(ipif);
 	return (error);
@@ -7798,6 +7862,7 @@ ipsq_exit(ipsq_t *ipsq, boolean_t start_igmp_timer, boolean_t start_mld_timer)
 	size_t	ill_list_size = 0;
 	int	cnt = 0;
 	boolean_t need_ipsq_free = B_FALSE;
+	ip_stack_t	*ipst = ipsq->ipsq_ipst;
 
 	ASSERT(IAM_WRITER_IPSQ(ipsq));
 	mutex_enter(&ipsq->ipsq_lock);
@@ -7840,7 +7905,8 @@ again:
 	 * If we need to call ill_split_ipsq and change <ill-ipsq> we need
 	 * to grab ill_g_lock as writer.
 	 */
-	rw_enter(&ill_g_lock, ipsq->ipsq_split ? RW_WRITER : RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock,
+	    ipsq->ipsq_split ? RW_WRITER : RW_READER);
 
 	/* ipsq_refs can't change while ill_g_lock is held as reader */
 	if (ipsq->ipsq_refs != 0) {
@@ -7863,7 +7929,7 @@ again:
 		/* oops, some message has landed up, we can't get out */
 		if (ill_list != NULL)
 			ill_unlock_ills(ill_list, cnt);
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		if (ill_list != NULL)
 			kmem_free(ill_list, ill_list_size);
 		ill_list = NULL;
@@ -7913,7 +7979,7 @@ again:
 		ill_unlock_ills(ill_list, cnt);
 	if (ipsq->ipsq_refs == 0)
 		need_ipsq_free = B_TRUE;
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	if (ill_list != 0)
 		kmem_free(ill_list, ill_list_size);
 
@@ -7941,23 +8007,23 @@ again:
 	 * all others pass B_TRUE.
 	 */
 	if (start_igmp_timer) {
-		mutex_enter(&igmp_timer_lock);
-		next = igmp_deferred_next;
-		igmp_deferred_next = INFINITY;
-		mutex_exit(&igmp_timer_lock);
+		mutex_enter(&ipst->ips_igmp_timer_lock);
+		next = ipst->ips_igmp_deferred_next;
+		ipst->ips_igmp_deferred_next = INFINITY;
+		mutex_exit(&ipst->ips_igmp_timer_lock);
 
 		if (next != INFINITY)
-			igmp_start_timers(next);
+			igmp_start_timers(next, ipst);
 	}
 
 	if (start_mld_timer) {
-		mutex_enter(&mld_timer_lock);
-		next = mld_deferred_next;
-		mld_deferred_next = INFINITY;
-		mutex_exit(&mld_timer_lock);
+		mutex_enter(&ipst->ips_mld_timer_lock);
+		next = ipst->ips_mld_deferred_next;
+		ipst->ips_mld_deferred_next = INFINITY;
+		mutex_exit(&ipst->ips_mld_timer_lock);
 
 		if (next != INFINITY)
-			mld_start_timers(next);
+			mld_start_timers(next, ipst);
 	}
 }
 
@@ -8178,8 +8244,10 @@ ip_sioctl_slifoindex(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	struct lifreq	*lifr = (struct lifreq *)ifreq;
 	boolean_t isv6;
 	conn_t	*connp;
+	ip_stack_t	*ipst;
 
 	connp = Q_TO_CONN(q);
+	ipst = connp->conn_netstack->netstack_ip;
 	isv6 = connp->conn_af_isv6;
 	/*
 	 * Set original index.
@@ -8205,7 +8273,7 @@ ip_sioctl_slifoindex(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 * physical interface.
 	 */
 	ill = ill_lookup_on_ifindex(lifr->lifr_index, isv6, NULL, NULL,
-	    NULL, NULL);
+	    NULL, NULL, ipst);
 	if (ill == NULL)
 		return (ENXIO);
 	ill_refrele(ill);
@@ -8267,6 +8335,7 @@ ip_extract_tunreq(queue_t *q, mblk_t *mp, ipif_t **ipifp, ipsq_func_t func)
 	mblk_t	*mp1;
 	int	error;
 	conn_t	*connp;
+	ip_stack_t	*ipst;
 
 	/* Existence verified in ip_wput_nondata */
 	mp1 = mp->b_cont->b_cont;
@@ -8280,11 +8349,12 @@ ip_extract_tunreq(queue_t *q, mblk_t *mp, ipif_t **ipifp, ipsq_func_t func)
 
 	connp = Q_TO_CONN(q);
 	isv6 = connp->conn_af_isv6;
+	ipst = connp->conn_netstack->netstack_ip;
 
 	/* Disallows implicit create */
 	ipif = ipif_lookup_on_name(ta->ifta_lifr_name,
 	    mi_strlen(ta->ifta_lifr_name), B_FALSE, &exists, isv6,
-	    connp->conn_zoneid, CONNP_TO_WQ(connp), mp, func, &error);
+	    connp->conn_zoneid, CONNP_TO_WQ(connp), mp, func, &error, ipst);
 	if (ipif == NULL)
 		return (error);
 
@@ -8348,12 +8418,14 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 	int		err;
 	mblk_t		*mp1;
 	zoneid_t	zoneid;
+	ip_stack_t	*ipst;
 
 	if (q->q_next != NULL) {
 		ill = (ill_t *)q->q_ptr;
 		isv6 = ill->ill_isv6;
 		connp = NULL;
 		zoneid = ALL_ZONES;
+		ipst = ill->ill_ipst;
 	} else {
 		ill = NULL;
 		connp = Q_TO_CONN(q);
@@ -8363,6 +8435,7 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 			/* global zone can access ipifs in all zones */
 			zoneid = ALL_ZONES;
 		}
+		ipst = connp->conn_netstack->netstack_ip;
 	}
 
 	/* Has been checked in ip_wput_nondata */
@@ -8405,7 +8478,6 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 		ci->ci_lifr = lifr;
 	}
 
-
 	if (iocp->ioc_cmd == SIOCSLIFNAME) {
 		/*
 		 * The ioctl will be failed if the ioctl comes down
@@ -8423,7 +8495,8 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 	} else {
 		ipif = ipif_lookup_on_name(name, mi_strlen(name), B_FALSE,
 		    &exists, isv6, zoneid,
-		    (connp == NULL) ? q : CONNP_TO_WQ(connp), mp, func, &err);
+		    (connp == NULL) ? q : CONNP_TO_WQ(connp), mp, func, &err,
+		    ipst);
 		if (ipif == NULL) {
 			if (err == EINPROGRESS)
 				return (err);
@@ -8438,7 +8511,7 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 				ipif = ipif_lookup_on_name(name,
 				    mi_strlen(name), B_FALSE, &exists, !isv6,
 				    zoneid, (connp == NULL) ? q :
-				    CONNP_TO_WQ(connp), mp, func, &err);
+				    CONNP_TO_WQ(connp), mp, func, &err, ipst);
 				if (err == EINPROGRESS)
 					return (err);
 			}
@@ -8484,15 +8557,15 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
  * Return the total number of ipifs.
  */
 static uint_t
-ip_get_numifs(zoneid_t zoneid)
+ip_get_numifs(zoneid_t zoneid, ip_stack_t *ipst)
 {
 	uint_t numifs = 0;
 	ill_t	*ill;
 	ill_walk_context_t	ctx;
 	ipif_t	*ipif;
 
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_V4(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_V4(&ctx, ipst);
 
 	while (ill != NULL) {
 		for (ipif = ill->ill_ipif; ipif != NULL;
@@ -8503,7 +8576,7 @@ ip_get_numifs(zoneid_t zoneid)
 		}
 		ill = ill_next(&ctx, ill);
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	return (numifs);
 }
 
@@ -8511,7 +8584,7 @@ ip_get_numifs(zoneid_t zoneid)
  * Return the total number of ipifs.
  */
 static uint_t
-ip_get_numlifs(int family, int lifn_flags, zoneid_t zoneid)
+ip_get_numlifs(int family, int lifn_flags, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	uint_t numifs = 0;
 	ill_t	*ill;
@@ -8520,13 +8593,13 @@ ip_get_numlifs(int family, int lifn_flags, zoneid_t zoneid)
 
 	ip1dbg(("ip_get_numlifs(%d %u %d)\n", family, lifn_flags, (int)zoneid));
 
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	if (family == AF_INET)
-		ill = ILL_START_WALK_V4(&ctx);
+		ill = ILL_START_WALK_V4(&ctx, ipst);
 	else if (family == AF_INET6)
-		ill = ILL_START_WALK_V6(&ctx);
+		ill = ILL_START_WALK_V6(&ctx, ipst);
 	else
-		ill = ILL_START_WALK_ALL(&ctx);
+		ill = ILL_START_WALK_ALL(&ctx, ipst);
 
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		for (ipif = ill->ill_ipif; ipif != NULL;
@@ -8555,7 +8628,7 @@ ip_get_numlifs(int family, int lifn_flags, zoneid_t zoneid)
 			numifs++;
 		}
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	return (numifs);
 }
 
@@ -8564,20 +8637,21 @@ ip_get_lifsrcofnum(ill_t *ill)
 {
 	uint_t numifs = 0;
 	ill_t	*ill_head = ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	/*
 	 * ill_g_usesrc_lock protects ill_usesrc_grp_next, for example, some
 	 * other thread may be trying to relink the ILLs in this usesrc group
 	 * and adjusting the ill_usesrc_grp_next pointers
 	 */
-	rw_enter(&ill_g_usesrc_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_usesrc_lock, RW_READER);
 	if ((ill->ill_usesrc_ifindex == 0) &&
 	    (ill->ill_usesrc_grp_next != NULL)) {
 		for (; (ill != NULL) && (ill->ill_usesrc_grp_next != ill_head);
 		    ill = ill->ill_usesrc_grp_next)
 			numifs++;
 	}
-	rw_exit(&ill_g_usesrc_lock);
+	rw_exit(&ipst->ips_ill_g_usesrc_lock);
 
 	return (numifs);
 }
@@ -8589,13 +8663,15 @@ ip_sioctl_get_ifnum(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
     mblk_t *mp, ip_ioctl_cmd_t *ipip, void *ifreq)
 {
 	int *nump;
+	conn_t *connp = Q_TO_CONN(q);
 
 	ASSERT(q->q_next == NULL); /* not a valid ioctl for ip as a module */
 
 	/* Existence of b_cont->b_cont checked in ip_wput_nondata */
 	nump = (int *)mp->b_cont->b_cont->b_rptr;
 
-	*nump = ip_get_numifs(Q_TO_CONN(q)->conn_zoneid);
+	*nump = ip_get_numifs(connp->conn_zoneid,
+	    connp->conn_netstack->netstack_ip);
 	ip1dbg(("ip_sioctl_get_ifnum numifs %d", *nump));
 	return (0);
 }
@@ -8608,6 +8684,7 @@ ip_sioctl_get_lifnum(ipif_t *dummy_ipif, sin_t *dummy_sin,
 {
 	struct lifnum *lifn;
 	mblk_t	*mp1;
+	conn_t *connp = Q_TO_CONN(q);
 
 	ASSERT(q->q_next == NULL); /* not a valid ioctl for ip as a module */
 
@@ -8625,7 +8702,7 @@ ip_sioctl_get_lifnum(ipif_t *dummy_ipif, sin_t *dummy_sin,
 	}
 
 	lifn->lifn_count = ip_get_numlifs(lifn->lifn_family, lifn->lifn_flags,
-	    Q_TO_CONN(q)->conn_zoneid);
+	    connp->conn_zoneid, connp->conn_netstack->netstack_ip);
 	ip1dbg(("ip_sioctl_get_lifnum numifs %d", lifn->lifn_count));
 	return (0);
 }
@@ -8645,6 +8722,7 @@ ip_sioctl_get_ifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 	struct sockaddr_in *sin;
 	int32_t	ifclen;
 	zoneid_t zoneid;
+	ip_stack_t *ipst = CONNQ_TO_IPST(q);
 
 	ASSERT(q->q_next == NULL); /* not valid ioctls for ip as a module */
 
@@ -8700,7 +8778,7 @@ ip_sioctl_get_ifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 		 * number of interfaces for a device, so we don't need
 		 * to count them here...
 		 */
-		numifs = ip_get_numifs(zoneid);
+		numifs = ip_get_numifs(zoneid, ipst);
 
 		ifclen = STRUCT_FGET(ifc, ifc_len);
 		ifc_bufsize = numifs * sizeof (struct ifreq);
@@ -8730,8 +8808,8 @@ ip_sioctl_get_ifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 
 	ifr = (struct ifreq *)mp1->b_rptr;
 
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_V4(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_V4(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		for (ipif = ill->ill_ipif; ipif != NULL;
 		    ipif = ipif->ipif_next) {
@@ -8741,7 +8819,7 @@ ip_sioctl_get_ifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 			if ((uchar_t *)&ifr[1] > mp1->b_wptr) {
 				if (iocp->ioc_cmd == O_SIOCGIFCONF) {
 					/* old behaviour */
-					rw_exit(&ill_g_lock);
+					rw_exit(&ipst->ips_ill_g_lock);
 					return (EINVAL);
 				} else {
 					goto if_copydone;
@@ -8758,7 +8836,7 @@ ip_sioctl_get_ifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 		}
 	}
 if_copydone:
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	mp1->b_wptr = (uchar_t *)ifr;
 
 	if (STRUCT_BUF(ifc) != NULL) {
@@ -8790,8 +8868,10 @@ ip_sioctl_get_lifsrcof(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 	boolean_t isv6 = B_FALSE;
 	struct	sockaddr_in	*sin;
 	struct	sockaddr_in6	*sin6;
-
 	STRUCT_HANDLE(lifsrcof, lifs);
+	ip_stack_t		*ipst;
+
+	ipst = CONNQ_TO_IPST(q);
 
 	ASSERT(q->q_next == NULL);
 
@@ -8813,7 +8893,7 @@ ip_sioctl_get_lifsrcof(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 	ifindex = STRUCT_FGET(lifs, lifs_ifindex);
 	isv6 = (Q_TO_CONN(q))->conn_af_isv6;
 	ipif = ipif_lookup_on_ifindex(ifindex, isv6, zoneid, q, mp,
-	    ip_process_ioctl, &err);
+	    ip_process_ioctl, &err, ipst);
 	if (ipif == NULL) {
 		ip1dbg(("ip_sioctl_get_lifsrcof: no ipif for ifindex %d\n",
 		    ifindex));
@@ -8850,8 +8930,8 @@ ip_sioctl_get_lifsrcof(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 	orig_ipif = ipif;
 
 	/* ill_g_usesrc_lock protects ill_usesrc_grp_next */
-	rw_enter(&ill_g_usesrc_lock, RW_READER);
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_usesrc_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 
 	ill = ill->ill_usesrc_grp_next; /* start from next ill */
 	for (; (ill != NULL) && (ill != ill_head);
@@ -8880,8 +8960,8 @@ ip_sioctl_get_lifsrcof(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 		}
 		lifr++;
 	}
-	rw_exit(&ill_g_usesrc_lock);
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_usesrc_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	ipif_refrele(orig_ipif);
 	mp1->b_wptr = (uchar_t *)lifr;
 	STRUCT_FSET(lifs, lifs_len, (int)((uchar_t *)lifr - mp1->b_rptr));
@@ -8910,6 +8990,7 @@ ip_sioctl_get_lifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 	int32_t	lifclen;
 	zoneid_t zoneid;
 	STRUCT_HANDLE(lifconf, lifc);
+	ip_stack_t *ipst = CONNQ_TO_IPST(q);
 
 	ip1dbg(("ip_sioctl_get_lifconf"));
 
@@ -8979,7 +9060,7 @@ ip_sioctl_get_lifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 	 * If lifc_len is smaller than what is needed, return
 	 * EINVAL.
 	 */
-	numlifs = ip_get_numlifs(family, flags, zoneid);
+	numlifs = ip_get_numlifs(family, flags, zoneid, ipst);
 	lifc_bufsize = numlifs * sizeof (struct lifreq);
 	lifclen = STRUCT_FGET(lifc, lifc_len);
 	if (lifc_bufsize > lifclen) {
@@ -8999,8 +9080,8 @@ ip_sioctl_get_lifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 
 	lifr = (struct lifreq *)mp1->b_rptr;
 
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ill_first(list, list, &ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ill_first(list, list, &ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		for (ipif = ill->ill_ipif; ipif != NULL;
 		    ipif = ipif->ipif_next) {
@@ -9029,7 +9110,7 @@ ip_sioctl_get_lifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 
 			if ((uchar_t *)&lifr[1] > mp1->b_wptr) {
 				if (iocp->ioc_cmd == O_SIOCGLIFCONF) {
-					rw_exit(&ill_g_lock);
+					rw_exit(&ipst->ips_ill_g_lock);
 					return (EINVAL);
 				} else {
 					goto lif_copydone;
@@ -9062,7 +9143,7 @@ ip_sioctl_get_lifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 		}
 	}
 lif_copydone:
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	mp1->b_wptr = (uchar_t *)lifr;
 	if (STRUCT_BUF(lifc) != NULL) {
@@ -9077,8 +9158,15 @@ int
 ip_sioctl_set_ipmpfailback(ipif_t *dummy_ipif, sin_t *dummy_sin,
     queue_t *q, mblk_t *mp, ip_ioctl_cmd_t *ipip, void *ifreq)
 {
+	ip_stack_t	*ipst;
+
+	if (q->q_next == NULL)
+		ipst = CONNQ_TO_IPST(q);
+	else
+		ipst = ILLQ_TO_IPST(q);
+
 	/* Existence of b_cont->b_cont checked in ip_wput_nondata */
-	ipmp_enable_failback = *(int *)mp->b_cont->b_cont->b_rptr;
+	ipst->ips_ipmp_enable_failback = *(int *)mp->b_cont->b_cont->b_rptr;
 	return (0);
 }
 
@@ -9089,6 +9177,12 @@ ip_sioctl_ip6addrpolicy(queue_t *q, mblk_t *mp)
 	size_t table_size;
 	mblk_t *data_mp;
 	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
+	ip_stack_t	*ipst;
+
+	if (q->q_next == NULL)
+		ipst = CONNQ_TO_IPST(q);
+	else
+		ipst = ILLQ_TO_IPST(q);
 
 	/* These two ioctls are I_STR only */
 	if (iocp->ioc_count == TRANSPARENT) {
@@ -9125,7 +9219,7 @@ ip_sioctl_ip6addrpolicy(queue_t *q, mblk_t *mp)
 
 	switch (iocp->ioc_cmd) {
 	case SIOCGIP6ADDRPOLICY:
-		iocp->ioc_rval = ip6_asp_get(table, table_size);
+		iocp->ioc_rval = ip6_asp_get(table, table_size, ipst);
 		if (iocp->ioc_rval == -1)
 			iocp->ioc_error = EINVAL;
 #if defined(_SYSCALL32_IMPL) && _LONG_LONG_ALIGNMENT_32 == 4
@@ -9168,7 +9262,7 @@ ip_sioctl_ip6addrpolicy(queue_t *q, mblk_t *mp)
 		 * and just recompile everything that depends on it.)
 		 */
 #endif
-		ip6_asp_replace(mp, table, table_size, B_FALSE,
+		ip6_asp_replace(mp, table, table_size, B_FALSE, ipst,
 		    iocp->ioc_flag & IOC_MODELS);
 		return;
 	}
@@ -9193,6 +9287,7 @@ ip_sioctl_dstinfo(queue_t *q, mblk_t *mp)
 	ipif_t		*src_ipif, *ire_ipif;
 	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
 	zoneid_t	zoneid;
+	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
 
 	ASSERT(q->q_next == NULL); /* this ioctl not allowed if ip is module */
 	zoneid = Q_TO_CONN(q)->conn_zoneid;
@@ -9233,16 +9328,16 @@ ip_sioctl_dstinfo(queue_t *q, mblk_t *mp)
 		 * and ipif_select_source[_v6]() do not.
 		 */
 		dir->dir_dscope = ip_addr_scope_v6(daddr);
-		dlabel = ip6_asp_lookup(daddr, &dir->dir_precedence);
+		dlabel = ip6_asp_lookup(daddr, &dir->dir_precedence, ipst);
 
 		isipv4 = IN6_IS_ADDR_V4MAPPED(daddr);
 		if (isipv4) {
 			IN6_V4MAPPED_TO_IPADDR(daddr, v4daddr);
 			ire = ire_ftable_lookup(v4daddr, NULL, NULL,
-			    0, NULL, NULL, zoneid, 0, NULL, match_ire);
+			    0, NULL, NULL, zoneid, 0, NULL, match_ire, ipst);
 		} else {
 			ire = ire_ftable_lookup_v6(daddr, NULL, NULL,
-			    0, NULL, NULL, zoneid, 0, NULL, match_ire);
+			    0, NULL, NULL, zoneid, 0, NULL, match_ire, ipst);
 		}
 		if (ire == NULL) {
 			dir->dir_dreachable = 0;
@@ -9276,7 +9371,7 @@ ip_sioctl_dstinfo(queue_t *q, mblk_t *mp)
 
 		*saddr = src_ipif->ipif_v6lcl_addr;
 		dir->dir_sscope = ip_addr_scope_v6(saddr);
-		slabel = ip6_asp_lookup(saddr, NULL);
+		slabel = ip6_asp_lookup(saddr, NULL, ipst);
 		dir->dir_labelmatch = ip6_asp_labelcmp(dlabel, slabel);
 		dir->dir_sdeprecated =
 		    (src_ipif->ipif_flags & IPIF_DEPRECATED) ? 1 : 0;
@@ -9311,11 +9406,13 @@ ip_sioctl_tmyaddr(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	ire_t *ire;
 	mblk_t *mp1;
 	zoneid_t zoneid;
+	ip_stack_t	*ipst;
 
 	ip1dbg(("ip_sioctl_tmyaddr"));
 
 	ASSERT(q->q_next == NULL); /* this ioctl not allowed if ip is module */
 	zoneid = Q_TO_CONN(q)->conn_zoneid;
+	ipst = CONNQ_TO_IPST(q);
 
 	/* Existence verified in ip_wput_nondata */
 	mp1 = mp->b_cont->b_cont;
@@ -9332,14 +9429,14 @@ ip_sioctl_tmyaddr(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 			    v4_addr);
 			ire = ire_ctable_lookup(v4_addr, 0,
 			    IRE_LOCAL|IRE_LOOPBACK, NULL, zoneid,
-			    NULL, MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY);
+			    NULL, MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY, ipst);
 		} else {
 			in6_addr_t v6addr;
 
 			v6addr = sin6->sin6_addr;
 			ire = ire_ctable_lookup_v6(&v6addr, 0,
 			    IRE_LOCAL|IRE_LOOPBACK, NULL, zoneid,
-			    NULL, MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY);
+			    NULL, MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY, ipst);
 		}
 		break;
 	}
@@ -9349,7 +9446,7 @@ ip_sioctl_tmyaddr(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 		v4addr = sin->sin_addr.s_addr;
 		ire = ire_ctable_lookup(v4addr, 0,
 		    IRE_LOCAL|IRE_LOOPBACK, NULL, zoneid,
-		    NULL, MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY);
+		    NULL, MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY, ipst);
 		break;
 	}
 	default:
@@ -9388,11 +9485,13 @@ ip_sioctl_tonlink(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	mblk_t	*mp1;
 	ire_t *ire = NULL;
 	zoneid_t zoneid;
+	ip_stack_t	*ipst;
 
 	ip1dbg(("ip_sioctl_tonlink"));
 
 	ASSERT(q->q_next == NULL); /* this ioctl not allowed if ip is module */
 	zoneid = Q_TO_CONN(q)->conn_zoneid;
+	ipst = CONNQ_TO_IPST(q);
 
 	/* Existence verified in ip_wput_nondata */
 	mp1 = mp->b_cont->b_cont;
@@ -9416,7 +9515,7 @@ ip_sioctl_tonlink(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 			if (!CLASSD(v4_addr)) {
 				ire = ire_route_lookup(v4_addr, 0, 0, 0,
 				    NULL, NULL, zoneid, NULL,
-				    MATCH_IRE_GW);
+				    MATCH_IRE_GW, ipst);
 			}
 		} else {
 			in6_addr_t v6addr;
@@ -9427,7 +9526,7 @@ ip_sioctl_tonlink(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 			if (!IN6_IS_ADDR_MULTICAST(&v6addr)) {
 				ire = ire_route_lookup_v6(&v6addr, 0,
 				    &v6gw, 0, NULL, NULL, zoneid,
-				    NULL, MATCH_IRE_GW);
+				    NULL, MATCH_IRE_GW, ipst);
 			}
 		}
 		break;
@@ -9439,7 +9538,7 @@ ip_sioctl_tonlink(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 		if (!CLASSD(v4addr)) {
 			ire = ire_route_lookup(v4addr, 0, 0, 0,
 			    NULL, NULL, zoneid, NULL,
-			    MATCH_IRE_GW);
+			    MATCH_IRE_GW, ipst);
 		}
 		break;
 	}
@@ -9539,9 +9638,11 @@ ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp, sin_t *sin,
 	boolean_t success;
 	int flags, alength;
 	char *lladdr;
+	ip_stack_t	*ipst;
 
 	ASSERT(!(q->q_flag & QREADR) && q->q_next == NULL);
 	connp = Q_TO_CONN(q);
+	ipst = connp->conn_netstack->netstack_ip;
 
 	iocp = (struct iocblk *)mp->b_rptr;
 	/*
@@ -9671,12 +9772,13 @@ ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp, sin_t *sin,
 		 * pick up any change from arp.
 		 */
 		if (!if_arp_ioctl) {
-			(void) ip_ire_clookup_and_delete(ipaddr, NULL);
+			(void) ip_ire_clookup_and_delete(ipaddr, NULL, ipst);
 			break;
 		} else {
 			ipif_t *ipif = ipif_get_next_ipif(NULL, ill);
 			if (ipif != NULL) {
-				(void) ip_ire_clookup_and_delete(ipaddr, ipif);
+				(void) ip_ire_clookup_and_delete(ipaddr, ipif,
+				    ipst);
 				ipif_refrele(ipif);
 			}
 			break;
@@ -9747,11 +9849,13 @@ ip_sioctl_xarp(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	ill_t	*ill = NULL;
 	struct sockaddr_in *sin;
 	boolean_t if_arp_ioctl = B_FALSE;
+	ip_stack_t	*ipst;
 
 	/* ioctl comes down on an conn */
 	ASSERT(!(q->q_flag & QREADR) && q->q_next == NULL);
 	connp = Q_TO_CONN(q);
 	isv6 = connp->conn_af_isv6;
+	ipst = connp->conn_netstack->netstack_ip;
 
 	/* Existance verified in ip_wput_nondata */
 	mp1 = mp->b_cont->b_cont;
@@ -9780,7 +9884,7 @@ ip_sioctl_xarp(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 		*cptr = '\0';
 		ill = ill_lookup_on_name(xar->xarp_ha.sdl_data,
 		    B_FALSE, isv6, CONNP_TO_WQ(connp), mp, ip_process_ioctl,
-		    &err, NULL);
+		    &err, NULL, ipst);
 		*cptr = cval;
 		if (ill == NULL)
 			return (err);
@@ -9796,7 +9900,8 @@ ip_sioctl_xarp(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 		 * as an extended BSD ioctl. The kernel uses the IP address
 		 * to figure out the network interface.
 		 */
-		ire = ire_cache_lookup(sin->sin_addr.s_addr, ALL_ZONES, NULL);
+		ire = ire_cache_lookup(sin->sin_addr.s_addr, ALL_ZONES, NULL,
+		    ipst);
 		if ((ire == NULL) || (ire->ire_type == IRE_LOOPBACK) ||
 		    ((ill = ire_to_ill(ire)) == NULL) ||
 		    (ill->ill_net_type != IRE_IF_RESOLVER)) {
@@ -9804,7 +9909,7 @@ ip_sioctl_xarp(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 				ire_refrele(ire);
 			ire = ire_ftable_lookup(sin->sin_addr.s_addr,
 			    0, 0, IRE_IF_RESOLVER, NULL, NULL, ALL_ZONES, 0,
-			    NULL, MATCH_IRE_TYPE);
+			    NULL, MATCH_IRE_TYPE, ipst);
 			if ((ire == NULL) ||
 			    ((ill = ire_to_ill(ire)) == NULL)) {
 				if (ire != NULL)
@@ -9851,10 +9956,12 @@ ip_sioctl_arp(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	int	err;
 	conn_t	*connp;
 	ill_t	*ill;
+	ip_stack_t	*ipst;
 
 	/* ioctl comes down on an conn */
 	ASSERT(!(q->q_flag & QREADR) && q->q_next == NULL);
 	connp = Q_TO_CONN(q);
+	ipst = CONNQ_TO_IPST(q);
 	isv6 = connp->conn_af_isv6;
 	if (isv6)
 		return (ENXIO);
@@ -9881,14 +9988,14 @@ ip_sioctl_arp(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	 * be rare enough since IRE cache entries have a longer
 	 * life expectancy than ARP cache entries.
 	 */
-	ire = ire_cache_lookup(sin->sin_addr.s_addr, ALL_ZONES, NULL);
+	ire = ire_cache_lookup(sin->sin_addr.s_addr, ALL_ZONES, NULL, ipst);
 	if ((ire == NULL) || (ire->ire_type == IRE_LOOPBACK) ||
 	    ((ill = ire_to_ill(ire)) == NULL)) {
 		if (ire != NULL)
 			ire_refrele(ire);
 		ire = ire_ftable_lookup(sin->sin_addr.s_addr,
 		    0, 0, IRE_IF_RESOLVER, NULL, NULL, ALL_ZONES, 0,
-		    NULL, MATCH_IRE_TYPE);
+		    NULL, MATCH_IRE_TYPE, ipst);
 		if ((ire == NULL) || ((ill = ire_to_ill(ire)) == NULL)) {
 			if (ire != NULL)
 				ire_refrele(ire);
@@ -9929,6 +10036,12 @@ ip_sioctl_plink(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	boolean_t	entered_ipsq = B_FALSE;
 	boolean_t islink;
 	queue_t *dwq = NULL;
+	ip_stack_t	*ipst;
+
+	if (CONN_Q(q))
+		ipst = CONNQ_TO_IPST(q);
+	else
+		ipst = ILLQ_TO_IPST(q);
 
 	ASSERT(iocp->ioc_cmd == I_PLINK || iocp->ioc_cmd == I_PUNLINK ||
 	    iocp->ioc_cmd == I_LINK || iocp->ioc_cmd == I_UNLINK);
@@ -10054,7 +10167,7 @@ ip_sioctl_plink(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		 * stream.
 		 */
 		ill = ill_lookup_on_name(ipmxp->ipmx_name, B_FALSE, B_FALSE,
-		    q, mp, ip_sioctl_plink, &err, NULL);
+		    q, mp, ip_sioctl_plink, &err, NULL, ipst);
 		if (ill == NULL) {
 			if (err == EINPROGRESS) {
 				return;
@@ -10268,6 +10381,12 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
 	ip_ioctl_cmd_t *ipip;
 	cred_t *cr;
+	ip_stack_t	*ipst;
+
+	if (CONN_Q(q))
+		ipst = CONNQ_TO_IPST(q);
+	else
+		ipst = ILLQ_TO_IPST(q);
 
 	ipip = ip_sioctl_lookup(iocp->ioc_cmd);
 	if (ipip == NULL) {
@@ -10290,7 +10409,7 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 	 * come back.
 	 */
 	if ((iocp->ioc_cmd == SIOCGDSTINFO ||
-	    iocp->ioc_cmd == SIOCGIP6ADDRPOLICY) && !ip6_asp_can_lookup()) {
+	    iocp->ioc_cmd == SIOCGIP6ADDRPOLICY) && !ip6_asp_can_lookup(ipst)) {
 		ip6_asp_pending_op(q, mp, ip_sioctl_copyin_resume);
 		return;
 	}
@@ -10333,9 +10452,9 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 
 	/* Make sure normal users don't send down privileged ioctls */
 	if ((ipip->ipi_flags & IPI_PRIV) &&
-	    (cr != NULL) && secpolicy_net_config(cr, B_TRUE) != 0) {
+	    (cr != NULL) && secpolicy_ip_config(cr, B_TRUE) != 0) {
 		/* We checked the privilege earlier but log it here */
-		miocnak(q, mp, 0, secpolicy_net_config(cr, B_FALSE));
+		miocnak(q, mp, 0, secpolicy_ip_config(cr, B_FALSE));
 		return;
 	}
 
@@ -10377,7 +10496,7 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 		return;
 	case SIOCGIP6ADDRPOLICY:
 		ip_sioctl_ip6addrpolicy(q, mp);
-		ip6_asp_table_refrele();
+		ip6_asp_table_refrele(ipst);
 		return;
 
 	case SIOCSIP6ADDRPOLICY:
@@ -10386,7 +10505,7 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 
 	case SIOCGDSTINFO:
 		ip_sioctl_dstinfo(q, mp);
-		ip6_asp_table_refrele();
+		ip6_asp_table_refrele(ipst);
 		return;
 
 	case I_PLINK:
@@ -10414,9 +10533,9 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 		 * Modifying the nd table thru nd_load/nd_unload requires
 		 * the writer lock.
 		 */
-		rw_enter(&ip_g_nd_lock, RW_READER);
-		if (nd_getset(q, ip_g_nd, mp)) {
-			rw_exit(&ip_g_nd_lock);
+		rw_enter(&ipst->ips_ip_g_nd_lock, RW_READER);
+		if (nd_getset(q, ipst->ips_ip_g_nd, mp)) {
+			rw_exit(&ipst->ips_ip_g_nd_lock);
 
 			if (iocp->ioc_error)
 				iocp->ioc_count = 0;
@@ -10424,7 +10543,7 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 			qreply(q, mp);
 			return;
 		}
-		rw_exit(&ip_g_nd_lock);
+		rw_exit(&ipst->ips_ip_g_nd_lock);
 		/*
 		 * We don't understand this subioctl of ND_GET / ND_SET.
 		 * Maybe intended for some driver / module below us
@@ -10477,9 +10596,11 @@ ip_sioctl_iocack(queue_t *q, mblk_t *mp)
 	sin_t *sin;
 	ipaddr_t addr;
 	int err;
+	ip_stack_t *ipst;
 
 	ill = q->q_ptr;
 	ASSERT(ill != NULL);
+	ipst = ill->ill_ipst;
 
 	/*
 	 * We should get back from ARP a packet chain that looks like:
@@ -10565,10 +10686,10 @@ ip_sioctl_iocack(queue_t *q, mblk_t *mp)
 			ipsqill = ill;
 			ire = ire_ctable_lookup(addr, 0, IRE_CACHE,
 			    ipsqill->ill_ipif, ALL_ZONES,
-			    NULL, MATCH_IRE_TYPE | MATCH_IRE_ILL);
+			    NULL, MATCH_IRE_TYPE | MATCH_IRE_ILL, ipst);
 		} else {
 			ire = ire_ctable_lookup(addr, 0, IRE_CACHE,
-			    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE);
+			    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
 			if (ire != NULL)
 				ipsqill = ire_to_ill(ire);
 		}
@@ -10651,7 +10772,7 @@ ip_sioctl_iocack(queue_t *q, mblk_t *mp)
 			 */
 			ipintf = ill->ill_ipif;
 		}
-		if (ip_ire_clookup_and_delete(addr, ipintf)) {
+		if (ip_ire_clookup_and_delete(addr, ipintf, ipst)) {
 			/*
 			 * The address in "addr" may be an entry for a
 			 * router. If that's true, then any off-net
@@ -10664,7 +10785,7 @@ ip_sioctl_iocack(queue_t *q, mblk_t *mp)
 				    ire_delete_cache_gw, (char *)&addr, ill);
 			else
 				ire_walk_v4(ire_delete_cache_gw, (char *)&addr,
-				    ALL_ZONES);
+				    ALL_ZONES, ipst);
 			iocp->ioc_error = 0;
 		}
 	}
@@ -10755,7 +10876,9 @@ ip_sioctl_addif(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	conn_t	*connp;
 	zoneid_t zoneid;
 	int	orig_ifindex = 0;
+	ip_stack_t *ipst = CONNQ_TO_IPST(q);
 
+	ASSERT(q->q_next == NULL);
 	ip1dbg(("ip_sioctl_addif\n"));
 	/* Existence of mp1 has been checked in ip_wput_nondata */
 	mp1 = mp->b_cont->b_cont;
@@ -10783,8 +10906,8 @@ ip_sioctl_addif(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 		 * can't be any other writer thread. So can pass null below
 		 * for the last 4 args to ipif_lookup_name.
 		 */
-		ipif = ipif_lookup_on_name(lifr->lifr_name, namelen,
-		    B_TRUE, &exists, isv6, zoneid, NULL, NULL, NULL, NULL);
+		ipif = ipif_lookup_on_name(lifr->lifr_name, namelen, B_TRUE,
+		    &exists, isv6, zoneid, NULL, NULL, NULL, NULL, ipst);
 		/* Prevent any further action */
 		if (ipif == NULL) {
 			return (ENOBUFS);
@@ -10823,7 +10946,7 @@ ip_sioctl_addif(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 			}
 		}
 		ill = ill_lookup_on_name(name, B_FALSE, isv6,
-		    CONNP_TO_WQ(connp), mp, ip_process_ioctl, &err, NULL);
+		    CONNP_TO_WQ(connp), mp, ip_process_ioctl, &err, NULL, ipst);
 		if (found_sep)
 			*cp = IPIF_SEPARATOR_CHAR;
 		if (ill == NULL)
@@ -10862,10 +10985,12 @@ ip_sioctl_addif(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 		 * plumbed when we're adding an IPv4 (resp. IPv6) ipif.
 		 * Otherwise we create the ipif on the failed interface.
 		 */
-		rw_enter(&ill_g_lock, RW_READER);
-		phyi = avl_first(&phyint_g_list.phyint_list_avl_by_index);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+		phyi = avl_first(&ipst->ips_phyint_g_list->
+		    phyint_list_avl_by_index);
 		for (; phyi != NULL;
-		    phyi = avl_walk(&phyint_g_list.phyint_list_avl_by_index,
+		    phyi = avl_walk(&ipst->ips_phyint_g_list->
+		    phyint_list_avl_by_index,
 		    phyi, AVL_AFTER)) {
 			if (phyi->phyint_groupname_len == 0)
 				continue;
@@ -10878,7 +11003,7 @@ ip_sioctl_addif(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 				break;
 			}
 		}
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 
 		if (phyi != NULL) {
 			orig_ifindex = ill->ill_phyint->phyint_ifindex;
@@ -10958,7 +11083,11 @@ ip_sioctl_removeif(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	conn_t		*connp;
 	ill_t		*ill = ipif->ipif_ill;
 	boolean_t	 success;
+	ip_stack_t	*ipst;
 
+	ipst = CONNQ_TO_IPST(q);
+
+	ASSERT(q->q_next == NULL);
 	ip1dbg(("ip_sioctl_remove_if(%s:%u %p)\n",
 		ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
 	ASSERT(IAM_WRITER_IPIF(ipif));
@@ -11033,14 +11162,15 @@ ip_sioctl_removeif(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 			sin6 = (sin6_t *)sin;
 			/* We are a writer, so we should be able to lookup */
 			ipif = ipif_lookup_addr_v6(&sin6->sin6_addr,
-			    ill, ALL_ZONES, NULL, NULL, NULL, NULL);
+			    ill, ALL_ZONES, NULL, NULL, NULL, NULL, ipst);
 			if (ipif == NULL) {
 				/*
 				 * Maybe the address in on another interface in
 				 * the same IPMP group? We check this below.
 				 */
 				ipif = ipif_lookup_addr_v6(&sin6->sin6_addr,
-				    NULL, ALL_ZONES, NULL, NULL, NULL, NULL);
+				    NULL, ALL_ZONES, NULL, NULL, NULL, NULL,
+				    ipst);
 			}
 		} else {
 			ipaddr_t addr;
@@ -11051,14 +11181,14 @@ ip_sioctl_removeif(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 			addr = sin->sin_addr.s_addr;
 			/* We are a writer, so we should be able to lookup */
 			ipif = ipif_lookup_addr(addr, ill, ALL_ZONES, NULL,
-			    NULL, NULL, NULL);
+			    NULL, NULL, NULL, ipst);
 			if (ipif == NULL) {
 				/*
 				 * Maybe the address in on another interface in
 				 * the same IPMP group? We check this below.
 				 */
 				ipif = ipif_lookup_addr(addr, NULL, ALL_ZONES,
-				    NULL, NULL, NULL, NULL);
+				    NULL, NULL, NULL, NULL, ipst);
 			}
 		}
 		if (ipif == NULL) {
@@ -11367,11 +11497,14 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 		info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
 		if (info != NULL) {
+			ip_stack_t	*ipst = ill->ill_ipst;
+
 			info->hne_nic =
 			    ipif->ipif_ill->ill_phyint->phyint_ifindex;
 			info->hne_lif = MAP_IPIF_ID(ipif->ipif_id);
 			info->hne_event = NE_ADDRESS_CHANGE;
-			info->hne_family = ipif->ipif_isv6 ? ipv6 : ipv4;
+			info->hne_family = ipif->ipif_isv6 ?
+			    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
 			info->hne_data = kmem_alloc(sinlen, KM_NOSLEEP);
 			if (info->hne_data != NULL) {
 				info->hne_datalen = sinlen;
@@ -11391,7 +11524,7 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		ipif->ipif_ill->ill_nic_event_info = info;
 	}
 
-	mutex_exit(&ipif->ipif_ill->ill_lock);
+	mutex_exit(&ill->ill_lock);
 
 	if (need_up) {
 		/*
@@ -11831,6 +11964,7 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	struct lifreq *lifr;
 	boolean_t set_linklocal = B_FALSE;
 	boolean_t zero_source = B_FALSE;
+	ip_stack_t *ipst;
 
 	ip1dbg(("ip_sioctl_flags(%s:%u %p)\n",
 		ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
@@ -11839,6 +11973,7 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 	ill = ipif->ipif_ill;
 	phyi = ill->ill_phyint;
+	ipst = ill->ill_ipst;
 
 	if (ipip->ipi_cmd_type == IF_CMD) {
 		ifr = (struct ifreq *)if_req;
@@ -11957,13 +12092,15 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		 * PHYI_FAILED and PHYI_INACTIVE are exclusive
 		 */
 		if ((turn_on & PHYI_FAILED) &&
-		    ((intf_flags & PHYI_STANDBY) || !ipmp_enable_failback)) {
+		    ((intf_flags & PHYI_STANDBY) ||
+		    !ipst->ips_ipmp_enable_failback)) {
 			/* Reset PHYI_INACTIVE when PHYI_FAILED is being set */
 			phyi->phyint_flags &= ~PHYI_INACTIVE;
 		}
 		if ((turn_off & PHYI_FAILED) &&
 		    ((intf_flags & PHYI_STANDBY) ||
-		    (!ipmp_enable_failback && ill_is_inactive(ill)))) {
+		    (!ipst->ips_ipmp_enable_failback &&
+		    ill_is_inactive(ill)))) {
 			phyint_inactive(phyi);
 		}
 
@@ -11981,7 +12118,7 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 				phyint_inactive(phyi);
 		}
 		if (turn_off & PHYI_STANDBY) {
-			if (ipmp_enable_failback) {
+			if (ipst->ips_ipmp_enable_failback) {
 				/*
 				 * Reset PHYI_INACTIVE.
 				 */
@@ -12282,6 +12419,9 @@ ip_sioctl_flags_restart(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	return (err);
 }
 
+/*
+ * Can operate on either a module or a driver queue.
+ */
 /* ARGSUSED */
 int
 ip_sioctl_get_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
@@ -12331,6 +12471,7 @@ ip_sioctl_mtu(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	struct ifreq	*ifr;
 	struct lifreq *lifr;
 	ire_t	*ire;
+	ip_stack_t *ipst;
 
 	ip1dbg(("ip_sioctl_mtu(%s:%u %p)\n", ipif->ipif_ill->ill_name,
 	    ipif->ipif_id, (void *)ipif));
@@ -12374,11 +12515,14 @@ ip_sioctl_mtu(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		ire->ire_max_frag = ipif->ipif_mtu;
 		ire_refrele(ire);
 	}
+	ipst = ipif->ipif_ill->ill_ipst;
 	if (ipif->ipif_flags & IPIF_UP) {
 		if (ipif->ipif_isv6)
-			ire_walk_v6(ipif_mtu_change, (char *)ipif, ALL_ZONES);
+			ire_walk_v6(ipif_mtu_change, (char *)ipif, ALL_ZONES,
+			    ipst);
 		else
-			ire_walk_v4(ipif_mtu_change, (char *)ipif, ALL_ZONES);
+			ire_walk_v4(ipif_mtu_change, (char *)ipif, ALL_ZONES,
+			    ipst);
 	}
 	/* Update the MTU in SCTP's list */
 	sctp_update_ipif(ipif, SCTP_IPIF_UPDATE);
@@ -12414,6 +12558,7 @@ ip_sioctl_brdaddr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 {
 	ipaddr_t addr;
 	ire_t	*ire;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	ip1dbg(("ip_sioctl_brdaddr(%s:%u)\n", ipif->ipif_ill->ill_name,
 	    ipif->ipif_id));
@@ -12441,7 +12586,7 @@ ip_sioctl_brdaddr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		 */
 		ire = ire_ctable_lookup(addr, 0, IRE_BROADCAST,
 		    ipif, ALL_ZONES, NULL,
-		    (MATCH_IRE_ILL | MATCH_IRE_TYPE));
+		    (MATCH_IRE_ILL | MATCH_IRE_TYPE), ipst);
 		if (ire == NULL) {
 			return (EINVAL);
 		} else {
@@ -13195,7 +13340,7 @@ ip_sioctl_get_lnkinfo(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
  * experimental.
  */
 static ipaddr_t
-ip_subnet_mask(ipaddr_t addr, ipif_t **ipifp)
+ip_subnet_mask(ipaddr_t addr, ipif_t **ipifp, ip_stack_t *ipst)
 {
 	ipaddr_t net_mask;
 	ill_t	*ill;
@@ -13211,8 +13356,8 @@ ip_subnet_mask(ipaddr_t addr, ipif_t **ipifp)
 
 	/* Let's check to see if this is maybe a local subnet route. */
 	/* this function only applies to IPv4 interfaces */
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_V4(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_V4(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		mutex_enter(&ill->ill_lock);
 		for (ipif = ill->ill_ipif; ipif != NULL;
@@ -13241,7 +13386,7 @@ ip_subnet_mask(ipaddr_t addr, ipif_t **ipifp)
 				 */
 				ipif_refhold_locked(ipif);
 				mutex_exit(&ill->ill_lock);
-				rw_exit(&ill_g_lock);
+				rw_exit(&ipst->ips_ill_g_lock);
 				if (fallback_ipif != NULL)
 					ipif_refrele(fallback_ipif);
 				*ipifp = ipif;
@@ -13250,7 +13395,7 @@ ip_subnet_mask(ipaddr_t addr, ipif_t **ipifp)
 		}
 		mutex_exit(&ill->ill_lock);
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	*ipifp = fallback_ipif;
 	return ((fallback_ipif != NULL) ?
@@ -13357,8 +13502,6 @@ ipif_lookup_seqid(ill_t *ill, uint_t seqid)
 	return (NULL);
 }
 
-uint64_t ipif_g_seqid;
-
 /*
  * Assign a unique id for the ipif. This is used later when we send
  * IRES to ARP for resolution where we initialize ire_ipif_seqid
@@ -13369,7 +13512,9 @@ uint64_t ipif_g_seqid;
 static void
 ipif_assign_seqid(ipif_t *ipif)
 {
-	ipif->ipif_seqid = atomic_add_64_nv(&ipif_g_seqid, 1);
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
+
+	ipif->ipif_seqid = atomic_add_64_nv(&ipst->ips_ipif_g_seqid, 1);
 }
 
 /*
@@ -13385,12 +13530,14 @@ ipif_insert(ipif_t *ipif, boolean_t acquire_g_lock, boolean_t acquire_ill_lock)
 	ipif_t *tipif;
 	ipif_t **tipifp;
 	int id;
+	ip_stack_t	*ipst;
 
 	ASSERT(ipif->ipif_ill->ill_net_type == IRE_LOOPBACK ||
 	    IAM_WRITER_IPIF(ipif));
 
 	ill = ipif->ipif_ill;
 	ASSERT(ill != NULL);
+	ipst = ill->ill_ipst;
 
 	/*
 	 * In the case of lo0:0 we already hold the ill_g_lock.
@@ -13398,7 +13545,7 @@ ipif_insert(ipif_t *ipif, boolean_t acquire_g_lock, boolean_t acquire_ill_lock)
 	 * ipif_insert. Another such caller is ipif_move.
 	 */
 	if (acquire_g_lock)
-		rw_enter(&ill_g_lock, RW_WRITER);
+		rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 	if (acquire_ill_lock)
 		mutex_enter(&ill->ill_lock);
 	id = ipif->ipif_id;
@@ -13413,15 +13560,15 @@ ipif_insert(ipif_t *ipif, boolean_t acquire_g_lock, boolean_t acquire_ill_lock)
 			tipifp = &(tipif->ipif_next);
 		}
 		/* limit number of logical interfaces */
-		if (id >= ip_addrs_per_if) {
+		if (id >= ipst->ips_ip_addrs_per_if) {
 			if (acquire_ill_lock)
 				mutex_exit(&ill->ill_lock);
 			if (acquire_g_lock)
-				rw_exit(&ill_g_lock);
+				rw_exit(&ipst->ips_ill_g_lock);
 			return (-1);
 		}
 		ipif->ipif_id = id; /* assign new id */
-	} else if (id < ip_addrs_per_if) {
+	} else if (id < ipst->ips_ip_addrs_per_if) {
 		/* we have a real id; insert ipif in the right place */
 		while ((tipif = *tipifp) != NULL) {
 			ASSERT(tipif->ipif_id != id);
@@ -13433,7 +13580,7 @@ ipif_insert(ipif_t *ipif, boolean_t acquire_g_lock, boolean_t acquire_ill_lock)
 		if (acquire_ill_lock)
 			mutex_exit(&ill->ill_lock);
 		if (acquire_g_lock)
-			rw_exit(&ill_g_lock);
+			rw_exit(&ipst->ips_ill_g_lock);
 		return (-1);
 	}
 
@@ -13444,7 +13591,7 @@ ipif_insert(ipif_t *ipif, boolean_t acquire_g_lock, boolean_t acquire_ill_lock)
 	if (acquire_ill_lock)
 		mutex_exit(&ill->ill_lock);
 	if (acquire_g_lock)
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 	return (0);
 }
 
@@ -13479,7 +13626,11 @@ ipif_allocate(ill_t *ill, int id, uint_t ire_type, boolean_t initialize)
 
 	ipif->ipif_ill = ill;
 	ipif->ipif_id = id;	/* could be -1 */
-	ipif->ipif_zoneid = GLOBAL_ZONEID;
+	/*
+	 * Inherit the zoneid from the ill; for the shared stack instance
+	 * this is always the global zone
+	 */
+	ipif->ipif_zoneid = ill->ill_zoneid;
 
 	mutex_init(&ipif->ipif_saved_ire_lock, NULL, MUTEX_DEFAULT, NULL);
 
@@ -14208,11 +14359,11 @@ ill_signal_ipsq_ills(ipsq_t *ipsq, boolean_t caller_holds_lock)
 }
 
 static ipsq_t *
-ipsq_create(char *groupname)
+ipsq_create(char *groupname, ip_stack_t *ipst)
 {
 	ipsq_t	*ipsq;
 
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_lock));
 	ipsq = kmem_zalloc(sizeof (ipsq_t), KM_NOSLEEP);
 	if (ipsq == NULL) {
 		return (NULL);
@@ -14225,8 +14376,9 @@ ipsq_create(char *groupname)
 
 	mutex_init(&ipsq->ipsq_lock, NULL, MUTEX_DEFAULT, NULL);
 	ipsq->ipsq_flags |= IPSQ_GROUP;
-	ipsq->ipsq_next = ipsq_g_head;
-	ipsq_g_head = ipsq;
+	ipsq->ipsq_next = ipst->ips_ipsq_g_head;
+	ipst->ips_ipsq_g_head = ipsq;
+	ipsq->ipsq_ipst = ipst;		/* No netstack_hold */
 	return (ipsq);
 }
 
@@ -14256,19 +14408,22 @@ ipsq_create(char *groupname)
  * natural state.
  */
 static ipsq_t *
-ip_ipsq_lookup(char *groupname, boolean_t create, ipsq_t *exclude_ipsq)
+ip_ipsq_lookup(char *groupname, boolean_t create, ipsq_t *exclude_ipsq,
+    ip_stack_t *ipst)
 {
 	ipsq_t	*ipsq;
 	int	group_len;
 	phyint_t *phyint;
 
-	ASSERT(RW_LOCK_HELD(&ill_g_lock));
+	ASSERT(RW_LOCK_HELD(&ipst->ips_ill_g_lock));
 
 	group_len = strlen(groupname);
 	ASSERT(group_len != 0);
 	group_len++;
 
-	for (ipsq = ipsq_g_head; ipsq != NULL; ipsq = ipsq->ipsq_next) {
+	for (ipsq = ipst->ips_ipsq_g_head;
+	    ipsq != NULL;
+	    ipsq = ipsq->ipsq_next) {
 		/*
 		 * When an ipsq is being split, and ill_split_ipsq
 		 * calls this function, we exclude it from being considered.
@@ -14291,7 +14446,7 @@ ip_ipsq_lookup(char *groupname, boolean_t create, ipsq_t *exclude_ipsq)
 			 * part of 1 ipsq and is not found in any other
 			 * ipsq.
 			 */
-			ASSERT(ip_ipsq_lookup(groupname, B_FALSE, ipsq) ==
+			ASSERT(ip_ipsq_lookup(groupname, B_FALSE, ipsq, ipst) ==
 			    NULL);
 			return (ipsq);
 		}
@@ -14313,15 +14468,15 @@ ip_ipsq_lookup(char *groupname, boolean_t create, ipsq_t *exclude_ipsq)
 				 * part of 1 ipsq and is not found in any other
 				 * ipsq.
 				 */
-				ASSERT(ip_ipsq_lookup(groupname, B_FALSE, ipsq)
-					== NULL);
+				ASSERT(ip_ipsq_lookup(groupname, B_FALSE, ipsq,
+				    ipst) == NULL);
 				return (ipsq);
 			}
 			phyint = phyint->phyint_ipsq_next;
 		}
 	}
 	if (create)
-		ipsq = ipsq_create(groupname);
+		ipsq = ipsq_create(groupname, ipst);
 	return (ipsq);
 }
 
@@ -14330,6 +14485,7 @@ ipsq_delete(ipsq_t *ipsq)
 {
 	ipsq_t *nipsq;
 	ipsq_t *pipsq = NULL;
+	ip_stack_t *ipst = ipsq->ipsq_ipst;
 
 	/*
 	 * We don't hold the ipsq lock, but we are sure no new
@@ -14345,17 +14501,19 @@ ipsq_delete(ipsq_t *ipsq)
 		/*
 		 * This is not the ipsq of an IPMP group.
 		 */
+		ipsq->ipsq_ipst = NULL;
 		kmem_free(ipsq, sizeof (ipsq_t));
 		return;
 	}
 
-	rw_enter(&ill_g_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 
 	/*
 	 * Locate the ipsq  before we can remove it from
 	 * the singly linked list of ipsq's.
 	 */
-	for (nipsq = ipsq_g_head; nipsq != NULL; nipsq = nipsq->ipsq_next) {
+	for (nipsq = ipst->ips_ipsq_g_head; nipsq != NULL;
+	    nipsq = nipsq->ipsq_next) {
 		if (nipsq == ipsq) {
 			break;
 		}
@@ -14368,17 +14526,16 @@ ipsq_delete(ipsq_t *ipsq)
 	if (pipsq != NULL)
 		pipsq->ipsq_next = ipsq->ipsq_next;
 	else
-		ipsq_g_head = ipsq->ipsq_next;
+		ipst->ips_ipsq_g_head = ipsq->ipsq_next;
+	ipsq->ipsq_ipst = NULL;
 	kmem_free(ipsq, sizeof (ipsq_t));
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 }
 
 static void
 ill_move_to_new_ipsq(ipsq_t *old_ipsq, ipsq_t *new_ipsq, mblk_t *current_mp,
     queue_t *q)
-
 {
-
 	ASSERT(MUTEX_HELD(&new_ipsq->ipsq_lock));
 	ASSERT(old_ipsq->ipsq_mphead == NULL && old_ipsq->ipsq_mptail == NULL);
 	ASSERT(old_ipsq->ipsq_pending_ipif == NULL);
@@ -14608,13 +14765,13 @@ ill_down_ipifs(ill_t *ill, mblk_t *mp, int index, boolean_t chk_nofailover)
 	}
 }
 
-#define	IPSQ_INC_REF(ipsq)	{			\
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));		\
+#define	IPSQ_INC_REF(ipsq, ipst)	{			\
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_lock));		\
 	(ipsq)->ipsq_refs++;				\
 }
 
-#define	IPSQ_DEC_REF(ipsq)	{			\
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));		\
+#define	IPSQ_DEC_REF(ipsq, ipst)	{			\
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_lock));		\
 	(ipsq)->ipsq_refs--;				\
 	if ((ipsq)->ipsq_refs == 0)				\
 		(ipsq)->ipsq_name[0] = '\0'; 		\
@@ -14625,7 +14782,7 @@ ill_down_ipifs(ill_t *ill, mblk_t *mp, int index, boolean_t chk_nofailover)
  * new_ipsq.
  */
 static void
-ill_merge_ipsq(ipsq_t *cur_ipsq, ipsq_t *new_ipsq)
+ill_merge_ipsq(ipsq_t *cur_ipsq, ipsq_t *new_ipsq, ip_stack_t *ipst)
 {
 	phyint_t *phyint;
 	phyint_t *next_phyint;
@@ -14635,16 +14792,16 @@ ill_merge_ipsq(ipsq_t *cur_ipsq, ipsq_t *new_ipsq)
 	 * writer and the ill_lock of the ill in question. Also the dest
 	 * ipsq can't vanish while we hold the ill_g_lock as writer.
 	 */
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_lock));
 
 	phyint = cur_ipsq->ipsq_phyint_list;
 	cur_ipsq->ipsq_phyint_list = NULL;
 	while (phyint != NULL) {
 		next_phyint = phyint->phyint_ipsq_next;
-		IPSQ_DEC_REF(cur_ipsq);
+		IPSQ_DEC_REF(cur_ipsq, ipst);
 		phyint->phyint_ipsq_next = new_ipsq->ipsq_phyint_list;
 		new_ipsq->ipsq_phyint_list = phyint;
-		IPSQ_INC_REF(new_ipsq);
+		IPSQ_INC_REF(new_ipsq, ipst);
 		phyint->phyint_ipsq = new_ipsq;
 		phyint = next_phyint;
 	}
@@ -14655,7 +14812,8 @@ ill_merge_ipsq(ipsq_t *cur_ipsq, ipsq_t *new_ipsq)
 #define	SPLIT_FAILED		2
 
 int
-ill_split_to_grp_ipsq(phyint_t *phyint, ipsq_t *cur_ipsq, boolean_t need_retry)
+ill_split_to_grp_ipsq(phyint_t *phyint, ipsq_t *cur_ipsq, boolean_t need_retry,
+    ip_stack_t *ipst)
 {
 	ipsq_t *newipsq = NULL;
 
@@ -14663,7 +14821,7 @@ ill_split_to_grp_ipsq(phyint_t *phyint, ipsq_t *cur_ipsq, boolean_t need_retry)
 	 * Assertions denote pre-requisites for changing the ipsq of
 	 * a phyint
 	 */
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_lock));
 	/*
 	 * <ill-phyint> assocs can't change while ill_g_lock
 	 * is held as writer. See ill_phyint_reinit()
@@ -14684,17 +14842,17 @@ ill_split_to_grp_ipsq(phyint_t *phyint, ipsq_t *cur_ipsq, boolean_t need_retry)
 		 * to be in the same ipsq even in the event of mem alloc fails.
 		 */
 		newipsq = ip_ipsq_lookup(phyint->phyint_groupname, !need_retry,
-		    cur_ipsq);
+		    cur_ipsq, ipst);
 		if (newipsq == NULL) {
 			/* Memory allocation failure */
 			return (SPLIT_FAILED);
 		} else {
 			/* ipsq_refs protected by ill_g_lock (writer) */
-			IPSQ_DEC_REF(cur_ipsq);
+			IPSQ_DEC_REF(cur_ipsq, ipst);
 			phyint->phyint_ipsq = newipsq;
 			phyint->phyint_ipsq_next = newipsq->ipsq_phyint_list;
 			newipsq->ipsq_phyint_list = phyint;
-			IPSQ_INC_REF(newipsq);
+			IPSQ_INC_REF(newipsq, ipst);
 			return (SPLIT_SUCCESS);
 		}
 	}
@@ -14706,11 +14864,11 @@ ill_split_to_grp_ipsq(phyint_t *phyint, ipsq_t *cur_ipsq, boolean_t need_retry)
  * to do this split
  */
 static int
-ill_split_to_own_ipsq(phyint_t *phyint, ipsq_t *cur_ipsq)
+ill_split_to_own_ipsq(phyint_t *phyint, ipsq_t *cur_ipsq, ip_stack_t *ipst)
 {
 	ipsq_t *newipsq;
 
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_lock));
 	/*
 	 * <ill-phyint> assocs can't change while ill_g_lock
 	 * is held as writer. See ill_phyint_reinit()
@@ -14731,7 +14889,7 @@ ill_split_to_own_ipsq(phyint_t *phyint, ipsq_t *cur_ipsq)
 	}
 
 	/* ipsq_ref is protected by ill_g_lock (writer) */
-	IPSQ_DEC_REF(cur_ipsq);
+	IPSQ_DEC_REF(cur_ipsq, ipst);
 
 	/*
 	 * This is a new ipsq that is unknown to the world.
@@ -14760,6 +14918,7 @@ ill_split_ipsq(ipsq_t *cur_ipsq)
 	phyint_t *next_phyint;
 	int	error;
 	boolean_t need_retry = B_FALSE;
+	ip_stack_t	*ipst = cur_ipsq->ipsq_ipst;
 
 	phyint = cur_ipsq->ipsq_phyint_list;
 	cur_ipsq->ipsq_phyint_list = NULL;
@@ -14771,10 +14930,10 @@ ill_split_ipsq(ipsq_t *cur_ipsq)
 		 * to return without creating an ipsq.
 		 */
 		if (phyint->phyint_groupname == NULL) {
-			error = ill_split_to_own_ipsq(phyint, cur_ipsq);
+			error = ill_split_to_own_ipsq(phyint, cur_ipsq, ipst);
 		} else {
 			error = ill_split_to_grp_ipsq(phyint, cur_ipsq,
-					need_retry);
+					need_retry, ipst);
 		}
 
 		switch (error) {
@@ -14812,12 +14971,13 @@ ill_lock_ipsq_ills(ipsq_t *ipsq, ill_t **list, int list_max)
 {
 	int	cnt = 0;
 	phyint_t	*phyint;
+	ip_stack_t	*ipst = ipsq->ipsq_ipst;
 
 	/*
 	 * The caller holds ill_g_lock to ensure that the ill memberships
 	 * of the ipsq don't change
 	 */
-	ASSERT(RW_LOCK_HELD(&ill_g_lock));
+	ASSERT(RW_LOCK_HELD(&ipst->ips_ill_g_lock));
 
 	phyint = ipsq->ipsq_phyint_list;
 	while (phyint != NULL) {
@@ -14905,7 +15065,9 @@ ill_merge_groups(ill_t *from_ill, ill_t *to_ill, char *groupname, mblk_t *mp,
 	int	cnt;
 	size_t	ill_list_size;
 	boolean_t became_writer_on_new_sq = B_FALSE;
+	ip_stack_t	*ipst = from_ill->ill_ipst;
 
+	ASSERT(to_ill == NULL || ipst == to_ill->ill_ipst);
 	/* Exactly 1 of 'to_ill' and groupname can be specified. */
 	ASSERT((to_ill != NULL) ^ (groupname != NULL));
 
@@ -14914,11 +15076,11 @@ ill_merge_groups(ill_t *from_ill, ill_t *to_ill, char *groupname, mblk_t *mp,
 	 * change the <ill-ipsq> assoc of an ill. Need to hold the
 	 * ipsq_lock to prevent new messages from landing on an ipsq.
 	 */
-	rw_enter(&ill_g_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 
 	old_ipsq = from_ill->ill_phyint->phyint_ipsq;
 	if (groupname != NULL)
-		new_ipsq = ip_ipsq_lookup(groupname, B_TRUE, NULL);
+		new_ipsq = ip_ipsq_lookup(groupname, B_TRUE, NULL, ipst);
 	else {
 		new_ipsq = to_ill->ill_phyint->phyint_ipsq;
 	}
@@ -14929,7 +15091,7 @@ ill_merge_groups(ill_t *from_ill, ill_t *to_ill, char *groupname, mblk_t *mp,
 	 * both groups are on the same ipsq.
 	 */
 	if (old_ipsq == new_ipsq) {
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		return (0);
 	}
 
@@ -14937,7 +15099,7 @@ ill_merge_groups(ill_t *from_ill, ill_t *to_ill, char *groupname, mblk_t *mp,
 	ill_list_size = cnt * sizeof (ill_t *);
 	ill_list = kmem_zalloc(ill_list_size, KM_NOSLEEP);
 	if (ill_list == NULL) {
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		return (ENOMEM);
 	}
 	cnt = ill_lock_ipsq_ills(old_ipsq, ill_list, cnt);
@@ -14965,7 +15127,7 @@ ill_merge_groups(ill_t *from_ill, ill_t *to_ill, char *groupname, mblk_t *mp,
 	 * 'new_ipsq' has been looked up, and it can't change its <ill-ipsq>
 	 * assocs. till we release the ill_g_lock, and hence it can't vanish.
 	 */
-	ill_merge_ipsq(old_ipsq, new_ipsq);
+	ill_merge_ipsq(old_ipsq, new_ipsq, ipst);
 
 	/*
 	 * Mark the new ipsq as needing a split since it is currently
@@ -14977,7 +15139,7 @@ ill_merge_groups(ill_t *from_ill, ill_t *to_ill, char *groupname, mblk_t *mp,
 	/* Now release all the locks */
 	mutex_exit(&new_ipsq->ipsq_lock);
 	ill_unlock_ills(ill_list, cnt);
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	kmem_free(ill_list, ill_list_size);
 
@@ -15014,6 +15176,7 @@ ill_bcast_delete_and_add(ill_t *ill, ipaddr_t addr)
 {
 	ire_t *ire, *nire, *nire_next, *ire_head = NULL;
 	ire_t **ire_ptpn = &ire_head;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	/*
 	 * The loopback and non-loopback IREs are inserted in the order in which
@@ -15022,7 +15185,7 @@ ill_bcast_delete_and_add(ill_t *ill, ipaddr_t addr)
 	 */
 	for (;;) {
 		ire = ire_ctable_lookup(addr, 0, IRE_BROADCAST, ill->ill_ipif,
-		    ALL_ZONES, NULL, MATCH_IRE_TYPE | MATCH_IRE_ILL);
+		    ALL_ZONES, NULL, MATCH_IRE_TYPE | MATCH_IRE_ILL, ipst);
 		if (ire == NULL)
 			break;
 
@@ -15069,7 +15232,8 @@ ill_bcast_delete_and_add(ill_t *ill, ipaddr_t addr)
 		    ire->ire_flags,
 		    &ire->ire_uinfo,
 		    NULL,
-		    NULL) == NULL) {
+		    NULL,
+		    ipst) == NULL) {
 			cmn_err(CE_PANIC, "ire_init() failed");
 		}
 		ire_delete(ire);
@@ -15172,11 +15336,12 @@ ill_clear_bcast_mark(ill_t *ill, ipaddr_t addr)
 {
 	ire_t *ire;
 	irb_t *irb;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(ill->ill_group == NULL);
 
 	ire = ire_ctable_lookup(addr, 0, IRE_BROADCAST, ill->ill_ipif,
-	    ALL_ZONES, NULL, MATCH_IRE_TYPE | MATCH_IRE_ILL);
+	    ALL_ZONES, NULL, MATCH_IRE_TYPE | MATCH_IRE_ILL, ipst);
 
 	if (ire != NULL) {
 		/*
@@ -15209,7 +15374,7 @@ ill_clear_bcast_mark(ill_t *ill, ipaddr_t addr)
  * a different ire with the same address for receiving.
  */
 static void
-ill_mark_bcast(ill_group_t *illgrp, ipaddr_t addr)
+ill_mark_bcast(ill_group_t *illgrp, ipaddr_t addr, ip_stack_t *ipst)
 {
 	irb_t *irb;
 	ire_t *ire;
@@ -15228,7 +15393,7 @@ ill_mark_bcast(ill_group_t *illgrp, ipaddr_t addr)
 	boolean_t fallback = B_FALSE;
 
 	ire = ire_ctable_lookup(addr, 0, IRE_BROADCAST, NULL, ALL_ZONES,
-	    NULL, MATCH_IRE_TYPE);
+	    NULL, MATCH_IRE_TYPE, ipst);
 	/*
 	 * We may not be able to find some ires if a previous
 	 * ire_create failed. This happens when an ipif goes
@@ -15379,7 +15544,8 @@ redo:
 		    clear_ire->ire_flags,
 		    &clear_ire->ire_uinfo,
 		    NULL,
-		    NULL) == NULL)
+		    NULL,
+		    ipst) == NULL)
 			cmn_err(CE_PANIC, "ire_init() failed");
 		if (clear_ire->ire_stq == NULL) {
 			ire_t *ire_next = clear_ire->ire_next;
@@ -15420,7 +15586,8 @@ redo:
 				    clear_ire_stq->ire_flags,
 				    &clear_ire_stq->ire_uinfo,
 				    NULL,
-				    NULL) == NULL)
+				    NULL,
+				    ipst) == NULL)
 					cmn_err(CE_PANIC, "ire_init() failed");
 			}
 		}
@@ -15456,7 +15623,7 @@ redo:
 		membar_producer();
 		*irep = new_lb_ire;
 		new_lb_ire_used = B_TRUE;
-		BUMP_IRE_STATS(ire_stats_v4, ire_stats_inserted);
+		BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_inserted);
 		new_lb_ire->ire_bucket->irb_ire_cnt++;
 		new_lb_ire->ire_ipif->ipif_ire_cnt++;
 
@@ -15473,7 +15640,8 @@ redo:
 			membar_producer();
 			*irep = new_nlb_ire;
 			new_nlb_ire_used = B_TRUE;
-			BUMP_IRE_STATS(ire_stats_v4, ire_stats_inserted);
+			BUMP_IRE_STATS(ipst->ips_ire_stats_v4,
+			    ire_stats_inserted);
 			new_nlb_ire->ire_bucket->irb_ire_cnt++;
 			new_nlb_ire->ire_ipif->ipif_ire_cnt++;
 			((ill_t *)new_nlb_ire->ire_stq->q_ptr)->ill_ire_cnt++;
@@ -15502,6 +15670,7 @@ ipif_renominate_bcast(ipif_t *ipif)
 	ipaddr_t subnet_netmask;
 	ipaddr_t addr;
 	ill_group_t *illgrp;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	illgrp = ill->ill_group;
 	/*
@@ -15516,8 +15685,8 @@ ipif_renominate_bcast(ipif_t *ipif)
 	if (ipif->ipif_subnet == 0)
 		return;
 
-	ill_mark_bcast(illgrp, 0);
-	ill_mark_bcast(illgrp, INADDR_BROADCAST);
+	ill_mark_bcast(illgrp, 0, ipst);
+	ill_mark_bcast(illgrp, INADDR_BROADCAST, ipst);
 
 	if ((ipif->ipif_lcl_addr != INADDR_ANY) &&
 	    !(ipif->ipif_flags & IPIF_NOLOCAL)) {
@@ -15526,17 +15695,17 @@ ipif_renominate_bcast(ipif_t *ipif)
 		net_mask = htonl(IN_CLASSA_NET);
 	}
 	addr = net_mask & ipif->ipif_subnet;
-	ill_mark_bcast(illgrp, addr);
+	ill_mark_bcast(illgrp, addr, ipst);
 
 	net_addr = ~net_mask | addr;
-	ill_mark_bcast(illgrp, net_addr);
+	ill_mark_bcast(illgrp, net_addr, ipst);
 
 	subnet_netmask = ipif->ipif_net_mask;
 	addr = ipif->ipif_subnet;
-	ill_mark_bcast(illgrp, addr);
+	ill_mark_bcast(illgrp, addr, ipst);
 
 	subnet_addr = ~subnet_netmask | addr;
-	ill_mark_bcast(illgrp, subnet_addr);
+	ill_mark_bcast(illgrp, subnet_addr, ipst);
 }
 
 /*
@@ -15571,6 +15740,7 @@ ill_nominate_bcast_rcv(ill_group_t *illgrp)
 	ipaddr_t net_mask = 0;
 	ipaddr_t subnet_netmask;
 	ipaddr_t addr;
+	ip_stack_t	*ipst;
 
 	/*
 	 * When the last memeber is leaving, there is nothing to
@@ -15583,6 +15753,7 @@ ill_nominate_bcast_rcv(ill_group_t *illgrp)
 
 	ill = illgrp->illgrp_ill;
 	ASSERT(!ill->ill_isv6);
+	ipst = ill->ill_ipst;
 	/*
 	 * We assume that ires with same address and belonging to the
 	 * same group, has been grouped together. Nominating a *single*
@@ -15625,8 +15796,8 @@ ill_nominate_bcast_rcv(ill_group_t *illgrp)
 	 * the first ire in the bucket for receiving and disables the
 	 * others.
 	 */
-	ill_mark_bcast(illgrp, 0);
-	ill_mark_bcast(illgrp, INADDR_BROADCAST);
+	ill_mark_bcast(illgrp, 0, ipst);
+	ill_mark_bcast(illgrp, INADDR_BROADCAST, ipst);
 	for (; ill != NULL; ill = ill->ill_group_next) {
 
 		for (ipif = ill->ill_ipif; ipif != NULL;
@@ -15644,9 +15815,9 @@ ill_nominate_bcast_rcv(ill_group_t *illgrp)
 			}
 			addr = net_mask & ipif->ipif_subnet;
 			if (prev_net_addr == 0 || prev_net_addr != addr) {
-				ill_mark_bcast(illgrp, addr);
+				ill_mark_bcast(illgrp, addr, ipst);
 				net_addr = ~net_mask | addr;
-				ill_mark_bcast(illgrp, net_addr);
+				ill_mark_bcast(illgrp, net_addr, ipst);
 			}
 			prev_net_addr = addr;
 
@@ -15654,9 +15825,9 @@ ill_nominate_bcast_rcv(ill_group_t *illgrp)
 			addr = ipif->ipif_subnet;
 			if (prev_subnet_addr == 0 ||
 			    prev_subnet_addr != addr) {
-				ill_mark_bcast(illgrp, addr);
+				ill_mark_bcast(illgrp, addr, ipst);
 				subnet_addr = ~subnet_netmask | addr;
-				ill_mark_bcast(illgrp, subnet_addr);
+				ill_mark_bcast(illgrp, subnet_addr, ipst);
 			}
 			prev_subnet_addr = addr;
 		}
@@ -15801,6 +15972,7 @@ ill_handoff_responsibility(ill_t *ill, ill_group_t *illgrp)
 	ipaddr_t net_mask = 0;
 	ipaddr_t subnet_netmask;
 	ipaddr_t addr;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	ASSERT(ill->ill_group == NULL);
 	/*
@@ -15905,7 +16077,7 @@ ill_handoff_responsibility(ill_t *ill, ill_group_t *illgrp)
 	 * the ire reference, we clean up the extra reference to the ill held in
 	 * ire->ire_stq.
 	 */
-	ipcl_walk(conn_cleanup_stale_ire, NULL);
+	ipcl_walk(conn_cleanup_stale_ire, NULL, ipst);
 
 	/*
 	 * Re-do source address selection for all the members in the
@@ -15932,12 +16104,13 @@ illgrp_delete(ill_t *ill)
 	ill_group_t *illgrp;
 	ill_group_t *tmpg;
 	ill_t *tmp_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	/*
 	 * Reset illgrp_ill_schednext if it was pointing at us.
 	 * We need to do this before we set ill_group to NULL.
 	 */
-	rw_enter(&ill_g_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 	mutex_enter(&ill->ill_lock);
 
 	illgrp_reset_schednext(ill);
@@ -15960,7 +16133,7 @@ illgrp_delete(ill_t *ill)
 
 	illgrp->illgrp_ill_count--;
 	mutex_exit(&ill->ill_lock);
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	/*
 	 * As this ill is leaving the group, we need to hand off
@@ -15970,16 +16143,16 @@ illgrp_delete(ill_t *ill)
 
 	ill_handoff_responsibility(ill, illgrp);
 
-	rw_enter(&ill_g_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 
 	if (illgrp->illgrp_ill_count == 0) {
 
 		ASSERT(illgrp->illgrp_ill == NULL);
 		if (ill->ill_isv6) {
-			if (illgrp == illgrp_head_v6) {
-				illgrp_head_v6 = illgrp->illgrp_next;
+			if (illgrp == ipst->ips_illgrp_head_v6) {
+				ipst->ips_illgrp_head_v6 = illgrp->illgrp_next;
 			} else {
-				tmpg = illgrp_head_v6;
+				tmpg = ipst->ips_illgrp_head_v6;
 				while (tmpg->illgrp_next != illgrp) {
 					tmpg = tmpg->illgrp_next;
 					ASSERT(tmpg != NULL);
@@ -15987,10 +16160,10 @@ illgrp_delete(ill_t *ill)
 				tmpg->illgrp_next = illgrp->illgrp_next;
 			}
 		} else {
-			if (illgrp == illgrp_head_v4) {
-				illgrp_head_v4 = illgrp->illgrp_next;
+			if (illgrp == ipst->ips_illgrp_head_v4) {
+				ipst->ips_illgrp_head_v4 = illgrp->illgrp_next;
 			} else {
-				tmpg = illgrp_head_v4;
+				tmpg = ipst->ips_illgrp_head_v4;
 				while (tmpg->illgrp_next != illgrp) {
 					tmpg = tmpg->illgrp_next;
 					ASSERT(tmpg != NULL);
@@ -16001,7 +16174,7 @@ illgrp_delete(ill_t *ill)
 		mutex_destroy(&illgrp->illgrp_lock);
 		mi_free(illgrp);
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	/*
 	 * Even though the ill is out of the group its not necessary
@@ -16065,10 +16238,11 @@ illgrp_insert(ill_group_t **illgrp_head, ill_t *ill, char *groupname,
 	ill_group_t *illgrp;
 	ill_t *prev_ill;
 	phyint_t *phyi;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(ill->ill_group == NULL);
 
-	rw_enter(&ill_g_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 	mutex_enter(&ill->ill_lock);
 
 	if (groupname != NULL) {
@@ -16154,7 +16328,7 @@ illgrp_insert(ill_group_t **illgrp_head, ill_t *ill, char *groupname,
 		ill->ill_flags |= (illgrp->illgrp_ill->ill_flags & ILLF_ROUTER);
 	}
 	mutex_exit(&ill->ill_lock);
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	/*
 	 * 1) When ipif_up_done() calls this function, ipif_up_count
@@ -16208,18 +16382,18 @@ illgrp_insert(ill_group_t **illgrp_head, ill_t *ill, char *groupname,
  * Needs work: called only from ip_sioctl_groupname
  */
 static phyint_t *
-phyint_lookup_group(char *groupname)
+phyint_lookup_group(char *groupname, ip_stack_t *ipst)
 {
 	phyint_t *phyi;
 
-	ASSERT(RW_LOCK_HELD(&ill_g_lock));
+	ASSERT(RW_LOCK_HELD(&ipst->ips_ill_g_lock));
 	/*
 	 * Group names are stored in the phyint - a common structure
 	 * to both IPv4 and IPv6.
 	 */
-	phyi = avl_first(&phyint_g_list.phyint_list_avl_by_index);
+	phyi = avl_first(&ipst->ips_phyint_g_list->phyint_list_avl_by_index);
 	for (; phyi != NULL;
-	    phyi = avl_walk(&phyint_g_list.phyint_list_avl_by_index,
+	    phyi = avl_walk(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
 	    phyi, AVL_AFTER)) {
 		if (phyi->phyint_groupname_len == 0)
 			continue;
@@ -16285,6 +16459,7 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	mblk_t	*mp1;
 	char *groupname;
 	ipsq_t *ipsq;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(IAM_WRITER_IPIF(ipif));
 
@@ -16389,7 +16564,7 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 			mutex_exit(&ill_v6->ill_lock);
 		}
 
-		rw_enter(&ill_g_lock, RW_WRITER);
+		rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 		GRAB_ILL_LOCKS(ill_v4, ill_v6);
 		mutex_enter(&phyi->phyint_lock);
 		ASSERT(phyi->phyint_groupname != NULL);
@@ -16398,7 +16573,7 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		phyi->phyint_groupname_len = 0;
 		mutex_exit(&phyi->phyint_lock);
 		RELEASE_ILL_LOCKS(ill_v4, ill_v6);
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		err = ill_up_ipifs(ill, q, mp);
 
 		/*
@@ -16419,7 +16594,7 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 			}
 		}
 
-		rw_enter(&ill_g_lock, RW_READER);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 		/*
 		 * Merge ipsq for the group's.
 		 * This check is here as multiple groups/ills might be
@@ -16427,9 +16602,9 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		 * If we have to merege than the operation is restarted
 		 * on the new ipsq.
 		 */
-		ipsq = ip_ipsq_lookup(groupname, B_FALSE, NULL);
+		ipsq = ip_ipsq_lookup(groupname, B_FALSE, NULL, ipst);
 		if (phyi->phyint_ipsq != ipsq) {
-			rw_exit(&ill_g_lock);
+			rw_exit(&ipst->ips_ill_g_lock);
 			err = ill_merge_groups(ill, NULL, groupname, mp, q);
 			goto done;
 		}
@@ -16448,7 +16623,7 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		 * packets across the group because of potential link-level
 		 * header differences.
 		 */
-		phyi_tmp = phyint_lookup_group(groupname);
+		phyi_tmp = phyint_lookup_group(groupname, ipst);
 		if (phyi_tmp != NULL) {
 			if ((ill_v4 != NULL &&
 			    phyi_tmp->phyint_illv4 != NULL) &&
@@ -16459,7 +16634,7 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 				mutex_enter(&phyi->phyint_ipsq->ipsq_lock);
 				phyi->phyint_ipsq->ipsq_split = B_TRUE;
 				mutex_exit(&phyi->phyint_ipsq->ipsq_lock);
-				rw_exit(&ill_g_lock);
+				rw_exit(&ipst->ips_ill_g_lock);
 				return (EINVAL);
 			}
 			if ((ill_v6 != NULL &&
@@ -16471,12 +16646,12 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 				mutex_enter(&phyi->phyint_ipsq->ipsq_lock);
 				phyi->phyint_ipsq->ipsq_split = B_TRUE;
 				mutex_exit(&phyi->phyint_ipsq->ipsq_lock);
-				rw_exit(&ill_g_lock);
+				rw_exit(&ipst->ips_ill_g_lock);
 				return (EINVAL);
 			}
 		}
 
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 
 		/*
 		 * bring down all v4 ipifs.
@@ -16529,7 +16704,7 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		if (tmp == NULL)
 			return (ENOMEM);
 
-		rw_enter(&ill_g_lock, RW_WRITER);
+		rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 		GRAB_ILL_LOCKS(ill_v4, ill_v6);
 		mutex_enter(&phyi->phyint_lock);
 		if (phyi->phyint_groupname_len != 0) {
@@ -16545,7 +16720,7 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		phyi->phyint_groupname_len = namelen + 1;
 		mutex_exit(&phyi->phyint_lock);
 		RELEASE_ILL_LOCKS(ill_v4, ill_v6);
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 
 		err = ill_up_ipifs(ill, q, mp);
 	}
@@ -16683,12 +16858,13 @@ static void
 conn_move_ill(ill_t *from_ill, ill_t *to_ill, int ifindex)
 {
 	conn_move_t connm;
+	ip_stack_t	*ipst = from_ill->ill_ipst;
 
 	connm.cm_from_ill = from_ill;
 	connm.cm_to_ill = to_ill;
 	connm.cm_ifindex = ifindex;
 
-	ipcl_walk(conn_move, (caddr_t)&connm);
+	ipcl_walk(conn_move, (caddr_t)&connm, ipst);
 }
 
 /*
@@ -16848,10 +17024,11 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 	int	count;
 	char buf[INET6_ADDRSTRLEN];
 	in6_addr_t ipv6_snm = ipv6_solicited_node_mcast;
+	ip_stack_t	*ipst = from_ill->ill_ipst;
 
 	ASSERT(MUTEX_HELD(&to_ill->ill_lock));
 	ASSERT(MUTEX_HELD(&from_ill->ill_lock));
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_lock));
 
 	if (ifindex == 0) {
 		/*
@@ -17193,10 +17370,11 @@ ilm_move_v4(ill_t *from_ill, ill_t *to_ill, ipif_t *ipif)
 	ilm_t	*ilm_next;
 	ilm_t	*new_ilm;
 	ilm_t	**ilmp;
+	ip_stack_t	*ipst = from_ill->ill_ipst;
 
 	ASSERT(MUTEX_HELD(&to_ill->ill_lock));
 	ASSERT(MUTEX_HELD(&from_ill->ill_lock));
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_lock));
 
 	ilmp = &from_ill->ill_ilm;
 	for (ilm = from_ill->ill_ilm; ilm != NULL; ilm = ilm_next) {
@@ -17328,6 +17506,7 @@ ipif_get_id(ill_t *ill, uint_t id)
 	uint_t	unit;
 	ipif_t	*tipif;
 	boolean_t found = B_FALSE;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	/*
 	 * During failback, we want to go back to the same id
@@ -17360,7 +17539,7 @@ ipif_get_id(ill_t *ill, uint_t id)
 		if (!found)
 			return (id);
 	}
-	for (unit = 0; unit <= ip_addrs_per_if; unit++) {
+	for (unit = 0; unit <= ipst->ips_ip_addrs_per_if; unit++) {
 		found = B_FALSE;
 		for (tipif = ill->ill_ipif; tipif != NULL;
 		    tipif = tipif->ipif_next) {
@@ -17390,6 +17569,7 @@ ipif_move(ipif_t *ipif, ill_t *to_ill, queue_t *q, mblk_t *mp,
 	boolean_t failback_cmd;
 	boolean_t remove_ipif;
 	int	rc;
+	ip_stack_t	*ipst;
 
 	ASSERT(IAM_WRITER_ILL(to_ill));
 	ASSERT(IAM_WRITER_IPIF(ipif));
@@ -17399,10 +17579,11 @@ ipif_move(ipif_t *ipif, ill_t *to_ill, queue_t *q, mblk_t *mp,
 	remove_ipif = B_FALSE;
 
 	from_ill = ipif->ipif_ill;
+	ipst = from_ill->ill_ipst;
 
 	ASSERT(MUTEX_HELD(&to_ill->ill_lock));
 	ASSERT(MUTEX_HELD(&from_ill->ill_lock));
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_lock));
 
 	/*
 	 * Don't move LINK LOCAL addresses as they are tied to
@@ -17481,7 +17662,7 @@ ipif_move(ipif_t *ipif, ill_t *to_ill, queue_t *q, mblk_t *mp,
 	if (to_ipif->ipif_id == MAX_ADDRS_PER_IF)
 		to_ipif->ipif_id = 0;
 
-	if (unit == ip_addrs_per_if) {
+	if (unit == ipst->ips_ip_addrs_per_if) {
 		ipif->ipif_was_up = B_FALSE;
 		IPIF_UNMARK_MOVING(ipif);
 		return (EINVAL);
@@ -17705,6 +17886,7 @@ ill_move(ill_t *from_ill, ill_t *to_ill, queue_t *q, mblk_t *mp)
 	ipif_t *rep_ipif_ptr = NULL;
 	ipif_t	*from_ipif = NULL;
 	boolean_t check_rep_if = B_FALSE;
+	ip_stack_t	*ipst = from_ill->ill_ipst;
 
 	iocp = (struct iocblk *)mp->b_rptr;
 	if (iocp->ioc_cmd == SIOCLIFFAILOVER) {
@@ -17766,7 +17948,7 @@ ill_move(ill_t *from_ill, ill_t *to_ill, queue_t *q, mblk_t *mp)
 	RELEASE_ILL_LOCKS(from_ill, to_ill);
 
 	ASSERT(!MUTEX_HELD(&to_ill->ill_lock));
-	rw_enter(&ill_g_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 	GRAB_ILL_LOCKS(from_ill, to_ill);
 	err = ipif_move_all(from_ill, to_ill, q, mp, ifindex, &rep_ipif_ptr);
 
@@ -17775,7 +17957,7 @@ ill_move(ill_t *from_ill, ill_t *to_ill, queue_t *q, mblk_t *mp)
 		ilm_move_v6(from_ill, to_ill, ifindex);
 
 	RELEASE_ILL_LOCKS(from_ill, to_ill);
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	/*
 	 * send rts messages and multicast messages.
@@ -17813,6 +17995,13 @@ ip_extract_move_args(queue_t *q, mblk_t *mp, ill_t **ill_from_v4,
 	boolean_t exists;
 	sin_t	*sin;
 	int	err = 0;
+	ip_stack_t	*ipst;
+
+	if (CONN_Q(q))
+		ipst = CONNQ_TO_IPST(q);
+	else
+		ipst = ILLQ_TO_IPST(q);
+
 
 	if ((mp1 = mp->b_cont) == NULL)
 		return (EPROTO);
@@ -17837,10 +18026,10 @@ ip_extract_move_args(queue_t *q, mblk_t *mp, ill_t **ill_from_v4,
 	 */
 	ipif_v4 = ipif_lookup_on_name(lifr->lifr_name,
 	    mi_strlen(lifr->lifr_name), B_FALSE, &exists, B_FALSE,
-	    ALL_ZONES, NULL, NULL, NULL, NULL);
+	    ALL_ZONES, NULL, NULL, NULL, NULL, ipst);
 	ipif_v6 = ipif_lookup_on_name(lifr->lifr_name,
 	    mi_strlen(lifr->lifr_name), B_FALSE, &exists, B_TRUE,
-	    ALL_ZONES, NULL, NULL, NULL, NULL);
+	    ALL_ZONES, NULL, NULL, NULL, NULL, ipst);
 
 	if (ipif_v4 == NULL && ipif_v6 == NULL)
 		return (ENXIO);
@@ -17870,7 +18059,7 @@ ip_extract_move_args(queue_t *q, mblk_t *mp, ill_t **ill_from_v4,
 	err = 0;
 	dst_index = lifr->lifr_movetoindex;
 	*ill_to_v4 = ill_lookup_on_ifindex(dst_index, B_FALSE,
-	    q, mp, ip_process_ioctl, &err);
+	    q, mp, ip_process_ioctl, &err, ipst);
 	if (err != 0) {
 		/*
 		 * There could be only v6.
@@ -17881,7 +18070,7 @@ ip_extract_move_args(queue_t *q, mblk_t *mp, ill_t **ill_from_v4,
 	}
 
 	*ill_to_v6 = ill_lookup_on_ifindex(dst_index, B_TRUE,
-	    q, mp, ip_process_ioctl, &err);
+	    q, mp, ip_process_ioctl, &err, ipst);
 	if (err != 0) {
 		if (err != ENXIO)
 			goto done;
@@ -18205,12 +18394,15 @@ ill_dl_down(ill_t *ill)
 
 	info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
 	if (info != NULL) {
+		ip_stack_t	*ipst = ill->ill_ipst;
+
 		info->hne_nic = ill->ill_phyint->phyint_ifindex;
 		info->hne_lif = 0;
 		info->hne_event = NE_DOWN;
 		info->hne_data = NULL;
 		info->hne_datalen = 0;
-		info->hne_family = ill->ill_isv6 ? ipv6 : ipv4;
+		info->hne_family = ill->ill_isv6 ?
+		    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
 	} else
 		ip2dbg(("ill_dl_down: could not attach DOWN nic event "
 		    "information for %s (ENOMEM)\n", ill->ill_name));
@@ -18518,6 +18710,7 @@ ipif_down(ipif_t *ipif, queue_t *q, mblk_t *mp)
 	conn_t		*connp;
 	boolean_t	success;
 	boolean_t	ipif_was_up = B_FALSE;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(IAM_WRITER_IPIF(ipif));
 
@@ -18553,7 +18746,7 @@ ipif_down(ipif_t *ipif, queue_t *q, mblk_t *mp)
 		int err;
 
 		err = ip_srcid_remove(&ipif->ipif_v6lcl_addr,
-		    ipif->ipif_zoneid);
+		    ipif->ipif_zoneid, ipst);
 		if (err != 0) {
 			ip0dbg(("ipif_down: srcid_remove %d\n", err));
 		}
@@ -18575,30 +18768,34 @@ ipif_down(ipif_t *ipif, queue_t *q, mblk_t *mp)
 	 *    because we have already marked down here i.e cleared
 	 *    IPIF_UP.
 	 */
-	if (ipif->ipif_isv6)
-		ire_walk_v6(ipif_down_delete_ire, (char *)ipif, ALL_ZONES);
-	else
-		ire_walk_v4(ipif_down_delete_ire, (char *)ipif, ALL_ZONES);
+	if (ipif->ipif_isv6) {
+		ire_walk_v6(ipif_down_delete_ire, (char *)ipif, ALL_ZONES,
+		    ipst);
+	} else {
+		ire_walk_v4(ipif_down_delete_ire, (char *)ipif, ALL_ZONES,
+		    ipst);
+	}
 
 	/*
 	 * Need to add these also to be saved and restored when the
 	 * ipif is brought down and up
 	 */
-	mutex_enter(&ire_mrtun_lock);
-	if (ire_mrtun_count != 0) {
-		mutex_exit(&ire_mrtun_lock);
+	mutex_enter(&ipst->ips_ire_mrtun_lock);
+	if (ipst->ips_ire_mrtun_count != 0) {
+		mutex_exit(&ipst->ips_ire_mrtun_lock);
 		ire_walk_ill_mrtun(0, 0, ipif_down_delete_ire,
-		    (char *)ipif, NULL);
+		    (char *)ipif, NULL, ipst);
 	} else {
-		mutex_exit(&ire_mrtun_lock);
+		mutex_exit(&ipst->ips_ire_mrtun_lock);
 	}
 
-	mutex_enter(&ire_srcif_table_lock);
-	if (ire_srcif_table_count > 0) {
-		mutex_exit(&ire_srcif_table_lock);
-		ire_walk_srcif_table_v4(ipif_down_delete_ire, (char *)ipif);
+	mutex_enter(&ipst->ips_ire_srcif_table_lock);
+	if (ipst->ips_ire_srcif_table_count > 0) {
+		mutex_exit(&ipst->ips_ire_srcif_table_lock);
+		ire_walk_srcif_table_v4(ipif_down_delete_ire, (char *)ipif,
+		    ipst);
 	} else {
-		mutex_exit(&ire_srcif_table_lock);
+		mutex_exit(&ipst->ips_ire_srcif_table_lock);
 	}
 
 	/*
@@ -18608,7 +18805,7 @@ ipif_down(ipif_t *ipif, queue_t *q, mblk_t *mp)
 	 * conn. The caching is done after making sure that the ire is not yet
 	 * condemned. Also documented in the block comment above ip_output
 	 */
-	ipcl_walk(conn_cleanup_stale_ire, NULL);
+	ipcl_walk(conn_cleanup_stale_ire, NULL, ipst);
 	/* Also, delete the ires cached in SCTP */
 	sctp_ire_cache_flush(ipif);
 
@@ -18974,6 +19171,8 @@ illgrp_cache_delete(ire_t *ire, char *ill_arg)
 static void
 ipif_free(ipif_t *ipif)
 {
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
+
 	ASSERT(IAM_WRITER_IPIF(ipif));
 
 	if (ipif->ipif_recovery_id != 0)
@@ -19005,10 +19204,10 @@ ipif_free(ipif_t *ipif)
 		(void) untimeout(ipif->ipif_recovery_id);
 	ipif->ipif_recovery_id = 0;
 
-	rw_enter(&ill_g_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 	/* Remove pointers to this ill in the multicast routing tables */
 	reset_mrt_vif_ipif(ipif);
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 }
 
 /*
@@ -19020,6 +19219,7 @@ ipif_free_tail(ipif_t *ipif)
 {
 	mblk_t	*mp;
 	ipif_t	**ipifp;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	/*
 	 * Free state for addition IRE_IF_[NO]RESOLVER ire's.
@@ -19035,7 +19235,7 @@ ipif_free_tail(ipif_t *ipif)
 	 * inserting or removing an ipif from the linked list
 	 * of ipifs hanging off the ill.
 	 */
-	rw_enter(&ill_g_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 	/*
 	 * Remove all multicast memberships on the interface now.
 	 * This removes IPv4 multicast memberships joined within
@@ -19069,7 +19269,7 @@ ipif_free_tail(ipif_t *ipif)
 	}
 
 	mutex_exit(&ipif->ipif_ill->ill_lock);
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	mutex_destroy(&ipif->ipif_saved_ire_lock);
 
@@ -19120,7 +19320,7 @@ ipif_get_name(const ipif_t *ipif, char *buf, int len)
 static ipif_t *
 ipif_lookup_on_name(char *name, size_t namelen, boolean_t do_alloc,
     boolean_t *exists, boolean_t isv6, zoneid_t zoneid, queue_t *q,
-    mblk_t *mp, ipsq_func_t func, int *error)
+    mblk_t *mp, ipsq_func_t func, int *error, ip_stack_t *ipst)
 {
 	char	*cp;
 	char	*endp;
@@ -19185,7 +19385,7 @@ ipif_lookup_on_name(char *name, size_t namelen, boolean_t do_alloc,
 	 * ill_lookup_on_name will clear it.
 	 */
 	ill = ill_lookup_on_name(name, do_alloc, isv6,
-	    q, mp, func, error, &did_alloc);
+	    q, mp, func, error, &did_alloc, ipst);
 	if (cp != endp)
 		*cp = IPIF_SEPARATOR_CHAR;
 	if (ill == NULL)
@@ -19299,10 +19499,11 @@ ipif_mask_reply(ipif_t *ipif)
 	icmph_t	*icmph;
 	ipha_t	*ipha;
 	mblk_t	*mp;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 #define	REPLY_LEN	(sizeof (icmp_ipha) + sizeof (icmph_t) + IP_ADDR_LEN)
 
-	if (!ip_respond_to_address_mask_broadcast)
+	if (!ipst->ips_ip_respond_to_address_mask_broadcast)
 		return;
 
 	/* ICMP mask reply is IPv4 only */
@@ -19318,7 +19519,7 @@ ipif_mask_reply(ipif_t *ipif)
 	ipha = (ipha_t *)mp->b_rptr;
 	bzero(ipha, REPLY_LEN);
 	*ipha = icmp_ipha;
-	ipha->ipha_ttl = ip_broadcast_ttl;
+	ipha->ipha_ttl = ipst->ips_ip_broadcast_ttl;
 	ipha->ipha_src = ipif->ipif_src_addr;
 	ipha->ipha_dst = ipif->ipif_brd_addr;
 	ipha->ipha_length = htons(REPLY_LEN);
@@ -19513,6 +19714,7 @@ ipif_recover_ire(ipif_t *ipif)
 	mblk_t	*mp;
 	ire_t	**ipif_saved_irep;
 	ire_t	**irep;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	ip1dbg(("ipif_recover_ire(%s:%u)", ipif->ipif_ill->ill_name,
 	    ipif->ipif_id));
@@ -19620,7 +19822,8 @@ ipif_recover_ire(ipif_t *ipif)
 		    ifrt->ifrt_flags,
 		    &ifrt->ifrt_iulp_info,
 		    NULL,
-		    NULL);
+		    NULL,
+		    ipst);
 
 		if (ire == NULL) {
 			mutex_exit(&ipif->ipif_saved_ire_lock);
@@ -19724,10 +19927,11 @@ ip_addr_availability_check(ipif_t *new_ipif)
 	ill_t *ill;
 	ipif_t *ipif;
 	ill_walk_context_t ctx;
+	ip_stack_t	*ipst = new_ipif->ipif_ill->ill_ipst;
 
 	ASSERT(IAM_WRITER_IPIF(new_ipif));
-	ASSERT(MUTEX_HELD(&ip_addr_avail_lock));
-	ASSERT(RW_READ_HELD(&ill_g_lock));
+	ASSERT(MUTEX_HELD(&ipst->ips_ip_addr_avail_lock));
+	ASSERT(RW_READ_HELD(&ipst->ips_ill_g_lock));
 
 	new_ipif->ipif_flags &= ~IPIF_UNNUMBERED;
 	if (IN6_IS_ADDR_UNSPECIFIED(&new_ipif->ipif_v6lcl_addr) ||
@@ -19737,9 +19941,9 @@ ip_addr_availability_check(ipif_t *new_ipif)
 	our_v6addr = new_ipif->ipif_v6lcl_addr;
 
 	if (new_ipif->ipif_isv6)
-		ill = ILL_START_WALK_V6(&ctx);
+		ill = ILL_START_WALK_V6(&ctx, ipst);
 	else
-		ill = ILL_START_WALK_V4(&ctx);
+		ill = ILL_START_WALK_V4(&ctx, ipst);
 
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		for (ipif = ill->ill_ipif; ipif != NULL;
@@ -20019,6 +20223,7 @@ ipif_up_done(ipif_t *ipif)
 	boolean_t	src_ipif_held = B_FALSE;
 	boolean_t	ire_added = B_FALSE;
 	boolean_t	loopback = B_FALSE;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ip1dbg(("ipif_up_done(%s:%u)\n",
 		ipif->ipif_ill->ill_name, ipif->ipif_id));
@@ -20111,7 +20316,7 @@ ipif_up_done(ipif_t *ipif)
 
 		/* Register the source address for __sin6_src_id */
 		err = ip_srcid_insert(&ipif->ipif_v6lcl_addr,
-		    ipif->ipif_zoneid);
+		    ipif->ipif_zoneid, ipst);
 		if (err != 0) {
 			ip0dbg(("ipif_up_done: srcid_insert %d\n", err));
 			return (err);
@@ -20143,7 +20348,8 @@ ipif_up_done(ipif_t *ipif)
 		    RTF_PRIVATE : 0,
 		    &ire_uinfo_null,
 		    NULL,
-		    NULL);
+		    NULL,
+		    ipst);
 	} else {
 		ip1dbg((
 		    "ipif_up_done: not creating IRE %d for 0x%x: flags 0x%x\n",
@@ -20208,7 +20414,8 @@ ipif_up_done(ipif_t *ipif)
 		    (ipif->ipif_flags & IPIF_PRIVATE) ? RTF_PRIVATE: 0,
 		    &ire_uinfo_null,
 		    NULL,
-		    NULL);
+		    NULL,
+		    ipst);
 	}
 
 	/*
@@ -20287,14 +20494,14 @@ ipif_up_done(ipif_t *ipif)
 	 * just to make sure no new ills or new ipifs are being added
 	 * to the system while we are checking the uniqueness of addresses.
 	 */
-	rw_enter(&ill_g_lock, RW_READER);
-	mutex_enter(&ip_addr_avail_lock);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	mutex_enter(&ipst->ips_ip_addr_avail_lock);
 	/* Mark it up, and increment counters. */
 	ipif->ipif_flags |= IPIF_UP;
 	ill->ill_ipif_up_count++;
 	err = ip_addr_availability_check(ipif);
-	mutex_exit(&ip_addr_avail_lock);
-	rw_exit(&ill_g_lock);
+	mutex_exit(&ipst->ips_ip_addr_avail_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	if (err != 0) {
 		/*
@@ -20354,7 +20561,7 @@ ipif_up_done(ipif_t *ipif)
 		ASSERT(phyi->phyint_groupname != NULL);
 		if (ill->ill_ipif_up_count == 1) {
 			ASSERT(ill->ill_group == NULL);
-			err = illgrp_insert(&illgrp_head_v4, ill,
+			err = illgrp_insert(&ipst->ips_illgrp_head_v4, ill,
 			    phyi->phyint_groupname, NULL, B_TRUE);
 			if (err != 0) {
 				ip1dbg(("ipif_up_done: illgrp allocation "
@@ -20390,7 +20597,7 @@ ipif_up_done(ipif_t *ipif)
 
 			ire = ire_ctable_lookup(ipif->ipif_brd_addr, 0,
 			    IRE_BROADCAST, ipif, ALL_ZONES,
-			    NULL, (MATCH_IRE_TYPE | MATCH_IRE_ILL));
+			    NULL, (MATCH_IRE_TYPE | MATCH_IRE_ILL), ipst);
 
 			if (ire == NULL) {
 				/*
@@ -20497,7 +20704,7 @@ bad:
 				ire_refrele(*irep);
 		}
 	}
-	(void) ip_srcid_remove(&ipif->ipif_v6lcl_addr, ipif->ipif_zoneid);
+	(void) ip_srcid_remove(&ipif->ipif_v6lcl_addr, ipif->ipif_zoneid, ipst);
 
 	if (ipif_saved_irep != NULL) {
 		kmem_free(ipif_saved_irep,
@@ -20638,6 +20845,7 @@ illgrp_scheduler(ill_t *ill)
 	int illcnt;
 	int i;
 	uint64_t flags;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	/*
 	 * We don't use a lock to check for the ill_group. If this ill
@@ -20654,9 +20862,9 @@ illgrp_scheduler(ill_t *ill)
 	 * a set of stable ills. No ill can be added or deleted or change
 	 * group while we hold the reader lock.
 	 */
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	if ((illgrp = ill->ill_group) == NULL) {
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		ill_refhold(ill);
 		return (ill);
 	}
@@ -20688,7 +20896,7 @@ illgrp_scheduler(ill_t *ill)
 			retill = illgrp->illgrp_ill;
 	}
 	mutex_exit(&illgrp->illgrp_lock);
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	return (i == illcnt ? NULL : retill);
 }
@@ -20705,6 +20913,7 @@ ipif_usesrc_avail(ill_t *ill, zoneid_t zoneid)
 	ipif_t	*ipif = NULL;
 	ill_t	*uill;
 	boolean_t isv6;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(ill != NULL);
 
@@ -20712,7 +20921,7 @@ ipif_usesrc_avail(ill_t *ill, zoneid_t zoneid)
 	ifindex = ill->ill_usesrc_ifindex;
 	if (ifindex != 0) {
 		uill = ill_lookup_on_ifindex(ifindex, isv6, NULL, NULL, NULL,
-		    NULL);
+		    NULL, ipst);
 		if (uill == NULL)
 			return (NULL);
 		mutex_enter(&uill->ill_lock);
@@ -20763,10 +20972,11 @@ ipif_select_source(ill_t *ill, ipaddr_t dst, zoneid_t zoneid)
 	boolean_t specific_found;
 	ill_t	*till, *usill = NULL;
 	tsol_tpc_t *src_rhtp, *dst_rhtp;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	if (ill->ill_usesrc_ifindex != 0) {
-		usill = ill_lookup_on_ifindex(ill->ill_usesrc_ifindex, B_FALSE,
-		    NULL, NULL, NULL, NULL);
+		usill = ill_lookup_on_ifindex(ill->ill_usesrc_ifindex,
+		    B_FALSE, NULL, NULL, NULL, NULL, ipst);
 		if (usill != NULL)
 			ill = usill;	/* Select source from usesrc ILL */
 		else
@@ -20798,7 +21008,7 @@ ipif_select_source(ill_t *ill, ipaddr_t dst, zoneid_t zoneid)
 	 * we retry. Inside the loop we still need to check for CONDEMNED,
 	 * but not under a lock.
 	 */
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 
 retry:
 	till = ill;
@@ -20966,7 +21176,7 @@ retry:
 	} else {
 		if (wrapped)
 			index = MAX_IPIF_SELECT_SOURCE;
-		ipif = ipif_arr[ipif_rand() % index];
+		ipif = ipif_arr[ipif_rand(ipst) % index];
 		ASSERT(ipif != NULL);
 	}
 
@@ -20980,7 +21190,7 @@ retry:
 		mutex_exit(&ipif->ipif_ill->ill_lock);
 	}
 
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	if (usill != NULL)
 		ill_refrele(usill);
 	if (dst_rhtp != NULL)
@@ -21027,6 +21237,7 @@ ipif_recreate_interface_routes(ipif_t *old_ipif, ipif_t *ipif)
 	ipif_t *nipif;
 	ill_t *ill;
 	boolean_t need_rele = B_FALSE;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	ASSERT(old_ipif == NULL || IAM_WRITER_IPIF(old_ipif));
 	ASSERT(IAM_WRITER_IPIF(ipif));
@@ -21120,7 +21331,8 @@ ipif_recreate_interface_routes(ipif_t *old_ipif, ipif_t *ipif)
 	    0,
 	    &ire_uinfo_null,
 	    NULL,
-	    NULL);
+	    NULL,
+	    ipst);
 
 	if (ire != NULL) {
 		ire_t *ret_ire;
@@ -21213,6 +21425,10 @@ if_unitsel_restart(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 }
 
 
+/*
+ * Can operate on either a module or a driver queue.
+ * Returns an error if not a module queue.
+ */
 /* ARGSUSED */
 int
 if_unitsel(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
@@ -21223,7 +21439,7 @@ if_unitsel(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	char		interf_name[LIFNAMSIZ];
 	uint_t		ppa = *(uint_t *)mp->b_cont->b_cont->b_rptr;
 
-	if (!q->q_next) {
+	if (q->q_next == NULL) {
 		ip1dbg((
 		    "if_unitsel: IF_UNITSEL: no q_next\n"));
 		return (EINVAL);
@@ -21281,7 +21497,6 @@ ipif_check_bcast_ires(ipif_t *test_ipif)
 	ire_t	*ire_array[12];
 	ire_t	**irep = &ire_array[0];
 	ire_t	**irep1;
-
 	ipaddr_t net_addr, subnet_addr, net_mask, subnet_mask;
 	ipaddr_t test_net_addr, test_subnet_addr;
 	ipaddr_t test_net_mask, test_subnet_mask;
@@ -21297,6 +21512,7 @@ ipif_check_bcast_ires(ipif_t *test_ipif)
 	ipif_t  *backup_ipif_allzeros = (ipif_t *)NULL;
 	ipif_t  *backup_ipif_allones = (ipif_t *)NULL;
 	uint64_t check_flags = IPIF_DEPRECATED | IPIF_NOLOCAL | IPIF_ANYCAST;
+	ip_stack_t	*ipst = test_ipif->ipif_ill->ill_ipst;
 
 	ASSERT(!test_ipif->ipif_isv6);
 	ASSERT(IAM_WRITER_IPIF(test_ipif));
@@ -21310,10 +21526,12 @@ ipif_check_bcast_ires(ipif_t *test_ipif)
 		return;
 
 	test_allzero_ire = ire_ctable_lookup(0, 0, IRE_BROADCAST,
-	    test_ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF));
+	    test_ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF),
+	    ipst);
 
 	test_allone_ire = ire_ctable_lookup(INADDR_BROADCAST, 0, IRE_BROADCAST,
-	    test_ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF));
+	    test_ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF),
+	    ipst);
 
 	test_net_mask = ip_net_mask(test_ipif->ipif_subnet);
 	test_subnet_mask = test_ipif->ipif_net_mask;
@@ -21329,14 +21547,16 @@ ipif_check_bcast_ires(ipif_t *test_ipif)
 	 */
 	test_net_addr = test_net_mask  & test_ipif->ipif_subnet;
 	test_net_ire = ire_ctable_lookup(test_net_addr, 0, IRE_BROADCAST,
-	    test_ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF));
+	    test_ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF),
+	    ipst);
 
 	/*
 	 * Check if there is a subnet broadcast IRE associated with this ipif
 	 */
 	test_subnet_addr = test_subnet_mask  & test_ipif->ipif_subnet;
 	test_subnet_ire = ire_ctable_lookup(test_subnet_addr, 0, IRE_BROADCAST,
-	    test_ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF));
+	    test_ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF),
+	    ipst);
 
 	/*
 	 * No broadcast ire's associated with this ipif.
@@ -21569,6 +21789,9 @@ bad:
  * since ipif_lookup_on_name uses the _isv6 flags when matching.
  * Returns EINPROGRESS when mp has been consumed by queueing it on
  * ill_pending_mp and the ioctl will complete in ip_rput.
+ *
+ * Can operate on either a module or a driver queue.
+ * Returns an error if not a module queue.
  */
 /* ARGSUSED */
 int
@@ -21581,7 +21804,12 @@ ip_sioctl_slifname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 	ASSERT(ipif != NULL);
 	ip1dbg(("ip_sioctl_slifname %s\n", lifr->lifr_name));
-	ASSERT(q->q_next != NULL);
+
+	if (q->q_next == NULL) {
+		ip1dbg((
+		    "if_sioctl_slifname: SIOCSLIFNAME: no q_next\n"));
+		return (EINVAL);
+	}
 
 	ill = (ill_t *)q->q_ptr;
 	/*
@@ -21692,7 +21920,7 @@ ip_sioctl_slifname_restart(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
  */
 ipif_t *
 ipif_lookup_on_ifindex(uint_t index, boolean_t isv6, zoneid_t zoneid,
-    queue_t *q, mblk_t *mp, ipsq_func_t func, int *err)
+    queue_t *q, mblk_t *mp, ipsq_func_t func, int *err, ip_stack_t *ipst)
 {
 	ill_t	*ill;
 	ipsq_t  *ipsq;
@@ -21710,13 +21938,13 @@ ipif_lookup_on_ifindex(uint_t index, boolean_t isv6, zoneid_t zoneid,
 	 * to both IPv4 and IPv6.
 	 */
 
-	rw_enter(&ill_g_lock, RW_READER);
-	phyi = avl_find(&phyint_g_list.phyint_list_avl_by_index,
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	phyi = avl_find(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
 	    (void *) &index, NULL);
 	if (phyi != NULL) {
 		ill = isv6 ? phyi->phyint_illv6 : phyi->phyint_illv4;
 		if (ill == NULL) {
-			rw_exit(&ill_g_lock);
+			rw_exit(&ipst->ips_ill_g_lock);
 			if (err != NULL)
 				*err = ENXIO;
 			return (NULL);
@@ -21733,14 +21961,14 @@ ipif_lookup_on_ifindex(uint_t index, boolean_t isv6, zoneid_t zoneid,
 					ipif_refhold_locked(ipif);
 					mutex_exit(&ill->ill_lock);
 					RELEASE_CONN_LOCK(q);
-					rw_exit(&ill_g_lock);
+					rw_exit(&ipst->ips_ill_g_lock);
 					return (ipif);
 				}
 			}
 		} else if (ILL_CAN_WAIT(ill, q)) {
 			ipsq = ill->ill_phyint->phyint_ipsq;
 			mutex_enter(&ipsq->ipsq_lock);
-			rw_exit(&ill_g_lock);
+			rw_exit(&ipst->ips_ill_g_lock);
 			mutex_exit(&ill->ill_lock);
 			ipsq_enq(ipsq, q, mp, func, NEW_OP, ill);
 			mutex_exit(&ipsq->ipsq_lock);
@@ -21751,7 +21979,7 @@ ipif_lookup_on_ifindex(uint_t index, boolean_t isv6, zoneid_t zoneid,
 		mutex_exit(&ill->ill_lock);
 		RELEASE_CONN_LOCK(q);
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	if (err != NULL)
 		*err = ENXIO;
 	return (NULL);
@@ -21814,12 +22042,13 @@ ip_change_ifindex(ill_t *ill_orig, conn_change_t *connc)
 	uint_t new_ifindex;
 	ilm_t *ilm;
 	ill_walk_context_t ctx;
+	ip_stack_t	*ipst = ill_orig->ill_ipst;
 
 	old_ifindex = connc->cc_old_ifindex;
 	new_ifindex = connc->cc_new_ifindex;
 
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_ALL(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_ALL(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		if ((ill_orig->ill_net_type != ill->ill_net_type) ||
 			(ill_orig->ill_type != ill->ill_type)) {
@@ -21835,7 +22064,7 @@ ip_change_ifindex(ill_t *ill_orig, conn_change_t *connc)
 				ilm->ilm_orig_ifindex = new_ifindex;
 		}
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 }
 
 /*
@@ -21858,6 +22087,7 @@ ip_sioctl_slifindex(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	uint_t	index;
 	ill_t	*ill_v4;
 	ill_t	*ill_v6;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	if (ipip->ipi_cmd_type == IF_CMD)
 		index = ifr->ifr_index;
@@ -21897,8 +22127,10 @@ ip_sioctl_slifindex(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 * Use ill_lookup_on_ifindex to determine if the
 	 * new index is unused and if so allow the change.
 	 */
-	ill_v6 = ill_lookup_on_ifindex(index, B_TRUE, NULL, NULL, NULL, NULL);
-	ill_v4 = ill_lookup_on_ifindex(index, B_FALSE, NULL, NULL, NULL, NULL);
+	ill_v6 = ill_lookup_on_ifindex(index, B_TRUE, NULL, NULL, NULL, NULL,
+	    ipst);
+	ill_v4 = ill_lookup_on_ifindex(index, B_FALSE, NULL, NULL, NULL, NULL,
+	    ipst);
 	if (ill_v6 != NULL || ill_v4 != NULL) {
 		if (ill_v4 != NULL)
 			ill_refrele(ill_v4);
@@ -21923,7 +22155,7 @@ ip_sioctl_slifindex(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	connc.cc_old_ifindex = old_index;
 	connc.cc_new_ifindex = index;
 	ip_change_ifindex(ill, &connc);
-	ipcl_walk(conn_change_ifindex, (caddr_t)&connc);
+	ipcl_walk(conn_change_ifindex, (caddr_t)&connc, ipst);
 
 	/* Send the routing sockets message */
 	ip_rts_ifmsg(ipif);
@@ -22034,9 +22266,23 @@ ip_sioctl_slifzone_tail(ipif_t *ipif, zoneid_t zoneid,
     queue_t *q, mblk_t *mp, boolean_t need_up)
 {
 	int	err = 0;
+	ip_stack_t	*ipst;
 
 	ip1dbg(("ip_sioctl_zoneid_tail(%s:%u %p)\n",
 	    ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
+
+	if (CONN_Q(q))
+		ipst = CONNQ_TO_IPST(q);
+	else
+		ipst = ILLQ_TO_IPST(q);
+
+	/*
+	 * For exclusive stacks we don't allow a different zoneid than
+	 * global.
+	 */
+	if (ipst->ips_netstack->netstack_stackid != GLOBAL_NETSTACKID &&
+	    zoneid != GLOBAL_ZONEID)
+		return (EINVAL);
 
 	/* Set the new zone id. */
 	ipif->ipif_zoneid = zoneid;
@@ -22153,7 +22399,9 @@ static void
 ill_disband_usesrc_group(ill_t *uill)
 {
 	ill_t *next_ill, *tmp_ill;
-	ASSERT(RW_WRITE_HELD(&ill_g_usesrc_lock));
+	ip_stack_t	*ipst = uill->ill_ipst;
+
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_usesrc_lock));
 	next_ill = uill->ill_usesrc_grp_next;
 
 	do {
@@ -22174,9 +22422,10 @@ int
 ill_relink_usesrc_ills(ill_t *ucill, ill_t *uill, uint_t ifindex)
 {
 	ill_t *ill, *tmp_ill;
+	ip_stack_t	*ipst = ucill->ill_ipst;
 
 	ASSERT((ucill != NULL) && (ucill->ill_usesrc_grp_next != NULL) &&
-	    (uill != NULL) && RW_WRITE_HELD(&ill_g_usesrc_lock));
+	    (uill != NULL) && RW_WRITE_HELD(&ipst->ips_ill_g_usesrc_lock));
 
 	/*
 	 * Check if the usesrc client ILL passed in is not already
@@ -22232,6 +22481,7 @@ ip_sioctl_slifusesrc(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	uint_t ifindex;
 	phyint_t *us_phyint, *us_cli_phyint;
 	ipsq_t *ipsq = NULL;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	ASSERT(IAM_WRITER_IPIF(ipif));
 	ASSERT(q->q_next == NULL);
@@ -22264,7 +22514,7 @@ ip_sioctl_slifusesrc(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	}
 
 	usesrc_ill = ill_lookup_on_ifindex(ifindex, isv6, q, mp,
-	    ip_process_ioctl, &err);
+	    ip_process_ioctl, &err, ipst);
 
 	if (usesrc_ill == NULL) {
 		return (err);
@@ -22337,23 +22587,23 @@ ip_sioctl_slifusesrc(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 	if (ipif->ipif_isv6)
 		ire_walk_v6(ipif_delete_cache_ire, (char *)usesrc_cli_ill,
-		    ALL_ZONES);
+		    ALL_ZONES, ipst);
 	else
 		ire_walk_v4(ipif_delete_cache_ire, (char *)usesrc_cli_ill,
-		    ALL_ZONES);
+		    ALL_ZONES, ipst);
 
 	/*
 	 * ill_g_usesrc_lock global lock protects the ill_usesrc_grp_next
 	 * and the ill_usesrc_ifindex fields
 	 */
-	rw_enter(&ill_g_usesrc_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_usesrc_lock, RW_WRITER);
 
 	if (reset_flg) {
 		ret = ill_relink_usesrc_ills(usesrc_cli_ill, usesrc_ill, 0);
 		if (ret != 0) {
 			err = EINVAL;
 		}
-		rw_exit(&ill_g_usesrc_lock);
+		rw_exit(&ipst->ips_ill_g_usesrc_lock);
 		goto done;
 	}
 
@@ -22383,7 +22633,7 @@ ip_sioctl_slifusesrc(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		if (ret != 0)
 			err = EINVAL;
 	}
-	rw_exit(&ill_g_usesrc_lock);
+	rw_exit(&ipst->ips_ill_g_usesrc_lock);
 
 done:
 	if (ill_flag_changed) {
@@ -22455,10 +22705,11 @@ ill_phyint_free(ill_t *ill)
 	phyint_t *phyi;
 	phyint_t *next_phyint;
 	ipsq_t *cur_ipsq;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(ill->ill_phyint != NULL);
 
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_lock));
 	phyi = ill->ill_phyint;
 	ill->ill_phyint = NULL;
 	/*
@@ -22487,9 +22738,9 @@ ill_phyint_free(ill_t *ill)
 	 * Make sure this phyint was put in the list.
 	 */
 	if (phyi->phyint_ifindex > 0) {
-		avl_remove(&phyint_g_list.phyint_list_avl_by_index,
+		avl_remove(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
 		    phyi);
-		avl_remove(&phyint_g_list.phyint_list_avl_by_name,
+		avl_remove(&ipst->ips_phyint_g_list->phyint_list_avl_by_name,
 		    phyi);
 	}
 	/*
@@ -22510,7 +22761,7 @@ ill_phyint_free(ill_t *ill)
 		}
 		ASSERT(next_phyint != NULL);
 	}
-	IPSQ_DEC_REF(cur_ipsq);
+	IPSQ_DEC_REF(cur_ipsq, ipst);
 
 	if (phyi->phyint_groupname_len != 0) {
 		ASSERT(phyi->phyint_groupname != NULL);
@@ -22536,8 +22787,9 @@ ill_phyint_reinit(ill_t *ill)
 	avl_index_t where = 0;
 	ill_t	*ill_other = NULL;
 	ipsq_t	*ipsq;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	ASSERT(RW_WRITE_HELD(&ill_g_lock));
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ill_g_lock));
 
 	phyi_old = ill->ill_phyint;
 	ASSERT(isv6 || (phyi_old->phyint_illv4 == ill &&
@@ -22546,7 +22798,7 @@ ill_phyint_reinit(ill_t *ill)
 	    phyi_old->phyint_illv4 == NULL));
 	ASSERT(phyi_old->phyint_ifindex == 0);
 
-	phyi = avl_find(&phyint_g_list.phyint_list_avl_by_name,
+	phyi = avl_find(&ipst->ips_phyint_g_list->phyint_list_avl_by_name,
 	    ill->ill_name, &where);
 
 	/*
@@ -22600,7 +22852,7 @@ ill_phyint_reinit(ill_t *ill)
 		 * ipsq_exit
 		 */
 		ipsq = phyi_old->phyint_ipsq;
-		IPSQ_DEC_REF(ipsq);
+		IPSQ_DEC_REF(ipsq, ipst);
 		ASSERT(ipsq->ipsq_refs == 0);
 		/* Get the singleton phyint out of the ipsq list */
 		ASSERT(phyi_old->phyint_ipsq_next == NULL);
@@ -22618,15 +22870,16 @@ ill_phyint_reinit(ill_t *ill)
 		phyi = phyi_old;
 		mutex_enter(&phyi->phyint_lock);
 		/* XXX We need a recovery strategy here. */
-		if (!phyint_assign_ifindex(phyi))
+		if (!phyint_assign_ifindex(phyi, ipst))
 			cmn_err(CE_PANIC, "phyint_assign_ifindex() failed");
 
-		avl_insert(&phyint_g_list.phyint_list_avl_by_name,
+		avl_insert(&ipst->ips_phyint_g_list->phyint_list_avl_by_name,
 		    (void *)phyi, where);
 
-		(void) avl_find(&phyint_g_list.phyint_list_avl_by_index,
+		(void) avl_find(&ipst->ips_phyint_g_list->
+		    phyint_list_avl_by_index,
 		    &phyi->phyint_ifindex, &where);
-		avl_insert(&phyint_g_list.phyint_list_avl_by_index,
+		avl_insert(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
 		    (void *)phyi, where);
 	}
 
@@ -22684,7 +22937,8 @@ ill_phyint_reinit(ill_t *ill)
 			info->hne_nic = ill->ill_phyint->phyint_ifindex;
 			info->hne_lif = 0;
 			info->hne_event = NE_PLUMB;
-			info->hne_family = ill->ill_isv6 ? ipv6 : ipv4;
+			info->hne_family = ill->ill_isv6 ?
+			    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
 			info->hne_data = kmem_alloc(ill->ill_name_length,
 			    KM_NOSLEEP);
 			if (info->hne_data != NULL) {
@@ -22748,12 +23002,11 @@ ip_ifname_notify(ill_t *ill, queue_t *q)
 	putnext(q, mp1);
 }
 
-static boolean_t ip_trash_timer_started = B_FALSE;
-
 static int
 ipif_set_values_tail(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 {
 	int err;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	/* Set the obsolete NDD per-interface forwarding name. */
 	err = ill_set_ndd_name(ill);
@@ -22775,33 +23028,35 @@ ipif_set_values_tail(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	 * If there is no IRE expiration timer running, get one started.
 	 * igmp and mld timers will be triggered by the first multicast
 	 */
-	if (!ip_trash_timer_started) {
+	if (ipst->ips_ip_ire_expire_id == 0) {
 		/*
 		 * acquire the lock and check again.
 		 */
-		mutex_enter(&ip_trash_timer_lock);
-		if (!ip_trash_timer_started) {
-			ip_ire_expire_id = timeout(ip_trash_timer_expire, NULL,
-			    MSEC_TO_TICK(ip_timer_interval));
-			ip_trash_timer_started = B_TRUE;
+		mutex_enter(&ipst->ips_ip_trash_timer_lock);
+		if (ipst->ips_ip_ire_expire_id == 0) {
+			ipst->ips_ip_ire_expire_id = timeout(
+			    ip_trash_timer_expire, ipst,
+			    MSEC_TO_TICK(ipst->ips_ip_timer_interval));
 		}
-		mutex_exit(&ip_trash_timer_lock);
+		mutex_exit(&ipst->ips_ip_trash_timer_lock);
 	}
 
 	if (ill->ill_isv6) {
-		mutex_enter(&mld_slowtimeout_lock);
-		if (mld_slowtimeout_id == 0) {
-			mld_slowtimeout_id = timeout(mld_slowtimo, NULL,
+		mutex_enter(&ipst->ips_mld_slowtimeout_lock);
+		if (ipst->ips_mld_slowtimeout_id == 0) {
+			ipst->ips_mld_slowtimeout_id = timeout(mld_slowtimo,
+			    (void *)ipst,
 			    MSEC_TO_TICK(MCAST_SLOWTIMO_INTERVAL));
 		}
-		mutex_exit(&mld_slowtimeout_lock);
+		mutex_exit(&ipst->ips_mld_slowtimeout_lock);
 	} else {
-		mutex_enter(&igmp_slowtimeout_lock);
-		if (igmp_slowtimeout_id == 0) {
-			igmp_slowtimeout_id = timeout(igmp_slowtimo, NULL,
+		mutex_enter(&ipst->ips_igmp_slowtimeout_lock);
+		if (ipst->ips_igmp_slowtimeout_id == 0) {
+			ipst->ips_igmp_slowtimeout_id = timeout(igmp_slowtimo,
+				(void *)ipst,
 				MSEC_TO_TICK(MCAST_SLOWTIMO_INTERVAL));
 		}
-		mutex_exit(&igmp_slowtimeout_lock);
+		mutex_exit(&ipst->ips_igmp_slowtimeout_lock);
 	}
 
 	return (err);
@@ -22827,13 +23082,16 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 	char	*old_ptr;
 	char	old_char;
 	int	error;
+	ip_stack_t	*ipst;
 
 	ip1dbg(("ipif_set_values: interface %s\n", interf_name));
 	ASSERT(q->q_next != NULL);
 	ASSERT(interf_name != NULL);
 
 	ill = (ill_t *)q->q_ptr;
+	ipst = ill->ill_ipst;
 
+	ASSERT(ill->ill_ipst != NULL);
 	ASSERT(ill->ill_name[0] == '\0');
 	ASSERT(IAM_WRITER_ILL(ill));
 	ASSERT((mi_strlen(interf_name) + 1) <= LIFNAMSIZ);
@@ -22929,7 +23187,7 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 		 * Set the ILLF_ROUTER flag according to the global
 		 * IPv6 forwarding policy.
 		 */
-		if (ipv6_forward != 0)
+		if (ipst->ips_ipv6_forward != 0)
 			ill->ill_flags |= ILLF_ROUTER;
 	} else if (ill->ill_flags & ILLF_IPV4) {
 		ill->ill_isv6 = B_FALSE;
@@ -22943,7 +23201,7 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 		 * Set the ILLF_ROUTER flag according to the global
 		 * IPv4 forwarding policy.
 		 */
-		if (ip_g_forward != 0)
+		if (ipst->ips_ip_g_forward != 0)
 			ill->ill_flags |= ILLF_ROUTER;
 	}
 
@@ -22971,7 +23229,7 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 	ill->ill_ifname_pending_err = 0;
 
 	ill_refhold(ill);
-	rw_enter(&ill_g_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 	if ((error = ill_glist_insert(ill, interf_name,
 	    (ill->ill_flags & ILLF_IPV6) == ILLF_IPV6)) > 0) {
 		ill->ill_ppa = UINT_MAX;
@@ -22980,7 +23238,7 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 		 * undo null termination done above.
 		 */
 		ppa_ptr[0] = old_char;
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		ill_refrele(ill);
 		return (error);
 	}
@@ -23015,7 +23273,7 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 	ipsq = ipsq_try_enter(NULL, ill, q, mp, ip_reprocess_ioctl, NEW_OP,
 	    B_TRUE);
 
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	ill_refrele(ill);
 	if (ipsq == NULL)
 		return (EINPROGRESS);
@@ -23040,10 +23298,8 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 }
 
 
-extern void (*ip_cleanup_func)(void);
-
 void
-ipif_init(void)
+ipif_init(ip_stack_t *ipst)
 {
 	hrtime_t hrt;
 	int i;
@@ -23054,23 +23310,24 @@ ipif_init(void)
 	 * source address everytime, this need not be really random.
 	 */
 	hrt = gethrtime();
-	ipif_src_random = ((hrt >> 32) & 0xffffffff) * (hrt & 0xffffffff);
+	ipst->ips_ipif_src_random =
+	    ((hrt >> 32) & 0xffffffff) * (hrt & 0xffffffff);
 
 	for (i = 0; i < MAX_G_HEADS; i++) {
-		ill_g_heads[i].ill_g_list_head = (ill_if_t *)&ill_g_heads[i];
-		ill_g_heads[i].ill_g_list_tail = (ill_if_t *)&ill_g_heads[i];
+		ipst->ips_ill_g_heads[i].ill_g_list_head =
+		    (ill_if_t *)&ipst->ips_ill_g_heads[i];
+		ipst->ips_ill_g_heads[i].ill_g_list_tail =
+		    (ill_if_t *)&ipst->ips_ill_g_heads[i];
 	}
 
-	avl_create(&phyint_g_list.phyint_list_avl_by_index,
+	avl_create(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
 	    ill_phyint_compare_index,
 	    sizeof (phyint_t),
 	    offsetof(struct phyint, phyint_avl_by_index));
-	avl_create(&phyint_g_list.phyint_list_avl_by_name,
+	avl_create(&ipst->ips_phyint_g_list->phyint_list_avl_by_name,
 	    ill_phyint_compare_name,
 	    sizeof (phyint_t),
 	    offsetof(struct phyint, phyint_avl_by_name));
-
-	ip_cleanup_func = ip_thread_exit;
 }
 
 /*
@@ -23083,7 +23340,8 @@ ipif_init(void)
  */
 int
 ip_mrtun_rt_add(ipaddr_t in_src_addr, int flags, ipif_t *ipif_arg,
-    ipif_t *src_ipif, ire_t **ire_arg, queue_t *q, mblk_t *mp, ipsq_func_t func)
+    ipif_t *src_ipif, ire_t **ire_arg, queue_t *q, mblk_t *mp, ipsq_func_t func,
+    ip_stack_t *ipst)
 {
 	ire_t   *ire;
 	ire_t	*save_ire;
@@ -23167,7 +23425,8 @@ ip_mrtun_rt_add(ipaddr_t in_src_addr, int flags, ipif_t *ipif_arg,
 	    flags,
 	    &ire_uinfo_null,
 	    NULL,
-	    NULL);
+	    NULL,
+	    ipst);
 
 	if (ire == NULL) {
 		freeb(dlureq_mp);
@@ -23244,7 +23503,7 @@ ip_mrtun_rt_delete(ipaddr_t in_src_addr, ipif_t *src_ipif)
  * It is used only by SO_DONTROUTE at the moment.
  */
 ipif_t *
-ipif_lookup_onlink_addr(ipaddr_t addr, zoneid_t zoneid)
+ipif_lookup_onlink_addr(ipaddr_t addr, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	ipif_t	*ipif, *best_ipif;
 	ill_t	*ill;
@@ -23253,8 +23512,8 @@ ipif_lookup_onlink_addr(ipaddr_t addr, zoneid_t zoneid)
 	ASSERT(zoneid != ALL_ZONES);
 	best_ipif = NULL;
 
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_V4(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_V4(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		mutex_enter(&ill->ill_lock);
 		for (ipif = ill->ill_ipif; ipif != NULL;
@@ -23272,7 +23531,7 @@ ipif_lookup_onlink_addr(ipaddr_t addr, zoneid_t zoneid)
 				if (ipif->ipif_pp_dst_addr == addr) {
 					ipif_refhold_locked(ipif);
 					mutex_exit(&ill->ill_lock);
-					rw_exit(&ill_g_lock);
+					rw_exit(&ipst->ips_ill_g_lock);
 					if (best_ipif != NULL)
 						ipif_refrele(best_ipif);
 					return (ipif);
@@ -23295,18 +23554,19 @@ ipif_lookup_onlink_addr(ipaddr_t addr, zoneid_t zoneid)
 				    (!(best_ipif->ipif_flags & IPIF_UP))))) {
 					ipif_refhold_locked(ipif);
 					mutex_exit(&ill->ill_lock);
-					rw_exit(&ill_g_lock);
+					rw_exit(&ipst->ips_ill_g_lock);
 					if (best_ipif != NULL)
 						ipif_refrele(best_ipif);
 					best_ipif = ipif;
-					rw_enter(&ill_g_lock, RW_READER);
+					rw_enter(&ipst->ips_ill_g_lock,
+					    RW_READER);
 					mutex_enter(&ill->ill_lock);
 				}
 			}
 		}
 		mutex_exit(&ill->ill_lock);
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	return (best_ipif);
 }
 
@@ -23381,7 +23641,7 @@ ipif_remove_ire(ipif_t *ipif, ire_t *ire)
  * at ifconfig time.
  */
 static void
-ip_cgtp_bcast_add(ire_t *ire, ire_t *ire_dst)
+ip_cgtp_bcast_add(ire_t *ire, ire_t *ire_dst, ip_stack_t *ipst)
 {
 	ire_t *ire_prim;
 
@@ -23389,7 +23649,7 @@ ip_cgtp_bcast_add(ire_t *ire, ire_t *ire_dst)
 	ASSERT(ire_dst != NULL);
 
 	ire_prim = ire_ctable_lookup(ire->ire_gateway_addr, 0,
-	    IRE_BROADCAST, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE);
+	    IRE_BROADCAST, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
 	if (ire_prim != NULL) {
 		/*
 		 * We are in the special case of broadcasts for
@@ -23429,7 +23689,8 @@ ip_cgtp_bcast_add(ire_t *ire, ire_t *ire_dst)
 		    ire->ire_flags,
 		    &ire_uinfo_null,
 		    NULL,
-		    NULL);
+		    NULL,
+		    ipst);
 
 		if (bcast_ire != NULL) {
 
@@ -23454,18 +23715,18 @@ ip_cgtp_bcast_add(ire_t *ire, ire_t *ire_dst)
  * Remove the broadcast ire
  */
 static void
-ip_cgtp_bcast_delete(ire_t *ire)
+ip_cgtp_bcast_delete(ire_t *ire, ip_stack_t *ipst)
 {
 	ire_t *ire_dst;
 
 	ASSERT(ire != NULL);
 	ire_dst = ire_ctable_lookup(ire->ire_addr, 0, IRE_BROADCAST,
-	    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE);
+	    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
 	if (ire_dst != NULL) {
 		ire_t *ire_prim;
 
 		ire_prim = ire_ctable_lookup(ire->ire_gateway_addr, 0,
-		    IRE_BROADCAST, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE);
+		    IRE_BROADCAST, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
 		if (ire_prim != NULL) {
 			ipif_t *ipif_prim;
 			ire_t  *bcast_ire;
@@ -23483,7 +23744,7 @@ ip_cgtp_bcast_delete(ire_t *ire)
 			    ipif_prim, ALL_ZONES,
 			    NULL,
 			    MATCH_IRE_TYPE | MATCH_IRE_GW | MATCH_IRE_IPIF |
-			    MATCH_IRE_MASK);
+			    MATCH_IRE_MASK, ipst);
 
 			if (bcast_ire != NULL) {
 				ip2dbg(("ip_cgtp_filter_bcast_delete: "
@@ -23604,16 +23865,17 @@ ill_ipsec_capab_resize_algparm(ill_ipsec_capab_t *capab, int algid)
  */
 boolean_t
 ipsec_capab_match(ill_t *ill, uint_t ill_index, boolean_t ill_isv6,
-    ipsa_t *sa)
+    ipsa_t *sa, netstack_t *ns)
 {
 	boolean_t sa_isv6;
 	uint_t algid;
 	struct ill_ipsec_capab_s *cpp;
 	boolean_t need_refrele = B_FALSE;
+	ip_stack_t	*ipst = ns->netstack_ip;
 
 	if (ill == NULL) {
 		ill = ill_lookup_on_ifindex(ill_index, ill_isv6, NULL,
-		    NULL, NULL, NULL);
+		    NULL, NULL, NULL, ipst);
 		if (ill == NULL) {
 			ip0dbg(("ipsec_capab_match: ill doesn't exist\n"));
 			return (B_FALSE);
@@ -23694,6 +23956,7 @@ ill_ipsec_capab_add(ill_t *ill, uint_t dl_cap, boolean_t sadb_resync)
 	ipsec_capab_ill_t **ills, *cur_ill, *new_ill;
 	uint_t sa_type;
 	uint_t ipproto;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT((dl_cap == DL_CAPAB_IPSEC_AH) ||
 	    (dl_cap == DL_CAPAB_IPSEC_ESP));
@@ -23701,17 +23964,17 @@ ill_ipsec_capab_add(ill_t *ill, uint_t dl_cap, boolean_t sadb_resync)
 	switch (dl_cap) {
 	case DL_CAPAB_IPSEC_AH:
 		sa_type = SADB_SATYPE_AH;
-		ills = &ipsec_capab_ills_ah;
+		ills = &ipst->ips_ipsec_capab_ills_ah;
 		ipproto = IPPROTO_AH;
 		break;
 	case DL_CAPAB_IPSEC_ESP:
 		sa_type = SADB_SATYPE_ESP;
-		ills = &ipsec_capab_ills_esp;
+		ills = &ipst->ips_ipsec_capab_ills_esp;
 		ipproto = IPPROTO_ESP;
 		break;
 	}
 
-	rw_enter(&ipsec_capab_ills_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ipsec_capab_ills_lock, RW_WRITER);
 
 	/*
 	 * Add ill index to list of hardware accelerators. If
@@ -23726,7 +23989,7 @@ ill_ipsec_capab_add(ill_t *ill, uint_t dl_cap, boolean_t sadb_resync)
 		/* if this is a new entry for this ill */
 		new_ill = kmem_zalloc(sizeof (ipsec_capab_ill_t), KM_NOSLEEP);
 		if (new_ill == NULL) {
-			rw_exit(&ipsec_capab_ills_lock);
+			rw_exit(&ipst->ips_ipsec_capab_ills_lock);
 			return;
 		}
 
@@ -23736,13 +23999,13 @@ ill_ipsec_capab_add(ill_t *ill, uint_t dl_cap, boolean_t sadb_resync)
 		*ills = new_ill;
 	} else if (!sadb_resync) {
 		/* not resync'ing SADB and an entry exists for this ill */
-		rw_exit(&ipsec_capab_ills_lock);
+		rw_exit(&ipst->ips_ipsec_capab_ills_lock);
 		return;
 	}
 
-	rw_exit(&ipsec_capab_ills_lock);
+	rw_exit(&ipst->ips_ipsec_capab_ills_lock);
 
-	if (ipcl_proto_fanout_v6[ipproto].connf_head != NULL)
+	if (ipst->ips_ipcl_proto_fanout_v6[ipproto].connf_head != NULL)
 		/*
 		 * IPsec module for protocol loaded, initiate dump
 		 * of the SADB to this ill.
@@ -23757,14 +24020,15 @@ static void
 ill_ipsec_capab_delete(ill_t *ill, uint_t dl_cap)
 {
 	ipsec_capab_ill_t **ills, *cur_ill, *prev_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(dl_cap == DL_CAPAB_IPSEC_AH ||
 	    dl_cap == DL_CAPAB_IPSEC_ESP);
 
-	ills = (dl_cap == DL_CAPAB_IPSEC_AH) ? &ipsec_capab_ills_ah :
-	    &ipsec_capab_ills_esp;
+	ills = (dl_cap == DL_CAPAB_IPSEC_AH) ? &ipst->ips_ipsec_capab_ills_ah :
+	    &ipst->ips_ipsec_capab_ills_esp;
 
-	rw_enter(&ipsec_capab_ills_lock, RW_WRITER);
+	rw_enter(&ipst->ips_ipsec_capab_ills_lock, RW_WRITER);
 
 	prev_ill = NULL;
 	for (cur_ill = *ills; cur_ill != NULL && (cur_ill->ill_index !=
@@ -23773,7 +24037,7 @@ ill_ipsec_capab_delete(ill_t *ill, uint_t dl_cap)
 		;
 	if (cur_ill == NULL) {
 		/* entry not found */
-		rw_exit(&ipsec_capab_ills_lock);
+		rw_exit(&ipst->ips_ipsec_capab_ills_lock);
 		return;
 	}
 	if (prev_ill == NULL) {
@@ -23783,7 +24047,7 @@ ill_ipsec_capab_delete(ill_t *ill, uint_t dl_cap)
 		prev_ill->next = cur_ill->next;
 	}
 	kmem_free(cur_ill, sizeof (ipsec_capab_ill_t));
-	rw_exit(&ipsec_capab_ills_lock);
+	rw_exit(&ipst->ips_ipsec_capab_ills_lock);
 }
 
 
@@ -23808,20 +24072,22 @@ ill_ipsec_capab_send_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
  * We free the mblk and, if sa is non-null, release the held referece.
  */
 void
-ill_ipsec_capab_send_all(uint_t sa_type, mblk_t *mp, ipsa_t *sa)
+ill_ipsec_capab_send_all(uint_t sa_type, mblk_t *mp, ipsa_t *sa,
+    netstack_t *ns)
 {
 	ipsec_capab_ill_t *ici, *cur_ici;
 	ill_t *ill;
 	mblk_t *nmp, *mp_ship_list = NULL, *next_mp;
+	ip_stack_t	*ipst = ns->netstack_ip;
 
-	ici = (sa_type == SADB_SATYPE_AH) ? ipsec_capab_ills_ah :
-	    ipsec_capab_ills_esp;
+	ici = (sa_type == SADB_SATYPE_AH) ? ipst->ips_ipsec_capab_ills_ah :
+	    ipst->ips_ipsec_capab_ills_esp;
 
-	rw_enter(&ipsec_capab_ills_lock, RW_READER);
+	rw_enter(&ipst->ips_ipsec_capab_ills_lock, RW_READER);
 
 	for (cur_ici = ici; cur_ici != NULL; cur_ici = cur_ici->next) {
 		ill = ill_lookup_on_ifindex(cur_ici->ill_index,
-		    cur_ici->ill_isv6, NULL, NULL, NULL, NULL);
+		    cur_ici->ill_isv6, NULL, NULL, NULL, NULL, ipst);
 
 		/*
 		 * Handle the case where the ill goes away while the SADB is
@@ -23838,7 +24104,7 @@ ill_ipsec_capab_send_all(uint_t sa_type, mblk_t *mp, ipsa_t *sa)
 			 * sending SA to ill.
 			 */
 			if (!ipsec_capab_match(ill, cur_ici->ill_index,
-			    cur_ici->ill_isv6, sa)) {
+			    cur_ici->ill_isv6, sa, ipst->ips_netstack)) {
 				ill_refrele(ill);
 				continue;
 			}
@@ -23869,7 +24135,7 @@ ill_ipsec_capab_send_all(uint_t sa_type, mblk_t *mp, ipsa_t *sa)
 		nmp->b_prev = (mblk_t *)ill;
 	}
 
-	rw_exit(&ipsec_capab_ills_lock);
+	rw_exit(&ipst->ips_ipsec_capab_ills_lock);
 
 	nmp = mp_ship_list;
 	while (nmp != NULL) {
@@ -24143,6 +24409,7 @@ boolean_t
 ipif_lookup_zoneid_group(ill_t *ill, zoneid_t zoneid, int flags, ipif_t **ipifp)
 {
 	ill_t *illg;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	/*
 	 * We look at the passed-in ill first without grabbing ill_g_lock.
@@ -24150,10 +24417,10 @@ ipif_lookup_zoneid_group(ill_t *ill, zoneid_t zoneid, int flags, ipif_t **ipifp)
 	if (ipif_lookup_zoneid(ill, zoneid, flags, ipifp)) {
 		return (B_TRUE);
 	}
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	if (ill->ill_group == NULL) {
 		/* ill not in a group */
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		return (B_FALSE);
 	}
 
@@ -24173,7 +24440,7 @@ ipif_lookup_zoneid_group(ill_t *ill, zoneid_t zoneid, int flags, ipif_t **ipifp)
 			break;
 		}
 	} while ((illg = illg->ill_group_next) != NULL);
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	return (illg != NULL);
 }
 
@@ -24198,12 +24465,14 @@ ill_is_probeonly(ill_t *ill)
  * an ill_refrele().
  */
 ipif_t *
-ipif_getby_indexes(uint_t ifindex, uint_t lifidx, boolean_t isv6)
+ipif_getby_indexes(uint_t ifindex, uint_t lifidx, boolean_t isv6,
+    ip_stack_t *ipst)
 {
 	ipif_t *ipif;
 	ill_t *ill;
 
-	ill = ill_lookup_on_ifindex(ifindex, isv6, NULL, NULL, NULL, NULL);
+	ill = ill_lookup_on_ifindex(ifindex, isv6, NULL, NULL, NULL, NULL,
+	    ipst);
 
 	if (ill == NULL)
 		return (NULL);
@@ -24238,9 +24507,11 @@ ipif_getby_indexes(uint_t ifindex, uint_t lifidx, boolean_t isv6)
 void
 ill_fastpath_flush(ill_t *ill)
 {
+	ip_stack_t *ipst = ill->ill_ipst;
+
 	nce_fastpath_list_dispatch(ill, NULL, NULL);
-	ndp_walk_common((ill->ill_isv6 ? &ndp6 : &ndp4), ill,
-	    (pfi_t)ndp_fastpath_flush, NULL, B_TRUE);
+	ndp_walk_common((ill->ill_isv6 ? ipst->ips_ndp6 : ipst->ips_ndp4),
+	    ill, (pfi_t)ndp_fastpath_flush, NULL, B_TRUE);
 }
 
 /*
@@ -24361,4 +24632,111 @@ ill_set_ndmp(ill_t *ill, mblk_t *ndmp, uint_t addroff, uint_t addrlen)
 	ill->ill_nd_lla = ndmp->b_rptr + addroff;
 	ill->ill_nd_lla_mp = ndmp;
 	ill->ill_nd_lla_len = addrlen;
+}
+
+
+
+major_t IP_MAJ;
+#define	IP	"ip"
+
+#define	UDP6DEV		"/devices/pseudo/udp6@0:udp6"
+#define	UDPDEV		"/devices/pseudo/udp@0:udp"
+
+/*
+ * Issue REMOVEIF ioctls to have the loopback interfaces
+ * go away.  Other interfaces are either I_LINKed or I_PLINKed;
+ * the former going away when the user-level processes in the zone
+ * are killed  * and the latter are cleaned up by the stream head
+ * str_stack_shutdown callback that undoes all I_PLINKs.
+ */
+void
+ip_loopback_cleanup(ip_stack_t *ipst)
+{
+	int error;
+	ldi_handle_t	lh = NULL;
+	ldi_ident_t	li = NULL;
+	int		rval;
+	cred_t		*cr;
+	struct strioctl iocb;
+	struct lifreq	lifreq;
+
+	IP_MAJ = ddi_name_to_major(IP);
+
+#ifdef NS_DEBUG
+	(void) printf("ip_loopback_cleanup() stackid %d\n",
+	    ipst->ips_netstack->netstack_stackid);
+#endif
+
+	bzero(&lifreq, sizeof (lifreq));
+	(void) strcpy(lifreq.lifr_name, ipif_loopback_name);
+
+	error = ldi_ident_from_major(IP_MAJ, &li);
+	if (error) {
+#ifdef DEBUG
+		printf("ip_loopback_cleanup: lyr ident get failed error %d\n",
+		    error);
+#endif
+		return;
+	}
+
+	cr = zone_get_kcred(netstackid_to_zoneid(
+		ipst->ips_netstack->netstack_stackid));
+	ASSERT(cr != NULL);
+	error = ldi_open_by_name(UDP6DEV, FREAD|FWRITE, cr, &lh, li);
+	if (error) {
+#ifdef DEBUG
+		printf("ip_loopback_cleanup: open of UDP6DEV failed error %d\n",
+		    error);
+#endif
+		goto out;
+	}
+	iocb.ic_cmd = SIOCLIFREMOVEIF;
+	iocb.ic_timout = 15;
+	iocb.ic_len = sizeof (lifreq);
+	iocb.ic_dp = (char *)&lifreq;
+
+	error = ldi_ioctl(lh, I_STR, (intptr_t)&iocb, FKIOCTL, cr, &rval);
+	/* LINTED - statement has no consequent */
+	if (error) {
+#ifdef NS_DEBUG
+		printf("ip_loopback_cleanup: ioctl SIOCLIFREMOVEIF failed on "
+		    "UDP6 error %d\n", error);
+#endif
+	}
+	(void) ldi_close(lh, FREAD|FWRITE, cr);
+	lh = NULL;
+
+	error = ldi_open_by_name(UDPDEV, FREAD|FWRITE, cr, &lh, li);
+	if (error) {
+#ifdef NS_DEBUG
+		printf("ip_loopback_cleanup: open of UDPDEV failed error %d\n",
+		    error);
+#endif
+		goto out;
+	}
+
+	iocb.ic_cmd = SIOCLIFREMOVEIF;
+	iocb.ic_timout = 15;
+	iocb.ic_len = sizeof (lifreq);
+	iocb.ic_dp = (char *)&lifreq;
+
+	error = ldi_ioctl(lh, I_STR, (intptr_t)&iocb, FKIOCTL, cr, &rval);
+	/* LINTED - statement has no consequent */
+	if (error) {
+#ifdef NS_DEBUG
+		printf("ip_loopback_cleanup: ioctl SIOCLIFREMOVEIF failed on "
+		    "UDP error %d\n", error);
+#endif
+	}
+	(void) ldi_close(lh, FREAD|FWRITE, cr);
+	lh = NULL;
+
+out:
+	/* Close layered handles */
+	if (lh)
+		(void) ldi_close(lh, FREAD|FWRITE, cr);
+	if (li)
+		ldi_ident_release(li);
+
+	crfree(cr);
 }

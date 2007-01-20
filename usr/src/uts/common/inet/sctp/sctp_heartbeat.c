@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/mib2.h>
+#include <inet/ipclassifier.h>
 #include "sctp_impl.h"
 
 void
@@ -51,6 +52,7 @@ sctp_return_heartbeat(sctp_t *sctp, sctp_chunk_hdr_t *hbcp, mblk_t *mp)
 	in6_addr_t addr;
 	sctp_faddr_t *fp;
 	uint16_t len;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 
@@ -82,7 +84,7 @@ sctp_return_heartbeat(sctp_t *sctp, sctp_chunk_hdr_t *hbcp, mblk_t *mp)
 	/* Create an IP header, returning to the src addr from the heartbt */
 	smp = sctp_make_mp(sctp, fp, len);
 	if (smp == NULL) {
-		SCTP_KSTAT(sctp_return_hb_failed);
+		SCTP_KSTAT(sctps, sctp_return_hb_failed);
 		return;
 	}
 
@@ -118,6 +120,7 @@ sctp_send_heartbeat(sctp_t *sctp, sctp_faddr_t *fp)
 	in6_addr_t *a;
 	mblk_t *hbmp;
 	size_t hblen;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	dprint(3, ("sctp_send_heartbeat: to %x:%x:%x:%x from %x:%x:%x:%x\n",
 	    SCTP_PRINTADDR(fp->faddr), SCTP_PRINTADDR(fp->saddr)));
@@ -129,7 +132,7 @@ sctp_send_heartbeat(sctp_t *sctp, sctp_faddr_t *fp)
 		sizeof (fp->faddr);
 	hbmp = sctp_make_mp(sctp, fp, hblen);
 	if (hbmp == NULL) {
-		SCTP_KSTAT(sctp_send_hb_failed);
+		SCTP_KSTAT(sctps, sctp_send_hb_failed);
 		return;
 	}
 
@@ -184,7 +187,7 @@ sctp_send_heartbeat(sctp_t *sctp, sctp_faddr_t *fp)
 	fp->hb_pending = B_TRUE;
 
 	BUMP_LOCAL(sctp->sctp_obchunks);
-	BUMP_MIB(&sctp_mib, sctpTimHeartBeatProbe);
+	BUMP_MIB(&sctps->sctps_mib, sctpTimHeartBeatProbe);
 
 	sctp_add_sendq(sctp, hbmp);
 }
@@ -199,10 +202,11 @@ sctp_validate_peer(sctp_t *sctp)
 	int		cnt;
 	int64_t		now;
 	int64_t		earliest_expiry;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	now = lbolt64;
 	earliest_expiry = 0;
-	cnt = sctp_maxburst;
+	cnt = sctps->sctps_maxburst;
 
 	/*
 	 * Loop thru the list looking for unconfirmed addresses and

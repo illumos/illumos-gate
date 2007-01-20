@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,7 @@ extern void yyerror(char *s);
 %token HELP CREATE EXPORT ADD DELETE REMOVE SELECT SET INFO CANCEL END VERIFY
 %token COMMIT REVERT EXIT SEMICOLON TOKEN ZONENAME ZONEPATH AUTOBOOT POOL NET
 %token FS IPD ATTR DEVICE RCTL SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL
+%token IPTYPE
 %token NAME MATCH PRIV LIMIT ACTION VALUE EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
 %token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS BRAND PSET
 %token MCAP NCPUS IMPORTANCE SHARES MAXLWPS MAXSHMMEM MAXSHMIDS MAXMSGIDS
@@ -70,7 +71,7 @@ extern void yyerror(char *s);
 %type <ival> resource_type NET FS IPD DEVICE RCTL ATTR DATASET PSET MCAP
 %type <ival> property_name SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL NAME
     MATCH ZONENAME ZONEPATH AUTOBOOT POOL LIMITPRIV BOOTARGS VALUE PRIV LIMIT
-    ACTION BRAND SCHED
+    ACTION BRAND SCHED IPTYPE
 %type <cmd> command
 %type <cmd> add_command ADD
 %type <cmd> cancel_command CANCEL
@@ -440,6 +441,15 @@ info_command:	INFO
 		cmd = $$;
 		$$->cmd_handler = &info_func;
 		$$->cmd_res_type = RT_AUTOBOOT;
+		$$->cmd_prop_nv_pairs = 0;
+	}
+	|	INFO IPTYPE
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_IPTYPE;
 		$$->cmd_prop_nv_pairs = 0;
 	}
 	|	INFO POOL
@@ -840,6 +850,7 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| ZONENAME	{ $$ = PT_ZONENAME; }
 	| ZONEPATH	{ $$ = PT_ZONEPATH; }
 	| AUTOBOOT	{ $$ = PT_AUTOBOOT; }
+	| IPTYPE	{ $$ = PT_IPTYPE; }
 	| POOL		{ $$ = PT_POOL; }
 	| LIMITPRIV	{ $$ = PT_LIMITPRIV; }
 	| BOOTARGS	{ $$ = PT_BOOTARGS; }

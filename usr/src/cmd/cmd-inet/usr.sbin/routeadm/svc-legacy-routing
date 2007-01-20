@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,7 +55,7 @@ case "$method" in
 		echo "${proto}-routing-stop-cmd not specified by routeadm."
 		exit $SMF_EXIT_ERR_CONFIG
 	fi
-	smf_is_globalzone || exit $SMF_EXIT_OK
+	smf_configure_ip || exit $SMF_EXIT_OK
 
 	# Run daemon - fail if it does not successfully daemonize.
 	eval "$daemon_prog $daemon_args"
@@ -65,10 +65,16 @@ case "$method" in
 	fi
 	# Create pidfile.
 	daemon_name=`/usr/bin/basename $daemon_prog`
-	/usr/bin/pgrep -P 1 -f $daemon_prog > /var/tmp/${daemon_name}.pid
+	if smf_is_globalzone; then
+		/usr/bin/pgrep -P 1 -z `smf_zonename` -f $daemon_prog > \
+			/var/tmp/${daemon_name}.pid
+	else
+		/usr/bin/pgrep -z `smf_zonename` -f $daemon_prog > \
+			/var/tmp/${daemon_name}.pid
+	fi
 	;;
 'stop' )
-	smf_is_globalzone || exit $SMF_EXIT_OK
+	smf_configure_ip || exit $SMF_EXIT_OK
 
 	# Stop daemon - ignore result.
 	if [ -n "$daemon_stop" ]; then

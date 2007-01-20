@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,9 +36,6 @@
 #include <sys/sad.h>
 #include <sys/kmem.h>
 #include <sys/sysmacros.h>
-
-struct saddev		*saddev;	/* sad device array */
-int			sadcnt = 16;	/* number of sad devices */
 
 /*
  * Currently we store all the sad data in a hash table keyed by major
@@ -69,9 +66,6 @@ int			sadcnt = 16;	/* number of sad devices */
  * for a given major number then there can't be any SAP_RANGE or SAP_ONE
  * nodes for that same major number.
  */
-kmutex_t		sad_lock;		/* protects sad_hash */
-static mod_hash_t	*sad_hash;
-static size_t		sad_hash_nchains = 127;
 
 /*
  * Private Internal Interfaces
@@ -207,59 +201,60 @@ sad_ap_alloc(void)
 }
 
 void
-sad_ap_rele(struct autopush *ap)
+sad_ap_rele(struct autopush *ap, str_stack_t *ss)
 {
-	mutex_enter(&sad_lock);
+	mutex_enter(&ss->ss_sad_lock);
 	ASSERT(ap->ap_cnt > 0);
 	if (--(ap->ap_cnt) == 0) {
-		mutex_exit(&sad_lock);
+		mutex_exit(&ss->ss_sad_lock);
 		kmem_free(ap, sizeof (struct autopush));
 	} else {
-		mutex_exit(&sad_lock);
+		mutex_exit(&ss->ss_sad_lock);
 	}
 }
 
 void
-sad_ap_insert(struct autopush *ap)
+sad_ap_insert(struct autopush *ap, str_stack_t *ss)
 {
-	ASSERT(MUTEX_HELD(&sad_lock));
+	ASSERT(MUTEX_HELD(&ss->ss_sad_lock));
 	ASSERT(sad_apc_verify(&ap->ap_common) == 0);
-	ASSERT(sad_ap_find(&ap->ap_common) == NULL);
-	(void) mod_hash_insert(sad_hash, &ap->ap_common, ap);
+	ASSERT(sad_ap_find(&ap->ap_common, ss) == NULL);
+	(void) mod_hash_insert(ss->ss_sad_hash, &ap->ap_common, ap);
 }
 
 void
-sad_ap_remove(struct autopush *ap)
+sad_ap_remove(struct autopush *ap, str_stack_t *ss)
 {
 	struct autopush	*ap_removed = NULL;
 
-	ASSERT(MUTEX_HELD(&sad_lock));
-	(void) mod_hash_remove(sad_hash, &ap->ap_common,
+	ASSERT(MUTEX_HELD(&ss->ss_sad_lock));
+	(void) mod_hash_remove(ss->ss_sad_hash, &ap->ap_common,
 	    (mod_hash_val_t *)&ap_removed);
 	ASSERT(ap == ap_removed);
 }
 
 struct autopush *
-sad_ap_find(struct apcommon *apc)
+sad_ap_find(struct apcommon *apc, str_stack_t *ss)
 {
 	struct autopush	*ap_result = NULL;
 
-	ASSERT(MUTEX_HELD(&sad_lock));
+	ASSERT(MUTEX_HELD(&ss->ss_sad_lock));
 	ASSERT(sad_apc_verify(apc) == 0);
 
-	(void) mod_hash_find(sad_hash, apc, (mod_hash_val_t *)&ap_result);
+	(void) mod_hash_find(ss->ss_sad_hash, apc,
+	    (mod_hash_val_t *)&ap_result);
 	if (ap_result != NULL)
 		ap_result->ap_cnt++;
 	return (ap_result);
 }
 
 struct autopush *
-sad_ap_find_by_dev(dev_t dev)
+sad_ap_find_by_dev(dev_t dev, str_stack_t *ss)
 {
 	struct apcommon	apc;
 	struct autopush	*ap_result;
 
-	ASSERT(MUTEX_NOT_HELD(&sad_lock));
+	ASSERT(MUTEX_NOT_HELD(&ss->ss_sad_lock));
 
 	/* prepare an apcommon structure to search with */
 	apc.apc_cmd = SAP_ONE;
@@ -274,17 +269,35 @@ sad_ap_find_by_dev(dev_t dev)
 	apc.apc_npush = 1;
 	apc.apc_lastminor = 0;
 
-	mutex_enter(&sad_lock);
-	ap_result = sad_ap_find(&apc);
-	mutex_exit(&sad_lock);
+	mutex_enter(&ss->ss_sad_lock);
+	ap_result = sad_ap_find(&apc, ss);
+	mutex_exit(&ss->ss_sad_lock);
 	return (ap_result);
 }
 
 void
-sad_initspace(void)
+sad_initspace(str_stack_t *ss)
 {
-	saddev = kmem_zalloc(sadcnt * sizeof (struct saddev), KM_SLEEP);
-	sad_hash = mod_hash_create_extended("sad_hash",
-	    sad_hash_nchains, mod_hash_null_keydtor, mod_hash_null_valdtor,
+	mutex_init(&ss->ss_sad_lock, NULL, MUTEX_DEFAULT, NULL);
+	ss->ss_sad_hash_nchains = 127;
+	ss->ss_sadcnt = 16;
+
+	ss->ss_saddev = kmem_zalloc(ss->ss_sadcnt * sizeof (struct saddev),
+	    KM_SLEEP);
+	ss->ss_sad_hash = mod_hash_create_extended("sad_hash",
+	    ss->ss_sad_hash_nchains, mod_hash_null_keydtor,
+	    mod_hash_null_valdtor,
 	    sad_hash_alg, NULL, sad_hash_keycmp, KM_SLEEP);
+}
+
+void
+sad_freespace(str_stack_t *ss)
+{
+	kmem_free(ss->ss_saddev, ss->ss_sadcnt * sizeof (struct saddev));
+	ss->ss_saddev = NULL;
+
+	mod_hash_destroy_hash(ss->ss_sad_hash);
+	ss->ss_sad_hash = NULL;
+
+	mutex_destroy(&ss->ss_sad_lock);
 }

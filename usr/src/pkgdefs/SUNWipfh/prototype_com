@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -26,9 +26,15 @@ i depend
 d none usr 755 root sys
 d none usr/include 755 root bin
 d none usr/include/netinet 755 root bin
+f none usr/include/netinet/ipf_stack.h 644 root bin
 f none usr/include/netinet/ip_compat.h 644 root bin
 f none usr/include/netinet/ip_fil.h 644 root bin
 f none usr/include/netinet/ip_nat.h 644 root bin
 f none usr/include/netinet/ip_state.h 644 root bin
 f none usr/include/netinet/ip_proxy.h 644 root bin
 f none usr/include/netinet/ipl.h 644 root bin
+f none usr/include/netinet/ip_frag.h 644 root bin
+f none usr/include/netinet/ip_auth.h 644 root bin
+f none usr/include/netinet/ip_pool.h 644 root bin
+f none usr/include/netinet/ip_htable.h 644 root bin
+f none usr/include/netinet/ip_lookup.h 644 root bin

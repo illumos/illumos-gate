@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,6 +92,7 @@ struct file;
 #include "netinet/ip_frag.h"
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
+#include "netinet/ipf_stack.h"
 #ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
 #endif
@@ -116,68 +117,33 @@ static const char sccsid[] = "@(#)ip_state.c	1.8 6/5/96 (C) 1993-2000 Darren Ree
 static const char rcsid[] = "@(#)$Id: ip_state.c,v 2.186.2.36 2005/08/11 19:58:03 darrenr Exp $";
 #endif
 
-static	ipstate_t **ips_table = NULL;
-static	u_long	*ips_seed = NULL;
-static	int	ips_num = 0;
-static	u_long ips_last_force_flush = 0;
-ips_stat_t ips_stats;
-
 #ifdef	USE_INET6
 static ipstate_t *fr_checkicmp6matchingstate __P((fr_info_t *));
 #endif
 static ipstate_t *fr_matchsrcdst __P((fr_info_t *, ipstate_t *, i6addr_t *,
 				      i6addr_t *, tcphdr_t *, u_32_t));
 static ipstate_t *fr_checkicmpmatchingstate __P((fr_info_t *));
-static int fr_state_flush __P((int, int));
-static ips_stat_t *fr_statetstats __P((void));
-static void fr_delstate __P((ipstate_t *, int));
-static int fr_state_remove __P((caddr_t));
-static void fr_ipsmove __P((ipstate_t *, u_int));
+static int fr_state_flush __P((int, int, ipf_stack_t *));
+static ips_stat_t *fr_statetstats __P((ipf_stack_t *));
+static void fr_delstate __P((ipstate_t *, int, ipf_stack_t *));
+static int fr_state_remove __P((caddr_t, ipf_stack_t *));
+static void fr_ipsmove __P((ipstate_t *, u_int, ipf_stack_t *));
 static int fr_tcpstate __P((fr_info_t *, tcphdr_t *, ipstate_t *));
 static int fr_tcpoptions __P((fr_info_t *, tcphdr_t *, tcpdata_t *));
 static ipstate_t *fr_stclone __P((fr_info_t *, tcphdr_t *, ipstate_t *));
 static void fr_fixinisn __P((fr_info_t *, ipstate_t *));
 static void fr_fixoutisn __P((fr_info_t *, ipstate_t *));
 static void fr_checknewisn __P((fr_info_t *, ipstate_t *));
+static int fr_stateiter __P((ipftoken_t *, ipfgeniter_t *, ipf_stack_t *));
 
-int fr_stputent __P((caddr_t));
-int fr_stgetent __P((caddr_t));
+int fr_stputent __P((caddr_t, ipf_stack_t *));
+int fr_stgetent __P((caddr_t, ipf_stack_t *));
 
 #define	ONE_DAY		IPF_TTLVAL(1 * 86400)	/* 1 day */
 #define	FIVE_DAYS	(5 * ONE_DAY)
-#define	DOUBLE_HASH(x)	(((x) + ips_seed[(x) % fr_statesize]) % fr_statesize)
+#define	DOUBLE_HASH(x, ifs)	\
+    (((x) + ifs->ifs_ips_seed[(x) % ifs->ifs_fr_statesize]) % ifs->ifs_fr_statesize)
 
-u_long	fr_tcpidletimeout = FIVE_DAYS,
-	fr_tcpclosewait = IPF_TTLVAL(2 * TCP_MSL),
-	fr_tcplastack = IPF_TTLVAL(2 * TCP_MSL),
-	fr_tcptimeout = IPF_TTLVAL(2 * TCP_MSL),
-	fr_tcpclosed = IPF_TTLVAL(60),
-	fr_tcphalfclosed = IPF_TTLVAL(2 * 3600),	/* 2 hours */
-	fr_udptimeout = IPF_TTLVAL(120),
-	fr_udpacktimeout = IPF_TTLVAL(12),
-	fr_icmptimeout = IPF_TTLVAL(60),
-	fr_icmpacktimeout = IPF_TTLVAL(6),
-	fr_iptimeout = IPF_TTLVAL(60);
-int	fr_statemax = IPSTATE_MAX,
-	fr_statesize = IPSTATE_SIZE;
-int	fr_state_doflush = 0,
-	fr_state_lock = 0,
-	fr_state_maxbucket = 0,
-	fr_state_maxbucket_reset = 1,
-	fr_state_init = 0;
-ipftq_t	ips_tqtqb[IPF_TCP_NSTATES],
-	ips_udptq,
-	ips_udpacktq,
-	ips_iptq,
-	ips_icmptq,
-	ips_icmpacktq,
-	*ips_utqe = NULL;
-#ifdef	IPFILTER_LOG
-int	ipstate_logging = 1;
-#else
-int	ipstate_logging = 0;
-#endif
-ipstate_t *ips_list = NULL;
 
 
 /* ------------------------------------------------------------------------ */
@@ -188,30 +154,55 @@ ipstate_t *ips_list = NULL;
 /* Initialise all the global variables used within the state code.          */
 /* This action also includes initiailising locks.                           */
 /* ------------------------------------------------------------------------ */
-int fr_stateinit()
+int fr_stateinit(ifs)
+ipf_stack_t *ifs;
 {
 	int i;
 
-	KMALLOCS(ips_table, ipstate_t **, fr_statesize * sizeof(ipstate_t *));
-	if (ips_table == NULL)
-		return -1;
-	bzero((char *)ips_table, fr_statesize * sizeof(ipstate_t *));
+	ifs->ifs_fr_tcpidletimeout = FIVE_DAYS;
+	ifs->ifs_fr_tcpclosewait = IPF_TTLVAL(TCP_MSL);
+	ifs->ifs_fr_tcplastack = IPF_TTLVAL(TCP_MSL);
+	ifs->ifs_fr_tcptimeout = IPF_TTLVAL(TCP_MSL);
+	ifs->ifs_fr_tcpclosed = IPF_TTLVAL(60);
+	ifs->ifs_fr_tcphalfclosed = IPF_TTLVAL(2 * 3600);	/* 2 hours */
+	ifs->ifs_fr_udptimeout = IPF_TTLVAL(120);
+	ifs->ifs_fr_udpacktimeout = IPF_TTLVAL(12);
+	ifs->ifs_fr_icmptimeout = IPF_TTLVAL(60);
+	ifs->ifs_fr_icmpacktimeout = IPF_TTLVAL(6);
+	ifs->ifs_fr_iptimeout = IPF_TTLVAL(60);
+	ifs->ifs_fr_statemax = IPSTATE_MAX;
+	ifs->ifs_fr_statesize = IPSTATE_SIZE;
+	ifs->ifs_fr_state_maxbucket_reset = 1;
+#ifdef	IPFILTER_LOG
+	ifs->ifs_ipstate_logging = 1;
+#else
+	ifs->ifs_ipstate_logging = 0;
+#endif
 
-	KMALLOCS(ips_seed, u_long *, fr_statesize * sizeof(*ips_seed));
-	if (ips_seed == NULL)
+	KMALLOCS(ifs->ifs_ips_table, ipstate_t **, 
+		 ifs->ifs_fr_statesize * sizeof(ipstate_t *));
+	if (ifs->ifs_ips_table == NULL)
+		return -1;
+	bzero((char *)ifs->ifs_ips_table, 
+	      ifs->ifs_fr_statesize * sizeof(ipstate_t *));
+
+	KMALLOCS(ifs->ifs_ips_seed, u_long *,
+		 ifs->ifs_fr_statesize * sizeof(*ifs->ifs_ips_seed));
+	if (ifs->ifs_ips_seed == NULL)
 		return -2;
-	for (i = 0; i < fr_statesize; i++) {
+	for (i = 0; i < ifs->ifs_fr_statesize; i++) {
 		/*
 		 * XXX - ips_seed[X] should be a random number of sorts.
 		 */
 #if  (__FreeBSD_version >= 400000)
-		ips_seed[i] = arc4random();
+		ifs->ifs_ips_seed[i] = arc4random();
 #else
-		ips_seed[i] = ((u_long)ips_seed + i) * fr_statesize;
-		ips_seed[i] ^= 0xa5a55a5a;
-		ips_seed[i] *= (u_long)ips_seed;
-		ips_seed[i] ^= 0x5a5aa5a5;
-		ips_seed[i] *= fr_statemax;
+		ifs->ifs_ips_seed[i] = ((u_long)ifs->ifs_ips_seed + i) *
+		    ifs->ifs_fr_statesize;
+		ifs->ifs_ips_seed[i] ^= 0xa5a55a5a;
+		ifs->ifs_ips_seed[i] *= (u_long)ifs->ifs_ips_seed;
+		ifs->ifs_ips_seed[i] ^= 0x5a5aa5a5;
+		ifs->ifs_ips_seed[i] *= ifs->ifs_fr_statemax;
 #endif
 	}
 
@@ -233,56 +224,57 @@ int fr_stateinit()
 	icmpreplytype6[ND_NEIGHBOR_SOLICIT] = ND_NEIGHBOR_ADVERT;
 #endif
 
-	KMALLOCS(ips_stats.iss_bucketlen, u_long *,
-		 fr_statesize * sizeof(u_long));
-	if (ips_stats.iss_bucketlen == NULL)
+	KMALLOCS(ifs->ifs_ips_stats.iss_bucketlen, u_long *,
+		 ifs->ifs_fr_statesize * sizeof(u_long));
+	if (ifs->ifs_ips_stats.iss_bucketlen == NULL)
 		return -1;
-	bzero((char *)ips_stats.iss_bucketlen, fr_statesize * sizeof(u_long));
+	bzero((char *)ifs->ifs_ips_stats.iss_bucketlen, 
+	      ifs->ifs_fr_statesize * sizeof(u_long));
 
-	if (fr_state_maxbucket == 0) {
-		for (i = fr_statesize; i > 0; i >>= 1)
-			fr_state_maxbucket++;
-		fr_state_maxbucket *= 2;
+	if (ifs->ifs_fr_state_maxbucket == 0) {
+		for (i = ifs->ifs_fr_statesize; i > 0; i >>= 1)
+			ifs->ifs_fr_state_maxbucket++;
+		ifs->ifs_fr_state_maxbucket *= 2;
 	}
 
-	fr_sttab_init(ips_tqtqb);
-	ips_tqtqb[IPF_TCP_NSTATES - 1].ifq_next = &ips_udptq;
-	ips_udptq.ifq_ttl = (u_long)fr_udptimeout;
-	ips_udptq.ifq_ref = 1;
-	ips_udptq.ifq_head = NULL;
-	ips_udptq.ifq_tail = &ips_udptq.ifq_head;
-	MUTEX_INIT(&ips_udptq.ifq_lock, "ipftq udp tab");
-	ips_udptq.ifq_next = &ips_udpacktq;
-	ips_udpacktq.ifq_ttl = (u_long)fr_udpacktimeout;
-	ips_udpacktq.ifq_ref = 1;
-	ips_udpacktq.ifq_head = NULL;
-	ips_udpacktq.ifq_tail = &ips_udpacktq.ifq_head;
-	MUTEX_INIT(&ips_udpacktq.ifq_lock, "ipftq udpack tab");
-	ips_udpacktq.ifq_next = &ips_icmptq;
-	ips_icmptq.ifq_ttl = (u_long)fr_icmptimeout;
-	ips_icmptq.ifq_ref = 1;
-	ips_icmptq.ifq_head = NULL;
-	ips_icmptq.ifq_tail = &ips_icmptq.ifq_head;
-	MUTEX_INIT(&ips_icmptq.ifq_lock, "ipftq icmp tab");
-	ips_icmptq.ifq_next = &ips_icmpacktq;
-	ips_icmpacktq.ifq_ttl = (u_long)fr_icmpacktimeout;
-	ips_icmpacktq.ifq_ref = 1;
-	ips_icmpacktq.ifq_head = NULL;
-	ips_icmpacktq.ifq_tail = &ips_icmpacktq.ifq_head;
-	MUTEX_INIT(&ips_icmpacktq.ifq_lock, "ipftq icmpack tab");
-	ips_icmpacktq.ifq_next = &ips_iptq;
-	ips_iptq.ifq_ttl = (u_long)fr_iptimeout;
-	ips_iptq.ifq_ref = 1;
-	ips_iptq.ifq_head = NULL;
-	ips_iptq.ifq_tail = &ips_iptq.ifq_head;
-	MUTEX_INIT(&ips_iptq.ifq_lock, "ipftq ip tab");
-	ips_iptq.ifq_next = NULL;
+	fr_sttab_init(ifs->ifs_ips_tqtqb, ifs);
+	ifs->ifs_ips_tqtqb[IPF_TCP_NSTATES - 1].ifq_next = &ifs->ifs_ips_udptq;
+	ifs->ifs_ips_udptq.ifq_ttl = (u_long)ifs->ifs_fr_udptimeout;
+	ifs->ifs_ips_udptq.ifq_ref = 1;
+	ifs->ifs_ips_udptq.ifq_head = NULL;
+	ifs->ifs_ips_udptq.ifq_tail = &ifs->ifs_ips_udptq.ifq_head;
+	MUTEX_INIT(&ifs->ifs_ips_udptq.ifq_lock, "ipftq udp tab");
+	ifs->ifs_ips_udptq.ifq_next = &ifs->ifs_ips_udpacktq;
+	ifs->ifs_ips_udpacktq.ifq_ttl = (u_long)ifs->ifs_fr_udpacktimeout;
+	ifs->ifs_ips_udpacktq.ifq_ref = 1;
+	ifs->ifs_ips_udpacktq.ifq_head = NULL;
+	ifs->ifs_ips_udpacktq.ifq_tail = &ifs->ifs_ips_udpacktq.ifq_head;
+	MUTEX_INIT(&ifs->ifs_ips_udpacktq.ifq_lock, "ipftq udpack tab");
+	ifs->ifs_ips_udpacktq.ifq_next = &ifs->ifs_ips_icmptq;
+	ifs->ifs_ips_icmptq.ifq_ttl = (u_long)ifs->ifs_fr_icmptimeout;
+	ifs->ifs_ips_icmptq.ifq_ref = 1;
+	ifs->ifs_ips_icmptq.ifq_head = NULL;
+	ifs->ifs_ips_icmptq.ifq_tail = &ifs->ifs_ips_icmptq.ifq_head;
+	MUTEX_INIT(&ifs->ifs_ips_icmptq.ifq_lock, "ipftq icmp tab");
+	ifs->ifs_ips_icmptq.ifq_next = &ifs->ifs_ips_icmpacktq;
+	ifs->ifs_ips_icmpacktq.ifq_ttl = (u_long)ifs->ifs_fr_icmpacktimeout;
+	ifs->ifs_ips_icmpacktq.ifq_ref = 1;
+	ifs->ifs_ips_icmpacktq.ifq_head = NULL;
+	ifs->ifs_ips_icmpacktq.ifq_tail = &ifs->ifs_ips_icmpacktq.ifq_head;
+	MUTEX_INIT(&ifs->ifs_ips_icmpacktq.ifq_lock, "ipftq icmpack tab");
+	ifs->ifs_ips_icmpacktq.ifq_next = &ifs->ifs_ips_iptq;
+	ifs->ifs_ips_iptq.ifq_ttl = (u_long)ifs->ifs_fr_iptimeout;
+	ifs->ifs_ips_iptq.ifq_ref = 1;
+	ifs->ifs_ips_iptq.ifq_head = NULL;
+	ifs->ifs_ips_iptq.ifq_tail = &ifs->ifs_ips_iptq.ifq_head;
+	MUTEX_INIT(&ifs->ifs_ips_iptq.ifq_lock, "ipftq ip tab");
+	ifs->ifs_ips_iptq.ifq_next = NULL;
 
-	RWLOCK_INIT(&ipf_state, "ipf IP state rwlock");
-	MUTEX_INIT(&ipf_stinsert, "ipf state insert mutex");
-	fr_state_init = 1;
+	RWLOCK_INIT(&ifs->ifs_ipf_state, "ipf IP state rwlock");
+	MUTEX_INIT(&ifs->ifs_ipf_stinsert, "ipf state insert mutex");
+	ifs->ifs_fr_state_init = 1;
 
-	ips_last_force_flush = fr_ticks;
+	ifs->ifs_ips_last_force_flush = ifs->ifs_fr_ticks;
 	return 0;
 }
 
@@ -295,13 +287,14 @@ int fr_stateinit()
 /* Release and destroy any resources acquired or initialised so that        */
 /* IPFilter can be unloaded or re-initialised.                              */
 /* ------------------------------------------------------------------------ */
-void fr_stateunload()
+void fr_stateunload(ifs)
+ipf_stack_t *ifs;
 {
 	ipftq_t *ifq, *ifqnext;
 	ipstate_t *is;
 
-	while ((is = ips_list) != NULL)
-		fr_delstate(is, 0);
+	while ((is = ifs->ifs_ips_list) != NULL)
+	    fr_delstate(is, 0, ifs);
 
 	/*
 	 * Proxy timeout queues are not cleaned here because although they
@@ -310,47 +303,50 @@ void fr_stateunload()
 	 * Should the proxy timeouts have their own list?  There's no real
 	 * justification as this is the only complicationA
 	 */
-	for (ifq = ips_utqe; ifq != NULL; ifq = ifqnext) {
+	for (ifq = ifs->ifs_ips_utqe; ifq != NULL; ifq = ifqnext) {
 		ifqnext = ifq->ifq_next;
 		if (((ifq->ifq_flags & IFQF_PROXY) == 0) &&
 		    (fr_deletetimeoutqueue(ifq) == 0))
-			fr_freetimeoutqueue(ifq);
+			fr_freetimeoutqueue(ifq, ifs);
 	}
 
-	ips_stats.iss_inuse = 0;
-	ips_num = 0;
+	ifs->ifs_ips_stats.iss_inuse = 0;
+	ifs->ifs_ips_num = 0;
 
-	if (fr_state_init == 1) {
-		fr_sttab_destroy(ips_tqtqb);
-		MUTEX_DESTROY(&ips_udptq.ifq_lock);
-		MUTEX_DESTROY(&ips_icmptq.ifq_lock);
-		MUTEX_DESTROY(&ips_udpacktq.ifq_lock);
-		MUTEX_DESTROY(&ips_icmpacktq.ifq_lock);
-		MUTEX_DESTROY(&ips_iptq.ifq_lock);
+	if (ifs->ifs_fr_state_init == 1) {
+		fr_sttab_destroy(ifs->ifs_ips_tqtqb);
+		MUTEX_DESTROY(&ifs->ifs_ips_udptq.ifq_lock);
+		MUTEX_DESTROY(&ifs->ifs_ips_icmptq.ifq_lock);
+		MUTEX_DESTROY(&ifs->ifs_ips_udpacktq.ifq_lock);
+		MUTEX_DESTROY(&ifs->ifs_ips_icmpacktq.ifq_lock);
+		MUTEX_DESTROY(&ifs->ifs_ips_iptq.ifq_lock);
 	}
 
-	if (ips_table != NULL) {
-		KFREES(ips_table, fr_statesize * sizeof(*ips_table));
-		ips_table = NULL;
+	if (ifs->ifs_ips_table != NULL) {
+		KFREES(ifs->ifs_ips_table, 
+		       ifs->ifs_fr_statesize * sizeof(*ifs->ifs_ips_table));
+		ifs->ifs_ips_table = NULL;
 	}
 
-	if (ips_seed != NULL) {
-		KFREES(ips_seed, fr_statesize * sizeof(*ips_seed));
-		ips_seed = NULL;
+	if (ifs->ifs_ips_seed != NULL) {
+		KFREES(ifs->ifs_ips_seed, 
+		       ifs->ifs_fr_statesize * sizeof(*ifs->ifs_ips_seed));
+		ifs->ifs_ips_seed = NULL;
 	}
 
-	if (ips_stats.iss_bucketlen != NULL) {
-		KFREES(ips_stats.iss_bucketlen, fr_statesize * sizeof(u_long));
-		ips_stats.iss_bucketlen = NULL;
+	if (ifs->ifs_ips_stats.iss_bucketlen != NULL) {
+		KFREES(ifs->ifs_ips_stats.iss_bucketlen, 
+		       ifs->ifs_fr_statesize * sizeof(u_long));
+		ifs->ifs_ips_stats.iss_bucketlen = NULL;
 	}
 
-	if (fr_state_maxbucket_reset == 1)
-		fr_state_maxbucket = 0;
+	if (ifs->ifs_fr_state_maxbucket_reset == 1)
+		ifs->ifs_fr_state_maxbucket = 0;
 
-	if (fr_state_init == 1) {
-		fr_state_init = 0;
-		RW_DESTROY(&ipf_state);
-		MUTEX_DESTROY(&ipf_stinsert);
+	if (ifs->ifs_fr_state_init == 1) {
+		ifs->ifs_fr_state_init = 0;
+		RW_DESTROY(&ifs->ifs_ipf_state);
+		MUTEX_DESTROY(&ifs->ifs_ipf_stinsert);
 	}
 }
 
@@ -363,15 +359,16 @@ void fr_stateunload()
 /* Put all the current numbers and pointers into a single struct and return */
 /* a pointer to it.                                                         */
 /* ------------------------------------------------------------------------ */
-static ips_stat_t *fr_statetstats()
+static ips_stat_t *fr_statetstats(ifs)
+ipf_stack_t *ifs;
 {
-	ips_stats.iss_active = ips_num;
-	ips_stats.iss_statesize = fr_statesize;
-	ips_stats.iss_statemax = fr_statemax;
-	ips_stats.iss_table = ips_table;
-	ips_stats.iss_list = ips_list;
-	ips_stats.iss_ticks = fr_ticks;
-	return &ips_stats;
+	ifs->ifs_ips_stats.iss_active = ifs->ifs_ips_num;
+	ifs->ifs_ips_stats.iss_statesize = ifs->ifs_fr_statesize;
+	ifs->ifs_ips_stats.iss_statemax = ifs->ifs_fr_statemax;
+	ifs->ifs_ips_stats.iss_table = ifs->ifs_ips_table;
+	ifs->ifs_ips_stats.iss_list = ifs->ifs_ips_list;
+	ifs->ifs_ips_stats.iss_ticks = ifs->ifs_fr_ticks;
+	return &ifs->ifs_ips_stats;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -382,8 +379,9 @@ static ips_stat_t *fr_statetstats()
 /* Search for a state structure that matches the one passed, according to   */
 /* the IP addresses and other protocol specific information.                */
 /* ------------------------------------------------------------------------ */
-static int fr_state_remove(data)
+static int fr_state_remove(data, ifs)
 caddr_t data;
+ipf_stack_t *ifs;
 {
 	ipstate_t *sp, st;
 	int error;
@@ -393,8 +391,8 @@ caddr_t data;
 	if (error)
 		return EFAULT;
 
-	WRITE_ENTER(&ipf_state);
-	for (sp = ips_list; sp; sp = sp->is_next)
+	WRITE_ENTER(&ifs->ifs_ipf_state);
+	for (sp = ifs->ifs_ips_list; sp; sp = sp->is_next)
 		if ((sp->is_p == st.is_p) && (sp->is_v == st.is_v) &&
 		    !bcmp((caddr_t)&sp->is_src, (caddr_t)&st.is_src,
 			  sizeof(st.is_src)) &&
@@ -402,11 +400,11 @@ caddr_t data;
 			  sizeof(st.is_dst)) &&
 		    !bcmp((caddr_t)&sp->is_ps, (caddr_t)&st.is_ps,
 			  sizeof(st.is_ps))) {
-			fr_delstate(sp, ISL_REMOVE);
-			RWLOCK_EXIT(&ipf_state);
+			fr_delstate(sp, ISL_REMOVE, ifs);
+			RWLOCK_EXIT(&ifs->ifs_ipf_state);
 			return 0;
 		}
-	RWLOCK_EXIT(&ipf_state);
+	RWLOCK_EXIT(&ifs->ifs_ipf_state);
 	return ESRCH;
 }
 
@@ -420,10 +418,12 @@ caddr_t data;
 /*                                                                          */
 /* Processes an ioctl call made to operate on the IP Filter state device.   */
 /* ------------------------------------------------------------------------ */
-int fr_state_ioctl(data, cmd, mode)
+int fr_state_ioctl(data, cmd, mode, uid, ctx, ifs)
 caddr_t data;
 ioctlcmd_t cmd;
-int mode;
+int mode, uid;
+void *ctx;
+ipf_stack_t *ifs;
 {
 	int arg, ret, error = 0;
 
@@ -433,7 +433,7 @@ int mode;
 	 * Delete an entry from the state table.
 	 */
 	case SIOCDELST :
-		error = fr_state_remove(data);
+	    error = fr_state_remove(data, ifs);
 		break;
 	/*
 	 * Flush the state table
@@ -441,9 +441,9 @@ int mode;
 	case SIOCIPFFL :
 		BCOPYIN(data, (char *)&arg, sizeof(arg));
 		if (arg == 0 || arg == 1) {
-			WRITE_ENTER(&ipf_state);
-			ret = fr_state_flush(arg, 4);
-			RWLOCK_EXIT(&ipf_state);
+			WRITE_ENTER(&ifs->ifs_ipf_state);
+			ret = fr_state_flush(arg, 4, ifs);
+			RWLOCK_EXIT(&ifs->ifs_ipf_state);
 			BCOPYOUT((char *)&ret, data, sizeof(ret));
 		} else
 			error = EINVAL;
@@ -452,9 +452,9 @@ int mode;
 	case SIOCIPFL6 :
 		BCOPYIN(data, (char *)&arg, sizeof(arg));
 		if (arg == 0 || arg == 1) {
-			WRITE_ENTER(&ipf_state);
-			ret = fr_state_flush(arg, 6);
-			RWLOCK_EXIT(&ipf_state);
+			WRITE_ENTER(&ifs->ifs_ipf_state);
+			ret = fr_state_flush(arg, 6, ifs);
+			RWLOCK_EXIT(&ifs->ifs_ipf_state);
 			BCOPYOUT((char *)&ret, data, sizeof(ret));
 		} else
 			error = EINVAL;
@@ -470,7 +470,7 @@ int mode;
 		else {
 			int tmp;
 
-			tmp = ipflog_clear(IPL_LOGSTATE);
+			tmp = ipflog_clear(IPL_LOGSTATE, ifs);
 			BCOPYOUT((char *)&tmp, data, sizeof(tmp));
 		}
 		break;
@@ -481,22 +481,23 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			BCOPYIN((char *)data, (char *)&ipstate_logging,
-				sizeof(ipstate_logging));
+			BCOPYIN((char *)data,
+				       (char *)&ifs->ifs_ipstate_logging,
+				       sizeof(ifs->ifs_ipstate_logging));
 		}
 		break;
 	/*
 	 * Return the current state of logging.
 	 */
 	case SIOCGETLG :
-		BCOPYOUT((char *)&ipstate_logging, (char *)data,
-			 sizeof(ipstate_logging));
+		BCOPYOUT((char *)&ifs->ifs_ipstate_logging, (char *)data,
+			sizeof(ifs->ifs_ipstate_logging));
 		break;
 	/*
 	 * Return the number of bytes currently waiting to be read.
 	 */
 	case FIONREAD :
-		arg = iplused[IPL_LOGSTATE];	/* returned in an int */
+		arg = ifs->ifs_iplused[IPL_LOGSTATE]; /* returned in an int */
 		BCOPYOUT((char *)&arg, data, sizeof(arg));
 		break;
 #endif
@@ -504,7 +505,7 @@ int mode;
 	 * Get the current state statistics.
 	 */
 	case SIOCGETFS :
-		error = fr_outobj(data, fr_statetstats(), IPFOBJ_STATESTAT);
+		error = fr_outobj(data, fr_statetstats(ifs), IPFOBJ_STATESTAT);
 		break;
 	/*
 	 * Lock/Unlock the state table.  (Locking prevents any changes, which
@@ -514,29 +515,53 @@ int mode;
 		if (!(mode & FWRITE)) {
 			error = EPERM;
 		} else {
-			fr_lock(data, &fr_state_lock);
+			fr_lock(data, &ifs->ifs_fr_state_lock);
 		}
 		break;
 	/*
 	 * Add an entry to the current state table.
 	 */
 	case SIOCSTPUT :
-		if (!fr_state_lock || !(mode &FWRITE)) {
+		if (!ifs->ifs_fr_state_lock || !(mode &FWRITE)) {
 			error = EACCES;
 			break;
 		}
-		error = fr_stputent(data);
+		error = fr_stputent(data, ifs);
 		break;
 	/*
 	 * Get a state table entry.
 	 */
 	case SIOCSTGET :
-		if (!fr_state_lock) {
+		if (!ifs->ifs_fr_state_lock) {
 			error = EACCES;
 			break;
 		}
-		error = fr_stgetent(data);
+		error = fr_stgetent(data, ifs);
 		break;
+
+	case SIOCGENITER :
+	    {
+		ipftoken_t *token;
+		ipfgeniter_t iter;
+
+		error = fr_inobj(data, &iter, IPFOBJ_GENITER);
+		if (error != 0)
+			break;
+
+		token = ipf_findtoken(IPFGENITER_STATE, uid, ctx, ifs);
+		if (token != NULL)
+			error = fr_stateiter(token, &iter, ifs);
+		else
+			error = ESRCH;
+		RWLOCK_EXIT(&ifs->ifs_ipf_tokens);
+		break;
+	    }
+
+	case SIOCIPFDELTOK :
+		(void) BCOPYIN(data, (char *)&arg, sizeof(arg));
+		error = ipf_deltoken(arg, uid, ctx, ifs);
+		break;
+
 	default :
 		error = EINVAL;
 		break;
@@ -556,8 +581,9 @@ int mode;
 /* the struct passed in and if not null and not found in the list of current*/
 /* state entries, the retrieval fails.                                      */
 /* ------------------------------------------------------------------------ */
-int fr_stgetent(data)
+int fr_stgetent(data, ifs)
 caddr_t data;
+ipf_stack_t *ifs;
 {
 	ipstate_t *is, *isn;
 	ipstate_save_t ips;
@@ -569,7 +595,7 @@ caddr_t data;
 
 	isn = ips.ips_next;
 	if (isn == NULL) {
-		isn = ips_list;
+		isn = ifs->ifs_ips_list;
 		if (isn == NULL) {
 			if (ips.ips_next == NULL)
 				return ENOENT;
@@ -581,7 +607,7 @@ caddr_t data;
 		 * current list of entries.  Security precaution to prevent
 		 * copying of random kernel data.
 		 */
-		for (is = ips_list; is; is = is->is_next)
+		for (is = ifs->ifs_ips_list; is; is = is->is_next)
 			if (is == isn)
 				break;
 		if (!is)
@@ -610,8 +636,9 @@ caddr_t data;
 /* then also add in an orphaned rule (will not show up in any "ipfstat -io" */
 /* output.                                                                  */
 /* ------------------------------------------------------------------------ */
-int fr_stputent(data)
+int fr_stputent(data, ifs)
 caddr_t data;
+ipf_stack_t *ifs;
 {
 	ipstate_t *is, *isn;
 	ipstate_save_t ips;
@@ -641,10 +668,10 @@ caddr_t data;
 	fr = ips.ips_rule;
 
 	if (fr == NULL) {
-		READ_ENTER(&ipf_state);
-		fr_stinsert(isn, 0);
+		READ_ENTER(&ifs->ifs_ipf_state);
+		fr_stinsert(isn, 0, ifs);
 		MUTEX_EXIT(&isn->is_lock);
-		RWLOCK_EXIT(&ipf_state);
+		RWLOCK_EXIT(&ifs->ifs_ipf_state);
 		return 0;
 	}
 
@@ -665,17 +692,17 @@ caddr_t data;
 		 */
 		for (i = 0; i < 4; i++) {
 			name = fr->fr_ifnames[i];
-			fr->fr_ifas[i] = fr_resolvenic(name, fr->fr_v);
+			fr->fr_ifas[i] = fr_resolvenic(name, fr->fr_v, ifs);
 			name = isn->is_ifname[i];
-			isn->is_ifp[i] = fr_resolvenic(name, isn->is_v);
+			isn->is_ifp[i] = fr_resolvenic(name, isn->is_v, ifs);
 		}
 
 		fr->fr_ref = 0;
 		fr->fr_dsize = 0;
 		fr->fr_data = NULL;
 
-		fr_resolvedest(&fr->fr_tif, fr->fr_v);
-		fr_resolvedest(&fr->fr_dif, fr->fr_v);
+		fr_resolvedest(&fr->fr_tif, fr->fr_v, ifs);
+		fr_resolvedest(&fr->fr_dif, fr->fr_v, ifs);
 
 		/*
 		 * send a copy back to userland of what we ended up
@@ -688,16 +715,16 @@ caddr_t data;
 			KFREE(fr);
 			return EFAULT;
 		}
-		READ_ENTER(&ipf_state);
-		fr_stinsert(isn, 0);
+		READ_ENTER(&ifs->ifs_ipf_state);
+		fr_stinsert(isn, 0, ifs);
 		MUTEX_EXIT(&isn->is_lock);
-		RWLOCK_EXIT(&ipf_state);
+		RWLOCK_EXIT(&ifs->ifs_ipf_state);
 
 	} else {
-		READ_ENTER(&ipf_state);
-		for (is = ips_list; is; is = is->is_next)
+		READ_ENTER(&ifs->ifs_ipf_state);
+		for (is = ifs->ifs_ips_list; is; is = is->is_next)
 			if (is->is_rule == fr) {
-				fr_stinsert(isn, 0);
+				fr_stinsert(isn, 0, ifs);
 				MUTEX_EXIT(&isn->is_lock);
 				break;
 			}
@@ -706,7 +733,7 @@ caddr_t data;
 			KFREE(isn);
 			isn = NULL;
 		}
-		RWLOCK_EXIT(&ipf_state);
+		RWLOCK_EXIT(&ifs->ifs_ipf_state);
 
 		return (isn == NULL) ? ESRCH : 0;
 	}
@@ -728,9 +755,10 @@ caddr_t data;
 /* Locking: it is assumed that some kind of lock on ipf_state is held.      */
 /*          Exits with is_lock initialised and held.                        */
 /* ------------------------------------------------------------------------ */
-void fr_stinsert(is, rev)
+void fr_stinsert(is, rev, ifs)
 ipstate_t *is;
 int rev;
+ipf_stack_t *ifs;
 {
 	frentry_t *fr;
 	u_int hv;
@@ -752,14 +780,14 @@ int rev;
 	for (i = 0; i < 4; i++) {
 		if (is->is_ifp[i] != NULL)
 			continue;
-		is->is_ifp[i] = fr_resolvenic(is->is_ifname[i], is->is_v);
+		is->is_ifp[i] = fr_resolvenic(is->is_ifname[i], is->is_v, ifs);
 	}
 
 	/*
 	 * If we could trust is_hv, then the modulous would not be needed, but
 	 * when running with IPFILTER_SYNC, this stops bad values.
 	 */
-	hv = is->is_hv % fr_statesize;
+	hv = is->is_hv % ifs->ifs_fr_statesize;
 	is->is_hv = hv;
 
 	/*
@@ -768,29 +796,29 @@ int rev;
 	 * come along, match the entry and want to update it.
 	 */
 	MUTEX_ENTER(&is->is_lock);
-	MUTEX_ENTER(&ipf_stinsert);
+	MUTEX_ENTER(&ifs->ifs_ipf_stinsert);
 
 	/*
 	 * add into list table.
 	 */
-	if (ips_list != NULL)
-		ips_list->is_pnext = &is->is_next;
-	is->is_pnext = &ips_list;
-	is->is_next = ips_list;
-	ips_list = is;
+	if (ifs->ifs_ips_list != NULL)
+		ifs->ifs_ips_list->is_pnext = &is->is_next;
+	is->is_pnext = &ifs->ifs_ips_list;
+	is->is_next = ifs->ifs_ips_list;
+	ifs->ifs_ips_list = is;
 
-	if (ips_table[hv] != NULL)
-		ips_table[hv]->is_phnext = &is->is_hnext;
+	if (ifs->ifs_ips_table[hv] != NULL)
+		ifs->ifs_ips_table[hv]->is_phnext = &is->is_hnext;
 	else
-		ips_stats.iss_inuse++;
-	is->is_phnext = ips_table + hv;
-	is->is_hnext = ips_table[hv];
-	ips_table[hv] = is;
-	ips_stats.iss_bucketlen[hv]++;
-	ips_num++;
-	MUTEX_EXIT(&ipf_stinsert);
+		ifs->ifs_ips_stats.iss_inuse++;
+	is->is_phnext = ifs->ifs_ips_table + hv;
+	is->is_hnext = ifs->ifs_ips_table[hv];
+	ifs->ifs_ips_table[hv] = is;
+	ifs->ifs_ips_stats.iss_bucketlen[hv]++;
+	ifs->ifs_ips_num++;
+	MUTEX_EXIT(&ifs->ifs_ipf_stinsert);
 
-	fr_setstatequeue(is, rev);
+	fr_setstatequeue(is, rev, ifs);
 }
 
 
@@ -820,8 +848,9 @@ u_int flags;
 	grehdr_t *gre;
 	void *ifp;
 	int out;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (fr_state_lock ||
+	if (ifs->ifs_fr_state_lock ||
 	    (fin->fin_flx & (FI_SHORT|FI_STATE|FI_FRAGBODY|FI_BAD)))
 		return NULL;
 
@@ -840,15 +869,15 @@ u_int flags;
 	 */
 	fr = fin->fin_fr;
 	if (fr != NULL) {
-		if ((ips_num == fr_statemax) && (fr->fr_statemax == 0)) {
-			ATOMIC_INCL(ips_stats.iss_max);
-			fr_state_doflush = 1;
+		if ((ifs->ifs_ips_num == ifs->ifs_fr_statemax) && (fr->fr_statemax == 0)) {
+			ATOMIC_INCL(ifs->ifs_ips_stats.iss_max);
+			ifs->ifs_fr_state_doflush = 1;
 			return NULL;
 		}
 		if ((fr->fr_statemax != 0) &&
 		    (fr->fr_statecnt >= fr->fr_statemax)) {
-			ATOMIC_INCL(ips_stats.iss_maxref);
-			fr_state_doflush = 1;
+			ATOMIC_INCL(ifs->ifs_ips_stats.iss_maxref);
+			ifs->ifs_fr_state_doflush = 1;
 			return NULL;
 		}
 	}
@@ -860,7 +889,7 @@ u_int flags;
 	out = fin->fin_out;
 	is = &ips;
 	bzero((char *)is, sizeof(*is));
-	is->is_die = 1 + fr_ticks;
+	is->is_die = 1 + ifs->ifs_fr_ticks;
 
 	/*
 	 * Copy and calculate...
@@ -921,7 +950,7 @@ u_int flags;
 		default :
 			return NULL;
 		}
-		ATOMIC_INCL(ips_stats.iss_icmp);
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_icmp);
 		break;
 #endif
 	case IPPROTO_ICMP :
@@ -939,7 +968,7 @@ u_int flags;
 		default :
 			return NULL;
 		}
-		ATOMIC_INCL(ips_stats.iss_icmp);
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_icmp);
 		break;
 
 	case IPPROTO_GRE :
@@ -1019,7 +1048,7 @@ u_int flags;
 		 * timer on it as we'll never see an error if it fails to
 		 * connect.
 		 */
-		ATOMIC_INCL(ips_stats.iss_tcp);
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_tcp);
 		break;
 
 	case IPPROTO_UDP :
@@ -1031,13 +1060,13 @@ u_int flags;
 			hv += tcp->th_dport;
 			hv += tcp->th_sport;
 		}
-		ATOMIC_INCL(ips_stats.iss_udp);
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_udp);
 		break;
 
 	default :
 		break;
 	}
-	hv = DOUBLE_HASH(hv);
+	hv = DOUBLE_HASH(hv, ifs);
 	is->is_hv = hv;
 	is->is_rule = fr;
 	is->is_flags = flags & IS_INHERITED;
@@ -1045,7 +1074,8 @@ u_int flags;
 	/*
 	 * Look for identical state.
 	 */
-	for (is = ips_table[is->is_hv % fr_statesize]; is != NULL;
+	for (is = ifs->ifs_ips_table[is->is_hv % ifs->ifs_fr_statesize];
+	     is != NULL;
 	     is = is->is_hnext) {
 		if (bcmp(&ips.is_src, &is->is_src,
 			 offsetof(struct ipstate, is_ps) -
@@ -1055,13 +1085,13 @@ u_int flags;
 	if (is != NULL)
 		return NULL;
 
-	if (ips_stats.iss_bucketlen[hv] >= fr_state_maxbucket) {
-		ATOMIC_INCL(ips_stats.iss_bucketfull);
+	if (ifs->ifs_ips_stats.iss_bucketlen[hv] >= ifs->ifs_fr_state_maxbucket) {
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_bucketfull);
 		return NULL;
 	}
 	KMALLOC(is, ipstate_t *);
 	if (is == NULL) {
-		ATOMIC_INCL(ips_stats.iss_nomem);
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_nomem);
 		return NULL;
 	}
 	bcopy((char *)&ips, (char *)is, sizeof(*is));
@@ -1071,16 +1101,17 @@ u_int flags;
 	if (fr != NULL) {
 		(void) strncpy(is->is_group, fr->fr_group, FR_GROUPLEN);
 		if (fr->fr_age[0] != 0) {
-			is->is_tqehead[0] = fr_addtimeoutqueue(&ips_utqe,
-							       fr->fr_age[0]);
+			is->is_tqehead[0] = 
+			    fr_addtimeoutqueue(&ifs->ifs_ips_utqe,
+					       fr->fr_age[0], ifs);
 			is->is_sti.tqe_flags |= TQE_RULEBASED;
 		}
 		if (fr->fr_age[1] != 0) {
-			is->is_tqehead[1] = fr_addtimeoutqueue(&ips_utqe,
-							       fr->fr_age[1]);
+			is->is_tqehead[1] = 
+			    fr_addtimeoutqueue(&ifs->ifs_ips_utqe,
+					       fr->fr_age[1], ifs);
 			is->is_sti.tqe_flags |= TQE_RULEBASED;
 		}
-
 		is->is_tag = fr->fr_logtag;
 
 		is->is_ifp[(out << 1) + 1] = fr->fr_ifas[1];
@@ -1100,7 +1131,7 @@ u_int flags;
 			COPYIFNAME(ifp, is->is_ifname[((1 - out) << 1) + 1], fr->fr_v);
 		}
 	} else {
-		pass = fr_flags;
+		pass = ifs->ifs_fr_flags;
 		is->is_tag = FR_NOLOGTAG;
 	}
 
@@ -1152,7 +1183,7 @@ u_int flags;
 	is->is_auth = fin->fin_auth;
 	is->is_authmsk = 0xffff;
 	if (flags & (SI_WILDP|SI_WILDA)) {
-		ATOMIC_INCL(ips_stats.iss_wild);
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_wild);
 	}
 	is->is_rulen = fin->fin_rule;
 
@@ -1160,10 +1191,10 @@ u_int flags;
 	if (pass & FR_LOGFIRST)
 		is->is_pass &= ~(FR_LOGFIRST|FR_LOG);
 
-	READ_ENTER(&ipf_state);
+	READ_ENTER(&ifs->ifs_ipf_state);
 	is->is_me = stsave;
 
-	fr_stinsert(is, fin->fin_rev);
+	fr_stinsert(is, fin->fin_rev, ifs);
 
 	if (fin->fin_p == IPPROTO_TCP) {
 		/*
@@ -1171,7 +1202,8 @@ u_int flags;
 		* timer on it as we'll never see an error if it fails to
 		* connect.
 		*/
-		(void) fr_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags);
+		(void) fr_tcp_age(&is->is_sti, fin, ifs->ifs_ips_tqtqb,
+				  is->is_flags);
 		MUTEX_EXIT(&is->is_lock);
 #ifdef	IPFILTER_SCAN
 		if ((is->is_flags & SI_CLONE) == 0)
@@ -1184,10 +1216,10 @@ u_int flags;
 	if ((is->is_flags & IS_STATESYNC) && ((is->is_flags & SI_CLONE) == 0))
 		is->is_sync = ipfsync_new(SMC_STATE, fin, is);
 #endif
-	if (ipstate_logging)
-		ipstate_log(is, ISL_NEW);
+	if (ifs->ifs_ipstate_logging)
+		ipstate_log(is, ISL_NEW, ifs);
 
-	RWLOCK_EXIT(&ipf_state);
+	RWLOCK_EXIT(&ifs->ifs_ipf_state);
 	fin->fin_state = is;
 	fin->fin_rev = IP6_NEQ(&is->is_dst, &fin->fin_daddr);
 	fin->fin_flx |= FI_STATE;
@@ -1303,6 +1335,7 @@ ipstate_t *is;
 {
 	int source, ret = 0, flags;
 	tcpdata_t  *fdata, *tdata;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	source = !fin->fin_rev;
 	if (((is->is_flags & IS_TCPFSM) != 0) && (source == 1) && 
@@ -1326,7 +1359,8 @@ ipstate_t *is;
 		/*
 		 * Nearing end of connection, start timeout.
 		 */
-		ret = fr_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags);
+		ret = fr_tcp_age(&is->is_sti, fin, ifs->ifs_ips_tqtqb,
+				 is->is_flags);
 		if (ret == 0) {
 			MUTEX_EXIT(&is->is_lock);
 			return 0;
@@ -1566,10 +1600,11 @@ ipstate_t *is;
 {
 	ipstate_t *clone;
 	u_32_t send;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (ips_num == fr_statemax) {
-		ATOMIC_INCL(ips_stats.iss_max);
-		fr_state_doflush = 1;
+	if (ifs->ifs_ips_num == ifs->ifs_fr_statemax) {
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_max);
+		ifs->ifs_fr_state_doflush = 1;
 		return NULL;
 	}
 	KMALLOC(clone, ipstate_t *);
@@ -1579,7 +1614,7 @@ ipstate_t *is;
 
 	MUTEX_NUKE(&clone->is_lock);
 
-	clone->is_die = ONE_DAY + fr_ticks;
+	clone->is_die = ONE_DAY + ifs->ifs_fr_ticks;
 	clone->is_state[0] = 0;
 	clone->is_state[1] = 0;
 	send = ntohl(tcp->th_seq) + fin->fin_dlen - (TCP_OFF(tcp) << 2) +
@@ -1606,10 +1641,10 @@ ipstate_t *is;
 
 	clone->is_flags &= ~SI_CLONE;
 	clone->is_flags |= SI_CLONED;
-	fr_stinsert(clone, fin->fin_rev);
+	fr_stinsert(clone, fin->fin_rev, ifs);
 	clone->is_ref = 2;
 	if (clone->is_p == IPPROTO_TCP) {
-		(void) fr_tcp_age(&clone->is_sti, fin, ips_tqtqb,
+		(void) fr_tcp_age(&clone->is_sti, fin, ifs->ifs_ips_tqtqb,
 				  clone->is_flags);
 	}
 	MUTEX_EXIT(&clone->is_lock);
@@ -1648,6 +1683,7 @@ u_32_t cmask;
 	u_short sp, dp;
 	u_32_t cflx;
 	void *ifp;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	rev = IP6_NEQ(&is->is_dst, dst);
 	ifp = fin->fin_ifp;
@@ -1781,7 +1817,7 @@ u_32_t cmask;
 			}
 		}
 		if ((is->is_flags & (SI_WILDA|SI_WILDP)) == 0) {
-			ATOMIC_DECL(ips_stats.iss_wild);
+			ATOMIC_DECL(ifs->ifs_ips_stats.iss_wild);
 		}
 	}
 
@@ -1816,7 +1852,7 @@ u_32_t cmask;
 				return NULL;
 			is = clone;
 		} else {
-			ATOMIC_DECL(ips_stats.iss_wild);
+			ATOMIC_DECL(ifs->ifs_ips_stats.iss_wild);
 		}
 
 		if ((flags & SI_W_SPORT) != 0) {
@@ -1839,8 +1875,8 @@ u_32_t cmask;
 			is->is_maxdend = is->is_dend + 1;
 		}
 		is->is_flags &= ~(SI_W_SPORT|SI_W_DPORT);
-		if ((flags & SI_CLONED) && ipstate_logging)
-			ipstate_log(is, ISL_CLONE);
+		if ((flags & SI_CLONED) && ifs->ifs_ipstate_logging)
+			ipstate_log(is, ISL_CLONE, ifs);
 	}
 
 	ret = -1;
@@ -1895,6 +1931,7 @@ fr_info_t *fin;
 	int len;
 	ip_t *oip;
 	u_int hv;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	/*
 	 * Does it at least have the return (basic) IP header ?
@@ -2017,10 +2054,10 @@ fr_info_t *fin;
 		dst.in4 = oip->ip_dst;
 		hv += dst.in4.s_addr;
 		hv += icmp->icmp_id;
-		hv = DOUBLE_HASH(hv);
+		hv = DOUBLE_HASH(hv, ifs);
 
-		READ_ENTER(&ipf_state);
-		for (isp = &ips_table[hv]; ((is = *isp) != NULL); ) {
+		READ_ENTER(&ifs->ifs_ipf_state);
+		for (isp = &ifs->ifs_ips_table[hv]; ((is = *isp) != NULL); ) {
 			isp = &is->is_hnext;
 			if ((is->is_p != pr) || (is->is_v != 4))
 				continue;
@@ -2030,7 +2067,7 @@ fr_info_t *fin;
 					    NULL, FI_ICMPCMP);
 			if (is != NULL) {
 				if ((is->is_pass & FR_NOICMPERR) != 0) {
-					RWLOCK_EXIT(&ipf_state);
+					RWLOCK_EXIT(&ifs->ifs_ipf_state);
 					return NULL;
 				}
 				/*
@@ -2048,12 +2085,12 @@ fr_info_t *fin;
 				oi = (backward << 1) + ofin.fin_out;
 				if (is->is_icmppkts[i] > is->is_pkts[oi])
 					continue;
-				ips_stats.iss_hits++;
+				ifs->ifs_ips_stats.iss_hits++;
 				is->is_icmppkts[i]++;
 				return is;
 			}
 		}
-		RWLOCK_EXIT(&ipf_state);
+		RWLOCK_EXIT(&ifs->ifs_ipf_state);
 		return NULL;
 	case IPPROTO_TCP :
 	case IPPROTO_UDP :
@@ -2073,10 +2110,10 @@ fr_info_t *fin;
 	hv += dst.in4.s_addr;
 	hv += dport;
 	hv += sport;
-	hv = DOUBLE_HASH(hv);
+	hv = DOUBLE_HASH(hv, ifs);
 
-	READ_ENTER(&ipf_state);
-	for (isp = &ips_table[hv]; ((is = *isp) != NULL); ) {
+	READ_ENTER(&ifs->ifs_ipf_state);
+	for (isp = &ifs->ifs_ips_table[hv]; ((is = *isp) != NULL); ) {
 		isp = &is->is_hnext;
 		/*
 		 * Only allow this icmp though if the
@@ -2105,7 +2142,7 @@ fr_info_t *fin;
 			if (((is->is_pass & FR_NOICMPERR) != 0) ||
 			    (is->is_icmppkts[i] > is->is_pkts[oi]))
 				break;
-			ips_stats.iss_hits++;
+			ifs->ifs_ips_stats.iss_hits++;
 			is->is_icmppkts[i]++;
 			/*
 			 * we deliberately do not touch the timeouts
@@ -2115,7 +2152,7 @@ fr_info_t *fin;
 			return is;
 		}
 	}
-	RWLOCK_EXIT(&ipf_state);
+	RWLOCK_EXIT(&ifs->ifs_ipf_state);
 	return NULL;
 }
 
@@ -2129,14 +2166,15 @@ fr_info_t *fin;
 /*                                                                          */
 /* Move a state entry from one position in the hash table to another.       */
 /* ------------------------------------------------------------------------ */
-static void fr_ipsmove(is, hv)
+static void fr_ipsmove(is, hv, ifs)
 ipstate_t *is;
 u_int hv;
+ipf_stack_t *ifs;
 {
 	ipstate_t **isp;
 	u_int hvm;
 
-	ASSERT(rw_read_locked(&ipf_state.ipf_lk) == 0);
+	ASSERT(rw_read_locked(&ifs->ifs_ipf_state.ipf_lk) == 0);
 
 	hvm = is->is_hv;
 	/*
@@ -2146,21 +2184,21 @@ u_int hv;
 	if (is->is_hnext)
 		is->is_hnext->is_phnext = isp;
 	*isp = is->is_hnext;
-	if (ips_table[hvm] == NULL)
-		ips_stats.iss_inuse--;
-	ips_stats.iss_bucketlen[hvm]--;
+	if (ifs->ifs_ips_table[hvm] == NULL)
+		ifs->ifs_ips_stats.iss_inuse--;
+	ifs->ifs_ips_stats.iss_bucketlen[hvm]--;
 
 	/*
 	 * ...and put the hash in the new one.
 	 */
-	hvm = DOUBLE_HASH(hv);
+	hvm = DOUBLE_HASH(hv, ifs);
 	is->is_hv = hvm;
-	isp = &ips_table[hvm];
+	isp = &ifs->ifs_ips_table[hvm];
 	if (*isp)
 		(*isp)->is_phnext = &is->is_hnext;
 	else
-		ips_stats.iss_inuse++;
-	ips_stats.iss_bucketlen[hvm]++;
+		ifs->ifs_ips_stats.iss_inuse++;
+	ifs->ifs_ips_stats.iss_bucketlen[hvm]++;
 	is->is_phnext = isp;
 	is->is_hnext = *isp;
 	*isp = is;
@@ -2192,6 +2230,7 @@ ipftq_t **ifqp;
 	struct icmp *ic;
 	ipftq_t *ifq;
 	int oow;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	is = NULL;
 	ifq = NULL;
@@ -2235,10 +2274,10 @@ ipftq_t **ifqp;
 				hv += ic->icmp_id;
 			}
 		}
-		READ_ENTER(&ipf_state);
+		READ_ENTER(&ifs->ifs_ipf_state);
 icmp6again:
-		hvm = DOUBLE_HASH(hv);
-		for (isp = &ips_table[hvm]; ((is = *isp) != NULL); ) {
+		hvm = DOUBLE_HASH(hv, ifs);
+		for (isp = &ifs->ifs_ips_table[hvm]; ((is = *isp) != NULL); ) {
 			isp = &is->is_hnext;
 			if ((is->is_p != pr) || (is->is_v != v))
 				continue;
@@ -2247,9 +2286,9 @@ icmp6again:
 			    fr_matchicmpqueryreply(v, &is->is_icmp,
 						   ic, fin->fin_rev)) {
 				if (fin->fin_rev)
-					ifq = &ips_icmpacktq;
+					ifq = &ifs->ifs_ips_icmpacktq;
 				else
-					ifq = &ips_icmptq;
+					ifq = &ifs->ifs_ips_icmptq;
 				break;
 			}
 		}
@@ -2260,12 +2299,12 @@ icmp6again:
 				hv += fin->fin_fi.fi_src.i6[1];
 				hv += fin->fin_fi.fi_src.i6[2];
 				hv += fin->fin_fi.fi_src.i6[3];
-				fr_ipsmove(is, hv);
-				MUTEX_DOWNGRADE(&ipf_state);
+				fr_ipsmove(is, hv, ifs);
+				MUTEX_DOWNGRADE(&ifs->ifs_ipf_state);
 			}
 			break;
 		}
-		RWLOCK_EXIT(&ipf_state);
+		RWLOCK_EXIT(&ifs->ifs_ipf_state);
 
 		/*
 		 * No matching icmp state entry. Perhaps this is a
@@ -2277,14 +2316,14 @@ icmp6again:
 		 * advantage of this requires some significant code changes
 		 * to handle the specific types where that is the case.
 		 */
-		if ((ips_stats.iss_wild != 0) && (v == 6) && (tryagain == 0) &&
+		if ((ifs->ifs_ips_stats.iss_wild != 0) && (v == 6) && (tryagain == 0) &&
 		    !IN6_IS_ADDR_MULTICAST(&fin->fin_fi.fi_src.in6)) {
 			hv -= fin->fin_fi.fi_src.i6[0];
 			hv -= fin->fin_fi.fi_src.i6[1];
 			hv -= fin->fin_fi.fi_src.i6[2];
 			hv -= fin->fin_fi.fi_src.i6[3];
 			tryagain = 1;
-			WRITE_ENTER(&ipf_state);
+			WRITE_ENTER(&ifs->ifs_ipf_state);
 			goto icmp6again;
 		}
 
@@ -2298,9 +2337,9 @@ icmp6again:
 		if (v == 4) {
 			hv += ic->icmp_id;
 		}
-		hv = DOUBLE_HASH(hv);
-		READ_ENTER(&ipf_state);
-		for (isp = &ips_table[hv]; ((is = *isp) != NULL); ) {
+		hv = DOUBLE_HASH(hv, ifs);
+		READ_ENTER(&ifs->ifs_ipf_state);
+		for (isp = &ifs->ifs_ips_table[hv]; ((is = *isp) != NULL); ) {
 			isp = &is->is_hnext;
 			if ((is->is_p != pr) || (is->is_v != v))
 				continue;
@@ -2309,14 +2348,14 @@ icmp6again:
 			    fr_matchicmpqueryreply(v, &is->is_icmp,
 						   ic, fin->fin_rev)) {
 				if (fin->fin_rev)
-					ifq = &ips_icmpacktq;
+					ifq = &ifs->ifs_ips_icmpacktq;
 				else
-					ifq = &ips_icmptq;
+					ifq = &ifs->ifs_ips_icmptq;
 				break;
 			}
 		}
 		if (is == NULL) {
-			RWLOCK_EXIT(&ipf_state);
+			RWLOCK_EXIT(&ifs->ifs_ipf_state);
 		}
 		break;
 
@@ -2329,10 +2368,10 @@ icmp6again:
 		hv += dport;
 		oow = 0;
 		tryagain = 0;
-		READ_ENTER(&ipf_state);
+		READ_ENTER(&ifs->ifs_ipf_state);
 retry_tcpudp:
-		hvm = DOUBLE_HASH(hv);
-		for (isp = &ips_table[hvm]; ((is = *isp) != NULL); ) {
+		hvm = DOUBLE_HASH(hv, ifs);
+		for (isp = &ifs->ifs_ips_table[hvm]; ((is = *isp) != NULL); ) {
 			isp = &is->is_hnext;
 			if ((is->is_p != pr) || (is->is_v != v))
 				continue;
@@ -2353,18 +2392,18 @@ retry_tcpudp:
 			    !(is->is_flags & (SI_CLONE|SI_WILDP|SI_WILDA))) {
 				hv += dport;
 				hv += sport;
-				fr_ipsmove(is, hv);
-				MUTEX_DOWNGRADE(&ipf_state);
+				fr_ipsmove(is, hv, ifs);
+				MUTEX_DOWNGRADE(&ifs->ifs_ipf_state);
 			}
 			break;
 		}
-		RWLOCK_EXIT(&ipf_state);
+		RWLOCK_EXIT(&ifs->ifs_ipf_state);
 
-		if (!tryagain && ips_stats.iss_wild) {
+		if (!tryagain && ifs->ifs_ips_stats.iss_wild) {
 			hv -= dport;
 			hv -= sport;
 			tryagain = 1;
-			WRITE_ENTER(&ipf_state);
+			WRITE_ENTER(&ifs->ifs_ipf_state);
 			goto retry_tcpudp;
 		}
 		fin->fin_flx |= oow;
@@ -2380,20 +2419,20 @@ retry_tcpudp:
 #endif
 	default :
 		ifqp = NULL;
-		hvm = DOUBLE_HASH(hv);
-		READ_ENTER(&ipf_state);
-		for (isp = &ips_table[hvm]; ((is = *isp) != NULL); ) {
+		hvm = DOUBLE_HASH(hv, ifs);
+		READ_ENTER(&ifs->ifs_ipf_state);
+		for (isp = &ifs->ifs_ips_table[hvm]; ((is = *isp) != NULL); ) {
 			isp = &is->is_hnext;
 			if ((is->is_p != pr) || (is->is_v != v))
 				continue;
 			is = fr_matchsrcdst(fin, is, &src, &dst, NULL, FI_CMP);
 			if (is != NULL) {
-				ifq = &ips_iptq;
+				ifq = &ifs->ifs_ips_iptq;
 				break;
 			}
 		}
 		if (is == NULL) {
-			RWLOCK_EXIT(&ipf_state);
+			RWLOCK_EXIT(&ifs->ifs_ipf_state);
 		}
 		break;
 	}
@@ -2424,6 +2463,7 @@ ipftq_t *ifq;
 {
 	ipftqent_t *tqe;
 	int i, pass;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	i = (fin->fin_rev << 1) + fin->fin_out;
 
@@ -2437,7 +2477,7 @@ ipftq_t *ifq;
 		ifq = is->is_tqehead[fin->fin_rev];
 
 	if (ifq != NULL)
-		fr_movequeue(tqe, tqe->tqe_ifq, ifq);
+		fr_movequeue(tqe, tqe->tqe_ifq, ifq, ifs);
 
 	is->is_pkts[i]++;
 	is->is_bytes[i] += fin->fin_plen;
@@ -2448,7 +2488,7 @@ ipftq_t *ifq;
 		ipfsync_update(SMC_STATE, fin, is->is_sync);
 #endif
 
-	ATOMIC_INCL(ips_stats.iss_hits);
+	ATOMIC_INCL(ifs->ifs_ips_stats.iss_hits);
 
 	fin->fin_fr = is->is_rule;
 
@@ -2480,8 +2520,9 @@ u_32_t *passp;
 	tcphdr_t *tcp;
 	ipftq_t *ifq;
 	u_int pass;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (fr_state_lock || (ips_list == NULL) ||
+	if (ifs->ifs_fr_state_lock || (ifs->ifs_ips_list == NULL) ||
 	    (fin->fin_flx & (FI_SHORT|FI_STATE|FI_FRAGBODY|FI_BAD)))
 		return NULL;
 
@@ -2540,13 +2581,13 @@ u_32_t *passp;
 		break;
 	default :
 		if (fin->fin_rev)
-			ifq = &ips_udpacktq;
+			ifq = &ifs->ifs_ips_udpacktq;
 		else
-			ifq = &ips_udptq;
+			ifq = &ifs->ifs_ips_udptq;
 		break;
 	}
 	if (is == NULL) {
-		ATOMIC_INCL(ips_stats.iss_miss);
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_miss);
 		return NULL;
 	}
 
@@ -2570,11 +2611,11 @@ matched:
 		fin->fin_nat = is->is_nat[fin->fin_rev];
 
 	fin->fin_state = is;
-	is->is_touched = fr_ticks;
+	is->is_touched = ifs->ifs_fr_ticks;
 	MUTEX_ENTER(&is->is_lock);
 	is->is_ref++;
 	MUTEX_EXIT(&is->is_lock);
-	RWLOCK_EXIT(&ipf_state);
+	RWLOCK_EXIT(&ifs->ifs_ipf_state);
 	fin->fin_flx |= FI_STATE;
 	if ((pass & FR_LOGFIRST) != 0)
 		pass &= ~(FR_LOGFIRST|FR_LOG);
@@ -2674,28 +2715,29 @@ ipstate_t *is;
 /* If ifp is passed in as being non-null then we are only doing updates for */
 /* existing, matching, uses of it.                                          */
 /* ------------------------------------------------------------------------ */
-void fr_statesync(action, v, ifp, name)
+void fr_statesync(action, v, ifp, name, ifs)
 int action, v;
 void *ifp;
 char *name;
+ipf_stack_t *ifs;
 {
 	ipstate_t *is;
 	int i;
 
-	if (fr_running <= 0)
+	if (ifs->ifs_fr_running <= 0)
 		return;
 
-	WRITE_ENTER(&ipf_state);
+	WRITE_ENTER(&ifs->ifs_ipf_state);
 
-	if (fr_running <= 0) {
-		RWLOCK_EXIT(&ipf_state);
+	if (ifs->ifs_fr_running <= 0) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_state);
 		return;
 	}
 
 	switch (action)
 	{
 	case IPFSYNC_RESYNC :
-		for (is = ips_list; is; is = is->is_next) {
+		for (is = ifs->ifs_ips_list; is; is = is->is_next) {
 			if (v != 0 && is->is_v != v)
 				continue;
 			/*
@@ -2703,12 +2745,12 @@ char *name;
 			 */
 			for (i = 0; i < 4; i++) {
 				is->is_ifp[i] = fr_resolvenic(is->is_ifname[i],
-							      is->is_v);
+							      is->is_v, ifs);
 			}
 		}
 		break;
 	case IPFSYNC_NEWIFP :
-		for (is = ips_list; is; is = is->is_next) {
+		for (is = ifs->ifs_ips_list; is; is = is->is_next) {
 			if (v != 0 && is->is_v != v)
 				continue;
 			/*
@@ -2722,7 +2764,7 @@ char *name;
 		}
 		break;
 	case IPFSYNC_OLDIFP :
-		for (is = ips_list; is; is = is->is_next) {
+		for (is = ifs->ifs_ips_list; is; is = is->is_next) {
 			if (v != 0 && is->is_v != v)
 				continue;
 			/*
@@ -2735,7 +2777,7 @@ char *name;
 		}
 		break;
 	}
-	RWLOCK_EXIT(&ipf_state);
+	RWLOCK_EXIT(&ifs->ifs_ipf_state);
 }
 
 
@@ -2750,13 +2792,14 @@ char *name;
 /* and timeout queue lists.  Make adjustments to hash table statistics and  */
 /* global counters as required.                                             */
 /* ------------------------------------------------------------------------ */
-static void fr_delstate(is, why)
+static void fr_delstate(is, why, ifs)
 ipstate_t *is;
 int why;
+ipf_stack_t *ifs;
 {
 
-	ASSERT(rw_write_held(&ipf_global.ipf_lk) == 0 ||
-		rw_write_held(&ipf_state.ipf_lk) == 0);
+	ASSERT(rw_write_held(&ifs->ifs_ipf_global.ipf_lk) == 0 ||
+		rw_write_held(&ifs->ifs_ipf_state.ipf_lk) == 0);
 
 	/*
 	 * Since we want to delete this, remove it from the state table,
@@ -2776,22 +2819,22 @@ int why;
 		*is->is_phnext = is->is_hnext;
 		if (is->is_hnext != NULL)
 			is->is_hnext->is_phnext = is->is_phnext;
-		if (ips_table[is->is_hv] == NULL)
-			ips_stats.iss_inuse--;
-		ips_stats.iss_bucketlen[is->is_hv]--;
+		if (ifs->ifs_ips_table[is->is_hv] == NULL)
+			ifs->ifs_ips_stats.iss_inuse--;
+		ifs->ifs_ips_stats.iss_bucketlen[is->is_hv]--;
 
 		is->is_phnext = NULL;
 		is->is_hnext = NULL;
 	}
 
 	/*
-	 * Because ips_stats.iss_wild is a count of entries in the state
+	 * Because ifs->ifs_ips_stats.iss_wild is a count of entries in the state
 	 * table that have wildcard flags set, only decerement it once
 	 * and do it here.
 	 */
 	if (is->is_flags & (SI_WILDP|SI_WILDA)) {
 		if (!(is->is_flags & SI_CLONED)) {
-			ATOMIC_DECL(ips_stats.iss_wild);
+			ATOMIC_DECL(ifs->ifs_ips_stats.iss_wild);
 		}
 		is->is_flags &= ~(SI_WILDP|SI_WILDA);
 	}
@@ -2813,11 +2856,11 @@ int why;
 
 	if (is->is_tqehead[0] != NULL) {
 		if (fr_deletetimeoutqueue(is->is_tqehead[0]) == 0)
-			fr_freetimeoutqueue(is->is_tqehead[0]);
+			fr_freetimeoutqueue(is->is_tqehead[0], ifs);
 	}
 	if (is->is_tqehead[1] != NULL) {
 		if (fr_deletetimeoutqueue(is->is_tqehead[1]) == 0)
-			fr_freetimeoutqueue(is->is_tqehead[1]);
+			fr_freetimeoutqueue(is->is_tqehead[1], ifs);
 	}
 
 #ifdef	IPFILTER_SYNC
@@ -2828,17 +2871,17 @@ int why;
 	(void) ipsc_detachis(is);
 #endif
 
-	if (ipstate_logging != 0 && why != 0)
-		ipstate_log(is, why);
+	if (ifs->ifs_ipstate_logging != 0 && why != 0)
+		ipstate_log(is, why, ifs);
 
 	if (is->is_rule != NULL) {
 		is->is_rule->fr_statecnt--;
-		(void)fr_derefrule(&is->is_rule);
+		(void)fr_derefrule(&is->is_rule, ifs);
 	}
 
 	MUTEX_DESTROY(&is->is_lock);
 	KFREE(is);
-	ips_num--;
+	ifs->ifs_ips_num--;
 }
 
 
@@ -2852,7 +2895,8 @@ int why;
 /* and the youngest at the bottom.  So if the top one doesn't need to be    */
 /* expired then neither will any under it.                                  */
 /* ------------------------------------------------------------------------ */
-void fr_timeoutstate()
+void fr_timeoutstate(ifs)
+ipf_stack_t *ifs;
 {
 	ipftq_t *ifq, *ifqnext;
 	ipftqent_t *tqe, *tqn;
@@ -2860,43 +2904,42 @@ void fr_timeoutstate()
 	SPL_INT(s);
 
 	SPL_NET(s);
-	WRITE_ENTER(&ipf_state);
-	for (ifq = ips_tqtqb; ifq != NULL; ifq = ifq->ifq_next)
+	WRITE_ENTER(&ifs->ifs_ipf_state);
+	for (ifq = ifs->ifs_ips_tqtqb; ifq != NULL; ifq = ifq->ifq_next)
 		for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {
-			if (tqe->tqe_die > fr_ticks)
+			if (tqe->tqe_die > ifs->ifs_fr_ticks)
 				break;
 			tqn = tqe->tqe_next;
 			is = tqe->tqe_parent;
-			fr_delstate(is, ISL_EXPIRE);
+			fr_delstate(is, ISL_EXPIRE, ifs);
 		}
 
-	for (ifq = ips_utqe; ifq != NULL; ifq = ifqnext) {
+	for (ifq = ifs->ifs_ips_utqe; ifq != NULL; ifq = ifqnext) {
 		ifqnext = ifq->ifq_next;
 
 		for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {
-			if (tqe->tqe_die > fr_ticks)
+			if (tqe->tqe_die > ifs->ifs_fr_ticks)
 				break;
 			tqn = tqe->tqe_next;
 			is = tqe->tqe_parent;
-			fr_delstate(is, ISL_EXPIRE);
+			fr_delstate(is, ISL_EXPIRE, ifs);
 		}
 	}
 
-	for (ifq = ips_utqe; ifq != NULL; ifq = ifqnext) {
+	for (ifq = ifs->ifs_ips_utqe; ifq != NULL; ifq = ifqnext) {
 		ifqnext = ifq->ifq_next;
 
 		if (((ifq->ifq_flags & IFQF_DELETE) != 0) &&
 		    (ifq->ifq_ref == 0)) {
-			fr_freetimeoutqueue(ifq);
+			fr_freetimeoutqueue(ifq, ifs);
 		}
 	}
 
-	if (fr_state_doflush) {
-		(void) fr_state_flush(2, 0);
-		fr_state_doflush = 0;
+	if (ifs->ifs_fr_state_doflush) {
+		(void) fr_state_flush(2, 0, ifs);
+		ifs->ifs_fr_state_doflush = 0;
 	}
-
-	RWLOCK_EXIT(&ipf_state);
+	RWLOCK_EXIT(&ifs->ifs_ipf_state);
 	SPL_X(s);
 }
 
@@ -2918,8 +2961,9 @@ void fr_timeoutstate()
 /*            If that too fails, then work backwards in 30 second intervals */
 /*            for the last 30 minutes to at worst 30 seconds idle.          */
 /* ------------------------------------------------------------------------ */
-static int fr_state_flush(which, proto)
+static int fr_state_flush(which, proto, ifs)
 int which, proto;
+ipf_stack_t *ifs;
 {
 	ipftq_t *ifq, *ifqnext;
 	ipftqent_t *tqe, *tqn;
@@ -2932,7 +2976,7 @@ int which, proto;
 	removed = 0;
 
 	SPL_NET(s);
-	for (isp = &ips_list; ((is = *isp) != NULL); ) {
+	for (isp = &ifs->ifs_ips_list; ((is = *isp) != NULL); ) {
 		delete = 0;
 
 		if ((proto != 0) && (is->is_v != proto)) {
@@ -2957,10 +3001,10 @@ int which, proto;
 
 		if (delete) {
 			if (is->is_p == IPPROTO_TCP)
-				ips_stats.iss_fin++;
+				ifs->ifs_ips_stats.iss_fin++;
 			else
-				ips_stats.iss_expire++;
-			fr_delstate(is, ISL_FLUSH);
+				ifs->ifs_ips_stats.iss_expire++;
+			fr_delstate(is, ISL_FLUSH, ifs);
 			removed++;
 		} else
 			isp = &is->is_next;
@@ -2978,29 +3022,29 @@ int which, proto;
 	 * Another alternative is to implement random drop and drop N entries
 	 * at random until N have been freed up.
 	 */
-	if (fr_ticks - ips_last_force_flush < IPF_TTLVAL(5))
+	if (ifs->ifs_fr_ticks - ifs->ifs_ips_last_force_flush < IPF_TTLVAL(5))
 		goto force_flush_skipped;
-	ips_last_force_flush = fr_ticks;
+	ifs->ifs_ips_last_force_flush = ifs->ifs_fr_ticks;
 
-	if (fr_ticks > IPF_TTLVAL(43200))
+	if (ifs->ifs_fr_ticks > IPF_TTLVAL(43200))
 		interval = IPF_TTLVAL(43200);
-	else if (fr_ticks > IPF_TTLVAL(1800))
+	else if (ifs->ifs_fr_ticks > IPF_TTLVAL(1800))
 		interval = IPF_TTLVAL(1800);
-	else if (fr_ticks > IPF_TTLVAL(30))
+	else if (ifs->ifs_fr_ticks > IPF_TTLVAL(30))
 		interval = IPF_TTLVAL(30);
 	else
 		interval = IPF_TTLVAL(10);
-	try = fr_ticks - (fr_ticks - interval);
+	try = ifs->ifs_fr_ticks - (ifs->ifs_fr_ticks - interval);
 	if (try < 0)
 		goto force_flush_skipped;
 
 	while (removed == 0) {
-		maxtick = fr_ticks - interval;
+		maxtick = ifs->ifs_fr_ticks - interval;
 		if (maxtick < 0)
 			break;
 
 		while (try < maxtick) {
-			for (ifq = ips_tqtqb; ifq != NULL;
+			for (ifq = ifs->ifs_ips_tqtqb; ifq != NULL;
 			     ifq = ifq->ifq_next) {
 				for (tqn = ifq->ifq_head;
 				     ((tqe = tqn) != NULL); ) {
@@ -3008,12 +3052,12 @@ int which, proto;
 						break;
 					tqn = tqe->tqe_next;
 					is = tqe->tqe_parent;
-					fr_delstate(is, ISL_EXPIRE);
+					fr_delstate(is, ISL_EXPIRE, ifs);
 					removed++;
 				}
 			}
 
-			for (ifq = ips_utqe; ifq != NULL; ifq = ifqnext) {
+			for (ifq = ifs->ifs_ips_utqe; ifq != NULL; ifq = ifqnext) {
 				ifqnext = ifq->ifq_next;
 
 				for (tqn = ifq->ifq_head;
@@ -3022,7 +3066,7 @@ int which, proto;
 						break;
 					tqn = tqe->tqe_next;
 					is = tqe->tqe_parent;
-					fr_delstate(is, ISL_EXPIRE);
+					fr_delstate(is, ISL_EXPIRE, ifs);
 					removed++;
 				}
 			}
@@ -3089,6 +3133,7 @@ int flags;
 	int dlen, ostate, nstate, rval, dir;
 	u_char tcpflags;
 	tcphdr_t *tcp;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	tcp = fin->fin_dp;
 
@@ -3385,7 +3430,7 @@ int flags;
 	else if (rval == 1) {
 		tqe->tqe_state[dir] = nstate;
 		if ((tqe->tqe_flags & TQE_RULEBASED) == 0)
-			fr_movequeue(tqe, tqe->tqe_ifq, tqtab + nstate);
+			fr_movequeue(tqe, tqe->tqe_ifq, tqtab + nstate, ifs);
 	}
 
 	return rval;
@@ -3402,9 +3447,10 @@ int flags;
 /* passed in.  Log packet/byte counts, source/destination address and other */
 /* protocol specific information.                                           */
 /* ------------------------------------------------------------------------ */
-void ipstate_log(is, type)
+void ipstate_log(is, type, ifs)
 struct ipstate *is;
 u_int type;
+ipf_stack_t *ifs;
 {
 #ifdef	IPFILTER_LOG
 	struct	ipslog	ipsl;
@@ -3454,10 +3500,10 @@ u_int type;
 	sizes[0] = sizeof(ipsl);
 	types[0] = 0;
 
-	if (ipllog(IPL_LOGSTATE, NULL, items, sizes, types, 1)) {
-		ATOMIC_INCL(ips_stats.iss_logged);
+	if (ipllog(IPL_LOGSTATE, NULL, items, sizes, types, 1, ifs)) {
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_logged);
 	} else {
-		ATOMIC_INCL(ips_stats.iss_logfail);
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_logfail);
 	}
 #endif
 }
@@ -3489,6 +3535,7 @@ fr_info_t *fin;
 	ip6_t *oip6;
 	u_char	pr;
 	u_int hv;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	/*
 	 * Does it at least have the return (basic) IP header ?
@@ -3554,10 +3601,10 @@ fr_info_t *fin;
 		hv += dst.in4.s_addr;
 		hv += oic->icmp6_id;
 		hv += oic->icmp6_seq;
-		hv = DOUBLE_HASH(hv);
+		hv = DOUBLE_HASH(hv, ifs);
 
-		READ_ENTER(&ipf_state);
-		for (isp = &ips_table[hv]; ((is = *isp) != NULL); ) {
+		READ_ENTER(&ifs->ifs_ipf_state);
+		for (isp = &ifs->ifs_ips_table[hv]; ((is = *isp) != NULL); ) {
 			ic = &is->is_icmp;
 			isp = &is->is_hnext;
 			if ((is->is_p == pr) &&
@@ -3574,7 +3621,7 @@ fr_info_t *fin;
 				if (((ic->ici_type == ICMP6_ECHO_REPLY) &&
 				     (oic->icmp6_type == ICMP6_ECHO_REQUEST)) ||
 				     (ic->ici_type - 1 == oic->icmp6_type )) {
-				    	ips_stats.iss_hits++;
+				    	ifs->ifs_ips_stats.iss_hits++;
 					backward = IP6_NEQ(&is->is_dst, &src);
 					fin->fin_rev = !backward;
 					i = (backward << 1) + fin->fin_out;
@@ -3583,7 +3630,7 @@ fr_info_t *fin;
 				}
 			}
 		}
-		RWLOCK_EXIT(&ipf_state);
+		RWLOCK_EXIT(&ifs->ifs_ipf_state);
 		return NULL;
 	}
 
@@ -3607,10 +3654,10 @@ fr_info_t *fin;
 		hv += sport;
 	} else
 		tcp = NULL;
-	hv = DOUBLE_HASH(hv);
+	hv = DOUBLE_HASH(hv, ifs);
 
-	READ_ENTER(&ipf_state);
-	for (isp = &ips_table[hv]; ((is = *isp) != NULL); ) {
+	READ_ENTER(&ifs->ifs_ipf_state);
+	for (isp = &ifs->ifs_ips_table[hv]; ((is = *isp) != NULL); ) {
 		isp = &is->is_hnext;
 		/*
 		 * Only allow this icmp though if the
@@ -3624,7 +3671,7 @@ fr_info_t *fin;
 			continue;
 		is = fr_matchsrcdst(&ofin, is, &src, &dst, tcp, FI_ICMPCMP);
 		if (is != NULL) {
-			ips_stats.iss_hits++;
+			ifs->ifs_ips_stats.iss_hits++;
 			backward = IP6_NEQ(&is->is_dst, &src);
 			fin->fin_rev = !backward;
 			i = (backward << 1) + fin->fin_out;
@@ -3637,7 +3684,7 @@ fr_info_t *fin;
 			return is;
 		}
 	}
-	RWLOCK_EXIT(&ipf_state);
+	RWLOCK_EXIT(&ifs->ifs_ipf_state);
 	return NULL;
 }
 #endif
@@ -3650,8 +3697,9 @@ fr_info_t *fin;
 /*                                                                          */
 /* Initialise the array of timeout queues for TCP.                          */
 /* ------------------------------------------------------------------------ */
-void fr_sttab_init(tqp)
+void fr_sttab_init(tqp, ifs)
 ipftq_t *tqp;
+ipf_stack_t *ifs;
 {
 	int i;
 
@@ -3664,18 +3712,18 @@ ipftq_t *tqp;
 		MUTEX_INIT(&tqp[i].ifq_lock, "ipftq tcp tab");
 	}
 	tqp[IPF_TCP_NSTATES - 1].ifq_next = NULL;
-	tqp[IPF_TCPS_CLOSED].ifq_ttl = fr_tcpclosed;
-	tqp[IPF_TCPS_LISTEN].ifq_ttl = fr_tcptimeout;
-	tqp[IPF_TCPS_SYN_SENT].ifq_ttl = fr_tcptimeout;
-	tqp[IPF_TCPS_SYN_RECEIVED].ifq_ttl = fr_tcptimeout;
-	tqp[IPF_TCPS_ESTABLISHED].ifq_ttl = fr_tcpidletimeout;
-	tqp[IPF_TCPS_CLOSE_WAIT].ifq_ttl = fr_tcphalfclosed;
-	tqp[IPF_TCPS_FIN_WAIT_1].ifq_ttl = fr_tcphalfclosed;
-	tqp[IPF_TCPS_CLOSING].ifq_ttl = fr_tcptimeout;
-	tqp[IPF_TCPS_LAST_ACK].ifq_ttl = fr_tcplastack;
-	tqp[IPF_TCPS_FIN_WAIT_2].ifq_ttl = fr_tcpclosewait;
-	tqp[IPF_TCPS_TIME_WAIT].ifq_ttl = fr_tcptimeout;
-	tqp[IPF_TCPS_HALF_ESTAB].ifq_ttl = fr_tcptimeout;
+	tqp[IPF_TCPS_CLOSED].ifq_ttl = ifs->ifs_fr_tcpclosed;
+	tqp[IPF_TCPS_LISTEN].ifq_ttl = ifs->ifs_fr_tcptimeout;
+	tqp[IPF_TCPS_SYN_SENT].ifq_ttl = ifs->ifs_fr_tcptimeout;
+	tqp[IPF_TCPS_SYN_RECEIVED].ifq_ttl = ifs->ifs_fr_tcptimeout;
+	tqp[IPF_TCPS_ESTABLISHED].ifq_ttl = ifs->ifs_fr_tcpidletimeout;
+	tqp[IPF_TCPS_CLOSE_WAIT].ifq_ttl = ifs->ifs_fr_tcphalfclosed;
+	tqp[IPF_TCPS_FIN_WAIT_1].ifq_ttl = ifs->ifs_fr_tcphalfclosed;
+	tqp[IPF_TCPS_CLOSING].ifq_ttl = ifs->ifs_fr_tcptimeout;
+	tqp[IPF_TCPS_LAST_ACK].ifq_ttl = ifs->ifs_fr_tcplastack;
+	tqp[IPF_TCPS_FIN_WAIT_2].ifq_ttl = ifs->ifs_fr_tcpclosewait;
+	tqp[IPF_TCPS_TIME_WAIT].ifq_ttl = ifs->ifs_fr_tcptimeout;
+	tqp[IPF_TCPS_HALF_ESTAB].ifq_ttl = ifs->ifs_fr_tcptimeout;
 }
 
 
@@ -3720,9 +3768,10 @@ ipftq_t *tqp;
 /*    dir == 0 : a packet from source to dest                               */
 /*    dir == 1 : a packet from dest to source                               */
 /* ------------------------------------------------------------------------ */
-void fr_statederef(fin, isp)
+void fr_statederef(fin, isp, ifs)
 fr_info_t *fin;
 ipstate_t **isp;
+ipf_stack_t *ifs;
 {
 	ipstate_t *is = *isp;
 #if 0
@@ -3756,11 +3805,11 @@ ipstate_t **isp;
 	fin = fin;	/* LINT */
 	is = *isp;
 	*isp = NULL;
-	WRITE_ENTER(&ipf_state);
+	WRITE_ENTER(&ifs->ifs_ipf_state);
 	is->is_ref--;
 	if (is->is_ref == 0) {
 		is->is_ref++;		/* To counter ref-- in fr_delstate() */
-		fr_delstate(is, ISL_EXPIRE);
+		fr_delstate(is, ISL_EXPIRE, ifs);
 #ifndef	_KERNEL
 #if 0
 	} else if (((fin->fin_out == 1) || (eol == 1)) &&
@@ -3771,10 +3820,10 @@ ipstate_t **isp;
 	} else if ((is->is_sti.tqe_state[0] > IPF_TCPS_ESTABLISHED) ||
 		   (is->is_sti.tqe_state[1] > IPF_TCPS_ESTABLISHED)) {
 #endif
-		fr_delstate(is, ISL_ORPHAN);
+		fr_delstate(is, ISL_ORPHAN, ifs);
 #endif
 	}
-	RWLOCK_EXIT(&ipf_state);
+	RWLOCK_EXIT(&ifs->ifs_ipf_state);
 }
 
 
@@ -3788,9 +3837,10 @@ ipstate_t **isp;
 /* Put the state entry on its default queue entry, using rev as a helped in */
 /* determining which queue it should be placed on.                          */
 /* ------------------------------------------------------------------------ */
-void fr_setstatequeue(is, rev)
+void fr_setstatequeue(is, rev, ifs)
 ipstate_t *is;
 int rev;
+ipf_stack_t *ifs;
 {
 	ipftq_t *oifq, *nifq;
 
@@ -3806,30 +3856,30 @@ int rev;
 #ifdef USE_INET6
 		case IPPROTO_ICMPV6 :
 			if (rev == 1)
-				nifq = &ips_icmpacktq;
+				nifq = &ifs->ifs_ips_icmpacktq;
 			else
-				nifq = &ips_icmptq;
+				nifq = &ifs->ifs_ips_icmptq;
 			break;
 #endif
 		case IPPROTO_ICMP :
 			if (rev == 1)
-				nifq = &ips_icmpacktq;
+				nifq = &ifs->ifs_ips_icmpacktq;
 			else
-				nifq = &ips_icmptq;
+				nifq = &ifs->ifs_ips_icmptq;
 			break;
 		case IPPROTO_TCP :
-			nifq = ips_tqtqb + is->is_state[rev];
+			nifq = ifs->ifs_ips_tqtqb + is->is_state[rev];
 			break;
 
 		case IPPROTO_UDP :
 			if (rev == 1)
-				nifq = &ips_udpacktq;
+				nifq = &ifs->ifs_ips_udpacktq;
 			else
-				nifq = &ips_udptq;
+				nifq = &ifs->ifs_ips_udptq;
 			break;
 
 		default :
-			nifq = &ips_iptq;
+			nifq = &ifs->ifs_ips_iptq;
 			break;
 		}
 	}
@@ -3840,8 +3890,80 @@ int rev;
 	 * another, else put it on the end of the newly determined queue.
 	 */
 	if (oifq != NULL)
-		fr_movequeue(&is->is_sti, oifq, nifq);
+		fr_movequeue(&is->is_sti, oifq, nifq, ifs);
 	else
-		fr_queueappend(&is->is_sti, nifq, is);
+		fr_queueappend(&is->is_sti, nifq, is, ifs);
 	return;
 }
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_stateiter                                                */
+/* Returns:     int - 0 == success, else error                              */
+/* Parameters:  token(I) - pointer to ipftoken structure                    */
+/*              itp(I)   - pointer to ipfgeniter structure                  */
+/*                                                                          */
+/* This function handles the SIOCGENITER ioctl for the state tables and     */
+/* walks through the list of entries in the state table list (ips_list.)    */
+/* ------------------------------------------------------------------------ */
+static int fr_stateiter(token, itp, ifs)
+ipftoken_t *token;
+ipfgeniter_t *itp;
+ipf_stack_t *ifs;
+{
+	ipstate_t *is, *next, zero;
+	int error;
+
+	if (itp->igi_data == NULL)
+		return EFAULT;
+
+	if (itp->igi_type != IPFGENITER_STATE)
+		return EINVAL;
+
+	is = token->ipt_data;
+	if (is == (void *)-1) {
+		ipf_freetoken(token, ifs);
+		return ESRCH;
+	}
+
+	READ_ENTER(&ifs->ifs_ipf_state);
+	if (is == NULL) {
+		next = ifs->ifs_ips_list;
+	} else {
+		next = is->is_next;
+	}
+
+	if (next != NULL) {
+		/*
+		 * If we find a state entry to use, bump its reference count
+		 * so that it can be used for is_next when we come back.
+		 */
+		MUTEX_ENTER(&next->is_lock);
+		next->is_ref++;
+		MUTEX_EXIT(&next->is_lock);
+		token->ipt_data = next;
+	} else {
+		bzero(&zero, sizeof(zero));
+		next = &zero;
+		token->ipt_data = (void *)-1;
+	}
+	RWLOCK_EXIT(&ifs->ifs_ipf_state);
+
+	/*
+	 * If we had a prior pointer to a state entry, release it.
+	 */
+	if (is != NULL) {
+		fr_statederef(NULL, &is, ifs);
+	}
+
+	/*
+	 * This should arguably be via fr_outobj() so that the state
+	 * structure can (if required) be massaged going out.
+	 */
+	error = COPYOUT(next, itp->igi_data, sizeof(*next));
+	if (error != 0)
+		error = EFAULT;
+
+	return error;
+}
+

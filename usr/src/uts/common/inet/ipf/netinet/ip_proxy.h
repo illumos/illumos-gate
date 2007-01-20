@@ -4,7 +4,12 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * $Id: ip_proxy.h,v 2.31.2.3 2005/06/18 02:41:33 darrenr Exp $
+ *
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	__IP_PROXY_H__
 #define	__IP_PROXY_H__
@@ -97,14 +102,15 @@ typedef	struct	aproxy	{
 	u_char	apr_p;		/* protocol */
 	int	apr_ref;	/* +1 per rule referencing it */
 	int	apr_flags;
-	int	(* apr_init) __P((void));
-	void	(* apr_fini) __P((void));
-	int	(* apr_new) __P((fr_info_t *, ap_session_t *, struct nat *));
-	void	(* apr_del) __P((ap_session_t *));
-	int	(* apr_inpkt) __P((fr_info_t *, ap_session_t *, struct nat *));
-	int	(* apr_outpkt) __P((fr_info_t *, ap_session_t *, struct nat *));
-	int	(* apr_match) __P((fr_info_t *, ap_session_t *, struct nat *));
-	int	(* apr_ctl) __P((struct aproxy *, struct ap_control *));
+	void	*apr_private;	/* proxy private data */
+	int	(* apr_init) __P((void **, ipf_stack_t *));
+	void	(* apr_fini) __P((void **, ipf_stack_t *));
+	int	(* apr_new) __P((fr_info_t *, ap_session_t *, struct nat *, void *));
+	void	(* apr_del) __P((ap_session_t *, void *, ipf_stack_t *));
+	int	(* apr_inpkt) __P((fr_info_t *, ap_session_t *, struct nat *, void *));
+	int	(* apr_outpkt) __P((fr_info_t *, ap_session_t *, struct nat *, void *));
+	int	(* apr_match) __P((fr_info_t *, ap_session_t *, struct nat *, void *));
+	int	(* apr_ctl) __P((struct aproxy *, struct ap_control *, void *));
 } aproxy_t;
 
 #define	APR_DELETE	1
@@ -436,23 +442,18 @@ typedef struct rpcb_session {
  */
 #define XDRALIGN(x)	((((x) % 4) != 0) ? ((((x) + 3) / 4) * 4) : (x))
 
-extern	ap_session_t	*ap_sess_tab[AP_SESS_SIZE];
-extern	ap_session_t	*ap_sess_list;
-extern	aproxy_t	ap_proxies[];
-extern	int		ippr_ftp_pasvonly;
-
-extern	int	appr_add __P((aproxy_t *));
-extern	int	appr_ctl __P((ap_ctl_t *));
-extern	int	appr_del __P((aproxy_t *));
-extern	int	appr_init __P((void));
-extern	void	appr_unload __P((void));
+extern	int	appr_add __P((aproxy_t *, ipf_stack_t *));
+extern	int	appr_ctl __P((ap_ctl_t *, ipf_stack_t *));
+extern	int	appr_del __P((aproxy_t *, ipf_stack_t *));
+extern	int	appr_init __P((ipf_stack_t *));
+extern	void	appr_unload __P((ipf_stack_t *));
 extern	int	appr_ok __P((fr_info_t *, tcphdr_t *, struct ipnat *));
 extern	int	appr_match __P((fr_info_t *, struct nat *));
 extern	void	appr_free __P((aproxy_t *));
-extern	void	aps_free __P((ap_session_t *));
+extern	void	aps_free __P((ap_session_t *, ipf_stack_t *));
 extern	int	appr_check __P((fr_info_t *, struct nat *));
-extern	aproxy_t	*appr_lookup __P((u_int, char *));
+extern	aproxy_t	*appr_lookup __P((u_int, char *, ipf_stack_t *));
 extern	int	appr_new __P((fr_info_t *, struct nat *));
-extern	int	appr_ioctl __P((caddr_t, ioctlcmd_t, int));
+extern	int	appr_ioctl __P((caddr_t, ioctlcmd_t, int, ipf_stack_t *));
 
 #endif /* __IP_PROXY_H__ */

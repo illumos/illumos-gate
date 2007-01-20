@@ -50,6 +50,7 @@
 #include <sys/isa_defs.h>
 #include <sys/suntpi.h>
 #include <sys/xti_inet.h>
+#include <sys/netstack.h>
 
 #include <net/route.h>
 #include <net/if.h>
@@ -102,14 +103,6 @@ extern uint_t		icmp_max_optsize;
  * exited the shared resource.
  */
 
-/* Named Dispatch Parameter Management Structure */
-typedef struct icmpparam_s {
-	uint_t	icmp_param_min;
-	uint_t	icmp_param_max;
-	uint_t	icmp_param_value;
-	char	*icmp_param_name;
-} icmpparam_t;
-
 static void	icmp_addr_req(queue_t *q, mblk_t *mp);
 static void	icmp_bind(queue_t *q, mblk_t *mp);
 static void	icmp_bind_proto(queue_t *q);
@@ -139,7 +132,7 @@ int		icmp_opt_set(queue_t *q, uint_t optset_context,
 int		icmp_opt_get(queue_t *q, int level, int name,
 		    uchar_t *ptr);
 static int	icmp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
-static boolean_t icmp_param_register(icmpparam_t *icmppa, int cnt);
+static boolean_t icmp_param_register(IDP *ndp, icmpparam_t *icmppa, int cnt);
 static int	icmp_param_set(queue_t *q, mblk_t *mp, char *value,
 		    caddr_t cp, cred_t *cr);
 static void	icmp_rput(queue_t *q, mblk_t *mp);
@@ -158,8 +151,11 @@ static void	icmp_wput_other(queue_t *q, mblk_t *mp);
 static void	icmp_wput_iocdata(queue_t *q, mblk_t *mp);
 static void	icmp_wput_restricted(queue_t *q, mblk_t *mp);
 
-static void	rawip_kstat_init(void);
-static void	rawip_kstat_fini(void);
+static void	*rawip_stack_init(netstackid_t stackid, netstack_t *ns);
+static void	rawip_stack_fini(netstackid_t stackid, void *arg);
+
+static void	*rawip_kstat_init(netstackid_t stackid);
+static void	rawip_kstat_fini(netstackid_t stackid, kstat_t *ksp);
 static int	rawip_kstat_update(kstat_t *kp, int rw);
 
 
@@ -181,12 +177,6 @@ struct streamtab icmpinfo = {
 
 static sin_t	sin_null;	/* Zero address for quick clears */
 static sin6_t	sin6_null;	/* Zero address for quick clears */
-static void	*icmp_g_head;	/* Head for list of open icmp streams. */
-static IDP	icmp_g_nd;	/* Points to table of ICMP ND variables. */
-
-/* MIB-2 stuff for SNMP */
-static mib2_rawip_t	rawip_mib;	/* SNMP fixed size info */
-static kstat_t		*rawip_mibkp;	/* kstat exporting rawip_mib data */
 
 /* Default structure copied into T_INFO_ACK messages */
 static struct T_info_ack icmp_g_t_info_ack = {
@@ -204,8 +194,8 @@ static struct T_info_ack icmp_g_t_info_ack = {
 };
 
 /*
- * Table of ND variables supported by icmp.  These are loaded into icmp_g_nd
- * in icmp_open.
+ * Table of ND variables supported by icmp.  These are loaded into is_nd
+ * when the stack instance is created.
  * All of these are alterable, within the min/max values given, at run time.
  */
 static icmpparam_t	icmp_param_arr[] = {
@@ -219,14 +209,14 @@ static icmpparam_t	icmp_param_arr[] = {
 	{ 4096,	65536,	8192,	"icmp_recv_hiwat"},
 	{ 65536, 1024*1024*1024, 256*1024,	"icmp_max_buf"},
 };
-#define	icmp_wroff_extra		icmp_param_arr[0].icmp_param_value
-#define	icmp_ipv4_ttl			icmp_param_arr[1].icmp_param_value
-#define	icmp_ipv6_hoplimit		icmp_param_arr[2].icmp_param_value
-#define	icmp_bsd_compat			icmp_param_arr[3].icmp_param_value
-#define	icmp_xmit_hiwat			icmp_param_arr[4].icmp_param_value
-#define	icmp_xmit_lowat			icmp_param_arr[5].icmp_param_value
-#define	icmp_recv_hiwat			icmp_param_arr[6].icmp_param_value
-#define	icmp_max_buf			icmp_param_arr[7].icmp_param_value
+#define	is_wroff_extra			is_param_arr[0].icmp_param_value
+#define	is_ipv4_ttl			is_param_arr[1].icmp_param_value
+#define	is_ipv6_hoplimit		is_param_arr[2].icmp_param_value
+#define	is_bsd_compat			is_param_arr[3].icmp_param_value
+#define	is_xmit_hiwat			is_param_arr[4].icmp_param_value
+#define	is_xmit_lowat			is_param_arr[5].icmp_param_value
+#define	is_recv_hiwat			is_param_arr[6].icmp_param_value
+#define	is_max_buf			is_param_arr[7].icmp_param_value
 
 /*
  * This routine is called to handle each O_T_BIND_REQ/T_BIND_REQ message
@@ -630,6 +620,7 @@ icmp_close(queue_t *q)
 {
 	icmp_t	*icmp = (icmp_t *)q->q_ptr;
 	int	i1;
+	icmp_stack_t *is = icmp->icmp_is;
 
 	/* tell IP that if we're not here, he can't trust labels */
 	if (is_system_labeled())
@@ -655,9 +646,10 @@ icmp_close(queue_t *q)
 	ip6_pkt_free(&icmp->icmp_sticky_ipp);
 
 	crfree(icmp->icmp_credp);
+	netstack_rele(icmp->icmp_is->is_netstack);
 
 	/* Free the icmp structure and release the minor device number. */
-	i1 = mi_close_comm(&icmp_g_head, q);
+	i1 = mi_close_comm(&is->is_head, q);
 
 	return (i1);
 }
@@ -926,7 +918,7 @@ icmp_icmp_error_ipv6(queue_t *q, mblk_t *mp)
 		udi_size = sizeof (struct T_unitdata_ind) + sizeof (sin6_t) +
 		    opt_length;
 		if ((newmp = allocb(udi_size, BPRI_MED)) == NULL) {
-			BUMP_MIB(&rawip_mib, rawipInErrors);
+			BUMP_MIB(&icmp->icmp_rawip_mib, rawipInErrors);
 			break;
 		}
 
@@ -1329,6 +1321,9 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	icmp_t	*icmp;
 	mblk_t	*mp;
 	out_labeled_t *olp;
+	netstack_t *ns;
+	icmp_stack_t *is;
+	zoneid_t zoneid;
 
 	/* If the stream is already open, return immediately. */
 	if (q->q_ptr != NULL)
@@ -1345,20 +1340,36 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	 * has an outer perimeter.)
 	 */
 
+	ns = netstack_find_by_cred(credp);
+	ASSERT(ns != NULL);
+	is = ns->netstack_icmp;
+	ASSERT(is != NULL);
+
+	/*
+	 * For exclusive stacks we set the zoneid to zero
+	 * to make ICMP operate as if in the global zone.
+	 */
+	if (is->is_netstack->netstack_stackid != GLOBAL_NETSTACKID)
+		zoneid = GLOBAL_ZONEID;
+	else
+		zoneid = crgetzoneid(credp);
+
 	/*
 	 * Create a icmp_t structure for this stream and link into the
 	 * list of open streams.
 	 */
-	err = mi_open_comm(&icmp_g_head, sizeof (icmp_t), q, devp,
+	err = mi_open_comm(&is->is_head, sizeof (icmp_t), q, devp,
 	    flag, sflag, credp);
-	if (err != 0)
+	if (err != 0) {
+		netstack_rele(is->is_netstack);
 		return (err);
+	}
 
 	/*
 	 * The receive hiwat is only looked at on the stream head queue.
 	 * Store in q_hiwat in order to return on SO_RCVBUF getsockopts.
 	 */
-	q->q_hiwat = icmp_recv_hiwat;
+	q->q_hiwat = is->is_recv_hiwat;
 
 	/* Set the initial state of the stream and the privilege status. */
 	icmp = (icmp_t *)q->q_ptr;
@@ -1377,7 +1388,8 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	if (getpflags(NET_MAC_AWARE, credp) != 0)
 		icmp->icmp_mac_exempt = B_TRUE;
 
-	icmp->icmp_zoneid = getzoneid();
+	icmp->icmp_zoneid = zoneid;
+	icmp->icmp_is = is;
 
 	if (getmajor(*devp) == (major_t)ICMP6_MAJ) {
 		icmp->icmp_ipversion = IPV6_VERSION;
@@ -1386,14 +1398,14 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		icmp->icmp_proto = IPPROTO_ICMPV6;
 		icmp->icmp_checksum_off = 2;	/* Offset for icmp6_cksum */
 		icmp->icmp_max_hdr_len = IPV6_HDR_LEN;
-		icmp->icmp_ttl = (uint8_t)icmp_ipv6_hoplimit;
+		icmp->icmp_ttl = (uint8_t)is->is_ipv6_hoplimit;
 	} else {
 		icmp->icmp_ipversion = IPV4_VERSION;
 		icmp->icmp_family = AF_INET;
 		/* May be changed by a SO_PROTOTYPE socket option. */
 		icmp->icmp_proto = IPPROTO_ICMP;
 		icmp->icmp_max_hdr_len = IP_SIMPLE_HDR_LENGTH;
-		icmp->icmp_ttl = (uint8_t)icmp_ipv4_ttl;
+		icmp->icmp_ttl = (uint8_t)is->is_ipv4_ttl;
 	}
 	qprocson(q);
 
@@ -1411,9 +1423,9 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	 * Store in q_hiwat in order to return on SO_SNDBUF
 	 * getsockopts.
 	 */
-	WR(q)->q_hiwat = icmp_xmit_hiwat;
+	WR(q)->q_hiwat = is->is_xmit_hiwat;
 	WR(q)->q_next->q_hiwat = WR(q)->q_hiwat;
-	WR(q)->q_lowat = icmp_xmit_lowat;
+	WR(q)->q_lowat = is->is_xmit_lowat;
 	WR(q)->q_next->q_lowat = WR(q)->q_lowat;
 
 	if (icmp->icmp_family == AF_INET6) {
@@ -1423,7 +1435,8 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 			goto open_error;
 	}
 	/* Set the Stream head write offset. */
-	(void) mi_set_sth_wroff(q, icmp->icmp_max_hdr_len + icmp_wroff_extra);
+	(void) mi_set_sth_wroff(q,
+	    icmp->icmp_max_hdr_len + is->is_wroff_extra);
 	(void) mi_set_sth_hiwat(q, q->q_hiwat);
 
 	if (is_system_labeled()) {
@@ -1453,7 +1466,8 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 open_error:
 	qprocsoff(q);
 	crfree(credp);
-	(void) mi_close_comm(&icmp_g_head, q);
+	(void) mi_close_comm(&is->is_head, q);
+	netstack_rele(is->is_netstack);
 	return (err);
 }
 
@@ -1475,6 +1489,8 @@ icmp_opt_allow_udr_set(t_scalar_t level, t_scalar_t name)
 int
 icmp_opt_default(queue_t *q, int level, int name, uchar_t *ptr)
 {
+	icmp_t *icmp = (icmp_t *)q->q_ptr;
+	icmp_stack_t *is = icmp->icmp_is;
 	int *i1 = (int *)ptr;
 
 	switch (level) {
@@ -1497,7 +1513,7 @@ icmp_opt_default(queue_t *q, int level, int name, uchar_t *ptr)
 			*i1 = IP_DEFAULT_MULTICAST_LOOP;
 			return (sizeof (int));
 		case IPV6_UNICAST_HOPS:
-			*i1 = icmp_ipv6_hoplimit;
+			*i1 = is->is_ipv6_hoplimit;
 			return (sizeof (int));
 		}
 		break;
@@ -1523,6 +1539,7 @@ icmp_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 	icmp_t	*icmp = (icmp_t *)q->q_ptr;
 	int	*i1 = (int *)ptr;
 	ip6_pkt_t	*ipp = &icmp->icmp_sticky_ipp;
+	icmp_stack_t	*is = icmp->icmp_is;
 
 	switch (level) {
 	case SOL_SOCKET:
@@ -1817,7 +1834,8 @@ icmp_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 				return (0);
 
 			return (ip_fill_mtuinfo(&icmp->icmp_v6dst, 0,
-				(struct ip6_mtuinfo *)ptr));
+				(struct ip6_mtuinfo *)ptr,
+				is->is_netstack));
 		case IPV6_TCLASS:
 			if (ipp->ipp_fields & IPPF_TCLASS)
 				*i1 = ipp->ipp_tclass;
@@ -1866,6 +1884,7 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
     void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
 {
 	icmp_t	*icmp = (icmp_t *)q->q_ptr;
+	icmp_stack_t *is = icmp->icmp_is;
 	int	*i1 = (int *)invalp;
 	boolean_t onoff = (*i1 == 0) ? 0 : 1;
 	boolean_t checkonly;
@@ -2022,7 +2041,7 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			break;
 
 		case SO_SNDBUF:
-			if (*i1 > icmp_max_buf) {
+			if (*i1 > is->is_max_buf) {
 				*outlenp = 0;
 				return (ENOBUFS);
 			}
@@ -2032,7 +2051,7 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			}
 			break;
 		case SO_RCVBUF:
-			if (*i1 > icmp_max_buf) {
+			if (*i1 > is->is_max_buf) {
 				*outlenp = 0;
 				return (ENOBUFS);
 			}
@@ -2107,7 +2126,7 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			icmp->icmp_max_hdr_len = IP_SIMPLE_HDR_LENGTH +
 			    icmp->icmp_ip_snd_options_len;
 			(void) mi_set_sth_wroff(RD(q), icmp->icmp_max_hdr_len +
-						icmp_wroff_extra);
+						is->is_wroff_extra);
 			break;
 		case IP_HDRINCL:
 			if (!checkonly)
@@ -2278,7 +2297,7 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (!checkonly) {
 				if (*i1 == -1) {
 					icmp->icmp_ttl = ipp->ipp_unicast_hops =
-					    icmp_ipv6_hoplimit;
+					    is->is_ipv6_hoplimit;
 					ipp->ipp_fields &= ~IPPF_UNICAST_HOPS;
 					/* Pass modified value to IP. */
 					*i1 = ipp->ipp_hoplimit;
@@ -2478,7 +2497,8 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				if (*i1 > 255 || *i1 < -1)
 					return (EINVAL);
 				if (*i1 == -1)
-					ipp->ipp_hoplimit = icmp_ipv6_hoplimit;
+					ipp->ipp_hoplimit =
+					    is->is_ipv6_hoplimit;
 				else
 					ipp->ipp_hoplimit = *i1;
 				ipp->ipp_fields |= IPPF_HOPLIMIT;
@@ -2814,6 +2834,7 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 static int
 icmp_build_hdrs(queue_t *q, icmp_t *icmp)
 {
+	icmp_stack_t *is = icmp->icmp_is;
 	uchar_t	*hdrs;
 	uint_t	hdrs_len;
 	ip6_t	*ip6h;
@@ -2864,7 +2885,7 @@ icmp_build_hdrs(queue_t *q, icmp_t *icmp)
 	if (hdrs_len > icmp->icmp_max_hdr_len) {
 		icmp->icmp_max_hdr_len = hdrs_len;
 		(void) mi_set_sth_wroff(RD(q), icmp->icmp_max_hdr_len +
-		    icmp_wroff_extra);
+		    is->is_wroff_extra);
 	}
 	return (0);
 }
@@ -2889,21 +2910,21 @@ icmp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
  * named dispatch (ND) handler.
  */
 static boolean_t
-icmp_param_register(icmpparam_t *icmppa, int cnt)
+icmp_param_register(IDP *ndp, icmpparam_t *icmppa, int cnt)
 {
 	for (; cnt-- > 0; icmppa++) {
 		if (icmppa->icmp_param_name && icmppa->icmp_param_name[0]) {
-			if (!nd_load(&icmp_g_nd, icmppa->icmp_param_name,
+			if (!nd_load(ndp, icmppa->icmp_param_name,
 			    icmp_param_get, icmp_param_set,
 			    (caddr_t)icmppa)) {
-				nd_free(&icmp_g_nd);
+				nd_free(ndp);
 				return (B_FALSE);
 			}
 		}
 	}
-	if (!nd_load(&icmp_g_nd, "icmp_status", icmp_status_report, NULL,
+	if (!nd_load(ndp, "icmp_status", icmp_status_report, NULL,
 	    NULL)) {
-		nd_free(&icmp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
 	return (B_TRUE);
@@ -2937,7 +2958,8 @@ icmp_rput(queue_t *q, mblk_t *mp)
 	struct T_unitdata_ind	*tudi;
 	uchar_t			*rptr;
 	struct T_error_ack	*tea;
-	icmp_t			*icmp;
+	icmp_t			*icmp = (icmp_t *)q->q_ptr;
+	icmp_stack_t		*is = icmp->icmp_is;
 	sin_t			*sin;
 	sin6_t			*sin6;
 	ip6_t			*ip6h;
@@ -2956,7 +2978,6 @@ icmp_rput(queue_t *q, mblk_t *mp)
 	boolean_t		icmp_ipv6_recvhoplimit = B_FALSE;
 	uint_t			hopstrip;
 
-	icmp = (icmp_t *)q->q_ptr;
 	if (icmp->icmp_restricted) {
 		putnext(q, mp);
 		return;
@@ -3106,7 +3127,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 		freemsg(mp);
 		if (options_mp != NULL)
 			freeb(options_mp);
-		BUMP_MIB(&rawip_mib, rawipInErrors);
+		BUMP_MIB(&icmp->icmp_rawip_mib, rawipInErrors);
 		return;
 	}
 	ipvers = IPH_HDR_VERSION((ipha_t *)rptr);
@@ -3133,7 +3154,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 				}
 			}
 		}
-		if (icmp_bsd_compat) {
+		if (is->is_bsd_compat) {
 			ushort_t len;
 			len = ntohs(ipha->ipha_length);
 
@@ -3149,7 +3170,8 @@ icmp_rput(queue_t *q, mblk_t *mp)
 					freemsg(mp);
 					if (options_mp != NULL)
 						freeb(options_mp);
-					BUMP_MIB(&rawip_mib, rawipInErrors);
+					BUMP_MIB(&icmp->icmp_rawip_mib,
+					    rawipInErrors);
 					return;
 				}
 				bcopy(rptr, mp1->b_rptr, hdr_len);
@@ -3199,7 +3221,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 			freemsg(mp);
 			if (options_mp != NULL)
 				freeb(options_mp);
-			BUMP_MIB(&rawip_mib, rawipInErrors);
+			BUMP_MIB(&icmp->icmp_rawip_mib, rawipInErrors);
 			return;
 		}
 		mp1->b_cont = mp;
@@ -3289,7 +3311,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 			ASSERT(udi_size == 0);
 		}
 
-		BUMP_MIB(&rawip_mib, rawipInDatagrams);
+		BUMP_MIB(&icmp->icmp_rawip_mib, rawipInDatagrams);
 		putnext(q, mp);
 		return;
 	}
@@ -3310,7 +3332,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 	    IPH_HDR_VERSION((ipha_t *)rptr) != IPV6_VERSION ||
 	    icmp->icmp_family != AF_INET6) {
 		freemsg(mp);
-		BUMP_MIB(&rawip_mib, rawipInErrors);
+		BUMP_MIB(&icmp->icmp_rawip_mib, rawipInErrors);
 		return;
 	}
 
@@ -3449,7 +3471,8 @@ icmp_rput(queue_t *q, mblk_t *mp)
 				ip0dbg(("icmp_rput: RAW checksum "
 				    "failed %x\n", sum));
 				freemsg(mp);
-				BUMP_MIB(&rawip_mib, rawipInCksumErrs);
+				BUMP_MIB(&icmp->icmp_rawip_mib,
+				    rawipInCksumErrs);
 				return;
 			}
 		}
@@ -3516,7 +3539,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 	mp1 = allocb(udi_size, BPRI_MED);
 	if (mp1 == NULL) {
 		freemsg(mp);
-		BUMP_MIB(&rawip_mib, rawipInErrors);
+		BUMP_MIB(&icmp->icmp_rawip_mib, rawipInErrors);
 		return;
 	}
 	mp1->b_cont = mp;
@@ -3545,7 +3568,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 		sin6->sin6_scope_id = 0;
 
 	sin6->__sin6_src_id = ip_srcid_find_addr(&ip6h->ip6_dst,
-	    icmp->icmp_zoneid);
+	    icmp->icmp_zoneid, is->is_netstack);
 
 	if (udi_size != 0) {
 		uchar_t *dstopt;
@@ -3664,7 +3687,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 		/* Consumed all of allocated space */
 		ASSERT(udi_size == 0);
 	}
-	BUMP_MIB(&rawip_mib, rawipInDatagrams);
+	BUMP_MIB(&icmp->icmp_rawip_mib, rawipInDatagrams);
 	putnext(q, mp);
 }
 
@@ -3795,6 +3818,7 @@ icmp_snmp_get(queue_t *q, mblk_t *mpctl)
 {
 	mblk_t			*mpdata;
 	struct opthdr		*optp;
+	icmp_t			*icmp = (icmp_t *)q->q_ptr;
 
 	if (mpctl == NULL ||
 	    (mpdata = mpctl->b_cont) == NULL) {
@@ -3805,7 +3829,8 @@ icmp_snmp_get(queue_t *q, mblk_t *mpctl)
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = EXPER_RAWIP;
 	optp->name = 0;
-	(void) snmp_append_data(mpdata, (char *)&rawip_mib, sizeof (rawip_mib));
+	(void) snmp_append_data(mpdata, (char *)&icmp->icmp_rawip_mib,
+	    sizeof (icmp->icmp_rawip_mib));
 	optp->len = msgdsize(mpdata);
 	qreply(q, mpctl);
 
@@ -3840,6 +3865,10 @@ icmp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	char	*state;
 	char	laddrbuf[INET6_ADDRSTRLEN];
 	char	faddrbuf[INET6_ADDRSTRLEN];
+	icmp_stack_t *is;
+
+	icmp = (icmp_t *)q->q_ptr;
+	is = icmp->icmp_is;
 
 	(void) mi_mpprintf(mp,
 	    "RAWIP    " MI_COL_HDRPAD_STR
@@ -3848,9 +3877,9 @@ icmp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	/*   xxx.xxx.xxx.xxx xxx.xxx.xxx.xxx UNBOUND */
 
 
-	for (idp = mi_first_ptr(&icmp_g_head);
+	for (idp = mi_first_ptr(&is->is_head);
 	    (icmp = (icmp_t *)idp) != NULL;
-	    idp = mi_next_ptr(&icmp_g_head, idp)) {
+	    idp = mi_next_ptr(&is->is_head, idp)) {
 		if (icmp->icmp_state == TS_UNBND)
 			state = "UNBOUND";
 		else if (icmp->icmp_state == TS_IDLE)
@@ -3933,6 +3962,7 @@ static void
 icmp_wput_hdrincl(queue_t *q, mblk_t *mp, icmp_t *icmp, ip4_pkt_t *pktinfop,
 boolean_t use_putnext)
 {
+	icmp_stack_t *is = icmp->icmp_is;
 	ipha_t	*ipha;
 	int	ip_hdr_length;
 	int	tp_hdr_len;
@@ -3946,7 +3976,8 @@ boolean_t use_putnext)
 	ip_hdr_length = IP_SIMPLE_HDR_LENGTH + icmp->icmp_ip_snd_options_len;
 	if ((mp->b_wptr - mp->b_rptr) < IP_SIMPLE_HDR_LENGTH) {
 		if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH)) {
-			BUMP_MIB(&rawip_mib, rawipOutErrors);
+			ASSERT(icmp != NULL);
+			BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 			freemsg(mp);
 			return;
 		}
@@ -3990,7 +4021,8 @@ boolean_t use_putnext)
 		    tp_hdr_len)) {
 			if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH +
 			    tp_hdr_len)) {
-				BUMP_MIB(&rawip_mib, rawipOutErrors);
+				BUMP_MIB(&icmp->icmp_rawip_mib,
+				    rawipOutErrors);
 				freemsg(mp);
 				return;
 			}
@@ -4007,12 +4039,12 @@ boolean_t use_putnext)
 			icmp_ud_err(q, mp, EMSGSIZE);
 			return;
 		}
-		if (!(mp1 = allocb(ip_hdr_length + icmp_wroff_extra +
+		if (!(mp1 = allocb(ip_hdr_length + is->is_wroff_extra +
 		    tp_hdr_len, BPRI_LO))) {
 			icmp_ud_err(q, mp, ENOMEM);
 			return;
 		}
-		mp1->b_rptr += icmp_wroff_extra;
+		mp1->b_rptr += is->is_wroff_extra;
 		mp1->b_wptr = mp1->b_rptr + ip_hdr_length;
 
 		ipha->ipha_length = htons((uint16_t)pkt_len);
@@ -4036,7 +4068,7 @@ boolean_t use_putnext)
 		 * Massage source route putting first source
 		 * route in ipha_dst.
 		 */
-		(void) ip_massage_options(ipha);
+		(void) ip_massage_options(ipha, icmp->icmp_is->is_netstack);
 	}
 
 	if (pktinfop != NULL) {
@@ -4071,14 +4103,15 @@ icmp_update_label(queue_t *q, icmp_t *icmp, mblk_t *mp, ipaddr_t dst)
 	uchar_t opt_storage[IP_MAX_OPT_LENGTH];
 
 	err = tsol_compute_label(DB_CREDDEF(mp, icmp->icmp_credp), dst,
-	    opt_storage, icmp->icmp_mac_exempt);
+	    opt_storage, icmp->icmp_mac_exempt,
+	    icmp->icmp_is->is_netstack->netstack_ip);
 	if (err == 0) {
 		err = tsol_update_options(&icmp->icmp_ip_snd_options,
 		    &icmp->icmp_ip_snd_options_len, &icmp->icmp_label_len,
 		    opt_storage);
 	}
 	if (err != 0) {
-		BUMP_MIB(&rawip_mib, rawipOutErrors);
+		BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 		DTRACE_PROBE4(
 		    tx__ip__log__drop__updatelabel__icmp,
 		    char *, "queue(1) failed to update options(2) on mp(3)",
@@ -4104,7 +4137,8 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	int	ip_hdr_length;
 #define	tudr ((struct T_unitdata_req *)rptr)
 	size_t	ip_len;
-	icmp_t	*icmp;
+	icmp_t	*icmp = (icmp_t *)q->q_ptr;
+	icmp_stack_t *is = icmp->icmp_is;
 	sin6_t	*sin6;
 	sin_t	*sin;
 	ipaddr_t	v4dst;
@@ -4114,7 +4148,6 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	queue_t		*ip_wq;
 	boolean_t	use_putnext = B_TRUE;
 
-	icmp = (icmp_t *)q->q_ptr;
 	if (icmp->icmp_restricted) {
 		icmp_wput_restricted(q, mp);
 		return;
@@ -4127,7 +4160,8 @@ icmp_wput(queue_t *q, mblk_t *mp)
 			ipha = (ipha_t *)mp->b_rptr;
 			if (mp->b_wptr - mp->b_rptr < IP_SIMPLE_HDR_LENGTH) {
 				if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH)) {
-					BUMP_MIB(&rawip_mib, rawipOutErrors);
+					BUMP_MIB(&icmp->icmp_rawip_mib,
+					    rawipOutErrors);
 					freemsg(mp);
 					return;
 				}
@@ -4171,19 +4205,19 @@ icmp_wput(queue_t *q, mblk_t *mp)
 
 	if (icmp->icmp_state == TS_UNBND) {
 		/* If a port has not been bound to the stream, fail. */
-		BUMP_MIB(&rawip_mib, rawipOutErrors);
+		BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 		icmp_ud_err(q, mp, EPROTO);
 		return;
 	}
 	mp1 = mp->b_cont;
 	if (mp1 == NULL) {
-		BUMP_MIB(&rawip_mib, rawipOutErrors);
+		BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 		icmp_ud_err(q, mp, EPROTO);
 		return;
 	}
 
 	if ((rptr + tudr->DEST_offset + tudr->DEST_length) > mp->b_wptr) {
-		BUMP_MIB(&rawip_mib, rawipOutErrors);
+		BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 		icmp_ud_err(q, mp, EADDRNOTAVAIL);
 		return;
 	}
@@ -4194,14 +4228,14 @@ icmp_wput(queue_t *q, mblk_t *mp)
 		if (!OK_32PTR((char *)sin6) ||
 		    tudr->DEST_length != sizeof (sin6_t) ||
 		    sin6->sin6_family != AF_INET6) {
-			BUMP_MIB(&rawip_mib, rawipOutErrors);
+			BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 			icmp_ud_err(q, mp, EADDRNOTAVAIL);
 			return;
 		}
 
 		/* No support for mapped addresses on raw sockets */
 		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-			BUMP_MIB(&rawip_mib, rawipOutErrors);
+			BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 			icmp_ud_err(q, mp, EADDRNOTAVAIL);
 			return;
 		}
@@ -4218,7 +4252,7 @@ icmp_wput(queue_t *q, mblk_t *mp)
 		if (!OK_32PTR((char *)sin) ||
 		    tudr->DEST_length != sizeof (sin_t) ||
 		    sin->sin_family != AF_INET) {
-			BUMP_MIB(&rawip_mib, rawipOutErrors);
+			BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 			icmp_ud_err(q, mp, EADDRNOTAVAIL);
 			return;
 		}
@@ -4246,7 +4280,7 @@ icmp_wput(queue_t *q, mblk_t *mp)
 		if (icmp_unitdata_opt_process(q, mp, &error,
 		    (void *)pktinfop) < 0) {
 			/* failure */
-			BUMP_MIB(&rawip_mib, rawipOutErrors);
+			BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 			icmp_ud_err(q, mp, error);
 			return;
 		}
@@ -4298,9 +4332,9 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	if ((uchar_t *)ipha < mp1->b_datap->db_base ||
 	    mp1->b_datap->db_ref != 1 ||
 	    !OK_32PTR(ipha)) {
-		if (!(mp1 = allocb(ip_hdr_length + icmp_wroff_extra,
+		if (!(mp1 = allocb(ip_hdr_length + is->is_wroff_extra,
 		    BPRI_LO))) {
-			BUMP_MIB(&rawip_mib, rawipOutErrors);
+			BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 			icmp_ud_err(q, mp, ENOMEM);
 			return;
 		}
@@ -4367,7 +4401,7 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	 * as this can cause problems in layers below.
 	 */
 	if (ip_len > IP_MAXPACKET) {
-		BUMP_MIB(&rawip_mib, rawipOutErrors);
+		BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 		icmp_ud_err(q, mp, EMSGSIZE);
 		return;
 	}
@@ -4392,11 +4426,11 @@ icmp_wput(queue_t *q, mblk_t *mp)
 		 * Massage source route putting first source route in ipha_dst.
 		 * Ignore the destination in the T_unitdata_req.
 		 */
-		(void) ip_massage_options(ipha);
+		(void) ip_massage_options(ipha, icmp->icmp_is->is_netstack);
 	}
 
 	freeb(mp);
-	BUMP_MIB(&rawip_mib, rawipOutDatagrams);
+	BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutDatagrams);
 	mblk_setcred(mp1, icmp->icmp_credp);
 	if (use_putnext) {
 		putnext(q, mp1);
@@ -4415,13 +4449,14 @@ icmp_update_label_v6(queue_t *wq, icmp_t *icmp, mblk_t *mp, in6_addr_t *dst)
 	uchar_t opt_storage[TSOL_MAX_IPV6_OPTION];
 
 	err = tsol_compute_label_v6(DB_CREDDEF(mp, icmp->icmp_credp), dst,
-	    opt_storage, icmp->icmp_mac_exempt);
+	    opt_storage, icmp->icmp_mac_exempt,
+	    icmp->icmp_is->is_netstack->netstack_ip);
 	if (err == 0) {
 		err = tsol_update_sticky(&icmp->icmp_sticky_ipp,
 		    &icmp->icmp_label_len_v6, opt_storage);
 	}
 	if (err != 0) {
-		BUMP_MIB(&rawip_mib, rawipOutErrors);
+		BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 		DTRACE_PROBE4(
 		    tx__ip__log__drop__updatelabel__icmp6,
 		    char *, "queue(1) failed to update options(2) on mp(3)",
@@ -4447,7 +4482,8 @@ icmp_wput_ipv6(queue_t *q, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen)
 	mblk_t			*mp1;
 	int			ip_hdr_len = IPV6_HDR_LEN;
 	size_t			ip_len;
-	icmp_t			*icmp;
+	icmp_t			*icmp = (icmp_t *)q->q_ptr;
+	icmp_stack_t		*is = icmp->icmp_is;
 	ip6_pkt_t		ipp_s;	/* For ancillary data options */
 	ip6_pkt_t		*ipp = &ipp_s;
 	ip6_pkt_t		*tipp;
@@ -4458,8 +4494,6 @@ icmp_wput_ipv6(queue_t *q, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen)
 	uint8_t			*nxthdr_ptr;
 	in6_addr_t		ip6_dst;
 
-	icmp = (icmp_t *)q->q_ptr;
-
 	/*
 	 * If the local address is a mapped address return
 	 * an error.
@@ -4468,7 +4502,7 @@ icmp_wput_ipv6(queue_t *q, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen)
 	 * since it is bound to a mapped address.
 	 */
 	if (IN6_IS_ADDR_V4MAPPED(&icmp->icmp_v6src)) {
-		BUMP_MIB(&rawip_mib, rawipOutErrors);
+		BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 		icmp_ud_err(q, mp, EADDRNOTAVAIL);
 		return;
 	}
@@ -4485,7 +4519,7 @@ icmp_wput_ipv6(queue_t *q, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen)
 		if (icmp_unitdata_opt_process(q, mp, &error,
 		    (void *)ipp) < 0) {
 			/* failure */
-			BUMP_MIB(&rawip_mib, rawipOutErrors);
+			BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 			icmp_ud_err(q, mp, error);
 			return;
 		}
@@ -4695,11 +4729,11 @@ no_options:
 		if (ip_hdr_len > icmp->icmp_max_hdr_len) {
 			icmp->icmp_max_hdr_len = ip_hdr_len;
 			(void) mi_set_sth_wroff(RD(q),
-			    icmp->icmp_max_hdr_len + icmp_wroff_extra);
+			    icmp->icmp_max_hdr_len + is->is_wroff_extra);
 		}
-		mp1 = allocb(ip_hdr_len + icmp_wroff_extra, BPRI_LO);
+		mp1 = allocb(ip_hdr_len + is->is_wroff_extra, BPRI_LO);
 		if (!mp1) {
-			BUMP_MIB(&rawip_mib, rawipOutErrors);
+			BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 			icmp_ud_err(q, mp, ENOMEM);
 			return;
 		}
@@ -4800,7 +4834,8 @@ no_options:
 		if (sin6->__sin6_src_id != 0 &&
 		    IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src)) {
 			ip_srcid_find_id(sin6->__sin6_src_id,
-			    &ip6h->ip6_src, icmp->icmp_zoneid);
+			    &ip6h->ip6_src, icmp->icmp_zoneid,
+			    is->is_netstack);
 		}
 	}
 
@@ -4900,7 +4935,8 @@ no_options:
 				 * Notify the application as well.
 				 */
 				icmp_ud_err(q, mp, EPROTO);
-				BUMP_MIB(&rawip_mib, rawipOutErrors);
+				BUMP_MIB(&icmp->icmp_rawip_mib,
+				    rawipOutErrors);
 				return;
 			}
 			/*
@@ -4909,7 +4945,8 @@ no_options:
 			 */
 			if (rth->ip6r_len & 0x1) {
 				icmp_ud_err(q, mp, EPROTO);
-				BUMP_MIB(&rawip_mib, rawipOutErrors);
+				BUMP_MIB(&icmp->icmp_rawip_mib,
+				    rawipOutErrors);
 				return;
 			}
 			/*
@@ -4918,7 +4955,8 @@ no_options:
 			 * between the first hop (in ip6_dst) and
 			 * the destination (in the last routing hdr entry).
 			 */
-			csum = ip_massage_options_v6(ip6h, rth);
+			csum = ip_massage_options_v6(ip6h, rth,
+			    icmp->icmp_is->is_netstack);
 			/*
 			 * Verify that the first hop isn't a mapped address.
 			 * Routers along the path need to do this verification
@@ -4926,7 +4964,8 @@ no_options:
 			 */
 			if (IN6_IS_ADDR_V4MAPPED(&ip6h->ip6_dst)) {
 				icmp_ud_err(q, mp, EADDRNOTAVAIL);
-				BUMP_MIB(&rawip_mib, rawipOutErrors);
+				BUMP_MIB(&icmp->icmp_rawip_mib,
+				    rawipOutErrors);
 				return;
 			}
 		}
@@ -4943,7 +4982,7 @@ no_options:
 	 * as this can cause problems in layers below.
 	 */
 	if (ip_len > IP_MAXPACKET) {
-		BUMP_MIB(&rawip_mib, rawipOutErrors);
+		BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutErrors);
 		icmp_ud_err(q, mp, EMSGSIZE);
 		return;
 	}
@@ -4966,7 +5005,8 @@ no_options:
 		cksum_off = ip_hdr_len + icmp->icmp_checksum_off;
 		if (cksum_off + sizeof (uint16_t) > mp1->b_wptr - mp1->b_rptr) {
 			if (!pullupmsg(mp1, cksum_off + sizeof (uint16_t))) {
-				BUMP_MIB(&rawip_mib, rawipOutErrors);
+				BUMP_MIB(&icmp->icmp_rawip_mib,
+				    rawipOutErrors);
 				freemsg(mp);
 				return;
 			}
@@ -4994,7 +5034,7 @@ no_options:
 	freeb(mp);
 
 	/* We're done. Pass the packet to IP */
-	BUMP_MIB(&rawip_mib, rawipOutDatagrams);
+	BUMP_MIB(&icmp->icmp_rawip_mib, rawipOutDatagrams);
 	mblk_setcred(mp1, icmp->icmp_credp);
 	putnext(q, mp1);
 }
@@ -5117,7 +5157,7 @@ icmp_wput_other(queue_t *q, mblk_t *mp)
 		case ND_SET:
 			/* nd_getset performs the necessary error checking */
 		case ND_GET:
-			if (nd_getset(q, icmp_g_nd, mp)) {
+			if (nd_getset(q, icmp->icmp_is->is_nd, mp)) {
 				qreply(q, mp);
 				return;
 			}
@@ -5367,21 +5407,62 @@ icmp_ddi_init(void)
 	    optcom_max_optsize(icmp_opt_obj.odb_opt_des_arr,
 		icmp_opt_obj.odb_opt_arr_cnt);
 
-	(void) icmp_param_register(icmp_param_arr, A_CNT(icmp_param_arr));
-
-	rawip_kstat_init();
+	/*
+	 * We want to be informed each time a stack is created or
+	 * destroyed in the kernel, so we can maintain the
+	 * set of icmp_stack_t's.
+	 */
+	netstack_register(NS_ICMP, rawip_stack_init, NULL, rawip_stack_fini);
 }
 
 void
 icmp_ddi_destroy(void)
 {
-	nd_free(&icmp_g_nd);
-
-	rawip_kstat_fini();
+	netstack_unregister(NS_ICMP);
 }
 
+/*
+ * Initialize the ICMP stack instance.
+ */
+static void *
+rawip_stack_init(netstackid_t stackid, netstack_t *ns)
+{
+	icmp_stack_t	*is;
+	icmpparam_t	*pa;
+
+	is = (icmp_stack_t *)kmem_zalloc(sizeof (*is), KM_SLEEP);
+	is->is_netstack = ns;
+
+	pa = (icmpparam_t *)kmem_alloc(sizeof (icmp_param_arr), KM_SLEEP);
+	is->is_param_arr = pa;
+	bcopy(icmp_param_arr, is->is_param_arr, sizeof (icmp_param_arr));
+
+	(void) icmp_param_register(&is->is_nd,
+	    is->is_param_arr, A_CNT(icmp_param_arr));
+	is->is_ksp = rawip_kstat_init(stackid);
+	return (is);
+}
+
+/*
+ * Free the ICMP stack instance.
+ */
 static void
-rawip_kstat_init(void) {
+rawip_stack_fini(netstackid_t stackid, void *arg)
+{
+	icmp_stack_t *is = (icmp_stack_t *)arg;
+
+	nd_free(&is->is_nd);
+	kmem_free(is->is_param_arr, sizeof (icmp_param_arr));
+	is->is_param_arr = NULL;
+
+	rawip_kstat_fini(stackid, is->is_ksp);
+	is->is_ksp = NULL;
+	kmem_free(is, sizeof (*is));
+}
+
+static void *
+rawip_kstat_init(netstackid_t stackid) {
+	kstat_t	*ksp;
 
 	rawip_named_kstat_t template = {
 		{ "inDatagrams",	KSTAT_DATA_UINT32, 0 },
@@ -5391,45 +5472,59 @@ rawip_kstat_init(void) {
 		{ "outErrors",		KSTAT_DATA_UINT32, 0 },
 	};
 
-	rawip_mibkp = kstat_create("icmp", 0, "rawip", "mib2",
+	ksp = kstat_create_netstack("icmp", 0, "rawip", "mib2",
 					KSTAT_TYPE_NAMED,
 					NUM_OF_FIELDS(rawip_named_kstat_t),
-					0);
-	if (rawip_mibkp == NULL)
-		return;
+					0, stackid);
+	if (ksp == NULL || ksp->ks_data == NULL)
+		return (NULL);
 
-	bcopy(&template, rawip_mibkp->ks_data, sizeof (template));
+	bcopy(&template, ksp->ks_data, sizeof (template));
+	ksp->ks_update = rawip_kstat_update;
+	ksp->ks_private = (void *)(uintptr_t)stackid;
 
-	rawip_mibkp->ks_update = rawip_kstat_update;
-
-	kstat_install(rawip_mibkp);
+	kstat_install(ksp);
+	return (ksp);
 }
 
 static void
-rawip_kstat_fini(void) {
-	if (rawip_mibkp) {
-		kstat_delete(rawip_mibkp);
-		rawip_mibkp = NULL;
+rawip_kstat_fini(netstackid_t stackid, kstat_t *ksp)
+{
+	if (ksp != NULL) {
+		ASSERT(stackid == (netstackid_t)(uintptr_t)ksp->ks_private);
+		kstat_delete_netstack(ksp, stackid);
 	}
 }
 
 static int
-rawip_kstat_update(kstat_t *kp, int rw) {
+rawip_kstat_update(kstat_t *ksp, int rw)
+{
 	rawip_named_kstat_t *rawipkp;
+	netstackid_t	stackid = (netstackid_t)(uintptr_t)ksp->ks_private;
+	netstack_t	*ns;
+	icmp_stack_t	*is;
 
-	if ((kp == NULL) || (kp->ks_data == NULL))
+	if ((ksp == NULL) || (ksp->ks_data == NULL))
 		return (EIO);
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
-	rawipkp = (rawip_named_kstat_t *)kp->ks_data;
+	rawipkp = (rawip_named_kstat_t *)ksp->ks_data;
 
-	rawipkp->inDatagrams.value.ui32 =	rawip_mib.rawipInDatagrams;
-	rawipkp->inCksumErrs.value.ui32 =	rawip_mib.rawipInCksumErrs;
-	rawipkp->inErrors.value.ui32 =		rawip_mib.rawipInErrors;
-	rawipkp->outDatagrams.value.ui32 =	rawip_mib.rawipOutDatagrams;
-	rawipkp->outErrors.value.ui32 =		rawip_mib.rawipOutErrors;
-
+	ns = netstack_find_by_stackid(stackid);
+	if (ns == NULL)
+		return (-1);
+	is = ns->netstack_icmp;
+	if (is == NULL) {
+		netstack_rele(ns);
+		return (-1);
+	}
+	rawipkp->inDatagrams.value.ui32 =  is->is_rawip_mib.rawipInDatagrams;
+	rawipkp->inCksumErrs.value.ui32 =  is->is_rawip_mib.rawipInCksumErrs;
+	rawipkp->inErrors.value.ui32 =	   is->is_rawip_mib.rawipInErrors;
+	rawipkp->outDatagrams.value.ui32 = is->is_rawip_mib.rawipOutDatagrams;
+	rawipkp->outErrors.value.ui32 =	   is->is_rawip_mib.rawipOutErrors;
+	netstack_rele(ns);
 	return (0);
 }

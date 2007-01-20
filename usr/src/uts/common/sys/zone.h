@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,8 @@
 #include <sys/ipc_rctl.h>
 #include <sys/pset.h>
 #include <sys/tsol/label.h>
+#include <sys/cred.h>
+#include <sys/netstack.h>
 #include <sys/uadmin.h>
 
 #ifdef	__cplusplus
@@ -65,16 +67,20 @@ extern "C" {
 #define	ALL_ZONES	(-1)
 
 /* system call subcodes */
-#define	ZONE_CREATE	0
-#define	ZONE_DESTROY	1
-#define	ZONE_GETATTR	2
-#define	ZONE_ENTER	3
-#define	ZONE_LIST	4
-#define	ZONE_SHUTDOWN	5
-#define	ZONE_LOOKUP	6
-#define	ZONE_BOOT	7
-#define	ZONE_VERSION	8
-#define	ZONE_SETATTR	9
+#define	ZONE_CREATE		0
+#define	ZONE_DESTROY		1
+#define	ZONE_GETATTR		2
+#define	ZONE_ENTER		3
+#define	ZONE_LIST		4
+#define	ZONE_SHUTDOWN		5
+#define	ZONE_LOOKUP		6
+#define	ZONE_BOOT		7
+#define	ZONE_VERSION		8
+#define	ZONE_SETATTR		9
+#define	ZONE_ADD_DATALINK	10
+#define	ZONE_DEL_DATALINK	11
+#define	ZONE_CHECK_DATALINK	12
+#define	ZONE_LIST_DATALINK	13
 
 /* zone attributes */
 #define	ZONE_ATTR_ROOT		1
@@ -90,6 +96,7 @@ extern "C" {
 #define	ZONE_ATTR_BRAND		11
 #define	ZONE_ATTR_PHYS_MCAP	12
 #define	ZONE_ATTR_SCHED_CLASS	13
+#define	ZONE_ATTR_FLAGS		14
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -166,6 +173,7 @@ typedef struct {
 	int match;			/* match level */
 	uint32_t doi;			/* DOI for label */
 	caddr32_t label;		/* label associated with zone */
+	int flags;
 } zone_def32;
 #endif
 typedef struct {
@@ -181,6 +189,7 @@ typedef struct {
 	int match;			/* match level */
 	uint32_t doi;			/* DOI for label */
 	const bslabel_t *label;		/* label associated with zone */
+	int flags;
 } zone_def;
 
 /* extended error information */
@@ -257,6 +266,15 @@ typedef struct zone_cmd_rval {
  */
 #define	ZONE_DOOR_PATH		ZONES_TMPDIR "/%s.zoneadmd_door"
 
+/* zone_flags */
+#define	ZF_DESTROYED		0x1	/* ZSD destructor callbacks run */
+#define	ZF_HASHED_LABEL		0x2	/* zone has a unique label */
+#define	ZF_IS_SCRATCH		0x4	/* scratch zone */
+#define	ZF_NET_EXCL		0x8	/* Zone has an exclusive IP stack */
+
+/* zone_create flags */
+#define	ZCF_NET_EXCL		0x1	/* Create a zone with exclusive IP */
+
 #ifdef _KERNEL
 /*
  * We need to protect the definition of 'list_t' from userland applications and
@@ -266,13 +284,9 @@ typedef struct zone_cmd_rval {
 
 #define	GLOBAL_ZONEUNIQID	0	/* uniqid of the global zone */
 
-/* zone_flags */
-#define	ZF_DESTROYED		0x1	/* ZSD destructor callbacks run */
-#define	ZF_HASHED_LABEL		0x2	/* zone has a unique label */
-#define	ZF_IS_SCRATCH		0x4	/* scratch zone */
-
 struct pool;
 struct brand;
+struct dlnamelist;
 
 /*
  * Structure to record list of ZFS datasets exported to a zone.
@@ -397,12 +411,18 @@ typedef struct zone {
 	id_t		zone_defaultcid;	/* dflt scheduling class id */
 	kstat_t		*zone_swapresv_kstat;
 	kstat_t		*zone_lockedmem_kstat;
+	/*
+	 * zone_dl_list is protected by zone_lock
+	 */
+	struct dlnamelist *zone_dl_list;
+	netstack_t	*zone_netstack;
 } zone_t;
 
 /*
  * Special value of zone_psetid to indicate that pools are disabled.
  */
 #define	ZONE_PS_INVAL	PS_MYID
+
 
 extern zone_t zone0;
 extern zone_t *global_zone;
@@ -424,6 +444,7 @@ extern zone_t *zone_find_by_name(char *);
 extern zone_t *zone_find_by_any_path(const char *, boolean_t);
 extern zone_t *zone_find_by_path(const char *);
 extern zoneid_t getzoneid(void);
+extern zone_t *zone_find_by_id_nolock(zoneid_t);
 
 /*
  * Zone-specific data (ZSD) APIs

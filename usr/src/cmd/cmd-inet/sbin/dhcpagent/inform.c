@@ -87,7 +87,10 @@ dhcp_inform(dhcp_smach_t *dsmp)
 		(void) add_pkt_opt16(dpkt, CD_MAX_DHCP_SIZE,
 		    htons(dsmp->dsm_lif->lif_pif->pif_max -
 		    sizeof (struct udpiphdr)));
-		(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id, class_id_len);
+		if (class_id_len != 0) {
+			(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id,
+			    class_id_len);
+		}
 		(void) add_pkt_prl(dpkt, dsmp);
 		(void) add_pkt_opt(dpkt, CD_END, NULL, 0);
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,42 +53,49 @@
 /*
  * IPv4 netinfo entry point declarations.
  */
-static int 		ip_getifname(phy_if_t, char *, const size_t);
-static int 		ip_getmtu(phy_if_t, lif_if_t);
-static int 		ip_getpmtuenabled(void);
+static int 		ip_getifname(phy_if_t, char *, const size_t,
+    netstack_t *);
+static int 		ip_getmtu(phy_if_t, lif_if_t, netstack_t *);
+static int 		ip_getpmtuenabled(netstack_t *);
 static int 		ip_getlifaddr(phy_if_t, lif_if_t, size_t,
-			    net_ifaddr_t [], void *);
-static phy_if_t		ip_phygetnext(phy_if_t);
-static phy_if_t 	ip_phylookup(const char *);
-static lif_if_t 	ip_lifgetnext(phy_if_t, lif_if_t);
-static int 		ip_inject(inject_t, net_inject_t *);
-static phy_if_t 	ip_routeto(struct sockaddr *);
+			    net_ifaddr_t [], void *, netstack_t *);
+static phy_if_t		ip_phygetnext(phy_if_t, netstack_t *);
+static phy_if_t 	ip_phylookup(const char *, netstack_t *);
+static lif_if_t 	ip_lifgetnext(phy_if_t, lif_if_t, netstack_t *);
+static int 		ip_inject(inject_t, net_inject_t *, netstack_t *);
+static phy_if_t 	ip_routeto(struct sockaddr *, netstack_t *);
 static int 		ip_ispartialchecksum(mblk_t *);
 static int 		ip_isvalidchecksum(mblk_t *);
 
-static int 		ipv6_getifname(phy_if_t, char *, const size_t);
-static int 		ipv6_getmtu(phy_if_t, lif_if_t);
+static int 		ipv6_getifname(phy_if_t, char *, const size_t,
+    netstack_t *);
+static int 		ipv6_getmtu(phy_if_t, lif_if_t, netstack_t *);
 static int 		ipv6_getlifaddr(phy_if_t, lif_if_t, size_t,
-			    net_ifaddr_t [], void *);
-static phy_if_t 	ipv6_phygetnext(phy_if_t);
-static phy_if_t 	ipv6_phylookup(const char *);
-static lif_if_t 	ipv6_lifgetnext(phy_if_t, lif_if_t);
-static int 		ipv6_inject(inject_t, net_inject_t *);
-static phy_if_t 	ipv6_routeto(struct sockaddr *);
+			    net_ifaddr_t [], void *, netstack_t *);
+static phy_if_t 	ipv6_phygetnext(phy_if_t, netstack_t *);
+static phy_if_t 	ipv6_phylookup(const char *, netstack_t *);
+static lif_if_t 	ipv6_lifgetnext(phy_if_t, lif_if_t, netstack_t *);
+static int 		ipv6_inject(inject_t, net_inject_t *, netstack_t *);
+static phy_if_t 	ipv6_routeto(struct sockaddr *, netstack_t *);
 static int 		ipv6_isvalidchecksum(mblk_t *);
 
 /* Netinfo private functions */
 static	int		ip_getifname_impl(phy_if_t, char *,
-			    const size_t, boolean_t);
-static	int		ip_getmtu_impl(phy_if_t, lif_if_t, boolean_t);
-static	phy_if_t	ip_phylookup_impl(const char *, boolean_t);
-static	lif_if_t	ip_lifgetnext_impl(phy_if_t, lif_if_t, boolean_t);
-static	int		ip_inject_impl(inject_t, net_inject_t *, boolean_t);
+    const size_t, boolean_t, ip_stack_t *);
+static	int		ip_getmtu_impl(phy_if_t, lif_if_t, boolean_t,
+    ip_stack_t *);
+static	phy_if_t	ip_phylookup_impl(const char *, boolean_t,
+    ip_stack_t *ipst);
+static	lif_if_t	ip_lifgetnext_impl(phy_if_t, lif_if_t, boolean_t,
+    ip_stack_t *ipst);
+static	int		ip_inject_impl(inject_t, net_inject_t *, boolean_t,
+    ip_stack_t *);
 static	int		ip_getifaddr_type(sa_family_t, ipif_t *, lif_if_t,
 			    void *);
-static	phy_if_t	ip_routeto_impl(struct sockaddr *);
+static	phy_if_t	ip_routeto_impl(struct sockaddr *, ip_stack_t *);
 static	int		ip_getlifaddr_impl(sa_family_t, phy_if_t, lif_if_t,
-			    size_t, net_ifaddr_t [], struct sockaddr *);
+			    size_t, net_ifaddr_t [], struct sockaddr *,
+			    ip_stack_t *);
 static	void		ip_ni_queue_in_func(void *);
 static	void		ip_ni_queue_out_func(void *);
 static	void		ip_ni_queue_func_impl(injection_t *,  boolean_t);
@@ -136,54 +143,12 @@ static ddi_taskq_t 	*eventq_queue_in = NULL;
 static ddi_taskq_t 	*eventq_queue_out = NULL;
 ddi_taskq_t 	*eventq_queue_nic = NULL;
 
-static hook_family_t	ipv4root;
-static hook_family_t	ipv6root;
-
 /*
- * Hooks for firewalling
- */
-hook_event_t		ip4_physical_in_event;
-hook_event_t		ip4_physical_out_event;
-hook_event_t		ip4_forwarding_event;
-hook_event_t		ip4_loopback_in_event;
-hook_event_t		ip4_loopback_out_event;
-hook_event_t		ip4_nic_events;
-hook_event_t		ip6_physical_in_event;
-hook_event_t		ip6_physical_out_event;
-hook_event_t		ip6_forwarding_event;
-hook_event_t		ip6_loopback_in_event;
-hook_event_t		ip6_loopback_out_event;
-hook_event_t		ip6_nic_events;
-
-hook_event_token_t	ipv4firewall_physical_in;
-hook_event_token_t	ipv4firewall_physical_out;
-hook_event_token_t	ipv4firewall_forwarding;
-hook_event_token_t	ipv4firewall_loopback_in;
-hook_event_token_t	ipv4firewall_loopback_out;
-hook_event_token_t	ipv4nicevents;
-hook_event_token_t	ipv6firewall_physical_in;
-hook_event_token_t	ipv6firewall_physical_out;
-hook_event_token_t	ipv6firewall_forwarding;
-hook_event_token_t	ipv6firewall_loopback_in;
-hook_event_token_t	ipv6firewall_loopback_out;
-hook_event_token_t	ipv6nicevents;
-
-net_data_t		ipv4 = NULL;
-net_data_t		ipv6 = NULL;
-
-
-/*
- * Register IPv4 and IPv6 netinfo functions and initialize queues for inject.
+ * Initialize queues for inject.
  */
 void
-ip_net_init()
+ip_net_g_init()
 {
-	ipv4 = net_register(&ipv4info);
-	ASSERT(ipv4 != NULL);
-
-	ipv6 = net_register(&ipv6info);
-	ASSERT(ipv6 != NULL);
-
 	if (eventq_queue_out == NULL) {
 		eventq_queue_out = ddi_taskq_create(NULL,
 		    "IP_INJECT_QUEUE_OUT", 1, TASKQ_DEFAULTPRI, 0);
@@ -213,10 +178,10 @@ ip_net_init()
 }
 
 /*
- * Unregister IPv4 and IPv6 functions and inject queues
+ * Destroy inject queues
  */
 void
-ip_net_destroy()
+ip_net_g_destroy()
 {
 	if (eventq_queue_nic != NULL) {
 		ddi_taskq_destroy(eventq_queue_nic);
@@ -232,15 +197,37 @@ ip_net_destroy()
 		ddi_taskq_destroy(eventq_queue_out);
 		eventq_queue_out = NULL;
 	}
+}
 
-	if (ipv4 != NULL) {
-		if (net_unregister(ipv4) == 0)
-			ipv4 = NULL;
+/*
+ * Register IPv4 and IPv6 netinfo functions and initialize queues for inject.
+ */
+void
+ip_net_init(ip_stack_t *ipst, netstack_t *ns)
+{
+
+	ipst->ips_ipv4_net_data = net_register_impl(&ipv4info, ns);
+	ASSERT(ipst->ips_ipv4_net_data != NULL);
+
+	ipst->ips_ipv6_net_data = net_register_impl(&ipv6info, ns);
+	ASSERT(ipst->ips_ipv6_net_data != NULL);
+}
+
+
+/*
+ * Unregister IPv4 and IPv6 functions and inject queues
+ */
+void
+ip_net_destroy(ip_stack_t *ipst)
+{
+	if (ipst->ips_ipv4_net_data != NULL) {
+		if (net_unregister(ipst->ips_ipv4_net_data) == 0)
+			ipst->ips_ipv4_net_data = NULL;
 	}
 
-	if (ipv6 != NULL) {
-		if (net_unregister(ipv6) == 0)
-			ipv6 = NULL;
+	if (ipst->ips_ipv6_net_data != NULL) {
+		if (net_unregister(ipst->ips_ipv6_net_data) == 0)
+			ipst->ips_ipv6_net_data = NULL;
 	}
 }
 
@@ -248,213 +235,235 @@ ip_net_destroy()
  * Initialize IPv4 hooks family the event
  */
 void
-ipv4_hook_init()
+ipv4_hook_init(ip_stack_t *ipst)
 {
-	HOOK_FAMILY_INIT(&ipv4root, Hn_IPV4);
-	if (net_register_family(ipv4, &ipv4root) != 0) {
+	HOOK_FAMILY_INIT(&ipst->ips_ipv4root, Hn_IPV4);
+	if (net_register_family(ipst->ips_ipv4_net_data, &ipst->ips_ipv4root)
+	    != 0) {
 		cmn_err(CE_NOTE, "ipv4_hook_init: "
 		    "net_register_family failed for ipv4");
 	}
 
-	HOOK_EVENT_INIT(&ip4_physical_in_event, NH_PHYSICAL_IN);
-	ipv4firewall_physical_in = net_register_event(ipv4,
-	    &ip4_physical_in_event);
-	if (ipv4firewall_physical_in == NULL) {
+	HOOK_EVENT_INIT(&ipst->ips_ip4_physical_in_event, NH_PHYSICAL_IN);
+	ipst->ips_ipv4firewall_physical_in = net_register_event(
+	    ipst->ips_ipv4_net_data, &ipst->ips_ip4_physical_in_event);
+	if (ipst->ips_ipv4firewall_physical_in == NULL) {
 		cmn_err(CE_NOTE, "ipv4_hook_init: "
 		    "net_register_event failed for ipv4/physical_in");
 	}
 
-	HOOK_EVENT_INIT(&ip4_physical_out_event, NH_PHYSICAL_OUT);
-	ipv4firewall_physical_out = net_register_event(ipv4,
-	    &ip4_physical_out_event);
-	if (ipv4firewall_physical_out == NULL) {
+	HOOK_EVENT_INIT(&ipst->ips_ip4_physical_out_event, NH_PHYSICAL_OUT);
+	ipst->ips_ipv4firewall_physical_out = net_register_event(
+	    ipst->ips_ipv4_net_data, &ipst->ips_ip4_physical_out_event);
+	if (ipst->ips_ipv4firewall_physical_out == NULL) {
 		cmn_err(CE_NOTE, "ipv4_hook_init: "
 		    "net_register_event failed for ipv4/physical_out");
 	}
 
-	HOOK_EVENT_INIT(&ip4_forwarding_event, NH_FORWARDING);
-	ipv4firewall_forwarding = net_register_event(ipv4,
-	    &ip4_forwarding_event);
-	if (ipv4firewall_forwarding == NULL) {
+	HOOK_EVENT_INIT(&ipst->ips_ip4_forwarding_event, NH_FORWARDING);
+	ipst->ips_ipv4firewall_forwarding = net_register_event(
+	    ipst->ips_ipv4_net_data, &ipst->ips_ip4_forwarding_event);
+	if (ipst->ips_ipv4firewall_forwarding == NULL) {
 		cmn_err(CE_NOTE, "ipv4_hook_init: "
 		    "net_register_event failed for ipv4/forwarding");
 	}
 
-	HOOK_EVENT_INIT(&ip4_loopback_in_event, NH_LOOPBACK_IN);
-	ipv4firewall_loopback_in = net_register_event(ipv4,
-	    &ip4_loopback_in_event);
-	if (ipv4firewall_loopback_in == NULL) {
+	HOOK_EVENT_INIT(&ipst->ips_ip4_loopback_in_event, NH_LOOPBACK_IN);
+	ipst->ips_ipv4firewall_loopback_in = net_register_event(
+	    ipst->ips_ipv4_net_data, &ipst->ips_ip4_loopback_in_event);
+	if (ipst->ips_ipv4firewall_loopback_in == NULL) {
 		cmn_err(CE_NOTE, "ipv4_hook_init: "
 		    "net_register_event failed for ipv4/loopback_in");
 	}
 
-	HOOK_EVENT_INIT(&ip4_loopback_out_event, NH_LOOPBACK_OUT);
-	ipv4firewall_loopback_out = net_register_event(ipv4,
-	    &ip4_loopback_out_event);
-	if (ipv4firewall_loopback_out == NULL) {
+	HOOK_EVENT_INIT(&ipst->ips_ip4_loopback_out_event, NH_LOOPBACK_OUT);
+	ipst->ips_ipv4firewall_loopback_out = net_register_event(
+	    ipst->ips_ipv4_net_data, &ipst->ips_ip4_loopback_out_event);
+	if (ipst->ips_ipv4firewall_loopback_out == NULL) {
 		cmn_err(CE_NOTE, "ipv4_hook_init: "
 		    "net_register_event failed for ipv4/loopback_out");
 	}
 
-	HOOK_EVENT_INIT(&ip4_nic_events, NH_NIC_EVENTS);
-	ip4_nic_events.he_flags = HOOK_RDONLY;
-	ipv4nicevents = net_register_event(ipv4, &ip4_nic_events);
-	if (ipv4nicevents == NULL) {
+	HOOK_EVENT_INIT(&ipst->ips_ip4_nic_events, NH_NIC_EVENTS);
+	ipst->ips_ip4_nic_events.he_flags = HOOK_RDONLY;
+	ipst->ips_ipv4nicevents = net_register_event(
+	    ipst->ips_ipv4_net_data, &ipst->ips_ip4_nic_events);
+	if (ipst->ips_ipv4nicevents == NULL) {
 		cmn_err(CE_NOTE, "ipv4_hook_init: "
 		    "net_register_event failed for ipv4/nic_events");
 	}
 }
 
 void
-ipv4_hook_destroy()
+ipv4_hook_destroy(ip_stack_t *ipst)
 {
-	if (ipv4firewall_forwarding != NULL) {
-		if (net_unregister_event(ipv4, &ip4_forwarding_event) == 0)
-			ipv4firewall_forwarding = NULL;
+	if (ipst->ips_ipv4firewall_forwarding != NULL) {
+		if (net_unregister_event(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_forwarding_event) == 0)
+			ipst->ips_ipv4firewall_forwarding = NULL;
 	}
 
-	if (ipv4firewall_physical_in != NULL) {
-		if (net_unregister_event(ipv4, &ip4_physical_in_event) == 0)
-			ipv4firewall_physical_in = NULL;
+	if (ipst->ips_ipv4firewall_physical_in != NULL) {
+		if (net_unregister_event(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_physical_in_event) == 0)
+			ipst->ips_ipv4firewall_physical_in = NULL;
 	}
 
-	if (ipv4firewall_physical_out != NULL) {
-		if (net_unregister_event(ipv4, &ip4_physical_out_event) == 0)
-			ipv4firewall_physical_out = NULL;
+	if (ipst->ips_ipv4firewall_physical_out != NULL) {
+		if (net_unregister_event(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_physical_out_event) == 0)
+			ipst->ips_ipv4firewall_physical_out = NULL;
 	}
 
-	if (ipv4firewall_loopback_in != NULL) {
-		if (net_unregister_event(ipv4, &ip4_loopback_in_event) == 0)
-			ipv4firewall_loopback_in = NULL;
+	if (ipst->ips_ipv4firewall_loopback_in != NULL) {
+		if (net_unregister_event(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_loopback_in_event) == 0)
+			ipst->ips_ipv4firewall_loopback_in = NULL;
 	}
 
-	if (ipv4firewall_loopback_out != NULL) {
-		if (net_unregister_event(ipv4, &ip4_loopback_out_event) == 0)
-			ipv4firewall_loopback_out = NULL;
+	if (ipst->ips_ipv4firewall_loopback_out != NULL) {
+		if (net_unregister_event(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_loopback_out_event) == 0)
+			ipst->ips_ipv4firewall_loopback_out = NULL;
 	}
 
-	if (ipv4nicevents != NULL) {
-		if (net_unregister_event(ipv4, &ip4_nic_events) == 0)
-			ipv4nicevents = NULL;
+	if (ipst->ips_ipv4nicevents != NULL) {
+		if (net_unregister_event(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_nic_events) == 0)
+			ipst->ips_ipv4nicevents = NULL;
 	}
 
-	(void) net_unregister_family(ipv4, &ipv4root);
+	(void) net_unregister_family(ipst->ips_ipv4_net_data,
+	    &ipst->ips_ipv4root);
 }
 
 /*
  * Initialize IPv6 hooks family and event
  */
 void
-ipv6_hook_init()
+ipv6_hook_init(ip_stack_t *ipst)
 {
 
-	HOOK_FAMILY_INIT(&ipv6root, Hn_IPV6);
-	if (net_register_family(ipv6, &ipv6root) != 0) {
+	HOOK_FAMILY_INIT(&ipst->ips_ipv6root, Hn_IPV6);
+	if (net_register_family(ipst->ips_ipv6_net_data, &ipst->ips_ipv6root)
+	    != 0) {
 		cmn_err(CE_NOTE, "ipv6_hook_init: "
 		    "net_register_family failed for ipv6");
 	}
 
-	HOOK_EVENT_INIT(&ip6_physical_in_event, NH_PHYSICAL_IN);
-	ipv6firewall_physical_in = net_register_event(ipv6,
-	    &ip6_physical_in_event);
-	if (ipv6firewall_physical_in == NULL) {
+	HOOK_EVENT_INIT(&ipst->ips_ip6_physical_in_event, NH_PHYSICAL_IN);
+	ipst->ips_ipv6firewall_physical_in = net_register_event(
+	    ipst->ips_ipv6_net_data, &ipst->ips_ip6_physical_in_event);
+	if (ipst->ips_ipv6firewall_physical_in == NULL) {
 		cmn_err(CE_NOTE, "ipv6_hook_init: "
 		    "net_register_event failed for ipv6/physical_in");
 	}
 
-	HOOK_EVENT_INIT(&ip6_physical_out_event, NH_PHYSICAL_OUT);
-	ipv6firewall_physical_out = net_register_event(ipv6,
-	    &ip6_physical_out_event);
-	if (ipv6firewall_physical_out == NULL) {
+	HOOK_EVENT_INIT(&ipst->ips_ip6_physical_out_event, NH_PHYSICAL_OUT);
+	ipst->ips_ipv6firewall_physical_out = net_register_event(
+	    ipst->ips_ipv6_net_data, &ipst->ips_ip6_physical_out_event);
+	if (ipst->ips_ipv6firewall_physical_out == NULL) {
 		cmn_err(CE_NOTE, "ipv6_hook_init: "
 		    "net_register_event failed for ipv6/physical_out");
 	}
 
-	HOOK_EVENT_INIT(&ip6_forwarding_event, NH_FORWARDING);
-	ipv6firewall_forwarding = net_register_event(ipv6,
-	    &ip6_forwarding_event);
-	if (ipv6firewall_forwarding == NULL) {
+	HOOK_EVENT_INIT(&ipst->ips_ip6_forwarding_event, NH_FORWARDING);
+	ipst->ips_ipv6firewall_forwarding = net_register_event(
+	    ipst->ips_ipv6_net_data, &ipst->ips_ip6_forwarding_event);
+	if (ipst->ips_ipv6firewall_forwarding == NULL) {
 		cmn_err(CE_NOTE, "ipv6_hook_init: "
 		    "net_register_event failed for ipv6/forwarding");
 	}
 
-	HOOK_EVENT_INIT(&ip6_loopback_in_event, NH_LOOPBACK_IN);
-	ipv6firewall_loopback_in = net_register_event(ipv6,
-	    &ip6_loopback_in_event);
-	if (ipv6firewall_loopback_in == NULL) {
+	HOOK_EVENT_INIT(&ipst->ips_ip6_loopback_in_event, NH_LOOPBACK_IN);
+	ipst->ips_ipv6firewall_loopback_in = net_register_event(
+	    ipst->ips_ipv6_net_data, &ipst->ips_ip6_loopback_in_event);
+	if (ipst->ips_ipv6firewall_loopback_in == NULL) {
 		cmn_err(CE_NOTE, "ipv6_hook_init: "
 		    "net_register_event failed for ipv6/loopback_in");
 	}
 
-	HOOK_EVENT_INIT(&ip6_loopback_out_event, NH_LOOPBACK_OUT);
-	ipv6firewall_loopback_out = net_register_event(ipv6,
-	    &ip6_loopback_out_event);
-	if (ipv6firewall_loopback_out == NULL) {
+	HOOK_EVENT_INIT(&ipst->ips_ip6_loopback_out_event, NH_LOOPBACK_OUT);
+	ipst->ips_ipv6firewall_loopback_out = net_register_event(
+	    ipst->ips_ipv6_net_data, &ipst->ips_ip6_loopback_out_event);
+	if (ipst->ips_ipv6firewall_loopback_out == NULL) {
 		cmn_err(CE_NOTE, "ipv6_hook_init: "
 		    "net_register_event failed for ipv6/loopback_out");
 	}
 
-	HOOK_EVENT_INIT(&ip6_nic_events, NH_NIC_EVENTS);
-	ip6_nic_events.he_flags = HOOK_RDONLY;
-	ipv6nicevents = net_register_event(ipv6, &ip6_nic_events);
-	if (ipv6nicevents == NULL) {
+	HOOK_EVENT_INIT(&ipst->ips_ip6_nic_events, NH_NIC_EVENTS);
+	ipst->ips_ip6_nic_events.he_flags = HOOK_RDONLY;
+	ipst->ips_ipv6nicevents = net_register_event(
+	    ipst->ips_ipv6_net_data, &ipst->ips_ip6_nic_events);
+	if (ipst->ips_ipv6nicevents == NULL) {
 		cmn_err(CE_NOTE, "ipv6_hook_init: "
 		    "net_register_event failed for ipv6/nic_events");
 	}
 }
 
 void
-ipv6_hook_destroy()
+ipv6_hook_destroy(ip_stack_t *ipst)
 {
-	if (ipv6firewall_forwarding != NULL) {
-		if (net_unregister_event(ipv6, &ip6_forwarding_event) == 0)
-			ipv6firewall_forwarding = NULL;
+	if (ipst->ips_ipv6firewall_forwarding != NULL) {
+		if (net_unregister_event(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_forwarding_event) == 0)
+			ipst->ips_ipv6firewall_forwarding = NULL;
 	}
 
-	if (ipv6firewall_physical_in != NULL) {
-		if (net_unregister_event(ipv6, &ip6_physical_in_event) == 0)
-			ipv6firewall_physical_in = NULL;
+	if (ipst->ips_ipv6firewall_physical_in != NULL) {
+		if (net_unregister_event(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_physical_in_event) == 0)
+			ipst->ips_ipv6firewall_physical_in = NULL;
 	}
 
-	if (ipv6firewall_physical_out != NULL) {
-		if (net_unregister_event(ipv6, &ip6_physical_out_event) == 0)
-			ipv6firewall_physical_out = NULL;
+	if (ipst->ips_ipv6firewall_physical_out != NULL) {
+		if (net_unregister_event(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_physical_out_event) == 0)
+			ipst->ips_ipv6firewall_physical_out = NULL;
 	}
 
-	if (ipv6firewall_loopback_in != NULL) {
-		if (net_unregister_event(ipv6, &ip6_loopback_in_event) == 0)
-			ipv6firewall_loopback_in = NULL;
+	if (ipst->ips_ipv6firewall_loopback_in != NULL) {
+		if (net_unregister_event(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_loopback_in_event) == 0)
+			ipst->ips_ipv6firewall_loopback_in = NULL;
 	}
 
-	if (ipv6firewall_loopback_out != NULL) {
-		if (net_unregister_event(ipv6, &ip6_loopback_out_event) == 0)
-			ipv6firewall_loopback_out = NULL;
+	if (ipst->ips_ipv6firewall_loopback_out != NULL) {
+		if (net_unregister_event(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_loopback_out_event) == 0)
+			ipst->ips_ipv6firewall_loopback_out = NULL;
 	}
 
-	if (ipv6nicevents != NULL) {
-		if (net_unregister_event(ipv6, &ip6_nic_events) == 0)
-			ipv6nicevents = NULL;
+	if (ipst->ips_ipv6nicevents != NULL) {
+		if (net_unregister_event(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_nic_events) == 0)
+			ipst->ips_ipv6nicevents = NULL;
 	}
 
-	(void) net_unregister_family(ipv6, &ipv6root);
+	(void) net_unregister_family(ipst->ips_ipv6_net_data,
+	    &ipst->ips_ipv6root);
 }
 
 /*
  * Determine the name of an IPv4 interface
  */
 static int
-ip_getifname(phy_if_t phy_ifdata, char *buffer, const size_t buflen)
+ip_getifname(phy_if_t phy_ifdata, char *buffer, const size_t buflen,
+    netstack_t *ns)
 {
-	return (ip_getifname_impl(phy_ifdata, buffer, buflen, B_FALSE));
+	return (ip_getifname_impl(phy_ifdata, buffer, buflen, B_FALSE,
+	    ns->netstack_ip));
 }
 
 /*
  * Determine the name of an IPv6 interface
  */
 static int
-ipv6_getifname(phy_if_t phy_ifdata, char *buffer, const size_t buflen)
+ipv6_getifname(phy_if_t phy_ifdata, char *buffer, const size_t buflen,
+    netstack_t *ns)
 {
-	return (ip_getifname_impl(phy_ifdata, buffer, buflen, B_TRUE));
+	return (ip_getifname_impl(phy_ifdata, buffer, buflen, B_TRUE,
+	    ns->netstack_ip));
 }
 
 /*
@@ -463,14 +472,14 @@ ipv6_getifname(phy_if_t phy_ifdata, char *buffer, const size_t buflen)
 /* ARGSUSED */
 static int
 ip_getifname_impl(phy_if_t phy_ifdata,
-    char *buffer, const size_t buflen, boolean_t isv6)
+    char *buffer, const size_t buflen, boolean_t isv6, ip_stack_t *ipst)
 {
 	ill_t *ill;
 
 	ASSERT(buffer != NULL);
 
 	ill = ill_lookup_on_ifindex((uint_t)phy_ifdata, isv6, NULL, NULL,
-	    NULL, NULL);
+	    NULL, NULL, ipst);
 	if (ill == NULL)
 		return (1);
 
@@ -489,18 +498,20 @@ ip_getifname_impl(phy_if_t phy_ifdata,
  * Determine the MTU of an IPv4 network interface
  */
 static int
-ip_getmtu(phy_if_t phy_ifdata, lif_if_t ifdata)
+ip_getmtu(phy_if_t phy_ifdata, lif_if_t ifdata, netstack_t *ns)
 {
-	return (ip_getmtu_impl(phy_ifdata, ifdata, B_FALSE));
+	ASSERT(ns != NULL);
+	return (ip_getmtu_impl(phy_ifdata, ifdata, B_FALSE, ns->netstack_ip));
 }
 
 /*
  * Determine the MTU of an IPv6 network interface
  */
 static int
-ipv6_getmtu(phy_if_t phy_ifdata, lif_if_t ifdata)
+ipv6_getmtu(phy_if_t phy_ifdata, lif_if_t ifdata, netstack_t *ns)
 {
-	return (ip_getmtu_impl(phy_ifdata, ifdata, B_TRUE));
+	ASSERT(ns != NULL);
+	return (ip_getmtu_impl(phy_ifdata, ifdata, B_TRUE, ns->netstack_ip));
 }
 
 /*
@@ -508,7 +519,8 @@ ipv6_getmtu(phy_if_t phy_ifdata, lif_if_t ifdata)
  */
 /* ARGSUSED */
 static int
-ip_getmtu_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6)
+ip_getmtu_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6,
+    ip_stack_t *ipst)
 {
 	lif_if_t ipifid;
 	ipif_t *ipif;
@@ -516,7 +528,8 @@ ip_getmtu_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6)
 
 	ipifid = UNMAP_IPIF_ID(ifdata);
 
-	ipif = ipif_getby_indexes((uint_t)phy_ifdata, (uint_t)ipifid, isv6);
+	ipif = ipif_getby_indexes((uint_t)phy_ifdata, (uint_t)ipifid,
+	    isv6, ipst);
 	if (ipif == NULL)
 		return (0);
 
@@ -527,7 +540,7 @@ ip_getmtu_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6)
 		ill_t *ill;
 
 		if ((ill = ill_lookup_on_ifindex((uint_t)phy_ifdata, isv6,
-		    NULL, NULL, NULL, NULL)) == NULL) {
+		    NULL, NULL, NULL, NULL, ipst)) == NULL) {
 			return (0);
 		}
 		mtu = ill->ill_max_frag;
@@ -541,46 +554,50 @@ ip_getmtu_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6)
  * Determine if path MTU discovery is enabled for IP
  */
 static int
-ip_getpmtuenabled(void)
+ip_getpmtuenabled(netstack_t *ns)
 {
-	return (ip_path_mtu_discovery);
+	ASSERT(ns != NULL);
+	return ((ns->netstack_ip)->ips_ip_path_mtu_discovery);
 }
 
 /*
  * Get next interface from the current list of IPv4 physical network interfaces
  */
 static phy_if_t
-ip_phygetnext(phy_if_t phy_ifdata)
+ip_phygetnext(phy_if_t phy_ifdata, netstack_t *ns)
 {
-	return (ill_get_next_ifindex(phy_ifdata, B_FALSE));
+	ASSERT(ns != NULL);
+	return (ill_get_next_ifindex(phy_ifdata, B_FALSE, ns->netstack_ip));
 }
 
 /*
  * Get next interface from the current list of IPv6 physical network interfaces
  */
 static phy_if_t
-ipv6_phygetnext(phy_if_t phy_ifdata)
+ipv6_phygetnext(phy_if_t phy_ifdata, netstack_t *ns)
 {
-	return (ill_get_next_ifindex(phy_ifdata, B_TRUE));
+	ASSERT(ns != NULL);
+	return (ill_get_next_ifindex(phy_ifdata, B_TRUE, ns->netstack_ip));
 }
 
 /*
  * Determine if a network interface name exists for IPv4
  */
 static phy_if_t
-ip_phylookup(const char *name)
+ip_phylookup(const char *name, netstack_t *ns)
 {
-	return (ip_phylookup_impl(name, B_FALSE));
-
+	ASSERT(ns != NULL);
+	return (ip_phylookup_impl(name, B_FALSE, ns->netstack_ip));
 }
 
 /*
  * Determine if a network interface name exists for IPv6
  */
 static phy_if_t
-ipv6_phylookup(const char *name)
+ipv6_phylookup(const char *name, netstack_t *ns)
 {
-	return (ip_phylookup_impl(name, B_TRUE));
+	ASSERT(ns != NULL);
+	return (ip_phylookup_impl(name, B_TRUE, ns->netstack_ip));
 }
 
 /*
@@ -589,13 +606,13 @@ ipv6_phylookup(const char *name)
  * because it does not match on the address family in addition to the name.
  */
 static phy_if_t
-ip_phylookup_impl(const char *name, boolean_t isv6)
+ip_phylookup_impl(const char *name, boolean_t isv6, ip_stack_t *ipst)
 {
 	phy_if_t phy;
 	ill_t *ill;
 
 	ill = ill_lookup_on_name((char *)name, B_FALSE, isv6, NULL, NULL,
-	    NULL, NULL, NULL);
+	    NULL, NULL, NULL, ipst);
 
 	if (ill == NULL)
 		return (0);
@@ -611,18 +628,22 @@ ip_phylookup_impl(const char *name, boolean_t isv6)
  * Get next interface from the current list of IPv4 logical network interfaces
  */
 static lif_if_t
-ip_lifgetnext(phy_if_t phy_ifdata, lif_if_t ifdata)
+ip_lifgetnext(phy_if_t phy_ifdata, lif_if_t ifdata, netstack_t *ns)
 {
-	return (ip_lifgetnext_impl(phy_ifdata, ifdata, B_FALSE));
+	ASSERT(ns != NULL);
+	return (ip_lifgetnext_impl(phy_ifdata, ifdata, B_FALSE,
+	    ns->netstack_ip));
 }
 
 /*
  * Get next interface from the current list of IPv6 logical network interfaces
  */
 static lif_if_t
-ipv6_lifgetnext(phy_if_t phy_ifdata, lif_if_t ifdata)
+ipv6_lifgetnext(phy_if_t phy_ifdata, lif_if_t ifdata, netstack_t *ns)
 {
-	return (ip_lifgetnext_impl(phy_ifdata, ifdata, B_TRUE));
+	ASSERT(ns != NULL);
+	return (ip_lifgetnext_impl(phy_ifdata, ifdata, B_TRUE,
+	    ns->netstack_ip));
 }
 
 /*
@@ -630,14 +651,16 @@ ipv6_lifgetnext(phy_if_t phy_ifdata, lif_if_t ifdata)
  * logical network interfaces
  */
 static lif_if_t
-ip_lifgetnext_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6)
+ip_lifgetnext_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6,
+    ip_stack_t *ipst)
 {
 	lif_if_t newidx, oldidx;
 	boolean_t nextok;
 	ipif_t *ipif;
 	ill_t *ill;
 
-	ill = ill_lookup_on_ifindex(phy_ifdata, isv6, NULL, NULL, NULL, NULL);
+	ill = ill_lookup_on_ifindex(phy_ifdata, isv6, NULL, NULL,
+	    NULL, NULL, ipst);
 	if (ill == NULL)
 		return (0);
 
@@ -688,9 +711,10 @@ ip_lifgetnext_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6)
  * Inject an IPv4 packet to or from an interface
  */
 static int
-ip_inject(inject_t style, net_inject_t *packet)
+ip_inject(inject_t style, net_inject_t *packet, netstack_t *ns)
 {
-	return (ip_inject_impl(style, packet, B_FALSE));
+	ASSERT(ns != NULL);
+	return (ip_inject_impl(style, packet, B_FALSE, ns->netstack_ip));
 }
 
 
@@ -698,9 +722,10 @@ ip_inject(inject_t style, net_inject_t *packet)
  * Inject an IPv6 packet to or from an interface
  */
 static int
-ipv6_inject(inject_t style, net_inject_t *packet)
+ipv6_inject(inject_t style, net_inject_t *packet, netstack_t *ns)
 {
-	return (ip_inject_impl(style, packet, B_TRUE));
+	ASSERT(ns != NULL);
+	return (ip_inject_impl(style, packet, B_TRUE, ns->netstack_ip));
 }
 
 /*
@@ -711,11 +736,12 @@ ipv6_inject(inject_t style, net_inject_t *packet)
  *   1: other errors
  */
 static int
-ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6)
+ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6,
+    ip_stack_t *ipst)
 {
 	struct sockaddr_in6 *sin6;
 	ddi_taskq_t *tq = NULL;
-	void (* func)(void*);
+	void (* func)(void *);
 	injection_t *inject;
 	ip6_t *ip6h;
 	ire_t *ire;
@@ -775,7 +801,8 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6)
 			 * Currently this function only supports IPv4.
 			 */
 			switch (ipfil_sendpkt(sock, mp, packet->ni_physical,
-			    ALL_ZONES)) {
+			    netstackid_to_zoneid(
+			    ipst->ips_netstack->netstack_stackid))) {
 			case 0 :
 			case EINPROGRESS:
 				return (0);
@@ -795,7 +822,8 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6)
 
 		ire = ire_route_lookup_v6(&sin6->sin6_addr, 0, 0, 0,
 		    NULL, NULL, ALL_ZONES, NULL,
-		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
+		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE,
+		    ipst);
 
 		if (ire == NULL) {
 			ip2dbg(("ip_inject: ire_cache_lookup failed\n"));
@@ -823,7 +851,7 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6)
 		    ire->ire_nce->nce_fp_mp == NULL &&
 		    ire->ire_nce->nce_res_mp == NULL) {
 			ip_newroute_v6(ire->ire_stq, mp,
-			    &sin6->sin6_addr, NULL, NULL, ALL_ZONES);
+			    &sin6->sin6_addr, NULL, NULL, ALL_ZONES, ipst);
 
 			ire_refrele(ire);
 			return (0);
@@ -860,6 +888,7 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6)
 	}
 
 	if (tq) {
+		inject->inj_ptr = ipst;
 		if (ddi_taskq_dispatch(tq, func, (void *)inject,
 		    DDI_SLEEP) == DDI_FAILURE) {
 			ip2dbg(("ip_inject:  ddi_taskq_dispatch failed\n"));
@@ -878,26 +907,28 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6)
  * Find the interface used for traffic to a given IPv4 address
  */
 static phy_if_t
-ip_routeto(struct sockaddr *address)
+ip_routeto(struct sockaddr *address, netstack_t *ns)
 {
 	ASSERT(address != NULL);
+	ASSERT(ns != NULL);
 
 	if (address->sa_family != AF_INET)
 		return (0);
-	return (ip_routeto_impl(address));
+	return (ip_routeto_impl(address, ns->netstack_ip));
 }
 
 /*
  * Find the interface used for traffic to a given IPv6 address
  */
 static phy_if_t
-ipv6_routeto(struct sockaddr *address)
+ipv6_routeto(struct sockaddr *address, netstack_t *ns)
 {
 	ASSERT(address != NULL);
+	ASSERT(ns != NULL);
 
 	if (address->sa_family != AF_INET6)
 		return (0);
-	return (ip_routeto_impl(address));
+	return (ip_routeto_impl(address, ns->netstack_ip));
 }
 
 
@@ -905,7 +936,7 @@ ipv6_routeto(struct sockaddr *address)
  * Find the interface used for traffic to an address
  */
 static phy_if_t
-ip_routeto_impl(struct sockaddr *address)
+ip_routeto_impl(struct sockaddr *address, ip_stack_t *ipst)
 {
 	ire_t *ire;
 	ill_t *ill;
@@ -915,12 +946,14 @@ ip_routeto_impl(struct sockaddr *address)
 		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)address;
 		ire = ire_route_lookup_v6(&sin6->sin6_addr, NULL,
 		    0, 0, NULL, NULL, ALL_ZONES, NULL,
-		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
+		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE,
+		    ipst);
 	} else {
 		struct sockaddr_in *sin = (struct sockaddr_in *)address;
 		ire = ire_route_lookup(sin->sin_addr.s_addr, 0,
 		    0, 0, NULL, NULL, ALL_ZONES, NULL,
-		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
+		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE,
+		    ipst);
 	}
 
 	if (ire == NULL)
@@ -1035,10 +1068,11 @@ ipv6_isvalidchecksum(mblk_t *mp)
  */
 static int
 ip_getlifaddr(phy_if_t phy_ifdata, lif_if_t ifdata, size_t nelem,
-	net_ifaddr_t type[], void *storage)
+	net_ifaddr_t type[], void *storage, netstack_t *ns)
 {
+	ASSERT(ns != NULL);
 	return (ip_getlifaddr_impl(AF_INET, phy_ifdata, ifdata,
-	    nelem, type, storage));
+	    nelem, type, storage, ns->netstack_ip));
 }
 
 /*
@@ -1046,10 +1080,11 @@ ip_getlifaddr(phy_if_t phy_ifdata, lif_if_t ifdata, size_t nelem,
  */
 static int
 ipv6_getlifaddr(phy_if_t phy_ifdata, lif_if_t ifdata, size_t nelem,
-		net_ifaddr_t type[], void *storage)
+		net_ifaddr_t type[], void *storage, netstack_t *ns)
 {
+	ASSERT(ns != NULL);
 	return (ip_getlifaddr_impl(AF_INET6, phy_ifdata, ifdata,
-	    nelem, type, storage));
+	    nelem, type, storage, ns->netstack_ip));
 }
 
 /*
@@ -1059,7 +1094,7 @@ ipv6_getlifaddr(phy_if_t phy_ifdata, lif_if_t ifdata, size_t nelem,
 static int
 ip_getlifaddr_impl(sa_family_t family, phy_if_t phy_ifdata,
     lif_if_t ifdata, size_t nelem, net_ifaddr_t type[],
-    struct sockaddr *storage)
+    struct sockaddr *storage, ip_stack_t *ipst)
 {
 	struct sockaddr_in6 *sin6;
 	struct sockaddr_in *sin;
@@ -1074,7 +1109,7 @@ ip_getlifaddr_impl(sa_family_t family, phy_if_t phy_ifdata,
 
 	if (family == AF_INET) {
 		if ((ipif = ipif_getby_indexes((uint_t)phy_ifdata,
-		    (uint_t)ipifid, B_FALSE)) == NULL)
+		    (uint_t)ipifid, B_FALSE, ipst)) == NULL)
 			return (1);
 
 		sin = (struct sockaddr_in *)storage;
@@ -1089,7 +1124,7 @@ ip_getlifaddr_impl(sa_family_t family, phy_if_t phy_ifdata,
 		}
 	} else {
 		if ((ipif = ipif_getby_indexes((uint_t)phy_ifdata,
-		    (uint_t)ipifid, B_TRUE)) == NULL)
+		    (uint_t)ipifid, B_TRUE, ipst)) == NULL)
 			return (1);
 
 		sin6 = (struct sockaddr_in6 *)storage;
@@ -1195,13 +1230,14 @@ ip_ni_queue_func_impl(injection_t *inject,  boolean_t out)
 	net_inject_t *packet;
 	conn_t *conn;
 	ill_t *ill;
+	ip_stack_t *ipst = (ip_stack_t *)inject->inj_ptr;
 
 	ASSERT(inject != NULL);
 	packet = &inject->inj_data;
 	ASSERT(packet->ni_packet != NULL);
 
 	if ((ill = ill_lookup_on_ifindex((uint_t)packet->ni_physical,
-	    B_FALSE, NULL, NULL, NULL, NULL)) == NULL) {
+	    B_FALSE, NULL, NULL, NULL, NULL, ipst)) == NULL) {
 		kmem_free(inject, sizeof (*inject));
 		return;
 	}
@@ -1223,7 +1259,7 @@ ip_ni_queue_func_impl(injection_t *inject,  boolean_t out)
 	 * be a TCP connection backing the packet and more than
 	 * likely, non-TCP packets will go here too.
 	 */
-	conn = ipcl_conn_create(IPCL_IPCCONN, KM_NOSLEEP);
+	conn = ipcl_conn_create(IPCL_IPCCONN, KM_NOSLEEP, ipst->ips_netstack);
 	if (conn != NULL) {
 		if (inject->inj_isv6) {
 			conn->conn_flags |= IPCL_ISV6;
@@ -1255,9 +1291,12 @@ ip_ne_queue_func(void *arg)
 {
 	hook_event_int_t *hr;
 	hook_nic_event_t *info = (hook_nic_event_t *)arg;
+	netstack_t *ns = info->hne_family->netd_netstack;
+	ip_stack_t *ipst = ns->netstack_ip;
 
-	hr = (info->hne_family == ipv6) ? ipv6nicevents : ipv4nicevents;
-	(void) hook_run(hr, (hook_data_t)info);
+	hr = (info->hne_family == ipst->ips_ipv6_net_data) ?
+	    ipst->ips_ipv6nicevents : ipst->ips_ipv4nicevents;
+	(void) hook_run(hr, (hook_data_t)info, ns);
 
 	if (info->hne_data != NULL)
 		kmem_free(info->hne_data, info->hne_datalen);

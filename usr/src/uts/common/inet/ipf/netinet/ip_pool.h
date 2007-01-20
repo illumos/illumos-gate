@@ -5,7 +5,7 @@
  *
  * $Id: ip_pool.h,v 2.26.2.3 2005/06/12 07:18:27 darrenr Exp $
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@ typedef	struct ip_pool_node {
 	addrfamily_t		ipn_addr;
 	addrfamily_t		ipn_mask;
 	int			ipn_info;
+	int			ipn_ref;
 	char			ipn_name[FR_GROUPLEN];
 	u_long			ipn_hits;
 	struct ip_pool_node	*ipn_next, **ipn_pnext;
@@ -68,24 +69,22 @@ typedef	struct	ip_pool_stat	{
 	ip_pool_t	*ipls_list[IPL_LOGSIZE];
 } ip_pool_stat_t;
 
-
-extern	ip_pool_stat_t	ipoolstat;
-extern	ip_pool_t	*ip_pool_list[IPL_LOGSIZE];
-
-extern	int	ip_pool_search __P((void *, int, void *));
-extern	int	ip_pool_init __P((void));
-extern	void	ip_pool_fini __P((void));
-extern	int	ip_pool_create __P((iplookupop_t *));
+extern	int	ip_pool_search __P((void *, int, void *, ipf_stack_t *));
+extern	int	ip_pool_init __P((ipf_stack_t *));
+extern	void	ip_pool_fini __P((ipf_stack_t *));
+extern	int	ip_pool_create __P((iplookupop_t *, ipf_stack_t *));
 extern	int	ip_pool_insert __P((ip_pool_t *, addrfamily_t *,
-				    addrfamily_t *, int));
-extern	int	ip_pool_remove __P((ip_pool_t *, ip_pool_node_t *));
-extern	int	ip_pool_destroy __P((iplookupop_t *));
-extern	void	ip_pool_free __P((ip_pool_t *));
-extern	void	ip_pool_deref __P((ip_pool_t *));
-extern	void	*ip_pool_find __P((int, char *));
+				    addrfamily_t *, int, ipf_stack_t *));
+extern	int	ip_pool_remove __P((ip_pool_t *, ip_pool_node_t *,
+				    ipf_stack_t *));
+extern	int	ip_pool_destroy __P((iplookupop_t *, ipf_stack_t *));
+extern	void	ip_pool_free __P((ip_pool_t *, ipf_stack_t *));
+extern	void	ip_pool_deref __P((ip_pool_t *, ipf_stack_t *));
+extern	void	*ip_pool_find __P((int, char *, ipf_stack_t *));
 extern	ip_pool_node_t *ip_pool_findeq __P((ip_pool_t *,
 					  addrfamily_t *, addrfamily_t *));
-extern	int	ip_pool_flush __P((iplookupflush_t *));
-extern	int	ip_pool_statistics __P((iplookupop_t *));
-
+extern	int	ip_pool_flush __P((iplookupflush_t *, ipf_stack_t *));
+extern	int	ip_pool_statistics __P((iplookupop_t *, ipf_stack_t *));
+extern	int	ip_pool_getnext __P((ipftoken_t *, ipflookupiter_t *, ipf_stack_t *));
+extern	void	ip_pool_iterderef __P((u_int, int, void *, ipf_stack_t *));
 #endif /* __IP_POOL_H__ */

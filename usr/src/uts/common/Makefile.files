@@ -198,6 +198,7 @@ GENUNIX_OBJS +=	\
 		nbmlock.o	\
 		ndifm.o		\
 		nice.o		\
+		netstack.o	\
 		ntptime.o	\
 		nvpair.o	\
 		nvpair_alloc_system.o	\

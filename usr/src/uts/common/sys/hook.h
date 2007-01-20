@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/queue.h>
+#include <sys/netstack.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -49,7 +50,7 @@ typedef uintptr_t hook_data_t;
 struct hook_event_int;
 typedef struct hook_event_int *hook_event_token_t;
 
-typedef int (* hook_func_t)(hook_event_token_t, hook_data_t);
+typedef int (* hook_func_t)(hook_event_token_t, hook_data_t, netstack_t *);
 
 /*
  * Hook
@@ -106,7 +107,6 @@ typedef struct hook_event {
 		(x)->he_interested = B_FALSE;	\
 		_NOTE(CONSTCOND)		\
 	} while (0)
-
 
 #ifdef	__cplusplus
 }

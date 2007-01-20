@@ -155,7 +155,7 @@ opdes_t	icmp_opt_arr[] = {
 	(OP_PASSNEXT|OP_NODEFAULT|OP_VARLEN),
 	sizeof (struct in_pktinfo), -1 /* not initialized */ },
 
-{ IP_NEXTHOP, IPPROTO_IP, OA_RW, OA_RW, OP_CONFIG, OP_PASSNEXT,
+{ IP_NEXTHOP, IPPROTO_IP, OA_R, OA_RW, OP_CONFIG, OP_PASSNEXT,
 	sizeof (in_addr_t), -1 /* not initialized */ },
 
 { MRT_INIT, IPPROTO_IP, 0, OA_X, OP_CONFIG,

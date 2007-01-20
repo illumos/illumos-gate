@@ -20,7 +20,7 @@
 
  CDDL HEADER END
 
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,7 +31,7 @@
 <!DOCTYPE platform PUBLIC "-//Sun Microsystems Inc//Zones Platform//EN"
     "file:///usr/share/lib/xml/dtd/zone_platform.dtd.1">
 
-<platform name="lx">
+<platform name="lx" allow-exclusive-ip="false">
 	<!-- Global filesystems to mount when booting the zone -->
 	<global_mount special="/dev" directory="/native/dev" type="dev"
 	    opt="attrdir=%R/dev" />

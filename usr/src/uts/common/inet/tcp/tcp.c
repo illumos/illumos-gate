@@ -57,6 +57,7 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
 #include <sys/policy.h>
 #include <sys/priv.h>
 #include <sys/zone.h>
+#include <sys/sunldi.h>
 
 #include <sys/errno.h>
 #include <sys/signal.h>
@@ -154,7 +155,7 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
  *
  * Opening a new connection:
  *
- * The outgoing connection open is pretty simple. ip_tcpopen() does the
+ * The outgoing connection open is pretty simple. tcp_open() does the
  * work in creating the conn/tcp structure and initializing it. The
  * squeue assignment is done based on the CPU the application
  * is running on. So for outbound connections, processing is always done
@@ -241,7 +242,7 @@ extern major_t TCP6_MAJ;
  * 2: squeue_enter
  * 3: squeue_fill
  */
-int tcp_squeue_close = 2;
+int tcp_squeue_close = 2;	/* Setable in /etc/system */
 int tcp_squeue_wput = 2;
 
 squeue_func_t tcp_squeue_close_proc;
@@ -280,7 +281,8 @@ int tcp_tx_pull_len = 16;
  * How to add new counters.
  *
  * 1) Add a field in the tcp_stat structure describing your counter.
- * 2) Add a line in tcp_statistics with the name of the counter.
+ * 2) Add a line in the template in tcp_kstat2_init() with the name
+ *    of the counter.
  *
  *    IMPORTANT!! - make sure that both are in sync !!
  * 3) Use either TCP_STAT or TCP_DBGSTAT with the name.
@@ -320,119 +322,33 @@ static uint_t tcp_clean_death_stat[TCP_MAX_CLEAN_DEATH_TAG];
 #endif
 
 #if TCP_DEBUG_COUNTER
-#define	TCP_DBGSTAT(x) atomic_add_64(&(tcp_statistics.x.value.ui64), 1)
+#define	TCP_DBGSTAT(tcps, x)	\
+	atomic_add_64(&((tcps)->tcps_statistics.x.value.ui64), 1)
+#define	TCP_G_DBGSTAT(x)	\
+	atomic_add_64(&(tcp_g_statistics.x.value.ui64), 1)
 #elif defined(lint)
-#define	TCP_DBGSTAT(x) ASSERT(_lint_dummy_ == 0);
+#define	TCP_DBGSTAT(tcps, x) ASSERT(_lint_dummy_ == 0);
+#define	TCP_G_DBGSTAT(x) ASSERT(_lint_dummy_ == 0);
 #else
-#define	TCP_DBGSTAT(x)
+#define	TCP_DBGSTAT(tcps, x)
+#define	TCP_G_DBGSTAT(x)
 #endif
 
-tcp_stat_t tcp_statistics = {
-	{ "tcp_time_wait",		KSTAT_DATA_UINT64 },
-	{ "tcp_time_wait_syn",		KSTAT_DATA_UINT64 },
-	{ "tcp_time_wait_success",	KSTAT_DATA_UINT64 },
-	{ "tcp_time_wait_fail",		KSTAT_DATA_UINT64 },
-	{ "tcp_reinput_syn",		KSTAT_DATA_UINT64 },
-	{ "tcp_ip_output",		KSTAT_DATA_UINT64 },
-	{ "tcp_detach_non_time_wait",	KSTAT_DATA_UINT64 },
-	{ "tcp_detach_time_wait",	KSTAT_DATA_UINT64 },
-	{ "tcp_time_wait_reap",		KSTAT_DATA_UINT64 },
-	{ "tcp_clean_death_nondetached",	KSTAT_DATA_UINT64 },
-	{ "tcp_reinit_calls",		KSTAT_DATA_UINT64 },
-	{ "tcp_eager_err1",		KSTAT_DATA_UINT64 },
-	{ "tcp_eager_err2",		KSTAT_DATA_UINT64 },
-	{ "tcp_eager_blowoff_calls",	KSTAT_DATA_UINT64 },
-	{ "tcp_eager_blowoff_q",	KSTAT_DATA_UINT64 },
-	{ "tcp_eager_blowoff_q0",	KSTAT_DATA_UINT64 },
-	{ "tcp_not_hard_bound",		KSTAT_DATA_UINT64 },
-	{ "tcp_no_listener",		KSTAT_DATA_UINT64 },
-	{ "tcp_found_eager",		KSTAT_DATA_UINT64 },
-	{ "tcp_wrong_queue",		KSTAT_DATA_UINT64 },
-	{ "tcp_found_eager_binding1",	KSTAT_DATA_UINT64 },
-	{ "tcp_found_eager_bound1",	KSTAT_DATA_UINT64 },
-	{ "tcp_eager_has_listener1",	KSTAT_DATA_UINT64 },
-	{ "tcp_open_alloc",		KSTAT_DATA_UINT64 },
-	{ "tcp_open_detached_alloc",	KSTAT_DATA_UINT64 },
-	{ "tcp_rput_time_wait",		KSTAT_DATA_UINT64 },
-	{ "tcp_listendrop",		KSTAT_DATA_UINT64 },
-	{ "tcp_listendropq0",		KSTAT_DATA_UINT64 },
-	{ "tcp_wrong_rq",		KSTAT_DATA_UINT64 },
-	{ "tcp_rsrv_calls",		KSTAT_DATA_UINT64 },
-	{ "tcp_eagerfree2",		KSTAT_DATA_UINT64 },
-	{ "tcp_eagerfree3",		KSTAT_DATA_UINT64 },
-	{ "tcp_eagerfree4",		KSTAT_DATA_UINT64 },
-	{ "tcp_eagerfree5",		KSTAT_DATA_UINT64 },
-	{ "tcp_timewait_syn_fail",	KSTAT_DATA_UINT64 },
-	{ "tcp_listen_badflags",	KSTAT_DATA_UINT64 },
-	{ "tcp_timeout_calls",		KSTAT_DATA_UINT64 },
-	{ "tcp_timeout_cached_alloc",	KSTAT_DATA_UINT64 },
-	{ "tcp_timeout_cancel_reqs",	KSTAT_DATA_UINT64 },
-	{ "tcp_timeout_canceled",	KSTAT_DATA_UINT64 },
-	{ "tcp_timermp_alloced",	KSTAT_DATA_UINT64 },
-	{ "tcp_timermp_freed",		KSTAT_DATA_UINT64 },
-	{ "tcp_timermp_allocfail",	KSTAT_DATA_UINT64 },
-	{ "tcp_timermp_allocdblfail",	KSTAT_DATA_UINT64 },
-	{ "tcp_push_timer_cnt",		KSTAT_DATA_UINT64 },
-	{ "tcp_ack_timer_cnt",		KSTAT_DATA_UINT64 },
-	{ "tcp_ire_null1",		KSTAT_DATA_UINT64 },
-	{ "tcp_ire_null",		KSTAT_DATA_UINT64 },
-	{ "tcp_ip_send",		KSTAT_DATA_UINT64 },
-	{ "tcp_ip_ire_send",		KSTAT_DATA_UINT64 },
-	{ "tcp_wsrv_called",		KSTAT_DATA_UINT64 },
-	{ "tcp_flwctl_on",		KSTAT_DATA_UINT64 },
-	{ "tcp_timer_fire_early",	KSTAT_DATA_UINT64 },
-	{ "tcp_timer_fire_miss",	KSTAT_DATA_UINT64 },
-	{ "tcp_freelist_cleanup",	KSTAT_DATA_UINT64 },
-	{ "tcp_rput_v6_error",		KSTAT_DATA_UINT64 },
-	{ "tcp_out_sw_cksum",		KSTAT_DATA_UINT64 },
-	{ "tcp_out_sw_cksum_bytes",	KSTAT_DATA_UINT64 },
-	{ "tcp_zcopy_on",		KSTAT_DATA_UINT64 },
-	{ "tcp_zcopy_off",		KSTAT_DATA_UINT64 },
-	{ "tcp_zcopy_backoff",		KSTAT_DATA_UINT64 },
-	{ "tcp_zcopy_disable",		KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_pkt_out",		KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_pkt_out_v4",		KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_pkt_out_v6",		KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_discarded",		KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_conn_halted1",	KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_conn_halted2",	KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_conn_halted3",	KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_conn_resumed1",	KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_conn_resumed2",	KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_legacy_small",	KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_legacy_all",		KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_legacy_ret",		KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_allocfail",		KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_addpdescfail",	KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_allocd",		KSTAT_DATA_UINT64 },
-	{ "tcp_mdt_linked",		KSTAT_DATA_UINT64 },
-	{ "tcp_fusion_flowctl",		KSTAT_DATA_UINT64 },
-	{ "tcp_fusion_backenabled",	KSTAT_DATA_UINT64 },
-	{ "tcp_fusion_urg",		KSTAT_DATA_UINT64 },
-	{ "tcp_fusion_putnext",		KSTAT_DATA_UINT64 },
-	{ "tcp_fusion_unfusable",	KSTAT_DATA_UINT64 },
-	{ "tcp_fusion_aborted",		KSTAT_DATA_UINT64 },
-	{ "tcp_fusion_unqualified",	KSTAT_DATA_UINT64 },
-	{ "tcp_fusion_rrw_busy",	KSTAT_DATA_UINT64 },
-	{ "tcp_fusion_rrw_msgcnt",	KSTAT_DATA_UINT64 },
-	{ "tcp_fusion_rrw_plugged",	KSTAT_DATA_UINT64 },
-	{ "tcp_in_ack_unsent_drop",	KSTAT_DATA_UINT64 },
-	{ "tcp_sock_fallback",		KSTAT_DATA_UINT64 },
-	{ "tcp_lso_enabled",		KSTAT_DATA_UINT64 },
-	{ "tcp_lso_disabled",		KSTAT_DATA_UINT64 },
-	{ "tcp_lso_times",		KSTAT_DATA_UINT64 },
-	{ "tcp_lso_pkt_out",		KSTAT_DATA_UINT64 },
-};
+#define	TCP_G_STAT(x)	(tcp_g_statistics.x.value.ui64++)
 
-static kstat_t *tcp_kstat;
+tcp_g_stat_t	tcp_g_statistics;
+kstat_t		*tcp_g_kstat;
 
 /*
  * Call either ip_output or ip_output_v6. This replaces putnext() calls on the
  * tcp write side.
  */
 #define	CALL_IP_WPUT(connp, q, mp) {					\
+	tcp_stack_t	*tcps;						\
+									\
+	tcps = connp->conn_netstack->netstack_tcp;			\
 	ASSERT(((q)->q_flag & QREADR) == 0);				\
-	TCP_DBGSTAT(tcp_ip_output);					\
+	TCP_DBGSTAT(tcps, tcp_ip_output);				\
 	connp->conn_send(connp, (mp), (q), IP_WPUT);			\
 }
 
@@ -464,14 +380,8 @@ static kstat_t *tcp_kstat;
 #define	ISS_INCR	250000
 #define	ISS_NSEC_SHT	12
 
-static uint32_t tcp_iss_incr_extra;	/* Incremented for each connection */
-static kmutex_t tcp_iss_key_lock;
-static MD5_CTX tcp_iss_key;
 static sin_t	sin_null;	/* Zero address for quick clears */
 static sin6_t	sin6_null;	/* Zero address for quick clears */
-
-/* Packet dropper for TCP IPsec policy drops. */
-static ipdropper_t tcp_dropper;
 
 /*
  * This implementation follows the 4.3BSD interpretation of the urgent
@@ -615,11 +525,15 @@ kmem_cache_t	*tcp_iphc_cache;
  * The list manipulations (including tcp_time_wait_next/prev)
  * are protected by the tcp_time_wait_lock. The content of the
  * detached TIME_WAIT connections is protected by the normal perimeters.
+ *
+ * This list is per squeue and squeues are shared across the tcp_stack_t's.
+ * Things on tcp_time_wait_head remain associated with the tcp_stack_t
+ * and conn_netstack.
+ * The tcp_t's that are added to tcp_free_list are disassociated and
+ * have NULL tcp_tcps and conn_netstack pointers.
  */
-
 typedef struct tcp_squeue_priv_s {
 	kmutex_t	tcp_time_wait_lock;
-				/* Protects the next 3 globals */
 	timeout_id_t	tcp_time_wait_tid;
 	tcp_t		*tcp_time_wait_head;
 	tcp_t		*tcp_time_wait_tail;
@@ -832,13 +746,16 @@ static int	tcp_tpistate(tcp_t *tcp);
 static void	tcp_bind_hash_insert(tf_t *tf, tcp_t *tcp,
     int caller_holds_lock);
 static void	tcp_bind_hash_remove(tcp_t *tcp);
-static tcp_t	*tcp_acceptor_hash_lookup(t_uscalar_t id);
+static tcp_t	*tcp_acceptor_hash_lookup(t_uscalar_t id, tcp_stack_t *);
 void		tcp_acceptor_hash_insert(t_uscalar_t id, tcp_t *tcp);
 static void	tcp_acceptor_hash_remove(tcp_t *tcp);
 static void	tcp_capability_req(tcp_t *tcp, mblk_t *mp);
 static void	tcp_info_req(tcp_t *tcp, mblk_t *mp);
 static void	tcp_addr_req(tcp_t *tcp, mblk_t *mp);
 static void	tcp_addr_req_ipv6(tcp_t *tcp, mblk_t *mp);
+void		tcp_g_q_setup(tcp_stack_t *);
+void		tcp_g_q_create(tcp_stack_t *);
+void		tcp_g_q_destroy(tcp_stack_t *);
 static int	tcp_header_init_ipv4(tcp_t *tcp);
 static int	tcp_header_init_ipv6(tcp_t *tcp);
 int		tcp_init(tcp_t *tcp, queue_t *q);
@@ -866,12 +783,13 @@ static void	tcp_opt_reverse(tcp_t *tcp, ipha_t *ipha);
 static int	tcp_opt_set_header(tcp_t *tcp, boolean_t checkonly,
 		    uchar_t *ptr, uint_t len);
 static int	tcp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
-static boolean_t tcp_param_register(tcpparam_t *tcppa, int cnt);
+static boolean_t tcp_param_register(IDP *ndp, tcpparam_t *tcppa, int cnt,
+    tcp_stack_t *);
 static int	tcp_param_set(queue_t *q, mblk_t *mp, char *value,
 		    caddr_t cp, cred_t *cr);
 static int	tcp_param_set_aligned(queue_t *q, mblk_t *mp, char *value,
 		    caddr_t cp, cred_t *cr);
-static void	tcp_iss_key_init(uint8_t *phrase, int len);
+static void	tcp_iss_key_init(uint8_t *phrase, int len, tcp_stack_t *);
 static int	tcp_1948_phrase_set(queue_t *q, mblk_t *mp, char *value,
 		    caddr_t cp, cred_t *cr);
 static void	tcp_process_shrunk_swnd(tcp_t *tcp, uint32_t shrunk_cnt);
@@ -884,7 +802,7 @@ static void	tcp_report_item(mblk_t *mp, tcp_t *tcp, int hashval,
 
 static uint_t	tcp_rcv_drain(queue_t *q, tcp_t *tcp);
 static void	tcp_sack_rxmit(tcp_t *tcp, uint_t *flags);
-static boolean_t tcp_send_rst_chk(void);
+static boolean_t tcp_send_rst_chk(tcp_stack_t *);
 static void	tcp_ss_rexmit(tcp_t *tcp);
 static mblk_t	*tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp);
 static void	tcp_process_options(tcp_t *, tcph_t *);
@@ -936,11 +854,11 @@ static void	tcp_ack_timer(void *arg);
 static mblk_t	*tcp_ack_mp(tcp_t *tcp);
 static void	tcp_xmit_early_reset(char *str, mblk_t *mp,
 		    uint32_t seq, uint32_t ack, int ctl, uint_t ip_hdr_len,
-		    zoneid_t zoneid);
+		    zoneid_t zoneid, tcp_stack_t *);
 static void	tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq,
 		    uint32_t ack, int ctl);
-static tcp_hsp_t *tcp_hsp_lookup(ipaddr_t addr);
-static tcp_hsp_t *tcp_hsp_lookup_ipv6(in6_addr_t *addr);
+static tcp_hsp_t *tcp_hsp_lookup(ipaddr_t addr, tcp_stack_t *);
+static tcp_hsp_t *tcp_hsp_lookup_ipv6(in6_addr_t *addr, tcp_stack_t *);
 static int	setmaxps(queue_t *q, int maxpsz);
 static void	tcp_set_rto(tcp_t *, time_t);
 static boolean_t tcp_check_policy(tcp_t *, mblk_t *, ipha_t *, ip6_t *,
@@ -956,14 +874,14 @@ static void	tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp,
 boolean_t	tcp_paws_check(tcp_t *tcp, tcph_t *tcph, tcp_opt_t *tcpoptp);
 boolean_t	tcp_reserved_port_add(int, in_port_t *, in_port_t *);
 boolean_t	tcp_reserved_port_del(in_port_t, in_port_t);
-boolean_t	tcp_reserved_port_check(in_port_t);
-static tcp_t	*tcp_alloc_temp_tcp(in_port_t);
+boolean_t	tcp_reserved_port_check(in_port_t, tcp_stack_t *);
+static tcp_t	*tcp_alloc_temp_tcp(in_port_t, tcp_stack_t *);
 static int	tcp_reserved_port_list(queue_t *, mblk_t *, caddr_t, cred_t *);
 static mblk_t	*tcp_mdt_info_mp(mblk_t *);
 static void	tcp_mdt_update(tcp_t *, ill_mdt_capab_t *, boolean_t);
 static int	tcp_mdt_add_attrs(multidata_t *, const mblk_t *,
 		    const boolean_t, const uint32_t, const uint32_t,
-		    const uint32_t, const uint32_t);
+		    const uint32_t, const uint32_t, tcp_stack_t *);
 static void	tcp_multisend_data(tcp_t *, ire_t *, const ill_t *, mblk_t *,
 		    const uint_t, const uint_t, boolean_t *);
 static mblk_t	*tcp_lso_info_mp(mblk_t *);
@@ -974,10 +892,15 @@ extern void	tcp_timermp_free(tcp_t *);
 static void	tcp_timer_free(tcp_t *tcp, mblk_t *mp);
 static void	tcp_stop_lingering(tcp_t *tcp);
 static void	tcp_close_linger_timeout(void *arg);
-void		tcp_ddi_init(void);
-void		tcp_ddi_destroy(void);
-static void	tcp_kstat_init(void);
-static void	tcp_kstat_fini(void);
+static void	*tcp_stack_init(netstackid_t stackid, netstack_t *ns);
+static void	tcp_stack_shutdown(netstackid_t stackid, void *arg);
+static void	tcp_stack_fini(netstackid_t stackid, void *arg);
+static void	*tcp_g_kstat_init(tcp_g_stat_t *);
+static void	tcp_g_kstat_fini(kstat_t *);
+static void	*tcp_kstat_init(netstackid_t, tcp_stack_t *);
+static void	tcp_kstat_fini(netstackid_t, kstat_t *);
+static void	*tcp_kstat2_init(netstackid_t, tcp_stat_t *);
+static void	tcp_kstat2_fini(netstackid_t, kstat_t *);
 static int	tcp_kstat_update(kstat_t *kp, int rw);
 void		tcp_reinput(conn_t *connp, mblk_t *mp, squeue_t *sqp);
 static int	tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
@@ -1028,10 +951,10 @@ void tcp_clean_death_wrapper(void *arg, mblk_t *mp, void *arg2);
 static mblk_t	*tcp_ioctl_abort_build_msg(tcp_ioc_abort_conn_t *, tcp_t *);
 static void	tcp_ioctl_abort_dump(tcp_ioc_abort_conn_t *);
 static void	tcp_ioctl_abort_handler(tcp_t *, mblk_t *);
-static int	tcp_ioctl_abort(tcp_ioc_abort_conn_t *);
+static int	tcp_ioctl_abort(tcp_ioc_abort_conn_t *, tcp_stack_t *tcps);
 static void	tcp_ioctl_abort_conn(queue_t *, mblk_t *);
 static int	tcp_ioctl_abort_bucket(tcp_ioc_abort_conn_t *, int, int *,
-    boolean_t);
+    boolean_t, tcp_stack_t *);
 
 static struct module_info tcp_rinfo =  {
 	TCP_MOD_ID, TCP_MOD_NAME, 0, INFPSZ, TCP_RECV_HIWATER, TCP_RECV_LOWATER
@@ -1096,49 +1019,11 @@ struct streamtab tcpinfo = {
 	&tcp_rinit, &tcp_winit
 };
 
-extern squeue_func_t tcp_squeue_wput_proc;
-extern squeue_func_t tcp_squeue_timer_proc;
-
-/* Protected by tcp_g_q_lock */
-static queue_t	*tcp_g_q;	/* Default queue used during detached closes */
-kmutex_t tcp_g_q_lock;
-
-/* Protected by tcp_hsp_lock */
 /*
- * XXX The host param mechanism should go away and instead we should use
- * the metrics associated with the routes to determine the default sndspace
- * and rcvspace.
+ * Have to ensure that tcp_g_q_close is not done by an
+ * interrupt thread.
  */
-static tcp_hsp_t	**tcp_hsp_hash;	/* Hash table for HSPs */
-krwlock_t tcp_hsp_lock;
-
-/*
- * Extra privileged ports. In host byte order.
- * Protected by tcp_epriv_port_lock.
- */
-#define	TCP_NUM_EPRIV_PORTS	64
-static int	tcp_g_num_epriv_ports = TCP_NUM_EPRIV_PORTS;
-static uint16_t	tcp_g_epriv_ports[TCP_NUM_EPRIV_PORTS] = { 2049, 4045 };
-kmutex_t tcp_epriv_port_lock;
-
-/*
- * The smallest anonymous port in the privileged port range which TCP
- * looks for free port.  Use in the option TCP_ANONPRIVBIND.
- */
-static in_port_t tcp_min_anonpriv_port = 512;
-
-/* Only modified during _init and _fini thus no locking is needed. */
-static caddr_t	tcp_g_nd;	/* Head of 'named dispatch' variable list */
-
-/* Hint not protected by any lock */
-static uint_t	tcp_next_port_to_try;
-
-
-/* TCP bind hash list - all tcp_t with state >= BOUND. */
-tf_t	tcp_bind_fanout[TCP_BIND_FANOUT_SIZE];
-
-/* TCP queue hash list - all tcp_t in case they will be an acceptor. */
-static tf_t	tcp_acceptor_fanout[TCP_FANOUT_SIZE];
+static taskq_t *tcp_taskq;
 
 /*
  * TCP has a private interface for other kernel modules to reserve a
@@ -1171,23 +1056,9 @@ typedef struct tcp_rport_s {
 	tcp_t		**temp_tcp_array;
 } tcp_rport_t;
 
-/* The reserved port array. */
-static tcp_rport_t tcp_reserved_port[TCP_RESERVED_PORTS_ARRAY_MAX_SIZE];
-
-/* Locks to protect the tcp_reserved_ports array. */
-static krwlock_t tcp_reserved_port_lock;
-
-/* The number of ranges in the array. */
-uint32_t tcp_reserved_port_array_size = 0;
-
-/*
- * MIB-2 stuff for SNMP
- * Note: tcpInErrs {tcp 15} is accumulated in ip.c
- */
-mib2_tcp_t	tcp_mib;	/* SNMP fixed size info */
-kstat_t		*tcp_mibkp;	/* kstat exporting tcp_mib data */
-
+/* Setable only in /etc/system. Move to ndd? */
 boolean_t tcp_icmp_source_quench = B_FALSE;
+
 /*
  * Following assumes TPI alignment requirements stay along 32 bit
  * boundaries
@@ -1245,8 +1116,8 @@ static struct T_info_ack tcp_g_t_info_ack_v6 = {
  * tcp_wroff_xtra is the extra space in front of TCP/IP header for link
  * layer header.  It has to be a multiple of 4.
  */
-static tcpparam_t tcp_wroff_xtra_param = { 0, 256, 32, "tcp_wroff_xtra" };
-#define	tcp_wroff_xtra	tcp_wroff_xtra_param.tcp_param_val
+static tcpparam_t lcl_tcp_wroff_xtra_param = { 0, 256, 32, "tcp_wroff_xtra" };
+#define	tcps_wroff_xtra	tcps_wroff_xtra_param->tcp_param_val
 
 /*
  * All of these are alterable, within the min/max values given, at run time.
@@ -1254,7 +1125,7 @@ static tcpparam_t tcp_wroff_xtra_param = { 0, 256, 32, "tcp_wroff_xtra" };
  * per the TCP spec.
  */
 /* BEGIN CSTYLED */
-tcpparam_t	tcp_param_arr[] = {
+static tcpparam_t	lcl_tcp_param_arr[] = {
  /*min		max		value		name */
  { 1*SECONDS,	10*MINUTES,	1*MINUTES,	"tcp_time_wait_interval"},
  { 1,		PARAM_MAX,	128,		"tcp_conn_req_max_q" },
@@ -1331,18 +1202,20 @@ tcpparam_t	tcp_param_arr[] = {
  * each header fragment in the header buffer.  Each parameter value has
  * to be a multiple of 4 (32-bit aligned).
  */
-static tcpparam_t tcp_mdt_head_param = { 32, 256, 32, "tcp_mdt_hdr_head_min" };
-static tcpparam_t tcp_mdt_tail_param = { 0,  256, 32, "tcp_mdt_hdr_tail_min" };
-#define	tcp_mdt_hdr_head_min	tcp_mdt_head_param.tcp_param_val
-#define	tcp_mdt_hdr_tail_min	tcp_mdt_tail_param.tcp_param_val
+static tcpparam_t lcl_tcp_mdt_head_param =
+	{ 32, 256, 32, "tcp_mdt_hdr_head_min" };
+static tcpparam_t lcl_tcp_mdt_tail_param =
+	{ 0,  256, 32, "tcp_mdt_hdr_tail_min" };
+#define	tcps_mdt_hdr_head_min	tcps_mdt_head_param->tcp_param_val
+#define	tcps_mdt_hdr_tail_min	tcps_mdt_tail_param->tcp_param_val
 
 /*
  * tcp_mdt_max_pbufs is the upper limit value that tcp uses to figure out
  * the maximum number of payload buffers associated per Multidata.
  */
-static tcpparam_t tcp_mdt_max_pbufs_param =
+static tcpparam_t lcl_tcp_mdt_max_pbufs_param =
 	{ 1, MULTIDATA_MAX_PBUFS, MULTIDATA_MAX_PBUFS, "tcp_mdt_max_pbufs" };
-#define	tcp_mdt_max_pbufs	tcp_mdt_max_pbufs_param.tcp_param_val
+#define	tcps_mdt_max_pbufs	tcps_mdt_max_pbufs_param->tcp_param_val
 
 /* Round up the value to the nearest mss. */
 #define	MSS_ROUNDUP(value, mss)		((((value) - 1) / (mss) + 1) * (mss))
@@ -1373,14 +1246,6 @@ static tcpparam_t tcp_mdt_max_pbufs_param =
 #define	DISP_PORT_ONLY		1
 #define	DISP_ADDR_AND_PORT	2
 
-/*
- * This controls the rate some ndd info report functions can be used
- * by non-privileged users.  It stores the last time such info is
- * requested.  When those report functions are called again, this
- * is checked with the current time and compare with the ndd param
- * tcp_ndd_get_info_interval.
- */
-static clock_t tcp_last_ndd_get_info_time = 0;
 #define	NDD_TOO_QUICK_MSG \
 	"ndd get info rate too high for non-privileged users, try again " \
 	"later.\n"
@@ -1389,17 +1254,6 @@ static clock_t tcp_last_ndd_get_info_time = 0;
 #define	IS_VMLOANED_MBLK(mp) \
 	(((mp)->b_datap->db_struioflag & STRUIO_ZC) != 0)
 
-/*
- * These two variables control the rate for TCP to generate RSTs in
- * response to segments not belonging to any connections.  We limit
- * TCP to sent out tcp_rst_sent_rate (ndd param) number of RSTs in
- * each 1 second interval.  This is to protect TCP against DoS attack.
- */
-static clock_t tcp_last_rst_intrvl;
-static uint32_t tcp_rst_cnt;
-
-/* The number of RST not sent because of the rate limit. */
-static uint32_t tcp_rst_unsent;
 
 /* Enable or disable b_cont M_MULTIDATA chaining for MDT. */
 boolean_t tcp_mdt_chain = B_TRUE;
@@ -1414,12 +1268,13 @@ uint_t tcp_mdt_smss_threshold = 1;
 uint32_t do_tcpzcopy = 1;		/* 0: disable, 1: enable, 2: force */
 
 /*
- * Forces all connections to obey the value of the tcp_maxpsz_multiplier
+ * Forces all connections to obey the value of the tcps_maxpsz_multiplier
  * tunable settable via NDD.  Otherwise, the per-connection behavior is
  * determined dynamically during tcp_adapt_ire(), which is the default.
  */
 boolean_t tcp_static_maxpsz = B_FALSE;
 
+/* Setable in /etc/system */
 /* If set to 0, pick ephemeral port sequentially; otherwise randomly. */
 uint32_t tcp_random_anon_port = 1;
 
@@ -1559,6 +1414,9 @@ extern uint32_t (*cl_inet_ipident)(uint8_t protocol, sa_family_t addr_family,
  */
 int cl_tcp_walk_list(int (*callback)(cl_tcp_info_t *, void *), void *arg);
 
+static int cl_tcp_walk_list_stack(int (*callback)(cl_tcp_info_t *, void *),
+    void *arg, tcp_stack_t *tcps);
+
 /*
  * Figure out the value of window scale opton.  Note that the rwnd is
  * ASSUMED to be rounded up to the nearest MSS before the calculation.
@@ -1595,6 +1453,8 @@ tcp_time_wait_remove(tcp_t *tcp, tcp_squeue_priv_t *tcp_time_wait)
 		    squeue_getprivate(tcp->tcp_connp->conn_sqp, SQPRIVATE_TCP));
 		mutex_enter(&tcp_time_wait->tcp_time_wait_lock);
 		locked = B_TRUE;
+	} else {
+		ASSERT(MUTEX_HELD(&tcp_time_wait->tcp_time_wait_lock));
 	}
 
 	if (tcp->tcp_time_wait_expire == 0) {
@@ -1646,6 +1506,7 @@ tcp_time_wait_remove(tcp_t *tcp, tcp_squeue_priv_t *tcp_time_wait)
 static void
 tcp_time_wait_append(tcp_t *tcp)
 {
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	tcp_squeue_priv_t *tcp_time_wait =
 	    *((tcp_squeue_priv_t **)squeue_getprivate(tcp->tcp_connp->conn_sqp,
 		SQPRIVATE_TCP));
@@ -1675,7 +1536,7 @@ tcp_time_wait_append(tcp_t *tcp)
 	 * modular arithmetic.
 	 */
 	tcp->tcp_time_wait_expire +=
-	    drv_usectohz(tcp_time_wait_interval * 1000);
+	    drv_usectohz(tcps->tcps_time_wait_interval * 1000);
 	if (tcp->tcp_time_wait_expire == 0)
 		tcp->tcp_time_wait_expire = 1;
 
@@ -1683,7 +1544,8 @@ tcp_time_wait_append(tcp_t *tcp)
 	ASSERT(tcp->tcp_state == TCPS_TIME_WAIT);
 	ASSERT(tcp->tcp_time_wait_next == NULL);
 	ASSERT(tcp->tcp_time_wait_prev == NULL);
-	TCP_DBGSTAT(tcp_time_wait);
+	TCP_DBGSTAT(tcps, tcp_time_wait);
+
 	mutex_enter(&tcp_time_wait->tcp_time_wait_lock);
 	if (tcp_time_wait->tcp_time_wait_head == NULL) {
 		ASSERT(tcp_time_wait->tcp_time_wait_tail == NULL);
@@ -1705,6 +1567,7 @@ tcp_timewait_output(void *arg, mblk_t *mp, void *arg2)
 {
 	conn_t	*connp = (conn_t *)arg;
 	tcp_t	*tcp = connp->conn_tcp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(tcp != NULL);
 	if (tcp->tcp_state == TCPS_CLOSED) {
@@ -1718,7 +1581,7 @@ tcp_timewait_output(void *arg, mblk_t *mp, void *arg2)
 	    tcp->tcp_ipversion == IPV6_VERSION)));
 	ASSERT(!tcp->tcp_listener);
 
-	TCP_STAT(tcp_time_wait_reap);
+	TCP_STAT(tcps, tcp_time_wait_reap);
 	ASSERT(TCP_IS_DETACHED(tcp));
 
 	/*
@@ -1728,6 +1591,32 @@ tcp_timewait_output(void *arg, mblk_t *mp, void *arg2)
 	tcp_close_detached(tcp);
 }
 
+/*
+ * Remove cached/latched IPsec references.
+ */
+void
+tcp_ipsec_cleanup(tcp_t *tcp)
+{
+	conn_t		*connp = tcp->tcp_connp;
+
+	if (connp->conn_flags & IPCL_TCPCONN) {
+		if (connp->conn_latch != NULL) {
+			IPLATCH_REFRELE(connp->conn_latch,
+			    connp->conn_netstack);
+			connp->conn_latch = NULL;
+		}
+		if (connp->conn_policy != NULL) {
+			IPPH_REFRELE(connp->conn_policy, connp->conn_netstack);
+			connp->conn_policy = NULL;
+		}
+	}
+}
+
+/*
+ * Cleaup before placing on free list.
+ * Disassociate from the netstack/tcp_stack_t since the freelist
+ * is per squeue and not per netstack.
+ */
 void
 tcp_cleanup(tcp_t *tcp)
 {
@@ -1737,8 +1626,14 @@ tcp_cleanup(tcp_t *tcp)
 	int		tcp_hdr_grown;
 	tcp_sack_info_t	*tcp_sack_info;
 	conn_t		*connp = tcp->tcp_connp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	netstack_t	*ns = tcps->tcps_netstack;
 
 	tcp_bind_hash_remove(tcp);
+
+	/* Cleanup that which needs the netstack first */
+	tcp_ipsec_cleanup(tcp);
+
 	tcp_free(tcp);
 
 	/* Release any SSL context */
@@ -1754,12 +1649,6 @@ tcp_cleanup(tcp_t *tcp)
 	tcp->tcp_kssl_pending = B_FALSE;
 
 	conn_delete_ire(connp, NULL);
-	if (connp->conn_flags & IPCL_TCPCONN) {
-		if (connp->conn_latch != NULL)
-			IPLATCH_REFRELE(connp->conn_latch);
-		if (connp->conn_policy != NULL)
-			IPPH_REFRELE(connp->conn_policy);
-	}
 
 	/*
 	 * Since we will bzero the entire structure, we need to
@@ -1771,6 +1660,18 @@ tcp_cleanup(tcp_t *tcp)
 	 * can get to it.
 	 */
 	ipcl_globalhash_remove(connp);
+
+	/*
+	 * Now it is safe to decrement the reference counts.
+	 * This might be the last reference on the netstack and TCPS
+	 * in which case it will cause the tcp_g_q_close and
+	 * the freeing of the IP Instance.
+	 */
+	connp->conn_netstack = NULL;
+	netstack_rele(ns);
+	ASSERT(tcps != NULL);
+	tcp->tcp_tcps = NULL;
+	TCPS_REFRELE(tcps);
 
 	/* Save some state */
 	mp = tcp->tcp_timercache;
@@ -1803,13 +1704,13 @@ tcp_cleanup(tcp_t *tcp)
 	connp->conn_state_flags = CONN_INCIPIENT;
 	connp->conn_ulp = IPPROTO_TCP;
 	connp->conn_ref = 1;
-
-	ipcl_globalhash_insert(connp);
 }
 
 /*
  * Blows away all tcps whose TIME_WAIT has expired. List traversal
  * is done forwards from the head.
+ * This walks all stack instances since
+ * tcp_time_wait remains global across all stacks.
  */
 /* ARGSUSED */
 void
@@ -1831,12 +1732,15 @@ tcp_time_wait_collector(void *arg)
 
 	if (tcp_time_wait->tcp_free_list != NULL &&
 	    tcp_time_wait->tcp_free_list->tcp_in_free_list == B_TRUE) {
-		TCP_STAT(tcp_freelist_cleanup);
+		TCP_G_STAT(tcp_freelist_cleanup);
 		while ((tcp = tcp_time_wait->tcp_free_list) != NULL) {
 			tcp_time_wait->tcp_free_list = tcp->tcp_time_wait_next;
+			tcp->tcp_time_wait_next = NULL;
+			tcp_time_wait->tcp_free_list_cnt--;
+			ASSERT(tcp->tcp_tcps == NULL);
 			CONN_DEC_REF(tcp->tcp_connp);
 		}
-		tcp_time_wait->tcp_free_list_cnt = 0;
+		ASSERT(tcp_time_wait->tcp_free_list_cnt == 0);
 	}
 
 	/*
@@ -1904,6 +1808,11 @@ tcp_time_wait_collector(void *arg)
 					mutex_exit(
 					    &tcp_time_wait->tcp_time_wait_lock);
 					tcp_cleanup(tcp);
+					ASSERT(connp->conn_latch == NULL);
+					ASSERT(connp->conn_policy == NULL);
+					ASSERT(tcp->tcp_tcps == NULL);
+					ASSERT(connp->conn_netstack == NULL);
+
 					mutex_enter(
 					    &tcp_time_wait->tcp_time_wait_lock);
 					tcp->tcp_time_wait_next =
@@ -1917,6 +1826,7 @@ tcp_time_wait_collector(void *arg)
 					    &tcp_time_wait->tcp_time_wait_lock);
 					tcp_bind_hash_remove(tcp);
 					conn_delete_ire(tcp->tcp_connp, NULL);
+					tcp_ipsec_cleanup(tcp);
 					CONN_DEC_REF(tcp->tcp_connp);
 				}
 			} else {
@@ -1984,7 +1894,6 @@ tcp_time_wait_collector(void *arg)
 	    timeout(tcp_time_wait_collector, sqp, TCP_TIME_WAIT_DELAY);
 	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
 }
-
 /*
  * Reply to a clients T_CONN_RES TPI message. This function
  * is used only for TLI/XTI listener. Sockfs sends T_CONN_RES
@@ -2003,6 +1912,7 @@ tcp_accept(tcp_t *listener, mblk_t *mp)
 	mblk_t	*opt_mp = NULL;	/* T_OPTMGMT_REQ messages */
 	mblk_t	*ok_mp;
 	mblk_t	*mp1;
+	tcp_stack_t	*tcps = listener->tcp_tcps;
 
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (*tcr)) {
 		tcp_err_ack(listener, mp, TPROTO, 0);
@@ -2071,7 +1981,7 @@ tcp_accept(tcp_t *listener, mblk_t *mp)
 		acceptor = listener;
 		CONN_INC_REF(acceptor->tcp_connp);
 	} else {
-		acceptor = tcp_acceptor_hash_lookup(acceptor_id);
+		acceptor = tcp_acceptor_hash_lookup(acceptor_id, tcps);
 		if (acceptor == NULL) {
 			if (listener->tcp_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 1,
@@ -2415,8 +2325,9 @@ tcp_accept(tcp_t *listener, mblk_t *mp)
 	 */
 finish:
 	ASSERT(acceptor->tcp_detached);
-	acceptor->tcp_rq = tcp_g_q;
-	acceptor->tcp_wq = WR(tcp_g_q);
+	ASSERT(tcps->tcps_g_q != NULL);
+	acceptor->tcp_rq = tcps->tcps_g_q;
+	acceptor->tcp_wq = WR(tcps->tcps_g_q);
 	(void) tcp_clean_death(acceptor, 0, 2);
 	CONN_DEC_REF(acceptor->tcp_connp);
 
@@ -2515,6 +2426,9 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	if (eager->tcp_cred != NULL)
 		crfree(eager->tcp_cred);
 	eager->tcp_cred = econnp->conn_cred = aconnp->conn_cred;
+	ASSERT(econnp->conn_netstack == aconnp->conn_netstack);
+	ASSERT(eager->tcp_tcps == acceptor->tcp_tcps);
+
 	aconnp->conn_cred = NULL;
 
 	econnp->conn_zoneid = aconnp->conn_zoneid;
@@ -2591,13 +2505,15 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 	ts_label_t	*tsl = crgetlabel(CONN_CRED(connp));
 	ill_t		*ill = NULL;
 	boolean_t	incoming = (ire_mp == NULL);
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
 	ASSERT(connp->conn_ire_cache == NULL);
 
 	if (tcp->tcp_ipversion == IPV4_VERSION) {
 
 		if (CLASSD(tcp->tcp_connp->conn_rem)) {
-			BUMP_MIB(&ip_mib, ipIfStatsInDiscards);
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
 			return (0);
 		}
 		/*
@@ -2620,12 +2536,13 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 		if (tcp->tcp_connp->conn_nexthop_set) {
 			ire = ire_ctable_lookup(tcp->tcp_connp->conn_rem,
 			    tcp->tcp_connp->conn_nexthop_v4, 0, NULL, zoneid,
-			    tsl, MATCH_IRE_MARK_PRIVATE_ADDR | MATCH_IRE_GW);
+			    tsl, MATCH_IRE_MARK_PRIVATE_ADDR | MATCH_IRE_GW,
+			    ipst);
 			if (ire == NULL) {
 				ire = ire_ftable_lookup(
 				    tcp->tcp_connp->conn_nexthop_v4,
 				    0, 0, IRE_INTERFACE, NULL, NULL, zoneid, 0,
-				    tsl, match_flags);
+				    tsl, match_flags, ipst);
 				if (ire == NULL)
 					return (0);
 			} else {
@@ -2633,7 +2550,7 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 			}
 		} else {
 			ire = ire_cache_lookup(tcp->tcp_connp->conn_rem,
-			    zoneid, tsl);
+			    zoneid, tsl, ipst);
 			if (ire != NULL) {
 				ire_cacheable = B_TRUE;
 				ire_uinfo = (ire_mp != NULL) ?
@@ -2646,7 +2563,7 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 					    tcp->tcp_connp->conn_rem,
 					    0, 0, 0, NULL, &sire, zoneid, 0,
 					    tsl, (MATCH_IRE_RECURSIVE |
-					    MATCH_IRE_DEFAULT));
+					    MATCH_IRE_DEFAULT), ipst);
 					if (ire == NULL)
 						return (0);
 					ire_uinfo = (sire != NULL) ?
@@ -2695,7 +2612,7 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 		 * should change. IP tells us the latest setting of
 		 * ip_path_mtu_discovery through ire_frag_flag.
 		 */
-		if (ip_path_mtu_discovery) {
+		if (ipst->ips_ip_path_mtu_discovery) {
 			tcp->tcp_ipha->ipha_fragment_offset_and_flags =
 			    htons(IPH_DF);
 		}
@@ -2741,7 +2658,7 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 			dst_ipif = dst_ill->ill_ipif;
 		}
 		ire = ire_ctable_lookup_v6(&tcp->tcp_connp->conn_remv6,
-		    0, 0, dst_ipif, zoneid, tsl, match_flags);
+		    0, 0, dst_ipif, zoneid, tsl, match_flags, ipst);
 
 		if (ire != NULL) {
 			ire_cacheable = B_TRUE;
@@ -2753,7 +2670,7 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 				ire = ire_ftable_lookup_v6(
 				    &tcp->tcp_connp->conn_remv6,
 				    0, 0, 0, dst_ipif, &sire, zoneid,
-				    0, tsl, match_flags);
+				    0, tsl, match_flags, ipst);
 				if (ire == NULL) {
 					if (dst_ill != NULL)
 						ill_refrele(dst_ill);
@@ -2834,12 +2751,13 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 			tcp->tcp_rtt_sa = ire_uinfo->iulp_rtt;
 			tcp->tcp_rtt_sd = ire_uinfo->iulp_rtt_sd;
 			rto = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
-			    tcp_rexmit_interval_extra + (tcp->tcp_rtt_sa >> 5);
+			    tcps->tcps_rexmit_interval_extra +
+			    (tcp->tcp_rtt_sa >> 5);
 
-			if (rto > tcp_rexmit_interval_max) {
-				tcp->tcp_rto = tcp_rexmit_interval_max;
-			} else if (rto < tcp_rexmit_interval_min) {
-				tcp->tcp_rto = tcp_rexmit_interval_min;
+			if (rto > tcps->tcps_rexmit_interval_max) {
+				tcp->tcp_rto = tcps->tcps_rexmit_interval_max;
+			} else if (rto < tcps->tcps_rexmit_interval_min) {
+				tcp->tcp_rto = tcps->tcps_rexmit_interval_min;
 			} else {
 				tcp->tcp_rto = rto;
 			}
@@ -2850,10 +2768,10 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 			tcp->tcp_cwnd_ssthresh = TCP_MAX_LARGEWIN;
 		if (ire_uinfo->iulp_spipe > 0) {
 			tcp->tcp_xmit_hiwater = MIN(ire_uinfo->iulp_spipe,
-			    tcp_max_buf);
-			if (tcp_snd_lowat_fraction != 0)
+			    tcps->tcps_max_buf);
+			if (tcps->tcps_snd_lowat_fraction != 0)
 				tcp->tcp_xmit_lowater = tcp->tcp_xmit_hiwater /
-				    tcp_snd_lowat_fraction;
+				    tcps->tcps_snd_lowat_fraction;
 			(void) tcp_maxpsz_set(tcp, B_TRUE);
 		}
 		/*
@@ -2864,7 +2782,8 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 		 * info back to the caller.
 		 */
 		if (ire_uinfo->iulp_rpipe > 0) {
-			tcp->tcp_rwnd = MIN(ire_uinfo->iulp_rpipe, tcp_max_buf);
+			tcp->tcp_rwnd = MIN(ire_uinfo->iulp_rpipe,
+					    tcps->tcps_max_buf);
 		}
 
 		if (ire_uinfo->iulp_rtomax > 0) {
@@ -2940,9 +2859,9 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 
 	/* Sanity check for MSS value. */
 	if (tcp->tcp_ipversion == IPV4_VERSION)
-		mss_max = tcp_mss_max_ipv4;
+		mss_max = tcps->tcps_mss_max_ipv4;
 	else
-		mss_max = tcp_mss_max_ipv6;
+		mss_max = tcps->tcps_mss_max_ipv6;
 
 	if (tcp->tcp_ipversion == IPV6_VERSION &&
 	    (ire->ire_frag_flag & IPH_FRAG_HDR)) {
@@ -2960,8 +2879,8 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 
 	mss -= tcp->tcp_ipsec_overhead;
 
-	if (mss < tcp_mss_min)
-		mss = tcp_mss_min;
+	if (mss < tcps->tcps_mss_min)
+		mss = tcps->tcps_mss_min;
 	if (mss > mss_max)
 		mss = mss_max;
 
@@ -2980,18 +2899,18 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 		tcp->tcp_loopback = B_TRUE;
 
 	if (tcp->tcp_ipversion == IPV4_VERSION) {
-		hsp = tcp_hsp_lookup(tcp->tcp_remote);
+		hsp = tcp_hsp_lookup(tcp->tcp_remote, tcps);
 	} else {
-		hsp = tcp_hsp_lookup_ipv6(&tcp->tcp_remote_v6);
+		hsp = tcp_hsp_lookup_ipv6(&tcp->tcp_remote_v6, tcps);
 	}
 
 	if (hsp != NULL) {
 		/* Only modify if we're going to make them bigger */
 		if (hsp->tcp_hsp_sendspace > tcp->tcp_xmit_hiwater) {
 			tcp->tcp_xmit_hiwater = hsp->tcp_hsp_sendspace;
-			if (tcp_snd_lowat_fraction != 0)
+			if (tcps->tcps_snd_lowat_fraction != 0)
 				tcp->tcp_xmit_lowater = tcp->tcp_xmit_hiwater /
-					tcp_snd_lowat_fraction;
+					tcps->tcps_snd_lowat_fraction;
 		}
 
 		if (hsp->tcp_hsp_recvspace > tcp->tcp_rwnd) {
@@ -3082,6 +3001,7 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 	zone_t	*zone;
 	cred_t	*cr;
 	in_port_t mlp_port;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT((uintptr_t)(mp->b_wptr - mp->b_rptr) <= (uintptr_t)INT_MAX);
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (*tbr)) {
@@ -3266,7 +3186,8 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 	if (requested_port == 0) {
 		requested_port = tcp->tcp_anon_priv_bind ?
 		    tcp_get_next_priv_port(tcp) :
-		    tcp_update_next_port(tcp_next_port_to_try, tcp, B_TRUE);
+		    tcp_update_next_port(tcps->tcps_next_port_to_try,
+			tcp, B_TRUE);
 		if (requested_port == 0) {
 			tcp_err_ack(tcp, mp, TNOADDR, 0);
 			return;
@@ -3283,7 +3204,8 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 		if (connp->conn_anon_mlp && is_system_labeled()) {
 			zone = crgetzone(cr);
 			addrtype = tsol_mlp_addr_type(zone->zone_id,
-			    IPV6_VERSION, &v6addr);
+			    IPV6_VERSION, &v6addr,
+			    tcps->tcps_netstack->netstack_ip);
 			if (addrtype == mlptSingle) {
 				tcp_err_ack(tcp, mp, TNOADDR, 0);
 				return;
@@ -3306,12 +3228,12 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 		 * - the atomic assignment of the elements of the array
 		 */
 		cr = DB_CREDDEF(mp, tcp->tcp_cred);
-		if (requested_port < tcp_smallest_nonpriv_port) {
+		if (requested_port < tcps->tcps_smallest_nonpriv_port) {
 			priv = B_TRUE;
 		} else {
-			for (i = 0; i < tcp_g_num_epriv_ports; i++) {
+			for (i = 0; i < tcps->tcps_g_num_epriv_ports; i++) {
 				if (requested_port ==
-				    tcp_g_epriv_ports[i]) {
+				    tcps->tcps_g_epriv_ports[i]) {
 					priv = B_TRUE;
 					break;
 				}
@@ -3335,7 +3257,8 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 		if (is_system_labeled()) {
 			zone = crgetzone(cr);
 			addrtype = tsol_mlp_addr_type(zone->zone_id,
-			    IPV6_VERSION, &v6addr);
+			    IPV6_VERSION, &v6addr,
+			    tcps->tcps_netstack->netstack_ip);
 			if (addrtype == mlptSingle) {
 				tcp_err_ack(tcp, mp, TNOADDR, 0);
 				return;
@@ -3363,6 +3286,10 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 		 * zone actually owns the MLP.  Reject if not.
 		 */
 		if (mlptype == mlptShared && addrtype == mlptShared) {
+			/*
+			 * No need to handle exclusive-stack zones since
+			 * ALL_ZONES only applies to the shared stack.
+			 */
 			zoneid_t mlpzone;
 
 			mlpzone = tsol_mlp_findzone(IPPROTO_TCP,
@@ -3475,10 +3402,10 @@ do_bind:
 
 	tcp->tcp_conn_req_max = tbr->CONIND_number;
 	if (tcp->tcp_conn_req_max) {
-		if (tcp->tcp_conn_req_max < tcp_conn_req_min)
-			tcp->tcp_conn_req_max = tcp_conn_req_min;
-		if (tcp->tcp_conn_req_max > tcp_conn_req_max_q)
-			tcp->tcp_conn_req_max = tcp_conn_req_max_q;
+		if (tcp->tcp_conn_req_max < tcps->tcps_conn_req_min)
+			tcp->tcp_conn_req_max = tcps->tcps_conn_req_min;
+		if (tcp->tcp_conn_req_max > tcps->tcps_conn_req_max_q)
+			tcp->tcp_conn_req_max = tcps->tcps_conn_req_max_q;
 		/*
 		 * If this is a listener, do not reset the eager list
 		 * and other stuffs.  Note that we don't check if the
@@ -3492,7 +3419,7 @@ do_bind:
 			tcp->tcp_eager_next_drop_q0 = tcp;
 			tcp->tcp_eager_prev_drop_q0 = tcp;
 			tcp->tcp_second_ctimer_threshold =
-			    tcp_ip_abort_linterval;
+			    tcps->tcps_ip_abort_linterval;
 		}
 	}
 
@@ -3552,6 +3479,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 	int loopmax;
 	conn_t *connp = tcp->tcp_connp;
 	zoneid_t zoneid = connp->conn_zoneid;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * Lookup for free addresses is done in a loop and "loopmax"
@@ -3576,10 +3504,11 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * loopmax =
 			 * 	(IPPORT_RESERVED-1) - tcp_min_anonpriv_port + 1
 			 */
-			loopmax = IPPORT_RESERVED - tcp_min_anonpriv_port;
+			loopmax = IPPORT_RESERVED -
+			    tcps->tcps_min_anonpriv_port;
 		} else {
-			loopmax = (tcp_largest_anon_port -
-			    tcp_smallest_anon_port + 1);
+			loopmax = (tcps->tcps_largest_anon_port -
+			    tcps->tcps_smallest_anon_port + 1);
 		}
 	}
 	do {
@@ -3602,7 +3531,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 		 * doing a CONN_INC_REF.
 		 */
 		tcp_bind_hash_remove(tcp);
-		tbf = &tcp_bind_fanout[TCP_BIND_HASH(lport)];
+		tbf = &tcps->tcps_bind_fanout[TCP_BIND_HASH(lport)];
 		mutex_enter(&tbf->tf_lock);
 		for (ltcp = tbf->tf_tcp; ltcp != NULL;
 		    ltcp = ltcp->tcp_bind_hash) {
@@ -3776,7 +3705,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			tcp->tcp_lport = htons(port);
 			*(uint16_t *)tcp->tcp_tcph->th_lport = tcp->tcp_lport;
 
-			ASSERT(&tcp_bind_fanout[TCP_BIND_HASH(
+			ASSERT(&tcps->tcps_bind_fanout[TCP_BIND_HASH(
 			    tcp->tcp_lport)] == tbf);
 			tcp_bind_hash_insert(tbf, tcp, 1);
 
@@ -3795,7 +3724,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * be in the valid range.
 			 */
 			if (!tcp->tcp_anon_priv_bind)
-				tcp_next_port_to_try = port + 1;
+				tcps->tcps_next_port_to_try = port + 1;
 			return (port);
 		}
 
@@ -3808,7 +3737,8 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 				 * get one to start with.
 				 */
 				port =
-				    tcp_update_next_port(tcp_next_port_to_try,
+				    tcp_update_next_port(
+					tcps->tcps_next_port_to_try,
 					tcp, B_TRUE);
 				user_specified = B_FALSE;
 			} else {
@@ -3859,6 +3789,7 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 {
 	mblk_t	*mp;
 	queue_t	*q;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	TCP_CLD_STAT(tag);
 
@@ -3907,7 +3838,7 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 		return (0);
 	}
 
-	TCP_STAT(tcp_clean_death_nondetached);
+	TCP_STAT(tcps, tcp_clean_death_nondetached);
 
 	/*
 	 * If T_ORDREL_IND has not been sent yet (done when service routine
@@ -3960,10 +3891,10 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 		}
 		if (tcp->tcp_state <= TCPS_SYN_RCVD) {
 			/* SYN_SENT or SYN_RCVD */
-			BUMP_MIB(&tcp_mib, tcpAttemptFails);
+			BUMP_MIB(&tcps->tcps_mib, tcpAttemptFails);
 		} else if (tcp->tcp_state <= TCPS_CLOSE_WAIT) {
 			/* ESTABLISHED or CLOSE_WAIT */
-			BUMP_MIB(&tcp_mib, tcpEstabResets);
+			BUMP_MIB(&tcps->tcps_mib, tcpEstabResets);
 		}
 	}
 
@@ -3979,6 +3910,7 @@ static void
 tcp_stop_lingering(tcp_t *tcp)
 {
 	clock_t	delta = 0;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	tcp->tcp_linger_tid = 0;
 	if (tcp->tcp_state > TCPS_LISTEN) {
@@ -4002,12 +3934,13 @@ tcp_stop_lingering(tcp_t *tcp)
 
 
 		tcp->tcp_detached = B_TRUE;
-		tcp->tcp_rq = tcp_g_q;
-		tcp->tcp_wq = WR(tcp_g_q);
+		ASSERT(tcps->tcps_g_q != NULL);
+		tcp->tcp_rq = tcps->tcps_g_q;
+		tcp->tcp_wq = WR(tcps->tcps_g_q);
 
 		if (tcp->tcp_state == TCPS_TIME_WAIT) {
 			tcp_time_wait_append(tcp);
-			TCP_DBGSTAT(tcp_detach_time_wait);
+			TCP_DBGSTAT(tcps, tcp_detach_time_wait);
 			goto finish;
 		}
 
@@ -4028,8 +3961,9 @@ finish:
 	/* Signal closing thread that it can complete close */
 	mutex_enter(&tcp->tcp_closelock);
 	tcp->tcp_detached = B_TRUE;
-	tcp->tcp_rq = tcp_g_q;
-	tcp->tcp_wq = WR(tcp_g_q);
+	ASSERT(tcps->tcps_g_q != NULL);
+	tcp->tcp_rq = tcps->tcps_g_q;
+	tcp->tcp_wq = WR(tcps->tcps_g_q);
 	tcp->tcp_closed = 1;
 	cv_signal(&tcp->tcp_closecv);
 	mutex_exit(&tcp->tcp_closelock);
@@ -4225,6 +4159,7 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 	conn_t	*connp = (conn_t *)arg;
 	tcp_t	*tcp = connp->conn_tcp;
 	clock_t	delta = 0;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT((connp->conn_fanout != NULL && connp->conn_ref >= 4) ||
 	    (connp->conn_fanout == NULL && connp->conn_ref >= 3));
@@ -4369,7 +4304,7 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 		tcp->tcp_detached = B_TRUE;
 		if (tcp->tcp_state == TCPS_TIME_WAIT) {
 			tcp_time_wait_append(tcp);
-			TCP_DBGSTAT(tcp_detach_time_wait);
+			TCP_DBGSTAT(tcps, tcp_detach_time_wait);
 			ASSERT(connp->conn_ref >= 3);
 			goto finish;
 		}
@@ -4391,10 +4326,10 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 	if (msg) {
 		if (tcp->tcp_state == TCPS_ESTABLISHED ||
 		    tcp->tcp_state == TCPS_CLOSE_WAIT)
-			BUMP_MIB(&tcp_mib, tcpEstabResets);
+			BUMP_MIB(&tcps->tcps_mib, tcpEstabResets);
 		if (tcp->tcp_state == TCPS_SYN_SENT ||
 		    tcp->tcp_state == TCPS_SYN_RCVD)
-			BUMP_MIB(&tcp_mib, tcpAttemptFails);
+			BUMP_MIB(&tcps->tcps_mib, tcpAttemptFails);
 		tcp_xmit_ctl(msg, tcp,  tcp->tcp_snxt, 0, TH_RST);
 	}
 
@@ -4407,13 +4342,13 @@ finish:
 	 * Although packets are always processed on the correct
 	 * tcp's perimeter and access is serialized via squeue's,
 	 * IP still needs a queue when sending packets in time_wait
-	 * state so use WR(tcp_g_q) till ip_output() can be
+	 * state so use WR(tcps_g_q) till ip_output() can be
 	 * changed to deal with just connp. For read side, we
 	 * could have set tcp_rq to NULL but there are some cases
 	 * in tcp_rput_data() from early days of this code which
 	 * do a putnext without checking if tcp is closed. Those
 	 * need to be identified before both tcp_rq and tcp_wq
-	 * can be set to NULL and tcp_q_q can disappear forever.
+	 * can be set to NULL and tcps_g_q can disappear forever.
 	 */
 	mutex_enter(&tcp->tcp_closelock);
 	/*
@@ -4423,8 +4358,13 @@ finish:
 	 */
 	if (!tcp->tcp_wait_for_eagers) {
 		tcp->tcp_detached = B_TRUE;
-		tcp->tcp_rq = tcp_g_q;
-		tcp->tcp_wq = WR(tcp_g_q);
+		/*
+		 * When default queue is closing we set tcps_g_q to NULL
+		 * after the close is done.
+		 */
+		ASSERT(tcps->tcps_g_q != NULL);
+		tcp->tcp_rq = tcps->tcps_g_q;
+		tcp->tcp_wq = WR(tcps->tcps_g_q);
 	}
 
 	/* Signal tcp_close() to finish closing. */
@@ -4509,13 +4449,14 @@ tcp_closei_local(tcp_t *tcp)
 {
 	ire_t 	*ire;
 	conn_t	*connp = tcp->tcp_connp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (!TCP_IS_SOCKET(tcp))
 		tcp_acceptor_hash_remove(tcp);
 
-	UPDATE_MIB(&tcp_mib, tcpHCInSegs, tcp->tcp_ibsegs);
+	UPDATE_MIB(&tcps->tcps_mib, tcpHCInSegs, tcp->tcp_ibsegs);
 	tcp->tcp_ibsegs = 0;
-	UPDATE_MIB(&tcp_mib, tcpHCOutSegs, tcp->tcp_obsegs);
+	UPDATE_MIB(&tcps->tcps_mib, tcpHCOutSegs, tcp->tcp_obsegs);
 	tcp->tcp_obsegs = 0;
 
 	/*
@@ -4544,8 +4485,9 @@ tcp_closei_local(tcp_t *tcp)
 			 * listener queue, after we have released our
 			 * reference on the listener
 			 */
-			tcp->tcp_rq = tcp_g_q;
-			tcp->tcp_wq = WR(tcp_g_q);
+			ASSERT(tcps->tcps_g_q != NULL);
+			tcp->tcp_rq = tcps->tcps_g_q;
+			tcp->tcp_wq = WR(tcps->tcps_g_q);
 			CONN_DEC_REF(listener->tcp_connp);
 		} else {
 			mutex_exit(&listener->tcp_eager_lock);
@@ -4609,6 +4551,8 @@ tcp_closei_local(tcp_t *tcp)
 		tcp->tcp_kssl_ctx = NULL;
 	}
 	tcp->tcp_kssl_pending = B_FALSE;
+
+	tcp_ipsec_cleanup(tcp);
 }
 
 /*
@@ -4812,6 +4756,7 @@ tcp_drop_q0(tcp_t *tcp)
 {
 	tcp_t	*eager;
 	mblk_t	*mp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(MUTEX_HELD(&tcp->tcp_eager_lock));
 	ASSERT(tcp->tcp_eager_next_q0 != tcp->tcp_eager_prev_q0);
@@ -4837,12 +4782,12 @@ tcp_drop_q0(tcp_t *tcp)
 	if (tcp->tcp_debug) {
 		(void) strlog(TCP_MOD_ID, 0, 3, SL_TRACE,
 		    "tcp_drop_q0: listen half-open queue (max=%d) overflow"
-		    " (%d pending) on %s, drop one", tcp_conn_req_max_q0,
+		    " (%d pending) on %s, drop one", tcps->tcps_conn_req_max_q0,
 		    tcp->tcp_conn_req_cnt_q0,
 		    tcp_display(tcp, NULL, DISP_PORT_ONLY));
 	}
 
-	BUMP_MIB(&tcp_mib, tcpHalfOpenDrop);
+	BUMP_MIB(&tcps->tcps_mib, tcpHalfOpenDrop);
 
 	/* Put a reference on the conn as we are enqueueing it in the sqeue */
 	CONN_INC_REF(eager->tcp_connp);
@@ -4869,6 +4814,7 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 	int		err;
 	int		ifindex = 0;
 	cred_t		*cr;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (ipvers == IPV4_VERSION) {
 		ipha = (ipha_t *)mp->b_rptr;
@@ -4885,7 +4831,7 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 		sin6.sin6_port = *(uint16_t *)tcph->th_lport;
 		sin6.sin6_family = AF_INET6;
 		sin6.__sin6_src_id = ip_srcid_find_addr(&v6dst,
-		    lconnp->conn_zoneid);
+		    lconnp->conn_zoneid, tcps->tcps_netstack);
 		if (tcp->tcp_recvdstaddr) {
 			sin6_t	sin6d;
 
@@ -4925,7 +4871,7 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_flowinfo = ip6h->ip6_vcf & ~IPV6_VERS_AND_FLOW_MASK;
 		sin6.__sin6_src_id = ip_srcid_find_addr(&ip6h->ip6_dst,
-		    lconnp->conn_zoneid);
+		    lconnp->conn_zoneid, tcps->tcps_netstack);
 
 		if (IN6_IS_ADDR_LINKSCOPE(&ip6h->ip6_src)) {
 			/* Pass up the scope_id of remote addr */
@@ -4961,7 +4907,7 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 	connp->conn_flags |= (IPCL_TCP6|IPCL_EAGER);
 	connp->conn_fully_bound = B_FALSE;
 
-	if (tcp_trace)
+	if (tcps->tcps_trace)
 		tcp->tcp_tracebuf = kmem_zalloc(sizeof (tcptrch_t), KM_NOSLEEP);
 
 	/* Inherit information from the "parent" */
@@ -4969,7 +4915,7 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 	tcp->tcp_family = ltcp->tcp_family;
 	tcp->tcp_wq = ltcp->tcp_wq;
 	tcp->tcp_rq = ltcp->tcp_rq;
-	tcp->tcp_mss = tcp_mss_def_ipv6;
+	tcp->tcp_mss = tcps->tcps_mss_def_ipv6;
 	tcp->tcp_detached = B_TRUE;
 	if ((err = tcp_init_values(tcp)) != 0) {
 		freemsg(tpi_mp);
@@ -5094,7 +5040,7 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 		tcp->tcp_ipha->ipha_src = ipha->ipha_dst;
 
 		/* Source routing option copyover (reverse it) */
-		if (tcp_rev_src_routes)
+		if (tcps->tcps_rev_src_routes)
 			tcp_opt_reverse(tcp, ipha);
 	} else {
 		ASSERT(ip6h != NULL);
@@ -5135,6 +5081,7 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 	mblk_t		*tpi_mp = NULL;
 	int		err;
 	cred_t		*cr;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	sin = sin_null;
 	sin.sin_addr.s_addr = ipha->ipha_src;
@@ -5172,7 +5119,7 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 	connp->conn_fport = *(uint16_t *)tcph->th_lport;
 	connp->conn_lport = *(uint16_t *)tcph->th_fport;
 
-	if (tcp_trace) {
+	if (tcps->tcps_trace) {
 		tcp->tcp_tracebuf = kmem_zalloc(sizeof (tcptrch_t), KM_NOSLEEP);
 	}
 
@@ -5181,7 +5128,7 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 	tcp->tcp_family = ltcp->tcp_family;
 	tcp->tcp_wq = ltcp->tcp_wq;
 	tcp->tcp_rq = ltcp->tcp_rq;
-	tcp->tcp_mss = tcp_mss_def_ipv4;
+	tcp->tcp_mss = tcps->tcps_mss_def_ipv4;
 	tcp->tcp_detached = B_TRUE;
 	if ((err = tcp_init_values(tcp)) != 0) {
 		freemsg(tpi_mp);
@@ -5221,7 +5168,7 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 	bcopy(tcph->th_fport, tcp->tcp_tcph->th_lport, sizeof (in_port_t));
 
 	/* Source routing option copyover (reverse it) */
-	if (tcp_rev_src_routes)
+	if (tcps->tcps_rev_src_routes)
 		tcp_opt_reverse(tcp, ipha);
 
 	ASSERT(tcp->tcp_conn.tcp_eager_conn_ind == NULL);
@@ -5262,7 +5209,7 @@ tcp_get_ipsec_conn(tcp_t *tcp, squeue_t *sqp, mblk_t **mpp)
 	boolean_t	mctl_present = B_FALSE;
 	uint_t		ipvers;
 
-	econnp = tcp_get_conn(sqp);
+	econnp = tcp_get_conn(sqp, tcp->tcp_tcps);
 	if (econnp == NULL) {
 		freemsg(first_mp);
 		return (NULL);
@@ -5398,12 +5345,13 @@ tcp_get_ipsec_conn(tcp_t *tcp, squeue_t *sqp, mblk_t **mpp)
  * there for too long.
  */
 void *
-tcp_get_conn(void *arg)
+tcp_get_conn(void *arg, tcp_stack_t *tcps)
 {
 	tcp_t			*tcp = NULL;
 	conn_t			*connp = NULL;
 	squeue_t		*sqp = (squeue_t *)arg;
 	tcp_squeue_priv_t 	*tcp_time_wait;
+	netstack_t		*ns;
 
 	tcp_time_wait =
 	    *((tcp_squeue_priv_t **)squeue_getprivate(sqp, SQPRIVATE_TCP));
@@ -5418,11 +5366,24 @@ tcp_get_conn(void *arg)
 		tcp->tcp_time_wait_next = NULL;
 		connp = tcp->tcp_connp;
 		connp->conn_flags |= IPCL_REUSED;
+
+		ASSERT(tcp->tcp_tcps == NULL);
+		ASSERT(connp->conn_netstack == NULL);
+		ns = tcps->tcps_netstack;
+		netstack_hold(ns);
+		connp->conn_netstack = ns;
+		tcp->tcp_tcps = tcps;
+		TCPS_REFHOLD(tcps);
+		ipcl_globalhash_insert(connp);
 		return ((void *)connp);
 	}
 	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
-	if ((connp = ipcl_conn_create(IPCL_TCPCONN, KM_NOSLEEP)) == NULL)
+	if ((connp = ipcl_conn_create(IPCL_TCPCONN, KM_NOSLEEP,
+		    tcps->tcps_netstack)) == NULL)
 		return (NULL);
+	tcp = connp->conn_tcp;
+	tcp->tcp_tcps = tcps;
+	TCPS_REFHOLD(tcps);
 	return ((void *)connp);
 }
 
@@ -5441,7 +5402,8 @@ tcp_update_label(tcp_t *tcp, const cred_t *cr)
 		int added;
 
 		if (tsol_compute_label(cr, tcp->tcp_remote, optbuf,
-		    connp->conn_mac_exempt) != 0)
+		    connp->conn_mac_exempt,
+		    tcp->tcp_tcps->tcps_netstack->netstack_ip) != 0)
 			return (B_FALSE);
 
 		added = tsol_remove_secopt(tcp->tcp_ipha, tcp->tcp_hdr_len);
@@ -5465,7 +5427,8 @@ tcp_update_label(tcp_t *tcp, const cred_t *cr)
 		uchar_t optbuf[TSOL_MAX_IPV6_OPTION];
 
 		if (tsol_compute_label_v6(cr, &tcp->tcp_remote_v6, optbuf,
-		    connp->conn_mac_exempt) != 0)
+		    connp->conn_mac_exempt,
+		    tcp->tcp_tcps->tcps_netstack->netstack_ip) != 0)
 			return (B_FALSE);
 		if (tsol_update_sticky(&tcp->tcp_sticky_ipp,
 		    &tcp->tcp_label_len, optbuf) != 0)
@@ -5504,7 +5467,7 @@ tcp_update_label(tcp_t *tcp, const cred_t *cr)
  * Sockfs ACCEPT Path:
  * -------------------
  *
- * open acceptor stream (ip_tcpopen allocates tcp_wput_accept()
+ * open acceptor stream (tcp_open allocates tcp_wput_accept()
  * as STREAM entry point)
  *
  * soaccept() sends T_CONN_RES on the acceptor STREAM to tcp_wput_accept()
@@ -5616,6 +5579,8 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	tcp_t		*tcp = connp->conn_tcp;
 	ire_t		*ire;
 	cred_t		*credp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ip_stack_t	*ipst;
 
 	if (tcp->tcp_state != TCPS_LISTEN)
 		goto error2;
@@ -5625,8 +5590,8 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	mutex_enter(&tcp->tcp_eager_lock);
 	if (tcp->tcp_conn_req_cnt_q >= tcp->tcp_conn_req_max) {
 		mutex_exit(&tcp->tcp_eager_lock);
-		TCP_STAT(tcp_listendrop);
-		BUMP_MIB(&tcp_mib, tcpListenDrop);
+		TCP_STAT(tcps, tcp_listendrop);
+		BUMP_MIB(&tcps->tcps_mib, tcpListenDrop);
 		if (tcp->tcp_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_TRACE|SL_ERROR,
 			    "tcp_conn_request: listen backlog (max=%d) "
@@ -5638,7 +5603,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	}
 
 	if (tcp->tcp_conn_req_cnt_q0 >=
-	    tcp->tcp_conn_req_max + tcp_conn_req_max_q0) {
+	    tcp->tcp_conn_req_max + tcps->tcps_conn_req_max_q0) {
 		/*
 		 * Q0 is full. Drop a pending half-open req from the queue
 		 * to make room for the new SYN req. Also mark the time we
@@ -5647,16 +5612,16 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 		 * A more aggressive defense against SYN attack will
 		 * be to set the "tcp_syn_defense" flag now.
 		 */
-		TCP_STAT(tcp_listendropq0);
+		TCP_STAT(tcps, tcp_listendropq0);
 		tcp->tcp_last_rcv_lbolt = lbolt64;
 		if (!tcp_drop_q0(tcp)) {
 			mutex_exit(&tcp->tcp_eager_lock);
-			BUMP_MIB(&tcp_mib, tcpListenDropQ0);
+			BUMP_MIB(&tcps->tcps_mib, tcpListenDropQ0);
 			if (tcp->tcp_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 3, SL_TRACE,
 				    "tcp_conn_request: listen half-open queue "
 				    "(max=%d) full (%d pending) on %s",
-				    tcp_conn_req_max_q0,
+				    tcps->tcps_conn_req_max_q0,
 				    tcp->tcp_conn_req_cnt_q0,
 				    tcp_display(tcp, NULL,
 				    DISP_PORT_ONLY));
@@ -5677,9 +5642,10 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 		new_sqp = (squeue_t *)DB_CKSUMSTART(mp);
 		DB_CKSUMSTART(mp) = 0;
 		mp->b_datap->db_struioflag &= ~STRUIO_EAGER;
-		econnp = (conn_t *)tcp_get_conn(arg2);
+		econnp = (conn_t *)tcp_get_conn(arg2, tcps);
 		if (econnp == NULL)
 			goto error2;
+		ASSERT(econnp->conn_netstack == connp->conn_netstack);
 		econnp->conn_sqp = new_sqp;
 	} else if ((mp->b_datap->db_struioflag & STRUIO_POLICY) != 0) {
 		/*
@@ -5692,6 +5658,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 			 */
 			return;
 		}
+		ASSERT(econnp->conn_netstack == connp->conn_netstack);
 	} else {
 		goto error2;
 	}
@@ -5804,7 +5771,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 
 	eager->tcp_hard_binding = B_TRUE;
 
-	tcp_bind_hash_insert(&tcp_bind_fanout[
+	tcp_bind_hash_insert(&tcps->tcps_bind_fanout[
 	    TCP_BIND_HASH(eager->tcp_lport)], eager, 0);
 
 	CL_INET_CONNECT(eager);
@@ -5838,7 +5805,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	tcp_process_options(eager, tcph);
 
 	/* Is the other end ECN capable? */
-	if (tcp_ecn_permitted >= 1 &&
+	if (tcps->tcps_ecn_permitted >= 1 &&
 	    (tcph->th_flags[0] & (TH_ECE|TH_CWR)) == (TH_ECE|TH_CWR)) {
 		eager->tcp_ecn_ok = B_TRUE;
 	}
@@ -5949,7 +5916,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	eager->tcp_rack = seg_seq;
 	eager->tcp_rnxt = seg_seq + 1;
 	U32_TO_ABE32(eager->tcp_rnxt, eager->tcp_tcph->th_ack);
-	BUMP_MIB(&tcp_mib, tcpPassiveOpens);
+	BUMP_MIB(&tcps->tcps_mib, tcpPassiveOpens);
 	eager->tcp_state = TCPS_SYN_RCVD;
 	mp1 = tcp_xmit_mp(eager, eager->tcp_xmit_head, eager->tcp_mss,
 	    NULL, NULL, eager->tcp_iss, B_FALSE, NULL, B_FALSE);
@@ -6043,7 +6010,9 @@ error1:
 	 * If a connection already exists, send the mp to that connections so
 	 * that it can be appropriately dealt with.
 	 */
-	if ((econnp = ipcl_classify(mp, connp->conn_zoneid)) != NULL) {
+	ipst = tcps->tcps_netstack->netstack_ip;
+
+	if ((econnp = ipcl_classify(mp, connp->conn_zoneid, ipst)) != NULL) {
 		if (!IPCL_IS_CONNECTED(econnp)) {
 			/*
 			 * Something bad happened. ipcl_conn_insert()
@@ -6469,6 +6438,7 @@ tcp_connect_ipv4(tcp_t *tcp, mblk_t *mp, ipaddr_t *dstaddrp, in_port_t dstport,
 	ipaddr_t dstaddr = *dstaddrp;
 	int32_t	oldstate;
 	uint16_t lport;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(tcp->tcp_ipversion == IPV4_VERSION);
 
@@ -6495,7 +6465,7 @@ tcp_connect_ipv4(tcp_t *tcp, mblk_t *mp, ipaddr_t *dstaddrp, in_port_t dstport,
 	/* Handle __sin6_src_id if socket not bound to an IP address */
 	if (srcid != 0 && tcp->tcp_ipha->ipha_src == INADDR_ANY) {
 		ip_srcid_find_id(srcid, &tcp->tcp_ip_src_v6,
-		    tcp->tcp_connp->conn_zoneid);
+		    tcp->tcp_connp->conn_zoneid, tcps->tcps_netstack);
 		IN6_V4MAPPED_TO_IPADDR(&tcp->tcp_ip_src_v6,
 		    tcp->tcp_ipha->ipha_src);
 	}
@@ -6524,7 +6494,7 @@ tcp_connect_ipv4(tcp_t *tcp, mblk_t *mp, ipaddr_t *dstaddrp, in_port_t dstport,
 	 * included in the checksum but that ip will include the
 	 * first hop in the source route in the tcp checksum.
 	 */
-	tcp->tcp_sum = ip_massage_options(tcp->tcp_ipha);
+	tcp->tcp_sum = ip_massage_options(tcp->tcp_ipha, tcps->tcps_netstack);
 	tcp->tcp_sum = (tcp->tcp_sum & 0xFFFF) + (tcp->tcp_sum >> 16);
 	tcp->tcp_sum -= ((tcp->tcp_ipha->ipha_dst >> 16) +
 	    (tcp->tcp_ipha->ipha_dst & 0xffff));
@@ -6550,7 +6520,8 @@ tcp_connect_ipv4(tcp_t *tcp, mblk_t *mp, ipaddr_t *dstaddrp, in_port_t dstport,
 		 * tcp_bindi will pick an unused port, insert the connection
 		 * in the bind hash and transition to BOUND state.
 		 */
-		lport = tcp_update_next_port(tcp_next_port_to_try, tcp, B_TRUE);
+		lport = tcp_update_next_port(tcps->tcps_next_port_to_try,
+		    tcp, B_TRUE);
 		lport = tcp_bindi(tcp, lport, &tcp->tcp_ip_src_v6, 0, B_TRUE,
 		    B_FALSE, B_FALSE);
 		if (lport == 0) {
@@ -6590,7 +6561,7 @@ tcp_connect_ipv4(tcp_t *tcp, mblk_t *mp, ipaddr_t *dstaddrp, in_port_t dstport,
 			mp1 = ip_bind_v6(tcp->tcp_wq, mp1, tcp->tcp_connp,
 			    &tcp->tcp_sticky_ipp);
 		}
-		BUMP_MIB(&tcp_mib, tcpActiveOpens);
+		BUMP_MIB(&tcps->tcps_mib, tcpActiveOpens);
 		tcp->tcp_active_open = 1;
 		/*
 		 * If the bind cannot complete immediately
@@ -6630,6 +6601,7 @@ tcp_connect_ipv6(tcp_t *tcp, mblk_t *mp, in6_addr_t *dstaddrp,
 	ip6_rthdr_t *rth;
 	int32_t  oldstate;
 	uint16_t lport;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(tcp->tcp_family == AF_INET6);
 
@@ -6656,7 +6628,7 @@ tcp_connect_ipv6(tcp_t *tcp, mblk_t *mp, in6_addr_t *dstaddrp,
 	/* Handle __sin6_src_id if socket not bound to an IP address */
 	if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&tcp->tcp_ip6h->ip6_src)) {
 		ip_srcid_find_id(srcid, &tcp->tcp_ip6h->ip6_src,
-		    tcp->tcp_connp->conn_zoneid);
+		    tcp->tcp_connp->conn_zoneid, tcps->tcps_netstack);
 		tcp->tcp_ip_src_v6 = tcp->tcp_ip6h->ip6_src;
 	}
 
@@ -6723,8 +6695,8 @@ tcp_connect_ipv6(tcp_t *tcp, mblk_t *mp, in6_addr_t *dstaddrp,
 	 */
 	rth = ip_find_rthdr_v6(tcp->tcp_ip6h, (uint8_t *)tcp->tcp_tcph);
 	if (rth != NULL) {
-
-		tcp->tcp_sum = ip_massage_options_v6(tcp->tcp_ip6h, rth);
+		tcp->tcp_sum = ip_massage_options_v6(tcp->tcp_ip6h, rth,
+		    tcps->tcps_netstack);
 		tcp->tcp_sum = ntohs((tcp->tcp_sum & 0xFFFF) +
 		    (tcp->tcp_sum >> 16));
 	} else {
@@ -6748,7 +6720,8 @@ tcp_connect_ipv6(tcp_t *tcp, mblk_t *mp, in6_addr_t *dstaddrp,
 		 * tcp_bindi will pick an unused port, insert the connection
 		 * in the bind hash and transition to BOUND state.
 		 */
-		lport = tcp_update_next_port(tcp_next_port_to_try, tcp, B_TRUE);
+		lport = tcp_update_next_port(tcps->tcps_next_port_to_try,
+		    tcp, B_TRUE);
 		lport = tcp_bindi(tcp, lport, &tcp->tcp_ip_src_v6, 0, B_TRUE,
 		    B_FALSE, B_FALSE);
 		if (lport == 0) {
@@ -6777,7 +6750,7 @@ tcp_connect_ipv6(tcp_t *tcp, mblk_t *mp, in6_addr_t *dstaddrp,
 		mblk_setcred(mp1, tcp->tcp_cred);
 		mp1 = ip_bind_v6(tcp->tcp_wq, mp1, tcp->tcp_connp,
 		    &tcp->tcp_sticky_ipp);
-		BUMP_MIB(&tcp_mib, tcpActiveOpens);
+		BUMP_MIB(&tcps->tcps_mib, tcpActiveOpens);
 		tcp->tcp_active_open = 1;
 		/* ip_bind_v6() may return ACK or ERROR */
 		if (mp1 != NULL)
@@ -6810,23 +6783,28 @@ tcp_def_q_set(tcp_t *tcp, mblk_t *mp)
 {
 	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
 	queue_t	*q = tcp->tcp_wq;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
+#ifdef NS_DEBUG
+	(void) printf("TCP_IOC_DEFAULT_Q for stack %d\n",
+	    tcps->tcps_netstack->netstack_stackid);
+#endif
 	mp->b_datap->db_type = M_IOCACK;
 	iocp->ioc_count = 0;
-	mutex_enter(&tcp_g_q_lock);
-	if (tcp_g_q != NULL) {
-		mutex_exit(&tcp_g_q_lock);
+	mutex_enter(&tcps->tcps_g_q_lock);
+	if (tcps->tcps_g_q != NULL) {
+		mutex_exit(&tcps->tcps_g_q_lock);
 		iocp->ioc_error = EALREADY;
 	} else {
 		mblk_t *mp1;
 
 		mp1 = tcp_ip_bind_mp(tcp, O_T_BIND_REQ, 0);
 		if (mp1 == NULL) {
-			mutex_exit(&tcp_g_q_lock);
+			mutex_exit(&tcps->tcps_g_q_lock);
 			iocp->ioc_error = ENOMEM;
 		} else {
-			tcp_g_q = tcp->tcp_rq;
-			mutex_exit(&tcp_g_q_lock);
+			tcps->tcps_g_q = tcp->tcp_rq;
+			mutex_exit(&tcps->tcps_g_q_lock);
 			iocp->ioc_error = 0;
 			iocp->ioc_rval = 0;
 			/*
@@ -6852,6 +6830,7 @@ tcp_disconnect(tcp_t *tcp, mblk_t *mp)
 	tcp_t	*ltcp = NULL;
 	t_scalar_t seqnum;
 	conn_t	*connp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT((uintptr_t)(mp->b_wptr - mp->b_rptr) <= (uintptr_t)INT_MAX);
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (struct T_discon_req)) {
@@ -6894,6 +6873,7 @@ tcp_disconnect(tcp_t *tcp, mblk_t *mp)
 		 */
 
 		int old_state = tcp->tcp_state;
+		ip_stack_t *ipst = tcps->tcps_netstack->netstack_ip;
 
 		/*
 		 * The connection can't be on the tcp_time_wait_head list
@@ -6910,14 +6890,14 @@ tcp_disconnect(tcp_t *tcp, mblk_t *mp)
 		if (tcp->tcp_ipversion == IPV4_VERSION) {
 			connp = ipcl_lookup_listener_v4(tcp->tcp_lport,
 			    tcp->tcp_ipha->ipha_src,
-			    tcp->tcp_connp->conn_zoneid);
+			    tcp->tcp_connp->conn_zoneid, ipst);
 			if (connp != NULL)
 				ltcp = connp->conn_tcp;
 		} else {
 			/* Allow tcp_bound_if listeners? */
 			connp = ipcl_lookup_listener_v6(tcp->tcp_lport,
 			    &tcp->tcp_ip6h->ip6_src, 0,
-			    tcp->tcp_connp->conn_zoneid);
+			    tcp->tcp_connp->conn_zoneid, ipst);
 			if (connp != NULL)
 				ltcp = connp->conn_tcp;
 		}
@@ -6930,10 +6910,10 @@ tcp_disconnect(tcp_t *tcp, mblk_t *mp)
 		if (ltcp != NULL)
 			CONN_DEC_REF(ltcp->tcp_connp);
 		if (old_state == TCPS_SYN_SENT || old_state == TCPS_SYN_RCVD) {
-			BUMP_MIB(&tcp_mib, tcpAttemptFails);
+			BUMP_MIB(&tcps->tcps_mib, tcpAttemptFails);
 		} else if (old_state == TCPS_ESTABLISHED ||
 		    old_state == TCPS_CLOSE_WAIT) {
-			BUMP_MIB(&tcp_mib, tcpEstabResets);
+			BUMP_MIB(&tcps->tcps_mib, tcpEstabResets);
 		}
 
 		if (tcp->tcp_fused)
@@ -7090,6 +7070,7 @@ tcp_eager_kill(void *arg, mblk_t *mp, void *arg2)
 	conn_t	*econnp = (conn_t *)arg;
 	tcp_t	*eager = econnp->conn_tcp;
 	tcp_t	*listener = eager->tcp_listener;
+	tcp_stack_t	*tcps = eager->tcp_tcps;
 
 	/*
 	 * We could be called because listener is closing. Since
@@ -7097,8 +7078,9 @@ tcp_eager_kill(void *arg, mblk_t *mp, void *arg2)
 	 * Better use the default queue just to send the TH_RST
 	 * out.
 	 */
-	eager->tcp_rq = tcp_g_q;
-	eager->tcp_wq = WR(tcp_g_q);
+	ASSERT(tcps->tcps_g_q != NULL);
+	eager->tcp_rq = tcps->tcps_g_q;
+	eager->tcp_wq = WR(tcps->tcps_g_q);
 
 	if (eager->tcp_state > TCPS_LISTEN) {
 		tcp_xmit_ctl("tcp_eager_kill, can't wait",
@@ -7136,8 +7118,9 @@ tcp_eager_blowoff(tcp_t	*listener, t_scalar_t seqnum)
 {
 	tcp_t	*eager;
 	mblk_t 	*mp;
+	tcp_stack_t	*tcps = listener->tcp_tcps;
 
-	TCP_STAT(tcp_eager_blowoff_calls);
+	TCP_STAT(tcps, tcp_eager_blowoff_calls);
 	eager = listener;
 	mutex_enter(&listener->tcp_eager_lock);
 	do {
@@ -7171,12 +7154,13 @@ tcp_eager_cleanup(tcp_t *listener, boolean_t q0_only)
 {
 	tcp_t	*eager;
 	mblk_t	*mp;
+	tcp_stack_t	*tcps = listener->tcp_tcps;
 
 	ASSERT(MUTEX_HELD(&listener->tcp_eager_lock));
 
 	if (!q0_only) {
 		/* First cleanup q */
-		TCP_STAT(tcp_eager_blowoff_q);
+		TCP_STAT(tcps, tcp_eager_blowoff_q);
 		eager = listener->tcp_eager_next_q;
 		while (eager != NULL) {
 			if (eager->tcp_closemp_used == 0) {
@@ -7192,7 +7176,7 @@ tcp_eager_cleanup(tcp_t *listener, boolean_t q0_only)
 		}
 	}
 	/* Then cleanup q0 */
-	TCP_STAT(tcp_eager_blowoff_q0);
+	TCP_STAT(tcps, tcp_eager_blowoff_q0);
 	eager = listener->tcp_eager_next_q0;
 	while (eager != listener) {
 		if (eager->tcp_closemp_used == 0) {
@@ -7323,10 +7307,12 @@ static int
 tcp_extra_priv_ports_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 {
 	int i;
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
 
-	for (i = 0; i < tcp_g_num_epriv_ports; i++) {
-		if (tcp_g_epriv_ports[i] != 0)
-			(void) mi_mpprintf(mp, "%d ", tcp_g_epriv_ports[i]);
+	for (i = 0; i < tcps->tcps_g_num_epriv_ports; i++) {
+		if (tcps->tcps_g_epriv_ports[i] != 0)
+			(void) mi_mpprintf(mp, "%d ",
+			    tcps->tcps_g_epriv_ports[i]);
 	}
 	return (0);
 }
@@ -7342,6 +7328,7 @@ tcp_extra_priv_ports_add(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 {
 	long	new_value;
 	int	i;
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
 
 	/*
 	 * Fail the request if the new value does not lie within the
@@ -7352,26 +7339,26 @@ tcp_extra_priv_ports_add(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 		return (EINVAL);
 	}
 
-	mutex_enter(&tcp_epriv_port_lock);
+	mutex_enter(&tcps->tcps_epriv_port_lock);
 	/* Check if the value is already in the list */
-	for (i = 0; i < tcp_g_num_epriv_ports; i++) {
-		if (new_value == tcp_g_epriv_ports[i]) {
-			mutex_exit(&tcp_epriv_port_lock);
+	for (i = 0; i < tcps->tcps_g_num_epriv_ports; i++) {
+		if (new_value == tcps->tcps_g_epriv_ports[i]) {
+			mutex_exit(&tcps->tcps_epriv_port_lock);
 			return (EEXIST);
 		}
 	}
 	/* Find an empty slot */
-	for (i = 0; i < tcp_g_num_epriv_ports; i++) {
-		if (tcp_g_epriv_ports[i] == 0)
+	for (i = 0; i < tcps->tcps_g_num_epriv_ports; i++) {
+		if (tcps->tcps_g_epriv_ports[i] == 0)
 			break;
 	}
-	if (i == tcp_g_num_epriv_ports) {
-		mutex_exit(&tcp_epriv_port_lock);
+	if (i == tcps->tcps_g_num_epriv_ports) {
+		mutex_exit(&tcps->tcps_epriv_port_lock);
 		return (EOVERFLOW);
 	}
 	/* Set the new value */
-	tcp_g_epriv_ports[i] = (uint16_t)new_value;
-	mutex_exit(&tcp_epriv_port_lock);
+	tcps->tcps_g_epriv_ports[i] = (uint16_t)new_value;
+	mutex_exit(&tcps->tcps_epriv_port_lock);
 	return (0);
 }
 
@@ -7386,6 +7373,7 @@ tcp_extra_priv_ports_del(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 {
 	long	new_value;
 	int	i;
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
 
 	/*
 	 * Fail the request if the new value does not lie within the
@@ -7396,19 +7384,19 @@ tcp_extra_priv_ports_del(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 		return (EINVAL);
 	}
 
-	mutex_enter(&tcp_epriv_port_lock);
+	mutex_enter(&tcps->tcps_epriv_port_lock);
 	/* Check that the value is already in the list */
-	for (i = 0; i < tcp_g_num_epriv_ports; i++) {
-		if (tcp_g_epriv_ports[i] == new_value)
+	for (i = 0; i < tcps->tcps_g_num_epriv_ports; i++) {
+		if (tcps->tcps_g_epriv_ports[i] == new_value)
 			break;
 	}
-	if (i == tcp_g_num_epriv_ports) {
-		mutex_exit(&tcp_epriv_port_lock);
+	if (i == tcps->tcps_g_num_epriv_ports) {
+		mutex_exit(&tcps->tcps_epriv_port_lock);
 		return (ESRCH);
 	}
 	/* Clear the value */
-	tcp_g_epriv_ports[i] = 0;
-	mutex_exit(&tcp_epriv_port_lock);
+	tcps->tcps_g_epriv_ports[i] = 0;
+	mutex_exit(&tcps->tcps_epriv_port_lock);
 	return (0);
 }
 
@@ -7473,6 +7461,8 @@ tcp_tpistate(tcp_t *tcp)
 static void
 tcp_copy_info(struct T_info_ack *tia, tcp_t *tcp)
 {
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+
 	if (tcp->tcp_family == AF_INET6)
 		*tia = tcp_g_t_info_ack_v6;
 	else
@@ -7482,9 +7472,9 @@ tcp_copy_info(struct T_info_ack *tia, tcp_t *tcp)
 	if (tcp->tcp_mss == 0) {
 		/* Not yet set - tcp_open does not set mss */
 		if (tcp->tcp_ipversion == IPV4_VERSION)
-			tia->TIDU_size = tcp_mss_def_ipv4;
+			tia->TIDU_size = tcps->tcps_mss_def_ipv4;
 		else
-			tia->TIDU_size = tcp_mss_def_ipv6;
+			tia->TIDU_size = tcps->tcps_mss_def_ipv6;
 	} else {
 		tia->TIDU_size = tcp->tcp_mss;
 	}
@@ -7692,8 +7682,9 @@ tcp_reinit(tcp_t *tcp)
 {
 	mblk_t	*mp;
 	int 	err;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
-	TCP_STAT(tcp_reinit_calls);
+	TCP_STAT(tcps, tcp_reinit_calls);
 
 	/* tcp_reinit should never be called for detached tcp_t's */
 	ASSERT(tcp->tcp_listener == NULL);
@@ -7710,9 +7701,9 @@ tcp_reinit(tcp_t *tcp)
 	 * Reset everything in the state vector, after updating global
 	 * MIB data from instance counters.
 	 */
-	UPDATE_MIB(&tcp_mib, tcpHCInSegs, tcp->tcp_ibsegs);
+	UPDATE_MIB(&tcps->tcps_mib, tcpHCInSegs, tcp->tcp_ibsegs);
 	tcp->tcp_ibsegs = 0;
-	UPDATE_MIB(&tcp_mib, tcpHCOutSegs, tcp->tcp_obsegs);
+	UPDATE_MIB(&tcps->tcps_mib, tcpHCOutSegs, tcp->tcp_obsegs);
 	tcp->tcp_obsegs = 0;
 
 	tcp_close_mpp(&tcp->tcp_xmit_head);
@@ -7787,6 +7778,7 @@ tcp_reinit(tcp_t *tcp)
 	tcp_reinit_values(tcp);
 	ipcl_hash_remove(tcp->tcp_connp);
 	conn_delete_ire(tcp->tcp_connp, NULL);
+	tcp_ipsec_cleanup(tcp);
 
 	if (tcp->tcp_conn_req_max != 0) {
 		/*
@@ -7844,10 +7836,10 @@ tcp_reinit(tcp_t *tcp)
 	tcp->tcp_ip_src_v6 = tcp->tcp_bound_source_v6;
 
 	ASSERT(tcp->tcp_ptpbhn != NULL);
-	tcp->tcp_rq->q_hiwat = tcp_recv_hiwat;
-	tcp->tcp_rwnd = tcp_recv_hiwat;
+	tcp->tcp_rq->q_hiwat = tcps->tcps_recv_hiwat;
+	tcp->tcp_rwnd = tcps->tcps_recv_hiwat;
 	tcp->tcp_mss = tcp->tcp_ipversion != IPV4_VERSION ?
-	    tcp_mss_def_ipv6 : tcp_mss_def_ipv4;
+	    tcps->tcps_mss_def_ipv6 : tcps->tcps_mss_def_ipv4;
 }
 
 /*
@@ -7861,6 +7853,8 @@ static void
 tcp_reinit_values(tcp)
 	tcp_t *tcp;
 {
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+
 #ifndef	lint
 #define	DONTCARE(x)
 #define	PRESERVE(x)
@@ -8092,10 +8086,10 @@ tcp_reinit_values(tcp)
 	PRESERVE(tcp->tcp_family);
 	if (tcp->tcp_family == AF_INET6) {
 		tcp->tcp_ipversion = IPV6_VERSION;
-		tcp->tcp_mss = tcp_mss_def_ipv6;
+		tcp->tcp_mss = tcps->tcps_mss_def_ipv6;
 	} else {
 		tcp->tcp_ipversion = IPV4_VERSION;
-		tcp->tcp_mss = tcp_mss_def_ipv4;
+		tcp->tcp_mss = tcps->tcps_mss_def_ipv4;
 	}
 
 	tcp->tcp_bound_if = 0;
@@ -8187,6 +8181,7 @@ static int
 tcp_init_values(tcp_t *tcp)
 {
 	int	err;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT((tcp->tcp_family == AF_INET &&
 	    tcp->tcp_ipversion == IPV4_VERSION) ||
@@ -8201,32 +8196,32 @@ tcp_init_values(tcp_t *tcp)
 	 * during first few transmissions of a connection as seen in slow
 	 * links.
 	 */
-	tcp->tcp_rtt_sa = tcp_rexmit_interval_initial << 2;
-	tcp->tcp_rtt_sd = tcp_rexmit_interval_initial >> 1;
+	tcp->tcp_rtt_sa = tcps->tcps_rexmit_interval_initial << 2;
+	tcp->tcp_rtt_sd = tcps->tcps_rexmit_interval_initial >> 1;
 	tcp->tcp_rto = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
-	    tcp_rexmit_interval_extra + (tcp->tcp_rtt_sa >> 5) +
-	    tcp_conn_grace_period;
-	if (tcp->tcp_rto < tcp_rexmit_interval_min)
-		tcp->tcp_rto = tcp_rexmit_interval_min;
+	    tcps->tcps_rexmit_interval_extra + (tcp->tcp_rtt_sa >> 5) +
+	    tcps->tcps_conn_grace_period;
+	if (tcp->tcp_rto < tcps->tcps_rexmit_interval_min)
+		tcp->tcp_rto = tcps->tcps_rexmit_interval_min;
 	tcp->tcp_timer_backoff = 0;
 	tcp->tcp_ms_we_have_waited = 0;
 	tcp->tcp_last_recv_time = lbolt;
-	tcp->tcp_cwnd_max = tcp_cwnd_max_;
+	tcp->tcp_cwnd_max = tcps->tcps_cwnd_max_;
 	tcp->tcp_cwnd_ssthresh = TCP_MAX_LARGEWIN;
 	tcp->tcp_snd_burst = TCP_CWND_INFINITE;
 
-	tcp->tcp_maxpsz = tcp_maxpsz_multiplier;
+	tcp->tcp_maxpsz = tcps->tcps_maxpsz_multiplier;
 
-	tcp->tcp_first_timer_threshold = tcp_ip_notify_interval;
-	tcp->tcp_first_ctimer_threshold = tcp_ip_notify_cinterval;
-	tcp->tcp_second_timer_threshold = tcp_ip_abort_interval;
+	tcp->tcp_first_timer_threshold = tcps->tcps_ip_notify_interval;
+	tcp->tcp_first_ctimer_threshold = tcps->tcps_ip_notify_cinterval;
+	tcp->tcp_second_timer_threshold = tcps->tcps_ip_abort_interval;
 	/*
 	 * Fix it to tcp_ip_abort_linterval later if it turns out to be a
 	 * passive open.
 	 */
-	tcp->tcp_second_ctimer_threshold = tcp_ip_abort_cinterval;
+	tcp->tcp_second_ctimer_threshold = tcps->tcps_ip_abort_cinterval;
 
-	tcp->tcp_naglim = tcp_naglim_def;
+	tcp->tcp_naglim = tcps->tcps_naglim_def;
 
 	/* NOTE:  ISS is now set in tcp_adapt_ire(). */
 
@@ -8259,8 +8254,8 @@ tcp_init_values(tcp_t *tcp)
 	 * down tcp_rwnd. tcp_adapt_ire() will set the right value later.
 	 */
 	tcp->tcp_rcv_ws = TCP_MAX_WINSHIFT;
-	tcp->tcp_xmit_lowater = tcp_xmit_lowat;
-	tcp->tcp_xmit_hiwater = tcp_xmit_hiwat;
+	tcp->tcp_xmit_lowater = tcps->tcps_xmit_lowat;
+	tcp->tcp_xmit_hiwater = tcps->tcps_xmit_hiwat;
 
 	tcp->tcp_cork = B_FALSE;
 	/*
@@ -8269,10 +8264,10 @@ tcp_init_values(tcp_t *tcp)
 	 * initialization here means that this value is not inherited thru
 	 * tcp_reinit().
 	 */
-	tcp->tcp_debug = tcp_dbg;
+	tcp->tcp_debug = tcps->tcps_dbg;
 
-	tcp->tcp_ka_interval = tcp_keepalive_interval;
-	tcp->tcp_ka_abort_thres = tcp_keepalive_abort_interval;
+	tcp->tcp_ka_interval = tcps->tcps_keepalive_interval;
+	tcp->tcp_ka_abort_thres = tcps->tcps_keepalive_abort_interval;
 
 	return (0);
 }
@@ -8286,6 +8281,7 @@ tcp_header_init_ipv4(tcp_t *tcp)
 	tcph_t		*tcph;
 	uint32_t	sum;
 	conn_t		*connp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * This is a simple initialization. If there's
@@ -8318,10 +8314,10 @@ tcp_header_init_ipv4(tcp_t *tcp)
 		= (IP_VERSION << 4) | IP_SIMPLE_HDR_LENGTH_IN_WORDS;
 	tcp->tcp_ipha->ipha_ident = 0;
 
-	tcp->tcp_ttl = (uchar_t)tcp_ipv4_ttl;
+	tcp->tcp_ttl = (uchar_t)tcps->tcps_ipv4_ttl;
 	tcp->tcp_tos = 0;
 	tcp->tcp_ipha->ipha_fragment_offset_and_flags = 0;
-	tcp->tcp_ipha->ipha_ttl = (uchar_t)tcp_ipv4_ttl;
+	tcp->tcp_ipha->ipha_ttl = (uchar_t)tcps->tcps_ipv4_ttl;
 	tcp->tcp_ipha->ipha_protocol = IPPROTO_TCP;
 
 	tcph = (tcph_t *)(tcp->tcp_iphc + sizeof (ipha_t));
@@ -8348,6 +8344,7 @@ tcp_header_init_ipv6(tcp_t *tcp)
 	tcph_t	*tcph;
 	uint32_t	sum;
 	conn_t	*connp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * This is a simple initialization. If there's
@@ -8390,7 +8387,7 @@ tcp_header_init_ipv6(tcp_t *tcp)
 	tcp->tcp_ip6h->ip6_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
 	tcp->tcp_ip6h->ip6_plen = ntohs(sizeof (tcph_t));
 	tcp->tcp_ip6h->ip6_nxt = IPPROTO_TCP;
-	tcp->tcp_ip6h->ip6_hops = (uint8_t)tcp_ipv6_hoplimit;
+	tcp->tcp_ip6h->ip6_hops = (uint8_t)tcps->tcps_ipv6_hoplimit;
 
 	tcph = (tcph_t *)(tcp->tcp_iphc + IPV6_HDR_LEN);
 	tcp->tcp_tcph = tcph;
@@ -8429,6 +8426,7 @@ tcp_icmp_error(tcp_t *tcp, mblk_t *mp)
 	uint32_t ratio;
 	size_t mp_size = MBLKL(mp);
 	uint32_t seg_seq;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/* Assume IP provides aligned packets - otherwise toss */
 	if (!OK_32PTR(mp->b_rptr)) {
@@ -8571,7 +8569,7 @@ noticmpv4:
 			 * tcp_wput_data().  Need to adjust all those
 			 * params to make sure tcp_wput_data() work properly.
 			 */
-			if (tcp_ignore_path_mtu)
+			if (tcps->tcps_ignore_path_mtu)
 				break;
 
 			/*
@@ -8598,7 +8596,7 @@ noticmpv4:
 			 * or less than tcp_mss_min.
 			 * The value 68 comes from rfc 1191.
 			 */
-			if (new_mss < MAX(68, tcp_mss_min))
+			if (new_mss < MAX(68, tcps->tcps_mss_min))
 				tcp->tcp_ipha->ipha_fragment_offset_and_flags =
 				    0;
 
@@ -8717,6 +8715,7 @@ tcp_icmp_error_ipv6(tcp_t *tcp, mblk_t *mp, boolean_t ipsec_mctl)
 	mblk_t *first_mp = mp;
 	size_t mp_size;
 	uint32_t seg_seq;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * The caller has determined if this is an IPSEC_IN packet and
@@ -8842,7 +8841,7 @@ noticmpv6:
 		 * tcp_wput_data().  Need to adjust all those
 		 * params to make sure tcp_wput_data() work properly.
 		 */
-		if (tcp_ignore_path_mtu)
+		if (tcps->tcps_ignore_path_mtu)
 			break;
 
 		/*
@@ -9193,13 +9192,14 @@ tcp_keepalive_killer(void *arg)
 	int32_t	firetime;
 	int32_t	idletime;
 	int32_t	ka_intrvl;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	tcp->tcp_ka_tid = 0;
 
 	if (tcp->tcp_fused)
 		return;
 
-	BUMP_MIB(&tcp_mib, tcpTimKeepalive);
+	BUMP_MIB(&tcps->tcps_mib, tcpTimKeepalive);
 	ka_intrvl = tcp->tcp_ka_interval;
 
 	/*
@@ -9224,7 +9224,7 @@ tcp_keepalive_killer(void *arg)
 	 */
 	if (tcp->tcp_ka_abort_thres != 0 &&
 	    idletime > (ka_intrvl + tcp->tcp_ka_abort_thres)) {
-		BUMP_MIB(&tcp_mib, tcpTimKeepaliveDrop);
+		BUMP_MIB(&tcps->tcps_mib, tcpTimKeepaliveDrop);
 		(void) tcp_clean_death(tcp, tcp->tcp_client_errno ?
 		    tcp->tcp_client_errno : ETIMEDOUT, 11);
 		return;
@@ -9248,18 +9248,20 @@ tcp_keepalive_killer(void *arg)
 				TCP_RECORD_TRACE(tcp, mp,
 				    TCP_TRACE_SEND_PKT);
 				tcp_send_data(tcp, tcp->tcp_wq, mp);
-				BUMP_MIB(&tcp_mib, tcpTimKeepaliveProbe);
+				BUMP_MIB(&tcps->tcps_mib,
+				    tcpTimKeepaliveProbe);
 				if (tcp->tcp_ka_last_intrvl != 0) {
+					int max;
 					/*
 					 * We should probe again at least
 					 * in ka_intrvl, but not more than
 					 * tcp_rexmit_interval_max.
 					 */
+					max = tcps->tcps_rexmit_interval_max;
 					firetime = MIN(ka_intrvl - 1,
 					    tcp->tcp_ka_last_intrvl << 1);
-					if (firetime > tcp_rexmit_interval_max)
-						firetime =
-						    tcp_rexmit_interval_max;
+					if (firetime > max)
+						firetime = max;
 				} else {
 					firetime = tcp->tcp_rto;
 				}
@@ -9501,14 +9503,15 @@ static void
 tcp_mss_set(tcp_t *tcp, uint32_t mss)
 {
 	uint32_t	mss_max;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (tcp->tcp_ipversion == IPV4_VERSION)
-		mss_max = tcp_mss_max_ipv4;
+		mss_max = tcps->tcps_mss_max_ipv4;
 	else
-		mss_max = tcp_mss_max_ipv6;
+		mss_max = tcps->tcps_mss_max_ipv6;
 
-	if (mss < tcp_mss_min)
-		mss = tcp_mss_min;
+	if (mss < tcps->tcps_mss_min)
+		mss = tcps->tcps_mss_min;
 	if (mss > mss_max)
 		mss = mss_max;
 	/*
@@ -9532,7 +9535,7 @@ tcp_mss_set(tcp_t *tcp, uint32_t mss)
 	 * The new tcp_cwnd should not get bigger.
 	 */
 	if (tcp->tcp_init_cwnd == 0) {
-		tcp->tcp_cwnd = MIN(tcp_slow_start_initial * mss,
+		tcp->tcp_cwnd = MIN(tcps->tcps_slow_start_initial * mss,
 		    MIN(4 * mss, MAX(2 * mss, 4380 / mss * mss)));
 	} else {
 		if (tcp->tcp_mss < mss) {
@@ -9554,25 +9557,60 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	conn_t		*connp;
 	int		err;
 	dev_t		conn_dev;
-	zoneid_t	zoneid = getzoneid();
-
-	/*
-	 * Special case for install: miniroot needs to be able to access files
-	 * via NFS as though it were always in the global zone.
-	 */
-	if (credp == kcred && nfs_global_client_only != 0)
-		zoneid = GLOBAL_ZONEID;
+	zoneid_t	zoneid;
+	tcp_stack_t	*tcps = NULL;
 
 	if (q->q_ptr != NULL)
 		return (0);
 
+	if (!(flag & SO_ACCEPTOR)) {
+		/*
+		 * Special case for install: miniroot needs to be able to
+		 * access files via NFS as though it were always in the
+		 * global zone.
+		 */
+		if (credp == kcred && nfs_global_client_only != 0) {
+			zoneid = GLOBAL_ZONEID;
+			tcps = netstack_find_by_stackid(GLOBAL_NETSTACKID)->
+			    netstack_tcp;
+			ASSERT(tcps != NULL);
+		} else {
+			netstack_t *ns;
+
+			ns = netstack_find_by_cred(credp);
+			ASSERT(ns != NULL);
+			tcps = ns->netstack_tcp;
+			ASSERT(tcps != NULL);
+
+			/*
+			 * For exclusive stacks we set the zoneid to zero
+			 * to make TCP operate as if in the global zone.
+			 */
+			if (tcps->tcps_netstack->netstack_stackid !=
+			    GLOBAL_NETSTACKID)
+				zoneid = GLOBAL_ZONEID;
+			else
+				zoneid = crgetzoneid(credp);
+		}
+		/*
+		 * For stackid zero this is done from strplumb.c, but
+		 * non-zero stackids are handled here.
+		 */
+		if (tcps->tcps_g_q == NULL &&
+		    tcps->tcps_netstack->netstack_stackid !=
+		    GLOBAL_NETSTACKID) {
+			tcp_g_q_setup(tcps);
+		}
+	}
 	if (sflag == MODOPEN) {
 		/*
 		 * This is a special case. The purpose of a modopen
 		 * is to allow just the T_SVR4_OPTMGMT_REQ to pass
 		 * through for MIB browsers. Everything else is failed.
 		 */
-		connp = (conn_t *)tcp_get_conn(IP_SQUEUE_GET(lbolt));
+		connp = (conn_t *)tcp_get_conn(IP_SQUEUE_GET(lbolt), tcps);
+		/* tcp_get_conn incremented refcnt */
+		netstack_rele(tcps->tcps_netstack);
 
 		if (connp == NULL)
 			return (ENOMEM);
@@ -9580,6 +9618,8 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		connp->conn_flags |= IPCL_TCPMOD;
 		connp->conn_cred = credp;
 		connp->conn_zoneid = zoneid;
+		ASSERT(connp->conn_netstack == tcps->tcps_netstack);
+		ASSERT(connp->conn_netstack->netstack_tcp == tcps);
 		q->q_ptr = WR(q)->q_ptr = connp;
 		crhold(credp);
 		q->q_qinfo = &tcp_mod_rinit;
@@ -9587,13 +9627,17 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		qprocson(q);
 		return (0);
 	}
-
-	if ((conn_dev = inet_minor_alloc(ip_minor_arena)) == 0)
+	if ((conn_dev = inet_minor_alloc(ip_minor_arena)) == 0) {
+		if (tcps != NULL)
+			netstack_rele(tcps->tcps_netstack);
 		return (EBUSY);
+	}
 
 	*devp = makedevice(getemajor(*devp), (minor_t)conn_dev);
 
 	if (flag & SO_ACCEPTOR) {
+		/* No netstack_find_by_cred, hence no netstack_rele needed */
+		ASSERT(tcps == NULL);
 		q->q_qinfo = &tcp_acceptor_rinit;
 		q->q_ptr = (void *)conn_dev;
 		WR(q)->q_qinfo = &tcp_acceptor_winit;
@@ -9602,7 +9646,12 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		return (0);
 	}
 
-	connp = (conn_t *)tcp_get_conn(IP_SQUEUE_GET(lbolt));
+	connp = (conn_t *)tcp_get_conn(IP_SQUEUE_GET(lbolt), tcps);
+	/*
+	 * Both tcp_get_conn and netstack_find_by_cred incremented refcnt,
+	 * so we drop it by one.
+	 */
+	netstack_rele(tcps->tcps_netstack);
 	if (connp == NULL) {
 		inet_minor_free(ip_minor_arena, conn_dev);
 		q->q_ptr = NULL;
@@ -9620,7 +9669,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		connp->conn_src_preferences = IPV6_PREFER_SRC_DEFAULT;
 		tcp->tcp_ipversion = IPV6_VERSION;
 		tcp->tcp_family = AF_INET6;
-		tcp->tcp_mss = tcp_mss_def_ipv6;
+		tcp->tcp_mss = tcps->tcps_mss_def_ipv6;
 	} else {
 		connp->conn_flags |= IPCL_TCP4;
 		connp->conn_send = ip_output;
@@ -9628,7 +9677,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		connp->conn_pkt_isv6 = B_FALSE;
 		tcp->tcp_ipversion = IPV4_VERSION;
 		tcp->tcp_family = AF_INET;
-		tcp->tcp_mss = tcp_mss_def_ipv4;
+		tcp->tcp_mss = tcps->tcps_mss_def_ipv4;
 	}
 
 	/*
@@ -9643,6 +9692,8 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	connp->conn_zoneid = zoneid;
 	connp->conn_mlp_type = mlptSingle;
 	connp->conn_ulp_labeled = !is_system_labeled();
+	ASSERT(connp->conn_netstack == tcps->tcps_netstack);
+	ASSERT(tcp->tcp_tcps == tcps);
 
 	/*
 	 * If the caller has the process-wide flag set, then default to MAC
@@ -9675,7 +9726,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		tcp_acceptor_hash_insert(tcp->tcp_acceptor_id, tcp);
 	}
 
-	if (tcp_trace)
+	if (tcps->tcps_trace)
 		tcp->tcp_tracebuf = kmem_zalloc(sizeof (tcptrch_t), KM_SLEEP);
 
 	err = tcp_init(tcp, q);
@@ -9687,8 +9738,8 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		return (err);
 	}
 
-	RD(q)->q_hiwat = tcp_recv_hiwat;
-	tcp->tcp_rwnd = tcp_recv_hiwat;
+	RD(q)->q_hiwat = tcps->tcps_recv_hiwat;
+	tcp->tcp_rwnd = tcps->tcps_recv_hiwat;
 
 	/* Non-zero default values */
 	connp->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
@@ -9745,21 +9796,22 @@ int
 tcp_opt_default(queue_t *q, int level, int name, uchar_t *ptr)
 {
 	int32_t	*i1 = (int32_t *)ptr;
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
 
 	switch (level) {
 	case IPPROTO_TCP:
 		switch (name) {
 		case TCP_NOTIFY_THRESHOLD:
-			*i1 = tcp_ip_notify_interval;
+			*i1 = tcps->tcps_ip_notify_interval;
 			break;
 		case TCP_ABORT_THRESHOLD:
-			*i1 = tcp_ip_abort_interval;
+			*i1 = tcps->tcps_ip_abort_interval;
 			break;
 		case TCP_CONN_NOTIFY_THRESHOLD:
-			*i1 = tcp_ip_notify_cinterval;
+			*i1 = tcps->tcps_ip_notify_cinterval;
 			break;
 		case TCP_CONN_ABORT_THRESHOLD:
-			*i1 = tcp_ip_abort_cinterval;
+			*i1 = tcps->tcps_ip_abort_cinterval;
 			break;
 		default:
 			return (-1);
@@ -9768,7 +9820,7 @@ tcp_opt_default(queue_t *q, int level, int name, uchar_t *ptr)
 	case IPPROTO_IP:
 		switch (name) {
 		case IP_TTL:
-			*i1 = tcp_ipv4_ttl;
+			*i1 = tcps->tcps_ipv4_ttl;
 			break;
 		default:
 			return (-1);
@@ -9777,7 +9829,7 @@ tcp_opt_default(queue_t *q, int level, int name, uchar_t *ptr)
 	case IPPROTO_IPV6:
 		switch (name) {
 		case IPV6_UNICAST_HOPS:
-			*i1 = tcp_ipv6_hoplimit;
+			*i1 = tcps->tcps_ipv6_hoplimit;
 			break;
 		default:
 			return (-1);
@@ -10093,7 +10145,8 @@ tcp_opt_get(queue_t *q, int level, int	name, uchar_t *ptr)
 				return (-1);
 
 			return (ip_fill_mtuinfo(&connp->conn_remv6,
-				connp->conn_fport, mtuinfo));
+				connp->conn_fport, mtuinfo,
+				connp->conn_netstack));
 		}
 		default:
 			return (-1);
@@ -10121,6 +10174,7 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 	boolean_t onoff = (*i1 == 0) ? 0 : 1;
 	boolean_t checkonly;
 	int	reterr;
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
 
 	switch (optset_context) {
 	case SETFN_OPTCOM_CHECKONLY:
@@ -10280,7 +10334,7 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				tcp->tcp_dgram_errind = onoff;
 			break;
 		case SO_SNDBUF: {
-			if (*i1 > tcp_max_buf) {
+			if (*i1 > tcps->tcps_max_buf) {
 				*outlenp = 0;
 				return (ENOBUFS);
 			}
@@ -10288,10 +10342,10 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				break;
 
 			tcp->tcp_xmit_hiwater = *i1;
-			if (tcp_snd_lowat_fraction != 0)
+			if (tcps->tcps_snd_lowat_fraction != 0)
 				tcp->tcp_xmit_lowater =
 				    tcp->tcp_xmit_hiwater /
-				    tcp_snd_lowat_fraction;
+				    tcps->tcps_snd_lowat_fraction;
 			(void) tcp_maxpsz_set(tcp, B_TRUE);
 			/*
 			 * If we are flow-controlled, recheck the condition.
@@ -10308,7 +10362,7 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			break;
 		}
 		case SO_RCVBUF:
-			if (*i1 > tcp_max_buf) {
+			if (*i1 > tcps->tcps_max_buf) {
 				*outlenp = 0;
 				return (ENOBUFS);
 			}
@@ -10419,7 +10473,7 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				tcp->tcp_init_cwnd = init_cwnd;
 				break;
 			}
-			if ((reterr = secpolicy_net_config(cr, B_TRUE)) != 0) {
+			if ((reterr = secpolicy_ip_config(cr, B_TRUE)) != 0) {
 				*outlenp = 0;
 				return (reterr);
 			}
@@ -10434,8 +10488,8 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (checkonly)
 				break;
 
-			if (*i1 < tcp_keepalive_interval_low ||
-			    *i1 > tcp_keepalive_interval_high) {
+			if (*i1 < tcps->tcps_keepalive_interval_low ||
+			    *i1 > tcps->tcps_keepalive_interval_high) {
 				*outlenp = 0;
 				return (EINVAL);
 			}
@@ -10458,8 +10512,10 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			break;
 		case TCP_KEEPALIVE_ABORT_THRESHOLD:
 			if (!checkonly) {
-				if (*i1 < tcp_keepalive_abort_interval_low ||
-				    *i1 > tcp_keepalive_abort_interval_high) {
+				if (*i1 <
+				    tcps->tcps_keepalive_abort_interval_low ||
+				    *i1 >
+				    tcps->tcps_keepalive_abort_interval_high) {
 					*outlenp = 0;
 					return (EINVAL);
 				}
@@ -10571,7 +10627,7 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				if (*i1 == -1) {
 					tcp->tcp_ip6h->ip6_hops =
 					    ipp->ipp_unicast_hops =
-					    (uint8_t)tcp_ipv6_hoplimit;
+					    (uint8_t)tcps->tcps_ipv6_hoplimit;
 					ipp->ipp_fields &= ~IPPF_UNICAST_HOPS;
 					/* Pass modified value to IP. */
 					*i1 = tcp->tcp_ip6h->ip6_hops;
@@ -10973,6 +11029,7 @@ tcp_build_hdrs(queue_t *q, tcp_t *tcp)
 	char	buf[TCP_MAX_HDR_LENGTH];
 	ip6_pkt_t *ipp = &tcp->tcp_sticky_ipp;
 	in6_addr_t src, dst;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * save the existing tcp header and source/dest IP addresses
@@ -11030,7 +11087,7 @@ tcp_build_hdrs(queue_t *q, tcp_t *tcp)
 	 * the default value for TCP.
 	 */
 	if (!(ipp->ipp_fields & IPPF_UNICAST_HOPS))
-		tcp->tcp_ip6h->ip6_hops = tcp_ipv6_hoplimit;
+		tcp->tcp_ip6h->ip6_hops = tcps->tcps_ipv6_hoplimit;
 
 	/*
 	 * If we're setting extension headers after a connection
@@ -11050,14 +11107,14 @@ tcp_build_hdrs(queue_t *q, tcp_t *tcp)
 		    (uint8_t *)tcp->tcp_tcph);
 		if (rth != NULL) {
 			tcp->tcp_sum = ip_massage_options_v6(tcp->tcp_ip6h,
-			    rth);
+			    rth, tcps->tcps_netstack);
 			tcp->tcp_sum = ntohs((tcp->tcp_sum & 0xFFFF) +
 			    (tcp->tcp_sum >> 16));
 		}
 	}
 
 	/* Try to get everything in a single mblk */
-	(void) mi_set_sth_wroff(RD(q), hdrs_len + tcp_wroff_xtra);
+	(void) mi_set_sth_wroff(RD(q), hdrs_len + tcps->tcps_wroff_xtra);
 	return (0);
 }
 
@@ -11183,6 +11240,7 @@ tcp_opt_set_header(tcp_t *tcp, boolean_t checkonly, uchar_t *ptr, uint_t len)
 	uint_t	tcph_len;
 	uint8_t	*ip_optp;
 	tcph_t	*new_tcph;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if ((len > TCP_MAX_IP_OPTIONS_LENGTH) || (len & 0x3))
 		return (EINVAL);
@@ -11224,7 +11282,7 @@ tcp_opt_set_header(tcp_t *tcp, boolean_t checkonly, uchar_t *ptr, uint_t len)
 	if (!TCP_IS_DETACHED(tcp)) {
 		/* Always allocate room for all options. */
 		(void) mi_set_sth_wroff(tcp->tcp_rq,
-		    TCP_MAX_COMBINED_HEADER_LENGTH + tcp_wroff_xtra);
+		    TCP_MAX_COMBINED_HEADER_LENGTH + tcps->tcps_wroff_xtra);
 	}
 	return (0);
 }
@@ -11245,100 +11303,116 @@ tcp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
  * named dispatch handler.
  */
 static boolean_t
-tcp_param_register(tcpparam_t *tcppa, int cnt)
+tcp_param_register(IDP *ndp, tcpparam_t *tcppa, int cnt, tcp_stack_t *tcps)
 {
 	for (; cnt-- > 0; tcppa++) {
 		if (tcppa->tcp_param_name && tcppa->tcp_param_name[0]) {
-			if (!nd_load(&tcp_g_nd, tcppa->tcp_param_name,
+			if (!nd_load(ndp, tcppa->tcp_param_name,
 			    tcp_param_get, tcp_param_set,
 			    (caddr_t)tcppa)) {
-				nd_free(&tcp_g_nd);
+				nd_free(ndp);
 				return (B_FALSE);
 			}
 		}
 	}
-	if (!nd_load(&tcp_g_nd, tcp_wroff_xtra_param.tcp_param_name,
+	tcps->tcps_wroff_xtra_param = kmem_zalloc(sizeof (tcpparam_t),
+	    KM_SLEEP);
+	bcopy(&lcl_tcp_wroff_xtra_param, tcps->tcps_wroff_xtra_param,
+	    sizeof (tcpparam_t));
+	if (!nd_load(ndp, tcps->tcps_wroff_xtra_param->tcp_param_name,
 	    tcp_param_get, tcp_param_set_aligned,
-	    (caddr_t)&tcp_wroff_xtra_param)) {
-		nd_free(&tcp_g_nd);
+	    (caddr_t)tcps->tcps_wroff_xtra_param)) {
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, tcp_mdt_head_param.tcp_param_name,
+	tcps->tcps_mdt_head_param = kmem_zalloc(sizeof (tcpparam_t),
+	    KM_SLEEP);
+	bcopy(&lcl_tcp_mdt_head_param, tcps->tcps_mdt_head_param,
+	    sizeof (tcpparam_t));
+	if (!nd_load(ndp, tcps->tcps_mdt_head_param->tcp_param_name,
 	    tcp_param_get, tcp_param_set_aligned,
-	    (caddr_t)&tcp_mdt_head_param)) {
-		nd_free(&tcp_g_nd);
+	    (caddr_t)tcps->tcps_mdt_head_param)) {
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, tcp_mdt_tail_param.tcp_param_name,
+	tcps->tcps_mdt_tail_param = kmem_zalloc(sizeof (tcpparam_t),
+	    KM_SLEEP);
+	bcopy(&lcl_tcp_mdt_tail_param, tcps->tcps_mdt_tail_param,
+	    sizeof (tcpparam_t));
+	if (!nd_load(ndp, tcps->tcps_mdt_tail_param->tcp_param_name,
 	    tcp_param_get, tcp_param_set_aligned,
-	    (caddr_t)&tcp_mdt_tail_param)) {
-		nd_free(&tcp_g_nd);
+	    (caddr_t)tcps->tcps_mdt_tail_param)) {
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, tcp_mdt_max_pbufs_param.tcp_param_name,
-	    tcp_param_get, tcp_param_set,
-	    (caddr_t)&tcp_mdt_max_pbufs_param)) {
-		nd_free(&tcp_g_nd);
+	tcps->tcps_mdt_max_pbufs_param = kmem_zalloc(sizeof (tcpparam_t),
+	    KM_SLEEP);
+	bcopy(&lcl_tcp_mdt_max_pbufs_param, tcps->tcps_mdt_max_pbufs_param,
+	    sizeof (tcpparam_t));
+	if (!nd_load(ndp, tcps->tcps_mdt_max_pbufs_param->tcp_param_name,
+	    tcp_param_get, tcp_param_set_aligned,
+	    (caddr_t)tcps->tcps_mdt_max_pbufs_param)) {
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, "tcp_extra_priv_ports",
+	if (!nd_load(ndp, "tcp_extra_priv_ports",
 	    tcp_extra_priv_ports_get, NULL, NULL)) {
-		nd_free(&tcp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, "tcp_extra_priv_ports_add",
+	if (!nd_load(ndp, "tcp_extra_priv_ports_add",
 	    NULL, tcp_extra_priv_ports_add, NULL)) {
-		nd_free(&tcp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, "tcp_extra_priv_ports_del",
+	if (!nd_load(ndp, "tcp_extra_priv_ports_del",
 	    NULL, tcp_extra_priv_ports_del, NULL)) {
-		nd_free(&tcp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, "tcp_status", tcp_status_report, NULL,
+	if (!nd_load(ndp, "tcp_status", tcp_status_report, NULL,
 	    NULL)) {
-		nd_free(&tcp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, "tcp_bind_hash", tcp_bind_hash_report,
+	if (!nd_load(ndp, "tcp_bind_hash", tcp_bind_hash_report,
 	    NULL, NULL)) {
-		nd_free(&tcp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, "tcp_listen_hash", tcp_listen_hash_report,
+	if (!nd_load(ndp, "tcp_listen_hash",
+	    tcp_listen_hash_report, NULL, NULL)) {
+		nd_free(ndp);
+		return (B_FALSE);
+	}
+	if (!nd_load(ndp, "tcp_conn_hash", tcp_conn_hash_report,
 	    NULL, NULL)) {
-		nd_free(&tcp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, "tcp_conn_hash", tcp_conn_hash_report,
-	    NULL, NULL)) {
-		nd_free(&tcp_g_nd);
+	if (!nd_load(ndp, "tcp_acceptor_hash",
+	    tcp_acceptor_hash_report, NULL, NULL)) {
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, "tcp_acceptor_hash", tcp_acceptor_hash_report,
-	    NULL, NULL)) {
-		nd_free(&tcp_g_nd);
-		return (B_FALSE);
-	}
-	if (!nd_load(&tcp_g_nd, "tcp_host_param", tcp_host_param_report,
+	if (!nd_load(ndp, "tcp_host_param", tcp_host_param_report,
 	    tcp_host_param_set, NULL)) {
-		nd_free(&tcp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, "tcp_host_param_ipv6", tcp_host_param_report,
-	    tcp_host_param_set_ipv6, NULL)) {
-		nd_free(&tcp_g_nd);
+	if (!nd_load(ndp, "tcp_host_param_ipv6",
+	    tcp_host_param_report, tcp_host_param_set_ipv6, NULL)) {
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, "tcp_1948_phrase", NULL, tcp_1948_phrase_set,
-	    NULL)) {
-		nd_free(&tcp_g_nd);
+	if (!nd_load(ndp, "tcp_1948_phrase", NULL,
+	    tcp_1948_phrase_set, NULL)) {
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&tcp_g_nd, "tcp_reserved_port_list",
+	if (!nd_load(ndp, "tcp_reserved_port_list",
 	    tcp_reserved_port_list, NULL, NULL)) {
-		nd_free(&tcp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
 	/*
@@ -11346,10 +11420,10 @@ tcp_param_register(tcpparam_t *tcppa, int cnt)
 	 * through printing of their name (no get or set routines)
 	 * XXX Remove in future releases ?
 	 */
-	if (!nd_load(&tcp_g_nd,
+	if (!nd_load(ndp,
 	    "tcp_close_wait_interval(obsoleted - "
 	    "use tcp_time_wait_interval)", NULL, NULL, NULL)) {
-		nd_free(&tcp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
 	return (B_TRUE);
@@ -11412,6 +11486,7 @@ tcp_reass(tcp_t *tcp, mblk_t *mp, uint32_t start)
 	mblk_t		*mp2;
 	mblk_t		*next_mp;
 	uint32_t	u1;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/* Walk through all the new pieces. */
 	do {
@@ -11431,8 +11506,8 @@ tcp_reass(tcp_t *tcp, mblk_t *mp, uint32_t start)
 		if (!mp1) {
 			tcp->tcp_reass_tail = mp;
 			tcp->tcp_reass_head = mp;
-			BUMP_MIB(&tcp_mib, tcpInDataUnorderSegs);
-			UPDATE_MIB(&tcp_mib,
+			BUMP_MIB(&tcps->tcps_mib, tcpInDataUnorderSegs);
+			UPDATE_MIB(&tcps->tcps_mib,
 			    tcpInDataUnorderBytes, end - start);
 			continue;
 		}
@@ -11441,8 +11516,8 @@ tcp_reass(tcp_t *tcp, mblk_t *mp, uint32_t start)
 			/* Link it on end. */
 			mp1->b_cont = mp;
 			tcp->tcp_reass_tail = mp;
-			BUMP_MIB(&tcp_mib, tcpInDataUnorderSegs);
-			UPDATE_MIB(&tcp_mib,
+			BUMP_MIB(&tcps->tcps_mib, tcpInDataUnorderSegs);
+			UPDATE_MIB(&tcps->tcps_mib,
 			    tcpInDataUnorderBytes, end - start);
 			continue;
 		}
@@ -11508,6 +11583,7 @@ tcp_reass_elim_overlap(tcp_t *tcp, mblk_t *mp)
 	uint32_t	end;
 	mblk_t		*mp1;
 	uint32_t	u1;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	end = TCP_REASS_END(mp);
 	while ((mp1 = mp->b_cont) != NULL) {
@@ -11517,16 +11593,17 @@ tcp_reass_elim_overlap(tcp_t *tcp, mblk_t *mp)
 		if (!SEQ_GEQ(end, TCP_REASS_END(mp1))) {
 			mp->b_wptr -= end - u1;
 			TCP_REASS_SET_END(mp, u1);
-			BUMP_MIB(&tcp_mib, tcpInDataPartDupSegs);
-			UPDATE_MIB(&tcp_mib, tcpInDataPartDupBytes, end - u1);
+			BUMP_MIB(&tcps->tcps_mib, tcpInDataPartDupSegs);
+			UPDATE_MIB(&tcps->tcps_mib,
+			    tcpInDataPartDupBytes, end - u1);
 			break;
 		}
 		mp->b_cont = mp1->b_cont;
 		TCP_REASS_SET_SEQ(mp1, 0);
 		TCP_REASS_SET_END(mp1, 0);
 		freeb(mp1);
-		BUMP_MIB(&tcp_mib, tcpInDataDupSegs);
-		UPDATE_MIB(&tcp_mib, tcpInDataDupBytes, end - u1);
+		BUMP_MIB(&tcps->tcps_mib, tcpInDataDupSegs);
+		UPDATE_MIB(&tcps->tcps_mib, tcpInDataDupBytes, end - u1);
 	}
 	if (!mp1)
 		tcp->tcp_reass_tail = mp;
@@ -11544,6 +11621,8 @@ tcp_rcv_drain(queue_t *q, tcp_t *tcp)
 #ifdef DEBUG
 	uint_t cnt = 0;
 #endif
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+
 	/* Can't drain on an eager connection */
 	if (tcp->tcp_listener != NULL)
 		return (ret);
@@ -11598,7 +11677,7 @@ tcp_rcv_drain(queue_t *q, tcp_t *tcp)
 		 * deferred acks segments, send an update immediately.
 		 */
 		if (thwin < tcp->tcp_rack_cur_max * tcp->tcp_mss) {
-			BUMP_MIB(&tcp_mib, tcpOutWinUpdate);
+			BUMP_MIB(&tcps->tcps_mib, tcpOutWinUpdate);
 			ret = TH_ACK_NEEDED;
 		}
 		tcp->tcp_rwnd = q->q_hiwat;
@@ -11684,8 +11763,9 @@ tcp_input(void *arg, mblk_t *mp, void *arg2)
 	if (tcp->tcp_state == TCPS_CLOSED ||
 	    tcp->tcp_state == TCPS_BOUND) {
 		conn_t	*new_connp;
+		ip_stack_t *ipst = tcp->tcp_tcps->tcps_netstack->netstack_ip;
 
-		new_connp = ipcl_classify(mp, connp->conn_zoneid);
+		new_connp = ipcl_classify(mp, connp->conn_zoneid, ipst);
 		if (new_connp != NULL) {
 			tcp_reinput(new_connp, mp, arg2);
 			return;
@@ -11809,8 +11889,9 @@ tcp_set_rto(tcp_t *tcp, clock_t rtt)
 	clock_t sa = tcp->tcp_rtt_sa;
 	clock_t sv = tcp->tcp_rtt_sd;
 	clock_t rto;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
-	BUMP_MIB(&tcp_mib, tcpRttUpdate);
+	BUMP_MIB(&tcps->tcps_mib, tcpRttUpdate);
 	tcp->tcp_rtt_update++;
 
 	/* tcp_rtt_sa is not 0 means this is a new sample. */
@@ -11877,12 +11958,12 @@ tcp_set_rto(tcp_t *tcp, clock_t rtt)
 	 * deviation of RTO to accomodate burstiness of 1/4 of
 	 * window size.
 	 */
-	rto = (sa >> 3) + sv + tcp_rexmit_interval_extra + (sa >> 5);
+	rto = (sa >> 3) + sv + tcps->tcps_rexmit_interval_extra + (sa >> 5);
 
-	if (rto > tcp_rexmit_interval_max) {
-		tcp->tcp_rto = tcp_rexmit_interval_max;
-	} else if (rto < tcp_rexmit_interval_min) {
-		tcp->tcp_rto = tcp_rexmit_interval_min;
+	if (rto > tcps->tcps_rexmit_interval_max) {
+		tcp->tcp_rto = tcps->tcps_rexmit_interval_max;
+	} else if (rto < tcps->tcps_rexmit_interval_min) {
+		tcp->tcp_rto = tcps->tcps_rexmit_interval_min;
 	} else {
 		tcp->tcp_rto = rto;
 	}
@@ -11952,6 +12033,7 @@ tcp_sack_rxmit(tcp_t *tcp, uint_t *flags)
 	int32_t		mss;
 	uint32_t	seg_len;
 	mblk_t		*xmit_mp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(tcp->tcp_sack_info != NULL);
 	ASSERT(tcp->tcp_notsack_list != NULL);
@@ -11988,7 +12070,7 @@ tcp_sack_rxmit(tcp_t *tcp, uint_t *flags)
 		for (; notsack_blk != NULL; notsack_blk = notsack_blk->next) {
 			if (SEQ_GT(notsack_blk->end, begin) &&
 			    (notsack_blk->sack_cnt >=
-			    tcp_dupack_fast_retransmit)) {
+			    tcps->tcps_dupack_fast_retransmit)) {
 				end = notsack_blk->end;
 				if (SEQ_LT(begin, notsack_blk->begin)) {
 					begin = notsack_blk->begin;
@@ -12046,9 +12128,9 @@ tcp_sack_rxmit(tcp_t *tcp, uint_t *flags)
 		 */
 		snxt_mp->b_prev = (mblk_t *)lbolt;
 
-		BUMP_MIB(&tcp_mib, tcpRetransSegs);
-		UPDATE_MIB(&tcp_mib, tcpRetransBytes, seg_len);
-		BUMP_MIB(&tcp_mib, tcpOutSackRetransSegs);
+		BUMP_MIB(&tcps->tcps_mib, tcpRetransSegs);
+		UPDATE_MIB(&tcps->tcps_mib, tcpRetransBytes, seg_len);
+		BUMP_MIB(&tcps->tcps_mib, tcpOutSackRetransSegs);
 		/*
 		 * Update tcp_rexmit_max to extend this SACK recovery phase.
 		 * This happens when new data sent during fast recovery is
@@ -12076,6 +12158,9 @@ tcp_check_policy(tcp_t *tcp, mblk_t *first_mp, ipha_t *ipha, ip6_t *ip6h,
 	ipsec_in_t *ii;
 	const char *reason;
 	kstat_named_t *counter;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ipsec_stack_t	*ipss;
+	ip_stack_t	*ipst;
 
 	ASSERT(mctl_present || !secure);
 
@@ -12093,9 +12178,13 @@ tcp_check_policy(tcp_t *tcp, mblk_t *first_mp, ipha_t *ipha, ip6_t *ip6h,
 		    act->ipa_act.ipa_type == IPSEC_ACT_CLEAR)
 			return (B_TRUE);
 		ipsec_log_policy_failure(IPSEC_POLICY_MISMATCH,
-		    "tcp_check_policy", ipha, ip6h, secure);
+		    "tcp_check_policy", ipha, ip6h, secure,
+		    tcps->tcps_netstack);
+		ipss = tcps->tcps_netstack->netstack_ipsec;
+
 		ip_drop_packet(first_mp, B_TRUE, NULL, NULL,
-		    &ipdrops_tcp_clear, &tcp_dropper);
+		    DROPPER(ipss, ipds_tcp_clear),
+		    &tcps->tcps_dropper);
 		return (B_FALSE);
 	}
 
@@ -12104,9 +12193,13 @@ tcp_check_policy(tcp_t *tcp, mblk_t *first_mp, ipha_t *ipha, ip6_t *ip6h,
 	 */
 	if (act == NULL) {
 		ipsec_log_policy_failure(IPSEC_POLICY_NOT_NEEDED,
-		    "tcp_check_policy", ipha, ip6h, secure);
+		    "tcp_check_policy", ipha, ip6h, secure,
+		    tcps->tcps_netstack);
+		ipss = tcps->tcps_netstack->netstack_ipsec;
+
 		ip_drop_packet(first_mp, B_TRUE, NULL, NULL,
-		    &ipdrops_tcp_secure, &tcp_dropper);
+		    DROPPER(ipss, ipds_tcp_secure),
+		    &tcps->tcps_dropper);
 		return (B_FALSE);
 	}
 
@@ -12122,17 +12215,20 @@ tcp_check_policy(tcp_t *tcp, mblk_t *first_mp, ipha_t *ipha, ip6_t *ip6h,
 
 	ii = (ipsec_in_t *)first_mp->b_rptr;
 
+	ipst = tcps->tcps_netstack->netstack_ip;
+
 	if (ipsec_check_ipsecin_latch(ii, data_mp, ipl, ipha, ip6h, &reason,
 	    &counter, tcp->tcp_connp)) {
-		BUMP_MIB(&ip_mib, ipsecInSucceeded);
+		BUMP_MIB(&ipst->ips_ip_mib, ipsecInSucceeded);
 		return (B_TRUE);
 	}
 	(void) strlog(TCP_MOD_ID, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
 	    "tcp inbound policy mismatch: %s, packet dropped\n",
 	    reason);
-	BUMP_MIB(&ip_mib, ipsecInFailed);
+	BUMP_MIB(&ipst->ips_ip_mib, ipsecInFailed);
 
-	ip_drop_packet(first_mp, B_TRUE, NULL, NULL, counter, &tcp_dropper);
+	ip_drop_packet(first_mp, B_TRUE, NULL, NULL, counter,
+	    &tcps->tcps_dropper);
 	return (B_FALSE);
 }
 
@@ -12153,6 +12249,7 @@ tcp_ss_rexmit(tcp_t *tcp)
 	int32_t		off;
 	int32_t		burst = tcp->tcp_snd_burst;
 	mblk_t		*snxt_mp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * Note that tcp_rexmit can be set even though TCP has retransmitted
@@ -12195,8 +12292,8 @@ tcp_ss_rexmit(tcp_t *tcp)
 			 * retransmission.
 			 */
 			old_snxt_mp->b_prev = (mblk_t *)lbolt;
-			BUMP_MIB(&tcp_mib, tcpRetransSegs);
-			UPDATE_MIB(&tcp_mib, tcpRetransBytes, cnt);
+			BUMP_MIB(&tcps->tcps_mib, tcpRetransSegs);
+			UPDATE_MIB(&tcps->tcps_mib, tcpRetransBytes, cnt);
 
 			tcp->tcp_rexmit_nxt = snxt;
 			burst--;
@@ -12236,6 +12333,7 @@ tcp_process_options(tcp_t *tcp, tcph_t *tcph)
 	tcp_opt_t tcpopt;
 	uint32_t mss_max;
 	char *tmp_tcph;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	tcpopt.tcp = NULL;
 	options = tcp_parse_options(tcph, &tcpopt);
@@ -12248,16 +12346,16 @@ tcp_process_options(tcp_t *tcp, tcph_t *tcph)
 	 */
 	if (!(options & TCP_OPT_MSS_PRESENT)) {
 		if (tcp->tcp_ipversion == IPV4_VERSION)
-			tcpopt.tcp_opt_mss = tcp_mss_def_ipv4;
+			tcpopt.tcp_opt_mss = tcps->tcps_mss_def_ipv4;
 		else
-			tcpopt.tcp_opt_mss = tcp_mss_def_ipv6;
+			tcpopt.tcp_opt_mss = tcps->tcps_mss_def_ipv6;
 	} else {
 		if (tcp->tcp_ipversion == IPV4_VERSION)
-			mss_max = tcp_mss_max_ipv4;
+			mss_max = tcps->tcps_mss_max_ipv4;
 		else
-			mss_max = tcp_mss_max_ipv6;
-		if (tcpopt.tcp_opt_mss < tcp_mss_min)
-			tcpopt.tcp_opt_mss = tcp_mss_min;
+			mss_max = tcps->tcps_mss_max_ipv6;
+		if (tcpopt.tcp_opt_mss < tcps->tcps_mss_min)
+			tcpopt.tcp_opt_mss = tcps->tcps_mss_min;
 		else if (tcpopt.tcp_opt_mss > mss_max)
 			tcpopt.tcp_opt_mss = mss_max;
 	}
@@ -12317,7 +12415,7 @@ tcp_process_options(tcp_t *tcp, tcph_t *tcph)
 	 */
 	if ((options & TCP_OPT_SACK_OK_PRESENT) &&
 	    (tcp->tcp_snd_sack_ok ||
-	    (tcp_sack_permitted != 0 && TCP_IS_DETACHED(tcp)))) {
+	    (tcps->tcps_sack_permitted != 0 && TCP_IS_DETACHED(tcp)))) {
 		/* This should be true only in the passive case. */
 		if (tcp->tcp_sack_info == NULL) {
 			ASSERT(TCP_IS_DETACHED(tcp));
@@ -12398,6 +12496,7 @@ tcp_send_conn_ind(void *arg, mblk_t *mp, void *arg2)
 	struct T_conn_ind	*conn_ind;
 	ipaddr_t 		*addr_cache;
 	boolean_t		need_send_conn_ind = B_FALSE;
+	tcp_stack_t		*tcps = listener->tcp_tcps;
 
 	/* retrieve the eager */
 	conn_ind = (struct T_conn_ind *)mp->b_rptr;
@@ -12509,7 +12608,7 @@ tcp_send_conn_ind(void *arg, mblk_t *mp, void *arg2)
 		listener->tcp_syn_rcvd_timeout--;
 		if (listener->tcp_syn_defense &&
 		    listener->tcp_syn_rcvd_timeout <=
-		    (tcp_conn_req_max_q0 >> 5) &&
+		    (tcps->tcps_conn_req_max_q0 >> 5) &&
 		    10*MINUTES < TICK_TO_MSEC(lbolt64 -
 			listener->tcp_last_rcv_lbolt)) {
 			/*
@@ -12552,6 +12651,7 @@ tcp_find_pktinfo(tcp_t *tcp, mblk_t *mp, uint_t *ipversp, uint_t *ip_hdr_lenp,
 	ip6_pkt_t	ipp;
 	uint_t		ipvers;
 	uint_t		ip_hdr_len;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	rptr = mp->b_rptr;
 	ASSERT(OK_32PTR(rptr));
@@ -12616,12 +12716,13 @@ tcp_find_pktinfo(tcp_t *tcp, mblk_t *mp, uint_t *ipversp, uint_t *ip_hdr_lenp,
 
 		if (ip6h->ip6_nxt != IPPROTO_TCP) {
 			uint8_t	nexthdrp;
+			ip_stack_t *ipst = tcps->tcps_netstack->netstack_ip;
 
 			/* Look for ifindex information */
 			if (ip6h->ip6_nxt == IPPROTO_RAW) {
 				ip6i_t *ip6i = (ip6i_t *)ip6h;
 				if ((uchar_t *)&ip6i[1] > mp->b_wptr) {
-					BUMP_MIB(&ip_mib, tcpInErrs);
+					BUMP_MIB(&ipst->ips_ip_mib, tcpInErrs);
 					freemsg(first_mp);
 					return (NULL);
 				}
@@ -12643,7 +12744,7 @@ tcp_find_pktinfo(tcp_t *tcp, mblk_t *mp, uint_t *ipversp, uint_t *ip_hdr_lenp,
 				}
 				if (MBLKL(mp) < IPV6_HDR_LEN +
 				    sizeof (tcph_t)) {
-					BUMP_MIB(&ip_mib, tcpInErrs);
+					BUMP_MIB(&ipst->ips_ip_mib, tcpInErrs);
 					freemsg(first_mp);
 					return (NULL);
 				}
@@ -12658,7 +12759,7 @@ tcp_find_pktinfo(tcp_t *tcp, mblk_t *mp, uint_t *ipversp, uint_t *ip_hdr_lenp,
 			ip_hdr_len = ip_find_hdr_v6(mp, ip6h, &ipp, &nexthdrp);
 			/* Verify if this is a TCP packet */
 			if (nexthdrp != IPPROTO_TCP) {
-				BUMP_MIB(&ip_mib, tcpInErrs);
+				BUMP_MIB(&ipst->ips_ip_mib, tcpInErrs);
 				freemsg(first_mp);
 				return (NULL);
 			}
@@ -12730,12 +12831,13 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 	conn_t		*connp = (conn_t *)arg;
 	squeue_t	*sqp = (squeue_t *)arg2;
 	tcp_t		*tcp = connp->conn_tcp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * RST from fused tcp loopback peer should trigger an unfuse.
 	 */
 	if (tcp->tcp_fused) {
-		TCP_STAT(tcp_fusion_aborted);
+		TCP_STAT(tcps, tcp_fusion_aborted);
 		tcp_unfuse(tcp);
 	}
 
@@ -12755,7 +12857,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		mp = tcp_find_pktinfo(tcp, mp, &ipvers, &ip_hdr_len,
 		    NULL, &ipp);
 		if (mp == NULL) {
-			TCP_STAT(tcp_rput_v6_error);
+			TCP_STAT(tcps, tcp_rput_v6_error);
 			return;
 		}
 		iphdr = mp->b_rptr;
@@ -12896,11 +12998,13 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 			if (tcp->tcp_snd_sack_ok) {
 				(void) mi_set_sth_wroff(tcp->tcp_rq,
 				    tcp->tcp_hdr_len + TCPOPT_MAX_SACK_LEN +
-				    (tcp->tcp_loopback ? 0 : tcp_wroff_xtra));
+				    (tcp->tcp_loopback ? 0 :
+				    tcps->tcps_wroff_xtra));
 			} else {
 				(void) mi_set_sth_wroff(tcp->tcp_rq,
 				    tcp->tcp_hdr_len +
-				    (tcp->tcp_loopback ? 0 : tcp_wroff_xtra));
+				    (tcp->tcp_loopback ? 0 :
+				    tcps->tcps_wroff_xtra));
 			}
 		}
 		if (flags & TH_ACK) {
@@ -12997,7 +13101,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 					    TCP_TRACE_SEND_PKT);
 					tcp_send_data(tcp, tcp->tcp_wq, ack_mp);
 					BUMP_LOCAL(tcp->tcp_obsegs);
-					BUMP_MIB(&tcp_mib, tcpOutAck);
+					BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
 
 					/* Send up T_CONN_CON */
 					putnext(tcp->tcp_rq, mp1);
@@ -13012,7 +13116,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 				 * as usual.  Mark this tcp as not capable
 				 * of fusion.
 				 */
-				TCP_STAT(tcp_fusion_unfusable);
+				TCP_STAT(tcps, tcp_fusion_unfusable);
 				tcp->tcp_unfusable = B_TRUE;
 				putnext(tcp->tcp_rq, mp1);
 			}
@@ -13091,8 +13195,9 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 	case TCPS_CLOSED:
 	case TCPS_BOUND: {
 		conn_t	*new_connp;
+		ip_stack_t *ipst = tcps->tcps_netstack->netstack_ip;
 
-		new_connp = ipcl_classify(mp, connp->conn_zoneid);
+		new_connp = ipcl_classify(mp, connp->conn_zoneid, ipst);
 		if (new_connp != NULL) {
 			tcp_reinput(new_connp, mp, connp->conn_sqp);
 			return;
@@ -13127,7 +13232,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 	 */
 	if (TCP_IS_DETACHED_NONEAGER(tcp) &&
 	    (seg_len > 0 && SEQ_GT(seg_seq + seg_len, tcp->tcp_rnxt))) {
-		BUMP_MIB(&tcp_mib, tcpInClosed);
+		BUMP_MIB(&tcps->tcps_mib, tcpInClosed);
 		TCP_RECORD_TRACE(tcp,
 		    mp, TCP_TRACE_RECV_PKT);
 
@@ -13195,8 +13300,8 @@ try_again:;
 			/* Recompute the gaps after noting the SYN. */
 			goto try_again;
 		}
-		BUMP_MIB(&tcp_mib, tcpInDataDupSegs);
-		UPDATE_MIB(&tcp_mib, tcpInDataDupBytes,
+		BUMP_MIB(&tcps->tcps_mib, tcpInDataDupSegs);
+		UPDATE_MIB(&tcps->tcps_mib, tcpInDataDupBytes,
 		    (seg_len > -gap ? -gap : seg_len));
 		/* Remove the old stuff from seg_len. */
 		seg_len += gap;
@@ -13313,10 +13418,11 @@ try_again:;
 		mblk_t	*mp2;
 
 		if (tcp->tcp_rwnd == 0) {
-			BUMP_MIB(&tcp_mib, tcpInWinProbe);
+			BUMP_MIB(&tcps->tcps_mib, tcpInWinProbe);
 		} else {
-			BUMP_MIB(&tcp_mib, tcpInDataPastWinSegs);
-			UPDATE_MIB(&tcp_mib, tcpInDataPastWinBytes, -rgap);
+			BUMP_MIB(&tcps->tcps_mib, tcpInDataPastWinSegs);
+			UPDATE_MIB(&tcps->tcps_mib,
+			    tcpInDataPastWinBytes, -rgap);
 		}
 
 		/*
@@ -13533,8 +13639,8 @@ ok:;
 			}
 		}
 	} else if (seg_len > 0) {
-		BUMP_MIB(&tcp_mib, tcpInDataInorderSegs);
-		UPDATE_MIB(&tcp_mib, tcpInDataInorderBytes, seg_len);
+		BUMP_MIB(&tcps->tcps_mib, tcpInDataInorderSegs);
+		UPDATE_MIB(&tcps->tcps_mib, tcpInDataInorderBytes, seg_len);
 		/*
 		 * If an out of order FIN was received before, and the seq
 		 * num and len of the new segment match that of the FIN,
@@ -13910,7 +14016,7 @@ process_ack:
 			 * simultaneous active opens.
 			 */
 			if (tcp->tcp_loopback) {
-				TCP_STAT(tcp_fusion_unfusable);
+				TCP_STAT(tcps, tcp_fusion_unfusable);
 				tcp->tcp_unfusable = B_TRUE;
 			}
 		}
@@ -14006,7 +14112,7 @@ process_ack:
 		if (!ofo_seg && seg_len == 0 && new_swnd == tcp->tcp_swnd) {
 			int dupack_cnt;
 
-			BUMP_MIB(&tcp_mib, tcpInDupAck);
+			BUMP_MIB(&tcps->tcps_mib, tcpInDupAck);
 			/*
 			 * Fast retransmit.  When we have seen exactly three
 			 * identical ACKs while we have unacked data
@@ -14019,7 +14125,7 @@ process_ack:
 			    ! tcp->tcp_rexmit) {
 				/* Do Limited Transmit */
 				if ((dupack_cnt = ++tcp->tcp_dupack_cnt) <
-				    tcp_dupack_fast_retransmit) {
+				    tcps->tcps_dupack_fast_retransmit) {
 					/*
 					 * RFC 3042
 					 *
@@ -14050,7 +14156,7 @@ process_ack:
 						flags |= TH_LIMIT_XMIT;
 					}
 				} else if (dupack_cnt ==
-				    tcp_dupack_fast_retransmit) {
+				    tcps->tcps_dupack_fast_retransmit) {
 
 				/*
 				 * If we have reduced tcp_ssthresh
@@ -14178,7 +14284,7 @@ process_ack:
 			if (new_swnd != 0) {
 				/* tcp_suna != tcp_snxt */
 				/* Packet contains a window update */
-				BUMP_MIB(&tcp_mib, tcpInWinUpdate);
+				BUMP_MIB(&tcps->tcps_mib, tcpInWinUpdate);
 				tcp->tcp_zero_win_probe = 0;
 				tcp->tcp_timer_backoff = 0;
 				tcp->tcp_ms_we_have_waited = 0;
@@ -14216,7 +14322,7 @@ process_ack:
 	 * Should we send ACKs in response to ACK only segments?
 	 */
 	if (SEQ_GT(seg_ack, tcp->tcp_snxt)) {
-		BUMP_MIB(&tcp_mib, tcpInAckUnsent);
+		BUMP_MIB(&tcps->tcps_mib, tcpInAckUnsent);
 		/* drop the received segment */
 		freemsg(mp);
 
@@ -14231,14 +14337,14 @@ process_ack:
 		 */
 		if (tcp_drop_ack_unsent_cnt > 0 &&
 		    ++tcp->tcp_in_ack_unsent > tcp_drop_ack_unsent_cnt) {
-			TCP_STAT(tcp_in_ack_unsent_drop);
+			TCP_STAT(tcps, tcp_in_ack_unsent_drop);
 			return;
 		}
 		mp = tcp_ack_mp(tcp);
 		if (mp != NULL) {
 			TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_SEND_PKT);
 			BUMP_LOCAL(tcp->tcp_obsegs);
-			BUMP_MIB(&tcp_mib, tcpOutAck);
+			BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
 			tcp_send_data(tcp, tcp->tcp_wq, mp);
 		}
 		return;
@@ -14259,7 +14365,7 @@ process_ack:
 	 * window was inflated to account for the other side's
 	 * cached packets, retract it.  If it is, do Hoe's algorithm.
 	 */
-	if (tcp->tcp_dupack_cnt >= tcp_dupack_fast_retransmit) {
+	if (tcp->tcp_dupack_cnt >= tcps->tcps_dupack_fast_retransmit) {
 		ASSERT(tcp->tcp_rexmit == B_FALSE);
 		if (SEQ_GEQ(seg_ack, tcp->tcp_rexmit_max)) {
 			tcp->tcp_dupack_cnt = 0;
@@ -14303,7 +14409,7 @@ process_ack:
 				 * segments.
 				 */
 				tcp->tcp_cwnd = tcp->tcp_cwnd_ssthresh +
-					tcp_dupack_fast_retransmit * mss;
+				    tcps->tcps_dupack_fast_retransmit * mss;
 				tcp->tcp_cwnd_cnt = tcp->tcp_cwnd;
 				flags |= TH_REXMIT_NEEDED;
 			}
@@ -14342,8 +14448,8 @@ process_ack:
 		}
 	}
 
-	BUMP_MIB(&tcp_mib, tcpInAckSegs);
-	UPDATE_MIB(&tcp_mib, tcpInAckBytes, bytes_acked);
+	BUMP_MIB(&tcps->tcps_mib, tcpInAckSegs);
+	UPDATE_MIB(&tcps->tcps_mib, tcpInAckBytes, bytes_acked);
 	tcp->tcp_suna = seg_ack;
 	if (tcp->tcp_zero_win_probe != 0) {
 		tcp->tcp_zero_win_probe = 0;
@@ -14425,7 +14531,7 @@ process_ack:
 			tcp_set_rto(tcp, (int32_t)lbolt -
 			    (int32_t)(intptr_t)mp1->b_prev);
 		else
-			BUMP_MIB(&tcp_mib, tcpRttNoUpdate);
+			BUMP_MIB(&tcps->tcps_mib, tcpRttNoUpdate);
 
 		/* Remeber the last sequence to be ACKed */
 		tcp->tcp_csuna = seg_ack;
@@ -14434,7 +14540,7 @@ process_ack:
 			tcp->tcp_set_timer = 0;
 		}
 	} else {
-		BUMP_MIB(&tcp_mib, tcpRttNoUpdate);
+		BUMP_MIB(&tcps->tcps_mib, tcpRttNoUpdate);
 	}
 
 	/* Eat acknowledged bytes off the xmit queue. */
@@ -14605,7 +14711,7 @@ est:
 				 * flushing the FIN_WAIT_2 connection.
 				 */
 				TCP_TIMER_RESTART(tcp,
-				    tcp_fin_wait_2_flush_interval);
+				    tcps->tcps_fin_wait_2_flush_interval);
 			}
 			break;
 		case TCPS_FIN_WAIT_2:
@@ -14628,10 +14734,10 @@ est:
 				tcp->tcp_exclbind = 0;
 				if (!TCP_IS_DETACHED(tcp)) {
 					TCP_TIMER_RESTART(tcp,
-					    tcp_time_wait_interval);
+					    tcps->tcps_time_wait_interval);
 				} else {
 					tcp_time_wait_append(tcp);
-					TCP_DBGSTAT(tcp_rput_time_wait);
+					TCP_DBGSTAT(tcps, tcp_rput_time_wait);
 				}
 			}
 			/*FALLTHRU*/
@@ -14683,10 +14789,10 @@ est:
 				tcp->tcp_exclbind = 0;
 				if (!TCP_IS_DETACHED(tcp)) {
 					TCP_TIMER_RESTART(tcp,
-					    tcp_time_wait_interval);
+					    tcps->tcps_time_wait_interval);
 				} else {
 					tcp_time_wait_append(tcp);
-					TCP_DBGSTAT(tcp_rput_time_wait);
+					TCP_DBGSTAT(tcps, tcp_rput_time_wait);
 				}
 				if (seg_len) {
 					/*
@@ -14879,9 +14985,9 @@ est:
 			 * do anything for a detached tcp.
 			 */
 			if (!TCP_IS_DETACHED(tcp))
-				tcp->tcp_push_tid = TCP_TIMER(tcp,
-				    tcp_push_timer,
-				    MSEC_TO_TICK(tcp_push_timer_interval));
+			    tcp->tcp_push_tid = TCP_TIMER(tcp,
+				tcp_push_timer,
+				MSEC_TO_TICK(tcps->tcps_push_timer_interval));
 		}
 	}
 xmit_check:
@@ -14898,7 +15004,7 @@ xmit_check:
 		if (flags & TH_REXMIT_NEEDED) {
 			uint32_t snd_size = tcp->tcp_snxt - tcp->tcp_suna;
 
-			BUMP_MIB(&tcp_mib, tcpOutFastRetrans);
+			BUMP_MIB(&tcps->tcps_mib, tcpOutFastRetrans);
 			if (snd_size > mss)
 				snd_size = mss;
 			if (snd_size > tcp->tcp_swnd)
@@ -14910,8 +15016,9 @@ xmit_check:
 			if (mp1 != NULL) {
 				tcp->tcp_xmit_head->b_prev = (mblk_t *)lbolt;
 				tcp->tcp_csuna = tcp->tcp_snxt;
-				BUMP_MIB(&tcp_mib, tcpRetransSegs);
-				UPDATE_MIB(&tcp_mib, tcpRetransBytes, snd_size);
+				BUMP_MIB(&tcps->tcps_mib, tcpRetransSegs);
+				UPDATE_MIB(&tcps->tcps_mib,
+				    tcpRetransBytes, snd_size);
 				TCP_RECORD_TRACE(tcp, mp1,
 				    TCP_TRACE_SEND_PKT);
 				tcp_send_data(tcp, tcp->tcp_wq, mp1);
@@ -14985,7 +15092,7 @@ ack_check:
 			TCP_RECORD_TRACE(tcp, mp1, TCP_TRACE_SEND_PKT);
 			tcp_send_data(tcp, tcp->tcp_wq, mp1);
 			BUMP_LOCAL(tcp->tcp_obsegs);
-			BUMP_MIB(&tcp_mib, tcpOutAck);
+			BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
 		}
 		if (tcp->tcp_ack_tid != 0) {
 			(void) TCP_TIMER_CANCEL(tcp, tcp->tcp_ack_tid);
@@ -15000,8 +15107,8 @@ ack_check:
 		if (tcp->tcp_ack_tid == 0) {
 			tcp->tcp_ack_tid = TCP_TIMER(tcp, tcp_ack_timer,
 			    MSEC_TO_TICK(tcp->tcp_localnet ?
-			    (clock_t)tcp_local_dack_interval :
-			    (clock_t)tcp_deferred_ack_interval));
+			    (clock_t)tcps->tcps_local_dack_interval :
+			    (clock_t)tcps->tcps_deferred_ack_interval));
 		}
 	}
 	if (flags & TH_ORDREL_NEEDED) {
@@ -15470,6 +15577,7 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 	mblk_t *lsoi;
 	int	retval;
 	mblk_t *ire_mp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	switch (mp->b_datap->db_type) {
 	case M_PROTO:
@@ -15580,12 +15688,12 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 			 * round up.
 			 */
 			tcp->tcp_rwnd = MAX(MSS_ROUNDUP(tcp->tcp_rwnd, mss),
-			    tcp_recv_hiwat_minmss * mss);
+			    tcps->tcps_recv_hiwat_minmss * mss);
 			q->q_hiwat = tcp->tcp_rwnd;
 			tcp_set_ws_value(tcp);
 			U32_TO_ABE16((tcp->tcp_rwnd >> tcp->tcp_rcv_ws),
 			    tcp->tcp_tcph->th_win);
-			if (tcp->tcp_rcv_ws > 0 || tcp_wscale_always)
+			if (tcp->tcp_rcv_ws > 0 || tcps->tcps_wscale_always)
 				tcp->tcp_snd_ws_ok = B_TRUE;
 
 			/*
@@ -15594,8 +15702,8 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 			 * include the timestamp
 			 * option in the SYN segment.
 			 */
-			if (tcp_tstamp_always ||
-			    (tcp->tcp_rcv_ws && tcp_tstamp_if_wscale)) {
+			if (tcps->tcps_tstamp_always ||
+			    (tcp->tcp_rcv_ws && tcps->tcps_tstamp_if_wscale)) {
 				tcp->tcp_snd_ts_ok = B_TRUE;
 			}
 
@@ -15604,7 +15712,7 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 			 * tcp_adapt_ire() if the sack metric
 			 * is set.  So check it here also.
 			 */
-			if (tcp_sack_permitted == 2 ||
+			if (tcps->tcps_sack_permitted == 2 ||
 			    tcp->tcp_snd_sack_ok) {
 				if (tcp->tcp_sack_info == NULL) {
 					tcp->tcp_sack_info =
@@ -15622,7 +15730,7 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 			 * enabled IP packets.  Setting it to 1 avoids
 			 * compatibility problems.
 			 */
-			if (tcp_ecn_permitted == 2)
+			if (tcps->tcps_ecn_permitted == 2)
 				tcp->tcp_ecn_ok = B_TRUE;
 
 			TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
@@ -15778,10 +15886,11 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 	tcp_t	*tcp = connp->conn_tcp;
 	queue_t	*q = tcp->tcp_rq;
 	uint_t	thwin;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	freeb(mp);
 
-	TCP_STAT(tcp_rsrv_calls);
+	TCP_STAT(tcps, tcp_rsrv_calls);
 
 	if (TCP_IS_DETACHED(tcp) || q == NULL) {
 		return;
@@ -15809,7 +15918,7 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 
 		tcp_clrqfull(peer_tcp);
 		TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(tcp);
-		TCP_STAT(tcp_fusion_backenabled);
+		TCP_STAT(tcps, tcp_fusion_backenabled);
 		return;
 	}
 
@@ -15829,7 +15938,7 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 			tcp_xmit_ctl(NULL, tcp,
 			    (tcp->tcp_swnd == 0) ? tcp->tcp_suna :
 			    tcp->tcp_snxt, tcp->tcp_rnxt, TH_ACK);
-			BUMP_MIB(&tcp_mib, tcpOutWinUpdate);
+			BUMP_MIB(&tcps->tcps_mib, tcpOutWinUpdate);
 		}
 	}
 	/* Handle a failure to allocate a T_ORDREL_IND here */
@@ -15879,12 +15988,13 @@ tcp_rsrv(queue_t *q)
 	conn_t *connp = Q_TO_CONN(q);
 	tcp_t	*tcp = connp->conn_tcp;
 	mblk_t	*mp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/* No code does a putq on the read side */
 	ASSERT(q->q_first == NULL);
 
 	/* Nothing to do for the default queue */
-	if (q == tcp_g_q) {
+	if (q == tcps->tcps_g_q) {
 		return;
 	}
 
@@ -15937,6 +16047,7 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 	uint32_t	old_max_rwnd;
 	uint32_t	max_transmittable_rwnd;
 	boolean_t	tcp_detached = TCP_IS_DETACHED(tcp);
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (tcp->tcp_fused) {
 		size_t sth_hiwat;
@@ -15973,7 +16084,7 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 	 * funny TCP interactions of Nagle algorithm, SWS avoidance
 	 * and delayed acknowledgement.
 	 */
-	rwnd = MAX(rwnd, tcp_recv_hiwat_minmss * mss);
+	rwnd = MAX(rwnd, tcps->tcps_recv_hiwat_minmss * mss);
 
 	/*
 	 * If window size info has already been exchanged, TCP should not
@@ -16005,7 +16116,7 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 	}
 	if (tcp->tcp_localnet) {
 		tcp->tcp_rack_abs_max =
-		    MIN(tcp_local_dacks_max, rwnd / mss / 2);
+		    MIN(tcps->tcps_local_dacks_max, rwnd / mss / 2);
 	} else {
 		/*
 		 * For a remote host on a different subnet (through a router),
@@ -16013,7 +16124,7 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 		 * tcp_deferred_acks_max is default to 2.
 		 */
 		tcp->tcp_rack_abs_max =
-		    MIN(tcp_deferred_acks_max, rwnd / mss / 2);
+		    MIN(tcps->tcps_deferred_acks_max, rwnd / mss / 2);
 	}
 	if (tcp->tcp_rack_cur_max > tcp->tcp_rack_abs_max)
 		tcp->tcp_rack_cur_max = tcp->tcp_rack_abs_max;
@@ -16042,7 +16153,8 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 	 * prefer to choose these values algorithmically, with a likely
 	 * relationship to rwnd.
 	 */
-	(void) mi_set_sth_hiwat(tcp->tcp_rq, MAX(rwnd, tcp_sth_rcv_hiwat));
+	(void) mi_set_sth_hiwat(tcp->tcp_rq,
+	    MAX(rwnd, tcps->tcps_sth_rcv_hiwat));
 	return (rwnd);
 }
 
@@ -16072,6 +16184,8 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 	zoneid_t 		zoneid;
 	int			v4_conn_idx;
 	int			v6_conn_idx;
+	tcp_stack_t		*tcps = Q_TO_TCP(q)->tcp_tcps;
+	ip_stack_t	*ipst;
 
 	if (mpctl == NULL ||
 	    (mpdata = mpctl->b_cont) == NULL ||
@@ -16087,22 +16201,23 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 	}
 
 	/* build table of connections -- need count in fixed part */
-	SET_MIB(tcp_mib.tcpRtoAlgorithm, 4);   /* vanj */
-	SET_MIB(tcp_mib.tcpRtoMin, tcp_rexmit_interval_min);
-	SET_MIB(tcp_mib.tcpRtoMax, tcp_rexmit_interval_max);
-	SET_MIB(tcp_mib.tcpMaxConn, -1);
-	SET_MIB(tcp_mib.tcpCurrEstab, 0);
+	SET_MIB(tcps->tcps_mib.tcpRtoAlgorithm, 4);   /* vanj */
+	SET_MIB(tcps->tcps_mib.tcpRtoMin, tcps->tcps_rexmit_interval_min);
+	SET_MIB(tcps->tcps_mib.tcpRtoMax, tcps->tcps_rexmit_interval_max);
+	SET_MIB(tcps->tcps_mib.tcpMaxConn, -1);
+	SET_MIB(tcps->tcps_mib.tcpCurrEstab, 0);
 
 	ispriv =
-	    secpolicy_net_config((Q_TO_CONN(q))->conn_cred, B_TRUE) == 0;
+	    secpolicy_ip_config((Q_TO_CONN(q))->conn_cred, B_TRUE) == 0;
 	zoneid = Q_TO_CONN(q)->conn_zoneid;
 
 	v4_conn_idx = v6_conn_idx = 0;
 	mp_conn_tail = mp_attr_tail = mp6_conn_tail = mp6_attr_tail = NULL;
 
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
+		ipst = tcps->tcps_netstack->netstack_ip;
 
-		connfp = &ipcl_globalhash_fanout[i];
+		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
 
 		connp = NULL;
 
@@ -16115,16 +16230,18 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 				continue;	/* not in this zone */
 
 			tcp = connp->conn_tcp;
-			UPDATE_MIB(&tcp_mib, tcpHCInSegs, tcp->tcp_ibsegs);
+			UPDATE_MIB(&tcps->tcps_mib,
+			    tcpHCInSegs, tcp->tcp_ibsegs);
 			tcp->tcp_ibsegs = 0;
-			UPDATE_MIB(&tcp_mib, tcpHCOutSegs, tcp->tcp_obsegs);
+			UPDATE_MIB(&tcps->tcps_mib,
+			    tcpHCOutSegs, tcp->tcp_obsegs);
 			tcp->tcp_obsegs = 0;
 
 			tce6.tcp6ConnState = tce.tcpConnState =
 			    tcp_snmp_state(tcp);
 			if (tce.tcpConnState == MIB2_TCP_established ||
 			    tce.tcpConnState == MIB2_TCP_closeWait)
-				BUMP_MIB(&tcp_mib, tcpCurrEstab);
+				BUMP_MIB(&tcps->tcps_mib, tcpCurrEstab);
 
 			needattr = B_FALSE;
 			bzero(&mlp, sizeof (mlp));
@@ -16268,15 +16385,17 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 	}
 
 	/* fixed length structure for IPv4 and IPv6 counters */
-	SET_MIB(tcp_mib.tcpConnTableSize, sizeof (mib2_tcpConnEntry_t));
-	SET_MIB(tcp_mib.tcp6ConnTableSize, sizeof (mib2_tcp6ConnEntry_t));
+	SET_MIB(tcps->tcps_mib.tcpConnTableSize, sizeof (mib2_tcpConnEntry_t));
+	SET_MIB(tcps->tcps_mib.tcp6ConnTableSize,
+	    sizeof (mib2_tcp6ConnEntry_t));
 	/* synchronize 32- and 64-bit counters */
-	SYNC32_MIB(&tcp_mib, tcpInSegs, tcpHCInSegs);
-	SYNC32_MIB(&tcp_mib, tcpOutSegs, tcpHCOutSegs);
+	SYNC32_MIB(&tcps->tcps_mib, tcpInSegs, tcpHCInSegs);
+	SYNC32_MIB(&tcps->tcps_mib, tcpOutSegs, tcpHCOutSegs);
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_TCP;
 	optp->name = 0;
-	(void) snmp_append_data(mpdata, (char *)&tcp_mib, sizeof (tcp_mib));
+	(void) snmp_append_data(mpdata, (char *)&tcps->tcps_mib,
+	    sizeof (tcps->tcps_mib));
 	optp->len = msgdsize(mpdata);
 	qreply(q, mpctl);
 
@@ -16395,7 +16514,7 @@ tcp_report_item(mblk_t *mp, tcp_t *tcp, int hashval, tcp_t *thisstream,
     cred_t *cr)
 {
 	char hash[10], addrbuf[INET6_ADDRSTRLEN];
-	boolean_t ispriv = secpolicy_net_config(cr, B_TRUE) == 0;
+	boolean_t ispriv = secpolicy_ip_config(cr, B_TRUE) == 0;
 	char cflag;
 	in6_addr_t	v6dst;
 	char buf[80];
@@ -16512,6 +16631,11 @@ tcp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	conn_t	*connp;
 	connf_t	*connfp;
 	zoneid_t zoneid;
+	tcp_stack_t *tcps;
+	ip_stack_t *ipst;
+
+	zoneid = Q_TO_CONN(q)->conn_zoneid;
+	tcps = Q_TO_TCP(q)->tcp_tcps;
 
 	/*
 	 * Because of the ndd constraint, at most we can have 64K buffer
@@ -16521,9 +16645,9 @@ tcp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	 * we limit the rate of doing this using tcp_ndd_get_info_interval.
 	 * This should be OK as normal users should not do this too often.
 	 */
-	if (cr == NULL || secpolicy_net_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - tcp_last_ndd_get_info_time <
-		    drv_usectohz(tcp_ndd_get_info_interval * 1000)) {
+	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
+		if (ddi_get_lbolt() - tcps->tcps_last_ndd_get_info_time <
+		    drv_usectohz(tcps->tcps_ndd_get_info_interval * 1000)) {
 			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
 			return (0);
 		}
@@ -16536,10 +16660,10 @@ tcp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 	(void) mi_mpprintf(mp, "%s", tcp_report_header);
 
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
 
-		connfp = &ipcl_globalhash_fanout[i];
+		ipst = tcps->tcps_netstack->netstack_ip;
+		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
 
 		connp = NULL;
 
@@ -16555,7 +16679,7 @@ tcp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 	}
 
-	tcp_last_ndd_get_info_time = ddi_get_lbolt();
+	tcps->tcps_last_ndd_get_info_time = ddi_get_lbolt();
 	return (0);
 }
 
@@ -16568,11 +16692,14 @@ tcp_bind_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	tcp_t	*tcp;
 	int	i;
 	zoneid_t zoneid;
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
+
+	zoneid = Q_TO_CONN(q)->conn_zoneid;
 
 	/* Refer to comments in tcp_status_report(). */
-	if (cr == NULL || secpolicy_net_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - tcp_last_ndd_get_info_time <
-		    drv_usectohz(tcp_ndd_get_info_interval * 1000)) {
+	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
+		if (ddi_get_lbolt() - tcps->tcps_last_ndd_get_info_time <
+		    drv_usectohz(tcps->tcps_ndd_get_info_interval * 1000)) {
 			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
 			return (0);
 		}
@@ -16585,10 +16712,8 @@ tcp_bind_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 	(void) mi_mpprintf(mp, "    %s", tcp_report_header);
 
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
-
-	for (i = 0; i < A_CNT(tcp_bind_fanout); i++) {
-		tbf = &tcp_bind_fanout[i];
+	for (i = 0; i < TCP_BIND_FANOUT_SIZE; i++) {
+		tbf = &tcps->tcps_bind_fanout[i];
 		mutex_enter(&tbf->tf_lock);
 		for (tcp = tbf->tf_tcp; tcp != NULL;
 		    tcp = tcp->tcp_bind_hash) {
@@ -16602,7 +16727,7 @@ tcp_bind_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 		}
 		mutex_exit(&tbf->tf_lock);
 	}
-	tcp_last_ndd_get_info_time = ddi_get_lbolt();
+	tcps->tcps_last_ndd_get_info_time = ddi_get_lbolt();
 	return (0);
 }
 
@@ -16616,11 +16741,16 @@ tcp_listen_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	tcp_t	*tcp;
 	int	i;
 	zoneid_t zoneid;
+	tcp_stack_t *tcps;
+	ip_stack_t	*ipst;
+
+	zoneid = Q_TO_CONN(q)->conn_zoneid;
+	tcps = Q_TO_TCP(q)->tcp_tcps;
 
 	/* Refer to comments in tcp_status_report(). */
-	if (cr == NULL || secpolicy_net_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - tcp_last_ndd_get_info_time <
-		    drv_usectohz(tcp_ndd_get_info_interval * 1000)) {
+	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
+		if (ddi_get_lbolt() - tcps->tcps_last_ndd_get_info_time <
+		    drv_usectohz(tcps->tcps_ndd_get_info_interval * 1000)) {
 			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
 			return (0);
 		}
@@ -16635,10 +16765,10 @@ tcp_listen_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	    "    TCP    " MI_COL_HDRPAD_STR
 	    "zone IP addr         port  seqnum   backlog (q0/q/max)");
 
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
+	ipst = tcps->tcps_netstack->netstack_ip;
 
-	for (i = 0; i < ipcl_bind_fanout_size; i++) {
-		connfp =  &ipcl_bind_fanout[i];
+	for (i = 0; i < ipst->ips_ipcl_bind_fanout_size; i++) {
+		connfp = &ipst->ips_ipcl_bind_fanout[i];
 		connp = NULL;
 		while ((connp =
 		    ipcl_get_next_conn(connfp, connp, IPCL_TCP)) != NULL) {
@@ -16650,7 +16780,7 @@ tcp_listen_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 		}
 	}
 
-	tcp_last_ndd_get_info_time = ddi_get_lbolt();
+	tcps->tcps_last_ndd_get_info_time = ddi_get_lbolt();
 	return (0);
 }
 
@@ -16664,11 +16794,17 @@ tcp_conn_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	tcp_t	*tcp;
 	int	i;
 	zoneid_t zoneid;
+	tcp_stack_t *tcps;
+	ip_stack_t *ipst;
+
+	zoneid = Q_TO_CONN(q)->conn_zoneid;
+	tcps = Q_TO_TCP(q)->tcp_tcps;
+	ipst = tcps->tcps_netstack->netstack_ip;
 
 	/* Refer to comments in tcp_status_report(). */
-	if (cr == NULL || secpolicy_net_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - tcp_last_ndd_get_info_time <
-		    drv_usectohz(tcp_ndd_get_info_interval * 1000)) {
+	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
+		if (ddi_get_lbolt() - tcps->tcps_last_ndd_get_info_time <
+		    drv_usectohz(tcps->tcps_ndd_get_info_interval * 1000)) {
 			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
 			return (0);
 		}
@@ -16680,13 +16816,11 @@ tcp_conn_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	}
 
 	(void) mi_mpprintf(mp, "tcp_conn_hash_size = %d",
-	    ipcl_conn_fanout_size);
+	    ipst->ips_ipcl_conn_fanout_size);
 	(void) mi_mpprintf(mp, "    %s", tcp_report_header);
 
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
-
-	for (i = 0; i < ipcl_conn_fanout_size; i++) {
-		connfp =  &ipcl_conn_fanout[i];
+	for (i = 0; i < ipst->ips_ipcl_conn_fanout_size; i++) {
+		connfp =  &ipst->ips_ipcl_conn_fanout[i];
 		connp = NULL;
 		while ((connp =
 		    ipcl_get_next_conn(connfp, connp, IPCL_TCP)) != NULL) {
@@ -16699,7 +16833,7 @@ tcp_conn_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 		}
 	}
 
-	tcp_last_ndd_get_info_time = ddi_get_lbolt();
+	tcps->tcps_last_ndd_get_info_time = ddi_get_lbolt();
 	return (0);
 }
 
@@ -16712,11 +16846,15 @@ tcp_acceptor_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	tcp_t	*tcp;
 	int	i;
 	zoneid_t zoneid;
+	tcp_stack_t	*tcps;
+
+	zoneid = Q_TO_CONN(q)->conn_zoneid;
+	tcps = Q_TO_TCP(q)->tcp_tcps;
 
 	/* Refer to comments in tcp_status_report(). */
-	if (cr == NULL || secpolicy_net_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - tcp_last_ndd_get_info_time <
-		    drv_usectohz(tcp_ndd_get_info_interval * 1000)) {
+	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
+		if (ddi_get_lbolt() - tcps->tcps_last_ndd_get_info_time <
+		    drv_usectohz(tcps->tcps_ndd_get_info_interval * 1000)) {
 			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
 			return (0);
 		}
@@ -16729,10 +16867,8 @@ tcp_acceptor_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 	(void) mi_mpprintf(mp, "    %s", tcp_report_header);
 
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
-
-	for (i = 0; i < A_CNT(tcp_acceptor_fanout); i++) {
-		tf = &tcp_acceptor_fanout[i];
+	for (i = 0; i < TCP_FANOUT_SIZE; i++) {
+		tf = &tcps->tcps_acceptor_fanout[i];
 		mutex_enter(&tf->tf_lock);
 		for (tcp = tf->tf_tcp; tcp != NULL;
 		    tcp = tcp->tcp_acceptor_hash) {
@@ -16744,7 +16880,7 @@ tcp_acceptor_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 		}
 		mutex_exit(&tf->tf_lock);
 	}
-	tcp_last_ndd_get_info_time = ddi_get_lbolt();
+	tcps->tcps_last_ndd_get_info_time = ddi_get_lbolt();
 	return (0);
 }
 
@@ -16764,6 +16900,7 @@ tcp_timer(void *arg)
 	uint32_t	mss;
 	conn_t		*connp = (conn_t *)arg;
 	tcp_t		*tcp = connp->conn_tcp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	tcp->tcp_timer_tid = 0;
 
@@ -16796,8 +16933,8 @@ tcp_timer(void *arg)
 			}
 			if (!listener->tcp_syn_defense &&
 			    (listener->tcp_syn_rcvd_timeout >
-			    (tcp_conn_req_max_q0 >> 2)) &&
-			    (tcp_conn_req_max_q0 > 200)) {
+			    (tcps->tcps_conn_req_max_q0 >> 2)) &&
+			    (tcps->tcps_conn_req_max_q0 > 200)) {
 				/* We may be under attack. Put on a defense. */
 				listener->tcp_syn_defense = B_TRUE;
 				cmn_err(CE_WARN, "High TCP connect timeout "
@@ -16844,7 +16981,7 @@ tcp_timer(void *arg)
 		if (tcp->tcp_suna != tcp->tcp_snxt) {
 			clock_t	time_to_wait;
 
-			BUMP_MIB(&tcp_mib, tcpTimRetrans);
+			BUMP_MIB(&tcps->tcps_mib, tcpTimRetrans);
 			if (!tcp->tcp_xmit_head)
 				break;
 			time_to_wait = lbolt -
@@ -16856,7 +16993,7 @@ tcp_timer(void *arg)
 			 * restart the timer.
 			 */
 			if (time_to_wait > msec_per_tick) {
-				TCP_STAT(tcp_timer_fire_early);
+				TCP_STAT(tcps, tcp_timer_fire_early);
 				TCP_TIMER_RESTART(tcp, time_to_wait);
 				return;
 			}
@@ -16937,7 +17074,7 @@ tcp_timer(void *arg)
 				/* Extend window for zero window probe */
 				tcp->tcp_swnd++;
 				tcp->tcp_zero_win_probe = B_TRUE;
-				BUMP_MIB(&tcp_mib, tcpOutWinProbe);
+				BUMP_MIB(&tcps->tcps_mib, tcpOutWinProbe);
 			} else {
 				/*
 				 * Handle timeout from sender SWS avoidance.
@@ -16965,7 +17102,7 @@ tcp_timer(void *arg)
 		    !tcp->tcp_fin_acked)
 			break;
 		/* Nothing to do, return without restarting timer. */
-		TCP_STAT(tcp_timer_fire_miss);
+		TCP_STAT(tcps, tcp_timer_fire_miss);
 		return;
 	case TCPS_FIN_WAIT_2:
 		/*
@@ -16977,7 +17114,8 @@ tcp_timer(void *arg)
 		if (TCP_IS_DETACHED(tcp)) {
 			(void) tcp_clean_death(tcp, 0, 23);
 		} else {
-			TCP_TIMER_RESTART(tcp, tcp_fin_wait_2_flush_interval);
+			TCP_TIMER_RESTART(tcp,
+			    tcps->tcps_fin_wait_2_flush_interval);
 		}
 		return;
 	case TCPS_TIME_WAIT:
@@ -17001,7 +17139,7 @@ tcp_timer(void *arg)
 		if ((tcp->tcp_zero_win_probe == 0) ||
 		    (TICK_TO_MSEC(lbolt - tcp->tcp_last_recv_time) >
 		    second_threshold)) {
-			BUMP_MIB(&tcp_mib, tcpTimRetransDrop);
+			BUMP_MIB(&tcps->tcps_mib, tcpTimRetransDrop);
 			/*
 			 * If TCP is in SYN_RCVD state, send back a
 			 * RST|ACK as BSD does.  Note that tcp_zero_win_probe
@@ -17059,19 +17197,19 @@ tcp_timer(void *arg)
 	}
 	tcp->tcp_timer_backoff++;
 	if ((ms = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
-	    tcp_rexmit_interval_extra + (tcp->tcp_rtt_sa >> 5)) <
-	    tcp_rexmit_interval_min) {
+	    tcps->tcps_rexmit_interval_extra + (tcp->tcp_rtt_sa >> 5)) <
+	    tcps->tcps_rexmit_interval_min) {
 		/*
 		 * This means the original RTO is tcp_rexmit_interval_min.
 		 * So we will use tcp_rexmit_interval_min as the RTO value
 		 * and do the backoff.
 		 */
-		ms = tcp_rexmit_interval_min << tcp->tcp_timer_backoff;
+		ms = tcps->tcps_rexmit_interval_min << tcp->tcp_timer_backoff;
 	} else {
 		ms <<= tcp->tcp_timer_backoff;
 	}
-	if (ms > tcp_rexmit_interval_max) {
-		ms = tcp_rexmit_interval_max;
+	if (ms > tcps->tcps_rexmit_interval_max) {
+		ms = tcps->tcps_rexmit_interval_max;
 		/*
 		 * ms is at max, decrement tcp_timer_backoff to avoid
 		 * overflow.
@@ -17135,8 +17273,8 @@ tcp_timer(void *arg)
 	}
 
 	tcp->tcp_csuna = tcp->tcp_snxt;
-	BUMP_MIB(&tcp_mib, tcpRetransSegs);
-	UPDATE_MIB(&tcp_mib, tcpRetransBytes, mss);
+	BUMP_MIB(&tcps->tcps_mib, tcpRetransSegs);
+	UPDATE_MIB(&tcps->tcps_mib, tcpRetransBytes, mss);
 	TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_SEND_PKT);
 	tcp_send_data(tcp, tcp->tcp_wq, mp);
 
@@ -17208,6 +17346,7 @@ tcp_update_next_port(in_port_t port, const tcp_t *tcp, boolean_t random)
 {
 	int i;
 	boolean_t restart = B_FALSE;
+	tcp_stack_t *tcps = tcp->tcp_tcps;
 
 	if (random && tcp_random_anon_port != 0) {
 		(void) random_get_pseudo_bytes((uint8_t *)&port,
@@ -17221,29 +17360,29 @@ tcp_update_next_port(in_port_t port, const tcp_t *tcp, boolean_t random)
 		 * port to get the random port.  It should fall into the
 		 * valid anon port range.
 		 */
-		if (port < tcp_smallest_anon_port) {
-			port = tcp_smallest_anon_port +
-			    port % (tcp_largest_anon_port -
-				tcp_smallest_anon_port);
+		if (port < tcps->tcps_smallest_anon_port) {
+			port = tcps->tcps_smallest_anon_port +
+			    port % (tcps->tcps_largest_anon_port -
+			    tcps->tcps_smallest_anon_port);
 		}
 	}
 
 retry:
-	if (port < tcp_smallest_anon_port)
-		port = (in_port_t)tcp_smallest_anon_port;
+	if (port < tcps->tcps_smallest_anon_port)
+		port = (in_port_t)tcps->tcps_smallest_anon_port;
 
-	if (port > tcp_largest_anon_port) {
+	if (port > tcps->tcps_largest_anon_port) {
 		if (restart)
 			return (0);
 		restart = B_TRUE;
-		port = (in_port_t)tcp_smallest_anon_port;
+		port = (in_port_t)tcps->tcps_smallest_anon_port;
 	}
 
-	if (port < tcp_smallest_nonpriv_port)
-		port = (in_port_t)tcp_smallest_nonpriv_port;
+	if (port < tcps->tcps_smallest_nonpriv_port)
+		port = (in_port_t)tcps->tcps_smallest_nonpriv_port;
 
-	for (i = 0; i < tcp_g_num_epriv_ports; i++) {
-		if (port == tcp_g_epriv_ports[i]) {
+	for (i = 0; i < tcps->tcps_g_num_epriv_ports; i++) {
+		if (port == tcps->tcps_g_epriv_ports[i]) {
 			port++;
 			/*
 			 * Make sure whether the port is in the
@@ -17275,9 +17414,9 @@ tcp_get_next_priv_port(const tcp_t *tcp)
 	static in_port_t next_priv_port = IPPORT_RESERVED - 1;
 	in_port_t nextport;
 	boolean_t restart = B_FALSE;
-
+	tcp_stack_t *tcps = tcp->tcp_tcps;
 retry:
-	if (next_priv_port < tcp_min_anonpriv_port ||
+	if (next_priv_port < tcps->tcps_min_anonpriv_port ||
 	    next_priv_port >= IPPORT_RESERVED) {
 		next_priv_port = IPPORT_RESERVED - 1;
 		if (restart)
@@ -17370,6 +17509,7 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	conn_t		*connp = (conn_t *)arg;
 	tcp_t		*tcp = connp->conn_tcp;
 	uint32_t	msize;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * Try and ASSERT the minimum possible references on the
@@ -17457,7 +17597,7 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	 */
 	if ((tcp->tcp_suna == snxt) && !tcp->tcp_localnet &&
 	    (TICK_TO_MSEC(lbolt - tcp->tcp_last_recv_time) >= tcp->tcp_rto)) {
-		SET_TCP_INIT_CWND(tcp, mss, tcp_slow_start_after_idle);
+		SET_TCP_INIT_CWND(tcp, mss, tcps->tcps_slow_start_after_idle);
 	}
 
 	usable = tcp->tcp_swnd;		/* tcp window size */
@@ -17530,8 +17670,8 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 
 	U32_TO_ABE32(snxt, tcph->th_seq);
 
-	BUMP_MIB(&tcp_mib, tcpOutDataSegs);
-	UPDATE_MIB(&tcp_mib, tcpOutDataBytes, len);
+	BUMP_MIB(&tcps->tcps_mib, tcpOutDataSegs);
+	UPDATE_MIB(&tcps->tcps_mib, tcpOutDataBytes, len);
 	BUMP_LOCAL(tcp->tcp_obsegs);
 
 	/* Update the latest receive window size in TCP header. */
@@ -17557,7 +17697,7 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	    (!OK_32PTR(rptr))) {
 		/* NOTE: we assume allocb returns an OK_32PTR */
 		mp = allocb(tcp->tcp_ip_hdr_len + TCP_MAX_HDR_LENGTH +
-		    tcp_wroff_xtra, BPRI_MED);
+		    tcps->tcps_wroff_xtra, BPRI_MED);
 		if (!mp) {
 			freemsg(mp1);
 			goto no_memory;
@@ -17566,7 +17706,7 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 		mp1 = mp;
 		/* Leave room for Link Level header */
 		/* hdrlen = tcp->tcp_hdr_len; */
-		rptr = &mp1->b_rptr[tcp_wroff_xtra];
+		rptr = &mp1->b_rptr[tcps->tcps_wroff_xtra];
 		mp1->b_wptr = &rptr[hdrlen];
 	}
 	mp1->b_rptr = rptr;
@@ -17657,6 +17797,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 	mblk_t			*stropt_mp = mp;
 	struct  stroptions	*stropt;
 	uint_t			thwin;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * Drop the eager's ref on the listener, that was placed when
@@ -17765,7 +17906,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 	}
 
 	stropt->so_flags = SO_HIWAT;
-	stropt->so_hiwat = MAX(q->q_hiwat, tcp_sth_rcv_hiwat);
+	stropt->so_hiwat = MAX(q->q_hiwat, tcps->tcps_sth_rcv_hiwat);
 
 	stropt->so_flags |= SO_MAXBLK;
 	stropt->so_maxblk = tcp_maxpsz_set(tcp, B_FALSE);
@@ -17800,10 +17941,10 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 		(void) tcp_maxpsz_set(tcp->tcp_loopback_peer, B_TRUE);
 	} else if (tcp->tcp_snd_sack_ok) {
 		stropt->so_wroff = tcp->tcp_hdr_len + TCPOPT_MAX_SACK_LEN +
-		    (tcp->tcp_loopback ? 0 : tcp_wroff_xtra);
+		    (tcp->tcp_loopback ? 0 : tcps->tcps_wroff_xtra);
 	} else {
 		stropt->so_wroff = tcp->tcp_hdr_len + (tcp->tcp_loopback ? 0 :
-		    tcp_wroff_xtra);
+		    tcps->tcps_wroff_xtra);
 	}
 
 	/*
@@ -17851,7 +17992,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 				    tcp, (tcp->tcp_swnd == 0) ?
 				    tcp->tcp_suna : tcp->tcp_snxt,
 				    tcp->tcp_rnxt, TH_ACK);
-				BUMP_MIB(&tcp_mib, tcpOutWinUpdate);
+				BUMP_MIB(&tcps->tcps_mib, tcpOutWinUpdate);
 			}
 
 		}
@@ -17880,7 +18021,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 			}
 			if (peer_tcp->tcp_flow_stopped) {
 				tcp_clrqfull(peer_tcp);
-				TCP_STAT(tcp_fusion_backenabled);
+				TCP_STAT(tcps, tcp_fusion_backenabled);
 			}
 			mutex_exit(&peer_tcp->tcp_non_sq_lock);
 			mutex_exit(&tcp->tcp_non_sq_lock);
@@ -17982,7 +18123,7 @@ tcp_send_pending(void *arg, mblk_t *mp, void *arg2)
 /*
  * This is the STREAMS entry point for T_CONN_RES coming down on
  * Acceptor STREAM when  sockfs listener does accept processing.
- * Read the block comment on top pf tcp_conn_request().
+ * Read the block comment on top of tcp_conn_request().
  */
 void
 tcp_wput_accept(queue_t *q, mblk_t *mp)
@@ -18048,6 +18189,9 @@ tcp_wput_accept(queue_t *q, mblk_t *mp)
 
 		econnp->conn_zoneid = listener->tcp_connp->conn_zoneid;
 		econnp->conn_allzones = listener->tcp_connp->conn_allzones;
+		ASSERT(econnp->conn_netstack ==
+		    listener->tcp_connp->conn_netstack);
+		ASSERT(eager->tcp_tcps == listener->tcp_tcps);
 
 		/* Put the ref for IP */
 		CONN_INC_REF(econnp);
@@ -18231,6 +18375,7 @@ tcp_wput(queue_t *q, mblk_t *mp)
 	uchar_t *rptr;
 	struct iocblk	*iocp;
 	uint32_t	msize;
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
 
 	ASSERT(connp->conn_ref >= 2);
 
@@ -18315,7 +18460,7 @@ tcp_wput(queue_t *q, mblk_t *mp)
 		case ND_SET:
 			/* nd_getset does the necessary checks */
 		case ND_GET:
-			if (!nd_getset(q, tcp_g_nd, mp)) {
+			if (!nd_getset(q, tcps->tcps_g_nd, mp)) {
 				CALL_IP_WPUT(connp, q, mp);
 				return;
 			}
@@ -18326,7 +18471,7 @@ tcp_wput(queue_t *q, mblk_t *mp)
 			 * Wants to be the default wq. Check the credentials
 			 * first, the rest is executed via squeue.
 			 */
-			if (secpolicy_net_config(iocp->ioc_cr, B_FALSE) != 0) {
+			if (secpolicy_ip_config(iocp->ioc_cr, B_FALSE) != 0) {
 				iocp->ioc_error = EPERM;
 				iocp->ioc_count = 0;
 				mp->b_datap->db_type = M_IOCACK;
@@ -18388,6 +18533,7 @@ tcp_zcopy_check(tcp_t *tcp)
 	conn_t	*connp = tcp->tcp_connp;
 	ire_t	*ire;
 	boolean_t	zc_enabled = B_FALSE;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (do_tcpzcopy == 2)
 		zc_enabled = B_TRUE;
@@ -18424,10 +18570,10 @@ tcp_zcopy_check(tcp_t *tcp)
 	if (!TCP_IS_DETACHED(tcp)) {
 		if (zc_enabled) {
 			(void) mi_set_sth_copyopt(tcp->tcp_rq, ZCVMSAFE);
-			TCP_STAT(tcp_zcopy_on);
+			TCP_STAT(tcps, tcp_zcopy_on);
 		} else {
 			(void) mi_set_sth_copyopt(tcp->tcp_rq, ZCVMUNSAFE);
-			TCP_STAT(tcp_zcopy_off);
+			TCP_STAT(tcps, tcp_zcopy_off);
 		}
 	}
 	return (zc_enabled);
@@ -18436,13 +18582,15 @@ tcp_zcopy_check(tcp_t *tcp)
 static mblk_t *
 tcp_zcopy_disable(tcp_t *tcp, mblk_t *bp)
 {
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+
 	if (do_tcpzcopy == 2)
 		return (bp);
 	else if (tcp->tcp_snd_zcopy_on) {
 		tcp->tcp_snd_zcopy_on = B_FALSE;
 		if (!TCP_IS_DETACHED(tcp)) {
 			(void) mi_set_sth_copyopt(tcp->tcp_rq, ZCVMUNSAFE);
-			TCP_STAT(tcp_zcopy_disable);
+			TCP_STAT(tcps, tcp_zcopy_disable);
 		}
 	}
 	return (tcp_zcopy_backoff(tcp, bp, 0));
@@ -18456,8 +18604,10 @@ static mblk_t *
 tcp_zcopy_backoff(tcp_t *tcp, mblk_t *bp, int fix_xmitlist)
 {
 	mblk_t *head, *tail, *nbp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+
 	if (IS_VMLOANED_MBLK(bp)) {
-		TCP_STAT(tcp_zcopy_backoff);
+		TCP_STAT(tcps, tcp_zcopy_backoff);
 		if ((head = copyb(bp)) == NULL) {
 			/* fail to backoff; leave it for the next backoff */
 			tcp->tcp_xmit_zc_clean = B_FALSE;
@@ -18486,7 +18636,7 @@ tcp_zcopy_backoff(tcp_t *tcp, mblk_t *bp, int fix_xmitlist)
 	tail = head;
 	while (nbp) {
 		if (IS_VMLOANED_MBLK(nbp)) {
-			TCP_STAT(tcp_zcopy_backoff);
+			TCP_STAT(tcps, tcp_zcopy_backoff);
 			if ((tail->b_cont = copyb(nbp)) == NULL) {
 				tcp->tcp_xmit_zc_clean = B_FALSE;
 				tail->b_cont = nbp;
@@ -18541,9 +18691,10 @@ tcp_zcopy_notify(tcp_t *tcp)
 static boolean_t
 tcp_send_find_ire(tcp_t *tcp, ipaddr_t *dst, ire_t **irep)
 {
-	ire_t *ire;
-	conn_t *connp = tcp->tcp_connp;
-
+	ire_t	*ire;
+	conn_t	*connp = tcp->tcp_connp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
 	mutex_enter(&connp->conn_lock);
 	ire = connp->conn_ire_cache;
@@ -18562,7 +18713,7 @@ tcp_send_find_ire(tcp_t *tcp, ipaddr_t *dst, ire_t **irep)
 		/* force a recheck later on */
 		tcp->tcp_ire_ill_check_done = B_FALSE;
 
-		TCP_DBGSTAT(tcp_ire_null1);
+		TCP_DBGSTAT(tcps, tcp_ire_null1);
 		connp->conn_ire_cache = NULL;
 		mutex_exit(&connp->conn_lock);
 
@@ -18570,12 +18721,13 @@ tcp_send_find_ire(tcp_t *tcp, ipaddr_t *dst, ire_t **irep)
 			IRE_REFRELE_NOTR(ire);
 
 		tsl = crgetlabel(CONN_CRED(connp));
-		ire = (dst ? ire_cache_lookup(*dst, connp->conn_zoneid, tsl) :
+		ire = (dst ?
+		    ire_cache_lookup(*dst, connp->conn_zoneid, tsl, ipst) :
 		    ire_cache_lookup_v6(&tcp->tcp_ip6h->ip6_dst,
-		    connp->conn_zoneid, tsl));
+		    connp->conn_zoneid, tsl, ipst));
 
 		if (ire == NULL) {
-			TCP_STAT(tcp_ire_null);
+			TCP_STAT(tcps, tcp_ire_null);
 			return (B_FALSE);
 		}
 
@@ -18630,6 +18782,7 @@ tcp_send_find_ire_ill(tcp_t *tcp, mblk_t *mp, ire_t **irep, ill_t **illp)
 	ill_t		*ill;
 	conn_t		*connp = tcp->tcp_connp;
 	mblk_t		*ire_fp_mp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (mp != NULL)
 		ipha = (ipha_t *)mp->b_rptr;
@@ -18646,7 +18799,7 @@ tcp_send_find_ire_ill(tcp_t *tcp, mblk_t *mp, ire_t **irep, ill_t **illp)
 	    ((ire_fp_mp = ire->ire_nce->nce_fp_mp) == NULL) ||
 	    ((mp != NULL) && (ire->ire_max_frag < ntohs(ipha->ipha_length) ||
 		MBLKL(ire_fp_mp) > MBLKHEAD(mp)))) {
-		TCP_STAT(tcp_ip_ire_send);
+		TCP_STAT(tcps, tcp_ip_ire_send);
 		IRE_REFRELE(ire);
 		return (B_FALSE);
 	}
@@ -18687,6 +18840,8 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 	uint32_t	hcksum_txflags = 0;
 	mblk_t		*ire_fp_mp;
 	uint_t		ire_fp_mp_len;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
@@ -18708,10 +18863,10 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 	    !connp->conn_ulp_labeled ||
 	    ipha->ipha_ident == IP_HDR_INCLUDED ||
 	    ipha->ipha_version_and_hdr_length != IP_SIMPLE_HDR_VERSION ||
-	    IPP_ENABLED(IPP_LOCAL_OUT)) {
+	    IPP_ENABLED(IPP_LOCAL_OUT, ipst)) {
 		if (tcp->tcp_snd_zcopy_aware)
 			mp = tcp_zcopy_disable(tcp, mp);
-		TCP_STAT(tcp_ip_send);
+		TCP_STAT(tcps, tcp_ip_send);
 		CALL_IP_WPUT(connp, q, mp);
 		return;
 	}
@@ -18746,7 +18901,7 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		 * Restore LSO for this connection, so that next time around
 		 * it is eligible to go through tcp_lsosend() path again.
 		 */
-		TCP_STAT(tcp_lso_enabled);
+		TCP_STAT(tcps, tcp_lso_enabled);
 		tcp->tcp_lso = B_TRUE;
 		ip1dbg(("tcp_send_data: reenabling LSO for connp %p on "
 		    "interface %s\n", (void *)connp, ill->ill_name));
@@ -18755,7 +18910,7 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		 * Restore MDT for this connection, so that next time around
 		 * it is eligible to go through tcp_multisend() path again.
 		 */
-		TCP_STAT(tcp_mdt_conn_resumed1);
+		TCP_STAT(tcps, tcp_mdt_conn_resumed1);
 		tcp->tcp_mdt = B_TRUE;
 		ip1dbg(("tcp_send_data: reenabling MDT for connp %p on "
 		    "interface %s\n", (void *)connp, ill->ill_name));
@@ -18787,8 +18942,8 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 
 	/* Software checksum? */
 	if (DB_CKSUMFLAGS(mp) == 0) {
-		TCP_STAT(tcp_out_sw_cksum);
-		TCP_STAT_UPDATE(tcp_out_sw_cksum_bytes,
+		TCP_STAT(tcps, tcp_out_sw_cksum);
+		TCP_STAT_UPDATE(tcps, tcp_out_sw_cksum_bytes,
 		    ntohs(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH);
 	}
 
@@ -18819,14 +18974,15 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		 * depending on the availability of transmit resources at
 		 * the media layer.
 		 */
-		IP_DLS_ILL_TX(ill, ipha, mp);
+		IP_DLS_ILL_TX(ill, ipha, mp, ipst);
 	} else {
 		ill_t *out_ill = (ill_t *)ire->ire_stq->q_ptr;
 		DTRACE_PROBE4(ip4__physical__out__start,
 		    ill_t *, NULL, ill_t *, out_ill,
 		    ipha_t *, ipha, mblk_t *, mp);
-		FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,
-		    NULL, out_ill, ipha, mp, mp);
+		FW_HOOKS(ipst->ips_ip4_physical_out_event,
+		    ipst->ips_ipv4firewall_physical_out,
+		    NULL, out_ill, ipha, mp, mp, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 		if (mp != NULL)
 			putnext(ire->ire_stq, mp);
@@ -18896,6 +19052,8 @@ tcp_wput_data(tcp_t *tcp, mblk_t *mp, boolean_t urgent)
 	int32_t		tcp_tcp_hdr_len;
 	int		mdt_thres;
 	int		rc;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ip_stack_t	*ipst;
 
 	tcpstate = tcp->tcp_state;
 	if (mp == NULL) {
@@ -19052,7 +19210,7 @@ data_null:
 
 	if ((tcp->tcp_suna == snxt) && !tcp->tcp_localnet &&
 	    (TICK_TO_MSEC(lbolt - tcp->tcp_last_recv_time) >= tcp->tcp_rto)) {
-		SET_TCP_INIT_CWND(tcp, mss, tcp_slow_start_after_idle);
+		SET_TCP_INIT_CWND(tcp, mss, tcps->tcps_slow_start_after_idle);
 	}
 	if (tcpstate == TCPS_SYN_RCVD) {
 		/*
@@ -19192,6 +19350,8 @@ data_null:
 	 * connection, stop using LSO/MDT and restore the stream head
 	 * parameters accordingly.
 	 */
+	ipst = tcps->tcps_netstack->netstack_ip;
+
 	if ((tcp->tcp_lso || tcp->tcp_mdt) &&
 	    ((tcp->tcp_ipversion == IPV4_VERSION &&
 	    tcp->tcp_ip_hdr_len != IP_SIMPLE_HDR_LENGTH) ||
@@ -19200,7 +19360,7 @@ data_null:
 	    tcp->tcp_state != TCPS_ESTABLISHED ||
 	    TCP_IS_DETACHED(tcp) || !CONN_IS_LSO_MD_FASTPATH(tcp->tcp_connp) ||
 	    CONN_IPSEC_OUT_ENCAPSULATED(tcp->tcp_connp) ||
-	    IPP_ENABLED(IPP_LOCAL_OUT))) {
+	    IPP_ENABLED(IPP_LOCAL_OUT, ipst))) {
 		if (tcp->tcp_lso) {
 			tcp->tcp_connp->conn_lso_ok = B_FALSE;
 			tcp->tcp_lso = B_FALSE;
@@ -19212,9 +19372,9 @@ data_null:
 		/* Anything other than detached is considered pathological */
 		if (!TCP_IS_DETACHED(tcp)) {
 			if (tcp->tcp_lso)
-				TCP_STAT(tcp_lso_disabled);
+				TCP_STAT(tcps, tcp_lso_disabled);
 			else
-				TCP_STAT(tcp_mdt_conn_halted1);
+				TCP_STAT(tcps, tcp_mdt_conn_halted1);
 			(void) tcp_maxpsz_set(tcp, B_TRUE);
 		}
 	}
@@ -19400,7 +19560,7 @@ tcp_fill_header(tcp_t *tcp, uchar_t *rptr, clock_t now, int num_sack_blk)
 static int
 tcp_mdt_add_attrs(multidata_t *mmd, const mblk_t *dlmp, const boolean_t hwcksum,
     const uint32_t start, const uint32_t stuff, const uint32_t end,
-    const uint32_t flags)
+    const uint32_t flags, tcp_stack_t *tcps)
 {
 	/* Add global destination address & SAP attribute */
 	if (dlmp == NULL || !ip_md_addr_attr(mmd, NULL, dlmp)) {
@@ -19408,7 +19568,7 @@ tcp_mdt_add_attrs(multidata_t *mmd, const mblk_t *dlmp, const boolean_t hwcksum,
 		    "destination address+SAP\n"));
 
 		if (dlmp != NULL)
-			TCP_STAT(tcp_mdt_allocfail);
+			TCP_STAT(tcps, tcp_mdt_allocfail);
 		return (-1);
 	}
 
@@ -19418,7 +19578,7 @@ tcp_mdt_add_attrs(multidata_t *mmd, const mblk_t *dlmp, const boolean_t hwcksum,
 		ip1dbg(("tcp_mdt_add_attrs: can't add global hardware "
 		    "checksum attribute\n"));
 
-		TCP_STAT(tcp_mdt_allocfail);
+		TCP_STAT(tcps, tcp_mdt_allocfail);
 		return (-1);
 	}
 
@@ -19472,6 +19632,8 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	conn_t		*connp;
 	mblk_t		*mp, *mp1, *fw_mp_head = NULL;
 	uchar_t		*pld_start;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ip_stack_t 	*ipst = tcps->tcps_netstack->netstack_ip;
 
 #ifdef	_BIG_ENDIAN
 #define	IPVER(ip6h)	((((uint32_t *)ip6h)[0] >> 28) & 0x7)
@@ -19574,7 +19736,7 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	 */
 	if (!ILL_MDT_USABLE(ill) || (ire->ire_flags & RTF_MULTIRT) != 0) {
 		/* don't go through this path anymore for this connection */
-		TCP_STAT(tcp_mdt_conn_halted2);
+		TCP_STAT(tcps, tcp_mdt_conn_halted2);
 		tcp->tcp_mdt = B_FALSE;
 		ip1dbg(("tcp_multisend: disabling MDT for connp %p on "
 		    "interface %s\n", (void *)connp, ill->ill_name));
@@ -19678,7 +19840,7 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			 * return to us once a large-size transmission is
 			 * possible.
 			 */
-			TCP_STAT(tcp_mdt_legacy_small);
+			TCP_STAT(tcps, tcp_mdt_legacy_small);
 			if ((err = tcp_send(q, tcp, mss, tcp_hdr_len,
 			    tcp_tcp_hdr_len, num_sack_blk, usable, snxt,
 			    tail_unsent, xmit_tail, local_time,
@@ -19694,7 +19856,7 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 				return (0);
 			}
 
-			TCP_STAT(tcp_mdt_legacy_ret);
+			TCP_STAT(tcps, tcp_mdt_legacy_ret);
 			/*
 			 * We may have delivered the Multidata, so make sure
 			 * to re-initialize before the next round.
@@ -19788,7 +19950,7 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			    /* hardware checksum offsets */
 			    start, stuff, 0,
 			    /* hardware checksum flag */
-			    hwcksum_flags) != 0)) {
+			    hwcksum_flags, tcps) != 0)) {
 legacy_send:
 				if (md_mp != NULL) {
 					/* Unlink message from the chain */
@@ -19807,11 +19969,11 @@ legacy_send:
 							md_mp_head = NULL;
 					}
 					/* md_hbuf gets freed automatically */
-					TCP_STAT(tcp_mdt_discarded);
+					TCP_STAT(tcps, tcp_mdt_discarded);
 					freeb(md_mp);
 				} else {
 					/* Either allocb or mmd_alloc failed */
-					TCP_STAT(tcp_mdt_allocfail);
+					TCP_STAT(tcps, tcp_mdt_allocfail);
 					if (md_hbuf != NULL)
 						freeb(md_hbuf);
 				}
@@ -19831,7 +19993,7 @@ legacy_send_no_md:
 				 * we gave up with the Multidata processings
 				 * and let the old path have it all.
 				 */
-				TCP_STAT(tcp_mdt_legacy_all);
+				TCP_STAT(tcps, tcp_mdt_legacy_all);
 				return (tcp_send(q, tcp, mss, tcp_hdr_len,
 				    tcp_tcp_hdr_len, num_sack_blk, usable,
 				    snxt, tail_unsent, xmit_tail, local_time,
@@ -19839,11 +20001,11 @@ legacy_send_no_md:
 			}
 
 			/* link to any existing ones, if applicable */
-			TCP_STAT(tcp_mdt_allocd);
+			TCP_STAT(tcps, tcp_mdt_allocd);
 			if (md_mp_head == NULL) {
 				md_mp_head = md_mp;
 			} else if (tcp_mdt_chain) {
-				TCP_STAT(tcp_mdt_linked);
+				TCP_STAT(tcps, tcp_mdt_linked);
 				linkb(md_mp_head, md_mp);
 			}
 		}
@@ -19896,7 +20058,7 @@ legacy_send_no_md:
 					break; /* done */
 
 				if ((md_pbuf = dupb(*xmit_tail)) == NULL) {
-					TCP_STAT(tcp_mdt_allocfail);
+					TCP_STAT(tcps, tcp_mdt_allocfail);
 					goto legacy_send; /* out_of_mem */
 				}
 
@@ -19905,7 +20067,8 @@ legacy_send_no_md:
 					if (!ip_md_zcopy_attr(mmd, NULL,
 					    zc_cap->ill_zerocopy_flags)) {
 						freeb(md_pbuf);
-						TCP_STAT(tcp_mdt_allocfail);
+						TCP_STAT(tcps,
+						    tcp_mdt_allocfail);
 						/* out_of_mem */
 						goto legacy_send;
 					}
@@ -19968,7 +20131,7 @@ legacy_send_no_md:
 			    max_pld > 0) {
 				md_pbuf_nxt = dupb((*xmit_tail)->b_cont);
 				if (md_pbuf_nxt == NULL) {
-					TCP_STAT(tcp_mdt_allocfail);
+					TCP_STAT(tcps, tcp_mdt_allocfail);
 					goto legacy_send; /* out_of_mem */
 				}
 
@@ -19977,7 +20140,8 @@ legacy_send_no_md:
 					if (!ip_md_zcopy_attr(mmd, NULL,
 					    zc_cap->ill_zerocopy_flags)) {
 						freeb(md_pbuf_nxt);
-						TCP_STAT(tcp_mdt_allocfail);
+						TCP_STAT(tcps,
+						    tcp_mdt_allocfail);
 						/* out_of_mem */
 						goto legacy_send;
 					}
@@ -20094,7 +20258,8 @@ legacy_send_no_md:
 			    *snxt == tcp->tcp_fss) {
 				if (!tcp->tcp_fin_acked) {
 					tcp->tcp_tcph->th_flags[0] |= TH_FIN;
-					BUMP_MIB(&tcp_mib, tcpOutControl);
+					BUMP_MIB(&tcps->tcps_mib,
+					    tcpOutControl);
 				}
 				if (!tcp->tcp_fin_sent) {
 					tcp->tcp_fin_sent = B_TRUE;
@@ -20294,7 +20459,7 @@ legacy_send_no_md:
 					    (void *)tcp, (void *)mmd,
 					    (void *)pkt_info, err);
 				}
-				TCP_STAT(tcp_mdt_addpdescfail);
+				TCP_STAT(tcps, tcp_mdt_addpdescfail);
 				goto legacy_send; /* out_of_mem */
 			}
 			ASSERT(pkt != NULL);
@@ -20336,8 +20501,8 @@ legacy_send_no_md:
 				*up = (sum & 0xFFFF) + (sum >> 16);
 			} else {
 				/* software checksumming */
-				TCP_STAT(tcp_out_sw_cksum);
-				TCP_STAT_UPDATE(tcp_out_sw_cksum_bytes,
+				TCP_STAT(tcps, tcp_out_sw_cksum);
+				TCP_STAT_UPDATE(tcps, tcp_out_sw_cksum_bytes,
 				    tcp->tcp_hdr_len + tcp->tcp_last_sent_len);
 				*up = IP_MD_CSUM(pkt, tcp->tcp_ip_hdr_len,
 				    cksum + IP_TCP_CSUM_COMP);
@@ -20359,8 +20524,10 @@ legacy_send_no_md:
 				}
 			}
 
-			if (af == AF_INET && HOOKS4_INTERESTED_PHYSICAL_OUT||
-			    af == AF_INET6 && HOOKS6_INTERESTED_PHYSICAL_OUT) {
+			if (af == AF_INET &&
+			    HOOKS4_INTERESTED_PHYSICAL_OUT(ipst) ||
+			    af == AF_INET6 &&
+			    HOOKS6_INTERESTED_PHYSICAL_OUT(ipst)) {
 				/* build header(IP/TCP) mblk for this segment */
 				if ((mp = dupb(md_hbuf)) == NULL)
 					goto legacy_send;
@@ -20387,9 +20554,10 @@ legacy_send_no_md:
 					    ill_t *, ill,
 					    ipha_t *, ipha,
 					    mblk_t *, mp);
-					FW_HOOKS(ip4_physical_out_event,
-					    ipv4firewall_physical_out,
-					    NULL, ill, ipha, mp, mp);
+					FW_HOOKS(
+					    ipst->ips_ip4_physical_out_event,
+					    ipst->ips_ipv4firewall_physical_out,
+					    NULL, ill, ipha, mp, mp, ipst);
 					DTRACE_PROBE1(
 					    ip4__physical__out__end,
 					    mblk_t *, mp);
@@ -20400,9 +20568,10 @@ legacy_send_no_md:
 					    ill_t *, ill,
 					    ip6_t *, ip6h,
 					    mblk_t *, mp);
-					FW_HOOKS6(ip6_physical_out_event,
-					    ipv6firewall_physical_out,
-					    NULL, ill, ip6h, mp, mp);
+					FW_HOOKS6(
+					    ipst->ips_ip6_physical_out_event,
+					    ipst->ips_ipv6firewall_physical_out,
+					    NULL, ill, ip6h, mp, mp, ipst);
 					DTRACE_PROBE1(
 					    ip6__physical__out__end,
 					    mblk_t *, mp);
@@ -20518,7 +20687,7 @@ legacy_send_no_md:
 			freemsg(mp);
 		}
 		if (buf_trunked) {
-			TCP_STAT(tcp_mdt_discarded);
+			TCP_STAT(tcps, tcp_mdt_discarded);
 			freeb(md_mp);
 			buf_trunked = B_FALSE;
 		}
@@ -20550,6 +20719,8 @@ tcp_multisend_data(tcp_t *tcp, ire_t *ire, const ill_t *ill, mblk_t *md_mp_head,
 {
 	uint64_t delta;
 	nce_t *nce;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
 	ASSERT(ire != NULL && ill != NULL);
 	ASSERT(ire->ire_stq != NULL);
@@ -20559,14 +20730,14 @@ tcp_multisend_data(tcp_t *tcp, ire_t *ire, const ill_t *ill, mblk_t *md_mp_head,
 	/* adjust MIBs and IRE timestamp */
 	TCP_RECORD_TRACE(tcp, md_mp_head, TCP_TRACE_SEND_PKT);
 	tcp->tcp_obsegs += obsegs;
-	UPDATE_MIB(&tcp_mib, tcpOutDataSegs, obsegs);
-	UPDATE_MIB(&tcp_mib, tcpOutDataBytes, obbytes);
-	TCP_STAT_UPDATE(tcp_mdt_pkt_out, obsegs);
+	UPDATE_MIB(&tcps->tcps_mib, tcpOutDataSegs, obsegs);
+	UPDATE_MIB(&tcps->tcps_mib, tcpOutDataBytes, obbytes);
+	TCP_STAT_UPDATE(tcps, tcp_mdt_pkt_out, obsegs);
 
 	if (tcp->tcp_ipversion == IPV4_VERSION) {
-		TCP_STAT_UPDATE(tcp_mdt_pkt_out_v4, obsegs);
+		TCP_STAT_UPDATE(tcps, tcp_mdt_pkt_out_v4, obsegs);
 	} else {
-		TCP_STAT_UPDATE(tcp_mdt_pkt_out_v6, obsegs);
+		TCP_STAT_UPDATE(tcps, tcp_mdt_pkt_out_v6, obsegs);
 	}
 	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutRequests, obsegs);
 	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits, obsegs);
@@ -20630,7 +20801,8 @@ tcp_multisend_data(tcp_t *tcp, ire_t *ire, const ill_t *ill, mblk_t *md_mp_head,
 			 */
 			nce->nce_state = ND_DELAY;
 			mutex_exit(&nce->nce_lock);
-			NDP_RESTART_TIMER(nce, delay_first_probe_time);
+			NDP_RESTART_TIMER(nce,
+			    ipst->ips_delay_first_probe_time);
 			if (ip_debug > 3) {
 				/* ip2dbg */
 				pr_addr_dbg("tcp_multisend_data: state "
@@ -20675,6 +20847,8 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 	ipaddr_t	dst;
 	uint32_t	cksum;
 	uint16_t	*up;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 	ASSERT(tcp->tcp_state == TCPS_ESTABLISHED);
@@ -20746,14 +20920,15 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 		 * depending on the availability of transmit resources at
 		 * the media layer.
 		 */
-		IP_DLS_ILL_TX(ill, ipha, mp);
+		IP_DLS_ILL_TX(ill, ipha, mp, ipst);
 	} else {
 		ill_t *out_ill = (ill_t *)ire->ire_stq->q_ptr;
 		DTRACE_PROBE4(ip4__physical__out__start,
 		    ill_t *, NULL, ill_t *, out_ill,
 		    ipha_t *, ipha, mblk_t *, mp);
-		FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,
-		    NULL, out_ill, ipha, mp, mp);
+		FW_HOOKS(ipst->ips_ip4_physical_out_event,
+		    ipst->ips_ipv4firewall_physical_out,
+		    NULL, out_ill, ipha, mp, mp, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 		if (mp != NULL)
 			putnext(ire->ire_stq, mp);
@@ -20785,6 +20960,7 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	int		num_lso_seg = 1;
 	uint_t		lso_usable;
 	boolean_t	do_lso_send = B_FALSE;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * Check LSO capability before any further work. And the similar check
@@ -21008,16 +21184,16 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			*snxt += len;
 			*tail_unsent = (*xmit_tail)->b_wptr - mp1->b_wptr;
 			BUMP_LOCAL(tcp->tcp_obsegs);
-			BUMP_MIB(&tcp_mib, tcpOutDataSegs);
-			UPDATE_MIB(&tcp_mib, tcpOutDataBytes, len);
+			BUMP_MIB(&tcps->tcps_mib, tcpOutDataSegs);
+			UPDATE_MIB(&tcps->tcps_mib, tcpOutDataBytes, len);
 			TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_SEND_PKT);
 			tcp_send_data(tcp, q, mp);
 			continue;
 		}
 
 		*snxt += len;	/* Adjust later if we don't send all of len */
-		BUMP_MIB(&tcp_mib, tcpOutDataSegs);
-		UPDATE_MIB(&tcp_mib, tcpOutDataBytes, len);
+		BUMP_MIB(&tcps->tcps_mib, tcpOutDataSegs);
+		UPDATE_MIB(&tcps->tcps_mib, tcpOutDataBytes, len);
 
 		if (*tail_unsent) {
 			/* Are the bytes above us in flight? */
@@ -21097,7 +21273,7 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 
 		must_alloc:;
 			mp1 = allocb(tcp->tcp_ip_hdr_len + TCP_MAX_HDR_LENGTH +
-			    tcp_wroff_xtra + ire_fp_mp_len, BPRI_MED);
+			    tcps->tcps_wroff_xtra + ire_fp_mp_len, BPRI_MED);
 			if (mp1 == NULL) {
 				freemsg(mp);
 				if (ire != NULL)
@@ -21108,7 +21284,8 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			mp = mp1;
 			/* Leave room for Link Level header */
 			len = tcp_hdr_len;
-			rptr = &mp->b_rptr[tcp_wroff_xtra + ire_fp_mp_len];
+			rptr =
+			    &mp->b_rptr[tcps->tcps_wroff_xtra + ire_fp_mp_len];
 			mp->b_wptr = &rptr[len];
 		}
 
@@ -21197,7 +21374,8 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 				*usable -= spill;
 				*snxt += spill;
 				tcp->tcp_last_sent_len += spill;
-				UPDATE_MIB(&tcp_mib, tcpOutDataBytes, spill);
+				UPDATE_MIB(&tcps->tcps_mib,
+				    tcpOutDataBytes, spill);
 				/*
 				 * Adjust the checksum
 				 */
@@ -21233,8 +21411,8 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			    num_lso_seg);
 			tcp->tcp_obsegs += num_lso_seg;
 
-			TCP_STAT(tcp_lso_times);
-			TCP_STAT_UPDATE(tcp_lso_pkt_out, num_lso_seg);
+			TCP_STAT(tcps, tcp_lso_times);
+			TCP_STAT_UPDATE(tcps, tcp_lso_pkt_out, num_lso_seg);
 		} else {
 			tcp_send_data(tcp, q, mp);
 			BUMP_LOCAL(tcp->tcp_obsegs);
@@ -21278,6 +21456,7 @@ static void
 tcp_mdt_update(tcp_t *tcp, ill_mdt_capab_t *mdt_capab, boolean_t first)
 {
 	boolean_t prev_state;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * IP is telling us to abort MDT on this connection?  We know
@@ -21292,7 +21471,7 @@ tcp_mdt_update(tcp_t *tcp, ill_mdt_capab_t *mdt_capab, boolean_t first)
 	prev_state = tcp->tcp_mdt;
 	tcp->tcp_mdt = (mdt_capab->ill_mdt_on != 0);
 	if (!tcp->tcp_mdt && !first) {
-		TCP_STAT(tcp_mdt_conn_halted3);
+		TCP_STAT(tcps, tcp_mdt_conn_halted3);
 		ip1dbg(("tcp_mdt_update: disabling MDT for connp %p\n",
 		    (void *)tcp->tcp_connp));
 	}
@@ -21335,18 +21514,18 @@ tcp_mdt_update(tcp_t *tcp, ill_mdt_capab_t *mdt_capab, boolean_t first)
 
 		/* a zero means driver wants default value */
 		tcp->tcp_mdt_max_pld = MIN(mdt_capab->ill_mdt_max_pld,
-		    tcp_mdt_max_pbufs);
+		    tcps->tcps_mdt_max_pbufs);
 		if (tcp->tcp_mdt_max_pld == 0)
-			tcp->tcp_mdt_max_pld = tcp_mdt_max_pbufs;
+			tcp->tcp_mdt_max_pld = tcps->tcps_mdt_max_pbufs;
 
 		/* ensure 32-bit alignment */
-		tcp->tcp_mdt_hdr_head = roundup(MAX(tcp_mdt_hdr_head_min,
+		tcp->tcp_mdt_hdr_head = roundup(MAX(tcps->tcps_mdt_hdr_head_min,
 		    mdt_capab->ill_mdt_hdr_head), 4);
-		tcp->tcp_mdt_hdr_tail = roundup(MAX(tcp_mdt_hdr_tail_min,
+		tcp->tcp_mdt_hdr_tail = roundup(MAX(tcps->tcps_mdt_hdr_tail_min,
 		    mdt_capab->ill_mdt_hdr_tail), 4);
 
 		if (!first && !prev_state) {
-			TCP_STAT(tcp_mdt_conn_resumed2);
+			TCP_STAT(tcps, tcp_mdt_conn_resumed2);
 			ip1dbg(("tcp_mdt_update: reenabling MDT for connp %p\n",
 			    (void *)tcp->tcp_connp));
 		}
@@ -21385,6 +21564,8 @@ tcp_lso_info_mp(mblk_t *mp)
 static void
 tcp_lso_update(tcp_t *tcp, ill_lso_capab_t *lso_capab)
 {
+	tcp_stack_t *tcps = tcp->tcp_tcps;
+
 	/*
 	 * IP is telling us to abort LSO on this connection?  We know
 	 * this because the capability is only turned off when IP
@@ -21396,7 +21577,7 @@ tcp_lso_update(tcp_t *tcp, ill_lso_capab_t *lso_capab)
 	 * will indicate that the feature is to be turned on.
 	 */
 	tcp->tcp_lso = (lso_capab->ill_lso_on != 0);
-	TCP_STAT(tcp_lso_enabled);
+	TCP_STAT(tcps, tcp_lso_enabled);
 
 	/*
 	 * We currently only support LSO on simple TCP/IPv4,
@@ -21408,7 +21589,7 @@ tcp_lso_update(tcp_t *tcp, ill_lso_capab_t *lso_capab)
 	    tcp->tcp_ip_hdr_len != IP_SIMPLE_HDR_LENGTH) ||
 	    (tcp->tcp_ipversion == IPV6_VERSION)) {
 		tcp->tcp_lso = B_FALSE;
-		TCP_STAT(tcp_lso_disabled);
+		TCP_STAT(tcps, tcp_lso_disabled);
 	} else {
 		tcp->tcp_lso_max = MIN(TCP_MAX_LSO_LENGTH,
 		    lso_capab->ill_lso_max);
@@ -21419,6 +21600,8 @@ static void
 tcp_ire_ill_check(tcp_t *tcp, ire_t *ire, ill_t *ill, boolean_t check_lso_mdt)
 {
 	conn_t *connp = tcp->tcp_connp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
 	ASSERT(ire != NULL);
 
@@ -21429,13 +21612,13 @@ tcp_ire_ill_check(tcp_t *tcp, ire_t *ire, ill_t *ill, boolean_t check_lso_mdt)
 	 * are only best-effort checks, and we do more thorough ones prior
 	 * to calling tcp_send()/tcp_multisend().
 	 */
-	if ((ip_lso_outbound || ip_multidata_outbound) && check_lso_mdt &&
-	    !(ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK)) &&
+	if ((ipst->ips_ip_lso_outbound || ipst->ips_ip_multidata_outbound) &&
+	    check_lso_mdt && !(ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK)) &&
 	    ill != NULL && !CONN_IPSEC_OUT_ENCAPSULATED(connp) &&
 	    !(ire->ire_flags & RTF_MULTIRT) &&
-	    !IPP_ENABLED(IPP_LOCAL_OUT) &&
+	    !IPP_ENABLED(IPP_LOCAL_OUT, ipst) &&
 	    CONN_IS_LSO_MD_FASTPATH(connp)) {
-		if (ip_lso_outbound && ILL_LSO_CAPABLE(ill)) {
+		if (ipst->ips_ip_lso_outbound && ILL_LSO_CAPABLE(ill)) {
 			/* Cache the result */
 			connp->conn_lso_ok = B_TRUE;
 
@@ -21447,7 +21630,8 @@ tcp_ire_ill_check(tcp_t *tcp, ire_t *ire, ill_t *ill, boolean_t check_lso_mdt)
 				    ill->ill_name));
 			}
 			tcp_lso_update(tcp, ill->ill_lso_capab);
-		} else if (ip_multidata_outbound && ILL_MDT_CAPABLE(ill)) {
+		} else if (ipst->ips_ip_multidata_outbound &&
+		    ILL_MDT_CAPABLE(ill)) {
 			/* Cache the result */
 			connp->conn_mdt_ok = B_TRUE;
 
@@ -21720,6 +21904,7 @@ tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2)
 	tcp_t	*tcp = connp->conn_tcp;
 	queue_t	*q = tcp->tcp_wq;
 	struct iocblk	*iocp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(DB_TYPE(mp) == M_IOCTL);
 	/*
@@ -21738,7 +21923,7 @@ tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2)
 	switch (iocp->ioc_cmd) {
 	case TCP_IOC_DEFAULT_Q:
 		/* Wants to be the default wq. */
-		if (secpolicy_net_config(iocp->ioc_cr, B_FALSE) != 0) {
+		if (secpolicy_ip_config(iocp->ioc_cr, B_FALSE) != 0) {
 			iocp->ioc_error = EPERM;
 			iocp->ioc_count = 0;
 			mp->b_datap->db_type = M_IOCACK;
@@ -21782,7 +21967,7 @@ tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2)
 				tcp_fuse_disable_pair(tcp, B_FALSE);
 			}
 			tcp->tcp_issocket = B_FALSE;
-			TCP_STAT(tcp_sock_fallback);
+			TCP_STAT(tcps, tcp_sock_fallback);
 
 			DB_TYPE(mp) = M_IOCACK;
 			iocp->ioc_error = 0;
@@ -21975,7 +22160,9 @@ non_urgent_data:
 static void
 tcp_wsrv(queue_t *q)
 {
-	TCP_STAT(tcp_wsrv_called);
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
+
+	TCP_STAT(tcps, tcp_wsrv_called);
 }
 
 /* Non overlapping byte exchanger */
@@ -22006,6 +22193,7 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 	int		tcp_hdr_len;
 	int		tcp_ip_hdr_len;
 	mblk_t		*mp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * Save sum for use in source route later.
@@ -22021,12 +22209,12 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 		    "tcp_xmit_ctl: '%s', seq 0x%x, ack 0x%x, ctl 0x%x",
 		    str, seq, ack, ctl);
 	}
-	mp = allocb(tcp_ip_hdr_len + TCP_MAX_HDR_LENGTH + tcp_wroff_xtra,
+	mp = allocb(tcp_ip_hdr_len + TCP_MAX_HDR_LENGTH + tcps->tcps_wroff_xtra,
 	    BPRI_MED);
 	if (mp == NULL) {
 		return;
 	}
-	rptr = &mp->b_rptr[tcp_wroff_xtra];
+	rptr = &mp->b_rptr[tcps->tcps_wroff_xtra];
 	mp->b_rptr = rptr;
 	mp->b_wptr = &rptr[tcp_hdr_len];
 	bcopy(tcp->tcp_iphc, rptr, tcp_hdr_len);
@@ -22043,8 +22231,8 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 	tcph = (tcph_t *)&rptr[tcp_ip_hdr_len];
 	tcph->th_flags[0] = (uint8_t)ctl;
 	if (ctl & TH_RST) {
-		BUMP_MIB(&tcp_mib, tcpOutRsts);
-		BUMP_MIB(&tcp_mib, tcpOutControl);
+		BUMP_MIB(&tcps->tcps_mib, tcpOutRsts);
+		BUMP_MIB(&tcps->tcps_mib, tcpOutControl);
 		/*
 		 * Don't send TSopt w/ TH_RST packets per RFC 1323.
 		 */
@@ -22076,7 +22264,7 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 		    tcph->th_win);
 		tcp->tcp_rack = ack;
 		tcp->tcp_rack_cnt = 0;
-		BUMP_MIB(&tcp_mib, tcpOutAck);
+		BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
 	}
 	BUMP_LOCAL(tcp->tcp_obsegs);
 	U32_TO_BE32(seq, tcph->th_seq);
@@ -22095,7 +22283,7 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
  * to a segment.  If it returns B_FALSE, TCP should not respond.
  */
 static boolean_t
-tcp_send_rst_chk(void)
+tcp_send_rst_chk(tcp_stack_t *tcps)
 {
 	clock_t	now;
 
@@ -22109,14 +22297,15 @@ tcp_send_rst_chk(void)
 	 * RSTs in normal cases but when under attack, the impact is
 	 * limited.
 	 */
-	if (tcp_rst_sent_rate_enabled != 0) {
+	if (tcps->tcps_rst_sent_rate_enabled != 0) {
 		now = lbolt;
 		/* lbolt can wrap around. */
-		if ((tcp_last_rst_intrvl > now) ||
-		    (TICK_TO_MSEC(now - tcp_last_rst_intrvl) > 1*SECONDS)) {
-			tcp_last_rst_intrvl = now;
-			tcp_rst_cnt = 1;
-		} else if (++tcp_rst_cnt > tcp_rst_sent_rate) {
+		if ((tcps->tcps_last_rst_intrvl > now) ||
+		    (TICK_TO_MSEC(now - tcps->tcps_last_rst_intrvl) >
+		    1*SECONDS)) {
+			tcps->tcps_last_rst_intrvl = now;
+			tcps->tcps_rst_cnt = 1;
+		} else if (++tcps->tcps_rst_cnt > tcps->tcps_rst_sent_rate) {
 			return (B_FALSE);
 		}
 	}
@@ -22191,7 +22380,8 @@ tcp_ip_advise_mblk(void *addr, int addr_len, ipic_t **ipic)
  */
 static void
 tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
-    uint32_t ack, int ctl, uint_t ip_hdr_len, zoneid_t zoneid)
+    uint32_t ack, int ctl, uint_t ip_hdr_len, zoneid_t zoneid,
+    tcp_stack_t *tcps)
 {
 	ipha_t		*ipha = NULL;
 	ip6_t		*ip6h = NULL;
@@ -22205,13 +22395,31 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 	in6_addr_t	v6addr;
 	int		addr_len;
 	void		*addr;
-	queue_t		*q = tcp_g_q;
-	tcp_t		*tcp = Q_TO_TCP(q);
+	queue_t		*q = tcps->tcps_g_q;
+	tcp_t		*tcp;
 	cred_t		*cr;
 	mblk_t		*nmp;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
-	if (!tcp_send_rst_chk()) {
-		tcp_rst_unsent++;
+	if (tcps->tcps_g_q == NULL) {
+		/*
+		 * For non-zero stackids the default queue isn't created
+		 * until the first open, thus there can be a need to send
+		 * a reset before then. But we can't do that, hence we just
+		 * drop the packet. Later during boot, when the default queue
+		 * has been setup, a retransmitted packet from the peer
+		 * will result in a reset.
+		 */
+		ASSERT(tcps->tcps_netstack->netstack_stackid !=
+		    GLOBAL_NETSTACKID);
+		freemsg(mp);
+		return;
+	}
+
+	tcp = Q_TO_TCP(q);
+
+	if (!tcp_send_rst_chk(tcps)) {
+		tcps->tcps_rst_unsent++;
 		freemsg(mp);
 		return;
 	}
@@ -22225,7 +22433,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		mctl_present = B_FALSE;
 	}
 
-	if (str && q && tcp_dbg) {
+	if (str && q && tcps->tcps_dbg) {
 		(void) strlog(TCP_MOD_ID, 0, 1, SL_TRACE,
 		    "tcp_xmit_early_reset: '%s', seq 0x%x, ack 0x%x, "
 		    "flags 0x%x",
@@ -22269,7 +22477,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		if (ipha->ipha_src == 0 || ipha->ipha_src == INADDR_BROADCAST ||
 		    CLASSD(ipha->ipha_src)) {
 			freemsg(ipsec_mp);
-			BUMP_MIB(&ip_mib, ipIfStatsInDiscards);
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
 			return;
 		}
 	} else {
@@ -22278,7 +22486,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		if (IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src) ||
 		    IN6_IS_ADDR_MULTICAST(&ip6h->ip6_src)) {
 			freemsg(ipsec_mp);
-			BUMP_MIB(&ip6_mib, ipIfStatsInDiscards);
+			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsInDiscards);
 			return;
 		}
 
@@ -22309,7 +22517,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		ipha->ipha_src = ipha->ipha_dst;
 		ipha->ipha_dst = v4addr;
 		ipha->ipha_ident = 0;
-		ipha->ipha_ttl = (uchar_t)tcp_ipv4_ttl;
+		ipha->ipha_ttl = (uchar_t)tcps->tcps_ipv4_ttl;
 		addr_len = IP_ADDR_LEN;
 		addr = &v4addr;
 	} else {
@@ -22319,7 +22527,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		v6addr = ip6h->ip6_src;
 		ip6h->ip6_src = ip6h->ip6_dst;
 		ip6h->ip6_dst = v6addr;
-		ip6h->ip6_hops = (uchar_t)tcp_ipv6_hoplimit;
+		ip6h->ip6_hops = (uchar_t)tcps->tcps_ipv6_hoplimit;
 		addr_len = IPV6_ADDR_LEN;
 		addr = &v6addr;
 	}
@@ -22330,8 +22538,8 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 	U16_TO_BE16(sizeof (tcph_t), tcph->th_sum);
 	tcph->th_flags[0] = (uint8_t)ctl;
 	if (ctl & TH_RST) {
-		BUMP_MIB(&tcp_mib, tcpOutRsts);
-		BUMP_MIB(&tcp_mib, tcpOutControl);
+		BUMP_MIB(&tcps->tcps_mib, tcpOutRsts);
+		BUMP_MIB(&tcps->tcps_mib, tcpOutControl);
 	}
 
 	/* IP trusts us to set up labels when required. */
@@ -22341,10 +22549,12 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 
 		if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION)
 			err = tsol_check_label(cr, &mp, &adjust,
-			    tcp->tcp_connp->conn_mac_exempt);
+			    tcp->tcp_connp->conn_mac_exempt,
+			    tcps->tcps_netstack->netstack_ip);
 		else
 			err = tsol_check_label_v6(cr, &mp, &adjust,
-			    tcp->tcp_connp->conn_mac_exempt);
+			    tcp->tcp_connp->conn_mac_exempt,
+			    tcps->tcps_netstack->netstack_ip);
 		if (mctl_present)
 			ipsec_mp->b_cont = mp;
 		else
@@ -22374,7 +22584,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		zoneid = GLOBAL_ZONEID;
 
 	/* Add the zoneid so ip_output routes it properly */
-	if ((nmp = ip_prepend_zoneid(ipsec_mp, zoneid)) == NULL) {
+	if ((nmp = ip_prepend_zoneid(ipsec_mp, zoneid, ipst)) == NULL) {
 		freemsg(ipsec_mp);
 		return;
 	}
@@ -22390,7 +22600,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 	 * reused by tcp_xmit_listener_reset, so it already contains
 	 * the right credentials and we don't need to call mblk_setcred.
 	 * Also the conn's cred is not right since it is associated
-	 * with tcp_g_q.
+	 * with tcps_g_q.
 	 */
 	CALL_IP_WPUT(tcp->tcp_connp, tcp->tcp_wq, ipsec_mp);
 
@@ -22424,6 +22634,7 @@ tcp_xmit_end(tcp_t *tcp)
 {
 	ipic_t	*ipic;
 	mblk_t	*mp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (tcp->tcp_state < TCPS_SYN_RCVD ||
 	    tcp->tcp_state > TCPS_CLOSE_WAIT) {
@@ -22477,7 +22688,8 @@ tcp_xmit_end(tcp_t *tcp)
 	 * If TCP does not get enough samples of RTT or tcp_rtt_updates
 	 * is 0, don't update the cache.
 	 */
-	if (tcp_rtt_updates == 0 || tcp->tcp_rtt_update < tcp_rtt_updates)
+	if (tcps->tcps_rtt_updates == 0 ||
+	    tcp->tcp_rtt_update < tcps->tcps_rtt_updates)
 		return (0);
 
 	/*
@@ -22520,7 +22732,8 @@ tcp_xmit_end(tcp_t *tcp)
  * RST.
  */
 void
-tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len, zoneid_t zoneid)
+tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len, zoneid_t zoneid,
+    tcp_stack_t *tcps)
 {
 	uchar_t		*rptr;
 	uint32_t	seg_len;
@@ -22534,8 +22747,9 @@ tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len, zoneid_t zoneid)
 	boolean_t	mctl_present = B_FALSE;
 	boolean_t	check = B_TRUE;
 	boolean_t	policy_present;
+	ipsec_stack_t	*ipss = tcps->tcps_netstack->netstack_ipsec;
 
-	TCP_STAT(tcp_no_listener);
+	TCP_STAT(tcps, tcp_no_listener);
 
 	ipsec_mp = mp;
 
@@ -22558,11 +22772,11 @@ tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len, zoneid_t zoneid)
 	}
 
 	if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
-		policy_present = ipsec_inbound_v4_policy_present;
+		policy_present = ipss->ipsec_inbound_v4_policy_present;
 		ipha = (ipha_t *)mp->b_rptr;
 		ip6h = NULL;
 	} else {
-		policy_present = ipsec_inbound_v6_policy_present;
+		policy_present = ipss->ipsec_inbound_v6_policy_present;
 		ipha = NULL;
 		ip6h = (ip6_t *)mp->b_rptr;
 	}
@@ -22573,7 +22787,8 @@ tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len, zoneid_t zoneid)
 		 * nobody's home.
 		 */
 		ipsec_mp = ipsec_check_global_policy(
-			ipsec_mp, (conn_t *)NULL, ipha, ip6h, mctl_present);
+		    ipsec_mp, (conn_t *)NULL, ipha, ip6h, mctl_present,
+		    tcps->tcps_netstack);
 		if (ipsec_mp == NULL)
 			return;
 	}
@@ -22599,7 +22814,7 @@ tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len, zoneid_t zoneid)
 		freemsg(ipsec_mp);
 	} else if (flags & TH_ACK) {
 		tcp_xmit_early_reset("no tcp, reset",
-		    ipsec_mp, seg_ack, 0, TH_RST, ip_hdr_len, zoneid);
+		    ipsec_mp, seg_ack, 0, TH_RST, ip_hdr_len, zoneid, tcps);
 	} else {
 		if (flags & TH_SYN) {
 			seg_len++;
@@ -22612,13 +22827,13 @@ tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len, zoneid_t zoneid)
 			 * floor.
 			 */
 			freemsg(ipsec_mp);
-			tcp_rst_unsent++;
+			tcps->tcps_rst_unsent++;
 			return;
 		}
 
 		tcp_xmit_early_reset("no tcp, reset/ack",
 		    ipsec_mp, 0, seg_seq + seg_len,
-		    TH_RST | TH_ACK, ip_hdr_len, zoneid);
+		    TH_RST | TH_ACK, ip_hdr_len, zoneid, tcps);
 	}
 }
 
@@ -22650,10 +22865,11 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 	tcph_t	*tcph;
 	int32_t	num_sack_blk = 0;
 	int32_t	sack_opt_len = 0;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/* Allocate for our maximum TCP header + link-level */
-	mp1 = allocb(tcp->tcp_ip_hdr_len + TCP_MAX_HDR_LENGTH + tcp_wroff_xtra,
-	    BPRI_MED);
+	mp1 = allocb(tcp->tcp_ip_hdr_len + TCP_MAX_HDR_LENGTH +
+	    tcps->tcps_wroff_xtra, BPRI_MED);
 	if (!mp1)
 		return (NULL);
 	data_length = 0;
@@ -22722,7 +22938,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 	U32_TO_ABE16(tcp->tcp_rwnd >> tcp->tcp_rcv_ws,
 	    tcp->tcp_tcph->th_win);
 
-	rptr = mp1->b_rptr + tcp_wroff_xtra;
+	rptr = mp1->b_rptr + tcps->tcps_wroff_xtra;
 	mp1->b_rptr = rptr;
 	mp1->b_wptr = rptr + tcp->tcp_hdr_len + sack_opt_len;
 	bcopy(tcp->tcp_iphc, rptr, tcp->tcp_hdr_len);
@@ -22863,7 +23079,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 				 * the peer's calculated SMSS may be smaller
 				 * than what it can be.  This should be OK.
 				 */
-				if (tcp_use_smss_as_mss_opt) {
+				if (tcps->tcps_use_smss_as_mss_opt) {
 					u1 = tcp->tcp_mss;
 					U16_TO_BE16(u1, wptr);
 				}
@@ -22916,13 +23132,13 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 			u1 += tcp->tcp_sum;
 			u1 = (u1 >> 16) + (u1 & 0xFFFF);
 			U16_TO_BE16(u1, tcph->th_sum);
-			BUMP_MIB(&tcp_mib, tcpOutControl);
+			BUMP_MIB(&tcps->tcps_mib, tcpOutControl);
 		}
 		if ((tcp->tcp_valid_bits & TCP_FSS_VALID) &&
 		    (seq + data_length) == tcp->tcp_fss) {
 			if (!tcp->tcp_fin_acked) {
 				flags |= TH_FIN;
-				BUMP_MIB(&tcp_mib, tcpOutControl);
+				BUMP_MIB(&tcps->tcps_mib, tcpOutControl);
 			}
 			if (!tcp->tcp_fin_sent) {
 				tcp->tcp_fin_sent = B_TRUE;
@@ -22950,7 +23166,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 		if ((tcp->tcp_valid_bits & TCP_URG_VALID) && u1 != 0 &&
 		    u1 < (uint32_t)(64 * 1024)) {
 			flags |= TH_URG;
-			BUMP_MIB(&tcp_mib, tcpOutUrg);
+			BUMP_MIB(&tcps->tcps_mib, tcpOutUrg);
 			U32_TO_ABE16(u1, tcph->th_urp);
 		}
 	}
@@ -23025,8 +23241,9 @@ tcp_push_timer(void *arg)
 {
 	conn_t	*connp = (conn_t *)arg;
 	tcp_t *tcp = connp->conn_tcp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
-	TCP_DBGSTAT(tcp_push_timer_cnt);
+	TCP_DBGSTAT(tcps, tcp_push_timer_cnt);
 
 	ASSERT(tcp->tcp_listener == NULL);
 
@@ -23051,8 +23268,9 @@ tcp_ack_timer(void *arg)
 	conn_t	*connp = (conn_t *)arg;
 	tcp_t *tcp = connp->conn_tcp;
 	mblk_t *mp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
-	TCP_DBGSTAT(tcp_ack_timer_cnt);
+	TCP_DBGSTAT(tcps, tcp_ack_timer_cnt);
 
 	tcp->tcp_ack_tid = 0;
 
@@ -23086,8 +23304,8 @@ tcp_ack_timer(void *arg)
 	if (mp != NULL) {
 		TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_SEND_PKT);
 		BUMP_LOCAL(tcp->tcp_obsegs);
-		BUMP_MIB(&tcp_mib, tcpOutAck);
-		BUMP_MIB(&tcp_mib, tcpOutAckDelayed);
+		BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
+		BUMP_MIB(&tcps->tcps_mib, tcpOutAckDelayed);
 		tcp_send_data(tcp, tcp->tcp_wq, mp);
 	}
 }
@@ -23098,6 +23316,7 @@ static mblk_t *
 tcp_ack_mp(tcp_t *tcp)
 {
 	uint32_t	seq_no;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
 	 * There are a few cases to be considered while setting the sequence no.
@@ -23155,7 +23374,7 @@ tcp_ack_mp(tcp_t *tcp)
 			tcp_hdr_len = tcp->tcp_hdr_len;
 			tcp_tcp_hdr_len = tcp->tcp_tcp_hdr_len;
 		}
-		mp1 = allocb(tcp_hdr_len + tcp_wroff_xtra, BPRI_MED);
+		mp1 = allocb(tcp_hdr_len + tcps->tcps_wroff_xtra, BPRI_MED);
 		if (!mp1)
 			return (NULL);
 
@@ -23163,7 +23382,7 @@ tcp_ack_mp(tcp_t *tcp)
 		U32_TO_ABE16(tcp->tcp_rwnd >> tcp->tcp_rcv_ws,
 		    tcp->tcp_tcph->th_win);
 		/* copy in prototype TCP + IP header */
-		rptr = mp1->b_rptr + tcp_wroff_xtra;
+		rptr = mp1->b_rptr + tcps->tcps_wroff_xtra;
 		mp1->b_rptr = rptr;
 		mp1->b_wptr = rptr + tcp_hdr_len;
 		bcopy(tcp->tcp_iphc, rptr, tcp->tcp_hdr_len);
@@ -23250,16 +23469,18 @@ tcp_ack_mp(tcp_t *tcp)
  */
 /* ARGSUSED */
 static tcp_t *
-tcp_alloc_temp_tcp(in_port_t port)
+tcp_alloc_temp_tcp(in_port_t port, tcp_stack_t *tcps)
 {
 	conn_t	*connp;
 	tcp_t	*tcp;
 
-	connp = ipcl_conn_create(IPCL_TCPCONN, KM_SLEEP);
+	connp = ipcl_conn_create(IPCL_TCPCONN, KM_SLEEP, tcps->tcps_netstack);
 	if (connp == NULL)
 		return (NULL);
 
 	tcp = connp->conn_tcp;
+	tcp->tcp_tcps = tcps;
+	TCPS_REFHOLD(tcps);
 
 	/*
 	 * Only initialize the necessary info in those structures.  Note
@@ -23291,6 +23512,8 @@ tcp_alloc_temp_tcp(in_port_t port)
  *
  * Return:
  *	B_TRUE if the deletion is successful, B_FALSE otherwise.
+ *
+ * Assumes that nca is only for zoneid=0
  */
 boolean_t
 tcp_reserved_port_del(in_port_t lo_port, in_port_t hi_port)
@@ -23299,19 +23522,25 @@ tcp_reserved_port_del(in_port_t lo_port, in_port_t hi_port)
 	int	size;
 	tcp_t	**temp_tcp_array;
 	tcp_t	*tcp;
+	tcp_stack_t	*tcps;
 
-	rw_enter(&tcp_reserved_port_lock, RW_WRITER);
+	tcps = netstack_find_by_stackid(GLOBAL_NETSTACKID)->netstack_tcp;
+	ASSERT(tcps != NULL);
+
+	rw_enter(&tcps->tcps_reserved_port_lock, RW_WRITER);
 
 	/* First make sure that the port ranage is indeed reserved. */
-	for (i = 0; i < tcp_reserved_port_array_size; i++) {
-		if (tcp_reserved_port[i].lo_port == lo_port) {
-			hi_port = tcp_reserved_port[i].hi_port;
-			temp_tcp_array = tcp_reserved_port[i].temp_tcp_array;
+	for (i = 0; i < tcps->tcps_reserved_port_array_size; i++) {
+		if (tcps->tcps_reserved_port[i].lo_port == lo_port) {
+			hi_port = tcps->tcps_reserved_port[i].hi_port;
+			temp_tcp_array =
+			    tcps->tcps_reserved_port[i].temp_tcp_array;
 			break;
 		}
 	}
-	if (i == tcp_reserved_port_array_size) {
-		rw_exit(&tcp_reserved_port_lock);
+	if (i == tcps->tcps_reserved_port_array_size) {
+		rw_exit(&tcps->tcps_reserved_port_lock);
+		netstack_rele(tcps->tcps_netstack);
 		return (B_FALSE);
 	}
 
@@ -23319,11 +23548,13 @@ tcp_reserved_port_del(in_port_t lo_port, in_port_t hi_port)
 	 * Remove the range from the array.  This simple loop is possible
 	 * because port ranges are inserted in ascending order.
 	 */
-	for (j = i; j < tcp_reserved_port_array_size - 1; j++) {
-		tcp_reserved_port[j].lo_port = tcp_reserved_port[j+1].lo_port;
-		tcp_reserved_port[j].hi_port = tcp_reserved_port[j+1].hi_port;
-		tcp_reserved_port[j].temp_tcp_array =
-		    tcp_reserved_port[j+1].temp_tcp_array;
+	for (j = i; j < tcps->tcps_reserved_port_array_size - 1; j++) {
+		tcps->tcps_reserved_port[j].lo_port =
+		    tcps->tcps_reserved_port[j+1].lo_port;
+		tcps->tcps_reserved_port[j].hi_port =
+		    tcps->tcps_reserved_port[j+1].hi_port;
+		tcps->tcps_reserved_port[j].temp_tcp_array =
+		    tcps->tcps_reserved_port[j+1].temp_tcp_array;
 	}
 
 	/* Remove all the temporary tcp structures. */
@@ -23336,8 +23567,9 @@ tcp_reserved_port_del(in_port_t lo_port, in_port_t hi_port)
 		size--;
 	}
 	kmem_free(temp_tcp_array, (hi_port - lo_port + 1) * sizeof (tcp_t *));
-	tcp_reserved_port_array_size--;
-	rw_exit(&tcp_reserved_port_lock);
+	tcps->tcps_reserved_port_array_size--;
+	rw_exit(&tcps->tcps_reserved_port_lock);
+	netstack_rele(tcps->tcps_netstack);
 	return (B_TRUE);
 }
 
@@ -23346,13 +23578,13 @@ tcp_reserved_port_del(in_port_t lo_port, in_port_t hi_port)
  * first parameter is the list of tcp to be removed.  The second parameter
  * is the number of tcps in the array.
  */
-#define	TCP_TMP_TCP_REMOVE(tcp_array, num) \
+#define	TCP_TMP_TCP_REMOVE(tcp_array, num, tcps) \
 { \
 	while ((num) > 0) { \
 		tcp_t *tcp = (tcp_array)[(num) - 1]; \
 		tf_t *tbf; \
 		tcp_t *tcpnext; \
-		tbf = &tcp_bind_fanout[TCP_BIND_HASH(tcp->tcp_lport)]; \
+		tbf = &tcps->tcps_bind_fanout[TCP_BIND_HASH(tcp->tcp_lport)]; \
 		mutex_enter(&tbf->tf_lock); \
 		tcpnext = tcp->tcp_bind_hash; \
 		if (tcpnext) { \
@@ -23384,6 +23616,8 @@ tcp_reserved_port_del(in_port_t lo_port, in_port_t hi_port)
  *
  * Return:
  *	B_TRUE if the port reservation is successful, B_FALSE otherwise.
+ *
+ * Assumes that nca is only for zoneid=0
  */
 boolean_t
 tcp_reserved_port_add(int size, in_port_t *lo_port, in_port_t *hi_port)
@@ -23399,15 +23633,21 @@ tcp_reserved_port_add(int size, in_port_t *lo_port, in_port_t *hi_port)
 	boolean_t	used;
 	tcp_rport_t 	tmp_ports[TCP_RESERVED_PORTS_ARRAY_MAX_SIZE];
 	zoneid_t	zoneid = GLOBAL_ZONEID;
+	tcp_stack_t	*tcps;
 
 	/* Sanity check. */
 	if (size <= 0 || size > TCP_RESERVED_PORTS_RANGE_MAX) {
 		return (B_FALSE);
 	}
 
-	rw_enter(&tcp_reserved_port_lock, RW_WRITER);
-	if (tcp_reserved_port_array_size == TCP_RESERVED_PORTS_ARRAY_MAX_SIZE) {
-		rw_exit(&tcp_reserved_port_lock);
+	tcps = netstack_find_by_stackid(GLOBAL_NETSTACKID)->netstack_tcp;
+	ASSERT(tcps != NULL);
+
+	rw_enter(&tcps->tcps_reserved_port_lock, RW_WRITER);
+	if (tcps->tcps_reserved_port_array_size ==
+	    TCP_RESERVED_PORTS_ARRAY_MAX_SIZE) {
+		rw_exit(&tcps->tcps_reserved_port_lock);
+		netstack_rele(tcps->tcps_netstack);
 		return (B_FALSE);
 	}
 
@@ -23417,22 +23657,25 @@ tcp_reserved_port_add(int size, in_port_t *lo_port, in_port_t *hi_port)
 	 */
 	*lo_port = TCP_SMALLEST_RESERVED_PORT;
 	*hi_port = TCP_LARGEST_RESERVED_PORT;
-	for (i = 0; i < tcp_reserved_port_array_size;
-	    *lo_port = tcp_reserved_port[i].hi_port + 1, i++) {
-		if (tcp_reserved_port[i].lo_port - *lo_port >= size) {
-			*hi_port = tcp_reserved_port[i].lo_port - 1;
+	for (i = 0; i < tcps->tcps_reserved_port_array_size;
+	    *lo_port = tcps->tcps_reserved_port[i].hi_port + 1, i++) {
+		if (tcps->tcps_reserved_port[i].lo_port - *lo_port >= size) {
+			*hi_port = tcps->tcps_reserved_port[i].lo_port - 1;
 			break;
 		}
 	}
 	/* No available port range. */
-	if (i == tcp_reserved_port_array_size && *hi_port - *lo_port < size) {
-		rw_exit(&tcp_reserved_port_lock);
+	if (i == tcps->tcps_reserved_port_array_size &&
+	    *hi_port - *lo_port < size) {
+		rw_exit(&tcps->tcps_reserved_port_lock);
+		netstack_rele(tcps->tcps_netstack);
 		return (B_FALSE);
 	}
 
 	temp_tcp_array = kmem_zalloc(size * sizeof (tcp_t *), KM_NOSLEEP);
 	if (temp_tcp_array == NULL) {
-		rw_exit(&tcp_reserved_port_lock);
+		rw_exit(&tcps->tcps_reserved_port_lock);
+		netstack_rele(tcps->tcps_netstack);
 		return (B_FALSE);
 	}
 
@@ -23442,7 +23685,7 @@ tcp_reserved_port_add(int size, in_port_t *lo_port, in_port_t *hi_port)
 	    cur_size++, port++) {
 		used = B_FALSE;
 		net_port = htons(port);
-		tbf = &tcp_bind_fanout[TCP_BIND_HASH(net_port)];
+		tbf = &tcps->tcps_bind_fanout[TCP_BIND_HASH(net_port)];
 		mutex_enter(&tbf->tf_lock);
 		for (tcp = tbf->tf_tcp; tcp != NULL;
 		    tcp = tcp->tcp_bind_hash) {
@@ -23454,7 +23697,8 @@ tcp_reserved_port_add(int size, in_port_t *lo_port, in_port_t *hi_port)
 				 * temporary tcps.
 				 */
 				mutex_exit(&tbf->tf_lock);
-				TCP_TMP_TCP_REMOVE(temp_tcp_array, cur_size);
+				TCP_TMP_TCP_REMOVE(temp_tcp_array, cur_size,
+				    tcps);
 				*lo_port = port + 1;
 				cur_size = -1;
 				used = B_TRUE;
@@ -23462,18 +23706,21 @@ tcp_reserved_port_add(int size, in_port_t *lo_port, in_port_t *hi_port)
 			}
 		}
 		if (!used) {
-			if ((tmp_tcp = tcp_alloc_temp_tcp(net_port)) == NULL) {
+			if ((tmp_tcp = tcp_alloc_temp_tcp(net_port, tcps)) ==
+			    NULL) {
 				/*
 				 * Allocation failure.  Just fail the request.
 				 * Need to remove all those temporary tcp
 				 * structures.
 				 */
 				mutex_exit(&tbf->tf_lock);
-				TCP_TMP_TCP_REMOVE(temp_tcp_array, cur_size);
-				rw_exit(&tcp_reserved_port_lock);
+				TCP_TMP_TCP_REMOVE(temp_tcp_array, cur_size,
+				    tcps);
+				rw_exit(&tcps->tcps_reserved_port_lock);
 				kmem_free(temp_tcp_array,
 				    (hi_port - lo_port + 1) *
 				    sizeof (tcp_t *));
+				netstack_rele(tcps->tcps_netstack);
 				return (B_FALSE);
 			}
 			temp_tcp_array[cur_size] = tmp_tcp;
@@ -23489,9 +23736,10 @@ tcp_reserved_port_add(int size, in_port_t *lo_port, in_port_t *hi_port)
 	 * range is available.
 	 */
 	if (cur_size < size) {
-		TCP_TMP_TCP_REMOVE(temp_tcp_array, cur_size);
-		rw_exit(&tcp_reserved_port_lock);
+		TCP_TMP_TCP_REMOVE(temp_tcp_array, cur_size, tcps);
+		rw_exit(&tcps->tcps_reserved_port_lock);
 		kmem_free(temp_tcp_array, size * sizeof (tcp_t *));
+		netstack_rele(tcps->tcps_netstack);
 		return (B_FALSE);
 	}
 	*hi_port = port - 1;
@@ -23504,32 +23752,37 @@ tcp_reserved_port_add(int size, in_port_t *lo_port, in_port_t *hi_port)
 	 * that we should provide more reserved port ranges, this function
 	 * has to be modified to be more efficient.
 	 */
-	if (tcp_reserved_port_array_size == 0) {
-		tcp_reserved_port[0].lo_port = *lo_port;
-		tcp_reserved_port[0].hi_port = *hi_port;
-		tcp_reserved_port[0].temp_tcp_array = temp_tcp_array;
+	if (tcps->tcps_reserved_port_array_size == 0) {
+		tcps->tcps_reserved_port[0].lo_port = *lo_port;
+		tcps->tcps_reserved_port[0].hi_port = *hi_port;
+		tcps->tcps_reserved_port[0].temp_tcp_array = temp_tcp_array;
 	} else {
-		for (i = 0, j = 0; i < tcp_reserved_port_array_size; i++, j++) {
-			if (*lo_port < tcp_reserved_port[i].lo_port && i == j) {
+		for (i = 0, j = 0; i < tcps->tcps_reserved_port_array_size;
+		    i++, j++) {
+			if (*lo_port < tcps->tcps_reserved_port[i].lo_port &&
+			    i == j) {
 				tmp_ports[j].lo_port = *lo_port;
 				tmp_ports[j].hi_port = *hi_port;
 				tmp_ports[j].temp_tcp_array = temp_tcp_array;
 				j++;
 			}
-			tmp_ports[j].lo_port = tcp_reserved_port[i].lo_port;
-			tmp_ports[j].hi_port = tcp_reserved_port[i].hi_port;
+			tmp_ports[j].lo_port =
+			    tcps->tcps_reserved_port[i].lo_port;
+			tmp_ports[j].hi_port =
+			    tcps->tcps_reserved_port[i].hi_port;
 			tmp_ports[j].temp_tcp_array =
-			    tcp_reserved_port[i].temp_tcp_array;
+			    tcps->tcps_reserved_port[i].temp_tcp_array;
 		}
 		if (j == i) {
 			tmp_ports[j].lo_port = *lo_port;
 			tmp_ports[j].hi_port = *hi_port;
 			tmp_ports[j].temp_tcp_array = temp_tcp_array;
 		}
-		bcopy(tmp_ports, tcp_reserved_port, sizeof (tmp_ports));
+		bcopy(tmp_ports, tcps->tcps_reserved_port, sizeof (tmp_ports));
 	}
-	tcp_reserved_port_array_size++;
-	rw_exit(&tcp_reserved_port_lock);
+	tcps->tcps_reserved_port_array_size++;
+	rw_exit(&tcps->tcps_reserved_port_lock);
+	netstack_rele(tcps->tcps_netstack);
 	return (B_TRUE);
 }
 
@@ -23543,19 +23796,19 @@ tcp_reserved_port_add(int size, in_port_t *lo_port, in_port_t *hi_port)
  *	B_TRUE is the port is inside a reserved port range, B_FALSE otherwise.
  */
 boolean_t
-tcp_reserved_port_check(in_port_t port)
+tcp_reserved_port_check(in_port_t port, tcp_stack_t *tcps)
 {
 	int i;
 
-	rw_enter(&tcp_reserved_port_lock, RW_READER);
-	for (i = 0; i < tcp_reserved_port_array_size; i++) {
-		if (port >= tcp_reserved_port[i].lo_port ||
-		    port <= tcp_reserved_port[i].hi_port) {
-			rw_exit(&tcp_reserved_port_lock);
+	rw_enter(&tcps->tcps_reserved_port_lock, RW_READER);
+	for (i = 0; i < tcps->tcps_reserved_port_array_size; i++) {
+		if (port >= tcps->tcps_reserved_port[i].lo_port ||
+		    port <= tcps->tcps_reserved_port[i].hi_port) {
+			rw_exit(&tcps->tcps_reserved_port_lock);
 			return (B_TRUE);
 		}
 	}
-	rw_exit(&tcp_reserved_port_lock);
+	rw_exit(&tcps->tcps_reserved_port_lock);
 	return (B_FALSE);
 }
 
@@ -23568,17 +23821,19 @@ static int
 tcp_reserved_port_list(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 {
 	int i;
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
 
-	rw_enter(&tcp_reserved_port_lock, RW_READER);
-	if (tcp_reserved_port_array_size > 0)
+	rw_enter(&tcps->tcps_reserved_port_lock, RW_READER);
+	if (tcps->tcps_reserved_port_array_size > 0)
 		(void) mi_mpprintf(mp, "The following ports are reserved:");
 	else
 		(void) mi_mpprintf(mp, "No port is reserved.");
-	for (i = 0; i < tcp_reserved_port_array_size; i++) {
+	for (i = 0; i < tcps->tcps_reserved_port_array_size; i++) {
 		(void) mi_mpprintf(mp, "%d-%d",
-		    tcp_reserved_port[i].lo_port, tcp_reserved_port[i].hi_port);
+		    tcps->tcps_reserved_port[i].lo_port,
+		    tcps->tcps_reserved_port[i].hi_port);
 	}
-	rw_exit(&tcp_reserved_port_lock);
+	rw_exit(&tcps->tcps_reserved_port_lock);
 	return (0);
 }
 
@@ -23639,6 +23894,7 @@ tcp_bind_hash_remove(tcp_t *tcp)
 {
 	tcp_t	*tcpnext;
 	kmutex_t *lockp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (tcp->tcp_ptpbhn == NULL)
 		return;
@@ -23648,7 +23904,7 @@ tcp_bind_hash_remove(tcp_t *tcp)
 	 * hash_remove's for this instance.
 	 */
 	ASSERT(tcp->tcp_lport != 0);
-	lockp = &tcp_bind_fanout[TCP_BIND_HASH(tcp->tcp_lport)].tf_lock;
+	lockp = &tcps->tcps_bind_fanout[TCP_BIND_HASH(tcp->tcp_lport)].tf_lock;
 
 	ASSERT(lockp != NULL);
 	mutex_enter(lockp);
@@ -23670,12 +23926,12 @@ tcp_bind_hash_remove(tcp_t *tcp)
  * Returns with a CONN_INC_REF tcp structure. Caller must do a CONN_DEC_REF.
  */
 static tcp_t *
-tcp_acceptor_hash_lookup(t_uscalar_t id)
+tcp_acceptor_hash_lookup(t_uscalar_t id, tcp_stack_t *tcps)
 {
 	tf_t	*tf;
 	tcp_t	*tcp;
 
-	tf = &tcp_acceptor_fanout[TCP_ACCEPTOR_HASH(id)];
+	tf = &tcps->tcps_acceptor_fanout[TCP_ACCEPTOR_HASH(id)];
 	mutex_enter(&tf->tf_lock);
 	for (tcp = tf->tf_tcp; tcp != NULL;
 	    tcp = tcp->tcp_acceptor_hash) {
@@ -23699,8 +23955,9 @@ tcp_acceptor_hash_insert(t_uscalar_t id, tcp_t *tcp)
 	tf_t	*tf;
 	tcp_t	**tcpp;
 	tcp_t	*tcpnext;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
-	tf = &tcp_acceptor_fanout[TCP_ACCEPTOR_HASH(id)];
+	tf = &tcps->tcps_acceptor_fanout[TCP_ACCEPTOR_HASH(id)];
 
 	if (tcp->tcp_ptpahn != NULL)
 		tcp_acceptor_hash_remove(tcp);
@@ -23756,13 +24013,12 @@ tcp_host_param_setvalue(queue_t *q, mblk_t *mp, char *value, caddr_t cp, int af)
 	int error = 0;
 	int retval;
 	char *end;
-
 	tcp_hsp_t *hsp;
 	tcp_hsp_t *hspprev;
-
 	ipaddr_t addr = 0;		/* Address we're looking for */
 	in6_addr_t v6addr;		/* Address we're looking for */
 	uint32_t hash;			/* Hash of that address */
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
 
 	/*
 	 * If the following variables are still zero after parsing the input
@@ -23777,7 +24033,7 @@ tcp_host_param_setvalue(queue_t *q, mblk_t *mp, char *value, caddr_t cp, int af)
 	long timestamp = 0;	/* Originate TCP TSTAMP option, 1 = yes */
 	boolean_t delete = B_FALSE;	/* User asked to delete this HSP */
 
-	rw_enter(&tcp_hsp_lock, RW_WRITER);
+	rw_enter(&tcps->tcps_hsp_lock, RW_WRITER);
 
 	/* Parse and validate address */
 	if (af == AF_INET) {
@@ -23884,14 +24140,14 @@ tcp_host_param_setvalue(queue_t *q, mblk_t *mp, char *value, caddr_t cp, int af)
 		 * Note that deletes don't return an error if the thing
 		 * we're trying to delete isn't there.
 		 */
-		if (tcp_hsp_hash == NULL)
+		if (tcps->tcps_hsp_hash == NULL)
 			goto done;
-		hsp = tcp_hsp_hash[hash];
+		hsp = tcps->tcps_hsp_hash[hash];
 
 		if (hsp) {
 			if (IN6_ARE_ADDR_EQUAL(&hsp->tcp_hsp_addr_v6,
 			    &v6addr)) {
-				tcp_hsp_hash[hash] = hsp->tcp_hsp_next;
+				tcps->tcps_hsp_hash[hash] = hsp->tcp_hsp_next;
 				mi_free((char *)hsp);
 			} else {
 				hspprev = hsp;
@@ -23913,10 +24169,10 @@ tcp_host_param_setvalue(queue_t *q, mblk_t *mp, char *value, caddr_t cp, int af)
 		 * so, allocate the hash table.
 		 */
 
-		if (!tcp_hsp_hash) {
-			tcp_hsp_hash = (tcp_hsp_t **)
+		if (!tcps->tcps_hsp_hash) {
+			tcps->tcps_hsp_hash = (tcp_hsp_t **)
 			    mi_zalloc(sizeof (tcp_hsp_t *) * TCP_HSP_HASH_SIZE);
-			if (!tcp_hsp_hash) {
+			if (!tcps->tcps_hsp_hash) {
 				error = EINVAL;
 				goto done;
 			}
@@ -23924,7 +24180,7 @@ tcp_host_param_setvalue(queue_t *q, mblk_t *mp, char *value, caddr_t cp, int af)
 
 		/* Get head of hash chain */
 
-		hsp = tcp_hsp_hash[hash];
+		hsp = tcps->tcps_hsp_hash[hash];
 
 		/* Try to find pre-existing hsp on hash chain */
 		/* Doesn't handle CIDR prefixes. */
@@ -23945,8 +24201,8 @@ tcp_host_param_setvalue(queue_t *q, mblk_t *mp, char *value, caddr_t cp, int af)
 				error = EINVAL;
 				goto done;
 			}
-			hsp->tcp_hsp_next = tcp_hsp_hash[hash];
-			tcp_hsp_hash[hash] = hsp;
+			hsp->tcp_hsp_next = tcps->tcps_hsp_hash[hash];
+			tcps->tcps_hsp_hash[hash] = hsp;
 		}
 
 		/* Set values that the user asked us to change */
@@ -23966,7 +24222,7 @@ tcp_host_param_setvalue(queue_t *q, mblk_t *mp, char *value, caddr_t cp, int af)
 	}
 
 done:
-	rw_exit(&tcp_hsp_lock);
+	rw_exit(&tcps->tcps_hsp_lock);
 	return (error);
 }
 
@@ -23993,14 +24249,15 @@ tcp_host_param_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	tcp_hsp_t *hsp;
 	int i;
 	char addrbuf[INET6_ADDRSTRLEN], subnetbuf[INET6_ADDRSTRLEN];
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
 
-	rw_enter(&tcp_hsp_lock, RW_READER);
+	rw_enter(&tcps->tcps_hsp_lock, RW_READER);
 	(void) mi_mpprintf(mp,
 	    "Hash HSP     " MI_COL_HDRPAD_STR
 	    "Address         Subnet Mask     Send       Receive    TStamp");
-	if (tcp_hsp_hash) {
+	if (tcps->tcps_hsp_hash) {
 		for (i = 0; i < TCP_HSP_HASH_SIZE; i++) {
-			hsp = tcp_hsp_hash[i];
+			hsp = tcps->tcps_hsp_hash[i];
 			while (hsp) {
 				if (hsp->tcp_hsp_vers == IPV4_VERSION) {
 					(void) inet_ntop(AF_INET,
@@ -24032,7 +24289,7 @@ tcp_host_param_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 			}
 		}
 	}
-	rw_exit(&tcp_hsp_lock);
+	rw_exit(&tcps->tcps_hsp_lock);
 	return (0);
 }
 
@@ -24051,19 +24308,19 @@ static ipaddr_t netmasks[] = {
  * associated with the routes to determine the default sndspace and rcvspace.
  */
 static tcp_hsp_t *
-tcp_hsp_lookup(ipaddr_t addr)
+tcp_hsp_lookup(ipaddr_t addr, tcp_stack_t *tcps)
 {
 	tcp_hsp_t *hsp = NULL;
 
 	/* Quick check without acquiring the lock. */
-	if (tcp_hsp_hash == NULL)
+	if (tcps->tcps_hsp_hash == NULL)
 		return (NULL);
 
-	rw_enter(&tcp_hsp_lock, RW_READER);
+	rw_enter(&tcps->tcps_hsp_lock, RW_READER);
 
 	/* This routine finds the best-matching HSP for address addr. */
 
-	if (tcp_hsp_hash) {
+	if (tcps->tcps_hsp_hash) {
 		int i;
 		ipaddr_t srchaddr;
 		tcp_hsp_t *hsp_net;
@@ -24075,7 +24332,7 @@ tcp_hsp_lookup(ipaddr_t addr)
 		for (i = 1; i <= 3; i++) {
 			/* Look for exact match on srchaddr */
 
-			hsp = tcp_hsp_hash[TCP_HSP_HASH(srchaddr)];
+			hsp = tcps->tcps_hsp_hash[TCP_HSP_HASH(srchaddr)];
 			while (hsp) {
 				if (hsp->tcp_hsp_vers == IPV4_VERSION &&
 				    hsp->tcp_hsp_addr == srchaddr)
@@ -24128,7 +24385,7 @@ tcp_hsp_lookup(ipaddr_t addr)
 		}
 	}
 
-	rw_exit(&tcp_hsp_lock);
+	rw_exit(&tcps->tcps_hsp_lock);
 	return (hsp);
 }
 
@@ -24137,19 +24394,19 @@ tcp_hsp_lookup(ipaddr_t addr)
  * match lookup.
  */
 static tcp_hsp_t *
-tcp_hsp_lookup_ipv6(in6_addr_t *v6addr)
+tcp_hsp_lookup_ipv6(in6_addr_t *v6addr, tcp_stack_t *tcps)
 {
 	tcp_hsp_t *hsp = NULL;
 
 	/* Quick check without acquiring the lock. */
-	if (tcp_hsp_hash == NULL)
+	if (tcps->tcps_hsp_hash == NULL)
 		return (NULL);
 
-	rw_enter(&tcp_hsp_lock, RW_READER);
+	rw_enter(&tcps->tcps_hsp_lock, RW_READER);
 
 	/* This routine finds the best-matching HSP for address addr. */
 
-	if (tcp_hsp_hash) {
+	if (tcps->tcps_hsp_hash) {
 		int i;
 		in6_addr_t v6srchaddr;
 		tcp_hsp_t *hsp_net;
@@ -24161,7 +24418,7 @@ tcp_hsp_lookup_ipv6(in6_addr_t *v6addr)
 		for (i = 1; i <= 3; i++) {
 			/* Look for exact match on srchaddr */
 
-			hsp = tcp_hsp_hash[TCP_HSP_HASH(
+			hsp = tcps->tcps_hsp_hash[TCP_HSP_HASH(
 			    V4_PART_OF_V6(v6srchaddr))];
 			while (hsp) {
 				if (hsp->tcp_hsp_vers == IPV6_VERSION &&
@@ -24224,7 +24481,7 @@ tcp_hsp_lookup_ipv6(in6_addr_t *v6addr)
 		}
 	}
 
-	rw_exit(&tcp_hsp_lock);
+	rw_exit(&tcps->tcps_hsp_lock);
 	return (hsp);
 }
 
@@ -24450,7 +24707,7 @@ tcp_conprim_opt_process(tcp_t *tcp, mblk_t *mp, int *do_disconnectp,
 #define	PASSWD_SIZE 16  /* MUST be multiple of 4 */
 
 static void
-tcp_iss_key_init(uint8_t *phrase, int len)
+tcp_iss_key_init(uint8_t *phrase, int len, tcp_stack_t *tcps)
 {
 	struct {
 		int32_t current_time;
@@ -24496,11 +24753,11 @@ tcp_iss_key_init(uint8_t *phrase, int len)
 	/*
 	 * Hash 'em all together.  The MD5Final is called per-connection.
 	 */
-	mutex_enter(&tcp_iss_key_lock);
-	MD5Init(&tcp_iss_key);
-	MD5Update(&tcp_iss_key, (uchar_t *)&tcp_iss_cookie,
+	mutex_enter(&tcps->tcps_iss_key_lock);
+	MD5Init(&tcps->tcps_iss_key);
+	MD5Update(&tcps->tcps_iss_key, (uchar_t *)&tcp_iss_cookie,
 	    sizeof (tcp_iss_cookie));
-	mutex_exit(&tcp_iss_key_lock);
+	mutex_exit(&tcps->tcps_iss_key_lock);
 }
 
 /*
@@ -24511,10 +24768,12 @@ static int
 tcp_1948_phrase_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
     cred_t *cr)
 {
+	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
+
 	/*
 	 * Basically, value contains a new pass phrase.  Pass it along!
 	 */
-	tcp_iss_key_init((uint8_t *)value, strlen(value));
+	tcp_iss_key_init((uint8_t *)value, strlen(value), tcps);
 	return (0);
 }
 
@@ -24534,45 +24793,232 @@ tcp_iphc_constructor(void *buf, void *cdrarg, int kmflags)
 	return (0);
 }
 
+/*
+ * Make sure we wait until the default queue is setup, yet allow
+ * tcp_g_q_create() to open a TCP stream.
+ * We need to allow tcp_g_q_create() do do an open
+ * of tcp, hence we compare curhread.
+ * All others have to wait until the tcps_g_q has been
+ * setup.
+ */
 void
-tcp_ddi_init(void)
+tcp_g_q_setup(tcp_stack_t *tcps)
 {
-	int i;
+	mutex_enter(&tcps->tcps_g_q_lock);
+	if (tcps->tcps_g_q != NULL) {
+		mutex_exit(&tcps->tcps_g_q_lock);
+		return;
+	}
+	if (tcps->tcps_g_q_creator == NULL) {
+		/* This thread will set it up */
+		tcps->tcps_g_q_creator = curthread;
+		mutex_exit(&tcps->tcps_g_q_lock);
+		tcp_g_q_create(tcps);
+		mutex_enter(&tcps->tcps_g_q_lock);
+		ASSERT(tcps->tcps_g_q_creator == curthread);
+		tcps->tcps_g_q_creator = NULL;
+		cv_signal(&tcps->tcps_g_q_cv);
+		ASSERT(tcps->tcps_g_q != NULL);
+		mutex_exit(&tcps->tcps_g_q_lock);
+		return;
+	}
+	/* Everybody but the creator has to wait */
+	if (tcps->tcps_g_q_creator != curthread) {
+		while (tcps->tcps_g_q == NULL)
+			cv_wait(&tcps->tcps_g_q_cv, &tcps->tcps_g_q_lock);
+	}
+	mutex_exit(&tcps->tcps_g_q_lock);
+}
 
-	/* Initialize locks */
-	rw_init(&tcp_hsp_lock, NULL, RW_DEFAULT, NULL);
-	mutex_init(&tcp_g_q_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&tcp_random_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&tcp_iss_key_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&tcp_epriv_port_lock, NULL, MUTEX_DEFAULT, NULL);
-	rw_init(&tcp_reserved_port_lock, NULL, RW_DEFAULT, NULL);
+major_t IP_MAJ;
+#define	IP	"ip"
 
-	for (i = 0; i < A_CNT(tcp_bind_fanout); i++) {
-		mutex_init(&tcp_bind_fanout[i].tf_lock, NULL,
-		    MUTEX_DEFAULT, NULL);
+#define	TCP6DEV		"/devices/pseudo/tcp6@0:tcp6"
+
+/*
+ * Create a default tcp queue here instead of in strplumb
+ */
+void
+tcp_g_q_create(tcp_stack_t *tcps)
+{
+	int error;
+	ldi_handle_t	lh = NULL;
+	ldi_ident_t	li = NULL;
+	int		rval;
+	cred_t		*cr;
+
+#ifdef NS_DEBUG
+	(void) printf("tcp_g_q_create()\n");
+#endif
+
+	ASSERT(tcps->tcps_g_q_creator == curthread);
+
+	error = ldi_ident_from_major(IP_MAJ, &li);
+	if (error) {
+#ifdef DEBUG
+		printf("tcp_g_q_create: lyr ident get failed error %d\n",
+		    error);
+#endif
+		return;
 	}
 
-	for (i = 0; i < A_CNT(tcp_acceptor_fanout); i++) {
-		mutex_init(&tcp_acceptor_fanout[i].tf_lock, NULL,
-		    MUTEX_DEFAULT, NULL);
-	}
-
-	/* TCP's IPsec code calls the packet dropper. */
-	ip_drop_register(&tcp_dropper, "TCP IPsec policy enforcement");
-
-	if (!tcp_g_nd) {
-		if (!tcp_param_register(tcp_param_arr, A_CNT(tcp_param_arr))) {
-			nd_free(&tcp_g_nd);
-		}
+	cr = zone_get_kcred(netstackid_to_zoneid(
+				tcps->tcps_netstack->netstack_stackid));
+	ASSERT(cr != NULL);
+	/*
+	 * We set the tcp default queue to IPv6 because IPv4 falls
+	 * back to IPv6 when it can't find a client, but
+	 * IPv6 does not fall back to IPv4.
+	 */
+	error = ldi_open_by_name(TCP6DEV, FREAD|FWRITE, cr, &lh, li);
+	if (error) {
+#ifdef DEBUG
+		printf("tcp_g_q_create: open of TCP6DEV failed error %d\n",
+		    error);
+#endif
+		goto out;
 	}
 
 	/*
-	 * Note: To really walk the device tree you need the devinfo
-	 * pointer to your device which is only available after probe/attach.
-	 * The following is safe only because it uses ddi_root_node()
+	 * This ioctl causes the tcp framework to cache a pointer to
+	 * this stream, so we don't want to close the stream after
+	 * this operation.
+	 * Use the kernel credentials that are for the zone we're in.
 	 */
-	tcp_max_optsize = optcom_max_optsize(tcp_opt_obj.odb_opt_des_arr,
-	    tcp_opt_obj.odb_opt_arr_cnt);
+	error = ldi_ioctl(lh, TCP_IOC_DEFAULT_Q,
+	    (intptr_t)0, FKIOCTL, cr, &rval);
+	if (error) {
+#ifdef DEBUG
+		printf("tcp_g_q_create: ioctl TCP_IOC_DEFAULT_Q failed "
+		    "error %d\n", error);
+#endif
+		goto out;
+	}
+	tcps->tcps_g_q_lh = lh;	/* For tcp_g_q_close */
+	lh = NULL;
+out:
+	/* Close layered handles */
+	if (li)
+		ldi_ident_release(li);
+	/* Keep cred around until _inactive needs it */
+	tcps->tcps_g_q_cr = cr;
+}
+
+/*
+ * We keep tcp_g_q set until all other tcp_t's in the zone
+ * has gone away, and then when tcp_g_q_inactive() is called
+ * we clear it.
+ */
+void
+tcp_g_q_destroy(tcp_stack_t *tcps)
+{
+#ifdef NS_DEBUG
+	(void) printf("tcp_g_q_destroy()for stack %d\n",
+	    tcps->tcps_netstack->netstack_stackid);
+#endif
+
+	if (tcps->tcps_g_q == NULL) {
+		return;	/* Nothing to cleanup */
+	}
+	/*
+	 * Drop reference corresponding to the default queue.
+	 * This reference was added from tcp_open when the default queue
+	 * was created, hence we compensate for this extra drop in
+	 * tcp_g_q_close. If the refcnt drops to zero here it means
+	 * the default queue was the last one to be open, in which
+	 * case, then tcp_g_q_inactive will be
+	 * called as a result of the refrele.
+	 */
+	TCPS_REFRELE(tcps);
+}
+
+/*
+ * Called when last tcp_t drops reference count using TCPS_REFRELE.
+ * Run by tcp_q_q_inactive using a taskq.
+ */
+static void
+tcp_g_q_close(void *arg)
+{
+	tcp_stack_t *tcps = arg;
+	int error;
+	ldi_handle_t	lh = NULL;
+	ldi_ident_t	li = NULL;
+	cred_t		*cr;
+
+#ifdef NS_DEBUG
+	(void) printf("tcp_g_q_inactive() for stack %d refcnt %d\n",
+	    tcps->tcps_netstack->netstack_stackid,
+	    tcps->tcps_netstack->netstack_refcnt);
+#endif
+	lh = tcps->tcps_g_q_lh;
+	if (lh == NULL)
+		return;	/* Nothing to cleanup */
+
+	ASSERT(tcps->tcps_refcnt == 1);
+	ASSERT(tcps->tcps_g_q != NULL);
+
+	error = ldi_ident_from_major(IP_MAJ, &li);
+	if (error) {
+#ifdef DEBUG
+		printf("tcp_g_q_inactive: lyr ident get failed error %d\n",
+		    error);
+#endif
+		return;
+	}
+
+	cr = tcps->tcps_g_q_cr;
+	tcps->tcps_g_q_cr = NULL;
+	ASSERT(cr != NULL);
+
+	/*
+	 * Make sure we can break the recursion when tcp_close decrements
+	 * the reference count causing g_q_inactive to be called again.
+	 */
+	tcps->tcps_g_q_lh = NULL;
+
+	/* close the default queue */
+	(void) ldi_close(lh, FREAD|FWRITE, cr);
+	/*
+	 * At this point in time tcps and the rest of netstack_t might
+	 * have been deleted.
+	 */
+	tcps = NULL;
+
+	/* Close layered handles */
+	ldi_ident_release(li);
+	crfree(cr);
+}
+
+/*
+ * Called when last tcp_t drops reference count using TCPS_REFRELE.
+ *
+ * Have to ensure that the ldi routines are not used by an
+ * interrupt thread by using a taskq.
+ */
+void
+tcp_g_q_inactive(tcp_stack_t *tcps)
+{
+	if (tcps->tcps_g_q_lh == NULL)
+		return;	/* Nothing to cleanup */
+
+	ASSERT(tcps->tcps_refcnt == 0);
+	TCPS_REFHOLD(tcps); /* Compensate for what g_q_destroy did */
+
+	if (servicing_interrupt()) {
+		(void) taskq_dispatch(tcp_taskq, tcp_g_q_close,
+			    (void *) tcps, TQ_SLEEP);
+	} else {
+		tcp_g_q_close(tcps);
+	}
+}
+
+/*
+ * Called by IP when IP is loaded into the kernel
+ */
+void
+tcp_ddi_g_init(void)
+{
+	IP_MAJ = ddi_name_to_major(IP);
 
 	tcp_timercache = kmem_cache_create("tcp_timercache",
 	    sizeof (tcp_timer_t) + sizeof (mblk_t), 0,
@@ -24586,13 +25032,92 @@ tcp_ddi_init(void)
 	    TCP_MAX_COMBINED_HEADER_LENGTH, 0,
 	    tcp_iphc_constructor, NULL, NULL, NULL, NULL, 0);
 
-	tcp_squeue_wput_proc = tcp_squeue_switch(tcp_squeue_wput);
-	tcp_squeue_close_proc = tcp_squeue_switch(tcp_squeue_close);
-
-	ip_squeue_init(tcp_squeue_add);
+	mutex_init(&tcp_random_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	/* Initialize the random number generator */
 	tcp_random_init();
+
+	tcp_squeue_wput_proc = tcp_squeue_switch(tcp_squeue_wput);
+	tcp_squeue_close_proc = tcp_squeue_switch(tcp_squeue_close);
+
+	/* A single callback independently of how many netstacks we have */
+	ip_squeue_init(tcp_squeue_add);
+
+	tcp_g_kstat = tcp_g_kstat_init(&tcp_g_statistics);
+
+	tcp_taskq = taskq_create("tcp_taskq", 1, minclsyspri, 1, 1,
+	    TASKQ_PREPOPULATE);
+
+	/*
+	 * We want to be informed each time a stack is created or
+	 * destroyed in the kernel, so we can maintain the
+	 * set of tcp_stack_t's.
+	 */
+	netstack_register(NS_TCP, tcp_stack_init, tcp_stack_shutdown,
+	    tcp_stack_fini);
+}
+
+
+/*
+ * Initialize the TCP stack instance.
+ */
+static void *
+tcp_stack_init(netstackid_t stackid, netstack_t *ns)
+{
+	tcp_stack_t	*tcps;
+	tcpparam_t	*pa;
+	int		i;
+
+	tcps = (tcp_stack_t *)kmem_zalloc(sizeof (*tcps), KM_SLEEP);
+	tcps->tcps_netstack = ns;
+
+	/* Initialize locks */
+	rw_init(&tcps->tcps_hsp_lock, NULL, RW_DEFAULT, NULL);
+	mutex_init(&tcps->tcps_g_q_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&tcps->tcps_g_q_cv, NULL, CV_DEFAULT, NULL);
+	mutex_init(&tcps->tcps_iss_key_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&tcps->tcps_epriv_port_lock, NULL, MUTEX_DEFAULT, NULL);
+	rw_init(&tcps->tcps_reserved_port_lock, NULL, RW_DEFAULT, NULL);
+
+	tcps->tcps_g_num_epriv_ports = TCP_NUM_EPRIV_PORTS;
+	tcps->tcps_g_epriv_ports[0] = 2049;
+	tcps->tcps_g_epriv_ports[1] = 4045;
+	tcps->tcps_min_anonpriv_port = 512;
+
+	tcps->tcps_bind_fanout = kmem_zalloc(sizeof (tf_t) *
+	    TCP_BIND_FANOUT_SIZE, KM_SLEEP);
+	tcps->tcps_acceptor_fanout = kmem_zalloc(sizeof (tf_t) *
+	    TCP_FANOUT_SIZE, KM_SLEEP);
+	tcps->tcps_reserved_port = kmem_zalloc(sizeof (tcp_rport_t) *
+	    TCP_RESERVED_PORTS_ARRAY_MAX_SIZE, KM_SLEEP);
+
+	for (i = 0; i < TCP_BIND_FANOUT_SIZE; i++) {
+		mutex_init(&tcps->tcps_bind_fanout[i].tf_lock, NULL,
+		    MUTEX_DEFAULT, NULL);
+	}
+
+	for (i = 0; i < TCP_FANOUT_SIZE; i++) {
+		mutex_init(&tcps->tcps_acceptor_fanout[i].tf_lock, NULL,
+		    MUTEX_DEFAULT, NULL);
+	}
+
+	/* TCP's IPsec code calls the packet dropper. */
+	ip_drop_register(&tcps->tcps_dropper, "TCP IPsec policy enforcement");
+
+	pa = (tcpparam_t *)kmem_alloc(sizeof (lcl_tcp_param_arr), KM_SLEEP);
+	tcps->tcps_params = pa;
+	bcopy(lcl_tcp_param_arr, tcps->tcps_params, sizeof (lcl_tcp_param_arr));
+
+	(void) tcp_param_register(&tcps->tcps_g_nd, tcps->tcps_params,
+	    A_CNT(lcl_tcp_param_arr), tcps);
+
+	/*
+	 * Note: To really walk the device tree you need the devinfo
+	 * pointer to your device which is only available after probe/attach.
+	 * The following is safe only because it uses ddi_root_node()
+	 */
+	tcp_max_optsize = optcom_max_optsize(tcp_opt_obj.odb_opt_des_arr,
+	    tcp_opt_obj.odb_opt_arr_cnt);
 
 	/*
 	 * Initialize RFC 1948 secret values.  This will probably be reset once
@@ -24605,48 +25130,104 @@ tcp_ddi_init(void)
 	 */
 
 	tcp_iss_key_init((uint8_t *)&tcp_g_t_info_ack,
-	    sizeof (tcp_g_t_info_ack));
+	    sizeof (tcp_g_t_info_ack), tcps);
 
-	if ((tcp_kstat = kstat_create(TCP_MOD_NAME, 0, "tcpstat",
-		"net", KSTAT_TYPE_NAMED,
-		sizeof (tcp_statistics) / sizeof (kstat_named_t),
-		KSTAT_FLAG_VIRTUAL)) != NULL) {
-		tcp_kstat->ks_data = &tcp_statistics;
-		kstat_install(tcp_kstat);
-	}
+	tcps->tcps_kstat = tcp_kstat2_init(stackid, &tcps->tcps_statistics);
+	tcps->tcps_mibkp = tcp_kstat_init(stackid, tcps);
 
-	tcp_kstat_init();
+	return (tcps);
 }
 
+/*
+ * Called when the IP module is about to be unloaded.
+ */
 void
-tcp_ddi_destroy(void)
+tcp_ddi_g_destroy(void)
 {
-	int i;
+	tcp_g_kstat_fini(tcp_g_kstat);
+	tcp_g_kstat = NULL;
+	bzero(&tcp_g_statistics, sizeof (tcp_g_statistics));
 
-	nd_free(&tcp_g_nd);
-
-	for (i = 0; i < A_CNT(tcp_bind_fanout); i++) {
-		mutex_destroy(&tcp_bind_fanout[i].tf_lock);
-	}
-
-	for (i = 0; i < A_CNT(tcp_acceptor_fanout); i++) {
-		mutex_destroy(&tcp_acceptor_fanout[i].tf_lock);
-	}
-
-	mutex_destroy(&tcp_iss_key_lock);
-	rw_destroy(&tcp_hsp_lock);
-	mutex_destroy(&tcp_g_q_lock);
 	mutex_destroy(&tcp_random_lock);
-	mutex_destroy(&tcp_epriv_port_lock);
-	rw_destroy(&tcp_reserved_port_lock);
-
-	ip_drop_unregister(&tcp_dropper);
 
 	kmem_cache_destroy(tcp_timercache);
 	kmem_cache_destroy(tcp_sack_info_cache);
 	kmem_cache_destroy(tcp_iphc_cache);
 
-	tcp_kstat_fini();
+	netstack_unregister(NS_TCP);
+	taskq_destroy(tcp_taskq);
+}
+
+/*
+ * Shut down the TCP stack instance.
+ */
+/* ARGSUSED */
+static void
+tcp_stack_shutdown(netstackid_t stackid, void *arg)
+{
+	tcp_stack_t *tcps = (tcp_stack_t *)arg;
+
+	tcp_g_q_destroy(tcps);
+}
+
+/*
+ * Free the TCP stack instance.
+ */
+static void
+tcp_stack_fini(netstackid_t stackid, void *arg)
+{
+	tcp_stack_t *tcps = (tcp_stack_t *)arg;
+	int i;
+
+	nd_free(&tcps->tcps_g_nd);
+	kmem_free(tcps->tcps_params, sizeof (lcl_tcp_param_arr));
+	tcps->tcps_params = NULL;
+	kmem_free(tcps->tcps_wroff_xtra_param, sizeof (tcpparam_t));
+	tcps->tcps_wroff_xtra_param = NULL;
+	kmem_free(tcps->tcps_mdt_head_param, sizeof (tcpparam_t));
+	tcps->tcps_mdt_head_param = NULL;
+	kmem_free(tcps->tcps_mdt_tail_param, sizeof (tcpparam_t));
+	tcps->tcps_mdt_tail_param = NULL;
+	kmem_free(tcps->tcps_mdt_max_pbufs_param, sizeof (tcpparam_t));
+	tcps->tcps_mdt_max_pbufs_param = NULL;
+
+	for (i = 0; i < TCP_BIND_FANOUT_SIZE; i++) {
+		ASSERT(tcps->tcps_bind_fanout[i].tf_tcp == NULL);
+		mutex_destroy(&tcps->tcps_bind_fanout[i].tf_lock);
+	}
+
+	for (i = 0; i < TCP_FANOUT_SIZE; i++) {
+		ASSERT(tcps->tcps_acceptor_fanout[i].tf_tcp == NULL);
+		mutex_destroy(&tcps->tcps_acceptor_fanout[i].tf_lock);
+	}
+
+	kmem_free(tcps->tcps_bind_fanout, sizeof (tf_t) * TCP_BIND_FANOUT_SIZE);
+	tcps->tcps_bind_fanout = NULL;
+
+	kmem_free(tcps->tcps_acceptor_fanout, sizeof (tf_t) * TCP_FANOUT_SIZE);
+	tcps->tcps_acceptor_fanout = NULL;
+
+	kmem_free(tcps->tcps_reserved_port, sizeof (tcp_rport_t) *
+	    TCP_RESERVED_PORTS_ARRAY_MAX_SIZE);
+	tcps->tcps_reserved_port = NULL;
+
+	mutex_destroy(&tcps->tcps_iss_key_lock);
+	rw_destroy(&tcps->tcps_hsp_lock);
+	mutex_destroy(&tcps->tcps_g_q_lock);
+	cv_destroy(&tcps->tcps_g_q_cv);
+	mutex_destroy(&tcps->tcps_epriv_port_lock);
+	rw_destroy(&tcps->tcps_reserved_port_lock);
+
+	ip_drop_unregister(&tcps->tcps_dropper);
+
+	tcp_kstat2_fini(stackid, tcps->tcps_kstat);
+	tcps->tcps_kstat = NULL;
+	bzero(&tcps->tcps_statistics, sizeof (tcps->tcps_statistics));
+
+	tcp_kstat_fini(stackid, tcps->tcps_mibkp);
+	tcps->tcps_mibkp = NULL;
+
+	kmem_free(tcps, sizeof (*tcps));
 }
 
 /*
@@ -24660,14 +25241,15 @@ tcp_iss_init(tcp_t *tcp)
 	MD5_CTX context;
 	struct { uint32_t ports; in6_addr_t src; in6_addr_t dst; } arg;
 	uint32_t answer[4];
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
-	tcp_iss_incr_extra += (ISS_INCR >> 1);
-	tcp->tcp_iss = tcp_iss_incr_extra;
-	switch (tcp_strong_iss) {
+	tcps->tcps_iss_incr_extra += (ISS_INCR >> 1);
+	tcp->tcp_iss = tcps->tcps_iss_incr_extra;
+	switch (tcps->tcps_strong_iss) {
 	case 2:
-		mutex_enter(&tcp_iss_key_lock);
-		context = tcp_iss_key;
-		mutex_exit(&tcp_iss_key_lock);
+		mutex_enter(&tcps->tcps_iss_key_lock);
+		context = tcps->tcps_iss_key;
+		mutex_exit(&tcps->tcps_iss_key_lock);
 		arg.ports = tcp->tcp_ports;
 		if (tcp->tcp_ipversion == IPV4_VERSION) {
 			IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src,
@@ -24713,19 +25295,38 @@ tcp_iss_init(tcp_t *tcp)
  * non-zero from the callback routine terminates the search.
  */
 int
-cl_tcp_walk_list(int (*callback)(cl_tcp_info_t *, void *), void *arg)
+cl_tcp_walk_list(int (*cl_callback)(cl_tcp_info_t *, void *),
+    void *arg)
+{
+	netstack_handle_t nh;
+	netstack_t *ns;
+	int ret = 0;
+
+	netstack_next_init(&nh);
+	while ((ns = netstack_next(&nh)) != NULL) {
+		ret = cl_tcp_walk_list_stack(cl_callback, arg,
+		    ns->netstack_tcp);
+		netstack_rele(ns);
+	}
+	netstack_next_fini(&nh);
+	return (ret);
+}
+
+static int
+cl_tcp_walk_list_stack(int (*callback)(cl_tcp_info_t *, void *), void *arg,
+    tcp_stack_t *tcps)
 {
 	tcp_t *tcp;
 	cl_tcp_info_t	cl_tcpi;
 	connf_t	*connfp;
 	conn_t	*connp;
 	int	i;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
 	ASSERT(callback != NULL);
 
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
-
-		connfp = &ipcl_globalhash_fanout[i];
+		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
 		connp = NULL;
 
 		while ((connp =
@@ -24959,13 +25560,16 @@ tcp_ioctl_abort_handler(tcp_t *tcp, mblk_t *mp)
  */
 static int
 tcp_ioctl_abort_bucket(tcp_ioc_abort_conn_t *acp, int index, int *count,
-    boolean_t exact)
+    boolean_t exact, tcp_stack_t *tcps)
 {
 	int nmatch, err = 0;
 	tcp_t *tcp;
 	MBLKP mp, last, listhead = NULL;
 	conn_t	*tconnp;
-	connf_t	*connfp = &ipcl_conn_fanout[index];
+	connf_t	*connfp;
+	ip_stack_t *ipst = tcps->tcps_netstack->netstack_ip;
+
+	connfp = &ipst->ips_ipcl_conn_fanout[index];
 
 startover:
 	nmatch = 0;
@@ -25021,7 +25625,7 @@ startover:
  * Abort all connections that matches the attributes specified in acp.
  */
 static int
-tcp_ioctl_abort(tcp_ioc_abort_conn_t *acp)
+tcp_ioctl_abort(tcp_ioc_abort_conn_t *acp, tcp_stack_t *tcps)
 {
 	sa_family_t af;
 	uint32_t  ports;
@@ -25030,6 +25634,7 @@ tcp_ioctl_abort(tcp_ioc_abort_conn_t *acp)
 	boolean_t exact = B_FALSE; /* set when there is no wildcard */
 	int index = -1;
 	ushort_t logflags;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
 	af = acp->ac_local.ss_family;
 
@@ -25057,14 +25662,16 @@ tcp_ioctl_abort(tcp_ioc_abort_conn_t *acp)
 	 */
 	if (index != -1) {
 		err = tcp_ioctl_abort_bucket(acp, index,
-			    &count, exact);
+			    &count, exact, tcps);
 	} else {
 		/*
 		 * loop through all entries for wildcard case
 		 */
-		for (index = 0; index < ipcl_conn_fanout_size; index++) {
+		for (index = 0;
+		    index < ipst->ips_ipcl_conn_fanout_size;
+		    index++) {
 			err = tcp_ioctl_abort_bucket(acp, index,
-			    &count, exact);
+			    &count, exact, tcps);
 			if (err != 0)
 				break;
 		}
@@ -25095,8 +25702,11 @@ tcp_ioctl_abort_conn(queue_t *q, mblk_t *mp)
 	MBLKP   mp1;
 	sa_family_t laf, raf;
 	tcp_ioc_abort_conn_t *acp;
-	zone_t *zptr;
-	zoneid_t zoneid = Q_TO_CONN(q)->conn_zoneid;
+	zone_t		*zptr;
+	conn_t		*connp = Q_TO_CONN(q);
+	zoneid_t	zoneid = connp->conn_zoneid;
+	tcp_t		*tcp = connp->conn_tcp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	iocp = (IOCP)mp->b_rptr;
 
@@ -25107,7 +25717,7 @@ tcp_ioctl_abort_conn(queue_t *q, mblk_t *mp)
 	}
 
 	/* check permissions */
-	if (secpolicy_net_config(iocp->ioc_cr, B_FALSE) != 0) {
+	if (secpolicy_ip_config(iocp->ioc_cr, B_FALSE) != 0) {
 		err = EPERM;
 		goto out;
 	}
@@ -25132,6 +25742,13 @@ tcp_ioctl_abort_conn(queue_t *q, mblk_t *mp)
 		}
 	}
 
+	/*
+	 * For exclusive stacks we set the zoneid to zero
+	 * to make TCP operate as if in the global zone.
+	 */
+	if (tcps->tcps_netstack->netstack_stackid != GLOBAL_NETSTACKID)
+		acp->ac_zoneid = GLOBAL_ZONEID;
+
 	if (acp->ac_start < TCPS_SYN_SENT || acp->ac_end > TCPS_TIME_WAIT ||
 	    acp->ac_start > acp->ac_end || laf != raf ||
 	    (laf != AF_INET && laf != AF_INET6)) {
@@ -25140,7 +25757,7 @@ tcp_ioctl_abort_conn(queue_t *q, mblk_t *mp)
 	}
 
 	tcp_ioctl_abort_dump(acp);
-	err = tcp_ioctl_abort(acp);
+	err = tcp_ioctl_abort(acp, tcps);
 
 out:
 	if (mp1 != NULL) {
@@ -25171,6 +25788,7 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 	uint_t		flags;
 	uint32_t	new_swnd = 0;
 	conn_t		*connp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	BUMP_LOCAL(tcp->tcp_ibsegs);
 	TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_RECV_PKT);
@@ -25188,8 +25806,8 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 	gap = seg_seq - tcp->tcp_rnxt;
 	rgap = tcp->tcp_rwnd - (gap + seg_len);
 	if (gap < 0) {
-		BUMP_MIB(&tcp_mib, tcpInDataDupSegs);
-		UPDATE_MIB(&tcp_mib, tcpInDataDupBytes,
+		BUMP_MIB(&tcps->tcps_mib, tcpInDataDupSegs);
+		UPDATE_MIB(&tcps->tcps_mib, tcpInDataDupBytes,
 		    (seg_len > -gap ? -gap : seg_len));
 		seg_len += gap;
 		if (seg_len < 0 || (seg_len == 0 && !(flags & TH_FIN))) {
@@ -25208,12 +25826,13 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 					if (tcp_time_wait_remove(tcp, NULL) ==
 					    B_TRUE) {
 						tcp_time_wait_append(tcp);
-						TCP_DBGSTAT(tcp_rput_time_wait);
+						TCP_DBGSTAT(tcps,
+						    tcp_rput_time_wait);
 					}
 				} else {
 					ASSERT(tcp != NULL);
 					TCP_TIMER_RESTART(tcp,
-					    tcp_time_wait_interval);
+					    tcps->tcps_time_wait_interval);
 				}
 				tcp_xmit_ctl(NULL, tcp, tcp->tcp_snxt,
 				    tcp->tcp_rnxt, TH_ACK);
@@ -25243,10 +25862,11 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 		 * The above calculation is ugly and is a
 		 * waste of CPU cycles...
 		 */
-		uint32_t new_iss = tcp_iss_incr_extra;
+		uint32_t new_iss = tcps->tcps_iss_incr_extra;
 		int32_t adj;
+		ip_stack_t *ipst = tcps->tcps_netstack->netstack_ip;
 
-		switch (tcp_strong_iss) {
+		switch (tcps->tcps_strong_iss) {
 		case 2: {
 			/* Add time and MD5 components. */
 			uint32_t answer[4];
@@ -25257,9 +25877,9 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 			} arg;
 			MD5_CTX context;
 
-			mutex_enter(&tcp_iss_key_lock);
-			context = tcp_iss_key;
-			mutex_exit(&tcp_iss_key_lock);
+			mutex_enter(&tcps->tcps_iss_key_lock);
+			context = tcps->tcps_iss_key;
+			mutex_exit(&tcps->tcps_iss_key_lock);
 			arg.ports = tcp->tcp_ports;
 			/* We use MAPPED addresses in tcp_iss_init */
 			arg.src = tcp->tcp_ip_src_v6;
@@ -25293,7 +25913,7 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 			 * ahead of the current tcp_snxt, so add the
 			 * difference to tcp_iss_incr_extra.
 			 */
-			tcp_iss_incr_extra += adj;
+			tcps->tcps_iss_incr_extra += adj;
 		}
 		/*
 		 * If tcp_clean_death() can not perform the task now,
@@ -25314,9 +25934,9 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 		 * check this time by attaching a dummy
 		 * ipsec_in with ipsec_in_dont_check set.
 		 */
-		if ((connp = ipcl_classify(mp, tcp->tcp_connp->conn_zoneid)) !=
-		    NULL) {
-			TCP_STAT(tcp_time_wait_syn_success);
+		connp = ipcl_classify(mp, tcp->tcp_connp->conn_zoneid, ipst);
+		if (connp != NULL) {
+			TCP_STAT(tcps, tcp_time_wait_syn_success);
 			tcp_reinput(connp, mp, tcp->tcp_connp->conn_sqp);
 			return;
 		}
@@ -25328,8 +25948,8 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 	 * value is the amount out of window.
 	 */
 	if (rgap < 0) {
-		BUMP_MIB(&tcp_mib, tcpInDataPastWinSegs);
-		UPDATE_MIB(&tcp_mib, tcpInDataPastWinBytes, -rgap);
+		BUMP_MIB(&tcps->tcps_mib, tcpInDataPastWinSegs);
+		UPDATE_MIB(&tcps->tcps_mib, tcpInDataPastWinBytes, -rgap);
 		/* Fix seg_len and make sure there is something left. */
 		seg_len += rgap;
 		if (seg_len <= 0) {
@@ -25358,9 +25978,9 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 		flags |= TH_ACK_NEEDED;
 		seg_len = 0;
 	} else if (seg_len > 0) {
-		BUMP_MIB(&tcp_mib, tcpInClosed);
-		BUMP_MIB(&tcp_mib, tcpInDataInorderSegs);
-		UPDATE_MIB(&tcp_mib, tcpInDataInorderBytes, seg_len);
+		BUMP_MIB(&tcps->tcps_mib, tcpInClosed);
+		BUMP_MIB(&tcps->tcps_mib, tcpInDataInorderSegs);
+		UPDATE_MIB(&tcps->tcps_mib, tcpInDataInorderBytes, seg_len);
 	}
 	if (flags & TH_RST) {
 		(void) tcp_clean_death(tcp, 0, 28);
@@ -25381,7 +26001,7 @@ process_ack:
 		if (bytes_acked <= 0) {
 			if (bytes_acked == 0 && seg_len == 0 &&
 			    new_swnd == tcp->tcp_swnd)
-				BUMP_MIB(&tcp_mib, tcpInDupAck);
+				BUMP_MIB(&tcps->tcps_mib, tcpInDupAck);
 		} else {
 			/* Acks something not sent */
 			flags |= TH_ACK_NEEDED;
@@ -25398,7 +26018,7 @@ done:
 	if ((mp->b_datap->db_struioflag & STRUIO_EAGER) != 0) {
 		DB_CKSUMSTART(mp) = 0;
 		mp->b_datap->db_struioflag &= ~STRUIO_EAGER;
-		TCP_STAT(tcp_time_wait_syn_fail);
+		TCP_STAT(tcps, tcp_time_wait_syn_fail);
 	}
 	freemsg(mp);
 }
@@ -25450,15 +26070,16 @@ tcp_timeout(conn_t *connp, void (*f)(void *), clock_t tim)
 	mblk_t *mp;
 	tcp_timer_t *tcpt;
 	tcp_t *tcp = connp->conn_tcp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(connp->conn_sqp != NULL);
 
-	TCP_DBGSTAT(tcp_timeout_calls);
+	TCP_DBGSTAT(tcps, tcp_timeout_calls);
 
 	if (tcp->tcp_timercache == NULL) {
 		mp = tcp_timermp_alloc(KM_NOSLEEP | KM_PANIC);
 	} else {
-		TCP_DBGSTAT(tcp_timeout_cached_alloc);
+		TCP_DBGSTAT(tcps, tcp_timeout_cached_alloc);
 		mp = tcp->tcp_timercache;
 		tcp->tcp_timercache = mp->b_next;
 		mp->b_next = NULL;
@@ -25523,8 +26144,9 @@ tcp_timeout_cancel(conn_t *connp, timeout_id_t id)
 	mblk_t	*mp = (mblk_t *)id;
 	tcp_timer_t *tcpt;
 	clock_t delta;
+	tcp_stack_t	*tcps = connp->conn_tcp->tcp_tcps;
 
-	TCP_DBGSTAT(tcp_timeout_cancel_reqs);
+	TCP_DBGSTAT(tcps, tcp_timeout_cancel_reqs);
 
 	if (mp == NULL)
 		return (-1);
@@ -25535,7 +26157,7 @@ tcp_timeout_cancel(conn_t *connp, timeout_id_t id)
 	delta = untimeout(tcpt->tcpt_tid);
 
 	if (delta >= 0) {
-		TCP_DBGSTAT(tcp_timeout_canceled);
+		TCP_DBGSTAT(tcps, tcp_timeout_canceled);
 		tcp_timer_free(connp->conn_tcp, mp);
 		CONN_DEC_REF(connp);
 	}
@@ -25566,19 +26188,24 @@ tcp_timermp_alloc(int kmflags)
 		mp->b_wptr = NULL;
 		mp->b_datap = NULL;
 		mp->b_queue = NULL;
+		mp->b_cont = NULL;
 	} else if (kmflags & KM_PANIC) {
 		/*
 		 * Failed to allocate memory for the timer. Try allocating from
 		 * dblock caches.
 		 */
-		TCP_STAT(tcp_timermp_allocfail);
+		/* ipclassifier calls this from a constructor - hence no tcps */
+		TCP_G_STAT(tcp_timermp_allocfail);
 		mp = allocb_tryhard(sizeof (tcp_timer_t));
 		if (mp == NULL) {
 			size_t size = 0;
 			/*
 			 * Memory is really low. Try tryhard allocation.
+			 *
+			 * ipclassifier calls this from a constructor -
+			 * hence no tcps
 			 */
-			TCP_STAT(tcp_timermp_allocdblfail);
+			TCP_G_STAT(tcp_timermp_allocdblfail);
 			mp = kmem_alloc_tryhard(sizeof (mblk_t) +
 			    sizeof (tcp_timer_t), &size, kmflags);
 			mp->b_rptr = (uchar_t *)(&mp[1]);
@@ -25586,10 +26213,12 @@ tcp_timermp_alloc(int kmflags)
 			mp->b_wptr = (uchar_t *)-1;
 			mp->b_datap = (dblk_t *)size;
 			mp->b_queue = NULL;
+			mp->b_cont = NULL;
 		}
 		ASSERT(mp->b_wptr != NULL);
 	}
-	TCP_DBGSTAT(tcp_timermp_alloced);
+	/* ipclassifier calls this from a constructor - hence no tcps */
+	TCP_G_DBGSTAT(tcp_timermp_alloced);
 
 	return (mp);
 }
@@ -25619,6 +26248,7 @@ static void
 tcp_timer_free(tcp_t *tcp, mblk_t *mp)
 {
 	mblk_t *mp1 = tcp->tcp_timercache;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (mp->b_wptr != NULL) {
 		/*
@@ -25636,7 +26266,7 @@ tcp_timer_free(tcp_t *tcp, mblk_t *mp)
 		tcp->tcp_timercache = mp;
 	} else {
 		kmem_cache_free(tcp_timercache, mp);
-		TCP_DBGSTAT(tcp_timermp_freed);
+		TCP_DBGSTAT(tcps, tcp_timermp_freed);
 	}
 }
 
@@ -25655,6 +26285,7 @@ void
 tcp_setqfull(tcp_t *tcp)
 {
 	queue_t *q = tcp->tcp_wq;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (!(q->q_flag & QFULL)) {
 		mutex_enter(QLOCK(q));
@@ -25663,7 +26294,7 @@ tcp_setqfull(tcp_t *tcp)
 			q->q_flag |= QFULL;
 			tcp->tcp_flow_stopped = B_TRUE;
 			mutex_exit(QLOCK(q));
-			TCP_STAT(tcp_flwctl_on);
+			TCP_STAT(tcps, tcp_flwctl_on);
 		} else {
 			mutex_exit(QLOCK(q));
 		}
@@ -25689,12 +26320,171 @@ tcp_clrqfull(tcp_t *tcp)
 	}
 }
 
+
+/*
+ * kstats related to squeues i.e. not per IP instance
+ */
+static void *
+tcp_g_kstat_init(tcp_g_stat_t *tcp_g_statp)
+{
+	kstat_t *ksp;
+
+	tcp_g_stat_t template = {
+		{ "tcp_timermp_alloced",	KSTAT_DATA_UINT64 },
+		{ "tcp_timermp_allocfail",	KSTAT_DATA_UINT64 },
+		{ "tcp_timermp_allocdblfail",	KSTAT_DATA_UINT64 },
+		{ "tcp_freelist_cleanup",	KSTAT_DATA_UINT64 },
+	};
+
+	ksp = kstat_create(TCP_MOD_NAME, 0, "tcpstat_g", "net",
+	    KSTAT_TYPE_NAMED, sizeof (template) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL);
+
+	if (ksp == NULL)
+		return (NULL);
+
+	bcopy(&template, tcp_g_statp, sizeof (template));
+	ksp->ks_data = (void *)tcp_g_statp;
+
+	kstat_install(ksp);
+	return (ksp);
+}
+
+static void
+tcp_g_kstat_fini(kstat_t *ksp)
+{
+	if (ksp != NULL) {
+		kstat_delete(ksp);
+	}
+}
+
+
+static void *
+tcp_kstat2_init(netstackid_t stackid, tcp_stat_t *tcps_statisticsp)
+{
+	kstat_t *ksp;
+
+	tcp_stat_t template = {
+		{ "tcp_time_wait",		KSTAT_DATA_UINT64 },
+		{ "tcp_time_wait_syn",		KSTAT_DATA_UINT64 },
+		{ "tcp_time_wait_success",	KSTAT_DATA_UINT64 },
+		{ "tcp_time_wait_fail",		KSTAT_DATA_UINT64 },
+		{ "tcp_reinput_syn",		KSTAT_DATA_UINT64 },
+		{ "tcp_ip_output",		KSTAT_DATA_UINT64 },
+		{ "tcp_detach_non_time_wait",	KSTAT_DATA_UINT64 },
+		{ "tcp_detach_time_wait",	KSTAT_DATA_UINT64 },
+		{ "tcp_time_wait_reap",		KSTAT_DATA_UINT64 },
+		{ "tcp_clean_death_nondetached",	KSTAT_DATA_UINT64 },
+		{ "tcp_reinit_calls",		KSTAT_DATA_UINT64 },
+		{ "tcp_eager_err1",		KSTAT_DATA_UINT64 },
+		{ "tcp_eager_err2",		KSTAT_DATA_UINT64 },
+		{ "tcp_eager_blowoff_calls",	KSTAT_DATA_UINT64 },
+		{ "tcp_eager_blowoff_q",	KSTAT_DATA_UINT64 },
+		{ "tcp_eager_blowoff_q0",	KSTAT_DATA_UINT64 },
+		{ "tcp_not_hard_bound",		KSTAT_DATA_UINT64 },
+		{ "tcp_no_listener",		KSTAT_DATA_UINT64 },
+		{ "tcp_found_eager",		KSTAT_DATA_UINT64 },
+		{ "tcp_wrong_queue",		KSTAT_DATA_UINT64 },
+		{ "tcp_found_eager_binding1",	KSTAT_DATA_UINT64 },
+		{ "tcp_found_eager_bound1",	KSTAT_DATA_UINT64 },
+		{ "tcp_eager_has_listener1",	KSTAT_DATA_UINT64 },
+		{ "tcp_open_alloc",		KSTAT_DATA_UINT64 },
+		{ "tcp_open_detached_alloc",	KSTAT_DATA_UINT64 },
+		{ "tcp_rput_time_wait",		KSTAT_DATA_UINT64 },
+		{ "tcp_listendrop",		KSTAT_DATA_UINT64 },
+		{ "tcp_listendropq0",		KSTAT_DATA_UINT64 },
+		{ "tcp_wrong_rq",		KSTAT_DATA_UINT64 },
+		{ "tcp_rsrv_calls",		KSTAT_DATA_UINT64 },
+		{ "tcp_eagerfree2",		KSTAT_DATA_UINT64 },
+		{ "tcp_eagerfree3",		KSTAT_DATA_UINT64 },
+		{ "tcp_eagerfree4",		KSTAT_DATA_UINT64 },
+		{ "tcp_eagerfree5",		KSTAT_DATA_UINT64 },
+		{ "tcp_timewait_syn_fail",	KSTAT_DATA_UINT64 },
+		{ "tcp_listen_badflags",	KSTAT_DATA_UINT64 },
+		{ "tcp_timeout_calls",		KSTAT_DATA_UINT64 },
+		{ "tcp_timeout_cached_alloc",	KSTAT_DATA_UINT64 },
+		{ "tcp_timeout_cancel_reqs",	KSTAT_DATA_UINT64 },
+		{ "tcp_timeout_canceled",	KSTAT_DATA_UINT64 },
+		{ "tcp_timermp_freed",		KSTAT_DATA_UINT64 },
+		{ "tcp_push_timer_cnt",		KSTAT_DATA_UINT64 },
+		{ "tcp_ack_timer_cnt",		KSTAT_DATA_UINT64 },
+		{ "tcp_ire_null1",		KSTAT_DATA_UINT64 },
+		{ "tcp_ire_null",		KSTAT_DATA_UINT64 },
+		{ "tcp_ip_send",		KSTAT_DATA_UINT64 },
+		{ "tcp_ip_ire_send",		KSTAT_DATA_UINT64 },
+		{ "tcp_wsrv_called",		KSTAT_DATA_UINT64 },
+		{ "tcp_flwctl_on",		KSTAT_DATA_UINT64 },
+		{ "tcp_timer_fire_early",	KSTAT_DATA_UINT64 },
+		{ "tcp_timer_fire_miss",	KSTAT_DATA_UINT64 },
+		{ "tcp_rput_v6_error",		KSTAT_DATA_UINT64 },
+		{ "tcp_out_sw_cksum",		KSTAT_DATA_UINT64 },
+		{ "tcp_out_sw_cksum_bytes",	KSTAT_DATA_UINT64 },
+		{ "tcp_zcopy_on",		KSTAT_DATA_UINT64 },
+		{ "tcp_zcopy_off",		KSTAT_DATA_UINT64 },
+		{ "tcp_zcopy_backoff",		KSTAT_DATA_UINT64 },
+		{ "tcp_zcopy_disable",		KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_pkt_out",		KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_pkt_out_v4",		KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_pkt_out_v6",		KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_discarded",		KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_conn_halted1",	KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_conn_halted2",	KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_conn_halted3",	KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_conn_resumed1",	KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_conn_resumed2",	KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_legacy_small",	KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_legacy_all",		KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_legacy_ret",		KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_allocfail",		KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_addpdescfail",	KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_allocd",		KSTAT_DATA_UINT64 },
+		{ "tcp_mdt_linked",		KSTAT_DATA_UINT64 },
+		{ "tcp_fusion_flowctl",		KSTAT_DATA_UINT64 },
+		{ "tcp_fusion_backenabled",	KSTAT_DATA_UINT64 },
+		{ "tcp_fusion_urg",		KSTAT_DATA_UINT64 },
+		{ "tcp_fusion_putnext",		KSTAT_DATA_UINT64 },
+		{ "tcp_fusion_unfusable",	KSTAT_DATA_UINT64 },
+		{ "tcp_fusion_aborted",		KSTAT_DATA_UINT64 },
+		{ "tcp_fusion_unqualified",	KSTAT_DATA_UINT64 },
+		{ "tcp_fusion_rrw_busy",	KSTAT_DATA_UINT64 },
+		{ "tcp_fusion_rrw_msgcnt",	KSTAT_DATA_UINT64 },
+		{ "tcp_fusion_rrw_plugged",	KSTAT_DATA_UINT64 },
+		{ "tcp_in_ack_unsent_drop",	KSTAT_DATA_UINT64 },
+		{ "tcp_sock_fallback",		KSTAT_DATA_UINT64 },
+	};
+
+	ksp = kstat_create_netstack(TCP_MOD_NAME, 0, "tcpstat", "net",
+	    KSTAT_TYPE_NAMED, sizeof (template) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL, stackid);
+
+	if (ksp == NULL)
+		return (NULL);
+
+	bcopy(&template, tcps_statisticsp, sizeof (template));
+	ksp->ks_data = (void *)tcps_statisticsp;
+	ksp->ks_private = (void *)(uintptr_t)stackid;
+
+	kstat_install(ksp);
+	return (ksp);
+}
+
+static void
+tcp_kstat2_fini(netstackid_t stackid, kstat_t *ksp)
+{
+	if (ksp != NULL) {
+		ASSERT(stackid == (netstackid_t)(uintptr_t)ksp->ks_private);
+		kstat_delete_netstack(ksp, stackid);
+	}
+}
+
 /*
  * TCP Kstats implementation
  */
-static void
-tcp_kstat_init(void)
+static void *
+tcp_kstat_init(netstackid_t stackid, tcp_stack_t *tcps)
 {
+	kstat_t	*ksp;
+
 	tcp_named_kstat_t template = {
 		{ "rtoAlgorithm",	KSTAT_DATA_INT32, 0 },
 		{ "rtoMin",		KSTAT_DATA_INT32, 0 },
@@ -25751,55 +26541,69 @@ tcp_kstat_init(void)
 		{ "connTableSize6",	KSTAT_DATA_INT32, 0 }
 	};
 
-	tcp_mibkp = kstat_create(TCP_MOD_NAME, 0, TCP_MOD_NAME,
-	    "mib2", KSTAT_TYPE_NAMED, NUM_OF_FIELDS(tcp_named_kstat_t), 0);
+	ksp = kstat_create_netstack(TCP_MOD_NAME, 0, TCP_MOD_NAME, "mib2",
+	    KSTAT_TYPE_NAMED, NUM_OF_FIELDS(tcp_named_kstat_t), 0, stackid);
 
-	if (tcp_mibkp == NULL)
-		return;
+	if (ksp == NULL)
+		return (NULL);
 
 	template.rtoAlgorithm.value.ui32 = 4;
-	template.rtoMin.value.ui32 = tcp_rexmit_interval_min;
-	template.rtoMax.value.ui32 = tcp_rexmit_interval_max;
+	template.rtoMin.value.ui32 = tcps->tcps_rexmit_interval_min;
+	template.rtoMax.value.ui32 = tcps->tcps_rexmit_interval_max;
 	template.maxConn.value.i32 = -1;
 
-	bcopy(&template, tcp_mibkp->ks_data, sizeof (template));
+	bcopy(&template, ksp->ks_data, sizeof (template));
+	ksp->ks_update = tcp_kstat_update;
+	ksp->ks_private = (void *)(uintptr_t)stackid;
 
-	tcp_mibkp->ks_update = tcp_kstat_update;
-
-	kstat_install(tcp_mibkp);
+	kstat_install(ksp);
+	return (ksp);
 }
 
 static void
-tcp_kstat_fini(void)
+tcp_kstat_fini(netstackid_t stackid, kstat_t *ksp)
 {
-
-	if (tcp_mibkp != NULL) {
-		kstat_delete(tcp_mibkp);
-		tcp_mibkp = NULL;
+	if (ksp != NULL) {
+		ASSERT(stackid == (netstackid_t)(uintptr_t)ksp->ks_private);
+		kstat_delete_netstack(ksp, stackid);
 	}
 }
 
 static int
 tcp_kstat_update(kstat_t *kp, int rw)
 {
-	tcp_named_kstat_t	*tcpkp;
-	tcp_t			*tcp;
-	connf_t			*connfp;
-	conn_t			*connp;
-	int 			i;
+	tcp_named_kstat_t *tcpkp;
+	tcp_t		*tcp;
+	connf_t		*connfp;
+	conn_t		*connp;
+	int 		i;
+	netstackid_t	stackid = (netstackid_t)(uintptr_t)kp->ks_private;
+	netstack_t	*ns;
+	tcp_stack_t	*tcps;
+	ip_stack_t	*ipst;
 
-	if (!kp || !kp->ks_data)
+	if ((kp == NULL) || (kp->ks_data == NULL))
 		return (EIO);
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
+	ns = netstack_find_by_stackid(stackid);
+	if (ns == NULL)
+		return (-1);
+	tcps = ns->netstack_tcp;
+	if (tcps == NULL) {
+		netstack_rele(ns);
+		return (-1);
+	}
 	tcpkp = (tcp_named_kstat_t *)kp->ks_data;
 
 	tcpkp->currEstab.value.ui32 = 0;
 
+	ipst = ns->netstack_ip;
+
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
-		connfp = &ipcl_globalhash_fanout[i];
+		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
 		connp = NULL;
 		while ((connp =
 		    ipcl_get_next_conn(connfp, connp, IPCL_TCP)) != NULL) {
@@ -25813,55 +26617,67 @@ tcp_kstat_update(kstat_t *kp, int rw)
 		}
 	}
 
-	tcpkp->activeOpens.value.ui32 = tcp_mib.tcpActiveOpens;
-	tcpkp->passiveOpens.value.ui32 = tcp_mib.tcpPassiveOpens;
-	tcpkp->attemptFails.value.ui32 = tcp_mib.tcpAttemptFails;
-	tcpkp->estabResets.value.ui32 = tcp_mib.tcpEstabResets;
-	tcpkp->inSegs.value.ui64 = tcp_mib.tcpHCInSegs;
-	tcpkp->outSegs.value.ui64 = tcp_mib.tcpHCOutSegs;
-	tcpkp->retransSegs.value.ui32 =	tcp_mib.tcpRetransSegs;
-	tcpkp->connTableSize.value.i32 = tcp_mib.tcpConnTableSize;
-	tcpkp->outRsts.value.ui32 = tcp_mib.tcpOutRsts;
-	tcpkp->outDataSegs.value.ui32 = tcp_mib.tcpOutDataSegs;
-	tcpkp->outDataBytes.value.ui32 = tcp_mib.tcpOutDataBytes;
-	tcpkp->retransBytes.value.ui32 = tcp_mib.tcpRetransBytes;
-	tcpkp->outAck.value.ui32 = tcp_mib.tcpOutAck;
-	tcpkp->outAckDelayed.value.ui32 = tcp_mib.tcpOutAckDelayed;
-	tcpkp->outUrg.value.ui32 = tcp_mib.tcpOutUrg;
-	tcpkp->outWinUpdate.value.ui32 = tcp_mib.tcpOutWinUpdate;
-	tcpkp->outWinProbe.value.ui32 = tcp_mib.tcpOutWinProbe;
-	tcpkp->outControl.value.ui32 = tcp_mib.tcpOutControl;
-	tcpkp->outFastRetrans.value.ui32 = tcp_mib.tcpOutFastRetrans;
-	tcpkp->inAckSegs.value.ui32 = tcp_mib.tcpInAckSegs;
-	tcpkp->inAckBytes.value.ui32 = tcp_mib.tcpInAckBytes;
-	tcpkp->inDupAck.value.ui32 = tcp_mib.tcpInDupAck;
-	tcpkp->inAckUnsent.value.ui32 = tcp_mib.tcpInAckUnsent;
-	tcpkp->inDataInorderSegs.value.ui32 = tcp_mib.tcpInDataInorderSegs;
-	tcpkp->inDataInorderBytes.value.ui32 = tcp_mib.tcpInDataInorderBytes;
-	tcpkp->inDataUnorderSegs.value.ui32 = tcp_mib.tcpInDataUnorderSegs;
-	tcpkp->inDataUnorderBytes.value.ui32 = tcp_mib.tcpInDataUnorderBytes;
-	tcpkp->inDataDupSegs.value.ui32 = tcp_mib.tcpInDataDupSegs;
-	tcpkp->inDataDupBytes.value.ui32 = tcp_mib.tcpInDataDupBytes;
-	tcpkp->inDataPartDupSegs.value.ui32 = tcp_mib.tcpInDataPartDupSegs;
-	tcpkp->inDataPartDupBytes.value.ui32 = tcp_mib.tcpInDataPartDupBytes;
-	tcpkp->inDataPastWinSegs.value.ui32 = tcp_mib.tcpInDataPastWinSegs;
-	tcpkp->inDataPastWinBytes.value.ui32 = tcp_mib.tcpInDataPastWinBytes;
-	tcpkp->inWinProbe.value.ui32 = tcp_mib.tcpInWinProbe;
-	tcpkp->inWinUpdate.value.ui32 = tcp_mib.tcpInWinUpdate;
-	tcpkp->inClosed.value.ui32 = tcp_mib.tcpInClosed;
-	tcpkp->rttNoUpdate.value.ui32 = tcp_mib.tcpRttNoUpdate;
-	tcpkp->rttUpdate.value.ui32 = tcp_mib.tcpRttUpdate;
-	tcpkp->timRetrans.value.ui32 = tcp_mib.tcpTimRetrans;
-	tcpkp->timRetransDrop.value.ui32 = tcp_mib.tcpTimRetransDrop;
-	tcpkp->timKeepalive.value.ui32 = tcp_mib.tcpTimKeepalive;
-	tcpkp->timKeepaliveProbe.value.ui32 = tcp_mib.tcpTimKeepaliveProbe;
-	tcpkp->timKeepaliveDrop.value.ui32 = tcp_mib.tcpTimKeepaliveDrop;
-	tcpkp->listenDrop.value.ui32 = tcp_mib.tcpListenDrop;
-	tcpkp->listenDropQ0.value.ui32 = tcp_mib.tcpListenDropQ0;
-	tcpkp->halfOpenDrop.value.ui32 = tcp_mib.tcpHalfOpenDrop;
-	tcpkp->outSackRetransSegs.value.ui32 = tcp_mib.tcpOutSackRetransSegs;
-	tcpkp->connTableSize6.value.i32 = tcp_mib.tcp6ConnTableSize;
+	tcpkp->activeOpens.value.ui32 = tcps->tcps_mib.tcpActiveOpens;
+	tcpkp->passiveOpens.value.ui32 = tcps->tcps_mib.tcpPassiveOpens;
+	tcpkp->attemptFails.value.ui32 = tcps->tcps_mib.tcpAttemptFails;
+	tcpkp->estabResets.value.ui32 = tcps->tcps_mib.tcpEstabResets;
+	tcpkp->inSegs.value.ui64 = tcps->tcps_mib.tcpHCInSegs;
+	tcpkp->outSegs.value.ui64 = tcps->tcps_mib.tcpHCOutSegs;
+	tcpkp->retransSegs.value.ui32 =	tcps->tcps_mib.tcpRetransSegs;
+	tcpkp->connTableSize.value.i32 = tcps->tcps_mib.tcpConnTableSize;
+	tcpkp->outRsts.value.ui32 = tcps->tcps_mib.tcpOutRsts;
+	tcpkp->outDataSegs.value.ui32 = tcps->tcps_mib.tcpOutDataSegs;
+	tcpkp->outDataBytes.value.ui32 = tcps->tcps_mib.tcpOutDataBytes;
+	tcpkp->retransBytes.value.ui32 = tcps->tcps_mib.tcpRetransBytes;
+	tcpkp->outAck.value.ui32 = tcps->tcps_mib.tcpOutAck;
+	tcpkp->outAckDelayed.value.ui32 = tcps->tcps_mib.tcpOutAckDelayed;
+	tcpkp->outUrg.value.ui32 = tcps->tcps_mib.tcpOutUrg;
+	tcpkp->outWinUpdate.value.ui32 = tcps->tcps_mib.tcpOutWinUpdate;
+	tcpkp->outWinProbe.value.ui32 = tcps->tcps_mib.tcpOutWinProbe;
+	tcpkp->outControl.value.ui32 = tcps->tcps_mib.tcpOutControl;
+	tcpkp->outFastRetrans.value.ui32 = tcps->tcps_mib.tcpOutFastRetrans;
+	tcpkp->inAckSegs.value.ui32 = tcps->tcps_mib.tcpInAckSegs;
+	tcpkp->inAckBytes.value.ui32 = tcps->tcps_mib.tcpInAckBytes;
+	tcpkp->inDupAck.value.ui32 = tcps->tcps_mib.tcpInDupAck;
+	tcpkp->inAckUnsent.value.ui32 = tcps->tcps_mib.tcpInAckUnsent;
+	tcpkp->inDataInorderSegs.value.ui32 =
+	    tcps->tcps_mib.tcpInDataInorderSegs;
+	tcpkp->inDataInorderBytes.value.ui32 =
+	    tcps->tcps_mib.tcpInDataInorderBytes;
+	tcpkp->inDataUnorderSegs.value.ui32 =
+	    tcps->tcps_mib.tcpInDataUnorderSegs;
+	tcpkp->inDataUnorderBytes.value.ui32 =
+	    tcps->tcps_mib.tcpInDataUnorderBytes;
+	tcpkp->inDataDupSegs.value.ui32 = tcps->tcps_mib.tcpInDataDupSegs;
+	tcpkp->inDataDupBytes.value.ui32 = tcps->tcps_mib.tcpInDataDupBytes;
+	tcpkp->inDataPartDupSegs.value.ui32 =
+	    tcps->tcps_mib.tcpInDataPartDupSegs;
+	tcpkp->inDataPartDupBytes.value.ui32 =
+	    tcps->tcps_mib.tcpInDataPartDupBytes;
+	tcpkp->inDataPastWinSegs.value.ui32 =
+	    tcps->tcps_mib.tcpInDataPastWinSegs;
+	tcpkp->inDataPastWinBytes.value.ui32 =
+	    tcps->tcps_mib.tcpInDataPastWinBytes;
+	tcpkp->inWinProbe.value.ui32 = tcps->tcps_mib.tcpInWinProbe;
+	tcpkp->inWinUpdate.value.ui32 = tcps->tcps_mib.tcpInWinUpdate;
+	tcpkp->inClosed.value.ui32 = tcps->tcps_mib.tcpInClosed;
+	tcpkp->rttNoUpdate.value.ui32 = tcps->tcps_mib.tcpRttNoUpdate;
+	tcpkp->rttUpdate.value.ui32 = tcps->tcps_mib.tcpRttUpdate;
+	tcpkp->timRetrans.value.ui32 = tcps->tcps_mib.tcpTimRetrans;
+	tcpkp->timRetransDrop.value.ui32 = tcps->tcps_mib.tcpTimRetransDrop;
+	tcpkp->timKeepalive.value.ui32 = tcps->tcps_mib.tcpTimKeepalive;
+	tcpkp->timKeepaliveProbe.value.ui32 =
+	    tcps->tcps_mib.tcpTimKeepaliveProbe;
+	tcpkp->timKeepaliveDrop.value.ui32 =
+	    tcps->tcps_mib.tcpTimKeepaliveDrop;
+	tcpkp->listenDrop.value.ui32 = tcps->tcps_mib.tcpListenDrop;
+	tcpkp->listenDropQ0.value.ui32 = tcps->tcps_mib.tcpListenDropQ0;
+	tcpkp->halfOpenDrop.value.ui32 = tcps->tcps_mib.tcpHalfOpenDrop;
+	tcpkp->outSackRetransSegs.value.ui32 =
+	    tcps->tcps_mib.tcpOutSackRetransSegs;
+	tcpkp->connTableSize6.value.i32 = tcps->tcps_mib.tcp6ConnTableSize;
 
+	netstack_rele(ns);
 	return (0);
 }
 
@@ -25872,10 +26688,11 @@ tcp_reinput(conn_t *connp, mblk_t *mp, squeue_t *sqp)
 	ipha_t		*ipha;
 	uint8_t		*nexthdrp;
 	tcph_t		*tcph;
+	tcp_stack_t	*tcps = connp->conn_tcp->tcp_tcps;
 
 	/* Already has an eager */
 	if ((mp->b_datap->db_struioflag & STRUIO_EAGER) != 0) {
-		TCP_STAT(tcp_reinput_syn);
+		TCP_STAT(tcps, tcp_reinput_syn);
 		squeue_enter(connp->conn_sqp, mp, connp->conn_recv,
 		    connp, SQTAG_TCP_REINPUT_EAGER);
 		return;
@@ -25924,6 +26741,10 @@ tcp_squeue_switch(int val)
 	return (rval);
 }
 
+/*
+ * This is called once for each squeue - globally for all stack
+ * instances.
+ */
 static void
 tcp_squeue_add(squeue_t *sqp)
 {

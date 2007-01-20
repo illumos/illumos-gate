@@ -141,10 +141,13 @@ f none usr/include/inet/ip_ftable.h 644 root bin
 f none usr/include/inet/ip_multi.h 644 root bin
 f none usr/include/inet/ip_netinfo.h 644 root bin
 f none usr/include/inet/ip_rts.h 644 root bin
+f none usr/include/inet/ip_stack.h 644 root bin
 f none usr/include/inet/ip6.h 644 root bin
 f none usr/include/inet/ip6_asp.h 644 root bin
 f none usr/include/inet/ipclassifier.h 644 root bin
 f none usr/include/inet/ipp_common.h 644 root bin
+d none usr/include/inet/kssl 755 root bin
+f none usr/include/inet/kssl/ksslapi.h 644 root bin
 f none usr/include/inet/led.h 644 root bin
 f none usr/include/inet/mi.h 644 root bin
 f none usr/include/inet/mib2.h 644 root bin
@@ -154,9 +157,8 @@ f none usr/include/inet/sctp_itf.h 644 root bin
 f none usr/include/inet/snmpcom.h 644 root bin
 f none usr/include/inet/tcp.h 644 root bin
 f none usr/include/inet/tcp_sack.h 644 root bin
+f none usr/include/inet/tcp_stack.h 644 root bin
 f none usr/include/inet/wifi_ioctl.h 644 root bin
-d none usr/include/inet/kssl 755 root bin
-f none usr/include/inet/kssl/ksslapi.h 644 root bin
 f none usr/include/inttypes.h 644 root bin
 f none usr/include/ipmp.h 644 root bin
 f none usr/include/ipmp_mpathd.h 644 root bin
@@ -904,6 +906,7 @@ f none usr/include/sys/nexusdefs.h 644 root bin
 f none usr/include/sys/ndifm.h 644 root bin
 f none usr/include/sys/ndi_impldefs.h 644 root bin
 f none usr/include/sys/neti.h 644 root bin
+f none usr/include/sys/netstack.h 644 root bin
 f none usr/include/sys/note.h 644 root bin
 f none usr/include/sys/nvpair.h 644 root bin
 f none usr/include/sys/nvpair_impl.h 644 root bin

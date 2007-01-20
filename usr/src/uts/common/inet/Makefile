@@ -21,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/common/inet/Makefile
@@ -33,8 +33,8 @@ HDRS=	arp.h arp_impl.h common.h ipclassifier.h ip.h ip6.h ipdrop.h ipsecah.h \
 	ipsecesp.h ipsec_info.h ip6_asp.h ip_if.h ip_ire.h ip_multi.h \
 	ip_netinfo.h ip_ndp.h ip_rts.h ipsec_impl.h keysock.h led.h mi.h \
 	mib2.h nd.h optcom.h sadb.h sctp_itf.h snmpcom.h tcp.h tcp_sack.h \
-	tun.h udp_impl.h rawip_impl.h ipp_common.h ip_ftable.h ip_impl.h \
-	tcp_impl.h wifi_ioctl.h
+	tcp_stack.h tun.h udp_impl.h rawip_impl.h ipp_common.h ip_ftable.h \
+	ip_impl.h tcp_impl.h wifi_ioctl.h ip_stack.h
 
 ROOTDIRS= $(ROOT)/usr/include/inet
 

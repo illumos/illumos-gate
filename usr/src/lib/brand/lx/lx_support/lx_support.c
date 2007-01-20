@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -420,6 +420,7 @@ lxs_verify(char *xmlfile)
 	struct zone_devtab	devtab;
 	boolean_t		audio, restart;
 	char			*idev, *odev;
+	zone_iptype_t		iptype;
 
 	if ((handle = zonecfg_init_handle()) == NULL)
 		lxs_err(gettext("internal libzonecfg.so.1 error"), 0);
@@ -467,6 +468,20 @@ lxs_verify(char *xmlfile)
 	if (zonecfg_getdevent(handle, &devtab) == Z_OK) {
 		zonecfg_fini_handle(handle);
 		lxs_err(gettext("lx zones do not support added devices"));
+	}
+
+	/*
+	 * Check to see whether the zone has ip-type configured as exclusive
+	 */
+	if (zonecfg_get_iptype(handle, &iptype) != Z_OK) {
+		zonecfg_fini_handle(handle);
+		lxs_err(gettext("zonecfg provided an invalid XML file"));
+	}
+
+	if (iptype == ZS_EXCLUSIVE) {
+		zonecfg_fini_handle(handle);
+		lxs_err(gettext("lx zones do not support an 'exclusive' "
+		    "ip-type"));
 	}
 
 	/* Extract any relevant attributes from the config file. */

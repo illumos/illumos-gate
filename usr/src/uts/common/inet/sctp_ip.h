@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,26 +32,28 @@
 extern "C" {
 #endif
 
+#include <inet/sctp/sctp_stack.h>
+
 #define	SCTP_COMMON_HDR_LENGTH	12	/* SCTP common header length */
 
 /* SCTP routines for IP to call. */
 extern void ip_fanout_sctp(mblk_t *, ill_t *, ipha_t *, uint32_t,
     uint_t, boolean_t, boolean_t, uint_t, zoneid_t);
-extern void sctp_ddi_init(void);
-extern void sctp_ddi_destroy(void);
+extern void sctp_ddi_g_init(void);
+extern void sctp_ddi_g_destroy(void);
 extern conn_t *sctp_find_conn(in6_addr_t *, in6_addr_t *, uint32_t, uint_t,
-    zoneid_t);
+    zoneid_t, sctp_stack_t *);
 extern conn_t *sctp_fanout(in6_addr_t *, in6_addr_t *, uint32_t, uint_t,
-    zoneid_t, mblk_t *);
+    zoneid_t, mblk_t *, sctp_stack_t *);
 
 extern void sctp_input(conn_t *, ipha_t *, mblk_t *, mblk_t *, ill_t *,
     boolean_t, boolean_t);
 extern void sctp_wput(queue_t *, mblk_t *);
 extern void sctp_ootb_input(mblk_t *, ill_t *, uint_t, zoneid_t, boolean_t);
-extern void sctp_hash_init(void);
-extern void sctp_hash_destroy(void);
+extern void sctp_hash_init(sctp_stack_t *);
+extern void sctp_hash_destroy(sctp_stack_t *);
 extern uint32_t sctp_cksum(mblk_t *, int);
-extern mblk_t *sctp_snmp_get_mib2(queue_t *, mblk_t *);
+extern mblk_t *sctp_snmp_get_mib2(queue_t *, mblk_t *, sctp_stack_t *);
 extern void sctp_free(conn_t *);
 
 #define	SCTP_STASH_IPINFO(mp, ire)			\
@@ -89,9 +91,6 @@ extern void sctp_move_ipif(ipif_t *, ill_t *, ill_t *);
 extern void ip_fanout_sctp_raw(mblk_t *, ill_t *, ipha_t *, boolean_t,
     uint32_t, boolean_t, uint_t, boolean_t, uint_t, zoneid_t);
 extern void sctp_ire_cache_flush(ipif_t *);
-
-/* SNMP fixed size info */
-extern mib2_sctp_t sctp_mib;
 
 /*
  * Private (and possibly temporary) ioctls.  It is a large number

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include	<sys/dld.h>
 #include	<sys/dld_impl.h>
 #include	<sys/dls_impl.h>
+#include 	<sys/vlan.h>
 #include	<inet/common.h>
 
 /*
@@ -486,6 +487,95 @@ failed:
 	miocnak(q, mp, 0, err);
 }
 
+/*
+ * DLDIOCHOLDVLAN
+ */
+static void
+drv_hold_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	queue_t		*q = ctls->cs_wq;
+	dld_hold_vlan_t	*dhv;
+	mblk_t		*nmp;
+	int		err;
+	dls_vlan_t	*dvp;
+
+	nmp = mp->b_cont;
+	if (nmp == NULL || MBLKL(nmp) < sizeof (dld_hold_vlan_t)) {
+		err = EINVAL;
+		miocnak(q, mp, 0, err);
+		return;
+	}
+	dhv = (dld_hold_vlan_t *)nmp->b_rptr;
+
+	if ((err = dls_vlan_hold(dhv->dhv_name, &dvp, B_TRUE)) != 0) {
+		miocnak(q, mp, 0, err);
+		return;
+	}
+
+	if ((err = dls_vlan_setzoneid(dhv->dhv_name, dhv->dhv_zid,
+	    dhv->dhv_docheck)) != 0)
+		miocnak(q, mp, 0, err);
+	else
+		miocack(q, mp, 0, 0);
+}
+
+/*
+ * DLDIOCRELEVLAN
+ */
+static void
+drv_rele_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	queue_t		*q = ctls->cs_wq;
+	dld_hold_vlan_t	*dhv;
+	mblk_t		*nmp;
+	int		err;
+
+	nmp = mp->b_cont;
+	if (nmp == NULL || MBLKL(nmp) < sizeof (dld_hold_vlan_t)) {
+		err = EINVAL;
+		miocnak(q, mp, 0, err);
+		return;
+	}
+	dhv = (dld_hold_vlan_t *)nmp->b_rptr;
+
+	if ((err = dls_vlan_setzoneid(dhv->dhv_name, dhv->dhv_zid,
+	    dhv->dhv_docheck)) != 0) {
+		miocnak(q, mp, 0, err);
+		return;
+	}
+
+	if ((err = dls_vlan_rele_by_name(dhv->dhv_name)) != 0) {
+		miocnak(q, mp, 0, err);
+		return;
+	}
+
+	miocack(q, mp, 0, 0);
+}
+
+/*
+ * DLDIOCZIDGET
+ */
+static void
+drv_ioc_zid_get(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	queue_t		*q = ctls->cs_wq;
+	dld_hold_vlan_t	*dhv;
+	mblk_t		*nmp;
+	int		err;
+
+	nmp = mp->b_cont;
+	if (nmp == NULL || MBLKL(nmp) < sizeof (dld_hold_vlan_t)) {
+		err = EINVAL;
+		miocnak(q, mp, 0, err);
+		return;
+	}
+	dhv = (dld_hold_vlan_t *)nmp->b_rptr;
+
+	if ((err = dls_vlan_getzoneid(dhv->dhv_name, &dhv->dhv_zid)) != 0)
+		miocnak(q, mp, 0, err);
+	else
+		miocack(q, mp, sizeof (dld_hold_vlan_t), 0);
+}
 
 /*
  * Process an IOCTL message received by the control node.
@@ -511,6 +601,15 @@ drv_ioc(dld_ctl_str_t *ctls, mblk_t *mp)
 		return;
 	case DLDIOCSECOBJUNSET:
 		drv_ioc_secobj_unset(ctls, mp);
+		return;
+	case DLDIOCHOLDVLAN:
+		drv_hold_vlan(ctls, mp);
+		return;
+	case DLDIOCRELEVLAN:
+		drv_rele_vlan(ctls, mp);
+		return;
+	case DLDIOCZIDGET:
+		drv_ioc_zid_get(ctls, mp);
 		return;
 	default:
 		miocnak(ctls->cs_wq, mp, 0, ENOTSUP);

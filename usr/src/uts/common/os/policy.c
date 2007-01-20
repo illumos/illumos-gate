@@ -1507,6 +1507,56 @@ secpolicy_net_config(const cred_t *cr, boolean_t checkonly)
 
 
 /*
+ * PRIV_SYS_NET_CONFIG has a superset of PRIV_SYS_IP_CONFIG.
+ *
+ * There are a few rare cases where the kernel generates ioctls() from
+ * interrupt context with a credential of kcred rather than NULL.
+ * In those cases, we take the safe and cheap test.
+ */
+int
+secpolicy_ip_config(const cred_t *cr, boolean_t checkonly)
+{
+	if (PRIV_POLICY_ONLY(cr, PRIV_SYS_NET_CONFIG, B_FALSE))
+		return (secpolicy_net_config(cr, checkonly));
+
+	if (checkonly) {
+		return (PRIV_POLICY_ONLY(cr, PRIV_SYS_IP_CONFIG, B_FALSE) ?
+		    0 : EPERM);
+	} else {
+		return (PRIV_POLICY(cr, PRIV_SYS_IP_CONFIG, B_FALSE, EPERM,
+		    NULL));
+	}
+}
+
+
+/*
+ * Map IP pseudo privileges to actual privileges.
+ * So we don't need to recompile IP when we change the privileges.
+ */
+int
+secpolicy_ip(const cred_t *cr, int netpriv, boolean_t checkonly)
+{
+	int priv = PRIV_ALL;
+
+	switch (netpriv) {
+	case OP_CONFIG:
+		priv = PRIV_SYS_IP_CONFIG;
+		break;
+	case OP_RAW:
+		priv = PRIV_NET_RAWACCESS;
+		break;
+	case OP_PRIVPORT:
+		priv = PRIV_NET_PRIVADDR;
+		break;
+	}
+	ASSERT(priv != PRIV_ALL);
+	if (checkonly)
+		return (PRIV_POLICY_ONLY(cr, priv, B_FALSE) ? 0 : EPERM);
+	else
+		return (PRIV_POLICY(cr, priv, B_FALSE, EPERM, NULL));
+}
+
+/*
  * Map network pseudo privileges to actual privileges.
  * So we don't need to recompile IP when we change the privileges.
  */

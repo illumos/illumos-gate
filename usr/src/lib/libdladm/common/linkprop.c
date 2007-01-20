@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,14 +29,66 @@
 #include <strings.h>
 #include <errno.h>
 #include <ctype.h>
+#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/dld.h>
+#include <sys/zone.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <libdevinfo.h>
+#include <zone.h>
 #include <libwladm.h>
 #include <libdladm_impl.h>
+
+#include <dlfcn.h>
+#include <link.h>
 
 static dladm_status_t	i_dladm_set_prop_db(const char *, const char *,
 			    char **, uint_t);
 static dladm_status_t	i_dladm_get_prop_db(const char *, const char *,
 			    char **, uint_t *);
+static dladm_status_t	i_dladm_get_prop_temp(const char *, dladm_prop_type_t,
+			    const char *, char **, uint_t *);
+static dladm_status_t	i_dladm_set_prop_temp(const char *, const char *,
+			    char **, uint_t, uint_t, char **);
+static boolean_t	i_dladm_is_prop_temponly(const char *prop_name,
+			    char **);
+
+typedef struct val_desc {
+	char	*vd_name;
+	void	*vd_val;
+} val_desc_t;
+
+struct prop_desc;
+
+typedef dladm_status_t	pd_getf_t(const char *, char **, uint_t *);
+typedef dladm_status_t	pd_setf_t(const char *, val_desc_t *, uint_t);
+typedef dladm_status_t	pd_checkf_t(struct prop_desc *, char **,
+			    uint_t, val_desc_t **);
+
+static pd_getf_t	do_get_zone;
+static pd_setf_t	do_set_zone;
+static pd_checkf_t	do_check_zone;
+
+typedef struct prop_desc {
+	char		*pd_name;
+	val_desc_t	pd_defval;
+	val_desc_t	*pd_modval;
+	uint_t		pd_nmodval;
+	boolean_t	pd_temponly;
+	pd_setf_t	*pd_set;
+	pd_getf_t	*pd_getmod;
+	pd_getf_t	*pd_get;
+	pd_checkf_t	*pd_check;
+} prop_desc_t;
+
+static prop_desc_t	prop_table[] = {
+	{ "zone",	{ "", NULL }, NULL, 0, B_TRUE,
+	    do_set_zone, NULL,
+	    do_get_zone, do_check_zone}
+};
+
+#define	MAX_PROPS	(sizeof (prop_table) / sizeof (prop_desc_t))
 
 /*
  * Convert a wladm_status_t to a dladm_status_t. This is used by wrappers
@@ -79,7 +131,7 @@ dladm_wladmstatus2status(wladm_status_t wstatus)
 
 dladm_status_t
 dladm_set_prop(const char *link, const char *prop_name, char **prop_val,
-    uint_t val_cnt, uint_t flags)
+    uint_t val_cnt, uint_t flags, char **errprop)
 {
 	dladm_status_t		status = DLADM_STATUS_BADARG;
 
@@ -88,15 +140,27 @@ dladm_set_prop(const char *link, const char *prop_name, char **prop_val,
 		return (DLADM_STATUS_BADARG);
 
 	if ((flags & DLADM_OPT_TEMP) != 0) {
-		if (wladm_is_valid(link)) {
-			status = dladm_wladmstatus2status(
-			    wladm_set_prop(link, prop_name,
-			    prop_val, val_cnt));
+		status = i_dladm_set_prop_temp(link, prop_name, prop_val,
+		    val_cnt, flags, errprop);
+		if (status == DLADM_STATUS_TEMPONLY &&
+		    (flags & DLADM_OPT_PERSIST) != 0)
+			return (DLADM_STATUS_TEMPONLY);
+
+		if (status == DLADM_STATUS_NOTFOUND) {
+			status = DLADM_STATUS_BADARG;
+			if (wladm_is_valid(link)) {
+				status = dladm_wladmstatus2status(
+				    wladm_set_prop(link, prop_name,
+				    prop_val, val_cnt, errprop));
+			}
 		}
 		if (status != DLADM_STATUS_OK)
 			return (status);
 	}
 	if ((flags & DLADM_OPT_PERSIST) != 0) {
+		if (i_dladm_is_prop_temponly(prop_name, errprop))
+			return (DLADM_STATUS_TEMPONLY);
+
 		status = i_dladm_set_prop_db(link, prop_name,
 		    prop_val, val_cnt);
 	}
@@ -107,20 +171,35 @@ dladm_status_t
 dladm_walk_prop(const char *link, void *arg,
     boolean_t (*func)(void *, const char *))
 {
+	int	i;
+
 	if (link == NULL || func == NULL)
 		return (DLADM_STATUS_BADARG);
 
+	/* For wifi links, show wifi properties first */
 	if (wladm_is_valid(link)) {
-		return (dladm_wladmstatus2status(
-		    wladm_walk_prop(link, arg, func)));
+		dladm_status_t	status;
+
+		status = dladm_wladmstatus2status(
+		    wladm_walk_prop(link, arg, func));
+		if (status != DLADM_STATUS_OK)
+			return (status);
 	}
-	return (DLADM_STATUS_BADARG);
+
+	/* Then show data-link properties if there are any */
+	for (i = 0; i < MAX_PROPS; i++) {
+		if (!func(arg, prop_table[i].pd_name))
+			break;
+	}
+	return (DLADM_STATUS_OK);
 }
 
 dladm_status_t
 dladm_get_prop(const char *link, dladm_prop_type_t type,
     const char *prop_name, char **prop_val, uint_t *val_cntp)
 {
+	dladm_status_t status;
+
 	if (link == NULL || prop_name == NULL || prop_val == NULL ||
 	    val_cntp == NULL || *val_cntp == 0)
 		return (DLADM_STATUS_BADARG);
@@ -129,6 +208,11 @@ dladm_get_prop(const char *link, dladm_prop_type_t type,
 		return (i_dladm_get_prop_db(link, prop_name,
 		    prop_val, val_cntp));
 	}
+
+	status = i_dladm_get_prop_temp(link, type, prop_name,
+	    prop_val, val_cntp);
+	if (status != DLADM_STATUS_NOTFOUND)
+		return (status);
 
 	if (wladm_is_valid(link)) {
 		wladm_prop_type_t	wtype;
@@ -421,7 +505,7 @@ process_linkprop_init(linkprop_db_state_t *lsp, char *buf,
 			propval[i] = (char *)lvp->lv_name;
 
 		status = dladm_set_prop(lsp->ls_link, lip->li_name,
-		    propval, valcnt, DLADM_OPT_TEMP);
+		    propval, valcnt, DLADM_OPT_TEMP, NULL);
 
 		/*
 		 * We continue with initializing other properties even
@@ -697,4 +781,423 @@ dladm_init_linkprop(void)
 	state.ls_valcntp = NULL;
 
 	return (LINKPROP_RW_DB(&state, B_FALSE));
+}
+
+static dladm_status_t
+i_dladm_get_zoneid(const char *link, zoneid_t *zidp)
+{
+	int fd;
+	dld_hold_vlan_t	dhv;
+
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+		return (dladm_errno2status(errno));
+
+	bzero(&dhv, sizeof (dld_hold_vlan_t));
+	(void) strlcpy(dhv.dhv_name, link, IFNAMSIZ);
+	dhv.dhv_zid = -1;
+
+	if (i_dladm_ioctl(fd, DLDIOCZIDGET, &dhv, sizeof (dhv)) < 0 &&
+	    errno != ENOENT) {
+		dladm_status_t status = dladm_errno2status(errno);
+
+		(void) close(fd);
+		return (status);
+	}
+
+	if (errno == ENOENT)
+		*zidp = GLOBAL_ZONEID;
+	else
+		*zidp = dhv.dhv_zid;
+
+	(void) close(fd);
+	return (DLADM_STATUS_OK);
+}
+
+typedef int (*zone_get_devroot_t)(char *, char *, size_t);
+
+static int
+i_dladm_get_zone_dev(char *zone_name, char *dev, size_t devlen)
+{
+	char			root[MAXPATHLEN];
+	zone_get_devroot_t	real_zone_get_devroot;
+	void			*dlhandle;
+	void			*sym;
+	int			ret;
+
+	if ((dlhandle = dlopen("libzonecfg.so.1", RTLD_LAZY)) == NULL)
+		return (-1);
+
+	if ((sym = dlsym(dlhandle, "zone_get_devroot")) == NULL) {
+		(void) dlclose(dlhandle);
+		return (-1);
+	}
+
+	real_zone_get_devroot = (zone_get_devroot_t)sym;
+
+	if ((ret = real_zone_get_devroot(zone_name, root, sizeof (root))) == 0)
+		(void) snprintf(dev, devlen, "%s%s", root, "/dev");
+	(void) dlclose(dlhandle);
+	return (ret);
+}
+
+static dladm_status_t
+i_dladm_add_deventry(zoneid_t zid, const char *link)
+{
+	char		path[MAXPATHLEN];
+	di_prof_t	prof = NULL;
+	char		zone_name[ZONENAME_MAX];
+	dladm_status_t	status;
+
+	if (getzonenamebyid(zid, zone_name, sizeof (zone_name)) < 0)
+		return (dladm_errno2status(errno));
+	if (i_dladm_get_zone_dev(zone_name, path, sizeof (path)) != 0)
+		return (dladm_errno2status(errno));
+	if (di_prof_init(path, &prof) != 0)
+		return (dladm_errno2status(errno));
+
+	status = DLADM_STATUS_OK;
+	if (di_prof_add_dev(prof, link) != 0) {
+		status = dladm_errno2status(errno);
+		goto cleanup;
+	}
+	if (di_prof_commit(prof) != 0)
+		status = dladm_errno2status(errno);
+cleanup:
+	if (prof)
+		di_prof_fini(prof);
+
+	return (status);
+}
+
+static dladm_status_t
+i_dladm_remove_deventry(zoneid_t zid, const char *link)
+{
+	char		path[MAXPATHLEN];
+	di_prof_t	prof = NULL;
+	char		zone_name[ZONENAME_MAX];
+	dladm_status_t	status;
+
+	if (getzonenamebyid(zid, zone_name, sizeof (zone_name)) < 0)
+		return (dladm_errno2status(errno));
+	if (i_dladm_get_zone_dev(zone_name, path, sizeof (path)) != 0)
+		return (dladm_errno2status(errno));
+	if (di_prof_init(path, &prof) != 0)
+		return (dladm_errno2status(errno));
+
+	status = DLADM_STATUS_OK;
+	if (di_prof_add_exclude(prof, link) != 0) {
+		status = dladm_errno2status(errno);
+		goto cleanup;
+	}
+	if (di_prof_commit(prof) != 0)
+		status = dladm_errno2status(errno);
+cleanup:
+	if (prof)
+		di_prof_fini(prof);
+
+	return (status);
+}
+
+static dladm_status_t
+do_get_zone(const char *link, char **prop_val, uint_t *val_cnt)
+{
+	char		zone_name[ZONENAME_MAX];
+	zoneid_t	zid;
+	dladm_status_t	status;
+
+	status = i_dladm_get_zoneid(link, &zid);
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	*val_cnt = 1;
+	if (zid != GLOBAL_ZONEID) {
+		if (getzonenamebyid(zid, zone_name, sizeof (zone_name)) < 0)
+			return (dladm_errno2status(errno));
+
+		(void) strncpy(*prop_val, zone_name, DLADM_PROP_VAL_MAX);
+	} else {
+		*prop_val[0] = '\0';
+	}
+
+	return (DLADM_STATUS_OK);
+}
+
+static dladm_status_t
+do_set_zone(const char *link, val_desc_t *vdp, uint_t val_cnt)
+{
+	dladm_status_t	status;
+	zoneid_t	zid_old, zid_new;
+	char		buff[IF_NAMESIZE + 1];
+	struct stat	st;
+
+	if (val_cnt != 1)
+		return (DLADM_STATUS_BADVALCNT);
+
+	status = i_dladm_get_zoneid(link, &zid_old);
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	/* Do nothing if setting to current value */
+	zid_new = (zoneid_t)vdp->vd_val;
+	if (zid_new == zid_old)
+		return (DLADM_STATUS_OK);
+
+	/* Do a stat to get the vlan created by MAC, if it's not there */
+	(void) strcpy(buff, "/dev/");
+	(void) strlcat(buff, link, IF_NAMESIZE);
+	(void) stat(buff, &st);
+
+	if (zid_old != GLOBAL_ZONEID) {
+		if (dladm_rele_link(link, GLOBAL_ZONEID, B_TRUE) < 0)
+			return (dladm_errno2status(errno));
+
+		if (zone_remove_datalink(zid_old, (char *)link) != 0 &&
+		    errno != ENXIO) {
+			status = dladm_errno2status(errno);
+			goto rollback1;
+		}
+
+		status = i_dladm_remove_deventry(zid_old, link);
+		if (status != DLADM_STATUS_OK)
+			goto rollback2;
+	}
+
+	if (zid_new != GLOBAL_ZONEID) {
+		if (zone_add_datalink(zid_new, (char *)link) != 0) {
+			status = dladm_errno2status(errno);
+			goto rollback3;
+		}
+
+		if (dladm_hold_link(link, zid_new, B_TRUE) < 0) {
+			(void) zone_remove_datalink(zid_new, (char *)link);
+			status = dladm_errno2status(errno);
+			goto rollback3;
+		}
+
+		status = i_dladm_add_deventry(zid_new, link);
+		if (status != DLADM_STATUS_OK) {
+			(void) dladm_rele_link(link, GLOBAL_ZONEID, B_FALSE);
+			(void) zone_remove_datalink(zid_new, (char *)link);
+			goto rollback3;
+		}
+	}
+	return (DLADM_STATUS_OK);
+
+rollback3:
+	if (zid_old != GLOBAL_ZONEID)
+		(void) i_dladm_add_deventry(zid_old, link);
+rollback2:
+	if (zid_old != GLOBAL_ZONEID)
+		(void) zone_add_datalink(zid_old, (char *)link);
+rollback1:
+	(void) dladm_hold_link(link, zid_old, B_FALSE);
+cleanexit:
+	return (status);
+}
+
+/* ARGSUSED */
+static dladm_status_t
+do_check_zone(prop_desc_t *pdp, char **prop_val, uint_t val_cnt,
+    val_desc_t **vdpp)
+{
+	zoneid_t 	zid;
+	val_desc_t	*vdp = NULL;
+
+	if (val_cnt != 1)
+		return (DLADM_STATUS_BADVALCNT);
+
+	if ((zid = getzoneidbyname(*prop_val)) == -1)
+		return (DLADM_STATUS_BADVAL);
+
+	if (zid != GLOBAL_ZONEID) {
+		ushort_t	flags;
+
+		if (zone_getattr(zid, ZONE_ATTR_FLAGS, &flags,
+		    sizeof (flags)) < 0) {
+			return (dladm_errno2status(errno));
+		}
+
+		if (!(flags & ZF_NET_EXCL)) {
+			return (DLADM_STATUS_BADVAL);
+		}
+	}
+
+	vdp = malloc(sizeof (val_desc_t));
+	if (vdp == NULL)
+		return (DLADM_STATUS_NOMEM);
+
+	vdp->vd_val = (void *)zid;
+	*vdpp = vdp;
+	return (DLADM_STATUS_OK);
+}
+
+static dladm_status_t
+i_dladm_get_prop_temp(const char *link, dladm_prop_type_t type,
+    const char *prop_name, char **prop_val, uint_t *val_cntp)
+{
+	int 		i;
+	dladm_status_t	status;
+	uint_t		cnt;
+	prop_desc_t	*pdp;
+
+	if (link == NULL || prop_name == NULL || prop_val == NULL ||
+	    val_cntp == NULL || *val_cntp == 0)
+		return (DLADM_STATUS_BADARG);
+
+	for (i = 0; i < MAX_PROPS; i++)
+		if (strcasecmp(prop_name, prop_table[i].pd_name) == 0)
+			break;
+
+	if (i == MAX_PROPS)
+		return (DLADM_STATUS_NOTFOUND);
+
+	pdp = &prop_table[i];
+	status = DLADM_STATUS_OK;
+
+	switch (type) {
+	case DLADM_PROP_VAL_CURRENT:
+		status = pdp->pd_get(link, prop_val, val_cntp);
+		break;
+	case DLADM_PROP_VAL_DEFAULT:
+		if (pdp->pd_defval.vd_name == NULL) {
+			status = DLADM_STATUS_NOTSUP;
+			break;
+		}
+		(void) strcpy(*prop_val, pdp->pd_defval.vd_name);
+		*val_cntp = 1;
+		break;
+
+	case DLADM_PROP_VAL_MODIFIABLE:
+		if (pdp->pd_getmod != NULL) {
+			status = pdp->pd_getmod(link, prop_val, val_cntp);
+			break;
+		}
+		cnt = pdp->pd_nmodval;
+		if (cnt == 0) {
+			status = DLADM_STATUS_NOTSUP;
+		} else if (cnt > *val_cntp) {
+			status = DLADM_STATUS_TOOSMALL;
+		} else {
+			for (i = 0; i < cnt; i++) {
+				(void) strcpy(prop_val[i],
+				    pdp->pd_modval[i].vd_name);
+			}
+			*val_cntp = cnt;
+		}
+		break;
+	default:
+		status = DLADM_STATUS_BADARG;
+		break;
+	}
+
+	return (status);
+}
+
+static dladm_status_t
+i_dladm_set_one_prop_temp(const char *link, prop_desc_t *pdp, char **prop_val,
+    uint_t val_cnt, uint_t flags)
+{
+	dladm_status_t	status;
+	val_desc_t	*vdp = NULL;
+	uint_t		cnt;
+
+	if (pdp->pd_temponly && (flags & DLADM_OPT_PERSIST) != 0)
+		return (DLADM_STATUS_TEMPONLY);
+
+	if (pdp->pd_set == NULL)
+		return (DLADM_STATUS_PROPRDONLY);
+
+	if (prop_val != NULL) {
+		if (pdp->pd_check != NULL)
+			status = pdp->pd_check(pdp, prop_val, val_cnt, &vdp);
+		else
+			status = DLADM_STATUS_BADARG;
+
+		if (status != DLADM_STATUS_OK)
+			return (status);
+
+		cnt = val_cnt;
+	} else {
+		if (pdp->pd_defval.vd_name == NULL)
+			return (DLADM_STATUS_NOTSUP);
+
+		if ((vdp = malloc(sizeof (val_desc_t))) == NULL)
+			return (DLADM_STATUS_NOMEM);
+
+		(void) memcpy(vdp, &pdp->pd_defval, sizeof (val_desc_t));
+		cnt = 1;
+	}
+
+	status = pdp->pd_set(link, vdp, cnt);
+
+	free(vdp);
+	return (status);
+}
+
+static dladm_status_t
+i_dladm_set_prop_temp(const char *link, const char *prop_name, char **prop_val,
+    uint_t val_cnt, uint_t flags, char **errprop)
+{
+	int 		i;
+	dladm_status_t	status = DLADM_STATUS_OK;
+	boolean_t	found = B_FALSE;
+
+	for (i = 0; i < MAX_PROPS; i++) {
+		prop_desc_t	*pdp = &prop_table[i];
+		dladm_status_t	s;
+
+		if (prop_name != NULL &&
+		    (strcasecmp(prop_name, pdp->pd_name) != 0))
+			continue;
+
+		found = B_TRUE;
+		s = i_dladm_set_one_prop_temp(link, pdp, prop_val, val_cnt,
+		    flags);
+
+		if (prop_name != NULL) {
+			status = s;
+			break;
+		} else {
+			if (s != DLADM_STATUS_OK &&
+			    s != DLADM_STATUS_NOTSUP) {
+				if (errprop != NULL)
+					*errprop = pdp->pd_name;
+				status = s;
+				break;
+			}
+		}
+	}
+
+	if (!found)
+		status = DLADM_STATUS_NOTFOUND;
+
+	return (status);
+}
+
+static boolean_t
+i_dladm_is_prop_temponly(const char *prop_name, char **errprop)
+{
+	int 		i;
+
+	for (i = 0; i < MAX_PROPS; i++) {
+		prop_desc_t	*pdp = &prop_table[i];
+
+		if (prop_name != NULL &&
+		    (strcasecmp(prop_name, pdp->pd_name) != 0))
+			continue;
+
+		if (errprop != NULL)
+			*errprop = pdp->pd_name;
+
+		if (pdp->pd_temponly)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+boolean_t
+dladm_is_prop_temponly(const char *prop_name, char **errprop)
+{
+	return (i_dladm_is_prop_temponly(prop_name, errprop));
 }

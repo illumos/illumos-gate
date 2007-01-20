@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,8 @@ extern brand_handle_t brand_open(const char *);
 extern void brand_close(brand_handle_t);
 
 extern int brand_is_native(brand_handle_t);
+
+extern boolean_t brand_allow_exclusive_ip(brand_handle_t);
 
 extern int brand_get_boot(brand_handle_t, const char *, const char *,
     char *, size_t, int, char **);
@@ -63,7 +65,7 @@ extern int brand_config_iter_privilege(brand_handle_t,
     int (*func)(void *, const char *, const char *), void *);
 
 extern int brand_platform_iter_devices(brand_handle_t, const char *,
-    int (*)(void *, const char *, const char *), void *);
+    int (*)(void *, const char *, const char *), void *, const char *);
 extern int brand_platform_iter_gmounts(brand_handle_t, const char *,
     int (*)(void *, const char *, const char *, const char *, const char *),
     void *);

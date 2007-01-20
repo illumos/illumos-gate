@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,8 +65,10 @@
 #define	DTD_ELEM_VERIFY_CFG	((const xmlChar *) "verify_cfg")
 #define	DTD_ELEM_VERIFY_ADM	((const xmlChar *) "verify_adm")
 
+#define	DTD_ATTR_ALLOWEXCL	((const xmlChar *) "allow-exclusive-ip")
 #define	DTD_ATTR_ARCH		((const xmlChar *) "arch")
 #define	DTD_ATTR_DIRECTORY	((const xmlChar *) "directory")
+#define	DTD_ATTR_IPTYPE		((const xmlChar *) "ip-type")
 #define	DTD_ATTR_MATCH		((const xmlChar *) "match")
 #define	DTD_ATTR_MODE		((const xmlChar *) "mode")
 #define	DTD_ATTR_NAME		((const xmlChar *) "name")
@@ -77,6 +79,8 @@
 #define	DTD_ATTR_SPECIAL	((const xmlChar *) "special")
 #define	DTD_ATTR_TARGET		((const xmlChar *) "target")
 #define	DTD_ATTR_TYPE		((const xmlChar *) "type")
+
+#define	DTD_ENTITY_TRUE		"true"
 
 static volatile boolean_t	libbrand_initialized = B_FALSE;
 static char			i_curr_arch[MAXNAMELEN];
@@ -538,6 +542,34 @@ brand_is_native(brand_handle_t bh)
 	return ((strcmp(bhp->bh_name, NATIVE_BRAND_NAME) == 0) ? 1 : 0);
 }
 
+boolean_t
+brand_allow_exclusive_ip(brand_handle_t bh)
+{
+	struct brand_handle	*bhp = (struct brand_handle *)bh;
+	xmlNodePtr		node;
+	xmlChar			*allow_excl;
+	boolean_t		ret;
+
+	assert(bhp != NULL);
+
+	if ((node = xmlDocGetRootElement(bhp->bh_platform)) == NULL)
+		return (B_FALSE);
+
+	allow_excl = xmlGetProp(node, DTD_ATTR_ALLOWEXCL);
+	if (allow_excl == NULL)
+		return (B_FALSE);
+
+	/* Note: only return B_TRUE if it's "true" */
+	if (strcmp((char *)allow_excl, DTD_ENTITY_TRUE) == 0)
+		ret = B_TRUE;
+	else
+		ret = B_FALSE;
+
+	xmlFree(allow_excl);
+
+	return (ret);
+}
+
 /*
  * Iterate over brand privileges
  *
@@ -738,12 +770,13 @@ brand_platform_iter_link(brand_handle_t bh,
  */
 int
 brand_platform_iter_devices(brand_handle_t bh, const char *zonename,
-    int (*func)(void *, const char *, const char *), void *data)
+    int (*func)(void *, const char *, const char *), void *data,
+    const char *curr_iptype)
 {
 	struct brand_handle	*bhp = (struct brand_handle *)bh;
 	const char		*curr_arch = get_curr_arch();
 	xmlNodePtr		node;
-	xmlChar			*match, *name, *arch;
+	xmlChar			*match, *name, *arch, *iptype;
 	char			match_exp[MAXPATHLEN];
 	boolean_t		err = B_FALSE;
 	int			ret = 0;
@@ -752,6 +785,7 @@ brand_platform_iter_devices(brand_handle_t bh, const char *zonename,
 	assert(bhp != NULL);
 	assert(zonename != NULL);
 	assert(func != NULL);
+	assert(curr_iptype != NULL);
 
 	if ((node = xmlDocGetRootElement(bhp->bh_platform)) == NULL)
 		return (-1);
@@ -764,7 +798,9 @@ brand_platform_iter_devices(brand_handle_t bh, const char *zonename,
 		match = xmlGetProp(node, DTD_ATTR_MATCH);
 		name = xmlGetProp(node, DTD_ATTR_NAME);
 		arch = xmlGetProp(node, DTD_ATTR_ARCH);
-		if ((match == NULL) || (name == NULL) || (arch == NULL)) {
+		iptype = xmlGetProp(node, DTD_ATTR_IPTYPE);
+		if ((match == NULL) || (name == NULL) || (arch == NULL) ||
+		    (iptype == NULL)) {
 			err = B_TRUE;
 			goto next;
 		}
@@ -772,6 +808,11 @@ brand_platform_iter_devices(brand_handle_t bh, const char *zonename,
 		/* check if the arch matches */
 		if ((strcmp((char *)arch, "all") != 0) &&
 		    (strcmp((char *)arch, curr_arch) != 0))
+			goto next;
+
+		/* check if the iptype matches */
+		if ((strcmp((char *)iptype, "all") != 0) &&
+		    (strcmp((char *)iptype, curr_iptype) != 0))
 			goto next;
 
 		/* Substitute token values as needed. */
@@ -798,6 +839,8 @@ next:
 			xmlFree(name);
 		if (arch != NULL)
 			xmlFree(arch);
+		if (iptype != NULL)
+			xmlFree(iptype);
 		if (err)
 			return (-1);
 		if (ret != 0)

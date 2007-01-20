@@ -47,6 +47,7 @@ extern "C" {
 #include <sys/hook.h>
 #include <sys/hook_event.h>
 #include <sys/hook_impl.h>
+#include <inet/ip_stack.h>
 
 #ifdef _KERNEL
 #include <netinet/ip6.h>
@@ -225,7 +226,7 @@ typedef struct ipoptp_s
 #define	IP_FORWARD_NEVER	0
 #define	IP_FORWARD_ALWAYS	1
 
-#define	WE_ARE_FORWARDING	(ip_g_forward == IP_FORWARD_ALWAYS)
+#define	WE_ARE_FORWARDING(ipst)	((ipst)->ips_ip_g_forward == IP_FORWARD_ALWAYS)
 
 #define	IPH_HDR_LENGTH(ipha)						\
 	((int)(((ipha_t *)ipha)->ipha_version_and_hdr_length & 0xF) << 2)
@@ -447,9 +448,10 @@ typedef enum {
  *  - when the nce is created  or reinit-ed
  *  - every time we get a sane arp response for the nce.
  */
-#define	NCE_EXPIRED(nce)	(nce->nce_last > 0 && \
-	((nce->nce_flags & NCE_F_PERMANENT) == 0) && \
-	((TICK_TO_MSEC(lbolt64) - nce->nce_last) > ip_ire_arp_interval))
+#define	NCE_EXPIRED(nce, ipst)	(nce->nce_last > 0 &&	\
+	    ((nce->nce_flags & NCE_F_PERMANENT) == 0) &&	\
+	    ((TICK_TO_MSEC(lbolt64) - nce->nce_last) > 		\
+		(ipst)->ips_ip_ire_arp_interval))
 
 #endif /* _KERNEL */
 
@@ -682,6 +684,18 @@ typedef struct ip_m_s {
 
 #define	IRE_MARK_UNCACHED	0x0080
 
+/*
+ * The comment below (and for other netstack_t references) refers
+ * to the fact that we only do netstack_hold in particular cases,
+ * such as the references from open streams (ill_t and conn_t's
+ * pointers). Internally within IP we rely on IP's ability to cleanup e.g.
+ * ire_t's when an ill goes away.
+ */
+typedef struct ire_expire_arg_s {
+	int		iea_flush_flag;
+	ip_stack_t	*iea_ipst;	/* Does not have a netstack_hold */
+} ire_expire_arg_t;
+
 /* Flags with ire_expire routine */
 #define	FLUSH_ARP_TIME		0x0001	/* ARP info potentially stale timer */
 #define	FLUSH_REDIRECT_TIME	0x0002	/* Redirects potentially stale */
@@ -833,6 +847,12 @@ typedef struct ilg_s {
  * ilm_ipif is used by IPv4 as multicast groups are joined using ipif.
  * ilm_ill is used by IPv6 as multicast groups are joined using ill.
  * ilm_ill is NULL for IPv4 and ilm_ipif is NULL for IPv6.
+ *
+ * The comment below (and for other netstack_t references) refers
+ * to the fact that we only do netstack_hold in particular cases,
+ * such as the references from open streams (ill_t and conn_t's
+ * pointers). Internally within IP we rely on IP's ability to cleanup e.g.
+ * ire_t's when an ill goes away.
  */
 #define	ILM_DELETED	0x1		/* ilm_flags */
 typedef struct ilm_s {
@@ -853,6 +873,7 @@ typedef struct ilm_s {
 	slist_t		*ilm_filter;	/* source filter list */
 	slist_t		*ilm_pendsrcs;	/* relevant src addrs for pending req */
 	rtx_state_t	ilm_rtx;	/* SCR retransmission state */
+	ip_stack_t	*ilm_ipst;	/* Does not have a netstack_hold */
 } ilm_t;
 
 #define	ilm_addr	V4_PART_OF_V6(ilm_v6addr)
@@ -945,11 +966,11 @@ typedef struct ipsec_latch_s
 	ASSERT((ipl)->ipl_refcnt != 0);			\
 }
 
-#define	IPLATCH_REFRELE(ipl) {					\
+#define	IPLATCH_REFRELE(ipl, ns) {				\
 	ASSERT((ipl)->ipl_refcnt != 0);				\
 	membar_exit();						\
 	if (atomic_add_32_nv(&(ipl)->ipl_refcnt, -1) == 0)	\
-		iplatch_free(ipl);				\
+		iplatch_free(ipl, ns);			\
 }
 
 /*
@@ -1107,25 +1128,25 @@ typedef	struct ipsec_selector {
  * 2) Or if we have not cached policy on the conn and the global policy is
  *    non-empty.
  */
-#define	CONN_INBOUND_POLICY_PRESENT(connp)	\
-	((connp)->conn_in_enforce_policy ||	\
-	(!((connp)->conn_policy_cached) &&	\
-	ipsec_inbound_v4_policy_present))
+#define	CONN_INBOUND_POLICY_PRESENT(connp, ipss)	\
+	((connp)->conn_in_enforce_policy ||		\
+	(!((connp)->conn_policy_cached) && 		\
+	(ipss)->ipsec_inbound_v4_policy_present))
 
-#define	CONN_INBOUND_POLICY_PRESENT_V6(connp)	\
-	((connp)->conn_in_enforce_policy ||	\
-	(!(connp)->conn_policy_cached &&	\
-	ipsec_inbound_v6_policy_present))
+#define	CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss)	\
+	((connp)->conn_in_enforce_policy ||		\
+	(!(connp)->conn_policy_cached &&		\
+	(ipss)->ipsec_inbound_v6_policy_present))
 
-#define	CONN_OUTBOUND_POLICY_PRESENT(connp)	\
-	((connp)->conn_out_enforce_policy ||	\
-	(!((connp)->conn_policy_cached) &&	\
-	ipsec_outbound_v4_policy_present))
+#define	CONN_OUTBOUND_POLICY_PRESENT(connp, ipss)	\
+	((connp)->conn_out_enforce_policy ||		\
+	(!((connp)->conn_policy_cached) &&		\
+	(ipss)->ipsec_outbound_v4_policy_present))
 
-#define	CONN_OUTBOUND_POLICY_PRESENT_V6(connp)	\
-	((connp)->conn_out_enforce_policy ||	\
-	(!(connp)->conn_policy_cached &&	\
-	ipsec_outbound_v6_policy_present))
+#define	CONN_OUTBOUND_POLICY_PRESENT_V6(connp, ipss)	\
+	((connp)->conn_out_enforce_policy ||		\
+	(!(connp)->conn_policy_cached &&		\
+	(ipss)->ipsec_outbound_v6_policy_present))
 
 /*
  * Information cached in IRE for upper layer protocol (ULP).
@@ -1451,6 +1472,7 @@ typedef struct ipsq_s {
 	int		ipsq_depth;	/* debugging aid */
 	pc_t		ipsq_stack[IP_STACK_DEPTH];	/* debugging aid */
 #endif
+	ip_stack_t	*ipsq_ipst;	/* Does not have a netstack_hold */
 } ipsq_t;
 
 /* ipsq_flags */
@@ -1542,8 +1564,6 @@ typedef	struct ill_group {
 	int		illgrp_ill_count;
 } ill_group_t;
 
-extern	ill_group_t	*illgrp_head_v6;
-
 /*
  * Fragmentation hash bucket
  */
@@ -1582,6 +1602,7 @@ typedef struct irb {
 	uint_t		irb_tmp_ire_cnt; /* Num of temporary IRE */
 	struct ire_s	*irb_rr_origin;	/* origin for round-robin */
 	int		irb_nire;	/* Num of ftable ire's that ref irb */
+	ip_stack_t	*irb_ipst;	/* Does not have a netstack_hold */
 } irb_t;
 
 #define	IRB2RT(irb)	(rt_t *)((caddr_t)(irb) - offsetof(rt_t, rt_irb))
@@ -1619,7 +1640,6 @@ typedef union 	ill_if_u {
 	char 	illif_filler[CACHE_ALIGN(_ill_if_s_)];
 } ill_if_t;
 
-
 #define	illif_next		ill_if_s.illif_next
 #define	illif_prev		ill_if_s.illif_prev
 #define	illif_avl_by_ppa	ill_if_s.illif_avl_by_ppa
@@ -1635,7 +1655,7 @@ typedef struct ill_walk_context_s {
 } ill_walk_context_t;
 
 /*
- * ill_gheads structure, one for IPV4 and one for IPV6
+ * ill_g_heads structure, one for IPV4 and one for IPV6
  */
 struct _ill_g_head_s_ {
 	ill_if_t	*ill_g_list_head;
@@ -1650,20 +1670,19 @@ typedef union ill_g_head_u {
 #define	ill_g_list_head	ill_g_head_s.ill_g_list_head
 #define	ill_g_list_tail	ill_g_head_s.ill_g_list_tail
 
-#pragma align CACHE_ALIGN_SIZE(ill_g_heads)
-extern ill_g_head_t	ill_g_heads[];	/* ILL List Head */
+#define	IP_V4_ILL_G_LIST(ipst)	\
+	(ipst)->ips_ill_g_heads[IP_V4_G_HEAD].ill_g_list_head
+#define	IP_V6_ILL_G_LIST(ipst)	\
+	(ipst)->ips_ill_g_heads[IP_V6_G_HEAD].ill_g_list_head
+#define	IP_VX_ILL_G_LIST(i, ipst)	\
+	(ipst)->ips_ill_g_heads[i].ill_g_list_head
 
-
-#define	IP_V4_ILL_G_LIST	ill_g_heads[IP_V4_G_HEAD].ill_g_list_head
-#define	IP_V6_ILL_G_LIST	ill_g_heads[IP_V6_G_HEAD].ill_g_list_head
-#define	IP_VX_ILL_G_LIST(i)	ill_g_heads[i].ill_g_list_head
-
-#define	ILL_START_WALK_V4(ctx_ptr)	ill_first(IP_V4_G_HEAD, IP_V4_G_HEAD, \
-					ctx_ptr)
-#define	ILL_START_WALK_V6(ctx_ptr)	ill_first(IP_V6_G_HEAD, IP_V6_G_HEAD, \
-					ctx_ptr)
-#define	ILL_START_WALK_ALL(ctx_ptr)	ill_first(MAX_G_HEADS, MAX_G_HEADS, \
-					ctx_ptr)
+#define	ILL_START_WALK_V4(ctx_ptr, ipst)	\
+	ill_first(IP_V4_G_HEAD, IP_V4_G_HEAD, ctx_ptr, ipst)
+#define	ILL_START_WALK_V6(ctx_ptr, ipst)	\
+	ill_first(IP_V6_G_HEAD, IP_V6_G_HEAD, ctx_ptr, ipst)
+#define	ILL_START_WALK_ALL(ctx_ptr, ipst)	\
+	ill_first(MAX_G_HEADS, MAX_G_HEADS, ctx_ptr, ipst)
 
 /*
  * Capabilities, possible flags for ill_capabilities.
@@ -1973,6 +1992,8 @@ typedef struct ill_s {
 	th_trace_t	*ill_trace[IP_TR_HASH_MAX];
 	boolean_t	ill_trace_disable;	/* True when alloc fails */
 #endif
+	zoneid_t	ill_zoneid;
+	ip_stack_t	*ill_ipst;	/* Corresponds to a netstack_hold */
 } ill_t;
 
 extern	void	ill_delete_glist(ill_t *);
@@ -2376,7 +2397,7 @@ typedef struct tsol_ire_gw_secattr_s {
 	if (atomic_add_32_nv(&(ire)->ire_refcnt, -1) == 0)	\
 		ire_inactive(ire);				\
 }
-#define	IRE_REFRELE_NOTR(ire) {					\
+#define	IRE_REFRELE_NOTR(ire) {				\
 	ASSERT((ire)->ire_refcnt != 0);				\
 	membar_exit();						\
 	if (atomic_add_32_nv(&(ire)->ire_refcnt, -1) == 0)	\
@@ -2530,6 +2551,7 @@ typedef struct ire_s {
 	uint_t	ire_stq_ifindex;
 	uint_t		ire_defense_count;	/* number of ARP conflicts */
 	uint_t		ire_defense_time;	/* last time defended (secs) */
+	ip_stack_t	*ire_ipst;	/* Does not have a netstack_hold */
 #ifdef IRE_DEBUG
 	th_trace_t	*ire_trace[IP_TR_HASH_MAX];
 	boolean_t	ire_trace_disable;	/* True when alloc fails */
@@ -2612,8 +2634,8 @@ typedef struct ipt_s {
  */
 #define	COMMON_IP_MTU 1500
 #define	MAX_FRAG_MIN 10
-#define	MAX_FRAG_PKTS	\
-	MAX(MAX_FRAG_MIN, (2 * (ip_reass_queue_bytes / \
+#define	MAX_FRAG_PKTS(ipst)	\
+	MAX(MAX_FRAG_MIN, (2 * (ipst->ips_ip_reass_queue_bytes / \
 	    (COMMON_IP_MTU * ILL_FRAG_HASH_TBL_COUNT))))
 
 /*
@@ -2842,104 +2864,96 @@ typedef struct cmd_info_s
 	struct lifreq *ci_lifr;	/* the lifreq struct passed down */
 } cmd_info_t;
 
-extern krwlock_t ill_g_lock;
-extern kmutex_t ip_addr_avail_lock;
-extern ipsq_t	*ipsq_g_head;
-
-extern ill_t	*ip_timer_ill;		/* ILL for IRE expiration timer. */
-extern timeout_id_t ip_ire_expire_id;	/* IRE expiration timeout id. */
-extern timeout_id_t ip_ire_reclaim_id;	/* IRE recalaim timeout id. */
-
-extern kmutex_t	ip_mi_lock;
-extern krwlock_t ip_g_nd_lock;		/* For adding/removing nd variables */
-extern kmutex_t ip_trash_timer_lock;	/* Protects ip_ire_expire_id */
-
-extern kmutex_t igmp_timer_lock;	/* Protects the igmp timer */
-extern kmutex_t mld_timer_lock;		/* Protects the mld timer */
-
-extern krwlock_t ill_g_usesrc_lock;	/* Protects usesrc related fields */
+/*
+ * List of AH and ESP IPsec acceleration capable ills
+ */
+typedef struct ipsec_capab_ill_s {
+	uint_t ill_index;
+	boolean_t ill_isv6;
+	struct ipsec_capab_ill_s *next;
+} ipsec_capab_ill_t;
 
 extern struct kmem_cache *ire_cache;
 
-extern uint_t	ip_redirect_cnt;	/* Num of redirect routes in ftable */
-
 extern ipaddr_t	ip_g_all_ones;
-extern caddr_t	ip_g_nd;		/* Named Dispatch List Head */
 
-extern uint_t	ip_loopback_mtu;
+extern	uint_t	ip_loopback_mtu;	/* /etc/system */
 
-extern ipparam_t	*ip_param_arr;
-
-extern int ip_g_forward;
-extern int ipv6_forward;
 extern vmem_t *ip_minor_arena;
 
-#define	ip_respond_to_address_mask_broadcast ip_param_arr[0].ip_param_value
-#define	ip_g_resp_to_echo_bcast		ip_param_arr[1].ip_param_value
-#define	ip_g_resp_to_echo_mcast		ip_param_arr[2].ip_param_value
-#define	ip_g_resp_to_timestamp		ip_param_arr[3].ip_param_value
-#define	ip_g_resp_to_timestamp_bcast	ip_param_arr[4].ip_param_value
-#define	ip_g_send_redirects		ip_param_arr[5].ip_param_value
-#define	ip_g_forward_directed_bcast	ip_param_arr[6].ip_param_value
-#define	ip_debug			ip_param_arr[7].ip_param_value
-#define	ip_mrtdebug			ip_param_arr[8].ip_param_value
-#define	ip_timer_interval		ip_param_arr[9].ip_param_value
-#define	ip_ire_arp_interval		ip_param_arr[10].ip_param_value
-#define	ip_ire_redir_interval		ip_param_arr[11].ip_param_value
-#define	ip_def_ttl			ip_param_arr[12].ip_param_value
-#define	ip_forward_src_routed		ip_param_arr[13].ip_param_value
-#define	ip_wroff_extra			ip_param_arr[14].ip_param_value
-#define	ip_ire_pathmtu_interval		ip_param_arr[15].ip_param_value
-#define	ip_icmp_return			ip_param_arr[16].ip_param_value
-#define	ip_path_mtu_discovery		ip_param_arr[17].ip_param_value
-#define	ip_ignore_delete_time		ip_param_arr[18].ip_param_value
-#define	ip_ignore_redirect		ip_param_arr[19].ip_param_value
-#define	ip_output_queue			ip_param_arr[20].ip_param_value
-#define	ip_broadcast_ttl		ip_param_arr[21].ip_param_value
-#define	ip_icmp_err_interval		ip_param_arr[22].ip_param_value
-#define	ip_icmp_err_burst		ip_param_arr[23].ip_param_value
-#define	ip_reass_queue_bytes		ip_param_arr[24].ip_param_value
-#define	ip_strict_dst_multihoming	ip_param_arr[25].ip_param_value
-#define	ip_addrs_per_if			ip_param_arr[26].ip_param_value
-#define	ipsec_override_persocket_policy	ip_param_arr[27].ip_param_value
-#define	icmp_accept_clear_messages	ip_param_arr[28].ip_param_value
-#define	igmp_accept_clear_messages	ip_param_arr[29].ip_param_value
+/*
+ * ip_g_forward controls IP forwarding.  It takes two values:
+ *	0: IP_FORWARD_NEVER	Don't forward packets ever.
+ *	1: IP_FORWARD_ALWAYS	Forward packets for elsewhere.
+ *
+ * RFC1122 says there must be a configuration switch to control forwarding,
+ * but that the default MUST be to not forward packets ever.  Implicit
+ * control based on configuration of multiple interfaces MUST NOT be
+ * implemented (Section 3.1).  SunOS 4.1 did provide the "automatic" capability
+ * and, in fact, it was the default.  That capability is now provided in the
+ * /etc/rc2.d/S69inet script.
+ */
+
+#define	ips_ip_respond_to_address_mask_broadcast ips_param_arr[0].ip_param_value
+#define	ips_ip_g_resp_to_echo_bcast	ips_param_arr[1].ip_param_value
+#define	ips_ip_g_resp_to_echo_mcast	ips_param_arr[2].ip_param_value
+#define	ips_ip_g_resp_to_timestamp	ips_param_arr[3].ip_param_value
+#define	ips_ip_g_resp_to_timestamp_bcast ips_param_arr[4].ip_param_value
+#define	ips_ip_g_send_redirects		ips_param_arr[5].ip_param_value
+#define	ips_ip_g_forward_directed_bcast	ips_param_arr[6].ip_param_value
+#define	ips_ip_debug			ips_param_arr[7].ip_param_value
+#define	ips_ip_mrtdebug			ips_param_arr[8].ip_param_value
+#define	ips_ip_timer_interval		ips_param_arr[9].ip_param_value
+#define	ips_ip_ire_arp_interval		ips_param_arr[10].ip_param_value
+#define	ips_ip_ire_redir_interval	ips_param_arr[11].ip_param_value
+#define	ips_ip_def_ttl			ips_param_arr[12].ip_param_value
+#define	ips_ip_forward_src_routed	ips_param_arr[13].ip_param_value
+#define	ips_ip_wroff_extra		ips_param_arr[14].ip_param_value
+#define	ips_ip_ire_pathmtu_interval	ips_param_arr[15].ip_param_value
+#define	ips_ip_icmp_return		ips_param_arr[16].ip_param_value
+#define	ips_ip_path_mtu_discovery	ips_param_arr[17].ip_param_value
+#define	ips_ip_ignore_delete_time	ips_param_arr[18].ip_param_value
+#define	ips_ip_ignore_redirect		ips_param_arr[19].ip_param_value
+#define	ips_ip_output_queue		ips_param_arr[20].ip_param_value
+#define	ips_ip_broadcast_ttl		ips_param_arr[21].ip_param_value
+#define	ips_ip_icmp_err_interval	ips_param_arr[22].ip_param_value
+#define	ips_ip_icmp_err_burst		ips_param_arr[23].ip_param_value
+#define	ips_ip_reass_queue_bytes	ips_param_arr[24].ip_param_value
+#define	ips_ip_strict_dst_multihoming	ips_param_arr[25].ip_param_value
+#define	ips_ip_addrs_per_if		ips_param_arr[26].ip_param_value
+#define	ips_ipsec_override_persocket_policy ips_param_arr[27].ip_param_value
+#define	ips_icmp_accept_clear_messages	ips_param_arr[28].ip_param_value
+#define	ips_igmp_accept_clear_messages	ips_param_arr[29].ip_param_value
 
 /* IPv6 configuration knobs */
-#define	delay_first_probe_time		ip_param_arr[30].ip_param_value
-#define	max_unicast_solicit		ip_param_arr[31].ip_param_value
-#define	ipv6_def_hops			ip_param_arr[32].ip_param_value
-#define	ipv6_icmp_return		ip_param_arr[33].ip_param_value
-#define	ipv6_forward_src_routed		ip_param_arr[34].ip_param_value
-#define	ipv6_resp_echo_mcast		ip_param_arr[35].ip_param_value
-#define	ipv6_send_redirects		ip_param_arr[36].ip_param_value
-#define	ipv6_ignore_redirect		ip_param_arr[37].ip_param_value
-#define	ipv6_strict_dst_multihoming	ip_param_arr[38].ip_param_value
-#define	ip_ire_reclaim_fraction		ip_param_arr[39].ip_param_value
-#define	ipsec_policy_log_interval	ip_param_arr[40].ip_param_value
-#define	pim_accept_clear_messages	ip_param_arr[41].ip_param_value
-#define	ip_ndp_unsolicit_interval	ip_param_arr[42].ip_param_value
-#define	ip_ndp_unsolicit_count		ip_param_arr[43].ip_param_value
-#define	ipv6_ignore_home_address_opt	ip_param_arr[44].ip_param_value
-#define	ip_policy_mask			ip_param_arr[45].ip_param_value
-#define	ip_multirt_resolution_interval	ip_param_arr[46].ip_param_value
-#define	ip_multirt_ttl			ip_param_arr[47].ip_param_value
-#define	ip_multidata_outbound		ip_param_arr[48].ip_param_value
-#define	ip_ndp_defense_interval		ip_param_arr[49].ip_param_value
-#define	ip_max_temp_idle		ip_param_arr[50].ip_param_value
-#define	ip_max_temp_defend		ip_param_arr[51].ip_param_value
-#define	ip_max_defend			ip_param_arr[52].ip_param_value
-#define	ip_defend_interval		ip_param_arr[53].ip_param_value
-#define	ip_dup_recovery			ip_param_arr[54].ip_param_value
-#define	ip_restrict_interzone_loopback	ip_param_arr[55].ip_param_value
-#define	ip_lso_outbound			ip_param_arr[56].ip_param_value
-#ifdef DEBUG
-#define	ipv6_drop_inbound_icmpv6	ip_param_arr[57].ip_param_value
-#else
-#define	ipv6_drop_inbound_icmpv6	0
-#endif
-
-extern hrtime_t	ipsec_policy_failure_last;
+#define	ips_delay_first_probe_time	ips_param_arr[30].ip_param_value
+#define	ips_max_unicast_solicit		ips_param_arr[31].ip_param_value
+#define	ips_ipv6_def_hops		ips_param_arr[32].ip_param_value
+#define	ips_ipv6_icmp_return		ips_param_arr[33].ip_param_value
+#define	ips_ipv6_forward_src_routed	ips_param_arr[34].ip_param_value
+#define	ips_ipv6_resp_echo_mcast	ips_param_arr[35].ip_param_value
+#define	ips_ipv6_send_redirects		ips_param_arr[36].ip_param_value
+#define	ips_ipv6_ignore_redirect	ips_param_arr[37].ip_param_value
+#define	ips_ipv6_strict_dst_multihoming	ips_param_arr[38].ip_param_value
+#define	ips_ip_ire_reclaim_fraction	ips_param_arr[39].ip_param_value
+#define	ips_ipsec_policy_log_interval	ips_param_arr[40].ip_param_value
+#define	ips_pim_accept_clear_messages	ips_param_arr[41].ip_param_value
+#define	ips_ip_ndp_unsolicit_interval	ips_param_arr[42].ip_param_value
+#define	ips_ip_ndp_unsolicit_count	ips_param_arr[43].ip_param_value
+#define	ips_ipv6_ignore_home_address_opt ips_param_arr[44].ip_param_value
+#define	ips_ip_policy_mask		ips_param_arr[45].ip_param_value
+#define	ips_ip_multirt_resolution_interval ips_param_arr[46].ip_param_value
+#define	ips_ip_multirt_ttl  		ips_param_arr[47].ip_param_value
+#define	ips_ip_multidata_outbound	ips_param_arr[48].ip_param_value
+#define	ips_ip_ndp_defense_interval	ips_param_arr[49].ip_param_value
+#define	ips_ip_max_temp_idle		ips_param_arr[50].ip_param_value
+#define	ips_ip_max_temp_defend		ips_param_arr[51].ip_param_value
+#define	ips_ip_max_defend		ips_param_arr[52].ip_param_value
+#define	ips_ip_defend_interval		ips_param_arr[53].ip_param_value
+#define	ips_ip_dup_recovery		ips_param_arr[54].ip_param_value
+#define	ips_ip_restrict_interzone_loopback ips_param_arr[55].ip_param_value
+#define	ips_ip_lso_outbound		ips_param_arr[56].ip_param_value
+#define	ips_ipv6_drop_inbound_icmpv6	ips_param_arr[57].ip_param_value
 
 extern int	dohwcksum;	/* use h/w cksum if supported by the h/w */
 #ifdef ZC_TEST
@@ -2950,76 +2964,35 @@ extern char	ipif_loopback_name[];
 
 extern nv_t	*ire_nv_tbl;
 
-extern time_t	ip_g_frag_timeout;
-extern clock_t	ip_g_frag_timo_ms;
-
-extern mib2_ipIfStatsEntry_t	ip_mib;	/* For tcpInErrs and udpNoPorts */
-
 extern struct module_info ip_mod_info;
 
-extern timeout_id_t	igmp_slowtimeout_id;
-extern timeout_id_t	mld_slowtimeout_id;
-
-extern uint_t	loopback_packets;
-
-/*
- * Hooks structures used inside of ip
- */
-extern hook_event_token_t	ipv4firewall_physical_in;
-extern hook_event_token_t	ipv4firewall_physical_out;
-extern hook_event_token_t	ipv4firewall_forwarding;
-extern hook_event_token_t	ipv4firewall_loopback_in;
-extern hook_event_token_t	ipv4firewall_loopback_out;
-extern hook_event_token_t	ipv4nicevents;
-
-extern hook_event_token_t	ipv6firewall_physical_in;
-extern hook_event_token_t	ipv6firewall_physical_out;
-extern hook_event_token_t	ipv6firewall_forwarding;
-extern hook_event_token_t	ipv6firewall_loopback_in;
-extern hook_event_token_t	ipv6firewall_loopback_out;
-extern hook_event_token_t	ipv6nicevents;
-
-extern hook_event_t	ip4_physical_in_event;
-extern hook_event_t	ip4_physical_out_event;
-extern hook_event_t	ip4_forwarding_event;
-extern hook_event_t	ip4_loopback_in_event;
-extern hook_event_t	ip4_loopback_out_event;
-extern hook_event_t	ip4_nic_events;
-
-extern hook_event_t	ip6_physical_in_event;
-extern hook_event_t	ip6_physical_out_event;
-extern hook_event_t	ip6_forwarding_event;
-extern hook_event_t	ip6_loopback_in_event;
-extern hook_event_t	ip6_loopback_out_event;
-extern hook_event_t	ip6_nic_events;
-
-#define	HOOKS4_INTERESTED_PHYSICAL_IN	\
-	(ip4_physical_in_event.he_interested)
-#define	HOOKS6_INTERESTED_PHYSICAL_IN	\
-	(ip6_physical_in_event.he_interested)
-#define	HOOKS4_INTERESTED_PHYSICAL_OUT	\
-	(ip4_physical_out_event.he_interested)
-#define	HOOKS6_INTERESTED_PHYSICAL_OUT	\
-	(ip6_physical_out_event.he_interested)
-#define	HOOKS4_INTERESTED_FORWARDING	\
-	(ip4_forwarding_event.he_interested)
-#define	HOOKS6_INTERESTED_FORWARDING	\
-	(ip6_forwarding_event.he_interested)
-#define	HOOKS4_INTERESTED_LOOPBACK_IN	\
-	(ip4_loopback_in_event.he_interested)
-#define	HOOKS6_INTERESTED_LOOPBACK_IN	\
-	(ip6_loopback_in_event.he_interested)
-#define	HOOKS4_INTERESTED_LOOPBACK_OUT	\
-	(ip4_loopback_out_event.he_interested)
-#define	HOOKS6_INTERESTED_LOOPBACK_OUT	\
-	(ip6_loopback_out_event.he_interested)
+#define	HOOKS4_INTERESTED_PHYSICAL_IN(ipst)	\
+	((ipst)->ips_ip4_physical_in_event.he_interested)
+#define	HOOKS6_INTERESTED_PHYSICAL_IN(ipst)	\
+	((ipst)->ips_ip6_physical_in_event.he_interested)
+#define	HOOKS4_INTERESTED_PHYSICAL_OUT(ipst)	\
+	((ipst)->ips_ip4_physical_out_event.he_interested)
+#define	HOOKS6_INTERESTED_PHYSICAL_OUT(ipst)	\
+	((ipst)->ips_ip6_physical_out_event.he_interested)
+#define	HOOKS4_INTERESTED_FORWARDING(ipst)	\
+	((ipst)->ips_ip4_forwarding_event.he_interested)
+#define	HOOKS6_INTERESTED_FORWARDING(ipst)	\
+	((ipst)->ips_ip6_forwarding_event.he_interested)
+#define	HOOKS4_INTERESTED_LOOPBACK_IN(ipst)	\
+	((ipst)->ips_ip4_loopback_in_event.he_interested)
+#define	HOOKS6_INTERESTED_LOOPBACK_IN(ipst)	\
+	((ipst)->ips_ip6_loopback_in_event.he_interested)
+#define	HOOKS4_INTERESTED_LOOPBACK_OUT(ipst)	\
+	((ipst)->ips_ip4_loopback_out_event.he_interested)
+#define	HOOKS6_INTERESTED_LOOPBACK_OUT(ipst)	\
+	((ipst)->ips_ip6_loopback_out_event.he_interested)
 
 /*
  * Hooks marcos used inside of ip
  */
 #define	IPHA_VHL	ipha_version_and_hdr_length
 
-#define	FW_HOOKS(_hook, _event, _ilp, _olp, _iph, _fm, _m)	\
+#define	FW_HOOKS(_hook, _event, _ilp, _olp, _iph, _fm, _m, ipst)	\
 									\
 	if ((_hook).he_interested) {	\
 		hook_pkt_event_t info;					\
@@ -3045,7 +3018,8 @@ extern hook_event_t	ip6_nic_events;
 		info.hpe_hdr = _iph;					\
 		info.hpe_mp = &(_fm);					\
 		info.hpe_mb = _m;					\
-		if (hook_run(_event, (hook_data_t)&info) != 0) {	\
+		if (hook_run(_event, (hook_data_t)&info,		\
+		    ipst->ips_netstack) != 0) {				\
 			ip2dbg(("%s hook dropped mblk chain %p hdr %p\n",\
 			    (_hook).he_name, (void *)_fm, (void *)_m));	\
 			if (_fm != NULL) {				\
@@ -3060,7 +3034,7 @@ extern hook_event_t	ip6_nic_events;
 		}							\
 	}
 
-#define	FW_HOOKS6(_hook, _event, _ilp, _olp, _iph, _fm, _m)	\
+#define	FW_HOOKS6(_hook, _event, _ilp, _olp, _iph, _fm, _m, ipst)	\
 									\
 	if ((_hook).he_interested) {	\
 		hook_pkt_event_t info;					\
@@ -3086,7 +3060,8 @@ extern hook_event_t	ip6_nic_events;
 		info.hpe_hdr = _iph;					\
 		info.hpe_mp = &(_fm);					\
 		info.hpe_mb = _m;					\
-		if (hook_run(_event, (hook_data_t)&info) != 0) {	\
+		if (hook_run(_event, (hook_data_t)&info,		\
+		    ipst->ips_netstack) != 0) {				\
 			ip2dbg(("%s hook dropped mblk chain %p hdr %p\n",\
 			    (_hook).he_name, (void *)_fm, (void *)_m));	\
 			if (_fm != NULL) {				\
@@ -3134,6 +3109,8 @@ extern uint32_t ipsechw_debug;
 #define	IPSECHW_CALL(f, r, x)	{}
 #endif
 
+extern int	ip_debug;
+
 #ifdef IP_DEBUG
 #include <sys/debug.h>
 #include <sys/promif.h>
@@ -3159,7 +3136,7 @@ struct	mac_header_info_s;
 extern const char *dlpi_prim_str(int);
 extern const char *dlpi_err_str(int);
 extern void	ill_frag_timer(void *);
-extern ill_t	*ill_first(int, int, ill_walk_context_t *);
+extern ill_t	*ill_first(int, int, ill_walk_context_t *, ip_stack_t *);
 extern ill_t	*ill_next(ill_walk_context_t *, ill_t *);
 extern void	ill_frag_timer_start(ill_t *);
 extern mblk_t	*ip_carve_mp(mblk_t **, ssize_t);
@@ -3167,10 +3144,12 @@ extern mblk_t	*ip_dlpi_alloc(size_t, t_uscalar_t);
 extern char	*ip_dot_addr(ipaddr_t, char *);
 extern const char *mac_colon_addr(const uint8_t *, size_t, char *, size_t);
 extern void	ip_lwput(queue_t *, mblk_t *);
-extern boolean_t icmp_err_rate_limit(void);
-extern void	icmp_time_exceeded(queue_t *, mblk_t *, uint8_t, zoneid_t);
-extern void	icmp_unreachable(queue_t *, mblk_t *, uint8_t, zoneid_t);
-extern mblk_t	*ip_add_info(mblk_t *, ill_t *, uint_t, zoneid_t);
+extern boolean_t icmp_err_rate_limit(ip_stack_t *);
+extern void	icmp_time_exceeded(queue_t *, mblk_t *, uint8_t, zoneid_t,
+    ip_stack_t *);
+extern void	icmp_unreachable(queue_t *, mblk_t *, uint8_t, zoneid_t,
+    ip_stack_t *);
+extern mblk_t	*ip_add_info(mblk_t *, ill_t *, uint_t, zoneid_t, ip_stack_t *);
 extern mblk_t	*ip_bind_v4(queue_t *, mblk_t *, conn_t *);
 extern int	ip_bind_connected(conn_t *, mblk_t *, ipaddr_t *, uint16_t,
     ipaddr_t, uint16_t, boolean_t, boolean_t, boolean_t,
@@ -3181,9 +3160,12 @@ extern int	ip_bind_laddr(conn_t *, mblk_t *, ipaddr_t, uint16_t,
 extern uint_t	ip_cksum(mblk_t *, int, uint32_t);
 extern int	ip_close(queue_t *, int);
 extern uint16_t	ip_csum_hdr(ipha_t *);
-extern void	ip_proto_not_sup(queue_t *, mblk_t *, uint_t, zoneid_t);
-extern void	ip_ire_fini(void);
-extern void	ip_ire_init(void);
+extern void	ip_proto_not_sup(queue_t *, mblk_t *, uint_t, zoneid_t,
+    ip_stack_t *);
+extern void	ip_ire_g_fini(void);
+extern void	ip_ire_g_init(void);
+extern void	ip_ire_fini(ip_stack_t *);
+extern void	ip_ire_init(ip_stack_t *);
 extern int	ip_open(queue_t *, dev_t *, int, int, cred_t *);
 extern int	ip_reassemble(mblk_t *, ipf_t *, uint_t, boolean_t, ill_t *,
     size_t);
@@ -3205,7 +3187,7 @@ extern void	ip_mib2_add_icmp6_stats(mib2_ipv6IfIcmpEntry_t *,
 extern void	ip_udp_input(queue_t *, mblk_t *, ipha_t *, ire_t *, ill_t *);
 extern void	ip_proto_input(queue_t *, mblk_t *, ipha_t *, ire_t *, ill_t *);
 extern void	ip_rput_other(ipsq_t *, queue_t *, mblk_t *, void *);
-extern void	ip_setqinfo(queue_t *, minor_t, boolean_t);
+extern void	ip_setqinfo(queue_t *, minor_t, boolean_t, ip_stack_t *);
 extern void	ip_trash_ire_reclaim(void *);
 extern void	ip_trash_timer_expire(void *);
 extern void	ip_wput(queue_t *, mblk_t *);
@@ -3224,13 +3206,13 @@ extern void	ip_wsrv(queue_t *);
 extern char	*ip_nv_lookup(nv_t *, int);
 extern boolean_t ip_local_addr_ok_v6(const in6_addr_t *, const in6_addr_t *);
 extern boolean_t ip_remote_addr_ok_v6(const in6_addr_t *, const in6_addr_t *);
-extern ipaddr_t ip_massage_options(ipha_t *);
+extern ipaddr_t ip_massage_options(ipha_t *, netstack_t *);
 extern ipaddr_t ip_net_mask(ipaddr_t);
 extern void	ip_newroute(queue_t *, mblk_t *, ipaddr_t, ill_t *, conn_t *,
-		    zoneid_t);
+		    zoneid_t, ip_stack_t *);
 extern ipxmit_state_t	ip_xmit_v4(mblk_t *, ire_t *, struct ipsec_out_s *,
     boolean_t);
-extern int	ip_hdr_complete(ipha_t *, zoneid_t);
+extern int	ip_hdr_complete(ipha_t *, zoneid_t, ip_stack_t *);
 
 extern struct qinit rinit_ipv6;
 extern struct qinit winit_ipv6;
@@ -3240,9 +3222,6 @@ extern struct qinit winit_tcp;
 extern struct qinit rinit_acceptor_tcp;
 extern struct qinit winit_acceptor_tcp;
 
-extern net_data_t ipv4;
-extern net_data_t ipv6;
-
 extern void	conn_drain_insert(conn_t *connp);
 extern	int	conn_ipsec_length(conn_t *connp);
 extern void	ip_wput_ipsec_out(queue_t *, mblk_t *, ipha_t *, ill_t *,
@@ -3250,7 +3229,7 @@ extern void	ip_wput_ipsec_out(queue_t *, mblk_t *, ipha_t *, ill_t *,
 extern ipaddr_t	ip_get_dst(ipha_t *);
 extern int	ipsec_out_extra_length(mblk_t *);
 extern int	ipsec_in_extra_length(mblk_t *);
-extern mblk_t	*ipsec_in_alloc();
+extern mblk_t	*ipsec_in_alloc(boolean_t, netstack_t *);
 extern boolean_t ipsec_in_is_secure(mblk_t *);
 extern void	ipsec_out_process(queue_t *, mblk_t *, ire_t *, uint_t);
 extern void	ipsec_out_to_in(mblk_t *);
@@ -3271,16 +3250,17 @@ extern	void	ill_trace_cleanup(ill_t *);
 extern	void	ipif_trace_cleanup(ipif_t *);
 #endif
 
-extern int	ip_srcid_insert(const in6_addr_t *, zoneid_t);
-extern int	ip_srcid_remove(const in6_addr_t *, zoneid_t);
-extern void	ip_srcid_find_id(uint_t, in6_addr_t *, zoneid_t);
-extern uint_t	ip_srcid_find_addr(const in6_addr_t *, zoneid_t);
+extern int	ip_srcid_insert(const in6_addr_t *, zoneid_t, ip_stack_t *);
+extern int	ip_srcid_remove(const in6_addr_t *, zoneid_t, ip_stack_t *);
+extern void	ip_srcid_find_id(uint_t, in6_addr_t *, zoneid_t, netstack_t *);
+extern uint_t	ip_srcid_find_addr(const in6_addr_t *, zoneid_t, netstack_t *);
 extern int	ip_srcid_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 
 extern uint8_t	ipoptp_next(ipoptp_t *);
 extern uint8_t	ipoptp_first(ipoptp_t *, ipha_t *);
 extern int	ip_opt_get_user(const ipha_t *, uchar_t *);
-extern ill_t	*ip_grab_attach_ill(ill_t *, mblk_t *, int, boolean_t);
+extern ill_t	*ip_grab_attach_ill(ill_t *, mblk_t *, int, boolean_t,
+    ip_stack_t *);
 extern ire_t	*conn_set_outgoing_ill(conn_t *, ire_t *, ill_t **);
 extern int	ipsec_req_from_conn(conn_t *, ipsec_req_t *, int);
 extern int	ip_snmp_get(queue_t *q, mblk_t *mctl);
@@ -3347,6 +3327,12 @@ typedef struct cgtp_filter_ops {
 
 #define	CGTP_MCAST_SUCCESS	1
 
+/*
+ * The separate CGTP module needs these as globals. It uses the first
+ * to unregister (since there is no ip_cgtp_filter_unregister() function)
+ * and it uses the second one to verify that the filter has been
+ * turned off (a ip_cgtp_filter_active() function would be good for that.)
+ */
 extern cgtp_filter_ops_t *ip_cgtp_filter_ops;
 extern boolean_t ip_cgtp_filter;
 
@@ -3520,7 +3506,7 @@ extern void	ip_soft_ring_assignment(ill_t *, ill_rx_ring_t *,
 extern void tcp_wput(queue_t *, mblk_t *);
 
 extern int	ip_fill_mtuinfo(struct in6_addr *, in_port_t,
-	struct ip6_mtuinfo *);
+	struct ip6_mtuinfo *, netstack_t *);
 extern	ipif_t *conn_get_held_ipif(conn_t *, ipif_t **, int *);
 
 typedef void    (*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);

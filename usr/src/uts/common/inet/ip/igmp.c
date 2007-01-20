@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -86,27 +86,6 @@ static void	mcast_init_rtx(ill_t *ill, rtx_state_t *rtxp,
 		    mcast_record_t rtype, slist_t *flist);
 static mrec_t	*mcast_merge_rtx(ilm_t *ilm, mrec_t *rp, slist_t *flist);
 
-/* Following protected by igmp_timer_lock */
-static int 	igmp_time_to_next;	/* Time since last timeout */
-static int 	igmp_timer_fired_last;
-uint_t		igmp_deferred_next = INFINITY;
-timeout_id_t	igmp_timeout_id = 0;
-kmutex_t	igmp_timer_lock;
-
-/* Protected by igmp_slowtimeout_lock */
-timeout_id_t	igmp_slowtimeout_id = 0;
-kmutex_t	igmp_slowtimeout_lock;
-
-/* Following protected by mld_timer_lock */
-static int 	mld_time_to_next;	/* Time since last timeout */
-static int 	mld_timer_fired_last;
-uint_t		mld_deferred_next = INFINITY;
-timeout_id_t	mld_timeout_id = 0;
-kmutex_t	mld_timer_lock;
-
-/* Protected by mld_slowtimeout_lock */
-timeout_id_t	mld_slowtimeout_id = 0;
-kmutex_t	mld_slowtimeout_lock;
 
 /*
  * Macros used to do timer len conversions.  Timer values are always
@@ -124,18 +103,16 @@ kmutex_t	mld_slowtimeout_lock;
  * The unit for next is milliseconds.
  */
 void
-igmp_start_timers(unsigned next)
+igmp_start_timers(unsigned next, ip_stack_t *ipst)
 {
 	int	time_left;
-	/* Protected by igmp_timer_lock */
-	static  boolean_t igmp_timer_setter_active;
 	int	ret;
 
 	ASSERT(next != 0 && next != INFINITY);
 
-	mutex_enter(&igmp_timer_lock);
+	mutex_enter(&ipst->ips_igmp_timer_lock);
 
-	if (igmp_timer_setter_active) {
+	if (ipst->ips_igmp_timer_setter_active) {
 		/*
 		 * Serialize timer setters, one at a time. If the
 		 * timer is currently being set by someone,
@@ -143,21 +120,22 @@ igmp_start_timers(unsigned next)
 		 * invoked and return. The current setter will
 		 * take care.
 		 */
-		igmp_time_to_next = MIN(igmp_time_to_next, next);
-		mutex_exit(&igmp_timer_lock);
+		ipst->ips_igmp_time_to_next =
+		    MIN(ipst->ips_igmp_time_to_next, next);
+		mutex_exit(&ipst->ips_igmp_timer_lock);
 		return;
 	} else {
-		igmp_timer_setter_active = B_TRUE;
+		ipst->ips_igmp_timer_setter_active = B_TRUE;
 	}
-	if (igmp_timeout_id == 0) {
+	if (ipst->ips_igmp_timeout_id == 0) {
 		/*
 		 * The timer is inactive. We need to start a timer
 		 */
-		igmp_time_to_next = next;
-		igmp_timeout_id = timeout(igmp_timeout_handler, NULL,
-		    MSEC_TO_TICK(igmp_time_to_next));
-		igmp_timer_setter_active = B_FALSE;
-		mutex_exit(&igmp_timer_lock);
+		ipst->ips_igmp_time_to_next = next;
+		ipst->ips_igmp_timeout_id = timeout(igmp_timeout_handler,
+		    (void *)ipst, MSEC_TO_TICK(ipst->ips_igmp_time_to_next));
+		ipst->ips_igmp_timer_setter_active = B_FALSE;
+		mutex_exit(&ipst->ips_igmp_timer_lock);
 		return;
 	}
 
@@ -167,17 +145,17 @@ igmp_start_timers(unsigned next)
 	 * reschedule the timeout if the new 'next' will happen
 	 * earlier than the currently scheduled timeout
 	 */
-	time_left = igmp_timer_fired_last +
-	    MSEC_TO_TICK(igmp_time_to_next) - ddi_get_lbolt();
+	time_left = ipst->ips_igmp_timer_fired_last +
+	    MSEC_TO_TICK(ipst->ips_igmp_time_to_next) - ddi_get_lbolt();
 	if (time_left < MSEC_TO_TICK(next)) {
-		igmp_timer_setter_active = B_FALSE;
-		mutex_exit(&igmp_timer_lock);
+		ipst->ips_igmp_timer_setter_active = B_FALSE;
+		mutex_exit(&ipst->ips_igmp_timer_lock);
 		return;
 	}
 
-	mutex_exit(&igmp_timer_lock);
-	ret = untimeout(igmp_timeout_id);
-	mutex_enter(&igmp_timer_lock);
+	mutex_exit(&ipst->ips_igmp_timer_lock);
+	ret = untimeout(ipst->ips_igmp_timeout_id);
+	mutex_enter(&ipst->ips_igmp_timer_lock);
 	/*
 	 * The timeout was cancelled, or the timeout handler
 	 * completed, while we were blocked in the untimeout.
@@ -188,18 +166,19 @@ igmp_start_timers(unsigned next)
 	 * if needed.
 	 */
 	if (ret == -1) {
-		ASSERT(igmp_timeout_id == 0);
+		ASSERT(ipst->ips_igmp_timeout_id == 0);
 	} else {
-		ASSERT(igmp_timeout_id != 0);
-		igmp_timeout_id = 0;
+		ASSERT(ipst->ips_igmp_timeout_id != 0);
+		ipst->ips_igmp_timeout_id = 0;
 	}
-	if (igmp_time_to_next != 0) {
-		igmp_time_to_next = MIN(igmp_time_to_next, next);
-		igmp_timeout_id = timeout(igmp_timeout_handler, NULL,
-		    MSEC_TO_TICK(igmp_time_to_next));
+	if (ipst->ips_igmp_time_to_next != 0) {
+		ipst->ips_igmp_time_to_next =
+		    MIN(ipst->ips_igmp_time_to_next, next);
+		ipst->ips_igmp_timeout_id = timeout(igmp_timeout_handler,
+		    (void *)ipst, MSEC_TO_TICK(ipst->ips_igmp_time_to_next));
 	}
-	igmp_timer_setter_active = B_FALSE;
-	mutex_exit(&igmp_timer_lock);
+	ipst->ips_igmp_timer_setter_active = B_FALSE;
+	mutex_exit(&ipst->ips_igmp_timer_lock);
 }
 
 /*
@@ -207,17 +186,15 @@ igmp_start_timers(unsigned next)
  * The unit for next is milliseconds.
  */
 void
-mld_start_timers(unsigned next)
+mld_start_timers(unsigned next, ip_stack_t *ipst)
 {
 	int	time_left;
-	/* Protedted by mld_timer_lock */
-	static  boolean_t mld_timer_setter_active;
 	int	ret;
 
 	ASSERT(next != 0 && next != INFINITY);
 
-	mutex_enter(&mld_timer_lock);
-	if (mld_timer_setter_active) {
+	mutex_enter(&ipst->ips_mld_timer_lock);
+	if (ipst->ips_mld_timer_setter_active) {
 		/*
 		 * Serialize timer setters, one at a time. If the
 		 * timer is currently being set by someone,
@@ -225,21 +202,22 @@ mld_start_timers(unsigned next)
 		 * invoked and return. The current setter will
 		 * take care.
 		 */
-		mld_time_to_next = MIN(mld_time_to_next, next);
-		mutex_exit(&mld_timer_lock);
+		ipst->ips_mld_time_to_next =
+		    MIN(ipst->ips_mld_time_to_next, next);
+		mutex_exit(&ipst->ips_mld_timer_lock);
 		return;
 	} else {
-		mld_timer_setter_active = B_TRUE;
+		ipst->ips_mld_timer_setter_active = B_TRUE;
 	}
-	if (mld_timeout_id == 0) {
+	if (ipst->ips_mld_timeout_id == 0) {
 		/*
 		 * The timer is inactive. We need to start a timer
 		 */
-		mld_time_to_next = next;
-		mld_timeout_id = timeout(mld_timeout_handler, NULL,
-		    MSEC_TO_TICK(mld_time_to_next));
-		mld_timer_setter_active = B_FALSE;
-		mutex_exit(&mld_timer_lock);
+		ipst->ips_mld_time_to_next = next;
+		ipst->ips_mld_timeout_id = timeout(mld_timeout_handler,
+		    (void *)ipst, MSEC_TO_TICK(ipst->ips_mld_time_to_next));
+		ipst->ips_mld_timer_setter_active = B_FALSE;
+		mutex_exit(&ipst->ips_mld_timer_lock);
 		return;
 	}
 
@@ -249,17 +227,17 @@ mld_start_timers(unsigned next)
 	 * reschedule the timeout if the new 'next' will happen
 	 * earlier than the currently scheduled timeout
 	 */
-	time_left = mld_timer_fired_last +
-	    MSEC_TO_TICK(mld_time_to_next) - ddi_get_lbolt();
+	time_left = ipst->ips_mld_timer_fired_last +
+	    MSEC_TO_TICK(ipst->ips_mld_time_to_next) - ddi_get_lbolt();
 	if (time_left < MSEC_TO_TICK(next)) {
-		mld_timer_setter_active = B_FALSE;
-		mutex_exit(&mld_timer_lock);
+		ipst->ips_mld_timer_setter_active = B_FALSE;
+		mutex_exit(&ipst->ips_mld_timer_lock);
 		return;
 	}
 
-	mutex_exit(&mld_timer_lock);
-	ret = untimeout(mld_timeout_id);
-	mutex_enter(&mld_timer_lock);
+	mutex_exit(&ipst->ips_mld_timer_lock);
+	ret = untimeout(ipst->ips_mld_timeout_id);
+	mutex_enter(&ipst->ips_mld_timer_lock);
 	/*
 	 * The timeout was cancelled, or the timeout handler
 	 * completed, while we were blocked in the untimeout.
@@ -270,18 +248,19 @@ mld_start_timers(unsigned next)
 	 * if needed.
 	 */
 	if (ret == -1) {
-		ASSERT(mld_timeout_id == 0);
+		ASSERT(ipst->ips_mld_timeout_id == 0);
 	} else {
-		ASSERT(mld_timeout_id != 0);
-		mld_timeout_id = 0;
+		ASSERT(ipst->ips_mld_timeout_id != 0);
+		ipst->ips_mld_timeout_id = 0;
 	}
-	if (mld_time_to_next != 0) {
-		mld_time_to_next = MIN(mld_time_to_next, next);
-		mld_timeout_id = timeout(mld_timeout_handler, NULL,
-		    MSEC_TO_TICK(mld_time_to_next));
+	if (ipst->ips_mld_time_to_next != 0) {
+		ipst->ips_mld_time_to_next =
+		    MIN(ipst->ips_mld_time_to_next, next);
+		ipst->ips_mld_timeout_id = timeout(mld_timeout_handler,
+		    (void *)ipst, MSEC_TO_TICK(ipst->ips_mld_time_to_next));
 	}
-	mld_timer_setter_active = B_FALSE;
-	mutex_exit(&mld_timer_lock);
+	ipst->ips_mld_timer_setter_active = B_FALSE;
+	mutex_exit(&ipst->ips_mld_timer_lock);
 }
 
 /*
@@ -303,14 +282,16 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 	uint32_t 	group;
 	uint_t		next;
 	ipif_t 		*ipif;
+	ip_stack_t	 *ipst;
 
 	ASSERT(ill != NULL);
 	ASSERT(!ill->ill_isv6);
-	++igmpstat.igps_rcv_total;
+	ipst = ill->ill_ipst;
+	++ipst->ips_igmpstat.igps_rcv_total;
 
 	mblklen = MBLKL(mp);
 	if (mblklen < 1 || mblklen < (iphlen = IPH_HDR_LENGTH(ipha))) {
-		++igmpstat.igps_rcv_tooshort;
+		++ipst->ips_igmpstat.igps_rcv_tooshort;
 		goto bad_pkt;
 	}
 	igmplen = ntohs(ipha->ipha_length) - iphlen;
@@ -321,7 +302,7 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 	if (MBLKL(mp) < (igmplen + iphlen)) {
 		mblk_t *mp1;
 		if ((mp1 = msgpullup(mp, -1)) == NULL) {
-			++igmpstat.igps_rcv_tooshort;
+			++ipst->ips_igmpstat.igps_rcv_tooshort;
 			goto bad_pkt;
 		}
 		freemsg(mp);
@@ -333,14 +314,14 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 	 * Validate lengths
 	 */
 	if (igmplen < IGMP_MINLEN) {
-		++igmpstat.igps_rcv_tooshort;
+		++ipst->ips_igmpstat.igps_rcv_tooshort;
 		goto bad_pkt;
 	}
 	/*
 	 * Validate checksum
 	 */
 	if (IP_CSUM(mp, iphlen, 0)) {
-		++igmpstat.igps_rcv_badsum;
+		++ipst->ips_igmpstat.igps_rcv_badsum;
 		goto bad_pkt;
 	}
 
@@ -365,14 +346,14 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 			next = igmpv3_query_in((igmp3qa_t *)igmpa, ill,
 			    igmplen);
 		} else {
-			++igmpstat.igps_rcv_tooshort;
+			++ipst->ips_igmpstat.igps_rcv_tooshort;
 			goto bad_pkt;
 		}
 		if (next == 0)
 			goto bad_pkt;
 
 		if (next != INFINITY)
-			igmp_start_timers(next);
+			igmp_start_timers(next, ipst);
 
 		break;
 
@@ -404,10 +385,10 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 		}
 		mutex_exit(&ill->ill_lock);
 
-		++igmpstat.igps_rcv_reports;
+		++ipst->ips_igmpstat.igps_rcv_reports;
 		group = igmpa->igmpa_group;
 		if (!CLASSD(group)) {
-			++igmpstat.igps_rcv_badreports;
+			++ipst->ips_igmpstat.igps_rcv_badreports;
 			goto bad_pkt;
 		}
 
@@ -445,7 +426,7 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 		    ipif = ipif->ipif_next) {
 			ilm = ilm_lookup_ipif(ipif, group);
 			if (ilm != NULL) {
-				++igmpstat.igps_rcv_ourreports;
+				++ipst->ips_igmpstat.igps_rcv_ourreports;
 				ilm->ilm_timer = INFINITY;
 				ilm->ilm_state = IGMP_OTHERMEMBER;
 			}
@@ -478,8 +459,10 @@ igmp_query_in(ipha_t *ipha, igmpa_t *igmpa, ill_t *ill)
 	ilm_t	*ilm;
 	int	timer;
 	uint_t	next;
+	ip_stack_t	 *ipst;
 
-	++igmpstat.igps_rcv_queries;
+	ipst = ill->ill_ipst;
+	++ipst->ips_igmpstat.igps_rcv_queries;
 
 	/*
 	 * In the IGMPv2 specification, there are 3 states and a flag.
@@ -516,7 +499,7 @@ igmp_query_in(ipha_t *ipha, igmpa_t *igmpa, ill_t *ill)
 
 		if (ipha->ipha_dst != htonl(INADDR_ALLHOSTS_GROUP) ||
 		    igmpa->igmpa_group != 0) {
-			++igmpstat.igps_rcv_badqueries;
+			++ipst->ips_igmpstat.igps_rcv_badqueries;
 			return (0);
 		}
 
@@ -529,7 +512,7 @@ igmp_query_in(ipha_t *ipha, igmpa_t *igmpa, ill_t *ill)
 		 */
 		group = igmpa->igmpa_group;
 		if (group != 0 && (!CLASSD(group))) {
-			++igmpstat.igps_rcv_badqueries;
+			++ipst->ips_igmpstat.igps_rcv_badqueries;
 			return (0);
 		}
 
@@ -609,16 +592,18 @@ igmpv3_query_in(igmp3qa_t *igmp3qa, ill_t *ill, int igmplen)
 	ilm_t		*ilm;
 	ipaddr_t	*src_array;
 	uint8_t		qrv;
+	ip_stack_t	 *ipst;
 
+	ipst = ill->ill_ipst;
 	/* make sure numsrc matches packet size */
 	numsrc = ntohs(igmp3qa->igmp3qa_numsrc);
 	if (igmplen < IGMP_V3_QUERY_MINLEN + (numsrc * sizeof (ipaddr_t))) {
-		++igmpstat.igps_rcv_tooshort;
+		++ipst->ips_igmpstat.igps_rcv_tooshort;
 		return (0);
 	}
 	src_array = (ipaddr_t *)&igmp3qa[1];
 
-	++igmpstat.igps_rcv_queries;
+	++ipst->ips_igmpstat.igps_rcv_queries;
 
 	if ((mrd = (uint_t)igmp3qa->igmp3qa_mxrc) >= IGMP_V3_MAXRT_FPMIN) {
 		uint_t hdrval, mant, exp;
@@ -738,6 +723,7 @@ void
 igmp_joingroup(ilm_t *ilm)
 {
 	ill_t	*ill;
+	ip_stack_t	*ipst = ilm->ilm_ipst;
 
 	ill = ilm->ilm_ipif->ipif_ill;
 
@@ -802,10 +788,10 @@ igmp_joingroup(ilm_t *ilm)
 		 * acquire the ipsq. Instead we start the timer after we get
 		 * out of the ipsq in ipsq_exit.
 		 */
-		mutex_enter(&igmp_timer_lock);
-		igmp_deferred_next = MIN(ilm->ilm_rtx.rtx_timer,
-		    igmp_deferred_next);
-		mutex_exit(&igmp_timer_lock);
+		mutex_enter(&ipst->ips_igmp_timer_lock);
+		ipst->ips_igmp_deferred_next = MIN(ilm->ilm_rtx.rtx_timer,
+		    ipst->ips_igmp_deferred_next);
+		mutex_exit(&ipst->ips_igmp_timer_lock);
 	}
 
 	if (ip_debug > 1) {
@@ -820,6 +806,7 @@ void
 mld_joingroup(ilm_t *ilm)
 {
 	ill_t	*ill;
+	ip_stack_t	*ipst = ilm->ilm_ipst;
 
 	ill = ilm->ilm_ill;
 
@@ -880,10 +867,10 @@ mld_joingroup(ilm_t *ilm)
 		 * acquire the ipsq. Instead we start the timer after we get
 		 * out of the ipsq in ipsq_exit
 		 */
-		mutex_enter(&mld_timer_lock);
-		mld_deferred_next = MIN(ilm->ilm_rtx.rtx_timer,
-		    mld_deferred_next);
-		mutex_exit(&mld_timer_lock);
+		mutex_enter(&ipst->ips_mld_timer_lock);
+		ipst->ips_mld_deferred_next = MIN(ilm->ilm_rtx.rtx_timer,
+		    ipst->ips_mld_deferred_next);
+		mutex_exit(&ipst->ips_mld_timer_lock);
 	}
 
 	if (ip_debug > 1) {
@@ -982,6 +969,7 @@ igmp_statechange(ilm_t *ilm, mcast_record_t fmode, slist_t *flist)
 {
 	ill_t *ill;
 	mrec_t *rp;
+	ip_stack_t	*ipst = ilm->ilm_ipst;
 
 	ASSERT(ilm != NULL);
 
@@ -1059,10 +1047,10 @@ send_to_in:
 	if (ilm->ilm_rtx.rtx_timer == INFINITY) {
 		MCAST_RANDOM_DELAY(ilm->ilm_rtx.rtx_timer,
 		    SEC_TO_MSEC(IGMP_MAX_HOST_REPORT_DELAY));
-		mutex_enter(&igmp_timer_lock);
-		igmp_deferred_next = MIN(igmp_deferred_next,
+		mutex_enter(&ipst->ips_igmp_timer_lock);
+		ipst->ips_igmp_deferred_next = MIN(ipst->ips_igmp_deferred_next,
 		    ilm->ilm_rtx.rtx_timer);
-		mutex_exit(&igmp_timer_lock);
+		mutex_exit(&ipst->ips_igmp_timer_lock);
 	}
 
 	mutex_exit(&ill->ill_lock);
@@ -1074,6 +1062,7 @@ mld_statechange(ilm_t *ilm, mcast_record_t fmode, slist_t *flist)
 {
 	ill_t *ill;
 	mrec_t *rp = NULL;
+	ip_stack_t	*ipst = ilm->ilm_ipst;
 
 	ASSERT(ilm != NULL);
 
@@ -1146,10 +1135,10 @@ send_to_in:
 	if (ilm->ilm_rtx.rtx_timer == INFINITY) {
 		MCAST_RANDOM_DELAY(ilm->ilm_rtx.rtx_timer,
 		    SEC_TO_MSEC(ICMP6_MAX_HOST_REPORT_DELAY));
-		mutex_enter(&mld_timer_lock);
-		mld_deferred_next =
-		    MIN(mld_deferred_next, ilm->ilm_rtx.rtx_timer);
-		mutex_exit(&mld_timer_lock);
+		mutex_enter(&ipst->ips_mld_timer_lock);
+		ipst->ips_mld_deferred_next =
+		    MIN(ipst->ips_mld_deferred_next, ilm->ilm_rtx.rtx_timer);
+		mutex_exit(&ipst->ips_mld_timer_lock);
 	}
 
 	mutex_exit(&ill->ill_lock);
@@ -1392,8 +1381,6 @@ per_ilm_rtxtimer:
  * The igmp_slowtimeo() function is called thru another timer.
  * igmp_slowtimeout_lock protects the igmp_slowtimeout_id
  */
-
-/* ARGSUSED */
 void
 igmp_timeout_handler(void *arg)
 {
@@ -1403,16 +1390,18 @@ igmp_timeout_handler(void *arg)
 	uint_t  next;
 	ill_walk_context_t ctx;
 	boolean_t success;
+	ip_stack_t *ipst = (ip_stack_t *)arg;
 
-	mutex_enter(&igmp_timer_lock);
-	ASSERT(igmp_timeout_id != 0);
-	igmp_timer_fired_last = ddi_get_lbolt();
-	elapsed = igmp_time_to_next;
-	igmp_time_to_next = 0;
-	mutex_exit(&igmp_timer_lock);
+	ASSERT(arg != NULL);
+	mutex_enter(&ipst->ips_igmp_timer_lock);
+	ASSERT(ipst->ips_igmp_timeout_id != 0);
+	ipst->ips_igmp_timer_fired_last = ddi_get_lbolt();
+	elapsed = ipst->ips_igmp_time_to_next;
+	ipst->ips_igmp_time_to_next = 0;
+	mutex_exit(&ipst->ips_igmp_timer_lock);
 
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_V4(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_V4(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		ASSERT(!ill->ill_isv6);
 		/*
@@ -1422,7 +1411,7 @@ igmp_timeout_handler(void *arg)
 		 */
 		if (!ill_waiter_inc(ill))
 			continue;
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		success = ipsq_enter(ill, B_TRUE);
 		if (success) {
 			next = igmp_timeout_handler_per_ill(ill, elapsed);
@@ -1431,18 +1420,18 @@ igmp_timeout_handler(void *arg)
 			ipsq_exit(ill->ill_phyint->phyint_ipsq, B_FALSE,
 			    B_TRUE);
 		}
-		rw_enter(&ill_g_lock, RW_READER);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 		ill_waiter_dcr(ill);
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
-	mutex_enter(&igmp_timer_lock);
-	ASSERT(igmp_timeout_id != 0);
-	igmp_timeout_id = 0;
-	mutex_exit(&igmp_timer_lock);
+	mutex_enter(&ipst->ips_igmp_timer_lock);
+	ASSERT(ipst->ips_igmp_timeout_id != 0);
+	ipst->ips_igmp_timeout_id = 0;
+	mutex_exit(&ipst->ips_igmp_timer_lock);
 
 	if (global_next != INFINITY)
-		igmp_start_timers(global_next);
+		igmp_start_timers(global_next, ipst);
 }
 
 /*
@@ -1645,7 +1634,6 @@ per_ilm_rtxtimer:
  * Returns number of ticks to next event (or 0 if none).
  * MT issues are same as igmp_timeout_handler
  */
-/* ARGSUSED */
 void
 mld_timeout_handler(void *arg)
 {
@@ -1655,16 +1643,18 @@ mld_timeout_handler(void *arg)
 	uint_t  next;
 	ill_walk_context_t ctx;
 	boolean_t success;
+	ip_stack_t *ipst = (ip_stack_t *)arg;
 
-	mutex_enter(&mld_timer_lock);
-	ASSERT(mld_timeout_id != 0);
-	mld_timer_fired_last = ddi_get_lbolt();
-	elapsed = mld_time_to_next;
-	mld_time_to_next = 0;
-	mutex_exit(&mld_timer_lock);
+	ASSERT(arg != NULL);
+	mutex_enter(&ipst->ips_mld_timer_lock);
+	ASSERT(ipst->ips_mld_timeout_id != 0);
+	ipst->ips_mld_timer_fired_last = ddi_get_lbolt();
+	elapsed = ipst->ips_mld_time_to_next;
+	ipst->ips_mld_time_to_next = 0;
+	mutex_exit(&ipst->ips_mld_timer_lock);
 
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_V6(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_V6(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		ASSERT(ill->ill_isv6);
 		/*
@@ -1674,7 +1664,7 @@ mld_timeout_handler(void *arg)
 		 */
 		if (!ill_waiter_inc(ill))
 			continue;
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		success = ipsq_enter(ill, B_TRUE);
 		if (success) {
 			next = mld_timeout_handler_per_ill(ill, elapsed);
@@ -1683,18 +1673,18 @@ mld_timeout_handler(void *arg)
 			ipsq_exit(ill->ill_phyint->phyint_ipsq, B_TRUE,
 			    B_FALSE);
 		}
-		rw_enter(&ill_g_lock, RW_READER);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 		ill_waiter_dcr(ill);
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
-	mutex_enter(&mld_timer_lock);
-	ASSERT(mld_timeout_id != 0);
-	mld_timeout_id = 0;
-	mutex_exit(&mld_timer_lock);
+	mutex_enter(&ipst->ips_mld_timer_lock);
+	ASSERT(ipst->ips_mld_timeout_id != 0);
+	ipst->ips_mld_timeout_id = 0;
+	mutex_exit(&ipst->ips_mld_timer_lock);
 
 	if (global_next != INFINITY)
-		mld_start_timers(global_next);
+		mld_start_timers(global_next, ipst);
 }
 
 /*
@@ -1711,16 +1701,17 @@ mld_timeout_handler(void *arg)
  *   in IGMP_AGE_THRESHOLD seconds.
  * - Resets slowtimeout.
  */
-/* ARGSUSED */
 void
 igmp_slowtimo(void *arg)
 {
 	ill_t	*ill;
 	ill_if_t *ifp;
 	avl_tree_t *avl_tree;
+	ip_stack_t *ipst = (ip_stack_t *)arg;
 
+	ASSERT(arg != NULL);
 	/* Hold the ill_g_lock so that we can safely walk the ill list */
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 
 	/*
 	 * The ill_if_t list is circular, hence the odd loop parameters.
@@ -1730,7 +1721,8 @@ igmp_slowtimo(void *arg)
 	 * structure (allowing us to skip if none of the instances have timers
 	 * running).
 	 */
-	for (ifp = IP_V4_ILL_G_LIST; ifp != (ill_if_t *)&IP_V4_ILL_G_LIST;
+	for (ifp = IP_V4_ILL_G_LIST(ipst);
+	    ifp != (ill_if_t *)&IP_V4_ILL_G_LIST(ipst);
 	    ifp = ifp->illif_next) {
 		/*
 		 * illif_mcast_v[12] are set using atomics. If an ill hears
@@ -1785,11 +1777,11 @@ igmp_slowtimo(void *arg)
 		}
 
 	}
-	rw_exit(&ill_g_lock);
-	mutex_enter(&igmp_slowtimeout_lock);
-	igmp_slowtimeout_id = timeout(igmp_slowtimo, NULL,
+	rw_exit(&ipst->ips_ill_g_lock);
+	mutex_enter(&ipst->ips_igmp_slowtimeout_lock);
+	ipst->ips_igmp_slowtimeout_id = timeout(igmp_slowtimo, (void *)ipst,
 		MSEC_TO_TICK(MCAST_SLOWTIMO_INTERVAL));
-	mutex_exit(&igmp_slowtimeout_lock);
+	mutex_exit(&ipst->ips_igmp_slowtimeout_lock);
 }
 
 /*
@@ -1805,12 +1797,14 @@ mld_slowtimo(void *arg)
 	ill_t *ill;
 	ill_if_t *ifp;
 	avl_tree_t *avl_tree;
+	ip_stack_t *ipst = (ip_stack_t *)arg;
 
+	ASSERT(arg != NULL);
 	/* See comments in igmp_slowtimo() above... */
-	rw_enter(&ill_g_lock, RW_READER);
-	for (ifp = IP_V6_ILL_G_LIST; ifp != (ill_if_t *)&IP_V6_ILL_G_LIST;
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	for (ifp = IP_V6_ILL_G_LIST(ipst);
+	    ifp != (ill_if_t *)&IP_V6_ILL_G_LIST(ipst);
 	    ifp = ifp->illif_next) {
-
 		if (ifp->illif_mcast_v1 == 0)
 			continue;
 
@@ -1834,11 +1828,11 @@ mld_slowtimo(void *arg)
 			mutex_exit(&ill->ill_lock);
 		}
 	}
-	rw_exit(&ill_g_lock);
-	mutex_enter(&mld_slowtimeout_lock);
-	mld_slowtimeout_id = timeout(mld_slowtimo, NULL,
+	rw_exit(&ipst->ips_ill_g_lock);
+	mutex_enter(&ipst->ips_mld_slowtimeout_lock);
+	ipst->ips_mld_slowtimeout_id = timeout(mld_slowtimo, (void *)ipst,
 	    MSEC_TO_TICK(MCAST_SLOWTIMO_INTERVAL));
-	mutex_exit(&mld_slowtimeout_lock);
+	mutex_exit(&ipst->ips_mld_slowtimeout_lock);
 }
 
 /*
@@ -1861,6 +1855,7 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 	mblk_t	*first_mp;
 	ipsec_out_t *io;
 	zoneid_t zoneid;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	/*
 	 * We need to make sure this packet goes out on an ipif. If
@@ -1900,6 +1895,7 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 	if ((zoneid = ilm->ilm_zoneid) == ALL_ZONES)
 		zoneid = GLOBAL_ZONEID;
 	io->ipsec_out_zoneid = zoneid;
+	io->ipsec_out_ns = ipst->ips_netstack;	/* No netstack_hold */
 
 	mp = allocb(size, BPRI_HI);
 	if (mp == NULL) {
@@ -1951,7 +1947,7 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 
 	ip_wput_multicast(ill->ill_wq, first_mp, ipif, zoneid);
 
-	++igmpstat.igps_snd_reports;
+	++ipst->ips_igmpstat.igps_snd_reports;
 }
 
 /*
@@ -1979,6 +1975,7 @@ igmpv3_sendrpt(ipif_t *ipif, mrec_t *reclist)
 	mrec_t *next_reclist = reclist;
 	boolean_t morepkts;
 	zoneid_t zoneid;
+	ip_stack_t	 *ipst = ill->ill_ipst;
 
 	/* if there aren't any records, there's nothing to send */
 	if (reclist == NULL)
@@ -2134,7 +2131,7 @@ nextpkt:
 
 	ip_wput_multicast(ill->ill_wq, first_mp, ipif, zoneid);
 
-	++igmpstat.igps_snd_reports;
+	++ipst->ips_igmpstat.igps_snd_reports;
 
 	if (morepkts) {
 		if (more_src_cnt > 0) {
@@ -2172,6 +2169,7 @@ mld_input(queue_t *q, mblk_t *mp, ill_t *ill)
 	in6_addr_t	*v6group_ptr, *lcladdr_ptr;
 	uint_t		next;
 	int		mldlen;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInGroupMembTotal);
 
@@ -2228,7 +2226,7 @@ mld_input(queue_t *q, mblk_t *mp, ill_t *ill)
 		}
 
 		if (next != INFINITY)
-			mld_start_timers(next);
+			mld_start_timers(next, ipst);
 		break;
 
 	case MLD_LISTENER_REPORT: {

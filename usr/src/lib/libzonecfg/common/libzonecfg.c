@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@
 #include <sys/mnttab.h>
 #include <sys/nvpair.h>
 #include <sys/types.h>
+#include <sys/sockio.h>
 #include <ftw.h>
 #include <pool.h>
 #include <libscf.h>
@@ -64,7 +65,6 @@
 
 #include <libzonecfg.h>
 #include "zonecfg_impl.h"
-
 
 #define	_PATH_TMPFILE	"/zonecfg.XXXXXX"
 #define	ZONE_CB_RETRY_COUNT		10
@@ -95,6 +95,7 @@
 #define	DTD_ATTR_ACTION		(const xmlChar *) "action"
 #define	DTD_ATTR_ADDRESS	(const xmlChar *) "address"
 #define	DTD_ATTR_AUTOBOOT	(const xmlChar *) "autoboot"
+#define	DTD_ATTR_IPTYPE		(const xmlChar *) "ip-type"
 #define	DTD_ATTR_DIR		(const xmlChar *) "directory"
 #define	DTD_ATTR_LIMIT		(const xmlChar *) "limit"
 #define	DTD_ATTR_LIMITPRIV	(const xmlChar *) "limitpriv"
@@ -1497,6 +1498,69 @@ out:
 	return (error);
 }
 
+int
+zonecfg_get_iptype(zone_dochandle_t handle, zone_iptype_t *iptypep)
+{
+	char property[10]; /* 10 is big enough for "shared"/"exclusive" */
+	int err;
+
+	err = getrootattr(handle, DTD_ATTR_IPTYPE, property, sizeof (property));
+	if (err == Z_BAD_PROPERTY) {
+		/* Return default value */
+		*iptypep = ZS_SHARED;
+		return (Z_OK);
+	} else if (err != Z_OK) {
+		return (err);
+	}
+
+	if (strlen(property) == 0 ||
+	    strcmp(property, "shared") == 0)
+		*iptypep = ZS_SHARED;
+	else if (strcmp(property, "exclusive") == 0)
+		*iptypep = ZS_EXCLUSIVE;
+	else
+		return (Z_INVAL);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_set_iptype(zone_dochandle_t handle, zone_iptype_t iptype)
+{
+	xmlNodePtr cur;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	cur = xmlDocGetRootElement(handle->zone_dh_doc);
+	if (cur == NULL) {
+		return (Z_EMPTY_DOCUMENT);
+	}
+
+	if (xmlStrcmp(cur->name, DTD_ELEM_ZONE) != 0) {
+		return (Z_WRONG_DOC_TYPE);
+	}
+	switch (iptype) {
+	case ZS_SHARED:
+		/*
+		 * Since "shared" is the default, we don't write it to the
+		 * configuration file, so that it's easier to migrate those
+		 * zones elsewhere, eg., to systems which are not IP-Instances
+		 * aware.
+		 * xmlUnsetProp only fails when the attribute doesn't exist,
+		 * which we don't care.
+		 */
+		(void) xmlUnsetProp(cur, DTD_ATTR_IPTYPE);
+		break;
+	case ZS_EXCLUSIVE:
+		if (xmlSetProp(cur, DTD_ATTR_IPTYPE,
+		    (const xmlChar *) "exclusive") == NULL)
+			return (Z_INVAL);
+		break;
+	}
+	return (Z_OK);
+}
+
 static int
 newprop(xmlNodePtr node, const xmlChar *attrname, char *src)
 {
@@ -2036,6 +2100,30 @@ zonecfg_valid_net_address(char *address, struct lifreq *lifr)
 		freeaddrinfo(result);
 	}
 	return (Z_OK);
+}
+
+boolean_t
+zonecfg_ifname_exists(sa_family_t af, char *ifname)
+{
+	struct lifreq lifr;
+	int so;
+	int save_errno;
+
+	(void) memset(&lifr, 0, sizeof (lifr));
+	(void) strlcpy(lifr.lifr_name, ifname, sizeof (lifr.lifr_name));
+	lifr.lifr_addr.ss_family = af;
+	if ((so = socket(af, SOCK_DGRAM, 0)) < 0) {
+		/* Odd - can't tell if the ifname exists */
+		return (B_FALSE);
+	}
+	if (ioctl(so, SIOCGLIFFLAGS, (caddr_t)&lifr) < 0) {
+		save_errno = errno;
+		(void) close(so);
+		errno = save_errno;
+		return (B_FALSE);
+	}
+	(void) close(so);
+	return (B_TRUE);
 }
 
 int

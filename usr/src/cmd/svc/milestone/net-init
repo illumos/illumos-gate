@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,11 +39,12 @@
 . /lib/svc/share/smf_include.sh
 
 #
-# In a zone we need this service to be up, but all of the work
-# it tries to do is irrelevant (and will actually lead to the service
-# failing if we try to do it), so just bail out.
+# In a shared-IP zone we need this service to be up, but all of the work
+# it tries to do is irrelevant (and will actually lead to the service 
+# failing if we try to do it), so just bail out. 
+# In the global zone and exclusive-IP zones we proceed.
 #
-smf_is_globalzone || exit $SMF_EXIT_OK
+smf_configure_ip || exit $SMF_EXIT_OK
 
 # Configure IPv6 Default Address Selection.
 if [ -f /etc/inet/ipaddrsel.conf ]; then
@@ -56,7 +57,8 @@ fi
 # automatically exit.  Note that it may already be running if we're not
 # executing as part of system boot.
 #
-/usr/bin/pgrep -x -u 0 in.mpathd >/dev/null 2>&1 || /usr/lib/inet/in.mpathd -a
+/usr/bin/pgrep -x -u 0 -z `smf_zonename` in.mpathd >/dev/null 2>&1 || \
+    /usr/lib/inet/in.mpathd -a
 
 #
 # Pass to the kernel the list of supported IPsec protocols and algorithms.

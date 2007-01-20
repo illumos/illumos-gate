@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -160,12 +160,16 @@ extern	mblk_t	*ill_ared_alloc(ill_t *, ipaddr_t);
 extern	void	ill_dlpi_done(ill_t *, t_uscalar_t);
 extern	void	ill_dlpi_send(ill_t *, mblk_t *);
 extern	mblk_t	*ill_dlur_gen(uchar_t *, uint_t, t_uscalar_t, t_scalar_t);
+/* NOTE: Keep unmodified ill_lookup_on_ifindex for ipp for now */
+extern  ill_t	*ill_lookup_on_ifindex_global_instance(uint_t, boolean_t,
+    queue_t *, mblk_t *, ipsq_func_t, int *);
 extern  ill_t	*ill_lookup_on_ifindex(uint_t, boolean_t, queue_t *, mblk_t *,
-    ipsq_func_t, int *);
+    ipsq_func_t, int *, ip_stack_t *);
 extern	ill_t	*ill_lookup_on_name(char *, boolean_t,
-    boolean_t, queue_t *, mblk_t *, ipsq_func_t, int *, boolean_t *);
-extern uint_t	ill_get_next_ifindex(uint_t, boolean_t);
-extern uint_t	ill_get_ifindex_by_name(char *);
+    boolean_t, queue_t *, mblk_t *, ipsq_func_t, int *, boolean_t *,
+    ip_stack_t *);
+extern uint_t	ill_get_next_ifindex(uint_t, boolean_t, ip_stack_t *);
+extern uint_t	ill_get_ifindex_by_name(char *, ip_stack_t *);
 extern ill_t	*ill_get_first(boolean_t isv6);
 extern	void	ill_ipif_cache_delete(ire_t *, char *);
 extern	void	ill_send_all_deferred_mp(ill_t *);
@@ -201,7 +205,8 @@ extern	void	ill_waiter_dcr(ill_t *);
 extern	void	ill_trace_ref(ill_t *);
 extern	void	ill_untrace_ref(ill_t *);
 extern	boolean_t ill_down_start(queue_t *, mblk_t *);
-extern	ill_t	*ill_lookup_group_v6(const in6_addr_t *, zoneid_t);
+extern	ill_t	*ill_lookup_group_v6(const in6_addr_t *, zoneid_t,
+    ip_stack_t *);
 extern	void	ill_capability_ack(ill_t *, mblk_t *);
 extern	void	ill_capability_probe(ill_t *);
 extern	void	ill_capability_reset(ill_t *);
@@ -210,21 +215,24 @@ extern void	ill_group_cleanup(ill_t *);
 extern int	ill_up_ipifs(ill_t *, queue_t *, mblk_t *);
 extern	boolean_t ill_is_probeonly(ill_t *);
 
+extern	void	ip_loopback_cleanup(ip_stack_t *);
 extern	char	*ipif_get_name(const ipif_t *, char *, int);
-extern	ipif_t	*ipif_getby_indexes(uint_t, uint_t, boolean_t);
-extern	void	ipif_init(void);
+extern	ipif_t	*ipif_getby_indexes(uint_t, uint_t, boolean_t, ip_stack_t *);
+extern	void	ipif_init(ip_stack_t *);
 extern	ipif_t	*ipif_lookup_addr(ipaddr_t, ill_t *, zoneid_t, queue_t *,
-    mblk_t *, ipsq_func_t, int *);
+    mblk_t *, ipsq_func_t, int *, ip_stack_t *);
 extern	ipif_t	*ipif_lookup_addr_v6(const in6_addr_t *, ill_t *, zoneid_t,
-    queue_t *, mblk_t *, ipsq_func_t, int *);
-extern	zoneid_t ipif_lookup_addr_zoneid(ipaddr_t, ill_t *);
-extern	zoneid_t ipif_lookup_addr_zoneid_v6(const in6_addr_t *, ill_t *);
-extern	ipif_t	*ipif_lookup_group(ipaddr_t, zoneid_t);
-extern	ipif_t	*ipif_lookup_group_v6(const in6_addr_t *, zoneid_t);
+    queue_t *, mblk_t *, ipsq_func_t, int *, ip_stack_t *);
+extern	zoneid_t ipif_lookup_addr_zoneid(ipaddr_t, ill_t *, ip_stack_t *);
+extern	zoneid_t ipif_lookup_addr_zoneid_v6(const in6_addr_t *, ill_t *,
+    ip_stack_t *);
+extern	ipif_t	*ipif_lookup_group(ipaddr_t, zoneid_t, ip_stack_t *);
+extern	ipif_t	*ipif_lookup_group_v6(const in6_addr_t *, zoneid_t,
+    ip_stack_t *);
 extern  ipif_t	*ipif_lookup_interface(ipaddr_t, ipaddr_t,
-    queue_t *, mblk_t *, ipsq_func_t, int *);
+    queue_t *, mblk_t *, ipsq_func_t, int *, ip_stack_t *);
 extern	ipif_t	*ipif_lookup_remote(ill_t *, ipaddr_t, zoneid_t);
-extern	ipif_t	*ipif_lookup_onlink_addr(ipaddr_t, zoneid_t);
+extern	ipif_t	*ipif_lookup_onlink_addr(ipaddr_t, zoneid_t, ip_stack_t *);
 extern	ipif_t	*ipif_lookup_seqid(ill_t *, uint_t);
 extern	boolean_t	ipif_lookup_zoneid(ill_t *, zoneid_t, int,
     ipif_t **);
@@ -256,7 +264,7 @@ extern	boolean_t	ipif_cant_setlinklocal(ipif_t *);
 extern	int	ipif_setlinklocal(ipif_t *);
 extern	void	ipif_set_tun_llink(ill_t *, struct iftun_req *);
 extern	ipif_t	*ipif_lookup_on_ifindex(uint_t, boolean_t, zoneid_t, queue_t *,
-    mblk_t *, ipsq_func_t, int *);
+    mblk_t *, ipsq_func_t, int *, ip_stack_t *);
 extern	ipif_t	*ipif_get_next_ipif(ipif_t *curr, ill_t *ill);
 extern	void	ipif_ill_refrele_tail(ill_t *ill);
 extern	void	ipif_arp_down(ipif_t *ipif);
@@ -289,19 +297,20 @@ extern	void	ip_ll_subnet_defaults(ill_t *, mblk_t *);
 
 extern	int	ip_rt_add(ipaddr_t, ipaddr_t, ipaddr_t, ipaddr_t, int,
     ipif_t *, ipif_t *, ire_t **, boolean_t, queue_t *, mblk_t *, ipsq_func_t,
-    struct rtsa_s *);
+    struct rtsa_s *, ip_stack_t *);
 extern	int	ip_mrtun_rt_add(ipaddr_t, int, ipif_t *, ipif_t *, ire_t **,
-    queue_t *, mblk_t *, ipsq_func_t);
+    queue_t *, mblk_t *, ipsq_func_t, ip_stack_t *);
 extern	int	ip_rt_add_v6(const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, int, ipif_t *, ire_t **,
-    queue_t *, mblk_t *, ipsq_func_t, struct rtsa_s *);
+    queue_t *, mblk_t *, ipsq_func_t, struct rtsa_s *, ip_stack_t *ipst);
 extern	int	ip_rt_delete(ipaddr_t, ipaddr_t, ipaddr_t, uint_t, int,
-    ipif_t *, ipif_t *, boolean_t, queue_t *, mblk_t *, ipsq_func_t);
+    ipif_t *, ipif_t *, boolean_t, queue_t *, mblk_t *, ipsq_func_t,
+    ip_stack_t *);
 extern	int	ip_mrtun_rt_delete(ipaddr_t, ipif_t *);
 
 extern	int	ip_rt_delete_v6(const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, uint_t, int, ipif_t *, queue_t *, mblk_t *,
-    ipsq_func_t);
+    ipsq_func_t, ip_stack_t *);
 extern int ip_siocdelndp_v6(ipif_t *, sin_t *, queue_t *, mblk_t *,
     ip_ioctl_cmd_t *, void *);
 extern int ip_siocqueryndp_v6(ipif_t *, sin_t *, queue_t *, mblk_t *,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,11 +38,11 @@
 #include <sys/neti.h>
 
 
-static krwlock_t netlock;
-static LIST_HEAD(netd_listhead, net_data) netd_head; /* list of net_data_t */
-
 static void net_init();
-static net_data_t net_find(const char *protocol);
+static void net_fini();
+static net_data_t net_find(const char *protocol, neti_stack_t *ns);
+static void *neti_stack_init(netstackid_t stackid, netstack_t *ns);
+static void neti_stack_fini(netstackid_t stackid, void *arg);
 
 /*
  * Module linkage information for the kernel.
@@ -64,16 +64,27 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
+	int error;
+
 	net_init();
-	return (mod_install(&modlinkage));
+	error = mod_install(&modlinkage);
+	if (error != 0)
+		net_fini();
+
+	return (error);
 }
 
 
 int
 _fini(void)
 {
+	int error;
 
-	return (mod_remove(&modlinkage));
+	error = mod_remove(&modlinkage);
+	if (error == 0)
+		net_fini();
+
+	return (error);
 }
 
 
@@ -88,20 +99,68 @@ _info(struct modinfo *modinfop)
 static void
 net_init()
 {
+	/*
+	 * We want to be informed each time a stack is created or
+	 * destroyed in the kernel.
+	 */
+	netstack_register(NS_NETI, neti_stack_init, NULL,
+	    neti_stack_fini);
+}
 
-	rw_init(&netlock, NULL, RW_DRIVER, NULL);
-	LIST_INIT(&netd_head);
+static void
+net_fini()
+{
+	netstack_unregister(NS_NETI);
+}
+
+
+/*
+ * Initialize the neti stack instance.
+ */
+/*ARGSUSED*/
+static void *
+neti_stack_init(netstackid_t stackid, netstack_t *ns)
+{
+	neti_stack_t	*nts;
+
+#ifdef NS_DEBUG
+	printf("neti_stack_init(stack %d)\n", stackid);
+#endif
+
+	nts = (neti_stack_t *)kmem_zalloc(sizeof (*nts), KM_SLEEP);
+	nts->nts_netstack = ns;
+
+	rw_init(&nts->nts_netlock, NULL, RW_DRIVER, NULL);
+	LIST_INIT(&nts->nts_netd_head);
+
+	return (nts);
+}
+
+
+/*
+ * Free the neti stack instance.
+ */
+/*ARGSUSED*/
+static void
+neti_stack_fini(netstackid_t stackid, void *arg)
+{
+	neti_stack_t	*nts = (neti_stack_t *)arg;
+#ifdef NS_DEBUG
+	printf("neti_stack_fini(%p, stack %d)\n", arg, stackid);
+#endif
+	rw_destroy(&nts->nts_netlock);
+	kmem_free(nts, sizeof (*nts));
 }
 
 
 static net_data_t
-net_find(const char *protocol)
+net_find(const char *protocol, neti_stack_t *nts)
 {
 	struct net_data *n;
 
 	ASSERT(protocol != NULL);
 
-	LIST_FOREACH(n, &netd_head, netd_list) {
+	LIST_FOREACH(n, &nts->nts_netd_head, netd_list) {
 		ASSERT(n->netd_info.neti_protocol != NULL);
 		if (strcmp(n->netd_info.neti_protocol, protocol) == 0) {
 			break;
@@ -111,33 +170,51 @@ net_find(const char *protocol)
 	return (n);
 }
 
+net_data_t
+net_register(const net_info_t *info, netstackid_t nsid)
+{
+	netstack_t *ns;
+	net_data_t nd;
+
+	ns = netstack_find_by_stackid(nsid);
+	nd = net_register_impl(info, ns);
+	netstack_rele(ns);
+
+	return (nd);
+}
 
 net_data_t
-net_register(const net_info_t *info)
+net_register_impl(const net_info_t *info, netstack_t *ns)
 {
 	struct net_data *n, *new;
+	struct neti_stack *nts;
 
 	ASSERT(info != NULL);
+	ASSERT(ns != NULL);
+
+	nts = ns->netstack_neti;
 
 	new = kmem_alloc(sizeof (*new), KM_SLEEP);
 	new->netd_refcnt = 0;
 	new->netd_hooks = NULL;
 	new->netd_info = *info;
+	new->netd_netstack = ns;
 
-	rw_enter(&netlock, RW_WRITER);
-	n = net_find(info->neti_protocol);
+	rw_enter(&nts->nts_netlock, RW_WRITER);
+	n = net_find(info->neti_protocol, nts);
 	if (n != NULL) {
-		rw_exit(&netlock);
+		rw_exit(&nts->nts_netlock);
 		kmem_free(new, sizeof (*new));
 		return (NULL);
 	}
 
-	if (LIST_EMPTY(&netd_head))
-		LIST_INSERT_HEAD(&netd_head, new, netd_list);
+	if (LIST_EMPTY(&nts->nts_netd_head))
+		LIST_INSERT_HEAD(&nts->nts_netd_head, new, netd_list);
 	else
-		LIST_INSERT_AFTER(LIST_FIRST(&netd_head), new, netd_list);
+		LIST_INSERT_AFTER(LIST_FIRST(&nts->nts_netd_head),
+		    new, netd_list);
 
-	rw_exit(&netlock);
+	rw_exit(&nts->nts_netlock);
 	return (new);
 }
 
@@ -145,36 +222,56 @@ net_register(const net_info_t *info)
 int
 net_unregister(net_data_t info)
 {
+	struct netstack *ns;
+	struct neti_stack *nts;
+	ns = info->netd_netstack;
+	nts = ns->netstack_neti;
 
 	ASSERT(info != NULL);
 
-	rw_enter(&netlock, RW_WRITER);
+	rw_enter(&nts->nts_netlock, RW_WRITER);
 	if (info->netd_refcnt != 0) {
-		rw_exit(&netlock);
+		rw_exit(&nts->nts_netlock);
 		return (EBUSY);
 	}
 
 	LIST_REMOVE(info, netd_list);
 
-	rw_exit(&netlock);
+	rw_exit(&nts->nts_netlock);
 
 	kmem_free(info, sizeof (struct net_data));
 	return (0);
 }
 
+net_data_t
+net_lookup(const char *protocol, netstackid_t nsid)
+{
+	netstack_t *ns;
+	net_data_t nd;
+
+	ns = netstack_find_by_stackid(nsid);
+	nd = net_lookup_impl(protocol, ns);
+	netstack_rele(ns);
+
+	return (nd);
+}
 
 net_data_t
-net_lookup(const char *protocol)
+net_lookup_impl(const char *protocol, netstack_t *ns)
 {
 	struct net_data *n;
+	struct neti_stack *nts;
 
 	ASSERT(protocol != NULL);
+	ASSERT(ns != NULL);
 
-	rw_enter(&netlock, RW_READER);
-	n = net_find(protocol);
+	nts = ns->netstack_neti;
+
+	rw_enter(&nts->nts_netlock, RW_READER);
+	n = net_find(protocol, nts);
 	if (n != NULL)
 		atomic_add_32((uint_t *)&n->netd_refcnt, 1);
-	rw_exit(&netlock);
+	rw_exit(&nts->nts_netlock);
 	return (n);
 }
 
@@ -187,33 +284,57 @@ net_lookup(const char *protocol)
 int
 net_release(net_data_t info)
 {
+	struct netstack *ns;
+	struct neti_stack *nts;
+
+	ns = info->netd_netstack;
+	nts = ns->netstack_neti;
+
 	ASSERT(info != NULL);
 
-	rw_enter(&netlock, RW_READER);
+	rw_enter(&nts->nts_netlock, RW_READER);
 	ASSERT(info->netd_refcnt > 0);
 	atomic_add_32((uint_t *)&info->netd_refcnt, -1);
 
 	/* net_release has been called too many times */
 	if (info->netd_refcnt < 0) {
-		rw_exit(&netlock);
+		rw_exit(&nts->nts_netlock);
 		return (1);
 	}
-	rw_exit(&netlock);
+	rw_exit(&nts->nts_netlock);
+
 	return (0);
 }
 
+net_data_t
+net_walk(net_data_t info, netstackid_t nsid)
+{
+	netstack_t *ns;
+	net_data_t nd;
+
+	ns = netstack_find_by_stackid(nsid);
+	nd = net_walk_impl(info, ns);
+	netstack_rele(ns);
+
+	return (nd);
+}
 
 net_data_t
-net_walk(net_data_t info)
+net_walk_impl(net_data_t info, netstack_t *ns)
 {
 	struct net_data *n = NULL;
 	boolean_t found = B_FALSE;
+	struct neti_stack *nts;
+
+	ASSERT(ns != NULL);
+
+	nts = ns->netstack_neti;
 
 	if (info == NULL)
 		found = B_TRUE;
 
-	rw_enter(&netlock, RW_READER);
-	LIST_FOREACH(n, &netd_head, netd_list) {
+	rw_enter(&nts->nts_netlock, RW_READER);
+	LIST_FOREACH(n, &nts->nts_netd_head, netd_list) {
 		if (found)
 			break;
 		if (n == info)
@@ -227,7 +348,8 @@ net_walk(net_data_t info)
 	if (n != NULL)
 		atomic_add_32((uint_t *)&n->netd_refcnt, 1);
 
-	rw_exit(&netlock);
+	rw_exit(&nts->nts_netlock);
+
 	return (n);
 }
 
@@ -242,7 +364,8 @@ net_getifname(net_data_t info, phy_if_t phy_ifdata,
 
 	ASSERT(info != NULL);
 
-	return (info->netd_info.neti_getifname(phy_ifdata, buffer, buflen));
+	return (info->netd_info.neti_getifname(phy_ifdata, buffer, buflen,
+	    info->netd_netstack));
 }
 
 
@@ -252,7 +375,8 @@ net_getmtu(net_data_t info, phy_if_t phy_ifdata, lif_if_t ifdata)
 
 	ASSERT(info != NULL);
 
-	return (info->netd_info.neti_getmtu(phy_ifdata, ifdata));
+	return (info->netd_info.neti_getmtu(phy_ifdata, ifdata,
+	    info->netd_netstack));
 }
 
 
@@ -262,7 +386,7 @@ net_getpmtuenabled(net_data_t info)
 
 	ASSERT(info != NULL);
 
-	return (info->netd_info.neti_getpmtuenabled());
+	return (info->netd_info.neti_getpmtuenabled(info->netd_netstack));
 }
 
 
@@ -274,7 +398,7 @@ net_getlifaddr(net_data_t info, phy_if_t phy_ifdata, lif_if_t ifdata,
 	ASSERT(info != NULL);
 
 	return (info->netd_info.neti_getlifaddr(phy_ifdata, ifdata,
-	    nelem, type, storage));
+	    nelem, type, storage, info->netd_netstack));
 }
 
 
@@ -284,7 +408,8 @@ net_phygetnext(net_data_t info, phy_if_t phy_ifdata)
 
 	ASSERT(info != NULL);
 
-	return (info->netd_info.neti_phygetnext(phy_ifdata));
+	return (info->netd_info.neti_phygetnext(phy_ifdata,
+	    info->netd_netstack));
 }
 
 
@@ -294,7 +419,7 @@ net_phylookup(net_data_t info, const char *name)
 
 	ASSERT(info != NULL);
 
-	return (info->netd_info.neti_phylookup(name));
+	return (info->netd_info.neti_phylookup(name, info->netd_netstack));
 }
 
 
@@ -304,7 +429,8 @@ net_lifgetnext(net_data_t info, phy_if_t ifidx, lif_if_t ifdata)
 
 	ASSERT(info != NULL);
 
-	return (info->netd_info.neti_lifgetnext(ifidx, ifdata));
+	return (info->netd_info.neti_lifgetnext(ifidx, ifdata,
+	    info->netd_netstack));
 }
 
 
@@ -314,7 +440,8 @@ net_inject(net_data_t info, inject_t style, net_inject_t *packet)
 
 	ASSERT(info != NULL);
 
-	return (info->netd_info.neti_inject(style, packet));
+	return (info->netd_info.neti_inject(style, packet,
+	    info->netd_netstack));
 }
 
 
@@ -324,7 +451,7 @@ net_routeto(net_data_t info, struct sockaddr *address)
 
 	ASSERT(info != NULL);
 
-	return (info->netd_info.neti_routeto(address));
+	return (info->netd_info.neti_routeto(address, info->netd_netstack));
 }
 
 
@@ -373,7 +500,7 @@ net_register_family(net_data_t info, hook_family_t *hf)
 	if (info->netd_hooks != NULL)
 		return (EEXIST);
 
-	hfi = hook_family_add(hf);
+	hfi = hook_family_add(hf, info->netd_netstack->netstack_hook);
 	if (hfi == NULL)
 		return (EEXIST);
 

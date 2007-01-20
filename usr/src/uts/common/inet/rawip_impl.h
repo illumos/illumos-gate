@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -36,6 +36,7 @@ extern "C" {
 #ifdef _KERNEL
 
 #include <sys/types.h>
+#include <sys/netstack.h>
 
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
@@ -43,6 +44,27 @@ extern "C" {
 
 #include <inet/common.h>
 #include <inet/ip.h>
+
+/* Named Dispatch Parameter Management Structure */
+typedef struct icmpparam_s {
+	uint_t	icmp_param_min;
+	uint_t	icmp_param_max;
+	uint_t	icmp_param_value;
+	char	*icmp_param_name;
+} icmpparam_t;
+
+/*
+ * ICMP stack instances
+ */
+struct icmp_stack {
+	netstack_t	*is_netstack;	/* Common netstack */
+	void		*is_head;	/* Head for list of open icmps */
+	IDP		is_nd;	/* Points to table of ICMP ND variables. */
+	icmpparam_t	*is_param_arr; 	/* ndd variable table */
+	kstat_t		*is_ksp;	/* kstats */
+	mib2_rawip_t	is_rawip_mib;	/* SNMP fixed size info */
+};
+typedef struct icmp_stack icmp_stack_t;
 
 /* Internal icmp control structure, one per open stream */
 typedef	struct icmp_s {
@@ -116,7 +138,9 @@ typedef	struct icmp_s {
 	uint_t		icmp_label_len_v6;	/* sec. part of sticky opt */
 	in6_addr_t 	icmp_v6lastdst;		/* most recent destination */
 	mblk_t		*icmp_delabel;		/* send this on close */
+	icmp_stack_t	*icmp_is;		/* Stack instance */
 } icmp_t;
+#define	icmp_rawip_mib	icmp_is->is_rawip_mib
 
 #endif	/* _KERNEL */
 

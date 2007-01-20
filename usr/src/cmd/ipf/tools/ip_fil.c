@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,7 @@ struct file;
 #include <stdlib.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <sys/zone.h>
 #include <arpa/inet.h>
 
 #ifdef __hpux
@@ -133,6 +134,7 @@ struct file;
 #ifdef IPFILTER_COMPILED
 # include "netinet/ip_rules.h"
 #endif
+#include "netinet/ipf_stack.h"
 #if defined(__FreeBSD_version) && (__FreeBSD_version >= 300000)
 # include <sys/malloc.h>
 #endif
@@ -150,7 +152,7 @@ extern	struct	protosw	inetsw[];
 static	struct	ifnet **ifneta = NULL;
 static	int	nifs = 0;
 
-static	int	frzerostats __P((caddr_t));
+static	int	frzerostats __P((caddr_t, ipf_stack_t *ifs));
 static	void	fr_setifpaddr __P((struct ifnet *, char *));
 void	init_ifp __P((void));
 #if defined(__sgi) && (IRIX < 60500)
@@ -173,32 +175,36 @@ static int	write_output __P((struct ifnet *, struct mbuf *,
 #endif
 
 
-int iplattach()
+int iplattach(ifs, ns)
+ipf_stack_t *ifs;
+netstack_t *ns;
 {
-	fr_running = 1;
+	ifs->ifs_fr_running = 1;
 	return 0;
 }
 
 
-int ipldetach()
+int ipldetach(ifs)
+ipf_stack_t *ifs;
 {
-	fr_running = -1;
+	ifs->ifs_fr_running = -1;
 	return 0;
 }
 
 
-static	int	frzerostats(data)
+static	int	frzerostats(data, ifs)
 caddr_t	data;
+ipf_stack_t *ifs;
 {
 	friostat_t fio;
 	int error;
 
-	fr_getstat(&fio);
+	fr_getstat(&fio, ifs);
 	error = copyoutptr(&fio, data, sizeof(fio));
 	if (error)
 		return EFAULT;
 
-	bzero((char *)frstats, sizeof(*frstats) * 2);
+	bzero((char *)ifs->ifs_frstats, sizeof(*ifs->ifs_frstats) * 2);
 
 	return 0;
 }
@@ -213,41 +219,46 @@ ioctlcmd_t cmd;
 caddr_t data;
 int mode;
 {
-	int error = 0, unit = 0, tmp;
+	int error = 0, unit = 0, tmp, uid;
 	friostat_t fio;
+	ipf_stack_t *ifs;
+	extern ipf_stack_t *get_ifs();
 
 	unit = dev;
+	uid = getuid();
+
+	ifs = get_ifs();
 
 	SPL_NET(s);
 
 	if (unit == IPL_LOGNAT) {
-		if (fr_running > 0)
-			error = fr_nat_ioctl(data, cmd, mode);
+		if (ifs->ifs_fr_running > 0)
+			error = fr_nat_ioctl(data, cmd, mode, uid, NULL, ifs);
 		else
 			error = EIO;
 		SPL_X(s);
 		return error;
 	}
 	if (unit == IPL_LOGSTATE) {
-		if (fr_running > 0)
-			error = fr_state_ioctl(data, cmd, mode);
+		if (ifs->ifs_fr_running > 0)
+			error = fr_state_ioctl(data, cmd, mode, uid, NULL, ifs);
 		else
 			error = EIO;
 		SPL_X(s);
 		return error;
 	}
 	if (unit == IPL_LOGAUTH) {
-		if (fr_running > 0) {
+		if (ifs->ifs_fr_running > 0) {
 			if ((cmd == (ioctlcmd_t)SIOCADAFR) ||
 			    (cmd == (ioctlcmd_t)SIOCRMAFR)) {
 				if (!(mode & FWRITE)) {
 					error = EPERM;
 				} else {
 					error = frrequest(unit, cmd, data,
-							  fr_active, 1);
+					    ifs->ifs_fr_active, 1, ifs);
 				}
 			} else {
-				error = fr_auth_ioctl(data, mode, cmd);
+				error = fr_auth_ioctl(data, mode, cmd, uid, NULL, ifs);
 			}
 		} else
 			error = EIO;
@@ -256,7 +267,7 @@ int mode;
 	}
 	if (unit == IPL_LOGSYNC) {
 #ifdef	IPFILTER_SYNC
-		if (fr_running > 0)
+		if (ifs->ifs_fr_running > 0)
 			error = fr_sync_ioctl(data, cmd, mode);
 		else
 #endif
@@ -266,7 +277,7 @@ int mode;
 	}
 	if (unit == IPL_LOGSCAN) {
 #ifdef	IPFILTER_SCAN
-		if (fr_running > 0)
+		if (ifs->ifs_fr_running > 0)
 			error = fr_scan_ioctl(data, cmd, mode);
 		else
 #endif
@@ -275,8 +286,9 @@ int mode;
 		return error;
 	}
 	if (unit == IPL_LOGLOOKUP) {
-		if (fr_running > 0)
-			error = ip_lookup_ioctl(data, cmd, mode);
+		if (ifs->ifs_fr_running > 0)
+			error = ip_lookup_ioctl(data, cmd, mode, uid,
+			    NULL, ifs);
 		else
 			error = EIO;
 		SPL_X(s);
@@ -287,8 +299,8 @@ int mode;
 	{
 	case FIONREAD :
 #ifdef IPFILTER_LOG
-		error = COPYOUT(&iplused[IPL_LOGIPF], (caddr_t)data,
-			       sizeof(iplused[IPL_LOGIPF]));
+		error = COPYOUT(&ifs->ifs_iplused[IPL_LOGIPF], (caddr_t)data,
+			       sizeof(ifs->ifs_iplused[IPL_LOGIPF]));
 #endif
 		break;
 	case SIOCFRENB :
@@ -299,9 +311,9 @@ int mode;
 			if (error)
 				break;
 			if (tmp)
-				error = iplattach();
+				error = iplattach(ifs, NULL);
 			else
-				error = ipldetach();
+				error = ipldetach(ifs);
 		}
 		break;
 	case SIOCIPFSET :
@@ -311,16 +323,18 @@ int mode;
 		}
 	case SIOCIPFGETNEXT :
 	case SIOCIPFGET :
-		error = fr_ipftune(cmd, (void *)data);
+		error = fr_ipftune(cmd, (void *)data, ifs);
 		break;
 	case SIOCSETFF :
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else
-			error = COPYIN(data, &fr_flags, sizeof(fr_flags));
+			error = COPYIN(data, &ifs->ifs_fr_flags,
+			    sizeof(ifs->ifs_fr_flags));
 		break;
 	case SIOCGETFF :
-		error = COPYOUT(&fr_flags, data, sizeof(fr_flags));
+		error = COPYOUT(&ifs->ifs_fr_flags, data,
+		    sizeof(ifs->ifs_fr_flags));
 		break;
 	case SIOCFUNCL :
 		error = fr_resolvefunc(data);
@@ -332,7 +346,8 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else
-			error = frrequest(unit, cmd, data, fr_active, 1);
+			error = frrequest(unit, cmd, data,
+			    ifs->ifs_fr_active, 1, ifs);
 		break;
 	case SIOCINIFR :
 	case SIOCRMIFR :
@@ -340,26 +355,28 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else
-			error = frrequest(unit, cmd, data, 1 - fr_active, 1);
+			error = frrequest(unit, cmd, data,
+			    1 - ifs->ifs_fr_active, 1, ifs);
 		break;
 	case SIOCSWAPA :
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			bzero((char *)frcache, sizeof(frcache[0]) * 2);
-			*(u_int *)data = fr_active;
-			fr_active = 1 - fr_active;
+			bzero((char *)ifs->ifs_frcache,
+			    sizeof(ifs->ifs_frcache[0]) * 2);
+			*(u_int *)data = ifs->ifs_fr_active;
+			ifs->ifs_fr_active = 1 - ifs->ifs_fr_active;
 		}
 		break;
 	case SIOCGETFS :
-		fr_getstat(&fio);
+		fr_getstat(&fio, ifs);
 		error = fr_outobj(data, &fio, IPFOBJ_IPFSTAT);
 		break;
 	case	SIOCFRZST :
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else
-			error = frzerostats(data);
+			error = frzerostats(data, ifs);
 		break;
 	case	SIOCIPFFL :
 		if (!(mode & FWRITE))
@@ -367,7 +384,7 @@ int mode;
 		else {
 			error = COPYIN(data, &tmp, sizeof(tmp));
 			if (!error) {
-				tmp = frflush(unit, 4, tmp);
+				tmp = frflush(unit, 4, tmp, ifs);
 				error = COPYOUT(&tmp, data, sizeof(tmp));
 			}
 		}
@@ -379,7 +396,7 @@ int mode;
 		else {
 			error = COPYIN(data, &tmp, sizeof(tmp));
 			if (!error) {
-				tmp = frflush(unit, 6, tmp);
+				tmp = frflush(unit, 6, tmp, ifs);
 				error = COPYOUT(&tmp, data, sizeof(tmp));
 			}
 		}
@@ -388,10 +405,10 @@ int mode;
 	case SIOCSTLCK :
 		error = COPYIN(data, &tmp, sizeof(tmp));
 		if (error == 0) {
-			fr_state_lock = tmp;
-			fr_nat_lock = tmp;
-			fr_frag_lock = tmp;
-			fr_auth_lock = tmp;
+			ifs->ifs_fr_state_lock = tmp;
+			ifs->ifs_fr_nat_lock = tmp;
+			ifs->ifs_fr_frag_lock = tmp;
+			ifs->ifs_fr_auth_lock = tmp;
 		} else
 			error = EFAULT;
 		break;
@@ -400,17 +417,17 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else
-			*(int *)data = ipflog_clear(unit);
+			*(int *)data = ipflog_clear(unit, ifs);
 		break;
 #endif /* IPFILTER_LOG */
 	case SIOCGFRST :
-		error = fr_outobj(data, fr_fragstats(), IPFOBJ_FRAGSTAT);
+		error = fr_outobj(data, fr_fragstats(ifs), IPFOBJ_FRAGSTAT);
 		break;
 	case SIOCFRSYN :
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			frsync(IPFSYNC_RESYNC, IPFSYNC_RESYNC, NULL, NULL);
+			frsync(IPFSYNC_RESYNC, IPFSYNC_RESYNC, NULL, NULL, ifs);
 		}
 		break;
 	default :
@@ -422,51 +439,61 @@ int mode;
 }
 
 
-void fr_forgetifp(ifp)
+void fr_forgetifp(ifp, ifs)
 void *ifp;
+ipf_stack_t *ifs;
 {
 	register frentry_t *f;
 
-	WRITE_ENTER(&ipf_mutex);
-	for (f = ipacct[0][fr_active]; (f != NULL); f = f->fr_next)
+	WRITE_ENTER(&ifs->ifs_ipf_mutex);
+	for (f = ifs->ifs_ipacct[0][ifs->ifs_fr_active]; (f != NULL);
+	    f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	for (f = ipacct[1][fr_active]; (f != NULL); f = f->fr_next)
+	for (f = ifs->ifs_ipacct[1][ifs->ifs_fr_active]; (f != NULL);
+	    f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	for (f = ipfilter[0][fr_active]; (f != NULL); f = f->fr_next)
+	for (f = ifs->ifs_ipfilter[0][ifs->ifs_fr_active]; (f != NULL);
+	    f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	for (f = ipfilter[1][fr_active]; (f != NULL); f = f->fr_next)
+	for (f = ifs->ifs_ipfilter[1][ifs->ifs_fr_active]; (f != NULL);
+	    f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
 #ifdef	USE_INET6
-	for (f = ipacct6[0][fr_active]; (f != NULL); f = f->fr_next)
+	for (f = ifs->ifs_ipacct6[0][ifs->ifs_fr_active]; (f != NULL);
+	    f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	for (f = ipacct6[1][fr_active]; (f != NULL); f = f->fr_next)
+	for (f = ifs->ifs_ipacct6[1][ifs->ifs_fr_active]; (f != NULL);
+	    f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	for (f = ipfilter6[0][fr_active]; (f != NULL); f = f->fr_next)
+	for (f = ifs->ifs_ipfilter6[0][ifs->ifs_fr_active]; (f != NULL);
+	    f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	for (f = ipfilter6[1][fr_active]; (f != NULL); f = f->fr_next)
+	for (f = ifs->ifs_ipfilter6[1][ifs->ifs_fr_active]; (f != NULL);
+	    f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
 #endif
-	RWLOCK_EXIT(&ipf_mutex);
-	fr_natifpsync(IPFSYNC_OLDIFP, ifp, NULL);
+	RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
+	fr_natifpsync(IPFSYNC_OLDIFP, ifp, NULL, ifs);
 }
 
 
-void fr_resolvedest(fdp, v)
+void fr_resolvedest(fdp, v, ifs)
 frdest_t *fdp;
 int v;
+ipf_stack_t *ifs;
 {
 	fdp->fd_ifp = NULL;
 
 	if (*fdp->fd_ifname) {
-		fdp->fd_ifp = GETIFP(fdp->fd_ifname, v);
+		fdp->fd_ifp = GETIFP(fdp->fd_ifname, v, ifs);
 		if (!fdp->fd_ifp)
 			fdp->fd_ifp = (struct ifnet *)-1;
 	}
@@ -579,9 +606,11 @@ char *addr;
 	}
 }
 
-struct ifnet *get_unit(name, v)
+/*ARGSUSED*/
+struct ifnet *get_unit(name, v, ifs)
 char *name;
 int v;
+ipf_stack_t *ifs;
 {
 	struct ifnet *ifp, **ifpp, **old_ifneta;
 	char *addr;
@@ -781,10 +810,11 @@ int dst;
 }
 
 
-void frsync(command, version, nic, data)
+void frsync(command, version, nic, data, ifs)
 int command, version;
 void *nic;
 char *data;
+ipf_stack_t *ifs;
 {
 	return;
 }
@@ -897,10 +927,11 @@ fr_info_t *fin;
 {
 	static u_short ipid = 0;
 	u_short id;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	MUTEX_ENTER(&ipf_rw);
+	MUTEX_ENTER(&ifs->ifs_ipf_rw);
 	id = ipid++;
-	MUTEX_EXIT(&ipf_rw);
+	MUTEX_EXIT(&ifs->ifs_ipf_rw);
 
 	return id;
 }
@@ -957,10 +988,11 @@ size_t size;
 /*
  * return the first IP Address associated with an interface
  */
-int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
+int fr_ifpaddr(v, atype, ifptr, inp, inpmask, ifs)
 int v, atype;
 void *ifptr;
 struct in_addr *inp, *inpmask;
+ipf_stack_t *ifs;
 {
 	struct ifnet *ifp = ifptr;
 #ifdef __sgi

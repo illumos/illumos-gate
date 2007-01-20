@@ -6,7 +6,7 @@
  * @(#)ip_compat.h	1.8 1/14/96
  * $Id: ip_compat.h,v 2.142.2.30 2005/08/11 15:13:49 darrenr Exp $
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -149,6 +149,7 @@ struct file;
 #  include	<sys/proc.h>
 #  include	<sys/devops.h>
 #  include	<sys/ddi_impldefs.h>
+#  include	<sys/neti.h>
 # endif
 
 /*
@@ -162,6 +163,7 @@ struct file;
  * because Solaris 2 defines these in two places :-/
  */
 # ifndef	KERNEL
+#  define	ADD_KERNEL
 #  define	_KERNEL
 #  undef	RES_INIT
 # endif /* _KERNEL */
@@ -180,6 +182,9 @@ struct file;
 # undef	IPOPT_SSRR
 # ifdef i386
 #  define _SYS_PROMIF_H
+# endif
+# ifdef ADD_KERNEL
+#  undef _KERNEL
 # endif
 # include <inet/ip.h>
 # undef COPYOUT
@@ -216,9 +221,6 @@ typedef	struct	qpktinfo	{
 } qpktinfo_t;
 
 #define	QPI_NOCKSUM	0x01
-
-extern net_data_t ipf_ipv4;
-extern net_data_t ipf_ipv6;
 
 extern void mb_copydata __P((mblk_t *, size_t , size_t, char *));
 extern void mb_copyback __P((mblk_t *, size_t , size_t, char *));
@@ -289,12 +291,12 @@ typedef unsigned int	u_32_t;
 #  define	KMALLOC(a,b)	(a) = (b)kmem_alloc(sizeof(*(a)), KM_NOSLEEP)
 #  define	KMALLOCS(a,b,c)	(a) = (b)kmem_alloc((c), KM_NOSLEEP)
 #  define	GET_MINOR(x)	getminor(x)
-extern	phy_if_t	get_unit __P((char *, int));
-#  define	GETIFP(n, v)	(void *)get_unit(n, v)
+/*extern	phy_if_t	get_unit __P((char *, int, ipf_stack_t *));*/
+#  define	GETIFP(n, v, ifs)	(void *)get_unit(n, v, ifs)
 #  define	IFNAME(x)	((ill_t *)x)->ill_name
 #  define	COPYIFNAME(x, b, v)	(void) net_getifname(((v) == 4) ? \
-					    ipf_ipv4 : ipf_ipv6, \
-					    (phy_if_t)(x), (b), sizeof(b))
+					ifs->ifs_ipf_ipv4 : ifs->ifs_ipf_ipv6,\
+					(phy_if_t)(x), (b), sizeof(b))
 #  define	GETKTIME(x)	uniqtime((struct timeval *)x)
 #  define	MSGDSIZE(x)	msgdsize(x)
 #  define	M_LEN(x)	((x)->b_wptr - (x)->b_rptr)
@@ -459,8 +461,8 @@ typedef	struct	iplog_select_s {
 #  define	SPL_IMP(x)	;
 #  undef	SPL_X
 #  define	SPL_X(x)	;
-extern	void	*get_unit __P((char *, int));
-#  define	GETIFP(n, v)	get_unit(n, v)
+/*extern	void	*get_unit __P((char *, int, ipf_stack_t *));*/
+#  define	GETIFP(n, v, ifs)	get_unit(n, v, ifs)
 #  define	IFNAME(x, b)	((ill_t *)x)->ill_name
 #  define	COPYIFNAME(x, b, v) \
 				strncpy(b, ((ifinfo_t *)x)->ifi_name, \
@@ -613,7 +615,7 @@ typedef struct {
 #  define	WAKEUP(id,x)	wakeup(id+x)
 #  define	KFREE(x)	kmem_free((char *)(x), sizeof(*(x)))
 #  define	KFREES(x,s)	kmem_free((char *)(x), (s))
-#  define	GETIFP(n,v)	ifunit(n)
+#  define	GETIFP(n,v, ifs)	ifunit(n)
 #  include <sys/kmem.h>
 #  include <sys/ddi.h>
 #  define	KMALLOC(a,b)	(a) = (b)kmem_alloc(sizeof(*(a)), KM_NOSLEEP)
@@ -689,7 +691,7 @@ typedef struct mbuf mb_t;
 #  define	UIOMOVE(a,b,c,d)	uiomove((caddr_t)a, b, d)
 #  define	FREE_MB_T(m)		m_freem(m)
 #  define	MTOD(m,t)		mtod(m,t)
-#  define	GETIFP(n, v)		ifunit(n)
+#  define	GETIFP(n, v, ifs)	ifunit(n)
 #  define	GET_MINOR		getminor
 #  define	WAKEUP(id,x)		wakeup(id + x)
 #  define	COPYIN(a,b,c)	copyin((caddr_t)(a), (caddr_t)(b), (c))
@@ -1057,7 +1059,7 @@ typedef	u_int32_t	u_32_t;
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
 				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
-#  define	GETIFP(n, v)	ifunit(n, IFNAMSIZ)
+#  define	GETIFP(n, v, ifs)	ifunit(n, IFNAMSIZ)
 #  define	KFREE(x)	kmem_free((char *)(x), sizeof(*(x)))
 #  define	KFREES(x,s)	kmem_free((char *)(x), (s))
 #  define	SLEEP(id, n)	sleep((id), PZERO+1)
@@ -1467,7 +1469,7 @@ typedef	struct	mb_s	{
 # define	KMALLOCS(a,b,c)	(a) = (b)malloc(c)
 # define	KFREE(x)	free(x)
 # define	KFREES(x,s)	free(x)
-# define	GETIFP(x, v)	get_unit(x,v)
+# define	GETIFP(x, v, ifs)	get_unit(x,v, ifs)
 # define	COPYIN(a,b,c)	(bcopy((a), (b), (c)), 0)
 # define	COPYOUT(a,b,c)	(bcopy((a), (b), (c)), 0)
 # define	BCOPYIN(a,b,c)	(bcopy((a), (b), (c)), 0)
@@ -1616,7 +1618,7 @@ MALLOC_DECLARE(M_IPFILTER);
 #  define	UIOMOVE(a,b,c,d)	uiomove(a,b,d)
 #  define	SLEEP(id, n)	tsleep((id), PPAUSE|PCATCH, n, 0)
 #  define	WAKEUP(id,x)	wakeup(id+x)
-#  define	GETIFP(n, v)	ifunit(n)
+#  define	GETIFP(n, v, ifs)	ifunit(n)
 # endif /* (Free)BSD */
 
 # if !defined(USE_MUTEXES) && !defined(SPL_NET)

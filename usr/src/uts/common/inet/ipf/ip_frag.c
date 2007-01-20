@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,7 @@ struct file;
 #include "netinet/ip_frag.h"
 #include "netinet/ip_state.h"
 #include "netinet/ip_auth.h"
-#include "netinet/ip_proxy.h"
+#include "netinet/ipf_stack.h"
 #if (__FreeBSD_version >= 300000)
 # include <sys/malloc.h>
 # if defined(_KERNEL)
@@ -109,34 +109,9 @@ static const char sccsid[] = "@(#)ip_frag.c	1.11 3/24/96 (C) 1993-2000 Darren Re
 static const char rcsid[] = "@(#)$Id: ip_frag.c,v 2.77.2.5 2005/08/11 14:33:10 darrenr Exp $";
 #endif
 
-
-static ipfr_t   *ipfr_list = NULL;
-static ipfr_t   **ipfr_tail = &ipfr_list;
-static ipfr_t	**ipfr_heads;
-
-static ipfr_t   *ipfr_natlist = NULL;
-static ipfr_t   **ipfr_nattail = &ipfr_natlist;
-static ipfr_t	**ipfr_nattab;
-
-static ipfr_t   *ipfr_ipidlist = NULL;
-static ipfr_t   **ipfr_ipidtail = &ipfr_ipidlist;
-static ipfr_t	**ipfr_ipidtab;
-
-static ipfrstat_t ipfr_stats;
-static int	ipfr_inuse = 0;
-int		ipfr_size = IPFT_SIZE;
-
-int	fr_ipfrttl = 120;	/* 60 seconds */
-int	fr_frag_lock = 0;
-int	fr_frag_init = 0;
-u_long	fr_ticks = 0;
-
-
 static ipfr_t *ipfr_newfrag __P((fr_info_t *, u_32_t, ipfr_t **));
 static ipfr_t *fr_fraglookup __P((fr_info_t *, ipfr_t **));
-static void fr_fragdelete __P((ipfr_t *, ipfr_t ***));
-
-static frentry_t frblock;
+static void fr_fragdelete __P((ipfr_t *, ipfr_t ***, ipf_stack_t *));
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_fraginit                                                 */
@@ -145,31 +120,44 @@ static frentry_t frblock;
 /*                                                                          */
 /* Initialise the hash tables for the fragment cache lookups.               */
 /* ------------------------------------------------------------------------ */
-int fr_fraginit()
+int fr_fraginit(ifs)
+ipf_stack_t *ifs;
 {
-	KMALLOCS(ipfr_heads, ipfr_t **, ipfr_size * sizeof(ipfr_t *));
-	if (ipfr_heads == NULL)
-		return -1;
-	bzero((char *)ipfr_heads, ipfr_size * sizeof(ipfr_t *));
+	ifs->ifs_ipfr_tail = &ifs->ifs_ipfr_list;
+	ifs->ifs_ipfr_nattail = &ifs->ifs_ipfr_natlist;
+	ifs->ifs_ipfr_ipidtail = &ifs->ifs_ipfr_ipidlist;
+	ifs->ifs_ipfr_size = IPFT_SIZE;
+	ifs->ifs_fr_ipfrttl = 120;	/* 60 seconds */
 
-	KMALLOCS(ipfr_nattab, ipfr_t **, ipfr_size * sizeof(ipfr_t *));
-	if (ipfr_nattab == NULL)
+	KMALLOCS(ifs->ifs_ipfr_heads, ipfr_t **,
+	    ifs->ifs_ipfr_size * sizeof(ipfr_t *));
+	if (ifs->ifs_ipfr_heads == NULL)
 		return -1;
-	bzero((char *)ipfr_nattab, ipfr_size * sizeof(ipfr_t *));
+	bzero((char *)ifs->ifs_ipfr_heads,
+	    ifs->ifs_ipfr_size * sizeof(ipfr_t *));
 
-	KMALLOCS(ipfr_ipidtab, ipfr_t **, ipfr_size * sizeof(ipfr_t *));
-	if (ipfr_ipidtab == NULL)
+	KMALLOCS(ifs->ifs_ipfr_nattab, ipfr_t **,
+	    ifs->ifs_ipfr_size * sizeof(ipfr_t *));
+	if (ifs->ifs_ipfr_nattab == NULL)
 		return -1;
-	bzero((char *)ipfr_ipidtab, ipfr_size * sizeof(ipfr_t *));
+	bzero((char *)ifs->ifs_ipfr_nattab,
+	    ifs->ifs_ipfr_size * sizeof(ipfr_t *));
 
-	RWLOCK_INIT(&ipf_frag, "ipf fragment rwlock");
+	KMALLOCS(ifs->ifs_ipfr_ipidtab, ipfr_t **,
+	    ifs->ifs_ipfr_size * sizeof(ipfr_t *));
+	if (ifs->ifs_ipfr_ipidtab == NULL)
+		return -1;
+	bzero((char *)ifs->ifs_ipfr_ipidtab,
+	    ifs->ifs_ipfr_size * sizeof(ipfr_t *));
+
+	RWLOCK_INIT(&ifs->ifs_ipf_frag, "ipf fragment rwlock");
 
 	/* Initialise frblock with "block in all" */
-	bzero((char *)&frblock, sizeof(frblock));
-	frblock.fr_flags = FR_BLOCK|FR_INQUE;	/* block in */
-	frblock.fr_ref = 1;
+	bzero((char *)&ifs->ifs_frblock, sizeof(ifs->ifs_frblock));
+	ifs->ifs_frblock.fr_flags = FR_BLOCK|FR_INQUE;	/* block in */
+	ifs->ifs_frblock.fr_ref = 1;
 
-	fr_frag_init = 1;
+	ifs->ifs_fr_frag_init = 1;
 
 	return 0;
 }
@@ -182,26 +170,33 @@ int fr_fraginit()
 /*                                                                          */
 /* Free all memory allocated whilst running and from initialisation.        */
 /* ------------------------------------------------------------------------ */
-void fr_fragunload()
+void fr_fragunload(ifs)
+ipf_stack_t *ifs;
 {
-	if (fr_frag_init == 1) {
-		fr_fragclear();
+	if (ifs->ifs_fr_frag_init == 1) {
+		fr_fragclear(ifs);
 
-		RW_DESTROY(&ipf_frag);
-		fr_frag_init = 0;
+		RW_DESTROY(&ifs->ifs_ipf_frag);
+		ifs->ifs_fr_frag_init = 0;
 	}
 
-	if (ipfr_heads != NULL)
-		KFREES(ipfr_heads, ipfr_size * sizeof(ipfr_t *));
-	ipfr_heads = NULL;
+	if (ifs->ifs_ipfr_heads != NULL) {
+		KFREES(ifs->ifs_ipfr_heads,
+		    ifs->ifs_ipfr_size * sizeof(ipfr_t *));
+	}
+	ifs->ifs_ipfr_heads = NULL;
 
-	if (ipfr_nattab != NULL)
-		KFREES(ipfr_nattab, ipfr_size * sizeof(ipfr_t *));
-	ipfr_nattab = NULL;
+	if (ifs->ifs_ipfr_nattab != NULL) {
+		KFREES(ifs->ifs_ipfr_nattab,
+		    ifs->ifs_ipfr_size * sizeof(ipfr_t *));
+	}
+	ifs->ifs_ipfr_nattab = NULL;
 
-	if (ipfr_ipidtab != NULL)
-		KFREES(ipfr_ipidtab, ipfr_size * sizeof(ipfr_t *));
-	ipfr_ipidtab = NULL;
+	if (ifs->ifs_ipfr_ipidtab != NULL) {
+		KFREES(ifs->ifs_ipfr_ipidtab,
+		    ifs->ifs_ipfr_size * sizeof(ipfr_t *));
+	}
+	ifs->ifs_ipfr_ipidtab = NULL;
 }
 
 
@@ -212,12 +207,13 @@ void fr_fragunload()
 /*                                                                          */
 /* Updates ipfr_stats with current information and returns a pointer to it  */
 /* ------------------------------------------------------------------------ */
-ipfrstat_t *fr_fragstats()
+ipfrstat_t *fr_fragstats(ifs)
+ipf_stack_t *ifs;
 {
-	ipfr_stats.ifs_table = ipfr_heads;
-	ipfr_stats.ifs_nattab = ipfr_nattab;
-	ipfr_stats.ifs_inuse = ipfr_inuse;
-	return &ipfr_stats;
+	ifs->ifs_ipfr_stats.ifs_table = ifs->ifs_ipfr_heads;
+	ifs->ifs_ipfr_stats.ifs_nattab = ifs->ifs_ipfr_nattab;
+	ifs->ifs_ipfr_stats.ifs_inuse = ifs->ifs_ipfr_inuse;
+	return &ifs->ifs_ipfr_stats;
 }
 
 
@@ -237,8 +233,9 @@ ipfr_t *table[];
 {
 	ipfr_t *fra, frag;
 	u_int idx, off;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (ipfr_inuse >= IPFT_SIZE)
+	if (ifs->ifs_ipfr_inuse >= IPFT_SIZE)
 		return NULL;
 
 	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG)
@@ -270,7 +267,7 @@ ipfr_t *table[];
 	for (fra = table[idx]; (fra != NULL); fra = fra->ipfr_hnext)
 		if (!bcmp((char *)&frag.ipfr_ifp, (char *)&fra->ipfr_ifp,
 			  IPFR_CMPSZ)) {
-			ipfr_stats.ifs_exists++;
+			ifs->ifs_ipfr_stats.ifs_exists++;
 			return NULL;
 		}
 
@@ -280,7 +277,7 @@ ipfr_t *table[];
 	 */
 	KMALLOC(fra, ipfr_t *);
 	if (fra == NULL) {
-		ipfr_stats.ifs_nomem++;
+		ifs->ifs_ipfr_stats.ifs_nomem++;
 		return NULL;
 	}
 
@@ -306,7 +303,7 @@ ipfr_t *table[];
 	fra->ipfr_data = NULL;
 	table[idx] = fra;
 	bcopy((char *)&frag.ipfr_ifp, (char *)&fra->ipfr_ifp, IPFR_CMPSZ);
-	fra->ipfr_ttl = fr_ticks + fr_ipfrttl;
+	fra->ipfr_ttl = ifs->ifs_fr_ticks + ifs->ifs_fr_ipfrttl;
 
 	/*
 	 * Compute the offset of the expected start of the next packet.
@@ -321,8 +318,9 @@ ipfr_t *table[];
 	}
 	fra->ipfr_off = off + fin->fin_dlen;
 	fra->ipfr_pass = pass;
-	ipfr_stats.ifs_new++;
-	ipfr_inuse++;
+	fra->ipfr_ref = 1;
+	ifs->ifs_ipfr_stats.ifs_new++;
+	ifs->ifs_ipfr_inuse++;
 	return fra;
 }
 
@@ -339,21 +337,22 @@ u_32_t pass;
 fr_info_t *fin;
 {
 	ipfr_t	*fra;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (fr_frag_lock != 0)
+	if (ifs->ifs_fr_frag_lock != 0)
 		return -1;
 
-	WRITE_ENTER(&ipf_frag);
-	fra = ipfr_newfrag(fin, pass, ipfr_heads);
+	WRITE_ENTER(&ifs->ifs_ipf_frag);
+	fra = ipfr_newfrag(fin, pass, ifs->ifs_ipfr_heads);
 	if (fra != NULL) {
-		*ipfr_tail = fra;
-		fra->ipfr_prev = ipfr_tail;
-		ipfr_tail = &fra->ipfr_next;
-		if (ipfr_list == NULL)
-			ipfr_list = fra;
+		*ifs->ifs_ipfr_tail = fra;
+		fra->ipfr_prev = ifs->ifs_ipfr_tail;
+		ifs->ifs_ipfr_tail = &fra->ipfr_next;
+		if (ifs->ifs_ipfr_list == NULL)
+			ifs->ifs_ipfr_list = fra;
 		fra->ipfr_next = NULL;
 	}
-	RWLOCK_EXIT(&ipf_frag);
+	RWLOCK_EXIT(&ifs->ifs_ipf_frag);
 	return fra ? 0 : -1;
 }
 
@@ -373,21 +372,22 @@ u_32_t pass;
 nat_t *nat;
 {
 	ipfr_t	*fra;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if ((fin->fin_v != 4) || (fr_frag_lock != 0))
+	if ((fin->fin_v != 4) || (ifs->ifs_fr_frag_lock != 0))
 		return 0;
 
-	WRITE_ENTER(&ipf_natfrag);
-	fra = ipfr_newfrag(fin, pass, ipfr_nattab);
+	WRITE_ENTER(&ifs->ifs_ipf_natfrag);
+	fra = ipfr_newfrag(fin, pass, ifs->ifs_ipfr_nattab);
 	if (fra != NULL) {
 		fra->ipfr_data = nat;
 		nat->nat_data = fra;
-		*ipfr_nattail = fra;
-		fra->ipfr_prev = ipfr_nattail;
-		ipfr_nattail = &fra->ipfr_next;
+		*ifs->ifs_ipfr_nattail = fra;
+		fra->ipfr_prev = ifs->ifs_ipfr_nattail;
+		ifs->ifs_ipfr_nattail = &fra->ipfr_next;
 		fra->ipfr_next = NULL;
 	}
-	RWLOCK_EXIT(&ipf_natfrag);
+	RWLOCK_EXIT(&ifs->ifs_ipf_natfrag);
 	return fra ? 0 : -1;
 }
 
@@ -406,20 +406,21 @@ fr_info_t *fin;
 u_32_t ipid;
 {
 	ipfr_t	*fra;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (fr_frag_lock)
+	if (ifs->ifs_fr_frag_lock)
 		return 0;
 
-	WRITE_ENTER(&ipf_ipidfrag);
-	fra = ipfr_newfrag(fin, 0, ipfr_ipidtab);
+	WRITE_ENTER(&ifs->ifs_ipf_ipidfrag);
+	fra = ipfr_newfrag(fin, 0, ifs->ifs_ipfr_ipidtab);
 	if (fra != NULL) {
 		fra->ipfr_data = (void *)(uintptr_t)ipid;
-		*ipfr_ipidtail = fra;
-		fra->ipfr_prev = ipfr_ipidtail;
-		ipfr_ipidtail = &fra->ipfr_next;
+		*ifs->ifs_ipfr_ipidtail = fra;
+		fra->ipfr_prev = ifs->ifs_ipfr_ipidtail;
+		ifs->ifs_ipfr_ipidtail = &fra->ipfr_next;
 		fra->ipfr_next = NULL;
 	}
-	RWLOCK_EXIT(&ipf_ipidfrag);
+	RWLOCK_EXIT(&ifs->ifs_ipf_ipidfrag);
 	return fra ? 0 : -1;
 }
 
@@ -440,6 +441,7 @@ ipfr_t *table[];
 {
 	ipfr_t *f, frag;
 	u_int idx;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG)
 		return NULL;
@@ -485,7 +487,7 @@ ipfr_t *table[];
 			 * packets had been seen.
 			 */
 			if (fin->fin_flx & FI_SHORT) {
-				ATOMIC_INCL(ipfr_stats.ifs_short);
+				ATOMIC_INCL(ifs->ifs_ipfr_stats.ifs_short);
 				continue;
 			}
 
@@ -498,7 +500,7 @@ ipfr_t *table[];
 			off = fin->fin_off; /* same as in ipfr_newfrag() */
 			if (f->ipfr_seen0) {
 				if (off == 0) {
-					ATOMIC_INCL(ipfr_stats.ifs_retrans0);
+					ATOMIC_INCL(ifs->ifs_ipfr_stats.ifs_retrans0);
 					continue;
 				}
 			} else if (off == 0) {
@@ -536,11 +538,11 @@ ipfr_t *table[];
 			 */
 			if (off == f->ipfr_off) {
 				if (!(fin->fin_ip->ip_off & IP_MF))
-					f->ipfr_ttl = fr_ticks + 1;
+					f->ipfr_ttl = ifs->ifs_fr_ticks + 1;
 				f->ipfr_off = fin->fin_dlen + off;
 			} else if (f->ipfr_pass & FR_FRSTRICT)
 				continue;
-			ATOMIC_INCL(ipfr_stats.ifs_hits);
+			ATOMIC_INCL(ifs->ifs_ipfr_stats.ifs_hits);
 			return f;
 		}
 	return NULL;
@@ -560,23 +562,24 @@ fr_info_t *fin;
 {
 	nat_t	*nat;
 	ipfr_t	*ipf;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if ((fin->fin_v != 4) || (fr_frag_lock) || !ipfr_natlist)
+	if ((fin->fin_v != 4) || (ifs->ifs_fr_frag_lock) || !ifs->ifs_ipfr_natlist)
 		return NULL;
-	READ_ENTER(&ipf_natfrag);
-	ipf = fr_fraglookup(fin, ipfr_nattab);
+	READ_ENTER(&ifs->ifs_ipf_natfrag);
+	ipf = fr_fraglookup(fin, ifs->ifs_ipfr_nattab);
 	if (ipf != NULL) {
 		nat = ipf->ipfr_data;
 		/*
 		 * This is the last fragment for this packet.
 		 */
-		if ((ipf->ipfr_ttl == fr_ticks + 1) && (nat != NULL)) {
+		if ((ipf->ipfr_ttl == ifs->ifs_fr_ticks + 1) && (nat != NULL)) {
 			nat->nat_data = NULL;
 			ipf->ipfr_data = NULL;
 		}
 	} else
 		nat = NULL;
-	RWLOCK_EXIT(&ipf_natfrag);
+	RWLOCK_EXIT(&ifs->ifs_ipf_natfrag);
 	return nat;
 }
 
@@ -594,17 +597,18 @@ fr_info_t *fin;
 {
 	ipfr_t	*ipf;
 	u_32_t	id;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if ((fin->fin_v != 4) || (fr_frag_lock) || !ipfr_ipidlist)
+	if ((fin->fin_v != 4) || (ifs->ifs_fr_frag_lock) || !ifs->ifs_ipfr_ipidlist)
 		return 0xffffffff;
 
-	READ_ENTER(&ipf_ipidfrag);
-	ipf = fr_fraglookup(fin, ipfr_ipidtab);
+	READ_ENTER(&ifs->ifs_ipf_ipidfrag);
+	ipf = fr_fraglookup(fin, ifs->ifs_ipfr_ipidtab);
 	if (ipf != NULL)
 		id = (u_32_t)(uintptr_t)ipf->ipfr_data;
 	else
 		id = 0xffffffff;
-	RWLOCK_EXIT(&ipf_ipidfrag);
+	RWLOCK_EXIT(&ifs->ifs_ipf_ipidfrag);
 	return id;
 }
 
@@ -627,13 +631,14 @@ u_32_t *passp;
 	frentry_t *fr = NULL;
 	ipfr_t	*fra;
 	u_32_t pass, oflx;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if ((fr_frag_lock) || (ipfr_list == NULL))
+	if ((ifs->ifs_fr_frag_lock) || (ifs->ifs_ipfr_list == NULL))
 		return NULL;
 
-	READ_ENTER(&ipf_frag);
+	READ_ENTER(&ifs->ifs_ipf_frag);
 	oflx = fin->fin_flx;
-	fra = fr_fraglookup(fin, ipfr_heads);
+	fra = fr_fraglookup(fin, ifs->ifs_ipfr_heads);
 	if (fra != NULL) {
 		fr = fra->ipfr_rule;
 		fin->fin_fr = fr;
@@ -647,9 +652,9 @@ u_32_t *passp;
 	if (!(oflx & FI_BAD) && (fin->fin_flx & FI_BAD)) {
 		*passp &= ~FR_CMDMASK;
 		*passp |= FR_BLOCK;
-		fr = &frblock;
+		fr = &ifs->ifs_frblock;
 	}
-	RWLOCK_EXIT(&ipf_frag);
+	RWLOCK_EXIT(&ifs->ifs_ipf_frag);
 	return fr;
 }
 
@@ -662,16 +667,17 @@ u_32_t *passp;
 /* Search through all of the fragment cache entries and wherever a pointer  */
 /* is found to match ptr, reset it to NULL.                                 */
 /* ------------------------------------------------------------------------ */
-void fr_forget(ptr)
+void fr_forget(ptr, ifs)
 void *ptr;
+ipf_stack_t *ifs;
 {
 	ipfr_t	*fr;
 
-	WRITE_ENTER(&ipf_frag);
-	for (fr = ipfr_list; fr; fr = fr->ipfr_next)
+	WRITE_ENTER(&ifs->ifs_ipf_frag);
+	for (fr = ifs->ifs_ipfr_list; fr; fr = fr->ipfr_next)
 		if (fr->ipfr_data == ptr)
 			fr->ipfr_data = NULL;
-	RWLOCK_EXIT(&ipf_frag);
+	RWLOCK_EXIT(&ifs->ifs_ipf_frag);
 }
 
 
@@ -683,16 +689,17 @@ void *ptr;
 /* Search through all of the fragment cache entries for NAT and wherever a  */
 /* pointer  is found to match ptr, reset it to NULL.                        */
 /* ------------------------------------------------------------------------ */
-void fr_forgetnat(ptr)
+void fr_forgetnat(ptr, ifs)
 void *ptr;
+ipf_stack_t *ifs;
 {
 	ipfr_t	*fr;
 
-	WRITE_ENTER(&ipf_natfrag);
-	for (fr = ipfr_natlist; fr; fr = fr->ipfr_next)
+	WRITE_ENTER(&ifs->ifs_ipf_natfrag);
+	for (fr = ifs->ifs_ipfr_natlist; fr; fr = fr->ipfr_next)
 		if (fr->ipfr_data == ptr)
 			fr->ipfr_data = NULL;
-	RWLOCK_EXIT(&ipf_natfrag);
+	RWLOCK_EXIT(&ifs->ifs_ipf_natfrag);
 }
 
 
@@ -707,14 +714,15 @@ void *ptr;
 /* the filter rule it is associated with it if it is no longer used as a    */
 /* result of decreasing the reference count.                                */
 /* ------------------------------------------------------------------------ */
-static void fr_fragdelete(fra, tail)
+static void fr_fragdelete(fra, tail, ifs)
 ipfr_t *fra, ***tail;
+ipf_stack_t *ifs;
 {
 	frentry_t *fr;
 
 	fr = fra->ipfr_rule;
 	if (fr != NULL)
-		(void)fr_derefrule(&fr);
+	    (void)fr_derefrule(&fr, ifs);
 
 	if (fra->ipfr_next)
 		fra->ipfr_next->ipfr_prev = fra->ipfr_prev;
@@ -725,7 +733,9 @@ ipfr_t *fra, ***tail;
 	if (fra->ipfr_hnext)
 		fra->ipfr_hnext->ipfr_hprev = fra->ipfr_hprev;
 	*fra->ipfr_hprev = fra->ipfr_hnext;
-	KFREE(fra);
+
+	if (fra->ipfr_ref <= 0)
+		KFREE(fra);
 }
 
 
@@ -737,30 +747,34 @@ ipfr_t *fra, ***tail;
 /* Free memory in use by fragment state information kept.  Do the normal    */
 /* fragment state stuff first and then the NAT-fragment table.              */
 /* ------------------------------------------------------------------------ */
-void fr_fragclear()
+void fr_fragclear(ifs)
+ipf_stack_t *ifs;
 {
 	ipfr_t	*fra;
 	nat_t	*nat;
 
-	WRITE_ENTER(&ipf_frag);
-	while ((fra = ipfr_list) != NULL)
-		fr_fragdelete(fra, &ipfr_tail);
-	ipfr_tail = &ipfr_list;
-	RWLOCK_EXIT(&ipf_frag);
+	WRITE_ENTER(&ifs->ifs_ipf_frag);
+	while ((fra = ifs->ifs_ipfr_list) != NULL) {
+		fra->ipfr_ref--;
+		fr_fragdelete(fra, &ifs->ifs_ipfr_tail, ifs);
+	}
+	ifs->ifs_ipfr_tail = &ifs->ifs_ipfr_list;
+	RWLOCK_EXIT(&ifs->ifs_ipf_frag);
 
-	WRITE_ENTER(&ipf_nat);
-	WRITE_ENTER(&ipf_natfrag);
-	while ((fra = ipfr_natlist) != NULL) {
+	WRITE_ENTER(&ifs->ifs_ipf_nat);
+	WRITE_ENTER(&ifs->ifs_ipf_natfrag);
+	while ((fra = ifs->ifs_ipfr_natlist) != NULL) {
 		nat = fra->ipfr_data;
 		if (nat != NULL) {
 			if (nat->nat_data == fra)
 				nat->nat_data = NULL;
 		}
-		fr_fragdelete(fra, &ipfr_nattail);
+		fra->ipfr_ref--;
+		fr_fragdelete(fra, &ifs->ifs_ipfr_nattail, ifs);
 	}
-	ipfr_nattail = &ipfr_natlist;
-	RWLOCK_EXIT(&ipf_natfrag);
-	RWLOCK_EXIT(&ipf_nat);
+	ifs->ifs_ipfr_nattail = &ifs->ifs_ipfr_natlist;
+	RWLOCK_EXIT(&ifs->ifs_ipf_natfrag);
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 }
 
 
@@ -771,39 +785,43 @@ void fr_fragclear()
 /*                                                                          */
 /* Expire entries in the fragment cache table that have been there too long */
 /* ------------------------------------------------------------------------ */
-void fr_fragexpire()
+void fr_fragexpire(ifs)
+ipf_stack_t *ifs;
 {
 	ipfr_t	**fp, *fra;
 	nat_t	*nat;
 	SPL_INT(s);
 
-	if (fr_frag_lock)
+	if (ifs->ifs_fr_frag_lock)
 		return;
 
 	SPL_NET(s);
-	WRITE_ENTER(&ipf_frag);
+	WRITE_ENTER(&ifs->ifs_ipf_frag);
 	/*
 	 * Go through the entire table, looking for entries to expire,
-	 * which is indicated by the ttl being less than or equal to fr_ticks.
+	 * which is indicated by the ttl being less than or equal to
+	 * ifs_fr_ticks.
 	 */
-	for (fp = &ipfr_list; ((fra = *fp) != NULL); ) {
-		if (fra->ipfr_ttl > fr_ticks)
+	for (fp = &ifs->ifs_ipfr_list; ((fra = *fp) != NULL); ) {
+		if (fra->ipfr_ttl > ifs->ifs_fr_ticks)
 			break;
-		fr_fragdelete(fra, &ipfr_tail);
-		ipfr_stats.ifs_expire++;
-		ipfr_inuse--;
+		fra->ipfr_ref--;
+		fr_fragdelete(fra, &ifs->ifs_ipfr_tail, ifs);
+		ifs->ifs_ipfr_stats.ifs_expire++;
+		ifs->ifs_ipfr_inuse--;
 	}
-	RWLOCK_EXIT(&ipf_frag);
+	RWLOCK_EXIT(&ifs->ifs_ipf_frag);
 
-	WRITE_ENTER(&ipf_ipidfrag);
-	for (fp = &ipfr_ipidlist; ((fra = *fp) != NULL); ) {
-		if (fra->ipfr_ttl > fr_ticks)
+	WRITE_ENTER(&ifs->ifs_ipf_ipidfrag);
+	for (fp = &ifs->ifs_ipfr_ipidlist; ((fra = *fp) != NULL); ) {
+		if (fra->ipfr_ttl > ifs->ifs_fr_ticks)
 			break;
-		fr_fragdelete(fra, &ipfr_ipidtail);
-		ipfr_stats.ifs_expire++;
-		ipfr_inuse--;
+		fra->ipfr_ref--;
+		fr_fragdelete(fra, &ifs->ifs_ipfr_ipidtail, ifs);
+		ifs->ifs_ipfr_stats.ifs_expire++;
+		ifs->ifs_ipfr_inuse--;
 	}
-	RWLOCK_EXIT(&ipf_ipidfrag);
+	RWLOCK_EXIT(&ifs->ifs_ipf_ipidfrag);
 
 	/*
 	 * Same again for the NAT table, except that if the structure also
@@ -812,22 +830,23 @@ void fr_fragexpire()
 	 * NOTE: We need to grab both mutex's early, and in this order so as
 	 * to prevent a deadlock if both try to expire at the same time.
 	 */
-	WRITE_ENTER(&ipf_nat);
-	WRITE_ENTER(&ipf_natfrag);
-	for (fp = &ipfr_natlist; ((fra = *fp) != NULL); ) {
-		if (fra->ipfr_ttl > fr_ticks)
+	WRITE_ENTER(&ifs->ifs_ipf_nat);
+	WRITE_ENTER(&ifs->ifs_ipf_natfrag);
+	for (fp = &ifs->ifs_ipfr_natlist; ((fra = *fp) != NULL); ) {
+		if (fra->ipfr_ttl > ifs->ifs_fr_ticks)
 			break;
 		nat = fra->ipfr_data;
 		if (nat != NULL) {
 			if (nat->nat_data == fra)
 				nat->nat_data = NULL;
 		}
-		fr_fragdelete(fra, &ipfr_nattail);
-		ipfr_stats.ifs_expire++;
-		ipfr_inuse--;
+		fra->ipfr_ref--;
+		fr_fragdelete(fra, &ifs->ifs_ipfr_nattail, ifs);
+		ifs->ifs_ipfr_stats.ifs_expire++;
+		ifs->ifs_ipfr_inuse--;
 	}
-	RWLOCK_EXIT(&ipf_natfrag);
-	RWLOCK_EXIT(&ipf_nat);
+	RWLOCK_EXIT(&ifs->ifs_ipf_natfrag);
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 	SPL_X(s);
 }
 
@@ -843,19 +862,21 @@ void fr_fragexpire()
 #if !defined(_KERNEL) || (!SOLARIS && !defined(__hpux) && !defined(__sgi) && \
 			  !defined(__osf__) && !defined(linux))
 # if defined(_KERNEL) && ((BSD >= 199103) || defined(__sgi))
-void fr_slowtimer __P((void *ptr))
+void fr_slowtimer __P((void *arg))
 # else
-int fr_slowtimer()
+int fr_slowtimer(void *arg)
 # endif
 {
-	READ_ENTER(&ipf_global);
+	ipf_stack_t *ifs = arg;
 
-	fr_fragexpire();
-	fr_timeoutstate();
-	fr_natexpire();
-	fr_authexpire();
-	fr_ticks++;
-	if (fr_running <= 0)
+	READ_ENTER(&ifs->ifs_ipf_global);
+
+	fr_fragexpire(ifs);
+	fr_timeoutstate(ifs);
+	fr_natexpire(ifs);
+	fr_authexpire(ifs);
+	ifs->ifs_fr_ticks++;
+	if (ifs->ifs_fr_running <= 0)
 		goto done;
 # ifdef _KERNEL
 #  if defined(__NetBSD__) && (__NetBSD_Version__ >= 104240000)
@@ -877,9 +898,74 @@ int fr_slowtimer()
 #  endif /* NetBSD */
 # endif
 done:
-	RWLOCK_EXIT(&ipf_global);
+	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 # if (BSD < 199103) || !defined(_KERNEL)
 	return 0;
 # endif
 }
 #endif /* !SOLARIS && !defined(__hpux) && !defined(__sgi) */
+
+/*ARGSUSED*/
+int fr_nextfrag(token, itp, top, tail, lock, ifs)
+ipftoken_t *token;
+ipfgeniter_t *itp;
+ipfr_t **top, ***tail;
+ipfrwlock_t *lock;
+ipf_stack_t *ifs;
+{
+	ipfr_t *frag, *next, zero;
+	int error = 0;
+
+	frag = token->ipt_data;
+	if (frag == (ipfr_t *)-1) {
+		ipf_freetoken(token, ifs);
+		return ESRCH;
+	}
+
+	READ_ENTER(lock);
+	if (frag == NULL)
+		next = *top;
+	else
+		next = frag->ipfr_next;
+
+	if (next != NULL) {
+		ATOMIC_INC(next->ipfr_ref);
+		token->ipt_data = next;
+	} else {
+		bzero(&zero, sizeof(zero));
+		next = &zero;
+		token->ipt_data = (void *)-1;
+	}
+	RWLOCK_EXIT(lock);
+
+	if (frag != NULL) {
+		fr_fragderef(&frag, lock, ifs);
+	}
+
+	error = COPYOUT(next, itp->igi_data, sizeof(*next));
+	if (error != 0)
+		error = EFAULT;
+
+	return error;
+}
+
+
+void fr_fragderef(frp, lock, ifs)
+ipfr_t **frp;
+ipfrwlock_t *lock;
+ipf_stack_t *ifs;
+{
+	ipfr_t *fra;
+
+	fra = *frp;
+	*frp = NULL;
+
+	WRITE_ENTER(lock);
+	fra->ipfr_ref--;
+	if (fra->ipfr_ref <= 0) {
+		KFREE(fra);
+		ifs->ifs_ipfr_stats.ifs_expire++;
+		ifs->ifs_ipfr_inuse--;
+	}
+	RWLOCK_EXIT(lock);
+}

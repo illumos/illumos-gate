@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,8 @@
 #include <inet/ip6.h>
 #include <inet/tcp.h>
 #include <netinet/udp.h>
+#include <inet/ipsec_impl.h>
+#include <inet/sadb.h>
 #include <inet/ipsecesp.h>
 #include <inet/ipsecah.h>
 

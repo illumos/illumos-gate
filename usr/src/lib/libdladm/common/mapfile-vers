@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,6 +33,7 @@ SUNWprivate_1.1 {
 	dladm_get_prop;
 	dladm_set_prop;
 	dladm_walk_prop;
+	dladm_is_prop_temponly;
 	dladm_get_secobj;
 	dladm_set_secobj;
 	dladm_unset_secobj;
@@ -44,6 +45,8 @@ SUNWprivate_1.1 {
 	dladm_init_secobj;
 	dladm_set_rootdir;
 
+	dladm_hold_link;
+	dladm_rele_link;
     local:
 	*;
 };

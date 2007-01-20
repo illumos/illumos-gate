@@ -111,58 +111,6 @@
 extern squeue_func_t ip_input_proc;
 
 /*
- * IP statistics.
- */
-#define	IP6_STAT(x)		(ip6_statistics.x.value.ui64++)
-#define	IP6_STAT_UPDATE(x, n)	(ip6_statistics.x.value.ui64 += (n))
-
-typedef struct ip6_stat {
-	kstat_named_t	ip6_udp_fast_path;
-	kstat_named_t	ip6_udp_slow_path;
-	kstat_named_t	ip6_udp_fannorm;
-	kstat_named_t	ip6_udp_fanmb;
-	kstat_named_t   ip6_out_sw_cksum;
-	kstat_named_t   ip6_in_sw_cksum;
-	kstat_named_t	ip6_tcp_in_full_hw_cksum_err;
-	kstat_named_t	ip6_tcp_in_part_hw_cksum_err;
-	kstat_named_t	ip6_tcp_in_sw_cksum_err;
-	kstat_named_t	ip6_tcp_out_sw_cksum_bytes;
-	kstat_named_t	ip6_udp_in_full_hw_cksum_err;
-	kstat_named_t	ip6_udp_in_part_hw_cksum_err;
-	kstat_named_t	ip6_udp_in_sw_cksum_err;
-	kstat_named_t	ip6_udp_out_sw_cksum_bytes;
-	kstat_named_t	ip6_frag_mdt_pkt_out;
-	kstat_named_t	ip6_frag_mdt_discarded;
-	kstat_named_t	ip6_frag_mdt_allocfail;
-	kstat_named_t	ip6_frag_mdt_addpdescfail;
-	kstat_named_t	ip6_frag_mdt_allocd;
-} ip6_stat_t;
-
-static ip6_stat_t ip6_statistics = {
-	{ "ip6_udp_fast_path",			KSTAT_DATA_UINT64 },
-	{ "ip6_udp_slow_path",			KSTAT_DATA_UINT64 },
-	{ "ip6_udp_fannorm",			KSTAT_DATA_UINT64 },
-	{ "ip6_udp_fanmb",			KSTAT_DATA_UINT64 },
-	{ "ip6_out_sw_cksum",			KSTAT_DATA_UINT64 },
-	{ "ip6_in_sw_cksum",			KSTAT_DATA_UINT64 },
-	{ "ip6_tcp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },
-	{ "ip6_tcp_in_part_hw_cksum_err",	KSTAT_DATA_UINT64 },
-	{ "ip6_tcp_in_sw_cksum_err",		KSTAT_DATA_UINT64 },
-	{ "ip6_tcp_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
-	{ "ip6_udp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },
-	{ "ip6_udp_in_part_hw_cksum_err",	KSTAT_DATA_UINT64 },
-	{ "ip6_udp_in_sw_cksum_err",		KSTAT_DATA_UINT64 },
-	{ "ip6_udp_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
-	{ "ip6_frag_mdt_pkt_out",		KSTAT_DATA_UINT64 },
-	{ "ip6_frag_mdt_discarded",		KSTAT_DATA_UINT64 },
-	{ "ip6_frag_mdt_allocfail",		KSTAT_DATA_UINT64 },
-	{ "ip6_frag_mdt_addpdescfail",		KSTAT_DATA_UINT64 },
-	{ "ip6_frag_mdt_allocd",		KSTAT_DATA_UINT64 },
-};
-
-static kstat_t *ip6_kstat;
-
-/*
  * Naming conventions:
  *      These rules should be judiciously applied
  *	if there is a need to identify something as IPv6 versus IPv4
@@ -180,22 +128,12 @@ static kstat_t *ip6_kstat;
  */
 
 /*
- * IPv6 mibs when the interface (ill) is not known.
- * When the ill is known the per-interface mib in the ill is used.
- */
-mib2_ipIfStatsEntry_t	ip6_mib;
-mib2_ipv6IfIcmpEntry_t	icmp6_mib;
-
-/*
  * ip6opt_ls is used to enable IPv6 (via /etc/system on TX systems).
  * We need to do this because we didn't obtain the IP6OPT_LS (0x0a)
  * from IANA. This mechanism will remain in effect until an official
  * number is obtained.
  */
 uchar_t ip6opt_ls;
-
-uint_t ipv6_ire_default_count;	/* Number of IPv6 IRE_DEFAULT entries */
-uint_t ipv6_ire_default_index;	/* Walking IPv6 index used to mod in */
 
 const in6_addr_t ipv6_all_ones =
 	{ 0xffffffffU, 0xffffffffU, 0xffffffffU, 0xffffffffU };
@@ -239,11 +177,6 @@ const in6_addr_t ipv6_solicited_node_mcast =
 			{ 0x000002ffU, 0, 0x01000000U, 0x000000ffU };
 #endif /* _BIG_ENDIAN */
 
-/*
- * Used by icmp_send_redirect_v6 for picking random src.
- */
-uint_t	icmp_redirect_v6_src_index;
-
 /* Leave room for ip_newroute to tack on the src and target addresses */
 #define	OK_RESOLVER_MP_V6(mp)						\
 		((mp) && ((mp)->b_wptr - (mp)->b_rptr) >= (2 * IPV6_ADDR_LEN))
@@ -251,13 +184,13 @@ uint_t	icmp_redirect_v6_src_index;
 static void	icmp_inbound_too_big_v6(queue_t *, mblk_t *, ill_t *ill,
     boolean_t, zoneid_t);
 static void	icmp_pkt_v6(queue_t *, mblk_t *, void *, size_t,
-    const in6_addr_t *, boolean_t, zoneid_t);
+    const in6_addr_t *, boolean_t, zoneid_t, ip_stack_t *);
 static void	icmp_redirect_v6(queue_t *, mblk_t *, ill_t *ill);
 static int	ip_bind_connected_v6(conn_t *, mblk_t *, in6_addr_t *,
     uint16_t, const in6_addr_t *, ip6_pkt_t *, uint16_t,
     boolean_t, boolean_t, boolean_t, boolean_t);
 static boolean_t ip_bind_insert_ire_v6(mblk_t *, ire_t *, const in6_addr_t *,
-    iulp_t *);
+    iulp_t *, ip_stack_t *);
 static int	ip_bind_laddr_v6(conn_t *, mblk_t *, const in6_addr_t *,
     uint16_t, boolean_t, boolean_t, boolean_t);
 static void	ip_fanout_proto_v6(queue_t *, mblk_t *, ip6_t *, ill_t *,
@@ -267,10 +200,10 @@ static void	ip_fanout_tcp_v6(queue_t *, mblk_t *, ip6_t *, ill_t *,
 static void	ip_fanout_udp_v6(queue_t *, mblk_t *, ip6_t *, uint32_t,
     ill_t *, ill_t *, uint_t, boolean_t, zoneid_t);
 static int	ip_process_options_v6(queue_t *, mblk_t *, ip6_t *,
-    uint8_t *, uint_t, uint8_t);
+    uint8_t *, uint_t, uint8_t, ip_stack_t *);
 static mblk_t	*ip_rput_frag_v6(queue_t *, mblk_t *, ip6_t *,
     ip6_frag_t *, uint_t, uint_t *, uint32_t *, uint16_t *);
-static boolean_t	ip_source_routed_v6(ip6_t *, mblk_t *);
+static boolean_t	ip_source_routed_v6(ip6_t *, mblk_t *, ip_stack_t *);
 static void	ip_wput_ire_v6(queue_t *, mblk_t *, ire_t *, int, int,
     conn_t *, int, int, int, zoneid_t);
 
@@ -340,6 +273,7 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, uint_t hdr_length,
 	ire_t		*ire;
 	mblk_t		*first_mp;
 	ipsec_in_t	*ii;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(ill != NULL);
 	first_mp = mp;
@@ -364,9 +298,9 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, uint_t hdr_length,
 		}
 		ip6h = (ip6_t *)mp->b_rptr;
 	}
-	if (icmp_accept_clear_messages == 0) {
+	if (ipst->ips_icmp_accept_clear_messages == 0) {
 		first_mp = ipsec_check_global_policy(first_mp, NULL,
-		    NULL, ip6h, mctl_present);
+		    NULL, ip6h, mctl_present, ipst->ips_netstack);
 		if (first_mp == NULL)
 			return;
 	}
@@ -393,7 +327,7 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, uint_t hdr_length,
 	interested = !(icmp6->icmp6_type & ICMP6_INFOMSG_MASK);
 
 	/* Initiate IPPF processing here */
-	if (IP6_IN_IPP(flags)) {
+	if (IP6_IN_IPP(flags, ipst)) {
 
 		/*
 		 * If the ifindex changes due to SIOCSLIFINDEX
@@ -430,7 +364,7 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, uint_t hdr_length,
 	case ICMP6_ECHO_REQUEST:
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInEchos);
 		if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst) &&
-		    !ipv6_resp_echo_mcast)
+		    !ipst->ips_ipv6_resp_echo_mcast)
 			break;
 
 		/*
@@ -495,7 +429,7 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, uint_t hdr_length,
 		}
 
 		/* set the hop limit */
-		ip6h->ip6_hops = ipv6_def_hops;
+		ip6h->ip6_hops = ipst->ips_ipv6_def_hops;
 
 		/*
 		 * Prepare for checksum by putting icmp length in the icmp
@@ -538,7 +472,7 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, uint_t hdr_length,
 			 * meant to our LOCAL address.
 			 */
 			ire = ire_cache_lookup_v6(&ip6h->ip6_dst, ALL_ZONES,
-			    NULL);
+			    NULL, ipst);
 			if (ire == NULL || ire->ire_type != IRE_LOCAL) {
 				mp = ip_add_info_v6(mp, NULL, &ip6h->ip6_dst);
 				if (mp == NULL) {
@@ -571,7 +505,8 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, uint_t hdr_length,
 			 * we attach a IPSEC_IN mp and clear ipsec_in_secure.
 			 */
 			ASSERT(first_mp == mp);
-			if ((first_mp = ipsec_in_alloc(B_FALSE)) == NULL) {
+			first_mp = ipsec_in_alloc(B_FALSE, ipst->ips_netstack);
+			if (first_mp == NULL) {
 				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				freemsg(mp);
 				return;
@@ -623,7 +558,7 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, uint_t hdr_length,
 	case ND_REDIRECT: {
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInRedirects);
 
-		if (ipv6_ignore_redirect)
+		if (ipst->ips_ipv6_ignore_redirect)
 			break;
 
 		/*
@@ -681,6 +616,7 @@ icmp_inbound_too_big_v6(queue_t *q, mblk_t *mp, ill_t *ill,
 	uint32_t	mtu;
 	ire_t		*ire, *first_ire;
 	mblk_t		*first_mp;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	first_mp = mp;
 	if (mctl_present)
@@ -740,7 +676,7 @@ icmp_inbound_too_big_v6(queue_t *q, mblk_t *mp, ill_t *ill,
 	if (IN6_IS_ADDR_LINKLOCAL(&inner_ip6h->ip6_dst)) {
 		first_ire = ire_ctable_lookup_v6(&inner_ip6h->ip6_dst, NULL,
 		    IRE_CACHE, ill->ill_ipif, ALL_ZONES, NULL,
-		    MATCH_IRE_TYPE | MATCH_IRE_ILL_GROUP);
+			MATCH_IRE_TYPE | MATCH_IRE_ILL_GROUP, ipst);
 
 		if (first_ire == NULL) {
 			if (ip_debug > 2) {
@@ -795,7 +731,8 @@ icmp_inbound_too_big_v6(queue_t *q, mblk_t *mp, ill_t *ill,
 		 * for non-link local destinations we match only on the IRE type
 		 */
 		ire = ire_ctable_lookup_v6(&inner_ip6h->ip6_dst, NULL,
-		    IRE_CACHE, ill->ill_ipif, ALL_ZONES, NULL, MATCH_IRE_TYPE);
+		    IRE_CACHE, ill->ill_ipif, ALL_ZONES, NULL, MATCH_IRE_TYPE,
+		    ipst);
 		if (ire == NULL) {
 			if (ip_debug > 2) {
 				/* ip1dbg */
@@ -889,6 +826,7 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	ipsec_in_t *ii;
 	tcpha_t	*tcpha;
 	conn_t	*connp;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	first_mp = mp;
 	if (mctl_present) {
@@ -938,7 +876,7 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 		 * this information to a set of listeners.  A separate
 		 * list could be kept to keep the cost of this down.
 		 */
-		ipcl_walk(pkt_too_big, (void *)mp);
+		ipcl_walk(pkt_too_big, (void *)mp, ipst);
 	}
 
 	/* Try to pass the ICMP message to clients who need it */
@@ -990,7 +928,7 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 
 		tcpha = (tcpha_t *)((char *)ip6h + hdr_length);
 		connp = ipcl_tcp_lookup_reversed_ipv6(ip6h, tcpha,
-		    TCPS_LISTEN, ill->ill_phyint->phyint_ifindex);
+		    TCPS_LISTEN, ill->ill_phyint->phyint_ifindex, ipst);
 		if (connp == NULL) {
 			goto drop_pkt;
 		}
@@ -1019,6 +957,7 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	case IPPROTO_ESP:
 	case IPPROTO_AH: {
 		int ipsec_rc;
+		ipsec_stack_t *ipss = ipst->ips_netstack->netstack_ipsec;
 
 		/*
 		 * We need a IPSEC_IN in the front to fanout to AH/ESP.
@@ -1059,7 +998,7 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 			 * to locate the ill.
 			 */
 			ASSERT(first_mp == mp);
-			first_mp = ipsec_in_alloc(B_FALSE);
+			first_mp = ipsec_in_alloc(B_FALSE, ipst->ips_netstack);
 			ASSERT(ill != NULL);
 			if (first_mp == NULL) {
 				freemsg(mp);
@@ -1077,8 +1016,8 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 			ii->ipsec_in_rill_index = ii->ipsec_in_ill_index;
 		}
 
-		if (!ipsec_loaded()) {
-			ip_proto_not_sup(q, first_mp, 0, zoneid);
+		if (!ipsec_loaded(ipss)) {
+			ip_proto_not_sup(q, first_mp, 0, zoneid, ipst);
 			return;
 		}
 
@@ -1234,6 +1173,7 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 	iulp_t		ulp_info = { 0 };
 	ill_t		*prev_ire_ill;
 	ipif_t		*ipif;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ip6h = (ip6_t *)mp->b_rptr;
 	if (ip6h->ip6_nxt != IPPROTO_ICMPV6)
@@ -1298,7 +1238,7 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 
 	prev_ire = ire_route_lookup_v6(dst, 0, src, 0, ipif, NULL,
 	    ALL_ZONES, NULL, MATCH_IRE_GW | MATCH_IRE_ILL_GROUP |
-	    MATCH_IRE_DEFAULT);
+	    MATCH_IRE_DEFAULT, ipst);
 
 	/*
 	 * Check that
@@ -1343,7 +1283,8 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 
 		tmp_ire = ire_ftable_lookup_v6(dst, 0, gateway, 0, NULL, &sire,
 		    ALL_ZONES, 0, NULL,
-		    (MATCH_IRE_RECURSIVE | MATCH_IRE_GW | MATCH_IRE_DEFAULT));
+		    (MATCH_IRE_RECURSIVE | MATCH_IRE_GW | MATCH_IRE_DEFAULT),
+		    ipst);
 		if (sire != NULL) {
 			bcopy(&sire->ire_uinfo, &ulp_info, sizeof (iulp_t));
 			ASSERT(tmp_ire != NULL);
@@ -1416,7 +1357,8 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		    (RTF_DYNAMIC | RTF_GATEWAY | RTF_HOST),
 		    &ulp_info,
 		    NULL,
-		    NULL);
+		    NULL,
+		    ipst);
 	} else {
 		queue_t *stq;
 
@@ -1444,7 +1386,8 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		    (RTF_DYNAMIC | RTF_HOST),
 		    &ulp_info,
 		    NULL,
-		    NULL);
+		    NULL,
+		    ipst);
 	}
 
 	/* Release reference from earlier ipif_get_next_ipif() */
@@ -1461,7 +1404,7 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		    &rd->nd_rd_target,
 		    &ipv6_all_ones, 0, &ire->ire_src_addr_v6,
 		    (RTF_DYNAMIC | RTF_GATEWAY | RTF_HOST), 0,
-		    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_AUTHOR));
+		    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_AUTHOR), ipst);
 
 		/*
 		 * Delete any existing IRE_HOST type ires for this destination.
@@ -1470,7 +1413,8 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		 */
 		redir_ire = ire_ftable_lookup_v6(dst, 0, src, IRE_HOST,
 		    ire->ire_ipif, NULL, ALL_ZONES, 0, NULL,
-		    (MATCH_IRE_GW | MATCH_IRE_TYPE | MATCH_IRE_ILL_GROUP));
+		    (MATCH_IRE_GW | MATCH_IRE_TYPE | MATCH_IRE_ILL_GROUP),
+		    ipst);
 
 		ire_refrele(ire);		/* Held in ire_add_v6 */
 
@@ -1493,7 +1437,7 @@ fail_redirect:
 }
 
 static ill_t *
-ip_queue_to_ill_v6(queue_t *q)
+ip_queue_to_ill_v6(queue_t *q, ip_stack_t *ipst)
 {
 	ill_t *ill;
 
@@ -1507,7 +1451,7 @@ ip_queue_to_ill_v6(queue_t *q)
 			ill = NULL;
 	} else {
 		ill = ill_lookup_on_name(ipif_loopback_name, B_FALSE, B_TRUE,
-		    NULL, NULL, NULL, NULL, NULL);
+		    NULL, NULL, NULL, NULL, NULL, ipst);
 	}
 	if (ill == NULL)
 		ip0dbg(("ip_queue_to_ill_v6: no ill\n"));
@@ -1524,7 +1468,7 @@ ip_queue_to_ill_v6(queue_t *q)
  */
 static in6_addr_t *
 icmp_pick_source_v6(queue_t *wq, in6_addr_t *origsrc, in6_addr_t *origdst,
-    in6_addr_t *src, zoneid_t zoneid)
+    in6_addr_t *src, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	ill_t	*ill;
 	ire_t	*ire;
@@ -1538,7 +1482,8 @@ icmp_pick_source_v6(queue_t *wq, in6_addr_t *origsrc, in6_addr_t *origdst,
 	}
 
 	ire = ire_route_lookup_v6(origdst, 0, 0, (IRE_LOCAL|IRE_LOOPBACK),
-	    NULL, NULL, zoneid, NULL, (MATCH_IRE_TYPE|MATCH_IRE_ZONEONLY));
+	    NULL, NULL, zoneid, NULL, (MATCH_IRE_TYPE|MATCH_IRE_ZONEONLY),
+	    ipst);
 	if (ire != NULL) {
 		/* Destined to one of our addresses */
 		*src = *origdst;
@@ -1553,9 +1498,9 @@ icmp_pick_source_v6(queue_t *wq, in6_addr_t *origsrc, in6_addr_t *origdst,
 		/* What is the route back to the original source? */
 		ire = ire_route_lookup_v6(origsrc, 0, 0, 0,
 		    NULL, NULL, zoneid, NULL,
-		    (MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE));
+		    (MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE), ipst);
 		if (ire == NULL) {
-			BUMP_MIB(&ip6_mib, ipIfStatsOutNoRoutes);
+			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutNoRoutes);
 			return (NULL);
 		}
 		/*
@@ -1579,9 +1524,9 @@ icmp_pick_source_v6(queue_t *wq, in6_addr_t *origsrc, in6_addr_t *origdst,
 	 */
 	ire = ire_route_lookup_v6(origsrc, 0, 0, 0,
 	    NULL, NULL, zoneid, NULL,
-	    (MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE));
+	    (MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE), ipst);
 	if (ire == NULL) {
-		BUMP_MIB(&ip6_mib, ipIfStatsOutNoRoutes);
+		BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutNoRoutes);
 		return (NULL);
 	}
 	ASSERT(ire != NULL);
@@ -1606,7 +1551,8 @@ icmp_pick_source_v6(queue_t *wq, in6_addr_t *origsrc, in6_addr_t *origdst,
  */
 static void
 icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
-    const in6_addr_t *v6src_ptr, boolean_t mctl_present, zoneid_t zoneid)
+    const in6_addr_t *v6src_ptr, boolean_t mctl_present, zoneid_t zoneid,
+    ip_stack_t *ipst)
 {
 	ip6_t		*ip6h;
 	in6_addr_t	v6dst;
@@ -1619,7 +1565,7 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 	mblk_t *ipsec_mp;
 	ipsec_out_t *io;
 
-	ill = ip_queue_to_ill_v6(q);
+	ill = ip_queue_to_ill_v6(q, ipst);
 	if (ill == NULL) {
 		freemsg(mp);
 		return;
@@ -1674,7 +1620,8 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		 */
 		ipsec_in_t *ii;
 		ASSERT(mp->b_datap->db_type == M_DATA);
-		if ((ipsec_mp = ipsec_in_alloc(B_FALSE)) == NULL) {
+		ipsec_mp = ipsec_in_alloc(B_FALSE, ipst->ips_netstack);
+		if (ipsec_mp == NULL) {
 			freemsg(mp);
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			ill_refrele(ill);
@@ -1709,14 +1656,14 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		v6src = *v6src_ptr;
 	} else {
 		if (icmp_pick_source_v6(q, &ip6h->ip6_src, &ip6h->ip6_dst,
-		    &v6src, zoneid) == NULL) {
+		    &v6src, zoneid, ipst) == NULL) {
 			freemsg(ipsec_mp);
 			ill_refrele(ill);
 			return;
 		}
 	}
 	v6dst = ip6h->ip6_src;
-	len_needed = ipv6_icmp_return - IPV6_HDR_LEN - len;
+	len_needed = ipst->ips_ipv6_icmp_return - IPV6_HDR_LEN - len;
 	msg_len = msgdsize(mp);
 	if (msg_len > len_needed) {
 		if (!adjmsg(mp, len_needed - msg_len)) {
@@ -1755,7 +1702,7 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 
 	ip6h->ip6_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
 	ip6h->ip6_nxt = IPPROTO_ICMPV6;
-	ip6h->ip6_hops = ipv6_def_hops;
+	ip6h->ip6_hops = ipst->ips_ipv6_def_hops;
 	ip6h->ip6_dst = v6dst;
 	ip6h->ip6_src = v6src;
 	msg_len += IPV6_HDR_LEN + len;
@@ -1857,7 +1804,7 @@ icmp_update_out_mib_v6(ill_t *ill, icmp6_t *icmp6)
  */
 static mblk_t *
 icmp_pkt_err_ok_v6(queue_t *q, mblk_t *mp,
-    boolean_t llbcast, boolean_t mcast_ok)
+    boolean_t llbcast, boolean_t mcast_ok, ip_stack_t *ipst)
 {
 	ip6_t	*ip6h;
 
@@ -1883,9 +1830,9 @@ icmp_pkt_err_ok_v6(queue_t *q, mblk_t *mp,
 			if (!pullupmsg(mp, len_needed)) {
 				ill_t	*ill;
 
-				ill = ip_queue_to_ill_v6(q);
+				ill = ip_queue_to_ill_v6(q, ipst);
 				if (ill == NULL) {
-					BUMP_MIB(&icmp6_mib,
+					BUMP_MIB(&ipst->ips_icmp6_mib,
 					    ipv6IfIcmpInErrors);
 				} else {
 					BUMP_MIB(ill->ill_icmp6_mib,
@@ -1915,7 +1862,7 @@ icmp_pkt_err_ok_v6(queue_t *q, mblk_t *mp,
 		freemsg(mp);
 		return (NULL);
 	}
-	if (icmp_err_rate_limit()) {
+	if (icmp_err_rate_limit(ipst)) {
 		/*
 		 * Only send ICMP error packets every so often.
 		 * This should be done on a per port/source basis,
@@ -1946,6 +1893,7 @@ icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
 	int		max_redir_hdr_data_len;
 	int		pkt_len;
 	in6_addr_t	*srcp;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	/*
 	 * We are called from ip_rput where we could
@@ -1953,7 +1901,7 @@ icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
 	 */
 	ASSERT(mp->b_datap->db_type == M_DATA);
 
-	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, B_FALSE);
+	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, B_FALSE, ipst);
 	if (mp == NULL)
 		return;
 	nce = ndp_lookup_v6(ill, targetp, B_FALSE);
@@ -1991,7 +1939,8 @@ icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
 	rdh = (nd_opt_rd_hdr_t *)(buf + sizeof (nd_redirect_t) + ll_opt_len);
 	rdh->nd_opt_rh_type = (uint8_t)ND_OPT_REDIRECTED_HEADER;
 	/* max_redir_hdr_data_len and nd_opt_rh_len must be multiple of 8 */
-	max_redir_hdr_data_len = (ipv6_icmp_return - IPV6_HDR_LEN - len)/8*8;
+	max_redir_hdr_data_len =
+	    (ipst->ips_ipv6_icmp_return - IPV6_HDR_LEN - len)/8*8;
 	pkt_len = msgdsize(mp);
 	/* Make sure mp is 8 byte aligned */
 	if (pkt_len > max_redir_hdr_data_len) {
@@ -2005,7 +1954,7 @@ icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
 	rdh->nd_opt_rh_reserved1 = 0;
 	rdh->nd_opt_rh_reserved2 = 0;
 	/* ipif_v6src_addr contains the link-local source address */
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	if (ill->ill_group != NULL) {
 		/*
 		 * The receiver of the redirect will verify whether it
@@ -2022,16 +1971,16 @@ icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
 		int cnt = ill->ill_group->illgrp_ill_count;
 
 		ill = ill->ill_group->illgrp_ill;
-		cnt = ++icmp_redirect_v6_src_index % cnt;
+		cnt = ++ipst->ips_icmp_redirect_v6_src_index % cnt;
 		while (cnt--)
 			ill = ill->ill_group_next;
 		srcp = &ill->ill_ipif->ipif_v6src_addr;
 	} else {
 		srcp = &ill->ill_ipif->ipif_v6src_addr;
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	/* Redirects sent by router, and router is global zone */
-	icmp_pkt_v6(q, mp, buf, len, srcp, B_FALSE, GLOBAL_ZONEID);
+	icmp_pkt_v6(q, mp, buf, len, srcp, B_FALSE, GLOBAL_ZONEID, ipst);
 	kmem_free(buf, len);
 }
 
@@ -2039,7 +1988,8 @@ icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
 /* Generate an ICMP time exceeded message.  (May be called as writer.) */
 void
 icmp_time_exceeded_v6(queue_t *q, mblk_t *mp, uint8_t code,
-    boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid)
+    boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid,
+    ip_stack_t *ipst)
 {
 	icmp6_t	icmp6;
 	boolean_t mctl_present;
@@ -2047,7 +1997,7 @@ icmp_time_exceeded_v6(queue_t *q, mblk_t *mp, uint8_t code,
 
 	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
 
-	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, mcast_ok);
+	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, mcast_ok, ipst);
 	if (mp == NULL) {
 		if (mctl_present)
 			freeb(first_mp);
@@ -2057,7 +2007,7 @@ icmp_time_exceeded_v6(queue_t *q, mblk_t *mp, uint8_t code,
 	icmp6.icmp6_type = ICMP6_TIME_EXCEEDED;
 	icmp6.icmp6_code = code;
 	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present,
-	    zoneid);
+	    zoneid, ipst);
 }
 
 /*
@@ -2065,7 +2015,8 @@ icmp_time_exceeded_v6(queue_t *q, mblk_t *mp, uint8_t code,
  */
 void
 icmp_unreachable_v6(queue_t *q, mblk_t *mp, uint8_t code,
-    boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid)
+    boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid,
+    ip_stack_t *ipst)
 {
 	icmp6_t	icmp6;
 	boolean_t mctl_present;
@@ -2073,7 +2024,7 @@ icmp_unreachable_v6(queue_t *q, mblk_t *mp, uint8_t code,
 
 	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
 
-	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, mcast_ok);
+	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, mcast_ok, ipst);
 	if (mp == NULL) {
 		if (mctl_present)
 			freeb(first_mp);
@@ -2083,7 +2034,7 @@ icmp_unreachable_v6(queue_t *q, mblk_t *mp, uint8_t code,
 	icmp6.icmp6_type = ICMP6_DST_UNREACH;
 	icmp6.icmp6_code = code;
 	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present,
-	    zoneid);
+	    zoneid, ipst);
 }
 
 /*
@@ -2091,7 +2042,7 @@ icmp_unreachable_v6(queue_t *q, mblk_t *mp, uint8_t code,
  */
 static void
 icmp_pkt2big_v6(queue_t *q, mblk_t *mp, uint32_t mtu,
-    boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid)
+    boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	icmp6_t	icmp6;
 	mblk_t *first_mp;
@@ -2099,7 +2050,7 @@ icmp_pkt2big_v6(queue_t *q, mblk_t *mp, uint32_t mtu,
 
 	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
 
-	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, mcast_ok);
+	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, mcast_ok,  ipst);
 	if (mp == NULL) {
 		if (mctl_present)
 			freeb(first_mp);
@@ -2111,7 +2062,7 @@ icmp_pkt2big_v6(queue_t *q, mblk_t *mp, uint32_t mtu,
 	icmp6.icmp6_mtu = htonl(mtu);
 
 	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present,
-	    zoneid);
+	    zoneid, ipst);
 }
 
 /*
@@ -2120,7 +2071,8 @@ icmp_pkt2big_v6(queue_t *q, mblk_t *mp, uint32_t mtu,
  */
 static void
 icmp_param_problem_v6(queue_t *q, mblk_t *mp, uint8_t code,
-    uint32_t offset, boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid)
+    uint32_t offset, boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid,
+    ip_stack_t *ipst)
 {
 	icmp6_t	icmp6;
 	boolean_t mctl_present;
@@ -2128,7 +2080,7 @@ icmp_param_problem_v6(queue_t *q, mblk_t *mp, uint8_t code,
 
 	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
 
-	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, mcast_ok);
+	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, mcast_ok, ipst);
 	if (mp == NULL) {
 		if (mctl_present)
 			freeb(first_mp);
@@ -2139,7 +2091,7 @@ icmp_param_problem_v6(queue_t *q, mblk_t *mp, uint8_t code,
 	icmp6.icmp6_code = code;
 	icmp6.icmp6_pptr = htonl(offset);
 	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present,
-	    zoneid);
+	    zoneid, ipst);
 }
 
 /*
@@ -2175,6 +2127,7 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 	boolean_t		orig_pkt_isv6 = connp->conn_pkt_isv6;
 	ipa6_conn_x_t		*acx6;
 	boolean_t		verify_dst;
+	ip_stack_t		*ipst = connp->conn_netstack->netstack_ip;
 
 	ASSERT(connp->conn_af_isv6);
 	len = mp->b_wptr - mp->b_rptr;
@@ -2199,7 +2152,8 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 	if (tbr->ADDR_length == 0) {
 		if ((protocol == IPPROTO_TCP || protocol == IPPROTO_SCTP ||
 		    protocol == IPPROTO_ESP || protocol == IPPROTO_AH) &&
-		    ipcl_proto_fanout_v6[protocol].connf_head != NULL) {
+		    ipst->ips_ipcl_proto_fanout_v6[protocol].connf_head !=
+		    NULL) {
 			/*
 			 * TCP, SCTP, AH, and ESP have single protocol fanouts.
 			 * Do not allow others to bind to these.
@@ -2380,9 +2334,9 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 	if ((orig_pkt_isv6 != connp->conn_pkt_isv6) &&
 	    !(IPCL_IS_TCP(connp) || IPCL_IS_UDP(connp))) {
 		if (connp->conn_pkt_isv6)
-			ip_setqinfo(RD(q), IPV6_MINOR, B_TRUE);
+			ip_setqinfo(RD(q), IPV6_MINOR, B_TRUE, ipst);
 		else
-			ip_setqinfo(RD(q), IPV4_MINOR, B_TRUE);
+			ip_setqinfo(RD(q), IPV4_MINOR, B_TRUE, ipst);
 	}
 
 	/*
@@ -2447,6 +2401,7 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
 	ipif_t		*ipif = NULL;
 	mblk_t		*policy_mp;
 	zoneid_t	zoneid;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	if (ipsec_policy_set)
 		policy_mp = mp->b_cont;
@@ -2461,7 +2416,7 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
 
 	if (!IN6_IS_ADDR_UNSPECIFIED(v6src)) {
 		src_ire = ire_route_lookup_v6(v6src, 0, 0,
-		    0, NULL, NULL, zoneid, NULL, MATCH_IRE_ZONEONLY);
+		    0, NULL, NULL, zoneid, NULL, MATCH_IRE_ZONEONLY, ipst);
 		/*
 		 * If an address other than in6addr_any is requested,
 		 * we verify that it is a valid address for bind
@@ -2498,7 +2453,7 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
 				 * ip_wput_v6
 				 */
 				multi_ipif = ipif_lookup_group_v6(
-				    &ipv6_unspecified_group, zoneid);
+				    &ipv6_unspecified_group, zoneid, ipst);
 			}
 			mutex_exit(&connp->conn_lock);
 			save_ire = src_ire;
@@ -2517,7 +2472,8 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
 		} else {
 			*mp->b_wptr++ = (char)connp->conn_ulp;
 			ipif = ipif_lookup_addr_v6(v6src, NULL, zoneid,
-			    CONNP_TO_WQ(connp), mp, ip_wput_nondata, &error);
+			    CONNP_TO_WQ(connp), mp, ip_wput_nondata, &error,
+			    ipst);
 			if (ipif == NULL) {
 				if (error == EINPROGRESS) {
 					if (src_ire != NULL)
@@ -2580,7 +2536,8 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
 	}
 	if (error == 0) {
 		if (ire_requested) {
-			if (!ip_bind_insert_ire_v6(mp, src_ire, v6src, NULL)) {
+			if (!ip_bind_insert_ire_v6(mp, src_ire, v6src, NULL,
+				ipst)) {
 				error = -1;
 				goto bad_addr;
 			}
@@ -2685,6 +2642,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 	ipif_t		*src_ipif = NULL;
 	zoneid_t	zoneid;
 	boolean_t ill_held = B_FALSE;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	src_ire = dst_ire = NULL;
 	/*
@@ -2721,7 +2679,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 			    zoneid, 0, &ipif);
 		} else {
 			/* Look for default like ip_wput_v6 */
-			ipif = ipif_lookup_group_v6(v6dst, zoneid);
+			ipif = ipif_lookup_group_v6(v6dst, zoneid, ipst);
 		}
 		mutex_exit(&connp->conn_lock);
 		if (ipif == NULL || !ire_requested ||
@@ -2743,7 +2701,8 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 		dst_ire = ire_route_lookup_v6(v6dst, NULL, NULL, 0,
 		    NULL, &sire, zoneid, MBLK_GETLABEL(mp),
 		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_PARENT | MATCH_IRE_RJ_BHOLE | MATCH_IRE_SECATTR);
+		    MATCH_IRE_PARENT | MATCH_IRE_RJ_BHOLE | MATCH_IRE_SECATTR,
+		    ipst);
 		/*
 		 * We also prevent ire's with src address INADDR_ANY to
 		 * be used, which are created temporarily for
@@ -2797,7 +2756,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 	if (dst_ire != NULL && is_system_labeled() &&
 	    !IPCL_IS_TCP(connp) &&
 	    tsol_compute_label_v6(DB_CREDDEF(mp, connp->conn_cred), v6dst, NULL,
-	    connp->conn_mac_exempt) != 0) {
+	    connp->conn_mac_exempt, ipst) != 0) {
 		error = EHOSTUNREACH;
 		if (ip_debug > 2) {
 			pr_addr_dbg("ip_bind_connected: no label for dst %s\n",
@@ -2835,7 +2794,8 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 	 * calling ip_newroute_v6().  This is why we further check on the
 	 * IRE during Multidata packet transmission in tcp_multisend().
 	 */
-	if (ip_multidata_outbound && !ipsec_policy_set && dst_ire != NULL &&
+	if (ipst->ips_ip_multidata_outbound && !ipsec_policy_set &&
+	    dst_ire != NULL &&
 	    !(dst_ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK | IRE_BROADCAST)) &&
 	    (md_ill = ire_to_ill(dst_ire), md_ill != NULL) &&
 	    ILL_MDT_CAPABLE(md_ill)) {
@@ -2850,7 +2810,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 		src_ire = ire_ftable_lookup_v6(v6dst, 0, 0, 0, NULL, NULL,
 		    zoneid, 0, NULL,
 		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_RJ_BHOLE);
+		    MATCH_IRE_RJ_BHOLE, ipst);
 		if (src_ire == NULL) {
 			error = EHOSTUNREACH;
 			goto bad_addr;
@@ -2896,7 +2856,8 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 
 				if_index = ipp->ipp_ifindex;
 				dst_ill = ill_lookup_on_ifindex(
-				    if_index, B_TRUE, NULL, NULL, NULL, NULL);
+				    if_index, B_TRUE, NULL, NULL, NULL, NULL,
+					ipst);
 				if (dst_ill == NULL) {
 					ip1dbg(("ip_bind_connected_v6:"
 					    " bad ifindex %d\n", if_index));
@@ -2926,7 +2887,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 				/* No need to hold ill here */
 				dst_ill = dst_ire->ire_ipif->ipif_ill;
 			}
-			if (!ip6_asp_can_lookup()) {
+			if (!ip6_asp_can_lookup(ipst)) {
 				*mp->b_wptr++ = (char)protocol;
 				ip6_asp_pending_op(CONNP_TO_WQ(connp), mp,
 				    ip_bind_connected_resume_v6);
@@ -2936,7 +2897,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 			src_ipif = ipif_select_source_v6(dst_ill, v6dst,
 			    RESTRICT_TO_NONE, connp->conn_src_preferences,
 			    zoneid);
-			ip6_asp_table_refrele();
+			ip6_asp_table_refrele(ipst);
 			if (src_ipif == NULL) {
 				pr_addr_dbg("ip_bind_connected_v6: "
 				    "no usable source address for "
@@ -2954,7 +2915,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 	 * UP interface for hard binding.
 	 */
 	src_ire = ire_route_lookup_v6(v6src, 0, 0, 0, NULL,
-	    NULL, zoneid, NULL, MATCH_IRE_ZONEONLY);
+	    NULL, zoneid, NULL, MATCH_IRE_ZONEONLY, ipst);
 
 	/* src_ire must be a local|loopback */
 	if (!IRE_IS_LOCAL(src_ire)) {
@@ -3017,7 +2978,8 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 		if (sire != NULL)
 			ulp_info = &(sire->ire_uinfo);
 
-		if (!ip_bind_insert_ire_v6(mp, dst_ire, v6dst, ulp_info)) {
+		if (!ip_bind_insert_ire_v6(mp, dst_ire, v6dst, ulp_info,
+		    ipst)) {
 			error = -1;
 			goto bad_addr;
 		}
@@ -3116,9 +3078,10 @@ refrele_and_quit:
  * Insert the ire in b_cont. Returns false if it fails (due to lack of space).
  * Makes the IRE be IRE_BROADCAST if dst is a multicast address.
  */
+/* ARGSUSED4 */
 static boolean_t
 ip_bind_insert_ire_v6(mblk_t *mp, ire_t *ire, const in6_addr_t *dst,
-    iulp_t *ulp_info)
+    iulp_t *ulp_info, ip_stack_t *ipst)
 {
 	mblk_t	*mp1;
 	ire_t	*ret_ire;
@@ -3227,6 +3190,8 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 	boolean_t secure, shared_addr;
 	conn_t	*connp, *first_connp, *next_connp;
 	connf_t *connfp;
+	ip_stack_t	*ipst = inill->ill_ipst;
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
 
 	if (mctl_present) {
 		mp = first_mp->b_cont;
@@ -3252,7 +3217,7 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 		zoneid = tsol_packet_to_zoneid(mp);
 	}
 
-	connfp = &ipcl_proto_fanout_v6[nexthdr];
+	connfp = &ipst->ips_ipcl_proto_fanout_v6[nexthdr];
 	mutex_enter(&connfp->connf_lock);
 	connp = connfp->connf_head;
 	for (connp = connfp->connf_head; connp != NULL;
@@ -3274,7 +3239,7 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 		mutex_exit(&connfp->connf_lock);
 		if (ip_fanout_send_icmp_v6(q, first_mp, flags,
 		    ICMP6_PARAM_PROB, ICMP6_PARAMPROB_NEXTHEADER,
-		    nexthdr_offset, mctl_present, zoneid)) {
+		    nexthdr_offset, mctl_present, zoneid, ipst)) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInUnknownProtos);
 		}
 
@@ -3356,7 +3321,8 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 			 * it instead.
 			 */
 			if (!IPCL_IS_IPTUN(connp) &&
-			    (CONN_INBOUND_POLICY_PRESENT_V6(connp) || secure)) {
+			    (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) ||
+			    secure)) {
 				first_mp1 = ipsec_check_inbound_policy
 				    (first_mp1, connp, NULL, ip6h,
 				    mctl_present);
@@ -3380,7 +3346,7 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 	mutex_exit(&connfp->connf_lock);
 
 	/* Initiate IPPF processing */
-	if (IP6_IN_IPP(flags)) {
+	if (IP6_IN_IPP(flags, ipst)) {
 		uint_t ifindex;
 
 		mutex_enter(&ill->ill_lock);
@@ -3443,7 +3409,7 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 		 * it instead.
 		 */
 		if (nexthdr != IPPROTO_ENCAP && nexthdr != IPPROTO_IPV6 &&
-		    (CONN_INBOUND_POLICY_PRESENT(connp) || secure)) {
+		    (CONN_INBOUND_POLICY_PRESENT(connp, ipss) || secure)) {
 			first_mp = ipsec_check_inbound_policy(first_mp, connp,
 			    NULL, ip6h, mctl_present);
 			if (first_mp == NULL) {
@@ -3466,12 +3432,13 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 int
 ip_fanout_send_icmp_v6(queue_t *q, mblk_t *mp, uint_t flags,
     uint_t icmp_type, uint8_t icmp_code, uint_t nexthdr_offset,
-    boolean_t mctl_present, zoneid_t zoneid)
+    boolean_t mctl_present, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	ip6_t *ip6h;
 	mblk_t *first_mp;
 	boolean_t secure;
 	unsigned char db_type;
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
 
 	first_mp = mp;
 	if (mctl_present) {
@@ -3498,9 +3465,9 @@ ip_fanout_send_icmp_v6(queue_t *q, mblk_t *mp, uint_t flags,
 	 * there is no "conn", we are checking with global policy.
 	 */
 	ip6h = (ip6_t *)mp->b_rptr;
-	if (secure || ipsec_inbound_v6_policy_present) {
+	if (secure || ipss->ipsec_inbound_v6_policy_present) {
 		first_mp = ipsec_check_global_policy(first_mp, NULL,
-		    NULL, ip6h, mctl_present);
+		    NULL, ip6h, mctl_present, ipst->ips_netstack);
 		if (first_mp == NULL)
 			return (0);
 	}
@@ -3510,7 +3477,7 @@ ip_fanout_send_icmp_v6(queue_t *q, mblk_t *mp, uint_t flags,
 
 	if (flags & IP_FF_SEND_ICMP) {
 		if (flags & IP_FF_HDR_COMPLETE) {
-			if (ip_hdr_complete_v6(ip6h, zoneid)) {
+			if (ip_hdr_complete_v6(ip6h, zoneid, ipst)) {
 				freemsg(first_mp);
 				return (1);
 			}
@@ -3518,11 +3485,11 @@ ip_fanout_send_icmp_v6(queue_t *q, mblk_t *mp, uint_t flags,
 		switch (icmp_type) {
 		case ICMP6_DST_UNREACH:
 			icmp_unreachable_v6(WR(q), first_mp, icmp_code,
-			    B_FALSE, B_FALSE, zoneid);
+			    B_FALSE, B_FALSE, zoneid, ipst);
 			break;
 		case ICMP6_PARAM_PROB:
 			icmp_param_problem_v6(WR(q), first_mp, icmp_code,
-			    nexthdr_offset, B_FALSE, B_FALSE, zoneid);
+			    nexthdr_offset, B_FALSE, B_FALSE, zoneid, ipst);
 			break;
 		default:
 #ifdef DEBUG
@@ -3555,6 +3522,8 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 	conn_t		*connp;
 	tcph_t		*tcph;
 	boolean_t	syn_present = B_FALSE;
+	ip_stack_t	*ipst = inill->ill_ipst;
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
 
 	first_mp = mp;
 	if (mctl_present) {
@@ -3565,7 +3534,7 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 		secure = B_FALSE;
 	}
 
-	connp = ipcl_classify_v6(mp, IPPROTO_TCP, hdr_len, zoneid);
+	connp = ipcl_classify_v6(mp, IPPROTO_TCP, hdr_len, zoneid, ipst);
 
 	if (connp == NULL ||
 	    !conn_wantpacket_v6(connp, ill, ip6h, flags, zoneid)) {
@@ -3578,7 +3547,8 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 		ASSERT((dp->db_struioflag & STRUIO_IP) == 0);
 
 		/* Initiate IPPf processing, if needed. */
-		if (IPP_ENABLED(IPP_LOCAL_IN) && (flags & IP6_NO_IPPOLICY)) {
+		if (IPP_ENABLED(IPP_LOCAL_IN, ipst) &&
+		    (flags & IP6_NO_IPPOLICY)) {
 			ill_index = ill->ill_phyint->phyint_ifindex;
 			ip_process(IPP_LOCAL_IN, &first_mp, ill_index);
 			if (first_mp == NULL) {
@@ -3588,7 +3558,8 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 			}
 		}
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-		tcp_xmit_listeners_reset(first_mp, hdr_len, zoneid);
+		tcp_xmit_listeners_reset(first_mp, hdr_len, zoneid,
+		    ipst->ips_netstack->netstack_tcp);
 		if (connp != NULL)
 			CONN_DEC_REF(connp);
 		return;
@@ -3604,8 +3575,9 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 			 * squeue to be that of the active connect's.
 			 */
 			if ((flags & IP_FF_LOOPBACK) && do_tcp_fusion &&
-			    !CONN_INBOUND_POLICY_PRESENT_V6(connp) && !secure &&
-			    !IP6_IN_IPP(flags)) {
+			    !CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) &&
+			    !secure &&
+			    !IP6_IN_IPP(flags, ipst)) {
 				ASSERT(Q_TO_CONN(q) != NULL);
 				sqp = Q_TO_CONN(q)->conn_sqp;
 			} else {
@@ -3634,7 +3606,8 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 			return;
 		}
 		if (flags & TH_ACK) {
-			tcp_xmit_listeners_reset(first_mp, hdr_len, zoneid);
+			tcp_xmit_listeners_reset(first_mp, hdr_len, zoneid,
+			    ipst->ips_netstack->netstack_tcp);
 			CONN_DEC_REF(connp);
 			return;
 		}
@@ -3644,7 +3617,7 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 		return;
 	}
 
-	if (CONN_INBOUND_POLICY_PRESENT_V6(connp) || secure) {
+	if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) || secure) {
 		first_mp = ipsec_check_inbound_policy(first_mp, connp,
 		    NULL, ip6h, mctl_present);
 		if (first_mp == NULL) {
@@ -3680,7 +3653,7 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 	}
 
 	/* Initiate IPPF processing */
-	if (IP6_IN_IPP(flags)) {
+	if (IP6_IN_IPP(flags, ipst)) {
 		uint_t	ifindex;
 
 		mutex_enter(&ill->ill_lock);
@@ -3764,6 +3737,8 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 	mblk_t		*mp1, *first_mp1;
 	in6_addr_t	src;
 	boolean_t	shared_addr;
+	ip_stack_t	*ipst = inill->ill_ipst;
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
 
 	first_mp = mp;
 	if (mctl_present) {
@@ -3782,6 +3757,10 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 
 	shared_addr = (zoneid == ALL_ZONES);
 	if (shared_addr) {
+		/*
+		 * No need to handle exclusive-stack zones since ALL_ZONES
+		 * only applies to the shared stack.
+		 */
 		zoneid = tsol_mlp_findzone(IPPROTO_UDP, dstport);
 		/*
 		 * If no shared MLP is found, tsol_mlp_findzone returns
@@ -3795,7 +3774,7 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 	}
 
 	/* Attempt to find a client stream based on destination port. */
-	connfp = &ipcl_udp_fanout[IPCL_UDP_HASH(dstport)];
+	connfp = &ipst->ips_ipcl_udp_fanout[IPCL_UDP_HASH(dstport, ipst)];
 	mutex_enter(&connfp->connf_lock);
 	connp = connfp->connf_head;
 	if (!IN6_IS_ADDR_MULTICAST(&dst)) {
@@ -3828,7 +3807,7 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 			CONN_DEC_REF(connp);
 			return;
 		}
-		if (CONN_INBOUND_POLICY_PRESENT_V6(connp) || secure) {
+		if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) || secure) {
 			first_mp = ipsec_check_inbound_policy(first_mp,
 			    connp, NULL, ip6h, mctl_present);
 			if (first_mp == NULL) {
@@ -3837,7 +3816,7 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 			}
 		}
 		/* Initiate IPPF processing */
-		if (IP6_IN_IPP(flags)) {
+		if (IP6_IN_IPP(flags, ipst)) {
 			uint_t	ifindex;
 
 			mutex_enter(&ill->ill_lock);
@@ -3878,7 +3857,7 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 		/* Send it upstream */
 		CONN_UDP_RECV(connp, mp);
 
-		IP6_STAT(ip6_udp_fannorm);
+		IP6_STAT(ipst, ip6_udp_fannorm);
 		CONN_DEC_REF(connp);
 		if (mctl_present)
 			freeb(first_mp);
@@ -3960,8 +3939,7 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 			goto next_one;
 		}
 
-		if (CONN_INBOUND_POLICY_PRESENT_V6(connp) ||
-		    secure) {
+		if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) || secure) {
 			first_mp1 = ipsec_check_inbound_policy
 			    (first_mp1, connp, NULL, ip6h,
 			    mctl_present);
@@ -3978,7 +3956,7 @@ next_one:
 		mutex_enter(&connfp->connf_lock);
 		/* Follow the next pointer before releasing the conn. */
 		next_conn = connp->conn_next;
-		IP6_STAT(ip6_udp_fanmb);
+		IP6_STAT(ipst, ip6_udp_fanmb);
 		CONN_DEC_REF(connp);
 		connp = next_conn;
 	}
@@ -3987,7 +3965,7 @@ next_one:
 	mutex_exit(&connfp->connf_lock);
 
 	/* Initiate IPPF processing */
-	if (IP6_IN_IPP(flags)) {
+	if (IP6_IN_IPP(flags, ipst)) {
 		uint_t	ifindex;
 
 		mutex_enter(&ill->ill_lock);
@@ -4027,7 +4005,7 @@ next_one:
 		BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
 		freemsg(mp);
 	} else {
-		if (CONN_INBOUND_POLICY_PRESENT_V6(connp) || secure) {
+		if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) || secure) {
 			first_mp = ipsec_check_inbound_policy(first_mp,
 			    connp, NULL, ip6h, mctl_present);
 			if (first_mp == NULL) {
@@ -4041,7 +4019,7 @@ next_one:
 		/* Send it upstream */
 		CONN_UDP_RECV(connp, mp);
 	}
-	IP6_STAT(ip6_udp_fanmb);
+	IP6_STAT(ipst, ip6_udp_fanmb);
 	CONN_DEC_REF(connp);
 	if (mctl_present)
 		freeb(first_mp);
@@ -4054,14 +4032,14 @@ notfound:
 	 * there a client that wants all
 	 * unclaimed datagrams?
 	 */
-	if (ipcl_proto_fanout_v6[IPPROTO_UDP].connf_head != NULL) {
+	if (ipst->ips_ipcl_proto_fanout_v6[IPPROTO_UDP].connf_head != NULL) {
 		ip_fanout_proto_v6(q, first_mp, ip6h, ill, inill, IPPROTO_UDP,
 		    0, flags | IP_FF_RAWIP | IP_FF_IPINFO, mctl_present,
 		    zoneid);
 	} else {
 		if (ip_fanout_send_icmp_v6(q, first_mp, flags,
 		    ICMP6_DST_UNREACH, ICMP6_DST_UNREACH_NOPORT, 0,
-		    mctl_present, zoneid)) {
+		    mctl_present, zoneid, ipst)) {
 			BUMP_MIB(ill->ill_ip_mib, udpIfStatsNoPorts);
 		}
 	}
@@ -4189,12 +4167,12 @@ done:
 }
 
 int
-ip_hdr_complete_v6(ip6_t *ip6h, zoneid_t zoneid)
+ip_hdr_complete_v6(ip6_t *ip6h, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	ire_t *ire;
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src)) {
-		ire = ire_lookup_local_v6(zoneid);
+		ire = ire_lookup_local_v6(zoneid, ipst);
 		if (ire == NULL) {
 			ip1dbg(("ip_hdr_complete_v6: no source IRE\n"));
 			return (1);
@@ -4203,7 +4181,7 @@ ip_hdr_complete_v6(ip6_t *ip6h, zoneid_t zoneid)
 		ire_refrele(ire);
 	}
 	ip6h->ip6_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
-	ip6h->ip6_hops = ipv6_def_hops;
+	ip6h->ip6_hops = ipst->ips_ipv6_def_hops;
 	return (0);
 }
 
@@ -4390,7 +4368,7 @@ ip_newroute_get_dst_ill_v6(ill_t *dst_ill)
 /* ARGSUSED */
 void
 ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
-    const in6_addr_t *v6srcp, ill_t *ill, zoneid_t zoneid)
+    const in6_addr_t *v6srcp, ill_t *ill, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	in6_addr_t	v6gw;
 	in6_addr_t	dst;
@@ -4449,7 +4427,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 		    ((ip6i_t *)ip6h)->ip6i_flags & IP6I_ATTACH_IF) {
 			attach_ill = ip_grab_attach_ill(ill, first_mp,
 			    (ip6i_present ? ((ip6i_t *)ip6h)->ip6i_ifindex :
-				io->ipsec_out_ill_index), B_TRUE);
+				io->ipsec_out_ill_index), B_TRUE, ipst);
 			/* Failure case frees things for us. */
 			if (attach_ill == NULL)
 				return;
@@ -4493,7 +4471,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 		    MATCH_IRE_PARENT | MATCH_IRE_RJ_BHOLE | MATCH_IRE_SECATTR;
 		ire = ire_ftable_lookup_v6(v6dstp, 0, 0, 0,
 		    NULL, &sire, zoneid, 0, MBLK_GETLABEL(mp),
-		    match_flags);
+		    match_flags, ipst);
 		/*
 		 * ire_add_then_send -> ip_newroute_v6 in the CGTP case passes
 		 * in a NULL ill, but the packet could be a neighbor
@@ -4519,7 +4497,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 		}
 		match_flags |= MATCH_IRE_PARENT | MATCH_IRE_SECATTR;
 		ire = ire_ftable_lookup_v6(v6dstp, NULL, NULL, 0, ill->ill_ipif,
-		    &sire, zoneid, 0, MBLK_GETLABEL(mp), match_flags);
+		    &sire, zoneid, 0, MBLK_GETLABEL(mp), match_flags, ipst);
 	}
 
 	ip3dbg(("ip_newroute_v6: ire_ftable_lookup_v6() "
@@ -4566,7 +4544,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			 * the destination contained in sire.
 			 */
 			multirt_is_resolvable = ire_multirt_lookup_v6(&ire,
-			    &sire, multirt_flags, MBLK_GETLABEL(mp));
+			    &sire, multirt_flags, MBLK_GETLABEL(mp), ipst);
 
 			ip3dbg(("ip_newroute_v6: multirt_is_resolvable %d, "
 			    "ire %p, sire %p\n",
@@ -4632,7 +4610,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				return;
 			}
 			ip_rts_change_v6(RTM_MISS, v6dstp, 0, 0, 0, 0, 0, 0,
-			    RTA_DST);
+			    RTA_DST, ipst);
 			goto icmp_err_ret;
 		}
 
@@ -4781,7 +4759,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 		ASSERT(src_ipif == NULL);
 		if (ire->ire_type == IRE_IF_RESOLVER &&
 		    !IN6_IS_ADDR_UNSPECIFIED(&v6gw) &&
-		    ip6_asp_can_lookup()) {
+		    ip6_asp_can_lookup(ipst)) {
 			/*
 			 * The ire cache entry we're adding is for the
 			 * gateway itself.  The source address in this case
@@ -4800,9 +4778,9 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				 */
 				src_ipif = ipif_lookup_addr_v6(
 				    &sire->ire_src_addr_v6, NULL, zoneid,
-					NULL, NULL, NULL, NULL);
+					NULL, NULL, NULL, NULL, ipst);
 			}
-			if (src_ipif == NULL && ip6_asp_can_lookup()) {
+			if (src_ipif == NULL && ip6_asp_can_lookup(ipst)) {
 				uint_t restrict_ill = RESTRICT_TO_NONE;
 
 				if (ip6i_present && ((ip6i_t *)ip6h)->ip6i_flags
@@ -4953,7 +4931,8 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				    (RTF_SETSRC | RTF_MULTIRT),
 				&(sire->ire_uinfo),
 				NULL,
-				gcgrp);
+				gcgrp,
+				ipst);
 
 			if (ire == NULL) {
 				if (gcgrp != NULL) {
@@ -5004,7 +4983,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			}
 			ire_add_then_send(q, ire, xmit_mp);
 			if (ip6_asp_table_held) {
-				ip6_asp_table_refrele();
+				ip6_asp_table_refrele(ipst);
 				ip6_asp_table_held = B_FALSE;
 			}
 			ire_refrele(save_ire);
@@ -5114,7 +5093,8 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				    (RTF_SETSRC | RTF_MULTIRT) : 0,
 				&(save_ire->ire_uinfo),
 				NULL,
-				gcgrp);
+				gcgrp,
+				ipst);
 
 			freeb(dlureq_mp);
 
@@ -5166,7 +5146,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			}
 			ire_add_then_send(q, ire, xmit_mp);
 			if (ip6_asp_table_held) {
-				ip6_asp_table_refrele();
+				ip6_asp_table_refrele(ipst);
 				ip6_asp_table_held = B_FALSE;
 			}
 
@@ -5250,7 +5230,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 
 				ip1dbg(("ip_newroute_v6:ILLF_XRESOLV\n"));
 				if (ip6_asp_table_held) {
-					ip6_asp_table_refrele();
+					ip6_asp_table_refrele(ipst);
 					ip6_asp_table_held = B_FALSE;
 				}
 				ire = ire_create_mp_v6(
@@ -5273,7 +5253,8 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 					0,		/* flags if any */
 					&(save_ire->ire_uinfo),
 					NULL,
-					NULL);
+					NULL,
+					ipst);
 
 				ire_refrele(save_ire);
 				if (ire == NULL) {
@@ -5462,7 +5443,8 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				0,			/* flags if any */
 				&(save_ire->ire_uinfo),
 				NULL,
-				gcgrp);
+				gcgrp,
+				ipst);
 
 			if (ire == NULL) {
 				if (gcgrp != NULL) {
@@ -5502,7 +5484,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				 */
 				ire_add_then_send(q, ire, first_mp);
 				if (ip6_asp_table_held) {
-					ip6_asp_table_refrele();
+					ip6_asp_table_refrele(ipst);
 					ip6_asp_table_held = B_FALSE;
 				}
 
@@ -5556,7 +5538,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				 * address is resolved.
 				 */
 				if (ip6_asp_table_held) {
-					ip6_asp_table_refrele();
+					ip6_asp_table_refrele(ipst);
 					ip6_asp_table_held = B_FALSE;
 				}
 				ASSERT(ire->ire_nce == NULL);
@@ -5609,7 +5591,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			break;
 		}
 		if (ip6_asp_table_held) {
-			ip6_asp_table_refrele();
+			ip6_asp_table_refrele(ipst);
 			ip6_asp_table_held = B_FALSE;
 		}
 	} while (multirt_resolve_next);
@@ -5633,9 +5615,9 @@ err_ret:
 			ill_refrele(ill);
 	} else {
 		if (mp->b_prev != NULL) {
-			BUMP_MIB(&ip6_mib, ipIfStatsInDiscards);
+			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsInDiscards);
 		} else {
-			BUMP_MIB(&ip6_mib, ipIfStatsOutDiscards);
+			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutDiscards);
 		}
 	}
 	/* Did this packet originate externally? */
@@ -5657,7 +5639,7 @@ err_ret:
 
 icmp_err_ret:
 	if (ip6_asp_table_held)
-		ip6_asp_table_refrele();
+		ip6_asp_table_refrele(ipst);
 	if (src_ipif != NULL)
 		ipif_refrele(src_ipif);
 	if (dst_ill != NULL) {
@@ -5691,7 +5673,7 @@ icmp_err_ret:
 		if (ill != NULL) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInNoRoutes);
 		} else {
-			BUMP_MIB(&ip6_mib, ipIfStatsInNoRoutes);
+			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsInNoRoutes);
 		}
 		mp->b_next = NULL;
 		mp->b_prev = NULL;
@@ -5700,9 +5682,9 @@ icmp_err_ret:
 		if (ill != NULL) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutNoRoutes);
 		} else {
-			BUMP_MIB(&ip6_mib, ipIfStatsOutNoRoutes);
+			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutNoRoutes);
 		}
-		if (ip_hdr_complete_v6(ip6h, zoneid)) {
+		if (ip_hdr_complete_v6(ip6h, zoneid, ipst)) {
 			/* Failed */
 			if (copy_mp != NULL) {
 				MULTIRT_DEBUG_UNTAG(copy_mp);
@@ -5745,7 +5727,7 @@ icmp_err_ret:
 		    AF_INET6, v6dstp);
 	}
 	icmp_unreachable_v6(WR(q), first_mp, ICMP6_DST_UNREACH_NOROUTE,
-	    B_FALSE, B_FALSE, zoneid);
+	    B_FALSE, B_FALSE, zoneid, ipst);
 }
 
 /*
@@ -5779,6 +5761,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 	boolean_t ipif_held = B_FALSE;
 	boolean_t ill_held = B_FALSE;
 	boolean_t ip6_asp_table_held = B_FALSE;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	/*
 	 * This loop is run only once in most cases.
@@ -5842,7 +5825,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				attach_ill = ip_grab_attach_ill(ill, first_mp,
 				    (ip6i_present ?
 					((ip6i_t *)ip6h)->ip6i_ifindex :
-					io->ipsec_out_ill_index), B_TRUE);
+					io->ipsec_out_ill_index), B_TRUE, ipst);
 				/* Failure case frees things for us. */
 				if (attach_ill == NULL)
 					return;
@@ -5927,9 +5910,9 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 			 */
 			src_ipif =
 			    ipif_lookup_addr_v6(&fire->ire_src_addr_v6,
-				NULL, zoneid, NULL, NULL, NULL, NULL);
+				NULL, zoneid, NULL, NULL, NULL, NULL, ipst);
 		}
-		if (src_ipif == NULL && ip6_asp_can_lookup()) {
+		if (src_ipif == NULL && ip6_asp_can_lookup(ipst)) {
 			ip6_asp_table_held = B_TRUE;
 			src_ipif = ipif_select_source_v6(dst_ill, v6dstp,
 			    RESTRICT_TO_NONE, IPV6_PREFER_SRC_DEFAULT, zoneid);
@@ -6053,7 +6036,8 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				0,
 				&ire_uinfo_null,
 				NULL,
-				NULL);
+				NULL,
+				ipst);
 
 			freeb(dlureq_mp);
 
@@ -6081,7 +6065,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 
 			ire_add_then_send(q, ire, first_mp);
 			if (ip6_asp_table_held) {
-				ip6_asp_table_refrele();
+				ip6_asp_table_refrele(ipst);
 				ip6_asp_table_held = B_FALSE;
 			}
 
@@ -6101,7 +6085,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 			if (copy_mp != NULL) {
 				boolean_t need_resolve =
 				    ire_multirt_need_resolve_v6(v6dstp,
-					MBLK_GETLABEL(copy_mp));
+					MBLK_GETLABEL(copy_mp), ipst);
 				if (!need_resolve) {
 					MULTIRT_DEBUG_UNTAG(copy_mp);
 					freemsg(copy_mp);
@@ -6125,7 +6109,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 						ipif_held = B_FALSE;
 					}
 					ipif = ipif_lookup_group_v6(v6dstp,
-					    zoneid);
+					    zoneid, ipst);
 					ip2dbg(("ip_newroute_ipif: "
 						"multirt dst %08x, ipif %p\n",
 						ntohl(V4_PART_OF_V6((*v6dstp))),
@@ -6185,7 +6169,8 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				0,
 				&ire_uinfo_null,
 				NULL,
-				NULL);
+				NULL,
+				ipst);
 
 			if (ire == NULL) {
 				ire_refrele(save_ire);
@@ -6212,7 +6197,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				 */
 				ire_add_then_send(q, ire, first_mp);
 				if (ip6_asp_table_held) {
-					ip6_asp_table_refrele();
+					ip6_asp_table_refrele(ipst);
 					ip6_asp_table_held = B_FALSE;
 				}
 
@@ -6232,7 +6217,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				if (copy_mp != NULL) {
 					boolean_t need_resolve =
 					    ire_multirt_need_resolve_v6(v6dstp,
-						MBLK_GETLABEL(copy_mp));
+						MBLK_GETLABEL(copy_mp), ipst);
 					if (!need_resolve) {
 						MULTIRT_DEBUG_UNTAG(copy_mp);
 						freemsg(copy_mp);
@@ -6257,7 +6242,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 							ipif_held = B_FALSE;
 						}
 						ipif = ipif_lookup_group_v6(
-						    v6dstp, zoneid);
+						    v6dstp, zoneid, ipst);
 						ip2dbg(("ip_newroute_ipif: "
 						    "multirt dst %08x, "
 						    "ipif %p\n",
@@ -6293,7 +6278,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				 * address is resolved.
 				 */
 				if (ip6_asp_table_held) {
-					ip6_asp_table_refrele();
+					ip6_asp_table_refrele(ipst);
 					ip6_asp_table_held = B_FALSE;
 				}
 				ire_delete(ire);
@@ -6310,7 +6295,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				if (copy_mp != NULL) {
 					boolean_t need_resolve =
 					    ire_multirt_need_resolve_v6(v6dstp,
-						MBLK_GETLABEL(copy_mp));
+						MBLK_GETLABEL(copy_mp), ipst);
 					if (!need_resolve) {
 						MULTIRT_DEBUG_UNTAG(copy_mp);
 						freemsg(copy_mp);
@@ -6335,7 +6320,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 							ipif_held = B_FALSE;
 						}
 						ipif = ipif_lookup_group_v6(
-						    v6dstp, zoneid);
+						    v6dstp, zoneid, ipst);
 						ip2dbg(("ip_newroute_ipif: "
 						    "multirt dst %08x, "
 						    "ipif %p\n",
@@ -6373,14 +6358,14 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 			break;
 		}
 		if (ip6_asp_table_held) {
-			ip6_asp_table_refrele();
+			ip6_asp_table_refrele(ipst);
 			ip6_asp_table_held = B_FALSE;
 		}
 	} while (multirt_resolve_next);
 
 err_ret:
 	if (ip6_asp_table_held)
-		ip6_asp_table_refrele();
+		ip6_asp_table_refrele(ipst);
 	if (ire != NULL)
 		ire_refrele(ire);
 	if (fire != NULL)
@@ -6428,7 +6413,7 @@ err_ret:
  */
 static int
 ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
-    uint8_t *optptr, uint_t optlen, uint8_t hdr_type)
+    uint8_t *optptr, uint_t optlen, uint8_t hdr_type, ip_stack_t *ipst)
 {
 	uint8_t opt_type;
 	uint_t optused;
@@ -6522,7 +6507,7 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 				struct ip6_opt_home_address *oh;
 				in6_addr_t tmp;
 
-				if (ipv6_ignore_home_address_opt)
+				if (ipst->ips_ipv6_ignore_home_address_opt)
 					goto opt_error;
 
 				if (hdr_type != IPPROTO_DSTOPTS)
@@ -6576,7 +6561,7 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 			opt_error:
 				/* Determine which zone should send error */
 				zoneid = ipif_lookup_addr_zoneid_v6(
-				    &ip6h->ip6_dst, ill);
+				    &ip6h->ip6_dst, ill, ipst);
 				switch (IP6OPT_TYPE(opt_type)) {
 				case IP6OPT_TYPE_SKIP:
 					optused = 2 + optptr[1];
@@ -6601,7 +6586,7 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 					    ICMP6_PARAMPROB_OPTION,
 					    (uint32_t)(optptr -
 					    (uint8_t *)ip6h),
-					    B_FALSE, B_FALSE, zoneid);
+					    B_FALSE, B_FALSE, zoneid, ipst);
 					return (-1);
 				case IP6OPT_TYPE_FORCEICMP:
 					if (zoneid == ALL_ZONES) {
@@ -6612,7 +6597,7 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 					    ICMP6_PARAMPROB_OPTION,
 					    (uint32_t)(optptr -
 					    (uint8_t *)ip6h),
-					    B_FALSE, B_TRUE, zoneid);
+					    B_FALSE, B_TRUE, zoneid, ipst);
 					return (-1);
 				default:
 					ASSERT(0);
@@ -6626,13 +6611,13 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 
 bad_opt:
 	/* Determine which zone should send error */
-	zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst, ill);
+	zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst, ill, ipst);
 	if (zoneid == ALL_ZONES) {
 		freemsg(first_mp);
 	} else {
 		icmp_param_problem_v6(WR(q), first_mp, ICMP6_PARAMPROB_OPTION,
 		    (uint32_t)(optptr - (uint8_t *)ip6h),
-		    B_FALSE, B_FALSE, zoneid);
+		    B_FALSE, B_FALSE, zoneid, ipst);
 	}
 	return (-1);
 }
@@ -6650,10 +6635,11 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 	uint_t numaddr;
 	in6_addr_t *addrptr;
 	in6_addr_t tmp;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(rth->ip6r_segleft != 0);
 
-	if (!ipv6_forward_src_routed) {
+	if (!ipst->ips_ipv6_forward_src_routed) {
 		/* XXX Check for source routed out same interface? */
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInAddrErrors);
@@ -6669,7 +6655,7 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 		icmp_param_problem_v6(WR(q), mp,
 		    ICMP6_PARAMPROB_HEADER,
 		    (uint32_t)((uchar_t *)&rth->ip6r_type - (uchar_t *)ip6h),
-		    B_FALSE, B_FALSE, GLOBAL_ZONEID);
+		    B_FALSE, B_FALSE, GLOBAL_ZONEID, ipst);
 		return;
 	}
 	rthdr = (ip6_rthdr0_t *)rth;
@@ -6685,7 +6671,7 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 		icmp_param_problem_v6(WR(q), mp,
 		    ICMP6_PARAMPROB_HEADER,
 		    (uint32_t)((uchar_t *)&rthdr->ip6r0_len - (uchar_t *)ip6h),
-		    B_FALSE, B_FALSE, GLOBAL_ZONEID);
+		    B_FALSE, B_FALSE, GLOBAL_ZONEID, ipst);
 		return;
 	}
 	numaddr = rthdr->ip6r0_len / 2;
@@ -6698,7 +6684,7 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 		    ICMP6_PARAMPROB_HEADER,
 		    (uint32_t)((uchar_t *)&rthdr->ip6r0_segleft -
 			(uchar_t *)ip6h),
-		    B_FALSE, B_FALSE, GLOBAL_ZONEID);
+		    B_FALSE, B_FALSE, GLOBAL_ZONEID, ipst);
 		return;
 	}
 	addrptr += (numaddr - rthdr->ip6r0_segleft);
@@ -6720,7 +6706,7 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 			goto hada_drop;
 		/* Sent by forwarding path, and router is global zone */
 		icmp_unreachable_v6(WR(q), mp, ICMP6_DST_UNREACH_NOROUTE,
-		    B_FALSE, B_FALSE, GLOBAL_ZONEID);
+		    B_FALSE, B_FALSE, GLOBAL_ZONEID, ipst);
 		return;
 	}
 	if (ip_check_v6_mblk(mp, ill) == 0) {
@@ -6749,8 +6735,10 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 	struct iocblk	*iocp;
 	uint_t 		flags = 0;
 	mblk_t		*dl_mp;
+	ip_stack_t	*ipst;
 
 	ill = (ill_t *)q->q_ptr;
+	ipst = ill->ill_ipst;
 	if (ill->ill_state_flags & ILL_CONDEMNED) {
 		union DL_primitives *dl;
 
@@ -6945,8 +6933,9 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 	    ill_t *, ill, ill_t *, NULL,
 	    ip6_t *, ip6h, mblk_t *, first_mp);
 
-	FW_HOOKS6(ip6_physical_in_event, ipv6firewall_physical_in,
-	    ill, NULL, ip6h, first_mp, mp);
+	FW_HOOKS6(ipst->ips_ip6_physical_in_event,
+	    ipst->ips_ipv6firewall_physical_in,
+	    ill, NULL, ip6h, first_mp, mp, ipst);
 
 	DTRACE_PROBE1(ip6__physical__in__end, mblk_t *, first_mp);
 
@@ -7104,6 +7093,9 @@ ipsec_early_ah_v6(queue_t *q, mblk_t *first_mp, boolean_t mctl_present,
 	ipsec_in_t *ii = NULL;
 	ah_t *ah;
 	ipsec_status_t ipsec_rc;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	netstack_t	*ns = ipst->ips_netstack;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	ASSERT((hada_mp == NULL) || (!mctl_present));
 
@@ -7122,7 +7114,8 @@ ipsec_early_ah_v6(queue_t *q, mblk_t *first_mp, boolean_t mctl_present,
 	ASSERT(nexthdr == IPPROTO_AH);
 	if (!mctl_present) {
 		mp = first_mp;
-		if ((first_mp = ipsec_in_alloc(B_FALSE)) == NULL) {
+		first_mp = ipsec_in_alloc(B_FALSE, ipst->ips_netstack);
+		if (first_mp == NULL) {
 			ip1dbg(("ipsec_early_ah_v6: IPSEC_IN "
 			    "allocation failure.\n"));
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
@@ -7150,12 +7143,12 @@ ipsec_early_ah_v6(queue_t *q, mblk_t *first_mp, boolean_t mctl_present,
 		ii->ipsec_in_da = hada_mp;
 	}
 
-	if (!ipsec_loaded()) {
-		ip_proto_not_sup(q, first_mp, IP_FF_SEND_ICMP, zoneid);
+	if (!ipsec_loaded(ipss)) {
+		ip_proto_not_sup(q, first_mp, IP_FF_SEND_ICMP, zoneid, ipst);
 		return (B_TRUE);
 	}
 
-	ah = ipsec_inbound_ah_sa(first_mp);
+	ah = ipsec_inbound_ah_sa(first_mp, ns);
 	if (ah == NULL)
 		return (B_TRUE);
 	ASSERT(ii->ipsec_in_ah_sa != NULL);
@@ -7168,7 +7161,7 @@ ipsec_early_ah_v6(queue_t *q, mblk_t *first_mp, boolean_t mctl_present,
 		ip_fanout_proto_again(first_mp, ill, ill, ire);
 		break;
 	case IPSEC_STATUS_FAILED:
-		BUMP_MIB(&ip6_mib, ipIfStatsInDiscards);
+		BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsInDiscards);
 		break;
 	case IPSEC_STATUS_PENDING:
 		/* no action needed */
@@ -7279,6 +7272,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	uint32_t	reass_sum;
 	boolean_t	cksum_err;
 	mblk_t		*mp1;
+	ip_stack_t	*ipst = inill->ill_ipst;
 
 	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
 
@@ -7361,7 +7355,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 		whereptr += ehdrlen;
 		remlen -= ehdrlen;
 		switch (ip_process_options_v6(q, first_mp, ip6h, optptr,
-		    ehdrlen - 2, IPPROTO_HOPOPTS)) {
+		    ehdrlen - 2, IPPROTO_HOPOPTS, ipst)) {
 		case -1:
 			/*
 			 * Packet has been consumed and any
@@ -7464,10 +7458,10 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	if (IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_dst)) {
 		ire = ire_ctable_lookup_v6(&ip6h->ip6_dst, NULL,
 		    IRE_CACHE|IRE_LOCAL, ill->ill_ipif, ALL_ZONES, NULL,
-		    MATCH_IRE_TYPE | MATCH_IRE_ILL_GROUP);
+		    MATCH_IRE_TYPE | MATCH_IRE_ILL_GROUP, ipst);
 	} else {
 		ire = ire_cache_lookup_v6(&ip6h->ip6_dst, ALL_ZONES,
-		    MBLK_GETLABEL(mp));
+		    MBLK_GETLABEL(mp), ipst);
 	}
 	if (ire == NULL) {
 		/*
@@ -7490,7 +7484,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 			/* Sent by forwarding path, and router is global zone */
 			icmp_time_exceeded_v6(WR(q), first_mp,
 			    ICMP6_TIME_EXCEED_TRANSIT, ll_multicast, B_FALSE,
-			    GLOBAL_ZONEID);
+			    GLOBAL_ZONEID, ipst);
 			return;
 		}
 		/*
@@ -7507,7 +7501,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 		    ill->ill_phyint->phyint_ifindex;
 		ip_newroute_v6(q, mp, &ip6h->ip6_dst, &ip6h->ip6_src,
 		    IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_dst) ? ill : NULL,
-		    ALL_ZONES);
+		    ALL_ZONES, ipst);
 		return;
 	}
 	ipif_id = ire->ire_ipif->ipif_seqid;
@@ -7557,7 +7551,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 			/* Sent by forwarding path, and router is global zone */
 			icmp_time_exceeded_v6(WR(q), mp,
 			    ICMP6_TIME_EXCEED_TRANSIT, ll_multicast, B_FALSE,
-			    GLOBAL_ZONEID);
+			    GLOBAL_ZONEID, ipst);
 			ire_refrele(ire);
 			return;
 		}
@@ -7592,7 +7586,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInTooBigErrors);
 			/* Sent by forwarding path, and router is global zone */
 			icmp_pkt2big_v6(WR(q), mp, ire->ire_max_frag,
-			    ll_multicast, B_TRUE, GLOBAL_ZONEID);
+			    ll_multicast, B_TRUE, GLOBAL_ZONEID, ipst);
 			ire_refrele(ire);
 			return;
 		}
@@ -7619,7 +7613,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 				return;
 			}
 			/* TBD add site-local check at site boundary? */
-		} else if (ipv6_send_redirects) {
+		} else if (ipst->ips_ipv6_send_redirects) {
 			in6_addr_t	*v6targ;
 			in6_addr_t	gw_addr_v6;
 			ire_t		*src_ire_v6 = NULL;
@@ -7628,7 +7622,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 			 * Don't send a redirect when forwarding a source
 			 * routed packet.
 			 */
-			if (ip_source_routed_v6(ip6h, mp))
+			if (ip_source_routed_v6(ip6h, mp, ipst))
 				goto forward;
 
 			mutex_enter(&ire->ire_lock);
@@ -7653,7 +7647,8 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 			src_ire_v6 = ire_ftable_lookup_v6(&ip6h->ip6_src,
 			    NULL, NULL, IRE_INTERFACE, ire->ire_ipif, NULL,
 			    ALL_ZONES, 0, NULL,
-			    MATCH_IRE_IPIF | MATCH_IRE_TYPE);
+			    MATCH_IRE_IPIF | MATCH_IRE_TYPE,
+			    ipst);
 
 			if (src_ire_v6 != NULL) {
 				/*
@@ -7679,8 +7674,9 @@ forward:
 		    ill_t *, inill, ill_t *, outill,
 		    ip6_t *, ip6h, mblk_t *, mp);
 
-		FW_HOOKS6(ip6_forwarding_event, ipv6firewall_forwarding,
-		    inill, outill, ip6h, mp, mp);
+		FW_HOOKS6(ipst->ips_ip6_forwarding_event,
+		    ipst->ips_ipv6firewall_forwarding,
+		    inill, outill, ip6h, mp, mp, ipst);
 
 		DTRACE_PROBE1(ip6__forwarding__end, mblk_t *, mp);
 
@@ -7739,7 +7735,8 @@ forward:
 		}
 
 		ASSERT(!IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst));
-		if (check_multi && ipv6_strict_dst_multihoming && no_forward) {
+		if (check_multi && ipst->ips_ipv6_strict_dst_multihoming &&
+		    no_forward) {
 			/*
 			 * This packet came in on an interface other than the
 			 * one associated with the destination address
@@ -7862,7 +7859,7 @@ ipv6forus:
 			mp1 = mp->b_cont;
 
 			if ((hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0)
-				IP6_STAT(ip6_in_sw_cksum);
+				IP6_STAT(ipst, ip6_in_sw_cksum);
 
 			IP_CKSUM_RECV(hck_flags, sum, (uchar_t *)
 			    ((uchar_t *)mp->b_rptr + DB_CKSUMSTART(mp)),
@@ -7872,13 +7869,15 @@ ipv6forus:
 			if (cksum_err) {
 				BUMP_MIB(ill->ill_ip_mib, tcpIfStatsInErrs);
 
-				if (hck_flags & HCK_FULLCKSUM)
-					IP6_STAT(ip6_tcp_in_full_hw_cksum_err);
-				else if (hck_flags & HCK_PARTIALCKSUM)
-					IP6_STAT(ip6_tcp_in_part_hw_cksum_err);
-				else
-					IP6_STAT(ip6_tcp_in_sw_cksum_err);
-
+				if (hck_flags & HCK_FULLCKSUM) {
+					IP6_STAT(ipst,
+					    ip6_tcp_in_full_hw_cksum_err);
+				} else if (hck_flags & HCK_PARTIALCKSUM) {
+					IP6_STAT(ipst,
+					    ip6_tcp_in_part_hw_cksum_err);
+				} else {
+					IP6_STAT(ipst, ip6_tcp_in_sw_cksum_err);
+				}
 				freemsg(first_mp);
 				return;
 			}
@@ -7893,6 +7892,9 @@ tcp_fanout:
 			sctp_hdr_t *sctph;
 			uint32_t calcsum, pktsum;
 			uint_t hdr_len = pkt_len - remlen;
+			sctp_stack_t *sctps;
+
+			sctps = inill->ill_ipst->ips_netstack->netstack_sctp;
 
 			/* SCTP needs all of the SCTP header */
 			if (remlen < sizeof (*sctph)) {
@@ -7916,14 +7918,14 @@ tcp_fanout:
 			sctph->sh_chksum = 0;
 			calcsum = sctp_cksum(mp, hdr_len);
 			if (calcsum != pktsum) {
-				BUMP_MIB(&sctp_mib, sctpChecksumError);
+				BUMP_MIB(&sctps->sctps_mib, sctpChecksumError);
 				freemsg(mp);
 				return;
 			}
 			sctph->sh_chksum = pktsum;
 			ports = *(uint32_t *)(mp->b_rptr + hdr_len);
 			if ((connp = sctp_fanout(&ip6h->ip6_src, &ip6h->ip6_dst,
-			    ports, ipif_id, zoneid, mp)) == NULL) {
+			    ports, ipif_id, zoneid, mp, sctps)) == NULL) {
 				ip_fanout_sctp_raw(first_mp, ill,
 				    (ipha_t *)ip6h, B_FALSE, ports,
 				    mctl_present,
@@ -8021,18 +8023,20 @@ tcp_fanout:
 			}
 
 			if ((hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0)
-				IP6_STAT(ip6_in_sw_cksum);
+				IP6_STAT(ipst, ip6_in_sw_cksum);
 
 			if (cksum_err) {
 				BUMP_MIB(ill->ill_ip_mib,
 				    udpIfStatsInCksumErrs);
 
 				if (hck_flags & HCK_FULLCKSUM)
-					IP6_STAT(ip6_udp_in_full_hw_cksum_err);
+					IP6_STAT(ipst,
+						ip6_udp_in_full_hw_cksum_err);
 				else if (hck_flags & HCK_PARTIALCKSUM)
-					IP6_STAT(ip6_udp_in_part_hw_cksum_err);
+					IP6_STAT(ipst,
+						ip6_udp_in_part_hw_cksum_err);
 				else
-					IP6_STAT(ip6_udp_in_sw_cksum_err);
+					IP6_STAT(ipst, ip6_udp_in_sw_cksum_err);
 
 				freemsg(first_mp);
 				return;
@@ -8071,7 +8075,7 @@ tcp_fanout:
 
 		icmp_fanout:
 			/* Check variable for testing applications */
-			if (ipv6_drop_inbound_icmpv6) {
+			if (ipst->ips_ipv6_drop_inbound_icmpv6) {
 				freemsg(first_mp);
 				return;
 			}
@@ -8118,7 +8122,6 @@ tcp_fanout:
 					    hdr_len, mctl_present, 0, zoneid,
 					    dl_mp);
 			}
-		}
 			/* FALLTHRU */
 		default: {
 			/*
@@ -8193,7 +8196,7 @@ tcp_fanout:
 			 * defined/implemented yet ).
 			 */
 			switch (ip_process_options_v6(q, first_mp, ip6h, optptr,
-			    ehdrlen - 2, IPPROTO_DSTOPTS)) {
+			    ehdrlen - 2, IPPROTO_DSTOPTS, ipst)) {
 			case -1:
 				/*
 				 * Packet has been consumed and any needed
@@ -8261,8 +8264,13 @@ tcp_fanout:
 			 * duplicates must be discarded. Filtering is active
 			 * only if the the ip_cgtp_filter ndd variable is
 			 * non-zero.
+			 *
+			 * Only applies to the shared stack since the
+			 * filter_ops do not carry an ip_stack_t or zoneid.
 			 */
-			if (ip_cgtp_filter && (ip_cgtp_filter_ops != NULL)) {
+			if (ip_cgtp_filter && (ip_cgtp_filter_ops != NULL) &&
+			    ipst->ips_netstack->netstack_stackid ==
+			    GLOBAL_NETSTACKID) {
 				int cgtp_flt_pkt =
 				    ip_cgtp_filter_ops->cfo_filter_v6(
 				    inill->ill_rq, ip6h, fraghdr);
@@ -8309,9 +8317,9 @@ tcp_fanout:
 			icmp_param_problem_v6(WR(q), first_mp,
 			    ICMP6_PARAMPROB_NEXTHEADER,
 			    prev_nexthdr_offset,
-			    B_FALSE, B_FALSE, zoneid);
+			    B_FALSE, B_FALSE, zoneid, ipst);
 			return;
-
+		}
 		case IPPROTO_ROUTING: {
 			uint_t ehdrlen;
 			ip6_rthdr_t *rthdr;
@@ -8368,11 +8376,14 @@ tcp_fanout:
 
 			ipsec_in_t *ii;
 			int ipsec_rc;
+			ipsec_stack_t *ipss;
 
+			ipss = ipst->ips_netstack->netstack_ipsec;
 			if (!mctl_present) {
 				ASSERT(first_mp == mp);
-				if ((first_mp = ipsec_in_alloc(B_FALSE)) ==
-				    NULL) {
+				first_mp = ipsec_in_alloc(B_FALSE,
+				    ipst->ips_netstack);
+				if (first_mp == NULL) {
 					ip1dbg(("ip_rput_data_v6: IPSEC_IN "
 					    "allocation failure.\n"));
 					BUMP_MIB(ill->ill_ip_mib,
@@ -8405,15 +8416,16 @@ tcp_fanout:
 				ii = (ipsec_in_t *)first_mp->b_rptr;
 			}
 
-			if (!ipsec_loaded()) {
+			if (!ipsec_loaded(ipss)) {
 				ip_proto_not_sup(q, first_mp, IP_FF_SEND_ICMP,
-				    ire->ire_zoneid);
+				    ire->ire_zoneid, ipst);
 				return;
 			}
 
 			/* select inbound SA and have IPsec process the pkt */
 			if (nexthdr == IPPROTO_ESP) {
-				esph_t *esph = ipsec_inbound_esp_sa(first_mp);
+				esph_t *esph = ipsec_inbound_esp_sa(first_mp,
+				    ipst->ips_netstack);
 				if (esph == NULL)
 					return;
 				ASSERT(ii->ipsec_in_esp_sa != NULL);
@@ -8422,7 +8434,8 @@ tcp_fanout:
 				ipsec_rc = ii->ipsec_in_esp_sa->ipsa_input_func(
 				    first_mp, esph);
 			} else {
-				ah_t *ah = ipsec_inbound_ah_sa(first_mp);
+				ah_t *ah = ipsec_inbound_ah_sa(first_mp,
+				    ipst->ips_netstack);
 				if (ah == NULL)
 					return;
 				ASSERT(ii->ipsec_in_ah_sa != NULL);
@@ -8469,7 +8482,8 @@ udp_fanout:
 	if (mctl_present || IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
 		connp = NULL;
 	} else {
-		connp = ipcl_classify_v6(mp, IPPROTO_UDP, hdr_len, zoneid);
+		connp = ipcl_classify_v6(mp, IPPROTO_UDP, hdr_len, zoneid,
+		    ipst);
 		if ((connp != NULL) && (connp->conn_upq == NULL)) {
 			CONN_DEC_REF(connp);
 			connp = NULL;
@@ -8481,7 +8495,7 @@ udp_fanout:
 
 		ports = *(uint32_t *)(mp->b_rptr + hdr_len +
 		    UDP_PORTS_OFFSET);
-		IP6_STAT(ip6_udp_slow_path);
+		IP6_STAT(ipst, ip6_udp_slow_path);
 		ip_fanout_udp_v6(q, first_mp, ip6h, ports, ill, inill,
 		    (flags|IP_FF_SEND_ICMP|IP_FF_IPINFO), mctl_present,
 		    zoneid);
@@ -8496,7 +8510,7 @@ udp_fanout:
 	}
 
 	/* Initiate IPPF processing */
-	if (IP6_IN_IPP(flags)) {
+	if (IP6_IN_IPP(flags, ipst)) {
 		ip_process(IPP_LOCAL_IN, &mp, ill->ill_phyint->phyint_ifindex);
 		if (mp == NULL) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
@@ -8515,7 +8529,7 @@ udp_fanout:
 		}
 	}
 
-	IP6_STAT(ip6_udp_fast_path);
+	IP6_STAT(ipst, ip6_udp_fast_path);
 	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 
 	/* Send it upstream */
@@ -8567,7 +8581,7 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	boolean_t	pruned = B_FALSE;
 	uint32_t	sum_val;
 	uint16_t	sum_flags;
-
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	if (cksum_val != NULL)
 		*cksum_val = 0;
@@ -8638,14 +8652,14 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 		zoneid_t zoneid;
 
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-		zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst, ill);
+		zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst, ill, ipst);
 		if (zoneid == ALL_ZONES) {
 			freemsg(mp);
 			return (NULL);
 		}
 		icmp_param_problem_v6(WR(q), mp, ICMP6_PARAMPROB_HEADER,
 		    (uint32_t)((char *)&ip6h->ip6_plen -
-		    (char *)ip6h), B_FALSE, B_FALSE, zoneid);
+		    (char *)ip6h), B_FALSE, B_FALSE, zoneid, ipst);
 		return (NULL);
 	}
 
@@ -8664,14 +8678,14 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 		zoneid_t	zoneid;
 
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-		zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst, ill);
+		zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst, ill, ipst);
 		if (zoneid == ALL_ZONES) {
 			freemsg(mp);
 			return (NULL);
 		}
 		icmp_param_problem_v6(WR(q), mp, ICMP6_PARAMPROB_HEADER,
 		    (uint32_t)((char *)&fraghdr->ip6f_offlg -
-		    (char *)ip6h), B_FALSE, B_FALSE, zoneid);
+		    (char *)ip6h), B_FALSE, B_FALSE, zoneid, ipst);
 		return (NULL);
 	}
 
@@ -8687,7 +8701,7 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	 * Drop the fragmented as early as possible, if
 	 * we don't have resource(s) to re-assemble.
 	 */
-	if (ip_reass_queue_bytes == 0) {
+	if (ipst->ips_ip_reass_queue_bytes == 0) {
 		freemsg(mp);
 		return (NULL);
 	}
@@ -8722,9 +8736,10 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	 */
 
 	if ((msg_len + sizeof (*ipf) + ill->ill_frag_count) >=
-	    ip_reass_queue_bytes) {
-		ill_frag_prune(ill, (ip_reass_queue_bytes < msg_len) ? 0
-		    : (ip_reass_queue_bytes - msg_len));
+	    ipst->ips_ip_reass_queue_bytes) {
+		ill_frag_prune(ill,
+		    (ipst->ips_ip_reass_queue_bytes < msg_len) ? 0 :
+		    (ipst->ips_ip_reass_queue_bytes - msg_len));
 		pruned = B_TRUE;
 	}
 
@@ -8790,7 +8805,7 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 			return (NULL);
 		}
 
-		if (ipfb->ipfb_frag_pkts >= MAX_FRAG_PKTS)  {
+		if (ipfb->ipfb_frag_pkts >= MAX_FRAG_PKTS(ipst))  {
 			/*
 			 * Too many fragmented packets in this hash bucket.
 			 * Free the oldest.
@@ -9171,7 +9186,7 @@ done:
  * want to send redirects.
  */
 static boolean_t
-ip_source_routed_v6(ip6_t *ip6h, mblk_t *mp)
+ip_source_routed_v6(ip6_t *ip6h, mblk_t *mp, ip_stack_t *ipst)
 {
 	uint8_t		nexthdr;
 	in6_addr_t	*addrptr;
@@ -9241,7 +9256,8 @@ ip_source_routed_v6(ip6_t *ip6h, mblk_t *mp)
 			if (addrptr != NULL) {
 				ire = ire_ctable_lookup_v6(addrptr, NULL,
 				    IRE_LOCAL, NULL, ALL_ZONES, NULL,
-				    MATCH_IRE_TYPE);
+				    MATCH_IRE_TYPE,
+				    ipst);
 				if (ire != NULL) {
 					ire_refrele(ire);
 					return (B_TRUE);
@@ -9315,6 +9331,16 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 	ill_t		*saved_ill = NULL;
 	boolean_t	conn_lock_held;
 	boolean_t	need_decref = B_FALSE;
+	ip_stack_t	*ipst;
+
+	if (q->q_next != NULL) {
+		ill = (ill_t *)q->q_ptr;
+		ipst = ill->ill_ipst;
+	} else {
+		connp = (conn_t *)arg;
+		ASSERT(connp != NULL);
+		ipst = connp->conn_netstack->netstack_ip;
+	}
 
 	/*
 	 * Highest bit in version field is Reachability Confirmation bit
@@ -9363,7 +9389,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 		 * originating from tcp should have been directed over to
 		 * tcp_multisend() in the first place.
 		 */
-		BUMP_MIB(&ip6_mib, ipIfStatsOutDiscards);
+		BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutDiscards);
 		freemsg(mp);
 		return;
 	} else if (DB_TYPE(mp) == M_CTL) {
@@ -9416,7 +9442,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 			if (mctltype == IPSEC_IN ||
 			    IPVER(ip6h) != IPV6_VERSION ||
 			    io->ipsec_out_proc_begin) {
-				mibptr = &ip6_mib;
+				mibptr = &ipst->ips_ip6_mib;
 				goto notv6;
 			}
 		}
@@ -9428,12 +9454,11 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 	ip6h = (ip6_t *)mp->b_rptr;
 
 	if (IPVER(ip6h) != IPV6_VERSION) {
-		mibptr = &ip6_mib;
+		mibptr = &ipst->ips_ip6_mib;
 		goto notv6;
 	}
 
 	if (q->q_next != NULL) {
-		ill = (ill_t *)q->q_ptr;
 		/*
 		 * We don't know if this ill will be used for IPv6
 		 * until the ILLF_IPV6 flag is set via SIOCSLIFNAME.
@@ -9483,7 +9508,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 			(void) putq(q, mp);
 			return;
 		}
-		mibptr = &ip6_mib;
+		mibptr = &ipst->ips_ip6_mib;
 		unspec_src = connp->conn_unspec_src;
 		do_outrequests = B_TRUE;
 		if (mp->b_flag & MSGHASREF) {
@@ -9506,7 +9531,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 			ASSERT(first_mp == mp);
 			/* XXX Any better way to get the protocol fast ? */
 			if (((mp = ipsec_attach_ipsec_out(mp, connp, NULL,
-			    connp->conn_ulp)) == NULL)) {
+			    connp->conn_ulp, ipst->ips_netstack)) == NULL)) {
 				BUMP_MIB(mibptr, ipIfStatsOutDiscards);
 				if (need_decref)
 					CONN_DEC_REF(connp);
@@ -9619,7 +9644,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 			if (ill != NULL)
 				ill_refrele(ill);
 			ill = ill_lookup_on_ifindex(ip6i->ip6i_ifindex, 1,
-			    NULL, NULL, NULL, NULL);
+			    NULL, NULL, NULL, NULL, ipst);
 			if (ill == NULL) {
 				if (do_outrequests) {
 					BUMP_MIB(mibptr,
@@ -9675,7 +9700,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 				    0, 0, (IRE_LOCAL|IRE_LOOPBACK), NULL,
 				    NULL, connp != NULL ?
 				    IPCL_ZONEID(connp) : zoneid, NULL,
-				    MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY);
+				    MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY, ipst);
 				if (ire == NULL) {
 					if (do_outrequests)
 						BUMP_MIB(mibptr,
@@ -9876,7 +9901,8 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 		 * as it does not really have a real destination to
 		 * talk to.
 		 */
-		ire = ire_cache_lookup_v6(v6dstp, zoneid, MBLK_GETLABEL(mp));
+		ire = ire_cache_lookup_v6(v6dstp, zoneid, MBLK_GETLABEL(mp),
+		    ipst);
 	} else {
 		/*
 		 * IRE_MARK_CONDEMNED is marked in ire_delete. We don't
@@ -9903,7 +9929,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 				IRE_REFRELE_NOTR(ire);
 
 			ire = ire_cache_lookup_v6(v6dstp, zoneid,
-			    MBLK_GETLABEL(mp));
+			    MBLK_GETLABEL(mp), ipst);
 			if (ire != NULL) {
 				IRE_REFHOLD_NOTR(ire);
 
@@ -9957,17 +9983,18 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 			 * NDP packets must have a hop limit of 255; don't
 			 * change the hop limit in that case.
 			 */
-			if ((ip_multirt_ttl > 0) &&
-			    (ip6h->ip6_hops > ip_multirt_ttl) &&
+			if ((ipst->ips_ip_multirt_ttl > 0) &&
+			    (ip6h->ip6_hops > ipst->ips_ip_multirt_ttl) &&
 			    (ip6h->ip6_hops != IPV6_MAX_HOPS)) {
 				if (ip_debug > 3) {
 					ip2dbg(("ip_wput_v6: forcing multirt "
 					    "hop limit to %d (was %d) ",
-					    ip_multirt_ttl, ip6h->ip6_hops));
+					    ipst->ips_ip_multirt_ttl,
+					    ip6h->ip6_hops));
 					pr_addr_dbg("v6dst %s\n", AF_INET6,
 					    &ire->ire_addr_v6);
 				}
-				ip6h->ip6_hops = ip_multirt_ttl;
+				ip6h->ip6_hops = ipst->ips_ip_multirt_ttl;
 			}
 
 			/*
@@ -9982,7 +10009,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 			 */
 			multirt_need_resolve =
 			    ire_multirt_need_resolve_v6(&ire->ire_addr_v6,
-				MBLK_GETLABEL(first_mp));
+				MBLK_GETLABEL(first_mp), ipst);
 			ip2dbg(("ip_wput_v6: ire %p, "
 			    "multirt_need_resolve %d, first_mp %p\n",
 			    (void *)ire, multirt_need_resolve,
@@ -10015,7 +10042,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 				ip6h = (ip6_t *)copy_mp->b_rptr;
 			}
 			ip_newroute_v6(q, copy_mp, &ip6h->ip6_dst,
-			    &ip6h->ip6_src, NULL, zoneid);
+			    &ip6h->ip6_src, NULL, zoneid, ipst);
 		}
 		if (ill != NULL)
 			ill_refrele(ill);
@@ -10099,7 +10126,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 		BUMP_MIB(mibptr, ipIfStatsHCOutRequests);
 	if (need_decref)
 		CONN_DEC_REF(connp);
-	ip_newroute_v6(q, first_mp, v6dstp, &ip6h->ip6_src, NULL, zoneid);
+	ip_newroute_v6(q, first_mp, v6dstp, &ip6h->ip6_src, NULL, zoneid, ipst);
 	if (ill != NULL)
 		ill_refrele(ill);
 	return;
@@ -10241,7 +10268,7 @@ multicast_discard:
 		} else {
 			mutex_exit(&connp->conn_lock);
 			conn_lock_held = B_FALSE;
-			ipif = ipif_lookup_group_v6(v6dstp, zoneid);
+			ipif = ipif_lookup_group_v6(v6dstp, zoneid, ipst);
 			if (ipif == NULL) {
 				ip1dbg(("ip_output_v6: multicast no ipif\n"));
 				goto multicast_discard;
@@ -10309,7 +10336,8 @@ multicast_discard:
 		ASSERT(io->ipsec_out_type == IPSEC_OUT);
 	} else {
 		ASSERT(mp == first_mp);
-		if ((first_mp = ipsec_alloc_ipsec_out()) == NULL) {
+		if ((first_mp = ipsec_alloc_ipsec_out(ipst->ips_netstack)) ==
+		    NULL) {
 			BUMP_MIB(mibptr, ipIfStatsOutDiscards);
 			freemsg(mp);
 			if (ill != NULL)
@@ -10361,7 +10389,7 @@ send_from_ill:
 	 *	  It is used only when ire_cache_lookup is used above.
 	 */
 	ire = ire_ctable_lookup_v6(v6dstp, 0, 0, ill->ill_ipif,
-	    zoneid, MBLK_GETLABEL(mp), match_flags);
+	    zoneid, MBLK_GETLABEL(mp), match_flags, ipst);
 	if (ire != NULL) {
 		/*
 		 * Check if the ire has the RTF_MULTIRT flag, inherited
@@ -10375,17 +10403,18 @@ send_from_ill:
 			 * NDP packets must have a hop limit of 255; don't
 			 * change the hop limit in that case.
 			 */
-			if ((ip_multirt_ttl > 0) &&
-			    (ip6h->ip6_hops > ip_multirt_ttl) &&
+			if ((ipst->ips_ip_multirt_ttl > 0) &&
+			    (ip6h->ip6_hops > ipst->ips_ip_multirt_ttl) &&
 			    (ip6h->ip6_hops != IPV6_MAX_HOPS)) {
 				if (ip_debug > 3) {
 					ip2dbg(("ip_wput_v6: forcing multirt "
 					    "hop limit to %d (was %d) ",
-					    ip_multirt_ttl, ip6h->ip6_hops));
+					    ipst->ips_ip_multirt_ttl,
+					    ip6h->ip6_hops));
 					pr_addr_dbg("v6dst %s\n", AF_INET6,
 					    &ire->ire_addr_v6);
 				}
-				ip6h->ip6_hops = ip_multirt_ttl;
+				ip6h->ip6_hops = ipst->ips_ip_multirt_ttl;
 			}
 
 			/*
@@ -10400,7 +10429,7 @@ send_from_ill:
 			 */
 			multirt_need_resolve =
 			    ire_multirt_need_resolve_v6(&ire->ire_addr_v6,
-				MBLK_GETLABEL(first_mp));
+				MBLK_GETLABEL(first_mp), ipst);
 			ip2dbg(("ip_wput_v6[send_from_ill]: ire %p, "
 			    "multirt_need_resolve %d, first_mp %p\n",
 			    (void *)ire, multirt_need_resolve,
@@ -10440,7 +10469,7 @@ send_from_ill:
 			}
 			if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
 				ipif = ipif_lookup_group_v6(&ip6h->ip6_dst,
-				    zoneid);
+				    zoneid, ipst);
 				if (ipif == NULL) {
 					ip1dbg(("ip_wput_v6: No ipif for "
 					    "multicast\n"));
@@ -10453,7 +10482,7 @@ send_from_ill:
 				ipif_refrele(ipif);
 			} else {
 				ip_newroute_v6(q, copy_mp, &ip6h->ip6_dst,
-				    &ip6h->ip6_src, ill, zoneid);
+				    &ip6h->ip6_src, ill, zoneid, ipst);
 			}
 		}
 		ill_refrele(ill);
@@ -10532,7 +10561,7 @@ send_from_ill:
 		    unspec_src, zoneid);
 	} else {
 		ip_newroute_v6(q, first_mp, v6dstp, &ip6h->ip6_src, ill,
-		    zoneid);
+		    zoneid, ipst);
 	}
 	ill_refrele(ill);
 	return;
@@ -10552,7 +10581,7 @@ notv6:
 			/* The 'q' is the default SCTP queue */
 			connp = (conn_t *)arg;
 		} else {
-			ip_setqinfo(RD(q), IPV4_MINOR, B_TRUE);
+			ip_setqinfo(RD(q), IPV4_MINOR, B_TRUE, ipst);
 		}
 	}
 	BUMP_MIB(mibptr, ipIfStatsOutWrongIPVersion);
@@ -10601,6 +10630,7 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 	mib2_ipIfStatsEntry_t	*mibptr;
 	ilm_t		*ilm;
 	uint_t	nexthdr_offset;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	if (DB_TYPE(mp) == M_CTL) {
 		io = (ipsec_out_t *)mp->b_rptr;
@@ -10630,8 +10660,9 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 	    ill_t *, ill, ill_t *, NULL,
 	    ip6_t *, ip6h, mblk_t *, first_mp);
 
-	FW_HOOKS6(ip6_loopback_in_event, ipv6firewall_loopback_in,
-	    ill, NULL, ip6h, first_mp, mp);
+	FW_HOOKS6(ipst->ips_ip6_loopback_in_event,
+	    ipst->ips_ipv6firewall_loopback_in,
+	    ill, NULL, ip6h, first_mp, mp, ipst);
 
 	DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, first_mp);
 
@@ -10731,7 +10762,7 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 			icmp_update_out_mib_v6(ill, icmp6);
 
 			/* Check variable for testing applications */
-			if (ipv6_drop_inbound_icmpv6) {
+			if (ipst->ips_ipv6_drop_inbound_icmpv6) {
 				freemsg(first_mp);
 				return;
 			}
@@ -10850,6 +10881,8 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 	boolean_t	conn_multicast_loop;	/* conn value for multicast */
 	boolean_t 	multicast_forward;	/* Should we forward ? */
 	int		max_frag;
+	ip_stack_t	*ipst = ire->ire_ipst;
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
 
 	ill = ire_to_ill(ire);
 	first_mp = mp;
@@ -10922,10 +10955,10 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 
 		src_ire = ire_ftable_lookup_v6(&ip6h->ip6_dst, 0, 0, 0,
 		    NULL, NULL, zoneid, 0, NULL, (MATCH_IRE_RECURSIVE |
-		    MATCH_IRE_DEFAULT | MATCH_IRE_RJ_BHOLE));
+		    MATCH_IRE_DEFAULT | MATCH_IRE_RJ_BHOLE), ipst);
 		if (src_ire != NULL &&
 		    !(src_ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE)) &&
-		    (!ip_restrict_interzone_loopback ||
+		    (!ipst->ips_ip_restrict_interzone_loopback ||
 		    ire_local_same_ill_group(ire, src_ire))) {
 			if (IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src) &&
 			    !unspec_src) {
@@ -10942,19 +10975,20 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 				}
 				ire_refrele(src_ire);
 			}
-			if (ip_hdr_complete_v6(ip6h, zoneid)) {
+			if (ip_hdr_complete_v6(ip6h, zoneid, ipst)) {
 				/* Failed */
 				freemsg(first_mp);
 				return;
 			}
 			icmp_unreachable_v6(q, first_mp,
 			    ICMP6_DST_UNREACH_NOROUTE, B_FALSE, B_FALSE,
-			    zoneid);
+			    zoneid, ipst);
 			return;
 		}
 	}
 
-	if (mp->b_datap->db_type == M_CTL || ipsec_outbound_v6_policy_present) {
+	if (mp->b_datap->db_type == M_CTL ||
+	    ipss->ipsec_outbound_v6_policy_present) {
 		mp = ip_wput_ire_parse_ipsec_out(first_mp, NULL, ip6h, ire,
 		    connp, unspec_src, zoneid);
 		if (mp == NULL) {
@@ -11042,9 +11076,11 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 					    ip6_t *, nip6h,
 					    mblk_t *, nmp);
 
-					FW_HOOKS6(ip6_loopback_out_event,
-					    ipv6firewall_loopback_out,
-					    NULL, ill, nip6h, nmp, mp_ip6h);
+					FW_HOOKS6(
+					    ipst->ips_ip6_loopback_out_event,
+					    ipst->ips_ipv6firewall_loopback_out,
+					    NULL, ill, nip6h, nmp, mp_ip6h,
+					    ipst);
 
 					DTRACE_PROBE1(
 					    ip6__loopback__out__end,
@@ -11108,7 +11144,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			 * the queue to enqueue the packet and we discard
 			 * the packet.
 			 */
-			if (ip_output_queue && connp != NULL &&
+			if (ipst->ips_ip_output_queue && connp != NULL &&
 			    !mctl_present && caller != IRE_SEND) {
 				if (caller == IP_WSRV) {
 					connp->conn_did_putbq = 1;
@@ -11261,8 +11297,9 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 
 			/* Software checksum? */
 			if (DB_CKSUMFLAGS(mp) == 0) {
-				IP6_STAT(ip6_out_sw_cksum);
-				IP6_STAT_UPDATE(ip6_tcp_out_sw_cksum_bytes,
+				IP6_STAT(ipst, ip6_out_sw_cksum);
+				IP6_STAT_UPDATE(ipst,
+				    ip6_tcp_out_sw_cksum_bytes,
 				    (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN) -
 				    hdr_length);
 			}
@@ -11308,8 +11345,9 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 
 			/* Software checksum? */
 			if (DB_CKSUMFLAGS(mp) == 0) {
-				IP6_STAT(ip6_out_sw_cksum);
-				IP6_STAT_UPDATE(ip6_udp_out_sw_cksum_bytes,
+				IP6_STAT(ipst, ip6_out_sw_cksum);
+				IP6_STAT_UPDATE(ipst,
+				    ip6_udp_out_sw_cksum_bytes,
 				    (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN) -
 				    hdr_length);
 			}
@@ -11399,7 +11437,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 		    (ire->ire_frag_flag & IPH_FRAG_HDR)) {
 			if (connp != NULL && (flags & IP6I_DONTFRAG)) {
 				icmp_pkt2big_v6(ire->ire_stq, first_mp,
-				    max_frag, B_FALSE, B_TRUE, zoneid);
+				    max_frag, B_FALSE, B_TRUE, zoneid, ipst);
 				return;
 			}
 
@@ -11425,7 +11463,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			    IPV6_HDR_LEN, max_frag));
 			ASSERT(mp == first_mp);
 			/* Initiate IPPF processing */
-			if (IPP_ENABLED(IPP_LOCAL_OUT)) {
+			if (IPP_ENABLED(IPP_LOCAL_OUT, ipst)) {
 				ip_process(IPP_LOCAL_OUT, &mp, ill_index);
 				if (mp == NULL) {
 					return;
@@ -11450,7 +11488,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 				 * generate.
 				 */
 				icmp_pkt2big_v6(ire->ire_stq, first_mp,
-				    max_frag, B_FALSE, B_TRUE, zoneid);
+				    max_frag, B_FALSE, B_TRUE, zoneid, ipst);
 				return;
 			}
 			if (attach_index != 0)
@@ -11480,8 +11518,9 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 		DTRACE_PROBE4(ip6__loopback__out__start,
 		    ill_t *, NULL, ill_t *, ill,
 		    ip6_t *, ip6h, mblk_t *, first_mp);
-		FW_HOOKS6(ip6_loopback_out_event, ipv6firewall_loopback_out,
-		    NULL, ill, ip6h, first_mp, mp);
+		FW_HOOKS6(ipst->ips_ip6_loopback_out_event,
+		    ipst->ips_ipv6firewall_loopback_out,
+		    NULL, ill, ip6h, first_mp, mp, ipst);
 		DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, first_mp);
 		if (first_mp != NULL)
 			ip_wput_local_v6(RD(q), ill, ip6h, first_mp, ire, 0);
@@ -11507,6 +11546,7 @@ ip_wput_frag_mdt_v6(mblk_t *mp, ire_t *ire, size_t max_chunk,
 	uint16_t	offset;
 	queue_t		*stq = ire->ire_stq;
 	ill_t		*ill = (ill_t *)stq->q_ptr;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 	ASSERT(MBLKL(mp) > unfragmentable_len);
@@ -11523,7 +11563,7 @@ ip_wput_frag_mdt_v6(mblk_t *mp, ire_t *ire, size_t max_chunk,
 	ASSERT(pkts > 1);
 
 	/* Allocate a message block which will hold all the IP Headers. */
-	wroff = ip_wroff_extra;
+	wroff = ipst->ips_ip_wroff_extra;
 	hdr_chunk_len = wroff + unfragmentable_len + sizeof (ip6_frag_t);
 
 	i1 = pkts * hdr_chunk_len;
@@ -11539,14 +11579,14 @@ ip_wput_frag_mdt_v6(mblk_t *mp, ire_t *ire, size_t max_chunk,
 		if (md_mp == NULL) {
 			freemsg(hdr_mp);
 		} else {
-free_mmd:		IP6_STAT(ip6_frag_mdt_discarded);
+free_mmd:		IP6_STAT(ipst, ip6_frag_mdt_discarded);
 			freemsg(md_mp);
 		}
-		IP6_STAT(ip6_frag_mdt_allocfail);
+		IP6_STAT(ipst, ip6_frag_mdt_allocfail);
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
 		return;
 	}
-	IP6_STAT(ip6_frag_mdt_allocd);
+	IP6_STAT(ipst, ip6_frag_mdt_allocd);
 
 	/*
 	 * Add a payload buffer to the Multidata; this operation must not
@@ -11655,7 +11695,7 @@ free_mmd:		IP6_STAT(ip6_frag_mdt_discarded);
 				    (void *)mmd, (void *)&pdi, error);
 				/* NOTREACHED */
 			}
-			IP6_STAT(ip6_frag_mdt_addpdescfail);
+			IP6_STAT(ipst, ip6_frag_mdt_addpdescfail);
 			/* Free unattached payload message blocks as well */
 			md_mp->b_cont = mp->b_cont;
 			goto free_mmd;
@@ -11695,7 +11735,7 @@ free_mmd:		IP6_STAT(ip6_frag_mdt_discarded);
 	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets,
 	    (ntohs(ip6h->ip6_plen) - (unfragmentable_len - IPV6_HDR_LEN)) +
 	    pkts * (unfragmentable_len + sizeof (ip6_frag_t)));
-	IP6_STAT_UPDATE(ip6_frag_mdt_pkt_out, pkts);
+	IP6_STAT_UPDATE(ipst, ip6_frag_mdt_pkt_out, pkts);
 
 	ire->ire_ob_pkt_count += pkts;
 	if (ire->ire_ipif != NULL)
@@ -11748,6 +11788,7 @@ ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
 	uint8_t		nexthdr;
 	uint_t		prev_nexthdr_offset;
 	uint8_t		*ptr;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	ASSERT(ire->ire_type == IRE_CACHE);
 	ill = (ill_t *)ire->ire_stq->q_ptr;
@@ -11806,7 +11847,7 @@ ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
 
 	/* Check if we can use MDT to send out the frags. */
 	ASSERT(!IRE_IS_LOCAL(ire));
-	if (ip_multidata_outbound && reachable == 0 &&
+	if (ipst->ips_ip_multidata_outbound && reachable == 0 &&
 	    !(ire->ire_flags & RTF_MULTIRT) && ILL_MDT_CAPABLE(ill) &&
 	    IP_CAN_FRAG_MDT(mp, unfragmentable_len, max_chunk)) {
 		ip_wput_frag_mdt_v6(mp, ire, max_chunk, unfragmentable_len,
@@ -11820,14 +11861,14 @@ ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
 	 * fragment header.  This (or a copy) will be used as the
 	 * first mblk for each fragment we send.
 	 */
-	hmp = allocb(unfragmentable_len + sizeof (ip6_frag_t) + ip_wroff_extra,
-	    BPRI_HI);
+	hmp = allocb(unfragmentable_len + sizeof (ip6_frag_t) +
+	    ipst->ips_ip_wroff_extra, BPRI_HI);
 	if (hmp == NULL) {
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
 		freemsg(mp);
 		return;
 	}
-	hmp->b_rptr += ip_wroff_extra;
+	hmp->b_rptr += ipst->ips_ip_wroff_extra;
 	hmp->b_wptr = hmp->b_rptr + unfragmentable_len + sizeof (ip6_frag_t);
 
 	fip6h = (ip6_t *)hmp->b_rptr;
@@ -12038,6 +12079,7 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 	ire_t		*save_ire = ire;
 	boolean_t	multirt_send = B_FALSE;
 	mblk_t		*next_mp = NULL;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	ip6h = (ip6_t *)mp->b_rptr;
 	ASSERT(!IN6_IS_ADDR_V4MAPPED(&ire->ire_addr_v6));
@@ -12216,7 +12258,7 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 			    ((ill_t *)stq->q_ptr)->ill_phyint->phyint_ifindex;
 
 			/* Initiate IPPF processing */
-			if (IP6_OUT_IPP(flags)) {
+			if (IP6_OUT_IPP(flags, ipst)) {
 				ip_process(IPP_LOCAL_OUT, &mp, ill_index);
 				if (mp == NULL) {
 					BUMP_MIB(ill->ill_ip_mib,
@@ -12323,9 +12365,9 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 			    ill_t *, NULL, ill_t *, out_ill,
 			    ip6_t *, ip6h, mblk_t *, mp);
 
-			FW_HOOKS6(ip6_physical_out_event,
-			    ipv6firewall_physical_out,
-			    NULL, out_ill, ip6h, mp, mp_ip6h);
+			FW_HOOKS6(ipst->ips_ip6_physical_out_event,
+			    ipst->ips_ipv6firewall_physical_out,
+			    NULL, out_ill, ip6h, mp, mp_ip6h, ipst);
 
 			DTRACE_PROBE1(ip6__physical__out__end, mblk_t *, mp);
 
@@ -12507,7 +12549,7 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 					nce->nce_state = ND_DELAY;
 					mutex_exit(&nce->nce_lock);
 					NDP_RESTART_TIMER(nce,
-					    delay_first_probe_time);
+					    ipst->ips_delay_first_probe_time);
 					if (ip_debug > 3) {
 						/* ip2dbg */
 						pr_addr_dbg("ip_xmit_v6: state"
@@ -12572,8 +12614,8 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 		 * position in the queue to enqueue the packet and we discard
 		 * the packet.
 		 */
-		if (ip_output_queue && (connp != NULL) && (io == NULL) &&
-		    (caller != IRE_SEND)) {
+		if (ipst->ips_ip_output_queue && (connp != NULL) &&
+		    (io == NULL) && (caller != IRE_SEND)) {
 			if (caller == IP_WSRV) {
 				connp->conn_did_putbq = 1;
 				(void) putbq(connp->conn_wq, mp);
@@ -12885,8 +12927,9 @@ ip_find_rthdr_v6(ip6_t *ip6h, uint8_t *endptr)
  * (last hop in the routing header when the packet is sent) and
  * the first hop (ip6_dst when the packet is sent)
  */
+/* ARGSUSED2 */
 uint32_t
-ip_massage_options_v6(ip6_t *ip6h, ip6_rthdr_t *rth)
+ip_massage_options_v6(ip6_t *ip6h, ip6_rthdr_t *rth, netstack_t *ns)
 {
 	uint_t		numaddr;
 	uint_t		i;
@@ -12971,6 +13014,7 @@ ip_multirt_apply_membership_v6(int (*fn)(conn_t *, boolean_t,
 	irb_t		*irb;
 	int		index, error = 0;
 	opt_restart_t	*or;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	irb = ire->ire_bucket;
 	ASSERT(irb != NULL);
@@ -12987,7 +13031,7 @@ ip_multirt_apply_membership_v6(int (*fn)(conn_t *, boolean_t,
 
 		ire_gw = ire_ftable_lookup_v6(&ire->ire_gateway_addr_v6, 0, 0,
 		    IRE_INTERFACE, NULL, NULL, ALL_ZONES, 0, NULL,
-		    MATCH_IRE_RECURSIVE | MATCH_IRE_TYPE);
+		    MATCH_IRE_RECURSIVE | MATCH_IRE_TYPE, ipst);
 		/* No resolver exists for the gateway; skip this ire. */
 		if (ire_gw == NULL)
 			continue;
@@ -13030,14 +13074,52 @@ ip_multirt_apply_membership_v6(int (*fn)(conn_t *, boolean_t,
 }
 
 void
-ip6_kstat_init(void)
+*ip6_kstat_init(netstackid_t stackid, ip6_stat_t *ip6_statisticsp)
 {
-	if ((ip6_kstat = kstat_create("ip", 0, "ip6stat",
-		"net", KSTAT_TYPE_NAMED,
-		sizeof (ip6_statistics) / sizeof (kstat_named_t),
-		KSTAT_FLAG_VIRTUAL)) != NULL) {
-		ip6_kstat->ks_data = &ip6_statistics;
-		kstat_install(ip6_kstat);
+	kstat_t *ksp;
+
+	ip6_stat_t template = {
+		{ "ip6_udp_fast_path", 	KSTAT_DATA_UINT64 },
+		{ "ip6_udp_slow_path", 	KSTAT_DATA_UINT64 },
+		{ "ip6_udp_fannorm", 	KSTAT_DATA_UINT64 },
+		{ "ip6_udp_fanmb", 	KSTAT_DATA_UINT64 },
+		{ "ip6_out_sw_cksum",			KSTAT_DATA_UINT64 },
+		{ "ip6_in_sw_cksum",			KSTAT_DATA_UINT64 },
+		{ "ip6_tcp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },
+		{ "ip6_tcp_in_part_hw_cksum_err",	KSTAT_DATA_UINT64 },
+		{ "ip6_tcp_in_sw_cksum_err",		KSTAT_DATA_UINT64 },
+		{ "ip6_tcp_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
+		{ "ip6_udp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },
+		{ "ip6_udp_in_part_hw_cksum_err",	KSTAT_DATA_UINT64 },
+		{ "ip6_udp_in_sw_cksum_err",		KSTAT_DATA_UINT64 },
+		{ "ip6_udp_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
+		{ "ip6_frag_mdt_pkt_out",		KSTAT_DATA_UINT64 },
+		{ "ip6_frag_mdt_discarded",		KSTAT_DATA_UINT64 },
+		{ "ip6_frag_mdt_allocfail",		KSTAT_DATA_UINT64 },
+		{ "ip6_frag_mdt_addpdescfail",		KSTAT_DATA_UINT64 },
+		{ "ip6_frag_mdt_allocd",		KSTAT_DATA_UINT64 },
+	};
+	ksp = kstat_create_netstack("ip", 0, "ip6stat", "net",
+	    KSTAT_TYPE_NAMED, sizeof (template) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL, stackid);
+
+	if (ksp == NULL)
+		return (NULL);
+
+	bcopy(&template, ip6_statisticsp, sizeof (template));
+	ksp->ks_data = (void *)ip6_statisticsp;
+	ksp->ks_private = (void *)(uintptr_t)stackid;
+
+	kstat_install(ksp);
+	return (ksp);
+}
+
+void
+ip6_kstat_fini(netstackid_t stackid, kstat_t *ksp)
+{
+	if (ksp != NULL) {
+		ASSERT(stackid == (netstackid_t)(uintptr_t)ksp->ks_private);
+		kstat_delete_netstack(ksp, stackid);
 	}
 }
 
@@ -13097,6 +13179,7 @@ ip6_set_pktinfo(cred_t *cr, conn_t *connp, struct in6_pktinfo *pkti, mblk_t *mp)
 	ill_t	*ill;
 	ire_t	*ire;
 	int	error;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	/*
 	 * Verify the source address and ifindex. Privileged users can use
@@ -13106,7 +13189,7 @@ ip6_set_pktinfo(cred_t *cr, conn_t *connp, struct in6_pktinfo *pkti, mblk_t *mp)
 	if (pkti->ipi6_ifindex != 0) {
 		ASSERT(connp != NULL);
 		ill = ill_lookup_on_ifindex(pkti->ipi6_ifindex, B_TRUE,
-		    CONNP_TO_WQ(connp), mp, ip_restart_optmgmt, &error);
+		    CONNP_TO_WQ(connp), mp, ip_restart_optmgmt, &error, ipst);
 		if (ill == NULL) {
 			/*
 			 * We just want to know if the interface exists, we
@@ -13123,7 +13206,7 @@ ip6_set_pktinfo(cred_t *cr, conn_t *connp, struct in6_pktinfo *pkti, mblk_t *mp)
 	    secpolicy_net_rawaccess(cr) != 0) {
 		ire = ire_route_lookup_v6(&pkti->ipi6_addr, 0, 0,
 		    (IRE_LOCAL|IRE_LOOPBACK), NULL, NULL,
-		    connp->conn_zoneid, NULL, MATCH_IRE_TYPE);
+		    connp->conn_zoneid, NULL, MATCH_IRE_TYPE, ipst);
 		if (ire != NULL)
 			ire_refrele(ire);
 		else

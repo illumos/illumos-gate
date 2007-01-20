@@ -152,6 +152,7 @@ sctp_timer_alloc(sctp_t *sctp, pfv_t func)
 	mblk_t *mp;
 	sctp_tb_t *sctp_tb;
 	sctpt_t	*sctpt;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if ((mp = allocb(sizeof (sctp_t) + sizeof (sctp_tb_t), BPRI_HI))) {
 		mp->b_datap->db_type = M_PCSIG;
@@ -167,7 +168,7 @@ sctp_timer_alloc(sctp_t *sctp, pfv_t func)
 		sctpt->sctpt_pfv = func;
 		return (mp);
 	}
-	SCTP_KSTAT(sctp_add_timer);
+	SCTP_KSTAT(sctps, sctp_add_timer);
 	return (NULL);
 }
 
@@ -364,9 +365,11 @@ sctp_timer_call(sctp_t *sctp, mblk_t *mp)
 void
 sctp_ack_timer(sctp_t *sctp)
 {
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
+
 	sctp->sctp_ack_timer_running = 0;
-	sctp->sctp_sack_toggle = sctp_deferred_acks_max;
-	BUMP_MIB(&sctp_mib, sctpOutAckDelayed);
+	sctp->sctp_sack_toggle = sctps->sctps_deferred_acks_max;
+	BUMP_MIB(&sctps->sctps_mib, sctpOutAckDelayed);
 	sctp_sack(sctp, NULL);
 }
 
@@ -380,6 +383,7 @@ sctp_heartbeat_timer(sctp_t *sctp)
 	int64_t		now;
 	int64_t		earliest_expiry;
 	int		cnt;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (sctp->sctp_strikes >= sctp->sctp_pa_max_rxt) {
 		/*
@@ -393,8 +397,8 @@ sctp_heartbeat_timer(sctp_t *sctp)
 		 */
 		if (!sctp_is_a_faddr_clean(sctp)) {
 			/* time to give up */
-			BUMP_MIB(&sctp_mib, sctpAborted);
-			BUMP_MIB(&sctp_mib, sctpTimHeartBeatDrop);
+			BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+			BUMP_MIB(&sctps->sctps_mib, sctpTimHeartBeatDrop);
 			sctp_assoc_event(sctp, SCTP_COMM_LOST, 0, NULL);
 			sctp_clean_death(sctp, sctp->sctp_client_errno ?
 			    sctp->sctp_client_errno : ETIMEDOUT);
@@ -410,7 +414,7 @@ sctp_heartbeat_timer(sctp_t *sctp)
 
 	now = lbolt64;
 	earliest_expiry = 0;
-	cnt = sctp_maxburst;
+	cnt = sctps->sctps_maxburst;
 
 	/*
 	 * Walk through all faddrs.  Since the timer should run infrequently
@@ -528,6 +532,7 @@ sctp_rexmit_timer(sctp_t *sctp, sctp_faddr_t *fp)
 {
 	mblk_t 		*mp;
 	uint32_t	rto_max = sctp->sctp_rto_max;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	ASSERT(fp != NULL);
 
@@ -540,8 +545,8 @@ sctp_rexmit_timer(sctp_t *sctp, sctp_faddr_t *fp)
 	if (sctp->sctp_state < SCTPS_ESTABLISHED) {
 		if (fp->strikes >= sctp->sctp_max_init_rxt) {
 			/* time to give up */
-			BUMP_MIB(&sctp_mib, sctpAborted);
-			BUMP_MIB(&sctp_mib, sctpTimRetransDrop);
+			BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+			BUMP_MIB(&sctps->sctps_mib, sctpTimRetransDrop);
 			sctp_assoc_event(sctp, SCTP_CANT_STR_ASSOC, 0, NULL);
 			sctp_clean_death(sctp, sctp->sctp_client_errno ?
 			    sctp->sctp_client_errno : ETIMEDOUT);
@@ -550,8 +555,8 @@ sctp_rexmit_timer(sctp_t *sctp, sctp_faddr_t *fp)
 	} else if (sctp->sctp_state >= SCTPS_ESTABLISHED) {
 		if (sctp->sctp_strikes >= sctp->sctp_pa_max_rxt) {
 			/* time to give up */
-			BUMP_MIB(&sctp_mib, sctpAborted);
-			BUMP_MIB(&sctp_mib, sctpTimRetransDrop);
+			BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+			BUMP_MIB(&sctps->sctps_mib, sctpTimRetransDrop);
 			sctp_assoc_event(sctp, SCTP_COMM_LOST, 0, NULL);
 			sctp_clean_death(sctp, sctp->sctp_client_errno ?
 			    sctp->sctp_client_errno : ETIMEDOUT);
@@ -593,7 +598,7 @@ sctp_rexmit_timer(sctp_t *sctp, sctp_faddr_t *fp)
 			return;
 		}
 
-		BUMP_MIB(&sctp_mib, sctpTimRetrans);
+		BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
 
 		sctp_rexmit(sctp, fp);
 		/*
@@ -612,7 +617,7 @@ rxmit_init:
 		 */
 		mp = sctp_init_mp(sctp);
 		if (mp != NULL) {
-			BUMP_MIB(&sctp_mib, sctpTimRetrans);
+			BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
 			sctp_add_sendq(sctp, mp);
 		}
 		rto_max = sctp->sctp_init_rto_max;
@@ -633,14 +638,14 @@ rxmit_init:
 		if (IPH_HDR_VERSION(iph) == IPV4_VERSION)
 			iph->ipha_ident = 0;
 		sctp_add_sendq(sctp, mp);
-		BUMP_MIB(&sctp_mib, sctpTimRetrans);
+		BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
 		rto_max = sctp->sctp_init_rto_max;
 		break;
 	}
 	case SCTPS_SHUTDOWN_SENT:
 		BUMP_LOCAL(sctp->sctp_T2expire);
 		sctp_send_shutdown(sctp, 1);
-		BUMP_MIB(&sctp_mib, sctpTimRetrans);
+		BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
 		break;
 	case SCTPS_SHUTDOWN_ACK_SENT:
 		/* We shouldn't have any more outstanding data */
@@ -650,7 +655,7 @@ rxmit_init:
 		BUMP_LOCAL(sctp->sctp_T2expire);
 		(void) sctp_shutdown_received(sctp, NULL, B_FALSE, B_TRUE,
 		    NULL);
-		BUMP_MIB(&sctp_mib, sctpTimRetrans);
+		BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
 		break;
 	default:
 		ASSERT(0);

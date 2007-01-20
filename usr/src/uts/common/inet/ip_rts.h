@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,12 +40,14 @@ extern "C" {
 #define	TSOL_RTSA_REQUEST_MAX	1	/* one per route destination */
 
 #ifdef _KERNEL
+
 extern	void	ip_rts_change(int, ipaddr_t, ipaddr_t,
     ipaddr_t, ipaddr_t, ipaddr_t, int, int,
-    int);
+    int, ip_stack_t *);
 
 extern	void	ip_rts_change_v6(int, const in6_addr_t *, const in6_addr_t *,
-    const in6_addr_t *, const in6_addr_t *, const in6_addr_t *, int, int, int);
+    const in6_addr_t *, const in6_addr_t *, const in6_addr_t *, int, int, int,
+    ip_stack_t *);
 
 extern	void	ip_rts_ifmsg(const ipif_t *);
 
@@ -53,7 +55,7 @@ extern	void	ip_rts_newaddrmsg(int, int, const ipif_t *);
 
 extern	int	ip_rts_request(queue_t *, mblk_t *, cred_t *);
 
-extern	void	ip_rts_rtmsg(int, ire_t *, int);
+extern	void	ip_rts_rtmsg(int, ire_t *, int, ip_stack_t *);
 
 extern	mblk_t	*rts_alloc_msg(int, int, sa_family_t, uint_t);
 
@@ -66,7 +68,8 @@ extern	void	rts_fill_msg_v6(int, int, const in6_addr_t *,
 
 extern	size_t	rts_header_msg_size(int);
 
-extern	void	rts_queue_input(mblk_t *, queue_t *, sa_family_t);
+extern	void	rts_queue_input(mblk_t *, queue_t *, sa_family_t,
+    ip_stack_t *);
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus

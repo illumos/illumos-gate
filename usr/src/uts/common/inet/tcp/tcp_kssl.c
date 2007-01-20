@@ -50,6 +50,7 @@
 #include <inet/mi.h>
 #include <inet/mib2.h>
 #include <inet/tcp.h>
+#include <inet/ipsec_impl.h>
 #include <inet/ipdrop.h>
 #include <inet/tcp_trace.h>
 #include <inet/tcp_impl.h>

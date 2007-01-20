@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -444,6 +444,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	boolean_t		linklocal = B_FALSE;
 	cred_t			*cr;
 	ts_label_t		*initlabel;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 	isv4 = (IPH_HDR_VERSION(initmp->b_rptr) == IPV4_VERSION);
@@ -520,7 +521,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	if (sctp->sctp_send_adaption)
 		iacklen += (sizeof (sctp_parm_hdr_t) + sizeof (uint32_t));
 	if (((sctp_options & SCTP_PRSCTP_OPTION) || initcollision) &&
-	    sctp->sctp_prsctp_aware && sctp_prsctp_enabled) {
+	    sctp->sctp_prsctp_aware && sctps->sctps_prsctp_enabled) {
 		iacklen += sctp_options_param_len(sctp, SCTP_PRSCTP_OPTION);
 	}
 	if (initcollision)
@@ -562,10 +563,10 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 			    SCTP_ERR_NO_RESOURCES, NULL, 0, initmp, 0, B_FALSE);
 			return;
 		}
-		iackmp = allocb_cred(ipsctplen + sctp_wroff_xtra, cr);
+		iackmp = allocb_cred(ipsctplen + sctps->sctps_wroff_xtra, cr);
 		crfree(cr);
 	} else {
-		iackmp = allocb_cred(ipsctplen + sctp_wroff_xtra,
+		iackmp = allocb_cred(ipsctplen + sctps->sctps_wroff_xtra,
 		    CONN_CRED(sctp->sctp_connp));
 	}
 	if (iackmp == NULL) {
@@ -575,7 +576,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	}
 
 	/* Copy in the [imcomplete] IP/SCTP composite header */
-	p = (char *)(iackmp->b_rptr + sctp_wroff_xtra);
+	p = (char *)(iackmp->b_rptr + sctps->sctps_wroff_xtra);
 	iackmp->b_rptr = (uchar_t *)p;
 	if (isv4) {
 		bcopy(sctp->sctp_iphc, p, sctp->sctp_hdr_len);
@@ -628,7 +629,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	if (!linklocal)
 		p += sctp_addr_params(sctp, supp_af, (uchar_t *)p);
 	if (((sctp_options & SCTP_PRSCTP_OPTION) || initcollision) &&
-	    sctp->sctp_prsctp_aware && sctp_prsctp_enabled) {
+	    sctp->sctp_prsctp_aware && sctps->sctps_prsctp_enabled) {
 		p += sctp_options_param(sctp, p, SCTP_PRSCTP_OPTION);
 	}
 	/*
@@ -711,9 +712,9 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	 * older than the new secret lifetime parameter permits,
 	 * copying the current secret to sctp_old_secret.
 	 */
-	if (sctp_new_secret_interval > 0 &&
+	if (sctps->sctps_new_secret_interval > 0 &&
 	    (sctp->sctp_last_secret_update +
-	    MSEC_TO_TICK(sctp_new_secret_interval)) <= nowt) {
+	    MSEC_TO_TICK(sctps->sctps_new_secret_interval)) <= nowt) {
 		bcopy(sctp->sctp_secret, sctp->sctp_old_secret,
 		    SCTP_SECRET_LEN);
 		(void) random_get_pseudo_bytes(sctp->sctp_secret,
@@ -734,10 +735,12 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 
 		if (isv4)
 			err = tsol_check_label(cr, &iackmp, &adjust,
-			    connp->conn_mac_exempt);
+			    connp->conn_mac_exempt,
+			    sctps->sctps_netstack->netstack_ip);
 		else
 			err = tsol_check_label_v6(cr, &iackmp, &adjust,
-			    connp->conn_mac_exempt);
+			    connp->conn_mac_exempt,
+			    sctps->sctps_netstack->netstack_ip);
 		if (err != 0) {
 			sctp_send_abort(sctp, sctp_init2vtag(ch),
 			    SCTP_ERR_AUTH_ERR, NULL, 0, initmp, 0, B_FALSE);
@@ -772,11 +775,12 @@ sctp_send_cookie_ack(sctp_t *sctp)
 {
 	sctp_chunk_hdr_t *cach;
 	mblk_t *camp;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	camp = sctp_make_mp(sctp, NULL, sizeof (*cach));
 	if (camp == NULL) {
 		/* XXX should abort, but don't have the inmp anymore */
-		SCTP_KSTAT(sctp_send_cookie_ack_failed);
+		SCTP_KSTAT(sctps, sctp_send_cookie_ack_failed);
 		return;
 	}
 
@@ -833,13 +837,14 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 	uint_t			sctp_options;
 	int			error;
 	uint16_t		old_num_str;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
 	iack = (sctp_init_chunk_t *)(iackch + 1);
 
 	cph = NULL;
 	if (validate_init_params(sctp, iackch, iack, iackmp, &cph, &errmp,
 	    &pad, &sctp_options) == 0) { /* result in 'pad' ignored */
-		BUMP_MIB(&sctp_mib, sctpAborted);
+		BUMP_MIB(&sctps->sctps_mib, sctpAborted);
 		sctp_assoc_event(sctp, SCTP_CANT_STR_ASSOC, 0, NULL);
 		sctp_clean_death(sctp, ECONNABORTED);
 		return;
@@ -858,7 +863,8 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 	else
 		hdrlen = sctp->sctp_hdr6_len;
 
-	cemp = allocb(sctp_wroff_xtra + hdrlen + ceclen + pad, BPRI_MED);
+	cemp = allocb(sctps->sctps_wroff_xtra + hdrlen + ceclen + pad,
+	    BPRI_MED);
 	if (cemp == NULL) {
 		SCTP_FADDR_TIMER_RESTART(sctp, sctp->sctp_current,
 		    sctp->sctp_current->rto);
@@ -866,7 +872,7 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 			freeb(errmp);
 		return;
 	}
-	cemp->b_rptr += (sctp_wroff_xtra + hdrlen);
+	cemp->b_rptr += (sctps->sctps_wroff_xtra + hdrlen);
 
 	/* Process the INIT ACK */
 	sctp->sctp_sctph->sh_verf = iack->sic_inittag;
@@ -887,7 +893,7 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 	 * Since IP uses this info during the fanout process, we need to hold
 	 * the lock for this hash line while performing this operation.
 	 */
-	/* XXX sctp_conn_fanout + SCTP_CONN_HASH(sctp->sctp_ports); */
+	/* XXX sctp_conn_fanout + SCTP_CONN_HASH(sctps, sctp->sctp_ports); */
 	ASSERT(sctp->sctp_conn_tfp != NULL);
 	tf = sctp->sctp_conn_tfp;
 	/* sctp isn't a listener so only need to hold conn fanout lock */
@@ -1057,7 +1063,7 @@ sendcookie:
 		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
 		if (errmp != NULL)
 			freeb(errmp);
-		SCTP_KSTAT(sctp_send_cookie_failed);
+		SCTP_KSTAT(sctps, sctp_send_cookie_failed);
 		return;
 	}
 	/*
@@ -1112,6 +1118,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 	uint32_t		*lttag;
 	uint32_t		*fttag;
 	uint32_t		ports;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 	/* Verify the ICV */
@@ -1183,7 +1190,8 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 
 	/* Check for attack by adding addresses to a restart */
 	bcopy(insctph, &ports, sizeof (ports));
-	if (sctp_secure_restart_check(cmp, initch, ports, KM_NOSLEEP) != 1) {
+	if (sctp_secure_restart_check(cmp, initch, ports, KM_NOSLEEP,
+	    sctps) != 1) {
 		return (-1);
 	}
 
@@ -1311,7 +1319,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
  */
 sctp_t *
 sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
-    uint_t ipif_seqid, zoneid_t zoneid)
+    uint_t ipif_seqid, zoneid_t zoneid, sctp_stack_t *sctps)
 {
 	int isv4;
 	ipha_t *iph;
@@ -1359,7 +1367,7 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 			    &src);
 
 			sctp = sctp_conn_match(&src, &dst, ports, ipif_seqid,
-			    zoneid);
+			    zoneid, sctps);
 
 			dprint(1,
 			    ("sctp_addrlist2sctp: src=%x:%x:%x:%x, sctp=%p\n",
@@ -1372,7 +1380,7 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 		} else if (ph->sph_type == PARM_ADDR6) {
 			src = *(in6_addr_t *)(ph + 1);
 			sctp = sctp_conn_match(&src, &dst, ports, ipif_seqid,
-			    zoneid);
+			    zoneid, sctps);
 
 			dprint(1,
 			    ("sctp_addrlist2sctp: src=%x:%x:%x:%x, sctp=%p\n",

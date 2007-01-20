@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -321,6 +321,7 @@ static void
 ilm_gen_filter(ilm_t *ilm, mcast_record_t *fmode, slist_t *flist)
 {
 	ilm_fbld_t fbld;
+	ip_stack_t *ipst = ilm->ilm_ipst;
 
 	fbld.fbld_ilm = ilm;
 	fbld.fbld_in_cnt = fbld.fbld_ex_cnt = 0;
@@ -328,7 +329,7 @@ ilm_gen_filter(ilm_t *ilm, mcast_record_t *fmode, slist_t *flist)
 	fbld.fbld_in_overflow = B_FALSE;
 
 	/* first, construct our master include and exclude lists */
-	ipcl_walk(ilm_bld_flists, (caddr_t)&fbld);
+	ipcl_walk(ilm_bld_flists, (caddr_t)&fbld, ipst);
 
 	/* now use those master lists to generate the interface filter */
 
@@ -1183,6 +1184,7 @@ ip_multicast_loopback(queue_t *q, ill_t *ill, mblk_t *mp_orig, int fanout_flags,
 	mblk_t	*mp;
 	mblk_t	*ipsec_mp;
 	ipha_t	*iph;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	if (DB_TYPE(mp_orig) == M_DATA &&
 	    ((ipha_t *)mp_orig->b_rptr)->ipha_protocol == IPPROTO_UDP) {
@@ -1208,7 +1210,7 @@ ip_multicast_loopback(queue_t *q, ill_t *ill, mblk_t *mp_orig, int fanout_flags,
 			mp = NULL;
 		}
 	} else {
-		mp = ip_copymsg(mp_orig);
+		mp = ip_copymsg(mp_orig); /* No refcnt on ipsec_out netstack */
 	}
 
 	if (mp == NULL)
@@ -1226,8 +1228,9 @@ ip_multicast_loopback(queue_t *q, ill_t *ill, mblk_t *mp_orig, int fanout_flags,
 	    ill_t *, NULL, ill_t *, ill,
 	    ipha_t *, iph, mblk_t *, ipsec_mp);
 
-	FW_HOOKS(ip4_loopback_out_event, ipv4firewall_loopback_out, NULL, ill,
-	    iph, ipsec_mp, mp);
+	FW_HOOKS(ipst->ips_ip4_loopback_out_event,
+	    ipst->ips_ipv4firewall_loopback_out,
+	    NULL, ill, iph, ipsec_mp, mp, ipst);
 
 	DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, ipsec_mp);
 
@@ -1726,6 +1729,9 @@ ilm_add_v6(ipif_t *ipif, const in6_addr_t *v6group, ilg_stat_t ilgstat,
 		ilm->ilm_ipif = ipif;
 		ilm->ilm_ill = NULL;
 	}
+	ASSERT(ill->ill_ipst);
+	ilm->ilm_ipst = ill->ill_ipst;	/* No netstack_hold */
+
 	/*
 	 * After this if ilm moves to a new ill, we don't change
 	 * the ilm_orig_ifindex. Thus, if ill_index != ilm_orig_ifindex,
@@ -1793,6 +1799,7 @@ ilm_walker_cleanup(ill_t *ill)
 			FREE_SLIST(ilm->ilm_pendsrcs);
 			FREE_SLIST(ilm->ilm_rtx.rtx_allow);
 			FREE_SLIST(ilm->ilm_rtx.rtx_block);
+			ilm->ilm_ipst = NULL;
 			mi_free((char *)ilm);
 		} else {
 			ilmp = &(*ilmp)->ilm_next;
@@ -1842,6 +1849,7 @@ ilm_delete(ilm_t *ilm)
 	FREE_SLIST(ilm->ilm_pendsrcs);
 	FREE_SLIST(ilm->ilm_rtx.rtx_allow);
 	FREE_SLIST(ilm->ilm_rtx.rtx_block);
+	ilm->ilm_ipst = NULL;
 	mi_free((char *)ilm);
 }
 
@@ -1874,6 +1882,7 @@ ip_opt_check(conn_t *connp, ipaddr_t group, ipaddr_t src, ipaddr_t ifaddr,
 	ipif_t *ipif;
 	int err = 0;
 	zoneid_t zoneid;
+	ip_stack_t	*ipst =  connp->conn_netstack->netstack_ip;
 
 	if (!CLASSD(group) || CLASSD(src)) {
 		return (EINVAL);
@@ -1885,14 +1894,14 @@ ip_opt_check(conn_t *connp, ipaddr_t group, ipaddr_t src, ipaddr_t ifaddr,
 	ASSERT(!(ifaddr != INADDR_ANY && ifindexp != NULL && *ifindexp != 0));
 	if (ifaddr != INADDR_ANY) {
 		ipif = ipif_lookup_addr(ifaddr, NULL, zoneid,
-		    CONNP_TO_WQ(connp), first_mp, func, &err);
+			CONNP_TO_WQ(connp), first_mp, func, &err, ipst);
 		if (err != 0 && err != EINPROGRESS)
 			err = EADDRNOTAVAIL;
 	} else if (ifindexp != NULL && *ifindexp != 0) {
 		ipif = ipif_lookup_on_ifindex(*ifindexp, B_FALSE, zoneid,
-		    CONNP_TO_WQ(connp), first_mp, func, &err);
+		    CONNP_TO_WQ(connp), first_mp, func, &err, ipst);
 	} else {
-		ipif = ipif_lookup_group(group, zoneid);
+		ipif = ipif_lookup_group(group, zoneid, ipst);
 		if (ipif == NULL)
 			return (EADDRNOTAVAIL);
 	}
@@ -1920,6 +1929,7 @@ ip_opt_check_v6(conn_t *connp, const in6_addr_t *v6group, ipaddr_t *v4group,
 	int err;
 	zoneid_t zoneid = connp->conn_zoneid;
 	queue_t *wq = CONNP_TO_WQ(connp);
+	ip_stack_t *ipst = connp->conn_netstack->netstack_ip;
 
 	src_unspec = IN6_IS_ADDR_UNSPECIFIED(v6src);
 
@@ -1949,15 +1959,15 @@ ip_opt_check_v6(conn_t *connp, const in6_addr_t *v6group, ipaddr_t *v4group,
 
 	if (ifindex == 0) {
 		if (*isv6)
-			ill = ill_lookup_group_v6(v6group, zoneid);
+			ill = ill_lookup_group_v6(v6group, zoneid, ipst);
 		else
-			ipif = ipif_lookup_group(*v4group, zoneid);
+			ipif = ipif_lookup_group(*v4group, zoneid, ipst);
 		if (ill == NULL && ipif == NULL)
 			return (EADDRNOTAVAIL);
 	} else {
 		if (*isv6) {
 			ill = ill_lookup_on_ifindex(ifindex, B_TRUE,
-			    wq, first_mp, func, &err);
+			    wq, first_mp, func, &err, ipst);
 			if (ill != NULL &&
 			    !ipif_lookup_zoneid(ill, zoneid, 0, NULL)) {
 				ill_refrele(ill);
@@ -1966,7 +1976,7 @@ ip_opt_check_v6(conn_t *connp, const in6_addr_t *v6group, ipaddr_t *v4group,
 			}
 		} else {
 			ipif = ipif_lookup_on_ifindex(ifindex, B_FALSE,
-			    zoneid, wq, first_mp, func, &err);
+			    zoneid, wq, first_mp, func, &err, ipst);
 		}
 		if (ill == NULL && ipif == NULL)
 			return (err);
@@ -2584,9 +2594,11 @@ ip_extract_msfilter(queue_t *q, mblk_t *mp, ipif_t **ipifpp, ipsq_func_t func)
 	in6_addr_t v6grp;
 	uint32_t index;
 	zoneid_t zoneid;
+	ip_stack_t *ipst;
 
 	connp = Q_TO_CONN(q);
 	zoneid = connp->conn_zoneid;
+	ipst = connp->conn_netstack->netstack_ip;
 
 	/* don't allow multicast operations on a tcp conn */
 	if (IPCL_IS_TCP(connp))
@@ -2601,12 +2613,12 @@ ip_extract_msfilter(queue_t *q, mblk_t *mp, ipif_t **ipifpp, ipsq_func_t func)
 		v4addr = imsf->imsf_interface.s_addr;
 		v4grp = imsf->imsf_multiaddr.s_addr;
 		if (v4addr == INADDR_ANY) {
-			ipif = ipif_lookup_group(v4grp, zoneid);
+			ipif = ipif_lookup_group(v4grp, zoneid, ipst);
 			if (ipif == NULL)
 				err = EADDRNOTAVAIL;
 		} else {
 			ipif = ipif_lookup_addr(v4addr, NULL, zoneid, q, mp,
-			    func, &err);
+						func, &err, ipst);
 		}
 	} else {
 		boolean_t isv6 = B_FALSE;
@@ -2628,15 +2640,17 @@ ip_extract_msfilter(queue_t *q, mblk_t *mp, ipif_t **ipifpp, ipsq_func_t func)
 			return (EAFNOSUPPORT);
 		}
 		if (index == 0) {
-			if (isv6)
-				ipif = ipif_lookup_group_v6(&v6grp, zoneid);
-			else
-				ipif = ipif_lookup_group(v4grp, zoneid);
+			if (isv6) {
+				ipif = ipif_lookup_group_v6(&v6grp, zoneid,
+				    ipst);
+			} else {
+				ipif = ipif_lookup_group(v4grp, zoneid, ipst);
+			}
 			if (ipif == NULL)
 				err = EADDRNOTAVAIL;
 		} else {
 			ipif = ipif_lookup_on_ifindex(index, isv6, zoneid,
-			    q, mp, func, &err);
+			    q, mp, func, &err, ipst);
 		}
 	}
 
@@ -4010,7 +4024,9 @@ void
 reset_conn_ipif(ipif)
 	ipif_t	*ipif;
 {
-	ipcl_walk(conn_delete_ipif, (caddr_t)ipif);
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
+
+	ipcl_walk(conn_delete_ipif, (caddr_t)ipif, ipst);
 }
 
 /*
@@ -4021,7 +4037,9 @@ reset_conn_ipif(ipif)
 void
 reset_conn_ill(ill_t *ill)
 {
-	ipcl_walk(conn_delete_ill, (caddr_t)ill);
+	ip_stack_t	*ipst = ill->ill_ipst;
+
+	ipcl_walk(conn_delete_ill, (caddr_t)ill, ipst);
 }
 
 #ifdef DEBUG
@@ -4037,9 +4055,10 @@ ilm_walk_ill(ill_t *ill)
 	ill_t *till;
 	ilm_t *ilm;
 	ill_walk_context_t ctx;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	rw_enter(&ill_g_lock, RW_READER);
-	till = ILL_START_WALK_ALL(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	till = ILL_START_WALK_ALL(&ctx, ipst);
 	for (; till != NULL; till = ill_next(&ctx, till)) {
 		for (ilm = till->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
 			if (ilm->ilm_ill == ill) {
@@ -4047,7 +4066,7 @@ ilm_walk_ill(ill_t *ill)
 			}
 		}
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	return (cnt);
 }
@@ -4062,8 +4081,9 @@ ilm_walk_ipif(ipif_t *ipif)
 	ill_t *till;
 	ilm_t *ilm;
 	ill_walk_context_t ctx;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
-	till = ILL_START_WALK_ALL(&ctx);
+	till = ILL_START_WALK_ALL(&ctx, ipst);
 	for (; till != NULL; till = ill_next(&ctx, till)) {
 		for (ilm = till->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
 			if (ilm->ilm_ipif == ipif) {

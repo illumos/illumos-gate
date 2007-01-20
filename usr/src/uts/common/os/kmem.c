@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,7 @@
 #include <sys/reboot.h>
 #include <sys/id32.h>
 #include <sys/zone.h>
+#include <sys/netstack.h>
 
 extern void streams_msg_init(void);
 extern int segkp_fromheap;
@@ -2601,6 +2602,7 @@ kmem_init(void)
 	 * can register their callbacks.
 	 */
 	zone_zsd_init();
+
 	log_init();
 	taskq_init();
 
@@ -2647,6 +2649,12 @@ kmem_init(void)
 	 * Initialize 32-bit ID cache.
 	 */
 	id32_init();
+
+	/*
+	 * Initialize the networking stack so modules loaded can
+	 * register their callbacks.
+	 */
+	netstack_init();
 }
 
 void

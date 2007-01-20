@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,7 @@
 zoneid_t
 zone_create(const char *name, const char *root, const struct priv_set *privs,
     const char *rctls, size_t rctlsz, const char *zfs, size_t zfssz,
-    int *extended_error, int match, int doi, const bslabel_t *label)
+    int *extended_error, int match, int doi, const bslabel_t *label, int flags)
 {
 	zone_def  zd;
 	priv_data_t *d;
@@ -63,6 +63,7 @@ zone_create(const char *name, const char *root, const struct priv_set *privs,
 	zd.match = match;
 	zd.doi = doi;
 	zd.label = label;
+	zd.flags = flags;
 
 	return ((zoneid_t)syscall(SYS_zone, ZONE_CREATE, &zd));
 }
@@ -220,4 +221,29 @@ int
 zone_version(int *version)
 {
 	return (syscall(SYS_zone, ZONE_VERSION, version));
+}
+
+
+int
+zone_add_datalink(zoneid_t zoneid, char *dlname)
+{
+	return (syscall(SYS_zone, ZONE_ADD_DATALINK, zoneid, dlname));
+}
+
+int
+zone_remove_datalink(zoneid_t zoneid, char *dlname)
+{
+	return (syscall(SYS_zone, ZONE_DEL_DATALINK, zoneid, dlname));
+}
+
+int
+zone_check_datalink(zoneid_t *zoneidp, char *dlname)
+{
+	return (syscall(SYS_zone, ZONE_CHECK_DATALINK, zoneidp, dlname));
+}
+
+int
+zone_list_datalink(zoneid_t zoneid, int *dlnump, char *buf)
+{
+	return (syscall(SYS_zone, ZONE_LIST_DATALINK, zoneid, dlnump, buf));
 }

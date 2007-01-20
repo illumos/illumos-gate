@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -36,12 +36,6 @@ extern "C" {
 #if defined(_KERNEL)
 
 #define	INFINITY	0xffffffffU
-
-extern	uint_t igmp_deferred_next;
-extern	uint_t mld_deferred_next;
-extern	kmutex_t igmp_slowtimeout_lock;
-extern	kmutex_t mld_slowtimeout_lock;
-
 /*
  * Enum used to pass ilg status to ip_addmulti() and friends. There
  * are three possibilities: the group is being joined from within ip,
@@ -113,15 +107,16 @@ extern	int		ip_leave_allmulti(ipif_t *);
 extern	void		ip_multicast_loopback(queue_t *, ill_t *, mblk_t *,
     int, zoneid_t);
 extern	int		ip_mforward(ill_t *, ipha_t *, mblk_t *);
-extern	void		ip_mroute_decap(queue_t *, mblk_t *);
-extern	int		ip_mroute_mrt(mblk_t *);
-extern	int		ip_mroute_stats(mblk_t *);
-extern	int		ip_mroute_vif(mblk_t *);
-extern	int		ip_mrouter_done(mblk_t *);
+extern	void		ip_mroute_decap(queue_t *, mblk_t *, ill_t *);
+extern	int		ip_mroute_mrt(mblk_t *, ip_stack_t *);
+extern	int		ip_mroute_stats(mblk_t *, ip_stack_t *);
+extern	int		ip_mroute_vif(mblk_t *, ip_stack_t *);
+extern	int		ip_mrouter_done(mblk_t *, ip_stack_t *);
 extern	int		ip_mrouter_get(int, queue_t *, uchar_t *);
 extern	int		ip_mrouter_set(int, queue_t *, int, uchar_t *, int,
     mblk_t *);
-
+extern	void		ip_mrouter_stack_init(ip_stack_t *);
+extern	void		ip_mrouter_stack_destroy(ip_stack_t *);
 
 extern	int		ip_opt_add_group(conn_t *, boolean_t, ipaddr_t,
     ipaddr_t, uint_t *, mcast_record_t, ipaddr_t, mblk_t *first_mp);
@@ -143,17 +138,16 @@ extern	void		ip_wput_ctl(queue_t *, mblk_t *);
 extern  int	mrt_ioctl(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
     ip_ioctl_cmd_t *ipip, void *if_req);
 
-extern	int		pim_input(queue_t *, mblk_t *);
+extern	int		pim_input(queue_t *, mblk_t *, ill_t *);
 extern	void		reset_conn_ipif(ipif_t *);
 extern	void		reset_conn_ill(ill_t *);
 extern	void		reset_mrt_ill(ill_t *);
 extern	void		reset_mrt_vif_ipif(ipif_t *);
-extern	void		igmp_start_timers(unsigned);
-extern	void		mld_start_timers(unsigned);
+extern	void		igmp_start_timers(unsigned, ip_stack_t *);
+extern	void		mld_start_timers(unsigned, ip_stack_t *);
 /*
  * Extern variables
  */
-extern  queue_t *ip_g_mrouter;
 
 #endif /* _KERNEL */
 

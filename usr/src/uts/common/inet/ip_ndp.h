@@ -86,9 +86,9 @@ typedef struct nce_s {
 /*
  * The ndp_g_t structure contains protocol specific information needed
  * to synchronize and manage neighbor cache entries for IPv4 and IPv6.
- * There are 2 such structures, ndp4 and ndp6.
- * ndp6 contains the data structures needed for IPv6 Neighbor Discovery.
- * ndp4 has IPv4 link layer info in its nce_t structures
+ * There are 2 such structures, ips_ndp4 and ips_ndp6.
+ * ips_ndp6 contains the data structures needed for IPv6 Neighbor Discovery.
+ * ips_ndp4 has IPv4 link layer info in its nce_t structures
  * Note that the nce_t is not currently used as the arp cache itself;
  * it is used for the following purposes:
  *   - queue packets in nce_qd_mp while waiting for arp resolution to complete
@@ -116,8 +116,6 @@ typedef	struct ndp_g_s {
 	int		ndp_g_walker; /* # of active thread walking hash list */
 	boolean_t	ndp_g_walker_cleanup; /* true implies defer deletion. */
 } ndp_g_t;
-
-extern ndp_g_t	ndp4, ndp6;
 
 /* nce_flags  */
 #define	NCE_F_PERMANENT		0x1
@@ -289,6 +287,9 @@ typedef struct {
 	(addr).s6_addr8[10] ^ (addr).s6_addr8[13] ^			\
 	(addr).s6_addr8[14] ^ (addr).s6_addr8[15]) % (table_size))
 
+/* NDP Cache Entry Hash Table */
+#define	NCE_TABLE_SIZE	256
+
 extern	void	ndp_cache_count(nce_t *, char *);
 extern	void	ndp_cache_reclaim(nce_t *, char *);
 extern	void	ndp_delete(nce_t *);
@@ -298,7 +299,7 @@ extern	boolean_t ndp_fastpath_update(nce_t *, void  *);
 extern	nd_opt_hdr_t *ndp_get_option(nd_opt_hdr_t *, int, int);
 extern	void	ndp_inactive(nce_t *);
 extern	void	ndp_input(ill_t *, mblk_t *, mblk_t *);
-extern	boolean_t ndp_lookup_ipaddr(in_addr_t);
+extern	boolean_t ndp_lookup_ipaddr(in_addr_t, netstack_t *);
 extern	nce_t	*ndp_lookup_v6(ill_t *, const in6_addr_t *, boolean_t);
 extern	nce_t	*ndp_lookup_v4(ill_t *, const in_addr_t *, boolean_t);
 extern	int	ndp_lookup_then_add(ill_t *, uchar_t *, const void *,
@@ -314,7 +315,7 @@ extern	int	ndp_resolver(ill_t *, const in6_addr_t *, mblk_t *, zoneid_t);
 extern	int	ndp_sioc_update(ill_t *, lif_nd_req_t *);
 extern	boolean_t	ndp_verify_optlen(nd_opt_hdr_t *, int);
 extern	void	ndp_timer(void *);
-extern	void	ndp_walk(ill_t *, pfi_t, void *);
+extern	void	ndp_walk(ill_t *, pfi_t, void *, ip_stack_t *);
 extern	void	ndp_walk_common(ndp_g_t *, ill_t *, pfi_t,
     void *, boolean_t);
 extern	int	ndp_add(ill_t *, uchar_t *, const void *,

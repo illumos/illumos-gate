@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,28 +120,18 @@ struct srcid_map {
 };
 typedef struct srcid_map srcid_map_t;
 
-static uint_t		srcid_nextid(void);
+static uint_t		srcid_nextid(ip_stack_t *);
 static srcid_map_t	**srcid_lookup_addr(const in6_addr_t *addr,
-    zoneid_t zoneid);
-static srcid_map_t	**srcid_lookup_id(uint_t id);
+    zoneid_t zoneid, ip_stack_t *);
+static srcid_map_t	**srcid_lookup_id(uint_t id, ip_stack_t *);
 
-
-/*
- * ID used to assign next free one.
- * Increases by one. Once it wraps we search for an unused ID.
- */
-static uint_t		ip_src_id = 1;
-static boolean_t	srcid_wrapped = B_FALSE;
-
-static srcid_map_t	*srcid_head;
-krwlock_t		srcid_lock;
 
 /*
  * Insert/add a new address to the map.
  * Returns zero if ok; otherwise errno (e.g. for memory allocation failure).
  */
 int
-ip_srcid_insert(const in6_addr_t *addr, zoneid_t zoneid)
+ip_srcid_insert(const in6_addr_t *addr, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	srcid_map_t	**smpp;
 #ifdef DEBUG
@@ -152,28 +141,28 @@ ip_srcid_insert(const in6_addr_t *addr, zoneid_t zoneid)
 	    inet_ntop(AF_INET6, addr, abuf, sizeof (abuf)), zoneid));
 #endif
 
-	rw_enter(&srcid_lock, RW_WRITER);
-	smpp = srcid_lookup_addr(addr, zoneid);
+	rw_enter(&ipst->ips_srcid_lock, RW_WRITER);
+	smpp = srcid_lookup_addr(addr, zoneid, ipst);
 	if (*smpp != NULL) {
 		/* Already present - increment refcount */
 		(*smpp)->sm_refcnt++;
 		ASSERT((*smpp)->sm_refcnt != 0);	/* wraparound */
-		rw_exit(&srcid_lock);
+		rw_exit(&ipst->ips_srcid_lock);
 		return (0);
 	}
 	/* Insert new */
 	*smpp = kmem_alloc(sizeof (srcid_map_t), KM_NOSLEEP);
 	if (*smpp == NULL) {
-		rw_exit(&srcid_lock);
+		rw_exit(&ipst->ips_srcid_lock);
 		return (ENOMEM);
 	}
 	(*smpp)->sm_next = NULL;
 	(*smpp)->sm_addr = *addr;
-	(*smpp)->sm_srcid = srcid_nextid();
+	(*smpp)->sm_srcid = srcid_nextid(ipst);
 	(*smpp)->sm_refcnt = 1;
 	(*smpp)->sm_zoneid = zoneid;
 
-	rw_exit(&srcid_lock);
+	rw_exit(&ipst->ips_srcid_lock);
 	return (0);
 }
 
@@ -182,7 +171,7 @@ ip_srcid_insert(const in6_addr_t *addr, zoneid_t zoneid)
  * Returns zero if ok; otherwise errno (e.g. for nonexistent address).
  */
 int
-ip_srcid_remove(const in6_addr_t *addr, zoneid_t zoneid)
+ip_srcid_remove(const in6_addr_t *addr, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	srcid_map_t	**smpp;
 	srcid_map_t	*smp;
@@ -193,12 +182,12 @@ ip_srcid_remove(const in6_addr_t *addr, zoneid_t zoneid)
 	    inet_ntop(AF_INET6, addr, abuf, sizeof (abuf)), zoneid));
 #endif
 
-	rw_enter(&srcid_lock, RW_WRITER);
-	smpp = srcid_lookup_addr(addr, zoneid);
+	rw_enter(&ipst->ips_srcid_lock, RW_WRITER);
+	smpp = srcid_lookup_addr(addr, zoneid, ipst);
 	smp = *smpp;
 	if (smp == NULL) {
 		/* Not preset */
-		rw_exit(&srcid_lock);
+		rw_exit(&ipst->ips_srcid_lock);
 		return (ENOENT);
 	}
 
@@ -206,12 +195,12 @@ ip_srcid_remove(const in6_addr_t *addr, zoneid_t zoneid)
 	ASSERT(smp->sm_refcnt != 0);
 	smp->sm_refcnt--;
 	if (smp->sm_refcnt != 0) {
-		rw_exit(&srcid_lock);
+		rw_exit(&ipst->ips_srcid_lock);
 		return (0);
 	}
 	/* Remove entry */
 	*smpp = smp->sm_next;
-	rw_exit(&srcid_lock);
+	rw_exit(&ipst->ips_srcid_lock);
 	smp->sm_next = NULL;
 	kmem_free(smp, sizeof (srcid_map_t));
 	return (0);
@@ -222,14 +211,16 @@ ip_srcid_remove(const in6_addr_t *addr, zoneid_t zoneid)
  * If the address is unknown return the unknown id (zero).
  */
 uint_t
-ip_srcid_find_addr(const in6_addr_t *addr, zoneid_t zoneid)
+ip_srcid_find_addr(const in6_addr_t *addr, zoneid_t zoneid,
+    netstack_t *ns)
 {
 	srcid_map_t	**smpp;
 	srcid_map_t	*smp;
 	uint_t		id;
+	ip_stack_t	*ipst = ns->netstack_ip;
 
-	rw_enter(&srcid_lock, RW_READER);
-	smpp = srcid_lookup_addr(addr, zoneid);
+	rw_enter(&ipst->ips_srcid_lock, RW_READER);
+	smpp = srcid_lookup_addr(addr, zoneid, ipst);
 	smp = *smpp;
 	if (smp == NULL) {
 		char		abuf[INET6_ADDRSTRLEN];
@@ -242,7 +233,7 @@ ip_srcid_find_addr(const in6_addr_t *addr, zoneid_t zoneid)
 		ASSERT(smp->sm_refcnt != 0);
 		id = smp->sm_srcid;
 	}
-	rw_exit(&srcid_lock);
+	rw_exit(&ipst->ips_srcid_lock);
 	return (id);
 }
 
@@ -251,13 +242,15 @@ ip_srcid_find_addr(const in6_addr_t *addr, zoneid_t zoneid)
  * If the id is unknown return the unspecified address.
  */
 void
-ip_srcid_find_id(uint_t id, in6_addr_t *addr, zoneid_t zoneid)
+ip_srcid_find_id(uint_t id, in6_addr_t *addr, zoneid_t zoneid,
+    netstack_t *ns)
 {
 	srcid_map_t	**smpp;
 	srcid_map_t	*smp;
+	ip_stack_t	*ipst = ns->netstack_ip;
 
-	rw_enter(&srcid_lock, RW_READER);
-	smpp = srcid_lookup_id(id);
+	rw_enter(&ipst->ips_srcid_lock, RW_READER);
+	smpp = srcid_lookup_id(id, ipst);
 	smp = *smpp;
 	if (smp == NULL || smp->sm_zoneid != zoneid) {
 		/* Not preset */
@@ -267,7 +260,7 @@ ip_srcid_find_id(uint_t id, in6_addr_t *addr, zoneid_t zoneid)
 		ASSERT(smp->sm_refcnt != 0);
 		*addr = smp->sm_addr;
 	}
-	rw_exit(&srcid_lock);
+	rw_exit(&ipst->ips_srcid_lock);
 }
 
 /*
@@ -280,41 +273,48 @@ ip_srcid_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 	srcid_map_t	*smp;
 	char		abuf[INET6_ADDRSTRLEN];
 	zoneid_t	zoneid;
+	ip_stack_t	*ipst;
 
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
+	if (CONN_Q(q)) {
+		ipst = CONNQ_TO_IPST(q);
+		zoneid = Q_TO_CONN(q)->conn_zoneid;
+	} else {
+		ipst = ILLQ_TO_IPST(q);
+		zoneid =  ((ill_t *)q->q_ptr)->ill_zoneid;
+	}
 	(void) mi_mpprintf(mp,
 	    "addr                                           "
 	    "id     zone refcnt");
-	rw_enter(&srcid_lock, RW_READER);
-	for (smp = srcid_head; smp != NULL; smp = smp->sm_next) {
+	rw_enter(&ipst->ips_srcid_lock, RW_READER);
+	for (smp = ipst->ips_srcid_head; smp != NULL; smp = smp->sm_next) {
 		if (zoneid != GLOBAL_ZONEID && zoneid != smp->sm_zoneid)
 			continue;
 		(void) mi_mpprintf(mp, "%46s %5u %5d %5u",
 		    inet_ntop(AF_INET6, &smp->sm_addr, abuf, sizeof (abuf)),
 		    smp->sm_srcid, smp->sm_zoneid, smp->sm_refcnt);
 	}
-	rw_exit(&srcid_lock);
+	rw_exit(&ipst->ips_srcid_lock);
 	return (0);
 }
 
 /* Assign the next available ID */
 static uint_t
-srcid_nextid(void)
+srcid_nextid(ip_stack_t *ipst)
 {
 	uint_t id;
 	srcid_map_t	**smpp;
 
-	ASSERT(rw_owner(&srcid_lock) == curthread);
+	ASSERT(rw_owner(&ipst->ips_srcid_lock) == curthread);
 
-	if (!srcid_wrapped) {
-		id = ip_src_id++;
-		if (ip_src_id == 0)
-			srcid_wrapped = B_TRUE;
+	if (!ipst->ips_srcid_wrapped) {
+		id = ipst->ips_ip_src_id++;
+		if (ipst->ips_ip_src_id == 0)
+			ipst->ips_srcid_wrapped = B_TRUE;
 		return (id);
 	}
 	/* Once it wraps we search for an unused ID. */
 	for (id = 0; id < 0xffffffff; id++) {
-		smpp = srcid_lookup_id(id);
+		smpp = srcid_lookup_id(id, ipst);
 		if (*smpp == NULL)
 			return (id);
 	}
@@ -329,12 +329,12 @@ srcid_nextid(void)
  * Otherwise *ptr will be NULL and can be used to insert a new object.
  */
 static srcid_map_t **
-srcid_lookup_addr(const in6_addr_t *addr, zoneid_t zoneid)
+srcid_lookup_addr(const in6_addr_t *addr, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	srcid_map_t	**smpp;
 
-	ASSERT(RW_LOCK_HELD(&srcid_lock));
-	smpp = &srcid_head;
+	ASSERT(RW_LOCK_HELD(&ipst->ips_srcid_lock));
+	smpp = &ipst->ips_srcid_head;
 	while (*smpp != NULL) {
 		if (IN6_ARE_ADDR_EQUAL(&(*smpp)->sm_addr, addr) &&
 		    zoneid == (*smpp)->sm_zoneid)
@@ -351,12 +351,12 @@ srcid_lookup_addr(const in6_addr_t *addr, zoneid_t zoneid)
  * Otherwise *ptr will be NULL and can be used to insert a new object.
  */
 static srcid_map_t **
-srcid_lookup_id(uint_t id)
+srcid_lookup_id(uint_t id, ip_stack_t *ipst)
 {
 	srcid_map_t	**smpp;
 
-	ASSERT(RW_LOCK_HELD(&srcid_lock));
-	smpp = &srcid_head;
+	ASSERT(RW_LOCK_HELD(&ipst->ips_srcid_lock));
+	smpp = &ipst->ips_srcid_head;
 	while (*smpp != NULL) {
 		if ((*smpp)->sm_srcid == id)
 			return (smpp);

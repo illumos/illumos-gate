@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,19 +54,20 @@ static struct modlinkage modlinkage = {
  * Hook internal functions
  */
 static hook_int_t *hook_copy(hook_t *src);
-static hook_event_int_t *hook_event_checkdup(hook_event_t *he);
+static hook_event_int_t *hook_event_checkdup(hook_event_t *he,
+    hook_stack_t *hks);
 static hook_event_int_t *hook_event_copy(hook_event_t *src);
 static hook_event_int_t *hook_event_find(hook_family_int_t *hfi, char *event);
 static void hook_event_free(hook_event_int_t *hei);
 static hook_family_int_t *hook_family_copy(hook_family_t *src);
-static hook_family_int_t *hook_family_find(char *family);
+static hook_family_int_t *hook_family_find(char *family, hook_stack_t *hks);
 static void hook_family_free(hook_family_int_t *hfi);
 static hook_int_t *hook_find(hook_event_int_t *hei, hook_t *h);
 static void hook_free(hook_int_t *hi);
 static void hook_init(void);
-
-static cvwaitlock_t familylock;			/* global lock */
-static hook_family_int_head_t familylist;	/* family list head */
+static void hook_fini(void);
+static void *hook_stack_init(netstackid_t stackid, netstack_t *ns);
+static void hook_stack_fini(netstackid_t stackid, void *arg);
 
 /*
  * Module entry points.
@@ -74,15 +75,27 @@ static hook_family_int_head_t familylist;	/* family list head */
 int
 _init(void)
 {
+	int error;
+
 	hook_init();
-	return (mod_install(&modlinkage));
+	error = mod_install(&modlinkage);
+	if (error != 0)
+		hook_fini();
+
+	return (error);
 }
 
 
 int
 _fini(void)
 {
-	return (mod_remove(&modlinkage));
+	int error;
+
+	error = mod_remove(&modlinkage);
+	if (error == 0)
+		hook_fini();
+
+	return (error);
 }
 
 
@@ -103,10 +116,63 @@ _info(struct modinfo *modinfop)
 static void
 hook_init(void)
 {
-	CVW_INIT(&familylock);
-	SLIST_INIT(&familylist);
+	/*
+	 * We want to be informed each time a stack is created or
+	 * destroyed in the kernel.
+	 */
+	netstack_register(NS_HOOK, hook_stack_init, NULL,
+	    hook_stack_fini);
 }
 
+/*
+ * Function:	hook_fini
+ * Returns:	None
+ * Parameters:	None
+ *
+ * Deinitialize hooks
+ */
+static void
+hook_fini(void)
+{
+	netstack_unregister(NS_HOOK);
+}
+
+/*
+ * Initialize the hook stack instance.
+ */
+/*ARGSUSED*/
+static void *
+hook_stack_init(netstackid_t stackid, netstack_t *ns)
+{
+	hook_stack_t	*hks;
+
+#ifdef NS_DEBUG
+	printf("hook_stack_init(stack %d)\n", stackid);
+#endif
+
+	hks = (hook_stack_t *)kmem_zalloc(sizeof (*hks), KM_SLEEP);
+	hks->hk_netstack = ns;
+
+	CVW_INIT(&hks->hks_familylock);
+	SLIST_INIT(&hks->hks_familylist);
+
+	return (hks);
+}
+
+/*
+ * Free the hook stack instance.
+ */
+/*ARGSUSED*/
+static void
+hook_stack_fini(netstackid_t stackid, void *arg)
+{
+	hook_stack_t	*hks = (hook_stack_t *)arg;
+#ifdef NS_DEBUG
+	printf("hook_stack_fini(%p, stack %d)\n", arg, stackid);
+#endif
+	CVW_DESTROY(&hks->hks_familylock);
+	kmem_free(hks, sizeof (*hks));
+}
 
 /*
  * Function:	hook_run
@@ -121,10 +187,11 @@ hook_init(void)
  * called more than once, simultaneously.
  */
 int
-hook_run(hook_event_token_t token, hook_data_t info)
+hook_run(hook_event_token_t token, hook_data_t info, netstack_t *ns)
 {
 	hook_int_t *hi;
 	hook_event_int_t *hei;
+	hook_stack_t *hks = ns->netstack_hook;
 	int rval = 0;
 
 	ASSERT(token != NULL);
@@ -135,7 +202,7 @@ hook_run(hook_event_token_t token, hook_data_t info)
 	    hook_data_t, info);
 
 	/* Hold global read lock to ensure event will not be deleted */
-	CVW_ENTER_READ(&familylock);
+	CVW_ENTER_READ(&hks->hks_familylock);
 
 	/* Hold event read lock to ensure hook will not be changed */
 	CVW_ENTER_READ(&hei->hei_lock);
@@ -146,7 +213,7 @@ hook_run(hook_event_token_t token, hook_data_t info)
 		    hook_event_token_t, token,
 		    hook_data_t, info,
 		    hook_int_t *, hi);
-		rval = (*hi->hi_hook.h_func)(token, info);
+		rval = (*hi->hi_hook.h_func)(token, info, ns);
 		DTRACE_PROBE4(hook__func__end,
 		    hook_event_token_t, token,
 		    hook_data_t, info,
@@ -157,7 +224,7 @@ hook_run(hook_event_token_t token, hook_data_t info)
 	}
 
 	CVW_EXIT_READ(&hei->hei_lock);
-	CVW_EXIT_READ(&familylock);
+	CVW_EXIT_READ(&hks->hks_familylock);
 
 	DTRACE_PROBE3(hook__run__end,
 	    hook_event_token_t, token,
@@ -176,7 +243,7 @@ hook_run(hook_event_token_t token, hook_data_t info)
  * Add new family to family list
  */
 hook_family_int_t *
-hook_family_add(hook_family_t *hf)
+hook_family_add(hook_family_t *hf, hook_stack_t *hks)
 {
 	hook_family_int_t *hfi, *new;
 
@@ -187,20 +254,22 @@ hook_family_add(hook_family_t *hf)
 	if (new == NULL)
 		return (NULL);
 
-	CVW_ENTER_WRITE(&familylock);
+	CVW_ENTER_WRITE(&hks->hks_familylock);
 
 	/* search family list */
-	hfi = hook_family_find(hf->hf_name);
+	hfi = hook_family_find(hf->hf_name, hks);
 	if (hfi != NULL) {
-		CVW_EXIT_WRITE(&familylock);
+		CVW_EXIT_WRITE(&hks->hks_familylock);
 		hook_family_free(new);
 		return (NULL);
 	}
 
-	/* Add to family list head */
-	SLIST_INSERT_HEAD(&familylist, new, hfi_entry);
+	new->hfi_ptr = (void *)hks;
 
-	CVW_EXIT_WRITE(&familylock);
+	/* Add to family list head */
+	SLIST_INSERT_HEAD(&hks->hks_familylist, new, hfi_entry);
+
+	CVW_EXIT_WRITE(&hks->hks_familylock);
 	return (new);
 }
 
@@ -215,21 +284,23 @@ hook_family_add(hook_family_t *hf)
 int
 hook_family_remove(hook_family_int_t *hfi)
 {
+	hook_stack_t *hks;
 
 	ASSERT(hfi != NULL);
+	hks = (hook_stack_t *)hfi->hfi_ptr;
 
-	CVW_ENTER_WRITE(&familylock);
+	CVW_ENTER_WRITE(&hks->hks_familylock);
 
 	/* Check if there are events  */
 	if (!SLIST_EMPTY(&hfi->hfi_head)) {
-		CVW_EXIT_WRITE(&familylock);
+		CVW_EXIT_WRITE(&hks->hks_familylock);
 		return (EBUSY);
 	}
 
 	/* Remove from family list */
-	SLIST_REMOVE(&familylist, hfi, hook_family_int, hfi_entry);
+	SLIST_REMOVE(&hks->hks_familylist, hfi, hook_family_int, hfi_entry);
 
-	CVW_EXIT_WRITE(&familylock);
+	CVW_EXIT_WRITE(&hks->hks_familylock);
 	hook_family_free(hfi);
 
 	return (0);
@@ -269,7 +340,6 @@ hook_family_copy(hook_family_t *src)
 
 
 /*
- * Function:	hook_family_find
  * Returns:	internal family pointer - NULL = Not match
  * Parameters:	family(I) - family name string
  *
@@ -277,13 +347,13 @@ hook_family_copy(hook_family_t *src)
  * 	A lock on familylock must be held when called.
  */
 static hook_family_int_t *
-hook_family_find(char *family)
+hook_family_find(char *family, hook_stack_t *hks)
 {
 	hook_family_int_t *hfi = NULL;
 
 	ASSERT(family != NULL);
 
-	SLIST_FOREACH(hfi, &familylist, hfi_entry) {
+	SLIST_FOREACH(hfi, &hks->hks_familylist, hfi_entry) {
 		if (strcmp(hfi->hfi_family.hf_name, family) == 0)
 			break;
 	}
@@ -328,22 +398,24 @@ hook_family_free(hook_family_int_t *hfi)
 hook_event_int_t *
 hook_event_add(hook_family_int_t *hfi, hook_event_t *he)
 {
+	hook_stack_t *hks;
 	hook_event_int_t *hei, *new;
 
 	ASSERT(hfi != NULL);
 	ASSERT(he != NULL);
 	ASSERT(he->he_name != NULL);
+	hks = (hook_stack_t *)hfi->hfi_ptr;
 
 	new = hook_event_copy(he);
 	if (new == NULL)
 		return (NULL);
 
-	CVW_ENTER_WRITE(&familylock);
+	CVW_ENTER_WRITE(&hks->hks_familylock);
 
 	/* Check whether this event pointer is already registered */
-	hei = hook_event_checkdup(he);
+	hei = hook_event_checkdup(he, hks);
 	if (hei != NULL) {
-		CVW_EXIT_WRITE(&familylock);
+		CVW_EXIT_WRITE(&hks->hks_familylock);
 		hook_event_free(new);
 		return (NULL);
 	}
@@ -351,7 +423,7 @@ hook_event_add(hook_family_int_t *hfi, hook_event_t *he)
 	/* Add to event list head */
 	SLIST_INSERT_HEAD(&hfi->hfi_head, new, hei_entry);
 
-	CVW_EXIT_WRITE(&familylock);
+	CVW_EXIT_WRITE(&hks->hks_familylock);
 	return (new);
 }
 
@@ -367,29 +439,31 @@ hook_event_add(hook_family_int_t *hfi, hook_event_t *he)
 int
 hook_event_remove(hook_family_int_t *hfi, hook_event_t *he)
 {
+	hook_stack_t *hks;
 	hook_event_int_t *hei;
 
 	ASSERT(hfi != NULL);
 	ASSERT(he != NULL);
+	hks = (hook_stack_t *)hfi->hfi_ptr;
 
-	CVW_ENTER_WRITE(&familylock);
+	CVW_ENTER_WRITE(&hks->hks_familylock);
 
 	hei = hook_event_find(hfi, he->he_name);
 	if (hei == NULL) {
-		CVW_EXIT_WRITE(&familylock);
+		CVW_EXIT_WRITE(&hks->hks_familylock);
 		return (ENXIO);
 	}
 
 	/* Check if there are registered hooks for this event */
 	if (!TAILQ_EMPTY(&hei->hei_head)) {
-		CVW_EXIT_WRITE(&familylock);
+		CVW_EXIT_WRITE(&hks->hks_familylock);
 		return (EBUSY);
 	}
 
 	/* Remove from event list */
 	SLIST_REMOVE(&hfi->hfi_head, hei, hook_event_int, hei_entry);
 
-	CVW_EXIT_WRITE(&familylock);
+	CVW_EXIT_WRITE(&hks->hks_familylock);
 	hook_event_free(hei);
 
 	return (0);
@@ -405,14 +479,14 @@ hook_event_remove(hook_family_int_t *hfi, hook_event_t *he)
  *      A lock on familylock must be held when called.
  */
 static hook_event_int_t *
-hook_event_checkdup(hook_event_t *he)
+hook_event_checkdup(hook_event_t *he, hook_stack_t *hks)
 {
 	hook_family_int_t *hfi;
 	hook_event_int_t *hei;
 
 	ASSERT(he != NULL);
 
-	SLIST_FOREACH(hfi, &familylist, hfi_entry) {
+	SLIST_FOREACH(hfi, &hks->hks_familylist, hfi_entry) {
 		SLIST_FOREACH(hei, &hfi->hfi_head, hei_entry) {
 			if (hei->hei_event == he)
 				return (hei);
@@ -456,7 +530,7 @@ hook_event_copy(hook_event_t *src)
  *		event(I) - event name string
  *
  * Search event list with event name
- * 	A lock on familylock must be held when called.
+ * 	A lock on hks->hks_familylock must be held when called.
  */
 static hook_event_int_t *
 hook_event_find(hook_family_int_t *hfi, char *event)
@@ -503,12 +577,14 @@ hook_event_free(hook_event_int_t *hei)
 int
 hook_register(hook_family_int_t *hfi, char *event, hook_t *h)
 {
+	hook_stack_t *hks;
 	hook_event_int_t *hei;
 	hook_int_t *hi, *new;
 
 	ASSERT(hfi != NULL);
 	ASSERT(event != NULL);
 	ASSERT(h != NULL);
+	hks = (hook_stack_t *)hfi->hfi_ptr;
 
 	/* Alloc hook_int_t and copy hook */
 	new = hook_copy(h);
@@ -520,11 +596,11 @@ hook_register(hook_family_int_t *hfi, char *event, hook_t *h)
 	 * to hold global family write lock. Just get read lock here to
 	 * ensure event will not be removed when doing hooks operation
 	 */
-	CVW_ENTER_READ(&familylock);
+	CVW_ENTER_READ(&hks->hks_familylock);
 
 	hei = hook_event_find(hfi, event);
 	if (hei == NULL) {
-		CVW_EXIT_READ(&familylock);
+		CVW_EXIT_READ(&hks->hks_familylock);
 		hook_free(new);
 		return (ENXIO);
 	}
@@ -535,7 +611,7 @@ hook_register(hook_family_int_t *hfi, char *event, hook_t *h)
 	if (((hei->hei_event->he_flags & HOOK_RDONLY) == 0) &&
 	    (!TAILQ_EMPTY(&hei->hei_head))) {
 		CVW_EXIT_WRITE(&hei->hei_lock);
-		CVW_EXIT_READ(&familylock);
+		CVW_EXIT_READ(&hks->hks_familylock);
 		hook_free(new);
 		return (EEXIST);
 	}
@@ -543,7 +619,7 @@ hook_register(hook_family_int_t *hfi, char *event, hook_t *h)
 	hi = hook_find(hei, h);
 	if (hi != NULL) {
 		CVW_EXIT_WRITE(&hei->hei_lock);
-		CVW_EXIT_READ(&familylock);
+		CVW_EXIT_READ(&hks->hks_familylock);
 		hook_free(new);
 		return (EEXIST);
 	}
@@ -553,7 +629,7 @@ hook_register(hook_family_int_t *hfi, char *event, hook_t *h)
 	hei->hei_event->he_interested = B_TRUE;
 
 	CVW_EXIT_WRITE(&hei->hei_lock);
-	CVW_EXIT_READ(&familylock);
+	CVW_EXIT_READ(&hks->hks_familylock);
 	return (0);
 }
 
@@ -570,17 +646,19 @@ hook_register(hook_family_int_t *hfi, char *event, hook_t *h)
 int
 hook_unregister(hook_family_int_t *hfi, char *event, hook_t *h)
 {
+	hook_stack_t *hks;
 	hook_event_int_t *hei;
 	hook_int_t *hi;
 
 	ASSERT(hfi != NULL);
 	ASSERT(h != NULL);
+	hks = (hook_stack_t *)hfi->hfi_ptr;
 
-	CVW_ENTER_READ(&familylock);
+	CVW_ENTER_READ(&hks->hks_familylock);
 
 	hei = hook_event_find(hfi, event);
 	if (hei == NULL) {
-		CVW_EXIT_READ(&familylock);
+		CVW_EXIT_READ(&hks->hks_familylock);
 		return (ENXIO);
 	}
 
@@ -590,7 +668,7 @@ hook_unregister(hook_family_int_t *hfi, char *event, hook_t *h)
 	hi = hook_find(hei, h);
 	if (hi == NULL) {
 		CVW_EXIT_WRITE(&hei->hei_lock);
-		CVW_EXIT_READ(&familylock);
+		CVW_EXIT_READ(&hks->hks_familylock);
 		return (ENXIO);
 	}
 
@@ -601,7 +679,7 @@ hook_unregister(hook_family_int_t *hfi, char *event, hook_t *h)
 	}
 
 	CVW_EXIT_WRITE(&hei->hei_lock);
-	CVW_EXIT_READ(&familylock);
+	CVW_EXIT_READ(&hks->hks_familylock);
 
 	hook_free(hi);
 	return (0);

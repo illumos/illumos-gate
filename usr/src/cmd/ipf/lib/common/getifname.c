@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@ struct ifnet *ptr;
 	int len;
 # endif
 	struct ifnet netif;
-
+#define SOLARIS_PFHOOKS	1
 # ifdef SOLARIS_PFHOOKS
 	if ((opts & OPT_DONOTHING) == 0)
 		return "@";

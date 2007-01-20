@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +77,10 @@
 #include <sys/strft.h>
 #include <sys/fs/snode.h>
 #include <sys/zone.h>
+#include <sys/open.h>
+#include <sys/sunldi.h>
+#include <sys/sad.h>
+#include <sys/netstack.h>
 
 #define	O_SAMESTR(q)	(((q)->q_next) && \
 	(((q)->q_flag & QREADR) == ((q)->q_next->q_flag & QREADR)))
@@ -199,6 +203,10 @@ kthread_t	*bc_bkgrnd_thread; /* Thread to service bufcall requests */
 kmutex_t	strresources;	/* protects global resources */
 kmutex_t	muxifier;	/* single-threads multiplexor creation */
 
+static void	*str_stack_init(netstackid_t stackid, netstack_t *ns);
+static void	str_stack_shutdown(netstackid_t stackid, void *arg);
+static void	str_stack_fini(netstackid_t stackid, void *arg);
+
 extern void	time_to_wait(clock_t *, clock_t);
 
 /*
@@ -227,8 +235,6 @@ int max_n_ciputctrl = 16;
  * if n_ciputctrl is < min_n_ciputctrl don't even create ciputctrl_cache.
  */
 int min_n_ciputctrl = 2;
-
-static struct mux_node *mux_nodes;	/* mux info for cycle checking */
 
 /*
  * Per-driver/module syncqs
@@ -835,15 +841,7 @@ ciputctrl_destructor(void *buf, void *cdrarg)
 void
 strinit(void)
 {
-	int i;
 	int ncpus = ((boot_max_ncpus == -1) ? max_ncpus : boot_max_ncpus);
-
-	/*
-	 * Set up mux_node structures.
-	 */
-	mux_nodes = kmem_zalloc((sizeof (struct mux_node) * devcnt), KM_SLEEP);
-	for (i = 0; i < devcnt; i++)
-		mux_nodes[i].mn_imaj = i;
 
 	stream_head_cache = kmem_cache_create("stream_head_cache",
 		sizeof (stdata_t), 0,
@@ -904,6 +902,16 @@ strinit(void)
 	 * TPI support routine initialisation.
 	 */
 	tpi_init();
+
+	/*
+	 * Handle to have autopush and persistent link information per
+	 * zone.
+	 * Note: uses shutdown hook instead of destroy hook so that the
+	 * persistent links can be torn down before the destroy hooks
+	 * in the TCP/IP stack are called.
+	 */
+	netstack_register(NS_STR, str_stack_init, str_stack_shutdown,
+	    str_stack_fini);
 }
 
 void
@@ -1544,7 +1552,7 @@ lbfree(linkinfo_t *linkp)
  * and 0 otherwise.
  */
 int
-linkcycle(stdata_t *upstp, stdata_t *lostp)
+linkcycle(stdata_t *upstp, stdata_t *lostp, str_stack_t *ss)
 {
 	struct mux_node *np;
 	struct mux_edge *ep;
@@ -1558,13 +1566,13 @@ linkcycle(stdata_t *upstp, stdata_t *lostp)
 	if (lostp->sd_vnode->v_type == VFIFO)
 		return (0);
 
-	for (i = 0; i < devcnt; i++) {
-		np = &mux_nodes[i];
+	for (i = 0; i < ss->ss_devcnt; i++) {
+		np = &ss->ss_mux_nodes[i];
 		MUX_CLEAR(np);
 	}
 	lomaj = getmajor(lostp->sd_vnode->v_rdev);
 	upmaj = getmajor(upstp->sd_vnode->v_rdev);
-	np = &mux_nodes[lomaj];
+	np = &ss->ss_mux_nodes[lomaj];
 	for (;;) {
 		if (!MUX_DIDVISIT(np)) {
 			if (np->mn_imaj == upmaj)
@@ -1607,7 +1615,7 @@ linkcycle(stdata_t *upstp, stdata_t *lostp)
  * Find linkinfo entry corresponding to the parameters.
  */
 linkinfo_t *
-findlinks(stdata_t *stp, int index, int type)
+findlinks(stdata_t *stp, int index, int type, str_stack_t *ss)
 {
 	linkinfo_t *linkp;
 	struct mux_edge *mep;
@@ -1626,7 +1634,7 @@ findlinks(stdata_t *stp, int index, int type)
 		}
 	} else {
 		ASSERT((type & LINKTYPEMASK) == LINKPERSIST);
-		mnp = &mux_nodes[getmajor(stp->sd_vnode->v_rdev)];
+		mnp = &ss->ss_mux_nodes[getmajor(stp->sd_vnode->v_rdev)];
 		mep = mnp->mn_outp;
 		while (mep) {
 			if ((index == 0) || (index == mep->me_muxid))
@@ -1724,6 +1732,8 @@ mlink_file(vnode_t *vp, int cmd, struct file *fpdown, cred_t *crp, int *rvalp,
 	uint32_t sqtype;
 	perdm_t *dmp;
 	int error = 0;
+	netstack_t *ns;
+	str_stack_t *ss;
 
 	stp = vp->v_stream;
 	TRACE_1(TR_FAC_STREAMS_FR,
@@ -1746,12 +1756,19 @@ mlink_file(vnode_t *vp, int cmd, struct file *fpdown, cred_t *crp, int *rvalp,
 	if (fpdown == NULL) {
 		return (EBADF);
 	}
-	if (getmajor(stp->sd_vnode->v_rdev) >= devcnt) {
+	ns = netstack_find_by_cred(crp);
+	ASSERT(ns != NULL);
+	ss = ns->netstack_str;
+	ASSERT(ss != NULL);
+
+	if (getmajor(stp->sd_vnode->v_rdev) >= ss->ss_devcnt) {
+		netstack_rele(ss->ss_netstack);
 		return (EINVAL);
 	}
 	mutex_enter(&muxifier);
 	if (stp->sd_flag & STPLEX) {
 		mutex_exit(&muxifier);
+		netstack_rele(ss->ss_netstack);
 		return (ENXIO);
 	}
 
@@ -1767,9 +1784,10 @@ mlink_file(vnode_t *vp, int cmd, struct file *fpdown, cred_t *crp, int *rvalp,
 	    (stpdown == stp) || (stpdown->sd_flag &
 	    (STPLEX|STRHUP|STRDERR|STWRERR|IOCWAIT|STRPLUMB)) ||
 	    ((stpdown->sd_vnode->v_type != VFIFO) &&
-	    (getmajor(stpdown->sd_vnode->v_rdev) >= devcnt)) ||
-	    linkcycle(stp, stpdown)) {
+	    (getmajor(stpdown->sd_vnode->v_rdev) >= ss->ss_devcnt)) ||
+	    linkcycle(stp, stpdown, ss)) {
 		mutex_exit(&muxifier);
+		netstack_rele(ss->ss_netstack);
 		return (EINVAL);
 	}
 	TRACE_1(TR_FAC_STREAMS_FR,
@@ -1899,6 +1917,7 @@ mlink_file(vnode_t *vp, int cmd, struct file *fpdown, cred_t *crp, int *rvalp,
 		mutex_exit(&stpdown->sd_lock);
 
 		mutex_exit(&muxifier);
+		netstack_rele(ss->ss_netstack);
 		return (error);
 	}
 	mutex_enter(&fpdown->f_tlock);
@@ -1919,7 +1938,7 @@ mlink_file(vnode_t *vp, int cmd, struct file *fpdown, cred_t *crp, int *rvalp,
 
 	link_rempassthru(passq);
 
-	mux_addedge(stp, stpdown, linkp->li_lblk.l_index);
+	mux_addedge(stp, stpdown, linkp->li_lblk.l_index, ss);
 
 	/*
 	 * Mark the upper stream as having dependent links
@@ -1944,6 +1963,7 @@ mlink_file(vnode_t *vp, int cmd, struct file *fpdown, cred_t *crp, int *rvalp,
 	mutex_exit(&stpdown->sd_lock);
 	mutex_exit(&muxifier);
 	*rvalp = linkp->li_lblk.l_index;
+	netstack_rele(ss->ss_netstack);
 	return (0);
 }
 
@@ -1979,7 +1999,8 @@ mlink(vnode_t *vp, int cmd, int arg, cred_t *crp, int *rvalp, int lhlink)
  * re-blocked.
  */
 int
-munlink(stdata_t *stp, linkinfo_t *linkp, int flag, cred_t *crp, int *rvalp)
+munlink(stdata_t *stp, linkinfo_t *linkp, int flag, cred_t *crp, int *rvalp,
+    str_stack_t *ss)
 {
 	struct strioctl strioc;
 	struct stdata *stpdown;
@@ -2037,7 +2058,7 @@ munlink(stdata_t *stp, linkinfo_t *linkp, int flag, cred_t *crp, int *rvalp)
 		}
 	}
 
-	mux_rmvedge(stp, linkp->li_lblk.l_index);
+	mux_rmvedge(stp, linkp->li_lblk.l_index, ss);
 	fpdown = linkp->li_fpdown;
 	lbfree(linkp);
 
@@ -2225,17 +2246,17 @@ munlink(stdata_t *stp, linkinfo_t *linkp, int flag, cred_t *crp, int *rvalp)
  * Return 0, or a non-zero errno on failure.
  */
 int
-munlinkall(stdata_t *stp, int flag, cred_t *crp, int *rvalp)
+munlinkall(stdata_t *stp, int flag, cred_t *crp, int *rvalp, str_stack_t *ss)
 {
 	linkinfo_t *linkp;
 	int error = 0;
 
 	mutex_enter(&muxifier);
-	while (linkp = findlinks(stp, 0, flag)) {
+	while (linkp = findlinks(stp, 0, flag, ss)) {
 		/*
 		 * munlink() releases the muxifier lock.
 		 */
-		if (error = munlink(stp, linkp, flag, crp, rvalp))
+		if (error = munlink(stp, linkp, flag, crp, rvalp, ss))
 			return (error);
 		mutex_enter(&muxifier);
 	}
@@ -2248,7 +2269,7 @@ munlinkall(stdata_t *stp, int flag, cred_t *crp, int *rvalp)
  * edge to the directed graph.
  */
 void
-mux_addedge(stdata_t *upstp, stdata_t *lostp, int muxid)
+mux_addedge(stdata_t *upstp, stdata_t *lostp, int muxid, str_stack_t *ss)
 {
 	struct mux_node *np;
 	struct mux_edge *ep;
@@ -2257,7 +2278,7 @@ mux_addedge(stdata_t *upstp, stdata_t *lostp, int muxid)
 
 	upmaj = getmajor(upstp->sd_vnode->v_rdev);
 	lomaj = getmajor(lostp->sd_vnode->v_rdev);
-	np = &mux_nodes[upmaj];
+	np = &ss->ss_mux_nodes[upmaj];
 	if (np->mn_outp) {
 		ep = np->mn_outp;
 		while (ep->me_nextp)
@@ -2270,10 +2291,18 @@ mux_addedge(stdata_t *upstp, stdata_t *lostp, int muxid)
 	}
 	ep->me_nextp = NULL;
 	ep->me_muxid = muxid;
+	/*
+	 * Save the dev_t for the purposes of str_stack_shutdown.
+	 * str_stack_shutdown assumes that the device allows reopen, since
+	 * this dev_t is the one after any cloning by xx_open().
+	 * Would prefer finding the dev_t from before any cloning,
+	 * but specfs doesn't retain that.
+	 */
+	ep->me_dev = upstp->sd_vnode->v_rdev;
 	if (lostp->sd_vnode->v_type == VFIFO)
 		ep->me_nodep = NULL;
 	else
-		ep->me_nodep = &mux_nodes[lomaj];
+		ep->me_nodep = &ss->ss_mux_nodes[lomaj];
 }
 
 /*
@@ -2281,7 +2310,7 @@ mux_addedge(stdata_t *upstp, stdata_t *lostp, int muxid)
  * edge in the directed graph.
  */
 void
-mux_rmvedge(stdata_t *upstp, int muxid)
+mux_rmvedge(stdata_t *upstp, int muxid, str_stack_t *ss)
 {
 	struct mux_node *np;
 	struct mux_edge *ep;
@@ -2289,7 +2318,7 @@ mux_rmvedge(stdata_t *upstp, int muxid)
 	major_t upmaj;
 
 	upmaj = getmajor(upstp->sd_vnode->v_rdev);
-	np = &mux_nodes[upmaj];
+	np = &ss->ss_mux_nodes[upmaj];
 	ASSERT(np->mn_outp != NULL);
 	ep = np->mn_outp;
 	while (ep) {
@@ -4057,9 +4086,11 @@ backenable(queue_t *q, uchar_t pri)
 		 * or with the stream frozen (the latter occurs when a module
 		 * calls rmvq with the stream frozen.) If the stream is frozen
 		 * by the caller the caller will hold all qlocks in the stream.
+		 * Note that a frozen stream doesn't freeze a mated stream,
+		 * so we explicitly check for that.
 		 */
 		freezer = STREAM(q)->sd_freezer;
-		if (freezer != curthread) {
+		if (freezer != curthread || STREAM(q) != STREAM(nq)) {
 			mutex_enter(QLOCK(nq));
 		}
 #ifdef DEBUG
@@ -4071,7 +4102,7 @@ backenable(queue_t *q, uchar_t pri)
 #endif
 		setqback(nq, pri);
 		qenable_locked(nq);
-		if (freezer != curthread)
+		if (freezer != curthread || STREAM(q) != STREAM(nq))
 			mutex_exit(QLOCK(nq));
 	}
 	releasestr(q);
@@ -8463,4 +8494,104 @@ runqueues(void)
 void
 queuerun(void)
 {
+}
+
+/*
+ * Initialize the STR stack instance, which tracks autopush and persistent
+ * links.
+ */
+/* ARGSUSED */
+static void *
+str_stack_init(netstackid_t stackid, netstack_t *ns)
+{
+	str_stack_t	*ss;
+	int i;
+
+	ss = (str_stack_t *)kmem_zalloc(sizeof (*ss), KM_SLEEP);
+	ss->ss_netstack = ns;
+
+	/*
+	 * set up autopush
+	 */
+	sad_initspace(ss);
+
+	/*
+	 * set up mux_node structures.
+	 */
+	ss->ss_devcnt = devcnt;	/* In case it should change before free */
+	ss->ss_mux_nodes = kmem_zalloc((sizeof (struct mux_node) *
+					    ss->ss_devcnt), KM_SLEEP);
+	for (i = 0; i < ss->ss_devcnt; i++)
+		ss->ss_mux_nodes[i].mn_imaj = i;
+	return (ss);
+}
+
+/*
+ * Note: run at zone shutdown and not destroy so that the PLINKs are
+ * gone by the time other cleanup happens from the destroy callbacks.
+ */
+static void
+str_stack_shutdown(netstackid_t stackid, void *arg)
+{
+	str_stack_t *ss = (str_stack_t *)arg;
+	int i;
+	cred_t *cr;
+
+	cr = zone_get_kcred(netstackid_to_zoneid(stackid));
+	ASSERT(cr != NULL);
+
+	/* Undo all the I_PLINKs for this zone */
+	for (i = 0; i < ss->ss_devcnt; i++) {
+		struct mux_edge		*ep;
+		ldi_handle_t		lh;
+		ldi_ident_t		li;
+		int			ret;
+		int			rval;
+		dev_t			rdev;
+
+		ep = ss->ss_mux_nodes[i].mn_outp;
+		if (ep == NULL)
+			continue;
+		ret = ldi_ident_from_major((major_t)i, &li);
+		if (ret != 0) {
+			continue;
+		}
+		rdev = ep->me_dev;
+		ret = ldi_open_by_dev(&rdev, OTYP_CHR, FREAD|FWRITE,
+		    cr, &lh, li);
+		if (ret != 0) {
+			ldi_ident_release(li);
+			continue;
+		}
+
+		ret = ldi_ioctl(lh, I_PUNLINK, (intptr_t)MUXID_ALL, FKIOCTL,
+		    cr, &rval);
+		if (ret) {
+			(void) ldi_close(lh, FREAD|FWRITE, cr);
+			ldi_ident_release(li);
+			continue;
+		}
+		(void) ldi_close(lh, FREAD|FWRITE, cr);
+
+		/* Close layered handles */
+		ldi_ident_release(li);
+	}
+	crfree(cr);
+
+	sad_freespace(ss);
+
+	kmem_free(ss->ss_mux_nodes, sizeof (struct mux_node) * ss->ss_devcnt);
+	ss->ss_mux_nodes = NULL;
+}
+
+/*
+ * Free the structure; str_stack_shutdown did the other cleanup work.
+ */
+/* ARGSUSED */
+static void
+str_stack_fini(netstackid_t stackid, void *arg)
+{
+	str_stack_t	*ss = (str_stack_t *)arg;
+
+	kmem_free(ss, sizeof (*ss));
 }

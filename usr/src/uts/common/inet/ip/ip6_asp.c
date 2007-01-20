@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +41,7 @@
 #include <inet/ip6.h>
 #include <inet/ip6_asp.h>
 #include <inet/ip_ire.h>
+#include <inet/ipclassifier.h>
 
 #define	IN6ADDR_MASK128_INIT \
 	{ 0xffffffffU, 0xffffffffU, 0xffffffffU, 0xffffffffU }
@@ -78,45 +78,36 @@ static ip6_asp_t default_ip6_asp_table[] = {
 	    "Default", 40 }
 };
 
-/* pending binds */
-static mblk_t *ip6_asp_pending_ops = NULL, *ip6_asp_pending_ops_tail = NULL;
-
-/* Synchronize updates with table usage */
-static mblk_t *ip6_asp_pending_update = NULL;	/* pending table updates */
-
-static boolean_t ip6_asp_uip = B_FALSE;		/* table update in progress */
-static kmutex_t	ip6_asp_lock;			/* protect all the above */
-static uint32_t	ip6_asp_refcnt = 0;		/* outstanding references */
-
 /*
  * The IPv6 Default Address Selection policy table.
  * Until someone up above reconfigures the policy table, use the global
  * default.  The table needs no lock since the only way to alter it is
  * through the SIOCSIP6ADDRPOLICY which is exclusive in ip.
  */
-static ip6_asp_t *ip6_asp_table = default_ip6_asp_table;
-/* The number of policy entries in the table */
-static uint_t ip6_asp_table_count =
-    sizeof (default_ip6_asp_table) / sizeof (ip6_asp_t);
-
 static void ip6_asp_copy(ip6_asp_t *, ip6_asp_t *, uint_t);
-static void ip6_asp_check_for_updates();
+static void ip6_asp_check_for_updates(ip_stack_t *);
 
 void
-ip6_asp_init(void)
+ip6_asp_init(ip_stack_t *ipst)
 {
 	/* Initialize the table lock */
-	mutex_init(&ip6_asp_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&ipst->ips_ip6_asp_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	ipst->ips_ip6_asp_table = default_ip6_asp_table;
+
+	ipst->ips_ip6_asp_table_count =
+	    sizeof (default_ip6_asp_table) / sizeof (ip6_asp_t);
 }
 
 void
-ip6_asp_free(void)
+ip6_asp_free(ip_stack_t *ipst)
 {
-	if (ip6_asp_table != default_ip6_asp_table) {
-		kmem_free(ip6_asp_table,
-		    ip6_asp_table_count * sizeof (ip6_asp_t));
+	if (ipst->ips_ip6_asp_table != default_ip6_asp_table) {
+		kmem_free(ipst->ips_ip6_asp_table,
+		    ipst->ips_ip6_asp_table_count * sizeof (ip6_asp_t));
+		ipst->ips_ip6_asp_table = NULL;
 	}
-	mutex_destroy(&ip6_asp_lock);
+	mutex_destroy(&ipst->ips_ip6_asp_lock);
 }
 
 /*
@@ -124,15 +115,15 @@ ip6_asp_free(void)
  * count and return true.
  */
 boolean_t
-ip6_asp_can_lookup()
+ip6_asp_can_lookup(ip_stack_t *ipst)
 {
-	mutex_enter(&ip6_asp_lock);
-	if (ip6_asp_uip) {
-		mutex_exit(&ip6_asp_lock);
+	mutex_enter(&ipst->ips_ip6_asp_lock);
+	if (ipst->ips_ip6_asp_uip) {
+		mutex_exit(&ipst->ips_ip6_asp_lock);
 		return (B_FALSE);
 	}
-	IP6_ASP_TABLE_REFHOLD();
-	mutex_exit(&ip6_asp_lock);
+	IP6_ASP_TABLE_REFHOLD(ipst);
+	mutex_exit(&ipst->ips_ip6_asp_lock);
 	return (B_TRUE);
 
 }
@@ -140,6 +131,8 @@ ip6_asp_can_lookup()
 void
 ip6_asp_pending_op(queue_t *q, mblk_t *mp, aspfunc_t func)
 {
+	conn_t	*connp = Q_TO_CONN(q);
+	ip_stack_t *ipst = connp->conn_netstack->netstack_ip;
 
 	ASSERT((mp->b_prev == NULL) && (mp->b_queue == NULL) &&
 	    (mp->b_next == NULL));
@@ -147,32 +140,33 @@ ip6_asp_pending_op(queue_t *q, mblk_t *mp, aspfunc_t func)
 	mp->b_prev = (void *)func;
 	mp->b_next = NULL;
 
-	mutex_enter(&ip6_asp_lock);
-	if (ip6_asp_pending_ops == NULL) {
-		ASSERT(ip6_asp_pending_ops_tail == NULL);
-		ip6_asp_pending_ops = ip6_asp_pending_ops_tail = mp;
+	mutex_enter(&ipst->ips_ip6_asp_lock);
+	if (ipst->ips_ip6_asp_pending_ops == NULL) {
+		ASSERT(ipst->ips_ip6_asp_pending_ops_tail == NULL);
+		ipst->ips_ip6_asp_pending_ops =
+		    ipst->ips_ip6_asp_pending_ops_tail = mp;
 	} else {
-		ip6_asp_pending_ops_tail->b_next = mp;
-		ip6_asp_pending_ops_tail = mp;
+		ipst->ips_ip6_asp_pending_ops_tail->b_next = mp;
+		ipst->ips_ip6_asp_pending_ops_tail = mp;
 	}
-	mutex_exit(&ip6_asp_lock);
+	mutex_exit(&ipst->ips_ip6_asp_lock);
 }
 
 static void
-ip6_asp_complete_op()
+ip6_asp_complete_op(ip_stack_t *ipst)
 {
 	mblk_t		*mp;
 	queue_t		*q;
 	aspfunc_t	func;
 
-	mutex_enter(&ip6_asp_lock);
-	while (ip6_asp_pending_ops != NULL) {
-		mp = ip6_asp_pending_ops;
-		ip6_asp_pending_ops = mp->b_next;
+	mutex_enter(&ipst->ips_ip6_asp_lock);
+	while (ipst->ips_ip6_asp_pending_ops != NULL) {
+		mp = ipst->ips_ip6_asp_pending_ops;
+		ipst->ips_ip6_asp_pending_ops = mp->b_next;
 		mp->b_next = NULL;
-		if (ip6_asp_pending_ops == NULL)
-			ip6_asp_pending_ops_tail = NULL;
-		mutex_exit(&ip6_asp_lock);
+		if (ipst->ips_ip6_asp_pending_ops == NULL)
+			ipst->ips_ip6_asp_pending_ops_tail = NULL;
+		mutex_exit(&ipst->ips_ip6_asp_lock);
 
 		q = (queue_t *)mp->b_queue;
 		func = (aspfunc_t)mp->b_prev;
@@ -182,9 +176,9 @@ ip6_asp_complete_op()
 
 
 		(*func)(NULL, q, mp, NULL);
-		mutex_enter(&ip6_asp_lock);
+		mutex_enter(&ipst->ips_ip6_asp_lock);
 	}
-	mutex_exit(&ip6_asp_lock);
+	mutex_exit(&ipst->ips_ip6_asp_lock);
 }
 
 /*
@@ -192,9 +186,9 @@ ip6_asp_complete_op()
  * saved update to the table, if any.
  */
 void
-ip6_asp_table_refrele()
+ip6_asp_table_refrele(ip_stack_t *ipst)
 {
-	IP6_ASP_TABLE_REFRELE();
+	IP6_ASP_TABLE_REFRELE(ipst);
 }
 
 /*
@@ -209,15 +203,15 @@ ip6_asp_table_refrele()
  * better than O(n).
  */
 char *
-ip6_asp_lookup(const in6_addr_t *addr, uint32_t *precedence)
+ip6_asp_lookup(const in6_addr_t *addr, uint32_t *precedence, ip_stack_t *ipst)
 {
 	ip6_asp_t *aspp;
 	ip6_asp_t *match = NULL;
 	ip6_asp_t *default_policy;
 
-	aspp = ip6_asp_table;
+	aspp = ipst->ips_ip6_asp_table;
 	/* The default entry must always be the last one */
-	default_policy = aspp + ip6_asp_table_count - 1;
+	default_policy = aspp + ipst->ips_ip6_asp_table_count - 1;
 
 	while (match == NULL) {
 		if (aspp == default_policy) {
@@ -242,24 +236,25 @@ ip6_asp_lookup(const in6_addr_t *addr, uint32_t *precedence)
  * ip_sioctl_ip6addrpolicy() has already done it for us.
  */
 void
-ip6_asp_check_for_updates()
+ip6_asp_check_for_updates(ip_stack_t *ipst)
 {
 	ip6_asp_t *table;
 	size_t	table_size;
 	mblk_t	*data_mp, *mp;
 	struct iocblk *iocp;
 
-	mutex_enter(&ip6_asp_lock);
-	if (ip6_asp_pending_update == NULL || ip6_asp_refcnt > 0) {
-		mutex_exit(&ip6_asp_lock);
+	mutex_enter(&ipst->ips_ip6_asp_lock);
+	if (ipst->ips_ip6_asp_pending_update == NULL ||
+	    ipst->ips_ip6_asp_refcnt > 0) {
+		mutex_exit(&ipst->ips_ip6_asp_lock);
 		return;
 	}
 
-	mp = ip6_asp_pending_update;
-	ip6_asp_pending_update = NULL;
+	mp = ipst->ips_ip6_asp_pending_update;
+	ipst->ips_ip6_asp_pending_update = NULL;
 	ASSERT(mp->b_prev != NULL);
 
-	ip6_asp_uip = B_TRUE;
+	ipst->ips_ip6_asp_uip = B_TRUE;
 
 	iocp = (struct iocblk *)mp->b_rptr;
 	data_mp = mp->b_cont;
@@ -271,7 +266,7 @@ ip6_asp_check_for_updates()
 		table_size = iocp->ioc_count;
 	}
 
-	ip6_asp_replace(mp, table, table_size, B_TRUE,
+	ip6_asp_replace(mp, table, table_size, B_TRUE, ipst,
 	    iocp->ioc_flag & IOC_MODELS);
 }
 
@@ -282,10 +277,10 @@ ip6_asp_check_for_updates()
  * table.  The caller is responsible for making sure that there are exactly
  * new_count policy entries in new_table.
  */
-/*ARGSUSED4*/
+/*ARGSUSED5*/
 void
 ip6_asp_replace(mblk_t *mp, ip6_asp_t *new_table, size_t new_size,
-    boolean_t locked, model_t datamodel)
+    boolean_t locked, ip_stack_t *ipst, model_t datamodel)
 {
 	int			ret_val = 0;
 	ip6_asp_t		*tmp_table;
@@ -310,44 +305,44 @@ ip6_asp_replace(mblk_t *mp, ip6_asp_t *new_table, size_t new_size,
 
 
 	if (!locked)
-		mutex_enter(&ip6_asp_lock);
+		mutex_enter(&ipst->ips_ip6_asp_lock);
 	/*
 	 * Check if we are in the process of creating any IRE using the
 	 * current information. If so, wait till that is done.
 	 */
-	if (!locked && ip6_asp_refcnt > 0) {
+	if (!locked && ipst->ips_ip6_asp_refcnt > 0) {
 		/* Save this request for later processing */
-		if (ip6_asp_pending_update == NULL) {
-			ip6_asp_pending_update = mp;
+		if (ipst->ips_ip6_asp_pending_update == NULL) {
+			ipst->ips_ip6_asp_pending_update = mp;
 		} else {
 			/* Let's not queue multiple requests for now */
 			ip1dbg(("ip6_asp_replace: discarding request\n"));
-			mutex_exit(&ip6_asp_lock);
+			mutex_exit(&ipst->ips_ip6_asp_lock);
 			ret_val =  EAGAIN;
 			goto replace_end;
 		}
-		mutex_exit(&ip6_asp_lock);
+		mutex_exit(&ipst->ips_ip6_asp_lock);
 		return;
 	}
 
 	/* Prevent lookups till the table have been updated */
 	if (!locked)
-		ip6_asp_uip = B_TRUE;
+		ipst->ips_ip6_asp_uip = B_TRUE;
 
-	ASSERT(ip6_asp_refcnt == 0);
+	ASSERT(ipst->ips_ip6_asp_refcnt == 0);
 
 	if (new_table == NULL) {
 		/*
 		 * This is a special case.  The user wants to revert
 		 * back to using the default table.
 		 */
-		if (ip6_asp_table == default_ip6_asp_table)
+		if (ipst->ips_ip6_asp_table == default_ip6_asp_table)
 			goto unlock_end;
 
-		kmem_free(ip6_asp_table,
-		    ip6_asp_table_count * sizeof (ip6_asp_t));
-		ip6_asp_table = default_ip6_asp_table;
-		ip6_asp_table_count =
+		kmem_free(ipst->ips_ip6_asp_table,
+		    ipst->ips_ip6_asp_table_count * sizeof (ip6_asp_t));
+		ipst->ips_ip6_asp_table = default_ip6_asp_table;
+		ipst->ips_ip6_asp_table_count =
 		    sizeof (default_ip6_asp_table) / sizeof (ip6_asp_t);
 		goto unlock_end;
 	}
@@ -413,12 +408,12 @@ ip6_asp_replace(mblk_t *mp, ip6_asp_t *new_table, size_t new_size,
 		ip1dbg(("ip6_asp_replace: bad table: no default entry\n"));
 		goto unlock_end;
 	}
-	if (ip6_asp_table != default_ip6_asp_table) {
-		kmem_free(ip6_asp_table,
-		    ip6_asp_table_count * sizeof (ip6_asp_t));
+	if (ipst->ips_ip6_asp_table != default_ip6_asp_table) {
+		kmem_free(ipst->ips_ip6_asp_table,
+		    ipst->ips_ip6_asp_table_count * sizeof (ip6_asp_t));
 	}
-	ip6_asp_table = tmp_table;
-	ip6_asp_table_count = count;
+	ipst->ips_ip6_asp_table = tmp_table;
+	ipst->ips_ip6_asp_table_count = count;
 
 	/*
 	 * The user has changed the address selection policy table.  IPv6
@@ -426,11 +421,11 @@ ip6_asp_replace(mblk_t *mp, ip6_asp_t *new_table, size_t new_size,
 	 * IRE_HOST_REDIRECT entries used the old table, so we need to
 	 * clear the cache.
 	 */
-	ire_walk_v6(ire_delete_cache_v6, NULL, ALL_ZONES);
+	ire_walk_v6(ire_delete_cache_v6, NULL, ALL_ZONES, ipst);
 
 unlock_end:
-	ip6_asp_uip = B_FALSE;
-	mutex_exit(&ip6_asp_lock);
+	ipst->ips_ip6_asp_uip = B_FALSE;
+	mutex_exit(&ipst->ips_ip6_asp_lock);
 
 replace_end:
 	/* Reply to the ioctl */
@@ -446,7 +441,7 @@ replace_end:
 	DB_TYPE(mp) = (iocp->ioc_error == 0) ? M_IOCACK : M_IOCNAK;
 	qreply(q, mp);
 check_binds:
-	ip6_asp_complete_op();
+	ip6_asp_complete_op(ipst);
 }
 
 /*
@@ -501,7 +496,7 @@ ip6_asp_copy(ip6_asp_t *src_table, ip6_asp_t *dst_table, uint_t count)
  * dtable.
  */
 int
-ip6_asp_get(ip6_asp_t *dtable, size_t dtable_size)
+ip6_asp_get(ip6_asp_t *dtable, size_t dtable_size, ip_stack_t *ipst)
 {
 	uint_t dtable_count;
 
@@ -510,12 +505,12 @@ ip6_asp_get(ip6_asp_t *dtable, size_t dtable_size)
 			return (-1);
 
 		dtable_count = dtable_size / sizeof (ip6_asp_t);
-		bcopy(ip6_asp_table, dtable,
-		    MIN(ip6_asp_table_count, dtable_count) *
+		bcopy(ipst->ips_ip6_asp_table, dtable,
+		    MIN(ipst->ips_ip6_asp_table_count, dtable_count) *
 		    sizeof (ip6_asp_t));
 	}
 
-	return (ip6_asp_table_count);
+	return (ipst->ips_ip6_asp_table_count);
 }
 
 /*

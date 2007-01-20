@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,21 +72,24 @@
 #include <inet/ipclassifier.h>
 #include <inet/tun.h>
 
-static void ipsec_update_present_flags();
-static ipsec_act_t *ipsec_act_wildcard_expand(ipsec_act_t *, uint_t *);
+static void ipsec_update_present_flags(ipsec_stack_t *);
+static ipsec_act_t *ipsec_act_wildcard_expand(ipsec_act_t *, uint_t *,
+    netstack_t *);
 static void ipsec_out_free(void *);
 static void ipsec_in_free(void *);
 static mblk_t *ipsec_attach_global_policy(mblk_t *, conn_t *,
-    ipsec_selector_t *);
+    ipsec_selector_t *, netstack_t *);
 static mblk_t *ipsec_apply_global_policy(mblk_t *, conn_t *,
-    ipsec_selector_t *);
+    ipsec_selector_t *, netstack_t *);
 static mblk_t *ipsec_check_ipsecin_policy(mblk_t *, ipsec_policy_t *,
-    ipha_t *, ip6_t *, uint64_t);
+    ipha_t *, ip6_t *, uint64_t, netstack_t *);
 static void ipsec_in_release_refs(ipsec_in_t *);
 static void ipsec_out_release_refs(ipsec_out_t *);
+static void ipsec_action_free_table(ipsec_action_t *);
 static void ipsec_action_reclaim(void *);
-static void ipsid_init(void);
-static void ipsid_fini(void);
+static void ipsec_action_reclaim_stack(netstack_t *);
+static void ipsid_init(netstack_t *);
+static void ipsid_fini(netstack_t *);
 
 /* sel_flags values for ipsec_init_inbound_sel(). */
 #define	SEL_NONE	0x0000
@@ -105,45 +108,23 @@ static boolean_t ipsec_check_ipsecin_action(struct ipsec_in_s *, mblk_t *,
     struct ipsec_action_s *, ipha_t *ipha, ip6_t *ip6h, const char **,
     kstat_named_t **);
 static void ipsec_unregister_prov_update(void);
+static void ipsec_prov_update_callback_stack(uint32_t, void *, netstack_t *);
 static boolean_t ipsec_compare_action(ipsec_policy_t *, ipsec_policy_t *);
 static uint32_t selector_hash(ipsec_selector_t *, ipsec_policy_root_t *);
+static boolean_t ipsec_kstat_init(ipsec_stack_t *);
+static void ipsec_kstat_destroy(ipsec_stack_t *);
+static int ipsec_free_tables(ipsec_stack_t *);
 static int tunnel_compare(const void *, const void *);
 static void ipsec_freemsg_chain(mblk_t *);
 static void ip_drop_packet_chain(mblk_t *, boolean_t, ill_t *, ire_t *,
     struct kstat_named *, ipdropper_t *);
-
-/*
- * Policy rule index generator.  We assume this won't wrap in the
- * lifetime of a system.  If we make 2^20 policy changes per second,
- * this will last 2^44 seconds, or roughly 500,000 years, so we don't
- * have to worry about reusing policy index values.
- *
- * Protected by ipsec_conf_lock.
- */
-uint64_t	ipsec_next_policy_index = 1;
-
-/*
- * Active & Inactive system policy roots
- */
-static ipsec_policy_head_t system_policy;
-static ipsec_policy_head_t inactive_policy;
-
-/*
- * Tunnel policies - AVL tree indexed by tunnel name.
- */
-krwlock_t tunnel_policy_lock;
-uint64_t tunnel_policy_gen;	/* To keep track of updates w/o searches. */
-avl_tree_t tunnel_policies;
-
-/* Packet dropper for generic SPD drops. */
-ipdropper_t spd_dropper;
-
-/*
- * For now, use a trivially sized hash table for actions.
- * In the future we can add the structure canonicalization necessary
- * to get the hash function to behave correctly..
- */
-#define	IPSEC_ACTION_HASH_SIZE 1
+static boolean_t ipsec_kstat_init(ipsec_stack_t *);
+static void ipsec_kstat_destroy(ipsec_stack_t *);
+static int ipsec_free_tables(ipsec_stack_t *);
+static int tunnel_compare(const void *, const void *);
+static void ipsec_freemsg_chain(mblk_t *);
+static void ip_drop_packet_chain(mblk_t *, boolean_t, ill_t *, ire_t *,
+    struct kstat_named *, ipdropper_t *);
 
 /*
  * Selector hash table is statically sized at module load time.
@@ -151,27 +132,22 @@ ipdropper_t spd_dropper;
  */
 
 #define	IPSEC_SPDHASH_DEFAULT 251
-uint32_t ipsec_spd_hashsize = 0;
 
 /* SPD hash-size tunable per tunnel. */
 #define	TUN_SPDHASH_DEFAULT 5
-uint32_t tun_spd_hashsize;
 
 
 #define	IPSEC_SEL_NOHASH ((uint32_t)(~0))
 
-static HASH_HEAD(ipsec_action_s) ipsec_action_hash[IPSEC_ACTION_HASH_SIZE];
-static HASH_HEAD(ipsec_sel) *ipsec_sel_hash;
+/*
+ * Handle global across all stack instances
+ */
+static crypto_notify_handle_t prov_update_handle = NULL;
 
 static kmem_cache_t *ipsec_action_cache;
 static kmem_cache_t *ipsec_sel_cache;
 static kmem_cache_t *ipsec_pol_cache;
 static kmem_cache_t *ipsec_info_cache;
-
-boolean_t ipsec_inbound_v4_policy_present = B_FALSE;
-boolean_t ipsec_outbound_v4_policy_present = B_FALSE;
-boolean_t ipsec_inbound_v6_policy_present = B_FALSE;
-boolean_t ipsec_outbound_v6_policy_present = B_FALSE;
 
 /* Frag cache prototypes */
 static void ipsec_fragcache_clean(ipsec_fragcache_t *);
@@ -179,21 +155,8 @@ static ipsec_fragcache_entry_t *fragcache_delentry(int,
     ipsec_fragcache_entry_t *, ipsec_fragcache_t *);
 boolean_t ipsec_fragcache_init(ipsec_fragcache_t *);
 void ipsec_fragcache_uninit(ipsec_fragcache_t *);
-mblk_t *ipsec_fragcache_add(ipsec_fragcache_t *, mblk_t *, mblk_t *, int);
-
-/*
- * Because policy needs to know what algorithms are supported, keep the
- * lists of algorithms here.
- */
-
-kmutex_t alg_lock;
-krwlock_t itp_get_byaddr_rw_lock;
-ipsec_tun_pol_t *(*itp_get_byaddr)(uint32_t *, uint32_t *, int);
-uint8_t ipsec_nalgs[IPSEC_NALGTYPES];
-ipsec_alginfo_t *ipsec_alglists[IPSEC_NALGTYPES][IPSEC_MAX_ALGS];
-uint8_t ipsec_sortlist[IPSEC_NALGTYPES][IPSEC_MAX_ALGS];
-ipsec_algs_exec_mode_t ipsec_algs_exec_mode[IPSEC_NALGTYPES];
-static crypto_notify_handle_t prov_update_handle = NULL;
+mblk_t *ipsec_fragcache_add(ipsec_fragcache_t *, mblk_t *, mblk_t *, int,
+    ipsec_stack_t *);
 
 int ipsec_hdr_pullup_needed = 0;
 int ipsec_weird_null_inbound_policy = 0;
@@ -248,12 +211,6 @@ static char *ipsec_policy_failure_msgs[] = {
 	"%s: Self-Encapsulation present while not expected in the "
 	"incoming %s packet; Source %s, Destination %s.\n",
 };
-/*
- * Have a counter for every possible policy message in the previous array.
- */
-static uint32_t ipsec_policy_failure_count[IPSEC_POLICY_MAX];
-/* Time since last ipsec policy failure that printed a message. */
-hrtime_t ipsec_policy_failure_last = 0;
 
 /*
  * General overviews:
@@ -261,7 +218,7 @@ hrtime_t ipsec_policy_failure_last = 0;
  * Locking:
  *
  *	All of the system policy structures are protected by a single
- *	rwlock, ipsec_conf_lock.  These structures are threaded in a
+ *	rwlock.  These structures are threaded in a
  *	fairly complex fashion and are not expected to change on a
  *	regular basis, so this should not cause scaling/contention
  *	problems.  As a result, policy checks should (hopefully) be MT-hot.
@@ -361,10 +318,14 @@ ipsec_policy_cmpbyid(const void *a, const void *b)
 	return (0);
 }
 
+/*
+ * Free what ipsec_alloc_table allocated.
+ */
 void
 ipsec_polhead_free_table(ipsec_policy_head_t *iph)
 {
 	int dir;
+	int i;
 
 	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
 		ipsec_policy_root_t *ipr = &iph->iph_root[dir];
@@ -372,8 +333,12 @@ ipsec_polhead_free_table(ipsec_policy_head_t *iph)
 		if (ipr->ipr_hash == NULL)
 			continue;
 
+		for (i = 0; i < ipr->ipr_nchains; i++) {
+			ASSERT(ipr->ipr_hash[i].hash_head == NULL);
+		}
 		kmem_free(ipr->ipr_hash, ipr->ipr_nchains *
 		    sizeof (ipsec_policy_hash_t));
+		ipr->ipr_hash = NULL;
 	}
 }
 
@@ -397,19 +362,22 @@ ipsec_polhead_destroy(ipsec_policy_head_t *iph)
 }
 
 /*
- * Module unload hook.
+ * Free the IPsec stack instance.
  */
-void
-ipsec_policy_destroy(void)
+/* ARGSUSED */
+static void
+ipsec_stack_fini(netstackid_t stackid, void *arg)
 {
-	int i;
+	ipsec_stack_t	*ipss = (ipsec_stack_t *)arg;
 	void *cookie;
 	ipsec_tun_pol_t *node;
+	netstack_t	*ns = ipss->ipsec_netstack;
+	int		i;
+	ipsec_algtype_t	algtype;
 
-	ip_drop_unregister(&spd_dropper);
-	ip_drop_destroy();
+	ipsec_loader_destroy(ipss);
 
-	rw_enter(&tunnel_policy_lock, RW_WRITER);
+	rw_enter(&ipss->ipsec_tunnel_policy_lock, RW_WRITER);
 	/*
 	 * It's possible we can just ASSERT() the tree is empty.  After all,
 	 * we aren't called until IP is ready to unload (and presumably all
@@ -418,47 +386,95 @@ ipsec_policy_destroy(void)
 	 */
 	cookie = NULL;
 	while ((node = (ipsec_tun_pol_t *)
-		    avl_destroy_nodes(&tunnel_policies, &cookie)) != NULL) {
-		ITP_REFRELE(node);
+	    avl_destroy_nodes(&ipss->ipsec_tunnel_policies,
+	    &cookie)) != NULL) {
+		ITP_REFRELE(node, ns);
 	}
-	avl_destroy(&tunnel_policies);
-	rw_exit(&tunnel_policy_lock);
-	rw_destroy(&tunnel_policy_lock);
-	ipsec_polhead_destroy(&system_policy);
-	ipsec_polhead_destroy(&inactive_policy);
+	avl_destroy(&ipss->ipsec_tunnel_policies);
+	rw_exit(&ipss->ipsec_tunnel_policy_lock);
+	rw_destroy(&ipss->ipsec_tunnel_policy_lock);
 
-	for (i = 0; i < IPSEC_ACTION_HASH_SIZE; i++)
-		mutex_destroy(&(ipsec_action_hash[i].hash_lock));
+	ipsec_config_flush(ns);
 
-	for (i = 0; i < ipsec_spd_hashsize; i++)
-		mutex_destroy(&(ipsec_sel_hash[i].hash_lock));
+	ipsec_kstat_destroy(ipss);
 
-	ipsec_unregister_prov_update();
+	ip_drop_unregister(&ipss->ipsec_dropper);
 
-	mutex_destroy(&alg_lock);
+	ip_drop_unregister(&ipss->ipsec_spd_dropper);
+	ip_drop_destroy(ipss);
+	/*
+	 * Globals start with ref == 1 to prevent IPPH_REFRELE() from
+	 * attempting to free them, hence they should have 1 now.
+	 */
+	ipsec_polhead_destroy(&ipss->ipsec_system_policy);
+	ASSERT(ipss->ipsec_system_policy.iph_refs == 1);
+	ipsec_polhead_destroy(&ipss->ipsec_inactive_policy);
+	ASSERT(ipss->ipsec_inactive_policy.iph_refs == 1);
 
+	for (i = 0; i < IPSEC_ACTION_HASH_SIZE; i++) {
+		ipsec_action_free_table(ipss->ipsec_action_hash[i].hash_head);
+		ipss->ipsec_action_hash[i].hash_head = NULL;
+		mutex_destroy(&(ipss->ipsec_action_hash[i].hash_lock));
+	}
+
+	for (i = 0; i < ipss->ipsec_spd_hashsize; i++) {
+		ASSERT(ipss->ipsec_sel_hash[i].hash_head == NULL);
+		mutex_destroy(&(ipss->ipsec_sel_hash[i].hash_lock));
+	}
+
+	mutex_enter(&ipss->ipsec_alg_lock);
+	for (algtype = 0; algtype < IPSEC_NALGTYPES; algtype ++) {
+		int nalgs = ipss->ipsec_nalgs[algtype];
+
+		for (i = 0; i < nalgs; i++) {
+			if (ipss->ipsec_alglists[algtype][i] != NULL)
+				ipsec_alg_unreg(algtype, i, ns);
+		}
+	}
+	mutex_exit(&ipss->ipsec_alg_lock);
+	mutex_destroy(&ipss->ipsec_alg_lock);
+
+	ipsid_gc(ns);
+	ipsid_fini(ns);
+
+	(void) ipsec_free_tables(ipss);
+	kmem_free(ipss, sizeof (*ipss));
+}
+
+void
+ipsec_policy_g_destroy(void)
+{
 	kmem_cache_destroy(ipsec_action_cache);
 	kmem_cache_destroy(ipsec_sel_cache);
 	kmem_cache_destroy(ipsec_pol_cache);
 	kmem_cache_destroy(ipsec_info_cache);
-	ipsid_gc();
-	ipsid_fini();
+
+	ipsec_unregister_prov_update();
+
+	netstack_unregister(NS_IPSEC);
 }
 
 
 /*
+ * Free what ipsec_alloc_tables allocated.
  * Called when table allocation fails to free the table.
  */
 static int
-ipsec_alloc_tables_failed()
+ipsec_free_tables(ipsec_stack_t *ipss)
 {
-	if (ipsec_sel_hash != NULL) {
-		kmem_free(ipsec_sel_hash, ipsec_spd_hashsize *
-		    sizeof (*ipsec_sel_hash));
-		ipsec_sel_hash = NULL;
+	int i;
+
+	if (ipss->ipsec_sel_hash != NULL) {
+		for (i = 0; i < ipss->ipsec_spd_hashsize; i++) {
+			ASSERT(ipss->ipsec_sel_hash[i].hash_head == NULL);
+		}
+		kmem_free(ipss->ipsec_sel_hash, ipss->ipsec_spd_hashsize *
+		    sizeof (*ipss->ipsec_sel_hash));
+		ipss->ipsec_sel_hash = NULL;
+		ipss->ipsec_spd_hashsize = 0;
 	}
-	ipsec_polhead_free_table(&system_policy);
-	ipsec_polhead_free_table(&inactive_policy);
+	ipsec_polhead_free_table(&ipss->ipsec_system_policy);
+	ipsec_polhead_free_table(&ipss->ipsec_inactive_policy);
 
 	return (ENOMEM);
 }
@@ -469,7 +485,7 @@ ipsec_alloc_tables_failed()
  */
 int
 ipsec_alloc_table(ipsec_policy_head_t *iph, int nchains, int kmflag,
-    boolean_t global_cleanup)
+    boolean_t global_cleanup, netstack_t *ns)
 {
 	int dir;
 
@@ -480,7 +496,8 @@ ipsec_alloc_table(ipsec_policy_head_t *iph, int nchains, int kmflag,
 		ipr->ipr_hash = kmem_zalloc(nchains *
 		    sizeof (ipsec_policy_hash_t), kmflag);
 		if (ipr->ipr_hash == NULL)
-			return (global_cleanup ? ipsec_alloc_tables_failed() :
+			return (global_cleanup ?
+			    ipsec_free_tables(ns->netstack_ipsec) :
 			    ENOMEM);
 	}
 	return (0);
@@ -491,25 +508,26 @@ ipsec_alloc_table(ipsec_policy_head_t *iph, int nchains, int kmflag,
  * after cleaning up any work in progress.
  */
 static int
-ipsec_alloc_tables(int kmflag)
+ipsec_alloc_tables(int kmflag, netstack_t *ns)
 {
 	int error;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	error = ipsec_alloc_table(&system_policy, ipsec_spd_hashsize, kmflag,
-	    B_TRUE);
+	error = ipsec_alloc_table(&ipss->ipsec_system_policy,
+	    ipss->ipsec_spd_hashsize, kmflag, B_TRUE, ns);
 	if (error != 0)
 		return (error);
 
-	error = ipsec_alloc_table(&inactive_policy, ipsec_spd_hashsize, kmflag,
-	    B_TRUE);
+	error = ipsec_alloc_table(&ipss->ipsec_inactive_policy,
+	    ipss->ipsec_spd_hashsize, kmflag, B_TRUE, ns);
 	if (error != 0)
 		return (error);
 
-	ipsec_sel_hash = kmem_zalloc(ipsec_spd_hashsize *
-	    sizeof (*ipsec_sel_hash), kmflag);
+	ipss->ipsec_sel_hash = kmem_zalloc(ipss->ipsec_spd_hashsize *
+	    sizeof (*ipss->ipsec_sel_hash), kmflag);
 
-	if (ipsec_sel_hash == NULL)
-		return (ipsec_alloc_tables_failed());
+	if (ipss->ipsec_sel_hash == NULL)
+		return (ipsec_free_tables(ipss));
 
 	return (0);
 }
@@ -537,62 +555,145 @@ ipsec_polhead_init(ipsec_policy_head_t *iph, int nchains)
 	}
 }
 
-/*
- * Module load hook.
- */
-void
-ipsec_policy_init()
+static boolean_t
+ipsec_kstat_init(ipsec_stack_t *ipss)
 {
+	ipss->ipsec_ksp = kstat_create_netstack("ip", 0, "ipsec_stat", "net",
+	    KSTAT_TYPE_NAMED, sizeof (ipsec_kstats_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_PERSISTENT, ipss->ipsec_netstack->netstack_stackid);
+
+	if (ipss->ipsec_ksp == NULL || ipss->ipsec_ksp->ks_data == NULL)
+		return (B_FALSE);
+
+	ipss->ipsec_kstats = ipss->ipsec_ksp->ks_data;
+
+#define	KI(x) kstat_named_init(&ipss->ipsec_kstats->x, #x, KSTAT_DATA_UINT64)
+	KI(esp_stat_in_requests);
+	KI(esp_stat_in_discards);
+	KI(esp_stat_lookup_failure);
+	KI(ah_stat_in_requests);
+	KI(ah_stat_in_discards);
+	KI(ah_stat_lookup_failure);
+	KI(sadb_acquire_maxpackets);
+	KI(sadb_acquire_qhiwater);
+#undef KI
+
+	kstat_install(ipss->ipsec_ksp);
+	return (B_TRUE);
+}
+
+static void
+ipsec_kstat_destroy(ipsec_stack_t *ipss)
+{
+	kstat_delete_netstack(ipss->ipsec_ksp,
+	    ipss->ipsec_netstack->netstack_stackid);
+	ipss->ipsec_kstats = NULL;
+
+}
+
+/*
+ * Initialize the IPsec stack instance.
+ */
+/* ARGSUSED */
+static void *
+ipsec_stack_init(netstackid_t stackid, netstack_t *ns)
+{
+	ipsec_stack_t	*ipss;
 	int i;
+
+	ipss = (ipsec_stack_t *)kmem_zalloc(sizeof (*ipss), KM_SLEEP);
+	ipss->ipsec_netstack = ns;
+
+	/*
+	 * FIXME: netstack_ipsec is used by some of the routines we call
+	 * below, but it isn't set until this routine returns.
+	 * Either we introduce optional xxx_stack_alloc() functions
+	 * that will be called by the netstack framework before xxx_stack_init,
+	 * or we switch spd.c and sadb.c to operate on ipsec_stack_t
+	 * (latter has some include file order issues for sadb.h, but makes
+	 * sense if we merge some of the ipsec related stack_t's together.
+	 */
+	ns->netstack_ipsec = ipss;
 
 	/*
 	 * Make two attempts to allocate policy hash tables; try it at
 	 * the "preferred" size (may be set in /etc/system) first,
 	 * then fall back to the default size.
 	 */
-	if (ipsec_spd_hashsize == 0)
-		ipsec_spd_hashsize = IPSEC_SPDHASH_DEFAULT;
+	if (ipss->ipsec_spd_hashsize == 0)
+		ipss->ipsec_spd_hashsize = IPSEC_SPDHASH_DEFAULT;
 
-	if (ipsec_alloc_tables(KM_NOSLEEP) != 0) {
+	if (ipsec_alloc_tables(KM_NOSLEEP, ns) != 0) {
 		cmn_err(CE_WARN,
 		    "Unable to allocate %d entry IPsec policy hash table",
-		    ipsec_spd_hashsize);
-		ipsec_spd_hashsize = IPSEC_SPDHASH_DEFAULT;
+		    ipss->ipsec_spd_hashsize);
+		ipss->ipsec_spd_hashsize = IPSEC_SPDHASH_DEFAULT;
 		cmn_err(CE_WARN, "Falling back to %d entries",
-		    ipsec_spd_hashsize);
-		(void) ipsec_alloc_tables(KM_SLEEP);
+		    ipss->ipsec_spd_hashsize);
+		(void) ipsec_alloc_tables(KM_SLEEP, ns);
 	}
 
 	/* Just set a default for tunnels. */
-	if (tun_spd_hashsize == 0)
-		tun_spd_hashsize = TUN_SPDHASH_DEFAULT;
+	if (ipss->ipsec_tun_spd_hashsize == 0)
+		ipss->ipsec_tun_spd_hashsize = TUN_SPDHASH_DEFAULT;
 
-	ipsid_init();
+	ipsid_init(ns);
 	/*
 	 * Globals need ref == 1 to prevent IPPH_REFRELE() from attempting
 	 * to free them.
 	 */
-	system_policy.iph_refs = 1;
-	inactive_policy.iph_refs = 1;
-	ipsec_polhead_init(&system_policy, ipsec_spd_hashsize);
-	ipsec_polhead_init(&inactive_policy, ipsec_spd_hashsize);
-	rw_init(&tunnel_policy_lock, NULL, RW_DEFAULT, NULL);
-	avl_create(&tunnel_policies, tunnel_compare, sizeof (ipsec_tun_pol_t),
-	    0);
+	ipss->ipsec_system_policy.iph_refs = 1;
+	ipss->ipsec_inactive_policy.iph_refs = 1;
+	ipsec_polhead_init(&ipss->ipsec_system_policy,
+	    ipss->ipsec_spd_hashsize);
+	ipsec_polhead_init(&ipss->ipsec_inactive_policy,
+	    ipss->ipsec_spd_hashsize);
+	rw_init(&ipss->ipsec_tunnel_policy_lock, NULL, RW_DEFAULT, NULL);
+	avl_create(&ipss->ipsec_tunnel_policies, tunnel_compare,
+	    sizeof (ipsec_tun_pol_t), 0);
+
+	ipss->ipsec_next_policy_index = 1;
+
+	rw_init(&ipss->ipsec_system_policy.iph_lock, NULL, RW_DEFAULT, NULL);
+	rw_init(&ipss->ipsec_inactive_policy.iph_lock, NULL, RW_DEFAULT, NULL);
 
 	for (i = 0; i < IPSEC_ACTION_HASH_SIZE; i++)
-		mutex_init(&(ipsec_action_hash[i].hash_lock),
+		mutex_init(&(ipss->ipsec_action_hash[i].hash_lock),
 		    NULL, MUTEX_DEFAULT, NULL);
 
-	for (i = 0; i < ipsec_spd_hashsize; i++)
-		mutex_init(&(ipsec_sel_hash[i].hash_lock),
+	for (i = 0; i < ipss->ipsec_spd_hashsize; i++)
+		mutex_init(&(ipss->ipsec_sel_hash[i].hash_lock),
 		    NULL, MUTEX_DEFAULT, NULL);
 
-	mutex_init(&alg_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&ipss->ipsec_alg_lock, NULL, MUTEX_DEFAULT, NULL);
+	for (i = 0; i < IPSEC_NALGTYPES; i++) {
+		ipss->ipsec_nalgs[i] = 0;
+	}
 
-	for (i = 0; i < IPSEC_NALGTYPES; i++)
-		ipsec_nalgs[i] = 0;
+	ip_drop_init(ipss);
+	ip_drop_register(&ipss->ipsec_spd_dropper, "IPsec SPD");
 
+	/* Set function to dummy until tun is loaded */
+	rw_init(&ipss->ipsec_itp_get_byaddr_rw_lock, NULL, RW_DEFAULT, NULL);
+	rw_enter(&ipss->ipsec_itp_get_byaddr_rw_lock, RW_WRITER);
+	ipss->ipsec_itp_get_byaddr = itp_get_byaddr_dummy;
+	rw_exit(&ipss->ipsec_itp_get_byaddr_rw_lock);
+
+	/* IP's IPsec code calls the packet dropper */
+	ip_drop_register(&ipss->ipsec_dropper, "IP IPsec processing");
+
+	(void) ipsec_kstat_init(ipss);
+
+	ipsec_loader_init(ipss);
+	ipsec_loader_start(ipss);
+
+	return (ipss);
+}
+
+/* Global across all stack instances */
+void
+ipsec_policy_g_init(void)
+{
 	ipsec_action_cache = kmem_cache_create("ipsec_actions",
 	    sizeof (ipsec_action_t), _POINTER_ALIGNMENT, NULL, NULL,
 	    ipsec_action_reclaim, NULL, NULL, 0);
@@ -606,14 +707,12 @@ ipsec_policy_init()
 	    sizeof (ipsec_info_t), _POINTER_ALIGNMENT, NULL, NULL,
 	    NULL, NULL, NULL, 0);
 
-	ip_drop_init();
-	ip_drop_register(&spd_dropper, "IPsec SPD");
-
-	/* Set function to dummy until tun is loaded */
-	rw_init(&itp_get_byaddr_rw_lock, NULL, RW_DEFAULT, NULL);
-	rw_enter(&itp_get_byaddr_rw_lock, RW_WRITER);
-	itp_get_byaddr = itp_get_byaddr_dummy;
-	rw_exit(&itp_get_byaddr_rw_lock);
+	/*
+	 * We want to be informed each time a stack is created or
+	 * destroyed in the kernel, so we can maintain the
+	 * set of ipsec_stack_t's.
+	 */
+	netstack_register(NS_IPSEC, ipsec_stack_init, NULL, ipsec_stack_fini);
 }
 
 /*
@@ -628,38 +727,39 @@ ipsec_policy_init()
  * We need a better metric for sorting algorithms by preference.
  */
 static void
-alg_insert_sortlist(enum ipsec_algtype at, uint8_t algid)
+alg_insert_sortlist(enum ipsec_algtype at, uint8_t algid, netstack_t *ns)
 {
-	ipsec_alginfo_t *ai = ipsec_alglists[at][algid];
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ipsec_alginfo_t *ai = ipss->ipsec_alglists[at][algid];
 	uint8_t holder, swap;
 	uint_t i;
-	uint_t count = ipsec_nalgs[at];
+	uint_t count = ipss->ipsec_nalgs[at];
 	ASSERT(ai != NULL);
 	ASSERT(algid == ai->alg_id);
 
-	ASSERT(MUTEX_HELD(&alg_lock));
+	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
 
 	holder = algid;
 
 	for (i = 0; i < count - 1; i++) {
 		ipsec_alginfo_t *alt;
 
-		alt = ipsec_alglists[at][ipsec_sortlist[at][i]];
+		alt = ipss->ipsec_alglists[at][ipss->ipsec_sortlist[at][i]];
 		/*
 		 * If you want to give precedence to newly added algs,
 		 * add the = in the > comparison.
 		 */
 		if ((holder != algid) || (ai->alg_minbits > alt->alg_minbits)) {
 			/* Swap sortlist[i] and holder. */
-			swap = ipsec_sortlist[at][i];
-			ipsec_sortlist[at][i] = holder;
+			swap = ipss->ipsec_sortlist[at][i];
+			ipss->ipsec_sortlist[at][i] = holder;
 			holder = swap;
 			ai = alt;
 		} /* Else just continue. */
 	}
 
 	/* Store holder in last slot. */
-	ipsec_sortlist[at][i] = holder;
+	ipss->ipsec_sortlist[at][i] = holder;
 }
 
 /*
@@ -667,19 +767,22 @@ alg_insert_sortlist(enum ipsec_algtype at, uint8_t algid)
  * This should be considerably easier, even with complex sorting.
  */
 static void
-alg_remove_sortlist(enum ipsec_algtype at, uint8_t algid)
+alg_remove_sortlist(enum ipsec_algtype at, uint8_t algid, netstack_t *ns)
 {
 	boolean_t copyback = B_FALSE;
 	int i;
-	int newcount = ipsec_nalgs[at];
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	int newcount = ipss->ipsec_nalgs[at];
 
-	ASSERT(MUTEX_HELD(&alg_lock));
+	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
 
 	for (i = 0; i <= newcount; i++) {
-		if (copyback)
-			ipsec_sortlist[at][i-1] = ipsec_sortlist[at][i];
-		else if (ipsec_sortlist[at][i] == algid)
+		if (copyback) {
+			ipss->ipsec_sortlist[at][i-1] =
+			    ipss->ipsec_sortlist[at][i];
+		} else if (ipss->ipsec_sortlist[at][i] == algid) {
 			copyback = B_TRUE;
+		}
 	}
 }
 
@@ -688,16 +791,18 @@ alg_remove_sortlist(enum ipsec_algtype at, uint8_t algid)
  * Must be called while holding the algorithm table writer lock.
  */
 void
-ipsec_alg_reg(ipsec_algtype_t algtype, ipsec_alginfo_t *alg)
+ipsec_alg_reg(ipsec_algtype_t algtype, ipsec_alginfo_t *alg, netstack_t *ns)
 {
-	ASSERT(MUTEX_HELD(&alg_lock));
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	ASSERT(ipsec_alglists[algtype][alg->alg_id] == NULL);
-	ipsec_alg_fix_min_max(alg, algtype);
-	ipsec_alglists[algtype][alg->alg_id] = alg;
+	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
 
-	ipsec_nalgs[algtype]++;
-	alg_insert_sortlist(algtype, alg->alg_id);
+	ASSERT(ipss->ipsec_alglists[algtype][alg->alg_id] == NULL);
+	ipsec_alg_fix_min_max(alg, algtype, ns);
+	ipss->ipsec_alglists[algtype][alg->alg_id] = alg;
+
+	ipss->ipsec_nalgs[algtype]++;
+	alg_insert_sortlist(algtype, alg->alg_id, ns);
 }
 
 /*
@@ -705,16 +810,18 @@ ipsec_alg_reg(ipsec_algtype_t algtype, ipsec_alginfo_t *alg)
  * Must be called while holding the algorithm table writer lock.
  */
 void
-ipsec_alg_unreg(ipsec_algtype_t algtype, uint8_t algid)
+ipsec_alg_unreg(ipsec_algtype_t algtype, uint8_t algid, netstack_t *ns)
 {
-	ASSERT(MUTEX_HELD(&alg_lock));
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	ASSERT(ipsec_alglists[algtype][algid] != NULL);
-	ipsec_alg_free(ipsec_alglists[algtype][algid]);
-	ipsec_alglists[algtype][algid] = NULL;
+	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
 
-	ipsec_nalgs[algtype]--;
-	alg_remove_sortlist(algtype, algid);
+	ASSERT(ipss->ipsec_alglists[algtype][algid] != NULL);
+	ipsec_alg_free(ipss->ipsec_alglists[algtype][algid]);
+	ipss->ipsec_alglists[algtype][algid] = NULL;
+
+	ipss->ipsec_nalgs[algtype]--;
+	alg_remove_sortlist(algtype, algid, ns);
 }
 
 /*
@@ -722,17 +829,21 @@ ipsec_alg_unreg(ipsec_algtype_t algtype, uint8_t algid)
  */
 
 ipsec_policy_head_t *
-ipsec_system_policy(void)
+ipsec_system_policy(netstack_t *ns)
 {
-	ipsec_policy_head_t *h = &system_policy;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ipsec_policy_head_t *h = &ipss->ipsec_system_policy;
+
 	IPPH_REFHOLD(h);
 	return (h);
 }
 
 ipsec_policy_head_t *
-ipsec_inactive_policy(void)
+ipsec_inactive_policy(netstack_t *ns)
 {
-	ipsec_policy_head_t *h = &inactive_policy;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ipsec_policy_head_t *h = &ipss->ipsec_inactive_policy;
+
 	IPPH_REFHOLD(h);
 	return (h);
 }
@@ -742,7 +853,8 @@ ipsec_inactive_policy(void)
  * pointers.
  */
 void
-ipsec_swap_policy(ipsec_policy_head_t *active, ipsec_policy_head_t *inactive)
+ipsec_swap_policy(ipsec_policy_head_t *active, ipsec_policy_head_t *inactive,
+    netstack_t *ns)
 {
 	int af, dir;
 	avl_tree_t r1, r2;
@@ -783,7 +895,7 @@ ipsec_swap_policy(ipsec_policy_head_t *active, ipsec_policy_head_t *inactive)
 	}
 	active->iph_gen++;
 	inactive->iph_gen++;
-	ipsec_update_present_flags();
+	ipsec_update_present_flags(ns->netstack_ipsec);
 	rw_exit(&active->iph_lock);
 	rw_exit(&inactive->iph_lock);
 }
@@ -792,9 +904,12 @@ ipsec_swap_policy(ipsec_policy_head_t *active, ipsec_policy_head_t *inactive)
  * Swap global policy primary/secondary.
  */
 void
-ipsec_swap_global_policy(void)
+ipsec_swap_global_policy(netstack_t *ns)
 {
-	ipsec_swap_policy(&system_policy, &inactive_policy);
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+
+	ipsec_swap_policy(&ipss->ipsec_system_policy,
+	    &ipss->ipsec_inactive_policy, ns);
 }
 
 /*
@@ -861,13 +976,14 @@ ipsec_copy_chain(ipsec_policy_head_t *dph, ipsec_policy_t *src,
  * policy head as we are not changing it.
  */
 int
-ipsec_copy_polhead(ipsec_policy_head_t *sph, ipsec_policy_head_t *dph)
+ipsec_copy_polhead(ipsec_policy_head_t *sph, ipsec_policy_head_t *dph,
+    netstack_t *ns)
 {
 	int af, dir, chain, nchains;
 
 	rw_enter(&dph->iph_lock, RW_WRITER);
 
-	ipsec_polhead_flush(dph);
+	ipsec_polhead_flush(dph, ns);
 
 	rw_enter(&sph->iph_lock, RW_READER);
 
@@ -899,7 +1015,7 @@ ipsec_copy_polhead(ipsec_policy_head_t *sph, ipsec_policy_head_t *dph)
 	return (0);
 
 abort_copy:
-	ipsec_polhead_flush(dph);
+	ipsec_polhead_flush(dph, ns);
 	rw_exit(&sph->iph_lock);
 	rw_exit(&dph->iph_lock);
 	return (ENOMEM);
@@ -909,9 +1025,12 @@ abort_copy:
  * Clone currently active policy to the inactive policy list.
  */
 int
-ipsec_clone_system_policy(void)
+ipsec_clone_system_policy(netstack_t *ns)
 {
-	return (ipsec_copy_polhead(&system_policy, &inactive_policy));
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+
+	return (ipsec_copy_polhead(&ipss->ipsec_system_policy,
+		    &ipss->ipsec_inactive_policy, ns));
 }
 
 /*
@@ -956,12 +1075,13 @@ iph_ipvN(ipsec_policy_head_t *iph, boolean_t v6)
  */
 void
 ipsec_log_policy_failure(int type, char *func_name, ipha_t *ipha, ip6_t *ip6h,
-    boolean_t secure)
+    boolean_t secure, netstack_t *ns)
 {
 	char	sbuf[INET6_ADDRSTRLEN];
 	char	dbuf[INET6_ADDRSTRLEN];
 	char	*s;
 	char	*d;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	ASSERT((ipha == NULL && ip6h != NULL) ||
 	    (ip6h == NULL && ipha != NULL));
@@ -976,9 +1096,9 @@ ipsec_log_policy_failure(int type, char *func_name, ipha_t *ipha, ip6_t *ip6h,
 	}
 
 	/* Always bump the policy failure counter. */
-	ipsec_policy_failure_count[type]++;
+	ipss->ipsec_policy_failure_count[type]++;
 
-	ipsec_rl_strlog(IP_MOD_ID, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
+	ipsec_rl_strlog(ns, IP_MOD_ID, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
 	    ipsec_policy_failure_msgs[type], func_name,
 	    (secure ? "secure" : "not secure"), s, d);
 }
@@ -989,10 +1109,13 @@ ipsec_log_policy_failure(int type, char *func_name, ipha_t *ipha, ip6_t *ip6h,
  * knob to turn to throttle the rate of messages.
  */
 void
-ipsec_rl_strlog(short mid, short sid, char level, ushort_t sl, char *fmt, ...)
+ipsec_rl_strlog(netstack_t *ns, short mid, short sid, char level, ushort_t sl,
+    char *fmt, ...)
 {
 	va_list adx;
 	hrtime_t current = gethrtime();
+	ip_stack_t	*ipst = ns->netstack_ip;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	sl |= SL_CONSOLE;
 	/*
@@ -1002,26 +1125,28 @@ ipsec_rl_strlog(short mid, short sid, char level, ushort_t sl, char *fmt, ...)
 	 * msec. Convert interval (in msec) to hrtime (in nsec).
 	 */
 
-	if (ipsec_policy_log_interval) {
-		if (ipsec_policy_failure_last +
-		    ((hrtime_t)ipsec_policy_log_interval * (hrtime_t)1000000) <=
-		    current) {
+	if (ipst->ips_ipsec_policy_log_interval) {
+		if (ipss->ipsec_policy_failure_last +
+		    ((hrtime_t)ipst->ips_ipsec_policy_log_interval *
+		    (hrtime_t)1000000) <= current) {
 			va_start(adx, fmt);
 			(void) vstrlog(mid, sid, level, sl, fmt, adx);
 			va_end(adx);
-			ipsec_policy_failure_last = current;
+			ipss->ipsec_policy_failure_last = current;
 		}
 	}
 }
 
 void
-ipsec_config_flush()
+ipsec_config_flush(netstack_t *ns)
 {
-	rw_enter(&system_policy.iph_lock, RW_WRITER);
-	ipsec_polhead_flush(&system_policy);
-	ipsec_next_policy_index = 1;
-	rw_exit(&system_policy.iph_lock);
-	ipsec_action_reclaim(0);
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+
+	rw_enter(&ipss->ipsec_system_policy.iph_lock, RW_WRITER);
+	ipsec_polhead_flush(&ipss->ipsec_system_policy, ns);
+	ipss->ipsec_next_policy_index = 1;
+	rw_exit(&ipss->ipsec_system_policy.iph_lock);
+	ipsec_action_reclaim_stack(ns);
 }
 
 /*
@@ -1030,9 +1155,11 @@ ipsec_config_flush()
  */
 static void
 act_alg_adjust(uint_t algtype, uint_t algid,
-    uint16_t *minbits, uint16_t *maxbits)
+    uint16_t *minbits, uint16_t *maxbits, netstack_t *ns)
 {
-	ipsec_alginfo_t *algp = ipsec_alglists[algtype][algid];
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ipsec_alginfo_t *algp = ipss->ipsec_alglists[algtype][algid];
+
 	if (algp != NULL) {
 		/*
 		 * If passed-in minbits is zero, we assume the caller trusts
@@ -1063,34 +1190,36 @@ act_alg_adjust(uint_t algtype, uint_t algid,
  * loaded in the system.
  */
 boolean_t
-ipsec_check_action(ipsec_act_t *act, int *diag)
+ipsec_check_action(ipsec_act_t *act, int *diag, netstack_t *ns)
 {
 	ipsec_prot_t *ipp;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	ipp = &act->ipa_apply;
 
 	if (ipp->ipp_use_ah &&
-	    ipsec_alglists[IPSEC_ALG_AUTH][ipp->ipp_auth_alg] == NULL) {
+	    ipss->ipsec_alglists[IPSEC_ALG_AUTH][ipp->ipp_auth_alg] == NULL) {
 		*diag = SPD_DIAGNOSTIC_UNSUPP_AH_ALG;
 		return (B_FALSE);
 	}
 	if (ipp->ipp_use_espa &&
-	    ipsec_alglists[IPSEC_ALG_AUTH][ipp->ipp_esp_auth_alg] == NULL) {
+	    ipss->ipsec_alglists[IPSEC_ALG_AUTH][ipp->ipp_esp_auth_alg] ==
+	    NULL) {
 		*diag = SPD_DIAGNOSTIC_UNSUPP_ESP_AUTH_ALG;
 		return (B_FALSE);
 	}
 	if (ipp->ipp_use_esp &&
-	    ipsec_alglists[IPSEC_ALG_ENCR][ipp->ipp_encr_alg] == NULL) {
+	    ipss->ipsec_alglists[IPSEC_ALG_ENCR][ipp->ipp_encr_alg] == NULL) {
 		*diag = SPD_DIAGNOSTIC_UNSUPP_ESP_ENCR_ALG;
 		return (B_FALSE);
 	}
 
 	act_alg_adjust(IPSEC_ALG_AUTH, ipp->ipp_auth_alg,
-	    &ipp->ipp_ah_minbits, &ipp->ipp_ah_maxbits);
+	    &ipp->ipp_ah_minbits, &ipp->ipp_ah_maxbits, ns);
 	act_alg_adjust(IPSEC_ALG_AUTH, ipp->ipp_esp_auth_alg,
-	    &ipp->ipp_espa_minbits, &ipp->ipp_espa_maxbits);
+	    &ipp->ipp_espa_minbits, &ipp->ipp_espa_maxbits, ns);
 	act_alg_adjust(IPSEC_ALG_ENCR, ipp->ipp_encr_alg,
-	    &ipp->ipp_espe_minbits, &ipp->ipp_espe_maxbits);
+	    &ipp->ipp_espe_minbits, &ipp->ipp_espe_maxbits, ns);
 
 	if (ipp->ipp_ah_minbits > ipp->ipp_ah_maxbits) {
 		*diag = SPD_DIAGNOSTIC_UNSUPP_AH_KEYSIZE;
@@ -1113,7 +1242,7 @@ ipsec_check_action(ipsec_act_t *act, int *diag)
  */
 static void
 ipsec_setup_act(ipsec_act_t *outact, ipsec_act_t *act,
-    uint_t auth_alg, uint_t encr_alg, uint_t eauth_alg)
+    uint_t auth_alg, uint_t encr_alg, uint_t eauth_alg, netstack_t *ns)
 {
 	ipsec_prot_t *ipp;
 
@@ -1124,11 +1253,11 @@ ipsec_setup_act(ipsec_act_t *outact, ipsec_act_t *act,
 	ipp->ipp_esp_auth_alg = (uint8_t)eauth_alg;
 
 	act_alg_adjust(IPSEC_ALG_AUTH, auth_alg,
-	    &ipp->ipp_ah_minbits, &ipp->ipp_ah_maxbits);
+	    &ipp->ipp_ah_minbits, &ipp->ipp_ah_maxbits, ns);
 	act_alg_adjust(IPSEC_ALG_AUTH, eauth_alg,
-	    &ipp->ipp_espa_minbits, &ipp->ipp_espa_maxbits);
+	    &ipp->ipp_espa_minbits, &ipp->ipp_espa_maxbits, ns);
 	act_alg_adjust(IPSEC_ALG_ENCR, encr_alg,
-	    &ipp->ipp_espe_minbits, &ipp->ipp_espe_maxbits);
+	    &ipp->ipp_espe_minbits, &ipp->ipp_espe_maxbits, ns);
 }
 
 /*
@@ -1137,7 +1266,7 @@ ipsec_setup_act(ipsec_act_t *outact, ipsec_act_t *act,
  * and return a count in *nact (output only).
  */
 static ipsec_act_t *
-ipsec_act_wildcard_expand(ipsec_act_t *act, uint_t *nact)
+ipsec_act_wildcard_expand(ipsec_act_t *act, uint_t *nact, netstack_t *ns)
 {
 	boolean_t use_ah, use_esp, use_espa;
 	boolean_t wild_auth, wild_encr, wild_eauth;
@@ -1146,6 +1275,7 @@ ipsec_act_wildcard_expand(ipsec_act_t *act, uint_t *nact)
 	uint_t  encr_alg, encr_idx, encr_min, encr_max;
 	uint_t	action_count, ai;
 	ipsec_act_t *outact;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	if (act->ipa_type != IPSEC_ACT_APPLY) {
 		outact = kmem_alloc(sizeof (*act), KM_NOSLEEP);
@@ -1186,21 +1316,22 @@ ipsec_act_wildcard_expand(ipsec_act_t *act, uint_t *nact)
 	 * kernel policies should be set for these algorithms.
 	 */
 
-#define	SET_EXP_MINMAX(type, wild, alg, min, max) if (wild) {	\
-		int nalgs = ipsec_nalgs[type];			\
-		if (ipsec_alglists[type][alg] != NULL)		\
+#define	SET_EXP_MINMAX(type, wild, alg, min, max, ipss)		\
+	if (wild) {						\
+		int nalgs = ipss->ipsec_nalgs[type];		\
+		if (ipss->ipsec_alglists[type][alg] != NULL)	\
 			nalgs--;				\
 		action_count *= nalgs;				\
 		min = 0;					\
-		max = ipsec_nalgs[type] - 1;			\
+		max = ipss->ipsec_nalgs[type] - 1;		\
 	}
 
 	SET_EXP_MINMAX(IPSEC_ALG_AUTH, wild_auth, SADB_AALG_NONE,
-	    auth_min, auth_max);
+	    auth_min, auth_max, ipss);
 	SET_EXP_MINMAX(IPSEC_ALG_AUTH, wild_eauth, SADB_AALG_NONE,
-	    eauth_min, eauth_max);
+	    eauth_min, eauth_max, ipss);
 	SET_EXP_MINMAX(IPSEC_ALG_ENCR, wild_encr, SADB_EALG_NONE,
-	    encr_min, encr_max);
+	    encr_min, encr_max, ipss);
 
 #undef	SET_EXP_MINMAX
 
@@ -1224,26 +1355,27 @@ ipsec_act_wildcard_expand(ipsec_act_t *act, uint_t *nact)
 
 	ai = 0;
 
-#define	WHICH_ALG(type, wild, idx) ((wild)?(ipsec_sortlist[type][idx]):(idx))
+#define	WHICH_ALG(type, wild, idx, ipss) \
+	((wild)?(ipss->ipsec_sortlist[type][idx]):(idx))
 
 	for (encr_idx = encr_min; encr_idx <= encr_max; encr_idx++) {
-		encr_alg = WHICH_ALG(IPSEC_ALG_ENCR, wild_encr, encr_idx);
+		encr_alg = WHICH_ALG(IPSEC_ALG_ENCR, wild_encr, encr_idx, ipss);
 		if (wild_encr && encr_alg == SADB_EALG_NONE)
 			continue;
 		for (auth_idx = auth_min; auth_idx <= auth_max; auth_idx++) {
 			auth_alg = WHICH_ALG(IPSEC_ALG_AUTH, wild_auth,
-			    auth_idx);
+			    auth_idx, ipss);
 			if (wild_auth && auth_alg == SADB_AALG_NONE)
 				continue;
 			for (eauth_idx = eauth_min; eauth_idx <= eauth_max;
 			    eauth_idx++) {
 				eauth_alg = WHICH_ALG(IPSEC_ALG_AUTH,
-				    wild_eauth, eauth_idx);
+				    wild_eauth, eauth_idx, ipss);
 				if (wild_eauth && eauth_alg == SADB_AALG_NONE)
 					continue;
 
 				ipsec_setup_act(&outact[ai], act,
-				    auth_alg, encr_alg, eauth_alg);
+				    auth_alg, encr_alg, eauth_alg, ns);
 				ai++;
 			}
 		}
@@ -1282,9 +1414,11 @@ ipsec_prot_from_req(ipsec_req_t *req, ipsec_prot_t *ipp)
  * Extract a new-style action from a request.
  */
 void
-ipsec_actvec_from_req(ipsec_req_t *req, ipsec_act_t **actp, uint_t *nactp)
+ipsec_actvec_from_req(ipsec_req_t *req, ipsec_act_t **actp, uint_t *nactp,
+    netstack_t *ns)
 {
 	struct ipsec_act act;
+
 	bzero(&act, sizeof (act));
 	if ((req->ipsr_ah_req & IPSEC_PREF_NEVER) &&
 	    (req->ipsr_esp_req & IPSEC_PREF_NEVER)) {
@@ -1293,7 +1427,7 @@ ipsec_actvec_from_req(ipsec_req_t *req, ipsec_act_t **actp, uint_t *nactp)
 		act.ipa_type = IPSEC_ACT_APPLY;
 		ipsec_prot_from_req(req, &act.ipa_apply);
 	}
-	*actp = ipsec_act_wildcard_expand(&act, nactp);
+	*actp = ipsec_act_wildcard_expand(&act, nactp, ns);
 }
 
 /*
@@ -1409,15 +1543,16 @@ ipsec_actvec_free(ipsec_act_t *act, uint_t nact)
  * an ipsec_out_t to the packet..
  */
 static mblk_t *
-ipsec_attach_global_policy(mblk_t *mp, conn_t *connp, ipsec_selector_t *sel)
+ipsec_attach_global_policy(mblk_t *mp, conn_t *connp, ipsec_selector_t *sel,
+    netstack_t *ns)
 {
 	ipsec_policy_t *p;
 
-	p = ipsec_find_policy(IPSEC_TYPE_OUTBOUND, connp, NULL, sel);
+	p = ipsec_find_policy(IPSEC_TYPE_OUTBOUND, connp, NULL, sel, ns);
 
 	if (p == NULL)
 		return (NULL);
-	return (ipsec_attach_ipsec_out(mp, connp, p, sel->ips_protocol));
+	return (ipsec_attach_ipsec_out(mp, connp, p, sel->ips_protocol, ns));
 }
 
 /*
@@ -1426,7 +1561,7 @@ ipsec_attach_global_policy(mblk_t *mp, conn_t *connp, ipsec_selector_t *sel)
  */
 static mblk_t *
 ipsec_apply_global_policy(mblk_t *ipsec_mp, conn_t *connp,
-    ipsec_selector_t *sel)
+    ipsec_selector_t *sel, netstack_t *ns)
 {
 	ipsec_out_t *io;
 	ipsec_policy_t *p;
@@ -1437,7 +1572,7 @@ ipsec_apply_global_policy(mblk_t *ipsec_mp, conn_t *connp,
 	io = (ipsec_out_t *)ipsec_mp->b_rptr;
 
 	if (io->ipsec_out_policy == NULL) {
-		p = ipsec_find_policy(IPSEC_TYPE_OUTBOUND, connp, io, sel);
+		p = ipsec_find_policy(IPSEC_TYPE_OUTBOUND, connp, io, sel, ns);
 		io->ipsec_out_policy = p;
 	}
 	return (ipsec_mp);
@@ -1453,6 +1588,7 @@ ipsec_check_loopback_policy(mblk_t *first_mp, boolean_t mctl_present,
 {
 	mblk_t *ipsec_mp;
 	ipsec_in_t *ii;
+	netstack_t	*ns;
 
 	if (!mctl_present)
 		return (first_mp);
@@ -1460,8 +1596,9 @@ ipsec_check_loopback_policy(mblk_t *first_mp, boolean_t mctl_present,
 	ipsec_mp = first_mp;
 
 	ii = (ipsec_in_t *)ipsec_mp->b_rptr;
+	ns = ii->ipsec_in_ns;
 	ASSERT(ii->ipsec_in_loopback);
-	IPPOL_REFRELE(ipsp);
+	IPPOL_REFRELE(ipsp, ns);
 
 	/*
 	 * We should do an actual policy check here.  Revisit this
@@ -1483,6 +1620,8 @@ ipsec_check_ipsecin_unique(ipsec_in_t *ii, const char **reason,
 	uint64_t ah_mask, esp_mask;
 	ipsa_t *ah_assoc;
 	ipsa_t *esp_assoc;
+	netstack_t	*ns = ii->ipsec_in_ns;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	ASSERT(ii->ipsec_in_secure);
 	ASSERT(!ii->ipsec_in_loopback);
@@ -1506,13 +1645,13 @@ ipsec_check_ipsecin_unique(ipsec_in_t *ii, const char **reason,
 	if (ah_mask != 0 &&
 	    ah_assoc->ipsa_unique_id != (pkt_unique & ah_mask)) {
 		*reason = "AH inner header mismatch";
-		*counter = &ipdrops_spd_ah_innermismatch;
+		*counter = DROPPER(ipss, ipds_spd_ah_innermismatch);
 		return (B_FALSE);
 	}
 	if (esp_mask != 0 &&
 	    esp_assoc->ipsa_unique_id != (pkt_unique & esp_mask)) {
 		*reason = "ESP inner header mismatch";
-		*counter = &ipdrops_spd_esp_innermismatch;
+		*counter = DROPPER(ipss, ipds_spd_esp_innermismatch);
 		return (B_FALSE);
 	}
 	return (B_TRUE);
@@ -1527,6 +1666,8 @@ ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
 	ipsa_t *ah_assoc;
 	ipsa_t *esp_assoc;
 	boolean_t decaps;
+	netstack_t	*ns = ii->ipsec_in_ns;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	ASSERT((ipha == NULL && ip6h != NULL) ||
 	    (ip6h == NULL && ipha != NULL));
@@ -1544,7 +1685,7 @@ ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
 			return (B_TRUE);
 
 		/* Deep compare necessary here?? */
-		*counter = &ipdrops_spd_loopback_mismatch;
+		*counter = DROPPER(ipss, ipds_spd_loopback_mismatch);
 		*reason = "loopback policy mismatch";
 		return (B_FALSE);
 	}
@@ -1559,13 +1700,13 @@ ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
 	case IPSEC_ACT_DISCARD:
 	case IPSEC_ACT_REJECT:
 		/* Should "fail hard" */
-		*counter = &ipdrops_spd_explicit;
+		*counter = DROPPER(ipss, ipds_spd_explicit);
 		*reason = "blocked by policy";
 		return (B_FALSE);
 
 	case IPSEC_ACT_BYPASS:
 	case IPSEC_ACT_CLEAR:
-		*counter = &ipdrops_spd_got_secure;
+		*counter = DROPPER(ipss, ipds_spd_got_secure);
 		*reason = "expected clear, got protected";
 		return (B_FALSE);
 
@@ -1583,7 +1724,7 @@ ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
 			if (ah_assoc == NULL) {
 				ret = ipsec_inbound_accept_clear(mp, ipha,
 				    ip6h);
-				*counter = &ipdrops_spd_got_clear;
+				*counter = DROPPER(ipss, ipds_spd_got_clear);
 				*reason = "unprotected not accepted";
 				break;
 			}
@@ -1592,7 +1733,7 @@ ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
 
 			if (ah_assoc->ipsa_auth_alg !=
 			    ipp->ipp_auth_alg) {
-				*counter = &ipdrops_spd_bad_ahalg;
+				*counter = DROPPER(ipss, ipds_spd_bad_ahalg);
 				*reason = "unacceptable ah alg";
 				ret = B_FALSE;
 				break;
@@ -1602,7 +1743,7 @@ ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
 			 * Don't allow this. Check IPSEC NOTE above
 			 * ip_fanout_proto().
 			 */
-			*counter = &ipdrops_spd_got_ah;
+			*counter = DROPPER(ipss, ipds_spd_got_ah);
 			*reason = "unexpected AH";
 			ret = B_FALSE;
 			break;
@@ -1611,7 +1752,7 @@ ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
 			if (esp_assoc == NULL) {
 				ret = ipsec_inbound_accept_clear(mp, ipha,
 				    ip6h);
-				*counter = &ipdrops_spd_got_clear;
+				*counter = DROPPER(ipss, ipds_spd_got_clear);
 				*reason = "unprotected not accepted";
 				break;
 			}
@@ -1620,7 +1761,7 @@ ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
 
 			if (esp_assoc->ipsa_encr_alg !=
 			    ipp->ipp_encr_alg) {
-				*counter = &ipdrops_spd_bad_espealg;
+				*counter = DROPPER(ipss, ipds_spd_bad_espealg);
 				*reason = "unacceptable esp alg";
 				ret = B_FALSE;
 				break;
@@ -1632,7 +1773,8 @@ ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
 			if (ipp->ipp_use_espa) {
 				if (esp_assoc->ipsa_auth_alg !=
 				    ipp->ipp_esp_auth_alg) {
-					*counter = &ipdrops_spd_bad_espaalg;
+					*counter = DROPPER(ipss,
+					    ipds_spd_bad_espaalg);
 					*reason = "unacceptable esp auth alg";
 					ret = B_FALSE;
 					break;
@@ -1643,7 +1785,7 @@ ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
 				 * Don't allow this. Check IPSEC NOTE above
 				 * ip_fanout_proto().
 				 */
-			*counter = &ipdrops_spd_got_esp;
+			*counter = DROPPER(ipss, ipds_spd_got_esp);
 			*reason = "unexpected ESP";
 			ret = B_FALSE;
 			break;
@@ -1654,7 +1796,8 @@ ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
 				    ip6h);
 				if (!ret) {
 					/* XXX mutant? */
-					*counter = &ipdrops_spd_bad_selfencap;
+					*counter = DROPPER(ipss,
+					    ipds_spd_bad_selfencap);
 					*reason = "self encap not found";
 					break;
 				}
@@ -1666,7 +1809,7 @@ ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
 			 * is okay. But we drop to be consistent with the
 			 * other cases.
 			 */
-			*counter = &ipdrops_spd_got_selfencap;
+			*counter = DROPPER(ipss, ipds_spd_got_selfencap);
 			*reason = "unexpected self encap";
 			ret = B_FALSE;
 			break;
@@ -1750,6 +1893,9 @@ ipsec_check_ipsecin_latch(ipsec_in_t *ii, mblk_t *mp, ipsec_latch_t *ipl,
     ipha_t *ipha, ip6_t *ip6h, const char **reason, kstat_named_t **counter,
     conn_t *connp)
 {
+	netstack_t	*ns = ii->ipsec_in_ns;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+
 	ASSERT(ipl->ipl_ids_latched == B_TRUE);
 
 	if (!ii->ipsec_in_loopback) {
@@ -1760,14 +1906,14 @@ ipsec_check_ipsecin_latch(ipsec_in_t *ii, mblk_t *mp, ipsec_latch_t *ipl,
 		 */
 		if ((ii->ipsec_in_ah_sa != NULL) &&
 		    (!spd_match_inbound_ids(ipl, ii->ipsec_in_ah_sa))) {
-			*counter = &ipdrops_spd_ah_badid;
+			*counter = DROPPER(ipss, ipds_spd_ah_badid);
 			*reason = "AH identity mismatch";
 			return (B_FALSE);
 		}
 
 		if ((ii->ipsec_in_esp_sa != NULL) &&
 		    (!spd_match_inbound_ids(ipl, ii->ipsec_in_esp_sa))) {
-			*counter = &ipdrops_spd_esp_badid;
+			*counter = DROPPER(ipss, ipds_spd_esp_badid);
 			*reason = "ESP identity mismatch";
 			return (B_FALSE);
 		}
@@ -1797,13 +1943,17 @@ ipsec_check_ipsecin_latch(ipsec_in_t *ii, mblk_t *mp, ipsec_latch_t *ipl,
  */
 static mblk_t *
 ipsec_check_ipsecin_policy(mblk_t *first_mp, ipsec_policy_t *ipsp,
-    ipha_t *ipha, ip6_t *ip6h, uint64_t pkt_unique)
+    ipha_t *ipha, ip6_t *ip6h, uint64_t pkt_unique, netstack_t *ns)
 {
 	ipsec_in_t *ii;
 	ipsec_action_t *ap;
 	const char *reason = "no policy actions found";
 	mblk_t *data_mp, *ipsec_mp;
-	kstat_named_t *counter = &ipdrops_spd_got_secure;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ip_stack_t	*ipst = ns->netstack_ip;
+	kstat_named_t *counter;
+
+	counter = DROPPER(ipss, ipds_spd_got_secure);
 
 	data_mp = first_mp->b_cont;
 	ipsec_mp = first_mp;
@@ -1831,7 +1981,7 @@ ipsec_check_ipsecin_policy(mblk_t *first_mp, ipsec_policy_t *ipsp,
 
 	if (!SA_IDS_MATCH(ii->ipsec_in_ah_sa, ii->ipsec_in_esp_sa)) {
 		reason = "inbound AH and ESP identities differ";
-		counter = &ipdrops_spd_ahesp_diffid;
+		counter = DROPPER(ipss, ipds_spd_ahesp_diffid);
 		goto drop;
 	}
 
@@ -1846,19 +1996,20 @@ ipsec_check_ipsecin_policy(mblk_t *first_mp, ipsec_policy_t *ipsp,
 	for (ap = ipsp->ipsp_act; ap != NULL; ap = ap->ipa_next) {
 		if (ipsec_check_ipsecin_action(ii, data_mp, ap,
 		    ipha, ip6h, &reason, &counter)) {
-			BUMP_MIB(&ip_mib, ipsecInSucceeded);
-			IPPOL_REFRELE(ipsp);
+			BUMP_MIB(&ipst->ips_ip_mib, ipsecInSucceeded);
+			IPPOL_REFRELE(ipsp, ns);
 			return (first_mp);
 		}
 	}
 drop:
-	ipsec_rl_strlog(IP_MOD_ID, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
+	ipsec_rl_strlog(ns, IP_MOD_ID, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
 	    "ipsec inbound policy mismatch: %s, packet dropped\n",
 	    reason);
-	IPPOL_REFRELE(ipsp);
+	IPPOL_REFRELE(ipsp, ns);
 	ASSERT(ii->ipsec_in_action == NULL);
-	BUMP_MIB(&ip_mib, ipsecInFailed);
-	ip_drop_packet(first_mp, B_TRUE, NULL, NULL, counter, &spd_dropper);
+	BUMP_MIB(&ipst->ips_ip_mib, ipsecInFailed);
+	ip_drop_packet(first_mp, B_TRUE, NULL, NULL, counter,
+	    &ipss->ipsec_spd_dropper);
 	return (NULL);
 }
 
@@ -1964,7 +2115,7 @@ ipsec_find_policy_chain(ipsec_policy_t *best, ipsec_policy_t *chain,
  */
 ipsec_policy_t *
 ipsec_find_policy_head(ipsec_policy_t *best, ipsec_policy_head_t *head,
-    int direction, ipsec_selector_t *sel)
+    int direction, ipsec_selector_t *sel, netstack_t *ns)
 {
 	ipsec_policy_t *curbest;
 	ipsec_policy_root_t *root;
@@ -2008,7 +2159,7 @@ ipsec_find_policy_head(ipsec_policy_t *best, ipsec_policy_head_t *head,
 		IPPOL_REFHOLD(curbest);
 
 		if (best != NULL) {
-			IPPOL_REFRELE(best);
+			IPPOL_REFRELE(best, ns);
 		}
 	}
 
@@ -2027,17 +2178,19 @@ ipsec_find_policy_head(ipsec_policy_t *best, ipsec_policy_head_t *head,
  */
 ipsec_policy_t *
 ipsec_find_policy(int direction, conn_t *connp, ipsec_out_t *io,
-    ipsec_selector_t *sel)
+    ipsec_selector_t *sel, netstack_t *ns)
 {
 	ipsec_policy_t *p;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	p = ipsec_find_policy_head(NULL, &system_policy, direction, sel);
+	p = ipsec_find_policy_head(NULL, &ipss->ipsec_system_policy,
+	    direction, sel, ns);
 	if ((connp != NULL) && (connp->conn_policy != NULL)) {
 		p = ipsec_find_policy_head(p, connp->conn_policy,
-		    direction, sel);
+		    direction, sel, ns);
 	} else if ((io != NULL) && (io->ipsec_out_polhead != NULL)) {
 		p = ipsec_find_policy_head(p, io->ipsec_out_polhead,
-		    direction, sel);
+		    direction, sel, ns);
 	}
 
 	return (p);
@@ -2058,7 +2211,7 @@ ipsec_find_policy(int direction, conn_t *connp, ipsec_out_t *io,
  */
 mblk_t *
 ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
-    ipha_t *ipha, ip6_t *ip6h, boolean_t mctl_present)
+    ipha_t *ipha, ip6_t *ip6h, boolean_t mctl_present, netstack_t *ns)
 {
 	ipsec_policy_t *p;
 	ipsec_selector_t sel;
@@ -2067,6 +2220,8 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 	kstat_named_t *counter;
 	ipsec_in_t *ii = NULL;
 	uint64_t pkt_unique;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ip_stack_t	*ipst = ns->netstack_ip;
 
 	data_mp = mctl_present ? first_mp->b_cont : first_mp;
 	ipsec_mp = mctl_present ? first_mp : NULL;
@@ -2077,9 +2232,9 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 	    (ip6h == NULL && ipha != NULL));
 
 	if (ipha != NULL)
-		policy_present = ipsec_inbound_v4_policy_present;
+		policy_present = ipss->ipsec_inbound_v4_policy_present;
 	else
-		policy_present = ipsec_inbound_v6_policy_present;
+		policy_present = ipss->ipsec_inbound_v6_policy_present;
 
 	if (!policy_present && connp == NULL) {
 		/*
@@ -2117,8 +2272,8 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 			 * an internal failure.
 			 */
 			ipsec_log_policy_failure(IPSEC_POLICY_MISMATCH,
-			    "ipsec_init_inbound_sel", ipha, ip6h, B_FALSE);
-			counter = &ipdrops_spd_nomem;
+			    "ipsec_init_inbound_sel", ipha, ip6h, B_FALSE, ns);
+			counter = DROPPER(ipss, ipds_spd_nomem);
 			goto fail;
 		}
 
@@ -2133,7 +2288,8 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 		 * local policy alone.
 		 */
 
-		p = ipsec_find_policy(IPSEC_TYPE_INBOUND, connp, NULL, &sel);
+		p = ipsec_find_policy(IPSEC_TYPE_INBOUND, connp, NULL, &sel,
+		    ns);
 		pkt_unique = SA_UNIQUE_ID(sel.ips_remote_port,
 		    sel.ips_local_port, sel.ips_protocol, 0);
 	}
@@ -2144,37 +2300,39 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 			 * We have no policy; default to succeeding.
 			 * XXX paranoid system design doesn't do this.
 			 */
-			BUMP_MIB(&ip_mib, ipsecInSucceeded);
+			BUMP_MIB(&ipst->ips_ip_mib, ipsecInSucceeded);
 			return (first_mp);
 		} else {
-			counter = &ipdrops_spd_got_secure;
+			counter = DROPPER(ipss, ipds_spd_got_secure);
 			ipsec_log_policy_failure(IPSEC_POLICY_NOT_NEEDED,
-			    "ipsec_check_global_policy", ipha, ip6h, B_TRUE);
+			    "ipsec_check_global_policy", ipha, ip6h, B_TRUE,
+			    ns);
 			goto fail;
 		}
 	}
 	if ((ii != NULL) && (ii->ipsec_in_secure)) {
 		return (ipsec_check_ipsecin_policy(ipsec_mp, p, ipha, ip6h,
-		    pkt_unique));
+		    pkt_unique, ns));
 	}
 	if (p->ipsp_act->ipa_allow_clear) {
-		BUMP_MIB(&ip_mib, ipsecInSucceeded);
-		IPPOL_REFRELE(p);
+		BUMP_MIB(&ipst->ips_ip_mib, ipsecInSucceeded);
+		IPPOL_REFRELE(p, ns);
 		return (first_mp);
 	}
-	IPPOL_REFRELE(p);
+	IPPOL_REFRELE(p, ns);
 	/*
 	 * If we reach here, we will drop the packet because it failed the
 	 * global policy check because the packet was cleartext, and it
 	 * should not have been.
 	 */
 	ipsec_log_policy_failure(IPSEC_POLICY_MISMATCH,
-	    "ipsec_check_global_policy", ipha, ip6h, B_FALSE);
-	counter = &ipdrops_spd_got_clear;
+	    "ipsec_check_global_policy", ipha, ip6h, B_FALSE, ns);
+	counter = DROPPER(ipss, ipds_spd_got_clear);
 
 fail:
-	ip_drop_packet(first_mp, B_TRUE, NULL, NULL, counter, &spd_dropper);
-	BUMP_MIB(&ip_mib, ipsecInFailed);
+	ip_drop_packet(first_mp, B_TRUE, NULL, NULL, counter,
+	    &ipss->ipsec_spd_dropper);
+	BUMP_MIB(&ipst->ips_ip_mib, ipsecInFailed);
 	return (NULL);
 }
 
@@ -2395,9 +2553,15 @@ ipsec_check_inbound_policy(mblk_t *first_mp, conn_t *connp,
 	mblk_t *ipsec_mp = mctl_present ? first_mp : NULL;
 	ipsec_latch_t *ipl;
 	uint64_t unique_id;
+	ipsec_stack_t	*ipss;
+	ip_stack_t	*ipst;
+	netstack_t	*ns;
 
 	ASSERT(connp != NULL);
 	ipl = connp->conn_latch;
+	ns = connp->conn_netstack;
+	ipss = ns->netstack_ipsec;
+	ipst = ns->netstack_ip;
 
 	if (ipsec_mp == NULL) {
 clear:
@@ -2418,21 +2582,24 @@ clear:
 				ret = ipsec_inbound_accept_clear(mp,
 				    ipha, ip6h);
 				if (ret) {
-					BUMP_MIB(&ip_mib, ipsecInSucceeded);
+					BUMP_MIB(&ipst->ips_ip_mib,
+					    ipsecInSucceeded);
 					return (first_mp);
 				} else {
 					ipsec_log_policy_failure(
 					    IPSEC_POLICY_MISMATCH,
 					    "ipsec_check_inbound_policy", ipha,
-					    ip6h, B_FALSE);
+					    ip6h, B_FALSE, ns);
 					ip_drop_packet(first_mp, B_TRUE, NULL,
-					    NULL, &ipdrops_spd_got_clear,
-					    &spd_dropper);
-					BUMP_MIB(&ip_mib, ipsecInFailed);
+					    NULL,
+					    DROPPER(ipss, ipds_spd_got_clear),
+					    &ipss->ipsec_spd_dropper);
+					BUMP_MIB(&ipst->ips_ip_mib,
+					    ipsecInFailed);
 					return (NULL);
 				}
 			} else {
-				BUMP_MIB(&ip_mib, ipsecInSucceeded);
+				BUMP_MIB(&ipst->ips_ip_mib, ipsecInSucceeded);
 				return (first_mp);
 			}
 		} else {
@@ -2447,7 +2614,7 @@ clear:
 			uchar_t db_type = mp->b_datap->db_type;
 			mp->b_datap->db_type = M_DATA;
 			first_mp = ipsec_check_global_policy(first_mp, connp,
-			    ipha, ip6h, mctl_present);
+			    ipha, ip6h, mctl_present, ns);
 			if (first_mp != NULL)
 				mp->b_datap->db_type = db_type;
 			return (first_mp);
@@ -2483,24 +2650,26 @@ clear:
 		 * depending on whichever is stronger.
 		 */
 		return (ipsec_check_global_policy(first_mp, connp,
-		    ipha, ip6h, mctl_present));
+		    ipha, ip6h, mctl_present, ns));
 	}
 
 	if (ipl->ipl_in_action != NULL) {
 		/* Policy is cached & latched; fast(er) path */
 		const char *reason;
 		kstat_named_t *counter;
+
 		if (ipsec_check_ipsecin_latch(ii, mp, ipl,
 		    ipha, ip6h, &reason, &counter, connp)) {
-			BUMP_MIB(&ip_mib, ipsecInSucceeded);
+			BUMP_MIB(&ipst->ips_ip_mib, ipsecInSucceeded);
 			return (first_mp);
 		}
-		ipsec_rl_strlog(IP_MOD_ID, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
+		ipsec_rl_strlog(ns, IP_MOD_ID, 0, 0,
+		    SL_ERROR|SL_WARN|SL_CONSOLE,
 		    "ipsec inbound policy mismatch: %s, packet dropped\n",
 		    reason);
 		ip_drop_packet(first_mp, B_TRUE, NULL, NULL, counter,
-		    &spd_dropper);
-		BUMP_MIB(&ip_mib, ipsecInFailed);
+		    &ipss->ipsec_spd_dropper);
+		BUMP_MIB(&ipst->ips_ip_mib, ipsecInFailed);
 		return (NULL);
 	} else if (ipl->ipl_in_policy == NULL) {
 		ipsec_weird_null_inbound_policy++;
@@ -2510,7 +2679,7 @@ clear:
 	unique_id = conn_to_unique(connp, mp, ipha, ip6h);
 	IPPOL_REFHOLD(ipl->ipl_in_policy);
 	first_mp = ipsec_check_ipsecin_policy(first_mp, ipl->ipl_in_policy,
-	    ipha, ip6h, unique_id);
+	    ipha, ip6h, unique_id, ns);
 	/*
 	 * NOTE: ipsecIn{Failed,Succeeeded} bumped by
 	 * ipsec_check_ipsecin_policy().
@@ -2659,7 +2828,7 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 
 static boolean_t
 ipsec_init_outbound_ports(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
-    ip6_t *ip6h, int outer_hdr_len)
+    ip6_t *ip6h, int outer_hdr_len, ipsec_stack_t *ipss)
 {
 	/*
 	 * XXX cut&paste shared with ipsec_init_inbound_sel
@@ -2695,7 +2864,8 @@ ipsec_init_outbound_ports(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 				/* Always works, even if NULL. */
 				ipsec_freemsg_chain(spare_mp);
 				ip_drop_packet_chain(mp, B_FALSE, NULL, NULL,
-				    &ipdrops_spd_nomem, &spd_dropper);
+				    DROPPER(ipss, ipds_spd_nomem),
+				    &ipss->ipsec_spd_dropper);
 				return (B_FALSE);
 			} else {
 				nexthdr = *nexthdrp;
@@ -2732,7 +2902,8 @@ ipsec_init_outbound_ports(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 		if (spare_mp == NULL &&
 		    (spare_mp = msgpullup(mp, -1)) == NULL) {
 			ip_drop_packet_chain(mp, B_FALSE, NULL, NULL,
-			    &ipdrops_spd_nomem, &spd_dropper);
+			    DROPPER(ipss, ipds_spd_nomem),
+			    &ipss->ipsec_spd_dropper);
 			return (B_FALSE);
 		}
 		ports = (uint16_t *)&spare_mp->b_rptr[hdr_len + outer_hdr_len];
@@ -2908,22 +3079,25 @@ policy_hash(int size, const void *start, const void *end)
  * but have slightly different roles.
  */
 static uint32_t
-selkey_hash(const ipsec_selkey_t *selkey)
+selkey_hash(const ipsec_selkey_t *selkey, netstack_t *ns)
 {
 	uint32_t valid = selkey->ipsl_valid;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	if (!(valid & IPSL_REMOTE_ADDR))
 		return (IPSEC_SEL_NOHASH);
 
 	if (valid & IPSL_IPV4) {
-		if (selkey->ipsl_remote_pfxlen == 32)
+		if (selkey->ipsl_remote_pfxlen == 32) {
 			return (IPSEC_IPV4_HASH(selkey->ipsl_remote.ipsad_v4,
-				    ipsec_spd_hashsize));
+				    ipss->ipsec_spd_hashsize));
+		}
 	}
 	if (valid & IPSL_IPV6) {
-		if (selkey->ipsl_remote_pfxlen == 128)
+		if (selkey->ipsl_remote_pfxlen == 128) {
 			return (IPSEC_IPV6_HASH(selkey->ipsl_remote.ipsad_v6,
-				    ipsec_spd_hashsize));
+				    ipss->ipsec_spd_hashsize));
+		}
 	}
 	return (IPSEC_SEL_NOHASH);
 }
@@ -2942,7 +3116,7 @@ selector_hash(ipsec_selector_t *sel, ipsec_policy_root_t *root)
  * Intern actions into the action hash table.
  */
 ipsec_action_t *
-ipsec_act_find(const ipsec_act_t *a, int n)
+ipsec_act_find(const ipsec_act_t *a, int n, netstack_t *ns)
 {
 	int i;
 	uint32_t hval;
@@ -2954,6 +3128,7 @@ ipsec_act_find(const ipsec_act_t *a, int n)
 	boolean_t want_esp = B_FALSE;
 	boolean_t want_se = B_FALSE;
 	boolean_t want_unique = B_FALSE;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	/*
 	 * TODO: should canonicalize a[] (i.e., zeroize any padding)
@@ -2962,9 +3137,10 @@ ipsec_act_find(const ipsec_act_t *a, int n)
 	for (i = n-1; i >= 0; i--) {
 		hval = policy_hash(IPSEC_ACTION_HASH_SIZE, &a[i], &a[n]);
 
-		HASH_LOCK(ipsec_action_hash, hval);
+		HASH_LOCK(ipss->ipsec_action_hash, hval);
 
-		for (HASH_ITERATE(ap, ipa_hash, ipsec_action_hash, hval)) {
+		for (HASH_ITERATE(ap, ipa_hash,
+		    ipss->ipsec_action_hash, hval)) {
 			if (bcmp(&ap->ipa_act, &a[i], sizeof (*a)) != 0)
 				continue;
 			if (ap->ipa_next != prev)
@@ -2972,7 +3148,7 @@ ipsec_act_find(const ipsec_act_t *a, int n)
 			break;
 		}
 		if (ap != NULL) {
-			HASH_UNLOCK(ipsec_action_hash, hval);
+			HASH_UNLOCK(ipss->ipsec_action_hash, hval);
 			prev = ap;
 			continue;
 		}
@@ -2981,12 +3157,12 @@ ipsec_act_find(const ipsec_act_t *a, int n)
 		 */
 		ap = kmem_cache_alloc(ipsec_action_cache, KM_NOSLEEP);
 		if (ap == NULL) {
-			HASH_UNLOCK(ipsec_action_hash, hval);
+			HASH_UNLOCK(ipss->ipsec_action_hash, hval);
 			if (prev != NULL)
 				ipsec_action_free(prev);
 			return (NULL);
 		}
-		HASH_INSERT(ap, ipa_hash, ipsec_action_hash, hval);
+		HASH_INSERT(ap, ipa_hash, ipss->ipsec_action_hash, hval);
 
 		ap->ipa_next = prev;
 		ap->ipa_act = a[i];
@@ -3017,7 +3193,7 @@ ipsec_act_find(const ipsec_act_t *a, int n)
 		if (prev)
 			prev->ipa_refs++;
 		prev = ap;
-		HASH_UNLOCK(ipsec_action_hash, hval);
+		HASH_UNLOCK(ipss->ipsec_action_hash, hval);
 	}
 
 	ap->ipa_refs++;		/* caller's reference */
@@ -3051,6 +3227,48 @@ ipsec_action_free(ipsec_action_t *ap)
 }
 
 /*
+ * Called when the action hash table goes away.
+ *
+ * The actions can be queued on an mblk with ipsec_in or
+ * ipsec_out, hence the actions might still be around.
+ * But we decrement ipa_refs here since we no longer have
+ * a reference to the action from the hash table.
+ */
+static void
+ipsec_action_free_table(ipsec_action_t *ap)
+{
+	while (ap != NULL) {
+		ipsec_action_t *np = ap->ipa_next;
+
+		/* FIXME: remove? */
+		(void) printf("ipsec_action_free_table(%p) ref %d\n",
+		    (void *)ap, ap->ipa_refs);
+		ASSERT(ap->ipa_refs > 0);
+		IPACT_REFRELE(ap);
+		ap = np;
+	}
+}
+
+/*
+ * Need to walk all stack instances since the reclaim function
+ * is global for all instances
+ */
+/* ARGSUSED */
+static void
+ipsec_action_reclaim(void *arg)
+{
+	netstack_handle_t nh;
+	netstack_t *ns;
+
+	netstack_next_init(&nh);
+	while ((ns = netstack_next(&nh)) != NULL) {
+		ipsec_action_reclaim_stack(ns);
+		netstack_rele(ns);
+	}
+	netstack_next_fini(&nh);
+}
+
+/*
  * Periodically sweep action hash table for actions with refcount==1, and
  * nuke them.  We cannot do this "on demand" (i.e., from IPACT_REFRELE)
  * because we can't close the race between another thread finding the action
@@ -3061,30 +3279,31 @@ ipsec_action_free(ipsec_action_t *ap)
  * Note that it may take several passes of ipsec_action_gc() to free all
  * "stale" actions.
  */
-/* ARGSUSED */
 static void
-ipsec_action_reclaim(void *dummy)
+ipsec_action_reclaim_stack(netstack_t *ns)
 {
 	int i;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	for (i = 0; i < IPSEC_ACTION_HASH_SIZE; i++) {
 		ipsec_action_t *ap, *np;
 
 		/* skip the lock if nobody home */
-		if (ipsec_action_hash[i].hash_head == NULL)
+		if (ipss->ipsec_action_hash[i].hash_head == NULL)
 			continue;
 
-		HASH_LOCK(ipsec_action_hash, i);
-		for (ap = ipsec_action_hash[i].hash_head;
+		HASH_LOCK(ipss->ipsec_action_hash, i);
+		for (ap = ipss->ipsec_action_hash[i].hash_head;
 		    ap != NULL; ap = np) {
 			ASSERT(ap->ipa_refs > 0);
 			np = ap->ipa_hash.hash_next;
 			if (ap->ipa_refs > 1)
 				continue;
-			HASH_UNCHAIN(ap, ipa_hash, ipsec_action_hash, i);
+			HASH_UNCHAIN(ap, ipa_hash,
+			    ipss->ipsec_action_hash, i);
 			IPACT_REFRELE(ap);
 		}
-		HASH_UNLOCK(ipsec_action_hash, i);
+		HASH_UNLOCK(ipss->ipsec_action_hash, i);
 	}
 }
 
@@ -3093,10 +3312,11 @@ ipsec_action_reclaim(void *dummy)
  * This is simpler than the actions case..
  */
 static ipsec_sel_t *
-ipsec_find_sel(ipsec_selkey_t *selkey)
+ipsec_find_sel(ipsec_selkey_t *selkey, netstack_t *ns)
 {
 	ipsec_sel_t *sp;
 	uint32_t hval, bucket;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	/*
 	 * Exactly one AF bit should be set in selkey.
@@ -3104,16 +3324,16 @@ ipsec_find_sel(ipsec_selkey_t *selkey)
 	ASSERT(!(selkey->ipsl_valid & IPSL_IPV4) ^
 	    !(selkey->ipsl_valid & IPSL_IPV6));
 
-	hval = selkey_hash(selkey);
+	hval = selkey_hash(selkey, ns);
 	/* Set pol_hval to uninitialized until we put it in a polhead. */
 	selkey->ipsl_sel_hval = hval;
 
 	bucket = (hval == IPSEC_SEL_NOHASH) ? 0 : hval;
 
-	ASSERT(!HASH_LOCKED(ipsec_sel_hash, bucket));
-	HASH_LOCK(ipsec_sel_hash, bucket);
+	ASSERT(!HASH_LOCKED(ipss->ipsec_sel_hash, bucket));
+	HASH_LOCK(ipss->ipsec_sel_hash, bucket);
 
-	for (HASH_ITERATE(sp, ipsl_hash, ipsec_sel_hash, bucket)) {
+	for (HASH_ITERATE(sp, ipsl_hash, ipss->ipsec_sel_hash, bucket)) {
 		if (bcmp(&sp->ipsl_key, selkey,
 		    offsetof(ipsec_selkey_t, ipsl_pol_hval)) == 0)
 			break;
@@ -3121,17 +3341,17 @@ ipsec_find_sel(ipsec_selkey_t *selkey)
 	if (sp != NULL) {
 		sp->ipsl_refs++;
 
-		HASH_UNLOCK(ipsec_sel_hash, bucket);
+		HASH_UNLOCK(ipss->ipsec_sel_hash, bucket);
 		return (sp);
 	}
 
 	sp = kmem_cache_alloc(ipsec_sel_cache, KM_NOSLEEP);
 	if (sp == NULL) {
-		HASH_UNLOCK(ipsec_sel_hash, bucket);
+		HASH_UNLOCK(ipss->ipsec_sel_hash, bucket);
 		return (NULL);
 	}
 
-	HASH_INSERT(sp, ipsl_hash, ipsec_sel_hash, bucket);
+	HASH_INSERT(sp, ipsl_hash, ipss->ipsec_sel_hash, bucket);
 	sp->ipsl_refs = 2;	/* one for hash table, one for caller */
 	sp->ipsl_key = *selkey;
 	/* Set to uninitalized and have insertion into polhead fix things. */
@@ -3140,46 +3360,49 @@ ipsec_find_sel(ipsec_selkey_t *selkey)
 	else
 		sp->ipsl_key.ipsl_pol_hval = IPSEC_SEL_NOHASH;
 
-	HASH_UNLOCK(ipsec_sel_hash, bucket);
+	HASH_UNLOCK(ipss->ipsec_sel_hash, bucket);
 
 	return (sp);
 }
 
 static void
-ipsec_sel_rel(ipsec_sel_t **spp)
+ipsec_sel_rel(ipsec_sel_t **spp, netstack_t *ns)
 {
 	ipsec_sel_t *sp = *spp;
 	int hval = sp->ipsl_key.ipsl_sel_hval;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+
 	*spp = NULL;
 
 	if (hval == IPSEC_SEL_NOHASH)
 		hval = 0;
 
-	ASSERT(!HASH_LOCKED(ipsec_sel_hash, hval));
-	HASH_LOCK(ipsec_sel_hash, hval);
+	ASSERT(!HASH_LOCKED(ipss->ipsec_sel_hash, hval));
+	HASH_LOCK(ipss->ipsec_sel_hash, hval);
 	if (--sp->ipsl_refs == 1) {
-		HASH_UNCHAIN(sp, ipsl_hash, ipsec_sel_hash, hval);
+		HASH_UNCHAIN(sp, ipsl_hash, ipss->ipsec_sel_hash, hval);
 		sp->ipsl_refs--;
-		HASH_UNLOCK(ipsec_sel_hash, hval);
+		HASH_UNLOCK(ipss->ipsec_sel_hash, hval);
 		ASSERT(sp->ipsl_refs == 0);
 		kmem_cache_free(ipsec_sel_cache, sp);
 		/* Caller unlocks */
 		return;
 	}
 
-	HASH_UNLOCK(ipsec_sel_hash, hval);
+	HASH_UNLOCK(ipss->ipsec_sel_hash, hval);
 }
 
 /*
  * Free a policy rule which we know is no longer being referenced.
  */
 void
-ipsec_policy_free(ipsec_policy_t *ipp)
+ipsec_policy_free(ipsec_policy_t *ipp, netstack_t *ns)
 {
 	ASSERT(ipp->ipsp_refs == 0);
 	ASSERT(ipp->ipsp_sel != NULL);
 	ASSERT(ipp->ipsp_act != NULL);
-	ipsec_sel_rel(&ipp->ipsp_sel);
+
+	ipsec_sel_rel(&ipp->ipsp_sel, ns);
 	IPACT_REFRELE(ipp->ipsp_act);
 	kmem_cache_free(ipsec_pol_cache, ipp);
 }
@@ -3190,25 +3413,26 @@ ipsec_policy_free(ipsec_policy_t *ipp)
  */
 ipsec_policy_t *
 ipsec_policy_create(ipsec_selkey_t *keys, const ipsec_act_t *a,
-    int nacts, int prio, uint64_t *index_ptr)
+    int nacts, int prio, uint64_t *index_ptr, netstack_t *ns)
 {
 	ipsec_action_t *ap;
 	ipsec_sel_t *sp;
 	ipsec_policy_t *ipp;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	if (index_ptr == NULL)
-		index_ptr = &ipsec_next_policy_index;
+		index_ptr = &ipss->ipsec_next_policy_index;
 
 	ipp = kmem_cache_alloc(ipsec_pol_cache, KM_NOSLEEP);
-	ap = ipsec_act_find(a, nacts);
-	sp = ipsec_find_sel(keys);
+	ap = ipsec_act_find(a, nacts, ns);
+	sp = ipsec_find_sel(keys, ns);
 
 	if ((ap == NULL) || (sp == NULL) || (ipp == NULL)) {
 		if (ap != NULL) {
 			IPACT_REFRELE(ap);
 		}
 		if (sp != NULL)
-			ipsec_sel_rel(&sp);
+			ipsec_sel_rel(&sp, ns);
 		if (ipp != NULL)
 			kmem_cache_free(ipsec_pol_cache, ipp);
 		return (NULL);
@@ -3227,41 +3451,44 @@ ipsec_policy_create(ipsec_selkey_t *keys, const ipsec_act_t *a,
 }
 
 static void
-ipsec_update_present_flags()
+ipsec_update_present_flags(ipsec_stack_t *ipss)
 {
-	boolean_t hashpol = (avl_numnodes(&system_policy.iph_rulebyid) > 0);
+	boolean_t hashpol;
+
+	hashpol = (avl_numnodes(&ipss->ipsec_system_policy.iph_rulebyid) > 0);
 
 	if (hashpol) {
-		ipsec_outbound_v4_policy_present = B_TRUE;
-		ipsec_outbound_v6_policy_present = B_TRUE;
-		ipsec_inbound_v4_policy_present = B_TRUE;
-		ipsec_inbound_v6_policy_present = B_TRUE;
+		ipss->ipsec_outbound_v4_policy_present = B_TRUE;
+		ipss->ipsec_outbound_v6_policy_present = B_TRUE;
+		ipss->ipsec_inbound_v4_policy_present = B_TRUE;
+		ipss->ipsec_inbound_v6_policy_present = B_TRUE;
 		return;
 	}
 
-	ipsec_outbound_v4_policy_present = (NULL !=
-	    system_policy.iph_root[IPSEC_TYPE_OUTBOUND].
+	ipss->ipsec_outbound_v4_policy_present = (NULL !=
+	    ipss->ipsec_system_policy.iph_root[IPSEC_TYPE_OUTBOUND].
 	    ipr_nonhash[IPSEC_AF_V4]);
-	ipsec_outbound_v6_policy_present = (NULL !=
-	    system_policy.iph_root[IPSEC_TYPE_OUTBOUND].
+	ipss->ipsec_outbound_v6_policy_present = (NULL !=
+	    ipss->ipsec_system_policy.iph_root[IPSEC_TYPE_OUTBOUND].
 	    ipr_nonhash[IPSEC_AF_V6]);
-	ipsec_inbound_v4_policy_present = (NULL !=
-	    system_policy.iph_root[IPSEC_TYPE_INBOUND].
+	ipss->ipsec_inbound_v4_policy_present = (NULL !=
+	    ipss->ipsec_system_policy.iph_root[IPSEC_TYPE_INBOUND].
 	    ipr_nonhash[IPSEC_AF_V4]);
-	ipsec_inbound_v6_policy_present = (NULL !=
-	    system_policy.iph_root[IPSEC_TYPE_INBOUND].
+	ipss->ipsec_inbound_v6_policy_present = (NULL !=
+	    ipss->ipsec_system_policy.iph_root[IPSEC_TYPE_INBOUND].
 	    ipr_nonhash[IPSEC_AF_V6]);
 }
 
 boolean_t
-ipsec_policy_delete(ipsec_policy_head_t *php, ipsec_selkey_t *keys, int dir)
+ipsec_policy_delete(ipsec_policy_head_t *php, ipsec_selkey_t *keys, int dir,
+	netstack_t *ns)
 {
 	ipsec_sel_t *sp;
 	ipsec_policy_t *ip, *nip, *head;
 	int af;
 	ipsec_policy_root_t *pr = &php->iph_root[dir];
 
-	sp = ipsec_find_sel(keys);
+	sp = ipsec_find_sel(keys, ns);
 
 	if (sp == NULL)
 		return (B_FALSE);
@@ -3282,25 +3509,26 @@ ipsec_policy_delete(ipsec_policy_head_t *php, ipsec_selkey_t *keys, int dir)
 			continue;
 		}
 
-		IPPOL_UNCHAIN(php, ip);
+		IPPOL_UNCHAIN(php, ip, ns);
 
 		php->iph_gen++;
-		ipsec_update_present_flags();
+		ipsec_update_present_flags(ns->netstack_ipsec);
 
 		rw_exit(&php->iph_lock);
 
-		ipsec_sel_rel(&sp);
+		ipsec_sel_rel(&sp, ns);
 
 		return (B_TRUE);
 	}
 
 	rw_exit(&php->iph_lock);
-	ipsec_sel_rel(&sp);
+	ipsec_sel_rel(&sp, ns);
 	return (B_FALSE);
 }
 
 int
-ipsec_policy_delete_index(ipsec_policy_head_t *php, uint64_t policy_index)
+ipsec_policy_delete_index(ipsec_policy_head_t *php, uint64_t policy_index,
+    netstack_t *ns)
 {
 	boolean_t found = B_FALSE;
 	ipsec_policy_t ipkey;
@@ -3332,13 +3560,13 @@ ipsec_policy_delete_index(ipsec_policy_head_t *php, uint64_t policy_index)
 			break;
 		}
 
-		IPPOL_UNCHAIN(php, ip);
+		IPPOL_UNCHAIN(php, ip, ns);
 		found = B_TRUE;
 	}
 
 	if (found) {
 		php->iph_gen++;
-		ipsec_update_present_flags();
+		ipsec_update_present_flags(ns->netstack_ipsec);
 	}
 
 	rw_exit(&php->iph_lock);
@@ -3530,7 +3758,8 @@ ipsec_compare_action(ipsec_policy_t *p1, ipsec_policy_t *p2)
  * duplicates).
  */
 void
-ipsec_enter_policy(ipsec_policy_head_t *php, ipsec_policy_t *ipp, int direction)
+ipsec_enter_policy(ipsec_policy_head_t *php, ipsec_policy_t *ipp, int direction,
+    netstack_t *ns)
 {
 	ipsec_policy_root_t *pr = &php->iph_root[direction];
 	ipsec_selkey_t *selkey = &ipp->ipsp_sel->ipsl_key;
@@ -3560,20 +3789,20 @@ ipsec_enter_policy(ipsec_policy_head_t *php, ipsec_policy_t *ipp, int direction)
 
 	ipsec_insert_always(&php->iph_rulebyid, ipp);
 
-	ipsec_update_present_flags();
+	ipsec_update_present_flags(ns->netstack_ipsec);
 }
 
 static void
-ipsec_ipr_flush(ipsec_policy_head_t *php, ipsec_policy_root_t *ipr)
+ipsec_ipr_flush(ipsec_policy_head_t *php, ipsec_policy_root_t *ipr,
+    netstack_t *ns)
 {
 	ipsec_policy_t *ip, *nip;
-
 	int af, chain, nchain;
 
 	for (af = 0; af < IPSEC_NAF; af++) {
 		for (ip = ipr->ipr_nonhash[af]; ip != NULL; ip = nip) {
 			nip = ip->ipsp_hash.hash_next;
-			IPPOL_UNCHAIN(php, ip);
+			IPPOL_UNCHAIN(php, ip, ns);
 		}
 		ipr->ipr_nonhash[af] = NULL;
 	}
@@ -3583,33 +3812,34 @@ ipsec_ipr_flush(ipsec_policy_head_t *php, ipsec_policy_root_t *ipr)
 		for (ip = ipr->ipr_hash[chain].hash_head; ip != NULL;
 		    ip = nip) {
 			nip = ip->ipsp_hash.hash_next;
-			IPPOL_UNCHAIN(php, ip);
+			IPPOL_UNCHAIN(php, ip, ns);
 		}
 		ipr->ipr_hash[chain].hash_head = NULL;
 	}
 }
 
 void
-ipsec_polhead_flush(ipsec_policy_head_t *php)
+ipsec_polhead_flush(ipsec_policy_head_t *php, netstack_t *ns)
 {
 	int dir;
 
 	ASSERT(RW_WRITE_HELD(&php->iph_lock));
 
 	for (dir = 0; dir < IPSEC_NTYPES; dir++)
-		ipsec_ipr_flush(php, &php->iph_root[dir]);
+		ipsec_ipr_flush(php, &php->iph_root[dir], ns);
 
-	ipsec_update_present_flags();
+	ipsec_update_present_flags(ns->netstack_ipsec);
 }
 
 void
-ipsec_polhead_free(ipsec_policy_head_t *php)
+ipsec_polhead_free(ipsec_policy_head_t *php, netstack_t *ns)
 {
 	int dir;
 
 	ASSERT(php->iph_refs == 0);
+
 	rw_enter(&php->iph_lock, RW_WRITER);
-	ipsec_polhead_flush(php);
+	ipsec_polhead_flush(php, ns);
 	rw_exit(&php->iph_lock);
 	rw_destroy(&php->iph_lock);
 	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
@@ -3665,7 +3895,7 @@ ipsec_polhead_create(void)
  * If the old one had a refcount of 1, just return it.
  */
 ipsec_policy_head_t *
-ipsec_polhead_split(ipsec_policy_head_t *php)
+ipsec_polhead_split(ipsec_policy_head_t *php, netstack_t *ns)
 {
 	ipsec_policy_head_t *nphp;
 
@@ -3678,11 +3908,11 @@ ipsec_polhead_split(ipsec_policy_head_t *php)
 	if (nphp == NULL)
 		return (NULL);
 
-	if (ipsec_copy_polhead(php, nphp) != 0) {
-		ipsec_polhead_free(nphp);
+	if (ipsec_copy_polhead(php, nphp, ns) != 0) {
+		ipsec_polhead_free(nphp, ns);
 		return (NULL);
 	}
-	IPPH_REFRELE(php);
+	IPPH_REFRELE(php, ns);
 	return (nphp);
 }
 
@@ -3721,6 +3951,7 @@ ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h)
 	ipsec_selector_t sel;
 	ipsec_action_t *reflect_action = NULL;
 	zoneid_t zoneid;
+	netstack_t	*ns;
 
 	ASSERT(ipsec_mp->b_datap->db_type == M_CTL);
 
@@ -3742,9 +3973,10 @@ ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h)
 	ifindex = ii->ipsec_in_ill_index;
 	zoneid = ii->ipsec_in_zoneid;
 	ASSERT(zoneid != ALL_ZONES);
+	ns = ii->ipsec_in_ns;
 	v4 = ii->ipsec_in_v4;
 
-	ipsec_in_release_refs(ii);
+	ipsec_in_release_refs(ii);	/* No netstack_rele/hold needed */
 
 	/*
 	 * The caller is going to send the datagram out which might
@@ -3764,7 +3996,8 @@ ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h)
 	io->ipsec_out_frtn.free_arg = (char *)io;
 	io->ipsec_out_act = reflect_action;
 
-	if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h, 0))
+	if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h, 0,
+	    ns->netstack_ipsec))
 		return (B_FALSE);
 
 	io->ipsec_out_src_port = sel.ips_local_port;
@@ -3784,21 +4017,30 @@ ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h)
 	io->ipsec_out_attach_if = attach_if;
 	io->ipsec_out_ill_index = ifindex;
 	io->ipsec_out_zoneid = zoneid;
+	io->ipsec_out_ns = ns;		/* No netstack_hold */
+
 	return (B_TRUE);
 }
 
 mblk_t *
-ipsec_in_tag(mblk_t *mp, mblk_t *cont)
+ipsec_in_tag(mblk_t *mp, mblk_t *cont, netstack_t *ns)
 {
 	ipsec_in_t *ii = (ipsec_in_t *)mp->b_rptr;
 	ipsec_in_t *nii;
 	mblk_t *nmp;
 	frtn_t nfrtn;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
 
 	ASSERT(ii->ipsec_in_type == IPSEC_IN);
 	ASSERT(ii->ipsec_in_len == sizeof (ipsec_in_t));
 
-	nmp = ipsec_in_alloc(ii->ipsec_in_v4);
+	nmp = ipsec_in_alloc(ii->ipsec_in_v4, ns);
+	if (nmp == NULL) {
+		ip_drop_packet_chain(cont, B_FALSE, NULL, NULL,
+		    DROPPER(ipss, ipds_spd_nomem),
+		    &ipss->ipsec_spd_dropper);
+		return (NULL);
+	}
 
 	ASSERT(nmp->b_datap->db_type == M_CTL);
 	ASSERT(nmp->b_wptr == (nmp->b_rptr + sizeof (ipsec_info_t)));
@@ -3828,20 +4070,22 @@ ipsec_in_tag(mblk_t *mp, mblk_t *cont)
 }
 
 mblk_t *
-ipsec_out_tag(mblk_t *mp, mblk_t *cont)
+ipsec_out_tag(mblk_t *mp, mblk_t *cont, netstack_t *ns)
 {
 	ipsec_out_t *io = (ipsec_out_t *)mp->b_rptr;
 	ipsec_out_t *nio;
 	mblk_t *nmp;
 	frtn_t nfrtn;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
 
 	ASSERT(io->ipsec_out_type == IPSEC_OUT);
 	ASSERT(io->ipsec_out_len == sizeof (ipsec_out_t));
 
-	nmp = ipsec_alloc_ipsec_out();
+	nmp = ipsec_alloc_ipsec_out(ns);
 	if (nmp == NULL) {
 		ip_drop_packet_chain(cont, B_FALSE, NULL, NULL,
-		    &ipdrops_spd_nomem, &spd_dropper);
+		    DROPPER(ipss, ipds_spd_nomem),
+		    &ipss->ipsec_spd_dropper);
 		return (NULL);
 	}
 	ASSERT(nmp->b_datap->db_type == M_CTL);
@@ -3882,8 +4126,11 @@ ipsec_out_tag(mblk_t *mp, mblk_t *cont)
 static void
 ipsec_out_release_refs(ipsec_out_t *io)
 {
+	netstack_t	*ns = io->ipsec_out_ns;
+
 	ASSERT(io->ipsec_out_type == IPSEC_OUT);
 	ASSERT(io->ipsec_out_len == sizeof (ipsec_out_t));
+	ASSERT(io->ipsec_out_ns != NULL);
 
 	/* Note: IPSA_REFRELE is multi-line macro */
 	if (io->ipsec_out_ah_sa != NULL)
@@ -3891,9 +4138,9 @@ ipsec_out_release_refs(ipsec_out_t *io)
 	if (io->ipsec_out_esp_sa != NULL)
 		IPSA_REFRELE(io->ipsec_out_esp_sa);
 	if (io->ipsec_out_polhead != NULL)
-		IPPH_REFRELE(io->ipsec_out_polhead);
+		IPPH_REFRELE(io->ipsec_out_polhead, ns);
 	if (io->ipsec_out_policy != NULL)
-		IPPOL_REFRELE(io->ipsec_out_policy);
+		IPPOL_REFRELE(io->ipsec_out_policy, ns);
 	if (io->ipsec_out_act != NULL)
 		IPACT_REFRELE(io->ipsec_out_act);
 	if (io->ipsec_out_cred != NULL) {
@@ -3901,7 +4148,7 @@ ipsec_out_release_refs(ipsec_out_t *io)
 		io->ipsec_out_cred = NULL;
 	}
 	if (io->ipsec_out_latch) {
-		IPLATCH_REFRELE(io->ipsec_out_latch);
+		IPLATCH_REFRELE(io->ipsec_out_latch, ns);
 		io->ipsec_out_latch = NULL;
 	}
 }
@@ -3917,13 +4164,17 @@ ipsec_out_free(void *arg)
 static void
 ipsec_in_release_refs(ipsec_in_t *ii)
 {
+	netstack_t	*ns = ii->ipsec_in_ns;
+
+	ASSERT(ii->ipsec_in_ns != NULL);
+
 	/* Note: IPSA_REFRELE is multi-line macro */
 	if (ii->ipsec_in_ah_sa != NULL)
 		IPSA_REFRELE(ii->ipsec_in_ah_sa);
 	if (ii->ipsec_in_esp_sa != NULL)
 		IPSA_REFRELE(ii->ipsec_in_esp_sa);
 	if (ii->ipsec_in_policy != NULL)
-		IPPH_REFRELE(ii->ipsec_in_policy);
+		IPPH_REFRELE(ii->ipsec_in_policy, ns);
 	if (ii->ipsec_in_da != NULL) {
 		freeb(ii->ipsec_in_da);
 		ii->ipsec_in_da = NULL;
@@ -3947,10 +4198,9 @@ ipsec_in_free(void *arg)
  *	    we can't make it fast by calling a dup.
  */
 mblk_t *
-ipsec_alloc_ipsec_out()
+ipsec_alloc_ipsec_out(netstack_t *ns)
 {
 	mblk_t *ipsec_mp;
-
 	ipsec_out_t *io = kmem_cache_alloc(ipsec_info_cache, KM_NOSLEEP);
 
 	if (io == NULL)
@@ -3969,6 +4219,7 @@ ipsec_alloc_ipsec_out()
 	 * a sane value.
 	 */
 	io->ipsec_out_zoneid = ALL_ZONES;
+	io->ipsec_out_ns = ns;		/* No netstack_hold */
 
 	ipsec_mp = desballoc((uint8_t *)io, sizeof (ipsec_info_t), BPRI_HI,
 	    &io->ipsec_out_frtn);
@@ -3991,22 +4242,24 @@ ipsec_alloc_ipsec_out()
  */
 mblk_t *
 ipsec_attach_ipsec_out(mblk_t *mp, conn_t *connp, ipsec_policy_t *pol,
-    uint8_t proto)
+    uint8_t proto, netstack_t *ns)
 {
 	mblk_t *ipsec_mp;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	ASSERT((pol != NULL) || (connp != NULL));
 
-	ipsec_mp = ipsec_alloc_ipsec_out();
+	ipsec_mp = ipsec_alloc_ipsec_out(ns);
 	if (ipsec_mp == NULL) {
-		ipsec_rl_strlog(IP_MOD_ID, 0, 0, SL_ERROR|SL_NOTE,
+		ipsec_rl_strlog(ns, IP_MOD_ID, 0, 0, SL_ERROR|SL_NOTE,
 		    "ipsec_attach_ipsec_out: Allocation failure\n");
-		ip_drop_packet(mp, B_FALSE, NULL, NULL, &ipdrops_spd_nomem,
-		    &spd_dropper);
+		ip_drop_packet(mp, B_FALSE, NULL, NULL,
+		    DROPPER(ipss, ipds_spd_nomem),
+		    &ipss->ipsec_spd_dropper);
 		return (NULL);
 	}
 	ipsec_mp->b_cont = mp;
-	return (ipsec_init_ipsec_out(ipsec_mp, connp, pol, proto));
+	return (ipsec_init_ipsec_out(ipsec_mp, connp, pol, proto, ns));
 }
 
 /*
@@ -4017,13 +4270,14 @@ ipsec_attach_ipsec_out(mblk_t *mp, conn_t *connp, ipsec_policy_t *pol,
  */
 mblk_t *
 ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
-    uint8_t proto)
+    uint8_t proto, netstack_t *ns)
 {
 	mblk_t *mp;
 	ipsec_out_t *io;
 	ipsec_policy_t *p;
 	ipha_t *ipha;
 	ip6_t *ip6h;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
 
 	ASSERT((pol != NULL) || (connp != NULL));
 
@@ -4045,6 +4299,8 @@ ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
 	 */
 	if (connp != NULL)
 		io->ipsec_out_zoneid = connp->conn_zoneid;
+
+	io->ipsec_out_ns = ns;		/* No netstack_hold */
 
 	if (mp != NULL) {
 		ipha = (ipha_t *)mp->b_rptr;
@@ -4071,6 +4327,7 @@ ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
 	 * around in IP.
 	 */
 	if (connp != NULL && connp->conn_latch != NULL) {
+		ASSERT(ns == connp->conn_netstack);
 		p = connp->conn_latch->ipl_out_policy;
 		io->ipsec_out_latch = connp->conn_latch;
 		IPLATCH_REFHOLD(connp->conn_latch);
@@ -4081,7 +4338,7 @@ ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
 		io->ipsec_out_dst_port = connp->conn_fport;
 		io->ipsec_out_icmp_type = io->ipsec_out_icmp_code = 0;
 		if (pol != NULL)
-			IPPOL_REFRELE(pol);
+			IPPOL_REFRELE(pol, ns);
 	} else if (pol != NULL) {
 		ipsec_selector_t sel;
 
@@ -4093,7 +4350,8 @@ ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
 		 * it from the packet.
 		 */
 
-		if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h, 0)) {
+		if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h, 0,
+		    ns->netstack_ipsec)) {
 			/* Callee did ip_drop_packet(). */
 			return (NULL);
 		}
@@ -4123,7 +4381,8 @@ ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
 		if (p->ipsp_act->ipa_act.ipa_type == IPSEC_ACT_DISCARD ||
 		    p->ipsp_act->ipa_act.ipa_type == IPSEC_ACT_REJECT) {
 			ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
-			    &ipdrops_spd_explicit, &spd_dropper);
+			    DROPPER(ipss, ipds_spd_explicit),
+			    &ipss->ipsec_spd_dropper);
 			ipsec_mp = NULL;
 		}
 	}
@@ -4137,7 +4396,7 @@ ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
  * datagram.
  */
 mblk_t *
-ipsec_in_alloc(boolean_t isv4)
+ipsec_in_alloc(boolean_t isv4, netstack_t *ns)
 {
 	mblk_t *ipsec_in;
 	ipsec_in_t *ii = kmem_cache_alloc(ipsec_info_cache, KM_NOSLEEP);
@@ -4151,6 +4410,7 @@ ipsec_in_alloc(boolean_t isv4)
 
 	ii->ipsec_in_v4 = isv4;
 	ii->ipsec_in_secure = B_TRUE;
+	ii->ipsec_in_ns = ns;		/* No netstack_hold */
 
 	ii->ipsec_in_frtn.free_func = ipsec_in_free;
 	ii->ipsec_in_frtn.free_arg = (char *)ii;
@@ -4192,6 +4452,7 @@ ipsec_out_to_in(mblk_t *ipsec_mp)
 	ipsec_action_t *act;
 	boolean_t v4, icmp_loopback;
 	zoneid_t zoneid;
+	netstack_t *ns;
 
 	ASSERT(ipsec_mp->b_datap->db_type == M_CTL);
 
@@ -4200,6 +4461,7 @@ ipsec_out_to_in(mblk_t *ipsec_mp)
 	v4 = io->ipsec_out_v4;
 	zoneid = io->ipsec_out_zoneid;
 	icmp_loopback = io->ipsec_out_icmp_loopback;
+	ns = io->ipsec_out_ns;
 
 	act = io->ipsec_out_act;
 	if (act == NULL) {
@@ -4211,13 +4473,15 @@ ipsec_out_to_in(mblk_t *ipsec_mp)
 	}
 	io->ipsec_out_act = NULL;
 
-	ipsec_out_release_refs(io);
+	ipsec_out_release_refs(io);	/* No netstack_rele/hold needed */
 
 	ii = (ipsec_in_t *)ipsec_mp->b_rptr;
 	bzero(ii, sizeof (ipsec_in_t));
 	ii->ipsec_in_type = IPSEC_IN;
 	ii->ipsec_in_len = sizeof (ipsec_in_t);
 	ii->ipsec_in_loopback = B_TRUE;
+	ii->ipsec_in_ns = ns;		/* No netstack_hold */
+
 	ii->ipsec_in_frtn.free_func = ipsec_in_free;
 	ii->ipsec_in_frtn.free_arg = (char *)ii;
 	ii->ipsec_in_action = act;
@@ -4258,6 +4522,9 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 	boolean_t conn_dontroutex;
 	boolean_t conn_multicast_loopx;
 	boolean_t policy_present;
+	ip_stack_t	*ipst = ire->ire_ipst;
+	netstack_t	*ns = ipst->ips_netstack;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	ASSERT((ipha != NULL && ip6h == NULL) ||
 	    (ip6h != NULL && ipha == NULL));
@@ -4265,9 +4532,9 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 	bzero((void*)&sel, sizeof (sel));
 
 	if (ipha != NULL)
-		policy_present = ipsec_outbound_v4_policy_present;
+		policy_present = ipss->ipsec_outbound_v4_policy_present;
 	else
-		policy_present = ipsec_outbound_v6_policy_present;
+		policy_present = ipss->ipsec_outbound_v6_policy_present;
 	/*
 	 * Fast Path to see if there is any policy.
 	 */
@@ -4370,7 +4637,8 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 		default:
 			if (!ip_hdr_length_nexthdr_v6(mp, ip6h,
 			    &hdr_len, &nexthdrp)) {
-				BUMP_MIB(&ip6_mib, ipIfStatsOutDiscards);
+				BUMP_MIB(&ipst->ips_ip6_mib,
+				    ipIfStatsOutDiscards);
 				freemsg(ipsec_mp); /* Not IPsec-related drop. */
 				return (NULL);
 			}
@@ -4379,11 +4647,11 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 		}
 	}
 
-	if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h, 0)) {
+	if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h, 0, ipss)) {
 		if (ipha != NULL) {
-			BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
 		} else {
-			BUMP_MIB(&ip6_mib, ipIfStatsOutDiscards);
+			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutDiscards);
 		}
 
 		/* Callee dropped the packet. */
@@ -4397,13 +4665,14 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 		 * whether we have to inherit or not.
 		 */
 		io->ipsec_out_need_policy = B_FALSE;
-		ipsec_mp = ipsec_apply_global_policy(ipsec_mp, connp, &sel);
+		ipsec_mp = ipsec_apply_global_policy(ipsec_mp, connp,
+		    &sel, ns);
 		ASSERT((io->ipsec_out_policy != NULL) ||
 		    (io->ipsec_out_act != NULL));
 		ASSERT(io->ipsec_out_need_policy == B_FALSE);
 		return (ipsec_mp);
 	}
-	ipsec_mp = ipsec_attach_global_policy(mp, connp, &sel);
+	ipsec_mp = ipsec_attach_global_policy(mp, connp, &sel, ns);
 	if (ipsec_mp == NULL)
 		return (mp);
 
@@ -4447,6 +4716,8 @@ int
 ipsec_conn_cache_policy(conn_t *connp, boolean_t isv4)
 {
 	boolean_t global_policy_present;
+	netstack_t	*ns = connp->conn_netstack;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	/*
 	 * There is no policy latching for ICMP sockets because we can't
@@ -4458,7 +4729,7 @@ ipsec_conn_cache_policy(conn_t *connp, boolean_t isv4)
 		connp->conn_in_enforce_policy =
 		    connp->conn_out_enforce_policy = B_TRUE;
 		if (connp->conn_latch != NULL) {
-			IPLATCH_REFRELE(connp->conn_latch);
+			IPLATCH_REFRELE(connp->conn_latch, ns);
 			connp->conn_latch = NULL;
 		}
 		connp->conn_flags |= IPCL_CHECK_POLICY;
@@ -4466,10 +4737,10 @@ ipsec_conn_cache_policy(conn_t *connp, boolean_t isv4)
 	}
 
 	global_policy_present = isv4 ?
-	    (ipsec_outbound_v4_policy_present ||
-		ipsec_inbound_v4_policy_present) :
-	    (ipsec_outbound_v6_policy_present ||
-		ipsec_inbound_v6_policy_present);
+	    (ipss->ipsec_outbound_v4_policy_present ||
+		ipss->ipsec_inbound_v4_policy_present) :
+	    (ipss->ipsec_outbound_v6_policy_present ||
+		ipss->ipsec_inbound_v6_policy_present);
 
 	if ((connp->conn_policy != NULL) || global_policy_present) {
 		ipsec_selector_t sel;
@@ -4493,15 +4764,17 @@ ipsec_conn_cache_policy(conn_t *connp, boolean_t isv4)
 			sel.ips_remote_addr_v6 = connp->conn_remv6;
 		}
 
-		p = ipsec_find_policy(IPSEC_TYPE_INBOUND, connp, NULL, &sel);
+		p = ipsec_find_policy(IPSEC_TYPE_INBOUND, connp, NULL, &sel,
+		    ns);
 		if (connp->conn_latch->ipl_in_policy != NULL)
-			IPPOL_REFRELE(connp->conn_latch->ipl_in_policy);
+			IPPOL_REFRELE(connp->conn_latch->ipl_in_policy, ns);
 		connp->conn_latch->ipl_in_policy = p;
 		connp->conn_in_enforce_policy = (p != NULL);
 
-		p = ipsec_find_policy(IPSEC_TYPE_OUTBOUND, connp, NULL, &sel);
+		p = ipsec_find_policy(IPSEC_TYPE_OUTBOUND, connp, NULL, &sel,
+		    ns);
 		if (connp->conn_latch->ipl_out_policy != NULL)
-			IPPOL_REFRELE(connp->conn_latch->ipl_out_policy);
+			IPPOL_REFRELE(connp->conn_latch->ipl_out_policy, ns);
 		connp->conn_latch->ipl_out_policy = p;
 		connp->conn_out_enforce_policy = (p != NULL);
 
@@ -4531,12 +4804,12 @@ ipsec_conn_cache_policy(conn_t *connp, boolean_t isv4)
 }
 
 void
-iplatch_free(ipsec_latch_t *ipl)
+iplatch_free(ipsec_latch_t *ipl, netstack_t *ns)
 {
 	if (ipl->ipl_out_policy != NULL)
-		IPPOL_REFRELE(ipl->ipl_out_policy);
+		IPPOL_REFRELE(ipl->ipl_out_policy, ns);
 	if (ipl->ipl_in_policy != NULL)
-		IPPOL_REFRELE(ipl->ipl_in_policy);
+		IPPOL_REFRELE(ipl->ipl_in_policy, ns);
 	if (ipl->ipl_in_action != NULL)
 		IPACT_REFRELE(ipl->ipl_in_action);
 	if (ipl->ipl_out_action != NULL)
@@ -4564,32 +4837,6 @@ iplatch_create()
 }
 
 /*
- * Identity hash table.
- *
- * Identities are refcounted and "interned" into the hash table.
- * Only references coming from other objects (SA's, latching state)
- * are counted in ipsid_refcnt.
- *
- * Locking: IPSID_REFHOLD is safe only when (a) the object's hash bucket
- * is locked, (b) we know that the refcount must be > 0.
- *
- * The ipsid_next and ipsid_ptpn fields are only to be referenced or
- * modified when the bucket lock is held; in particular, we only
- * delete objects while holding the bucket lock, and we only increase
- * the refcount from 0 to 1 while the bucket lock is held.
- */
-
-#define	IPSID_HASHSIZE 64
-
-typedef struct ipsif_s
-{
-	ipsid_t *ipsif_head;
-	kmutex_t ipsif_lock;
-} ipsif_t;
-
-ipsif_t ipsid_buckets[IPSID_HASHSIZE];
-
-/*
  * Hash function for ID hash table.
  */
 static uint32_t
@@ -4613,13 +4860,15 @@ ipsid_hash(int idtype, char *idstring)
  * Return NULL if we need to allocate a new one and can't get memory.
  */
 ipsid_t *
-ipsid_lookup(int idtype, char *idstring)
+ipsid_lookup(int idtype, char *idstring, netstack_t *ns)
 {
 	ipsid_t *retval;
 	char *nstr;
 	int idlen = strlen(idstring) + 1;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ipsif_t *bucket;
 
-	ipsif_t *bucket = &ipsid_buckets[ipsid_hash(idtype, idstring)];
+	bucket = &ipss->ipsec_ipsid_buckets[ipsid_hash(idtype, idstring)];
 
 	mutex_enter(&bucket->ipsif_lock);
 
@@ -4666,14 +4915,15 @@ ipsid_lookup(int idtype, char *idstring)
  * Garbage collect the identity hash table.
  */
 void
-ipsid_gc()
+ipsid_gc(netstack_t *ns)
 {
 	int i, len;
 	ipsid_t *id, *nid;
 	ipsif_t *bucket;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	for (i = 0; i < IPSID_HASHSIZE; i++) {
-		bucket = &ipsid_buckets[i];
+		bucket = &ipss->ipsec_ipsid_buckets[i];
 		mutex_enter(&bucket->ipsif_lock);
 		for (id = bucket->ipsif_head; id != NULL; id = nid) {
 			nid = id->ipsid_next;
@@ -4714,13 +4964,14 @@ ipsid_equal(ipsid_t *id1, ipsid_t *id2)
  * Initialize identity table; called during module initialization.
  */
 static void
-ipsid_init()
+ipsid_init(netstack_t *ns)
 {
 	ipsif_t *bucket;
 	int i;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	for (i = 0; i < IPSID_HASHSIZE; i++) {
-		bucket = &ipsid_buckets[i];
+		bucket = &ipss->ipsec_ipsid_buckets[i];
 		mutex_init(&bucket->ipsif_lock, NULL, MUTEX_DEFAULT, NULL);
 	}
 }
@@ -4729,13 +4980,15 @@ ipsid_init()
  * Free identity table (preparatory to module unload)
  */
 static void
-ipsid_fini()
+ipsid_fini(netstack_t *ns)
 {
 	ipsif_t *bucket;
 	int i;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	for (i = 0; i < IPSID_HASHSIZE; i++) {
-		bucket = &ipsid_buckets[i];
+		bucket = &ipss->ipsec_ipsid_buckets[i];
+		ASSERT(bucket->ipsif_head == NULL);
 		mutex_destroy(&bucket->ipsif_lock);
 	}
 }
@@ -4745,7 +4998,8 @@ ipsid_fini()
  * specified algorithm. Must be called while holding the algorithms lock.
  */
 void
-ipsec_alg_fix_min_max(ipsec_alginfo_t *alg, ipsec_algtype_t alg_type)
+ipsec_alg_fix_min_max(ipsec_alginfo_t *alg, ipsec_algtype_t alg_type,
+    netstack_t *ns)
 {
 	size_t crypto_min = (size_t)-1, crypto_max = 0;
 	size_t cur_crypto_min, cur_crypto_max;
@@ -4754,8 +5008,9 @@ ipsec_alg_fix_min_max(ipsec_alginfo_t *alg, ipsec_algtype_t alg_type)
 	uint_t nmech_infos;
 	int crypto_rc, i;
 	crypto_mech_usage_t mask;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	ASSERT(MUTEX_HELD(&alg_lock));
+	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
 
 	/*
 	 * Compute the min, max, and default key sizes (in number of
@@ -4934,14 +5189,16 @@ ipsec_alg_free(ipsec_alginfo_t *alg)
 	if (alg == NULL)
 		return;
 
-	if (alg->alg_key_sizes != NULL)
+	if (alg->alg_key_sizes != NULL) {
 		kmem_free(alg->alg_key_sizes,
 		    (alg->alg_nkey_sizes + 1) * sizeof (uint16_t));
-
-	if (alg->alg_block_sizes != NULL)
+		alg->alg_key_sizes = NULL;
+	}
+	if (alg->alg_block_sizes != NULL) {
 		kmem_free(alg->alg_block_sizes,
 		    (alg->alg_nblock_sizes + 1) * sizeof (uint16_t));
-
+		alg->alg_block_sizes = NULL;
+	}
 	kmem_free(alg, sizeof (*alg));
 }
 
@@ -4978,9 +5235,27 @@ ipsec_valid_key_size(uint16_t key_size, ipsec_alginfo_t *alg)
  * tables when a crypto algorithm is no longer available or becomes
  * available, and triggers the freeing/creation of context templates
  * associated with existing SAs, if needed.
+ *
+ * Need to walk all stack instances since the callback is global
+ * for all instances
  */
 void
 ipsec_prov_update_callback(uint32_t event, void *event_arg)
+{
+	netstack_handle_t nh;
+	netstack_t *ns;
+
+	netstack_next_init(&nh);
+	while ((ns = netstack_next(&nh)) != NULL) {
+		ipsec_prov_update_callback_stack(event, event_arg, ns);
+		netstack_rele(ns);
+	}
+	netstack_next_fini(&nh);
+}
+
+static void
+ipsec_prov_update_callback_stack(uint32_t event, void *event_arg,
+    netstack_t *ns)
 {
 	crypto_notify_event_change_t *prov_change =
 	    (crypto_notify_event_change_t *)event_arg;
@@ -4989,6 +5264,7 @@ ipsec_prov_update_callback(uint32_t event, void *event_arg)
 	ipsec_alginfo_t oalg;
 	crypto_mech_name_t *mechs;
 	boolean_t alg_changed = B_FALSE;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	/* ignore events for which we didn't register */
 	if (event != CRYPTO_EVENT_MECHS_CHANGED) {
@@ -5006,12 +5282,13 @@ ipsec_prov_update_callback(uint32_t event, void *event_arg)
 	 * the algorithm valid flag and trigger an update of the
 	 * SAs that depend on that algorithm.
 	 */
-	mutex_enter(&alg_lock);
+	mutex_enter(&ipss->ipsec_alg_lock);
 	for (algtype = 0; algtype < IPSEC_NALGTYPES; algtype++) {
-		for (algidx = 0; algidx < ipsec_nalgs[algtype]; algidx++) {
+		for (algidx = 0; algidx < ipss->ipsec_nalgs[algtype];
+		    algidx++) {
 
-			algid = ipsec_sortlist[algtype][algidx];
-			alg = ipsec_alglists[algtype][algid];
+			algid = ipss->ipsec_sortlist[algtype][algidx];
+			alg = ipss->ipsec_alglists[algtype][algid];
 			ASSERT(alg != NULL);
 
 			/*
@@ -5048,7 +5325,7 @@ ipsec_prov_update_callback(uint32_t event, void *event_arg)
 			 * removed.
 			 */
 			oalg = *alg;
-			ipsec_alg_fix_min_max(alg, algtype);
+			ipsec_alg_fix_min_max(alg, algtype, ns);
 			if (!alg_changed &&
 			    alg->alg_ef_minbits != oalg.alg_ef_minbits ||
 			    alg->alg_ef_maxbits != oalg.alg_ef_maxbits ||
@@ -5065,10 +5342,10 @@ ipsec_prov_update_callback(uint32_t event, void *event_arg)
 			    CRYPTO_SW_PROVIDER)
 				sadb_alg_update(algtype, alg->alg_id,
 				    prov_change->ec_change ==
-				    CRYPTO_MECH_ADDED);
+				    CRYPTO_MECH_ADDED, ns);
 		}
 	}
-	mutex_exit(&alg_lock);
+	mutex_exit(&ipss->ipsec_alg_lock);
 	crypto_free_mech_list(mechs, mech_count);
 
 	if (alg_changed) {
@@ -5078,8 +5355,8 @@ ipsec_prov_update_callback(uint32_t event, void *event_arg)
 		 * Notify ipsecah and ipsecesp of this change so
 		 * that they can send a SADB_REGISTER to their consumers.
 		 */
-		ipsecah_algs_changed();
-		ipsecesp_algs_changed();
+		ipsecah_algs_changed(ns);
+		ipsecesp_algs_changed(ns);
 	}
 }
 
@@ -5088,17 +5365,23 @@ ipsec_prov_update_callback(uint32_t event, void *event_arg)
  * providers changes. Used to update the algorithm tables and
  * to free or create context templates if needed. Invoked after IPsec
  * is loaded successfully.
+ *
+ * This is called separately for each IP instance, so we ensure we only
+ * register once.
  */
 void
 ipsec_register_prov_update(void)
 {
+	if (prov_update_handle != NULL)
+		return;
+
 	prov_update_handle = crypto_notify_events(
 	    ipsec_prov_update_callback, CRYPTO_EVENT_MECHS_CHANGED);
 }
 
 /*
  * Unregisters from the framework to be notified of crypto providers
- * changes. Called from ipsec_policy_destroy().
+ * changes. Called from ipsec_policy_g_destroy().
  */
 static void
 ipsec_unregister_prov_update(void)
@@ -5122,7 +5405,8 @@ ipsec_unregister_prov_update(void)
  */
 mblk_t *
 ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
-    ip6_t *inner_ipv6, ipha_t *outer_ipv4, ip6_t *outer_ipv6, int outer_hdr_len)
+    ip6_t *inner_ipv6, ipha_t *outer_ipv4, ip6_t *outer_ipv6, int outer_hdr_len,
+    netstack_t *ns)
 {
 	ipsec_tun_pol_t *itp = atp->tun_itp;
 	ipsec_policy_head_t *polhead;
@@ -5132,6 +5416,7 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 	ipsec_out_t *io;
 	boolean_t is_fragment;
 	ipsec_policy_t *pol;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
 
 	ASSERT(outer_ipv6 != NULL && outer_ipv4 == NULL ||
 	    outer_ipv4 != NULL && outer_ipv6 == NULL);
@@ -5179,7 +5464,7 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 			 * We have a fragment we need to track!
 			 */
 			mp = ipsec_fragcache_add(&itp->itp_fragcache, NULL, mp,
-			    outer_hdr_len);
+			    outer_hdr_len, ipss);
 			if (mp == NULL)
 				return (NULL);
 
@@ -5197,8 +5482,9 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 				ASSERT(IPH_HDR_VERSION(oiph) == IPV6_VERSION);
 				if ((spare_mp = msgpullup(mp, -1)) == NULL) {
 					ip_drop_packet_chain(mp, B_FALSE,
-					    NULL, NULL, &ipdrops_spd_nomem,
-					    &spd_dropper);
+					    NULL, NULL,
+					    DROPPER(ipss, ipds_spd_nomem),
+					    &ipss->ipsec_spd_dropper);
 				}
 				ip6h = (ip6_t *)spare_mp->b_rptr;
 				(void) ip_hdr_length_nexthdr_v6(spare_mp, ip6h,
@@ -5221,8 +5507,9 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 				if ((spare_mp == NULL) &&
 				    ((spare_mp = msgpullup(mp, -1)) == NULL)) {
 					ip_drop_packet_chain(mp, B_FALSE,
-					    NULL, NULL, &ipdrops_spd_nomem,
-					    &spd_dropper);
+					    NULL, NULL,
+					    DROPPER(ipss, ipds_spd_nomem),
+					    &ipss->ipsec_spd_dropper);
 				}
 				inner_ipv6 = (ip6_t *)(spare_mp->b_rptr +
 				    hdr_len);
@@ -5244,7 +5531,7 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 		/* Get ports... */
 		if (spare_mp != NULL) {
 			if (!ipsec_init_outbound_ports(&sel, spare_mp,
-			    inner_ipv4, inner_ipv6, outer_hdr_len)) {
+			    inner_ipv4, inner_ipv6, outer_hdr_len, ipss)) {
 				/*
 				 * callee did ip_drop_packet_chain() on
 				 * spare_mp
@@ -5254,7 +5541,7 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 			}
 		} else {
 			if (!ipsec_init_outbound_ports(&sel, mp,
-			    inner_ipv4, inner_ipv6, outer_hdr_len)) {
+			    inner_ipv4, inner_ipv6, outer_hdr_len, ipss)) {
 				/* callee did ip_drop_packet_chain() on mp. */
 				return (NULL);
 			}
@@ -5279,7 +5566,8 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 		ipsec_freemsg_chain(spare_mp);
 	}
 	rw_enter(&polhead->iph_lock, RW_READER);
-	pol = ipsec_find_policy_head(NULL, polhead, IPSEC_TYPE_OUTBOUND, &sel);
+	pol = ipsec_find_policy_head(NULL, polhead, IPSEC_TYPE_OUTBOUND,
+	    &sel, ns);
 	rw_exit(&polhead->iph_lock);
 	if (pol == NULL) {
 		/*
@@ -5302,7 +5590,8 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 		    "per-port policy\n");
 #endif
 		ip_drop_packet_chain(mp, B_FALSE, NULL, NULL,
-		    &ipdrops_spd_explicit, &spd_dropper);
+		    DROPPER(ipss, ipds_spd_explicit),
+		    &ipss->ipsec_spd_dropper);
 		return (NULL);
 	}
 
@@ -5311,11 +5600,12 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 #endif
 
 	/* Construct an IPSEC_OUT message. */
-	ipsec_mp = ipsec_mp_head = ipsec_alloc_ipsec_out();
+	ipsec_mp = ipsec_mp_head = ipsec_alloc_ipsec_out(ns);
 	if (ipsec_mp == NULL) {
-		IPPOL_REFRELE(pol);
-		ip_drop_packet(mp, B_FALSE, NULL, NULL, &ipdrops_spd_nomem,
-		    &spd_dropper);
+		IPPOL_REFRELE(pol, ns);
+		ip_drop_packet(mp, B_FALSE, NULL, NULL,
+		    DROPPER(ipss, ipds_spd_nomem),
+		    &ipss->ipsec_spd_dropper);
 		return (NULL);
 	}
 	ipsec_mp->b_cont = mp;
@@ -5384,12 +5674,14 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 	ASSERT(ipsec_mp != NULL);
 	while (mp != NULL) {
 		nmp = mp->b_next;
-		ipsec_mp->b_next = ipsec_out_tag(ipsec_mp_head, mp);
+		ipsec_mp->b_next = ipsec_out_tag(ipsec_mp_head, mp, ns);
 		if (ipsec_mp->b_next == NULL) {
 			ip_drop_packet_chain(ipsec_mp_head, B_FALSE, NULL, NULL,
-			    &ipdrops_spd_nomem, &spd_dropper);
+			    DROPPER(ipss, ipds_spd_nomem),
+			    &ipss->ipsec_spd_dropper);
 			ip_drop_packet_chain(mp, B_FALSE, NULL, NULL,
-			    &ipdrops_spd_nomem, &spd_dropper);
+			    DROPPER(ipss, ipds_spd_nomem),
+			    &ipss->ipsec_spd_dropper);
 			return (NULL);
 		}
 		ipsec_mp = ipsec_mp->b_next;
@@ -5405,7 +5697,7 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
  */
 mblk_t *
 ipsec_check_ipsecin_policy_reasm(mblk_t *ipsec_mp, ipsec_policy_t *pol,
-    ipha_t *inner_ipv4, ip6_t *inner_ipv6, uint64_t pkt_unique)
+    ipha_t *inner_ipv4, ip6_t *inner_ipv6, uint64_t pkt_unique, netstack_t *ns)
 {
 	/* Assume ipsec_mp is a chain of b_next-linked IPSEC_IN M_CTLs. */
 	mblk_t *data_chain = NULL, *data_tail = NULL;
@@ -5422,7 +5714,7 @@ ipsec_check_ipsecin_policy_reasm(mblk_t *ipsec_mp, ipsec_policy_t *pol,
 		IPPOL_REFHOLD(pol);
 
 		if (ipsec_check_ipsecin_policy(ipsec_mp, pol, inner_ipv4,
-		    inner_ipv6, pkt_unique) != NULL) {
+		    inner_ipv6, pkt_unique, ns) != NULL) {
 			if (data_tail == NULL) {
 				/* First one */
 				data_chain = data_tail = ipsec_mp->b_cont;
@@ -5437,7 +5729,7 @@ ipsec_check_ipsecin_policy_reasm(mblk_t *ipsec_mp, ipsec_policy_t *pol,
 			 * already.   Need to get rid of any extra pol
 			 * references, and any remaining bits as well.
 			 */
-			IPPOL_REFRELE(pol);
+			IPPOL_REFRELE(pol, ns);
 			ipsec_freemsg_chain(data_chain);
 			ipsec_freemsg_chain(ii_next);	/* ipdrop stats? */
 			return (NULL);
@@ -5448,7 +5740,7 @@ ipsec_check_ipsecin_policy_reasm(mblk_t *ipsec_mp, ipsec_policy_t *pol,
 	 * One last release because either the loop bumped it up, or we never
 	 * called ipsec_check_ipsecin_policy().
 	 */
-	IPPOL_REFRELE(pol);
+	IPPOL_REFRELE(pol, ns);
 
 	/* data_chain is ready for return to tun module. */
 	return (data_chain);
@@ -5473,7 +5765,7 @@ ipsec_check_ipsecin_policy_reasm(mblk_t *ipsec_mp, ipsec_policy_t *pol,
 boolean_t
 ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
     ipha_t *inner_ipv4, ip6_t *inner_ipv6, ipha_t *outer_ipv4,
-    ip6_t *outer_ipv6, int outer_hdr_len)
+    ip6_t *outer_ipv6, int outer_hdr_len, netstack_t *ns)
 {
 	ipsec_policy_head_t *polhead;
 	ipsec_selector_t sel;
@@ -5484,6 +5776,7 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 	boolean_t retval, port_policy_present, is_icmp, global_present;
 	in6_addr_t tmpaddr;
 	ipaddr_t tmp4;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
 	uint8_t flags, *holder, *outer_hdr;
 
 	sel.ips_is_icmp_inv_acq = 0;
@@ -5491,10 +5784,10 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 	if (outer_ipv4 != NULL) {
 		ASSERT(outer_ipv6 == NULL);
 		outer_hdr = (uint8_t *)outer_ipv4;
-		global_present = ipsec_inbound_v4_policy_present;
+		global_present = ipss->ipsec_inbound_v4_policy_present;
 	} else {
 		outer_hdr = (uint8_t *)outer_ipv6;
-		global_present = ipsec_inbound_v6_policy_present;
+		global_present = ipss->ipsec_inbound_v6_policy_present;
 	}
 	ASSERT(outer_hdr != NULL);
 
@@ -5530,7 +5823,8 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 		switch (rc) {
 		case SELRET_NOMEM:
 			ip_drop_packet(message, B_TRUE, NULL, NULL,
-			    &ipdrops_spd_nomem, &spd_dropper);
+			    DROPPER(ipss, ipds_spd_nomem),
+			    &ipss->ipsec_spd_dropper);
 			return (B_FALSE);
 		case SELRET_TUNFRAG:
 			/*
@@ -5539,14 +5833,15 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 			 */
 			if (ipsec_mp == NULL) {
 				ip_drop_packet(*data_mp, B_TRUE, NULL, NULL,
-				    &ipdrops_spd_got_clear, &spd_dropper);
+				    DROPPER(ipss, ipds_spd_got_clear),
+				    &ipss->ipsec_spd_dropper);
 				*data_mp = NULL;
 				return (B_FALSE);
 			}
 			ASSERT(((ipsec_in_t *)ipsec_mp->b_rptr)->
 			    ipsec_in_secure);
 			message = ipsec_fragcache_add(&itp->itp_fragcache,
-			    ipsec_mp, *data_mp, outer_hdr_len);
+			    ipsec_mp, *data_mp, outer_hdr_len, ipss);
 
 			if (message == NULL) {
 				/*
@@ -5580,13 +5875,16 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 				 */
 				break;
 			case SELRET_NOMEM:
-				ip_drop_packet_chain(message, B_TRUE, NULL,
-				    NULL, &ipdrops_spd_nomem, &spd_dropper);
+				ip_drop_packet_chain(message, B_TRUE,
+				    NULL, NULL,
+				    DROPPER(ipss, ipds_spd_nomem),
+				    &ipss->ipsec_spd_dropper);
 				return (B_FALSE);
 			case SELRET_BADPKT:
-				ip_drop_packet_chain(message, B_TRUE, NULL,
-				    NULL, &ipdrops_spd_malformed_frag,
-				    &spd_dropper);
+				ip_drop_packet_chain(message, B_TRUE,
+				    NULL, NULL,
+				    DROPPER(ipss, ipds_spd_malformed_frag),
+				    &ipss->ipsec_spd_dropper);
 				return (B_FALSE);
 			case SELRET_TUNFRAG:
 				cmn_err(CE_WARN, "(TUNFRAG on 2nd call...)");
@@ -5637,7 +5935,7 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 		/* find_policy_head() */
 		rw_enter(&polhead->iph_lock, RW_READER);
 		pol = ipsec_find_policy_head(NULL, polhead, IPSEC_TYPE_INBOUND,
-		    &sel);
+		    &sel, ns);
 		rw_exit(&polhead->iph_lock);
 		if (pol != NULL) {
 			if (ipsec_mp == NULL ||
@@ -5651,13 +5949,14 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 					 */
 					ASSERT(message->b_next == NULL);
 					ip_drop_packet(message, B_TRUE, NULL,
-					    NULL, &ipdrops_spd_got_clear,
-					    &spd_dropper);
+					    NULL,
+					    DROPPER(ipss, ipds_spd_got_clear),
+					    &ipss->ipsec_spd_dropper);
 				} else if (ipsec_mp != NULL) {
 					freeb(ipsec_mp);
 				}
 
-				IPPOL_REFRELE(pol);
+				IPPOL_REFRELE(pol, ns);
 				return (retval);
 			}
 			/*
@@ -5670,7 +5969,7 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 			    pol, inner_ipv4, inner_ipv6, SA_UNIQUE_ID(
 				sel.ips_remote_port, sel.ips_local_port,
 				(inner_ipv4 == NULL) ? IPPROTO_IPV6 :
-				IPPROTO_ENCAP, sel.ips_protocol));
+				IPPROTO_ENCAP, sel.ips_protocol), ns);
 			return (*data_mp != NULL);
 		}
 
@@ -5682,7 +5981,9 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 		 */
 		if ((itp->itp_flags & ITPF_P_TUNNEL) && !is_icmp) {
 			ip_drop_packet_chain(message, B_TRUE, NULL,
-			    NULL, &ipdrops_spd_explicit, &spd_dropper);
+			    NULL,
+			    DROPPER(ipss, ipds_spd_explicit),
+			    &ipss->ipsec_spd_dropper);
 			return (B_FALSE);
 		}
 	}
@@ -5708,7 +6009,8 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 		}
 
 		ip_drop_packet(ipsec_mp, B_TRUE, NULL, NULL,
-		    &ipdrops_spd_got_secure, &spd_dropper);
+		    DROPPER(ipss, ipds_spd_got_secure),
+		    &ipss->ipsec_spd_dropper);
 		return (B_FALSE);
 	}
 
@@ -5747,7 +6049,7 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 
 	/* NOTE:  Frees message if it returns NULL. */
 	if (ipsec_check_global_policy(message, NULL, outer_ipv4, outer_ipv6,
-		(ipsec_mp != NULL)) == NULL) {
+		(ipsec_mp != NULL), ns) == NULL) {
 		return (B_FALSE);
 	}
 
@@ -5797,23 +6099,25 @@ tunnel_compare(const void *arg1, const void *arg2)
  * Free a tunnel policy node.
  */
 void
-itp_free(ipsec_tun_pol_t *node)
+itp_free(ipsec_tun_pol_t *node, netstack_t *ns)
 {
-	IPPH_REFRELE(node->itp_policy);
-	IPPH_REFRELE(node->itp_inactive);
+	IPPH_REFRELE(node->itp_policy, ns);
+	IPPH_REFRELE(node->itp_inactive, ns);
 	mutex_destroy(&node->itp_lock);
 	kmem_free(node, sizeof (*node));
 }
 
 void
-itp_unlink(ipsec_tun_pol_t *node)
+itp_unlink(ipsec_tun_pol_t *node, netstack_t *ns)
 {
-	rw_enter(&tunnel_policy_lock, RW_WRITER);
-	tunnel_policy_gen++;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
+
+	rw_enter(&ipss->ipsec_tunnel_policy_lock, RW_WRITER);
+	ipss->ipsec_tunnel_policy_gen++;
 	ipsec_fragcache_uninit(&node->itp_fragcache);
-	avl_remove(&tunnel_policies, node);
-	rw_exit(&tunnel_policy_lock);
-	ITP_REFRELE(node);
+	avl_remove(&ipss->ipsec_tunnel_policies, node);
+	rw_exit(&ipss->ipsec_tunnel_policy_lock);
+	ITP_REFRELE(node, ns);
 }
 
 /*
@@ -5821,18 +6125,20 @@ itp_unlink(ipsec_tun_pol_t *node)
  * spdsock mostly.  Returns "node" with a bumped refcnt.
  */
 ipsec_tun_pol_t *
-get_tunnel_policy(char *name)
+get_tunnel_policy(char *name, netstack_t *ns)
 {
 	ipsec_tun_pol_t *node, lookup;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
 
 	(void) strncpy(lookup.itp_name, name, LIFNAMSIZ);
 
-	rw_enter(&tunnel_policy_lock, RW_READER);
-	node = (ipsec_tun_pol_t *)avl_find(&tunnel_policies, &lookup, NULL);
+	rw_enter(&ipss->ipsec_tunnel_policy_lock, RW_READER);
+	node = (ipsec_tun_pol_t *)avl_find(&ipss->ipsec_tunnel_policies,
+	    &lookup, NULL);
 	if (node != NULL) {
 		ITP_REFHOLD(node);
 	}
-	rw_exit(&tunnel_policy_lock);
+	rw_exit(&ipss->ipsec_tunnel_policy_lock);
 
 	return (node);
 }
@@ -5842,32 +6148,37 @@ get_tunnel_policy(char *name)
  * DUMP operations.  iterator() will not consume a reference.
  */
 void
-itp_walk(void (*iterator)(ipsec_tun_pol_t *, void *), void *arg)
+itp_walk(void (*iterator)(ipsec_tun_pol_t *, void *, netstack_t *),
+    void *arg, netstack_t *ns)
 {
 	ipsec_tun_pol_t *node;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
 
-	rw_enter(&tunnel_policy_lock, RW_READER);
-	for (node = avl_first(&tunnel_policies); node != NULL;
-	    node = AVL_NEXT(&tunnel_policies, node)) {
-		iterator(node, arg);
+	rw_enter(&ipss->ipsec_tunnel_policy_lock, RW_READER);
+	for (node = avl_first(&ipss->ipsec_tunnel_policies); node != NULL;
+	    node = AVL_NEXT(&ipss->ipsec_tunnel_policies, node)) {
+		iterator(node, arg, ns);
 	}
-	rw_exit(&tunnel_policy_lock);
+	rw_exit(&ipss->ipsec_tunnel_policy_lock);
 }
 
 /*
  * Initialize policy head.  This can only fail if there's a memory problem.
  */
 static boolean_t
-tunnel_polhead_init(ipsec_policy_head_t *iph)
+tunnel_polhead_init(ipsec_policy_head_t *iph, netstack_t *ns)
 {
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
+
 	rw_init(&iph->iph_lock, NULL, RW_DEFAULT, NULL);
 	iph->iph_refs = 1;
 	iph->iph_gen = 0;
-	if (ipsec_alloc_table(iph, tun_spd_hashsize, KM_SLEEP, B_FALSE) != 0) {
+	if (ipsec_alloc_table(iph, ipss->ipsec_tun_spd_hashsize,
+	    KM_SLEEP, B_FALSE, ns) != 0) {
 		ipsec_polhead_free_table(iph);
 		return (B_FALSE);
 	}
-	ipsec_polhead_init(iph, tun_spd_hashsize);
+	ipsec_polhead_init(iph, ipss->ipsec_tun_spd_hashsize);
 	return (B_TRUE);
 }
 
@@ -5877,10 +6188,11 @@ tunnel_polhead_init(ipsec_policy_head_t *iph)
  * node.
  */
 ipsec_tun_pol_t *
-create_tunnel_policy(char *name, int *errno, uint64_t *gen)
+create_tunnel_policy(char *name, int *errno, uint64_t *gen, netstack_t *ns)
 {
 	ipsec_tun_pol_t *newbie, *existing;
 	avl_index_t where;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
 
 	newbie = kmem_zalloc(sizeof (*newbie), KM_NOSLEEP);
 	if (newbie == NULL) {
@@ -5895,20 +6207,20 @@ create_tunnel_policy(char *name, int *errno, uint64_t *gen)
 
 	(void) strncpy(newbie->itp_name, name, LIFNAMSIZ);
 
-	rw_enter(&tunnel_policy_lock, RW_WRITER);
-	existing = (ipsec_tun_pol_t *)avl_find(&tunnel_policies, newbie,
-	    &where);
+	rw_enter(&ipss->ipsec_tunnel_policy_lock, RW_WRITER);
+	existing = (ipsec_tun_pol_t *)avl_find(&ipss->ipsec_tunnel_policies,
+	    newbie, &where);
 	if (existing != NULL) {
-		itp_free(newbie);
+		itp_free(newbie, ns);
 		*errno = EEXIST;
-		rw_exit(&tunnel_policy_lock);
+		rw_exit(&ipss->ipsec_tunnel_policy_lock);
 		return (NULL);
 	}
-	tunnel_policy_gen++;
-	*gen = tunnel_policy_gen;
+	ipss->ipsec_tunnel_policy_gen++;
+	*gen = ipss->ipsec_tunnel_policy_gen;
 	newbie->itp_refcnt = 2;	/* One for the caller, one for the tree. */
 	newbie->itp_next_policy_index = 1;
-	avl_insert(&tunnel_policies, newbie, where);
+	avl_insert(&ipss->ipsec_tunnel_policies, newbie, where);
 	mutex_init(&newbie->itp_lock, NULL, MUTEX_DEFAULT, NULL);
 	newbie->itp_policy = kmem_zalloc(sizeof (ipsec_policy_head_t),
 	    KM_NOSLEEP);
@@ -5921,16 +6233,16 @@ create_tunnel_policy(char *name, int *errno, uint64_t *gen)
 		goto nomem;
 	}
 
-	if (!tunnel_polhead_init(newbie->itp_policy)) {
+	if (!tunnel_polhead_init(newbie->itp_policy, ns)) {
 		kmem_free(newbie->itp_policy, sizeof (ipsec_policy_head_t));
 		kmem_free(newbie->itp_inactive, sizeof (ipsec_policy_head_t));
 		goto nomem;
-	} else if (!tunnel_polhead_init(newbie->itp_inactive)) {
-		IPPH_REFRELE(newbie->itp_policy);
+	} else if (!tunnel_polhead_init(newbie->itp_inactive, ns)) {
+		IPPH_REFRELE(newbie->itp_policy, ns);
 		kmem_free(newbie->itp_inactive, sizeof (ipsec_policy_head_t));
 		goto nomem;
 	}
-	rw_exit(&tunnel_policy_lock);
+	rw_exit(&ipss->ipsec_tunnel_policy_lock);
 
 	return (newbie);
 nomem:
@@ -5946,7 +6258,7 @@ nomem:
  */
 /* ARGSUSED */
 ipsec_tun_pol_t *
-itp_get_byaddr_dummy(uint32_t *laddr, uint32_t *faddr, int af)
+itp_get_byaddr_dummy(uint32_t *laddr, uint32_t *faddr, int af, netstack_t *ns)
 {
 	return (NULL);  /* Always return NULL. */
 }
@@ -6072,7 +6384,7 @@ ipsec_fragcache_uninit(ipsec_fragcache_t *frag)
 
 mblk_t *
 ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
-    int outer_hdr_len)
+    int outer_hdr_len, ipsec_stack_t *ipss)
 {
 	boolean_t is_v4;
 	time_t itpf_time;
@@ -6104,7 +6416,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 		if ((spare_mp = msgpullup(mp, -1)) == NULL) {
 			mutex_exit(&frag->itpf_lock);
 			ip_drop_packet(first_mp, inbound, NULL, NULL,
-			    &ipdrops_spd_nomem, &spd_dropper);
+			    DROPPER(ipss, ipds_spd_nomem),
+			    &ipss->ipsec_spd_dropper);
 			return (NULL);
 		}
 		ip6h = (ip6_t *)(spare_mp->b_rptr + outer_hdr_len);
@@ -6117,7 +6430,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 			 */
 			mutex_exit(&frag->itpf_lock);
 			ip_drop_packet(first_mp, inbound, NULL, NULL,
-			    &ipdrops_spd_malformed_packet, &spd_dropper);
+			    DROPPER(ipss, ipds_spd_malformed_packet),
+			    &ipss->ipsec_spd_dropper);
 			freemsg(spare_mp);
 			return (NULL);
 		} else {
@@ -6134,7 +6448,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 			 */
 			mutex_exit(&frag->itpf_lock);
 			ip_drop_packet(first_mp, inbound, NULL, NULL,
-			    &ipdrops_spd_malformed_frag, &spd_dropper);
+			    DROPPER(ipss, ipds_spd_malformed_frag),
+			    &ipss->ipsec_spd_dropper);
 			freemsg(spare_mp);
 			return (NULL);
 		}
@@ -6212,7 +6527,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 			(void) fragcache_delentry(i, fep, frag);
 		mutex_exit(&frag->itpf_lock);
 		ip_drop_packet(first_mp, inbound, NULL, NULL,
-		    &ipdrops_spd_malformed_frag, &spd_dropper);
+		    DROPPER(ipss, ipds_spd_malformed_frag),
+		    &ipss->ipsec_spd_dropper);
 		freemsg(spare_mp);
 		return (NULL);
 	}
@@ -6225,7 +6541,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 			if (frag->itpf_freelist == NULL) {
 				mutex_exit(&frag->itpf_lock);
 				ip_drop_packet(first_mp, inbound, NULL, NULL,
-				    &ipdrops_spd_nomem, &spd_dropper);
+				    DROPPER(ipss, ipds_spd_nomem),
+				    &ipss->ipsec_spd_dropper);
 				freemsg(spare_mp);
 				return (NULL);
 			}
@@ -6303,7 +6620,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 			if ((nspare_mp = msgpullup(ndata_mp, -1)) == NULL) {
 				mutex_exit(&frag->itpf_lock);
 				ip_drop_packet_chain(nmp, inbound, NULL, NULL,
-				    &ipdrops_spd_nomem, &spd_dropper);
+				    DROPPER(ipss, ipds_spd_nomem),
+				    &ipss->ipsec_spd_dropper);
 				return (NULL);
 			}
 			nip6h = (ip6_t *)nspare_mp->b_rptr;
@@ -6330,7 +6648,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 			    ((nspare_mp = msgpullup(ndata_mp, -1)) == NULL)) {
 				mutex_exit(&frag->itpf_lock);
 				ip_drop_packet_chain(nmp, inbound, NULL, NULL,
-				    &ipdrops_spd_nomem, &spd_dropper);
+				    DROPPER(ipss, ipds_spd_nomem),
+				    &ipss->ipsec_spd_dropper);
 				return (NULL);
 			}
 			nip6h = (ip6_t *)(nspare_mp->b_rptr + hdr_len);
@@ -6338,7 +6657,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 			    &nip6_hdr_length, &nv6_proto_p)) {
 				mutex_exit(&frag->itpf_lock);
 			    ip_drop_packet_chain(nmp, inbound, NULL, NULL,
-				&ipdrops_spd_malformed_frag, &spd_dropper);
+				DROPPER(ipss, ipds_spd_malformed_frag),
+				&ipss->ipsec_spd_dropper);
 			    ipsec_freemsg_chain(nspare_mp);
 			    return (NULL);
 			}
@@ -6378,8 +6698,9 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 				/* Overlapping data does not match */
 				(void) fragcache_delentry(i, fep, frag);
 				mutex_exit(&frag->itpf_lock);
-				ip_drop_packet(first_mp, inbound, NULL, NULL,
-				    &ipdrops_spd_overlap_frag, &spd_dropper);
+			    ip_drop_packet(first_mp, inbound, NULL, NULL,
+				DROPPER(ipss, ipds_spd_overlap_frag),
+				&ipss->ipsec_spd_dropper);
 				return (NULL);
 			}
 			/* Part of defense for jolt2.c fragmentation attack */
@@ -6395,7 +6716,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 				 */
 				mutex_exit(&frag->itpf_lock);
 				ip_drop_packet(first_mp, inbound, NULL, NULL,
-				    &ipdrops_spd_evil_frag, &spd_dropper);
+				    DROPPER(ipss, ipds_spd_evil_frag),
+				    &ipss->ipsec_spd_dropper);
 				return (NULL);
 			}
 
@@ -6435,9 +6757,10 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 					/* Overlap mismatch */
 					(void) fragcache_delentry(i, fep, frag);
 					mutex_exit(&frag->itpf_lock);
-					ip_drop_packet(first_mp, inbound, NULL,
-					    NULL, &ipdrops_spd_overlap_frag,
-					    &spd_dropper);
+				    ip_drop_packet(first_mp, inbound, NULL,
+					NULL,
+					DROPPER(ipss, ipds_spd_overlap_frag),
+					&ipss->ipsec_spd_dropper);
 					return (NULL);
 				}
 			}
@@ -6466,7 +6789,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 		(void) fragcache_delentry(i, fep, frag);
 		mutex_exit(&frag->itpf_lock);
 		ip_drop_packet(first_mp, inbound, NULL, NULL,
-		    &ipdrops_spd_max_frags, &spd_dropper);
+		    DROPPER(ipss, ipds_spd_max_frags),
+		    &ipss->ipsec_spd_dropper);
 		return (NULL);
 	}
 
@@ -6504,7 +6828,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 			if ((spare_mp = msgpullup(data_mp, -1)) == NULL) {
 				mutex_exit(&frag->itpf_lock);
 				ip_drop_packet_chain(mp, inbound, NULL, NULL,
-				    &ipdrops_spd_nomem, &spd_dropper);
+				    DROPPER(ipss, ipds_spd_nomem),
+				    &ipss->ipsec_spd_dropper);
 				return (NULL);
 			}
 			ip6h = (ip6_t *)spare_mp->b_rptr;
@@ -6527,7 +6852,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 				((spare_mp = msgpullup(data_mp, -1)) == NULL)) {
 				mutex_exit(&frag->itpf_lock);
 				ip_drop_packet_chain(mp, inbound, NULL, NULL,
-				    &ipdrops_spd_nomem, &spd_dropper);
+				    DROPPER(ipss, ipds_spd_nomem),
+				    &ipss->ipsec_spd_dropper);
 				return (NULL);
 			}
 			ip6h = (ip6_t *)(spare_mp->b_rptr + hdr_len);
@@ -6535,7 +6861,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 			    &ip6_hdr_length, &v6_proto_p)) {
 				mutex_exit(&frag->itpf_lock);
 				ip_drop_packet_chain(mp, inbound, NULL, NULL,
-				    &ipdrops_spd_malformed_frag, &spd_dropper);
+				    DROPPER(ipss, ipds_spd_malformed_frag),
+				    &ipss->ipsec_spd_dropper);
 				ipsec_freemsg_chain(spare_mp);
 				return (NULL);
 			}
@@ -6589,7 +6916,8 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
 				/* It is an invalid "ping-o-death" packet */
 				/* Discard it */
 				ip_drop_packet_chain(mp, inbound, NULL, NULL,
-				    &ipdrops_spd_evil_frag, &spd_dropper);
+				    DROPPER(ipss, ipds_spd_evil_frag),
+				    &ipss->ipsec_spd_dropper);
 				ipsec_freemsg_chain(spare_mp);
 				return (NULL);
 			}

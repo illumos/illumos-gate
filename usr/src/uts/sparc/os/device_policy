@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -51,10 +51,10 @@ icmp		read_priv_set=net_icmpaccess	write_priv_set=net_icmpaccess
 icmp6		read_priv_set=net_icmpaccess	write_priv_set=net_icmpaccess
 ip		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 ip6		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-keysock		read_priv_set=sys_net_config	write_priv_set=sys_net_config
-ipsecah		read_priv_set=sys_net_config	write_priv_set=sys_net_config
-ipsecesp	read_priv_set=sys_net_config	write_priv_set=sys_net_config
-spdsock		read_priv_set=sys_net_config	write_priv_set=sys_net_config
+keysock		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
+ipsecah		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
+ipsecesp	read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
+spdsock		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
 #
 # Raw network interface access permissions
 #
@@ -89,5 +89,5 @@ aggr:ctl	read_priv_set=sys_net_config	write_priv_set=sys_net_config
 #
 # IP Filter
 #
-ipf             read_priv_set=sys_net_config    write_priv_set=sys_net_config
+ipf             read_priv_set=sys_ip_config     write_priv_set=sys_ip_config
 

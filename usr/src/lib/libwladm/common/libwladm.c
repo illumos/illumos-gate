@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1054,7 +1054,7 @@ do_set_prop(int fd, wldp_t *gbuf, prop_desc_t *pdp,
 
 wladm_status_t
 wladm_set_prop(const char *link, const char *prop_name,
-    char **prop_val, uint_t val_cnt)
+    char **prop_val, uint_t val_cnt, char **errprop)
 {
 	int		fd, i;
 	wldp_t		*gbuf = NULL;
@@ -1089,8 +1089,12 @@ wladm_set_prop(const char *link, const char *prop_name,
 			break;
 		} else {
 			if (s != WLADM_STATUS_OK &&
-			    s != WLADM_STATUS_NOTSUP)
+			    s != WLADM_STATUS_NOTSUP) {
+				if (errprop != NULL)
+					*errprop = pdp->pd_name;
 				status = s;
+				break;
+			}
 		}
 	}
 	if (!found)

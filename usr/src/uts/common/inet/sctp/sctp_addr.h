@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,15 +101,22 @@ typedef struct sctp_saddrs_ipif_s {
  * sctp_ill_ipifcnt gives the number of IPIFs for this ILL,
  * sctp_ill_index is phyint_ifindex in the actual ILL structure (in IP)
  * and sctp_ill_flags is ill_flags from the ILL structure.
+ *
+ * The comment below (and for other netstack_t references) refers
+ * to the fact that we only do netstack_hold in particular cases,
+ * such as the references from open streams (ill_t and conn_t's
+ * pointers). Internally within IP we rely on IP's ability to cleanup e.g.
+ * ire_t's when an ill goes away.
  */
 typedef struct sctp_ill_s {
-	list_node_t		sctp_ills;
-	int			sctp_ill_name_length;
-	char			*sctp_ill_name;
-	int			sctp_ill_state;
-	uint32_t		sctp_ill_ipifcnt;
-	uint_t			sctp_ill_index;
-	uint64_t		sctp_ill_flags;
+	list_node_t	sctp_ills;
+	int		sctp_ill_name_length;
+	char		*sctp_ill_name;
+	int		sctp_ill_state;
+	uint32_t	sctp_ill_ipifcnt;
+	uint_t		sctp_ill_index;
+	uint64_t	sctp_ill_flags;
+	netstack_t	*sctp_ill_netstack; /* Does not have a netstack_hold */
 } sctp_ill_t;
 
 /* ill_state */
@@ -122,17 +128,6 @@ typedef struct sctp_ill_hash_s {
 	list_t	sctp_ill_list;
 	int	ill_count;
 } sctp_ill_hash_t;
-
-/* Global list of SCTP ILLs */
-extern sctp_ill_hash_t	sctp_g_ills[SCTP_ILL_HASH];
-krwlock_t		sctp_g_ills_lock;
-extern uint32_t		sctp_ills_count;
-extern uint32_t		sctp_ills_min_mtu;
-
-/* Global list of SCTP ipifs */
-extern	sctp_ipif_hash_t	sctp_g_ipifs[SCTP_IPIF_HASH];
-extern	uint32_t		sctp_g_ipifs_count;
-krwlock_t			sctp_g_ipifs_lock;
 
 
 #define	SCTP_IPIF_REFHOLD(sctp_ipif) {				\
@@ -167,8 +162,8 @@ extern void		sctp_del_saddr_list(sctp_t *, const void *, int,
 			    boolean_t);
 extern void		sctp_del_saddr(sctp_t *, sctp_saddr_ipif_t *);
 extern void		sctp_free_saddrs(sctp_t *);
-extern void		sctp_saddr_init();
-extern void		sctp_saddr_fini();
+extern void		sctp_saddr_init(sctp_stack_t *);
+extern void		sctp_saddr_fini(sctp_stack_t *);
 extern sctp_saddr_ipif_t	*sctp_ipif_lookup(sctp_t *, uint_t);
 extern int		sctp_getmyaddrs(void *, void *, int *);
 extern int		sctp_saddr_add_addr(sctp_t *, in6_addr_t *, uint_t);

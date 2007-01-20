@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -2219,14 +2219,18 @@ SUNWprivate_1.1 {
 	_xgetwidth;
 	__xpg6 = NODIRECT;
 	_yield;
+	zone_add_datalink;
 	zone_boot;
+	zone_check_datalink;
 	zone_create;
 	zone_destroy;
 	zone_enter;
 	zone_getattr;
 	zone_get_id;
 	zone_list;
+	zone_list_datalink;
 	zonept;
+	zone_remove_datalink;
 	zone_setattr;
 	zone_shutdown;
 	zone_version;

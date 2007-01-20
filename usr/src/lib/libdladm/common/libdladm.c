@@ -19,12 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <ctype.h>
 #include <unistd.h>
 #include <stropts.h>
 #include <errno.h>
@@ -38,6 +39,7 @@
 #include <libdevinfo.h>
 #include <libdladm_impl.h>
 #include <libintl.h>
+#include <sys/vlan.h>
 
 typedef struct dladm_dev {
 	char			dd_name[IFNAMSIZ];
@@ -162,6 +164,74 @@ i_dladm_nt_net_walk(di_node_t node, di_minor_t minor, void *arg)
 }
 
 /*
+ * Hold a data-link.
+ */
+static int
+i_dladm_hold_link(const char *name, zoneid_t zoneid, boolean_t docheck)
+{
+	int		fd;
+	dld_hold_vlan_t	dhv;
+
+	if (strlen(name) >= IFNAMSIZ) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+		return (-1);
+
+	bzero(&dhv, sizeof (dld_hold_vlan_t));
+	(void) strlcpy(dhv.dhv_name, name, IFNAMSIZ);
+	dhv.dhv_zid = zoneid;
+	dhv.dhv_docheck = docheck;
+
+	if (i_dladm_ioctl(fd, DLDIOCHOLDVLAN, &dhv, sizeof (dhv)) < 0) {
+		int olderrno = errno;
+
+		(void) close(fd);
+		errno = olderrno;
+		return (-1);
+	}
+
+	(void) close(fd);
+	return (0);
+}
+
+/*
+ * Release a data-link.
+ */
+static int
+i_dladm_rele_link(const char *name, zoneid_t zoneid, boolean_t docheck)
+{
+	int		fd;
+	dld_hold_vlan_t	dhv;
+
+	if (strlen(name) >= IFNAMSIZ) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+		return (-1);
+
+	bzero(&dhv, sizeof (dld_hold_vlan_t));
+	(void) strlcpy(dhv.dhv_name, name, IFNAMSIZ);
+	dhv.dhv_zid = zoneid;
+	dhv.dhv_docheck = docheck;
+
+	if (i_dladm_ioctl(fd, DLDIOCRELEVLAN, &dhv, sizeof (dhv)) < 0) {
+		int olderrno = errno;
+
+		(void) close(fd);
+		errno = olderrno;
+		return (-1);
+	}
+
+	(void) close(fd);
+	return (0);
+}
+
+/*
  * Invoke the specified callback function for each active DDI_NT_NET
  * node.
  */
@@ -186,7 +256,6 @@ dladm_walk(void (*fn)(void *, const char *), void *arg)
 	ddp = dw.dw_dev_list;
 	while (ddp) {
 		fn(arg, ddp->dd_name);
-		(void) dladm_walk_vlan(fn, arg, ddp->dd_name);
 		last_ddp = ddp;
 		ddp = ddp->dd_next;
 		free(last_ddp);
@@ -303,6 +372,9 @@ dladm_status2str(dladm_status_t status, char *buf)
 		break;
 	case DLADM_STATUS_IOERR:
 		s = "I/O error";
+		break;
+	case DLADM_STATUS_TEMPONLY:
+		s = "change cannot be persistent, specify -t please";
 		break;
 	default:
 		s = "<unknown error>";
@@ -505,4 +577,22 @@ dladm_set_rootdir(const char *rootdir)
 	(void) strncpy(dladm_rootdir, rootdir, MAXPATHLEN);
 	(void) closedir(dp);
 	return (DLADM_STATUS_OK);
+}
+
+/*
+ * Do a "hold" operation to a link.
+ */
+int
+dladm_hold_link(const char *name, zoneid_t zoneid, boolean_t docheck)
+{
+	return (i_dladm_hold_link(name, zoneid, docheck));
+}
+
+/*
+ * Do a "release" operation to a link.
+ */
+int
+dladm_rele_link(const char *name, zoneid_t zoneid, boolean_t docheck)
+{
+	return (i_dladm_rele_link(name, zoneid, docheck));
 }

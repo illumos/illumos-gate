@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +63,8 @@ sctp_def_q_set(queue_t *q, mblk_t *mp)
 	struct iocblk	*iocp = (struct iocblk *)mp->b_rptr;
 	mblk_t		*mp1;
 	hrtime_t	t;
-	extern int	sctp_g_q_fd;
+	sctp_stack_t	*sctps = connp->conn_netstack->
+	    netstack_sctp;
 
 	ASSERT(connp != NULL && connp->conn_ulp == IPPROTO_SCTP &&
 	    connp->conn_rq == NULL);
@@ -75,22 +75,28 @@ sctp_def_q_set(queue_t *q, mblk_t *mp)
 		goto done;
 	}
 
-	if (sctp_g_q != NULL) {
+	mutex_enter(&sctps->sctps_g_q_lock);
+	if (sctps->sctps_g_q != NULL) {
+		mutex_exit(&sctps->sctps_g_q_lock);
 		ip0dbg(("sctp_def_q_set: already set\n"));
 		iocp->ioc_error = EALREADY;
 		goto done;
 	}
 
-	sctp_g_q = q;
-	sctp_g_q_fd = *(int *)(mp1->b_rptr);
-	gsctp = (sctp_t *)sctp_create(NULL, NULL, AF_INET6,
+	sctps->sctps_g_q = q;
+	mutex_exit(&sctps->sctps_g_q_lock);
+	sctps->sctps_gsctp = (sctp_t *)sctp_create(NULL, NULL, AF_INET6,
 	    SCTP_CAN_BLOCK, NULL, NULL, connp->conn_cred);
-	if (gsctp == NULL) {
-		sctp_g_q = NULL;
+	mutex_enter(&sctps->sctps_g_q_lock);
+	if (sctps->sctps_gsctp == NULL) {
+		sctps->sctps_g_q = NULL;
+		mutex_exit(&sctps->sctps_g_q_lock);
 		iocp->ioc_error = ENOMEM;
 		goto done;
 	}
-	ASSERT(list_head(&sctp_g_list) == gsctp);
+	mutex_exit(&sctps->sctps_g_q_lock);
+	ASSERT(sctps->sctps_g_q_ref >= 1);
+	ASSERT(list_head(&sctps->sctps_g_list) == sctps->sctps_gsctp);
 
 	/*
 	 * As a good citizen of using /dev/urandom, add some entropy
@@ -130,7 +136,7 @@ sctp_wput_ioctl(queue_t *q, mblk_t *mp)
 	switch (iocp->ioc_cmd) {
 	case SCTP_IOC_DEFAULT_Q:
 		/* Wants to be the default wq. */
-		if (cr != NULL && secpolicy_net_config(cr, B_FALSE) != 0) {
+		if (cr != NULL && secpolicy_ip_config(cr, B_FALSE) != 0) {
 			iocp->ioc_error = EPERM;
 			goto err_ret;
 		}

@@ -20,7 +20,7 @@
 
  CDDL HEADER END
 
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,7 +44,7 @@
 
 <!ELEMENT network	EMPTY>
 
-<!ATTLIST network	address		CDATA #REQUIRED
+<!ATTLIST network	address		CDATA ""
 			physical	CDATA #REQUIRED>
 
 <!ELEMENT device	EMPTY>
@@ -136,6 +136,7 @@
 <!ATTLIST zone		name		CDATA #REQUIRED
 			zonepath	CDATA #REQUIRED
 			autoboot	(true | false) #REQUIRED
+			ip-type		CDATA ""
 			pool		CDATA ""
 			limitpriv	CDATA ""
 			bootargs	CDATA ""

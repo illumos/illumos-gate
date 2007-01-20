@@ -1188,6 +1188,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 	int trypartial = 0;
 	int tpfinished = 1;
 	int32_t new_rwnd;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	/* The following are used multiple times, so we inline them */
 #define	SCTP_ACK_IT(sctp, tsn)						\
@@ -1236,7 +1237,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 
 	/* We cannot deliver anything up now but we still need to handle it. */
 	if (SCTP_IS_DETACHED(sctp)) {
-		BUMP_MIB(&sctp_mib, sctpInClosed);
+		BUMP_MIB(&sctps->sctps_mib, sctpInClosed);
 		can_deliver = B_FALSE;
 	}
 
@@ -1622,13 +1623,14 @@ sctp_make_sack(sctp_t *sctp, sctp_faddr_t *sendto, mblk_t *dups)
 	sctp_chunk_hdr_t *sch;
 	sctp_sack_chunk_t *sc;
 	int32_t acks_max;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (sctp->sctp_force_sack) {
 		sctp->sctp_force_sack = 0;
 		goto checks_done;
 	}
 
-	acks_max = sctp_deferred_acks_max;
+	acks_max = sctps->sctps_deferred_acks_max;
 	if (sctp->sctp_state == SCTPS_ESTABLISHED) {
 		if (sctp->sctp_sack_toggle < acks_max) {
 			/* no need to SACK right now */
@@ -1653,7 +1655,7 @@ checks_done:
 	    (sizeof (sctp_sack_frag_t) * sctp->sctp_sack_gaps);
 	smp = sctp_make_mp(sctp, sendto, slen);
 	if (smp == NULL) {
-		SCTP_KSTAT(sctp_send_sack_failed);
+		SCTP_KSTAT(sctps, sctp_send_sack_failed);
 		return (NULL);
 	}
 	sch = (sctp_chunk_hdr_t *)smp->b_wptr;
@@ -1675,6 +1677,7 @@ void
 sctp_sack(sctp_t *sctp, mblk_t *dups)
 {
 	mblk_t *smp;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	/* If we are shutting down, let send_shutdown() bundle the SACK */
 	if (sctp->sctp_state == SCTPS_SHUTDOWN_SENT) {
@@ -1698,7 +1701,7 @@ sctp_sack(sctp_t *sctp, mblk_t *dups)
 
 	sctp->sctp_active = lbolt64;
 
-	BUMP_MIB(&sctp_mib, sctpOutAck);
+	BUMP_MIB(&sctps->sctps_mib, sctpOutAck);
 	sctp_add_sendq(sctp, smp);
 }
 
@@ -1721,6 +1724,7 @@ sctp_check_abandoned_msg(sctp_t *sctp, mblk_t *meta)
 	mblk_t		*mp1 = meta->b_cont;
 	uint32_t	adv_pap = sctp->sctp_adv_pap;
 	sctp_faddr_t	*fp = sctp->sctp_current;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	dh = (sctp_data_hdr_t *)mp1->b_rptr;
 	if (SEQ_GEQ(sctp->sctp_lastack_rxd, ntohl(dh->sdh_tsn))) {
@@ -1748,7 +1752,7 @@ sctp_check_abandoned_msg(sctp_t *sctp, mblk_t *meta)
 		if (head == NULL) {
 			sctp->sctp_adv_pap = adv_pap;
 			freemsg(nmp);
-			SCTP_KSTAT(sctp_send_ftsn_failed);
+			SCTP_KSTAT(sctps, sctp_send_ftsn_failed);
 			return (ENOMEM);
 		}
 		SCTP_MSG_SET_ABANDONED(meta);
@@ -1790,6 +1794,7 @@ sctp_cumack(sctp_t *sctp, uint32_t tsn, mblk_t **first_unacked)
 	sctp_data_hdr_t *sdc;
 	uint32_t cumack_forward = 0;
 	sctp_msg_hdr_t	*mhdr;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	ump = sctp->sctp_xmit_head;
 
@@ -1877,7 +1882,7 @@ sctp_cumack(sctp_t *sctp, uint32_t tsn, mblk_t **first_unacked)
 cum_ack_done:
 	*first_unacked = mp;
 	if (cumack_forward > 0) {
-		BUMP_MIB(&sctp_mib, sctpInAck);
+		BUMP_MIB(&sctps->sctps_mib, sctpInAck);
 		if (SEQ_GT(sctp->sctp_lastack_rxd, sctp->sctp_recovery_tsn)) {
 			sctp->sctp_recovery_tsn = sctp->sctp_lastack_rxd;
 		}
@@ -1898,7 +1903,7 @@ cum_ack_done:
 		sctp->sctp_xmit_unacked = mp;
 	} else {
 		/* dup ack */
-		BUMP_MIB(&sctp_mib, sctpInDupAck);
+		BUMP_MIB(&sctps->sctps_mib, sctpInDupAck);
 	}
 	sctp->sctp_lastack_rxd = tsn;
 	if (SEQ_LT(sctp->sctp_adv_pap, sctp->sctp_lastack_rxd))
@@ -2041,12 +2046,13 @@ sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
 	mblk_t		*pmp;
 	sctp_data_hdr_t	*dc;
 	ssize_t		remaining;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	*ftsn = ntohl(*ftsn);
 	remaining =  ntohs(ch->sch_len) - sizeof (*ch) - sizeof (*ftsn);
 
 	if (SCTP_IS_DETACHED(sctp)) {
-		BUMP_MIB(&sctp_mib, sctpInClosed);
+		BUMP_MIB(&sctps->sctps_mib, sctpInClosed);
 		can_deliver = B_FALSE;
 	}
 	/*
@@ -2244,6 +2250,7 @@ sctp_process_uo_gaps(sctp_t *sctp, uint32_t ctsn, sctp_sack_frag_t *ssf,
 	mblk_t			*mp = mphead;
 	sctp_faddr_t		*fp;
 	uint32_t		acked = 0;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
 	/*
 	 * gstart tracks the last (in the order of TSN) gapstart that
@@ -2275,7 +2282,7 @@ sctp_process_uo_gaps(sctp_t *sctp, uint32_t ctsn, sctp_sack_frag_t *ssf,
 		/* SACK for TSN we have not sent - ABORT */
 		if (SEQ_GT(gapstart, sctp->sctp_ltsn - 1) ||
 		    SEQ_GT(gapend, sctp->sctp_ltsn - 1)) {
-			BUMP_MIB(&sctp_mib, sctpInAckUnsent);
+			BUMP_MIB(&sctps->sctps_mib, sctpInAckUnsent);
 			*trysend = -1;
 			return (acked);
 		} else if (SEQ_LT(gapend, gapstart)) {
@@ -2394,7 +2401,8 @@ sctp_process_uo_gaps(sctp_t *sctp, uint32_t ctsn, sctp_sack_frag_t *ssf,
 		 */
 		if (SEQ_GT(xtsn, fr_xtsn) && !SCTP_CHUNK_ISACKED(mp)) {
 			SCTP_CHUNK_SET_SACKCNT(mp, SCTP_CHUNK_SACKCNT(mp) + 1);
-			if (SCTP_CHUNK_SACKCNT(mp) == sctp_fast_rxt_thresh) {
+			if (SCTP_CHUNK_SACKCNT(mp) ==
+			    sctps->sctps_fast_rxt_thresh) {
 				SCTP_CHUNK_REXMIT(mp);
 				sctp->sctp_chk_fast_rexmit = B_TRUE;
 				*trysend = 1;
@@ -2453,6 +2461,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 	boolean_t		fast_recovery = B_FALSE;
 	boolean_t		cumack_forward = B_FALSE;
 	boolean_t		fwd_tsn = B_FALSE;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 	chunklen = ntohs(sch->sch_len);
@@ -2470,7 +2479,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 		return (0);
 
 	if (SEQ_GT(cumtsn, sctp->sctp_ltsn - 1)) {
-		BUMP_MIB(&sctp_mib, sctpInAckUnsent);
+		BUMP_MIB(&sctps->sctps_mib, sctpInAckUnsent);
 		/* Send an ABORT */
 		return (-1);
 	}
@@ -2496,7 +2505,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			mp = sctp->sctp_xmit_head->b_cont;
 		else
 			mp = NULL;
-		BUMP_MIB(&sctp_mib, sctpInDupAck);
+		BUMP_MIB(&sctps->sctps_mib, sctpInDupAck);
 		/*
 		 * If we were doing a zero win probe and the win
 		 * has now opened to at least MSS, re-transmit the
@@ -2519,7 +2528,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			pkt = sctp_rexmit_packet(sctp, &meta, &mp1, fp,
 			    &pkt_len);
 			if (pkt == NULL) {
-				SCTP_KSTAT(sctp_ss_rexmit_failed);
+				SCTP_KSTAT(sctps, sctp_ss_rexmit_failed);
 				return (0);
 			}
 			ASSERT(pkt_len <= fp->sfa_pmss);
@@ -2604,7 +2613,8 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 				    sctp->sctp_xmit_head, mp1,
 				    &trysend, &fast_recovery, gapstart);
 				if (trysend < 0) {
-					BUMP_MIB(&sctp_mib, sctpInAckUnsent);
+					BUMP_MIB(&sctps->sctps_mib,
+					    sctpInAckUnsent);
 					return (-1);
 				}
 				break;
@@ -2616,7 +2626,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 		/* SACK for TSN we have not sent - ABORT */
 		if (SEQ_GT(gapstart, sctp->sctp_ltsn - 1) ||
 		    SEQ_GT(gapend, sctp->sctp_ltsn - 1)) {
-			BUMP_MIB(&sctp_mib, sctpInAckUnsent);
+			BUMP_MIB(&sctps->sctps_mib, sctpInAckUnsent);
 			return (-1);
 		} else if (SEQ_LT(gapend, gapstart)) {
 			break;
@@ -2638,7 +2648,8 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 		ASSERT(SEQ_LT(xtsn, gapstart));
 		while (xtsn != gapstart) {
 			SCTP_CHUNK_SET_SACKCNT(mp, SCTP_CHUNK_SACKCNT(mp) + 1);
-			if (SCTP_CHUNK_SACKCNT(mp) == sctp_fast_rxt_thresh) {
+			if (SCTP_CHUNK_SACKCNT(mp) ==
+			    sctps->sctps_fast_rxt_thresh) {
 				SCTP_CHUNK_REXMIT(mp);
 				sctp->sctp_chk_fast_rexmit = B_TRUE;
 				trysend = 1;
@@ -2830,8 +2841,10 @@ ret:
 		/*
 		 * Limit the burst of transmitted data segments.
 		 */
-		if (fp->suna + sctp_maxburst * fp->sfa_pmss < fp->cwnd) {
-			fp->cwnd = fp->suna + sctp_maxburst * fp->sfa_pmss;
+		if (fp->suna + sctps->sctps_maxburst * fp->sfa_pmss <
+		    fp->cwnd) {
+			fp->cwnd = fp->suna + sctps->sctps_maxburst *
+			    fp->sfa_pmss;
 		}
 		fp->acked = 0;
 		goto check_ss_rxmit;
@@ -2856,8 +2869,10 @@ ret:
 				}
 			}
 		}
-		if (fp->suna + sctp_maxburst * fp->sfa_pmss < fp->cwnd) {
-			fp->cwnd = fp->suna + sctp_maxburst * fp->sfa_pmss;
+		if (fp->suna + sctps->sctps_maxburst * fp->sfa_pmss <
+		    fp->cwnd) {
+			fp->cwnd = fp->suna + sctps->sctps_maxburst *
+			    fp->sfa_pmss;
 		}
 		fp->acked = 0;
 	}
@@ -3126,9 +3141,14 @@ sctp_check_in_policy(mblk_t *mp, mblk_t *ipsec_mp)
 	boolean_t policy_present;
 	ipha_t *ipha;
 	ip6_t *ip6h;
+	netstack_t	*ns;
+	ipsec_stack_t	*ipss;
 
 	ii = (ipsec_in_t *)ipsec_mp->b_rptr;
 	ASSERT(ii->ipsec_in_type == IPSEC_IN);
+	ns = ii->ipsec_in_ns;
+	ipss = ns->netstack_ipsec;
+
 	if (ii->ipsec_in_dont_check) {
 		check = B_FALSE;
 		if (!ii->ipsec_in_secure) {
@@ -3137,11 +3157,11 @@ sctp_check_in_policy(mblk_t *mp, mblk_t *ipsec_mp)
 		}
 	}
 	if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
-		policy_present = ipsec_inbound_v4_policy_present;
+		policy_present = ipss->ipsec_inbound_v4_policy_present;
 		ipha = (ipha_t *)mp->b_rptr;
 		ip6h = NULL;
 	} else {
-		policy_present = ipsec_inbound_v6_policy_present;
+		policy_present = ipss->ipsec_inbound_v6_policy_present;
 		ipha = NULL;
 		ip6h = (ip6_t *)mp->b_rptr;
 	}
@@ -3152,7 +3172,7 @@ sctp_check_in_policy(mblk_t *mp, mblk_t *ipsec_mp)
 		 * nobody's home.
 		 */
 		ipsec_mp = ipsec_check_global_policy(ipsec_mp, (conn_t *)NULL,
-		    ipha, ip6h, B_TRUE);
+		    ipha, ip6h, B_TRUE, ns);
 		if (ipsec_mp == NULL)
 			return (NULL);
 	}
@@ -3176,16 +3196,37 @@ sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, uint_t ipif_seqid,
 	ssize_t			mlen;
 	ip_pktinfo_t		*pinfo = NULL;
 	mblk_t			*first_mp;
+	sctp_stack_t		*sctps;
+	ip_stack_t		*ipst;
 
-	BUMP_MIB(&sctp_mib, sctpOutOfBlue);
-	BUMP_MIB(&sctp_mib, sctpInSCTPPkts);
+	ASSERT(recv_ill != NULL);
+	ipst = recv_ill->ill_ipst;
+	sctps = ipst->ips_netstack->netstack_sctp;
+
+	BUMP_MIB(&sctps->sctps_mib, sctpOutOfBlue);
+	BUMP_MIB(&sctps->sctps_mib, sctpInSCTPPkts);
+
+	if (sctps->sctps_gsctp == NULL) {
+		/*
+		 * For non-zero stackids the default queue isn't created
+		 * until the first open, thus there can be a need to send
+		 * an error before then. But we can't do that, hence we just
+		 * drop the packet. Later during boot, when the default queue
+		 * has been setup, a retransmitted packet from the peer
+		 * will result in a error.
+		 */
+		ASSERT(sctps->sctps_netstack->netstack_stackid !=
+		    GLOBAL_NETSTACKID);
+		freemsg(mp);
+		return;
+	}
 
 	first_mp = mp;
 	if (mctl_present)
 		mp = mp->b_cont;
 
 	/* Initiate IPPf processing, if needed. */
-	if (IPP_ENABLED(IPP_LOCAL_IN)) {
+	if (IPP_ENABLED(IPP_LOCAL_IN, ipst)) {
 		ip_process(IPP_LOCAL_IN, &mp,
 		    recv_ill->ill_phyint->phyint_ifindex);
 		if (mp == NULL) {
@@ -3226,12 +3267,13 @@ sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, uint_t ipif_seqid,
 		/* no listener; send abort  */
 		if (mctl_present && sctp_check_in_policy(mp, first_mp) == NULL)
 			return;
-		sctp_send_abort(gsctp, sctp_init2vtag(ch), 0,
+		sctp_send_abort(sctps->sctps_gsctp, sctp_init2vtag(ch), 0,
 		    NULL, 0, mp, 0, B_TRUE);
 		break;
 	case CHUNK_INIT_ACK:
 		/* check for changed src addr */
-		sctp = sctp_addrlist2sctp(mp, sctph, ch, ipif_seqid, zoneid);
+		sctp = sctp_addrlist2sctp(mp, sctph, ch, ipif_seqid, zoneid,
+		    sctps);
 		if (sctp != NULL) {
 			/* success; proceed to normal path */
 			mutex_enter(&sctp->sctp_lock);
@@ -3265,8 +3307,8 @@ sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, uint_t ipif_seqid,
 	case CHUNK_SHUTDOWN_ACK:
 		if (mctl_present && sctp_check_in_policy(mp, first_mp) == NULL)
 			return;
-		sctp_ootb_shutdown_ack(gsctp, mp, ip_hdr_len);
-		sctp_process_sendq(gsctp);
+		sctp_ootb_shutdown_ack(sctps->sctps_gsctp, mp, ip_hdr_len);
+		sctp_process_sendq(sctps->sctps_gsctp);
 		return;
 	case CHUNK_ERROR:
 	case CHUNK_ABORT:
@@ -3278,11 +3320,11 @@ sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, uint_t ipif_seqid,
 	default:
 		if (mctl_present && sctp_check_in_policy(mp, first_mp) == NULL)
 			return;
-		sctp_send_abort(gsctp, sctph->sh_verf, 0, NULL, 0, mp, 0,
-		    B_TRUE);
+		sctp_send_abort(sctps->sctps_gsctp, sctph->sh_verf, 0,
+		    NULL, 0, mp, 0, B_TRUE);
 		break;
 	}
-	sctp_process_sendq(gsctp);
+	sctp_process_sendq(sctps->sctps_gsctp);
 	freemsg(mp);
 }
 
@@ -3291,12 +3333,14 @@ sctp_input(conn_t *connp, ipha_t *ipha, mblk_t *mp, mblk_t *first_mp,
     ill_t *recv_ill, boolean_t isv4, boolean_t mctl_present)
 {
 	sctp_t *sctp = CONN2SCTP(connp);
+	ip_stack_t	*ipst = recv_ill->ill_ipst;
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
 
 	/*
 	 * We check some fields in conn_t without holding a lock.
 	 * This should be fine.
 	 */
-	if (CONN_INBOUND_POLICY_PRESENT(connp) || mctl_present) {
+	if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) || mctl_present) {
 		first_mp = ipsec_check_inbound_policy(first_mp, connp,
 		    ipha, NULL, mctl_present);
 		if (first_mp == NULL) {
@@ -3307,7 +3351,7 @@ sctp_input(conn_t *connp, ipha_t *ipha, mblk_t *mp, mblk_t *first_mp,
 	}
 
 	/* Initiate IPPF processing for fastpath */
-	if (IPP_ENABLED(IPP_LOCAL_IN)) {
+	if (IPP_ENABLED(IPP_LOCAL_IN, ipst)) {
 		ip_process(IPP_LOCAL_IN, &mp,
 		    recv_ill->ill_phyint->phyint_ifindex);
 		if (mp == NULL) {
@@ -3338,7 +3382,7 @@ sctp_input(conn_t *connp, ipha_t *ipha, mblk_t *mp, mblk_t *first_mp,
 		}
 		if (isv4) {
 			mp = ip_add_info(mp, recv_ill, in_flags,
-			    IPCL_ZONEID(connp));
+			    IPCL_ZONEID(connp), ipst);
 		} else {
 			mp = ip_add_info_v6(mp, recv_ill,
 			    &(((ip6_t *)ipha)->ip6_dst));
@@ -3400,7 +3444,9 @@ sctp_input(conn_t *connp, ipha_t *ipha, mblk_t *mp, mblk_t *first_mp,
 static void
 sctp_process_abort(sctp_t *sctp, sctp_chunk_hdr_t *ch, int err)
 {
-	BUMP_MIB(&sctp_mib, sctpAborted);
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
+
+	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 
 	sctp_assoc_event(sctp, SCTP_COMM_LOST,
@@ -3432,6 +3478,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 	ip_pktinfo_t		*pinfo = NULL;
 	in6_addr_t		peer_src;
 	int64_t			now;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
+	ip_stack_t		*ipst = sctps->sctps_netstack->netstack_ip;
 
 	if (DB_TYPE(mp) != M_DATA) {
 		ASSERT(DB_TYPE(mp) == M_CTL);
@@ -3456,7 +3504,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 		 * assume a single contiguous chunk of data.
 		 */
 		if (pullupmsg(mp, -1) == 0) {
-			BUMP_MIB(&ip_mib, ipIfStatsInDiscards);
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
 			if (ipsec_mp != NULL)
 				freeb(ipsec_mp);
 			if (pinfo != NULL)
@@ -3474,7 +3522,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 	mlen = mp->b_wptr - (uchar_t *)(sctph + 1);
 	ch = sctp_first_chunk((uchar_t *)(sctph + 1), mlen);
 	if (ch == NULL) {
-		BUMP_MIB(&ip_mib, ipIfStatsInDiscards);
+		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
 		if (ipsec_mp != NULL)
 			freeb(ipsec_mp);
 		freemsg(mp);
@@ -3482,7 +3530,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 	}
 
 	if (!sctp_check_input(sctp, ch, mlen, 1)) {
-		BUMP_MIB(&ip_mib, ipIfStatsInDiscards);
+		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
 		goto done;
 	}
 	/*
@@ -3591,10 +3639,11 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 					 * shutdown ack from the peer,
 					 * abort the association.
 					 */
-					if (sctp_shutack_wait_bound != 0 &&
+					if (sctps->sctps_shutack_wait_bound !=
+					    0 &&
 					    TICK_TO_MSEC(now -
 					    sctp->sctp_out_time) >
-					    sctp_shutack_wait_bound) {
+					    sctps->sctps_shutack_wait_bound) {
 						sctp_send_abort(sctp,
 						    sctp->sctp_fvtag, 0, NULL,
 						    0, mp, 0, B_FALSE);
@@ -3642,7 +3691,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				if (sctp->sctp_state == SCTPS_SHUTDOWN_SENT) {
 					sctp_shutdown_complete(sctp);
-					BUMP_MIB(&sctp_mib, sctpShutdowns);
+					BUMP_MIB(&sctps->sctps_mib,
+					    sctpShutdowns);
 					sctp_assoc_event(sctp,
 					    SCTP_SHUTDOWN_COMP, 0, NULL);
 					sctp_clean_death(sctp, 0);
@@ -3677,7 +3727,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 						sctp_adaption_event(sctp);
 					}
 				} else {
-					BUMP_MIB(&sctp_mib,
+					BUMP_MIB(&sctps->sctps_mib,
 					    sctpInInvalidCookie);
 				}
 				break;
@@ -3730,7 +3780,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
 				    sctph, &recv_adaption, &peer_src) == -1) {
-					BUMP_MIB(&sctp_mib,
+					BUMP_MIB(&sctps->sctps_mib,
 					    sctpInInvalidCookie);
 					goto done;
 				}
@@ -3774,7 +3824,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				 * properly reprocessed on the
 				 * eager's queue.
 				 */
-				BUMP_MIB(&sctp_mib, sctpPassiveEstab);
+				BUMP_MIB(&sctps->sctps_mib, sctpPassiveEstab);
 				if (mlen > ntohs(ch->sch_len)) {
 					eager->sctp_cookie_mp = dupb(mp);
 					mblk_setcred(eager->sctp_cookie_mp,
@@ -3851,7 +3901,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 			case CHUNK_COOKIE:
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
 				    sctph, &recv_adaption, NULL) == -1) {
-					BUMP_MIB(&sctp_mib,
+					BUMP_MIB(&sctps->sctps_mib,
 					    sctpInInvalidCookie);
 					break;
 				}
@@ -3863,7 +3913,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				}
 				sctp->sctp_state = SCTPS_ESTABLISHED;
 				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
-				BUMP_MIB(&sctp_mib, sctpActiveEstab);
+				BUMP_MIB(&sctps->sctps_mib, sctpActiveEstab);
 				if (sctp->sctp_cookie_mp) {
 					freemsg(sctp->sctp_cookie_mp);
 					sctp->sctp_cookie_mp = NULL;
@@ -3900,7 +3950,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 					sctp_stop_faddr_timers(sctp);
 				sctp->sctp_state = SCTPS_ESTABLISHED;
 				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
-				BUMP_MIB(&sctp_mib, sctpActiveEstab);
+				BUMP_MIB(&sctps->sctps_mib, sctpActiveEstab);
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				if (sctp->sctp_cookie_mp) {
 					freemsg(sctp->sctp_cookie_mp);
@@ -3922,7 +3972,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 			case CHUNK_COOKIE:
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
 				    sctph, &recv_adaption, NULL) == -1) {
-					BUMP_MIB(&sctp_mib,
+					BUMP_MIB(&sctps->sctps_mib,
 					    sctpInInvalidCookie);
 					break;
 				}
@@ -3936,7 +3986,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 					sctp_stop_faddr_timers(sctp);
 				sctp->sctp_state = SCTPS_ESTABLISHED;
 				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
-				BUMP_MIB(&sctp_mib, sctpActiveEstab);
+				BUMP_MIB(&sctps->sctps_mib, sctpActiveEstab);
 				if (sctp->sctp_cookie_mp) {
 					freemsg(sctp->sctp_cookie_mp);
 					sctp->sctp_cookie_mp = NULL;
@@ -3968,7 +4018,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 					p = (sctp_parm_hdr_t *)(ch + 1);
 					if (p->sph_type ==
 					    htons(SCTP_ERR_STALE_COOKIE)) {
-						BUMP_MIB(&sctp_mib,
+						BUMP_MIB(&sctps->sctps_mib,
 						    sctpAborted);
 						sctp_error_event(sctp, ch);
 						sctp_assoc_event(sctp,
@@ -3999,7 +4049,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				goto done;
 			case CHUNK_SHUTDOWN_COMPLETE:
 				BUMP_LOCAL(sctp->sctp_ibchunks);
-				BUMP_MIB(&sctp_mib, sctpShutdowns);
+				BUMP_MIB(&sctps->sctps_mib, sctpShutdowns);
 				sctp_assoc_event(sctp, SCTP_SHUTDOWN_COMP, 0,
 				    NULL);
 
@@ -4010,7 +4060,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 			case CHUNK_SHUTDOWN_ACK:
 				sctp_shutdown_complete(sctp);
 				BUMP_LOCAL(sctp->sctp_ibchunks);
-				BUMP_MIB(&sctp_mib, sctpShutdowns);
+				BUMP_MIB(&sctps->sctps_mib, sctpShutdowns);
 				sctp_assoc_event(sctp, SCTP_SHUTDOWN_COMP, 0,
 				    NULL);
 				sctp_clean_death(sctp, 0);
@@ -4089,7 +4139,7 @@ nomorechunks:
 		if (!sctp->sctp_ack_timer_running) {
 			sctp->sctp_ack_timer_running = B_TRUE;
 			sctp_timer(sctp, sctp->sctp_ack_mp,
-			    MSEC_TO_TICK(sctp_deferred_ack_interval));
+			    MSEC_TO_TICK(sctps->sctps_deferred_ack_interval));
 		}
 	}
 
@@ -4138,6 +4188,7 @@ void
 sctp_recvd(sctp_t *sctp, int len)
 {
 	int32_t old, new;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	ASSERT(sctp != NULL);
 	RUN_SCTP(sctp);
@@ -4154,7 +4205,7 @@ sctp_recvd(sctp_t *sctp, int len)
 	if (sctp->sctp_state >= SCTPS_ESTABLISHED &&
 	    ((old <= new >> 1) || (old < sctp->sctp_mss))) {
 		sctp->sctp_force_sack = 1;
-		BUMP_MIB(&sctp_mib, sctpOutWinUpdate);
+		BUMP_MIB(&sctps->sctps_mib, sctpOutWinUpdate);
 		sctp_sack(sctp, NULL);
 		old = 1;
 	} else {

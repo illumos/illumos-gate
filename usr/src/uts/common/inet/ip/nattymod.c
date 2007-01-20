@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,8 +48,11 @@
 #include <inet/sadb.h>
 #include <inet/ip_ire.h>
 #include <sys/cmn_err.h>
-#include <inet/ipdrop.h>
 #include <inet/udp_impl.h>
+#include <inet/ipsec_impl.h>
+#include <inet/ipdrop.h>
+#include <inet/sadb.h>
+#include <inet/ipsecesp.h>
 
 /*
  * Design notes:
@@ -77,14 +80,12 @@ typedef struct nattyinfo
 	boolean_t ni_rh_wait;	/* Seen UDP_RCVHDR request go by */
 	boolean_t ni_rh_set;	/* Have we set UDP_RCVHDR? */
 	boolean_t ni_addr_wait;	/* Seen T_ADDR_REQ go by */
+	netstack_t *ni_netstack;
 } nattyinfo_t;
 
 kmutex_t nattyhlock;	/* List lock. */
 nattyinfo_t *nattyhead;	/* List of instances. */
 
-
-/* Packet dropper for IP IPsec processing failures */
-extern ipdropper_t ip_dropper;
 
 /*
  * Function prototypes.
@@ -199,12 +200,16 @@ _info(struct modinfo *modinfop)
 
 /* ARGSUSED */
 static int
-nattymodopen(queue_t *rq, dev_t *dev, int oflag, int sflag, cred_t *crp)
+nattymodopen(queue_t *rq, dev_t *dev, int oflag, int sflag, cred_t *credp)
 {
 	nattyinfo_t *ni;
+	netstack_t *ns;
 
 	if (sflag != MODOPEN)
 		return (EINVAL);
+
+	ns = netstack_find_by_cred(credp);
+	ASSERT(ns != NULL);
 
 	/* Use kmem_zalloc() to avoid initializing ni->* fields. */
 	ni = kmem_zalloc(sizeof (nattyinfo_t), KM_SLEEP);
@@ -220,6 +225,7 @@ nattymodopen(queue_t *rq, dev_t *dev, int oflag, int sflag, cred_t *crp)
 		nattyhead->ni_ptpn = &ni->ni_next;
 	ni->ni_next = nattyhead;
 	nattyhead = ni;
+	ni->ni_netstack = ns;
 	mutex_exit(&nattyhlock);
 
 	qprocson(rq);
@@ -239,8 +245,9 @@ nattymodclose(queue_t *rq)
 		ni->ni_next->ni_ptpn = ni->ni_ptpn;
 	mutex_exit(&nattyhlock);
 
-	sadb_clear_timeouts(WR(rq));
+	sadb_clear_timeouts(WR(rq), ni->ni_netstack);
 
+	netstack_rele(ni->ni_netstack);
 	qprocsoff(rq);
 
 	/* Unlinked from list means ==> no need to mutex. */
@@ -308,7 +315,7 @@ get_my_ire(nattyinfo_t *ni, ipaddr_t addr)
 	ni->ni_addr = addr;
 
 	ire = ire_ctable_lookup(addr, 0, IRE_LOCAL, NULL, ALL_ZONES, NULL,
-	    MATCH_IRE_TYPE);
+	    MATCH_IRE_TYPE, ni->ni_netstack->netstack_ip);
 	if (ire == NULL)
 		goto bail;
 
@@ -423,6 +430,9 @@ natty_rput_pkt(queue_t *q, mblk_t *mp)
 	int ntries = 0;
 	nattyinfo_t *ni = q->q_ptr;
 	sadb_t *sp;
+	netstack_t	*ns = ni->ni_netstack;
+	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	if (!ni->ni_rh_set) {
 #ifdef DEBUG
@@ -536,7 +546,7 @@ natty_rput_pkt(queue_t *q, mblk_t *mp)
 		iph_mp->b_wptr -= UDPH_SIZE;
 
 		/* we are v4 only */
-		sp = &esp_sadb.s_v4;
+		sp = &espstack->esp_sadb.s_v4;
 		bucket = INBOUND_BUCKET(sp, spi);
 
 		mutex_enter(&bucket->isaf_lock);
@@ -564,8 +574,10 @@ natty_rput_pkt(queue_t *q, mblk_t *mp)
 				IPSA_REFRELE(ipsa);
 			}
 
+			/* Handle the kstat_create in ip_drop_init() failing */
 			ip_drop_packet(iph_mp, B_TRUE, NULL, NULL,
-			    &ipdrops_esp_no_sa, &ip_dropper);
+			    DROPPER(ipss, ipds_esp_no_sa),
+			    &ipss->ipsec_dropper);
 			return;
 		}
 

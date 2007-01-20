@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,8 @@ typedef enum {
 	DLADM_STATUS_BADVALCNT,
 	DLADM_STATUS_DBNOTFOUND,
 	DLADM_STATUS_DENIED,
-	DLADM_STATUS_IOERR
+	DLADM_STATUS_IOERR,
+	DLADM_STATUS_TEMPONLY
 } dladm_status_t;
 
 typedef enum {
@@ -82,13 +83,16 @@ typedef void (dladm_walkcb_t)(void *, const char *);
 extern int	dladm_walk(dladm_walkcb_t *, void *);
 extern int	dladm_walk_vlan(dladm_walkcb_t *, void *, const char *);
 extern int	dladm_info(const char *, dladm_attr_t *);
+extern int	dladm_hold_link(const char *, zoneid_t, boolean_t);
+extern int	dladm_rele_link(const char *, zoneid_t, boolean_t);
 
 extern dladm_status_t	dladm_set_prop(const char *, const char *,
-			    char **, uint_t, uint_t);
+			    char **, uint_t, uint_t, char **);
 extern dladm_status_t	dladm_get_prop(const char *, dladm_prop_type_t,
 			    const char *, char **, uint_t *);
 extern dladm_status_t	dladm_walk_prop(const char *, void *,
 			    boolean_t (*)(void *, const char *));
+extern boolean_t	dladm_is_prop_temponly(const char *, char **);
 
 extern dladm_status_t	dladm_set_secobj(const char *, dladm_secobj_class_t,
 			    uint8_t *, uint_t, uint_t);

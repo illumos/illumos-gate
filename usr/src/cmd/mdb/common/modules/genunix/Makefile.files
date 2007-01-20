@@ -55,6 +55,7 @@ GENUNIX_SRCS =		\
 	modhash.c	\
 	ndievents.c	\
 	net.c		\
+	netstack.c	\
 	nvpair.c	\
 	pg.c		\
 	rctl.c		\

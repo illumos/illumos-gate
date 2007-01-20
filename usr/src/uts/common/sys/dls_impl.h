@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,16 +70,20 @@ struct dls_link_s {
 	kmutex_t		dl_lock;
 };
 
+typedef struct dls_impl_s dls_impl_t;
+typedef struct dls_head_s dls_head_t;
+
 typedef struct dls_vlan_s {
 	char			dv_name[IFNAMSIZ];
 	uint_t			dv_ref;
 	dls_link_t		*dv_dlp;
 	uint16_t		dv_id;
 	kstat_t			*dv_ksp;
+	minor_t			dv_minor;
+	t_uscalar_t		dv_ppa;
+	zoneid_t		dv_zid;
+	dls_impl_t		*dv_impl_list;
 } dls_vlan_t;
-
-typedef struct dls_impl_s dls_impl_t;
-typedef struct dls_head_s dls_head_t;
 
 struct dls_impl_s {
 	dls_impl_t			*di_nextp;
@@ -103,6 +107,8 @@ struct dls_impl_s {
 	soft_ring_t			**di_soft_ring_list;
 	uint_t				di_soft_ring_size;
 	int				di_soft_ring_fanout_type;
+	zoneid_t			di_zid;
+	dls_impl_t			*di_next_impl;
 };
 
 struct dls_head_s {
@@ -133,6 +139,15 @@ extern int		dls_vlan_destroy(const char *);
 extern int		dls_vlan_hold(const char *, dls_vlan_t **, boolean_t);
 extern void		dls_vlan_rele(dls_vlan_t *);
 extern int		dls_vlan_walk(int (*)(dls_vlan_t *, void *), void *);
+extern dev_info_t	*dls_vlan_finddevinfo(dev_t);
+extern int		dls_vlan_ppa_from_minor(minor_t, t_uscalar_t *);
+extern int		dls_vlan_rele_by_name(const char *);
+extern minor_t		dls_minor_hold(boolean_t);
+extern void		dls_minor_rele(minor_t);
+extern int		dls_vlan_setzoneid(char *, zoneid_t, boolean_t);
+extern int		dls_vlan_getzoneid(char *, zoneid_t *);
+extern void		dls_vlan_add_impl(dls_vlan_t *, dls_impl_t *);
+extern void		dls_vlan_remove_impl(dls_vlan_t *, dls_impl_t *);
 
 extern void		dls_init(void);
 extern int		dls_fini(void);

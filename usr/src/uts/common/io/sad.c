@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include <sys/modctl.h>
 #include <sys/priv_names.h>
 #include <sys/sysmacros.h>
+#include <sys/zone.h>
 
 static int sadopen(queue_t *, dev_t *, int, int, cred_t *);
 static int sadclose(queue_t *, int, cred_t *);
@@ -186,35 +187,45 @@ sadopen(
 	cred_t *credp)	/* user credentials */
 {
 	int i;
+	netstack_t *ns;
+	str_stack_t *ss;
 
 	if (sflag)		/* no longer called from clone driver */
 		return (EINVAL);
 
+	ns = netstack_find_by_cred(credp);
+	ASSERT(ns != NULL);
+	ss = ns->netstack_str;
+	ASSERT(ss != NULL);
+
 	/*
 	 * Both USRMIN and ADMMIN are clone interfaces.
 	 */
-	for (i = 0; i < sadcnt; i++)
-		if (saddev[i].sa_qp == NULL)
+	for (i = 0; i < ss->ss_sadcnt; i++)
+		if (ss->ss_saddev[i].sa_qp == NULL)
 			break;
-	if (i >= sadcnt)		/* no such device */
+	if (i >= ss->ss_sadcnt) {		/* no such device */
+		netstack_rele(ss->ss_netstack);
 		return (ENXIO);
-
+	}
 	switch (getminor(*devp)) {
 	case USRMIN:			/* mere mortal */
-		saddev[i].sa_flags = 0;
+		ss->ss_saddev[i].sa_flags = 0;
 		break;
 
 	case ADMMIN:			/* privileged user */
-		saddev[i].sa_flags = SADPRIV;
+		ss->ss_saddev[i].sa_flags = SADPRIV;
 		break;
 
 	default:
+		netstack_rele(ss->ss_netstack);
 		return (EINVAL);
 	}
 
-	saddev[i].sa_qp = qp;
-	qp->q_ptr = (caddr_t)&saddev[i];
-	WR(qp)->q_ptr = (caddr_t)&saddev[i];
+	ss->ss_saddev[i].sa_qp = qp;
+	ss->ss_saddev[i].sa_ss = ss;
+	qp->q_ptr = (caddr_t)&ss->ss_saddev[i];
+	WR(qp)->q_ptr = (caddr_t)&ss->ss_saddev[i];
 
 	/*
 	 * NOTE: should the ADMMIN or USRMIN minors change
@@ -244,6 +255,8 @@ sadclose(
 	sadp = (struct saddev *)qp->q_ptr;
 	sadp->sa_qp = NULL;
 	sadp->sa_addr = NULL;
+	netstack_rele(sadp->sa_ss->ss_netstack);
+	sadp->sa_ss = NULL;
 	qp->q_ptr = NULL;
 	WR(qp)->q_ptr = NULL;
 	return (0);
@@ -382,6 +395,10 @@ apush_iocdata(
 	struct saddev *sadp;
 	uint_t size;
 	dev_t dev;
+	str_stack_t *ss;
+
+	sadp = (struct saddev *)qp->q_ptr;
+	ss = sadp->sa_ss;
 
 	csp = (struct copyresp *)mp->b_rptr;
 	if (csp->cp_rval) {	/* if there was an error */
@@ -436,25 +453,26 @@ apush_iocdata(
 			/* sanity check the request */
 			if (((ret = sad_ap_verify(ap)) != 0) ||
 			    ((ret = valid_major(ap->ap_major)) != 0)) {
-				sad_ap_rele(ap);
+				sad_ap_rele(ap, ss);
 				miocnak(qp, mp, 0, ret);
 				return;
 			}
 
 			/* check for overlapping configs */
-			mutex_enter(&sad_lock);
-			if ((ap_tmp = sad_ap_find(&ap->ap_common)) != NULL) {
+			mutex_enter(&ss->ss_sad_lock);
+			ap_tmp = sad_ap_find(&ap->ap_common, ss);
+			if (ap_tmp != NULL) {
 				/* already configured */
-				mutex_exit(&sad_lock);
-				sad_ap_rele(ap_tmp);
-				sad_ap_rele(ap);
+				mutex_exit(&ss->ss_sad_lock);
+				sad_ap_rele(ap_tmp, ss);
+				sad_ap_rele(ap, ss);
 				miocnak(qp, mp, 0, EEXIST);
 				return;
 			}
 
 			/* add the new config to our hash */
-			sad_ap_insert(ap);
-			mutex_exit(&sad_lock);
+			sad_ap_insert(ap, ss);
+			mutex_exit(&ss->ss_sad_lock);
 			miocack(qp, mp, 0, 0);
 			return;
 
@@ -466,7 +484,7 @@ apush_iocdata(
 			}
 
 			/* search for a matching config */
-			if ((ap = sad_ap_find_by_dev(dev)) == NULL) {
+			if ((ap = sad_ap_find_by_dev(dev, ss)) == NULL) {
 				/* no config found */
 				miocnak(qp, mp, 0, ENODEV);
 				return;
@@ -479,7 +497,7 @@ apush_iocdata(
 			 */
 			if ((ap->ap_type == SAP_RANGE) &&
 			    (ap->ap_minor != sap->sap_minor)) {
-				sad_ap_rele(ap);
+				sad_ap_rele(ap, ss);
 				miocnak(qp, mp, 0, ERANGE);
 				return;
 			}
@@ -490,7 +508,7 @@ apush_iocdata(
 			 */
 			if ((ap->ap_type == SAP_ALL) &&
 			    (sap->sap_minor != 0)) {
-				sad_ap_rele(ap);
+				sad_ap_rele(ap, ss);
 				miocnak(qp, mp, 0, EINVAL);
 				return;
 			}
@@ -499,27 +517,27 @@ apush_iocdata(
 			 * make sure someone else hasn't already
 			 * removed this config from the hash.
 			 */
-			mutex_enter(&sad_lock);
-			ap_tmp = sad_ap_find(&ap->ap_common);
+			mutex_enter(&ss->ss_sad_lock);
+			ap_tmp = sad_ap_find(&ap->ap_common, ss);
 			if (ap_tmp != ap) {
-				mutex_exit(&sad_lock);
-				sad_ap_rele(ap_tmp);
-				sad_ap_rele(ap);
+				mutex_exit(&ss->ss_sad_lock);
+				sad_ap_rele(ap_tmp, ss);
+				sad_ap_rele(ap, ss);
 				miocnak(qp, mp, 0, ENODEV);
 				return;
-			} else
+			}
 
 			/* remove the config from the hash and return */
-			sad_ap_remove(ap);
-			mutex_exit(&sad_lock);
+			sad_ap_remove(ap, ss);
+			mutex_exit(&ss->ss_sad_lock);
 
 			/*
 			 * Release thrice, once for sad_ap_find_by_dev(),
 			 * once for sad_ap_find(), and once to free.
 			 */
-			sad_ap_rele(ap);
-			sad_ap_rele(ap);
-			sad_ap_rele(ap);
+			sad_ap_rele(ap, ss);
+			sad_ap_rele(ap, ss);
+			sad_ap_rele(ap, ss);
 			miocack(qp, mp, 0, 0);
 			return;
 		} /* switch (sap_cmd) */
@@ -536,7 +554,7 @@ apush_iocdata(
 			}
 
 			/* search for a matching config */
-			if ((ap = sad_ap_find_by_dev(dev)) == NULL) {
+			if ((ap = sad_ap_find_by_dev(dev, ss)) == NULL) {
 				/* no config found */
 				miocnak(qp, mp, 0, ENODEV);
 				return;
@@ -550,9 +568,10 @@ apush_iocdata(
 				(void) strcpy(sap->sap_list[i], ap->ap_list[i]);
 			for (; i < MAXAPUSH; i++)
 				bzero(sap->sap_list[i], FMNAMESZ + 1);
+			mutex_exit(&ss->ss_sad_lock);
 
 			/* release our hold on the config */
-			sad_ap_rele(ap);
+			sad_ap_rele(ap, ss);
 
 			/* copyout the results */
 			if (SAD_VER(csp->cp_cmd) == 1)
@@ -560,7 +579,6 @@ apush_iocdata(
 			else
 				size = STRAPUSH_V0_LEN;
 
-			sadp = (struct saddev *)qp->q_ptr;
 			mcopyout(mp, (void *)GETRESULT, size, sadp->sa_addr,
 			    NULL);
 			qreply(qp, mp);

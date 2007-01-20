@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -22,14 +22,9 @@ static const char rcsid[] = "@(#)$Id: ipftest.c,v 1.44.2.4 2005/07/16 06:05:28 d
 extern	char	*optarg;
 extern	struct frentry	*ipfilter[2][2];
 extern	struct ipread	snoop, etherf, tcpd, pcap, iptext, iphex;
-extern	struct ifnet	*get_unit __P((char *, int));
+extern	struct ifnet	*get_unit __P((char *, int, ipf_stack_t *));
 extern	void	init_ifp __P((void));
-extern	int	fr_running;
 
-ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;
-ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
-ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ip_poolrw, ipf_frcache;
-ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 int	opts = OPT_DONOTHING;
 int	use_inet6 = 0;
 int	pfil_delayed_copy = 0;
@@ -37,12 +32,16 @@ int	main __P((int, char *[]));
 int	loadrules __P((char *, int));
 int	kmemcpy __P((char *, long, int));
 int     kstrncpy __P((char *, long, int n));
-void	dumpnat __P((void));
-void	dumpstate __P((void));
-void	dumplookups __P((void));
-void	dumpgroups __P((void));
-void	drain_log __P((char *));
+void	dumpnat __P((ipf_stack_t *ifs));
+void	dumpstate __P((ipf_stack_t *ifs));
+void	dumplookups __P((ipf_stack_t *ifs));
+void	dumpgroups __P((ipf_stack_t *ifs));
+void	drain_log __P((char *, ipf_stack_t *ifs));
 void	fixv4sums __P((mb_t *, ip_t *));
+ipf_stack_t *get_ifs __P((void));
+ipf_stack_t *create_ifs __P((void));
+netstack_t *create_ns __P((void));
+
 
 #if defined(__NetBSD__) || defined(__OpenBSD__) || SOLARIS || \
 	(_BSDI_VERSION >= 199701) || (__FreeBSD_version >= 300000) || \
@@ -84,6 +83,8 @@ char *argv[];
 	struct	ipread	*r;
 	mb_t	mb, *m;
 	ip_t	*ip;
+	ipf_stack_t *ifs;
+	netstack_t *ns;
 
 	m = &mb;
 	dir = 0;
@@ -96,17 +97,34 @@ char *argv[];
 	ifname = "anon0";
 	datain = NULL;
 
-	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
-	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock");
-	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
-	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
-	RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
-	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
-
 	initparse();
-	if (fr_initialise() == -1)
-		abort();
-	fr_running = 1;
+	ifs = create_ifs();
+	ns = create_ns();
+	ifs->ifs_netstack = ns;
+
+#if defined(IPFILTER_DEFAULT_BLOCK)
+        ifs->ifs_fr_pass = FR_BLOCK|FR_NOMATCH;
+#else
+        ifs->ifs_fr_pass = (IPF_DEFAULT_PASS)|FR_NOMATCH;
+#endif
+	ipftuneable_alloc(ifs);
+	
+	bzero((char *)ifs->ifs_frcache, sizeof(ifs->ifs_frcache));
+	MUTEX_INIT(&ifs->ifs_ipf_rw, "ipf rw mutex");
+	MUTEX_INIT(&ifs->ifs_ipf_timeoutlock, "ipf timeout lock");
+	RWLOCK_INIT(&ifs->ifs_ipf_global, "ipf filter load/unload mutex");
+	RWLOCK_INIT(&ifs->ifs_ipf_mutex, "ipf filter rwlock");
+	RWLOCK_INIT(&ifs->ifs_ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
+	RWLOCK_INIT(&ifs->ifs_ipf_frcache, "ipf cache rwlock");
+
+	fr_loginit(ifs);
+	fr_authinit(ifs);
+	fr_fraginit(ifs);
+	fr_stateinit(ifs);
+	fr_natinit(ifs);
+	appr_init(ifs);
+	ip_lookup_init(ifs);
+	ifs->ifs_fr_running = 1;
 
 	while ((c = getopt(argc, argv, "6bdDF:i:I:l:N:P:or:RT:vxX")) != -1)
 		switch (c)
@@ -207,7 +225,7 @@ char *argv[];
 				    &iface, &dir)) > 0) {
 		if (iface == NULL || *iface == '\0')
 			iface = ifname;
-		ifp = get_unit(iface, IP_V(ip));
+		ifp = get_unit(iface, IP_V(ip), ifs);
 		if (ifp == NULL) {
 			fprintf(stderr, "out of memory\n");
 			exit(1);
@@ -226,7 +244,7 @@ char *argv[];
 		/* ipfr_slowtimer(); */
 		m = &mb;
 		m->mb_len = i;
-		i = fr_check(ip, hlen, ifp, dir, &m);
+		i = fr_check(ip, hlen, ifp, dir, &m, ifs);
 		if ((opts & OPT_NAT) == 0)
 			switch (i)
 			{
@@ -294,17 +312,17 @@ char *argv[];
 	(*r->r_close)();
 
 	if (logout != NULL) {
-		drain_log(logout);
+		drain_log(logout, ifs);
 	}
 
 	if (dump == 1)  {
-		dumpnat();
-		dumpstate();
-		dumplookups();
-		dumpgroups();
+		dumpnat(ifs);
+		dumpstate(ifs);
+		dumplookups(ifs);
+		dumpgroups(ifs);
 	}
 
-	fr_deinitialise();
+	fr_deinitialise(ifs);
 
 	return 0;
 }
@@ -621,17 +639,18 @@ int n;
 /*
  * Display the built up NAT table rules and mapping entries.
  */
-void dumpnat()
+void dumpnat(ifs)
+	ipf_stack_t *ifs;
 {
 	ipnat_t	*ipn;
 	nat_t	*nat;
 
 	printf("List of active MAP/Redirect filters:\n");
-	for (ipn = nat_list; ipn != NULL; ipn = ipn->in_next)
+	for (ipn = ifs->ifs_nat_list; ipn != NULL; ipn = ipn->in_next)
 		printnat(ipn, opts & (OPT_DEBUG|OPT_VERBOSE));
 	printf("\nList of active sessions:\n");
-	for (nat = nat_instances; nat; nat = nat->nat_next) {
-		printactivenat(nat, opts);
+	for (nat = ifs->ifs_nat_instances; nat; nat = nat->nat_next) {
+		printactivenat(nat, opts, 0);
 		if (nat->nat_aps)
 			printaps(nat->nat_aps, opts);
 	}
@@ -641,18 +660,20 @@ void dumpnat()
 /*
  * Display the built up state table rules and mapping entries.
  */
-void dumpstate()
+void dumpstate(ifs)
+	ipf_stack_t *ifs;
 {
 	ipstate_t *ips;
 
 	printf("List of active state sessions:\n");
-	for (ips = ips_list; ips != NULL; )
+	for (ips = ifs->ifs_ips_list; ips != NULL; )
 		ips = printstate(ips, opts & (OPT_DEBUG|OPT_VERBOSE),
-				 fr_ticks);
+				 ifs->ifs_fr_ticks);
 }
 
 
-void dumplookups()
+void dumplookups(ifs)
+	ipf_stack_t *ifs;
 {
 	iphtable_t *iph;
 	ip_pool_t *ipl;
@@ -660,17 +681,20 @@ void dumplookups()
 
 	printf("List of configured pools\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (ipl = ip_pool_list[i]; ipl != NULL; ipl = ipl->ipo_next)
+		for (ipl = ifs->ifs_ip_pool_list[i]; ipl != NULL;
+		    ipl = ipl->ipo_next)
 			printpool(ipl, bcopywrap, NULL, opts);
 
 	printf("List of configured hash tables\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (iph = ipf_htables[i]; iph != NULL; iph = iph->iph_next)
+		for (iph = ifs->ifs_ipf_htables[i]; iph != NULL;
+		     iph = iph->iph_next)
 			printhash(iph, bcopywrap, NULL, opts);
 }
 
 
-void dumpgroups()
+void dumpgroups(ifs)
+	ipf_stack_t *ifs;
 {
 	frgroup_t *fg;
 	frentry_t *fr;
@@ -678,7 +702,8 @@ void dumpgroups()
 
 	printf("List of groups configured (set 0)\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (fg =  ipfgroups[i][0]; fg != NULL; fg = fg->fg_next) {
+		for (fg =  ifs->ifs_ipfgroups[i][0]; fg != NULL;
+		    fg = fg->fg_next) {
 			printf("Dev.%d. Group %s Ref %d Flags %#x\n",
 				i, fg->fg_name, fg->fg_ref, fg->fg_flags);
 			for (fr = fg->fg_start; fr != NULL; fr = fr->fr_next) {
@@ -693,7 +718,8 @@ void dumpgroups()
 
 	printf("List of groups configured (set 1)\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (fg =  ipfgroups[i][1]; fg != NULL; fg = fg->fg_next) {
+		for (fg =  ifs->ifs_ipfgroups[i][1]; fg != NULL;
+		    fg = fg->fg_next) {
 			printf("Dev.%d. Group %s Ref %d Flags %#x\n",
 				i, fg->fg_name, fg->fg_ref, fg->fg_flags);
 			for (fr = fg->fg_start; fr != NULL; fr = fr->fr_next) {
@@ -708,8 +734,9 @@ void dumpgroups()
 }
 
 
-void drain_log(filename)
+void drain_log(filename, ifs)
 char *filename;
+ipf_stack_t *ifs;
 {
 	char buffer[DEFAULT_IPFLOGSIZE];
 	struct iovec iov;
@@ -735,7 +762,7 @@ char *filename;
 			uio.uio_resid = iov.iov_len;
 			resid = uio.uio_resid;
 
-			if (ipflog_read(i, &uio) == 0) {
+			if (ipflog_read(i, &uio, ifs) == 0) {
 				/*
 				 * If nothing was read then break out.
 				 */
@@ -781,4 +808,36 @@ ip_t *ip;
 		*csump = 0;
 		*(u_short *)csump = fr_cksum(m, ip, ip->ip_p, hdr);
 	}
+}
+
+ipf_stack_t *gifs;
+
+/*
+ * Allocate and keep pointer for get_ifs()
+ */
+ipf_stack_t *
+create_ifs()
+{
+	ipf_stack_t *ifs;
+
+	KMALLOCS(ifs, ipf_stack_t *, sizeof (*ifs));
+	bzero(ifs, sizeof (*ifs));
+	gifs = ifs;
+	return (ifs);
+}
+
+ipf_stack_t *
+get_ifs()
+{
+	return (gifs);
+}
+
+netstack_t *
+create_ns()
+{
+	netstack_t *ns;
+
+	KMALLOCS(ns, netstack_t *, sizeof (*ns));
+	bzero(ns, sizeof (*ns));
+	return (ns);
 }

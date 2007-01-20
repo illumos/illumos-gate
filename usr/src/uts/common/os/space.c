@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -176,7 +176,6 @@ char ti_statetbl[TE_NOEVENTS][TS_NOSTATES] = {
 };
 
 
-#include <sys/sad.h>
 #include <sys/tty.h>
 #include <sys/ptyvar.h>
 
@@ -188,7 +187,6 @@ static void store_fetch_initspace();
 void
 space_init(void)
 {
-	sad_initspace();
 	pty_initspace();
 	store_fetch_initspace();
 }
@@ -219,16 +217,6 @@ dev_t	uconsdev = NODEV;
  */
 
 int	cn_conf;
-
-/*
- * Moved from sad_conf.c because of the usual in loadable modules
- */
-
-#ifndef NSTRPHASH
-#define	NSTRPHASH	128
-#endif
-struct autopush **strpcache;
-int strpmask = NSTRPHASH - 1;
 
 /*
  * Flag whether console fb output is using PROM/PROM emulation

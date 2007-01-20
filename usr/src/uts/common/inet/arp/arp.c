@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -45,6 +45,7 @@
 #include <sys/vtrace.h>
 #include <sys/strsun.h>
 #include <sys/policy.h>
+#include <sys/zone.h>
 #include <sys/ethernet.h>
 #include <sys/zone.h>
 #include <sys/random.h>
@@ -132,10 +133,6 @@ typedef struct {
 	(mp->b_prev != AR_DRAINING && (arl->arl_queue != NULL ||	\
 	    arl->arl_dlpi_pending != DL_PRIM_INVAL))
 
-#define	ACE_EXTERNAL_FLAGS_MASK \
-	(ACE_F_PERMANENT | ACE_F_PUBLISH | ACE_F_MAPPING | ACE_F_MYADDR | \
-	ACE_F_AUTHORITY)
-
 #define	ARH_FIXED_LEN	8
 
 /*
@@ -149,20 +146,10 @@ typedef struct ar_m_s {
 	uint32_t	ar_mac_hw_addr_length;
 } ar_m_t;
 
-/* Named Dispatch Parameter Management Structure */
-typedef struct arpparam_s {
-	uint32_t	arp_param_min;
-	uint32_t	arp_param_max;
-	uint32_t	arp_param_value;
-	char		*arp_param_name;
-} arpparam_t;
-
 typedef struct msg2_args {
 	mblk_t	*m2a_mpdata;
 	mblk_t	*m2a_mptail;
 } msg2_args_t;
-
-extern ire_stats_t ire_stats_v4;
 
 static mblk_t	*ar_alloc(uint32_t cmd, int);
 static int	ar_ce_create(arl_t *arl, uint32_t proto, uchar_t *hw_addr,
@@ -172,23 +159,24 @@ static int	ar_ce_create(arl_t *arl, uint32_t proto, uchar_t *hw_addr,
     uint32_t flags);
 static void	ar_ce_delete(ace_t *ace);
 static void	ar_ce_delete_per_arl(ace_t *ace, void *arg);
-static ace_t	**ar_ce_hash(uint32_t proto, const uchar_t *proto_addr,
-    uint32_t proto_addr_length);
+static ace_t	**ar_ce_hash(arp_stack_t *as, uint32_t proto,
+    const uchar_t *proto_addr, uint32_t proto_addr_length);
 static ace_t	*ar_ce_lookup(arl_t *arl, uint32_t proto,
     const uchar_t *proto_addr, uint32_t proto_addr_length);
 static ace_t	*ar_ce_lookup_entry(arl_t *arl, uint32_t proto,
     const uchar_t *proto_addr, uint32_t proto_addr_length);
-static ace_t	*ar_ce_lookup_from_area(mblk_t *mp, ace_t *matchfn());
+static ace_t	*ar_ce_lookup_from_area(arp_stack_t *as, mblk_t *mp,
+    ace_t *matchfn());
 static ace_t	*ar_ce_lookup_mapping(arl_t *arl, uint32_t proto,
     const uchar_t *proto_addr, uint32_t proto_addr_length);
 static boolean_t ar_ce_resolve(ace_t *ace, const uchar_t *hw_addr,
     uint32_t hw_addr_length);
-static void	ar_ce_walk(void (*pfi)(ace_t *, void *), void *arg1);
+static void	ar_ce_walk(arp_stack_t *as, void (*pfi)(ace_t *, void *),
+    void *arg1);
 
-static void	ar_cleanup(void);
 static void	ar_client_notify(const arl_t *arl, mblk_t *mp, int code);
 static int	ar_close(queue_t *q);
-static int	ar_cmd_dispatch(queue_t *q, mblk_t *mp);
+static int	ar_cmd_dispatch(queue_t *q, mblk_t *mp, boolean_t from_wput);
 static void	ar_cmd_done(arl_t *arl);
 static mblk_t	*ar_dlpi_comm(t_uscalar_t prim, size_t size);
 static void	ar_dlpi_send(arl_t *, mblk_t *);
@@ -203,9 +191,9 @@ static int	ar_interface_on(queue_t *q, mblk_t *mp);
 static int	ar_interface_off(queue_t *q, mblk_t *mp);
 static void	ar_ll_cleanup_arl_queue(queue_t *q);
 static void	ar_ll_down(arl_t *arl);
-static arl_t	*ar_ll_lookup_by_name(const char *name);
-static arl_t	*ar_ll_lookup_from_mp(mblk_t *mp);
-static void	ar_ll_init(ar_t *, mblk_t *mp);
+static arl_t	*ar_ll_lookup_by_name(arp_stack_t *as, const char *name);
+static arl_t	*ar_ll_lookup_from_mp(arp_stack_t *as, mblk_t *mp);
+static void	ar_ll_init(arp_stack_t *, ar_t *, mblk_t *mp);
 static void	ar_ll_set_defaults(arl_t *, mblk_t *mp);
 static void	ar_ll_clear_defaults(arl_t *);
 static int	ar_ll_up(arl_t *arl);
@@ -216,13 +204,13 @@ static int	ar_nd_ioctl(queue_t *q, mblk_t *mp);
 static int	ar_open(queue_t *q, dev_t *devp, int flag, int sflag,
     cred_t *credp);
 static int	ar_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
-static boolean_t	ar_param_register(arpparam_t *arppa, int cnt);
+static boolean_t ar_param_register(IDP *ndp, arpparam_t *arppa, int cnt);
 static int	ar_param_set(queue_t *q, mblk_t *mp, char *value,
     caddr_t cp, cred_t *cr);
 static void	ar_query_delete(ace_t *ace, void *ar);
 static void	ar_query_reply(ace_t *ace, int ret_val,
     uchar_t *proto_addr, uint32_t proto_addr_len);
-static clock_t	ar_query_xmit(ace_t *ace, ace_t *src_ace);
+static clock_t	ar_query_xmit(arp_stack_t *as, ace_t *ace, ace_t *src_ace);
 static void	ar_rput(queue_t *q, mblk_t *mp_orig);
 static void	ar_rput_dlpi(queue_t *q, mblk_t *mp);
 static void	ar_set_address(ace_t *ace, uchar_t *addrpos,
@@ -235,11 +223,14 @@ static void	ar_wput(queue_t *q, mblk_t *mp);
 static void	ar_wsrv(queue_t *q);
 static void	ar_xmit(arl_t *arl, uint32_t operation, uint32_t proto,
     uint32_t plen, const uchar_t *haddr1, const uchar_t *paddr1,
-    const uchar_t *haddr2, const uchar_t *paddr2, const uchar_t *dstaddr);
+    const uchar_t *haddr2, const uchar_t *paddr2, const uchar_t *dstaddr,
+    arp_stack_t *as);
 static void	ar_cmd_enqueue(arl_t *arl, mblk_t *mp, queue_t *q,
     ushort_t cmd, boolean_t);
 static mblk_t	*ar_cmd_dequeue(arl_t *arl);
 
+static void	*arp_stack_init(netstackid_t stackid, netstack_t *ns);
+static void	arp_stack_fini(netstackid_t stackid, void *arg);
 /*
  * All of these are alterable, within the min/max values given,
  * at run time. arp_publish_interval and arp_publish_count are
@@ -264,20 +255,19 @@ static arpparam_t	arp_param_arr[] = {
 	{ 0,		3600000,	15000,	"arp_broadcast_interval"},
 	{ 5,		86400,		3600,	"arp_defend_period"}
 };
-
-#define	arp_cleanup_interval	arp_param_arr[0].arp_param_value
-#define	arp_publish_interval	arp_param_arr[1].arp_param_value
-#define	arp_publish_count	arp_param_arr[2].arp_param_value
-#define	arp_probe_delay		arp_param_arr[3].arp_param_value
-#define	arp_probe_interval	arp_param_arr[4].arp_param_value
-#define	arp_probe_count		arp_param_arr[5].arp_param_value
-#define	arp_fastprobe_delay	arp_param_arr[6].arp_param_value
-#define	arp_fastprobe_interval	arp_param_arr[7].arp_param_value
-#define	arp_fastprobe_count	arp_param_arr[8].arp_param_value
-#define	arp_defend_interval	arp_param_arr[9].arp_param_value
-#define	arp_defend_rate		arp_param_arr[10].arp_param_value
-#define	arp_broadcast_interval	arp_param_arr[11].arp_param_value
-#define	arp_defend_period	arp_param_arr[12].arp_param_value
+#define	as_cleanup_interval	as_param_arr[0].arp_param_value
+#define	as_publish_interval	as_param_arr[1].arp_param_value
+#define	as_publish_count	as_param_arr[2].arp_param_value
+#define	as_probe_delay		as_param_arr[3].arp_param_value
+#define	as_probe_interval	as_param_arr[4].arp_param_value
+#define	as_probe_count		as_param_arr[5].arp_param_value
+#define	as_fastprobe_delay	as_param_arr[6].arp_param_value
+#define	as_fastprobe_interval	as_param_arr[7].arp_param_value
+#define	as_fastprobe_count	as_param_arr[8].arp_param_value
+#define	as_defend_interval	as_param_arr[9].arp_param_value
+#define	as_defend_rate		as_param_arr[10].arp_param_value
+#define	as_broadcast_interval	as_param_arr[11].arp_param_value
+#define	as_defend_period	as_param_arr[12].arp_param_value
 
 static struct module_info info = {
 	0, "arp", 0, INFPSZ, 512, 128
@@ -295,18 +285,6 @@ struct streamtab arpinfo = {
 	&rinit, &winit
 };
 
-static void	*ar_g_head;	/* AR Instance Data List Head */
-static caddr_t	ar_g_nd;	/* AR Named Dispatch Head */
-
-/*
- * With the introduction of netinfo (neti kernel module), it is now possible
- * to access data structures in the ARP module without the code being
- * executed in the context of the IP module, thus there is no locking being
- * enforced through the use of STREAMS.
- */
-krwlock_t	arl_g_lock;
-arl_t		*arl_g_head;	/* ARL List Head */
-
 /*
  * TODO: we need a better mechanism to set the ARP hardware type since
  * the DLPI mac type does not include enough predefined values.
@@ -322,14 +300,6 @@ static ar_m_t	ar_m_tbl[] = {
 	{ DL_OTHER,	ARPHRD_ETHER,	-2,	6},	/* unknown */
 };
 
-/* ARP Cache Entry Hash Table */
-static ace_t	*ar_ce_hash_tbl[ARP_HASH_SIZE];
-
-static ace_t	*ar_ce_mask_entries;	/* proto_mask not all ones */
-
-static uint32_t	arp_index_counter = 1;
-static uint32_t	arp_counter_wrapped = 0;
-
 /*
  * Note that all routines which need to queue the message for later
  * processing have to be ioctl_aware to be able to queue the complete message.
@@ -337,6 +307,7 @@ static uint32_t	arp_counter_wrapped = 0;
  */
 #define	ARF_IOCTL_AWARE	0x1	/* Arp command can come down as M_IOCTL */
 #define	ARF_ONLY_CMD	0x2	/* Command is exclusive to ARP */
+#define	ARF_WPUT_OK	0x4	/* Command is allowed from ar_wput */
 
 /* ARP Cmd Table entry */
 typedef struct arct_s {
@@ -348,15 +319,22 @@ typedef struct arct_s {
 	const char	*arct_txt;
 } arct_t;
 
+/*
+ * AR_ENTRY_ADD, QUERY and SQUERY are used by sdp, hence they need to
+ * have ARF_WPUT_OK set.
+ */
 static arct_t	ar_cmd_tbl[] = {
 	{ ar_entry_add,		AR_ENTRY_ADD,		sizeof (area_t),
-	    ARF_IOCTL_AWARE | ARF_ONLY_CMD, OP_CONFIG, "AR_ENTRY_ADD" },
+	    ARF_IOCTL_AWARE | ARF_ONLY_CMD | ARF_WPUT_OK, OP_CONFIG,
+	    "AR_ENTRY_ADD" },
 	{ ar_entry_delete,	AR_ENTRY_DELETE,	sizeof (ared_t),
 	    ARF_IOCTL_AWARE | ARF_ONLY_CMD, OP_CONFIG, "AR_ENTRY_DELETE" },
 	{ ar_entry_query,	AR_ENTRY_QUERY,		sizeof (areq_t),
-	    ARF_IOCTL_AWARE | ARF_ONLY_CMD, OP_NP, "AR_ENTRY_QUERY" },
+	    ARF_IOCTL_AWARE | ARF_ONLY_CMD | ARF_WPUT_OK, OP_NP,
+	    "AR_ENTRY_QUERY" },
 	{ ar_entry_squery,	AR_ENTRY_SQUERY,	sizeof (area_t),
-	    ARF_IOCTL_AWARE | ARF_ONLY_CMD, OP_NP, "AR_ENTRY_SQUERY" },
+	    ARF_IOCTL_AWARE | ARF_ONLY_CMD | ARF_WPUT_OK, OP_NP,
+	    "AR_ENTRY_SQUERY" },
 	{ ar_mapping_add,	AR_MAPPING_ADD,		sizeof (arma_t),
 	    ARF_IOCTL_AWARE | ARF_ONLY_CMD, OP_CONFIG, "AR_MAPPING_ADD" },
 	{ ar_interface_up,	AR_INTERFACE_UP,	sizeof (arc_t),
@@ -368,15 +346,16 @@ static arct_t	ar_cmd_tbl[] = {
 	{ ar_interface_off,	AR_INTERFACE_OFF,	sizeof (arc_t),
 	    ARF_ONLY_CMD, OP_CONFIG, "AR_INTERFACE_OFF" },
 	{ ar_set_ppa,		(uint32_t)IF_UNITSEL,	sizeof (int),
-	    ARF_IOCTL_AWARE, OP_CONFIG, "IF_UNITSEL" },
+	    ARF_IOCTL_AWARE | ARF_WPUT_OK, OP_CONFIG, "IF_UNITSEL" },
 	{ ar_nd_ioctl,		ND_GET,			1,
-	    ARF_IOCTL_AWARE, OP_NP, "ND_GET" },
+	    ARF_IOCTL_AWARE | ARF_WPUT_OK, OP_NP, "ND_GET" },
 	{ ar_nd_ioctl,		ND_SET,			1,
-	    ARF_IOCTL_AWARE, OP_CONFIG, "ND_SET" },
+	    ARF_IOCTL_AWARE | ARF_WPUT_OK, OP_CONFIG, "ND_SET" },
 	{ ar_snmp_msg,		AR_SNMP_MSG,	sizeof (struct T_optmgmt_ack),
-	    ARF_IOCTL_AWARE | ARF_ONLY_CMD, OP_NP, "AR_SNMP_MSG" },
+	    ARF_IOCTL_AWARE | ARF_WPUT_OK | ARF_ONLY_CMD, OP_NP,
+	    "AR_SNMP_MSG" },
 	{ ar_slifname,		(uint32_t)SIOCSLIFNAME,	sizeof (struct lifreq),
-	    ARF_IOCTL_AWARE, OP_CONFIG, "SIOCSLIFNAME" }
+	    ARF_IOCTL_AWARE | ARF_WPUT_OK, OP_CONFIG, "SIOCSLIFNAME" }
 };
 
 /*
@@ -394,6 +373,7 @@ ar_ce_create(arl_t *arl, uint_t proto, uchar_t *hw_addr, uint_t hw_addr_len,
 	ace_t	**acep;
 	uchar_t	*dst;
 	mblk_t	*mp;
+	arp_stack_t *as = ARL_TO_ARPSTACK(arl);
 	arlphy_t *ap;
 
 	if ((flags & ~ACE_EXTERNAL_FLAGS_MASK) || arl == NULL)
@@ -491,13 +471,12 @@ ar_ce_create(arl_t *arl, uint_t proto, uchar_t *hw_addr, uint_t hw_addr_len,
 	}
 
 	ace->ace_flags = flags;
-
 	if (ar_mask_all_ones(ace->ace_proto_mask,
 	    ace->ace_proto_addr_length)) {
-		acep = ar_ce_hash(ace->ace_proto, ace->ace_proto_addr,
+		acep = ar_ce_hash(as, ace->ace_proto, ace->ace_proto_addr,
 		    ace->ace_proto_addr_length);
 	} else {
-		acep = &ar_ce_mask_entries;
+		acep = &as->as_ce_mask_entries;
 	}
 	if ((ace->ace_next = *acep) != NULL)
 		ace->ace_next->ace_ptpn = &ace->ace_next;
@@ -540,7 +519,7 @@ ar_ce_delete_per_arl(ace_t *ace, void *arl)
 
 /* Cache entry hash routine, based on protocol and protocol address. */
 static ace_t **
-ar_ce_hash(uint32_t proto, const uchar_t *proto_addr,
+ar_ce_hash(arp_stack_t *as, uint32_t proto, const uchar_t *proto_addr,
     uint32_t proto_addr_length)
 {
 	const uchar_t *up = proto_addr;
@@ -549,7 +528,7 @@ ar_ce_hash(uint32_t proto, const uchar_t *proto_addr,
 
 	while (--len >= 0)
 		hval ^= *up++;
-	return (&ar_ce_hash_tbl[hval % A_CNT(ar_ce_hash_tbl)]);
+	return (&as->as_ce_hash_tbl[hval % ARP_HASH_SIZE]);
 }
 
 /* Cache entry lookup.	Try to find an ace matching the parameters passed. */
@@ -575,10 +554,11 @@ ar_ce_lookup_entry(arl_t *arl, uint32_t proto, const uchar_t *proto_addr,
     uint32_t proto_addr_length)
 {
 	ace_t	*ace;
+	arp_stack_t *as = ARL_TO_ARPSTACK(arl);
 
 	if (!proto_addr)
 		return (NULL);
-	ace = *ar_ce_hash(proto, proto_addr, proto_addr_length);
+	ace = *ar_ce_hash(as, proto, proto_addr, proto_addr_length);
 	for (; ace; ace = ace->ace_next) {
 		if (ace->ace_arl == arl &&
 		    ace->ace_proto_addr_length == proto_addr_length &&
@@ -604,7 +584,7 @@ ar_ce_lookup_entry(arl_t *arl, uint32_t proto, const uchar_t *proto_addr,
  * call the supplied match function.
  */
 static ace_t *
-ar_ce_lookup_from_area(mblk_t *mp, ace_t *matchfn())
+ar_ce_lookup_from_area(arp_stack_t *as, mblk_t *mp, ace_t *matchfn())
 {
 	uchar_t	*proto_addr;
 	area_t	*area = (area_t *)mp->b_rptr;
@@ -613,7 +593,7 @@ ar_ce_lookup_from_area(mblk_t *mp, ace_t *matchfn())
 	    area->area_proto_addr_length);
 	if (!proto_addr)
 		return (NULL);
-	return ((*matchfn)(ar_ll_lookup_from_mp(mp), area->area_proto,
+	return ((*matchfn)(ar_ll_lookup_from_mp(as, mp), area->area_proto,
 	    proto_addr, area->area_proto_addr_length));
 }
 
@@ -626,10 +606,11 @@ ar_ce_lookup_mapping(arl_t *arl, uint32_t proto, const uchar_t *proto_addr,
     uint32_t proto_addr_length)
 {
 	ace_t	*ace;
+	arp_stack_t *as = ARL_TO_ARPSTACK(arl);
 
 	if (!proto_addr)
 		return (NULL);
-	ace = ar_ce_mask_entries;
+	ace = as->as_ce_mask_entries;
 	for (; ace; ace = ace->ace_next) {
 		if (ace->ace_arl == arl &&
 		    ace->ace_proto_addr_length == proto_addr_length &&
@@ -661,12 +642,12 @@ ar_ce_lookup_mapping(arl_t *arl, uint32_t proto, const uchar_t *proto_addr,
  * mapping to avoid arp interpreting it as a duplicate.
  */
 static ace_t *
-ar_ce_lookup_permanent(uint32_t proto, uchar_t *proto_addr,
+ar_ce_lookup_permanent(arp_stack_t *as, uint32_t proto, uchar_t *proto_addr,
     uint32_t proto_addr_length)
 {
 	ace_t	*ace;
 
-	ace = *ar_ce_hash(proto, proto_addr, proto_addr_length);
+	ace = *ar_ce_hash(as, proto, proto_addr, proto_addr_length);
 	for (; ace != NULL; ace = ace->ace_next) {
 		if (!(ace->ace_flags & ACE_F_PERMANENT))
 			continue;
@@ -771,8 +752,9 @@ ar_ce_resolve_all(arl_t *arl, uint32_t proto, const uchar_t *src_haddr,
 	uchar_t *ace_addr;
 	uchar_t *mask;
 	int retv = AR_NOTFOUND;
+	arp_stack_t *as = ARL_TO_ARPSTACK(arl);
 
-	ace = *ar_ce_hash(proto, src_paddr, plen);
+	ace = *ar_ce_hash(as, proto, src_paddr, plen);
 	for (; ace != NULL; ace = ace_next) {
 
 		/* ar_ce_resolve may delete the ace; fetch next pointer now */
@@ -853,34 +835,26 @@ ar_ce_resolve_all(arl_t *arl, uint32_t proto, const uchar_t *src_haddr,
 
 /* Pass arg1 to the pfi supplied, along with each ace in existence. */
 static void
-ar_ce_walk(void (*pfi)(ace_t *, void *), void *arg1)
+ar_ce_walk(arp_stack_t *as, void (*pfi)(ace_t *, void *), void *arg1)
 {
 	ace_t	*ace;
 	ace_t	*ace1;
-	ace_t	**acep;
+	int i;
 
-	for (acep = ar_ce_hash_tbl; acep < A_END(ar_ce_hash_tbl); acep++) {
+	for (i = 0; i < ARP_HASH_SIZE; i++) {
 		/*
 		 * We walk the hash chain in a way that allows the current
 		 * ace to get blown off by the called routine.
 		 */
-		for (ace = *acep; ace; ace = ace1) {
+		for (ace = as->as_ce_hash_tbl[i]; ace; ace = ace1) {
 			ace1 = ace->ace_next;
 			(*pfi)(ace, arg1);
 		}
 	}
-	for (ace = ar_ce_mask_entries; ace; ace = ace1) {
+	for (ace = as->as_ce_mask_entries; ace; ace = ace1) {
 		ace1 = ace->ace_next;
 		(*pfi)(ace, arg1);
 	}
-}
-
-/* Free the ND tables if the last ar has gone away. */
-static void
-ar_cleanup(void)
-{
-	if (!ar_g_head)
-		nd_free(&ar_g_nd);
 }
 
 /*
@@ -969,6 +943,7 @@ ar_close(queue_t *q)
 	arc_t	*arc;
 	mblk_t	*mp1;
 	int	index;
+	arp_stack_t *as = ar->ar_as;
 
 	TRACE_1(TR_FAC_ARP, TR_ARP_CLOSE,
 	    "arp_close: q %p", q);
@@ -997,7 +972,7 @@ ar_close(queue_t *q)
 			}
 		}
 		/* Delete all our pending queries, 'arl' is not dereferenced */
-		ar_ce_walk(ar_query_delete, ar);
+		ar_ce_walk(as, ar_query_delete, ar);
 		/*
 		 * The request could be pending on some arl_queue also. This
 		 * happens if the arl is not yet bound, and bind is pending.
@@ -1021,11 +996,12 @@ ar_close(queue_t *q)
 		 * If this is the control stream for an arl, delete anything
 		 * hanging off our arl.
 		 */
-		ar_ce_walk(ar_ce_delete_per_arl, arl);
+		ar_ce_walk(as, ar_ce_delete_per_arl, arl);
 		/* Free any messages waiting for a bind_ack */
 		/* Get the arl out of the chain. */
-		rw_enter(&arl_g_lock, RW_WRITER);
-		for (arlp = &arl_g_head; *arlp; arlp = &(*arlp)->arl_next) {
+		rw_enter(&as->as_arl_g_lock, RW_WRITER);
+		for (arlp = &as->as_arl_head; *arlp;
+		    arlp = &(*arlp)->arl_next) {
 			if (*arlp == arl) {
 				*arlp = arl->arl_next;
 				break;
@@ -1034,7 +1010,7 @@ ar_close(queue_t *q)
 
 		ASSERT(arl->arl_dlpi_deferred == NULL);
 		ar->ar_arl = NULL;
-		rw_exit(&arl_g_lock);
+		rw_exit(&as->as_arl_g_lock);
 
 		mi_free((char *)arl);
 	}
@@ -1047,8 +1023,7 @@ ar_close(queue_t *q)
 	}
 	cr = ar->ar_credp;
 	/* mi_close_comm frees the instance data. */
-	(void) mi_close_comm(&ar_g_head, q);
-	ar_cleanup();
+	(void) mi_close_comm(&as->as_head, q);
 	qprocsoff(q);
 	crfree(cr);
 
@@ -1060,8 +1035,10 @@ ar_close(queue_t *q)
 		info.hne_event = NE_UNPLUMB;
 		info.hne_data = name;
 		info.hne_datalen = strlen(name);
-		(void) hook_run(arpnicevents, (hook_data_t)&info);
+		(void) hook_run(as->as_arpnicevents, (hook_data_t)&info,
+		    as->as_netstack);
 	}
+	netstack_rele(as->as_netstack);
 	return (0);
 }
 
@@ -1071,7 +1048,7 @@ ar_close(queue_t *q)
  */
 /* TODO: error reporting for M_PROTO case */
 static int
-ar_cmd_dispatch(queue_t *q, mblk_t *mp_orig)
+ar_cmd_dispatch(queue_t *q, mblk_t *mp_orig, boolean_t from_wput)
 {
 	arct_t	*arct;
 	uint32_t	cmd;
@@ -1117,10 +1094,15 @@ ar_cmd_dispatch(queue_t *q, mblk_t *mp_orig)
 		if (cr == NULL)
 			cr = DB_CREDDEF(mp_orig, ((ar_t *)q->q_ptr)->ar_credp);
 
-		if ((error = secpolicy_net(cr, arct->arct_priv_req,
+		if ((error = secpolicy_ip(cr, arct->arct_priv_req,
 		    B_FALSE)) != 0)
 			return (error);
 	}
+	/* Disallow many commands except if from rput i.e. from IP */
+	if (from_wput && !(arct->arct_flags & ARF_WPUT_OK)) {
+		return (EINVAL);
+	}
+
 	if (arct->arct_flags & ARF_IOCTL_AWARE)
 		mp = mp_orig;
 
@@ -1436,11 +1418,12 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 	int	err;
 	uint_t	aflags;
 	boolean_t unverified;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
 	/* We handle both M_IOCTL and M_PROTO messages. */
 	if (DB_TYPE(mp) == M_IOCTL)
 		mp = mp->b_cont;
-	arl = ar_ll_lookup_from_mp(mp);
+	arl = ar_ll_lookup_from_mp(as, mp);
 	if (arl == NULL)
 		return (EINVAL);
 	/*
@@ -1462,7 +1445,8 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 	 * duplicate address detection state.  If it's a new entry, then we're
 	 * obligated to do duplicate address detection now.
 	 */
-	if ((ace = ar_ce_lookup_from_area(mp, ar_ce_lookup_entry)) != NULL) {
+	ace = ar_ce_lookup_from_area(as, mp, ar_ce_lookup_entry);
+	if (ace != NULL) {
 		unverified = (ace->ace_flags & ACE_F_UNVERIFIED) != 0;
 		ar_ce_delete(ace);
 	} else {
@@ -1525,11 +1509,11 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 		ASSERT(ace != NULL);
 
 		if (ace->ace_flags & ACE_F_FAST) {
-			ace->ace_xmit_count = arp_fastprobe_count;
-			ace->ace_xmit_interval = arp_fastprobe_delay;
+			ace->ace_xmit_count = as->as_fastprobe_count;
+			ace->ace_xmit_interval = as->as_fastprobe_delay;
 		} else {
-			ace->ace_xmit_count = arp_probe_count;
-			ace->ace_xmit_interval = arp_probe_delay;
+			ace->ace_xmit_count = as->as_probe_count;
+			ace->ace_xmit_interval = as->as_probe_delay;
 		}
 
 		/*
@@ -1558,12 +1542,12 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 				    area_t *, area);
 				ar_xmit(arl, ARP_REQUEST, area->area_proto,
 				    proto_addr_len, hw_addr, NULL, NULL,
-				    proto_addr, NULL);
+				    proto_addr, NULL, as);
 				ace->ace_xmit_count--;
 				ace->ace_xmit_interval =
 				    (ace->ace_flags & ACE_F_FAST) ?
-				    arp_fastprobe_interval :
-				    arp_probe_interval;
+				    as->as_fastprobe_interval :
+				    as->as_probe_interval;
 				ace_set_timer(ace, B_FALSE);
 			} else {
 				DTRACE_PROBE2(eadd_delay, ace_t *, ace,
@@ -1576,7 +1560,7 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 			    area_t *, area);
 			ar_xmit(arl, ARP_REQUEST, area->area_proto,
 			    proto_addr_len, hw_addr, proto_addr,
-			    ap->ap_arp_addr, proto_addr, NULL);
+			    ap->ap_arp_addr, proto_addr, NULL, as);
 			ace->ace_last_bcast = ddi_get_lbolt();
 
 			/*
@@ -1590,10 +1574,11 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 			 */
 			if ((aflags & ACE_F_AUTHORITY) &&
 			    !(aflags & ACE_F_DEFEND) &&
-			    arp_publish_count > 0) {
+			    as->as_publish_count > 0) {
 				/* Account for the xmit we just did */
-				ace->ace_xmit_count = arp_publish_count - 1;
-				ace->ace_xmit_interval = arp_publish_interval;
+				ace->ace_xmit_count = as->as_publish_count - 1;
+				ace->ace_xmit_interval =
+				    as->as_publish_interval;
 				if (ace->ace_xmit_count > 0)
 					ace_set_timer(ace, B_FALSE);
 			}
@@ -1609,11 +1594,12 @@ ar_entry_delete(queue_t *q, mblk_t *mp_orig)
 	ace_t	*ace;
 	arl_t	*arl;
 	mblk_t	*mp = mp_orig;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
 	/* We handle both M_IOCTL and M_PROTO messages. */
 	if (DB_TYPE(mp) == M_IOCTL)
 		mp = mp->b_cont;
-	arl = ar_ll_lookup_from_mp(mp);
+	arl = ar_ll_lookup_from_mp(as, mp);
 	if (arl == NULL)
 		return (EINVAL);
 	/*
@@ -1631,7 +1617,7 @@ ar_entry_delete(queue_t *q, mblk_t *mp_orig)
 	 * Need to know if it is a mapping or an exact match.  Check exact
 	 * match first.
 	 */
-	ace = ar_ce_lookup_from_area(mp, ar_ce_lookup);
+	ace = ar_ce_lookup_from_area(as, mp, ar_ce_lookup);
 	if (ace != NULL) {
 		/*
 		 * If it's a permanent entry, then the client is the one who
@@ -1667,13 +1653,14 @@ ar_entry_query(queue_t *q, mblk_t *mp_orig)
 	uint32_t proto_addr_len;
 	clock_t	ms;
 	boolean_t is_mproto = B_TRUE;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
 	/* We handle both M_IOCTL and M_PROTO messages. */
 	if (DB_TYPE(mp) == M_IOCTL) {
 		is_mproto = B_FALSE;
 		mp = mp->b_cont;
 	}
-	arl = ar_ll_lookup_from_mp(mp);
+	arl = ar_ll_lookup_from_mp(as, mp);
 	if (arl == NULL) {
 		DTRACE_PROBE2(query_no_arl, queue_t *, q, mblk_t *, mp);
 		err = EINVAL;
@@ -1830,8 +1817,8 @@ ar_entry_query(queue_t *q, mblk_t *mp_orig)
 		 * search the other arl for a resolved ACE. If we find one,
 		 * we resolve it rather than sending out a ARP request.
 		 */
-		src_ace = ar_ce_lookup_permanent(areq->areq_proto, sender_addr,
-		    areq->areq_sender_addr_length);
+		src_ace = ar_ce_lookup_permanent(as, areq->areq_proto,
+		    sender_addr, areq->areq_sender_addr_length);
 		if (src_ace == NULL) {
 			DTRACE_PROBE3(query_source_missing, arl_t *, arl,
 			    areq_t *, areq, ace_t *, ace);
@@ -1861,7 +1848,7 @@ ar_entry_query(queue_t *q, mblk_t *mp_orig)
 			}
 		}
 	}
-	ms = ar_query_xmit(ace, src_ace);
+	ms = ar_query_xmit(as, ace, src_ace);
 	if (ms == 0) {
 		/* Immediate reply requested. */
 		ar_query_reply(ace, ENXIO, NULL, (uint32_t)0);
@@ -1870,8 +1857,11 @@ ar_entry_query(queue_t *q, mblk_t *mp_orig)
 	}
 	return (EINPROGRESS);
 err_ret:
-	if (is_mproto)
-		BUMP_IRE_STATS(ire_stats_v4, ire_stats_freed);
+	if (is_mproto) {
+		ip_stack_t *ipst = as->as_netstack->netstack_ip;
+
+		BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_freed);
+	}
 	return (err);
 }
 
@@ -1887,10 +1877,11 @@ ar_entry_squery(queue_t *q, mblk_t *mp_orig)
 	mblk_t	*mp = mp_orig;
 	uchar_t	*proto_addr;
 	int	proto_addr_len;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
 	if (DB_TYPE(mp) == M_IOCTL)
 		mp = mp->b_cont;
-	arl = ar_ll_lookup_from_mp(mp);
+	arl = ar_ll_lookup_from_mp(as, mp);
 	if (arl == NULL)
 		return (EINVAL);
 	/*
@@ -1952,8 +1943,9 @@ static int
 ar_interface_down(queue_t *q, mblk_t *mp)
 {
 	arl_t	*arl;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
-	arl = ar_ll_lookup_from_mp(mp);
+	arl = ar_ll_lookup_from_mp(as, mp);
 	if (arl == NULL || arl->arl_closing) {
 		DTRACE_PROBE2(down_no_arl, queue_t *, q, mblk_t *, mp);
 		return (EINVAL);
@@ -1987,7 +1979,7 @@ ar_interface_down(queue_t *q, mblk_t *mp)
 	ASSERT(arl->arl_state == ARL_S_UP);
 
 	/* Free all arp entries for this interface */
-	ar_ce_walk(ar_ce_delete_per_arl, arl);
+	ar_ce_walk(as, ar_ce_delete_per_arl, arl);
 
 	ar_ll_down(arl);
 	/* Return EINPROGRESS so that ar_rput does not free the 'mp' */
@@ -2003,8 +1995,9 @@ ar_interface_up(queue_t *q, mblk_t *mp)
 	arl_t	*arl;
 	int	err;
 	mblk_t	*mp1;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
-	arl = ar_ll_lookup_from_mp(mp);
+	arl = ar_ll_lookup_from_mp(as, mp);
 	if (arl == NULL || arl->arl_closing) {
 		DTRACE_PROBE2(up_no_arl, queue_t *, q, mblk_t *, mp);
 		err = EINVAL;
@@ -2063,8 +2056,9 @@ static int
 ar_interface_on(queue_t *q, mblk_t *mp)
 {
 	arl_t	*arl;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
-	arl = ar_ll_lookup_from_mp(mp);
+	arl = ar_ll_lookup_from_mp(as, mp);
 	if (arl == NULL) {
 		DTRACE_PROBE2(on_no_arl, queue_t *, q, mblk_t *, mp);
 		return (EINVAL);
@@ -2084,8 +2078,9 @@ static int
 ar_interface_off(queue_t *q, mblk_t *mp)
 {
 	arl_t	*arl;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
-	arl = ar_ll_lookup_from_mp(mp);
+	arl = ar_ll_lookup_from_mp(as, mp);
 	if (arl == NULL) {
 		DTRACE_PROBE2(off_no_arl, queue_t *, q, mblk_t *, mp);
 		return (EINVAL);
@@ -2108,8 +2103,10 @@ ar_ll_cleanup_arl_queue(queue_t *q)
 	mblk_t	*mp;
 	mblk_t	*mpnext;
 	mblk_t	*prev;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
+	ip_stack_t *ipst = as->as_netstack->netstack_ip;
 
-	for (arl = arl_g_head; arl != NULL; arl = arl->arl_next) {
+	for (arl = as->as_arl_head; arl != NULL; arl = arl->arl_next) {
 		for (prev = NULL, mp = arl->arl_queue; mp != NULL;
 		    mp = mpnext) {
 			mpnext = mp->b_next;
@@ -2123,7 +2120,7 @@ ar_ll_cleanup_arl_queue(queue_t *q)
 					arl->arl_queue_tail = prev;
 				if (DB_TYPE(mp) == M_PROTO &&
 				    *(uint32_t *)mp->b_rptr == AR_ENTRY_QUERY) {
-					BUMP_IRE_STATS(ire_stats_v4,
+					BUMP_IRE_STATS(ipst->ips_ire_stats_v4,
 					    ire_stats_freed);
 				}
 				inet_freemsg(mp);
@@ -2138,11 +2135,11 @@ ar_ll_cleanup_arl_queue(queue_t *q)
  * Look up a lower level tap by name.
  */
 static arl_t *
-ar_ll_lookup_by_name(const char *name)
+ar_ll_lookup_by_name(arp_stack_t *as, const char *name)
 {
 	arl_t	*arl;
 
-	for (arl = arl_g_head; arl; arl = arl->arl_next) {
+	for (arl = as->as_arl_head; arl; arl = arl->arl_next) {
 		if (strcmp(arl->arl_name, name) == 0) {
 			return (arl);
 		}
@@ -2155,7 +2152,7 @@ ar_ll_lookup_by_name(const char *name)
  * portion of the ARP command.
  */
 static arl_t *
-ar_ll_lookup_from_mp(mblk_t *mp)
+ar_ll_lookup_from_mp(arp_stack_t *as, mblk_t *mp)
 {
 	arc_t	*arc = (arc_t *)mp->b_rptr;
 	uint8_t	*name;
@@ -2164,11 +2161,11 @@ ar_ll_lookup_from_mp(mblk_t *mp)
 	name = mi_offset_param(mp, arc->arc_name_offset, namelen);
 	if (name == NULL || name[namelen - 1] != '\0')
 		return (NULL);
-	return (ar_ll_lookup_by_name((char *)name));
+	return (ar_ll_lookup_by_name(as, (char *)name));
 }
 
 static void
-ar_ll_init(ar_t *ar, mblk_t *mp)
+ar_ll_init(arp_stack_t *as, ar_t *ar, mblk_t *mp)
 {
 	arl_t	*arl;
 	dl_info_ack_t *dlia = (dl_info_ack_t *)mp->b_rptr;
@@ -2200,27 +2197,29 @@ ar_ll_init(ar_t *ar, mblk_t *mp)
 	 * second of every day (non-leap year) for it to wrap around and the
 	 * for() loop below to kick in as a performance concern.
 	 */
-	if (arp_counter_wrapped) {
-		arl_t *as;
+	if (as->as_arp_counter_wrapped) {
+		arl_t *arl1;
 
 		do {
-			for (as = arl_g_head; as != NULL; as = as->arl_next)
-				if (as->arl_index == arp_index_counter) {
-					arp_index_counter++;
-					if (arp_index_counter == 0) {
-						arp_counter_wrapped++;
-						arp_index_counter = 1;
+			for (arl1 = as->as_arl_g_head; arl1 != NULL;
+			    arl1 = arl1->arl_next)
+				if (arl1->arl_index ==
+				    as->as_arp_index_counter) {
+					as->as_arp_index_counter++;
+					if (as->as_arp_index_counter == 0) {
+						as->as_arp_counter_wrapped++;
+						as->as_arp_index_counter = 1;
 					}
 					break;
 			}
-		} while (as != NULL);
+		} while (arl1 != NULL);
 	} else {
-		arl->arl_index = arp_index_counter;
+		arl->arl_index = as->as_arp_index_counter;
 	}
-	arp_index_counter++;
-	if (arp_index_counter == 0) {
-		arp_counter_wrapped++;
-		arp_index_counter = 1;
+	as->as_arp_index_counter++;
+	if (as->as_arp_index_counter == 0) {
+		as->as_arp_counter_wrapped++;
+		as->as_arp_index_counter = 1;
 	}
 }
 
@@ -2454,11 +2453,12 @@ ar_mapping_add(queue_t *q, mblk_t *mp_orig)
 	uchar_t	*proto_extract_mask;
 	uint32_t	hw_extract_start;
 	arl_t	*arl;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
 	/* We handle both M_IOCTL and M_PROTO messages. */
 	if (DB_TYPE(mp) == M_IOCTL)
 		mp = mp->b_cont;
-	arl = ar_ll_lookup_from_mp(mp);
+	arl = ar_ll_lookup_from_mp(as, mp);
 	if (arl == NULL)
 		return (EINVAL);
 	/*
@@ -2473,7 +2473,8 @@ ar_mapping_add(queue_t *q, mblk_t *mp_orig)
 	mp_orig->b_prev = NULL;
 
 	arma = (arma_t *)mp->b_rptr;
-	if ((ace = ar_ce_lookup_from_area(mp, ar_ce_lookup_mapping)) != NULL)
+	ace = ar_ce_lookup_from_area(as, mp, ar_ce_lookup_mapping);
+	if (ace != NULL)
 		ar_ce_delete(ace);
 	hw_addr_len = arma->arma_hw_addr_length;
 	hw_addr = mi_offset_paramc(mp, arma->arma_hw_addr_offset, hw_addr_len);
@@ -2533,7 +2534,10 @@ ar_m_lookup(t_uscalar_t mac_type)
 static int
 ar_nd_ioctl(queue_t *q, mblk_t *mp)
 {
-	if (DB_TYPE(mp) == M_IOCTL && nd_getset(q, ar_g_nd, mp))
+	ar_t	*ar = (ar_t *)q->q_ptr;
+	arp_stack_t *as = ar->ar_as;
+
+	if (DB_TYPE(mp) == M_IOCTL && nd_getset(q, as->as_nd, mp))
 		return (0);
 	return (ENOENT);
 }
@@ -2546,6 +2550,8 @@ ar_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	int	err;
 	queue_t *tmp_q;
 	mblk_t *mp;
+	netstack_t *ns;
+	arp_stack_t *as;
 
 	TRACE_1(TR_FAC_ARP, TR_ARP_OPEN,
 	    "arp_open: q %p", q);
@@ -2553,17 +2559,17 @@ ar_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	if (q->q_ptr != NULL) {
 		return (0);
 	}
-	/* Load up the Named Dispatch tables, if not already done. */
-	if (ar_g_nd == NULL &&
-	    !ar_param_register(arp_param_arr, A_CNT(arp_param_arr))) {
-		ar_cleanup();
-		return (ENOMEM);
-	}
+
+	ns = netstack_find_by_cred(credp);
+	ASSERT(ns != NULL);
+	as = ns->netstack_arp;
+	ASSERT(as != NULL);
+
 	/* mi_open_comm allocates the instance data structure, etc. */
-	err = mi_open_comm(&ar_g_head, sizeof (ar_t), q, devp, flag, sflag,
+	err = mi_open_comm(&as->as_head, sizeof (ar_t), q, devp, flag, sflag,
 	    credp);
 	if (err) {
-		ar_cleanup();
+		netstack_rele(as->as_netstack);
 		return (err);
 	}
 
@@ -2579,6 +2585,7 @@ ar_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	ar->ar_wq = q;
 	crhold(credp);
 	ar->ar_credp = credp;
+	ar->ar_as = as;
 
 	/*
 	 * Probe for the DLPI info if we are not pushed on IP. Wait for
@@ -2668,14 +2675,14 @@ ar_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
  * named dispatch handler.
  */
 static boolean_t
-ar_param_register(arpparam_t *arppa, int cnt)
+ar_param_register(IDP *ndp, arpparam_t *arppa, int cnt)
 {
 	for (; cnt-- > 0; arppa++) {
 		if (arppa->arp_param_name && arppa->arp_param_name[0]) {
-			if (!nd_load(&ar_g_nd, arppa->arp_param_name,
+			if (!nd_load(ndp, arppa->arp_param_name,
 			    ar_param_get, ar_param_set,
 			    (caddr_t)arppa)) {
-				nd_free(&ar_g_nd);
+				nd_free(ndp);
 				return (B_FALSE);
 			}
 		}
@@ -2715,7 +2722,8 @@ ar_plink_send(queue_t *q, mblk_t *mp)
 	char	*name;
 	mblk_t 	*muxmp;
 	mblk_t 	*mp1;
-	ar_t	*ar;
+	ar_t	*ar = (ar_t *)q->q_ptr;
+	arp_stack_t *as = ar->ar_as;
 	struct	linkblk *li;
 	struct	ipmx_s	*ipmxp;
 	queue_t	*arpwq;
@@ -2764,8 +2772,8 @@ ar_plink_send(queue_t *q, mblk_t *mp)
 	 * for use by IP. IP will send the M_IOCACK.
 	 */
 	if (arpwq != NULL) {
-		for (ar = (ar_t *)mi_first_ptr(&ar_g_head); ar != NULL;
-		    ar = (ar_t *)mi_next_ptr(&ar_g_head, (void *)ar)) {
+		for (ar = (ar_t *)mi_first_ptr(&as->as_head); ar != NULL;
+		    ar = (ar_t *)mi_next_ptr(&as->as_head, (void *)ar)) {
 			if ((ar->ar_wq == arpwq) && (ar->ar_arl != NULL)) {
 				ipmxp->ipmx_arpdev_stream = 1;
 				(void) strcpy((char *)ipmxp->ipmx_name,
@@ -2789,6 +2797,8 @@ ar_query_delete(ace_t *ace, void *arg)
 	ar_t	*ar = arg;
 	mblk_t	**mpp = &ace->ace_query_mp;
 	mblk_t	*mp;
+	arp_stack_t *as = ar->ar_as;
+	ip_stack_t *ipst = as->as_netstack->netstack_ip;
 
 	while ((mp = *mpp) != NULL) {
 		/* The response queue was stored in the query b_prev. */
@@ -2797,7 +2807,8 @@ ar_query_delete(ace_t *ace, void *arg)
 			*mpp = mp->b_next;
 			if (DB_TYPE(mp) == M_PROTO &&
 			    *(uint32_t *)mp->b_rptr == AR_ENTRY_QUERY) {
-				BUMP_IRE_STATS(ire_stats_v4, ire_stats_freed);
+				BUMP_IRE_STATS(ipst->ips_ire_stats_v4,
+				    ire_stats_freed);
 			}
 			inet_freemsg(mp);
 		} else {
@@ -2822,6 +2833,8 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
 	arl_t	*arl = ace->ace_arl;
 	mblk_t	*mp;
 	mblk_t	*xmit_mp;
+	arp_stack_t *as = ARL_TO_ARPSTACK(arl);
+	ip_stack_t *ipst = as->as_netstack->netstack_ip;
 	arlphy_t *ap = arl->arl_phy;
 
 	/* Cancel any outstanding timer. */
@@ -2870,7 +2883,8 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
 			if (ret_val != 0) {
 				/* TODO: find some way to let the guy know? */
 				inet_freemsg(mp);
-				BUMP_IRE_STATS(ire_stats_v4, ire_stats_freed);
+				BUMP_IRE_STATS(ipst->ips_ire_stats_v4,
+				    ire_stats_freed);
 				continue;
 			}
 			/*
@@ -2928,7 +2942,7 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
 			ar_ce_delete(ace);
 		} else {
 			mi_timer(arl->arl_wq, ace->ace_mp,
-			    arp_cleanup_interval);
+			    as->as_cleanup_interval);
 		}
 	}
 }
@@ -2939,7 +2953,7 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
  * to the source address in the areq sent by IP.
  */
 static clock_t
-ar_query_xmit(ace_t *ace, ace_t *src_ace)
+ar_query_xmit(arp_stack_t *as, ace_t *ace, ace_t *src_ace)
 {
 	areq_t	*areq;
 	mblk_t	*mp;
@@ -2967,8 +2981,8 @@ ar_query_xmit(ace_t *ace, ace_t *src_ace)
 	 * interface.
 	 */
 	if (src_ace == NULL) {
-		src_ace = ar_ce_lookup_permanent(areq->areq_proto, sender_addr,
-		    areq->areq_sender_addr_length);
+		src_ace = ar_ce_lookup_permanent(as, areq->areq_proto,
+		    sender_addr, areq->areq_sender_addr_length);
 		if (src_ace == NULL) {
 			DTRACE_PROBE3(xmit_no_source, ace_t *, ace,
 			    areq_t *, areq, uchar_t *, sender_addr);
@@ -3001,7 +3015,7 @@ ar_query_xmit(ace_t *ace, ace_t *src_ace)
 	    areq_t *, areq);
 	ar_xmit(src_arl, ARP_REQUEST, areq->areq_proto,
 	    areq->areq_sender_addr_length, src_arl->arl_phy->ap_hw_addr,
-	    sender_addr, src_arl->arl_phy->ap_arp_addr, proto_addr, NULL);
+	    sender_addr, src_arl->arl_phy->ap_arp_addr, proto_addr, NULL, as);
 	src_ace->ace_last_bcast = ddi_get_lbolt();
 	return (areq->areq_xmit_interval);
 }
@@ -3025,6 +3039,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 	uchar_t	*src_paddr;
 	boolean_t is_probe;
 	int i;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
 	TRACE_1(TR_FAC_ARP, TR_ARP_RPUT_START,
 	    "arp_rput_start: q %p", q);
@@ -3036,7 +3051,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 	 */
 	switch (DB_TYPE(mp)) {
 	case M_IOCTL:
-		err = ar_cmd_dispatch(q, mp);
+		err = ar_cmd_dispatch(q, mp, B_FALSE);
 		switch (err) {
 		case ENOENT:
 			DB_TYPE(mp) = M_IOCNAK;
@@ -3092,7 +3107,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 			    "arp_rput_end: q %p (%S)", q, "default");
 			return;
 		}
-		err = ar_cmd_dispatch(q, mp);
+		err = ar_cmd_dispatch(q, mp, B_FALSE);
 		switch (err) {
 		case ENOENT:
 			/* Miscellaneous DLPI messages get shuffled off. */
@@ -3179,8 +3194,8 @@ ar_rput(queue_t *q, mblk_t *mp)
 	DTRACE_PROBE3(arp__physical__in__start,
 	    arl_t *, arl, arh_t *, arh, mblk_t *, mp);
 
-	ARP_HOOK_IN(arp_physical_in_event, arp_physical_in,
-		    arl->arl_index, arh, mp, mp1);
+	ARP_HOOK_IN(as->as_arp_physical_in_event, as->as_arp_physical_in,
+		    arl->arl_index, arh, mp, mp1, as);
 
 	DTRACE_PROBE1(arp__physical__in__end, mblk_t *, mp);
 
@@ -3318,7 +3333,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 		 */
 		now = ddi_get_lbolt();
 		if ((now - dst_ace->ace_last_bcast) >
-		    MSEC_TO_TICK(arp_broadcast_interval)) {
+		    MSEC_TO_TICK(as->as_broadcast_interval)) {
 			DTRACE_PROBE3(rput_bcast_reply, arl_t *, arl,
 			    arh_t *, arh, ace_t *, dst_ace);
 			dst_ace->ace_last_bcast = now;
@@ -3334,7 +3349,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 
 		ar_xmit(arl, ARP_RESPONSE, dst_ace->ace_proto, plen,
 		    dst_ace->ace_hw_addr, dst_ace->ace_proto_addr,
-		    src_haddr, src_paddr, dstaddr);
+		    src_haddr, src_paddr, dstaddr, as);
 		if (!is_probe && err == AR_NOTFOUND &&
 		    ar_ce_create(arl, proto, src_haddr, hlen, src_paddr, plen,
 		    NULL, NULL, 0, 0) == 0) {
@@ -3343,7 +3358,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 			ace = ar_ce_lookup(arl, proto, src_paddr, plen);
 			ASSERT(ace != NULL);
 			mi_timer(arl->arl_wq, ace->ace_mp,
-			    arp_cleanup_interval);
+			    as->as_cleanup_interval);
 		}
 	}
 	if (err == AR_CHANGED) {
@@ -3359,8 +3374,11 @@ ar_rput(queue_t *q, mblk_t *mp)
 }
 
 static void
-ar_ce_restart_dad(ace_t *ace, void *arl)
+ar_ce_restart_dad(ace_t *ace, void *arl_arg)
 {
+	arl_t *arl = arl_arg;
+	arp_stack_t *as = ARL_TO_ARPSTACK(arl);
+
 	if ((ace->ace_arl == arl) &&
 	    (ace->ace_flags & (ACE_F_UNVERIFIED|ACE_F_DAD_ABORTED)) ==
 	    (ACE_F_UNVERIFIED|ACE_F_DAD_ABORTED)) {
@@ -3369,11 +3387,11 @@ ar_ce_restart_dad(ace_t *ace, void *arl)
 		 * in this obscure case.
 		 */
 		if (ace->ace_flags & ACE_F_FAST) {
-			ace->ace_xmit_count = arp_fastprobe_count;
-			ace->ace_xmit_interval = arp_fastprobe_interval;
+			ace->ace_xmit_count = as->as_fastprobe_count;
+			ace->ace_xmit_interval = as->as_fastprobe_interval;
 		} else {
-			ace->ace_xmit_count = arp_probe_count;
-			ace->ace_xmit_interval = arp_probe_interval;
+			ace->ace_xmit_count = as->as_probe_count;
+			ace->ace_xmit_interval = as->as_probe_interval;
 		}
 		ace->ace_flags &= ~ACE_F_DAD_ABORTED;
 		ace_set_timer(ace, B_FALSE);
@@ -3389,6 +3407,7 @@ ar_rput_dlpi(queue_t *q, mblk_t *mp)
 	arlphy_t	*ap = NULL;
 	union DL_primitives *dlp;
 	const char	*err_str;
+	arp_stack_t	*as = ar->ar_as;
 
 	if (arl != NULL)
 		ap = arl->arl_phy;
@@ -3451,7 +3470,7 @@ ar_rput_dlpi(queue_t *q, mblk_t *mp)
 			ar_ll_set_defaults(arl, mp);
 			ar_dlpi_done(arl, DL_INFO_REQ);
 		} else if (arl == NULL) {
-			ar_ll_init(ar, mp);
+			ar_ll_init(as, ar, mp);
 		}
 		/* Kick off any awaiting messages */
 		qenable(WR(q));
@@ -3509,7 +3528,7 @@ ar_rput_dlpi(queue_t *q, mblk_t *mp)
 			switch (dlp->notify_ind.dl_notification) {
 			case DL_NOTE_LINK_UP:
 				ap->ap_link_down = B_FALSE;
-				ar_ce_walk(ar_ce_restart_dad, arl);
+				ar_ce_walk(as, ar_ce_restart_dad, arl);
 				break;
 			case DL_NOTE_LINK_DOWN:
 				ap->ap_link_down = B_TRUE;
@@ -3570,6 +3589,7 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 	mblk_t *ioccpy;
 	struct iocblk *iocp;
 	hook_nic_event_t info;
+	arp_stack_t *as = ar->ar_as;
 
 	if (ar->ar_on_ill_stream) {
 		/*
@@ -3613,7 +3633,7 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 
 	/* Check whether the name is already in use. */
 
-	old_arl = ar_ll_lookup_by_name(lifr->lifr_name);
+	old_arl = ar_ll_lookup_by_name(as, lifr->lifr_name);
 	if (old_arl != NULL) {
 		DTRACE_PROBE2(slifname_exists, arl_t *, arl, arl_t *, old_arl);
 		return (EEXIST);
@@ -3644,12 +3664,13 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 	info.hne_event = NE_PLUMB;
 	info.hne_data = arl->arl_name;
 	info.hne_datalen = strlen(arl->arl_name);
-	(void) hook_run(arpnicevents, (hook_data_t)&info);
+	(void) hook_run(as->as_arpnicevents, (hook_data_t)&info,
+	    as->as_netstack);
 
 	/* Chain in the new arl. */
-	rw_enter(&arl_g_lock, RW_WRITER);
-	arl->arl_next = arl_g_head;
-	arl_g_head = arl;
+	rw_enter(&as->as_arl_g_lock, RW_WRITER);
+	arl->arl_next = as->as_arl_head;
+	as->as_arl_head = arl;
 	DTRACE_PROBE1(slifname_set, arl_t *, arl);
 
 	/*
@@ -3663,7 +3684,7 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 	iocp->ioc_count = msgsize(ioccpy->b_cont);
 	ioccpy->b_wptr = (uchar_t *)(iocp + 1);
 	putnext(arl->arl_wq, ioccpy);
-	rw_exit(&arl_g_lock);
+	rw_exit(&as->as_arl_g_lock);
 
 	return (0);
 }
@@ -3677,6 +3698,7 @@ ar_set_ppa(queue_t *q, mblk_t *mp_orig)
 	char	*cp;
 	mblk_t	*mp = mp_orig;
 	arl_t	*old_arl;
+	arp_stack_t *as = ar->ar_as;
 
 	if (ar->ar_on_ill_stream) {
 		/*
@@ -3714,7 +3736,7 @@ ar_set_ppa(queue_t *q, mblk_t *mp_orig)
 	ppa = *(int *)(mp->b_rptr);
 	(void) snprintf(arl->arl_name, sizeof (arl->arl_name), "%s%d", cp, ppa);
 
-	old_arl = ar_ll_lookup_by_name(arl->arl_name);
+	old_arl = ar_ll_lookup_by_name(as, arl->arl_name);
 	if (old_arl != NULL) {
 		DTRACE_PROBE2(setppa_exists, arl_t *, arl, arl_t *, old_arl);
 		/* Make it a null string again */
@@ -3725,10 +3747,10 @@ ar_set_ppa(queue_t *q, mblk_t *mp_orig)
 	arl->arl_ppa = ppa;
 	DTRACE_PROBE1(setppa_done, arl_t *, arl);
 	/* Chain in the new arl. */
-	rw_enter(&arl_g_lock, RW_WRITER);
-	arl->arl_next = arl_g_head;
-	arl_g_head = arl;
-	rw_exit(&arl_g_lock);
+	rw_enter(&as->as_arl_g_lock, RW_WRITER);
+	arl->arl_next = as->as_arl_head;
+	as->as_arl_head = arl;
+	rw_exit(&as->as_arl_g_lock);
 
 	return (0);
 }
@@ -3739,6 +3761,7 @@ ar_snmp_msg(queue_t *q, mblk_t *mp_orig)
 	mblk_t		*mpdata, *mp = mp_orig;
 	struct opthdr	*optp;
 	msg2_args_t	args;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
 	if (mp == NULL)
 		return (0);
@@ -3761,7 +3784,7 @@ ar_snmp_msg(queue_t *q, mblk_t *mp_orig)
 
 		args.m2a_mpdata = mpdata;
 		args.m2a_mptail = NULL;
-		ar_ce_walk(ar_snmp_msg2, &args);
+		ar_ce_walk(as, ar_snmp_msg2, &args);
 		optp->len = msgdsize(mpdata);
 	}
 	putnext(q, mp_orig);
@@ -3828,7 +3851,7 @@ ar_wput(queue_t *q, mblk_t *mp)
 	 */
 	switch (DB_TYPE(mp)) {
 	case M_IOCTL:
-		switch (err = ar_cmd_dispatch(q, mp)) {
+		switch (err = ar_cmd_dispatch(q, mp, B_TRUE)) {
 		case ENOENT:
 			/*
 			 * If it is an I_PLINK, process it. Otherwise
@@ -3913,7 +3936,7 @@ ar_wput(queue_t *q, mblk_t *mp)
 		 * Commands in the form of PROTO messages are handled very
 		 * much the same as IOCTLs, but no response is returned.
 		 */
-		switch (err = ar_cmd_dispatch(q, mp)) {
+		switch (err = ar_cmd_dispatch(q, mp, B_TRUE)) {
 		case ENOENT:
 			if (q->q_next) {
 				putnext(q, mp);
@@ -4041,23 +4064,24 @@ arl_reschedule(arl_t *arl)
 	ace_resched_t art;
 	int i;
 	ace_t *ace;
+	arp_stack_t *as = ARL_TO_ARPSTACK(arl);
 
 	i = ap->ap_defend_count;
 	ap->ap_defend_count = 0;
 	/* If none could be sitting around, then don't reschedule */
-	if (i < arp_defend_rate) {
+	if (i < as->as_defend_rate) {
 		DTRACE_PROBE1(reschedule_none, arl_t *, arl);
 		return;
 	}
 	art.art_arl = arl;
-	while (ap->ap_defend_count < arp_defend_rate) {
+	while (ap->ap_defend_count < as->as_defend_rate) {
 		art.art_naces = 0;
-		ar_ce_walk(ace_reschedule, &art);
+		ar_ce_walk(as, ace_reschedule, &art);
 		for (i = 0; i < art.art_naces; i++) {
 			ace = art.art_aces[i];
 			ace->ace_flags |= ACE_F_DELAYED;
 			ace_set_timer(ace, B_FALSE);
-			if (++ap->ap_defend_count >= arp_defend_rate)
+			if (++ap->ap_defend_count >= as->as_defend_rate)
 				break;
 		}
 		if (art.art_naces < ACE_RESCHED_LIST_LEN)
@@ -4079,6 +4103,7 @@ ar_wsrv(queue_t *q)
 	arlphy_t *ap;
 	mblk_t *mp;
 	clock_t	ms;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
 	TRACE_1(TR_FAC_ARP, TR_ARP_WSRV_START,
 	    "arp_wsrv_start: q %p", q);
@@ -4115,15 +4140,16 @@ ar_wsrv(queue_t *q)
 					    ace->ace_proto,
 					    ace->ace_proto_addr_length,
 					    ace->ace_hw_addr, NULL, NULL,
-					    ace->ace_proto_addr, NULL);
+					    ace->ace_proto_addr, NULL, as);
 					ace_set_timer(ace, B_FALSE);
 					continue;
 				}
 				if (!arp_say_ready(ace))
 					continue;
 				DTRACE_PROBE1(timer_ready, ace_t *, ace);
-				ace->ace_xmit_interval = arp_publish_interval;
-				ace->ace_xmit_count = arp_publish_count;
+				ace->ace_xmit_interval =
+				    as->as_publish_interval;
+				ace->ace_xmit_count = as->as_publish_count;
 				if (ace->ace_xmit_count == 0)
 					ace->ace_xmit_count++;
 				ace->ace_flags &= ~ACE_F_UNVERIFIED;
@@ -4137,9 +4163,9 @@ ar_wsrv(queue_t *q)
 				 * them.
 				 */
 				now = ddi_get_lbolt();
-				if (arp_defend_rate > 0 &&
+				if (as->as_defend_rate > 0 &&
 				    now - ap->ap_defend_start >
-				    SEC_TO_TICK(arp_defend_period)) {
+				    SEC_TO_TICK(as->as_defend_period)) {
 					ap->ap_defend_start = now;
 					arl_reschedule(arl);
 				}
@@ -4164,9 +4190,11 @@ ar_wsrv(queue_t *q)
 					DTRACE_PROBE1(timer_send_delayed,
 					    ace_t *, ace);
 					ace->ace_flags &= ~ACE_F_DELAYED;
-				} else if (arp_defend_rate > 0 &&
-				    (ap->ap_defend_count >= arp_defend_rate ||
-				    ++ap->ap_defend_count >= arp_defend_rate)) {
+				} else if (as->as_defend_rate > 0 &&
+				    (ap->ap_defend_count >=
+				    as->as_defend_rate ||
+				    ++ap->ap_defend_count >=
+				    as->as_defend_rate)) {
 					/*
 					 * If we're no longer allowed to send
 					 * unbidden defense messages, then just
@@ -4186,11 +4214,11 @@ ar_wsrv(queue_t *q)
 				    ace->ace_hw_addr,
 				    ace->ace_proto_addr,
 				    ap->ap_arp_addr,
-				    ace->ace_proto_addr, NULL);
+				    ace->ace_proto_addr, NULL, as);
 				ace->ace_last_bcast = now;
 				if (ace->ace_xmit_count == 0)
 					ace->ace_xmit_interval =
-					    arp_defend_interval;
+					    as->as_defend_interval;
 				if (ace->ace_xmit_interval != 0)
 					ace_set_timer(ace, B_FALSE);
 				continue;
@@ -4206,10 +4234,10 @@ ar_wsrv(queue_t *q)
 			if (ACE_NONPERM(ace)) {
 				if (ace->ace_proto == IP_ARP_PROTO_TYPE &&
 				    ndp_lookup_ipaddr(*(ipaddr_t *)
-				    ace->ace_proto_addr)) {
+				    ace->ace_proto_addr, as->as_netstack)) {
 					ace->ace_flags |= ACE_F_OLD;
 					mi_timer(arl->arl_wq, ace->ace_mp,
-					    arp_cleanup_interval);
+					    as->as_cleanup_interval);
 				} else {
 					ar_delete_notify(ace);
 					ar_ce_delete(ace);
@@ -4226,7 +4254,7 @@ ar_wsrv(queue_t *q)
 			 * Otherwise, we restart the timer.
 			 */
 			ASSERT(ace->ace_query_mp != NULL);
-			ms = ar_query_xmit(ace, NULL);
+			ms = ar_query_xmit(as, ace, NULL);
 			if (ms == 0)
 				ar_query_reply(ace, ENXIO, NULL, (uint32_t)0);
 			else
@@ -4245,7 +4273,7 @@ ar_wsrv(queue_t *q)
 static void
 ar_xmit(arl_t *arl, uint32_t operation, uint32_t proto, uint32_t plen,
     const uchar_t *haddr1, const uchar_t *paddr1, const uchar_t *haddr2,
-    const uchar_t *paddr2, const uchar_t *dstaddr)
+    const uchar_t *paddr2, const uchar_t *dstaddr, arp_stack_t *as)
 {
 	arh_t	*arh;
 	uint8_t	*cp;
@@ -4320,8 +4348,8 @@ ar_xmit(arl_t *arl, uint32_t operation, uint32_t proto, uint32_t plen,
 	DTRACE_PROBE3(arp__physical__out__start,
 	    arl_t *, arl, arh_t *, arh, mblk_t *, mp);
 
-	ARP_HOOK_OUT(arp_physical_out_event, arp_physical_out,
-	    arl->arl_index, arh, mp, mp->b_cont);
+	ARP_HOOK_OUT(as->as_arp_physical_out_event, as->as_arp_physical_out,
+	    arl->arl_index, arh, mp, mp->b_cont, as);
 
 	DTRACE_PROBE1(arp__physical__out__end, mblk_t *, mp);
 
@@ -4369,4 +4397,70 @@ ar_alloc(uint32_t cmd, int err)
 	mp1->b_wptr = (uchar_t *)&cp[len];
 	linkb(mp, mp1);
 	return (mp);
+}
+
+void
+arp_ddi_init(void)
+{
+	/*
+	 * We want to be informed each time a stack is created or
+	 * destroyed in the kernel, so we can maintain the
+	 * set of arp_stack_t's.
+	 */
+	netstack_register(NS_ARP, arp_stack_init, NULL, arp_stack_fini);
+}
+
+void
+arp_ddi_destroy(void)
+{
+	netstack_unregister(NS_ARP);
+}
+
+/*
+ * Initialize the ARP stack instance.
+ */
+/* ARGSUSED */
+static void *
+arp_stack_init(netstackid_t stackid, netstack_t *ns)
+{
+	arp_stack_t	*as;
+	arpparam_t	*pa;
+
+	as = (arp_stack_t *)kmem_zalloc(sizeof (*as), KM_SLEEP);
+	as->as_netstack = ns;
+
+	pa = (arpparam_t *)kmem_alloc(sizeof (arp_param_arr), KM_SLEEP);
+	as->as_param_arr = pa;
+	bcopy(arp_param_arr, as->as_param_arr, sizeof (arp_param_arr));
+
+	(void) ar_param_register(&as->as_nd,
+	    as->as_param_arr, A_CNT(arp_param_arr));
+
+	as->as_arp_index_counter = 1;
+	as->as_arp_counter_wrapped = 0;
+
+	rw_init(&as->as_arl_g_lock, "ARP ARl lock", RW_DRIVER, NULL);
+	arp_net_init(as, ns);
+	arp_hook_init(as);
+
+	return (as);
+}
+
+/*
+ * Free the ARP stack instance.
+ */
+/* ARGSUSED */
+static void
+arp_stack_fini(netstackid_t stackid, void *arg)
+{
+	arp_stack_t *as = (arp_stack_t *)arg;
+
+	arp_hook_destroy(as);
+	arp_net_destroy(as);
+	rw_destroy(&as->as_arl_g_lock);
+
+	nd_free(&as->as_nd);
+	kmem_free(as->as_param_arr, sizeof (arp_param_arr));
+	as->as_param_arr = NULL;
+	kmem_free(as, sizeof (*as));
 }

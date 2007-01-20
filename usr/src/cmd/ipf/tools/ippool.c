@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,13 +33,14 @@
 #include <netdb.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <nlist.h>
 
 #include "ipf.h"
+#include "netinet/ipl.h"
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
 #include "kmem.h"
-
 
 extern	int	ippool_yyparse __P((void));
 extern	int	ippool_yydebug;
@@ -58,6 +59,9 @@ int	poolflush __P((int, char *[]));
 int	poolstats __P((int, char *[]));
 int	gettype __P((char *, u_int *));
 int	getrole __P((char *));
+void	poollist_dead __P((int, char *, int, char *, char *));
+void	showpools_live(int, int, ip_pool_stat_t *, char *, int);
+void	showhashs_live(int, int, iphtstat_t *, char *, int);
 
 int	opts = 0;
 int	fd = -1;
@@ -418,29 +422,109 @@ char *argv[];
 	}
 	op.iplo_unit = role;
 
-	if (openkmem(kernel, core) == -1)
-		exit(-1);
+	if (live_kernel == 0) {
+		poollist_dead(role, poolname, type, kernel, core);
+		return (0);
+	}
 
 	if (type == IPLT_ALL || type == IPLT_POOL) {
 		plstp = &plstat;
 		op.iplo_type = IPLT_POOL;
 		op.iplo_size = sizeof(plstat);
 		op.iplo_struct = &plstat;
-		c = ioctl(fd, SIOCLOOKUPSTAT, &op);
-		if (c == -1) {
-			perror("ioctl(SIOCLOOKUPSTAT)");
-			return -1;
-		}
+		op.iplo_name[0] = '\0';
+		op.iplo_arg = 0;
 
 		if (role != IPL_LOGALL) {
-			ptr = plstp->ipls_list[role];
+			op.iplo_unit = role;
+
+			c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+			if (c == -1) {
+				perror("ioctl(SIOCLOOKUPSTAT)");
+				return -1;
+			}
+
+			showpools_live(fd, role, &plstat, poolname, opts);
+		} else {
+			for (role = 0; role <= IPL_LOGMAX; role++) {
+				op.iplo_unit = role;
+
+				c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+				if (c == -1) {
+					perror("ioctl(SIOCLOOKUPSTAT)");
+					return -1;
+				}
+
+				showpools_live(fd, role, &plstat, poolname, opts);
+			}
+
+			role = IPL_LOGALL;
+		}
+	}
+	if (type == IPLT_ALL || type == IPLT_HASH) {
+		htstp = &htstat;
+		op.iplo_type = IPLT_HASH;
+		op.iplo_size = sizeof(htstat);
+		op.iplo_struct = &htstat;
+		op.iplo_name[0] = '\0';
+		op.iplo_arg = 0;
+
+		if (role != IPL_LOGALL) {
+			op.iplo_unit = role;
+
+			c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+			if (c == -1) {
+				perror("ioctl(SIOCLOOKUPSTAT)");
+				return -1;
+			}
+			showhashs_live(fd, role, &htstat, poolname, opts);
+		} else {
+			for (role = 0; role <= IPL_LOGMAX; role++) {
+
+				op.iplo_unit = role;
+				c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+				if (c == -1) {
+					perror("ioctl(SIOCLOOKUPSTAT)");
+					return -1;
+				}
+
+				showhashs_live(fd, role, &htstat, poolname, opts);
+			}
+		}
+	}
+	return 0;
+}
+
+void poollist_dead(role, poolname, type, kernel, core)
+int role, type;
+char *poolname, *kernel, *core;
+{
+	iphtable_t *hptr;
+	ip_pool_t *ptr;
+
+	if (openkmem(kernel, core) == -1)
+		exit(-1);
+
+	if (type == IPLT_ALL || type == IPLT_POOL) {
+		ip_pool_t *pools[IPL_LOGSIZE];
+		struct nlist names[2] = { { "ip_pool_list" } , { "" } };
+
+		if (nlist(kernel, names) != 1)
+			return;
+
+		bzero(&pools, sizeof(pools));
+		if (kmemcpy((char *)&pools, names[0].n_value, sizeof(pools)))
+			return;
+
+		if (role != IPL_LOGALL) {
+			ptr = pools[role];
 			while (ptr != NULL) {
-				ptr = printpool(ptr, kmemcpywrap, poolname,
-						opts);
+				ptr = printpool(ptr, kmemcpywrap,
+						poolname, opts);
 			}
 		} else {
 			for (role = 0; role <= IPL_LOGMAX; role++) {
-				ptr = plstp->ipls_list[role];
+				ptr = pools[role];
 				while (ptr != NULL) {
 					ptr = printpool(ptr, kmemcpywrap,
 							poolname, opts);
@@ -450,42 +534,68 @@ char *argv[];
 		}
 	}
 	if (type == IPLT_ALL || type == IPLT_HASH) {
-		htstp = &htstat;
-		op.iplo_type = IPLT_HASH;
-		op.iplo_size = sizeof(htstat);
-		op.iplo_struct = &htstat;
-		c = ioctl(fd, SIOCLOOKUPSTAT, &op);
-		if (c == -1) {
-			perror("ioctl(SIOCLOOKUPSTAT)");
-			return -1;
-		}
+		iphtable_t *tables[IPL_LOGSIZE];
+		struct nlist names[2] = { { "ipf_htables" } , { "" } };
+
+		if (nlist(kernel, names) != 1)
+			return;
+
+		bzero(&tables, sizeof(tables));
+		if (kmemcpy((char *)&tables, names[0].n_value, sizeof(tables)))
+			return;
 
 		if (role != IPL_LOGALL) {
-			hptr = htstp->iphs_tables;
+			hptr = tables[role];
 			while (hptr != NULL) {
 				hptr = printhash(hptr, kmemcpywrap,
 						 poolname, opts);
 			}
 		} else {
 			for (role = 0; role <= IPL_LOGMAX; role++) {
-				hptr = htstp->iphs_tables;
+				hptr = tables[role];
 				while (hptr != NULL) {
 					hptr = printhash(hptr, kmemcpywrap,
 							 poolname, opts);
 				}
-
-				op.iplo_unit = role;
-				c = ioctl(fd, SIOCLOOKUPSTAT, &op);
-				if (c == -1) {
-					perror("ioctl(SIOCLOOKUPSTAT)");
-					return -1;
-				}
 			}
 		}
 	}
-	return 0;
 }
 
+
+void
+showpools_live(fd, role, plstp, poolname, opts)
+int fd, role;
+ip_pool_stat_t *plstp;
+char *poolname;
+int opts;
+{
+	ipflookupiter_t iter;
+	ip_pool_t pool;
+	ipfobj_t obj;
+
+	obj.ipfo_rev = IPFILTER_VERSION;
+	obj.ipfo_type = IPFOBJ_LOOKUPITER;
+	obj.ipfo_size = sizeof(iter);
+	obj.ipfo_ptr = &iter;
+
+	iter.ili_type = IPLT_POOL;
+	iter.ili_otype = IPFLOOKUPITER_LIST;
+	iter.ili_ival = IPFGENITER_LOOKUP;
+	iter.ili_data = &pool;
+	iter.ili_unit = role;
+	*iter.ili_name = '\0';
+
+	while (plstp->ipls_list[role] != NULL) {
+		if (ioctl(fd, SIOCLOOKUPITER, &obj)) {
+			perror("ioctl(SIOCLOOKUPITER)");
+			break;
+		}
+		(void) printpool_live(&pool, fd, poolname, opts);
+
+		plstp->ipls_list[role] = pool.ipo_next;
+	}
+}
 
 int poolstats(argc, argv)
 int argc;
@@ -701,4 +811,38 @@ u_int *minor;
 		type = IPLT_NONE;
 	}
 	return type;
+}
+
+void showhashs_live(fd, role, htstp, poolname, opts)
+int fd, role;
+iphtstat_t *htstp;
+char *poolname;
+int opts;
+{
+	ipflookupiter_t iter;
+	iphtable_t table;
+	ipfobj_t obj;
+
+	obj.ipfo_rev = IPFILTER_VERSION;
+	obj.ipfo_type = IPFOBJ_LOOKUPITER;
+	obj.ipfo_size = sizeof(iter);
+	obj.ipfo_ptr = &iter;
+
+	iter.ili_type = IPLT_HASH;
+	iter.ili_otype = IPFLOOKUPITER_LIST;
+	iter.ili_ival = IPFGENITER_LOOKUP;
+	iter.ili_data = &table;
+	iter.ili_unit = role;
+	*iter.ili_name = '\0';
+
+	while (htstp->iphs_tables != NULL) {
+		if (ioctl(fd, SIOCLOOKUPITER, &obj)) {
+			perror("ioctl(SIOCLOOKUPITER)");
+			break;
+		}
+
+		printhash_live(&table, fd, poolname, opts);
+
+		htstp->iphs_tables = table.iph_next;
+	}
 }

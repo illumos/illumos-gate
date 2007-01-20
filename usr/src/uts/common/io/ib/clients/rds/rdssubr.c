@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -299,9 +299,14 @@ boolean_t
 rds_islocal(ipaddr_t addr)
 {
 	ire_t *ire;
+	ip_stack_t *ipst;
+
+	ipst = netstack_find_by_zoneid(GLOBAL_ZONEID)->netstack_ip;
+	ASSERT(ipst != NULL);
 
 	ire = ire_ctable_lookup(addr, NULL, IRE_LOCAL | IRE_LOOPBACK |
-	    IRE_BROADCAST, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE);
+	    IRE_BROADCAST, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
+	netstack_rele(ipst->ips_netstack);
 	if (ire == NULL)
 		return (B_FALSE);
 	ire_refrele(ire);

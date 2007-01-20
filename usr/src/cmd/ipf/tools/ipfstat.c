@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -143,6 +143,8 @@ static	void	showipstates __P((ips_stat_t *));
 static	void	showauthstates __P((fr_authstat_t *));
 static	void	showgroups __P((friostat_t *));
 static	void	usage __P((char *));
+static	void	printlivelist __P((int, int, frentry_t *, char *, char *));
+static	void	printdeadlist __P((int, int, frentry_t *, char *, char *));
 static	void	printlist __P((frentry_t *, char *));
 static	void	parse_ipportstr __P((const char *, i6addr_t *, int *));
 static	void	ipfstate_live __P((char *, friostat_t **, ips_stat_t **,
@@ -261,13 +263,12 @@ char *argv[];
 	if (kern != NULL || memf != NULL) {
 		(void)setgid(getgid());
 		(void)setreuid(getuid(), getuid());
+		if (openkmem(kern, memf) == -1)
+			exit(-1);
 	}
 
 	if (live_kernel == 1)
 		(void) checkrev(device);
-	if (openkmem(kern, memf) == -1)
-		exit(-1);
-
 	(void)setgid(getgid());
 	(void)setreuid(getuid(), getuid());
 
@@ -778,21 +779,52 @@ u_32_t frf;
 /*
  * Print out a list of rules from the kernel, starting at the one passed.
  */
-static void printlist(fp, comment)
+static void printlivelist(out, set, fp, group, comment)
+int out, set;
 frentry_t *fp;
-char *comment;
+char *group, *comment;
 {
+	frgroup_t *grtop, *grtail, *g;
 	struct	frentry	fb, *fg;
-	char	*data;
-	u_32_t	type;
 	int	n;
+	ipfruleiter_t rule;
+	ipfobj_t obj;
 
-	for (n = 1; fp; n++) {
-		if (kmemcpy((char *)&fb, (u_long)fp, sizeof(fb)) == -1) {
-			perror("kmemcpy");
+	fb.fr_next = fp;
+	n = 0;
+
+	grtop = NULL;
+	grtail = NULL;
+	rule.iri_ver = use_inet6? AF_INET6 : AF_INET;
+	rule.iri_inout = out;
+	rule.iri_active = set;
+	rule.iri_rule = &fb;
+	if (group != NULL)
+		strncpy(rule.iri_group, group, FR_GROUPLEN);
+	else
+		rule.iri_group[0] = '\0';
+
+	bzero((char *)&obj, sizeof(obj));
+	obj.ipfo_rev = IPFILTER_VERSION;
+	obj.ipfo_type = IPFOBJ_IPFITER;
+	obj.ipfo_size = sizeof(rule);
+	obj.ipfo_ptr = &rule;
+
+	do {
+		u_long array[1000];
+
+		memset(array, 0xff, sizeof(array));
+		fp = (frentry_t *)array;
+		rule.iri_rule = fp;
+		if (ioctl(ipf_fd, SIOCIPFITER, &obj) == -1) {
+			perror("ioctl(SIOCIPFITER)");
 			return;
 		}
-		fp = &fb;
+		if (fp->fr_data != NULL)
+			fp->fr_data = (char *)fp + sizeof(*fp);
+
+		n++;
+
 		if (opts & (OPT_HITS|OPT_VERBOSE))
 #ifdef	USE_QUAD_T
 			PRINTF("%qu ", (unsigned long long) fp->fr_hits);
@@ -807,24 +839,6 @@ char *comment;
 #endif
 		if (opts & OPT_SHOWLINENO)
 			PRINTF("@%d ", n);
-		data = NULL;
-		type = fp->fr_type & ~FR_T_BUILTIN;
-		if (type == FR_T_IPF || type == FR_T_BPFOPC) {
-			if (fp->fr_dsize) {
-				data = malloc(fp->fr_dsize);
-				if (data == NULL) {
-					perror("malloc");
-					exit(1);
-				}
-
-				if (kmemcpy(data, (u_long)fp->fr_data,
-					    fp->fr_dsize) == -1) {
-					perror("kmemcpy");
-					return;
-				}
-				fp->fr_data = data;
-			}
-		}
 
 		printfr(fp, ioctl);
 		if (opts & OPT_DEBUG) {
@@ -832,19 +846,124 @@ char *comment;
 			if (fp->fr_data != NULL && fp->fr_dsize > 0)
 				binprint(fp->fr_data, fp->fr_dsize);
 		}
-		if (data != NULL)
-			free(data);
-		if (fp->fr_grp != NULL) {
-			if (!kmemcpy((char *)&fg, (u_long)fp->fr_grp,
-				     sizeof(fg)))
-				printlist(fg, comment);
+
+		if (fp->fr_grhead[0] != '\0') {
+			g = calloc(1, sizeof(*g));
+
+			if (g != NULL) {
+				strncpy(g->fg_name, fp->fr_grhead,
+					FR_GROUPLEN);
+				if (grtop == NULL) {
+					grtop = g;
+					grtail = g;
+				} else {
+					grtail->fg_next = g;
+					grtail = g;
+				}
+			}
 		}
-		if (type == FR_T_CALLFUNC) {
-			printlist(fp->fr_data, "# callfunc: ");
-		}
-		fp = fp->fr_next;
+	} while (fp->fr_next != NULL);
+
+	while ((g = grtop) != NULL) {
+		printlivelist(out, set, NULL, g->fg_name, comment);
+		grtop = g->fg_next;
+		free(g);
 	}
 }
+
+
+static void printdeadlist(out, set, fp, group, comment)
+int out, set;
+frentry_t *fp;
+char *group, *comment;
+{
+	frgroup_t *grtop, *grtail, *g;
+	struct	frentry	fb, *fg;
+	char	*data;
+	u_32_t	type;
+	int	n;
+
+	fb.fr_next = fp;
+	n = 0;
+	grtop = NULL;
+	grtail = NULL;
+
+	do {
+		fp = fb.fr_next;
+		if (kmemcpy((char *)&fb, (u_long)fb.fr_next,
+			    sizeof(fb)) == -1) {
+			perror("kmemcpy");
+			return;
+		}
+
+		data = NULL;
+		type = fb.fr_type & ~FR_T_BUILTIN;
+		if (type == FR_T_IPF || type == FR_T_BPFOPC) {
+			if (fb.fr_dsize) {
+				data = malloc(fb.fr_dsize);
+
+				if (kmemcpy(data, (u_long)fb.fr_data,
+					    fb.fr_dsize) == -1) {
+					perror("kmemcpy");
+					return;
+				}
+				fb.fr_data = data;
+			}
+		}
+
+		n++;
+
+		if (opts & (OPT_HITS|OPT_VERBOSE))
+#ifdef	USE_QUAD_T
+			PRINTF("%qu ", (unsigned long long) fb.fr_hits);
+#else
+			PRINTF("%lu ", fb.fr_hits);
+#endif
+		if (opts & (OPT_ACCNT|OPT_VERBOSE))
+#ifdef	USE_QUAD_T
+			PRINTF("%qu ", (unsigned long long) fb.fr_bytes);
+#else
+			PRINTF("%lu ", fb.fr_bytes);
+#endif
+		if (opts & OPT_SHOWLINENO)
+			PRINTF("@%d ", n);
+
+		printfr(fp, ioctl);
+		if (opts & OPT_DEBUG) {
+			binprint(fp, sizeof(*fp));
+			if (fb.fr_data != NULL && fb.fr_dsize > 0)
+				binprint(fb.fr_data, fb.fr_dsize);
+		}
+		if (data != NULL)
+			free(data);
+		if (fb.fr_grhead[0] != '\0') {
+			g = calloc(1, sizeof(*g));
+
+			if (g != NULL) {
+				strncpy(g->fg_name, fb.fr_grhead,
+					FR_GROUPLEN);
+				if (grtop == NULL) {
+					grtop = g;
+					grtail = g;
+				} else {
+					grtail->fg_next = g;
+					grtail = g;
+				}
+			}
+		}
+		if (type == FR_T_CALLFUNC) {
+			printdeadlist(out, set, fb.fr_data, group,
+				      "# callfunc: ");
+		}
+	} while (fb.fr_next != NULL);
+
+	while ((g = grtop) != NULL) {
+		printdeadlist(out, set, NULL, g->fg_name, comment);
+		grtop = g->fg_next;
+		free(g);
+	}
+}
+
 
 /*
  * print out all of the asked for rule sets, using the stats struct as
@@ -908,7 +1027,10 @@ struct	friostat	*fiop;
 			(opts & OPT_INACTIVE) ? "inactive " : "", filters[i]);
 		return;
 	}
-	printlist(fp, NULL);
+	if (live_kernel == 1)
+		printlivelist(i, set, fp, NULL, NULL);
+	else
+		printdeadlist(i, set, fp, NULL, NULL);
 }
 
 

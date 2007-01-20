@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,6 +100,7 @@ extern struct ifnet vpnif;
 #include "netinet/ip_frag.h"
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
+#include "netinet/ipf_stack.h"
 #ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
 #endif
@@ -139,65 +140,39 @@ static const char rcsid[] = "@(#)$Id: ip_nat.c,v 2.195.2.42 2005/08/11 19:51:36 
 /* ======================================================================== */
 
 
-nat_t	**nat_table[2] = { NULL, NULL },
-	*nat_instances = NULL;
-ipnat_t	*nat_list = NULL;
-u_int	ipf_nattable_max = NAT_TABLE_MAX;
-u_int	ipf_nattable_sz = NAT_TABLE_SZ;
-u_int	ipf_natrules_sz = NAT_SIZE;
-u_int	ipf_rdrrules_sz = RDR_SIZE;
-u_int	ipf_hostmap_sz = HOSTMAP_SIZE;
-u_int	fr_nat_maxbucket = 0,
-	fr_nat_maxbucket_reset = 1;
-u_32_t	nat_masks = 0;
-u_32_t	rdr_masks = 0;
-ipnat_t	**nat_rules = NULL;
-ipnat_t	**rdr_rules = NULL;
-hostmap_t	**maptable  = NULL;
-ipftq_t	nat_tqb[IPF_TCP_NSTATES];
-ipftq_t	nat_udptq;
-ipftq_t	nat_icmptq;
-ipftq_t	nat_iptq;
-ipftq_t	*nat_utqe = NULL;
-#ifdef  IPFILTER_LOG
-int	nat_logging = 1;
-#else
-int	nat_logging = 0;
-#endif
 
-u_long	fr_defnatage = DEF_NAT_AGE,
-	fr_defnatipage = 120,		/* 60 seconds */
-	fr_defnaticmpage = 6;		/* 3 seconds */
-natstat_t nat_stats;
-int	fr_nat_lock = 0;
-int	fr_nat_init = 0;
-
-static	int	nat_flushtable __P((void));
-static	int	nat_clearlist __P((void));
-static	void	nat_addnat __P((struct ipnat *));
-static	void	nat_addrdr __P((struct ipnat *));
-static	void	nat_delete __P((struct nat *, int));
+static	int	nat_flushtable __P((ipf_stack_t *));
+static	int	nat_clearlist __P((ipf_stack_t *));
+static	void	nat_addnat __P((struct ipnat *, ipf_stack_t *));
+static	void	nat_addrdr __P((struct ipnat *, ipf_stack_t *));
+static	void	nat_delete __P((struct nat *, int, ipf_stack_t *));
 static	void	nat_delrdr __P((struct ipnat *));
 static	void	nat_delnat __P((struct ipnat *));
-static	int	fr_natgetent __P((caddr_t));
-static	int	fr_natgetsz __P((caddr_t));
-static	int	fr_natputent __P((caddr_t, int));
-static	void	nat_tabmove __P((nat_t *));
+static	int	fr_natgetent __P((caddr_t, ipf_stack_t *));
+static	int	fr_natgetsz __P((caddr_t, ipf_stack_t *));
+static	int	fr_natputent __P((caddr_t, int, ipf_stack_t *));
+static	void	nat_tabmove __P((nat_t *, ipf_stack_t *));
 static	int	nat_match __P((fr_info_t *, ipnat_t *));
 static	INLINE	int nat_newmap __P((fr_info_t *, nat_t *, natinfo_t *));
 static	INLINE	int nat_newrdr __P((fr_info_t *, nat_t *, natinfo_t *));
 static	hostmap_t *nat_hostmap __P((ipnat_t *, struct in_addr,
-				    struct in_addr, struct in_addr, u_32_t));
+				    struct in_addr, struct in_addr, u_32_t, 
+				    ipf_stack_t *));
 static	void	nat_hostmapdel __P((struct hostmap *));
 static	INLINE	int nat_icmpquerytype4 __P((int));
-static	int	nat_siocaddnat __P((ipnat_t *, ipnat_t **, int));
-static	void	nat_siocdelnat __P((ipnat_t *, ipnat_t **, int));
+static	int	nat_siocaddnat __P((ipnat_t *, ipnat_t **, int,
+				    ipf_stack_t *));
+static	void	nat_siocdelnat __P((ipnat_t *, ipnat_t **, int,
+				    ipf_stack_t *));
+static	INLINE	int nat_icmperrortype4 __P((int));
 static	INLINE	int nat_finalise __P((fr_info_t *, nat_t *, natinfo_t *,
 				      tcphdr_t *, nat_t **, int));
-static	void	nat_resolverule __P((ipnat_t *));
+static	INLINE	void nat_resolverule __P((ipnat_t *, ipf_stack_t *));
 static	nat_t	*fr_natclone __P((fr_info_t *, nat_t *));
 static	void	nat_mssclamp __P((tcphdr_t *, u_32_t, u_short *));
 static	INLINE	int nat_wildok __P((nat_t *, int, int, int, int));
+static	int	nat_getnext __P((ipftoken_t *, ipfgeniter_t *, ipf_stack_t *));
+static	int	nat_iterator __P((ipftoken_t *, ipfgeniter_t *, ipf_stack_t *));
 
 
 /* ------------------------------------------------------------------------ */
@@ -207,93 +182,120 @@ static	INLINE	int nat_wildok __P((nat_t *, int, int, int, int));
 /*                                                                          */
 /* Initialise all of the NAT locks, tables and other structures.            */
 /* ------------------------------------------------------------------------ */
-int fr_natinit()
+int fr_natinit(ifs)
+ipf_stack_t *ifs;
 {
 	int i;
 
-	KMALLOCS(nat_table[0], nat_t **, sizeof(nat_t *) * ipf_nattable_sz);
-	if (nat_table[0] != NULL)
-		bzero((char *)nat_table[0], ipf_nattable_sz * sizeof(nat_t *));
+	ifs->ifs_ipf_nattable_sz = NAT_TABLE_SZ;
+	ifs->ifs_ipf_nattable_max = NAT_TABLE_MAX;
+	ifs->ifs_ipf_natrules_sz = NAT_SIZE;
+	ifs->ifs_ipf_rdrrules_sz = RDR_SIZE;
+	ifs->ifs_ipf_hostmap_sz = HOSTMAP_SIZE;
+	ifs->ifs_fr_nat_maxbucket_reset = 1;
+#ifdef  IPFILTER_LOG
+	ifs->ifs_nat_logging = 1;
+#else
+	ifs->ifs_nat_logging = 0;
+#endif
+	ifs->ifs_fr_defnatage = DEF_NAT_AGE;
+	ifs->ifs_fr_defnatipage = 120;		/* 60 seconds */
+	ifs->ifs_fr_defnaticmpage = 6;		/* 3 seconds */
+
+	KMALLOCS(ifs->ifs_nat_table[0], nat_t **,
+		 sizeof(nat_t *) * ifs->ifs_ipf_nattable_sz);
+	if (ifs->ifs_nat_table[0] != NULL)
+		bzero((char *)ifs->ifs_nat_table[0],
+		      ifs->ifs_ipf_nattable_sz * sizeof(nat_t *));
 	else
 		return -1;
 
-	KMALLOCS(nat_table[1], nat_t **, sizeof(nat_t *) * ipf_nattable_sz);
-	if (nat_table[1] != NULL)
-		bzero((char *)nat_table[1], ipf_nattable_sz * sizeof(nat_t *));
+	KMALLOCS(ifs->ifs_nat_table[1], nat_t **,
+		 sizeof(nat_t *) * ifs->ifs_ipf_nattable_sz);
+	if (ifs->ifs_nat_table[1] != NULL)
+		bzero((char *)ifs->ifs_nat_table[1],
+		      ifs->ifs_ipf_nattable_sz * sizeof(nat_t *));
 	else
 		return -2;
 
-	KMALLOCS(nat_rules, ipnat_t **, sizeof(ipnat_t *) * ipf_natrules_sz);
-	if (nat_rules != NULL)
-		bzero((char *)nat_rules, ipf_natrules_sz * sizeof(ipnat_t *));
+	KMALLOCS(ifs->ifs_nat_rules, ipnat_t **,
+		 sizeof(ipnat_t *) * ifs->ifs_ipf_natrules_sz);
+	if (ifs->ifs_nat_rules != NULL)
+		bzero((char *)ifs->ifs_nat_rules,
+		      ifs->ifs_ipf_natrules_sz * sizeof(ipnat_t *));
 	else
 		return -3;
 
-	KMALLOCS(rdr_rules, ipnat_t **, sizeof(ipnat_t *) * ipf_rdrrules_sz);
-	if (rdr_rules != NULL)
-		bzero((char *)rdr_rules, ipf_rdrrules_sz * sizeof(ipnat_t *));
+	KMALLOCS(ifs->ifs_rdr_rules, ipnat_t **,
+		 sizeof(ipnat_t *) * ifs->ifs_ipf_rdrrules_sz);
+	if (ifs->ifs_rdr_rules != NULL)
+		bzero((char *)ifs->ifs_rdr_rules,
+		      ifs->ifs_ipf_rdrrules_sz * sizeof(ipnat_t *));
 	else
 		return -4;
 
-	KMALLOCS(maptable, hostmap_t **, sizeof(hostmap_t *) * ipf_hostmap_sz);
-	if (maptable != NULL)
-		bzero((char *)maptable, sizeof(hostmap_t *) * ipf_hostmap_sz);
+	KMALLOCS(ifs->ifs_maptable, hostmap_t **,
+		 sizeof(hostmap_t *) * ifs->ifs_ipf_hostmap_sz);
+	if (ifs->ifs_maptable != NULL)
+		bzero((char *)ifs->ifs_maptable,
+		      sizeof(hostmap_t *) * ifs->ifs_ipf_hostmap_sz);
 	else
 		return -5;
 
-	KMALLOCS(nat_stats.ns_bucketlen[0], u_long *,
-		 ipf_nattable_sz * sizeof(u_long));
-	if (nat_stats.ns_bucketlen[0] == NULL)
-		return -6;
-	bzero((char *)nat_stats.ns_bucketlen[0],
-	      ipf_nattable_sz * sizeof(u_long));
+	ifs->ifs_ipf_hm_maplist = NULL;
 
-	KMALLOCS(nat_stats.ns_bucketlen[1], u_long *,
-		 ipf_nattable_sz * sizeof(u_long));
-	if (nat_stats.ns_bucketlen[1] == NULL)
-		return -7;
+	KMALLOCS(ifs->ifs_nat_stats.ns_bucketlen[0], u_long *,
+		 ifs->ifs_ipf_nattable_sz * sizeof(u_long));
+	if (ifs->ifs_nat_stats.ns_bucketlen[0] == NULL)
+		return -1;
+	bzero((char *)ifs->ifs_nat_stats.ns_bucketlen[0],
+	      ifs->ifs_ipf_nattable_sz * sizeof(u_long));
 
-	bzero((char *)nat_stats.ns_bucketlen[1],
-	      ipf_nattable_sz * sizeof(u_long));
+	KMALLOCS(ifs->ifs_nat_stats.ns_bucketlen[1], u_long *,
+		 ifs->ifs_ipf_nattable_sz * sizeof(u_long));
+	if (ifs->ifs_nat_stats.ns_bucketlen[1] == NULL)
+		return -1;
+	bzero((char *)ifs->ifs_nat_stats.ns_bucketlen[1],
+	      ifs->ifs_ipf_nattable_sz * sizeof(u_long));
 
-	if (fr_nat_maxbucket == 0) {
-		for (i = ipf_nattable_sz; i > 0; i >>= 1)
-			fr_nat_maxbucket++;
-		fr_nat_maxbucket *= 2;
+	if (ifs->ifs_fr_nat_maxbucket == 0) {
+		for (i = ifs->ifs_ipf_nattable_sz; i > 0; i >>= 1)
+			ifs->ifs_fr_nat_maxbucket++;
+		ifs->ifs_fr_nat_maxbucket *= 2;
 	}
 
-	fr_sttab_init(nat_tqb);
+	fr_sttab_init(ifs->ifs_nat_tqb, ifs);
 	/*
 	 * Increase this because we may have "keep state" following this too
 	 * and packet storms can occur if this is removed too quickly.
 	 */
-	nat_tqb[IPF_TCPS_CLOSED].ifq_ttl = fr_tcplastack;
-	nat_tqb[IPF_TCP_NSTATES - 1].ifq_next = &nat_udptq;
-	nat_udptq.ifq_ttl = fr_defnatage;
-	nat_udptq.ifq_ref = 1;
-	nat_udptq.ifq_head = NULL;
-	nat_udptq.ifq_tail = &nat_udptq.ifq_head;
-	MUTEX_INIT(&nat_udptq.ifq_lock, "nat ipftq udp tab");
-	nat_udptq.ifq_next = &nat_icmptq;
-	nat_icmptq.ifq_ttl = fr_defnaticmpage;
-	nat_icmptq.ifq_ref = 1;
-	nat_icmptq.ifq_head = NULL;
-	nat_icmptq.ifq_tail = &nat_icmptq.ifq_head;
-	MUTEX_INIT(&nat_icmptq.ifq_lock, "nat icmp ipftq tab");
-	nat_icmptq.ifq_next = &nat_iptq;
-	nat_iptq.ifq_ttl = fr_defnatipage;
-	nat_iptq.ifq_ref = 1;
-	nat_iptq.ifq_head = NULL;
-	nat_iptq.ifq_tail = &nat_iptq.ifq_head;
-	MUTEX_INIT(&nat_iptq.ifq_lock, "nat ip ipftq tab");
-	nat_iptq.ifq_next = NULL;
+	ifs->ifs_nat_tqb[IPF_TCPS_CLOSED].ifq_ttl = ifs->ifs_fr_tcplastack;
+	ifs->ifs_nat_tqb[IPF_TCP_NSTATES - 1].ifq_next = &ifs->ifs_nat_udptq;
+	ifs->ifs_nat_udptq.ifq_ttl = ifs->ifs_fr_defnatage;
+	ifs->ifs_nat_udptq.ifq_ref = 1;
+	ifs->ifs_nat_udptq.ifq_head = NULL;
+	ifs->ifs_nat_udptq.ifq_tail = &ifs->ifs_nat_udptq.ifq_head;
+	MUTEX_INIT(&ifs->ifs_nat_udptq.ifq_lock, "nat ipftq udp tab");
+	ifs->ifs_nat_udptq.ifq_next = &ifs->ifs_nat_icmptq;
+	ifs->ifs_nat_icmptq.ifq_ttl = ifs->ifs_fr_defnaticmpage;
+	ifs->ifs_nat_icmptq.ifq_ref = 1;
+	ifs->ifs_nat_icmptq.ifq_head = NULL;
+	ifs->ifs_nat_icmptq.ifq_tail = &ifs->ifs_nat_icmptq.ifq_head;
+	MUTEX_INIT(&ifs->ifs_nat_icmptq.ifq_lock, "nat icmp ipftq tab");
+	ifs->ifs_nat_icmptq.ifq_next = &ifs->ifs_nat_iptq;
+	ifs->ifs_nat_iptq.ifq_ttl = ifs->ifs_fr_defnatipage;
+	ifs->ifs_nat_iptq.ifq_ref = 1;
+	ifs->ifs_nat_iptq.ifq_head = NULL;
+	ifs->ifs_nat_iptq.ifq_tail = &ifs->ifs_nat_iptq.ifq_head;
+	MUTEX_INIT(&ifs->ifs_nat_iptq.ifq_lock, "nat ip ipftq tab");
+	ifs->ifs_nat_iptq.ifq_next = NULL;
 
 	for (i = 0; i < IPF_TCP_NSTATES; i++) {
-		if (nat_tqb[i].ifq_ttl < fr_defnaticmpage)
-			nat_tqb[i].ifq_ttl = fr_defnaticmpage;
+		if (ifs->ifs_nat_tqb[i].ifq_ttl < ifs->ifs_fr_defnaticmpage)
+			ifs->ifs_nat_tqb[i].ifq_ttl = ifs->ifs_fr_defnaticmpage;
 #ifdef LARGE_NAT
-		else if (nat_tqb[i].ifq_ttl > fr_defnatage)
-			nat_tqb[i].ifq_ttl = fr_defnatage;
+		else if (ifs->ifs_nat_tqb[i].ifq_ttl > ifs->ifs_fr_defnatage)
+			ifs->ifs_nat_tqb[i].ifq_ttl = ifs->ifs_fr_defnatage;
 #endif
 	}
 
@@ -302,14 +304,15 @@ int fr_natinit()
 	 * this too and packet storms can occur if this is removed
 	 * too quickly.
 	 */
-	nat_tqb[IPF_TCPS_CLOSED].ifq_ttl = nat_tqb[IPF_TCPS_LAST_ACK].ifq_ttl;
+	ifs->ifs_nat_tqb[IPF_TCPS_CLOSED].ifq_ttl =
+	    ifs->ifs_nat_tqb[IPF_TCPS_LAST_ACK].ifq_ttl;
 
-	RWLOCK_INIT(&ipf_nat, "ipf IP NAT rwlock");
-	RWLOCK_INIT(&ipf_natfrag, "ipf IP NAT-Frag rwlock");
-	MUTEX_INIT(&ipf_nat_new, "ipf nat new mutex");
-	MUTEX_INIT(&ipf_natio, "ipf nat io mutex");
+	RWLOCK_INIT(&ifs->ifs_ipf_nat, "ipf IP NAT rwlock");
+	RWLOCK_INIT(&ifs->ifs_ipf_natfrag, "ipf IP NAT-Frag rwlock");
+	MUTEX_INIT(&ifs->ifs_ipf_nat_new, "ipf nat new mutex");
+	MUTEX_INIT(&ifs->ifs_ipf_natio, "ipf nat io mutex");
 
-	fr_nat_init = 1;
+	ifs->ifs_fr_nat_init = 1;
 
 	return 0;
 }
@@ -324,8 +327,9 @@ int fr_natinit()
 /* loaded NAT rules.  Updates the bitmask indicating which netmasks are in  */
 /* use by redirect rules.                                                   */
 /* ------------------------------------------------------------------------ */
-static void nat_addrdr(n)
+static void nat_addrdr(n, ifs)
 ipnat_t *n;
+ipf_stack_t *ifs;
 {
 	ipnat_t **np;
 	u_32_t j;
@@ -334,10 +338,10 @@ ipnat_t *n;
 
 	k = count4bits(n->in_outmsk);
 	if ((k >= 0) && (k != 32))
-		rdr_masks |= 1 << k;
+		ifs->ifs_rdr_masks |= 1 << k;
 	j = (n->in_outip & n->in_outmsk);
-	hv = NAT_HASH_FN(j, 0, ipf_rdrrules_sz);
-	np = rdr_rules + hv;
+	hv = NAT_HASH_FN(j, 0, ifs->ifs_ipf_rdrrules_sz);
+	np = ifs->ifs_rdr_rules + hv;
 	while (*np != NULL)
 		np = &(*np)->in_rnext;
 	n->in_rnext = NULL;
@@ -356,8 +360,9 @@ ipnat_t *n;
 /* NAT rules.  Updates the bitmask indicating which netmasks are in use by  */
 /* redirect rules.                                                          */
 /* ------------------------------------------------------------------------ */
-static void nat_addnat(n)
+static void nat_addnat(n, ifs)
 ipnat_t *n;
+ipf_stack_t *ifs;
 {
 	ipnat_t **np;
 	u_32_t j;
@@ -366,10 +371,10 @@ ipnat_t *n;
 
 	k = count4bits(n->in_inmsk);
 	if ((k >= 0) && (k != 32))
-		nat_masks |= 1 << k;
+		ifs->ifs_nat_masks |= 1 << k;
 	j = (n->in_inip & n->in_inmsk);
-	hv = NAT_HASH_FN(j, 0, ipf_natrules_sz);
-	np = nat_rules + hv;
+	hv = NAT_HASH_FN(j, 0, ifs->ifs_ipf_natrules_sz);
+	np = ifs->ifs_nat_rules + hv;
 	while (*np != NULL)
 		np = &(*np)->in_mnext;
 	n->in_mnext = NULL;
@@ -425,12 +430,13 @@ ipnat_t *n;
 /* that is not doing port based translation.  If is not yet allocated, then */
 /* create a new entry if a non-NULL NAT rule pointer has been supplied.     */
 /* ------------------------------------------------------------------------ */
-static struct hostmap *nat_hostmap(np, src, dst, map, port)
+static struct hostmap *nat_hostmap(np, src, dst, map, port, ifs)
 ipnat_t *np;
 struct in_addr src;
 struct in_addr dst;
 struct in_addr map;
 u_32_t port;
+ipf_stack_t *ifs;
 {
 	hostmap_t *hm;
 	u_int hv;
@@ -439,7 +445,7 @@ u_32_t port;
 	hv += src.s_addr;
 	hv += dst.s_addr;
 	hv %= HOSTMAP_SIZE;
-	for (hm = maptable[hv]; hm; hm = hm->hm_next)
+	for (hm = ifs->ifs_maptable[hv]; hm; hm = hm->hm_next)
 		if ((hm->hm_srcip.s_addr == src.s_addr) &&
 		    (hm->hm_dstip.s_addr == dst.s_addr) &&
 		    ((np == NULL) || (np == hm->hm_ipnat)) &&
@@ -453,11 +459,17 @@ u_32_t port;
 
 	KMALLOC(hm, hostmap_t *);
 	if (hm) {
-		hm->hm_next = maptable[hv];
-		hm->hm_pnext = maptable + hv;
-		if (maptable[hv] != NULL)
-			maptable[hv]->hm_pnext = &hm->hm_next;
-		maptable[hv] = hm;
+		hm->hm_hnext = ifs->ifs_ipf_hm_maplist;
+		hm->hm_phnext = &ifs->ifs_ipf_hm_maplist;
+		if (ifs->ifs_ipf_hm_maplist != NULL)
+			ifs->ifs_ipf_hm_maplist->hm_phnext = &hm->hm_hnext;
+		ifs->ifs_ipf_hm_maplist = hm;
+
+		hm->hm_next = ifs->ifs_maptable[hv];
+		hm->hm_pnext = ifs->ifs_maptable + hv;
+		if (ifs->ifs_maptable[hv] != NULL)
+			ifs->ifs_maptable[hv]->hm_pnext = &hm->hm_next;
+		ifs->ifs_maptable[hv] = hm;
 		hm->hm_ipnat = np;
 		hm->hm_srcip = src;
 		hm->hm_dstip = dst;
@@ -486,8 +498,23 @@ struct hostmap *hm;
 		if (hm->hm_next)
 			hm->hm_next->hm_pnext = hm->hm_pnext;
 		*hm->hm_pnext = hm->hm_next;
+		if (hm->hm_hnext)
+			hm->hm_hnext->hm_phnext = hm->hm_phnext;
+		*hm->hm_phnext = hm->hm_hnext;
 		KFREE(hm);
 	}
+}
+
+void fr_hostmapderef(hmp)
+struct hostmap **hmp;
+{
+	struct hostmap *hm;
+
+	hm = *hmp;
+	*hmp = NULL;
+	hm->hm_ref--;
+	if (hm->hm_ref == 0)
+		nat_hostmapdel(hm);
 }
 
 
@@ -594,10 +621,12 @@ u_32_t n;
 /*                                                                          */
 /* Processes an ioctl call made to operate on the IP Filter NAT device.     */
 /* ------------------------------------------------------------------------ */
-int fr_nat_ioctl(data, cmd, mode)
+int fr_nat_ioctl(data, cmd, mode, uid, ctx, ifs)
 ioctlcmd_t cmd;
 caddr_t data;
-int mode;
+int mode, uid;
+void *ctx;
+ipf_stack_t *ifs;
 {
 	ipnat_t *nat, *nt, *n = NULL, **np = NULL;
 	int error = 0, ret, arg, getlock;
@@ -650,8 +679,9 @@ int mode;
 			if ((nat->in_flags & IPN_IPRANGE) == 0)
 				nat->in_outip &= nat->in_outmsk;
 		}
-		MUTEX_ENTER(&ipf_natio);
-		for (np = &nat_list; ((n = *np) != NULL); np = &n->in_next)
+		MUTEX_ENTER(&ifs->ifs_ipf_natio);
+		for (np = &ifs->ifs_nat_list; ((n = *np) != NULL);
+		     np = &n->in_next)
 			if (!bcmp((char *)&nat->in_flags, (char *)&n->in_flags,
 					IPN_CMPSIZ))
 				break;
@@ -659,6 +689,23 @@ int mode;
 
 	switch (cmd)
 	{
+	case SIOCGENITER :
+	    {
+		ipfgeniter_t iter;
+		ipftoken_t *token;
+
+		error = fr_inobj(data, &iter, IPFOBJ_GENITER);
+		if (error != 0)
+			break;
+
+		token = ipf_findtoken(iter.igi_type, uid, ctx, ifs);
+		if (token != NULL)
+			error  = nat_iterator(token, &iter, ifs);
+		else
+			error = ESRCH;
+		RWLOCK_EXIT(&ifs->ifs_ipf_tokens);
+		break;
+	    }
 #ifdef  IPFILTER_LOG
 	case SIOCIPFFB :
 	{
@@ -667,7 +714,7 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			tmp = ipflog_clear(IPL_LOGNAT);
+			tmp = ipflog_clear(IPL_LOGNAT, ifs);
 			BCOPYOUT((char *)&tmp, (char *)data, sizeof(tmp));
 		}
 		break;
@@ -676,16 +723,17 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			BCOPYIN((char *)data, (char *)&nat_logging,
-				sizeof(nat_logging));
+			BCOPYIN((char *)data,
+				       (char *)&ifs->ifs_nat_logging,
+				sizeof(ifs->ifs_nat_logging));
 		}
 		break;
 	case SIOCGETLG :
-		BCOPYOUT((char *)&nat_logging, (char *)data,
-			 sizeof(nat_logging));
+		BCOPYOUT((char *)&ifs->ifs_nat_logging, (char *)data,
+			sizeof(ifs->ifs_nat_logging));
 		break;
 	case FIONREAD :
-		arg = iplused[IPL_LOGNAT];
+		arg = ifs->ifs_iplused[IPL_LOGNAT];
 		BCOPYOUT(&arg, data, sizeof(arg));
 		break;
 #endif
@@ -698,12 +746,12 @@ int mode;
 			error = ENOMEM;
 		}
 		if (error != 0) {
-			MUTEX_EXIT(&ipf_natio);
+			MUTEX_EXIT(&ifs->ifs_ipf_natio);
 			break;
 		}
 		bcopy((char *)nat, (char *)nt, sizeof(*n));
-		error = nat_siocaddnat(nt, np, getlock);
-		MUTEX_EXIT(&ipf_natio);
+		error = nat_siocaddnat(nt, np, getlock, ifs);
+		MUTEX_EXIT(&ifs->ifs_ipf_natio);
 		if (error == 0)
 			nt = NULL;
 		break;
@@ -716,45 +764,46 @@ int mode;
 		}
 
 		if (error != 0) {
-			MUTEX_EXIT(&ipf_natio);
+			MUTEX_EXIT(&ifs->ifs_ipf_natio);
 			break;
 		}
-		nat_siocdelnat(n, np, getlock);
+		nat_siocdelnat(n, np, getlock, ifs);
 
-		MUTEX_EXIT(&ipf_natio);
+		MUTEX_EXIT(&ifs->ifs_ipf_natio);
 		n = NULL;
 		break;
 	case SIOCGNATS :
-		nat_stats.ns_table[0] = nat_table[0];
-		nat_stats.ns_table[1] = nat_table[1];
-		nat_stats.ns_list = nat_list;
-		nat_stats.ns_maptable = maptable;
-		nat_stats.ns_nattab_sz = ipf_nattable_sz;
-		nat_stats.ns_nattab_max = ipf_nattable_max;
-		nat_stats.ns_rultab_sz = ipf_natrules_sz;
-		nat_stats.ns_rdrtab_sz = ipf_rdrrules_sz;
-		nat_stats.ns_hostmap_sz = ipf_hostmap_sz;
-		nat_stats.ns_instances = nat_instances;
-		nat_stats.ns_apslist = ap_sess_list;
-		error = fr_outobj(data, &nat_stats, IPFOBJ_NATSTAT);
+		ifs->ifs_nat_stats.ns_table[0] = ifs->ifs_nat_table[0];
+		ifs->ifs_nat_stats.ns_table[1] = ifs->ifs_nat_table[1];
+		ifs->ifs_nat_stats.ns_list = ifs->ifs_nat_list;
+		ifs->ifs_nat_stats.ns_maptable = ifs->ifs_maptable;
+		ifs->ifs_nat_stats.ns_maplist = ifs->ifs_ipf_hm_maplist;
+		ifs->ifs_nat_stats.ns_nattab_max = ifs->ifs_ipf_nattable_max;
+		ifs->ifs_nat_stats.ns_nattab_sz = ifs->ifs_ipf_nattable_sz;
+		ifs->ifs_nat_stats.ns_rultab_sz = ifs->ifs_ipf_natrules_sz;
+		ifs->ifs_nat_stats.ns_rdrtab_sz = ifs->ifs_ipf_rdrrules_sz;
+		ifs->ifs_nat_stats.ns_hostmap_sz = ifs->ifs_ipf_hostmap_sz;
+		ifs->ifs_nat_stats.ns_instances = ifs->ifs_nat_instances;
+		ifs->ifs_nat_stats.ns_apslist = ifs->ifs_ap_sess_list;
+		error = fr_outobj(data, &ifs->ifs_nat_stats, IPFOBJ_NATSTAT);
 		break;
 	case SIOCGNATL :
 	    {
 		natlookup_t nl;
 
 		if (getlock) {
-			READ_ENTER(&ipf_nat);
+			READ_ENTER(&ifs->ifs_ipf_nat);
 		}
 		error = fr_inobj(data, &nl, IPFOBJ_NATLOOKUP);
 		if (error == 0) {
-			if (nat_lookupredir(&nl) != NULL) {
+			if (nat_lookupredir(&nl, ifs) != NULL) {
 				error = fr_outobj(data, &nl, IPFOBJ_NATLOOKUP);
 			} else {
 				error = ESRCH;
 			}
 		}
 		if (getlock) {
-			RWLOCK_EXIT(&ipf_nat);
+			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		}
 		break;
 	    }
@@ -764,62 +813,66 @@ int mode;
 			break;
 		}
 		if (getlock) {
-			WRITE_ENTER(&ipf_nat);
+			WRITE_ENTER(&ifs->ifs_ipf_nat);
 		}
 		error = 0;
 		if (arg == 0)
-			ret = nat_flushtable();
+			ret = nat_flushtable(ifs);
 		else if (arg == 1)
-			ret = nat_clearlist();
+			ret = nat_clearlist(ifs);
 		else
 			error = EINVAL;
 		if (getlock) {
-			RWLOCK_EXIT(&ipf_nat);
+			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		}
 		if (error == 0) {
 			BCOPYOUT(&ret, data, sizeof(ret));
 		}
 		break;
 	case SIOCPROXY :
-		error = appr_ioctl(data, cmd, mode);
+		error = appr_ioctl(data, cmd, mode, ifs);
 		break;
 	case SIOCSTLCK :
 		if (!(mode & FWRITE)) {
 			error = EPERM;
 		} else {
-			fr_lock(data, &fr_nat_lock);
+			fr_lock(data, &ifs->ifs_fr_nat_lock);
 		}
 		break;
 	case SIOCSTPUT :
 		if ((mode & FWRITE) != 0) {
-			error = fr_natputent(data, getlock);
+			error = fr_natputent(data, getlock, ifs);
 		} else {
 			error = EACCES;
 		}
 		break;
 	case SIOCSTGSZ :
-		if (fr_nat_lock) {
+		if (ifs->ifs_fr_nat_lock) {
 			if (getlock) {
-				READ_ENTER(&ipf_nat);
+				READ_ENTER(&ifs->ifs_ipf_nat);
 			}
-			error = fr_natgetsz(data);
+			error = fr_natgetsz(data, ifs);
 			if (getlock) {
-				RWLOCK_EXIT(&ipf_nat);
+				RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 			}
 		} else
 			error = EACCES;
 		break;
 	case SIOCSTGET :
-		if (fr_nat_lock) {
+		if (ifs->ifs_fr_nat_lock) {
 			if (getlock) {
-				READ_ENTER(&ipf_nat);
+				READ_ENTER(&ifs->ifs_ipf_nat);
 			}
-			error = fr_natgetent(data);
+			error = fr_natgetent(data, ifs);
 			if (getlock) {
-				RWLOCK_EXIT(&ipf_nat);
+				RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 			}
 		} else
 			error = EACCES;
+		break;
+	case SIOCIPFDELTOK :
+		(void) BCOPYIN((caddr_t)data, (caddr_t)&arg, sizeof(arg));
+		error = ipf_deltoken(arg, uid, ctx, ifs);
 		break;
 	default :
 		error = EINVAL;
@@ -844,13 +897,14 @@ done:
 /* from information passed to the kernel, then add it  to the appropriate   */
 /* NAT rule table(s).                                                       */
 /* ------------------------------------------------------------------------ */
-static int nat_siocaddnat(n, np, getlock)
+static int nat_siocaddnat(n, np, getlock, ifs)
 ipnat_t *n, **np;
 int getlock;
+ipf_stack_t *ifs;
 {
 	int error = 0, i, j;
 
-	nat_resolverule(n);
+	nat_resolverule(n, ifs);
 	if (n->in_plabel[0] != '\0') {
 		if (n->in_apr == NULL)
 			return ENOENT;
@@ -938,29 +992,31 @@ int getlock;
 	/* Otherwise, these fields are preset */
 
 	if (getlock) {
-		WRITE_ENTER(&ipf_nat);
+		WRITE_ENTER(&ifs->ifs_ipf_nat);
 	}
 	n->in_next = NULL;
 	*np = n;
 
 	if (n->in_age[0] != 0)
-		n->in_tqehead[0] = fr_addtimeoutqueue(&nat_utqe, n->in_age[0]);
+	    n->in_tqehead[0] = fr_addtimeoutqueue(&ifs->ifs_nat_utqe,
+						  n->in_age[0], ifs);
 
 	if (n->in_age[1] != 0)
-		n->in_tqehead[1] = fr_addtimeoutqueue(&nat_utqe, n->in_age[1]);
+	    n->in_tqehead[1] = fr_addtimeoutqueue(&ifs->ifs_nat_utqe,
+						  n->in_age[1], ifs);
 
 	if (n->in_redir & NAT_REDIRECT) {
 		n->in_flags &= ~IPN_NOTDST;
-		nat_addrdr(n);
+		nat_addrdr(n, ifs);
 	}
 	if (n->in_redir & (NAT_MAP|NAT_MAPBLK)) {
 		n->in_flags &= ~IPN_NOTSRC;
-		nat_addnat(n);
+		nat_addnat(n, ifs);
 	}
 	n = NULL;
-	nat_stats.ns_rules++;
+	ifs->ifs_nat_stats.ns_rules++;
 	if (getlock) {
-		RWLOCK_EXIT(&ipf_nat);			/* WRITE */
+		RWLOCK_EXIT(&ifs->ifs_ipf_nat);			/* WRITE */
 	}
 
 	return error;
@@ -976,22 +1032,23 @@ int getlock;
 /* from information passed to the kernel, then add it  to the appropriate   */
 /* NAT rule table(s).                                                       */
 /* ------------------------------------------------------------------------ */
-static void nat_resolverule(n)
+static void nat_resolverule(n, ifs)
 ipnat_t *n;
+ipf_stack_t *ifs;
 {
 	n->in_ifnames[0][LIFNAMSIZ - 1] = '\0';
-	n->in_ifps[0] = fr_resolvenic(n->in_ifnames[0], 4);
+	n->in_ifps[0] = fr_resolvenic(n->in_ifnames[0], 4, ifs);
 
 	n->in_ifnames[1][LIFNAMSIZ - 1] = '\0';
 	if (n->in_ifnames[1][0] == '\0') {
 		(void) strncpy(n->in_ifnames[1], n->in_ifnames[0], LIFNAMSIZ);
 		n->in_ifps[1] = n->in_ifps[0];
 	} else {
-		n->in_ifps[1] = fr_resolvenic(n->in_ifnames[0], 4);
+		n->in_ifps[1] = fr_resolvenic(n->in_ifnames[0], 4, ifs);
 	}
 
 	if (n->in_plabel[0] != '\0') {
-		n->in_apr = appr_lookup(n->in_p, n->in_plabel);
+		n->in_apr = appr_lookup(n->in_p, n->in_plabel, ifs);
 	}
 }
 
@@ -1008,31 +1065,32 @@ ipnat_t *n;
 /* from information passed to the kernel, then add it  to the appropriate   */
 /* NAT rule table(s).                                                       */
 /* ------------------------------------------------------------------------ */
-static void nat_siocdelnat(n, np, getlock)
+static void nat_siocdelnat(n, np, getlock, ifs)
 ipnat_t *n, **np;
 int getlock;
+ipf_stack_t *ifs;
 {
 	if (getlock) {
-		WRITE_ENTER(&ipf_nat);
+		WRITE_ENTER(&ifs->ifs_ipf_nat);
 	}
 	if (n->in_redir & NAT_REDIRECT)
 		nat_delrdr(n);
 	if (n->in_redir & (NAT_MAPBLK|NAT_MAP))
 		nat_delnat(n);
-	if (nat_list == NULL) {
-		nat_masks = 0;
-		rdr_masks = 0;
+	if (ifs->ifs_nat_list == NULL) {
+		ifs->ifs_nat_masks = 0;
+		ifs->ifs_rdr_masks = 0;
 	}
 
 	if (n->in_tqehead[0] != NULL) {
 		if (fr_deletetimeoutqueue(n->in_tqehead[0]) == 0) {
-			fr_freetimeoutqueue(n->in_tqehead[1]);
+			fr_freetimeoutqueue(n->in_tqehead[1], ifs);
 		}
 	}
 
 	if (n->in_tqehead[1] != NULL) {
 		if (fr_deletetimeoutqueue(n->in_tqehead[1]) == 0) {
-			fr_freetimeoutqueue(n->in_tqehead[1]);
+			fr_freetimeoutqueue(n->in_tqehead[1], ifs);
 		}
 	}
 
@@ -1042,13 +1100,13 @@ int getlock;
 		if (n->in_apr)
 			appr_free(n->in_apr);
 		KFREE(n);
-		nat_stats.ns_rules--;
+		ifs->ifs_nat_stats.ns_rules--;
 	} else {
 		n->in_flags |= IPN_DELETE;
 		n->in_next = NULL;
 	}
 	if (getlock) {
-		RWLOCK_EXIT(&ipf_nat);			/* READ/WRITE */
+		RWLOCK_EXIT(&ifs->ifs_ipf_nat);			/* READ/WRITE */
 	}
 }
 
@@ -1064,8 +1122,9 @@ int getlock;
 /* The size of the entry is stored in the ng_sz field and the enture natget */
 /* structure is copied back to the user.                                    */
 /* ------------------------------------------------------------------------ */
-static int fr_natgetsz(data)
+static int fr_natgetsz(data, ifs)
 caddr_t data;
+ipf_stack_t *ifs;
 {
 	ap_session_t *aps;
 	nat_t *nat, *n;
@@ -1075,7 +1134,7 @@ caddr_t data;
 
 	nat = ng.ng_ptr;
 	if (!nat) {
-		nat = nat_instances;
+		nat = ifs->ifs_nat_instances;
 		ng.ng_sz = 0;
 		/*
 		 * Empty list so the size returned is 0.  Simple.
@@ -1090,7 +1149,7 @@ caddr_t data;
 		 * current list of entries.  Security precaution to prevent
 		 * copying of random kernel data.
 		 */
-		for (n = nat_instances; n; n = n->nat_next)
+		for (n = ifs->ifs_nat_instances; n; n = n->nat_next)
 			if (n == nat)
 				break;
 		if (!n)
@@ -1123,8 +1182,9 @@ caddr_t data;
 /* Copies out NAT entry to user space.  Any additional data held for a      */
 /* proxy is also copied, as to is the NAT rule which was responsible for it */
 /* ------------------------------------------------------------------------ */
-static int fr_natgetent(data)
+static int fr_natgetent(data, ifs)
 caddr_t data;
+ipf_stack_t *ifs;
 {
 	int error, outsize;
 	ap_session_t *aps;
@@ -1145,9 +1205,9 @@ caddr_t data;
 	ipn->ipn_dsize = ipns.ipn_dsize;
 	nat = ipns.ipn_next;
 	if (nat == NULL) {
-		nat = nat_instances;
+		nat = ifs->ifs_nat_instances;
 		if (nat == NULL) {
-			if (nat_instances == NULL)
+			if (ifs->ifs_nat_instances == NULL)
 				error = ENOENT;
 			goto finished;
 		}
@@ -1157,7 +1217,7 @@ caddr_t data;
 		 * current list of entries.  Security precaution to prevent
 		 * copying of random kernel data.
 		 */
-		for (n = nat_instances; n; n = n->nat_next)
+		for (n = ifs->ifs_nat_instances; n; n = n->nat_next)
 			if (n == nat)
 				break;
 		if (n == NULL) {
@@ -1235,9 +1295,10 @@ finished:
 /* Loads a NAT table entry from user space, including a NAT rule, proxy and */
 /* firewall rule data structures, if pointers to them indicate so.          */
 /* ------------------------------------------------------------------------ */
-static int fr_natputent(data, getlock)
+static int fr_natputent(data, getlock, ifs)
 caddr_t data;
 int getlock;
+ipf_stack_t *ifs;
 {
 	nat_save_t ipn, *ipnn;
 	ap_session_t *aps;
@@ -1314,9 +1375,9 @@ int getlock;
 		in->in_use = 1;
 		in->in_flags |= IPN_DELETE;
 
-		ATOMIC_INC(nat_stats.ns_rules);
+		ATOMIC_INC(ifs->ifs_nat_stats.ns_rules);
 
-		nat_resolverule(in);
+		nat_resolverule(in, ifs);
 	}
 
 	/*
@@ -1329,12 +1390,12 @@ int getlock;
 		fin.fin_data[1] = ntohs(nat->nat_outport);
 		fin.fin_ifp = nat->nat_ifps[0];
 		if (getlock) {
-			READ_ENTER(&ipf_nat);
+			READ_ENTER(&ifs->ifs_ipf_nat);
 		}
 		n = nat_inlookup(&fin, nat->nat_flags, fin.fin_p,
 			nat->nat_oip, nat->nat_outip);
 		if (getlock) {
-			RWLOCK_EXIT(&ipf_nat);
+			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		}
 		if (n != NULL) {
 			error = EEXIST;
@@ -1345,12 +1406,12 @@ int getlock;
 		fin.fin_data[1] = ntohs(nat->nat_oport);
 		fin.fin_ifp = nat->nat_ifps[1];
 		if (getlock) {
-			READ_ENTER(&ipf_nat);
+			READ_ENTER(&ifs->ifs_ipf_nat);
 		}
 		n = nat_outlookup(&fin, nat->nat_flags, fin.fin_p,
 			nat->nat_inip, nat->nat_oip);
 		if (getlock) {
-			RWLOCK_EXIT(&ipf_nat);
+			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		}
 		if (n != NULL) {
 			error = EEXIST;
@@ -1416,8 +1477,8 @@ int getlock;
 			MUTEX_NUKE(&fr->fr_lock);
 			MUTEX_INIT(&fr->fr_lock, "nat-filter rule lock");
 		} else {
-			READ_ENTER(&ipf_nat);
-			for (n = nat_instances; n; n = n->nat_next)
+			READ_ENTER(&ifs->ifs_ipf_nat);
+			for (n = ifs->ifs_nat_instances; n; n = n->nat_next)
 				if (n->nat_fr == fr)
 					break;
 
@@ -1426,7 +1487,7 @@ int getlock;
 				fr->fr_ref++;
 				MUTEX_EXIT(&fr->fr_lock);
 			}
-			RWLOCK_EXIT(&ipf_nat);
+			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 
 			if (!n) {
 				error = ESRCH;
@@ -1441,15 +1502,15 @@ int getlock;
 	}
 
 	if (getlock) {
-		WRITE_ENTER(&ipf_nat);
+		WRITE_ENTER(&ifs->ifs_ipf_nat);
 	}
-	error = nat_insert(nat, nat->nat_rev);
+	error = nat_insert(nat, nat->nat_rev, ifs);
 	if ((error == 0) && (aps != NULL)) {
-		aps->aps_next = ap_sess_list;
-		ap_sess_list = aps;
+		aps->aps_next = ifs->ifs_ap_sess_list;
+		ifs->ifs_ap_sess_list = aps;
 	}
 	if (getlock) {
-		RWLOCK_EXIT(&ipf_nat);
+		RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 	}
 
 	if (error == 0)
@@ -1459,7 +1520,7 @@ int getlock;
 
 junkput:
 	if (fr != NULL)
-		(void) fr_derefrule(&fr);
+		(void) fr_derefrule(&fr, ifs);
 
 	if ((ipnn != NULL) && (ipnn != &ipn)) {
 		KFREES(ipnn, ipn.ipn_dsize);
@@ -1492,24 +1553,25 @@ junkput:
 /* Delete a nat entry from the various lists and table.  If NAT logging is  */
 /* enabled then generate a NAT log record for this event.                   */
 /* ------------------------------------------------------------------------ */
-static void nat_delete(nat, logtype)
+static void nat_delete(nat, logtype, ifs)
 struct nat *nat;
 int logtype;
+ipf_stack_t *ifs;
 {
 	struct ipnat *ipn;
 
-	if (logtype != 0 && nat_logging != 0)
-		nat_log(nat, logtype);
+	if (logtype != 0 && ifs->ifs_nat_logging != 0)
+		nat_log(nat, logtype, ifs);
 
-	MUTEX_ENTER(&ipf_nat_new);
+	MUTEX_ENTER(&ifs->ifs_ipf_nat_new);
 
 	/*
 	 * Take it as a general indication that all the pointers are set if
 	 * nat_pnext is set.
 	 */
 	if (nat->nat_pnext != NULL) {
-		nat_stats.ns_bucketlen[0][nat->nat_hv[0]]--;
-		nat_stats.ns_bucketlen[1][nat->nat_hv[1]]--;
+		ifs->ifs_nat_stats.ns_bucketlen[0][nat->nat_hv[0]]--;
+		ifs->ifs_nat_stats.ns_bucketlen[1][nat->nat_hv[1]]--;
 
 		*nat->nat_pnext = nat->nat_next;
 		if (nat->nat_next != NULL) {
@@ -1533,7 +1595,7 @@ int logtype;
 		nat->nat_phnext[1] = NULL;
 
 		if ((nat->nat_flags & SI_WILDP) != 0)
-			nat_stats.ns_wilds--;
+			ifs->ifs_nat_stats.ns_wilds--;
 	}
 
 	if (nat->nat_me != NULL) {
@@ -1545,7 +1607,7 @@ int logtype;
 
 	nat->nat_ref--;
 	if (nat->nat_ref > 0) {
-		MUTEX_EXIT(&ipf_nat_new);
+		MUTEX_EXIT(&ifs->ifs_ipf_nat_new);
 		return;
 	}
 
@@ -1555,7 +1617,7 @@ int logtype;
 #endif
 
 	if (nat->nat_fr != NULL)
-		(void)fr_derefrule(&nat->nat_fr);
+		(void)fr_derefrule(&nat->nat_fr, ifs);
 
 	if (nat->nat_hm != NULL)
 		nat_hostmapdel(nat->nat_hm);
@@ -1573,22 +1635,22 @@ int logtype;
 			if (ipn->in_apr)
 				appr_free(ipn->in_apr);
 			KFREE(ipn);
-			nat_stats.ns_rules--;
+			ifs->ifs_nat_stats.ns_rules--;
 		}
 	}
 
 	MUTEX_DESTROY(&nat->nat_lock);
 
-	aps_free(nat->nat_aps);
-	nat_stats.ns_inuse--;
-	MUTEX_EXIT(&ipf_nat_new);
+	aps_free(nat->nat_aps, ifs);
+	ifs->ifs_nat_stats.ns_inuse--;
+	MUTEX_EXIT(&ifs->ifs_ipf_nat_new);
 
 	/*
 	 * If there's a fragment table entry too for this nat entry, then
 	 * dereference that as well.  This is after nat_lock is released
 	 * because of Tru64.
 	 */
-	fr_forgetnat((void *)nat);
+	fr_forgetnat((void *)nat, ifs);
 
 	KFREE(nat);
 }
@@ -1605,7 +1667,8 @@ int logtype;
 /*
  * nat_flushtable - clear the NAT table of all mapping entries.
  */
-static int nat_flushtable()
+static int nat_flushtable(ifs)
+ipf_stack_t *ifs;
 {
 	nat_t *nat;
 	int j = 0;
@@ -1614,19 +1677,19 @@ static int nat_flushtable()
 	 * ALL NAT mappings deleted, so lets just make the deletions
 	 * quicker.
 	 */
-	if (nat_table[0] != NULL)
-		bzero((char *)nat_table[0],
-		      sizeof(nat_table[0]) * ipf_nattable_sz);
-	if (nat_table[1] != NULL)
-		bzero((char *)nat_table[1],
-		      sizeof(nat_table[1]) * ipf_nattable_sz);
+	if (ifs->ifs_nat_table[0] != NULL)
+		bzero((char *)ifs->ifs_nat_table[0],
+		      sizeof(ifs->ifs_nat_table[0]) * ifs->ifs_ipf_nattable_sz);
+	if (ifs->ifs_nat_table[1] != NULL)
+		bzero((char *)ifs->ifs_nat_table[1],
+		      sizeof(ifs->ifs_nat_table[1]) * ifs->ifs_ipf_nattable_sz);
 
-	while ((nat = nat_instances) != NULL) {
-		nat_delete(nat, NL_FLUSH);
+	while ((nat = ifs->ifs_nat_instances) != NULL) {
+		nat_delete(nat, NL_FLUSH, ifs);
 		j++;
 	}
 
-	nat_stats.ns_inuse = 0;
+	ifs->ifs_nat_stats.ns_inuse = 0;
 	return j;
 }
 
@@ -1640,15 +1703,18 @@ static int nat_flushtable()
 /* about this cleanup: simply free all entries on the list of rules and     */
 /* clear out the tables used for hashed NAT rule lookups.                   */
 /* ------------------------------------------------------------------------ */
-static int nat_clearlist()
+static int nat_clearlist(ifs)
+ipf_stack_t *ifs;
 {
-	ipnat_t *n, **np = &nat_list;
+	ipnat_t *n, **np = &ifs->ifs_nat_list;
 	int i = 0;
 
-	if (nat_rules != NULL)
-		bzero((char *)nat_rules, sizeof(*nat_rules) * ipf_natrules_sz);
-	if (rdr_rules != NULL)
-		bzero((char *)rdr_rules, sizeof(*rdr_rules) * ipf_rdrrules_sz);
+	if (ifs->ifs_nat_rules != NULL)
+		bzero((char *)ifs->ifs_nat_rules,
+		      sizeof(*ifs->ifs_nat_rules) * ifs->ifs_ipf_natrules_sz);
+	if (ifs->ifs_rdr_rules != NULL)
+		bzero((char *)ifs->ifs_rdr_rules,
+		      sizeof(*ifs->ifs_rdr_rules) * ifs->ifs_ipf_rdrrules_sz);
 
 	while ((n = *np) != NULL) {
 		*np = n->in_next;
@@ -1656,15 +1722,15 @@ static int nat_clearlist()
 			if (n->in_apr != NULL)
 				appr_free(n->in_apr);
 			KFREE(n);
-			nat_stats.ns_rules--;
+			ifs->ifs_nat_stats.ns_rules--;
 		} else {
 			n->in_flags |= IPN_DELETE;
 			n->in_next = NULL;
 		}
 		i++;
 	}
-	nat_masks = 0;
-	rdr_masks = 0;
+	ifs->ifs_nat_masks = 0;
+	ifs->ifs_rdr_masks = 0;
 	return i;
 }
 
@@ -1695,6 +1761,7 @@ natinfo_t *ni;
 	ipnat_t *np;
 	nat_t *natl;
 	int l;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	/*
 	 * If it's an outbound packet which doesn't match any existing
@@ -1723,7 +1790,7 @@ natinfo_t *ni;
 			 * setup for this IP address pair.
 			 */
 			hm = nat_hostmap(np, fin->fin_src, fin->fin_dst,
-					 in, 0);
+					 in, 0, ifs);
 			if (hm != NULL)
 				in.s_addr = hm->hm_mapip.s_addr;
 		} else if ((l == 1) && (hm != NULL)) {
@@ -1781,7 +1848,7 @@ natinfo_t *ni;
 			 */
 			if ((l > 0) ||
 			    fr_ifpaddr(4, FRI_NORMAL, fin->fin_ifp,
-				       &in, NULL) == -1)
+				       &in, NULL, fin->fin_ifs) == -1)
 				return -1;
 			in.s_addr = ntohl(in.s_addr);
 
@@ -1890,7 +1957,7 @@ natinfo_t *ni;
 	nat->nat_oip = fin->fin_dst;
 	if (nat->nat_hm == NULL)
 		nat->nat_hm = nat_hostmap(np, fin->fin_src, fin->fin_dst,
-					  nat->nat_outip, 0);
+					  nat->nat_outip, 0, ifs);
 
 	/*
 	 * The ICMP checksum does not have a pseudo header containing
@@ -1944,6 +2011,7 @@ natinfo_t *ni;
 	u_32_t flags;
 	ipnat_t *np;
 	int move;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	move = 1;
 	hm = NULL;
@@ -1963,7 +2031,7 @@ natinfo_t *ni;
 	if ((np->in_flags & (IPN_ROUNDR|IPN_STICKY)) ==
 	    (IPN_ROUNDR|IPN_STICKY)) {
 		hm = nat_hostmap(NULL, fin->fin_src, fin->fin_dst, in,
-				 (u_32_t)dport);
+				 (u_32_t)dport, ifs);
 		if (hm != NULL) {
 			in.s_addr = ntohl(hm->hm_mapip.s_addr);
 			np = hm->hm_ipnat;
@@ -1983,7 +2051,7 @@ natinfo_t *ni;
 
 		if ((np->in_flags & (IPN_ROUNDR|IPN_STICKY)) == IPN_STICKY) {
 			hm = nat_hostmap(np, fin->fin_src, fin->fin_dst,
-					 in, (u_32_t)dport);
+					 in, (u_32_t)dport, ifs);
 			if (hm != NULL) {
 				in.s_addr = hm->hm_mapip.s_addr;
 				move = 0;
@@ -2003,7 +2071,8 @@ natinfo_t *ni;
 		/*
 		 * 0/32 - use the interface's IP address.
 		 */
-		if (fr_ifpaddr(4, FRI_NORMAL, fin->fin_ifp, &in, NULL) == -1)
+		if (fr_ifpaddr(4, FRI_NORMAL, fin->fin_ifp, &in, NULL,
+			   fin->fin_ifs) == -1)
 			return -1;
 		in.s_addr = ntohl(in.s_addr);
 
@@ -2112,9 +2181,10 @@ int direction;
 	natinfo_t ni;
 	u_32_t sumd;
 	int move;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (nat_stats.ns_inuse >= ipf_nattable_max) {
-		nat_stats.ns_memfail++;
+	if (ifs->ifs_nat_stats.ns_inuse >= ifs->ifs_ipf_nattable_max) {
+		ifs->ifs_nat_stats.ns_memfail++;
 		return NULL;
 	}
 
@@ -2129,17 +2199,17 @@ int direction;
 	/* Give me a new nat */
 	KMALLOC(nat, nat_t *);
 	if (nat == NULL) {
-		nat_stats.ns_memfail++;
+		ifs->ifs_nat_stats.ns_memfail++;
 		/*
 		 * Try to automatically tune the max # of entries in the
 		 * table allowed to be less than what will cause kmem_alloc()
 		 * to fail and try to eliminate panics due to out of memory
 		 * conditions arising.
 		 */
-		if (ipf_nattable_max > ipf_nattable_sz) {
-			ipf_nattable_max = nat_stats.ns_inuse - 100;
+		if (ifs->ifs_ipf_nattable_max > ifs->ifs_ipf_nattable_sz) {
+			ifs->ifs_ipf_nattable_max = ifs->ifs_nat_stats.ns_inuse - 100;
 			printf("ipf_nattable_max reduced to %d\n",
-				ipf_nattable_max);
+				ifs->ifs_ipf_nattable_max);
 		}
 		return NULL;
 	}
@@ -2168,9 +2238,10 @@ int direction;
 
 	bzero((char *)nat, sizeof(*nat));
 	nat->nat_flags = flags;
+	nat->nat_redir = np->in_redir;
 
 	if ((flags & NAT_SLAVE) == 0) {
-		MUTEX_ENTER(&ipf_nat_new);
+		MUTEX_ENTER(&ifs->ifs_ipf_nat_new);
 	}
 
 	/*
@@ -2219,10 +2290,10 @@ int direction;
 	if ((move == 1) && (np->in_flags & IPN_ROUNDR)) {
 		if (np->in_redir == NAT_REDIRECT) {
 			nat_delrdr(np);
-			nat_addrdr(np);
+			nat_addrdr(np, ifs);
 		} else if (np->in_redir == NAT_MAP) {
 			nat_delnat(np);
-			nat_addnat(np);
+			nat_addnat(np, ifs);
 		}
 	}
 
@@ -2278,17 +2349,17 @@ int direction;
 		goto badnat;
 	}
 	if (flags & SI_WILDP)
-		nat_stats.ns_wilds++;
+		ifs->ifs_nat_stats.ns_wilds++;
 	goto done;
 badnat:
-	nat_stats.ns_badnat++;
+	ifs->ifs_nat_stats.ns_badnat++;
 	if ((hm = nat->nat_hm) != NULL)
 		nat_hostmapdel(hm);
 	KFREE(nat);
 	nat = NULL;
 done:
 	if ((flags & NAT_SLAVE) == 0) {
-		MUTEX_EXIT(&ipf_nat_new);
+		MUTEX_EXIT(&ifs->ifs_ipf_nat_new);
 	}
 	return nat;
 }
@@ -2317,6 +2388,7 @@ int direction;
 {
 	frentry_t *fr;
 	ipnat_t *np;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	np = ni->nai_np;
 
@@ -2341,9 +2413,9 @@ int direction;
 		if (appr_new(fin, nat) == -1)
 			return -1;
 
-	if (nat_insert(nat, fin->fin_rev) == 0) {
-		if (nat_logging)
-			nat_log(nat, (u_int)np->in_redir);
+	if (nat_insert(nat, fin->fin_rev, ifs) == 0) {
+		if (ifs->ifs_nat_logging)
+			nat_log(nat, (u_int)np->in_redir, ifs);
 		np->in_use++;
 		if (fr != NULL) {
 			MUTEX_ENTER(&fr->fr_lock);
@@ -2370,9 +2442,10 @@ int direction;
 /* Insert a NAT entry into the hash tables for searching and add it to the  */
 /* list of active NAT entries.  Adjust global counters when complete.       */
 /* ------------------------------------------------------------------------ */
-int	nat_insert(nat, rev)
+int	nat_insert(nat, rev, ifs)
 nat_t	*nat;
 int	rev;
+ipf_stack_t *ifs;
 {
 	u_int hv1, hv2;
 	nat_t **natp;
@@ -2385,20 +2458,22 @@ int	rev;
 		hv1 = NAT_HASH_FN(nat->nat_inip.s_addr, nat->nat_inport,
 				  0xffffffff);
 		hv1 = NAT_HASH_FN(nat->nat_oip.s_addr, hv1 + nat->nat_oport,
-				  ipf_nattable_sz);
+				  ifs->ifs_ipf_nattable_sz);
 		hv2 = NAT_HASH_FN(nat->nat_outip.s_addr, nat->nat_outport,
 				  0xffffffff);
 		hv2 = NAT_HASH_FN(nat->nat_oip.s_addr, hv2 + nat->nat_oport,
-				  ipf_nattable_sz);
+				  ifs->ifs_ipf_nattable_sz);
 	} else {
 		hv1 = NAT_HASH_FN(nat->nat_inip.s_addr, 0, 0xffffffff);
-		hv1 = NAT_HASH_FN(nat->nat_oip.s_addr, hv1, ipf_nattable_sz);
+		hv1 = NAT_HASH_FN(nat->nat_oip.s_addr, hv1,
+				  ifs->ifs_ipf_nattable_sz);
 		hv2 = NAT_HASH_FN(nat->nat_outip.s_addr, 0, 0xffffffff);
-		hv2 = NAT_HASH_FN(nat->nat_oip.s_addr, hv2, ipf_nattable_sz);
+		hv2 = NAT_HASH_FN(nat->nat_oip.s_addr, hv2,
+				  ifs->ifs_ipf_nattable_sz);
 	}
 
-	if (nat_stats.ns_bucketlen[0][hv1] >= fr_nat_maxbucket ||
-	    nat_stats.ns_bucketlen[1][hv2] >= fr_nat_maxbucket) {
+	if (ifs->ifs_nat_stats.ns_bucketlen[0][hv1] >= ifs->ifs_fr_nat_maxbucket ||
+	    ifs->ifs_nat_stats.ns_bucketlen[1][hv2] >= ifs->ifs_fr_nat_maxbucket) {
 		return -1;
 	}
 
@@ -2415,11 +2490,11 @@ int	rev;
 	nat->nat_pkts[1] = 0;
 
 	nat->nat_ifnames[0][LIFNAMSIZ - 1] = '\0';
-	nat->nat_ifps[0] = fr_resolvenic(nat->nat_ifnames[0], 4);
+	nat->nat_ifps[0] = fr_resolvenic(nat->nat_ifnames[0], 4, ifs);
 
 	if (nat->nat_ifnames[1][0] !='\0') {
 		nat->nat_ifnames[1][LIFNAMSIZ - 1] = '\0';
-		nat->nat_ifps[1] = fr_resolvenic(nat->nat_ifnames[1], 4);
+		nat->nat_ifps[1] = fr_resolvenic(nat->nat_ifnames[1], 4, ifs);
 	} else {
 		(void) strncpy(nat->nat_ifnames[1], nat->nat_ifnames[0],
 			       LIFNAMSIZ);
@@ -2427,32 +2502,32 @@ int	rev;
 		nat->nat_ifps[1] = nat->nat_ifps[0];
 	}
 
-	nat->nat_next = nat_instances;
-	nat->nat_pnext = &nat_instances;
-	if (nat_instances)
-		nat_instances->nat_pnext = &nat->nat_next;
-	nat_instances = nat;
+	nat->nat_next = ifs->ifs_nat_instances;
+	nat->nat_pnext = &ifs->ifs_nat_instances;
+	if (ifs->ifs_nat_instances)
+		ifs->ifs_nat_instances->nat_pnext = &nat->nat_next;
+	ifs->ifs_nat_instances = nat;
 
-	natp = &nat_table[0][hv1];
+	natp = &ifs->ifs_nat_table[0][hv1];
 	if (*natp)
 		(*natp)->nat_phnext[0] = &nat->nat_hnext[0];
 	nat->nat_phnext[0] = natp;
 	nat->nat_hnext[0] = *natp;
 	*natp = nat;
-	nat_stats.ns_bucketlen[0][hv1]++;
+	ifs->ifs_nat_stats.ns_bucketlen[0][hv1]++;
 
-	natp = &nat_table[1][hv2];
+	natp = &ifs->ifs_nat_table[1][hv2];
 	if (*natp)
 		(*natp)->nat_phnext[1] = &nat->nat_hnext[1];
 	nat->nat_phnext[1] = natp;
 	nat->nat_hnext[1] = *natp;
 	*natp = nat;
-	nat_stats.ns_bucketlen[1][hv2]++;
+	ifs->ifs_nat_stats.ns_bucketlen[1][hv2]++;
 
-	fr_setnatqueue(nat, rev);
+	fr_setnatqueue(nat, rev, ifs);
 
-	nat_stats.ns_added++;
-	nat_stats.ns_inuse++;
+	ifs->ifs_nat_stats.ns_added++;
+	ifs->ifs_nat_stats.ns_inuse++;
 	return 0;
 }
 
@@ -2885,6 +2960,7 @@ struct in_addr src , mapdst;
 	u_32_t dst;
 	void *ifp;
 	u_int hv;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	if (fin != NULL)
 		ifp = fin->fin_ifp;
@@ -2917,8 +2993,8 @@ struct in_addr src , mapdst;
 		goto find_in_wild_ports;
 
 	hv = NAT_HASH_FN(dst, dport, 0xffffffff);
-	hv = NAT_HASH_FN(src.s_addr, hv + sport, ipf_nattable_sz);
-	nat = nat_table[1][hv];
+	hv = NAT_HASH_FN(src.s_addr, hv + sport, ifs->ifs_ipf_nattable_sz);
+	nat = ifs->ifs_nat_table[1][hv];
 	for (; nat; nat = nat->nat_hnext[1]) {
 		if (nat->nat_ifps[0] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
@@ -2979,17 +3055,17 @@ struct in_addr src , mapdst;
 find_in_wild_ports:
 	if (!(flags & NAT_TCPUDP) || !(flags & NAT_SEARCH))
 		return NULL;
-	if (nat_stats.ns_wilds == 0)
+	if (ifs->ifs_nat_stats.ns_wilds == 0)
 		return NULL;
 
-	RWLOCK_EXIT(&ipf_nat);
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 
 	hv = NAT_HASH_FN(dst, 0, 0xffffffff);
-	hv = NAT_HASH_FN(src.s_addr, hv, ipf_nattable_sz);
+	hv = NAT_HASH_FN(src.s_addr, hv, ifs->ifs_ipf_nattable_sz);
 
-	WRITE_ENTER(&ipf_nat);
+	WRITE_ENTER(&ifs->ifs_ipf_nat);
 
-	nat = nat_table[1][hv];
+	nat = ifs->ifs_nat_table[1][hv];
 	for (; nat; nat = nat->nat_hnext[1]) {
 		if (nat->nat_ifps[0] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
@@ -3016,19 +3092,19 @@ find_in_wild_ports:
 				if (nat == NULL)
 					break;
 			} else {
-				MUTEX_ENTER(&ipf_nat_new);
-				nat_stats.ns_wilds--;
-				MUTEX_EXIT(&ipf_nat_new);
+				MUTEX_ENTER(&ifs->ifs_ipf_nat_new);
+				ifs->ifs_nat_stats.ns_wilds--;
+				MUTEX_EXIT(&ifs->ifs_ipf_nat_new);
 			}
 			nat->nat_oport = sport;
 			nat->nat_outport = dport;
 			nat->nat_flags &= ~(SI_W_DPORT|SI_W_SPORT);
-			nat_tabmove(nat);
+			nat_tabmove(nat, ifs);
 			break;
 		}
 	}
 
-	MUTEX_DOWNGRADE(&ipf_nat);
+	MUTEX_DOWNGRADE(&ifs->ifs_ipf_nat);
 
 	return nat;
 }
@@ -3044,8 +3120,9 @@ find_in_wild_ports:
 /* original was placed in the table without hashing on the ports and we now */
 /* want to include hashing on port numbers.                                 */
 /* ------------------------------------------------------------------------ */
-static void nat_tabmove(nat)
+static void nat_tabmove(nat, ifs)
 nat_t *nat;
+ipf_stack_t *ifs;
 {
 	nat_t **natp;
 	u_int hv;
@@ -3059,39 +3136,39 @@ nat_t *nat;
 	if (nat->nat_hnext[0])
 		nat->nat_hnext[0]->nat_phnext[0] = nat->nat_phnext[0];
 	*nat->nat_phnext[0] = nat->nat_hnext[0];
-	nat_stats.ns_bucketlen[0][nat->nat_hv[0]]--;
+	ifs->ifs_nat_stats.ns_bucketlen[0][nat->nat_hv[0]]--;
 
 	if (nat->nat_hnext[1])
 		nat->nat_hnext[1]->nat_phnext[1] = nat->nat_phnext[1];
 	*nat->nat_phnext[1] = nat->nat_hnext[1];
-	nat_stats.ns_bucketlen[1][nat->nat_hv[1]]--;
+	ifs->ifs_nat_stats.ns_bucketlen[1][nat->nat_hv[1]]--;
 
 	/*
 	 * Add into the NAT table in the new position
 	 */
 	hv = NAT_HASH_FN(nat->nat_inip.s_addr, nat->nat_inport, 0xffffffff);
 	hv = NAT_HASH_FN(nat->nat_oip.s_addr, hv + nat->nat_oport,
-			 ipf_nattable_sz);
+			 ifs->ifs_ipf_nattable_sz);
 	nat->nat_hv[0] = hv;
-	natp = &nat_table[0][hv];
+	natp = &ifs->ifs_nat_table[0][hv];
 	if (*natp)
 		(*natp)->nat_phnext[0] = &nat->nat_hnext[0];
 	nat->nat_phnext[0] = natp;
 	nat->nat_hnext[0] = *natp;
 	*natp = nat;
-	nat_stats.ns_bucketlen[0][hv]++;
+	ifs->ifs_nat_stats.ns_bucketlen[0][hv]++;
 
 	hv = NAT_HASH_FN(nat->nat_outip.s_addr, nat->nat_outport, 0xffffffff);
 	hv = NAT_HASH_FN(nat->nat_oip.s_addr, hv + nat->nat_oport,
-			 ipf_nattable_sz);
+			 ifs->ifs_ipf_nattable_sz);
 	nat->nat_hv[1] = hv;
-	natp = &nat_table[1][hv];
+	natp = &ifs->ifs_nat_table[1][hv];
 	if (*natp)
 		(*natp)->nat_phnext[1] = &nat->nat_hnext[1];
 	nat->nat_phnext[1] = natp;
 	nat->nat_hnext[1] = *natp;
 	*natp = nat;
-	nat_stats.ns_bucketlen[1][hv]++;
+	ifs->ifs_nat_stats.ns_bucketlen[1][hv]++;
 }
 
 
@@ -3132,11 +3209,12 @@ struct in_addr src , dst;
 	void *ifp;
 	u_int hv;
 	frentry_t *fr;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	fr = fin->fin_fr;
 
 	if ((fr != NULL) && !(fr->fr_flags & FR_DUP) &&
-		fr->fr_tif.fd_ifp && fr->fr_tif.fd_ifp != (void *)-1)
+	    fr->fr_tif.fd_ifp && fr->fr_tif.fd_ifp != (void *)-1)
 		ifp = fr->fr_tif.fd_ifp;
 	else
 		ifp = fin->fin_ifp;
@@ -3167,8 +3245,8 @@ struct in_addr src , dst;
 		goto find_out_wild_ports;
 
 	hv = NAT_HASH_FN(srcip, sport, 0xffffffff);
-	hv = NAT_HASH_FN(dst.s_addr, hv + dport, ipf_nattable_sz);
-	nat = nat_table[0][hv];
+	hv = NAT_HASH_FN(dst.s_addr, hv + dport, ifs->ifs_ipf_nattable_sz);
+	nat = ifs->ifs_nat_table[0][hv];
 	for (; nat; nat = nat->nat_hnext[0]) {
 		if (nat->nat_ifps[1] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
@@ -3219,21 +3297,21 @@ struct in_addr src , dst;
 find_out_wild_ports:
 	if (!(flags & NAT_TCPUDP) || !(flags & NAT_SEARCH))
 		return NULL;
-	if (nat_stats.ns_wilds == 0)
+	if (ifs->ifs_nat_stats.ns_wilds == 0)
 		return NULL;
 
-	RWLOCK_EXIT(&ipf_nat);
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 
 	hv = NAT_HASH_FN(srcip, 0, 0xffffffff);
-	hv = NAT_HASH_FN(dst.s_addr, hv, ipf_nattable_sz);
+	hv = NAT_HASH_FN(dst.s_addr, hv, ifs->ifs_ipf_nattable_sz);
 
-	WRITE_ENTER(&ipf_nat);
+	WRITE_ENTER(&ifs->ifs_ipf_nat);
 
-	nat = nat_table[0][hv];
+	nat = ifs->ifs_nat_table[0][hv];
 	for (; nat; nat = nat->nat_hnext[0]) {
 		if (nat->nat_ifps[1] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
-			continue;
+				continue;
 		} else if (ifp != NULL)
 			nat->nat_ifps[1] = ifp;
 
@@ -3256,21 +3334,21 @@ find_out_wild_ports:
 				if (nat == NULL)
 					break;
 			} else {
-				MUTEX_ENTER(&ipf_nat_new);
-				nat_stats.ns_wilds--;
-				MUTEX_EXIT(&ipf_nat_new);
+				MUTEX_ENTER(&ifs->ifs_ipf_nat_new);
+				ifs->ifs_nat_stats.ns_wilds--;
+				MUTEX_EXIT(&ifs->ifs_ipf_nat_new);
 			}
 			nat->nat_inport = sport;
 			nat->nat_oport = dport;
 			if (nat->nat_outport == 0)
 				nat->nat_outport = sport;
 			nat->nat_flags &= ~(SI_W_DPORT|SI_W_SPORT);
-			nat_tabmove(nat);
+			nat_tabmove(nat, ifs);
 			break;
 		}
 	}
 
-	MUTEX_DOWNGRADE(&ipf_nat);
+	MUTEX_DOWNGRADE(&ifs->ifs_ipf_nat);
 
 	return nat;
 }
@@ -3285,8 +3363,9 @@ find_out_wild_ports:
 /*                                                                          */
 /* Lookup the NAT tables to search for a matching redirect                  */
 /* ------------------------------------------------------------------------ */
-nat_t *nat_lookupredir(np)
+nat_t *nat_lookupredir(np, ifs)
 natlookup_t *np;
+ipf_stack_t *ifs;
 {
 	fr_info_t fi;
 	nat_t *nat;
@@ -3306,6 +3385,7 @@ natlookup_t *np;
 	else if (np->nl_flags & (IPN_ICMPERR|IPN_ICMPQUERY))
 		fi.fin_p = IPPROTO_ICMP;
 
+	fi.fin_ifs = ifs;
 	/*
 	 * We can do two sorts of lookups:
 	 * - IPN_IN: we have the `real' and `out' address, look for `in'.
@@ -3331,6 +3411,7 @@ natlookup_t *np;
 				fin.fin_p = nat->nat_p;
 				fin.fin_data[0] = ntohs(nat->nat_outport);
 				fin.fin_data[1] = ntohs(nat->nat_oport);
+				fin.fin_ifs = ifs;
 				if (nat_inlookup(&fin, np->nl_flags, fin.fin_p,
 						 nat->nat_outip,
 						 nat->nat_oip) != NULL) {
@@ -3416,6 +3497,7 @@ ipnat_t *np;
 {
 	ipftq_t *ifq, *ifq2;
 	ipftqent_t *tqe;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	MUTEX_ENTER(&nat->nat_lock);
 	tqe = &nat->nat_tqe;
@@ -3432,18 +3514,18 @@ ipnat_t *np;
 		ifq2 = NULL;
 
 	if (nat->nat_p == IPPROTO_TCP && ifq2 == NULL) {
-		(void) fr_tcp_age(&nat->nat_tqe, fin, nat_tqb, 0);
+		(void) fr_tcp_age(&nat->nat_tqe, fin, ifs->ifs_nat_tqb, 0);
 	} else {
 		if (ifq2 == NULL) {
 			if (nat->nat_p == IPPROTO_UDP)
-				ifq2 = &nat_udptq;
+				ifq2 = &ifs->ifs_nat_udptq;
 			else if (nat->nat_p == IPPROTO_ICMP)
-				ifq2 = &nat_icmptq;
+				ifq2 = &ifs->ifs_nat_icmptq;
 			else
-				ifq2 = &nat_iptq;
+				ifq2 = &ifs->ifs_nat_iptq;
 		}
 
-		fr_movequeue(tqe, ifq, ifq2);
+		fr_movequeue(tqe, ifq, ifq2, ifs);
 	}
 	MUTEX_EXIT(&nat->nat_lock);
 }
@@ -3478,8 +3560,9 @@ u_32_t *passp;
 	int natadd = 1;
 	frentry_t *fr;
 	nat_t *nat;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (nat_stats.ns_rules == 0 || fr_nat_lock != 0)
+	if (ifs->ifs_nat_stats.ns_rules == 0 || ifs->ifs_fr_nat_lock != 0)
 		return 0;
 
 	natfailed = 0;
@@ -3519,7 +3602,7 @@ u_32_t *passp;
 
 	ipa = fin->fin_saddr;
 
-	READ_ENTER(&ipf_nat);
+	READ_ENTER(&ifs->ifs_ipf_nat);
 
 	if ((fin->fin_p == IPPROTO_ICMP) && !(nflags & IPN_ICMPQUERY) &&
 	    (nat = nat_icmperror(fin, &nflags, NAT_OUTBOUND)))
@@ -3536,14 +3619,14 @@ u_32_t *passp;
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
 		 */
-		RWLOCK_EXIT(&ipf_nat);
+		RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		msk = 0xffffffff;
-		nmsk = nat_masks;
-		WRITE_ENTER(&ipf_nat);
+		nmsk = ifs->ifs_nat_masks;
+		WRITE_ENTER(&ifs->ifs_ipf_nat);
 maskloop:
 		iph = ipa & htonl(msk);
-		hv = NAT_HASH_FN(iph, 0, ipf_natrules_sz);
-		for (np = nat_rules[hv]; np; np = np->in_mnext)
+		hv = NAT_HASH_FN(iph, 0, ifs->ifs_ipf_natrules_sz);
+		for (np = ifs->ifs_nat_rules[hv]; np; np = np->in_mnext)
 		{
 			if ((np->in_ifps[1] && (np->in_ifps[1] != ifp)))
 				continue;
@@ -3590,7 +3673,7 @@ maskloop:
 				goto maskloop;
 			}
 		}
-		MUTEX_DOWNGRADE(&ipf_nat);
+		MUTEX_DOWNGRADE(&ifs->ifs_ipf_nat);
 	}
 
 	if (nat != NULL) {
@@ -3603,7 +3686,7 @@ maskloop:
 		}
 	} else
 		rval = natfailed;
-	RWLOCK_EXIT(&ipf_nat);
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 
 	if (rval == -1) {
 		if (passp != NULL)
@@ -3637,13 +3720,14 @@ u_32_t nflags;
 	tcphdr_t *tcp;
 	ipnat_t *np;
 	int i;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 #if SOLARIS && defined(_KERNEL)
 	net_data_t net_data_p;
 	if (fin->fin_v == 4)
-		net_data_p = ipf_ipv4;
+		net_data_p = ifs->ifs_ipf_ipv4;
 	else
-		net_data_p = ipf_ipv6;
+		net_data_p = ifs->ifs_ipf_ipv6;
 #endif
 
 	tcp = NULL;
@@ -3751,7 +3835,7 @@ u_32_t nflags;
 			i = 1;
 	} else
 		i = 1;
-	ATOMIC_INCL(nat_stats.ns_mapped[1]);
+	ATOMIC_INCL(ifs->ifs_nat_stats.ns_mapped[1]);
 	fin->fin_flx |= FI_NATED;
 	return i;
 }
@@ -3786,8 +3870,9 @@ u_32_t *passp;
 	ipnat_t *np;
 	nat_t *nat;
 	u_32_t iph;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (nat_stats.ns_rules == 0 || fr_nat_lock != 0)
+	if (ifs->ifs_nat_stats.ns_rules == 0 || ifs->ifs_fr_nat_lock != 0)
 		return 0;
 
 	tcp = NULL;
@@ -3830,7 +3915,7 @@ u_32_t *passp;
 
 	in = fin->fin_dst;
 
-	READ_ENTER(&ipf_nat);
+	READ_ENTER(&ifs->ifs_ipf_nat);
 
 	if ((fin->fin_p == IPPROTO_ICMP) && !(nflags & IPN_ICMPQUERY) &&
 	    (nat = nat_icmperror(fin, &nflags, NAT_INBOUND)))
@@ -3843,18 +3928,18 @@ u_32_t *passp;
 	} else {
 		u_32_t hv, msk, rmsk;
 
-		RWLOCK_EXIT(&ipf_nat);
-		rmsk = rdr_masks;
+		RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+		rmsk = ifs->ifs_rdr_masks;
 		msk = 0xffffffff;
-		WRITE_ENTER(&ipf_nat);
+		WRITE_ENTER(&ifs->ifs_ipf_nat);
 		/*
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
 		 */
 maskloop:
 		iph = in.s_addr & htonl(msk);
-		hv = NAT_HASH_FN(iph, 0, ipf_rdrrules_sz);
-		for (np = rdr_rules[hv]; np; np = np->in_rnext) {
+		hv = NAT_HASH_FN(iph, 0, ifs->ifs_ipf_rdrrules_sz);
+		for (np = ifs->ifs_rdr_rules[hv]; np; np = np->in_rnext) {
 			if (np->in_ifps[0] && (np->in_ifps[0] != ifp))
 				continue;
 			if (np->in_v != fin->fin_v)
@@ -3901,7 +3986,7 @@ maskloop:
 				goto maskloop;
 			}
 		}
-		MUTEX_DOWNGRADE(&ipf_nat);
+		MUTEX_DOWNGRADE(&ifs->ifs_ipf_nat);
 	}
 	if (nat != NULL) {
 		rval = fr_natin(fin, nat, natadd, nflags);
@@ -3914,7 +3999,7 @@ maskloop:
 		}
 	} else
 		rval = natfailed;
-	RWLOCK_EXIT(&ipf_nat);
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 
 	if (rval == -1) {
 		if (passp != NULL)
@@ -3949,13 +4034,14 @@ u_32_t nflags;
 	tcphdr_t *tcp;
 	ipnat_t *np;
 	int i;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 #if SOLARIS && defined(_KERNEL)
 	net_data_t net_data_p;
 	if (fin->fin_v == 4)
-		net_data_p = ipf_ipv4;
+		net_data_p = ifs->ifs_ipf_ipv4;
 	else
-		net_data_p = ipf_ipv6;
+		net_data_p = ifs->ifs_ipf_ipv6;
 #endif
 
 	tcp = NULL;
@@ -4060,7 +4146,7 @@ u_32_t nflags;
 		else
 			fix_outcksum(csump, sumd);
 	}
-	ATOMIC_INCL(nat_stats.ns_mapped[0]);
+	ATOMIC_INCL(ifs->ifs_nat_stats.ns_mapped[0]);
 	fin->fin_flx |= FI_NATED;
 	if (np != NULL && np->in_tag.ipt_num[0] != 0)
 		fin->fin_nattag = &np->in_tag;
@@ -4142,12 +4228,13 @@ u_int nflags;
 /*                                                                          */
 /* Free all memory used by NAT structures allocated at runtime.             */
 /* ------------------------------------------------------------------------ */
-void fr_natunload()
+void fr_natunload(ifs)
+ipf_stack_t *ifs;
 {
 	ipftq_t *ifq, *ifqnext;
 
-	(void) nat_clearlist();
-	(void) nat_flushtable();
+	(void) nat_clearlist(ifs);
+	(void) nat_flushtable(ifs);
 
 	/*
 	 * Proxy timeout queues are not cleaned here because although they
@@ -4156,60 +4243,65 @@ void fr_natunload()
 	 * Should the proxy timeouts have their own list?  There's no real
 	 * justification as this is the only complication.
 	 */
-	for (ifq = nat_utqe; ifq != NULL; ifq = ifqnext) {
+	for (ifq = ifs->ifs_nat_utqe; ifq != NULL; ifq = ifqnext) {
 		ifqnext = ifq->ifq_next;
 		if (((ifq->ifq_flags & IFQF_PROXY) == 0) &&
 		    (fr_deletetimeoutqueue(ifq) == 0))
-			fr_freetimeoutqueue(ifq);
+			fr_freetimeoutqueue(ifq, ifs);
 	}
 
-	if (nat_table[0] != NULL) {
-		KFREES(nat_table[0], sizeof(nat_t *) * ipf_nattable_sz);
-		nat_table[0] = NULL;
+	if (ifs->ifs_nat_table[0] != NULL) {
+		KFREES(ifs->ifs_nat_table[0],
+		       sizeof(nat_t *) * ifs->ifs_ipf_nattable_sz);
+		ifs->ifs_nat_table[0] = NULL;
 	}
-	if (nat_table[1] != NULL) {
-		KFREES(nat_table[1], sizeof(nat_t *) * ipf_nattable_sz);
-		nat_table[1] = NULL;
+	if (ifs->ifs_nat_table[1] != NULL) {
+		KFREES(ifs->ifs_nat_table[1],
+		       sizeof(nat_t *) * ifs->ifs_ipf_nattable_sz);
+		ifs->ifs_nat_table[1] = NULL;
 	}
-	if (nat_rules != NULL) {
-		KFREES(nat_rules, sizeof(ipnat_t *) * ipf_natrules_sz);
-		nat_rules = NULL;
+	if (ifs->ifs_nat_rules != NULL) {
+		KFREES(ifs->ifs_nat_rules, 
+		       sizeof(ipnat_t *) * ifs->ifs_ipf_natrules_sz);
+		ifs->ifs_nat_rules = NULL;
 	}
-	if (rdr_rules != NULL) {
-		KFREES(rdr_rules, sizeof(ipnat_t *) * ipf_rdrrules_sz);
-		rdr_rules = NULL;
+	if (ifs->ifs_rdr_rules != NULL) {
+		KFREES(ifs->ifs_rdr_rules,
+		       sizeof(ipnat_t *) * ifs->ifs_ipf_rdrrules_sz);
+		ifs->ifs_rdr_rules = NULL;
 	}
-	if (maptable != NULL) {
-		KFREES(maptable, sizeof(hostmap_t *) * ipf_hostmap_sz);
-		maptable = NULL;
+	if (ifs->ifs_maptable != NULL) {
+		KFREES(ifs->ifs_maptable, 
+		       sizeof(hostmap_t *) * ifs->ifs_ipf_hostmap_sz);
+		ifs->ifs_maptable = NULL;
 	}
-	if (nat_stats.ns_bucketlen[0] != NULL) {
-		KFREES(nat_stats.ns_bucketlen[0],
-		       sizeof(u_long *) * ipf_nattable_sz);
-		nat_stats.ns_bucketlen[0] = NULL;
+	if (ifs->ifs_nat_stats.ns_bucketlen[0] != NULL) {
+		KFREES(ifs->ifs_nat_stats.ns_bucketlen[0],
+		       sizeof(u_long *) * ifs->ifs_ipf_nattable_sz);
+		ifs->ifs_nat_stats.ns_bucketlen[0] = NULL;
 	}
-	if (nat_stats.ns_bucketlen[1] != NULL) {
-		KFREES(nat_stats.ns_bucketlen[1],
-		       sizeof(u_long *) * ipf_nattable_sz);
-		nat_stats.ns_bucketlen[1] = NULL;
+	if (ifs->ifs_nat_stats.ns_bucketlen[1] != NULL) {
+		KFREES(ifs->ifs_nat_stats.ns_bucketlen[1],
+		       sizeof(u_long *) * ifs->ifs_ipf_nattable_sz);
+		ifs->ifs_nat_stats.ns_bucketlen[1] = NULL;
 	}
 
-	if (fr_nat_maxbucket_reset == 1)
-		fr_nat_maxbucket = 0;
+	if (ifs->ifs_fr_nat_maxbucket_reset == 1)
+		ifs->ifs_fr_nat_maxbucket = 0;
 
-	if (fr_nat_init == 1) {
-		fr_nat_init = 0;
-		fr_sttab_destroy(nat_tqb);
+	if (ifs->ifs_fr_nat_init == 1) {
+		ifs->ifs_fr_nat_init = 0;
+		fr_sttab_destroy(ifs->ifs_nat_tqb);
 
-		RW_DESTROY(&ipf_natfrag);
-		RW_DESTROY(&ipf_nat);
+		RW_DESTROY(&ifs->ifs_ipf_natfrag);
+		RW_DESTROY(&ifs->ifs_ipf_nat);
 
-		MUTEX_DESTROY(&ipf_nat_new);
-		MUTEX_DESTROY(&ipf_natio);
+		MUTEX_DESTROY(&ifs->ifs_ipf_nat_new);
+		MUTEX_DESTROY(&ifs->ifs_ipf_natio);
 
-		MUTEX_DESTROY(&nat_udptq.ifq_lock);
-		MUTEX_DESTROY(&nat_icmptq.ifq_lock);
-		MUTEX_DESTROY(&nat_iptq.ifq_lock);
+		MUTEX_DESTROY(&ifs->ifs_nat_udptq.ifq_lock);
+		MUTEX_DESTROY(&ifs->ifs_nat_icmptq.ifq_lock);
+		MUTEX_DESTROY(&ifs->ifs_nat_iptq.ifq_lock);
 	}
 }
 
@@ -4222,7 +4314,8 @@ void fr_natunload()
 /* Check all of the timeout queues for entries at the top which need to be  */
 /* expired.                                                                 */
 /* ------------------------------------------------------------------------ */
-void fr_natexpire()
+void fr_natexpire(ifs)
+ipf_stack_t *ifs;
 {
 	ipftq_t *ifq, *ifqnext;
 	ipftqent_t *tqe, *tqn;
@@ -4230,37 +4323,37 @@ void fr_natexpire()
 	SPL_INT(s);
 
 	SPL_NET(s);
-	WRITE_ENTER(&ipf_nat);
-	for (ifq = nat_tqb, i = 0; ifq != NULL; ifq = ifq->ifq_next) {
+	WRITE_ENTER(&ifs->ifs_ipf_nat);
+	for (ifq = ifs->ifs_nat_tqb, i = 0; ifq != NULL; ifq = ifq->ifq_next) {
 		for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); i++) {
-			if (tqe->tqe_die > fr_ticks)
+			if (tqe->tqe_die > ifs->ifs_fr_ticks)
 				break;
 			tqn = tqe->tqe_next;
-			nat_delete(tqe->tqe_parent, NL_EXPIRE);
+			nat_delete(tqe->tqe_parent, NL_EXPIRE, ifs);
 		}
 	}
 
-	for (ifq = nat_utqe; ifq != NULL; ifq = ifqnext) {
+	for (ifq = ifs->ifs_nat_utqe; ifq != NULL; ifq = ifqnext) {
 		ifqnext = ifq->ifq_next;
 
 		for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); i++) {
-			if (tqe->tqe_die > fr_ticks)
+			if (tqe->tqe_die > ifs->ifs_fr_ticks)
 				break;
 			tqn = tqe->tqe_next;
-			nat_delete(tqe->tqe_parent, NL_EXPIRE);
+			nat_delete(tqe->tqe_parent, NL_EXPIRE, ifs);
 		}
 	}
 
-	for (ifq = nat_utqe; ifq != NULL; ifq = ifqnext) {
+	for (ifq = ifs->ifs_nat_utqe; ifq != NULL; ifq = ifqnext) {
 		ifqnext = ifq->ifq_next;
 
 		if (((ifq->ifq_flags & IFQF_DELETE) != 0) &&
 		    (ifq->ifq_ref == 0)) {
-			fr_freetimeoutqueue(ifq);
+			fr_freetimeoutqueue(ifq, ifs);
 		}
 	}
 
-	RWLOCK_EXIT(&ipf_nat);
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 	SPL_X(s);
 }
 
@@ -4276,23 +4369,24 @@ void fr_natexpire()
 /* matches the one passed in) and change it, recalculating the checksum sum */
 /* difference too.                                                          */
 /* ------------------------------------------------------------------------ */
-void fr_nataddrsync(ifp, addr)
+void fr_nataddrsync(ifp, addr, ifs)
 void *ifp;
 struct in_addr *addr;
+ipf_stack_t *ifs;
 {
 	u_32_t sum1, sum2, sumd;
 	nat_t *nat;
 	ipnat_t *np;
 	SPL_INT(s);
 
-	if (fr_running <= 0)
+	if (ifs->ifs_fr_running <= 0)
 		return;
 
 	SPL_NET(s);
-	WRITE_ENTER(&ipf_nat);
+	WRITE_ENTER(&ifs->ifs_ipf_nat);
 
-	if (fr_running <= 0) {
-		RWLOCK_EXIT(&ipf_nat);
+	if (ifs->ifs_fr_running <= 0) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		return;
 	}
 
@@ -4302,7 +4396,7 @@ struct in_addr *addr;
 	 * which will get changed are those which are "map ... -> 0/32",
 	 * where the rule specifies the address is taken from the interface.
 	 */
-	for (nat = nat_instances; nat; nat = nat->nat_next) {
+	for (nat = ifs->ifs_nat_instances; nat; nat = nat->nat_next) {
 		if (addr != NULL) {
 			if (((ifp != NULL) && ifp != (nat->nat_ifps[0])) ||
 			    ((nat->nat_flags & IPN_TCP) != 0))
@@ -4330,7 +4424,7 @@ struct in_addr *addr;
 			 */
 			sum1 = nat->nat_outip.s_addr;
 			if (fr_ifpaddr(4, FRI_NORMAL, nat->nat_ifps[0],
-				       &in, NULL) != -1)
+				       &in, NULL, ifs) != -1)
 				nat->nat_outip = in;
 			sum2 = nat->nat_outip.s_addr;
 		} else {
@@ -4352,7 +4446,7 @@ struct in_addr *addr;
 		nat->nat_sumd[1] = nat->nat_sumd[0];
 	}
 
-	RWLOCK_EXIT(&ipf_nat);
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 	SPL_X(s);
 }
 
@@ -4371,10 +4465,11 @@ struct in_addr *addr;
 /* "name" and for "action == IPFSYNC_OLDIFP", ifp is a pointer for which    */
 /* there is no longer any interface associated with it.                     */
 /* ------------------------------------------------------------------------ */
-void fr_natifpsync(action, ifp, name)
+void fr_natifpsync(action, ifp, name, ifs)
 int action;
 void *ifp;
 char *name;
+ipf_stack_t *ifs;
 {
 #if defined(_KERNEL) && !defined(MENTAT) && defined(USE_SPL)
 	int s;
@@ -4382,49 +4477,49 @@ char *name;
 	nat_t *nat;
 	ipnat_t *n;
 
-	if (fr_running <= 0)
+	if (ifs->ifs_fr_running <= 0)
 		return;
 
 	SPL_NET(s);
-	WRITE_ENTER(&ipf_nat);
+	WRITE_ENTER(&ifs->ifs_ipf_nat);
 
-	if (fr_running <= 0) {
-		RWLOCK_EXIT(&ipf_nat);
+	if (ifs->ifs_fr_running <= 0) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		return;
 	}
 
 	switch (action)
 	{
 	case IPFSYNC_RESYNC :
-		for (nat = nat_instances; nat; nat = nat->nat_next) {
+		for (nat = ifs->ifs_nat_instances; nat; nat = nat->nat_next) {
 			if ((ifp == nat->nat_ifps[0]) ||
 			    (nat->nat_ifps[0] == (void *)-1)) {
 				nat->nat_ifps[0] =
-				    fr_resolvenic(nat->nat_ifnames[0], 4);
+				    fr_resolvenic(nat->nat_ifnames[0], 4, ifs);
 			}
 
 			if ((ifp == nat->nat_ifps[1]) ||
 			    (nat->nat_ifps[1] == (void *)-1)) {
 				nat->nat_ifps[1] =
-				    fr_resolvenic(nat->nat_ifnames[1], 4);
+				    fr_resolvenic(nat->nat_ifnames[1], 4, ifs);
 			}
 		}
 
-		for (n = nat_list; (n != NULL); n = n->in_next) {
+		for (n = ifs->ifs_nat_list; (n != NULL); n = n->in_next) {
 			if (n->in_ifps[0] == ifp ||
 			    n->in_ifps[0] == (void *)-1) {
 				n->in_ifps[0] =
-				    fr_resolvenic(n->in_ifnames[0], 4);
+				    fr_resolvenic(n->in_ifnames[0], 4, ifs);
 			}
 			if (n->in_ifps[1] == ifp ||
 			    n->in_ifps[1] == (void *)-1) {
 				n->in_ifps[1] =
-				    fr_resolvenic(n->in_ifnames[1], 4);
+				    fr_resolvenic(n->in_ifnames[1], 4, ifs);
 			}
 		}
 		break;
 	case IPFSYNC_NEWIFP :
-		for (nat = nat_instances; nat; nat = nat->nat_next) {
+		for (nat = ifs->ifs_nat_instances; nat; nat = nat->nat_next) {
 			if (!strncmp(name, nat->nat_ifnames[0],
 				     sizeof(nat->nat_ifnames[0])))
 				nat->nat_ifps[0] = ifp;
@@ -4432,7 +4527,7 @@ char *name;
 				     sizeof(nat->nat_ifnames[1])))
 				nat->nat_ifps[1] = ifp;
 		}
-		for (n = nat_list; (n != NULL); n = n->in_next) {
+		for (n = ifs->ifs_nat_list; (n != NULL); n = n->in_next) {
 			if (!strncmp(name, n->in_ifnames[0],
 				     sizeof(n->in_ifnames[0])))
 				n->in_ifps[0] = ifp;
@@ -4442,13 +4537,13 @@ char *name;
 		}
 		break;
 	case IPFSYNC_OLDIFP :
-		for (nat = nat_instances; nat; nat = nat->nat_next) {
+		for (nat = ifs->ifs_nat_instances; nat; nat = nat->nat_next) {
 			if (ifp == nat->nat_ifps[0])
 				nat->nat_ifps[0] = (void *)-1;
 			if (ifp == nat->nat_ifps[1])
 				nat->nat_ifps[1] = (void *)-1;
 		}
-		for (n = nat_list; (n != NULL); n = n->in_next) {
+		for (n = ifs->ifs_nat_list; (n != NULL); n = n->in_next) {
 			if (n->in_ifps[0] == ifp)
 				n->in_ifps[0] = (void *)-1;
 			if (n->in_ifps[1] == ifp)
@@ -4456,7 +4551,7 @@ char *name;
 		}
 		break;
 	}
-	RWLOCK_EXIT(&ipf_nat);
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 	SPL_X(s);
 }
 
@@ -4511,9 +4606,10 @@ int icmptype;
 /*                                                                          */
 /* Creates a NAT log entry.                                                 */
 /* ------------------------------------------------------------------------ */
-void nat_log(nat, type)
+void nat_log(nat, type, ifs)
 struct nat *nat;
 u_int type;
+ipf_stack_t *ifs;
 {
 #ifdef	IPFILTER_LOG
 # ifndef LARGE_NAT
@@ -4540,7 +4636,8 @@ u_int type;
 	natl.nl_rule = -1;
 # ifndef LARGE_NAT
 	if (nat->nat_ptr != NULL) {
-		for (rulen = 0, np = nat_list; np; np = np->in_next, rulen++)
+		for (rulen = 0, np = ifs->ifs_nat_list; np;
+		     np = np->in_next, rulen++)
 			if (np == nat->nat_ptr) {
 				natl.nl_rule = rulen;
 				break;
@@ -4551,7 +4648,7 @@ u_int type;
 	sizes[0] = sizeof(natl);
 	types[0] = 0;
 
-	(void) ipllog(IPL_LOGNAT, NULL, items, sizes, types, 1);
+	(void) ipllog(IPL_LOGNAT, NULL, items, sizes, types, 1, ifs);
 #endif
 }
 
@@ -4565,13 +4662,46 @@ u_int type;
 /* Compatibility interface for OpenBSD to trigger the correct updating of   */
 /* interface references within IPFilter.                                    */
 /* ------------------------------------------------------------------------ */
-void nat_ifdetach(ifp)
+void nat_ifdetach(ifp, ifs)
 void *ifp;
+ipf_stack_t *ifs;
 {
-	frsync(ifp);
+	frsync(ifp, ifs);
 	return;
 }
 #endif
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_ipnatderef                                               */
+/* Returns:     Nil                                                         */
+/* Parameters:  isp(I) - pointer to pointer to NAT rule                     */
+/* Write Locks: ipf_nat                                                     */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+void fr_ipnatderef(inp, ifs)
+ipnat_t **inp;
+ipf_stack_t *ifs;
+{
+	ipnat_t *in;
+
+	in = *inp;
+	*inp = NULL;
+	in->in_space++;
+	in->in_use--;
+	if (in->in_use == 0 && (in->in_flags & IPN_DELETE)) {
+		if (in->in_apr)
+			appr_free(in->in_apr);
+		KFREE(in);
+		ifs->ifs_nat_stats.ns_rules--;
+#ifdef notdef
+#if SOLARIS
+		if (ifs->ifs_nat_stats.ns_rules == 0)
+			ifs->ifs_pfil_delayed_copy = 1;
+#endif
+#endif
+	}
+}
 
 
 /* ------------------------------------------------------------------------ */
@@ -4582,18 +4712,19 @@ void *ifp;
 /* Decrement the reference counter for this NAT table entry and free it if  */
 /* there are no more things using it.                                       */
 /* ------------------------------------------------------------------------ */
-void fr_natderef(natp)
+void fr_natderef(natp, ifs)
 nat_t **natp;
+ipf_stack_t *ifs;
 {
 	nat_t *nat;
 
 	nat = *natp;
 	*natp = NULL;
-	WRITE_ENTER(&ipf_nat);
+	WRITE_ENTER(&ifs->ifs_ipf_nat);
 	nat->nat_ref--;
 	if (nat->nat_ref == 0)
-		nat_delete(nat, NL_EXPIRE);
-	RWLOCK_EXIT(&ipf_nat);
+	    nat_delete(nat, NL_EXPIRE, ifs);
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 }
 
 
@@ -4614,6 +4745,7 @@ nat_t *nat;
 	frentry_t *fr;
 	nat_t *clone;
 	ipnat_t *np;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	KMALLOC(clone, nat_t *);
 	if (clone == NULL)
@@ -4637,14 +4769,14 @@ nat_t *nat;
 	if (clone->nat_hm)
 		clone->nat_hm->hm_ref++;
 
-	if (nat_insert(clone, fin->fin_rev) == -1) {
+	if (nat_insert(clone, fin->fin_rev, ifs) == -1) {
 		KFREE(clone);
 		return NULL;
 	}
 	np = clone->nat_ptr;
 	if (np != NULL) {
-		if (nat_logging)
-			nat_log(clone, (u_int)np->in_redir);
+		if (ifs->ifs_nat_logging)
+			nat_log(clone, (u_int)np->in_redir, ifs);
 		np->in_use++;
 	}
 	fr = clone->nat_fr;
@@ -4660,14 +4792,14 @@ nat_t *nat;
 	 * state of the new NAT from here.
 	 */
 	if (clone->nat_p == IPPROTO_TCP) {
-		(void) fr_tcp_age(&clone->nat_tqe, fin, nat_tqb,
+		(void) fr_tcp_age(&clone->nat_tqe, fin, ifs->ifs_nat_tqb,
 				  clone->nat_flags);
 	}
 #ifdef	IPFILTER_SYNC
 	clone->nat_sync = ipfsync_new(SMC_NAT, fin, clone);
 #endif
-	if (nat_logging)
-		nat_log(clone, NL_CLONE);
+	if (ifs->ifs_nat_logging)
+		nat_log(clone, NL_CLONE, ifs);
 	return clone;
 }
 
@@ -4813,9 +4945,10 @@ u_short *csump;
 /* Put the NAT entry on its default queue entry, using rev as a helped in   */
 /* determining which queue it should be placed on.                          */
 /* ------------------------------------------------------------------------ */
-void fr_setnatqueue(nat, rev)
+void fr_setnatqueue(nat, rev, ifs)
 nat_t *nat;
 int rev;
+ipf_stack_t *ifs;
 {
 	ipftq_t *oifq, *nifq;
 
@@ -4828,16 +4961,16 @@ int rev;
 		switch (nat->nat_p)
 		{
 		case IPPROTO_UDP :
-			nifq = &nat_udptq;
+			nifq = &ifs->ifs_nat_udptq;
 			break;
 		case IPPROTO_ICMP :
-			nifq = &nat_icmptq;
+			nifq = &ifs->ifs_nat_icmptq;
 			break;
 		case IPPROTO_TCP :
-			nifq = nat_tqb + nat->nat_tqe.tqe_state[rev];
+			nifq = ifs->ifs_nat_tqb + nat->nat_tqe.tqe_state[rev];
 			break;
 		default :
-			nifq = &nat_iptq;
+			nifq = &ifs->ifs_nat_iptq;
 			break;
 		}
 	}
@@ -4848,8 +4981,186 @@ int rev;
 	 * another, else put it on the end of the newly determined queue.
 	 */
 	if (oifq != NULL)
-		fr_movequeue(&nat->nat_tqe, oifq, nifq);
+		fr_movequeue(&nat->nat_tqe, oifq, nifq, ifs);
 	else
-		fr_queueappend(&nat->nat_tqe, nifq, nat);
+		fr_queueappend(&nat->nat_tqe, nifq, nat, ifs);
 	return;
+}
+
+/* Function:    nat_getnext                                                 */
+/* Returns:     int - 0 == ok, else error                                   */
+/* Parameters:  t(I)   - pointer to ipftoken structure                      */
+/*              itp(I) - pointer to ipfgeniter_t structure                  */
+/*                                                                          */
+/* Fetch the next nat/ipnat structure pointer from the linked list and      */
+/* copy it out to the storage space pointed to by itp_data.  The next item  */
+/* in the list to look at is put back in the ipftoken struture.             */
+/* If we call ipf_freetoken, the accompanying pointer is set to NULL because*/
+/* ipf_freetoken will call a deref function for us and we dont want to call */
+/* that twice (second time would be in the second switch statement below.   */
+/* ------------------------------------------------------------------------ */
+static int nat_getnext(t, itp, ifs)
+ipftoken_t *t;
+ipfgeniter_t *itp;
+ipf_stack_t *ifs;
+{
+	hostmap_t *hm, *nexthm = NULL, zerohm;
+	ipnat_t *ipn, *nextipnat = NULL, zeroipn;
+	nat_t *nat, *nextnat = NULL, zeronat;
+	int error = 0;
+
+	READ_ENTER(&ifs->ifs_ipf_nat);
+	switch (itp->igi_type)
+	{
+	case IPFGENITER_HOSTMAP :
+		hm = t->ipt_data;
+		if (hm == NULL) {
+			nexthm = ifs->ifs_ipf_hm_maplist;
+		} else {
+			nexthm = hm->hm_hnext;
+		}
+		if (nexthm != NULL) {
+			if (nexthm->hm_hnext == NULL) {
+				t->ipt_alive = 0;
+				/* ipf_freetoken(t, ifs);
+				hm = NULL; */
+			} else {
+				/*MUTEX_ENTER(&nexthm->hm_lock);*/
+				nexthm->hm_ref++;
+				/*MUTEX_EXIT(&nextipnat->hm_lock);*/
+			}
+				
+		} else {
+			bzero(&zerohm, sizeof(zerohm));
+			nexthm = &zerohm;
+		}
+		break;
+
+	case IPFGENITER_IPNAT :
+		ipn = t->ipt_data;
+		if (ipn == NULL) {
+			nextipnat = ifs->ifs_nat_list;
+		} else {
+			nextipnat = ipn->in_next;
+		}
+		if (nextipnat != NULL) {
+			if (nextipnat->in_next == NULL) {
+				t->ipt_alive = 0;
+				/*ipf_freetoken(t, ifs);
+				ipn = NULL;*/
+			} else {
+				/* MUTEX_ENTER(&nextipnat->in_lock); */
+				nextipnat->in_use++;
+				/* MUTEX_EXIT(&nextipnat->in_lock); */
+			}
+		} else {
+			bzero(&zeroipn, sizeof(zeroipn));
+			nextipnat = &zeroipn;
+		}
+		break;
+
+	case IPFGENITER_NAT :
+		nat = t->ipt_data;
+		if (nat == NULL) {
+			nextnat = ifs->ifs_nat_instances;
+		} else {
+			nextnat = nat->nat_next;
+		}
+		if (nextnat != NULL) {
+			if (nextnat->nat_next == NULL) {
+				t->ipt_alive = 0;
+				/*ipf_freetoken(t, ifs);
+				nat = NULL;*/
+			} else {
+				MUTEX_ENTER(&nextnat->nat_lock);
+				nextnat->nat_ref++;
+				MUTEX_EXIT(&nextnat->nat_lock);
+			}
+		} else {
+			bzero(&zeronat, sizeof(zeronat));
+			nextnat = &zeronat;
+		}
+		break;
+	}
+
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+
+	switch (itp->igi_type)
+	{
+	case IPFGENITER_HOSTMAP :
+		if (hm != NULL) {
+			WRITE_ENTER(&ifs->ifs_ipf_nat);
+			fr_hostmapderef(&hm);
+			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+		}
+		t->ipt_data = nexthm;
+		error = COPYOUT(nexthm, itp->igi_data, sizeof(*nexthm));
+		if (error != 0)
+			error = EFAULT;
+		break;
+
+	case IPFGENITER_IPNAT :
+		if (ipn != NULL)
+			fr_ipnatderef(&ipn, ifs);
+		t->ipt_data = nextipnat;
+		error = COPYOUT(nextipnat, itp->igi_data, sizeof(*nextipnat));
+		if (error != 0)
+			error = EFAULT;
+		break;
+
+	case IPFGENITER_NAT :
+		if (nat != NULL)
+			fr_natderef(&nat, ifs);
+		t->ipt_data = nextnat;
+		error = COPYOUT(nextnat, itp->igi_data, sizeof(*nextnat));
+		if (error != 0)
+			error = EFAULT;
+		break;
+	}
+
+	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    nat_iterator                                                */
+/* Returns:     int - 0 == ok, else error                                   */
+/* Parameters:  token(I) - pointer to ipftoken structure                    */
+/*              itp(I) - pointer to ipfgeniter_t structure                  */
+/*                                                                          */
+/* This function acts as a handler for the SIOCGENITER ioctls that use a    */
+/* generic structure to iterate through a list.  There are three different  */
+/* linked lists of NAT related information to go through: NAT rules, active */
+/* NAT mappings and the NAT fragment cache.                                 */
+/* ------------------------------------------------------------------------ */
+static int nat_iterator(token, itp, ifs)
+ipftoken_t *token;
+ipfgeniter_t *itp;
+ipf_stack_t *ifs;
+{
+	int error;
+
+	if (itp->igi_data == NULL)
+		return EFAULT;
+
+	token->ipt_subtype = itp->igi_type;
+
+	switch (itp->igi_type)
+	{
+	case IPFGENITER_HOSTMAP :
+	case IPFGENITER_IPNAT :
+	case IPFGENITER_NAT :
+		error = nat_getnext(token, itp, ifs);
+		break;
+	case IPFGENITER_NATFRAG :
+		error = fr_nextfrag(token, itp, &ifs->ifs_ipfr_natlist,
+				    &ifs->ifs_ipfr_nattail,
+				    &ifs->ifs_ipf_natfrag, ifs);
+		break;
+	default :
+		error = EINVAL;
+		break;
+	}
+
+	return error;
 }

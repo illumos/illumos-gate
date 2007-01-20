@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,8 @@ extern "C" {
 #define	SIOCG6TO4TUNRRADDR	5	/* ipaddr_t */
 
 #ifdef	_KERNEL
+
+#include <sys/netstack.h>
 
 #define	TUN_MODID	5134
 #define	ATUN_MODID	5135
@@ -199,6 +201,7 @@ typedef struct tun_s {
 	uint64_t tun_HCOutOctets;	/* # Total Octets sent */
 	uint64_t tun_HCOutUcastPkts;	/* # Packets requested */
 	uint64_t tun_HCOutMulticastPkts; /* Multicast Packets requested */
+	netstack_t	*tun_netstack;
 } tun_t;
 
 
@@ -249,6 +252,34 @@ struct old_iftun_req {
 							/* set tunnel */
 							/* parameters */
 
+/*
+ * Linked list of tunnels.
+ */
+
+#define	TUN_PPA_SZ	64
+#define	TUN_LIST_HASH(ppa)	((ppa) % TUN_PPA_SZ)
+
+#define	TUN_T_SZ	251
+#define	TUN_BYADDR_LIST_HASH(a) (((a).s6_addr32[3]) % (TUN_T_SZ))
+
+/*
+ * tunnel stack instances
+ */
+struct tun_stack {
+	netstack_t	*tuns_netstack;	/* Common netstack */
+
+	/*
+	 * protects global data structures such as tun_ppa_list
+	 * also protects tun_t at ts_next and *ts_atp
+	 * should be acquired before ts_lock
+	 */
+	kmutex_t	tuns_global_lock;
+	tun_stats_t	*tuns_ppa_list[TUN_PPA_SZ];
+	tun_t		*tuns_byaddr_list[TUN_T_SZ];
+
+	ipaddr_t	tuns_relay_rtr_addr_v4;
+};
+typedef struct tun_stack tun_stack_t;
 
 
 int	tun_open(queue_t *, dev_t *, int, int, cred_t *);

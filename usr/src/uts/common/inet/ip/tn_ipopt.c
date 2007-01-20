@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,7 +201,7 @@ tsol_get_option(mblk_t *mp, uchar_t **buffer)
  */
 int
 tsol_compute_label(const cred_t *credp, ipaddr_t dst, uchar_t *opt_storage,
-    boolean_t isexempt)
+    boolean_t isexempt, ip_stack_t *ipst)
 {
 	uint_t		sec_opt_len;
 	ts_label_t	*tsl;
@@ -209,7 +209,7 @@ tsol_compute_label(const cred_t *credp, ipaddr_t dst, uchar_t *opt_storage,
 	ire_t		*ire, *sire = NULL;
 	boolean_t	compute_label = B_FALSE;
 	tsol_ire_gw_secattr_t *attrp;
-	zoneid_t	zoneid;
+	zoneid_t	zoneid, ip_zoneid;
 
 	if (opt_storage != NULL)
 		opt_storage[IPOPT_OLEN] = 0;
@@ -230,6 +230,15 @@ tsol_compute_label(const cred_t *credp, ipaddr_t dst, uchar_t *opt_storage,
 
 	zoneid = crgetzoneid(credp);
 
+	/*
+	 * For exclusive stacks we set the zoneid to zero
+	 * to operate as if in the global zone for IRE and conn_t comparisons.
+	 */
+	if (ipst->ips_netstack->netstack_stackid != GLOBAL_NETSTACKID)
+		ip_zoneid = GLOBAL_ZONEID;
+	else
+		ip_zoneid = zoneid;
+
 	switch (dst_rhtp->tpc_tp.host_type) {
 	case UNLABELED:
 		/*
@@ -238,7 +247,7 @@ tsol_compute_label(const cred_t *credp, ipaddr_t dst, uchar_t *opt_storage,
 		 * not on the same subnet, and that the next-hop
 		 * gateway is labeled.
 		 */
-		ire = ire_cache_lookup(dst, zoneid, tsl);
+		ire = ire_cache_lookup(dst, ip_zoneid, tsl, ipst);
 
 		if (ire != NULL && (ire->ire_type & (IRE_BROADCAST | IRE_LOCAL |
 		    IRE_LOOPBACK | IRE_INTERFACE)) != 0) {
@@ -247,8 +256,8 @@ tsol_compute_label(const cred_t *credp, ipaddr_t dst, uchar_t *opt_storage,
 			return (0);
 		} else if (ire == NULL) {
 			ire = ire_ftable_lookup(dst, 0, 0, 0, NULL, &sire,
-			    zoneid, 0, tsl, (MATCH_IRE_RECURSIVE |
-			    MATCH_IRE_DEFAULT | MATCH_IRE_SECATTR));
+			    ip_zoneid, 0, tsl, (MATCH_IRE_RECURSIVE |
+				MATCH_IRE_DEFAULT | MATCH_IRE_SECATTR), ipst);
 		}
 
 		/* no route to destination */
@@ -607,7 +616,7 @@ tsol_prepend_option(uchar_t *optbuf, ipha_t *ipha, int buflen)
  */
 int
 tsol_check_label(const cred_t *credp, mblk_t **mpp, int *addedp,
-    boolean_t isexempt)
+    boolean_t isexempt, ip_stack_t *ipst)
 {
 	mblk_t *mp = *mpp;
 	ipha_t  *ipha;
@@ -625,7 +634,8 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, int *addedp,
 
 	ipha = (ipha_t *)mp->b_rptr;
 
-	retv = tsol_compute_label(credp, ipha->ipha_dst, opt_storage, isexempt);
+	retv = tsol_compute_label(credp, ipha->ipha_dst, opt_storage, isexempt,
+	    ipst);
 	if (retv != 0)
 		return (retv);
 
@@ -724,13 +734,13 @@ param_prob:
  */
 int
 tsol_compute_label_v6(const cred_t *credp, const in6_addr_t *dst,
-    uchar_t *opt_storage, boolean_t isexempt)
+    uchar_t *opt_storage, boolean_t isexempt, ip_stack_t *ipst)
 {
 	tsol_tpc_t	*dst_rhtp;
 	ts_label_t	*tsl;
 	uint_t		sec_opt_len;
 	uint32_t	doi;
-	zoneid_t	zoneid;
+	zoneid_t	zoneid, ip_zoneid;
 	ire_t		*ire, *sire;
 	tsol_ire_gw_secattr_t *attrp;
 	boolean_t	compute_label;
@@ -758,6 +768,15 @@ tsol_compute_label_v6(const cred_t *credp, const in6_addr_t *dst,
 	zoneid = crgetzoneid(credp);
 
 	/*
+	 * For exclusive stacks we set the zoneid to zero
+	 * to operate as if in the global zone for IRE and conn_t comparisons.
+	 */
+	if (ipst->ips_netstack->netstack_stackid != GLOBAL_NETSTACKID)
+		ip_zoneid = GLOBAL_ZONEID;
+	else
+		ip_zoneid = zoneid;
+
+	/*
 	 * Fill in a V6 label.  If a new format is added here, make certain
 	 * that the maximum size of this label is reflected in sys/tsol/tnet.h
 	 * as TSOL_MAX_IPV6_OPTION.
@@ -772,7 +791,7 @@ tsol_compute_label_v6(const cred_t *credp, const in6_addr_t *dst,
 		 * gateway is labeled.
 		 */
 		sire = NULL;
-		ire = ire_cache_lookup_v6(dst, zoneid, tsl);
+		ire = ire_cache_lookup_v6(dst, ip_zoneid, tsl, ipst);
 
 		if (ire != NULL && (ire->ire_type & (IRE_LOCAL |
 		    IRE_LOOPBACK | IRE_INTERFACE)) != 0) {
@@ -781,8 +800,8 @@ tsol_compute_label_v6(const cred_t *credp, const in6_addr_t *dst,
 			return (0);
 		} else if (ire == NULL) {
 			ire = ire_ftable_lookup_v6(dst, NULL, NULL, 0, NULL,
-			    &sire, zoneid, 0, tsl, (MATCH_IRE_RECURSIVE |
-			    MATCH_IRE_DEFAULT | MATCH_IRE_SECATTR));
+			    &sire, ip_zoneid, 0, tsl, (MATCH_IRE_RECURSIVE |
+			    MATCH_IRE_DEFAULT | MATCH_IRE_SECATTR), ipst);
 		}
 
 		/* no route to destination */
@@ -1153,7 +1172,7 @@ tsol_prepend_option_v6(uchar_t *optbuf, ip6_t *ip6h, int buflen)
  */
 int
 tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, int *addedp,
-    boolean_t isexempt)
+    boolean_t isexempt, ip_stack_t *ipst)
 {
 	mblk_t *mp = *mpp;
 	ip6_t  *ip6h;
@@ -1177,7 +1196,7 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, int *addedp,
 
 	ip6h = (ip6_t *)mp->b_rptr;
 	retv = tsol_compute_label_v6(credp, &ip6h->ip6_dst, opt_storage,
-	    isexempt);
+	    isexempt, ipst);
 	if (retv != 0)
 		return (retv);
 

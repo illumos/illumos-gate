@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,9 +28,37 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/netstack.h>
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+/*
+ * SPDSOCK stack instances
+ */
+struct spd_stack {
+	netstack_t		*spds_netstack;	/* Common netstack */
+
+	caddr_t			spds_g_nd;
+	struct spdsockparam_s	*spds_params;
+	kmutex_t		spds_param_lock;
+				/* Protects the NDD variables. */
+
+	/*
+	 * To save algorithm update messages that are processed only after
+	 * IPsec is loaded.
+	 */
+	struct spd_ext		*spds_extv_algs[SPD_EXT_MAX + 1];
+	mblk_t			*spds_mp_algs;
+	boolean_t		spds_algs_pending;
+	struct ipsec_alginfo
+			*spds_algs[IPSEC_NALGTYPES][IPSEC_MAX_ALGS];
+	int		spds_algs_exec_mode[IPSEC_NALGTYPES];
+	kmutex_t		spds_alg_lock;
+};
+typedef struct spd_stack spd_stack_t;
+
 
 /*
  * spdsock (PF_POLICY) session state; one per open PF_POLICY socket.
@@ -64,6 +92,7 @@ typedef struct spdsock_s
 	ipsec_policy_t 		*spdsock_dump_cur_rule;
 	uint32_t		spdsock_dump_cur_chain;
 	uint32_t		spdsock_dump_count;
+	spd_stack_t		*spdsock_spds;
 	/* These are used for all-polhead dumps. */
 	int			spdsock_dump_tun_gen;
 	boolean_t		spdsock_dump_active;

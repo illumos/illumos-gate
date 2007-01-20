@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,6 +121,7 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
 	((connp)->conn_flags & IPCL_IPTUN))
 
 typedef struct connf_s connf_t;
+
 typedef struct
 {
 	int	ctb_depth;
@@ -271,6 +272,7 @@ struct conn_s {
 		conn_mac_exempt : 1,		/* unlabeled with loose MAC */
 		conn_spare : 26;
 
+	netstack_t	*conn_netstack;	/* Corresponds to a netstack_hold */
 #ifdef CONN_DEBUG
 #define	CONN_TRACE_MAX	10
 	int		conn_trace_last;	/* ndx of last used tracebuf */
@@ -290,7 +292,6 @@ struct conn_s {
  * protected by the per-bucket lock. Each conn_t inserted in the list
  * points back at the connf_t that heads the bucket.
  */
-
 struct connf_s {
 	struct conn_s	*connf_head;
 	kmutex_t	connf_lock;
@@ -385,12 +386,12 @@ struct connf_s {
 	(conn_wantpacket_v6((connp), (ill), (ip6h),			   \
 	(fanout_flags), (zoneid)) || ((protocol) == IPPROTO_RSVP)))
 
-#define	IPCL_CONN_HASH(src, ports)					\
+#define	IPCL_CONN_HASH(src, ports, ipst)				\
 	((unsigned)(ntohl((src)) ^ ((ports) >> 24) ^ ((ports) >> 16) ^	\
-	((ports) >> 8) ^ (ports)) % ipcl_conn_fanout_size)
+	((ports) >> 8) ^ (ports)) % (ipst)->ips_ipcl_conn_fanout_size)
 
-#define	IPCL_CONN_HASH_V6(src, ports)			\
-	IPCL_CONN_HASH(V4_PART_OF_V6((src)), (ports))
+#define	IPCL_CONN_HASH_V6(src, ports, ipst)				\
+	IPCL_CONN_HASH(V4_PART_OF_V6((src)), (ports), (ipst))
 
 #define	IPCL_CONN_MATCH(connp, proto, src, dst, ports)			\
 	((connp)->conn_ulp == (proto) &&				\
@@ -422,7 +423,9 @@ struct connf_s {
 #define	IPCL_PORT_HASH(port, size) \
 	((((port) >> 8) ^ (port)) & ((size) - 1))
 
-#define	IPCL_BIND_HASH(lport)	IPCL_PORT_HASH(lport, ipcl_bind_fanout_size)
+#define	IPCL_BIND_HASH(lport, ipst)					\
+	((unsigned)(((lport) >> 8) ^ (lport)) % \
+	    (ipst)->ips_ipcl_bind_fanout_size)
 
 #define	IPCL_BIND_MATCH(connp, proto, laddr, lport)			\
 	((connp)->conn_ulp == (proto) &&				\
@@ -474,15 +477,14 @@ struct connf_s {
 	(connp)->conn_sqp = IP_SQUEUE_GET(lbolt);			\
 }
 
-#define	ipcl_proto_search(protocol)					\
-	(ipcl_proto_fanout[(protocol)].connf_head)
-
-#define	IPCL_UDP_HASH(lport)	IPCL_PORT_HASH(lport, ipcl_udp_fanout_size)
+#define	IPCL_UDP_HASH(lport, ipst)	\
+	IPCL_PORT_HASH(lport, (ipst)->ips_ipcl_udp_fanout_size)
 
 #define	CONN_G_HASH_SIZE	1024
 
 /* Raw socket hash function. */
-#define	IPCL_RAW_HASH(lport)	IPCL_PORT_HASH(lport, ipcl_raw_fanout_size)
+#define	IPCL_RAW_HASH(lport, ipst)	\
+	IPCL_PORT_HASH(lport, (ipst)->ips_ipcl_raw_fanout_size)
 
 /*
  * This is similar to IPCL_BIND_MATCH except that the local port check
@@ -500,24 +502,12 @@ struct connf_s {
 	(IN6_IS_ADDR_UNSPECIFIED(&(connp)->conn_srcv6) ||	\
 	IN6_ARE_ADDR_EQUAL(&(connp)->conn_srcv6, &(laddr))))
 
-/* hash tables */
-extern connf_t	rts_clients;
-extern connf_t	*ipcl_conn_fanout;
-extern connf_t	*ipcl_bind_fanout;
-extern connf_t	ipcl_proto_fanout[IPPROTO_MAX + 1];
-extern connf_t	ipcl_proto_fanout_v6[IPPROTO_MAX + 1];
-extern connf_t	*ipcl_udp_fanout;
-extern connf_t	*ipcl_globalhash_fanout;
-extern connf_t	*ipcl_raw_fanout;
-extern uint_t	ipcl_conn_fanout_size;
-extern uint_t	ipcl_bind_fanout_size;
-extern uint_t	ipcl_udp_fanout_size;
-extern uint_t	ipcl_raw_fanout_size;
-
 /* Function prototypes */
-extern void ipcl_init(void);
-extern void ipcl_destroy(void);
-extern conn_t *ipcl_conn_create(uint32_t, int);
+extern void ipcl_g_init(void);
+extern void ipcl_init(ip_stack_t *);
+extern void ipcl_g_destroy(void);
+extern void ipcl_destroy(ip_stack_t *);
+extern conn_t *ipcl_conn_create(uint32_t, int, netstack_t *);
 extern void ipcl_conn_destroy(conn_t *);
 
 void ipcl_hash_insert_connected(connf_t *, conn_t *);
@@ -537,21 +527,26 @@ extern conn_t	*ipcl_get_next_conn(connf_t *, conn_t *, uint32_t);
 
 void ipcl_proto_insert(conn_t *, uint8_t);
 void ipcl_proto_insert_v6(conn_t *, uint8_t);
-conn_t *ipcl_classify_v4(mblk_t *, uint8_t, uint_t, zoneid_t);
-conn_t *ipcl_classify_v6(mblk_t *, uint8_t, uint_t, zoneid_t);
-conn_t *ipcl_classify(mblk_t *, zoneid_t);
-conn_t *ipcl_classify_raw(mblk_t *, uint8_t, zoneid_t, uint32_t, ipha_t *);
+conn_t *ipcl_classify_v4(mblk_t *, uint8_t, uint_t, zoneid_t, ip_stack_t *);
+conn_t *ipcl_classify_v6(mblk_t *, uint8_t, uint_t, zoneid_t, ip_stack_t *);
+conn_t *ipcl_classify(mblk_t *, zoneid_t, ip_stack_t *);
+conn_t *ipcl_classify_raw(mblk_t *, uint8_t, zoneid_t, uint32_t, ipha_t *,
+	    ip_stack_t *);
 void	ipcl_globalhash_insert(conn_t *);
 void	ipcl_globalhash_remove(conn_t *);
-void	ipcl_walk(pfv_t, void *);
-conn_t	*ipcl_tcp_lookup_reversed_ipv4(ipha_t *, tcph_t *, int);
-conn_t	*ipcl_tcp_lookup_reversed_ipv6(ip6_t *, tcpha_t *, int, uint_t);
-conn_t	*ipcl_lookup_listener_v4(uint16_t, ipaddr_t, zoneid_t);
-conn_t	*ipcl_lookup_listener_v6(uint16_t, in6_addr_t *, uint_t, zoneid_t);
+void	ipcl_walk(pfv_t, void *, ip_stack_t *);
+conn_t	*ipcl_tcp_lookup_reversed_ipv4(ipha_t *, tcph_t *, int, ip_stack_t *);
+conn_t	*ipcl_tcp_lookup_reversed_ipv6(ip6_t *, tcpha_t *, int, uint_t,
+	    ip_stack_t *);
+conn_t	*ipcl_lookup_listener_v4(uint16_t, ipaddr_t, zoneid_t, ip_stack_t *);
+conn_t	*ipcl_lookup_listener_v6(uint16_t, in6_addr_t *, uint_t, zoneid_t,
+	    ip_stack_t *);
 int	conn_trace_ref(conn_t *);
 int	conn_untrace_ref(conn_t *);
-conn_t *ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *, ipha_t *, tcph_t *);
-conn_t *ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *, ip6_t *, tcph_t *);
+conn_t *ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *, ipha_t *, tcph_t *,
+	    ip_stack_t *);
+conn_t *ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *, ip6_t *, tcph_t *,
+	    ip_stack_t *);
 #ifdef	__cplusplus
 }
 #endif

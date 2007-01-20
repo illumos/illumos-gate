@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,21 +32,54 @@
 #include <zone.h>
 #include <libzonecfg.h>
 #include <dlfcn.h>
+#include <sys/zone.h>
 
 #if !defined(TEXT_DOMAIN)		/* should be defined by cc -D */
 #define	TEXT_DOMAIN	"SYS_TEST"	/* Use this only if it wasn't */
 #endif
 
+/*
+ * -t prints "shared" vs. "exclusive"
+ */
 int
-main(void)
+main(int argc, char *argv[])
 {
+	zoneid_t zoneid;
 	char zonename[ZONENAME_MAX];
 	FILE *fp;
+	int arg;
+	boolean_t stacktype = B_FALSE;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	if (getzonenamebyid(getzoneid(), zonename, sizeof (zonename)) < 0) {
+	opterr = 0;
+	while ((arg = getopt(argc, argv, "t")) != EOF) {
+		switch (arg) {
+		case 't':
+			stacktype = B_TRUE;
+			break;
+		}
+	}
+
+	zoneid = getzoneid();
+
+	if (stacktype) {
+		ushort_t flags;
+
+		if (zone_getattr(zoneid, ZONE_ATTR_FLAGS, &flags,
+		    sizeof (flags)) < 0) {
+			perror("could not determine zone IP type");
+			exit(1);
+		}
+		if (flags & ZF_NET_EXCL)
+			(void) puts("exclusive");
+		else
+			(void) puts("shared");
+		return (0);
+	}
+
+	if (getzonenamebyid(zoneid, zonename, sizeof (zonename)) < 0) {
 		(void) fputs(gettext("could not determine zone name\n"),
 		    stderr);
 		return (1);

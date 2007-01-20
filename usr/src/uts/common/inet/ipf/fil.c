@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,6 +115,7 @@ struct file;
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_auth.h"
+#include "netinet/ipf_stack.h"
 #ifdef IPFILTER_SCAN
 # include "netinet/ip_scan.h"
 #endif
@@ -157,41 +158,7 @@ extern	int	opts;
 #endif /* _KERNEL */
 
 
-fr_info_t	frcache[2][8];
-struct	filterstats frstats[2] = { { 0, 0, 0, 0, 0 }, { 0, 0, 0, 0, 0 } };
-struct	frentry	*ipfilter[2][2] = { { NULL, NULL }, { NULL, NULL } },
-		*ipfilter6[2][2] = { { NULL, NULL }, { NULL, NULL } },
-		*ipacct6[2][2] = { { NULL, NULL }, { NULL, NULL } },
-		*ipacct[2][2] = { { NULL, NULL }, { NULL, NULL } },
-		*ipnatrules[2][2] = { { NULL, NULL }, { NULL, NULL } };
-struct	frgroup *ipfgroups[IPL_LOGSIZE][2];
 char	ipfilter_version[] = IPL_VERSION;
-int	fr_refcnt = 0;
-/*
- * For fr_running:
- * 0 == loading, 1 = running, -1 = disabled, -2 = unloading
- */
-int	fr_running = 0;
-int	fr_flags = IPF_LOGGING;
-int	fr_active = 0;
-int	fr_control_forwarding = 0;
-int	fr_update_ipid = 0;
-u_short	fr_ip_id = 0;
-int	fr_chksrc = 0;	/* causes a system crash if enabled */
-int	fr_minttl = 4;
-int	fr_icmpminfragmtu = 68;
-u_long	fr_frouteok[2] = {0, 0};
-u_long	fr_userifqs = 0;
-u_long	fr_badcoalesces[2] = {0, 0};
-u_char	ipf_iss_secret[32];
-#if SOLARIS2 >= 10
-int	ipf_loopback = 0;
-#endif
-#if defined(IPFILTER_DEFAULT_BLOCK)
-int	fr_pass = FR_BLOCK|FR_NOMATCH;
-#else
-int	fr_pass = (IPF_DEFAULT_PASS)|FR_NOMATCH;
-#endif
 int	fr_features = 0
 #ifdef	IPFILTER_LKM
 		| IPF_FEAT_LKM
@@ -224,10 +191,11 @@ int	fr_features = 0
 
 static	INLINE int	fr_ipfcheck __P((fr_info_t *, frentry_t *, int));
 static	int		fr_portcheck __P((frpcmp_t *, u_short *));
-static	int		frflushlist __P((int, minor_t, int *, frentry_t **));
+static	int		frflushlist __P((int, minor_t, int *, frentry_t **,
+					 ipf_stack_t *));
 static	ipfunc_t	fr_findfunc __P((ipfunc_t));
 static	frentry_t	*fr_firewall __P((fr_info_t *, u_32_t *));
-static	int		fr_funcinit __P((frentry_t *fr));
+static	int		fr_funcinit __P((frentry_t *fr, ipf_stack_t *));
 static	INLINE void	frpr_ah __P((fr_info_t *));
 static	INLINE void	frpr_esp __P((fr_info_t *));
 static	INLINE void	frpr_gre __P((fr_info_t *));
@@ -241,14 +209,16 @@ static	INLINE void	frpr_tcpcommon __P((fr_info_t *));
 static	INLINE void	frpr_udpcommon __P((fr_info_t *));
 static	INLINE int	fr_updateipid __P((fr_info_t *));
 #ifdef	IPFILTER_LOOKUP
-static	int		fr_grpmapinit __P((frentry_t *fr));
-static	INLINE void	*fr_resolvelookup __P((u_int, u_int, lookupfunc_t *));
+static	int		fr_grpmapinit __P((frentry_t *fr, ipf_stack_t *));
+static	INLINE void	*fr_resolvelookup __P((u_int, u_int, lookupfunc_t *,
+					       ipf_stack_t *));
 #endif
-static	void		frsynclist __P((int, int, void *, char *, frentry_t *));
+static	void		frsynclist __P((int, int, void *, char *, frentry_t *,
+    ipf_stack_t *));
 static	void		*fr_ifsync __P((int, int, char *, char *,
-					void *, void *));
-static	ipftuneable_t	*fr_findtunebyname __P((const char *));
-static	ipftuneable_t	*fr_findtunebycookie __P((void *, void **));
+					void *, void *, ipf_stack_t *));
+static	ipftuneable_t	*fr_findtunebyname __P((const char *, ipf_stack_t *));
+static	ipftuneable_t	*fr_findtunebycookie __P((void *, void **, ipf_stack_t *));
 
 
 /*
@@ -965,6 +935,7 @@ fr_info_t *fin;
 	int minicmpsz = sizeof(struct icmp);
 	icmphdr_t *icmp;
 	ip_t *oip;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	if (fin->fin_off != 0) {
 		frpr_short(fin, ICMPERR_ICMPHLEN);
@@ -1011,7 +982,7 @@ fr_info_t *fin;
 		 */
 		case ICMP_UNREACH :
 			if (icmp->icmp_code == ICMP_UNREACH_NEEDFRAG) {
-				if (icmp->icmp_nextmtu < fr_icmpminfragmtu)
+				if (icmp->icmp_nextmtu < ifs->ifs_fr_icmpminfragmtu)
 					fin->fin_flx |= FI_BAD;
 			}
 			/* FALLTHRU */
@@ -1697,6 +1668,7 @@ int portcmp;
 	fripf_t *fri;
 	fr_ip_t *fi;
 	int i;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	fi = &fin->fin_fi;
 	fri = fr->fr_ipf;
@@ -1734,7 +1706,7 @@ int portcmp;
 	 */
 #ifdef	IPFILTER_LOOKUP
 	if (fr->fr_satype == FRI_LOOKUP) {
-		i = (*fr->fr_srcfunc)(fr->fr_srcptr, fi->fi_v, lip);
+		i = (*fr->fr_srcfunc)(fr->fr_srcptr, fi->fi_v, lip, ifs);
 		if (i == -1)
 			return 1;
 		lip += 3;
@@ -1776,7 +1748,7 @@ int portcmp;
 	lip++, lm++, ld++;
 #ifdef	IPFILTER_LOOKUP
 	if (fr->fr_datype == FRI_LOOKUP) {
-		i = (*fr->fr_dstfunc)(fr->fr_dstptr, fi->fi_v, lip);
+		i = (*fr->fr_dstfunc)(fr->fr_dstptr, fi->fi_v, lip, ifs);
 		if (i == -1)
 			return 1;
 		lip += 3;
@@ -1882,6 +1854,7 @@ u_32_t pass;
 	int rulen, portcmp, off, logged, skip;
 	struct frentry *fr, *fnext;
 	u_32_t passt, passo;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	/*
 	 * Do not allow nesting deeper than 16 levels.
@@ -2030,9 +2003,9 @@ u_32_t pass;
 					passt &= ~FR_CMDMASK;
 					passt |= FR_BLOCK|FR_QUICK;
 				}
-				ATOMIC_INCL(frstats[fin->fin_out].fr_skip);
+				ATOMIC_INCL(ifs->ifs_frstats[fin->fin_out].fr_skip);
 			}
-			ATOMIC_INCL(frstats[fin->fin_out].fr_pkl);
+			ATOMIC_INCL(ifs->ifs_frstats[fin->fin_out].fr_pkl);
 			logged = 1;
 		}
 #endif /* IPFILTER_LOG */
@@ -2074,9 +2047,9 @@ u_32_t pass;
 				int out = fin->fin_out;
 
 				if (fr_addstate(fin, NULL, 0) != NULL) {
-					ATOMIC_INCL(frstats[out].fr_ads);
+					ATOMIC_INCL(ifs->ifs_frstats[out].fr_ads);
 				} else {
-					ATOMIC_INCL(frstats[out].fr_bads);
+					ATOMIC_INCL(ifs->ifs_frstats[out].fr_bads);
 					pass = passo;
 					continue;
 				}
@@ -2110,14 +2083,15 @@ u_32_t *passp;
 	char group[FR_GROUPLEN];
 	frentry_t *fr, *frsave;
 	u_32_t pass, rulen;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	passp = passp;
 #ifdef	USE_INET6
 	if (fin->fin_v == 6)
-		fr = ipacct6[fin->fin_out][fr_active];
+		fr = ifs->ifs_ipacct6[fin->fin_out][ifs->ifs_fr_active];
 	else
 #endif
-		fr = ipacct[fin->fin_out][fr_active];
+		fr = ifs->ifs_ipacct[fin->fin_out][ifs->ifs_fr_active];
 
 	if (fr != NULL) {
 		frsave = fin->fin_fr;
@@ -2126,7 +2100,7 @@ u_32_t *passp;
 		fin->fin_fr = fr;
 		pass = fr_scanlist(fin, FR_NOMATCH);
 		if (FR_ISACCOUNT(pass)) {
-			ATOMIC_INCL(frstats[0].fr_acct);
+			ATOMIC_INCL(ifs->ifs_frstats[0].fr_acct);
 		}
 		fin->fin_fr = frsave;
 		bcopy(group, fin->fin_group, FR_GROUPLEN);
@@ -2157,6 +2131,7 @@ u_32_t *passp;
 	fr_info_t *fc;
 	u_32_t pass;
 	int out;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	out = fin->fin_out;
 	pass = *passp;
@@ -2166,40 +2141,40 @@ u_32_t *passp;
 	 * the access lists for permission but we do need to consider
 	 * the result as if it were from the ACL's.
 	 */
-	fc = &frcache[out][CACHE_HASH(fin)];
-	READ_ENTER(&ipf_frcache);
+	fc = &ifs->ifs_frcache[out][CACHE_HASH(fin)];
+	READ_ENTER(&ifs->ifs_ipf_frcache);
 	if (!bcmp((char *)fin, (char *)fc, FI_CSIZE)) {
 		/*
 		 * copy cached data so we can unlock the mutexes earlier.
 		 */
 		bcopy((char *)fc, (char *)fin, FI_COPYSIZE);
-		RWLOCK_EXIT(&ipf_frcache);
-		ATOMIC_INCL(frstats[out].fr_chit);
+		RWLOCK_EXIT(&ifs->ifs_ipf_frcache);
+		ATOMIC_INCL(ifs->ifs_frstats[out].fr_chit);
 
 		if ((fr = fin->fin_fr) != NULL) {
 			ATOMIC_INC64(fr->fr_hits);
 			pass = fr->fr_flags;
 		}
 	} else {
-		RWLOCK_EXIT(&ipf_frcache);
+		RWLOCK_EXIT(&ifs->ifs_ipf_frcache);
 
 #ifdef	USE_INET6
 		if (fin->fin_v == 6)
-			fin->fin_fr = ipfilter6[out][fr_active];
+			fin->fin_fr = ifs->ifs_ipfilter6[out][ifs->ifs_fr_active];
 		else
 #endif
-			fin->fin_fr = ipfilter[out][fr_active];
+			fin->fin_fr = ifs->ifs_ipfilter[out][ifs->ifs_fr_active];
 		if (fin->fin_fr != NULL)
-			pass = fr_scanlist(fin, fr_pass);
+			pass = fr_scanlist(fin, ifs->ifs_fr_pass);
 
 		if (((pass & FR_KEEPSTATE) == 0) &&
 		    ((fin->fin_flx & FI_DONTCACHE) == 0)) {
-			WRITE_ENTER(&ipf_frcache);
+			WRITE_ENTER(&ifs->ifs_ipf_frcache);
 			bcopy((char *)fin, (char *)fc, FI_COPYSIZE);
-			RWLOCK_EXIT(&ipf_frcache);
+			RWLOCK_EXIT(&ifs->ifs_ipf_frcache);
 		}
 		if ((pass & FR_NOMATCH)) {
-			ATOMIC_INCL(frstats[out].fr_nom);
+			ATOMIC_INCL(ifs->ifs_frstats[out].fr_nom);
 		}
 		fr = fin->fin_fr;
 	}
@@ -2211,7 +2186,7 @@ u_32_t *passp;
 	    !ppsratecheck(&fr->fr_lastpkt, &fr->fr_curpps, fr->fr_pps)) {
 		pass &= ~(FR_CMDMASK|FR_DUP|FR_RETICMP|FR_RETRST);
 		pass |= FR_BLOCK;
-		ATOMIC_INCL(frstats[out].fr_ppshit);
+		ATOMIC_INCL(ifs->ifs_frstats[out].fr_ppshit);
 	}
 
 	/*
@@ -2242,8 +2217,8 @@ u_32_t *passp;
 	 * is treated as "not a pass", hence the packet is blocked.
 	 */
 	if (FR_ISPREAUTH(pass)) {
-		if ((fin->fin_fr = ipauth) != NULL)
-			pass = fr_scanlist(fin, fr_pass);
+		if ((fin->fin_fr = ifs->ifs_ipauth) != NULL)
+			pass = fr_scanlist(fin, ifs->ifs_fr_pass);
 	}
 
 	/*
@@ -2253,12 +2228,12 @@ u_32_t *passp;
 	if ((pass & (FR_KEEPFRAG|FR_KEEPSTATE)) == FR_KEEPFRAG) {
 		if (fin->fin_flx & FI_FRAG) {
 			if (fr_newfrag(fin, pass) == -1) {
-				ATOMIC_INCL(frstats[out].fr_bnfr);
+				ATOMIC_INCL(ifs->ifs_frstats[out].fr_bnfr);
 			} else {
-				ATOMIC_INCL(frstats[out].fr_nfr);
+				ATOMIC_INCL(ifs->ifs_frstats[out].fr_nfr);
 			}
 		} else {
-			ATOMIC_INCL(frstats[out].fr_cfr);
+			ATOMIC_INCL(ifs->ifs_frstats[out].fr_cfr);
 		}
 	}
 
@@ -2267,9 +2242,9 @@ u_32_t *passp;
 	 */
 	if ((pass & FR_KEEPSTATE) && !(fin->fin_flx & FI_STATE)) {
 		if (fr_addstate(fin, NULL, 0) != NULL) {
-			ATOMIC_INCL(frstats[out].fr_ads);
+			ATOMIC_INCL(ifs->ifs_frstats[out].fr_ads);
 		} else {
-			ATOMIC_INCL(frstats[out].fr_bads);
+			ATOMIC_INCL(ifs->ifs_frstats[out].fr_bads);
 			if (FR_ISPASS(pass)) {
 				pass &= ~FR_CMDMASK;
 				pass |= FR_BLOCK;
@@ -2318,23 +2293,24 @@ u_32_t *passp;
 /* ------------------------------------------------------------------------ */
 int fr_check(ip, hlen, ifp, out
 #if defined(_KERNEL) && defined(MENTAT)
-, qif, mp)
+, qif, mp, ifs)
 void *qif;
 #else
-, mp)
+, mp, ifs)
 #endif
 mb_t **mp;
 ip_t *ip;
 int hlen;
 void *ifp;
 int out;
+ipf_stack_t *ifs;
 {
 	/*
 	 * The above really sucks, but short of writing a diff
 	 */
 	fr_info_t frinfo;
 	fr_info_t *fin = &frinfo;
-	u_32_t pass = fr_pass;
+	u_32_t pass;
 	frentry_t *fr = NULL;
 	int v = IP_V(ip);
 	mb_t *mc = NULL;
@@ -2347,7 +2323,9 @@ int out;
 	qpktinfo_t *qpi = qif;
 #endif
 #endif
+
 	SPL_INT(s);
+	pass = ifs->ifs_fr_pass;
 
 	/*
 	 * The first part of fr_check() deals with making sure that what goes
@@ -2362,10 +2340,10 @@ int out;
 		return 2;
 # endif
 
-	READ_ENTER(&ipf_global);
+	READ_ENTER(&ifs->ifs_ipf_global);
 
-	if (fr_running <= 0) {
-		RWLOCK_EXIT(&ipf_global);
+	if (ifs->ifs_fr_running <= 0) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		return 0;
 	}
 
@@ -2412,7 +2390,7 @@ int out;
 #  endif /* CSUM_DELAY_DATA */
 # endif /* MENTAT */
 #else
-	READ_ENTER(&ipf_global);
+	READ_ENTER(&ifs->ifs_ipf_global);
 
 	bzero((char *)fin, sizeof(*fin));
 	m = *mp;
@@ -2427,14 +2405,14 @@ int out;
 	fin->fin_error = ENETUNREACH;
 	fin->fin_hlen = (u_short)hlen;
 	fin->fin_dp = (char *)ip + hlen;
-
 	fin->fin_ipoff = (char *)ip - MTOD(m, char *);
+	fin->fin_ifs = ifs;
 
 	SPL_NET(s);
 
 #ifdef	USE_INET6
 	if (v == 6) {
-		ATOMIC_INCL(frstats[out].fr_ipv6);
+		ATOMIC_INCL(ifs->ifs_frstats[out].fr_ipv6);
 		/*
 		 * Jumbo grams are quite likely too big for internal buffer
 		 * structures to handle comfortably, for now, so just drop
@@ -2443,7 +2421,7 @@ int out;
 		ip6 = (ip6_t *)ip;
 		fin->fin_plen = ntohs(ip6->ip6_plen);
 		if (fin->fin_plen == 0) {
-			READ_ENTER(&ipf_mutex);
+			READ_ENTER(&ifs->ifs_ipf_mutex);
 			pass = FR_BLOCK|FR_NOMATCH;
 			goto filtered;
 		}
@@ -2459,7 +2437,7 @@ int out;
 	}
 
 	if (fr_makefrip(hlen, ip, fin) == -1) {
-		READ_ENTER(&ipf_mutex);
+		READ_ENTER(&ifs->ifs_ipf_mutex);
 		pass = FR_BLOCK;
 		goto filtered;
 	}
@@ -2474,13 +2452,13 @@ int out;
 	if (!out) {
 		if (v == 4) {
 #ifdef _KERNEL
-			if (fr_chksrc && !fr_verifysrc(fin)) {
-				ATOMIC_INCL(frstats[0].fr_badsrc);
+			if (ifs->ifs_fr_chksrc && !fr_verifysrc(fin)) {
+				ATOMIC_INCL(ifs->ifs_frstats[0].fr_badsrc);
 				fin->fin_flx |= FI_BADSRC;
 			}
 #endif
-			if (fin->fin_ip->ip_ttl < fr_minttl) {
-				ATOMIC_INCL(frstats[0].fr_badttl);
+			if (fin->fin_ip->ip_ttl < ifs->ifs_fr_minttl) {
+				ATOMIC_INCL(ifs->ifs_frstats[0].fr_badttl);
 				fin->fin_flx |= FI_LOWTTL;
 			}
 		}
@@ -2488,13 +2466,13 @@ int out;
 		else  if (v == 6) {
 			ip6 = (ip6_t *)ip;
 #ifdef _KERNEL
-			if (fr_chksrc && !fr_verifysrc(fin)) {
-				ATOMIC_INCL(frstats[0].fr_badsrc);
+			if (ifs->ifs_fr_chksrc && !fr_verifysrc(fin)) {
+				ATOMIC_INCL(ifs->ifs_frstats[0].fr_badsrc);
 				fin->fin_flx |= FI_BADSRC;
 			}
 #endif
-			if (ip6->ip6_hlim < fr_minttl) {
-				ATOMIC_INCL(frstats[0].fr_badttl);
+			if (ip6->ip6_hlim < ifs->ifs_fr_minttl) {
+				ATOMIC_INCL(ifs->ifs_frstats[0].fr_badttl);
 				fin->fin_flx |= FI_LOWTTL;
 			}
 		}
@@ -2502,10 +2480,10 @@ int out;
 	}
 
 	if (fin->fin_flx & FI_SHORT) {
-		ATOMIC_INCL(frstats[out].fr_short);
+		ATOMIC_INCL(ifs->ifs_frstats[out].fr_short);
 	}
 
-	READ_ENTER(&ipf_mutex);
+	READ_ENTER(&ifs->ifs_ipf_mutex);
 
 	/*
 	 * Check auth now.  This, combined with the check below to see if apass
@@ -2517,7 +2495,7 @@ int out;
 	fr = fr_checkauth(fin, &pass);
 	if (!out) {
 		if (fr_checknatin(fin, &pass) == -1) {
-			RWLOCK_EXIT(&ipf_mutex);
+			RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
 			goto finished;
 		}
 	}
@@ -2543,30 +2521,30 @@ int out;
 		(void) fr_acctpkt(fin, NULL);
 
 		if (fr_checknatout(fin, &pass) == -1) {
-			RWLOCK_EXIT(&ipf_mutex);
+			RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
 			goto finished;
-		} else if ((fr_update_ipid != 0) && (v == 4)) {
+		} else if ((ifs->ifs_fr_update_ipid != 0) && (v == 4)) {
 			if (fr_updateipid(fin) == -1) {
-				ATOMIC_INCL(frstats[1].fr_ipud);
+				ATOMIC_INCL(ifs->ifs_frstats[1].fr_ipud);
 				pass &= ~FR_CMDMASK;
 				pass |= FR_BLOCK;
 			} else {
-				ATOMIC_INCL(frstats[0].fr_ipud);
+				ATOMIC_INCL(ifs->ifs_frstats[0].fr_ipud);
 			}
 		}
 	}
 
 #ifdef	IPFILTER_LOG
-	if ((fr_flags & FF_LOGGING) || (pass & FR_LOGMASK)) {
+	if ((ifs->ifs_fr_flags & FF_LOGGING) || (pass & FR_LOGMASK)) {
 		(void) fr_dolog(fin, &pass);
 	}
 #endif
 
 	if (fin->fin_state != NULL)
-		fr_statederef(fin, (ipstate_t **)&fin->fin_state);
+		fr_statederef(fin, (ipstate_t **)&fin->fin_state, ifs);
 
 	if (fin->fin_nat != NULL)
-		fr_natderef((nat_t **)&fin->fin_nat);
+		fr_natderef((nat_t **)&fin->fin_nat, ifs);
 
 	/*
 	 * Only allow FR_DUP to work if a rule matched - it makes no sense to
@@ -2596,11 +2574,11 @@ int out;
 				else
 					dst = 0;
 				(void) fr_send_icmp_err(ICMP_UNREACH, fin, dst);
-				ATOMIC_INCL(frstats[0].fr_ret);
+				ATOMIC_INCL(ifs->ifs_frstats[0].fr_ret);
 			} else if (((pass & FR_RETMASK) == FR_RETRST) &&
 				   !(fin->fin_flx & FI_SHORT)) {
 				if (fr_send_reset(fin) == 0) {
-					ATOMIC_INCL(frstats[1].fr_ret);
+					ATOMIC_INCL(ifs->ifs_frstats[1].fr_ret);
 				}
 			}
 		} else {
@@ -2649,17 +2627,17 @@ filtered:
 	/*
 	 * This late because the likes of fr_fastroute() use fin_fr.
 	 */
-	RWLOCK_EXIT(&ipf_mutex);
+	RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
 
 finished:
 	if (!FR_ISPASS(pass)) {
-		ATOMIC_INCL(frstats[out].fr_block);
+		ATOMIC_INCL(ifs->ifs_frstats[out].fr_block);
 		if (*mp != NULL) {
 			FREE_MB_T(*mp);
 			m = *mp = NULL;
 		}
 	} else {
-		ATOMIC_INCL(frstats[out].fr_pass);
+		ATOMIC_INCL(ifs->ifs_frstats[out].fr_pass);
 #if defined(_KERNEL) && defined(__sgi)
 		if ((fin->fin_hbuf != NULL) &&
 		    (mtod(fin->fin_m, struct ip *) != fin->fin_ip)) {
@@ -2669,7 +2647,7 @@ finished:
 	}
 
 	SPL_X(s);
-	RWLOCK_EXIT(&ipf_global);
+	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 
 #ifdef _KERNEL
 # if OpenBSD >= 200311
@@ -2730,28 +2708,29 @@ u_32_t *passp;
 {
 	u_32_t pass;
 	int out;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	out = fin->fin_out;
 	pass = *passp;
 
-	if ((fr_flags & FF_LOGNOMATCH) && (pass & FR_NOMATCH)) {
+	if ((ifs->ifs_fr_flags & FF_LOGNOMATCH) && (pass & FR_NOMATCH)) {
 		pass |= FF_LOGNOMATCH;
-		ATOMIC_INCL(frstats[out].fr_npkl);
+		ATOMIC_INCL(ifs->ifs_frstats[out].fr_npkl);
 		goto logit;
 	} else if (((pass & FR_LOGMASK) == FR_LOGP) ||
-	    (FR_ISPASS(pass) && (fr_flags & FF_LOGPASS))) {
+	    (FR_ISPASS(pass) && (ifs->ifs_fr_flags & FF_LOGPASS))) {
 		if ((pass & FR_LOGMASK) != FR_LOGP)
 			pass |= FF_LOGPASS;
-		ATOMIC_INCL(frstats[out].fr_ppkl);
+		ATOMIC_INCL(ifs->ifs_frstats[out].fr_ppkl);
 		goto logit;
 	} else if (((pass & FR_LOGMASK) == FR_LOGB) ||
-		   (FR_ISBLOCK(pass) && (fr_flags & FF_LOGBLOCK))) {
+		   (FR_ISBLOCK(pass) && (ifs->ifs_fr_flags & FF_LOGBLOCK))) {
 		if ((pass & FR_LOGMASK) != FR_LOGB)
 			pass |= FF_LOGBLOCK;
-		ATOMIC_INCL(frstats[out].fr_bpkl);
+		ATOMIC_INCL(ifs->ifs_frstats[out].fr_bpkl);
 logit:
 		if (ipflog(fin, pass) == -1) {
-			ATOMIC_INCL(frstats[out].fr_skip);
+			ATOMIC_INCL(ifs->ifs_frstats[out].fr_skip);
 
 			/*
 			 * If the "or-block" option has been used then
@@ -3203,11 +3182,12 @@ out:
 /*                                                                          */
 /* Search amongst the defined groups for a particular group number.         */
 /* ------------------------------------------------------------------------ */
-frgroup_t *fr_findgroup(group, unit, set, fgpp)
+frgroup_t *fr_findgroup(group, unit, set, fgpp, ifs)
 char *group;
 minor_t unit;
 int set;
 frgroup_t ***fgpp;
+ipf_stack_t *ifs;
 {
 	frgroup_t *fg, **fgp;
 
@@ -3215,7 +3195,7 @@ frgroup_t ***fgpp;
 	 * Which list of groups to search in is dependent on which list of
 	 * rules are being operated on.
 	 */
-	fgp = &ipfgroups[unit][set];
+	fgp = &ifs->ifs_ipfgroups[unit][set];
 
 	while ((fg = *fgp) != NULL) {
 		if (strncmp(group, fg->fg_name, FR_GROUPLEN) == 0)
@@ -3243,12 +3223,13 @@ frgroup_t ***fgpp;
 /* Add a new group head, or if it already exists, increase the reference    */
 /* count to it.                                                             */
 /* ------------------------------------------------------------------------ */
-frgroup_t *fr_addgroup(group, head, flags, unit, set)
+frgroup_t *fr_addgroup(group, head, flags, unit, set, ifs)
 char *group;
 void *head;
 u_32_t flags;
 minor_t unit;
 int set;
+ipf_stack_t *ifs;
 {
 	frgroup_t *fg, **fgp;
 	u_32_t gflags;
@@ -3262,7 +3243,7 @@ int set;
 	fgp = NULL;
 	gflags = flags & FR_INOUT;
 
-	fg = fr_findgroup(group, unit, set, &fgp);
+	fg = fr_findgroup(group, unit, set, &fgp, ifs);
 	if (fg != NULL) {
 		if (fg->fg_flags == 0)
 			fg->fg_flags = gflags;
@@ -3296,14 +3277,15 @@ int set;
 /* Attempt to delete a group head.                                          */
 /* Only do this when its reference count reaches 0.                         */
 /* ------------------------------------------------------------------------ */
-void fr_delgroup(group, unit, set)
+void fr_delgroup(group, unit, set, ifs)
 char *group;
 minor_t unit;
 int set;
+ipf_stack_t *ifs;
 {
 	frgroup_t *fg, **fgp;
 
-	fg = fr_findgroup(group, unit, set, &fgp);
+	fg = fr_findgroup(group, unit, set, &fgp, ifs);
 	if (fg == NULL)
 		return;
 
@@ -3326,15 +3308,16 @@ int set;
 /* Find rule # n in group # g and return a pointer to it.  Return NULl if   */
 /* group # g doesn't exist or there are less than n rules in the group.     */
 /* ------------------------------------------------------------------------ */
-frentry_t *fr_getrulen(unit, group, n)
+frentry_t *fr_getrulen(unit, group, n, ifs)
 int unit;
 char *group;
 u_32_t n;
+ipf_stack_t *ifs;
 {
 	frentry_t *fr;
 	frgroup_t *fg;
 
-	fg = fr_findgroup(group, unit, fr_active, NULL);
+	fg = fr_findgroup(group, unit, ifs->ifs_fr_active, NULL, ifs);
 	if (fg == NULL)
 		return NULL;
 	for (fr = fg->fg_head; fr && n; fr = fr->fr_next, n--)
@@ -3353,9 +3336,10 @@ u_32_t n;
 /*                                                                          */
 /* Return the number for a rule on a specific filtering device.             */
 /* ------------------------------------------------------------------------ */
-int fr_rulen(unit, fr)
+int fr_rulen(unit, fr, ifs)
 int unit;
 frentry_t *fr;
+ipf_stack_t *ifs;
 {
 	frentry_t *fh;
 	frgroup_t *fg;
@@ -3363,7 +3347,7 @@ frentry_t *fr;
 
 	if (fr == NULL)
 		return -1;
-	fg = fr_findgroup(fr->fr_group, unit, fr_active, NULL);
+	fg = fr_findgroup(fr->fr_group, unit, ifs->ifs_fr_active, NULL, ifs);
 	if (fg == NULL)
 		return -1;
 	for (fh = fg->fg_head; fh; n++, fh = fh->fr_next)
@@ -3394,11 +3378,12 @@ frentry_t *fr;
 /*                                                                          */
 /* NOTE: Rules not loaded from user space cannot be flushed.                */
 /* ------------------------------------------------------------------------ */
-static int frflushlist(set, unit, nfreedp, listp)
+static int frflushlist(set, unit, nfreedp, listp, ifs)
 int set;
 minor_t unit;
 int *nfreedp;
 frentry_t **listp;
+ipf_stack_t *ifs;
 {
 	int freed = 0, i;
 	frentry_t *fp;
@@ -3411,18 +3396,18 @@ frentry_t **listp;
 		}
 		*listp = fp->fr_next;
 		if (fp->fr_grp != NULL) {
-			i = frflushlist(set, unit, nfreedp, fp->fr_grp);
+			i = frflushlist(set, unit, nfreedp, fp->fr_grp, ifs);
 			fp->fr_ref -= i;
 		}
 
 		if (fp->fr_grhead != NULL) {
-			fr_delgroup(fp->fr_grhead, unit, set);
+			fr_delgroup(fp->fr_grhead, unit, set, ifs);
 			*fp->fr_grhead = '\0';
 		}
 
 		ASSERT(fp->fr_ref > 0);
 		fp->fr_next = NULL;
-		if (fr_derefrule(&fp) == 0)
+		if (fr_derefrule(&fp, ifs) == 0)
 			freed++;
 	}
 	*nfreedp += freed;
@@ -3439,53 +3424,54 @@ frentry_t **listp;
 /* Calls flushlist() for all filter rules (accounting, firewall - both IPv4 */
 /* and IPv6) as defined by the value of flags.                              */
 /* ------------------------------------------------------------------------ */
-int frflush(unit, proto, flags)
+int frflush(unit, proto, flags, ifs)
 minor_t unit;
 int proto, flags;
+ipf_stack_t *ifs;
 {
 	int flushed = 0, set;
 
-	WRITE_ENTER(&ipf_mutex);
-	bzero((char *)frcache, sizeof(frcache));
+	WRITE_ENTER(&ifs->ifs_ipf_mutex);
+	bzero((char *)&ifs->ifs_frcache, sizeof (ifs->ifs_frcache));
 
-	set = fr_active;
+	set = ifs->ifs_fr_active;
 	if ((flags & FR_INACTIVE) == FR_INACTIVE)
 		set = 1 - set;
 
 	if (flags & FR_OUTQUE) {
 		if (proto == 0 || proto == 6) {
 			(void) frflushlist(set, unit,
-			    &flushed, &ipfilter6[1][set]);
+			    &flushed, &ifs->ifs_ipfilter6[1][set], ifs);
 			(void) frflushlist(set, unit,
-			    &flushed, &ipacct6[1][set]);
+			    &flushed, &ifs->ifs_ipacct6[1][set], ifs);
 		}
 		if (proto == 0 || proto == 4) {
 			(void) frflushlist(set, unit,
-			    &flushed, &ipfilter[1][set]);
+			    &flushed, &ifs->ifs_ipfilter[1][set], ifs);
 			(void) frflushlist(set, unit,
-			    &flushed, &ipacct[1][set]);
+			    &flushed, &ifs->ifs_ipacct[1][set], ifs);
 		}
 	}
 	if (flags & FR_INQUE) {
 		if (proto == 0 || proto == 6) {
 			(void) frflushlist(set, unit,
-			    &flushed, &ipfilter6[0][set]);
+			    &flushed, &ifs->ifs_ipfilter6[0][set], ifs);
 			(void) frflushlist(set, unit,
-			    &flushed, &ipacct6[0][set]);
+			    &flushed, &ifs->ifs_ipacct6[0][set], ifs);
 		}
 		if (proto == 0 || proto == 4) {
 			(void) frflushlist(set, unit,
-			    &flushed, &ipfilter[0][set]);
+			    &flushed, &ifs->ifs_ipfilter[0][set], ifs);
 			(void) frflushlist(set, unit,
-			    &flushed, &ipacct[0][set]);
+			    &flushed, &ifs->ifs_ipacct[0][set], ifs);
 		}
 	}
-	RWLOCK_EXIT(&ipf_mutex);
+	RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
 
 	if (unit == IPL_LOGIPF) {
 		int tmp;
 
-		tmp = frflush(IPL_LOGCOUNT, proto, flags);
+		tmp = frflush(IPL_LOGCOUNT, proto, flags, ifs);
 		if (tmp >= 0)
 			flushed += tmp;
 	}
@@ -3639,10 +3625,11 @@ u_32_t *msk;
 /*   if oldifp matches newifp then we are are doing a sync to remove any    */
 /*   references to oldifp, so we return "-1".                               */
 /* ------------------------------------------------------------------------ */
-static void *fr_ifsync(action, v, newname, oldname, newifp, oldifp)
+static void *fr_ifsync(action, v, newname, oldname, newifp, oldifp, ifs)
 int action, v;
 char *newname, *oldname;
 void *newifp, *oldifp;
+ipf_stack_t *ifs;
 {
 	void *rval = oldifp;
 
@@ -3650,7 +3637,7 @@ void *newifp, *oldifp;
 	{
 	case IPFSYNC_RESYNC :
 		if (oldname[0] != '\0') {
-			rval = fr_resolvenic(oldname, v);
+			rval = fr_resolvenic(oldname, v, ifs);
 		}
 		break;
 	case IPFSYNC_NEWIFP :
@@ -3681,11 +3668,12 @@ void *newifp, *oldifp;
 /* used in the rule.  The interface pointer is used to limit the lookups to */
 /* a specific set of matching names if it is non-NULL.                      */
 /* ------------------------------------------------------------------------ */
-static void frsynclist(action, v, ifp, ifname, fr)
+static void frsynclist(action, v, ifp, ifname, fr, ifs)
 int action, v;
 void *ifp;
 char *ifname;
 frentry_t *fr;
+ipf_stack_t *ifs;
 {
 	frdest_t *fdp;
 	int rv, i;
@@ -3703,20 +3691,21 @@ frentry_t *fr;
 				continue;
 			fr->fr_ifas[i] = fr_ifsync(action, rv, ifname,
 						   fr->fr_ifnames[i],
-						   ifp, fr->fr_ifas[i]);
+						   ifp, fr->fr_ifas[i],
+						   ifs);
 		}
 
 		fdp = &fr->fr_tifs[0];
 		fdp->fd_ifp = fr_ifsync(action, rv, ifname, fdp->fd_ifname,
-					   ifp, fdp->fd_ifp);
+					   ifp, fdp->fd_ifp, ifs);
 
 		fdp = &fr->fr_tifs[1];
 		fdp->fd_ifp = fr_ifsync(action, rv, ifname, fdp->fd_ifname,
-					   ifp, fdp->fd_ifp);
+					   ifp, fdp->fd_ifp, ifs);
 
 		fdp = &fr->fr_dif;
 		fdp->fd_ifp = fr_ifsync(action, rv, ifname, fdp->fd_ifname,
-					   ifp, fdp->fd_ifp);
+					   ifp, fdp->fd_ifp, ifs);
 
 		if (action != IPFSYNC_RESYNC)
 			return;
@@ -3726,13 +3715,15 @@ frentry_t *fr;
 			    fr->fr_satype != FRI_LOOKUP) {
 				(void)fr_ifpaddr(rv, fr->fr_satype,
 						 fr->fr_ifas[fr->fr_sifpidx],
-						 &fr->fr_src, &fr->fr_smsk);
+						 &fr->fr_src, &fr->fr_smsk,
+						 ifs);
 			}
 			if (fr->fr_datype != FRI_NORMAL &&
 			    fr->fr_datype != FRI_LOOKUP) {
 				(void)fr_ifpaddr(rv, fr->fr_datype,
 						 fr->fr_ifas[fr->fr_difpidx],
-						 &fr->fr_dst, &fr->fr_dmsk);
+						 &fr->fr_dst, &fr->fr_dmsk,
+						 ifs);
 			}
 		}
 
@@ -3741,13 +3732,13 @@ frentry_t *fr;
 		    fr->fr_srcptr == NULL) {
 			fr->fr_srcptr = fr_resolvelookup(fr->fr_srctype,
 							 fr->fr_srcnum,
-							 &fr->fr_srcfunc);
+							 &fr->fr_srcfunc, ifs);
 		}
 		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP &&
 		    fr->fr_dstptr == NULL) {
 			fr->fr_dstptr = fr_resolvelookup(fr->fr_dsttype,
 							 fr->fr_dstnum,
-							 &fr->fr_dstfunc);
+							 &fr->fr_dstfunc, ifs);
 		}
 #endif
 	}
@@ -3773,32 +3764,33 @@ frentry_t *fr;
 /* - new interface being announced with its name and identifier             */
 /* - interface removal being announced by only its identifier               */
 /* ------------------------------------------------------------------------ */
-void frsync(action, v, ifp, name)
+void frsync(action, v, ifp, name, ifs)
 int action, v;
 void *ifp;
 char *name;
+ipf_stack_t *ifs;
 {
 	int i;
 
-	WRITE_ENTER(&ipf_mutex);
-	frsynclist(action, v, ifp, name, ipacct[0][fr_active]);
-	frsynclist(action, v, ifp, name, ipacct[1][fr_active]);
-	frsynclist(action, v, ifp, name, ipfilter[0][fr_active]);
-	frsynclist(action, v, ifp, name, ipfilter[1][fr_active]);
-	frsynclist(action, v, ifp, name, ipacct6[0][fr_active]);
-	frsynclist(action, v, ifp, name, ipacct6[1][fr_active]);
-	frsynclist(action, v, ifp, name, ipfilter6[0][fr_active]);
-	frsynclist(action, v, ifp, name, ipfilter6[1][fr_active]);
+	WRITE_ENTER(&ifs->ifs_ipf_mutex);
+	frsynclist(action, v, ifp, name, ifs->ifs_ipacct[0][ifs->ifs_fr_active], ifs);
+	frsynclist(action, v, ifp, name, ifs->ifs_ipacct[1][ifs->ifs_fr_active], ifs);
+	frsynclist(action, v, ifp, name, ifs->ifs_ipfilter[0][ifs->ifs_fr_active], ifs);
+	frsynclist(action, v, ifp, name, ifs->ifs_ipfilter[1][ifs->ifs_fr_active], ifs);
+	frsynclist(action, v, ifp, name, ifs->ifs_ipacct6[0][ifs->ifs_fr_active], ifs);
+	frsynclist(action, v, ifp, name, ifs->ifs_ipacct6[1][ifs->ifs_fr_active], ifs);
+	frsynclist(action, v, ifp, name, ifs->ifs_ipfilter6[0][ifs->ifs_fr_active], ifs);
+	frsynclist(action, v, ifp, name, ifs->ifs_ipfilter6[1][ifs->ifs_fr_active], ifs);
 
 	for (i = 0; i < IPL_LOGSIZE; i++) {
 		frgroup_t *g;
 
-		for (g = ipfgroups[i][0]; g != NULL; g = g->fg_next)
-			frsynclist(action, v, ifp, name, g->fg_start);
-		for (g = ipfgroups[i][1]; g != NULL; g = g->fg_next)
-			frsynclist(action, v, ifp, name, g->fg_start);
+		for (g = ifs->ifs_ipfgroups[i][0]; g != NULL; g = g->fg_next)
+			frsynclist(action, v, ifp, name, g->fg_start, ifs);
+		for (g = ifs->ifs_ipfgroups[i][1]; g != NULL; g = g->fg_next)
+			frsynclist(action, v, ifp, name, g->fg_start, ifs);
 	}
-	RWLOCK_EXIT(&ipf_mutex);
+	RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
 }
 
 
@@ -3897,41 +3889,43 @@ int *lockp;
 /* Stores a copy of current pointers, counters, etc, in the friostat        */
 /* structure.                                                               */
 /* ------------------------------------------------------------------------ */
-void fr_getstat(fiop)
+void fr_getstat(fiop, ifs)
 friostat_t *fiop;
+ipf_stack_t *ifs;
 {
 	int i, j;
 
-	bcopy((char *)frstats, (char *)fiop->f_st, sizeof(filterstats_t) * 2);
-	fiop->f_locks[IPL_LOGSTATE] = fr_state_lock;
-	fiop->f_locks[IPL_LOGNAT] = fr_nat_lock;
-	fiop->f_locks[IPL_LOGIPF] = fr_frag_lock;
-	fiop->f_locks[IPL_LOGAUTH] = fr_auth_lock;
+	bcopy((char *)&ifs->ifs_frstats, (char *)fiop->f_st,
+	    sizeof(filterstats_t) * 2);
+	fiop->f_locks[IPL_LOGSTATE] = ifs->ifs_fr_state_lock;
+	fiop->f_locks[IPL_LOGNAT] = ifs->ifs_fr_nat_lock;
+	fiop->f_locks[IPL_LOGIPF] = ifs->ifs_fr_frag_lock;
+	fiop->f_locks[IPL_LOGAUTH] = ifs->ifs_fr_auth_lock;
 
 	for (i = 0; i < 2; i++)
 		for (j = 0; j < 2; j++) {
-			fiop->f_ipf[i][j] = ipfilter[i][j];
-			fiop->f_acct[i][j] = ipacct[i][j];
-			fiop->f_ipf6[i][j] = ipfilter6[i][j];
-			fiop->f_acct6[i][j] = ipacct6[i][j];
+			fiop->f_ipf[i][j] = ifs->ifs_ipfilter[i][j];
+			fiop->f_acct[i][j] = ifs->ifs_ipacct[i][j];
+			fiop->f_ipf6[i][j] = ifs->ifs_ipfilter6[i][j];
+			fiop->f_acct6[i][j] = ifs->ifs_ipacct6[i][j];
 		}
 
-	fiop->f_ticks = fr_ticks;
-	fiop->f_active = fr_active;
-	fiop->f_froute[0] = fr_frouteok[0];
-	fiop->f_froute[1] = fr_frouteok[1];
+	fiop->f_ticks = ifs->ifs_fr_ticks;
+	fiop->f_active = ifs->ifs_fr_active;
+	fiop->f_froute[0] = ifs->ifs_fr_frouteok[0];
+	fiop->f_froute[1] = ifs->ifs_fr_frouteok[1];
 
-	fiop->f_running = fr_running;
+	fiop->f_running = ifs->ifs_fr_running;
 	for (i = 0; i < IPL_LOGSIZE; i++) {
-		fiop->f_groups[i][0] = ipfgroups[i][0];
-		fiop->f_groups[i][1] = ipfgroups[i][1];
+		fiop->f_groups[i][0] = ifs->ifs_ipfgroups[i][0];
+		fiop->f_groups[i][1] = ifs->ifs_ipfgroups[i][1];
 	}
 #ifdef  IPFILTER_LOG
 	fiop->f_logging = 1;
 #else
 	fiop->f_logging = 0;
 #endif
-	fiop->f_defpass = fr_pass;
+	fiop->f_defpass = ifs->ifs_fr_pass;
 	fiop->f_features = fr_features;
 	(void) strncpy(fiop->f_version, ipfilter_version,
 		       sizeof(fiop->f_version));
@@ -4048,9 +4042,10 @@ int rev;
 /* call to do the IP address search will be change, regardless of whether   */
 /* or not the "table" number exists.                                        */
 /* ------------------------------------------------------------------------ */
-static void *fr_resolvelookup(type, number, funcptr)
+static void *fr_resolvelookup(type, number, funcptr, ifs)
 u_int type, number;
 lookupfunc_t *funcptr;
+ipf_stack_t *ifs;
 {
 	char name[FR_GROUPLEN];
 	iphtable_t *iph;
@@ -4063,7 +4058,7 @@ lookupfunc_t *funcptr;
 	(void) sprintf(name, "%u", number);
 #endif
 
-	READ_ENTER(&ip_poolrw);
+	READ_ENTER(&ifs->ifs_ip_poolrw);
 
 	switch (type)
 	{
@@ -4072,7 +4067,7 @@ lookupfunc_t *funcptr;
 		ptr = NULL;
 		*funcptr = NULL;
 # else
-		ipo = ip_pool_find(IPL_LOGIPF, name);
+		ipo = ip_pool_find(IPL_LOGIPF, name, ifs);
 		ptr = ipo;
 		if (ipo != NULL) {
 			ATOMIC_INC32(ipo->ipo_ref);
@@ -4081,7 +4076,7 @@ lookupfunc_t *funcptr;
 # endif
 		break;
 	case IPLT_HASH :
-		iph = fr_findhtable(IPL_LOGIPF, name);
+		iph = fr_findhtable(IPL_LOGIPF, name, ifs);
 		ptr = iph;
 		if (iph != NULL) {
 			ATOMIC_INC32(iph->iph_ref);
@@ -4093,7 +4088,7 @@ lookupfunc_t *funcptr;
 		*funcptr = NULL;
 		break;
 	}
-	RWLOCK_EXIT(&ip_poolrw);
+	RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 
 	return ptr;
 }
@@ -4117,11 +4112,12 @@ lookupfunc_t *funcptr;
 /* of the rule structure being loaded.  If a rule has user defined timeouts */
 /* then make sure they are created and initialised before exiting.          */
 /* ------------------------------------------------------------------------ */
-int frrequest(unit, req, data, set, makecopy)
+int frrequest(unit, req, data, set, makecopy, ifs)
 int unit;
 ioctlcmd_t req;
 int set, makecopy;
 caddr_t data;
+ipf_stack_t *ifs;
 {
 	frentry_t frd, *fp, *f, **fprev, **ftail;
 	int error = 0, in, v;
@@ -4175,7 +4171,7 @@ caddr_t data;
 	if ((makecopy == 1) && (fp->fr_func != NULL)) {
 		if (fr_findfunc(fp->fr_func) == NULL)
 			return ESRCH;
-		error = fr_funcinit(fp);
+		error = fr_funcinit(fp, ifs);
 		if (error != 0)
 			return error;
 	}
@@ -4195,7 +4191,7 @@ caddr_t data;
 		unit = IPL_LOGCOUNT;
 
 	if ((req != (int)SIOCZRLST) && (*group != '\0')) {
-		fg = fr_findgroup(group, unit, set, NULL);
+		fg = fr_findgroup(group, unit, set, NULL, ifs);
 		if (fg == NULL)
 			return ESRCH;
 		if (fg->fg_flags == 0)
@@ -4212,23 +4208,23 @@ caddr_t data;
 	ftail = NULL;
 	fprev = NULL;
 	if (unit == IPL_LOGAUTH)
-		fprev = &ipauth;
+		fprev = &ifs->ifs_ipauth;
 	else if (v == 4) {
 		if (FR_ISACCOUNT(fp->fr_flags))
-			fprev = &ipacct[in][set];
+			fprev = &ifs->ifs_ipacct[in][set];
 		else if ((fp->fr_flags & (FR_OUTQUE|FR_INQUE)) != 0)
-			fprev = &ipfilter[in][set];
+			fprev = &ifs->ifs_ipfilter[in][set];
 	} else if (v == 6) {
 		if (FR_ISACCOUNT(fp->fr_flags))
-			fprev = &ipacct6[in][set];
+			fprev = &ifs->ifs_ipacct6[in][set];
 		else if ((fp->fr_flags & (FR_OUTQUE|FR_INQUE)) != 0)
-			fprev = &ipfilter6[in][set];
+			fprev = &ifs->ifs_ipfilter6[in][set];
 	}
 	if (fprev == NULL)
 		return ESRCH;
 
 	if (*group != '\0') {
-		if (!fg && !(fg = fr_findgroup(group, unit, set, NULL)))
+	    if (!fg && !(fg = fr_findgroup(group, unit, set, NULL, ifs)))
 			return ESRCH;
 		fprev = &fg->fg_start;
 	}
@@ -4311,7 +4307,7 @@ caddr_t data;
 		case FRI_LOOKUP :
 			fp->fr_srcptr = fr_resolvelookup(fp->fr_srctype,
 							 fp->fr_srcnum,
-							 &fp->fr_srcfunc);
+							 &fp->fr_srcfunc, ifs);
 			break;
 #endif
 		default :
@@ -4336,7 +4332,7 @@ caddr_t data;
 		case FRI_LOOKUP :
 			fp->fr_dstptr = fr_resolvelookup(fp->fr_dsttype,
 							 fp->fr_dstnum,
-							 &fp->fr_dstfunc);
+							 &fp->fr_dstfunc, ifs);
 			break;
 #endif
 		default :
@@ -4359,7 +4355,7 @@ caddr_t data;
 	/*
 	 * Lookup all the interface names that are part of the rule.
 	 */
-	frsynclist(0, 0, NULL, NULL, fp);
+	frsynclist(0, 0, NULL, NULL, fp, ifs);
 	fp->fr_statecnt = 0;
 
 	/*
@@ -4376,8 +4372,8 @@ caddr_t data;
 	for (p = (u_int *)fp->fr_data; p < pp; p++)
 		fp->fr_cksum += *p;
 
-	WRITE_ENTER(&ipf_mutex);
-	bzero((char *)frcache, sizeof(frcache));
+	WRITE_ENTER(&ifs->ifs_ipf_mutex);
+	bzero((char *)&ifs->ifs_frcache, sizeof (ifs->ifs_frcache));
 
 	for (; (f = *ftail) != NULL; ftail = &f->fr_next) {
 		if ((fp->fr_cksum != f->fr_cksum) ||
@@ -4430,7 +4426,7 @@ caddr_t data;
 		if ((ptr != NULL) && (makecopy != 0)) {
 			KFREES(ptr, fp->fr_dsize);
 		}
-		RWLOCK_EXIT(&ipf_mutex);
+		RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
 		return error;
 	}
 
@@ -4508,15 +4504,15 @@ caddr_t data;
 			if ((fg != NULL) && (fg->fg_head != NULL))
 				fg->fg_head->fr_ref--;
 			if (unit == IPL_LOGAUTH) {
-				error = fr_preauthcmd(req, f, ftail);
+				error = fr_preauthcmd(req, f, ftail, ifs);
 				goto done;
 			}
 			if (*f->fr_grhead != '\0')
-				fr_delgroup(f->fr_grhead, unit, set);
+				fr_delgroup(f->fr_grhead, unit, set, ifs);
 			fr_fixskip(ftail, f, -1);
 			*ftail = f->fr_next;
 			f->fr_next = NULL;
-			(void)fr_derefrule(&f);
+			(void)fr_derefrule(&f, ifs);
 		}
 	} else {
 		/*
@@ -4526,7 +4522,7 @@ caddr_t data;
 			error = EEXIST;
 		else {
 			if (unit == IPL_LOGAUTH) {
-				error = fr_preauthcmd(req, fp, ftail);
+				error = fr_preauthcmd(req, fp, ftail, ifs);
 				goto done;
 			}
 			if (makecopy) {
@@ -4558,7 +4554,7 @@ caddr_t data;
 				group = f->fr_grhead;
 				if (*group != '\0') {
 					fg = fr_addgroup(group, f, f->fr_flags,
-							 unit, set);
+							 unit, set, ifs);
 					if (fg != NULL)
 						f->fr_grp = &fg->fg_start;
 				}
@@ -4567,7 +4563,7 @@ caddr_t data;
 		}
 	}
 done:
-	RWLOCK_EXIT(&ipf_mutex);
+	RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
 	if ((ptr != NULL) && (error != 0) && (makecopy != 0)) {
 		KFREES(ptr, fp->fr_dsize);
 	}
@@ -4583,8 +4579,9 @@ done:
 /* If a rule is a call rule, then check if the function it points to needs  */
 /* an init function to be called now the rule has been loaded.              */
 /* ------------------------------------------------------------------------ */
-static int fr_funcinit(fr)
+static int fr_funcinit(fr, ifs)
 frentry_t *fr;
+ipf_stack_t *ifs;
 {
 	ipfunc_resolve_t *ft;
 	int err;
@@ -4595,7 +4592,7 @@ frentry_t *fr;
 		if (ft->ipfu_addr == fr->fr_func) {
 			err = 0;
 			if (ft->ipfu_init != NULL)
-				err = (*ft->ipfu_init)(fr);
+				err = (*ft->ipfu_init)(fr, ifs);
 			break;
 		}
 	return err;
@@ -4724,8 +4721,9 @@ ppsratecheck(lasttime, curpps, maxpps)
 /* Decrement the reference counter to a rule by one.  If it reaches zero,   */
 /* free it and any associated storage space being used by it.               */
 /* ------------------------------------------------------------------------ */
-int fr_derefrule(frp)
+int fr_derefrule(frp, ifs)
 frentry_t **frp;
+ipf_stack_t *ifs;
 {
 	frentry_t *fr;
 
@@ -4739,9 +4737,9 @@ frentry_t **frp;
 
 #ifdef IPFILTER_LOOKUP
 		if (fr->fr_type == FR_T_IPF && fr->fr_satype == FRI_LOOKUP)
-			ip_lookup_deref(fr->fr_srctype, fr->fr_srcptr);
+		    ip_lookup_deref(fr->fr_srctype, fr->fr_srcptr, ifs);
 		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP)
-			ip_lookup_deref(fr->fr_dsttype, fr->fr_dstptr);
+		    ip_lookup_deref(fr->fr_dsttype, fr->fr_dstptr, ifs);
 #endif
 
 		if (fr->fr_dsize) {
@@ -4769,8 +4767,9 @@ frentry_t **frp;
 /* Looks for group hash table fr_arg and stores a pointer to it in fr_ptr.  */
 /* fr_ptr is later used by fr_srcgrpmap and fr_dstgrpmap.                   */
 /* ------------------------------------------------------------------------ */
-static int fr_grpmapinit(fr)
+static int fr_grpmapinit(fr, ifs)
 frentry_t *fr;
+ipf_stack_t *ifs;
 {
 	char name[FR_GROUPLEN];
 	iphtable_t *iph;
@@ -4780,7 +4779,7 @@ frentry_t *fr;
 #else
 	(void) sprintf(name, "%d", fr->fr_arg);
 #endif
-	iph = fr_findhtable(IPL_LOGIPF, name);
+	iph = fr_findhtable(IPL_LOGIPF, name, ifs);
 	if (iph == NULL)
 		return ESRCH;
 	if ((iph->iph_flags & FR_INOUT) != (fr->fr_flags & FR_INOUT))
@@ -4806,8 +4805,9 @@ u_32_t *passp;
 {
 	frgroup_t *fg;
 	void *rval;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	rval = fr_iphmfindgroup(fin->fin_fr->fr_ptr, fin->fin_v, &fin->fin_src);
+	rval = fr_iphmfindgroup(fin->fin_fr->fr_ptr, fin->fin_v, &fin->fin_src, ifs);
 	if (rval == NULL)
 		return NULL;
 
@@ -4834,8 +4834,9 @@ u_32_t *passp;
 {
 	frgroup_t *fg;
 	void *rval;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	rval = fr_iphmfindgroup(fin->fin_fr->fr_ptr, fin->fin_v, &fin->fin_dst);
+	rval = fr_iphmfindgroup(fin->fin_fr->fr_ptr, fin->fin_v, &fin->fin_dst, ifs);
 	if (rval == NULL)
 		return NULL;
 
@@ -4874,16 +4875,17 @@ u_32_t *passp;
 /* It is assumed that the caller of this function has an appropriate lock   */
 /* held (exclusively) in the domain that encompases 'parent'.               */
 /* ------------------------------------------------------------------------ */
-ipftq_t *fr_addtimeoutqueue(parent, seconds)
+ipftq_t *fr_addtimeoutqueue(parent, seconds, ifs)
 ipftq_t **parent;
 u_int seconds;
+ipf_stack_t *ifs;
 {
 	ipftq_t *ifq;
 	u_int period;
 
 	period = seconds * IPF_HZ_DIVIDE;
 
-	MUTEX_ENTER(&ipf_timeoutlock);
+	MUTEX_ENTER(&ifs->ifs_ipf_timeoutlock);
 	for (ifq = *parent; ifq != NULL; ifq = ifq->ifq_next) {
 		if (ifq->ifq_ttl == period) {
 			/*
@@ -4894,7 +4896,7 @@ u_int seconds;
 			ifq->ifq_flags &= ~IFQF_DELETE;
 			ifq->ifq_ref++;
 			MUTEX_EXIT(&ifq->ifq_lock);
-			MUTEX_EXIT(&ipf_timeoutlock);
+			MUTEX_EXIT(&ifs->ifs_ipf_timeoutlock);
 
 			return ifq;
 		}
@@ -4910,11 +4912,11 @@ u_int seconds;
 		ifq->ifq_ref = 1;
 		ifq->ifq_flags = IFQF_USER;
 		*parent = ifq;
-		fr_userifqs++;
+		ifs->ifs_fr_userifqs++;
 		MUTEX_NUKE(&ifq->ifq_lock);
 		MUTEX_INIT(&ifq->ifq_lock, "ipftq mutex");
 	}
-	MUTEX_EXIT(&ipf_timeoutlock);
+	MUTEX_EXIT(&ifs->ifs_ipf_timeoutlock);
 	return ifq;
 }
 
@@ -4960,8 +4962,9 @@ ipftq_t *ifq;
 /* Remove a user definde timeout queue from the list of queues it is in and */
 /* tidy up after this is done.                                              */
 /* ------------------------------------------------------------------------ */
-void fr_freetimeoutqueue(ifq)
+void fr_freetimeoutqueue(ifq, ifs)
 ipftq_t *ifq;
+ipf_stack_t *ifs;
 {
 
 
@@ -4981,7 +4984,7 @@ ipftq_t *ifq;
 		ifq->ifq_next->ifq_pnext = ifq->ifq_pnext;
 
 	MUTEX_DESTROY(&ifq->ifq_lock);
-	fr_userifqs--;
+	ifs->ifs_fr_userifqs--;
 	KFREE(ifq);
 }
 
@@ -5065,15 +5068,16 @@ ipftqent_t *tqe;
 /*                                                                          */
 /* Move a queue entry to the back of the queue, if it isn't already there.  */
 /* ------------------------------------------------------------------------ */
-void fr_queueback(tqe)
+void fr_queueback(tqe, ifs)
 ipftqent_t *tqe;
+ipf_stack_t *ifs;
 {
 	ipftq_t *ifq;
 
 	ifq = tqe->tqe_ifq;
 	if (ifq == NULL)
 		return;
-	tqe->tqe_die = fr_ticks + ifq->ifq_ttl;
+	tqe->tqe_die = ifs->ifs_fr_ticks + ifq->ifq_ttl;
 
 	MUTEX_ENTER(&ifq->ifq_lock);
 	if (tqe->tqe_next == NULL) {		/* at the end already ? */
@@ -5107,10 +5111,11 @@ ipftqent_t *tqe;
 /*                                                                          */
 /* Add a new item to this queue and put it on the very end.                 */
 /* ------------------------------------------------------------------------ */
-void fr_queueappend(tqe, ifq, parent)
+void fr_queueappend(tqe, ifq, parent, ifs)
 ipftqent_t *tqe;
 ipftq_t *ifq;
 void *parent;
+ipf_stack_t *ifs;
 {
 
 	MUTEX_ENTER(&ifq->ifq_lock);
@@ -5120,7 +5125,7 @@ void *parent;
 	ifq->ifq_tail = &tqe->tqe_next;
 	tqe->tqe_next = NULL;
 	tqe->tqe_ifq = ifq;
-	tqe->tqe_die = fr_ticks + ifq->ifq_ttl;
+	tqe->tqe_die = ifs->ifs_fr_ticks + ifq->ifq_ttl;
 	ifq->ifq_ref++;
 	MUTEX_EXIT(&ifq->ifq_lock);
 }
@@ -5137,9 +5142,10 @@ void *parent;
 /* If it notices that the current entry is already last and does not need   */
 /* to move queue, the return.                                               */
 /* ------------------------------------------------------------------------ */
-void fr_movequeue(tqe, oifq, nifq)
+void fr_movequeue(tqe, oifq, nifq, ifs)
 ipftqent_t *tqe;
 ipftq_t *oifq, *nifq;
+ipf_stack_t *ifs;
 {
 	/*
 	 * Is the operation here going to be a no-op ?
@@ -5181,7 +5187,7 @@ ipftq_t *oifq, *nifq;
 	/*
 	 * Add to the bottom of the new queue
 	 */
-	tqe->tqe_die = fr_ticks + nifq->ifq_ttl;
+	tqe->tqe_die = ifs->ifs_fr_ticks + nifq->ifq_ttl;
 	tqe->tqe_pnext = nifq->ifq_tail;
 	*nifq->ifq_tail = tqe;
 	nifq->ifq_tail = &tqe->tqe_next;
@@ -5260,8 +5266,11 @@ char *buffer;
 	char *s;
 # endif
 
+	ASSERT(buffer != NULL);
+#ifdef notdef
 	if (buffer == NULL)
 		buffer = namebuf;
+#endif
 	(void) strncpy(buffer, ifp->if_name, LIFNAMSIZ);
 	buffer[LIFNAMSIZ - 1] = '\0';
 # if defined(MENTAT) || defined(__FreeBSD__) || defined(__osf__) || \
@@ -5297,10 +5306,11 @@ char *buffer;
 /* EIO if ipfilter is not running.   Also checks if write perms are req'd   */
 /* for the device in order to execute the ioctl.                            */
 /* ------------------------------------------------------------------------ */
-int fr_ioctlswitch(unit, data, cmd, mode)
-int unit, mode;
+INLINE int fr_ioctlswitch(unit, data, cmd, mode, uid, ctx, ifs)
+int unit, mode, uid;
 ioctlcmd_t cmd;
-void *data;
+void *data, *ctx;
+ipf_stack_t *ifs;
 {
 	int error = 0;
 
@@ -5310,53 +5320,53 @@ void *data;
 		error = -1;
 		break;
 	case IPL_LOGNAT :
-		if (fr_running > 0)
-			error = fr_nat_ioctl(data, cmd, mode);
+		if (ifs->ifs_fr_running > 0)
+			error = fr_nat_ioctl(data, cmd, mode, uid, ctx, ifs);
 		else
 			error = EIO;
 		break;
 	case IPL_LOGSTATE :
-		if (fr_running > 0)
-			error = fr_state_ioctl(data, cmd, mode);
+		if (ifs->ifs_fr_running > 0)
+			error = fr_state_ioctl(data, cmd, mode, uid, ctx, ifs);
 		else
 			error = EIO;
 		break;
 	case IPL_LOGAUTH :
-		if (fr_running > 0) {
+		if (ifs->ifs_fr_running > 0) {
 			if ((cmd == (ioctlcmd_t)SIOCADAFR) ||
 			    (cmd == (ioctlcmd_t)SIOCRMAFR)) {
 				if (!(mode & FWRITE)) {
 					error = EPERM;
 				} else {
 					error = frrequest(unit, cmd, data,
-							  fr_active, 1);
+						  ifs->ifs_fr_active, 1, ifs);
 				}
 			} else {
-				error = fr_auth_ioctl(data, cmd, mode);
+				error = fr_auth_ioctl(data, cmd, mode, uid, ctx, ifs);
 			}
 		} else
 			error = EIO;
 		break;
 	case IPL_LOGSYNC :
 #ifdef IPFILTER_SYNC
-		if (fr_running > 0)
-			error = fr_sync_ioctl(data, cmd, mode);
+		if (ifs->ifs_fr_running > 0)
+			error = fr_sync_ioctl(data, cmd, mode, ifs);
 		else
 #endif
 			error = EIO;
 		break;
 	case IPL_LOGSCAN :
 #ifdef IPFILTER_SCAN
-		if (fr_running > 0)
-			error = fr_scan_ioctl(data, cmd, mode);
+		if (ifs->ifs_fr_running > 0)
+			error = fr_scan_ioctl(data, cmd, mode, ifs);
 		else
 #endif
 			error = EIO;
 		break;
 	case IPL_LOGLOOKUP :
 #ifdef IPFILTER_LOOKUP
-		if (fr_running > 0)
-			error = ip_lookup_ioctl(data, cmd, mode);
+		if (ifs->ifs_fr_running > 0)
+			error = ip_lookup_ioctl(data, cmd, mode, uid, ctx, ifs);
 		else
 #endif
 			error = EIO;
@@ -5374,7 +5384,7 @@ void *data;
  * This array defines the expected size of objects coming into the kernel
  * for the various recognised object types.
  */
-#define	NUM_OBJ_TYPES	14
+#define	NUM_OBJ_TYPES	19
 
 static	int	fr_objbytes[NUM_OBJ_TYPES][2] = {
 	{ 1,	sizeof(struct frentry) },		/* frentry */
@@ -5390,7 +5400,12 @@ static	int	fr_objbytes[NUM_OBJ_TYPES][2] = {
 	{ 1,	sizeof(struct ipstate) },		/* ipstate */
 	{ 0,	sizeof(struct ips_stat) },
 	{ 0,	sizeof(struct frauth) },
-	{ 0,	sizeof(struct ipftune) }
+	{ 0,	sizeof(struct ipftune) },
+	{ 0,	sizeof(struct nat) },                   /* nat_t */
+	{ 0,	sizeof(struct ipfruleiter) },
+	{ 0,	sizeof(struct ipfgeniter) },
+	{ 0,	sizeof(struct ipftable) },
+	{ 0,	sizeof(struct ipflookupiter) }
 };
 
 
@@ -5615,13 +5630,14 @@ fr_info_t *fin;
 	u_short sum, hdrsum, *csump;
 	udphdr_t *udp;
 	int dosum;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
 	net_data_t net_data_p;
 	if (fin->fin_v == 4)
-		net_data_p = ipf_ipv4;
+		net_data_p = ifs->ifs_ipf_ipv4;
 	else
-		net_data_p = ipf_ipv6;
+		net_data_p = ifs->ifs_ipf_ipv6;
 #endif
 
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
@@ -5836,6 +5852,7 @@ ipftag_t *tag1, *tag2;
 int fr_coalesce(fin)
 fr_info_t *fin;
 {
+	ipf_stack_t *ifs = fin->fin_ifs;
 	if ((fin->fin_flx & FI_COALESCE) != 0)
 		return 1;
 
@@ -5848,7 +5865,7 @@ fr_info_t *fin;
 
 #if defined(_KERNEL)
 	if (fr_pullup(fin->fin_m, fin, fin->fin_plen) == NULL) {
-		ATOMIC_INCL(fr_badcoalesces[fin->fin_out]);
+		ATOMIC_INCL(ifs->ifs_fr_badcoalesces[fin->fin_out]);
 # ifdef MENTAT
 		FREE_MB_T(*fin->fin_mp);
 # endif
@@ -5865,7 +5882,7 @@ fr_info_t *fin;
 
 /*
  * The following table lists all of the tunable variables that can be
- * accessed via SIOCIPFGET/SIOCIPFSET/SIOCIPFGETNEXt.  The format of each row
+ * accessed via SIOCIPFGET/SIOCIPFSET/SIOCIPFGETNEXT.  The format of each row
  * in the table below is as follows:
  *
  * pointer to value, name of value, minimum, maximum, size of the value's
@@ -5876,111 +5893,204 @@ fr_info_t *fin;
  * The obvious implication is if neither of these are set then the value can be
  * changed at any time without harm.
  */
-ipftuneable_t ipf_tuneables[] = {
+ipftuneable_t lcl_ipf_tuneables[] = {
 	/* filtering */
-	{ { &fr_flags },	"fr_flags",		0,	0xffffffff,
-			sizeof(fr_flags),		0 },
-	{ { &fr_active },	"fr_active",		0,	0,
-			sizeof(fr_active),		IPFT_RDONLY },
-	{ { &fr_control_forwarding },	"fr_control_forwarding",	0, 1,
-			sizeof(fr_control_forwarding),	0 },
-	{ { &fr_update_ipid },	"fr_update_ipid",	0,	1,
-			sizeof(fr_update_ipid),		0 },
-	{ { &fr_chksrc },	"fr_chksrc",		0,	1,
-			sizeof(fr_chksrc),		0 },
-	{ { &fr_minttl },	"fr_minttl",		0,	1,
-			sizeof(fr_minttl),		0 },
-	{ { &fr_icmpminfragmtu }, "fr_icmpminfragmtu",	0,	1,
-			sizeof(fr_icmpminfragmtu),	0 },
-	{ { &fr_pass },		"fr_pass",		0,	0xffffffff,
-			sizeof(fr_pass),		0 },
+	{ { NULL },	"fr_flags",		0,	0xffffffff,
+			0,		0 },
+	{ { NULL },	"fr_active",		0,	0,
+			0,		IPFT_RDONLY },
+	{ { NULL },	"fr_control_forwarding",	0, 1,
+			0,		0 },
+	{ { NULL },	"fr_update_ipid",	0,	1,
+			0,		0 },
+	{ { NULL },	"fr_chksrc",		0,	1,
+			0,		0 },
+	{ { NULL },	"fr_minttl",		0,	1,
+			0,		0 },
+	{ { NULL }, 	"fr_icmpminfragmtu",	0,	1,
+			0,		0 },
+	{ { NULL },		"fr_pass",		0,	0xffffffff,
+			0,		0 },
 #if SOLARIS2 >= 10
-	{ { &ipf_loopback},	"ipf_loopback",		0,	1,
-			sizeof(ipf_loopback),		IPFT_WRDISABLED },
+	{ { NULL },	"ipf_loopback",		0,	1,
+			0,		IPFT_WRDISABLED },
 #endif
 	/* state */
-	{ { &fr_tcpidletimeout }, "fr_tcpidletimeout",	1,	0x7fffffff,
-			sizeof(fr_tcpidletimeout),	IPFT_WRDISABLED },
-	{ { &fr_tcpclosewait },	"fr_tcpclosewait",	1,	0x7fffffff,
-			sizeof(fr_tcpclosewait),	IPFT_WRDISABLED },
-	{ { &fr_tcplastack },	"fr_tcplastack",	1,	0x7fffffff,
-			sizeof(fr_tcplastack),		IPFT_WRDISABLED },
-	{ { &fr_tcptimeout },	"fr_tcptimeout",	1,	0x7fffffff,
-			sizeof(fr_tcptimeout),		IPFT_WRDISABLED },
-	{ { &fr_tcpclosed },	"fr_tcpclosed",		1,	0x7fffffff,
-			sizeof(fr_tcpclosed),		IPFT_WRDISABLED },
-	{ { &fr_tcphalfclosed }, "fr_tcphalfclosed",	1,	0x7fffffff,
-			sizeof(fr_tcphalfclosed),	IPFT_WRDISABLED },
-	{ { &fr_udptimeout },	"fr_udptimeout",	1,	0x7fffffff,
-			sizeof(fr_udptimeout),		IPFT_WRDISABLED },
-	{ { &fr_udpacktimeout }, "fr_udpacktimeout",	1,	0x7fffffff,
-			sizeof(fr_udpacktimeout),	IPFT_WRDISABLED },
-	{ { &fr_icmptimeout },	"fr_icmptimeout",	1,	0x7fffffff,
-			sizeof(fr_icmptimeout),		IPFT_WRDISABLED },
-	{ { &fr_icmpacktimeout }, "fr_icmpacktimeout",	1,	0x7fffffff,
-			sizeof(fr_icmpacktimeout),	IPFT_WRDISABLED },
-	{ { &fr_iptimeout }, "fr_iptimeout",		1,	0x7fffffff,
-			sizeof(fr_iptimeout),		IPFT_WRDISABLED },
-	{ { &fr_statemax },	"fr_statemax",		1,	0x7fffffff,
-			sizeof(fr_statemax),		0 },
-	{ { &fr_statesize },	"fr_statesize",		1,	0x7fffffff,
-			sizeof(fr_statesize),		IPFT_WRDISABLED },
-	{ { &fr_state_lock },	"fr_state_lock",	0,	1,
-			sizeof(fr_state_lock),		IPFT_RDONLY },
-	{ { &fr_state_maxbucket }, "fr_state_maxbucket", 1,	0x7fffffff,
-			sizeof(fr_state_maxbucket),	IPFT_WRDISABLED },
-	{ { &fr_state_maxbucket_reset }, "fr_state_maxbucket_reset",	0, 1,
-			sizeof(fr_state_maxbucket_reset), IPFT_WRDISABLED },
-	{ { &ipstate_logging },	"ipstate_logging",	0,	1,
-			sizeof(ipstate_logging),	0 },
+	{ { NULL }, "fr_tcpidletimeout",	1,	0x7fffffff,
+			0,	IPFT_WRDISABLED },
+	{ { NULL },	"fr_tcpclosewait",	1,	0x7fffffff,
+			0,	IPFT_WRDISABLED },
+	{ { NULL },	"fr_tcplastack",	1,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
+	{ { NULL },	"fr_tcptimeout",	1,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
+	{ { NULL },	"fr_tcpclosed",		1,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
+	{ { NULL },	"fr_tcphalfclosed",	1,	0x7fffffff,
+			0,	IPFT_WRDISABLED },
+	{ { NULL },	"fr_udptimeout",	1,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
+	{ { NULL }, "fr_udpacktimeout",	1,	0x7fffffff,
+			0,	IPFT_WRDISABLED },
+	{ { NULL },	"fr_icmptimeout",	1,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
+	{ { NULL }, "fr_icmpacktimeout",	1,	0x7fffffff,
+			0,	IPFT_WRDISABLED },
+	{ { NULL }, "fr_iptimeout",		1,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
+	{ { NULL },	"fr_statemax",		1,	0x7fffffff,
+			0,		0 },
+	{ { NULL },	"fr_statesize",		1,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
+	{ { NULL },	"fr_state_lock",	0,	1,
+			0,		IPFT_RDONLY },
+	{ { NULL }, "fr_state_maxbucket", 1,	0x7fffffff,
+			0,	IPFT_WRDISABLED },
+	{ { NULL }, "fr_state_maxbucket_reset",	0, 1,
+			0, IPFT_WRDISABLED },
+	{ { NULL },	"ipstate_logging",	0,	1,
+			0,	0 },
 	/* nat */
-	{ { &fr_nat_lock },		"fr_nat_lock",		0,	1,
-			sizeof(fr_nat_lock),		IPFT_RDONLY },
-	{ { &ipf_nattable_sz },	"ipf_nattable_sz",	1,	0x7fffffff,
-			sizeof(ipf_nattable_sz),	IPFT_WRDISABLED },
-	{ { &ipf_nattable_max }, "ipf_nattable_max",	1,	0x7fffffff,
-			sizeof(ipf_nattable_max),	0 },
-	{ { &ipf_natrules_sz },	"ipf_natrules_sz",	1,	0x7fffffff,
-			sizeof(ipf_natrules_sz),	IPFT_WRDISABLED },
-	{ { &ipf_rdrrules_sz },	"ipf_rdrrules_sz",	1,	0x7fffffff,
-			sizeof(ipf_rdrrules_sz),	IPFT_WRDISABLED },
-	{ { &ipf_hostmap_sz },	"ipf_hostmap_sz",	1,	0x7fffffff,
-			sizeof(ipf_hostmap_sz),		IPFT_WRDISABLED },
-	{ { &fr_nat_maxbucket }, "fr_nat_maxbucket",	1,	0x7fffffff,
-			sizeof(fr_nat_maxbucket),	IPFT_WRDISABLED },
-	{ { &fr_nat_maxbucket_reset },	"fr_nat_maxbucket_reset",	0, 1,
-			sizeof(fr_nat_maxbucket_reset),	IPFT_WRDISABLED },
-	{ { &nat_logging },		"nat_logging",		0,	1,
-			sizeof(nat_logging),		0 },
-	{ { &fr_defnatage },	"fr_defnatage",		1,	0x7fffffff,
-			sizeof(fr_defnatage),		IPFT_WRDISABLED },
-	{ { &fr_defnatipage },	"fr_defnatipage",	1,	0x7fffffff,
-			sizeof(fr_defnatipage),		IPFT_WRDISABLED },
-	{ { &fr_defnaticmpage }, "fr_defnaticmpage",	1,	0x7fffffff,
-			sizeof(fr_defnaticmpage),	IPFT_WRDISABLED },
+	{ { NULL },		"fr_nat_lock",		0,	1,
+			0,		IPFT_RDONLY },
+	{ { NULL },	"ipf_nattable_sz",	1,	0x7fffffff,
+			0,	IPFT_WRDISABLED },
+	{ { NULL }, "ipf_nattable_max",	1,	0x7fffffff,
+			0,	0 },
+	{ { NULL },	"ipf_natrules_sz",	1,	0x7fffffff,
+			0,	IPFT_WRDISABLED },
+	{ { NULL },	"ipf_rdrrules_sz",	1,	0x7fffffff,
+			0,	IPFT_WRDISABLED },
+	{ { NULL },	"ipf_hostmap_sz",	1,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
+	{ { NULL }, "fr_nat_maxbucket",	1,	0x7fffffff,
+			0,	IPFT_WRDISABLED },
+	{ { NULL },	"fr_nat_maxbucket_reset",	0, 1,
+			0,	IPFT_WRDISABLED },
+	{ { NULL },		"nat_logging",		0,	1,
+			0,		0 },
+	{ { NULL },	"fr_defnatage",		1,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
+	{ { NULL },	"fr_defnatipage",	1,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
+	{ { NULL }, "fr_defnaticmpage",	1,	0x7fffffff,
+			0,	IPFT_WRDISABLED },
 	/* frag */
-	{ { &ipfr_size },	"ipfr_size",		1,	0x7fffffff,
-			sizeof(ipfr_size),		IPFT_WRDISABLED },
-	{ { &fr_ipfrttl },	"fr_ipfrttl",		1,	0x7fffffff,
-			sizeof(fr_ipfrttl),		IPFT_WRDISABLED },
+	{ { NULL },	"ipfr_size",		1,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
+	{ { NULL },	"fr_ipfrttl",		1,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
 #ifdef IPFILTER_LOG
 	/* log */
-	{ { &ipl_suppress },	"ipl_suppress",		0,	1,
-			sizeof(ipl_suppress),		0 },
-	{ { &ipl_buffer_sz },	"ipl_buffer_sz",	0,	0,
-			sizeof(ipl_buffer_sz),		IPFT_RDONLY },
-	{ { &ipl_logmax },	"ipl_logmax",		0,	0x7fffffff,
-			sizeof(ipl_logmax),		IPFT_WRDISABLED },
-	{ { &ipl_logall },	"ipl_logall",		0,	1,
-			sizeof(ipl_logall),		0 },
-	{ { &ipl_logsize },	"ipl_logsize",		0,	0x80000,
-			sizeof(ipl_logsize),		0 },
+	{ { NULL },	"ipl_suppress",		0,	1,
+			0,		0 },
+	{ { NULL },	"ipl_buffer_sz",	0,	0,
+			0,		IPFT_RDONLY },
+	{ { NULL },	"ipl_logmax",		0,	0x7fffffff,
+			0,		IPFT_WRDISABLED },
+	{ { NULL },	"ipl_logall",		0,	1,
+			0,		0 },
+	{ { NULL },	"ipl_logsize",		0,	0x80000,
+			0,		0 },
 #endif
 	{ { NULL },		NULL,			0,	0 }
 };
 
-static ipftuneable_t *ipf_tunelist = NULL;
+static ipftuneable_t *
+tune_lookup(ipf_stack_t *ifs, char *name)
+{
+    int i;
 
+    for (i = 0; ifs->ifs_ipf_tuneables[i].ipft_name != NULL; i++) {
+	if (strcmp(ifs->ifs_ipf_tuneables[i].ipft_name, name) == 0)
+	    return (&ifs->ifs_ipf_tuneables[i]);
+    }
+    return (NULL);
+}
+
+#ifdef _KERNEL
+extern dev_info_t *ipf_dev_info;
+extern int ipf_property_update __P((dev_info_t *, ipf_stack_t *));
+#endif
+/*
+ * Allocate a per-stack tuneable and copy in the names. Then
+ * set it to point to each of the per-stack tunables.
+ */
+void
+ipftuneable_alloc(ipf_stack_t *ifs)
+{
+    ipftuneable_t *item;
+
+    KMALLOCS(ifs->ifs_ipf_tuneables, ipftuneable_t *,
+	sizeof (lcl_ipf_tuneables));
+    bcopy(lcl_ipf_tuneables, ifs->ifs_ipf_tuneables,
+	sizeof (lcl_ipf_tuneables));
+
+#define TUNE_SET(_ifs, _name, _field)			\
+    item = tune_lookup((_ifs), (_name));		\
+    if (item != NULL) {					\
+	item->ipft_una.ipftp_int = (unsigned int *)&((_ifs)->_field);	\
+	item->ipft_sz = sizeof ((_ifs)->_field);	\
+    }
+
+    TUNE_SET(ifs, "fr_flags", ifs_fr_flags);
+    TUNE_SET(ifs, "fr_active", ifs_fr_active);
+    TUNE_SET(ifs, "fr_control_forwarding", ifs_fr_control_forwarding);
+    TUNE_SET(ifs, "fr_update_ipid", ifs_fr_update_ipid);
+    TUNE_SET(ifs, "fr_chksrc", ifs_fr_chksrc);
+    TUNE_SET(ifs, "fr_minttl", ifs_fr_minttl);
+    TUNE_SET(ifs, "fr_icmpminfragmtu", ifs_fr_icmpminfragmtu);
+    TUNE_SET(ifs, "fr_pass", ifs_fr_pass);
+    TUNE_SET(ifs, "fr_tcpidletimeout", ifs_fr_tcpidletimeout);
+    TUNE_SET(ifs, "fr_tcpclosewait", ifs_fr_tcpclosewait);
+    TUNE_SET(ifs, "fr_tcplastack", ifs_fr_tcplastack);
+    TUNE_SET(ifs, "fr_tcptimeout", ifs_fr_tcptimeout);
+    TUNE_SET(ifs, "fr_tcpclosed", ifs_fr_tcpclosed);
+    TUNE_SET(ifs, "fr_tcphalfclosed", ifs_fr_tcphalfclosed);
+    TUNE_SET(ifs, "fr_udptimeout", ifs_fr_udptimeout);
+    TUNE_SET(ifs, "fr_udpacktimeout", ifs_fr_udpacktimeout);
+    TUNE_SET(ifs, "fr_icmptimeout", ifs_fr_icmptimeout);
+    TUNE_SET(ifs, "fr_icmpacktimeout", ifs_fr_icmpacktimeout);
+    TUNE_SET(ifs, "fr_iptimeout", ifs_fr_iptimeout);
+    TUNE_SET(ifs, "fr_statemax", ifs_fr_statemax);
+    TUNE_SET(ifs, "fr_statesize", ifs_fr_statesize);
+    TUNE_SET(ifs, "fr_state_lock", ifs_fr_state_lock);
+    TUNE_SET(ifs, "fr_state_maxbucket", ifs_fr_state_maxbucket);
+    TUNE_SET(ifs, "fr_state_maxbucket_reset", ifs_fr_state_maxbucket_reset);
+    TUNE_SET(ifs, "ipstate_logging", ifs_ipstate_logging);
+    TUNE_SET(ifs, "fr_nat_lock", ifs_fr_nat_lock);
+    TUNE_SET(ifs, "ipf_nattable_sz", ifs_ipf_nattable_sz);
+    TUNE_SET(ifs, "ipf_nattable_max", ifs_ipf_nattable_max);
+    TUNE_SET(ifs, "ipf_natrules_sz", ifs_ipf_natrules_sz);
+    TUNE_SET(ifs, "ipf_rdrrules_sz", ifs_ipf_rdrrules_sz);
+    TUNE_SET(ifs, "ipf_hostmap_sz", ifs_ipf_hostmap_sz);
+    TUNE_SET(ifs, "fr_nat_maxbucket", ifs_fr_nat_maxbucket);
+    TUNE_SET(ifs, "fr_nat_maxbucket_reset", ifs_fr_nat_maxbucket_reset);
+    TUNE_SET(ifs, "nat_logging", ifs_nat_logging);
+    TUNE_SET(ifs, "fr_defnatage", ifs_fr_defnatage);
+    TUNE_SET(ifs, "fr_defnaticmpage", ifs_fr_defnaticmpage);
+    TUNE_SET(ifs, "ipfr_size", ifs_ipfr_size);
+    TUNE_SET(ifs, "fr_ipfrttl", ifs_fr_ipfrttl);
+#ifdef IPFILTER_LOG
+    TUNE_SET(ifs, "ipl_suppress", ifs_ipl_suppress);
+    TUNE_SET(ifs, "ipl_buffer_sz", ifs_ipl_buffer_sz);
+    TUNE_SET(ifs, "ipl_logmax", ifs_ipl_logmax);
+    TUNE_SET(ifs, "ipl_logall", ifs_ipl_logall);
+    TUNE_SET(ifs, "ipl_logsize", ifs_ipl_logsize);
+#endif
+#undef TUNE_SET
+
+#ifdef _KERNEL
+    (void) ipf_property_update(ipf_dev_info, ifs);
+#endif
+}
+
+void
+ipftuneable_free(ipf_stack_t *ifs)
+{
+	KFREES(ifs->ifs_ipf_tuneables, sizeof (lcl_ipf_tuneables));
+	ifs->ifs_ipf_tuneables = NULL;
+}
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_findtunebycookie                                         */
@@ -5994,12 +6104,13 @@ static ipftuneable_t *ipf_tunelist = NULL;
 /* a matching value for "cookie" - ie its address.  When returning a match, */
 /* the next one to be found may be returned inside next.                    */
 /* ------------------------------------------------------------------------ */
-static ipftuneable_t *fr_findtunebycookie(cookie, next)
+static ipftuneable_t *fr_findtunebycookie(cookie, next, ifs)
 void *cookie, **next;
+ipf_stack_t * ifs;
 {
 	ipftuneable_t *ta, **tap;
 
-	for (ta = ipf_tuneables; ta->ipft_name != NULL; ta++)
+	for (ta = ifs->ifs_ipf_tuneables; ta->ipft_name != NULL; ta++)
 		if (ta == cookie) {
 			if (next != NULL) {
 				/*
@@ -6013,12 +6124,12 @@ void *cookie, **next;
 				if ((ta + 1)->ipft_name != NULL)
 					*next = ta + 1;
 				else
-					*next = &ipf_tunelist;
+					*next = &ifs->ifs_ipf_tunelist;
 			}
 			return ta;
 		}
 
-	for (tap = &ipf_tunelist; (ta = *tap) != NULL; tap = &ta->ipft_next)
+	for (tap = &ifs->ifs_ipf_tunelist; (ta = *tap) != NULL; tap = &ta->ipft_next)
 		if (tap == cookie) {
 			if (next != NULL)
 				*next = &ta->ipft_next;
@@ -6040,17 +6151,18 @@ void *cookie, **next;
 /* for an entry with a matching name.  If we can find one, return a pointer */
 /* to the matching structure.                                               */
 /* ------------------------------------------------------------------------ */
-static ipftuneable_t *fr_findtunebyname(name)
+static ipftuneable_t *fr_findtunebyname(name, ifs)
 const char *name;
+ipf_stack_t *ifs;
 {
 	ipftuneable_t *ta;
 
-	for (ta = ipf_tuneables; ta->ipft_name != NULL; ta++)
+	for (ta = ifs->ifs_ipf_tuneables; ta->ipft_name != NULL; ta++)
 		if (!strcmp(ta->ipft_name, name)) {
 			return ta;
 		}
 
-	for (ta = ipf_tunelist; ta != NULL; ta = ta->ipft_next)
+	for (ta = ifs->ifs_ipf_tunelist; ta != NULL; ta = ta->ipft_next)
 		if (!strcmp(ta->ipft_name, name)) {
 			return ta;
 		}
@@ -6068,16 +6180,17 @@ const char *name;
 /* current list of "dynamic" tuneable parameters.  Once added, the owner    */
 /* of the object is not expected to ever change "ipft_next".                */
 /* ------------------------------------------------------------------------ */
-int fr_addipftune(newtune)
+int fr_addipftune(newtune, ifs)
 ipftuneable_t *newtune;
+ipf_stack_t *ifs;
 {
 	ipftuneable_t *ta, **tap;
 
-	ta = fr_findtunebyname(newtune->ipft_name);
+	ta = fr_findtunebyname(newtune->ipft_name, ifs);
 	if (ta != NULL)
 		return EEXIST;
 
-	for (tap = &ipf_tunelist; *tap != NULL; tap = &(*tap)->ipft_next)
+	for (tap = &ifs->ifs_ipf_tunelist; *tap != NULL; tap = &(*tap)->ipft_next)
 		;
 
 	newtune->ipft_next = NULL;
@@ -6096,12 +6209,13 @@ ipftuneable_t *newtune;
 /* dynamically added at run time.  If found, adjust the list so that this   */
 /* structure is no longer part of it.                                       */
 /* ------------------------------------------------------------------------ */
-int fr_delipftune(oldtune)
+int fr_delipftune(oldtune, ifs)
 ipftuneable_t *oldtune;
+ipf_stack_t *ifs;
 {
 	ipftuneable_t *ta, **tap;
 
-	for (tap = &ipf_tunelist; (ta = *tap) != NULL; tap = &ta->ipft_next)
+	for (tap = &ifs->ifs_ipf_tunelist; (ta = *tap) != NULL; tap = &ta->ipft_next)
 		if (ta == oldtune) {
 			*tap = oldtune->ipft_next;
 			oldtune->ipft_next = NULL;
@@ -6125,9 +6239,10 @@ ipftuneable_t *oldtune;
 /* and 'destruction' routines of the various components of ipfilter are all */
 /* each responsible for handling their own values being too big.            */
 /* ------------------------------------------------------------------------ */
-int fr_ipftune(cmd, data)
+int fr_ipftune(cmd, data, ifs)
 ioctlcmd_t cmd;
 void *data;
+ipf_stack_t *ifs;
 {
 	ipftuneable_t *ta;
 	ipftune_t tu;
@@ -6155,9 +6270,9 @@ void *data;
 		 * at the front of the list.
 		 */
 		if (cookie != NULL) {
-			ta = fr_findtunebycookie(cookie, &tu.ipft_cookie);
+			ta = fr_findtunebycookie(cookie, &tu.ipft_cookie, ifs);
 		} else {
-			ta = ipf_tuneables;
+			ta = ifs->ifs_ipf_tuneables;
 			tu.ipft_cookie = ta + 1;
 		}
 		if (ta != NULL) {
@@ -6197,11 +6312,11 @@ void *data;
 		 */
 		error = ESRCH;
 		if (cookie != NULL) {
-			ta = fr_findtunebycookie(cookie, NULL);
+			ta = fr_findtunebycookie(cookie, NULL, ifs);
 			if (ta != NULL)
 				error = 0;
 		} else if (tu.ipft_name[0] != '\0') {
-			ta = fr_findtunebyname(tu.ipft_name);
+			ta = fr_findtunebyname(tu.ipft_name, ifs);
 			if (ta != NULL)
 				error = 0;
 		}
@@ -6237,7 +6352,7 @@ void *data;
 			u_long in;
 
 			if (((ta->ipft_flags & IPFT_WRDISABLED) != 0) &&
-			    (fr_running > 0)) {
+			    (ifs->ifs_fr_running > 0)) {
 				error = EBUSY;
 				break;
 			}
@@ -6283,52 +6398,53 @@ void *data;
 /* of IPFilter.  If any of them should fail, return immeadiately a failure  */
 /* BUT do not try to recover from the error here.                           */
 /* ------------------------------------------------------------------------ */
-int fr_initialise()
+int fr_initialise(ifs)
+ipf_stack_t *ifs;
 {
 	int i;
 
 #ifdef IPFILTER_LOG
-	i = fr_loginit();
+	i = fr_loginit(ifs);
 	if (i < 0)
 		return -10 + i;
 #endif
-	i = fr_natinit();
+	i = fr_natinit(ifs);
 	if (i < 0)
 		return -20 + i;
 
-	i = fr_stateinit();
+	i = fr_stateinit(ifs);
 	if (i < 0)
 		return -30 + i;
 
-	i = fr_authinit();
+	i = fr_authinit(ifs);
 	if (i < 0)
 		return -40 + i;
 
-	i = fr_fraginit();
+	i = fr_fraginit(ifs);
 	if (i < 0)
 		return -50 + i;
 
-	i = appr_init();
+	i = appr_init(ifs);
 	if (i < 0)
 		return -60 + i;
 
 #ifdef IPFILTER_SYNC
-	i = ipfsync_init();
+	i = ipfsync_init(ifs);
 	if (i < 0)
 		return -70 + i;
 #endif
 #ifdef IPFILTER_SCAN
-	i = ipsc_init();
+	i = ipsc_init(ifs);
 	if (i < 0)
 		return -80 + i;
 #endif
 #ifdef IPFILTER_LOOKUP
-	i = ip_lookup_init();
+	i = ip_lookup_init(ifs);
 	if (i < 0)
 		return -90 + i;
 #endif
 #ifdef IPFILTER_COMPILED
-	ipfrule_add();
+	ipfrule_add(ifs);
 #endif
 	return 0;
 }
@@ -6344,32 +6460,33 @@ int fr_initialise()
 /* The order here IS important as there are some cross references of        */
 /* internal data structures.                                                */
 /* ------------------------------------------------------------------------ */
-void fr_deinitialise()
+void fr_deinitialise(ifs)
+ipf_stack_t *ifs;
 {
-	fr_fragunload();
-	fr_authunload();
-	fr_natunload();
-	fr_stateunload();
+	fr_fragunload(ifs);
+	fr_authunload(ifs);
+	fr_natunload(ifs);
+	fr_stateunload(ifs);
 #ifdef IPFILTER_SCAN
-	fr_scanunload();
+	fr_scanunload(ifs);
 #endif
-	appr_unload();
+	appr_unload(ifs);
 
 #ifdef IPFILTER_COMPILED
-	ipfrule_remove();
+	ipfrule_remove(ifs);
 #endif
 
-	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE);
-	(void) frflush(IPL_LOGCOUNT, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(IPL_LOGCOUNT, 0, FR_INQUE|FR_OUTQUE);
+	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE, ifs);
+	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE, ifs);
+	(void) frflush(IPL_LOGCOUNT, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE, ifs);
+	(void) frflush(IPL_LOGCOUNT, 0, FR_INQUE|FR_OUTQUE, ifs);
 
 #ifdef IPFILTER_LOOKUP
-	ip_lookup_unload();
+	ip_lookup_unload(ifs);
 #endif
 
 #ifdef IPFILTER_LOG
-	fr_logunload();
+	fr_logunload(ifs);
 #endif
 }
 
@@ -6383,20 +6500,21 @@ void fr_deinitialise()
 /* current ones in the kernel. The lock is only held across the bzero() as  */
 /* the copyout may result in paging (ie network activity.)                  */
 /* ------------------------------------------------------------------------ */
-int	fr_zerostats(data)
+int	fr_zerostats(data, ifs)
 caddr_t	data;
+ipf_stack_t *ifs;
 {
 	friostat_t fio;
 	int error;
 
-	fr_getstat(&fio);
+	fr_getstat(&fio, ifs);
 	error = copyoutptr(&fio, data, sizeof(fio));
 	if (error)
 		return EFAULT;
 
-	WRITE_ENTER(&ipf_mutex);
-	bzero((char *)frstats, sizeof(*frstats) * 2);
-	RWLOCK_EXIT(&ipf_mutex);
+	WRITE_ENTER(&ifs->ifs_ipf_mutex);
+	bzero((char *)ifs->ifs_frstats, sizeof(*ifs->ifs_frstats) * 2);
+	RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
 
 	return 0;
 }
@@ -6415,14 +6533,15 @@ caddr_t	data;
 /* found, then set the interface pointer to be -1 as NULL is considered to  */
 /* indicate there is no information at all in the structure.                */
 /* ------------------------------------------------------------------------ */
-void fr_resolvedest(fdp, v)
+void fr_resolvedest(fdp, v, ifs)
 frdest_t *fdp;
 int v;
+ipf_stack_t *ifs;
 {
 	fdp->fd_ifp = NULL;
 
   	if (*fdp->fd_ifname != '\0') {
- 		fdp->fd_ifp = GETIFP(fdp->fd_ifname, v);
+ 		fdp->fd_ifp = GETIFP(fdp->fd_ifname, v, ifs);
 		if (fdp->fd_ifp == NULL)
 			fdp->fd_ifp = (void *)-1;
 	}
@@ -6452,9 +6571,10 @@ int v;
 /* NOTE: This SHOULD ONLY be used with IPFilter structures that have an     */
 /*       array for the name that is LIFNAMSIZ bytes (at least) in length.   */
 /* ------------------------------------------------------------------------ */
-void *fr_resolvenic(name, v)
+void *fr_resolvenic(name, v, ifs)
 char *name;
 int v;
+ipf_stack_t *ifs;
 {
 	void *nic;
 
@@ -6467,8 +6587,303 @@ int v;
 
 	name[LIFNAMSIZ - 1] = '\0';
 
-	nic = GETIFP(name, v);
+	nic = GETIFP(name, v, ifs);
 	if (nic == NULL)
 		nic = (void *)-1;
 	return nic;
+}
+
+void ipf_expiretokens(ifs)
+ipf_stack_t *ifs;
+{
+	ipftoken_t *it;
+
+	WRITE_ENTER(&ifs->ifs_ipf_tokens);
+	while ((it = ifs->ifs_ipftokenhead) != NULL) {
+		if (it->ipt_die > ifs->ifs_fr_ticks)
+			break;
+
+		ipf_freetoken(it, ifs);
+	}
+	RWLOCK_EXIT(&ifs->ifs_ipf_tokens);
+}
+
+
+int ipf_deltoken(type, uid, ptr, ifs)
+int type, uid;
+void *ptr;
+ipf_stack_t *ifs;
+{
+	ipftoken_t *it;
+	int error = ESRCH;
+
+	WRITE_ENTER(&ifs->ifs_ipf_tokens);
+	for (it = ifs->ifs_ipftokenhead; it != NULL; it = it->ipt_next)
+		if (ptr == it->ipt_ctx && type == it->ipt_type &&
+		    uid == it->ipt_uid) {
+			ipf_freetoken(it, ifs);
+			error = 0;
+			break;
+	}
+	RWLOCK_EXIT(&ifs->ifs_ipf_tokens);
+
+	return error;
+}
+
+static void ipf_unlinktoken(token, ifs)
+ipftoken_t *token;
+ipf_stack_t *ifs;
+{
+
+	if (ifs->ifs_ipftokentail == &token->ipt_next)
+		ifs->ifs_ipftokentail = token->ipt_pnext;
+
+	*token->ipt_pnext = token->ipt_next;
+	if (token->ipt_next != NULL)
+		token->ipt_next->ipt_pnext = token->ipt_pnext;
+}
+
+
+
+ipftoken_t *ipf_findtoken(type, uid, ptr, ifs)
+int type, uid;
+void *ptr;
+ipf_stack_t *ifs;
+{
+	ipftoken_t *it, *new;
+
+	KMALLOC(new, ipftoken_t *);
+
+	WRITE_ENTER(&ifs->ifs_ipf_tokens);
+	for (it = ifs->ifs_ipftokenhead; it != NULL; it = it->ipt_next) {
+		if (it->ipt_alive == 0)
+			continue;
+		if (ptr == it->ipt_ctx && type == it->ipt_type &&
+		    uid == it->ipt_uid)
+			break;
+	}
+
+	if (it == NULL) {
+		it = new;
+		new = NULL;
+		if (it == NULL)
+			return NULL;
+		it->ipt_data = NULL;
+		it->ipt_ctx = ptr;
+		it->ipt_uid = uid;
+		it->ipt_type = type;
+		it->ipt_next = NULL;
+		it->ipt_alive = 1;
+	} else {
+		if (new != NULL) {
+			KFREE(new);
+			new = NULL;
+		}
+
+		ipf_unlinktoken(it, ifs);
+	}
+	it->ipt_pnext = ifs->ifs_ipftokentail;
+	*ifs->ifs_ipftokentail = it;
+	ifs->ifs_ipftokentail = &it->ipt_next;
+	it->ipt_next = NULL;
+
+	/* XXX: more needed */
+	it->ipt_die = ifs->ifs_fr_ticks + 2;
+
+	MUTEX_DOWNGRADE(&ifs->ifs_ipf_tokens);
+
+	return it;
+}
+
+
+void ipf_freetoken(token, ifs)
+ipftoken_t *token;
+ipf_stack_t *ifs;
+{
+	void *data;
+
+	ipf_unlinktoken(token, ifs);
+
+	data = token->ipt_data;
+
+	if ((data != NULL) && (data != (void *)-1)) {
+		switch (token->ipt_type)
+		{
+		case IPFGENITER_IPF :
+			(void)fr_derefrule((frentry_t **)&data, ifs);
+			break;
+		case IPFGENITER_IPNAT :
+			WRITE_ENTER(&ifs->ifs_ipf_nat);
+			fr_ipnatderef((ipnat_t **)&data, ifs);
+			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+			break;
+		case IPFGENITER_NAT :
+			fr_natderef((nat_t **)&data, ifs);
+			break;
+		case IPFGENITER_STATE :
+			fr_statederef(NULL, (ipstate_t **)&data, ifs);
+			break;
+		case IPFGENITER_FRAG :
+			fr_fragderef((ipfr_t **)&data, &ifs->ifs_ipf_frag, ifs);
+			break;
+		case IPFGENITER_NATFRAG :
+ 			fr_fragderef((ipfr_t **)&data, &ifs->ifs_ipf_natfrag, ifs);
+			break;
+		case IPFGENITER_HOSTMAP :
+			fr_hostmapderef((hostmap_t **)&data);
+			break;
+		default :
+			(void) ip_lookup_iterderef(token->ipt_type, data, ifs);
+			break;
+		}
+	}
+
+	KFREE(token);
+}
+
+int ipf_getnextrule(ipftoken_t *t, void *ptr, ipf_stack_t *ifs)
+{
+	frentry_t *fr, *next, zero;
+	ipfruleiter_t it;
+	frgroup_t *fg;
+	int error;
+
+	if (t == NULL || ptr == NULL)
+		return EFAULT;
+	error = fr_inobj(ptr, &it, IPFOBJ_IPFITER);
+	if (error != 0)
+		return error;
+	if ((it.iri_ver != AF_INET) && (it.iri_ver != AF_INET6))
+		return EINVAL;
+	if ((it.iri_inout != 0) && (it.iri_inout != 1))
+		return EINVAL;
+	if ((it.iri_active != 0) && (it.iri_active != 1))
+		return EINVAL;
+	if (it.iri_rule == NULL)
+		return EFAULT;
+
+	fr = t->ipt_data;
+	READ_ENTER(&ifs->ifs_ipf_mutex);
+	if (fr == NULL) {
+		if (*it.iri_group == '\0') {
+			if (it.iri_ver == AF_INET)
+				next = ifs->ifs_ipfilter
+				    [it.iri_inout][it.iri_active];
+			else
+				next = ifs->ifs_ipfilter6
+				    [it.iri_inout][it.iri_active];
+		} else {
+			fg = fr_findgroup(it.iri_group, IPL_LOGIPF,
+					  it.iri_active, NULL, ifs);
+			if (fg != NULL)
+				next = fg->fg_start;
+			else
+				next = NULL;
+		}
+	} else {
+		next = fr->fr_next;
+	}
+
+	if (next != NULL) {
+		if (next->fr_next == NULL) {
+			t->ipt_alive = 0;
+			/*ipf_freetoken(t, ifs);
+			fr = NULL; */
+		} else {
+			MUTEX_ENTER(&next->fr_lock);
+			next->fr_ref++;
+			MUTEX_EXIT(&next->fr_lock);
+		}
+		t->ipt_data = next;
+	} else {
+		bzero(&zero, sizeof(zero));
+		next = &zero;
+		ipf_freetoken(t, ifs);
+		fr = NULL;
+	}
+	RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
+
+	if (fr != NULL) {
+		(void)fr_derefrule(&fr, ifs);
+	}
+
+	error = COPYOUT(next, it.iri_rule, sizeof(*next));
+	if (error != 0)
+		return EFAULT;
+
+	if (next->fr_data != NULL) {
+		error = COPYOUT(next->fr_data,
+				(char *)it.iri_rule + sizeof(*next),
+				next->fr_dsize);
+		if (error != 0)
+			error = EFAULT;
+	}
+
+	return error;
+}
+
+
+int ipf_frruleiter(data, uid, ctx, ifs)
+void *data, *ctx;
+int uid;
+ipf_stack_t *ifs;
+{
+	ipftoken_t *token;
+	int error;
+
+	token = ipf_findtoken(IPFGENITER_IPF, uid, ctx, ifs);
+	if (token != NULL)
+		error = ipf_getnextrule(token, data, ifs);
+	else
+		error = EFAULT;
+	RWLOCK_EXIT(&ifs->ifs_ipf_tokens);
+
+	return error;
+}
+
+
+int ipf_geniter(token, itp, ifs)
+ipftoken_t *token;
+ipfgeniter_t *itp;
+ipf_stack_t *ifs;
+{
+	int error;
+
+	switch (itp->igi_type)
+	{
+	case IPFGENITER_FRAG :
+		error = fr_nextfrag(token, itp, &ifs->ifs_ipfr_list,
+				    &ifs->ifs_ipfr_tail, &ifs->ifs_ipf_frag, ifs);
+		break;
+	default :
+		error = EINVAL;
+		break;
+	}
+
+	return error;
+}
+
+
+int ipf_genericiter(data, uid, ctx, ifs)
+void *data, *ctx;
+int uid;
+ipf_stack_t *ifs;
+{
+	ipftoken_t *token;
+	ipfgeniter_t iter;
+	int error;
+
+	error = fr_inobj(data, &iter, IPFOBJ_GENITER);
+	if (error != 0)
+		return error;
+
+	token = ipf_findtoken(iter.igi_type, uid, ctx, ifs);
+	if (token != NULL) {
+		token->ipt_subtype = iter.igi_type;
+		error = ipf_geniter(token, &iter, ifs);
+	} else
+		error = EFAULT;
+	RWLOCK_EXIT(&ifs->ifs_ipf_tokens);
+
+	return error;
 }

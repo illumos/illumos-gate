@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,22 +65,47 @@
 
 #define	MDB_SCTP_SHOW_ALL	0xffffffff
 
-uint_t sctp_conn_hash_size;
-static GElf_Sym sctp_list_sym;
-static list_t sctp_list;
-
-/*
- * Both the ill and ipif global arrays are small, so we just read
- * in the whole arrays.
- */
-static sctp_ill_hash_t local_g_ills[SCTP_ILL_HASH];
-static sctp_ipif_hash_t local_g_ipifs[SCTP_IPIF_HASH];
-
 /*
  * Copy from usr/src/uts/common/os/list.c.  Should we have a generic
  * mdb list walker?
  */
 #define	list_object(a, node) ((void *)(((char *)node) - (a)->list_offset))
+
+static int
+ns_to_stackid(uintptr_t kaddr)
+{
+	netstack_t nss;
+
+	if (mdb_vread(&nss, sizeof (nss), kaddr) == -1) {
+		mdb_warn("failed to read netdstack info %p", kaddr);
+		return (0);
+	}
+	return (nss.netstack_stackid);
+}
+
+int
+sctp_stacks_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("netstack", wsp) == -1) {
+		mdb_warn("can't walk 'netstack'");
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+int
+sctp_stacks_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t kaddr;
+	netstack_t nss;
+
+	if (mdb_vread(&nss, sizeof (nss), wsp->walk_addr) == -1) {
+		mdb_warn("can't read netstack at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	kaddr = (uintptr_t)nss.netstack_modules[NS_SCTP];
+	return (wsp->walk_callback(kaddr, wsp->walk_layer, wsp->walk_cbdata));
+}
 
 static char *
 sctp_faddr_state(int state)
@@ -713,8 +738,9 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_nhconvert(&lport, &sctp.sctp_lport, sizeof (lport));
 	mdb_nhconvert(&fport, &sctp.sctp_fport, sizeof (fport));
-	mdb_printf("%<u>%p% %22s S=%-6hu D=%-6hu% ZONE=%d%</u>", addr,
-	    state2str(&sctp), lport, fport, connp.conn_zoneid);
+	mdb_printf("%<u>%p% %22s S=%-6hu D=%-6hu% STACK=%d ZONE=%d%</u>", addr,
+	    state2str(&sctp), lport, fport,
+	    ns_to_stackid((uintptr_t)connp.conn_netstack), connp.conn_zoneid);
 
 	if (sctp.sctp_faddrs) {
 		sctp_faddr_t faddr;
@@ -888,8 +914,6 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%<b>Hash Tables%</b>\n");
 		mdb_printf("conn_hash_next\t%?p\t", sctp.sctp_conn_hash_next);
 		mdb_printf("conn_hash_prev\t%?p\n", sctp.sctp_conn_hash_prev);
-		mdb_printf("[ conn_hash bucket\t%?d ]\n",
-		    SCTP_CONN_HASH(sctp.sctp_ports));
 
 		mdb_printf("listen_hash_next%?p\t",
 		    sctp.sctp_listen_hash_next);
@@ -956,8 +980,9 @@ typedef struct fanout_walk_data {
 } fanout_walk_data_t;
 
 typedef struct fanout_init {
-	const char *symname;
-	int (*getsize)();
+	const char *nested_walker_name;
+	size_t offset;	/* for what used to be a symbol */
+	int (*getsize)(sctp_stack_t *);
 	uintptr_t (*getnext)(sctp_t *);
 } fanout_init_t;
 
@@ -967,8 +992,9 @@ listen_next(sctp_t *sctp)
 	return ((uintptr_t)sctp->sctp_listen_hash_next);
 }
 
+/* ARGSUSED */
 static int
-listen_size(void)
+listen_size(sctp_stack_t *sctps)
 {
 	return (SCTP_LISTEN_FANOUT_SIZE);
 }
@@ -980,17 +1006,15 @@ conn_next(sctp_t *sctp)
 }
 
 static int
-conn_size(void)
+conn_size(sctp_stack_t *sctps)
 {
-	GElf_Sym sym;
 	int size;
+	uintptr_t kaddr;
 
-	if (mdb_lookup_by_name("sctp_conn_hash_size", &sym) == -1) {
-		mdb_warn("can't read 'sctp_conn_hash_size'");
-		return (1);
-	}
-	if (mdb_vread(&size, sizeof (size), sym.st_value) == -1) {
-		mdb_warn("can't dereference 'sctp_conn_hash_size'");
+	kaddr = (uintptr_t)&sctps->sctps_conn_hash_size;
+
+	if (mdb_vread(&size, sizeof (size), kaddr) == -1) {
+		mdb_warn("can't read 'sctps_conn_hash_size' at %p", kaddr);
 		return (1);
 	}
 	return (size);
@@ -1002,8 +1026,9 @@ bind_next(sctp_t *sctp)
 	return ((uintptr_t)sctp->sctp_bind_hash);
 }
 
+/* ARGSUSED */
 static int
-bind_size(void)
+bind_size(sctp_stack_t *sctps)
 {
 	return (SCTP_BIND_FANOUT_SIZE);
 }
@@ -1048,22 +1073,25 @@ find_next_hash_item(fanout_walk_data_t *fw)
 }
 
 static int
-fanout_walk_init(mdb_walk_state_t *wsp)
+fanout_stack_walk_init(mdb_walk_state_t *wsp)
 {
-	GElf_Sym sym;
 	fanout_walk_data_t *lw;
 	fanout_init_t *fi = wsp->walk_arg;
+	sctp_stack_t *sctps = (sctp_stack_t *)wsp->walk_addr;
+	uintptr_t kaddr;
 
-	if (mdb_lookup_by_name(fi->symname, &sym) == -1) {
-		mdb_warn("failed to read '%s'", fi->symname);
+	if (mdb_vread(&kaddr, sizeof (kaddr),
+	    wsp->walk_addr + fi->offset) == -1) {
+		mdb_warn("can't read sctp fanout at %p",
+		    wsp->walk_addr + fi->offset);
 		return (WALK_ERR);
 	}
 
 	lw = mdb_alloc(sizeof (*lw), UM_SLEEP);
 	lw->index = 0;
-	lw->size = fi->getsize();
+	lw->size = fi->getsize(sctps);
 	lw->sctp = NULL;
-	lw->fanout = (sctp_tf_t *)(uintptr_t)sym.st_value;
+	lw->fanout = (sctp_tf_t *)kaddr;
 	lw->getnext = fi->getnext;
 
 	if ((wsp->walk_addr = find_next_hash_item(lw)) == NULL) {
@@ -1074,7 +1102,7 @@ fanout_walk_init(mdb_walk_state_t *wsp)
 }
 
 static int
-fanout_walk_step(mdb_walk_state_t *wsp)
+fanout_stack_walk_step(mdb_walk_state_t *wsp)
 {
 	fanout_walk_data_t *fw = wsp->walk_data;
 	uintptr_t addr = wsp->walk_addr;
@@ -1097,43 +1125,62 @@ fanout_walk_step(mdb_walk_state_t *wsp)
 }
 
 static void
-fanout_walk_fini(mdb_walk_state_t *wsp)
+fanout_stack_walk_fini(mdb_walk_state_t *wsp)
 {
 	fanout_walk_data_t *fw = wsp->walk_data;
 
 	mdb_free(fw, sizeof (*fw));
 }
 
-static int
-sctp_walk_init(mdb_walk_state_t *wsp)
+int
+fanout_walk_init(mdb_walk_state_t *wsp)
 {
-	wsp->walk_addr = (uintptr_t)list_object(&sctp_list,
-	    sctp_list.list_head.list_next);
+	if (mdb_layered_walk("sctp_stacks", wsp) == -1) {
+		mdb_warn("can't walk 'sctp_stacks'");
+		return (WALK_ERR);
+	}
+
 	return (WALK_NEXT);
 }
 
-static int
-sctp_walk_step(mdb_walk_state_t *wsp)
+int
+fanout_walk_step(mdb_walk_state_t *wsp)
 {
-	uintptr_t psctp = wsp->walk_addr;
-	sctp_t sctp;
-	int status;
+	fanout_init_t *fi = wsp->walk_arg;
 
-	if (mdb_vread(&sctp, sizeof (sctp), psctp) == -1) {
-		mdb_warn("failed to read sctp at %p", psctp);
+	if (mdb_pwalk(fi->nested_walker_name, wsp->walk_callback,
+		wsp->walk_cbdata, wsp->walk_addr) == -1) {
+		mdb_warn("couldn't walk '%s'for address %p",
+		    fi->nested_walker_name, wsp->walk_addr);
 		return (WALK_ERR);
 	}
-	status = wsp->walk_callback(psctp, &sctp, wsp->walk_cbdata);
-	if (status != WALK_NEXT)
-		return (status);
+	return (WALK_NEXT);
+}
 
-	if ((psctp = (uintptr_t)sctp.sctp_list.list_next) ==
-	    sctp_list_sym.st_value + OFFSETOF(list_t, list_head)) {
-		return (WALK_DONE);
-	} else {
-		wsp->walk_addr = (uintptr_t)list_object(&sctp_list, psctp);
-		return (WALK_NEXT);
+int
+sctps_walk_init(mdb_walk_state_t *wsp)
+{
+
+	if (mdb_layered_walk("sctp_stacks", wsp) == -1) {
+		mdb_warn("can't walk 'sctp_stacks'");
+		return (WALK_ERR);
 	}
+
+	return (WALK_NEXT);
+}
+
+int
+sctps_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t kaddr;
+
+	kaddr = wsp->walk_addr + OFFSETOF(sctp_stack_t, sctps_g_list);
+	if (mdb_pwalk("list", wsp->walk_callback,
+		wsp->walk_cbdata, kaddr) == -1) {
+		mdb_warn("couldn't walk 'list' for address %p", kaddr);
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
 }
 
 static int
@@ -1281,66 +1328,78 @@ sctp_walk_saddr_fini(mdb_walk_state_t *wsp)
 	mdb_free(swalker, sizeof (saddr_walk_t));
 }
 
-static int
-sctp_walk_ill_init(mdb_walk_state_t *wsp)
+
+typedef struct ill_walk_data {
+	sctp_ill_hash_t ills[SCTP_ILL_HASH];
+	uint32_t	count;
+} ill_walk_data_t;
+
+typedef struct ipuf_walk_data {
+	sctp_ipif_hash_t ipifs[SCTP_IPIF_HASH];
+	uint32_t	count;
+} ipif_walk_data_t;
+
+
+int
+sctp_ill_walk_init(mdb_walk_state_t *wsp)
 {
+	if (mdb_layered_walk("sctp_stacks", wsp) == -1) {
+		mdb_warn("can't walk 'sctp_stacks'");
+		return (WALK_ERR);
+	}
+
+	return (WALK_NEXT);
+}
+
+int
+sctp_ill_walk_step(mdb_walk_state_t *wsp)
+{
+	if (mdb_pwalk("sctp_stack_walk_ill", wsp->walk_callback,
+		wsp->walk_cbdata, wsp->walk_addr) == -1) {
+		mdb_warn("couldn't walk 'sctp_stack_walk_ill' for addr %p",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+/*
+ * wsp->walk_addr is the address of sctps_ill_list
+ */
+static int
+sctp_stack_ill_walk_init(mdb_walk_state_t *wsp)
+{
+	ill_walk_data_t iw;
 	intptr_t i;
+	uintptr_t kaddr, uaddr;
+	size_t offset;
+
+	kaddr = wsp->walk_addr + OFFSETOF(sctp_stack_t, sctps_ills_count);
+	if (mdb_vread(&iw.count, sizeof (iw.count), kaddr) == -1) {
+		mdb_warn("can't read sctps_ills_count at %p", kaddr);
+		return (WALK_ERR);
+	}
+	kaddr = wsp->walk_addr + OFFSETOF(sctp_stack_t, sctps_g_ills);
+
+	if (mdb_vread(&kaddr, sizeof (kaddr), kaddr) == -1) {
+		mdb_warn("can't read scpts_g_ills %p", kaddr);
+		return (WALK_ERR);
+	}
+	if (mdb_vread(&iw.ills, sizeof (iw.ills), kaddr) == -1) {
+		mdb_warn("failed to read 'sctps_g_ills'");
+		return (NULL);
+	}
 
 	/* Find the first ill. */
 	for (i = 0; i < SCTP_ILL_HASH; i++) {
-		if (local_g_ills[i].ill_count > 0) {
-			wsp->walk_addr = (uintptr_t)list_object(
-			    &local_g_ills[i].sctp_ill_list,
-			    local_g_ills[i].sctp_ill_list.list_head.list_next);
-			wsp->walk_data = (void *)i;
-			wsp->walk_arg = (void *)1;
-			return (WALK_NEXT);
-		}
-	}
-	return (WALK_DONE);
-}
-
-static int
-sctp_walk_ill_step(mdb_walk_state_t *wsp)
-{
-	uintptr_t ill_ptr = wsp->walk_addr;
-	sctp_ill_t ill;
-	int status;
-	intptr_t i, j;
-
-	if (mdb_vread(&ill, sizeof (sctp_ill_t), ill_ptr) == -1) {
-		mdb_warn("failed to read sctp_ill_t at %p", ill_ptr);
-		return (WALK_ERR);
-	}
-	status = wsp->walk_callback(ill_ptr, &ill, wsp->walk_cbdata);
-	if (status != WALK_NEXT)
-		return (status);
-
-	i = (intptr_t)wsp->walk_data;
-	j = (intptr_t)wsp->walk_arg;
-
-	/*
-	 * If there is still an ill in the current list, return it.
-	 * Otherwise, go to the next list and find another one.
-	 */
-	if (j++ < local_g_ills[i].ill_count) {
-		wsp->walk_addr = (uintptr_t)ill.sctp_ills.list_next;
-		wsp->walk_data = (void *)i;
-		wsp->walk_arg = (void *)j;
-		return (WALK_NEXT);
-	} else {
-		list_t *ill_list;
-
-		for (i = i + 1; i < SCTP_ILL_HASH; i++) {
-			if (local_g_ills[i].ill_count > 0) {
-				ill_list = &local_g_ills[i].sctp_ill_list;
-				wsp->walk_addr = (uintptr_t)list_object(
-				    ill_list, ill_list->list_head.list_next);
-
-				/* Record the current position. */
-				wsp->walk_data = (void *)i;
-				wsp->walk_arg = (void *)1;
-				return (WALK_NEXT);
+		if (iw.ills[i].ill_count > 0) {
+			uaddr = (uintptr_t)&iw.ills[i].sctp_ill_list;
+			offset = uaddr - (uintptr_t)&iw.ills;
+			if (mdb_pwalk("list", wsp->walk_callback,
+				wsp->walk_cbdata, kaddr+offset) == -1) {
+				mdb_warn("couldn't walk 'list' for address %p",
+				    kaddr);
+				return (WALK_ERR);
 			}
 		}
 	}
@@ -1348,70 +1407,82 @@ sctp_walk_ill_step(mdb_walk_state_t *wsp)
 }
 
 static int
-sctp_walk_ipif_init(mdb_walk_state_t *wsp)
+sctp_stack_ill_walk_step(mdb_walk_state_t *wsp)
 {
+	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_layer,
+		    wsp->walk_cbdata));
+}
+
+int
+sctp_ipif_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("sctp_stacks", wsp) == -1) {
+		mdb_warn("can't walk 'sctp_stacks'");
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+int
+sctp_ipif_walk_step(mdb_walk_state_t *wsp)
+{
+	if (mdb_pwalk("sctp_stack_walk_ipif", wsp->walk_callback,
+		wsp->walk_cbdata, wsp->walk_addr) == -1) {
+		mdb_warn("couldn't walk 'sctp_stack_walk_ipif' for addr %p",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+/*
+ * wsp->walk_addr is the address of sctps_ipif_list
+ */
+static int
+sctp_stack_ipif_walk_init(mdb_walk_state_t *wsp)
+{
+	ipif_walk_data_t iw;
 	intptr_t i;
-	list_t *ipif_list;
+	uintptr_t kaddr, uaddr;
+	size_t offset;
 
+	kaddr = wsp->walk_addr + OFFSETOF(sctp_stack_t, sctps_g_ipifs_count);
+	if (mdb_vread(&iw.count, sizeof (iw.count), kaddr) == -1) {
+		mdb_warn("can't read sctps_g_ipifs_count at %p", kaddr);
+		return (WALK_ERR);
+	}
+	kaddr = wsp->walk_addr + OFFSETOF(sctp_stack_t, sctps_g_ipifs);
+
+	if (mdb_vread(&kaddr, sizeof (kaddr), kaddr) == -1) {
+		mdb_warn("can't read scpts_g_ipifs %p", kaddr);
+		return (WALK_ERR);
+	}
+	if (mdb_vread(&iw.ipifs, sizeof (iw.ipifs), kaddr) == -1) {
+		mdb_warn("failed to read 'sctps_g_ipifs'");
+		return (NULL);
+	}
+
+	/* Find the first ipif. */
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
-		if (local_g_ipifs[i].ipif_count > 0) {
-			ipif_list = &local_g_ipifs[i].sctp_ipif_list;
-
-			wsp->walk_addr = (uintptr_t)list_object(ipif_list,
-			    ipif_list->list_head.list_next);
-			wsp->walk_data = (void *)i;
-			wsp->walk_arg = (void *)1;
-			return (WALK_NEXT);
+		if (iw.ipifs[i].ipif_count > 0) {
+			uaddr = (uintptr_t)&iw.ipifs[i].sctp_ipif_list;
+			offset = uaddr - (uintptr_t)&iw.ipifs;
+			if (mdb_pwalk("list", wsp->walk_callback,
+				wsp->walk_cbdata, kaddr+offset) == -1) {
+				mdb_warn("couldn't walk 'list' for address %p",
+				    kaddr);
+				return (WALK_ERR);
+			}
 		}
 	}
 	return (WALK_DONE);
 }
 
 static int
-sctp_walk_ipif_step(mdb_walk_state_t *wsp)
+sctp_stack_ipif_walk_step(mdb_walk_state_t *wsp)
 {
-	uintptr_t ipif_ptr = wsp->walk_addr;
-	sctp_ipif_t ipif;
-	int status;
-	intptr_t i, j;
-
-	if (mdb_vread(&ipif, sizeof (sctp_ipif_t), ipif_ptr) == -1) {
-		mdb_warn("failed to read sctp_ipif_t at %p", ipif_ptr);
-		return (WALK_ERR);
-	}
-	status = wsp->walk_callback(ipif_ptr, &ipif, wsp->walk_cbdata);
-	if (status != WALK_NEXT)
-		return (status);
-
-	i = (intptr_t)wsp->walk_data;
-	j = (intptr_t)wsp->walk_arg;
-
-	/*
-	 * If there is still an ipif in the current list, return it.
-	 * Otherwise, go to the next list and find another one.
-	 */
-	if (j++ < local_g_ipifs[i].ipif_count) {
-		wsp->walk_addr = (uintptr_t)ipif.sctp_ipifs.list_next;
-		wsp->walk_data = (void *)i;
-		wsp->walk_arg = (void *)j;
-		return (WALK_NEXT);
-	} else {
-		list_t *ipif_list;
-
-		for (i = i + 1; i < SCTP_IPIF_HASH; i++) {
-			if (local_g_ipifs[i].ipif_count > 0) {
-				ipif_list = &local_g_ipifs[i].sctp_ipif_list;
-				wsp->walk_addr = (uintptr_t)list_object(
-				    ipif_list, ipif_list->list_head.list_next);
-
-				/* Record the current position */
-				wsp->walk_data = (void *)i;
-				wsp->walk_arg = (void *)1;
-				return (WALK_NEXT);
-			}
-		}
-	}
-	return (WALK_DONE);
+	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_layer,
+		    wsp->walk_cbdata));
 }
 
 static void
@@ -1455,37 +1526,59 @@ static const mdb_dcmd_t dcmds[] = {
 };
 
 static const fanout_init_t listen_fanout_init = {
-	"sctp_listen_fanout", listen_size, listen_next
+	"sctp_stack_listen_fanout", OFFSETOF(sctp_stack_t, sctps_listen_fanout),
+	listen_size, listen_next
 };
 
 static const fanout_init_t conn_fanout_init = {
-	"sctp_conn_fanout", conn_size, conn_next
+	"sctp_stack_conn_fanout",  OFFSETOF(sctp_stack_t, sctps_conn_fanout),
+	conn_size, conn_next
 };
 
 static const fanout_init_t bind_fanout_init = {
-	"sctp_bind_fanout", bind_size, bind_next
+	"sctp_stack_bind_fanout", OFFSETOF(sctp_stack_t, sctps_bind_fanout),
+	bind_size, bind_next
 };
 
 static const mdb_walker_t walkers[] = {
-	{ "sctps", "walk the full chain of sctps",
-	    sctp_walk_init, sctp_walk_step, NULL },
-	{ "sctp_listen_fanout", "walk the sctp listen fanout",
-	    fanout_walk_init, fanout_walk_step, fanout_walk_fini,
+	{ "sctps", "walk the full chain of sctps for all stacks",
+	    sctps_walk_init, sctps_walk_step, NULL },
+	{ "sctp_listen_fanout", "walk the sctp listen fanout for all stacks",
+	    fanout_walk_init, fanout_walk_step, NULL,
 	    (void *)&listen_fanout_init },
-	{ "sctp_conn_fanout", "walk the sctp conn fanout",
-	    fanout_walk_init, fanout_walk_step, fanout_walk_fini,
+	{ "sctp_conn_fanout", "walk the sctp conn fanout for all stacks",
+	    fanout_walk_init, fanout_walk_step, NULL,
 	    (void *)&conn_fanout_init },
-	{ "sctp_bind_fanout", "walk the sctp bind fanout",
-	    fanout_walk_init, fanout_walk_step, fanout_walk_fini,
+	{ "sctp_bind_fanout", "walk the sctp bind fanout for all stacks",
+	    fanout_walk_init, fanout_walk_step, NULL,
+	    (void *)&bind_fanout_init },
+	{ "sctp_stack_listen_fanout",
+	    "walk the sctp listen fanout for one stack",
+	    fanout_stack_walk_init, fanout_stack_walk_step,
+	    fanout_stack_walk_fini,
+	    (void *)&listen_fanout_init },
+	{ "sctp_stack_conn_fanout", "walk the sctp conn fanout for one stack",
+	    fanout_stack_walk_init, fanout_stack_walk_step,
+	    fanout_stack_walk_fini,
+	    (void *)&conn_fanout_init },
+	{ "sctp_stack_bind_fanout", "walk the sctp bind fanoutfor one stack",
+	    fanout_stack_walk_init, fanout_stack_walk_step,
+	    fanout_stack_walk_fini,
 	    (void *)&bind_fanout_init },
 	{ "sctp_walk_faddr", "walk the peer address list of a given sctp_t",
 	    sctp_walk_faddr_init, sctp_walk_faddr_step, NULL },
 	{ "sctp_walk_saddr", "walk the local address list of a given sctp_t",
 	    sctp_walk_saddr_init, sctp_walk_saddr_step, sctp_walk_saddr_fini },
-	{ "sctp_walk_ill", "walk the sctp_g_ills list",
-	    sctp_walk_ill_init, sctp_walk_ill_step, NULL },
-	{ "sctp_walk_ipif", "walk the sctp_g_ipif list",
-	    sctp_walk_ipif_init, sctp_walk_ipif_step, NULL },
+	{ "sctp_walk_ill", "walk the sctp_g_ills list for all stacks",
+	    sctp_ill_walk_init, sctp_ill_walk_step, NULL },
+	{ "sctp_walk_ipif", "walk the sctp_g_ipif list for all stacks",
+		sctp_ipif_walk_init, sctp_ipif_walk_step, NULL },
+	{ "sctp_stack_walk_ill", "walk the sctp_g_ills list for one stack",
+		sctp_stack_ill_walk_init, sctp_stack_ill_walk_step, NULL },
+	{ "sctp_stack_walk_ipif", "walk the sctp_g_ipif list for one stack",
+		sctp_stack_ipif_walk_init, sctp_stack_ipif_walk_step, NULL },
+	{ "sctp_stacks", "walk all the sctp_stack_t",
+		sctp_stacks_walk_init, sctp_stacks_walk_step, NULL },
 	{ NULL }
 };
 
@@ -1494,44 +1587,5 @@ static const mdb_modinfo_t modinfo = { MDB_API_VERSION, dcmds, walkers };
 const mdb_modinfo_t *
 _mdb_init(void)
 {
-	GElf_Sym sym;
-	GElf_Sym ills_sym;
-	GElf_Sym ipifs_sym;
-
-	if (mdb_lookup_by_name("sctp_g_list", &sctp_list_sym) == -1) {
-		mdb_warn("failed to find 'sctp_g_list'");
-		return (NULL);
-	}
-	if (mdb_vread(&sctp_list, sizeof (list_t),
-	    (uintptr_t)sctp_list_sym.st_value) == -1) {
-		mdb_warn("failed to read 'sctp_g_list'");
-		return (NULL);
-	}
-	if (mdb_lookup_by_name("sctp_conn_hash_size", &sym) != -1) {
-		if (mdb_vread(&sctp_conn_hash_size,
-		    sizeof (sctp_conn_hash_size), sym.st_value) == -1) {
-			mdb_warn("failed to read 'sctp_conn_hash_size'");
-			return (NULL);
-		}
-	}
-	if (mdb_lookup_by_name("sctp_g_ills", &ills_sym) == -1) {
-		mdb_warn("failed to find 'sctp_g_ills'");
-		return (NULL);
-	}
-	if (mdb_vread(&local_g_ills, sizeof (local_g_ills),
-	    (uintptr_t)ills_sym.st_value) == -1) {
-		mdb_warn("failed to read 'sctp_g_ills'");
-		return (NULL);
-	}
-	if (mdb_lookup_by_name("sctp_g_ipifs", &ipifs_sym) == -1) {
-		mdb_warn("failed to find 'sctp_g_ipifs'");
-		return (NULL);
-	}
-	if (mdb_vread(&local_g_ipifs, sizeof (local_g_ipifs),
-	    (uintptr_t)ipifs_sym.st_value) == -1) {
-		mdb_warn("failed to read 'sctp_g_ipifs'");
-		return (NULL);
-	}
-
 	return (&modinfo);
 }

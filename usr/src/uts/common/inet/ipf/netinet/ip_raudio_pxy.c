@@ -5,7 +5,7 @@
  *
  * $Id: ip_raudio_pxy.c,v 1.40.2.3 2005/02/04 10:22:55 darrenr Exp $
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -13,49 +13,69 @@
 
 #define	IPF_RAUDIO_PROXY
 
+typedef struct ifs_raudiopxy {
+	frentry_t	raudiofr;
+	int		raudio_proxy_init;
+} ifs_raudiopxy_t;
 
-int ippr_raudio_init __P((void));
-void ippr_raudio_fini __P((void));
-int ippr_raudio_new __P((fr_info_t *, ap_session_t *, nat_t *));
-int ippr_raudio_in __P((fr_info_t *, ap_session_t *, nat_t *));
-int ippr_raudio_out __P((fr_info_t *, ap_session_t *, nat_t *));
-
-static	frentry_t	raudiofr;
-
-int	raudio_proxy_init = 0;
-
+int ippr_raudio_init __P((void **, ipf_stack_t *));
+void ippr_raudio_fini __P((void **, ipf_stack_t *));
+int ippr_raudio_new __P((fr_info_t *, ap_session_t *, nat_t *, void *));
+int ippr_raudio_in __P((fr_info_t *, ap_session_t *, nat_t *, void *));
+int ippr_raudio_out __P((fr_info_t *, ap_session_t *, nat_t *, void *));
 
 /*
  * Real Audio application proxy initialization.
  */
-int ippr_raudio_init()
+/*ARGSUSED*/
+int ippr_raudio_init(private, ifs)
+void **private;
+ipf_stack_t *ifs;
 {
-	bzero((char *)&raudiofr, sizeof(raudiofr));
-	raudiofr.fr_ref = 1;
-	raudiofr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
-	MUTEX_INIT(&raudiofr.fr_lock, "Real Audio proxy rule lock");
-	raudio_proxy_init = 1;
+	ifs_raudiopxy_t *ifsraudio;
+
+	KMALLOC(ifsraudio, ifs_raudiopxy_t *);
+	if (ifsraudio == NULL)
+		return -1;
+
+	bzero((char *)&ifsraudio->raudiofr, sizeof(ifsraudio->raudiofr));
+	ifsraudio->raudiofr.fr_ref = 1;
+	ifsraudio->raudiofr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
+	MUTEX_INIT(&ifsraudio->raudiofr.fr_lock, "Real Audio proxy rule lock");
+	ifsraudio->raudio_proxy_init = 1;
+
+	*private = (void *)ifsraudio;
 
 	return 0;
 }
 
 
-void ippr_raudio_fini()
+/*ARGSUSED*/
+void ippr_raudio_fini(private, ifs)
+void **private;
+ipf_stack_t *ifs;
 {
-	if (raudio_proxy_init == 1) {
-		MUTEX_DESTROY(&raudiofr.fr_lock);
-		raudio_proxy_init = 0;
+	ifs_raudiopxy_t *ifsraudio = *((ifs_raudiopxy_t **)private);
+
+	if (ifsraudio->raudio_proxy_init == 1) {
+		MUTEX_DESTROY(&ifsraudio->raudiofr.fr_lock);
+		ifsraudio->raudio_proxy_init = 0;
 	}
+
+	KFREE(ifsraudio);
+	*private = NULL;
 }
 
 
 /*
  * Setup for a new proxy to handle Real Audio.
  */
-int ippr_raudio_new(fin, aps, nat)
+/*ARGSUSED*/
+int ippr_raudio_new(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	raudio_t *rap;
 
@@ -74,11 +94,12 @@ nat_t *nat;
 }
 
 
-
-int ippr_raudio_out(fin, aps, nat)
+/*ARGSUSED*/
+int ippr_raudio_out(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	raudio_t *rap = aps->aps_data;
 	unsigned char membuf[512 + 1], *s;
@@ -181,10 +202,11 @@ nat_t *nat;
 }
 
 
-int ippr_raudio_in(fin, aps, nat)
+int ippr_raudio_in(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	unsigned char membuf[IPF_MAXPORTLEN + 1], *s;
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
@@ -199,6 +221,8 @@ nat_t *nat;
 	u_char swp;
 	ip_t *ip;
 	mb_t *m;
+	ipf_stack_t *ifs = fin->fin_ifs;
+	ifs_raudiopxy_t *ifsraudio = (ifs_raudiopxy_t *)private;
 
 	/*
 	 * Wait until we've seen the end of the start messages and even then
@@ -284,7 +308,7 @@ nat_t *nat;
 	fi.fin_nat = NULL;
 	fi.fin_flx |= FI_IGNORE;
 	fi.fin_dp = (char *)tcp2;
-	fi.fin_fr = &raudiofr;
+	fi.fin_fr = &ifsraudio->raudiofr;
 	fi.fin_dlen = sizeof(*tcp2);
 	fi.fin_plen = fi.fin_hlen + sizeof(*tcp2);
 	tcp2->th_win = htons(8192);
@@ -309,7 +333,7 @@ nat_t *nat;
 
 			(void) fr_addstate(&fi, NULL, (sp ? 0 : SI_W_SPORT));
 			if (fi.fin_state != NULL)
-				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+				fr_statederef(&fi, (ipstate_t **)&fi.fin_state, ifs);
 		}
 	}
 
@@ -329,7 +353,7 @@ nat_t *nat;
 
 			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
 			if (fi.fin_state != NULL)
-				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+				fr_statederef(&fi, (ipstate_t **)&fi.fin_state, ifs);
 		}
 	}
 

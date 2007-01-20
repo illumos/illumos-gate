@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,34 +76,92 @@ typedef struct illif_walk_data {
 static int iphdr(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int ip6hdr(uintptr_t, uint_t, int, const mdb_arg_t *);
 
+static int ire_format(uintptr_t addr, const ire_t *irep, uint_t *verbose);
+
+/*
+ * Given the kernel address of an ip_stack_t, return the stackid
+ */
+static int
+ips_to_stackid(uintptr_t kaddr)
+{
+	ip_stack_t ipss;
+	netstack_t nss;
+
+	if (mdb_vread(&ipss, sizeof (ipss), kaddr) == -1) {
+		mdb_warn("failed to read ip_stack_t %p", kaddr);
+		return (0);
+	}
+	kaddr = (uintptr_t)ipss.ips_netstack;
+	if (mdb_vread(&nss, sizeof (nss), kaddr) == -1) {
+		mdb_warn("failed to read netstack_t %p", kaddr);
+		return (0);
+	}
+	return (nss.netstack_stackid);
+}
+
 int
-illif_walk_init(mdb_walk_state_t *wsp)
+ip_stacks_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("netstack", wsp) == -1) {
+		mdb_warn("can't walk 'netstack'");
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+int
+ip_stacks_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t kaddr;
+	netstack_t nss;
+
+#ifdef DEBUG
+	mdb_printf("DEBUG: ip_stacks_walk_step: addr %p\n", wsp->walk_addr);
+#endif
+	if (mdb_vread(&nss, sizeof (nss), wsp->walk_addr) == -1) {
+		mdb_warn("can't read netstack at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	kaddr = (uintptr_t)nss.netstack_modules[NS_IP];
+
+#ifdef DEBUG
+	mdb_printf("DEBUG: ip_stacks_walk_step: ip_stack_t at %p\n", kaddr);
+#endif
+	return (wsp->walk_callback(kaddr, wsp->walk_layer, wsp->walk_cbdata));
+}
+
+/*
+ * Called with walk_addr being the address of ips_ill_g_heads
+ */
+int
+illif_stack_walk_init(mdb_walk_state_t *wsp)
 {
 	illif_walk_data_t *iw;
 
-	if (wsp->walk_addr != NULL) {
-		mdb_warn("illif supports only global walks\n");
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("illif_stack supports only local walks\n");
 		return (WALK_ERR);
 	}
 
 	iw = mdb_alloc(sizeof (illif_walk_data_t), UM_SLEEP);
 
-	if (mdb_readsym(iw->ill_g_heads, MAX_G_HEADS * sizeof (ill_g_head_t),
-	    "ill_g_heads") == -1) {
-		mdb_warn("failed to read 'ill_g_heads'");
+	if (mdb_vread(iw->ill_g_heads, MAX_G_HEADS * sizeof (ill_g_head_t),
+	    wsp->walk_addr) == -1) {
+		mdb_warn("failed to read 'ips_ill_g_heads' at %p",
+		    wsp->walk_addr);
 		mdb_free(iw, sizeof (illif_walk_data_t));
 		return (WALK_ERR);
 	}
 
 	iw->ill_list = 0;
-	wsp->walk_addr = (uintptr_t)iw->IP_VX_ILL_G_LIST(0);
+	wsp->walk_addr = (uintptr_t)iw->ill_g_heads[0].ill_g_list_head;
 	wsp->walk_data = iw;
 
 	return (WALK_NEXT);
 }
 
 int
-illif_walk_step(mdb_walk_state_t *wsp)
+illif_stack_walk_step(mdb_walk_state_t *wsp)
 {
 	uintptr_t addr = wsp->walk_addr;
 	illif_walk_data_t *iw = wsp->walk_data;
@@ -116,13 +174,15 @@ illif_walk_step(mdb_walk_state_t *wsp)
 
 	wsp->walk_addr = (uintptr_t)iw->ill_if.illif_next;
 
-	if (wsp->walk_addr == (uintptr_t)iw->IP_VX_ILL_G_LIST(list)) {
+	if (wsp->walk_addr ==
+	    (uintptr_t)iw->ill_g_heads[list].ill_g_list_head) {
 
 		if (++list >= MAX_G_HEADS)
 			return (WALK_DONE);
 
 		iw->ill_list = list;
-		wsp->walk_addr = (uintptr_t)iw->IP_VX_ILL_G_LIST(list);
+		wsp->walk_addr =
+		    (uintptr_t)iw->ill_g_heads[list].ill_g_list_head;
 		return (WALK_NEXT);
 	}
 
@@ -130,7 +190,7 @@ illif_walk_step(mdb_walk_state_t *wsp)
 }
 
 void
-illif_walk_fini(mdb_walk_state_t *wsp)
+illif_stack_walk_fini(mdb_walk_state_t *wsp)
 {
 	mdb_free(wsp->walk_data, sizeof (illif_walk_data_t));
 }
@@ -172,6 +232,45 @@ illif_cb(uintptr_t addr, const illif_walk_data_t *iw, illif_cbdata_t *id)
 
 	id->ill_printed = TRUE;
 
+	return (WALK_NEXT);
+}
+
+int
+illif_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("ip_stacks", wsp) == -1) {
+		mdb_warn("can't walk 'ip_stacks'");
+		return (WALK_ERR);
+	}
+
+	return (WALK_NEXT);
+}
+
+int
+illif_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t kaddr;
+
+#ifdef DEBUG
+	mdb_printf("DEBUG: illif_walk_step: addr %p\n", wsp->walk_addr);
+#endif
+
+	kaddr = wsp->walk_addr + OFFSETOF(ip_stack_t, ips_ill_g_heads);
+
+	if (mdb_vread(&kaddr, sizeof (kaddr), kaddr) == -1) {
+		mdb_warn("can't read ips_ip_cache_table at %p", kaddr);
+		return (WALK_ERR);
+	}
+#ifdef DEBUG
+	mdb_printf("DEBUG: illif_walk_step: ips_ill_g_heads %p\n", kaddr);
+#endif
+
+	if (mdb_pwalk("illif_stack", wsp->walk_callback,
+		wsp->walk_cbdata, kaddr) == -1) {
+		mdb_warn("couldn't walk 'illif_stack' for ips_ill_g_heads %p",
+		    kaddr);
+		return (WALK_ERR);
+	}
 	return (WALK_NEXT);
 }
 
@@ -265,6 +364,112 @@ ire_walk_step(mdb_walk_state_t *wsp)
 	return (wsp->walk_callback(wsp->walk_addr, &ire, wsp->walk_cbdata));
 }
 
+int
+ire_ctable_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("ip_stacks", wsp) == -1) {
+		mdb_warn("can't walk 'ip_stacks'");
+		return (WALK_ERR);
+	}
+
+	return (WALK_NEXT);
+}
+
+int
+ire_ctable_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t kaddr;
+	irb_t *irb;
+	int verbose = 0;
+	uint32_t cache_table_size;
+	int i;
+
+#ifdef DEBUG
+	mdb_printf("DEBUG: ire_ctable_walk_step: addr %p\n", wsp->walk_addr);
+#endif
+
+	kaddr = wsp->walk_addr + OFFSETOF(ip_stack_t, ips_ip_cache_table_size);
+
+	if (mdb_vread(&cache_table_size, sizeof (uint32_t), kaddr) == -1) {
+		mdb_warn("can't read ips_ip_cache_table at %p", kaddr);
+		return (WALK_ERR);
+	}
+#ifdef DEBUG
+	mdb_printf("DEBUG: ire_ctable_walk_step: ips_ip_cache_table_size %u\n",
+		cache_table_size);
+#endif
+
+	kaddr = wsp->walk_addr + OFFSETOF(ip_stack_t, ips_ip_cache_table);
+	if (mdb_vread(&kaddr, sizeof (kaddr), kaddr) == -1) {
+		mdb_warn("can't read ips_ip_cache_table at %p", kaddr);
+		return (WALK_ERR);
+	}
+#ifdef DEBUG
+	mdb_printf("DEBUG: ire_ctable_walk_step: ips_ip_cache_table %p\n",
+	    kaddr);
+#endif
+
+	irb = mdb_alloc(sizeof (irb_t) * cache_table_size, UM_SLEEP|UM_GC);
+	if (mdb_vread(irb, sizeof (irb_t) * cache_table_size, kaddr) == -1) {
+		mdb_warn("can't read irb at %p", kaddr);
+		return (WALK_ERR);
+	}
+	for (i = 0; i < cache_table_size; i++) {
+		kaddr = (uintptr_t)irb[i].irb_ire;
+#ifdef DEBUG
+		mdb_printf("DEBUG: ire_ctable_walk_step: %d ire %p\n",
+		    i, kaddr);
+#endif
+
+		if (mdb_pwalk("ire_next", (mdb_walk_cb_t)ire_format, &verbose,
+			kaddr) == -1) {
+			mdb_warn("can't walk 'ire_next' for ire %p", kaddr);
+			return (WALK_ERR);
+		}
+	}
+	return (WALK_NEXT);
+}
+
+/* ARGSUSED */
+int
+ire_next_walk_init(mdb_walk_state_t *wsp)
+{
+#ifdef DEBUG
+	mdb_printf("DEBUG: ire_next_walk_init: addr %p\n", wsp->walk_addr);
+#endif
+	return (WALK_NEXT);
+}
+
+int
+ire_next_walk_step(mdb_walk_state_t *wsp)
+{
+	ire_t ire;
+	int status;
+
+#ifdef DEBUG
+	mdb_printf("DEBUG: ire_next_walk_step: addr %p\n", wsp->walk_addr);
+#endif
+
+	if (wsp->walk_addr == NULL)
+		return (WALK_DONE);
+
+	if (mdb_vread(&ire, sizeof (ire), wsp->walk_addr) == -1) {
+		mdb_warn("can't read ire at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	status = wsp->walk_callback(wsp->walk_addr, &ire,
+	    wsp->walk_cbdata);
+
+	if (status != WALK_NEXT)
+		return (status);
+
+	wsp->walk_addr = (uintptr_t)ire.ire_next;
+#ifdef DEBUG
+	mdb_printf("DEBUG: ire_ctable_walk_step: next %p\n", wsp->walk_addr);
+#endif
+	return (status);
+}
+
 static int
 ire_format(uintptr_t addr, const ire_t *irep, uint_t *verbose)
 {
@@ -318,15 +523,20 @@ ire_format(uintptr_t addr, const ire_t *irep, uint_t *verbose)
 
 		mdb_printf("%<b>%?p%</b> %40N <%hb>\n"
 		    "%?s %40N <%hb>\n"
-		    "%?s %40d <%hb>\n",
+		    "%?s %40d %4d <%hb>\n",
 		    addr, &irep->ire_src_addr_v6, irep->ire_type, tmasks,
 		    "", &irep->ire_addr_v6, (ushort_t)irep->ire_marks, mmasks,
-		    "", irep->ire_zoneid, irep->ire_flags, fmasks);
+		    "", ips_to_stackid((uintptr_t)irep->ire_ipst),
+		    irep->ire_zoneid,
+		    irep->ire_flags, fmasks);
 
 	} else if (irep->ire_ipversion == 6) {
 
-		mdb_printf("%?p %30N %30N %4d\n", addr, &irep->ire_src_addr_v6,
-		    &irep->ire_addr_v6, irep->ire_zoneid);
+		mdb_printf("%?p %30N %30N %5d %4d\n",
+		    addr, &irep->ire_src_addr_v6,
+		    &irep->ire_addr_v6,
+		    ips_to_stackid((uintptr_t)irep->ire_ipst),
+		    irep->ire_zoneid);
 
 	} else if (*verbose) {
 
@@ -335,12 +545,14 @@ ire_format(uintptr_t addr, const ire_t *irep, uint_t *verbose)
 		    "%?s %40d <%hb>\n",
 		    addr, irep->ire_src_addr, irep->ire_type, tmasks,
 		    "", irep->ire_addr, (ushort_t)irep->ire_marks, mmasks,
-		    "", irep->ire_zoneid, irep->ire_flags, fmasks);
+		    "", ips_to_stackid((uintptr_t)irep->ire_ipst),
+		    irep->ire_zoneid, irep->ire_flags, fmasks);
 
 	} else {
 
-		mdb_printf("%?p %30I %30I %4d\n", addr, irep->ire_src_addr,
-		    irep->ire_addr, irep->ire_zoneid);
+		mdb_printf("%?p %30I %30I %5d %4d\n", addr, irep->ire_src_addr,
+		    irep->ire_addr, ips_to_stackid((uintptr_t)irep->ire_ipst),
+		    irep->ire_zoneid);
 	}
 
 	return (WALK_NEXT);
@@ -676,13 +888,13 @@ ire(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (verbose) {
 			mdb_printf("%?s %40s %-20s%\n"
 			    "%?s %40s %-20s%\n"
-			    "%<u>%?s %40s %-20s%</u>\n",
+			    "%<u>%?s %40s %4s %-20s%</u>\n",
 			    "ADDR", "SRC", "TYPE",
 			    "", "DST", "MARKS",
-			    "", "ZONE", "FLAGS");
+			    "", "STACK", "ZONE", "FLAGS");
 		} else {
-			mdb_printf("%<u>%?s %30s %30s %4s%</u>\n",
-			    "ADDR", "SRC", "DST", "ZONE");
+			mdb_printf("%<u>%?s %30s %30s %5s %4s%</u>\n",
+			    "ADDR", "SRC", "DST", "STACK", "ZONE");
 		}
 	}
 
@@ -853,10 +1065,19 @@ static const mdb_dcmd_t dcmds[] = {
 };
 
 static const mdb_walker_t walkers[] = {
-	{ "illif", "walk list of ill interface types",
-		illif_walk_init, illif_walk_step, illif_walk_fini },
+	{ "illif", "walk list of ill interface types for all stacks",
+		illif_walk_init, illif_walk_step, NULL },
+	{ "illif_stack", "walk list of ill interface types",
+		illif_stack_walk_init, illif_stack_walk_step,
+		illif_stack_walk_fini },
 	{ "ire", "walk active ire_t structures",
 		ire_walk_init, ire_walk_step, NULL },
+	{ "ire_ctable", "walk ire_t structures in the ctable",
+		ire_ctable_walk_init, ire_ctable_walk_step, NULL },
+	{ "ire_next", "walk ire_t structures in the ctable",
+		ire_next_walk_init, ire_next_walk_step, NULL },
+	{ "ip_stacks", "walk all the ip_stack_t",
+		ip_stacks_walk_init, ip_stacks_walk_step, NULL },
 	{ NULL }
 };
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <sys/int_types.h>
 #include <sys/queue.h>
 #include <sys/hook_impl.h>
+#include <sys/netstack.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -118,16 +119,17 @@ typedef struct net_inject {
 typedef struct net_info {
 	int		neti_version;
 	char		*neti_protocol;
-	int		(*neti_getifname)(phy_if_t, char *, const size_t);
-	int		(*neti_getmtu)(phy_if_t, lif_if_t);
-	int		(*neti_getpmtuenabled)(void);
+	int		(*neti_getifname)(phy_if_t, char *, const size_t,
+			    netstack_t *);
+	int		(*neti_getmtu)(phy_if_t, lif_if_t, netstack_t *);
+	int		(*neti_getpmtuenabled)(netstack_t *);
 	int		(*neti_getlifaddr)(phy_if_t, lif_if_t, size_t,
-			    net_ifaddr_t [], void *);
-	phy_if_t	(*neti_phygetnext)(phy_if_t);
-	phy_if_t	(*neti_phylookup)(const char *);
-	lif_if_t	(*neti_lifgetnext)(phy_if_t, lif_if_t);
-	int		(*neti_inject)(inject_t, net_inject_t *);
-	phy_if_t	(*neti_routeto)(struct sockaddr *);
+			    net_ifaddr_t [], void *, netstack_t *);
+	phy_if_t	(*neti_phygetnext)(phy_if_t, netstack_t *);
+	phy_if_t	(*neti_phylookup)(const char *, netstack_t *);
+	lif_if_t	(*neti_lifgetnext)(phy_if_t, lif_if_t, netstack_t *);
+	int		(*neti_inject)(inject_t, net_inject_t *, netstack_t *);
+	phy_if_t	(*neti_routeto)(struct sockaddr *, netstack_t *);
 	int		(*neti_ispartialchecksum)(mblk_t *);
 	int		(*neti_isvalidchecksum)(mblk_t *);
 } net_info_t;
@@ -141,12 +143,14 @@ struct net_data {
 	net_info_t			netd_info;
 	int				netd_refcnt;
 	hook_family_int_t		*netd_hooks;
+	netstack_t 			*netd_netstack;
 };
 
 
 typedef struct injection_s {
 	net_inject_t	inj_data;
 	boolean_t	inj_isv6;
+	void *		inj_ptr;
 } injection_t;
 
 /*
@@ -160,13 +164,29 @@ typedef struct injection_s {
 
 
 /*
+ * neti stack instances
+ */
+struct neti_stack {
+	krwlock_t nts_netlock;
+
+	/* list of net_data_t */
+	LIST_HEAD(netd_listhead, net_data) nts_netd_head;
+	netstack_t *nts_netstack;
+};
+typedef struct neti_stack neti_stack_t;
+
+
+/*
  * Data management functions
  */
-extern net_data_t net_register(const net_info_t *);
+extern net_data_t net_register(const net_info_t *, netstackid_t);
+extern net_data_t net_register_impl(const net_info_t *, netstack_t *);
 extern int net_unregister(net_data_t);
-extern net_data_t net_lookup(const char *);
+extern net_data_t net_lookup(const char *, netstackid_t);
+extern net_data_t net_lookup_impl(const char *, netstack_t *);
 extern int net_release(net_data_t);
-extern net_data_t net_walk(net_data_t);
+extern net_data_t net_walk(net_data_t, netstackid_t);
+extern net_data_t net_walk_impl(net_data_t, netstack_t *);
 
 /*
  * Accessor functions

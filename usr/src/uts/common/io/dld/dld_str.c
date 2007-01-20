@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,20 +57,14 @@ static void	ioc_raw(dld_str_t *, mblk_t *);
 static void	ioc_fast(dld_str_t *,  mblk_t *);
 static void	ioc(dld_str_t *, mblk_t *);
 static void	dld_ioc(dld_str_t *, mblk_t *);
-static minor_t	dld_minor_hold(boolean_t);
-static void	dld_minor_rele(minor_t);
 static void	str_mdata_raw_put(dld_str_t *, mblk_t *);
 static mblk_t	*i_dld_ether_header_update_tag(mblk_t *, uint_t, uint16_t);
 static mblk_t	*i_dld_ether_header_strip_tag(mblk_t *);
 
 static uint32_t		str_count;
 static kmem_cache_t	*str_cachep;
-static vmem_t		*minor_arenap;
 static uint32_t		minor_count;
 static mod_hash_t	*str_hashp;
-
-#define	MINOR_TO_PTR(minor)	((void *)(uintptr_t)(minor))
-#define	PTR_TO_MINOR(ptr)	((minor_t)(uintptr_t)(ptr))
 
 #define	STR_HASHSZ		64
 #define	STR_HASH_KEY(key)	((mod_hash_key_t)(uintptr_t)(key))
@@ -213,9 +207,12 @@ dld_finddevinfo(dev_t dev)
 		return (NULL);
 
 	mod_hash_walk(str_hashp, i_dld_str_walker, &state);
-	return (state.ds_dip);
-}
+	if (state.ds_dip != NULL || state.ds_minor <= DLD_MAX_MINOR)
+		return (state.ds_dip);
 
+	/* See if it's a minor node of a VLAN */
+	return (dls_finddevinfo(dev));
+}
 
 /*
  * devo_getinfo: getinfo(9e)
@@ -273,8 +270,6 @@ dld_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	major = getmajor(*devp);
 	minor = getminor(*devp);
-	if (minor > DLD_MAX_MINOR)
-		return (ENODEV);
 
 	/*
 	 * Create a new dld_str_t for the stream. This will grab a new minor
@@ -291,8 +286,12 @@ dld_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 		/*
 		 * Style 1 open
 		 */
+		t_uscalar_t ppa;
 
-		if ((err = dld_str_attach(dsp, (t_uscalar_t)minor - 1)) != 0)
+		if ((dls_ppa_from_minor(minor, &ppa)) != 0)
+			goto failed;
+
+		if ((err = dld_str_attach(dsp, ppa)) != 0)
 			goto failed;
 		ASSERT(dsp->ds_dlstate == DL_UNBOUND);
 	} else {
@@ -558,20 +557,10 @@ dld_str_init(void)
 	ASSERT(str_cachep != NULL);
 
 	/*
-	 * Allocate a vmem arena to manage minor numbers. The range of the
-	 * arena will be from DLD_MAX_MINOR + 1 to MAXMIN (maximum legal
-	 * minor number).
-	 */
-	minor_arenap = vmem_create("dld_minor_arena",
-	    MINOR_TO_PTR(DLD_MAX_MINOR + 1), MAXMIN, 1, NULL, NULL, NULL, 0,
-	    VM_SLEEP | VMC_IDENTIFIER);
-	ASSERT(minor_arenap != NULL);
-
-	/*
 	 * Create a hash table for maintaining dld_str_t's.
 	 * The ds_minor field (the clone minor number) of a dld_str_t
 	 * is used as a key for this hash table because this number is
-	 * globally unique (allocated from "dld_minor_arena").
+	 * globally unique (allocated from "dls_minor_arena").
 	 */
 	str_hashp = mod_hash_create_idhash("dld_str_hash", STR_HASHSZ,
 	    mod_hash_null_valdtor);
@@ -599,7 +588,6 @@ dld_str_fini(void)
 	 * Destroy object cache.
 	 */
 	kmem_cache_destroy(str_cachep);
-	vmem_destroy(minor_arenap);
 	mod_hash_destroy_idhash(str_hashp);
 	return (0);
 }
@@ -723,8 +711,11 @@ str_constructor(void *buf, void *cdrarg, int kmflags)
 	/*
 	 * Allocate a new minor number.
 	 */
-	if ((dsp->ds_minor = dld_minor_hold(kmflags == KM_SLEEP)) == 0)
+	atomic_add_32(&minor_count, 1);
+	if ((dsp->ds_minor = dls_minor_hold(kmflags == KM_SLEEP)) == 0) {
+		atomic_add_32(&minor_count, -1);
 		return (-1);
+	}
 
 	/*
 	 * Initialize the DLPI state machine.
@@ -773,7 +764,8 @@ str_destructor(void *buf, void *cdrarg)
 	/*
 	 * Release the minor number.
 	 */
-	dld_minor_rele(dsp->ds_minor);
+	dls_minor_rele(dsp->ds_minor);
+	atomic_add_32(&minor_count, -1);
 
 	ASSERT(!RW_LOCK_HELD(&dsp->ds_lock));
 	rw_destroy(&dsp->ds_lock);
@@ -2088,39 +2080,4 @@ ioc(dld_str_t *dsp, mblk_t *mp)
 	ASSERT(mh != NULL);
 	rw_exit(&dsp->ds_lock);
 	mac_ioctl(mh, q, mp);
-}
-
-/*
- * Allocate a new minor number.
- */
-static minor_t
-dld_minor_hold(boolean_t sleep)
-{
-	minor_t		minor;
-
-	/*
-	 * Grab a value from the arena.
-	 */
-	atomic_add_32(&minor_count, 1);
-	if ((minor = PTR_TO_MINOR(vmem_alloc(minor_arenap, 1,
-	    (sleep) ? VM_SLEEP : VM_NOSLEEP))) == 0) {
-		atomic_add_32(&minor_count, -1);
-		return (0);
-	}
-
-	return (minor);
-}
-
-/*
- * Release a previously allocated minor number.
- */
-static void
-dld_minor_rele(minor_t minor)
-{
-	/*
-	 * Return the value to the arena.
-	 */
-	vmem_free(minor_arenap, MINOR_TO_PTR(minor), 1);
-
-	atomic_add_32(&minor_count, -1);
 }

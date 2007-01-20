@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@ extern "C" {
 #include <inet/ipsec_info.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/api.h>
+#include <sys/note.h>
 
 #define	IPSA_MAX_ADDRLEN 4	/* Max address len. (in 32-bits) for an SA. */
 
@@ -232,6 +233,7 @@ typedef struct ipsa_s {
 
 	/* MLS boxen will probably need more fields in here. */
 
+	netstack_t	*ipsa_netstack;	/* Does not have a netstack_hold */
 } ipsa_t;
 
 /*
@@ -452,15 +454,10 @@ typedef struct sadbp_s
 	uint32_t	s_satype;
 	queue_t		*s_ip_q;
 	uint32_t	*s_acquire_timeout;
-	void 		(*s_acqfn)(ipsacq_t *, mblk_t *);
+	void 		(*s_acqfn)(ipsacq_t *, mblk_t *, netstack_t *);
 	sadb_t		s_v4;
 	sadb_t		s_v6;
 } sadbp_t;
-
-/*
- * Global IPsec security association databases (and all that go with them).
- */
-extern sadbp_t ah_sadb, esp_sadb;
 
 /* Pointer to an all-zeroes IPv6 address. */
 #define	ALL_ZEROES_PTR	((uint32_t *)&ipv6_all_zeros)
@@ -533,9 +530,9 @@ ipsa_t *ipsec_getassocbyconn(isaf_t *, ipsec_out_t *, uint32_t *, uint32_t *,
 int sadb_insertassoc(ipsa_t *, isaf_t *);
 
 /* SA table construction and destruction. */
-void sadbp_init(const char *name, sadbp_t *, int, int);
-void sadbp_flush(sadbp_t *);
-void sadbp_destroy(sadbp_t *);
+void sadbp_init(const char *name, sadbp_t *, int, int, netstack_t *);
+void sadbp_flush(sadbp_t *, netstack_t *);
+void sadbp_destroy(sadbp_t *, netstack_t *);
 
 /* SA insertion and deletion. */
 int sadb_insertassoc(ipsa_t *, isaf_t *);
@@ -548,9 +545,9 @@ void sadb_pfkey_echo(queue_t *, mblk_t *, sadb_msg_t *, struct keysock_in_s *,
     ipsa_t *);
 void sadb_pfkey_error(queue_t *, mblk_t *, int, int, uint_t);
 void sadb_keysock_hello(queue_t **, queue_t *, mblk_t *, void (*)(void *),
-    timeout_id_t *, int);
-int sadb_addrcheck(queue_t *, mblk_t *, sadb_ext_t *, uint_t);
-boolean_t sadb_addrfix(keysock_in_t *, queue_t *, mblk_t *);
+    void *, timeout_id_t *, int);
+int sadb_addrcheck(queue_t *, mblk_t *, sadb_ext_t *, uint_t, netstack_t *);
+boolean_t sadb_addrfix(keysock_in_t *, queue_t *, mblk_t *, netstack_t *);
 int sadb_addrset(ire_t *);
 int sadb_delget_sa(mblk_t *, keysock_in_t *, sadbp_t *, int *, queue_t *,
     boolean_t);
@@ -559,27 +556,30 @@ int sadb_delget_sa(mblk_t *, keysock_in_t *, sadbp_t *, int *, queue_t *,
 
 int sadb_purge_sa(mblk_t *, keysock_in_t *, sadb_t *, queue_t *, queue_t *);
 int sadb_common_add(queue_t *, queue_t *, mblk_t *, sadb_msg_t *,
-    keysock_in_t *, isaf_t *, isaf_t *, ipsa_t *, boolean_t, boolean_t, int *);
+    keysock_in_t *, isaf_t *, isaf_t *, ipsa_t *, boolean_t, boolean_t, int *,
+    netstack_t *);
 void sadb_set_usetime(ipsa_t *);
 boolean_t sadb_age_bytes(queue_t *, ipsa_t *, uint64_t, boolean_t);
 int sadb_update_sa(mblk_t *, keysock_in_t *, sadb_t *,
-    int *, queue_t *, int (*)(mblk_t *, keysock_in_t *, int *));
+    int *, queue_t *, int (*)(mblk_t *, keysock_in_t *, int *, netstack_t *),
+    netstack_t *);
 void sadb_acquire(mblk_t *, ipsec_out_t *, boolean_t, boolean_t);
 
-void sadb_destroy_acquire(ipsacq_t *);
-mblk_t *sadb_setup_acquire(ipsacq_t *, uint8_t);
-ipsa_t *sadb_getspi(keysock_in_t *, uint32_t, int *);
-void sadb_in_acquire(sadb_msg_t *, sadbp_t *, queue_t *);
+void sadb_destroy_acquire(ipsacq_t *, netstack_t *);
+struct ipsec_stack;
+mblk_t *sadb_setup_acquire(ipsacq_t *, uint8_t, struct ipsec_stack *);
+ipsa_t *sadb_getspi(keysock_in_t *, uint32_t, int *, netstack_t *);
+void sadb_in_acquire(sadb_msg_t *, sadbp_t *, queue_t *, netstack_t *);
 boolean_t sadb_replay_check(ipsa_t *, uint32_t);
 boolean_t sadb_replay_peek(ipsa_t *, uint32_t);
 int sadb_dump(queue_t *, mblk_t *, minor_t, sadb_t *);
 void sadb_replay_delete(ipsa_t *);
-void sadb_ager(sadb_t *, queue_t *, queue_t *, int);
+void sadb_ager(sadb_t *, queue_t *, queue_t *, int, netstack_t *);
 
-timeout_id_t sadb_retimeout(hrtime_t, queue_t *, void (*)(void *),
+timeout_id_t sadb_retimeout(hrtime_t, queue_t *, void (*)(void *), void *,
     uint_t *, uint_t, short);
 void sadb_sa_refrele(void *target);
-void sadb_set_lpkt(ipsa_t *, mblk_t *);
+void sadb_set_lpkt(ipsa_t *, mblk_t *, netstack_t *);
 mblk_t *sadb_clear_lpkt(ipsa_t *);
 
 /*
@@ -591,19 +591,22 @@ mblk_t *sadb_fmt_sa_req(uint_t, uint_t, ipsa_t *, boolean_t);
  * Sub-set of the IPsec hardware acceleration capabilities functions
  * implemented by ip_if.c
  */
-extern	boolean_t ipsec_capab_match(ill_t *, uint_t, boolean_t, ipsa_t *);
-extern	void	ill_ipsec_capab_send_all(uint_t, mblk_t *, ipsa_t *);
+extern	boolean_t ipsec_capab_match(ill_t *, uint_t, boolean_t, ipsa_t *,
+    netstack_t *);
+extern	void	ill_ipsec_capab_send_all(uint_t, mblk_t *, ipsa_t *,
+    netstack_t *);
 
 
 /*
  * One IPsec -> IP linking routine, and two IPsec rate-limiting routines.
  */
 extern boolean_t sadb_t_bind_req(queue_t *, int);
-/*PRINTFLIKE5*/
-extern void ipsec_rl_strlog(short, short, char, ushort_t, char *, ...)
-    __KPRINTFLIKE(5);
+/*PRINTFLIKE6*/
+extern void ipsec_rl_strlog(netstack_t *, short, short, char,
+    ushort_t, char *, ...)
+    __KPRINTFLIKE(6);
 extern void ipsec_assocfailure(short, short, char, ushort_t, char *, uint32_t,
-    void *, int);
+    void *, int, netstack_t *);
 
 /*
  * Algorithm types.
@@ -671,19 +674,14 @@ typedef enum {
 	IPSEC_ALGS_EXEC_ASYNC = 1
 } ipsec_algs_exec_mode_t;
 
-extern uint8_t ipsec_nalgs[IPSEC_NALGTYPES];
-extern ipsec_alginfo_t *ipsec_alglists[IPSEC_NALGTYPES][IPSEC_MAX_ALGS];
-extern uint8_t ipsec_sortlist[IPSEC_NALGTYPES][IPSEC_MAX_ALGS];
-extern ipsec_algs_exec_mode_t ipsec_algs_exec_mode[IPSEC_NALGTYPES];
-
-extern kmutex_t alg_lock;
-
-extern void ipsec_alg_reg(ipsec_algtype_t, ipsec_alginfo_t *);
-extern void ipsec_alg_unreg(ipsec_algtype_t, uint8_t);
-extern void ipsec_alg_fix_min_max(ipsec_alginfo_t *, ipsec_algtype_t);
+extern void ipsec_alg_reg(ipsec_algtype_t, ipsec_alginfo_t *, netstack_t *);
+extern void ipsec_alg_unreg(ipsec_algtype_t, uint8_t, netstack_t *);
+extern void ipsec_alg_fix_min_max(ipsec_alginfo_t *, ipsec_algtype_t,
+    netstack_t *ns);
 extern void ipsec_alg_free(ipsec_alginfo_t *);
 extern void ipsec_register_prov_update(void);
-extern void sadb_alg_update(ipsec_algtype_t, uint8_t, boolean_t);
+extern void sadb_alg_update(ipsec_algtype_t, uint8_t, boolean_t,
+    netstack_t *);
 
 /*
  * Context templates management.
@@ -694,9 +692,12 @@ extern void sadb_alg_update(ipsec_algtype_t, uint8_t, boolean_t);
 	if ((_tmpl = (_sa)->_which) == IPSEC_CTX_TMPL_ALLOC) {		\
 		mutex_enter(&assoc->ipsa_lock);				\
 		if ((_sa)->_which == IPSEC_CTX_TMPL_ALLOC) {		\
-			mutex_enter(&alg_lock);				\
+			ipsec_stack_t *ipss;				\
+									\
+			ipss = assoc->ipsa_netstack->netstack_ipsec;	\
+			mutex_enter(&ipss->ipsec_alg_lock);		\
 			(void) ipsec_create_ctx_tmpl(_sa, _type);	\
-			mutex_exit(&alg_lock);				\
+			mutex_exit(&ipss->ipsec_alg_lock);		\
 		}							\
 		mutex_exit(&assoc->ipsa_lock);				\
 		if ((_tmpl = (_sa)->_which) == IPSEC_CTX_TMPL_ALLOC)	\
@@ -711,9 +712,9 @@ extern void ipsec_destroy_ctx_tmpl(ipsa_t *, ipsec_algtype_t);
 extern int ipsec_check_key(crypto_mech_type_t, sadb_key_t *, boolean_t, int *);
 
 /* natt cleanup */
-extern void sadb_clear_timeouts(queue_t *);
+extern void sadb_clear_timeouts(queue_t *, netstack_t *);
 
-typedef struct {
+typedef struct ipsec_kstats_s {
 	kstat_named_t esp_stat_in_requests;
 	kstat_named_t esp_stat_in_discards;
 	kstat_named_t esp_stat_lookup_failure;
@@ -724,15 +725,36 @@ typedef struct {
 	kstat_named_t sadb_acquire_qhiwater;
 } ipsec_kstats_t;
 
-extern ipsec_kstats_t *ipsec_kstats;
-extern void ipsec_kstat_init(void);
-extern void ipsec_kstat_destroy(void);
+/*
+ * (ipss)->ipsec_kstats is equal to (ipss)->ipsec_ksp->ks_data if
+ * kstat_create_netstack for (ipss)->ipsec_ksp succeeds, but when it
+ * fails, it will be NULL. Note this is done for all stack instances,
+ * so it *could* fail. hence a non-NULL checking is done for
+ * IP_ESP_BUMP_STAT, IP_AH_BUMP_STAT and IP_ACQUIRE_STAT
+ */
+#define	IP_ESP_BUMP_STAT(ipss, x)					\
+do {									\
+	if ((ipss)->ipsec_kstats != NULL)				\
+		((ipss)->ipsec_kstats->esp_stat_ ## x).value.ui64++;	\
+_NOTE(CONSTCOND)							\
+} while (0)
 
-#define	IP_ESP_BUMP_STAT(x) (ipsec_kstats->esp_stat_ ## x).value.ui64++
-#define	IP_AH_BUMP_STAT(x) (ipsec_kstats->ah_stat_ ## x).value.ui64++
-#define	IP_ACQUIRE_STAT(val, new) \
-if (((uint64_t)(new)) > (ipsec_kstats->sadb_acquire_ ## val).value.ui64) \
-	(ipsec_kstats->sadb_acquire_ ## val).value.ui64 = ((uint64_t)(new))
+#define	IP_AH_BUMP_STAT(ipss, x)					\
+do {									\
+	if ((ipss)->ipsec_kstats != NULL)				\
+		((ipss)->ipsec_kstats->ah_stat_ ## x).value.ui64++;	\
+_NOTE(CONSTCOND)							\
+} while (0)
+
+#define	IP_ACQUIRE_STAT(ipss, val, new)					\
+do {									\
+	if ((ipss)->ipsec_kstats != NULL &&				\
+	    ((uint64_t)(new)) >						\
+	    ((ipss)->ipsec_kstats->sadb_acquire_ ## val).value.ui64)	\
+		((ipss)->ipsec_kstats->sadb_acquire_ ## val).value.ui64 = \
+			((uint64_t)(new));				\
+_NOTE(CONSTCOND)							\
+} while (0)
 
 #ifdef	__cplusplus
 }

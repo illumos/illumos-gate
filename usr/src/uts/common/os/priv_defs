@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
 INSERT COMMENT
@@ -363,16 +363,20 @@ privilege PRIV_SYS_MOUNT
 	only control mounts performed from within said zone.
 	Outside the global zone, the "nodevices" option is always forced.
 
-privilege PRIV_SYS_NET_CONFIG
+privilege PRIV_SYS_IP_CONFIG
 
 	Allows a process to configure a system's network interfaces and routes.
 	Allows a process to configure network parameters using ndd.
 	Allows a process access to otherwise restricted information using ndd.
+	Allows a process to configure IPsec.
+	Allows a process to pop anchored STREAMs modules with matching zoneid.
+
+privilege PRIV_SYS_NET_CONFIG
+
+	Allows all that PRIV_SYS_IP_CONFIG allows.
 	Allows a process to push the rpcmod STREAMs module.
-	Allows a process to pop anchored STREAMs modules.
 	Allows a process to INSERT/REMOVE STREAMs modules on locations other
 	than the top of the module stack.
-	Allows a process to configure IPsec.
 
 privilege PRIV_SYS_NFS
 

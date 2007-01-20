@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@
 #include <sys/dls.h>
 #include <sys/dld.h>
 #include <sys/modctl.h>
+#include <sys/fs/dv_node.h>
 #include <sys/atomic.h>
 
 #define	IMPL_HASHSZ	67	/* prime */
@@ -1885,4 +1886,28 @@ mactype_unregister(const char *ident)
 done:
 	mutex_exit(&i_mactype_lock);
 	return (err);
+}
+
+int
+mac_vlan_create(mac_handle_t mh, const char *name, minor_t minor)
+{
+	mac_impl_t		*mip = (mac_impl_t *)mh;
+
+	/* Create a style-1 DLPI device */
+	if (ddi_create_minor_node(mip->mi_dip, (char *)name, S_IFCHR, minor,
+	    DDI_NT_NET, 0) != DDI_SUCCESS) {
+		return (-1);
+	}
+	return (0);
+}
+
+void
+mac_vlan_remove(mac_handle_t mh, const char *name)
+{
+	mac_impl_t		*mip = (mac_impl_t *)mh;
+	dev_info_t		*dipp;
+
+	ddi_remove_minor_node(mip->mi_dip, (char *)name);
+	dipp = ddi_get_parent(mip->mi_dip);
+	(void) devfs_clean(dipp, NULL, 0);
 }

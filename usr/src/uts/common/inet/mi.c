@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -817,10 +816,12 @@ mi_open_link(void **mi_headp, IDP ptr, dev_t *devp, int flag, int sflag,
 		ulong_t offset;
 
 		head_name = kobj_getsymname((uintptr_t)mi_headp, &offset);
-		if (head_name != NULL && offset == 0)
+		if (head_name != NULL && offset == 0) {
 			(void) sprintf(arena_name, "%s_", head_name);
-		else
-			(void) sprintf(arena_name, "0x%p_", (void *)mi_headp);
+		} else {
+			(void) sprintf(arena_name, "Hex0x%p_",
+			    (void *)mi_headp);
+		}
 		(void) sprintf(strchr(arena_name, '_') + 1, "minor");
 		mi_head = (mi_head_t *)mi_zalloc_sleep(sizeof (mi_head_t));
 		*mi_headp = (void *)mi_head;

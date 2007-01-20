@@ -6,7 +6,7 @@
  * @(#)ip_nat.h	1.5 2/4/96
  * $Id: ip_nat.h,v 2.90.2.11 2005/06/18 02:41:32 darrenr Exp $
 *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -124,6 +124,7 @@ typedef	struct	nat	{
 	int		nat_hv[2];
 	char		nat_ifnames[2][LIFNAMSIZ];
 	int		nat_rev;		/* 0 = forward, 1 = reverse */
+	int		nat_redir;		/* copy of in_redir */
 } nat_t;
 
 #define	nat_inip	nat_inip6.in4
@@ -324,6 +325,8 @@ typedef	struct	nattrpnt	{
 typedef	struct	hostmap	{
 	struct	hostmap	*hm_next;
 	struct	hostmap	**hm_pnext;
+	struct	hostmap	*hm_hnext;
+	struct	hostmap	**hm_phnext;
 	struct	ipnat	*hm_ipnat;
 	struct	in_addr	hm_srcip;
 	struct	in_addr	hm_dstip;
@@ -374,6 +377,7 @@ typedef	struct	natstat	{
 	u_int	ns_hostmap_sz;
 	nat_t	*ns_instances;
 	nattrpnt_t *ns_trpntlist;
+	hostmap_t *ns_maplist;
 	u_long	*ns_bucketlen[2];
 } natstat_t;
 
@@ -419,34 +423,15 @@ typedef	struct	natlog {
 #define	NAT_LOCKHELD		0x40000000
 
 
-extern	u_int	ipf_nattable_sz;
-extern	u_int	ipf_nattable_max;
-extern	u_int	ipf_natrules_sz;
-extern	u_int	ipf_rdrrules_sz;
-extern	u_int	ipf_hostmap_sz;
-extern	u_int	fr_nat_maxbucket;
-extern	u_int	fr_nat_maxbucket_reset;
-extern	int	fr_nat_lock;
-extern	void	fr_nataddrsync __P((void *, struct in_addr *));
-extern	void	fr_natifpsync __P((int, void *, char *));
-extern	u_long	fr_defnatage;
-extern	u_long	fr_defnaticmpage;
-extern	u_long	fr_defnatipage;
-	/* nat_table[0] -> hashed list sorted by inside (ip, port) */
-	/* nat_table[1] -> hashed list sorted by outside (ip, port) */
-extern	nat_t	**nat_table[2];
-extern	nat_t	*nat_instances;
-extern	ipnat_t	*nat_list;
-extern	ipnat_t	**nat_rules;
-extern	ipnat_t	**rdr_rules;
-extern	ipftq_t	*nat_utqe;
-extern	natstat_t	nat_stats;
+extern	void	fr_natsync __P((void *, ipf_stack_t *));
+extern	void	fr_nataddrsync __P((void *, struct in_addr *, ipf_stack_t *));
+extern	void	fr_natifpsync __P((int, void *, char *, ipf_stack_t *));
 
 #if defined(__OpenBSD__)
-extern	void	nat_ifdetach __P((void *));
+extern	void	nat_ifdetach __P((void *, ipf_stack_t *));
 #endif
-extern	int	fr_nat_ioctl __P((caddr_t, ioctlcmd_t, int));
-extern	int	fr_natinit __P((void));
+extern	int	fr_nat_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *, ipf_stack_t *));
+extern	int	fr_natinit __P((ipf_stack_t *));
 extern	nat_t	*nat_new __P((fr_info_t *, ipnat_t *, nat_t **, u_int, int));
 extern	nat_t	*nat_outlookup __P((fr_info_t *, u_int, u_int, struct in_addr,
 				 struct in_addr));
@@ -456,23 +441,25 @@ extern	nat_t	*nat_inlookup __P((fr_info_t *, u_int, u_int, struct in_addr,
 extern	nat_t	*nat_tnlookup __P((fr_info_t *, int));
 extern	nat_t	*nat_maplookup __P((void *, u_int, struct in_addr,
 				struct in_addr));
-extern	nat_t	*nat_lookupredir __P((natlookup_t *));
+extern	nat_t	*nat_lookupredir __P((natlookup_t *, ipf_stack_t *));
 extern	nat_t	*nat_icmperrorlookup __P((fr_info_t *, int));
 extern	nat_t	*nat_icmperror __P((fr_info_t *, u_int *, int));
-extern	int	nat_insert __P((nat_t *, int));
+extern	int	nat_insert __P((nat_t *, int, ipf_stack_t *));
 
 extern	int	fr_checknatout __P((fr_info_t *, u_32_t *));
 extern	int	fr_natout __P((fr_info_t *, nat_t *, int, u_32_t));
 extern	int	fr_checknatin __P((fr_info_t *, u_32_t *));
 extern	int	fr_natin __P((fr_info_t *, nat_t *, int, u_32_t));
-extern	void	fr_natunload __P((void));
-extern	void	fr_natexpire __P((void));
-extern	void	nat_log __P((struct nat *, u_int));
+extern	void	fr_natunload __P((ipf_stack_t *));
+extern	void	fr_natexpire __P((ipf_stack_t *));
+extern	void	nat_log __P((struct nat *, u_int, ipf_stack_t *));
 extern	void	fix_incksum __P((u_short *, u_32_t));
 extern	void	fix_outcksum __P((u_short *, u_32_t));
-extern	void	fr_natderef __P((nat_t **));
+extern  void    fr_ipnatderef __P((ipnat_t **, ipf_stack_t *));
+extern	void	fr_natderef __P((nat_t **, ipf_stack_t *));
 extern	u_short	*nat_proto __P((fr_info_t *, nat_t *, u_int));
 extern	void	nat_update __P((fr_info_t *, nat_t *, ipnat_t *));
-extern	void	fr_setnatqueue __P((nat_t *, int));
+extern	void	fr_setnatqueue __P((nat_t *, int, ipf_stack_t *));
+extern  void    fr_hostmapderef __P((hostmap_t **));
 
 #endif /* __IP_NAT_H__ */

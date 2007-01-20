@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
+#include <sys/netstack.h>
 
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -74,6 +75,7 @@
 #include <net/if_dl.h>
 #include <inet/ip_if.h>
 #include <sys/strsun.h>
+#include <inet/ipsec_impl.h>
 #include <inet/ipdrop.h>
 #include <inet/tun.h>
 #include <inet/ipsec_impl.h>
@@ -123,7 +125,7 @@ static void	icmp_ricmp_err_v6_v6(queue_t *, mblk_t *, mblk_t *, icmp6_t *);
 static void	tun_rput_icmp_err_v6(queue_t *, mblk_t *, mblk_t *);
 static int	tun_rput_tpi(queue_t *, mblk_t *);
 static int	tun_send_bind_req(queue_t *);
-static void	tun_statinit(tun_stats_t *, char *);
+static void	tun_statinit(tun_stats_t *, char *, netstackid_t);
 static int	tun_stat_kstat_update(kstat_t *, int);
 static void	tun_wdata_v4(queue_t *, mblk_t *);
 static void	tun_wdata_v6(queue_t *, mblk_t *);
@@ -133,6 +135,8 @@ static int	tun_wputnext_v6(queue_t *, mblk_t *);
 static int	tun_wputnext_v4(queue_t *, mblk_t *);
 static boolean_t tun_limit_value_v6(queue_t *, mblk_t *, ip6_t *, int *);
 static void	tun_freemsg_chain(mblk_t *, uint64_t *);
+static void	*tun_stack_init(netstackid_t, netstack_t *);
+static void	tun_stack_fini(netstackid_t, void *);
 
 /* module's defined constants, globals and data structures */
 
@@ -238,31 +242,14 @@ static struct tun_encap_limit tun_limit_init_upper_v6 = {
 	0
 };
 
-/*
- * Linked list of tunnels.
- */
-
-#define	TUN_PPA_SZ	64
-#define	TUN_LIST_HASH(ppa)	((ppa) % TUN_PPA_SZ)
-
-/*
- * protects global data structures such as tun_ppa_list
- * also protects tun_t at ts_next and *ts_atp
- * should be acquired before ts_lock
- */
-static kmutex_t		tun_global_lock;
-static tun_stats_t	*tun_ppa_list[TUN_PPA_SZ];
 static tun_stats_t	*tun_add_stat(queue_t *);
 
-#define	TUN_T_SZ	251
-#define	TUN_BYADDR_LIST_HASH(a) (((a).s6_addr32[3]) % (TUN_T_SZ))
-
-tun_t *tun_byaddr_list[TUN_T_SZ];
 static void tun_add_byaddr(tun_t *);
-static ipsec_tun_pol_t *itp_get_byaddr_fn(uint32_t *, uint32_t *, int);
+static ipsec_tun_pol_t *itp_get_byaddr_fn(uint32_t *, uint32_t *, int,
+    netstack_t *);
 
+/* Setable in /etc/system */
 static boolean_t 	tun_do_fastpath = B_TRUE;
-static ipaddr_t		relay_rtr_addr_v4 = INADDR_ANY;
 
 /* streams linkages */
 static struct module_info info = {
@@ -326,29 +313,31 @@ _init(void)
 
 	IP_MAJ = ddi_name_to_major(IP);
 	IP6_MAJ = ddi_name_to_major(IP6);
+
+	/*
+	 * We want to be informed each time a stack is created or
+	 * destroyed in the kernel, so we can maintain the
+	 * set of tun_stack_t's.
+	 */
+	netstack_register(NS_TUN, tun_stack_init, NULL, tun_stack_fini);
+
 	rc = mod_install(&modlinkage);
-	if (rc == 0) {
-		mutex_init(&tun_global_lock, NULL, MUTEX_DEFAULT, NULL);
-	}
-	rw_enter(&itp_get_byaddr_rw_lock, RW_WRITER);
-	itp_get_byaddr = itp_get_byaddr_fn;
-	rw_exit(&itp_get_byaddr_rw_lock);
+	if (rc != 0)
+		netstack_unregister(NS_TUN);
+
 	return (rc);
 }
 
 int
 _fini(void)
 {
-	int	rc;
+	int error;
 
-	rc = mod_remove(&modlinkage);
-	if (rc == 0) {
-		mutex_destroy(&tun_global_lock);
-		rw_enter(&itp_get_byaddr_rw_lock, RW_WRITER);
-		itp_get_byaddr = itp_get_byaddr_dummy;
-		rw_exit(&itp_get_byaddr_rw_lock);
-	}
-	return (rc);
+	error = mod_remove(&modlinkage);
+	if (error == 0)
+		netstack_unregister(NS_TUN);
+
+	return (error);
 }
 
 int
@@ -369,6 +358,8 @@ tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	tun_t	*atp;
 	mblk_t *hello;
 	ipsec_info_t *ii;
+	netstack_t *ns;
+	zoneid_t zoneid;
 
 	if (q->q_ptr != NULL) {
 		/* re-open of an already open instance */
@@ -381,16 +372,31 @@ tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	tun1dbg(("tun_open\n"));
 
+	ns = netstack_find_by_cred(credp);
+	ASSERT(ns != NULL);
+
+	/*
+	 * For exclusive stacks we set the zoneid to zero
+	 * to make IP operate as if in the global zone.
+	 */
+	if (ns->netstack_stackid != GLOBAL_NETSTACKID)
+		zoneid = GLOBAL_ZONEID;
+	else
+		zoneid = crgetzoneid(credp);
+
 	hello = allocb(sizeof (ipsec_info_t), BPRI_HI);
-	if (hello == NULL)
+	if (hello == NULL) {
+		netstack_rele(ns);
 		return (ENOMEM);
+	}
 
 	/* allocate per-instance structure */
 	atp = kmem_zalloc(sizeof (tun_t), KM_SLEEP);
 
 	atp->tun_state = DL_UNATTACHED;
 	atp->tun_dev = *devp;
-	atp->tun_zoneid = crgetzoneid(credp);
+	atp->tun_zoneid = zoneid;
+	atp->tun_netstack = ns;
 
 	/*
 	 * Based on the lower version of IP, initialize stuff that
@@ -423,6 +429,7 @@ tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		atp->tun_ip6h.ip6_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
 		atp->tun_ip6h.ip6_hops = IPV6_DEFAULT_HOPS;
 	} else {
+		netstack_rele(ns);
 		kmem_free(atp, sizeof (tun_t));
 		return (ENXIO);
 	}
@@ -442,6 +449,7 @@ tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 			atp->tun_mtu = ATUN_MTU;
 		} else {
 			/* Error. */
+			netstack_rele(ns);
 			kmem_free(atp, sizeof (tun_t));
 			return (ENXIO);
 		}
@@ -455,6 +463,7 @@ tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 			atp->tun_mtu = ATUN_MTU;
 		} else {
 			/* Error. */
+			netstack_rele(ns);
 			kmem_free(atp, sizeof (tun_t));
 			return (ENXIO);
 		}
@@ -478,8 +487,11 @@ int
 tun_close(queue_t *q, int flag, cred_t *cred_p)
 {
 	tun_t *atp = (tun_t *)q->q_ptr;
+	netstack_t *ns;
 
 	ASSERT(atp != NULL);
+
+	ns = atp->tun_netstack;
 
 	/* Cancel outstanding qtimeouts() or qbufcalls() */
 	tun_cancel_rec_evs(q, &atp->tun_events);
@@ -492,8 +504,10 @@ tun_close(queue_t *q, int flag, cred_t *cred_p)
 
 	if (atp->tun_itp != NULL) {
 		/* In brackets because of ITP_REFRELE's brackets. */
-		ITP_REFRELE(atp->tun_itp);
+		ITP_REFRELE(atp->tun_itp, ns);
 	}
+
+	netstack_rele(ns);
 
 	mutex_destroy(&atp->tun_lock);
 
@@ -859,13 +873,15 @@ tun_freemsg_chain(mblk_t *mp, uint64_t *bytecount)
  * (tun)->tun_itp_gen so we don't lose races with other possible updates via
  * PF_POLICY.
  */
-#define	tun_policy_present(tun)	(((tun)->tun_itp != NULL) || \
-	(((tun)->tun_itp_gen < tunnel_policy_gen) && \
-	    ((tun)->tun_itp_gen = tunnel_policy_gen) && \
-	    (((tun)->tun_itp = get_tunnel_policy((tun)->tun_lifname)) != NULL)))
+#define	tun_policy_present(tun, ns, ipss)	\
+	(((tun)->tun_itp != NULL) || \
+	(((tun)->tun_itp_gen < ipss->ipsec_tunnel_policy_gen) && \
+	    ((tun)->tun_itp_gen = ipss->ipsec_tunnel_policy_gen) && \
+	    (((tun)->tun_itp = get_tunnel_policy((tun)->tun_lifname, ns)) \
+	    != NULL)))
 
 /*
- * Search tun_byaddr_list for occurrence of tun_t with matching
+ * Search tuns_byaddr_list for occurrence of tun_t with matching
  * inner addresses.  This function does not take into account
  * prefixes.  Possibly we could generalize this function in the
  * future with V6_MASK_EQ() and pass in an all 1's prefix for IP
@@ -874,11 +890,13 @@ tun_freemsg_chain(mblk_t *mp, uint64_t *bytecount)
  * This function is not directly called - it's assigned into itp_get_byaddr().
  */
 static ipsec_tun_pol_t *
-itp_get_byaddr_fn(uint32_t *lin, uint32_t *fin, int af)
+itp_get_byaddr_fn(uint32_t *lin, uint32_t *fin, int af, netstack_t *ns)
 {
 	tun_t	*tun_list;
 	uint_t index;
 	in6_addr_t lmapped, fmapped, *laddr, *faddr;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
+	tun_stack_t *tuns = ns->netstack_tun;
 
 	if (af == AF_INET) {
 		laddr = &lmapped;
@@ -895,7 +913,7 @@ itp_get_byaddr_fn(uint32_t *lin, uint32_t *fin, int af)
 	/*
 	 * it's ok to grab global lock while holding tun_lock/perimeter
 	 */
-	mutex_enter(&tun_global_lock);
+	mutex_enter(&tuns->tuns_global_lock);
 
 	/*
 	 * walk through list of tun_t looking for a match of
@@ -903,13 +921,13 @@ itp_get_byaddr_fn(uint32_t *lin, uint32_t *fin, int af)
 	 * IN6_IPADDR_TO_V4MAPPED(), so v6 matching works for
 	 * all cases.
 	 */
-	for (tun_list = tun_byaddr_list[index]; tun_list;
+	for (tun_list = tuns->tuns_byaddr_list[index]; tun_list;
 	    tun_list = tun_list->tun_next) {
 		if (IN6_ARE_ADDR_EQUAL(&tun_list->tun_laddr, laddr) &&
 		    IN6_ARE_ADDR_EQUAL(&tun_list->tun_faddr, faddr)) {
 			ipsec_tun_pol_t *itp;
 
-			if (!tun_policy_present(tun_list)) {
+			if (!tun_policy_present(tun_list, ns, ipss)) {
 				tun1dbg(("itp_get_byaddr: No IPsec policy on "
 				    "matching tun_t instance %p/%s\n",
 				    (void *)tun_list, tun_list->tun_lifname));
@@ -919,7 +937,7 @@ itp_get_byaddr_fn(uint32_t *lin, uint32_t *fin, int af)
 			    "IPsec policy\n", (void *)tun_list));
 			mutex_enter(&tun_list->tun_itp->itp_lock);
 			itp = tun_list->tun_itp;
-			mutex_exit(&tun_global_lock);
+			mutex_exit(&tuns->tuns_global_lock);
 			ITP_REFHOLD(itp);
 			mutex_exit(&itp->itp_lock);
 			tun1dbg(("itp_get_byaddr: Found itp %p \n",
@@ -931,12 +949,12 @@ itp_get_byaddr_fn(uint32_t *lin, uint32_t *fin, int af)
 	/* didn't find one, return zilch */
 
 	tun1dbg(("itp_get_byaddr: No matching tunnel instances with policy\n"));
-	mutex_exit(&tun_global_lock);
+	mutex_exit(&tuns->tuns_global_lock);
 	return (NULL);
 }
 
 /*
- * Search tun_byaddr_list for occurrence of tun_t, same upper and lower stream,
+ * Search tuns_byaddr_list for occurrence of tun_t, same upper and lower stream,
  * and same type (6to4 vs automatic vs configured)
  * If none is found, insert this tun entry.
  */
@@ -948,6 +966,7 @@ tun_add_byaddr(tun_t *atp)
 	uint_t	mask = atp->tun_flags & (TUN_LOWER_MASK | TUN_UPPER_MASK);
 	uint_t	tun_type = (atp->tun_flags & (TUN_AUTOMATIC | TUN_6TO4));
 	uint_t index = TUN_BYADDR_LIST_HASH(atp->tun_faddr);
+	tun_stack_t *tuns = atp->tun_netstack->netstack_tun;
 
 	tun1dbg(("tun_add_byaddr: index = %d\n", index));
 
@@ -955,7 +974,7 @@ tun_add_byaddr(tun_t *atp)
 	/*
 	 * it's ok to grab global lock while holding tun_lock/perimeter
 	 */
-	mutex_enter(&tun_global_lock);
+	mutex_enter(&tuns->tuns_global_lock);
 
 	/*
 	 * walk through list of tun_t looking for a match of
@@ -964,7 +983,7 @@ tun_add_byaddr(tun_t *atp)
 	 * There shouldn't be all that many tunnels, so a sequential
 	 * search of the bucket should be fine.
 	 */
-	for (tun_list = tun_byaddr_list[index]; tun_list;
+	for (tun_list = tuns->tuns_byaddr_list[index]; tun_list;
 	    tun_list = tun_list->tun_next) {
 		if (tun_list->tun_ppa == ppa &&
 		    ((tun_list->tun_flags & (TUN_LOWER_MASK |
@@ -975,23 +994,23 @@ tun_add_byaddr(tun_t *atp)
 			    "tun_stats 0x%p\n", (void *)atp, ppa,
 			    (void *)tun_list));
 			tun1dbg(("tun_add_byaddr: Nothing to do."));
-			mutex_exit(&tun_global_lock);
+			mutex_exit(&tuns->tuns_global_lock);
 			return;
 		}
 	}
 
 	/* didn't find one, throw it in the global list */
 
-	atp->tun_next = tun_byaddr_list[index];
-	atp->tun_ptpn = &(tun_byaddr_list[index]);
-	if (tun_byaddr_list[index] != NULL)
-		tun_byaddr_list[index]->tun_ptpn = &(atp->tun_next);
-	tun_byaddr_list[index] = atp;
-	mutex_exit(&tun_global_lock);
+	atp->tun_next = tuns->tuns_byaddr_list[index];
+	atp->tun_ptpn = &(tuns->tuns_byaddr_list[index]);
+	if (tuns->tuns_byaddr_list[index] != NULL)
+		tuns->tuns_byaddr_list[index]->tun_ptpn = &(atp->tun_next);
+	tuns->tuns_byaddr_list[index] = atp;
+	mutex_exit(&tuns->tuns_global_lock);
 }
 
 /*
- * Search tun_ppa_list for occurrence of tun_ppa, same lower stream,
+ * Search tuns_ppa_list for occurrence of tun_ppa, same lower stream,
  * and same type (6to4 vs automatic vs configured)
  * If none is found, insert this tun entry and create a new kstat for
  * the entry.
@@ -1010,6 +1029,7 @@ tun_add_stat(queue_t *q)
 	uint_t	lower = atp->tun_flags & TUN_LOWER_MASK;
 	uint_t	tun_type = (atp->tun_flags & (TUN_AUTOMATIC | TUN_6TO4));
 	uint_t index = TUN_LIST_HASH(ppa);
+	tun_stack_t *tuns = atp->tun_netstack->netstack_tun;
 
 	ASSERT(atp->tun_stats == NULL);
 
@@ -1017,7 +1037,7 @@ tun_add_stat(queue_t *q)
 	/*
 	 * it's ok to grab global lock while holding tun_lock/perimeter
 	 */
-	mutex_enter(&tun_global_lock);
+	mutex_enter(&tuns->tuns_global_lock);
 
 	/*
 	 * walk through list of tun_stats looking for a match of
@@ -1027,7 +1047,7 @@ tun_add_stat(queue_t *q)
 	 * search should be fine
 	 * XXX - this may change if tunnels get ever get created on the fly
 	 */
-	for (tun_list = tun_ppa_list[index]; tun_list;
+	for (tun_list = tuns->tuns_ppa_list[index]; tun_list;
 	    tun_list = tun_list->ts_next) {
 		if (tun_list->ts_ppa == ppa &&
 		    tun_list->ts_lower == lower &&
@@ -1036,7 +1056,7 @@ tun_add_stat(queue_t *q)
 			    "tun_stats 0x%p\n", (void *)atp, ppa,
 			    (void *)tun_list));
 			mutex_enter(&tun_list->ts_lock);
-			mutex_exit(&tun_global_lock);
+			mutex_exit(&tuns->tuns_global_lock);
 			ASSERT(tun_list->ts_refcnt > 0);
 			tun_list->ts_refcnt++;
 			ASSERT(atp->tun_kstat_next == NULL);
@@ -1058,7 +1078,8 @@ tun_add_stat(queue_t *q)
 			if (atp->tun_lifname[0] != '\0' &&
 			    atp->tun_itp == NULL) {
 				atp->tun_itp =
-				    get_tunnel_policy(atp->tun_lifname);
+				    get_tunnel_policy(atp->tun_lifname,
+				    atp->tun_netstack);
 			}
 			return (tun_list);
 		}
@@ -1076,27 +1097,30 @@ tun_add_stat(queue_t *q)
 		tun_stat->ts_lower = lower;
 		tun_stat->ts_type = tun_type;
 		tun_stat->ts_ppa = ppa;
-		tun_stat->ts_next = tun_ppa_list[index];
-		tun_ppa_list[index] = tun_stat;
+		tun_stat->ts_next = tuns->tuns_ppa_list[index];
+		tuns->tuns_ppa_list[index] = tun_stat;
 		tun_stat->ts_atp = atp;
 		atp->tun_kstat_next = NULL;
 		atp->tun_stats = tun_stat;
-		mutex_exit(&tun_global_lock);
-		tun_statinit(tun_stat, q->q_qinfo->qi_minfo->mi_idname);
+		mutex_exit(&tuns->tuns_global_lock);
+		tun_statinit(tun_stat, q->q_qinfo->qi_minfo->mi_idname,
+			atp->tun_netstack->netstack_stackid);
 	} else {
-		mutex_exit(&tun_global_lock);
+		mutex_exit(&tuns->tuns_global_lock);
 	}
 	return (tun_stat);
 }
 
 /*
- * remove tun from tun_byaddr_list
+ * remove tun from tuns_byaddr_list
  * called either holding tun_lock or in perimeter
  */
 static void
 tun_rem_tun_byaddr_list(tun_t *atp)
 {
-	mutex_enter(&tun_global_lock);
+	tun_stack_t *tuns = atp->tun_netstack->netstack_tun;
+
+	mutex_enter(&tuns->tuns_global_lock);
 
 	/*
 	 * remove tunnel instance from list of tun_t
@@ -1109,11 +1133,11 @@ tun_rem_tun_byaddr_list(tun_t *atp)
 	atp->tun_ptpn = NULL;
 
 	ASSERT(atp->tun_next == NULL);
-	mutex_exit(&tun_global_lock);
+	mutex_exit(&tuns->tuns_global_lock);
 }
 
 /*
- * remove tun from tun_ppa_list
+ * remove tun from tuns_ppa_list
  * called either holding tun_lock or in perimeter
  */
 static void
@@ -1123,12 +1147,13 @@ tun_rem_ppa_list(tun_t *atp)
 	tun_stats_t	*tun_stat = atp->tun_stats;
 	tun_stats_t	**tun_list;
 	tun_t		**at_list;
+	tun_stack_t	*tuns = atp->tun_netstack->netstack_tun;
 
 	if (tun_stat == NULL)
 		return;
 
 	ASSERT(atp->tun_ppa == tun_stat->ts_ppa);
-	mutex_enter(&tun_global_lock);
+	mutex_enter(&tuns->tuns_global_lock);
 	mutex_enter(&tun_stat->ts_lock);
 	atp->tun_stats = NULL;
 	tun_stat->ts_refcnt--;
@@ -1145,10 +1170,10 @@ tun_rem_ppa_list(tun_t *atp)
 		    (void *)tun_stat));
 
 		if (atp->tun_itp != NULL)
-			itp_unlink(atp->tun_itp);
+			itp_unlink(atp->tun_itp, atp->tun_netstack);
 
 		ASSERT(atp->tun_kstat_next == NULL);
-		for (tun_list = &tun_ppa_list[index]; *tun_list;
+		for (tun_list = &tuns->tuns_ppa_list[index]; *tun_list;
 		    tun_list = &(*tun_list)->ts_next) {
 			if (tun_stat == *tun_list) {
 				*tun_list = tun_stat->ts_next;
@@ -1156,16 +1181,17 @@ tun_rem_ppa_list(tun_t *atp)
 				break;
 			}
 		}
-		mutex_exit(&tun_global_lock);
+		mutex_exit(&tuns->tuns_global_lock);
 		tksp = tun_stat->ts_ksp;
 		tun_stat->ts_ksp = NULL;
 		mutex_exit(&tun_stat->ts_lock);
-		kstat_delete(tksp);
+		kstat_delete_netstack(tksp,
+		    atp->tun_netstack->netstack_stackid);
 		mutex_destroy(&tun_stat->ts_lock);
 		kmem_free(tun_stat, sizeof (tun_stats_t));
 		return;
 	}
-	mutex_exit(&tun_global_lock);
+	mutex_exit(&tuns->tuns_global_lock);
 
 	tun1dbg(("tun_rem_ppa_list: tun 0x%p Removing ref ppa %d tun_stat " \
 	    "0x%p\n", (void *)atp, tun_stat->ts_ppa, (void *)tun_stat));
@@ -1612,6 +1638,7 @@ tun_sparam(queue_t *q, mblk_t *mp)
 	sin6_t *sin6;
 	size_t	size;
 	boolean_t new;
+	ipsec_stack_t *ipss = atp->tun_netstack->netstack_ipsec;
 
 	/* don't allow changes after dl_bind_req */
 	if (atp->tun_state  == DL_IDLE) {
@@ -1836,17 +1863,17 @@ tun_sparam(queue_t *q, mblk_t *mp)
 		 * The version number checked out, so just cast
 		 * ifta_secinfo to an ipsr.
 		 */
-		if (ipsec_loaded()) {
+		if (ipsec_loaded(ipss)) {
 			uerr = tun_set_sec_simple(atp,
 			    (ipsec_req_t *)&ta->ifta_secinfo);
 		} else {
-			if (ipsec_failed()) {
+			if (ipsec_failed(ipss)) {
 				uerr = EPROTONOSUPPORT;
 				goto nak;
 			}
 			/* Otherwise, try again later and load IPsec. */
 			(void) putq(q, mp);
-			ipsec_loader_loadnow();
+			ipsec_loader_loadnow(ipss);
 			return;
 		}
 		if (uerr != 0)
@@ -1921,6 +1948,9 @@ tun_ioctl(queue_t *q, mblk_t *mp)
 	ipaddr_t *rr_addr;
 	char buf[INET6_ADDRSTRLEN];
 	struct lifreq *lifr;
+	netstack_t *ns = atp->tun_netstack;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
+	tun_stack_t *tuns = ns->netstack_tun;
 
 	lvers = atp->tun_flags & TUN_LOWER_MASK;
 
@@ -1980,7 +2010,8 @@ tun_ioctl(queue_t *q, mblk_t *mp)
 		 * dependent.
 		 */
 
-		if (tun_policy_present(atp) && tun_thisvers_policy(atp)) {
+		if (tun_policy_present(atp, ns, ipss) &&
+		    tun_thisvers_policy(atp)) {
 			mutex_enter(&atp->tun_itp->itp_lock);
 			if (!(atp->tun_itp->itp_flags & ITPF_P_TUNNEL) &&
 			    (atp->tun_policy_index >=
@@ -2110,7 +2141,7 @@ tun_ioctl(queue_t *q, mblk_t *mp)
 			tun1dbg(("tun_ioctl: 6to4 Relay Router = %s\n",
 			    inet_ntop(AF_INET, rr_addr, buf,
 				sizeof (buf))));
-			relay_rtr_addr_v4 = *rr_addr;
+			tuns->tuns_relay_rtr_addr_v4 = *rr_addr;
 		} else {
 			tun1dbg(("tun_ioctl: Invalid 6to4 Relay Router " \
 			    "address (%s)\n",
@@ -2136,7 +2167,7 @@ tun_ioctl(queue_t *q, mblk_t *mp)
 		}
 
 		rr_addr = (ipaddr_t *)mp1->b_rptr;
-		*rr_addr = relay_rtr_addr_v4;
+		*rr_addr = tuns->tuns_relay_rtr_addr_v4;
 		break;
 	case DL_IOC_HDR_INFO:
 		uerr = tun_fastpath(q, mp);
@@ -2164,7 +2195,8 @@ tun_ioctl(queue_t *q, mblk_t *mp)
 				    lifr->lifr_name, LIFNAMSIZ);
 				ASSERT(atp->tun_itp == NULL);
 				atp->tun_itp =
-				    get_tunnel_policy(atp->tun_lifname);
+				    get_tunnel_policy(atp->tun_lifname,
+				    ns);
 				/*
 				 * It really doesn't matter if we return
 				 * NULL or not.  If we get the itp pointer,
@@ -2427,7 +2459,7 @@ tun_wproc_mdata(queue_t *q, mblk_t *mp)
  * filled in in TUNSPARAM cases.
  */
 static void
-flush_af(ipsec_policy_head_t *polhead, int ulp_vector)
+flush_af(ipsec_policy_head_t *polhead, int ulp_vector, netstack_t *ns)
 {
 	int dir;
 	int af = (ulp_vector == TUN_U_V4) ? IPSEC_AF_V4 : IPSEC_AF_V6;
@@ -2439,7 +2471,7 @@ flush_af(ipsec_policy_head_t *polhead, int ulp_vector)
 		for (ip = polhead->iph_root[dir].ipr_nonhash[af]; ip != NULL;
 		    ip = nip) {
 			nip = ip->ipsp_hash.hash_next;
-			IPPOL_UNCHAIN(polhead, ip);
+			IPPOL_UNCHAIN(polhead, ip, ns);
 		}
 	}
 }
@@ -2449,7 +2481,7 @@ flush_af(ipsec_policy_head_t *polhead, int ulp_vector)
  */
 static boolean_t
 insert_actual_policies(ipsec_tun_pol_t *itp, ipsec_act_t *actp, uint_t nact,
-    int ulp_vector)
+    int ulp_vector, netstack_t *ns)
 {
 	ipsec_selkey_t selkey;
 	ipsec_policy_t *pol;
@@ -2463,7 +2495,7 @@ insert_actual_policies(ipsec_tun_pol_t *itp, ipsec_act_t *actp, uint_t nact,
 
 		/* v4 inbound */
 		pol = ipsec_policy_create(&selkey, actp, nact,
-		    IPSEC_PRIO_SOCKET, &itp->itp_next_policy_index);
+		    IPSEC_PRIO_SOCKET, &itp->itp_next_policy_index, ns);
 		if (pol == NULL)
 			return (B_FALSE);
 		pr = &polhead->iph_root[IPSEC_TYPE_INBOUND];
@@ -2472,7 +2504,7 @@ insert_actual_policies(ipsec_tun_pol_t *itp, ipsec_act_t *actp, uint_t nact,
 
 		/* v4 outbound */
 		pol = ipsec_policy_create(&selkey, actp, nact,
-		    IPSEC_PRIO_SOCKET, &itp->itp_next_policy_index);
+		    IPSEC_PRIO_SOCKET, &itp->itp_next_policy_index, ns);
 		if (pol == NULL)
 			return (B_FALSE);
 		pr = &polhead->iph_root[IPSEC_TYPE_OUTBOUND];
@@ -2485,7 +2517,7 @@ insert_actual_policies(ipsec_tun_pol_t *itp, ipsec_act_t *actp, uint_t nact,
 
 		/* v6 inbound */
 		pol = ipsec_policy_create(&selkey, actp, nact,
-		    IPSEC_PRIO_SOCKET, &itp->itp_next_policy_index);
+		    IPSEC_PRIO_SOCKET, &itp->itp_next_policy_index, ns);
 		if (pol == NULL)
 			return (B_FALSE);
 		pr = &polhead->iph_root[IPSEC_TYPE_INBOUND];
@@ -2494,7 +2526,7 @@ insert_actual_policies(ipsec_tun_pol_t *itp, ipsec_act_t *actp, uint_t nact,
 
 		/* v6 outbound */
 		pol = ipsec_policy_create(&selkey, actp, nact,
-		    IPSEC_PRIO_SOCKET, &itp->itp_next_policy_index);
+		    IPSEC_PRIO_SOCKET, &itp->itp_next_policy_index, ns);
 		if (pol == NULL)
 			return (B_FALSE);
 		pr = &polhead->iph_root[IPSEC_TYPE_OUTBOUND];
@@ -2519,6 +2551,8 @@ tun_set_sec_simple(tun_t *atp, ipsec_req_t *ipsr)
 	boolean_t clear_all, old_policy = B_FALSE;
 	ipsec_tun_pol_t *itp;
 	tun_t *other_tun;
+	netstack_t *ns = atp->tun_netstack;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
 
 	tun1dbg(
 	    ("tun_set_sec_simple: adjusting tunnel security the old way."));
@@ -2537,7 +2571,7 @@ tun_set_sec_simple(tun_t *atp, ipsec_req_t *ipsr)
 #undef REQ_MASK
 
 	mutex_enter(&atp->tun_lock);
-	if (!tun_policy_present(atp)) {
+	if (!tun_policy_present(atp, ns, ipss)) {
 		if (clear_all) {
 			bzero(&atp->tun_secinfo, sizeof (ipsec_req_t));
 			atp->tun_policy_index = 0;
@@ -2546,7 +2580,7 @@ tun_set_sec_simple(tun_t *atp, ipsec_req_t *ipsr)
 
 		ASSERT(atp->tun_lifname[0] != '\0');
 		atp->tun_itp = create_tunnel_policy(atp->tun_lifname,
-		    &rc, &atp->tun_itp_gen);
+		    &rc, &atp->tun_itp_gen, ns);
 		/* NOTE:  "rc" set by create_tunnel_policy(). */
 		if (atp->tun_itp == NULL)
 			goto bail;
@@ -2554,7 +2588,7 @@ tun_set_sec_simple(tun_t *atp, ipsec_req_t *ipsr)
 	itp = atp->tun_itp;
 
 	/* Allocate the actvec now, before holding itp or polhead locks. */
-	ipsec_actvec_from_req(ipsr, &actp, &nact);
+	ipsec_actvec_from_req(ipsr, &actp, &nact, ns);
 	if (actp == NULL) {
 		rc = ENOMEM;
 		goto bail;
@@ -2584,14 +2618,14 @@ tun_set_sec_simple(tun_t *atp, ipsec_req_t *ipsr)
 		 * in the spdosock code-paths, due to backward compatibility.
 		 */
 		ITPF_CLONE(itp->itp_flags);
-		rc = ipsec_copy_polhead(itp->itp_policy, itp->itp_inactive);
+		rc = ipsec_copy_polhead(itp->itp_policy, itp->itp_inactive, ns);
 		if (rc != 0) {
 			/* inactive has already been cleared. */
 			itp->itp_flags &= ~ITPF_IFLAGS;
 			goto mutex_bail;
 		}
 		rw_enter(&itp->itp_policy->iph_lock, RW_WRITER);
-		flush_af(itp->itp_policy, atp->tun_flags & TUN_UPPER_MASK);
+		flush_af(itp->itp_policy, atp->tun_flags & TUN_UPPER_MASK, ns);
 	} else {
 		/* Else assume itp->itp_policy is already flushed. */
 		rw_enter(&itp->itp_policy->iph_lock, RW_WRITER);
@@ -2607,7 +2641,7 @@ tun_set_sec_simple(tun_t *atp, ipsec_req_t *ipsr)
 		goto recover_bail;
 	}
 	if (insert_actual_policies(itp, actp, nact,
-		atp->tun_flags & TUN_UPPER_MASK)) {
+		atp->tun_flags & TUN_UPPER_MASK, ns)) {
 		rw_exit(&itp->itp_policy->iph_lock);
 		/*
 		 * Adjust MTU and make sure the DL side knows what's up.
@@ -2647,7 +2681,7 @@ recover_bail:
 
 	if (old_policy) {
 		/* Recover policy in in active polhead. */
-		ipsec_swap_policy(itp->itp_policy, itp->itp_inactive);
+		ipsec_swap_policy(itp->itp_policy, itp->itp_inactive, ns);
 		ITPF_SWAP(itp->itp_flags);
 		atp->tun_extra_offset = TUN_LINK_EXTRA_OFF;
 	}
@@ -2655,7 +2689,7 @@ recover_bail:
 	/* Clear policy in inactive polhead. */
 	itp->itp_flags &= ~ITPF_IFLAGS;
 	rw_enter(&itp->itp_inactive->iph_lock, RW_WRITER);
-	ipsec_polhead_flush(itp->itp_inactive);
+	ipsec_polhead_flush(itp->itp_inactive, ns);
 	rw_exit(&itp->itp_inactive->iph_lock);
 
 mutex_bail:
@@ -3012,7 +3046,8 @@ tun_rdata_v6(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 		ASSERT(IN6_ARE_ADDR_EQUAL(&v6dst, &atp->tun_laddr) &&
 		    IN6_ARE_ADDR_EQUAL(&v6src, &atp->tun_faddr));
 		if (!ipsec_tun_inbound(ipsec_mp, &data_mp, atp->tun_itp,
-			inner_iph, NULL, NULL, outer_ip6h, 0)) {
+		    inner_iph, NULL, NULL, outer_ip6h, 0,
+		    atp->tun_netstack)) {
 			data_mp = NULL;
 			ipsec_mp = NULL;
 			atomic_add_32(&atp->tun_InErrors, 1);
@@ -3046,7 +3081,7 @@ tun_rdata_v6(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 		ASSERT(IN6_ARE_ADDR_EQUAL(&v6dst, &atp->tun_laddr));
 
 		if (!ipsec_tun_inbound(ipsec_mp, &data_mp, atp->tun_itp, NULL,
-			ip6h, NULL, outer_ip6h, 0)) {
+			ip6h, NULL, outer_ip6h, 0, atp->tun_netstack)) {
 			data_mp = NULL;
 			ipsec_mp = NULL;
 			atomic_add_32(&atp->tun_InErrors, 1);
@@ -3121,6 +3156,7 @@ tun_rdata_v4(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 	char		buf2[INET6_ADDRSTRLEN];
 	char		buf[TUN_WHO_BUF];
 	int		pullup_len;
+	tun_stack_t	*tuns = atp->tun_netstack->netstack_tun;
 
 	/* need at least an IP header */
 	ASSERT((data_mp->b_wptr - data_mp->b_rptr) >= sizeof (ipha_t));
@@ -3168,7 +3204,7 @@ tun_rdata_v4(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 
 		/* NOTE:  ipsec_tun_inbound() always frees ipsec_mp. */
 		if (!ipsec_tun_inbound(ipsec_mp, &data_mp, atp->tun_itp,
-			inner_iph, NULL, iph, NULL, 0)) {
+			inner_iph, NULL, iph, NULL, 0, atp->tun_netstack)) {
 			data_mp = NULL;
 			atomic_add_32(&atp->tun_InErrors, 1);
 			goto drop;
@@ -3201,7 +3237,7 @@ tun_rdata_v4(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 
 		/* NOTE:  ipsec_tun_inbound() always frees ipsec_mp. */
 		if (!ipsec_tun_inbound(ipsec_mp, &data_mp, atp->tun_itp, NULL,
-			ip6h, iph, NULL, 0)) {
+			ip6h, iph, NULL, 0, atp->tun_netstack)) {
 			data_mp = NULL;
 			atomic_add_32(&atp->tun_InErrors, 1);
 			goto drop;
@@ -3374,7 +3410,7 @@ tun_rdata_v4(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 				/*
 				 * Check if tun module support 6to4 Relay
 				 * Router is disabled or enabled.
-				 * relay_rtr_addr_v4 will equal INADDR_ANY
+				 * tuns_relay_rtr_addr_v4 will equal INADDR_ANY
 				 * if support is disabled.  Otherwise, it will
 				 * equal a valid, routable, IPv4 address;
 				 * denoting that the packet will be accepted.
@@ -3384,14 +3420,15 @@ tun_rdata_v4(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 				 * support is disabled by default for
 				 * security reasons.
 				 */
-				if (relay_rtr_addr_v4 == INADDR_ANY) {
-					tun1dbg(("tun_rdata_v4: " \
-					    "%s relay_rtr_addr_v4 = %s, " \
-					    "dropping packet from IPv4 src " \
+				if (tuns->tuns_relay_rtr_addr_v4 ==
+				    INADDR_ANY) {
+					tun1dbg(("tun_rdata_v4: "
+					    "%s tuns_relay_rtr_addr_v4 = %s, "
+					    "dropping packet from IPv4 src "
 					    "%s\n", tun_who(q, buf),
 					    inet_ntop(AF_INET,
-						&relay_rtr_addr_v4, buf1,
-						sizeof (buf1)),
+						&tuns->tuns_relay_rtr_addr_v4,
+						buf1, sizeof (buf1)),
 					    inet_ntop(AF_INET, &v4src, buf2,
 						sizeof (buf2))));
 					for (nmp = data_mp; nmp != NULL;
@@ -3584,7 +3621,7 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 	 * ipsec_tun_inbound() always frees ipsec_mp.
 	 */
 	if (!ipsec_tun_inbound(ipsec_mp, &mp, atp->tun_itp, inner_ipha, NULL,
-		outer_ipha, NULL, -outer_hlen)) {
+		outer_ipha, NULL, -outer_hlen, atp->tun_netstack)) {
 		/* Callee did all of the freeing */
 		return;
 	}
@@ -3739,7 +3776,7 @@ icmp_ricmp_err_v4_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp, icmp6_t *icmph)
 	 * ipsec_tun_inbound() always frees ipsec_mp.
 	 */
 	if (!ipsec_tun_inbound(ipsec_mp, &mp, atp->tun_itp, ipha, NULL, NULL,
-		ip6, -outer_hlen))
+		ip6, -outer_hlen, atp->tun_netstack))
 		/* Callee did all of the freeing */
 		return;
 	ASSERT(mp == orig_mp);
@@ -3894,7 +3931,7 @@ icmp_ricmp_err_v6_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp, icmp6_t *icmph)
 	 * ipsec_tun_inbound() always frees ipsec_mp.
 	 */
 	if (!ipsec_tun_inbound(ipsec_mp, &mp, atp->tun_itp, NULL, inner_ip6,
-		NULL, ip6, -outer_hlen))
+		NULL, ip6, -outer_hlen, atp->tun_netstack))
 		/* Callee did all of the freeing */
 		return;
 	ASSERT(mp == orig_mp);
@@ -4101,7 +4138,7 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 	 * ipsec_tun_inbound() always frees ipsec_mp.
 	 */
 	if (!ipsec_tun_inbound(ipsec_mp, &mp, atp->tun_itp, NULL, ip6h,
-		outer_ipha, NULL, -outer_hlen))
+		outer_ipha, NULL, -outer_hlen, atp->tun_netstack))
 		/* Callee did all of the freeing */
 		return;
 	ASSERT(mp == orig_mp);
@@ -4761,7 +4798,7 @@ tun_wdata_v4(queue_t *q, mblk_t *mp)
 	atomic_add_64(&atp->tun_HCOutOctets, (int64_t)msgdsize(mp));
 
 	mp = ipsec_tun_outbound(mp, atp, inner_ipha, NULL, outer_ipha, ip6,
-	    hdrlen);
+	    hdrlen, atp->tun_netstack);
 	if (mp == NULL)
 		return;
 
@@ -4888,7 +4925,7 @@ tun_wputnext_v4(queue_t *q, mblk_t *mp)
 	atomic_add_64(&atp->tun_HCOutOctets, (int64_t)msgsize(mp));
 
 	mp = ipsec_tun_outbound(mp, atp, inner_ipha, NULL, outer_ipha, ip6,
-	    hdrlen);
+	    hdrlen, atp->tun_netstack);
 	if (mp == NULL)
 		return (0);
 
@@ -5044,7 +5081,8 @@ tun_wputnext_v6(queue_t *q, mblk_t *mp)
 		tun_send_ire_req(q);
 
 	/* send the packet down the transport stream to IPv4/IPv6 */
-	mp = ipsec_tun_outbound(mp, atp, NULL, ip6h, ipha, outer_ip6, hdrlen);
+	mp = ipsec_tun_outbound(mp, atp, NULL, ip6h, ipha, outer_ip6, hdrlen,
+	    atp->tun_netstack);
 	if (mp == NULL)
 		return (0);
 
@@ -5160,6 +5198,7 @@ tun_wdata_v6(queue_t *q, mblk_t *mp)
 	size_t		hdrlen;
 	int		encap_limit = 0;
 	struct ip6_opt_tunnel *encap_opt;
+	tun_stack_t	*tuns = atp->tun_netstack->netstack_tun;
 
 	ASSERT((mp->b_wptr - mp->b_rptr) >= sizeof (ip6_t));
 
@@ -5292,7 +5331,8 @@ tun_wdata_v6(queue_t *q, mblk_t *mp)
 			 * This implementation will drop packets with native
 			 * IPv6 destinations if 6to4 Relay Router communication
 			 * support is disabled.  This support is checked
-			 * by examining relay_rtr_addr_v4; INADDR_ANY denotes
+			 * by examining tuns_relay_rtr_addr_v4; INADDR_ANY
+			 * denotes
 			 * support is disabled; a valid, routable IPv4 addr
 			 * denotes support is enabled.  Support is disabled
 			 * by default, because there is no standard trust
@@ -5307,18 +5347,19 @@ tun_wdata_v6(queue_t *q, mblk_t *mp)
 				/*
 				 * destination is a native IPv6 address
 				 */
-				if (relay_rtr_addr_v4 == INADDR_ANY) {
+				if (tuns->tuns_relay_rtr_addr_v4 ==
+				    INADDR_ANY) {
 					/*
 					 * 6to4 Relay Router communication
 					 * support is disabled.
 					 */
-					tun1dbg(("tun_wdata_v6: " \
-					    "%s relay_rtr_addr_v4 = %s, " \
-					    "dropping packet with IPv6 dst " \
+					tun1dbg(("tun_wdata_v6: "
+					    "%s tuns_relay_rtr_addr_v4 = %s, "
+					    "dropping packet with IPv6 dst "
 					    "%s\n", tun_who(q, buf),
 					    inet_ntop(AF_INET,
-						&relay_rtr_addr_v4, buf1,
-						sizeof (buf1)),
+						&tuns->tuns_relay_rtr_addr_v4,
+						buf1, sizeof (buf1)),
 					    inet_ntop(AF_INET6, &ip6h->ip6_dst,
 						buf2, sizeof (buf2))));
 					atomic_add_32(&atp->tun_OutDiscard, 1);
@@ -5332,7 +5373,7 @@ tun_wdata_v6(queue_t *q, mblk_t *mp)
 				 *  6to4 Relay Router anycast address,
 				 * defined in RFC 3068)
 				 */
-				ipha->ipha_dst = relay_rtr_addr_v4;
+				ipha->ipha_dst = tuns->tuns_relay_rtr_addr_v4;
 			}
 		}
 		/*
@@ -5430,7 +5471,8 @@ tun_wdata_v6(queue_t *q, mblk_t *mp)
 		tun_send_ire_req(q);
 
 	/* send the packet down the transport stream to IP */
-	mp = ipsec_tun_outbound(mp, atp, NULL, ip6h, ipha, outer_ip6, hdrlen);
+	mp = ipsec_tun_outbound(mp, atp, NULL, ip6h, ipha, outer_ip6, hdrlen,
+	    atp->tun_netstack);
 	if (mp == NULL)
 		return;
 
@@ -5613,6 +5655,9 @@ tun_stat_kstat_update(kstat_t *ksp, int rw)
 	tun_stats_t *tstats;
 	struct tunstat *tunsp;
 
+	if (ksp == NULL || ksp->ks_data == NULL)
+		return (EIO);
+
 	tstats = (tun_stats_t *)ksp->ks_private;
 	mutex_enter(&tstats->ts_lock);
 	tunsp = (struct tunstat *)ksp->ks_data;
@@ -5706,7 +5751,7 @@ tun_stat_kstat_update(kstat_t *ksp, int rw)
  * Initialize kstats
  */
 static void
-tun_statinit(tun_stats_t *tun_stat, char *modname)
+tun_statinit(tun_stats_t *tun_stat, char *modname, netstackid_t stackid)
 {
 	kstat_t	*ksp;
 	struct tunstat *tunsp;
@@ -5723,9 +5768,9 @@ tun_statinit(tun_stats_t *tun_stat, char *modname)
 	}
 	(void) sprintf(buf, "%s.%s%d", mod_buf, modname, tun_stat->ts_ppa);
 	tun1dbg(("tunstatinit: Creating kstat %s\n", buf));
-	if ((ksp = kstat_create(mod_buf, tun_stat->ts_ppa, buf, "net",
+	if ((ksp = kstat_create_netstack(mod_buf, tun_stat->ts_ppa, buf, "net",
 	    KSTAT_TYPE_NAMED, sizeof (struct tunstat) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_PERSISTENT)) == NULL) {
+	    KSTAT_FLAG_PERSISTENT, stackid)) == NULL) {
 		cmn_err(CE_CONT, "tun: kstat_create failed tun%d",
 		    tun_stat->ts_ppa);
 		return;
@@ -5792,4 +5837,51 @@ tun_who(queue_t *q, char *buf)
 	    (atp->tun_flags & TUN_UPPER_MASK) == TUN_U_V6 ? "inet6" :
 	    "<unknown af>");
 	return (buf);
+}
+
+/*
+ * Initialize the tunnel stack instance.
+ */
+/*ARGSUSED*/
+static void *
+tun_stack_init(netstackid_t stackid, netstack_t *ns)
+{
+	tun_stack_t	*tuns;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+
+	tuns = (tun_stack_t *)kmem_zalloc(sizeof (*tuns), KM_SLEEP);
+	tuns->tuns_netstack = ns;
+
+	mutex_init(&tuns->tuns_global_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	rw_enter(&ipss->ipsec_itp_get_byaddr_rw_lock, RW_WRITER);
+	ipss->ipsec_itp_get_byaddr = itp_get_byaddr_fn;
+	rw_exit(&ipss->ipsec_itp_get_byaddr_rw_lock);
+
+	return (tuns);
+}
+
+/*
+ * Free the tunnel stack instance.
+ */
+/*ARGSUSED*/
+static void
+tun_stack_fini(netstackid_t stackid, void *arg)
+{
+	tun_stack_t	*tuns = (tun_stack_t *)arg;
+	ipsec_stack_t	*ipss = tuns->tuns_netstack->netstack_ipsec;
+	int		i;
+
+	rw_enter(&ipss->ipsec_itp_get_byaddr_rw_lock, RW_WRITER);
+	ipss->ipsec_itp_get_byaddr = itp_get_byaddr_dummy;
+	rw_exit(&ipss->ipsec_itp_get_byaddr_rw_lock);
+
+	for (i = 0; i < TUN_PPA_SZ; i++) {
+		ASSERT(tuns->tuns_ppa_list[i] == NULL);
+	}
+	for (i = 0; i < TUN_T_SZ; i++) {
+		ASSERT(tuns->tuns_byaddr_list[i] == NULL);
+	}
+	mutex_destroy(&tuns->tuns_global_lock);
+	kmem_free(tuns, sizeof (*tuns));
 }

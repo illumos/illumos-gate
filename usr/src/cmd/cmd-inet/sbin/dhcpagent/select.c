@@ -169,7 +169,10 @@ dhcp_selecting(dhcp_smach_t *dsmp)
 		    htons(dsmp->dsm_lif->lif_max - sizeof (struct udpiphdr)));
 		(void) add_pkt_opt32(dpkt, CD_LEASE_TIME, htonl(DHCP_PERM));
 
-		(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id, class_id_len);
+		if (class_id_len != 0) {
+			(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id,
+			    class_id_len);
+		}
 		(void) add_pkt_prl(dpkt, dsmp);
 
 		if (df_get_bool(dsmp->dsm_name, dsmp->dsm_isv6,
@@ -280,7 +283,7 @@ dhcp_collect_dlpi(iu_eh_t *eh, int fd, short events, iu_event_id_t id,
 		return;
 	}
 
-	if (pkt_v4_match(recv_type, DHCP_PACK | DHCP_PNAK)) {
+	if (pkt_v4_match(recv_type, DHCP_PACK)) {
 		if (!dhcp_bound(dsmp, plp)) {
 			dhcpmsg(MSG_WARNING, "dhcp_collect_dlpi: dhcp_bound "
 			    "failed for %s", dsmp->dsm_name);
@@ -289,6 +292,9 @@ dhcp_collect_dlpi(iu_eh_t *eh, int fd, short events, iu_event_id_t id,
 		}
 		dhcpmsg(MSG_VERBOSE, "dhcp_collect_dlpi: %s on %s",
 		    pname, dsmp->dsm_name);
+	} else if (pkt_v4_match(recv_type, DHCP_PNAK)) {
+		free_pkt_entry(plp);
+		dhcp_restart(dsmp);
 	} else {
 		pkt_smach_enqueue(dsmp, plp);
 	}

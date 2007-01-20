@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,6 +86,7 @@ struct file;
 #include <netinet/ip_icmp.h>
 #include "netinet/ip_compat.h"
 #include <netinet/tcpip.h>
+#include "netinet/ipf_stack.h"
 #include "netinet/ip_fil.h"
 #include "netinet/ip_nat.h"
 #include "netinet/ip_state.h"
@@ -121,73 +122,72 @@ int		ipf_proxy_debug = 0;
 #else
 int		ipf_proxy_debug = 2;
 #endif
-ap_session_t	*ap_sess_tab[AP_SESS_SIZE];
-ap_session_t	*ap_sess_list = NULL;
-aproxy_t	*ap_proxylist = NULL;
-aproxy_t	ap_proxies[] = {
+
+static aproxy_t	lcl_ap_proxies[] = {
 #ifdef	IPF_FTP_PROXY
-	{ NULL, "ftp", (char)IPPROTO_TCP, 0, 0, ippr_ftp_init, ippr_ftp_fini,
+	{ NULL, "ftp", (char)IPPROTO_TCP, 0, 0, NULL, ippr_ftp_init, ippr_ftp_fini,
 	  ippr_ftp_new, NULL, ippr_ftp_in, ippr_ftp_out, NULL },
 #endif
 #ifdef	IPF_IRC_PROXY
-	{ NULL, "irc", (char)IPPROTO_TCP, 0, 0, ippr_irc_init, ippr_irc_fini,
+	{ NULL, "irc", (char)IPPROTO_TCP, 0, 0, NULL, ippr_irc_init, ippr_irc_fini,
 	  ippr_irc_new, NULL, NULL, ippr_irc_out, NULL, NULL },
 #endif
 #ifdef	IPF_RCMD_PROXY
-	{ NULL, "rcmd", (char)IPPROTO_TCP, 0, 0, ippr_rcmd_init, ippr_rcmd_fini,
+	{ NULL, "rcmd", (char)IPPROTO_TCP, 0, 0, NULL, ippr_rcmd_init, ippr_rcmd_fini,
 	  ippr_rcmd_new, NULL, ippr_rcmd_in, ippr_rcmd_out, NULL, NULL },
 #endif
 #ifdef	IPF_RAUDIO_PROXY
-	{ NULL, "raudio", (char)IPPROTO_TCP, 0, 0, ippr_raudio_init, ippr_raudio_fini,
+	{ NULL, "raudio", (char)IPPROTO_TCP, 0, 0, NULL, ippr_raudio_init, ippr_raudio_fini,
 	  ippr_raudio_new, NULL, ippr_raudio_in, ippr_raudio_out, NULL, NULL },
 #endif
 #ifdef	IPF_MSNRPC_PROXY
-	{ NULL, "msnrpc", (char)IPPROTO_TCP, 0, 0, ippr_msnrpc_init, ippr_msnrpc_fini,
+	{ NULL, "msnrpc", (char)IPPROTO_TCP, 0, 0, NULL, ippr_msnrpc_init, ippr_msnrpc_fini,
 	  ippr_msnrpc_new, NULL, ippr_msnrpc_in, ippr_msnrpc_out, NULL, NULL },
 #endif
 #ifdef	IPF_NETBIOS_PROXY
-	{ NULL, "netbios", (char)IPPROTO_UDP, 0, 0, ippr_netbios_init, ippr_netbios_fini,
+	{ NULL, "netbios", (char)IPPROTO_UDP, 0, 0, NULL, ippr_netbios_init, ippr_netbios_fini,
 	  NULL, NULL, NULL, ippr_netbios_out, NULL, NULL },
 #endif
 #ifdef	IPF_IPSEC_PROXY
-	{ NULL, "ipsec", (char)IPPROTO_UDP, 0, 0,
+	{ NULL, "ipsec", (char)IPPROTO_UDP, 0, 0, NULL,
 	  ippr_ipsec_init, ippr_ipsec_fini, ippr_ipsec_new, ippr_ipsec_del,
 	  ippr_ipsec_inout, ippr_ipsec_inout, ippr_ipsec_match, NULL },
 #endif
 #ifdef	IPF_PPTP_PROXY
-	{ NULL, "pptp", (char)IPPROTO_TCP, 0, 0,
+	{ NULL, "pptp", (char)IPPROTO_TCP, 0, 0, NULL,
 	  ippr_pptp_init, ippr_pptp_fini, ippr_pptp_new, ippr_pptp_del,
 	  ippr_pptp_inout, ippr_pptp_inout, NULL, NULL },
 #endif
 #ifdef  IPF_H323_PROXY
-	{ NULL, "h323", (char)IPPROTO_TCP, 0, 0, ippr_h323_init, ippr_h323_fini,
+	{ NULL, "h323", (char)IPPROTO_TCP, 0, 0, NULL, ippr_h323_init, ippr_h323_fini,
 	  ippr_h323_new, ippr_h323_del, ippr_h323_in, NULL, NULL },
-	{ NULL, "h245", (char)IPPROTO_TCP, 0, 0, NULL, NULL,
+	{ NULL, "h245", (char)IPPROTO_TCP, 0, 0, NULL, NULL, NULL,
 	  ippr_h245_new, NULL, NULL, ippr_h245_out, NULL },
 #endif
 #ifdef	IPF_RPCB_PROXY
 # if 0
-	{ NULL, "rpcbt", (char)IPPROTO_TCP, 0, 0,
+	{ NULL, "rpcbt", (char)IPPROTO_TCP, 0, 0, NULL,
 	  ippr_rpcb_init, ippr_rpcb_fini, ippr_rpcb_new, ippr_rpcb_del,
 	  ippr_rpcb_in, ippr_rpcb_out, NULL, NULL },
 # endif
-	{ NULL, "rpcbu", (char)IPPROTO_UDP, 0, 0,
+	{ NULL, "rpcbu", (char)IPPROTO_UDP, 0, 0, NULL,
 	  ippr_rpcb_init, ippr_rpcb_fini, ippr_rpcb_new, ippr_rpcb_del,
 	  ippr_rpcb_in, ippr_rpcb_out, NULL, NULL },
 #endif
-	{ NULL, "", '\0', 0, 0, NULL, NULL, NULL, NULL }
+	{ NULL, "", '\0', 0, 0, NULL, NULL, NULL, NULL, NULL }
 };
 
 /*
  * Dynamically add a new kernel proxy.  Ensure that it is unique in the
  * collection compiled in and dynamically added.
  */
-int appr_add(ap)
+int appr_add(ap, ifs)
 aproxy_t *ap;
+ipf_stack_t *ifs;
 {
 	aproxy_t *a;
 
-	for (a = ap_proxies; a->apr_p; a++)
+	for (a = ifs->ifs_ap_proxies; a->apr_p; a++)
 		if ((a->apr_p == ap->apr_p) &&
 		    !strncmp(a->apr_label, ap->apr_label,
 			     sizeof(ap->apr_label))) {
@@ -197,7 +197,7 @@ aproxy_t *ap;
 			return -1;
 		}
 
-	for (a = ap_proxylist; a->apr_p; a = a->apr_next)
+	for (a = ifs->ifs_ap_proxylist; a->apr_p; a = a->apr_next)
 		if ((a->apr_p == ap->apr_p) &&
 		    !strncmp(a->apr_label, ap->apr_label,
 			     sizeof(ap->apr_label))) {
@@ -206,10 +206,11 @@ aproxy_t *ap;
 				       a->apr_label, a->apr_p);
 			return -1;
 		}
-	ap->apr_next = ap_proxylist;
-	ap_proxylist = ap;
+	ap->apr_next = ifs->ifs_ap_proxylist;
+	ifs->ifs_ap_proxylist = ap;
 	if (ap->apr_init != NULL)
-		return (*ap->apr_init)();
+		return (*ap->apr_init)(&ap->apr_private, ifs);
+
 	return 0;
 }
 
@@ -219,13 +220,14 @@ aproxy_t *ap;
  * exists, and if it does and it has a control function then invoke that
  * control function.
  */
-int appr_ctl(ctl)
+int appr_ctl(ctl, ifs)
 ap_ctl_t *ctl;
+ipf_stack_t *ifs;
 {
 	aproxy_t *a;
 	int error;
 
-	a = appr_lookup(ctl->apc_p, ctl->apc_label);
+	a = appr_lookup(ctl->apc_p, ctl->apc_label, ifs);
 	if (a == NULL) {
 		if (ipf_proxy_debug > 1)
 			printf("appr_ctl: can't find %s/%d\n",
@@ -237,7 +239,7 @@ ap_ctl_t *ctl;
 				ctl->apc_label, ctl->apc_p);
 		error = ENXIO;
 	} else {
-		error = (*a->apr_ctl)(a, ctl);
+		error = (*a->apr_ctl)(a, ctl, a->apr_private);
 		if ((error != 0) && (ipf_proxy_debug > 1))
 			printf("appr_ctl: %s/%d ctl error %d\n",
 				a->apr_label, a->apr_p, error);
@@ -251,12 +253,14 @@ ap_ctl_t *ctl;
  * If it is in use, return 1 (do not destroy NOW), not in use 0 or -1
  * if it cannot be matched.
  */
-int appr_del(ap)
+int appr_del(ap, ifs)
 aproxy_t *ap;
+ipf_stack_t *ifs;
 {
 	aproxy_t *a, **app;
 
-	for (app = &ap_proxylist; ((a = *app) != NULL); app = &a->apr_next)
+	for (app = &ifs->ifs_ap_proxylist; ((a = *app) != NULL);
+	     app = &a->apr_next)
 		if (a == ap) {
 			a->apr_flags |= APR_DELETE;
 			*app = a->apr_next;
@@ -294,10 +298,11 @@ ipnat_t *nat;
 }
 
 
-int appr_ioctl(data, cmd, mode)
+int appr_ioctl(data, cmd, mode, ifs)
 caddr_t data;
 ioctlcmd_t cmd;
 int mode;
+ipf_stack_t *ifs;
 {
 	ap_ctl_t ctl;
 	caddr_t ptr;
@@ -327,7 +332,7 @@ int mode;
 		}
 
 		if (error == 0)
-			error = appr_ctl(&ctl);
+			error = appr_ctl(&ctl, ifs);
 
 		if ((ctl.apc_dsize > 0) && (ptr != NULL) &&
 		    (ctl.apc_data == ptr)) {
@@ -376,7 +381,7 @@ nat_t *nat;
 	}
 
 	if (apr->apr_match != NULL) {
-		result = (*apr->apr_match)(fin, nat->nat_aps, nat);
+		result = (*apr->apr_match)(fin, nat->nat_aps, nat, apr->apr_private);
 		if (result != 0) {
 			if (ipf_proxy_debug > 4)
 				printf("appr_match: result %d\n", result);
@@ -398,6 +403,7 @@ nat_t *nat;
 {
 	register ap_session_t *aps;
 	aproxy_t *apr;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	if (ipf_proxy_debug > 8)
 		printf("appr_new(%lx,%lx) \n", (u_long)fin, (u_long)nat);
@@ -433,7 +439,7 @@ nat_t *nat;
 	aps->aps_apr = apr;
 	aps->aps_psiz = 0;
 	if (apr->apr_new != NULL)
-		if ((*apr->apr_new)(fin, aps, nat) == -1) {
+		if ((*apr->apr_new)(fin, aps, nat, apr->apr_private) == -1) {
 			if ((aps->aps_data != NULL) && (aps->aps_psiz != 0)) {
 				KFREES(aps->aps_data, aps->aps_psiz);
 			}
@@ -444,8 +450,8 @@ nat_t *nat;
 			return -1;
 		}
 	aps->aps_nat = nat;
-	aps->aps_next = ap_sess_list;
-	ap_sess_list = aps;
+	aps->aps_next = ifs->ifs_ap_sess_list;
+	ifs->ifs_ap_sess_list = aps;
 	nat->nat_aps = aps;
 
 	return 0;
@@ -476,12 +482,14 @@ nat_t *nat;
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi)
 	u_32_t s1, s2, sd;
 #endif
+	ipf_stack_t *ifs = fin->fin_ifs;
+
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
 	net_data_t net_data_p;
 	if (fin->fin_v == 4)
-		net_data_p = ipf_ipv4;
+		net_data_p = ifs->ifs_ipf_ipv4;
 	else
-		net_data_p = ipf_ipv6;
+		net_data_p = ifs->ifs_ipf_ipv6;
 #endif
 
 	if (fin->fin_flx & FI_BAD) {
@@ -496,7 +504,7 @@ nat_t *nat;
 			printf("appr_check: l4 checksum failure %d\n",
 				fin->fin_p);
 		if (fin->fin_p == IPPROTO_TCP)
-			frstats[fin->fin_out].fr_tcpbad++;
+			ifs->ifs_frstats[fin->fin_out].fr_tcpbad++;
 		return -1;
 	}
 #endif
@@ -545,10 +553,10 @@ nat_t *nat;
 		err = 0;
 		if (fin->fin_out != 0) {
 			if (apr->apr_outpkt != NULL)
-				err = (*apr->apr_outpkt)(fin, aps, nat);
+				err = (*apr->apr_outpkt)(fin, aps, nat, apr->apr_private);
 		} else {
 			if (apr->apr_inpkt != NULL)
-				err = (*apr->apr_inpkt)(fin, aps, nat);
+				err = (*apr->apr_inpkt)(fin, aps, nat, apr->apr_private);
 		}
 
 		rv = APR_EXIT(err);
@@ -627,23 +635,24 @@ nat_t *nat;
 /*
  * Search for an proxy by the protocol it is being used with and its name.
  */
-aproxy_t *appr_lookup(pr, name)
+aproxy_t *appr_lookup(pr, name, ifs)
 u_int pr;
 char *name;
+ipf_stack_t *ifs;
 {
 	aproxy_t *ap;
 
 	if (ipf_proxy_debug > 8)
 		printf("appr_lookup(%d,%s)\n", pr, name);
 
-	for (ap = ap_proxies; ap->apr_p; ap++)
+	for (ap = ifs->ifs_ap_proxies; ap->apr_p; ap++)
 		if ((ap->apr_p == pr) &&
 		    !strncmp(name, ap->apr_label, sizeof(ap->apr_label))) {
 			ap->apr_ref++;
 			return ap;
 		}
 
-	for (ap = ap_proxylist; ap; ap = ap->apr_next)
+	for (ap = ifs->ifs_ap_proxylist; ap; ap = ap->apr_next)
 		if ((ap->apr_p == pr) &&
 		    !strncmp(name, ap->apr_label, sizeof(ap->apr_label))) {
 			ap->apr_ref++;
@@ -662,8 +671,9 @@ aproxy_t *ap;
 }
 
 
-void aps_free(aps)
+void aps_free(aps, ifs)
 ap_session_t *aps;
+ipf_stack_t *ifs;
 {
 	ap_session_t *a, **ap;
 	aproxy_t *apr;
@@ -671,7 +681,7 @@ ap_session_t *aps;
 	if (!aps)
 		return;
 
-	for (ap = &ap_sess_list; ((a = *ap) != NULL); ap = &a->aps_next)
+	for (ap = &ifs->ifs_ap_sess_list; ((a = *ap) != NULL); ap = &a->aps_next)
 		if (a == aps) {
 			*ap = a->aps_next;
 			break;
@@ -679,7 +689,7 @@ ap_session_t *aps;
 
 	apr = aps->aps_apr;
 	if ((apr != NULL) && (apr->apr_del != NULL))
-		(*apr->apr_del)(aps);
+		(*apr->apr_del)(aps, apr->apr_private, ifs);
 
 	if ((aps->aps_data != NULL) && (aps->aps_psiz != 0))
 		KFREES(aps->aps_data, aps->aps_psiz);
@@ -836,19 +846,24 @@ int inc;
  * Initialise hook for kernel application proxies.
  * Call the initialise routine for all the compiled in kernel proxies.
  */
-int appr_init()
+int appr_init(ifs)
+ipf_stack_t *ifs;
 {
 	aproxy_t *ap;
-	int err = 0;
+	int err =  0;
 
-	for (ap = ap_proxies; ap->apr_p; ap++) {
+	/* Since the refcnt is used we make a copy of lcl_ap_proxies */
+	KMALLOCS(ifs->ifs_ap_proxies, aproxy_t *, sizeof (lcl_ap_proxies));
+	bcopy(lcl_ap_proxies, ifs->ifs_ap_proxies, sizeof (lcl_ap_proxies));
+
+	for (ap = ifs->ifs_ap_proxies; ap->apr_p; ap++) {
 		if (ap->apr_init != NULL) {
-			err = (*ap->apr_init)();
+			err = (*ap->apr_init)(&ap->apr_private, ifs);
 			if (err != 0)
 				break;
 		}
 	}
-	return err;
+	return 0;
 }
 
 
@@ -856,14 +871,20 @@ int appr_init()
  * Unload hook for kernel application proxies.
  * Call the finialise routine for all the compiled in kernel proxies.
  */
-void appr_unload()
+void appr_unload(ifs)
+ipf_stack_t *ifs;
 {
 	aproxy_t *ap;
+	if(ifs->ifs_ap_proxies == NULL)
+		return;
 
-	for (ap = ap_proxies; ap->apr_p; ap++)
+	for (ap = ifs->ifs_ap_proxies; ap->apr_p; ap++)
 		if (ap->apr_fini != NULL)
-			(*ap->apr_fini)();
-	for (ap = ap_proxylist; ap; ap = ap->apr_next)
+			(*ap->apr_fini)(&ap->apr_private, ifs);
+	for (ap = ifs->ifs_ap_proxylist; ap; ap = ap->apr_next)
 		if (ap->apr_fini != NULL)
-			(*ap->apr_fini)();
+			(*ap->apr_fini)(&ap->apr_private, ifs);
+
+	KFREES(ifs->ifs_ap_proxies, sizeof (lcl_ap_proxies));
+	ifs->ifs_ap_proxies = NULL;
 }

@@ -74,6 +74,10 @@
 #include <sys/stropts.h>
 #include <sys/conf.h>
 
+#include <sys/dlpi.h>
+#include <libdlpi.h>
+#include <libdladm.h>
+
 #include <inet/tcp.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -974,6 +978,29 @@ mount_one_dev_symlink_cb(void *arg, const char *source, const char *target)
 	return (di_prof_add_symlink(prof, source, target));
 }
 
+static int
+get_iptype(zlog_t *zlogp, zone_iptype_t *iptypep)
+{
+	zone_dochandle_t handle;
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zerror(zlogp, B_TRUE, "getting zone configuration handle");
+		return (-1);
+	}
+	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration");
+		zonecfg_fini_handle(handle);
+		return (-1);
+	}
+	if (zonecfg_get_iptype(handle, iptypep) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid ip-type configuration");
+		zonecfg_fini_handle(handle);
+		return (-1);
+	}
+	zonecfg_fini_handle(handle);
+	return (0);
+}
+
 /*
  * Apply the standard lists of devices/symlinks/mappings and the user-specified
  * list of devices (via zonecfg) to the /dev filesystem.  The filesystem will
@@ -989,6 +1016,8 @@ mount_one_dev(zlog_t *zlogp, char *devpath)
 	di_prof_t		prof = NULL;
 	int			err;
 	int			retval = -1;
+	zone_iptype_t		iptype;
+	const char 		*curr_iptype;
 
 	if (di_prof_init(devpath, &prof)) {
 		zerror(zlogp, B_TRUE, "failed to initialize profile");
@@ -1002,8 +1031,21 @@ mount_one_dev(zlog_t *zlogp, char *devpath)
 		goto cleanup;
 	}
 
+	if (get_iptype(zlogp, &iptype) < 0) {
+		zerror(zlogp, B_TRUE, "unable to determine ip-type");
+		goto cleanup;
+	}
+	switch (iptype) {
+	case ZS_SHARED:
+		curr_iptype = "shared";
+		break;
+	case ZS_EXCLUSIVE:
+		curr_iptype = "exclusive";
+		break;
+	}
+
 	if (brand_platform_iter_devices(bh, zone_name,
-	    mount_one_dev_device_cb, prof) != 0) {
+	    mount_one_dev_device_cb, prof, curr_iptype) != 0) {
 		zerror(zlogp, B_TRUE, "failed to add standard device");
 		goto cleanup;
 	}
@@ -1715,7 +1757,7 @@ addr2netmask(char *prefixstr, int maxprefixlen, uchar_t *maskstr)
  * If anything goes wrong, log an error message and return an error.
  */
 static int
-unconfigure_network_interfaces(zlog_t *zlogp, zoneid_t zone_id)
+unconfigure_shared_network_interfaces(zlog_t *zlogp, zoneid_t zone_id)
 {
 	struct lifnum lifn;
 	struct lifconf lifc;
@@ -1734,7 +1776,7 @@ unconfigure_network_interfaces(zlog_t *zlogp, zoneid_t zone_id)
 	lifn.lifn_flags = (int)lifc_flags;
 	if (ioctl(s, SIOCGLIFNUM, (char *)&lifn) < 0) {
 		zerror(zlogp, B_TRUE,
-		    "could not determine number of interfaces");
+		    "could not determine number of network interfaces");
 		ret_code = -1;
 		goto bad;
 	}
@@ -1750,7 +1792,8 @@ unconfigure_network_interfaces(zlog_t *zlogp, zoneid_t zone_id)
 	lifc.lifc_len = bufsize;
 	lifc.lifc_buf = buf;
 	if (ioctl(s, SIOCGLIFCONF, (char *)&lifc) < 0) {
-		zerror(zlogp, B_TRUE, "could not get configured interfaces");
+		zerror(zlogp, B_TRUE, "could not get configured network "
+		    "interfaces");
 		ret_code = -1;
 		goto bad;
 	}
@@ -1776,14 +1819,14 @@ unconfigure_network_interfaces(zlog_t *zlogp, zoneid_t zone_id)
 				continue;
 			zerror(zlogp, B_TRUE,
 			    "%s: could not determine the zone to which this "
-			    "interface is bound", lifrl.lifr_name);
+			    "network interface is bound", lifrl.lifr_name);
 			ret_code = -1;
 			continue;
 		}
 		if (lifrl.lifr_zoneid == zone_id) {
 			if (ioctl(s, SIOCLIFREMOVEIF, (caddr_t)&lifrl) < 0) {
 				zerror(zlogp, B_TRUE,
-				    "%s: could not remove interface",
+				    "%s: could not remove network interface",
 				    lifrl.lifr_name);
 				ret_code = -1;
 				continue;
@@ -1927,7 +1970,7 @@ who_is_using(zlog_t *zlogp, struct lifreq *lifr)
 		return (NULL);
 	}
 	if ((rtmsg.hdr.rtm_addrs & RTA_IFP) == 0) {
-		zerror(zlogp, B_FALSE, "interface not found");
+		zerror(zlogp, B_FALSE, "network interface not found");
 		return (NULL);
 	}
 	cp = ((char *)(&rtmsg.hdr + 1));
@@ -1945,7 +1988,8 @@ who_is_using(zlog_t *zlogp, struct lifreq *lifr)
 		break;
 	}
 	if (ifp == NULL) {
-		zerror(zlogp, B_FALSE, "interface could not be determined");
+		zerror(zlogp, B_FALSE, "network interface could not be "
+		    "determined");
 		return (NULL);
 	}
 
@@ -1964,8 +2008,8 @@ who_is_using(zlog_t *zlogp, struct lifreq *lifr)
 	(void) strlcpy(lifr->lifr_name, save_if_name, sizeof (save_if_name));
 	if (i < 0) {
 		zerror(zlogp, B_TRUE,
-		    "%s: could not determine the zone interface belongs to",
-		    lifr->lifr_name);
+		    "%s: could not determine the zone network interface "
+		    "belongs to", lifr->lifr_name);
 		return (NULL);
 	}
 	if (getzonenamebyid(lifr->lifr_zoneid, answer, sizeof (answer)) < 0)
@@ -2061,7 +2105,7 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 		 * the console by zoneadm(1M) so instead we log the
 		 * message to syslog and continue.
 		 */
-		zerror(&logsys, B_TRUE, "WARNING: skipping interface "
+		zerror(&logsys, B_TRUE, "WARNING: skipping network interface "
 		    "'%s' which may not be present/plumbed in the "
 		    "global zone.", lifr.lifr_name);
 		(void) close(s);
@@ -2081,8 +2125,8 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 
 	lifr.lifr_zoneid = zone_id;
 	if (ioctl(s, SIOCSLIFZONE, (caddr_t)&lifr) < 0) {
-		zerror(zlogp, B_TRUE, "%s: could not place interface into zone",
-		    lifr.lifr_name);
+		zerror(zlogp, B_TRUE, "%s: could not place network interface "
+		    "into zone", lifr.lifr_name);
 		goto bad;
 	}
 
@@ -2180,7 +2224,8 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 		 */
 		if (errno != EADDRNOTAVAIL) {
 			zerror(zlogp, B_TRUE,
-			    "%s: could not bring interface up", lifr.lifr_name);
+			    "%s: could not bring network interface up",
+			    lifr.lifr_name);
 			goto bad;
 		}
 		if (ioctl(s, SIOCGLIFADDR, (caddr_t)&lifr) < 0) {
@@ -2192,11 +2237,12 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 		errno = save_errno;
 		if (zone_using == NULL)
 			zerror(zlogp, B_TRUE,
-			    "%s: could not bring interface up", lifr.lifr_name);
+			    "%s: could not bring network interface up",
+			    lifr.lifr_name);
 		else
-			zerror(zlogp, B_TRUE, "%s: could not bring interface "
-			    "up: address in use by zone '%s'", lifr.lifr_name,
-			    zone_using);
+			zerror(zlogp, B_TRUE, "%s: could not bring network "
+			    "interface up: address in use by zone '%s'",
+			    lifr.lifr_name, zone_using);
 		goto bad;
 	}
 	if ((lifr.lifr_flags & IFF_MULTICAST) && ((af == AF_INET &&
@@ -2249,13 +2295,13 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 		 */
 		if (rlen < mcast_rtmsg.m_rtm.rtm_msglen) {
 			if (rlen < 0) {
-				zerror(zlogp, B_TRUE, "WARNING: interface "
-				    "'%s' not available as default for "
-				    "multicast.", lifr.lifr_name);
+				zerror(zlogp, B_TRUE, "WARNING: network "
+				    "interface '%s' not available as default "
+				    "for multicast.", lifr.lifr_name);
 			} else {
-				zerror(zlogp, B_FALSE, "WARNING: interface "
-				    "'%s' not available as default for "
-				    "multicast; routing socket returned "
+				zerror(zlogp, B_FALSE, "WARNING: network "
+				    "interface '%s' not available as default "
+				    "for multicast; routing socket returned "
 				    "unexpected %d bytes.",
 				    lifr.lifr_name, rlen);
 			}
@@ -2321,7 +2367,7 @@ bad:
  * whatever we set up, and return an error.
  */
 static int
-configure_network_interfaces(zlog_t *zlogp)
+configure_shared_network_interfaces(zlog_t *zlogp)
 {
 	zone_dochandle_t handle;
 	struct zone_nwiftab nwiftab, loopback_iftab;
@@ -2380,6 +2426,279 @@ configure_network_interfaces(zlog_t *zlogp)
 			return (-1);
 		}
 	}
+	return (0);
+}
+
+static void
+show_owner(zlog_t *zlogp, char *dlname)
+{
+	zoneid_t dl_owner_zid;
+	char dl_owner_zname[ZONENAME_MAX];
+
+	dl_owner_zid = ALL_ZONES;
+	if (zone_check_datalink(&dl_owner_zid, dlname) != 0)
+		(void) snprintf(dl_owner_zname, ZONENAME_MAX, "<unknown>");
+	else if (getzonenamebyid(dl_owner_zid, dl_owner_zname, ZONENAME_MAX)
+	    < 0)
+		(void) snprintf(dl_owner_zname, ZONENAME_MAX, "<%d>",
+		    dl_owner_zid);
+
+	errno = EPERM;
+	zerror(zlogp, B_TRUE, "WARNING: skipping network interface '%s' "
+	    "which is used by the non-global zone '%s'.\n",
+	    dlname, dl_owner_zname);
+}
+
+static int
+add_datalink(zlog_t *zlogp, zoneid_t zoneid, char *dlname)
+{
+	/* First check if it's in use by global zone. */
+	if (zonecfg_ifname_exists(AF_INET, dlname) ||
+	    zonecfg_ifname_exists(AF_INET6, dlname)) {
+		errno = EPERM;
+		zerror(zlogp, B_TRUE, "WARNING: skipping network interface "
+		    "'%s' which is used in the global zone.", dlname);
+		return (-1);
+	}
+
+	/* Add access control information */
+	if (zone_add_datalink(zoneid, dlname) != 0) {
+		/* If someone got this link before us, show its name */
+		if (errno == EPERM)
+			show_owner(zlogp, dlname);
+		else
+			zerror(zlogp, B_TRUE, "WARNING: unable to add network "
+			    "interface '%s'.", dlname);
+		return (-1);
+	}
+
+	/* Hold the link for this zone */
+	if (dladm_hold_link(dlname, zoneid, B_FALSE) < 0) {
+		zerror(zlogp, B_TRUE, "WARNING: unable to hold network "
+		    "interface '%s'.", dlname);
+		(void) zone_remove_datalink(zoneid, dlname);
+		return (-1);
+	}
+
+	return (0);
+}
+
+static int
+remove_datalink(zlog_t *zlogp, zoneid_t zoneid, char *dlname)
+{
+	/*
+	 * Remove access control information.
+	 * If the errno is ENXIO, the interface is not added yet,
+	 * nothing to report then.
+	 */
+	if (zone_remove_datalink(zoneid, dlname) != 0) {
+		if (errno == ENXIO)
+			return (0);
+		zerror(zlogp, B_TRUE, "unable to remove network interface '%s'",
+		    dlname);
+		return (-1);
+	}
+
+	if (dladm_rele_link(dlname, 0, B_FALSE) < 0) {
+		zerror(zlogp, B_TRUE, "unable to release network "
+		    "interface '%s'", dlname);
+		return (-1);
+	}
+	return (0);
+}
+
+/*
+ * Add the kernel access control information for the interface names.
+ * If anything goes wrong, we log a general error message, attempt to tear down
+ * whatever we set up, and return an error.
+ */
+static int
+configure_exclusive_network_interfaces(zlog_t *zlogp)
+{
+	zone_dochandle_t handle;
+	struct zone_nwiftab nwiftab;
+	zoneid_t zoneid;
+	char rootpath[MAXPATHLEN];
+	char path[MAXPATHLEN];
+	di_prof_t prof = NULL;
+	boolean_t added = B_FALSE;
+
+	if ((zoneid = getzoneidbyname(zone_name)) == -1) {
+		zerror(zlogp, B_TRUE, "unable to get zoneid");
+		return (-1);
+	}
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zerror(zlogp, B_TRUE, "getting zone configuration handle");
+		return (-1);
+	}
+	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration");
+		zonecfg_fini_handle(handle);
+		return (-1);
+	}
+
+	if (zonecfg_setnwifent(handle) != Z_OK) {
+		zonecfg_fini_handle(handle);
+		return (0);
+	}
+
+	for (;;) {
+		if (zonecfg_getnwifent(handle, &nwiftab) != Z_OK)
+			break;
+
+		if (prof == NULL) {
+			if (zone_get_devroot(zone_name, rootpath,
+			    sizeof (rootpath)) != Z_OK) {
+				(void) zonecfg_endnwifent(handle);
+				zonecfg_fini_handle(handle);
+				zerror(zlogp, B_TRUE,
+				    "unable to determine dev root");
+				return (-1);
+			}
+			(void) snprintf(path, sizeof (path), "%s%s", rootpath,
+			    "/dev");
+			if (di_prof_init(path, &prof) != 0) {
+				(void) zonecfg_endnwifent(handle);
+				zonecfg_fini_handle(handle);
+				zerror(zlogp, B_TRUE,
+				    "failed to initialize profile");
+				return (-1);
+			}
+		}
+
+		/*
+		 * Only create the /dev entry if it's not in use.
+		 * Note here the zone still boots when the interfaces
+		 * assigned is inaccessible, used by others, etc.
+		 */
+		if (add_datalink(zlogp, zoneid, nwiftab.zone_nwif_physical)
+		    == 0) {
+			if (di_prof_add_dev(prof, nwiftab.zone_nwif_physical)
+			    != 0) {
+				(void) zonecfg_endnwifent(handle);
+				zonecfg_fini_handle(handle);
+				zerror(zlogp, B_TRUE,
+				    "failed to add network device");
+				return (-1);
+			}
+			added = B_TRUE;
+		}
+	}
+	(void) zonecfg_endnwifent(handle);
+	zonecfg_fini_handle(handle);
+
+	if (prof != NULL && added) {
+		if (di_prof_commit(prof) != 0) {
+			zerror(zlogp, B_TRUE, "failed to commit profile");
+			return (-1);
+		}
+	}
+	if (prof != NULL)
+		di_prof_fini(prof);
+
+	return (0);
+}
+
+/*
+ * Get the list of the data-links from kernel, and try to remove it
+ */
+static int
+unconfigure_exclusive_network_interfaces_run(zlog_t *zlogp, zoneid_t zoneid)
+{
+	char *dlnames, *ptr;
+	int dlnum, dlnum_saved, i;
+
+	dlnum = 0;
+	if (zone_list_datalink(zoneid, &dlnum, NULL) != 0) {
+		zerror(zlogp, B_TRUE, "unable to list network interfaces");
+		return (-1);
+	}
+again:
+	/* this zone doesn't have any data-links */
+	if (dlnum == 0)
+		return (0);
+
+	dlnames = malloc(dlnum * LIFNAMSIZ);
+	if (dlnames == NULL) {
+		zerror(zlogp, B_TRUE, "memory allocation failed");
+		return (-1);
+	}
+	dlnum_saved = dlnum;
+
+	if (zone_list_datalink(zoneid, &dlnum, dlnames) != 0) {
+		zerror(zlogp, B_TRUE, "unable to list network interfaces");
+		free(dlnames);
+		return (-1);
+	}
+	if (dlnum_saved < dlnum) {
+		/* list increased, try again */
+		free(dlnames);
+		goto again;
+	}
+	ptr = dlnames;
+	for (i = 0; i < dlnum; i++) {
+		/* Remove access control information */
+		if (remove_datalink(zlogp, zoneid, ptr) != 0) {
+			free(dlnames);
+			return (-1);
+		}
+		ptr += LIFNAMSIZ;
+	}
+	free(dlnames);
+	return (0);
+}
+
+/*
+ * Get the list of the data-links from configuration, and try to remove it
+ */
+static int
+unconfigure_exclusive_network_interfaces_static(zlog_t *zlogp, zoneid_t zoneid)
+{
+	zone_dochandle_t handle;
+	struct zone_nwiftab nwiftab;
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zerror(zlogp, B_TRUE, "getting zone configuration handle");
+		return (-1);
+	}
+	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration");
+		zonecfg_fini_handle(handle);
+		return (-1);
+	}
+	if (zonecfg_setnwifent(handle) != Z_OK) {
+		zonecfg_fini_handle(handle);
+		return (0);
+	}
+	for (;;) {
+		if (zonecfg_getnwifent(handle, &nwiftab) != Z_OK)
+			break;
+		/* Remove access control information */
+		if (remove_datalink(zlogp, zoneid, nwiftab.zone_nwif_physical)
+		    != 0) {
+			(void) zonecfg_endnwifent(handle);
+			zonecfg_fini_handle(handle);
+			return (-1);
+		}
+	}
+	(void) zonecfg_endnwifent(handle);
+	zonecfg_fini_handle(handle);
+	return (0);
+}
+
+/*
+ * Remove the access control information from the kernel for the exclusive
+ * network interfaces.
+ */
+static int
+unconfigure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
+{
+	if (unconfigure_exclusive_network_interfaces_run(zlogp, zoneid) != 0) {
+		return (unconfigure_exclusive_network_interfaces_static(zlogp,
+		    zoneid));
+	}
+
 	return (0);
 }
 
@@ -3562,6 +3881,8 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	tsol_zcent_t *zcent = NULL;
 	int match = 0;
 	int doi = 0;
+	int flags;
+	zone_iptype_t iptype;
 
 	if (zone_get_rootpath(zone_name, rootpath, sizeof (rootpath)) != Z_OK) {
 		zerror(zlogp, B_TRUE, "unable to determine zone root");
@@ -3570,11 +3891,35 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	if (zonecfg_in_alt_root())
 		resolve_lofs(zlogp, rootpath, sizeof (rootpath));
 
+	if (get_iptype(zlogp, &iptype) < 0) {
+		zerror(zlogp, B_TRUE, "unable to determine ip-type");
+		return (-1);
+	}
+	switch (iptype) {
+	case ZS_SHARED:
+		flags = 0;
+		break;
+	case ZS_EXCLUSIVE:
+		flags = ZCF_NET_EXCL;
+		break;
+	}
+
 	if ((privs = priv_allocset()) == NULL) {
 		zerror(zlogp, B_TRUE, "%s failed", "priv_allocset");
 		return (-1);
 	}
 	priv_emptyset(privs);
+	if (iptype == ZS_EXCLUSIVE) {
+		/*
+		 * add PRIV_NET_RAWACCESS and PRIV_SYS_IP_CONFIG
+		 */
+		if (priv_addset(privs, PRIV_NET_RAWACCESS) != 0 ||
+		    priv_addset(privs, PRIV_SYS_IP_CONFIG) != 0) {
+			zerror(zlogp, B_TRUE,
+			    "Failed to add networking privileges");
+			goto error;
+		}
+	}
 	if (get_privset(zlogp, privs, mount_cmd) != 0)
 		goto error;
 
@@ -3669,7 +4014,8 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 
 	xerr = 0;
 	if ((zoneid = zone_create(kzone, rootpath, privs, rctlbuf,
-	    rctlbufsz, zfsbuf, zfsbufsz, &xerr, match, doi, zlabel)) == -1) {
+	    rctlbufsz, zfsbuf, zfsbufsz, &xerr, match, doi, zlabel,
+	    flags)) == -1) {
 		if (xerr == ZE_AREMOUNTS) {
 			if (zonecfg_find_mounts(rootpath, NULL, NULL) < 1) {
 				zerror(zlogp, B_FALSE,
@@ -3863,9 +4209,31 @@ vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd, zoneid_t zoneid)
 		return (-1);
 	}
 
-	if (!mount_cmd && configure_network_interfaces(zlogp) != 0) {
-		lofs_discard_mnttab();
-		return (-1);
+	if (!mount_cmd) {
+		zone_iptype_t iptype;
+
+		if (get_iptype(zlogp, &iptype) < 0) {
+			zerror(zlogp, B_TRUE, "unable to determine ip-type");
+			lofs_discard_mnttab();
+			return (-1);
+		}
+
+		switch (iptype) {
+		case ZS_SHARED:
+			/* Always do this to make lo0 get configured */
+			if (configure_shared_network_interfaces(zlogp) != 0) {
+				lofs_discard_mnttab();
+				return (-1);
+			}
+			break;
+		case ZS_EXCLUSIVE:
+			if (configure_exclusive_network_interfaces(zlogp) !=
+			    0) {
+				lofs_discard_mnttab();
+				return (-1);
+			}
+			break;
+		}
 	}
 
 	write_index_file(zoneid);
@@ -3952,6 +4320,7 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 	char cmdbuf[MAXPATHLEN];
 	char brand[MAXNAMELEN];
 	brand_handle_t bh = NULL;
+	ushort_t flags;
 
 	kzone = zone_name;
 	if (zonecfg_in_alt_root()) {
@@ -4016,11 +4385,41 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 		goto error;
 	}
 
-	if (!unmount_cmd &&
-	    unconfigure_network_interfaces(zlogp, zoneid) != 0) {
-		zerror(zlogp, B_FALSE,
-		    "unable to unconfigure network interfaces in zone");
-		goto error;
+	if (!unmount_cmd) {
+		zone_iptype_t iptype;
+
+		if (zone_getattr(zoneid, ZONE_ATTR_FLAGS, &flags,
+		    sizeof (flags)) < 0) {
+			if (get_iptype(zlogp, &iptype) < 0) {
+				zerror(zlogp, B_TRUE, "unable to determine "
+				    "ip-type");
+				goto error;
+			}
+		} else {
+			if (flags & ZF_NET_EXCL)
+				iptype = ZS_EXCLUSIVE;
+			else
+				iptype = ZS_SHARED;
+		}
+
+		switch (iptype) {
+		case ZS_SHARED:
+			if (unconfigure_shared_network_interfaces(zlogp,
+			    zoneid) != 0) {
+				zerror(zlogp, B_FALSE, "unable to unconfigure "
+				    "network interfaces in zone");
+				goto error;
+			}
+			break;
+		case ZS_EXCLUSIVE:
+			if (unconfigure_exclusive_network_interfaces(zlogp,
+			    zoneid) != 0) {
+				zerror(zlogp, B_FALSE, "unable to unconfigure "
+				    "network interfaces in zone");
+				goto error;
+			}
+			break;
+		}
 	}
 
 	if (!unmount_cmd && tcp_abort_connections(zlogp, zoneid) != 0) {

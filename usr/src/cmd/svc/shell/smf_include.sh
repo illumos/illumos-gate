@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -71,6 +71,27 @@ smf_is_globalzone() {
 #
 smf_is_nonglobalzone() {
 	[ "${SMF_ZONENAME:=`/sbin/zonename`}" != "global" ] && return 0
+	return 1
+}
+
+# smf_configure_ip
+#
+#  Returns zero (success) if this zone needs IP to be configured i.e.
+#  the global zone or has an exclusive stack.  1 otherwise.
+#
+smf_configure_ip() {
+	[ "${SMF_ZONENAME:=`/sbin/zonename`}" = "global" -o \
+	 `/sbin/zonename -t` = exclusive ] && return 0
+	return 1
+}
+
+# smf_dont_configure_ip
+#
+#  Inverse of smf_configure_ip
+#
+smf_dont_configure_ip() {
+	[ "${SMF_ZONENAME:=`/sbin/zonename`}" != "global" -a \
+	 `/sbin/zonename -t` = shared ] && return 0
 	return 1
 }
 

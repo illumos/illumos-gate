@@ -24,6 +24,7 @@ static const char rcsid[] = "@(#)$Id: ip_fil_solaris.c,v 2.62.2.19 2005/07/13 21
 #include <sys/systm.h>
 #include <sys/strsubr.h>
 #include <sys/cred.h>
+#include <sys/cred_impl.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/ksynch.h>
@@ -33,6 +34,7 @@ static const char rcsid[] = "@(#)$Id: ip_fil_solaris.c,v 2.62.2.19 2005/07/13 21
 #include <sys/socket.h>
 #include <sys/dditypes.h>
 #include <sys/cmn_err.h>
+#include <sys/zone.h>
 #include <net/if.h>
 #include <net/af.h>
 #include <net/route.h>
@@ -54,6 +56,7 @@ static const char rcsid[] = "@(#)$Id: ip_fil_solaris.c,v 2.62.2.19 2005/07/13 21
 #include "netinet/ip_state.h"
 #include "netinet/ip_auth.h"
 #include "netinet/ip_proxy.h"
+#include "netinet/ipf_stack.h"
 #ifdef	IPFILTER_LOOKUP
 # include "netinet/ip_lookup.h"
 #endif
@@ -62,53 +65,27 @@ static const char rcsid[] = "@(#)$Id: ip_fil_solaris.c,v 2.62.2.19 2005/07/13 21
 #include <sys/md5.h>
 #include <sys/neti.h>
 
-extern	int	fr_flags, fr_active;
-#if SOLARIS2 >= 7
-timeout_id_t	fr_timer_id;
-#else
-int	fr_timer_id;
-#endif
-#if SOLARIS2 >= 10
-extern	int	ipf_loopback;
-#endif
-
-
-static	int	fr_setipfloopback __P((int));
+static	int	frzerostats __P((caddr_t, ipf_stack_t *));
+static	int	fr_setipfloopback __P((int, ipf_stack_t *));
 static	int	fr_send_ip __P((fr_info_t *fin, mblk_t *m, mblk_t **mp));
-static	int	ipf_nic_event_v4 __P((hook_event_token_t, hook_data_t));
-static	int	ipf_nic_event_v6 __P((hook_event_token_t, hook_data_t));
-static	int	ipf_hook_out __P((hook_event_token_t, hook_data_t));
-static	int	ipf_hook_in __P((hook_event_token_t, hook_data_t));
-static	int	ipf_hook_loop_out __P((hook_event_token_t, hook_data_t));
-static	int	ipf_hook_loop_in __P((hook_event_token_t, hook_data_t));
-static	int	ipf_hook __P((hook_data_t, int, int));
+static	int	ipf_nic_event_v4 __P((hook_event_token_t, hook_data_t,
+    netstack_t *));
+static	int	ipf_nic_event_v6 __P((hook_event_token_t, hook_data_t,
+    netstack_t *));
+static	int	ipf_hook_out __P((hook_event_token_t, hook_data_t,
+    netstack_t *));
+static	int	ipf_hook_in __P((hook_event_token_t, hook_data_t,
+    netstack_t *));
+static	int	ipf_hook_loop_out __P((hook_event_token_t, hook_data_t,
+    netstack_t *));
+static	int	ipf_hook_loop_in __P((hook_event_token_t, hook_data_t,
+    netstack_t *));
+static	int	ipf_hook __P((hook_data_t, int, int, netstack_t *));
+extern	int	ipf_geniter __P((ipftoken_t *, ipfgeniter_t *, ipf_stack_t *));
+extern	int	ipf_frruleiter __P((void *, int, void *, ipf_stack_t *));
 
-static	hook_t	ipfhook_in;
-static	hook_t	ipfhook_out;
-static  hook_t  ipfhook_loop_in;
-static  hook_t  ipfhook_loop_out;
-static	hook_t	ipfhook_nicevents;
-
-/* flags to indicate whether hooks are registered. */
-static	boolean_t	hook4_physical_in	= B_FALSE;
-static	boolean_t	hook4_physical_out	= B_FALSE;
-static	boolean_t	hook4_nic_events	= B_FALSE;
-static	boolean_t	hook4_loopback_in	= B_FALSE;
-static	boolean_t	hook4_loopback_out	= B_FALSE;
-static	boolean_t	hook6_physical_in	= B_FALSE;
-static	boolean_t	hook6_physical_out	= B_FALSE;
-static	boolean_t	hook6_nic_events	= B_FALSE;
-static	boolean_t	hook6_loopback_in	= B_FALSE;
-static	boolean_t	hook6_loopback_out	= B_FALSE;
-
-ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;
-ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
-ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache;
-ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
-kcondvar_t	iplwait, ipfauthwait;
 #if SOLARIS2 < 10
 #if SOLARIS2 >= 7
-timeout_id_t	fr_timer_id;
 u_int		*ip_ttl_ptr = NULL;
 u_int		*ip_mtudisc = NULL;
 # if SOLARIS2 >= 8
@@ -118,17 +95,11 @@ u_int		*ip6_forwarding = NULL;
 u_int		*ip_forwarding = NULL;
 # endif
 #else
-int		fr_timer_id;
 u_long		*ip_ttl_ptr = NULL;
 u_long		*ip_mtudisc = NULL;
 u_long		*ip_forwarding = NULL;
 #endif
 #endif
-#if SOLARIS2 >= 10
-extern net_data_t ipf_ipv4;
-extern net_data_t ipf_ipv6;
-#endif
-int		ipf_locks_done = 0;
 
 
 /* ------------------------------------------------------------------------ */
@@ -142,14 +113,15 @@ int		ipf_locks_done = 0;
 /* configures a table to be so large that we cannot allocate enough memory  */
 /* for it.                                                                  */
 /* ------------------------------------------------------------------------ */
-int ipldetach()
+int ipldetach(ifs)
+ipf_stack_t *ifs;
 {
 
-	ASSERT(rw_read_locked(&ipf_global.ipf_lk) == 0);
+	ASSERT(rw_read_locked(&ifs->ifs_ipf_global.ipf_lk) == 0);
 
 #if SOLARIS2 < 10
 
-	if (fr_control_forwarding & 2) {
+	if (ifs->ifs_fr_control_forwarding & 2) {
 		if (ip_forwarding != NULL)
 			*ip_forwarding = 0;
 #if SOLARIS2 >= 8
@@ -165,100 +137,111 @@ int ipldetach()
 	 * W(ipf_global)->R(hook_family)->W(hei_lock) (this code path) vs
 	 * R(hook_family)->R(hei_lock)->R(ipf_global) (active hook running)
 	 */
-	RWLOCK_EXIT(&ipf_global);
+	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 
 	/*
 	 * Remove IPv6 Hooks
 	 */
-	if (ipf_ipv6 != NULL) {
-		if (hook6_physical_in) {
-			hook6_physical_in = (net_unregister_hook(ipf_ipv6,
-			    NH_PHYSICAL_IN, &ipfhook_in) != 0);
+	if (ifs->ifs_ipf_ipv6 != NULL) {
+		if (ifs->ifs_hook6_physical_in) {
+			ifs->ifs_hook6_physical_in = (net_unregister_hook(ifs->ifs_ipf_ipv6,
+			    NH_PHYSICAL_IN, &ifs->ifs_ipfhook_in) != 0);
 		}
-		if (hook6_physical_out) {
-			hook6_physical_out = (net_unregister_hook(ipf_ipv6,
-			    NH_PHYSICAL_OUT, &ipfhook_out) != 0);
+		if (ifs->ifs_hook6_physical_out) {
+			ifs->ifs_hook6_physical_out =
+			    (net_unregister_hook(ifs->ifs_ipf_ipv6,
+			    NH_PHYSICAL_OUT, &ifs->ifs_ipfhook_out) != 0);
 		}
-		if (hook6_nic_events) {
-			hook6_nic_events = (net_unregister_hook(ipf_ipv6,
-			    NH_NIC_EVENTS, &ipfhook_nicevents) != 0);
+		if (ifs->ifs_hook6_nic_events) {
+			ifs->ifs_hook6_nic_events =
+			    (net_unregister_hook(ifs->ifs_ipf_ipv6,
+			    NH_NIC_EVENTS, &ifs->ifs_ipfhook_nicevents) != 0);
 		}
-		if (hook6_loopback_in) {
-			hook6_loopback_in = (net_unregister_hook(ipf_ipv6,
-			    NH_LOOPBACK_IN, &ipfhook_loop_in) != 0);
+		if (ifs->ifs_hook6_loopback_in) {
+			ifs->ifs_hook6_loopback_in =
+			    (net_unregister_hook(ifs->ifs_ipf_ipv6,
+			    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) != 0);
 		}
-		if (hook6_loopback_out) {
-			hook6_loopback_out = (net_unregister_hook(ipf_ipv6,
-			    NH_LOOPBACK_OUT, &ipfhook_loop_out) != 0);
+		if (ifs->ifs_hook6_loopback_out) {
+			ifs->ifs_hook6_loopback_out =
+			    (net_unregister_hook(ifs->ifs_ipf_ipv6,
+			    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) != 0);
 		}
 
-		if (net_release(ipf_ipv6) != 0)
+		if (net_release(ifs->ifs_ipf_ipv6) != 0)
 			goto detach_failed;
-		ipf_ipv6 = NULL;
+		ifs->ifs_ipf_ipv6 = NULL;
         }
 
 	/*
 	 * Remove IPv4 Hooks
 	 */
-	if (ipf_ipv4 != NULL) {
-		if (hook4_physical_in) {
-			hook4_physical_in = (net_unregister_hook(ipf_ipv4,
-			    NH_PHYSICAL_IN, &ipfhook_in) != 0);
+	if (ifs->ifs_ipf_ipv4 != NULL) {
+		if (ifs->ifs_hook4_physical_in) {
+			ifs->ifs_hook4_physical_in =
+			    (net_unregister_hook(ifs->ifs_ipf_ipv4,
+			    NH_PHYSICAL_IN, &ifs->ifs_ipfhook_in) != 0);
 		}
-		if (hook4_physical_out) {
-			hook4_physical_out = (net_unregister_hook(ipf_ipv4,
-			    NH_PHYSICAL_OUT, &ipfhook_out) != 0);
+		if (ifs->ifs_hook4_physical_out) {
+			ifs->ifs_hook4_physical_out =
+			    (net_unregister_hook(ifs->ifs_ipf_ipv4,
+			    NH_PHYSICAL_OUT, &ifs->ifs_ipfhook_out) != 0);
 		}
-		if (hook4_nic_events) {
-			hook4_nic_events = (net_unregister_hook(ipf_ipv4,
-			    NH_NIC_EVENTS, &ipfhook_nicevents) != 0);
+		if (ifs->ifs_hook4_nic_events) {
+			ifs->ifs_hook4_nic_events =
+			    (net_unregister_hook(ifs->ifs_ipf_ipv4,
+			    NH_NIC_EVENTS, &ifs->ifs_ipfhook_nicevents) != 0);
 		}
-		if (hook4_loopback_in) {
-			hook4_loopback_in = (net_unregister_hook(ipf_ipv4,
-			    NH_LOOPBACK_IN, &ipfhook_loop_in) != 0);
+		if (ifs->ifs_hook4_loopback_in) {
+			ifs->ifs_hook4_loopback_in =
+			    (net_unregister_hook(ifs->ifs_ipf_ipv4,
+			    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) != 0);
 		}
-		if (hook4_loopback_out) {
-			hook4_loopback_out = (net_unregister_hook(ipf_ipv4,
-			    NH_LOOPBACK_OUT, &ipfhook_loop_out) != 0);
+		if (ifs->ifs_hook4_loopback_out) {
+			ifs->ifs_hook4_loopback_out =
+			    (net_unregister_hook(ifs->ifs_ipf_ipv4,
+			    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) != 0);
 		}
 
-		if (net_release(ipf_ipv4) != 0)
+		if (net_release(ifs->ifs_ipf_ipv4) != 0)
 			goto detach_failed;
-		ipf_ipv4 = NULL;
+		ifs->ifs_ipf_ipv4 = NULL;
 	}
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "ipldetach()\n");
 #endif
 
-	WRITE_ENTER(&ipf_global);
-	fr_deinitialise();
+	WRITE_ENTER(&ifs->ifs_ipf_global);
+	fr_deinitialise(ifs);
 
-	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE);
+	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE, ifs);
+	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE, ifs);
 
-	if (ipf_locks_done == 1) {
-		MUTEX_DESTROY(&ipf_timeoutlock);
-		MUTEX_DESTROY(&ipf_rw);
-		RW_DESTROY(&ipf_ipidfrag);
-		ipf_locks_done = 0;
+	if (ifs->ifs_ipf_locks_done == 1) {
+		MUTEX_DESTROY(&ifs->ifs_ipf_timeoutlock);
+		MUTEX_DESTROY(&ifs->ifs_ipf_rw);
+		RW_DESTROY(&ifs->ifs_ipf_tokens);
+		RW_DESTROY(&ifs->ifs_ipf_ipidfrag);
+		ifs->ifs_ipf_locks_done = 0;
 	}
 
-	if (hook4_physical_in || hook4_physical_out || hook4_nic_events ||
-	    hook4_loopback_in || hook4_loopback_out || hook6_nic_events ||
-	    hook6_physical_in || hook6_physical_out || hook6_loopback_in ||
-	    hook6_loopback_out)
+	if (ifs->ifs_hook4_physical_in || ifs->ifs_hook4_physical_out || ifs->ifs_hook4_nic_events ||
+	    ifs->ifs_hook4_loopback_in || ifs->ifs_hook4_loopback_out || ifs->ifs_hook6_nic_events ||
+	    ifs->ifs_hook6_physical_in || ifs->ifs_hook6_physical_out || ifs->ifs_hook6_loopback_in ||
+	    ifs->ifs_hook6_loopback_out)
 		return -1;
 
 	return 0;
 
 detach_failed:
-	WRITE_ENTER(&ipf_global);
+	WRITE_ENTER(&ifs->ifs_ipf_global);
 	return -1;
 }
 
-
-int iplattach __P((void))
+int iplattach(ifs, ns)
+ipf_stack_t *ifs;
+netstack_t *ns;
 {
 #if SOLARIS2 < 10
 	int i;
@@ -268,23 +251,39 @@ int iplattach __P((void))
 	cmn_err(CE_CONT, "iplattach()\n");
 #endif
 
-	ASSERT(rw_read_locked(&ipf_global.ipf_lk) == 0);
+	ASSERT(rw_read_locked(&ifs->ifs_ipf_global.ipf_lk) == 0);
+	ifs->ifs_fr_flags = IPF_LOGGING;
+#ifdef _KERNEL
+	ifs->ifs_fr_update_ipid = 0;
+#else
+	ifs->ifs_fr_update_ipid = 1;
+#endif
+	ifs->ifs_fr_minttl = 4;
+	ifs->ifs_fr_icmpminfragmtu = 68;
+#if defined(IPFILTER_DEFAULT_BLOCK)
+	ifs->ifs_fr_pass = FR_BLOCK|FR_NOMATCH;
+#else
+	ifs->ifs_fr_pass = (IPF_DEFAULT_PASS)|FR_NOMATCH;
+#endif
+	ifs->ifs_ipf_loopback = 0;
 
-	bzero((char *)frcache, sizeof(frcache));
-	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
-	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock mutex");
-	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
-	ipf_locks_done = 1;
+	bzero((char *)ifs->ifs_frcache, sizeof(ifs->ifs_frcache));
+	MUTEX_INIT(&ifs->ifs_ipf_rw, "ipf rw mutex");
+	MUTEX_INIT(&ifs->ifs_ipf_timeoutlock, "ipf timeout lock mutex");
+	RWLOCK_INIT(&ifs->ifs_ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
+	RWLOCK_INIT(&ifs->ifs_ipf_tokens, "ipf token rwlock");
+	ifs->ifs_ipf_locks_done = 1;
 
-	if (fr_initialise() < 0)
+	if (fr_initialise(ifs) < 0)
 		return -1;
 
-	HOOK_INIT(&ipfhook_nicevents, ipf_nic_event_v4,
+	HOOK_INIT(&ifs->ifs_ipfhook_nicevents, ipf_nic_event_v4,
 		  "ipfilter_hook_nicevents");
-	HOOK_INIT(&ipfhook_in, ipf_hook_in, "ipfilter_hook_in");
-	HOOK_INIT(&ipfhook_out, ipf_hook_out, "ipfilter_hook_out");
-	HOOK_INIT(&ipfhook_loop_in, ipf_hook_loop_in, "ipfilter_hook_loop_in");
-	HOOK_INIT(&ipfhook_loop_out, ipf_hook_loop_out,
+	HOOK_INIT(&ifs->ifs_ipfhook_in, ipf_hook_in, "ipfilter_hook_in");
+	HOOK_INIT(&ifs->ifs_ipfhook_out, ipf_hook_out, "ipfilter_hook_out");
+	HOOK_INIT(&ifs->ifs_ipfhook_loop_in, ipf_hook_in,
+	    "ipfilter_hook_loop_in");
+	HOOK_INIT(&ifs->ifs_ipfhook_loop_out, ipf_hook_out,
 	    "ipfilter_hook_loop_out");
 
 	/*
@@ -293,81 +292,85 @@ int iplattach __P((void))
 	 * W(ipf_global)->R(hook_family)->W(hei_lock) (this code path) vs
 	 * R(hook_family)->R(hei_lock)->R(ipf_global) (packet path)
 	 */
-	RWLOCK_EXIT(&ipf_global);
+	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 
 	/*
 	 * Add IPv4 hooks
 	 */
-	ipf_ipv4 = net_lookup(NHF_INET);
-	if (ipf_ipv4 == NULL)
+	ifs->ifs_ipf_ipv4 = net_lookup_impl(NHF_INET, ns);
+	if (ifs->ifs_ipf_ipv4 == NULL)
 		goto hookup_failed;
 
-	hook4_nic_events = (net_register_hook(ipf_ipv4, NH_NIC_EVENTS,
-	    &ipfhook_nicevents) == 0);
-	if (!hook4_nic_events)
+	ifs->ifs_hook4_nic_events = (net_register_hook(ifs->ifs_ipf_ipv4,
+	    NH_NIC_EVENTS, &ifs->ifs_ipfhook_nicevents) == 0);
+	if (!ifs->ifs_hook4_nic_events)
 		goto hookup_failed;
 
-	hook4_physical_in = (net_register_hook(ipf_ipv4, NH_PHYSICAL_IN,
-	    &ipfhook_in) == 0);
-	if (!hook4_physical_in)
+	ifs->ifs_hook4_physical_in = (net_register_hook(ifs->ifs_ipf_ipv4,
+	    NH_PHYSICAL_IN, &ifs->ifs_ipfhook_in) == 0);
+	if (!ifs->ifs_hook4_physical_in)
 		goto hookup_failed;
 
-	hook4_physical_out = (net_register_hook(ipf_ipv4, NH_PHYSICAL_OUT,
-	    &ipfhook_out) == 0);
-	if (!hook4_physical_out)
+	ifs->ifs_hook4_physical_out = (net_register_hook(ifs->ifs_ipf_ipv4,
+	    NH_PHYSICAL_OUT, &ifs->ifs_ipfhook_out) == 0);
+	if (!ifs->ifs_hook4_physical_out)
 		goto hookup_failed;
 
-	if (ipf_loopback) {
-		hook4_loopback_in = (net_register_hook(ipf_ipv4,
-		    NH_LOOPBACK_IN, &ipfhook_loop_in) == 0);
-		if (!hook4_loopback_in)
+	if (ifs->ifs_ipf_loopback) {
+		ifs->ifs_hook4_loopback_in =
+		    (net_register_hook(ifs->ifs_ipf_ipv4,
+		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) == 0);
+		if (!ifs->ifs_hook4_loopback_in)
 			goto hookup_failed;
 
-		hook4_loopback_out = (net_register_hook(ipf_ipv4,
-		    NH_LOOPBACK_OUT, &ipfhook_loop_out) == 0);
-		if (!hook4_loopback_out)
+		ifs->ifs_hook4_loopback_out =
+		    (net_register_hook(ifs->ifs_ipf_ipv4,
+		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) == 0);
+		if (!ifs->ifs_hook4_loopback_out)
 			goto hookup_failed;
 	}
 	/*
 	 * Add IPv6 hooks
 	 */
-	ipf_ipv6 = net_lookup(NHF_INET6);
-	if (ipf_ipv6 == NULL)
+	ifs->ifs_ipf_ipv6 = net_lookup_impl(NHF_INET6, ns);
+	if (ifs->ifs_ipf_ipv6 == NULL)
 		goto hookup_failed;
 
-	HOOK_INIT(&ipfhook_nicevents, ipf_nic_event_v6,
+	HOOK_INIT(&ifs->ifs_ipfhook_nicevents, ipf_nic_event_v6,
 		  "ipfilter_hook_nicevents");
-	hook6_nic_events = (net_register_hook(ipf_ipv6, NH_NIC_EVENTS,
-	    &ipfhook_nicevents) == 0);
-	if (!hook6_nic_events)
+	ifs->ifs_hook6_nic_events = (net_register_hook(ifs->ifs_ipf_ipv6,
+	    NH_NIC_EVENTS, &ifs->ifs_ipfhook_nicevents) == 0);
+	if (!ifs->ifs_hook6_nic_events)
 		goto hookup_failed;
 
-	hook6_physical_in = (net_register_hook(ipf_ipv6, NH_PHYSICAL_IN,
-	    &ipfhook_in) == 0);
-	if (!hook6_physical_in)
+	ifs->ifs_hook6_physical_in = (net_register_hook(ifs->ifs_ipf_ipv6,
+	    NH_PHYSICAL_IN, &ifs->ifs_ipfhook_in) == 0);
+	if (!ifs->ifs_hook6_physical_in)
 		goto hookup_failed;
 
-	hook6_physical_out = (net_register_hook(ipf_ipv6, NH_PHYSICAL_OUT,
-	    &ipfhook_out) == 0);
-	if (!hook6_physical_out)
+	ifs->ifs_hook6_physical_out = (net_register_hook(ifs->ifs_ipf_ipv6,
+	    NH_PHYSICAL_OUT, &ifs->ifs_ipfhook_out) == 0);
+	if (!ifs->ifs_hook6_physical_out)
 		goto hookup_failed;
 
-	if (ipf_loopback) {
-		hook6_loopback_in = (net_register_hook(ipf_ipv6,
-		    NH_LOOPBACK_IN, &ipfhook_loop_in) == 0);
-		if (!hook6_loopback_in)
+	if (ifs->ifs_ipf_loopback) {
+		ifs->ifs_hook6_loopback_in =
+		    (net_register_hook(ifs->ifs_ipf_ipv6,
+		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) == 0);
+		if (!ifs->ifs_hook6_loopback_in)
 			goto hookup_failed;
 
-		hook6_loopback_out = (net_register_hook(ipf_ipv6,
-		    NH_LOOPBACK_OUT, &ipfhook_loop_out) == 0);
-		if (!hook6_loopback_out)
+		ifs->ifs_hook6_loopback_out =
+		    (net_register_hook(ifs->ifs_ipf_ipv6,
+		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) == 0);
+		if (!ifs->ifs_hook6_loopback_out)
 			goto hookup_failed;
 	}
 
 	/*
 	 * Reacquire ipf_global, now it is safe.
 	 */
-	WRITE_ENTER(&ipf_global);
+	WRITE_ENTER(&ifs->ifs_ipf_global);
 
 /* Do not use private interface ip_params_arr[] in Solaris 10 */
 #if SOLARIS2 < 10
@@ -410,7 +413,7 @@ int iplattach __P((void))
 	}
 #endif
 
-	if (fr_control_forwarding & 1) {
+	if (ifs->ifs_fr_control_forwarding & 1) {
 		if (ip_forwarding != NULL)
 			*ip_forwarding = 1;
 #if SOLARIS2 >= 8
@@ -423,60 +426,69 @@ int iplattach __P((void))
 
 	return 0;
 hookup_failed:
-	WRITE_ENTER(&ipf_global);
+	WRITE_ENTER(&ifs->ifs_ipf_global);
 	return -1;
 }
 
-static	int	fr_setipfloopback(set)
+static	int	fr_setipfloopback(set, ifs)
 int set;
+ipf_stack_t *ifs;
 {
-	if (ipf_ipv4 == NULL || ipf_ipv6 == NULL)
+	if (ifs->ifs_ipf_ipv4 == NULL || ifs->ifs_ipf_ipv6 == NULL)
 		return EFAULT;
 
-	if (set && !ipf_loopback) {
-		ipf_loopback = 1;
+	if (set && !ifs->ifs_ipf_loopback) {
+		ifs->ifs_ipf_loopback = 1;
 
-		hook4_loopback_in = (net_register_hook(ipf_ipv4,
-		    NH_LOOPBACK_IN, &ipfhook_loop_in) == 0);
-		if (!hook4_loopback_in)
+		ifs->ifs_hook4_loopback_in =
+		    (net_register_hook(ifs->ifs_ipf_ipv4,
+		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) == 0);
+		if (!ifs->ifs_hook4_loopback_in)
 			return EINVAL;
 
-		hook4_loopback_out = (net_register_hook(ipf_ipv4,
-		    NH_LOOPBACK_OUT, &ipfhook_loop_out) == 0);
-		if (!hook4_loopback_out)
+		ifs->ifs_hook4_loopback_out =
+		    (net_register_hook(ifs->ifs_ipf_ipv4,
+		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) == 0);
+		if (!ifs->ifs_hook4_loopback_out)
 			return EINVAL;
 
-		hook6_loopback_in = (net_register_hook(ipf_ipv6,
-		    NH_LOOPBACK_IN, &ipfhook_loop_in) == 0);
-		if (!hook6_loopback_in)
+		ifs->ifs_hook6_loopback_in =
+		    (net_register_hook(ifs->ifs_ipf_ipv6,
+		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) == 0);
+		if (!ifs->ifs_hook6_loopback_in)
 			return EINVAL;
 
-		hook6_loopback_out = (net_register_hook(ipf_ipv6,
-		    NH_LOOPBACK_OUT, &ipfhook_loop_out) == 0);
-		if (!hook6_loopback_out)
+		ifs->ifs_hook6_loopback_out =
+		    (net_register_hook(ifs->ifs_ipf_ipv6,
+		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) == 0);
+		if (!ifs->ifs_hook6_loopback_out)
 			return EINVAL;
 
-	} else if (!set && ipf_loopback) {
-		ipf_loopback = 0;
+	} else if (!set && ifs->ifs_ipf_loopback) {
+		ifs->ifs_ipf_loopback = 0;
 
-		hook4_loopback_in = (net_unregister_hook(ipf_ipv4,
-		    NH_LOOPBACK_IN, &ipfhook_loop_in) != 0);
-		if (hook4_loopback_in)
+		ifs->ifs_hook4_loopback_in =
+		    (net_unregister_hook(ifs->ifs_ipf_ipv4,
+		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) != 0);
+		if (ifs->ifs_hook4_loopback_in)
 			return EBUSY;
 
-		hook4_loopback_out = (net_unregister_hook(ipf_ipv4,
-		    NH_LOOPBACK_OUT, &ipfhook_loop_out) != 0);
-		if (hook4_loopback_out)
+		ifs->ifs_hook4_loopback_out =
+		    (net_unregister_hook(ifs->ifs_ipf_ipv4,
+		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) != 0);
+		if (ifs->ifs_hook4_loopback_out)
 			return EBUSY;
 
-		hook6_loopback_in = (net_unregister_hook(ipf_ipv6,
-		    NH_LOOPBACK_IN, &ipfhook_loop_in) != 0);
-		if (hook6_loopback_in)
+		ifs->ifs_hook6_loopback_in =
+		    (net_unregister_hook(ifs->ifs_ipf_ipv6,
+		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) != 0);
+		if (ifs->ifs_hook6_loopback_in)
 			return EBUSY;
 
-		hook6_loopback_out = (net_unregister_hook(ipf_ipv6,
-		    NH_LOOPBACK_OUT, &ipfhook_loop_out) != 0);
-		if (hook6_loopback_out)
+		ifs->ifs_hook6_loopback_out =
+		    (net_unregister_hook(ifs->ifs_ipf_ipv6,
+		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) != 0);
+		if (ifs->ifs_hook6_loopback_out)
 			return EBUSY;
 	}
 	return 0;
@@ -503,6 +515,8 @@ int *rp;
 	friostat_t fio;
 	minor_t unit;
 	u_int enable;
+	netstack_t *ns;
+	ipf_stack_t *ifs;
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplioctl(%x,%x,%x,%d,%x,%d)\n",
@@ -512,20 +526,30 @@ int *rp;
 	if (IPL_LOGMAX < unit)
 		return ENXIO;
 
-	if (fr_running <= 0) {
-		if (unit != IPL_LOGIPF)
+	ns = netstack_find_by_cred(cp);
+	ASSERT(ns != NULL);
+	ifs = ns->netstack_ipf;
+	ASSERT(ifs != NULL);
+
+	if (ifs->ifs_fr_running <= 0) {
+		if (unit != IPL_LOGIPF) {
+			netstack_rele(ifs->ifs_netstack);
 			return EIO;
+		}
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
 		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
-		    cmd != SIOCGETFS && cmd != SIOCGETFF)
+		    cmd != SIOCGETFS && cmd != SIOCGETFF) {
+			netstack_rele(ifs->ifs_netstack);
 			return EIO;
+		}
 	}
 
-	READ_ENTER(&ipf_global);
+	READ_ENTER(&ifs->ifs_ipf_global);
 
-	error = fr_ioctlswitch(unit, (caddr_t)data, cmd, mode);
+	error = fr_ioctlswitch(unit, (caddr_t)data, cmd, mode, cp->cr_uid, curproc, ifs);
 	if (error != -1) {
-		RWLOCK_EXIT(&ipf_global);
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
+		netstack_rele(ifs->ifs_netstack);
 		return error;
 	}
 	error = 0;
@@ -543,21 +567,21 @@ int *rp;
 				break;
 			}
 
-			RWLOCK_EXIT(&ipf_global);
-			WRITE_ENTER(&ipf_global);
+			RWLOCK_EXIT(&ifs->ifs_ipf_global);
+			WRITE_ENTER(&ifs->ifs_ipf_global);
 			if (enable) {
-				if (fr_running > 0)
+				if (ifs->ifs_fr_running > 0)
 					error = 0;
 				else
-					error = iplattach();
+					error = iplattach(ifs, ns);
 				if (error == 0)
-					fr_running = 1;
+					ifs->ifs_fr_running = 1;
 				else
-					(void) ipldetach();
+					(void) ipldetach(ifs);
 			} else {
-				error = ipldetach();
+				error = ipldetach(ifs);
 				if (error == 0)
-					fr_running = -1;
+					ifs->ifs_fr_running = -1;
 			}
 		}
 		break;
@@ -569,14 +593,14 @@ int *rp;
 		/* FALLTHRU */
 	case SIOCIPFGETNEXT :
 	case SIOCIPFGET :
-		error = fr_ipftune(cmd, (void *)data);
+		error = fr_ipftune(cmd, (void *)data, ifs);
 		break;
 	case SIOCSETFF :
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			error = COPYIN((caddr_t)data, (caddr_t)&fr_flags,
-			       sizeof(fr_flags));
+			error = COPYIN((caddr_t)data, (caddr_t)&ifs->ifs_fr_flags,
+			       sizeof(ifs->ifs_fr_flags));
 			if (error != 0)
 				error = EFAULT;
 		}
@@ -587,11 +611,11 @@ int *rp;
 		if (error != 0)
 			error = EFAULT;
 		else
-			error = fr_setipfloopback(tmp);
+			error = fr_setipfloopback(tmp, ifs);
 		break;
 	case SIOCGETFF :
-		error = COPYOUT((caddr_t)&fr_flags, (caddr_t)data,
-			       sizeof(fr_flags));
+		error = COPYOUT((caddr_t)&ifs->ifs_fr_flags, (caddr_t)data,
+			       sizeof(ifs->ifs_fr_flags));
 		if (error != 0)
 			error = EFAULT;
 		break;
@@ -606,7 +630,7 @@ int *rp;
 			error = EPERM;
 		else
 			error = frrequest(unit, cmd, (caddr_t)data,
-					  fr_active, 1);
+					  ifs->ifs_fr_active, 1, ifs);
 		break;
 	case SIOCINIFR :
 	case SIOCRMIFR :
@@ -615,32 +639,35 @@ int *rp;
 			error = EPERM;
 		else
 			error = frrequest(unit, cmd, (caddr_t)data,
-					  1 - fr_active, 1);
+					  1 - ifs->ifs_fr_active, 1, ifs);
 		break;
 	case SIOCSWAPA :
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			WRITE_ENTER(&ipf_mutex);
-			bzero((char *)frcache, sizeof(frcache[0]) * 2);
-			error = COPYOUT((caddr_t)&fr_active, (caddr_t)data,
-				       sizeof(fr_active));
+			WRITE_ENTER(&ifs->ifs_ipf_mutex);
+			/* Clear one fourth of the table */
+			bzero((char *)&ifs->ifs_frcache,
+			    sizeof (ifs->ifs_frcache[0]) * 2);
+			error = COPYOUT((caddr_t)&ifs->ifs_fr_active,
+					(caddr_t)data,
+					sizeof(ifs->ifs_fr_active));
 			if (error != 0)
 				error = EFAULT;
 			else
-				fr_active = 1 - fr_active;
-			RWLOCK_EXIT(&ipf_mutex);
+				ifs->ifs_fr_active = 1 - ifs->ifs_fr_active;
+			RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
 		}
 		break;
 	case SIOCGETFS :
-		fr_getstat(&fio);
+		fr_getstat(&fio, ifs);
 		error = fr_outobj((void *)data, &fio, IPFOBJ_IPFSTAT);
 		break;
 	case SIOCFRZST :
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else
-			error = fr_zerostats((caddr_t)data);
+			error = fr_zerostats((caddr_t)data, ifs);
 		break;
 	case	SIOCIPFFL :
 		if (!(mode & FWRITE))
@@ -649,7 +676,7 @@ int *rp;
 			error = COPYIN((caddr_t)data, (caddr_t)&tmp,
 				       sizeof(tmp));
 			if (!error) {
-				tmp = frflush(unit, 4, tmp);
+				tmp = frflush(unit, 4, tmp, ifs);
 				error = COPYOUT((caddr_t)&tmp, (caddr_t)data,
 					       sizeof(tmp));
 				if (error != 0)
@@ -666,7 +693,7 @@ int *rp;
 			error = COPYIN((caddr_t)data, (caddr_t)&tmp,
 				       sizeof(tmp));
 			if (!error) {
-				tmp = frflush(unit, 6, tmp);
+				tmp = frflush(unit, 6, tmp, ifs);
 				error = COPYOUT((caddr_t)&tmp, (caddr_t)data,
 					       sizeof(tmp));
 				if (error != 0)
@@ -679,10 +706,10 @@ int *rp;
 	case SIOCSTLCK :
 		error = COPYIN((caddr_t)data, (caddr_t)&tmp, sizeof(tmp));
 		if (error == 0) {
-			fr_state_lock = tmp;
-			fr_nat_lock = tmp;
-			fr_frag_lock = tmp;
-			fr_auth_lock = tmp;
+			ifs->ifs_fr_state_lock = tmp;
+			ifs->ifs_fr_nat_lock = tmp;
+			ifs->ifs_fr_frag_lock = tmp;
+			ifs->ifs_fr_auth_lock = tmp;
 		} else
 			error = EFAULT;
 	break;
@@ -691,7 +718,7 @@ int *rp;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			tmp = ipflog_clear(unit);
+			tmp = ipflog_clear(unit, ifs);
 			error = COPYOUT((caddr_t)&tmp, (caddr_t)data,
 				       sizeof(tmp));
 			if (error)
@@ -703,56 +730,70 @@ int *rp;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			RWLOCK_EXIT(&ipf_global);
-			WRITE_ENTER(&ipf_global);
+			RWLOCK_EXIT(&ifs->ifs_ipf_global);
+			WRITE_ENTER(&ifs->ifs_ipf_global);
 
-			frsync(IPFSYNC_RESYNC, 0, NULL, NULL);
-			fr_natifpsync(IPFSYNC_RESYNC, NULL, NULL);
-			fr_nataddrsync(NULL, NULL);
-			fr_statesync(IPFSYNC_RESYNC, 0, NULL, NULL);
+			frsync(IPFSYNC_RESYNC, 0, NULL, NULL, ifs);
+			fr_natifpsync(IPFSYNC_RESYNC, NULL, NULL, ifs);
+			fr_nataddrsync(NULL, NULL, ifs);
+			fr_statesync(IPFSYNC_RESYNC, 0, NULL, NULL, ifs);
 			error = 0;
 		}
 		break;
 	case SIOCGFRST :
-		error = fr_outobj((void *)data, fr_fragstats(),
+		error = fr_outobj((void *)data, fr_fragstats(ifs),
 				  IPFOBJ_FRAGSTAT);
 		break;
 	case FIONREAD :
 #ifdef	IPFILTER_LOG
-		tmp = (int)iplused[IPL_LOGIPF];
+		tmp = (int)ifs->ifs_iplused[IPL_LOGIPF];
 
 		error = COPYOUT((caddr_t)&tmp, (caddr_t)data, sizeof(tmp));
 		if (error != 0)
 			error = EFAULT;
 #endif
 		break;
+	case SIOCIPFITER :
+		error = ipf_frruleiter((caddr_t)data, cp->cr_uid, curproc, ifs);
+		break;
+
+	case SIOCGENITER :
+		error = ipf_genericiter((caddr_t)data, cp->cr_uid, curproc, ifs);
+		break;
+
+	case SIOCIPFDELTOK :
+		(void)BCOPYIN((caddr_t)data, (caddr_t)&tmp, sizeof(tmp));
+		error = ipf_deltoken(tmp, cp->cr_uid, curproc, ifs);
+		break;
+
 	default :
 		cmn_err(CE_NOTE, "Unknown: cmd 0x%x data %p", cmd, (void *)data);
 		error = EINVAL;
 		break;
 	}
-	RWLOCK_EXIT(&ipf_global);
+	RWLOCK_EXIT(&ifs->ifs_ipf_global);
+	netstack_rele(ifs->ifs_netstack);
 	return error;
 }
 
 
-phy_if_t	get_unit(name, v)
-char		*name;
-int    		v;
+phy_if_t get_unit(name, v, ifs)
+char *name;
+int v;
+ipf_stack_t *ifs;
 {
-	phy_if_t phy;
 	net_data_t nif;
  
   	if (v == 4)
- 		nif = ipf_ipv4;
+ 		nif = ifs->ifs_ipf_ipv4;
   	else if (v == 6)
- 		nif = ipf_ipv6;
+ 		nif = ifs->ifs_ipf_ipv6;
   	else
  		return 0;
-  
- 	phy = net_phylookup(nif, name);
 
- 	return (phy);
+	nif->netd_netstack = ifs->ifs_netstack;
+
+ 	return (net_phylookup(nif, name));
 }
 
 /*
@@ -806,19 +847,34 @@ dev_t dev;
 register struct uio *uio;
 cred_t *cp;
 {
+	netstack_t *ns;
+	ipf_stack_t *ifs;
+	int ret;
+
+	ns = netstack_find_by_cred(cp);
+	ASSERT(ns != NULL);
+	ifs = ns->netstack_ipf;
+	ASSERT(ifs != NULL);
+
 # ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplread(%x,%x,%x)\n", dev, uio, cp);
 # endif
 
-	if (fr_running < 1)
+	if (ifs->ifs_fr_running < 1) {
+		netstack_rele(ifs->ifs_netstack);
 		return EIO;
+	}
 
 # ifdef	IPFILTER_SYNC
-	if (getminor(dev) == IPL_LOGSYNC)
+	if (getminor(dev) == IPL_LOGSYNC) {
+		netstack_rele(ifs->ifs_netstack);
 		return ipfsync_read(uio);
+	}
 # endif
 
-	return ipflog_read(getminor(dev), uio);
+	ret = ipflog_read(getminor(dev), uio, ifs);
+	netstack_rele(ifs->ifs_netstack);
+	return ret;
 }
 #endif /* IPFILTER_LOG */
 
@@ -834,12 +890,22 @@ dev_t dev;
 register struct uio *uio;
 cred_t *cp;
 {
+	netstack_t *ns;
+	ipf_stack_t *ifs;
+
+	ns = netstack_find_by_cred(cp);
+	ASSERT(ns != NULL);
+	ifs = ns->netstack_ipf;
+	ASSERT(ifs != NULL);
+
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
 #endif
 
-	if (fr_running < 1)
+	if (ifs->ifs_fr_running < 1) {
+		netstack_rele(ifs->ifs_netstack);
 		return EIO;
+	}
 
 #ifdef	IPFILTER_SYNC
 	if (getminor(dev) == IPL_LOGSYNC)
@@ -848,6 +914,7 @@ cred_t *cp;
 	dev = dev;	/* LINT */
 	uio = uio;	/* LINT */
 	cp = cp;	/* LINT */
+	netstack_rele(ifs->ifs_netstack);
 	return ENXIO;
 }
 
@@ -959,6 +1026,7 @@ mblk_t *m, **mpp;
 	fr_info_t fnew;
 	ip_t *ip;
 	int i, hlen;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	ip = (ip_t *)m->b_rptr;
 	bzero((char *)&fnew, sizeof(fnew));
@@ -979,7 +1047,7 @@ mblk_t *m, **mpp;
 		fnew.fin_v = 4;
 #if SOLARIS2 >= 10
 		ip->ip_ttl = 255;
-		if (net_getpmtuenabled(ipf_ipv4) == 1)
+		if (net_getpmtuenabled(ifs->ifs_ipf_ipv4) == 1)
 			ip->ip_off = htons(IP_DF);
 #else
 		if (ip_ttl_ptr != NULL)
@@ -1017,6 +1085,7 @@ mblk_t *m, **mpp;
 	fnew.fin_mp = mpp;
 	fnew.fin_hlen = hlen;
 	fnew.fin_dp = (char *)ip + hlen;
+	fnew.fin_ifs = fin->fin_ifs;
 	(void) fr_makefrip(hlen, ip, &fnew);
 
 	i = fr_fastroute(m, mpp, &fnew, NULL);
@@ -1043,6 +1112,7 @@ int dst;
 	ip6_t *ip6;
 #endif
 	ip_t *ip;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	if ((type < 0) || (type > ICMP_MAXTYPE))
 		return -1;
@@ -1106,7 +1176,7 @@ int dst;
 	phy = (phy_if_t)qpi->qpi_ill; 
 	if (type == ICMP_UNREACH && (phy != 0) && 
 	    fin->fin_icode == ICMP_UNREACH_NEEDFRAG)
-		icmp->icmp_nextmtu = net_getmtu(ipf_ipv4, phy,0 );
+		icmp->icmp_nextmtu = net_getmtu(ifs->ifs_ipf_ipv4, phy,0 );
 
 #ifdef	USE_INET6
 	if (fin->fin_v == 6) {
@@ -1114,8 +1184,10 @@ int dst;
 		int csz;
 
 		if (dst == 0) {
+			ipf_stack_t *ifs = fin->fin_ifs;
+
 			if (fr_ifpaddr(6, FRI_NORMAL, (void *)phy,
-				       (void *)&dst6, NULL) == -1) {
+				       (void *)&dst6, NULL, ifs) == -1) {
 				FREE_MB_T(m);
 				return -1;
 			}
@@ -1142,8 +1214,10 @@ int dst;
 		ip->ip_tos = fin->fin_ip->ip_tos;
 		ip->ip_len = (u_short)sz;
 		if (dst == 0) {
+			ipf_stack_t *ifs = fin->fin_ifs;
+
 			if (fr_ifpaddr(4, FRI_NORMAL, (void *)phy,
-				       (void *)&dst4, NULL) == -1) {
+				       (void *)&dst4, NULL, ifs) == -1) {
 				FREE_MB_T(m);
 				return -1;
 			}
@@ -1182,7 +1256,8 @@ int dst;
 /*
  * Print out warning message at rate-limited speed.
  */
-static void rate_limit_message(int rate, const char *message, ...)
+static void rate_limit_message(ipf_stack_t *ifs,
+			       int rate, const char *message, ...)
 {
 	static time_t last_time = 0;
 	time_t now;
@@ -1193,13 +1268,13 @@ static void rate_limit_message(int rate, const char *message, ...)
 	now = ddi_get_time();
 
 	/* make sure, no multiple entries */
-	ASSERT(MUTEX_NOT_HELD(&(ipf_rw.ipf_lk)));
-	MUTEX_ENTER(&ipf_rw);
+	ASSERT(MUTEX_NOT_HELD(&(ifs->ifs_ipf_rw.ipf_lk)));
+	MUTEX_ENTER(&ifs->ifs_ipf_rw);
 	if (now - last_time >= rate) {
 		need_printed = 1;
 		last_time = now;
 	}
-	MUTEX_EXIT(&ipf_rw);
+	MUTEX_EXIT(&ifs->ifs_ipf_rw);
 
 	if (need_printed) {
 		va_start(args, message);
@@ -1217,10 +1292,11 @@ static void rate_limit_message(int rate, const char *message, ...)
  * return the first IP Address associated with an interface
  */
 /*ARGSUSED*/
-int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
+int fr_ifpaddr(v, atype, ifptr, inp, inpmask, ifs)
 int v, atype;
 void *ifptr;
 struct in_addr  *inp, *inpmask;
+ipf_stack_t *ifs;
 {
 	struct sockaddr_in6 v6addr[2];
 	struct sockaddr_in v4addr[2];
@@ -1232,11 +1308,11 @@ struct in_addr  *inp, *inpmask;
 	switch (v)
 	{
 	case 4:
-		net_data = ipf_ipv4;
+		net_data = ifs->ifs_ipf_ipv4;
 		array = v4addr;
 		break;
 	case 6:
-		net_data = ipf_ipv6;
+		net_data = ifs->ifs_ipf_ipv6;
 		array = v6addr;
 		break;
 	default:
@@ -1284,6 +1360,7 @@ fr_info_t *fin;
 	u_char hash[16];
 	u_32_t newiss;
 	MD5_CTX ctx;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	/*
 	 * Compute the base value of the ISS.  It is a hash
@@ -1297,7 +1374,7 @@ fr_info_t *fin;
 		  sizeof(fin->fin_fi.fi_dst));
 	MD5Update(&ctx, (u_char *) &fin->fin_dat, sizeof(fin->fin_dat));
 
-	MD5Update(&ctx, ipf_iss_secret, sizeof(ipf_iss_secret));
+	MD5Update(&ctx, ifs->ifs_ipf_iss_secret, sizeof(ifs->ifs_ipf_iss_secret));
 
 	MD5Final(hash, &ctx);
 
@@ -1330,8 +1407,9 @@ fr_info_t *fin;
 	ipstate_t *is;
 	nat_t *nat;
 	u_short id;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	MUTEX_ENTER(&ipf_rw);
+	MUTEX_ENTER(&ifs->ifs_ipf_rw);
 	if (fin->fin_state != NULL) {
 		is = fin->fin_state;
 		id = (u_short)(is->is_pkts[(fin->fin_rev << 1) + 1] & 0xffff);
@@ -1340,7 +1418,7 @@ fr_info_t *fin;
 		id = (u_short)(nat->nat_pkts[fin->fin_out] & 0xffff);
 	} else
 		id = ipid++;
-	MUTEX_EXIT(&ipf_rw);
+	MUTEX_EXIT(&ifs->ifs_ipf_rw);
 
 	return id;
 }
@@ -1378,28 +1456,30 @@ fr_info_t *fin;
 void fr_slowtimer()
 #else
 /*ARGSUSED*/
-void fr_slowtimer __P((void *ptr))
+void fr_slowtimer __P((void *arg))
 #endif
 {
+	ipf_stack_t *ifs = arg;
 
-	WRITE_ENTER(&ipf_global);
-	if (fr_running == -1 || fr_running == 0) {
-		fr_timer_id = timeout(fr_slowtimer, NULL, drv_usectohz(500000));
-		RWLOCK_EXIT(&ipf_global);
+	WRITE_ENTER(&ifs->ifs_ipf_global);
+	if (ifs->ifs_fr_running == -1 || ifs->ifs_fr_running == 0) {
+		ifs->ifs_fr_timer_id = timeout(fr_slowtimer, arg, drv_usectohz(500000));
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		return;
 	}
-	MUTEX_DOWNGRADE(&ipf_global);
+	MUTEX_DOWNGRADE(&ifs->ifs_ipf_global);
 
-	fr_fragexpire();
-	fr_timeoutstate();
-	fr_natexpire();
-	fr_authexpire();
-	fr_ticks++;
-	if (fr_running == -1 || fr_running == 1)
-		fr_timer_id = timeout(fr_slowtimer, NULL, drv_usectohz(500000));
+	fr_fragexpire(ifs);
+	fr_timeoutstate(ifs);
+	fr_natexpire(ifs);
+	fr_authexpire(ifs);
+	ifs->ifs_fr_ticks++;
+	if (ifs->ifs_fr_running == -1 || ifs->ifs_fr_running == 1)
+		ifs->ifs_fr_timer_id = timeout(fr_slowtimer, arg,
+		    drv_usectohz(500000));
 	else
-		fr_timer_id = NULL;
-	RWLOCK_EXIT(&ipf_global);
+		ifs->ifs_fr_timer_id = NULL;
+	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 }
 
 
@@ -1430,6 +1510,7 @@ int len;
 	mb_t *m = min, *m1, *m2;
 	char *ip;
 	uint32_t start, stuff, end, value, flags;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	if (m == NULL)
 		return NULL;
@@ -1487,7 +1568,7 @@ int len;
 		    &value, &flags);
 
 		if (pullupmsg(m, len + ipoff + inc) == 0) {
-			ATOMIC_INCL(frstats[out].fr_pull[1]);
+			ATOMIC_INCL(ifs->ifs_frstats[out].fr_pull[1]);
 			FREE_MB_T(*fin->fin_mp);
 			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
@@ -1507,7 +1588,7 @@ int len;
 		qpi->qpi_data = ip;
 	}
 
-	ATOMIC_INCL(frstats[out].fr_pull[0]);
+	ATOMIC_INCL(ifs->ifs_frstats[out].fr_pull[0]);
 	fin->fin_ip = (ip_t *)ip;
 	if (fin->fin_dp != NULL)
 		fin->fin_dp = (char *)fin->fin_ip + dpoff;
@@ -1533,11 +1614,12 @@ fr_info_t *fin;
 	net_data_t net_data_p;
 	phy_if_t phy_ifdata_routeto;
 	struct sockaddr	sin;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	if (fin->fin_v == 4) { 
-		net_data_p = ipf_ipv4;
+		net_data_p = ifs->ifs_ipf_ipv4;
 	} else if (fin->fin_v == 6) { 
-		net_data_p = ipf_ipv6;
+		net_data_p = ifs->ifs_ipf_ipv6;
 	} else { 
 		return (0); 
 	}
@@ -1588,14 +1670,15 @@ frdest_t *fdp;
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
 	struct sockaddr *sinp;
+	ipf_stack_t *ifs = fin->fin_ifs;
 #ifndef	sparc
 	u_short __iplen, __ipoff;
 #endif
 
 	if (fin->fin_v == 4) {
-		net_data_p = ipf_ipv4;
+		net_data_p = ifs->ifs_ipf_ipv4;
 	} else if (fin->fin_v == 6) {
-		net_data_p = ipf_ipv6;
+		net_data_p = ifs->ifs_ipf_ipv6;
 	} else {
 		return (-1);
 	}
@@ -1689,7 +1772,7 @@ frdest_t *fdp;
 		fin->fin_ifp = saveifp;
 
 		if (fin->fin_nat != NULL)
-			fr_natderef((nat_t **)&fin->fin_nat);
+			fr_natderef((nat_t **)&fin->fin_nat, ifs);
 	}
 #ifndef	sparc
 	if (fin->fin_v == 4) {
@@ -1707,11 +1790,11 @@ frdest_t *fdp;
 		}
 	}
 
-	fr_frouteok[0]++;
+	ifs->ifs_fr_frouteok[0]++;
 	return 0;
 bad_fastroute:
 	freemsg(mb);
-	fr_frouteok[1]++;
+	ifs->ifs_fr_frouteok[1]++;
 	return -1;
 }
 
@@ -1725,9 +1808,9 @@ bad_fastroute:
 /* Calling ipf_hook.                                                        */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-int ipf_hook_out(hook_event_token_t token, hook_data_t info)
+int ipf_hook_out(hook_event_token_t token, hook_data_t info, netstack_t *ns)
 {
-	return ipf_hook(info, 1, 0);
+	return ipf_hook(info, 1, 0, ns);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1739,9 +1822,9 @@ int ipf_hook_out(hook_event_token_t token, hook_data_t info)
 /* Calling ipf_hook.                                                        */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-int ipf_hook_in(hook_event_token_t token, hook_data_t info)
+int ipf_hook_in(hook_event_token_t token, hook_data_t info, netstack_t *ns)
 {
-	return ipf_hook(info, 0, 0);
+	return ipf_hook(info, 0, 0, ns);
 }
 
 
@@ -1754,9 +1837,10 @@ int ipf_hook_in(hook_event_token_t token, hook_data_t info)
 /* Calling ipf_hook.                                                        */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-int ipf_hook_loop_out(hook_event_token_t token, hook_data_t info)
+int ipf_hook_loop_out(hook_event_token_t token, hook_data_t info,
+    netstack_t *ns)
 {
-	return ipf_hook(info, 1, 1);
+	return ipf_hook(info, 1, 1, ns);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1768,9 +1852,10 @@ int ipf_hook_loop_out(hook_event_token_t token, hook_data_t info)
 /* Calling ipf_hook.                                                        */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-int ipf_hook_loop_in(hook_event_token_t token, hook_data_t info)
+int ipf_hook_loop_in(hook_event_token_t token, hook_data_t info,
+    netstack_t *ns)
 {
-	return ipf_hook(info, 0, 1);
+	return ipf_hook(info, 0, 1, ns);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1784,7 +1869,7 @@ int ipf_hook_loop_in(hook_event_token_t token, hook_data_t info)
 /* parameters out of the info structure and forms them up to be useful for  */
 /* calling ipfilter.                                                        */
 /* ------------------------------------------------------------------------ */
-int ipf_hook(hook_data_t info, int out, int loopback)
+int ipf_hook(hook_data_t info, int out, int loopback, netstack_t *ns)
 {
 	hook_pkt_event_t *fw;
 	int rval, v, hlen;
@@ -1821,7 +1906,8 @@ int ipf_hook(hook_data_t info, int out, int loopback)
 	else
 		qpi.qpi_flags = 0;
 
-	rval = fr_check(fw->hpe_hdr, hlen, qpi.qpi_ill, out, &qpi, fw->hpe_mp);
+	rval = fr_check(fw->hpe_hdr, hlen, qpi.qpi_ill, out,
+	    &qpi, fw->hpe_mp, ns->netstack_ipf);
 
 	/* For fastroute cases, fr_check returns 0 with mp set to NULL */
 	if (rval == 0 && *(fw->hpe_mp) == NULL)
@@ -1851,32 +1937,34 @@ int ipf_hook(hook_data_t info, int out, int loopback)
 /* Function to receive asynchronous NIC events from IP                      */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-int ipf_nic_event_v4(hook_event_token_t event, hook_data_t info)
+int ipf_nic_event_v4(hook_event_token_t event, hook_data_t info,
+    netstack_t *ns)
 {
 	struct sockaddr_in *sin;
 	hook_nic_event_t *hn;
+	ipf_stack_t *ifs = ns->netstack_ipf;
 
 	hn = (hook_nic_event_t *)info;
 
 	switch (hn->hne_event)
 	{
 	case NE_PLUMB :
-		frsync(IPFSYNC_NEWIFP, 4, (void *)hn->hne_nic, hn->hne_data);
+		frsync(IPFSYNC_NEWIFP, 4, (void *)hn->hne_nic, hn->hne_data, ifs);
 		fr_natifpsync(IPFSYNC_NEWIFP, (void *)hn->hne_nic,
-			      hn->hne_data);
+			      hn->hne_data, ifs);
 		fr_statesync(IPFSYNC_NEWIFP, 4, (void *)hn->hne_nic,
-			     hn->hne_data);
+			     hn->hne_data, ifs);
 		break;
 
 	case NE_UNPLUMB :
-		frsync(IPFSYNC_OLDIFP, 4, (void *)hn->hne_nic, NULL);
-		fr_natifpsync(IPFSYNC_OLDIFP, (void *)hn->hne_nic, NULL);
-		fr_statesync(IPFSYNC_OLDIFP, 4, (void *)hn->hne_nic, NULL);
+		frsync(IPFSYNC_OLDIFP, 4, (void *)hn->hne_nic, NULL, ifs);
+		fr_natifpsync(IPFSYNC_OLDIFP, (void *)hn->hne_nic, NULL, ifs);
+		fr_statesync(IPFSYNC_OLDIFP, 4, (void *)hn->hne_nic, NULL, ifs);
 		break;
 
 	case NE_ADDRESS_CHANGE :
 		sin = hn->hne_data;
-		fr_nataddrsync((void *)hn->hne_nic, &sin->sin_addr);
+		fr_nataddrsync((void *)hn->hne_nic, &sin->sin_addr, ifs);
 		break;
 
 	default :
@@ -1896,23 +1984,25 @@ int ipf_nic_event_v4(hook_event_token_t event, hook_data_t info)
 /* Function to receive asynchronous NIC events from IP                      */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-int ipf_nic_event_v6(hook_event_token_t event, hook_data_t info)
+int ipf_nic_event_v6(hook_event_token_t event, hook_data_t info,
+    netstack_t *ns)
 {
 	hook_nic_event_t *hn;
+	ipf_stack_t *ifs = ns->netstack_ipf;
 
 	hn = (hook_nic_event_t *)info;
 
 	switch (hn->hne_event)
 	{
 	case NE_PLUMB :
-		frsync(IPFSYNC_NEWIFP, 6, (void *)hn->hne_nic, hn->hne_data);
+		frsync(IPFSYNC_NEWIFP, 6, (void *)hn->hne_nic, hn->hne_data, ifs);
 		fr_statesync(IPFSYNC_NEWIFP, 6, (void *)hn->hne_nic,
-			     hn->hne_data);
+			     hn->hne_data, ifs);
 		break;
 
 	case NE_UNPLUMB :
-		frsync(IPFSYNC_OLDIFP, 6, (void *)hn->hne_nic, NULL);
-		fr_statesync(IPFSYNC_OLDIFP, 6, (void *)hn->hne_nic, NULL);
+		frsync(IPFSYNC_OLDIFP, 6, (void *)hn->hne_nic, NULL, ifs);
+		fr_statesync(IPFSYNC_OLDIFP, 6, (void *)hn->hne_nic, NULL, ifs);
 		break;
 
 	case NE_ADDRESS_CHANGE :

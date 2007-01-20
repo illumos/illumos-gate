@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,14 +105,14 @@ static void	ip_rts_request_retry(ipsq_t *, queue_t *q, mblk_t *mp, void *);
  *
  */
 void
-rts_queue_input(mblk_t *mp, queue_t *q, sa_family_t af)
+rts_queue_input(mblk_t *mp, queue_t *q, sa_family_t af, ip_stack_t *ipst)
 {
 	mblk_t	*mp1;
 	int	checkqfull;
 	conn_t 	*connp, *next_connp;
 
-	mutex_enter(&rts_clients.connf_lock);
-	connp = rts_clients.connf_head;
+	mutex_enter(&ipst->ips_rts_clients->connf_lock);
+	connp = ipst->ips_rts_clients->connf_head;
 
 	while (connp != NULL) {
 		/*
@@ -136,12 +136,17 @@ rts_queue_input(mblk_t *mp, queue_t *q, sa_family_t af)
 				connp = connp->conn_next;
 				continue;
 			}
-			checkqfull = B_FALSE;
+			/*
+			 * Just because it is the same queue doesn't mean it
+			 * will promptly read its acks. Have to avoid using
+			 * all of kernel memory.
+			 */
+			checkqfull = B_TRUE;
 		} else {
 			checkqfull = B_TRUE;
 		}
 		CONN_INC_REF(connp);
-		mutex_exit(&rts_clients.connf_lock);
+		mutex_exit(&ipst->ips_rts_clients->connf_lock);
 		if (!checkqfull || canputnext(CONNP_TO_RQ(connp))) {
 			mp1 = dupmsg(mp);
 			if (mp1 == NULL)
@@ -150,13 +155,13 @@ rts_queue_input(mblk_t *mp, queue_t *q, sa_family_t af)
 				putnext(CONNP_TO_RQ(connp), mp1);
 		}
 
-		mutex_enter(&rts_clients.connf_lock);
+		mutex_enter(&ipst->ips_rts_clients->connf_lock);
 		/* Follow the next pointer before releasing the conn. */
 		next_connp = connp->conn_next;
 		CONN_DEC_REF(connp);
 		connp = next_connp;
 	}
-	mutex_exit(&rts_clients.connf_lock);
+	mutex_exit(&ipst->ips_rts_clients->connf_lock);
 	freemsg(mp);
 }
 
@@ -167,7 +172,7 @@ rts_queue_input(mblk_t *mp, queue_t *q, sa_family_t af)
  * - when ire_expire deletes a stale redirect
  */
 void
-ip_rts_rtmsg(int type, ire_t *ire, int error)
+ip_rts_rtmsg(int type, ire_t *ire, int error, ip_stack_t *ipst)
 {
 	mblk_t		*mp;
 	rt_msghdr_t	*rtm;
@@ -215,7 +220,7 @@ ip_rts_rtmsg(int type, ire_t *ire, int error)
 		rtm->rtm_errno = error;
 	else
 		rtm->rtm_flags |= RTF_DONE;
-	rts_queue_input(mp, NULL, af);
+	rts_queue_input(mp, NULL, af, ipst);
 }
 
 /* ARGSUSED */
@@ -281,12 +286,14 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	tsol_gc_t	*gc = NULL;
 	ts_label_t	*tsl = NULL;
 	zoneid_t	zoneid;
+	ip_stack_t	*ipst;
 
 	ip1dbg(("ip_rts_request: mp is %x\n", DB_TYPE(mp)));
 
 	ASSERT(CONN_Q(q));
 	connp = Q_TO_CONN(q);
 	zoneid = connp->conn_zoneid;
+	ipst = connp->conn_netstack->netstack_ip;
 
 	ASSERT(mp->b_cont != NULL);
 	/* ioc_mp holds mp */
@@ -314,7 +321,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 		 */
 
 		connp->conn_loopback = 1;
-		ipcl_hash_insert_wildcard(&rts_clients, connp);
+		ipcl_hash_insert_wildcard(ipst->ips_rts_clients, connp);
 
 		goto done;
 	}
@@ -350,7 +357,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	if (rtm->rtm_type != RTM_GET &&
 	    rtm->rtm_type != RTM_RESOLVE &&
 	    (ioc_cr == NULL ||
-	    secpolicy_net_config(ioc_cr, B_FALSE) != 0)) {
+	    secpolicy_ip_config(ioc_cr, B_FALSE) != 0)) {
 		error = EPERM;
 		goto done;
 	}
@@ -442,7 +449,8 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 		 * If ILL_CHANGING the request is queued in the ipsq.
 		 */
 		ill = ill_lookup_on_ifindex(index, af == AF_INET6,
-		    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry, &error);
+		    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry, &error,
+		    ipst);
 		if (ill == NULL) {
 			if (error != EINPROGRESS)
 				error = EINVAL;
@@ -468,7 +476,8 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 
 		/* If ILL_CHANGING the request is queued in the ipsq. */
 		ill = ill_lookup_on_ifindex(src_index, B_FALSE,
-		    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry, &error);
+		    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry, &error,
+		    ipst);
 		if (ill == NULL) {
 			if (error != EINPROGRESS)
 				error = EINVAL;
@@ -539,7 +548,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 					error = ip_mrtun_rt_add(src_addr,
 					    rtm->rtm_flags, ipif,
 					    src_ipif, &ire, CONNP_TO_WQ(connp),
-					    ioc_mp, ip_rts_request_retry);
+					    ioc_mp, ip_rts_request_retry, ipst);
 					break;
 				}
 				/*
@@ -557,7 +566,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 				 */
 				tmp_ipif = ipif_lookup_addr(src_addr, NULL,
 				    ALL_ZONES, CONNP_TO_WQ(connp), ioc_mp,
-				    ip_rts_request_retry, &error);
+				    ip_rts_request_retry, &error, ipst);
 				if (tmp_ipif == NULL) {
 					if (error != EINPROGRESS)
 						error = EADDRNOTAVAIL;
@@ -583,7 +592,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			error = ip_rt_add(dst_addr, net_mask, gw_addr, src_addr,
 			    rtm->rtm_flags, ipif, src_ipif, &ire, B_FALSE,
 			    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry,
-			    rtsap);
+			    rtsap, ipst);
 			if (ipif != NULL)
 				ASSERT(!MUTEX_HELD(&ipif->ipif_ill->ill_lock));
 			break;
@@ -614,7 +623,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 				 */
 				tmp_ipif = ipif_lookup_addr_v6(&src_addr_v6,
 				    NULL, ALL_ZONES, CONNP_TO_WQ(connp), ioc_mp,
-				    ip_rts_request_retry, &error);
+				    ip_rts_request_retry, &error, ipst);
 				if (tmp_ipif == NULL) {
 					if (error != EINPROGRESS)
 						error = EADDRNOTAVAIL;
@@ -631,7 +640,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 				error = ip_rt_add_v6(&dst_addr_v6, &net_mask_v6,
 				    &gw_addr_v6, &src_addr_v6, rtm->rtm_flags,
 				    ipif, &ire, CONNP_TO_WQ(connp), ioc_mp,
-				    ip_rts_request_retry, rtsap);
+				    ip_rts_request_retry, rtsap, ipst);
 				break;
 			}
 			/*
@@ -645,7 +654,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			error = ip_rt_add_v6(&dst_addr_v6, &net_mask_v6,
 			    &gw_addr_v6, NULL, rtm->rtm_flags,
 			    ipif, &ire, CONNP_TO_WQ(connp), ioc_mp,
-			    ip_rts_request_retry, rtsap);
+			    ip_rts_request_retry, rtsap, ipst);
 			if (ipif != NULL)
 				ASSERT(!MUTEX_HELD(&ipif->ipif_ill->ill_lock));
 			break;
@@ -684,12 +693,13 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			error = ip_rt_delete(dst_addr, net_mask, gw_addr,
 			    found_addrs, rtm->rtm_flags, ipif, src_ipif,
 			    B_FALSE, CONNP_TO_WQ(connp), ioc_mp,
-			    ip_rts_request_retry);
+			    ip_rts_request_retry, ipst);
 			break;
 		case AF_INET6:
 			error = ip_rt_delete_v6(&dst_addr_v6, &net_mask_v6,
 			    &gw_addr_v6, found_addrs, rtm->rtm_flags, ipif,
-			    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry);
+			    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry,
+			    ipst);
 			break;
 		}
 		break;
@@ -773,7 +783,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			if (net_mask == IP_HOST_MASK) {
 				ire = ire_ctable_lookup(dst_addr, gw_addr,
 				    IRE_LOCAL | IRE_LOOPBACK, NULL, zoneid,
-				    tsl, match_flags_local);
+				    tsl, match_flags_local, ipst);
 				/*
 				 * If we found an IRE_LOCAL, make sure
 				 * it is one that would be used by this
@@ -781,9 +791,9 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 				 */
 				if (ire != NULL &&
 				    ire->ire_type == IRE_LOCAL &&
-				    ip_restrict_interzone_loopback &&
+				    ipst->ips_ip_restrict_interzone_loopback &&
 				    !ire_local_ok_across_zones(ire,
-				    zoneid, &dst_addr, tsl)) {
+				    zoneid, &dst_addr, tsl, ipst)) {
 					ire_refrele(ire);
 					ire = NULL;
 				}
@@ -791,14 +801,14 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			if (ire == NULL) {
 				ire = ire_ftable_lookup(dst_addr, net_mask,
 				    gw_addr, 0, ipif, &sire, zoneid, 0,
-				    tsl, match_flags);
+				    tsl, match_flags, ipst);
 			}
 			break;
 		case AF_INET6:
 			if (IN6_ARE_ADDR_EQUAL(&net_mask_v6, &ipv6_all_ones)) {
 				ire = ire_ctable_lookup_v6(&dst_addr_v6,
 				    &gw_addr_v6, IRE_LOCAL | IRE_LOOPBACK, NULL,
-				    zoneid, tsl, match_flags_local);
+				    zoneid, tsl, match_flags_local, ipst);
 				/*
 				 * If we found an IRE_LOCAL, make sure
 				 * it is one that would be used by this
@@ -806,9 +816,9 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 				 */
 				if (ire != NULL &&
 				    ire->ire_type == IRE_LOCAL &&
-				    ip_restrict_interzone_loopback &&
+				    ipst->ips_ip_restrict_interzone_loopback &&
 				    !ire_local_ok_across_zones(ire,
-				    zoneid, (void *)&dst_addr_v6, tsl)) {
+				    zoneid, (void *)&dst_addr_v6, tsl, ipst)) {
 					ire_refrele(ire);
 					ire = NULL;
 				}
@@ -816,7 +826,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			if (ire == NULL) {
 				ire = ire_ftable_lookup_v6(&dst_addr_v6,
 				    &net_mask_v6, &gw_addr_v6, 0, ipif, &sire,
-				    zoneid, 0, tsl, match_flags);
+				    zoneid, 0, tsl, match_flags, ipst);
 			}
 			break;
 		}
@@ -905,7 +915,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 						    src_addr, NULL, ALL_ZONES,
 						    CONNP_TO_WQ(connp), ioc_mp,
 						    ip_rts_request_retry,
-						    &error);
+						    &error, ipst);
 						if (tmp_ipif == NULL) {
 							error = (error ==
 							    EINPROGRESS) ?
@@ -981,7 +991,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 						    ALL_ZONES,
 						    CONNP_TO_WQ(connp), ioc_mp,
 						    ip_rts_request_retry,
-						    &error);
+						    &error, ipst);
 						if (tmp_ipif == NULL) {
 							mutex_exit(
 							    &ire->ire_lock);
@@ -1046,10 +1056,10 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 				IN6_V4MAPPED_TO_IPADDR(&ga.ga_addr, ga_addr4);
 				if (af == AF_INET) {
 					ire_clookup_delete_cache_gw(
-					    ga_addr4, ALL_ZONES);
+					    ga_addr4, ALL_ZONES, ipst);
 				} else {
 					ire_clookup_delete_cache_gw_v6(
-					    &ga.ga_addr, ALL_ZONES);
+					    &ga.ga_addr, ALL_ZONES, ipst);
 				}
 			}
 			rts_setmetrics(ire, rtm->rtm_inits, &rtm->rtm_rmx);
@@ -1091,7 +1101,7 @@ done:
 			/* OK ACK already set up by caller except this */
 			ip2dbg(("ip_rts_request: OK ACK\n"));
 		}
-		rts_queue_input(mp, q, af);
+		rts_queue_input(mp, q, af, ipst);
 	}
 	iocp->ioc_error = error;
 	ioc_mp->b_datap->db_type = M_IOCACK;
@@ -1769,7 +1779,8 @@ rts_data_msg_size(int rtm_addrs, sa_family_t af, uint_t sacnt)
  */
 void
 ip_rts_change(int type, ipaddr_t dst_addr, ipaddr_t gw_addr, ipaddr_t net_mask,
-    ipaddr_t source, ipaddr_t author, int flags, int error, int rtm_addrs)
+    ipaddr_t source, ipaddr_t author, int flags, int error, int rtm_addrs,
+    ip_stack_t *ipst)
 {
 	rt_msghdr_t	*rtm;
 	mblk_t		*mp;
@@ -1786,7 +1797,7 @@ ip_rts_change(int type, ipaddr_t dst_addr, ipaddr_t gw_addr, ipaddr_t net_mask,
 	rtm->rtm_errno = error;
 	rtm->rtm_flags |= RTF_DONE;
 	rtm->rtm_addrs = rtm_addrs;
-	rts_queue_input(mp, NULL, AF_INET);
+	rts_queue_input(mp, NULL, AF_INET, ipst);
 }
 
 /*
@@ -1800,6 +1811,7 @@ ip_rts_ifmsg(const ipif_t *ipif)
 	if_msghdr_t	*ifm;
 	mblk_t		*mp;
 	sa_family_t	af;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	/*
 	 * This message should be generated only
@@ -1830,7 +1842,7 @@ ip_rts_ifmsg(const ipif_t *ipif)
 	    ipif->ipif_ill->ill_phyint->phyint_flags;
 	rts_getifdata(&ifm->ifm_data, ipif);
 	ifm->ifm_addrs = RTA_IFP;
-	rts_queue_input(mp, NULL, af);
+	rts_queue_input(mp, NULL, af, ipst);
 }
 
 /*
@@ -1848,6 +1860,7 @@ ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif)
 	ifa_msghdr_t	*ifam;
 	rt_msghdr_t	*rtm;
 	sa_family_t	af;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	if (ipif->ipif_isv6)
 		af = AF_INET6;
@@ -1887,7 +1900,7 @@ ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif)
 			ifam->ifam_metric = ipif->ipif_metric;
 			ifam->ifam_flags = ((cmd == RTM_ADD) ? RTF_UP : 0);
 			ifam->ifam_addrs = rtm_addrs;
-			rts_queue_input(mp, NULL, af);
+			rts_queue_input(mp, NULL, af, ipst);
 		}
 		if ((cmd == RTM_ADD && pass == 2) ||
 		    (cmd == RTM_DELETE && pass == 1)) {
@@ -1917,7 +1930,7 @@ ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif)
 			if (error == 0)
 				rtm->rtm_flags |= RTF_DONE;
 			rtm->rtm_addrs = rtm_addrs;
-			rts_queue_input(mp, NULL, af);
+			rts_queue_input(mp, NULL, af, ipst);
 		}
 	}
 }

@@ -40,6 +40,7 @@
 #include <sys/proc.h>
 #include <sys/suntpi.h>
 #include <sys/policy.h>
+#include <sys/zone.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -75,6 +76,17 @@
  */
 
 /*
+ * RTS stack instances
+ */
+struct rts_stack {
+	netstack_t		*rtss_netstack;	/* Common netstack */
+
+	caddr_t			rtss_g_nd;
+	struct rtsparam_s	*rtss_params;
+};
+typedef struct rts_stack rts_stack_t;
+
+/*
  * Object to represent database of options to search passed to
  * {sock,tpi}optcom_req() interface routine to take care of option
  * management and associated methods.
@@ -99,6 +111,7 @@ typedef	struct rts_s {
 		rts_hdrincl : 1,	/* IP_HDRINCL option + RAW and IGMP */
 
 		: 0;
+	rts_stack_t	*rts_rtss;
 } rts_t;
 
 #define	RTS_WPUT_PENDING	0x1	/* Waiting for write-side to complete */
@@ -121,7 +134,7 @@ static struct T_info_ack rts_g_t_info_ack = {
 };
 
 /* Named Dispatch Parameter Management Structure */
-typedef struct rtspparam_s {
+typedef struct rtsparam_s {
 	uint_t	rts_param_min;
 	uint_t	rts_param_max;
 	uint_t	rts_param_value;
@@ -133,17 +146,17 @@ typedef struct rtspparam_s {
  * in rts_open.
  * All of these are alterable, within the min/max values given, at run time.
  */
-static rtsparam_t	rts_param_arr[] = {
+static rtsparam_t	lcl_param_arr[] = {
 	/* min		max		value		name */
 	{ 4096,		65536,		8192,		"rts_xmit_hiwat"},
 	{ 0,		65536,		1024,		"rts_xmit_lowat"},
 	{ 4096,		65536,		8192,		"rts_recv_hiwat"},
 	{ 65536,	1024*1024*1024, 256*1024,	"rts_max_buf"},
 };
-#define	rts_xmit_hiwat			rts_param_arr[0].rts_param_value
-#define	rts_xmit_lowat			rts_param_arr[1].rts_param_value
-#define	rts_recv_hiwat			rts_param_arr[2].rts_param_value
-#define	rts_max_buf			rts_param_arr[3].rts_param_value
+#define	rtss_xmit_hiwat		rtss_params[0].rts_param_value
+#define	rtss_xmit_lowat		rtss_params[1].rts_param_value
+#define	rtss_recv_hiwat		rtss_params[2].rts_param_value
+#define	rtss_max_buf			rtss_params[3].rts_param_value
 
 static int	rts_close(queue_t *q);
 static void 	rts_err_ack(queue_t *q, mblk_t *mp, t_scalar_t t_error,
@@ -158,12 +171,14 @@ int		rts_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name,
 int		rts_opt_set(queue_t *q, uint_t optset_context, int level,
     int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
     uchar_t *outvalp, void *thisdg_attrs, cred_t *cr, mblk_t *mblk);
-static void	rts_param_cleanup(void);
+static void	rts_param_cleanup(IDP *ndp);
 static int	rts_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
-static boolean_t rts_param_register(rtsparam_t *rtspa, int cnt);
+static boolean_t rts_param_register(IDP *ndp, rtsparam_t *rtspa, int cnt);
 static int	rts_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
     cred_t *cr);
 static void	rts_rput(queue_t *q, mblk_t *mp);
+static void	*rts_stack_init(netstackid_t stackid, netstack_t *ns);
+static void	rts_stack_fini(netstackid_t stackid, void *arg);
 static void	rts_wput(queue_t *q, mblk_t *mp);
 static void	rts_wput_iocdata(queue_t *q, mblk_t *mp);
 static void 	rts_wput_other(queue_t *q, mblk_t *mp);
@@ -185,9 +200,6 @@ static struct qinit winit = {
 struct streamtab rtsinfo = {
 	&rinit, &winit
 };
-
-static IDP	rts_g_nd;	/* Points to table of RTS ND variables. */
-uint_t		rts_open_streams = 0;
 
 /*
  * This routine allocates the necessary
@@ -238,17 +250,14 @@ rts_ioctl_alloc(mblk_t *data, cred_t *cr)
 static int
 rts_close(queue_t *q)
 {
+	rts_t *rts = (rts_t *)q->q_ptr;
+
 	qprocsoff(q);
 
-	crfree(((rts_t *)q->q_ptr)->rts_credp);
+	crfree(rts->rts_credp);
+	netstack_rele(rts->rts_rtss->rtss_netstack);
 
 	mi_free(q->q_ptr);
-	rts_open_streams--;
-	/*
-	 * Free the ND table if this was
-	 * the last stream close
-	 */
-	rts_param_cleanup();
 	return (0);
 }
 
@@ -264,6 +273,8 @@ rts_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 {
 	mblk_t	*mp = NULL;
 	rts_t	*rts;
+	netstack_t *ns;
+	rts_stack_t *rtss;
 
 	/* If the stream is already open, return immediately. */
 	if (q->q_ptr != NULL)
@@ -273,14 +284,16 @@ rts_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	if (sflag != MODOPEN)
 		return (EINVAL);
 
-	/* If this is the first open of rts, create the ND table. */
-	if (rts_g_nd == NULL) {
-		if (!rts_param_register(rts_param_arr, A_CNT(rts_param_arr)))
-			return (ENOMEM);
-	}
+	ns = netstack_find_by_cred(credp);
+	ASSERT(ns != NULL);
+	rtss = ns->netstack_rts;
+	ASSERT(rtss != NULL);
+
 	q->q_ptr = mi_zalloc_sleep(sizeof (rts_t));
 	WR(q)->q_ptr = q->q_ptr;
 	rts = (rts_t *)q->q_ptr;
+
+	rts->rts_rtss = rtss;
 
 	rts->rts_credp = credp;
 	crhold(credp);
@@ -288,14 +301,14 @@ rts_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	 * The receive hiwat is only looked at on the stream head queue.
 	 * Store in q_hiwat in order to return on SO_RCVBUF getsockopts.
 	 */
-	q->q_hiwat = rts_recv_hiwat;
+	q->q_hiwat = rtss->rtss_recv_hiwat;
 	/*
 	 * The transmit hiwat/lowat is only looked at on IP's queue.
 	 * Store in q_hiwat/q_lowat in order to return on SO_SNDBUF/SO_SNDLOWAT
 	 * getsockopts.
 	 */
-	WR(q)->q_hiwat = rts_xmit_hiwat;
-	WR(q)->q_lowat = rts_xmit_lowat;
+	WR(q)->q_hiwat = rtss->rtss_xmit_hiwat;
+	WR(q)->q_lowat = rtss->rtss_xmit_lowat;
 	qprocson(q);
 	/*
 	 * Indicate the down IP module that this is a routing socket
@@ -305,14 +318,13 @@ rts_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	 */
 	mp = rts_ioctl_alloc(NULL, credp);
 	if (mp == NULL) {
-		rts_param_cleanup();
 		qprocsoff(q);
 		ASSERT(q->q_ptr != NULL);
+		netstack_rele(rtss->rtss_netstack);
 		mi_free(q->q_ptr);
 		crfree(credp);
 		return (ENOMEM);
 	}
-	rts_open_streams++;
 	rts->rts_flag |= RTS_OPEN_PENDING;
 	putnext(WR(q), mp);
 	while (rts->rts_flag & RTS_OPEN_PENDING) {
@@ -565,6 +577,7 @@ rts_opt_set(queue_t *q, uint_t optset_context, int level,
 	int	*i1 = (int *)invalp;
 	rts_t	*rts = (rts_t *)q->q_ptr;
 	boolean_t checkonly;
+	rts_stack_t	*rtss = rts->rts_rtss;
 
 	switch (optset_context) {
 	case SETFN_OPTCOM_CHECKONLY:
@@ -662,7 +675,7 @@ rts_opt_set(queue_t *q, uint_t optset_context, int level,
 		 * but changing them should do nothing.
 		 */
 		case SO_SNDBUF:
-			if (*i1 > rts_max_buf) {
+			if (*i1 > rtss->rtss_max_buf) {
 				*outlenp = 0;
 				return (ENOBUFS);
 			}
@@ -672,7 +685,7 @@ rts_opt_set(queue_t *q, uint_t optset_context, int level,
 			}
 			break;	/* goto sizeof (int) option return */
 		case SO_RCVBUF:
-			if (*i1 > rts_max_buf) {
+			if (*i1 > rtss->rtss_max_buf) {
 				*outlenp = 0;
 				return (ENOBUFS);
 			}
@@ -703,10 +716,9 @@ rts_opt_set(queue_t *q, uint_t optset_context, int level,
  * It is called by rts_close and rts_open.
  */
 static void
-rts_param_cleanup(void)
+rts_param_cleanup(IDP *ndp)
 {
-	if (!rts_open_streams)
-		nd_free(&rts_g_nd);
+	nd_free(ndp);
 }
 
 /*
@@ -729,13 +741,13 @@ rts_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
  * named dispatch (ND) handler.
  */
 static boolean_t
-rts_param_register(rtsparam_t *rtspa, int cnt)
+rts_param_register(IDP *ndp, rtsparam_t *rtspa, int cnt)
 {
 	for (; cnt-- > 0; rtspa++) {
 		if (rtspa->rts_param_name != NULL && rtspa->rts_param_name[0]) {
-			if (!nd_load(&rts_g_nd, rtspa->rts_param_name,
+			if (!nd_load(ndp, rtspa->rts_param_name,
 			    rts_param_get, rts_param_set, (caddr_t)rtspa)) {
-				nd_free(&rts_g_nd);
+				nd_free(ndp);
 				return (B_FALSE);
 			}
 		}
@@ -792,7 +804,7 @@ rts_wrw(queue_t *q, struiod_t *dp)
 			rts->rts_error = EINTR;
 			goto err_ret;
 		}
-	}
+		}
 	rts->rts_flag |= RTS_WRW_PENDING;
 
 	if (isuioq(q) && (error = struioget(q, mp, dp, 0))) {
@@ -918,8 +930,10 @@ rts_wput_other(queue_t *q, mblk_t *mp)
 	rts_t	*rts;
 	struct iocblk	*iocp;
 	cred_t	*cr;
+	rts_stack_t	*rtss;
 
 	rts = (rts_t *)q->q_ptr;
+	rtss = rts->rts_rtss;
 
 	cr = DB_CREDDEF(mp, rts->rts_credp);
 
@@ -976,7 +990,7 @@ rts_wput_other(queue_t *q, mblk_t *mp)
 		switch (iocp->ioc_cmd) {
 		case ND_SET:
 		case ND_GET:
-			if (nd_getset(q, rts_g_nd, mp)) {
+			if (nd_getset(q, rtss->rtss_g_nd, mp)) {
 				qreply(q, mp);
 				return;
 			}
@@ -1111,4 +1125,54 @@ rts_ddi_init(void)
 {
 	rts_max_optsize = optcom_max_optsize(rts_opt_obj.odb_opt_des_arr,
 	    rts_opt_obj.odb_opt_arr_cnt);
+
+	/*
+	 * We want to be informed each time a stack is created or
+	 * destroyed in the kernel, so we can maintain the
+	 * set of rts_stack_t's.
+	 */
+	netstack_register(NS_RTS, rts_stack_init, NULL, rts_stack_fini);
+}
+
+void
+rts_ddi_destroy(void)
+{
+	netstack_unregister(NS_RTS);
+}
+
+/*
+ * Initialize the RTS stack instance.
+ */
+/* ARGSUSED */
+static void *
+rts_stack_init(netstackid_t stackid, netstack_t *ns)
+{
+	rts_stack_t	*rtss;
+	rtsparam_t	*pa;
+
+	rtss = (rts_stack_t *)kmem_zalloc(sizeof (*rtss), KM_SLEEP);
+	rtss->rtss_netstack = ns;
+
+	pa = (rtsparam_t *)kmem_alloc(sizeof (lcl_param_arr), KM_SLEEP);
+	rtss->rtss_params = pa;
+	bcopy(lcl_param_arr, rtss->rtss_params, sizeof (lcl_param_arr));
+
+	(void) rts_param_register(&rtss->rtss_g_nd,
+	    rtss->rtss_params, A_CNT(lcl_param_arr));
+	return (rtss);
+}
+
+/*
+ * Free the RTS stack instance.
+ */
+/* ARGSUSED */
+static void
+rts_stack_fini(netstackid_t stackid, void *arg)
+{
+	rts_stack_t *rtss = (rts_stack_t *)arg;
+
+	rts_param_cleanup(&rtss->rtss_g_nd);
+	kmem_free(rtss->rtss_params, sizeof (lcl_param_arr));
+	rtss->rtss_params = NULL;
+	kmem_free(rtss, sizeof (*rtss));
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <sys/strsun.h>
 #include <sys/stropts.h>
 #include <sys/vnode.h>
+#include <sys/zone.h>
 #include <sys/strlog.h>
 #include <sys/sysmacros.h>
 #define	_SUN_TPI_VERSION 2
@@ -52,6 +53,7 @@
 #include <sys/atomic.h>
 #include <sys/mkdev.h>
 #include <sys/policy.h>
+#include <sys/disp.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -90,17 +92,9 @@
  * down the *multiple* messages they create.
  */
 
-/* List of open PF_KEY sockets, protected by keysock_list_lock. */
-static kmutex_t keysock_list_lock;
-static keysock_t *keysock_list;
-
 static vmem_t *keysock_vmem;		/* for minor numbers. */
 
-/* Consumers table.  If an entry is NULL, keysock maintains the table. */
-static kmutex_t keysock_consumers_lock;
-
 #define	KEYSOCK_MAX_CONSUMERS 256
-static keysock_consumer_t *keysock_consumers[KEYSOCK_MAX_CONSUMERS];
 
 /* Default structure copied into T_INFO_ACK messages (from rts.c...) */
 static struct T_info_ack keysock_g_t_info_ack = {
@@ -118,7 +112,7 @@ static struct T_info_ack keysock_g_t_info_ack = {
 };
 
 /* Named Dispatch Parameter Management Structure */
-typedef struct keysockpparam_s {
+typedef struct keysockparam_s {
 	uint_t	keysock_param_min;
 	uint_t	keysock_param_max;
 	uint_t	keysock_param_value;
@@ -130,7 +124,7 @@ typedef struct keysockpparam_s {
  * keysock_g_nd in keysock_init_nd.
  * All of these are alterable, within the min/max values given, at run time.
  */
-static	keysockparam_t	keysock_param_arr[] = {
+static	keysockparam_t	lcl_param_arr[] = {
 	/* min	max	value	name */
 	{ 4096, 65536,	8192,	"keysock_xmit_hiwat"},
 	{ 0,	65536,	1024,	"keysock_xmit_lowat"},
@@ -138,28 +132,17 @@ static	keysockparam_t	keysock_param_arr[] = {
 	{ 65536, 1024*1024*1024, 256*1024,	"keysock_max_buf"},
 	{ 0,	3,	0,	"keysock_debug"},
 };
-#define	keysock_xmit_hiwat	keysock_param_arr[0].keysock_param_value
-#define	keysock_xmit_lowat	keysock_param_arr[1].keysock_param_value
-#define	keysock_recv_hiwat	keysock_param_arr[2].keysock_param_value
-#define	keysock_max_buf		keysock_param_arr[3].keysock_param_value
-#define	keysock_debug		keysock_param_arr[4].keysock_param_value
-
-kmutex_t keysock_param_lock;	/* Protects the NDD variables. */
+#define	keystack_xmit_hiwat	keystack_params[0].keysock_param_value
+#define	keystack_xmit_lowat	keystack_params[1].keysock_param_value
+#define	keystack_recv_hiwat	keystack_params[2].keysock_param_value
+#define	keystack_max_buf	keystack_params[3].keysock_param_value
+#define	keystack_debug	keystack_params[4].keysock_param_value
 
 #define	ks0dbg(a)	printf a
 /* NOTE:  != 0 instead of > 0 so lint doesn't complain. */
-#define	ks1dbg(a)	if (keysock_debug != 0) printf a
-#define	ks2dbg(a)	if (keysock_debug > 1) printf a
-#define	ks3dbg(a)	if (keysock_debug > 2) printf a
-
-static IDP keysock_g_nd;
-
-/*
- * State for flush/dump.  This would normally be a boolean_t, but
- * cas32() works best for a known 32-bit quantity.
- */
-static uint32_t keysock_flushdump;
-static int keysock_flushdump_errno;
+#define	ks1dbg(keystack, a)	if (keystack->keystack_debug != 0) printf a
+#define	ks2dbg(keystack, a)	if (keystack->keystack_debug > 1) printf a
+#define	ks3dbg(keystack, a)	if (keystack->keystack_debug > 2) printf a
 
 static int keysock_close(queue_t *);
 static int keysock_open(queue_t *, dev_t *, int, int, cred_t *);
@@ -167,7 +150,9 @@ static void keysock_wput(queue_t *, mblk_t *);
 static void keysock_rput(queue_t *, mblk_t *);
 static void keysock_rsrv(queue_t *);
 static void keysock_passup(mblk_t *, sadb_msg_t *, minor_t,
-    keysock_consumer_t *, boolean_t);
+    keysock_consumer_t *, boolean_t, keysock_stack_t *);
+static void *keysock_stack_init(netstackid_t stackid, netstack_t *ns);
+static void keysock_stack_fini(netstackid_t stackid, void *arg);
 
 static struct module_info info = {
 	5138, "keysock", 1, INFPSZ, 512, 128
@@ -205,37 +190,29 @@ static char *KEYSOCK = "keysock";
 static char *STRMOD = "strmod";
 
 /*
- * keysock_plumbed: zero if plumb not attempted, positive if it succeeded,
- * negative if it failed.
- */
-static int keysock_plumbed = 0;
-
-/*
- * This integer counts the number of extended REGISTERed sockets.  This
- * determines if we should send extended REGISTERs.
- */
-static uint32_t keysock_num_extended = 0;
-
-/*
- * Global sequence space for SADB_ACQUIRE messages of any sort.
- */
-static uint32_t keysock_acquire_seq = 0xffffffff;
-
-/*
  * Load the other ipsec modules and plumb them together.
  */
 int
-keysock_plumb_ipsec(void)
+keysock_plumb_ipsec(netstack_t *ns)
 {
 	ldi_handle_t	lh, ip6_lh = NULL;
 	ldi_ident_t	li = NULL;
 	int		err = 0;
 	int		muxid, rval;
 	boolean_t	esp_present = B_TRUE;
+	cred_t		*cr;
+	keysock_stack_t *keystack = ns->netstack_keysock;
 
+#ifdef NS_DEBUG
+	(void) printf("keysock_plumb_ipsec(%d)\n",
+	    ns->netstack_stackid);
+#endif
 
-	keysock_plumbed = 0;	/* we're trying again.. */
+	keystack->keystack_plumbed = 0;	/* we're trying again.. */
 
+	cr = zone_get_kcred(netstackid_to_zoneid(
+		keystack->keystack_netstack->netstack_stackid));
+	ASSERT(cr != NULL);
 	/*
 	 * Load up the drivers (AH/ESP).
 	 *
@@ -266,70 +243,75 @@ keysock_plumb_ipsec(void)
 		goto bail;
 	}
 
-	err = ldi_open_by_name(IP6DEV, FREAD|FWRITE, CRED(), &ip6_lh, li);
+	err = ldi_open_by_name(IP6DEV, FREAD|FWRITE, cr, &ip6_lh, li);
 	if (err) {
 		ks0dbg(("IPsec:  Open of IP6 failed (err %d).\n", err));
 		goto bail;
 	}
 
 	/* PLINK KEYSOCK/AH */
-	err = ldi_open_by_name(IPSECAHDEV, FREAD|FWRITE, CRED(), &lh, li);
+	err = ldi_open_by_name(IPSECAHDEV, FREAD|FWRITE, cr, &lh, li);
 	if (err) {
 		ks0dbg(("IPsec:  Open of AH failed (err %d).\n", err));
 		goto bail;
 	}
 	err = ldi_ioctl(lh,
-	    I_PUSH, (intptr_t)KEYSOCK, FKIOCTL, CRED(), &rval);
+	    I_PUSH, (intptr_t)KEYSOCK, FKIOCTL, cr, &rval);
 	if (err) {
 		ks0dbg(("IPsec:  Push of KEYSOCK onto AH failed (err %d).\n",
 		    err));
-		(void) ldi_close(lh, FREAD|FWRITE, CRED());
+		(void) ldi_close(lh, FREAD|FWRITE, cr);
 		goto bail;
 	}
 	err = ldi_ioctl(ip6_lh, I_PLINK, (intptr_t)lh,
-			FREAD+FWRITE+FNOCTTY+FKIOCTL, kcred, &muxid);
+			FREAD+FWRITE+FNOCTTY+FKIOCTL, cr, &muxid);
 	if (err) {
 		ks0dbg(("IPsec:  PLINK of KEYSOCK/AH failed (err %d).\n", err));
-		(void) ldi_close(lh, FREAD|FWRITE, CRED());
+		(void) ldi_close(lh, FREAD|FWRITE, cr);
 		goto bail;
 	}
-	(void) ldi_close(lh, FREAD|FWRITE, CRED());
+	(void) ldi_close(lh, FREAD|FWRITE, cr);
 
 	/* PLINK KEYSOCK/ESP */
 	if (esp_present) {
 		err = ldi_open_by_name(IPSECESPDEV,
-		    FREAD|FWRITE, CRED(), &lh, li);
+		    FREAD|FWRITE, cr, &lh, li);
 		if (err) {
 			ks0dbg(("IPsec:  Open of ESP failed (err %d).\n", err));
 			goto bail;
 		}
 		err = ldi_ioctl(lh,
-		    I_PUSH, (intptr_t)KEYSOCK, FKIOCTL, CRED(), &rval);
+		    I_PUSH, (intptr_t)KEYSOCK, FKIOCTL, cr, &rval);
 		if (err) {
 			ks0dbg(("IPsec:  "
 			    "Push of KEYSOCK onto ESP failed (err %d).\n",
 			    err));
-			(void) ldi_close(lh, FREAD|FWRITE, CRED());
+			(void) ldi_close(lh, FREAD|FWRITE, cr);
 			goto bail;
 		}
 		err = ldi_ioctl(ip6_lh, I_PLINK, (intptr_t)lh,
-				FREAD+FWRITE+FNOCTTY+FKIOCTL, kcred, &muxid);
+				FREAD+FWRITE+FNOCTTY+FKIOCTL, cr, &muxid);
 		if (err) {
 			ks0dbg(("IPsec:  "
 			    "PLINK of KEYSOCK/ESP failed (err %d).\n", err));
-			(void) ldi_close(lh, FREAD|FWRITE, CRED());
+			(void) ldi_close(lh, FREAD|FWRITE, cr);
 			goto bail;
 		}
-		(void) ldi_close(lh, FREAD|FWRITE, CRED());
+		(void) ldi_close(lh, FREAD|FWRITE, cr);
 	}
 
 bail:
-	keysock_plumbed = (err == 0) ? 1 : -1;
+	keystack->keystack_plumbed = (err == 0) ? 1 : -1;
 	if (ip6_lh != NULL) {
-		(void) ldi_close(ip6_lh, FREAD|FWRITE, CRED());
+		(void) ldi_close(ip6_lh, FREAD|FWRITE, cr);
 	}
 	if (li != NULL)
 		ldi_ident_release(li);
+#ifdef NS_DEBUG
+	(void) printf("keysock_plumb_ipsec -> %d\n",
+	    keystack->keystack_plumbed);
+#endif
+	crfree(cr);
 	return (err);
 }
 
@@ -343,10 +325,12 @@ keysock_param_get(q, mp, cp, cr)
 {
 	keysockparam_t	*keysockpa = (keysockparam_t *)cp;
 	uint_t value;
+	keysock_t *ks = (keysock_t *)q->q_ptr;
+	keysock_stack_t	*keystack = ks->keysock_keystack;
 
-	mutex_enter(&keysock_param_lock);
+	mutex_enter(&keystack->keystack_param_lock);
 	value = keysockpa->keysock_param_value;
-	mutex_exit(&keysock_param_lock);
+	mutex_exit(&keystack->keystack_param_lock);
 
 	(void) mi_mpprintf(mp, "%u", value);
 	return (0);
@@ -364,64 +348,103 @@ keysock_param_set(q, mp, value, cp, cr)
 {
 	ulong_t	new_value;
 	keysockparam_t	*keysockpa = (keysockparam_t *)cp;
+	keysock_t *ks = (keysock_t *)q->q_ptr;
+	keysock_stack_t	*keystack = ks->keysock_keystack;
 
 	/* Convert the value from a string into a long integer. */
 	if (ddi_strtoul(value, NULL, 10, &new_value) != 0)
 		return (EINVAL);
 
-	mutex_enter(&keysock_param_lock);
+	mutex_enter(&keystack->keystack_param_lock);
 	/*
 	 * Fail the request if the new value does not lie within the
 	 * required bounds.
 	 */
 	if (new_value < keysockpa->keysock_param_min ||
 	    new_value > keysockpa->keysock_param_max) {
-		mutex_exit(&keysock_param_lock);
+		mutex_exit(&keystack->keystack_param_lock);
 		return (EINVAL);
 	}
 
 	/* Set the new value */
 	keysockpa->keysock_param_value = new_value;
-	mutex_exit(&keysock_param_lock);
+	mutex_exit(&keystack->keystack_param_lock);
 
 	return (0);
 }
 
 /*
- * Initialize NDD variables, and other things, for keysock.
+ * Initialize keysock at module load time
  */
 boolean_t
 keysock_ddi_init(void)
 {
-	keysockparam_t *ksp = keysock_param_arr;
-	int count = A_CNT(keysock_param_arr);
-
-	if (!keysock_g_nd) {
-		for (; count-- > 0; ksp++) {
-			if (ksp->keysock_param_name != NULL &&
-			    ksp->keysock_param_name[0]) {
-				if (!nd_load(&keysock_g_nd,
-				    ksp->keysock_param_name,
-				    keysock_param_get, keysock_param_set,
-				    (caddr_t)ksp)) {
-					nd_free(&keysock_g_nd);
-					return (B_FALSE);
-				}
-			}
-		}
-	}
-
 	keysock_max_optsize = optcom_max_optsize(
 	    keysock_opt_obj.odb_opt_des_arr, keysock_opt_obj.odb_opt_arr_cnt);
 
 	keysock_vmem = vmem_create("keysock", (void *)1, MAXMIN, 1,
 	    NULL, NULL, NULL, 1, VM_SLEEP | VMC_IDENTIFIER);
 
-	mutex_init(&keysock_list_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&keysock_consumers_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&keysock_param_lock, NULL, MUTEX_DEFAULT, NULL);
+	/*
+	 * We want to be informed each time a stack is created or
+	 * destroyed in the kernel, so we can maintain the
+	 * set of keysock_stack_t's.
+	 */
+	netstack_register(NS_KEYSOCK, keysock_stack_init, NULL,
+	    keysock_stack_fini);
 
 	return (B_TRUE);
+}
+
+/*
+ * Walk through the param array specified registering each element with the
+ * named dispatch handler.
+ */
+static boolean_t
+keysock_param_register(IDP *ndp, keysockparam_t *ksp, int cnt)
+{
+	for (; cnt-- > 0; ksp++) {
+		if (ksp->keysock_param_name != NULL &&
+		    ksp->keysock_param_name[0]) {
+			if (!nd_load(ndp,
+			    ksp->keysock_param_name,
+			    keysock_param_get, keysock_param_set,
+			    (caddr_t)ksp)) {
+				nd_free(ndp);
+				return (B_FALSE);
+			}
+		}
+	}
+	return (B_TRUE);
+}
+
+/*
+ * Initialize keysock for one stack instance
+ */
+/* ARGSUSED */
+static void *
+keysock_stack_init(netstackid_t stackid, netstack_t *ns)
+{
+	keysock_stack_t	*keystack;
+	keysockparam_t *ksp;
+
+	keystack = (keysock_stack_t *)kmem_zalloc(sizeof (*keystack), KM_SLEEP);
+	keystack->keystack_netstack = ns;
+
+	keystack->keystack_acquire_seq = 0xffffffff;
+
+	ksp = (keysockparam_t *)kmem_alloc(sizeof (lcl_param_arr), KM_SLEEP);
+	keystack->keystack_params = ksp;
+	bcopy(lcl_param_arr, ksp, sizeof (lcl_param_arr));
+
+	(void) keysock_param_register(&keystack->keystack_g_nd, ksp,
+	    A_CNT(lcl_param_arr));
+
+	mutex_init(&keystack->keystack_list_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&keystack->keystack_consumers_lock,
+	    NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&keystack->keystack_param_lock, NULL, MUTEX_DEFAULT, NULL);
+	return (keystack);
 }
 
 /*
@@ -430,14 +453,28 @@ keysock_ddi_init(void)
 void
 keysock_ddi_destroy(void)
 {
-	/* XXX Free instances? */
-	ks0dbg(("keysock_ddi_destroy being called.\n"));
-
+	netstack_unregister(NS_KEYSOCK);
 	vmem_destroy(keysock_vmem);
-	mutex_destroy(&keysock_list_lock);
-	mutex_destroy(&keysock_consumers_lock);
-	mutex_destroy(&keysock_param_lock);
-	nd_free(&keysock_g_nd);
+}
+
+/*
+ * Remove one stack instance from keysock
+ */
+/* ARGSUSED */
+static void
+keysock_stack_fini(netstackid_t stackid, void *arg)
+{
+	keysock_stack_t *keystack = (keysock_stack_t *)arg;
+
+	nd_free(&keystack->keystack_g_nd);
+	kmem_free(keystack->keystack_params, sizeof (lcl_param_arr));
+	keystack->keystack_params = NULL;
+
+	mutex_destroy(&keystack->keystack_list_lock);
+	mutex_destroy(&keystack->keystack_consumers_lock);
+	mutex_destroy(&keystack->keystack_param_lock);
+
+	kmem_free(keystack, sizeof (*keystack));
 }
 
 /*
@@ -450,6 +487,8 @@ keysock_close(queue_t *q)
 	keysock_consumer_t *kc;
 	void *ptr = q->q_ptr;
 	int size;
+	keysock_stack_t	*keystack;
+
 
 	qprocsoff(q);
 
@@ -458,7 +497,9 @@ keysock_close(queue_t *q)
 
 	if (WR(q)->q_next) {
 		kc = (keysock_consumer_t *)ptr;
-		ks0dbg(("Module close, removing a consumer (%d).\n",
+		keystack = kc->kc_keystack;
+
+		ks1dbg(keystack, ("Module close, removing a consumer (%d).\n",
 		    kc->kc_sa_type));
 		/*
 		 * Because of PERMOD open/close exclusive perimeter, I
@@ -473,8 +514,8 @@ keysock_close(queue_t *q)
 			 * really necessary, but if we ever loosen up, we will
 			 * have this bit covered already.
 			 */
-			keysock_flushdump--;
-			if (keysock_flushdump == 0) {
+			keystack->keystack_flushdump--;
+			if (keystack->keystack_flushdump == 0) {
 				/*
 				 * The flush/dump terminated by having a
 				 * consumer go away.  I need to send up to the
@@ -487,24 +528,29 @@ keysock_close(queue_t *q)
 			}
 		}
 		size = sizeof (keysock_consumer_t);
-		mutex_enter(&keysock_consumers_lock);
-		keysock_consumers[kc->kc_sa_type] = NULL;
-		mutex_exit(&keysock_consumers_lock);
+		mutex_enter(&keystack->keystack_consumers_lock);
+		keystack->keystack_consumers[kc->kc_sa_type] = NULL;
+		mutex_exit(&keystack->keystack_consumers_lock);
 		mutex_destroy(&kc->kc_lock);
+		netstack_rele(kc->kc_keystack->keystack_netstack);
 	} else {
-		ks3dbg(("Driver close, PF_KEY socket is going away.\n"));
 		ks = (keysock_t *)ptr;
+		keystack = ks->keysock_keystack;
+
+		ks3dbg(keystack,
+		    ("Driver close, PF_KEY socket is going away.\n"));
 		if ((ks->keysock_flags & KEYSOCK_EXTENDED) != 0)
-			atomic_add_32(&keysock_num_extended, -1);
+			atomic_add_32(&keystack->keystack_num_extended, -1);
 		size = sizeof (keysock_t);
-		mutex_enter(&keysock_list_lock);
+		mutex_enter(&keystack->keystack_list_lock);
 		*(ks->keysock_ptpn) = ks->keysock_next;
 		if (ks->keysock_next != NULL)
 			ks->keysock_next->keysock_ptpn = ks->keysock_ptpn;
-		mutex_exit(&keysock_list_lock);
+		mutex_exit(&keystack->keystack_list_lock);
 		mutex_destroy(&ks->keysock_lock);
 		vmem_free(keysock_vmem, (void *)(uintptr_t)ks->keysock_serial,
 		    1);
+		netstack_rele(ks->keysock_keystack->keystack_netstack);
 	}
 
 	/* Now I'm free. */
@@ -522,10 +568,10 @@ keysock_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	keysock_consumer_t *kc;
 	mblk_t *mp;
 	ipsec_info_t *ii;
+	netstack_t *ns;
+	keysock_stack_t *keystack;
 
-	ks3dbg(("Entering keysock open.\n"));
-
-	if (secpolicy_net_config(credp, B_FALSE) != 0) {
+	if (secpolicy_ip_config(credp, B_FALSE) != 0) {
 		/* Privilege debugging will log the error */
 		return (EPERM);
 	}
@@ -533,21 +579,36 @@ keysock_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	if (q->q_ptr != NULL)
 		return (0);  /* Re-open of an already open instance. */
 
-	if (keysock_plumbed < 1) {
-		keysock_plumbed = 0;
+	ns = netstack_find_by_cred(credp);
+	ASSERT(ns != NULL);
+	keystack = ns->netstack_keysock;
+	ASSERT(keystack != NULL);
+
+	ks3dbg(keystack, ("Entering keysock open.\n"));
+
+	if (keystack->keystack_plumbed < 1) {
+		netstack_t *ns = keystack->keystack_netstack;
+
+		keystack->keystack_plumbed = 0;
+#ifdef NS_DEBUG
+		printf("keysock_open(%d) - plumb\n",
+		    keystack->keystack_netstack->netstack_stackid);
+#endif
 		/*
 		 * Don't worry about ipsec_failure being true here.
 		 * (See ip.c).  An open of keysock should try and force
 		 * the issue.  Maybe it was a transient failure.
 		 */
-		ipsec_loader_loadnow();
+		ipsec_loader_loadnow(ns->netstack_ipsec);
 	}
 
 	if (sflag & MODOPEN) {
 		/* Initialize keysock_consumer state here. */
 		kc = kmem_zalloc(sizeof (keysock_consumer_t), KM_NOSLEEP);
-		if (kc == NULL)
+		if (kc == NULL) {
+			netstack_rele(keystack->keystack_netstack);
 			return (ENOMEM);
+		}
 		mutex_init(&kc->kc_lock, NULL, MUTEX_DEFAULT, 0);
 		kc->kc_rq = q;
 		kc->kc_wq = WR(q);
@@ -555,6 +616,7 @@ keysock_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		q->q_ptr = kc;
 		WR(q)->q_ptr = kc;
 
+		kc->kc_keystack = keystack;
 		qprocson(q);
 
 		/*
@@ -565,13 +627,14 @@ keysock_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		/* Allocate it. */
 		mp = allocb(sizeof (ipsec_info_t), BPRI_HI);
 		if (mp == NULL) {
-			ks1dbg((
+			ks1dbg(keystack, (
 			    "keysock_open:  Cannot allocate KEYSOCK_HELLO.\n"));
 			/* Do I need to set these to null? */
 			q->q_ptr = NULL;
 			WR(q)->q_ptr = NULL;
 			mutex_destroy(&kc->kc_lock);
 			kmem_free(kc, sizeof (*kc));
+			netstack_rele(keystack->keystack_netstack);
 			return (ENOMEM);
 		}
 
@@ -582,23 +645,25 @@ keysock_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		ii->ipsec_info_type = KEYSOCK_HELLO;
 		/* Length only of type/len. */
 		ii->ipsec_info_len = sizeof (ii->ipsec_allu);
-		ks2dbg(("Ready to putnext KEYSOCK_HELLO.\n"));
+		ks2dbg(keystack, ("Ready to putnext KEYSOCK_HELLO.\n"));
 		putnext(kc->kc_wq, mp);
 	} else {
 		minor_t ksminor;
 
 		/* Initialize keysock state. */
 
-		ks2dbg(("Made it into PF_KEY socket open.\n"));
+		ks2dbg(keystack, ("Made it into PF_KEY socket open.\n"));
 
 		ksminor = (minor_t)(uintptr_t)
 		    vmem_alloc(keysock_vmem, 1, VM_NOSLEEP);
-		if (ksminor == 0)
+		if (ksminor == 0) {
+			netstack_rele(keystack->keystack_netstack);
 			return (ENOMEM);
-
+		}
 		ks = kmem_zalloc(sizeof (keysock_t), KM_NOSLEEP);
 		if (ks == NULL) {
 			vmem_free(keysock_vmem, (void *)(uintptr_t)ksminor, 1);
+			netstack_rele(keystack->keystack_netstack);
 			return (ENOMEM);
 		}
 
@@ -610,6 +675,7 @@ keysock_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 		q->q_ptr = ks;
 		WR(q)->q_ptr = ks;
+		ks->keysock_keystack = keystack;
 
 		/*
 		 * The receive hiwat is only looked at on the stream head
@@ -617,7 +683,7 @@ keysock_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		 * getsockopts.
 		 */
 
-		q->q_hiwat = keysock_recv_hiwat;
+		q->q_hiwat = keystack->keystack_recv_hiwat;
 
 		/*
 		 * The transmit hiwat/lowat is only looked at on IP's queue.
@@ -625,30 +691,33 @@ keysock_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		 * SO_SNDBUF/SO_SNDLOWAT getsockopts.
 		 */
 
-		WR(q)->q_hiwat = keysock_xmit_hiwat;
-		WR(q)->q_lowat = keysock_xmit_lowat;
+		WR(q)->q_hiwat = keystack->keystack_xmit_hiwat;
+		WR(q)->q_lowat = keystack->keystack_xmit_lowat;
 
 		*devp = makedevice(getmajor(*devp), ksminor);
 
 		/*
 		 * Thread keysock into the global keysock list.
 		 */
-		mutex_enter(&keysock_list_lock);
-		ks->keysock_next = keysock_list;
-		ks->keysock_ptpn = &keysock_list;
-		if (keysock_list != NULL)
-			keysock_list->keysock_ptpn = &ks->keysock_next;
-		keysock_list = ks;
-		mutex_exit(&keysock_list_lock);
+		mutex_enter(&keystack->keystack_list_lock);
+		ks->keysock_next = keystack->keystack_list;
+		ks->keysock_ptpn = &keystack->keystack_list;
+		if (keystack->keystack_list != NULL) {
+			keystack->keystack_list->keysock_ptpn =
+			    &ks->keysock_next;
+		}
+		keystack->keystack_list = ks;
+		mutex_exit(&keystack->keystack_list_lock);
 
 		qprocson(q);
-		(void) mi_set_sth_hiwat(q, keysock_recv_hiwat);
+		(void) mi_set_sth_hiwat(q, keystack->keystack_recv_hiwat);
 		/*
 		 * Wait outside the keysock module perimeter for IPsec
 		 * plumbing to be completed.  If it fails, keysock_close()
 		 * undoes everything we just did.
 		 */
-		if (!ipsec_loader_wait(q)) {
+		if (!ipsec_loader_wait(q,
+		    keystack->keystack_netstack->netstack_ipsec)) {
 			(void) keysock_close(q);
 			return (EPFNOSUPPORT);
 		}
@@ -789,6 +858,7 @@ keysock_opt_set(queue_t *q, uint_t mgmt_flags, int level,
 {
 	int *i1 = (int *)invalp;
 	keysock_t *ks = (keysock_t *)q->q_ptr;
+	keysock_stack_t	*keystack = ks->keysock_keystack;
 
 	switch (level) {
 	case SOL_SOCKET:
@@ -800,12 +870,12 @@ keysock_opt_set(queue_t *q, uint_t mgmt_flags, int level,
 			else ks->keysock_flags &= ~KEYSOCK_NOLOOP;
 			break;
 		case SO_SNDBUF:
-			if (*i1 > keysock_max_buf)
+			if (*i1 > keystack->keystack_max_buf)
 				return (ENOBUFS);
 			q->q_hiwat = *i1;
 			break;
 		case SO_RCVBUF:
-			if (*i1 > keysock_max_buf)
+			if (*i1 > keystack->keystack_max_buf)
 				return (ENOBUFS);
 			RD(q)->q_hiwat = *i1;
 			(void) mi_set_sth_hiwat(RD(q), *i1);
@@ -825,43 +895,52 @@ keysock_wput_other(queue_t *q, mblk_t *mp)
 {
 	struct iocblk *iocp;
 	int error;
+	keysock_t *ks = (keysock_t *)q->q_ptr;
+	keysock_stack_t	*keystack = ks->keysock_keystack;
+	cred_t		*cr;
 
 	switch (mp->b_datap->db_type) {
 	case M_PROTO:
 	case M_PCPROTO:
 		if ((mp->b_wptr - mp->b_rptr) < sizeof (long)) {
-			ks3dbg((
+			ks3dbg(keystack, (
 			    "keysock_wput_other: Not big enough M_PROTO\n"));
 			freemsg(mp);
 			return;
 		}
+		cr = zone_get_kcred(netstackid_to_zoneid(
+			keystack->keystack_netstack->netstack_stackid));
+		ASSERT(cr != NULL);
+
 		switch (((union T_primitives *)mp->b_rptr)->type) {
 		case T_CAPABILITY_REQ:
 			keysock_capability_req(q, mp);
-			return;
+			break;
 		case T_INFO_REQ:
 			keysock_info_req(q, mp);
-			return;
+			break;
 		case T_SVR4_OPTMGMT_REQ:
-			(void) svr4_optcom_req(q, mp, DB_CREDDEF(mp, kcred),
+			(void) svr4_optcom_req(q, mp, DB_CREDDEF(mp, cr),
 			    &keysock_opt_obj);
-			return;
+			break;
 		case T_OPTMGMT_REQ:
-			(void) tpi_optcom_req(q, mp, DB_CREDDEF(mp, kcred),
+			(void) tpi_optcom_req(q, mp, DB_CREDDEF(mp, cr),
 			    &keysock_opt_obj);
-			return;
+			break;
 		case T_DATA_REQ:
 		case T_EXDATA_REQ:
 		case T_ORDREL_REQ:
 			/* Illegal for keysock. */
 			freemsg(mp);
 			(void) putnextctl1(RD(q), M_ERROR, EPROTO);
-			return;
+			break;
 		default:
 			/* Not supported by keysock. */
 			keysock_err_ack(q, mp, TNOTSUPPORT, 0);
-			return;
+			break;
 		}
+		crfree(cr);
+		return;
 	case M_IOCTL:
 		iocp = (struct iocblk *)mp->b_rptr;
 		error = EINVAL;
@@ -869,7 +948,7 @@ keysock_wput_other(queue_t *q, mblk_t *mp)
 		switch (iocp->ioc_cmd) {
 		case ND_SET:
 		case ND_GET:
-			if (nd_getset(q, keysock_g_nd, mp)) {
+			if (nd_getset(q, keystack->keystack_g_nd, mp)) {
 				qreply(q, mp);
 				return;
 			} else
@@ -907,6 +986,7 @@ static void
 keysock_error(keysock_t *ks, mblk_t *mp, int error, int diagnostic)
 {
 	sadb_msg_t *samsg = (sadb_msg_t *)mp->b_rptr;
+	keysock_stack_t	*keystack = ks->keysock_keystack;
 
 	ASSERT(mp->b_datap->db_type == M_DATA);
 
@@ -923,7 +1003,7 @@ keysock_error(keysock_t *ks, mblk_t *mp, int error, int diagnostic)
 	samsg->sadb_msg_errno = (uint8_t)error;
 	samsg->sadb_x_msg_diagnostic = (uint16_t)diagnostic;
 
-	keysock_passup(mp, samsg, ks->keysock_serial, NULL, B_FALSE);
+	keysock_passup(mp, samsg, ks->keysock_serial, NULL, B_FALSE, keystack);
 }
 
 /*
@@ -938,10 +1018,11 @@ keysock_passdown(keysock_t *ks, mblk_t *mp, uint8_t satype, sadb_ext_t *extv[],
 	mblk_t *wrapper;
 	keysock_in_t *ksi;
 	int i;
+	keysock_stack_t	*keystack = ks->keysock_keystack;
 
 	wrapper = allocb(sizeof (ipsec_info_t), BPRI_HI);
 	if (wrapper == NULL) {
-		ks3dbg(("keysock_passdown: allocb failed.\n"));
+		ks3dbg(keystack, ("keysock_passdown: allocb failed.\n"));
 		if (extv[SADB_EXT_KEY_ENCRYPT] != NULL)
 			bzero(extv[SADB_EXT_KEY_ENCRYPT],
 			    SADB_64TO8(
@@ -954,7 +1035,7 @@ keysock_passdown(keysock_t *ks, mblk_t *mp, uint8_t satype, sadb_ext_t *extv[],
 			ks0dbg((
 			    "keysock: Downwards flush/dump message failed!\n"));
 			/* If this is true, I hold the perimeter. */
-			keysock_flushdump--;
+			keystack->keystack_flushdump--;
 		}
 		freemsg(mp);
 		return;
@@ -979,7 +1060,7 @@ keysock_passdown(keysock_t *ks, mblk_t *mp, uint8_t satype, sadb_ext_t *extv[],
 	/*
 	 * Find the appropriate consumer where the message is passed down.
 	 */
-	kc = keysock_consumers[satype];
+	kc = keystack->keystack_consumers[satype];
 	if (kc == NULL) {
 		freeb(wrapper);
 		keysock_error(ks, mp, EINVAL, SADB_X_DIAGNOSTIC_UNKNOWN_SATYPE);
@@ -987,7 +1068,7 @@ keysock_passdown(keysock_t *ks, mblk_t *mp, uint8_t satype, sadb_ext_t *extv[],
 			ks0dbg((
 			    "keysock: Downwards flush/dump message failed!\n"));
 			/* If this is true, I hold the perimeter. */
-			keysock_flushdump--;
+			keystack->keystack_flushdump--;
 		}
 		return;
 	}
@@ -1011,7 +1092,7 @@ keysock_passdown(keysock_t *ks, mblk_t *mp, uint8_t satype, sadb_ext_t *extv[],
  * High-level reality checking of extensions.
  */
 static boolean_t
-ext_check(sadb_ext_t *ext)
+ext_check(sadb_ext_t *ext, keysock_stack_t *keystack)
 {
 	int i;
 	uint64_t *lp;
@@ -1050,9 +1131,9 @@ ext_check(sadb_ext_t *ext)
 		 */
 		if ((roundup(SADB_1TO8(((sadb_key_t *)ext)->sadb_key_bits), 8) +
 		    sizeof (sadb_key_t)) != SADB_64TO8(ext->sadb_ext_len)) {
-			ks1dbg((
+			ks1dbg(keystack, (
 			    "ext_check:  Key bits/length inconsistent.\n"));
-			ks1dbg(("%d bits, len is %d bytes.\n",
+			ks1dbg(keystack, ("%d bits, len is %d bytes.\n",
 			    ((sadb_key_t *)ext)->sadb_key_bits,
 			    SADB_64TO8(ext->sadb_ext_len)));
 			return (B_FALSE);
@@ -1123,7 +1204,8 @@ ext_check(sadb_ext_t *ext)
  * like an assembly programmer, yet trying to make the compiler happy.
  */
 static int
-keysock_get_ext(sadb_ext_t *extv[], sadb_msg_t *basehdr, uint_t msgsize)
+keysock_get_ext(sadb_ext_t *extv[], sadb_msg_t *basehdr, uint_t msgsize,
+    keysock_stack_t *keystack)
 {
 	bzero(extv, sizeof (sadb_ext_t *) * (SADB_EXT_MAX + 1));
 
@@ -1155,7 +1237,7 @@ keysock_get_ext(sadb_ext_t *extv[], sadb_msg_t *basehdr, uint_t msgsize)
 		 * Reality check the extension if possible at the keysock
 		 * level.
 		 */
-		if (!ext_check(extv[0]))
+		if (!ext_check(extv[0], keystack))
 			return (KGE_CHK);
 
 		/* If I make it here, assign the appropriate bin. */
@@ -1190,17 +1272,19 @@ keysock_do_flushdump(queue_t *q, mblk_t *mp)
 	keysock_t *ks = (keysock_t *)q->q_ptr;
 	sadb_ext_t *extv[SADB_EXT_MAX + 1];
 	sadb_msg_t *samsg = (sadb_msg_t *)mp->b_rptr;
+	keysock_stack_t	*keystack = ks->keysock_keystack;
 
 	/*
 	 * I am guaranteed this will work.  I did the work in keysock_parse()
 	 * already.
 	 */
-	(void) keysock_get_ext(extv, samsg, SADB_64TO8(samsg->sadb_msg_len));
+	(void) keysock_get_ext(extv, samsg, SADB_64TO8(samsg->sadb_msg_len),
+	    keystack);
 
 	/*
 	 * I hold the perimeter, therefore I don't need to use atomic ops.
 	 */
-	if (keysock_flushdump != 0) {
+	if (keystack->keystack_flushdump != 0) {
 		/* XXX Should I instead use EBUSY? */
 		/* XXX Or is there a way to queue these up? */
 		keysock_error(ks, mp, ENOMEM, SADB_X_DIAGNOSTIC_NONE);
@@ -1220,7 +1304,7 @@ keysock_do_flushdump(queue_t *q, mblk_t *mp)
 	 * and/or flushes.
 	 */
 
-	keysock_flushdump_errno = 0;
+	keystack->keystack_flushdump_errno = 0;
 
 	/*
 	 * Okay, I hold the perimeter.  Eventually keysock_flushdump will
@@ -1239,9 +1323,9 @@ keysock_do_flushdump(queue_t *q, mblk_t *mp)
 	 * and accordingly back to the socket.
 	 */
 
-	mutex_enter(&keysock_consumers_lock);
+	mutex_enter(&keystack->keystack_consumers_lock);
 	for (i = start; i <= finish; i++) {
-		if (keysock_consumers[i] != NULL) {
+		if (keystack->keystack_consumers[i] != NULL) {
 			mp1 = copymsg(mp);
 			if (mp1 == NULL) {
 				ks0dbg(("SADB_FLUSH copymsg() failed.\n"));
@@ -1261,13 +1345,14 @@ keysock_do_flushdump(queue_t *q, mblk_t *mp)
 			 * Because my entry conditions are met above, the
 			 * following assertion should hold true.
 			 */
-			mutex_enter(&(keysock_consumers[i]->kc_lock));
-			ASSERT((keysock_consumers[i]->kc_flags & KC_FLUSHING)
-			    == 0);
-			keysock_consumers[i]->kc_flags |= KC_FLUSHING;
-			mutex_exit(&(keysock_consumers[i]->kc_lock));
+			mutex_enter(&keystack->keystack_consumers[i]->kc_lock);
+			ASSERT((keystack->keystack_consumers[i]->kc_flags &
+				KC_FLUSHING) == 0);
+			keystack->keystack_consumers[i]->kc_flags |=
+			    KC_FLUSHING;
+			mutex_exit(&(keystack->keystack_consumers[i]->kc_lock));
 			/* Always increment the number of flushes... */
-			keysock_flushdump++;
+			keystack->keystack_flushdump++;
 			/* Guaranteed to return a message. */
 			keysock_passdown(ks, mp1, i, extv, B_TRUE);
 		} else if (start == finish) {
@@ -1275,15 +1360,15 @@ keysock_do_flushdump(queue_t *q, mblk_t *mp)
 			 * In case where start == finish, and there's no
 			 * consumer, should we force an error?  Yes.
 			 */
-			mutex_exit(&keysock_consumers_lock);
+			mutex_exit(&keystack->keystack_consumers_lock);
 			keysock_error(ks, mp, EINVAL,
 			    SADB_X_DIAGNOSTIC_UNKNOWN_SATYPE);
 			return;
 		}
 	}
-	mutex_exit(&keysock_consumers_lock);
+	mutex_exit(&keystack->keystack_consumers_lock);
 
-	if (keysock_flushdump == 0) {
+	if (keystack->keystack_flushdump == 0) {
 		/*
 		 * There were no consumers at all for this message.
 		 * XXX For now return ESRCH.
@@ -1380,6 +1465,7 @@ keysock_inverse_acquire(mblk_t *mp, sadb_msg_t *samsg, sadb_ext_t *extv[],
     keysock_t *ks)
 {
 	mblk_t *reply_mp;
+	keysock_stack_t	*keystack = ks->keysock_keystack;
 
 	/*
 	 * Reality check things...
@@ -1407,12 +1493,13 @@ keysock_inverse_acquire(mblk_t *mp, sadb_msg_t *samsg, sadb_ext_t *extv[],
 		return;
 	}
 
-	reply_mp = ipsec_construct_inverse_acquire(samsg, extv);
+	reply_mp = ipsec_construct_inverse_acquire(samsg, extv,
+	    keystack->keystack_netstack);
 
 	if (reply_mp != NULL) {
 		freemsg(mp);
 		keysock_passup(reply_mp, (sadb_msg_t *)reply_mp->b_rptr,
-		    ks->keysock_serial, NULL, B_FALSE);
+		    ks->keysock_serial, NULL, B_FALSE, keystack);
 	} else {
 		keysock_error(ks, mp, samsg->sadb_msg_errno,
 		    samsg->sadb_x_msg_diagnostic);
@@ -1429,6 +1516,7 @@ keysock_extended_register(keysock_t *ks, mblk_t *mp, sadb_ext_t *extv[])
 	uint8_t *satypes, *fencepost;
 	mblk_t *downmp;
 	sadb_ext_t *downextv[SADB_EXT_MAX + 1];
+	keysock_stack_t	*keystack = ks->keysock_keystack;
 
 	if (ks->keysock_registered[0] != 0 || ks->keysock_registered[1] != 0 ||
 	    ks->keysock_registered[2] != 0 || ks->keysock_registered[3] != 0) {
@@ -1452,7 +1540,8 @@ keysock_extended_register(keysock_t *ks, mblk_t *mp, sadb_ext_t *extv[])
 			 * Since we've made it here, keysock_get_ext will work!
 			 */
 			(void) keysock_get_ext(downextv,
-			    (sadb_msg_t *)downmp->b_rptr, msgdsize(downmp));
+			    (sadb_msg_t *)downmp->b_rptr, msgdsize(downmp),
+			    keystack);
 			keysock_passdown(ks, downmp, *satypes, downextv,
 			    B_FALSE);
 			++satypes;
@@ -1463,7 +1552,7 @@ keysock_extended_register(keysock_t *ks, mblk_t *mp, sadb_ext_t *extv[])
 	/*
 	 * Set global to indicate we prefer an extended ACQUIRE.
 	 */
-	atomic_add_32(&keysock_num_extended, 1);
+	atomic_add_32(&keystack->keystack_num_extended, 1);
 }
 
 /*
@@ -1477,12 +1566,13 @@ keysock_parse(queue_t *q, mblk_t *mp)
 	keysock_t *ks = (keysock_t *)q->q_ptr;
 	uint_t msgsize;
 	uint8_t satype;
+	keysock_stack_t	*keystack = ks->keysock_keystack;
 
 	/* Make sure I'm a PF_KEY socket.  (i.e. nothing's below me) */
 	ASSERT(WR(q)->q_next == NULL);
 
 	samsg = (sadb_msg_t *)mp->b_rptr;
-	ks2dbg(("Received possible PF_KEY message, type %d.\n",
+	ks2dbg(keystack, ("Received possible PF_KEY message, type %d.\n",
 	    samsg->sadb_msg_type));
 
 	msgsize = SADB_64TO8(samsg->sadb_msg_len);
@@ -1496,7 +1586,8 @@ keysock_parse(queue_t *q, mblk_t *mp)
 		 * do the right thing.	Then again, maybe just letting
 		 * the error delivery do the right thing.
 		 */
-		ks2dbg(("mblk (%lu) and base (%d) message sizes don't jibe.\n",
+		ks2dbg(keystack,
+		    ("mblk (%lu) and base (%d) message sizes don't jibe.\n",
 		    msgdsize(mp), msgsize));
 		keysock_error(ks, mp, EMSGSIZE, SADB_X_DIAGNOSTIC_NONE);
 		return;
@@ -1508,36 +1599,39 @@ keysock_parse(queue_t *q, mblk_t *mp)
 			/*
 			 * Something screwy happened.
 			 */
-			ks3dbg(("keysock_parse: pullupmsg() failed.\n"));
+			ks3dbg(keystack,
+			    ("keysock_parse: pullupmsg() failed.\n"));
 			return;
 		} else {
 			samsg = (sadb_msg_t *)mp->b_rptr;
 		}
 	}
 
-	switch (keysock_get_ext(extv, samsg, msgsize)) {
+	switch (keysock_get_ext(extv, samsg, msgsize, keystack)) {
 	case KGE_DUP:
 		/* Handle duplicate extension. */
-		ks1dbg(("Got duplicate extension of type %d.\n",
+		ks1dbg(keystack, ("Got duplicate extension of type %d.\n",
 		    extv[0]->sadb_ext_type));
 		keysock_error(ks, mp, EINVAL,
 		    keysock_duplicate(extv[0]->sadb_ext_type));
 		return;
 	case KGE_UNK:
 		/* Handle unknown extension. */
-		ks1dbg(("Got unknown extension of type %d.\n",
+		ks1dbg(keystack, ("Got unknown extension of type %d.\n",
 		    extv[0]->sadb_ext_type));
 		keysock_error(ks, mp, EINVAL, SADB_X_DIAGNOSTIC_UNKNOWN_EXT);
 		return;
 	case KGE_LEN:
 		/* Length error. */
-		ks1dbg(("Length %d on extension type %d overrun or 0.\n",
+		ks1dbg(keystack,
+		    ("Length %d on extension type %d overrun or 0.\n",
 		    extv[0]->sadb_ext_len, extv[0]->sadb_ext_type));
 		keysock_error(ks, mp, EINVAL, SADB_X_DIAGNOSTIC_BAD_EXTLEN);
 		return;
 	case KGE_CHK:
 		/* Reality check failed. */
-		ks1dbg(("Reality check failed on extension type %d.\n",
+		ks1dbg(keystack,
+		    ("Reality check failed on extension type %d.\n",
 		    extv[0]->sadb_ext_type));
 		keysock_error(ks, mp, EINVAL,
 		    keysock_malformed(extv[0]->sadb_ext_type));
@@ -1614,11 +1708,13 @@ keysock_parse(queue_t *q, mblk_t *mp)
 			}
 			keysock_passdown(ks, mp, satype, extv, B_FALSE);
 		} else {
-			if (samsg->sadb_msg_satype == SADB_SATYPE_UNSPEC)
+			if (samsg->sadb_msg_satype == SADB_SATYPE_UNSPEC) {
 				keysock_error(ks, mp, EINVAL,
 				    SADB_X_DIAGNOSTIC_SATYPE_NEEDED);
-			else
-				keysock_passup(mp, samsg, 0, NULL, B_FALSE);
+			} else {
+				keysock_passup(mp, samsg, 0, NULL, B_FALSE,
+				    keystack);
+			}
 		}
 		return;
 	case SADB_EXPIRE:
@@ -1647,7 +1743,7 @@ keysock_parse(queue_t *q, mblk_t *mp)
 			 * FLUSH or DUMP messages shouldn't have extensions.
 			 * Return EINVAL.
 			 */
-			ks2dbg(("FLUSH message with extension.\n"));
+			ks2dbg(keystack, ("FLUSH message with extension.\n"));
 			keysock_error(ks, mp, EINVAL, SADB_X_DIAGNOSTIC_NO_EXT);
 			return;
 		}
@@ -1663,13 +1759,14 @@ keysock_parse(queue_t *q, mblk_t *mp)
 			ks->keysock_flags &= ~KEYSOCK_PROMISC;
 		else
 			ks->keysock_flags |= KEYSOCK_PROMISC;
-		keysock_passup(mp, samsg, ks->keysock_serial, NULL, B_FALSE);
+		keysock_passup(mp, samsg, ks->keysock_serial, NULL, B_FALSE,
+		    keystack);
 		return;
 	case SADB_X_INVERSE_ACQUIRE:
 		keysock_inverse_acquire(mp, samsg, extv, ks);
 		return;
 	default:
-		ks2dbg(("Got unknown message type %d.\n",
+		ks2dbg(keystack, ("Got unknown message type %d.\n",
 		    samsg->sadb_msg_type));
 		keysock_error(ks, mp, EINVAL, SADB_X_DIAGNOSTIC_UNKNOWN_MSG);
 		return;
@@ -1691,28 +1788,35 @@ keysock_wput(queue_t *q, mblk_t *mp)
 {
 	uchar_t *rptr = mp->b_rptr;
 	mblk_t *mp1;
-
-	ks3dbg(("In keysock_wput\n"));
+	keysock_t *ks;
+	keysock_stack_t	*keystack;
 
 	if (WR(q)->q_next) {
 		keysock_consumer_t *kc = (keysock_consumer_t *)q->q_ptr;
+		keystack = kc->kc_keystack;
+
+		ks3dbg(keystack, ("In keysock_wput\n"));
 
 		/*
 		 * We shouldn't get writes on a consumer instance.
 		 * But for now, just passthru.
 		 */
-		ks1dbg(("Huh?  wput for an consumer instance (%d)?\n",
+		ks1dbg(keystack, ("Huh?  wput for an consumer instance (%d)?\n",
 		    kc->kc_sa_type));
 		putnext(q, mp);
 		return;
 	}
+	ks = (keysock_t *)q->q_ptr;
+	keystack = ks->keysock_keystack;
+
+	ks3dbg(keystack, ("In keysock_wput\n"));
 
 	switch (mp->b_datap->db_type) {
 	case M_DATA:
 		/*
 		 * Silently discard.
 		 */
-		ks2dbg(("raw M_DATA in keysock.\n"));
+		ks2dbg(keystack, ("raw M_DATA in keysock.\n"));
 		freemsg(mp);
 		return;
 	case M_PROTO:
@@ -1721,19 +1825,20 @@ keysock_wput(queue_t *q, mblk_t *mp)
 			if (((union T_primitives *)rptr)->type == T_DATA_REQ) {
 				if ((mp1 = mp->b_cont) == NULL) {
 					/* No data after T_DATA_REQ. */
-					ks2dbg(("No data after DATA_REQ.\n"));
+					ks2dbg(keystack,
+					    ("No data after DATA_REQ.\n"));
 					freemsg(mp);
 					return;
 				}
 				freeb(mp);
 				mp = mp1;
-				ks2dbg(("T_DATA_REQ\n"));
+				ks2dbg(keystack, ("T_DATA_REQ\n"));
 				break;	/* Out of switch. */
 			}
 		}
 		/* FALLTHRU */
 	default:
-		ks3dbg(("In default wput case (%d %d).\n",
+		ks3dbg(keystack, ("In default wput case (%d %d).\n",
 		    mp->b_datap->db_type, ((union T_primitives *)rptr)->type));
 		keysock_wput_other(q, mp);
 		return;
@@ -1753,10 +1858,11 @@ static void
 keysock_link_consumer(uint8_t satype, keysock_consumer_t *kc)
 {
 	keysock_t *ks;
+	keysock_stack_t	*keystack = kc->kc_keystack;
 
-	mutex_enter(&keysock_consumers_lock);
+	mutex_enter(&keystack->keystack_consumers_lock);
 	mutex_enter(&kc->kc_lock);
-	if (keysock_consumers[satype] != NULL) {
+	if (keystack->keystack_consumers[satype] != NULL) {
 		ks0dbg((
 		    "Hmmmm, someone closed %d before the HELLO_ACK happened.\n",
 		    satype));
@@ -1765,29 +1871,31 @@ keysock_link_consumer(uint8_t satype, keysock_consumer_t *kc)
 		 * so far would work too?
 		 */
 		mutex_exit(&kc->kc_lock);
-		mutex_exit(&keysock_consumers_lock);
+		mutex_exit(&keystack->keystack_consumers_lock);
 	} else {
 		/* Add new below-me consumer. */
-		keysock_consumers[satype] = kc;
+		keystack->keystack_consumers[satype] = kc;
 
 		kc->kc_flags = 0;
 		kc->kc_sa_type = satype;
 		mutex_exit(&kc->kc_lock);
-		mutex_exit(&keysock_consumers_lock);
+		mutex_exit(&keystack->keystack_consumers_lock);
 
 		/* Scan the keysock list. */
-		mutex_enter(&keysock_list_lock);
-		for (ks = keysock_list; ks != NULL; ks = ks->keysock_next) {
+		mutex_enter(&keystack->keystack_list_lock);
+		for (ks = keystack->keystack_list; ks != NULL;
+		    ks = ks->keysock_next) {
 			if (KEYSOCK_ISREG(ks, satype)) {
 				/*
 				 * XXX Perhaps send an SADB_REGISTER down on
 				 * the socket's behalf.
 				 */
-				ks1dbg(("Socket %u registered already for "
+				ks1dbg(keystack,
+				    ("Socket %u registered already for "
 				    "new consumer.\n", ks->keysock_serial));
 			}
 		}
-		mutex_exit(&keysock_list_lock);
+		mutex_exit(&keystack->keystack_list_lock);
 	}
 }
 
@@ -1799,10 +1907,11 @@ keysock_out_err(keysock_consumer_t *kc, int ks_errno, mblk_t *mp)
 {
 	keysock_out_err_t *kse;
 	mblk_t *imp;
+	keysock_stack_t	*keystack = kc->kc_keystack;
 
 	imp = allocb(sizeof (ipsec_info_t), BPRI_HI);
 	if (imp == NULL) {
-		ks1dbg(("keysock_out_err:  Can't alloc message.\n"));
+		ks1dbg(keystack, ("keysock_out_err:  Can't alloc message.\n"));
 		return;
 	}
 
@@ -1843,7 +1952,7 @@ keysock_out_err(keysock_consumer_t *kc, int ks_errno, mblk_t *mp)
  */
 static void
 keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
-    keysock_consumer_t *kc, boolean_t persistent)
+    keysock_consumer_t *kc, boolean_t persistent, keysock_stack_t *keystack)
 {
 	keysock_t *ks;
 	uint8_t satype = samsg->sadb_msg_satype;
@@ -1876,7 +1985,8 @@ keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
 		 * These are most likely replies.  Don't worry about
 		 * KEYSOCK_OUT_ERR handling.  Deliver to all sockets.
 		 */
-		ks3dbg(("Delivering normal message (%d) to all sockets.\n",
+		ks3dbg(keystack,
+		    ("Delivering normal message (%d) to all sockets.\n",
 		    samsg->sadb_msg_type));
 		toall = B_TRUE;
 		break;
@@ -1901,7 +2011,7 @@ keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
 			ASSERT(samsg->sadb_msg_errno != 0);
 			break;	/* Out of switch. */
 		}
-		ks3dbg(("Delivering REGISTER.\n"));
+		ks3dbg(keystack, ("Delivering REGISTER.\n"));
 		if (satype == SADB_SATYPE_UNSPEC) {
 			/* REGISTER Reason #2 */
 			allereg = B_TRUE;
@@ -1928,7 +2038,7 @@ keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
 		 * regular (sadb_msg_satype != 0).  And we're guaranteed
 		 * that serial == 0 for an ACQUIRE.
 		 */
-		ks3dbg(("Delivering ACQUIRE.\n"));
+		ks3dbg(keystack, ("Delivering ACQUIRE.\n"));
 		allereg = (satype == SADB_SATYPE_UNSPEC);
 		allreg = !allereg;
 		/*
@@ -1938,7 +2048,7 @@ keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
 		 * their ACQUIRE record.  This might be too hackish of a
 		 * solution.
 		 */
-		if (allreg && keysock_num_extended > 0)
+		if (allreg && keystack->keystack_num_extended > 0)
 			err = 0;
 		break;
 	case SADB_X_PROMISC:
@@ -1949,13 +2059,13 @@ keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
 		/*
 		 * Deliver to the sender and promiscuous only.
 		 */
-		ks3dbg(("Delivering sender/promisc only (%d).\n",
+		ks3dbg(keystack, ("Delivering sender/promisc only (%d).\n",
 		    samsg->sadb_msg_type));
 		break;
 	}
 
-	mutex_enter(&keysock_list_lock);
-	for (ks = keysock_list; ks != NULL; ks = ks->keysock_next) {
+	mutex_enter(&keystack->keystack_list_lock);
+	for (ks = keystack->keystack_list; ks != NULL; ks = ks->keysock_next) {
 		/* Delivery loop. */
 
 		/*
@@ -1994,7 +2104,7 @@ keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
 
 		mp1 = dupmsg(mp);
 		if (mp1 == NULL) {
-			ks2dbg((
+			ks2dbg(keystack, (
 			    "keysock_passup():  dupmsg() failed.\n"));
 			mp1 = mp;
 			mp = NULL;
@@ -2015,7 +2125,7 @@ keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
 		if (!canputnext(ks->keysock_rq)) {
 			if (persistent) {
 				if (putq(ks->keysock_rq, mp1) == 0) {
-					ks1dbg((
+					ks1dbg(keystack, (
 					    "keysock_passup: putq failed.\n"));
 				} else {
 					continue;
@@ -2025,7 +2135,8 @@ keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
 			continue;
 		}
 
-		ks3dbg(("Putting to serial %d.\n", ks->keysock_serial));
+		ks3dbg(keystack,
+		    ("Putting to serial %d.\n", ks->keysock_serial));
 		/*
 		 * Unlike the specific keysock instance case, this
 		 * will only hit for listeners, so we will only
@@ -2035,7 +2146,7 @@ keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
 		if (mp == NULL)
 			break;	/* out of for loop. */
 	}
-	mutex_exit(&keysock_list_lock);
+	mutex_exit(&keystack->keystack_list_lock);
 
 error:
 	if ((err != 0) && (kc != NULL)) {
@@ -2044,7 +2155,8 @@ error:
 		 * Basically, I send this back if I have not been able to
 		 * transmit (for whatever reason)
 		 */
-		ks1dbg(("keysock_passup():  No registered of type %d.\n",
+		ks1dbg(keystack,
+		    ("keysock_passup():  No registered of type %d.\n",
 		    satype));
 		if (mp != NULL) {
 			if (mp->b_datap->db_type == M_PROTO) {
@@ -2058,7 +2170,8 @@ error:
 			 */
 			mp1 = copymsg(mp);
 			if (mp1 == NULL) {
-				ks2dbg(("keysock_passup: copymsg() failed.\n"));
+				ks2dbg(keystack,
+				    ("keysock_passup: copymsg() failed.\n"));
 				mp1 = mp;
 				mp = NULL;
 			}
@@ -2110,6 +2223,7 @@ keysock_rput(queue_t *q, mblk_t *mp)
 	minor_t serial;
 	mblk_t *mp1;
 	sadb_msg_t *samsg;
+	keysock_stack_t	*keystack = kc->kc_keystack;
 
 	/* Make sure I'm a consumer instance.  (i.e. something's below me) */
 	ASSERT(WR(q)->q_next != NULL);
@@ -2121,7 +2235,8 @@ keysock_rput(queue_t *q, mblk_t *mp)
 		 * To be robust, however, putnext() up so the STREAM head can
 		 * deal with it appropriately.
 		 */
-		ks1dbg(("Hmmm, a non M_CTL (%d, 0x%x) on keysock_rput.\n",
+		ks1dbg(keystack,
+		    ("Hmmm, a non M_CTL (%d, 0x%x) on keysock_rput.\n",
 		    mp->b_datap->db_type, mp->b_datap->db_type));
 		putnext(q, mp);
 		return;
@@ -2146,35 +2261,39 @@ keysock_rput(queue_t *q, mblk_t *mp)
 			/*
 			 * If I'm an end-of-FLUSH or an end-of-DUMP marker...
 			 */
-			ASSERT(keysock_flushdump != 0);  /* Am I flushing? */
+			ASSERT(keystack->keystack_flushdump != 0);
+						/* Am I flushing? */
 
 			mutex_enter(&kc->kc_lock);
 			kc->kc_flags &= ~KC_FLUSHING;
 			mutex_exit(&kc->kc_lock);
 
 			if (samsg->sadb_msg_errno != 0)
-				keysock_flushdump_errno = samsg->sadb_msg_errno;
+				keystack->keystack_flushdump_errno =
+				    samsg->sadb_msg_errno;
 
 			/*
 			 * Lower the atomic "flushing" count.  If it's
 			 * the last one, send up the end-of-{FLUSH,DUMP} to
 			 * the appropriate PF_KEY socket.
 			 */
-			if (atomic_add_32_nv(&keysock_flushdump, -1) != 0) {
-				ks1dbg(("One flush/dump message back from %d,"
+			if (atomic_add_32_nv(&keystack->keystack_flushdump,
+			    -1) != 0) {
+				ks1dbg(keystack,
+				    ("One flush/dump message back from %d,"
 				    " more to go.\n", samsg->sadb_msg_satype));
 				freemsg(mp1);
 				return;
 			}
 
 			samsg->sadb_msg_errno =
-			    (uint8_t)keysock_flushdump_errno;
+			    (uint8_t)keystack->keystack_flushdump_errno;
 			if (samsg->sadb_msg_type == SADB_DUMP) {
 				samsg->sadb_msg_seq = 0;
 			}
 		}
 		keysock_passup(mp1, samsg, serial, kc,
-		    (samsg->sadb_msg_type == SADB_DUMP));
+		    (samsg->sadb_msg_type == SADB_DUMP), keystack);
 		return;
 	case KEYSOCK_HELLO_ACK:
 		/* Aha, now we can link in the consumer! */
@@ -2183,7 +2302,7 @@ keysock_rput(queue_t *q, mblk_t *mp)
 		freemsg(mp);
 		return;
 	default:
-		ks1dbg(("Hmmm, an IPsec info I'm not used to, 0x%x\n",
+		ks1dbg(keystack, ("Hmmm, an IPsec info I'm not used to, 0x%x\n",
 		    ii->ipsec_info_type));
 		putnext(q, mp);
 	}
@@ -2193,13 +2312,17 @@ keysock_rput(queue_t *q, mblk_t *mp)
  * So we can avoid external linking problems....
  */
 boolean_t
-keysock_extended_reg(void)
+keysock_extended_reg(netstack_t *ns)
 {
-	return (keysock_num_extended != 0);
+	keysock_stack_t	*keystack = ns->netstack_keysock;
+
+	return (keystack->keystack_num_extended != 0);
 }
 
 uint32_t
-keysock_next_seq(void)
+keysock_next_seq(netstack_t *ns)
 {
-	return (atomic_add_32_nv(&keysock_acquire_seq, -1));
+	keysock_stack_t	*keystack = ns->netstack_keysock;
+
+	return (atomic_add_32_nv(&keystack->keystack_acquire_seq, -1));
 }

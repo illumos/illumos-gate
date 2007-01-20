@@ -150,7 +150,7 @@ opdes_t	tcp_opt_arr[] = {
 { IPV6_BOUND_IF, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
 	sizeof (int),	0 /* no ifindex */ },
 
-{ IP_NEXTHOP, IPPROTO_IP, OA_RW, OA_RW, OP_CONFIG, OP_PASSNEXT,
+{ IP_NEXTHOP, IPPROTO_IP, OA_R, OA_RW, OP_CONFIG, OP_PASSNEXT,
 	sizeof (in_addr_t),	-1 /* not initialized  */ },
 
 { IPV6_BOUND_PIF, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,

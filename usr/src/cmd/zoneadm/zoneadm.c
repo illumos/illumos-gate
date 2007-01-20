@@ -95,6 +95,7 @@ typedef struct zone_entry {
 	char		zbrand[MAXNAMELEN];
 	char		zroot[MAXPATHLEN];
 	char		zuuid[UUID_PRINTABLE_STRING_LENGTH];
+	zone_iptype_t	ziptype;
 } zone_entry_t;
 
 static zone_entry_t *zents;
@@ -141,6 +142,8 @@ struct cmd {
 #define	RMCOMMAND	"/usr/bin/rm -rf"
 
 static int cleanup_zonepath(char *, boolean_t);
+
+extern int ifname_open(char *);
 
 static int help_func(int argc, char *argv[]);
 static int ready_func(int argc, char *argv[]);
@@ -415,12 +418,19 @@ static void
 zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 {
 	static boolean_t firsttime = B_TRUE;
+	char *ip_type_str;
+
+	if (zent->ziptype == ZS_EXCLUSIVE)
+		ip_type_str = "excl";
+	else
+		ip_type_str = "shared";
 
 	assert(!(verbose && parsable));
 	if (firsttime && verbose) {
 		firsttime = B_FALSE;
-		(void) printf("%*s %-16s %-14s %-30s %-10s\n", ZONEID_WIDTH,
-		    "ID", "NAME", "STATUS", "PATH", "BRAND");
+		(void) printf("%*s %-16s %-10s %-30s %-8s %-6s\n",
+		    ZONEID_WIDTH, "ID", "NAME", "STATUS", "PATH", "BRAND",
+		    "IP");
 	}
 	if (!verbose) {
 		char *cp, *clim;
@@ -439,7 +449,8 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 			(void) printf("%.*s\\:", clim - cp, cp);
 			cp = clim + 1;
 		}
-		(void) printf("%s:%s:%s\n", cp, zent->zuuid, zent->zbrand);
+		(void) printf("%s:%s:%s:%s\n", cp, zent->zuuid, zent->zbrand,
+		    ip_type_str);
 		return;
 	}
 	if (zent->zstate_str != NULL) {
@@ -447,8 +458,8 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 			(void) printf("%*s", ZONEID_WIDTH, "-");
 		else
 			(void) printf("%*lu", ZONEID_WIDTH, zent->zid);
-		(void) printf(" %-16s %-14s %-30s %-10s\n", zent->zname,
-		    zent->zstate_str, zent->zroot, zent->zbrand);
+		(void) printf(" %-16s %-10s %-30s %-8s %-6s\n", zent->zname,
+		    zent->zstate_str, zent->zroot, zent->zbrand, ip_type_str);
 	}
 }
 
@@ -522,6 +533,54 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 	    sizeof (zent->zbrand)) != Z_OK) {
 		zperror2(zent->zname, gettext("could not get brand name"));
 		return (Z_ERR);
+	}
+
+	/*
+	 * Get ip type of the zone.
+	 * Note for global zone, ZS_SHARED is set always.
+	 */
+	if (zid == GLOBAL_ZONEID) {
+		zent->ziptype = ZS_SHARED;
+	} else {
+
+		if (zent->zstate_num == ZONE_STATE_RUNNING) {
+			ushort_t flags;
+
+			if (zone_getattr(zid, ZONE_ATTR_FLAGS, &flags,
+			    sizeof (flags)) < 0) {
+				zperror2(zent->zname,
+				    gettext("could not get zone flags"));
+				return (Z_ERR);
+			}
+			if (flags & ZF_NET_EXCL)
+				zent->ziptype = ZS_EXCLUSIVE;
+			else
+				zent->ziptype = ZS_SHARED;
+		} else {
+			zone_dochandle_t handle;
+
+			if ((handle = zonecfg_init_handle()) == NULL) {
+				zperror2(zent->zname,
+				    gettext("could not init handle"));
+				return (Z_ERR);
+			}
+			if ((err = zonecfg_get_handle(zent->zname, handle))
+			    != Z_OK) {
+				zperror2(zent->zname,
+				    gettext("could not get handle"));
+				zonecfg_fini_handle(handle);
+				return (Z_ERR);
+			}
+
+			if ((err = zonecfg_get_iptype(handle, &zent->ziptype))
+			    != Z_OK) {
+				zperror2(zent->zname,
+				    gettext("could not get ip-type"));
+				zonecfg_fini_handle(handle);
+				return (Z_ERR);
+			}
+			zonecfg_fini_handle(handle);
+		}
 	}
 
 	return (Z_OK);
@@ -1542,6 +1601,7 @@ fake_up_local_zone(zoneid_t zid, zone_entry_t *zeptr)
 	ssize_t result;
 	uuid_t uuid;
 	FILE *fp;
+	ushort_t flags;
 
 	(void) memset(zeptr, 0, sizeof (*zeptr));
 
@@ -1575,6 +1635,15 @@ fake_up_local_zone(zoneid_t zid, zone_entry_t *zeptr)
 	if (zonecfg_get_uuid(zeptr->zname, uuid) == Z_OK &&
 	    !uuid_is_null(uuid))
 		uuid_unparse(uuid, zeptr->zuuid);
+
+	if (zone_getattr(zid, ZONE_ATTR_FLAGS, &flags, sizeof (flags)) < 0) {
+		zperror2(zeptr->zname, gettext("could not get zone flags"));
+		exit(Z_ERR);
+	}
+	if (flags & ZF_NET_EXCL)
+		zeptr->ziptype = ZS_EXCLUSIVE;
+	else
+		zeptr->ziptype = ZS_SHARED;
 }
 
 static int
@@ -2739,8 +2808,8 @@ print_net_err(char *phys, char *addr, int af, char *msg)
 	if (!found_af && af != AF_UNSPEC) {
 		(void) fprintf(stderr,
 		    gettext("could not verify %s %s=%s %s=%s\n\tthe %s address "
-		    "family is not configured on this interface in the\n\t"
-		    "global zone\n"),
+		    "family is not configured on this network interface in "
+		    "the\n\tglobal zone\n"),
 		    "net", "address", addr, "physical", phys, af2str(af));
 		return;
 	}
@@ -2757,11 +2826,19 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 	int return_code = Z_OK;
 	int err;
 	boolean_t in_alt_root;
+	zone_iptype_t iptype;
+	int fd;
 
 	in_alt_root = zonecfg_in_alt_root();
 	if (in_alt_root)
 		goto no_net;
 
+	if ((err = zonecfg_get_iptype(handle, &iptype)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(cmd_num), B_TRUE);
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
 	if ((err = zonecfg_setnwifent(handle)) != Z_OK) {
 		errno = err;
 		zperror(cmd_to_str(cmd_num), B_TRUE);
@@ -2771,47 +2848,114 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 	while (zonecfg_getnwifent(handle, &nwiftab) == Z_OK) {
 		struct lifreq lifr;
 		sa_family_t af = AF_UNSPEC;
-		int so, res;
+		char dl_owner_zname[ZONENAME_MAX];
+		zoneid_t dl_owner_zid;
+		zoneid_t target_zid;
+		int res;
 
 		/* skip any loopback interfaces */
 		if (strcmp(nwiftab.zone_nwif_physical, "lo0") == 0)
 			continue;
-		if ((res = zonecfg_valid_net_address(nwiftab.zone_nwif_address,
-		    &lifr)) != Z_OK) {
-			print_net_err(nwiftab.zone_nwif_physical,
-			    nwiftab.zone_nwif_address, af,
-			    zonecfg_strerror(res));
-			return_code = Z_ERR;
-			continue;
-		}
-		af = lifr.lifr_addr.ss_family;
-		(void) memset(&lifr, 0, sizeof (lifr));
-		(void) strlcpy(lifr.lifr_name, nwiftab.zone_nwif_physical,
-		    sizeof (lifr.lifr_name));
-		lifr.lifr_addr.ss_family = af;
-		if ((so = socket(af, SOCK_DGRAM, 0)) < 0) {
-			(void) fprintf(stderr, gettext("could not verify %s "
-			    "%s=%s %s=%s: could not get socket: %s\n"), "net",
-			    "address", nwiftab.zone_nwif_address, "physical",
-			    nwiftab.zone_nwif_physical, strerror(errno));
-			return_code = Z_ERR;
-			continue;
-		}
-		if (ioctl(so, SIOCGLIFFLAGS, &lifr) < 0) {
+		switch (iptype) {
+		case ZS_SHARED:
+			if ((res = zonecfg_valid_net_address(
+			    nwiftab.zone_nwif_address, &lifr)) != Z_OK) {
+				print_net_err(nwiftab.zone_nwif_physical,
+				    nwiftab.zone_nwif_address, af,
+				    zonecfg_strerror(res));
+			    return_code = Z_ERR;
+			    continue;
+			}
+			af = lifr.lifr_addr.ss_family;
+			if (!zonecfg_ifname_exists(af,
+			    nwiftab.zone_nwif_physical)) {
+				/*
+				 * The interface failed to come up. We continue
+				 * on anyway for the sake of consistency: a
+				 * zone is not shut down if the interface fails
+				 * any time after boot, nor does the global zone
+				 * fail to boot if an interface fails.
+				 */
+				(void) fprintf(stderr,
+				    gettext("WARNING: skipping network "
+					"interface '%s' which may not be "
+					"present/plumbed in the global "
+					"zone.\n"),
+				    nwiftab.zone_nwif_physical);
+			}
+			break;
+		case ZS_EXCLUSIVE:
+			/* Warning if it exists for either IPv4 or IPv6 */
+
+			if (zonecfg_ifname_exists(AF_INET,
+			    nwiftab.zone_nwif_physical) ||
+			    zonecfg_ifname_exists(AF_INET6,
+			    nwiftab.zone_nwif_physical)) {
+				(void) fprintf(stderr,
+				    gettext("WARNING: skipping network "
+				    "interface '%s' which is used in the "
+				    "global zone.\n"),
+				    nwiftab.zone_nwif_physical);
+				break;
+			}
 			/*
-			 * The interface failed to come up.  We continue on
-			 * anyway for the sake of consistency: a zone is not
-			 * shut down if the interface fails any time after
-			 * boot, nor does the global zone fail to boot if an
-			 * interface fails.
+			 * Verify that the physical interface can
+			 * be opened
+			 */
+			fd = ifname_open(nwiftab.zone_nwif_physical);
+			if (fd == -1) {
+				(void) fprintf(stderr,
+				    gettext("WARNING: skipping network "
+				    "interface '%s' which cannot be opened.\n"),
+				    nwiftab.zone_nwif_physical);
+				break;
+			} else {
+				(void) close(fd);
+			}
+			/*
+			 * Verify whether the physical interface is already
+			 * used by a zone.
+			 */
+			dl_owner_zid = ALL_ZONES;
+			if (zone_check_datalink(&dl_owner_zid,
+			    nwiftab.zone_nwif_physical) != 0)
+				break;
+
+			/*
+			 * If the zone being verified is
+			 * running and owns the interface
+			 */
+			target_zid = getzoneidbyname(target_zone);
+			if (target_zid == dl_owner_zid)
+				break;
+
+			/* Zone id match failed, use name to check */
+			if (getzonenamebyid(dl_owner_zid, dl_owner_zname,
+			    ZONENAME_MAX) < 0) {
+				/* No name, show ID instead */
+				(void) snprintf(dl_owner_zname, ZONENAME_MAX,
+				    "<%d>", dl_owner_zid);
+			} else if (strcmp(dl_owner_zname, target_zone) == 0)
+				break;
+
+			/*
+			 * Note here we only report a warning that
+			 * the interface is already in use by another
+			 * running zone, and the verify process just
+			 * goes on, if the interface is still in use
+			 * when this zone really boots up, zoneadmd
+			 * will find it. If the name of the zone which
+			 * owns this interface cannot be determined,
+			 * then it is not possible to determine if there
+			 * is a conflict so just report it as a warning.
 			 */
 			(void) fprintf(stderr,
-			    gettext("WARNING: skipping interface '%s' which "
-			    "may not be present/plumbed in the global zone.\n"),
-			    nwiftab.zone_nwif_physical);
-
+			    gettext("WARNING: skipping network interface "
+			    "'%s' which is used by the non-global zone "
+			    "'%s'.\n"), nwiftab.zone_nwif_physical,
+			    dl_owner_zname);
+			break;
 		}
-		(void) close(so);
 	}
 	(void) zonecfg_endnwifent(handle);
 no_net:
@@ -3439,6 +3583,10 @@ warn_ip_match(zone_dochandle_t s_handle, char *source_zone,
 			if ((p = strchr(s_nwiftab.zone_nwif_address, '/'))
 			    != NULL)
 				*p = '\0';
+
+			/* For exclusive-IP zones, address is not specified. */
+			if (strlen(s_nwiftab.zone_nwif_address) == 0)
+				continue;
 
 			if (strcmp(t_nwiftab.zone_nwif_address,
 			    s_nwiftab.zone_nwif_address) == 0) {

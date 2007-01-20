@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,6 +115,8 @@ static cmdfunc_t do_scan_wifi, do_connect_wifi, do_disconnect_wifi;
 static cmdfunc_t do_show_linkprop, do_set_linkprop, do_reset_linkprop;
 static cmdfunc_t do_create_secobj, do_delete_secobj, do_show_secobj;
 static cmdfunc_t do_init_linkprop, do_init_secobj;
+
+static void	show_linkprop_onelink(void *, const char *);
 
 static void	link_stats(const char *, uint_t);
 static void	aggr_stats(uint32_t, uint_t);
@@ -2340,6 +2342,7 @@ typedef struct show_linkprop_state {
 	const char	*ls_link;
 	char		*ls_line;
 	char		**ls_propvals;
+	prop_list_t	*ls_proplist;
 	boolean_t	ls_parseable;
 	boolean_t	ls_persist;
 	boolean_t	ls_header;
@@ -2420,8 +2423,8 @@ fail:
 static void
 print_linkprop_head(void)
 {
-	(void) printf("%-15s %-14s %-14s %-30s \n",
-	    "PROPERTY", "VALUE", "DEFAULT", "POSSIBLE");
+	(void) printf("%-12s %-15s %-14s %-14s %-20s \n",
+	    "LINK", "PROPERTY", "VALUE", "DEFAULT", "POSSIBLE");
 }
 
 static void
@@ -2481,6 +2484,15 @@ show_linkprop(void *arg, const char *propname)
 	char			*ptr = statep->ls_line;
 	char			*lim = ptr + MAX_PROP_LINE;
 
+	if (statep->ls_persist && dladm_is_prop_temponly(propname, NULL))
+		return (B_TRUE);
+
+	if (statep->ls_parseable)
+		ptr += snprintf(ptr, lim - ptr, "LINK=\"%s\" ",
+		    statep->ls_link);
+	else
+		ptr += snprintf(ptr, lim - ptr, "%-12s ", statep->ls_link);
+
 	if (statep->ls_parseable)
 		ptr += snprintf(ptr, lim - ptr, "PROPERTY=\"%s\" ", propname);
 	else
@@ -2492,7 +2504,7 @@ show_linkprop(void *arg, const char *propname)
 	print_linkprop(statep, propname, DLADM_PROP_VAL_DEFAULT,
 	    "DEFAULT", "%-14s ", &ptr);
 	print_linkprop(statep, propname, DLADM_PROP_VAL_MODIFIABLE,
-	    "POSSIBLE", "%-30s ", &ptr);
+	    "POSSIBLE", "%-20s ", &ptr);
 
 	if (statep->ls_header) {
 		statep->ls_header = B_FALSE;
@@ -2506,11 +2518,8 @@ show_linkprop(void *arg, const char *propname)
 static void
 do_show_linkprop(int argc, char **argv)
 {
-	int			i, option, fd;
-	char			linkname[MAXPATHLEN];
+	int			option;
 	prop_list_t		*proplist = NULL;
-	char			*buf;
-	dladm_status_t		status;
 	show_linkprop_state_t	state;
 
 	opterr = 0;
@@ -2544,8 +2553,31 @@ do_show_linkprop(int argc, char **argv)
 	else if (optind != argc)
 		usage();
 
-	if (state.ls_link == NULL)
-		die("link name must be specified");
+	state.ls_proplist = proplist;
+
+	if (state.ls_link == NULL) {
+		(void) dladm_walk(show_linkprop_onelink, &state);
+	} else {
+		show_linkprop_onelink(&state, state.ls_link);
+	}
+	free_props(proplist);
+}
+
+static void
+show_linkprop_onelink(void *arg, const char *link)
+{
+	int			i, fd;
+	char			linkname[MAXPATHLEN];
+	char			*buf;
+	dladm_status_t		status;
+	prop_list_t		*proplist = NULL;
+	show_linkprop_state_t	*statep;
+	const char		*savep;
+
+	statep = (show_linkprop_state_t *)arg;
+	savep = statep->ls_link;
+	statep->ls_link = link;
+	proplist = statep->ls_proplist;
 
 	/*
 	 * When some WiFi links are opened for the first time, their hardware
@@ -2553,37 +2585,37 @@ do_show_linkprop(int argc, char **argv)
 	 * if there are no open links, the retrieval of link properties
 	 * (below) will proceed slowly unless we hold the link open.
 	 */
-	(void) snprintf(linkname, MAXPATHLEN, "/dev/%s", state.ls_link);
+	(void) snprintf(linkname, MAXPATHLEN, "/dev/%s", link);
 	if ((fd = open(linkname, O_RDWR)) < 0)
-		die("cannot open %s: %s", state.ls_link, strerror(errno));
+		die("cannot open %s: %s", link, strerror(errno));
 
 	buf = malloc((sizeof (char *) + DLADM_PROP_VAL_MAX) * MAX_PROP_VALS +
 	    MAX_PROP_LINE);
 	if (buf == NULL)
 		die("insufficient memory");
 
-	state.ls_propvals = (char **)(void *)buf;
+	statep->ls_propvals = (char **)(void *)buf;
 	for (i = 0; i < MAX_PROP_VALS; i++) {
-		state.ls_propvals[i] = buf + sizeof (char *) * MAX_PROP_VALS +
+		statep->ls_propvals[i] = buf + sizeof (char *) * MAX_PROP_VALS +
 		    i * DLADM_PROP_VAL_MAX;
 	}
-	state.ls_line = buf +
+	statep->ls_line = buf +
 	    (sizeof (char *) + DLADM_PROP_VAL_MAX) * MAX_PROP_VALS;
 
 	if (proplist != NULL) {
 		for (i = 0; i < proplist->pl_count; i++) {
-			if (!show_linkprop(&state,
+			if (!show_linkprop(statep,
 			    proplist->pl_info[i].pi_name))
 				break;
 		}
 	} else {
-		status = dladm_walk_prop(state.ls_link, &state, show_linkprop);
+		status = dladm_walk_prop(link, statep, show_linkprop);
 		if (status != DLADM_STATUS_OK)
 			die_dlerr(status, "show-linkprop");
 	}
 	(void) close(fd);
 	free(buf);
-	free_props(proplist);
+	statep->ls_link = savep;
 }
 
 static dladm_status_t
@@ -2591,17 +2623,18 @@ set_linkprop_persist(const char *link, const char *prop_name, char **prop_val,
     uint_t val_cnt, boolean_t reset)
 {
 	dladm_status_t	status;
+	char		*errprop;
 
 	status = dladm_set_prop(link, prop_name, prop_val, val_cnt,
-	    DLADM_OPT_PERSIST);
+	    DLADM_OPT_PERSIST, &errprop);
 
 	if (status != DLADM_STATUS_OK) {
 		if (reset) {
 			warn_dlerr(status, "cannot persistently reset link "
-			    "property '%s' on '%s'", prop_name, link);
+			    "property '%s' on '%s'", errprop, link);
 		} else {
 			warn_dlerr(status, "cannot persistently set link "
-			    "property '%s' on '%s'", prop_name, link);
+			    "property '%s' on '%s'", errprop, link);
 		}
 	}
 	return (status);
@@ -2650,13 +2683,16 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 		die("link name must be specified");
 
 	if (proplist == NULL) {
+		char *errprop;
+
 		if (!reset)
 			die("link property must be specified");
 
-		status = dladm_set_prop(link, NULL, NULL, 0, DLADM_OPT_TEMP);
+		status = dladm_set_prop(link, NULL, NULL, 0, DLADM_OPT_TEMP,
+		    &errprop);
 		if (status != DLADM_STATUS_OK) {
-			warn_dlerr(status, "cannot reset link properties "
-			    "on '%s'", link);
+			warn_dlerr(status, "cannot reset link property '%s' "
+			    "on '%s'", errprop, link);
 		}
 		if (!temp) {
 			dladm_status_t	s;
@@ -2688,7 +2724,7 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 			}
 		}
 		s = dladm_set_prop(link, pip->pi_name, val, count,
-		    DLADM_OPT_TEMP);
+		    DLADM_OPT_TEMP, NULL);
 		if (s == DLADM_STATUS_OK) {
 			if (!temp) {
 				s = set_linkprop_persist(link,
@@ -2734,10 +2770,12 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 				if (ptr >= lim)
 					break;
 			}
-			if (ptr > errmsg)
+			if (ptr > errmsg) {
 				*(ptr - 1) = '\0';
-			warn("link property '%s' must be one of: %s",
-			    pip->pi_name, errmsg);
+				warn("link property '%s' must be one of: %s",
+				    pip->pi_name, errmsg);
+			} else
+				warn("invalid link property '%s'", *val);
 			free(propvals);
 			break;
 		}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -628,6 +628,10 @@ strplumb(void)
 	if ((err = ldi_ident_from_mod(&modlinkage, &li)) != 0)
 		return (err);
 
+	/*
+	 * Setup the TCP and SCTP default queues for the global stack.
+	 * tcp/sctp_stack_init will do this for additional stack instances.
+	 */
 	if ((err = strplumb_sctpq(li)) != 0)
 		goto done;
 

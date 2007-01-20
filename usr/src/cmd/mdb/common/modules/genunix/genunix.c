@@ -87,6 +87,7 @@
 #include "ndievents.h"
 #include "mmd.h"
 #include "net.h"
+#include "netstack.h"
 #include "nvpair.h"
 #include "ctxop.h"
 #include "tsd.h"
@@ -3418,6 +3419,9 @@ static const mdb_dcmd_t dcmds[] = {
 		"[-t stream | dgram | raw | #] [-p #]",
 		"filter and display sonode", sonode },
 
+	/* from netstack.c */
+	{ "netstack", "", "show stack instances", netstack },
+
 	/* from nvpair.c */
 	{ NVPAIR_DCMD_NAME, NVPAIR_DCMD_USAGE, NVPAIR_DCMD_DESCR,
 		nvpair_print },
@@ -3755,19 +3759,27 @@ static const mdb_walker_t walkers[] = {
 		NULL, modchain_walk_step, NULL },
 
 	/* from net.c */
-	{ "ar", "walk ar_t structures using MI",
-		mi_payload_walk_init, mi_payload_walk_step,
-		mi_payload_walk_fini, &mi_ar_arg },
-	{ "icmp", "walk ICMP control structures using MI",
-		mi_payload_walk_init, mi_payload_walk_step,
-		mi_payload_walk_fini, &mi_icmp_arg },
-	{ "ill", "walk ill_t structures using MI",
-		mi_payload_walk_init, mi_payload_walk_step,
-		mi_payload_walk_fini, &mi_ill_arg },
+	{ "ar", "walk ar_t structures using MI for all stacks",
+		mi_payload_walk_init, mi_payload_walk_step, NULL, &mi_ar_arg },
+	{ "icmp", "walk ICMP control structures using MI for all stacks",
+		mi_payload_walk_init, mi_payload_walk_step, NULL,
+		&mi_icmp_arg },
+	{ "ill", "walk ill_t structures using MI for all stacks",
+		mi_payload_walk_init, mi_payload_walk_step, NULL, &mi_ill_arg },
+
 	{ "mi", "given a MI_O, walk the MI",
 		mi_walk_init, mi_walk_step, mi_walk_fini, NULL },
 	{ "sonode", "given a sonode, walk its children",
 		sonode_walk_init, sonode_walk_step, sonode_walk_fini, NULL },
+
+	{ "ar_stacks", "walk all the ar_stack_t",
+		ar_stacks_walk_init, ar_stacks_walk_step, NULL },
+	{ "icmp_stacks", "walk all the icmp_stack_t",
+		icmp_stacks_walk_init, icmp_stacks_walk_step, NULL },
+	{ "tcp_stacks", "walk all the tcp_stack_t",
+		tcp_stacks_walk_init, tcp_stacks_walk_step, NULL },
+	{ "udp_stacks", "walk all the udp_stack_t",
+		udp_stacks_walk_init, udp_stacks_walk_step, NULL },
 
 	/* from nvpair.c */
 	{ NVPAIR_WALKER_NAME, NVPAIR_WALKER_DESCR,
@@ -3859,6 +3871,10 @@ static const mdb_walker_t walkers[] = {
 		mdi_phci_ph_next_walk_init,
 		mdi_phci_ph_next_walk_step,
 		mdi_phci_ph_next_walk_fini },
+
+	/* from netstack.c */
+	{ "netstack", "walk a list of kernel netstacks",
+		netstack_walk_init, netstack_walk_step, NULL },
 
 	{ NULL }
 };

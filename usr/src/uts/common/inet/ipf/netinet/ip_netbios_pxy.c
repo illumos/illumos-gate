@@ -30,46 +30,73 @@
  * SUCH DAMAGE.
  *
  * $Id: ip_netbios_pxy.c,v 2.8.2.1 2005/07/15 21:56:51 darrenr Exp $
+ *
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	IPF_NETBIOS_PROXY
 
-int ippr_netbios_init __P((void));
-void ippr_netbios_fini __P((void));
-int ippr_netbios_out __P((fr_info_t *, ap_session_t *, nat_t *));
+typedef struct ifs_netbiospxy {
+	frentry_t	netbiosfr;
+	int		netbios_proxy_init;
+} ifs_netbiospxy_t;
 
-static	frentry_t	netbiosfr;
-
-int	netbios_proxy_init = 0;
+int ippr_netbios_init __P((void **, ipf_stack_t *));
+void ippr_netbios_fini __P((void **, ipf_stack_t *));
+int ippr_netbios_out __P((fr_info_t *, ap_session_t *, nat_t *, void *));
 
 /*
  * Initialize local structures.
  */
-int ippr_netbios_init()
+/*ARGSUSED*/
+int ippr_netbios_init(private, ifs)
+void **private;
+ipf_stack_t *ifs;
 {
-	bzero((char *)&netbiosfr, sizeof(netbiosfr));
-	netbiosfr.fr_ref = 1;
-	netbiosfr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
-	MUTEX_INIT(&netbiosfr.fr_lock, "NETBIOS proxy rule lock");
-	netbios_proxy_init = 1;
+	ifs_netbiospxy_t *ifsnetbios;
+
+	KMALLOC(ifsnetbios, ifs_netbiospxy_t *);
+	if (ifsnetbios == NULL)
+		return -1;
+
+	bzero((char *)&ifsnetbios->netbiosfr, sizeof(ifsnetbios->netbiosfr));
+	ifsnetbios->netbiosfr.fr_ref = 1;
+	ifsnetbios->netbiosfr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
+	MUTEX_INIT(&ifsnetbios->netbiosfr.fr_lock, "NETBIOS proxy rule lock");
+	ifsnetbios->netbios_proxy_init = 1;
+
+	*private = (void *)ifsnetbios;
 
 	return 0;
 }
 
 
-void ippr_netbios_fini()
+/*ARGSUSED*/
+void ippr_netbios_fini(private, ifs)
+void **private;
+ipf_stack_t *ifs;
 {
-	if (netbios_proxy_init == 1) {
-		MUTEX_DESTROY(&netbiosfr.fr_lock);
-		netbios_proxy_init = 0;
+	ifs_netbiospxy_t *ifsnetbios = *((ifs_netbiospxy_t **)private);
+
+	if (ifsnetbios->netbios_proxy_init == 1) {
+		MUTEX_DESTROY(&ifsnetbios->netbiosfr.fr_lock);
+		ifsnetbios->netbios_proxy_init = 0;
 	}
+
+	KFREE(ifsnetbios);
+	*private = NULL;
 }
 
 
-int ippr_netbios_out(fin, aps, nat)
+/*ARGSUSED*/
+int ippr_netbios_out(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	char dgmbuf[6];
 	int off, dlen;

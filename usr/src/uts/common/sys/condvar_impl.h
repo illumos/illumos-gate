@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,6 +100,11 @@ typedef	struct	cvwaitlock_s	{
 	(_c)->cvw_refcnt = 0;				\
 	cv_broadcast(&(_c)->cvw_waiter);		\
 	mutex_exit(&(_c)->cvw_lock);			\
+}
+
+#define	CVW_DESTROY(_c)	{				\
+	mutex_destroy(&(_c)->cvw_lock);			\
+	cv_destroy(&(_c)->cvw_waiter);			\
 }
 
 #ifdef	__cplusplus

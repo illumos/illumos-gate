@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,7 +174,7 @@ extern wladm_status_t	wladm_get_link_attr(const char *, wladm_link_attr_t *);
 extern wladm_status_t	wladm_walk(void *, boolean_t (*)(void *, const char *));
 extern boolean_t	wladm_is_valid(const char *);
 extern wladm_status_t	wladm_set_prop(const char *, const char *, char **,
-			    uint_t);
+			    uint_t, char **);
 extern wladm_status_t	wladm_walk_prop(const char *, void *,
 			    boolean_t (*)(void *, const char *));
 extern wladm_status_t	wladm_get_prop(const char *, wladm_prop_type_t,

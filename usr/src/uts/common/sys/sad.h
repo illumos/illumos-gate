@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,9 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
 
 #include <sys/types.h>
+#ifdef	_KERNEL
+#include <sys/strsubr.h>
+#endif
 #include <sys/modhash.h>
 
 #ifdef	__cplusplus
@@ -168,6 +171,7 @@ struct saddev {
 	queue_t	*sa_qp;		/* pointer to read queue */
 	caddr_t	 sa_addr;	/* saved address for copyout */
 	int	 sa_flags;	/* see below */
+	str_stack_t *sa_ss;
 };
 
 /*
@@ -201,11 +205,6 @@ struct autopush {
 #define	ap_npush	ap_common.apc_npush
 #define	ap_anchor	ap_data.apd_anchor
 
-extern struct saddev	*saddev;	/* sad device array */
-extern int		sadcnt;		/* number of elements in saddev */
-
-extern kmutex_t		sad_lock;	/* protects sad ap data store */
-
 /*
  * function prototypes
  */
@@ -220,27 +219,28 @@ void audit_fdsend(int, struct file *, int);
 void audit_fdrecv(int, struct file *);
 #endif
 
-extern void sad_initspace(void);
+extern void sad_initspace(str_stack_t *);
+extern void sad_freespace(str_stack_t *);
 
 /*
- * The following interfaces do not care about sad_lock.
+ * The following interfaces do not care about ss_sad_lock.
  */
 extern struct autopush *sad_ap_alloc(void);
 extern int sad_apc_verify(struct apcommon *);
 extern int sad_ap_verify(struct autopush *);
 
 /*
- * The following interfaces attempt to acquire sad_lock.
+ * The following interfaces attempt to acquire ss_sad_lock.
  */
-extern void sad_ap_rele(struct autopush *);
-extern struct autopush *sad_ap_find_by_dev(dev_t);
+extern void sad_ap_rele(struct autopush *, str_stack_t *);
+extern struct autopush *sad_ap_find_by_dev(dev_t, str_stack_t *);
 
 /*
- * The following interfaces require sad_lock to be held when invoked.
+ * The following interfaces require ss_sad_lock to be held when invoked.
  */
-extern void sad_ap_insert(struct autopush *);
-extern void sad_ap_remove(struct autopush *);
-extern struct autopush *sad_ap_find(struct apcommon *);
+extern void sad_ap_insert(struct autopush *, str_stack_t *);
+extern void sad_ap_remove(struct autopush *, str_stack_t *);
+extern struct autopush *sad_ap_find(struct apcommon *, str_stack_t *);
 
 #endif /* _KERNEL */
 

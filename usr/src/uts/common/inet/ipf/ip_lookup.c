@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +64,7 @@ struct file;
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
 #include "netinet/ip_lookup.h"
+#include "netinet/ipf_stack.h"
 /* END OF INCLUDES */
 
 #if !defined(lint)
@@ -71,14 +72,13 @@ static const char rcsid[] = "@(#)$Id: ip_lookup.c,v 2.35.2.7 2005/06/12 07:18:20
 #endif
 
 #ifdef	IPFILTER_LOOKUP
-int	ip_lookup_inited = 0;
+static int iplookup_addnode __P((caddr_t, ipf_stack_t *));
+static int iplookup_delnode __P((caddr_t data, ipf_stack_t *));
+static int iplookup_addtable __P((caddr_t, ipf_stack_t *));
+static int iplookup_deltable __P((caddr_t, ipf_stack_t *));
+static int iplookup_stats __P((caddr_t, ipf_stack_t *));
+static int iplookup_flush __P((caddr_t, ipf_stack_t *));
 
-static int iplookup_addnode __P((caddr_t));
-static int iplookup_delnode __P((caddr_t data));
-static int iplookup_addtable __P((caddr_t));
-static int iplookup_deltable __P((caddr_t));
-static int iplookup_stats __P((caddr_t));
-static int iplookup_flush __P((caddr_t));
 
 
 /* ------------------------------------------------------------------------ */
@@ -88,16 +88,18 @@ static int iplookup_flush __P((caddr_t));
 /*                                                                          */
 /* Initialise all of the subcomponents of the lookup infrstructure.         */
 /* ------------------------------------------------------------------------ */
-int ip_lookup_init()
+int ip_lookup_init(ifs)
+ipf_stack_t *ifs;
 {
 
-	if (ip_pool_init() == -1)
+	if (ip_pool_init(ifs) == -1)
 		return -1;
 
-	RWLOCK_INIT(&ip_poolrw, "ip pool rwlock");
+	RWLOCK_INIT(&ifs->ifs_ip_poolrw, "ip pool rwlock");
 
-	ip_lookup_inited = 1;
-
+	ifs->ifs_ip_lookup_inited = 1;
+	ifs->ifs_ipftokenhead = NULL;
+	ifs->ifs_ipftokentail = &ifs->ifs_ipftokenhead;
 	return 0;
 }
 
@@ -111,14 +113,15 @@ int ip_lookup_init()
 /* has been running.  Also, do any other deinitialisation required such     */
 /* ip_lookup_init() can be called again, safely.                            */
 /* ------------------------------------------------------------------------ */
-void ip_lookup_unload()
+void ip_lookup_unload(ifs)
+ipf_stack_t *ifs;
 {
-	ip_pool_fini();
-	fr_htable_unload();
+	ip_pool_fini(ifs);
+	fr_htable_unload(ifs);
 
-	if (ip_lookup_inited == 1) {
-		RW_DESTROY(&ip_poolrw);
-		ip_lookup_inited = 0;
+	if (ifs->ifs_ip_lookup_inited == 1) {
+		RW_DESTROY(&ifs->ifs_ip_poolrw);
+		ifs->ifs_ip_lookup_inited = 0;
 	}
 }
 
@@ -135,10 +138,12 @@ void ip_lookup_unload()
 /* involves just calling another function to handle the specifics of each   */
 /* command.                                                                 */
 /* ------------------------------------------------------------------------ */
-int ip_lookup_ioctl(data, cmd, mode)
+int ip_lookup_ioctl(data, cmd, mode, uid, ctx, ifs)
 caddr_t data;
 ioctlcmd_t cmd;
-int mode;
+int mode, uid;
+void *ctx;
+ipf_stack_t *ifs;
 {
 	int err;
 	SPL_INT(s);
@@ -151,41 +156,45 @@ int mode;
 	{
 	case SIOCLOOKUPADDNODE :
 	case SIOCLOOKUPADDNODEW :
-		WRITE_ENTER(&ip_poolrw);
-		err = iplookup_addnode(data);
-		RWLOCK_EXIT(&ip_poolrw);
+		WRITE_ENTER(&ifs->ifs_ip_poolrw);
+		err = iplookup_addnode(data, ifs);
+		RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 		break;
 
 	case SIOCLOOKUPDELNODE :
 	case SIOCLOOKUPDELNODEW :
-		WRITE_ENTER(&ip_poolrw);
-		err = iplookup_delnode(data);
-		RWLOCK_EXIT(&ip_poolrw);
+		WRITE_ENTER(&ifs->ifs_ip_poolrw);
+		err = iplookup_delnode(data, ifs);
+		RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 		break;
 
 	case SIOCLOOKUPADDTABLE :
-		WRITE_ENTER(&ip_poolrw);
-		err = iplookup_addtable(data);
-		RWLOCK_EXIT(&ip_poolrw);
+		WRITE_ENTER(&ifs->ifs_ip_poolrw);
+		err = iplookup_addtable(data, ifs);
+		RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 		break;
 
 	case SIOCLOOKUPDELTABLE :
-		WRITE_ENTER(&ip_poolrw);
-		err = iplookup_deltable(data);
-		RWLOCK_EXIT(&ip_poolrw);
+		WRITE_ENTER(&ifs->ifs_ip_poolrw);
+		err = iplookup_deltable(data, ifs);
+		RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 		break;
 
 	case SIOCLOOKUPSTAT :
 	case SIOCLOOKUPSTATW :
-		WRITE_ENTER(&ip_poolrw);
-		err = iplookup_stats(data);
-		RWLOCK_EXIT(&ip_poolrw);
+		WRITE_ENTER(&ifs->ifs_ip_poolrw);
+		err = iplookup_stats(data, ifs);
+		RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 		break;
 
 	case SIOCLOOKUPFLUSH :
-		WRITE_ENTER(&ip_poolrw);
-		err = iplookup_flush(data);
-		RWLOCK_EXIT(&ip_poolrw);
+		WRITE_ENTER(&ifs->ifs_ip_poolrw);
+		err = iplookup_flush(data, ifs);
+		RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
+		break;
+
+	case SIOCLOOKUPITER :
+		err = ip_lookup_iterate(data, uid, ctx, ifs);
 		break;
 
 	default :
@@ -206,8 +215,9 @@ int mode;
 /* parent structure refered to by name exists and if it does, then go on to */
 /* add a node to it.                                                        */
 /* ------------------------------------------------------------------------ */
-static int iplookup_addnode(data)
+static int iplookup_addnode(data, ifs)
 caddr_t data;
+ipf_stack_t *ifs;
 {
 	ip_pool_node_t node, *m;
 	iplookupop_t op;
@@ -230,7 +240,7 @@ caddr_t data;
 		if (err != 0)
 			return EFAULT;
 
-		p = ip_pool_find(op.iplo_unit, op.iplo_name);
+		p = ip_pool_find(op.iplo_unit, op.iplo_name, ifs);
 		if (p == NULL)
 			return ESRCH;
 
@@ -243,7 +253,7 @@ caddr_t data;
 		if (m)
 			return EEXIST;
 		err = ip_pool_insert(p, &node.ipn_addr,
-				     &node.ipn_mask, node.ipn_info);
+				     &node.ipn_mask, node.ipn_info, ifs);
 		break;
 
 	case IPLT_HASH :
@@ -254,10 +264,10 @@ caddr_t data;
 		if (err != 0)
 			return EFAULT;
 
-		iph = fr_findhtable(op.iplo_unit, op.iplo_name);
+		iph = fr_findhtable(op.iplo_unit, op.iplo_name, ifs);
 		if (iph == NULL)
 			return ESRCH;
-		err = fr_addhtent(iph, &hte);
+		err = fr_addhtent(iph, &hte, ifs);
 		break;
 
 	default :
@@ -276,8 +286,9 @@ caddr_t data;
 /* Delete a node from a lookup table by first looking for the table it is   */
 /* in and then deleting the entry that gets found.                          */
 /* ------------------------------------------------------------------------ */
-static int iplookup_delnode(data)
+static int iplookup_delnode(data, ifs)
 caddr_t data;
+ipf_stack_t *ifs;
 {
 	ip_pool_node_t node, *m;
 	iplookupop_t op;
@@ -301,14 +312,14 @@ caddr_t data;
 		if (err != 0)
 			return EFAULT;
 
-		p = ip_pool_find(op.iplo_unit, op.iplo_name);
+		p = ip_pool_find(op.iplo_unit, op.iplo_name, ifs);
 		if (!p)
 			return ESRCH;
 
 		m = ip_pool_findeq(p, &node.ipn_addr, &node.ipn_mask);
 		if (m == NULL)
 			return ENOENT;
-		err = ip_pool_remove(p, m);
+		err = ip_pool_remove(p, m, ifs);
 		break;
 
 	case IPLT_HASH :
@@ -319,10 +330,10 @@ caddr_t data;
 		if (err != 0)
 			return EFAULT;
 
-		iph = fr_findhtable(op.iplo_unit, op.iplo_name);
+		iph = fr_findhtable(op.iplo_unit, op.iplo_name, ifs);
 		if (iph == NULL)
 			return ESRCH;
-		err = fr_delhtent(iph, &hte);
+		err = fr_delhtent(iph, &hte, ifs);
 		break;
 
 	default :
@@ -341,8 +352,9 @@ caddr_t data;
 /* Create a new lookup table, if one doesn't already exist using the name   */
 /* for this one.                                                            */
 /* ------------------------------------------------------------------------ */
-static int iplookup_addtable(data)
+static int iplookup_addtable(data, ifs)
 caddr_t data;
+ipf_stack_t *ifs;
 {
 	iplookupop_t op;
 	int err;
@@ -355,17 +367,17 @@ caddr_t data;
 	switch (op.iplo_type)
 	{
 	case IPLT_POOL :
-		if (ip_pool_find(op.iplo_unit, op.iplo_name) != NULL)
+		if (ip_pool_find(op.iplo_unit, op.iplo_name, ifs) != NULL)
 			err = EEXIST;
 		else
-			err = ip_pool_create(&op);
+			err = ip_pool_create(&op, ifs);
 		break;
 
 	case IPLT_HASH :
-		if (fr_findhtable(op.iplo_unit, op.iplo_name) != NULL)
+		if (fr_findhtable(op.iplo_unit, op.iplo_name, ifs) != NULL)
 			err = EEXIST;
 		else
-			err = fr_newhtable(&op);
+			err = fr_newhtable(&op, ifs);
 		break;
 
 	default :
@@ -384,8 +396,9 @@ caddr_t data;
 /* Decodes ioctl request to remove a particular hash table or pool and      */
 /* calls the relevant function to do the cleanup.                           */
 /* ------------------------------------------------------------------------ */
-static int iplookup_deltable(data)
+static int iplookup_deltable(data, ifs)
 caddr_t data;
+ipf_stack_t *ifs;
 {
 	iplookupop_t op;
 	int err;
@@ -403,11 +416,11 @@ caddr_t data;
 	switch (op.iplo_type)
 	{
 	case IPLT_POOL :
-		err = ip_pool_destroy(&op);
+		err = ip_pool_destroy(&op, ifs);
 		break;
 
 	case IPLT_HASH :
-		err = fr_removehtable(&op);
+		err = fr_removehtable(&op, ifs);
 		break;
 
 	default :
@@ -425,8 +438,9 @@ caddr_t data;
 /*                                                                          */
 /* Copy statistical information from inside the kernel back to user space.  */
 /* ------------------------------------------------------------------------ */
-static int iplookup_stats(data)
+static int iplookup_stats(data, ifs)
 caddr_t data;
+ipf_stack_t *ifs;
 {
 	iplookupop_t op;
 	int err;
@@ -437,11 +451,11 @@ caddr_t data;
 	switch (op.iplo_type)
 	{
 	case IPLT_POOL :
-		err = ip_pool_statistics(&op);
+		err = ip_pool_statistics(&op, ifs);
 		break;
 
 	case IPLT_HASH :
-		err = fr_gethtablestat(&op);
+		err = fr_gethtablestat(&op, ifs);
 		break;
 
 	default :
@@ -460,8 +474,9 @@ caddr_t data;
 /* A flush is called when we want to flush all the nodes from a particular  */
 /* entry in the hash table/pool or want to remove all groups from those.    */
 /* ------------------------------------------------------------------------ */
-static int iplookup_flush(data)
+static int iplookup_flush(data, ifs)
 caddr_t data;
+ipf_stack_t *ifs;
 {
 	int err, unit, num, type;
 	iplookupflush_t flush;
@@ -481,12 +496,12 @@ caddr_t data;
 
 	if (type == IPLT_POOL || type == IPLT_ALL) {
 		err = 0;
-		num = ip_pool_flush(&flush);
+		num = ip_pool_flush(&flush, ifs);
 	}
 
 	if (type == IPLT_HASH  || type == IPLT_ALL) {
 		err = 0;
-		num += fr_flushhtable(&flush);
+		num += fr_flushhtable(&flush, ifs);
 	}
 
 	if (err == 0) {
@@ -497,35 +512,123 @@ caddr_t data;
 }
 
 
-void ip_lookup_deref(type, ptr)
+
+void ip_lookup_deref(type, ptr, ifs)
 int type;
 void *ptr;
+ipf_stack_t *ifs;
 {
 	if (ptr == NULL)
 		return;
 
-	WRITE_ENTER(&ip_poolrw);
+	WRITE_ENTER(&ifs->ifs_ip_poolrw);
 	switch (type)
 	{
 	case IPLT_POOL :
-		ip_pool_deref(ptr);
+		ip_pool_deref(ptr, ifs);
 		break;
 
 	case IPLT_HASH :
-		fr_derefhtable(ptr);
+		fr_derefhtable(ptr, ifs);
 		break;
 	}
-	RWLOCK_EXIT(&ip_poolrw);
+	RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
+}
+
+	
+int ip_lookup_iterate(data, uid, ctx, ifs)
+void *data;
+int uid;
+void *ctx;
+ipf_stack_t *ifs;
+{
+	ipflookupiter_t iter;
+	ipftoken_t *token;
+	int err;
+
+	err = fr_inobj(data, &iter, IPFOBJ_LOOKUPITER);
+	if (err != 0) {
+#ifdef _KERNEL
+		(void) printf("fr_inobj\n");
+#endif
+		return err;
+	}
+
+	if (iter.ili_unit < 0 || iter.ili_unit > IPL_LOGMAX) {
+#ifdef _KERNEL
+		(void) printf("unit=%d\n", iter.ili_unit);
+#endif
+		return EINVAL;
+	}
+
+	if (iter.ili_ival != IPFGENITER_LOOKUP) {
+#ifdef _KERNEL
+		(void) printf("ival=%d\n", iter.ili_ival);
+#endif
+		return EINVAL;
+	}
+
+	token = ipf_findtoken(iter.ili_key, uid, ctx, ifs);
+	if (token == NULL) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_tokens);
+		return ESRCH;
+	}
+
+	switch (iter.ili_type)
+	{
+	case IPLT_POOL :
+		err = ip_pool_getnext(token, &iter, ifs);
+		break;
+	case IPLT_HASH :
+		err = fr_htable_getnext(token, &iter, ifs);
+		break;
+	default :
+#ifdef _KERNEL
+		(void) printf("type=%d\n", iter.ili_type);
+#endif
+		err = EINVAL;
+		break;
+	}
+	RWLOCK_EXIT(&ifs->ifs_ipf_tokens);
+
+	return err;
+}
+
+
+void ip_lookup_iterderef(type, data, ifs)
+u_32_t type;
+void *data;
+ipf_stack_t *ifs;
+{
+	iplookupiterkey_t	key;
+
+	key.ilik_key = type;
+
+	if (key.ilik_unstr.ilik_ival != IPFGENITER_LOOKUP)
+		return;
+
+	switch (key.ilik_unstr.ilik_type)
+	{
+	case IPLT_HASH :
+		fr_htable_iterderef((u_int)key.ilik_unstr.ilik_otype,
+				    (int)key.ilik_unstr.ilik_unit, data, ifs);
+		break;
+	case IPLT_POOL :
+		ip_pool_iterderef((u_int)key.ilik_unstr.ilik_otype,
+				  (int)key.ilik_unstr.ilik_unit, data, ifs);
+		break;
+	}
 }
 
 
 #else /* IPFILTER_LOOKUP */
 
 /*ARGSUSED*/
-int ip_lookup_ioctl(data, cmd, mode)
+int ip_lookup_ioctl(data, cmd, mode, uid, ifs)
 caddr_t data;
 ioctlcmd_t cmd;
-int mode;
+int mode, uid;
+ipf_stack_t *ifs;
 {
 	return EIO;
 }

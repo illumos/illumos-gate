@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,9 +94,9 @@ typedef struct ire_ftable_args_s {
 	ire_t		*ift_best_ire;
 } ire_ftable_args_t;
 
-struct	radix_node_head	*ip_ftable;
-static ire_t	*route_to_dst(const struct sockaddr *, zoneid_t);
-static ire_t   	*ire_round_robin(irb_t *, zoneid_t, ire_ftable_args_t *);
+static ire_t	*route_to_dst(const struct sockaddr *, zoneid_t, ip_stack_t *);
+static ire_t   	*ire_round_robin(irb_t *, zoneid_t, ire_ftable_args_t *,
+    ip_stack_t *);
 static void		ire_del_host_redir(ire_t *, char *);
 static boolean_t	ire_find_best_route(struct radix_node *, void *);
 
@@ -133,7 +133,7 @@ static boolean_t	ire_find_best_route(struct radix_node *, void *);
 ire_t *
 ire_ftable_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
     int type, const ipif_t *ipif, ire_t **pire, zoneid_t zoneid,
-    uint32_t ihandle, const ts_label_t *tsl, int flags)
+    uint32_t ihandle, const ts_label_t *tsl, int flags, ip_stack_t *ipst)
 {
 	ire_t *ire = NULL;
 	ipaddr_t gw_addr;
@@ -193,11 +193,11 @@ ire_ftable_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	 * rn_match_args.Before dropping the global tree lock, ensure
 	 * that the radix node can't be deleted by incrementing ire_refcnt.
 	 */
-	RADIX_NODE_HEAD_RLOCK(ip_ftable);
-	rt = (struct rt_entry *)ip_ftable->rnh_matchaddr_args(&rdst, ip_ftable,
-	    ire_find_best_route, &margs);
+	RADIX_NODE_HEAD_RLOCK(ipst->ips_ip_ftable);
+	rt = (struct rt_entry *)ipst->ips_ip_ftable->rnh_matchaddr_args(&rdst,
+	    ipst->ips_ip_ftable, ire_find_best_route, &margs);
 	ire = margs.ift_best_ire;
-	RADIX_NODE_HEAD_UNLOCK(ip_ftable);
+	RADIX_NODE_HEAD_UNLOCK(ipst->ips_ip_ftable);
 
 	if (rt == NULL) {
 		return (NULL);
@@ -247,7 +247,8 @@ found_default_ire:
 	    MATCH_IRE_DEFAULT)) {
 		ire_t *next_ire;
 
-		next_ire = ire_round_robin(ire->ire_bucket, zoneid, &margs);
+		next_ire = ire_round_robin(ire->ire_bucket, zoneid, &margs,
+		    ipst);
 		IRE_REFRELE(ire);
 		if (next_ire != NULL) {
 			ire = next_ire;
@@ -310,7 +311,7 @@ found_ire_held:
 			match_flags |= MATCH_IRE_ILL_GROUP;
 
 		ire = ire_route_lookup(ire->ire_gateway_addr, 0, 0, 0,
-		    ire->ire_ipif, NULL, zoneid, tsl, match_flags);
+		    ire->ire_ipif, NULL, zoneid, tsl, match_flags, ipst);
 		DTRACE_PROBE2(ftable__route__lookup1, (ire_t *), ire,
 		    (ire_t *), save_ire);
 		if (ire == NULL ||
@@ -361,7 +362,7 @@ found_ire_held:
 		ire = ire_route_lookup(gw_addr, 0, 0,
 		    (found_incomplete? IRE_INTERFACE :
 		    (IRE_CACHETABLE | IRE_INTERFACE)),
-		    gw_ipif, NULL, zoneid, tsl, match_flags);
+		    gw_ipif, NULL, zoneid, tsl, match_flags, ipst);
 		DTRACE_PROBE2(ftable__route__lookup2, (ire_t *), ire,
 		    (ire_t *), save_ire);
 		if (ire == NULL ||
@@ -420,11 +421,12 @@ ipif_lookup_multi_ire(ipif_t *ipif, ipaddr_t group)
 	irb_t   *irb;
 	ipaddr_t gw_addr;
 	int	match_flags = MATCH_IRE_TYPE | MATCH_IRE_ILL;
+	ip_stack_t *ipst = ipif->ipif_ill->ill_ipst;
 
 	ASSERT(CLASSD(group));
 
 	ire = ire_ftable_lookup(group, 0, 0, 0, NULL, NULL, ALL_ZONES, 0,
-	    NULL, MATCH_IRE_DEFAULT);
+	    NULL, MATCH_IRE_DEFAULT, ipst);
 
 	if (ire == NULL)
 		return (NULL);
@@ -447,7 +449,7 @@ ipif_lookup_multi_ire(ipif_t *ipif, ipaddr_t group)
 		case IRE_HOST:
 			gw_addr = ire->ire_gateway_addr;
 			gw_ire = ire_ftable_lookup(gw_addr, 0, 0, IRE_INTERFACE,
-			    ipif, NULL, ALL_ZONES, 0, NULL, match_flags);
+			    ipif, NULL, ALL_ZONES, 0, NULL, match_flags, ipst);
 
 			if (gw_ire != NULL) {
 				if (save_ire != NULL) {
@@ -494,7 +496,7 @@ ipif_lookup_multi_ire(ipif_t *ipif, ipaddr_t group)
  * Supports IP_BOUND_IF by following the ipif/ill when recursing.
  */
 ire_t *
-ire_lookup_multi(ipaddr_t group, zoneid_t zoneid)
+ire_lookup_multi(ipaddr_t group, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	ire_t	*ire;
 	ipif_t	*ipif = NULL;
@@ -502,7 +504,7 @@ ire_lookup_multi(ipaddr_t group, zoneid_t zoneid)
 	ipaddr_t gw_addr;
 
 	ire = ire_ftable_lookup(group, 0, 0, 0, NULL, NULL, zoneid,
-	    0, NULL, MATCH_IRE_DEFAULT);
+	    0, NULL, MATCH_IRE_DEFAULT, ipst);
 
 	/* We search a resolvable ire in case of multirouting. */
 	if ((ire != NULL) && (ire->ire_flags & RTF_MULTIRT)) {
@@ -512,7 +514,8 @@ ire_lookup_multi(ipaddr_t group, zoneid_t zoneid)
 		 * may be changed here. In that case, ire_multirt_lookup()
 		 * IRE_REFRELE the original ire and change it.
 		 */
-		(void) ire_multirt_lookup(&cire, &ire, MULTIRT_CACHEGW, NULL);
+		(void) ire_multirt_lookup(&cire, &ire, MULTIRT_CACHEGW,
+		    NULL, ipst);
 		if (cire != NULL)
 			ire_refrele(cire);
 	}
@@ -539,7 +542,7 @@ ire_lookup_multi(ipaddr_t group, zoneid_t zoneid)
 		ire_refrele(ire);
 		ire = ire_ftable_lookup(gw_addr, 0, 0,
 		    IRE_INTERFACE, ipif, NULL, zoneid, 0,
-		    NULL, match_flags);
+		    NULL, match_flags, ipst);
 		return (ire);
 	case IRE_IF_NORESOLVER:
 	case IRE_IF_RESOLVER:
@@ -568,15 +571,15 @@ ire_del_host_redir(ire_t *ire, char *gateway)
  * when a default gateway is going away.
  */
 void
-ire_delete_host_redirects(ipaddr_t gateway)
+ire_delete_host_redirects(ipaddr_t gateway, ip_stack_t *ipst)
 {
 	struct rtfuncarg rtfarg;
 
 	(void) memset(&rtfarg, 0, sizeof (rtfarg));
 	rtfarg.rt_func = ire_del_host_redir;
 	rtfarg.rt_arg = (void *)&gateway;
-	(void) ip_ftable->rnh_walktree_mt(ip_ftable, rtfunc, &rtfarg,
-	    irb_refhold_rn, irb_refrele_rn);
+	(void) ipst->ips_ip_ftable->rnh_walktree_mt(ipst->ips_ip_ftable,
+	    rtfunc, &rtfarg, irb_refhold_rn, irb_refrele_rn);
 }
 
 struct ihandle_arg {
@@ -620,8 +623,10 @@ ire_ihandle_lookup_onlink(ire_t *cire)
 	ire_t	*ire;
 	int	match_flags;
 	struct ihandle_arg ih;
+	ip_stack_t *ipst;
 
 	ASSERT(cire != NULL);
+	ipst = cire->ire_ipst;
 
 	/*
 	 * We don't need to specify the zoneid to ire_ftable_lookup() below
@@ -635,7 +640,7 @@ ire_ihandle_lookup_onlink(ire_t *cire)
 	 */
 	ire = ire_ftable_lookup(cire->ire_addr, cire->ire_cmask, 0,
 	    IRE_INTERFACE, NULL, NULL, ALL_ZONES, cire->ire_ihandle,
-	    NULL, match_flags);
+	    NULL, match_flags, ipst);
 	if (ire != NULL)
 		return (ire);
 	/*
@@ -665,8 +670,8 @@ ire_ihandle_lookup_onlink(ire_t *cire)
 	 */
 	(void) memset(&ih, 0, sizeof (ih));
 	ih.ihandle = cire->ire_ihandle;
-	(void) ip_ftable->rnh_walktree_mt(ip_ftable, ire_ihandle_onlink_match,
-	    &ih, irb_refhold_rn, irb_refrele_rn);
+	(void) ipst->ips_ip_ftable->rnh_walktree_mt(ipst->ips_ip_ftable,
+	    ire_ihandle_onlink_match, &ih, irb_refhold_rn, irb_refrele_rn);
 	return (ih.ire);
 }
 
@@ -700,6 +705,7 @@ ire_forward_src_ipif(ipaddr_t dst, ire_t *sire, ire_t *ire, ill_t *dst_ill,
     int zoneid, ushort_t *marks)
 {
 	ipif_t *src_ipif;
+	ip_stack_t *ipst = dst_ill->ill_ipst;
 
 	/*
 	 * Pick the best source address from dst_ill.
@@ -736,7 +742,7 @@ ire_forward_src_ipif(ipaddr_t dst, ire_t *sire, ire_t *ire, ill_t *dst_ill,
 		 * address still exists.
 		 */
 		src_ipif = ipif_lookup_addr(sire->ire_src_addr, NULL,
-		    zoneid, NULL, NULL, NULL, NULL);
+		    zoneid, NULL, NULL, NULL, NULL, ipst);
 		return (src_ipif);
 	}
 	*marks |= IRE_MARK_USESRC_CHECK;
@@ -755,9 +761,6 @@ ire_forward_src_ipif(ipaddr_t dst, ire_t *sire, ire_t *ire, ill_t *dst_ill,
 	}
 	return (src_ipif);
 }
-
-/* Added to root cause a bug - should be removed later */
-ire_t *ire_gw_cache = NULL;
 
 /*
  * This function is called by ip_rput_noire() and ip_fast_forward()
@@ -786,7 +789,7 @@ ire_t *ire_gw_cache = NULL;
 
 ire_t *
 ire_forward(ipaddr_t dst, boolean_t *check_multirt, ire_t *supplied_ire,
-    ire_t *supplied_sire, const struct ts_label_s *tsl)
+    ire_t *supplied_sire, const struct ts_label_s *tsl, ip_stack_t *ipst)
 {
 	ipaddr_t gw = 0;
 	ire_t	*ire = NULL;
@@ -811,10 +814,10 @@ ire_forward(ipaddr_t dst, boolean_t *check_multirt, ire_t *supplied_ire,
 
 	ire = ire_ftable_lookup(dst, 0, 0, 0, NULL, &sire, zoneid, 0,
 	    tsl, MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-	    MATCH_IRE_RJ_BHOLE | MATCH_IRE_PARENT|MATCH_IRE_SECATTR);
+	    MATCH_IRE_RJ_BHOLE | MATCH_IRE_PARENT|MATCH_IRE_SECATTR, ipst);
 
 	if (ire == NULL) {
-		ip_rts_change(RTM_MISS, dst, 0, 0, 0, 0, 0, 0, RTA_DST);
+		ip_rts_change(RTM_MISS, dst, 0, 0, 0, 0, 0, 0, RTA_DST, ipst);
 		goto icmp_err_ret;
 	}
 
@@ -1020,7 +1023,8 @@ create_irecache:
 		    0,
 		    &(ire->ire_uinfo),
 		    NULL,
-		    gcgrp);
+		    gcgrp,
+		    ipst);
 		ip1dbg(("incomplete ire_cache 0x%p\n", (void *)ire));
 		if (ire != NULL) {
 			gcgrp = NULL; /* reference now held by IRE */
@@ -1072,7 +1076,8 @@ icmp_err_ret:
 }
 
 /*
- * Obtain the rt_entry and rt_irb for the route to be added to the ip_ftable.
+ * Obtain the rt_entry and rt_irb for the route to be added to
+ * the ips_ip_ftable.
  * First attempt to add a node to the radix tree via rn_addroute. If the
  * route already exists, return the bucket for the existing route.
  *
@@ -1088,8 +1093,9 @@ ire_get_bucket(ire_t *ire)
 	struct rt_entry *rt;
 	struct rt_sockaddr rmask, rdst;
 	irb_t *irb = NULL;
+	ip_stack_t *ipst = ire->ire_ipst;
 
-	ASSERT(ip_ftable != NULL);
+	ASSERT(ipst->ips_ip_ftable != NULL);
 
 	/* first try to see if route exists (based on rtalloc1) */
 	(void) memset(&rdst, 0, sizeof (rdst));
@@ -1111,18 +1117,20 @@ ire_get_bucket(ire_t *ire)
 	rt->rt_dst = rdst;
 	irb = &rt->rt_irb;
 	irb->irb_marks |= IRB_MARK_FTABLE; /* dynamically allocated/freed */
+	irb->irb_ipst = ipst;
 	rw_init(&irb->irb_lock, NULL, RW_DEFAULT, NULL);
-	RADIX_NODE_HEAD_WLOCK(ip_ftable);
-	rn = ip_ftable->rnh_addaddr(&rt->rt_dst, &rmask, ip_ftable,
-	    (struct radix_node *)rt);
+	RADIX_NODE_HEAD_WLOCK(ipst->ips_ip_ftable);
+	rn = ipst->ips_ip_ftable->rnh_addaddr(&rt->rt_dst, &rmask,
+	    ipst->ips_ip_ftable, (struct radix_node *)rt);
 	if (rn == NULL) {
-		RADIX_NODE_HEAD_UNLOCK(ip_ftable);
+		RADIX_NODE_HEAD_UNLOCK(ipst->ips_ip_ftable);
 		Free(rt, rt_entry_cache);
 		rt = NULL;
 		irb = NULL;
-		RADIX_NODE_HEAD_RLOCK(ip_ftable);
-		if ((rn = ip_ftable->rnh_lookup(&rdst, &rmask, ip_ftable)) !=
-		    NULL && ((rn->rn_flags & RNF_ROOT) == 0)) {
+		RADIX_NODE_HEAD_RLOCK(ipst->ips_ip_ftable);
+		rn = ipst->ips_ip_ftable->rnh_lookup(&rdst, &rmask,
+		    ipst->ips_ip_ftable);
+		if (rn != NULL && ((rn->rn_flags & RNF_ROOT) == 0)) {
 			/* found a non-root match */
 			rt = (struct rt_entry *)rn;
 		}
@@ -1131,7 +1139,7 @@ ire_get_bucket(ire_t *ire)
 		irb = &rt->rt_irb;
 		IRB_REFHOLD(irb);
 	}
-	RADIX_NODE_HEAD_UNLOCK(ip_ftable);
+	RADIX_NODE_HEAD_UNLOCK(ipst->ips_ip_ftable);
 	return (irb);
 }
 
@@ -1151,18 +1159,32 @@ ifindex_lookup(const struct sockaddr *ipaddr, zoneid_t zoneid)
 	uint_t ifindex = 0;
 	ire_t *ire;
 	ill_t *ill;
+	netstack_t *ns;
+	ip_stack_t *ipst;
 
-	/* zoneid is a placeholder for future routing table per-zone project */
-	ASSERT(zoneid == ALL_ZONES);
+	if (zoneid == ALL_ZONES)
+		ns = netstack_find_by_zoneid(GLOBAL_ZONEID);
+	else
+		ns = netstack_find_by_zoneid(zoneid);
+	ASSERT(ns != NULL);
+
+	/*
+	 * For exclusive stacks we set the zoneid to zero
+	 * since IP uses the global zoneid in the exclusive stacks.
+	 */
+	if (ns->netstack_stackid != GLOBAL_NETSTACKID)
+		zoneid = GLOBAL_ZONEID;
+	ipst = ns->netstack_ip;
 
 	ASSERT(ipaddr->sa_family == AF_INET || ipaddr->sa_family == AF_INET6);
 
-	if ((ire =  route_to_dst(ipaddr, zoneid)) != NULL) {
+	if ((ire =  route_to_dst(ipaddr, zoneid, ipst)) != NULL) {
 		ill = ire_to_ill(ire);
 		if (ill != NULL)
 			ifindex = ill->ill_phyint->phyint_ifindex;
 		ire_refrele(ire);
 	}
+	netstack_rele(ns);
 	return (ifindex);
 }
 
@@ -1171,7 +1193,7 @@ ifindex_lookup(const struct sockaddr *ipaddr, zoneid_t zoneid)
  * it tries to match the the route to the corresponding ipif for the ifindex
  */
 static	ire_t *
-route_to_dst(const struct sockaddr *dst_addr, zoneid_t zoneid)
+route_to_dst(const struct sockaddr *dst_addr, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	ire_t *ire = NULL;
 	int match_flags;
@@ -1184,11 +1206,11 @@ route_to_dst(const struct sockaddr *dst_addr, zoneid_t zoneid)
 	if (dst_addr->sa_family == AF_INET) {
 		ire = ire_route_lookup(
 		    ((struct sockaddr_in *)dst_addr)->sin_addr.s_addr,
-		    0, 0, 0, NULL, NULL, zoneid, NULL, match_flags);
+			0, 0, 0, NULL, NULL, zoneid, NULL, match_flags, ipst);
 	} else {
 		ire = ire_route_lookup_v6(
 		    &((struct sockaddr_in6 *)dst_addr)->sin6_addr,
-		    0, 0, 0, NULL, NULL, zoneid, NULL, match_flags);
+		    0, 0, 0, NULL, NULL, zoneid, NULL, match_flags, ipst);
 	}
 	return (ire);
 }
@@ -1226,8 +1248,24 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 	int value;
 	int match_flags;
 	ipaddr_t dst;
+	netstack_t *ns;
+	ip_stack_t *ipst;
 
 	ASSERT(mp != NULL);
+
+	if (zoneid == ALL_ZONES)
+		ns = netstack_find_by_zoneid(GLOBAL_ZONEID);
+	else
+		ns = netstack_find_by_zoneid(zoneid);
+	ASSERT(ns != NULL);
+
+	/*
+	 * For exclusive stacks we set the zoneid to zero
+	 * since IP uses the global zoneid in the exclusive stacks.
+	 */
+	if (ns->netstack_stackid != GLOBAL_NETSTACKID)
+		zoneid = GLOBAL_ZONEID;
+	ipst = ns->netstack_ip;
 
 	ASSERT(dst_addr->sa_family == AF_INET ||
 	    dst_addr->sa_family == AF_INET6);
@@ -1262,7 +1300,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		    MATCH_IRE_RECURSIVE | MATCH_IRE_RJ_BHOLE);
 		ire = ire_route_lookup(dst,
 		    0, 0, 0, NULL, &sire, zoneid, MBLK_GETLABEL(mp),
-		    match_flags);
+		    match_flags, ipst);
 	} else {
 		ipif_t *supplied_ipif;
 		ill_t *ill;
@@ -1274,7 +1312,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		 */
 
 		ill = ill_lookup_on_ifindex(ifindex, B_FALSE,
-		    NULL, NULL, NULL, NULL);
+		    NULL, NULL, NULL, NULL, ipst);
 		if (ill != NULL) {
 			supplied_ipif = ipif_get_next_ipif(NULL, ill);
 		} else {
@@ -1290,7 +1328,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		    MATCH_IRE_SECATTR);
 
 		ire = ire_route_lookup(dst, 0, 0, 0, supplied_ipif,
-		    &sire, zoneid, MBLK_GETLABEL(mp), match_flags);
+		    &sire, zoneid, MBLK_GETLABEL(mp), match_flags, ipst);
 		ipif_refrele(supplied_ipif);
 		ill_refrele(ill);
 	}
@@ -1349,7 +1387,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		 * to the ire cache table
 		 */
 		ire_cache = ire_forward(dst, &check_multirt, ire, sire,
-		    MBLK_GETLABEL(mp));
+		    MBLK_GETLABEL(mp), ipst);
 		if (ire_cache == NULL) {
 			ip1dbg(("ipfil_sendpkt: failed to create the"
 			    " ire cache entry \n"));
@@ -1390,20 +1428,23 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		value = ECOMM;
 		break;
 	case LOOKUP_IN_PROGRESS:
+		netstack_rele(ns);
 		return (EINPROGRESS);
 	case SEND_PASSED:
+		netstack_rele(ns);
 		return (0);
 	}
 discard:
 	if (dst_addr->sa_family == AF_INET) {
-		BUMP_MIB(&ip_mib, ipIfStatsOutDiscards);
+		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
 	} else {
-		BUMP_MIB(&ip6_mib, ipIfStatsOutDiscards);
+		BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutDiscards);
 	}
 	if (ire != NULL)
 		ire_refrele(ire);
 	if (sire != NULL)
 		ire_refrele(sire);
+	netstack_rele(ns);
 	return (value);
 }
 
@@ -1601,7 +1642,8 @@ irb_refrele_ftable(irb_t *irb)
  * the first IRE_INTERFACE route found (if any).
  */
 ire_t *
-ire_round_robin(irb_t *irb_ptr, zoneid_t zoneid, ire_ftable_args_t *margs)
+ire_round_robin(irb_t *irb_ptr, zoneid_t zoneid, ire_ftable_args_t *margs,
+	ip_stack_t *ipst)
 {
 	ire_t	*ire_origin;
 	ire_t	*ire, *maybe_ire = NULL;
@@ -1676,7 +1718,7 @@ ire_round_robin(irb_t *irb_ptr, zoneid_t zoneid, ire_ftable_args_t *margs)
 		}
 		rire = ire_route_lookup(ire->ire_gateway_addr,
 		    0, 0, 0, ire->ire_ipif, NULL, zoneid, margs->ift_tsl,
-		    match_flags);
+		    match_flags, ipst);
 		if (rire != NULL) {
 			ire_refrele(rire);
 			IRE_REFHOLD(ire);

@@ -57,6 +57,7 @@
 #include <inet/nd.h>
 #include <inet/ip.h>
 #include <inet/ip_impl.h>
+#include <inet/ipclassifier.h>
 #include <inet/ip_if.h>
 #include <inet/ip_ire.h>
 #include <inet/ip_rts.h>
@@ -117,13 +118,12 @@ static	int	ndp_add_v4(ill_t *, uchar_t *, const in_addr_t *,
 void	nce_trace_inactive(nce_t *);
 #endif
 
-ndp_g_t ndp4, ndp6;
+#define	NCE_HASH_PTR_V4(ipst, addr)					\
+	(&((ipst)->ips_ndp4->nce_hash_tbl[IRE_ADDR_HASH(addr, NCE_TABLE_SIZE)]))
 
-#define	NCE_HASH_PTR_V4(addr) \
-	(&(ndp4.nce_hash_tbl[IRE_ADDR_HASH(addr, NCE_TABLE_SIZE)]))
-
-#define	NCE_HASH_PTR_V6(addr) \
-	(&(ndp6.nce_hash_tbl[NCE_ADDR_HASH_V6(addr, NCE_TABLE_SIZE)]))
+#define	NCE_HASH_PTR_V6(ipst, addr)				 \
+	(&((ipst)->ips_ndp6->nce_hash_tbl[NCE_ADDR_HASH_V6(addr, \
+		NCE_TABLE_SIZE)]))
 
 /*
  * Compute default flags to use for an advertisement of this nce's address.
@@ -165,7 +165,7 @@ ndp_add(ill_t *ill, uchar_t *hw_addr, const void *addr,
 /*
  * NDP Cache Entry creation routine.
  * Mapped entries will never do NUD .
- * This routine must always be called with ndp6.ndp_g_lock held.
+ * This routine must always be called with ndp6->ndp_g_lock held.
  * Prior to return, nce_refcnt is incremented.
  */
 static int
@@ -181,8 +181,9 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 	nce_t		**ncep;
 	int		err;
 	boolean_t	dropped = B_FALSE;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	ASSERT(MUTEX_HELD(&ndp6.ndp_g_lock));
+	ASSERT(MUTEX_HELD(&ipst->ips_ndp6->ndp_g_lock));
 	ASSERT(ill != NULL && ill->ill_isv6);
 	if (IN6_IS_ADDR_UNSPECIFIED(addr)) {
 		ip0dbg(("ndp_add: no addr\n"));
@@ -256,9 +257,9 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 		ASSERT(IN6_IS_ADDR_MULTICAST(addr));
 		ASSERT(!IN6_IS_ADDR_UNSPECIFIED(&nce->nce_mask));
 		ASSERT(!IN6_IS_ADDR_UNSPECIFIED(&nce->nce_extract_mask));
-		ncep = &ndp6.nce_mask_entries;
+		ncep = &ipst->ips_ndp6->nce_mask_entries;
 	} else {
-		ncep = ((nce_t **)NCE_HASH_PTR_V6(*addr));
+		ncep = ((nce_t **)NCE_HASH_PTR_V6(ipst, *addr));
 	}
 
 #ifdef NCE_DEBUG
@@ -290,7 +291,7 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 	err = 0;
 	if ((flags & NCE_F_PERMANENT) && state == ND_PROBE) {
 		mutex_enter(&nce->nce_lock);
-		mutex_exit(&ndp6.ndp_g_lock);
+		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		nce->nce_pcnt = ND_MAX_UNICAST_SOLICIT;
 		mutex_exit(&nce->nce_lock);
 		dropped = nce_xmit(ill, ND_NEIGHBOR_SOLICIT, NULL, B_FALSE,
@@ -301,7 +302,7 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 			mutex_exit(&nce->nce_lock);
 		}
 		NDP_RESTART_TIMER(nce, ILL_PROBE_INTERVAL(ill));
-		mutex_enter(&ndp6.ndp_g_lock);
+		mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
 		err = EINPROGRESS;
 	} else if (flags & NCE_F_UNSOL_ADV) {
 		/*
@@ -310,8 +311,8 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 		 * are done in ndp_timer.
 		 */
 		mutex_enter(&nce->nce_lock);
-		mutex_exit(&ndp6.ndp_g_lock);
-		nce->nce_unsolicit_count = ip_ndp_unsolicit_count - 1;
+		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
+		nce->nce_unsolicit_count = ipst->ips_ip_ndp_unsolicit_count - 1;
 		mutex_exit(&nce->nce_lock);
 		dropped = nce_xmit(ill,
 		    ND_NEIGHBOR_ADVERT,
@@ -325,10 +326,10 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 			nce->nce_unsolicit_count++;
 		if (nce->nce_unsolicit_count != 0) {
 			nce->nce_timeout_id = timeout(ndp_timer, nce,
-			    MSEC_TO_TICK(ip_ndp_unsolicit_interval));
+			    MSEC_TO_TICK(ipst->ips_ip_ndp_unsolicit_interval));
 		}
 		mutex_exit(&nce->nce_lock);
-		mutex_enter(&ndp6.ndp_g_lock);
+		mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
 	}
 	/*
 	 * If the hw_addr is NULL, typically for ND_INCOMPLETE nces, then
@@ -372,10 +373,13 @@ ndp_lookup_then_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 {
 	int	err = 0;
 	nce_t	*nce;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(ill != NULL && ill->ill_isv6);
-	mutex_enter(&ndp6.ndp_g_lock);
-	nce = *((nce_t **)NCE_HASH_PTR_V6(*addr)); /* head of v6 hash table */
+	mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
+
+	/* Get head of v6 hash table */
+	nce = *((nce_t **)NCE_HASH_PTR_V6(ipst, *addr));
 	nce = nce_lookup_addr(ill, addr, nce);
 	if (nce == NULL) {
 		err = ndp_add(ill,
@@ -393,7 +397,7 @@ ndp_lookup_then_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 		*newnce = nce;
 		err = EEXIST;
 	}
-	mutex_exit(&ndp6.ndp_g_lock);
+	mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 	return (err);
 }
 
@@ -446,7 +450,13 @@ ndp_delete(nce_t *nce)
 	nce_t	**ptpn;
 	nce_t	*nce1;
 	int	ipversion = nce->nce_ipversion;
-	ndp_g_t *ndp = (ipversion == IPV4_VERSION ? &ndp4 : &ndp6);
+	ndp_g_t *ndp;
+	ip_stack_t	*ipst = nce->nce_ill->ill_ipst;
+
+	if (ipversion == IPV4_VERSION)
+		ndp = ipst->ips_ndp4;
+	else
+		ndp = ipst->ips_ndp6;
 
 	/* Serialize deletes */
 	mutex_enter(&nce->nce_lock);
@@ -697,17 +707,23 @@ nce_t *
 ndp_lookup_v6(ill_t *ill, const in6_addr_t *addr, boolean_t caller_holds_lock)
 {
 	nce_t	*nce;
+	ip_stack_t	*ipst;
+
+	ASSERT(ill != NULL);
+	ipst = ill->ill_ipst;
 
 	ASSERT(ill != NULL && ill->ill_isv6);
 	if (!caller_holds_lock) {
-		mutex_enter(&ndp6.ndp_g_lock);
+		mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
 	}
-	nce = *((nce_t **)NCE_HASH_PTR_V6(*addr)); /* head of v6 hash table */
+
+	/* Get head of v6 hash table */
+	nce = *((nce_t **)NCE_HASH_PTR_V6(ipst, *addr));
 	nce = nce_lookup_addr(ill, addr, nce);
 	if (nce == NULL)
 		nce = nce_lookup_mapping(ill, addr);
 	if (!caller_holds_lock)
-		mutex_exit(&ndp6.ndp_g_lock);
+		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 	return (nce);
 }
 /*
@@ -722,15 +738,18 @@ ndp_lookup_v4(ill_t *ill, const in_addr_t *addr, boolean_t caller_holds_lock)
 {
 	nce_t	*nce;
 	in6_addr_t addr6;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	if (!caller_holds_lock) {
-		mutex_enter(&ndp4.ndp_g_lock);
+		mutex_enter(&ipst->ips_ndp4->ndp_g_lock);
 	}
-	nce = *((nce_t **)NCE_HASH_PTR_V4(*addr)); /* head of v6 hash table */
+
+	/* Get head of v4 hash table */
+	nce = *((nce_t **)NCE_HASH_PTR_V4(ipst, *addr));
 	IN6_IPADDR_TO_V4MAPPED(*addr, &addr6);
 	nce = nce_lookup_addr(ill, &addr6, nce);
 	if (!caller_holds_lock)
-		mutex_exit(&ndp4.ndp_g_lock);
+		mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 	return (nce);
 }
 
@@ -744,7 +763,13 @@ ndp_lookup_v4(ill_t *ill, const in_addr_t *addr, boolean_t caller_holds_lock)
 static nce_t *
 nce_lookup_addr(ill_t *ill, const in6_addr_t *addr, nce_t *nce)
 {
-	ndp_g_t *ndp = (ill->ill_isv6 ? &ndp6 : &ndp4);
+	ndp_g_t		*ndp;
+	ip_stack_t	*ipst = ill->ill_ipst;
+
+	if (ill->ill_isv6)
+		ndp = ipst->ips_ndp6;
+	else
+		ndp = ipst->ips_ndp4;
 
 	ASSERT(ill != NULL);
 	ASSERT(MUTEX_HELD(&ndp->ndp_g_lock));
@@ -776,12 +801,13 @@ static nce_t *
 nce_lookup_mapping(ill_t *ill, const in6_addr_t *addr)
 {
 	nce_t	*nce;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(ill != NULL && ill->ill_isv6);
-	ASSERT(MUTEX_HELD(&ndp6.ndp_g_lock));
+	ASSERT(MUTEX_HELD(&ipst->ips_ndp6->ndp_g_lock));
 	if (!IN6_IS_ADDR_MULTICAST(addr))
 		return (NULL);
-	nce = ndp6.nce_mask_entries;
+	nce = ipst->ips_ndp6->nce_mask_entries;
 	for (; nce != NULL; nce = nce->nce_next)
 		if (nce->nce_ill == ill &&
 		    (V6_MASK_EQ(*addr, nce->nce_mask, nce->nce_addr))) {
@@ -808,6 +834,7 @@ ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 	mblk_t	*mp;
 	boolean_t ll_updated = B_FALSE;
 	boolean_t ll_changed;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(nce->nce_ipversion == IPV6_VERSION);
 	/*
@@ -854,7 +881,7 @@ ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 
 				ifindex = (uint_t)(uintptr_t)data_mp->b_prev;
 				inbound_ill = ill_lookup_on_ifindex(ifindex,
-				    B_TRUE, NULL, NULL, NULL, NULL);
+				    B_TRUE, NULL, NULL, NULL, NULL, ipst);
 				if (inbound_ill == NULL) {
 					data_mp->b_prev = NULL;
 					freemsg(mp);
@@ -934,9 +961,9 @@ ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 			    &ipv6_all_zeros, &nce->nce_addr, IRE_DEFAULT,
 			    nce->nce_ill->ill_ipif, NULL, ALL_ZONES, 0, NULL,
 			    MATCH_IRE_ILL | MATCH_IRE_TYPE | MATCH_IRE_GW |
-			    MATCH_IRE_DEFAULT);
+			    MATCH_IRE_DEFAULT, ipst);
 			if (ire != NULL) {
-				ip_rts_rtmsg(RTM_DELETE, ire, 0);
+				ip_rts_rtmsg(RTM_DELETE, ire, 0, ipst);
 				ire_delete(ire);
 				ire_refrele(ire);
 			}
@@ -1025,11 +1052,15 @@ ndp_walk_common(ndp_g_t *ndp, ill_t *ill, pfi_t pfi, void *arg1,
 	}
 }
 
+/*
+ * Walk everything.
+ * Note that ill can be NULL hence can't derive the ipst from it.
+ */
 void
-ndp_walk(ill_t *ill, pfi_t pfi, void *arg1)
+ndp_walk(ill_t *ill, pfi_t pfi, void *arg1, ip_stack_t *ipst)
 {
-	ndp_walk_common(&ndp4, ill, pfi, arg1, B_TRUE);
-	ndp_walk_common(&ndp6, ill, pfi, arg1, B_TRUE);
+	ndp_walk_common(ipst->ips_ndp4, ill, pfi, arg1, B_TRUE);
+	ndp_walk_common(ipst->ips_ndp6, ill, pfi, arg1, B_TRUE);
 }
 
 /*
@@ -1048,6 +1079,7 @@ ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 	int		err = 0;
 	uint32_t	ms;
 	mblk_t		*mp_nce = NULL;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(ill != NULL);
 	ASSERT(ill->ill_isv6);
@@ -1082,25 +1114,25 @@ ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 			NCE_REFRELE(nce);
 			return (0);
 		}
-		rw_enter(&ill_g_lock, RW_READER);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 		mutex_enter(&nce->nce_lock);
 		if (nce->nce_state != ND_INCOMPLETE) {
 			mutex_exit(&nce->nce_lock);
-			rw_exit(&ill_g_lock);
+			rw_exit(&ipst->ips_ill_g_lock);
 			NCE_REFRELE(nce);
 			return (0);
 		}
-		mp_nce = ip_prepend_zoneid(mp, zoneid);
+		mp_nce = ip_prepend_zoneid(mp, zoneid, ipst);
 		if (mp_nce == NULL) {
 			/* The caller will free mp */
 			mutex_exit(&nce->nce_lock);
-			rw_exit(&ill_g_lock);
+			rw_exit(&ipst->ips_ill_g_lock);
 			ndp_delete(nce);
 			NCE_REFRELE(nce);
 			return (ENOMEM);
 		}
 		ms = nce_solicit(nce, mp_nce);
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		if (ms == 0) {
 			/* The caller will free mp */
 			if (mp_nce != mp)
@@ -1118,7 +1150,7 @@ ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 		/* Resolution in progress just queue the packet */
 		mutex_enter(&nce->nce_lock);
 		if (nce->nce_state == ND_INCOMPLETE) {
-			mp_nce = ip_prepend_zoneid(mp, zoneid);
+			mp_nce = ip_prepend_zoneid(mp, zoneid, ipst);
 			if (mp_nce == NULL) {
 				err = ENOMEM;
 			} else {
@@ -1210,16 +1242,17 @@ nce_set_multicast(ill_t *ill, const in6_addr_t *dst)
 	nce_t		*nce;
 	uchar_t		*hw_addr = NULL;
 	int		err = 0;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(ill != NULL);
 	ASSERT(ill->ill_isv6);
 	ASSERT(!(IN6_IS_ADDR_UNSPECIFIED(dst)));
 
-	mutex_enter(&ndp6.ndp_g_lock);
-	nce = *((nce_t **)NCE_HASH_PTR_V6(*dst));
+	mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
+	nce = *((nce_t **)NCE_HASH_PTR_V6(ipst, *dst));
 	nce = nce_lookup_addr(ill, dst, nce);
 	if (nce != NULL) {
-		mutex_exit(&ndp6.ndp_g_lock);
+		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		NCE_REFRELE(nce);
 		return (0);
 	}
@@ -1227,7 +1260,7 @@ nce_set_multicast(ill_t *ill, const in6_addr_t *dst)
 	mnce = nce_lookup_mapping(ill, dst);
 	if (mnce == NULL) {
 		/* Something broken for the interface. */
-		mutex_exit(&ndp6.ndp_g_lock);
+		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		return (ESRCH);
 	}
 	ASSERT(mnce->nce_flags & NCE_F_MAPPING);
@@ -1239,7 +1272,7 @@ nce_set_multicast(ill_t *ill, const in6_addr_t *dst)
 		 */
 		hw_addr = kmem_alloc(ill->ill_nd_lla_len, KM_NOSLEEP);
 		if (hw_addr == NULL) {
-			mutex_exit(&ndp6.ndp_g_lock);
+			mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 			NCE_REFRELE(mnce);
 			return (ENOMEM);
 		}
@@ -1261,7 +1294,7 @@ nce_set_multicast(ill_t *ill, const in6_addr_t *dst)
 	    &nce,
 	    NULL,
 	    NULL);
-	mutex_exit(&ndp6.ndp_g_lock);
+	mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 	if (hw_addr != NULL)
 		kmem_free(hw_addr, ill->ill_nd_lla_len);
 	if (err != 0) {
@@ -1322,6 +1355,7 @@ ndp_mcastreq(ill_t *ill, const in6_addr_t *addr, uint32_t hw_addr_len,
 {
 	nce_t		*nce;
 	uchar_t		*hw_addr;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(ill != NULL && ill->ill_isv6);
 	ASSERT(ill->ill_net_type == IRE_IF_RESOLVER);
@@ -1330,14 +1364,14 @@ ndp_mcastreq(ill_t *ill, const in6_addr_t *addr, uint32_t hw_addr_len,
 		freemsg(mp);
 		return (EINVAL);
 	}
-	mutex_enter(&ndp6.ndp_g_lock);
+	mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
 	nce = nce_lookup_mapping(ill, addr);
 	if (nce == NULL) {
-		mutex_exit(&ndp6.ndp_g_lock);
+		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		freemsg(mp);
 		return (ESRCH);
 	}
-	mutex_exit(&ndp6.ndp_g_lock);
+	mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 	/*
 	 * Update dl_addr_length and dl_addr_offset for primitives that
 	 * have physical addresses as opposed to full saps
@@ -1384,8 +1418,9 @@ nce_solicit(nce_t *nce, mblk_t *mp)
 	ipif_t		*ipif;
 	ip6i_t		*ip6i;
 	boolean_t	dropped = B_FALSE;
+	ip_stack_t	*ipst = nce->nce_ill->ill_ipst;
 
-	ASSERT(RW_READ_HELD(&ill_g_lock));
+	ASSERT(RW_READ_HELD(&ipst->ips_ill_g_lock));
 	ASSERT(MUTEX_HELD(&nce->nce_lock));
 	ill = nce->nce_ill;
 	ASSERT(ill != NULL);
@@ -1459,10 +1494,10 @@ nce_solicit(nce_t *nce, mblk_t *mp)
 		src_ill = NULL;
 	nce->nce_rcnt--;
 	mutex_exit(&nce->nce_lock);
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 	dropped = nce_xmit(ill, ND_NEIGHBOR_SOLICIT, src_ill, B_TRUE, &src,
 	    &dst, 0);
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	mutex_enter(&nce->nce_lock);
 	if (dropped)
 		nce->nce_rcnt++;
@@ -1564,6 +1599,7 @@ ndp_do_recovery(ipif_t *ipif)
 {
 	ill_t *ill = ipif->ipif_ill;
 	mblk_t *mp;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	mp = allocb(sizeof (ipif->ipif_v6lcl_addr), BPRI_MED);
 	if (mp == NULL) {
@@ -1572,7 +1608,7 @@ ndp_do_recovery(ipif_t *ipif)
 		    !(ipif->ipif_state_flags & (IPIF_MOVING |
 		    IPIF_CONDEMNED))) {
 			ipif->ipif_recovery_id = timeout(ipif6_dup_recovery,
-			    ipif, MSEC_TO_TICK(ip_dup_recovery));
+			    ipif, MSEC_TO_TICK(ipst->ips_ip_dup_recovery));
 		}
 		mutex_exit(&ill->ill_lock);
 	} else {
@@ -1679,6 +1715,7 @@ ip_ndp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 	nd_neighbor_solicit_t *ns;
 	mblk_t *dl_mp = NULL;
 	uchar_t *haddr;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	if (DB_TYPE(mp) != M_DATA) {
 		dl_mp = mp;
@@ -1732,9 +1769,9 @@ ip_ndp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		    ill->ill_net_type == IRE_IF_RESOLVER &&
 		    !(ipif->ipif_state_flags & (IPIF_MOVING |
 		    IPIF_CONDEMNED)) &&
-		    ip_dup_recovery > 0) {
+		    ipst->ips_ip_dup_recovery > 0) {
 			ipif->ipif_recovery_id = timeout(ipif6_dup_recovery,
-			    ipif, MSEC_TO_TICK(ip_dup_recovery));
+			    ipif, MSEC_TO_TICK(ipst->ips_ip_dup_recovery));
 		}
 		mutex_exit(&ill->ill_lock);
 	}
@@ -1781,18 +1818,19 @@ ip_ndp_conflict(ill_t *ill, mblk_t *mp, mblk_t *dl_mp, nce_t *nce)
 	uint32_t now;
 	uint_t maxdefense;
 	uint_t defs;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	ipif = ipif_lookup_addr_v6(&nce->nce_addr, ill, ALL_ZONES, NULL, NULL,
-	    NULL, NULL);
+	    NULL, NULL, ipst);
 	if (ipif == NULL)
 		return;
 	/*
 	 * First, figure out if this address is disposable.
 	 */
 	if (ipif->ipif_flags & (IPIF_DHCPRUNNING | IPIF_TEMPORARY))
-		maxdefense = ip_max_temp_defend;
+		maxdefense = ipst->ips_ip_max_temp_defend;
 	else
-		maxdefense = ip_max_defend;
+		maxdefense = ipst->ips_ip_max_defend;
 
 	/*
 	 * Now figure out how many times we've defended ourselves.  Ignore
@@ -1801,7 +1839,7 @@ ip_ndp_conflict(ill_t *ill, mblk_t *mp, mblk_t *dl_mp, nce_t *nce)
 	now = gethrestime_sec();
 	mutex_enter(&nce->nce_lock);
 	if ((defs = nce->nce_defense_count) > 0 &&
-	    now - nce->nce_defense_time > ip_defend_interval) {
+	    now - nce->nce_defense_time > ipst->ips_ip_defend_interval) {
 		nce->nce_defense_count = defs = 0;
 	}
 	nce->nce_defense_count++;
@@ -2055,6 +2093,7 @@ ndp_input_advert(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 	nd_opt_hdr_t	*opt = NULL;
 	int		len;
 	mib2_ipv6IfIcmpEntry_t	*mib = ill->ill_icmp6_mib;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ip6h = (ip6_t *)mp->b_rptr;
 	icmp_nd = (icmp6_t *)(mp->b_rptr + IPV6_HDR_LEN);
@@ -2100,7 +2139,7 @@ ndp_input_advert(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 	 * If this interface is part of the group look at all the
 	 * ills in the group.
 	 */
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	if (ill->ill_group != NULL)
 		ill = ill->ill_group->illgrp_ill;
 
@@ -2114,7 +2153,7 @@ ndp_input_advert(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 		mutex_exit(&ill->ill_lock);
 		dst_nce = ndp_lookup_v6(ill, &target, B_FALSE);
 		/* We have to drop the lock since ndp_process calls put* */
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		if (dst_nce != NULL) {
 			if ((dst_nce->nce_flags & NCE_F_PERMANENT) &&
 			    dst_nce->nce_state == ND_PROBE) {
@@ -2153,10 +2192,10 @@ ndp_input_advert(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 			}
 			NCE_REFRELE(dst_nce);
 		}
-		rw_enter(&ill_g_lock, RW_READER);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 		ill_refrele(ill);
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 }
 
 /*
@@ -2431,9 +2470,16 @@ nce_make_mapping(nce_t *nce, uchar_t *addrpos, uchar_t *addr)
 int
 ndp_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 {
+	ip_stack_t	*ipst;
+
+	if (CONN_Q(q))
+		ipst = CONNQ_TO_IPST(q);
+	else
+		ipst = ILLQ_TO_IPST(q);
+
 	(void) mi_mpprintf(mp, "ifname      hardware addr    flags"
 			"     proto addr/mask");
-	ndp_walk(NULL, (pfi_t)nce_report1, (uchar_t *)mp);
+	ndp_walk(NULL, (pfi_t)nce_report1, (uchar_t *)mp, ipst);
 	return (0);
 }
 
@@ -2572,6 +2618,7 @@ ndp_timer(void *arg)
 	char		addrbuf[INET6_ADDRSTRLEN];
 	mblk_t		*mp;
 	boolean_t	dropped = B_FALSE;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	/*
 	 * The timer has to be cancelled by ndp_delete before doing the final
@@ -2585,7 +2632,7 @@ ndp_timer(void *arg)
 	 * Grab the ill_g_lock now itself to avoid lock order problems.
 	 * nce_solicit needs ill_g_lock to be able to traverse ills
 	 */
-	rw_enter(&ill_g_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	mutex_enter(&nce->nce_lock);
 	NCE_REFHOLD_LOCKED(nce);
 	nce->nce_timeout_id = 0;
@@ -2595,7 +2642,7 @@ ndp_timer(void *arg)
 	 */
 	switch (nce->nce_state) {
 	case ND_DELAY:
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		nce->nce_state = ND_PROBE;
 		mutex_exit(&nce->nce_lock);
 		(void) nce_xmit(ill, ND_NEIGHBOR_SOLICIT, NULL, B_FALSE,
@@ -2610,7 +2657,7 @@ ndp_timer(void *arg)
 		return;
 	case ND_PROBE:
 		/* must be retransmit timer */
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		nce->nce_pcnt--;
 		ASSERT(nce->nce_pcnt < ND_MAX_UNICAST_SOLICIT &&
 		    nce->nce_pcnt >= -1);
@@ -2664,7 +2711,7 @@ ndp_timer(void *arg)
 			nce->nce_state = ND_REACHABLE;
 			mutex_exit(&nce->nce_lock);
 			ipif = ipif_lookup_addr_v6(&nce->nce_addr, ill,
-			    ALL_ZONES, NULL, NULL, NULL, NULL);
+			    ALL_ZONES, NULL, NULL, NULL, NULL, ipst);
 			if (ipif != NULL) {
 				if (ipif->ipif_was_dup) {
 					char ibuf[LIFNAMSIZ + 10];
@@ -2703,9 +2750,10 @@ ndp_timer(void *arg)
 			if (dropped) {
 				nce->nce_unsolicit_count = 1;
 				NDP_RESTART_TIMER(nce,
-				    ip_ndp_unsolicit_interval);
-			} else if (ip_ndp_defense_interval != 0) {
-				NDP_RESTART_TIMER(nce, ip_ndp_defense_interval);
+				    ipst->ips_ip_ndp_unsolicit_interval);
+			} else if (ipst->ips_ip_ndp_defense_interval != 0) {
+				NDP_RESTART_TIMER(nce,
+				    ipst->ips_ip_ndp_defense_interval);
 			}
 		} else {
 			/*
@@ -2762,7 +2810,7 @@ ndp_timer(void *arg)
 		}
 		if (nce->nce_qd_mp != NULL) {
 			ms = nce_solicit(nce, NULL);
-			rw_exit(&ill_g_lock);
+			rw_exit(&ipst->ips_ill_g_lock);
 			if (ms == 0) {
 				if (nce->nce_state != ND_REACHABLE) {
 					mutex_exit(&nce->nce_lock);
@@ -2779,15 +2827,15 @@ ndp_timer(void *arg)
 			return;
 		}
 		mutex_exit(&nce->nce_lock);
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		NCE_REFRELE(nce);
 		break;
 	case ND_REACHABLE :
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		if (((nce->nce_flags & NCE_F_UNSOL_ADV) &&
 		    nce->nce_unsolicit_count != 0) ||
 		    ((nce->nce_flags & NCE_F_PERMANENT) &&
-		    ip_ndp_defense_interval != 0)) {
+		    ipst->ips_ip_ndp_defense_interval != 0)) {
 			if (nce->nce_unsolicit_count > 0)
 				nce->nce_unsolicit_count--;
 			mutex_exit(&nce->nce_lock);
@@ -2805,10 +2853,10 @@ ndp_timer(void *arg)
 			}
 			if (nce->nce_unsolicit_count != 0) {
 				NDP_RESTART_TIMER(nce,
-				    ip_ndp_unsolicit_interval);
+				    ipst->ips_ip_ndp_unsolicit_interval);
 			} else {
 				NDP_RESTART_TIMER(nce,
-				    ip_ndp_defense_interval);
+				    ipst->ips_ip_ndp_defense_interval);
 			}
 		} else {
 			mutex_exit(&nce->nce_lock);
@@ -2816,7 +2864,7 @@ ndp_timer(void *arg)
 		NCE_REFRELE(nce);
 		break;
 	default:
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		mutex_exit(&nce->nce_lock);
 		NCE_REFRELE(nce);
 		break;
@@ -3048,6 +3096,7 @@ nce_resolv_failed(nce_t *nce)
 	char	buf[INET6_ADDRSTRLEN];
 	ip6_t *ip6h;
 	zoneid_t zoneid = GLOBAL_ZONEID;
+	ip_stack_t	*ipst = nce->nce_ill->ill_ipst;
 
 	ip1dbg(("nce_resolv_failed: dst %s\n",
 	    inet_ntop(AF_INET6, (char *)&nce->nce_addr, buf, sizeof (buf))));
@@ -3086,9 +3135,9 @@ nce_resolv_failed(nce_t *nce)
 		 * Ignore failure since icmp_unreachable_v6 will silently
 		 * drop packets with an unspecified source address.
 		 */
-		(void) ip_hdr_complete_v6((ip6_t *)mp->b_rptr, zoneid);
+		(void) ip_hdr_complete_v6((ip6_t *)mp->b_rptr, zoneid, ipst);
 		icmp_unreachable_v6(nce->nce_ill->ill_wq, first_mp,
-		    ICMP6_DST_UNREACH_ADDR, B_FALSE, B_FALSE, zoneid);
+		    ICMP6_DST_UNREACH_ADDR, B_FALSE, B_FALSE, zoneid, ipst);
 		mp = nxt_mp;
 	}
 }
@@ -3108,6 +3157,7 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 	uint16_t	new_flags = 0;
 	uint16_t	old_flags = 0;
 	int		inflags = lnr->lnr_flags;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(ill->ill_isv6);
 	if ((lnr->lnr_state_create != ND_REACHABLE) &&
@@ -3117,9 +3167,9 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 	sin6 = (sin6_t *)&lnr->lnr_addr;
 	addr = &sin6->sin6_addr;
 
-	mutex_enter(&ndp6.ndp_g_lock);
+	mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
 	/* We know it can not be mapping so just look in the hash table */
-	nce = *((nce_t **)NCE_HASH_PTR_V6(*addr));
+	nce = *((nce_t **)NCE_HASH_PTR_V6(ipst, *addr));
 	nce = nce_lookup_addr(ill, addr, nce);
 	if (nce != NULL)
 		new_flags = nce->nce_flags;
@@ -3132,7 +3182,7 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 		new_flags &= ~NCE_F_ISROUTER;
 		break;
 	case (NDF_ISROUTER_OFF|NDF_ISROUTER_ON):
-		mutex_exit(&ndp6.ndp_g_lock);
+		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		if (nce != NULL)
 			NCE_REFRELE(nce);
 		return (EINVAL);
@@ -3146,7 +3196,7 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 		new_flags &= ~NCE_F_ANYCAST;
 		break;
 	case (NDF_ANYCAST_OFF|NDF_ANYCAST_ON):
-		mutex_exit(&ndp6.ndp_g_lock);
+		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		if (nce != NULL)
 			NCE_REFRELE(nce);
 		return (EINVAL);
@@ -3160,7 +3210,7 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 		new_flags &= ~NCE_F_PROXY;
 		break;
 	case (NDF_PROXY_OFF|NDF_PROXY_ON):
-		mutex_exit(&ndp6.ndp_g_lock);
+		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		if (nce != NULL)
 			NCE_REFRELE(nce);
 		return (EINVAL);
@@ -3179,7 +3229,7 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 		    NULL,
 		    NULL);
 		if (err != 0) {
-			mutex_exit(&ndp6.ndp_g_lock);
+			mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 			ip1dbg(("ndp_sioc_update: Can't create NCE %d\n", err));
 			return (err);
 		}
@@ -3191,12 +3241,12 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 		 * XXX Just delete the entry, but we need to add too.
 		 */
 		nce->nce_flags &= ~NCE_F_ISROUTER;
-		mutex_exit(&ndp6.ndp_g_lock);
+		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		ndp_delete(nce);
 		NCE_REFRELE(nce);
 		return (0);
 	}
-	mutex_exit(&ndp6.ndp_g_lock);
+	mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 
 	mutex_enter(&nce->nce_lock);
 	nce->nce_flags = new_flags;
@@ -3661,6 +3711,7 @@ arp_resolv_failed(nce_t *nce)
 	char	buf[INET6_ADDRSTRLEN];
 	zoneid_t zoneid = GLOBAL_ZONEID;
 	struct in_addr ipv4addr;
+	ip_stack_t *ipst = nce->nce_ill->ill_ipst;
 
 	IN6_V4MAPPED_TO_INADDR(&nce->nce_addr, &ipv4addr);
 	ip3dbg(("arp_resolv_failed: dst %s\n",
@@ -3680,10 +3731,10 @@ arp_resolv_failed(nce_t *nce)
 		 * Send icmp unreachable messages
 		 * to the hosts.
 		 */
-		(void) ip_hdr_complete((ipha_t *)mp->b_rptr, zoneid);
+		(void) ip_hdr_complete((ipha_t *)mp->b_rptr, zoneid, ipst);
 		ip3dbg(("arp_resolv_failed: Calling icmp_unreachable\n"));
 		icmp_unreachable(nce->nce_ill->ill_wq, first_mp,
-		    ICMP_HOST_UNREACHABLE, zoneid);
+		    ICMP_HOST_UNREACHABLE, zoneid, ipst);
 		mp = nxt_mp;
 	}
 }
@@ -3697,9 +3748,10 @@ ndp_lookup_then_add_v4(ill_t *ill, uchar_t *hw_addr, const in_addr_t *addr,
 	int	err = 0;
 	nce_t	*nce;
 	in6_addr_t addr6;
+	ip_stack_t *ipst = ill->ill_ipst;
 
-	mutex_enter(&ndp4.ndp_g_lock);
-	nce = *((nce_t **)NCE_HASH_PTR_V4(*addr));
+	mutex_enter(&ipst->ips_ndp4->ndp_g_lock);
+	nce = *((nce_t **)NCE_HASH_PTR_V4(ipst, *addr));
 	IN6_IPADDR_TO_V4MAPPED(*addr, &addr6);
 	nce = nce_lookup_addr(ill, &addr6, nce);
 	if (nce == NULL) {
@@ -3718,14 +3770,14 @@ ndp_lookup_then_add_v4(ill_t *ill, uchar_t *hw_addr, const in_addr_t *addr,
 		*newnce = nce;
 		err = EEXIST;
 	}
-	mutex_exit(&ndp4.ndp_g_lock);
+	mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 	return (err);
 }
 
 /*
  * NDP Cache Entry creation routine for IPv4.
  * Mapped entries are handled in arp.
- * This routine must always be called with ndp4.ndp_g_lock held.
+ * This routine must always be called with ndp4->ndp_g_lock held.
  * Prior to return, nce_refcnt is incremented.
  */
 static int
@@ -3739,8 +3791,9 @@ ndp_add_v4(ill_t *ill, uchar_t *hw_addr, const in_addr_t *addr,
 	mblk_t		*mp;
 	mblk_t		*template;
 	nce_t		**ncep;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	ASSERT(MUTEX_HELD(&ndp4.ndp_g_lock));
+	ASSERT(MUTEX_HELD(&ipst->ips_ndp4->ndp_g_lock));
 	ASSERT(ill != NULL);
 	if ((flags & ~NCE_EXTERNAL_FLAGS_MASK)) {
 		return (EINVAL);
@@ -3805,7 +3858,7 @@ ndp_add_v4(ill_t *ill, uchar_t *hw_addr, const in_addr_t *addr,
 	/* This one is for nce getting created */
 	nce->nce_refcnt = 1;
 	mutex_init(&nce->nce_lock, NULL, MUTEX_DEFAULT, NULL);
-	ncep = ((nce_t **)NCE_HASH_PTR_V4(*addr));
+	ncep = ((nce_t **)NCE_HASH_PTR_V4(ipst, *addr));
 
 #ifdef NCE_DEBUG
 	bzero(nce->nce_trace, sizeof (th_trace_t *) * IP_TR_HASH_MAX);
@@ -3862,6 +3915,7 @@ nce_reinit(nce_t *nce)
 {
 	nce_t *newnce = NULL;
 	in_addr_t nce_addr, nce_mask;
+	ip_stack_t *ipst = nce->nce_ill->ill_ipst;
 
 	IN6_V4MAPPED_TO_IPADDR(&nce->nce_addr, nce_addr);
 	IN6_V4MAPPED_TO_IPADDR(&nce->nce_mask, nce_mask);
@@ -3873,10 +3927,10 @@ nce_reinit(nce_t *nce)
 	/*
 	 * create a new nce with the same addr and mask.
 	 */
-	mutex_enter(&ndp4.ndp_g_lock);
+	mutex_enter(&ipst->ips_ndp4->ndp_g_lock);
 	(void) ndp_add_v4(nce->nce_ill, NULL, &nce_addr, &nce_mask, NULL, 0, 0,
 	    ND_INITIAL, &newnce, NULL, NULL);
-	mutex_exit(&ndp4.ndp_g_lock);
+	mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 	/*
 	 * refrele the old nce.
 	 */
@@ -3941,16 +3995,17 @@ nce_delete_hw_changed(nce_t *nce, void *arg)
  * so that it can continue to look for hardware changes on that address.
  */
 boolean_t
-ndp_lookup_ipaddr(in_addr_t addr)
+ndp_lookup_ipaddr(in_addr_t addr, netstack_t *ns)
 {
 	nce_t		*nce;
 	struct in_addr	nceaddr;
+	ip_stack_t	*ipst = ns->netstack_ip;
 
 	if (addr == INADDR_ANY)
 		return (B_FALSE);
 
-	mutex_enter(&ndp4.ndp_g_lock);
-	nce = *(nce_t **)NCE_HASH_PTR_V4(addr);
+	mutex_enter(&ipst->ips_ndp4->ndp_g_lock);
+	nce = *(nce_t **)NCE_HASH_PTR_V4(ipst, addr);
 	for (; nce != NULL; nce = nce->nce_next) {
 		/* Note that only v4 mapped entries are in the table. */
 		IN6_V4MAPPED_TO_INADDR(&nce->nce_addr, &nceaddr);
@@ -3961,6 +4016,6 @@ ndp_lookup_ipaddr(in_addr_t addr)
 				break;
 		}
 	}
-	mutex_exit(&ndp4.ndp_g_lock);
+	mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 	return (nce != NULL);
 }

@@ -6,7 +6,7 @@
  * @(#)ip_frag.h	1.5 3/24/96
  * $Id: ip_frag.h,v 2.23.2.2 2005/06/10 18:02:37 darrenr Exp $
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,10 +32,11 @@ typedef	struct	ipfr	{
 	u_char	ipfr_tos;
 	u_32_t	ipfr_pass;
 	u_short	ipfr_off;
-	u_char	ipfr_ttl;
+	u_long	ipfr_ttl;
 	u_char	ipfr_seen0;
 	u_short ipfr_firstend;
 	frentry_t *ipfr_rule;
+	int	ipfr_ref;
 } ipfr_t;
 
 #define ipfr_src	ipfr_source.in4
@@ -57,12 +58,9 @@ typedef	struct	ipfrstat {
 #define	IPFR_CMPSZ	(offsetof(ipfr_t, ipfr_tos) - \
 			 offsetof(ipfr_t, ipfr_ifp))
 
-extern	int	ipfr_size;
-extern	int	fr_ipfrttl;
-extern	int	fr_frag_lock;
-extern	int	fr_fraginit __P((void));
-extern	void	fr_fragunload __P((void));
-extern	ipfrstat_t	*fr_fragstats __P((void));
+extern	int	fr_fraginit __P((ipf_stack_t *));
+extern	void	fr_fragunload __P((ipf_stack_t *));
+extern	ipfrstat_t	*fr_fragstats __P((ipf_stack_t *));
 
 extern	int	fr_newfrag __P((fr_info_t *, u_32_t));
 extern	frentry_t *fr_knownfrag __P((fr_info_t *, u_32_t *));
@@ -72,16 +70,19 @@ extern	nat_t	*fr_nat_knownfrag __P((fr_info_t *));
 
 extern	int	fr_ipid_newfrag __P((fr_info_t *, u_32_t));
 extern	u_32_t	fr_ipid_knownfrag __P((fr_info_t *));
+extern  void    fr_fragderef __P((ipfr_t **, ipfrwlock_t *, ipf_stack_t *));
 
-extern	void	fr_forget __P((void *));
-extern	void	fr_forgetnat __P((void *));
-extern	void	fr_fragclear __P((void));
-extern	void	fr_fragexpire __P((void));
+extern	void	fr_forget __P((void *, ipf_stack_t *));
+extern	void	fr_forgetnat __P((void *, ipf_stack_t *));
+extern	void	fr_fragclear __P((ipf_stack_t *));
+extern	void	fr_fragexpire __P((ipf_stack_t *));
+extern	int	fr_nextfrag __P((ipftoken_t *, ipfgeniter_t *, ipfr_t **, \
+				 ipfr_t ***, ipfrwlock_t *, ipf_stack_t *));
 
 #if     defined(_KERNEL) && ((BSD >= 199306) || SOLARIS || defined(__sgi) \
 	        || defined(__osf__) || (defined(__sgi) && (IRIX >= 60500)))
 # if defined(SOLARIS2) && (SOLARIS2 < 7)
-extern	void	fr_slowtimer __P((void));
+extern	void	fr_slowtimer __P((void *));
 # else
 extern	void	fr_slowtimer __P((void *));
 # endif
@@ -89,7 +90,7 @@ extern	void	fr_slowtimer __P((void *));
 # if defined(linux) && defined(_KERNEL)
 extern	void	fr_slowtimer __P((long));
 # else
-extern	int	fr_slowtimer __P((void));
+extern	int	fr_slowtimer __P((void *));
 # endif
 #endif
 

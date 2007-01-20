@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #include <sys/rwlock.h>
 #include <mdb/mdb_modapi.h>
 #include <sys/queue.h>
+#include <inet/ip.h>
 #include <sys/hook.h>
 #include <sys/hook_impl.h>
 
@@ -153,6 +154,7 @@ hookeventlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 int
 hookrootlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
+	struct hook_stack *hks;
 	hook_family_int_head_t hfh;
 	hook_family_int_t hf, *hfp;
 	char hrrstr[MAX_LENGTH];
@@ -160,8 +162,15 @@ hookrootlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argc)
 		return (DCMD_USAGE);
 
-	if (mdb_readvar(&hfh, "familylist") == -1) {
-		mdb_warn("couldn't read symbol 'familylist'");
+	if (mdb_vread((void *)&hks, sizeof (hks),
+	    (uintptr_t)(addr + OFFSETOF(netstack_t, netstack_hook))) == -1) {
+		mdb_warn("couldn't read netstack_hook");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_vread((void *)&hfh, sizeof (hfh), (uintptr_t)((uintptr_t)hks +
+	    OFFSETOF(hook_stack_t, hks_familylist))) == -1) {
+		mdb_warn("couldn't read hook family head");
 		return (DCMD_ERR);
 	}
 
@@ -192,7 +201,7 @@ hookrootlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 
 static int
-hookevent_walk_init(mdb_walk_state_t *wsp)
+hookevent_stack_walk_init(mdb_walk_state_t *wsp)
 {
 	hook_family_int_t hf;
 
@@ -212,7 +221,7 @@ hookevent_walk_init(mdb_walk_state_t *wsp)
 }
 
 static int
-hookevent_walk_step(mdb_walk_state_t *wsp)
+hookevent_stack_walk_step(mdb_walk_state_t *wsp)
 {
 	hook_event_int_t hr;
 
@@ -228,7 +237,6 @@ hookevent_walk_step(mdb_walk_state_t *wsp)
 		    wsp->walk_cbdata));
 }
 
-
 static const mdb_dcmd_t dcmds[] = {
 	{ "hookrootlist", "", "display hook family information", hookrootlist },
 	{ "hookeventlist", "", "display hook event information",
@@ -238,8 +246,8 @@ static const mdb_dcmd_t dcmds[] = {
 };
 
 static const mdb_walker_t walkers[] = {
-	{ "hookevent", "walk a list of hooks",
-		hookevent_walk_init, hookevent_walk_step, NULL },
+	{ "hookevent_stack", "walk list of hooks",
+		hookevent_stack_walk_init, hookevent_stack_walk_step, NULL },
 	{ NULL }
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -199,7 +199,7 @@ void
 ip_rts_change_v6(int type, const in6_addr_t *dst_addr,
     const in6_addr_t *gw_addr, const in6_addr_t *net_mask,
     const in6_addr_t *source, const in6_addr_t *author,
-    int flags, int error, int rtm_addrs)
+    int flags, int error, int rtm_addrs, ip_stack_t *ipst)
 {
 	rt_msghdr_t	*rtm;
 	mblk_t		*mp;
@@ -216,5 +216,5 @@ ip_rts_change_v6(int type, const in6_addr_t *dst_addr,
 	rtm->rtm_errno = error;
 	rtm->rtm_flags |= RTF_DONE;
 	rtm->rtm_addrs = rtm_addrs;
-	rts_queue_input(mp, NULL, AF_INET6);
+	rts_queue_input(mp, NULL, AF_INET6, ipst);
 }

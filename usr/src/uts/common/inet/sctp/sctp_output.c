@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,9 +86,6 @@
 #include "sctp_impl.h"
 
 static struct kmem_cache	*sctp_kmem_ftsn_set_cache;
-
-/* Padding mblk for SCTP chunks. */
-mblk_t *sctp_pad_mp;
 
 #ifdef	DEBUG
 static boolean_t	sctp_verify_chain(mblk_t *, mblk_t *);
@@ -327,14 +324,17 @@ sctp_chunkify(sctp_t *sctp, int first_len, int bytes_to_send)
 	sctp_faddr_t		*fp1;
 	size_t			xtralen;
 	sctp_msg_hdr_t		*msg_hdr;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	fp = SCTP_CHUNK_DEST(mdblk);
 	if (fp == NULL)
 		fp = sctp->sctp_current;
 	if (fp->isv4)
-		xtralen = sctp->sctp_hdr_len + sctp_wroff_xtra + sizeof (*sdc);
+		xtralen = sctp->sctp_hdr_len + sctps->sctps_wroff_xtra +
+		    sizeof (*sdc);
 	else
-		xtralen = sctp->sctp_hdr6_len + sctp_wroff_xtra + sizeof (*sdc);
+		xtralen = sctp->sctp_hdr6_len + sctps->sctps_wroff_xtra +
+		    sizeof (*sdc);
 	count = chunksize = first_len - sizeof (*sdc);
 nextmsg:
 	chunk_mp = mdblk->b_cont;
@@ -520,7 +520,7 @@ try_next:
 				xtralen = sctp->sctp_hdr_len;
 			else
 				xtralen = sctp->sctp_hdr6_len;
-			xtralen += sctp_wroff_xtra + sizeof (*sdc);
+			xtralen += sctps->sctps_wroff_xtra + sizeof (*sdc);
 			count = chunksize = fp1->sfa_pmss - sizeof (*sdc);
 			fp = fp1;
 		}
@@ -550,6 +550,7 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 	int hdrlen;
 	char *hdr;
 	int isv4 = fp->isv4;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (error != NULL)
 		*error = 0;
@@ -581,7 +582,7 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 	}
 	/* Copy in IP header. */
 	if ((mp->b_rptr - mp->b_datap->db_base) <
-	    (sctp_wroff_xtra + hdrlen + sacklen) || DB_REF(mp) > 2 ||
+	    (sctps->sctps_wroff_xtra + hdrlen + sacklen) || DB_REF(mp) > 2 ||
 	    !IS_P2ALIGNED(DB_BASE(mp), sizeof (ire_t *))) {
 		mblk_t *nmp;
 
@@ -590,14 +591,14 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 		 * data was moved into chunks, or during retransmission,
 		 * or things like snoop is running.
 		 */
-		nmp = allocb_cred(sctp_wroff_xtra + hdrlen + sacklen,
+		nmp = allocb_cred(sctps->sctps_wroff_xtra + hdrlen + sacklen,
 		    CONN_CRED(sctp->sctp_connp));
 		if (nmp == NULL) {
 			if (error !=  NULL)
 				*error = ENOMEM;
 			return (NULL);
 		}
-		nmp->b_rptr += sctp_wroff_xtra;
+		nmp->b_rptr += sctps->sctps_wroff_xtra;
 		nmp->b_wptr = nmp->b_rptr + hdrlen + sacklen;
 		nmp->b_cont = mp;
 		mp = nmp;
@@ -651,12 +652,12 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
  * the specified pad length.
  */
 static mblk_t *
-sctp_get_padding(int pad)
+sctp_get_padding(int pad, sctp_stack_t *sctps)
 {
 	mblk_t *fill;
 
 	ASSERT(pad < SCTP_ALIGN);
-	if ((fill = dupb(sctp_pad_mp)) != NULL) {
+	if ((fill = dupb(sctps->sctps_pad_mp)) != NULL) {
 		fill->b_wptr += pad;
 		return (fill);
 	}
@@ -689,6 +690,7 @@ sctp_find_fast_rexmit_mblks(sctp_t *sctp, int *total, sctp_faddr_t **fp)
 	sctp_msg_hdr_t	*msg_hdr;
 	sctp_faddr_t	*old_fp = NULL;
 	sctp_faddr_t	*chunk_fp;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	for (meta = sctp->sctp_xmit_head; meta != NULL; meta = meta->b_next) {
 		msg_hdr = (sctp_msg_hdr_t *)meta->b_rptr;
@@ -738,14 +740,14 @@ sctp_find_fast_rexmit_mblks(sctp_t *sctp, int *total, sctp_faddr_t **fp)
 				if ((nmp = dupmsg(mp)) == NULL)
 					return (start_mp);
 				if (extra > 0) {
-					fill = sctp_get_padding(extra);
+					fill = sctp_get_padding(extra, sctps);
 					if (fill != NULL) {
 						linkb(nmp, fill);
 					} else {
 						return (start_mp);
 					}
 				}
-				BUMP_MIB(&sctp_mib, sctpOutFastRetrans);
+				BUMP_MIB(&sctps->sctps_mib, sctpOutFastRetrans);
 				BUMP_LOCAL(sctp->sctp_rxtchunks);
 				SCTP_CHUNK_CLEAR_REXMIT(mp);
 				if (start_mp == NULL) {
@@ -941,16 +943,17 @@ sctp_fast_rexmit(sctp_t *sctp)
 	mblk_t		*mp, *head;
 	int		pktlen = 0;
 	sctp_faddr_t	*fp = NULL;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	ASSERT(sctp->sctp_xmit_head != NULL);
 	mp = sctp_find_fast_rexmit_mblks(sctp, &pktlen, &fp);
 	if (mp == NULL) {
-		SCTP_KSTAT(sctp_fr_not_found);
+		SCTP_KSTAT(sctps, sctp_fr_not_found);
 		return;
 	}
 	if ((head = sctp_add_proto_hdr(sctp, fp, mp, 0, NULL)) == NULL) {
 		freemsg(mp);
-		SCTP_KSTAT(sctp_fr_add_hdr);
+		SCTP_KSTAT(sctps, sctp_fr_add_hdr);
 		return;
 	}
 	if ((pktlen > fp->sfa_pmss) && fp->isv4) {
@@ -986,6 +989,7 @@ sctp_output(sctp_t *sctp)
 	sctp_data_hdr_t		*sdc;
 	int			error;
 	boolean_t		notsent = B_TRUE;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (sctp->sctp_ftsn == sctp->sctp_lastacked + 1) {
 		sacklen = 0;
@@ -1089,7 +1093,7 @@ sctp_output(sctp_t *sctp)
 					    fp, chunklen, meta);
 				}
 				freemsg(nmp);
-				SCTP_KSTAT(sctp_output_failed);
+				SCTP_KSTAT(sctps, sctp_output_failed);
 				goto unsent_data;
 			}
 			seglen += sacklen;
@@ -1104,7 +1108,7 @@ sctp_output(sctp_t *sctp)
 			 * a while, do slow start again.
 			 */
 			if (now - fp->lastactive > fp->rto) {
-				fp->cwnd = sctp_slow_start_after_idle *
+				fp->cwnd = sctps->sctps_slow_start_after_idle *
 				    fp->sfa_pmss;
 			}
 
@@ -1135,7 +1139,7 @@ sctp_output(sctp_t *sctp)
 					    fp, chunklen, meta);
 				}
 				freemsg(nmp);
-				SCTP_KSTAT(sctp_output_failed);
+				SCTP_KSTAT(sctps, sctp_output_failed);
 				goto unsent_data;
 			}
 		}
@@ -1152,7 +1156,7 @@ sctp_output(sctp_t *sctp)
 			ASSERT(sctp->sctp_rtt_tsn == ntohl(sdc->sdh_tsn));
 		}
 		if (extra > 0) {
-			fill = sctp_get_padding(extra);
+			fill = sctp_get_padding(extra, sctps);
 			if (fill != NULL) {
 				linkb(head, fill);
 				pad = extra;
@@ -1201,7 +1205,7 @@ sctp_output(sctp_t *sctp)
 			if ((nmp = dupmsg(mp)) == NULL)
 				break;
 			if (extra > 0) {
-				fill = sctp_get_padding(extra);
+				fill = sctp_get_padding(extra, sctps);
 				if (fill != NULL) {
 					pad += extra;
 					new_len += extra;
@@ -1364,12 +1368,13 @@ sctp_make_ftsn_chunk(sctp_t *sctp, sctp_faddr_t *fp, sctp_ftsn_set_t *sets,
 	uint16_t		schlen;
 	size_t			xtralen;
 	ftsn_entry_t		*ftsn_entry;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	seglen += sizeof (sctp_chunk_hdr_t);
 	if (fp->isv4)
-		xtralen = sctp->sctp_hdr_len + sctp_wroff_xtra;
+		xtralen = sctp->sctp_hdr_len + sctps->sctps_wroff_xtra;
 	else
-		xtralen = sctp->sctp_hdr6_len + sctp_wroff_xtra;
+		xtralen = sctp->sctp_hdr6_len + sctps->sctps_wroff_xtra;
 	ftsn_mp = allocb_cred(xtralen + seglen, CONN_CRED(sctp->sctp_connp));
 	if (ftsn_mp == NULL)
 		return (NULL);
@@ -1425,6 +1430,7 @@ sctp_make_ftsns(sctp_t *sctp, mblk_t *meta, mblk_t *mp, mblk_t **nmp,
 	uint32_t	adv_pap = sctp->sctp_adv_pap;
 	uint32_t	unsent = 0;
 	boolean_t	ubit;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	*seglen = sizeof (uint32_t);
 
@@ -1483,7 +1489,7 @@ ftsn_done:
 	if (head == NULL) {
 		freemsg(*nmp);
 		*nmp = NULL;
-		SCTP_KSTAT(sctp_send_ftsn_failed);
+		SCTP_KSTAT(sctps, sctp_send_ftsn_failed);
 		return;
 	}
 	*seglen += sacklen;
@@ -1638,6 +1644,7 @@ sctp_rexmit(sctp_t *sctp, sctp_faddr_t *oldfp)
 	uint32_t	first_ua_tsn;
 	sctp_msg_hdr_t	*mhdr;
 	uint32_t	tot_wnd;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	while (meta != NULL) {
 		for (mp = meta->b_cont; mp != NULL; mp = mp->b_next) {
@@ -1722,7 +1729,7 @@ window_probe:
 		sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn - 1;
 		ASSERT(sctp->sctp_rxt_maxtsn >= sctp->sctp_rxt_nxttsn);
 		sctp->sctp_zero_win_probe = B_TRUE;
-		BUMP_MIB(&sctp_mib, sctpOutWinProbe);
+		BUMP_MIB(&sctps->sctps_mib, sctpOutWinProbe);
 	}
 	return;
 out:
@@ -1747,7 +1754,7 @@ out:
 			sctp_set_iplen(sctp, pkt);
 			sctp_add_sendq(sctp, pkt);
 		} else {
-			SCTP_KSTAT(sctp_ss_rexmit_failed);
+			SCTP_KSTAT(sctps, sctp_ss_rexmit_failed);
 		}
 		oldfp->strikes++;
 		sctp->sctp_strikes++;
@@ -1755,7 +1762,7 @@ out:
 		if (oldfp != fp && oldfp->suna != 0)
 			SCTP_FADDR_TIMER_RESTART(sctp, oldfp, fp->rto);
 		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
-		BUMP_MIB(&sctp_mib, sctpOutWinProbe);
+		BUMP_MIB(&sctps->sctps_mib, sctpOutWinProbe);
 		return;
 	}
 
@@ -1844,7 +1851,7 @@ out:
 	if (nmp == NULL)
 		goto restart_timer;
 	if (extra > 0) {
-		fill = sctp_get_padding(extra);
+		fill = sctp_get_padding(extra, sctps);
 		if (fill != NULL) {
 			linkb(nmp, fill);
 			seglen += extra;
@@ -1857,7 +1864,7 @@ out:
 	head = sctp_add_proto_hdr(sctp, fp, nmp, sacklen, NULL);
 	if (head == NULL) {
 		freemsg(nmp);
-		SCTP_KSTAT(sctp_rexmit_failed);
+		SCTP_KSTAT(sctps, sctp_rexmit_failed);
 		goto restart_timer;
 	}
 	seglen += sacklen;
@@ -1921,7 +1928,7 @@ try_bundle:
 			break;
 
 		if (extra > 0) {
-			fill = sctp_get_padding(extra);
+			fill = sctp_get_padding(extra, sctps);
 			if (fill != NULL) {
 				linkb(nmp, fill);
 			} else {
@@ -2059,6 +2066,7 @@ sctp_rexmit_packet(sctp_t *sctp, mblk_t **meta, mblk_t **mp, sctp_faddr_t *fp,
 	mblk_t		*fill;
 	sctp_data_hdr_t	*sdc;
 	sctp_msg_hdr_t	*mhdr;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	sdc = (sctp_data_hdr_t *)(*mp)->b_rptr;
 	seglen = ntohs(sdc->sdh_len);
@@ -2070,7 +2078,7 @@ sctp_rexmit_packet(sctp_t *sctp, mblk_t **meta, mblk_t **mp, sctp_faddr_t *fp,
 	if (nmp == NULL)
 		return (NULL);
 	if (extra > 0) {
-		fill = sctp_get_padding(extra);
+		fill = sctp_get_padding(extra, sctps);
 		if (fill != NULL) {
 			linkb(nmp, fill);
 			seglen += extra;
@@ -2143,7 +2151,7 @@ try_bundle:
 			break;
 
 		if (extra > 0) {
-			fill = sctp_get_padding(extra);
+			fill = sctp_get_padding(extra, sctps);
 			if (fill != NULL) {
 				linkb(nmp, fill);
 			} else {
@@ -2190,6 +2198,7 @@ sctp_ss_rexmit(sctp_t *sctp)
 	uint32_t	tot_wnd;
 	sctp_data_hdr_t	*sdc;
 	int		burst;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	ASSERT(!sctp->sctp_zero_win_probe);
 
@@ -2248,7 +2257,7 @@ found_msg:
 		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
 	pkt = sctp_rexmit_packet(sctp, &meta, &mp, fp, &pkt_len);
 	if (pkt == NULL) {
-		SCTP_KSTAT(sctp_ss_rexmit_failed);
+		SCTP_KSTAT(sctps, sctp_ss_rexmit_failed);
 		return;
 	}
 	if ((pkt_len > fp->sfa_pmss) && fp->isv4) {
@@ -2274,7 +2283,7 @@ found_msg:
 		return;
 
 	/* Retransmit another packet if the window allows. */
-	for (tot_wnd -= pkt_len, burst = sctp_maxburst - 1;
+	for (tot_wnd -= pkt_len, burst = sctps->sctps_maxburst - 1;
 	    meta != NULL && burst > 0; meta = meta->b_next, burst--) {
 		if (mp == NULL)
 			mp = meta->b_cont;

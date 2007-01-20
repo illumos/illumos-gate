@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,7 @@ struct file;
 #include <net/if.h>
 #include <netinet/in.h>
 
+#include "netinet/ipf_stack.h"
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
 #include "netinet/ip_pool.h"
@@ -89,9 +90,6 @@ static const char rcsid[] = "@(#)$Id: ip_pool.c,v 2.55.2.14 2005/06/12 07:18:26 
 
 #ifdef IPFILTER_LOOKUP
 
-ip_pool_stat_t ipoolstat;
-ipfrwlock_t ip_poolrw;
-
 /*
  * Binary tree routines from Sedgewick and enhanced to do ranges of addresses.
  * NOTE: Insertion *MUST* be from greatest range to least for it to work!
@@ -109,9 +107,6 @@ ipfrwlock_t ip_poolrw;
  * not make it worthwhile not using radix trees.  For now the radix tree from
  * 4.4 BSD is used, but this is not viewed as a long term solution.
  */
-ip_pool_t *ip_pool_list[IPL_LOGSIZE] = { NULL, NULL, NULL, NULL,
-					 NULL, NULL, NULL, NULL };
-
 
 #ifdef TEST_POOL
 void treeprint __P((ip_pool_t *));
@@ -126,8 +121,8 @@ main(argc, argv)
 	ip_pool_t *ipo;
 	i6addr_t ip;
 
-	RWLOCK_INIT(&ip_poolrw, "poolrw");
-	ip_pool_init();
+	RWLOCK_INIT(&ifs->ifs_ip_poolrw, "poolrw");
+	ip_pool_init(ifs);
 
 	bzero((char *)&a, sizeof(a));
 	bzero((char *)&b, sizeof(b));
@@ -135,82 +130,82 @@ main(argc, argv)
 	bzero((char *)&op, sizeof(op));
 	strcpy(op.iplo_name, "0");
 
-	if (ip_pool_create(&op) == 0)
-		ipo = ip_pool_find(0, "0");
+	if (ip_pool_create(&op, ifs) == 0)
+		ipo = ip_pool_find(0, "0", ifs);
 
 	a.adf_addr.in4.s_addr = 0x0a010203;
 	b.adf_addr.in4.s_addr = 0xffffffff;
-	ip_pool_insert(ipo, &a, &b, 1);
-	ip_pool_insert(ipo, &a, &b, 1);
+	ip_pool_insert(ipo, &a, &b, 1, ifs);
+	ip_pool_insert(ipo, &a, &b, 1, ifs);
 
 	a.adf_addr.in4.s_addr = 0x0a000000;
 	b.adf_addr.in4.s_addr = 0xff000000;
-	ip_pool_insert(ipo, &a, &b, 0);
-	ip_pool_insert(ipo, &a, &b, 0);
+	ip_pool_insert(ipo, &a, &b, 0, ifs);
+	ip_pool_insert(ipo, &a, &b, 0, ifs);
 
 	a.adf_addr.in4.s_addr = 0x0a010100;
 	b.adf_addr.in4.s_addr = 0xffffff00;
-	ip_pool_insert(ipo, &a, &b, 1);
-	ip_pool_insert(ipo, &a, &b, 1);
+	ip_pool_insert(ipo, &a, &b, 1, ifs);
+	ip_pool_insert(ipo, &a, &b, 1, ifs);
 
 	a.adf_addr.in4.s_addr = 0x0a010200;
 	b.adf_addr.in4.s_addr = 0xffffff00;
-	ip_pool_insert(ipo, &a, &b, 0);
-	ip_pool_insert(ipo, &a, &b, 0);
+	ip_pool_insert(ipo, &a, &b, 0, ifs);
+	ip_pool_insert(ipo, &a, &b, 0, ifs);
 
 	a.adf_addr.in4.s_addr = 0x0a010000;
 	b.adf_addr.in4.s_addr = 0xffff0000;
-	ip_pool_insert(ipo, &a, &b, 1);
-	ip_pool_insert(ipo, &a, &b, 1);
+	ip_pool_insert(ipo, &a, &b, 1, ifs);
+	ip_pool_insert(ipo, &a, &b, 1, ifs);
 
 	a.adf_addr.in4.s_addr = 0x0a01020f;
 	b.adf_addr.in4.s_addr = 0xffffffff;
-	ip_pool_insert(ipo, &a, &b, 1);
-	ip_pool_insert(ipo, &a, &b, 1);
+	ip_pool_insert(ipo, &a, &b, 1, ifs);
+	ip_pool_insert(ipo, &a, &b, 1, ifs);
 #ifdef	DEBUG_POOL
 treeprint(ipo);
 #endif
 	ip.in4.s_addr = 0x0a00aabb;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip));
+		ip_pool_search(ipo, 4, &ip, ifs));
 
 	ip.in4.s_addr = 0x0a000001;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip));
+		ip_pool_search(ipo, 4, &ip, ifs));
 
 	ip.in4.s_addr = 0x0a000101;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip));
+		ip_pool_search(ipo, 4, &ip, ifs));
 
 	ip.in4.s_addr = 0x0a010001;
 	printf("search(%#x) = %d (1)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip));
+		ip_pool_search(ipo, 4, &ip, ifs));
 
 	ip.in4.s_addr = 0x0a010101;
 	printf("search(%#x) = %d (1)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip));
+		ip_pool_search(ipo, 4, &ip, ifs));
 
 	ip.in4.s_addr = 0x0a010201;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip));
+		ip_pool_search(ipo, 4, &ip, ifs));
 
 	ip.in4.s_addr = 0x0a010203;
 	printf("search(%#x) = %d (1)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip));
+		ip_pool_search(ipo, 4, &ip, ifs));
 
 	ip.in4.s_addr = 0x0a01020f;
 	printf("search(%#x) = %d (1)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip));
+		ip_pool_search(ipo, 4, &ip, ifs));
 
 	ip.in4.s_addr = 0x0b00aabb;
 	printf("search(%#x) = %d (-1)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip));
+		ip_pool_search(ipo, 4, &ip, ifs));
 
 #ifdef	DEBUG_POOL
 treeprint(ipo);
 #endif
 
-	ip_pool_fini();
+	ip_pool_fini(ifs);
 
 	return 0;
 }
@@ -237,10 +232,11 @@ ip_pool_t *ipo;
 /*                                                                          */
 /* Initialise the routing table data structures where required.             */
 /* ------------------------------------------------------------------------ */
-int ip_pool_init()
+int ip_pool_init(ifs)
+ipf_stack_t *ifs;
 {
 
-	bzero((char *)&ipoolstat, sizeof(ipoolstat));
+	bzero(&ifs->ifs_ipoolstat, sizeof (ip_pool_stat_t));
 
 #if !defined(_KERNEL) || ((BSD < 199306) && (SOLARIS2 < 10))
 	rn_init();
@@ -258,21 +254,22 @@ int ip_pool_init()
 /* function for the radix tree that supports the pools. ip_pool_destroy() is*/
 /* used to delete the pools one by one to ensure they're properly freed up. */
 /* ------------------------------------------------------------------------ */
-void ip_pool_fini()
+void ip_pool_fini(ifs)
+ipf_stack_t *ifs;
 {
 	ip_pool_t *p, *q;
 	iplookupop_t op;
 	int i;
 
-	ASSERT(rw_read_locked(&ipf_global.ipf_lk) == 0);
+	ASSERT(rw_read_locked(&ifs->ifs_ipf_global.ipf_lk) == 0);
 
 	for (i = 0; i <= IPL_LOGMAX; i++) {
-		for (q = ip_pool_list[i]; (p = q) != NULL; ) {
+		for (q = ifs->ifs_ip_pool_list[i]; (p = q) != NULL; ) {
 			op.iplo_unit = i;
 			(void)strncpy(op.iplo_name, p->ipo_name,
 				sizeof(op.iplo_name));
 			q = p->ipo_next;
-			(void) ip_pool_destroy(&op);
+			(void) ip_pool_destroy(&op, ifs);
 		}
 	}
 
@@ -290,26 +287,27 @@ void ip_pool_fini()
 /* Copy the current statistics out into user space, collecting pool list    */
 /* pointers as appropriate for later use.                                   */
 /* ------------------------------------------------------------------------ */
-int ip_pool_statistics(op)
+int ip_pool_statistics(op, ifs)
 iplookupop_t *op;
+ipf_stack_t *ifs;
 {
 	ip_pool_stat_t stats;
 	int unit, i, err = 0;
 
-	if (op->iplo_size != sizeof(ipoolstat))
+	if (op->iplo_size != sizeof(ip_pool_stat_t))
 		return EINVAL;
 
-	bcopy((char *)&ipoolstat, (char *)&stats, sizeof(stats));
+	bcopy((char *)&ifs->ifs_ipoolstat, (char *)&stats, sizeof(stats));
 	unit = op->iplo_unit;
 	if (unit == IPL_LOGALL) {
 		for (i = 0; i < IPL_LOGSIZE; i++)
-			stats.ipls_list[i] = ip_pool_list[i];
+			stats.ipls_list[i] = ifs->ifs_ip_pool_list[i];
 	} else if (unit >= 0 && unit < IPL_LOGSIZE) {
 		if (op->iplo_name[0] != '\0')
 			stats.ipls_list[unit] = ip_pool_find(unit,
-							     op->iplo_name);
+							     op->iplo_name, ifs);
 		else
-			stats.ipls_list[unit] = ip_pool_list[unit];
+			stats.ipls_list[unit] = ifs->ifs_ip_pool_list[unit];
 	} else
 		err = EINVAL;
 	if (err == 0)
@@ -327,13 +325,14 @@ iplookupop_t *op;
 /* Find a matching pool inside the collection of pools for a particular     */
 /* device, indicated by the unit number.                                    */
 /* ------------------------------------------------------------------------ */
-void *ip_pool_find(unit, name)
+void *ip_pool_find(unit, name, ifs)
 int unit;
 char *name;
+ipf_stack_t *ifs;
 {
 	ip_pool_t *p;
 
-	for (p = ip_pool_list[unit]; p != NULL; p = p->ipo_next)
+	for (p = ifs->ifs_ip_pool_list[unit]; p != NULL; p = p->ipo_next)
 		if (strncmp(p->ipo_name, name, sizeof(p->ipo_name)) == 0)
 			break;
 	return p;
@@ -372,10 +371,11 @@ addrfamily_t *addr, *mask;
 /*                                                                          */
 /* Search the pool for a given address and return a search result.          */
 /* ------------------------------------------------------------------------ */
-int ip_pool_search(tptr, version, dptr)
+int ip_pool_search(tptr, version, dptr, ifs)
 void *tptr;
 int version;
 void *dptr;
+ipf_stack_t *ifs;
 {
 	struct radix_node *rn;
 	ip_pool_node_t *m;
@@ -405,7 +405,7 @@ void *dptr;
 	} else
 		return -1;
 
-	READ_ENTER(&ip_poolrw);
+	READ_ENTER(&ifs->ifs_ip_poolrw);
 
 	rn = ipo->ipo_head->rnh_matchaddr(&v, ipo->ipo_head);
 
@@ -415,7 +415,7 @@ void *dptr;
 		m->ipn_hits++;
 		rv = m->ipn_info;
 	}
-	RWLOCK_EXIT(&ip_poolrw);
+	RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 	return rv;
 }
 
@@ -432,15 +432,16 @@ void *dptr;
 /* Add another node to the pool given by ipo.  The three parameters passed  */
 /* in (addr, mask, info) shold all be stored in the node.                   */
 /* ------------------------------------------------------------------------ */
-int ip_pool_insert(ipo, addr, mask, info)
+int ip_pool_insert(ipo, addr, mask, info, ifs)
 ip_pool_t *ipo;
 addrfamily_t *addr, *mask;
 int info;
+ipf_stack_t *ifs;
 {
 	struct radix_node *rn;
 	ip_pool_node_t *x;
 
-	ASSERT(rw_read_locked(&ip_poolrw.ipf_lk) == 0);
+	ASSERT(rw_read_locked(&ifs->ifs_ip_poolrw.ipf_lk) == 0);
 
 	KMALLOC(x, ip_pool_node_t *);
 	if (x == NULL) {
@@ -468,13 +469,14 @@ int info;
 		return ENOMEM;
 	}
 
+	x->ipn_ref = 1;
 	x->ipn_next = ipo->ipo_list;
 	x->ipn_pnext = &ipo->ipo_list;
 	if (ipo->ipo_list != NULL)
 		ipo->ipo_list->ipn_pnext = &x->ipn_next;
 	ipo->ipo_list = x;
 
-	ipoolstat.ipls_nodes++;
+	ifs->ifs_ipoolstat.ipls_nodes++;
 
 	return 0;
 }
@@ -492,14 +494,15 @@ int info;
 /* marked as being anonymous, give it a new, unique, identifier.  Call any  */
 /* other functions required to initialise the structure.                    */
 /* ------------------------------------------------------------------------ */
-int ip_pool_create(op)
+int ip_pool_create(op, ifs)
 iplookupop_t *op;
+ipf_stack_t *ifs;
 {
 	char name[FR_GROUPLEN];
 	int poolnum, unit;
 	ip_pool_t *h;
 
-	ASSERT(rw_read_locked(&ip_poolrw.ipf_lk) == 0);
+	ASSERT(rw_read_locked(&ifs->ifs_ip_poolrw.ipf_lk) == 0);
 
 	KMALLOC(h, ip_pool_t *);
 	if (h == NULL)
@@ -525,7 +528,7 @@ iplookupop_t *op;
 		(void)sprintf(name, "%x", poolnum);
 #endif
 
-		for (p = ip_pool_list[unit]; p != NULL; ) {
+		for (p = ifs->ifs_ip_pool_list[unit]; p != NULL; ) {
 			if (strncmp(name, p->ipo_name,
 				    sizeof(p->ipo_name)) == 0) {
 				poolnum++;
@@ -534,7 +537,7 @@ iplookupop_t *op;
 #else
 				(void)sprintf(name, "%x", poolnum);
 #endif
-				p = ip_pool_list[unit];
+				p = ifs->ifs_ip_pool_list[unit];
 			} else
 				p = p->ipo_next;
 		}
@@ -547,13 +550,13 @@ iplookupop_t *op;
 	h->ipo_ref = 1;
 	h->ipo_list = NULL;
 	h->ipo_unit = unit;
-	h->ipo_next = ip_pool_list[unit];
-	if (ip_pool_list[unit] != NULL)
-		ip_pool_list[unit]->ipo_pnext = &h->ipo_next;
-	h->ipo_pnext = &ip_pool_list[unit];
-	ip_pool_list[unit] = h;
+	h->ipo_next = ifs->ifs_ip_pool_list[unit];
+	if (ifs->ifs_ip_pool_list[unit] != NULL)
+		ifs->ifs_ip_pool_list[unit]->ipo_pnext = &h->ipo_next;
+	h->ipo_pnext = &ifs->ifs_ip_pool_list[unit];
+	ifs->ifs_ip_pool_list[unit] = h;
 
-	ipoolstat.ipls_pools++;
+	ifs->ifs_ipoolstat.ipls_pools++;
 
 	return 0;
 }
@@ -569,13 +572,14 @@ iplookupop_t *op;
 /* Add another node to the pool given by ipo.  The three parameters passed  */
 /* in (addr, mask, info) shold all be stored in the node.                   */
 /* ------------------------------------------------------------------------ */
-int ip_pool_remove(ipo, ipe)
+int ip_pool_remove(ipo, ipe, ifs)
 ip_pool_t *ipo;
 ip_pool_node_t *ipe;
+ipf_stack_t *ifs;
 {
 	ip_pool_node_t **ipp, *n;
 
-	ASSERT(rw_read_locked(&ip_poolrw.ipf_lk) == 0);
+	ASSERT(rw_read_locked(&ifs->ifs_ip_poolrw.ipf_lk) == 0);
 
 	for (ipp = &ipo->ipo_list; (n = *ipp) != NULL; ipp = &n->ipn_next) {
 		if (ipe == n) {
@@ -593,7 +597,7 @@ ip_pool_node_t *ipe;
 				   ipo->ipo_head);
 	KFREE(n);
 
-	ipoolstat.ipls_nodes--;
+	ifs->ifs_ipoolstat.ipls_nodes--;	
 
 	return 0;
 }
@@ -612,19 +616,20 @@ ip_pool_node_t *ipe;
 /* may not be initialised, we can't use an ASSERT to enforce the locking    */
 /* assertion that one of the two (ip_poolrw,ipf_global) is held.            */
 /* ------------------------------------------------------------------------ */
-int ip_pool_destroy(op)
+int ip_pool_destroy(op, ifs)
 iplookupop_t *op;
+ipf_stack_t *ifs;
 {
 	ip_pool_t *ipo;
 
-	ipo = ip_pool_find(op->iplo_unit, op->iplo_name);
+	ipo = ip_pool_find(op->iplo_unit, op->iplo_name, ifs);
 	if (ipo == NULL)
 		return ESRCH;
 
 	if (ipo->ipo_ref != 1)
 		return EBUSY;
 
-	ip_pool_free(ipo);
+	ip_pool_free(ipo, ifs);
 	return 0;
 }
 
@@ -642,8 +647,9 @@ iplookupop_t *op;
 /* may not be initialised, we can't use an ASSERT to enforce the locking    */
 /* assertion that one of the two (ip_poolrw,ipf_global) is held.            */
 /* ------------------------------------------------------------------------ */
-int ip_pool_flush(fp)
+int ip_pool_flush(fp, ifs)
 iplookupflush_t *fp;
+ipf_stack_t *ifs;
 {
 	int i, num = 0, unit, err;
 	ip_pool_t *p, *q;
@@ -654,12 +660,12 @@ iplookupflush_t *fp;
 	for (i = 0; i <= IPL_LOGMAX; i++) {
 		if (unit != IPLT_ALL && i != unit)
 			continue;
-		for (q = ip_pool_list[i]; (p = q) != NULL; ) {
+		for (q = ifs->ifs_ip_pool_list[i]; (p = q) != NULL; ) {
 			op.iplo_unit = i;
 			(void)strncpy(op.iplo_name, p->ipo_name,
 				sizeof(op.iplo_name));
 			q = p->ipo_next;
-			err = ip_pool_destroy(&op);
+			err = ip_pool_destroy(&op, ifs);
 			if (err == 0)
 				num++;
 			else
@@ -684,8 +690,9 @@ iplookupflush_t *fp;
 /* may not be initialised, we can't use an ASSERT to enforce the locking    */
 /* assertion that one of the two (ip_poolrw,ipf_global) is held.            */
 /* ------------------------------------------------------------------------ */
-void ip_pool_free(ipo)
+void ip_pool_free(ipo, ifs)
 ip_pool_t *ipo;
+ipf_stack_t *ifs;
 {
 	ip_pool_node_t *n;
 
@@ -699,7 +706,7 @@ ip_pool_t *ipo;
 
 		KFREE(n);
 
-		ipoolstat.ipls_nodes--;
+		ifs->ifs_ipoolstat.ipls_nodes--;
 	}
 
 	ipo->ipo_list = NULL;
@@ -709,7 +716,7 @@ ip_pool_t *ipo;
 	rn_freehead(ipo->ipo_head);
 	KFREE(ipo);
 
-	ipoolstat.ipls_pools--;
+	ifs->ifs_ipoolstat.ipls_pools--;
 }
 
 
@@ -722,29 +729,182 @@ ip_pool_t *ipo;
 /* Drop the number of known references to this pool structure by one and if */
 /* we arrive at zero known references, free it.                             */
 /* ------------------------------------------------------------------------ */
-void ip_pool_deref(ipo)
+void ip_pool_deref(ipo, ifs)
 ip_pool_t *ipo;
+ipf_stack_t *ifs;
 {
 
-	ASSERT(rw_read_locked(&ip_poolrw.ipf_lk) == 0);
+	ASSERT(rw_read_locked(&ifs->ifs_ip_poolrw.ipf_lk) == 0);
 
 	ipo->ipo_ref--;
 	if (ipo->ipo_ref == 0)
-		ip_pool_free(ipo);
+		ip_pool_free(ipo, ifs);
+}
+
+
+
+void ip_pool_node_deref(ipn, ifs)
+ip_pool_node_t *ipn;
+ipf_stack_t *ifs;
+{
+
+	ipn->ipn_ref--;
+
+	if (ipn->ipn_ref == 0) {
+		KFREE(ipn);
+		ifs->ifs_ipoolstat.ipls_nodes--;
+	}
+}
+
+
+int ip_pool_getnext(token, ilp, ifs)
+ipftoken_t *token;
+ipflookupiter_t *ilp;
+ipf_stack_t *ifs;
+{
+	ip_pool_node_t *node, zn, *nextnode;
+	ip_pool_t *ipo, zp, *nextipo;
+	int err;
+
+	err = 0;
+	node = NULL;
+	nextnode = NULL;
+	ipo = NULL;
+	nextipo = NULL;
+
+	READ_ENTER(&ifs->ifs_ip_poolrw);
+
+	switch (ilp->ili_otype)
+	{
+	case IPFLOOKUPITER_LIST :
+		ipo = token->ipt_data;
+		if (ipo == NULL) {
+			nextipo = ifs->ifs_ip_pool_list[(int)ilp->ili_unit];
+		} else {
+			nextipo = ipo->ipo_next;
+		}
+
+		if (nextipo != NULL) {
+			if (nextipo->ipo_next == NULL)
+				token->ipt_alive = 0;
+			else {
+				ATOMIC_INC(nextipo->ipo_ref);
+			}
+		} else {
+			bzero((char *)&zp, sizeof(zp));
+			nextipo = &zp;
+		}
+		break;
+
+	case IPFLOOKUPITER_NODE :
+		node = token->ipt_data;
+		if (node == NULL) {
+			ipo = ip_pool_find(ilp->ili_unit, ilp->ili_name, ifs);
+			if (ipo == NULL)
+				err = ESRCH;
+			else {
+				nextnode = ipo->ipo_list;
+				ipo = NULL;
+			}
+		} else {
+			nextnode = node->ipn_next;
+		}
+
+		if (nextnode != NULL) {
+			if (nextnode->ipn_next == NULL)
+				token->ipt_alive = 0;
+			else {
+				ATOMIC_INC(nextnode->ipn_ref);
+			}
+		} else {
+			bzero((char *)&zn, sizeof(zn));
+			nextnode = &zn;
+		}
+		break;
+	default :
+		err = EINVAL;
+		break;
+	}
+
+	RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
+
+	if (err != 0)
+		return err;
+
+	switch (ilp->ili_otype)
+	{
+	case IPFLOOKUPITER_LIST :
+		if (ipo != NULL) {
+			WRITE_ENTER(&ifs->ifs_ip_poolrw);
+			ip_pool_deref(ipo, ifs);
+			RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
+		}
+		token->ipt_data = nextipo;
+		err = COPYOUT(nextipo, ilp->ili_data, sizeof(*nextipo));
+		if (err != 0)
+			err = EFAULT;
+		break;
+
+	case IPFLOOKUPITER_NODE :
+		if (node != NULL) {
+			WRITE_ENTER(&ifs->ifs_ip_poolrw);
+			ip_pool_node_deref(node, ifs);
+			RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
+		}
+		token->ipt_data = nextnode;
+		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
+		if (err != 0)
+			err = EFAULT;
+		break;
+	}
+
+	return err;
+}
+
+
+void ip_pool_iterderef(otype, unit, data, ifs)
+u_int otype;
+int unit;
+void *data;
+ipf_stack_t *ifs;
+{
+
+	if (data == NULL)
+		return;
+
+	if (unit < 0 || unit > IPL_LOGMAX)
+		return;
+
+	switch (otype)
+	{
+	case IPFLOOKUPITER_LIST :
+		WRITE_ENTER(&ifs->ifs_ip_poolrw);
+		ip_pool_deref((ip_pool_t *)data, ifs);
+		RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
+		break;
+
+	case IPFLOOKUPITER_NODE :
+		WRITE_ENTER(&ifs->ifs_ip_poolrw);
+		ip_pool_node_deref((ip_pool_node_t *)data, ifs);
+		RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
+		break;
+	default :
+		break;
+	}
 }
 
 
 # if defined(_KERNEL) && ((BSD >= 198911) && !defined(__osf__) && \
       !defined(__hpux) && !defined(__sgi))
 static int
-rn_freenode(struct radix_node *n, void *p)
+rn_freenode(struct radix_node *n, void *p, ipf_stack_t *ifs)
 {
 	struct radix_node_head *rnh = p;
 	struct radix_node *d;
 
 	d = rnh->rnh_deladdr(n->rn_key, NULL, rnh);
 	if (d != NULL) {
-		FreeS(d, max_keylen + 2 * sizeof (*d));
+		FreeS(d, ifs->ifs_max_keylen + 2 * sizeof (*d));
 	}
 	return 0;
 }

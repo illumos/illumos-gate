@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,8 @@
 #include <sys/kstat.h>
 #include <sys/uio.h>
 #include <sys/proc.h>
+#include <sys/netstack.h>
+#include <sys/modhash.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -241,6 +243,7 @@ typedef struct stdata {
 	kcondvar_t	sd_qcv;		/* Waiters for qhead to become empty */
 	kcondvar_t	sd_zcopy_wait;
 	uint_t		sd_copyflag;	/* copy-related flags */
+	zoneid_t	sd_anchorzone;	/* Allow removal from same zone only */
 } stdata_t;
 
 /*
@@ -687,6 +690,7 @@ struct mux_edge {
 	struct mux_node	*me_nodep;	/* edge leads to this node */
 	struct mux_edge	*me_nextp;	/* next edge */
 	int		 me_muxid;	/* id of link */
+	dev_t		 me_dev;	/* dev_t - used for kernel PUNLINK */
 };
 
 /*
@@ -779,6 +783,20 @@ enum jcaccess {
 	JCSETP,			/* set ctty parameters */
 	JCGETP			/* get ctty parameters */
 };
+
+struct str_stack {
+	netstack_t	*ss_netstack;	/* Common netstack */
+
+	kmutex_t	ss_sad_lock;	/* autopush lock */
+	mod_hash_t	*ss_sad_hash;
+	size_t		ss_sad_hash_nchains;
+	struct saddev	*ss_saddev;	/* sad device array */
+	int		ss_sadcnt;	/* number of sad devices */
+
+	int		ss_devcnt;	/* number of mux_nodes */
+	struct mux_node	*ss_mux_nodes;	/* mux info for cycle checking */
+};
+typedef struct str_stack str_stack_t;
 
 /*
  * Finding related queues
@@ -1070,15 +1088,16 @@ extern int putiocd(mblk_t *, caddr_t, int, cred_t *);
 extern int getiocd(mblk_t *, caddr_t, int);
 extern struct linkinfo *alloclink(queue_t *, queue_t *, struct file *);
 extern void lbfree(struct linkinfo *);
-extern int linkcycle(stdata_t *, stdata_t *);
-extern struct linkinfo *findlinks(stdata_t *, int, int);
+extern int linkcycle(stdata_t *, stdata_t *, str_stack_t *);
+extern struct linkinfo *findlinks(stdata_t *, int, int, str_stack_t *);
 extern queue_t *getendq(queue_t *);
 extern int mlink(vnode_t *, int, int, cred_t *, int *, int);
 extern int mlink_file(vnode_t *, int, struct file *, cred_t *, int *, int);
-extern int munlink(struct stdata *, struct linkinfo *, int, cred_t *, int *);
-extern int munlinkall(struct stdata *, int, cred_t *, int *);
-extern void mux_addedge(stdata_t *, stdata_t *, int);
-extern void mux_rmvedge(stdata_t *, int);
+extern int munlink(struct stdata *, struct linkinfo *, int, cred_t *, int *,
+    str_stack_t *);
+extern int munlinkall(struct stdata *, int, cred_t *, int *, str_stack_t *);
+extern void mux_addedge(stdata_t *, stdata_t *, int, str_stack_t *);
+extern void mux_rmvedge(stdata_t *, int, str_stack_t *);
 extern int devflg_to_qflag(struct streamtab *, uint32_t, uint32_t *,
     uint32_t *);
 extern void setq(queue_t *, struct qinit *, struct qinit *, perdm_t *,

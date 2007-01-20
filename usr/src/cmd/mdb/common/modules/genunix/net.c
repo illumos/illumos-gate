@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,8 +51,6 @@
 #include <inet/rawip_impl.h>
 #include <inet/mi.h>
 
-#define	MIH2MIO(mihp) (&(mihp)->mh_o)
-
 #define	ADDR_V6_WIDTH	23
 #define	ADDR_V4_WIDTH	15
 
@@ -64,6 +62,104 @@
 #define	NETSTAT_UNIX	0x20
 
 #define	NETSTAT_FIRST	0x80000000u
+
+
+/* Walkers for various *_stack_t */
+int
+ar_stacks_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("netstack", wsp) == -1) {
+		mdb_warn("can't walk 'netstack'");
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+int
+ar_stacks_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t kaddr;
+	netstack_t nss;
+
+	if (mdb_vread(&nss, sizeof (nss), wsp->walk_addr) == -1) {
+		mdb_warn("can't read netstack at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	kaddr = (uintptr_t)nss.netstack_modules[NS_ARP];
+	return (wsp->walk_callback(kaddr, wsp->walk_layer, wsp->walk_cbdata));
+}
+
+int
+icmp_stacks_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("netstack", wsp) == -1) {
+		mdb_warn("can't walk 'netstack'");
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+int
+icmp_stacks_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t kaddr;
+	netstack_t nss;
+
+	if (mdb_vread(&nss, sizeof (nss), wsp->walk_addr) == -1) {
+		mdb_warn("can't read netstack at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	kaddr = (uintptr_t)nss.netstack_modules[NS_ICMP];
+	return (wsp->walk_callback(kaddr, wsp->walk_layer, wsp->walk_cbdata));
+}
+
+int
+tcp_stacks_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("netstack", wsp) == -1) {
+		mdb_warn("can't walk 'netstack'");
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+int
+tcp_stacks_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t kaddr;
+	netstack_t nss;
+
+	if (mdb_vread(&nss, sizeof (nss), wsp->walk_addr) == -1) {
+		mdb_warn("can't read netstack at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	kaddr = (uintptr_t)nss.netstack_modules[NS_TCP];
+	return (wsp->walk_callback(kaddr, wsp->walk_layer, wsp->walk_cbdata));
+}
+
+int
+udp_stacks_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("netstack", wsp) == -1) {
+		mdb_warn("can't walk 'netstack'");
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+int
+udp_stacks_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t kaddr;
+	netstack_t nss;
+
+	if (mdb_vread(&nss, sizeof (nss), wsp->walk_addr) == -1) {
+		mdb_warn("can't read netstack at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	kaddr = (uintptr_t)nss.netstack_modules[NS_UDP];
+	return (wsp->walk_callback(kaddr, wsp->walk_layer, wsp->walk_cbdata));
+}
 
 /*
  * Print an IPv4 address and port number in a compact and easy to read format
@@ -228,11 +324,14 @@ mi_walk_step(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	status = wsp->walk_callback(wsp->walk_addr, miop, wsp->walk_cbdata);
-
 	/* Only true in the first iteration */
-	if (wdp->mi_wd_miofirst == NULL)
+	if (wdp->mi_wd_miofirst == NULL) {
 		wdp->mi_wd_miofirst = wsp->walk_addr;
+		status = WALK_NEXT;
+	} else {
+		status = wsp->walk_callback(wsp->walk_addr + sizeof (MI_O),
+		    &miop[1], wsp->walk_cbdata);
+	}
 
 	wsp->walk_addr = (uintptr_t)miop->mi_o_next;
 	return (status);
@@ -244,21 +343,9 @@ mi_walk_fini(mdb_walk_state_t *wsp)
 	mdb_free(wsp->walk_data, sizeof (struct mi_walk_data));
 }
 
-typedef struct mi_payload_walk_data_s {
-	uintptr_t mi_pwd_first;
-	void *mi_pwd_data;
-} mi_payload_walk_data_t;
-
-static void
-delete_mi_payload_walk_data(mi_payload_walk_data_t *pwdp, size_t payload_size)
-{
-	mdb_free(pwdp->mi_pwd_data, payload_size);
-	mdb_free(pwdp, sizeof (mi_payload_walk_data_t));
-}
-
 typedef struct mi_payload_walk_arg_s {
-	const char *mi_pwa_obj;		/* load object of mi_o_head_t * */
-	const char *mi_pwa_sym;		/* symbol name of mi_o_head_t * */
+	const char *mi_pwa_walker;	/* Underlying walker */
+	const off_t mi_pwa_head_off;	/* Offset for mi_o_head_t * in stack */
 	const size_t mi_pwa_size;	/* size of mi payload */
 	const uint_t mi_pwa_flags;	/* device and/or module */
 } mi_payload_walk_arg_t;
@@ -270,45 +357,11 @@ int
 mi_payload_walk_init(mdb_walk_state_t *wsp)
 {
 	const mi_payload_walk_arg_t *arg = wsp->walk_arg;
-	mi_payload_walk_data_t *pwdp;
-	GElf_Sym sym;
-	mi_head_t *mihp;
 
-	/* Determine the address to start or end the walk with */
-	if (mdb_lookup_by_obj(arg->mi_pwa_obj, arg->mi_pwa_sym, &sym) == -1) {
-		mdb_warn("failed to lookup %s`%s",
-		    arg->mi_pwa_obj, arg->mi_pwa_sym);
+	if (mdb_layered_walk(arg->mi_pwa_walker, wsp) == -1) {
+		mdb_warn("can't walk '%s'", arg->mi_pwa_walker);
 		return (WALK_ERR);
 	}
-
-	if (mdb_vread(&mihp, sizeof (mihp), (uintptr_t)sym.st_value) == -1) {
-		mdb_warn("failed to read address of global MI Head "
-		    "mi_o_head_t at %p", (uintptr_t)sym.st_value);
-		return (WALK_ERR);
-	}
-
-	pwdp = mdb_alloc(sizeof (mi_payload_walk_data_t), UM_SLEEP);
-	pwdp->mi_pwd_data = mdb_alloc(arg->mi_pwa_size, UM_SLEEP);
-	wsp->walk_data = pwdp;
-
-	if (wsp->walk_addr == NULL) {
-		/* Do not immediately return WALK_DONE below */
-		pwdp->mi_pwd_first = NULL;
-		/* We determined where to begin */
-		wsp->walk_addr = (uintptr_t)MIH2MIO(mihp);
-	} else {
-		/* Do not cycle through all of the MI_O objects */
-		pwdp->mi_pwd_first = (uintptr_t)MIH2MIO(mihp);
-		/* We were given where to begin */
-		wsp->walk_addr = (uintptr_t)((MI_OP)wsp->walk_addr - 1);
-	}
-
-	if (mdb_layered_walk("genunix`mi", wsp) == -1) {
-		mdb_warn("failed to walk genunix`mi");
-		delete_mi_payload_walk_data(pwdp, arg->mi_pwa_size);
-		return (WALK_ERR);
-	}
-
 	return (WALK_NEXT);
 }
 
@@ -316,63 +369,43 @@ int
 mi_payload_walk_step(mdb_walk_state_t *wsp)
 {
 	const mi_payload_walk_arg_t *arg = wsp->walk_arg;
-	mi_payload_walk_data_t *pwdp = wsp->walk_data;
-	void *payload = pwdp->mi_pwd_data;
-	uintptr_t payload_kaddr = (uintptr_t)((MI_OP)wsp->walk_addr + 1);
-	const MI_O *mio = wsp->walk_layer;
+	uintptr_t kaddr;
 
-	/* If this is a local walk, prevent cycling */
-	if (wsp->walk_addr == pwdp->mi_pwd_first)
-		return (WALK_DONE);
+	kaddr = wsp->walk_addr + arg->mi_pwa_head_off;
 
-	/*
-	 * This was a global walk, prevent reading this payload as the
-	 * initial MI_O is the head of the list and is not the header
-	 * to a valid payload
-	 */
-	if (pwdp->mi_pwd_first == NULL) {
-		pwdp->mi_pwd_first = wsp->walk_addr;
-		return (WALK_NEXT);
-	}
-
-	if (mio->mi_o_isdev == B_FALSE) {
-		/* mio is a module */
-		if (!(arg->mi_pwa_flags & MI_PAYLOAD_MODULE))
-			return (WALK_NEXT);
-	} else {
-		/* mio is a device */
-		if (!(arg->mi_pwa_flags & MI_PAYLOAD_DEVICE))
-			return (WALK_NEXT);
-	}
-
-	if (mdb_vread(payload, arg->mi_pwa_size, payload_kaddr) == -1) {
-		mdb_warn("failed to read payload at %p", payload_kaddr);
+	if (mdb_vread(&kaddr, sizeof (kaddr), kaddr) == -1) {
+		mdb_warn("can't read address of mi head at %p for %s",
+		    kaddr, arg->mi_pwa_walker);
 		return (WALK_ERR);
 	}
 
-	return (wsp->walk_callback(payload_kaddr, payload, wsp->walk_cbdata));
-}
+	if (kaddr == 0) {
+		/* Empty list */
+		return (WALK_DONE);
+	}
 
-void
-mi_payload_walk_fini(mdb_walk_state_t *wsp)
-{
-	const mi_payload_walk_arg_t *arg = wsp->walk_arg;
-
-	delete_mi_payload_walk_data(wsp->walk_data, arg->mi_pwa_size);
+	if (mdb_pwalk("genunix`mi", wsp->walk_callback,
+	    wsp->walk_cbdata, kaddr) == -1) {
+		mdb_warn("failed to walk genunix`mi");
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
 }
 
 const mi_payload_walk_arg_t mi_ar_arg = {
-	"arp", "ar_g_head", sizeof (ar_t),
+	"ar_stacks", OFFSETOF(arp_stack_t, as_head), sizeof (ar_t),
 	MI_PAYLOAD_DEVICE | MI_PAYLOAD_MODULE
 };
 
 const mi_payload_walk_arg_t mi_icmp_arg = {
-	"icmp", "icmp_g_head", sizeof (icmp_t),
+	"icmp_stacks", OFFSETOF(icmp_stack_t, is_head), sizeof (icmp_t),
 	MI_PAYLOAD_DEVICE | MI_PAYLOAD_MODULE
 };
 
-const mi_payload_walk_arg_t mi_ill_arg =
-	{ "ip", "ip_g_head", sizeof (ill_t), MI_PAYLOAD_MODULE };
+const mi_payload_walk_arg_t mi_ill_arg = {
+	"ip_stacks", OFFSETOF(ip_stack_t, ips_ip_g_head), sizeof (ill_t),
+	MI_PAYLOAD_MODULE
+};
 
 int
 sonode(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -557,6 +590,20 @@ mi(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static int
+ns_to_stackid(uintptr_t kaddr)
+{
+	netstack_t nss;
+
+	if (mdb_vread(&nss, sizeof (nss), kaddr) == -1) {
+		mdb_warn("failed to read netstack_t %p", kaddr);
+		return (0);
+	}
+	return (nss.netstack_stackid);
+}
+
+
+
 static void
 netstat_tcp_verbose_pr(const tcp_t *tcp)
 {
@@ -620,6 +667,8 @@ netstat_tcp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data, int af)
 		mdb_printf(" ");
 		net_ipv6addrport_pr(&tcp->tcp_remote_v6, tcp->tcp_fport);
 	}
+	mdb_printf(" %4i", ns_to_stackid((uintptr_t)connp->conn_netstack));
+
 	mdb_printf(" %4i\n", connp->conn_zoneid);
 
 	if (opts & NETSTAT_VERBOSE)
@@ -676,6 +725,8 @@ netstat_udp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data, int af)
 		mdb_printf(" ");
 		net_ipv6addrport_pr(&udp.udp_v6dst, udp.udp_dstport);
 	}
+	mdb_printf(" %4i", ns_to_stackid((uintptr_t)connp.conn_netstack));
+
 	mdb_printf(" %4i\n", connp.conn_zoneid);
 
 	return (WALK_NEXT);
@@ -1158,10 +1209,10 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if ((optP == NULL) || (strcmp("tcp", optP) == 0)) {
 		if ((optf == NULL) || (strcmp("inet", optf) == 0)) {
 			/* Print TCPv4 connection */
-			mdb_printf(
-			    "%<u>%-?s St %*s       %*s       %s%</u>\n",
+			mdb_printf("%<u>%-?s St %*s       %*s       "
+			    "%s%       %s%</u>\n",
 			    "TCPv4", ADDR_V4_WIDTH, "Local Address",
-			    ADDR_V4_WIDTH, "Remote Address", "Zone");
+			    ADDR_V4_WIDTH, "Remote Address", "Stack", "Zone");
 
 			if (opts & NETSTAT_VERBOSE)
 				netstat_tcp_verbose_header_pr();
@@ -1175,10 +1226,10 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		if ((optf == NULL) || (strcmp("inet6", optf) == 0)) {
 			/* Print TCPv6 connection */
-			mdb_printf(
-			    "%<u>%-?s St %*s       %*s       %s\n%</u>",
+			mdb_printf("%<u>%-?s St %*s       %*s       "
+			    "%s       %s%\n%</u>",
 			    "TCPv6", ADDR_V6_WIDTH, "Local Address",
-			    ADDR_V6_WIDTH, "Remote Address", "Zone");
+			    ADDR_V6_WIDTH, "Remote Address", "Stack", "Zone");
 
 			if (opts & NETSTAT_VERBOSE)
 				netstat_tcp_verbose_header_pr();
@@ -1194,10 +1245,10 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if ((optP == NULL) || (strcmp("udp", optP) == 0)) {
 		if ((optf == NULL) || (strcmp("inet", optf) == 0)) {
 			/* Print UDPv4 connection */
-			mdb_printf(
-			    "%<u>%-?s St %*s       %*s       %s\n%</u>",
+			mdb_printf("%<u>%-?s St %*s       %*s       "
+			    "%s       %s%\n%</u>",
 			    "UDPv4", ADDR_V4_WIDTH, "Local Address",
-			    ADDR_V4_WIDTH, "Remote Address", "Zone");
+			    ADDR_V4_WIDTH, "Remote Address", "Stack", "Zone");
 
 			if (mdb_walk("udp_cache", netstat_udpv4_cb,
 			    (void *)(uintptr_t)opts) == -1) {
@@ -1209,10 +1260,10 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		if ((optf == NULL) || (strcmp("inet6", optf) == 0)) {
 			/* Print UDPv6 connection */
-			mdb_printf(
-			    "%<u>%-?s St %*s       %*s       %s\n%</u>",
+			mdb_printf("%<u>%-?s St %*s       %*s       "
+			    "%s       %s%\n%</u>",
 			    "UDPv6", ADDR_V6_WIDTH, "Local Address",
-			    ADDR_V6_WIDTH, "Remote Address", "Zone");
+			    ADDR_V6_WIDTH, "Remote Address", "Stack", "Zone");
 
 			if (mdb_walk("udp_cache", netstat_udpv6_cb,
 			    (void *)(uintptr_t)opts) == -1) {

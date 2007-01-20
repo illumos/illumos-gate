@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #  NOTE:  When a change is made to the source file for
@@ -41,12 +41,17 @@ do
 	sed < $dest.$$ > $dest \
 	    -e '/md:admin/s/read_priv_set=sys_config/			/' \
 	    -e '/^icmp[ 	]*read_priv_set=net_rawaccess[ 	]*write_priv_set=net_rawaccess$/d' \
-	    -e '/^icmp6[ 	]*read_priv_set=net_rawaccess[ 	]*write_priv_set=net_rawaccess$/d'
+	    -e '/^icmp6[ 	]*read_priv_set=net_rawaccess[ 	]*write_priv_set=net_rawaccess$/d' \
+	    -e '/^keysock[ 	]*read_priv_set=sys_net_config[ 	]*write_priv_set=sys_net_config$/d' \
+	    -e '/^ipsecah[ 	]*read_priv_set=sys_net_config[ 	]*write_priv_set=sys_net_config$/d' \
+	    -e '/^ipsecesp[ 	]*read_priv_set=sys_net_config[ 	]*write_priv_set=sys_net_config$/d' \
+	    -e '/^spdsock[ 	]*read_priv_set=sys_net_config[ 	]*write_priv_set=sys_net_config$/d' \
+	    -e '/^ipf[ 	]*read_priv_set=sys_net_config[ 	]*write_priv_set=sys_net_config$/d'
 
 	rm -f $dest.$$
 
 	# potential additions
-	additions="aggr aggr:ctl bge dld:ctl dnet ibd icmp icmp6 openeepr random vni ipf pfil scsi_vhci"
+	additions="aggr aggr:ctl bge dld:ctl dnet keysock ibd icmp icmp6 ipsecah ipsecesp openeepr random spdsock vni ipf pfil scsi_vhci"
 
 	for dev in $additions
 	do

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <inet/nd.h>
 #include <inet/optcom.h>
 #include <inet/sctp_ip.h>
+#include <inet/ipclassifier.h>
 #include "sctp_impl.h"
 
 void
@@ -54,6 +55,7 @@ sctp_send_shutdown(sctp_t *sctp, int rexmit)
 	sctp_chunk_hdr_t *sch;
 	uint32_t *ctsn;
 	sctp_faddr_t *fp;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (sctp->sctp_state != SCTPS_ESTABLISHED &&
 	    sctp->sctp_state != SCTPS_SHUTDOWN_PENDING &&
@@ -110,7 +112,7 @@ sctp_send_shutdown(sctp_t *sctp, int rexmit)
 		sendmp = sctp_make_mp(sctp, fp,
 		    sizeof (*sch) + sizeof (*ctsn));
 		if (sendmp == NULL) {
-			SCTP_KSTAT(sctp_send_shutdown_failed);
+			SCTP_KSTAT(sctps, sctp_send_shutdown_failed);
 			goto done;
 		}
 		sch = (sctp_chunk_hdr_t *)sendmp->b_wptr;
@@ -150,6 +152,7 @@ sctp_shutdown_received(sctp_t *sctp, sctp_chunk_hdr_t *sch, boolean_t crwsd,
 	sctp_chunk_hdr_t *sach;
 	uint32_t *tsn;
 	int trysend = 0;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (sctp->sctp_state != SCTPS_SHUTDOWN_ACK_SENT)
 		sctp->sctp_state = SCTPS_SHUTDOWN_RECEIVED;
@@ -183,7 +186,7 @@ sctp_shutdown_received(sctp_t *sctp, sctp_chunk_hdr_t *sch, boolean_t crwsd,
 
 	samp = sctp_make_mp(sctp, fp, sizeof (*sach));
 	if (samp == NULL) {
-		SCTP_KSTAT(sctp_send_shutdown_ack_failed);
+		SCTP_KSTAT(sctps, sctp_send_shutdown_ack_failed);
 		goto dotimer;
 	}
 
@@ -227,11 +230,12 @@ sctp_shutdown_complete(sctp_t *sctp)
 {
 	mblk_t *scmp;
 	sctp_chunk_hdr_t *scch;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	scmp = sctp_make_mp(sctp, NULL, sizeof (*scch));
 	if (scmp == NULL) {
 		/* XXX use timer approach */
-		SCTP_KSTAT(sctp_send_shutdown_comp_failed);
+		SCTP_KSTAT(sctps, sctp_send_shutdown_comp_failed);
 		return;
 	}
 
@@ -265,6 +269,7 @@ sctp_ootb_shutdown_ack(sctp_t *gsctp, mblk_t *inmp, uint_t ip_hdr_len)
 	int			i;
 	uint16_t		port;
 	mblk_t			*mp1;
+	sctp_stack_t	*sctps = gsctp->sctp_sctps;
 
 	isv4 = (IPH_HDR_VERSION(inmp->b_rptr) == IPV4_VERSION);
 
@@ -284,12 +289,12 @@ sctp_ootb_shutdown_ack(sctp_t *gsctp, mblk_t *inmp, uint_t ip_hdr_len)
 	 */
 	if (!IS_P2ALIGNED(DB_BASE(inmp), sizeof (ire_t *)) ||
 	    DB_REF(inmp) != 1) {
-		mp1 = allocb(MBLKL(inmp) + sctp_wroff_xtra, BPRI_MED);
+		mp1 = allocb(MBLKL(inmp) + sctps->sctps_wroff_xtra, BPRI_MED);
 		if (mp1 == NULL) {
 			freeb(inmp);
 			return;
 		}
-		mp1->b_rptr += sctp_wroff_xtra;
+		mp1->b_rptr += sctps->sctps_wroff_xtra;
 		mp1->b_wptr = mp1->b_rptr + MBLKL(inmp);
 		bcopy(inmp->b_rptr, mp1->b_rptr, MBLKL(inmp));
 		freeb(inmp);
@@ -315,7 +320,7 @@ sctp_ootb_shutdown_ack(sctp_t *gsctp, mblk_t *inmp, uint_t ip_hdr_len)
 		inip4h->ipha_src = inip4h->ipha_dst;
 		inip4h->ipha_dst = v4addr;
 		inip4h->ipha_ident = 0;
-		inip4h->ipha_ttl = (uchar_t)sctp_ipv4_ttl;
+		inip4h->ipha_ttl = (uchar_t)sctps->sctps_ipv4_ttl;
 	} else {
 		in6_addr_t	v6addr;
 
@@ -336,7 +341,7 @@ sctp_ootb_shutdown_ack(sctp_t *gsctp, mblk_t *inmp, uint_t ip_hdr_len)
 		v6addr = inip6h->ip6_src;
 		inip6h->ip6_src = inip6h->ip6_dst;
 		inip6h->ip6_dst = v6addr;
-		inip6h->ip6_hops = (uchar_t)sctp_ipv6_hoplimit;
+		inip6h->ip6_hops = (uchar_t)sctps->sctps_ipv6_hoplimit;
 	}
 	insctph = (sctp_hdr_t *)(inmp->b_rptr + ip_hdr_len);
 

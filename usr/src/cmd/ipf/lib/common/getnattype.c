@@ -4,7 +4,13 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * Added redirect stuff and a variety of bug fixes. (mcn@EnGarde.com)
+ *
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include "ipf.h"
 #include "kmem.h"
 
@@ -16,19 +22,27 @@ static const char rcsid[] = "@(#)$Id: getnattype.c,v 1.3 2004/01/17 17:26:07 dar
 /*
  * Get a nat filter type given its kernel address.
  */
-char *getnattype(ipnat)
-ipnat_t *ipnat;
+char *getnattype(nat, alive)
+nat_t *nat;
+int alive;
 {
 	static char unknownbuf[20];
-	ipnat_t ipnatbuff;
+	ipnat_t *ipn, ipnatbuff;
 	char *which;
+	int type;
 
-	if (!ipnat)
+	if (!nat)
 		return "???";
-	if (kmemcpy((char *)&ipnatbuff, (long)ipnat, sizeof(ipnatbuff)))
-		return "!!!";
+	if (alive) {
+		type = nat->nat_redir;
+	} else {
+		ipn = nat->nat_ptr;
+		if (kmemcpy((char *)&ipnatbuff, (long)ipn, sizeof(ipnatbuff)))
+			return "!!!";
+		type = ipnatbuff.in_redir;
+	}
 
-	switch (ipnatbuff.in_redir)
+	switch (type)
 	{
 	case NAT_MAP :
 		which = "MAP";
@@ -43,8 +57,7 @@ ipnat_t *ipnat;
 		which = "BIMAP";
 		break;
 	default :
-		sprintf(unknownbuf, "unknown(%04x)",
-			ipnatbuff.in_redir & 0xffffffff);
+		sprintf(unknownbuf, "unknown(%04x)", type & 0xffffffff);
 		which = unknownbuf;
 		break;
 	}

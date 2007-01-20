@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,14 +51,14 @@
 #include "sctp_asconf.h"
 #include "sctp_addr.h"
 
-uint_t	sctp_next_port_to_try;
-
 /*
  * Returns 0 on success, EACCES on permission failure.
  */
 static int
 sctp_select_port(sctp_t *sctp, in_port_t *requested_port, int *user_specified)
 {
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
+
 	/*
 	 * Get a valid port (within the anonymous range and should not
 	 * be a privileged one) to use if the user has not given a port.
@@ -68,8 +68,9 @@ sctp_select_port(sctp_t *sctp, in_port_t *requested_port, int *user_specified)
 	 * the same port.
 	 */
 	if (*requested_port == 0) {
-		*requested_port = sctp_update_next_port(sctp_next_port_to_try,
-		    crgetzone(sctp->sctp_credp));
+		*requested_port = sctp_update_next_port(
+		    sctps->sctps_next_port_to_try,
+		    crgetzone(sctp->sctp_credp), sctps);
 		if (*requested_port == 0)
 			return (EACCES);
 		*user_specified = 0;
@@ -86,11 +87,12 @@ sctp_select_port(sctp_t *sctp, in_port_t *requested_port, int *user_specified)
 		 *   changes
 		 * - the atomic assignment of the elements of the array
 		 */
-		if (*requested_port < sctp_smallest_nonpriv_port) {
+		if (*requested_port < sctps->sctps_smallest_nonpriv_port) {
 			priv = B_TRUE;
 		} else {
-			for (i = 0; i < sctp_g_num_epriv_ports; i++) {
-				if (*requested_port == sctp_g_epriv_ports[i]) {
+			for (i = 0; i < sctps->sctps_g_num_epriv_ports; i++) {
+				if (*requested_port ==
+				    sctps->sctps_g_epriv_ports[i]) {
 					priv = B_TRUE;
 					break;
 				}
@@ -119,6 +121,7 @@ int
 sctp_listen(sctp_t *sctp)
 {
 	sctp_tf_t	*tf;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	RUN_SCTP(sctp);
 	/*
@@ -149,7 +152,8 @@ sctp_listen(sctp_t *sctp)
 	(void) random_get_pseudo_bytes(sctp->sctp_secret, SCTP_SECRET_LEN);
 	sctp->sctp_last_secret_update = lbolt64;
 	bzero(sctp->sctp_old_secret, SCTP_SECRET_LEN);
-	tf = &sctp_listen_fanout[SCTP_LISTEN_HASH(ntohs(sctp->sctp_lport))];
+	tf = &sctps->sctps_listen_fanout[SCTP_LISTEN_HASH(
+					    ntohs(sctp->sctp_lport))];
 	sctp_listen_hash_insert(tf, sctp);
 	WAKE_SCTP(sctp);
 	return (0);
@@ -256,6 +260,7 @@ sctp_bind_add(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 {
 	int		err = 0;
 	boolean_t	do_asconf = B_FALSE;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (!caller_hold_lock)
 		RUN_SCTP(sctp);
@@ -271,7 +276,8 @@ sctp_bind_add(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 		 * Let's do some checking here rather than undoing the
 		 * add later (for these reasons).
 		 */
-		if (!sctp_addip_enabled || !sctp->sctp_understands_asconf ||
+		if (!sctps->sctps_addip_enabled ||
+		    !sctp->sctp_understands_asconf ||
 		    !sctp->sctp_understands_addip) {
 			if (!caller_hold_lock)
 				WAKE_SCTP(sctp);
@@ -314,7 +320,7 @@ sctp_bind_add(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 			ASSERT(size == 0);
 			if (!caller_hold_lock)
 				WAKE_SCTP(sctp);
-			SCTP_KSTAT(sctp_cl_check_addrs);
+			SCTP_KSTAT(sctps, sctp_cl_check_addrs);
 			return (err);
 		}
 		ASSERT(addrlist != NULL);
@@ -378,6 +384,7 @@ sctp_bind_del(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 	boolean_t	do_asconf = B_FALSE;
 	uchar_t		*ulist = NULL;
 	size_t		usize = 0;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (!caller_hold_lock)
 		RUN_SCTP(sctp);
@@ -392,7 +399,8 @@ sctp_bind_del(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 	 * to the peer.
 	 */
 	if (sctp->sctp_state > SCTPS_LISTEN) {
-		if (!sctp_addip_enabled || !sctp->sctp_understands_asconf ||
+		if (!sctps->sctps_addip_enabled ||
+		    !sctp->sctp_understands_asconf ||
 		    !sctp->sctp_understands_addip) {
 			if (!caller_hold_lock)
 				WAKE_SCTP(sctp);
@@ -461,6 +469,7 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 	int loopmax;
 	zoneid_t zoneid = sctp->sctp_zoneid;
 	zone_t *zone = crgetzone(sctp->sctp_credp);
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	/*
 	 * Lookup for free addresses is done in a loop and "loopmax"
@@ -480,8 +489,8 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 		 * Set loopmax appropriately so that one does not look
 		 * forever in the case all of the anonymous ports are in use.
 		 */
-		loopmax = (sctp_largest_anon_port -
-		    sctp_smallest_anon_port + 1);
+		loopmax = (sctps->sctps_largest_anon_port -
+		    sctps->sctps_smallest_anon_port + 1);
 	}
 	do {
 		uint16_t	lport;
@@ -504,7 +513,7 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 		 * in sctp_compress()
 		 */
 		sctp_bind_hash_remove(sctp);
-		tbf = &sctp_bind_fanout[SCTP_BIND_HASH(port)];
+		tbf = &sctps->sctps_bind_fanout[SCTP_BIND_HASH(port)];
 		mutex_enter(&tbf->tf_lock);
 		for (lsctp = tbf->tf_sctp; lsctp != NULL;
 		    lsctp = lsctp->sctp_bind_hash) {
@@ -563,7 +572,8 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 				    sctp->sctp_ipversion,
 				    sctp->sctp_ipversion == IPV4_VERSION ?
 				    (void *)&sctp->sctp_ipha->ipha_src :
-				    (void *)&sctp->sctp_ip6h->ip6_src);
+				    (void *)&sctp->sctp_ip6h->ip6_src,
+				    sctps->sctps_netstack->netstack_ip);
 
 				/*
 				 * tsol_mlp_addr_type returns the possibilities
@@ -589,6 +599,10 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 					 * make sure that this zone is the one
 					 * that owns that MLP.  Shared MLPs can
 					 * be owned by at most one zone.
+					 *
+					 * No need to handle exclusive-stack
+					 * zones since ALL_ZONES only applies
+					 * to the shared stack.
 					 */
 
 					if (mlptype == mlptShared &&
@@ -611,7 +625,8 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 			sctp->sctp_lport = lport;
 			sctp->sctp_sctph->sh_sport = lport;
 
-			ASSERT(&sctp_bind_fanout[SCTP_BIND_HASH(port)] == tbf);
+			ASSERT(&sctps->sctps_bind_fanout[
+				    SCTP_BIND_HASH(port)] == tbf);
 			sctp_bind_hash_insert(tbf, sctp, 1);
 
 			mutex_exit(&tbf->tf_lock);
@@ -625,7 +640,7 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 			 * be in the valid range.
 			 */
 			if (user_specified == 0)
-				sctp_next_port_to_try = port + 1;
+				sctps->sctps_next_port_to_try = port + 1;
 
 			*allocated_port = port;
 
@@ -637,11 +652,12 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 			 * We may have to return an anonymous port. So
 			 * get one to start with.
 			 */
-			port = sctp_update_next_port(sctp_next_port_to_try,
-			    zone);
+			port = sctp_update_next_port(
+			    sctps->sctps_next_port_to_try,
+			    zone, sctps);
 			user_specified = 0;
 		} else {
-			port = sctp_update_next_port(port + 1, zone);
+			port = sctp_update_next_port(port + 1, zone, sctps);
 		}
 		if (port == 0)
 			break;
@@ -668,27 +684,27 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
  * - the atomic assignment of the elements of the array
  */
 in_port_t
-sctp_update_next_port(in_port_t port, zone_t *zone)
+sctp_update_next_port(in_port_t port, zone_t *zone, sctp_stack_t *sctps)
 {
 	int i;
 	boolean_t restart = B_FALSE;
 
 retry:
-	if (port < sctp_smallest_anon_port)
-		port = sctp_smallest_anon_port;
+	if (port < sctps->sctps_smallest_anon_port)
+		port = sctps->sctps_smallest_anon_port;
 
-	if (port > sctp_largest_anon_port) {
+	if (port > sctps->sctps_largest_anon_port) {
 		if (restart)
 			return (0);
 		restart = B_TRUE;
-		port = sctp_smallest_anon_port;
+		port = sctps->sctps_smallest_anon_port;
 	}
 
-	if (port < sctp_smallest_nonpriv_port)
-		port = sctp_smallest_nonpriv_port;
+	if (port < sctps->sctps_smallest_nonpriv_port)
+		port = sctps->sctps_smallest_nonpriv_port;
 
-	for (i = 0; i < sctp_g_num_epriv_ports; i++) {
-		if (port == sctp_g_epriv_ports[i]) {
+	for (i = 0; i < sctps->sctps_g_num_epriv_ports; i++) {
+		if (port == sctps->sctps_g_epriv_ports[i]) {
 			port++;
 			/*
 			 * Make sure whether the port is in the

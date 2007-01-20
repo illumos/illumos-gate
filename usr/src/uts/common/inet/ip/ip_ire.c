@@ -69,6 +69,8 @@
 #include <inet/tcp.h>
 #include <inet/ipclassifier.h>
 #include <sys/zone.h>
+#include <sys/cpuvar.h>
+
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
 
@@ -146,11 +148,11 @@ struct kmem_cache *rt_entry_cache;
  * Cache table (ip_cache_table/ip_cache_table_v6) is a pointer to an
  * array of irb_t structure and forwarding table (ip_forwarding_table/
  * ip_forwarding_table_v6) is an array of pointers to array of irb_t
- * structure. ip_forwarding_table[_v6] is allocated dynamically in
- * ire_add_v4/v6. ire_ft_init_lock is used to serialize multiple threads
+ * structure. ip_forwarding_table_v6 is allocated dynamically in
+ * ire_add_v6. ire_ft_init_lock is used to serialize multiple threads
  * initializing the same bucket. Once a bucket is initialized, it is never
- * de-alloacted. This assumption enables us to access ip_forwarding_table[i]
- * or ip_forwarding_table_v6[i] without any locks.
+ * de-alloacted. This assumption enables us to access
+ * ip_forwarding_table_v6[i] without any locks.
  *
  * Each irb_t - ire bucket structure has a lock to protect
  * a bucket and the ires residing in the bucket have a back pointer to
@@ -231,26 +233,6 @@ struct kmem_cache *rt_entry_cache;
  *	comment in ire_walk_ill_match().
  */
 
-/* This is dynamically allocated in ip_ire_init */
-irb_t *ip_cache_table;
-/* This is dynamically allocated in ire_add_mrtun */
-irb_t	*ip_mrtun_table;
-
-uint32_t	ire_handle = 1;
-/*
- * ire_ft_init_lock is used while initializing ip_forwarding_table
- * dynamically in ire_add.
- */
-kmutex_t	ire_ft_init_lock;
-kmutex_t	ire_mrtun_lock;  /* Protects creation of table and it's count */
-kmutex_t	ire_srcif_table_lock; /* Same as above */
-/*
- * The following counts are used to determine whether a walk is
- * needed through the reverse tunnel table or through ills
- */
-kmutex_t ire_handle_lock;	/* Protects ire_handle */
-uint_t	ire_mrtun_count;	/* Number of ires in reverse tun table */
-
 /*
  * A per-interface routing table is created ( if not present)
  * when the first entry is added to this special routing table.
@@ -269,11 +251,10 @@ uint_t	ire_mrtun_count;	/* Number of ires in reverse tun table */
  * of ires in that table.
  */
 
-uint_t	ire_srcif_table_count; /* Number of ires in all srcif tables */
-
 /*
  * The minimum size of IRE cache table.  It will be recalcuated in
  * ip_ire_init().
+ * Setable in /etc/system
  */
 uint32_t ip_cache_table_size = IP_CACHE_TABLE_SIZE;
 uint32_t ip6_cache_table_size = IP6_CACHE_TABLE_SIZE;
@@ -281,14 +262,12 @@ uint32_t ip6_cache_table_size = IP6_CACHE_TABLE_SIZE;
 /*
  * The size of the forwarding table.  We will make sure that it is a
  * power of 2 in ip_ire_init().
+ * Setable in /etc/system
  */
 uint32_t ip6_ftable_hash_size = IP6_FTABLE_HASH_SIZE;
 
 struct	kmem_cache	*ire_cache;
 static ire_t	ire_null;
-
-ire_stats_t ire_stats_v4;	/* IPv4 ire statistics */
-ire_stats_t ire_stats_v6;	/* IPv6 ire statistics */
 
 /*
  * The threshold number of IRE in a bucket when the IREs are
@@ -342,7 +321,7 @@ ire_stats_t ire_stats_v6;	/* IPv6 ire statistics */
  * different.  In future, when we have more experience, we
  * may want to change this behavior.
  */
-uint32_t ip_ire_max_bucket_cnt = 10;
+uint32_t ip_ire_max_bucket_cnt = 10;	/* Setable in /etc/system */
 uint32_t ip6_ire_max_bucket_cnt = 10;
 
 /*
@@ -351,7 +330,7 @@ uint32_t ip6_ire_max_bucket_cnt = 10;
  * performance of some apps as the temporary IREs are removed too
  * often.
  */
-uint32_t ip_ire_min_bucket_cnt = 3;
+uint32_t ip_ire_min_bucket_cnt = 3;	/* /etc/system - not used */
 uint32_t ip6_ire_min_bucket_cnt = 3;
 
 /*
@@ -359,9 +338,9 @@ uint32_t ip6_ire_min_bucket_cnt = 3;
  * memory.  This is a shift factor, so 6 means the ratio 1 to 64.  This
  * value can be changed in /etc/system.  6 is a reasonable number.
  */
-uint32_t ip_ire_mem_ratio = 6;
+uint32_t ip_ire_mem_ratio = 6;	/* /etc/system */
 /* The shift factor for CPU speed to calculate the max IRE bucket length. */
-uint32_t ip_ire_cpu_ratio = 7;
+uint32_t ip_ire_cpu_ratio = 7;	/* /etc/system */
 
 typedef struct nce_clookup_s {
 	ipaddr_t ncecl_addr;
@@ -376,6 +355,7 @@ typedef struct nce_clookup_s {
  */
 #define	IP_MAX_CACHE_TABLE_SIZE	4096
 
+/* Setable in /etc/system */
 static uint32_t	ip_max_cache_table_size = IP_MAX_CACHE_TABLE_SIZE;
 static uint32_t	ip6_max_cache_table_size = IP_MAX_CACHE_TABLE_SIZE;
 
@@ -392,9 +372,9 @@ static ire_t	*ire_update_srcif_v4(ire_t *ire);
 static void	ire_delete_v4(ire_t *ire);
 static void	ire_report_ctable(ire_t *ire, char *mp);
 static void	ire_report_mrtun_table(ire_t *ire, char *mp);
-static void	ire_report_srcif_table(ire_t *ire, char *mp);
+static void	ire_report_srcif_table(ire_t *ire, char *mp, ip_stack_t *ipst);
 static void	ire_walk_ipvers(pfv_t func, void *arg, uchar_t vers,
-    zoneid_t zoneid);
+    zoneid_t zoneid, ip_stack_t *);
 static void	ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type,
     pfv_t func, void *arg, uchar_t vers, ill_t *ill);
 static void	ire_cache_cleanup(irb_t *irb, uint32_t threshold, int cnt);
@@ -470,6 +450,7 @@ ip_ire_advise(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	in6_addr_t	v6addr;
 	irb_t	*irb;
 	zoneid_t	zoneid;
+	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
 
 	ASSERT(q->q_next == NULL);
 	zoneid = Q_TO_CONN(q)->conn_zoneid;
@@ -478,7 +459,7 @@ ip_ire_advise(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	 * Check privilege using the ioctl credential; if it is NULL
 	 * then this is a kernel message and therefor privileged.
 	 */
-	if (ioc_cr != NULL && secpolicy_net_config(ioc_cr, B_FALSE) != 0)
+	if (ioc_cr != NULL && secpolicy_ip_config(ioc_cr, B_FALSE) != 0)
 		return (EPERM);
 
 	ipic = (ipic_t *)mp->b_rptr;
@@ -493,14 +474,14 @@ ip_ire_advise(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 		/* Extract the destination address. */
 		addr = *(ipaddr_t *)addr_ucp;
 		/* Find the corresponding IRE. */
-		ire = ire_cache_lookup(addr, zoneid, NULL);
+		ire = ire_cache_lookup(addr, zoneid, NULL, ipst);
 		break;
 	}
 	case IPV6_ADDR_LEN: {
 		/* Extract the destination address. */
 		v6addr = *(in6_addr_t *)addr_ucp;
 		/* Find the corresponding IRE. */
-		ire = ire_cache_lookup_v6(&v6addr, zoneid, NULL);
+		ire = ire_cache_lookup_v6(&v6addr, zoneid, NULL, ipst);
 		break;
 	}
 	default:
@@ -596,15 +577,17 @@ ip_ire_delete(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	ire_t		*gire = NULL;
 	ill_t		*ill;
 	mblk_t		*arp_mp;
+	ip_stack_t	*ipst;
 
 	ASSERT(q->q_next == NULL);
 	zoneid = Q_TO_CONN(q)->conn_zoneid;
+	ipst = CONNQ_TO_IPST(q);
 
 	/*
 	 * Check privilege using the ioctl credential; if it is NULL
 	 * then this is a kernel message and therefor privileged.
 	 */
-	if (ioc_cr != NULL && secpolicy_net_config(ioc_cr, B_FALSE) != 0)
+	if (ioc_cr != NULL && secpolicy_ip_config(ioc_cr, B_FALSE) != 0)
 		return (EPERM);
 
 	ipid = (ipid_t *)mp->b_rptr;
@@ -638,7 +621,7 @@ ip_ire_delete(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	bcopy(addr_ucp, &addr, IP_ADDR_LEN);
 
 	/* Try to find the CACHED IRE. */
-	ire = ire_cache_lookup(addr, zoneid, NULL);
+	ire = ire_cache_lookup(addr, zoneid, NULL, ipst);
 
 	/* Nail it. */
 	if (ire) {
@@ -654,7 +637,7 @@ ip_ire_delete(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 		 * that are too eager in sending delete messages.
 		 */
 		if (gethrestime_sec() <
-		    ire->ire_create_time + ip_ignore_delete_time) {
+		    ire->ire_create_time + ipst->ips_ip_ignore_delete_time) {
 			ire_refrele(ire);
 			return (EINVAL);
 		}
@@ -679,7 +662,8 @@ ip_ire_delete(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 
 			gire = ire_ftable_lookup(ire->ire_addr,
 			    ire->ire_cmask, 0, 0,
-			    ire->ire_ipif, NULL, zoneid, 0, NULL, match_flags);
+			    ire->ire_ipif, NULL, zoneid, 0, NULL, match_flags,
+			    ipst);
 
 			ip3dbg(("ire_ftable_lookup() returned gire %p\n",
 			    (void *)gire));
@@ -720,7 +704,7 @@ done:
 		/* report the bad route to routing sockets */
 		ip_rts_change(RTM_LOSING, ire->ire_addr, ire->ire_gateway_addr,
 		    ire->ire_mask, ire->ire_src_addr, 0, 0, 0,
-		    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFA));
+		    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFA), ipst);
 		routing_sock_info = B_TRUE;
 
 		/*
@@ -742,7 +726,7 @@ done:
 	 * remove it if present.
 	 */
 	ire = ire_route_lookup(addr, 0, 0, IRE_HOST, NULL, NULL,
-	    ALL_ZONES, NULL, MATCH_IRE_TYPE);
+	    ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
 
 	/* Nail it. */
 	if (ire != NULL) {
@@ -751,7 +735,8 @@ done:
 			ip_rts_change(RTM_LOSING, ire->ire_addr,
 			    ire->ire_gateway_addr, ire->ire_mask,
 			    ire->ire_src_addr, 0, 0, 0,
-			    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFA));
+			    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFA),
+			    ipst);
 		}
 		ire_delete(ire);
 	    }
@@ -770,6 +755,12 @@ int
 ip_ire_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 {
 	zoneid_t zoneid;
+	ip_stack_t	*ipst;
+
+	if (CONN_Q(q))
+		ipst = CONNQ_TO_IPST(q);
+	else
+		ipst = ILLQ_TO_IPST(q);
 
 	(void) mi_mpprintf(mp,
 	    "IRE      " MI_COL_HDRPAD_STR
@@ -805,8 +796,8 @@ ip_ire_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 	if (zoneid == GLOBAL_ZONEID)
 		zoneid = ALL_ZONES;
 
-	ire_walk_v4(ire_report_ftable, mp->b_cont, zoneid);
-	ire_walk_v4(ire_report_ctable, mp->b_cont, zoneid);
+	ire_walk_v4(ire_report_ftable, mp->b_cont, zoneid, ipst);
+	ire_walk_v4(ire_report_ctable, mp->b_cont, zoneid, ipst);
 
 	return (0);
 }
@@ -871,6 +862,13 @@ ire_report_ctable(ire_t *ire, char *mp)
 int
 ip_ire_report_mrtun(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 {
+	ip_stack_t	*ipst;
+
+	if (CONN_Q(q))
+		ipst = CONNQ_TO_IPST(q);
+	else
+		ipst = ILLQ_TO_IPST(q);
+
 	(void) mi_mpprintf(mp,
 	"IRE      " MI_COL_HDRPAD_STR
 	/*   01234567[89ABCDEF] */
@@ -885,7 +883,8 @@ ip_ire_report_mrtun(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 	"ref     ");
 	/*   123 */
 
-	ire_walk_ill_mrtun(0, 0, ire_report_mrtun_table, mp, NULL);
+	ire_walk_ill_mrtun(0, 0, ire_report_mrtun_table, mp, NULL,
+	    ipst);
 	return (0);
 }
 
@@ -916,6 +915,12 @@ ire_report_mrtun_table(ire_t *ire, char *mp)
 int
 ip_ire_report_srcif(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 {
+	ip_stack_t	*ipst;
+
+	if (CONN_Q(q))
+		ipst = CONNQ_TO_IPST(q);
+	else
+		ipst = ILLQ_TO_IPST(q);
 
 	/* Report all interface based ires */
 
@@ -937,13 +942,14 @@ ip_ire_report_srcif(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 	    "type    "
 	    /* ABCDEFGH */
 	    "in/out/forward");
-	ire_walk_srcif_table_v4(ire_report_srcif_table, mp);
+	ire_walk_srcif_table_v4(ire_report_srcif_table, mp, ipst);
 	return (0);
 }
 
 /* Reports the interface table ires */
+/* ARGSUSED2 */
 static void
-ire_report_srcif_table(ire_t *ire, char *mp)
+ire_report_srcif_table(ire_t *ire, char *mp, ip_stack_t *ipst)
 {
 	char    buf1[INET_ADDRSTRLEN];
 	char    buf2[INET_ADDRSTRLEN];
@@ -986,6 +992,9 @@ ip_ire_req(queue_t *q, mblk_t *mp)
 	mblk_t	*mp1;
 	ire_t	*sire = NULL;
 	zoneid_t zoneid = Q_TO_CONN(q)->conn_zoneid;
+	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
+
+	ASSERT(q->q_next == NULL);
 
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (ire_t) ||
 	    !OK_32PTR(mp->b_rptr)) {
@@ -999,12 +1008,12 @@ ip_ire_req(queue_t *q, mblk_t *mp)
 	if (inire->ire_ipversion == IPV6_VERSION) {
 		ire = ire_route_lookup_v6(&inire->ire_addr_v6, 0, 0, 0,
 		    NULL, &sire, zoneid, NULL,
-		    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT));
+		    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT), ipst);
 	} else {
 		ASSERT(inire->ire_ipversion == IPV4_VERSION);
 		ire = ire_route_lookup(inire->ire_addr, 0, 0, 0,
 		    NULL, &sire, zoneid, NULL,
-		    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT));
+		    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT), ipst);
 	}
 
 	/*
@@ -1035,7 +1044,8 @@ ip_ire_req(queue_t *q, mblk_t *mp)
 		inire->ire_ipsec_overhead = conn_ipsec_length(Q_TO_CONN(q));
 
 		/* Pass the latest setting of the ip_path_mtu_discovery */
-		inire->ire_frag_flag |= (ip_path_mtu_discovery) ? IPH_DF : 0;
+		inire->ire_frag_flag |=
+		    (ipst->ips_ip_path_mtu_discovery) ? IPH_DF : 0;
 	}
 	if (ire != NULL)
 		ire_refrele(ire);
@@ -1067,6 +1077,7 @@ ire_send(queue_t *q, mblk_t *pkt, ire_t *ire)
 	uint_t ifindex;
 	ill_t	*ill;
 	zoneid_t zoneid = ire->ire_zoneid;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
 	ASSERT(!(ire->ire_type & IRE_LOCAL)); /* Has different ire_zoneid */
@@ -1091,7 +1102,7 @@ ire_send(queue_t *q, mblk_t *pkt, ire_t *ire)
 		 */
 		ifindex = (uint_t)(uintptr_t)pkt->b_prev;
 		ill = ill_lookup_on_ifindex(ifindex, B_FALSE,
-		    NULL, NULL, NULL, NULL);
+		    NULL, NULL, NULL, NULL, ipst);
 		if (ill == NULL) {
 			pkt->b_prev = NULL;
 			pkt->b_next = NULL;
@@ -1239,6 +1250,7 @@ ire_send_v6(queue_t *q, mblk_t *pkt, ire_t *ire)
 	boolean_t secure;
 	uint_t ifindex;
 	zoneid_t zoneid = ire->ire_zoneid;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	ASSERT(ire->ire_ipversion == IPV6_VERSION);
 	ASSERT(!(ire->ire_type & IRE_LOCAL)); /* Has different ire_zoneid */
@@ -1267,7 +1279,7 @@ ire_send_v6(queue_t *q, mblk_t *pkt, ire_t *ire)
 		 */
 		ifindex = (uint_t)(uintptr_t)pkt->b_prev;
 		ill = ill_lookup_on_ifindex(ifindex, B_TRUE,
-		    NULL, NULL, NULL, NULL);
+		    NULL, NULL, NULL, NULL, ipst);
 		if (ill == NULL) {
 			pkt->b_prev = NULL;
 			pkt->b_next = NULL;
@@ -1434,9 +1446,15 @@ ire_cache_cleanup(irb_t *irb, uint32_t threshold, int cnt)
 	if (irb->irb_ire_cnt - irb->irb_tmp_ire_cnt > threshold) {
 		for (ire = irb->irb_ire; ire != NULL && cnt > 0;
 		    ire = ire->ire_next) {
-			if (ire->ire_marks & IRE_MARK_CONDEMNED ||
-			    ire->ire_gateway_addr == 0) {
+			if (ire->ire_marks & IRE_MARK_CONDEMNED)
 				continue;
+			if (ire->ire_ipversion == IPV4_VERSION) {
+				if (ire->ire_gateway_addr == 0)
+					continue;
+			} else {
+				if (IN6_IS_ADDR_UNSPECIFIED(
+				    &ire->ire_gateway_addr_v6))
+					continue;
 			}
 			if ((ire->ire_type == IRE_CACHE) &&
 			    (lbolt - ire->ire_last_used_time > cut_off) &&
@@ -1478,6 +1496,7 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 	ire_t *dst_ire;
 	ipha_t *ipha;
 	ip6_t *ip6h;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	if (mp != NULL) {
 		/*
@@ -1499,7 +1518,7 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 			mp = first_mp;
 
 			dst_ire = ire_cache_lookup(ipha->ipha_dst,
-			    ire->ire_zoneid, MBLK_GETLABEL(mp));
+			    ire->ire_zoneid, MBLK_GETLABEL(mp), ipst);
 		} else {
 			ASSERT(ire->ire_ipversion == IPV6_VERSION);
 			/*
@@ -1514,7 +1533,7 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 			save_mp = mp;
 			mp = first_mp;
 			dst_ire = ire_cache_lookup_v6(&ip6h->ip6_dst,
-			    ire->ire_zoneid, MBLK_GETLABEL(mp));
+			    ire->ire_zoneid, MBLK_GETLABEL(mp), ipst);
 		}
 		if (dst_ire != NULL) {
 			if (dst_ire->ire_flags & RTF_MULTIRT) {
@@ -1610,11 +1629,11 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 				 */
 				ip_newroute(q, mp, ipha->ipha_dst, 0,
 				    (CONN_Q(q) ? Q_TO_CONN(q) : NULL),
-				    ire->ire_zoneid);
+				    ire->ire_zoneid, ipst);
 			} else {
 				ASSERT(ire->ire_ipversion == IPV6_VERSION);
 				ip_newroute_v6(q, mp, &ip6h->ip6_dst, NULL,
-				    NULL, ire->ire_zoneid);
+				    NULL, ire->ire_zoneid, ipst);
 			}
 		}
 
@@ -1649,7 +1668,8 @@ ire_init(ire_t *ire, uchar_t *addr, uchar_t *mask, uchar_t *src_addr,
     uchar_t *gateway, uchar_t *in_src_addr, uint_t *max_fragp, mblk_t *fp_mp,
     queue_t *rfq, queue_t *stq, ushort_t type, mblk_t *dlureq_mp, ipif_t *ipif,
     ill_t *in_ill, ipaddr_t cmask, uint32_t phandle, uint32_t ihandle,
-    uint32_t flags, const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp)
+    uint32_t flags, const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp,
+    ip_stack_t *ipst)
 {
 	/*
 	 * Reject IRE security attribute creation/initialization
@@ -1695,7 +1715,7 @@ ire_init(ire_t *ire, uchar_t *addr, uchar_t *mask, uchar_t *src_addr,
 		return (NULL);
 	}
 
-	BUMP_IRE_STATS(ire_stats_v4, ire_stats_alloced);
+	BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_alloced);
 
 	if (addr != NULL)
 		bcopy(addr, &ire->ire_addr, IP_ADDR_LEN);
@@ -1718,7 +1738,7 @@ ire_init(ire_t *ire, uchar_t *addr, uchar_t *mask, uchar_t *src_addr,
 	/* ire_init_common will free the mblks upon encountering any failure */
 	if (!ire_init_common(ire, max_fragp, fp_mp, rfq, stq, type, dlureq_mp,
 	    ipif, in_ill, phandle, ihandle, flags, IPV4_VERSION, ulp_info,
-	    gc, gcgrp))
+	    gc, gcgrp, ipst))
 		return (NULL);
 
 	return (ire);
@@ -1734,7 +1754,8 @@ ire_create_mp(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
     uchar_t *in_src_addr, uint_t max_frag, mblk_t *fp_mp, queue_t *rfq,
     queue_t *stq, ushort_t type, mblk_t *dlureq_mp, ipif_t *ipif, ill_t *in_ill,
     ipaddr_t cmask, uint32_t phandle, uint32_t ihandle, uint32_t flags,
-    const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp)
+    const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp,
+    ip_stack_t *ipst)
 {
 	ire_t	*ire, *buf;
 	ire_t	*ret_ire;
@@ -1779,11 +1800,13 @@ ire_create_mp(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
 
 	ret_ire = ire_init(ire, addr, mask, src_addr, gateway, in_src_addr,
 	    NULL, fp_mp, rfq, stq, type, dlureq_mp, ipif, in_ill, cmask,
-	    phandle, ihandle, flags, ulp_info, gc, gcgrp);
+	    phandle, ihandle, flags, ulp_info, gc, gcgrp, ipst);
 
 	ill = (ill_t *)(stq->q_ptr);
 	if (ret_ire == NULL) {
+		/* ire_freemblk needs these set */
 		ire->ire_stq_ifindex = ill->ill_phyint->phyint_ifindex;
+		ire->ire_ipst = ipst;
 		freeb(ire->ire_mp);
 		return (NULL);
 	}
@@ -1810,7 +1833,8 @@ ire_create(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
     uchar_t *in_src_addr, uint_t *max_fragp, mblk_t *fp_mp, queue_t *rfq,
     queue_t *stq, ushort_t type, mblk_t *dlureq_mp, ipif_t *ipif, ill_t *in_ill,
     ipaddr_t cmask, uint32_t phandle, uint32_t ihandle, uint32_t flags,
-    const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp)
+    const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp,
+    ip_stack_t *ipst)
 {
 	ire_t	*ire;
 	ire_t	*ret_ire;
@@ -1824,7 +1848,7 @@ ire_create(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
 
 	ret_ire = ire_init(ire, addr, mask, src_addr, gateway, in_src_addr,
 	    max_fragp, fp_mp, rfq, stq, type, dlureq_mp, ipif, in_ill,  cmask,
-	    phandle, ihandle, flags, ulp_info, gc, gcgrp);
+	    phandle, ihandle, flags, ulp_info, gc, gcgrp, ipst);
 
 	if (ret_ire == NULL) {
 		kmem_cache_free(ire_cache, ire);
@@ -1843,10 +1867,11 @@ ire_init_common(ire_t *ire, uint_t *max_fragp, mblk_t *fp_mp,
     queue_t *rfq, queue_t *stq, ushort_t type,
     mblk_t *dlureq_mp, ipif_t *ipif, ill_t *in_ill, uint32_t phandle,
     uint32_t ihandle, uint32_t flags, uchar_t ipversion,
-    const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp)
+    const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp,
+    ip_stack_t *ipst)
 {
 	ire->ire_max_fragp = max_fragp;
-	ire->ire_frag_flag |= (ip_path_mtu_discovery) ? IPH_DF : 0;
+	ire->ire_frag_flag |= (ipst->ips_ip_path_mtu_discovery) ? IPH_DF : 0;
 
 	ASSERT(fp_mp == NULL || fp_mp->b_datap->db_type == M_DATA);
 #ifdef DEBUG
@@ -1910,13 +1935,13 @@ ire_init_common(ire_t *ire, uint_t *max_fragp, mblk_t *fp_mp,
 	 * called as a writer.
 	 */
 	if (ire->ire_type & IRE_OFFSUBNET) {
-		mutex_enter(&ire_handle_lock);
-		ire->ire_phandle = (uint32_t)ire_handle++;
-		mutex_exit(&ire_handle_lock);
+		mutex_enter(&ipst->ips_ire_handle_lock);
+		ire->ire_phandle = (uint32_t)ipst->ips_ire_handle++;
+		mutex_exit(&ipst->ips_ire_handle_lock);
 	} else if (ire->ire_type & IRE_INTERFACE) {
-		mutex_enter(&ire_handle_lock);
-		ire->ire_ihandle = (uint32_t)ire_handle++;
-		mutex_exit(&ire_handle_lock);
+		mutex_enter(&ipst->ips_ire_handle_lock);
+		ire->ire_ihandle = (uint32_t)ipst->ips_ire_handle++;
+		mutex_exit(&ipst->ips_ire_handle_lock);
 	} else if (ire->ire_type == IRE_CACHE) {
 		ire->ire_phandle = phandle;
 		ire->ire_ihandle = ihandle;
@@ -1949,6 +1974,7 @@ ire_init_common(ire_t *ire, uint_t *max_fragp, mblk_t *fp_mp,
 			freemsg(fp_mp);
 	}
 	ire->ire_refcnt = 1;
+	ire->ire_ipst = ipst;	/* No netstack_hold */
 
 #ifdef IRE_DEBUG
 	bzero(ire->ire_trace, sizeof (th_trace_t *) * IP_TR_HASH_MAX);
@@ -1979,6 +2005,7 @@ ire_check_and_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep,
 {
 	ire_t *ire;
 	uint64_t check_flags = IPIF_DEPRECATED | IPIF_NOLOCAL | IPIF_ANYCAST;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	/*
 	 * No broadcast IREs for the LOOPBACK interface
@@ -1990,7 +2017,7 @@ ire_check_and_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep,
 
 	/* If this would be a duplicate, don't bother. */
 	if ((ire = ire_ctable_lookup(addr, 0, IRE_BROADCAST, ipif,
-	    ipif->ipif_zoneid, NULL, match_flags)) != NULL) {
+	    ipif->ipif_zoneid, NULL, match_flags, ipst)) != NULL) {
 		/*
 		 * We look for non-deprecated (and non-anycast, non-nolocal)
 		 * ipifs as the best choice. ipifs with check_flags matching
@@ -2030,6 +2057,8 @@ uint_t ip_loopback_mtu = IP_LOOPBACK_MTU;
 ire_t **
 ire_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep)
 {
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
+
 	*irep++ = ire_create(
 	    (uchar_t *)&addr,			/* dest addr */
 	    (uchar_t *)&ip_g_all_ones,		/* mask */
@@ -2050,7 +2079,8 @@ ire_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep)
 	    0,
 	    &ire_uinfo_null,
 	    NULL,
-	    NULL);
+	    NULL,
+	    ipst);
 
 	*irep++ = ire_create(
 		(uchar_t *)&addr,		 /* dest address */
@@ -2072,7 +2102,8 @@ ire_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep)
 		0,
 		&ire_uinfo_null,
 		NULL,
-		NULL);
+		NULL,
+		ipst);
 
 	return (irep);
 }
@@ -2089,16 +2120,18 @@ ire_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep)
 void
 ire_expire(ire_t *ire, char *arg)
 {
-	int flush_flags = (int)(uintptr_t)arg;
-	ill_t	*stq_ill;
+	ire_expire_arg_t	*ieap = (ire_expire_arg_t *)(uintptr_t)arg;
+	ill_t			*stq_ill;
+	int			flush_flags = ieap->iea_flush_flag;
+	ip_stack_t		*ipst = ieap->iea_ipst;
 
 	if ((flush_flags & FLUSH_REDIRECT_TIME) &&
 	    (ire->ire_flags & RTF_DYNAMIC)) {
 		/* Make sure we delete the corresponding IRE_CACHE */
 		ip1dbg(("ire_expire: all redirects\n"));
-		ip_rts_rtmsg(RTM_DELETE, ire, 0);
+		ip_rts_rtmsg(RTM_DELETE, ire, 0, ipst);
 		ire_delete(ire);
-		atomic_dec_32(&ip_redirect_cnt);
+		atomic_dec_32(&ipst->ips_ip_redirect_cnt);
 		return;
 	}
 	if (ire->ire_type != IRE_CACHE)
@@ -2110,13 +2143,13 @@ ire_expire(ire_t *ire, char *arg)
 		 * Verify that create time is more than
 		 * ip_ire_arp_interval milliseconds ago.
 		 */
-		if (NCE_EXPIRED(ire->ire_nce)) {
+		if (NCE_EXPIRED(ire->ire_nce, ipst)) {
 			ire_delete(ire);
 			return;
 		}
 	}
 
-	if (ip_path_mtu_discovery && (flush_flags & FLUSH_MTU_TIME) &&
+	if (ipst->ips_ip_path_mtu_discovery && (flush_flags & FLUSH_MTU_TIME) &&
 	    (ire->ire_ipif != NULL)) {
 		/* Increase pmtu if it is less than the interface mtu */
 		mutex_enter(&ire->ire_lock);
@@ -2143,15 +2176,15 @@ ire_expire(ire_t *ire, char *arg)
  * Preference for IRE_LOCAL entries.
  */
 ire_t *
-ire_lookup_local(zoneid_t zoneid)
+ire_lookup_local(zoneid_t zoneid, ip_stack_t *ipst)
 {
 	ire_t	*ire;
 	irb_t	*irb;
 	ire_t	*maybe = NULL;
 	int i;
 
-	for (i = 0; i < ip_cache_table_size;  i++) {
-		irb = &ip_cache_table[i];
+	for (i = 0; i < ipst->ips_ip_cache_table_size;  i++) {
+		irb = &ipst->ips_ip_cache_table[i];
 		if (irb->irb_ire == NULL)
 			continue;
 		rw_enter(&irb->irb_lock, RW_READER);
@@ -2243,42 +2276,46 @@ ire_to_ill(const ire_t *ire)
 
 /* Arrange to call the specified function for every IRE in the world. */
 void
-ire_walk(pfv_t func, void *arg)
+ire_walk(pfv_t func, void *arg, ip_stack_t *ipst)
 {
-	ire_walk_ipvers(func, arg, 0, ALL_ZONES);
+	ire_walk_ipvers(func, arg, 0, ALL_ZONES, ipst);
 }
 
 void
-ire_walk_v4(pfv_t func, void *arg, zoneid_t zoneid)
+ire_walk_v4(pfv_t func, void *arg, zoneid_t zoneid, ip_stack_t *ipst)
 {
-	ire_walk_ipvers(func, arg, IPV4_VERSION, zoneid);
+	ire_walk_ipvers(func, arg, IPV4_VERSION, zoneid, ipst);
 }
 
 void
-ire_walk_v6(pfv_t func, void *arg, zoneid_t zoneid)
+ire_walk_v6(pfv_t func, void *arg, zoneid_t zoneid, ip_stack_t *ipst)
 {
-	ire_walk_ipvers(func, arg, IPV6_VERSION, zoneid);
+	ire_walk_ipvers(func, arg, IPV6_VERSION, zoneid, ipst);
 }
 
 /*
  * Walk a particular version. version == 0 means both v4 and v6.
  */
 static void
-ire_walk_ipvers(pfv_t func, void *arg, uchar_t vers, zoneid_t zoneid)
+ire_walk_ipvers(pfv_t func, void *arg, uchar_t vers, zoneid_t zoneid,
+    ip_stack_t *ipst)
 {
 	if (vers != IPV6_VERSION) {
 		/*
 		 * ip_forwarding_table variable doesn't matter for IPv4 since
-		 * ire_walk_ill_tables directly calls with the ip_ftable global
+		 * ire_walk_ill_tables uses ips_ip_ftable for IPv4.
 		 */
 		ire_walk_ill_tables(0, 0, func, arg, IP_MASK_TABLE_SIZE,
 		    0, NULL,
-		    ip_cache_table_size, ip_cache_table, NULL, zoneid);
+		    ipst->ips_ip_cache_table_size, ipst->ips_ip_cache_table,
+		    NULL, zoneid, ipst);
 	}
 	if (vers != IPV4_VERSION) {
 		ire_walk_ill_tables(0, 0, func, arg, IP6_MASK_TABLE_SIZE,
-		    ip6_ftable_hash_size, ip_forwarding_table_v6,
-		    ip6_cache_table_size, ip_cache_table_v6, NULL, zoneid);
+		    ipst->ips_ip6_ftable_hash_size,
+		    ipst->ips_ip_forwarding_table_v6,
+		    ipst->ips_ip6_cache_table_size,
+		    ipst->ips_ip_cache_table_v6, NULL, zoneid, ipst);
 	}
 }
 
@@ -2316,23 +2353,26 @@ static void
 ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type, pfv_t func,
     void *arg, uchar_t vers, ill_t *ill)
 {
+	ip_stack_t	*ipst = ill->ill_ipst;
+
 	if (vers != IPV6_VERSION) {
 		ire_walk_ill_tables(match_flags, ire_type, func, arg,
 		    IP_MASK_TABLE_SIZE, 0,
-		    NULL, ip_cache_table_size,
-		    ip_cache_table, ill, ALL_ZONES);
+		    NULL, ipst->ips_ip_cache_table_size,
+		    ipst->ips_ip_cache_table, ill, ALL_ZONES, ipst);
 	}
 	if (vers != IPV4_VERSION) {
 		ire_walk_ill_tables(match_flags, ire_type, func, arg,
-		    IP6_MASK_TABLE_SIZE, ip6_ftable_hash_size,
-		    ip_forwarding_table_v6, ip6_cache_table_size,
-		    ip_cache_table_v6, ill, ALL_ZONES);
+		    IP6_MASK_TABLE_SIZE, ipst->ips_ip6_ftable_hash_size,
+		    ipst->ips_ip_forwarding_table_v6,
+		    ipst->ips_ip6_cache_table_size,
+		    ipst->ips_ip_cache_table_v6, ill, ALL_ZONES, ipst);
 	}
 }
 
 boolean_t
 ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
-    ill_t *ill, zoneid_t zoneid)
+    ill_t *ill, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	ill_t *ire_stq_ill = NULL;
 	ill_t *ire_ipif_ill = NULL;
@@ -2442,7 +2482,7 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 			if (ire->ire_ipversion == IPV4_VERSION) {
 				rire = ire_route_lookup(ire->ire_gateway_addr,
 				    0, 0, IRE_INTERFACE, ire->ire_ipif, NULL,
-				    zoneid, NULL, ire_match_flags);
+				    zoneid, NULL, ire_match_flags, ipst);
 			} else {
 				ASSERT(ire->ire_ipversion == IPV6_VERSION);
 				mutex_enter(&ire->ire_lock);
@@ -2450,7 +2490,7 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 				mutex_exit(&ire->ire_lock);
 				rire = ire_route_lookup_v6(&gw_addr_v6,
 				    NULL, NULL, IRE_INTERFACE, ire->ire_ipif,
-				    NULL, zoneid, NULL, ire_match_flags);
+				    NULL, zoneid, NULL, ire_match_flags, ipst);
 			}
 			if (rire == NULL) {
 				return (B_FALSE);
@@ -2491,7 +2531,7 @@ rtfunc(struct radix_node *rn, void *arg)
 		    (rtf->rt_zoneid != ALL_ZONES)) {
 			ret = ire_walk_ill_match(rtf->rt_match_flags,
 			    rtf->rt_ire_type, ire,
-			    rtf->rt_ill, rtf->rt_zoneid);
+			    rtf->rt_ill, rtf->rt_zoneid, rtf->rt_ipst);
 		} else
 			ret = B_TRUE;
 		if (ret)
@@ -2506,7 +2546,8 @@ rtfunc(struct radix_node *rn, void *arg)
 void
 ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
     void *arg, size_t ftbl_sz, size_t htbl_sz, irb_t **ipftbl,
-    size_t ctbl_sz, irb_t *ipctbl, ill_t *ill, zoneid_t zoneid)
+    size_t ctbl_sz, irb_t *ipctbl, ill_t *ill, zoneid_t zoneid,
+    ip_stack_t *ipst)
 {
 	irb_t	*irb_ptr;
 	irb_t	*irb;
@@ -2526,7 +2567,7 @@ ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
 	if (!(match_flags & MATCH_IRE_TYPE) ||
 	    ((ire_type & IRE_FORWARDTABLE) != 0)) {
 		/* knobs such that routine is called only for v6 case */
-		if (ipftbl == ip_forwarding_table_v6) {
+		if (ipftbl == ipst->ips_ip_forwarding_table_v6) {
 			for (i = (ftbl_sz - 1);  i >= 0; i--) {
 				if ((irb_ptr = ipftbl[i]) == NULL)
 					continue;
@@ -2546,7 +2587,7 @@ ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
 							    ire_walk_ill_match(
 							    match_flags,
 							    ire_type, ire, ill,
-							    zoneid);
+							    zoneid, ipst);
 						}
 						if (ret)
 							(*func)(ire, arg);
@@ -2564,8 +2605,10 @@ ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
 			rtfarg.rt_ire_type = ire_type;
 			rtfarg.rt_ill = ill;
 			rtfarg.rt_zoneid = zoneid;
-			(void) ip_ftable->rnh_walktree_mt(ip_ftable, rtfunc,
-			    &rtfarg, irb_refhold_rn, irb_refrele_rn);
+			rtfarg.rt_ipst = ipst;	/* No netstack_hold */
+			(void) ipst->ips_ip_ftable->rnh_walktree_mt(
+			    ipst->ips_ip_ftable,
+			    rtfunc, &rtfarg, irb_refhold_rn, irb_refrele_rn);
 		}
 	}
 
@@ -2588,7 +2631,7 @@ ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
 				} else {
 					ret = ire_walk_ill_match(
 					    match_flags, ire_type,
-					    ire, ill, zoneid);
+					    ire, ill, zoneid, ipst);
 				}
 				if (ret)
 					(*func)(ire, arg);
@@ -2605,7 +2648,7 @@ ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
  * down/deleted or the 'ipv4_ire_srcif_status' report is printed.
  */
 void
-ire_walk_srcif_table_v4(pfv_t func, void *arg)
+ire_walk_srcif_table_v4(pfv_t func, void *arg, ip_stack_t *ipst)
 {
 	irb_t   *irb;
 	ire_t   *ire;
@@ -2619,18 +2662,18 @@ ire_walk_srcif_table_v4(pfv_t func, void *arg)
 	 * table. Check if any ire in any of the ill's ill_srcif_table
 	 * is pointing to this ill.
 	 */
-	mutex_enter(&ire_srcif_table_lock);
-	if (ire_srcif_table_count == 0) {
-		mutex_exit(&ire_srcif_table_lock);
+	mutex_enter(&ipst->ips_ire_srcif_table_lock);
+	if (ipst->ips_ire_srcif_table_count == 0) {
+		mutex_exit(&ipst->ips_ire_srcif_table_lock);
 		return;
 	}
-	mutex_exit(&ire_srcif_table_lock);
+	mutex_exit(&ipst->ips_ire_srcif_table_lock);
 
 #ifdef DEBUG
 	/* Keep accounting of all interface based table ires */
 	total_count = 0;
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_V4(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_V4(&ctx, ipst);
 	while (ill != NULL) {
 		mutex_enter(&ill->ill_lock);
 		total_count += ill->ill_srcif_refcnt;
@@ -2638,17 +2681,17 @@ ire_walk_srcif_table_v4(pfv_t func, void *arg)
 		mutex_exit(&ill->ill_lock);
 		ill = next_ill;
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	/* Hold lock here to make sure ire_srcif_table_count is stable */
-	mutex_enter(&ire_srcif_table_lock);
-	i = ire_srcif_table_count;
-	mutex_exit(&ire_srcif_table_lock);
+	mutex_enter(&ipst->ips_ire_srcif_table_lock);
+	i = ipst->ips_ire_srcif_table_count;
+	mutex_exit(&ipst->ips_ire_srcif_table_lock);
 	ip1dbg(("ire_walk_srcif_v4: ire_srcif_table_count %d "
 	    "total ill_srcif_refcnt %d\n", i, total_count));
 #endif
-	rw_enter(&ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_V4(&ctx);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_V4(&ctx, ipst);
 	while (ill != NULL) {
 		mutex_enter(&ill->ill_lock);
 		if ((ill->ill_srcif_refcnt == 0) || !ILL_CAN_LOOKUP(ill)) {
@@ -2659,7 +2702,7 @@ ire_walk_srcif_table_v4(pfv_t func, void *arg)
 		}
 		ill_refhold_locked(ill);
 		mutex_exit(&ill->ill_lock);
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		if (ill->ill_srcif_table != NULL) {
 			for (i = 0; i < IP_SRCIF_TABLE_SIZE; i++) {
 				irb = &(ill->ill_srcif_table[i]);
@@ -2673,12 +2716,12 @@ ire_walk_srcif_table_v4(pfv_t func, void *arg)
 				IRB_REFRELE(irb);
 			}
 		}
-		rw_enter(&ill_g_lock, RW_READER);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 		next_ill = ill_next(&ctx, ill);
 		ill_refrele(ill);
 		ill = next_ill;
 	}
-	rw_exit(&ill_g_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
 }
 
 /*
@@ -2706,13 +2749,14 @@ void
 ire_atomic_end(irb_t *irb_ptr, ire_t *ire)
 {
 	ill_t	*ill_list[NUM_ILLS];
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	ill_list[0] = ire->ire_stq != NULL ? ire->ire_stq->q_ptr : NULL;
 	ill_list[1] = ire->ire_ipif != NULL ? ire->ire_ipif->ipif_ill : NULL;
 	ill_list[2] = ire->ire_in_ill;
 	ill_unlock_ills(ill_list, NUM_ILLS);
 	rw_exit(&irb_ptr->irb_lock);
-	rw_exit(&ill_g_usesrc_lock);
+	rw_exit(&ipst->ips_ill_g_usesrc_lock);
 }
 
 /*
@@ -2735,6 +2779,7 @@ ire_atomic_start(irb_t *irb_ptr, ire_t *ire, queue_t *q, mblk_t *mp,
 	int	cnt = NUM_ILLS;
 	int	error = 0;
 	ill_t	*ill = NULL;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	ill_list[0] = stq_ill = ire->ire_stq !=
 		NULL ? ire->ire_stq->q_ptr : NULL;
@@ -2744,7 +2789,7 @@ ire_atomic_start(irb_t *irb_ptr, ire_t *ire, queue_t *q, mblk_t *mp,
 
 	ASSERT((q != NULL && mp != NULL && func != NULL) ||
 	    (q == NULL && mp == NULL && func == NULL));
-	rw_enter(&ill_g_usesrc_lock, RW_READER);
+	rw_enter(&ipst->ips_ill_g_usesrc_lock, RW_READER);
 	GRAB_CONN_LOCK(q);
 	rw_enter(&irb_ptr->irb_lock, RW_WRITER);
 	ill_lock_ills(ill_list, cnt);
@@ -2864,6 +2909,7 @@ ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func,
 	boolean_t ire_is_mblk = B_FALSE;
 	tsol_gcgrp_t *gcgrp = NULL;
 	tsol_gcgrp_addr_t ga;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	ASSERT(ire->ire_type != IRE_MIPRTUN);
 
@@ -2922,8 +2968,8 @@ ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func,
 
 	if (stq_ill != NULL && ire->ire_type == IRE_CACHE &&
 	    stq_ill->ill_net_type == IRE_IF_RESOLVER) {
-		rw_enter(&ill_g_lock, RW_READER);
-		ill = ILL_START_WALK_ALL(&ctx);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+		ill = ILL_START_WALK_ALL(&ctx, ipst);
 		for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 			mutex_enter(&ill->ill_lock);
 			if (ill->ill_state_flags & ILL_CONDEMNED) {
@@ -2954,7 +3000,7 @@ ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func,
 			}
 			mutex_exit(&ill->ill_lock);
 		}
-		rw_exit(&ill_g_lock);
+		rw_exit(&ipst->ips_ill_g_lock);
 		if (ipif == NULL ||
 		    (ipif->ipif_isv6 &&
 		    !IN6_ARE_ADDR_EQUAL(&ire->ire_src_addr_v6,
@@ -3064,6 +3110,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 	int	error;
 	boolean_t need_refrele = B_FALSE;
 	nce_t	*nce;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	if (ire->ire_ipif != NULL)
 		ASSERT(!MUTEX_HELD(&ire->ire_ipif->ipif_ill->ill_lock));
@@ -3216,8 +3263,8 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 			return (EINVAL);
 		}
 	} else {
-		irb_ptr = &(ip_cache_table[IRE_ADDR_HASH(ire->ire_addr,
-		    ip_cache_table_size)]);
+		irb_ptr = &(ipst->ips_ip_cache_table[IRE_ADDR_HASH(
+		    ire->ire_addr, ipst->ips_ip_cache_table_size)]);
 	}
 
 	/*
@@ -3226,12 +3273,12 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 	 *
 	 * If ipif or ill is changing ire_atomic_start() may queue the
 	 * request and return EINPROGRESS.
-	 * To avoid lock order problems, get the ndp4.ndp_g_lock.
+	 * To avoid lock order problems, get the ndp4->ndp_g_lock.
 	 */
-	mutex_enter(&ndp4.ndp_g_lock);
+	mutex_enter(&ipst->ips_ndp4->ndp_g_lock);
 	error = ire_atomic_start(irb_ptr, ire, q, mp, func);
 	if (error != 0) {
-		mutex_exit(&ndp4.ndp_g_lock);
+		mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 		/*
 		 * We don't know whether it is a valid ipif or not.
 		 * So, set it to NULL. This assumes that the ire has not added
@@ -3319,7 +3366,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 			    (void *)ire1, (void *)ire));
 			IRE_REFHOLD(ire1);
 			ire_atomic_end(irb_ptr, ire);
-			mutex_exit(&ndp4.ndp_g_lock);
+			mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 			ire_delete(ire);
 			if (pire != NULL) {
 				/*
@@ -3358,7 +3405,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 			if (nce != NULL)
 				mutex_exit(&nce->nce_lock);
 			ire_atomic_end(irb_ptr, ire);
-			mutex_exit(&ndp4.ndp_g_lock);
+			mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 			if (nce != NULL)
 				NCE_REFRELE(nce);
 			DTRACE_PROBE1(ire__no__nce, ire_t *, ire);
@@ -3511,7 +3558,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 	 * up the reference count on this yet.
 	 */
 	IRE_REFHOLD_LOCKED(ire);
-	BUMP_IRE_STATS(ire_stats_v4, ire_stats_inserted);
+	BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_inserted);
 
 	irb_ptr->irb_ire_cnt++;
 	if (irb_ptr->irb_marks & IRB_MARK_FTABLE)
@@ -3531,7 +3578,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 	}
 
 	ire_atomic_end(irb_ptr, ire);
-	mutex_exit(&ndp4.ndp_g_lock);
+	mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 
 	if (pire != NULL) {
 		/* Assert that it is not removed from the list yet */
@@ -3551,7 +3598,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 		if (ire->ire_mask == IP_HOST_MASK) {
 			ire_t *lire;
 			lire = ire_ctable_lookup(ire->ire_addr, NULL, IRE_CACHE,
-			    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE);
+			    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
 			if (lire != NULL) {
 				ire_refrele(lire);
 				ire_flush_cache_v4(ire, IRE_FLUSH_ADD);
@@ -3587,6 +3634,7 @@ void
 ire_cleanup(ire_t *ire)
 {
 	ire_t *ire_next;
+	ip_stack_t *ipst = ire->ire_ipst;
 
 	ASSERT(ire != NULL);
 
@@ -3594,11 +3642,13 @@ ire_cleanup(ire_t *ire)
 		ire_next = ire->ire_next;
 		if (ire->ire_ipversion == IPV4_VERSION) {
 			ire_delete_v4(ire);
-			BUMP_IRE_STATS(ire_stats_v4, ire_stats_deleted);
+			BUMP_IRE_STATS(ipst->ips_ire_stats_v4,
+			    ire_stats_deleted);
 		} else {
 			ASSERT(ire->ire_ipversion == IPV6_VERSION);
 			ire_delete_v6(ire);
-			BUMP_IRE_STATS(ire_stats_v6, ire_stats_deleted);
+			BUMP_IRE_STATS(ipst->ips_ire_stats_v6,
+			    ire_stats_deleted);
 		}
 		/*
 		 * Now it's really out of the list. Before doing the
@@ -3630,6 +3680,8 @@ ire_unlink(irb_t *irb)
 	ASSERT(irb->irb_ire != NULL);
 
 	for (ire = irb->irb_ire; ire != NULL; ire = ire1) {
+		ip_stack_t	*ipst = ire->ire_ipst;
+
 		ire1 = ire->ire_next;
 		if (ire->ire_marks & IRE_MARK_CONDEMNED) {
 			ptpn = ire->ire_ptpn;
@@ -3646,8 +3698,10 @@ ire_unlink(irb_t *irb)
 				 * the lock.
 				 */
 				if (ire->ire_ipversion == IPV6_VERSION) {
-					ASSERT(ipv6_ire_default_count != 0);
-					ipv6_ire_default_count--;
+					ASSERT(ipst->
+					    ips_ipv6_ire_default_count !=
+					    0);
+					ipst->ips_ipv6_ire_default_count--;
 				}
 			}
 			/*
@@ -3683,7 +3737,7 @@ ire_unlink(irb_t *irb)
  * ip_if->ipif_ill also needs to be matched.
  */
 boolean_t
-ip_ire_clookup_and_delete(ipaddr_t addr, ipif_t *ipif)
+ip_ire_clookup_and_delete(ipaddr_t addr, ipif_t *ipif, ip_stack_t *ipst)
 {
 	ill_t	*ill;
 	nce_t	*nce;
@@ -3710,7 +3764,7 @@ ip_ire_clookup_and_delete(ipaddr_t addr, ipif_t *ipif)
 		cl.ncecl_addr = addr;
 		cl.ncecl_found = B_FALSE;
 
-		ndp_walk_common(&ndp4, NULL,
+		ndp_walk_common(ipst->ips_ndp4, NULL,
 		    (pfi_t)ip_nce_clookup_and_delete, (uchar_t *)&cl, B_TRUE);
 
 		/*
@@ -3748,25 +3802,28 @@ irb_inactive(irb_t *irb)
 {
 	struct rt_entry *rt;
 	struct radix_node *rn;
+	ip_stack_t *ipst = irb->irb_ipst;
+
+	ASSERT(irb->irb_ipst != NULL);
 
 	rt = IRB2RT(irb);
 	rn = (struct radix_node *)rt;
 
 	/* first remove it from the radix tree. */
-	RADIX_NODE_HEAD_WLOCK(ip_ftable);
+	RADIX_NODE_HEAD_WLOCK(ipst->ips_ip_ftable);
 	rw_enter(&irb->irb_lock, RW_WRITER);
 	if (irb->irb_refcnt == 1 && irb->irb_nire == 0) {
-		rn = ip_ftable->rnh_deladdr(rn->rn_key, rn->rn_mask,
-		    ip_ftable);
+		rn = ipst->ips_ip_ftable->rnh_deladdr(rn->rn_key, rn->rn_mask,
+		    ipst->ips_ip_ftable);
 		DTRACE_PROBE1(irb__free, rt_t *,  rt);
 		ASSERT((void *)rn == (void *)rt);
 		Free(rt, rt_entry_cache);
 		/* irb_lock is freed */
-		RADIX_NODE_HEAD_UNLOCK(ip_ftable);
+		RADIX_NODE_HEAD_UNLOCK(ipst->ips_ip_ftable);
 		return (B_TRUE);
 	}
 	rw_exit(&irb->irb_lock);
-	RADIX_NODE_HEAD_UNLOCK(ip_ftable);
+	RADIX_NODE_HEAD_UNLOCK(ipst->ips_ip_ftable);
 	return (B_FALSE);
 }
 
@@ -3779,6 +3836,7 @@ ire_delete(ire_t *ire)
 	ire_t	*ire1;
 	ire_t	**ptpn;
 	irb_t *irb;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	if ((irb = ire->ire_bucket) == NULL) {
 		/*
@@ -3848,9 +3906,9 @@ ire_delete(ire_t *ire)
 	ire->ire_ptpn = NULL;
 	ire->ire_next = NULL;
 	if (ire->ire_ipversion == IPV6_VERSION) {
-		BUMP_IRE_STATS(ire_stats_v6, ire_stats_deleted);
+		BUMP_IRE_STATS(ipst->ips_ire_stats_v6, ire_stats_deleted);
 	} else {
-		BUMP_IRE_STATS(ire_stats_v4, ire_stats_deleted);
+		BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_deleted);
 	}
 	/*
 	 * ip_wput/ip_wput_v6 checks this flag to see whether
@@ -3863,8 +3921,8 @@ ire_delete(ire_t *ire)
 		 * accounting before we drop the lock.
 		 */
 		if (ire->ire_ipversion == IPV6_VERSION) {
-			ASSERT(ipv6_ire_default_count != 0);
-			ipv6_ire_default_count--;
+			ASSERT(ipst->ips_ipv6_ire_default_count != 0);
+			ipst->ips_ipv6_ire_default_count--;
 		}
 	}
 	irb->irb_ire_cnt--;
@@ -3896,6 +3954,8 @@ ire_delete(ire_t *ire)
 static void
 ire_delete_v4(ire_t *ire)
 {
+	ip_stack_t	*ipst = ire->ire_ipst;
+
 	ASSERT(ire->ire_refcnt >= 1);
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
 
@@ -3907,7 +3967,7 @@ ire_delete_v4(ire_t *ire)
 		 * delete all the host redirects pointing at that
 		 * gateway.
 		 */
-		ire_delete_host_redirects(ire->ire_gateway_addr);
+		ire_delete_host_redirects(ire->ire_gateway_addr, ipst);
 	}
 }
 
@@ -3925,6 +3985,7 @@ ire_inactive(ire_t *ire)
 	ipif_t	*ipif;
 	boolean_t	need_wakeup = B_FALSE;
 	irb_t 	*irb;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	ASSERT(ire->ire_refcnt == 0);
 	ASSERT(ire->ire_ptpn == NULL);
@@ -3938,7 +3999,7 @@ ire_inactive(ire_t *ire)
 	if (ire->ire_mp != NULL) {
 		ASSERT(ire->ire_bucket == NULL);
 		mutex_destroy(&ire->ire_lock);
-		BUMP_IRE_STATS(ire_stats_v4, ire_stats_freed);
+		BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_freed);
 		if (ire->ire_nce != NULL)
 			NCE_REFRELE_NOTR(ire->ire_nce);
 		freeb(ire->ire_mp);
@@ -4040,9 +4101,9 @@ ire_inactive(ire_t *ire)
 				 * mipagent is deleting reverse tunnel
 				 * route for a particular mobile node.
 				 */
-				mutex_enter(&ire_mrtun_lock);
-				ire_mrtun_count--;
-				mutex_exit(&ire_mrtun_lock);
+				mutex_enter(&ipst->ips_ire_mrtun_lock);
+				ipst->ips_ire_mrtun_count--;
+				mutex_exit(&ipst->ips_ire_mrtun_lock);
 				ASSERT(in_ill->ill_mrtun_refcnt != 0);
 				in_ill->ill_mrtun_refcnt--;
 				if (in_ill->ill_mrtun_refcnt == 0) {
@@ -4052,9 +4113,9 @@ ire_inactive(ire_t *ire)
 					mutex_exit(&in_ill->ill_lock);
 				}
 			} else {
-				mutex_enter(&ire_srcif_table_lock);
-				ire_srcif_table_count--;
-				mutex_exit(&ire_srcif_table_lock);
+				mutex_enter(&ipst->ips_ire_srcif_table_lock);
+				ipst->ips_ire_srcif_table_count--;
+				mutex_exit(&ipst->ips_ire_srcif_table_lock);
 				ASSERT(in_ill->ill_srcif_refcnt != 0);
 				in_ill->ill_srcif_refcnt--;
 				if (in_ill->ill_srcif_refcnt == 0) {
@@ -4096,9 +4157,9 @@ end:
 #endif
 	mutex_destroy(&ire->ire_lock);
 	if (ire->ire_ipversion == IPV6_VERSION) {
-		BUMP_IRE_STATS(ire_stats_v6, ire_stats_freed);
+		BUMP_IRE_STATS(ipst->ips_ire_stats_v6, ire_stats_freed);
 	} else {
-		BUMP_IRE_STATS(ire_stats_v4, ire_stats_freed);
+		BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_freed);
 	}
 	ASSERT(ire->ire_mp == NULL);
 	/* Has been allocated out of the cache */
@@ -4153,6 +4214,7 @@ ire_flush_cache_v4(ire_t *ire, int flag)
 	int i;
 	ire_t *cire;
 	irb_t *irb;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	if (ire->ire_type & IRE_CACHE)
 	    return;
@@ -4169,8 +4231,8 @@ ire_flush_cache_v4(ire_t *ire, int flag)
 		 * This selective flush is due to the addition of
 		 * new IRE.
 		 */
-		for (i = 0; i < ip_cache_table_size; i++) {
-			irb = &ip_cache_table[i];
+		for (i = 0; i < ipst->ips_ip_cache_table_size; i++) {
+			irb = &ipst->ips_ip_cache_table[i];
 			if ((cire = irb->irb_ire) == NULL)
 				continue;
 			IRB_REFHOLD(irb);
@@ -4240,8 +4302,8 @@ ire_flush_cache_v4(ire_t *ire, int flag)
 		 * handle in the IRE as this IRE is
 		 * being deleted/changed.
 		 */
-		for (i = 0; i < ip_cache_table_size; i++) {
-			irb = &ip_cache_table[i];
+		for (i = 0; i < ipst->ips_ip_cache_table_size; i++) {
+			irb = &ipst->ips_ip_cache_table[i];
 			if ((cire = irb->irb_ire) == NULL)
 				continue;
 			IRB_REFHOLD(irb);
@@ -4443,7 +4505,7 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 ire_t *
 ire_route_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
     int type, const ipif_t *ipif, ire_t **pire, zoneid_t zoneid,
-    const ts_label_t *tsl, int flags)
+    const ts_label_t *tsl, int flags, ip_stack_t *ipst)
 {
 	ire_t *ire = NULL;
 
@@ -4465,13 +4527,13 @@ ire_route_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	 */
 	if ((flags & MATCH_IRE_TYPE) == 0 || (type & IRE_CACHETABLE) != 0) {
 		ire = ire_ctable_lookup(addr, gateway, type, ipif, zoneid,
-		    tsl, flags);
+		    tsl, flags, ipst);
 		if (ire != NULL)
 			return (ire);
 	}
 	if ((flags & MATCH_IRE_TYPE) == 0 || (type & IRE_FORWARDTABLE) != 0) {
 		ire = ire_ftable_lookup(addr, mask, gateway, type, ipif, pire,
-		    zoneid, 0, tsl, flags);
+		    zoneid, 0, tsl, flags, ipst);
 	}
 	return (ire);
 }
@@ -4483,12 +4545,13 @@ ire_route_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
  * be created on demand by ip_newroute.
  */
 void
-ire_clookup_delete_cache_gw(ipaddr_t addr, zoneid_t zoneid)
+ire_clookup_delete_cache_gw(ipaddr_t addr, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	irb_t *irb;
 	ire_t *ire;
 
-	irb = &ip_cache_table[IRE_ADDR_HASH(addr, ip_cache_table_size)];
+	irb = &ipst->ips_ip_cache_table[IRE_ADDR_HASH(addr,
+	    ipst->ips_ip_cache_table_size)];
 	IRB_REFHOLD(irb);
 	for (ire = irb->irb_ire; ire != NULL; ire = ire->ire_next) {
 		if (ire->ire_marks & IRE_MARK_CONDEMNED)
@@ -4503,7 +4566,7 @@ ire_clookup_delete_cache_gw(ipaddr_t addr, zoneid_t zoneid)
 	}
 	IRB_REFRELE(irb);
 
-	ire_walk_v4(ire_delete_cache_gw, &addr, zoneid);
+	ire_walk_v4(ire_delete_cache_gw, &addr, zoneid, ipst);
 }
 
 /*
@@ -4514,7 +4577,7 @@ ire_clookup_delete_cache_gw(ipaddr_t addr, zoneid_t zoneid)
  */
 ire_t *
 ire_ctable_lookup(ipaddr_t addr, ipaddr_t gateway, int type, const ipif_t *ipif,
-    zoneid_t zoneid, const ts_label_t *tsl, int flags)
+    zoneid_t zoneid, const ts_label_t *tsl, int flags, ip_stack_t *ipst)
 {
 	irb_t *irb_ptr;
 	ire_t *ire;
@@ -4527,7 +4590,8 @@ ire_ctable_lookup(ipaddr_t addr, ipaddr_t gateway, int type, const ipif_t *ipif,
 	    (ipif == NULL))
 		return (NULL);
 
-	irb_ptr = &ip_cache_table[IRE_ADDR_HASH(addr, ip_cache_table_size)];
+	irb_ptr = &ipst->ips_ip_cache_table[IRE_ADDR_HASH(addr,
+					    ipst->ips_ip_cache_table_size)];
 	rw_enter(&irb_ptr->irb_lock, RW_READER);
 	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
 		if (ire->ire_marks & IRE_MARK_CONDEMNED)
@@ -4584,7 +4648,7 @@ ire_local_same_ill_group(ire_t *ire_local, ire_t *xmit_ire)
  */
 boolean_t
 ire_local_ok_across_zones(ire_t *ire_local, zoneid_t zoneid, void *addr,
-    const ts_label_t *tsl)
+    const ts_label_t *tsl, ip_stack_t *ipst)
 {
 	ire_t		*alt_ire;
 	boolean_t	rval;
@@ -4593,12 +4657,12 @@ ire_local_ok_across_zones(ire_t *ire_local, zoneid_t zoneid, void *addr,
 		alt_ire = ire_ftable_lookup(*((ipaddr_t *)addr), 0, 0, 0, NULL,
 		    NULL, zoneid, 0, tsl,
 		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_RJ_BHOLE);
+		    MATCH_IRE_RJ_BHOLE, ipst);
 	} else {
 		alt_ire = ire_ftable_lookup_v6((in6_addr_t *)addr, NULL, NULL,
 		    0, NULL, NULL, zoneid, 0, tsl,
 		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_RJ_BHOLE);
+		    MATCH_IRE_RJ_BHOLE, ipst);
 	}
 
 	if (alt_ire == NULL)
@@ -4633,12 +4697,14 @@ ire_local_ok_across_zones(ire_t *ire_local, zoneid_t zoneid, void *addr,
  * ip_restrict_interzone_loopback is turned off.
  */
 ire_t *
-ire_cache_lookup(ipaddr_t addr, zoneid_t zoneid, const ts_label_t *tsl)
+ire_cache_lookup(ipaddr_t addr, zoneid_t zoneid, const ts_label_t *tsl,
+    ip_stack_t *ipst)
 {
 	irb_t *irb_ptr;
 	ire_t *ire;
 
-	irb_ptr = &ip_cache_table[IRE_ADDR_HASH(addr, ip_cache_table_size)];
+	irb_ptr = &ipst->ips_ip_cache_table[IRE_ADDR_HASH(addr,
+					    ipst->ips_ip_cache_table_size)];
 	rw_enter(&irb_ptr->irb_lock, RW_READER);
 	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
 		if (ire->ire_marks & (IRE_MARK_CONDEMNED |
@@ -4665,9 +4731,9 @@ ire_cache_lookup(ipaddr_t addr, zoneid_t zoneid, const ts_label_t *tsl)
 			}
 
 			if (ire->ire_type == IRE_LOCAL) {
-				if (ip_restrict_interzone_loopback &&
+				if (ipst->ips_ip_restrict_interzone_loopback &&
 				    !ire_local_ok_across_zones(ire, zoneid,
-				    &addr, tsl))
+				    &addr, tsl, ipst))
 					continue;
 
 				IRE_REFHOLD(ire);
@@ -4696,6 +4762,7 @@ ire_ihandle_lookup_offlink(ire_t *cire, ire_t *pire)
 	int	match_flags;
 	ipaddr_t gw_addr;
 	ipif_t	*gw_ipif;
+	ip_stack_t	*ipst = cire->ire_ipst;
 
 	ASSERT(cire != NULL && pire != NULL);
 
@@ -4718,7 +4785,7 @@ ire_ihandle_lookup_offlink(ire_t *cire, ire_t *pire)
 	 */
 	ire = ire_ftable_lookup(cire->ire_addr, cire->ire_cmask, 0,
 	    IRE_INTERFACE, pire->ire_ipif, NULL, ALL_ZONES, cire->ire_ihandle,
-	    NULL, match_flags);
+	    NULL, match_flags, ipst);
 	if (ire != NULL)
 		return (ire);
 	/*
@@ -4749,7 +4816,7 @@ ire_ihandle_lookup_offlink(ire_t *cire, ire_t *pire)
 	if (pire->ire_ipif != NULL)
 		match_flags |= MATCH_IRE_ILL_GROUP;
 	ire = ire_ftable_lookup(pire->ire_gateway_addr, 0, 0, IRE_OFFSUBNET,
-	    pire->ire_ipif, NULL, ALL_ZONES, 0, NULL, match_flags);
+	    pire->ire_ipif, NULL, ALL_ZONES, 0, NULL, match_flags, ipst);
 	if (ire == NULL)
 		return (NULL);
 	/*
@@ -4762,7 +4829,8 @@ ire_ihandle_lookup_offlink(ire_t *cire, ire_t *pire)
 
 	match_flags |= MATCH_IRE_IHANDLE;
 	ire = ire_ftable_lookup(gw_addr, 0, 0, IRE_INTERFACE,
-	    gw_ipif, NULL, ALL_ZONES, cire->ire_ihandle, NULL, match_flags);
+	    gw_ipif, NULL, ALL_ZONES, cire->ire_ihandle, NULL, match_flags,
+	    ipst);
 	return (ire);
 }
 
@@ -4777,13 +4845,15 @@ ire_mrtun_lookup(ipaddr_t srcaddr, ill_t *ill)
 {
 	irb_t *irb_ptr;
 	ire_t *ire;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(ill != NULL);
 	ASSERT(!(ill->ill_isv6));
 
-	if (ip_mrtun_table == NULL)
+	if (ipst->ips_ip_mrtun_table == NULL)
 		return (NULL);
-	irb_ptr = &ip_mrtun_table[IRE_ADDR_HASH(srcaddr, IP_MRTUN_TABLE_SIZE)];
+	irb_ptr = &ipst->ips_ip_mrtun_table[IRE_ADDR_HASH(srcaddr,
+					    IP_MRTUN_TABLE_SIZE)];
 	rw_enter(&irb_ptr->irb_lock, RW_READER);
 	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
 		if (ire->ire_marks & IRE_MARK_CONDEMNED)
@@ -4814,21 +4884,23 @@ ire_t *
 ipif_to_ire(const ipif_t *ipif)
 {
 	ire_t	*ire;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	ASSERT(!ipif->ipif_isv6);
 	if (ipif->ipif_ire_type == IRE_LOOPBACK) {
 		ire = ire_ctable_lookup(ipif->ipif_lcl_addr, 0, IRE_LOOPBACK,
-		    ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF));
+		    ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF),
+		    ipst);
 	} else if (ipif->ipif_flags & IPIF_POINTOPOINT) {
 		/* In this case we need to lookup destination address. */
 		ire = ire_ftable_lookup(ipif->ipif_pp_dst_addr, IP_HOST_MASK, 0,
 		    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0, NULL,
-		    (MATCH_IRE_TYPE | MATCH_IRE_IPIF | MATCH_IRE_MASK));
+		    (MATCH_IRE_TYPE | MATCH_IRE_IPIF | MATCH_IRE_MASK), ipst);
 	} else {
 		ire = ire_ftable_lookup(ipif->ipif_subnet,
 		    ipif->ipif_net_mask, 0, IRE_INTERFACE, ipif, NULL,
 		    ALL_ZONES, 0, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF |
-		    MATCH_IRE_MASK));
+		    MATCH_IRE_MASK), ipst);
 	}
 	return (ire);
 }
@@ -4885,13 +4957,15 @@ ire_cache_reclaim(ire_t *ire, char *arg)
 {
 	ire_cache_reclaim_t *icr = (ire_cache_reclaim_t *)arg;
 	uint_t rand;
+	ip_stack_t	*ipst = icr->icr_ipst;
 
 	if (ire->ire_type != IRE_CACHE)
 		return;
 
 	if (ire->ire_ipversion == IPV6_VERSION) {
 		rand = (uint_t)lbolt +
-		    IRE_ADDR_HASH_V6(ire->ire_addr_v6, ip6_cache_table_size);
+		    IRE_ADDR_HASH_V6(ire->ire_addr_v6,
+			ipst->ips_ip6_cache_table_size);
 		mutex_enter(&ire->ire_lock);
 		if (IN6_IS_ADDR_UNSPECIFIED(&ire->ire_gateway_addr_v6)) {
 			mutex_exit(&ire->ire_lock);
@@ -4905,7 +4979,7 @@ ire_cache_reclaim(ire_t *ire, char *arg)
 		mutex_exit(&ire->ire_lock);
 	} else {
 		rand = (uint_t)lbolt +
-		    IRE_ADDR_HASH(ire->ire_addr, ip_cache_table_size);
+		    IRE_ADDR_HASH(ire->ire_addr, ipst->ips_ip_cache_table_size);
 		if (ire->ire_gateway_addr == 0) {
 			if (icr->icr_onlink != 0 &&
 			    (rand/icr->icr_onlink)*icr->icr_onlink == rand) {
@@ -4960,61 +5034,10 @@ power2_roundup(uint32_t *value)
 	*value = (1 << i);
 }
 
+/* Global init for all zones */
 void
-ip_ire_init()
+ip_ire_g_init()
 {
-	int i;
-
-	mutex_init(&ire_ft_init_lock, NULL, MUTEX_DEFAULT, 0);
-	mutex_init(&ire_handle_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&ire_mrtun_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&ire_srcif_table_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&ndp4.ndp_g_lock, NULL, MUTEX_DEFAULT, NULL);
-
-	rn_init();
-	(void) rn_inithead((void **)&ip_ftable, 32);
-	rt_entry_cache = kmem_cache_create("rt_entry",
-	    sizeof (struct rt_entry), 0, NULL, NULL, NULL, NULL, NULL, 0);
-
-	/* Calculate the IPv4 cache table size. */
-	ip_cache_table_size = MAX(ip_cache_table_size,
-	    ((kmem_avail() >> ip_ire_mem_ratio) / sizeof (ire_t) /
-	    ip_ire_max_bucket_cnt));
-	if (ip_cache_table_size > ip_max_cache_table_size)
-		ip_cache_table_size = ip_max_cache_table_size;
-	/*
-	 * Make sure that the table size is always a power of 2.  The
-	 * hash macro IRE_ADDR_HASH() depends on that.
-	 */
-	power2_roundup(&ip_cache_table_size);
-
-	ip_cache_table = (irb_t *)kmem_zalloc(ip_cache_table_size *
-	    sizeof (irb_t), KM_SLEEP);
-
-	for (i = 0; i < ip_cache_table_size; i++) {
-		rw_init(&ip_cache_table[i].irb_lock, NULL,
-		    RW_DEFAULT, NULL);
-	}
-
-	/* Calculate the IPv6 cache table size. */
-	ip6_cache_table_size = MAX(ip6_cache_table_size,
-	    ((kmem_avail() >> ip_ire_mem_ratio) / sizeof (ire_t) /
-	    ip6_ire_max_bucket_cnt));
-	if (ip6_cache_table_size > ip6_max_cache_table_size)
-		ip6_cache_table_size = ip6_max_cache_table_size;
-	/*
-	 * Make sure that the table size is always a power of 2.  The
-	 * hash macro IRE_ADDR_HASH_V6() depends on that.
-	 */
-	power2_roundup(&ip6_cache_table_size);
-
-	ip_cache_table_v6 = (irb_t *)kmem_zalloc(ip6_cache_table_size *
-	    sizeof (irb_t), KM_SLEEP);
-
-	for (i = 0; i < ip6_cache_table_size; i++) {
-		rw_init(&ip_cache_table_v6[i].irb_lock, NULL,
-		    RW_DEFAULT, NULL);
-	}
 	/*
 	 * Create ire caches, ire_reclaim()
 	 * will give IRE_CACHE back to system when needed.
@@ -5025,49 +5048,190 @@ ip_ire_init()
 		sizeof (ire_t), 0, ip_ire_constructor,
 		ip_ire_destructor, ip_trash_ire_reclaim, NULL, NULL, 0);
 
+	rt_entry_cache = kmem_cache_create("rt_entry",
+	    sizeof (struct rt_entry), 0, NULL, NULL, NULL, NULL, NULL, 0);
+
+	/*
+	 * Have radix code setup kmem caches etc.
+	 */
+	rn_init();
+}
+
+void
+ip_ire_init(ip_stack_t *ipst)
+{
+	int i;
+	uint32_t mem_cnt;
+	uint32_t cpu_cnt;
+	uint32_t min_cnt;
+	pgcnt_t mem_avail;
+
+	/*
+	 * ip_ire_max_bucket_cnt is sized below based on the memory
+	 * size and the cpu speed of the machine. This is upper
+	 * bounded by the compile time value of ip_ire_max_bucket_cnt
+	 * and is lower bounded by the compile time value of
+	 * ip_ire_min_bucket_cnt.  Similar logic applies to
+	 * ip6_ire_max_bucket_cnt.
+	 *
+	 * We calculate this for each IP Instances in order to use
+	 * the kmem_avail and ip_ire_{min,max}_bucket_cnt that are
+	 * in effect when the zone is booted.
+	 */
+	mem_avail = kmem_avail();
+	mem_cnt = (mem_avail >> ip_ire_mem_ratio) /
+	    ip_cache_table_size / sizeof (ire_t);
+	cpu_cnt = CPU->cpu_type_info.pi_clock >> ip_ire_cpu_ratio;
+
+	min_cnt = MIN(cpu_cnt, mem_cnt);
+	if (min_cnt < ip_ire_min_bucket_cnt)
+		min_cnt = ip_ire_min_bucket_cnt;
+	if (ip_ire_max_bucket_cnt > min_cnt) {
+		ip_ire_max_bucket_cnt = min_cnt;
+	}
+
+	mem_cnt = (mem_avail >> ip_ire_mem_ratio) /
+	    ip6_cache_table_size / sizeof (ire_t);
+	min_cnt = MIN(cpu_cnt, mem_cnt);
+	if (min_cnt < ip6_ire_min_bucket_cnt)
+		min_cnt = ip6_ire_min_bucket_cnt;
+	if (ip6_ire_max_bucket_cnt > min_cnt) {
+		ip6_ire_max_bucket_cnt = min_cnt;
+	}
+
+	mutex_init(&ipst->ips_ire_ft_init_lock, NULL, MUTEX_DEFAULT, 0);
+	mutex_init(&ipst->ips_ire_handle_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&ipst->ips_ire_mrtun_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&ipst->ips_ire_srcif_table_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	(void) rn_inithead((void **)&ipst->ips_ip_ftable, 32);
+
+
+	/* Calculate the IPv4 cache table size. */
+	ipst->ips_ip_cache_table_size = MAX(ip_cache_table_size,
+	    ((mem_avail >> ip_ire_mem_ratio) / sizeof (ire_t) /
+	    ip_ire_max_bucket_cnt));
+	if (ipst->ips_ip_cache_table_size > ip_max_cache_table_size)
+		ipst->ips_ip_cache_table_size = ip_max_cache_table_size;
+	/*
+	 * Make sure that the table size is always a power of 2.  The
+	 * hash macro IRE_ADDR_HASH() depends on that.
+	 */
+	power2_roundup(&ipst->ips_ip_cache_table_size);
+
+	ipst->ips_ip_cache_table = kmem_zalloc(ipst->ips_ip_cache_table_size *
+	    sizeof (irb_t), KM_SLEEP);
+
+	for (i = 0; i < ipst->ips_ip_cache_table_size; i++) {
+		rw_init(&ipst->ips_ip_cache_table[i].irb_lock, NULL,
+		    RW_DEFAULT, NULL);
+	}
+
+	/* Calculate the IPv6 cache table size. */
+	ipst->ips_ip6_cache_table_size = MAX(ip6_cache_table_size,
+	    ((mem_avail >> ip_ire_mem_ratio) / sizeof (ire_t) /
+	    ip6_ire_max_bucket_cnt));
+	if (ipst->ips_ip6_cache_table_size > ip6_max_cache_table_size)
+		ipst->ips_ip6_cache_table_size = ip6_max_cache_table_size;
+	/*
+	 * Make sure that the table size is always a power of 2.  The
+	 * hash macro IRE_ADDR_HASH_V6() depends on that.
+	 */
+	power2_roundup(&ipst->ips_ip6_cache_table_size);
+
+	ipst->ips_ip_cache_table_v6 = kmem_zalloc(
+	    ipst->ips_ip6_cache_table_size * sizeof (irb_t), KM_SLEEP);
+
+	for (i = 0; i < ipst->ips_ip6_cache_table_size; i++) {
+		rw_init(&ipst->ips_ip_cache_table_v6[i].irb_lock, NULL,
+		    RW_DEFAULT, NULL);
+	}
+
 	/*
 	 * Initialize ip_mrtun_table to NULL now, it will be
 	 * populated by ip_rt_add if reverse tunnel is created
 	 */
-	ip_mrtun_table = NULL;
+	ipst->ips_ip_mrtun_table = NULL;
 
 	/*
 	 * Make sure that the forwarding table size is a power of 2.
 	 * The IRE*_ADDR_HASH() macroes depend on that.
 	 */
-	power2_roundup(&ip6_ftable_hash_size);
+	ipst->ips_ip6_ftable_hash_size = ip6_ftable_hash_size;
+	power2_roundup(&ipst->ips_ip6_ftable_hash_size);
+
+	ipst->ips_ire_handle = 1;
 }
 
 void
-ip_ire_fini()
+ip_ire_g_fini(void)
+{
+	kmem_cache_destroy(ire_cache);
+	kmem_cache_destroy(rt_entry_cache);
+
+	rn_fini();
+}
+
+void
+ip_ire_fini(ip_stack_t *ipst)
 {
 	int i;
 
-	mutex_destroy(&ire_ft_init_lock);
-	mutex_destroy(&ire_handle_lock);
-	mutex_destroy(&ndp4.ndp_g_lock);
+	/*
+	 * Delete all IREs - assumes that the ill/ipifs have
+	 * been removed so what remains are just the ftable and IRE_CACHE.
+	 */
+	ire_walk_ill_mrtun(0, 0, ire_delete, NULL, NULL, ipst);
+	ire_walk(ire_delete, NULL, ipst);
 
-	rn_fini();
-	RADIX_NODE_HEAD_DESTROY(ip_ftable);
-	kmem_cache_destroy(rt_entry_cache);
+	rn_freehead(ipst->ips_ip_ftable);
+	ipst->ips_ip_ftable = NULL;
 
-	for (i = 0; i < ip_cache_table_size; i++) {
-		rw_destroy(&ip_cache_table[i].irb_lock);
+	mutex_destroy(&ipst->ips_ire_ft_init_lock);
+	mutex_destroy(&ipst->ips_ire_handle_lock);
+	mutex_destroy(&ipst->ips_ire_mrtun_lock);
+	mutex_destroy(&ipst->ips_ire_srcif_table_lock);
+
+	for (i = 0; i < ipst->ips_ip_cache_table_size; i++) {
+		ASSERT(ipst->ips_ip_cache_table[i].irb_ire == NULL);
+		rw_destroy(&ipst->ips_ip_cache_table[i].irb_lock);
 	}
-	kmem_free(ip_cache_table, ip_cache_table_size * sizeof (irb_t));
+	kmem_free(ipst->ips_ip_cache_table,
+	    ipst->ips_ip_cache_table_size * sizeof (irb_t));
+	ipst->ips_ip_cache_table = NULL;
 
-	for (i = 0; i < ip6_cache_table_size; i++) {
-		rw_destroy(&ip_cache_table_v6[i].irb_lock);
+	for (i = 0; i < ipst->ips_ip6_cache_table_size; i++) {
+		ASSERT(ipst->ips_ip_cache_table_v6[i].irb_ire == NULL);
+		rw_destroy(&ipst->ips_ip_cache_table_v6[i].irb_lock);
 	}
-	kmem_free(ip_cache_table_v6, ip6_cache_table_size * sizeof (irb_t));
+	kmem_free(ipst->ips_ip_cache_table_v6,
+	    ipst->ips_ip6_cache_table_size * sizeof (irb_t));
+	ipst->ips_ip_cache_table_v6 = NULL;
 
-	if (ip_mrtun_table != NULL) {
+	if (ipst->ips_ip_mrtun_table != NULL) {
 		for (i = 0; i < IP_MRTUN_TABLE_SIZE; i++) {
-			rw_destroy(&ip_mrtun_table[i].irb_lock);
+			ASSERT(ipst->ips_ip_mrtun_table[i].irb_ire == NULL);
+			rw_destroy(&ipst->ips_ip_mrtun_table[i].irb_lock);
 		}
-		kmem_free(ip_mrtun_table, IP_MRTUN_TABLE_SIZE * sizeof (irb_t));
+		kmem_free(ipst->ips_ip_mrtun_table,
+		    IP_MRTUN_TABLE_SIZE * sizeof (irb_t));
+		ipst->ips_ip_mrtun_table = NULL;
 	}
-	kmem_cache_destroy(ire_cache);
+
+	for (i = 0; i < IP6_MASK_TABLE_SIZE; i++) {
+		irb_t *ptr;
+		int j;
+
+		if ((ptr = ipst->ips_ip_forwarding_table_v6[i]) == NULL)
+			continue;
+
+		for (j = 0; j < ipst->ips_ip6_ftable_hash_size; j++) {
+			ASSERT(ptr[j].irb_ire == NULL);
+			rw_destroy(&ptr[j].irb_lock);
+		}
+		mi_free(ptr);
+		ipst->ips_ip_forwarding_table_v6[i] = NULL;
+	}
 }
 
 int
@@ -5076,46 +5240,45 @@ ire_add_mrtun(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 	ire_t   *ire1;
 	irb_t	*irb_ptr;
 	ire_t	**irep;
-	ire_t	*ire;
+	ire_t	*ire = *ire_p;
 	int	i;
 	uint_t	max_frag;
 	ill_t	*stq_ill;
 	int error;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
-	ire = *ire_p;
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
 	/* Is ip_mrtun_table empty ? */
 
-	if (ip_mrtun_table == NULL) {
+	if (ipst->ips_ip_mrtun_table == NULL) {
 		/* create the mrtun table */
-		mutex_enter(&ire_mrtun_lock);
-		if (ip_mrtun_table == NULL) {
-			ip_mrtun_table =
-			    (irb_t *)kmem_zalloc(IP_MRTUN_TABLE_SIZE *
-			    sizeof (irb_t), KM_NOSLEEP);
+		mutex_enter(&ipst->ips_ire_mrtun_lock);
+		if (ipst->ips_ip_mrtun_table == NULL) {
+			ipst->ips_ip_mrtun_table = kmem_zalloc(
+			    IP_MRTUN_TABLE_SIZE * sizeof (irb_t), KM_NOSLEEP);
 
-			if (ip_mrtun_table == NULL) {
+			if (ipst->ips_ip_mrtun_table == NULL) {
 				ip2dbg(("ire_add_mrtun: allocation failure\n"));
-				mutex_exit(&ire_mrtun_lock);
+				mutex_exit(&ipst->ips_ire_mrtun_lock);
 				ire_refrele(ire);
 				*ire_p = NULL;
 				return (ENOMEM);
 			}
 
 			for (i = 0; i < IP_MRTUN_TABLE_SIZE; i++) {
-			    rw_init(&ip_mrtun_table[i].irb_lock, NULL,
+			    rw_init(&ipst->ips_ip_mrtun_table[i].irb_lock, NULL,
 				    RW_DEFAULT, NULL);
 			}
 			ip2dbg(("ire_add_mrtun: mrtun table is created\n"));
 		}
 		/* some other thread got it and created the table */
-		mutex_exit(&ire_mrtun_lock);
+		mutex_exit(&ipst->ips_ire_mrtun_lock);
 	}
 
 	/*
 	 * Check for duplicate in the bucket and insert in the table
 	 */
-	irb_ptr = &(ip_mrtun_table[IRE_ADDR_HASH(ire->ire_in_src_addr,
+	irb_ptr = &(ipst->ips_ip_mrtun_table[IRE_ADDR_HASH(ire->ire_in_src_addr,
 	    IP_MRTUN_TABLE_SIZE)]);
 
 	/*
@@ -5187,9 +5350,9 @@ ire_add_mrtun(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 	 * Protect ire_mrtun_count and ill_mrtun_refcnt from
 	 * another thread trying to add ire in the table
 	 */
-	mutex_enter(&ire_mrtun_lock);
-	ire_mrtun_count++;
-	mutex_exit(&ire_mrtun_lock);
+	mutex_enter(&ipst->ips_ire_mrtun_lock);
+	ipst->ips_ire_mrtun_count++;
+	mutex_exit(&ipst->ips_ire_mrtun_lock);
 	/*
 	 * ill_mrtun_refcnt is protected by the ill_lock held via
 	 * ire_atomic_start
@@ -5217,7 +5380,7 @@ ire_add_mrtun(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 
 void
 ire_walk_ill_mrtun(uint_t match_flags, uint_t ire_type, pfv_t func, void *arg,
-    ill_t *ill)
+    ill_t *ill, ip_stack_t *ipst)
 {
 	irb_t	*irb;
 	ire_t	*ire;
@@ -5228,17 +5391,17 @@ ire_walk_ill_mrtun(uint_t match_flags, uint_t ire_type, pfv_t func, void *arg,
 	    MATCH_IRE_ILL_GROUP))) || (ill != NULL));
 	ASSERT(match_flags == 0 || ire_type == IRE_MIPRTUN);
 
-	mutex_enter(&ire_mrtun_lock);
-	if (ire_mrtun_count == 0) {
-		mutex_exit(&ire_mrtun_lock);
+	mutex_enter(&ipst->ips_ire_mrtun_lock);
+	if (ipst->ips_ire_mrtun_count == 0) {
+		mutex_exit(&ipst->ips_ire_mrtun_lock);
 		return;
 	}
-	mutex_exit(&ire_mrtun_lock);
+	mutex_exit(&ipst->ips_ire_mrtun_lock);
 
 	ip2dbg(("ire_walk_ill_mrtun:walking the reverse tunnel table \n"));
 	for (i = 0; i < IP_MRTUN_TABLE_SIZE; i++) {
 
-		irb = &(ip_mrtun_table[i]);
+		irb = &(ipst->ips_ip_mrtun_table[i]);
 		if (irb->irb_ire == NULL)
 			continue;
 		IRB_REFHOLD(irb);
@@ -5248,7 +5411,7 @@ ire_walk_ill_mrtun(uint_t match_flags, uint_t ire_type, pfv_t func, void *arg,
 			if (match_flags != 0) {
 				ret = ire_walk_ill_match(
 				    match_flags, ire_type,
-				    ire, ill, ALL_ZONES);
+				    ire, ill, ALL_ZONES, ipst);
 			}
 			if (match_flags == 0 || ret)
 				(*func)(ire, arg);
@@ -5337,8 +5500,10 @@ ire_add_srcif_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 	ill_t	*stq_ill;
 	uint_t	max_frag;
 	int error = 0;
+	ip_stack_t	*ipst;
 
 	ire = *ire_p;
+	ipst = ire->ire_ipst;
 	ASSERT(ire->ire_in_ill != NULL);
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
 	ASSERT(ire->ire_type == IRE_IF_NORESOLVER ||
@@ -5374,9 +5539,8 @@ ire_add_srcif_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 	mutex_enter(&ire->ire_in_ill->ill_lock);
 	if (ire->ire_in_ill->ill_srcif_table == NULL) {
 		/* create the incoming interface based table */
-		ire->ire_in_ill->ill_srcif_table =
-		    (irb_t *)kmem_zalloc(IP_SRCIF_TABLE_SIZE *
-			sizeof (irb_t), KM_NOSLEEP);
+		ire->ire_in_ill->ill_srcif_table = kmem_zalloc(
+		    IP_SRCIF_TABLE_SIZE * sizeof (irb_t), KM_NOSLEEP);
 		if (ire->ire_in_ill->ill_srcif_table == NULL) {
 			ip1dbg(("ire_add_srcif_v4: Allocation fail\n"));
 			mutex_exit(&ire->ire_in_ill->ill_lock);
@@ -5467,9 +5631,9 @@ ire_add_srcif_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 	 * so ill_srcif_refcnt is already protected.
 	 */
 	ire->ire_in_ill->ill_srcif_refcnt++;
-	mutex_enter(&ire_srcif_table_lock);
-	ire_srcif_table_count++;
-	mutex_exit(&ire_srcif_table_lock);
+	mutex_enter(&ipst->ips_ire_srcif_table_lock);
+	ipst->ips_ire_srcif_table_count++;
+	mutex_exit(&ipst->ips_ire_srcif_table_lock);
 	irb_ptr->irb_ire_cnt++;
 	if (ire->ire_ipif != NULL) {
 		ire->ire_ipif->ipif_ire_cnt++;
@@ -5494,7 +5658,6 @@ ire_add_srcif_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
  * information for the ire. The passed ire is returned to the caller as it
  * is the ire which is created as mblk.
  */
-
 static ire_t *
 ire_update_srcif_v4(ire_t *ire)
 {
@@ -5573,7 +5736,7 @@ ire_update_srcif_v4(ire_t *ire)
  * This only works in the global zone.
  */
 boolean_t
-ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl)
+ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl, ip_stack_t *ipst)
 {
 	ire_t	*first_fire;
 	ire_t	*first_cire;
@@ -5587,7 +5750,7 @@ ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl)
 	/* Retrieve the first IRE_HOST that matches the destination */
 	first_fire = ire_ftable_lookup(dst, IP_HOST_MASK, 0, IRE_HOST, NULL,
 	    NULL, ALL_ZONES, 0, tsl,
-	    MATCH_IRE_MASK | MATCH_IRE_TYPE | MATCH_IRE_SECATTR);
+	    MATCH_IRE_MASK | MATCH_IRE_TYPE | MATCH_IRE_SECATTR, ipst);
 
 	/* No route at all */
 	if (first_fire == NULL) {
@@ -5598,7 +5761,7 @@ ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl)
 	ASSERT(firb != NULL);
 
 	/* Retrieve the first IRE_CACHE ire for that destination. */
-	first_cire = ire_cache_lookup(dst, GLOBAL_ZONEID, tsl);
+	first_cire = ire_cache_lookup(dst, GLOBAL_ZONEID, tsl, ipst);
 
 	/* No resolved route. */
 	if (first_cire == NULL) {
@@ -5643,7 +5806,7 @@ ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl)
 	/* At least one route is unresolved; search for a resolvable route. */
 	if (unres_cnt > 0)
 		resolvable = ire_multirt_lookup(&first_cire, &first_fire,
-		    MULTIRT_USESTAMP | MULTIRT_CACHEGW, tsl);
+		    MULTIRT_USESTAMP | MULTIRT_CACHEGW, tsl, ipst);
 
 	if (first_fire != NULL)
 		ire_refrele(first_fire);
@@ -5707,7 +5870,7 @@ ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl)
  */
 boolean_t
 ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
-    const ts_label_t *tsl)
+    const ts_label_t *tsl, ip_stack_t *ipst)
 {
 	clock_t	delta;
 	ire_t	*best_fire = NULL;
@@ -5749,7 +5912,7 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 	 * if we don't find one, no route for that dest is
 	 * resolved yet.
 	 */
-	first_cire = ire_cache_lookup(dst, GLOBAL_ZONEID, tsl);
+	first_cire = ire_cache_lookup(dst, GLOBAL_ZONEID, tsl, ipst);
 	if (first_cire != NULL) {
 		cirb = first_cire->ire_bucket;
 	}
@@ -5844,7 +6007,7 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 			 */
 			gw_ire = ire_route_lookup(gw, 0, 0, 0, NULL, NULL,
 			    ALL_ZONES, tsl,
-			    MATCH_IRE_RECURSIVE | MATCH_IRE_SECATTR);
+			    MATCH_IRE_RECURSIVE | MATCH_IRE_SECATTR, ipst);
 
 			ip2dbg(("ire_multirt_lookup: looked up gw_ire %p\n",
 			    (void *)gw_ire));
@@ -5893,8 +6056,8 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 			delta = lbolt - fire->ire_last_used_time;
 			delta = TICK_TO_MSEC(delta);
 
-			res = (boolean_t)
-			    ((delta > ip_multirt_resolution_interval) ||
+			res = (boolean_t)((delta >
+				ipst->ips_ip_multirt_resolution_interval) ||
 				(!(flags & MULTIRT_USESTAMP)));
 
 			ip2dbg(("ire_multirt_lookup: fire %p, delta %lu, "
@@ -5983,7 +6146,7 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 			gw_ire = ire_ftable_lookup(gw, 0, 0, IRE_INTERFACE,
 			    NULL, NULL, ALL_ZONES, 0, tsl,
 			    MATCH_IRE_RECURSIVE | MATCH_IRE_TYPE |
-			    MATCH_IRE_SECATTR);
+			    MATCH_IRE_SECATTR, ipst);
 
 			/* No resolver for the gateway; we skip this ire. */
 			if (gw_ire == NULL) {
@@ -6056,9 +6219,9 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 			delta = lbolt - fire->ire_last_used_time;
 			delta = TICK_TO_MSEC(delta);
 
-			res = (boolean_t)
-			    ((delta > ip_multirt_resolution_interval) ||
-			    (!(flags & MULTIRT_USESTAMP)));
+			res = (boolean_t)((delta >
+				ipst->ips_ip_multirt_resolution_interval) ||
+				(!(flags & MULTIRT_USESTAMP)));
 
 			ip3dbg(("ire_multirt_lookup: fire %p, delta %lx, "
 			    "flags %04x, res %d\n",
@@ -6340,6 +6503,7 @@ ire_arpresolve(ire_t *in_ire, ill_t *dst_ill)
 	size_t		bufsize;
 	frtn_t		*frtnp;
 	ill_t		*ill;
+	ip_stack_t	*ipst = dst_ill->ill_ipst;
 
 	/*
 	 * Construct message chain for the resolver
@@ -6405,6 +6569,8 @@ ire_arpresolve(ire_t *in_ire, ill_t *dst_ill)
 	ill = ire_to_ill(ire);
 	ire->ire_stq_ifindex = ill->ill_phyint->phyint_ifindex;
 	ire->ire_zoneid = in_ire->ire_zoneid;
+	ire->ire_ipst = ipst;
+
 	/*
 	 * ire_freemblk will be called when ire_mp is freed, both for
 	 * successful and failed arp resolution. IRE_MARK_UNCACHED will be set
@@ -6460,6 +6626,7 @@ ire_freemblk(ire_t *ire_mp)
 {
 	nce_t		*nce = NULL;
 	ill_t		*ill;
+	ip_stack_t	*ipst;
 
 	ASSERT(ire_mp != NULL);
 
@@ -6479,12 +6646,16 @@ ire_freemblk(ire_t *ire_mp)
 	 */
 	ASSERT(ire_mp->ire_stq != NULL);
 	ASSERT(ire_mp->ire_stq_ifindex != 0);
+	ASSERT(ire_mp->ire_ipst != NULL);
+
+	ipst = ire_mp->ire_ipst;
+
 	/*
 	 * Get any nce's corresponding to this ire_mp. We first have to
 	 * make sure that the ill is still around.
 	 */
-	ill = ill_lookup_on_ifindex(ire_mp->ire_stq_ifindex, B_FALSE,
-	    NULL, NULL, NULL, NULL);
+	ill = ill_lookup_on_ifindex(ire_mp->ire_stq_ifindex,
+	    B_FALSE, NULL, NULL, NULL, NULL, ipst);
 	if (ill == NULL || (ire_mp->ire_stq != ill->ill_wq) ||
 	    (ill->ill_state_flags & ILL_CONDEMNED)) {
 		/*
@@ -6560,6 +6731,7 @@ ire_nce_init(ire_t *ire, mblk_t *fp_mp, mblk_t *res_mp)
 	nce_t		*arpce = NULL;
 	ill_t		*ire_ill;
 	uint16_t	nce_state, nce_flags;
+	ip_stack_t	*ipst;
 
 	if (ire->ire_stq == NULL) {
 		if (res_mp)
@@ -6594,6 +6766,7 @@ ire_nce_init(ire_t *ire, mblk_t *fp_mp, mblk_t *res_mp)
 	 * for the outgoing interface, which we get from the ire_stq.
 	 */
 	ire_ill = ire_to_ill(ire);
+	ipst = ire_ill->ill_ipst;
 
 	/*
 	 * if we are creating an nce for the first time, and this is
@@ -6680,7 +6853,7 @@ ire_nce_init(ire_t *ire, mblk_t *fp_mp, mblk_t *res_mp)
 		 */
 		NCE_REFHOLD_TO_REFHOLD_NOTR(ire->ire_nce);
 	} else {
-		if (NCE_EXPIRED(arpce))
+		if (NCE_EXPIRED(arpce, ipst))
 			arpce = nce_reinit(arpce);
 		if (arpce != NULL) {
 			/*

@@ -4,7 +4,12 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * Added redirect stuff and a variety of bug fixes. (mcn@EnGarde.com)
+ *
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ipf.h"
 
@@ -14,12 +19,12 @@ static const char rcsid[] = "@(#)$Id: printactivenat.c,v 1.3.2.4 2004/05/11 16:0
 #endif
 
 
-void printactivenat(nat, opts)
+void printactivenat(nat, opts, alive)
 nat_t *nat;
-int opts;
+int opts, alive;
 {
 
-	printf("%s", getnattype(nat->nat_ptr));
+	printf("%s", getnattype(nat, alive));
 
 	if (nat->nat_flags & SI_CLONE)
 		printf(" CLONE");

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -509,7 +509,7 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
  * Macro that hands off one or more messages directly to DLD
  * when the interface is marked with ILL_CAPAB_POLL.
  */
-#define	IP_DLS_ILL_TX(ill, ipha, mp) {					\
+#define	IP_DLS_ILL_TX(ill, ipha, mp, ipst) {				\
 	ill_dls_capab_t *ill_dls = ill->ill_dls_capab;			\
 	ASSERT(ILL_DLS_CAPABLE(ill));					\
 	ASSERT(ill_dls != NULL);					\
@@ -518,8 +518,9 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 	DTRACE_PROBE4(ip4__physical__out__start,			\
 	    ill_t *, NULL, ill_t *, ill,				\
 	    ipha_t *, ipha, mblk_t *, mp);				\
-	FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,	\
-	    NULL, ill, ipha, mp, mp);					\
+	FW_HOOKS(ipst->ips_ip4_physical_out_event,			\
+	    ipst->ips_ipv4firewall_physical_out,			\
+	    NULL, ill, ipha, mp, mp, ipst);				\
 	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);		\
 	if (mp != NULL)							\
 		ill_dls->ill_tx(ill_dls->ill_tx_handle, mp);		\
@@ -527,7 +528,7 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 
 extern int	ip_wput_frag_mdt_min;
 extern boolean_t ip_can_frag_mdt(mblk_t *, ssize_t, ssize_t);
-extern mblk_t   *ip_prepend_zoneid(mblk_t *, zoneid_t);
+extern mblk_t   *ip_prepend_zoneid(mblk_t *, zoneid_t, ip_stack_t *);
 
 #endif	/* _KERNEL */
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998,2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +46,55 @@ extern optdb_obj_t	keysock_opt_obj;
 extern uint_t		keysock_max_optsize;
 
 /*
+ * KEYSOCK stack instances
+ */
+struct keysock_stack {
+	netstack_t		*keystack_netstack;	/* Common netstack */
+	/*
+	 * keysock_plumbed: zero if plumb not attempted, positive if it
+	 * succeeded,  negative if it failed.
+	 */
+	int			keystack_plumbed;
+	caddr_t			keystack_g_nd;
+	struct keysockparam_s	*keystack_params;
+
+	kmutex_t		keystack_param_lock;
+				/* Protects the NDD variables. */
+
+	/* List of open PF_KEY sockets, protected by keysock_list_lock. */
+	kmutex_t		keystack_list_lock;
+	struct keysock_s	*keystack_list;
+
+	/*
+	 * Consumers table. If an entry is NULL, keysock maintains
+	 * the table.
+	 */
+	kmutex_t		keystack_consumers_lock;
+
+#define	KEYSOCK_MAX_CONSUMERS 256
+	struct keysock_consumer_s *keystack_consumers[KEYSOCK_MAX_CONSUMERS];
+
+	/*
+	 * State for flush/dump.  This would normally be a boolean_t, but
+	 * cas32() works best for a known 32-bit quantity.
+	 */
+	uint32_t		keystack_flushdump;
+	int			keystack_flushdump_errno;
+
+	/*
+	 * This integer counts the number of extended REGISTERed sockets.  This
+	 * determines if we should send extended REGISTERs.
+	 */
+	uint32_t		keystack_num_extended;
+
+	/*
+	 * Global sequence space for SADB_ACQUIRE messages of any sort.
+	 */
+	uint32_t		keystack_acquire_seq;
+};
+typedef struct keysock_stack keysock_stack_t;
+
+/*
  * keysock session state (one per open PF_KEY socket (i.e. as a driver))
  *
  * I keep these in a linked list, and assign a monotonically increasing
@@ -69,6 +117,7 @@ typedef struct keysock_s {
 
 	/* Also protected by keysock_list_lock. */
 	minor_t keysock_serial; /* Serial number of this socket. */
+	keysock_stack_t		*keysock_keystack;
 } keysock_t;
 
 #define	KEYSOCK_NOLOOP	0x1	/* Don't loopback messages (no replies). */
@@ -95,13 +144,16 @@ typedef struct keysock_consumer_s {
 	queue_t *kc_wq;		/* Write queue, putnext down */
 
 	/* Other goodies as a need them. */
-	uint8_t kc_sa_type;	/* What sort of SA am I? */
-	uint_t kc_flags;
+	uint8_t			kc_sa_type;	/* What sort of SA am I? */
+	uint_t			kc_flags;
+	keysock_stack_t		*kc_keystack;
 } keysock_consumer_t;
 
 /* Can only set flags when keysock_consumer_lock is held. */
 #define	KC_INTERNAL 0x1		/* Consumer maintained by keysock itself. */
 #define	KC_FLUSHING 0x2		/* SADB_FLUSH pending on this consumer. */
+
+extern int keysock_plumb_ipsec(netstack_t *);
 
 #ifdef	__cplusplus
 }

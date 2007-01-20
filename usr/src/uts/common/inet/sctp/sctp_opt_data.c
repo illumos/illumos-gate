@@ -267,31 +267,32 @@ sctp_set_rtoinfo(sctp_t *sctp, const void *invalp, uint_t inlen)
 {
 	const struct sctp_rtoinfo *srto;
 	boolean_t ispriv;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (inlen < sizeof (*srto)) {
 		return (EINVAL);
 	}
 	srto = invalp;
 
-	ispriv = secpolicy_net_config(CRED(), B_TRUE) == 0;
+	ispriv = secpolicy_ip_config(sctp->sctp_credp, B_TRUE) == 0;
 
 	/*
 	 * Bounds checking.  Priviledged user can set the RTO initial
 	 * outside the ndd boundary.
 	 */
 	if (srto->srto_initial != 0 &&
-	    (!ispriv && (srto->srto_initial < sctp_rto_initialg_low ||
-		srto->srto_initial > sctp_rto_initialg_high))) {
+	    (!ispriv && (srto->srto_initial < sctps->sctps_rto_initialg_low ||
+		srto->srto_initial > sctps->sctps_rto_initialg_high))) {
 		return (EINVAL);
 	}
 	if (srto->srto_max != 0 &&
-	    (!ispriv && (srto->srto_max < sctp_rto_maxg_low ||
-		srto->srto_max > sctp_rto_maxg_high))) {
+	    (!ispriv && (srto->srto_max < sctps->sctps_rto_maxg_low ||
+		srto->srto_max > sctps->sctps_rto_maxg_high))) {
 		return (EINVAL);
 	}
 	if (srto->srto_min != 0 &&
-	    (!ispriv && (srto->srto_min < sctp_rto_ming_low ||
-		srto->srto_min > sctp_rto_ming_high))) {
+	    (!ispriv && (srto->srto_min < sctps->sctps_rto_ming_low ||
+		srto->srto_min > sctps->sctps_rto_ming_high))) {
 		return (EINVAL);
 	}
 
@@ -340,6 +341,7 @@ sctp_set_assocparams(sctp_t *sctp, const void *invalp, uint_t inlen)
 	const struct sctp_assocparams *sap = invalp;
 	uint32_t sum = 0;
 	sctp_faddr_t *fp;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (inlen < sizeof (*sap)) {
 		return (EINVAL);
@@ -358,8 +360,8 @@ sctp_set_assocparams(sctp_t *sctp, const void *invalp, uint_t inlen)
 				return (EINVAL);
 			}
 		}
-		if (sap->sasoc_asocmaxrxt < sctp_pa_max_retr_low ||
-		    sap->sasoc_asocmaxrxt > sctp_pa_max_retr_high) {
+		if (sap->sasoc_asocmaxrxt < sctps->sctps_pa_max_retr_low ||
+		    sap->sasoc_asocmaxrxt > sctps->sctps_pa_max_retr_high) {
 			/*
 			 * Out of bounds.
 			 */
@@ -367,8 +369,8 @@ sctp_set_assocparams(sctp_t *sctp, const void *invalp, uint_t inlen)
 		}
 	}
 	if (sap->sasoc_cookie_life != 0 &&
-	    (sap->sasoc_cookie_life < sctp_cookie_life_low ||
-		sap->sasoc_cookie_life > sctp_cookie_life_high)) {
+	    (sap->sasoc_cookie_life < sctps->sctps_cookie_life_low ||
+		sap->sasoc_cookie_life > sctps->sctps_cookie_life_high)) {
 			return (EINVAL);
 	}
 
@@ -402,6 +404,7 @@ static int
 sctp_set_initmsg(sctp_t *sctp, const void *invalp, uint_t inlen)
 {
 	const struct sctp_initmsg *si = invalp;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (sctp->sctp_state > SCTPS_LISTEN) {
 		return (EINVAL);
@@ -410,27 +413,28 @@ sctp_set_initmsg(sctp_t *sctp, const void *invalp, uint_t inlen)
 		return (EINVAL);
 	}
 	if (si->sinit_num_ostreams != 0 &&
-	    (si->sinit_num_ostreams < sctp_initial_out_streams_low ||
-		si->sinit_num_ostreams > sctp_initial_out_streams_high)) {
+	    (si->sinit_num_ostreams < sctps->sctps_initial_out_streams_low ||
+	    si->sinit_num_ostreams >
+	    sctps->sctps_initial_out_streams_high)) {
 		/*
 		 * Out of bounds.
 		 */
 		return (EINVAL);
 	}
 	if (si->sinit_max_instreams != 0 &&
-	    (si->sinit_max_instreams < sctp_max_in_streams_low ||
-		si->sinit_max_instreams > sctp_max_in_streams_high)) {
+	    (si->sinit_max_instreams < sctps->sctps_max_in_streams_low ||
+		si->sinit_max_instreams > sctps->sctps_max_in_streams_high)) {
 		return (EINVAL);
 	}
 	if (si->sinit_max_attempts != 0 &&
-	    (si->sinit_max_attempts < sctp_max_init_retr_low ||
-		si->sinit_max_attempts > sctp_max_init_retr_high)) {
+	    (si->sinit_max_attempts < sctps->sctps_max_init_retr_low ||
+		si->sinit_max_attempts > sctps->sctps_max_init_retr_high)) {
 		return (EINVAL);
 	}
 	if (si->sinit_max_init_timeo != 0 &&
-	    (secpolicy_net_config(CRED(), B_TRUE) != 0 &&
-		(si->sinit_max_init_timeo < sctp_rto_maxg_low ||
-		si->sinit_max_init_timeo > sctp_rto_maxg_high))) {
+	    (secpolicy_ip_config(sctp->sctp_credp, B_TRUE) != 0 &&
+		(si->sinit_max_init_timeo < sctps->sctps_rto_maxg_low ||
+		si->sinit_max_init_timeo > sctps->sctps_rto_maxg_high))) {
 		return (EINVAL);
 	}
 	if (si->sinit_num_ostreams != 0)
@@ -511,6 +515,7 @@ sctp_set_peer_addr_params(sctp_t *sctp, const void *invalp, uint_t inlen)
 	int retval;
 	uint32_t sum = 0;
 	int64_t now;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (inlen < sizeof (*spp)) {
 		return (EINVAL);
@@ -522,13 +527,13 @@ sctp_set_peer_addr_params(sctp_t *sctp, const void *invalp, uint_t inlen)
 	}
 
 	if (spp->spp_hbinterval && spp->spp_hbinterval != UINT32_MAX &&
-	    (spp->spp_hbinterval < sctp_heartbeat_interval_low ||
-		spp->spp_hbinterval > sctp_heartbeat_interval_high)) {
+	    (spp->spp_hbinterval < sctps->sctps_heartbeat_interval_low ||
+		spp->spp_hbinterval > sctps->sctps_heartbeat_interval_high)) {
 		return (EINVAL);
 	}
 	if (spp->spp_pathmaxrxt &&
-	    (spp->spp_pathmaxrxt < sctp_pp_max_retr_low ||
-		spp->spp_pathmaxrxt > sctp_pp_max_retr_high)) {
+	    (spp->spp_pathmaxrxt < sctps->sctps_pp_max_retr_low ||
+		spp->spp_pathmaxrxt > sctps->sctps_pp_max_retr_high)) {
 		return (EINVAL);
 	}
 	if (spp->spp_pathmaxrxt && sctp->sctp_faddrs) {
@@ -1128,6 +1133,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 	boolean_t	onoff;
 	int		retval = 0, addrcnt;
 	conn_t		*connp = sctp->sctp_connp;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	/* In all cases, the size of the option must be bigger than int */
 	if (inlen >= sizeof (int32_t)) {
@@ -1187,7 +1193,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			sctp->sctp_dgram_errind = onoff;
 			break;
 		case SO_SNDBUF:
-			if (*i1 > sctp_max_buf) {
+			if (*i1 > sctps->sctps_max_buf) {
 				retval = ENOBUFS;
 				break;
 			}
@@ -1196,13 +1202,13 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				break;
 			}
 			sctp->sctp_xmit_hiwater = *i1;
-			if (sctp_snd_lowat_fraction != 0)
+			if (sctps->sctps_snd_lowat_fraction != 0)
 				sctp->sctp_xmit_lowater =
 				    sctp->sctp_xmit_hiwater /
-				    sctp_snd_lowat_fraction;
+				    sctps->sctps_snd_lowat_fraction;
 			break;
 		case SO_RCVBUF:
-			if (*i1 > sctp_max_buf) {
+			if (*i1 > sctps->sctps_max_buf) {
 				retval = ENOBUFS;
 				break;
 			}
@@ -1216,7 +1222,8 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				 * acknowledgement.
 				 */
 				*i1 = MAX(*i1,
-				    sctp_recv_hiwat_minmss * sctp->sctp_mss);
+				    sctps->sctps_recv_hiwat_minmss *
+				    sctp->sctp_mss);
 				sctp->sctp_rwnd = *i1;
 				sctp->sctp_irwnd = sctp->sctp_rwnd;
 			}
@@ -1226,7 +1233,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			 */
 			break;
 		case SO_ALLZONES:
-			if (secpolicy_net(sctp->sctp_credp, OP_CONFIG,
+			if (secpolicy_ip(sctp->sctp_credp, OP_CONFIG,
 			    B_TRUE)) {
 				retval = EACCES;
 				break;
@@ -1432,11 +1439,13 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			ipaddr_t addr = *i1;
 			ipif_t *ipif = NULL;
 			ill_t *ill;
+			ip_stack_t *ipst = sctps->sctps_netstack->netstack_ip;
 
-			if (secpolicy_net(CRED(), OP_CONFIG, B_TRUE) == 0) {
+			if (secpolicy_ip(sctp->sctp_credp, OP_CONFIG,
+			    B_TRUE) == 0) {
 				ipif =
 				    ipif_lookup_onlink_addr(addr,
-				    connp->conn_zoneid);
+					connp->conn_zoneid, ipst);
 				if (ipif == NULL) {
 					retval = EHOSTUNREACH;
 					break;
@@ -1481,7 +1490,8 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				break;
 			}
 			if (*i1 == -1) {
-				ipp->ipp_unicast_hops = sctp_ipv6_hoplimit;
+				ipp->ipp_unicast_hops =
+				    sctps->sctps_ipv6_hoplimit;
 				ipp->ipp_fields &= ~IPPF_UNICAST_HOPS;
 			} else {
 				ipp->ipp_unicast_hops = (uint8_t)*i1;
@@ -1606,6 +1616,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			break;
 		case IPV6_NEXTHOP: {
 			struct sockaddr_in6 *sin6;
+			ip_stack_t *ipst = sctps->sctps_netstack->netstack_ip;
 
 			if (inlen != 0 && inlen != sizeof (sin6_t)) {
 				retval = EINVAL;
@@ -1633,7 +1644,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 					ire = ire_route_lookup_v6(
 					    &sin6->sin6_addr, NULL, NULL, 0,
 					    NULL, NULL, ALL_ZONES, NULL,
-					    MATCH_IRE_DEFAULT);
+					    MATCH_IRE_DEFAULT, ipst);
 					if (ire == NULL) {
 						retval = EHOSTUNREACH;
 						break;

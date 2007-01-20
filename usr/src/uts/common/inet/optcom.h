@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -113,10 +113,10 @@ typedef struct opdes_s {
  * are used to determine permissions.
  */
 #define	OA_POLICY_OK(x, c) \
-		(secpolicy_net((c), (x)->opdes_access_req_priv, B_FALSE) == 0)
+		(secpolicy_ip((c), (x)->opdes_access_req_priv, B_FALSE) == 0)
 
 #define	OA_POLICY_ONLY_OK(x, c) \
-		(secpolicy_net((c), (x)->opdes_access_req_priv, B_TRUE) == 0)
+		(secpolicy_ip((c), (x)->opdes_access_req_priv, B_TRUE) == 0)
 
 #define	OA_MATCHED_PRIV(x, c)	((x)->opdes_access_req_priv != OP_NP && \
 		OA_POLICY_ONLY_OK((x), (c)))

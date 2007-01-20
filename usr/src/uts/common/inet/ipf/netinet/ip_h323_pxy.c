@@ -10,6 +10,9 @@
  * please email licensing@qnx.com.
  *
  * For more details, see QNX_OCL.txt provided with this distribution.
+ *
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -18,6 +21,8 @@
  *      by xtang@canada.com
  *	ported to ipfilter 3.4.20 by Michael Grant mg-ipf@grant.org
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if __FreeBSD_version >= 220000 && defined(_KERNEL)
 # include <sys/fcntl.h>
@@ -30,20 +35,21 @@
 
 #define IPF_H323_PROXY
 
-int  ippr_h323_init __P((void));
-void  ippr_h323_fini __P((void));
-int  ippr_h323_new __P((fr_info_t *, ap_session_t *, nat_t *));
-void ippr_h323_del __P((ap_session_t *));
-int  ippr_h323_out __P((fr_info_t *, ap_session_t *, nat_t *));
-int  ippr_h323_in __P((fr_info_t *, ap_session_t *, nat_t *));
+typedef struct ifs_h323pxy {
+	frentry_t	h323_fr;
+	int		h323_proxy_init;
+} ifs_h323pxy_t;
 
-int  ippr_h245_new __P((fr_info_t *, ap_session_t *, nat_t *));
-int  ippr_h245_out __P((fr_info_t *, ap_session_t *, nat_t *));
-int  ippr_h245_in __P((fr_info_t *, ap_session_t *, nat_t *));
+int  ippr_h323_init __P((void **, ipf_stack_t *));
+void  ippr_h323_fini __P((void **, ipf_stack_t *));
+int  ippr_h323_new __P((fr_info_t *, ap_session_t *, nat_t *, void *));
+void ippr_h323_del __P((ap_session_t *, void *, ipf_stack_t *));
+int  ippr_h323_out __P((fr_info_t *, ap_session_t *, nat_t *, void *));
+int  ippr_h323_in __P((fr_info_t *, ap_session_t *, nat_t *, void *));
 
-static	frentry_t	h323_fr;
-
-int	h323_proxy_init = 0;
+int  ippr_h245_new __P((fr_info_t *, ap_session_t *, nat_t *, void *));
+int  ippr_h245_out __P((fr_info_t *, ap_session_t *, nat_t *, void *));
+int  ippr_h245_in __P((fr_info_t *, ap_session_t *, nat_t *, void *));
 
 static int find_port __P((int, caddr_t, int datlen, int *, u_short *));
 
@@ -81,31 +87,50 @@ unsigned short *port;
 /*
  * Initialize local structures.
  */
-int ippr_h323_init()
+/*ARGSUSED*/
+int ippr_h323_init(private, ifs)
+void **private;
+ipf_stack_t *ifs;
 {
-	bzero((char *)&h323_fr, sizeof(h323_fr));
-	h323_fr.fr_ref = 1;
-	h323_fr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
-	MUTEX_INIT(&h323_fr.fr_lock, "H323 proxy rule lock");
-	h323_proxy_init = 1;
+	ifs_h323pxy_t *ifsh323;
+
+	KMALLOC(ifsh323, ifs_h323pxy_t *);
+	if (ifsh323 == NULL)
+		return -1;
+
+	ifsh323->h323_fr.fr_ref = 1;
+	ifsh323->h323_fr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
+	MUTEX_INIT(&ifsh323->h323_fr.fr_lock, "H323 proxy rule lock");
+	ifsh323->h323_proxy_init = 1;
+
+	*private = (void *)ifsh323;
 
 	return 0;
 }
 
 
-void ippr_h323_fini()
+/*ARGSUSED*/
+void ippr_h323_fini(private, ifs)
+void **private;
+ipf_stack_t *ifs;
 {
-	if (h323_proxy_init == 1) {
-		MUTEX_DESTROY(&h323_fr.fr_lock);
-		h323_proxy_init = 0;
+	ifs_h323pxy_t *ifsh323 = *((ifs_h323pxy_t **)private);
+
+	if (ifsh323->h323_proxy_init == 1) {
+		MUTEX_DESTROY(&ifsh323->h323_fr.fr_lock);
+		ifsh323->h323_proxy_init = 0;
 	}
+
+	KFREE(ifsh323);
+	*private = NULL;
 }
 
-
-int ippr_h323_new(fin, aps, nat)
+/*ARGSUSED*/
+int ippr_h323_new(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	fin = fin;	/* LINT */
 	nat = nat;	/* LINT */
@@ -116,9 +141,11 @@ nat_t *nat;
 	return 0;
 }
 
-
-void ippr_h323_del(aps)
+/*ARGSUSED*/
+void ippr_h323_del(aps, private, ifs)
 ap_session_t *aps;
+void *private;
+ipf_stack_t *ifs;
 {
 	int i;
 	ipnat_t *ipn;
@@ -135,7 +162,7 @@ ap_session_t *aps;
 			 * called with ipf_nat locked.
 			 */
 			if (fr_nat_ioctl((caddr_t)ipn, SIOCRMNAT, NAT_SYSSPACE|
-				         NAT_LOCKHELD|FWRITE) == -1) {
+				         NAT_LOCKHELD|FWRITE, 0, NULL, ifs) == -1) {
 				/*EMPTY*/;
 				/* log the error */
 			}
@@ -149,16 +176,19 @@ ap_session_t *aps;
 }
 
 
-int ippr_h323_in(fin, aps, nat)
+/*ARGSUSED*/
+int ippr_h323_in(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	int ipaddr, off, datlen;
 	unsigned short port;
 	caddr_t data;
 	tcphdr_t *tcp;
 	ip_t *ip;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	ip = fin->fin_ip;
 	tcp = (tcphdr_t *)fin->fin_dp;
@@ -197,13 +227,13 @@ nat_t *nat;
 		 * A (maybe better) solution is do a UPGRADE(), and instead
 		 * of calling fr_nat_ioctl(), we add the nat rule ourself.
 		 */
-		RWLOCK_EXIT(&ipf_nat);
+		RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		if (fr_nat_ioctl((caddr_t)ipn, SIOCADNAT,
-				 NAT_SYSSPACE|FWRITE) == -1) {
-			READ_ENTER(&ipf_nat);
+				 NAT_SYSSPACE|FWRITE, 0, NULL, ifs) == -1) {
+			READ_ENTER(&ifs->ifs_ipf_nat);
 			return -1;
 		}
-		READ_ENTER(&ipf_nat);
+		READ_ENTER(&ifs->ifs_ipf_nat);
 		if (aps->aps_data != NULL && aps->aps_psiz > 0) {
 			bcopy(aps->aps_data, newarray, aps->aps_psiz);
 			KFREES(aps->aps_data, aps->aps_psiz);
@@ -215,10 +245,12 @@ nat_t *nat;
 }
 
 
-int ippr_h245_new(fin, aps, nat)
+/*ARGSUSED*/
+int ippr_h245_new(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	fin = fin;	/* LINT */
 	nat = nat;	/* LINT */
@@ -229,16 +261,19 @@ nat_t *nat;
 }
 
 
-int ippr_h245_out(fin, aps, nat)
+/*ARGSUSED*/
+int ippr_h245_out(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	int ipaddr, off, datlen;
 	tcphdr_t *tcp;
 	caddr_t data;
 	u_short port;
 	ip_t *ip;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	aps = aps;	/* LINT */
 
@@ -281,7 +316,8 @@ nat_t *nat;
 
 				nat2->nat_ptr->in_hits++;
 #ifdef	IPFILTER_LOG
-				nat_log(nat2, (u_int)(nat->nat_ptr->in_redir));
+				nat_log(nat2, (u_int)(nat->nat_ptr->in_redir),
+					ifs);
 #endif
 				bcopy((caddr_t)&ip->ip_src.s_addr,
 				      data + off, 4);

@@ -5,7 +5,7 @@
  *
  * $Id: ip_rcmd_pxy.c,v 1.41.2.4 2005/02/04 10:22:55 darrenr Exp $
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Simple RCMD transparent proxy for in-kernel use.  For use with the NAT
@@ -16,51 +16,71 @@
 
 #define	IPF_RCMD_PROXY
 
+typedef struct ifs_rcmdpxy {
+	frentry_t	rcmdfr;
+	int		rcmd_proxy_init;
+} ifs_rcmdpxy_t;
 
-int ippr_rcmd_init __P((void));
-void ippr_rcmd_fini __P((void));
-int ippr_rcmd_new __P((fr_info_t *, ap_session_t *, nat_t *));
-int ippr_rcmd_out __P((fr_info_t *, ap_session_t *, nat_t *));
-int ippr_rcmd_in __P((fr_info_t *, ap_session_t *, nat_t *));
+int ippr_rcmd_init __P((void **, ipf_stack_t *));
+void ippr_rcmd_fini __P((void **, ipf_stack_t *));
+int ippr_rcmd_new __P((fr_info_t *, ap_session_t *, nat_t *, void *));
+int ippr_rcmd_out __P((fr_info_t *, ap_session_t *, nat_t *, void *));
+int ippr_rcmd_in __P((fr_info_t *, ap_session_t *, nat_t *, void *));
 u_short ipf_rcmd_atoi __P((char *));
-int ippr_rcmd_portmsg __P((fr_info_t *, ap_session_t *, nat_t *));
-
-static	frentry_t	rcmdfr;
-
-int	rcmd_proxy_init = 0;
-
+int ippr_rcmd_portmsg __P((fr_info_t *, ap_session_t *, nat_t *, ifs_rcmdpxy_t *));
 
 /*
  * RCMD application proxy initialization.
  */
-int ippr_rcmd_init()
+/*ARGSUSED*/
+int ippr_rcmd_init(private, ifs)
+void **private;
+ipf_stack_t *ifs;
 {
-	bzero((char *)&rcmdfr, sizeof(rcmdfr));
-	rcmdfr.fr_ref = 1;
-	rcmdfr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
-	MUTEX_INIT(&rcmdfr.fr_lock, "RCMD proxy rule lock");
-	rcmd_proxy_init = 1;
+	ifs_rcmdpxy_t *ifsrcmd;
+
+	KMALLOC(ifsrcmd, ifs_rcmdpxy_t *);
+	if (ifsrcmd == NULL)
+		return -1;
+
+	bzero((char *)&ifsrcmd->rcmdfr, sizeof(ifsrcmd->rcmdfr));
+	ifsrcmd->rcmdfr.fr_ref = 1;
+	ifsrcmd->rcmdfr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
+	MUTEX_INIT(&ifsrcmd->rcmdfr.fr_lock, "RCMD proxy rule lock");
+	ifsrcmd->rcmd_proxy_init = 1;
+
+	*private = (void *)ifsrcmd;
 
 	return 0;
 }
 
 
-void ippr_rcmd_fini()
+/*ARGSUSED*/
+void ippr_rcmd_fini(private, ifs)
+void **private;
+ipf_stack_t *ifs;
 {
-	if (rcmd_proxy_init == 1) {
-		MUTEX_DESTROY(&rcmdfr.fr_lock);
-		rcmd_proxy_init = 0;
+	ifs_rcmdpxy_t *ifsrcmd = *((ifs_rcmdpxy_t **)private);
+
+	if (ifsrcmd->rcmd_proxy_init == 1) {
+		MUTEX_DESTROY(&ifsrcmd->rcmdfr.fr_lock);
+		ifsrcmd->rcmd_proxy_init = 0;
 	}
+
+	KFREE(ifsrcmd);
+	*private = NULL;
 }
 
 
 /*
  * Setup for a new RCMD proxy.
  */
-int ippr_rcmd_new(fin, aps, nat)
+/*ARGSUSED*/
+int ippr_rcmd_new(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	tcphdr_t *tcp = (tcphdr_t *)fin->fin_dp;
 
@@ -99,10 +119,11 @@ char *ptr;
 }
 
 
-int ippr_rcmd_portmsg(fin, aps, nat)
+int ippr_rcmd_portmsg(fin, aps, nat, ifsrcmd)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+ifs_rcmdpxy_t *ifsrcmd;
 {
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
 	struct in_addr swip, swip2;
@@ -113,6 +134,7 @@ nat_t *nat;
 	nat_t *nat2;
 	ip_t *ip;
 	mb_t *m;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	tcp = (tcphdr_t *)fin->fin_dp;
 
@@ -177,7 +199,7 @@ nat_t *nat;
 		TCP_OFF_A(tcp2, 5);
 		tcp2->th_flags = TH_SYN;
 		fi.fin_dp = (char *)tcp2;
-		fi.fin_fr = &rcmdfr;
+		fi.fin_fr = &ifsrcmd->rcmdfr;
 		fi.fin_dlen = sizeof(*tcp2);
 		fi.fin_plen = fi.fin_hlen + sizeof(*tcp2);
 		fi.fin_flx &= FI_LOWTTL|FI_FRAG|FI_TCPUDP|FI_OPTIONS|FI_IGNORE;
@@ -207,7 +229,7 @@ nat_t *nat;
 			}
 			(void) fr_addstate(&fi, &nat2->nat_state, SI_W_DPORT);
 			if (fi.fin_state != NULL)
-				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+				fr_statederef(&fi, (ipstate_t **)&fi.fin_state, ifs);
 		}
 		ip->ip_len = slen;
 		ip->ip_src = swip;
@@ -217,23 +239,25 @@ nat_t *nat;
 }
 
 
-int ippr_rcmd_out(fin, aps, nat)
+int ippr_rcmd_out(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	if (nat->nat_dir == NAT_OUTBOUND)
-		return ippr_rcmd_portmsg(fin, aps, nat);
+		return ippr_rcmd_portmsg(fin, aps, nat, (ifs_rcmdpxy_t *)private);
 	return 0;
 }
 
 
-int ippr_rcmd_in(fin, aps, nat)
+int ippr_rcmd_in(fin, aps, nat, private)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
+void *private;
 {
 	if (nat->nat_dir == NAT_INBOUND)
-		return ippr_rcmd_portmsg(fin, aps, nat);
+		return ippr_rcmd_portmsg(fin, aps, nat, (ifs_rcmdpxy_t *)private);
 	return 0;
 }

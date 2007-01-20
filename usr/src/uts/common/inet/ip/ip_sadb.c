@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,56 +35,15 @@
 #include <inet/mib2.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
-#include <inet/ipdrop.h>
 
 #include <net/pfkeyv2.h>
 #include <inet/ipsec_info.h>
 #include <inet/sadb.h>
 #include <inet/ipsec_impl.h>
+#include <inet/ipdrop.h>
 #include <inet/ipsecesp.h>
 #include <inet/ipsecah.h>
 #include <sys/kstat.h>
-
-/* stats */
-static kstat_t *ipsec_ksp;
-ipsec_kstats_t *ipsec_kstats;
-
-/* The IPsec SADBs for AH and ESP */
-sadbp_t ah_sadb, esp_sadb;
-
-/* Packet dropper for IP IPsec processing failures */
-extern ipdropper_t ip_dropper;
-
-void
-ipsec_kstat_init(void)
-{
-	ipsec_ksp = kstat_create("ip", 0, "ipsec_stat", "net",
-	    KSTAT_TYPE_NAMED, sizeof (*ipsec_kstats) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_PERSISTENT);
-
-	ASSERT(ipsec_ksp != NULL);
-
-	ipsec_kstats = ipsec_ksp->ks_data;
-
-#define	KI(x) kstat_named_init(&ipsec_kstats->x, #x, KSTAT_DATA_UINT64)
-	KI(esp_stat_in_requests);
-	KI(esp_stat_in_discards);
-	KI(esp_stat_lookup_failure);
-	KI(ah_stat_in_requests);
-	KI(ah_stat_in_discards);
-	KI(ah_stat_lookup_failure);
-	KI(sadb_acquire_maxpackets);
-	KI(sadb_acquire_qhiwater);
-#undef KI
-
-	kstat_install(ipsec_ksp);
-}
-
-void
-ipsec_kstat_destroy(void)
-{
-	kstat_delete(ipsec_ksp);
-}
 
 /*
  * Returns B_TRUE if the identities in the SA match the identities
@@ -589,17 +548,25 @@ ipsec_outbound_sa(mblk_t *mp, uint_t proto)
 	sadbp_t *sadbp;
 	sadb_t *sp;
 	sa_family_t af;
+	netstack_t	*ns;
 
 	data_mp = mp->b_cont;
 	io = (ipsec_out_t *)mp->b_rptr;
+	ns = io->ipsec_out_ns;
 
 	if (proto == IPPROTO_ESP) {
+		ipsecesp_stack_t	*espstack;
+
+		espstack = ns->netstack_ipsecesp;
 		sa = &io->ipsec_out_esp_sa;
-		sadbp = &esp_sadb;
+		sadbp = &espstack->esp_sadb;
 	} else {
+		ipsecah_stack_t	*ahstack;
+
 		ASSERT(proto == IPPROTO_AH);
+		ahstack = ns->netstack_ipsecah;
 		sa = &io->ipsec_out_ah_sa;
-		sadbp = &ah_sadb;
+		sadbp = &ahstack->ah_sadb;
 	}
 
 	ASSERT(*sa == NULL);
@@ -659,7 +626,7 @@ ipsec_outbound_sa(mblk_t *mp, uint_t proto)
  */
 
 ah_t *
-ipsec_inbound_ah_sa(mblk_t *mp)
+ipsec_inbound_ah_sa(mblk_t *mp, netstack_t *ns)
 {
 	mblk_t *ipsec_in;
 	ipha_t *ipha;
@@ -674,8 +641,10 @@ ipsec_inbound_ah_sa(mblk_t *mp)
 	int pullup_len;
 	sadb_t *sp;
 	sa_family_t af;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
 
-	IP_AH_BUMP_STAT(in_requests);
+	IP_AH_BUMP_STAT(ipss, in_requests);
 
 	ASSERT(mp->b_datap->db_type == M_CTL);
 
@@ -705,12 +674,13 @@ ipsec_inbound_ah_sa(mblk_t *mp)
 	pullup_len = ah_offset + sizeof (ah_t);
 	if (mp->b_rptr + pullup_len > mp->b_wptr) {
 		if (!pullupmsg(mp, pullup_len)) {
-			ipsec_rl_strlog(ip_mod_info.mi_idnum, 0, 0,
+			ipsec_rl_strlog(ns, ip_mod_info.mi_idnum, 0, 0,
 			    SL_WARN | SL_ERROR,
 			    "ipsec_inbound_ah_sa: Small AH header\n");
-			IP_AH_BUMP_STAT(in_discards);
+			IP_AH_BUMP_STAT(ipss, in_discards);
 			ip_drop_packet(ipsec_in, B_TRUE, NULL, NULL,
-			    &ipdrops_ah_bad_length, &ip_dropper);
+			    DROPPER(ipss, ipds_ah_bad_length),
+			    &ipss->ipsec_dropper);
 			return (NULL);
 		}
 		if (isv6)
@@ -724,12 +694,12 @@ ipsec_inbound_ah_sa(mblk_t *mp)
 	if (isv6) {
 		src_ptr = (uint32_t *)&ip6h->ip6_src;
 		dst_ptr = (uint32_t *)&ip6h->ip6_dst;
-		sp = &ah_sadb.s_v6;
+		sp = &ahstack->ah_sadb.s_v6;
 		af = AF_INET6;
 	} else {
 		src_ptr = (uint32_t *)&ipha->ipha_src;
 		dst_ptr = (uint32_t *)&ipha->ipha_dst;
-		sp = &ah_sadb.s_v4;
+		sp = &ahstack->ah_sadb.s_v4;
 		af = AF_INET;
 	}
 
@@ -739,13 +709,13 @@ ipsec_inbound_ah_sa(mblk_t *mp)
 	mutex_exit(&hptr->isaf_lock);
 
 	if (assoc == NULL || assoc->ipsa_state == IPSA_STATE_DEAD) {
-		IP_AH_BUMP_STAT(lookup_failure);
-		IP_AH_BUMP_STAT(in_discards);
+		IP_AH_BUMP_STAT(ipss, lookup_failure);
+		IP_AH_BUMP_STAT(ipss, in_discards);
 		ipsecah_in_assocfailure(ipsec_in, 0,
 		    SL_ERROR | SL_CONSOLE | SL_WARN,
 		    "ipsec_inbound_ah_sa: No association found for "
 		    "spi 0x%x, dst addr %s\n",
-		    ah->ah_spi, dst_ptr, af);
+		    ah->ah_spi, dst_ptr, af, ahstack);
 		if (assoc != NULL) {
 			IPSA_REFRELE(assoc);
 		}
@@ -754,7 +724,7 @@ ipsec_inbound_ah_sa(mblk_t *mp)
 
 	if (assoc->ipsa_state == IPSA_STATE_LARVAL) {
 		/* Not fully baked; swap the packet under a rock until then */
-		sadb_set_lpkt(assoc, ipsec_in);
+		sadb_set_lpkt(assoc, ipsec_in, ns);
 		IPSA_REFRELE(assoc);
 		return (NULL);
 	}
@@ -774,7 +744,7 @@ ipsec_inbound_ah_sa(mblk_t *mp)
 }
 
 esph_t *
-ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp)
+ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp, netstack_t *ns)
 {
 	mblk_t *data_mp, *placeholder;
 	uint32_t *src_ptr, *dst_ptr;
@@ -788,8 +758,10 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp)
 	sa_family_t af;
 	boolean_t isv6;
 	sadb_t *sp;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 
-	IP_ESP_BUMP_STAT(in_requests);
+	IP_ESP_BUMP_STAT(ipss, in_requests);
 	ASSERT(ipsec_in_mp->b_datap->db_type == M_CTL);
 
 	/* We have IPSEC_IN already! */
@@ -821,13 +793,14 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp)
 		: ntohs(ipha->ipha_length))) {
 		placeholder = msgpullup(data_mp, -1);
 		if (placeholder == NULL) {
-			IP_ESP_BUMP_STAT(in_discards);
+			IP_ESP_BUMP_STAT(ipss, in_discards);
 			/*
 			 * TODO: Extract inbound interface from the IPSEC_IN
 			 * message's ii->ipsec_in_rill_index.
 			 */
 			ip_drop_packet(ipsec_in_mp, B_TRUE, NULL, NULL,
-			    &ipdrops_esp_nomem, &ip_dropper);
+			    DROPPER(ipss, ipds_esp_nomem),
+			    &ipss->ipsec_dropper);
 			return (NULL);
 		} else {
 			/* Reset packet with new pulled up mblk. */
@@ -852,7 +825,7 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp)
 			preamble = sizeof (ip6_t);
 		}
 
-		sp = &esp_sadb.s_v6;
+		sp = &espstack->esp_sadb.s_v6;
 		af = AF_INET6;
 	} else {
 		ipha = (ipha_t *)data_mp->b_rptr;
@@ -860,7 +833,7 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp)
 		dst_ptr = (uint32_t *)&ipha->ipha_dst;
 		preamble = IPH_HDR_LENGTH(ipha);
 
-		sp = &esp_sadb.s_v4;
+		sp = &espstack->esp_sadb.s_v4;
 		af = AF_INET;
 	}
 
@@ -875,13 +848,13 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp)
 
 	if (ipsa == NULL || ipsa->ipsa_state == IPSA_STATE_DEAD) {
 		/*  This is a loggable error!  AUDIT ME! */
-		IP_ESP_BUMP_STAT(lookup_failure);
-		IP_ESP_BUMP_STAT(in_discards);
+		IP_ESP_BUMP_STAT(ipss, lookup_failure);
+		IP_ESP_BUMP_STAT(ipss, in_discards);
 		ipsecesp_in_assocfailure(ipsec_in_mp, 0,
 		    SL_ERROR | SL_CONSOLE | SL_WARN,
 		    "ipsec_inbound_esp_sa: No association found for "
 		    "spi 0x%x, dst addr %s\n",
-		    esph->esph_spi, dst_ptr, af);
+		    esph->esph_spi, dst_ptr, af, espstack);
 		if (ipsa != NULL) {
 			IPSA_REFRELE(ipsa);
 		}
@@ -890,7 +863,7 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp)
 
 	if (ipsa->ipsa_state == IPSA_STATE_LARVAL) {
 		/* Not fully baked; swap the packet under a rock until then */
-		sadb_set_lpkt(ipsa, ipsec_in_mp);
+		sadb_set_lpkt(ipsa, ipsec_in_mp, ns);
 		IPSA_REFRELE(ipsa);
 		return (NULL);
 	}

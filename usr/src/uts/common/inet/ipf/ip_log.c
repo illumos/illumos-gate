@@ -5,7 +5,7 @@
  *
  * $Id: ip_log.c,v 2.75.2.7 2005/06/11 07:47:44 darrenr Exp $
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,6 +129,7 @@ struct file;
 #include "netinet/ip_frag.h"
 #include "netinet/ip_state.h"
 #include "netinet/ip_auth.h"
+#include "netinet/ipf_stack.h"
 #if (__FreeBSD_version >= 300000) || defined(__NetBSD__)
 # include <sys/malloc.h>
 #endif
@@ -146,26 +147,10 @@ iplog_select_t	iplog_ss[IPL_LOGMAX+1];
 extern int selwait;
 # endif /* IPL_SELECT */
 
-# if defined(linux) && defined(_KERNEL)
-wait_queue_head_t	iplh_linux[IPL_LOGSIZE];
-# endif
-# if SOLARIS
-extern	kcondvar_t	iplwait;
-# endif
-
-iplog_t	**iplh[IPL_LOGSIZE], *iplt[IPL_LOGSIZE], *ipll[IPL_LOGSIZE];
-int	iplused[IPL_LOGSIZE];
-static fr_info_t	iplcrc[IPL_LOGSIZE];
-int	ipl_suppress = 1;
-int	ipl_buffer_sz;
-int	ipl_logmax = IPL_LOGMAX;
-int	ipl_logall = 0;
-int	ipl_log_init = 0;
-int	ipl_logsize = IPFILTER_LOGSIZE;
+/* ipl_magic never changes */
 int	ipl_magic[IPL_LOGSIZE] = { IPL_MAGIC, IPL_MAGIC_NAT, IPL_MAGIC_STATE,
 				   IPL_MAGIC, IPL_MAGIC, IPL_MAGIC,
 				   IPL_MAGIC, IPL_MAGIC };
-
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_loginit                                                  */
@@ -175,16 +160,20 @@ int	ipl_magic[IPL_LOGSIZE] = { IPL_MAGIC, IPL_MAGIC_NAT, IPL_MAGIC_STATE,
 /* Initialise log buffers & pointers.  Also iniialised the CRC to a local   */
 /* secret for use in calculating the "last log checksum".                   */
 /* ------------------------------------------------------------------------ */
-int fr_loginit()
+int fr_loginit(ifs)
+ipf_stack_t *ifs;
 {
 	int	i;
-
+	
+	ifs->ifs_ipl_suppress = 1;
+	ifs->ifs_ipl_logmax = IPL_LOGMAX;
+	ifs->ifs_ipl_logsize = IPFILTER_LOGSIZE;
 	for (i = IPL_LOGMAX; i >= 0; i--) {
-		iplt[i] = NULL;
-		ipll[i] = NULL;
-		iplh[i] = &iplt[i];
-		iplused[i] = 0;
-		bzero((char *)&iplcrc[i], sizeof(iplcrc[i]));
+		ifs->ifs_iplt[i] = NULL;
+		ifs->ifs_ipll[i] = NULL;
+		ifs->ifs_iplh[i] = &ifs->ifs_iplt[i];
+		ifs->ifs_iplused[i] = 0;
+		bzero((char *)&ifs->ifs_iplcrc[i], sizeof(ifs->ifs_iplcrc[i]));
 # ifdef	IPL_SELECT
 		iplog_ss[i].read_waiter = 0;
 		iplog_ss[i].state = 0;
@@ -195,11 +184,11 @@ int fr_loginit()
 	}
 
 # if SOLARIS && defined(_KERNEL)
-	cv_init(&iplwait, "ipl condvar", CV_DRIVER, NULL);
+	cv_init(&ifs->ifs_iplwait, "ipl condvar", CV_DRIVER, NULL);
 # endif
-	MUTEX_INIT(&ipl_mutex, "ipf log mutex");
+	MUTEX_INIT(&ifs->ifs_ipl_mutex, "ipf log mutex");
 
-	ipl_log_init = 1;
+	ifs->ifs_ipl_log_init = 1;
 
 	return 0;
 }
@@ -212,22 +201,23 @@ int fr_loginit()
 /*                                                                          */
 /* Clean up any log data that has accumulated without being read.           */
 /* ------------------------------------------------------------------------ */
-void fr_logunload()
+void fr_logunload(ifs)
+ipf_stack_t *ifs;
 {
 	int i;
 
-	if (ipl_log_init == 0)
+	if (ifs->ifs_ipl_log_init == 0)
 		return;
 
 	for (i = IPL_LOGMAX; i >= 0; i--)
-		(void) ipflog_clear(i);
+		(void) ipflog_clear(i, ifs);
 
 # if SOLARIS && defined(_KERNEL)
-	cv_destroy(&iplwait);
+	cv_destroy(&ifs->ifs_iplwait);
 # endif
-	MUTEX_DESTROY(&ipl_mutex);
+	MUTEX_DESTROY(&ifs->ifs_ipl_mutex);
 
-	ipl_log_init = 0;
+	ifs->ifs_ipl_log_init = 0;
 }
 
 
@@ -264,6 +254,7 @@ u_int flags;
 	struct ifnet *ifp;
 #  endif
 # endif /* SOLARIS */
+	ipf_stack_t *ifs = fin->fin_ifs;
 
 	ipfl.fl_nattag.ipt_num[0] = 0;
 	m = fin->fin_m;
@@ -333,9 +324,9 @@ u_int flags;
 	ipfl.fl_unit = (u_int)0;
 	nif = NULL;
 	if (fin->fin_fi.fi_v == 4)
-		nif = ipf_ipv4;
+		nif = ifs->ifs_ipf_ipv4;
 	else if (fin->fin_fi.fi_v == 6)
-		nif = ipf_ipv6;
+		nif = ifs->ifs_ipf_ipv6;
 	if (nif != NULL) {
 		if (net_getifname(nif, (phy_if_t)ifp,
 		    ipfl.fl_ifname, sizeof(ipfl.fl_ifname)) != 0)
@@ -366,7 +357,7 @@ u_int flags;
 #  endif /* __hpux */
 # endif /* SOLARIS */
 	mlen = fin->fin_plen - hlen;
-	if (!ipl_logall) {
+	if (!ifs->ifs_ipl_logall) {
 		mlen = (flags & FR_LOGBODY) ? MIN(mlen, 128) : 0;
 	} else if ((flags & FR_LOGBODY) == 0) {
 		mlen = 0;
@@ -411,7 +402,7 @@ u_int flags;
 	sizes[1] = hlen + mlen;
 	types[1] = 1;
 # endif /* MENTAT */
-	return ipllog(IPL_LOGIPF, fin, ptrs, sizes, types, 2);
+	return ipllog(IPL_LOGIPF, fin, ptrs, sizes, types, 2, fin->fin_ifs);
 }
 
 
@@ -429,12 +420,13 @@ u_int flags;
 /* miscellaneous packet information, as well as packet data, for reading    */
 /* from the log device.                                                     */
 /* ------------------------------------------------------------------------ */
-int ipllog(dev, fin, items, itemsz, types, cnt)
+int ipllog(dev, fin, items, itemsz, types, cnt, ifs)
 int dev;
 fr_info_t *fin;
 void **items;
 size_t *itemsz;
 int *types, cnt;
+ipf_stack_t *ifs;
 {
 	caddr_t buf, ptr;
 	iplog_t *ipl;
@@ -447,20 +439,21 @@ int *types, cnt;
 	 * record logged.  If it does, just up the count on the previous one
 	 * rather than create a new one.
 	 */
-	if (ipl_suppress) {
-		MUTEX_ENTER(&ipl_mutex);
+	if (ifs->ifs_ipl_suppress) {
+		MUTEX_ENTER(&ifs->ifs_ipl_mutex);
 		if ((fin != NULL) && (fin->fin_off == 0)) {
-			if ((ipll[dev] != NULL) &&
-			    bcmp((char *)fin, (char *)&iplcrc[dev],
+			if ((ifs->ifs_ipll[dev] != NULL) &&
+			    bcmp((char *)fin, (char *)&ifs->ifs_iplcrc[dev],
 				 FI_LCSIZE) == 0) {
-				ipll[dev]->ipl_count++;
-				MUTEX_EXIT(&ipl_mutex);
+				ifs->ifs_ipll[dev]->ipl_count++;
+				MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 				return 0;
 			}
-			bcopy((char *)fin, (char *)&iplcrc[dev], FI_LCSIZE);
+			bcopy((char *)fin, (char *)&ifs->ifs_iplcrc[dev],
+			      FI_LCSIZE);
 		} else
-			bzero((char *)&iplcrc[dev], FI_CSIZE);
-		MUTEX_EXIT(&ipl_mutex);
+			bzero((char *)&ifs->ifs_iplcrc[dev], FI_CSIZE);
+		MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 	}
 
 	/*
@@ -477,15 +470,15 @@ int *types, cnt;
 	if (buf == NULL)
 		return -1;
 	SPL_NET(s);
-	MUTEX_ENTER(&ipl_mutex);
-	if ((iplused[dev] + len) > ipl_logsize) {
-		MUTEX_EXIT(&ipl_mutex);
+	MUTEX_ENTER(&ifs->ifs_ipl_mutex);
+	if ((ifs->ifs_iplused[dev] + len) > IPFILTER_LOGSIZE) {
+		MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 		SPL_X(s);
 		KFREES(buf, len);
 		return -1;
 	}
-	iplused[dev] += len;
-	MUTEX_EXIT(&ipl_mutex);
+	ifs->ifs_iplused[dev] += len;
+	MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 	SPL_X(s);
 
 	/*
@@ -517,21 +510,21 @@ int *types, cnt;
 		ptr += itemsz[i];
 	}
 	SPL_NET(s);
-	MUTEX_ENTER(&ipl_mutex);
-	ipll[dev] = ipl;
-	*iplh[dev] = ipl;
-	iplh[dev] = &ipl->ipl_next;
+	MUTEX_ENTER(&ifs->ifs_ipl_mutex);
+	ifs->ifs_ipll[dev] = ipl;
+	*ifs->ifs_iplh[dev] = ipl;
+	ifs->ifs_iplh[dev] = &ipl->ipl_next;
 
 	/*
 	 * Now that the log record has been completed and added to the queue,
 	 * wake up any listeners who may want to read it.
 	 */
 # if SOLARIS && defined(_KERNEL)
-	cv_signal(&iplwait);
-	MUTEX_EXIT(&ipl_mutex);
+	cv_signal(&ifs->ifs_iplwait);
+	MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 # else
-	MUTEX_EXIT(&ipl_mutex);
-	WAKEUP(iplh,dev);
+	MUTEX_EXIT(&ifs->ifs_ipl_mutex);
+	WAKEUP(&ifs->ifs_iplh, dev);
 # endif
 	SPL_X(s);
 # ifdef	IPL_SELECT
@@ -553,9 +546,10 @@ int *types, cnt;
 /* NOTE: This function will block and wait for a signal to return data if   */
 /* there is none present.  Asynchronous I/O is not implemented.             */
 /* ------------------------------------------------------------------------ */
-int ipflog_read(unit, uio)
+int ipflog_read(unit, uio, ifs)
 minor_t unit;
 struct uio *uio;
+ipf_stack_t *ifs;
 {
 	size_t dlen, copied;
 	int error = 0;
@@ -571,7 +565,7 @@ struct uio *uio;
 	if (uio->uio_resid == 0)
 		return 0;
 	if ((uio->uio_resid < sizeof(iplog_t)) ||
-	    (uio->uio_resid > ipl_logsize))
+	    (uio->uio_resid > ifs->ifs_ipl_logsize))
 		return EINVAL;
 
 	/*
@@ -579,12 +573,12 @@ struct uio *uio;
 	 * if the log is empty.
 	 */
 	SPL_NET(s);
-	MUTEX_ENTER(&ipl_mutex);
+	MUTEX_ENTER(&ifs->ifs_ipl_mutex);
 
-	while (iplt[unit] == NULL) {
+	while (ifs->ifs_iplt[unit] == NULL) {
 # if SOLARIS && defined(_KERNEL)
-		if (!cv_wait_sig(&iplwait, &ipl_mutex.ipf_lk)) {
-			MUTEX_EXIT(&ipl_mutex);
+		if (!cv_wait_sig(&ifs->ifs_iplwait, &ifs->ifs_ipl_mutex.ipf_lk)) {
+			MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 			return EINTR;
 		}
 # else
@@ -594,29 +588,29 @@ struct uio *uio;
 #   ifdef IPL_SELECT
 		if (uio->uio_fpflags & (FNBLOCK|FNDELAY)) {
 			/* this is no blocking system call */
-			MUTEX_EXIT(&ipl_mutex);
+			MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 			return 0;
 		}
 #   endif
 
-		MUTEX_EXIT(&ipl_mutex);
-		l = get_sleep_lock(&iplh[unit]);
-		error = sleep(&iplh[unit], PZERO+1);
+		MUTEX_EXIT(&ifs->ifs_ipl_mutex);
+		l = get_sleep_lock(&ifs->ifs_iplh[unit]);
+		error = sleep(&ifs->ifs_iplh[unit], PZERO+1);
 		spinunlock(l);
 #  else
 #   if defined(__osf__) && defined(_KERNEL)
-		error = mpsleep(&iplh[unit], PSUSP|PCATCH,  "iplread", 0,
-				&ipl_mutex, MS_LOCK_SIMPLE);
+		error = mpsleep(&ifs->ifs_iplh[unit], PSUSP|PCATCH,  "iplread", 0,
+				&ifs->ifs_ipl_mutex, MS_LOCK_SIMPLE);
 #   else
-		MUTEX_EXIT(&ipl_mutex);
+		MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 		SPL_X(s);
-		error = SLEEP(unit + iplh, "ipl sleep");
+		error = SLEEP(&ifs->ifs_iplh[unit], "ipl sleep");
 #   endif /* __osf__ */
 #  endif /* __hpux */
 		if (error)
 			return error;
 		SPL_NET(s);
-		MUTEX_ENTER(&ipl_mutex);
+		MUTEX_ENTER(&ifs->ifs_ipl_mutex);
 # endif /* SOLARIS */
 	}
 
@@ -624,41 +618,41 @@ struct uio *uio;
 	uio->uio_rw = UIO_READ;
 # endif
 
-	for (copied = 0; (ipl = iplt[unit]) != NULL; copied += dlen) {
+	for (copied = 0; ((ipl = ifs->ifs_iplt[unit]) != NULL); copied += dlen) {
 		dlen = ipl->ipl_dsize;
 		if (dlen > uio->uio_resid)
 			break;
 		/*
 		 * Don't hold the mutex over the uiomove call.
 		 */
-		iplt[unit] = ipl->ipl_next;
-		iplused[unit] -= dlen;
-		if (iplt[unit] == NULL) {
-			iplh[unit] = &iplt[unit];
-			ipll[unit] = NULL;
+		ifs->ifs_iplt[unit] = ipl->ipl_next;
+		ifs->ifs_iplused[unit] -= dlen;
+		if (ifs->ifs_iplt[unit] == NULL) {
+			ifs->ifs_iplh[unit] = &ifs->ifs_iplt[unit];
+			ifs->ifs_ipll[unit] = NULL;
 		}
-		MUTEX_EXIT(&ipl_mutex);
+		MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 		SPL_X(s);
 		error = UIOMOVE((caddr_t)ipl, dlen, UIO_READ, uio);
 		if (error) {
 			SPL_NET(s);
-			MUTEX_ENTER(&ipl_mutex);
-			iplused[unit] += dlen;
-			ipl->ipl_next = iplt[unit];
-			iplt[unit] = ipl;
-			ipll[unit] = ipl;
-			if (iplh[unit] == &iplt[unit]) {
-				*iplh[unit] = ipl;
-				iplh[unit] = &ipl->ipl_next;
+			MUTEX_ENTER(&ifs->ifs_ipl_mutex);
+			ifs->ifs_iplused[unit] += dlen;
+			ipl->ipl_next = ifs->ifs_iplt[unit];
+			ifs->ifs_iplt[unit] = ipl;
+			ifs->ifs_ipll[unit] = ipl;
+			if (ifs->ifs_iplh[unit] == &ifs->ifs_iplt[unit]) {
+				*ifs->ifs_iplh[unit] = ipl;
+				ifs->ifs_iplh[unit] = &ipl->ipl_next;
 			}
 			break;
 		}
-		MUTEX_ENTER(&ipl_mutex);
+		MUTEX_ENTER(&ifs->ifs_ipl_mutex);
 		KFREES((caddr_t)ipl, dlen);
 		SPL_NET(s);
 	}
 
-	MUTEX_EXIT(&ipl_mutex);
+	MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 	SPL_X(s);
 	return error;
 }
@@ -671,25 +665,26 @@ struct uio *uio;
 /*                                                                          */
 /* Deletes all queued up log records for a given output device.             */
 /* ------------------------------------------------------------------------ */
-int ipflog_clear(unit)
+int ipflog_clear(unit, ifs)
 minor_t unit;
+ipf_stack_t *ifs;
 {
 	iplog_t *ipl;
 	int used;
 	SPL_INT(s);
 
 	SPL_NET(s);
-	MUTEX_ENTER(&ipl_mutex);
-	while ((ipl = iplt[unit]) != NULL) {
-		iplt[unit] = ipl->ipl_next;
+	MUTEX_ENTER(&ifs->ifs_ipl_mutex);
+	while ((ipl = ifs->ifs_iplt[unit]) != NULL) {
+		ifs->ifs_iplt[unit] = ipl->ipl_next;
 		KFREES((caddr_t)ipl, ipl->ipl_dsize);
 	}
-	iplh[unit] = &iplt[unit];
-	ipll[unit] = NULL;
-	used = iplused[unit];
-	iplused[unit] = 0;
-	bzero((char *)&iplcrc[unit], FI_CSIZE);
-	MUTEX_EXIT(&ipl_mutex);
+	ifs->ifs_iplh[unit] = &ifs->ifs_iplt[unit];
+	ifs->ifs_ipll[unit] = NULL;
+	used = ifs->ifs_iplused[unit];
+	ifs->ifs_iplused[unit] = 0;
+	bzero((char *)&ifs->ifs_iplcrc[unit], FI_CSIZE);
+	MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 	SPL_X(s);
 	return used;
 }

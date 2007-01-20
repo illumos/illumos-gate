@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -923,8 +923,12 @@ tsol_receive_local(const mblk_t *mp, const void *addr, uchar_t version,
 		    blequal(label, conn_label))
 			return (B_TRUE);
 
+		/*
+		 * conn_zoneid is global for an exclusive stack, thus we use
+		 * conn_cred to get the zoneid
+		 */
 		if (!connp->conn_mac_exempt ||
-		    (connp->conn_zoneid != GLOBAL_ZONEID &&
+		    (crgetzoneid(connp->conn_cred) != GLOBAL_ZONEID &&
 		    (plabel->tsl_doi != conn_plabel->tsl_doi ||
 		    !bldominates(conn_label, label)))) {
 			DTRACE_PROBE3(
@@ -1179,6 +1183,11 @@ tsol_can_reply_error(const mblk_t *mp)
  *
  * This is used by the classifier when the packet matches an ALL_ZONES IRE, and
  * there's no MLP defined.
+ *
+ * Note that we assume that this is only invoked in the ALL_ZONES case.
+ * Handling other cases would require handle exclusive stack zones where either
+ * this routine or the callers would have to map from
+ * the zoneid (zone->zone_id) to what IP uses in conn_zoneid etc.
  */
 zoneid_t
 tsol_packet_to_zoneid(const mblk_t *mp)
@@ -1460,6 +1469,7 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 	uint16_t	iplen;
 	boolean_t	need_tpc_rele = B_FALSE;
 	ipaddr_t	*gw;
+	ip_stack_t	*ipst = ire->ire_ipst;
 
 	ASSERT(ire != NULL && mp != NULL);
 	ASSERT(ire->ire_stq != NULL);
@@ -1659,9 +1669,10 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 		goto keep_label;
 
 	if ((af == AF_INET &&
-	    tsol_check_label(DB_CRED(mp), &mp, &adjust, B_FALSE) != 0) ||
+	    tsol_check_label(DB_CRED(mp), &mp, &adjust, B_FALSE, ipst) != 0) ||
 	    (af == AF_INET6 &&
-	    tsol_check_label_v6(DB_CRED(mp), &mp, &adjust, B_FALSE) != 0)) {
+	    tsol_check_label_v6(DB_CRED(mp), &mp, &adjust, B_FALSE,
+	    ipst) != 0)) {
 		mp = NULL;
 		goto keep_label;
 	}
@@ -1865,16 +1876,31 @@ tsol_ire_init_gwattr(ire_t *ire, uchar_t ipversion, tsol_gc_t *gc,
  *
  * If we can't figure out what it is, then return mlptSingle.  That's actually
  * an error case.
+ *
+ * The callers are assume to pass in zone->zone_id and not the zoneid that
+ * is stored in a conn_t (since the latter will be GLOBAL_ZONEID in an
+ * exclusive stack zone).
  */
 mlp_type_t
-tsol_mlp_addr_type(zoneid_t zoneid, uchar_t version, const void *addr)
+tsol_mlp_addr_type(zoneid_t zoneid, uchar_t version, const void *addr,
+    ip_stack_t *ipst)
 {
 	in_addr_t in4;
 	ire_t *ire;
 	ipif_t *ipif;
 	zoneid_t addrzone;
+	zoneid_t ip_zoneid;
 
 	ASSERT(addr != NULL);
+
+	/*
+	 * For exclusive stacks we set the zoneid to zero
+	 * to operate as if in the global zone for IRE and conn_t comparisons.
+	 */
+	if (ipst->ips_netstack->netstack_stackid != GLOBAL_NETSTACKID)
+		ip_zoneid = GLOBAL_ZONEID;
+	else
+		ip_zoneid = zoneid;
 
 	if (version == IPV6_VERSION &&
 	    IN6_IS_ADDR_V4MAPPED((const in6_addr_t *)addr)) {
@@ -1885,13 +1911,15 @@ tsol_mlp_addr_type(zoneid_t zoneid, uchar_t version, const void *addr)
 
 	if (version == IPV4_VERSION) {
 		in4 = *(const in_addr_t *)addr;
-		if (in4 == INADDR_ANY)
+		if (in4 == INADDR_ANY) {
 			return (mlptBoth);
-		ire = ire_cache_lookup(in4, zoneid, NULL);
+		}
+		ire = ire_cache_lookup(in4, ip_zoneid, NULL, ipst);
 	} else {
-		if (IN6_IS_ADDR_UNSPECIFIED((const in6_addr_t *)addr))
+		if (IN6_IS_ADDR_UNSPECIFIED((const in6_addr_t *)addr)) {
 			return (mlptBoth);
-		ire = ire_cache_lookup_v6(addr, zoneid, NULL);
+		}
+		ire = ire_cache_lookup_v6(addr, ip_zoneid, NULL, ipst);
 	}
 	/*
 	 * If we can't find the IRE, then we have to behave exactly like
@@ -1905,12 +1933,13 @@ tsol_mlp_addr_type(zoneid_t zoneid, uchar_t version, const void *addr)
 	if (ire == NULL) {
 		if (version == IPV4_VERSION)
 			ipif = ipif_lookup_addr(*(const in_addr_t *)addr, NULL,
-			    zoneid, NULL, NULL, NULL, NULL);
+			    ip_zoneid, NULL, NULL, NULL, NULL, ipst);
 		else
 			ipif = ipif_lookup_addr_v6((const in6_addr_t *)addr,
-			    NULL, zoneid, NULL, NULL, NULL, NULL);
-		if (ipif == NULL)
+			    NULL, ip_zoneid, NULL, NULL, NULL, NULL, ipst);
+		if (ipif == NULL) {
 			return (mlptSingle);
+		}
 		addrzone = ipif->ipif_zoneid;
 		ipif_refrele(ipif);
 	} else {
@@ -1947,6 +1976,7 @@ tsol_check_interface_address(const ipif_t *ipif)
 	const char *ifname;
 	boolean_t retval;
 	tsol_rhent_t rhent;
+	netstack_t *ns = ipif->ipif_ill->ill_ipst->ips_netstack;
 
 	if (IN6_IS_ADDR_V4MAPPED(&ipif->ipif_v6lcl_addr)) {
 		af = AF_INET;
@@ -1957,8 +1987,17 @@ tsol_check_interface_address(const ipif_t *ipif)
 	}
 
 	tp = find_tpc(&ipif->ipif_v6lcl_addr, IPV6_VERSION, B_FALSE);
-	zone = ipif->ipif_zoneid == ALL_ZONES ? NULL :
-	    zone_find_by_id(ipif->ipif_zoneid);
+
+	/* assumes that ALL_ZONES implies that there is no exclusive stack */
+	if (ipif->ipif_zoneid == ALL_ZONES) {
+		zone = NULL;
+	} else if (ns->netstack_stackid == GLOBAL_NETSTACKID) {
+		/* Shared stack case */
+		zone = zone_find_by_id(ipif->ipif_zoneid);
+	} else {
+		/* Exclusive stack case */
+		zone = zone_find_by_id(crgetzoneid(ipif->ipif_ill->ill_credp));
+	}
 	if (zone != NULL) {
 		plabel = zone->zone_slabel;
 		ASSERT(plabel != NULL);

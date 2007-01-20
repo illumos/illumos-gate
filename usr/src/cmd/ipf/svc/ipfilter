@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -36,11 +36,12 @@ IPNATCONF=/etc/ipf/ipnat.conf
 IPPOOLCONF=/etc/ipf/ippool.conf
 PFILCHECKED=no
 
+zone=`smf_zonename`
 ipfid=`/usr/sbin/modinfo 2>&1 | awk '/ipf/ { print $1 } ' - 2>/dev/null`
 if [ -f $PIDFILE ] ; then
 	pid=`cat $PIDFILE 2>/dev/null`
 else
-	pid=`pgrep ipmon`
+	pid=`pgrep -z $zone ipmon`
 fi
 
 logmsg()

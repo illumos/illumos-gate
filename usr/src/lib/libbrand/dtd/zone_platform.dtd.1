@@ -20,7 +20,7 @@
 
  CDDL HEADER END
 
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,11 +45,16 @@
       arch	Identifies devices only available for certain architectures.
 		Can be "sparc" or "i386".
 
+      ip-type	Optional, identifies devices only available for certain IP
+		types. Can be "shared" or "exclusive". If it's not specified,
+		the default value "all" will be used, which means it's
+		available regardless the IP type.
+
     For example, the following entry:
 	<device match="brand/windows/foo" name="bar" arch="sparc" />
     would result in mapping the following global zone device:
 	/dev/brand/windows/foo
-    into the zone as:
+    into the zone (disregarding its IP type) as:
 	/dev/bar
     but the mapping would only exist on sparc machines.
 
@@ -58,7 +63,8 @@
 
 <!ATTLIST device	match	CDATA #REQUIRED
 			name	CDATA ""
-			arch	( sparc | i386 ) "all" >
+			arch	( sparc | i386 ) "all" 
+			ip-type	( shared | exclusive ) "all" >
 
 <!--
   symlink
@@ -138,7 +144,10 @@
       name	The name of the brand.  This must match the name of the
 		directory in which this file is stored, as well as the name
 		of the brand that refers to it.
+      allow-exclusive-ip	Whether the zones of this brand can have their
+				own exclusive IP stack. It is a boolean value. 
 -->
 <!ELEMENT platform	(device | global_mount | mount | symlink)* >
 
-<!ATTLIST platform	name		CDATA #REQUIRED>
+<!ATTLIST platform	name			CDATA #REQUIRED
+			allow-exclusive-ip	(true | false) #REQUIRED>

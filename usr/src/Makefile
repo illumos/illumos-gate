@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -134,13 +134,12 @@ closedbins: FRC $(ROOTDIRS)
 $(SUBDIRS) head ucbhead pkgdefs: FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
-.PARALLEL:	sysheaders userheaders libheaders ucbheaders cmdheaders \
-		commonheaders
+.PARALLEL:	sysheaders userheaders libheaders ucbheaders cmdheaders
 
 # librpcsvc has a dependency on headers installed by
 # userheaders, hence the .WAIT before libheaders.
 sgs: rootdirs .WAIT sysheaders userheaders .WAIT \
-	libheaders ucbheaders cmdheaders commonheaders
+	libheaders ucbheaders cmdheaders
 
 #
 # top-level setup target to setup the development environment
@@ -181,9 +180,6 @@ ucbheaders: FRC
 cmdheaders: FRC
 	@cd cmd/fm; pwd; $(MAKE) install_h
 	@cd cmd/mdb; pwd; $(MAKE) install_h
-
-commonheaders: FRC
-	@cd uts/common/inet/ipf/netinet; pwd; $(MAKE) install_h
 
 # each xmod target depends on a corresponding MACH-specific pseudotarget
 # before doing common xmod work

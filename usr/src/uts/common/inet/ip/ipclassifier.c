@@ -94,8 +94,8 @@ const char ipclassifier_version[] = "@(#)ipclassifier.c	%I%	%E% SMI";
  * Connection Lookup:
  * ------------------
  *
- * conn_t *ipcl_classify_v4(mp, protocol, hdr_len, zoneid)
- * conn_t *ipcl_classify_v6(mp, protocol, hdr_len, zoneid)
+ * conn_t *ipcl_classify_v4(mp, protocol, hdr_len, zoneid, ip_stack)
+ * conn_t *ipcl_classify_v6(mp, protocol, hdr_len, zoneid, ip_stack)
  *
  * Finds connection for an incoming IPv4 or IPv6 packet. Returns NULL if
  * it can't find any associated connection. If the connection is found, its
@@ -159,21 +159,24 @@ const char ipclassifier_version[] = "@(#)ipclassifier.c	%I%	%E% SMI";
  * any.  In any event, the receiving socket must have SO_MAC_EXEMPT set and the
  * receiver's label must dominate the sender's default label.
  *
- * conn_t	*ipcl_tcp_lookup_reversed_ipv4(ipha_t *, tcph_t *, int);
- * conn_t	*ipcl_tcp_lookup_reversed_ipv6(ip6_t *, tcpha_t *, int, uint_t);
+ * conn_t *ipcl_tcp_lookup_reversed_ipv4(ipha_t *, tcph_t *, int, ip_stack);
+ * conn_t *ipcl_tcp_lookup_reversed_ipv6(ip6_t *, tcpha_t *, int, uint_t,
+ *					 ip_stack);
  *
  *	Lookup routine to find a exact match for {src, dst, local port,
  *	remote port) for TCP connections in ipcl_conn_fanout. The address and
  *	ports are read from the IP and TCP header respectively.
  *
- * conn_t	*ipcl_lookup_listener_v4(lport, laddr, protocol);
- * conn_t	*ipcl_lookup_listener_v6(lport, laddr, protocol, ifindex);
+ * conn_t	*ipcl_lookup_listener_v4(lport, laddr, protocol,
+ *					 zoneid, ip_stack);
+ * conn_t	*ipcl_lookup_listener_v6(lport, laddr, protocol, ifindex,
+ *					 zoneid, ip_stack);
  *
  * 	Lookup routine to find a listener with the tuple {lport, laddr,
  * 	protocol} in the ipcl_bind_fanout table. For IPv6, an additional
  * 	parameter interface index is also compared.
  *
- * void ipcl_walk(func, arg)
+ * void ipcl_walk(func, arg, ip_stack)
  *
  * 	Apply 'func' to every connection available. The 'func' is called as
  *	(*func)(connp, arg). The walk is non-atomic so connections may be
@@ -221,7 +224,7 @@ const char ipclassifier_version[] = "@(#)ipclassifier.c	%I%	%E% SMI";
  * Connection Creation/Destruction
  * -------------------------------
  *
- * conn_t *ipcl_conn_create(type, sleep)
+ * conn_t *ipcl_conn_create(type, sleep, netstack_t *)
  *
  * 	Creates a new conn based on the type flag, inserts it into
  * 	globalhash table.
@@ -262,6 +265,7 @@ const char ipclassifier_version[] = "@(#)ipclassifier.c	%I%	%E% SMI";
 #include <inet/ip_ndp.h>
 #include <inet/udp_impl.h>
 #include <inet/sctp_ip.h>
+#include <inet/sctp/sctp_impl.h>
 
 #include <sys/cpuvar.h>
 
@@ -283,27 +287,13 @@ int	ipcl_debug_level = 0;
 #else
 #define	IPCL_DEBUG_LVL(level, args) {; }
 #endif
-connf_t	*ipcl_conn_fanout;
-connf_t	*ipcl_bind_fanout;
-connf_t	ipcl_proto_fanout[IPPROTO_MAX + 1];
-connf_t	ipcl_proto_fanout_v6[IPPROTO_MAX + 1];
-connf_t	*ipcl_udp_fanout;
-
-/* A separate hash list for raw socket. */
-connf_t *ipcl_raw_fanout;
-
-connf_t rts_clients;
-
-/* Old value for compatibility */
+/* Old value for compatibility. Setable in /etc/system */
 uint_t tcp_conn_hash_size = 0;
 
-/* New value. Zero means choose automatically. */
+/* New value. Zero means choose automatically.  Setable in /etc/system */
 uint_t ipcl_conn_hash_size = 0;
 uint_t ipcl_conn_hash_memfactor = 8192;
 uint_t ipcl_conn_hash_maxsize = 82500;
-
-uint_t ipcl_conn_fanout_size = 0;
-
 
 /* bind/udp fanout table size */
 uint_t ipcl_bind_fanout_size = 512;
@@ -337,7 +327,6 @@ typedef struct itc_s {
 #define	itc_conn	itc_u.itcu_conn
 
 struct kmem_cache  *ipcl_tcpconn_cache;
-struct kmem_cache  *ipcl_tcp_cache;
 struct kmem_cache  *ipcl_conn_cache;
 extern struct kmem_cache  *sctp_conn_cache;
 extern struct kmem_cache  *tcp_sack_info_cache;
@@ -348,9 +337,6 @@ extern mblk_t	*tcp_timermp_alloc(int);
 
 static int	ipcl_tcpconn_constructor(void *, void *, int);
 static void	ipcl_tcpconn_destructor(void *, void *);
-
-static int conn_g_index;
-connf_t	*ipcl_globalhash_fanout;
 
 #ifdef	IPCL_DEBUG
 #define	INET_NTOA_BUFSIZE	18
@@ -367,15 +353,11 @@ inet_ntoa_r(uint32_t in, char *b)
 #endif
 
 /*
- * ipclassifier intialization routine, sets up hash tables and
- * conn caches.
+ * Global (for all stack instances) init routine
  */
 void
-ipcl_init(void)
+ipcl_g_init(void)
 {
-	int i;
-	int sizes[] = P2Ps();
-
 	ipcl_conn_cache = kmem_cache_create("ipcl_conn_cache",
 	    sizeof (conn_t), CACHE_ALIGN_SIZE,
 	    NULL, NULL, NULL, NULL, NULL, 0);
@@ -384,117 +366,184 @@ ipcl_init(void)
 	    sizeof (itc_t), CACHE_ALIGN_SIZE,
 	    ipcl_tcpconn_constructor, ipcl_tcpconn_destructor,
 	    NULL, NULL, NULL, 0);
+}
+
+/*
+ * ipclassifier intialization routine, sets up hash tables.
+ */
+void
+ipcl_init(ip_stack_t *ipst)
+{
+	int i;
+	int sizes[] = P2Ps();
 
 	/*
-	 * Calculate size of conn fanout table.
+	 * Calculate size of conn fanout table from /etc/system settings
 	 */
 	if (ipcl_conn_hash_size != 0) {
-		ipcl_conn_fanout_size = ipcl_conn_hash_size;
+		ipst->ips_ipcl_conn_fanout_size = ipcl_conn_hash_size;
 	} else if (tcp_conn_hash_size != 0) {
-		ipcl_conn_fanout_size = tcp_conn_hash_size;
+		ipst->ips_ipcl_conn_fanout_size = tcp_conn_hash_size;
 	} else {
 		extern pgcnt_t freemem;
 
-		ipcl_conn_fanout_size =
+		ipst->ips_ipcl_conn_fanout_size =
 		    (freemem * PAGESIZE) / ipcl_conn_hash_memfactor;
 
-		if (ipcl_conn_fanout_size > ipcl_conn_hash_maxsize)
-			ipcl_conn_fanout_size = ipcl_conn_hash_maxsize;
+		if (ipst->ips_ipcl_conn_fanout_size > ipcl_conn_hash_maxsize) {
+			ipst->ips_ipcl_conn_fanout_size =
+			    ipcl_conn_hash_maxsize;
+		}
 	}
 
 	for (i = 9; i < sizeof (sizes) / sizeof (*sizes) - 1; i++) {
-		if (sizes[i] >= ipcl_conn_fanout_size) {
+		if (sizes[i] >= ipst->ips_ipcl_conn_fanout_size) {
 			break;
 		}
 	}
-	if ((ipcl_conn_fanout_size = sizes[i]) == 0) {
+	if ((ipst->ips_ipcl_conn_fanout_size = sizes[i]) == 0) {
 		/* Out of range, use the 2^16 value */
-		ipcl_conn_fanout_size = sizes[16];
+		ipst->ips_ipcl_conn_fanout_size = sizes[16];
 	}
-	ipcl_conn_fanout = (connf_t *)kmem_zalloc(ipcl_conn_fanout_size *
-	    sizeof (*ipcl_conn_fanout), KM_SLEEP);
 
-	for (i = 0; i < ipcl_conn_fanout_size; i++) {
-		mutex_init(&ipcl_conn_fanout[i].connf_lock, NULL,
+	/* Take values from /etc/system */
+	ipst->ips_ipcl_bind_fanout_size = ipcl_bind_fanout_size;
+	ipst->ips_ipcl_udp_fanout_size = ipcl_udp_fanout_size;
+	ipst->ips_ipcl_raw_fanout_size = ipcl_raw_fanout_size;
+
+	ASSERT(ipst->ips_ipcl_conn_fanout == NULL);
+
+	ipst->ips_ipcl_conn_fanout = kmem_zalloc(
+	    ipst->ips_ipcl_conn_fanout_size * sizeof (connf_t), KM_SLEEP);
+
+	for (i = 0; i < ipst->ips_ipcl_conn_fanout_size; i++) {
+		mutex_init(&ipst->ips_ipcl_conn_fanout[i].connf_lock, NULL,
 		    MUTEX_DEFAULT, NULL);
 	}
 
-	ipcl_bind_fanout = (connf_t *)kmem_zalloc(ipcl_bind_fanout_size *
-	    sizeof (*ipcl_bind_fanout), KM_SLEEP);
+	ipst->ips_ipcl_bind_fanout = kmem_zalloc(
+	    ipst->ips_ipcl_bind_fanout_size * sizeof (connf_t), KM_SLEEP);
 
-	for (i = 0; i < ipcl_bind_fanout_size; i++) {
-		mutex_init(&ipcl_bind_fanout[i].connf_lock, NULL,
+	for (i = 0; i < ipst->ips_ipcl_bind_fanout_size; i++) {
+		mutex_init(&ipst->ips_ipcl_bind_fanout[i].connf_lock, NULL,
 		    MUTEX_DEFAULT, NULL);
 	}
 
-	for (i = 0; i < A_CNT(ipcl_proto_fanout); i++) {
-		mutex_init(&ipcl_proto_fanout[i].connf_lock, NULL,
-		    MUTEX_DEFAULT, NULL);
-	}
-	for (i = 0; i < A_CNT(ipcl_proto_fanout_v6); i++) {
-		mutex_init(&ipcl_proto_fanout_v6[i].connf_lock, NULL,
-		    MUTEX_DEFAULT, NULL);
-	}
-
-	mutex_init(&rts_clients.connf_lock, NULL, MUTEX_DEFAULT, NULL);
-
-	ipcl_udp_fanout = (connf_t *)kmem_zalloc(ipcl_udp_fanout_size *
-	    sizeof (*ipcl_udp_fanout), KM_SLEEP);
-
-	for (i = 0; i < ipcl_udp_fanout_size; i++) {
-		mutex_init(&ipcl_udp_fanout[i].connf_lock, NULL,
+	ipst->ips_ipcl_proto_fanout = kmem_zalloc(IPPROTO_MAX *
+	    sizeof (connf_t), KM_SLEEP);
+	for (i = 0; i < IPPROTO_MAX; i++) {
+		mutex_init(&ipst->ips_ipcl_proto_fanout[i].connf_lock, NULL,
 		    MUTEX_DEFAULT, NULL);
 	}
 
-	ipcl_raw_fanout = (connf_t *)kmem_zalloc(ipcl_raw_fanout_size *
-	    sizeof (*ipcl_raw_fanout), KM_SLEEP);
-
-	for (i = 0; i < ipcl_raw_fanout_size; i++) {
-		mutex_init(&ipcl_raw_fanout[i].connf_lock, NULL,
+	ipst->ips_ipcl_proto_fanout_v6 = kmem_zalloc(IPPROTO_MAX *
+	    sizeof (connf_t), KM_SLEEP);
+	for (i = 0; i < IPPROTO_MAX; i++) {
+		mutex_init(&ipst->ips_ipcl_proto_fanout_v6[i].connf_lock, NULL,
 		    MUTEX_DEFAULT, NULL);
 	}
 
-	ipcl_globalhash_fanout = (connf_t *)kmem_zalloc(sizeof (connf_t) *
-	    CONN_G_HASH_SIZE, KM_SLEEP);
+	ipst->ips_rts_clients = kmem_zalloc(sizeof (connf_t), KM_SLEEP);
+	mutex_init(&ipst->ips_rts_clients->connf_lock,
+	    NULL, MUTEX_DEFAULT, NULL);
 
+	ipst->ips_ipcl_udp_fanout = kmem_zalloc(
+	    ipst->ips_ipcl_udp_fanout_size * sizeof (connf_t), KM_SLEEP);
+	for (i = 0; i < ipst->ips_ipcl_udp_fanout_size; i++) {
+		mutex_init(&ipst->ips_ipcl_udp_fanout[i].connf_lock, NULL,
+		    MUTEX_DEFAULT, NULL);
+	}
+
+	ipst->ips_ipcl_raw_fanout = kmem_zalloc(
+	    ipst->ips_ipcl_raw_fanout_size * sizeof (connf_t), KM_SLEEP);
+	for (i = 0; i < ipst->ips_ipcl_raw_fanout_size; i++) {
+		mutex_init(&ipst->ips_ipcl_raw_fanout[i].connf_lock, NULL,
+		    MUTEX_DEFAULT, NULL);
+	}
+
+	ipst->ips_ipcl_globalhash_fanout = kmem_zalloc(
+	    sizeof (connf_t) * CONN_G_HASH_SIZE, KM_SLEEP);
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
-		mutex_init(&ipcl_globalhash_fanout[i].connf_lock, NULL,
-		    MUTEX_DEFAULT, NULL);
+		mutex_init(&ipst->ips_ipcl_globalhash_fanout[i].connf_lock,
+		    NULL, MUTEX_DEFAULT, NULL);
 	}
 }
 
 void
-ipcl_destroy(void)
+ipcl_g_destroy(void)
 {
-	int i;
 	kmem_cache_destroy(ipcl_conn_cache);
 	kmem_cache_destroy(ipcl_tcpconn_cache);
-	for (i = 0; i < ipcl_conn_fanout_size; i++)
-		mutex_destroy(&ipcl_conn_fanout[i].connf_lock);
-	kmem_free(ipcl_conn_fanout, ipcl_conn_fanout_size *
-	    sizeof (*ipcl_conn_fanout));
-	for (i = 0; i < ipcl_bind_fanout_size; i++)
-		mutex_destroy(&ipcl_bind_fanout[i].connf_lock);
-	kmem_free(ipcl_bind_fanout, ipcl_bind_fanout_size *
-	    sizeof (*ipcl_bind_fanout));
+}
 
-	for (i = 0; i < A_CNT(ipcl_proto_fanout); i++)
-		mutex_destroy(&ipcl_proto_fanout[i].connf_lock);
-	for (i = 0; i < A_CNT(ipcl_proto_fanout_v6); i++)
-		mutex_destroy(&ipcl_proto_fanout_v6[i].connf_lock);
+/*
+ * All user-level and kernel use of the stack must be gone
+ * by now.
+ */
+void
+ipcl_destroy(ip_stack_t *ipst)
+{
+	int i;
 
-	for (i = 0; i < ipcl_udp_fanout_size; i++)
-		mutex_destroy(&ipcl_udp_fanout[i].connf_lock);
-	kmem_free(ipcl_udp_fanout, ipcl_udp_fanout_size *
-	    sizeof (*ipcl_udp_fanout));
+	for (i = 0; i < ipst->ips_ipcl_conn_fanout_size; i++) {
+		ASSERT(ipst->ips_ipcl_conn_fanout[i].connf_head == NULL);
+		mutex_destroy(&ipst->ips_ipcl_conn_fanout[i].connf_lock);
+	}
+	kmem_free(ipst->ips_ipcl_conn_fanout, ipst->ips_ipcl_conn_fanout_size *
+	    sizeof (connf_t));
+	ipst->ips_ipcl_conn_fanout = NULL;
 
-	for (i = 0; i < ipcl_raw_fanout_size; i++)
-		mutex_destroy(&ipcl_raw_fanout[i].connf_lock);
-	kmem_free(ipcl_raw_fanout, ipcl_raw_fanout_size *
-	    sizeof (*ipcl_raw_fanout));
+	for (i = 0; i < ipst->ips_ipcl_bind_fanout_size; i++) {
+		ASSERT(ipst->ips_ipcl_bind_fanout[i].connf_head == NULL);
+		mutex_destroy(&ipst->ips_ipcl_bind_fanout[i].connf_lock);
+	}
+	kmem_free(ipst->ips_ipcl_bind_fanout, ipst->ips_ipcl_bind_fanout_size *
+	    sizeof (connf_t));
+	ipst->ips_ipcl_bind_fanout = NULL;
 
-	kmem_free(ipcl_globalhash_fanout, sizeof (connf_t) * CONN_G_HASH_SIZE);
-	mutex_destroy(&rts_clients.connf_lock);
+	for (i = 0; i < IPPROTO_MAX; i++) {
+		ASSERT(ipst->ips_ipcl_proto_fanout[i].connf_head == NULL);
+		mutex_destroy(&ipst->ips_ipcl_proto_fanout[i].connf_lock);
+	}
+	kmem_free(ipst->ips_ipcl_proto_fanout, IPPROTO_MAX * sizeof (connf_t));
+	ipst->ips_ipcl_proto_fanout = NULL;
+
+	for (i = 0; i < IPPROTO_MAX; i++) {
+		ASSERT(ipst->ips_ipcl_proto_fanout_v6[i].connf_head == NULL);
+		mutex_destroy(&ipst->ips_ipcl_proto_fanout_v6[i].connf_lock);
+	}
+	kmem_free(ipst->ips_ipcl_proto_fanout_v6,
+	    IPPROTO_MAX * sizeof (connf_t));
+	ipst->ips_ipcl_proto_fanout_v6 = NULL;
+
+	for (i = 0; i < ipst->ips_ipcl_udp_fanout_size; i++) {
+		ASSERT(ipst->ips_ipcl_udp_fanout[i].connf_head == NULL);
+		mutex_destroy(&ipst->ips_ipcl_udp_fanout[i].connf_lock);
+	}
+	kmem_free(ipst->ips_ipcl_udp_fanout, ipst->ips_ipcl_udp_fanout_size *
+	    sizeof (connf_t));
+	ipst->ips_ipcl_udp_fanout = NULL;
+
+	for (i = 0; i < ipst->ips_ipcl_raw_fanout_size; i++) {
+		ASSERT(ipst->ips_ipcl_raw_fanout[i].connf_head == NULL);
+		mutex_destroy(&ipst->ips_ipcl_raw_fanout[i].connf_lock);
+	}
+	kmem_free(ipst->ips_ipcl_raw_fanout, ipst->ips_ipcl_raw_fanout_size *
+	    sizeof (connf_t));
+	ipst->ips_ipcl_raw_fanout = NULL;
+
+	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
+		ASSERT(ipst->ips_ipcl_globalhash_fanout[i].connf_head == NULL);
+		mutex_destroy(&ipst->ips_ipcl_globalhash_fanout[i].connf_lock);
+	}
+	kmem_free(ipst->ips_ipcl_globalhash_fanout,
+	    sizeof (connf_t) * CONN_G_HASH_SIZE);
+	ipst->ips_ipcl_globalhash_fanout = NULL;
+
+	ASSERT(ipst->ips_rts_clients->connf_head == NULL);
+	mutex_destroy(&ipst->ips_rts_clients->connf_lock);
+	kmem_free(ipst->ips_rts_clients, sizeof (connf_t));
+	ipst->ips_rts_clients = NULL;
 }
 
 /*
@@ -502,10 +551,11 @@ ipcl_destroy(void)
  * and inserts it in the global hash table.
  */
 conn_t *
-ipcl_conn_create(uint32_t type, int sleep)
+ipcl_conn_create(uint32_t type, int sleep, netstack_t *ns)
 {
 	itc_t	*itc;
 	conn_t	*connp;
+	sctp_stack_t *sctps;
 
 	switch (type) {
 	case IPCL_TCPCONN:
@@ -514,6 +564,8 @@ ipcl_conn_create(uint32_t type, int sleep)
 			return (NULL);
 		connp = &itc->itc_conn;
 		connp->conn_ref = 1;
+		netstack_hold(ns);
+		connp->conn_netstack = ns;
 		IPCL_DEBUG_LVL(1,
 		    ("ipcl_conn_create: connp = %p tcp (%p)",
 		    (void *)connp, (void *)connp->conn_tcp));
@@ -523,6 +575,10 @@ ipcl_conn_create(uint32_t type, int sleep)
 		if ((connp = kmem_cache_alloc(sctp_conn_cache, sleep)) == NULL)
 			return (NULL);
 		connp->conn_flags = IPCL_SCTPCONN;
+		sctps = ns->netstack_sctp;
+		SCTP_G_Q_REFHOLD(sctps);
+		netstack_hold(ns);
+		connp->conn_netstack = ns;
 		break;
 	case IPCL_IPCCONN:
 		connp = kmem_cache_alloc(ipcl_conn_cache, sleep);
@@ -533,6 +589,8 @@ ipcl_conn_create(uint32_t type, int sleep)
 		cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
 		connp->conn_flags = IPCL_IPCCONN;
 		connp->conn_ref = 1;
+		netstack_hold(ns);
+		connp->conn_netstack = ns;
 		IPCL_DEBUG_LVL(1,
 		    ("ipcl_conn_create: connp = %p\n", (void *)connp));
 		ipcl_globalhash_insert(connp);
@@ -549,6 +607,7 @@ void
 ipcl_conn_destroy(conn_t *connp)
 {
 	mblk_t	*mp;
+	netstack_t	*ns = connp->conn_netstack;
 
 	ASSERT(!MUTEX_HELD(&connp->conn_lock));
 	ASSERT(connp->conn_ref == 0);
@@ -569,9 +628,24 @@ ipcl_conn_destroy(conn_t *connp)
 	cv_destroy(&connp->conn_cv);
 	if (connp->conn_flags & IPCL_TCPCONN) {
 		tcp_t	*tcp = connp->conn_tcp;
+		tcp_stack_t *tcps;
+
+		ASSERT(tcp != NULL);
+		tcps = tcp->tcp_tcps;
+		if (tcps != NULL) {
+			if (connp->conn_latch != NULL) {
+				IPLATCH_REFRELE(connp->conn_latch, ns);
+				connp->conn_latch = NULL;
+			}
+			if (connp->conn_policy != NULL) {
+				IPPH_REFRELE(connp->conn_policy, ns);
+				connp->conn_policy = NULL;
+			}
+			tcp->tcp_tcps = NULL;
+			TCPS_REFRELE(tcps);
+		}
 
 		mutex_destroy(&connp->conn_lock);
-		ASSERT(connp->conn_tcp != NULL);
 		tcp_free(tcp);
 		mp = tcp->tcp_timercache;
 		tcp->tcp_cred = NULL;
@@ -592,10 +666,9 @@ ipcl_conn_destroy(conn_t *connp)
 		}
 		ASSERT(tcp->tcp_iphc_len == 0);
 
-		if (connp->conn_latch != NULL)
-			IPLATCH_REFRELE(connp->conn_latch);
-		if (connp->conn_policy != NULL)
-			IPPH_REFRELE(connp->conn_policy);
+		ASSERT(connp->conn_latch == NULL);
+		ASSERT(connp->conn_policy == NULL);
+
 		bzero(connp, sizeof (itc_t));
 
 		tcp->tcp_timercache = mp;
@@ -603,12 +676,22 @@ ipcl_conn_destroy(conn_t *connp)
 		connp->conn_flags = IPCL_TCPCONN;
 		connp->conn_ulp = IPPROTO_TCP;
 		tcp->tcp_connp = connp;
+		if (ns != NULL) {
+			ASSERT(tcp->tcp_tcps == NULL);
+			connp->conn_netstack = NULL;
+			netstack_rele(ns);
+		}
 		kmem_cache_free(ipcl_tcpconn_cache, connp);
 	} else if (connp->conn_flags & IPCL_SCTPCONN) {
+		ASSERT(ns != NULL);
 		sctp_free(connp);
 	} else {
 		ASSERT(connp->conn_udp == NULL);
 		mutex_destroy(&connp->conn_lock);
+		if (ns != NULL) {
+			connp->conn_netstack = NULL;
+			netstack_rele(ns);
+		}
 		kmem_cache_free(ipcl_conn_cache, connp);
 	}
 }
@@ -808,6 +891,7 @@ void
 ipcl_proto_insert(conn_t *connp, uint8_t protocol)
 {
 	connf_t	*connfp;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	ASSERT(connp != NULL);
 	ASSERT(!connp->conn_mac_exempt || protocol == IPPROTO_AH ||
@@ -816,7 +900,7 @@ ipcl_proto_insert(conn_t *connp, uint8_t protocol)
 	connp->conn_ulp = protocol;
 
 	/* Insert it in the protocol hash */
-	connfp = &ipcl_proto_fanout[protocol];
+	connfp = &ipst->ips_ipcl_proto_fanout[protocol];
 	IPCL_HASH_INSERT_WILDCARD(connfp, connp);
 }
 
@@ -824,6 +908,7 @@ void
 ipcl_proto_insert_v6(conn_t *connp, uint8_t protocol)
 {
 	connf_t	*connfp;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	ASSERT(connp != NULL);
 	ASSERT(!connp->conn_mac_exempt || protocol == IPPROTO_AH ||
@@ -832,7 +917,7 @@ ipcl_proto_insert_v6(conn_t *connp, uint8_t protocol)
 	connp->conn_ulp = protocol;
 
 	/* Insert it in the Bind Hash */
-	connfp = &ipcl_proto_fanout_v6[protocol];
+	connfp = &ipst->ips_ipcl_proto_fanout_v6[protocol];
 	IPCL_HASH_INSERT_WILDCARD(connfp, connp);
 }
 
@@ -848,8 +933,9 @@ ipcl_sctp_hash_insert(conn_t *connp, in_port_t lport)
 {
 	connf_t	*connfp;
 	conn_t	*oconnp;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
-	connfp = &ipcl_raw_fanout[IPCL_RAW_HASH(ntohs(lport))];
+	connfp = &ipst->ips_ipcl_raw_fanout[IPCL_RAW_HASH(ntohs(lport), ipst)];
 
 	/* Check for existing raw socket already bound to the port. */
 	mutex_enter(&connfp->connf_lock);
@@ -893,12 +979,12 @@ ipcl_sctp_hash_insert(conn_t *connp, in_port_t lport)
  * Returns true if there's a conflict.
  */
 static boolean_t
-check_exempt_conflict_v4(conn_t *connp)
+check_exempt_conflict_v4(conn_t *connp, ip_stack_t *ipst)
 {
 	connf_t	*connfp;
 	conn_t *tconn;
 
-	connfp = &ipcl_proto_fanout[connp->conn_ulp];
+	connfp = &ipst->ips_ipcl_proto_fanout[connp->conn_ulp];
 	mutex_enter(&connfp->connf_lock);
 	for (tconn = connfp->connf_head; tconn != NULL;
 	    tconn = tconn->conn_next) {
@@ -921,12 +1007,12 @@ check_exempt_conflict_v4(conn_t *connp)
 }
 
 static boolean_t
-check_exempt_conflict_v6(conn_t *connp)
+check_exempt_conflict_v6(conn_t *connp, ip_stack_t *ipst)
 {
 	connf_t	*connfp;
 	conn_t *tconn;
 
-	connfp = &ipcl_proto_fanout[connp->conn_ulp];
+	connfp = &ipst->ips_ipcl_proto_fanout[connp->conn_ulp];
 	mutex_enter(&connfp->connf_lock);
 	for (tconn = connfp->connf_head; tconn != NULL;
 	    tconn = tconn->conn_next) {
@@ -959,6 +1045,7 @@ ipcl_bind_insert(conn_t *connp, uint8_t protocol, ipaddr_t src, uint16_t lport)
 	char	buf[INET_NTOA_BUFSIZE];
 #endif
 	int	ret = 0;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	ASSERT(connp);
 
@@ -971,7 +1058,8 @@ ipcl_bind_insert(conn_t *connp, uint8_t protocol, ipaddr_t src, uint16_t lport)
 
 	switch (protocol) {
 	default:
-		if (is_system_labeled() && check_exempt_conflict_v4(connp))
+		if (is_system_labeled() &&
+		    check_exempt_conflict_v4(connp, ipst))
 			return (EADDRINUSE);
 		/* FALLTHROUGH */
 	case IPPROTO_UDP:
@@ -979,12 +1067,13 @@ ipcl_bind_insert(conn_t *connp, uint8_t protocol, ipaddr_t src, uint16_t lport)
 			IPCL_DEBUG_LVL(64,
 			    ("ipcl_bind_insert: connp %p - udp\n",
 			    (void *)connp));
-			connfp = &ipcl_udp_fanout[IPCL_UDP_HASH(lport)];
+			connfp = &ipst->ips_ipcl_udp_fanout[
+			    IPCL_UDP_HASH(lport, ipst)];
 		} else {
 			IPCL_DEBUG_LVL(64,
 			    ("ipcl_bind_insert: connp %p - protocol\n",
 			    (void *)connp));
-			connfp = &ipcl_proto_fanout[protocol];
+			connfp = &ipst->ips_ipcl_proto_fanout[protocol];
 		}
 
 		if (connp->conn_rem != INADDR_ANY) {
@@ -1000,7 +1089,8 @@ ipcl_bind_insert(conn_t *connp, uint8_t protocol, ipaddr_t src, uint16_t lport)
 
 		/* Insert it in the Bind Hash */
 		ASSERT(connp->conn_zoneid != ALL_ZONES);
-		connfp = &ipcl_bind_fanout[IPCL_BIND_HASH(lport)];
+		connfp = &ipst->ips_ipcl_bind_fanout[
+		    IPCL_BIND_HASH(lport, ipst)];
 		if (connp->conn_src != INADDR_ANY) {
 			IPCL_HASH_INSERT_BOUND(connfp, connp);
 		} else {
@@ -1028,6 +1118,7 @@ ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 {
 	connf_t	*connfp;
 	int	ret = 0;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	ASSERT(connp);
 
@@ -1037,7 +1128,8 @@ ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 
 	switch (protocol) {
 	default:
-		if (is_system_labeled() && check_exempt_conflict_v6(connp))
+		if (is_system_labeled() &&
+		    check_exempt_conflict_v6(connp, ipst))
 			return (EADDRINUSE);
 		/* FALLTHROUGH */
 	case IPPROTO_UDP:
@@ -1045,12 +1137,13 @@ ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 			IPCL_DEBUG_LVL(128,
 			    ("ipcl_bind_insert_v6: connp %p - udp\n",
 			    (void *)connp));
-			connfp = &ipcl_udp_fanout[IPCL_UDP_HASH(lport)];
+			connfp = &ipst->ips_ipcl_udp_fanout[
+			    IPCL_UDP_HASH(lport, ipst)];
 		} else {
 			IPCL_DEBUG_LVL(128,
 			    ("ipcl_bind_insert_v6: connp %p - protocol\n",
 			    (void *)connp));
-			connfp = &ipcl_proto_fanout_v6[protocol];
+			connfp = &ipst->ips_ipcl_proto_fanout_v6[protocol];
 		}
 
 		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_remv6)) {
@@ -1067,7 +1160,8 @@ ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 
 		/* Insert it in the Bind Hash */
 		ASSERT(connp->conn_zoneid != ALL_ZONES);
-		connfp = &ipcl_bind_fanout[IPCL_BIND_HASH(lport)];
+		connfp = &ipst->ips_ipcl_bind_fanout[
+		    IPCL_BIND_HASH(lport, ipst)];
 		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_srcv6)) {
 			IPCL_HASH_INSERT_BOUND(connfp, connp);
 		} else {
@@ -1114,6 +1208,7 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 #endif
 	in_port_t	lport;
 	int		ret = 0;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	IPCL_DEBUG_LVL(256, ("ipcl_conn_insert: connp %p, src = %s, "
 	    "dst = %s, ports = %x, protocol = %x", (void *)connp,
@@ -1131,8 +1226,9 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 			 */
 			IPCL_CONN_INIT(connp, protocol, src, rem, ports);
 		}
-		connfp = &ipcl_conn_fanout[IPCL_CONN_HASH(connp->conn_rem,
-		    connp->conn_ports)];
+		connfp = &ipst->ips_ipcl_conn_fanout[
+		    IPCL_CONN_HASH(connp->conn_rem,
+		    connp->conn_ports, ipst)];
 		mutex_enter(&connfp->connf_lock);
 		for (tconnp = connfp->connf_head; tconnp != NULL;
 		    tconnp = tconnp->conn_next) {
@@ -1178,7 +1274,8 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 		 * level per-transport binding logic.  For all others, it's
 		 * done here.
 		 */
-		if (is_system_labeled() && check_exempt_conflict_v4(connp))
+		if (is_system_labeled() &&
+		    check_exempt_conflict_v4(connp, ipst))
 			return (EADDRINUSE);
 		/* FALLTHROUGH */
 
@@ -1186,9 +1283,10 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 		up = (uint16_t *)&ports;
 		IPCL_CONN_INIT(connp, protocol, src, rem, ports);
 		if (protocol == IPPROTO_UDP) {
-			connfp = &ipcl_udp_fanout[IPCL_UDP_HASH(up[1])];
+			connfp = &ipst->ips_ipcl_udp_fanout[
+			    IPCL_UDP_HASH(up[1], ipst)];
 		} else {
-			connfp = &ipcl_proto_fanout[protocol];
+			connfp = &ipst->ips_ipcl_proto_fanout[protocol];
 		}
 
 		if (connp->conn_rem != INADDR_ANY) {
@@ -1213,6 +1311,7 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 	conn_t		*tconnp;
 	in_port_t	lport;
 	int		ret = 0;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	switch (protocol) {
 	case IPPROTO_TCP:
@@ -1220,8 +1319,9 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 		if (!(connp->conn_flags & IPCL_EAGER)) {
 			IPCL_CONN_INIT_V6(connp, protocol, *src, *rem, ports);
 		}
-		connfp = &ipcl_conn_fanout[IPCL_CONN_HASH_V6(connp->conn_remv6,
-		    connp->conn_ports)];
+		connfp = &ipst->ips_ipcl_conn_fanout[
+		    IPCL_CONN_HASH_V6(connp->conn_remv6, connp->conn_ports,
+		    ipst)];
 		mutex_enter(&connfp->connf_lock);
 		for (tconnp = connfp->connf_head; tconnp != NULL;
 		    tconnp = tconnp->conn_next) {
@@ -1255,16 +1355,18 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 		break;
 
 	default:
-		if (is_system_labeled() && check_exempt_conflict_v6(connp))
+		if (is_system_labeled() &&
+		    check_exempt_conflict_v6(connp, ipst))
 			return (EADDRINUSE);
 		/* FALLTHROUGH */
 	case IPPROTO_UDP:
 		up = (uint16_t *)&ports;
 		IPCL_CONN_INIT_V6(connp, protocol, *src, *rem, ports);
 		if (protocol == IPPROTO_UDP) {
-			connfp = &ipcl_udp_fanout[IPCL_UDP_HASH(up[1])];
+			connfp = &ipst->ips_ipcl_udp_fanout[
+			    IPCL_UDP_HASH(up[1], ipst)];
 		} else {
-			connfp = &ipcl_proto_fanout_v6[protocol];
+			connfp = &ipst->ips_ipcl_proto_fanout_v6[protocol];
 		}
 
 		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_remv6)) {
@@ -1291,7 +1393,8 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
  * zone, then label checks are omitted.
  */
 conn_t *
-ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
+ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
+    ip_stack_t *ipst)
 {
 	ipha_t	*ipha;
 	connf_t	*connfp, *bind_connfp;
@@ -1310,7 +1413,8 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 	case IPPROTO_TCP:
 		ports = *(uint32_t *)up;
 		connfp =
-		    &ipcl_conn_fanout[IPCL_CONN_HASH(ipha->ipha_src, ports)];
+		    &ipst->ips_ipcl_conn_fanout[IPCL_CONN_HASH(ipha->ipha_src,
+		    ports, ipst)];
 		mutex_enter(&connfp->connf_lock);
 		for (connp = connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
@@ -1342,6 +1446,10 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 			    TSLF_UNLABELED) != 0;
 		shared_addr = (zoneid == ALL_ZONES);
 		if (shared_addr) {
+			/*
+			 * No need to handle exclusive-stack zones since
+			 * ALL_ZONES only applies to the shared stack.
+			 */
 			zoneid = tsol_mlp_findzone(protocol, lport);
 			/*
 			 * If no shared MLP is found, tsol_mlp_findzone returns
@@ -1359,7 +1467,8 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 				unlabeled = B_FALSE;
 		}
 
-		bind_connfp = &ipcl_bind_fanout[IPCL_BIND_HASH(lport)];
+		bind_connfp =
+		    &ipst->ips_ipcl_bind_fanout[IPCL_BIND_HASH(lport, ipst)];
 		mutex_enter(&bind_connfp->connf_lock);
 		for (connp = bind_connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
@@ -1409,6 +1518,10 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 			    TSLF_UNLABELED) != 0;
 		shared_addr = (zoneid == ALL_ZONES);
 		if (shared_addr) {
+			/*
+			 * No need to handle exclusive-stack zones since
+			 * ALL_ZONES only applies to the shared stack.
+			 */
 			zoneid = tsol_mlp_findzone(protocol, lport);
 			/*
 			 * If no shared MLP is found, tsol_mlp_findzone returns
@@ -1427,7 +1540,7 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		}
 		fport = up[0];
 		IPCL_DEBUG_LVL(512, ("ipcl_udp_classify %x %x", lport, fport));
-		connfp = &ipcl_udp_fanout[IPCL_UDP_HASH(lport)];
+		connfp = &ipst->ips_ipcl_udp_fanout[IPCL_UDP_HASH(lport, ipst)];
 		mutex_enter(&connfp->connf_lock);
 		for (connp = connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
@@ -1467,7 +1580,8 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 }
 
 conn_t *
-ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
+ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
+    ip_stack_t *ipst)
 {
 	ip6_t		*ip6h;
 	connf_t		*connfp, *bind_connfp;
@@ -1489,7 +1603,8 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		ports = *(uint32_t *)up;
 
 		connfp =
-		    &ipcl_conn_fanout[IPCL_CONN_HASH_V6(ip6h->ip6_src, ports)];
+		    &ipst->ips_ipcl_conn_fanout[IPCL_CONN_HASH_V6(ip6h->ip6_src,
+		    ports, ipst)];
 		mutex_enter(&connfp->connf_lock);
 		for (connp = connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
@@ -1524,6 +1639,10 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		}
 		shared_addr = (zoneid == ALL_ZONES);
 		if (shared_addr) {
+			/*
+			 * No need to handle exclusive-stack zones since
+			 * ALL_ZONES only applies to the shared stack.
+			 */
 			zoneid = tsol_mlp_findzone(protocol, lport);
 			/*
 			 * If no shared MLP is found, tsol_mlp_findzone returns
@@ -1541,7 +1660,8 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 				unlabeled = B_FALSE;
 		}
 
-		bind_connfp = &ipcl_bind_fanout[IPCL_BIND_HASH(lport)];
+		bind_connfp =
+		    &ipst->ips_ipcl_bind_fanout[IPCL_BIND_HASH(lport, ipst)];
 		mutex_enter(&bind_connfp->connf_lock);
 		for (connp = bind_connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
@@ -1592,6 +1712,10 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		}
 		shared_addr = (zoneid == ALL_ZONES);
 		if (shared_addr) {
+			/*
+			 * No need to handle exclusive-stack zones since
+			 * ALL_ZONES only applies to the shared stack.
+			 */
 			zoneid = tsol_mlp_findzone(protocol, lport);
 			/*
 			 * If no shared MLP is found, tsol_mlp_findzone returns
@@ -1612,7 +1736,7 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		fport = up[0];
 		IPCL_DEBUG_LVL(512, ("ipcl_udp_classify_v6 %x %x", lport,
 		    fport));
-		connfp = &ipcl_udp_fanout[IPCL_UDP_HASH(lport)];
+		connfp = &ipst->ips_ipcl_udp_fanout[IPCL_UDP_HASH(lport, ipst)];
 		mutex_enter(&connfp->connf_lock);
 		for (connp = connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
@@ -1655,7 +1779,7 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
  * wrapper around ipcl_classify_(v4,v6) routines.
  */
 conn_t *
-ipcl_classify(mblk_t *mp, zoneid_t zoneid)
+ipcl_classify(mblk_t *mp, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	uint16_t	hdr_len;
 	ipha_t		*ipha;
@@ -1669,13 +1793,13 @@ ipcl_classify(mblk_t *mp, zoneid_t zoneid)
 		ipha = (ipha_t *)mp->b_rptr;
 		hdr_len = IPH_HDR_LENGTH(ipha);
 		return (ipcl_classify_v4(mp, ipha->ipha_protocol, hdr_len,
-		    zoneid));
+		    zoneid, ipst));
 	case IPV6_VERSION:
 		if (!ip_hdr_length_nexthdr_v6(mp, (ip6_t *)mp->b_rptr,
 		    &hdr_len, &nexthdrp))
 			return (NULL);
 
-		return (ipcl_classify_v6(mp, *nexthdrp, hdr_len, zoneid));
+		return (ipcl_classify_v6(mp, *nexthdrp, hdr_len, zoneid, ipst));
 	}
 
 	return (NULL);
@@ -1683,7 +1807,7 @@ ipcl_classify(mblk_t *mp, zoneid_t zoneid)
 
 conn_t *
 ipcl_classify_raw(mblk_t *mp, uint8_t protocol, zoneid_t zoneid,
-    uint32_t ports, ipha_t *hdr)
+    uint32_t ports, ipha_t *hdr, ip_stack_t *ipst)
 {
 	connf_t		*connfp;
 	conn_t		*connp;
@@ -1705,6 +1829,10 @@ ipcl_classify_raw(mblk_t *mp, uint8_t protocol, zoneid_t zoneid,
 	}
 	shared_addr = (zoneid == ALL_ZONES);
 	if (shared_addr) {
+		/*
+		 * No need to handle exclusive-stack zones since ALL_ZONES
+		 * only applies to the shared stack.
+		 */
 		zoneid = tsol_mlp_findzone(protocol, lport);
 		/*
 		 * If no shared MLP is found, tsol_mlp_findzone returns
@@ -1724,7 +1852,7 @@ ipcl_classify_raw(mblk_t *mp, uint8_t protocol, zoneid_t zoneid,
 	af = IPH_HDR_VERSION(hdr);
 	dst = af == IPV4_VERSION ? (const void *)&hdr->ipha_dst :
 	    (const void *)&((ip6_t *)hdr)->ip6_dst;
-	connfp = &ipcl_raw_fanout[IPCL_RAW_HASH(ntohs(lport))];
+	connfp = &ipst->ips_ipcl_raw_fanout[IPCL_RAW_HASH(ntohs(lport), ipst)];
 
 	mutex_enter(&connfp->connf_lock);
 	for (connp = connfp->connf_head; connp != NULL;
@@ -1779,7 +1907,7 @@ ipcl_classify_raw(mblk_t *mp, uint8_t protocol, zoneid_t zoneid,
 	mutex_exit(&connfp->connf_lock);
 
 	/* Try to look for a wildcard match. */
-	connfp = &ipcl_raw_fanout[IPCL_RAW_HASH(0)];
+	connfp = &ipst->ips_ipcl_raw_fanout[IPCL_RAW_HASH(0, ipst)];
 	mutex_enter(&connfp->connf_lock);
 	for (connp = connfp->connf_head; connp != NULL;
 	    connp = connp->conn_next) {
@@ -1859,13 +1987,15 @@ void
 ipcl_globalhash_insert(conn_t *connp)
 {
 	int	index;
+	struct connf_s	*connfp;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	/*
 	 * No need for atomic here. Approximate even distribution
 	 * in the global lists is sufficient.
 	 */
-	conn_g_index++;
-	index = conn_g_index & (CONN_G_HASH_SIZE - 1);
+	ipst->ips_conn_g_index++;
+	index = ipst->ips_conn_g_index & (CONN_G_HASH_SIZE - 1);
 
 	connp->conn_g_prev = NULL;
 	/*
@@ -1874,22 +2004,25 @@ ipcl_globalhash_insert(conn_t *connp)
 	 */
 	connp->conn_state_flags |= CONN_INCIPIENT;
 
+	connfp = &ipst->ips_ipcl_globalhash_fanout[index];
 	/* Insert at the head of the list */
-	mutex_enter(&ipcl_globalhash_fanout[index].connf_lock);
-	connp->conn_g_next = ipcl_globalhash_fanout[index].connf_head;
+	mutex_enter(&connfp->connf_lock);
+	connp->conn_g_next = connfp->connf_head;
 	if (connp->conn_g_next != NULL)
 		connp->conn_g_next->conn_g_prev = connp;
-	ipcl_globalhash_fanout[index].connf_head = connp;
+	connfp->connf_head = connp;
 
 	/* The fanout bucket this conn points to */
-	connp->conn_g_fanout = &ipcl_globalhash_fanout[index];
+	connp->conn_g_fanout = connfp;
 
-	mutex_exit(&ipcl_globalhash_fanout[index].connf_lock);
+	mutex_exit(&connfp->connf_lock);
 }
 
 void
 ipcl_globalhash_remove(conn_t *connp)
 {
+	struct connf_s	*connfp;
+
 	/*
 	 * We were never inserted in the global multi list.
 	 * IPCL_NONE variety is never inserted in the global multilist
@@ -1898,14 +2031,15 @@ ipcl_globalhash_remove(conn_t *connp)
 	if (connp->conn_g_fanout == NULL)
 		return;
 
-	mutex_enter(&connp->conn_g_fanout->connf_lock);
+	connfp = connp->conn_g_fanout;
+	mutex_enter(&connfp->connf_lock);
 	if (connp->conn_g_prev != NULL)
 		connp->conn_g_prev->conn_g_next = connp->conn_g_next;
 	else
-		connp->conn_g_fanout->connf_head = connp->conn_g_next;
+		connfp->connf_head = connp->conn_g_next;
 	if (connp->conn_g_next != NULL)
 		connp->conn_g_next->conn_g_prev = connp->conn_g_prev;
-	mutex_exit(&connp->conn_g_fanout->connf_lock);
+	mutex_exit(&connfp->connf_lock);
 
 	/* Better to stumble on a null pointer than to corrupt memory */
 	connp->conn_g_next = NULL;
@@ -1926,16 +2060,16 @@ ipcl_globalhash_remove(conn_t *connp)
  * is created to the struct that is going away.
  */
 void
-ipcl_walk(pfv_t func, void *arg)
+ipcl_walk(pfv_t func, void *arg, ip_stack_t *ipst)
 {
 	int	i;
 	conn_t	*connp;
 	conn_t	*prev_connp;
 
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
-		mutex_enter(&ipcl_globalhash_fanout[i].connf_lock);
+		mutex_enter(&ipst->ips_ipcl_globalhash_fanout[i].connf_lock);
 		prev_connp = NULL;
-		connp = ipcl_globalhash_fanout[i].connf_head;
+		connp = ipst->ips_ipcl_globalhash_fanout[i].connf_head;
 		while (connp != NULL) {
 			mutex_enter(&connp->conn_lock);
 			if (connp->conn_state_flags &
@@ -1946,15 +2080,17 @@ ipcl_walk(pfv_t func, void *arg)
 			}
 			CONN_INC_REF_LOCKED(connp);
 			mutex_exit(&connp->conn_lock);
-			mutex_exit(&ipcl_globalhash_fanout[i].connf_lock);
+			mutex_exit(
+			    &ipst->ips_ipcl_globalhash_fanout[i].connf_lock);
 			(*func)(connp, arg);
 			if (prev_connp != NULL)
 				CONN_DEC_REF(prev_connp);
-			mutex_enter(&ipcl_globalhash_fanout[i].connf_lock);
+			mutex_enter(
+			    &ipst->ips_ipcl_globalhash_fanout[i].connf_lock);
 			prev_connp = connp;
 			connp = connp->conn_g_next;
 		}
-		mutex_exit(&ipcl_globalhash_fanout[i].connf_lock);
+		mutex_exit(&ipst->ips_ipcl_globalhash_fanout[i].connf_lock);
 		if (prev_connp != NULL)
 			CONN_DEC_REF(prev_connp);
 	}
@@ -1967,7 +2103,8 @@ ipcl_walk(pfv_t func, void *arg)
  * (peer tcp in ESTABLISHED state).
  */
 conn_t *
-ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *connp, ipha_t *ipha, tcph_t *tcph)
+ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *connp, ipha_t *ipha, tcph_t *tcph,
+    ip_stack_t *ipst)
 {
 	uint32_t ports;
 	uint16_t *pports = (uint16_t *)&ports;
@@ -1987,7 +2124,8 @@ ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *connp, ipha_t *ipha, tcph_t *tcph)
 	bcopy(tcph->th_fport, &pports[0], sizeof (uint16_t));
 	bcopy(tcph->th_lport, &pports[1], sizeof (uint16_t));
 
-	connfp = &ipcl_conn_fanout[IPCL_CONN_HASH(ipha->ipha_dst, ports)];
+	connfp = &ipst->ips_ipcl_conn_fanout[IPCL_CONN_HASH(ipha->ipha_dst,
+	    ports, ipst)];
 
 	mutex_enter(&connfp->connf_lock);
 	for (tconnp = connfp->connf_head; tconnp != NULL;
@@ -2015,7 +2153,8 @@ ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *connp, ipha_t *ipha, tcph_t *tcph)
  * (peer tcp in ESTABLISHED state).
  */
 conn_t *
-ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *connp, ip6_t *ip6h, tcph_t *tcph)
+ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *connp, ip6_t *ip6h, tcph_t *tcph,
+    ip_stack_t *ipst)
 {
 	uint32_t ports;
 	uint16_t *pports = (uint16_t *)&ports;
@@ -2038,7 +2177,8 @@ ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *connp, ip6_t *ip6h, tcph_t *tcph)
 	bcopy(tcph->th_fport, &pports[0], sizeof (uint16_t));
 	bcopy(tcph->th_lport, &pports[1], sizeof (uint16_t));
 
-	connfp = &ipcl_conn_fanout[IPCL_CONN_HASH_V6(ip6h->ip6_dst, ports)];
+	connfp = &ipst->ips_ipcl_conn_fanout[IPCL_CONN_HASH_V6(ip6h->ip6_dst,
+	    ports, ipst)];
 
 	mutex_enter(&connfp->connf_lock);
 	for (tconnp = connfp->connf_head; tconnp != NULL;
@@ -2066,7 +2206,8 @@ ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *connp, ip6_t *ip6h, tcph_t *tcph)
  * Only checks for connected entries i.e. no INADDR_ANY checks.
  */
 conn_t *
-ipcl_tcp_lookup_reversed_ipv4(ipha_t *ipha, tcph_t *tcph, int min_state)
+ipcl_tcp_lookup_reversed_ipv4(ipha_t *ipha, tcph_t *tcph, int min_state,
+    ip_stack_t *ipst)
 {
 	uint32_t ports;
 	uint16_t *pports;
@@ -2077,7 +2218,8 @@ ipcl_tcp_lookup_reversed_ipv4(ipha_t *ipha, tcph_t *tcph, int min_state)
 	bcopy(tcph->th_fport, &pports[0], sizeof (uint16_t));
 	bcopy(tcph->th_lport, &pports[1], sizeof (uint16_t));
 
-	connfp = &ipcl_conn_fanout[IPCL_CONN_HASH(ipha->ipha_dst, ports)];
+	connfp = &ipst->ips_ipcl_conn_fanout[IPCL_CONN_HASH(ipha->ipha_dst,
+					    ports, ipst)];
 
 	mutex_enter(&connfp->connf_lock);
 	for (tconnp = connfp->connf_head; tconnp != NULL;
@@ -2104,7 +2246,7 @@ ipcl_tcp_lookup_reversed_ipv4(ipha_t *ipha, tcph_t *tcph, int min_state)
  */
 conn_t *
 ipcl_tcp_lookup_reversed_ipv6(ip6_t *ip6h, tcpha_t *tcpha, int min_state,
-    uint_t ifindex)
+    uint_t ifindex, ip_stack_t *ipst)
 {
 	tcp_t	*tcp;
 	uint32_t ports;
@@ -2116,7 +2258,8 @@ ipcl_tcp_lookup_reversed_ipv6(ip6_t *ip6h, tcpha_t *tcpha, int min_state,
 	pports[0] = tcpha->tha_fport;
 	pports[1] = tcpha->tha_lport;
 
-	connfp = &ipcl_conn_fanout[IPCL_CONN_HASH_V6(ip6h->ip6_dst, ports)];
+	connfp = &ipst->ips_ipcl_conn_fanout[IPCL_CONN_HASH_V6(ip6h->ip6_dst,
+					    ports, ipst)];
 
 	mutex_enter(&connfp->connf_lock);
 	for (tconnp = connfp->connf_head; tconnp != NULL;
@@ -2143,7 +2286,8 @@ ipcl_tcp_lookup_reversed_ipv6(ip6_t *ip6h, tcpha_t *tcpha, int min_state,
  * a listener when changing state.
  */
 conn_t *
-ipcl_lookup_listener_v4(uint16_t lport, ipaddr_t laddr, zoneid_t zoneid)
+ipcl_lookup_listener_v4(uint16_t lport, ipaddr_t laddr, zoneid_t zoneid,
+    ip_stack_t *ipst)
 {
 	connf_t		*bind_connfp;
 	conn_t		*connp;
@@ -2158,7 +2302,7 @@ ipcl_lookup_listener_v4(uint16_t lport, ipaddr_t laddr, zoneid_t zoneid)
 
 	ASSERT(zoneid != ALL_ZONES);
 
-	bind_connfp = &ipcl_bind_fanout[IPCL_BIND_HASH(lport)];
+	bind_connfp = &ipst->ips_ipcl_bind_fanout[IPCL_BIND_HASH(lport, ipst)];
 	mutex_enter(&bind_connfp->connf_lock);
 	for (connp = bind_connfp->connf_head; connp != NULL;
 	    connp = connp->conn_next) {
@@ -2181,7 +2325,7 @@ ipcl_lookup_listener_v4(uint16_t lport, ipaddr_t laddr, zoneid_t zoneid)
  */
 conn_t *
 ipcl_lookup_listener_v6(uint16_t lport, in6_addr_t *laddr, uint_t ifindex,
-    zoneid_t zoneid)
+    zoneid_t zoneid, ip_stack_t *ipst)
 {
 	connf_t		*bind_connfp;
 	conn_t		*connp = NULL;
@@ -2196,7 +2340,7 @@ ipcl_lookup_listener_v6(uint16_t lport, in6_addr_t *laddr, uint_t ifindex,
 
 	ASSERT(zoneid != ALL_ZONES);
 
-	bind_connfp = &ipcl_bind_fanout[IPCL_BIND_HASH(lport)];
+	bind_connfp = &ipst->ips_ipcl_bind_fanout[IPCL_BIND_HASH(lport, ipst)];
 	mutex_enter(&bind_connfp->connf_lock);
 	for (connp = bind_connfp->connf_head; connp != NULL;
 	    connp = connp->conn_next) {

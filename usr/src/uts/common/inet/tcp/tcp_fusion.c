@@ -101,25 +101,6 @@
  */
 
 /*
- * Macros that determine whether or not IP processing is needed for TCP.
- */
-#define	TCP_IPOPT_POLICY_V4(tcp)					\
-	((tcp)->tcp_ipversion == IPV4_VERSION &&			\
-	((tcp)->tcp_ip_hdr_len != IP_SIMPLE_HDR_LENGTH ||		\
-	CONN_OUTBOUND_POLICY_PRESENT((tcp)->tcp_connp) ||		\
-	CONN_INBOUND_POLICY_PRESENT((tcp)->tcp_connp)))
-
-#define	TCP_IPOPT_POLICY_V6(tcp)					\
-	((tcp)->tcp_ipversion == IPV6_VERSION &&			\
-	((tcp)->tcp_ip_hdr_len != IPV6_HDR_LEN ||			\
-	CONN_OUTBOUND_POLICY_PRESENT_V6((tcp)->tcp_connp) ||		\
-	CONN_INBOUND_POLICY_PRESENT_V6((tcp)->tcp_connp)))
-
-#define	TCP_LOOPBACK_IP(tcp)						\
-	(TCP_IPOPT_POLICY_V4(tcp) || TCP_IPOPT_POLICY_V6(tcp) ||	\
-	!CONN_IS_LSO_MD_FASTPATH((tcp)->tcp_connp))
-
-/*
  * Setting this to false means we disable fusion altogether and
  * loopback connections would go through the protocol paths.
  */
@@ -146,6 +127,35 @@ static void	tcp_fuse_syncstr_disable(tcp_t *);
 static void	strrput_sig(queue_t *, boolean_t);
 
 /*
+ * Return true if this connection needs some IP functionality
+ */
+static boolean_t
+tcp_loopback_needs_ip(tcp_t *tcp, netstack_t *ns)
+{
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+
+	if (tcp->tcp_ipversion == IPV4_VERSION) {
+		if (tcp->tcp_ip_hdr_len != IP_SIMPLE_HDR_LENGTH)
+			return (B_TRUE);
+		if (CONN_OUTBOUND_POLICY_PRESENT(tcp->tcp_connp, ipss))
+			return (B_TRUE);
+		if (CONN_INBOUND_POLICY_PRESENT(tcp->tcp_connp, ipss))
+			return (B_TRUE);
+	} else {
+		if (tcp->tcp_ip_hdr_len != IPV6_HDR_LEN)
+			return (B_TRUE);
+		if (CONN_OUTBOUND_POLICY_PRESENT_V6(tcp->tcp_connp, ipss))
+			return (B_TRUE);
+		if (CONN_INBOUND_POLICY_PRESENT_V6(tcp->tcp_connp, ipss))
+			return (B_TRUE);
+	}
+	if (!CONN_IS_LSO_MD_FASTPATH(tcp->tcp_connp))
+		return (B_TRUE);
+	return (B_FALSE);
+}
+
+
+/*
  * This routine gets called by the eager tcp upon changing state from
  * SYN_RCVD to ESTABLISHED.  It fuses a direct path between itself
  * and the active connect tcp such that the regular tcp processings
@@ -161,6 +171,9 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 {
 	conn_t *peer_connp, *connp = tcp->tcp_connp;
 	tcp_t *peer_tcp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	netstack_t	*ns;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
 	ASSERT(!tcp->tcp_fused);
 	ASSERT(tcp->tcp_loopback);
@@ -186,10 +199,10 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 	 */
 	if (tcp->tcp_ipversion == IPV4_VERSION) {
 		peer_connp = ipcl_conn_tcp_lookup_reversed_ipv4(connp,
-		    (ipha_t *)iphdr, tcph);
+		    (ipha_t *)iphdr, tcph, ipst);
 	} else {
 		peer_connp = ipcl_conn_tcp_lookup_reversed_ipv6(connp,
-		    (ip6_t *)iphdr, tcph);
+		    (ip6_t *)iphdr, tcph, ipst);
 	}
 
 	/*
@@ -204,7 +217,7 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 	if (peer_connp == NULL || peer_connp->conn_sqp != connp->conn_sqp ||
 	    !IPCL_IS_TCP(peer_connp)) {
 		if (peer_connp != NULL) {
-			TCP_STAT(tcp_fusion_unqualified);
+			TCP_STAT(tcps, tcp_fusion_unqualified);
 			CONN_DEC_REF(peer_connp);
 		}
 		return;
@@ -221,10 +234,14 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 	 * In particular we bail out for non-simple TCP/IP or if IPsec/
 	 * IPQoS policy/kernel SSL exists.
 	 */
+	ns = tcps->tcps_netstack;
+	ipst = ns->netstack_ip;
+
 	if (!tcp->tcp_unfusable && !peer_tcp->tcp_unfusable &&
-	    !TCP_LOOPBACK_IP(tcp) && !TCP_LOOPBACK_IP(peer_tcp) &&
+	    !tcp_loopback_needs_ip(tcp, ns) &&
+	    !tcp_loopback_needs_ip(peer_tcp, ns) &&
 	    tcp->tcp_kssl_ent == NULL &&
-	    !IPP_ENABLED(IPP_LOCAL_OUT|IPP_LOCAL_IN)) {
+	    !IPP_ENABLED(IPP_LOCAL_OUT|IPP_LOCAL_IN, ipst)) {
 		mblk_t *mp;
 		struct stroptions *stropt;
 		queue_t *peer_rq = peer_tcp->tcp_rq;
@@ -314,7 +331,7 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 		/* Send the options up */
 		putnext(peer_rq, mp);
 	} else {
-		TCP_STAT(tcp_fusion_unqualified);
+		TCP_STAT(tcps, tcp_fusion_unqualified);
 	}
 	CONN_DEC_REF(peer_connp);
 	return;
@@ -377,6 +394,7 @@ tcp_fuse_output_urg(tcp_t *tcp, mblk_t *mp)
 	struct T_exdata_ind *tei;
 	tcp_t *peer_tcp = tcp->tcp_loopback_peer;
 	mblk_t *head, *prev_head = NULL;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(tcp->tcp_fused);
 	ASSERT(peer_tcp != NULL && peer_tcp->tcp_loopback_peer == tcp);
@@ -423,8 +441,8 @@ tcp_fuse_output_urg(tcp_t *tcp, mblk_t *mp)
 	tei->MORE_flag = 0;
 	mp->b_wptr = (uchar_t *)&tei[1];
 
-	TCP_STAT(tcp_fusion_urg);
-	BUMP_MIB(&tcp_mib, tcpOutUrg);
+	TCP_STAT(tcps, tcp_fusion_urg);
+	BUMP_MIB(&tcps->tcps_mib, tcpOutUrg);
 
 	head = peer_tcp->tcp_rcv_list;
 	while (head != NULL) {
@@ -474,6 +492,9 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	uint_t ip_hdr_len;
 	uint32_t seq;
 	uint32_t recv_size = send_size;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	netstack_t	*ns = tcps->tcps_netstack;
+	ip_stack_t	*ipst = ns->netstack_ip;
 
 	ASSERT(tcp->tcp_fused);
 	ASSERT(peer_tcp != NULL && peer_tcp->tcp_loopback_peer == tcp);
@@ -484,9 +505,10 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	max_unread = peer_tcp->tcp_fuse_rcv_unread_hiwater;
 
 	/* If this connection requires IP, unfuse and use regular path */
-	if (TCP_LOOPBACK_IP(tcp) || TCP_LOOPBACK_IP(peer_tcp) ||
-	    IPP_ENABLED(IPP_LOCAL_OUT|IPP_LOCAL_IN)) {
-		TCP_STAT(tcp_fusion_aborted);
+	if (tcp_loopback_needs_ip(tcp, ns) ||
+	    tcp_loopback_needs_ip(peer_tcp, ns) ||
+	    IPP_ENABLED(IPP_LOCAL_OUT|IPP_LOCAL_IN, ipst)) {
+		TCP_STAT(tcps, tcp_fusion_aborted);
 		goto unfuse;
 	}
 
@@ -515,11 +537,11 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	}
 
 	if (tcp->tcp_ipversion == IPV4_VERSION &&
-	    (HOOKS4_INTERESTED_LOOPBACK_IN ||
-	    HOOKS4_INTERESTED_LOOPBACK_OUT) ||
+	    (HOOKS4_INTERESTED_LOOPBACK_IN(ipst) ||
+	    HOOKS4_INTERESTED_LOOPBACK_OUT(ipst)) ||
 	    tcp->tcp_ipversion == IPV6_VERSION &&
-	    (HOOKS6_INTERESTED_LOOPBACK_IN ||
-	    HOOKS6_INTERESTED_LOOPBACK_OUT)) {
+	    (HOOKS6_INTERESTED_LOOPBACK_IN(ipst) ||
+	    HOOKS6_INTERESTED_LOOPBACK_OUT(ipst))) {
 		/*
 		 * Build ip and tcp header to satisfy FW_HOOKS.
 		 * We only build it when any hook is present.
@@ -538,9 +560,9 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			DTRACE_PROBE4(ip4__loopback__out__start,
 			    ill_t *, NULL, ill_t *, olp,
 			    ipha_t *, ipha, mblk_t *, mp1);
-			FW_HOOKS(ip4_loopback_out_event,
-			    ipv4firewall_loopback_out,
-			    NULL, olp, ipha, mp1, mp1);
+			FW_HOOKS(ipst->ips_ip4_loopback_out_event,
+			    ipst->ips_ipv4firewall_loopback_out,
+			    NULL, olp, ipha, mp1, mp1, ipst);
 			DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, mp1);
 		} else {
 			ip6h = (ip6_t *)mp1->b_rptr;
@@ -548,9 +570,9 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			DTRACE_PROBE4(ip6__loopback__out__start,
 			    ill_t *, NULL, ill_t *, olp,
 			    ip6_t *, ip6h, mblk_t *, mp1);
-			FW_HOOKS6(ip6_loopback_out_event,
-			    ipv6firewall_loopback_out,
-			    NULL, olp, ip6h, mp1, mp1);
+			FW_HOOKS6(ipst->ips_ip6_loopback_out_event,
+			    ipst->ips_ipv6firewall_loopback_out,
+			    NULL, olp, ip6h, mp1, mp1, ipst);
 			DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, mp1);
 		}
 		if (mp1 == NULL)
@@ -565,9 +587,9 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			DTRACE_PROBE4(ip4__loopback__in__start,
 			    ill_t *, ilp, ill_t *, NULL,
 			    ipha_t *, ipha, mblk_t *, mp1);
-			FW_HOOKS(ip4_loopback_in_event,
-			    ipv4firewall_loopback_in,
-			    ilp, NULL, ipha, mp1, mp1);
+			FW_HOOKS(ipst->ips_ip4_loopback_in_event,
+			    ipst->ips_ipv4firewall_loopback_in,
+			    ilp, NULL, ipha, mp1, mp1, ipst);
 			DTRACE_PROBE1(ip4__loopback__in__end, mblk_t *, mp1);
 			if (mp1 == NULL)
 				goto unfuse;
@@ -577,9 +599,9 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			DTRACE_PROBE4(ip6__loopback__in__start,
 			    ill_t *, ilp, ill_t *, NULL,
 			    ip6_t *, ip6h, mblk_t *, mp1);
-			FW_HOOKS6(ip6_loopback_in_event,
-			    ipv6firewall_loopback_in,
-			    ilp, NULL, ip6h, mp1, mp1);
+			FW_HOOKS6(ipst->ips_ip6_loopback_in_event,
+			    ipst->ips_ipv6firewall_loopback_in,
+			    ilp, NULL, ip6h, mp1, mp1, ipst);
 			DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, mp1);
 			if (mp1 == NULL)
 				goto unfuse;
@@ -669,7 +691,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	    !TCP_IS_DETACHED(peer_tcp) && !canputnext(peer_tcp->tcp_rq)))) {
 		tcp_setqfull(tcp);
 		flow_stopped = B_TRUE;
-		TCP_STAT(tcp_fusion_flowctl);
+		TCP_STAT(tcps, tcp_fusion_flowctl);
 		DTRACE_PROBE4(tcp__fuse__output__flowctl, tcp_t *, tcp,
 		    uint_t, send_size, uint_t, peer_tcp->tcp_rcv_cnt,
 		    uint_t, peer_tcp->tcp_fuse_rcv_unread_cnt);
@@ -679,7 +701,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		flow_stopped = B_FALSE;
 	}
 	mutex_exit(&tcp->tcp_non_sq_lock);
-	loopback_packets++;
+	ipst->ips_loopback_packets++;
 	tcp->tcp_last_sent_len = send_size;
 
 	/* Need to adjust the following SNMP MIB-related variables */
@@ -688,12 +710,12 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	peer_tcp->tcp_rnxt += recv_size;
 	peer_tcp->tcp_rack = peer_tcp->tcp_rnxt;
 
-	BUMP_MIB(&tcp_mib, tcpOutDataSegs);
-	UPDATE_MIB(&tcp_mib, tcpOutDataBytes, send_size);
+	BUMP_MIB(&tcps->tcps_mib, tcpOutDataSegs);
+	UPDATE_MIB(&tcps->tcps_mib, tcpOutDataBytes, send_size);
 
-	BUMP_MIB(&tcp_mib, tcpInSegs);
-	BUMP_MIB(&tcp_mib, tcpInDataInorderSegs);
-	UPDATE_MIB(&tcp_mib, tcpInDataInorderBytes, send_size);
+	BUMP_MIB(&tcps->tcps_mib, tcpInSegs);
+	BUMP_MIB(&tcps->tcps_mib, tcpInDataInorderSegs);
+	UPDATE_MIB(&tcps->tcps_mib, tcpInDataInorderBytes, send_size);
 
 	BUMP_LOCAL(tcp->tcp_obsegs);
 	BUMP_LOCAL(peer_tcp->tcp_ibsegs);
@@ -749,6 +771,7 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 #ifdef DEBUG
 	uint_t cnt = 0;
 #endif
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(tcp->tcp_loopback);
 	ASSERT(tcp->tcp_fused || tcp->tcp_fused_sigurg);
@@ -777,7 +800,7 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 		    (mp = allocb_tryhard(1)) == NULL) {
 			/* Alloc failed; try again next time */
 			tcp->tcp_push_tid = TCP_TIMER(tcp, tcp_push_timer,
-			    MSEC_TO_TICK(tcp_push_timer_interval));
+			    MSEC_TO_TICK(tcps->tcps_push_timer_interval));
 			return (B_TRUE);
 		} else if (sigurg_mpp != NULL) {
 			/*
@@ -823,7 +846,7 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 		cnt += msgdsize(mp);
 #endif
 		putnext(q, mp);
-		TCP_STAT(tcp_fusion_putnext);
+		TCP_STAT(tcps, tcp_fusion_putnext);
 	}
 
 	if (tcp->tcp_direct_sockfs)
@@ -860,6 +883,7 @@ tcp_fuse_rrw(queue_t *q, struiod_t *dp)
 	tcp_t *tcp = Q_TO_CONN(q)->conn_tcp;
 	mblk_t *mp;
 	tcp_t *peer_tcp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	mutex_enter(&tcp->tcp_non_sq_lock);
 
@@ -876,8 +900,8 @@ plugged:
 		} while (tcp->tcp_fuse_syncstr_plugged);
 
 		mutex_exit(&tcp->tcp_non_sq_lock);
-		TCP_STAT(tcp_fusion_rrw_plugged);
-		TCP_STAT(tcp_fusion_rrw_busy);
+		TCP_STAT(tcps, tcp_fusion_rrw_plugged);
+		TCP_STAT(tcps, tcp_fusion_rrw_busy);
 		return (EBUSY);
 	}
 
@@ -890,7 +914,7 @@ plugged:
 	 */
 	if (!tcp->tcp_direct_sockfs || tcp->tcp_fuse_syncstr_stopped) {
 		mutex_exit(&tcp->tcp_non_sq_lock);
-		TCP_STAT(tcp_fusion_rrw_busy);
+		TCP_STAT(tcps, tcp_fusion_rrw_busy);
 		return (EBUSY);
 	}
 
@@ -921,7 +945,7 @@ plugged:
 		    uint32_t, tcp->tcp_rcv_cnt, ssize_t, dp->d_uio.uio_resid);
 
 		tcp->tcp_rcv_list = NULL;
-		TCP_STAT(tcp_fusion_rrw_msgcnt);
+		TCP_STAT(tcps, tcp_fusion_rrw_msgcnt);
 
 		/*
 		 * At this point nothing should be left in tcp_rcv_list.
@@ -940,7 +964,7 @@ plugged:
 
 		if (peer_tcp->tcp_flow_stopped) {
 			tcp_clrqfull(peer_tcp);
-			TCP_STAT(tcp_fusion_backenabled);
+			TCP_STAT(tcps, tcp_fusion_backenabled);
 		}
 	}
 	mutex_exit(&peer_tcp->tcp_non_sq_lock);
@@ -1149,6 +1173,7 @@ void
 tcp_fuse_disable_pair(tcp_t *tcp, boolean_t unfusing)
 {
 	tcp_t *peer_tcp = tcp->tcp_loopback_peer;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(tcp->tcp_fused);
 	ASSERT(peer_tcp != NULL);
@@ -1194,11 +1219,11 @@ tcp_fuse_disable_pair(tcp_t *tcp, boolean_t unfusing)
 	/* Lift up any flow-control conditions */
 	if (tcp->tcp_flow_stopped) {
 		tcp_clrqfull(tcp);
-		TCP_STAT(tcp_fusion_backenabled);
+		TCP_STAT(tcps, tcp_fusion_backenabled);
 	}
 	if (peer_tcp->tcp_flow_stopped) {
 		tcp_clrqfull(peer_tcp);
-		TCP_STAT(tcp_fusion_backenabled);
+		TCP_STAT(tcps, tcp_fusion_backenabled);
 	}
 
 	/* Disable synchronous streams */
@@ -1212,15 +1237,17 @@ tcp_fuse_disable_pair(tcp_t *tcp, boolean_t unfusing)
 size_t
 tcp_fuse_set_rcv_hiwat(tcp_t *tcp, size_t rwnd)
 {
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+
 	ASSERT(tcp->tcp_fused);
 
 	/* Ensure that value is within the maximum upper bound */
-	if (rwnd > tcp_max_buf)
-		rwnd = tcp_max_buf;
+	if (rwnd > tcps->tcps_max_buf)
+		rwnd = tcps->tcps_max_buf;
 
 	/* Obey the absolute minimum tcp receive high water mark */
-	if (rwnd < tcp_sth_rcv_hiwat)
-		rwnd = tcp_sth_rcv_hiwat;
+	if (rwnd < tcps->tcps_sth_rcv_hiwat)
+		rwnd = tcps->tcps_sth_rcv_hiwat;
 
 	/*
 	 * Round up to system page size in case SO_RCVBUF is modified

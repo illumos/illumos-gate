@@ -5,7 +5,12 @@
  *
  * $Id: ip_auth.h,v 2.16 2003/07/25 12:29:56 darrenr Exp $
  *
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #ifndef	__IP_AUTH_H__
 #define	__IP_AUTH_H__
 
@@ -27,6 +32,7 @@ typedef	struct	frauthent  {
 	struct	frentry	fae_fr;
 	struct	frauthent	*fae_next;
 	u_long	fae_age;
+	int	fae_ref;
 } frauthent_t;
 
 typedef struct  fr_authstat {
@@ -43,22 +49,13 @@ typedef struct  fr_authstat {
 } fr_authstat_t;
 
 
-extern	frentry_t	*ipauth;
-extern	struct fr_authstat	fr_authstats;
-extern	int	fr_defaultauthage;
-extern	int	fr_authstart;
-extern	int	fr_authend;
-extern	int	fr_authsize;
-extern	int	fr_authused;
-extern	int	fr_auth_lock;
 extern	frentry_t *fr_checkauth __P((fr_info_t *, u_32_t *));
-extern	void	fr_authexpire __P((void));
-extern	int	fr_authinit __P((void));
-extern	void	fr_authunload __P((void));
-extern	int	fr_authflush __P((void));
-extern	mb_t	**fr_authpkts;
+extern	void	fr_authexpire __P((ipf_stack_t *));
+extern	int	fr_authinit __P((ipf_stack_t *));
+extern	void	fr_authunload __P((ipf_stack_t *));
+extern	int	fr_authflush __P((ipf_stack_t *));
 extern	int	fr_newauth __P((mb_t *, fr_info_t *));
-extern	int	fr_preauthcmd __P((ioctlcmd_t, frentry_t *, frentry_t **));
-extern	int	fr_auth_ioctl __P((caddr_t, ioctlcmd_t, int));
+extern	int	fr_preauthcmd __P((ioctlcmd_t, frentry_t *, frentry_t **, ipf_stack_t *));
+extern	int	fr_auth_ioctl __P((caddr_t, int, int, int, void *, ipf_stack_t *));
 
 #endif	/* __IP_AUTH_H__ */

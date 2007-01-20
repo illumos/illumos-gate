@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,6 +95,8 @@ int secpolicy_fs_config(const cred_t *, const struct vfs *);
 int secpolicy_fs_linkdir(const cred_t *, const struct vfs *);
 int secpolicy_fs_minfree(const cred_t *, const struct vfs *);
 int secpolicy_fs_quota(const cred_t *, const struct vfs *);
+int secpolicy_ip(const cred_t *, int, boolean_t);
+int secpolicy_ip_config(const cred_t *, boolean_t);
 int secpolicy_ipc_access(const cred_t *, const struct kipc_perm *, mode_t);
 int secpolicy_ipc_config(const cred_t *);
 int secpolicy_ipc_owner(const cred_t *, const struct kipc_perm *);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,9 +93,10 @@ typedef int bool;
 #define	RT_MAXSEMIDS	21	/* really a rctl alias property, but for info */
 #define	RT_SHARES	22	/* really a rctl alias property, but for info */
 #define	RT_SCHED	23	/* really a property, but for info ... */
+#define	RT_IPTYPE	24	/* really a property, but for info ... */
 
 #define	RT_MIN		RT_UNKNOWN
-#define	RT_MAX		RT_SCHED
+#define	RT_MAX		RT_IPTYPE
 
 /* property types: increment PT_MAX when expanding this list */
 #define	PT_UNKNOWN	0
@@ -132,9 +133,10 @@ typedef int bool;
 #define	PT_MAXLOCKEDMEM	31
 #define	PT_MAXSWAP	32
 #define	PT_SCHED	33
+#define	PT_IPTYPE	34
 
 #define	PT_MIN		PT_UNKNOWN
-#define	PT_MAX		PT_SCHED
+#define	PT_MAX		PT_IPTYPE
 
 #define	MAX_EQ_PROP_PAIRS	3
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,11 @@ extern "C" {
 #define	DLS_PPA2INST(ppa)	((int)((ppa) % 1000))
 #define	DLS_PPA2VID(ppa)	((uint16_t)((ppa) / 1000))
 #define	DLS_PPA2MINOR(ppa)	((minor_t)((DLS_PPA2INST(ppa)) + 1))
+
+/*
+ * Maps a (VID, INST) pair to ppa
+ */
+#define	DLS_VIDINST2PPA(vid, inst)	((minor_t)((vid) * 1000 + (inst)))
 
 /*
  * Converts a minor to an instance#; makes sense only when minor <= 1000.
@@ -104,6 +109,8 @@ extern mblk_t		*dls_tx(dls_channel_t, mblk_t *);
 extern boolean_t	dls_active_set(dls_channel_t);
 extern void		dls_active_clear(dls_channel_t);
 
+extern dev_info_t	*dls_finddevinfo(dev_t);
+extern int		dls_ppa_from_minor(minor_t, t_uscalar_t *);
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

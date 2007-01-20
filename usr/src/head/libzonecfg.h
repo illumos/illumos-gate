@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -238,6 +238,11 @@ struct zone_devpermtab {
 	char	*zone_devperm_acl;
 };
 
+typedef enum zone_iptype {
+	ZS_SHARED,
+	ZS_EXCLUSIVE
+} zone_iptype_t;
+
 /*
  * Basic configuration management routines.
  */
@@ -277,6 +282,8 @@ extern	int	zonecfg_get_zonepath(zone_dochandle_t, char *, size_t);
 extern	int	zonecfg_set_zonepath(zone_dochandle_t, char *);
 extern	int	zonecfg_get_autoboot(zone_dochandle_t, boolean_t *);
 extern	int	zonecfg_set_autoboot(zone_dochandle_t, boolean_t);
+extern	int	zonecfg_get_iptype(zone_dochandle_t, zone_iptype_t *);
+extern	int	zonecfg_set_iptype(zone_dochandle_t, zone_iptype_t);
 extern	int	zonecfg_get_pool(zone_dochandle_t, char *, size_t);
 extern	int	zonecfg_set_pool(zone_dochandle_t, char *);
 extern	int	zonecfg_get_bootargs(zone_dochandle_t, char *, size_t);
@@ -500,6 +507,7 @@ extern boolean_t zonecfg_valid_fs_type(const char *);
  */
 extern boolean_t zonecfg_same_net_address(char *, char *);
 extern int zonecfg_valid_net_address(char *, struct lifreq *);
+extern boolean_t zonecfg_ifname_exists(sa_family_t, char *);
 
 /*
  * Rctl-related common functions.

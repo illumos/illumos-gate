@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -42,29 +42,35 @@
 #define	INET_DEVMTFLAGS	IP_DEVMTFLAGS	/* since as a driver we're ip */
 #define	INET_MODMTFLAGS	(D_MP | D_MTPERMOD)
 
-static void	arp_ddi_destroy();
-static void	arp_ddi_init();
-
 #include "../inetddi.c"
+
+extern void arp_ddi_init(void);
+extern void arp_ddi_destroy(void);
 
 int
 _init(void)
 {
-	int error;
+	int	error;
 
-	arp_ddi_init();
 	INET_BECOME_IP();
 
+	/*
+	 * Note: After mod_install succeeds, another thread can enter
+	 * therefore all initialization is done before it and any
+	 * de-initialization needed done if it fails.
+	 */
+	arp_ddi_init();
 	error = mod_install(&modlinkage);
 	if (error != 0)
 		arp_ddi_destroy();
+
 	return (error);
 }
 
 int
 _fini(void)
 {
-	int error;
+	int	error;
 
 	error = mod_remove(&modlinkage);
 	if (error == 0)
@@ -76,22 +82,4 @@ int
 _info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
-}
-
-
-static void
-arp_ddi_init()
-{
-	rw_init(&arl_g_lock, "ARP ARl lock", RW_DRIVER, NULL);
-	arp_net_init();
-	arp_hook_init();
-}
-
-
-static void
-arp_ddi_destroy()
-{
-	arp_hook_destroy();
-	arp_net_destroy();
-	rw_destroy(&arl_g_lock);
 }

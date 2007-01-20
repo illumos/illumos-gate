@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -178,6 +178,7 @@ static char *res_types[] = {
 	ALIAS_MAXSEMIDS,
 	ALIAS_SHARES,
 	"scheduling-class",
+	"ip-type",
 	NULL
 };
 
@@ -217,6 +218,7 @@ static char *prop_types[] = {
 	ALIAS_MAXLOCKEDMEM,
 	ALIAS_MAXSWAP,
 	"scheduling-class",
+	"ip-type",
 	NULL
 };
 
@@ -273,6 +275,7 @@ static const char *clear_cmds[] = {
 	"clear limitpriv",
 	"clear bootargs",
 	"clear scheduling-class",
+	"clear ip-type",
 	"clear " ALIAS_MAXLWPS,
 	"clear " ALIAS_MAXSHMMEM,
 	"clear " ALIAS_MAXSHMIDS,
@@ -317,6 +320,7 @@ static const char *set_cmds[] = {
 	"set limitpriv=",
 	"set bootargs=",
 	"set scheduling-class=",
+	"set ip-type=",
 	"set " ALIAS_MAXLWPS "=",
 	"set " ALIAS_MAXSHMMEM "=",
 	"set " ALIAS_MAXSHMIDS "=",
@@ -344,6 +348,7 @@ static const char *info_cmds[] = {
 	"info bootargs",
 	"info brand",
 	"info scheduling-class",
+	"info ip-type",
 	"info max-lwps",
 	"info max-shm-memory",
 	"info max-shm-ids",
@@ -914,6 +919,11 @@ usage(bool verbose, uint_t flags)
 			    pt_to_str(PT_PHYSICAL), gettext("<interface>"));
 			(void) fprintf(fp, gettext("See ifconfig(1M) for "
 			    "details of the <interface> string.\n"));
+			(void) fprintf(fp, gettext("%s %s is valid if the %s "
+			    "property is set to %s, otherwise it must not be "
+			    "set.\n"),
+			    cmd_to_str(CMD_SET), pt_to_str(PT_ADDRESS),
+			    pt_to_str(PT_IPTYPE), "shared");
 			break;
 		case RT_DEVICE:
 			(void) fprintf(fp, gettext("The '%s' resource scope is "
@@ -1094,6 +1104,8 @@ usage(bool verbose, uint_t flags)
 		    pt_to_str(PT_LIMITPRIV));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_SCHED));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_IPTYPE));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_MAXLWPS));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
@@ -1571,6 +1583,7 @@ export_func(cmd_t *cmd)
 	char *limitpriv;
 	FILE *of;
 	boolean_t autoboot;
+	zone_iptype_t iptype;
 	bool need_to_close = FALSE;
 
 	assert(cmd != NULL);
@@ -1650,6 +1663,19 @@ export_func(cmd_t *cmd)
 	    strlen(sched) > 0)
 		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
 		    pt_to_str(PT_SCHED), sched);
+
+	if (zonecfg_get_iptype(handle, &iptype) == Z_OK) {
+		switch (iptype) {
+		case ZS_SHARED:
+			(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_IPTYPE), "shared");
+			break;
+		case ZS_EXCLUSIVE:
+			(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_IPTYPE), "exclusive");
+			break;
+		}
+	}
 
 	if ((err = zonecfg_setipdent(handle)) != Z_OK) {
 		zone_perror(zone, err, FALSE);
@@ -2157,7 +2183,8 @@ gz_invalid_rt_property(int type)
 {
 	return (global_zone && (type == RT_ZONENAME || type == RT_ZONEPATH ||
 	    type == RT_AUTOBOOT || type == RT_LIMITPRIV ||
-	    type == RT_BOOTARGS || type == RT_BRAND || type == RT_SCHED));
+	    type == RT_BOOTARGS || type == RT_BRAND || type == RT_SCHED ||
+	    type == RT_IPTYPE));
 }
 
 static boolean_t
@@ -2165,7 +2192,8 @@ gz_invalid_property(int type)
 {
 	return (global_zone && (type == PT_ZONENAME || type == PT_ZONEPATH ||
 	    type == PT_AUTOBOOT || type == PT_LIMITPRIV ||
-	    type == PT_BOOTARGS || type == PT_BRAND || type == PT_SCHED));
+	    type == PT_BOOTARGS || type == PT_BRAND || type == PT_SCHED ||
+	    type == PT_IPTYPE));
 }
 
 void
@@ -3268,6 +3296,13 @@ clear_global(cmd_t *cmd)
 		else
 			need_to_commit = TRUE;
 		return;
+	case PT_IPTYPE:
+		/* shared is default; we'll treat as equivalent to clearing */
+		if ((err = zonecfg_set_iptype(handle, ZS_SHARED)) != Z_OK)
+			z_cmd_rt_perror(CMD_CLEAR, RT_IPTYPE, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
 	case PT_MAXLWPS:
 		remove_aliased_rctl(PT_MAXLWPS, ALIAS_MAXLWPS);
 		return;
@@ -3555,6 +3590,30 @@ valid_fs_type(const char *type)
 	return (B_TRUE);
 }
 
+static boolean_t
+allow_exclusive()
+{
+	brand_handle_t	bh;
+	char		brand[MAXNAMELEN];
+	boolean_t	ret;
+
+	if (zonecfg_get_brand(handle, brand, sizeof (brand)) != Z_OK) {
+		zerr("%s: %s\n", zone, gettext("could not get zone brand"));
+		return (B_FALSE);
+	}
+	if ((bh = brand_open(brand)) == NULL) {
+		zerr("%s: %s\n", zone, gettext("unknown brand."));
+		return (B_FALSE);
+	}
+	ret = brand_allow_exclusive_ip(bh);
+	brand_close(bh);
+	if (!ret)
+		zerr(gettext("%s cannot be '%s' when %s is '%s'."),
+		    pt_to_str(PT_IPTYPE), "exclusive",
+		    pt_to_str(PT_BRAND), brand);
+	return (ret);
+}
+
 static void
 set_aliased_rctl(char *alias, int prop_type, char *s)
 {
@@ -3605,6 +3664,7 @@ set_func(cmd_t *cmd)
 	int arg, err, res_type, prop_type;
 	property_value_ptr_t pp;
 	boolean_t autoboot;
+	zone_iptype_t iptype;
 	boolean_t force_set = FALSE;
 	size_t physmem_size = sizeof (in_progress_mcaptab.zone_physmem_cap);
 	uint64_t mem_cap, mem_limit;
@@ -3655,6 +3715,8 @@ set_func(cmd_t *cmd)
 			res_type = RT_BOOTARGS;
 		} else if (prop_type == PT_SCHED) {
 			res_type = RT_SCHED;
+		} else if (prop_type == PT_IPTYPE) {
+			res_type = RT_IPTYPE;
 		} else if (prop_type == PT_MAXLWPS) {
 			res_type = RT_MAXLWPS;
 		} else if (prop_type == PT_MAXSHMMEM) {
@@ -3827,6 +3889,26 @@ set_func(cmd_t *cmd)
 		return;
 	case RT_SCHED:
 		if ((err = zonecfg_set_sched(handle, prop_id)) != Z_OK)
+			zone_perror(zone, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	case RT_IPTYPE:
+		if (strcmp(prop_id, "shared") == 0) {
+			iptype = ZS_SHARED;
+		} else if (strcmp(prop_id, "exclusive") == 0) {
+			iptype = ZS_EXCLUSIVE;
+		} else {
+			zerr(gettext("%s value must be '%s' or '%s'."),
+			    pt_to_str(PT_IPTYPE), "shared", "exclusive");
+			saw_error = TRUE;
+			return;
+		}
+		if (iptype == ZS_EXCLUSIVE && !allow_exclusive()) {
+			saw_error = TRUE;
+			return;
+		}
+		if ((err = zonecfg_set_iptype(handle, iptype)) != Z_OK)
 			zone_perror(zone, err, TRUE);
 		else
 			need_to_commit = TRUE;
@@ -4304,6 +4386,28 @@ info_sched(zone_dochandle_t handle, FILE *fp)
 }
 
 static void
+info_iptype(zone_dochandle_t handle, FILE *fp)
+{
+	zone_iptype_t iptype;
+	int err;
+
+	if ((err = zonecfg_get_iptype(handle, &iptype)) == Z_OK) {
+		switch (iptype) {
+		case ZS_SHARED:
+			(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_IPTYPE),
+			    "shared");
+			break;
+		case ZS_EXCLUSIVE:
+			(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_IPTYPE),
+			    "exclusive");
+			break;
+		}
+	} else {
+		zone_perror(zone, err, TRUE);
+	}
+}
+
+static void
 output_fs(FILE *fp, struct zone_fstab *fstab)
 {
 	zone_fsopt_t *this;
@@ -4430,6 +4534,7 @@ info_net(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 		    strcmp(user.zone_nwif_physical,
 		    lookup.zone_nwif_physical) != 0)
 			continue;	/* no match */
+		/* If present make sure it matches */
 		if (strlen(user.zone_nwif_address) > 0 &&
 		    !zonecfg_same_net_address(user.zone_nwif_address,
 		    lookup.zone_nwif_address))
@@ -4822,6 +4927,7 @@ info_func(cmd_t *cmd)
 		if (!global_zone) {
 			info_limitpriv(handle, fp);
 			info_sched(handle, fp);
+			info_iptype(handle, fp);
 		}
 		info_aliased_rctl(handle, fp, ALIAS_MAXLWPS);
 		info_aliased_rctl(handle, fp, ALIAS_MAXSHMMEM);
@@ -4866,6 +4972,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_SCHED:
 		info_sched(handle, fp);
+		break;
+	case RT_IPTYPE:
+		info_iptype(handle, fp);
 		break;
 	case RT_MAXLWPS:
 		info_aliased_rctl(handle, fp, ALIAS_MAXLWPS);
@@ -5051,6 +5160,7 @@ verify_func(cmd_t *cmd)
 	char brand[MAXNAMELEN];
 	int err, ret_val = Z_OK, arg;
 	bool save = FALSE;
+	zone_iptype_t iptype;
 	boolean_t has_cpu_shares = B_FALSE;
 
 	optind = 0;
@@ -5102,6 +5212,11 @@ verify_func(cmd_t *cmd)
 		}
 	}
 
+	if (zonecfg_get_iptype(handle, &iptype) != Z_OK) {
+		zerr("%s %s", gettext("cannot get"), pt_to_str(PT_IPTYPE));
+		ret_val = Z_REQD_RESOURCE_MISSING;
+		saw_error = TRUE;
+	}
 	if ((err = zonecfg_setipdent(handle)) != Z_OK) {
 		zone_perror(zone, err, TRUE);
 		return;
@@ -5130,10 +5245,30 @@ verify_func(cmd_t *cmd)
 		return;
 	}
 	while (zonecfg_getnwifent(handle, &nwiftab) == Z_OK) {
-		check_reqd_prop(nwiftab.zone_nwif_address, RT_NET,
-		    PT_ADDRESS, &ret_val);
+		/*
+		 * physical is required in all cases.
+		 * A shared IP requires an address, while
+		 * an exclusive IP must not have an address.
+		 */
 		check_reqd_prop(nwiftab.zone_nwif_physical, RT_NET,
 		    PT_PHYSICAL, &ret_val);
+
+		switch (iptype) {
+		case ZS_SHARED:
+			check_reqd_prop(nwiftab.zone_nwif_address, RT_NET,
+			    PT_ADDRESS, &ret_val);
+			break;
+		case ZS_EXCLUSIVE:
+			if (strlen(nwiftab.zone_nwif_address) > 0) {
+				zerr(gettext("%s: %s cannot be specified "
+				    "for an exclusive IP type"),
+				    rt_to_str(RT_NET), pt_to_str(PT_ADDRESS));
+				saw_error = TRUE;
+				if (ret_val == Z_OK)
+					ret_val = Z_INVAL;
+			}
+			break;
+		}
 	}
 	(void) zonecfg_endnwifent(handle);
 
@@ -5492,27 +5627,35 @@ end_func(cmd_t *cmd)
 		}
 		break;
 	case RT_NET:
-		/* First make sure everything was filled in. */
+		/*
+		 * First make sure everything was filled in.
+		 * Since we don't know whether IP will be shared
+		 * or exclusive here, some checks are deferred until
+		 * the verify command.
+		 */
 		(void) end_check_reqd(in_progress_nwiftab.zone_nwif_physical,
 		    PT_PHYSICAL, &validation_failed);
-		(void) end_check_reqd(in_progress_nwiftab.zone_nwif_address,
-		    PT_ADDRESS, &validation_failed);
 
 		if (validation_failed) {
 			saw_error = TRUE;
 			return;
 		}
-
 		if (end_op == CMD_ADD) {
 			/* Make sure there isn't already one like this. */
 			bzero(&tmp_nwiftab, sizeof (tmp_nwiftab));
+			(void) strlcpy(tmp_nwiftab.zone_nwif_physical,
+			    in_progress_nwiftab.zone_nwif_physical,
+			    sizeof (tmp_nwiftab.zone_nwif_physical));
 			(void) strlcpy(tmp_nwiftab.zone_nwif_address,
 			    in_progress_nwiftab.zone_nwif_address,
 			    sizeof (tmp_nwiftab.zone_nwif_address));
 			if (zonecfg_lookup_nwif(handle, &tmp_nwiftab) == Z_OK) {
-				zerr(gettext("A %s resource "
-				    "with the %s '%s' already exists."),
-				    rt_to_str(RT_NET), pt_to_str(PT_ADDRESS),
+				zerr(gettext("A %s resource with the %s '%s', "
+				    "and %s '%s' already exists."),
+				    rt_to_str(RT_NET),
+				    pt_to_str(PT_PHYSICAL),
+				    in_progress_nwiftab.zone_nwif_physical,
+				    pt_to_str(PT_ADDRESS),
 				    in_progress_nwiftab.zone_nwif_address);
 				saw_error = TRUE;
 				return;

@@ -99,6 +99,8 @@ all_zones_files="
 	etc/inet/*
 	etc/init.d/*
 	etc/inittab
+	etc/ipf/ipf.conf
+	etc/iu.ap
 	etc/krb5/kadm5.acl
 	etc/krb5/kdc.conf
 	etc/krb5/kpropd.acl
@@ -185,9 +187,6 @@ global_zone_only_files="
 	etc/devlink.tab
 	etc/driver_aliases
 	etc/driver_classes
-	etc/ipf/ipf.conf
-	etc/ipf/pfil.ap
-	etc/iu.ap
 	etc/lvm/devpath
 	etc/lvm/lock
 	etc/lvm/md.cf
@@ -240,7 +239,6 @@ superfluous_local_zone_files="
 	dev/pts
 	dev/rdsk
 	dev/rmt
-	dev/sad
 	dev/stderr
 	dev/stdin
 	dev/stdout
@@ -249,66 +247,45 @@ superfluous_local_zone_files="
 	devices
 	etc/dacf.conf
 	etc/dat
-	etc/default/dhcpagent
-	etc/default/inetinit
-	etc/default/ipsec
 	etc/default/metassist.xml
-	etc/default/mpathd
 	etc/default/power
 	etc/flash/postdeployment/svm.cleanup
 	etc/flash/predeployment/svm.save
-	etc/inet/datemsk.ndpd
-	etc/inet/ike
 	etc/inet/ipqosconf.1.sample
 	etc/inet/ipqosconf.2.sample
 	etc/inet/ipqosconf.3.sample
-	etc/inet/ipsecalgs
-	etc/inet/ipsecinit.sample
-	etc/inet/mipagent.conf-sample
-	etc/inet/mipagent.conf.fa-sample
-	etc/inet/mipagent.conf.ha-sample
-	etc/inet/secret
 	etc/inet/sock2path
 	etc/init.d/devlinks
 	etc/init.d/dodatadm.udaplt
 	etc/init.d/drvconfig
 	etc/init.d/llc2
-	etc/init.d/mipagent
 	etc/init.d/ncakmod
 	etc/init.d/ncalogd
 	etc/init.d/pcmcia
 	etc/init.d/pppd
 	etc/init.d/wrsmcfg
-	etc/ipf
 	etc/llc2
 	etc/lvm
 	etc/nca
 	etc/openwin
 	etc/ppp
-	etc/rc0.d/K06mipagent
 	etc/rc0.d/K34ncalogd
 	etc/rc0.d/K50pppd
 	etc/rc0.d/K52llc2
-	etc/rc1.d/K06mipagent
 	etc/rc1.d/K34ncalogd
 	etc/rc1.d/K50pppd
 	etc/rc1.d/K52llc2
-	etc/rc2.d/K06mipagent
 	etc/rc2.d/S40llc2
 	etc/rc2.d/S42ncakmod
 	etc/rc2.d/S47pppd
 	etc/rc2.d/S81dodatadm.udaplt
 	etc/rc2.d/S94ncalogd
-	etc/rc3.d/S80mipagent
-	etc/rcS.d/K06mipagent
 	etc/rcS.d/K34ncalogd
 	etc/rcS.d/K44wrsmcfg
 	etc/rcS.d/K50pppd
 	etc/rcS.d/K52llc2
 	etc/rcS.d/S29wrsmcfg
 	etc/rcm
-	etc/snmp/conf/mipagent.acl
-	etc/snmp/conf/mipagent.reg
 	etc/sock2path
 	etc/usb
 	etc/wrsm
@@ -316,7 +293,6 @@ superfluous_local_zone_files="
 	kernel
 	lib/libmeta.so
 	lib/libmeta.so.1
-	lib/svc/method/ipfilter
 	lib/svc/method/sf880dr
 	lib/svc/method/svc-cvcd
 	lib/svc/method/svc-dcs
@@ -354,18 +330,11 @@ superfluous_local_zone_files="
 	platform/sun4u/wanboot
 	platform/sun4v/ufsboot
 	platform/sun4v/wanboot
-	sbin/dladm
 	sbin/metadb
 	sbin/metadevadm
 	sbin/metainit
 	sbin/metarecover
 	sbin/metastat
-	usr/include/netinet/ip_compat.h
-	usr/include/netinet/ip_fil.h
-	usr/include/netinet/ip_nat.h
-	usr/include/netinet/ip_proxy.h
-	usr/include/netinet/ip_state.h
-	usr/include/netinet/ipl.h
 	usr/include/sys/dcam
 	usr/lib/devfsadm/linkmod/SUNW_dcam1394_link.so
 	usr/lib/ldoms
@@ -375,9 +344,7 @@ superfluous_local_zone_files="
 	usr/platform/SUNW,SPARC-Enterprise/lib/llib-ldscp.ln
 	usr/platform/SUNW,SPARC-Enterprise/sbin/prtdscp
 	var/adm/pool
-	var/db/ipf
 	var/log/pool
-	var/svc/manifest/network/ipfilter.xml
 	var/svc/manifest/network/rpc/mdcomm.xml
 	var/svc/manifest/network/rpc/meta.xml
 	var/svc/manifest/network/rpc/metamed.xml

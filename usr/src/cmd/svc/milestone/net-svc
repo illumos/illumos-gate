@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,11 +36,12 @@
 case "$1" in
 'start')
 	#
-	# In a zone we need this service to be up, but all of the work
-	# it tries to do is irrelevant (and will actually lead to the service
-	# failing if we try to do it), so just bail out.
+	# In a shared-IP zone we need this service to be up, but all of the
+	# work it tries to do is irrelevant (and will actually lead to the
+	# service failing if we try to do it), so just bail out. 
+	# In the global zone and exclusive-IP zones we proceed.
 	#
-	smf_is_globalzone || exit 0
+	smf_configure_ip || exit 0
 	;; # Fall through -- rest of script is the initialization code
 
 'stop')

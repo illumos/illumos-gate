@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,7 +34,7 @@ include ../Makefile.cmd
 
 ROOTMANIFESTDIR=        $(ROOTSVCSYSTEM)
 
-OBJS= zoneadm.o sw_cmp.o zfs.o
+OBJS= zoneadm.o sw_cmp.o zfs.o dlprims.o
 SRCS = $(OBJS:.o=.c)
 POFILE=zoneadm_all.po
 POFILES= $(OBJS:%.o=%.po)

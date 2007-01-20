@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,8 +73,8 @@ void			sctp_del_saddr_list(sctp_t *, const void *, int,
 sctp_saddr_ipif_t	*sctp_saddr_lookup(sctp_t *, in6_addr_t *, uint_t);
 in6_addr_t		sctp_get_valid_addr(sctp_t *, boolean_t);
 int			sctp_getmyaddrs(void *, void *, int *);
-void			sctp_saddr_init();
-void			sctp_saddr_fini();
+void			sctp_saddr_init(sctp_stack_t *);
+void			sctp_saddr_fini(sctp_stack_t *);
 
 #define	SCTP_IPIF_USABLE(sctp_ipif_state)	\
 	((sctp_ipif_state) == SCTP_IPIFS_UP ||	\
@@ -101,13 +101,6 @@ void			sctp_saddr_fini();
 #define	SCTP_IPIF_HASH_FN(seqid)	((seqid) % SCTP_IPIF_HASH)
 #define	SCTP_ILL_TO_PHYINDEX(ill)	((ill)->ill_phyint->phyint_ifindex)
 
-/* Global list of SCTP ILLs */
-sctp_ill_hash_t	sctp_g_ills[SCTP_ILL_HASH];
-uint32_t	sctp_ills_count = 0;
-
-/* Global list of SCTP IPIFs */
-sctp_ipif_hash_t	sctp_g_ipifs[SCTP_IPIF_HASH];
-uint32_t		sctp_g_ipifs_count = 0;
 /*
  *
  *
@@ -127,9 +120,11 @@ sctp_ipif_inactive(sctp_ipif_t *sctp_ipif)
 	sctp_ill_t	*sctp_ill;
 	uint_t		ipif_index;
 	uint_t		ill_index;
+	sctp_stack_t	*sctps = sctp_ipif->sctp_ipif_ill->
+	    sctp_ill_netstack->netstack_sctp;
 
-	rw_enter(&sctp_g_ills_lock, RW_READER);
-	rw_enter(&sctp_g_ipifs_lock, RW_WRITER);
+	rw_enter(&sctps->sctps_g_ills_lock, RW_READER);
+	rw_enter(&sctps->sctps_g_ipifs_lock, RW_WRITER);
 
 	ipif_index = SCTP_IPIF_HASH_FN(sctp_ipif->sctp_ipif_id);
 	sctp_ill = sctp_ipif->sctp_ipif_ill;
@@ -137,32 +132,33 @@ sctp_ipif_inactive(sctp_ipif_t *sctp_ipif)
 	ill_index = SCTP_ILL_HASH_FN(sctp_ill->sctp_ill_index);
 	if (sctp_ipif->sctp_ipif_state != SCTP_IPIFS_CONDEMNED ||
 	    sctp_ipif->sctp_ipif_refcnt != 0) {
-		rw_exit(&sctp_g_ipifs_lock);
-		rw_exit(&sctp_g_ills_lock);
+		rw_exit(&sctps->sctps_g_ipifs_lock);
+		rw_exit(&sctps->sctps_g_ills_lock);
 		return;
 	}
-	list_remove(&sctp_g_ipifs[ipif_index].sctp_ipif_list, sctp_ipif);
-	sctp_g_ipifs[ipif_index].ipif_count--;
-	sctp_g_ipifs_count--;
+	list_remove(&sctps->sctps_g_ipifs[ipif_index].sctp_ipif_list,
+	    sctp_ipif);
+	sctps->sctps_g_ipifs[ipif_index].ipif_count--;
+	sctps->sctps_g_ipifs_count--;
 	rw_destroy(&sctp_ipif->sctp_ipif_lock);
 	kmem_free(sctp_ipif, sizeof (sctp_ipif_t));
 
 	(void) atomic_add_32_nv(&sctp_ill->sctp_ill_ipifcnt, -1);
-	if (rw_tryupgrade(&sctp_g_ills_lock) != 0) {
-		rw_downgrade(&sctp_g_ipifs_lock);
+	if (rw_tryupgrade(&sctps->sctps_g_ills_lock) != 0) {
+		rw_downgrade(&sctps->sctps_g_ipifs_lock);
 		if (sctp_ill->sctp_ill_ipifcnt == 0 &&
 		    sctp_ill->sctp_ill_state == SCTP_ILLS_CONDEMNED) {
-			list_remove(&sctp_g_ills[ill_index].sctp_ill_list,
-			    (void *)sctp_ill);
-			sctp_g_ills[ill_index].ill_count--;
-			sctp_ills_count--;
+			list_remove(&sctps->sctps_g_ills[ill_index].
+			    sctp_ill_list, (void *)sctp_ill);
+			sctps->sctps_g_ills[ill_index].ill_count--;
+			sctps->sctps_ills_count--;
 			kmem_free(sctp_ill->sctp_ill_name,
 			    sctp_ill->sctp_ill_name_length);
 			kmem_free(sctp_ill, sizeof (sctp_ill_t));
 		}
 	}
-	rw_exit(&sctp_g_ipifs_lock);
-	rw_exit(&sctp_g_ills_lock);
+	rw_exit(&sctps->sctps_g_ipifs_lock);
+	rw_exit(&sctps->sctps_g_ills_lock);
 }
 
 /*
@@ -176,14 +172,15 @@ sctp_lookup_ipif_addr(in6_addr_t *addr, boolean_t refhold, sctp_t *sctp,
 	int		i;
 	int		j;
 	sctp_ipif_t	*sctp_ipif;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	ASSERT(sctp->sctp_zoneid != ALL_ZONES);
-	rw_enter(&sctp_g_ipifs_lock, RW_READER);
+	rw_enter(&sctps->sctps_g_ipifs_lock, RW_READER);
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
-		if (sctp_g_ipifs[i].ipif_count == 0)
+		if (sctps->sctps_g_ipifs[i].ipif_count == 0)
 			continue;
-		sctp_ipif = list_head(&sctp_g_ipifs[i].sctp_ipif_list);
-		for (j = 0; j < sctp_g_ipifs[i].ipif_count; j++) {
+		sctp_ipif = list_head(&sctps->sctps_g_ipifs[i].sctp_ipif_list);
+		for (j = 0; j < sctps->sctps_g_ipifs[i].ipif_count; j++) {
 			rw_enter(&sctp_ipif->sctp_ipif_lock, RW_READER);
 			if (SCTP_IPIF_ZONE_MATCH(sctp, sctp_ipif) &&
 			    SCTP_IPIF_USABLE(sctp_ipif->sctp_ipif_state) &&
@@ -194,15 +191,15 @@ sctp_lookup_ipif_addr(in6_addr_t *addr, boolean_t refhold, sctp_t *sctp,
 				rw_exit(&sctp_ipif->sctp_ipif_lock);
 				if (refhold)
 					SCTP_IPIF_REFHOLD(sctp_ipif);
-				rw_exit(&sctp_g_ipifs_lock);
+				rw_exit(&sctps->sctps_g_ipifs_lock);
 				return (sctp_ipif);
 			}
 			rw_exit(&sctp_ipif->sctp_ipif_lock);
-			sctp_ipif = list_next(&sctp_g_ipifs[i].sctp_ipif_list,
-			    sctp_ipif);
+			sctp_ipif = list_next(
+			    &sctps->sctps_g_ipifs[i].sctp_ipif_list, sctp_ipif);
 		}
 	}
-	rw_exit(&sctp_g_ipifs_lock);
+	rw_exit(&sctps->sctps_g_ipifs_lock);
 	return (NULL);
 }
 
@@ -218,13 +215,14 @@ sctp_get_all_ipifs(sctp_t *sctp, int sleep)
 	int			i;
 	int			j;
 	int			error = 0;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
-	rw_enter(&sctp_g_ipifs_lock, RW_READER);
+	rw_enter(&sctps->sctps_g_ipifs_lock, RW_READER);
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
-		if (sctp_g_ipifs[i].ipif_count == 0)
+		if (sctps->sctps_g_ipifs[i].ipif_count == 0)
 			continue;
-		sctp_ipif = list_head(&sctp_g_ipifs[i].sctp_ipif_list);
-		for (j = 0; j < sctp_g_ipifs[i].ipif_count; j++) {
+		sctp_ipif = list_head(&sctps->sctps_g_ipifs[i].sctp_ipif_list);
+		for (j = 0; j < sctps->sctps_g_ipifs[i].ipif_count; j++) {
 			rw_enter(&sctp_ipif->sctp_ipif_lock, RW_READER);
 			if (SCTP_IPIF_DISCARD(sctp_ipif->sctp_ipif_flags) ||
 			    !SCTP_IPIF_USABLE(sctp_ipif->sctp_ipif_state) ||
@@ -235,7 +233,8 @@ sctp_get_all_ipifs(sctp_t *sctp, int sleep)
 			    !sctp_ipif->sctp_ipif_isv6)) {
 				rw_exit(&sctp_ipif->sctp_ipif_lock);
 				sctp_ipif = list_next(
-				    &sctp_g_ipifs[i].sctp_ipif_list, sctp_ipif);
+				    &sctps->sctps_g_ipifs[i].sctp_ipif_list,
+				    sctp_ipif);
 				continue;
 			}
 			rw_exit(&sctp_ipif->sctp_ipif_lock);
@@ -244,14 +243,15 @@ sctp_get_all_ipifs(sctp_t *sctp, int sleep)
 			    B_FALSE);
 			if (error != 0)
 				goto free_stuff;
-			sctp_ipif = list_next(&sctp_g_ipifs[i].sctp_ipif_list,
+			sctp_ipif = list_next(
+			    &sctps->sctps_g_ipifs[i].sctp_ipif_list,
 			    sctp_ipif);
 		}
 	}
-	rw_exit(&sctp_g_ipifs_lock);
+	rw_exit(&sctps->sctps_g_ipifs_lock);
 	return (0);
 free_stuff:
-	rw_exit(&sctp_g_ipifs_lock);
+	rw_exit(&sctps->sctps_g_ipifs_lock);
 	sctp_free_saddrs(sctp);
 	return (ENOMEM);
 }
@@ -625,17 +625,19 @@ sctp_update_ill(ill_t *ill, int op)
 	int		i;
 	sctp_ill_t	*sctp_ill = NULL;
 	uint_t		index;
+	netstack_t	*ns = ill->ill_ipst->ips_netstack;
+	sctp_stack_t	*sctps = ns->netstack_sctp;
 
 	ip2dbg(("sctp_update_ill: %s\n", ill->ill_name));
 
-	rw_enter(&sctp_g_ills_lock, RW_WRITER);
+	rw_enter(&sctps->sctps_g_ills_lock, RW_WRITER);
 
 	index = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(ill));
-	sctp_ill = list_head(&sctp_g_ills[index].sctp_ill_list);
-	for (i = 0; i < sctp_g_ills[index].ill_count; i++) {
+	sctp_ill = list_head(&sctps->sctps_g_ills[index].sctp_ill_list);
+	for (i = 0; i < sctps->sctps_g_ills[index].ill_count; i++) {
 		if (sctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(ill))
 			break;
-		sctp_ill = list_next(&sctp_g_ills[index].sctp_ill_list,
+		sctp_ill = list_next(&sctps->sctps_g_ills[index].sctp_ill_list,
 		    sctp_ill);
 	}
 
@@ -645,14 +647,14 @@ sctp_update_ill(ill_t *ill, int op)
 			/* Unmark it if it is condemned */
 			if (sctp_ill->sctp_ill_state == SCTP_ILLS_CONDEMNED)
 				sctp_ill->sctp_ill_state = 0;
-			rw_exit(&sctp_g_ills_lock);
+			rw_exit(&sctps->sctps_g_ills_lock);
 			return;
 		}
 		sctp_ill = kmem_zalloc(sizeof (sctp_ill_t), KM_NOSLEEP);
 		/* Need to re-try? */
 		if (sctp_ill == NULL) {
 			ip1dbg(("sctp_ill_insert: mem error..\n"));
-			rw_exit(&sctp_g_ills_lock);
+			rw_exit(&sctps->sctps_g_ills_lock);
 			return;
 		}
 		sctp_ill->sctp_ill_name =
@@ -660,7 +662,7 @@ sctp_update_ill(ill_t *ill, int op)
 		if (sctp_ill->sctp_ill_name == NULL) {
 			ip1dbg(("sctp_ill_insert: mem error..\n"));
 			kmem_free(sctp_ill, sizeof (sctp_ill_t));
-			rw_exit(&sctp_g_ills_lock);
+			rw_exit(&sctps->sctps_g_ills_lock);
 			return;
 		}
 		bcopy(ill->ill_name, sctp_ill->sctp_ill_name,
@@ -668,24 +670,25 @@ sctp_update_ill(ill_t *ill, int op)
 		sctp_ill->sctp_ill_name_length = ill->ill_name_length;
 		sctp_ill->sctp_ill_index = SCTP_ILL_TO_PHYINDEX(ill);
 		sctp_ill->sctp_ill_flags = ill->ill_phyint->phyint_flags;
-		list_insert_tail(&sctp_g_ills[index].sctp_ill_list,
+		sctp_ill->sctp_ill_netstack = ns;	/* No netstack_hold */
+		list_insert_tail(&sctps->sctps_g_ills[index].sctp_ill_list,
 		    (void *)sctp_ill);
-		sctp_g_ills[index].ill_count++;
-		sctp_ills_count++;
+		sctps->sctps_g_ills[index].ill_count++;
+		sctps->sctps_ills_count++;
 
 		break;
 
 	case SCTP_ILL_REMOVE:
 
 		if (sctp_ill == NULL) {
-			rw_exit(&sctp_g_ills_lock);
+			rw_exit(&sctps->sctps_g_ills_lock);
 			return;
 		}
 		if (sctp_ill->sctp_ill_ipifcnt == 0) {
-			list_remove(&sctp_g_ills[index].sctp_ill_list,
+			list_remove(&sctps->sctps_g_ills[index].sctp_ill_list,
 			    (void *)sctp_ill);
-			sctp_g_ills[index].ill_count--;
-			sctp_ills_count--;
+			sctps->sctps_g_ills[index].ill_count--;
+			sctps->sctps_ills_count--;
 			kmem_free(sctp_ill->sctp_ill_name,
 			    ill->ill_name_length);
 			kmem_free(sctp_ill, sizeof (sctp_ill_t));
@@ -695,7 +698,7 @@ sctp_update_ill(ill_t *ill, int op)
 
 		break;
 	}
-	rw_exit(&sctp_g_ills_lock);
+	rw_exit(&sctps->sctps_g_ills_lock);
 }
 
 /* move ipif from f_ill to t_ill */
@@ -707,42 +710,44 @@ sctp_move_ipif(ipif_t *ipif, ill_t *f_ill, ill_t *t_ill)
 	sctp_ipif_t	*sctp_ipif;
 	uint_t		index;
 	int		i;
+	netstack_t	*ns = ipif->ipif_ill->ill_ipst->ips_netstack;
+	sctp_stack_t	*sctps = ns->netstack_sctp;
 
-	rw_enter(&sctp_g_ills_lock, RW_READER);
-	rw_enter(&sctp_g_ipifs_lock, RW_READER);
+	rw_enter(&sctps->sctps_g_ills_lock, RW_READER);
+	rw_enter(&sctps->sctps_g_ipifs_lock, RW_READER);
 
 	index = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(f_ill));
-	fsctp_ill = list_head(&sctp_g_ills[index].sctp_ill_list);
-	for (i = 0; i < sctp_g_ills[index].ill_count; i++) {
+	fsctp_ill = list_head(&sctps->sctps_g_ills[index].sctp_ill_list);
+	for (i = 0; i < sctps->sctps_g_ills[index].ill_count; i++) {
 		if (fsctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(f_ill))
 			break;
-		fsctp_ill = list_next(&sctp_g_ills[index].sctp_ill_list,
+		fsctp_ill = list_next(&sctps->sctps_g_ills[index].sctp_ill_list,
 		    fsctp_ill);
 	}
 
 	index = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(t_ill));
-	tsctp_ill = list_head(&sctp_g_ills[index].sctp_ill_list);
-	for (i = 0; i < sctp_g_ills[index].ill_count; i++) {
+	tsctp_ill = list_head(&sctps->sctps_g_ills[index].sctp_ill_list);
+	for (i = 0; i < sctps->sctps_g_ills[index].ill_count; i++) {
 		if (tsctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(t_ill))
 			break;
-		tsctp_ill = list_next(&sctp_g_ills[index].sctp_ill_list,
+		tsctp_ill = list_next(&sctps->sctps_g_ills[index].sctp_ill_list,
 		    tsctp_ill);
 	}
 
 	index = SCTP_IPIF_HASH_FN(ipif->ipif_seqid);
-	sctp_ipif = list_head(&sctp_g_ipifs[index].sctp_ipif_list);
-	for (i = 0; i < sctp_g_ipifs[index].ipif_count; i++) {
+	sctp_ipif = list_head(&sctps->sctps_g_ipifs[index].sctp_ipif_list);
+	for (i = 0; i < sctps->sctps_g_ipifs[index].ipif_count; i++) {
 		if (sctp_ipif->sctp_ipif_id == ipif->ipif_seqid)
 			break;
-		sctp_ipif = list_next(&sctp_g_ipifs[index].sctp_ipif_list,
-		    sctp_ipif);
+		sctp_ipif = list_next(
+		    &sctps->sctps_g_ipifs[index].sctp_ipif_list, sctp_ipif);
 	}
 	/* Should be an ASSERT? */
 	if (fsctp_ill == NULL || tsctp_ill == NULL || sctp_ipif == NULL) {
 		ip1dbg(("sctp_move_ipif: error moving ipif %p from %p to %p\n",
 		    (void *)ipif, (void *)f_ill, (void *)t_ill));
-		rw_exit(&sctp_g_ipifs_lock);
-		rw_exit(&sctp_g_ills_lock);
+		rw_exit(&sctps->sctps_g_ipifs_lock);
+		rw_exit(&sctps->sctps_g_ills_lock);
 		return;
 	}
 	rw_enter(&sctp_ipif->sctp_ipif_lock, RW_WRITER);
@@ -751,8 +756,8 @@ sctp_move_ipif(ipif_t *ipif, ill_t *f_ill, ill_t *t_ill)
 	rw_exit(&sctp_ipif->sctp_ipif_lock);
 	(void) atomic_add_32_nv(&fsctp_ill->sctp_ill_ipifcnt, -1);
 	atomic_add_32(&tsctp_ill->sctp_ill_ipifcnt, 1);
-	rw_exit(&sctp_g_ipifs_lock);
-	rw_exit(&sctp_g_ills_lock);
+	rw_exit(&sctps->sctps_g_ipifs_lock);
+	rw_exit(&sctps->sctps_g_ills_lock);
 }
 
 /* Insert, Remove,  Mark up or Mark down the ipif */
@@ -765,38 +770,41 @@ sctp_update_ipif(ipif_t *ipif, int op)
 	sctp_ipif_t	*sctp_ipif;
 	uint_t		ill_index;
 	uint_t		ipif_index;
+	netstack_t	*ns = ipif->ipif_ill->ill_ipst->ips_netstack;
+	sctp_stack_t	*sctps = ns->netstack_sctp;
 
 	ip2dbg(("sctp_update_ipif: %s %d\n", ill->ill_name, ipif->ipif_seqid));
 
-	rw_enter(&sctp_g_ills_lock, RW_READER);
-	rw_enter(&sctp_g_ipifs_lock, RW_WRITER);
+	rw_enter(&sctps->sctps_g_ills_lock, RW_READER);
+	rw_enter(&sctps->sctps_g_ipifs_lock, RW_WRITER);
 
 	ill_index = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(ill));
-	sctp_ill = list_head(&sctp_g_ills[ill_index].sctp_ill_list);
-	for (i = 0; i < sctp_g_ills[ill_index].ill_count; i++) {
+	sctp_ill = list_head(&sctps->sctps_g_ills[ill_index].sctp_ill_list);
+	for (i = 0; i < sctps->sctps_g_ills[ill_index].ill_count; i++) {
 		if (sctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(ill))
 			break;
-		sctp_ill = list_next(&sctp_g_ills[ill_index].sctp_ill_list,
-		    sctp_ill);
+		sctp_ill = list_next(
+		    &sctps->sctps_g_ills[ill_index].sctp_ill_list, sctp_ill);
 	}
 	if (sctp_ill == NULL) {
-		rw_exit(&sctp_g_ipifs_lock);
-		rw_exit(&sctp_g_ills_lock);
+		rw_exit(&sctps->sctps_g_ipifs_lock);
+		rw_exit(&sctps->sctps_g_ills_lock);
 		return;
 	}
 
 	ipif_index = SCTP_IPIF_HASH_FN(ipif->ipif_seqid);
-	sctp_ipif = list_head(&sctp_g_ipifs[ipif_index].sctp_ipif_list);
-	for (i = 0; i < sctp_g_ipifs[ipif_index].ipif_count; i++) {
+	sctp_ipif = list_head(&sctps->sctps_g_ipifs[ipif_index].sctp_ipif_list);
+	for (i = 0; i < sctps->sctps_g_ipifs[ipif_index].ipif_count; i++) {
 		if (sctp_ipif->sctp_ipif_id == ipif->ipif_seqid)
 			break;
-		sctp_ipif = list_next(&sctp_g_ipifs[ipif_index].sctp_ipif_list,
+		sctp_ipif = list_next(
+		    &sctps->sctps_g_ipifs[ipif_index].sctp_ipif_list,
 		    sctp_ipif);
 	}
 	if (op != SCTP_IPIF_INSERT && sctp_ipif == NULL) {
 		ip1dbg(("sctp_update_ipif: null sctp_ipif for %d\n", op));
-		rw_exit(&sctp_g_ipifs_lock);
-		rw_exit(&sctp_g_ills_lock);
+		rw_exit(&sctps->sctps_g_ipifs_lock);
+		rw_exit(&sctps->sctps_g_ills_lock);
 		return;
 	}
 #ifdef	DEBUG
@@ -808,16 +816,16 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		if (sctp_ipif != NULL) {
 			if (sctp_ipif->sctp_ipif_state == SCTP_IPIFS_CONDEMNED)
 				sctp_ipif->sctp_ipif_state = SCTP_IPIFS_INVALID;
-			rw_exit(&sctp_g_ipifs_lock);
-			rw_exit(&sctp_g_ills_lock);
+			rw_exit(&sctps->sctps_g_ipifs_lock);
+			rw_exit(&sctps->sctps_g_ills_lock);
 			return;
 		}
 		sctp_ipif = kmem_zalloc(sizeof (sctp_ipif_t), KM_NOSLEEP);
 		/* Try again? */
 		if (sctp_ipif == NULL) {
 			ip1dbg(("sctp_ipif_insert: mem failure..\n"));
-			rw_exit(&sctp_g_ipifs_lock);
-			rw_exit(&sctp_g_ills_lock);
+			rw_exit(&sctps->sctps_g_ipifs_lock);
+			rw_exit(&sctps->sctps_g_ills_lock);
 			return;
 		}
 		sctp_ipif->sctp_ipif_id = ipif->ipif_seqid;
@@ -828,10 +836,11 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		sctp_ipif->sctp_ipif_isv6 = ill->ill_isv6;
 		sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
 		rw_init(&sctp_ipif->sctp_ipif_lock, NULL, RW_DEFAULT, NULL);
-		list_insert_tail(&sctp_g_ipifs[ipif_index].sctp_ipif_list,
+		list_insert_tail(
+		    &sctps->sctps_g_ipifs[ipif_index].sctp_ipif_list,
 		    (void *)sctp_ipif);
-		sctp_g_ipifs[ipif_index].ipif_count++;
-		sctp_g_ipifs_count++;
+		sctps->sctps_g_ipifs[ipif_index].ipif_count++;
+		sctps->sctps_g_ipifs_count++;
 		atomic_add_32(&sctp_ill->sctp_ill_ipifcnt, 1);
 
 		break;
@@ -841,27 +850,27 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		list_t		*ipif_list;
 		list_t		*ill_list;
 
-		ill_list = &sctp_g_ills[ill_index].sctp_ill_list;
-		ipif_list = &sctp_g_ipifs[ipif_index].sctp_ipif_list;
+		ill_list = &sctps->sctps_g_ills[ill_index].sctp_ill_list;
+		ipif_list = &sctps->sctps_g_ipifs[ipif_index].sctp_ipif_list;
 		if (sctp_ipif->sctp_ipif_refcnt != 0) {
 			sctp_ipif->sctp_ipif_state = SCTP_IPIFS_CONDEMNED;
-			rw_exit(&sctp_g_ipifs_lock);
-			rw_exit(&sctp_g_ills_lock);
+			rw_exit(&sctps->sctps_g_ipifs_lock);
+			rw_exit(&sctps->sctps_g_ills_lock);
 			return;
 		}
 		list_remove(ipif_list, (void *)sctp_ipif);
-		sctp_g_ipifs[ipif_index].ipif_count--;
-		sctp_g_ipifs_count--;
+		sctps->sctps_g_ipifs[ipif_index].ipif_count--;
+		sctps->sctps_g_ipifs_count--;
 		rw_destroy(&sctp_ipif->sctp_ipif_lock);
 		kmem_free(sctp_ipif, sizeof (sctp_ipif_t));
 		(void) atomic_add_32_nv(&sctp_ill->sctp_ill_ipifcnt, -1);
-		if (rw_tryupgrade(&sctp_g_ills_lock) != 0) {
-			rw_downgrade(&sctp_g_ipifs_lock);
+		if (rw_tryupgrade(&sctps->sctps_g_ills_lock) != 0) {
+			rw_downgrade(&sctps->sctps_g_ipifs_lock);
 			if (sctp_ill->sctp_ill_ipifcnt == 0 &&
 			    sctp_ill->sctp_ill_state == SCTP_ILLS_CONDEMNED) {
 				list_remove(ill_list, (void *)sctp_ill);
-				sctp_ills_count--;
-				sctp_g_ills[ill_index].ill_count--;
+				sctps->sctps_ills_count--;
+				sctps->sctps_g_ills[ill_index].ill_count--;
 				kmem_free(sctp_ill->sctp_ill_name,
 				    sctp_ill->sctp_ill_name_length);
 				kmem_free(sctp_ill, sizeof (sctp_ill_t));
@@ -872,7 +881,7 @@ sctp_update_ipif(ipif_t *ipif, int op)
 
 	case SCTP_IPIF_UP:
 
-		rw_downgrade(&sctp_g_ipifs_lock);
+		rw_downgrade(&sctps->sctps_g_ipifs_lock);
 		rw_enter(&sctp_ipif->sctp_ipif_lock, RW_WRITER);
 		sctp_ipif->sctp_ipif_state = SCTP_IPIFS_UP;
 		sctp_ipif->sctp_ipif_saddr = ipif->ipif_v6lcl_addr;
@@ -884,7 +893,7 @@ sctp_update_ipif(ipif_t *ipif, int op)
 
 	case SCTP_IPIF_UPDATE:
 
-		rw_downgrade(&sctp_g_ipifs_lock);
+		rw_downgrade(&sctps->sctps_g_ipifs_lock);
 		rw_enter(&sctp_ipif->sctp_ipif_lock, RW_WRITER);
 		sctp_ipif->sctp_ipif_mtu = ipif->ipif_mtu;
 		sctp_ipif->sctp_ipif_saddr = ipif->ipif_v6lcl_addr;
@@ -896,15 +905,15 @@ sctp_update_ipif(ipif_t *ipif, int op)
 
 	case SCTP_IPIF_DOWN:
 
-		rw_downgrade(&sctp_g_ipifs_lock);
+		rw_downgrade(&sctps->sctps_g_ipifs_lock);
 		rw_enter(&sctp_ipif->sctp_ipif_lock, RW_WRITER);
 		sctp_ipif->sctp_ipif_state = SCTP_IPIFS_DOWN;
 		rw_exit(&sctp_ipif->sctp_ipif_lock);
 
 		break;
 	}
-	rw_exit(&sctp_g_ipifs_lock);
-	rw_exit(&sctp_g_ills_lock);
+	rw_exit(&sctps->sctps_g_ipifs_lock);
+	rw_exit(&sctps->sctps_g_ills_lock);
 }
 
 /*
@@ -1347,6 +1356,7 @@ sctp_get_addrlist(sctp_t *sctp, const void *addrs, uint32_t *addrcnt,
 	struct sockaddr_in6	*s6;
 	uchar_t			*p;
 	int			err = 0;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
 	*addrlist = NULL;
 	*size = 0;
@@ -1419,25 +1429,30 @@ get_all_addrs:
 	 * We allocate upfront so that the clustering module need to bother
 	 * re-sizing the list.
 	 */
-	if (sctp->sctp_family == AF_INET)
-		*size = sizeof (struct sockaddr_in) * sctp_g_ipifs_count;
-	else
-		*size = sizeof (struct sockaddr_in6) * sctp_g_ipifs_count;
-
+	if (sctp->sctp_family == AF_INET) {
+		*size = sizeof (struct sockaddr_in) *
+		    sctps->sctps_g_ipifs_count;
+	} else {
+		*size = sizeof (struct sockaddr_in6) *
+		    sctps->sctps_g_ipifs_count;
+	}
 	*addrlist = kmem_zalloc(*size, KM_SLEEP);
 	*addrcnt = 0;
 	p = *addrlist;
-	rw_enter(&sctp_g_ipifs_lock, RW_READER);
+	rw_enter(&sctps->sctps_g_ipifs_lock, RW_READER);
 
 	/*
 	 * Walk through the global interface list and add all addresses,
 	 * except those that are hosted on loopback interfaces.
 	 */
 	for (cnt = 0; cnt <  SCTP_IPIF_HASH; cnt++) {
-		if (sctp_g_ipifs[cnt].ipif_count == 0)
+		if (sctps->sctps_g_ipifs[cnt].ipif_count == 0)
 			continue;
-		sctp_ipif = list_head(&sctp_g_ipifs[cnt].sctp_ipif_list);
-		for (icnt = 0; icnt < sctp_g_ipifs[cnt].ipif_count; icnt++) {
+		sctp_ipif = list_head(
+		    &sctps->sctps_g_ipifs[cnt].sctp_ipif_list);
+		for (icnt = 0;
+		    icnt < sctps->sctps_g_ipifs[cnt].ipif_count;
+		    icnt++) {
 			in6_addr_t	addr;
 
 			rw_enter(&sctp_ipif->sctp_ipif_lock, RW_READER);
@@ -1453,7 +1468,7 @@ get_all_addrs:
 			    !sctp_ipif->sctp_ipif_isv6)) {
 				rw_exit(&sctp_ipif->sctp_ipif_lock);
 				sctp_ipif = list_next(
-				    &sctp_g_ipifs[cnt].sctp_ipif_list,
+				    &sctps->sctps_g_ipifs[cnt].sctp_ipif_list,
 				    sctp_ipif);
 				continue;
 			}
@@ -1472,11 +1487,12 @@ get_all_addrs:
 				p += sizeof (*s6);
 			}
 			(*addrcnt)++;
-			sctp_ipif = list_next(&sctp_g_ipifs[cnt].sctp_ipif_list,
+			sctp_ipif = list_next(
+			    &sctps->sctps_g_ipifs[cnt].sctp_ipif_list,
 			    sctp_ipif);
 		}
 	}
-	rw_exit(&sctp_g_ipifs_lock);
+	rw_exit(&sctps->sctps_g_ipifs_lock);
 	return (err);
 }
 
@@ -1512,7 +1528,8 @@ sctp_get_saddr_list(sctp_t *sctp, uchar_t *p, size_t psize)
 			psize -= sizeof (ipif->sctp_ipif_saddr);
 			if (scanned >= sctp->sctp_nsaddrs)
 				return;
-			obj = list_next(&sctp->sctp_saddrs[icnt].sctp_ipif_list,
+			obj = list_next(
+			    &sctp->sctp_saddrs[icnt].sctp_ipif_list,
 			    obj);
 		}
 	}
@@ -1536,37 +1553,112 @@ sctp_get_faddr_list(sctp_t *sctp, uchar_t *p, size_t psize)
 	}
 }
 
+static void
+sctp_free_ills(sctp_stack_t *sctps)
+{
+	int			i;
+	int			l;
+	sctp_ill_t	*sctp_ill;
+
+	if (sctps->sctps_ills_count == 0)
+		return;
+
+	for (i = 0; i < SCTP_ILL_HASH; i++) {
+		sctp_ill = list_tail(&sctps->sctps_g_ills[i].sctp_ill_list);
+		for (l = 0; l < sctps->sctps_g_ills[i].ill_count; l++) {
+			ASSERT(sctp_ill->sctp_ill_ipifcnt == 0);
+			list_remove(&sctps->sctps_g_ills[i].sctp_ill_list,
+			    sctp_ill);
+			sctps->sctps_ills_count--;
+			kmem_free(sctp_ill->sctp_ill_name,
+			    sctp_ill->sctp_ill_name_length);
+			kmem_free(sctp_ill, sizeof (sctp_ill_t));
+			sctp_ill =
+			    list_tail(&sctps->sctps_g_ills[i].sctp_ill_list);
+		}
+		sctps->sctps_g_ills[i].ill_count = 0;
+	}
+	ASSERT(sctps->sctps_ills_count == 0);
+}
+
+static void
+sctp_free_ipifs(sctp_stack_t *sctps)
+{
+	int			i;
+	int			l;
+	sctp_ipif_t	*sctp_ipif;
+	sctp_ill_t	*sctp_ill;
+
+	if (sctps->sctps_g_ipifs_count == 0)
+		return;
+
+	for (i = 0; i < SCTP_IPIF_HASH; i++) {
+		sctp_ipif = list_tail(&sctps->sctps_g_ipifs[i].sctp_ipif_list);
+		for (l = 0; l < sctps->sctps_g_ipifs[i].ipif_count; l++) {
+			sctp_ill = sctp_ipif->sctp_ipif_ill;
+
+			list_remove(&sctps->sctps_g_ipifs[i].sctp_ipif_list,
+			    sctp_ipif);
+			sctps->sctps_g_ipifs_count--;
+			(void) atomic_add_32_nv(&sctp_ill->sctp_ill_ipifcnt,
+			    -1);
+			kmem_free(sctp_ipif, sizeof (sctp_ipif_t));
+			sctp_ipif =
+			    list_tail(&sctps->sctps_g_ipifs[i].sctp_ipif_list);
+		}
+		sctps->sctps_g_ipifs[i].ipif_count = 0;
+	}
+	ASSERT(sctps->sctps_g_ipifs_count == 0);
+}
+
+
 /* Initialize the SCTP ILL list and lock */
 void
-sctp_saddr_init()
+sctp_saddr_init(sctp_stack_t *sctps)
 {
 	int	i;
 
-	rw_init(&sctp_g_ills_lock, NULL, RW_DEFAULT, NULL);
-	rw_init(&sctp_g_ipifs_lock, NULL, RW_DEFAULT, NULL);
+	sctps->sctps_g_ills = kmem_zalloc(sizeof (sctp_ill_hash_t) *
+	    SCTP_ILL_HASH, KM_SLEEP);
+	sctps->sctps_g_ipifs = kmem_zalloc(sizeof (sctp_ipif_hash_t) *
+	    SCTP_IPIF_HASH, KM_SLEEP);
+
+	rw_init(&sctps->sctps_g_ills_lock, NULL, RW_DEFAULT, NULL);
+	rw_init(&sctps->sctps_g_ipifs_lock, NULL, RW_DEFAULT, NULL);
 
 	for (i = 0; i < SCTP_ILL_HASH; i++) {
-		sctp_g_ills[i].ill_count = 0;
-		list_create(&sctp_g_ills[i].sctp_ill_list, sizeof (sctp_ill_t),
+		sctps->sctps_g_ills[i].ill_count = 0;
+		list_create(&sctps->sctps_g_ills[i].sctp_ill_list,
+		    sizeof (sctp_ill_t),
 		    offsetof(sctp_ill_t, sctp_ills));
 	}
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
-		sctp_g_ipifs[i].ipif_count = 0;
-		list_create(&sctp_g_ipifs[i].sctp_ipif_list,
+		sctps->sctps_g_ipifs[i].ipif_count = 0;
+		list_create(&sctps->sctps_g_ipifs[i].sctp_ipif_list,
 		    sizeof (sctp_ipif_t), offsetof(sctp_ipif_t, sctp_ipifs));
 	}
 }
 
 void
-sctp_saddr_fini()
+sctp_saddr_fini(sctp_stack_t *sctps)
 {
 	int	i;
 
-	rw_destroy(&sctp_g_ills_lock);
-	rw_destroy(&sctp_g_ipifs_lock);
-	ASSERT(sctp_ills_count == 0 && sctp_g_ipifs_count == 0);
+	sctp_free_ipifs(sctps);
+	sctp_free_ills(sctps);
+
 	for (i = 0; i < SCTP_ILL_HASH; i++)
-		list_destroy(&sctp_g_ills[i].sctp_ill_list);
+		list_destroy(&sctps->sctps_g_ills[i].sctp_ill_list);
 	for (i = 0; i < SCTP_IPIF_HASH; i++)
-		list_destroy(&sctp_g_ipifs[i].sctp_ipif_list);
+		list_destroy(&sctps->sctps_g_ipifs[i].sctp_ipif_list);
+
+	ASSERT(sctps->sctps_ills_count == 0 && sctps->sctps_g_ipifs_count == 0);
+	kmem_free(sctps->sctps_g_ills, sizeof (sctp_ill_hash_t) *
+	    SCTP_ILL_HASH);
+	sctps->sctps_g_ills = NULL;
+	kmem_free(sctps->sctps_g_ipifs, sizeof (sctp_ipif_hash_t) *
+	    SCTP_IPIF_HASH);
+	sctps->sctps_g_ipifs = NULL;
+	rw_destroy(&sctps->sctps_g_ills_lock);
+	rw_destroy(&sctps->sctps_g_ipifs_lock);
 }

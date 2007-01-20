@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1988, 1989, 1993
@@ -1221,6 +1221,7 @@ rn_freehead(rnh)
 	rnh->rnh_walktree = NULL;
 
 #ifdef	_KERNEL
+	RADIX_NODE_HEAD_DESTROY(rnh);
 	FreeHead(rnh, sizeof (*rnh));
 #else
 	Free(rnh, NULL);

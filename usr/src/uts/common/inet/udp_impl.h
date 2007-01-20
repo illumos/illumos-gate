@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@ extern "C" {
 #ifdef _KERNEL
 
 #include <sys/int_types.h>
+#include <sys/netstack.h>
 
 #include <netinet/in.h>
 #include <netinet/ip6.h>
@@ -59,6 +60,116 @@ typedef enum {
 	UDP_QUEUED_SQUEUE = 2,		/* Messages enqueued in conn_sqp */
 	UDP_SQUEUE = 3			/* Single threaded using squeues */
 } udp_mode_t;
+
+/*
+ * Bind hash list size and hash function.  It has to be a power of 2 for
+ * hashing.
+ */
+#define	UDP_BIND_FANOUT_SIZE	512
+#define	UDP_BIND_HASH(lport, size) \
+	((ntohs((uint16_t)lport)) & (size - 1))
+
+/* UDP bind fanout hash structure. */
+typedef struct udp_fanout_s {
+	struct udp_s *uf_udp;
+	kmutex_t uf_lock;
+#if defined(_LP64) || defined(_I32LPx)
+	char	uf_pad[48];
+#else
+	char	uf_pad[56];
+#endif
+} udp_fanout_t;
+
+
+/* Kstats */
+typedef struct udp_stat {			/* Class "net" kstats */
+	kstat_named_t	udp_ip_send;
+	kstat_named_t	udp_ip_ire_send;
+	kstat_named_t	udp_ire_null;
+	kstat_named_t	udp_drain;
+	kstat_named_t	udp_sock_fallback;
+	kstat_named_t	udp_rrw_busy;
+	kstat_named_t	udp_rrw_msgcnt;
+	kstat_named_t	udp_out_sw_cksum;
+	kstat_named_t	udp_out_sw_cksum_bytes;
+	kstat_named_t	udp_out_opt;
+	kstat_named_t	udp_out_err_notconn;
+	kstat_named_t	udp_out_err_output;
+	kstat_named_t	udp_out_err_tudr;
+	kstat_named_t	udp_in_pktinfo;
+	kstat_named_t	udp_in_recvdstaddr;
+	kstat_named_t	udp_in_recvopts;
+	kstat_named_t	udp_in_recvif;
+	kstat_named_t	udp_in_recvslla;
+	kstat_named_t	udp_in_recvucred;
+	kstat_named_t	udp_in_recvttl;
+	kstat_named_t	udp_in_recvhopopts;
+	kstat_named_t	udp_in_recvhoplimit;
+	kstat_named_t	udp_in_recvdstopts;
+	kstat_named_t	udp_in_recvrtdstopts;
+	kstat_named_t	udp_in_recvrthdr;
+	kstat_named_t	udp_in_recvpktinfo;
+	kstat_named_t	udp_in_recvtclass;
+	kstat_named_t	udp_in_timestamp;
+	kstat_named_t	udp_ip_recvpktinfo;
+#ifdef DEBUG
+	kstat_named_t	udp_data_conn;
+	kstat_named_t	udp_data_notconn;
+#endif
+
+} udp_stat_t;
+
+/* Named Dispatch Parameter Management Structure */
+typedef struct udpparam_s {
+	uint32_t udp_param_min;
+	uint32_t udp_param_max;
+	uint32_t udp_param_value;
+	char	*udp_param_name;
+} udpparam_t;
+
+#define	UDP_NUM_EPRIV_PORTS	64
+
+/*
+ * UDP stack instances
+ */
+struct udp_stack {
+	netstack_t	*us_netstack;	/* Common netstack */
+
+	uint_t		us_bind_fanout_size;
+	udp_fanout_t	*us_bind_fanout;
+
+	int		us_num_epriv_ports;
+	in_port_t	us_epriv_ports[UDP_NUM_EPRIV_PORTS];
+
+	/* Hint not protected by any lock */
+	in_port_t	us_next_port_to_try;
+
+	IDP		us_nd;	/* Points to table of UDP ND variables. */
+	udpparam_t	*us_param_arr; 	/* ndd variable table */
+
+	kstat_t		*us_mibkp;	/* kstats exporting mib data */
+	kstat_t		*us_kstat;
+	udp_stat_t	us_statistics;
+
+	mib2_udp_t	us_udp_mib;	/* SNMP fixed size info */
+
+/*
+ * This controls the rate some ndd info report functions can be used
+ * by non-priviledged users.  It stores the last time such info is
+ * requested.  When those report functions are called again, this
+ * is checked with the current time and compare with the ndd param
+ * udp_ndd_get_info_interval.
+ */
+	clock_t		us_last_ndd_get_info_time;
+
+/*
+ * The smallest anonymous port in the priviledged port range which UDP
+ * looks for free port.  Use in the option UDP_ANONPRIVBIND.
+ */
+	in_port_t	us_min_anonpriv_port;
+
+};
+typedef struct udp_stack udp_stack_t;
 
 /* Internal udp control structure, one per open stream */
 typedef	struct udp_s {
@@ -155,7 +266,9 @@ typedef	struct udp_s {
 
 	uint64_t	udp_open_time;	/* time when this was opened */
 	pid_t		udp_open_pid;	/* process id when this was opened */
+	udp_stack_t	*udp_us;		/* Stack instance for zone */
 } udp_t;
+#define	udp_mib	udp_us->us_udp_mib
 
 /* UDP Protocol header */
 /* UDP Protocol header aligned */
@@ -166,74 +279,28 @@ typedef	struct udpahdr_s {
 	uint16_t	uha_checksum;		/* UDP checksum */
 } udpha_t;
 
-/* Named Dispatch Parameter Management Structure */
-typedef struct udpparam_s {
-	uint32_t udp_param_min;
-	uint32_t udp_param_max;
-	uint32_t udp_param_value;
-	char	*udp_param_name;
-} udpparam_t;
+#define	us_wroff_extra			us_param_arr[0].udp_param_value
+#define	us_ipv4_ttl			us_param_arr[1].udp_param_value
+#define	us_ipv6_hoplimit		us_param_arr[2].udp_param_value
+#define	us_smallest_nonpriv_port	us_param_arr[3].udp_param_value
+#define	us_do_checksum			us_param_arr[4].udp_param_value
+#define	us_smallest_anon_port		us_param_arr[5].udp_param_value
+#define	us_largest_anon_port		us_param_arr[6].udp_param_value
+#define	us_xmit_hiwat			us_param_arr[7].udp_param_value
+#define	us_xmit_lowat			us_param_arr[8].udp_param_value
+#define	us_recv_hiwat			us_param_arr[9].udp_param_value
+#define	us_max_buf			us_param_arr[10].udp_param_value
+#define	us_ndd_get_info_interval	us_param_arr[11].udp_param_value
 
-extern udpparam_t udp_param_arr[];
 
-#define	udp_wroff_extra			udp_param_arr[0].udp_param_value
-#define	udp_ipv4_ttl			udp_param_arr[1].udp_param_value
-#define	udp_ipv6_hoplimit		udp_param_arr[2].udp_param_value
-#define	udp_smallest_nonpriv_port	udp_param_arr[3].udp_param_value
-#define	udp_do_checksum			udp_param_arr[4].udp_param_value
-#define	udp_smallest_anon_port		udp_param_arr[5].udp_param_value
-#define	udp_largest_anon_port		udp_param_arr[6].udp_param_value
-#define	udp_xmit_hiwat			udp_param_arr[7].udp_param_value
-#define	udp_xmit_lowat			udp_param_arr[8].udp_param_value
-#define	udp_recv_hiwat			udp_param_arr[9].udp_param_value
-#define	udp_max_buf			udp_param_arr[10].udp_param_value
-#define	udp_ndd_get_info_interval	udp_param_arr[11].udp_param_value
+#define	UDP_STAT(us, x)		((us)->us_statistics.x.value.ui64++)
+#define	UDP_STAT_UPDATE(us, x, n)	\
+			((us)->us_statistics.x.value.ui64 += (n))
 
-/* Kstats */
-typedef struct {				/* Class "net" kstats */
-	kstat_named_t	udp_ip_send;
-	kstat_named_t	udp_ip_ire_send;
-	kstat_named_t	udp_ire_null;
-	kstat_named_t	udp_drain;
-	kstat_named_t	udp_sock_fallback;
-	kstat_named_t	udp_rrw_busy;
-	kstat_named_t	udp_rrw_msgcnt;
-	kstat_named_t	udp_out_sw_cksum;
-	kstat_named_t	udp_out_sw_cksum_bytes;
-	kstat_named_t	udp_out_opt;
-	kstat_named_t	udp_out_err_notconn;
-	kstat_named_t	udp_out_err_output;
-	kstat_named_t	udp_out_err_tudr;
-	kstat_named_t	udp_in_pktinfo;
-	kstat_named_t	udp_in_recvdstaddr;
-	kstat_named_t	udp_in_recvopts;
-	kstat_named_t	udp_in_recvif;
-	kstat_named_t	udp_in_recvslla;
-	kstat_named_t	udp_in_recvucred;
-	kstat_named_t	udp_in_recvttl;
-	kstat_named_t	udp_in_recvhopopts;
-	kstat_named_t	udp_in_recvhoplimit;
-	kstat_named_t	udp_in_recvdstopts;
-	kstat_named_t	udp_in_recvrtdstopts;
-	kstat_named_t	udp_in_recvrthdr;
-	kstat_named_t	udp_in_recvpktinfo;
-	kstat_named_t	udp_in_recvtclass;
-	kstat_named_t	udp_in_timestamp;
-	kstat_named_t	udp_ip_recvpktinfo;
 #ifdef DEBUG
-	kstat_named_t	udp_data_conn;
-	kstat_named_t	udp_data_notconn;
-#endif
-} udp_stat_t;
-
-extern udp_stat_t	udp_statistics;
-
-#define	UDP_STAT(x)		(udp_statistics.x.value.ui64++)
-#define	UDP_STAT_UPDATE(x, n)	(udp_statistics.x.value.ui64 += (n))
-#ifdef DEBUG
-#define	UDP_DBGSTAT(x)		UDP_STAT(x)
+#define	UDP_DBGSTAT(us, x)	UDP_STAT(us, x)
 #else
-#define	UDP_DBGSTAT(x)
+#define	UDP_DBGSTAT(us, x)
 #endif /* DEBUG */
 
 extern major_t	UDP6_MAJ;
@@ -250,7 +317,7 @@ extern void	udp_ddi_init(void);
 extern void	udp_ddi_destroy(void);
 extern void	udp_resume_bind(conn_t *, mblk_t *);
 extern void	udp_conn_recv(conn_t *, mblk_t *);
-extern boolean_t udp_compute_checksum(void);
+extern boolean_t udp_compute_checksum(netstack_t *);
 extern void	udp_wput_data(queue_t *, mblk_t *, struct sockaddr *,
 		    socklen_t);
 

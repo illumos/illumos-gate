@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,7 @@
 #include <sys/uio.h>
 #include <sys/cmn_err.h>
 #include <sys/sad.h>
+#include <sys/netstack.h>
 #include <sys/priocntl.h>
 #include <sys/jioctl.h>
 #include <sys/procset.h>
@@ -76,6 +77,7 @@
 #include <sys/sunldi_impl.h>
 #include <sys/autoconf.h>
 #include <sys/policy.h>
+#include <sys/zone.h>
 
 
 /*
@@ -190,7 +192,7 @@ static boolean_t msghasdata(mblk_t *bp);
 
 static int
 push_mod(queue_t *qp, dev_t *devp, struct stdata *stp, const char *name,
-    int anchor, cred_t *crp)
+    int anchor, cred_t *crp, uint_t anchor_zoneid)
 {
 	int error;
 	fmodsw_impl_t *fp;
@@ -219,8 +221,10 @@ push_mod(queue_t *qp, dev_t *devp, struct stdata *stp, const char *name,
 	 * put at this place in the stream, and add if so.
 	 */
 	mutex_enter(&stp->sd_lock);
-	if (anchor == stp->sd_pushcnt)
+	if (anchor == stp->sd_pushcnt) {
 		stp->sd_anchor = stp->sd_pushcnt;
+		stp->sd_anchorzone = anchor_zoneid;
+	}
 	mutex_exit(&stp->sd_lock);
 
 	return (0);
@@ -242,6 +246,9 @@ stropen(vnode_t *vp, dev_t *devp, int flag, cred_t *crp)
 	int cloneopen;
 	queue_t *brq;
 	major_t major;
+	str_stack_t *ss;
+	zoneid_t zoneid;
+	uint_t anchor;
 
 #ifdef C2_AUDIT
 	if (audit_active)
@@ -464,23 +471,41 @@ ckreturn:
 	major = getmajor(*devp);
 	if (push_drcompat && cloneopen && NETWORK_DRV(major) &&
 	    ((brq->q_flag & _QASSOCIATED) == 0)) {
-		if (push_mod(qp, &dummydev, stp, DRMODNAME, 0, crp) != 0)
+		if (push_mod(qp, &dummydev, stp, DRMODNAME, 0, crp, 0) != 0)
 			cmn_err(CE_WARN, "cannot push " DRMODNAME
 			    " streams module");
 	}
 
 	/*
-	 * check for modules that need to be autopushed
+	 * Check for autopush. Start with the global zone. If not found
+	 * check in the local zone.
 	 */
-	if ((ap = sad_ap_find_by_dev(*devp)) == NULL)
+	zoneid = GLOBAL_ZONEID;
+retryap:
+	ss = netstack_find_by_stackid(zoneid_to_netstackid(zoneid))->
+	    netstack_str;
+	if ((ap = sad_ap_find_by_dev(*devp, ss)) == NULL) {
+		netstack_rele(ss->ss_netstack);
+		if (zoneid == GLOBAL_ZONEID) {
+			/*
+			 * None found. Also look in the zone's autopush table.
+			 */
+			zoneid = crgetzoneid(crp);
+			if (zoneid != GLOBAL_ZONEID)
+				goto retryap;
+		}
 		goto opendone;
+	}
+	anchor = ap->ap_anchor;
+	zoneid = crgetzoneid(crp);
 	for (s = 0; s < ap->ap_npush; s++) {
 		error = push_mod(qp, &dummydev, stp, ap->ap_list[s],
-		    ap->ap_anchor, crp);
+		    anchor, crp, zoneid);
 		if (error != 0)
 			break;
 	}
-	sad_ap_rele(ap);
+	sad_ap_rele(ap, ss);
+	netstack_rele(ss->ss_netstack);
 
 	/*
 	 * let specfs know that open failed part way through
@@ -623,7 +648,16 @@ strclose(struct vnode *vp, int flag, cred_t *crp)
 
 	/* Check if an I_LINK was ever done on this stream */
 	if (stp->sd_flag & STRHASLINKS) {
-		(void) munlinkall(stp, LINKCLOSE|LINKNORMAL, crp, &rval);
+		netstack_t *ns;
+		str_stack_t *ss;
+
+		ns = netstack_find_by_cred(crp);
+		ASSERT(ns != NULL);
+		ss = ns->netstack_str;
+		ASSERT(ss != NULL);
+
+		(void) munlinkall(stp, LINKCLOSE|LINKNORMAL, crp, &rval, ss);
+		netstack_rele(ss->ss_netstack);
 	}
 
 	while (_SAMESTR(qp)) {
@@ -3754,7 +3788,8 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 * privileges; take the cheapest (non-locking) check
 		 * first.
 		 */
-		if (secpolicy_net_config(crp, B_TRUE) != 0) {
+		if (secpolicy_ip_config(crp, B_TRUE) != 0 ||
+		    (stp->sd_anchorzone != crgetzoneid(crp))) {
 			mutex_enter(&stp->sd_lock);
 			/*
 			 * Anchors only apply if there's at least one
@@ -3765,8 +3800,10 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			    stp->sd_vnode->v_type != VFIFO) {
 				strendplumb(stp);
 				mutex_exit(&stp->sd_lock);
+				if (stp->sd_anchorzone != crgetzoneid(crp))
+					return (EINVAL);
 				/* Audit and report error */
-				return (secpolicy_net_config(crp, B_FALSE));
+				return (secpolicy_ip_config(crp, B_FALSE));
 			}
 			mutex_exit(&stp->sd_lock);
 		}
@@ -3809,9 +3846,10 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		mutex_exit(QLOCK(wrq));
 
 		/* If we popped through the anchor, then reset the anchor. */
-		if (stp->sd_pushcnt < stp->sd_anchor)
+		if (stp->sd_pushcnt < stp->sd_anchor) {
 			stp->sd_anchor = 0;
-
+			stp->sd_anchorzone = 0;
+		}
 		strendplumb(stp);
 		mutex_exit(&stp->sd_lock);
 		return (error);
@@ -3841,6 +3879,8 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		int fd;
 		linkinfo_t *linkp;
 		struct file *fp;
+		netstack_t *ns;
+		str_stack_t *ss;
 
 		/*
 		 * Do not allow the wildcard muxid.  This ioctl is not
@@ -3850,15 +3890,22 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			return (EINVAL);
 		}
 
+		ns = netstack_find_by_cred(crp);
+		ASSERT(ns != NULL);
+		ss = ns->netstack_str;
+		ASSERT(ss != NULL);
+
 		mutex_enter(&muxifier);
-		linkp = findlinks(vp->v_stream, muxid, LINKPERSIST);
+		linkp = findlinks(vp->v_stream, muxid, LINKPERSIST, ss);
 		if (linkp == NULL) {
 			mutex_exit(&muxifier);
+			netstack_rele(ss->ss_netstack);
 			return (EINVAL);
 		}
 
 		if ((fd = ufalloc(0)) == -1) {
 			mutex_exit(&muxifier);
+			netstack_rele(ss->ss_netstack);
 			return (EMFILE);
 		}
 		fp = linkp->li_fpdown;
@@ -3868,6 +3915,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		mutex_exit(&muxifier);
 		setf(fd, fp);
 		*rvalp = fd;
+		netstack_rele(ss->ss_netstack);
 		return (0);
 	}
 
@@ -3876,7 +3924,9 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		/*
 		 * To insert a module to a given position in a stream.
 		 * In the first release, only allow privileged user
-		 * to use this ioctl.
+		 * to use this ioctl. Furthermore, the insert is only allowed
+		 * below an anchor if the zoneid is the same as the zoneid
+		 * which created the anchor.
 		 *
 		 * Note that we do not plan to support this ioctl
 		 * on pipes in the first release.  We want to learn more
@@ -3905,6 +3955,9 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			return (EINVAL);
 		if ((error = secpolicy_net_config(crp, B_FALSE)) != 0)
 			return (error);
+		if (stp->sd_anchor != 0 &&
+		    stp->sd_anchorzone != crgetzoneid(crp))
+			return (EINVAL);
 
 		error = strcopyin((void *)arg, STRUCT_BUF(strmodinsert),
 		    STRUCT_SIZE(strmodinsert), copyflag);
@@ -3950,6 +4003,22 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			mutex_exit(&stp->sd_lock);
 			return (EINVAL);
 		}
+		if (stp->sd_anchor != 0) {
+			/*
+			 * Is this insert below the anchor?
+			 * Pushcnt hasn't been increased yet hence
+			 * we test for greater than here, and greater or
+			 * equal after qattach.
+			 */
+			if (pos > (stp->sd_pushcnt - stp->sd_anchor) &&
+			    stp->sd_anchorzone != crgetzoneid(crp)) {
+				fmodsw_rele(fp);
+				strendplumb(stp);
+				mutex_exit(&stp->sd_lock);
+				return (EPERM);
+			}
+		}
+
 		mutex_exit(&stp->sd_lock);
 
 		/*
@@ -4026,6 +4095,9 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 * the ambiguity of removal if a module is inserted/pushed
 		 * multiple times in a stream.  In the first release, only
 		 * allow privileged user to use this ioctl.
+		 * Furthermore, the remove is only allowed
+		 * below an anchor if the zoneid is the same as the zoneid
+		 * which created the anchor.
 		 *
 		 * Note that we do not plan to support this ioctl
 		 * on pipes in the first release.  We want to learn more
@@ -4055,6 +4127,9 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			return (EINVAL);
 		if ((error = secpolicy_net_config(crp, B_FALSE)) != 0)
 			return (error);
+		if (stp->sd_anchor != 0 &&
+		    stp->sd_anchorzone != crgetzoneid(crp))
+			return (EINVAL);
 
 		error = strcopyin((void *)arg, STRUCT_BUF(strmodremove),
 		    STRUCT_SIZE(strmodremove), copyflag);
@@ -4088,6 +4163,22 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			mutex_exit(&stp->sd_lock);
 			return (EINVAL);
 		}
+
+		/*
+		 * If the position is at or below an anchor, then the zoneid
+		 * must match the zoneid that created the anchor.
+		 */
+		if (stp->sd_anchor != 0) {
+			pos = STRUCT_FGET(strmodremove, pos);
+			if (pos >= (stp->sd_pushcnt - stp->sd_anchor) &&
+			    stp->sd_anchorzone != crgetzoneid(crp)) {
+				mutex_enter(&stp->sd_lock);
+				strendplumb(stp);
+				mutex_exit(&stp->sd_lock);
+				return (EPERM);
+			}
+		}
+
 
 		ASSERT(!(q->q_flag & QREADR));
 		qdetach(_RD(q), 1, flag, crp, is_remove);
@@ -4132,7 +4223,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 */
 		if (stp->sd_anchor != 0) {
 			pos = STRUCT_FGET(strmodremove, pos);
-			if (pos == 0)
+			if (pos == stp->sd_pushcnt - stp->sd_anchor + 1)
 				stp->sd_anchor = 0;
 			else if (pos > (stp->sd_pushcnt - stp->sd_anchor + 1))
 				stp->sd_anchor--;
@@ -4156,9 +4247,14 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			mutex_exit(&stp->sd_lock);
 			return (EINVAL);
 		}
-
+		/* Only allow the same zoneid to update the anchor */
+		if (stp->sd_anchor != 0 &&
+		    stp->sd_anchorzone != crgetzoneid(crp)) {
+			mutex_exit(&stp->sd_lock);
+			return (EINVAL);
+		}
 		stp->sd_anchor = stp->sd_pushcnt;
-
+		stp->sd_anchorzone = crgetzoneid(crp);
 		mutex_exit(&stp->sd_lock);
 		return (0);
 
@@ -4185,7 +4281,8 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		/*
 		 * Link a multiplexor.
 		 */
-		return (mlink(vp, cmd, (int)arg, crp, rvalp, 0));
+		error = mlink(vp, cmd, (int)arg, crp, rvalp, 0);
+		return (error);
 
 	case _I_PLINK_LH:
 		/*
@@ -4207,6 +4304,8 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		struct linkinfo *linkp;
 		int native_arg = (int)arg;
 		int type;
+		netstack_t *ns;
+		str_stack_t *ss;
 
 		TRACE_1(TR_FAC_STREAMS_FR,
 			TR_I_UNLINK, "I_UNLINK/I_PUNLINK:%p", stp);
@@ -4220,18 +4319,25 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		if (native_arg == 0) {
 			return (EINVAL);
 		}
+		ns = netstack_find_by_cred(crp);
+		ASSERT(ns != NULL);
+		ss = ns->netstack_str;
+		ASSERT(ss != NULL);
+
 		if (native_arg == MUXID_ALL)
-			error = munlinkall(stp, type, crp, rvalp);
+			error = munlinkall(stp, type, crp, rvalp, ss);
 		else {
 			mutex_enter(&muxifier);
-			if (!(linkp = findlinks(stp, (int)arg, type))) {
+			if (!(linkp = findlinks(stp, (int)arg, type, ss))) {
 				/* invalid user supplied index number */
 				mutex_exit(&muxifier);
+				netstack_rele(ss->ss_netstack);
 				return (EINVAL);
 			}
 			/* munlink drops the muxifier lock */
-			error = munlink(stp, linkp, type, crp, rvalp);
+			error = munlink(stp, linkp, type, crp, rvalp, ss);
 		}
+		netstack_rele(ss->ss_netstack);
 		return (error);
 	    }
 

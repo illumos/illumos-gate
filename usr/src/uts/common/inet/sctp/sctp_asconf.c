@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/mib2.h>
+#include <inet/ipclassifier.h>
 #include "sctp_impl.h"
 #include "sctp_asconf.h"
 #include "sctp_addr.h"
@@ -391,6 +392,7 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 	uchar_t			*dptr = NULL;
 	int			acount = 0;
 	int			dcount = 0;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
 	ASSERT(ch->sch_id == CHUNK_ASCONF);
 
@@ -417,7 +419,7 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 	hmp = sctp_make_mp(sctp, fp, sizeof (*ach) + sizeof (*idp));
 	if (hmp == NULL) {
 		/* Let the peer retransmit */
-		SCTP_KSTAT(sctp_send_asconf_ack_failed);
+		SCTP_KSTAT(sctps, sctp_send_asconf_ack_failed);
 		return;
 	}
 	ach = (sctp_chunk_hdr_t *)hmp->b_wptr;
@@ -480,7 +482,7 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 				alist = kmem_alloc(asize, KM_NOSLEEP);
 				if (alist == NULL) {
 					freeb(hmp);
-					SCTP_KSTAT(sctp_cl_assoc_change);
+					SCTP_KSTAT(sctps, sctp_cl_assoc_change);
 					return;
 				}
 			}
@@ -491,7 +493,7 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 					if (acount > 0)
 						kmem_free(alist, asize);
 					freeb(hmp);
-					SCTP_KSTAT(sctp_cl_assoc_change);
+					SCTP_KSTAT(sctps, sctp_cl_assoc_change);
 					return;
 				}
 			}
@@ -839,6 +841,7 @@ sctp_rc_timer(sctp_t *sctp, sctp_faddr_t *fp)
 #define	SCTP_CLR_SENT_FLAG(mp)	((mp)->b_flag &= ~SCTP_CHUNK_FLAG_SENT)
 	sctp_faddr_t	*nfp;
 	sctp_faddr_t	*ofp;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	ASSERT(fp != NULL);
 
@@ -863,7 +866,7 @@ sctp_rc_timer(sctp_t *sctp, sctp_faddr_t *fp)
 	/* Retransmission */
 	if (sctp->sctp_strikes >= sctp->sctp_pa_max_rxt) {
 		/* time to give up */
-		BUMP_MIB(&sctp_mib, sctpAborted);
+		BUMP_MIB(&sctps->sctps_mib, sctpAborted);
 		sctp_assoc_event(sctp, SCTP_COMM_LOST, 0, NULL);
 		sctp_clean_death(sctp, ETIMEDOUT);
 		return;
@@ -913,6 +916,7 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 	uint32_t 		*snp;
 	sctp_parm_hdr_t		*ph;
 	boolean_t		isv4;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
 	if (sctp->sctp_cchunk_pend || sctp->sctp_cxmit_list == NULL ||
 	    /* Queue it for later transmission if not yet established */
@@ -931,7 +935,7 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 	ipmp = sctp_make_mp(sctp, fp, 0);
 	if (ipmp == NULL) {
 		SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->rto);
-		SCTP_KSTAT(sctp_send_asconf_failed);
+		SCTP_KSTAT(sctps, sctp_send_asconf_failed);
 		return;
 	}
 	mp = sctp->sctp_cxmit_list;
@@ -1144,11 +1148,12 @@ sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 	sctp_faddr_t	*nfp;
 	sctp_parm_hdr_t	*oph = ph;
 	int		err;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	*cont = 1;
 
 	/* Send back an authorization error if addip is disabled */
-	if (!sctp_addip_enabled) {
+	if (!sctps->sctps_addip_enabled) {
 		err = SCTP_ERR_UNAUTHORIZED;
 		goto error_handler;
 	}
@@ -1528,9 +1533,10 @@ sctp_del_ip(sctp_t *sctp, const void *addrs, uint32_t cnt, uchar_t *ulist,
 	sctp_cl_ainfo_t		*ainfo = NULL;
 	uchar_t			*p = ulist;
 	boolean_t		check_lport = B_FALSE;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
 	/* Does the peer understand ASCONF and Add-IP? */
-	if (sctp->sctp_state <= SCTPS_LISTEN || !sctp_addip_enabled ||
+	if (sctp->sctp_state <= SCTPS_LISTEN || !sctps->sctps_addip_enabled ||
 	    !sctp->sctp_understands_asconf || !sctp->sctp_understands_addip) {
 		asconf = B_FALSE;
 	}

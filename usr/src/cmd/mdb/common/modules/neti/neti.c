@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
  */
 #define	PROT_LENGTH 32
 
-LIST_HEAD(netd_listhead, net_data);
-
 /*
  * List pfhooks netinfo information.
  */
@@ -47,6 +45,7 @@ LIST_HEAD(netd_listhead, net_data);
 int
 netinfolist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
+	struct neti_stack *nts;
 	struct netd_listhead nlh;
 	struct net_data nd, *p;
 	char str[PROT_LENGTH];
@@ -54,8 +53,15 @@ netinfolist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argc)
 		return (DCMD_USAGE);
 
-	if (mdb_readvar(&nlh, "netd_head") == -1) {
-		mdb_warn("couldn't read symbol 'netd_head'");
+	if (mdb_vread((void *)&nts, sizeof (nts),
+	    (uintptr_t)(addr + OFFSETOF(netstack_t, netstack_neti))) == -1) {
+		mdb_warn("couldn't read netstack_neti");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_vread((void *)&nlh, sizeof (nlh), (uintptr_t)((uintptr_t)nts +
+	    OFFSETOF(neti_stack_t, nts_netd_head))) == -1) {
+		mdb_warn("couldn't read netd list head");
 		return (DCMD_ERR);
 	}
 	mdb_printf("%<u>%?s %?s %10s%</u>\n",

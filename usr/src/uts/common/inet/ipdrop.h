@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 extern "C" {
 #endif
 
+#ifdef _KERNEL
 /*
  * Opaque data type which will contain state about an entity that is dropping
  * a packet (e.g. IPsec SPD, IPsec SADB, TCP, IP forwarding, etc.).
@@ -45,16 +46,10 @@ void ip_drop_unregister(ipdropper_t *);
 void ip_drop_packet(mblk_t *, boolean_t, ill_t *, ire_t *, struct kstat_named *,
     ipdropper_t *);
 
-extern kstat_t *ip_drop_kstat;
-extern struct ip_dropstats *ip_drop_types;
-void ip_drop_init(void);
-void ip_drop_destroy(void);
-
 /*
  * ip_dropstats - When a protocol developer comes up with a new reason to
  * drop a packet, it should have a bean counter placed here in this structure,
- * an ipdrops_* definition for that bean counter, and an initializer in
- * ipdrop.c's ip_drop_init().
+ * and an initializer in ipdrop.c's ip_drop_init().
  *
  * This will suffice until we come up with a more dynamic way of adding
  * named kstats to a single kstat instance (if that is possible).
@@ -126,76 +121,7 @@ struct ip_dropstats {
 	kstat_named_t ipds_ip_ipsec_not_loaded;
 };
 
-/*
- * Use this section to create easy-to-name definitions for specific IP Drop
- * statistics.  As a naming convention, prefix them with ipdrops_<foo>.
- */
-/* TCP IPsec drop statistics. */
-#define	ipdrops_tcp_clear	ip_drop_types->ipds_tcp_clear
-#define	ipdrops_tcp_secure	ip_drop_types->ipds_tcp_secure
-#define	ipdrops_tcp_mismatch	ip_drop_types->ipds_tcp_mismatch
-#define	ipdrops_tcp_ipsec_alloc	ip_drop_types->ipds_tcp_ipsec_alloc
-
-/* SADB-specific drop statistics. */
-#define	ipdrops_sadb_inlarval_timeout ip_drop_types->ipds_sadb_inlarval_timeout
-#define	ipdrops_sadb_inlarval_replace ip_drop_types->ipds_sadb_inlarval_replace
-#define	ipdrops_sadb_acquire_nomem	ip_drop_types->ipds_sadb_acquire_nomem
-#define	ipdrops_sadb_acquire_toofull	ip_drop_types->ipds_sadb_acquire_toofull
-#define	ipdrops_sadb_acquire_timeout	ip_drop_types->ipds_sadb_acquire_timeout
-
-/* SPD drop statistics. */
-#define	ipdrops_spd_ahesp_diffid	ip_drop_types->ipds_spd_ahesp_diffid
-#define	ipdrops_spd_loopback_mismatch ip_drop_types->ipds_spd_loopback_mismatch
-#define	ipdrops_spd_explicit		ip_drop_types->ipds_spd_explicit
-#define	ipdrops_spd_got_secure		ip_drop_types->ipds_spd_got_secure
-#define	ipdrops_spd_got_clear		ip_drop_types->ipds_spd_got_clear
-#define	ipdrops_spd_bad_ahalg		ip_drop_types->ipds_spd_bad_ahalg
-#define	ipdrops_spd_got_ah		ip_drop_types->ipds_spd_got_ah
-#define	ipdrops_spd_bad_espealg		ip_drop_types->ipds_spd_bad_espealg
-#define	ipdrops_spd_bad_espaalg		ip_drop_types->ipds_spd_bad_espaalg
-#define	ipdrops_spd_got_esp		ip_drop_types->ipds_spd_got_esp
-#define	ipdrops_spd_got_selfencap	ip_drop_types->ipds_spd_got_selfencap
-#define	ipdrops_spd_bad_selfencap	ip_drop_types->ipds_spd_bad_selfencap
-#define	ipdrops_spd_nomem		ip_drop_types->ipds_spd_nomem
-#define	ipdrops_spd_ah_badid		ip_drop_types->ipds_spd_ah_badid
-#define	ipdrops_spd_esp_badid		ip_drop_types->ipds_spd_esp_badid
-#define	ipdrops_spd_ah_innermismatch	\
-				ip_drop_types->ipds_spd_ah_innermismatch
-#define	ipdrops_spd_esp_innermismatch	\
-				ip_drop_types->ipds_spd_esp_innermismatch
-#define	ipdrops_spd_no_policy		ip_drop_types->ipds_spd_no_policy
-#define	ipdrops_spd_malformed_packet	ip_drop_types->ipds_spd_malformed_packet
-#define	ipdrops_spd_malformed_frag	ip_drop_types->ipds_spd_malformed_frag
-#define	ipdrops_spd_overlap_frag	ip_drop_types->ipds_spd_overlap_frag
-#define	ipdrops_spd_evil_frag		ip_drop_types->ipds_spd_evil_frag
-#define	ipdrops_spd_max_frags		ip_drop_types->ipds_spd_max_frags
-
-/* ESP-specific drop statistics. */
-#define	ipdrops_esp_nomem		ip_drop_types->ipds_esp_nomem
-#define	ipdrops_esp_no_sa		ip_drop_types->ipds_esp_no_sa
-#define	ipdrops_esp_early_replay	ip_drop_types->ipds_esp_early_replay
-#define	ipdrops_esp_replay		ip_drop_types->ipds_esp_replay
-#define	ipdrops_esp_bytes_expire	ip_drop_types->ipds_esp_bytes_expire
-#define	ipdrops_esp_bad_padlen		ip_drop_types->ipds_esp_bad_padlen
-#define	ipdrops_esp_bad_padding		ip_drop_types->ipds_esp_bad_padding
-#define	ipdrops_esp_bad_auth		ip_drop_types->ipds_esp_bad_auth
-#define	ipdrops_esp_crypto_failed	ip_drop_types->ipds_esp_crypto_failed
-#define	ipdrops_esp_icmp		ip_drop_types->ipds_esp_icmp
-
-/* AH-specific drop statistics. */
-#define	ipdrops_ah_nomem		ip_drop_types->ipds_ah_nomem
-#define	ipdrops_ah_bad_v6_hdrs		ip_drop_types->ipds_ah_bad_v6_hdrs
-#define	ipdrops_ah_bad_v4_opts		ip_drop_types->ipds_ah_bad_v4_opts
-#define	ipdrops_ah_no_sa		ip_drop_types->ipds_ah_no_sa
-#define	ipdrops_ah_bad_length		ip_drop_types->ipds_ah_bad_length
-#define	ipdrops_ah_bad_auth		ip_drop_types->ipds_ah_bad_auth
-#define	ipdrops_ah_crypto_failed	ip_drop_types->ipds_ah_crypto_failed
-#define	ipdrops_ah_early_replay		ip_drop_types->ipds_ah_early_replay
-#define	ipdrops_ah_replay		ip_drop_types->ipds_ah_replay
-#define	ipdrops_ah_bytes_expire		ip_drop_types->ipds_ah_bytes_expire
-
-/* IP-specific drop statistics. */
-#define	ipdrops_ip_ipsec_not_loaded	ip_drop_types->ipds_ip_ipsec_not_loaded
+#endif /* _KERNEL */
 
 #ifdef	__cplusplus
 }

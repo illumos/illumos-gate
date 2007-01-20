@@ -304,7 +304,10 @@ dhcp_requesting(iu_tq_t *tqp, void *arg)
 		    offer->opts[CD_SERVER_ID]->value,
 		    offer->opts[CD_SERVER_ID]->len);
 
-		(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id, class_id_len);
+		if (class_id_len != 0) {
+			(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id,
+			    class_id_len);
+		}
 		(void) add_pkt_prl(dpkt, dsmp);
 
 		/*

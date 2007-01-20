@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -103,6 +103,20 @@ install:	$(INSTALL_DEPS)
 
 $(ROOTLINK):	$(ROOT_STRMOD_DIR) $(ROOTMODULE)
 	-$(RM) $@; ln $(ROOTMODULE) $@
+
+sis_check:	sis_check.obj sis_check.debug
+sis_check.obj: $(ALL_DEPS)
+	@$(GREP) -v '#' $(MODULE).objt-symbols.obj64 |$(GREP) . |$(SORT) -u \
+	    > $(MODULE).symbols.tmp
+	@$(NM) obj64/$(MODULE) |$(GREP) OBJT |$(GREP) -v UNDEF | \
+	    $(CUT) -d'|' -f8 |$(SORT) -u > $(MODULE).symbols.tmp.new
+	-@$(DIFF) $(MODULE).symbols.tmp $(MODULE).symbols.tmp.new
+sis_check.debug: $(ALL_DEPS)
+	@$(GREP) -v '#' $(MODULE).objt-symbols.debug64 |$(GREP) . |$(SORT) -u \
+	    > $(MODULE).symbols.dbg.tmp
+	@$(NM) debug64/$(MODULE) |$(GREP) OBJT |$(GREP) -v UNDEF | \
+	    $(CUT) -d'|' -f8 |$(SORT) -u > $(MODULE).symbols.dbg.tmp.new
+	-@$(DIFF) $(MODULE).symbols.dbg.tmp $(MODULE).symbols.dbg.tmp.new
 
 #
 #	Include common targets.

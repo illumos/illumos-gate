@@ -480,7 +480,10 @@ dhcp_extending(dhcp_smach_t *dsmp)
 		    htons(lif->lif_max - sizeof (struct udpiphdr)));
 		(void) add_pkt_opt32(dpkt, CD_LEASE_TIME, htonl(DHCP_PERM));
 
-		(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id, class_id_len);
+		if (class_id_len != 0) {
+			(void) add_pkt_opt(dpkt, CD_CLASS_ID, class_id,
+			    class_id_len);
+		}
 		(void) add_pkt_prl(dpkt, dsmp);
 		/*
 		 * dsm_reqhost was set for this state machine in

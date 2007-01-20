@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,6 @@ struct dls_kstats dls_kstat =
 {
 	{ "soft_ring_pkt_drop", KSTAT_DATA_UINT32 },
 };
-
 
 /*
  * Private functions.
@@ -226,6 +225,17 @@ dls_open(const char *name, dls_channel_t *dcp)
 	atomic_add_32(&i_dls_impl_count, 1);
 
 	/*
+	 * Set the di_zid to the zone id of current zone
+	 */
+	dip->di_zid = getzoneid();
+
+	/*
+	 * Add this dls_impl_t to the list of the "opened stream"
+	 * list of the corresponding dls_vlan_t
+	 */
+	dls_vlan_add_impl(dvp, dip);
+
+	/*
 	 * Hand back a reference to the dls_impl_t.
 	 */
 	*dcp = (dls_channel_t)dip;
@@ -276,6 +286,12 @@ dls_close(dls_channel_t dc)
 		kmem_free(p, sizeof (dls_multicst_addr_t));
 	}
 	dip->di_dmap = NULL;
+
+	/*
+	 * Remove this dls_impl_t from the list of the "open streams"
+	 * list of the corresponding dls_vlan_t
+	 */
+	dls_vlan_remove_impl(dvp, dip);
 
 	rw_exit(&(dip->di_lock));
 
@@ -869,4 +885,16 @@ dls_active_clear(dls_channel_t dc)
 	mutex_exit(&dlp->dl_lock);
 out:
 	rw_exit(&dip->di_lock);
+}
+
+dev_info_t *
+dls_finddevinfo(dev_t dev)
+{
+	return (dls_vlan_finddevinfo(dev));
+}
+
+int
+dls_ppa_from_minor(minor_t minor, t_uscalar_t *ppa)
+{
+	return (dls_vlan_ppa_from_minor(minor, ppa));
 }

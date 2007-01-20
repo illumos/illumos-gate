@@ -36,9 +36,16 @@ extern "C" {
 #include <sys/inttypes.h>
 #include <netinet/ip6.h>
 #include <netinet/tcp.h>
-#include <inet/tcp_sack.h>
 #include <sys/socket.h>
 #include <sys/multidata.h>
+#include <sys/md5.h>
+#include <inet/common.h>
+#include <inet/ip.h>
+#include <inet/ip6.h>
+#include <inet/mi.h>
+#include <inet/mib2.h>
+#include <inet/tcp_stack.h>
+#include <inet/tcp_sack.h>
 #include <inet/kssl/ksslapi.h>
 
 /*
@@ -142,12 +149,14 @@ struct conn_s;
 
 typedef struct tcp_s {
 				/* Pointer to previous bind hash next. */
-	struct tcp_s *tcp_time_wait_next;
+	struct tcp_s	*tcp_time_wait_next;
 				/* Pointer to next T/W block */
-	struct tcp_s *tcp_time_wait_prev;
+	struct tcp_s	*tcp_time_wait_prev;
 				/* Pointer to previous T/W next */
-	clock_t	tcp_time_wait_expire;
-	struct conn_s *tcp_connp;
+	clock_t		tcp_time_wait_expire;
+
+	struct conn_s	*tcp_connp;
+	tcp_stack_t	*tcp_tcps;	/* Shortcut via conn_netstack */
 
 	int32_t	tcp_state;
 	int32_t	tcp_rcv_ws;		/* My window scale power */
@@ -603,16 +612,48 @@ typedef struct tcp_s {
 #define	TCP_DEBUG_GETPCSTACK(buffer, depth)
 #endif
 
+/*
+ * Track a reference count on the tcps in order to know when
+ * the tcps_g_q can be removed. As long as there is any
+ * tcp_t, other that the tcps_g_q itself, in the tcp_stack_t we
+ * need to keep tcps_g_q around so that a closing connection can
+ * switch to using tcps_g_q as part of it closing.
+ */
+#define	TCPS_REFHOLD(tcps) {					\
+	atomic_add_32(&(tcps)->tcps_refcnt, 1);			\
+	ASSERT((tcps)->tcps_refcnt != 0);			\
+	DTRACE_PROBE1(tcps__refhold, tcp_stack_t, tcps);	\
+}
+
+/*
+ * Decrement the reference count on the tcp_stack_t.
+ * In architectures e.g sun4u, where atomic_add_32_nv is just
+ * a cas, we need to maintain the right memory barrier semantics
+ * as that of mutex_exit i.e all the loads and stores should complete
+ * before the cas is executed. membar_exit() does that here.
+ */
+#define	TCPS_REFRELE(tcps) {					\
+	ASSERT((tcps)->tcps_refcnt != 0);			\
+	membar_exit();						\
+	DTRACE_PROBE1(tcps__refrele, tcp_stack_t, tcps);	\
+	if (atomic_add_32_nv(&(tcps)->tcps_refcnt, -1) == 0 &&	\
+	    (tcps)->tcps_g_q != NULL) {				\
+		/* Only tcps_g_q left */			\
+		tcp_g_q_inactive(tcps);				\
+	}							\
+}
+
 extern void 	tcp_free(tcp_t *tcp);
-extern void	tcp_ddi_init(void);
-extern void	tcp_ddi_destroy(void);
+extern void	tcp_ddi_g_init(void);
+extern void	tcp_ddi_g_destroy(void);
+extern void	tcp_g_q_inactive(tcp_stack_t *);
 extern void	tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len,
-		    zoneid_t zoneid);
+    zoneid_t zoneid, tcp_stack_t *);
 extern void	tcp_conn_request(void *arg, mblk_t *mp, void *arg2);
 extern void	tcp_conn_request_unbound(void *arg, mblk_t *mp, void *arg2);
 extern void 	tcp_input(void *arg, mblk_t *mp, void *arg2);
 extern void	tcp_rput_data(void *arg, mblk_t *mp, void *arg2);
-extern void 	*tcp_get_conn(void *arg);
+extern void 	*tcp_get_conn(void *arg, tcp_stack_t *);
 extern void	tcp_time_wait_collector(void *arg);
 extern int	tcp_snmp_get(queue_t *, mblk_t *);
 extern int	tcp_snmp_set(queue_t *, int, int, uchar_t *, int len);
@@ -627,15 +668,11 @@ extern mblk_t	*tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send,
  *
  * The listener and acceptor hash queues are lists of tcp_t.
  */
-
 /* listener hash and acceptor hash queue head */
 typedef struct tf_s {
 	tcp_t		*tf_tcp;
 	kmutex_t	tf_lock;
 } tf_t;
-
-extern mib2_tcp_t tcp_mib;
-
 #endif	/* (defined(_KERNEL) || defined(_KMEMUSER)) */
 
 /* Contract private interface between TCP and Clustering. */

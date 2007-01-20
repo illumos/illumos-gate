@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,10 +101,11 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data, boolean_t tbit)
 	int len, hdrlen;
 	char *cause;
 	sctp_faddr_t *fp = sctp->sctp_current;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	mp = sctp_make_mp(sctp, fp, 0);
 	if (mp == NULL) {
-		SCTP_KSTAT(sctp_send_user_abort_failed);
+		SCTP_KSTAT(sctps, sctp_send_user_abort_failed);
 		return;
 	}
 
@@ -134,7 +135,7 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data, boolean_t tbit)
 		return;
 	}
 	sctp_set_iplen(sctp, mp);
-	BUMP_MIB(&sctp_mib, sctpAborted);
+	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_opkts);
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
@@ -168,6 +169,8 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 	ts_label_t	*tsl;
 	conn_t		*connp;
 	cred_t		*cr = NULL;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	ip_stack_t	*ipst;
 
 	isv4 = (IPH_HDR_VERSION(inmp->b_rptr) == IPV4_VERSION);
 	if (isv4) {
@@ -183,14 +186,15 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 	if (is_system_labeled() && !tsol_can_reply_error(inmp))
 		return;
 
-	hmp = allocb_cred(sctp_wroff_xtra + ahlen, CONN_CRED(sctp->sctp_connp));
+	hmp = allocb_cred(sctps->sctps_wroff_xtra + ahlen,
+	    CONN_CRED(sctp->sctp_connp));
 	if (hmp == NULL) {
 		/* XXX no resources */
 		return;
 	}
 
 	/* copy in the IP / SCTP header */
-	p = hmp->b_rptr + sctp_wroff_xtra;
+	p = hmp->b_rptr + sctps->sctps_wroff_xtra;
 	hmp->b_rptr = p;
 	hmp->b_wptr = p + ahlen;
 	if (isv4) {
@@ -247,7 +251,7 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 		ahip6h->ip6_plen = htons(alen + sizeof (*sh));
 	}
 
-	BUMP_MIB(&sctp_mib, sctpAborted);
+	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
 	connp = sctp->sctp_connp;
@@ -257,10 +261,12 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 
 		if (isv4)
 			err = tsol_check_label(cr, &hmp, &adjust,
-			    connp->conn_mac_exempt);
+			    connp->conn_mac_exempt,
+			    sctps->sctps_netstack->netstack_ip);
 		else
 			err = tsol_check_label_v6(cr, &hmp, &adjust,
-			    connp->conn_mac_exempt);
+			    connp->conn_mac_exempt,
+			    sctps->sctps_netstack->netstack_ip);
 		if (err != 0) {
 			freemsg(hmp);
 			return;
@@ -283,12 +289,15 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 	 * Let's just mark the IRE for this destination as temporary
 	 * to prevent any DoS attack.
 	 */
+	ipst = sctps->sctps_netstack->netstack_ip;
 	tsl = cr == NULL ? NULL : crgetlabel(cr);
-	if (isv4)
-		ire = ire_cache_lookup(iniph->ipha_src, sctp->sctp_zoneid, tsl);
-	else
+	if (isv4) {
+		ire = ire_cache_lookup(iniph->ipha_src, sctp->sctp_zoneid, tsl,
+		    ipst);
+	} else {
 		ire = ire_cache_lookup_v6(&inip6h->ip6_src, sctp->sctp_zoneid,
-		    tsl);
+		    tsl, ipst);
+	}
 	/*
 	 * In the normal case the ire would be non-null, however it could be
 	 * null, say, if IP needs to resolve the gateway for this address. We
@@ -363,6 +372,7 @@ void
 sctp_send_err(sctp_t *sctp, mblk_t *emp, sctp_faddr_t *dest)
 {
 	mblk_t	*sendmp;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	sendmp = sctp_make_sack(sctp, dest, NULL);
 	if (sendmp != NULL) {
@@ -370,7 +380,7 @@ sctp_send_err(sctp_t *sctp, mblk_t *emp, sctp_faddr_t *dest)
 	} else {
 		sendmp = sctp_make_mp(sctp, dest, 0);
 		if (sendmp == NULL) {
-			SCTP_KSTAT(sctp_send_err_failed);
+			SCTP_KSTAT(sctps, sctp_send_err_failed);
 			freemsg(emp);
 			return;
 		}

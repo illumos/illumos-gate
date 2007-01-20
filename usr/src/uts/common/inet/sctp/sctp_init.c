@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 #include <inet/mib2.h>
 #include <inet/nd.h>
 #include <inet/optcom.h>
+#include <inet/ipclassifier.h>
 #include "sctp_impl.h"
 #include "sctp_addr.h"
 
@@ -175,6 +176,7 @@ sctp_init_mp(sctp_t *sctp)
 	sctp_chunk_hdr_t	*chp;
 	uint16_t		schlen;
 	int			supp_af;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (sctp->sctp_family == AF_INET) {
 		supp_af = PARM_SUPP_V4;
@@ -191,7 +193,7 @@ sctp_init_mp(sctp_t *sctp)
 	}
 	initlen += sctp_supaddr_param_len(sctp);
 	initlen += sctp_addr_params_len(sctp, supp_af, B_TRUE);
-	if (sctp->sctp_prsctp_aware && sctp_prsctp_enabled)
+	if (sctp->sctp_prsctp_aware && sctps->sctps_prsctp_enabled)
 		initlen += sctp_options_param_len(sctp, SCTP_PRSCTP_OPTION);
 
 	/*
@@ -203,7 +205,7 @@ sctp_init_mp(sctp_t *sctp)
 
 	mp = sctp_make_mp(sctp, NULL, initlen);
 	if (mp == NULL) {
-		SCTP_KSTAT(sctp_send_init_failed);
+		SCTP_KSTAT(sctps, sctp_send_init_failed);
 		return (NULL);
 	}
 
@@ -235,7 +237,7 @@ sctp_init_mp(sctp_t *sctp)
 	p += sctp_addr_params(sctp, supp_af, p);
 
 	/* Add Forward-TSN-Supported param */
-	if (sctp->sctp_prsctp_aware && sctp_prsctp_enabled)
+	if (sctp->sctp_prsctp_aware && sctps->sctps_prsctp_enabled)
 		p += sctp_options_param(sctp, p, SCTP_PRSCTP_OPTION);
 
 	BUMP_LOCAL(sctp->sctp_obchunks);

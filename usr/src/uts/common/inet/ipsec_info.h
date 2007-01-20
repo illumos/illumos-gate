@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,13 @@ extern "C" {
  *
  *	* Keysock consumer interface  -  These messages are wrappers for
  *	  PF_KEY messages.  They flow between AH/ESP and keysock.
+ *
+ * Some of these messages include pointers such as a netstack_t pointer.
+ * We do not explicitly reference count those with netstack_hold/rele,
+ * since we depend on IP's ability to discard all of the IPSEC_{IN,OUT}
+ * messages in order to handle the ipsa pointers.
+ * We have special logic when doing asynch callouts to kEF for which we
+ * verify netstack_t pointer using the netstackid_t.
  */
 
 /*
@@ -83,6 +90,12 @@ extern "C" {
  * attributes of the security are reflected in <foo>_done fields below.
  * The code in policy check infers that it is a loopback case and
  * would not try to get the associations.
+ *
+ * The comment below (and for other netstack_t references) refers
+ * to the fact that we only do netstack_hold in particular cases,
+ * such as the references from open streams (ill_t and conn_t's
+ * pointers). Internally within IP we rely on IP's ability to cleanup e.g.
+ * ire_t's when an ill goes away.
  */
 typedef struct ipsec_in_s {
 	uint32_t ipsec_in_type;
@@ -125,6 +138,8 @@ typedef struct ipsec_in_s {
 	crypto_data_t ipsec_in_crypto_mac;	/* to store the MAC */
 
 	zoneid_t ipsec_in_zoneid;	/* target zone for the datagram */
+	netstack_t *ipsec_in_ns;	/* Does not have a netstack_hold */
+	netstackid_t ipsec_in_stackid;	/* Used while waing for kEF callback */
 } ipsec_in_t;
 
 #define	IPSECOUT_MAX_ADDRLEN 4	/* Max addr len. (in 32-bit words) */
@@ -233,6 +248,8 @@ typedef struct ipsec_out_s {
 	zoneid_t ipsec_out_zoneid;	/* source zone for the datagram */
 	in6_addr_t ipsec_out_nexthop_v6;	/* nexthop IP address */
 #define	ipsec_out_nexthop_addr V4_PART_OF_V6(ipsec_out_nexthop_v6)
+	netstack_t *ipsec_out_ns;	/* Does not have a netstack_hold */
+	netstackid_t ipsec_out_stackid;	/* Used while waing for kEF callback */
 } ipsec_out_t;
 
 /*

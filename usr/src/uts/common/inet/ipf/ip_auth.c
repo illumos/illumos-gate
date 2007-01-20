@@ -2,10 +2,13 @@
  * Copyright (C) 1998-2003 by Darren Reed & Guido van Rooij.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,6 +111,7 @@ extern struct ifqueue   ipintrq;		/* ip packet input queue */
 #include <netinet/ip_icmp.h>
 #include "netinet/ip_compat.h"
 #include <netinet/tcpip.h>
+#include "netinet/ipf_stack.h"
 #include "netinet/ip_fil.h"
 #include "netinet/ip_auth.h"
 #if !defined(MENTAT) && !defined(linux)
@@ -129,56 +133,42 @@ extern struct ifqueue   ipintrq;		/* ip packet input queue */
 static const char rcsid[] = "@(#)$Id: ip_auth.c,v 2.73.2.5 2005/06/12 07:18:14 darrenr Exp $";
 #endif
 
+void fr_authderef __P((frauthent_t **));
+int fr_authgeniter __P((ipftoken_t *, ipfgeniter_t *, ipf_stack_t *));
 
-#if SOLARIS
-extern kcondvar_t ipfauthwait;
-#endif /* SOLARIS */
-#if defined(linux) && defined(_KERNEL)
-wait_queue_head_t     fr_authnext_linux;
-#endif
 
-int	fr_authsize = FR_NUMAUTH;
-int	fr_authused = 0;
-int	fr_defaultauthage = 600;
-int	fr_auth_lock = 0;
-int	fr_auth_init = 0;
-fr_authstat_t	fr_authstats;
-static frauth_t *fr_auth = NULL;
-mb_t	**fr_authpkts = NULL;
-int	fr_authstart = 0, fr_authend = 0, fr_authnext = 0;
-frauthent_t	*fae_list = NULL;
-frentry_t	*ipauth = NULL,
-		*fr_authlist = NULL;
-
-#if SOLARIS2 >= 10
-extern net_data_t ipf_ipv4;
-extern net_data_t ipf_ipv6;
-#endif
-
-int fr_authinit()
+int fr_authinit(ifs)
+ipf_stack_t *ifs;
 {
-	KMALLOCS(fr_auth, frauth_t *, fr_authsize * sizeof(*fr_auth));
-	if (fr_auth != NULL)
-		bzero((char *)fr_auth, fr_authsize * sizeof(*fr_auth));
+	ifs->ifs_fr_authsize = FR_NUMAUTH;
+	ifs->ifs_fr_defaultauthage = 600;
+
+	KMALLOCS(ifs->ifs_fr_auth, frauth_t *,
+		 ifs->ifs_fr_authsize * sizeof(*ifs->ifs_fr_auth));
+	if (ifs->ifs_fr_auth != NULL)
+		bzero((char *)ifs->ifs_fr_auth,
+		      ifs->ifs_fr_authsize * sizeof(*ifs->ifs_fr_auth));
 	else
 		return -1;
 
-	KMALLOCS(fr_authpkts, mb_t **, fr_authsize * sizeof(*fr_authpkts));
-	if (fr_authpkts != NULL)
-		bzero((char *)fr_authpkts, fr_authsize * sizeof(*fr_authpkts));
+	KMALLOCS(ifs->ifs_fr_authpkts, mb_t **,
+		 ifs->ifs_fr_authsize * sizeof(*ifs->ifs_fr_authpkts));
+	if (ifs->ifs_fr_authpkts != NULL)
+		bzero((char *)ifs->ifs_fr_authpkts,
+		      ifs->ifs_fr_authsize * sizeof(*ifs->ifs_fr_authpkts));
 	else
 		return -2;
 
-	MUTEX_INIT(&ipf_authmx, "ipf auth log mutex");
-	RWLOCK_INIT(&ipf_auth, "ipf IP User-Auth rwlock");
+	MUTEX_INIT(&ifs->ifs_ipf_authmx, "ipf auth log mutex");
+	RWLOCK_INIT(&ifs->ifs_ipf_auth, "ipf IP User-Auth rwlock");
 #if SOLARIS && defined(_KERNEL)
-	cv_init(&ipfauthwait, "ipf auth condvar", CV_DRIVER, NULL);
+	cv_init(&ifs->ifs_ipfauthwait, "ipf auth condvar", CV_DRIVER, NULL);
 #endif
 #if defined(linux) && defined(_KERNEL)
 	init_waitqueue_head(&fr_authnext_linux);
 #endif
 
-	fr_auth_init = 1;
+	ifs->ifs_fr_auth_init = 1;
 
 	return 0;
 }
@@ -199,21 +189,22 @@ u_32_t *passp;
 	u_short id;
 	ip_t *ip;
 	int i;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (fr_auth_lock || !fr_authused)
+	if (ifs->ifs_fr_auth_lock || !ifs->ifs_fr_authused)
 		return NULL;
 
 	ip = fin->fin_ip;
 	id = ip->ip_id;
 
-	READ_ENTER(&ipf_auth);
-	for (i = fr_authstart; i != fr_authend; ) {
+	READ_ENTER(&ifs->ifs_ipf_auth);
+	for (i = ifs->ifs_fr_authstart; i != ifs->ifs_fr_authend; ) {
 		/*
 		 * index becomes -2 only after an SIOCAUTHW.  Check this in
 		 * case the same packet gets sent again and it hasn't yet been
 		 * auth'd.
 		 */
-		fra = fr_auth + i;
+		fra = ifs->ifs_fr_auth + i;
 		if ((fra->fra_index == -2) && (id == fra->fra_info.fin_id) &&
 		    !bcmp((char *)fin, (char *)&fra->fra_info, FI_CSIZE)) {
 			/*
@@ -244,45 +235,46 @@ u_32_t *passp;
 			} else
 				fr = fra->fra_info.fin_fr;
 			fin->fin_fr = fr;
-			RWLOCK_EXIT(&ipf_auth);
-			WRITE_ENTER(&ipf_auth);
+			RWLOCK_EXIT(&ifs->ifs_ipf_auth);
+			WRITE_ENTER(&ifs->ifs_ipf_auth);
 			if ((fr != NULL) && (fr != fra->fra_info.fin_fr)) {
-				fr->fr_next = fr_authlist;
-				fr_authlist = fr;
+				fr->fr_next = ifs->ifs_fr_authlist;
+				ifs->ifs_fr_authlist = fr;
 			}
-			fr_authstats.fas_hits++;
+			ifs->ifs_fr_authstats.fas_hits++;
 			fra->fra_index = -1;
-			fr_authused--;
-			if (i == fr_authstart) {
+			ifs->ifs_fr_authused--;
+			if (i == ifs->ifs_fr_authstart) {
 				while (fra->fra_index == -1) {
 					i++;
 					fra++;
-					if (i == fr_authsize) {
+					if (i == ifs->ifs_fr_authsize) {
 						i = 0;
-						fra = fr_auth;
+						fra = ifs->ifs_fr_auth;
 					}
-					fr_authstart = i;
-					if (i == fr_authend)
+					ifs->ifs_fr_authstart = i;
+					if (i == ifs->ifs_fr_authend)
 						break;
 				}
-				if (fr_authstart == fr_authend) {
-					fr_authnext = 0;
-					fr_authstart = fr_authend = 0;
+				if (ifs->ifs_fr_authstart == ifs->ifs_fr_authend) {
+					ifs->ifs_fr_authnext = 0;
+					ifs->ifs_fr_authstart = 0;
+					ifs->ifs_fr_authend = 0;
 				}
 			}
-			RWLOCK_EXIT(&ipf_auth);
+			RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 			if (passp != NULL)
 				*passp = pass;
-			ATOMIC_INC64(fr_authstats.fas_hits);
+			ATOMIC_INC64(ifs->ifs_fr_authstats.fas_hits);
 			return fr;
 		}
 		i++;
-		if (i == fr_authsize)
+		if (i == ifs->ifs_fr_authsize)
 			i = 0;
 	}
-	fr_authstats.fas_miss++;
-	RWLOCK_EXIT(&ipf_auth);
-	ATOMIC_INC64(fr_authstats.fas_miss);
+	ifs->ifs_fr_authstats.fas_miss++;
+	RWLOCK_EXIT(&ifs->ifs_ipf_auth);
+	ATOMIC_INC64(ifs->ifs_fr_authstats.fas_miss);
 	return NULL;
 }
 
@@ -304,34 +296,35 @@ fr_info_t *fin;
 	ip_t *ip;
 #endif
 	int i;
+	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (fr_auth_lock)
+	if (ifs->ifs_fr_auth_lock)
 		return 0;
 
-	WRITE_ENTER(&ipf_auth);
-	if (fr_authstart > fr_authend) {
-		fr_authstats.fas_nospace++;
-		RWLOCK_EXIT(&ipf_auth);
+	WRITE_ENTER(&ifs->ifs_ipf_auth);
+	if (ifs->ifs_fr_authstart > ifs->ifs_fr_authend) {
+		ifs->ifs_fr_authstats.fas_nospace++;
+		RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 		return 0;
 	} else {
-		if (fr_authused == fr_authsize) {
-			fr_authstats.fas_nospace++;
-			RWLOCK_EXIT(&ipf_auth);
+		if (ifs->ifs_fr_authused == ifs->ifs_fr_authsize) {
+			ifs->ifs_fr_authstats.fas_nospace++;
+			RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 			return 0;
 		}
 	}
 
-	fr_authstats.fas_added++;
-	fr_authused++;
-	i = fr_authend++;
-	if (fr_authend == fr_authsize)
-		fr_authend = 0;
-	RWLOCK_EXIT(&ipf_auth);
+	ifs->ifs_fr_authstats.fas_added++;
+	ifs->ifs_fr_authused++;
+	i = ifs->ifs_fr_authend++;
+	if (ifs->ifs_fr_authend == ifs->ifs_fr_authsize)
+		ifs->ifs_fr_authend = 0;
+	RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 
-	fra = fr_auth + i;
+	fra = ifs->ifs_fr_auth + i;
 	fra->fra_index = i;
 	fra->fra_pass = 0;
-	fra->fra_age = fr_defaultauthage;
+	fra->fra_age = ifs->ifs_fr_defaultauthage;
 	bcopy((char *)fin, (char *)&fra->fra_info, sizeof(*fin));
 #if !defined(sparc) && !defined(m68k)
 	/*
@@ -353,8 +346,8 @@ fr_info_t *fin;
 #endif
 #if SOLARIS && defined(_KERNEL)
 	m->b_rptr -= qpi->qpi_off;
-	fr_authpkts[i] = *(mblk_t **)fin->fin_mp;
-	cv_signal(&ipfauthwait);
+	ifs->ifs_fr_authpkts[i] = *(mblk_t **)fin->fin_mp;
+	cv_signal(&ifs->ifs_ipfauthwait);
 #else
 # if defined(BSD) && !defined(sparc) && (BSD >= 199306)
 	if (!fin->fin_out) {
@@ -362,17 +355,19 @@ fr_info_t *fin;
 		ip->ip_off = htons(ip->ip_off);
 	}
 # endif
-	fr_authpkts[i] = m;
-	WAKEUP(&fr_authnext,0);
+	ifs->ifs_fr_authpkts[i] = m;
+	WAKEUP(&ifs->ifs_fr_authnext, 0);
 #endif
 	return 1;
 }
 
 
-int fr_auth_ioctl(data, cmd, mode)
+int fr_auth_ioctl(data, cmd, mode, uid, ctx, ifs)
 caddr_t data;
 ioctlcmd_t cmd;
-int mode;
+int mode,uid;
+void *ctx;
+ipf_stack_t *ifs;
 {
 	mb_t *m;
 #if defined(_KERNEL) && !defined(MENTAT) && !defined(linux) && \
@@ -389,24 +384,44 @@ int mode;
 
 	switch (cmd)
 	{
+	case SIOCGENITER :
+	    {
+		ipftoken_t *token;
+		ipfgeniter_t iter;
+
+		error = fr_inobj(data, &iter, IPFOBJ_GENITER);
+		if (error != 0)
+			break;
+
+		token = ipf_findtoken(IPFGENITER_AUTH, uid, ctx, ifs);
+		if (token != NULL)
+			error = fr_authgeniter(token, &iter, ifs);
+		else
+			error = ESRCH;
+		RWLOCK_EXIT(&ifs->ifs_ipf_tokens);
+
+		break;
+	    }
+
 	case SIOCSTLCK :
 		if (!(mode & FWRITE)) {
 			error = EPERM;
 			break;
 		}
-		fr_lock(data, &fr_auth_lock);
+		fr_lock(data, &ifs->ifs_fr_auth_lock);
 		break;
 
 	case SIOCATHST:
-		fr_authstats.fas_faelist = fae_list;
-		error = fr_outobj(data, &fr_authstats, IPFOBJ_AUTHSTAT);
+		ifs->ifs_fr_authstats.fas_faelist = ifs->ifs_fae_list;
+		error = fr_outobj(data, &ifs->ifs_fr_authstats,
+		    IPFOBJ_AUTHSTAT);
 		break;
 
 	case SIOCIPFFL:
 		SPL_NET(s);
-		WRITE_ENTER(&ipf_auth);
-		i = fr_authflush();
-		RWLOCK_EXIT(&ipf_auth);
+		WRITE_ENTER(&ifs->ifs_ipf_auth);
+		i = fr_authflush(ifs);
+		RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 		SPL_X(s);
 		error = copyoutptr((char *)&i, data, sizeof(i));
 		break;
@@ -414,16 +429,18 @@ int mode;
 	case SIOCAUTHW:
 fr_authioctlloop:
 		error = fr_inobj(data, au, IPFOBJ_FRAUTH);
-		READ_ENTER(&ipf_auth);
-		if ((fr_authnext != fr_authend) && fr_authpkts[fr_authnext]) {
-			error = fr_outobj(data, &fr_auth[fr_authnext],
+		READ_ENTER(&ifs->ifs_ipf_auth);
+		if ((ifs->ifs_fr_authnext != ifs->ifs_fr_authend) &&
+		    ifs->ifs_fr_authpkts[ifs->ifs_fr_authnext]) {
+			error = fr_outobj(data,
+					  &ifs->ifs_fr_auth[ifs->ifs_fr_authnext],
 					  IPFOBJ_FRAUTH);
 			if (auth.fra_len != 0 && auth.fra_buf != NULL) {
 				/*
 				 * Copy packet contents out to user space if
 				 * requested.  Bail on an error.
 				 */
-				m = fr_authpkts[fr_authnext];
+				m = ifs->ifs_fr_authpkts[ifs->ifs_fr_authnext];
 				len = MSGDSIZE(m);
 				if (len > auth.fra_len)
 					len = auth.fra_len;
@@ -438,19 +455,19 @@ fr_authioctlloop:
 						break;
 				}
 			}
-			RWLOCK_EXIT(&ipf_auth);
+			RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 			if (error != 0)
 				break;
 			SPL_NET(s);
-			WRITE_ENTER(&ipf_auth);
-			fr_authnext++;
-			if (fr_authnext == fr_authsize)
-				fr_authnext = 0;
-			RWLOCK_EXIT(&ipf_auth);
+			WRITE_ENTER(&ifs->ifs_ipf_auth);
+			ifs->ifs_fr_authnext++;
+			if (ifs->ifs_fr_authnext == ifs->ifs_fr_authsize)
+				ifs->ifs_fr_authnext = 0;
+			RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 			SPL_X(s);
 			return 0;
 		}
-		RWLOCK_EXIT(&ipf_auth);
+		RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 		/*
 		 * We exit ipf_global here because a program that enters in
 		 * here will have a lock on it and goto sleep having this lock.
@@ -459,37 +476,38 @@ fr_authioctlloop:
 		 * caller of this function expects it to be held when we
 		 * return so we have to reacquire it in here.
 		 */
-		RWLOCK_EXIT(&ipf_global);
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 
-		MUTEX_ENTER(&ipf_authmx);
+		MUTEX_ENTER(&ifs->ifs_ipf_authmx);
 #ifdef	_KERNEL
 # if	SOLARIS
 		error = 0;
-		if (!cv_wait_sig(&ipfauthwait, &ipf_authmx.ipf_lk))
+		if (!cv_wait_sig(&ifs->ifs_ipfauthwait, &ifs->ifs_ipf_authmx.ipf_lk))
 			error = EINTR;
 # else /* SOLARIS */
 #  ifdef __hpux
 		{
 		lock_t *l;
 
-		l = get_sleep_lock(&fr_authnext);
-		error = sleep(&fr_authnext, PZERO+1);
+		l = get_sleep_lock(&ifs->ifs_fr_authnext);
+		error = sleep(&ifs->ifs_fr_authnext, PZERO+1);
 		spinunlock(l);
 		}
 #  else
 #   ifdef __osf__
-		error = mpsleep(&fr_authnext, PSUSP|PCATCH, "fr_authnext", 0,
-				&ipf_authmx, MS_LOCK_SIMPLE);
+		error = mpsleep(&ifs->ifs_fr_authnext, PSUSP|PCATCH,
+				"fr_authnext", 0,
+				&ifs->ifs_ipf_authmx, MS_LOCK_SIMPLE);
 #   else
-		error = SLEEP(&fr_authnext, "fr_authnext");
+		error = SLEEP(&ifs->ifs_fr_authnext, "fr_authnext");
 #   endif /* __osf__ */
 #  endif /* __hpux */
 # endif /* SOLARIS */
 #endif
-		MUTEX_EXIT(&ipf_authmx);
-		READ_ENTER(&ipf_global);
+		MUTEX_EXIT(&ifs->ifs_ipf_authmx);
+		READ_ENTER(&ifs->ifs_ipf_global);
 		if (error == 0) {
-			READ_ENTER(&ipf_auth);
+			READ_ENTER(&ifs->ifs_ipf_auth);
 			goto fr_authioctlloop;
 		}
 		break;
@@ -499,26 +517,25 @@ fr_authioctlloop:
 		if (error != 0)
 			return error;
 		SPL_NET(s);
-		WRITE_ENTER(&ipf_auth);
+		WRITE_ENTER(&ifs->ifs_ipf_auth);
 		i = au->fra_index;
-		fra = fr_auth + i;
-		if ((i < 0) || (i >= fr_authsize) ||
+		fra = ifs->ifs_fr_auth + i;
+		if ((i < 0) || (i >= ifs->ifs_fr_authsize) ||
 		    (fra->fra_info.fin_id != au->fra_info.fin_id)) {
-			RWLOCK_EXIT(&ipf_auth);
+			RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 			SPL_X(s);
 			return ESRCH;
 		}
-		m = fr_authpkts[i];
+		m = ifs->ifs_fr_authpkts[i];
 		fra->fra_index = -2;
 		fra->fra_pass = au->fra_pass;
-		fr_authpkts[i] = NULL;
-		RWLOCK_EXIT(&ipf_auth);
-
+		ifs->ifs_fr_authpkts[i] = NULL;
+		RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 #ifdef	_KERNEL
 		if (fra->fra_info.fin_v == 4) { 
-			net_data_p = ipf_ipv4;
+			net_data_p = ifs->ifs_ipf_ipv4;
 		} else if (fra->fra_info.fin_v == 6) { 
-			net_data_p = ipf_ipv6;
+			net_data_p = ifs->ifs_ipf_ipv6;
 		} else { 
 			return (-1); 
 		}
@@ -537,9 +554,9 @@ fr_authioctlloop:
 			ret = net_inject(net_data_p, NI_QUEUE_OUT, &inj_data);
 
 			if (ret < 0)
-				fr_authstats.fas_sendfail++;
+				ifs->ifs_fr_authstats.fas_sendfail++;
 			else
-				fr_authstats.fas_sendok++;
+				ifs->ifs_fr_authstats.fas_sendok++;
 # else /* MENTAT */
 #  if defined(linux) || defined(AIX)
 #  else
@@ -552,9 +569,9 @@ fr_authioctlloop:
 			error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL);
 #   endif
 			if (error != 0)
-				fr_authstats.fas_sendfail++;
+				ifs->ifs_fr_authstats.fas_sendfail++;
 			else
-				fr_authstats.fas_sendok++;
+				ifs->ifs_fr_authstats.fas_sendok++;
 #  endif /* Linux */
 # endif /* MENTAT */
 		} else if (m) {
@@ -586,9 +603,9 @@ fr_authioctlloop:
 #  endif /* Linux */
 # endif /* MENTAT */
 			if (error != 0)
-				fr_authstats.fas_quefail++;
+				ifs->ifs_fr_authstats.fas_quefail++;
 			else
-				fr_authstats.fas_queok++;
+				ifs->ifs_fr_authstats.fas_queok++;
 		} else
 			error = EINVAL;
 # ifdef MENTAT
@@ -600,21 +617,22 @@ fr_authioctlloop:
 		 * not being processed, make sure we advance to the next one.
 		 */
 		if (error == ENOBUFS) {
-			fr_authused--;
+			ifs->ifs_fr_authused--;
 			fra->fra_index = -1;
 			fra->fra_pass = 0;
-			if (i == fr_authstart) {
+			if (i == ifs->ifs_fr_authstart) {
 				while (fra->fra_index == -1) {
 					i++;
-					if (i == fr_authsize)
+					if (i == ifs->ifs_fr_authsize)
 						i = 0;
-					fr_authstart = i;
-					if (i == fr_authend)
+					ifs->ifs_fr_authstart = i;
+					if (i == ifs->ifs_fr_authend)
 						break;
 				}
-				if (fr_authstart == fr_authend) {
-					fr_authnext = 0;
-					fr_authstart = fr_authend = 0;
+				if (ifs->ifs_fr_authstart == ifs->ifs_fr_authend) {
+					ifs->ifs_fr_authnext = 0;
+					ifs->ifs_fr_authstart = 0;
+					ifs->ifs_fr_authend = 0;
 				}
 			}
 		}
@@ -634,39 +652,42 @@ fr_authioctlloop:
 /*
  * Free all network buffer memory used to keep saved packets.
  */
-void fr_authunload()
+void fr_authunload(ifs)
+ipf_stack_t *ifs;
 {
 	register int i;
 	register frauthent_t *fae, **faep;
 	frentry_t *fr, **frp;
 	mb_t *m;
 
-	if (fr_auth != NULL) {
-		KFREES(fr_auth, fr_authsize * sizeof(*fr_auth));
-		fr_auth = NULL;
+	if (ifs->ifs_fr_auth != NULL) {
+		KFREES(ifs->ifs_fr_auth,
+		       ifs->ifs_fr_authsize * sizeof(*ifs->ifs_fr_auth));
+		ifs->ifs_fr_auth = NULL;
 	}
 
-	if (fr_authpkts != NULL) {
-		for (i = 0; i < fr_authsize; i++) {
-			m = fr_authpkts[i];
+	if (ifs->ifs_fr_authpkts != NULL) {
+		for (i = 0; i < ifs->ifs_fr_authsize; i++) {
+			m = ifs->ifs_fr_authpkts[i];
 			if (m != NULL) {
 				FREE_MB_T(m);
-				fr_authpkts[i] = NULL;
+				ifs->ifs_fr_authpkts[i] = NULL;
 			}
 		}
-		KFREES(fr_authpkts, fr_authsize * sizeof(*fr_authpkts));
-		fr_authpkts = NULL;
+		KFREES(ifs->ifs_fr_authpkts,
+		       ifs->ifs_fr_authsize * sizeof(*ifs->ifs_fr_authpkts));
+		ifs->ifs_fr_authpkts = NULL;
 	}
 
-	faep = &fae_list;
+	faep = &ifs->ifs_fae_list;
 	while ((fae = *faep) != NULL) {
 		*faep = fae->fae_next;
 		KFREE(fae);
 	}
-	ipauth = NULL;
+	ifs->ifs_ipauth = NULL;
 
-	if (fr_authlist != NULL) {
-		for (frp = &fr_authlist; ((fr = *frp) != NULL); ) {
+	if (ifs->ifs_fr_authlist != NULL) {
+		for (frp = &ifs->ifs_fr_authlist; ((fr = *frp) != NULL); ) {
 			if (fr->fr_ref == 1) {
 				*frp = fr->fr_next;
 				KFREE(fr);
@@ -675,14 +696,14 @@ void fr_authunload()
 		}
 	}
 
-	if (fr_auth_init == 1) {
+	if (ifs->ifs_fr_auth_init == 1) {
 # if SOLARIS && defined(_KERNEL)
-		cv_destroy(&ipfauthwait);
+		cv_destroy(&ifs->ifs_ipfauthwait);
 # endif
-		MUTEX_DESTROY(&ipf_authmx);
-		RW_DESTROY(&ipf_auth);
+		MUTEX_DESTROY(&ifs->ifs_ipf_authmx);
+		RW_DESTROY(&ifs->ifs_ipf_auth);
 
-		fr_auth_init = 0;
+		ifs->ifs_fr_auth_init = 0;
 	}
 }
 
@@ -691,7 +712,8 @@ void fr_authunload()
  * Slowly expire held auth records.  Timeouts are set
  * in expectation of this being called twice per second.
  */
-void fr_authexpire()
+void fr_authexpire(ifs)
+ipf_stack_t *ifs;
 {
 	register int i;
 	register frauth_t *fra;
@@ -700,50 +722,51 @@ void fr_authexpire()
 	mb_t *m;
 	SPL_INT(s);
 
-	if (fr_auth_lock)
+	if (ifs->ifs_fr_auth_lock)
 		return;
 
 	SPL_NET(s);
-	WRITE_ENTER(&ipf_auth);
-	for (i = 0, fra = fr_auth; i < fr_authsize; i++, fra++) {
+	WRITE_ENTER(&ifs->ifs_ipf_auth);
+	for (i = 0, fra = ifs->ifs_fr_auth; i < ifs->ifs_fr_authsize; i++, fra++) {
 		fra->fra_age--;
-		if ((fra->fra_age == 0) && (m = fr_authpkts[i])) {
+		if ((fra->fra_age == 0) && (m = ifs->ifs_fr_authpkts[i])) {
 			FREE_MB_T(m);
-			fr_authpkts[i] = NULL;
-			fr_auth[i].fra_index = -1;
-			fr_authstats.fas_expire++;
-			fr_authused--;
+			ifs->ifs_fr_authpkts[i] = NULL;
+			ifs->ifs_fr_auth[i].fra_index = -1;
+			ifs->ifs_fr_authstats.fas_expire++;
+			ifs->ifs_fr_authused--;
 		}
 	}
 
-	for (faep = &fae_list; ((fae = *faep) != NULL); ) {
+	for (faep = &ifs->ifs_fae_list; ((fae = *faep) != NULL); ) {
 		fae->fae_age--;
 		if (fae->fae_age == 0) {
 			*faep = fae->fae_next;
 			KFREE(fae);
-			fr_authstats.fas_expire++;
+			ifs->ifs_fr_authstats.fas_expire++;
 		} else
 			faep = &fae->fae_next;
 	}
-	if (fae_list != NULL)
-		ipauth = &fae_list->fae_fr;
+	if (ifs->ifs_fae_list != NULL)
+		ifs->ifs_ipauth = &ifs->ifs_fae_list->fae_fr;
 	else
-		ipauth = NULL;
+		ifs->ifs_ipauth = NULL;
 
-	for (frp = &fr_authlist; ((fr = *frp) != NULL); ) {
+	for (frp = &ifs->ifs_fr_authlist; ((fr = *frp) != NULL); ) {
 		if (fr->fr_ref == 1) {
 			*frp = fr->fr_next;
 			KFREE(fr);
 		} else
 			frp = &fr->fr_next;
 	}
-	RWLOCK_EXIT(&ipf_auth);
+	RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 	SPL_X(s);
 }
 
-int fr_preauthcmd(cmd, fr, frptr)
+int fr_preauthcmd(cmd, fr, frptr, ifs)
 ioctlcmd_t cmd;
 frentry_t *fr, **frptr;
+ipf_stack_t *ifs;
 {
 	frauthent_t *fae, **faep;
 	int error = 0;
@@ -752,7 +775,7 @@ frentry_t *fr, **frptr;
 	if ((cmd != SIOCADAFR) && (cmd != SIOCRMAFR))
 		return EIO;
 	
-	for (faep = &fae_list; ((fae = *faep) != NULL); ) {
+	for (faep = &ifs->ifs_fae_list; ((fae = *faep) != NULL); ) {
 		if (&fae->fae_fr == fr)
 			break;
 		else
@@ -766,11 +789,12 @@ frentry_t *fr, **frptr;
 			error = ESRCH;
 		else {
 			SPL_NET(s);
-			WRITE_ENTER(&ipf_auth);
+			WRITE_ENTER(&ifs->ifs_ipf_auth);
 			*faep = fae->fae_next;
-			if (ipauth == &fae->fae_fr)
-				ipauth = fae_list ? &fae_list->fae_fr : NULL;
-			RWLOCK_EXIT(&ipf_auth);
+			if (ifs->ifs_ipauth == &fae->fae_fr)
+				ifs->ifs_ipauth = ifs->ifs_fae_list ?
+				    &ifs->ifs_fae_list->fae_fr : NULL;
+			RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 			SPL_X(s);
 
 			KFREE(fae);
@@ -781,15 +805,16 @@ frentry_t *fr, **frptr;
 			bcopy((char *)fr, (char *)&fae->fae_fr,
 			      sizeof(*fr));
 			SPL_NET(s);
-			WRITE_ENTER(&ipf_auth);
-			fae->fae_age = fr_defaultauthage;
+			WRITE_ENTER(&ifs->ifs_ipf_auth);
+			fae->fae_age = ifs->ifs_fr_defaultauthage;
 			fae->fae_fr.fr_hits = 0;
 			fae->fae_fr.fr_next = *frptr;
+			fae->fae_ref = 1;
 			*frptr = &fae->fae_fr;
 			fae->fae_next = *faep;
 			*faep = fae;
-			ipauth = &fae_list->fae_fr;
-			RWLOCK_EXIT(&ipf_auth);
+			ifs->ifs_ipauth = &ifs->ifs_fae_list->fae_fr;
+			RWLOCK_EXIT(&ifs->ifs_ipf_auth);
 			SPL_X(s);
 		} else
 			error = ENOMEM;
@@ -804,32 +829,112 @@ frentry_t *fr, **frptr;
  * Must already be properly SPL'ed and Locked on &ipf_auth.
  *
  */
-int fr_authflush()
+int fr_authflush(ifs)
+ipf_stack_t *ifs;
 {
 	register int i, num_flushed;
 	mb_t *m;
 
-	if (fr_auth_lock)
+	if (ifs->ifs_fr_auth_lock)
 		return -1;
 
 	num_flushed = 0;
 
-	for (i = 0 ; i < fr_authsize; i++) {
-		m = fr_authpkts[i];
+	for (i = 0 ; i < ifs->ifs_fr_authsize; i++) {
+		m = ifs->ifs_fr_authpkts[i];
 		if (m != NULL) {
 			FREE_MB_T(m);
-			fr_authpkts[i] = NULL;
-			fr_auth[i].fra_index = -1;
+			ifs->ifs_fr_authpkts[i] = NULL;
+			ifs->ifs_fr_auth[i].fra_index = -1;
 			/* perhaps add & use a flush counter inst.*/
-			fr_authstats.fas_expire++;
-			fr_authused--;
+			ifs->ifs_fr_authstats.fas_expire++;
+			ifs->ifs_fr_authused--;
 			num_flushed++;
 		}
 	}
 
-	fr_authstart = 0;
-	fr_authend = 0;
-	fr_authnext = 0;
+	ifs->ifs_fr_authstart = 0;
+	ifs->ifs_fr_authend = 0;
+	ifs->ifs_fr_authnext = 0;
 
 	return num_flushed;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_authgeniter                                              */
+/* Returns:     int - 0 == success, else error                              */
+/* Parameters:  token(I) - pointer to ipftoken structure                    */
+/*              itp(I)   - pointer to ipfgeniter structure                  */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+int fr_authgeniter(token, itp, ifs)
+ipftoken_t *token;
+ipfgeniter_t *itp;
+ipf_stack_t *ifs;
+{
+	frauthent_t *fae, *next, zero;
+	int error;
+
+	if (itp->igi_data == NULL)
+		return EFAULT;
+
+	if (itp->igi_type != IPFGENITER_AUTH)
+		return EINVAL;
+
+	fae = token->ipt_data;
+	READ_ENTER(&ifs->ifs_ipf_auth);
+	if (fae == NULL) {
+		next = ifs->ifs_fae_list;
+	} else {
+		next = fae->fae_next;
+	}
+
+	if (next != NULL) {
+		/*
+		 * If we find an auth entry to use, bump its reference count
+		 * so that it can be used for is_next when we come back.
+		 */
+		ATOMIC_INC(next->fae_ref);
+		if (next->fae_next == NULL)
+			ipf_freetoken(token, ifs);
+	} else {
+		bzero(&zero, sizeof(zero));
+		next = &zero;
+	}
+	RWLOCK_EXIT(&ifs->ifs_ipf_auth);
+
+	/*
+	 * If we had a prior pointer to an auth entry, release it.
+	 */
+	if (fae != NULL) {
+		WRITE_ENTER(&ifs->ifs_ipf_auth);
+		fr_authderef(&fae);
+		RWLOCK_EXIT(&ifs->ifs_ipf_auth);
+	}
+	token->ipt_data = next;
+
+	/*
+	 * This should arguably be via fr_outobj() so that the auth
+	 * structure can (if required) be massaged going out.
+	 */
+	error = COPYOUT(next, itp->igi_data, sizeof(*next));
+	if (error != 0)
+		error = EFAULT;
+
+	return error;
+}
+
+
+void fr_authderef(faep)
+frauthent_t **faep;
+{
+	frauthent_t *fae;
+
+	fae = *faep;
+	*faep = NULL;
+
+	fae->fae_ref--;
+	if (fae->fae_ref == 0) {
+		KFREE(fae);
+	}
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,7 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	conn_t			*aconnp;
 	conn_t			*lconnp;
 	cred_t			*cr;
+	sctp_stack_t	*sctps = listener->sctp_sctps;
 
 	sctph = (sctp_hdr_t *)(cr_pkt->b_rptr + ip_hdr_len);
 	ASSERT(OK_32PTR(sctph));
@@ -96,7 +97,7 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 		return (err);
 
 	if ((sctp_options & SCTP_PRSCTP_OPTION) &&
-	    listener->sctp_prsctp_aware && sctp_prsctp_enabled) {
+	    listener->sctp_prsctp_aware && sctps->sctps_prsctp_enabled) {
 		acceptor->sctp_prsctp_aware = B_TRUE;
 	} else {
 		acceptor->sctp_prsctp_aware = B_FALSE;
@@ -130,9 +131,9 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	 */
 	RUN_SCTP(acceptor);
 
-	sctp_conn_hash_insert(&sctp_conn_fanout[
-	    SCTP_CONN_HASH(acceptor->sctp_ports)], acceptor, 0);
-	sctp_bind_hash_insert(&sctp_bind_fanout[
+	sctp_conn_hash_insert(&sctps->sctps_conn_fanout[
+	    SCTP_CONN_HASH(sctps, acceptor->sctp_ports)], acceptor, 0);
+	sctp_bind_hash_insert(&sctps->sctps_bind_fanout[
 	    SCTP_BIND_HASH(ntohs(acceptor->sctp_lport))], acceptor, 0);
 
 	/*
@@ -166,6 +167,7 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	ip6_t	*ip6h;
 	int	err;
 	conn_t	*connp, *econnp;
+	sctp_stack_t	*sctps;
 
 	/*
 	 * No need to check for duplicate as this is the listener
@@ -202,6 +204,7 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	}
 
 	connp = sctp->sctp_connp;
+	sctps = sctp->sctp_sctps;
 	econnp = eager->sctp_connp;
 
 	if (connp->conn_policy != NULL) {
@@ -216,7 +219,7 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 		ipsec_mp->b_datap->db_type = IPSEC_POLICY_SET;
 		if (!ip_bind_ipsec_policy_set(econnp, ipsec_mp)) {
 			sctp_close_eager(eager);
-			BUMP_MIB(&sctp_mib, sctpListenDrop);
+			BUMP_MIB(&sctps->sctps_mib, sctpListenDrop);
 			return (NULL);
 		}
 	}
@@ -242,14 +245,14 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	}
 	if (ipsec_conn_cache_policy(econnp, ipvers == IPV4_VERSION) != 0) {
 		sctp_close_eager(eager);
-		BUMP_MIB(&sctp_mib, sctpListenDrop);
+		BUMP_MIB(&sctps->sctps_mib, sctpListenDrop);
 		return (NULL);
 	}
 
 	err = sctp_accept_comm(sctp, eager, mp, ip_hdr_len, iack);
 	if (err) {
 		sctp_close_eager(eager);
-		BUMP_MIB(&sctp_mib, sctpListenDrop);
+		BUMP_MIB(&sctps->sctps_mib, sctpListenDrop);
 		return (NULL);
 	}
 
@@ -273,8 +276,8 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 			if (flist != NULL)
 				kmem_free(flist, fsize);
 			sctp_close_eager(eager);
-			BUMP_MIB(&sctp_mib, sctpListenDrop);
-			SCTP_KSTAT(sctp_cl_connect);
+			BUMP_MIB(&sctps->sctps_mib, sctpListenDrop);
+			SCTP_KSTAT(sctps, sctp_cl_connect);
 			return (NULL);
 		}
 		/* The clustering module frees these list */
@@ -290,18 +293,18 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	if ((eager->sctp_ulpd = sctp->sctp_ulp_newconn(sctp->sctp_ulpd,
 	    eager)) == NULL) {
 		sctp_close_eager(eager);
-		BUMP_MIB(&sctp_mib, sctpListenDrop);
+		BUMP_MIB(&sctps->sctps_mib, sctpListenDrop);
 		return (NULL);
 	}
 	ASSERT(SCTP_IS_DETACHED(eager));
 	eager->sctp_detached = B_FALSE;
 	if (eager->sctp_family == AF_INET) {
 		eager->sctp_ulp_prop(eager->sctp_ulpd,
-		    sctp_wroff_xtra + sizeof (sctp_data_hdr_t) +
+		    sctps->sctps_wroff_xtra + sizeof (sctp_data_hdr_t) +
 		    sctp->sctp_hdr_len, strmsgsz);
 	} else {
 		eager->sctp_ulp_prop(eager->sctp_ulpd,
-		    sctp_wroff_xtra + sizeof (sctp_data_hdr_t) +
+		    sctps->sctps_wroff_xtra + sizeof (sctp_data_hdr_t) +
 		    sctp->sctp_hdr6_len, strmsgsz);
 	}
 	return (eager);
@@ -328,6 +331,7 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 	ip6_rthdr_t	*rth;
 	int		err;
 	sctp_faddr_t	*cur_fp;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	/*
 	 * Determine packet type based on type of address passed in
@@ -462,7 +466,8 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		 * Ensure that the duplicate check and insertion is atomic.
 		 */
 		sctp_conn_hash_remove(sctp);
-		tbf = &sctp_conn_fanout[SCTP_CONN_HASH(sctp->sctp_ports)];
+		tbf = &sctps->sctps_conn_fanout[SCTP_CONN_HASH(sctps,
+						    sctp->sctp_ports)];
 		mutex_enter(&tbf->tf_lock);
 		lsctp = sctp_lookup(sctp, &dstaddr, tbf, &sctp->sctp_ports,
 		    SCTPS_COOKIE_WAIT);
@@ -509,8 +514,10 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		 */
 		rth = ip_find_rthdr_v6(sctp->sctp_ip6h,
 		    (uint8_t *)sctp->sctp_sctph6);
-		if (rth != NULL)
-			(void) ip_massage_options_v6(sctp->sctp_ip6h, rth);
+		if (rth != NULL) {
+			(void) ip_massage_options_v6(sctp->sctp_ip6h, rth,
+			    sctps->sctps_netstack);
+		}
 
 		/*
 		 * Turn off the don't fragment bit on the (only) faddr,
@@ -576,7 +583,8 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		BUMP_LOCAL(sctp->sctp_opkts);
 
 		sctp->sctp_ulp_prop(sctp->sctp_ulpd,
-		    sctp_wroff_xtra + hdrlen + sizeof (sctp_data_hdr_t), 0);
+		    sctps->sctps_wroff_xtra + hdrlen + sizeof (sctp_data_hdr_t),
+		    0);
 
 		return (0);
 	default:

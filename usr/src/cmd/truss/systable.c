@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -797,6 +797,10 @@ static const struct systable zonetable[] = {
 {"zone_boot",	2, DEC, NOV, HID, DEC},				/* 7 */
 {"zone_version", 2, HEX, NOV, HID, DEC},			/* 8 */
 {"zone_setattr", 5, DEC, NOV, HID, DEC, ZGA, HEX, DEC},		/* 9 */
+{"zone_add_datalink", 3, DEC, NOV, HID, DEC, STG},		/* 10 */
+{"zone_remove_datalink", 3, DEC, NOV, HID, DEC, STG},		/* 11 */
+{"zone_check_datalink", 3, DEC, NOV, HID, HEX, STG},		/* 12 */
+{"zone_list_datalink", 4, DEC, NOV, HID, DEC, HEX, HEX},	/* 13 */
 };
 #define	NZONECODE	(sizeof (zonetable) / sizeof (struct systable))
 
@@ -963,6 +967,10 @@ const	struct sysalias sysalias[] = {
 	{ "getzoneid",		SYS_zone	},
 	{ "zone_list",		SYS_zone	},
 	{ "zone_shutdown",	SYS_zone	},
+	{ "zone_add_datalink",	SYS_zone	},
+	{ "zone_remove_datalink", SYS_zone	},
+	{ "zone_check_datalink", SYS_zone	},
+	{ "zone_list_datalink",	SYS_zone	},
 	{ "is_system_labeled",	SYS_labelsys	},
 	{ "tnrh",		SYS_labelsys	},
 	{ "tnrhtp",		SYS_labelsys	},

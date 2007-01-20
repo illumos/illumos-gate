@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,6 +108,12 @@ typedef struct dld_vlan_info {
 	char		dvi_name[IFNAMSIZ];
 } dld_vlan_info_t;
 
+typedef struct dld_hold_vlan {
+	char		dhv_name[IFNAMSIZ];
+	zoneid_t	dhv_zid;
+	boolean_t	dhv_docheck;
+} dld_hold_vlan_t;
+
 /*
  * Secure objects ioctls
  */
@@ -141,6 +147,17 @@ typedef struct dld_ioc_secobj_get {
 typedef struct dld_ioc_secobj_unset {
 	char			su_name[DLD_SECOBJ_NAME_MAX];
 } dld_ioc_secobj_unset_t;
+
+/*
+ * DLDIOCHOLDVLAN/DLDIOCRELEVLAN are added to support a "hold/release"
+ * operation on a VLAN. A hold will cause a VLAN to be created or the
+ * reference count will be increased, release will do the reverse.
+ */
+#define	DLDIOCHOLDVLAN  (DLDIOC | 0x08)
+
+#define	DLDIOCRELEVLAN  (DLDIOC | 0x09)
+
+#define	DLDIOCZIDGET	(DLDIOC | 0x0a)
 
 #ifdef _KERNEL
 int	dld_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);

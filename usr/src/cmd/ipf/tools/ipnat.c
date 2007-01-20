@@ -5,7 +5,7 @@
  *
  * Added redirect stuff and a variety of bug fixes. (mcn@EnGarde.com)
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,11 +83,14 @@ char	thishost[MAXHOSTNAMELEN];
 
 extern	char	*optarg;
 
-void	dostats __P((natstat_t *, int)), flushtable __P((int, int));
+void	dostats __P((int, natstat_t *, int, int));
+void	flushtable __P((int, int));
 void	usage __P((char *));
 int	main __P((int, char*[]));
 void	showhostmap __P((natstat_t *nsp));
 void	natstat_dead __P((natstat_t *, char *));
+void	dostats_live __P((int, natstat_t *, int));
+void	showhostmap_live __P((int, natstat_t *));
 
 int	opts;
 
@@ -183,9 +186,10 @@ char *argv[];
 
 
 	if (!(opts & OPT_DONOTHING) && (kernel == NULL) && (core == NULL)) {
+#ifdef notdef
 		if (openkmem(kernel, core) == -1)
 			exit(1);
-
+#endif
 		if (((fd = open(IPNAT_NAME, mode)) == -1) &&
 		    ((fd = open(IPNAT_NAME, O_RDONLY)) == -1)) {
 			(void) fprintf(stderr, "%s: open: %s\n", IPNAT_NAME,
@@ -210,7 +214,7 @@ char *argv[];
 
 		natstat_dead(nsp, kernel);
 		if (opts & (OPT_LIST|OPT_STAT))
-			dostats(nsp, opts);
+			dostats(fd, nsp, opts, 0);
 		exit(0);
 	}
 
@@ -220,7 +224,7 @@ char *argv[];
 		ipnat_parsefile(fd, ipnat_addrule, ioctl, file);
 	}
 	if (opts & (OPT_LIST|OPT_STAT))
-		dostats(nsp, opts);
+		dostats(fd, nsp, opts, 1);
 	return 0;
 }
 
@@ -283,9 +287,9 @@ char *kernel;
 /*
  * Display NAT statistics.
  */
-void dostats(nsp, opts)
+void dostats(fd, nsp, opts, alive)
 natstat_t *nsp;
-int opts;
+int fd, opts, alive;
 {
 	nat_t *np, nat;
 	ipnat_t	ipn;
@@ -312,6 +316,10 @@ int opts;
 	 * Show list of NAT rules and NAT sessions ?
 	 */
 	if (opts & OPT_LIST) {
+		if (alive) {
+			dostats_live(fd, nsp, opts);
+			return;
+		}
 		printf("List of active MAP/Redirect filters:\n");
 		while (nsp->ns_list) {
 			if (kmemcpy((char *)&ipn, (long)nsp->ns_list,
@@ -330,7 +338,7 @@ int opts;
 		for (np = nsp->ns_instances; np; np = nat.nat_next) {
 			if (kmemcpy((char *)&nat, (long)np, sizeof(nat)))
 				break;
-			printactivenat(&nat, opts);
+			printactivenat(&nat, opts, 0);
 			if (nat.nat_aps)
 				printaps(nat.nat_aps, opts);
 		}
@@ -406,3 +414,87 @@ int fd, opts;
 			printf("%d entries flushed from NAT list\n", n);
 	}
 }
+
+/*
+ * Display NAT statistics.
+ */
+void dostats_live(fd, nsp, opts)
+natstat_t *nsp;
+int fd, opts;
+{
+	ipfgeniter_t iter;
+	ipfobj_t obj;
+	ipnat_t	ipn;
+	nat_t nat;
+
+	bzero((char *)&obj, sizeof(obj));
+	obj.ipfo_rev = IPFILTER_VERSION;
+	obj.ipfo_type = IPFOBJ_GENITER;
+	obj.ipfo_size = sizeof(iter);
+	obj.ipfo_ptr = &iter;
+
+	iter.igi_type = IPFGENITER_IPNAT;
+	iter.igi_data = &ipn;
+
+	/*
+	 * Show list of NAT rules and NAT sessions ?
+	 */
+	printf("List of active MAP/Redirect filters:\n");
+	while (nsp->ns_list) {
+		if (ioctl(fd, SIOCGENITER, &obj) == -1)
+			break;
+		if (opts & OPT_HITS)
+			printf("%lu ", ipn.in_hits);
+		printnat(&ipn, opts & (OPT_DEBUG|OPT_VERBOSE));
+		nsp->ns_list = ipn.in_next;
+	}
+
+	printf("\nList of active sessions:\n");
+
+	iter.igi_type = IPFGENITER_NAT;
+	iter.igi_data = &nat;
+
+	while (nsp->ns_instances != NULL) {
+		if (ioctl(fd, SIOCGENITER, &obj) == -1)
+			break;
+		printactivenat(&nat, opts, 1);
+		if (nat.nat_aps)
+			printaps(nat.nat_aps, opts);
+		nsp->ns_instances = nat.nat_next;
+	}
+
+	if (opts & OPT_VERBOSE)
+		showhostmap_live(fd, nsp);
+}
+
+/*
+ * Display the active host mapping table.
+ */
+void showhostmap_live(fd, nsp)
+int fd;
+natstat_t *nsp;
+{
+	hostmap_t hm, *hmp;
+	ipfgeniter_t iter;
+	ipfobj_t obj;
+
+	bzero((char *)&obj, sizeof(obj));
+	obj.ipfo_rev = IPFILTER_VERSION;
+	obj.ipfo_type = IPFOBJ_GENITER;
+	obj.ipfo_size = sizeof(iter);
+	obj.ipfo_ptr = &iter;
+
+	iter.igi_type = IPFGENITER_HOSTMAP;
+	iter.igi_data = &hm;
+
+	printf("\nList of active host mappings:\n");
+
+	while (nsp->ns_maplist != NULL) {
+		if (ioctl(fd, SIOCGENITER, &obj) == -1)
+			break;
+		printhostmap(&hm, 0);
+		nsp->ns_maplist = hm.hm_next;
+	}
+}
+
+

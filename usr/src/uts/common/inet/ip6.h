@@ -315,13 +315,10 @@ typedef struct ip6_info	ip6i_t;
 	((ntohl((v6addr).s6_addr32[3]) ^ (i ^ (i >> 8))) % 		\
 						ILL_FRAG_HASH_TBL_COUNT)
 
+
 /*
  * GLOBAL EXTERNALS
  */
-extern uint_t ipv6_ire_default_count;	/* Number of IPv6 IRE_DEFAULT entries */
-extern uint_t ipv6_ire_default_index;	/* Walking IPv6 index used to mod in */
-extern int ipv6_ire_cache_cnt;	/* Number of IPv6 IRE_CACHE entries */
-
 extern const in6_addr_t	ipv6_all_ones;
 extern const in6_addr_t	ipv6_all_zeros;
 extern const in6_addr_t	ipv6_loopback;
@@ -330,13 +327,6 @@ extern const in6_addr_t	ipv6_all_rtrs_mcast;
 extern const in6_addr_t	ipv6_all_v2rtrs_mcast;
 extern const in6_addr_t	ipv6_solicited_node_mcast;
 extern const in6_addr_t	ipv6_unspecified_group;
-
-/*
- * IPv6 mibs when the interface (ill) is not known.
- * When the ill is known the per-interface mib in the ill is used.
- */
-extern mib2_ipIfStatsEntry_t	ip6_mib;
-extern mib2_ipv6IfIcmpEntry_t	icmp6_mib;
 
 /*
  * FUNCTION PROTOTYPES
@@ -348,9 +338,9 @@ extern void	convert2ascii(char *buf, const in6_addr_t *addr);
 extern char	*inet_ntop(int, const void *, char *, int);
 extern int	inet_pton(int, char *, void *);
 extern void	icmp_time_exceeded_v6(queue_t *, mblk_t *, uint8_t,
-    boolean_t, boolean_t, zoneid_t);
+    boolean_t, boolean_t, zoneid_t, ip_stack_t *);
 extern void	icmp_unreachable_v6(queue_t *, mblk_t *, uint8_t,
-    boolean_t, boolean_t, zoneid_t);
+    boolean_t, boolean_t, zoneid_t, ip_stack_t *);
 extern void	icmp_inbound_error_fanout_v6(queue_t *, mblk_t *, ip6_t *,
     icmp6_t *, ill_t *, boolean_t, zoneid_t);
 extern boolean_t conn_wantpacket_v6(conn_t *, ill_t *, ip6_t *, int, zoneid_t);
@@ -359,16 +349,16 @@ extern in6addr_scope_t	ip_addr_scope_v6(const in6_addr_t *);
 extern mblk_t	*ip_bind_v6(queue_t *, mblk_t *, conn_t *, ip6_pkt_t *);
 extern void	ip_build_hdrs_v6(uchar_t *, uint_t, ip6_pkt_t *, uint8_t);
 extern int	ip_fanout_send_icmp_v6(queue_t *, mblk_t *, uint_t,
-    uint_t, uint8_t, uint_t, boolean_t, zoneid_t);
+    uint_t, uint8_t, uint_t, boolean_t, zoneid_t, ip_stack_t *);
 extern int	ip_find_hdr_v6(mblk_t *, ip6_t *, ip6_pkt_t *, uint8_t *);
 extern in6_addr_t ip_get_dst_v6(ip6_t *, boolean_t *);
 extern ip6_rthdr_t	*ip_find_rthdr_v6(ip6_t *, uint8_t *);
-extern int	ip_hdr_complete_v6(ip6_t *, zoneid_t);
+extern int	ip_hdr_complete_v6(ip6_t *, zoneid_t, ip_stack_t *);
 extern boolean_t	ip_hdr_length_nexthdr_v6(mblk_t *, ip6_t *,
     uint16_t *, uint8_t **);
 extern int	ip_hdr_length_v6(mblk_t *, ip6_t *);
 extern int	ip_check_v6_mblk(mblk_t *, ill_t *);
-extern uint32_t	ip_massage_options_v6(ip6_t *, ip6_rthdr_t *);
+extern uint32_t	ip_massage_options_v6(ip6_t *, ip6_rthdr_t *, netstack_t *);
 extern void	ip_wput_frag_v6(mblk_t *, ire_t *, uint_t, conn_t *, int, int);
 extern void 	ip_wput_ipsec_out_v6(queue_t *, mblk_t *, ip6_t *, ill_t *,
     ire_t *);
@@ -399,8 +389,9 @@ extern int	ip_multirt_apply_membership_v6(int (*fn)(conn_t *, boolean_t,
 extern void	ip_newroute_ipif_v6(queue_t *, mblk_t *, ipif_t *,
     in6_addr_t, int, zoneid_t);
 extern void	ip_newroute_v6(queue_t *, mblk_t *, const in6_addr_t *,
-    const in6_addr_t *, ill_t *, zoneid_t);
-extern void	ip6_kstat_init(void);
+    const in6_addr_t *, ill_t *, zoneid_t, ip_stack_t *);
+extern void	*ip6_kstat_init(netstackid_t, ip6_stat_t *);
+extern void	ip6_kstat_fini(netstackid_t, kstat_t *);
 extern size_t	ip6_get_src_preferences(conn_t *, uint32_t *);
 extern int	ip6_set_src_preferences(conn_t *, uint32_t);
 extern int	ip6_set_pktinfo(cred_t *, conn_t *, struct in6_pktinfo *,

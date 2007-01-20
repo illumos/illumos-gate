@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,6 +183,9 @@ char *safe_strdup(char *s);
 
 <TSTATE>autoboot	{ return AUTOBOOT; }
 <CSTATE>autoboot	{ return AUTOBOOT; }
+
+<TSTATE>ip-type		{ return IPTYPE; }
+<CSTATE>ip-type		{ return IPTYPE; }
 
 <TSTATE>pool	{ return POOL; }
 <CSTATE>pool	{ return POOL; }

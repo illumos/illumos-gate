@@ -191,75 +191,11 @@ const char udp_version[] = "%Z%%M%	%I%	%E% SMI";
 static queue_t *UDP_WR(queue_t *);
 static queue_t *UDP_RD(queue_t *);
 
-udp_stat_t udp_statistics = {
-	{ "udp_ip_send",		KSTAT_DATA_UINT64 },
-	{ "udp_ip_ire_send",		KSTAT_DATA_UINT64 },
-	{ "udp_ire_null",		KSTAT_DATA_UINT64 },
-	{ "udp_drain",			KSTAT_DATA_UINT64 },
-	{ "udp_sock_fallback",		KSTAT_DATA_UINT64 },
-	{ "udp_rrw_busy",		KSTAT_DATA_UINT64 },
-	{ "udp_rrw_msgcnt",		KSTAT_DATA_UINT64 },
-	{ "udp_out_sw_cksum",		KSTAT_DATA_UINT64 },
-	{ "udp_out_sw_cksum_bytes",	KSTAT_DATA_UINT64 },
-	{ "udp_out_opt",		KSTAT_DATA_UINT64 },
-	{ "udp_out_err_notconn",	KSTAT_DATA_UINT64 },
-	{ "udp_out_err_output",		KSTAT_DATA_UINT64 },
-	{ "udp_out_err_tudr",		KSTAT_DATA_UINT64 },
-	{ "udp_in_pktinfo",		KSTAT_DATA_UINT64 },
-	{ "udp_in_recvdstaddr",		KSTAT_DATA_UINT64 },
-	{ "udp_in_recvopts",		KSTAT_DATA_UINT64 },
-	{ "udp_in_recvif",		KSTAT_DATA_UINT64 },
-	{ "udp_in_recvslla",		KSTAT_DATA_UINT64 },
-	{ "udp_in_recvucred",		KSTAT_DATA_UINT64 },
-	{ "udp_in_recvttl",		KSTAT_DATA_UINT64 },
-	{ "udp_in_recvhopopts",		KSTAT_DATA_UINT64 },
-	{ "udp_in_recvhoplimit",	KSTAT_DATA_UINT64 },
-	{ "udp_in_recvdstopts",		KSTAT_DATA_UINT64 },
-	{ "udp_in_recvrtdstopts",	KSTAT_DATA_UINT64 },
-	{ "udp_in_recvrthdr",		KSTAT_DATA_UINT64 },
-	{ "udp_in_recvpktinfo",		KSTAT_DATA_UINT64 },
-	{ "udp_in_recvtclass",		KSTAT_DATA_UINT64 },
-	{ "udp_in_timestamp",		KSTAT_DATA_UINT64 },
-#ifdef DEBUG
-	{ "udp_data_conn",		KSTAT_DATA_UINT64 },
-	{ "udp_data_notconn",		KSTAT_DATA_UINT64 },
-#endif
-};
-
-static kstat_t *udp_ksp;
 struct kmem_cache *udp_cache;
 
-/*
- * Bind hash list size and hash function.  It has to be a power of 2 for
- * hashing.
- */
-#define	UDP_BIND_FANOUT_SIZE	512
-#define	UDP_BIND_HASH(lport) \
-	((ntohs((uint16_t)lport)) & (udp_bind_fanout_size - 1))
-
-/* UDP bind fanout hash structure. */
-typedef struct udp_fanout_s {
-	udp_t *uf_udp;
-	kmutex_t uf_lock;
-#if defined(_LP64) || defined(_I32LPx)
-	char	uf_pad[48];
-#else
-	char	uf_pad[56];
-#endif
-} udp_fanout_t;
-
+/* For /etc/system control */
 uint_t udp_bind_fanout_size = UDP_BIND_FANOUT_SIZE;
-/* udp_fanout_t *udp_bind_fanout. */
-static udp_fanout_t *udp_bind_fanout;
 
-/*
- * This controls the rate some ndd info report functions can be used
- * by non-privileged users.  It stores the last time such info is
- * requested.  When those report functions are called again, this
- * is checked with the current time and compare with the ndd param
- * udp_ndd_get_info_interval.
- */
-static clock_t udp_last_ndd_get_info_time;
 #define	NDD_TOO_QUICK_MSG \
 	"ndd get info rate too high for non-privileged users, try again " \
 	"later.\n"
@@ -307,7 +243,7 @@ static  int	udp_unitdata_opt_process(queue_t *q, mblk_t *mp,
 		    int *errorp, udpattrs_t *udpattrs);
 static boolean_t udp_opt_allow_udr_set(t_scalar_t level, t_scalar_t name);
 static int	udp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
-static boolean_t udp_param_register(udpparam_t *udppa, int cnt);
+static boolean_t udp_param_register(IDP *ndp, udpparam_t *udppa, int cnt);
 static int	udp_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 		    cred_t *cr);
 static void	udp_report_item(mblk_t *mp, udp_t *udp);
@@ -335,8 +271,13 @@ static void	udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr,
 		    socklen_t addrlen);
 static size_t	udp_set_rcv_hiwat(udp_t *udp, size_t size);
 
-static void	udp_kstat_init(void);
-static void	udp_kstat_fini(void);
+static void	*udp_stack_init(netstackid_t stackid, netstack_t *ns);
+static void	udp_stack_fini(netstackid_t stackid, void *arg);
+
+static void	*udp_kstat_init(netstackid_t stackid);
+static void	udp_kstat_fini(netstackid_t stackid, kstat_t *ksp);
+static void	*udp_kstat2_init(netstackid_t, udp_stat_t *);
+static void	udp_kstat2_fini(netstackid_t, kstat_t *);
 static int	udp_kstat_update(kstat_t *kp, int rw);
 static void	udp_input_wrapper(void *arg, mblk_t *mp, void *arg2);
 static void	udp_rput_other_wrapper(void *arg, mblk_t *mp, void *arg2);
@@ -375,11 +316,6 @@ static struct qinit udp_winit = {
 	&udp_info, NULL, NULL, NULL, STRUIOT_NONE
 };
 
-static struct qinit winit = {
-	(pfi_t)putnext, NULL, NULL, NULL, NULL,
-	&udp_info, NULL, NULL, NULL, STRUIOT_NONE
-};
-
 /* Support for just SNMP if UDP is not pushed directly over device IP */
 struct qinit udp_snmp_rinit = {
 	(pfi_t)putnext, NULL, udp_open, ip_snmpmod_close, NULL,
@@ -392,28 +328,11 @@ struct qinit udp_snmp_winit = {
 };
 
 struct streamtab udpinfo = {
-	&udp_rinit, &winit
+	&udp_rinit, &udp_winit
 };
 
 static	sin_t	sin_null;	/* Zero address for quick clears */
 static	sin6_t	sin6_null;	/* Zero address for quick clears */
-
-/* Hint not protected by any lock */
-static in_port_t	udp_g_next_port_to_try;
-
-/*
- * Extra privileged ports. In host byte order.
- */
-#define	UDP_NUM_EPRIV_PORTS	64
-static int	udp_g_num_epriv_ports = UDP_NUM_EPRIV_PORTS;
-static in_port_t udp_g_epriv_ports[UDP_NUM_EPRIV_PORTS] = { 2049, 4045 };
-
-/* Only modified during _init and _fini thus no locking is needed. */
-static IDP	udp_g_nd;	/* Points to table of UDP ND variables. */
-
-/* MIB-2 stuff for SNMP */
-static mib2_udp_t	udp_mib;	/* SNMP fixed size info */
-static kstat_t		*udp_mibkp;	/* kstat exporting udp_mib data */
 
 #define	UDP_MAXPACKET_IPV4 (IP_MAXPACKET - UDPH_SIZE - IP_SIMPLE_HDR_LENGTH)
 
@@ -452,7 +371,7 @@ static	struct T_info_ack udp_g_t_info_ack_ipv6 = {
 #define	UDP_MAX_PORT	65535
 
 /*
- * Table of ND variables supported by udp.  These are loaded into udp_g_nd
+ * Table of ND variables supported by udp.  These are loaded into us_nd
  * in udp_open.
  * All of these are alterable, within the min/max values given, at run time.
  */
@@ -474,12 +393,7 @@ udpparam_t udp_param_arr[] = {
 };
 /* END CSTYLED */
 
-/*
- * The smallest anonymous port in the privileged port range which UDP
- * looks for free port.  Use in the option UDP_ANONPRIVBIND.
- */
-static in_port_t udp_min_anonpriv_port = 512;
-
+/* Setable in /etc/system */
 /* If set to 0, pick ephemeral port sequentially; otherwise randomly. */
 uint32_t udp_random_anon_port = 1;
 
@@ -934,9 +848,10 @@ udp_get_next_priv_port(udp_t *udp)
 	static in_port_t next_priv_port = IPPORT_RESERVED - 1;
 	in_port_t nextport;
 	boolean_t restart = B_FALSE;
+	udp_stack_t *us = udp->udp_us;
 
 retry:
-	if (next_priv_port < udp_min_anonpriv_port ||
+	if (next_priv_port < us->us_min_anonpriv_port ||
 	    next_priv_port >= IPPORT_RESERVED) {
 		next_priv_port = IPPORT_RESERVED - 1;
 		if (restart)
@@ -964,14 +879,16 @@ udp_bind_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	zoneid_t	zoneid;
 	conn_t		*connp;
 	udp_t		*udp;
+	udp_stack_t	*us;
 
 	connp = Q_TO_CONN(q);
 	udp = connp->conn_udp;
+	us = udp->udp_us;
 
 	/* Refer to comments in udp_status_report(). */
-	if (cr == NULL || secpolicy_net_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - udp_last_ndd_get_info_time <
-		    drv_usectohz(udp_ndd_get_info_interval * 1000)) {
+	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
+		if (ddi_get_lbolt() - us->us_last_ndd_get_info_time <
+		    drv_usectohz(us->us_ndd_get_info_interval * 1000)) {
 			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
 			return (0);
 		}
@@ -990,8 +907,8 @@ udp_bind_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 	zoneid = connp->conn_zoneid;
 
-	for (i = 0; i < udp_bind_fanout_size; i++) {
-		udpf = &udp_bind_fanout[i];
+	for (i = 0; i < us->us_bind_fanout_size; i++) {
+		udpf = &us->us_bind_fanout[i];
 		mutex_enter(&udpf->uf_lock);
 
 		/* Print the hash index. */
@@ -1022,7 +939,7 @@ udp_bind_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 		}
 		mutex_exit(&udpf->uf_lock);
 	}
-	udp_last_ndd_get_info_time = ddi_get_lbolt();
+	us->us_last_ndd_get_info_time = ddi_get_lbolt();
 	return (0);
 }
 
@@ -1034,6 +951,7 @@ udp_bind_hash_remove(udp_t *udp, boolean_t caller_holds_lock)
 {
 	udp_t	*udpnext;
 	kmutex_t *lockp;
+	udp_stack_t *us = udp->udp_us;
 
 	if (udp->udp_ptpbhn == NULL)
 		return;
@@ -1044,7 +962,8 @@ udp_bind_hash_remove(udp_t *udp, boolean_t caller_holds_lock)
 	 */
 	ASSERT(udp->udp_port != 0);
 	if (!caller_holds_lock) {
-		lockp = &udp_bind_fanout[UDP_BIND_HASH(udp->udp_port)].uf_lock;
+		lockp = &us->us_bind_fanout[UDP_BIND_HASH(udp->udp_port,
+					    us->us_bind_fanout_size)].uf_lock;
 		ASSERT(lockp != NULL);
 		mutex_enter(lockp);
 	}
@@ -1115,7 +1034,7 @@ udp_bind_hash_insert(udp_fanout_t *uf, udp_t *udp)
  * without setting SO_REUSEADDR. This is needed so that they
  * can be viewed as two independent transport protocols.
  * However, anonymouns ports are allocated from the same range to avoid
- * duplicating the udp_g_next_port_to_try.
+ * duplicating the us->us_next_port_to_try.
  */
 static void
 udp_bind(queue_t *q, mblk_t *mp)
@@ -1137,9 +1056,11 @@ udp_bind(queue_t *q, mblk_t *mp)
 	udp_t		*udp;
 	boolean_t	is_inaddr_any;
 	mlp_type_t	addrtype, mlptype;
+	udp_stack_t	*us;
 
 	connp = Q_TO_CONN(q);
 	udp = connp->conn_udp;
+	us = udp->udp_us;
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (*tbr)) {
 		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
 		    "udp_bind: bad req, len %u",
@@ -1240,7 +1161,7 @@ udp_bind(queue_t *q, mblk_t *mp)
 			port = udp_get_next_priv_port(udp);
 		} else {
 			port = udp_update_next_port(udp,
-			    udp_g_next_port_to_try, B_TRUE);
+			    us->us_next_port_to_try, B_TRUE);
 		}
 	} else {
 		/*
@@ -1250,11 +1171,11 @@ udp_bind(queue_t *q, mblk_t *mp)
 		int i;
 		boolean_t priv = B_FALSE;
 
-		if (port < udp_smallest_nonpriv_port) {
+		if (port < us->us_smallest_nonpriv_port) {
 			priv = B_TRUE;
 		} else {
-			for (i = 0; i < udp_g_num_epriv_ports; i++) {
-				if (port == udp_g_epriv_ports[i]) {
+			for (i = 0; i < us->us_num_epriv_ports; i++) {
+				if (port == us->us_epriv_ports[i]) {
 					priv = B_TRUE;
 					break;
 				}
@@ -1324,10 +1245,14 @@ udp_bind(queue_t *q, mblk_t *mp)
 
 	count = 0;
 	if (udp->udp_anon_priv_bind) {
-		/* loopmax = (IPPORT_RESERVED-1) - udp_min_anonpriv_port + 1 */
-		loopmax = IPPORT_RESERVED - udp_min_anonpriv_port;
+		/*
+		 * loopmax = (IPPORT_RESERVED-1) -
+		 *    us->us_min_anonpriv_port + 1
+		 */
+		loopmax = IPPORT_RESERVED - us->us_min_anonpriv_port;
 	} else {
-		loopmax = udp_largest_anon_port - udp_smallest_anon_port + 1;
+		loopmax = us->us_largest_anon_port -
+		    us->us_smallest_anon_port + 1;
 	}
 
 	is_inaddr_any = V6_OR_V4_INADDR_ANY(v6src);
@@ -1342,7 +1267,8 @@ udp_bind(queue_t *q, mblk_t *mp)
 		 * requested port with the same IP address.
 		 */
 		lport = htons(port);
-		udpf = &udp_bind_fanout[UDP_BIND_HASH(lport)];
+		udpf = &us->us_bind_fanout[UDP_BIND_HASH(lport,
+		    us->us_bind_fanout_size)];
 		mutex_enter(&udpf->uf_lock);
 		for (udp1 = udpf->uf_udp; udp1 != NULL;
 		    udp1 = udp1->udp_bind_hash) {
@@ -1467,10 +1393,10 @@ udp_bind(queue_t *q, mblk_t *mp)
 				 * If the application wants us to find
 				 * a port, get one to start with. Set
 				 * requested_port to 0, so that we will
-				 * update udp_g_next_port_to_try below.
+				 * update us->us_next_port_to_try below.
 				 */
 				port = udp_update_next_port(udp,
-				    udp_g_next_port_to_try, B_TRUE);
+				    us->us_next_port_to_try, B_TRUE);
 				requested_port = 0;
 			} else {
 				port = udp_update_next_port(udp, port + 1,
@@ -1503,7 +1429,7 @@ udp_bind(queue_t *q, mblk_t *mp)
 	 * an anonymous port, or we handed out the next anonymous port.
 	 */
 	if ((requested_port == 0) && (!udp->udp_anon_priv_bind)) {
-		udp_g_next_port_to_try = port + 1;
+		us->us_next_port_to_try = port + 1;
 	}
 
 	/* Initialize the O_T_BIND_REQ/T_BIND_REQ for ip. */
@@ -1548,9 +1474,11 @@ udp_bind(queue_t *q, mblk_t *mp)
 		cred_t *cr = connp->conn_cred;
 		zone_t *zone;
 
+		zone = crgetzone(cr);
 		connp->conn_mlp_type = udp->udp_recvucred ? mlptBoth :
 		    mlptSingle;
-		addrtype = tsol_mlp_addr_type(zoneid, IPV6_VERSION, &v6src);
+		addrtype = tsol_mlp_addr_type(zone->zone_id, IPV6_VERSION,
+		    &v6src, udp->udp_us->us_netstack->netstack_ip);
 		if (addrtype == mlptSingle) {
 			udp_err_ack(q, mp, TNOADDR, 0);
 			connp->conn_anon_port = B_FALSE;
@@ -1558,7 +1486,6 @@ udp_bind(queue_t *q, mblk_t *mp)
 			return;
 		}
 		mlpport = connp->conn_anon_port ? PMAPPORT : port;
-		zone = crgetzone(cr);
 		mlptype = tsol_mlp_port_type(zone, IPPROTO_UDP, mlpport,
 		    addrtype);
 		if (mlptype != mlptSingle &&
@@ -1582,6 +1509,10 @@ udp_bind(queue_t *q, mblk_t *mp)
 		 * zone actually owns the MLP.  Reject if not.
 		 */
 		if (mlptype == mlptShared && addrtype == mlptShared) {
+			/*
+			 * No need to handle exclusive-stack zones since
+			 * ALL_ZONES only applies to the shared stack.
+			 */
 			zoneid_t mlpzone;
 
 			mlpzone = tsol_mlp_findzone(IPPROTO_UDP,
@@ -1702,10 +1633,12 @@ udp_connect(queue_t *q, mblk_t *mp)
 	mblk_t	*mp1, *mp2;
 	udp_fanout_t	*udpf;
 	udp_t	*udp, *udp1;
+	udp_stack_t	*us;
 
 	udp = Q_TO_UDP(q);
 
 	tcr = (struct T_conn_req *)mp->b_rptr;
+	us = udp->udp_us;
 
 	/* A bit of sanity checking */
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (struct T_conn_req)) {
@@ -1724,7 +1657,8 @@ udp_connect(queue_t *q, mblk_t *mp)
 	}
 	ASSERT(udp->udp_port != 0 && udp->udp_ptpbhn != NULL);
 
-	udpf = &udp_bind_fanout[UDP_BIND_HASH(udp->udp_port)];
+	udpf = &us->us_bind_fanout[UDP_BIND_HASH(udp->udp_port,
+	    us->us_bind_fanout_size)];
 
 	if (udp->udp_state == TS_DATA_XFER) {
 		/* Already connected - clear out state */
@@ -2044,6 +1978,8 @@ udp_close_free(conn_t *connp)
 	ip6_pkt_free(&udp->udp_sticky_ipp);
 
 	udp->udp_connp = NULL;
+	netstack_rele(udp->udp_us->us_netstack);
+
 	connp->conn_udp = NULL;
 	kmem_cache_free(udp_cache, udp);
 }
@@ -2069,14 +2005,17 @@ udp_disconnect(queue_t *q, mblk_t *mp)
 	udp_t	*udp = Q_TO_UDP(q);
 	mblk_t	*mp1;
 	udp_fanout_t *udpf;
+	udp_stack_t *us;
 
+	us = udp->udp_us;
 	if (udp->udp_state != TS_DATA_XFER) {
 		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
 		    "udp_disconnect: bad state, %u", udp->udp_state);
 		udp_err_ack(q, mp, TOUTSTATE, 0);
 		return;
 	}
-	udpf = &udp_bind_fanout[UDP_BIND_HASH(udp->udp_port)];
+	udpf = &us->us_bind_fanout[UDP_BIND_HASH(udp->udp_port,
+	    us->us_bind_fanout_size)];
 	mutex_enter(&udpf->uf_lock);
 	udp->udp_v6src = udp->udp_bound_v6src;
 	udp->udp_state = TS_IDLE;
@@ -2160,10 +2099,12 @@ static int
 udp_extra_priv_ports_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 {
 	int i;
+	udp_t		*udp = Q_TO_UDP(q);
+	udp_stack_t *us = udp->udp_us;
 
-	for (i = 0; i < udp_g_num_epriv_ports; i++) {
-		if (udp_g_epriv_ports[i] != 0)
-			(void) mi_mpprintf(mp, "%d ", udp_g_epriv_ports[i]);
+	for (i = 0; i < us->us_num_epriv_ports; i++) {
+		if (us->us_epriv_ports[i] != 0)
+			(void) mi_mpprintf(mp, "%d ", us->us_epriv_ports[i]);
 	}
 	return (0);
 }
@@ -2175,6 +2116,8 @@ udp_extra_priv_ports_add(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 {
 	long	new_value;
 	int	i;
+	udp_t		*udp = Q_TO_UDP(q);
+	udp_stack_t *us = udp->udp_us;
 
 	/*
 	 * Fail the request if the new value does not lie within the
@@ -2186,22 +2129,22 @@ udp_extra_priv_ports_add(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 	}
 
 	/* Check if the value is already in the list */
-	for (i = 0; i < udp_g_num_epriv_ports; i++) {
-		if (new_value == udp_g_epriv_ports[i]) {
+	for (i = 0; i < us->us_num_epriv_ports; i++) {
+		if (new_value == us->us_epriv_ports[i]) {
 			return (EEXIST);
 		}
 	}
 	/* Find an empty slot */
-	for (i = 0; i < udp_g_num_epriv_ports; i++) {
-		if (udp_g_epriv_ports[i] == 0)
+	for (i = 0; i < us->us_num_epriv_ports; i++) {
+		if (us->us_epriv_ports[i] == 0)
 			break;
 	}
-	if (i == udp_g_num_epriv_ports) {
+	if (i == us->us_num_epriv_ports) {
 		return (EOVERFLOW);
 	}
 
 	/* Set the new value */
-	udp_g_epriv_ports[i] = (in_port_t)new_value;
+	us->us_epriv_ports[i] = (in_port_t)new_value;
 	return (0);
 }
 
@@ -2212,6 +2155,8 @@ udp_extra_priv_ports_del(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 {
 	long	new_value;
 	int	i;
+	udp_t		*udp = Q_TO_UDP(q);
+	udp_stack_t *us = udp->udp_us;
 
 	/*
 	 * Fail the request if the new value does not lie within the
@@ -2223,16 +2168,16 @@ udp_extra_priv_ports_del(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 	}
 
 	/* Check that the value is already in the list */
-	for (i = 0; i < udp_g_num_epriv_ports; i++) {
-		if (udp_g_epriv_ports[i] == new_value)
+	for (i = 0; i < us->us_num_epriv_ports; i++) {
+		if (us->us_epriv_ports[i] == new_value)
 			break;
 	}
-	if (i == udp_g_num_epriv_ports) {
+	if (i == us->us_num_epriv_ports) {
 		return (ESRCH);
 	}
 
 	/* Clear the value */
-	udp_g_epriv_ports[i] = 0;
+	us->us_epriv_ports[i] = 0;
 	return (0);
 }
 
@@ -2479,7 +2424,7 @@ noticmpv6:
 		udi_size = sizeof (struct T_unitdata_ind) + sizeof (sin6_t) +
 		    opt_length;
 		if ((newmp = allocb(udi_size, BPRI_MED)) == NULL) {
-			BUMP_MIB(&udp_mib, udpInErrors);
+			BUMP_MIB(&udp->udp_mib, udpInErrors);
 			break;
 		}
 
@@ -2890,8 +2835,10 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	int	err;
 	udp_t	*udp;
 	conn_t *connp;
-	zoneid_t zoneid = getzoneid();
 	queue_t	*ip_wq;
+	zoneid_t zoneid;
+	netstack_t *ns;
+	udp_stack_t *us;
 
 	TRACE_1(TR_FAC_UDP, TR_UDP_OPEN, "udp_open: q %p", q);
 
@@ -2903,9 +2850,23 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	if (sflag != MODOPEN)
 		return (EINVAL);
 
-	q->q_hiwat = udp_recv_hiwat;
-	WR(q)->q_hiwat = udp_xmit_hiwat;
-	WR(q)->q_lowat = udp_xmit_lowat;
+	ns = netstack_find_by_cred(credp);
+	ASSERT(ns != NULL);
+	us = ns->netstack_udp;
+	ASSERT(us != NULL);
+
+	/*
+	 * For exclusive stacks we set the zoneid to zero
+	 * to make UDP operate as if in the global zone.
+	 */
+	if (us->us_netstack->netstack_stackid != GLOBAL_NETSTACKID)
+		zoneid = GLOBAL_ZONEID;
+	else
+		zoneid = crgetzoneid(credp);
+
+	q->q_hiwat = us->us_recv_hiwat;
+	WR(q)->q_hiwat = us->us_xmit_hiwat;
+	WR(q)->q_lowat = us->us_xmit_lowat;
 
 	/* Insert ourselves in the stream since we're about to walk q_next */
 	qprocson(q);
@@ -2922,13 +2883,15 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	ip_wq = WR(q)->q_next;
 	if (NOT_OVER_IP(ip_wq)) {
 		/* Support just SNMP for MIB browsers */
-		connp = ipcl_conn_create(IPCL_IPCCONN, KM_SLEEP);
+		connp = ipcl_conn_create(IPCL_IPCCONN, KM_SLEEP,
+		    us->us_netstack);
 		connp->conn_rq = q;
 		connp->conn_wq = WR(q);
 		connp->conn_flags |= IPCL_UDPMOD;
 		connp->conn_cred = credp;
 		connp->conn_zoneid = zoneid;
 		connp->conn_udp = udp;
+		udp->udp_us = us;
 		udp->udp_connp = connp;
 		q->q_ptr = WR(q)->q_ptr = connp;
 		crhold(credp);
@@ -2956,14 +2919,14 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		udp->udp_family = AF_INET6;
 		udp->udp_ipversion = IPV6_VERSION;
 		udp->udp_max_hdr_len = IPV6_HDR_LEN + UDPH_SIZE;
-		udp->udp_ttl = udp_ipv6_hoplimit;
+		udp->udp_ttl = us->us_ipv6_hoplimit;
 		connp->conn_af_isv6 = B_TRUE;
 		connp->conn_flags |= IPCL_ISV6;
 	} else {
 		udp->udp_family = AF_INET;
 		udp->udp_ipversion = IPV4_VERSION;
 		udp->udp_max_hdr_len = IP_SIMPLE_HDR_LENGTH + UDPH_SIZE;
-		udp->udp_ttl = udp_ipv4_ttl;
+		udp->udp_ttl = us->us_ipv4_ttl;
 		connp->conn_af_isv6 = B_FALSE;
 		connp->conn_flags &= ~IPCL_ISV6;
 	}
@@ -2990,20 +2953,21 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	connp->conn_ulp_labeled = is_system_labeled();
 
 	mutex_exit(&connp->conn_lock);
+	udp->udp_us = us;
 
 	/*
 	 * The transmit hiwat/lowat is only looked at on IP's queue.
 	 * Store in q_hiwat in order to return on SO_SNDBUF/SO_RCVBUF
 	 * getsockopts.
 	 */
-	q->q_hiwat = udp_recv_hiwat;
-	WR(q)->q_hiwat = udp_xmit_hiwat;
-	WR(q)->q_lowat = udp_xmit_lowat;
+	q->q_hiwat = us->us_recv_hiwat;
+	WR(q)->q_hiwat = us->us_xmit_hiwat;
+	WR(q)->q_lowat = us->us_xmit_lowat;
 
 	if (udp->udp_family == AF_INET6) {
 		/* Build initial header template for transmit */
 		if ((err = udp_build_hdrs(q, udp)) != 0) {
-error:
+			/* XXX missing free of connp? crfree? netstack_rele? */
 			qprocsoff(UDP_RD(q));
 			udp->udp_connp = NULL;
 			connp->conn_udp = NULL;
@@ -3014,10 +2978,8 @@ error:
 
 	/* Set the Stream head write offset and high watermark. */
 	(void) mi_set_sth_wroff(UDP_RD(q),
-	    udp->udp_max_hdr_len + udp_wroff_extra);
+	    udp->udp_max_hdr_len + us->us_wroff_extra);
 	(void) mi_set_sth_hiwat(UDP_RD(q), udp_set_rcv_hiwat(udp, q->q_hiwat));
-
-	WR(UDP_RD(q))->q_qinfo = &udp_winit;
 
 	return (0);
 }
@@ -3040,6 +3002,8 @@ udp_opt_allow_udr_set(t_scalar_t level, t_scalar_t name)
 int
 udp_opt_default(queue_t	*q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 {
+	udp_t		*udp = Q_TO_UDP(q);
+	udp_stack_t *us = udp->udp_us;
 	int *i1 = (int *)ptr;
 
 	switch (level) {
@@ -3062,7 +3026,7 @@ udp_opt_default(queue_t	*q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 			*i1 = IP_DEFAULT_MULTICAST_LOOP;
 			return (sizeof (int));
 		case IPV6_UNICAST_HOPS:
-			*i1 = udp_ipv6_hoplimit;
+			*i1 = us->us_ipv6_hoplimit;
 			return (sizeof (int));
 		}
 		break;
@@ -3083,11 +3047,13 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 	udp_t	*udp;
 	ip6_pkt_t *ipp;
 	int	len;
+	udp_stack_t	*us;
 
 	q = UDP_WR(q);
 	connp = Q_TO_CONN(q);
 	udp = connp->conn_udp;
 	ipp = &udp->udp_sticky_ipp;
+	us = udp->udp_us;
 
 	switch (level) {
 	case SOL_SOCKET:
@@ -3366,7 +3332,8 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 			return (ipp->ipp_dstoptslen);
 		case IPV6_PATHMTU:
 			return (ip_fill_mtuinfo(&udp->udp_v6dst,
-				udp->udp_dstport, (struct ip6_mtuinfo *)ptr));
+				udp->udp_dstport, (struct ip6_mtuinfo *)ptr,
+				us->us_netstack));
 		default:
 			return (-1);
 		}
@@ -3410,10 +3377,12 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 	conn_t	*connp;
 	udp_t	*udp;
 	uint_t	newlen;
+	udp_stack_t *us;
 
 	q = UDP_WR(q);
 	connp = Q_TO_CONN(q);
 	udp = connp->conn_udp;
+	us = udp->udp_us;
 
 	switch (optset_context) {
 	case SETFN_OPTCOM_CHECKONLY:
@@ -3495,7 +3464,7 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 			break;
 
 		case SO_SNDBUF:
-			if (*i1 > udp_max_buf) {
+			if (*i1 > us->us_max_buf) {
 				*outlenp = 0;
 				return (ENOBUFS);
 			}
@@ -3505,7 +3474,7 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 			}
 			break;
 		case SO_RCVBUF:
-			if (*i1 > udp_max_buf) {
+			if (*i1 > us->us_max_buf) {
 				*outlenp = 0;
 				return (ENOBUFS);
 			}
@@ -3620,7 +3589,7 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 			udp->udp_max_hdr_len = IP_SIMPLE_HDR_LENGTH +
 			    UDPH_SIZE + udp->udp_ip_snd_options_len;
 			(void) mi_set_sth_wroff(RD(q), udp->udp_max_hdr_len +
-			    udp_wroff_extra);
+			    us->us_wroff_extra);
 			break;
 
 		case IP_TTL:
@@ -3796,7 +3765,7 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 			if (!checkonly) {
 				if (*i1 == -1) {
 					udp->udp_ttl = ipp->ipp_unicast_hops =
-					    udp_ipv6_hoplimit;
+					    us->us_ipv6_hoplimit;
 					ipp->ipp_fields &= ~IPPF_UNICAST_HOPS;
 					/* Pass modified value to IP. */
 					*i1 = udp->udp_ttl;
@@ -3963,7 +3932,8 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 				if (*i1 > 255 || *i1 < -1)
 					return (EINVAL);
 				if (*i1 == -1)
-					ipp->ipp_hoplimit = udp_ipv6_hoplimit;
+					ipp->ipp_hoplimit =
+					    us->us_ipv6_hoplimit;
 				else
 					ipp->ipp_hoplimit = *i1;
 				ipp->ipp_fields |= IPPF_HOPLIMIT;
@@ -4264,6 +4234,7 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 static int
 udp_build_hdrs(queue_t *q, udp_t *udp)
 {
+	udp_stack_t *us = udp->udp_us;
 	uchar_t	*hdrs;
 	uint_t	hdrs_len;
 	ip6_t	*ip6h;
@@ -4307,7 +4278,7 @@ udp_build_hdrs(queue_t *q, udp_t *udp)
 	if (hdrs_len > udp->udp_max_hdr_len) {
 		udp->udp_max_hdr_len = hdrs_len;
 		(void) mi_set_sth_wroff(RD(q), udp->udp_max_hdr_len +
-		    udp_wroff_extra);
+		    us->us_wroff_extra);
 	}
 	return (0);
 }
@@ -4332,41 +4303,41 @@ udp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
  * named dispatch (ND) handler.
  */
 static boolean_t
-udp_param_register(udpparam_t *udppa, int cnt)
+udp_param_register(IDP *ndp, udpparam_t *udppa, int cnt)
 {
 	for (; cnt-- > 0; udppa++) {
 		if (udppa->udp_param_name && udppa->udp_param_name[0]) {
-			if (!nd_load(&udp_g_nd, udppa->udp_param_name,
+			if (!nd_load(ndp, udppa->udp_param_name,
 			    udp_param_get, udp_param_set,
 			    (caddr_t)udppa)) {
-				nd_free(&udp_g_nd);
+				nd_free(ndp);
 				return (B_FALSE);
 			}
 		}
 	}
-	if (!nd_load(&udp_g_nd, "udp_extra_priv_ports",
+	if (!nd_load(ndp, "udp_extra_priv_ports",
 	    udp_extra_priv_ports_get, NULL, NULL)) {
-		nd_free(&udp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&udp_g_nd, "udp_extra_priv_ports_add",
+	if (!nd_load(ndp, "udp_extra_priv_ports_add",
 	    NULL, udp_extra_priv_ports_add, NULL)) {
-		nd_free(&udp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&udp_g_nd, "udp_extra_priv_ports_del",
+	if (!nd_load(ndp, "udp_extra_priv_ports_del",
 	    NULL, udp_extra_priv_ports_del, NULL)) {
-		nd_free(&udp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&udp_g_nd, "udp_status", udp_status_report, NULL,
+	if (!nd_load(ndp, "udp_status", udp_status_report, NULL,
 	    NULL)) {
-		nd_free(&udp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&udp_g_nd, "udp_bind_hash", udp_bind_hash_report, NULL,
+	if (!nd_load(ndp, "udp_bind_hash", udp_bind_hash_report, NULL,
 	    NULL)) {
-		nd_free(&udp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
 	return (B_TRUE);
@@ -4566,11 +4537,13 @@ udp_input(conn_t *connp, mblk_t *mp)
 	queue_t			*q = connp->conn_rq;
 	pid_t			cpid;
 	cred_t			*rcr = connp->conn_cred;
+	udp_stack_t *us;
 
 	TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_START,
 	    "udp_rput_start: q %p mp %p", q, mp);
 
 	udp = connp->conn_udp;
+	us = udp->udp_us;
 	rptr = mp->b_rptr;
 	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_CTL);
 	ASSERT(OK_32PTR(rptr));
@@ -4593,7 +4566,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 			options_mp = mp;
 			mp = mp->b_cont;
 			rptr = mp->b_rptr;
-			UDP_STAT(udp_in_pktinfo);
+			UDP_STAT(us, udp_in_pktinfo);
 		} else {
 			/*
 			 * ICMP messages.
@@ -4757,14 +4730,14 @@ udp_input(conn_t *connp, mblk_t *mp)
 		if (udp->udp_recvdstaddr) {
 			udi_size += sizeof (struct T_opthdr) +
 			    sizeof (struct in_addr);
-			UDP_STAT(udp_in_recvdstaddr);
+			UDP_STAT(us, udp_in_recvdstaddr);
 		}
 
 		if (udp->udp_ip_recvpktinfo && (pinfo != NULL) &&
 		    (pinfo->ip_pkt_flags & IPF_RECVADDR)) {
 			udi_size += sizeof (struct T_opthdr) +
 			    sizeof (struct in_pktinfo);
-			UDP_STAT(udp_ip_recvpktinfo);
+			UDP_STAT(us, udp_ip_recvpktinfo);
 		}
 
 		/*
@@ -4774,20 +4747,20 @@ udp_input(conn_t *connp, mblk_t *mp)
 		if (udp->udp_recvif && (pinfo != NULL) &&
 		    (pinfo->ip_pkt_flags & IPF_RECVIF)) {
 			udi_size += sizeof (struct T_opthdr) + sizeof (uint_t);
-			UDP_STAT(udp_in_recvif);
+			UDP_STAT(us, udp_in_recvif);
 		}
 
 		if (udp->udp_recvslla && (pinfo != NULL) &&
 		    (pinfo->ip_pkt_flags & IPF_RECVSLLA)) {
 			udi_size += sizeof (struct T_opthdr) +
 			    sizeof (struct sockaddr_dl);
-			UDP_STAT(udp_in_recvslla);
+			UDP_STAT(us, udp_in_recvslla);
 		}
 
 		if (udp->udp_recvucred && (cr = DB_CRED(mp)) != NULL) {
 			udi_size += sizeof (struct T_opthdr) + ucredsize;
 			cpid = DB_CPID(mp);
-			UDP_STAT(udp_in_recvucred);
+			UDP_STAT(us, udp_in_recvucred);
 		}
 
 		/*
@@ -4799,7 +4772,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 		if (udp->udp_timestamp) {
 			udi_size += sizeof (struct T_opthdr) +
 			    sizeof (timestruc_t) + _POINTER_ALIGNMENT;
-			UDP_STAT(udp_in_timestamp);
+			UDP_STAT(us, udp_in_timestamp);
 		}
 
 		/*
@@ -4807,7 +4780,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 		 */
 		if (udp->udp_recvttl) {
 			udi_size += sizeof (struct T_opthdr) + sizeof (uint8_t);
-			UDP_STAT(udp_in_recvttl);
+			UDP_STAT(us, udp_in_recvttl);
 		}
 		ASSERT(IPH_HDR_LENGTH((ipha_t *)rptr) == IP_SIMPLE_HDR_LENGTH);
 
@@ -4819,7 +4792,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				freeb(options_mp);
 			TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
 				"udp_rput_end: q %p (%S)", q, "allocbfail");
-			BUMP_MIB(&udp_mib, udpInErrors);
+			BUMP_MIB(&udp->udp_mib, udpInErrors);
 			return;
 		}
 		mp1->b_cont = mp;
@@ -5012,7 +4985,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 			    (ipp.ipp_fields & IPPF_HOPOPTS)) {
 				size_t hlen;
 
-				UDP_STAT(udp_in_recvhopopts);
+				UDP_STAT(us, udp_in_recvhopopts);
 				hlen = copy_hop_opts(&ipp, NULL);
 				if (hlen == 0)
 					ipp.ipp_fields &= ~IPPF_HOPOPTS;
@@ -5023,7 +4996,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 			    (ipp.ipp_fields & IPPF_DSTOPTS)) {
 				udi_size += sizeof (struct T_opthdr) +
 				    ipp.ipp_dstoptslen;
-				UDP_STAT(udp_in_recvdstopts);
+				UDP_STAT(us, udp_in_recvdstopts);
 			}
 			if (((udp->udp_ipv6_recvdstopts &&
 			    udp->udp_ipv6_recvrthdr &&
@@ -5032,36 +5005,36 @@ udp_input(conn_t *connp, mblk_t *mp)
 			    (ipp.ipp_fields & IPPF_RTDSTOPTS)) {
 				udi_size += sizeof (struct T_opthdr) +
 				    ipp.ipp_rtdstoptslen;
-				UDP_STAT(udp_in_recvrtdstopts);
+				UDP_STAT(us, udp_in_recvrtdstopts);
 			}
 			if (udp->udp_ipv6_recvrthdr &&
 			    (ipp.ipp_fields & IPPF_RTHDR)) {
 				udi_size += sizeof (struct T_opthdr) +
 				    ipp.ipp_rthdrlen;
-				UDP_STAT(udp_in_recvrthdr);
+				UDP_STAT(us, udp_in_recvrthdr);
 			}
 			if (udp->udp_ip_recvpktinfo &&
 			    (ipp.ipp_fields & IPPF_IFINDEX)) {
 				udi_size += sizeof (struct T_opthdr) +
 				    sizeof (struct in6_pktinfo);
-				UDP_STAT(udp_in_recvpktinfo);
+				UDP_STAT(us, udp_in_recvpktinfo);
 			}
 
 		}
 		if (udp->udp_recvucred && (cr = DB_CRED(mp)) != NULL) {
 			udi_size += sizeof (struct T_opthdr) + ucredsize;
 			cpid = DB_CPID(mp);
-			UDP_STAT(udp_in_recvucred);
+			UDP_STAT(us, udp_in_recvucred);
 		}
 
 		if (udp->udp_ipv6_recvhoplimit) {
 			udi_size += sizeof (struct T_opthdr) + sizeof (int);
-			UDP_STAT(udp_in_recvhoplimit);
+			UDP_STAT(us, udp_in_recvhoplimit);
 		}
 
 		if (udp->udp_ipv6_recvtclass) {
 			udi_size += sizeof (struct T_opthdr) + sizeof (int);
-			UDP_STAT(udp_in_recvtclass);
+			UDP_STAT(us, udp_in_recvtclass);
 		}
 
 		mp1 = allocb(udi_size, BPRI_MED);
@@ -5071,7 +5044,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				freeb(options_mp);
 			TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
 				"udp_rput_end: q %p (%S)", q, "allocbfail");
-			BUMP_MIB(&udp_mib, udpInErrors);
+			BUMP_MIB(&udp->udp_mib, udpInErrors);
 			return;
 		}
 		mp1->b_cont = mp;
@@ -5097,7 +5070,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 			sin6->sin6_flowinfo = 0;
 			sin6->sin6_scope_id = 0;
 			sin6->__sin6_src_id = ip_srcid_find_addr(&v6dst,
-			    connp->conn_zoneid);
+			    connp->conn_zoneid, us->us_netstack);
 		} else {
 			sin6->sin6_addr = ip6h->ip6_src;
 			/* No sin6_flowinfo per API */
@@ -5109,7 +5082,8 @@ udp_input(conn_t *connp, mblk_t *mp)
 			else
 				sin6->sin6_scope_id = 0;
 			sin6->__sin6_src_id = ip_srcid_find_addr(
-			    &ip6h->ip6_dst, connp->conn_zoneid);
+			    &ip6h->ip6_dst, connp->conn_zoneid,
+			    us->us_netstack);
 		}
 		sin6->sin6_port = udpha->uha_src_port;
 		sin6->sin6_family = udp->udp_family;
@@ -5257,7 +5231,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 		/* No IP_RECVDSTADDR for IPv6. */
 	}
 
-	BUMP_MIB(&udp_mib, udpHCInDatagrams);
+	BUMP_MIB(&udp->udp_mib, udpHCInDatagrams);
 	TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
 		"udp_rput_end: q %p (%S)", q, "end");
 	if (options_mp != NULL)
@@ -5286,7 +5260,7 @@ tossit:
 	freemsg(mp);
 	if (options_mp != NULL)
 		freeb(options_mp);
-	BUMP_MIB(&udp_mib, udpInErrors);
+	BUMP_MIB(&udp->udp_mib, udpInErrors);
 }
 
 void
@@ -5326,6 +5300,7 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 	udp_t			*udp = Q_TO_UDP(q);
 	pid_t			cpid;
 	cred_t			*rcr = udp->udp_connp->conn_cred;
+	udp_stack_t		*us = udp->udp_us;
 
 	TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_START,
 	    "udp_rput_other: q %p mp %p", q, mp);
@@ -5381,8 +5356,9 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 				 */
 				udp_fanout_t	*udpf;
 
-				udpf = &udp_bind_fanout[
-				    UDP_BIND_HASH(udp->udp_port)];
+				udpf = &us->us_bind_fanout[
+				    UDP_BIND_HASH(udp->udp_port,
+					us->us_bind_fanout_size)];
 				mutex_enter(&udpf->uf_lock);
 				if (udp->udp_state == TS_DATA_XFER) {
 					/* Connect failed */
@@ -5400,16 +5376,16 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 					tea->ERROR_prim = T_DISCON_REQ;
 					udp->udp_discon_pending = 0;
 				}
-				V6_SET_ZERO(udp->udp_v6src);
-				V6_SET_ZERO(udp->udp_bound_v6src);
-				udp->udp_state = TS_UNBND;
-				udp_bind_hash_remove(udp, B_TRUE);
-				udp->udp_port = 0;
-				mutex_exit(&udpf->uf_lock);
-				if (udp->udp_family == AF_INET6)
-					(void) udp_build_hdrs(q, udp);
-				break;
-			}
+					V6_SET_ZERO(udp->udp_v6src);
+					V6_SET_ZERO(udp->udp_bound_v6src);
+					udp->udp_state = TS_UNBND;
+					udp_bind_hash_remove(udp, B_TRUE);
+					udp->udp_port = 0;
+					mutex_exit(&udpf->uf_lock);
+					if (udp->udp_family == AF_INET6)
+						(void) udp_build_hdrs(q, udp);
+					break;
+				}
 			default:
 				break;
 			}
@@ -5444,10 +5420,9 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 			freemsg(mp);
 			if (options_mp != NULL)
 				freeb(options_mp);
-			BUMP_MIB(&udp_mib, udpInErrors);
+			BUMP_MIB(&udp->udp_mib, udpInErrors);
 			TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
 			    "udp_rput_other_end: q %p (%S)", q, "hdrshort");
-			BUMP_MIB(&udp_mib, udpInErrors);
 			return;
 		}
 		rptr = mp->b_rptr;
@@ -5490,19 +5465,19 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 	udi_size = sizeof (struct T_unitdata_ind) + sizeof (sin_t);
 	if (udp->udp_recvdstaddr) {
 		udi_size += sizeof (struct T_opthdr) + sizeof (struct in_addr);
-		UDP_STAT(udp_in_recvdstaddr);
+		UDP_STAT(us, udp_in_recvdstaddr);
 	}
 
 	if (udp->udp_ip_recvpktinfo && recv_on &&
 	    (pinfo->ip_pkt_flags & IPF_RECVADDR)) {
 		udi_size += sizeof (struct T_opthdr) +
 		    sizeof (struct in_pktinfo);
-		UDP_STAT(udp_ip_recvpktinfo);
+		UDP_STAT(us, udp_ip_recvpktinfo);
 	}
 
 	if (udp->udp_recvopts && opt_len > 0) {
 		udi_size += sizeof (struct T_opthdr) + opt_len;
-		UDP_STAT(udp_in_recvopts);
+		UDP_STAT(us, udp_in_recvopts);
 	}
 
 	/*
@@ -5512,27 +5487,27 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 	if (udp->udp_recvif && recv_on &&
 	    (pinfo->ip_pkt_flags & IPF_RECVIF)) {
 		udi_size += sizeof (struct T_opthdr) + sizeof (uint_t);
-		UDP_STAT(udp_in_recvif);
+		UDP_STAT(us, udp_in_recvif);
 	}
 
 	if (udp->udp_recvslla && recv_on &&
 	    (pinfo->ip_pkt_flags & IPF_RECVSLLA)) {
 		udi_size += sizeof (struct T_opthdr) +
 		    sizeof (struct sockaddr_dl);
-		UDP_STAT(udp_in_recvslla);
+		UDP_STAT(us, udp_in_recvslla);
 	}
 
 	if (udp->udp_recvucred && (cr = DB_CRED(mp)) != NULL) {
 		udi_size += sizeof (struct T_opthdr) + ucredsize;
 		cpid = DB_CPID(mp);
-		UDP_STAT(udp_in_recvucred);
+		UDP_STAT(us, udp_in_recvucred);
 	}
 	/*
 	 * If IP_RECVTTL is set allocate the appropriate sized buffer
 	 */
 	if (udp->udp_recvttl) {
 		udi_size += sizeof (struct T_opthdr) + sizeof (uint8_t);
-		UDP_STAT(udp_in_recvttl);
+		UDP_STAT(us, udp_in_recvttl);
 	}
 
 	/* Allocate a message block for the T_UNITDATA_IND structure. */
@@ -5543,7 +5518,7 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 			freeb(options_mp);
 		TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
 			"udp_rput_other_end: q %p (%S)", q, "allocbfail");
-		BUMP_MIB(&udp_mib, udpInErrors);
+		BUMP_MIB(&udp->udp_mib, udpInErrors);
 		return;
 	}
 	mp1->b_cont = mp;
@@ -5700,7 +5675,7 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 
 		ASSERT(udi_size == 0);	/* "Consumed" all of allocated space */
 	}
-	BUMP_MIB(&udp_mib, udpHCInDatagrams);
+	BUMP_MIB(&udp->udp_mib, udpHCInDatagrams);
 	TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
 	    "udp_rput_other_end: q %p (%S)", q, "end");
 	if (options_mp != NULL)
@@ -5870,6 +5845,7 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 	int			v4_conn_idx;
 	int			v6_conn_idx;
 	boolean_t		needattr;
+	ip_stack_t		*ipst = connp->conn_netstack->netstack_ip;
 
 	mp_conn_ctl = mp_attr_ctl = mp6_conn_ctl = NULL;
 	if (mpctl == NULL ||
@@ -5887,16 +5863,17 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 	zoneid = connp->conn_zoneid;
 
 	/* fixed length structure for IPv4 and IPv6 counters */
-	SET_MIB(udp_mib.udpEntrySize, sizeof (mib2_udpEntry_t));
-	SET_MIB(udp_mib.udp6EntrySize, sizeof (mib2_udp6Entry_t));
+	SET_MIB(udp->udp_mib.udpEntrySize, sizeof (mib2_udpEntry_t));
+	SET_MIB(udp->udp_mib.udp6EntrySize, sizeof (mib2_udp6Entry_t));
 	/* synchronize 64- and 32-bit counters */
-	SYNC32_MIB(&udp_mib, udpInDatagrams, udpHCInDatagrams);
-	SYNC32_MIB(&udp_mib, udpOutDatagrams, udpHCOutDatagrams);
+	SYNC32_MIB(&udp->udp_mib, udpInDatagrams, udpHCInDatagrams);
+	SYNC32_MIB(&udp->udp_mib, udpOutDatagrams, udpHCOutDatagrams);
 
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_UDP;
 	optp->name = 0;
-	(void) snmp_append_data(mpdata, (char *)&udp_mib, sizeof (udp_mib));
+	(void) snmp_append_data(mpdata, (char *)&udp->udp_mib,
+	    sizeof (udp->udp_mib));
 	optp->len = msgdsize(mpdata);
 	qreply(q, mpctl);
 
@@ -5904,7 +5881,7 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 	v4_conn_idx = v6_conn_idx = 0;
 
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
-		connfp = &ipcl_globalhash_fanout[i];
+		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
 		connp = NULL;
 
 		while ((connp = ipcl_get_next_conn(connfp, connp,
@@ -6140,18 +6117,20 @@ udp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	conn_t	*connp = Q_TO_CONN(q);
 	udp_t	*udp = connp->conn_udp;
 	int	i;
+	udp_stack_t *us = udp->udp_us;
+	ip_stack_t *ipst = connp->conn_netstack->netstack_ip;
 
 	/*
 	 * Because of the ndd constraint, at most we can have 64K buffer
 	 * to put in all UDP info.  So to be more efficient, just
 	 * allocate a 64K buffer here, assuming we need that large buffer.
 	 * This may be a problem as any user can read udp_status.  Therefore
-	 * we limit the rate of doing this using udp_ndd_get_info_interval.
+	 * we limit the rate of doing this using us_ndd_get_info_interval.
 	 * This should be OK as normal users should not do this too often.
 	 */
-	if (cr == NULL || secpolicy_net_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - udp_last_ndd_get_info_time <
-		    drv_usectohz(udp_ndd_get_info_interval * 1000)) {
+	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
+		if (ddi_get_lbolt() - us->us_last_ndd_get_info_time <
+		    drv_usectohz(us->us_ndd_get_info_interval * 1000)) {
 			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
 			return (0);
 		}
@@ -6170,7 +6149,7 @@ udp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	zoneid = connp->conn_zoneid;
 
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
-		connfp = &ipcl_globalhash_fanout[i];
+		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
 		connp = NULL;
 
 		while ((connp = ipcl_get_next_conn(connfp, connp,
@@ -6183,7 +6162,7 @@ udp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 			udp_report_item(mp->b_cont, udp);
 		}
 	}
-	udp_last_ndd_get_info_time = ddi_get_lbolt();
+	us->us_last_ndd_get_info_time = ddi_get_lbolt();
 	return (0);
 }
 
@@ -6294,7 +6273,7 @@ udp_unbind(queue_t *q, mblk_t *mp)
  * Don't let port fall into the privileged range.
  * Since the extra privileged ports can be arbitrary we also
  * ensure that we exclude those from consideration.
- * udp_g_epriv_ports is not sorted thus we loop over it until
+ * us->us_epriv_ports is not sorted thus we loop over it until
  * there are no changes.
  */
 static in_port_t
@@ -6303,6 +6282,7 @@ udp_update_next_port(udp_t *udp, in_port_t port, boolean_t random)
 	int i;
 	in_port_t nextport;
 	boolean_t restart = B_FALSE;
+	udp_stack_t *us = udp->udp_us;
 
 	if (random && udp_random_anon_port != 0) {
 		(void) random_get_pseudo_bytes((uint8_t *)&port,
@@ -6316,29 +6296,29 @@ udp_update_next_port(udp_t *udp, in_port_t port, boolean_t random)
 		 * port to get the random port.  It should fall into the
 		 * valid anon port range.
 		 */
-		if (port < udp_smallest_anon_port) {
-			port = udp_smallest_anon_port +
-			    port % (udp_largest_anon_port -
-			    udp_smallest_anon_port);
+		if (port < us->us_smallest_anon_port) {
+			port = us->us_smallest_anon_port +
+			    port % (us->us_largest_anon_port -
+			    us->us_smallest_anon_port);
 		}
 	}
 
 retry:
-	if (port < udp_smallest_anon_port)
-		port = udp_smallest_anon_port;
+	if (port < us->us_smallest_anon_port)
+		port = us->us_smallest_anon_port;
 
-	if (port > udp_largest_anon_port) {
-		port = udp_smallest_anon_port;
+	if (port > us->us_largest_anon_port) {
+		port = us->us_smallest_anon_port;
 		if (restart)
 			return (0);
 		restart = B_TRUE;
 	}
 
-	if (port < udp_smallest_nonpriv_port)
-		port = udp_smallest_nonpriv_port;
+	if (port < us->us_smallest_nonpriv_port)
+		port = us->us_smallest_nonpriv_port;
 
-	for (i = 0; i < udp_g_num_epriv_ports; i++) {
-		if (port == udp_g_epriv_ports[i]) {
+	for (i = 0; i < us->us_num_epriv_ports; i++) {
+		if (port == us->us_epriv_ports[i]) {
 			port++;
 			/*
 			 * Make sure that the port is in the
@@ -6366,7 +6346,8 @@ udp_update_label(queue_t *wq, mblk_t *mp, ipaddr_t dst)
 	udp_t *udp = Q_TO_UDP(wq);
 
 	err = tsol_compute_label(DB_CREDDEF(mp, udp->udp_connp->conn_cred), dst,
-	    opt_storage, udp->udp_mac_exempt);
+	    opt_storage, udp->udp_mac_exempt,
+	    udp->udp_us->us_netstack->netstack_ip);
 	if (err == 0) {
 		err = tsol_update_options(&udp->udp_ip_snd_options,
 		    &udp->udp_ip_snd_options_len, &udp->udp_label_len,
@@ -6401,6 +6382,9 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	ip4_pkt_t  pktinfo;
 	ip4_pkt_t  *pktinfop = &pktinfo;
 	ip_opt_info_t optinfo;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
+	udp_stack_t	*us = udp->udp_us;
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
 
 
 	*error = 0;
@@ -6475,7 +6459,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	ipha = (ipha_t *)&mp1->b_rptr[-ip_hdr_length];
 	if (DB_REF(mp1) != 1 || (uchar_t *)ipha < DB_BASE(mp1) ||
 	    !OK_32PTR(ipha)) {
-		mp2 = allocb(ip_hdr_length + udp_wroff_extra, BPRI_LO);
+		mp2 = allocb(ip_hdr_length + us->us_wroff_extra, BPRI_LO);
 		if (mp2 == NULL) {
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_END,
 			    "udp_wput_end: q %p (%S)", q, "allocbfail2");
@@ -6522,7 +6506,8 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 		if (srcid != 0 && ipha->ipha_src == INADDR_ANY) {
 			in6_addr_t v6src;
 
-			ip_srcid_find_id(srcid, &v6src, connp->conn_zoneid);
+			ip_srcid_find_id(srcid, &v6src, connp->conn_zoneid,
+			    us->us_netstack);
 			IN6_V4MAPPED_TO_IPADDR(&v6src, ipha->ipha_src);
 		}
 	}
@@ -6586,7 +6571,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 		 * Ignore the destination in T_unitdata_req.
 		 * Create a checksum adjustment for a source route, if any.
 		 */
-		cksum = ip_massage_options(ipha);
+		cksum = ip_massage_options(ipha, us->us_netstack);
 		cksum = (cksum & 0xFFFF) + (cksum >> 16);
 		cksum -= ((ipha->ipha_dst >> 16) & 0xFFFF) +
 		    (ipha->ipha_dst & 0xFFFF);
@@ -6603,10 +6588,10 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 		/* There might be a carry. */
 		cksum = (cksum & 0xFFFF) + (cksum >> 16);
 #ifdef _LITTLE_ENDIAN
-		if (udp_do_checksum)
+		if (us->us_do_checksum)
 			ip_len = (cksum << 16) | ip_len;
 #else
-		if (udp_do_checksum)
+		if (us->us_do_checksum)
 			ip_len = (ip_len << 16) | cksum;
 		else
 			ip_len <<= 16;
@@ -6617,7 +6602,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 		 * We make it easy for IP to include our pseudo header
 		 * by putting our length in uha_checksum.
 		 */
-		if (udp_do_checksum)
+		if (us->us_do_checksum)
 			ip_len |= (ip_len << 16);
 #ifndef _LITTLE_ENDIAN
 		else
@@ -6640,19 +6625,20 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	mp = NULL;
 
 	/* We're done.  Pass the packet to ip. */
-	BUMP_MIB(&udp_mib, udpHCOutDatagrams);
+	BUMP_MIB(&udp->udp_mib, udpHCOutDatagrams);
 	TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_END,
 		"udp_wput_end: q %p (%S)", q, "end");
 
 	if ((connp->conn_flags & IPCL_CHECK_POLICY) != 0 ||
-	    CONN_OUTBOUND_POLICY_PRESENT(connp) ||
+	    CONN_OUTBOUND_POLICY_PRESENT(connp, ipss) ||
 	    connp->conn_dontroute || connp->conn_xmit_if_ill != NULL ||
 	    connp->conn_nofailover_ill != NULL ||
 	    connp->conn_outgoing_ill != NULL || optinfo.ip_opt_flags != 0 ||
 	    optinfo.ip_opt_ill_index != 0 ||
 	    ipha->ipha_version_and_hdr_length != IP_SIMPLE_HDR_VERSION ||
-	    IPP_ENABLED(IPP_LOCAL_OUT) || ip_g_mrouter != NULL) {
-		UDP_STAT(udp_ip_send);
+	    IPP_ENABLED(IPP_LOCAL_OUT, ipst) ||
+	    ipst->ips_ip_g_mrouter != NULL) {
+		UDP_STAT(us, udp_ip_send);
 		ip_output_options(connp, mp1, connp->conn_wq, IP_WPUT,
 		    &optinfo);
 	} else {
@@ -6662,7 +6648,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 done:
 	if (*error != 0) {
 		ASSERT(mp != NULL);
-		BUMP_MIB(&udp_mib, udpOutErrors);
+		BUMP_MIB(&udp->udp_mib, udpOutErrors);
 	}
 	return (mp);
 }
@@ -6681,6 +6667,8 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 	uint32_t cksum, hcksum_txflags;
 	queue_t	*dev_q;
 	boolean_t retry_caching;
+	udp_stack_t *us = udp->udp_us;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	dst = ipha->ipha_dst;
 	src = ipha->ipha_src;
@@ -6697,7 +6685,7 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 		    PHYI_LOOPBACK)) {
 			if (ipif != NULL)
 				ipif_refrele(ipif);
-			UDP_STAT(udp_ip_send);
+			UDP_STAT(us, udp_ip_send);
 			ip_output(connp, mp, q, IP_WPUT);
 			return;
 		}
@@ -6740,17 +6728,17 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 			ASSERT(ipif != NULL);
 			ire = ire_ctable_lookup(dst, 0, 0, ipif,
 			    connp->conn_zoneid, MBLK_GETLABEL(mp),
-			    MATCH_IRE_ILL_GROUP);
+			    MATCH_IRE_ILL_GROUP, ipst);
 		} else {
 			ASSERT(ipif == NULL);
 			ire = ire_cache_lookup(dst, connp->conn_zoneid,
-			    MBLK_GETLABEL(mp));
+			    MBLK_GETLABEL(mp), ipst);
 		}
 
 		if (ire == NULL) {
 			if (ipif != NULL)
 				ipif_refrele(ipif);
-			UDP_STAT(udp_ire_null);
+			UDP_STAT(us, udp_ire_null);
 			ip_output(connp, mp, q, IP_WPUT);
 			return;
 		}
@@ -6793,7 +6781,7 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 	    ((ire_fp_mp_len = MBLKL(ire_fp_mp)) > MBLKHEAD(mp))) {
 		if (ipif != NULL)
 			ipif_refrele(ipif);
-		UDP_STAT(udp_ip_ire_send);
+		UDP_STAT(us, udp_ip_ire_send);
 		IRE_REFRELE(ire);
 		ip_output(connp, mp, q, IP_WPUT);
 		return;
@@ -6812,7 +6800,7 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 	 */
 	if ((q->q_first != NULL || connp->conn_draining) ||
 	    ((dev_q->q_next || dev_q->q_first) && !canput(dev_q))) {
-		if (ip_output_queue) {
+		if (ipst->ips_ip_output_queue) {
 			(void) putq(q, mp);
 		} else {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
@@ -6855,8 +6843,8 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 
 		/* Software checksum? */
 		if (DB_CKSUMFLAGS(mp) == 0) {
-			UDP_STAT(udp_out_sw_cksum);
-			UDP_STAT_UPDATE(udp_out_sw_cksum_bytes,
+			UDP_STAT(us, udp_out_sw_cksum);
+			UDP_STAT_UPDATE(us, udp_out_sw_cksum_bytes,
 			    ntohs(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH);
 		}
 	}
@@ -6909,13 +6897,14 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 		 * depending on the availability of transmit resources at
 		 * the media layer.
 		 */
-		IP_DLS_ILL_TX(ill, ipha, mp);
+		IP_DLS_ILL_TX(ill, ipha, mp, ipst);
 	} else {
 		DTRACE_PROBE4(ip4__physical__out__start,
 		    ill_t *, NULL, ill_t *, ill,
 		    ipha_t *, ipha, mblk_t *, mp);
-		FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,
-		    NULL, ill, ipha, mp, mp);
+		FW_HOOKS(ipst->ips_ip4_physical_out_event,
+		    ipst->ips_ipv4firewall_physical_out,
+		    NULL, ill, ipha, mp, mp, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 		if (mp != NULL)
 			putnext(ire->ire_stq, mp);
@@ -6934,7 +6923,8 @@ udp_update_label_v6(queue_t *wq, mblk_t *mp, in6_addr_t *dst)
 	uchar_t opt_storage[TSOL_MAX_IPV6_OPTION];
 
 	err = tsol_compute_label_v6(DB_CREDDEF(mp, udp->udp_connp->conn_cred),
-	    dst, opt_storage, udp->udp_mac_exempt);
+	    dst, opt_storage, udp->udp_mac_exempt,
+	    udp->udp_us->us_netstack->netstack_ip);
 	if (err == 0) {
 		err = tsol_update_sticky(&udp->udp_sticky_ipp,
 		    &udp->udp_label_len_v6, opt_storage);
@@ -6967,6 +6957,7 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 	udp_t		*udp = connp->conn_udp;
 	int		error = 0;
 	struct sockaddr_storage ss;
+	udp_stack_t *us = udp->udp_us;
 
 	TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_START,
 	    "udp_wput_start: connp %p mp %p", connp, mp);
@@ -6983,8 +6974,8 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 			if (!udp->udp_direct_sockfs ||
 			    addr == NULL || addrlen == 0) {
 				/* Not connected; address is required */
-				BUMP_MIB(&udp_mib, udpOutErrors);
-				UDP_STAT(udp_out_err_notconn);
+				BUMP_MIB(&udp->udp_mib, udpOutErrors);
+				UDP_STAT(us, udp_out_err_notconn);
 				freemsg(mp);
 				TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_END,
 				    "udp_wput_end: connp %p (%S)", connp,
@@ -6992,12 +6983,12 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 				return;
 			}
 			ASSERT(udp->udp_issocket);
-			UDP_DBGSTAT(udp_data_notconn);
+			UDP_DBGSTAT(us, udp_data_notconn);
 			/* Not connected; do some more checks below */
 			break;
 		}
 		/* M_DATA for connected socket */
-		UDP_DBGSTAT(udp_data_conn);
+		UDP_DBGSTAT(us, udp_data_conn);
 		IN6_V4MAPPED_TO_IPADDR(&udp->udp_v6dst, v4dst);
 
 		/* Initialize addr and addrlen as if they're passed in */
@@ -7079,7 +7070,7 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 			    &mp->b_rptr[tudr->DEST_offset];
 			addrlen = tudr->DEST_length;
 			if (tudr->OPT_length != 0)
-				UDP_STAT(udp_out_opt);
+				UDP_STAT(us, udp_out_opt);
 			break;
 		}
 		/* FALLTHRU */
@@ -7154,7 +7145,7 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 	mp = udp_output_v4(connp, mp, v4dst, port, srcid, &error);
 	if (error != 0) {
 ud_error:
-		UDP_STAT(udp_out_err_output);
+		UDP_STAT(us, udp_out_err_output);
 		ASSERT(mp != NULL);
 		/* mp is freed by the following routine */
 		udp_ud_err(q, mp, (uchar_t *)addr, (t_scalar_t)addrlen,
@@ -7214,10 +7205,12 @@ udp_wput_data(queue_t *q, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 {
 	conn_t	*connp;
 	udp_t	*udp;
+	udp_stack_t *us;
 
 	q = UDP_WR(q);
 	connp = Q_TO_CONN(q);
 	udp = connp->conn_udp;
+	us = udp->udp_us;
 
 	/* udpsockfs should only send down M_DATA for this entry point */
 	ASSERT(DB_TYPE(mp) == M_DATA);
@@ -7238,8 +7231,8 @@ udp_wput_data(queue_t *q, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 
 			if (tudr_mp == NULL) {
 				mutex_exit(&connp->conn_lock);
-				BUMP_MIB(&udp_mib, udpOutErrors);
-				UDP_STAT(udp_out_err_tudr);
+				BUMP_MIB(&udp->udp_mib, udpOutErrors);
+				UDP_STAT(us, udp_out_err_tudr);
 				freemsg(mp);
 				return;
 			}
@@ -7292,6 +7285,7 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error)
 	ip6_hbh_t	*hopoptsptr = NULL;
 	uint_t		hopoptslen = 0;
 	boolean_t	is_ancillary = B_FALSE;
+	udp_stack_t	*us = udp->udp_us;
 
 	*error = 0;
 
@@ -7546,9 +7540,9 @@ no_options:
 		if (udp_ip_hdr_len > udp->udp_max_hdr_len) {
 			udp->udp_max_hdr_len = udp_ip_hdr_len;
 			(void) mi_set_sth_wroff(UDP_RD(q),
-			    udp->udp_max_hdr_len + udp_wroff_extra);
+			    udp->udp_max_hdr_len + us->us_wroff_extra);
 		}
-		mp2 = allocb(udp_ip_hdr_len + udp_wroff_extra, BPRI_LO);
+		mp2 = allocb(udp_ip_hdr_len + us->us_wroff_extra, BPRI_LO);
 		if (mp2 == NULL) {
 			*error = ENOMEM;
 			goto done;
@@ -7647,7 +7641,8 @@ no_options:
 		if (sin6->__sin6_src_id != 0 &&
 		    IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src)) {
 			ip_srcid_find_id(sin6->__sin6_src_id,
-			    &ip6h->ip6_src, connp->conn_zoneid);
+			    &ip6h->ip6_src, connp->conn_zoneid,
+			    us->us_netstack);
 		}
 	}
 
@@ -7780,7 +7775,8 @@ no_options:
 			 * between the first hop (in ip6_dst) and
 			 * the destination (in the last routing hdr entry).
 			 */
-			csum = ip_massage_options_v6(ip6h, rth);
+			csum = ip_massage_options_v6(ip6h, rth,
+			    us->us_netstack);
 			/*
 			 * Verify that the first hop isn't a mapped address.
 			 * Routers along the path need to do this verification
@@ -7846,7 +7842,7 @@ no_options:
 	mp = NULL;
 
 	/* We're done. Pass the packet to IP */
-	BUMP_MIB(&udp_mib, udpHCOutDatagrams);
+	BUMP_MIB(&udp->udp_mib, udpHCOutDatagrams);
 	ip_output_v6(connp, mp1, q, IP_WPUT);
 
 done:
@@ -7856,7 +7852,7 @@ done:
 	}
 	if (*error != 0) {
 		ASSERT(mp != NULL);
-		BUMP_MIB(&udp_mib, udpOutErrors);
+		BUMP_MIB(&udp->udp_mib, udpOutErrors);
 	}
 	return (mp);
 }
@@ -7870,10 +7866,12 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 	cred_t	*cr;
 	conn_t	*connp = Q_TO_CONN(q);
 	udp_t	*udp = connp->conn_udp;
+	udp_stack_t *us;
 
 	TRACE_1(TR_FAC_UDP, TR_UDP_WPUT_OTHER_START,
 		"udp_wput_other_start: q %p", q);
 
+	us = udp->udp_us;
 	db = mp->b_datap;
 
 	cr = DB_CREDDEF(mp, connp->conn_cred);
@@ -8028,7 +8026,7 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 		case ND_SET:
 			/* nd_getset performs the necessary checking */
 		case ND_GET:
-			if (nd_getset(q, udp_g_nd, mp)) {
+			if (nd_getset(q, us->us_nd, mp)) {
 				putnext(UDP_RD(q), mp);
 				TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
 					"udp_wput_other_end: q %p (%S)",
@@ -8059,7 +8057,7 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 					udp_rcv_drain(UDP_RD(q), udp,
 					    B_FALSE);
 					ASSERT(!udp->udp_direct_sockfs);
-					UDP_STAT(udp_sock_fallback);
+					UDP_STAT(us, udp_sock_fallback);
 				}
 				DB_TYPE(mp) = M_IOCACK;
 				iocp->ioc_error = 0;
@@ -8288,57 +8286,183 @@ udp_unitdata_opt_process(queue_t *q, mblk_t *mp, int *errorp,
 void
 udp_ddi_init(void)
 {
-	int i;
-
 	UDP6_MAJ = ddi_name_to_major(UDP6);
-
 	udp_max_optsize = optcom_max_optsize(udp_opt_obj.odb_opt_des_arr,
 	    udp_opt_obj.odb_opt_arr_cnt);
 
-	if (udp_bind_fanout_size & (udp_bind_fanout_size - 1)) {
-		/* Not a power of two. Round up to nearest power of two */
-		for (i = 0; i < 31; i++) {
-			if (udp_bind_fanout_size < (1 << i))
-				break;
-		}
-		udp_bind_fanout_size = 1 << i;
-	}
-	udp_bind_fanout = kmem_zalloc(udp_bind_fanout_size *
-	    sizeof (udp_fanout_t), KM_SLEEP);
-	for (i = 0; i < udp_bind_fanout_size; i++) {
-		mutex_init(&udp_bind_fanout[i].uf_lock, NULL, MUTEX_DEFAULT,
-		    NULL);
-	}
-	(void) udp_param_register(udp_param_arr, A_CNT(udp_param_arr));
-
-	udp_kstat_init();
-
 	udp_cache = kmem_cache_create("udp_cache", sizeof (udp_t),
 	    CACHE_ALIGN_SIZE, NULL, NULL, NULL, NULL, NULL, 0);
+
+	/*
+	 * We want to be informed each time a stack is created or
+	 * destroyed in the kernel, so we can maintain the
+	 * set of udp_stack_t's.
+	 */
+	netstack_register(NS_UDP, udp_stack_init, NULL, udp_stack_fini);
 }
 
 void
 udp_ddi_destroy(void)
 {
-	int i;
-
-	nd_free(&udp_g_nd);
-
-	for (i = 0; i < udp_bind_fanout_size; i++) {
-		mutex_destroy(&udp_bind_fanout[i].uf_lock);
-	}
-
-	kmem_free(udp_bind_fanout, udp_bind_fanout_size *
-	    sizeof (udp_fanout_t));
-
-	udp_kstat_fini();
+	netstack_unregister(NS_UDP);
 
 	kmem_cache_destroy(udp_cache);
 }
 
-static void
-udp_kstat_init(void)
+/*
+ * Initialize the UDP stack instance.
+ */
+static void *
+udp_stack_init(netstackid_t stackid, netstack_t *ns)
 {
+	udp_stack_t	*us;
+	udpparam_t	*pa;
+	int		i;
+
+	us = (udp_stack_t *)kmem_zalloc(sizeof (*us), KM_SLEEP);
+	us->us_netstack = ns;
+
+	us->us_num_epriv_ports = UDP_NUM_EPRIV_PORTS;
+	us->us_epriv_ports[0] = 2049;
+	us->us_epriv_ports[1] = 4045;
+
+	/*
+	 * The smallest anonymous port in the priviledged port range which UDP
+	 * looks for free port.  Use in the option UDP_ANONPRIVBIND.
+	 */
+	us->us_min_anonpriv_port = 512;
+
+	us->us_bind_fanout_size = udp_bind_fanout_size;
+
+	/* Roundup variable that might have been modified in /etc/system */
+	if (us->us_bind_fanout_size & (us->us_bind_fanout_size - 1)) {
+		/* Not a power of two. Round up to nearest power of two */
+		for (i = 0; i < 31; i++) {
+			if (us->us_bind_fanout_size < (1 << i))
+				break;
+		}
+		us->us_bind_fanout_size = 1 << i;
+	}
+	us->us_bind_fanout = kmem_zalloc(us->us_bind_fanout_size *
+	    sizeof (udp_fanout_t), KM_SLEEP);
+	for (i = 0; i < us->us_bind_fanout_size; i++) {
+		mutex_init(&us->us_bind_fanout[i].uf_lock, NULL, MUTEX_DEFAULT,
+		    NULL);
+	}
+
+	pa = (udpparam_t *)kmem_alloc(sizeof (udp_param_arr), KM_SLEEP);
+
+	us->us_param_arr = pa;
+	bcopy(udp_param_arr, us->us_param_arr, sizeof (udp_param_arr));
+
+	(void) udp_param_register(&us->us_nd,
+	    us->us_param_arr, A_CNT(udp_param_arr));
+
+	us->us_kstat = udp_kstat2_init(stackid, &us->us_statistics);
+	us->us_mibkp = udp_kstat_init(stackid);
+	return (us);
+}
+
+/*
+ * Free the UDP stack instance.
+ */
+static void
+udp_stack_fini(netstackid_t stackid, void *arg)
+{
+	udp_stack_t *us = (udp_stack_t *)arg;
+	int i;
+
+	for (i = 0; i < us->us_bind_fanout_size; i++) {
+		mutex_destroy(&us->us_bind_fanout[i].uf_lock);
+	}
+
+	kmem_free(us->us_bind_fanout, us->us_bind_fanout_size *
+	    sizeof (udp_fanout_t));
+
+	us->us_bind_fanout = NULL;
+
+	nd_free(&us->us_nd);
+	kmem_free(us->us_param_arr, sizeof (udp_param_arr));
+	us->us_param_arr = NULL;
+
+	udp_kstat_fini(stackid, us->us_mibkp);
+	us->us_mibkp = NULL;
+
+	udp_kstat2_fini(stackid, us->us_kstat);
+	us->us_kstat = NULL;
+	bzero(&us->us_statistics, sizeof (us->us_statistics));
+	kmem_free(us, sizeof (*us));
+}
+
+static void *
+udp_kstat2_init(netstackid_t stackid, udp_stat_t *us_statisticsp)
+{
+	kstat_t *ksp;
+
+	udp_stat_t template = {
+		{ "udp_ip_send",		KSTAT_DATA_UINT64 },
+		{ "udp_ip_ire_send",		KSTAT_DATA_UINT64 },
+		{ "udp_ire_null",		KSTAT_DATA_UINT64 },
+		{ "udp_drain",			KSTAT_DATA_UINT64 },
+		{ "udp_sock_fallback",		KSTAT_DATA_UINT64 },
+		{ "udp_rrw_busy",		KSTAT_DATA_UINT64 },
+		{ "udp_rrw_msgcnt",		KSTAT_DATA_UINT64 },
+		{ "udp_out_sw_cksum",		KSTAT_DATA_UINT64 },
+		{ "udp_out_sw_cksum_bytes",	KSTAT_DATA_UINT64 },
+		{ "udp_out_opt",		KSTAT_DATA_UINT64 },
+		{ "udp_out_err_notconn",	KSTAT_DATA_UINT64 },
+		{ "udp_out_err_output",		KSTAT_DATA_UINT64 },
+		{ "udp_out_err_tudr",		KSTAT_DATA_UINT64 },
+		{ "udp_in_pktinfo",		KSTAT_DATA_UINT64 },
+		{ "udp_in_recvdstaddr",		KSTAT_DATA_UINT64 },
+		{ "udp_in_recvopts",		KSTAT_DATA_UINT64 },
+		{ "udp_in_recvif",		KSTAT_DATA_UINT64 },
+		{ "udp_in_recvslla",		KSTAT_DATA_UINT64 },
+		{ "udp_in_recvucred",		KSTAT_DATA_UINT64 },
+		{ "udp_in_recvttl",		KSTAT_DATA_UINT64 },
+		{ "udp_in_recvhopopts",		KSTAT_DATA_UINT64 },
+		{ "udp_in_recvhoplimit",	KSTAT_DATA_UINT64 },
+		{ "udp_in_recvdstopts",		KSTAT_DATA_UINT64 },
+		{ "udp_in_recvrtdstopts",	KSTAT_DATA_UINT64 },
+		{ "udp_in_recvrthdr",		KSTAT_DATA_UINT64 },
+		{ "udp_in_recvpktinfo",		KSTAT_DATA_UINT64 },
+		{ "udp_in_recvtclass",		KSTAT_DATA_UINT64 },
+		{ "udp_in_timestamp",		KSTAT_DATA_UINT64 },
+#ifdef DEBUG
+		{ "udp_data_conn",		KSTAT_DATA_UINT64 },
+		{ "udp_data_notconn",		KSTAT_DATA_UINT64 },
+#endif
+	};
+
+	ksp = kstat_create_netstack(UDP_MOD_NAME, 0, "udpstat", "net",
+	    KSTAT_TYPE_NAMED, sizeof (template) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL, stackid);
+
+	if (ksp == NULL)
+		return (NULL);
+
+	bcopy(&template, us_statisticsp, sizeof (template));
+	ksp->ks_data = (void *)us_statisticsp;
+	ksp->ks_private = (void *)(uintptr_t)stackid;
+
+	kstat_install(ksp);
+	return (ksp);
+}
+
+static void
+udp_kstat2_fini(netstackid_t stackid, kstat_t *ksp)
+{
+	if (ksp != NULL) {
+		ASSERT(stackid == (netstackid_t)(uintptr_t)ksp->ks_private);
+		kstat_delete_netstack(ksp, stackid);
+	}
+}
+
+static void *
+udp_kstat_init(netstackid_t stackid)
+{
+	kstat_t	*ksp;
+
 	udp_named_kstat_t template = {
 		{ "inDatagrams",	KSTAT_DATA_UINT64, 0 },
 		{ "inErrors",		KSTAT_DATA_UINT32, 0 },
@@ -8348,40 +8472,30 @@ udp_kstat_init(void)
 		{ "outErrors",		KSTAT_DATA_UINT32, 0 },
 	};
 
-	udp_mibkp = kstat_create(UDP_MOD_NAME, 0, UDP_MOD_NAME,
-	    "mib2", KSTAT_TYPE_NAMED, NUM_OF_FIELDS(udp_named_kstat_t), 0);
+	ksp = kstat_create_netstack(UDP_MOD_NAME, 0, UDP_MOD_NAME, "mib2",
+	    KSTAT_TYPE_NAMED,
+	    NUM_OF_FIELDS(udp_named_kstat_t), 0, stackid);
 
-	if (udp_mibkp == NULL)
-		return;
+	if (ksp == NULL || ksp->ks_data == NULL)
+		return (NULL);
 
 	template.entrySize.value.ui32 = sizeof (mib2_udpEntry_t);
 	template.entry6Size.value.ui32 = sizeof (mib2_udp6Entry_t);
 
-	bcopy(&template, udp_mibkp->ks_data, sizeof (template));
+	bcopy(&template, ksp->ks_data, sizeof (template));
+	ksp->ks_update = udp_kstat_update;
+	ksp->ks_private = (void *)(uintptr_t)stackid;
 
-	udp_mibkp->ks_update = udp_kstat_update;
-
-	kstat_install(udp_mibkp);
-
-	if ((udp_ksp = kstat_create(UDP_MOD_NAME, 0, "udpstat",
-	    "net", KSTAT_TYPE_NAMED,
-	    sizeof (udp_statistics) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_VIRTUAL)) != NULL) {
-		udp_ksp->ks_data = &udp_statistics;
-		kstat_install(udp_ksp);
-	}
+	kstat_install(ksp);
+	return (ksp);
 }
 
 static void
-udp_kstat_fini(void)
+udp_kstat_fini(netstackid_t stackid, kstat_t *ksp)
 {
-	if (udp_ksp != NULL) {
-		kstat_delete(udp_ksp);
-		udp_ksp = NULL;
-	}
-	if (udp_mibkp != NULL) {
-		kstat_delete(udp_mibkp);
-		udp_mibkp = NULL;
+	if (ksp != NULL) {
+		ASSERT(stackid == (netstackid_t)(uintptr_t)ksp->ks_private);
+		kstat_delete_netstack(ksp, stackid);
 	}
 }
 
@@ -8389,6 +8503,9 @@ static int
 udp_kstat_update(kstat_t *kp, int rw)
 {
 	udp_named_kstat_t *udpkp;
+	netstackid_t	stackid = (netstackid_t)(uintptr_t)kp->ks_private;
+	netstack_t	*ns;
+	udp_stack_t	*us;
 
 	if ((kp == NULL) || (kp->ks_data == NULL))
 		return (EIO);
@@ -8396,13 +8513,21 @@ udp_kstat_update(kstat_t *kp, int rw)
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
+	ns = netstack_find_by_stackid(stackid);
+	if (ns == NULL)
+		return (-1);
+	us = ns->netstack_udp;
+	if (us == NULL) {
+		netstack_rele(ns);
+		return (-1);
+	}
 	udpkp = (udp_named_kstat_t *)kp->ks_data;
 
-	udpkp->inDatagrams.value.ui64 =		udp_mib.udpHCInDatagrams;
-	udpkp->inErrors.value.ui32 =		udp_mib.udpInErrors;
-	udpkp->outDatagrams.value.ui64 = 	udp_mib.udpHCOutDatagrams;
-	udpkp->outErrors.value.ui32 =		udp_mib.udpOutErrors;
-
+	udpkp->inDatagrams.value.ui32 =	us->us_udp_mib.udpHCInDatagrams;
+	udpkp->inErrors.value.ui32 =	us->us_udp_mib.udpInErrors;
+	udpkp->outDatagrams.value.ui32 = us->us_udp_mib.udpHCOutDatagrams;
+	udpkp->outErrors.value.ui32 =	us->us_udp_mib.udpOutErrors;
+	netstack_rele(ns);
 	return (0);
 }
 
@@ -8504,6 +8629,7 @@ udp_rrw(queue_t *q, struiod_t *dp)
 {
 	mblk_t	*mp;
 	udp_t	*udp = Q_TO_UDP(_RD(UDP_WR(q)));
+	udp_stack_t *us = udp->udp_us;
 
 	/* We should never get here when we're in SNMP mode */
 	ASSERT(!(udp->udp_connp->conn_flags & IPCL_UDPMOD));
@@ -8517,7 +8643,7 @@ udp_rrw(queue_t *q, struiod_t *dp)
 	mutex_enter(&udp->udp_drain_lock);
 	if (!udp->udp_direct_sockfs) {
 		mutex_exit(&udp->udp_drain_lock);
-		UDP_STAT(udp_rrw_busy);
+		UDP_STAT(us, udp_rrw_busy);
 		return (EBUSY);
 	}
 	if ((mp = udp->udp_rcv_list_head) != NULL) {
@@ -8530,7 +8656,7 @@ udp_rrw(queue_t *q, struiod_t *dp)
 
 		udp->udp_rcv_cnt -= size;
 		udp->udp_rcv_msgcnt--;
-		UDP_STAT(udp_rrw_msgcnt);
+		UDP_STAT(us, udp_rrw_msgcnt);
 
 		/* No longer flow-controlling? */
 		if (udp->udp_rcv_cnt < udp->udp_rcv_hiwat &&
@@ -8616,6 +8742,7 @@ static void
 udp_rcv_drain(queue_t *q, udp_t *udp, boolean_t closing)
 {
 	mblk_t *mp;
+	udp_stack_t *us = udp->udp_us;
 
 	ASSERT(q == RD(q));
 
@@ -8631,7 +8758,7 @@ udp_rcv_drain(queue_t *q, udp_t *udp, boolean_t closing)
 	mutex_exit(&udp->udp_drain_lock);
 
 	if (udp->udp_rcv_list_head != NULL)
-		UDP_STAT(udp_drain);
+		UDP_STAT(us, udp_drain);
 
 	/*
 	 * Send up everything via putnext(); note here that we
@@ -8660,10 +8787,12 @@ udp_rcv_drain(queue_t *q, udp_t *udp, boolean_t closing)
 static size_t
 udp_set_rcv_hiwat(udp_t *udp, size_t size)
 {
+	udp_stack_t *us = udp->udp_us;
+
 	/* We add a bit of extra buffering */
 	size += size >> 1;
-	if (size > udp_max_buf)
-		size = udp_max_buf;
+	if (size > us->us_max_buf)
+		size = us->us_max_buf;
 
 	udp->udp_rcv_hiwat = size;
 	return (size);
@@ -8673,7 +8802,9 @@ udp_set_rcv_hiwat(udp_t *udp, size_t size)
  * Little helper for IPsec's NAT-T processing.
  */
 boolean_t
-udp_compute_checksum(void)
+udp_compute_checksum(netstack_t *ns)
 {
-	return (udp_do_checksum);
+	udp_stack_t *us = ns->netstack_udp;
+
+	return (us->us_do_checksum);
 }

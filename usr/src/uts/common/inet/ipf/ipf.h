@@ -6,7 +6,7 @@
  * @(#)ipf.h	1.12 6/5/96
  * $Id: ipf.h,v 2.71.2.7 2005/06/12 07:18:31 darrenr Exp $
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +71,7 @@ struct file;
 #include <string.h>
 #include <unistd.h>
 
+#include "netinet/ipf_stack.h"
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
 #include "netinet/ip_nat.h"
@@ -209,7 +210,7 @@ extern int getportproto __P((char *, int));
 extern int getproto __P((char *));
 extern char *getline __P((char *, size_t, FILE *, int *));
 extern int genmask __P((char *, u_32_t *));
-extern char *getnattype __P((struct ipnat *));
+extern char *getnattype __P((struct nat *, int));
 extern char *getsumd __P((u_32_t));
 extern u_32_t getoptbyname __P((char *));
 extern u_32_t getoptbyvalue __P((int));
@@ -252,6 +253,8 @@ extern void print_toif __P((char *, struct frdest *));
 extern void printaps __P((ap_session_t *, int));
 extern void printbuf __P((char *, int, int));
 extern void printfr __P((struct frentry *, ioctlfunc_t));
+extern struct iphtable_s *printhash_live __P((struct iphtable_s *, int, char*, int));
+extern void printhashdata __P((struct iphtable_s *, int));
 extern void printtunable __P((ipftune_t *));
 extern struct iphtable_s *printhash __P((struct iphtable_s *, copyfunc_t,
 					 char *, int));
@@ -267,6 +270,8 @@ extern void printpacket __P((struct ip *));
 extern void printpacket6 __P((struct ip *));
 extern struct ip_pool_s *printpool __P((struct ip_pool_s *, copyfunc_t,
 					char *, int));
+extern struct ip_pool_s *printpool_live __P((struct ip_pool_s *, int, char*, int));
+extern void printpooldata __P((struct ip_pool_s *, int));
 extern struct ip_pool_node *printpoolnode __P((struct ip_pool_node *, int));
 extern void printproto __P((struct protoent *, int, struct ipnat *));
 extern void printportcmp __P((int, struct frpcmp *));
@@ -293,7 +298,7 @@ extern char *hostname __P((int, void *));
 extern struct ipstate *printstate __P((struct ipstate *, int, u_long));
 extern void printsbuf __P((char *));
 extern void printnat __P((struct ipnat *, int));
-extern void printactivenat __P((struct nat *, int));
+extern void printactivenat __P((struct nat *, int, int));
 extern void printhostmap __P((struct hostmap *, u_int));
 extern void printpacket __P((struct ip *));
 

@@ -40,6 +40,7 @@
 #include <inet/mi.h>
 #include <inet/mib2.h>
 #include <inet/nd.h>
+#include <inet/ipclassifier.h>
 #include "sctp_impl.h"
 #include "sctp_addr.h"
 
@@ -67,9 +68,6 @@
  * Protected by sctp_epriv_port_lock.
  */
 #define	SCTP_NUM_EPRIV_PORTS	64
-int		sctp_g_num_epriv_ports = SCTP_NUM_EPRIV_PORTS;
-uint16_t	sctp_g_epriv_ports[SCTP_NUM_EPRIV_PORTS] = { 2049, 4045 };
-kmutex_t	sctp_epriv_port_lock;
 
 /*
  * sctp_wroff_xtra is the extra space in front of SCTP/IP header for link
@@ -77,7 +75,7 @@ kmutex_t	sctp_epriv_port_lock;
  * Also there has to be enough space to stash in information passed between
  * IP and SCTP.
  */
-sctpparam_t sctp_wroff_xtra_param = { sizeof (conn_t *) + sizeof (ire_t *),
+sctpparam_t lcl_sctp_wroff_xtra_param = { sizeof (conn_t *) + sizeof (ire_t *),
 					256, 32, "sctp_wroff_xtra" };
 
 /*
@@ -86,7 +84,7 @@ sctpparam_t sctp_wroff_xtra_param = { sizeof (conn_t *) + sizeof (ire_t *),
  * per the SCTP spec.
  */
 /* BEGIN CSTYLED */
-sctpparam_t	sctp_param_arr[] = {
+sctpparam_t	lcl_sctp_param_arr[] = {
  /*min		max		value		name */
  { 0,		128,		8,		"sctp_max_init_retr"},
  { 1,		128,		10,		"sctp_pa_max_retr"},
@@ -128,9 +126,6 @@ sctpparam_t	sctp_param_arr[] = {
  { 1,		16,		2,		"sctp_deferred_acks_max"},
 };
 /* END CSTYLED */
-
-/* Only modified during _init and _fini thus no locking is needed. */
-static caddr_t	sctp_g_nd;	/* Head of 'named dispatch' variable list */
 
 /* Get callback routine passed to nd_load by sctp_param_register */
 /* ARGSUSED */
@@ -196,10 +191,12 @@ static int
 sctp_extra_priv_ports_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 {
 	int i;
+	sctp_stack_t	*sctps = Q_TO_CONN(q)->conn_netstack->netstack_sctp;
 
-	for (i = 0; i < sctp_g_num_epriv_ports; i++) {
-		if (sctp_g_epriv_ports[i] != 0)
-			(void) mi_mpprintf(mp, "%d ", sctp_g_epriv_ports[i]);
+	for (i = 0; i < sctps->sctps_g_num_epriv_ports; i++) {
+		if (sctps->sctps_g_epriv_ports[i] != 0)
+			(void) mi_mpprintf(mp, "%d ",
+			    sctps->sctps_g_epriv_ports[i]);
 	}
 	return (0);
 }
@@ -215,6 +212,7 @@ sctp_extra_priv_ports_add(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 {
 	long	new_value;
 	int	i;
+	sctp_stack_t	*sctps = Q_TO_CONN(q)->conn_netstack->netstack_sctp;
 
 	/*
 	 * Fail the request if the new value does not lie within the
@@ -225,26 +223,26 @@ sctp_extra_priv_ports_add(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 		return (EINVAL);
 	}
 
-	mutex_enter(&sctp_epriv_port_lock);
+	mutex_enter(&sctps->sctps_epriv_port_lock);
 	/* Check if the value is already in the list */
-	for (i = 0; i < sctp_g_num_epriv_ports; i++) {
-		if (new_value == sctp_g_epriv_ports[i]) {
-			mutex_exit(&sctp_epriv_port_lock);
+	for (i = 0; i < sctps->sctps_g_num_epriv_ports; i++) {
+		if (new_value == sctps->sctps_g_epriv_ports[i]) {
+			mutex_exit(&sctps->sctps_epriv_port_lock);
 			return (EEXIST);
 		}
 	}
 	/* Find an empty slot */
-	for (i = 0; i < sctp_g_num_epriv_ports; i++) {
-		if (sctp_g_epriv_ports[i] == 0)
+	for (i = 0; i < sctps->sctps_g_num_epriv_ports; i++) {
+		if (sctps->sctps_g_epriv_ports[i] == 0)
 			break;
 	}
-	if (i == sctp_g_num_epriv_ports) {
-		mutex_exit(&sctp_epriv_port_lock);
+	if (i == sctps->sctps_g_num_epriv_ports) {
+		mutex_exit(&sctps->sctps_epriv_port_lock);
 		return (EOVERFLOW);
 	}
 	/* Set the new value */
-	sctp_g_epriv_ports[i] = (uint16_t)new_value;
-	mutex_exit(&sctp_epriv_port_lock);
+	sctps->sctps_g_epriv_ports[i] = (uint16_t)new_value;
+	mutex_exit(&sctps->sctps_epriv_port_lock);
 	return (0);
 }
 
@@ -259,6 +257,7 @@ sctp_extra_priv_ports_del(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 {
 	long	new_value;
 	int	i;
+	sctp_stack_t	*sctps = Q_TO_CONN(q)->conn_netstack->netstack_sctp;
 
 	/*
 	 * Fail the request if the new value does not lie within the
@@ -269,19 +268,19 @@ sctp_extra_priv_ports_del(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 		return (EINVAL);
 	}
 
-	mutex_enter(&sctp_epriv_port_lock);
+	mutex_enter(&sctps->sctps_epriv_port_lock);
 	/* Check that the value is already in the list */
-	for (i = 0; i < sctp_g_num_epriv_ports; i++) {
-		if (sctp_g_epriv_ports[i] == new_value)
+	for (i = 0; i < sctps->sctps_g_num_epriv_ports; i++) {
+		if (sctps->sctps_g_epriv_ports[i] == new_value)
 			break;
 	}
-	if (i == sctp_g_num_epriv_ports) {
-		mutex_exit(&sctp_epriv_port_lock);
+	if (i == sctps->sctps_g_num_epriv_ports) {
+		mutex_exit(&sctps->sctps_epriv_port_lock);
 		return (ESRCH);
 	}
 	/* Clear the value */
-	sctp_g_epriv_ports[i] = 0;
-	mutex_exit(&sctp_epriv_port_lock);
+	sctps->sctps_g_epriv_ports[i] = 0;
+	mutex_exit(&sctps->sctps_epriv_port_lock);
 	return (0);
 }
 
@@ -290,63 +289,78 @@ sctp_extra_priv_ports_del(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
  * named dispatch handler.
  */
 boolean_t
-sctp_param_register(sctpparam_t *sctppa, int cnt)
+sctp_param_register(IDP *ndp, sctpparam_t *sctppa, int cnt, sctp_stack_t *sctps)
 {
 
-	if (sctp_g_nd != NULL) {
+	if (*ndp != NULL) {
 		return (B_TRUE);
 	}
 
 	for (; cnt-- > 0; sctppa++) {
 		if (sctppa->sctp_param_name && sctppa->sctp_param_name[0]) {
-			if (!nd_load(&sctp_g_nd, sctppa->sctp_param_name,
+			if (!nd_load(ndp, sctppa->sctp_param_name,
 			    sctp_param_get, sctp_param_set,
 			    (caddr_t)sctppa)) {
-				nd_free(&sctp_g_nd);
+				nd_free(ndp);
 				return (B_FALSE);
 			}
 		}
 	}
-	if (!nd_load(&sctp_g_nd, sctp_wroff_xtra_param.sctp_param_name,
+	sctps->sctps_wroff_xtra_param = kmem_zalloc(sizeof (sctpparam_t),
+	    KM_SLEEP);
+	bcopy(&lcl_sctp_wroff_xtra_param, sctps->sctps_wroff_xtra_param,
+	    sizeof (sctpparam_t));
+	if (!nd_load(ndp, sctps->sctps_wroff_xtra_param->sctp_param_name,
 	    sctp_param_get, sctp_wroff_xtra_set,
-	    (caddr_t)&sctp_wroff_xtra_param)) {
-		nd_free(&sctp_g_nd);
+	    (caddr_t)sctps->sctps_wroff_xtra_param)) {
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&sctp_g_nd, "sctp_extra_priv_ports",
+	if (!nd_load(ndp, "sctp_extra_priv_ports",
 	    sctp_extra_priv_ports_get, NULL, NULL)) {
-		nd_free(&sctp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&sctp_g_nd, "sctp_extra_priv_ports_add",
+	if (!nd_load(ndp, "sctp_extra_priv_ports_add",
 	    NULL, sctp_extra_priv_ports_add, NULL)) {
-		nd_free(&sctp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(&sctp_g_nd, "sctp_extra_priv_ports_del",
+	if (!nd_load(ndp, "sctp_extra_priv_ports_del",
 	    NULL, sctp_extra_priv_ports_del, NULL)) {
-		nd_free(&sctp_g_nd);
+		nd_free(ndp);
 		return (B_FALSE);
 	}
 	return (B_TRUE);
 }
 
 boolean_t
-sctp_nd_init()
+sctp_nd_init(sctp_stack_t *sctps)
 {
-	return (sctp_param_register(sctp_param_arr, A_CNT(sctp_param_arr)));
-}
+	sctpparam_t *pa;
 
-/* Accessors to keep the static sctp_g_nd local */
+	pa = kmem_alloc(sizeof (lcl_sctp_param_arr), KM_SLEEP);
+	bcopy(lcl_sctp_param_arr, pa, sizeof (lcl_sctp_param_arr));
+	sctps->sctps_params = pa;
+	return (sctp_param_register(&sctps->sctps_g_nd, pa,
+		    A_CNT(lcl_sctp_param_arr), sctps));
+}
 
 int
 sctp_nd_getset(queue_t *q, MBLKP mp)
 {
-	return (nd_getset(q, sctp_g_nd, mp));
+	sctp_stack_t	*sctps = Q_TO_CONN(q)->conn_netstack->netstack_sctp;
+
+	return (nd_getset(q, sctps->sctps_g_nd, mp));
 }
 
 void
-sctp_nd_free()
+sctp_nd_free(sctp_stack_t *sctps)
 {
-	nd_free(&sctp_g_nd);
+	nd_free(&sctps->sctps_g_nd);
+	kmem_free(sctps->sctps_params, sizeof (lcl_sctp_param_arr));
+	sctps->sctps_params = NULL;
+	kmem_free(sctps->sctps_wroff_xtra_param, sizeof (sctpparam_t));
+	sctps->sctps_wroff_xtra_param = NULL;
+
 }
