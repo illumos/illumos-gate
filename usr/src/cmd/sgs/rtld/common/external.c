@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -506,6 +506,26 @@ __mutex_lock(mutex_t *mp)
 /* ARGSUSED */
 int
 __mutex_unlock(mutex_t *mp)
+{
+	return (0);
+}
+
+#pragma weak _private_mutex_init = __mutex_init
+#pragma weak mutex_init = __mutex_init
+#pragma weak _mutex_init = __mutex_init
+/* ARGSUSED */
+int
+__mutex_init(mutex_t *mp, int type, void *arg)
+{
+	return (0);
+}
+
+#pragma weak _private_mutex_destroy = __mutex_destroy
+#pragma weak mutex_destroy = __mutex_destroy
+#pragma weak _mutex_destroy = __mutex_destroy
+/* ARGSUSED */
+int
+__mutex_destroy(mutex_t *mp)
 {
 	return (0);
 }

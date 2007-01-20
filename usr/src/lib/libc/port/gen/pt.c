@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -28,19 +29,18 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #pragma weak ptsname = _ptsname
 #pragma weak grantpt = _grantpt
 #pragma weak unlockpt = _unlockpt
 #pragma weak posix_openpt = _posix_openpt
 
 #include "synonyms.h"
-#include <mtlib.h>
+#include "libc.h"
+#include "mtlib.h"
 #include <sys/types.h>
 #include <signal.h>
 #include <sys/param.h>
 #include <sys/mkdev.h>
-#include <sys/fs/ufs_fsdir.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
 #include <sys/wait.h>
@@ -53,10 +53,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <wait.h>
-#include <synch.h>
-#include <thread.h>
 #include <spawn.h>
-#include <libc.h>
 #include <grp.h>
 #include "tsd.h"
 

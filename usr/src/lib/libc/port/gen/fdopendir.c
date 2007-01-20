@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,6 @@
 
 #include "synonyms.h"
 #include <mtlib.h>
-#include <sys/types.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -52,12 +51,13 @@ extern int __fcntl(int fd, int cmd, intptr_t arg);
 DIR *
 fdopendir(int fd)
 {
-	DIR *dirp = lmalloc(sizeof (DIR));
+	private_DIR *pdirp = lmalloc(sizeof (*pdirp));
+	DIR *dirp = (DIR *)pdirp;
 	void *buf = lmalloc(DIRBUF);
 	int error = 0;
 	struct stat64 sbuf;
 
-	if (dirp == NULL || buf == NULL)
+	if (pdirp == NULL || buf == NULL)
 		goto fail;
 	/*
 	 * POSIX mandated behavior
@@ -73,12 +73,14 @@ fdopendir(int fd)
 	}
 	dirp->dd_buf = buf;
 	dirp->dd_fd = fd;
-	dirp->dd_loc = dirp->dd_size = 0;
+	dirp->dd_loc = 0;
+	dirp->dd_size = 0;
+	(void) mutex_init(&pdirp->dd_lock, USYNC_THREAD, NULL);
 	return (dirp);
 
 fail:
-	if (dirp != NULL)
-		lfree(dirp, sizeof (DIR));
+	if (pdirp != NULL)
+		lfree(pdirp, sizeof (*pdirp));
 	if (buf != NULL)
 		lfree(buf, DIRBUF);
 	if (error)

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * closedir -- C library extension routine
@@ -41,7 +40,6 @@
 #pragma weak closedir = _closedir
 
 #include "synonyms.h"
-#include <sys/types.h>
 #include <dirent.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -50,9 +48,11 @@
 int
 closedir(DIR *dirp)
 {
+	private_DIR *pdirp = (private_DIR *)(uintptr_t)dirp;
 	int fd = dirp->dd_fd;
 
+	mutex_destroy(&pdirp->dd_lock);
 	lfree(dirp->dd_buf, DIRBUF);
-	lfree(dirp, sizeof (DIR));
+	lfree(pdirp, sizeof (*pdirp));
 	return (close(fd));
 }

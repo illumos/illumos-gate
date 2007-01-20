@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * readdir_r -- C library extension routine
@@ -41,22 +40,14 @@
 #endif
 #pragma weak readdir_r = _readdir_r
 
-#include	"synonyms.h"
-#include	<mtlib.h>
-#include	<sys/types.h>
-#include	<sys/dirent.h>
-#include	<dirent.h>
-#include	<thread.h>
-#include	<string.h>
-#include	<synch.h>
-#include	<stdio.h>
-#include	<limits.h>
-#include	<errno.h>
-#include	"libc.h"
-
-extern mutex_t	_dirent_lock;
-
-#define	LBUFSIZE	(sizeof (struct dirent64) + _POSIX_PATH_MAX + 1)
+#include "synonyms.h"
+#include "libc.h"
+#include <mtlib.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <string.h>
+#include <limits.h>
+#include <errno.h>
 
 #ifdef _LP64
 
@@ -65,15 +56,16 @@ extern mutex_t	_dirent_lock;
  */
 
 int
-readdir_r(DIR *dirp, struct dirent *entry, struct dirent **result)
+readdir_r(DIR *dirp, dirent_t *entry, dirent_t **result)
 {
-	struct dirent	*dp;	/* -> directory data */
+	private_DIR *pdirp = (private_DIR *)dirp;
+	dirent_t *dp;		/* -> directory data */
 	int saveloc = 0;
 
-	lmutex_lock(&_dirent_lock);
+	lmutex_lock(&pdirp->dd_lock);
 	if (dirp->dd_size != 0) {
-		dp = (struct dirent *)(uintptr_t)&dirp->dd_buf[dirp->dd_loc];
-		saveloc = dirp->dd_loc;   /* save for possible EOF */
+		dp = (dirent_t *)(uintptr_t)&dirp->dd_buf[dirp->dd_loc];
+		saveloc = dirp->dd_loc;		/* save for possible EOF */
 		dirp->dd_loc += (int)dp->d_reclen;
 	}
 
@@ -82,21 +74,21 @@ readdir_r(DIR *dirp, struct dirent *entry, struct dirent **result)
 
 	if (dirp->dd_size == 0 &&	/* refill buffer */
 	    (dirp->dd_size = getdents(dirp->dd_fd,
-	    (struct dirent *)(uintptr_t)dirp->dd_buf, DIRBUF)) <= 0) {
-		if (dirp->dd_size == 0) { /* This means EOF */
-			dirp->dd_loc = saveloc;  /* EOF so save for telldir */
-			lmutex_unlock(&_dirent_lock);
+	    (dirent_t *)(uintptr_t)dirp->dd_buf, DIRBUF)) <= 0) {
+		if (dirp->dd_size == 0) {	/* This means EOF */
+			dirp->dd_loc = saveloc;	/* so save for telldir */
+			lmutex_unlock(&pdirp->dd_lock);
 			*result = NULL;
-			return (0); /* EOF */
+			return (0);
 		}
-		lmutex_unlock(&_dirent_lock);
+		lmutex_unlock(&pdirp->dd_lock);
 		*result = NULL;
-		return (errno);	/* error */
+		return (errno);		/* error */
 	}
 
-	dp = (struct dirent *)(uintptr_t)&dirp->dd_buf[dirp->dd_loc];
+	dp = (dirent_t *)(uintptr_t)&dirp->dd_buf[dirp->dd_loc];
 	(void) memcpy(entry, dp, (size_t)dp->d_reclen);
-	lmutex_unlock(&_dirent_lock);
+	lmutex_unlock(&pdirp->dd_lock);
 	*result = entry;
 	return (0);
 }
@@ -109,26 +101,26 @@ readdir_r(DIR *dirp, struct dirent *entry, struct dirent **result)
  */
 
 int
-readdir64_r(DIR *dirp, struct dirent64 *entry, struct dirent64 **result)
+readdir64_r(DIR *dirp, dirent64_t *entry, dirent64_t **result)
 {
-	struct dirent64	*dp64;	/* -> directory data */
+	private_DIR *pdirp = (private_DIR *)(uintptr_t)dirp;
+	dirent64_t *dp64;	/* -> directory data */
 	int saveloc = 0;
 
-	lmutex_lock(&_dirent_lock);
+	lmutex_lock(&pdirp->dd_lock);
 	if (dirp->dd_size != 0) {
-		dp64 = (struct dirent64 *)
-			(uintptr_t)&dirp->dd_buf[dirp->dd_loc];
+		dp64 = (dirent64_t *)(uintptr_t)&dirp->dd_buf[dirp->dd_loc];
 		/* was converted by readdir and needs to be reversed */
 		if (dp64->d_ino == (ino64_t)-1) {
-			struct dirent	*dp32;	/* -> 32 bit directory data */
+			dirent_t *dp32;	/* -> 32 bit directory data */
 
-			dp32 = (struct dirent *)(&dp64->d_off);
+			dp32 = (dirent_t *)(&dp64->d_off);
 			dp64->d_ino = (ino64_t)dp32->d_ino;
 			dp64->d_off = (off64_t)dp32->d_off;
 			dp64->d_reclen = (unsigned short)(dp32->d_reclen +
-				((char *)&dp64->d_off - (char *)dp64));
+			    ((char *)&dp64->d_off - (char *)dp64));
 		}
-		saveloc = dirp->dd_loc;   /* save for possible EOF */
+		saveloc = dirp->dd_loc;		/* save for possible EOF */
 		dirp->dd_loc += (int)dp64->d_reclen;
 	}
 
@@ -137,22 +129,58 @@ readdir64_r(DIR *dirp, struct dirent64 *entry, struct dirent64 **result)
 
 	if (dirp->dd_size == 0 &&	/* refill buffer */
 	    (dirp->dd_size = getdents64(dirp->dd_fd,
-	    (struct dirent64 *)(uintptr_t)dirp->dd_buf, DIRBUF)) <= 0) {
-		if (dirp->dd_size == 0) { /* This means EOF */
-			dirp->dd_loc = saveloc;  /* EOF so save for telldir */
-			lmutex_unlock(&_dirent_lock);
+	    (dirent64_t *)(uintptr_t)dirp->dd_buf, DIRBUF)) <= 0) {
+		if (dirp->dd_size == 0) {	/* This means EOF */
+			dirp->dd_loc = saveloc;	/* so save for telldir */
+			lmutex_unlock(&pdirp->dd_lock);
 			*result = NULL;
-			return (0); /* EOF */
+			return (0);
 		}
-		lmutex_unlock(&_dirent_lock);
+		lmutex_unlock(&pdirp->dd_lock);
 		*result = NULL;
-		return (errno);	/* error */
+		return (errno);		/* error */
 	}
 
-	dp64 = (struct dirent64 *)(uintptr_t)&dirp->dd_buf[dirp->dd_loc];
+	dp64 = (dirent64_t *)(uintptr_t)&dirp->dd_buf[dirp->dd_loc];
 	(void) memcpy(entry, dp64, (size_t)dp64->d_reclen);
 	*result = entry;
-	lmutex_unlock(&_dirent_lock);
+	lmutex_unlock(&pdirp->dd_lock);
+	return (0);
+}
+
+/*
+ * POSIX.1c standard version of the function readdir_r.
+ * User gets it via static readdir_r from header file.
+ */
+
+int
+__posix_readdir_r(DIR *dirp, dirent_t *entry, dirent_t **result)
+{
+	int error;
+	dirent64_t *dp64;
+	struct {
+		dirent64_t dirent64;
+		char chars[MAXNAMLEN];
+	} buf;
+
+	error = readdir64_r(dirp, (dirent64_t *)&buf, &dp64);
+	if (error != 0 || dp64 == NULL) {
+		*result = NULL;
+		return (error);
+	}
+
+	if (dp64->d_ino > SIZE_MAX ||
+	    (uint64_t)dp64->d_off > (uint64_t)UINT32_MAX) {
+		*result = NULL;
+		return (EOVERFLOW);
+	}
+
+	entry->d_ino = (ino_t)dp64->d_ino;
+	entry->d_off = (off_t)dp64->d_off;
+	entry->d_reclen = (unsigned short)((((char *)entry->d_name -
+	    (char *)entry) + strlen(dp64->d_name) + 1 + 3) & ~3);
+	(void) strcpy(entry->d_name, dp64->d_name);
+	*result = entry;
 	return (0);
 }
 
@@ -161,62 +189,15 @@ readdir64_r(DIR *dirp, struct dirent64 *entry, struct dirent64 **result)
  * It was implemented by Solaris 2.3.
  */
 
-struct dirent *
-readdir_r(DIR *dirp, struct dirent *entry)
+dirent_t *
+readdir_r(DIR *dirp, dirent_t *entry)
 {
-	long buf[LBUFSIZE / sizeof (long) + 1];
-	struct dirent64	*dp64;
+	int error;
+	dirent_t *result;
 
-	if (readdir64_r(dirp, (struct dirent64 *)(uintptr_t)buf, &dp64) != 0 ||
-	    dp64 == NULL)
-		return (NULL);
-
-	if ((dp64->d_ino > SIZE_MAX) || ((uint64_t)dp64->d_off >
-	    (uint64_t)UINT32_MAX)) {
-		errno = EOVERFLOW;
-		return (NULL);
-	}
-
-	entry->d_ino = (ino_t)dp64->d_ino;
-	entry->d_off = (off_t)dp64->d_off;
-	entry->d_reclen = (unsigned short)((((char *)entry->d_name -
-	    (char *)entry) + strlen(dp64->d_name) + 1 + 3) & ~3);
-	(void) strcpy(entry->d_name, dp64->d_name);
-
-	return (entry);
-}
-
-/*
- * POSIX.1c standard version of the thr function readdir_r.
- * User gets it via static readdir_r from header file.
- */
-
-int
-__posix_readdir_r(DIR *dirp, struct dirent *entry, struct dirent **result)
-{
-	long buf[LBUFSIZE / sizeof (long) + 1];
-	struct dirent64 *dp64;
-	int ret;
-
-	ret = readdir64_r(dirp, (struct dirent64 *)(uintptr_t)buf, &dp64);
-	if (ret != 0 || dp64 == NULL) {
-		*result = NULL;
-		return (ret);
-	}
-
-	if ((dp64->d_ino > SIZE_MAX) || ((uint64_t)dp64->d_off >
-		(uint64_t)UINT32_MAX)) {
-		*result = NULL;
-		return (EOVERFLOW);
-	}
-
-	entry->d_ino = (ino_t)dp64->d_ino;
-	entry->d_off = (off_t)dp64->d_off;
-	entry->d_reclen = (unsigned short)((((char *)entry->d_name -
-		(char *)entry) + strlen(dp64->d_name) + 1 + 3) & ~3);
-	(void) strcpy(entry->d_name, dp64->d_name);
-	*result = entry;
-	return (0);
+	if ((error = __posix_readdir_r(dirp, entry, &result)) != 0)
+		errno = error;
+	return (result);
 }
 
 #endif	/* _LP64 */

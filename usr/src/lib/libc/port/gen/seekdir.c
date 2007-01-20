@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * seekdir -- C library extension routine
@@ -41,30 +40,25 @@
 #endif
 #pragma weak seekdir = _seekdir
 
-#include	"synonyms.h"
-#include	<mtlib.h>
-#include	<sys/types.h>
-#include	<fcntl.h>
-#include	<unistd.h>
-#include	<stdio.h>
-#include	<dirent.h>
-#include	<thread.h>
-#include	<synch.h>
-
-
-extern mutex_t	_dirent_lock;
+#include "synonyms.h"
+#include "libc.h"
+#include <mtlib.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #ifdef _LP64
 
 void
 seekdir(DIR *dirp, long loc)
 {
-	struct dirent	*dp;
+	private_DIR	*pdirp = (private_DIR *)dirp;
+	dirent_t	*dp;
 	off_t		off = 0;
 
-	lmutex_lock(&_dirent_lock);
+	lmutex_lock(&pdirp->dd_lock);
 	if (lseek(dirp->dd_fd, 0, SEEK_CUR) != 0) {
-		dp = (struct dirent *)(uintptr_t)&dirp->dd_buf[dirp->dd_loc];
+		dp = (dirent_t *)(uintptr_t)&dirp->dd_buf[dirp->dd_loc];
 		off = dp->d_off;
 	}
 	if (off != loc) {
@@ -76,9 +70,9 @@ seekdir(DIR *dirp, long loc)
 		 * Save seek offset in d_off field, in case telldir
 		 * follows seekdir with no intervening call to readdir
 		 */
-		((struct dirent *)(uintptr_t)&dirp->dd_buf[0])->d_off = loc;
+		((dirent_t *)(uintptr_t)&dirp->dd_buf[0])->d_off = loc;
 	}
-	lmutex_unlock(&_dirent_lock);
+	lmutex_unlock(&pdirp->dd_lock);
 }
 
 #else	/* _LP64 */
@@ -86,23 +80,22 @@ seekdir(DIR *dirp, long loc)
 static void
 seekdir64(DIR *dirp, off64_t loc)
 {
-	struct dirent64	*dp64;
+	private_DIR	*pdirp = (private_DIR *)(uintptr_t)dirp;
+	dirent64_t	*dp64;
 	off64_t		off = 0;
 
-	lmutex_lock(&_dirent_lock);
+	lmutex_lock(&pdirp->dd_lock);
 	if (lseek64(dirp->dd_fd, 0, SEEK_CUR) != 0) {
-		dp64 = (struct dirent64 *)
-			(uintptr_t)&dirp->dd_buf[dirp->dd_loc];
+		dp64 = (dirent64_t *)(uintptr_t)&dirp->dd_buf[dirp->dd_loc];
 		/* was converted by readdir and needs to be reversed */
 		if (dp64->d_ino == (ino64_t)-1) {
-			struct dirent	*dp32;
+			dirent_t *dp32;
 
-			dp32 = (struct dirent *)
-			    ((uintptr_t)dp64 + sizeof (ino64_t));
+			dp32 = (dirent_t *)((uintptr_t)dp64 + sizeof (ino64_t));
 			dp64->d_ino = (ino64_t)dp32->d_ino;
 			dp64->d_off = (off64_t)dp32->d_off;
 			dp64->d_reclen = (unsigned short)(dp32->d_reclen +
-				((char *)&dp64->d_off - (char *)dp64));
+			    ((char *)&dp64->d_off - (char *)dp64));
 		}
 		off = dp64->d_off;
 	}
@@ -115,9 +108,9 @@ seekdir64(DIR *dirp, off64_t loc)
 		 * Save seek offset in d_off field, in case telldir
 		 * follows seekdir with no intervening call to readdir
 		 */
-		((struct dirent64 *)(uintptr_t)&dirp->dd_buf[0])->d_off = loc;
+		((dirent64_t *)(uintptr_t)&dirp->dd_buf[0])->d_off = loc;
 	}
-	lmutex_unlock(&_dirent_lock);
+	lmutex_unlock(&pdirp->dd_lock);
 }
 
 void
