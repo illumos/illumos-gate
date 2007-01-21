@@ -38,7 +38,6 @@
  */
 
 extern uintptr_t scsi_callback_id;
-extern uchar_t	scsi_cdb_size[];
 
 /*
  * Common buffer for scsi_log

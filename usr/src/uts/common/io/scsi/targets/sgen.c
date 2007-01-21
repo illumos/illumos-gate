@@ -1214,7 +1214,7 @@ sgen_uscsi_cmd(dev_t dev, struct uscsi_cmd *ucmd, int flag)
 	    USCSI_OTAG | USCSI_HTAG | USCSI_HEAD));
 	if (flags != uscmd->uscsi_flags) {
 		sgen_log(sg_state, SGEN_DIAG1, "sgen_uscsi_cmd: cleared "
-		    "unsafe uscsi_flags 0x%x", ucmd->uscsi_flags & ~flags);
+		    "unsafe uscsi_flags 0x%x", uscmd->uscsi_flags & ~flags);
 		uscmd->uscsi_flags = flags;
 	}
 
