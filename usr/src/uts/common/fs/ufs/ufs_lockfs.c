@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -331,6 +331,7 @@ ufs_flush(struct vfs *vfsp)
 	int		saverror = 0;
 	struct ufsvfs	*ufsvfsp	= (struct ufsvfs *)vfsp->vfs_data;
 	struct fs	*fs		= ufsvfsp->vfs_fs;
+	int		tdontblock = 0;
 
 	ASSERT(vfs_lock_held(vfsp));
 
@@ -402,14 +403,26 @@ ufs_flush(struct vfs *vfsp)
 		if (ul->un_flags & LDL_NOROLL) {
 			ASSERT(mtm->mtm_nme == 0);
 		} else {
-			curthread->t_flag |= T_DONTBLOCK;
+			/*
+			 * Do not set T_DONTBLOCK if there is a
+			 * transaction opened by caller.
+			 */
+			if (curthread->t_flag & T_DONTBLOCK)
+				tdontblock = 1;
+			else
+				curthread->t_flag |= T_DONTBLOCK;
+
 			TRANS_BEGIN_SYNC(ufsvfsp, TOP_COMMIT_FLUSH,
 			    TOP_COMMIT_SIZE, error);
+
 			if (!error) {
 				TRANS_END_SYNC(ufsvfsp, saverror,
 				    TOP_COMMIT_FLUSH, TOP_COMMIT_SIZE);
 			}
-			curthread->t_flag &= ~T_DONTBLOCK;
+
+			if (tdontblock == 0)
+				curthread->t_flag &= ~T_DONTBLOCK;
+
 			logmap_roll_dev(ufsvfsp->vfs_log);
 		}
 	}
@@ -864,6 +877,7 @@ ufs__fiolfs(
 	extern struct pollhead ufs_pollhd;
 	ulockfs_info_t *head;
 	ulockfs_info_t *info;
+	int signal = 0;
 
 	/* check valid lock type */
 	if (!lockfsp || lockfsp->lf_lock > LOCKFS_MAXLOCK)
@@ -986,8 +1000,20 @@ ufs__fiolfs(
 	/*
 	 * Quiesce (wait for outstanding accesses to finish)
 	 */
-	if (error = ufs_quiesce(ulp))
+	if (error = ufs_quiesce(ulp)) {
+		/*
+		 * Interrupted due to signal. There could still be
+		 * pending vnops.
+		 */
+		signal = 1;
+
+		/*
+		 * We do broadcast because lock-status
+		 * could be reverted to old status.
+		 */
+		cv_broadcast(&ulp->ul_cv);
 		goto errout;
+	}
 
 	/*
 	 * If the fallocate thread requested a write fs lock operation
@@ -1147,7 +1173,15 @@ errout:
 		bcopy(&lfs, &ulp->ul_lockfs, sizeof (struct lockfs));
 		ulp->ul_fs_lock = (1 << lfs.lf_lock);
 	}
-	(void) ufs_thaw(vfsp, ufsvfsp, ulp);
+
+	/*
+	 * Don't call ufs_thaw() when there's a signal during
+	 * ufs quiesce operation as it can lead to deadlock
+	 * with getpage.
+	 */
+	if (signal == 0)
+		(void) ufs_thaw(vfsp, ufsvfsp, ulp);
+
 	ULOCKFS_CLR_BUSY(ulp);
 	LOCKFS_CLR_BUSY(&ulp->ul_lockfs);
 
