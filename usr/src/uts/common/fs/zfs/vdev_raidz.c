@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -260,8 +260,8 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 	 * multiple of the LCM of the number of children and the minimum
 	 * stripe width are sufficient to avoid pessimal behavior.
 	 * Unfortunately, this decision created an implicit on-disk format
-	 * requirement that we need to support for all eternity (but only for
-	 * RAID-Z with one parity device).
+	 * requirement that we need to support for all eternity, but only
+	 * for single-parity RAID-Z.
 	 */
 	ASSERT(rm->rm_cols >= 2);
 	ASSERT(rm->rm_col[0].rc_size == rm->rm_col[1].rc_size);
@@ -792,6 +792,7 @@ vdev_raidz_io_done(zio_t *zio)
 	raidz_col_t *rc, *rc1;
 	int unexpected_errors = 0;
 	int parity_errors = 0;
+	int parity_untried = 0;
 	int data_errors = 0;
 	int n, c, c1;
 
@@ -823,6 +824,8 @@ vdev_raidz_io_done(zio_t *zio)
 				unexpected_errors++;
 
 			zio->io_numerrors++;
+		} else if (c < rm->rm_firstdatacol && !rc->rc_tried) {
+			parity_untried++;
 		}
 	}
 
@@ -855,23 +858,35 @@ vdev_raidz_io_done(zio_t *zio)
 
 	/*
 	 * If the number of errors we saw was correctable -- less than or equal
-	 * to the number of parity disks -- attempt to produce data that has a
-	 * valid checksum. Naturally, zero errors falls into this case.
+	 * to the number of parity disks read -- attempt to produce data that
+	 * has a valid checksum. Naturally, this case applies in the absence of
+	 * any errors.
 	 */
-	if (zio->io_numerrors <= rm->rm_firstdatacol) {
+	if (zio->io_numerrors <= rm->rm_firstdatacol - parity_untried) {
 		switch (data_errors) {
 		case 0:
 			if (zio_checksum_error(zio) == 0) {
 				zio->io_error = 0;
-				n = raidz_parity_verify(zio, rm);
-				unexpected_errors += n;
-				ASSERT(parity_errors + n <=
-				    rm->rm_firstdatacol);
+				if (parity_errors + parity_untried <
+				    rm->rm_firstdatacol) {
+					n = raidz_parity_verify(zio, rm);
+					unexpected_errors += n;
+					ASSERT(parity_errors + n <=
+					    rm->rm_firstdatacol);
+				}
 				goto done;
 			}
 			break;
 
 		case 1:
+			/*
+			 * We either attempt to read all the parity columns or
+			 * none of them. If we didn't try to read parity, we
+			 * wouldn't be here in the correctable case. There must
+			 * also have been fewer parity errors than parity
+			 * columns or, again, we wouldn't be in this code path.
+			 */
+			ASSERT(parity_untried == 0);
 			ASSERT(parity_errors < rm->rm_firstdatacol);
 
 			/*
@@ -901,11 +916,17 @@ vdev_raidz_io_done(zio_t *zio)
 					atomic_inc_64(&raidz_corrected_q);
 
 				/*
-				 * If there's more than one parity disk,
-				 * confirm that the parity disk not used above
-				 * has the correct data.
+				 * If there's more than one parity disk that
+				 * was successfully read, confirm that the
+				 * other parity disk produced the correct data.
+				 * This routine is suboptimal in that it
+				 * regenerates both the parity we wish to test
+				 * as well as the parity we just used to
+				 * perform the reconstruction, but this should
+				 * be a relatively uncommon case, and can be
+				 * optimized if it becomes a problem.
 				 */
-				if (rm->rm_firstdatacol > 1) {
+				if (parity_errors < rm->rm_firstdatacol - 1) {
 					n = raidz_parity_verify(zio, rm);
 					unexpected_errors += n;
 					ASSERT(parity_errors + n <=
@@ -917,6 +938,11 @@ vdev_raidz_io_done(zio_t *zio)
 			break;
 
 		case 2:
+			/*
+			 * Two data column errors require double parity.
+			 */
+			ASSERT(rm->rm_firstdatacol == 2);
+
 			/*
 			 * Find the two columns that reported errors.
 			 */
