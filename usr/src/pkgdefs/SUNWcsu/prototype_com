@@ -990,7 +990,8 @@ f none usr/share/lib/zoneinfo/Africa/Abidjan 644 root bin
 f none usr/share/lib/zoneinfo/Africa/Accra 644 root bin
 f none usr/share/lib/zoneinfo/Africa/Addis_Ababa 644 root bin
 f none usr/share/lib/zoneinfo/Africa/Algiers 644 root bin
-f none usr/share/lib/zoneinfo/Africa/Asmera 644 root bin
+f none usr/share/lib/zoneinfo/Africa/Asmara 644 root bin
+l none usr/share/lib/zoneinfo/Africa/Asmera=../../../../../usr/share/lib/zoneinfo/Africa/Asmara
 f none usr/share/lib/zoneinfo/Africa/Bamako 644 root bin
 f none usr/share/lib/zoneinfo/Africa/Bangui 644 root bin
 f none usr/share/lib/zoneinfo/Africa/Banjul 644 root bin
@@ -1295,7 +1296,8 @@ f none usr/share/lib/zoneinfo/Atlantic/Azores 644 root bin
 f none usr/share/lib/zoneinfo/Atlantic/Bermuda 644 root bin
 f none usr/share/lib/zoneinfo/Atlantic/Canary 644 root bin
 f none usr/share/lib/zoneinfo/Atlantic/Cape_Verde 644 root bin
-f none usr/share/lib/zoneinfo/Atlantic/Faeroe 644 root bin
+l none usr/share/lib/zoneinfo/Atlantic/Faeroe=../../../../../usr/share/lib/zoneinfo/Atlantic/Faroe
+f none usr/share/lib/zoneinfo/Atlantic/Faroe 644 root bin
 l none usr/share/lib/zoneinfo/Atlantic/Jan_Mayen=../../../../../usr/share/lib/zoneinfo/Europe/Oslo
 f none usr/share/lib/zoneinfo/Atlantic/Madeira 644 root bin
 f none usr/share/lib/zoneinfo/Atlantic/Reykjavik 644 root bin
@@ -1310,6 +1312,7 @@ f none usr/share/lib/zoneinfo/Australia/Broken_Hill 644 root bin
 l none usr/share/lib/zoneinfo/Australia/Canberra=../../../../../usr/share/lib/zoneinfo/Australia/Sydney
 f none usr/share/lib/zoneinfo/Australia/Currie 644 root bin
 f none usr/share/lib/zoneinfo/Australia/Darwin 644 root bin
+f none usr/share/lib/zoneinfo/Australia/Eucla 644 root bin
 f none usr/share/lib/zoneinfo/Australia/Hobart 644 root bin
 l none usr/share/lib/zoneinfo/Australia/LHI=../../../../../usr/share/lib/zoneinfo/Australia/Lord_Howe
 f none usr/share/lib/zoneinfo/Australia/Lindeman 644 root bin

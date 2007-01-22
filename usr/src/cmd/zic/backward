@@ -1,14 +1,15 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-# @(#)backward	8.2
+# @(#)backward	8.3
 
 # This file provides links between current names for time zones
 # and their old names.  Many names changed in late 1993.
 
+Link	Africa/Asmara		Africa/Asmera
 Link	Africa/Bamako		Africa/Timbuktu
 Link	America/Argentina/Catamarca	America/Argentina/ComodRivadavia
 Link	America/Adak		America/Atka
@@ -34,6 +35,7 @@ Link	Asia/Jerusalem		Asia/Tel_Aviv
 Link	Asia/Thimphu		Asia/Thimbu
 Link	Asia/Makassar		Asia/Ujung_Pandang
 Link	Asia/Ulaanbaatar	Asia/Ulan_Bator
+Link	Atlantic/Faroe		Atlantic/Faeroe
 Link	Australia/Sydney	Australia/ACT
 Link	Australia/Sydney	Australia/Canberra
 Link	Australia/Lord_Howe	Australia/LHI
