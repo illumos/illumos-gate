@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,7 +102,7 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 	 */
 	mutex_enter(&dzp->z_lock);
 	for (;;) {
-		if (dzp->z_reap) {
+		if (dzp->z_unlinked) {
 			mutex_exit(&dzp->z_lock);
 			return (ENOENT);
 		}
@@ -276,7 +276,7 @@ zfs_dirlook(znode_t *dzp, char *name, vnode_t **vpp)
 }
 
 static char *
-zfs_dq_hexname(char namebuf[17], uint64_t x)
+zfs_unlinked_hexname(char namebuf[17], uint64_t x)
 {
 	char *name = &namebuf[16];
 	const char digits[16] = "0123456789abcdef";
@@ -291,33 +291,84 @@ zfs_dq_hexname(char namebuf[17], uint64_t x)
 }
 
 /*
- * Delete Queue Error Handling
+ * unlinked Set (formerly known as the "delete queue") Error Handling
  *
- * When dealing with the delete queue, we dmu_tx_hold_zap(), but we
+ * When dealing with the unlinked set, we dmu_tx_hold_zap(), but we
  * don't specify the name of the entry that we will be manipulating.  We
  * also fib and say that we won't be adding any new entries to the
- * delete queue, even though we might (this is to lower the minimum file
+ * unlinked set, even though we might (this is to lower the minimum file
  * size that can be deleted in a full filesystem).  So on the small
- * chance that the delete queue is using a fat zap (ie. has more than
+ * chance that the nlink list is using a fat zap (ie. has more than
  * 2000 entries), we *may* not pre-read a block that's needed.
  * Therefore it is remotely possible for some of the assertions
- * regarding the delete queue below to fail due to i/o error.  On a
+ * regarding the unlinked set below to fail due to i/o error.  On a
  * nondebug system, this will result in the space being leaked.
  */
-
 void
-zfs_dq_add(znode_t *zp, dmu_tx_t *tx)
+zfs_unlinked_add(znode_t *zp, dmu_tx_t *tx)
 {
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 	char obj_name[17];
 	int error;
 
-	ASSERT(zp->z_reap);
+	ASSERT(zp->z_unlinked);
 	ASSERT3U(zp->z_phys->zp_links, ==, 0);
 
-	error = zap_add(zfsvfs->z_os, zfsvfs->z_dqueue,
-	    zfs_dq_hexname(obj_name, zp->z_id), 8, 1, &zp->z_id, tx);
+	error = zap_add(zfsvfs->z_os, zfsvfs->z_unlinkedobj,
+	    zfs_unlinked_hexname(obj_name, zp->z_id), 8, 1, &zp->z_id, tx);
 	ASSERT3U(error, ==, 0);
+}
+
+/*
+ * Clean up any znodes that had no links when we either crashed or
+ * (force) umounted the file system.
+ */
+void
+zfs_unlinked_drain(zfsvfs_t *zfsvfs)
+{
+	zap_cursor_t	zc;
+	zap_attribute_t zap;
+	dmu_object_info_t doi;
+	znode_t		*zp;
+	int		error;
+
+	/*
+	 * Interate over the contents of the unlinked set.
+	 */
+	for (zap_cursor_init(&zc, zfsvfs->z_os, zfsvfs->z_unlinkedobj);
+	    zap_cursor_retrieve(&zc, &zap) == 0;
+	    zap_cursor_advance(&zc)) {
+
+		/*
+		 * See what kind of object we have in list
+		 */
+
+		error = dmu_object_info(zfsvfs->z_os,
+		    zap.za_first_integer, &doi);
+		if (error != 0)
+			continue;
+
+		ASSERT((doi.doi_type == DMU_OT_PLAIN_FILE_CONTENTS) ||
+		    (doi.doi_type == DMU_OT_DIRECTORY_CONTENTS));
+		/*
+		 * We need to re-mark these list entries for deletion,
+		 * so we pull them back into core and set zp->z_unlinked.
+		 */
+		error = zfs_zget(zfsvfs, zap.za_first_integer, &zp);
+
+		/*
+		 * We may pick up znodes that are already marked for deletion.
+		 * This could happen during the purge of an extended attribute
+		 * directory.  All we need to do is skip over them, since they
+		 * are already in the system marked z_unlinked.
+		 */
+		if (error != 0)
+			continue;
+
+		zp->z_unlinked = B_TRUE;
+		VN_RELE(ZTOV(zp));
+	}
+	zap_cursor_fini(&zc);
 }
 
 /*
@@ -341,7 +392,6 @@ zfs_purgedir(znode_t *dzp)
 	int skipped = 0;
 	int error;
 
-
 	for (zap_cursor_init(&zc, zfsvfs->z_os, dzp->z_id);
 	    (error = zap_cursor_retrieve(&zc, &zap)) == 0;
 	    zap_cursor_advance(&zc)) {
@@ -355,7 +405,7 @@ zfs_purgedir(znode_t *dzp)
 		dmu_tx_hold_bonus(tx, dzp->z_id);
 		dmu_tx_hold_zap(tx, dzp->z_id, FALSE, zap.za_name);
 		dmu_tx_hold_bonus(tx, xzp->z_id);
-		dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, FALSE, NULL);
+		dmu_tx_hold_zap(tx, zfsvfs->z_unlinkedobj, FALSE, NULL);
 		error = dmu_tx_assign(tx, TXG_WAIT);
 		if (error) {
 			dmu_tx_abort(tx);
@@ -378,180 +428,6 @@ zfs_purgedir(znode_t *dzp)
 	return (skipped);
 }
 
-/*
- * Special function to requeue the znodes for deletion that were
- * in progress when we either crashed or umounted the file system.
- *
- * returns 1 if queue was drained.
- */
-static int
-zfs_drain_dq(zfsvfs_t *zfsvfs)
-{
-	zap_cursor_t	zc;
-	zap_attribute_t zap;
-	dmu_object_info_t doi;
-	znode_t		*zp;
-	int		error;
-
-	/*
-	 * Interate over the contents of the delete queue.
-	 */
-	for (zap_cursor_init(&zc, zfsvfs->z_os, zfsvfs->z_dqueue);
-	    zap_cursor_retrieve(&zc, &zap) == 0;
-	    zap_cursor_advance(&zc)) {
-
-		/*
-		 * Create more threads if necessary to balance the load.
-		 * quit if the delete threads have been shut down.
-		 */
-		if (zfs_delete_thread_target(zfsvfs, -1) != 0)
-			return (0);
-
-		/*
-		 * See what kind of object we have in queue
-		 */
-
-		error = dmu_object_info(zfsvfs->z_os,
-		    zap.za_first_integer, &doi);
-		if (error != 0)
-			continue;
-
-		ASSERT((doi.doi_type == DMU_OT_PLAIN_FILE_CONTENTS) ||
-		    (doi.doi_type == DMU_OT_DIRECTORY_CONTENTS));
-		/*
-		 * We need to re-mark these queue entries for reaping,
-		 * so we pull them back into core and set zp->z_reap.
-		 */
-		error = zfs_zget(zfsvfs, zap.za_first_integer, &zp);
-
-		/*
-		 * We may pick up znodes that are already marked for reaping.
-		 * This could happen during the purge of an extended attribute
-		 * directory.  All we need to do is skip over them, since they
-		 * are already in the system to be processed by the delete
-		 * thread(s).
-		 */
-		if (error != 0) {
-			continue;
-		}
-
-		zp->z_reap = 1;
-		VN_RELE(ZTOV(zp));
-	}
-	zap_cursor_fini(&zc);
-	return (1);
-}
-
-void
-zfs_delete_thread(void *arg)
-{
-	zfsvfs_t	*zfsvfs = arg;
-	zfs_delete_t 	*zd = &zfsvfs->z_delete_head;
-	znode_t		*zp;
-	callb_cpr_t	cprinfo;
-	int		drained;
-
-	CALLB_CPR_INIT(&cprinfo, &zd->z_mutex, callb_generic_cpr, "zfs_delete");
-
-	mutex_enter(&zd->z_mutex);
-
-	if (!zd->z_drained && !zd->z_draining) {
-		zd->z_draining = B_TRUE;
-		mutex_exit(&zd->z_mutex);
-		drained = zfs_drain_dq(zfsvfs);
-		mutex_enter(&zd->z_mutex);
-		zd->z_draining = B_FALSE;
-		zd->z_drained = drained;
-		cv_broadcast(&zd->z_quiesce_cv);
-	}
-
-	while (zd->z_thread_count <= zd->z_thread_target) {
-		zp = list_head(&zd->z_znodes);
-		if (zp == NULL) {
-			ASSERT(zd->z_znode_count == 0);
-			CALLB_CPR_SAFE_BEGIN(&cprinfo);
-			cv_wait(&zd->z_cv, &zd->z_mutex);
-			CALLB_CPR_SAFE_END(&cprinfo, &zd->z_mutex);
-			continue;
-		}
-		ASSERT(zd->z_znode_count != 0);
-		list_remove(&zd->z_znodes, zp);
-		if (--zd->z_znode_count == 0)
-			cv_broadcast(&zd->z_quiesce_cv);
-		mutex_exit(&zd->z_mutex);
-		zfs_rmnode(zp);
-		(void) zfs_delete_thread_target(zfsvfs, -1);
-		mutex_enter(&zd->z_mutex);
-	}
-
-	ASSERT(zd->z_thread_count != 0);
-	if (--zd->z_thread_count == 0)
-		cv_broadcast(&zd->z_cv);
-
-	CALLB_CPR_EXIT(&cprinfo);	/* NB: drops z_mutex */
-	thread_exit();
-}
-
-static int zfs_work_per_thread_shift = 11;	/* 2048 (2^11) per thread */
-
-/*
- * Set the target number of delete threads to 'nthreads'.
- * If nthreads == -1, choose a number based on current workload.
- * If nthreads == 0, don't return until the threads have exited.
- */
-int
-zfs_delete_thread_target(zfsvfs_t *zfsvfs, int nthreads)
-{
-	zfs_delete_t *zd = &zfsvfs->z_delete_head;
-
-	mutex_enter(&zd->z_mutex);
-
-	if (nthreads == -1) {
-		if (zd->z_thread_target == 0) {
-			mutex_exit(&zd->z_mutex);
-			return (EBUSY);
-		}
-		nthreads = zd->z_znode_count >> zfs_work_per_thread_shift;
-		nthreads = MIN(nthreads, ncpus << 1);
-		nthreads = MAX(nthreads, 1);
-		nthreads += !!zd->z_draining;
-	}
-
-	zd->z_thread_target = nthreads;
-
-	while (zd->z_thread_count < zd->z_thread_target) {
-		(void) thread_create(NULL, 0, zfs_delete_thread, zfsvfs,
-		    0, &p0, TS_RUN, minclsyspri);
-		zd->z_thread_count++;
-	}
-
-	while (zd->z_thread_count > zd->z_thread_target && nthreads == 0) {
-		cv_broadcast(&zd->z_cv);
-		cv_wait(&zd->z_cv, &zd->z_mutex);
-	}
-
-	mutex_exit(&zd->z_mutex);
-
-	return (0);
-}
-
-/*
- * Wait until everything that's been queued has been deleted.
- */
-void
-zfs_delete_wait_empty(zfsvfs_t *zfsvfs)
-{
-	zfs_delete_t *zd = &zfsvfs->z_delete_head;
-
-	mutex_enter(&zd->z_mutex);
-	ASSERT(zd->z_thread_target != 0);
-	while (!zd->z_drained || zd->z_znode_count != 0) {
-		ASSERT(zd->z_thread_target != 0);
-		cv_wait(&zd->z_quiesce_cv, &zd->z_mutex);
-	}
-	mutex_exit(&zd->z_mutex);
-}
-
 void
 zfs_rmnode(znode_t *zp)
 {
@@ -569,23 +445,19 @@ zfs_rmnode(znode_t *zp)
 	/*
 	 * If this is an attribute directory, purge its contents.
 	 */
-	if (ZTOV(zp)->v_type == VDIR && (zp->z_phys->zp_flags & ZFS_XATTR))
+	if (ZTOV(zp)->v_type == VDIR && (zp->z_phys->zp_flags & ZFS_XATTR)) {
 		if (zfs_purgedir(zp) != 0) {
-			zfs_delete_t *delq = &zfsvfs->z_delete_head;
 			/*
-			 * Add this back to the delete list to be retried later.
-			 *
-			 * XXX - this could just busy loop on us...
+			 * Not enough space to delete some xattrs.
+			 * Leave it on the unlinked set.
 			 */
-			mutex_enter(&delq->z_mutex);
-			list_insert_tail(&delq->z_znodes, zp);
-			delq->z_znode_count++;
-			mutex_exit(&delq->z_mutex);
 			return;
 		}
+	}
 
 	/*
-	 * If the file has extended attributes, unlink the xattr dir.
+	 * If the file has extended attributes, we're going to unlink
+	 * the xattr dir.
 	 */
 	if (zp->z_phys->zp_xattr) {
 		error = zfs_zget(zfsvfs, zp->z_phys->zp_xattr, &xzp);
@@ -599,44 +471,36 @@ zfs_rmnode(znode_t *zp)
 	 */
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_free(tx, zp->z_id, 0, DMU_OBJECT_END);
-	dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, FALSE, NULL);
+	dmu_tx_hold_zap(tx, zfsvfs->z_unlinkedobj, FALSE, NULL);
 	if (xzp) {
 		dmu_tx_hold_bonus(tx, xzp->z_id);
-		dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, TRUE, NULL);
+		dmu_tx_hold_zap(tx, zfsvfs->z_unlinkedobj, TRUE, NULL);
 	}
 	if (acl_obj)
 		dmu_tx_hold_free(tx, acl_obj, 0, DMU_OBJECT_END);
 	error = dmu_tx_assign(tx, TXG_WAIT);
 	if (error) {
-		zfs_delete_t *delq = &zfsvfs->z_delete_head;
-
-		dmu_tx_abort(tx);
 		/*
-		 * Add this back to the delete list to be retried later.
-		 *
-		 * XXX - this could just busy loop on us...
+		 * Not enough space to delete the file.  Leave it in the
+		 * unlinked set, leaking it until the fs is remounted (at
+		 * which point we'll call zfs_unlinked_drain() to process it).
 		 */
-		mutex_enter(&delq->z_mutex);
-		list_insert_tail(&delq->z_znodes, zp);
-		delq->z_znode_count++;
-		mutex_exit(&delq->z_mutex);
+		dmu_tx_abort(tx);
 		return;
 	}
 
 	if (xzp) {
 		dmu_buf_will_dirty(xzp->z_dbuf, tx);
 		mutex_enter(&xzp->z_lock);
-		xzp->z_reap = 1;		/* mark xzp for deletion */
+		xzp->z_unlinked = B_TRUE;	/* mark xzp for deletion */
 		xzp->z_phys->zp_links = 0;	/* no more links to it */
 		mutex_exit(&xzp->z_lock);
-		zfs_dq_add(xzp, tx);		/* add xzp to delete queue */
+		zfs_unlinked_add(xzp, tx);
 	}
 
-	/*
-	 * Remove this znode from delete queue
-	 */
-	error = zap_remove(os, zfsvfs->z_dqueue,
-	    zfs_dq_hexname(obj_name, zp->z_id), tx);
+	/* Remove this znode from the unlinked set */
+	error = zap_remove(os, zfsvfs->z_unlinkedobj,
+	    zfs_unlinked_hexname(obj_name, zp->z_id), tx);
 	ASSERT3U(error, ==, 0);
 
 	zfs_znode_delete(zp, tx);
@@ -648,7 +512,7 @@ zfs_rmnode(znode_t *zp)
 }
 
 /*
- * Link zp into dl.  Can only fail if zp has been reaped.
+ * Link zp into dl.  Can only fail if zp has been unlinked.
  */
 int
 zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
@@ -662,7 +526,7 @@ zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
 	mutex_enter(&zp->z_lock);
 
 	if (!(flag & ZRENAMING)) {
-		if (zp->z_reap) {	/* no new links to reaped zp */
+		if (zp->z_unlinked) {	/* no new links to unlinked zp */
 			ASSERT(!(flag & (ZNEW | ZEXISTS)));
 			mutex_exit(&zp->z_lock);
 			return (ENOENT);
@@ -692,20 +556,20 @@ zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
 }
 
 /*
- * Unlink zp from dl, and mark zp for reaping if this was the last link.
+ * Unlink zp from dl, and mark zp for deletion if this was the last link.
  * Can fail if zp is a mount point (EBUSY) or a non-empty directory (EEXIST).
- * If 'reaped_ptr' is NULL, we put reaped znodes on the delete queue.
- * If it's non-NULL, we use it to indicate whether the znode needs reaping,
+ * If 'unlinkedp' is NULL, we put unlinked znodes on the unlinked list.
+ * If it's non-NULL, we use it to indicate whether the znode needs deletion,
  * and it's the caller's job to do it.
  */
 int
 zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
-	int *reaped_ptr)
+	boolean_t *unlinkedp)
 {
 	znode_t *dzp = dl->dl_dzp;
 	vnode_t *vp = ZTOV(zp);
 	int zp_is_dir = (vp->v_type == VDIR);
-	int reaped = 0;
+	boolean_t unlinked = B_FALSE;
 	int error;
 
 	dnlc_remove(ZTOV(dzp), dl->dl_name);
@@ -729,9 +593,9 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 		}
 		ASSERT(zp->z_phys->zp_links > zp_is_dir);
 		if (--zp->z_phys->zp_links == zp_is_dir) {
-			zp->z_reap = 1;
+			zp->z_unlinked = B_TRUE;
 			zp->z_phys->zp_links = 0;
-			reaped = 1;
+			unlinked = B_TRUE;
 		} else {
 			zfs_time_stamper_locked(zp, STATE_CHANGED, tx);
 		}
@@ -749,10 +613,10 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 	error = zap_remove(zp->z_zfsvfs->z_os, dzp->z_id, dl->dl_name, tx);
 	ASSERT(error == 0);
 
-	if (reaped_ptr != NULL)
-		*reaped_ptr = reaped;
-	else if (reaped)
-		zfs_dq_add(zp, tx);
+	if (unlinkedp != NULL)
+		*unlinkedp = unlinked;
+	else if (unlinked)
+		zfs_unlinked_add(zp, tx);
 
 	return (0);
 }

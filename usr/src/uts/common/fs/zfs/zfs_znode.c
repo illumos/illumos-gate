@@ -245,7 +245,6 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 	extern int zfsfstype;
 
 	objset_t	*os = zfsvfs->z_os;
-	uint64_t	zoid;
 	uint64_t	version = ZPL_VERSION;
 	int		i, error;
 	dmu_object_info_t doi;
@@ -295,11 +294,11 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 	zfsvfs->z_vfs->vfs_fsid.val[1] = ((fsid_guid>>32) << 8) |
 	    zfsfstype & 0xFF;
 
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_ROOT_OBJ, 8, 1, &zoid);
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_ROOT_OBJ, 8, 1,
+	    &zfsvfs->z_root);
 	if (error)
 		return (error);
-	ASSERT(zoid != 0);
-	zfsvfs->z_root = zoid;
+	ASSERT(zfsvfs->z_root != 0);
 
 	/*
 	 * Create the per mount vop tables.
@@ -311,27 +310,15 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 	for (i = 0; i != ZFS_OBJ_MTX_SZ; i++)
 		mutex_init(&zfsvfs->z_hold_mtx[i], NULL, MUTEX_DEFAULT, NULL);
 
-	error = zfs_zget(zfsvfs, zoid, zpp);
+	error = zfs_zget(zfsvfs, zfsvfs->z_root, zpp);
 	if (error)
 		return (error);
-	ASSERT3U((*zpp)->z_id, ==, zoid);
+	ASSERT3U((*zpp)->z_id, ==, zfsvfs->z_root);
 
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_DELETE_QUEUE, 8, 1, &zoid);
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_UNLINKED_SET, 8, 1,
+	    &zfsvfs->z_unlinkedobj);
 	if (error)
 		return (error);
-
-	zfsvfs->z_dqueue = zoid;
-
-	/*
-	 * Initialize delete head structure
-	 * Thread(s) will be started/stopped via
-	 * readonly_changed_cb() depending
-	 * on whether this is rw/ro mount.
-	 */
-	list_create(&zfsvfs->z_delete_head.z_znodes,
-	    sizeof (znode_t), offsetof(znode_t, z_list_node));
-	/* Mutex never destroyed. */
-	mutex_init(&zfsvfs->z_delete_head.z_mutex, NULL, MUTEX_DEFAULT, NULL);
 
 	return (0);
 }
@@ -412,7 +399,7 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, uint64_t obj_num, int blksz)
 
 	zp->z_phys = db->db_data;
 	zp->z_zfsvfs = zfsvfs;
-	zp->z_reap = 0;
+	zp->z_unlinked = 0;
 	zp->z_atime_dirty = 0;
 	zp->z_dbuf_held = 0;
 	zp->z_mapcnt = 0;
@@ -680,7 +667,7 @@ zfs_zget(zfsvfs_t *zfsvfs, uint64_t obj_num, znode_t **zpp)
 		mutex_enter(&zp->z_lock);
 
 		ASSERT3U(zp->z_id, ==, obj_num);
-		if (zp->z_reap) {
+		if (zp->z_unlinked) {
 			dmu_buf_rele(db, NULL);
 			mutex_exit(&zp->z_lock);
 			ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
@@ -770,19 +757,10 @@ zfs_zinactive(znode_t *zp)
 	 * If this was the last reference to a file with no links,
 	 * remove the file from the file system.
 	 */
-	if (zp->z_reap) {
+	if (zp->z_unlinked) {
 		mutex_exit(&zp->z_lock);
 		ZFS_OBJ_HOLD_EXIT(zfsvfs, z_id);
-		/* XATTR files are not put on the delete queue */
-		if (zp->z_phys->zp_flags & ZFS_XATTR) {
-			zfs_rmnode(zp);
-		} else {
-			mutex_enter(&zfsvfs->z_delete_head.z_mutex);
-			list_insert_tail(&zfsvfs->z_delete_head.z_znodes, zp);
-			zfsvfs->z_delete_head.z_znode_count++;
-			cv_broadcast(&zfsvfs->z_delete_head.z_cv);
-			mutex_exit(&zfsvfs->z_delete_head.z_mutex);
-		}
+		zfs_rmnode(zp);
 		VFS_RELE(zfsvfs->z_vfs);
 		return;
 	}
@@ -1093,9 +1071,9 @@ zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx)
 	/*
 	 * Create a delete queue.
 	 */
-	doid = zap_create(os, DMU_OT_DELETE_QUEUE, DMU_OT_NONE, 0, tx);
+	doid = zap_create(os, DMU_OT_UNLINKED_SET, DMU_OT_NONE, 0, tx);
 
-	error = zap_add(os, moid, ZFS_DELETE_QUEUE, 8, 1, &doid, tx);
+	error = zap_add(os, moid, ZFS_UNLINKED_SET, 8, 1, &doid, tx);
 	ASSERT(error == 0);
 
 	/*
@@ -1110,7 +1088,7 @@ zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx)
 
 	rootzp = kmem_cache_alloc(znode_cache, KM_SLEEP);
 	rootzp->z_zfsvfs = &zfsvfs;
-	rootzp->z_reap = 0;
+	rootzp->z_unlinked = 0;
 	rootzp->z_atime_dirty = 0;
 	rootzp->z_dbuf_held = 0;
 

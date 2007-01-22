@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1315,7 +1315,6 @@ typedef struct zil_replay_arg {
 	objset_t	*zr_os;
 	zil_replay_func_t **zr_replay;
 	void		*zr_arg;
-	void		(*zr_rm_sync)(void *arg);
 	uint64_t	*zr_txgp;
 	boolean_t	zr_byteswap;
 	char		*zr_lrbuf;
@@ -1440,8 +1439,6 @@ zil_replay_log_record(zilog_t *zilog, lr_t *lr, void *zra, uint64_t claim_txg)
 		 * transaction.
 		 */
 		if (error != ERESTART && !sunk) {
-			if (zr->zr_rm_sync != NULL)
-				zr->zr_rm_sync(zr->zr_arg);
 			txg_wait_synced(spa_get_dsl(zilog->zl_spa), 0);
 			sunk = B_TRUE;
 			continue; /* retry */
@@ -1479,7 +1476,7 @@ zil_incr_blks(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t claim_txg)
  */
 void
 zil_replay(objset_t *os, void *arg, uint64_t *txgp,
-	zil_replay_func_t *replay_func[TX_MAX_TYPE], void (*rm_sync)(void *arg))
+	zil_replay_func_t *replay_func[TX_MAX_TYPE])
 {
 	zilog_t *zilog = dmu_objset_zil(os);
 	const zil_header_t *zh = zilog->zl_header;
@@ -1493,7 +1490,6 @@ zil_replay(objset_t *os, void *arg, uint64_t *txgp,
 	zr.zr_os = os;
 	zr.zr_replay = replay_func;
 	zr.zr_arg = arg;
-	zr.zr_rm_sync = rm_sync;
 	zr.zr_txgp = txgp;
 	zr.zr_byteswap = BP_SHOULD_BYTESWAP(&zh->zh_log);
 	zr.zr_lrbuf = kmem_alloc(2 * SPA_MAXBLOCKSIZE, KM_SLEEP);
@@ -1501,8 +1497,6 @@ zil_replay(objset_t *os, void *arg, uint64_t *txgp,
 	/*
 	 * Wait for in-progress removes to sync before starting replay.
 	 */
-	if (rm_sync != NULL)
-		rm_sync(arg);
 	txg_wait_synced(zilog->zl_dmu_pool, 0);
 
 	zilog->zl_stop_replay = 0;

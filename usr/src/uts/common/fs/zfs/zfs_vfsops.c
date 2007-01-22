@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 #include <sys/cmn_err.h>
 #include "fs/fs_subr.h"
 #include <sys/zfs_znode.h>
+#include <sys/zfs_dir.h>
 #include <sys/zil.h>
 #include <sys/fs/zfs.h>
 #include <sys/dmu.h>
@@ -271,13 +272,11 @@ readonly_changed_cb(void *arg, uint64_t newval)
 		zfsvfs->z_vfs->vfs_flag |= VFS_RDONLY;
 		vfs_clearmntopt(zfsvfs->z_vfs, MNTOPT_RW);
 		vfs_setmntopt(zfsvfs->z_vfs, MNTOPT_RO, NULL, 0);
-		(void) zfs_delete_thread_target(zfsvfs, 0);
 	} else {
 		/* XXX locking on vfs_flag? */
 		zfsvfs->z_vfs->vfs_flag &= ~VFS_RDONLY;
 		vfs_clearmntopt(zfsvfs->z_vfs, MNTOPT_RO);
 		vfs_setmntopt(zfsvfs->z_vfs, MNTOPT_RW, NULL, 0);
-		(void) zfs_delete_thread_target(zfsvfs, 1);
 	}
 }
 
@@ -629,16 +628,13 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 		if (error)
 			goto out;
 
-		/*
-		 * Start a delete thread running.
-		 */
-		(void) zfs_delete_thread_target(zfsvfs, 1);
+		zfs_unlinked_drain(zfsvfs);
 
 		/*
 		 * Parse and replay the intent log.
 		 */
 		zil_replay(zfsvfs->z_os, zfsvfs, &zfsvfs->z_assign,
-		    zfs_replay_vector, (void (*)(void *))zfs_delete_wait_empty);
+		    zfs_replay_vector);
 
 		if (!zil_disable)
 			zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data);
@@ -983,11 +979,6 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 		return (0);
 	}
 	/*
-	 * Stop all delete threads.
-	 */
-	(void) zfs_delete_thread_target(zfsvfs, 0);
-
-	/*
 	 * Check the number of active vnodes in the file system.
 	 * Our count is maintained in the vfs structure, but the number
 	 * is off by 1 to indicate a hold on the vfs structure itself.
@@ -996,16 +987,11 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 	 * references underneath are reflected in the vnode count.
 	 */
 	if (zfsvfs->z_ctldir == NULL) {
-		if (vfsp->vfs_count > 1) {
-			if ((zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) == 0)
-				(void) zfs_delete_thread_target(zfsvfs, 1);
+		if (vfsp->vfs_count > 1)
 			return (EBUSY);
-		}
 	} else {
 		if (vfsp->vfs_count > 2 ||
 		    (zfsvfs->z_ctldir->v_count > 1 && !(fflag & MS_FORCE))) {
-			if ((zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) == 0)
-				(void) zfs_delete_thread_target(zfsvfs, 1);
 			return (EBUSY);
 		}
 	}
@@ -1088,7 +1074,7 @@ zfs_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 	zp_gen = zp->z_phys->zp_gen & gen_mask;
 	if (zp_gen == 0)
 		zp_gen = 1;
-	if (zp->z_reap || zp_gen != fid_gen) {
+	if (zp->z_unlinked || zp_gen != fid_gen) {
 		dprintf("znode gen (%u) != fid gen (%u)\n", zp_gen, fid_gen);
 		VN_RELE(ZTOV(zp));
 		ZFS_EXIT(zfsvfs);
@@ -1103,14 +1089,8 @@ zfs_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 static void
 zfs_objset_close(zfsvfs_t *zfsvfs)
 {
-	zfs_delete_t	*zd = &zfsvfs->z_delete_head;
 	znode_t		*zp, *nextzp;
 	objset_t	*os = zfsvfs->z_os;
-
-	/*
-	 * Stop all delete threads.
-	 */
-	(void) zfs_delete_thread_target(zfsvfs, 0);
 
 	/*
 	 * For forced unmount, at this point all vops except zfs_inactive
@@ -1119,18 +1099,6 @@ zfs_objset_close(zfsvfs_t *zfsvfs)
 	 * to use behaviour without a objset.
 	 */
 	rw_enter(&zfsvfs->z_um_lock, RW_WRITER);
-
-	/*
-	 * Release all delete in progress znodes
-	 * They will be processed when the file system remounts.
-	 */
-	mutex_enter(&zd->z_mutex);
-	while (zp = list_head(&zd->z_znodes)) {
-		list_remove(&zd->z_znodes, zp);
-		zp->z_dbuf_held = 0;
-		dmu_buf_rele(zp->z_dbuf, NULL);
-	}
-	mutex_exit(&zd->z_mutex);
 
 	/*
 	 * Release all holds on dbufs

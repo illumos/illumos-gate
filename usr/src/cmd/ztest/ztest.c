@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1161,7 +1161,7 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	if (ztest_random(2) == 0 &&
 	    dmu_objset_open(name, DMU_OST_OTHER, DS_MODE_PRIMARY, &os) == 0) {
 		zr.zr_os = os;
-		zil_replay(os, &zr, &zr.zr_assign, ztest_replay_vector, NULL);
+		zil_replay(os, &zr, &zr.zr_assign, ztest_replay_vector);
 		dmu_objset_close(os);
 	}
 
@@ -3081,7 +3081,7 @@ ztest_run(char *pool)
 			(void) rw_unlock(&ztest_shared->zs_name_lock);
 			zr.zr_os = za[d].za_os;
 			zil_replay(zr.zr_os, &zr, &zr.zr_assign,
-			    ztest_replay_vector, NULL);
+			    ztest_replay_vector);
 			za[d].za_zilog = zil_open(za[d].za_os, NULL);
 		}
 		za[t].za_pool = spa_strdup(pool);

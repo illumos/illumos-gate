@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,18 +38,6 @@
 extern "C" {
 #endif
 
-typedef struct zfs_delete_list {
-	kmutex_t		z_mutex;
-	kcondvar_t		z_cv;
-	kcondvar_t		z_quiesce_cv;
-	uint8_t			z_drained;
-	uint8_t			z_draining;
-	uint32_t		z_thread_target;
-	uint32_t		z_thread_count;
-	uint64_t		z_znode_count;
-	list_t			z_znodes;
-} zfs_delete_t;
-
 typedef struct zfsvfs zfsvfs_t;
 
 struct zfsvfs {
@@ -58,7 +45,7 @@ struct zfsvfs {
 	zfsvfs_t	*z_parent;	/* parent fs */
 	objset_t	*z_os;		/* objset reference */
 	uint64_t	z_root;		/* id of root znode */
-	uint64_t	z_dqueue;	/* delete queue */
+	uint64_t	z_unlinkedobj;	/* id of unlinked zapobj */
 	uint64_t	z_max_blksz;	/* maximum block size for files */
 	uint64_t	z_assign;	/* TXG_NOWAIT or set by zil_replay() */
 	zilog_t		*z_log;		/* intent log pointer */
@@ -69,7 +56,6 @@ struct zfsvfs {
 	boolean_t	z_unmounted2;	/* unmounted phase 2 */
 	uint32_t	z_op_cnt;	/* vnode/vfs operations ref count */
 	krwlock_t	z_um_lock;	/* rw lock for umount phase 2 */
-	zfs_delete_t 	z_delete_head;	/* zfs delete list */
 	list_t		z_all_znodes;	/* all vnodes in the fs */
 	kmutex_t	z_znodes_lock;	/* lock for z_all_znodes */
 	vnode_t		*z_ctldir;	/* .zfs directory pointer */

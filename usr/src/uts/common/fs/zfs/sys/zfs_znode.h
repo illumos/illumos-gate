@@ -56,7 +56,7 @@ extern "C" {
  */
 
 #define	ZFS_FSID		"FSID"
-#define	ZFS_DELETE_QUEUE	"DELETE_QUEUE"
+#define	ZFS_UNLINKED_SET	"DELETE_QUEUE"
 #define	ZFS_ROOT_OBJ		"ROOT"
 #define	ZPL_VERSION_OBJ		"VERSION"
 #define	ZFS_PROP_BLOCKPERPAGE	"BLOCKPERPAGE"
@@ -135,7 +135,6 @@ typedef struct zfs_dirlock {
 typedef struct znode {
 	struct zfsvfs	*z_zfsvfs;
 	vnode_t		*z_vnode;
-	list_node_t 	z_list_node;	/* deleted znodes */
 	uint64_t	z_id;		/* object ID for this znode */
 	kmutex_t	z_lock;		/* znode modification lock */
 	krwlock_t	z_map_lock;	/* page map lock */
@@ -143,7 +142,7 @@ typedef struct znode {
 	zfs_dirlock_t	*z_dirlocks;	/* directory entry lock list */
 	kmutex_t	z_range_lock;	/* protects changes to z_range_avl */
 	avl_tree_t	z_range_avl;	/* avl tree of file range locks */
-	uint8_t		z_reap;		/* reap file at last reference */
+	uint8_t		z_unlinked;	/* file has been unlinked */
 	uint8_t		z_atime_dirty;	/* atime needs to be synced */
 	uint8_t		z_dbuf_held;	/* Is z_dbuf already held? */
 	uint8_t		z_zn_prefetch;	/* Prefetch znodes? */
@@ -249,8 +248,6 @@ extern int	zfs_zget(zfsvfs_t *, uint64_t, znode_t **);
 extern void	zfs_zinactive(znode_t *);
 extern void	zfs_znode_delete(znode_t *, dmu_tx_t *);
 extern void	zfs_znode_free(znode_t *);
-extern int	zfs_delete_thread_target(zfsvfs_t *zfsvfs, int nthreads);
-extern void	zfs_delete_wait_empty(zfsvfs_t *zfsvfs);
 extern void	zfs_remove_op_tables();
 extern int	zfs_create_op_tables();
 extern int	zfs_sync(vfs_t *vfsp, short flag, cred_t *cr);

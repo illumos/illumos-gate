@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -249,7 +249,7 @@ extern zilog_t	*zil_open(objset_t *os, zil_get_data_t *get_data);
 extern void	zil_close(zilog_t *zilog);
 
 extern void	zil_replay(objset_t *os, void *arg, uint64_t *txgp,
-    zil_replay_func_t *replay_func[TX_MAX_TYPE], void (*rm_wait)(void *));
+    zil_replay_func_t *replay_func[TX_MAX_TYPE]);
 extern void	zil_destroy(zilog_t *zilog, boolean_t keep_first);
 
 extern itx_t	*zil_itx_create(int txtype, size_t lrsize);

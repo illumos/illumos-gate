@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -874,7 +874,7 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 	 */
 	if (zfs_zget(zfsvfs, lr->lr_foid, &zp) != 0)
 		return (ENOENT);
-	if (zp->z_reap) {
+	if (zp->z_unlinked) {
 		VN_RELE(ZTOV(zp));
 		return (ENOENT);
 	}
@@ -1276,8 +1276,8 @@ zfs_remove(vnode_t *dvp, char *name, cred_t *cr)
 	uint64_t	acl_obj, xattr_obj;
 	zfs_dirlock_t	*dl;
 	dmu_tx_t	*tx;
-	int		may_delete_now, delete_now = FALSE;
-	int		reaped;
+	boolean_t	may_delete_now, delete_now = FALSE;
+	boolean_t	unlinked;
 	int		error;
 
 	ZFS_ENTER(zfsvfs);
@@ -1314,7 +1314,7 @@ top:
 	mutex_exit(&vp->v_lock);
 
 	/*
-	 * We may delete the znode now, or we may put it on the delete queue;
+	 * We may delete the znode now, or we may put it in the unlinked set;
 	 * it depends on whether we're the last link, and on whether there are
 	 * other holds on the vnode.  So we dmu_tx_hold() the right things to
 	 * allow for either case.
@@ -1327,12 +1327,6 @@ top:
 
 	/* are there any extended attributes? */
 	if ((xattr_obj = zp->z_phys->zp_xattr) != 0) {
-		/*
-		 * XXX - There is a possibility that the delete
-		 * of the parent file could succeed, but then we get
-		 * an ENOSPC when we try to delete the xattrs...
-		 * so we would need to re-try the deletes periodically
-		 */
 		/* XXX - do we need this if we are deleting? */
 		dmu_tx_hold_bonus(tx, xattr_obj);
 	}
@@ -1343,7 +1337,7 @@ top:
 		dmu_tx_hold_free(tx, acl_obj, 0, DMU_OBJECT_END);
 
 	/* charge as an update -- would be nice not to charge at all */
-	dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, FALSE, NULL);
+	dmu_tx_hold_zap(tx, zfsvfs->z_unlinkedobj, FALSE, NULL);
 
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
@@ -1362,14 +1356,14 @@ top:
 	/*
 	 * Remove the directory entry.
 	 */
-	error = zfs_link_destroy(dl, zp, tx, 0, &reaped);
+	error = zfs_link_destroy(dl, zp, tx, 0, &unlinked);
 
 	if (error) {
 		dmu_tx_commit(tx);
 		goto out;
 	}
 
-	if (reaped) {
+	if (unlinked) {
 		mutex_enter(&vp->v_lock);
 		delete_now = may_delete_now &&
 		    vp->v_count == 1 && !vn_has_cached_data(vp) &&
@@ -1385,10 +1379,10 @@ top:
 			ASSERT3U(xzp->z_phys->zp_links, ==, 2);
 			dmu_buf_will_dirty(xzp->z_dbuf, tx);
 			mutex_enter(&xzp->z_lock);
-			xzp->z_reap = 1;
+			xzp->z_unlinked = 1;
 			xzp->z_phys->zp_links = 0;
 			mutex_exit(&xzp->z_lock);
-			zfs_dq_add(xzp, tx);
+			zfs_unlinked_add(xzp, tx);
 			zp->z_phys->zp_xattr = 0; /* probably unnecessary */
 		}
 		mutex_enter(&zp->z_lock);
@@ -1399,8 +1393,8 @@ top:
 		mutex_exit(&zp->z_lock);
 		zfs_znode_delete(zp, tx);
 		VFS_RELE(zfsvfs->z_vfs);
-	} else if (reaped) {
-		zfs_dq_add(zp, tx);
+	} else if (unlinked) {
+		zfs_unlinked_add(zp, tx);
 	}
 
 	zfs_log_remove(zilog, tx, TX_REMOVE, dzp, name);
@@ -1585,7 +1579,7 @@ top:
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_zap(tx, dzp->z_id, FALSE, name);
 	dmu_tx_hold_bonus(tx, zp->z_id);
-	dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, FALSE, NULL);
+	dmu_tx_hold_zap(tx, zfsvfs->z_unlinkedobj, FALSE, NULL);
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
 		rw_exit(&zp->z_parent_lock);
@@ -1684,7 +1678,7 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp)
 	/*
 	 * Quit if directory has been removed (posix)
 	 */
-	if ((*eofp = zp->z_reap) != 0) {
+	if ((*eofp = zp->z_unlinked) != 0) {
 		ZFS_EXIT(zfsvfs);
 		return (0);
 	}
@@ -2486,7 +2480,7 @@ top:
 		dmu_tx_hold_bonus(tx, tdzp->z_id);	/* nlink changes */
 	if (tzp)
 		dmu_tx_hold_bonus(tx, tzp->z_id);	/* parent changes */
-	dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, FALSE, NULL);
+	dmu_tx_hold_zap(tx, zfsvfs->z_unlinkedobj, FALSE, NULL);
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
 		if (zl != NULL)
@@ -3062,7 +3056,7 @@ zfs_inactive(vnode_t *vp, cred_t *cr)
 		    cr);
 	}
 
-	if (zp->z_atime_dirty && zp->z_reap == 0) {
+	if (zp->z_atime_dirty && zp->z_unlinked == 0) {
 		dmu_tx_t *tx = dmu_tx_create(zfsvfs->z_os);
 
 		dmu_tx_hold_bonus(tx, zp->z_id);

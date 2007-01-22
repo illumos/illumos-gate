@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,13 +51,15 @@ extern int zfs_dirent_lock(zfs_dirlock_t **, znode_t *, char *, znode_t **,
     int);
 extern void zfs_dirent_unlock(zfs_dirlock_t *);
 extern int zfs_link_create(zfs_dirlock_t *, znode_t *, dmu_tx_t *, int);
-extern int zfs_link_destroy(zfs_dirlock_t *, znode_t *, dmu_tx_t *, int, int *);
+extern int zfs_link_destroy(zfs_dirlock_t *, znode_t *, dmu_tx_t *, int,
+    boolean_t *);
 extern int zfs_dirlook(znode_t *, char *, vnode_t **);
 extern void zfs_mknode(znode_t *, vattr_t *, uint64_t *,
     dmu_tx_t *, cred_t *, uint_t, znode_t **, int);
 extern void zfs_rmnode(znode_t *);
 extern boolean_t zfs_dirempty(znode_t *);
-extern void zfs_dq_add(znode_t *, dmu_tx_t *);
+extern void zfs_unlinked_add(znode_t *, dmu_tx_t *);
+extern void zfs_unlinked_drain(zfsvfs_t *zfsvfs);
 extern int zfs_sticky_remove_access(znode_t *, znode_t *, cred_t *cr);
 extern int zfs_get_xattrdir(znode_t *, vnode_t **, cred_t *, int);
 extern int zfs_make_xattrdir(znode_t *, vattr_t *, vnode_t **, cred_t *);

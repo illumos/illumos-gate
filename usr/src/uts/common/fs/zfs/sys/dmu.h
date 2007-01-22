@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,7 +94,7 @@ typedef enum dmu_object_type {
 	DMU_OT_PLAIN_FILE_CONTENTS,	/* UINT8 */
 	DMU_OT_DIRECTORY_CONTENTS,	/* ZAP */
 	DMU_OT_MASTER_NODE,		/* ZAP */
-	DMU_OT_DELETE_QUEUE,		/* ZAP */
+	DMU_OT_UNLINKED_SET,		/* ZAP */
 	/* zvol: */
 	DMU_OT_ZVOL,			/* UINT8 */
 	DMU_OT_ZVOL_PROP,		/* ZAP */

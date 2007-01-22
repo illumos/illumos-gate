@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -446,7 +446,7 @@ zvol_create_minor(const char *name, dev_t dev)
 
 	rw_init(&zv->zv_dslock, NULL, RW_DEFAULT, NULL);
 
-	zil_replay(os, zv, &zv->zv_txg_assign, zvol_replay_vector, NULL);
+	zil_replay(os, zv, &zv->zv_txg_assign, zvol_replay_vector);
 
 	zvol_size_changed(zv, dev);
 

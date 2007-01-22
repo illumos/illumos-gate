@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,7 +217,7 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	size_t dlen;
 	int err;
 
-	if (zilog == NULL || zp->z_reap)
+	if (zilog == NULL || zp->z_unlinked)
 		return;
 
 	/*
@@ -289,7 +289,7 @@ zfs_log_truncate(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	uint64_t seq;
 	lr_truncate_t *lr;
 
-	if (zilog == NULL || zp->z_reap)
+	if (zilog == NULL || zp->z_unlinked)
 		return;
 
 	itx = zil_itx_create(txtype, sizeof (*lr));
@@ -314,7 +314,7 @@ zfs_log_setattr(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	uint64_t seq;
 	lr_setattr_t *lr;
 
-	if (zilog == NULL || zp->z_reap)
+	if (zilog == NULL || zp->z_unlinked)
 		return;
 
 	itx = zil_itx_create(txtype, sizeof (*lr));
@@ -344,7 +344,7 @@ zfs_log_acl(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	uint64_t seq;
 	lr_acl_t *lr;
 
-	if (zilog == NULL || zp->z_reap)
+	if (zilog == NULL || zp->z_unlinked)
 		return;
 
 	itx = zil_itx_create(txtype, sizeof (*lr) + aclcnt * sizeof (ace_t));
