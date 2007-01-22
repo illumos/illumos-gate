@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -798,7 +798,6 @@ zio_done(zio_t *zio)
 	spa_t *spa = zio->io_spa;
 	blkptr_t *bp = zio->io_bp;
 	vdev_t *vd = zio->io_vd;
-	char blkbuf[BP_SPRINTF_LEN];
 
 	ASSERT(zio->io_children_notready == 0);
 	ASSERT(zio->io_children_notdone == 0);
@@ -850,18 +849,22 @@ zio_done(zio_t *zio)
 		 * For I/O requests that cannot fail, panic appropriately.
 		 */
 		if (!(zio->io_flags & ZIO_FLAG_CANFAIL)) {
-			sprintf_blkptr(blkbuf, BP_SPRINTF_LEN,
-			    bp ? bp : &zio->io_bp_copy);
+			char *blkbuf;
+
+			blkbuf = kmem_alloc(BP_SPRINTF_LEN, KM_NOSLEEP);
+			if (blkbuf) {
+				sprintf_blkptr(blkbuf, BP_SPRINTF_LEN,
+				    bp ? bp : &zio->io_bp_copy);
+			}
 			panic("ZFS: %s (%s on %s off %llx: zio %p %s): error "
 			    "%d", zio->io_error == ECKSUM ?
 			    "bad checksum" : "I/O failure",
 			    zio_type_name[zio->io_type],
 			    vdev_description(vd),
 			    (u_longlong_t)zio->io_offset,
-			    zio, blkbuf, zio->io_error);
+			    zio, blkbuf ? blkbuf : "", zio->io_error);
 		}
 	}
-
 	zio_clear_transform_stack(zio);
 
 	if (zio->io_done)
