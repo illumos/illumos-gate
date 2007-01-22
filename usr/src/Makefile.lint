@@ -356,6 +356,7 @@ COMMON_SUBDIRS = \
 	lib/libpool \
 	lib/libproc \
 	lib/libpthread \
+	lib/libraidcfg \
 	lib/librcm \
 	lib/librestart \
 	lib/librt \
@@ -392,6 +393,7 @@ COMMON_SUBDIRS = \
 	lib/passwdutil \
 	lib/pkcs11 \
 	lib/print \
+	lib/raidcfg_plugins \
 	lib/fm \
 	lib/udapl \
 	lib/watchmalloc \

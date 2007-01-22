@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -199,10 +199,12 @@ SUBDIRS += \
 	gss_mechs/mech_dummy	\
 	gss_mechs/mech_dh	\
 	rpcsec_gss	\
+	libraidcfg	.WAIT	\
 	librcm		.WAIT	\
 	libcfgadm	.WAIT	\
 	libpicl		.WAIT	\
 	libpicltree	.WAIT \
+	raidcfg_plugins	\
 	cfgadm_plugins	\
 	libmail		\
 	lvm		\

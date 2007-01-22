@@ -18,29 +18,32 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/raidctl/Makefile
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG=	raidctl
-
-include $(SRC)/cmd/Makefile.cmd
-
-LDLIBS   += -lraidcfg
-CFLAGS	 += $(CCVERBOSE)
-
-.KEEP_STATE:
-
-all: $(PROG)
-
-install: all $(ROOTUSRSBINPROG)
-
-clean:
-
-lint:	lint_PROG
-
-include $(SRC)/cmd/Makefile.targ
+SUNWprivate {
+    global:
+	raidcfg_errstr;
+	raidcfg_get_controller;
+	raidcfg_get_array;
+	raidcfg_get_disk;
+	raidcfg_open_controller;
+	raidcfg_close_controller;
+	raidcfg_get_type;
+	raidcfg_get_attr;
+	raidcfg_get_container;
+	raidcfg_list_head;
+	raidcfg_list_next;
+	raidcfg_set_attr;
+	raidcfg_create_array;
+	raidcfg_delete_array;
+	raidcfg_set_hsp;
+	raidcfg_unset_hsp;
+	raidcfg_update_fw;
+    local:
+	*;
+};

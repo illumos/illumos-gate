@@ -18,29 +18,34 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/raidctl/Makefile
+# lib/libraidcfg/Makefile.com
 #
 
-PROG=	raidctl
+LIBRARY =	libraidcfg.a
+VERS =		.1
+OBJECTS =	raidcfg.o
 
-include $(SRC)/cmd/Makefile.cmd
+include ../../Makefile.lib
 
-LDLIBS   += -lraidcfg
-CFLAGS	 += $(CCVERBOSE)
+LIBS =		$(DYNLIB) $(LINTLIB)
+LDLIBS +=	-lcfgadm -ldevinfo -lc
+
+SRCDIR =	../common
+$(LINTLIB):=	SRCS = $(LINTSRC:%=$(SRCDIR)/%)
+
+CFLAGS +=	$(CCVERBOSE)
 
 .KEEP_STATE:
 
-all: $(PROG)
+all: $(LIBS)
 
-install: all $(ROOTUSRSBINPROG)
+lint: lintcheck
 
-clean:
-
-lint:	lint_PROG
-
-include $(SRC)/cmd/Makefile.targ
+include ../../Makefile.targ

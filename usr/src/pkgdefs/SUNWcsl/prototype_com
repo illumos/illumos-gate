@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -221,6 +221,7 @@ s none usr/lib/librt.so.1=../../lib/librt.so.1
 s none usr/lib/librt.so=../../lib/librt.so.1
 s none usr/lib/libposix4.so=../../lib/librt.so.1
 s none usr/lib/libposix4.so.1=../../lib/librt.so.1
+f none usr/lib/libraidcfg.so.1 755 root bin
 s none usr/lib/librtld.so.1=../../lib/librtld.so.1
 s none usr/lib/librtld_db.so=../../lib/librtld_db.so.1
 s none usr/lib/librtld_db.so.1=../../lib/librtld_db.so.1
@@ -289,6 +290,8 @@ s none usr/lib/nss_nis.so.1=../../lib/nss_nis.so.1
 s none usr/lib/nss_nisplus.so.1=../../lib/nss_nisplus.so.1
 s none usr/lib/nss_user.so.1=../../lib/nss_user.so.1
 f none usr/lib/passwdutil.so.1 755 root bin
+d none usr/lib/raidcfg 755 root bin
+f none usr/lib/raidcfg/mpt.so.1 755 root bin
 s none usr/lib/straddr.so=./straddr.so.2
 f none usr/lib/straddr.so.2 755 root bin
 d none usr/lib/security 755 root bin

@@ -427,6 +427,16 @@ usr/lib/llib-ldisasm			sparc
 usr/lib/llib-ldisasm.ln			sparc
 usr/lib/sparcv9/llib-ldisasm.ln		sparc
 #
+# Private interfaces for libraidcfg
+#
+usr/include/raidcfg.h			sparc
+usr/include/raidcfg_spi.h		sparc
+usr/lib/libraidcfg.so			sparc
+usr/lib/llib-lraidcfg			sparc
+usr/lib/llib-lraidcfg.ln		sparc
+usr/lib/sparcv9/llib-lraidcfg.ln	sparc
+usr/lib/sparcv9/libraidcfg.so		sparc
+#
 # This file is used for private communication between mdb, drv/kmdb, and
 # misc/kmdb.  The interfaces described herein are not intended for customer
 # use, and are thus excluded from packaging.

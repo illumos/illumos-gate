@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -79,6 +79,8 @@ d none usr/lib/lwp/sparcv9 755 root bin
 s none usr/lib/lwp/64=sparcv9
 s none usr/lib/lwp/sparcv9/libthread.so.1=../../sparcv9/libthread.so.1
 s none usr/lib/lwp/sparcv9/libthread_db.so.1=../../sparcv9/libthread_db.so.1
+d none usr/lib/raidcfg/sparcv9 755 root bin
+f none usr/lib/raidcfg/sparcv9/mpt.so.1 755 root bin
 d none usr/lib/security/sparcv9 755 root bin
 s none usr/lib/security/64=sparcv9
 f none usr/lib/security/sparcv9/crypt_bsdmd5.so.1 755 root bin
@@ -189,6 +191,7 @@ f none usr/lib/sparcv9/libproject.so.1 755 root bin
 s none usr/lib/sparcv9/libproject.so=libproject.so.1
 f none usr/lib/sparcv9/libpkcs11.so.1 755 root bin
 s none usr/lib/sparcv9/libpkcs11.so=libpkcs11.so.1
+f none usr/lib/sparcv9/libraidcfg.so.1 755 root bin
 f none usr/lib/sparcv9/lib300.so.1 755 root bin
 s none usr/lib/sparcv9/lib300.so=./lib300.so.1
 f none usr/lib/sparcv9/lib300s.so.1 755 root bin

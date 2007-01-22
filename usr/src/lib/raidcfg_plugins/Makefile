@@ -18,29 +18,35 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/raidctl/Makefile
+# lib/raidcfg_plugins/Makefile
 #
 
-PROG=	raidctl
+include $(SRC)/Makefile.master
 
-include $(SRC)/cmd/Makefile.cmd
+CLOSED_PLUGIN = $(CLOSED)/lib/raidcfg_plugins/
 
-LDLIBS   += -lraidcfg
-CFLAGS	 += $(CCVERBOSE)
+$(CLOSED_BUILD)COMMON_SUBDIRS += $(CLOSED_PLUGIN)/mpt
+
+SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
+
+all:= 		TARGET= all
+install:=	TARGET= install
+clean:=		TARGET= clean
+clobber:=	TARGET= clobber
+lint:=		TARGET= lint
+_msg:=		TARGET= _msg
 
 .KEEP_STATE:
 
-all: $(PROG)
+all clean clobber lint install _msg: $(SUBDIRS)
 
-install: all $(ROOTUSRSBINPROG)
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-clean:
-
-lint:	lint_PROG
-
-include $(SRC)/cmd/Makefile.targ
+FRC:

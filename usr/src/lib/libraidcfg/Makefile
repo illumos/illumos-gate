@@ -18,29 +18,44 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/raidctl/Makefile
+# lib/libraidcfg/Makefile
 #
 
-PROG=	raidctl
+include $(SRC)/lib/Makefile.lib
 
-include $(SRC)/cmd/Makefile.cmd
+SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
-LDLIBS   += -lraidcfg
-CFLAGS	 += $(CCVERBOSE)
+POFILE =	libraidcfg.po
+MSGSRCS :sh =	echo */*.c
+MSGFILES =	$(MSGSRCS:%.c=%.i)
+
+all :=		TARGET= all
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+install :=	TARGET= install
+lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all: $(PROG)
+all clean clobber install lint: $(SUBDIRS)
 
-install: all $(ROOTUSRSBINPROG)
+$(SUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-clean:
+_msg:	$(MSGDOMAINPOFILE)
 
-lint:	lint_PROG
+$(POFILE): $(MSGFILES)
+	$(BUILDPO.msgfiles)
 
-include $(SRC)/cmd/Makefile.targ
+FRC:
+
+include $(SRC)/Makefile.msg.targ
+include $(SRC)/lib/Makefile.targ

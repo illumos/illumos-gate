@@ -18,29 +18,15 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/raidctl/Makefile
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG=	raidctl
+include ../Makefile.com
+include ../../Makefile.lib.64
 
-include $(SRC)/cmd/Makefile.cmd
-
-LDLIBS   += -lraidcfg
-CFLAGS	 += $(CCVERBOSE)
-
-.KEEP_STATE:
-
-all: $(PROG)
-
-install: all $(ROOTUSRSBINPROG)
-
-clean:
-
-lint:	lint_PROG
-
-include $(SRC)/cmd/Makefile.targ
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

@@ -423,6 +423,16 @@ usr/lib/llib-ldisasm			i386
 usr/lib/llib-ldisasm.ln			i386
 usr/lib/amd64/llib-ldisasm.ln		i386
 #
+# Private interfaces for libraidcfg
+#
+usr/include/raidcfg.h			i386
+usr/include/raidcfg_spi.h		i386
+usr/lib/libraidcfg.so			i386
+usr/lib/llib-lraidcfg			i386
+usr/lib/llib-lraidcfg.ln		i386
+usr/lib/amd64/libraidcfg.so		i386
+usr/lib/amd64/llib-lraidcfg.ln		i386
+#
 # This file is used for private communication between mdb, drv/kmdb, and
 # misc/kmdb.  The interfaces described herein are not intended for customer
 # use, and are thus excluded from packaging.

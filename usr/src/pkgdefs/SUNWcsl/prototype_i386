@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -86,6 +86,8 @@ d none usr/lib/lwp/amd64 755 root bin
 s none usr/lib/lwp/64=amd64
 s none usr/lib/lwp/amd64/libthread.so.1=../../amd64/libthread.so.1
 s none usr/lib/lwp/amd64/libthread_db.so.1=../../amd64/libthread_db.so.1
+d none usr/lib/raidcfg/amd64 755 root bin
+f none usr/lib/raidcfg/amd64/mpt.so.1 755 root bin
 d none usr/lib/security/amd64 755 root bin
 s none usr/lib/security/64=amd64
 f none usr/lib/security/amd64/crypt_bsdmd5.so.1 755 root bin
@@ -196,6 +198,7 @@ f none usr/lib/amd64/libproject.so.1 755 root bin
 s none usr/lib/amd64/libproject.so=libproject.so.1
 f none usr/lib/amd64/libpkcs11.so.1 755 root bin
 s none usr/lib/amd64/libpkcs11.so=libpkcs11.so.1
+f none usr/lib/amd64/libraidcfg.so.1 755 root bin
 f none usr/lib/amd64/lib300.so.1 755 root bin
 s none usr/lib/amd64/lib300.so=./lib300.so.1
 f none usr/lib/amd64/lib300s.so.1 755 root bin
