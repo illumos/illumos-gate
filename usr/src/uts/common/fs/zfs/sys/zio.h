@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,6 +113,7 @@ enum zio_compress {
 #define	ZIO_FLAG_CANFAIL		0x00001
 #define	ZIO_FLAG_FAILFAST		0x00002
 #define	ZIO_FLAG_CONFIG_HELD		0x00004
+#define	ZIO_FLAG_CONFIG_GRABBED		0x00008
 
 #define	ZIO_FLAG_DONT_CACHE		0x00010
 #define	ZIO_FLAG_DONT_QUEUE		0x00020

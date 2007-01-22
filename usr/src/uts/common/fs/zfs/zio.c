@@ -230,6 +230,7 @@ zio_data_buf_free(void *buf, size_t size)
 
 	kmem_cache_free(zio_data_buf_cache[c], buf);
 }
+
 /*
  * ==========================================================================
  * Push and pop I/O transform buffers
@@ -320,15 +321,43 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	mutex_init(&zio->io_lock, NULL, MUTEX_DEFAULT, NULL);
 	zio_push_transform(zio, data, size, size);
 
+	/*
+	 * Note on config lock:
+	 *
+	 * If CONFIG_HELD is set, then the caller already has the config
+	 * lock, so we don't need it for this io.
+	 *
+	 * We set CONFIG_GRABBED to indicate that we have grabbed the
+	 * config lock on behalf of this io, so it should be released
+	 * in zio_done.
+	 *
+	 * Unless CONFIG_HELD is set, we will grab the config lock for
+	 * any top-level (parent-less) io, *except* NULL top-level ios.
+	 * The NULL top-level ios rarely have any children, so we delay
+	 * grabbing the lock until the first child is added (but it is
+	 * still grabbed on behalf of the top-level i/o, so additional
+	 * children don't need to also grab it).  This greatly reduces
+	 * contention on the config lock.
+	 */
 	if (pio == NULL) {
-		if (!(flags & ZIO_FLAG_CONFIG_HELD))
+		if (type != ZIO_TYPE_NULL &&
+		    !(flags & ZIO_FLAG_CONFIG_HELD)) {
 			spa_config_enter(zio->io_spa, RW_READER, zio);
+			zio->io_flags |= ZIO_FLAG_CONFIG_GRABBED;
+		}
 		zio->io_root = zio;
 	} else {
 		zio->io_root = pio->io_root;
 		if (!(flags & ZIO_FLAG_NOBOOKMARK))
 			zio->io_logical = pio->io_logical;
 		mutex_enter(&pio->io_lock);
+		if (pio->io_parent == NULL &&
+		    pio->io_type == ZIO_TYPE_NULL &&
+		    !(pio->io_flags & ZIO_FLAG_CONFIG_GRABBED) &&
+		    !(pio->io_flags & ZIO_FLAG_CONFIG_HELD)) {
+			pio->io_flags |= ZIO_FLAG_CONFIG_GRABBED;
+			spa_config_enter(zio->io_spa, RW_READER, pio);
+		}
 		if (stage < ZIO_STAGE_READY)
 			pio->io_children_notready++;
 		pio->io_children_notdone++;
@@ -891,7 +920,12 @@ zio_done(zio_t *zio)
 		    &pio->io_children_notdone);
 	}
 
-	if (pio == NULL && !(zio->io_flags & ZIO_FLAG_CONFIG_HELD))
+	/*
+	 * Note: this I/O is now done, and will shortly be
+	 * kmem_free()'d, so there is no need to clear this (or any
+	 * other) flag.
+	 */
+	if (zio->io_flags & ZIO_FLAG_CONFIG_GRABBED)
 		spa_config_exit(spa, zio);
 
 	if (zio->io_waiter != NULL) {
@@ -1458,7 +1492,8 @@ zio_vdev_io_assess(zio_t *zio)
 
 		zio->io_retries++;
 		zio->io_error = 0;
-		zio->io_flags &= ZIO_FLAG_VDEV_INHERIT;
+		zio->io_flags &= ZIO_FLAG_VDEV_INHERIT |
+		    ZIO_FLAG_CONFIG_GRABBED;
 		/* XXPOLICY */
 		zio->io_flags &= ~ZIO_FLAG_FAILFAST;
 		zio->io_flags |= ZIO_FLAG_DONT_CACHE;
