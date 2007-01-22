@@ -868,6 +868,19 @@ top:
 			return (ENOMEM);
 		}
 
+		/*
+		 * If any new failure points are introduced between the
+		 * the above anon_resv() and the below ipc_commit_begin(),
+		 * these failure points will need to unreserve the anon
+		 * reserved using anon_unresv().
+		 *
+		 * Once ipc_commit_begin() is called, the anon reserved
+		 * above will be automatically unreserved by future calls to
+		 * ipcs_cleanup() -> shm_dtor() -> shm_rm_amp().  If
+		 * ipc_commit_begin() fails, it internally calls shm_dtor(),
+		 * unreserving the above anon, and freeing the below amp.
+		 */
+
 		sp->shm_amp = anonmap_alloc(rsize, rsize);
 		sp->shm_amp->a_sp = sp;
 		/*
@@ -1235,11 +1248,8 @@ shm_rm_amp(kshmid_t *sp)
 	struct anon_map *amp = sp->shm_amp;
 	zone_t *zone;
 
-	/*
-	 * This may return NULL if global zone is removing a shm created by
-	 * a non-global zone that has been destroyed.
-	 */
-	zone = zone_find_by_id(sp->shm_perm.ipc_proj->kpj_zoneid);
+	zone = sp->shm_perm.ipc_zone;
+	ASSERT(zone != NULL);
 	/*
 	 * Free up the anon_map.
 	 */
@@ -1252,8 +1262,6 @@ shm_rm_amp(kshmid_t *sp)
 		anon_free(amp->ahp, 0, amp->size);
 	}
 	anon_unresv_zone(amp->swresv, zone);
-	if (zone != NULL)
-		zone_rele(zone);
 	anonmap_free(amp);
 }
 

@@ -464,21 +464,15 @@ segspt_create(struct seg *seg, caddr_t argsp)
 			more_pgs = new_npgs - npages;
 
 			/*
-			 * This may return NULL if global zone is removing a
-			 * shm created by a non-global zone that has been
-			 * destroyed.
+			 * The zone will never be NULL, as a fully created
+			 * shm always has an owning zone.
 			 */
-			zone =
-			    zone_find_by_id(sp->shm_perm.ipc_proj->kpj_zoneid);
-
+			zone = sp->shm_perm.ipc_zone;
+			ASSERT(zone != NULL);
 			if (anon_resv_zone(ptob(more_pgs), zone) == 0) {
-				if (zone != NULL)
-					zone_rele(zone);
 				err = ENOMEM;
 				goto out4;
 			}
-			if (zone != NULL)
-				zone_rele(zone);
 
 			nahp = anon_create(new_npgs, ANON_SLEEP);
 			ANON_LOCK_ENTER(&amp->a_rwlock, RW_WRITER);

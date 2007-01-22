@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1068,6 +1068,14 @@ ipc_commit_begin(ipc_service_t *service, key_t key, int flag,
 	ASSERT(newperm->ipc_ref == 1);
 	ASSERT(IPC_FREE(newperm));
 
+	/*
+	 * Set ipc_proj and ipc_zone so that future calls to ipc_cleanup()
+	 * clean up the necessary state.  This must be done before the
+	 * potential call to ipcs_dtor() below.
+	 */
+	newperm->ipc_proj = pp->p_task->tk_proj;
+	newperm->ipc_zone = pp->p_zone;
+
 	mutex_enter(&service->ipcs_lock);
 	/*
 	 * Ensure that no-one has raced with us and created the key.
@@ -1086,12 +1094,6 @@ ipc_commit_begin(ipc_service_t *service, key_t key, int flag,
 	 */
 	if (error = ipc_alloc_test(service, pp))
 		goto errout;
-
-	/*
-	 * Set ipc_proj so ipc_cleanup cleans up necessary state.
-	 */
-	newperm->ipc_proj = pp->p_task->tk_proj;
-	newperm->ipc_zone = pp->p_zone;
 
 	ASSERT(MUTEX_HELD(&service->ipcs_lock));
 	ASSERT(MUTEX_HELD(&pp->p_lock));
