@@ -547,10 +547,12 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	buf = vp->vp_nvlist;
 	buflen = sizeof (vp->vp_nvlist);
 
-	if (nvlist_pack(label, &buf, &buflen, NV_ENCODE_XDR, KM_SLEEP) != 0) {
+	error = nvlist_pack(label, &buf, &buflen, NV_ENCODE_XDR, KM_SLEEP);
+	if (error != 0) {
 		nvlist_free(label);
 		zio_buf_free(vp, sizeof (vdev_phys_t));
-		return (EINVAL);
+		/* EFAULT means nvlist_pack ran out of room */
+		return (error == EFAULT ? ENAMETOOLONG : EINVAL);
 	}
 
 	/*
