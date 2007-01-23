@@ -1,6 +1,6 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -1151,3 +1151,5 @@ Bugid   Risk Synopsis
 6496718 restricted visibility symbol references should trigger archive
 	extraction
 6501793 GOTOP relocation transition (optimization) fails with offsets > 2^32
+6515970 HWCAP processing doesn't clean up fmap structure - browser fails to
+	run java applet

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -122,8 +122,10 @@ remove_fdesc(Fdesc *fdp)
 		 * from the global fmap descriptor.  If so, clean up the global
 		 * descriptor to prevent a duplicate (unnecessary) unmap.
 		 */
-		if (fmap->fm_maddr == fdp->fd_fmap.fm_maddr)
+		if (fmap->fm_maddr == fdp->fd_fmap.fm_maddr) {
 			fmap->fm_maddr = 0;
+			fmap_setup();
+		}
 	}
 	if (fdp->fd_fd)
 		(void) close(fdp->fd_fd);
