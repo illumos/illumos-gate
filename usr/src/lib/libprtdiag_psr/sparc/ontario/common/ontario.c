@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -262,7 +262,7 @@ ontario_pci_callback(picl_nodehdl_t pcih, void *args)
 		/* Print Parent Path */
 		log_printf("%46.45s", pci_card.notes);
 		/* Printf Card Name */
-		if (strlen(pci_card.name) > 24)
+		if (strlen(pci_card.name) > 25)
 			log_printf("%25.24s+", pci_card.name);
 		else
 			log_printf("%26s", pci_card.name);
@@ -270,7 +270,7 @@ ontario_pci_callback(picl_nodehdl_t pcih, void *args)
 		if (strlen(pci_card.model) > 10)
 			log_printf("%10.9s+", pci_card.model);
 		else
-			log_printf("%10s", pci_card.model);
+			log_printf("%11s", pci_card.model);
 		log_printf("\n");
 
 		err = picl_get_propval_by_name(nodeh, PICL_PROP_PEER, &nodeh,
@@ -288,7 +288,7 @@ void
 sun4v_display_pci(picl_nodehdl_t plafh)
 {
 	char    platbuf[MAXSTRLEN];
-	char	*fmt = "%-11s %-5s %-4s %-45s %-25s %-8s";
+	char	*fmt = "%-11s %-5s %-4s %-45s %-25s %-10s";
 	static int banner = FALSE; /* Have we printed the column headings? */
 
 	if (banner == FALSE) {
@@ -305,7 +305,7 @@ sun4v_display_pci(picl_nodehdl_t plafh)
 		log_printf("\n");
 		log_printf(fmt, "-----------", "-----", "----",
 		    "---------------------------------------------",
-		    "-------------------------", "---------", 0);
+		    "-------------------------", "----------", 0);
 		log_printf("\n");
 		banner = TRUE;
 	}

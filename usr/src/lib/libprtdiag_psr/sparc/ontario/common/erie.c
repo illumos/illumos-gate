@@ -2,12 +2,11 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.open2solaris.org/os/licensing.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,16 +139,15 @@ erie_pci_callback(picl_nodehdl_t pcih, void *args)
 		}
 
 		/* Printf Node Name */
-		log_printf("%26s", name);
-		if (strlen(name) > 30)
-			log_printf(dgettext(TEXT_DOMAIN, "+ "));
+		if (strlen(name) > 25)
+			log_printf("%25.24s+", name);
 		else
-			log_printf(dgettext(TEXT_DOMAIN, "  "));
-
+			log_printf("%26s", name);
 		/* Print Card Model */
-		log_printf("%-8s", model);
-		if (strlen(model) > 8)
-			log_printf(dgettext(TEXT_DOMAIN, "+"));
+		if (strlen(model) > 10)
+			log_printf("%10.9s+", model);
+		else
+			log_printf("%11s", model);
 		log_printf("\n");
 
 		/* Grab the next child under parent node and do it again */
