@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,13 +68,13 @@ static const cma_subscriber_t cma_subrs[] = {
 	    NULL },
 	{ "fault.cpu.SPARC64-VI.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    cma_cpu_retire },
-	{ "fault.chassis.opl.cpu.SPARC64-VI.core.se-offlinereq",
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.se",
 		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
-	{ "fault.chassis.opl.cpu.SPARC64-VI.core.se-offlinereq-silence",
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.se-offlinereq",
 		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
-	{ "fault.chassis.opl.cpu.SPARC64-VI.core.ce-offlinereq",
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.ce",
 		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
-	{ "fault.chassis.opl.cpu.SPARC64-VI.core.ce-offlinereq-silence",
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.ce-offlinereq",
 		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
 	{ NULL, NULL, 0, NULL }
 };
@@ -219,7 +219,7 @@ _fmd_init(fmd_hdl_t *hdl)
 
 	fmd_hdl_subscribe(hdl, "fault.cpu.*");
 	fmd_hdl_subscribe(hdl, "fault.memory.*");
-	fmd_hdl_subscribe(hdl, "fault.chassis.opl.*");
+	fmd_hdl_subscribe(hdl, "fault.chassis.SPARC-Enterprise.cpu.*");
 
 	(void) fmd_stat_create(hdl, FMD_STAT_NOALLOC, sizeof (cma_stats) /
 	    sizeof (fmd_stat_t), (fmd_stat_t *)&cma_stats);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2037,6 +2037,92 @@ cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 		cpu_case_restore(hdl, cpu, &cpu->cpu_misc_regs, cp,
 		    "misc_regs");
 		break;
+#ifdef sun4u
+	case CMD_PTR_CPU_INV_SFSR:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_invsfsr, cp,
+		    "opl_invsfsr");
+		break;
+	case CMD_PTR_CPU_UE_DET_CPU:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_oplue_detcpu, cp,
+		    "oplue_detcpu");
+		break;
+	case CMD_PTR_CPU_UE_DET_IO:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_oplue_detio, cp,
+		    "oplue_detio");
+		break;
+	case CMD_PTR_CPU_MTLB:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_mtlb, cp,
+		    "opl_mtlb");
+		break;
+	case CMD_PTR_CPU_TLBP:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_tlbp, cp,
+		    "opl_tlbp");
+		break;
+	case CMD_PTR_CPU_UGESR_INV_URG:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_inv_urg, cp,
+		    "opl_inv_urg");
+		break;
+	case CMD_PTR_CPU_UGESR_CRE:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_cre, cp,
+		    "opl_cre");
+		break;
+	case CMD_PTR_CPU_UGESR_TSB_CTX:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_tsb_ctx, cp,
+		    "opl_tsb_ctx");
+		break;
+	case CMD_PTR_CPU_UGESR_TSBP:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_tsbp, cp,
+		    "opl_tsbp");
+		break;
+	case CMD_PTR_CPU_UGESR_PSTATE:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_pstate, cp,
+		    "opl_pstate");
+		break;
+	case CMD_PTR_CPU_UGESR_TSTATE:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_tstate, cp,
+		    "opl_tstate");
+		break;
+	case CMD_PTR_CPU_UGESR_IUG_F:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_iug_f, cp,
+		    "opl_iug_f");
+		break;
+	case CMD_PTR_CPU_UGESR_IUG_R:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_iug_r, cp,
+		    "opl_iug_r");
+		break;
+	case CMD_PTR_CPU_UGESR_SDC:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_sdc, cp,
+		    "opl_sdc");
+		break;
+	case CMD_PTR_CPU_UGESR_WDT:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_wdt, cp,
+		    "opl_wdt");
+		break;
+	case CMD_PTR_CPU_UGESR_DTLB:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_dtlb, cp,
+		    "opl_dtlb");
+		break;
+	case CMD_PTR_CPU_UGESR_ITLB:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_itlb, cp,
+		    "opl_itlb");
+		break;
+	case CMD_PTR_CPU_UGESR_CORE_ERR:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_core_err, cp,
+		    "opl_core_err");
+		break;
+	case CMD_PTR_CPU_UGESR_DAE:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_dae, cp,
+		    "opl_dae");
+		break;
+	case CMD_PTR_CPU_UGESR_IAE:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_iae, cp,
+		    "opl_iae");
+		break;
+	case CMD_PTR_CPU_UGESR_UGE:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_opl_uge, cp,
+		    "opl_uge");
+		break;
+#endif	/* sun4u */
 	default:
 		fmd_hdl_abort(hdl, "invalid %s subtype %d\n",
 		    ptr->ptr_name, ptr->ptr_subtype);
