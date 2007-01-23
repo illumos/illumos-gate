@@ -48,9 +48,11 @@ do
 			echo "Creating ram disk for $ALT_ROOT"
 		fi
 		;;
-	-n|--nocompress) compress=no ;;
+	-n|--nocompress) compress=no
+		;;
         *)      echo Usage: ${0##*/}: [-R \<root\>] [--nocompress]
-		exit ;;
+		exit
+		;;
         esac
 	shift
 done

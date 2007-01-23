@@ -4625,7 +4625,7 @@ install_failsafe()
 {
 	if [ "$root" != "/" ] || \
 	    [ -f /boot/x86.miniroot-safe ] || \
-	    [ -x ${GATEPATH}/public/bin/update_failsafe ]; then
+	    [ ! -x ${GATEPATH}/public/bin/update_failsafe ]; then
 		#
 		# Either we're not bfu'ing /, or the failsafe archives were
 		# already installed, or update_failsafe is not available.

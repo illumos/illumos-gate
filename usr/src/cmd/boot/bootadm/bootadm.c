@@ -428,7 +428,7 @@ parse_args_internal(int argc, char *argv[])
 	opterr = 0;
 
 	error = 0;
-	while ((c = getopt(argc, argv, "a:d:fm:no:vCR:xX")) != -1) {
+	while ((c = getopt(argc, argv, "a:d:fm:no:vCR:")) != -1) {
 		switch (c) {
 		case 'a':
 			if (bam_cmd) {
@@ -3188,7 +3188,12 @@ find_boot_entry(menu_t *mp, char *title, char *root, char *module,
 			continue;
 		}
 
-		/* check for matching module entry (failsafe or normal) */
+		/*
+		 * Check for matching module entry (failsafe or normal).  We
+		 * use a strncmp to match "module" or "module$", since we
+		 * don't know which one it should be.  If it fails to match,
+		 * we go around the loop again.
+		 */
 		lp = lp->next;	/* advance to module line */
 		if ((strncmp(lp->cmd, menu_cmds[MODULE_CMD],
 		    strlen(menu_cmds[MODULE_CMD])) != 0) ||

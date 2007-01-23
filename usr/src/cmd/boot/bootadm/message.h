@@ -332,30 +332,30 @@ the failsafe archive unbootable\n")
 #define	NOT_DBOOT \
 	gettext("bootadm set-menu %s may only be run on directboot kernels.\n")
 
-#define	DEFAULT_NOT_BAM	\
-gettext("Default menu.lst entry is not controlled by bootadm.  Exiting\n")
+#define	DEFAULT_NOT_BAM	gettext(	\
+"Default /boot/grub/menu.lst entry is not controlled by bootadm.  Exiting\n")
 
 #define	NO_KERNEL_MATCH	\
 gettext("Unexpected kernel command on line %d.\n\
-** YOU MUST MANUALLY CORRECT menu.lst BEFORE REBOOT! **\n\
+** YOU MUST MANUALLY CORRECT /boot/grub/menu.lst BEFORE REBOOT! **\n\
 For details, see %s\n")
 
 #define	NO_MODULE_MATCH	\
 gettext("Unexpected module command on line %d.\n\
-** YOU MUST MANUALLY CORRECT menu.lst BEFORE REBOOT! **\n\
+** YOU MUST MANUALLY CORRECT /boot/grub/menu.lst BEFORE REBOOT! **\n\
 For details, see %s\n")
 
 #define	NO_KERNELS_FOUND	\
 gettext("Could not find any kernel lines to update.  Only entries created by\n\
 bootadm(1M) and lu(1M) can be updated.  All other must be manually changed.\n\
-** YOU MUST MANUALLY CORRECT menu.lst BEFORE REBOOT! **\n\
+** YOU MUST MANUALLY CORRECT /boot/grub/menu.lst BEFORE REBOOT! **\n\
 For details on updating entries, see %s\n")
 
 #define	HAND_ADDED_ENTRY	\
 gettext("On upgrades, bootadm(1M) will only upgrade entries added by\n\
-bootadm(1M) or lu(1M).  The following entry or entries in menu.lst will\n\
-not be upgraded.  For details on updating entries, see\n\
-%s\n")
+bootadm(1M) or lu(1M).  The following entry or entries in\n\
+/boot/grub/menu.lst will not be upgraded.  For details on updating entries,\n\
+see %s\n")
 
 #define	NOT_ELF_FILE gettext("%s is not an ELF file.\n")
 
