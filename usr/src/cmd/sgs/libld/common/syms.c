@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -131,7 +131,7 @@ string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
  * referenced, mark it so that we don't directly bind to it.
  */
 uintptr_t
-ld_sym_nodirect(Is_desc * isp, Ifl_desc * ifl, Ofl_desc * ofl)
+ld_sym_nodirect(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 {
 	Shdr		*sifshdr, *symshdr;
 	Syminfo		*sifdata;
@@ -370,13 +370,15 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 		sdp->sd_ref = REF_REL_NEED;
 
 		/*
-		 * Under -Bnodirect, all exported interfaces are tagged to
-		 * prevent direct binding to them.
+		 * Under -Bnodirect, all exported interfaces that have not
+		 * explicitly been defined protected or directly bound to, are
+		 * tagged to prevent direct binding.
 		 */
 		if ((ofl->ofl_flags1 & FLG_OF1_ALNODIR) &&
-		    (nsym->st_shndx != SHN_UNDEF))
+		    ((sdp->sd_flags1 & (FLG_SY1_PROT | FLG_SY1_DIR)) == 0) &&
+		    (nsym->st_shndx != SHN_UNDEF)) {
 			sdp->sd_flags1 |= FLG_SY1_NDIR;
-
+		}
 	} else {
 		sdp->sd_ref = REF_DYN_SEEN;
 
@@ -552,15 +554,23 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 			usdp->sd_aux->sa_symspec = (Half)sdaux_id;
 
 			/*
-			 * If a user hasn't specifically indicated the scope of
-			 * this symbol be made local then leave it as global
-			 * (ie. prevent automatic scoping).
+			 * If a user hasn't specifically indicated that the
+			 * scope of this symbol be made local, then leave it
+			 * as global (ie. prevent automatic scoping).  The GOT
+			 * should be defined protected, whereas all other
+			 * special symbols are tagged as no-direct.
 			 */
 			if (!(usdp->sd_flags1 & FLG_SY1_LOCL) &&
 			    (flags1 & FLG_SY1_GLOB)) {
-				usdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
-				if ((usdp->sd_flags1 & FLG_SY1_DIR) == 0)
-					usdp->sd_flags1 |= FLG_SY1_NDIR;
+			    usdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
+			    if (sdaux_id == SDAUX_ID_GOT) {
+				    usdp->sd_flags1 &= ~FLG_SY1_NDIR;
+				    usdp->sd_flags1 |= FLG_SY1_PROT;
+				    usdp->sd_sym->st_other = STV_PROTECTED;
+			    } else if (((usdp->sd_flags1 & FLG_SY1_DIR) == 0) &&
+				((ofl->ofl_flags & FLG_OF_SYMBOLIC) == 0)) {
+				    usdp->sd_flags1 |= FLG_SY1_NDIR;
+			    }
 			}
 			usdp->sd_flags1 |= flags1;
 
@@ -596,8 +606,14 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		usdp->sd_aux->sa_symspec = (Half)sdaux_id;
 
 		usdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
-		if (flags1 & FLG_SY1_GLOB)
+
+		if (sdaux_id == SDAUX_ID_GOT) {
+			usdp->sd_flags1 |= FLG_SY1_PROT;
+			usdp->sd_sym->st_other = STV_PROTECTED;
+		} else if ((flags1 & FLG_SY1_GLOB) &&
+		    ((ofl->ofl_flags & FLG_OF_SYMBOLIC) == 0)) {
 			usdp->sd_flags1 |= FLG_SY1_NDIR;
+		}
 		usdp->sd_flags1 |= flags1;
 	}
 
@@ -628,15 +644,22 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		sdp->sd_sym->st_info = ELF_ST_INFO(bind, STT_OBJECT);
 
 		/*
-		 * If a user hasn't specifically indicated the scope of
-		 * this symbol be made local then leave it as global
-		 * (ie. prevent automatic scoping).
+		 * If a user hasn't specifically indicated the scope of this
+		 * symbol be made local then leave it as global (ie. prevent
+		 * automatic scoping).  The GOT should be defined protected,
+		 * whereas all other special symbols are tagged as no-direct.
 		 */
 		if (!(sdp->sd_flags1 & FLG_SY1_LOCL) &&
 		    (flags1 & FLG_SY1_GLOB)) {
 			sdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
-			if ((sdp->sd_flags1 & FLG_SY1_DIR) == 0)
+			if (sdaux_id == SDAUX_ID_GOT) {
+				sdp->sd_flags1 &= ~FLG_SY1_NDIR;
+				sdp->sd_flags1 |= FLG_SY1_PROT;
+				sdp->sd_sym->st_other = STV_PROTECTED;
+			} else if (((sdp->sd_flags1 & FLG_SY1_DIR) == 0) &&
+			    ((ofl->ofl_flags & FLG_OF_SYMBOLIC) == 0)) {
 				sdp->sd_flags1 |= FLG_SY1_NDIR;
+			}
 		}
 		sdp->sd_flags1 |= flags1;
 
@@ -745,52 +768,56 @@ sym_undef_entry(Ofl_desc *ofl, Sym_desc *sdp, Type type)
 uintptr_t
 ld_sym_spec(Ofl_desc *ofl)
 {
-	if (!(ofl->ofl_flags & FLG_OF_RELOBJ)) {
+	Sym_desc	*sdp;
 
-		DBG_CALL(Dbg_syms_spec_title(ofl->ofl_lml));
+	if (ofl->ofl_flags & FLG_OF_RELOBJ)
+		return (1);
 
-		if (sym_add_spec(MSG_ORIG(MSG_SYM_ETEXT),
-		    MSG_ORIG(MSG_SYM_ETEXT_U), SDAUX_ID_ETEXT,
+	DBG_CALL(Dbg_syms_spec_title(ofl->ofl_lml));
+
+	if (sym_add_spec(MSG_ORIG(MSG_SYM_ETEXT), MSG_ORIG(MSG_SYM_ETEXT_U),
+	    SDAUX_ID_ETEXT, FLG_SY1_GLOB, ofl) == S_ERROR)
+		return (S_ERROR);
+	if (sym_add_spec(MSG_ORIG(MSG_SYM_EDATA), MSG_ORIG(MSG_SYM_EDATA_U),
+	    SDAUX_ID_EDATA, FLG_SY1_GLOB, ofl) == S_ERROR)
+		return (S_ERROR);
+	if (sym_add_spec(MSG_ORIG(MSG_SYM_END), MSG_ORIG(MSG_SYM_END_U),
+	    SDAUX_ID_END, FLG_SY1_GLOB, ofl) == S_ERROR)
+		return (S_ERROR);
+	if (sym_add_spec(MSG_ORIG(MSG_SYM_L_END), MSG_ORIG(MSG_SYM_L_END_U),
+	    SDAUX_ID_END, FLG_SY1_LOCL, ofl) == S_ERROR)
+		return (S_ERROR);
+	if (sym_add_spec(MSG_ORIG(MSG_SYM_L_START), MSG_ORIG(MSG_SYM_L_START_U),
+	    SDAUX_ID_START, FLG_SY1_LOCL, ofl) == S_ERROR)
+		return (S_ERROR);
+
+	/*
+	 * Historically we've always produced a _DYNAMIC symbol, even for
+	 * static executables (in which case its value will be 0).
+	 */
+	if (sym_add_spec(MSG_ORIG(MSG_SYM_DYNAMIC), MSG_ORIG(MSG_SYM_DYNAMIC_U),
+	    SDAUX_ID_DYN, FLG_SY1_GLOB, ofl) == S_ERROR)
+		return (S_ERROR);
+
+	if (OFL_ALLOW_DYNSYM(ofl)) {
+		if (sym_add_spec(MSG_ORIG(MSG_SYM_PLKTBL),
+		    MSG_ORIG(MSG_SYM_PLKTBL_U), SDAUX_ID_PLT,
 		    FLG_SY1_GLOB, ofl) == S_ERROR)
 			return (S_ERROR);
-		if (sym_add_spec(MSG_ORIG(MSG_SYM_EDATA),
-		    MSG_ORIG(MSG_SYM_EDATA_U), SDAUX_ID_EDATA,
-		    FLG_SY1_GLOB, ofl) == S_ERROR)
-			return (S_ERROR);
-		if (sym_add_spec(MSG_ORIG(MSG_SYM_END),
-		    MSG_ORIG(MSG_SYM_END_U), SDAUX_ID_END,
-		    FLG_SY1_GLOB, ofl) == S_ERROR)
-			return (S_ERROR);
-		if (sym_add_spec(MSG_ORIG(MSG_SYM_L_END),
-		    MSG_ORIG(MSG_SYM_L_END_U), SDAUX_ID_END,
-		    FLG_SY1_LOCL, ofl) == S_ERROR)
-			return (S_ERROR);
-		if (sym_add_spec(MSG_ORIG(MSG_SYM_L_START),
-		    MSG_ORIG(MSG_SYM_L_START_U), SDAUX_ID_START,
-		    FLG_SY1_LOCL, ofl) == S_ERROR)
-			return (S_ERROR);
-
-		/*
-		 * Historically we've always produced a _DYNAMIC symbol, even
-		 * for static executables (in which case its value will be 0).
-		 */
-		if (sym_add_spec(MSG_ORIG(MSG_SYM_DYNAMIC),
-		    MSG_ORIG(MSG_SYM_DYNAMIC_U), SDAUX_ID_DYN,
-		    FLG_SY1_GLOB, ofl) == S_ERROR)
-			return (S_ERROR);
-
-		if (OFL_ALLOW_DYNSYM(ofl))
-			if (sym_add_spec(MSG_ORIG(MSG_SYM_PLKTBL),
-			    MSG_ORIG(MSG_SYM_PLKTBL_U), SDAUX_ID_PLT,
-			    FLG_SY1_GLOB, ofl) == S_ERROR)
-				return (S_ERROR);
-
-		if (ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U), SYM_NOHASH, 0, ofl))
-			if (sym_add_spec(MSG_ORIG(MSG_SYM_GOFTBL),
-			    MSG_ORIG(MSG_SYM_GOFTBL_U), SDAUX_ID_GOT,
-			    FLG_SY1_GLOB, ofl) == S_ERROR)
-				return (S_ERROR);
 	}
+
+	/*
+	 * A GOT reference will be accompanied by the associated GOT symbol.
+	 * Make sure it gets assigned the appropriate special attributes.
+	 */
+	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U),
+	    SYM_NOHASH, 0, ofl)) != 0) && (sdp->sd_ref != REF_DYN_SEEN)) {
+		if (sym_add_spec(MSG_ORIG(MSG_SYM_GOFTBL),
+		    MSG_ORIG(MSG_SYM_GOFTBL_U), SDAUX_ID_GOT, FLG_SY1_GLOB,
+		    ofl) == S_ERROR)
+			return (S_ERROR);
+	}
+
 	return (1);
 }
 
@@ -831,12 +858,13 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 		}
 
 		/*
-		 * If '-Bsymbolic' is in effect - then bind all global symbols
-		 * 'symbolically' and assign the STV_PROTECTED visibility
+		 * If -Bsymbolic is in effect, and the symbol hasn't explicitly
+		 * been defined nodirect (via a mapfile), then bind the global
+		 * symbol symbolically and assign the STV_PROTECTED visibility
 		 * attribute.
 		 */
 		if ((oflags & FLG_OF_SYMBOLIC) &&
-		    ((sdp->sd_flags1 & FLG_SY1_LOCL) == 0)) {
+		    ((sdp->sd_flags1 & (FLG_SY1_LOCL | FLG_SY1_NDIR)) == 0)) {
 
 			sdp->sd_flags1 |= FLG_SY1_PROT;
 			if (ELF_ST_VISIBILITY(sym->st_other) == STV_DEFAULT)

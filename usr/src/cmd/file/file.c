@@ -26,7 +26,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,7 +135,7 @@ static char	*debug_sections[] = { /* Debug sections in a ELF file */
 
 
 /* start for MB env */
-static wchar_t wchar;
+static wchar_t	wchar;
 static int	length;
 static int	IS_ascii;
 static int	Max;
@@ -165,7 +165,7 @@ static void is_stripped(Elf *elf);
 static Elf *is_elf_file(int elffd);
 static void ar_coff_or_aout(int ifd);
 static int type(char *file);
-static int def_position_tests(void);
+static int def_position_tests(char *file);
 static void def_context_tests(void);
 static int troffint(char *bp, int n);
 static int lookup(char **tab);
@@ -174,9 +174,9 @@ static int ascom(void);
 static int sccs(void);
 static int english(char *bp, int n);
 static int old_core(Elf *elf, GElf_Ehdr *ehdr, int format);
-static int core(Elf *elf, GElf_Ehdr *ehdr, int format);
+static int core(Elf *elf, GElf_Ehdr *ehdr, int format, char *file);
 static int shellscript(char buf[], struct stat64 *sb);
-static int elf_check(Elf *elf);
+static int elf_check(Elf *elf, char *file);
 static int get_door_target(char *, char *, size_t);
 static int zipfile(char *, int);
 static int is_crash_dump(const char *, int);
@@ -197,6 +197,12 @@ static int is_rtld_config(void);
 #else	/* !XPG4 */
 #define	prf(x)	(void) printf("%s:%s", x, (int)strlen(x) > 6 ? "\t" : "\t\t");
 #endif	/* XPG4 */
+
+/*
+ * Static program identifier - used to prevent localization of the name "file"
+ * within individual error messages.
+ */
+const char *File = "file";
 
 int
 main(int argc, char **argv)
@@ -239,23 +245,28 @@ main(int argc, char **argv)
 
 		case 'f':
 			fflg++;
+			errno = 0;
 			if ((fl = fopen(optarg, "r")) == NULL) {
-				(void) fprintf(stderr,
-					gettext("cannot open %s\n"), optarg);
+				int err = errno;
+				(void) fprintf(stderr, gettext("%s: cannot "
+				    "open file %s: %s\n"), File, optarg,
+				    err ? strerror(err) : "");
 				usage();
 			}
 			pathlen = pathconf("/", _PC_PATH_MAX);
 			if (pathlen == -1) {
-				(void) fprintf(stderr,
-				    gettext("pathconf: cannot determine "
-					"maximum path length\n"));
+				int err = errno;
+				(void) fprintf(stderr, gettext("%s: cannot "
+				    "determine maximum path length: %s\n"),
+				    File, strerror(err));
 				exit(1);
 			}
 			pathlen += 2; /* for null and newline in fgets */
-			ap = malloc(pathlen * sizeof (char));
-			if (ap == NULL) {
-				perror("malloc");
-				exit(1);
+			if ((ap = malloc(pathlen * sizeof (char))) == NULL) {
+				int err = errno;
+				(void) fprintf(stderr, gettext("%s: malloc "
+				    "failed: %s\n"), File, strerror(err));
+				exit(2);
 			}
 			break;
 
@@ -366,24 +377,29 @@ main(int argc, char **argv)
 	}
 	if (maxmagicoffset < (intmax_t)FBSZ)
 		maxmagicoffset = (intmax_t)FBSZ;
-	if ((magicbuf = (char *)malloc(maxmagicoffset)) == NULL) {
-		(void) fprintf(stderr, gettext("malloc failed\n"));
+	if ((magicbuf = malloc(maxmagicoffset)) == NULL) {
+		int err = errno;
+		(void) fprintf(stderr, gettext("%s: malloc failed: %s\n"),
+		    File, strerror(err));
 		exit(2);
 	}
 
 	if (cflg) {
 		f_prtmtab();
 		if (ferror(stdout) != 0) {
-			(void) fprintf(stderr, gettext("file: error writing to "
-			    "stdout\n"));
+			(void) fprintf(stderr, gettext("%s: error writing to "
+			    "stdout\n"), File);
 			exit(1);
 		}
 		if (fclose(stdout) != 0) {
-			perror(gettext("file: fclose failed"));
+			int err = errno;
+			(void) fprintf(stderr, gettext("%s: fclose "
+			    "failed: %s\n"), File, strerror(err));
 			exit(1);
 		}
 		exit(0);
 	}
+
 	for (; fflg || optind < argc; optind += !fflg) {
 		register int	l;
 
@@ -405,16 +421,18 @@ main(int argc, char **argv)
 	}
 	if (ap != NULL)
 		free(ap);
-	if (tret != 0) {
+	if (tret != 0)
 		exit(tret);
-	}
+
 	if (ferror(stdout) != 0) {
-		(void) fprintf(stderr, gettext("file: error writing to "
-		    "stdout\n"));
+		(void) fprintf(stderr, gettext("%s: error writing to "
+		    "stdout\n"), File);
 		exit(1);
 	}
 	if (fclose(stdout) != 0) {
-		perror(gettext("file: fclose failed"));
+		int err = errno;
+		(void) fprintf(stderr, gettext("%s: fclose failed: %s\n"),
+		    File, strerror(err));
 		exit(1);
 	}
 	return (0);
@@ -431,8 +449,9 @@ type(char *file)
 	ifd = -1;
 	if ((*statf)(file, &mbuf) < 0) {
 		if (statf == lstat64 || lstat64(file, &mbuf) < 0) {
+			int err = errno;
 			(void) printf(gettext("cannot open: %s\n"),
-			    strerror(errno));
+			    strerror(err));
 			return (0);		/* POSIX.2 */
 		}
 	}
@@ -457,8 +476,9 @@ type(char *file)
 
 	case S_IFLNK:
 		if ((cc = readlink(file, buf, BUFSIZ)) < 0) {
+			int err = errno;
 			(void) printf(gettext("readlink error: %s\n"),
-				strerror(errno));
+			    strerror(err));
 			return (1);
 		}
 		buf[cc] = '\0';
@@ -494,20 +514,23 @@ spcl:
 
 	ifd = open64(file, O_RDONLY);
 	if (ifd < 0) {
-		(void) printf(gettext("cannot open: %s\n"), strerror(errno));
+		int err = errno;
+		(void) printf(gettext("cannot open: %s\n"), strerror(err));
 		return (0);			/* POSIX.2 */
 	}
 
 	/* need another fd for elf, since we might want to read the file too */
 	elffd = open64(file, O_RDONLY);
 	if (elffd < 0) {
-		(void) printf(gettext("cannot open: %s\n"), strerror(errno));
+		int err = errno;
+		(void) printf(gettext("cannot open: %s\n"), strerror(err));
 		(void) close(ifd);
 		ifd = -1;
 		return (0);			/* POSIX.2 */
 	}
 	if ((fbsz = read(ifd, fbuf, FBSZ)) == -1) {
-		(void) printf(gettext("cannot read: %s\n"), strerror(errno));
+		int err = errno;
+		(void) printf(gettext("cannot read: %s\n"), strerror(err));
 		(void) close(ifd);
 		ifd = -1;
 		return (0);			/* POSIX.2 */
@@ -523,8 +546,9 @@ spcl:
 	 * which need to execute before the default tests.
 	 */
 	if ((mread = pread(ifd, (void*)magicbuf, (size_t)maxmagicoffset,
-			(off_t)0)) == -1) {
-		(void) printf(gettext("cannot read: %s\n"), strerror(errno));
+	    (off_t)0)) == -1) {
+		int err = errno;
+		(void) printf(gettext("cannot read: %s\n"), strerror(err));
 		fd_cleanup();
 		return (0);
 	}
@@ -555,7 +579,7 @@ spcl:
 		 * default position-dependent tests,
 		 * plus non-default magic tests, if any
 		 */
-		switch (def_position_tests()) {
+		switch (def_position_tests(file)) {
 			case -1:	/* error */
 				fd_cleanup();
 				return (1);
@@ -594,7 +618,7 @@ spcl:
  */
 
 static int
-def_position_tests(void)
+def_position_tests(char *file)
 {
 	Elf	*elf;
 
@@ -605,7 +629,7 @@ def_position_tests(void)
 	if (fbuf[0] == '#' && fbuf[1] == '!' && shellscript(fbuf+2, &mbuf))
 		return (1);
 	if ((elf = is_elf_file(elffd)) != NULL) {
-		(void) elf_check(elf);
+		(void) elf_check(elf, file);
 		(void) elf_end(elf);
 		(void) putchar('\n');
 		return (1);
@@ -1165,7 +1189,7 @@ print_elf_flags(int machine, unsigned int flags)
 }
 
 static int
-print_cap(Elf *elf, GElf_Ehdr *ehdr)
+print_cap(Elf *elf, GElf_Ehdr *ehdr, char *file)
 {
 	Elf_Scn	*scn = 0;
 
@@ -1179,8 +1203,9 @@ print_cap(Elf *elf, GElf_Ehdr *ehdr)
 		Elf_Data	*data;
 
 		if (gelf_getshdr(scn, &shdr) == 0) {
-			(void) fprintf(stderr,
-			    gettext("can't read ELF section header\n"));
+			(void) fprintf(stderr, gettext("%s: %s: can't read "
+			    "ELF section header - ELF capabilities ignored\n"),
+			    File, file);
 			return (1);
 		}
 		if (shdr.sh_type != SHT_SUNW_cap)
@@ -1190,19 +1215,28 @@ print_cap(Elf *elf, GElf_Ehdr *ehdr)
 		 * Get the data associated with the .cap section.
 		 */
 		if ((data = elf_getdata(scn, 0)) == 0) {
-			(void) fprintf(stderr,
-				gettext("can't read ELF section data\n"));
+			(void) fprintf(stderr, gettext("%s: %s: can't read "
+			    "ELF section data - ELF capabilities ignored\n"),
+			    File, file);
 			return (1);
 		}
 
+		if ((shdr.sh_size == 0) || (shdr.sh_entsize == 0)) {
+			(void) fprintf(stderr, gettext("%s: %s zero size or "
+			    "zero entry ELF section - ELF capabilities "
+			    "ignored\n"), File, file);
+			return (1);
+		}
 		capn = (GElf_Word)(shdr.sh_size / shdr.sh_entsize);
+
 		for (ndx = 0; ndx < capn; ndx++) {
 			char		str[100];
 			GElf_Cap	cap;
 
 			if (gelf_getcap(data, ndx, &cap) == NULL) {
-				(void) fprintf(stderr,
-				    gettext("can't read capabilities data\n"));
+				(void) fprintf(stderr, gettext("%s: %s: can't "
+				    "read ELF capabilities data - ELF "
+				    "capabilities ignored\n"), File, file);
 				return (1);
 			}
 			if (cap.c_tag != CA_SUNW_NULL) {
@@ -1216,7 +1250,7 @@ print_cap(Elf *elf, GElf_Ehdr *ehdr)
 }
 
 static int
-elf_check(Elf *elf)
+elf_check(Elf *elf, char *file)
 {
 	GElf_Ehdr	ehdr;
 	GElf_Phdr	phdr;
@@ -1225,10 +1259,11 @@ elf_check(Elf *elf)
 	size_t	size;
 
 	/*
-	 * verify information in file header
+	 * Verify information in file header.
 	 */
 	if (gelf_getehdr(elf, &ehdr) == (GElf_Ehdr *)0) {
-		(void) fprintf(stderr, gettext("can't read ELF header\n"));
+		(void) fprintf(stderr, gettext("%s: %s: can't read ELF "
+		    "header\n"), File, file);
 		return (1);
 	}
 	ident = elf_getident(elf, &size);
@@ -1242,30 +1277,31 @@ elf_check(Elf *elf)
 		    gettext("Version"), (int)ehdr.e_version);
 	print_elf_flags(ehdr.e_machine, ehdr.e_flags);
 
-	if (core(elf, &ehdr, ident[EI_DATA]))	/* check for core file */
+	if (core(elf, &ehdr, ident[EI_DATA], file)) /* check for core file */
 		return (0);
 
-	if (print_cap(elf, &ehdr))
+	if (print_cap(elf, &ehdr, file))
 		return (1);
 
 	/*
-	 * check type
+	 * Check type.
 	 */
 	if ((ehdr.e_type != ET_EXEC) && (ehdr.e_type != ET_DYN))
 		return (1);
 
 	/*
-	 * read program header and check for dynamic section
+	 * Read program header and check for dynamic section.
 	 */
 	if (ehdr.e_phnum == 0) {
-		(void) fprintf(stderr, gettext("can't read program header\n"));
+		(void) fprintf(stderr, gettext("%s: %s: no ELF program headers "
+		    "exist\n"), File, file);
 		return (1);
 	}
 
 	for (dynamic = 0, cnt = 0; cnt < (int)ehdr.e_phnum; cnt++) {
 		if (gelf_getphdr(elf, cnt, &phdr) == NULL) {
-			(void) fprintf(stderr,
-				gettext("can't read program header\n"));
+			(void) fprintf(stderr, gettext("%s: %s: can't read "
+			    "ELF program header\n"), File, file);
 			return (1);
 		}
 		if (phdr.p_type == PT_DYNAMIC) {
@@ -1618,7 +1654,7 @@ old_core(Elf *elf, GElf_Ehdr *ehdr, int format)
  * If it's a core file, print out the name of the file that dumped core.
  */
 static int
-core(Elf *elf, GElf_Ehdr *ehdr, int format)
+core(Elf *elf, GElf_Ehdr *ehdr, int format, char *file)
 {
 	register int inx;
 	char *psinfo;
@@ -1631,19 +1667,20 @@ core(Elf *elf, GElf_Ehdr *ehdr, int format)
 		return (0);
 	for (inx = 0; inx < (int)ehdr->e_phnum; inx++) {
 		if (gelf_getphdr(elf, inx, &phdr) == NULL) {
-			(void) fprintf(stderr,
-				gettext("can't read program header\n"));
+			(void) fprintf(stderr, gettext("%s: %s: can't read "
+			    "ELF program header\n"), File, file);
 			return (0);
 		}
 		if (phdr.p_type == PT_NOTE) {
 			char *fname;
 			size_t size;
+
 			/*
 			 * If the next segment is also a note, use it instead.
 			 */
 			if (gelf_getphdr(elf, inx+1, &nphdr) == NULL) {
-				(void) fprintf(stderr,
-				    gettext("can't read program header\n"));
+				(void) fprintf(stderr, gettext("%s: %s: can't "
+				    "read ELF program header\n"), File, file);
 				return (0);
 			}
 			if (nphdr.p_type == PT_NOTE)
@@ -1651,6 +1688,7 @@ core(Elf *elf, GElf_Ehdr *ehdr, int format)
 			offset = (off_t)phdr.p_offset;
 			(void) pread(ifd, &nhdr, sizeof (GElf_Nhdr), offset);
 			convert_gelf_nhdr(elf, &nhdr, ehdr->e_version, format);
+
 			/*
 			 * Note: the ABI states that n_namesz must
 			 * be rounded up to a 4 byte boundary.
@@ -1658,8 +1696,14 @@ core(Elf *elf, GElf_Ehdr *ehdr, int format)
 			offset += sizeof (GElf_Nhdr) +
 			    ((nhdr.n_namesz + 0x03) & ~0x3);
 			size = nhdr.n_descsz;
-			psinfo = malloc(size);
+			if ((psinfo = malloc(size)) == NULL) {
+				int err = errno;
+				(void) fprintf(stderr, gettext("%s: malloc "
+				    "failed: %s\n"), File, strerror(err));
+				exit(2);
+			}
 			(void) pread(ifd, psinfo, size, offset);
+
 			/*
 			 * We want to print the string contained
 			 * in psinfo->pr_fname[], where 'psinfo'
@@ -1952,8 +1996,10 @@ default_magic(void)
 	const char *msg_locale = setlocale(LC_MESSAGES, NULL);
 	struct stat	statbuf;
 
-	if ((dfile = (char *)malloc(strlen(msg_locale) + 35)) == NULL) {
-		perror("file");
+	if ((dfile = malloc(strlen(msg_locale) + 35)) == NULL) {
+		int err = errno;
+		(void) fprintf(stderr, gettext("%s: malloc failed: %s\n"),
+		    File, strerror(err));
 		exit(2);
 	}
 	(void) snprintf(dfile, strlen(msg_locale) + 35,
@@ -1993,9 +2039,10 @@ add_to_mlist(char *magic_file, int first)
 	}
 
 	if (mlist == NULL) {	/* initial mlist allocation */
-		if ((mlist = (char **)calloc(MLIST_SZ, sizeof (char *)))
-		    == NULL) {
-			perror("file");
+		if ((mlist = calloc(MLIST_SZ, sizeof (char *))) == NULL) {
+			int err = errno;
+			(void) fprintf(stderr, gettext("%s: malloc "
+			    "failed: %s\n"), File, strerror(err));
 			exit(2);
 		}
 		mlist_sz = MLIST_SZ;
@@ -2004,9 +2051,11 @@ add_to_mlist(char *magic_file, int first)
 	if ((mlistp - mlist) >= mlist_sz) {
 		mlistp_off = mlistp - mlist;
 		mlist_sz *= 2;
-		if ((mlist = (char **)realloc(mlist,
+		if ((mlist = realloc(mlist,
 		    mlist_sz * sizeof (char *))) == NULL) {
-			perror("file");
+			int err = errno;
+			(void) fprintf(stderr, gettext("%s: malloc "
+			    "failed: %s\n"), File, strerror(err));
 			exit(2);
 		}
 		mlistp = mlist + mlistp_off;
@@ -2016,7 +2065,9 @@ add_to_mlist(char *magic_file, int first)
 	 * magic file name string
 	 */
 	if ((*mlistp = malloc(strlen(magic_file) + 1)) == NULL) {
-		perror("file");
+		int err = errno;
+		(void) fprintf(stderr, gettext("%s: malloc failed: %s\n"),
+		    File, strerror(err));
 		exit(2);
 	}
 	(void) strlcpy(*mlistp, magic_file, strlen(magic_file) + 1);

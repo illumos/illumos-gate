@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -840,9 +840,9 @@
 # TRANSLATION_NOTE - the following two entries provide for a series of one or
 # more symbol information table entries that align with the initial title.
 
-@ MSG_SYMINFO_TITLE	"     index  flags        \
+@ MSG_SYMINFO_TITLE	"     index  flags            \
 			 bound to                 symbol"
-@ MSG_SYMINFO_ENTRY	"%10.10s  %-4s %7s %-24s %s"
+@ MSG_SYMINFO_ENTRY	"%10.10s  %-8s %7s %-24s %s"
 
 @ MSG_SYMINFO_SELF	"<self>"
 @ MSG_SYMINFO_PARENT	"<parent>"
@@ -1248,7 +1248,7 @@
 
 # Syminfo formats
 
-@ MSG_SYMINFO_UNKFLAG	" 0x%x"
+@ MSG_SYMINFO_UNKFLAG	"[0x%x]"
 
 # Lc_interface interface tags.
 

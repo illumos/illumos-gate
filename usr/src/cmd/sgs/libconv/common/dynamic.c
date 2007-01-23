@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -128,8 +128,9 @@ conv_dyn_flag(Xword flags, int fmt_flags)
 		MSG_DF1_NODIRECT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_DF1_IGNMULDEF_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_DF1_NOKSYMS_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		MSG_DF1_NORELOC_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_DF1_NOHDR_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_NORELOC_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_SYMINTPOSE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 const char *
@@ -157,8 +158,9 @@ conv_dyn_flag1(Xword flags)
 		{ DF_1_NODIRECT,	MSG_ORIG(MSG_DF1_NODIRECT) },
 		{ DF_1_IGNMULDEF,	MSG_ORIG(MSG_DF1_IGNMULDEF) },
 		{ DF_1_NOKSYMS,		MSG_ORIG(MSG_DF1_NOKSYMS) },
-		{ DF_1_NORELOC,		MSG_ORIG(MSG_DF1_NORELOC) },
 		{ DF_1_NOHDR,		MSG_ORIG(MSG_DF1_NOHDR) },
+		{ DF_1_NORELOC,		MSG_ORIG(MSG_DF1_NORELOC) },
+		{ DF_1_SYMINTPOSE,	MSG_ORIG(MSG_DF1_SYMINTPOSE) },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };

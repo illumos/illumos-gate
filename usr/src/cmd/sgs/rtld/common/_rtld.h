@@ -23,7 +23,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -562,15 +562,16 @@ extern void		fmap_setup();
 extern void		get_lcinterface(Rt_map *, Lc_interface *);
 extern Lmid_t		get_linkmap_id(Lm_list *);
 extern Pnode		*get_next_dir(Pnode **, Rt_map *, uint_t);
-int			hdl_add(Grp_hdl *, Rt_map *, uint_t);
-Grp_hdl			*hdl_create(Lm_list *, Rt_map *, Rt_map *, uint_t);
-int			hdl_initialize(Grp_hdl *, Rt_map *, Rt_map *, int, int);
+extern int		hdl_add(Grp_hdl *, Rt_map *, uint_t);
+extern Grp_hdl		*hdl_create(Lm_list *, Rt_map *, Rt_map *, uint_t);
+extern int		hdl_initialize(Grp_hdl *, Rt_map *, Rt_map *, int, int);
 extern int		hwcap_check(Rej_desc *, Ehdr *);
 extern Pnode 		*hwcap_filtees(Pnode **, Aliste, Dyninfo *, Rt_map *,
 			    const char *, int, uint_t);
-void			is_dep_ready(Rt_map *, Rt_map *, int);
-void			is_dep_init(Rt_map *, Rt_map *);
-void			ldso_plt_init(Rt_map *);
+extern void		is_dep_ready(Rt_map *, Rt_map *, int);
+extern void		is_dep_init(Rt_map *, Rt_map *);
+extern int		is_sym_interposer(Rt_map *, Sym *);
+extern void		ldso_plt_init(Rt_map *);
 extern Listnode		*list_append(List *, const void *);
 extern Listnode		*list_insert(List *, const void *, Listnode *);
 extern Listnode		*list_prepend(List *, const void *);

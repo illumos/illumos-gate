@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -858,8 +858,8 @@
 			 a non-existent segment `%s'"
 @ MSG_MAP_INCOMFLG	"%s: %lld: incompatible flags $SPECVERS and $ADDVERS \
 			 used on the same object `%s'"
-@ MSG_MAP_MULSONAME	"%s: %lld: multiple definition of SONAME field for %s\
-			 \n\tfirst `%s', second `%s'; first value used"
+@ MSG_MAP_MULSONAME	"%s: %lld: multiple definition of SONAME field for %s: \
+			 first `%s', second `%s'; first value used"
 @ MSG_MAP_UNEXDEP	"%s: %lld: dependency `%s' unexpected; ignored"
 @ MSG_MAP_UNEXTOK	"%s: %lld: unexpected occurrence of `%c' token"
 
@@ -907,6 +907,10 @@
 @ MSG_MAP_NOFILTER	"%s: %lld: filtee definition required"
 @ MSG_MAP_BADSF1	"%s: %lld: unknown software capabilities: 0x%llx; \
 			 ignored"
+@ MSG_MAP_NOINTPOSE	"%s: %lld: interposition symbols can only be defined \
+			 when building a dynamic executable"
+@ MSG_MAP_PROTNDIR	"%s: %lld: protected scope and no-direct declaration \
+			 are incompatible"
 
 @ MSG_MAP_SEGSAME	"segments `%s' and `%s' have the same assigned \
 			 virtual address"
@@ -928,8 +932,8 @@
 @ MSG_MAP_SYMVAL	"symbol value"
 @ MSG_MAP_SYMSIZE	"symbol size"
 
-@ MSG_MAP_SECORDER	"section ordering set but no matching section found;\
-			 \n\tsegment: %s section: %s"
+@ MSG_MAP_SECORDER	"section ordering requested, but no matching section \
+			 found: segment: %s section: %s"
 
 # Generic error diagnostic labels
 
@@ -1141,6 +1145,7 @@
 @ MSG_MAP_FILTER	"filter"
 @ MSG_MAP_AUXILIARY	"auxiliary"
 @ MSG_MAP_OVERRIDE	"override"
+@ MSG_MAP_INTERPOSE	"interpose"
 
 @ MSG_FMT_INDEX		"[%lld]"
 

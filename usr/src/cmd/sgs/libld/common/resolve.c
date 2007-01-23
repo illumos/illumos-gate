@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVR4 6.2/18.2 */
@@ -252,11 +252,13 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 			sdp->sd_aux->sa_rfile = ifl->ifl_name;
 		} else {
 			/*
-			 * Under -Bnodirect, all exported interfaces are tagged
-			 * to prevent direct binding to them.
+			 * Under -Bnodirect, all exported interfaces that have
+			 * not explicitly been defined protected or directly
+			 * bound to, are tagged to prevent direct binding.
 			 */
 			if ((ofl->ofl_flags1 & FLG_OF1_ALNODIR) &&
-			    ((sdp->sd_flags1 & FLG_SY1_DIR) == 0))
+			    ((sdp->sd_flags1 &
+			    (FLG_SY1_PROT | FLG_SY1_DIR)) == 0))
 				sdp->sd_flags1 |= FLG_SY1_NDIR;
 		}
 

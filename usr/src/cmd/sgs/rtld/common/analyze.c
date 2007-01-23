@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1844,7 +1844,7 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 		 * If the object wasn't explicitly dlopen()'ed associate it with
 		 * the parent.
 		 */
-		if (flags != FLG_RT_HANDLE)
+		if ((flags & FLG_RT_HANDLE) == 0)
 			nmode |= RTLD_PARENT;
 	}
 
@@ -2234,15 +2234,35 @@ load_one(Lm_list *lml, Aliste lmco, Pnode *pnp, Rt_map *clmp, int mode,
 }
 
 /*
+ * Determine whether a symbol is defined as an interposer.
+ */
+int
+is_sym_interposer(Rt_map *lmp, Sym *sym)
+{
+	Syminfo	*sip = SYMINFO(lmp);
+
+	if (sip) {
+		ulong_t	ndx;
+
+		ndx = (((ulong_t)sym - (ulong_t)SYMTAB(lmp)) / SYMENT(lmp));
+		/* LINTED */
+		sip = (Syminfo *)((char *)sip + (ndx * SYMINENT(lmp)));
+		if (sip->si_flags & SYMINFO_FLG_INTERPOSE)
+			return (1);
+	}
+	return (0);
+}
+
+/*
  * While processing direct or group bindings, determine whether the object to
  * which we've bound can be interposed upon.  In this context, copy relocations
  * are a form of interposition.
  */
 static Sym *
-lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list * lml,
-    Sym * sym)
+lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
+    Sym *sym)
 {
-	Rt_map *	lmp;
+	Rt_map		*lmp;
 	Slookup		sl;
 
 	/*
@@ -2278,7 +2298,7 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list * lml,
 	 */
 	lmp = lml->lm_head;
 	sl = *slp;
-	if (((FLAGS(lmp) & FLG_RT_INTRPOSE) == 0) || (sl.sl_flags & LKUP_COPY))
+	if (((FLAGS(lmp) & MSK_RT_INTPOSE) == 0) || (sl.sl_flags & LKUP_COPY))
 		lmp = (Rt_map *)NEXT(lmp);
 	else
 		sl.sl_flags &= ~LKUP_SPEC;
@@ -2286,13 +2306,29 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list * lml,
 	for (; lmp; lmp = (Rt_map *)NEXT(lmp)) {
 		if (FLAGS(lmp) & FLG_RT_DELETE)
 			continue;
-		if ((FLAGS(lmp) & FLG_RT_INTRPOSE) == 0)
+		if ((FLAGS(lmp) & MSK_RT_INTPOSE) == 0)
 			break;
 
 		if (callable(lmp, *dlmp, 0)) {
+			Rt_map	*ilmp;
+
 			sl.sl_imap = lmp;
-			if (sym = SYMINTP(lmp)(&sl, dlmp, binfo)) {
+			if (sym = SYMINTP(lmp)(&sl, &ilmp, binfo)) {
+				/*
+				 * If this object provides individual symbol
+				 * interposers, make sure that the symbol we
+				 * have found is tagged as an interposer.
+				 */
+				if ((FLAGS(ilmp) & FLG_RT_SYMINTPO) &&
+				    (is_sym_interposer(ilmp, sym) == 0))
+					continue;
+
+				/*
+				 * Indicate this binding has occurred to an
+				 * interposer, and return the symbol.
+				 */
 				*binfo |= DBG_BINFO_INTERPOSE;
+				*dlmp = ilmp;
 				return (sym);
 			}
 		}
@@ -2511,7 +2547,7 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 			 */
 			if (((FLAGS(clmp) & FLG_RT_TRANS) ||
 			    (!(LIST(clmp)->lm_tflags & LML_TFLG_NODIRECT))) &&
-			    ((FLAGS(clmp) & FLG_RT_DIRECT) ||
+			    ((FLAGS1(clmp) & FL1_RT_DIRECT) ||
 			    (sip->si_flags & SYMINFO_FLG_DIRECTBIND))) {
 				sym = lookup_sym_direct(slp, dlmp, binfo,
 				    sip, lmp);
@@ -2538,8 +2574,21 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 */
 	if (FLAGS1(clmp) & FL1_RT_SYMBOLIC) {
 		sl.sl_imap = clmp;
-		if (sym = SYMINTP(clmp)(&sl, dlmp, binfo))
-			return (sym);
+		if (sym = SYMINTP(clmp)(&sl, dlmp, binfo)) {
+			ulong_t	dsymndx = (((ulong_t)sym -
+				    (ulong_t)SYMTAB(*dlmp)) / SYMENT(*dlmp));
+
+			/*
+			 * Make sure this symbol hasn't explicitly been defined
+			 * as nodirect.
+			 */
+			if (((sip = SYMINFO(*dlmp)) == 0) ||
+			    /* LINTED */
+			    ((sip = (Syminfo *)((char *)sip +
+			    (dsymndx * SYMINENT(*dlmp)))) == 0) ||
+			    ((sip->si_flags & SYMINFO_FLG_NOEXTDIRECT) == 0))
+				return (sym);
+		}
 	}
 
 	/*

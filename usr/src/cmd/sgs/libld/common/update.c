@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1128,10 +1128,12 @@ update_osym(Ofl_desc *ofl)
 				 */
 				syminfo[ndx].si_boundto = SYMINFO_BT_EXTERN;
 
-			} else if (sdp->sd_flags & FLG_SY_PARENT) {
+			} else if ((sdp->sd_flags & FLG_SY_PARENT) &&
+			    (sdp->sd_sym->st_shndx == SHN_UNDEF)) {
 				/*
-				 * A reference to a parent object.  Indicate
-				 * whether a direct binding should be
+				 * If this symbol has been explicitly defined
+				 * to be a reference to a parent object,
+				 * indicate whether a direct binding should be
 				 * established.
 				 */
 				syminfo[ndx].si_flags |= SYMINFO_FLG_DIRECT;
@@ -1166,6 +1168,7 @@ update_osym(Ofl_desc *ofl)
 
 			} else if ((sdp->sd_ref == REF_REL_NEED) &&
 			    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
+
 				/*
 				 * This definition exists within the object
 				 * being created.  Flag whether it is necessary
@@ -1176,6 +1179,15 @@ update_osym(Ofl_desc *ofl)
 					    SYMINFO_BT_NONE;
 					syminfo[ndx].si_flags |=
 					    SYMINFO_FLG_NOEXTDIRECT;
+				}
+
+				/*
+				 * Indicate that this symbol is acting as an
+				 * individual interposer.
+				 */
+				if (sdp->sd_flags & FLG_SY_INTPOSE) {
+					syminfo[ndx].si_flags |=
+					    SYMINFO_FLG_INTERPOSE;
 				}
 
 				/*
@@ -1262,7 +1274,7 @@ update_osym(Ofl_desc *ofl)
 				if (_hashndx = hashbkt[hashval]) {
 				    while (hashchain[_hashndx])
 					_hashndx = hashchain[_hashndx];
-					hashchain[_hashndx] = sdp->sd_symndx;
+				    hashchain[_hashndx] = sdp->sd_symndx;
 				} else {
 					hashbkt[hashval] = sdp->sd_symndx;
 				}

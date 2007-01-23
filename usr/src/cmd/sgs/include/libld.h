@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,8 +189,8 @@ struct ofl_desc {
 	Word		ofl_regsymcnt;	/* no. of output register symbols */
 	Word		ofl_lregsymcnt;	/* no. of local register symbols */
 	Sym_desc	*ofl_dtracesym;	/* ld -zdtrace= */
-	Word		ofl_flags;	/* various state bits, args etc. */
-	Word		ofl_flags1;	/*	more flags */
+	Lword		ofl_flags;	/* various state bits, args etc. */
+	Lword		ofl_flags1;	/*	more flags */
 	Xword		ofl_segorigin;	/* segment origin (start) */
 	void		*ofl_entry;	/* entry point (-e and Sym_desc *) */
 	char		*ofl_filtees;	/* shared objects we are a filter for */
@@ -315,6 +315,9 @@ struct ofl_desc {
 #define	FLG_OF_FATAL	0x20000000	/* fatal error during input */
 #define	FLG_OF_WARN	0x40000000	/* warning during input processing. */
 #define	FLG_OF_VERBOSE	0x80000000	/* -z verbose flag set */
+
+#define	FLG_OF_MAPSYMB	0x000100000000	/* symbolic scope definition seen */
+#define	FLG_OF_MAPGLOB	0x000200000000	/* global scope definition seen */
 
 /*
  * In the flags1 arena, establish any options that are applicable to archive
@@ -781,7 +784,7 @@ struct sym_avlnode {
 #define	FLG_SY_REFRSD	0x00000400	/* symbols sd_ref has been raised */
 					/* 	due to a copy-relocs */
 					/*	weak-strong pairing */
-
+#define	FLG_SY_INTPOSE	0x00000800	/* symbol defines an interposer */
 #define	FLG_SY_INVALID	0x00001000	/* unwanted/erroneous symbol */
 #define	FLG_SY_SMGOT	0x00002000	/* small got index assigned to symbol */
 					/*	sparc only */

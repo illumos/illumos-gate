@@ -707,7 +707,6 @@ BDYNAMIC=	-Bdynamic
 BLOCAL=		-Blocal
 BREDUCE=	-Breduce
 BSTATIC=	-Bstatic
-BSYMBOLIC=	-Bsymbolic
 
 ZCOMBRELOC=	-zcombreloc
 ZDEFS=		-zdefs

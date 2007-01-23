@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -89,12 +89,16 @@ Elf_syminfo_entry(Lm_list *lml, Word ndx, Syminfo *sip, const char *name,
 		flagstr[flgndx++] = 'N';
 		flags &= ~SYMINFO_FLG_NOEXTDIRECT;
 	}
+	if (flags & SYMINFO_FLG_INTERPOSE) {
+		flagstr[flgndx++] = 'I';
+		flags &= ~SYMINFO_FLG_INTERPOSE;
+	}
 
 	/*
 	 * Did we account for all of the flags?
 	 */
 	if (flags)
-		(void) snprintf(&flagstr[flgndx], FLAGSZ - ndx,
+		(void) snprintf(&flagstr[flgndx], FLAGSZ - flgndx,
 		    MSG_ORIG(MSG_SYMINFO_UNKFLAG), flags);
 	else
 		flagstr[flgndx] = '\0';

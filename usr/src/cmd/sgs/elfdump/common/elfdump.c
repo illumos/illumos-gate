@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,6 +49,9 @@ string(Cache *refsec, Word ndx, Cache *strsec, const char *file, Word name)
 {
 	static Cache	*osec = 0;
 	static int	nostr;
+
+	if (strsec->c_data == NULL)
+		return (NULL);
 
 	const char	*strs = (char *)strsec->c_data->d_buf;
 	Word		strn = strsec->c_data->d_size;
@@ -149,11 +152,17 @@ stringtbl(Cache *cache, int symtab, Word ndx, Word shnum, const char *file,
 			    file, cache[ndx].c_name, EC_WORD(shdr->sh_link));
 			return (0);
 		}
+		if ((shdr->sh_entsize == 0) || (shdr->sh_size == 0)) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+			    file, cache[ndx].c_name);
+			return (0);
+		}
 
 		/*
 		 * Obtain, and verify the symbol table data.
 		 */
-		if (cache[ndx].c_data->d_buf == 0) {
+		if ((cache[ndx].c_data == NULL) ||
+		    (cache[ndx].c_data->d_buf == NULL)) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
 			    file, cache[ndx].c_name);
 			return (0);
@@ -213,6 +222,9 @@ symlookup(const char *name, Cache *cache, Word shnum, Sym **sym,
 		    file, symtab->c_name);
 		return (0);
 	}
+	if (symtab->c_data == NULL)
+		return (0);
+
 	/* LINTED */
 	symn = (Word)(shdr->sh_size / shdr->sh_entsize);
 	syms = (Sym *)symtab->c_data->d_buf;
@@ -386,6 +398,9 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *name,
 		    MSG_SCN_FRMHDR_SIZE) != 0))
 			continue;
 		if (name && strcmp(name, _cache->c_name))
+			continue;
+
+		if (_cache->c_data == NULL)
 			continue;
 
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
@@ -616,8 +631,8 @@ cap(const char *file, Cache *cache, Word shnum, Word phnum, Ehdr *ehdr,
     Elf *elf)
 {
 	Word		cnt;
-	Shdr *		cshdr = 0;
-	Cache *		ccache;
+	Shdr		*cshdr = 0;
+	Cache		*ccache;
 	Off		cphdr_off = 0;
 	Xword		cphdr_sz;
 
@@ -655,6 +670,9 @@ cap(const char *file, Cache *cache, Word shnum, Word phnum, Ehdr *ehdr,
 		    (cphdr_off + cphdr_sz) > (shdr->sh_offset + shdr->sh_size)))
 			continue;
 
+		if (_cache->c_data == NULL)
+			continue;
+
 		ccache = _cache;
 		cshdr = shdr;
 		break;
@@ -663,12 +681,18 @@ cap(const char *file, Cache *cache, Word shnum, Word phnum, Ehdr *ehdr,
 	if ((cshdr == 0) && (cphdr_off == 0))
 		return;
 
+	if ((cshdr->sh_entsize == 0) || (cshdr->sh_size == 0)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+		    file, ccache->c_name);
+		return;
+	}
+
 	/*
 	 * Print the hardware/software capabilities section.
 	 */
 	if (cshdr) {
 		Word	ndx, capn;
-		Cap	*cap = (Cap *)ccache->c_data->d_buf;
+		Cap	*cap  = (Cap *)ccache->c_data->d_buf;
 
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 		dbg_print(0, MSG_INTL(MSG_ELF_SCN_CAP), ccache->c_name);
@@ -752,7 +776,7 @@ interp(const char *file, Cache *cache, Word shnum, Word phnum, Elf *elf)
 	 * Print the interpreter string based on the offset defined in the
 	 * program header, as this is the offset used by the kernel.
 	 */
-	if (ishdr) {
+	if (ishdr && icache->c_data) {
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 		dbg_print(0, MSG_INTL(MSG_ELF_SCN_INTERP), icache->c_name);
 		dbg_print(0, MSG_ORIG(MSG_FMT_INDENT),
@@ -800,6 +824,9 @@ syminfo(Cache *cache, Word shnum, const char *file)
 		    file, infocache->c_name);
 		return;
 	}
+	if (infocache->c_data == NULL)
+		return;
+
 	infonum = (Word)(infoshdr->sh_size / infoshdr->sh_entsize);
 	info = (Syminfo *)infocache->c_data->d_buf;
 
@@ -811,6 +838,9 @@ syminfo(Cache *cache, Word shnum, const char *file)
 		    file, infocache->c_name, EC_WORD(infoshdr->sh_info));
 		return;
 	}
+	if (cache[infoshdr->sh_info].c_data == NULL)
+		return;
+
 	dyns = cache[infoshdr->sh_info].c_data->d_buf;
 	if (dyns == 0) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
@@ -992,7 +1022,8 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags)
 		/*
 		 * Determine the version section data and number.
 		 */
-		if ((ver = (void *)_cache->c_data->d_buf) == 0) {
+		if ((_cache->c_data == NULL) ||
+		    ((ver = (void *)_cache->c_data->d_buf) == NULL)) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
 			    file, secname);
 			continue;
@@ -1047,6 +1078,9 @@ symbols_getxindex(Cache *cache, Word shnum, Word seccnt, Word **shxndx,
 		if ((shdr->sh_entsize) &&
 		    /* LINTED */
 		    ((symn = (uint_t)(shdr->sh_size / shdr->sh_entsize)) == 0))
+			continue;
+
+		if (_cache->c_data == NULL)
 			continue;
 
 		*shxndx = _cache->c_data->d_buf;
@@ -1108,6 +1142,9 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
 			    file, secname);
 			continue;
 		}
+		if (_cache->c_data == NULL)
+			continue;
+
 		/* LINTED */
 		symn = (Word)(shdr->sh_size / shdr->sh_entsize);
 		sym = (Sym *)_cache->c_data->d_buf;
@@ -1125,7 +1162,8 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
 		 * Determine if there is a associated Versym section
 		 * with this Symbol Table.
 		 */
-		if (versymcache && (versymcache->c_shdr->sh_link == seccnt))
+		if (versymcache && (versymcache->c_shdr->sh_link == seccnt) &&
+		    versymcache->c_data)
 			versym = versymcache->c_data->d_buf;
 		else
 			versym = 0;
@@ -1319,6 +1357,9 @@ reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *name, const char *file,
 			    file, relname);
 			continue;
 		}
+		if (_cache->c_data == NULL)
+			continue;
+
 		rels = _cache->c_data->d_buf;
 		relnum = shdr->sh_size / relsize;
 
@@ -1428,6 +1469,14 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 		if (stringtbl(cache, 0, cnt, shnum, file, 0, 0, &strsec) == 0)
 			continue;
 
+		if ((shdr->sh_entsize == 0) || (shdr->sh_size == 0)) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+			    file, _cache->c_name);
+			continue;
+		}
+		if (_cache->c_data == NULL)
+			continue;
+
 		numdyn = shdr->sh_size / shdr->sh_entsize;
 		dyn = (Dyn *)_cache->c_data->d_buf;
 
@@ -1505,6 +1554,9 @@ move(Cache *cache, Word shnum, const char *name, const char *file, uint_t flags)
 			    file, _cache->c_name);
 			continue;
 		}
+		if (_cache->c_data == NULL)
+			continue;
+
 		move = (Move *)_cache->c_data->d_buf;
 		movenum = shdr->sh_size / shdr->sh_entsize;
 
@@ -1757,6 +1809,8 @@ note(Cache *cache, Word shnum, const char *name, const char *file)
 			    file, _cache->c_name);
 			continue;
 		}
+		if (_cache->c_data == NULL)
+			continue;
 
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 		dbg_print(0, MSG_INTL(MSG_ELF_SCN_NOTE), _cache->c_name);
@@ -1844,6 +1898,9 @@ hash(Cache *cache, Word shnum, const char *name, const char *file, uint_t flags)
 			    file, hsecname);
 			continue;
 		}
+		if (_cache->c_data == NULL)
+			continue;
+
 		hash = (uint_t *)_cache->c_data->d_buf;
 		bkts = *hash;
 		chain = hash + 2 + bkts;
@@ -1861,7 +1918,10 @@ hash(Cache *cache, Word shnum, const char *name, const char *file, uint_t flags)
 		_cache = &cache[hshdr->sh_link];
 		ssecname = _cache->c_name;
 
-		if ((syms = (Sym *)_cache->c_data->d_buf) == 0) {
+		if (_cache->c_data == NULL)
+			continue;
+
+		if ((syms = (Sym *)_cache->c_data->d_buf) == NULL) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
 			    file, ssecname);
 			continue;
@@ -1969,8 +2029,8 @@ group(Cache *cache, Word shnum, const char *name, const char *file,
 			continue;
 		if (name && strcmp(name, _cache->c_name))
 			continue;
-		if ((_cache->c_data == 0) ||
-		    ((grpdata = (Word *)_cache->c_data->d_buf) == 0))
+		if ((_cache->c_data == NULL) ||
+		    ((grpdata = (Word *)_cache->c_data->d_buf) == NULL))
 			continue;
 		grpcnt = shdr->sh_size / sizeof (Word);
 
@@ -2086,6 +2146,9 @@ got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file, uint_t flags)
 	if ((gentsize = gotshdr->sh_entsize) == 0)
 		gentsize = sizeof (Xword);
 
+	if (gotcache->c_data == NULL)
+		return;
+
 	/* LINTED */
 	gotents = (Word)(gotshdr->sh_size / gentsize);
 	gotdata = gotcache->c_data->d_buf;
@@ -2146,6 +2209,9 @@ got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file, uint_t flags)
 			    file, _cache->c_name);
 			continue;
 		}
+		if (_cache->c_data == NULL)
+			continue;
+
 		rels = _cache->c_data->d_buf;
 		relnum = shdr->sh_size / relsize;
 
@@ -2427,7 +2493,8 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 		/*
 		 * Do we wish to write the section out?
 		 */
-		if (wfd && Nname && (strcmp(Nname, _cache->c_name) == 0)) {
+		if (wfd && Nname && (strcmp(Nname, _cache->c_name) == 0) &&
+		    _cache->c_data) {
 			(void) write(wfd, _cache->c_data->d_buf,
 			    _cache->c_data->d_size);
 		}

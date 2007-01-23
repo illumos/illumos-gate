@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -655,9 +655,11 @@ typedef struct rt_map32 {
 #define	FLG_RT_NOOPEN	0x00100000	/* dlopen() not allowed */
 #define	FLG_RT_FINICLCT	0x00200000	/* fini has been collected (tsort) */
 #define	FLG_RT_INITCALL	0x00400000	/* objects .init has been called */
-#define	FLG_RT_INTRPOSE	0x00800000	/* object is an INTERPOSER */
-#define	FLG_RT_DIRECT	0x01000000	/* object has DIRECT bindings enabled */
-#define	FLG_RT_SUNWBSS	0x02000000	/* object with PT_SUNWBSS, not mapped */
+#define	FLG_RT_SUNWBSS	0x00800000	/* object with PT_SUNWBSS, not mapped */
+#define	FLG_RT_OBJINTPO	0x01000000	/* object is a global interposer */
+#define	FLG_RT_SYMINTPO	0x02000000	/* object contains symbol interposer */
+#define	MSK_RT_INTPOSE	0x03000000	/* mask for all interposer */
+					/*	possibilities */
 #define	FLG_RT_MOVE	0x04000000	/* object needs move operation */
 #define	FLG_RT_DLSYM	0x08000000	/* dlsym in progress on object */
 #define	FLG_RT_REGSYMS	0x10000000	/* object has DT_REGISTER entries */
@@ -686,6 +688,7 @@ typedef struct rt_map32 {
 
 #define	FL1_RT_TLSADD	0x00010000	/* objects TLS has been registered */
 #define	FL1_RT_TLSSTAT	0x00020000	/* object requires static TLS */
+#define	FL1_RT_DIRECT	0x00040000	/* object has DIRECT bindings enabled */
 
 /*
  * The following range of bits are reserved to hold LML_TFLG_AUD_ values

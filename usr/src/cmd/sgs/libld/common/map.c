@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1430,22 +1430,27 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			/*
 			 * Establish a new scope.  All symbols added by this
 			 * mapfile are actually global entries. They will be
-			 * reduced to locals during sym_update().
+			 * reduced to locals during sym_update().  If a symbolic
+			 * scope is detected, remember this.  If a symbolic
+			 * scope is the only scope defined in this (or any other
+			 * mapfiles), then -Bsymbolic is established.
 			 */
 			if ((strcmp(MSG_ORIG(MSG_STR_LOCAL),
 			    _name) == 0) ||
-			    (strcmp(MSG_ORIG(MSG_MAP_HIDDEN), _name) == 0))
+			    (strcmp(MSG_ORIG(MSG_MAP_HIDDEN), _name) == 0)) {
 				scope = FLG_SCOPE_LOCL;
-			else if ((strcmp(MSG_ORIG(MSG_MAP_GLOBAL),
+			} else if ((strcmp(MSG_ORIG(MSG_MAP_GLOBAL),
 			    _name) == 0) ||
-			    (strcmp(MSG_ORIG(MSG_MAP_DEFAULT), _name) == 0))
+			    (strcmp(MSG_ORIG(MSG_MAP_DEFAULT), _name) == 0)) {
 				scope = FLG_SCOPE_GLOB;
-			else if ((strcmp(MSG_ORIG(MSG_STR_SYMBOLIC),
+				ofl->ofl_flags |= FLG_OF_MAPGLOB;
+			} else if ((strcmp(MSG_ORIG(MSG_STR_SYMBOLIC),
 			    _name) == 0) ||
-			    (strcmp(MSG_ORIG(MSG_MAP_PROTECTED), _name) == 0))
+			    (strcmp(MSG_ORIG(MSG_MAP_PROTECTED), _name) == 0)) {
 				scope = FLG_SCOPE_SYMB;
-			else if (strcmp(MSG_ORIG(MSG_STR_ELIMINATE), _name)
-			    == 0)
+				ofl->ofl_flags |= FLG_OF_MAPSYMB;
+			} else if (strcmp(MSG_ORIG(MSG_STR_ELIMINATE),
+			    _name) == 0)
 				scope = FLG_SCOPE_ELIM;
 			else {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -1570,6 +1575,13 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_NODIRECT)) == 0) {
+					if (scope == FLG_SCOPE_SYMB) {
+						eprintf(ofl->ofl_lml, ERR_FATAL,
+						    MSG_INTL(MSG_MAP_PROTNDIR),
+						    mapfile,
+						    EC_XWORD(Line_num));
+						return (S_ERROR);
+					}
 					sym_flags1 |= FLG_SY1_NDIR;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 					ofl->ofl_flags1 |= FLG_OF1_NDIRECT;
@@ -1585,6 +1597,19 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					dftflag = filter = FLG_SY_AUXFLTR;
 					sym_flags |= FLG_SY_AUXFLTR;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
+					continue;
+				} else if (strcmp(Start_tok,
+				    MSG_ORIG(MSG_MAP_INTERPOSE)) == 0) {
+					if (!(ofl->ofl_flags & FLG_OF_EXEC)) {
+						eprintf(ofl->ofl_lml, ERR_FATAL,
+						    MSG_INTL(MSG_MAP_NOINTPOSE),
+						    mapfile,
+						    EC_XWORD(Line_num));
+						return (S_ERROR);
+					}
+					sym_flags |= FLG_SY_INTPOSE;
+					ofl->ofl_flags |= FLG_OF_SYMINFO;
+					ofl->ofl_dtflags_1 |= DF_1_SYMINTPOSE;
 					continue;
 				} else {
 					eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -1602,7 +1627,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			 * specified in local scope and indicates that all
 			 * symbols processed that are not explicitly defined to
 			 * be global are to be reduced to local scope in the
-			 * output image.  This also applies that a version
+			 * output image.  This also implies that a version
 			 * definition is created as the user has effectively
 			 * defined an interface.
 			 */

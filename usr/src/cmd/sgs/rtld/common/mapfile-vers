@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,7 +40,7 @@
 # All symbols in ld.so.1 are private as no-one should bind to these directly.
 
 SUNWprivate_1.2 {
-	global:
+	protected:
 		_dladdr;		# Standard dlopen(3x) family	
 		 dladdr;
 		_dladdr1;

@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -383,13 +383,23 @@ check_flags(Ofl_desc * ofl, int argc)
 			ofl->ofl_flags |= FLG_OF_SHAROBJ;
 
 			/*
-			 * By default we print relocation errors for
-			 * executables but *not* for a shared object
+			 * By default, print text relocation errors for
+			 * executables but *not* for shared objects.
 			 */
 			if (ztflag == 0)
 				ofl->ofl_flags1 |= FLG_OF1_TEXTOFF;
 
 			if (Bsflag) {
+				/*
+				 * -Bsymbolic, and -Bnodirect make no sense.
+				 */
+				if (Bdflag == SET_FALSE) {
+					eprintf(ofl->ofl_lml, ERR_FATAL,
+					    MSG_INTL(MSG_ARG_INCOMP),
+					    MSG_ORIG(MSG_ARG_BSYMBOLIC),
+					    MSG_ORIG(MSG_ARG_BNODIRECT));
+					ofl->ofl_flags |= FLG_OF_FATAL;
+				}
 				ofl->ofl_flags |= FLG_OF_SYMBOLIC;
 				ofl->ofl_dtflags |= DF_SYMBOLIC;
 			}
@@ -541,6 +551,19 @@ check_flags(Ofl_desc * ofl, int argc)
 		if (ofl->ofl_flags & FLG_OF_SEGSORT)
 			if (ld_sort_seg_list(ofl) == S_ERROR)
 				return (S_ERROR);
+	}
+
+	/*
+	 * If a mapfile has been used to define a single symbolic scope of
+	 * interfaces, -Bsymbolic is established.  This global setting goes
+	 * beyond individual symbol protection, and ensures all relocations
+	 * (even those that reference section symbols) are processed within
+	 * the object being built.
+	 */
+	if ((ofl->ofl_flags &
+	    (FLG_OF_MAPSYMB | FLG_OF_MAPGLOB)) == FLG_OF_MAPSYMB) {
+		ofl->ofl_flags |= FLG_OF_SYMBOLIC;
+		ofl->ofl_dtflags |= DF_SYMBOLIC;
 	}
 
 	/*

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,6 +93,9 @@ struct	entry	{
 	const char	*e_str;
 };
 
+/* Non-localized string giving name of command.  Defined in file.c */
+extern const char	*File;
+
 typedef	struct entry	Entry;
 
 static Entry	*mtab1;	/* 1st magic table, applied before default tests */
@@ -111,7 +113,7 @@ static Entry	*ep1;	/* current entry in mtab1 */
 static Entry	*ep2;	/* current entry in mtab2 */
 
 static char *
-getstr(char *p)
+getstr(char *p, char *file)
 {
 	char	*newstr;
 	char	*s;
@@ -120,7 +122,9 @@ getstr(char *p)
 
 	newstr = (char *)malloc((strlen(p) + 1) * sizeof (char));
 	if (newstr == NULL) {
-		perror(gettext("magic table string allocation"));
+		int err = errno;
+		(void) fprintf(stderr, gettext("%s: malloc failed: %s\n"),
+		    File, strerror(err));
 		return (NULL);
 	}
 
@@ -143,8 +147,9 @@ getstr(char *p)
 			errno = 0;
 			val = strtol(p, &p, base);
 			if (val > UCHAR_MAX || val < 0 || errno != 0) {
-				perror(gettext("magic table invalid "
-				    "string value"));
+				(void) fprintf(stderr, gettext("%s: %s: magic "
+				    "table invalid string value\n"), File,
+				    file);
 				return (NULL);
 			}
 			*s++ = (char)val;
@@ -238,10 +243,10 @@ f_mkmtab(char *magfile, int cflg, int first)
 
 	/* mtab may have been allocated on a previous f_mkmtab call */
 	if (mtab == (Entry *)NULL) {
-		mtab = (Entry *) calloc(sizeof (Entry), NENT);
-		if (mtab == (Entry *)NULL) {
-			(void) fprintf(stderr,
-			gettext("no memory for magic table\n"));
+		if ((mtab = calloc(sizeof (Entry), NENT)) == NULL) {
+			int err = errno;
+			(void) fprintf(stderr, gettext("%s: malloc "
+			    "failed: %s\n"), File, strerror(err));
 			return (-1);
 		}
 
@@ -249,11 +254,11 @@ f_mkmtab(char *magfile, int cflg, int first)
 		mend = &mtab[NENT];
 	}
 
-	fp = fopen(magfile, "r");
-	if (fp == NULL) {
-		(void) fprintf(stderr,
-		gettext("cannot open magic file <%s>.\n"),
-		magfile);
+	errno = 0;
+	if ((fp = fopen(magfile, "r")) == NULL) {
+		int err = errno;
+		(void) fprintf(stderr, gettext("%s: %s: cannot open magic "
+		    "file: %s\n"), File, magfile, err ? strerror(err) : "");
 		return (-1);
 	}
 	while (fgets(buf, BSZ, fp) != NULL) {
@@ -270,7 +275,9 @@ f_mkmtab(char *magfile, int cflg, int first)
 			oldsize = mend - mtab;
 			tbsize = (NENT + oldsize) * sizeof (Entry);
 			if ((mtab = realloc(mtab, tbsize)) == NULL) {
-				perror(gettext("magic table overflow"));
+				int err = errno;
+				(void) fprintf(stderr, gettext("%s: malloc "
+				    "failed: %s\n"), File, strerror(err));
 				return (-1);
 			} else {
 				(void) memset(mtab + oldsize, 0,
@@ -294,9 +301,9 @@ f_mkmtab(char *magfile, int cflg, int first)
 		p2 = strchr(p, '\t');
 		if (p2 == NULL) {
 			if (cflg)
-				(void) fprintf(stderr,
-				    gettext("fmt error, no tab after %s on "
-				    "line %d of %s\n"), p, lcnt, magfile);
+				(void) fprintf(stderr, gettext("%s: %s: format "
+				    "error, no tab after %s on line %d\n"),
+				    File, magfile, p, lcnt);
 			continue;
 		}
 		*p2++ = NULL;
@@ -308,9 +315,9 @@ f_mkmtab(char *magfile, int cflg, int first)
 		p2 = strchr(p, '\t');
 		if (p2 == NULL) {
 			if (cflg)
-				(void) fprintf(stderr,
-				    gettext("fmt error, no tab after %s on "
-				    "line %d of %s\n"), p, lcnt, magfile);
+				(void) fprintf(stderr, gettext("%s: %s: format "
+				    "error, no tab after %s on line %d\n"),
+				    File, magfile, p, lcnt);
 			continue;
 		}
 		*p2++ = NULL;
@@ -440,9 +447,9 @@ f_mkmtab(char *magfile, int cflg, int first)
 		p2 = strchr(p, '\t');
 		if (p2 == NULL) {
 			if (cflg)
-				(void) fprintf(stderr,
-				    gettext("fmt error, no tab after %s on "
-				    "line %d of %s\n"), p, lcnt, magfile);
+				(void) fprintf(stderr, gettext("%s: %s: format "
+				    "error, no tab after %s on line %d\n"),
+				    File, magfile, p, lcnt);
 			continue;
 		}
 		*p2++ = NULL;
@@ -480,14 +487,17 @@ f_mkmtab(char *magfile, int cflg, int first)
 			if (ep->e_type != STR) {
 				ep->e_value.num = strtoull((const char *)p,
 				    (char **)NULL, 0);
-			} else if ((ep->e_value.str = getstr(p)) == NULL) {
+			} else if ((ep->e_value.str =
+			    getstr(p, magfile)) == NULL) {
 				return (-1);
 			}
 		}
 		p2 += strspn(p2, "\t");
 			/* STRING */
 		if ((ep->e_str = strdup(p2)) == NULL) {
-			perror(gettext("magic table message allocation"));
+			int err = errno;
+			(void) fprintf(stderr, gettext("%s: malloc "
+			    "failed: %s\n"), File, strerror(err));
 			return (-1);
 		} else {
 			if ((p = strchr(ep->e_str, '\n')) != NULL)
@@ -508,8 +518,10 @@ f_mkmtab(char *magfile, int cflg, int first)
 		mend2 = mend;
 		ep2 = ep;
 	}
-	if (fclose(fp) == EOF) {
-		perror(magfile);
+	if (fclose(fp) != 0) {
+		int err = errno;
+		(void) fprintf(stderr, gettext("%s: fclose failed: %s\n"),
+		    File, strerror(err));
 		return (-1);
 	}
 	return (0);

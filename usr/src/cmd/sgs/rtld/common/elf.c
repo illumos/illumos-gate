@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1300,7 +1300,7 @@ elf_null_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
  * Disable filtee use.
  */
 static void
-elf_disable_filtee(Rt_map * lmp, Dyninfo * dip)
+elf_disable_filtee(Rt_map *lmp, Dyninfo *dip)
 {
 	dip->di_info = 0;
 
@@ -1418,7 +1418,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 	 * using their group handle to lookup the symbol.
 	 */
 	for (any = 0, pnpp = (Pnode **)&(dip->di_info), pnp = *pnpp; pnp;
-	    pnpp = &pnp->p_next, pnp = * pnpp) {
+	    pnpp = &pnp->p_next, pnp = *pnpp) {
 		int	mode;
 		Grp_hdl	*ghp;
 		Rt_map	*nlmp = 0;
@@ -1893,7 +1893,9 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		if (sym->st_shndx != SHN_UNDEF) {
 			*dlmp = ilmp;
 			*binfo |= DBG_BINFO_FOUND;
-			if (FLAGS(ilmp) & FLG_RT_INTRPOSE)
+			if ((FLAGS(ilmp) & FLG_RT_OBJINTPO) ||
+			    ((FLAGS(ilmp) & FLG_RT_SYMINTPO) &&
+			    is_sym_interposer(ilmp, sym)))
 				*binfo |= DBG_BINFO_INTERPOSE;
 			break;
 
@@ -1910,7 +1912,9 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		    (ELF_ST_TYPE(sym->st_info) == STT_FUNC)) {
 			*dlmp = ilmp;
 			*binfo |= (DBG_BINFO_FOUND | DBG_BINFO_PLTADDR);
-			if (FLAGS(ilmp) & FLG_RT_INTRPOSE)
+			if ((FLAGS(ilmp) & FLG_RT_OBJINTPO) ||
+			    ((FLAGS(ilmp) & FLG_RT_SYMINTPO) &&
+			    is_sym_interposer(ilmp, sym)))
 				*binfo |= DBG_BINFO_INTERPOSE;
 			return (sym);
 		}
@@ -2293,7 +2297,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				if (ld->d_un.d_val & DF_1_CONFALT)
 					crle = 1;
 				if (ld->d_un.d_val & DF_1_DIRECT)
-					FLAGS(lmp) |= FLG_RT_DIRECT;
+					FLAGS1(lmp) |= FL1_RT_DIRECT;
 				if (ld->d_un.d_val & DF_1_NODEFLIB)
 					FLAGS1(lmp) |= FL1_RT_NODEFLIB;
 				if (ld->d_un.d_val & DF_1_ENDFILTEE)
@@ -2310,16 +2314,18 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				 * already started, then demote it.  It's too
 				 * late to guarantee complete interposition.
 				 */
-				if (ld->d_un.d_val & DF_1_INTERPOSE) {
-				    if ((lml->lm_flags & LML_FLG_STARTREL) == 0)
-					FLAGS(lmp) |= FLG_RT_INTRPOSE;
-				    else {
+				if (ld->d_un.d_val &
+				    (DF_1_INTERPOSE | DF_1_SYMINTPOSE)) {
+				    if (lml->lm_flags & LML_FLG_STARTREL) {
 					DBG_CALL(Dbg_util_intoolate(lmp));
 					if (lml->lm_flags & LML_FLG_TRC_ENABLE)
 					    (void) printf(
 						MSG_INTL(MSG_LDD_REL_ERR2),
 						NAME(lmp));
-				    }
+				    } else if (ld->d_un.d_val & DF_1_INTERPOSE)
+					FLAGS(lmp) |= FLG_RT_OBJINTPO;
+				    else
+					FLAGS(lmp) |= FLG_RT_SYMINTPO;
 				}
 				break;
 			case DT_SYMINFO:
@@ -3086,10 +3092,10 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 }
 
 static void
-elf_lazy_cleanup(Alist * alp)
+elf_lazy_cleanup(Alist *alp)
 {
-	Rt_map **	lmpp;
-	Aliste		off;
+	Rt_map	**lmpp;
+	Aliste	off;
 
 	/*
 	 * Cleanup any link-maps added to this dynamic list and free it.

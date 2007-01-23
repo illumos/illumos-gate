@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,6 +63,9 @@ $(PROG) : $(OBJS)
 $(XPG4) : $(XPG4OBJS)
 	$(LINK.c) $(XPG4OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
+
+%.o:	%.c
+	$(COMPILE.c) -o $@ $<
 
 xpg4_%.o:	%.c
 	$(COMPILE.c) -o $@ $<

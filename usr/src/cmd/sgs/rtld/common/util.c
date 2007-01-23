@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1124,7 +1124,7 @@ lm_append(Lm_list *lml, Aliste lmco, Rt_map *lmp)
 		lmc->lc_head = lmc->lc_tail = lmp;
 		add = 0;
 
-	} else if (FLAGS(lmp) & FLG_RT_INTRPOSE) {
+	} else if (FLAGS(lmp) & FLG_RT_OBJINTPO) {
 		Rt_map	*tlmp;
 
 		/*
@@ -1152,7 +1152,7 @@ lm_append(Lm_list *lml, Aliste lmco, Rt_map *lmp)
 		for (tlmp = (Rt_map *)NEXT(lmc->lc_head); tlmp;
 		    tlmp = (Rt_map *)NEXT(tlmp)) {
 
-			if (FLAGS(tlmp) & FLG_RT_INTRPOSE)
+			if (FLAGS(tlmp) & FLG_RT_OBJINTPO)
 				continue;
 
 			/*
@@ -1194,7 +1194,7 @@ lm_append(Lm_list *lml, Aliste lmco, Rt_map *lmp)
 	 * link-map can be explicitly defined as an interposer so that it can
 	 * provide interposition over direct binding requests.
 	 */
-	if (FLAGS(lmp) & FLG_RT_INTRPOSE)
+	if (FLAGS(lmp) & MSK_RT_INTPOSE)
 		lml->lm_flags |= LML_FLG_INTRPOSE;
 
 	/*

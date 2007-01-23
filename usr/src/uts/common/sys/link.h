@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,7 +120,7 @@ typedef struct {
 #define	DT_SUNW_SYMTAB		0x60000011	/* symtab with local fcn */
 						/*	symbols immediately */
 						/*	preceding DT_SYMTAB */
-#define	DT_SUNW_SYMSZ		0x60000012	/* Size of SUNW_SYMTAB table */
+#define	DT_SUNW_SYMSZ		0x60000012	/* size of SUNW_SYMTAB table */
 #define	DT_HIOS			0x6ffff000
 
 /*
@@ -218,7 +218,7 @@ typedef struct {
 #define	DF_1_ORIGIN	0x00000080	/* ORIGIN processing required */
 #define	DF_1_DIRECT	0x00000100	/* direct binding enabled */
 #define	DF_1_TRANS	0x00000200
-#define	DF_1_INTERPOSE	0x00000400	/* object is an 'interposer' */
+#define	DF_1_INTERPOSE	0x00000400	/* object is an interposer */
 #define	DF_1_NODEFLIB	0x00000800	/* ignore default library search path */
 #define	DF_1_NODUMP	0x00001000	/* object can't be dldump(3x)'ed */
 #define	DF_1_CONFALT	0x00002000	/* configuration alternative created */
@@ -233,6 +233,8 @@ typedef struct {
 #define	DF_1_NOHDR	0x00100000	/* mapfile ?N:1st segment mapping */
 					/*	omits ELF & program headers */
 #define	DF_1_NORELOC	0x00400000	/* internal: unrelocated object */
+#define	DF_1_SYMINTPOSE	0x00800000	/* individual symbol interposers */
+					/*	exist */
 
 /*
  * Values set to DT_FEATURE_1 tag's d_val.
@@ -393,7 +395,7 @@ typedef struct {
 					/*	to object containing defn. */
 #define	SYMINFO_FLG_PASSTHRU	0x0002	/* ignored - see SYMINFO_FLG_FILTER */
 #define	SYMINFO_FLG_COPY	0x0004	/* symbol is a copy-reloc */
-#define	SYMINFO_FLG_LAZYLOAD	0x0008	/* object containing defn should be */
+#define	SYMINFO_FLG_LAZYLOAD	0x0008	/* object containing defn. should be */
 					/*	lazily-loaded */
 #define	SYMINFO_FLG_DIRECTBIND	0x0010	/* ref should be bound directly to */
 					/*	object containing defn. */
@@ -401,6 +403,7 @@ typedef struct {
 					/*	directly bind to this symbol */
 #define	SYMINFO_FLG_FILTER	0x0002	/* symbol ref is associated to a */
 #define	SYMINFO_FLG_AUXILIARY	0x0040	/* 	standard or auxiliary filter */
+#define	SYMINFO_FLG_INTERPOSE	0x0080	/* symbol defines an interposer */
 
 /*
  * Syminfo.si_boundto values.

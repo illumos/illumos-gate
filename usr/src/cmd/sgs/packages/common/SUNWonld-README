@@ -1130,6 +1130,7 @@ Bugid   Risk Synopsis
 6423746 add an option to relax the resolution of COMDAT relocs (D)
 4934427 runtime linker should load up static symbol names visible to
 	dladdr() (D)
+	PSARC 2006/526 SHT_SUNW_LDYNSYM - default local symbol addition
 6448719 sys/elf.h could be updated with additional machine and ABI types
 6336605 link-editors need to support R_*_SIZE relocations
 	PSARC/2006/558 R_*_SIZE relocation support
@@ -1153,3 +1154,5 @@ Bugid   Risk Synopsis
 6501793 GOTOP relocation transition (optimization) fails with offsets > 2^32
 6515970 HWCAP processing doesn't clean up fmap structure - browser fails to
 	run java applet
+6494214 Refinements to symbolic binding, symbol declarations and interposition 
+	PSARC/2006/714 ld(1) mapfile: symbol interpose definition

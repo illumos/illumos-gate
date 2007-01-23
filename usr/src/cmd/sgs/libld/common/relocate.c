@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1115,30 +1115,30 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 
 	/*
 	 * Determine whether this symbol should be bound locally or not.
-	 * Symbols will be bound locally if one of the following is true:
+	 * Symbols are bound locally if one of the following is true:
 	 *
-	 *  o	the symbol is of type STB_LOCAL
+	 *  o	the symbol is of type STB_LOCAL.
 	 *
-	 *  o	the output image is not a relocatable object and the
-	 *	relocation is relative to the .got
+	 *  o	the output image is not a relocatable object and the relocation
+	 *	is relative to the .got.
 	 *
-	 *  o	the section being relocated is of type SHT_SUNW_dof;
-	 *	these sections are bound to the functions in the
-	 *	containing object and don't care about interpositioning
+	 *  o	the section being relocated is of type SHT_SUNW_dof.  These
+	 *	sections must be bound to the functions in the containing
+	 *	object and can not be interposed upon.
 	 *
-	 *  o	the symbol has been reduced (scoped to a local or
-	 *	symbolic) and reductions are being processed
+	 *  o	the symbol has been reduced (scoped to a local or symbolic) and
+	 *	reductions are being processed.
 	 *
-	 *  o	the -Bsymbolic flag is in use when building a shared
-	 *	object or an executable (fixed address) is being created
+	 *  o	the -Bsymbolic flag is in use when building a shared object,
+	 *	and the symbol hasn't explicitly been defined as nodirect.
 	 *
-	 *  o	Building an executable and the symbol is defined
-	 *	in the executable.
+	 *  o	an executable (fixed address) is being created, and the symbol
+	 *	is defined in the executable.
 	 *
-	 *  o	the relocation is against a segment which will not
-	 *	be loaded into memory.  If that is the case we need
-	 *	to resolve the relocation now because ld.so.1 won't
-	 *	be able to.
+	 *  o	the relocation is against a segment which will not be loaded
+	 *	into memory.  In this case, the relocation must be resolved
+	 *	now, as ld.so.1 can not process relocations against unmapped
+	 *	segments.
 	 */
 	local = FALSE;
 	if (ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL) {
@@ -1153,9 +1153,20 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 		    (IS_LOCALBND(rtype) || IS_SEG_RELATIVE(rtype))) {
 			local = TRUE;
 		} else if (sdp->sd_ref == REF_REL_NEED) {
+			/*
+			 * Global symbols may have been individually reduced in
+			 * scope.  If the whole object is to be self contained,
+			 * such as when generating an executable or a symbolic
+			 * shared object, make sure all relocation symbol
+			 * references (sections too) are treated locally.  Note,
+			 * explicit no-direct symbols should not be bound to
+			 * locally.
+			 */
 			if ((sdp->sd_flags1 & (FLG_SY1_LOCL | FLG_SY1_PROT)))
 				local = TRUE;
-			else if (flags & (FLG_OF_SYMBOLIC | FLG_OF_EXEC))
+			else if ((flags & FLG_OF_EXEC) ||
+			    ((flags & FLG_OF_SYMBOLIC) &&
+			    ((sdp->sd_flags1 & FLG_SY1_NDIR) == 0)))
 				local = TRUE;
 		}
 	}
@@ -1871,6 +1882,7 @@ ld_reloc_init(Ofl_desc *ofl)
 {
 	Listnode	*lnp;
 	Is_desc		*isp;
+	Sym_desc	*sdp;
 
 	/*
 	 * At this point we have finished processing all input symbols.  Make
@@ -1919,12 +1931,11 @@ ld_reloc_init(Ofl_desc *ofl)
 	 * check the validity of copy relocations.
 	 */
 	if (ofl->ofl_copyrels.head != 0) {
-		Copy_rel *	cpyrel;
+		Copy_rel	*cpyrel;
 
 		for (LIST_TRAVERSE(&ofl->ofl_copyrels, lnp, cpyrel)) {
-			Sym_desc *	sdp;
-
 			sdp = cpyrel->copyrel_symd;
+
 			/*
 			 * If there were no displacement relocation
 			 * in this file, don't worry about it.
@@ -1942,10 +1953,10 @@ ld_reloc_init(Ofl_desc *ofl)
 	 */
 	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
 	    ((ofl->ofl_flags & FLG_OF_BLDGOT) ||
-	    (ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL),
-	    SYM_NOHASH, 0, ofl) != 0) ||
-	    (ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U),
-	    SYM_NOHASH, 0, ofl) != 0))) {
+	    ((((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL),
+	    SYM_NOHASH, 0, ofl)) != 0) ||
+	    ((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U),
+	    SYM_NOHASH, 0, ofl)) != 0)) && (sdp->sd_ref != REF_DYN_SEEN)))) {
 		if (ld_make_got(ofl) == S_ERROR)
 			return (S_ERROR);
 

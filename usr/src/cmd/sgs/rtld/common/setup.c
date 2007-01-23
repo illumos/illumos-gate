@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -97,7 +97,7 @@ preload(const char *str, Rt_map *lmp)
 	if ((lmflags & LML_FLG_TRC_ENABLE) && (FLAGS1(lmp) & FL1_RT_LDDSTUB))
 		flags = FLG_RT_PRELOAD;
 	else
-		flags = (FLG_RT_PRELOAD | FLG_RT_INTRPOSE);
+		flags = (FLG_RT_PRELOAD | FLG_RT_OBJINTPO);
 
 	ptr = strtok_r(objs, MSG_ORIG(MSG_STR_DELIMIT), &next);
 	do {
@@ -127,7 +127,7 @@ preload(const char *str, Rt_map *lmp)
 		 * error occurred with loading this object, indicate that this
 		 * link-map list contains an interposer.
 		 */
-		flags |= FLG_RT_INTRPOSE;
+		flags |= FLG_RT_OBJINTPO;
 		if (nlmp == 0) {
 			if ((lmflags & LML_FLG_TRC_ENABLE) ||
 			    (rtld_flags & RT_FL_SECURE))

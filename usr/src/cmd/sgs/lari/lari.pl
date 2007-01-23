@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -90,7 +90,7 @@ $Glob = 0x00001;	# symbol is global
 $Sfte = 0x00002;	# symbol is a filtee backing a standard filter
 $Afte = 0x00004;	# symbol is a filtee backing a auxiliary filter
 $Gfte = 0x00008;	# symbol bound as a filtee
-$Intp = 0x00010;	# symbol originates for explicit interposer
+$Intp = 0x00010;	# symbol originates from explicit interposer
 $Dirc = 0x00020;	# symbol bound to directly
 $Cpyr = 0x00040;	# symbol bound to copy-relocation reference
 $Prot = 0x00080;	# symbol is protected (symbolic)
@@ -1284,7 +1284,7 @@ sub GetAllSymbols {
 
 			# Determine whether this object is an interposer.
 			if (($Fields[1] eq 'FLAGS_1') &&
-			    ($Line =~ / INTERPOSE /)) {
+			    ($Line =~ / OBJECT-INTERPOSE /)) {
 				$Interpose = 1;
 				next;
 			}
@@ -1342,6 +1342,9 @@ sub GetAllSymbols {
 			if ($Fields[1] =~ /A/) {
 				$Flags |= $Saft;
 			}
+			if ($Fields[1] =~ /I/) {
+				$Flags |= $Intp;
+			}
 
 			# Determine the symbol name based upon the number of
 			# fields.
@@ -1354,7 +1357,7 @@ sub GetAllSymbols {
 			# If this is a filter, we need to tag the associated
 			# filtee symbol.  However, the filtee might not have
 			# been processed yet, so save this information for later.
-			$Flags &= ~$Nodi;
+			$Flags &= ~($Nodi | $Intp);
 			if ($Flags) {
 				my ($Filtee) = $Fields[$#Fields - 1];
 
