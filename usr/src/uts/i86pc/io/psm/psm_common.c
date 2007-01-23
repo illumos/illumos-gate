@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,16 +40,6 @@
 #include <sys/sunndi.h>
 #include <sys/ksynch.h>
 
-/*
- * ACPI Poweroff patchable options in acpi_poweroff_opt for broken BIOS
- * workarounds.
- */
-#define	ACPI_PO_CLRWAK	0x0001
-#define	ACPI_PO_CLRALL	0x0002
-#define	ACPI_PO_RSTGPE	0x0004
-#define	ACPI_PO_DISARB	0x0008
-#define	ACPI_PO_2NDTRY	0x0010
-
 /* Global configurables */
 
 char *psm_module_name;	/* used to store name of psm module */
@@ -66,16 +56,6 @@ char *psm_module_name;	/* used to store name of psm module */
  *
  */
 int acpi_irq_check_elcr = 0;
-
-/*
- * acpi_s5_slp_typ:
- * If >= 0 then override the \_S5 parameter return value. This is useful
- * for systems with broken \_S5 methods which return the wrong value for
- * the chipset in use.
- */
-int acpi_s5_slp_typ = -1;
-int acpi_s5_slp_typ2 = -1;	/* second parameter (only patch if different) */
-int acpi_poweroff_opt = 0;	/* patchable poweroff options */
 
 int psm_verbose = 0;
 

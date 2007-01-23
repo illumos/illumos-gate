@@ -1400,9 +1400,6 @@ apic_preshutdown(int cmd, int fcn)
 	APIC_VERBOSE_POWEROFF(("apic_preshutdown(%d,%d); m=%d a=%d\n",
 	    cmd, fcn, apic_poweroff_method, apic_enable_acpi));
 
-	if ((cmd != A_SHUTDOWN) || (fcn != AD_POWEROFF)) {
-		return;
-	}
 }
 
 static void
@@ -1438,9 +1435,17 @@ apic_shutdown(int cmd, int fcn)
 
 	intr_restore(iflag);
 
-	if ((cmd != A_SHUTDOWN) || (fcn != AD_POWEROFF)) {
+	/* remainder of function is for shutdown cases only */
+	if (cmd != A_SHUTDOWN)
 		return;
-	}
+
+	/* switch system back into Legacy Mode if using ACPI */
+	if (apic_enable_acpi)
+		(void) AcpiDisable();
+
+	/* remainder of function is for shutdown+poweroff case only */
+	if (fcn != AD_POWEROFF)
+		return;
 
 	switch (apic_poweroff_method) {
 		case APIC_POWEROFF_VIA_RTC:

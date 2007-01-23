@@ -459,15 +459,6 @@ uppc_preshutdown(int cmd, int fcn)
 {
 	UPPC_VERBOSE_POWEROFF(("uppc_preshutdown(%d,%d);\n", cmd, fcn));
 
-	if ((cmd != A_SHUTDOWN) || (fcn != AD_POWEROFF)) {
-		return;
-	}
-
-	if (uppc_enable_acpi) {
-		UPPC_VERBOSE_POWEROFF(("uppc_preshutdown: ACPI enabled\n"));
-	} else {
-		UPPC_VERBOSE_POWEROFF(("uppc_preshutdown: ACPI not enabled\n"));
-	}
 }
 
 static void
@@ -475,11 +466,20 @@ uppc_shutdown(int cmd, int fcn)
 {
 	UPPC_VERBOSE_POWEROFF(("uppc_shutdown(%d,%d);\n", cmd, fcn));
 
-	if ((cmd != A_SHUTDOWN) || (fcn != AD_POWEROFF)) {
+	/*
+	 * Return if passed a command other than A_SHUTDOWN or
+	 * if we're not using ACPI.
+	 */
+	if ((cmd != A_SHUTDOWN) || (!uppc_enable_acpi))
 		return;
-	}
-	if (uppc_enable_acpi)
-		(void) acpi_poweroff();
+
+	/* switch system back into Legacy Mode */
+	(void) AcpiDisable();
+
+	if (fcn != AD_POWEROFF)
+		return;
+
+	(void) acpi_poweroff();
 }
 
 static int

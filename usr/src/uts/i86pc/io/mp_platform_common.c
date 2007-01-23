@@ -1703,10 +1703,10 @@ apic_handle_pci_pci_bridge(dev_info_t *idip, int child_devno, int child_ipin,
 
 	/*CONSTCOND*/
 	while (1) {
-		if ((dipp = ddi_get_parent(dip)) == (dev_info_t *)NULL)
+		if (((dipp = ddi_get_parent(dip)) == (dev_info_t *)NULL) ||
+		    (pci_config_setup(dipp, &cfg_handle) == DDI_SUCCESS))
 			return (-1);
-		if ((pci_config_setup(dipp, &cfg_handle) == DDI_SUCCESS) &&
-		    (pci_config_get8(cfg_handle, PCI_CONF_BASCLASS) ==
+		if ((pci_config_get8(cfg_handle, PCI_CONF_BASCLASS) ==
 		    PCI_CLASS_BRIDGE) && (pci_config_get8(cfg_handle,
 		    PCI_CONF_SUBCLASS) == PCI_BRIDGE_PCI)) {
 			pci_config_teardown(&cfg_handle);
@@ -1714,12 +1714,11 @@ apic_handle_pci_pci_bridge(dev_info_t *idip, int child_devno, int child_ipin,
 			    NULL) != 0)
 				return (-1);
 			/*
-			 * This is the rotating scheme that Compaq is using
-			 * and documented in the pci to pci spec.  Also, if
-			 * the pci to pci bridge is behind another pci to
-			 * pci bridge, then it need to keep transversing
-			 * up until an interrupt entry is found or reach
-			 * the top of the tree
+			 * This is the rotating scheme documented in the
+			 * PCI-to-PCI spec.  If the PCI-to-PCI bridge is
+			 * behind another PCI-to-PCI bridge, then it needs
+			 * to keep ascending until an interrupt entry is
+			 * found or the root is reached.
 			 */
 			ipin = (child_devno + child_ipin) % PCI_INTD;
 				if (bridge_bus == 0 && apic_pci_bus_total == 1)
@@ -1733,8 +1732,10 @@ apic_handle_pci_pci_bridge(dev_info_t *idip, int child_devno, int child_ipin,
 			dip = dipp;
 			child_devno = bridge_devno;
 			child_ipin = ipin;
-		} else
+		} else {
+			pci_config_teardown(&cfg_handle);
 			return (-1);
+		}
 	}
 	/*LINTED: function will not fall off the bottom */
 }
