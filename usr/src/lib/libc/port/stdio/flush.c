@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,6 @@
 #include "synonyms.h"
 #include "mtlib.h"
 #include "file64.h"
-#include "../gen/_libc_gettext.h"
 
 #define	_iob	__iob
 
@@ -833,9 +832,9 @@ _file_get(FILE *iop)
 	 */
 	if (!iop->__xf_nocheck && bad_fd > -1 && iop->_magic != bad_fd) {
 		/* LINTED: variable format specifier */
-		(void) fprintf(stderr, _libc_gettext(
+		(void) fprintf(stderr,
 		    "Application violated extended FILE safety mechanism.\n"
-		    "Please read the man page for extendedFILE.\nAborting\n"));
+		    "Please read the man page for extendedFILE.\nAborting\n");
 		abort();
 	}
 	return (altfd);
