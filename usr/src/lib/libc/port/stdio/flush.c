@@ -831,7 +831,6 @@ _file_get(FILE *iop)
 	 * silent data corruption.
 	 */
 	if (!iop->__xf_nocheck && bad_fd > -1 && iop->_magic != bad_fd) {
-		/* LINTED: variable format specifier */
 		(void) fprintf(stderr,
 		    "Application violated extended FILE safety mechanism.\n"
 		    "Please read the man page for extendedFILE.\nAborting\n");
