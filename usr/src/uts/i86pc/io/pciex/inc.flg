@@ -74,6 +74,7 @@ find_files "s.*"	\
 	usr/src/uts/common/rpc		\
 	usr/src/uts/intel/asm		\
 	usr/src/uts/intel/amd64		\
+	usr/src/uts/intel/io/hotplug	\
 	usr/src/uts/intel/io/pci	\
 	usr/src/uts/intel/io/pciex	\
 	usr/src/uts/i86pc/io/pci	\

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,34 +30,17 @@
  */
 
 #include <sys/sysmacros.h>
-#include <sys/isa_defs.h>
-
 #include <sys/conf.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/modctl.h>
 #include <sys/autoconf.h>
-
 #include <sys/hwconf.h>
-#include <sys/ddi_impldefs.h>
-
 #include <sys/pcie.h>
-
 #include <sys/ddi.h>
-#include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/hotplug/pci/pcicfg.h>
-
 #include <sys/ndi_impldefs.h>
-
-/*
- * The following macro enables hack to differentiate QFE device from a
- * Freshchoice and hence assigned different drivers which are  written
- * for the same silicon..Yikes.
- */
-#if defined(__sparc)
-#define	_EFCODE_WORKAROUND
-#endif
 
 /*
  * ************************************************************************
@@ -66,11 +49,6 @@
  */
 
 static	int	pcicfg_start_devno = 0;	/* for Debug only */
-
-#define	PCICFG_MAX_DEVICE 32
-#define	PCICFG_MAX_FUNCTION 8
-#define	PCICFG_MAX_REGISTER 64
-#define	PCICFG_MAX_BUS_DEPTH 255
 
 #define	PCICFG_NODEVICE 42
 #define	PCICFG_NOMEMORY 43
@@ -96,8 +74,6 @@ static	int	pcicfg_start_devno = 0;	/* for Debug only */
 #define	PCICFG_MEM_MULT 4
 #define	PCICFG_IO_MULT 4
 #define	PCICFG_RANGE_LEN 3 /* Number of range entries */
-
-#define	PCI_STAT_ECP_SUPP	0x10
 
 static int pcicfg_slot_busnums = 8;
 static int pcicfg_slot_memsize = 32 * PCICFG_MEMGRAN; /* 32MB per slot */
@@ -268,7 +244,6 @@ static void pcicfg_get_io(pcicfg_phdl_t *, uint32_t, uint32_t *);
 static int pcicfg_update_ranges_prop(dev_info_t *, ppb_ranges_t *);
 static int pcicfg_configure_ntbridge(dev_info_t *, uint_t, uint_t);
 static uint_t pcicfg_ntbridge_child(dev_info_t *);
-static int pcicfg_indirect_map(dev_info_t *dip);
 static uint_t pcicfg_get_ntbridge_child_range(dev_info_t *, uint64_t *,
 				uint64_t *, uint_t);
 static int pcicfg_is_ntbridge(dev_info_t *);
@@ -303,15 +278,6 @@ static uint64_t pcicfg_unused_space(hole_t *, uint32_t *);
 #define	PCICFG_DUMP_COMMON_CONFIG(handle)
 #define	PCICFG_DUMP_DEVICE_CONFIG(handle)
 #define	PCICFG_DUMP_BRIDGE_CONFIG(handle)
-#endif
-#ifdef	_EFCODE_WORKAROUND
-static int pcicfg_update_ethernet(dev_info_t *, void *);
-static int pcicfg_match_ethernet(dev_info_t *, void *);
-static void pcicfg_fix_ethernet(dev_info_t *);
-static int pcicfg_fcode_name(dev_info_t *, ddi_acc_handle_t, char *);
-static int pcicfg_fcode_compatible(dev_info_t *, ddi_acc_handle_t, char *);
-static int pcicfg_alarm_card(dev_info_t *dip);
-static int pcicfg_create_ac_child(dev_info_t *dip);
 #endif
 
 static kmutex_t pcicfg_list_mutex; /* Protects the probe handle list */
@@ -532,9 +498,6 @@ _init()
 {
 	DEBUG0(" PCI configurator installed\n");
 	mutex_init(&pcicfg_list_mutex, NULL, MUTEX_DRIVER, NULL);
-#if defined(__sparc)
-		pcicfg_do_legacy_props = 0;
-#endif
 	return (mod_install(&modlinkage));
 }
 
@@ -601,7 +564,7 @@ pcicfg_configure(dev_info_t *devi, uint_t device)
 	attach_point = devi;
 
 	ndi_devi_enter(devi, &circ);
-	for (func = 0; func < PCICFG_MAX_FUNCTION; func++) {
+	for (func = 0; func < PCI_MAX_FUNCTIONS; func++) {
 
 		DEBUG3("Configuring [0x%x][0x%x][0x%x]\n", bus, device, func);
 
@@ -667,9 +630,6 @@ pcicfg_configure(dev_info_t *devi, uint_t device)
 			if (rc == PCICFG_FAILURE)
 				goto cleanup;
 		}
-#ifdef	_EFCODE_WORKAROUND
-		(void) pcicfg_fix_ethernet(new_device);
-#endif
 	}
 
 	ndi_devi_exit(devi, circ);
@@ -686,7 +646,7 @@ cleanup:
 	 * probe state.
 	 */
 
-	for (func = 0; func < PCICFG_MAX_FUNCTION; func++) {
+	for (func = 0; func < PCI_MAX_FUNCTIONS; func++) {
 		if ((new_device = pcicfg_devi_find(devi,
 			device, func)) == NULL) {
 			continue;
@@ -806,7 +766,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 		max_devs = 0;
 		rc = PCICFG_FAILURE;
 	} else
-		max_devs = PCICFG_MAX_DEVICE;
+		max_devs = PCI_MAX_DEVICES;
 
 	/* Probe devices on 2nd bus */
 	for (devno = pcicfg_start_devno; devno < max_devs; devno++) {
@@ -1327,34 +1287,6 @@ pcicfg_ntbridge_child(dev_info_t *dip)
 	return (DDI_SUCCESS);
 }
 
-/*
- * this function is called only for SPARC platforms, where we may have
- * a mix n' match of direct vs indirectly mapped configuration space.
- * On x86, this function does not get called. We always return TRUE
- * via a macro for x86.
- */
-/*ARGSUSED*/
-static int
-pcicfg_indirect_map(dev_info_t *dip)
-{
-#if defined(__sparc)
-	int rc = DDI_FAILURE;
-
-	if (ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip), 0,
-			PCI_DEV_CONF_MAP_PROP, DDI_FAILURE) != DDI_FAILURE)
-		rc = DDI_SUCCESS;
-	else
-		if (ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip),
-		    0, PCI_BUS_CONF_MAP_PROP,
-		    DDI_FAILURE) != DDI_FAILURE)
-			rc = DDI_SUCCESS;
-
-	return (rc);
-#else
-	return (DDI_SUCCESS);
-#endif
-}
-
 static uint_t
 pcicfg_get_ntbridge_child_range(dev_info_t *dip, uint64_t *boundbase,
 				uint64_t *boundlen, uint_t space_type)
@@ -1427,7 +1359,7 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device)
 	 * Cycle through devices to make sure none are busy.
 	 * If a single device is busy fail the whole unconfigure.
 	 */
-	for (func = 0; func < PCICFG_MAX_FUNCTION; func++) {
+	for (func = 0; func < PCI_MAX_FUNCTIONS; func++) {
 		if ((child_dip = pcicfg_devi_find(devi, device, func)) == NULL)
 			continue;
 
@@ -1459,7 +1391,7 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device)
 	/*
 	 * Now, tear down all devinfo nodes for this AP.
 	 */
-	for (func = 0; func < PCICFG_MAX_FUNCTION; func++) {
+	for (func = 0; func < PCI_MAX_FUNCTIONS; func++) {
 		if ((child_dip = pcicfg_devi_find(devi,
 			device, func)) == NULL) {
 			DEBUG2("No device at %x,%x\n", device, func);
@@ -3063,6 +2995,7 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 
 	return (PCICFG_SUCCESS);
 }
+
 static int
 pcicfg_set_busnode_props(dev_info_t *dip, uint8_t pcie_device_type)
 {
@@ -3103,9 +3036,6 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	int		i;
 	int		n;
 	uint16_t		sub_vid, sub_sid, vid, did;
-#ifdef _EFCODE_WORKAROUND
-	char		nmbuffer[32];
-#endif
 	/* set the property prefix based on the device type */
 	if (pcie_dev) {
 		(void) sprintf(pprefix, "pciex");
@@ -3113,12 +3043,9 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 		(void) sprintf(pprefix, "pci");
 
 	/* set the prefix right for name property */
-#if defined(__sparc)
-	(void) sprintf(nprefix, pprefix);
-#else
 	/* x86 platforms need to go with pci for upgrade purposes */
 	(void) sprintf(nprefix, "pci");
-#endif
+
 	/*
 	 * NOTE: These are for both a child and PCI-PCI bridge node
 	 */
@@ -3153,11 +3080,6 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 		name = buffer;
 	}
 #endif
-#ifdef _EFCODE_WORKAROUND
-	if (pcicfg_fcode_name(dip, config_handle, nmbuffer) ==
-								DDI_SUCCESS)
-		name = nmbuffer;
-#endif
 
 	/*
 	 * The node name field needs to be filled in with the name
@@ -3172,13 +3094,6 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	 * to strings.  Start with the buffer created above.
 	 */
 	n = 0;
-#ifdef _EFCODE_WORKAROUND
-	if (pcicfg_fcode_compatible(dip, config_handle, nmbuffer) ==
-								DDI_SUCCESS) {
-		compat[n] = kmem_alloc(strlen(nmbuffer) + 1, KM_SLEEP);
-		(void) strcpy(compat[n++], nmbuffer);
-	}
-#endif
 
 	/*
 	 * Setup 'compatible' as per the PCI2.1 bindings document.
@@ -3682,8 +3597,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	bzero((caddr_t)&req, sizeof (ndi_ra_request_t));
 	req.ra_flags = (NDI_RA_ALLOC_BOUNDED | NDI_RA_ALLOC_PARTIAL_OK);
 	req.ra_boundbase = 0;
-	req.ra_boundlen = PCICFG_MAX_BUS_DEPTH;
-	req.ra_len = PCICFG_MAX_BUS_DEPTH;
+	req.ra_boundlen = req.ra_len = (PCI_MAX_BUS_NUM -1);
 	req.ra_align_mask = 0;  /* no alignment needed */
 
 	rval = ndi_ra_alloc(ddi_get_parent(new_child), &req,
@@ -4041,8 +3955,8 @@ pf_setup_end:
 	 */
 	DEBUG0("Bridge Programming Complete - probe children\n");
 	ndi_devi_enter(new_child, &count);
-	for (i = 0; i < PCICFG_MAX_DEVICE; i++) {
-		for (j = 0; j < PCICFG_MAX_FUNCTION; j++) {
+	for (i = 0; i < PCI_MAX_DEVICES; i++) {
+		for (j = 0; j < PCI_MAX_FUNCTIONS; j++) {
 			if ((rval = pcicfg_probe_children(new_child,
 					new_bus, i, j, highest_bus))
 							!= PCICFG_SUCCESS) {
@@ -4456,7 +4370,6 @@ pcicfg_reparent_node(dev_info_t *child, dev_info_t *parent)
 /*
  * Return PCICFG_SUCCESS if device exists at the specified address.
  * Return PCICFG_NODEVICE is no device exists at the specified address.
- *
  */
 int
 pcicfg_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle)
@@ -4469,13 +4382,6 @@ pcicfg_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle)
 	pci_regspec_t	*reg;
 	int		ret = DDI_SUCCESS;
 	int16_t		tmp;
-	/*
-	 * flags = PCICFG_CONF_INDIRECT_MAP if configuration space is indirectly
-	 * mapped, otherwise it is 0. "flags" is introduced in support of any
-	 * non transparent bridges, where configuration space is indirectly
-	 * mapped.
-	 */
-	int	flags = 0;
 
 	/*
 	 * Get the pci register spec from the node
@@ -4495,12 +4401,7 @@ pcicfg_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle)
 	}
 
 	anode = dip;
-
-	if (pcicfg_indirect_map(anode) == DDI_SUCCESS)
-		flags |= PCICFG_CONF_INDIRECT_MAP;
-
-	DEBUG3("conf_map: flags = %d, dip=%llx, anode=%llx\n",
-						flags, dip, anode);
+	DEBUG2("conf_map: dip=%p, anode=%p\n", dip, anode);
 
 	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
 	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
@@ -4513,31 +4414,22 @@ pcicfg_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle)
 		return (PCICFG_FAILURE);
 	}
 
-	if (flags & PCICFG_CONF_INDIRECT_MAP) {
-		/*
-		 * need to use DDI interfaces as the conf space is
-		 * cannot be directly accessed by the host.
-		 */
-		tmp = (int16_t)ddi_get16(*handle, (uint16_t *)cfgaddr);
+	/*
+	 * need to use DDI interfaces as the conf space is
+	 * cannot be directly accessed by the host.
+	 */
+	tmp = (int16_t)ddi_get16(*handle, (uint16_t *)cfgaddr);
+	if ((tmp == (int16_t)0xffff) || (tmp == -1)) {
+		DEBUG1("NO DEVICEFOUND, read %x\n", tmp);
+		ret = PCICFG_NODEVICE;
 	} else {
-		ret = ddi_peek16(anode, (int16_t *)cfgaddr, &tmp);
-	}
-	if (ret == DDI_SUCCESS) {
-		if ((tmp == (int16_t)0xffff) || (tmp == -1)) {
-			DEBUG1("NO DEVICEFOUND, read %x\n", tmp);
+		if (tmp == 0) {
+			DEBUG0("Device Not Ready yet ?");
 			ret = PCICFG_NODEVICE;
 		} else {
-			if (tmp == 0) {
-				DEBUG0("Device Not Ready yet ?");
-				ret = PCICFG_NODEVICE;
-			} else {
-				DEBUG1("DEVICEFOUND, read %x\n", tmp);
-				ret = PCICFG_SUCCESS;
-			}
+			DEBUG1("DEVICEFOUND, read %x\n", tmp);
+			ret = PCICFG_SUCCESS;
 		}
-	} else {
-		DEBUG0("ddi_peek failed, must be NODEVICE\n");
-		ret = PCICFG_NODEVICE;
 	}
 
 	if (ret == PCICFG_NODEVICE)
@@ -4578,306 +4470,6 @@ debug(char *fmt, uintptr_t a1, uintptr_t a2, uintptr_t a3,
 }
 #endif
 
-#ifdef _EFCODE_WORKAROUND
-static int
-pcicfg_update_ethernet(dev_info_t *dip, void *hdl)
-{
-	char *string = (char *)hdl;
-	uint_t length;
-	int *vendor_id;
-	int *device_id;
-
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY,
-		dip, DDI_PROP_DONTPASS,
-		"vendor-id", &vendor_id,
-		&length) != DDI_PROP_SUCCESS) {
-		return (DDI_WALK_TERMINATE);
-	}
-
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY,
-		dip, DDI_PROP_DONTPASS,
-		"device-id", &device_id,
-		&length) != DDI_PROP_SUCCESS) {
-		ddi_prop_free(vendor_id);
-		return (DDI_WALK_TERMINATE);
-	}
-
-	/*
-	 * Change the name of the "ethernet" node appropriately
-	 */
-	if (*vendor_id == 0x108e && *device_id == 0x1001) {
-		(void) ndi_devi_set_nodename(dip, string, 0);
-	}
-
-	/*
-	 * free the memory allocated by ddi_prop_lookup_int_array
-	 */
-	ddi_prop_free(vendor_id);
-	ddi_prop_free(device_id);
-
-	/*
-	 * continue the walk to the next sibling
-	 */
-	return (DDI_WALK_CONTINUE);
-}
-
-static int
-pcicfg_match_ethernet(dev_info_t *dip, void *hdl)
-{
-	int *count = (int *)hdl;
-	uint_t length;
-	int *vendor_id;
-	int *device_id;
-
-	length = 0;
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY,
-		dip, DDI_PROP_DONTPASS,
-		"vendor-id", &vendor_id,
-		&length) != DDI_PROP_SUCCESS) {
-		*count = 0;
-		return (DDI_WALK_TERMINATE);
-	}
-
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY,
-		dip, DDI_PROP_DONTPASS,
-		"device-id", &device_id,
-		&length) != DDI_PROP_SUCCESS) {
-		*count = 0;
-		ddi_prop_free(vendor_id);
-		return (DDI_WALK_TERMINATE);
-	}
-
-	/*
-	 * Keep a running tally of ethernet devices found.
-	 */
-	if (*vendor_id == 0x108e &&
-		(*device_id == 0x1001)) {
-		*count += 1;
-	}
-
-	/*
-	 * free the memory allocated by ddi_prop_lookup_int_array
-	 */
-	ddi_prop_free(vendor_id);
-	ddi_prop_free(device_id);
-
-	/*
-	 * continue the walk to the next sibling
-	 */
-	return (DDI_WALK_CONTINUE);
-}
-
-static void
-pcicfg_fix_ethernet(dev_info_t *dip)
-{
-	int number;
-	static char buffer[16];
-	dev_info_t *parent;
-	int circular;
-
-	number = 0;
-	/*
-	 * Walk the device nodes below the attach point
-	 * and count the number of ethernet devices.
-	 */
-	if ((parent = ddi_get_parent(dip)) != NULL)
-		ndi_devi_enter(parent, &circular);
-	ddi_walk_devs(dip, pcicfg_match_ethernet, (void *)&number);
-	if (parent)
-		ndi_devi_exit(parent, circular);
-
-	if (number > 1) {
-		(void) strncpy(buffer, "SUNW,qfe", 8);
-	} else if (number) {
-		(void) strncpy(buffer, "SUNW,hme", 8);
-	} else {
-		return;
-	}
-
-	if (parent)
-		ndi_devi_enter(parent, &circular);
-	ddi_walk_devs(dip, pcicfg_update_ethernet, (void *)buffer);
-	if (parent)
-		ndi_devi_exit(parent, circular);
-}
-
-/*
- * Called from pcicfg_set_childnode_props(), this functions returns
- * the value of FCode "name" property for a list of FCode devices
- * that we support currently, whose name property is not as per the 1275
- * PCI bindings.
- * Up until the FCode interpreter is available, any special hacks for a
- * a given node may have to be put here.
- */
-/*ARGSUSED*/
-static int
-pcicfg_fcode_name(dev_info_t *dip, ddi_acc_handle_t config_handle, char *buffer)
-{
-	uint16_t sub_vid, sub_sid, vid, did;
-	dev_info_t *pdip;
-	int rc = DDI_FAILURE;
-
-	vid = pci_config_get16(config_handle, PCI_CONF_VENID),
-	did = pci_config_get16(config_handle, PCI_CONF_DEVID);
-	sub_vid = pci_config_get16(config_handle, PCI_CONF_SUBVENID),
-	sub_sid = pci_config_get16(config_handle, PCI_CONF_SUBSYSID);
-
-	/*
-	 * If the driver binding is based on subsystem vendor id and
-	 * subsystem Id via the 'name' property, then place the
-	 * binding entry here and set rc=DDI_SUCCESS so that we do
-	 * not proceed to the next switch loop.
-	 */
-	switch (sub_sid | (sub_vid << 16)) {
-		default:
-			break;
-	}
-	if (rc == DDI_SUCCESS)
-		return (rc);
-
-	/*
-	 * If we got here, then the driver binding is based on vendor id and
-	 * device Id via the 'name' property. So place the
-	 * binding entry here and set rc=DDI_SUCCESS.
-	 */
-	switch (did | (vid << 16)) {
-		case 0x10772200:
-			(void) strcpy(buffer, "SUNW,qlc");
-			rc = DDI_SUCCESS;
-			break;
-		case 0x108e1001:
-			/* default name is hme, change later to qfe if reqd. */
-			(void) strcpy(buffer, "SUNW,hme");
-			rc = DDI_SUCCESS;
-			break;
-		case 0x10771020:
-			(void) strcpy(buffer, "SUNW,isptwo");
-			rc = DDI_SUCCESS;
-			break;
-		case 0x108e1000:
-			pdip = ddi_get_parent(ddi_get_parent(dip));
-
-			if ((ddi_root_node() != ddi_get_parent(pdip)) &&
-				(ddi_root_node() !=
-				ddi_get_parent(ddi_get_parent(pdip)))) {
-				if (pcicfg_alarm_card(pdip) == DDI_SUCCESS) {
-					if (pcicfg_create_ac_child(dip)
-							== DDI_SUCCESS) {
-						(void) strcpy(buffer, "ebus");
-						rc = DDI_SUCCESS;
-					}
-				}
-			}
-			break;
-		case 0x108e7777:
-			/* ATM device is SUNW,ma */
-			(void) strcpy(buffer, "SUNW,ma");
-			rc = DDI_SUCCESS;
-			break;
-		default:
-			break;
-	}
-	return (rc);
-}
-
-/*
- * Called from pcicfg_set_childnode_props(), this functions returns
- * the value of FCode "compatible" property for a list of FCode devices
- * that we support currently, whose compatible property is not as per the 1275
- * PCI bindings.
- * Up until the FCode interpreter is available, any special workarounds for a
- * a given node may have to be put here.
- */
-/*ARGSUSED*/
-static int
-pcicfg_fcode_compatible(dev_info_t *dip, ddi_acc_handle_t config_handle,
-			char *buffer)
-{
-	uint16_t sub_vid, sub_sid, vid, did;
-	dev_info_t *pdip;
-	int rc = DDI_FAILURE;
-
-	vid = pci_config_get16(config_handle, PCI_CONF_VENID),
-	did = pci_config_get16(config_handle, PCI_CONF_DEVID);
-	sub_vid = pci_config_get16(config_handle, PCI_CONF_SUBVENID),
-	sub_sid = pci_config_get16(config_handle, PCI_CONF_SUBSYSID);
-
-	/*
-	 * If the driver binding is based on subsystem vendor id and
-	 * subsystem Id via the 'compatible' property, then place the
-	 * binding entry here and set rc=DDI_SUCCESS so that we do
-	 * not proceed to the next switch loop.
-	 */
-	switch (sub_sid | (sub_vid << 16)) {
-		default:
-			break;
-	}
-	if (rc == DDI_SUCCESS)
-		return (rc);
-
-	/*
-	 * If we got here, then the driver binding is based on vendor id and
-	 * device Id via the 'compatible' property. So place the
-	 * binding entry here and set rc=DDI_SUCCESS.
-	 */
-	switch (did | (vid << 16)) {
-		case 0x108e1000:
-			pdip = ddi_get_parent(ddi_get_parent(dip));
-
-			if ((ddi_root_node() != ddi_get_parent(pdip)) &&
-				(ddi_root_node() !=
-				ddi_get_parent(ddi_get_parent(pdip)))) {
-				if (pcicfg_alarm_card(pdip) == DDI_SUCCESS) {
-					(void) strcpy(buffer, "acebus");
-					rc = DDI_SUCCESS;
-				}
-			}
-			break;
-		default:
-			break;
-	}
-	return (rc);
-}
-
-static int
-pcicfg_alarm_card(dev_info_t *dip)
-{
-	uint16_t sub_vid, sub_sid;
-	int rc = DDI_FAILURE;
-	ddi_acc_handle_t config_handle;
-
-	if (pci_config_setup(dip, &config_handle) != DDI_SUCCESS)
-		return (DDI_FAILURE);
-	sub_vid = pci_config_get16(config_handle, PCI_CONF_SUBVENID),
-	sub_sid = pci_config_get16(config_handle, PCI_CONF_SUBSYSID);
-	if ((sub_vid == 0x108e) && (sub_sid == 0x6722))
-		rc = DDI_SUCCESS;
-	pci_config_teardown(&config_handle);
-	return (rc);
-}
-
-static int
-pcicfg_create_ac_child(dev_info_t *dip)
-{
-	dev_info_t	*cdip;
-	char		*compat[1];
-
-	ndi_devi_alloc_sleep(dip, "se", (pnode_t)DEVI_SID_NODEID, &cdip);
-	compat[0] = kmem_alloc(strlen("acse") + 1, KM_SLEEP);
-	(void) strcpy(compat[0], "acse");
-	if (ndi_prop_update_string_array(DDI_DEV_T_NONE, cdip,
-		"compatible", (char **)compat, 1) != DDI_SUCCESS) {
-
-		DEBUG0("pcicfg: Failed to set ac child compatibles\n");
-		(void) ndi_devi_free(cdip);
-		return (DDI_FAILURE);
-	}
-	kmem_free(compat[0], strlen("acse") + 1);
-	(void) i_ndi_config_node(cdip, DS_LINKED, 0);
-	return (DDI_SUCCESS);
-}
-#endif /* _EFCODE_WORKAROUND */
-
 /*
  * given a cap_id, return its cap_id location in config space
  */
@@ -4895,7 +4487,7 @@ pcicfg_get_cap(ddi_acc_handle_t config_handle, uint8_t cap_id)
 	 * offset could change. Should support type 1 next.
 	 */
 	status = pci_config_get16(config_handle, PCI_CONF_STAT);
-	if (!(status & PCI_STAT_ECP_SUPP)) {
+	if (!(status & PCI_STAT_CAP)) {
 		return (-1);
 	}
 	cap_id_loc = pci_config_get8(config_handle, PCI_CONF_CAP_PTR);
