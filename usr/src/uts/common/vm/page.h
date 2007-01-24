@@ -753,6 +753,9 @@ int	page_unretire(uint64_t);
 int	page_unretire_pp(page_t *, int);
 void	page_tryretire(page_t *);
 void	page_retire_mdboot();
+uint64_t	page_retire_pend_count(void);
+void	page_retire_incr_pend_count(void);
+void	page_retire_decr_pend_count(void);
 void	page_clrtoxic(page_t *, uchar_t);
 void	page_settoxic(page_t *, uchar_t);
 

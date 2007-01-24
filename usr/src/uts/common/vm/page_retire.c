@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -814,6 +814,28 @@ pr_list_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 	mutex_exit(vphm);
 
 	return (0);
+}
+
+/*
+ * page_retire_pend_count -- helper function for page_capture_thread,
+ * returns the number of pages pending retirement.
+ */
+uint64_t
+page_retire_pend_count(void)
+{
+	return (PR_KSTAT_PENDING);
+}
+
+void
+page_retire_incr_pend_count(void)
+{
+	PR_INCR_KSTAT(pr_pending);
+}
+
+void
+page_retire_decr_pend_count(void)
+{
+	PR_DECR_KSTAT(pr_pending);
 }
 
 /*

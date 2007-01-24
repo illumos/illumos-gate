@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -869,6 +869,51 @@ seg_p_mem_config_post_add(
 	/* Nothing to do. */
 }
 
+void
+seg_p_enable(void)
+{
+	mutex_enter(&seg_pcache);
+	ASSERT(seg_pdisable != 0);
+	seg_pdisable--;
+	mutex_exit(&seg_pcache);
+}
+
+/*
+ * seg_p_disable - disables seg_pcache, and then attempts to empty the
+ * cache.
+ * Returns SEGP_SUCCESS if the cache was successfully emptied, or
+ * SEGP_FAIL if the cache could not be emptied.
+ */
+int
+seg_p_disable(void)
+{
+	pgcnt_t	old_plocked;
+	int stall_count = 0;
+
+	mutex_enter(&seg_pcache);
+	seg_pdisable++;
+	ASSERT(seg_pdisable != 0);
+	mutex_exit(&seg_pcache);
+
+	/*
+	 * Attempt to empty the cache. Terminate if seg_plocked does not
+	 * diminish with SEGP_STALL_THRESHOLD consecutive attempts.
+	 */
+	while (seg_plocked != 0) {
+		old_plocked = seg_plocked;
+		seg_ppurge_all(1);
+		if (seg_plocked == old_plocked) {
+			if (stall_count++ > SEGP_STALL_THRESHOLD) {
+				return (SEGP_FAIL);
+			}
+		} else
+			stall_count = 0;
+		if (seg_plocked != 0)
+			delay(hz/SEGP_PREDEL_DELAY_FACTOR);
+	}
+	return (SEGP_SUCCESS);
+}
+
 /*
  * Attempt to purge seg_pcache.  May need to return before this has
  * completed to allow other pre_del callbacks to unlock pages. This is
@@ -889,32 +934,9 @@ seg_p_mem_config_pre_del(
 	void *arg,
 	pgcnt_t delta_pages)
 {
-	pgcnt_t	old_plocked;
-	int stall_count = 0;
-
-	mutex_enter(&seg_pcache);
-	seg_pdisable++;
-	ASSERT(seg_pdisable != 0);
-	mutex_exit(&seg_pcache);
-
-	/*
-	 * Attempt to empty the cache. Terminate if seg_plocked does not
-	 * diminish with SEGP_STALL_THRESHOLD consecutive attempts.
-	 */
-	while (seg_plocked != 0) {
-		old_plocked = seg_plocked;
-		seg_ppurge_all(1);
-		if (seg_plocked == old_plocked) {
-			if (stall_count++ > SEGP_STALL_THRESHOLD) {
-				cmn_err(CE_NOTE, "!Pre-delete couldn't purge"
-					" pagelock cache - continuing");
-				break;
-			}
-		} else
-			stall_count = 0;
-		if (seg_plocked != 0)
-			delay(hz/SEGP_PREDEL_DELAY_FACTOR);
-	}
+	if (seg_p_disable() != SEGP_SUCCESS)
+		cmn_err(CE_NOTE,
+		    "!Pre-delete couldn't purge"" pagelock cache - continuing");
 	return (0);
 }
 
@@ -925,10 +947,7 @@ seg_p_mem_config_post_del(
 	pgcnt_t delta_pages,
 	int cancelled)
 {
-	mutex_enter(&seg_pcache);
-	ASSERT(seg_pdisable != 0);
-	seg_pdisable--;
-	mutex_exit(&seg_pcache);
+	seg_p_enable();
 }
 
 static kphysm_setup_vector_t seg_p_mem_config_vec = {

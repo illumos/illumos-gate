@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,6 +161,8 @@ extern	struct	page **seg_plookup(struct seg *seg, caddr_t addr,
 			size_t len, enum seg_rw rw);
 extern	void	seg_pasync_thread(void);
 extern	void	seg_preap(void);
+extern	int	seg_p_disable(void);
+extern	void	seg_p_enable(void);
 
 extern	int	seg_preapahead;
 extern	segadvstat_t  segadvstat;

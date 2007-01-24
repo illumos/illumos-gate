@@ -58,7 +58,7 @@
 /*
  * # pages used for spt
  */
-static size_t	spt_used;
+size_t	spt_used;
 
 /*
  * segspt_minfree is the memory left for system after ISM

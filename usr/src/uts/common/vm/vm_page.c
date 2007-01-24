@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,8 @@
 #include <vm/vm_dep.h>
 #include <sys/vm_usage.h>
 #include <fs/fs_subr.h>
+#include <sys/ddi.h>
+#include <sys/modctl.h>
 
 static int nopageage = 0;
 
@@ -6423,6 +6425,7 @@ kcondvar_t pc_cv;
 static kmutex_t pc_thread_mutex;
 static clock_t pc_thread_shortwait;
 static clock_t pc_thread_longwait;
+static int pc_thread_ism_retry;
 
 struct page_capture_callback pc_cb[PC_NUM_CALLBACKS];
 
@@ -6672,6 +6675,9 @@ page_capture_add_hash(page_t *pp, uint_t szc, uint_t flags, void *datap)
 		bp1->next->prev = bp1;
 		page_capture_hash[index].lists[0].next = bp1;
 		page_capture_hash[index].num_pages++;
+		if (flags & CAPTURE_RETIRE) {
+			page_retire_incr_pend_count();
+		}
 		mutex_exit(&page_capture_hash[index].pchh_mutex);
 		rw_exit(&pc_cb[cb_index].cb_rwlock);
 		cv_signal(&pc_cv);
@@ -6696,6 +6702,7 @@ page_capture_add_hash(page_t *pp, uint_t szc, uint_t flags, void *datap)
 			if (bp2->pp == pp) {
 				if (flags & CAPTURE_RETIRE) {
 					if (!(bp2->flags & CAPTURE_RETIRE)) {
+						page_retire_incr_pend_count();
 						bp2->flags = flags;
 						bp2->expires = bp1->expires;
 						bp2->datap = datap;
@@ -7043,6 +7050,9 @@ page_capture_take_action(page_t *pp, uint_t flags, void *datap)
 	 */
 	if (ret >= 0) {
 		if (found) {
+			if (bp1->flags & CAPTURE_RETIRE) {
+				page_retire_decr_pend_count();
+			}
 			kmem_free(bp1, sizeof (*bp1));
 		}
 		return (ret);
@@ -7316,6 +7326,7 @@ page_capture_init()
 
 	pc_thread_shortwait = 23 * hz;
 	pc_thread_longwait = 1201 * hz;
+	pc_thread_ism_retry = 3;
 	mutex_init(&pc_thread_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&pc_cv, NULL, CV_DEFAULT, NULL);
 	pc_thread_id = thread_create(NULL, 0, page_capture_thread, NULL, 0, &p0,
@@ -7440,6 +7451,106 @@ page_capture_async()
 }
 
 /*
+ * This function is called by the page_capture_thread, and is needed in
+ * in order to initiate aio cleanup, so that pages used in aio
+ * will be unlocked and subsequently retired by page_capture_thread.
+ */
+static int
+do_aio_cleanup(void)
+{
+	proc_t *procp;
+	int (*aio_cleanup_dr_delete_memory)(proc_t *);
+	int cleaned = 0;
+
+	if (modload("sys", "kaio") == -1) {
+		cmn_err(CE_WARN, "do_aio_cleanup: cannot load kaio");
+		return (0);
+	}
+	/*
+	 * We use the aio_cleanup_dr_delete_memory function to
+	 * initiate the actual clean up; this function will wake
+	 * up the per-process aio_cleanup_thread.
+	 */
+	aio_cleanup_dr_delete_memory = (int (*)(proc_t *))
+	    modgetsymvalue("aio_cleanup_dr_delete_memory", 0);
+	if (aio_cleanup_dr_delete_memory == NULL) {
+		cmn_err(CE_WARN,
+	    "aio_cleanup_dr_delete_memory not found in kaio");
+		return (0);
+	}
+	mutex_enter(&pidlock);
+	for (procp = practive; (procp != NULL); procp = procp->p_next) {
+		mutex_enter(&procp->p_lock);
+		if (procp->p_aio != NULL) {
+			/* cleanup proc's outstanding kaio */
+			cleaned += (*aio_cleanup_dr_delete_memory)(procp);
+		}
+		mutex_exit(&procp->p_lock);
+	}
+	mutex_exit(&pidlock);
+	return (cleaned);
+}
+
+/*
+ * helper function for page_capture_thread
+ */
+static void
+page_capture_handle_outstanding(void)
+{
+	extern size_t spt_used;
+	int ntry;
+
+	if (!page_retire_pend_count()) {
+		/*
+		 * Do we really want to be this aggressive
+		 * for things other than page_retire?
+		 * Maybe have a counter for each callback
+		 * type to guide how aggressive we should
+		 * be here.  Thus if there's at least one
+		 * page for page_retire we go ahead and reap
+		 * like this.
+		 */
+		kmem_reap();
+		seg_preap();
+		page_capture_async();
+	} else {
+		/*
+		 * There are pages pending retirement, so
+		 * we reap prior to attempting to capture.
+		 */
+		kmem_reap();
+		/*
+		 * When ISM is in use, we need to disable and
+		 * purge the seg_pcache, and initiate aio
+		 * cleanup in order to release page locks and
+		 * subsquently retire pages in need of
+		 * retirement.
+		 */
+		if (spt_used) {
+			/* disable and purge seg_pcache */
+			(void) seg_p_disable();
+			for (ntry = 0; ntry < pc_thread_ism_retry; ntry++) {
+				if (!page_retire_pend_count())
+					break;
+				if (do_aio_cleanup()) {
+					/*
+					 * allow the apps cleanup threads
+					 * to run
+					 */
+					delay(pc_thread_shortwait);
+				}
+				page_capture_async();
+			}
+			/* reenable seg_pcache */
+			seg_p_enable();
+		} else {
+			seg_preap();
+			page_capture_async();
+		}
+	}
+}
+
+/*
  * The page_capture_thread loops forever, looking to see if there are
  * pages still waiting to be captured.
  */
@@ -7458,17 +7569,7 @@ page_capture_thread(void)
 		for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++)
 			outstanding += page_capture_hash[i].num_pages;
 		if (outstanding) {
-			/*
-			 * Do we really want to be this aggressive for things
-			 * other than page_retire?
-			 * Maybe have a counter for each callback type to
-			 * guide how aggressive we should be here.
-			 * Thus if there's at least one page for page_retire
-			 * we go ahead and reap like this.
-			 */
-			kmem_reap();
-			seg_preap();
-			page_capture_async();
+			page_capture_handle_outstanding();
 			CALLB_CPR_SAFE_BEGIN(&c);
 			(void) cv_timedwait(&pc_cv, &pc_thread_mutex,
 			    lbolt + pc_thread_shortwait);
