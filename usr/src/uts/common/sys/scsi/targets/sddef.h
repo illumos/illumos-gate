@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -494,7 +494,8 @@ struct sd_lun {
 	    un_f_wcc_inprog		:1,	/* write cache change in */
 						/* progress */
 	    un_f_capacity_adjusted	:1,	/* for 1TB disk & off-by-1 */
-	    un_f_reserved		:13;
+	    un_f_ejecting		:1,	/* media is ejecting */
+	    un_f_reserved		:12;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;

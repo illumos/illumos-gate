@@ -19198,6 +19198,20 @@ sd_send_scsi_DOORLOCK(struct sd_lun *un, int flag, int path_flag)
 		return (0);
 	}
 
+	/*
+	 * If we are ejecting and see an SD_REMOVAL_PREVENT
+	 * ignore the command so we can complete the eject
+	 * operation.
+	 */
+	if (flag == SD_REMOVAL_PREVENT) {
+		mutex_enter(SD_MUTEX(un));
+		if (un->un_f_ejecting == TRUE) {
+			mutex_exit(SD_MUTEX(un));
+			return (EAGAIN);
+		}
+		mutex_exit(SD_MUTEX(un));
+	}
+
 	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 
@@ -19645,6 +19659,20 @@ sd_send_scsi_START_STOP_UNIT(struct sd_lun *un, int flag, int path_flag)
 	    ((flag == SD_TARGET_START) || (flag == SD_TARGET_STOP)) &&
 	    (un->un_f_start_stop_supported != TRUE)) {
 		return (0);
+	}
+
+	/*
+	 * If we are performing an eject operation and
+	 * we receive any command other than SD_TARGET_EJECT
+	 * we should immediately return.
+	 */
+	if (flag != SD_TARGET_EJECT) {
+		mutex_enter(SD_MUTEX(un));
+		if (un->un_f_ejecting == TRUE) {
+			mutex_exit(SD_MUTEX(un));
+			return (EAGAIN);
+		}
+		mutex_exit(SD_MUTEX(un));
 	}
 
 	bzero(&cdb, sizeof (cdb));
@@ -29114,8 +29142,29 @@ sr_eject(dev_t dev)
 	    (un->un_state == SD_STATE_OFFLINE)) {
 		return (ENXIO);
 	}
+
+	/*
+	 * To prevent race conditions with the eject
+	 * command, keep track of an eject command as
+	 * it progresses. If we are already handling
+	 * an eject command in the driver for the given
+	 * unit and another request to eject is received
+	 * immediately return EAGAIN so we don't lose
+	 * the command if the current eject command fails.
+	 */
+	mutex_enter(SD_MUTEX(un));
+	if (un->un_f_ejecting == TRUE) {
+		mutex_exit(SD_MUTEX(un));
+		return (EAGAIN);
+	}
+	un->un_f_ejecting = TRUE;
+	mutex_exit(SD_MUTEX(un));
+
 	if ((rval = sd_send_scsi_DOORLOCK(un, SD_REMOVAL_ALLOW,
 	    SD_PATH_STANDARD)) != 0) {
+		mutex_enter(SD_MUTEX(un));
+		un->un_f_ejecting = FALSE;
+		mutex_exit(SD_MUTEX(un));
 		return (rval);
 	}
 
@@ -29126,7 +29175,12 @@ sr_eject(dev_t dev)
 		mutex_enter(SD_MUTEX(un));
 		sr_ejected(un);
 		un->un_mediastate = DKIO_EJECTED;
+		un->un_f_ejecting = FALSE;
 		cv_broadcast(&un->un_state_cv);
+		mutex_exit(SD_MUTEX(un));
+	} else {
+		mutex_enter(SD_MUTEX(un));
+		un->un_f_ejecting = FALSE;
 		mutex_exit(SD_MUTEX(un));
 	}
 	return (rval);
