@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -106,11 +106,11 @@ warlock.audio:
 	@cd ../mixer; make clean; $(MAKE) warlock
 	@cd $(CLOSED)/uts/intel/amsrc1; make clean; $(MAKE) warlock
 	@cd ../amsrc2; make clean; $(MAKE) warlock
-	@cd ../../i86pc/audio810; make clean; $(MAKE) warlock
-	@cd ../../i86pc/audiohd; make clean; $(MAKE) warlock
-	@cd ../../i86pc/audioixp; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/i86pc/audiovia823x; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/i86pc/audioens; make clean; $(MAKE) warlock
+	@cd ../../intel/audio810; make clean; $(MAKE) warlock
+	@cd ../../intel/audiohd; make clean; $(MAKE) warlock
+	@cd ../../intel/audioixp; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/intel/audiovia823x; make clean; $(MAKE) warlock
+	@cd $(CLOSED)/uts/intel/audioens; make clean; $(MAKE) warlock
 	@cd ../usb_ac; make clean; $(MAKE) warlock
 	@cd ../usb_as; make clean; $(MAKE) warlock
 	@cd ../usb_ah; make clean; $(MAKE) warlock
