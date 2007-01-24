@@ -464,9 +464,9 @@ libcmdutils:	libavl
 libcontract:	libnvpair
 libdevid:	libdevinfo
 libdevinfo:	libnvpair libsec
-libdhcpagent:	libdhcputil libnsl libsocket
+libdhcpagent:	libsocket libdhcputil libuuid libdlpi
 libdhcpsvc:	libinetutil
-libdhcputil:	libinetutil
+libdhcputil:	libnsl libgen libinetutil libdlpi
 libdladm:	libdlpi libdevinfo libwladm libinetutil
 libdtrace:	libproc libgen libctf
 libdtrace_jni:	libuutil libdtrace

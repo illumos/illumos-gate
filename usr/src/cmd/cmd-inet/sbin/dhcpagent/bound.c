@@ -1146,7 +1146,7 @@ configure_v4_lease(dhcp_smach_t *dsmp)
 		    lif->lif_name);
 	}
 
-	lif->lif_broadcast = inaddr.s_addr;
+	lif->lif_broadcast = sin->sin_addr.s_addr;
 	dhcpmsg(MSG_INFO,
 	    "configure_v4_lease: using broadcast address %s on %s",
 	    inet_ntoa(inaddr), lif->lif_name);

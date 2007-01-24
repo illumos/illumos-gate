@@ -1250,7 +1250,7 @@ sock_recvpkt(int fd, PKT_LIST *plp)
 {
 	struct iovec iov;
 	struct msghdr msg;
-	long ctrl[8192 / sizeof (long)];
+	int64_t ctrl[8192 / sizeof (int64_t)];
 	ssize_t msglen;
 
 	(void) memset(&iov, 0, sizeof (iov));
