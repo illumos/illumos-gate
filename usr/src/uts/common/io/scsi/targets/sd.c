@@ -4481,6 +4481,14 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 			return (EACCES);
 		case SD_CMD_FAILURE:
 			ASSERT(mutex_owned(SD_MUTEX(un)));
+			/*
+			 * A multisession audio cd can have an unreadable
+			 * fdisk sector, but there could be readable data
+			 * in a separate session. Accept this and let
+			 * the code build a default disk label later on.
+			 */
+			if (ISCD(un))
+				break;
 			return (ENOMEM);
 		}
 
@@ -4915,8 +4923,9 @@ sd_read_fdisk(struct sd_lun *un, uint_t capacity, int lbasize, int path_flag)
 	if (rval != 0) {
 		SD_ERROR(SD_LOG_ATTACH_DETACH, un,
 		    "sd_read_fdisk: fdisk read err\n");
-		kmem_free(bufp, blocksize);
-		return (SD_CMD_FAILURE);
+		bzero(un->un_fmap, sizeof (struct fmap) * FD_NUMPART);
+		rval = SD_CMD_FAILURE;
+		goto done;
 	}
 
 	mbp = (struct mboot *)bufp;
