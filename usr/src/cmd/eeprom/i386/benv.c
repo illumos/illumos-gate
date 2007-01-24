@@ -320,7 +320,7 @@ output_error_msg(const char *msg)
 }
 
 static char *
-get_bootadm_value(char *name)
+get_bootadm_value(char *name, const int quiet)
 {
 	char *ptr, *ret_str, *end_ptr, *orig_ptr;
 	char output[BUFSIZ];
@@ -340,7 +340,9 @@ get_bootadm_value(char *name)
 	}
 
 	if (exec_cmd(ptr, output, BUFSIZ) != 0) {
-		output_error_msg(output);
+		if (quiet == 0) {
+			output_error_msg(output);
+		}
 		return (NULL);
 	}
 
@@ -416,9 +418,9 @@ get_bootadm_value(char *name)
  * a message.
  */
 static void
-print_bootadm_value(char *name, int quiet)
+print_bootadm_value(char *name, const int quiet)
 {
-	char *value = get_bootadm_value(name);
+	char *value = get_bootadm_value(name, quiet);
 
 	if ((value != NULL) && (value[0] != '\0')) {
 		(void) printf("%s=%s\n", name, value);
@@ -497,7 +499,7 @@ set_bootadm_var(char *name, char *value)
 {
 	char buf[BUFSIZ];
 	char output[BUFSIZ] = "";
-	char *ptr, *console, *args;
+	char *console, *args;
 	int is_console;
 
 	if (verbose) {
@@ -509,7 +511,7 @@ set_bootadm_var(char *name, char *value)
 	 * For security, we single-quote whatever we run on the command line,
 	 * and we don't allow single quotes in the string.
 	 */
-	if ((ptr = strchr(value, '\'')) != NULL) {
+	if (strchr(value, '\'') != NULL) {
 		eeprom_error("Single quotes are not allowed "
 		    "in the %s property.\n", name);
 		return;
@@ -521,11 +523,11 @@ set_bootadm_var(char *name, char *value)
 		    "kernel='%s' 2>&1", value);
 	} else if (is_console || (strcmp(name, "boot-args") == 0)) {
 		if (is_console) {
-			args = get_bootadm_value("boot-args");
+			args = get_bootadm_value("boot-args", 1);
 			console = value;
 		} else {
 			args = value;
-			console = get_bootadm_value("console");
+			console = get_bootadm_value("console", 1);
 		}
 		if (((args == NULL) || (args[0] == '\0')) &&
 		    ((console == NULL) || (console[0] == '\0'))) {
