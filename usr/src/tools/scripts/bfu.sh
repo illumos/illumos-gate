@@ -4933,6 +4933,11 @@ mondo_loop() {
 	fi
 
 	#
+	# Remove old ndpd header (moved to /usr/include per 6509782)
+	#
+	rm -f $usr/include/protocols/ndpd.h
+
+	#
 	# Remove old FMA dictionary files
 	#
 	rm -f $usr/lib/fm/FMD.dict

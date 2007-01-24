@@ -107,6 +107,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	mqueue.h	\
 	nan.h		\
 	ndbm.h		\
+	ndpd.h		\
 	netconfig.h	\
 	netdb.h		\
 	netdir.h	\
@@ -309,7 +310,7 @@ $(LVMRPCHDRS:%.h=%.x)
 
 RPCSVCHDRS= $(RPCSVC_SRC_HDRS) $(RPCSVC_GEN_HDRS)
 
-PROTOHDRS=   dumprestore.h ndpd.h routed.h ripngd.h rwhod.h timed.h
+PROTOHDRS=   dumprestore.h routed.h ripngd.h rwhod.h timed.h
 
 ROOTHDRS= $(HDRS:%=$(ROOT)/usr/include/%)  \
 	$(KRB5HDRS:%=$(ROOT)/usr/include/kerberosv5/%)  \

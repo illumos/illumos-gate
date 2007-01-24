@@ -239,6 +239,7 @@ f none usr/include/mqueue.h 644 root bin
 f none usr/include/mtmalloc.h 644 root bin
 f none usr/include/nan.h 644 root bin
 f none usr/include/ndbm.h 644 root bin
+f none usr/include/ndpd.h 644 root bin
 d none usr/include/net 755 root bin
 f none usr/include/net/af.h 644 root bin
 f none usr/include/net/if.h 644 root bin
@@ -335,7 +336,6 @@ f none usr/include/prof_attr.h 644 root bin
 f none usr/include/project.h 644 root bin
 d none usr/include/protocols 755 root bin
 f none usr/include/protocols/dumprestore.h 644 root bin
-f none usr/include/protocols/ndpd.h 644 root bin
 f none usr/include/protocols/routed.h 644 root bin
 f none usr/include/protocols/rwhod.h 644 root bin
 f none usr/include/protocols/timed.h 644 root bin

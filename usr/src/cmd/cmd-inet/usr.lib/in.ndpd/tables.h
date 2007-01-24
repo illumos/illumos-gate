@@ -32,7 +32,7 @@
 extern "C" {
 #endif
 
-#include <protocols/ndpd.h>
+#include <ndpd.h>
 
 enum adv_states { NO_ADV = 0, REG_ADV, INIT_ADV, SOLICIT_ADV, FINAL_ADV };
 enum adv_events { ADV_OFF, START_INIT_ADV, START_FINAL_ADV, RECEIVED_SOLICIT,
