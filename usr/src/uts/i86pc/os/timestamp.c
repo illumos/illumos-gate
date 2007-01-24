@@ -442,14 +442,29 @@ dtrace_gethrtime(void)
 {
 	uint32_t old_hres_lock;
 	hrtime_t tsc, hrt;
+	int flags;
 
 	do {
 		old_hres_lock = hres_lock;
 
 		/*
+		 * Interrupts are disabled to ensure that the thread isn't
+		 * migrated between the tsc_read() and adding the CPU's
+		 * TSC tick delta.
+		 */
+		flags = clear_int_flag();
+
+		tsc = tsc_read();
+
+		if (gethrtimef == tsc_gethrtime_delta)
+			tsc += tsc_sync_tick_delta[CPU->cpu_id];
+
+		restore_int_flag(flags);
+
+		/*
 		 * See the comments in tsc_gethrtime(), above.
 		 */
-		if ((tsc = tsc_read()) >= tsc_last)
+		if (tsc >= tsc_last)
 			tsc -= tsc_last;
 		else if (tsc >= tsc_last - 2*tsc_max_delta)
 			tsc = 0;
@@ -480,9 +495,23 @@ dtrace_gethrtime(void)
 		old_hres_lock = shadow_hres_lock;
 
 		/*
+		 * Again, disable interrupts to ensure that the thread
+		 * isn't migrated between the tsc_read() and adding
+		 * the CPU's TSC tick delta.
+		 */
+		flags = clear_int_flag();
+
+		tsc = tsc_read();
+
+		if (gethrtimef == tsc_gethrtime_delta)
+			tsc += tsc_sync_tick_delta[CPU->cpu_id];
+
+		restore_int_flag(flags);
+
+		/*
 		 * See the comments in tsc_gethrtime(), above.
 		 */
-		if ((tsc = tsc_read()) >= shadow_tsc_last)
+		if (tsc >= shadow_tsc_last)
 			tsc -= shadow_tsc_last;
 		else if (tsc >= shadow_tsc_last - 2 * tsc_max_delta)
 			tsc = 0;
