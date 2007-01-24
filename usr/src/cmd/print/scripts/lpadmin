@@ -20,11 +20,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+set -o noclobber
+
 PATH=/bin:/usr/bin:/usr/sbin export PATH
 
 TEXTDOMAIN="SUNW_OST_OSCMD"
@@ -34,6 +36,7 @@ LPSET=/usr/bin/lpset
 LPGET=/usr/bin/lpget
 LPSTAT=/usr/bin/lpstat
 LPADMIN=/usr/lib/lp/local/lpadmin
+COMM=/usr/bin/comm
 
 HOST=$(/bin/uname -n)
 exit_code=0
@@ -48,21 +51,6 @@ usage() {
 	gettext "	lpadmin -M -f form-name [ -a [ -o filebreak ]\n" 1>&2
 	gettext "		[ -t tray-number ]]\n" 1>&2
 	exit 1
-}
-
-# echo names in ${1} that are not in ${2}
-missing() {
-	for i in ${1} ; do
-		MATCHED=0
-		for j in ${2} ; do
-			if [[ $i = $j ]] ; then
-				MATCHED=1
-			fi
-		done
-		if [[ $MATCHED == 0 ]] ; then
-			echo $i
-		fi
-	done
 }
 
 # create a filter table for LP service
@@ -85,24 +73,22 @@ lp_config_service() {	# (enable | disable)
 
 # synchronize printers.conf with LP configuration changes
 lp_config_sync_pconf() {	# (pre) (post)
-	if [[ "${1}" != "${2}" ]] ; then
-		ADDED=$(missing "${2}" "${1}")
-		REMOVED=$(missing "${1}" "${2}")
+	ADDED=$(${COMM} -13 ${1} ${2})
+	REMOVED=$(${COMM} -23 ${1} ${2})
 
-		lp_server=${server:-${HOST}}
-		for DEST in ${ADDED} ; do
-			lp_uri="ipp://${lp_server}/printers/${DEST}"
-			lp_bsdaddr="${lp_server},${DEST},Solaris"
-			${LPSET} -n system \
-				-a "printer-uri-supported=${lp_uri}" \
-				-a "bsdaddr=${lp_bsdaddr}" \
-			 	${DEST} 2>/dev/null
-		done
+	lp_server=${server:-${HOST}}
+	for DEST in ${ADDED} ; do
+		lp_uri="ipp://${lp_server}/printers/${DEST}"
+		lp_bsdaddr="${lp_server},${DEST},Solaris"
+		${LPSET} -n system \
+			-a "printer-uri-supported=${lp_uri}" \
+			-a "bsdaddr=${lp_bsdaddr}" \
+		 	${DEST} 2>/dev/null
+	done
 
-		for DEST in ${REMOVED} ; do
-			${LPSET} -n system -x ${DEST} 2>/dev/null
-		done
-	fi
+	for DEST in ${REMOVED} ; do
+		${LPSET} -n system -x ${DEST} 2>/dev/null
+	done
 }
 
 # Delete all destinations in printers.conf
@@ -293,11 +279,12 @@ fi
 # Do the LP configuration for a local printer served by lpsched
 if [[ -x ${LPADMIN} && -n "${local}" ]] ; then
 	# enumerate LP configured printers before modification
-	PRE=$(/bin/ls /etc/lp/printers 2>/dev/null ; /bin/ls /etc/lp/classes \
-		2>/dev/null)
+	PRE=/tmp/lpadmin-pre.$$
+	(/bin/ls /etc/lp/printers 2>/dev/null ; /bin/ls /etc/lp/classes \
+		2>/dev/null) >${PRE}
 
 	# if there are no printers configured, enable LP service(s)
-	[[ -z "${PRE}" ]] && lp_config_service enable
+	[[ -s "${PRE}" ]] && lp_config_service enable
 
 	# add filters to LP service
 	lp_config_filters
@@ -319,14 +306,17 @@ if [[ -x ${LPADMIN} && -n "${local}" ]] ; then
 	exit_code=$?
 
 	# enumerate LP configured printers after modification
-	POST=$(/bin/ls /etc/lp/printers 2>/dev/null ; /bin/ls /etc/lp/classes \
-                    2>/dev/null)
+	POST=/tmp/lpadmin-post.$$
+	(/bin/ls /etc/lp/printers 2>/dev/null ; /bin/ls /etc/lp/classes \
+		2>/dev/null) >${POST}
 
 	# if there are no destinations, disable the service(s)
-	[[ -z "${POST}" ]] && lp_config_service disable
+	[[ ! -s "${POST}" ]] && lp_config_service disable
 
 	# sync printers.conf with LP configuration
 	lp_config_sync_pconf "${PRE}" "${POST}"
+
+	/bin/rm -f ${PRE} ${POST}
 fi
 
 # Do any printers.conf configuration that is required
