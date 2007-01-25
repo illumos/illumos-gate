@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,9 +165,10 @@ static uint64_t	msiq_config_other_regs[] = {
 #define	MSIQ_MAPPING_SIZE	(MSI_MAPPING_ENTRIES * sizeof (uint64_t))
 
 /* OPL tuning variables for link unstable issue */
-int wait_perst = 500000; 	/* step 9, default: 500ms */
-int wait_enable_port = 45000;	/* step 11, default: 45ms */
+int wait_perst = 5000000; 	/* step 9, default: 5s */
+int wait_enable_port = 30000;	/* step 11, default: 30ms */
 int link_retry_count = 2; 	/* step 11, default: 2 */
+int link_status_check = 400000;	/* step 11, default: 400ms */
 
 static uint64_t msiq_suspend(devhandle_t dev_hdl, pxu_t *pxu_p);
 static void msiq_resume(devhandle_t dev_hdl, pxu_t *pxu_p);
@@ -3008,6 +3009,13 @@ oberon_hp_pwron(caddr_t csr_base)
 		goto fail;
 	}
 
+	/* Check HP Capable */
+	if (!CSR_BR(csr_base, TLU_SLOT_CAPABILITIES, HP)) {
+		DBG(DBG_HP, NULL, "oberon_hp_pwron fails: leaf not "
+			"hotplugable\n");
+		goto fail;
+	}
+
 	/* Check Slot status */
 	reg = CSR_XR(csr_base, TLU_SLOT_STATUS);
 	if (!(reg & (1ull << TLU_SLOT_STATUS_PSD)) ||
@@ -3078,7 +3086,7 @@ oberon_hp_pwron(caddr_t csr_base)
 
 		/* wait for the link up */
 		for (i = 0; (i < 2) && (link_up == B_FALSE); i++) {
-			delay(drv_usectohz(100000));
+			delay(drv_usectohz(link_status_check));
 			reg = CSR_XR(csr_base, DLU_LINK_LAYER_STATUS);
 
 		    if ((((reg >> DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS) &
@@ -3128,8 +3136,8 @@ oberon_hp_pwron(caddr_t csr_base)
 	reg &= ~(TLU_SLOT_CAPABILITIES_SPLS_MASK <<
 	    TLU_SLOT_CAPABILITIES_SPLS);
 	reg &= ~(TLU_SLOT_CAPABILITIES_SPLV_MASK <<
-	    TLU_SLOT_CAPABILITIES_SPLS);
-	reg |= (0x19 << TLU_SLOT_CAPABILITIES_SPLS);
+	    TLU_SLOT_CAPABILITIES_SPLV);
+	reg |= (0x19 << TLU_SLOT_CAPABILITIES_SPLV);
 	CSR_XS(csr_base, TLU_SLOT_CAPABILITIES, reg);
 
 	/* Turn on Power LED */

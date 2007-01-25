@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -541,7 +541,7 @@ DEF:
  *	3) <IOB_PRE string>
  *
  * PROP_SERID encoding <64-bit int: msb ... lsb>:
- * <24 bits: vendor id><40 bits: serial number>
+ * <24 bits: IEEE company id><40 bits: serial number>
  *
  * sun encoding of 40 bit serial number:
  * first byte = device type indicator (ignored in naming scheme)
@@ -553,27 +553,30 @@ pci_cfg_iob_name(di_minor_t minor, di_node_t node, di_prom_handle_t ph,
     char *buf, int bufsz)
 {
 	int64_t *seridp;
-	int64_t serid;
-	char *idstr;
+	uint64_t serid;
 
 	if (di_prop_lookup_int64(DDI_DEV_T_ANY, node, PROP_SERID,
 	    &seridp) < 1) {
 		(void) strlcpy(buf, IOB_PRE, bufsz);
 		return (1);
 	}
-	serid = *seridp;
+	serid = (uint64_t)*seridp;
 
-	if (serid >> 40 != VENDID_SUN) {
+	if ((serid >> 40) != (uint64_t)IEEE_SUN_ID) {
 		(void) snprintf(buf, bufsz, "%s%llx", IOB_PRE, serid);
 		return (1);
 	}
 
-	serid &= SIZE2MASK64(40);
-	idstr = (char *)&serid;
-	idstr[sizeof (serid) - 1] = '\0';
-	/* skip device type indicator */
-	idstr++;
-	(void) snprintf(buf, bufsz, "%s%s", IOB_PRE, idstr);
+	/*
+	 * skip 32 bits because the first 3 bytes are the company id and the
+	 * next byte is the PCIe or PCI-X indicator. The last 4 bytes
+	 * is being treated as raw unsigned integer instead of a string
+	 * because some of the bytes are 0x0 (NULL).
+	 */
+
+	(void) snprintf(buf, bufsz, "%s%08x", IOB_PRE,
+	    (uint32_t)(SIZE2MASK64(32) & serid));
+
 	return (1);
 }
 

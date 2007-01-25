@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,7 @@ extern "C" {
 #define	IOB_PRE			"iob"
 #define	AP_PATH_SEP		":"
 #define	AP_PATH_IOB_SEP		"."
-#define	VENDID_SUN		0x108e
+#define	IEEE_SUN_ID		0x080020
 #define	APNODE_DEFNAME		0x1
 #define	PCIDEV_NIL		((minor_t)-1)
 
