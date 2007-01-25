@@ -510,6 +510,9 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
  * issue a warning and leave the symbol as is.  If the non-underscore symbol
  * is referenced then turn it into a weak alias of the underscored symbol.
  *
+ * The bits in flags_u are OR'd into the flags field of the symbol
+ * for the underscored symbol.
+ *
  * If this is a global symbol, and it hasn't explicitly been defined as being
  * directly bound to, indicate that it can't be directly bound to.
  * Historically, most special symbols only have meaning to the object in which
@@ -524,7 +527,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
  */
 static uintptr_t
 sym_add_spec(const char *name, const char *uname, Word sdaux_id,
-    Half flags1, Ofl_desc *ofl)
+    Word flags_u, Half flags1, Ofl_desc *ofl)
 {
 	Sym_desc	*sdp;
 	Sym_desc 	*usdp;
@@ -544,7 +547,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		    (usdp->sd_ref != REF_REL_NEED)) {
 			usdp->sd_ref = REF_REL_NEED;
 			usdp->sd_shndx = usdp->sd_sym->st_shndx = SHN_ABS;
-			usdp->sd_flags |= FLG_SY_SPECSEC;
+			usdp->sd_flags |= FLG_SY_SPECSEC | flags_u;
 			usdp->sd_sym->st_info =
 			    ELF_ST_INFO(STB_GLOBAL, STT_OBJECT);
 			usdp->sd_isc = NULL;
@@ -598,7 +601,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		sym->st_value = 0;
 		DBG_CALL(Dbg_syms_created(ofl->ofl_lml, uname));
 		if ((usdp = ld_sym_enter(uname, sym, hash, (Ifl_desc *)NULL,
-		    ofl, 0, SHN_ABS, FLG_SY_SPECSEC, 0, &where)) ==
+		    ofl, 0, SHN_ABS, FLG_SY_SPECSEC | flags_u, 0, &where)) ==
 		    (Sym_desc *)S_ERROR)
 			return (S_ERROR);
 		usdp->sd_ref = REF_REL_NEED;
@@ -776,19 +779,19 @@ ld_sym_spec(Ofl_desc *ofl)
 	DBG_CALL(Dbg_syms_spec_title(ofl->ofl_lml));
 
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_ETEXT), MSG_ORIG(MSG_SYM_ETEXT_U),
-	    SDAUX_ID_ETEXT, FLG_SY1_GLOB, ofl) == S_ERROR)
+	    SDAUX_ID_ETEXT, 0, FLG_SY1_GLOB, ofl) == S_ERROR)
 		return (S_ERROR);
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_EDATA), MSG_ORIG(MSG_SYM_EDATA_U),
-	    SDAUX_ID_EDATA, FLG_SY1_GLOB, ofl) == S_ERROR)
+	    SDAUX_ID_EDATA, 0, FLG_SY1_GLOB, ofl) == S_ERROR)
 		return (S_ERROR);
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_END), MSG_ORIG(MSG_SYM_END_U),
-	    SDAUX_ID_END, FLG_SY1_GLOB, ofl) == S_ERROR)
+	    SDAUX_ID_END, FLG_SY_DYNSORT, FLG_SY1_GLOB, ofl) == S_ERROR)
 		return (S_ERROR);
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_L_END), MSG_ORIG(MSG_SYM_L_END_U),
-	    SDAUX_ID_END, FLG_SY1_LOCL, ofl) == S_ERROR)
+	    SDAUX_ID_END, 0, FLG_SY1_LOCL, ofl) == S_ERROR)
 		return (S_ERROR);
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_L_START), MSG_ORIG(MSG_SYM_L_START_U),
-	    SDAUX_ID_START, FLG_SY1_LOCL, ofl) == S_ERROR)
+	    SDAUX_ID_START, 0, FLG_SY1_LOCL, ofl) == S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -796,15 +799,14 @@ ld_sym_spec(Ofl_desc *ofl)
 	 * static executables (in which case its value will be 0).
 	 */
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_DYNAMIC), MSG_ORIG(MSG_SYM_DYNAMIC_U),
-	    SDAUX_ID_DYN, FLG_SY1_GLOB, ofl) == S_ERROR)
+	    SDAUX_ID_DYN, FLG_SY_DYNSORT, FLG_SY1_GLOB, ofl) == S_ERROR)
 		return (S_ERROR);
 
-	if (OFL_ALLOW_DYNSYM(ofl)) {
+	if (OFL_ALLOW_DYNSYM(ofl))
 		if (sym_add_spec(MSG_ORIG(MSG_SYM_PLKTBL),
 		    MSG_ORIG(MSG_SYM_PLKTBL_U), SDAUX_ID_PLT,
-		    FLG_SY1_GLOB, ofl) == S_ERROR)
+		    FLG_SY_DYNSORT, FLG_SY1_GLOB, ofl) == S_ERROR)
 			return (S_ERROR);
-	}
 
 	/*
 	 * A GOT reference will be accompanied by the associated GOT symbol.
@@ -813,8 +815,8 @@ ld_sym_spec(Ofl_desc *ofl)
 	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U),
 	    SYM_NOHASH, 0, ofl)) != 0) && (sdp->sd_ref != REF_DYN_SEEN)) {
 		if (sym_add_spec(MSG_ORIG(MSG_SYM_GOFTBL),
-		    MSG_ORIG(MSG_SYM_GOFTBL_U), SDAUX_ID_GOT, FLG_SY1_GLOB,
-		    ofl) == S_ERROR)
+		    MSG_ORIG(MSG_SYM_GOFTBL_U), SDAUX_ID_GOT, FLG_SY_DYNSORT,
+		    FLG_SY1_GLOB, ofl) == S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -865,7 +867,6 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 		 */
 		if ((oflags & FLG_OF_SYMBOLIC) &&
 		    ((sdp->sd_flags1 & (FLG_SY1_LOCL | FLG_SY1_NDIR)) == 0)) {
-
 			sdp->sd_flags1 |= FLG_SY1_PROT;
 			if (ELF_ST_VISIBILITY(sym->st_other) == STV_DEFAULT)
 				sym->st_other = STV_PROTECTED |
@@ -984,6 +985,7 @@ ld_sym_validate(Ofl_desc *ofl)
 #endif
 	int		ret;
 	int		allow_ldynsym;
+	uchar_t		type;
 
 	/*
 	 * If a symbol is undefined and this link-edit calls for no undefined
@@ -1019,6 +1021,34 @@ ld_sym_validate(Ofl_desc *ofl)
 		verdesc = FLG_OF_FATAL;
 
 	allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
+
+	if (allow_ldynsym) {
+		/*
+		 * Normally, we disallow symbols with 0 size from appearing
+		 * in a dyn[sym|tls]sort section. However, there are some
+		 * symbols that serve special purposes that we want to exempt
+		 * from this rule. Look them up, and set their
+		 * FLG_SY_DYNSORT flag.
+		 */
+		static const char *special[] = {
+			MSG_ORIG(MSG_SYM_INIT_U),	/* _init */
+			MSG_ORIG(MSG_SYM_FINI_U),	/* _fini */
+			MSG_ORIG(MSG_SYM_START),	/* _start */
+			NULL
+		};
+		int i;
+
+		for (i = 0; special[i] != NULL; i++) {
+			if (((sdp = ld_sym_find(special[i],
+			    SYM_NOHASH, 0, ofl)) != NULL) &&
+			    (sdp->sd_sym->st_size == 0)) {
+				if (ld_sym_copy(sdp) == S_ERROR)
+					return (S_ERROR);
+				sdp->sd_flags |= FLG_SY_DYNSORT;
+			}
+		}
+	}
+
 	/*
 	 * Collect and validate the globals from the internal symbol table.
 	 */
@@ -1049,12 +1079,13 @@ ld_sym_validate(Ofl_desc *ofl)
 		}
 
 		sym = sdp->sd_sym;
+		type = ELF_ST_TYPE(sym->st_info);
 
 		/*
 		 * Sanity check TLS.
 		 */
-		if ((ELF_ST_TYPE(sym->st_info) == STT_TLS) &&
-		    (sym->st_size != 0) && (sym->st_shndx != SHN_UNDEF) &&
+		if ((type == STT_TLS) && (sym->st_size != 0) &&
+		    (sym->st_shndx != SHN_UNDEF) &&
 		    (sym->st_shndx != SHN_COMMON)) {
 			Is_desc *	isp = sdp->sd_isc;
 			Ifl_desc *	ifl = sdp->sd_file;
@@ -1286,7 +1317,7 @@ ld_sym_validate(Ofl_desc *ofl)
 			if (countbss) {
 				Xword * size, * align;
 
-				if (ELF_ST_TYPE(sym->st_info) != STT_TLS) {
+				if (type != STT_TLS) {
 					size = &bsssize;
 					align = &bssalign;
 				} else {
@@ -1347,15 +1378,27 @@ ld_sym_validate(Ofl_desc *ofl)
 				    sdp->sd_name) == -1))
 					return (S_ERROR);
 				if (allow_ldynsym && sym->st_name &&
-				    (ELF_ST_TYPE(sym->st_info) == STT_FUNC)) {
+				    ldynsym_symtype[type]) {
 					ofl->ofl_dynscopecnt++;
 					if (st_insert(ofl->ofl_dynstrtab,
 					    sdp->sd_name) == -1)
 						return (S_ERROR);
+					/* Include it in sort section? */
+					DYNSORT_COUNT(sdp, sym, type, ++);
 				}
 			}
 		} else {
 			ofl->ofl_globcnt++;
+
+			/*
+			 * Check to see if this global variable should
+			 * go into a sort section. Sort sections require
+			 * a .SUNW_ldynsym section, so, don't check
+			 * unless a .SUNW_ldynsym is allowed.
+			 */
+			if (allow_ldynsym) {
+				DYNSORT_COUNT(sdp, sym, type, ++);
+			}
 
 			/*
 			 * If global direct bindings are in effect, or this
@@ -1599,7 +1642,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * True (1). Otherwise, False(0).
 	 */
 #define	SYM_LOC_BADADDR(_sdp, _sym, _type) \
-	(_sym->st_size && dynaddr_symtype[_type] && \
+	(_sym->st_size && dynsymsort_symtype[_type] && \
 	(_sym->st_shndx != SHN_UNDEF) && \
 	((_sym->st_shndx < SHN_LORESERVE) || \
 		(_sym->st_shndx == SHN_XINDEX)) && \
@@ -1687,7 +1730,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	if ((ifl->ifl_oldndx = libld_malloc((size_t)(total *
 	    sizeof (Sym_desc *)))) == 0)
 		return (S_ERROR);
-	etype_rel = etype == ET_REL;
+	etype_rel = (etype == ET_REL);
 	if (etype_rel && local) {
 		if ((ifl->ifl_locs =
 		    libld_calloc(sizeof (Sym_desc), local)) == 0)
@@ -1915,12 +1958,13 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 					return (S_ERROR);
 
 				if (allow_ldynsym && sym->st_name &&
-				    ((type == STT_FUNC) ||
-				    (type == STT_FILE))) {
+				    ldynsym_symtype[type]) {
 					ofl->ofl_dynlocscnt++;
 					if (st_insert(ofl->ofl_dynstrtab,
 					    sdp->sd_name) == -1)
 						return (S_ERROR);
+					/* Include it in sort section? */
+					DYNSORT_COUNT(sdp, sym, type, ++);
 				}
 			}
 		}
@@ -2139,7 +2183,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * (typical single alias) or more (in the uncommon instance of multiple
 	 * weak to strong associations) entries to determine if a match exists.
 	 */
-	if (ifl->ifl_ehdr->e_type == ET_DYN) {
+	if ((OFL_ALLOW_LDYNSYM(ofl) || (etype == ET_DYN)) &&
+	    (total > local)) {
 		Sym_desc **	sort;
 		size_t		size = (total - local) * sizeof (Sym_desc *);
 
@@ -2190,10 +2235,46 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				    (ssdp->sd_sym->st_shndx != SHN_UNDEF) &&
 				    (ELF_ST_BIND(ssym->st_info) != STB_WEAK) &&
 				    ((ssdp->sd_flags & FLG_SY_SPECSEC) == 0)) {
-					ssdp->sd_aux->sa_linkndx =
-					    (Word)wsdp->sd_symndx;
-					wsdp->sd_aux->sa_linkndx =
-					    (Word)ssdp->sd_symndx;
+					int w_dynbits, s_dynbits;
+
+					/*
+					 * If a sharable object, set link
+					 * fields so they reference each other
+					 */
+					if (etype == ET_DYN) {
+						ssdp->sd_aux->sa_linkndx =
+						    (Word)wsdp->sd_symndx;
+						wsdp->sd_aux->sa_linkndx =
+						    (Word)ssdp->sd_symndx;
+					}
+					/*
+					 * Determine which of these two symbols
+					 * go into the sort section. If the
+					 * mapfile has made explicit settings
+					 * of the FLG_SY_*DYNSORT flags for both
+					 * symbols, then we do what they say.
+					 * If one has the DYNSORT flags set,
+					 * we set the NODYNSORT bit in the
+					 * other. And if neither has an
+					 * explicit setting, then we favor the
+					 * weak symbol because they usually
+					 * lack the leading underscore.
+					 */
+					w_dynbits = wsdp->sd_flags &
+					    (FLG_SY_DYNSORT | FLG_SY_NODYNSORT);
+					s_dynbits = ssdp->sd_flags &
+					    (FLG_SY_DYNSORT | FLG_SY_NODYNSORT);
+					if (!(w_dynbits && s_dynbits)) {
+					    if (s_dynbits) {
+						if (s_dynbits == FLG_SY_DYNSORT)
+						    wsdp->sd_flags |=
+							FLG_SY_NODYNSORT;
+					    } else if (w_dynbits !=
+						FLG_SY_NODYNSORT) {
+						ssdp->sd_flags |=
+						    FLG_SY_NODYNSORT;
+					    }
+					}
 					break;
 				}
 			}

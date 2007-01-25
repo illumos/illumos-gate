@@ -2359,6 +2359,16 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				rti->rti_lmp = lmp;
 				rti->rti_info = (void *)(ld->d_un.d_ptr + base);
 				break;
+			case DT_SUNW_SORTENT:
+				SUNWSORTENT(lmp) = ld->d_un.d_val;
+				break;
+			case DT_SUNW_SYMSORT:
+				SUNWSYMSORT(lmp) =
+				    (void *)(ld->d_un.d_ptr + base);
+				break;
+			case DT_SUNW_SYMSORTSZ:
+				SUNWSYMSORTSZ(lmp) = ld->d_un.d_val;
+				break;
 			case DT_DEPRECATED_SPARC_REGISTER:
 			case M_DT_REGISTER:
 				FLAGS(lmp) |= FLG_RT_REGSYMS;
@@ -2970,6 +2980,9 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 	Sym		*sym, *_sym;
 	const char	*str;
 	int		_flags;
+	uint_t		*dynaddr_ndx;
+	uint_t		dynaddr_n = 0;
+	ulong_t		value;
 
 	/*
 	 * If SUNWSYMTAB() is non-NULL, then it sees a special version of
@@ -2978,6 +2991,12 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 	 * case, SUNWSYMSZ tells us how long the symbol table is. The
 	 * availability of local function symbols will enhance the results
 	 * we can provide.
+	 *
+	 * If SUNWSYMTAB() is non-NULL, then there might also be a
+	 * SUNWSYMSORT() vector associated with it. SUNWSYMSORT() contains
+	 * an array of indices into SUNWSYMTAB, sorted by increasing
+	 * address. We can use this to do an O(log N) search instead of a
+	 * brute force search.
 	 *
 	 * If SUNWSYMTAB() is NULL, then SYMTAB() references a dynsym that
 	 * contains only global symbols. In that case, the length of
@@ -2997,6 +3016,9 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 	} else {
 		sym = SUNWSYMTAB(lmp);
 		cnt = SUNWSYMSZ(lmp) / SYMENT(lmp);
+		dynaddr_ndx = SUNWSYMSORT(lmp);
+		if (dynaddr_ndx != NULL)
+			dynaddr_n = SUNWSYMSORTSZ(lmp) / SUNWSORTENT(lmp);
 	}
 
 	if (FLAGS(lmp) & FLG_RT_FIXED)
@@ -3004,43 +3026,97 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 	else
 		base = ADDR(lmp);
 
-	for (_sym = 0, _value = 0, sym++, ndx = 1; ndx < cnt; ndx++, sym++) {
-		ulong_t	value;
+	if (dynaddr_n > 0) {		/* Binary search */
+		long	low = 0, low_bnd;
+		long	high = dynaddr_n - 1, high_bnd;
+		long	mid;
+		Sym	*mid_sym;
 
 		/*
-		 * Skip expected symbol types that are not functions
-		 * or data:
-		 *	- A symbol table starts with an undefined symbol
-		 *		in slot 0. If we are using SUNWSYMTAB(),
-		 *		there will be a second undefined symbol
-		 *		right before the globals.
-		 *	- The local part of SUNWSYMTAB() contains a
-		 *		series of function symbols. Each section
-		 *		starts with an initial STT_FILE symbol.
+		 * Note that SUNWSYMSORT only contains symbols types that
+		 * supply memory addresses, so there's no need to check and
+		 * filter out any other types.
 		 */
-		if ((sym->st_shndx == SHN_UNDEF) ||
-		    (ELF_ST_TYPE(sym->st_info) == STT_FILE))
-			continue;
-
-		value = sym->st_value + base;
-		if (value > addr)
-			continue;
-		if (value < _value)
-			continue;
-
-		_sym = sym;
-		_value = value;
-
+		low_bnd = low;
+		high_bnd = high;
+		_sym = NULL;
+		while (low <= high) {
+			mid = (low + high) / 2;
+			mid_sym = &sym[dynaddr_ndx[mid]];
+			value = mid_sym->st_value + base;
+			if (addr < value) {
+				if ((sym[dynaddr_ndx[high]].st_value + base) >=
+				    addr)
+					high_bnd = high;
+				high = mid - 1;
+			} else if (addr > value) {
+				if ((sym[dynaddr_ndx[low]].st_value + base) <=
+				    addr)
+					low_bnd = low;
+				low = mid + 1;
+			} else {
+				_sym = mid_sym;
+				_value = value;
+				break;
+			}
+		}
 		/*
-		 * Note, because we accept local and global symbols we could
-		 * find a section symbol that matches the associated address,
-		 * which means that the symbol name will be null.  In this
-		 * case continue the search in case we can find a global
-		 * symbol of the same value.
+		 * If the above didn't find it exactly, then we must
+		 * return the closest symbol with a value that doesn't
+		 * exceed the one we are looking for. If that symbol exists,
+		 * it will lie in the range bounded by low_bnd and
+		 * high_bnd. This is a linear search, but a short one.
 		 */
-		if ((value == addr) &&
-		    (ELF_ST_TYPE(sym->st_info) != STT_SECTION))
-			break;
+		if (_sym == NULL) {
+			for (mid = low_bnd; mid <= high_bnd; mid++) {
+				mid_sym = &sym[dynaddr_ndx[mid]];
+				value = mid_sym->st_value + base;
+				if (addr >= value) {
+					_sym = mid_sym;
+					_value = value;
+				} else {
+					break;
+				}
+			}
+		}
+	} else {			/* Linear search */
+		for (_value = 0, sym++, ndx = 1; ndx < cnt; ndx++, sym++) {
+			/*
+			 * Skip expected symbol types that are not functions
+			 * or data:
+			 *	- A symbol table starts with an undefined symbol
+			 *		in slot 0. If we are using SUNWSYMTAB(),
+			 *		there will be a second undefined symbol
+			 *		right before the globals.
+			 *	- The local part of SUNWSYMTAB() contains a
+			 *		series of function symbols. Each section
+			 *		starts with an initial STT_FILE symbol.
+			 */
+			if ((sym->st_shndx == SHN_UNDEF) ||
+			    (ELF_ST_TYPE(sym->st_info) == STT_FILE))
+				continue;
+
+			value = sym->st_value + base;
+			if (value > addr)
+				continue;
+			if (value < _value)
+				continue;
+
+			_sym = sym;
+			_value = value;
+
+			/*
+			 * Note, because we accept local and global symbols
+			 * we could find a section symbol that matches the
+			 * associated address, which means that the symbol
+			 * name will be null.  In this case continue the
+			 * search in case we can find a global symbol of
+			 * the same value.
+			 */
+			if ((value == addr) &&
+			    (ELF_ST_TYPE(sym->st_info) != STT_SECTION))
+				break;
+		}
 	}
 
 	_flags = flags & RTLD_DL_MASK;

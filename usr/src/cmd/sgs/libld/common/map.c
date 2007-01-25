@@ -1611,6 +1611,16 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 					ofl->ofl_dtflags_1 |= DF_1_SYMINTPOSE;
 					continue;
+				} else if (strcmp(Start_tok,
+				    MSG_ORIG(MSG_MAP_DYNSORT)) == 0) {
+					sym_flags |= FLG_SY_DYNSORT;
+					sym_flags &= ~FLG_SY_NODYNSORT;
+					continue;
+				} else if (strcmp(Start_tok,
+				    MSG_ORIG(MSG_MAP_NODYNSORT)) == 0) {
+					sym_flags &= ~FLG_SY_DYNSORT;
+					sym_flags |= FLG_SY_NODYNSORT;
+					continue;
 				} else {
 					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_UNKSYMDEF),

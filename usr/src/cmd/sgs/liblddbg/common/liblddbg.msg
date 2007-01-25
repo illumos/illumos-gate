@@ -533,6 +533,14 @@
 @ MSG_SHD_ORIG		"  original:"
 @ MSG_SHD_NEW		"  new:"
 
+# TRANSLATION_NOTE - The following two items are used following a number in
+# the MSG_SHD_OFFSET_ENT_XX format strings below. For example "1 entry"
+# or "23 entries".
+# 
+@ MSG_SHD_ENTRY_1	"entry"
+@ MSG_SHD_ENTRY_N	"entries"
+
+
 # Section messages
 
 @ MSG_SEC_INPUT		"section=%s; input from file=%s"
@@ -629,9 +637,13 @@
 
 @ MSG_SYM_LAZY_RESCAN	"rescanning for lazy dependencies for symbol: %s"
 
+@ MSG_SYM_DUPSORTADDR	"section %s: symbol `%s' and symbol `%s' have the \
+			 same address: %#llx"
+
 # Syminfo string
 
 @ MSG_SYMINFO_INFO	"syminfo information"
+
 
 # Version strings
 
@@ -1225,12 +1237,16 @@
 @ MSG_SHD_ADDR_32	"    sh_addr:      %#-10llx      sh_flags:   %s"
 @ MSG_SHD_SIZE_32	"    sh_size:      %#-10llx      sh_type:    %s"
 @ MSG_SHD_OFFSET_32	"    sh_offset:    %#-10llx      sh_entsize: %#llx"
+@ MSG_SHD_OFFSET_ENT_32	"    sh_offset:    %#-10llx      sh_entsize: %#llx \
+			 (%lld %s)"
 @ MSG_SHD_LINK_32	"    sh_link:      %-14s  sh_info:    %s"
 @ MSG_SHD_ALIGN_32	"    sh_addralign: %#-10llx"
 
 @ MSG_SHD_ADDR_64	"    sh_addr:      %#-18llx  sh_flags:   %s"
 @ MSG_SHD_SIZE_64	"    sh_size:      %#-18llx  sh_type:    %s"
 @ MSG_SHD_OFFSET_64	"    sh_offset:    %#-18llx  sh_entsize: %#llx"
+@ MSG_SHD_OFFSET_ENT_64	"    sh_offset:    %#-18llx  sh_entsize: %#llx \
+			 (%lld %s)"
 @ MSG_SHD_LINK_64	"    sh_link:      %-18s  sh_info:    %s"
 @ MSG_SHD_ALIGN_64	"    sh_addralign: %#-18llx"
 

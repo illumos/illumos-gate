@@ -1156,3 +1156,5 @@ Bugid   Risk Synopsis
 	run java applet
 6494214 Refinements to symbolic binding, symbol declarations and interposition 
 	PSARC/2006/714 ld(1) mapfile: symbol interpose definition
+6475344 DTrace needs ELF function and data symbols sorted by address (D)
+	PSARC/2007/026 ELF symbol sort sections

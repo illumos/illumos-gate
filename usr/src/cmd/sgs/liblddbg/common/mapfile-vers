@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +38,7 @@
 #	Policy for Shared Library Version Names and Interface Definitions
 
 
-SUNWprivate_4.55 {
+SUNWprivate_4.56 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -319,6 +319,8 @@ SUNWprivate_4.55 {
 		Dbg64_syms_discarded;
 		Dbg32_syms_dlsym;
 		Dbg64_syms_dlsym;
+		Dbg32_syms_dup_sort_addr;
+		Dbg64_syms_dup_sort_addr;
 		Dbg32_syms_entered;
 		Dbg64_syms_entered;
 		Dbg32_syms_entry;
@@ -426,7 +428,7 @@ SUNWprivate_4.55 {
 
 
 # The following interfaces are used by various parts of the link-editors and
-# the elfdump(1).  The link-editors are always packaged together but there
+# elfdump(1).  The link-editors are always packaged together but there
 # seems to be a variety of old elfdump's lying around.  elfdump only uses
 # this interface, and thus by separating in from the ever changing Dbg_*
 # interfaces we can provide a stable verioning environment for this utility.

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,7 @@ extern "C" {
 #define	FLG_GROUP	0x00002000
 #define	FLG_CAP		0x00004000
 #define	FLG_UNWIND	0x00008000
+#define	FLG_SORT	0x00010000
 #define	FLG_LONGNAME	0x00100000	/* not done by default */
 #define	FLG_CHECKSUM	0x00200000	/* not done by default */
 #define	FLG_DEMANGLE	0x00400000	/* not done by default */

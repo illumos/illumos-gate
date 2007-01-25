@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -119,9 +119,11 @@ ignore_section_processing(Ofl_desc *ofl)
 			Os_desc		*osp;
 			/* LINTED - only used for assert() */
 			int		err;
+			uchar_t		type;
 
 			sdp = ifl->ifl_oldndx[num];
 			symp = sdp->sd_sym;
+			type = ELF_ST_TYPE(symp->st_info);
 
 			/*
 			 * If the whole file is being eliminated, remove the
@@ -131,7 +133,7 @@ ignore_section_processing(Ofl_desc *ofl)
 			 */
 			if ((ofl->ofl_flags1 & FLG_OF1_IGNORE) &&
 			    ((ifl->ifl_flags & FLG_IF_FILEREF) == 0) &&
-			    ((ELF_ST_TYPE(symp->st_info) == STT_FILE) ||
+			    ((type == STT_FILE) ||
 			    ((symp->st_shndx == SHN_COMMON) &&
 			    ((sdp->sd_flags & FLG_SY_UPREQD) == 0)))) {
 				if ((ofl->ofl_flags1 & FLG_OF1_REDLSYM) == 0) {
@@ -140,13 +142,15 @@ ignore_section_processing(Ofl_desc *ofl)
 					    sdp->sd_name);
 					assert(err != -1);
 					if (allow_ldynsym &&
-					    (ELF_ST_TYPE(symp->st_info) ==
-					    STT_FILE)) {
+					    ldynsym_symtype[type]) {
 						ofl->ofl_dynlocscnt--;
 						err = st_delstring(
 							ofl->ofl_dynstrtab,
 							sdp->sd_name);
 						assert(err != -1);
+						/* Remove from sort section? */
+						DYNSORT_COUNT(sdp, symp,
+						    type, --);
 					}
 				}
 				sdp->sd_flags |= FLG_SY_ISDISC;
@@ -161,7 +165,7 @@ ignore_section_processing(Ofl_desc *ofl)
 			 */
 			if ((symp->st_shndx == SHN_UNDEF) ||
 			    (symp->st_shndx >= SHN_LORESERVE) ||
-			    (ELF_ST_TYPE(symp->st_info) == STT_SECTION) ||
+			    (type == STT_SECTION) ||
 			    (sdp->sd_flags & FLG_SY_ISDISC) ||
 			    (sdp->sd_flags1 & FLG_SY1_ELIM) ||
 			    (sdp->sd_isc == 0) || (sdp->sd_file != ifl))
@@ -181,29 +185,30 @@ ignore_section_processing(Ofl_desc *ofl)
 			 * Finish processing any local symbols.
 			 */
 			if (ELF_ST_BIND(symp->st_info) == STB_LOCAL) {
-				if (ofl->ofl_flags1 & FLG_OF1_IGNORE) {
-					if ((ofl->ofl_flags1 &
-					    FLG_OF1_REDLSYM) == 0) {
-						ofl->ofl_locscnt--;
+			    if (ofl->ofl_flags1 & FLG_OF1_IGNORE) {
+				if ((ofl->ofl_flags1 &
+				    FLG_OF1_REDLSYM) == 0) {
+					ofl->ofl_locscnt--;
+					err = st_delstring(ofl->ofl_strtab,
+					    sdp->sd_name);
+					assert(err != -1);
+					if (allow_ldynsym &&
+					    ldynsym_symtype[type]) {
+						ofl->ofl_dynlocscnt--;
 						err = st_delstring(
-						    ofl->ofl_strtab,
+						    ofl->ofl_dynstrtab,
 						    sdp->sd_name);
 						assert(err != -1);
-						if (allow_ldynsym &&
-						    (ELF_ST_TYPE(symp->st_info)
-							== STT_FUNC)) {
-							ofl->ofl_dynlocscnt--;
-							err = st_delstring(
-							    ofl->ofl_dynstrtab,
-							    sdp->sd_name);
-							assert(err != -1);
-						}
+						/* Remove from sort section? */
+						DYNSORT_COUNT(sdp, symp,
+						    type, --);
 					}
-					sdp->sd_flags |= FLG_SY_ISDISC;
 				}
-				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml,
-				    sdp, sdp->sd_isc));
-				continue;
+				sdp->sd_flags |= FLG_SY_ISDISC;
+			    }
+			    DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml,
+				sdp, sdp->sd_isc));
+			    continue;
 			}
 
 			/*
@@ -212,22 +217,23 @@ ignore_section_processing(Ofl_desc *ofl)
 			 */
 			if (sdp->sd_flags1 & FLG_SY1_LOCL) {
 				if (ofl->ofl_flags1 & FLG_OF1_IGNORE) {
-					ofl->ofl_scopecnt--;
-					ofl->ofl_elimcnt++;
+				    ofl->ofl_scopecnt--;
+				    ofl->ofl_elimcnt++;
 
-					err = st_delstring(ofl->ofl_strtab,
-					    sdp->sd_name);
-					assert(err != -1);
+				    err = st_delstring(ofl->ofl_strtab,
+					sdp->sd_name);
+				    assert(err != -1);
 
-					sdp->sd_flags1 |= FLG_SY1_ELIM;
-					if (allow_ldynsym &&
-					    (ELF_ST_TYPE(symp->st_info) ==
-						STT_FUNC)) {
-						ofl->ofl_dynscopecnt--;
-						err = st_delstring(
-							ofl->ofl_dynstrtab,
-							sdp->sd_name);
-						assert(err != -1);
+				    sdp->sd_flags1 |= FLG_SY1_ELIM;
+				    if (allow_ldynsym &&
+					ldynsym_symtype[type]) {
+					    ofl->ofl_dynscopecnt--;
+					    err = st_delstring(
+						ofl->ofl_dynstrtab,
+						sdp->sd_name);
+					    assert(err != -1);
+					    /* Remove from sort section? */
+					    DYNSORT_COUNT(sdp, symp, type, --);
 					}
 				}
 				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml,
@@ -398,6 +404,8 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		break;
 
 	case SHT_HASH:
+	case SHT_SUNW_symsort:
+	case SHT_SUNW_tlssort:
 		SET_SEC_INFO(ELF_T_WORD, M_WORD_ALIGN, SHF_ALLOC, sizeof (Word))
 		break;
 
@@ -913,9 +921,18 @@ make_dynamic(Ofl_desc *ofl)
 		 * the dynsym, then also reserve entries for DT_SUNW_SYMTAB
 		 * and DT_SUNW_SYMSZ.
 		 */
-		if (!(ofl->ofl_flags & FLG_OF_NOLDYNSYM) &&
-		    ((ofl->ofl_dynlocscnt + ofl->ofl_dynscopecnt) > 0))
+		if (OFL_ALLOW_LDYNSYM(ofl))
 			cnt += 2;
+
+		if ((ofl->ofl_dynsymsortcnt > 0) ||
+		    (ofl->ofl_dyntlssortcnt > 0))
+			cnt++;		/* DT_SUNW_SORTENT */
+
+		if (ofl->ofl_dynsymsortcnt > 0)
+			cnt += 2;	/* DT_SUNW_[SYMSORT|SYMSORTSZ] */
+
+		if (ofl->ofl_dyntlssortcnt > 0)
+			cnt += 2;	/* DT_SUNW_[TLSSORT|TLSSORTSZ] */
 
 		if ((flags & (FLG_OF_VERDEF | FLG_OF_NOVERSEC)) ==
 		    FLG_OF_VERDEF)
@@ -1351,8 +1368,14 @@ make_symtab(Ofl_desc *ofl)
 
 
 /*
- * Build a dynamic symbol table.  Contains only globals symbols and resides
- * in the text segment of a dynamic executable or shared library.
+ * Build a dynamic symbol table. These tables reside in the text
+ * segment of a dynamic executable or shared library.
+ *
+ *	.SUNW_ldynsym contains local function symbols
+ *	.dynsym contains only globals symbols
+ *
+ * The two tables are created adjacent to each other, with .SUNW_ldynsym
+ * coming first.
  */
 static uintptr_t
 make_dynsym(Ofl_desc *ofl)
@@ -1362,16 +1385,29 @@ make_dynsym(Ofl_desc *ofl)
 	Is_desc		*isec, *lisec;
 	size_t		size;
 	Xword		cnt;
-	int		need_ldynsym;
+	int		allow_ldynsym;
 
-	need_ldynsym = !(ofl->ofl_flags & FLG_OF_NOLDYNSYM) &&
-	    ((ofl->ofl_dynlocscnt + ofl->ofl_dynscopecnt) > 0);
+	/*
+	 * Unless explicitly disabled, always produce a .SUNW_ldynsym section
+	 * when it is allowed by the file type, even if the resulting
+	 * table only ends up with a single STT_FILE in it. There are
+	 * two reasons: (1) It causes the generation of the DT_SUNW_SYMTAB
+	 * entry in the .dynamic section, which is something we would
+	 * like to encourage, and (2) Without it, we cannot generate
+	 * the associated .SUNW_dyn[sym|tls]sort sections, which are of
+	 * value to DTrace.
+	 *
+	 * In practice, it is extremely rare for an object not to have
+	 * local symbols for .SUNW_ldynsym, so 99% of the time, we'd be
+	 * doing it anyway.
+	 */
+	allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
 
 	/*
 	 * Create the section headers. Note that we supply an ent_cnt
 	 * of 0. We won't know the count until the section has been placed.
 	 */
-	if (need_ldynsym && new_section(ofl, SHT_SUNW_LDYNSYM,
+	if (allow_ldynsym && new_section(ofl, SHT_SUNW_LDYNSYM,
 	    MSG_ORIG(MSG_SCN_LDYNSYM), 0, &lisec, &lshdr, &ldata) == S_ERROR)
 		return (S_ERROR);
 
@@ -1383,7 +1419,7 @@ make_dynsym(Ofl_desc *ofl)
 	 * Place the section(s) first since it will affect the local symbol
 	 * count.
 	 */
-	if (need_ldynsym &&
+	if (allow_ldynsym &&
 	    ((ofl->ofl_osldynsym = ld_place_section(ofl, lisec,
 	    M_ID_LDYNSYM, 0)) == (Os_desc *)S_ERROR))
 		return (S_ERROR);
@@ -1409,7 +1445,7 @@ make_dynsym(Ofl_desc *ofl)
 	 * stack traces to be generated in contexts where the symtab
 	 * is not available. (dladdr(), or stripped executable/library files).
 	 */
-	if (need_ldynsym) {
+	if (allow_ldynsym) {
 		cnt = 1 + ofl->ofl_dynlocscnt + ofl->ofl_dynscopecnt;
 		size = (size_t)cnt * shdr->sh_entsize;
 
@@ -1421,8 +1457,52 @@ make_dynsym(Ofl_desc *ofl)
 }
 
 /*
+ * Build .SUNW_dynsymsort and/or .SUNW_dyntlssort sections. These are
+ * index sections for the .SUNW_ldynsym/.dynsym pair that present data
+ * and function symbols sorted by address.
+ */
+static uintptr_t
+make_dynsort(Ofl_desc *ofl)
+{
+	Shdr		*shdr;
+	Elf_Data	*data;
+	Is_desc		*isec;
+
+
+	/* Only do it if the .SUNW_ldynsym section is present */
+	if (!OFL_ALLOW_LDYNSYM(ofl))
+		return (1);
+
+	/* .SUNW_dynsymsort */
+	if (ofl->ofl_dynsymsortcnt > 0) {
+		if (new_section(ofl, SHT_SUNW_symsort,
+		    MSG_ORIG(MSG_SCN_DYNSYMSORT), ofl->ofl_dynsymsortcnt,
+		    &isec, &shdr, &data) == S_ERROR)
+		return (S_ERROR);
+
+		if ((ofl->ofl_osdynsymsort = ld_place_section(ofl, isec,
+		    M_ID_DYNSORT, 0)) == (Os_desc *)S_ERROR)
+			return (S_ERROR);
+	}
+
+	/* .SUNW_dyntlssort */
+	if (ofl->ofl_dyntlssortcnt > 0) {
+		if (new_section(ofl, SHT_SUNW_tlssort,
+		    MSG_ORIG(MSG_SCN_DYNTLSSORT),
+		    ofl->ofl_dyntlssortcnt, &isec, &shdr, &data) == S_ERROR)
+		return (S_ERROR);
+
+		if ((ofl->ofl_osdyntlssort = ld_place_section(ofl, isec,
+		    M_ID_DYNSORT, 0)) == (Os_desc *)S_ERROR)
+			return (S_ERROR);
+	}
+
+	return (1);
+}
+
+/*
  * Helper routine for make_dynsym_shndx. Builds a
- * a SHT_SYMTAB_SHNDX for dynsym or ldynsym, without knowing
+ * a SHT_SYMTAB_SHNDX for .dynsym or .SUNW_ldynsym, without knowing
  * which one it is.
  */
 static uintptr_t
@@ -1458,11 +1538,10 @@ static uintptr_t
 make_dynsym_shndx(Ofl_desc *ofl)
 {
 	/*
-	 * If there is an ldynsym, generate a section for its extended
+	 * If there is a .SUNW_ldynsym, generate a section for its extended
 	 * index section as well.
 	 */
-	if (!(ofl->ofl_flags & FLG_OF_NOLDYNSYM) &&
-	    ((ofl->ofl_dynlocscnt + ofl->ofl_dynscopecnt) > 0)) {
+	if (OFL_ALLOW_LDYNSYM(ofl)) {
 		if (make_dyn_shndx(ofl, MSG_ORIG(MSG_SCN_LDYNSYM_SHNDX),
 		    ofl->ofl_osldynsym, &ofl->ofl_osldynshndx) == S_ERROR)
 			return (S_ERROR);
@@ -1555,11 +1634,10 @@ make_dynstr(Ofl_desc *ofl)
 	size_t		size;
 
 	/*
-	 * If this dynstr is to contain local symbols, and if we
-	 * have scope reduced global symbols to put there, then
-	 * account for the STT_FILE symbol that precedes those symbols.
+	 * If producing a .SUNW_ldynsym, account for the initial STT_FILE
+	 * symbol that precedes the scope reduced global symbols.
 	 */
-	if (!(ofl->ofl_flags & FLG_OF_NOLDYNSYM) && ofl->ofl_dynscopecnt) {
+	if (OFL_ALLOW_LDYNSYM(ofl)) {
 		if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_name) == -1)
 			return (S_ERROR);
 		ofl->ofl_dynscopecnt++;
@@ -2121,6 +2199,8 @@ ld_make_sections(Ofl_desc *ofl)
 			if (make_amd64_unwindhdr(ofl) == S_ERROR)
 				return (S_ERROR);
 #endif
+			if (make_dynsort(ofl) == S_ERROR)
+				return (S_ERROR);
 		}
 	}
 

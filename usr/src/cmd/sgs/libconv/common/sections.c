@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -65,6 +65,7 @@ static const Msg secs_alt[SHT_NUM] = {
 #endif
 
 static const Msg usecs[SHT_HISUNW - SHT_LOSUNW + 1] = {
+	MSG_SHT_SUNW_symsort,		MSG_SHT_SUNW_tlssort,
 	MSG_SHT_SUNW_LDYNSYM,		MSG_SHT_SUNW_dof,
 	MSG_SHT_SUNW_cap,		MSG_SHT_SUNW_SIGNATURE,
 	MSG_SHT_SUNW_ANNOTATE,		MSG_SHT_SUNW_DEBUGSTR,
@@ -74,6 +75,7 @@ static const Msg usecs[SHT_HISUNW - SHT_LOSUNW + 1] = {
 	MSG_SHT_SUNW_versym
 };
 static const Msg usecs_alt[SHT_HISUNW - SHT_LOSUNW + 1] = {
+	MSG_SHT_SUNW_symsort_ALT,	MSG_SHT_SUNW_tlssort_ALT,
 	MSG_SHT_SUNW_LDYNSYM_ALT,	MSG_SHT_SUNW_dof_ALT,
 	MSG_SHT_SUNW_cap_ALT,		MSG_SHT_SUNW_SIGNATURE_ALT,
 	MSG_SHT_SUNW_ANNOTATE_ALT,	MSG_SHT_SUNW_DEBUGSTR_ALT,
@@ -82,7 +84,7 @@ static const Msg usecs_alt[SHT_HISUNW - SHT_LOSUNW + 1] = {
 	MSG_SHT_SUNW_verdef_ALT,	MSG_SHT_SUNW_verneed_ALT,
 	MSG_SHT_SUNW_versym_ALT
 };
-#if	(SHT_LOSUNW != SHT_SUNW_LDYNSYM)
+#if	(SHT_LOSUNW != SHT_SUNW_symsort)
 #error	"SHT_LOSUNW has moved"
 #endif
 

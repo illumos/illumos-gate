@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -409,7 +409,9 @@ typedef struct {
 
 /* Solaris ABI specific values */
 #define	SHT_LOOS		0x60000000	/* OS specific range */
-#define	SHT_LOSUNW		0x6ffffff3
+#define	SHT_LOSUNW		0x6ffffff1
+#define	SHT_SUNW_symsort	0x6ffffff1
+#define	SHT_SUNW_tlssort	0x6ffffff2
 #define	SHT_SUNW_LDYNSYM	0x6ffffff3
 #define	SHT_SUNW_dof		0x6ffffff4
 #define	SHT_SUNW_cap		0x6ffffff5

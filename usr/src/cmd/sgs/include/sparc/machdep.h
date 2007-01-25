@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Global include file for all sgs SPARC machine dependent macros, constants
@@ -318,9 +318,10 @@ extern "C" {
 #define	M_ID_DYNSYM	0x07
 #define	M_ID_DYNSTR	0x08
 #define	M_ID_VERSION	0x09
-#define	M_ID_REL	0x0a
-#define	M_ID_TEXT	0x0b			/* SHF_ALLOC + SHF_EXECINSTR */
-#define	M_ID_DATA	0x0c
+#define	M_ID_DYNSORT	0x0a
+#define	M_ID_REL	0x0b
+#define	M_ID_TEXT	0x0c			/* SHF_ALLOC + SHF_EXECINSTR */
+#define	M_ID_DATA	0x0d
 
 /*	M_ID_USER	0x01			dual entry - listed above */
 #define	M_ID_GOTDATA	0x02			/* SHF_ALLOC + SHF_WRITE */

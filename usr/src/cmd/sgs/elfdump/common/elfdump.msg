@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,7 +34,7 @@
 
 # Usage Messages
 
-@ MSG_USAGE_BRIEF	"usage: %s [-cCdegGhHiklmnprsuvy] [-N name] \
+@ MSG_USAGE_BRIEF	"usage: %s [-cCdegGhHiklmnprSsuvy] [-N name] \
 			 [-w file] file(s)\n"
 @ MSG_USAGE_DETAIL1	"\t[-c]\t\tdump section header information\n"
 @ MSG_USAGE_DETAIL2	"\t[-C]\t\tdemangle C++ symbol names\n"
@@ -55,14 +55,16 @@
 @ MSG_USAGE_DETAIL14	"\t[-p]\t\tdump the program headers\n"
 @ MSG_USAGE_DETAIL15	"\t[-r]\t\tdump the contents of the relocation \
 			 sections\n"
-@ MSG_USAGE_DETAIL16	"\t[-s]\t\tdump the contents of the symbol table \
+@ MSG_USAGE_DETAIL16	"\t[-S]\t\tdump the contents of the sort index \
 			 sections\n"
-@ MSG_USAGE_DETAIL17	"\t[-u]\t\tdump the contents of a frame unwind \
+@ MSG_USAGE_DETAIL17	"\t[-s]\t\tdump the contents of the symbol table \
+			 sections\n"
+@ MSG_USAGE_DETAIL18	"\t[-u]\t\tdump the contents of a frame unwind \
 			 section\n"
-@ MSG_USAGE_DETAIL18	"\t[-v]\t\tdump the contents of the version sections\n"
-@ MSG_USAGE_DETAIL19	"\t[-w file]\twrite the contents of specified section \
+@ MSG_USAGE_DETAIL19	"\t[-v]\t\tdump the contents of the version sections\n"
+@ MSG_USAGE_DETAIL20	"\t[-w file]\twrite the contents of specified section \
 			 to `file'\n"
-@ MSG_USAGE_DETAIL20	"\t[-y]\t\tdump the contents of the .SUNW_syminfo \
+@ MSG_USAGE_DETAIL21	"\t[-y]\t\tdump the contents of the .SUNW_syminfo \
 			 section\n"
 
 # Errors
@@ -103,6 +105,11 @@
 @ MSG_ERR_BADMINFO	"%s: %s: invalid m_info: 0x%llx\n"
 @ MSG_ERR_BADHASH	"%s: %s: bad hash entry: symbol %s: exists in bucket \
 			 %d, should be bucket %ld\n"
+@ MSG_ERR_NODYNSYM	"%s: %s: associated SHT_DYNSYM section not found\n"
+@ MSG_ERR_BADNDXSEC	"%s: %s: unexpected section type associated with index section: %s\n"
+@ MSG_ERR_LDYNNOTADJ	"%s: bad dynamic symbol table layout: %s and %s \
+			 sections are not adjacent\n"
+@ MSG_ERR_BADSORTNDX	"%s: %s: sort section has bad symbol index: %d\n"
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"
 @ MSG_WARN_INVINTERP2	"%s: interp section: %s: and PT_INTERP program \
@@ -132,6 +139,8 @@
 @ MSG_ELF_SCN_GOT	"Global Offset Table Section:  %s"
 @ MSG_ELF_SCN_GRP	"Group Section:  %s"
 @ MSG_ELF_SCN_MOVE	"Move Section:  %s"
+@ MSG_ELF_SCN_SYMSORT1	"Symbol Sort Section:  %s (%s)"
+@ MSG_ELF_SCN_SYMSORT2	"Symbol Sort Section:  %s (%s / %s)"
 
 @ MSG_ELF_HASH_BKTS1	"%10.10s  buckets contain %8d symbols"
 @ MSG_ELF_HASH_BKTS2	"%10.10s  buckets         %8d symbols (globals)"
@@ -219,7 +228,7 @@
 
 @ MSG_GOT_SYM		"_GLOBAL_OFFSET_TABLE_"
 
-@ MSG_STR_OPTIONS	"CcdeGgHhiklmN:nprsuvw:y"
+@ MSG_STR_OPTIONS	"CcdeGgHhiklmN:nprSsuvw:y"
 
 @ MSG_STR_EMPTY		""
 

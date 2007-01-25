@@ -23,7 +23,7 @@
  *	  All Rights Reserved
  *
  *
- *	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -94,7 +94,10 @@ typedef struct _rt_elf_private {
 	void		*e_pltreserve;	/* ia64: DT_IA_64_PLTRESERVE */
 	void		*e_dynplt;	/* dynamic plt table - used by prof */
 	void		*e_jmprel;	/* plt relocations */
-	ulong_t		e_sunwsymsz;	/* size of w_sunwsymtab */
+	ulong_t		e_sunwsortent;	/* size of sunw[sym|tls]sort entry */
+	uint_t		*e_sunwsymsort;	/* sunwsymtab indices sorted by addr */
+	ulong_t		e_sunwsymsortsz; /* size of sunwsymtab */
+	ulong_t		e_sunwsymsz;	/* size of e_sunwsymtab */
 	ulong_t		e_pltrelsize;	/* size of PLT relocation entries */
 	ulong_t		e_relsz;	/* size of relocs */
 	ulong_t		e_relent;	/* size of base reloc entry */
@@ -119,36 +122,39 @@ typedef struct _rt_elf_private {
 /*
  * Macros for getting to linker ELF private data.
  */
-#define	ELFPRV(X)	((X)->rt_priv)
-#define	SYMTAB(X)	(((Rt_elfp *)(X)->rt_priv)->e_symtab)
-#define	SUNWSYMTAB(X)	(((Rt_elfp *)(X)->rt_priv)->e_sunwsymtab)
-#define	HASH(X)		(((Rt_elfp *)(X)->rt_priv)->e_hash)
-#define	STRTAB(X)	(((Rt_elfp *)(X)->rt_priv)->e_strtab)
-#define	REL(X)		(((Rt_elfp *)(X)->rt_priv)->e_reloc)
-#define	PLTGOT(X)	(((Rt_elfp *)(X)->rt_priv)->e_pltgot)
-#define	MOVESZ(X)	(((Rt_elfp *)(X)->rt_priv)->e_movesz)
-#define	MOVEENT(X)	(((Rt_elfp *)(X)->rt_priv)->e_moveent)
-#define	MOVETAB(X)	(((Rt_elfp *)(X)->rt_priv)->e_movetab)
-#define	DYNPLT(X)	(((Rt_elfp *)(X)->rt_priv)->e_dynplt)
-#define	JMPREL(X)	(((Rt_elfp *)(X)->rt_priv)->e_jmprel)
-#define	SUNWSYMSZ(X)	(((Rt_elfp *)(X)->rt_priv)->e_sunwsymsz)
-#define	PTTLS(X)	(((Rt_elfp *)(X)->rt_priv)->e_pttls)
-#define	PTUNWIND(X)	(((Rt_elfp *)(X)->rt_priv)->e_ptunwind)
-#define	TLSSTATOFF(X)	(((Rt_elfp *)(X)->rt_priv)->e_tlsstatoff)
-#define	PLTRELSZ(X)	(((Rt_elfp *)(X)->rt_priv)->e_pltrelsize)
-#define	RELSZ(X)	(((Rt_elfp *)(X)->rt_priv)->e_relsz)
-#define	RELENT(X)	(((Rt_elfp *)(X)->rt_priv)->e_relent)
-#define	SYMENT(X)	(((Rt_elfp *)(X)->rt_priv)->e_syment)
-#define	ENTRY(X)	(((Rt_elfp *)(X)->rt_priv)->e_entry)
-#define	VERNEED(X)	(((Rt_elfp *)(X)->rt_priv)->e_verneed)
-#define	VERNEEDNUM(X)	(((Rt_elfp *)(X)->rt_priv)->e_verneednum)
-#define	VERDEF(X)	(((Rt_elfp *)(X)->rt_priv)->e_verdef)
-#define	VERDEFNUM(X)	(((Rt_elfp *)(X)->rt_priv)->e_verdefnum)
-#define	SUNWBSS(X)	(((Rt_elfp *)(X)->rt_priv)->e_sunwbss)
-#define	SYMINENT(X)	(((Rt_elfp *)(X)->rt_priv)->e_syminent)
-#define	PLTPAD(X)	(((Rt_elfp *)(X)->rt_priv)->e_pltpad)
-#define	PLTPADEND(X)	(((Rt_elfp *)(X)->rt_priv)->e_pltpadend)
-#define	PLTRESERVE(X)	(((Rt_elfp *)(X)->rt_priv)->e_pltreserve)
+#define	ELFPRV(X)		((X)->rt_priv)
+#define	SYMTAB(X)		(((Rt_elfp *)(X)->rt_priv)->e_symtab)
+#define	SUNWSYMTAB(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwsymtab)
+#define	HASH(X)			(((Rt_elfp *)(X)->rt_priv)->e_hash)
+#define	STRTAB(X)		(((Rt_elfp *)(X)->rt_priv)->e_strtab)
+#define	REL(X)			(((Rt_elfp *)(X)->rt_priv)->e_reloc)
+#define	PLTGOT(X)		(((Rt_elfp *)(X)->rt_priv)->e_pltgot)
+#define	MOVESZ(X)		(((Rt_elfp *)(X)->rt_priv)->e_movesz)
+#define	MOVEENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_moveent)
+#define	MOVETAB(X)		(((Rt_elfp *)(X)->rt_priv)->e_movetab)
+#define	DYNPLT(X)		(((Rt_elfp *)(X)->rt_priv)->e_dynplt)
+#define	JMPREL(X)		(((Rt_elfp *)(X)->rt_priv)->e_jmprel)
+#define	SUNWSYMSZ(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwsymsz)
+#define	PTTLS(X)		(((Rt_elfp *)(X)->rt_priv)->e_pttls)
+#define	PTUNWIND(X)		(((Rt_elfp *)(X)->rt_priv)->e_ptunwind)
+#define	TLSSTATOFF(X)		(((Rt_elfp *)(X)->rt_priv)->e_tlsstatoff)
+#define	PLTRELSZ(X)		(((Rt_elfp *)(X)->rt_priv)->e_pltrelsize)
+#define	RELSZ(X)		(((Rt_elfp *)(X)->rt_priv)->e_relsz)
+#define	RELENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_relent)
+#define	SYMENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_syment)
+#define	ENTRY(X)		(((Rt_elfp *)(X)->rt_priv)->e_entry)
+#define	VERNEED(X)		(((Rt_elfp *)(X)->rt_priv)->e_verneed)
+#define	VERNEEDNUM(X)		(((Rt_elfp *)(X)->rt_priv)->e_verneednum)
+#define	VERDEF(X)		(((Rt_elfp *)(X)->rt_priv)->e_verdef)
+#define	VERDEFNUM(X)		(((Rt_elfp *)(X)->rt_priv)->e_verdefnum)
+#define	SUNWBSS(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwbss)
+#define	SYMINENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_syminent)
+#define	PLTPAD(X)		(((Rt_elfp *)(X)->rt_priv)->e_pltpad)
+#define	PLTPADEND(X)		(((Rt_elfp *)(X)->rt_priv)->e_pltpadend)
+#define	PLTRESERVE(X)		(((Rt_elfp *)(X)->rt_priv)->e_pltreserve)
+#define	SUNWSORTENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwsortent)
+#define	SUNWSYMSORT(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwsymsort)
+#define	SUNWSYMSORTSZ(X)	(((Rt_elfp *)(X)->rt_priv)->e_sunwsymsortsz)
 
 #ifdef	__cplusplus
 }

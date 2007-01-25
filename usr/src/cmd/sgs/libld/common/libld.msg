@@ -435,6 +435,9 @@
 @ MSG_SYM_RESERVE	"reserved symbol `%s' already defined in file %s"
 @ MSG_SYM_NOTNULL	"undefined symbol `%s' with non-zero value encountered \
 			 from file %s"
+@ MSG_SYM_DUPSORTADDR	"section %s: symbol `%s' and symbol `%s' have the \
+			 same address: %#llx: remove duplicate with \
+			 NOSORTSYM mapfile directive"
 
 @ MSG_PSYM_INVMINFO1	"file %s: section %s: entry[%d] has invalid m_info: \
 			 0x%llx for symbol index"
@@ -615,6 +618,8 @@
 @ MSG_SCN_COMMENT	".comment"
 @ MSG_SCN_DEBUG		".debug"
 @ MSG_SCN_DYNAMIC	".dynamic"
+@ MSG_SCN_DYNSYMSORT	".SUNW_dynsymsort"
+@ MSG_SCN_DYNTLSSORT	".SUNW_dyntlssort"
 @ MSG_SCN_DYNSTR	".dynstr"
 @ MSG_SCN_DYNSYM	".dynsym"
 @ MSG_SCN_DYNSYM_SHNDX	".dynsym_shndx"
@@ -1146,6 +1151,8 @@
 @ MSG_MAP_AUXILIARY	"auxiliary"
 @ MSG_MAP_OVERRIDE	"override"
 @ MSG_MAP_INTERPOSE	"interpose"
+@ MSG_MAP_DYNSORT	"dynsort"
+@ MSG_MAP_NODYNSORT	"nodynsort"
 
 @ MSG_FMT_INDEX		"[%lld]"
 

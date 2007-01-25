@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Global include file for all sgs ia32 based machine dependent macros,
@@ -308,10 +308,11 @@ extern "C" {
 #define	M_ID_DYNSYM	0x0a
 #define	M_ID_DYNSTR	0x0b
 #define	M_ID_VERSION	0x0c
-#define	M_ID_REL	0x0d
-#define	M_ID_PLT	0x0e			/* SHF_ALLOC + SHF_EXECISNTR */
-#define	M_ID_TEXT	0x0f
-#define	M_ID_DATA	0x10
+#define	M_ID_DYNSORT	0x0d
+#define	M_ID_REL	0x0e
+#define	M_ID_PLT	0x0f			/* SHF_ALLOC + SHF_EXECISNTR */
+#define	M_ID_TEXT	0x10
+#define	M_ID_DATA	0x20
 
 /*	M_ID_USER	0x02			dual entry - listed above */
 #define	M_ID_GOT	0x03			/* SHF_ALLOC + SHF_WRITE */

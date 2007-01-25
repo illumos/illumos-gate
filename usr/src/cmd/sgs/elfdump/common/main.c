@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -102,6 +102,7 @@ detail_usage()
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL18));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL19));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL20));
+	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL21));
 }
 
 static void
@@ -124,7 +125,7 @@ archive(const char *file, int fd, Elf *elf, uint_t flags, char *Nname,
 	Elf_Arsym	*arsym = 0;
 
 	/*
-	 * Determine if the archive sysmbol table itself is required.
+	 * Determine if the archive symbol table itself is required.
 	 */
 	if ((flags & FLG_SYMBOLS) && ((Nname == NULL) ||
 	    (strcmp(Nname, MSG_ORIG(MSG_ELF_ARSYM)) == 0))) {
@@ -329,6 +330,9 @@ main(int argc, char **argv, char **envp)
 			break;
 		case 'r':
 			flags |= FLG_RELOC;
+			break;
+		case 'S':
+			flags |= FLG_SORT;
 			break;
 		case 's':
 			flags |= FLG_SYMBOLS;

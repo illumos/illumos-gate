@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -144,6 +144,7 @@ typedef struct {
 #define	MSG_SHD_ADDR		MSG_SHD_ADDR_64
 #define	MSG_SHD_SIZE		MSG_SHD_SIZE_64
 #define	MSG_SHD_OFFSET		MSG_SHD_OFFSET_64
+#define	MSG_SHD_OFFSET_ENT	MSG_SHD_OFFSET_ENT_64
 #define	MSG_SHD_ALIGN		MSG_SHD_ALIGN_64
 #define	MSG_SHD_LINK		MSG_SHD_LINK_64
 
@@ -198,6 +199,7 @@ typedef struct {
 #define	MSG_SHD_ADDR		MSG_SHD_ADDR_32
 #define	MSG_SHD_SIZE		MSG_SHD_SIZE_32
 #define	MSG_SHD_OFFSET		MSG_SHD_OFFSET_32
+#define	MSG_SHD_OFFSET_ENT	MSG_SHD_OFFSET_ENT_32
 #define	MSG_SHD_ALIGN		MSG_SHD_ALIGN_32
 #define	MSG_SHD_LINK		MSG_SHD_LINK_32
 

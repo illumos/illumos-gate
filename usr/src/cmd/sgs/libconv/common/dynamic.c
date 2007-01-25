@@ -35,6 +35,13 @@
 #include	"_conv.h"
 #include	"dynamic_msg.h"
 
+
+
+/* Instantiate a local copy of conv_map2str() from _conv.h */
+DEFINE_conv_map2str
+
+
+
 #define	POSSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
 		MSG_DFP_LAZYLOAD_ALT_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_DFP_GROUPPERM_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
@@ -208,7 +215,38 @@ const char *
 conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 {
 	static Conv_inv_buf_t	string;
-	static const Msg	tags[DT_MAXPOSTAGS] = {
+
+	/*
+	 * Dynamic tag values are sparse, cover a wide range, and have
+	 * holes. To handle this efficiently, we fall through a series
+	 * of tests below, in increasing tag order, returning at the first
+	 * match.
+	 *
+	 * If we fall all the way to the end, the tag is unknown,
+	 * and its numeric value is printed.
+	 */
+
+	/*
+	 * Most of the tag values are clustered in contiguous ranges.
+	 * Each contiguous range of defined values is handled with
+	 * an array that contains the message index corresponding to
+	 * each value in that range. The DYN_RANGE macro checks the
+	 * tag value against range of values starting at _start_tag.
+	 * If there is a match, the index of the appropriate name is
+	 * pulled from _array and returned to the caller.
+	 */
+#define	DYN_RANGE(_start_tag, _array) \
+	if ((tag >= _start_tag) && (tag < (_start_tag + ARRAY_NELTS(_array)))) \
+		return (MSG_ORIG(_array[tag - _start_tag]));
+
+
+	/*
+	 * Generic dynamic tags:
+	 *	- Note hole between DT_FLAGS and DT_PREINIT_ARRAY
+	 *	- The first range has alternative names for dump,
+	 *	  requiring a second array.
+	 */
+	static const Msg	tags_null[] = {
 		MSG_DYN_NULL,		MSG_DYN_NEEDED,
 		MSG_DYN_PLTRELSZ,	MSG_DYN_PLTGOT,
 		MSG_DYN_HASH,		MSG_DYN_STRTAB,
@@ -224,10 +262,9 @@ conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 		MSG_DYN_BIND_NOW,	MSG_DYN_INIT_ARRAY,
 		MSG_DYN_FINI_ARRAY,	MSG_DYN_INIT_ARRAYSZ,
 		MSG_DYN_FINI_ARRAYSZ,	MSG_DYN_RUNPATH,
-		MSG_DYN_FLAGS,		MSG_DYN_NULL,
-		MSG_DYN_PREINIT_ARRAY,	MSG_DYN_PREINIT_ARRAYSZ
+		MSG_DYN_FLAGS
 	};
-	static const Msg	tags_alt[DT_MAXPOSTAGS] = {
+	static const Msg	tags_null_alt[] = {
 		MSG_DYN_NULL,		MSG_DYN_NEEDED,
 		MSG_DYN_PLTRELSZ_ALT,	MSG_DYN_PLTGOT,
 		MSG_DYN_HASH,		MSG_DYN_STRTAB,
@@ -243,108 +280,92 @@ conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 		MSG_DYN_BIND_NOW,	MSG_DYN_INIT_ARRAY,
 		MSG_DYN_FINI_ARRAY,	MSG_DYN_INIT_ARRAYSZ,
 		MSG_DYN_FINI_ARRAYSZ,	MSG_DYN_RUNPATH,
-		MSG_DYN_FLAGS,		MSG_DYN_NULL,
+		MSG_DYN_FLAGS
+	};
+	static const Msg	tags_preinit_array[] = {
 		MSG_DYN_PREINIT_ARRAY,	MSG_DYN_PREINIT_ARRAYSZ
 	};
 
-	if (tag < DT_MAXPOSTAGS) {
-		/*
-		 * Generic dynamic tags.
-		 */
-		return ((fmt_flags & CONV_FMTALTMASK)
-			? MSG_ORIG(tags_alt[tag]) : MSG_ORIG(tags[tag]));
-	} else {
-		/*
-		 * SUNW: DT_LOOS -> DT_HIOS range.
-		 */
-		if (tag == DT_SUNW_AUXILIARY)
-			return (MSG_ORIG(MSG_DYN_SUNW_AUXILIARY));
-		else if (tag == DT_SUNW_RTLDINF)
-			return (MSG_ORIG(MSG_DYN_SUNW_RTLDINF));
-		else if (tag == DT_SUNW_FILTER)
-			return (MSG_ORIG(MSG_DYN_SUNW_FILTER));
-		else if (tag == DT_SUNW_CAP)
-			return (MSG_ORIG(MSG_DYN_SUNW_CAP));
-		else if (tag == DT_SUNW_SYMTAB)
-			return (MSG_ORIG(MSG_DYN_SUNW_SYMTAB));
-		else if (tag == DT_SUNW_SYMSZ)
-			return (MSG_ORIG(MSG_DYN_SUNW_SYMSZ));
+	/*
+	 * SUNW: DT_LOOS -> DT_HIOS range.
+	 */
+	static const Msg	tags_sunw_auxiliary[] = {
+		MSG_DYN_SUNW_AUXILIARY,	MSG_DYN_SUNW_RTLDINF,
+		MSG_DYN_SUNW_FILTER,	MSG_DYN_SUNW_CAP,
+		MSG_DYN_SUNW_SYMTAB,	MSG_DYN_SUNW_SYMSZ,
+		MSG_DYN_SUNW_SORTENT,	MSG_DYN_SUNW_SYMSORTSZ,
+		MSG_DYN_SUNW_TLSSORT,	MSG_DYN_SUNW_TLSSORTSZ
+	};
 
-		/*
-		 * SUNW: DT_VALRNGLO - DT_VALRNGHI range.
-		 */
-		else if (tag == DT_CHECKSUM)
-			return (MSG_ORIG(MSG_DYN_CHECKSUM));
-		else if (tag == DT_PLTPADSZ)
-			return (MSG_ORIG(MSG_DYN_PLTPADSZ));
-		else if (tag == DT_MOVEENT)
-			return (MSG_ORIG(MSG_DYN_MOVEENT));
-		else if (tag == DT_MOVESZ)
-			return (MSG_ORIG(MSG_DYN_MOVESZ));
-		else if (tag == DT_FEATURE_1)
-			return (MSG_ORIG(MSG_DYN_FEATURE_1));
-		else if (tag == DT_POSFLAG_1)
-			return (MSG_ORIG(MSG_DYN_POSFLAG_1));
-		else if (tag == DT_SYMINSZ)
-			return (MSG_ORIG(MSG_DYN_SYMINSZ));
-		else if (tag == DT_SYMINENT)
-			return (MSG_ORIG(MSG_DYN_SYMINENT));
+	/*
+	 * SUNW: DT_VALRNGLO - DT_VALRNGHI range.
+	 */
+	static const Msg	tags_checksum[] = {
+		MSG_DYN_CHECKSUM,	MSG_DYN_PLTPADSZ,
+		MSG_DYN_MOVEENT,	MSG_DYN_MOVESZ,
+		MSG_DYN_FEATURE_1,	MSG_DYN_POSFLAG_1,
+		MSG_DYN_SYMINSZ,	MSG_DYN_SYMINENT
+	};
 
-		/*
-		 * SUNW: DT_ADDRRNGLO - DT_ADDRRNGHI range.
-		 */
-		else if (tag == DT_CONFIG)
-			return (MSG_ORIG(MSG_DYN_CONFIG));
-		else if (tag == DT_DEPAUDIT)
-			return (MSG_ORIG(MSG_DYN_DEPAUDIT));
-		else if (tag == DT_AUDIT)
-			return (MSG_ORIG(MSG_DYN_AUDIT));
-		else if (tag == DT_PLTPAD)
-			return (MSG_ORIG(MSG_DYN_PLTPAD));
-		else if (tag == DT_MOVETAB)
-			return (MSG_ORIG(MSG_DYN_MOVETAB));
-		else if (tag == DT_SYMINFO)
-			return (MSG_ORIG(MSG_DYN_SYMINFO));
+	/*
+	 * SUNW: DT_ADDRRNGLO - DT_ADDRRNGHI range.
+	 */
+	static const Msg	tags_config[] = {
+		MSG_DYN_CONFIG,		MSG_DYN_DEPAUDIT,
+		MSG_DYN_AUDIT,		MSG_DYN_PLTPAD,
+		MSG_DYN_MOVETAB,	MSG_DYN_SYMINFO
+	};
 
-		/*
-		 * SUNW: generic range.
-		 */
-		else if (tag == DT_VERSYM)
-			return (MSG_ORIG(MSG_DYN_VERSYM));
-		else if (tag == DT_RELACOUNT)
-			return (MSG_ORIG(MSG_DYN_RELACOUNT));
-		else if (tag == DT_RELCOUNT)
-			return (MSG_ORIG(MSG_DYN_RELCOUNT));
-		else if (tag == DT_FLAGS_1)
-			return (MSG_ORIG(MSG_DYN_FLAGS_1));
-		else if (tag == DT_VERDEF)
-			return (MSG_ORIG(MSG_DYN_VERDEF));
-		else if (tag == DT_VERDEFNUM)
-			return (MSG_ORIG(MSG_DYN_VERDEFNUM));
-		else if (tag == DT_VERNEED)
-			return (MSG_ORIG(MSG_DYN_VERNEED));
-		else if (tag == DT_VERNEEDNUM)
-			return (MSG_ORIG(MSG_DYN_VERNEEDNUM));
-		else if (tag == DT_AUXILIARY)
-			return (MSG_ORIG(MSG_DYN_AUXILIARY));
-		else if (tag == DT_USED)
-			return (MSG_ORIG(MSG_DYN_USED));
-		else if (tag == DT_FILTER)
-			return (MSG_ORIG(MSG_DYN_FILTER));
+	/*
+	 * SUNW: generic range. Note hole between DT_VERSYM and DT_RELACOUNT.
+	 * We handle DT_VERSYM as a single value below.
+	 */
+	static const Msg	tags_relacount[] = {
+		MSG_DYN_RELACOUNT,	MSG_DYN_RELCOUNT,
+		MSG_DYN_FLAGS_1,	MSG_DYN_VERDEF,
+		MSG_DYN_VERDEFNUM,	MSG_DYN_VERNEED,
+		MSG_DYN_VERNEEDNUM
+	};
 
-		/*
-		 * SUNW: machine specific range.
-		 */
-		else if (((mach == EM_SPARC) || (mach == EM_SPARCV9) ||
-		    (mach == EM_SPARC32PLUS)) && (tag == DT_SPARC_REGISTER))
-			/* this is so x86 can display a sparc binary */
-			return (MSG_ORIG(MSG_DYN_REGISTER));
-		else if (tag == DT_DEPRECATED_SPARC_REGISTER)
-			return (MSG_ORIG(MSG_DYN_REGISTER));
-		else
-			return (conv_invalid_val(string, CONV_INV_STRSIZE,
-			    tag, fmt_flags));
-	}
+	/*
+	 * DT_LOPROC - DT_HIPROC range.
+	 */
+	static const Msg	tags_auxiliary[] = {
+		MSG_DYN_AUXILIARY,	MSG_DYN_USED,
+		MSG_DYN_FILTER
+	};
+
+
+
+
+	if (tag <= DT_FLAGS)
+		return (conv_map2str(string, sizeof (string), tag,
+			fmt_flags, ARRAY_NELTS(tags_null), tags_null,
+			tags_null_alt, NULL));
+	DYN_RANGE(DT_PREINIT_ARRAY, tags_preinit_array);
+	DYN_RANGE(DT_SUNW_AUXILIARY, tags_sunw_auxiliary);
+	DYN_RANGE(DT_CHECKSUM, tags_checksum);
+	DYN_RANGE(DT_CONFIG, tags_config);
+	if (tag == DT_VERSYM)
+		return (MSG_ORIG(MSG_DYN_VERSYM));
+	DYN_RANGE(DT_RELACOUNT, tags_relacount);
+	DYN_RANGE(DT_AUXILIARY, tags_auxiliary);
+
+	/*
+	 * SUNW: machine specific range.
+	 */
+	if (((mach == EM_SPARC) || (mach == EM_SPARCV9) ||
+	    (mach == EM_SPARC32PLUS)) && (tag == DT_SPARC_REGISTER))
+		/* this is so x86 can display a sparc binary */
+		return (MSG_ORIG(MSG_DYN_REGISTER));
+
+	if (tag == DT_DEPRECATED_SPARC_REGISTER)
+		return (MSG_ORIG(MSG_DYN_REGISTER));
+
+	/* Unknown item */
+	return (conv_invalid_val(string, CONV_INV_STRSIZE, tag, fmt_flags));
+
+#undef DYN_RANGE
 }
 
 #define	BINDTSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \

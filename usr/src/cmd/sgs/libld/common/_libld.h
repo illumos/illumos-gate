@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,7 +189,97 @@ extern List		lib_support;
 extern int		demangle_flag;
 extern const Msg	reject[];
 extern int		Verbose;
-extern const int	dynaddr_symtype[STT_NUM];
+extern const int	ldynsym_symtype[STT_NUM];
+extern const int	dynsymsort_symtype[STT_NUM];
+
+/*
+ * Given a symbol of a type that is allowed within a .SUNW_dynsymsort or
+ * .SUNW_dyntlssort section, examine the symbol attributes to determine
+ * if this particular symbol should be included or not.
+ *
+ * entry:
+ *	The symbol must have an allowed type: Either a type verified by
+ *	dynsymsort_symtype[] or STT_TLS.
+ *
+ *	_sdp - Pointer to symbol descriptor
+ *	_sym - Pointer to symbol referenced by _sdp.
+ *
+ *	_sym is derivable from _sdp: _sdp->sd_sym
+ *	However, most callers assign it to a local variable for efficiency,
+ *	and this macro allows such a variable to be used within. If you
+ *	don't have such a variable, supply _sdp->sd_sym.
+ *
+ * The tests used require some explanation:
+ *
+ *	(_sdp->sd_flags & FLG_SY_DYNSORT)
+ *		Some special symbols are kept even if they don't meet the
+ *		usual requirements. These symbols have the FLG_SY_DYNSORT
+ *		bit set. If this bit isn't set then we look at the other
+ *		attributes.
+ *
+ *	((_sdp->sd_ref != REF_DYN_NEED) || (_sdp->sd_flags & FLG_SY_MVTOCOMM))
+ *		We do not want to include symbols that are not defined within
+ *		the object we are creating. REF_DYN_NEED corresponds to those
+ *		UNDEF items. However, if the symbol is the target of a copy
+ *		relocation, then it effectively becomes defined within the
+ *		object after all. FLG_SY_MVTOCOMM indicates a copy relocation,
+ *		and prevents us from culling those exceptions.
+ *
+ *	(_sym->st_size != 0)
+ *		Symbols with 0 length are labels injected by the compilers
+ *		or the linker for purposes of code generation, and do
+ *		not directly correspond to actual code. In fact, most of the
+ *		symbols we mark with FLG_SY_DYNSORT need that flag set because
+ *		they have size 0. This size test filters out the others.
+ *
+ *	!(_sdp->sd_flags & FLG_SY_NODYNSORT)
+ *		Some symbols are not kept, even though they do meet the usual
+ *		requirements. These symbols have FLG_SY_NODYNSORT set.
+ *		For example, if there are weak and non-weak versions of a given
+ *		symbol, we only want to keep one of them. So, we set
+ *		FLG_SY_NODYNSORT on the one we don't want.
+ */
+#define	DYNSORT_TEST_ATTR(_sdp, _sym) \
+	((_sdp->sd_flags & FLG_SY_DYNSORT) || \
+	(((_sdp->sd_ref != REF_DYN_NEED) || \
+		(_sdp->sd_flags & FLG_SY_MVTOCOMM)) && \
+	(_sym->st_size != 0) && \
+	!(_sdp->sd_flags & FLG_SY_NODYNSORT)))
+
+/*
+ * We use output section descriptor counters to add up the number of
+ * symbol indexes to put in the .SUNW_dynsort and .SUNW_dyntlssort sections.
+ * Non-TLS symbols are counted by ofl->ofl_dynsymsortcnt, while TLS symbols are
+ * counted by ofl->ofl_dyntlssortcnt. This computation is done inline in
+ * several places. The DYNSORT_COUNT macro allows us to generate this from
+ * a single description.
+ *
+ * entry:
+ *	_sdp, _sym - As per DYNSORT_TEST_ATTR
+ *	_type - Type of symbol (STT_*)
+ *	_inc_or_dec_op - Either ++, or --. This specifies the operation
+ *		to be applied to the counter, and determines whether we
+ *		are adding, or removing, a symbol from .SUNW_dynsymsort.
+ *
+ * Note that _type is derivable from _sym: ELF_ST_TYPE(_sdp->sd_sym->st_info).
+ * Most callers already have it in a variable, so this allows us to use that
+ * variable. If you don't have such a variable, use ELF_ST_TYPE() as shown.
+ */
+#define	DYNSORT_COUNT(_sdp, _sym, _type, _inc_or_dec_op) \
+{ \
+	Word *_cnt_var; \
+	\
+	if (dynsymsort_symtype[_type]) {	/* Non-TLS counter */ \
+		_cnt_var = &ofl->ofl_dynsymsortcnt; \
+	} else if ((_type) == STT_TLS) {	/* TLS counter */ \
+		_cnt_var = &ofl->ofl_dyntlssortcnt; \
+	} else {				/* Don't count this symbol */ \
+		_cnt_var = NULL; \
+	} \
+	if ((_cnt_var != NULL) && DYNSORT_TEST_ATTR(_sdp, _sym)) \
+		(*_cnt_var)_inc_or_dec_op;	/* Increment/Decrement */ \
+}
+
 
 /*
  * For backward compatibility provide a /dev/zero file descriptor.

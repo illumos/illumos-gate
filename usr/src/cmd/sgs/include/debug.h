@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -329,6 +329,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_syms_created	Dbg64_syms_created
 #define	Dbg_syms_discarded	Dbg64_syms_discarded
 #define	Dbg_syms_dlsym		Dbg64_syms_dlsym
+#define	Dbg_syms_dup_sort_addr	Dbg64_syms_dup_sort_addr
 #define	Dbg_syms_entered	Dbg64_syms_entered
 #define	Dbg_syms_entry		Dbg64_syms_entry
 #define	Dbg_syms_global		Dbg64_syms_global
@@ -524,6 +525,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_syms_created	Dbg32_syms_created
 #define	Dbg_syms_discarded	Dbg32_syms_discarded
 #define	Dbg_syms_dlsym		Dbg32_syms_dlsym
+#define	Dbg_syms_dup_sort_addr	Dbg32_syms_dup_sort_addr
 #define	Dbg_syms_entered	Dbg32_syms_entered
 #define	Dbg_syms_entry		Dbg32_syms_entry
 #define	Dbg_syms_global		Dbg32_syms_global
@@ -755,6 +757,8 @@ extern	void	Dbg_syms_ar_title(Lm_list *, const char *, int);
 extern	void	Dbg_syms_created(Lm_list *, const char *);
 extern	void	Dbg_syms_discarded(Lm_list *, Sym_desc *, Is_desc *);
 extern	void	Dbg_syms_dlsym(Rt_map *, const char *, const char *, int);
+extern	void	Dbg_syms_dup_sort_addr(Lm_list *, const char *, const char *,
+		    const char *, Addr);
 extern	void	Dbg_syms_entered(Ofl_desc *, Sym *, Sym_desc *);
 extern	void	Dbg_syms_entry(Lm_list *, Word, Sym_desc *);
 extern	void	Dbg_syms_global(Lm_list *, Word, const char *);

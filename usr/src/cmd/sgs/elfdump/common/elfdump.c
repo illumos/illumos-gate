@@ -49,12 +49,14 @@ string(Cache *refsec, Word ndx, Cache *strsec, const char *file, Word name)
 {
 	static Cache	*osec = 0;
 	static int	nostr;
+	const char	*strs;
+	Word		strn;
 
 	if (strsec->c_data == NULL)
 		return (NULL);
 
-	const char	*strs = (char *)strsec->c_data->d_buf;
-	Word		strn = strsec->c_data->d_size;
+	strs = (char *)strsec->c_data->d_buf;
+	strn = strsec->c_data->d_size;
 
 	/*
 	 * Only print a diagnostic regarding an empty string table once per
@@ -692,7 +694,7 @@ cap(const char *file, Cache *cache, Word shnum, Word phnum, Ehdr *ehdr,
 	 */
 	if (cshdr) {
 		Word	ndx, capn;
-		Cap	*cap  = (Cap *)ccache->c_data->d_buf;
+		Cap	*cap = (Cap *)ccache->c_data->d_buf;
 
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 		dbg_print(0, MSG_INTL(MSG_ELF_SCN_CAP), ccache->c_name);
@@ -1058,21 +1060,116 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags)
 }
 
 /*
- * Determine the extended section index used for symbol tables entries.
+ * SYMTBL_STATE is used to maintain information about a single symbol
+ * table section, for use by the routines that display symbol information.
+ */
+typedef struct {
+	const		char *file;	/* Name of file */
+	Ehdr		*ehdr;		/* ELF header for file */
+	Cache		*cache;		/* Cache of all section headers */
+	Word		shnum;		/* # of sections in cache */
+	Cache		*seccache;	/* Cache of symbol table section hdr */
+	Word		secndx;		/* Index of symbol table section hdr */
+	const char	*secname;	/* Name of section */
+	uint_t		flags;		/* Command line option flags */
+	struct {			/* Extended section index data */
+		int	checked;	/* TRUE if already checked for shxndx */
+		Word	*data;		/* NULL, or extended section index */
+					/*	used for symbol table entries */
+		uint_t	n;		/* # items in shxndx.data */
+	} shxndx;
+	Versym		*versym;	/* NULL, or versym array for symtbl */
+	Sym 		*sym;		/* Array of symbols */
+	Word		symn;		/* # of symbols */
+} SYMTBL_STATE;
+
+/*
+ * Initialize a symbol table state structure
+ *
+ * entry:
+ *	state - State structure to be initialized
+ *	cache - Cache of all section headers
+ *	shnum - # of sections in cache
+ *	secndx - Index of symbol table section
+ *	ehdr - ELF header for file
+ *	versymcache - NULL, or cache of versym section
+ *	file - Name of file
+ *	flags - Command line option flags
  */
 static int
-symbols_getxindex(Cache *cache, Word shnum, Word seccnt, Word **shxndx,
-    uint_t *symnshxndx)
+init_symtbl_state(SYMTBL_STATE *state, Cache *cache, Word shnum, Word secndx,
+    Ehdr *ehdr, Cache *versymcache, const char *file, uint_t flags)
+{
+	Shdr *shdr;
+
+	state->file = file;
+	state->ehdr = ehdr;
+	state->cache = cache;
+	state->shnum = shnum;
+	state->seccache = &cache[secndx];
+	state->secndx = secndx;
+	state->secname = state->seccache->c_name;
+	state->flags = flags;
+	state->shxndx.checked = 0;
+	state->shxndx.data = NULL;
+	state->shxndx.n = 0;
+
+	shdr = state->seccache->c_shdr;
+
+	/*
+	 * Check the symbol data and per-item size.
+	 */
+	if ((shdr->sh_entsize == 0) || (shdr->sh_size == 0)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+		    file, state->secname);
+		return (0);
+	}
+	if (state->seccache->c_data == NULL)
+		return (0);
+
+	/* LINTED */
+	state->symn = (Word)(shdr->sh_size / shdr->sh_entsize);
+	state->sym = (Sym *)state->seccache->c_data->d_buf;
+
+	/*
+	 * Check associated string table section.
+	 */
+	if ((shdr->sh_link == 0) || (shdr->sh_link >= shnum)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHLINK),
+		    file, state->secname, EC_WORD(shdr->sh_link));
+		return (0);
+	}
+
+	/*
+	 * Determine if there is a associated Versym section
+	 * with this Symbol Table.
+	 */
+	if (versymcache && (versymcache->c_shdr->sh_link == state->secndx) &&
+	    versymcache->c_data)
+		state->versym = versymcache->c_data->d_buf;
+	else
+		state->versym = NULL;
+
+
+	return (1);
+}
+
+/*
+ * Determine the extended section index used for symbol tables entries.
+ */
+static void
+symbols_getxindex(SYMTBL_STATE * state)
 {
 	uint_t	symn;
 	Word	symcnt;
 
-	for (symcnt = 1; symcnt < shnum; symcnt++) {
-		Cache	*_cache = &cache[symcnt];
+	state->shxndx.checked = 1;   /* Note that we've been called */
+	for (symcnt = 1; symcnt < state->shnum; symcnt++) {
+		Cache	*_cache = &state->cache[symcnt];
 		Shdr	*shdr = _cache->c_shdr;
 
 		if ((shdr->sh_type != SHT_SYMTAB_SHNDX) ||
-		    (shdr->sh_link != seccnt))
+		    (shdr->sh_link != state->secndx))
 			continue;
 
 		if ((shdr->sh_entsize) &&
@@ -1083,25 +1180,31 @@ symbols_getxindex(Cache *cache, Word shnum, Word seccnt, Word **shxndx,
 		if (_cache->c_data == NULL)
 			continue;
 
-		*shxndx = _cache->c_data->d_buf;
-		*symnshxndx = symn;
-		return (0);
+		state->shxndx.data = _cache->c_data->d_buf;
+		state->shxndx.n = symn;
+		return;
 	}
-	return (1);
 }
 
 /*
- * Search for and process any symbol tables.
+ * Produce a line of output for the given symbol
+ *
+ * entry:
+ *	symndx - Index of symbol within the table
+ *	symndx_disp - Index to display. This may not be the same
+ *		as symndx if the display is relative to the logical
+ *		combination of the SUNW_ldynsym/dynsym tables.
+ *	sym - Symbol to display
+ *	state - Symbol table state
  */
-void
-symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
-    Cache *versymcache, const char *file, uint_t flags)
+static void
+output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 {
 	/*
 	 * Symbol types for which we check that the specified
 	 * address/size land inside the target section.
 	 */
-	static const int dynaddr_symtype[STT_NUM] = {
+	static const int addr_symtype[STT_NUM] = {
 		0,			/* STT_NOTYPE */
 		1,			/* STT_OBJECT */
 		1,			/* STT_FUNC */
@@ -1111,204 +1214,313 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
 		0,			/* STT_TLS */
 	};
 #if STT_NUM != (STT_TLS + 1)
-#error "STT_NUM has grown. Update dynaddr_symtype[]"
+#error "STT_NUM has grown. Update addr_symtype[]"
 #endif
 
-	Word	seccnt;
-	char	is_core = (ehdr->e_type == ET_CORE);
+	char		index[MAXNDXSIZE], *sec;
+	const char	*symname;
+	int		verndx;
+	uchar_t		type;
+	Shdr		*tshdr;
+	Word		shndx;
 
-	for (seccnt = 1; seccnt < shnum; seccnt++) {
-		Word		symn, symcnt, *shxndx;
-		Versym		*versym;
-		Cache		*_cache = &cache[seccnt];
-		Shdr		*shdr = _cache->c_shdr;
-		const char	*secname = _cache->c_name;
-		Sym 		*sym;
-		int		noshxndx;
-		uint_t		symnshxndx;
+	/* Ensure symbol index is in range */
+	if (symndx >= state->symn) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSORTNDX),
+		    state->file, state->secname, EC_WORD(symndx));
+		return;
+	}
+
+	/*
+	 * If we are using extended symbol indexes, find the
+	 * corresponding SHN_SYMTAB_SHNDX table.
+	 */
+	if ((sym->st_shndx == SHN_XINDEX) && (state->shxndx.checked == 0))
+		symbols_getxindex(state);
+
+	/* LINTED */
+	symname = string(state->seccache, symndx,
+	    &state->cache[state->seccache->c_shdr->sh_link], state->file,
+	    sym->st_name);
+
+	tshdr = 0;
+	sec = NULL;
+
+	if ((state->ehdr->e_type == ET_CORE))
+		sec = (char *)MSG_INTL(MSG_STR_UNKNOWN);
+	else if ((sym->st_shndx < SHN_LORESERVE) &&
+	    (sym->st_shndx < state->shnum)) {
+		shndx = sym->st_shndx;
+		tshdr = state->cache[shndx].c_shdr;
+		sec = state->cache[shndx].c_name;
+	} else if (sym->st_shndx == SHN_XINDEX) {
+		if (state->shxndx.data) {
+			Word	_shxndx;
+
+			if (symndx > state->shxndx.n) {
+			    (void) fprintf(stderr,
+				MSG_INTL(MSG_ERR_BADSYMXINDEX1),
+				state->file, state->secname, EC_WORD(symndx));
+			} else if ((_shxndx =
+			    state->shxndx.data[symndx]) > state->shnum) {
+			    (void) fprintf(stderr,
+				MSG_INTL(MSG_ERR_BADSYMXINDEX2),
+				state->file, state->secname, EC_WORD(symndx),
+				EC_WORD(_shxndx));
+			} else {
+			    shndx = _shxndx;
+			    tshdr = state->cache[shndx].c_shdr;
+			    sec = state->cache[shndx].c_name;
+			}
+		} else {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_BADSYMXINDEX3),
+			    state->file, state->secname, EC_WORD(symndx));
+		}
+	} else if ((sym->st_shndx < SHN_LORESERVE) &&
+	    (sym->st_shndx >= state->shnum)) {
+		(void) fprintf(stderr,
+		    MSG_INTL(MSG_ERR_BADSYM5), state->file,
+		    state->secname, demangle(symname, state->flags),
+		    sym->st_shndx);
+	}
+
+	/*
+	 * If versioning is available display the
+	 * version index.
+	 */
+	if (state->versym)
+		verndx = (int)state->versym[symndx];
+	else
+		verndx = 0;
+
+	/*
+	 * Error checking for TLS.
+	 */
+	type = ELF_ST_TYPE(sym->st_info);
+	if (type == STT_TLS) {
+		if (tshdr &&
+		    (sym->st_shndx != SHN_UNDEF) &&
+		    ((tshdr->sh_flags & SHF_TLS) == 0)) {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_BADSYM3), state->file,
+			    state->secname, demangle(symname, state->flags));
+		}
+	} else if ((type != STT_SECTION) && sym->st_size &&
+	    tshdr && (tshdr->sh_flags & SHF_TLS)) {
+		(void) fprintf(stderr,
+		    MSG_INTL(MSG_ERR_BADSYM4), state->file,
+		    state->secname, demangle(symname, state->flags));
+	}
+
+	/*
+	 * If a symbol with non-zero size has a type that
+	 * specifies an address, then make sure the location
+	 * it references is actually contained within the
+	 * section.  UNDEF symbols don't count in this case,
+	 * so we ignore them.
+	 *
+	 * The meaning of the st_value field in a symbol
+	 * depends on the type of object. For a relocatable
+	 * object, it is the offset within the section.
+	 * For sharable objects, it is the offset relative to
+	 * the base of the object, and for other types, it is
+	 * the virtual address. To get an offset within the
+	 * section for non-ET_REL files, we subtract the
+	 * base address of the section.
+	 */
+	if (addr_symtype[type] && (sym->st_size > 0) &&
+	    (sym->st_shndx != SHN_UNDEF) && ((sym->st_shndx < SHN_LORESERVE) ||
+	    (sym->st_shndx == SHN_XINDEX)) && (tshdr != NULL)) {
+		Word v = sym->st_value;
+			if (state->ehdr->e_type != ET_REL)
+			v -= tshdr->sh_addr;
+		if (((v + sym->st_size) > tshdr->sh_size)) {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_BADSYM6), state->file,
+			    state->secname, demangle(symname, state->flags),
+			    EC_WORD(shndx), EC_XWORD(tshdr->sh_size),
+			    EC_XWORD(sym->st_value), EC_XWORD(sym->st_size));
+		}
+	}
+
+	(void) snprintf(index, MAXNDXSIZE,
+	    MSG_ORIG(MSG_FMT_INDEX), EC_XWORD(disp_symndx));
+	Elf_syms_table_entry(0, ELF_DBG_ELFDUMP, index,
+	    state->ehdr->e_machine, sym, verndx, sec, symname);
+}
+
+/*
+ * Search for and process any symbol tables.
+ */
+void
+symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
+    Cache *versymcache, const char *file, uint_t flags)
+{
+	SYMTBL_STATE state;
+	Cache *_cache;
+	Word secndx;
+
+	for (secndx = 1; secndx < shnum; secndx++) {
+		Word		symcnt;
+		Shdr		*shdr;
+
+		_cache = &cache[secndx];
+		shdr = _cache->c_shdr;
 
 		if ((shdr->sh_type != SHT_SYMTAB) &&
 		    (shdr->sh_type != SHT_DYNSYM) &&
 		    (shdr->sh_type != SHT_SUNW_LDYNSYM))
 			continue;
-		if (name && strcmp(name, secname))
+		if (name && strcmp(name, _cache->c_name))
 			continue;
 
-		/*
-		 * Determine the symbol data and number.
-		 */
-		if ((shdr->sh_entsize == 0) || (shdr->sh_size == 0)) {
-			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
-			    file, secname);
+		if (!init_symtbl_state(&state, cache, shnum, secndx, ehdr,
+		    versymcache, file, flags))
 			continue;
-		}
-		if (_cache->c_data == NULL)
-			continue;
-
-		/* LINTED */
-		symn = (Word)(shdr->sh_size / shdr->sh_entsize);
-		sym = (Sym *)_cache->c_data->d_buf;
-
-		/*
-		 * Get the associated string table section.
-		 */
-		if ((shdr->sh_link == 0) || (shdr->sh_link >= shnum)) {
-			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHLINK),
-			    file, secname, EC_WORD(shdr->sh_link));
-			continue;
-		}
-
-		/*
-		 * Determine if there is a associated Versym section
-		 * with this Symbol Table.
-		 */
-		if (versymcache && (versymcache->c_shdr->sh_link == seccnt) &&
-		    versymcache->c_data)
-			versym = versymcache->c_data->d_buf;
-		else
-			versym = 0;
-
 		/*
 		 * Loop through the symbol tables entries.
 		 */
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
-		dbg_print(0, MSG_INTL(MSG_ELF_SCN_SYMTAB), secname);
+		dbg_print(0, MSG_INTL(MSG_ELF_SCN_SYMTAB), state.secname);
 		Elf_syms_table_title(0, ELF_DBG_ELFDUMP);
 
-		shxndx = 0;
-		noshxndx = 0;
-		symnshxndx = 0;
-		for (symcnt = 0; symcnt < symn; sym++, symcnt++) {
-			char		index[MAXNDXSIZE], *sec;
-			const char	*symname;
-			int		verndx;
-			uchar_t		type;
-			Shdr		*tshdr;
-			Word		shndx;
+		for (symcnt = 0; symcnt < state.symn; symcnt++)
+			output_symbol(&state, symcnt, symcnt,
+			    state.sym + symcnt);
+	}
+}
 
+/*
+ * Search for and process any SHT_SUNW_symsort or SHT_SUNW_tlssort sections.
+ * These sections are always associated with the .SUNW_ldynsym./.dynsym pair.
+ */
+static void
+sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
+    Cache *versymcache, const char *file, uint_t flags)
+{
+	SYMTBL_STATE	ldynsym_state,	dynsym_state;
+	Cache		*sortcache,	*symcache;
+	Shdr		*sortshdr,	*symshdr;
+	Word		sortsecndx,	symsecndx;
+	Word		ldynsym_cnt;
+	Word		*ndx;
+	Word		ndxn;
+	int		output_cnt = 0;
+
+	for (sortsecndx = 1; sortsecndx < shnum; sortsecndx++) {
+
+		sortcache = &cache[sortsecndx];
+		sortshdr = sortcache->c_shdr;
+
+		if ((sortshdr->sh_type != SHT_SUNW_symsort) &&
+		    (sortshdr->sh_type != SHT_SUNW_tlssort))
+			continue;
+		if (name && strcmp(name, sortcache->c_name))
+			continue;
+
+		/*
+		 * If the section references a SUNW_ldynsym, then we
+		 * expect to see the associated .dynsym immediately
+		 * following. If it references a .dynsym, there is no
+		 * SUNW_ldynsym. If it is any other type, then we don't
+		 * know what to do with it.
+		 */
+		if ((sortshdr->sh_link == 0) || (sortshdr->sh_link >= shnum)) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHLINK),
+			    file, sortcache->c_name,
+			    EC_WORD(sortshdr->sh_link));
+			continue;
+		}
+		symcache = &cache[sortshdr->sh_link];
+		symshdr = symcache->c_shdr;
+		symsecndx = sortshdr->sh_link;
+		ldynsym_cnt = 0;
+		switch (symshdr->sh_type) {
+		case SHT_SUNW_LDYNSYM:
+			if (!init_symtbl_state(&ldynsym_state, cache, shnum,
+			    symsecndx, ehdr, versymcache, file, flags))
+				continue;
+			ldynsym_cnt = ldynsym_state.symn;
 			/*
-			 * If we are using extended symbol indexes, find the
-			 * corresponding SHN_SYMTAB_SHNDX table.
+			 * We know that the dynsym follows immediately
+			 * after the SUNW_ldynsym, and so, should be at
+			 * (sortshdr->sh_link + 1). However, elfdump is a
+			 * diagnostic tool, so we do the full paranoid
+			 * search instead.
 			 */
-			if ((sym->st_shndx == SHN_XINDEX) &&
-			    (shxndx == 0) && (noshxndx == 0))
-				noshxndx = symbols_getxindex(cache, shnum,
-				    seccnt, &shxndx, &symnshxndx);
-
-			/* LINTED */
-			symname = string(_cache, symcnt, &cache[shdr->sh_link],
-			    file, sym->st_name);
-
-			tshdr = 0;
-			sec = NULL;
-
-			if (is_core)
-				sec = (char *)MSG_INTL(MSG_STR_UNKNOWN);
-			else if ((sym->st_shndx < SHN_LORESERVE) &&
-			    (sym->st_shndx < shnum)) {
-				shndx = sym->st_shndx;
-				tshdr = cache[shndx].c_shdr;
-				sec = cache[shndx].c_name;
-			} else if (sym->st_shndx == SHN_XINDEX) {
-				if (shxndx) {
-					Word	_shxndx;
-
-					if (symcnt > symnshxndx) {
-					    (void) fprintf(stderr,
-						MSG_INTL(MSG_ERR_BADSYMXINDEX1),
-						file, secname, EC_WORD(symcnt));
-					} else if ((_shxndx =
-					    shxndx[symcnt]) > shnum) {
-					    (void) fprintf(stderr,
-						MSG_INTL(MSG_ERR_BADSYMXINDEX2),
-						file, secname, EC_WORD(symcnt),
-						EC_WORD(_shxndx));
-					} else {
-					    shndx = _shxndx;
-					    tshdr = cache[shndx].c_shdr;
-					    sec = cache[shndx].c_name;
-					}
-				} else {
-					(void) fprintf(stderr,
-					    MSG_INTL(MSG_ERR_BADSYMXINDEX3),
-					    file, secname, EC_WORD(symcnt));
-				}
-			} else if ((sym->st_shndx < SHN_LORESERVE) &&
-			    (sym->st_shndx >= shnum)) {
+			for (symsecndx = 1; symsecndx < shnum; symsecndx++) {
+				symcache = &cache[symsecndx];
+				symshdr = symcache->c_shdr;
+				if (symshdr->sh_type == SHT_DYNSYM)
+					break;
+			}
+			if (symsecndx >= shnum) {	/* Dynsym not found! */
 				(void) fprintf(stderr,
-				    MSG_INTL(MSG_ERR_BADSYM5), file,
-				    secname, demangle(symname, flags),
-				    sym->st_shndx);
+				    MSG_INTL(MSG_ERR_NODYNSYM),
+				    file, sortcache->c_name);
+				continue;
 			}
+			/* Fallthrough to process associated dynsym */
+			/*FALLTHROUGH*/
+		case SHT_DYNSYM:
+			if (!init_symtbl_state(&dynsym_state, cache, shnum,
+			    symsecndx, ehdr, versymcache, file, flags))
+				continue;
+			break;
+		default:
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADNDXSEC),
+			    file, sortcache->c_name, conv_sec_type(
+			    ehdr->e_machine, symshdr->sh_type, 0));
+			continue;
+		}
 
+		/*
+		 * Output header
+		 */
+		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
+		if (ldynsym_cnt > 0) {
+			dbg_print(0, MSG_INTL(MSG_ELF_SCN_SYMSORT2),
+			    sortcache->c_name, ldynsym_state.secname,
+			    dynsym_state.secname);
 			/*
-			 * If versioning is available display the
-			 * version index.
+			 * The data for .SUNW_ldynsym and dynsym sections
+			 * is supposed to be adjacent with SUNW_ldynsym coming
+			 * first. Check, and issue a warning if it isn't so.
 			 */
-			if (versym)
-				verndx = (int)versym[symcnt];
-			else
-				verndx = 0;
-
-			/*
-			 * Error checking for TLS.
-			 */
-			type = ELF_ST_TYPE(sym->st_info);
-			if (type == STT_TLS) {
-				if (tshdr &&
-				    (sym->st_shndx != SHN_UNDEF) &&
-				    ((tshdr->sh_flags & SHF_TLS) == 0)) {
-					(void) fprintf(stderr,
-					    MSG_INTL(MSG_ERR_BADSYM3), file,
-					    secname, demangle(symname, flags));
-				}
-			} else if ((type != STT_SECTION) && sym->st_size &&
-			    tshdr && (tshdr->sh_flags & SHF_TLS)) {
+			if ((ldynsym_state.sym + ldynsym_state.symn)
+			    != dynsym_state.sym)
 				(void) fprintf(stderr,
-				    MSG_INTL(MSG_ERR_BADSYM4), file,
-				    secname, demangle(symname, flags));
+				    MSG_INTL(MSG_ERR_LDYNNOTADJ), file,
+				    ldynsym_state.secname,
+				    dynsym_state.secname);
+		} else {
+			dbg_print(0, MSG_INTL(MSG_ELF_SCN_SYMSORT1),
+			    sortcache->c_name, dynsym_state.secname);
+		}
+		Elf_syms_table_title(0, ELF_DBG_ELFDUMP);
+
+		/* If not first one, insert a line of whitespace */
+		if (output_cnt++ > 0)
+			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
+
+		/*
+		 * SUNW_dynsymsort and SUNW_dyntlssort are arrays of
+		 * symbol indices. Iterate over the array entries,
+		 * dispaying the referenced symbols.
+		 */
+		ndxn = sortshdr->sh_size / sortshdr->sh_entsize;
+		ndx = (Word *)sortcache->c_data->d_buf;
+		for (; ndxn-- > 0; ndx++) {
+			if (*ndx >= ldynsym_cnt) {
+				Word sec_ndx = *ndx - ldynsym_cnt;
+
+				output_symbol(&dynsym_state, sec_ndx,
+				    *ndx, dynsym_state.sym + sec_ndx);
+			} else {
+				output_symbol(&ldynsym_state, *ndx,
+				    *ndx, ldynsym_state.sym + *ndx);
 			}
-
-			/*
-			 * If a symbol with non-zero size has a type that
-			 * specifies an address, then make sure the location
-			 * it references is actually contained within the
-			 * section.  UNDEF symbols don't count in this case,
-			 * so we ignore them.
-			 *
-			 * The meaning of the st_value field in a symbol
-			 * depends on the type of object. For a relocatable
-			 * object, it is the offset within the section.
-			 * For sharable objects, it is the offset relative to
-			 * the base of the object, and for other types, it is
-			 * the virtual address. To get an offset within the
-			 * section for non-ET_REL files, we subtract the
-			 * base address of the section.
-			 */
-			if (dynaddr_symtype[type] && (sym->st_size > 0) &&
-			    (sym->st_shndx != SHN_UNDEF) &&
-			    ((sym->st_shndx < SHN_LORESERVE) || \
-			    (sym->st_shndx == SHN_XINDEX)) &&
-			    (tshdr != NULL)) {
-				Word v = sym->st_value;
-
-				if (ehdr->e_type != ET_REL)
-					v -= tshdr->sh_addr;
-				if (((v + sym->st_size) > tshdr->sh_size)) {
-					(void) fprintf(stderr,
-					    MSG_INTL(MSG_ERR_BADSYM6), file,
-					    secname, demangle(symname, flags),
-					    EC_WORD(shndx),
-					    EC_XWORD(tshdr->sh_size),
-					    EC_XWORD(sym->st_value),
-					    EC_XWORD(sym->st_size));
-				}
-			}
-
-			(void) snprintf(index, MAXNDXSIZE,
-			    MSG_ORIG(MSG_FMT_INDEX), EC_XWORD(symcnt));
-			Elf_syms_table_entry(0, ELF_DBG_ELFDUMP, index,
-			    ehdr->e_machine, sym, verndx, sec, symname);
 		}
 	}
 }
@@ -2510,6 +2722,9 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 
 	if (flags & FLG_SYMBOLS)
 		symbols(cache, shnum, ehdr, Nname, versymcache, file, flags);
+
+	if (flags & FLG_SORT)
+		sunw_sort(cache, shnum, ehdr, Nname, versymcache, file, flags);
 
 	if (flags & FLG_HASH)
 		hash(cache, shnum, Nname, file, flags);

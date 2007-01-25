@@ -212,6 +212,8 @@ struct ofl_desc {
 	Word		ofl_elimcnt;	/* no. of eliminated symbols */
 	Word		ofl_locscnt;	/* no. of local symbols in .symtab */
 	Word		ofl_dynlocscnt;	/* no. local symbols in .SUNW_ldynsym */
+	Word		ofl_dynsymsortcnt; /* no. ndx in .SUNW_dynsymsort */
+	Word		ofl_dyntlssortcnt; /* no. ndx in .SUNW_dyntlssort */
 	Word		ofl_dynshdrcnt;	/* no. of output section in .dynsym */
 	Word		ofl_shdrcnt;	/* no. of output sections */
 	Str_tbl		*ofl_shdrsttab;	/* Str_tbl for shdr strtab */
@@ -243,6 +245,8 @@ struct ofl_desc {
 	Os_desc		*ofl_osdynsym;	/* .dynsym output section */
 	Os_desc		*ofl_osldynsym;	/* .SUNW_ldynsym output section */
 	Os_desc		*ofl_osdynstr;	/* .dynstr output section */
+	Os_desc		*ofl_osdynsymsort; /* .SUNW_dynsymsort output section */
+	Os_desc		*ofl_osdyntlssort; /* .SUNW_dyntlssort output section */
 	Os_desc		*ofl_osgot;	/* .got output section */
 	Os_desc		*ofl_oshash;	/* .hash output section */
 	Os_desc		*ofl_osinitarray; /* .initarray output section */
@@ -724,7 +728,8 @@ struct sym_aux {
 	Word		sa_hash;	/* the pure hash value of symbol */
 	Word		sa_PLTndx;	/* index into PLT for symbol */
 	Word		sa_PLTGOTndx;	/* GOT entry indx for PLT indirection */
-	Word		sa_linkndx;	/* index of associated symbol */
+	Word		sa_linkndx;	/* index of associated symbol from */
+					/*	ET_DYN file */
 	Half		sa_symspec;	/* special symbol ids */
 	Half		sa_overndx;	/* output file versioning index */
 	Half		sa_dverndx;	/* dependency versioning index */
@@ -815,6 +820,8 @@ struct sym_avlnode {
 #define	FLG_SY_VISIBLE	0x08000000	/* symbols visibility determined */
 #define	FLG_SY_STDFLTR	0x10000000	/* symbol is a standard filter */
 #define	FLG_SY_AUXFLTR	0x20000000	/* symbol is an auxiliary filter */
+#define	FLG_SY_DYNSORT	0x40000000	/* req. in dyn[sym|tls]sort section */
+#define	FLG_SY_NODYNSORT 0x80000000	/* excluded from dyn[sym_tls]sort sec */
 
 /*
  * Sym_desc.sd_flags1

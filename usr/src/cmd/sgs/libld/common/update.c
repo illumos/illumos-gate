@@ -51,6 +51,86 @@ sym_hash_compare(Sym_s_list * s1, Sym_s_list * s2)
 }
 
 /*
+ * Comparison routine used by qsort() for sorting of dyn[sym|tls]sort section
+ * indices based on the address of the symbols they reference. The
+ * use of the global dynsort_compare_syms variable is needed because
+ * we need to examine the symbols the indices reference. It is safe, because
+ * the linker is single threaded.
+ */
+Sym *dynsort_compare_syms;
+
+static int
+dynsort_compare(const void *idx1, const void *idx2)
+{
+	Sym *s1 = dynsort_compare_syms + *((const Word *) idx1);
+	Sym *s2 = dynsort_compare_syms + *((const Word *) idx2);
+
+	/*
+	 * Note: the logical computation for this is
+	 *	(st_value1 - st_value2)
+	 * However, that is only correct if the address type is smaller
+	 * than a pointer. Writing it this way makes it immune to the
+	 * class (32 or 64-bit) of the linker.
+	 */
+	return ((s1->st_value < s2->st_value) ? -1 :
+	    (s1->st_value > s2->st_value));
+}
+
+
+/*
+ * Scan the sorted symbols, and issue warnings if there are any duplicate
+ * values in the list. We only do this if -zverbose is set, or we are
+ * running with LD_DEBUG defined
+ *
+ * entry:
+ *	ofl - Output file descriptor
+ *	ldynsym - Pointer to start of .SUNW_ldynsym section that the
+ *		sort section indexes reference.
+ *	symsort - Pointer to start of .SUNW_dynsymsort or .SUNW_dyntlssort
+ *		section.
+ *	n - # of indices in symsort array
+ *	secname - Name of the symsort section.
+ *
+ * exit:
+ *	If the symsort section contains indexes to more than one
+ *	symbol with the same address value, a warning is issued.
+ */
+static void
+dynsort_dupwarn(Ofl_desc *ofl, Sym *ldynsym, const char *str,
+    Word *symsort, Word n, const char *secname)
+{
+	int zverbose = (ofl->ofl_flags & FLG_OF_VERBOSE) != 0;
+	Word ndx, cmp_ndx;
+	Addr addr, cmp_addr;
+
+	/* Nothing to do if -zverbose or LD_DEBUG are not active */
+	if (!(zverbose || DBG_ENABLED))
+		return;
+
+	cmp_ndx = 0;
+	cmp_addr = ldynsym[symsort[cmp_ndx]].st_value;
+	for (ndx = 1; ndx < n; ndx++) {
+		addr = ldynsym[symsort[ndx]].st_value;
+		if (cmp_addr == addr) {
+			if (zverbose)
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_SYM_DUPSORTADDR), secname,
+				    str + ldynsym[symsort[cmp_ndx]].st_name,
+				    str + ldynsym[symsort[ndx]].st_name,
+				    EC_ADDR(addr));
+			DBG_CALL(Dbg_syms_dup_sort_addr(ofl->ofl_lml, secname,
+			    str + ldynsym[symsort[cmp_ndx]].st_name,
+			    str + ldynsym[symsort[ndx]].st_name,
+			    EC_ADDR(addr)));
+		} else {	/* Not a dup. Move reference up */
+			cmp_ndx = ndx;
+			cmp_addr = addr;
+		}
+	}
+}
+
+
+/*
  * Build and update any output symbol tables.  Here we work on all the symbol
  * tables at once to reduce the duplication of symbol and string manipulation.
  * Symbols and their associated strings are copied from the read-only input
@@ -60,6 +140,37 @@ sym_hash_compare(Sym_s_list * s1, Sym_s_list * s2)
 static Addr
 update_osym(Ofl_desc *ofl)
 {
+	/*
+	 * There are several places in this function where we wish
+	 * to insert a symbol index to the combined .SUNW_ldynsym/.dynsym
+	 * symbol table into one of the two sort sections (.SUNW_dynsymsort
+	 * or .SUNW_dyntlssort), if that symbol has the right attributes.
+	 * This macro is used to generate the necessary code from a single
+	 * specification.
+	 *
+	 * entry:
+	 *	_sdp, _sym, _type - As per DYNSORT_COUNT. See _libld.h
+	 *	_sym_ndx - Index that _sym will have in the combined
+	 *		.SUNW_ldynsym/.dynsym symbol table.
+	 */
+#define	ADD_TO_DYNSORT(_sdp, _sym, _type, _sym_ndx) \
+	{ \
+		Word *_dynsort_arr, *_dynsort_ndx; \
+		\
+		if (dynsymsort_symtype[_type]) { \
+			_dynsort_arr = dynsymsort; \
+			_dynsort_ndx = &dynsymsort_ndx; \
+		} else if (_type == STT_TLS) { \
+			_dynsort_arr = dyntlssort; \
+			_dynsort_ndx = &dyntlssort_ndx; \
+		} else { \
+			_dynsort_arr = NULL; \
+		} \
+		if ((_dynsort_arr != NULL) && DYNSORT_TEST_ATTR(_sdp, _sym)) \
+			_dynsort_arr[(*_dynsort_ndx)++] = _sym_ndx; \
+	}
+
+
 	Listnode	*lnp1;
 	Sym_desc	*sdp;
 	Sym_avlnode	*sav;
@@ -84,10 +195,15 @@ update_osym(Ofl_desc *ofl)
 	Word		dynsym_ndx = 0;		/* index into .dynsym */
 	Word		scopesym_ndx = 0; /* index into scoped symbols */
 	Word		ldynscopesym_ndx = 0; /* index to ldynsym scoped syms */
+	Word		*dynsymsort = NULL; /* SUNW_dynsymsort index vector */
+	Word		*dyntlssort = NULL; /* SUNW_dyntlssort index vector */
+	Word		dynsymsort_ndx;		/* index dynsymsort array */
+	Word		dyntlssort_ndx;		/* index dyntlssort array */
 	Word		*symndx;	/* Symbol index (for relocation use) */
 	Word		*symshndx = 0;	/* .symtab_shndx table */
 	Word		*dynshndx = 0;	/* .dynsym_shndx table */
 	Word		*ldynshndx = 0;	/* .SUNW_ldynsym_shndx table */
+	Word		ldynsym_cnt = 0; /* # of items in .SUNW_ldynsym */
 	Str_tbl		*shstrtab;
 	Str_tbl		*strtab;
 	Str_tbl		*dynstr;
@@ -132,6 +248,25 @@ update_osym(Ofl_desc *ofl)
 		if (ofl->ofl_osldynsym) {
 			ldynsym = (Sym *)ofl->ofl_osldynsym->os_outdata->d_buf;
 			ldynsym[ldynsym_ndx++] = _sym;
+			ldynsym_cnt = 1 + ofl->ofl_dynlocscnt +
+			    ofl->ofl_dynscopecnt;
+
+			/*
+			 * If there is a SUNW_ldynsym, then there may also
+			 * be a .SUNW_dynsymsort and/or .SUNW_dyntlssort
+			 * sections, used to collect indices of function
+			 * and data symbols sorted by address order.
+			 */
+			if (ofl->ofl_osdynsymsort) {	/* .SUNW_dynsymsort */
+				dynsymsort = (Word *)
+				    ofl->ofl_osdynsymsort->os_outdata->d_buf;
+				dynsymsort_ndx = 0;
+			}
+			if (ofl->ofl_osdyntlssort) {	/* .SUNW_dyntlssort */
+				dyntlssort = (Word *)
+				    ofl->ofl_osdyntlssort->os_outdata->d_buf;
+				dyntlssort_ndx = 0;
+			}
 		}
 
 		/*
@@ -204,7 +339,7 @@ update_osym(Ofl_desc *ofl)
 		if (versym && !dynsym)
 			versym[1] = 0;
 	}
-	if (ldynsym && ofl->ofl_dynscopecnt) {
+	if (ldynsym) {
 		(void) st_setstring(dynstr, ofl->ofl_name, &stoff);
 		sym = &ldynsym[ldynsym_ndx];
 		/* LINTED */
@@ -502,7 +637,7 @@ update_osym(Ofl_desc *ofl)
 		for (lndx = 1; lndx < local; lndx++) {
 			Listnode	*lnp2;
 			Gotndx		*gnp;
-			unsigned char	type;
+			uchar_t		type;
 			Word		*_symshndx;
 			int		enter_in_symtab, enter_in_ldynsym;
 			int		update_done;
@@ -560,7 +695,8 @@ update_osym(Ofl_desc *ofl)
 			    (!(ofl->ofl_flags1 & FLG_OF1_REDLSYM) ||
 			    (sdp->sd_psyminfo));
 			enter_in_ldynsym = ldynsym && sdp->sd_name &&
-			    ((type == STT_FUNC) || (type == STT_FILE));
+			    ldynsym_symtype[type] &&
+			    !(ofl->ofl_flags1 & FLG_OF1_REDLSYM);
 			_symshndx = 0;
 			if (enter_in_symtab) {
 				if (!dynsym)
@@ -598,7 +734,10 @@ update_osym(Ofl_desc *ofl)
 				sdp->sd_flags &= ~FLG_SY_CLEAN;
 				if (ldynshndx)
 					_symshndx = &ldynshndx[ldynsym_ndx];
-				sdp->sd_sym = sym = &ldynsym[ldynsym_ndx++];
+				sdp->sd_sym = sym = &ldynsym[ldynsym_ndx];
+				/* Add it to sort section if it qualifies */
+				ADD_TO_DYNSORT(sdp, sym, type, ldynsym_ndx);
+				ldynsym_ndx++;
 			} else {	/* Not using symtab or ldynsym */
 				/*
 				 * If this symbol requires modifying to provide
@@ -663,8 +802,8 @@ update_osym(Ofl_desc *ofl)
 					 * TLS symbols are relative to
 					 * the TLS segment.
 					 */
-					if ((ELF_ST_TYPE(sym->st_info) ==
-					    STT_TLS) && (ofl->ofl_tlsphdr)) {
+					if ((type == STT_TLS) &&
+					    (ofl->ofl_tlsphdr)) {
 						sym->st_value -=
 						    ofl->ofl_tlsphdr->p_vaddr;
 					}
@@ -697,6 +836,9 @@ update_osym(Ofl_desc *ofl)
 
 				if (_symshndx && ldynshndx)
 					ldynshndx[ldynsym_ndx] = *_symshndx;
+
+				/* Add it to sort section if it qualifies */
+				ADD_TO_DYNSORT(sdp, sym, type, ldynsym_ndx);
 
 				ldynsym_ndx++;
 			}
@@ -939,7 +1081,7 @@ update_osym(Ofl_desc *ofl)
 		}
 
 		if (restore != 0) {
-			unsigned char	type, bind;
+			uchar_t		type, bind;
 
 			/*
 			 * Make sure this COMMON symbol is returned to the same
@@ -1027,7 +1169,8 @@ update_osym(Ofl_desc *ofl)
 			if (sdp->sd_flags1 & FLG_SY1_ELIM) {
 				enter_in_symtab = 0;
 			} else if (ldynsym && sdp->sd_sym->st_name &&
-			    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_FUNC)) {
+			    ldynsym_symtype[
+			    ELF_ST_TYPE(sdp->sd_sym->st_info)]) {
 				dynlocal = 1;
 			}
 		} else {
@@ -1255,6 +1398,9 @@ update_osym(Ofl_desc *ofl)
 			sdp->sd_sym = sym = &ldynsym[ldynscopesym_ndx];
 			(void) st_setstring(dynstr, name, &stoff);
 			ldynsym[ldynscopesym_ndx].st_name = stoff;
+			/* Add it to sort section if it qualifies */
+			ADD_TO_DYNSORT(sdp, sym, ELF_ST_TYPE(sym->st_info),
+			    ldynscopesym_ndx);
 		}
 
 		if (dynsym && !local) {
@@ -1281,6 +1427,15 @@ update_osym(Ofl_desc *ofl)
 			    }
 			}
 			sdp->sd_sym = sym = &dynsym[dynsym_ndx];
+			/*
+			 * Add it to sort section if it qualifies.
+			 * The indexes in that section are relative to the
+			 * the adjacent SUNW_ldynsym/dymsym pair, so we
+			 * add the number of items in SUNW_ldynsym to the
+			 * dynsym index.
+			 */
+			ADD_TO_DYNSORT(sdp, sym, ELF_ST_TYPE(sym->st_info),
+			    ldynsym_cnt + dynsym_ndx);
 		}
 		if (!enter_in_symtab && (!dynsym || (local && !dynlocal))) {
 			if (!(sdp->sd_flags & FLG_SY_UPREQD))
@@ -1398,7 +1553,7 @@ update_osym(Ofl_desc *ofl)
 				 */
 				;
 			} else if (sdp->sd_ref == REF_DYN_NEED) {
-				unsigned char	type, bind;
+				uchar_t	type, bind;
 
 				sectndx = SHN_UNDEF;
 				sym->st_value = 0;
@@ -1620,7 +1775,7 @@ update_osym(Ofl_desc *ofl)
 	for (LIST_TRAVERSE(&weak, lnp1, wkp)) {
 		Sym_desc *	sdp, * _sdp;
 		Sym *		sym, * _sym, * __sym;
-		unsigned char	bind;
+		uchar_t		bind;
 
 		sdp = wkp->wk_weak;
 		_sdp = wkp->wk_alias;
@@ -1725,10 +1880,10 @@ update_osym(Ofl_desc *ofl)
 		 *
 		 * Note that I use ldynsym_ndx here instead of the
 		 * computation I used to set the section size
-		 * (1 + ofl->ofl_dynlocscnt + ofl->ofl_dynscopecnt).
-		 * The two will agree, unless we somehow miscounted symbols
-		 * or failed to insert them all. Using ldynsym_ndx here
-		 * catches that error in addition to checking for adjacency.
+		 * (found in ldynsym_cnt). The two will agree, unless
+		 * we somehow miscounted symbols or failed to insert them
+		 * all. Using ldynsym_ndx here catches that error in
+		 * addition to checking for adjacency.
 		 */
 		assert(dynsym == (ldynsym + ldynsym_ndx));
 
@@ -1741,12 +1896,50 @@ update_osym(Ofl_desc *ofl)
 			shdr->sh_link =
 				(Word)elf_ndxscn(ofl->ofl_osldynsym->os_scn);
 		}
+
+		/*
+		 * The presence of .SUNW_ldynsym means that there may be
+		 * associated sort sections, one for regular symbols
+		 * and the other for TLS. Each sort section needs the
+		 * following done:
+		 *	- Section header link references .SUNW_ldynsym
+		 *	- Should have received the expected # of items
+		 *	- Sorted by increasing address
+		 */
+		if (ofl->ofl_osdynsymsort) {	/* .SUNW_dynsymsort */
+			ofl->ofl_osdynsymsort->os_shdr->sh_link =
+			    (Word)elf_ndxscn(ofl->ofl_osldynsym->os_scn);
+			assert(ofl->ofl_dynsymsortcnt == dynsymsort_ndx);
+			if (dynsymsort_ndx > 1) {
+				dynsort_compare_syms = ldynsym;
+				qsort(dynsymsort, dynsymsort_ndx,
+				    sizeof (*dynsymsort), dynsort_compare);
+				dynsort_dupwarn(ofl, ldynsym, dynstr->st_strbuf,
+				    dynsymsort, dynsymsort_ndx,
+				    MSG_ORIG(MSG_SCN_DYNSYMSORT));
+			}
+		}
+		if (ofl->ofl_osdyntlssort) {	/* .SUNW_dyntlssort */
+			ofl->ofl_osdyntlssort->os_shdr->sh_link =
+			    (Word)elf_ndxscn(ofl->ofl_osldynsym->os_scn);
+			assert(ofl->ofl_dyntlssortcnt == dyntlssort_ndx);
+			if (dyntlssort_ndx > 1) {
+				dynsort_compare_syms = ldynsym;
+				qsort(dyntlssort, dyntlssort_ndx,
+				    sizeof (*dyntlssort), dynsort_compare);
+				dynsort_dupwarn(ofl, ldynsym, dynstr->st_strbuf,
+				    dyntlssort, dyntlssort_ndx,
+				    MSG_ORIG(MSG_SCN_DYNTLSSORT));
+			}
+		}
 	}
 
 	/*
 	 * Used by ld.so.1 only.
 	 */
 	return (etext);
+
+#undef ADD_TO_DYNSORT
 }
 
 /*
@@ -1922,6 +2115,36 @@ update_odynamic(Ofl_desc *ofl)
 
 			dyn->d_tag = DT_SUNW_SYMSZ;
 			dyn->d_un.d_val = lshdr->sh_size + shdr->sh_size;
+			dyn++;
+		}
+
+		if (ofl->ofl_osdynsymsort || ofl->ofl_osdyntlssort) {
+			dyn->d_tag = DT_SUNW_SORTENT;
+			dyn->d_un.d_val = sizeof (Word);
+			dyn++;
+		}
+
+		if (ofl->ofl_osdynsymsort) {
+			dyn->d_tag = DT_SUNW_SYMSORT;
+			dyn->d_un.d_ptr =
+			    ofl->ofl_osdynsymsort->os_shdr->sh_addr;
+			dyn++;
+
+			dyn->d_tag = DT_SUNW_SYMSORTSZ;
+			dyn->d_un.d_val =
+			    ofl->ofl_osdynsymsort->os_shdr->sh_size;
+			dyn++;
+		}
+
+		if (ofl->ofl_osdyntlssort) {
+			dyn->d_tag = DT_SUNW_TLSSORT;
+			dyn->d_un.d_ptr =
+			    ofl->ofl_osdyntlssort->os_shdr->sh_addr;
+			dyn++;
+
+			dyn->d_tag = DT_SUNW_TLSSORTSZ;
+			dyn->d_un.d_val =
+			    ofl->ofl_osdyntlssort->os_shdr->sh_size;
 			dyn++;
 		}
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,8 +39,18 @@ Elf_shdr(Lm_list *lml, Half mach, Shdr *shdr)
 	    conv_sec_flags(shdr->sh_flags));
 	dbg_print(lml, MSG_ORIG(MSG_SHD_SIZE), EC_XWORD(shdr->sh_size),
 	    conv_sec_type(mach, shdr->sh_type, 0));
-	dbg_print(lml, MSG_ORIG(MSG_SHD_OFFSET), EC_OFF(shdr->sh_offset),
-	    EC_XWORD(shdr->sh_entsize));
+	if (shdr->sh_entsize == 0) {
+		dbg_print(lml, MSG_ORIG(MSG_SHD_OFFSET),
+		    EC_OFF(shdr->sh_offset), EC_XWORD(shdr->sh_entsize));
+	} else {		/* Provide an entry count */
+		Xword nelts = shdr->sh_size / shdr->sh_entsize;
+		const char *entstr = (nelts == 1) ? MSG_INTL(MSG_SHD_ENTRY_1) :
+		    MSG_INTL(MSG_SHD_ENTRY_N);
+
+		dbg_print(lml, MSG_ORIG(MSG_SHD_OFFSET_ENT),
+		    EC_OFF(shdr->sh_offset), EC_XWORD(shdr->sh_entsize),
+		    EC_XWORD(nelts), entstr);
+	}
 	dbg_print(lml, MSG_ORIG(MSG_SHD_LINK),
 	    conv_sec_linkinfo(shdr->sh_link, shdr->sh_flags, link),
 	    conv_sec_linkinfo(shdr->sh_info, shdr->sh_flags, info));

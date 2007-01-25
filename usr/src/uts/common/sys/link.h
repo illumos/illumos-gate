@@ -105,12 +105,32 @@ typedef struct {
 #define	DT_RUNPATH	29	/* run-time search path */
 #define	DT_FLAGS	30	/* state flags - see DF_* */
 
-#define	DT_ENCODING		32    /* DT_* encoding rules start after this */
+/*
+ * DT_* encoding rules: The value of each dynamic tag determines the
+ * interpretation of the d_un union. This convention provides for simpler
+ * interpretation of dynamic tags by external tools. A tag whose value
+ * is an even number indicates a dynamic section entry that uses d_ptr.
+ * A tag whose value is an odd number indicates a dynamic section entry
+ * that uses d_val, or that uses neither d_ptr nor d_val.
+ *
+ * There are exceptions to the above rule:
+ *	- Tags with values that are less than DT_ENCODING.
+ *	- Tags with values that fall between DT_LOOS and DT_SUNW_ENCODING
+ *	- Tags with values that fall between DT_HIOS and DT_LOPROC
+ *
+ * Third party tools must handle these exception ranges explicitly
+ * on an item by item basis.
+ */
+#define	DT_ENCODING		32	/* positive tag DT_* encoding rules */
+					/*	start after this */
 #define	DT_PREINIT_ARRAY	32    /* pointer to .preinitarray segment */
 #define	DT_PREINIT_ARRAYSZ	33    /* size of .preinitarray segment */
 
 #define	DT_MAXPOSTAGS		34	/* number of positive tags */
 
+/*
+ * DT_* encoding rules do not apply between DT_LOOS and DT_SUNW_ENCODING
+ */
 #define	DT_LOOS			0x6000000d	/* OS specific range */
 #define	DT_SUNW_AUXILIARY	0x6000000d	/* symbol auxiliary name */
 #define	DT_SUNW_RTLDINF		0x6000000e	/* ld.so.1 info (private) */
@@ -120,7 +140,22 @@ typedef struct {
 #define	DT_SUNW_SYMTAB		0x60000011	/* symtab with local fcn */
 						/*	symbols immediately */
 						/*	preceding DT_SYMTAB */
-#define	DT_SUNW_SYMSZ		0x60000012	/* size of SUNW_SYMTAB table */
+#define	DT_SUNW_SYMSZ		0x60000012	/* Size of SUNW_SYMTAB table */
+
+/*
+ * DT_* encoding rules apply between DT_SUNW_ENCODING and DT_HIOS
+ */
+#define	DT_SUNW_ENCODING	0x60000013	/* DT_* encoding rules resume */
+						/*	after this */
+#define	DT_SUNW_SORTENT		0x60000013	/* sizeof [SYM|TLS]SORT entrt */
+#define	DT_SUNW_SYMSORT		0x60000014	/* sym indices sorted by addr */
+#define	DT_SUNW_SYMSORTSZ	0x60000015	/* size of SUNW_SYMSORT */
+#define	DT_SUNW_TLSSORT		0x60000016	/* tls sym ndx sort by offset */
+#define	DT_SUNW_TLSSORTSZ	0x60000017	/* size of SUNW_TLSSORT */
+
+/*
+ * DT_* encoding rules do not apply between DT_HIOS and DT_LOPROC
+ */
 #define	DT_HIOS			0x6ffff000
 
 /*
@@ -179,6 +214,8 @@ typedef struct {
 /*
  * DT_* entries between DT_HIPROC and DT_LOPROC are reserved for processor
  * specific semantics.
+ *
+ * DT_* encoding rules apply to all tag values larger than DT_LOPROC.
  */
 #define	DT_LOPROC	0x70000000	/* processor specific range */
 #define	DT_AUXILIARY	0x7ffffffd	/* shared library auxiliary name */

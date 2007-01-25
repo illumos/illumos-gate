@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -62,8 +62,12 @@
 @ MSG_SHT_SYMTAB_SHNDX		"[ SHT_SYMTAB_SHNDX ]"
 @ MSG_SHT_SYMTAB_SHNDX_ALT	"SHDX"
 
+@ MSG_SHT_SUNW_symsort		"[ SHT_SUNW_symsort ]"
+@ MSG_SHT_SUNW_symsort_ALT	"SSRT"
+@ MSG_SHT_SUNW_tlssort		"[ SHT_SUNW_tlssort ]"
+@ MSG_SHT_SUNW_tlssort_ALT	"TSRT"
 @ MSG_SHT_SUNW_LDYNSYM		"[ SHT_SUNW_LDYNSYM ]"
-@ MSG_SHT_SUNW_LDYNSYM_ALT	"LDYNSYM"
+@ MSG_SHT_SUNW_LDYNSYM_ALT	"LDSM"
 @ MSG_SHT_SUNW_dof		"[ SHT_SUNW_dof ]"
 @ MSG_SHT_SUNW_dof_ALT		"DOF "
 @ MSG_SHT_SUNW_cap		"[ SHT_SUNW_cap ]"

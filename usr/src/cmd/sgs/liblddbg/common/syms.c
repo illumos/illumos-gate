@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -429,6 +429,17 @@ Dbg_syms_reduce(Ofl_desc *ofl, int which, Sym_desc *sdp, int idx,
 	    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
 	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, NULL,
 	    sdp->sd_file->ifl_name);
+}
+
+void
+Dbg_syms_dup_sort_addr(Lm_list *lml, const char *secname, const char *symname1,
+    const char *symname2, Addr addr)
+{
+	if (DBG_NOTCLASS(DBG_C_SYMBOLS) || DBG_NOTDETAIL())
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_SYM_DUPSORTADDR), secname,
+	    symname1, symname2, EC_ADDR(addr));
 }
 
 void
