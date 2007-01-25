@@ -46,7 +46,6 @@ extern "C" {
 #include <netinet/ip.h>
 #include <netinet/igmp_var.h>
 #include <inet/ip.h>
-#include <sys/list.h>
 #include <sys/taskq.h>
 
 #ifdef _KERNEL
