@@ -688,3 +688,9 @@ UserSymbolRecord$Value:
 UserSymbolRecord$Value:
   encoded: org.opensolaris.os.dtrace.UserSymbolRecord$Value[processID = 7, address = -1]
   decoded: org.opensolaris.os.dtrace.UserSymbolRecord$Value[processID = 7, address = -1]
+Program:
+  serialized: org.opensolaris.os.dtrace.Program[contents = syscall:::entry { @[execname] = count(); }, info = null]
+  deserialized: org.opensolaris.os.dtrace.Program[contents = syscall:::entry { @[execname] = count(); }, info = null]
+Program$File:
+  serialized: org.opensolaris.os.dtrace.Program$File[super = org.opensolaris.os.dtrace.Program[contents = syscall:::entry { @[execname] = count(); }, info = null], file = TestBean.out]
+  deserialized: org.opensolaris.os.dtrace.Program$File[super = org.opensolaris.os.dtrace.Program[contents = syscall:::entry { @[execname] = count(); }, info = null], file = TestBean.out]

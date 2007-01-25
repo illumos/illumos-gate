@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -411,6 +411,7 @@ public class LocalConsumer implements Consumer {
 	p.contents = Program.getProgramString(program);
 	p.file = program;
 	p.validate();
+	p.validateFile();
 	state = State.COMPILED;
 
 	return p;

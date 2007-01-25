@@ -36,19 +36,12 @@
 #
 ############################################################################
 
-FLAGS=""
-ARCH=`bitarch.exe`
-
-if [ $ARCH == "64" ]; then
-	FLAGS="-d64"
-fi
-
-java $FLAGS -cp test.jar TestMaxConsumers
-java $FLAGS -DJAVA_DTRACE_MAX_CONSUMERS=-1 -cp test.jar TestMaxConsumers
-java $FLAGS -DJAVA_DTRACE_MAX_CONSUMERS=0 -cp test.jar TestMaxConsumers
-java $FLAGS -DJAVA_DTRACE_MAX_CONSUMERS=1 -cp test.jar TestMaxConsumers
-java $FLAGS -DJAVA_DTRACE_MAX_CONSUMERS=2 -cp test.jar TestMaxConsumers
-java $FLAGS -DJAVA_DTRACE_MAX_CONSUMERS=7 -cp test.jar TestMaxConsumers
-java $FLAGS -DJAVA_DTRACE_MAX_CONSUMERS=8 -cp test.jar TestMaxConsumers
-java $FLAGS -DJAVA_DTRACE_MAX_CONSUMERS=9 -cp test.jar TestMaxConsumers
-java $FLAGS -DJAVA_DTRACE_MAX_CONSUMERS=19 -cp test.jar TestMaxConsumers
+java -cp test.jar TestMaxConsumers
+java -DJAVA_DTRACE_MAX_CONSUMERS=-1 -cp test.jar TestMaxConsumers
+java -DJAVA_DTRACE_MAX_CONSUMERS=0 -cp test.jar TestMaxConsumers
+java -DJAVA_DTRACE_MAX_CONSUMERS=1 -cp test.jar TestMaxConsumers
+java -DJAVA_DTRACE_MAX_CONSUMERS=2 -cp test.jar TestMaxConsumers
+java -DJAVA_DTRACE_MAX_CONSUMERS=7 -cp test.jar TestMaxConsumers
+java -DJAVA_DTRACE_MAX_CONSUMERS=8 -cp test.jar TestMaxConsumers
+java -DJAVA_DTRACE_MAX_CONSUMERS=9 -cp test.jar TestMaxConsumers
+java -DJAVA_DTRACE_MAX_CONSUMERS=19 -cp test.jar TestMaxConsumers

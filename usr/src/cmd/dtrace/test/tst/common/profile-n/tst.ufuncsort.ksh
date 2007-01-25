@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -45,7 +45,7 @@ fi
 
 dtrace=$1
 
-$dtrace -c tst.ufuncsort.exe -s /dev/stdin <<EOF
+$dtrace -c ./tst.ufuncsort.exe -s /dev/stdin <<EOF
 
 
 	#pragma D option quiet

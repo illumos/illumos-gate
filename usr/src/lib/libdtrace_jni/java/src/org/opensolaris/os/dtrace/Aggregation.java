@@ -152,7 +152,7 @@ public final class Aggregation implements Serializable {
 	}
     }
 
-    private void
+    private final void
     validate()
     {
 	if (name == null) {
@@ -320,7 +320,11 @@ public final class Aggregation implements Serializable {
 	mapRecords(records);
 	// Check class invariants (only after defensive copy)
 	name = Aggregate.filterUnnamedAggregationName(name);
-	validate();
+	try {
+	    validate();
+	} catch (Exception e) {
+	    throw new InvalidObjectException(e.getMessage());
+	}
     }
 
     /**

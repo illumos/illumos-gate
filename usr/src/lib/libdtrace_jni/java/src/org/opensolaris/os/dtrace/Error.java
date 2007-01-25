@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -156,7 +156,7 @@ public final class Error implements Serializable {
 	validate();
     }
 
-    private void
+    private final void
     validate()
     {
 	if (probeDescription == null) {

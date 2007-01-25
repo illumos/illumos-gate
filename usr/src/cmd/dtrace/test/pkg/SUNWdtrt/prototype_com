@@ -1366,7 +1366,6 @@ f none opt/SUNWdtrt/bin/jdtrace 0555 root bin
 f none opt/SUNWdtrt/bin/exception.lst 0444 root bin
 d none opt/SUNWdtrt/tst/common/java_api 0755 root bin
 f none opt/SUNWdtrt/tst/common/java_api/test.jar 0644 root bin
-f none opt/SUNWdtrt/tst/common/java_api/bitarch.exe 0555 root bin
 f none opt/SUNWdtrt/tst/common/java_api/tst.ProbeDescription.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/java_api/tst.ProbeDescription.ksh.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/java_api/tst.Bean.ksh 0444 root bin

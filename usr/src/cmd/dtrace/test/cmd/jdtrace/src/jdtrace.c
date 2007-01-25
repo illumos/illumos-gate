@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,17 +37,10 @@ main(int argc, char **argv)
 	int i, ac, has64;
 	char **av, **p;
 
-	has64 = (sysinfo(SI_ARCHITECTURE_64, NULL, 0) != -1);
-
 	ac = argc + 3;
-	if (has64)
-		ac++;
-
 	av = p = alloca(sizeof (char *) * ac);
 
 	*p++ = "java";
-	if (has64)
-		*p++ = "-d64";
 	*p++ = "-jar";
 	*p++ = "/opt/SUNWdtrt/lib/java/jdtrace.jar";
 

@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -36,11 +36,4 @@
 #
 ############################################################################
 
-FLAGS=""
-ARCH=`bitarch.exe`
-
-if [ $ARCH == "64" ]; then
-	FLAGS="-d64"
-fi
-
-java $FLAGS -cp test.jar TestStopLock
+java -cp test.jar TestStopLock

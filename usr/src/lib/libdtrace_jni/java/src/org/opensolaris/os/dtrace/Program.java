@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -77,7 +77,7 @@ public class Program implements Serializable {
     // Called by LocalConsumer.compile() to ensure that only valid
     // instances are made accessible to users.  Similarly called by
     // readObject to ensure that only valid instances are deserialized.
-    void
+    final void
     validate()
     {
 	if (id < 0) {
@@ -222,10 +222,9 @@ public class Program implements Serializable {
 	// Called by LocalConsumer.compile() to ensure that only valid
 	// instances are made accessible to users.  Similarly called by
 	// readObject to ensure that only valid instances are deserialized.
-	void
-	validate()
+	final void
+	validateFile()
 	{
-	    super.validate();
 	    if (file == null) {
 		throw new NullPointerException("file is null");
 	    }
@@ -241,6 +240,19 @@ public class Program implements Serializable {
 	getFile()
 	{
 	    return file;
+	}
+
+	private void
+	readObject(ObjectInputStream s)
+		throws IOException, ClassNotFoundException
+	{
+	    s.defaultReadObject();
+	    // check class invariants
+	    try {
+		validateFile();
+	    } catch (Exception e) {
+		throw new InvalidObjectException(e.getMessage());
+	    }
 	}
 
 	public String

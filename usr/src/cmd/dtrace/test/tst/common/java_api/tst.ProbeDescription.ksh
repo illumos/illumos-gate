@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -35,18 +35,11 @@
 #
 ############################################################################
 
-FLAGS=""
-ARCH=`bitarch.exe`
-
-if [ $ARCH == "64" ]; then
-	FLAGS="-d64"
-fi
-
-java $FLAGS -cp test.jar TestProbeDescription syscall:::entry
-java $FLAGS -cp test.jar TestProbeDescription BEGIN
-java $FLAGS -cp test.jar TestProbeDescription isdigit entry
-java $FLAGS -cp test.jar TestProbeDescription genunix isdigit entry
-java $FLAGS -cp test.jar TestProbeDescription fbt genunix isdigit entry
-java $FLAGS -cp test.jar TestProbeDescription fbt:genunix:isdigit:entry
-java $FLAGS -cp test.jar TestProbeDescription syscall::entry
-java $FLAGS -cp test.jar TestProbeDescription syscall:entry
+java -cp test.jar TestProbeDescription syscall:::entry
+java -cp test.jar TestProbeDescription BEGIN
+java -cp test.jar TestProbeDescription isdigit entry
+java -cp test.jar TestProbeDescription genunix isdigit entry
+java -cp test.jar TestProbeDescription fbt genunix isdigit entry
+java -cp test.jar TestProbeDescription fbt:genunix:isdigit:entry
+java -cp test.jar TestProbeDescription syscall::entry
+java -cp test.jar TestProbeDescription syscall:entry

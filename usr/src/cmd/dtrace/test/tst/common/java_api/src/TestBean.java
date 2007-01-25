@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,8 +72,12 @@ public class TestBean {
 	"Flow",
 	"KernelSymbolRecord",
 	"UserSymbolRecord",
-	"UserSymbolRecord$Value"
+	"UserSymbolRecord$Value",
+	"Program",
+	"Program$File"
     };
+
+    static File file;
 
     static void
     exit(int status)
@@ -485,6 +489,44 @@ public class TestBean {
 	return v;
     }
 
+    public static Program
+    getProgram()
+    {
+	final String PROGRAM = "syscall:::entry { @[execname] = count(); }";
+	Consumer consumer = new LocalConsumer();
+	Program p;
+	try {
+	    consumer.open();
+	    p = consumer.compile(PROGRAM);
+	    consumer.close();
+	} catch (DTraceException e) {
+	    e.printStackTrace();
+	    p = null;
+	}
+	return p;
+    }
+
+    public static Program.File
+    getProgram$File()
+    {
+	final String PROGRAM = "syscall:::entry { @[execname] = count(); }";
+	Consumer consumer = new LocalConsumer();
+	Program p;
+	try {
+            OutputStream out = new FileOutputStream(file);
+	    out.write(PROGRAM.getBytes(), 0, PROGRAM.length());
+	    out.flush();
+	    out.close();
+	    consumer.open();
+	    p = consumer.compile(file);
+	    consumer.close();
+	} catch (Exception e) {
+	    e.printStackTrace();
+	    p = null;
+	}
+	return Program.File.class.cast(p);
+    }
+
     static String
     getString(Object o)
     {
@@ -578,6 +620,11 @@ public class TestBean {
 	    exit(1);
 	}
 
+	Class c = obj.getClass();
+	if (c.getConstructors().length == 0) {
+	    return;
+	}
+
 	System.out.println(classname + ":");
 	XMLEncoder encoder = getXMLEncoder(file);
 	String encoded = getString(obj);
@@ -612,7 +659,7 @@ public class TestBean {
 	    classname = args[1];
 	}
 
-	File file = new File(filename);
+	file = new File(filename);
 	try {
 	    if (!file.canRead()) {
 		try {
