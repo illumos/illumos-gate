@@ -78,6 +78,7 @@ struct xboot_info {
 	native_ptr_t	bi_next_vaddr;	/* next virtual address not used */
 	native_ptr_t	bi_cmdline;
 	native_ptr_t	bi_phys_install;
+	native_ptr_t	bi_pcimem;
 	native_ptr_t	bi_modules;
 	uint32_t	bi_module_cnt;
 	uint32_t	bi_use_largepage;	/* MMU uses large pages */

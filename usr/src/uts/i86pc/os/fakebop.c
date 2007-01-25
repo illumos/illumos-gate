@@ -1109,9 +1109,10 @@ _start(struct xboot_info *xbp)
 	bop_idt_init();
 
 	/*
-	 * only physinstalled is still used by startup.
+	 * physavail is no longer used by startup
 	 */
 	bm.physinstalled = xbp->bi_phys_install;
+	bm.pcimem = xbp->bi_pcimem;
 	bm.physavail = NULL;
 
 	/*

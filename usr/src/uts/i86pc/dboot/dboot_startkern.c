@@ -120,9 +120,11 @@ uint32_t entry_addr_low;
 /*
  * Memlists for the kernel. We shouldn't need a lot of these.
  */
-#define	MAX_MEMLIST (10)
+#define	MAX_MEMLIST (50)
 struct boot_memlist memlists[MAX_MEMLIST];
 uint_t memlists_used = 0;
+struct boot_memlist pcimemlists[MAX_MEMLIST];
+uint_t pcimemlists_used = 0;
 
 #define	MAX_MODULES (10)
 struct boot_modules modules[MAX_MODULES];
@@ -388,6 +390,60 @@ check_higher(paddr_t a)
 }
 
 /*
+ * This is called to remove start..end from the
+ * possible range of PCI addresses.
+ */
+const uint64_t pci_lo_limit = 0x00100000ul;
+const uint64_t pci_hi_limit = 0xfff00000ul;
+static void
+exclude_from_pci(uint64_t start, uint64_t end)
+{
+	int i;
+	int j;
+	struct boot_memlist *ml;
+
+	for (i = 0; i < pcimemlists_used; ++i) {
+		ml = &pcimemlists[i];
+
+		/* delete the entire range? */
+		if (start <= ml->addr && ml->addr + ml->size <= end) {
+			--pcimemlists_used;
+			for (j = i; j < pcimemlists_used; ++j)
+				pcimemlists[j] = pcimemlists[j + 1];
+			--i;	/* to revisit the new one at this index */
+		}
+
+		/* split a range? */
+		else if (ml->addr < start && end < ml->addr + ml->size) {
+
+			++pcimemlists_used;
+			if (pcimemlists_used > MAX_MEMLIST)
+				dboot_panic("too many pcimemlists");
+
+			for (j = pcimemlists_used - 1; j > i; --j)
+				pcimemlists[j] = pcimemlists[j - 1];
+			ml->size = start - ml->addr;
+
+			++ml;
+			ml->size = (ml->addr + ml->size) - end;
+			ml->addr = end;
+			++i;	/* skip on to next one */
+		}
+
+		/* cut memory off the start? */
+		else if (ml->addr < end && end < ml->addr + ml->size) {
+			ml->size -= end - ml->addr;
+			ml->addr = end;
+		}
+
+		/* cut memory off the end? */
+		else if (ml->addr <= start && start < ml->addr + ml->size) {
+			ml->size = start - ml->addr;
+		}
+	}
+}
+
+/*
  * Walk through the module information finding the last used address.
  * The first available address will become the top level page table.
  *
@@ -432,6 +488,13 @@ init_mem_alloc(void)
 	DBG(bi->bi_module_cnt);
 
 	/*
+	 * start out by assuming PCI can use all physical addresses
+	 */
+	pcimemlists[0].addr = pci_lo_limit;
+	pcimemlists[0].size = pci_hi_limit - pci_lo_limit;
+	pcimemlists_used = 1;
+
+	/*
 	 * Walk through the memory map from multiboot and build our memlist
 	 * structures. Note these will have native format pointers.
 	 */
@@ -453,16 +516,9 @@ init_mem_alloc(void)
 			end = start + ((uint64_t)mmap->length_high << 32) +
 			    mmap->length_low;
 
-			if (prom_debug) {
+			if (prom_debug)
 				dboot_printf("\ttype: %d %" PRIx64 "..%"
 				    PRIx64 "\n", mmap->type, start, end);
-			}
-
-			/*
-			 * only type 1 is usable RAM
-			 */
-			if (mmap->type != 1)
-				continue;
 
 			/*
 			 * page align start and end
@@ -472,12 +528,22 @@ init_mem_alloc(void)
 			if (end <= start)
 				continue;
 
+			exclude_from_pci(start, end);
+
+			/*
+			 * only type 1 is usable RAM
+			 */
+			if (mmap->type != 1)
+				continue;
+
 			if (end > max_mem)
 				max_mem = end;
 
 			memlists[memlists_used].addr = start;
 			memlists[memlists_used].size = end - start;
-			++memlists_used;	/* no overflow check */
+			++memlists_used;
+			if (memlists_used > MAX_MEMLIST)
+				dboot_panic("too many memlists");
 		}
 	} else if (mb_info->flags & 0x01) {
 		DBG(mb_info->mem_lower);
@@ -488,6 +554,10 @@ init_mem_alloc(void)
 		memlists[memlists_used].addr = 1024 * 1024;
 		memlists[memlists_used].size = mb_info->mem_upper * 1024;
 		++memlists_used;
+		exclude_from_pci(memlists[0].addr,
+		    memlists[0].addr + memlists[memlists_used].size);
+		exclude_from_pci(memlists[1].addr,
+		    memlists[1].addr + memlists[memlists_used].size);
 	} else {
 		dboot_panic("No memory info from boot loader!!!\n");
 	}
@@ -498,6 +568,28 @@ init_mem_alloc(void)
 	 * finish processing the physinstall list
 	 */
 	sort_physinstall();
+
+	/*
+	 * Finish off the pcimemlist
+	 */
+	if (prom_debug) {
+		for (i = 0; i < pcimemlists_used; ++i) {
+			dboot_printf("pcimemlist entry 0x%" PRIx64 "..0x%"
+				    PRIx64 "\n", pcimemlists[i].addr,
+				pcimemlists[i].addr + pcimemlists[i].size);
+		}
+	}
+	pcimemlists[0].next = 0;
+	pcimemlists[0].prev = 0;
+	for (i = 1; i < pcimemlists_used; ++i) {
+		pcimemlists[i].prev =
+		    (native_ptr_t)(uintptr_t)(pcimemlists + i - 1);
+		pcimemlists[i].next = 0;
+		pcimemlists[i - 1].next =
+		    (native_ptr_t)(uintptr_t)(pcimemlists + i);
+	}
+	bi->bi_pcimem = (native_ptr_t)pcimemlists;
+	DBG(bi->bi_pcimem);
 }
 
 /*
