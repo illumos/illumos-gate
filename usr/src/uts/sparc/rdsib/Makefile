@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,7 +61,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 CFLAGS += $(CCVERBOSE)
 
-LDFLAGS += -dy -Ndrv/rds -Nmisc/ibtl -Nmisc/ibcm
+LDFLAGS += -dy -Ndrv/rds -Nmisc/ibtl -Nmisc/ibcm -Ndrv/ip
 
 #
 #	Default build targets.

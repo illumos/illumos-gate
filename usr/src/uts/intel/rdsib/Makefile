@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +38,7 @@ MODULE		= rdsib
 OBJECTS		= $(RDSIB_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(RDSIB_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-LDFLAGS		+= -dy -Ndrv/rds -Nmisc/ibtl -Nmisc/ibcm
+LDFLAGS		+= -dy -Ndrv/rds -Nmisc/ibtl -Nmisc/ibcm -Ndrv/ip
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/rds
 #
 #	Include common rules.

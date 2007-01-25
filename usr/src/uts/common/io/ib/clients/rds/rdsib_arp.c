@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,15 +50,7 @@ extern int rds_pr_lookup(rds_streams_t *rdss, rds_ipx_addr_t *dst_addr,
     rds_ipx_addr_t *src_addr, uint8_t localroute, uint32_t bound_dev_if,
     rds_pr_comp_func_t func);
 extern void rds_pr_arp_ack(mblk_t *mp);
-extern void rds_pr_ip6_ack(mblk_t *mp);
-extern void rds_pr_proto(queue_t *, mblk_t *);
-extern void rds_pr_ip_ack(mblk_t *mp);
-extern int rds_rts_announce(rds_streams_t *rdss);
 extern void rds_prwqn_delete(rds_prwqn_t *wqnp);
-
-#if 0
-extern dev_info_t *rdsdip;
-#endif
 
 extern ddi_taskq_t	*rds_taskq;
 
@@ -105,17 +97,9 @@ rds_lrsrv(queue_t *q)
 
 	RDS_DPRINTF4("rds_lrsrv", "Enter: 0x%p 0x%p", q, rdss);
 
-	if (WR(q) == rdss->ipqueue) {
-		while (mp = getq(q)) {
-			rds_pr_ip_ack(mp);
-		}
-	} else if (WR(q) == rdss->arpqueue) {
+	if (WR(q) == rdss->arpqueue) {
 		while (mp = getq(q)) {
 			rds_pr_arp_ack(mp);
-		}
-	} else if (WR(q) == rdss->ip6queue) {
-		while (mp = getq(q)) {
-			rds_pr_ip6_ack(mp);
 		}
 	} else {
 		freemsg(mp);
@@ -184,10 +168,6 @@ rds_lrput(queue_t *q, mblk_t *mp)
 			(void) putq(q, mp);
 			qenable(q);
 			break;
-		case M_PROTO:
-		case M_PCPROTO:
-			rds_pr_proto(q, mp);
-			break;
 		default:
 			RDS_DPRINTF1(LABEL, "lrput: got unknown msg <0x%x>\n",
 			mp->b_datap->db_type);
@@ -249,9 +229,6 @@ int
 rds_link_driver(rds_streams_t *rdss, char *path, queue_t **q, vnode_t **dev_vp)
 {
 	struct stdata *dev_stp;
-#if 0
-	cdevsw_impl_t *dp;
-#endif
 	vnode_t *vp;
 	int error;
 	queue_t *rq;
@@ -277,14 +254,8 @@ rds_link_driver(rds_streams_t *rdss, char *path, queue_t **q, vnode_t **dev_vp)
 
 	rq = RD(dev_stp->sd_wrq);
 	RD(rq)->q_ptr = WR(rq)->q_ptr = rdss;
-#if 0
-	dp = &devimpl[rdss->major];
-	setq(rq, &rds_lrinit, &rds_lwinit, dp->d_dmp, dp->d_qflag,
-	    dp->d_sqtype, B_TRUE);
-#else
 	setq(rq, &rds_lrinit, &rds_lwinit, NULL, QMTSAFE,
 	    SQ_CI|SQ_CO, B_FALSE);
-#endif
 
 	RDS_DPRINTF4("rds_link_driver", "Return: %s", path);
 
@@ -335,10 +306,6 @@ rds_unlink_drivers(rds_streams_t *rdss)
 {
 	RDS_DPRINTF4("rds_unlink_drivers", "Enter");
 
-	if (rdss->ipqueue) {
-		(void) rds_unlink_driver(&rdss->ipqueue, &rdss->ip_vp);
-	}
-
 	if (rdss->arpqueue) {
 		(void) rds_unlink_driver(&rdss->arpqueue, &rdss->arp_vp);
 	}
@@ -358,26 +325,9 @@ rds_link_drivers(rds_streams_t *rdss)
 
 	RDS_DPRINTF4("rds_link_drivers", "Enter");
 
-	if ((rc = rds_link_driver(rdss, "/dev/ip", &rdss->ipqueue,
-	    &rdss->ip_vp)) != 0) {
-		RDS_DPRINTF1(LABEL, "rds_link_drivers: ip failed\n");
-		return (rc);
-	}
-
 	if ((rc = rds_link_driver(rdss, "/dev/arp", &rdss->arpqueue,
 	    &rdss->arp_vp)) != 0) {
-		(void) rds_unlink_driver(&rdss->ipqueue,
-		    &rdss->ip_vp);
 		RDS_DPRINTF1(LABEL, "rds_link_drivers: rds failed\n");
-		return (rc);
-	}
-
-	/*
-	 * let IP know this is a routing socket
-	 */
-	if ((rc = rds_rts_announce(rdss))) {
-		RDS_DPRINTF1(LABEL, "link_drivers: rts_announce failed\n");
-		(void) rds_unlink_drivers(rdss);
 		return (rc);
 	}
 
@@ -385,8 +335,6 @@ rds_link_drivers(rds_streams_t *rdss)
 
 	return (0);
 }
-
-#define	AF_RDS	30
 
 typedef struct rds_get_ibaddr_args_s {
 	int		ret;
@@ -413,9 +361,6 @@ rds_get_ibaddr_impl(void *arg)
 
 	mutex_init(&rdss->lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&rdss->cv, NULL, CV_DRIVER, NULL);
-#if 0
-	rdss->major = ddi_driver_major(rdsdip);
-#endif
 
 	ret = rds_link_drivers(rdss);
 	if (ret != 0) {
@@ -427,17 +372,19 @@ rds_get_ibaddr_impl(void *arg)
 		return;
 	}
 
-	destaddr.family = AF_INET;
+	destaddr.family = AF_INET_OFFLOAD;
 	destaddr.un.ip4addr = htonl(argsp->destip);
-	srcaddr.family = AF_INET;
+	srcaddr.family = AF_INET_OFFLOAD;
 	srcaddr.un.ip4addr = htonl(argsp->srcip);
 
-	(void) rds_pr_lookup(rdss, &destaddr, &srcaddr, 0, NULL,
+	ret = rds_pr_lookup(rdss, &destaddr, &srcaddr, 0, NULL,
 	    rds_get_ibaddr_complete);
 
-	mutex_enter(&rdss->lock);
-	cv_wait(&rdss->cv, &rdss->lock);
-	mutex_exit(&rdss->lock);
+	if (ret == 0) {
+		mutex_enter(&rdss->lock);
+		cv_wait(&rdss->cv, &rdss->lock);
+		mutex_exit(&rdss->lock);
+	}
 
 	(void) rds_unlink_drivers(rdss);
 
@@ -445,9 +392,9 @@ rds_get_ibaddr_impl(void *arg)
 	if (argsp->ret == 0) {
 		argsp->sgid = rdss->wqnp->sgid;
 		argsp->dgid = rdss->wqnp->dgid;
+		rds_prwqn_delete(rdss->wqnp);
 	}
 
-	rds_prwqn_delete(rdss->wqnp);
 	mutex_destroy(&rdss->lock);
 	cv_destroy(&rdss->cv);
 	kmem_free(rdss, sizeof (rds_streams_t));

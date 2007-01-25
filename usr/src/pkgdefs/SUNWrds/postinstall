@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,10 +28,23 @@
 PATH="/usr/bin:/usr/sbin:/sbin:${PATH}"
 export PATH
 RDS_SOCK_ENTRY="        30      1       0       /dev/rds"
+DRVPERM='* 0644 root sys'
+IB_DEV_DIR="/devices/ib"
 
-if [ "${BASEDIR:=/}" != "/" ]
+ADD_DRV="add_drv -b $BASEDIR"
+if [ "${BASEDIR:=/}" = "/" ]
 then
-	BASEDIR_OPT="-b $BASEDIR"
+	ADD_DRV="add_drv"
+
+	# Is there IB Hardware?
+	if [ ! -d $IB_DEV_DIR ]
+	then
+		#
+		# On a running system with NO IB hardware, modify the
+		# system files only.
+		#
+		ADD_DRV_OPT="-n"
+	fi
 fi
 
 not_installed() {
@@ -42,9 +55,9 @@ not_installed() {
 
 EXIT=0
 
-not_installed rds || add_drv ${BASEDIR_OPT} -m '* 0644 root sys' rds || EXIT=1
+not_installed rds || $ADD_DRV -m "${DRVPERM}" rds || EXIT=1
 
-not_installed rdsib || add_drv ${BASEDIR_OPT} -m '* 0644 root sys' \
+not_installed rdsib || $ADD_DRV ${ADD_DRV_OPT} -m "${DRVPERM}" \
 	rdsib || EXIT=1
 
 # Check rds entry exists in sock2path

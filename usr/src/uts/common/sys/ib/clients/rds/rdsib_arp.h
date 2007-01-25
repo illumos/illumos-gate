@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,8 +117,6 @@ typedef struct rds_prwqn {
 	rds_ipx_addr_t dst_addr;	/* user supplied dest address */
 
 	rds_ipx_addr_t src_addr;	/* rts's view  of source address */
-	rds_ipx_addr_t gateway;		/* rts returned gateway address */
-	rds_ipx_addr_t netmask;		/* rts returned netmask */
 	char ifname[RDS_MAX_IFNAME_LEN];
 	int ibd_instance;
 	uint16_t ifproto;
@@ -136,13 +134,8 @@ typedef struct rds_prwqn {
 typedef struct rds_streams_s {
 	kmutex_t	lock;
 	kcondvar_t	cv;
-	major_t		major;
-	queue_t		*ipqueue;
-	vnode_t		*ip_vp;
 	queue_t		*arpqueue;
 	vnode_t		*arp_vp;
-	queue_t		*ip6queue;
-	vnode_t		*ip6_vp;
 	int		status;
 	rds_prwqn_t	*wqnp;
 } rds_streams_t;
