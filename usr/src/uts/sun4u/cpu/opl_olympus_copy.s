@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -479,10 +479,11 @@
 
 /*
  * Number of outstanding prefetches.
- * We may need more tuning when Olympus-C processor is available.
+ * first prefetch moves data from L2 to L1 (n_reads)
+ * second prefetch moves data from memory to L2 (one_read)
  */
-#define	OLYMPUS_C_PREFETCH	4
-#define	OLYMPUS_C_2ND_PREFETCH	10
+#define	OLYMPUS_C_PREFETCH	24
+#define	OLYMPUS_C_2ND_PREFETCH	12
 
 #define	VIS_BLOCKSIZE		64
 
@@ -1319,28 +1320,28 @@ bcopy(const void *from, void *to, size_t count)
 	prefetch [SRC + (2 * VIS_BLOCKSIZE)], #n_reads
 	faligndata %f0, %f2, %f32
 	ldd	[SRC + 0x10], %f4
-	prefetch [SRC + (3 * VIS_BLOCKSIZE)], #one_read
+	prefetch [SRC + (3 * VIS_BLOCKSIZE)], #n_reads
 	faligndata %f2, %f4, %f34
 	ldd	[SRC + 0x18], %f6
 	prefetch [SRC + (4 * VIS_BLOCKSIZE)], #one_read
 	faligndata %f4, %f6, %f36
 	ldd	[SRC + 0x20], %f8
-	prefetch [SRC + (5 * VIS_BLOCKSIZE)], #one_read
+	prefetch [SRC + (8 * VIS_BLOCKSIZE)], #one_read
 	faligndata %f6, %f8, %f38
 	ldd	[SRC + 0x28], %f10
-	prefetch [SRC + (6 * VIS_BLOCKSIZE)], #one_read
+	prefetch [SRC + (12 * VIS_BLOCKSIZE)], #one_read
 	faligndata %f8, %f10, %f40
 	ldd	[SRC + 0x30], %f12
-	prefetch [SRC + (7 * VIS_BLOCKSIZE)], #one_read
+	prefetch [SRC + (16 * VIS_BLOCKSIZE)], #one_read
 	faligndata %f10, %f12, %f42
 	ldd	[SRC + 0x38], %f14
 	ldd	[SRC + VIS_BLOCKSIZE], %f0
 	sub	CNT, VIS_BLOCKSIZE, CNT
 	add	SRC, VIS_BLOCKSIZE, SRC
-	prefetch [SRC + (9 * VIS_BLOCKSIZE) - VIS_BLOCKSIZE], #one_read
+	prefetch [SRC + (19 * VIS_BLOCKSIZE)], #one_read
 	add	REALSRC, VIS_BLOCKSIZE, REALSRC
 	ba,pt	%ncc, 1f
-	  prefetch [SRC + (10 * VIS_BLOCKSIZE) - VIS_BLOCKSIZE], #one_read
+	  prefetch [SRC + (23 * VIS_BLOCKSIZE)], #one_read
 	.align	32
 1:
 	ldd	[SRC + 0x08], %f2
@@ -1356,20 +1357,19 @@ bcopy(const void *from, void *to, size_t count)
 	faligndata %f4, %f6, %f36
 	ldd	[SRC + 0x30], %f12
 	faligndata %f6, %f8, %f38
-	ldd	[SRC + 0x38], %f14
-	prefetch [SRC + ((OLYMPUS_C_PREFETCH) * VIS_BLOCKSIZE)], #n_reads
-	faligndata %f8, %f10, %f40
-	ldd	[SRC + VIS_BLOCKSIZE], %f0
-	prefetch [SRC + ((OLYMPUS_C_2ND_PREFETCH) * VIS_BLOCKSIZE)], #one_read
-	faligndata %f10, %f12, %f42
-	prefetch [SRC + ((OLYMPUS_C_PREFETCH) * VIS_BLOCKSIZE) + 0x20], #n_reads
-	prefetch [SRC + ((OLYMPUS_C_2ND_PREFETCH) * VIS_BLOCKSIZE) + 0x20], #one_read
 	sub	CNT, VIS_BLOCKSIZE, CNT
+	ldd	[SRC + 0x38], %f14
+	faligndata %f8, %f10, %f40
 	add	DST, VIS_BLOCKSIZE, DST
+	ldd	[SRC + VIS_BLOCKSIZE], %f0
+	faligndata %f10, %f12, %f42
 	add	REALSRC, VIS_BLOCKSIZE, REALSRC
+	prefetch [SRC + (3 * VIS_BLOCKSIZE)], #n_reads
+	add	SRC, VIS_BLOCKSIZE, SRC
+	prefetch [SRC + ((OLYMPUS_C_PREFETCH) * VIS_BLOCKSIZE)], #one_read
 	cmp	CNT, VIS_BLOCKSIZE + 8
 	bgu,pt	%ncc, 1b
-	  add	SRC, VIS_BLOCKSIZE, SRC
+	  prefetch [SRC + ((OLYMPUS_C_2ND_PREFETCH) * VIS_BLOCKSIZE)], #one_read
 
 	! only if REALSRC & 0x7 is 0
 	cmp	CNT, VIS_BLOCKSIZE
@@ -1551,27 +1551,27 @@ hwblkpagecopy(const void *src, void *dst)
 	prefetch [SRC + (2 * VIS_BLOCKSIZE)], #n_reads
 	fmovd	%f0, %f32
 	ldd	[SRC + 0x10], %f4
-	prefetch [SRC + (3 * VIS_BLOCKSIZE)], #one_read
+	prefetch [SRC + (3 * VIS_BLOCKSIZE)], #n_reads
 	fmovd	%f2, %f34
 	ldd	[SRC + 0x18], %f6
 	prefetch [SRC + (4 * VIS_BLOCKSIZE)], #one_read
 	fmovd	%f4, %f36
 	ldd	[SRC + 0x20], %f8
-	prefetch [SRC + (5 * VIS_BLOCKSIZE)], #one_read
+	prefetch [SRC + (8 * VIS_BLOCKSIZE)], #one_read
 	fmovd	%f6, %f38
 	ldd	[SRC + 0x28], %f10
-	prefetch [SRC + (6 * VIS_BLOCKSIZE)], #one_read
+	prefetch [SRC + (12 * VIS_BLOCKSIZE)], #one_read
 	fmovd	%f8, %f40
 	ldd	[SRC + 0x30], %f12
-	prefetch [SRC + (7 * VIS_BLOCKSIZE)], #one_read
+	prefetch [SRC + (16 * VIS_BLOCKSIZE)], #one_read
 	fmovd	%f10, %f42
 	ldd	[SRC + 0x38], %f14
 	ldd	[SRC + VIS_BLOCKSIZE], %f0
 	sub	CNT, VIS_BLOCKSIZE, CNT
 	add	SRC, VIS_BLOCKSIZE, SRC
-	prefetch [SRC + (9 * VIS_BLOCKSIZE) - VIS_BLOCKSIZE], #one_read
+	prefetch [SRC + (19 * VIS_BLOCKSIZE)], #one_read
 	ba,pt	%ncc, 2f
-	  prefetch [SRC + (10 * VIS_BLOCKSIZE) - VIS_BLOCKSIZE], #one_read
+	prefetch [SRC + (23 * VIS_BLOCKSIZE)], #one_read
 	.align	32
 2:
 	ldd	[SRC + 0x08], %f2
@@ -1588,18 +1588,17 @@ hwblkpagecopy(const void *src, void *dst)
 	ldd	[SRC + 0x30], %f12
 	fmovd	%f6, %f38
 	ldd	[SRC + 0x38], %f14
-	prefetch [SRC + ((OLYMPUS_C_PREFETCH) * VIS_BLOCKSIZE)], #n_reads
 	fmovd	%f8, %f40
 	ldd	[SRC + VIS_BLOCKSIZE], %f0
-	prefetch [SRC + ((OLYMPUS_C_2ND_PREFETCH) * VIS_BLOCKSIZE)], #one_read
 	fmovd	%f10, %f42
-	prefetch [SRC + ((OLYMPUS_C_PREFETCH) * VIS_BLOCKSIZE) + 0x20], #n_reads
-	prefetch [SRC + ((OLYMPUS_C_2ND_PREFETCH) * VIS_BLOCKSIZE) + 0x20], #one_read
 	sub	CNT, VIS_BLOCKSIZE, CNT
+	prefetch [SRC + (3 * VIS_BLOCKSIZE)], #n_reads
 	add	DST, VIS_BLOCKSIZE, DST
+	prefetch [SRC + ((OLYMPUS_C_PREFETCH) * VIS_BLOCKSIZE)], #one_read
+	add	SRC, VIS_BLOCKSIZE, SRC
 	cmp	CNT, VIS_BLOCKSIZE + 8
 	bgu,pt	%ncc, 2b
-	  add	SRC, VIS_BLOCKSIZE, SRC
+	  prefetch [SRC + ((OLYMPUS_C_2ND_PREFETCH) * VIS_BLOCKSIZE)], #one_read
 
 	! trailing block
 	ldd	[SRC + 0x08], %f2
@@ -2246,28 +2245,28 @@ copyout(const void *kaddr, void *uaddr, size_t count)
 	prefetch [SRC + (2 * VIS_BLOCKSIZE)], #n_reads
 	faligndata %f16, %f18, %f48
 	ldd	[SRC + 0x10], %f20
-	prefetch [SRC + (3 * VIS_BLOCKSIZE)], #one_read
+	prefetch [SRC + (3 * VIS_BLOCKSIZE)], #n_reads
 	faligndata %f18, %f20, %f50
 	ldd	[SRC + 0x18], %f22
 	prefetch [SRC + (4 * VIS_BLOCKSIZE)], #one_read
 	faligndata %f20, %f22, %f52
 	ldd	[SRC + 0x20], %f24
-	prefetch [SRC + (5 * VIS_BLOCKSIZE)], #one_read
+	prefetch [SRC + (8 * VIS_BLOCKSIZE)], #one_read
 	faligndata %f22, %f24, %f54
 	ldd	[SRC + 0x28], %f26
-	prefetch [SRC + (6 * VIS_BLOCKSIZE)], #one_read
+	prefetch [SRC + (12 * VIS_BLOCKSIZE)], #one_read
 	faligndata %f24, %f26, %f56
 	ldd	[SRC + 0x30], %f28
-	prefetch [SRC + (7 * VIS_BLOCKSIZE)], #one_read
+	prefetch [SRC + (16 * VIS_BLOCKSIZE)], #one_read
 	faligndata %f26, %f28, %f58
 	ldd	[SRC + 0x38], %f30
 	ldd	[SRC + VIS_BLOCKSIZE], %f16
 	sub	CNT, VIS_BLOCKSIZE, CNT
 	add	SRC, VIS_BLOCKSIZE, SRC
-	prefetch [SRC + (9 * VIS_BLOCKSIZE) - VIS_BLOCKSIZE], #one_read
+	prefetch [SRC + (19 * VIS_BLOCKSIZE)], #one_read
 	add	REALSRC, VIS_BLOCKSIZE, REALSRC
 	ba,pt	%ncc, 1f
-	  prefetch [SRC + (10 * VIS_BLOCKSIZE) - VIS_BLOCKSIZE], #one_read
+	prefetch [SRC + (23 * VIS_BLOCKSIZE)], #one_read
 	.align	32
 1:
 	ldd	[SRC + 0x08], %f18
@@ -2283,20 +2282,19 @@ copyout(const void *kaddr, void *uaddr, size_t count)
 	faligndata %f20, %f22, %f52
 	ldd	[SRC + 0x30], %f28
 	faligndata %f22, %f24, %f54
-	ldd	[SRC + 0x38], %f30
-	prefetch [SRC + ((OLYMPUS_C_PREFETCH) * VIS_BLOCKSIZE)], #n_reads
-	faligndata %f24, %f26, %f56
-	ldd	[SRC + VIS_BLOCKSIZE], %f16
-	prefetch [SRC + ((OLYMPUS_C_2ND_PREFETCH) * VIS_BLOCKSIZE)], #one_read
-	faligndata %f26, %f28, %f58
-	prefetch [SRC + ((OLYMPUS_C_PREFETCH) * VIS_BLOCKSIZE) + 0x20], #n_reads
-	prefetch [SRC + ((OLYMPUS_C_2ND_PREFETCH) * VIS_BLOCKSIZE) + 0x20], #one_read
 	sub	CNT, VIS_BLOCKSIZE, CNT
+	ldd	[SRC + 0x38], %f30
+	faligndata %f24, %f26, %f56
 	add	DST, VIS_BLOCKSIZE, DST
+	ldd	[SRC + VIS_BLOCKSIZE], %f16
+	faligndata %f26, %f28, %f58
 	add	REALSRC, VIS_BLOCKSIZE, REALSRC
+	prefetch [SRC + (3 * VIS_BLOCKSIZE)], #n_reads
+	add	SRC, VIS_BLOCKSIZE, SRC
+	prefetch [SRC + ((OLYMPUS_C_PREFETCH) * VIS_BLOCKSIZE)], #one_read
 	cmp	CNT, VIS_BLOCKSIZE + 8
 	bgu,pt	%ncc, 1b
-	  add	SRC, VIS_BLOCKSIZE, SRC
+	  prefetch [SRC + ((OLYMPUS_C_2ND_PREFETCH) * VIS_BLOCKSIZE)], #one_read
 
 	! only if REALSRC & 0x7 is 0
 	cmp	CNT, VIS_BLOCKSIZE
@@ -3026,28 +3024,28 @@ copyin(const void *uaddr, void *kaddr, size_t count)
 	prefetcha [SRC + (2 * VIS_BLOCKSIZE)]%asi, #n_reads
 	faligndata %f16, %f18, %f48
 	ldda	[SRC + 0x10]%asi, %f20
-	prefetcha [SRC + (3 * VIS_BLOCKSIZE)]%asi, #one_read
+	prefetcha [SRC + (3 * VIS_BLOCKSIZE)]%asi, #n_reads
 	faligndata %f18, %f20, %f50
 	ldda	[SRC + 0x18]%asi, %f22
 	prefetcha [SRC + (4 * VIS_BLOCKSIZE)]%asi, #one_read
 	faligndata %f20, %f22, %f52
 	ldda	[SRC + 0x20]%asi, %f24
-	prefetcha [SRC + (5 * VIS_BLOCKSIZE)]%asi, #one_read
+	prefetcha [SRC + (8 * VIS_BLOCKSIZE)]%asi, #one_read
 	faligndata %f22, %f24, %f54
 	ldda	[SRC + 0x28]%asi, %f26
-	prefetcha [SRC + (6 * VIS_BLOCKSIZE)]%asi, #one_read
+	prefetcha [SRC + (12 * VIS_BLOCKSIZE)]%asi, #one_read
 	faligndata %f24, %f26, %f56
 	ldda	[SRC + 0x30]%asi, %f28
-	prefetcha [SRC + (7 * VIS_BLOCKSIZE)]%asi, #one_read
+	prefetcha [SRC + (16 * VIS_BLOCKSIZE)]%asi, #one_read
 	faligndata %f26, %f28, %f58
 	ldda	[SRC + 0x38]%asi, %f30
 	ldda	[SRC + VIS_BLOCKSIZE]%asi, %f16
 	sub	CNT, VIS_BLOCKSIZE, CNT
 	add	SRC, VIS_BLOCKSIZE, SRC
-	prefetcha [SRC + (9 * VIS_BLOCKSIZE) - VIS_BLOCKSIZE]%asi, #one_read
+	prefetcha [SRC + (19 * VIS_BLOCKSIZE)]%asi, #one_read
 	add	REALSRC, VIS_BLOCKSIZE, REALSRC
 	ba,pt	%ncc, 1f
-	  prefetcha [SRC + (10 * VIS_BLOCKSIZE) - VIS_BLOCKSIZE]%asi, #one_read
+	prefetcha [SRC + (23 * VIS_BLOCKSIZE)]%asi, #one_read
 	.align	32
 1:
 	ldda	[SRC + 0x08]%asi, %f18
@@ -3063,20 +3061,19 @@ copyin(const void *uaddr, void *kaddr, size_t count)
 	faligndata %f20, %f22, %f52
 	ldda	[SRC + 0x30]%asi, %f28
 	faligndata %f22, %f24, %f54
-	ldda	[SRC + 0x38]%asi, %f30
-	prefetcha [SRC + ((OLYMPUS_C_PREFETCH) * VIS_BLOCKSIZE)]%asi, #n_reads
-	faligndata %f24, %f26, %f56
-	ldda	[SRC + VIS_BLOCKSIZE]%asi, %f16
-	prefetcha [SRC + ((OLYMPUS_C_2ND_PREFETCH) * VIS_BLOCKSIZE)]%asi, #one_read
-	faligndata %f26, %f28, %f58
-	prefetcha [SRC + ((OLYMPUS_C_PREFETCH) * VIS_BLOCKSIZE) + 0x20]%asi, #n_reads
-	prefetcha [SRC + ((OLYMPUS_C_2ND_PREFETCH) * VIS_BLOCKSIZE) + 0x20]%asi, #one_read
 	sub	CNT, VIS_BLOCKSIZE, CNT
+	ldda	[SRC + 0x38]%asi, %f30
+	faligndata %f24, %f26, %f56
 	add	DST, VIS_BLOCKSIZE, DST
+	ldda	[SRC + VIS_BLOCKSIZE]%asi, %f16
+	faligndata %f26, %f28, %f58
 	add	REALSRC, VIS_BLOCKSIZE, REALSRC
+	prefetcha [SRC + (3 * VIS_BLOCKSIZE)]%asi, #n_reads
+	add	SRC, VIS_BLOCKSIZE, SRC
+	prefetcha [SRC + ((OLYMPUS_C_PREFETCH) * VIS_BLOCKSIZE)]%asi, #one_read
 	cmp	CNT, VIS_BLOCKSIZE + 8
 	bgu,pt	%ncc, 1b
-	  add	SRC, VIS_BLOCKSIZE, SRC
+	  prefetcha [SRC + ((OLYMPUS_C_2ND_PREFETCH) * VIS_BLOCKSIZE)]%asi, #one_read
 
 	! only if REALSRC & 0x7 is 0
 	cmp	CNT, VIS_BLOCKSIZE
