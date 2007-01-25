@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3099,7 +3099,6 @@ rmclomv_refresh(caddr_t arg)
 	CALLB_CPR_INIT(&cprinfo, &rmclomv_refresh_lock, callb_generic_cpr,
 	    "rmclomv_refresh");
 
-	delay(drv_usectohz(5000000));
 	mutex_enter(&rmclomv_refresh_lock);
 	for (;;) {
 

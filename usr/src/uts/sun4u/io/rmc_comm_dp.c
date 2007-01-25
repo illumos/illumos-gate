@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * implementation of the transport layer protocol (known as librsc protocol):
@@ -1276,7 +1276,7 @@ rmc_comm_dp_msend(struct rmc_comm_state *rcs, dp_message_t *req)
 			if (req->msg_msglen > DP_MAX_MSGLEN) {
 				DPRINTF(rcs, DPRO,
 				    (CE_CONT, "msend err: msg too big\n"));
-				return (RCEGENERIC);
+				return (RCEINVARG);
 			}
 
 			pkt = &drr->request;

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +73,7 @@ rmc_comm_request_response(rmc_comm_msg_t *request,
     rmc_comm_msg_t *response, uint32_t wait_time)
 {
 	struct rmc_comm_state	*rcs;
+	int err;
 
 	/*
 	 * get the soft state struct (instance 0)
@@ -81,7 +82,10 @@ rmc_comm_request_response(rmc_comm_msg_t *request,
 				"rmc_comm_request_response")) == NULL)
 		return (RCENOSOFTSTATE);
 
-	return (rmc_comm_send_req_resp(rcs, request, response, wait_time));
+	do {
+		err = rmc_comm_send_req_resp(rcs, request, response, wait_time);
+	} while (err == RCEGENERIC);
+	return (err);
 }
 
 /*
@@ -966,8 +970,9 @@ rmc_comm_send_pend_req(caddr_t arg)
 		/*
 		 * deliver the request (and wait...)
 		 */
-		(void) rmc_comm_send_req_resp(rcs, &dis->dreq_request, NULL,
-		    RMC_COMM_DREQ_DEFAULT_TIME);
+		while (rmc_comm_send_req_resp(rcs, &dis->dreq_request, NULL,
+		    RMC_COMM_DREQ_DEFAULT_TIME) == RCEGENERIC) {
+		}
 
 		mutex_enter(dis->dreq_mutex);
 		if (dis->dreq_state != RMC_COMM_DREQ_ST_EXIT)
