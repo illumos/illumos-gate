@@ -1168,6 +1168,11 @@ d none opt/SUNWdtrt/tst/common/syscall 0755 root bin
 f none opt/SUNWdtrt/tst/common/syscall/tst.openret.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/syscall/tst.args.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/syscall/tst.args.exe 0555 root bin
+d none opt/SUNWdtrt/tst/common/sysevent 0755 root bin
+f none opt/SUNWdtrt/tst/common/sysevent/tst.post.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/sysevent/tst.post.exe 0555 root bin
+f none opt/SUNWdtrt/tst/common/sysevent/tst.post_chan.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/sysevent/tst.post_chan.exe 0555 root bin
 d none opt/SUNWdtrt/tst/common/tick-n 0755 root bin
 f none opt/SUNWdtrt/tst/common/tick-n/err.D_PDESC_ZERO.tick.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/tick-n/err.D_PDESC_ZEROonens.d 0444 root bin

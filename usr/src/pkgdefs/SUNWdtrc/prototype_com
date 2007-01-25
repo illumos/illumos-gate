@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,6 +53,7 @@ f none usr/lib/dtrace/procfs.d 644 root bin
 f none usr/lib/dtrace/regs.d 644 root bin
 f none usr/lib/dtrace/sched.d 644 root bin
 f none usr/lib/dtrace/signal.d 644 root bin
+f none usr/lib/dtrace/sysevent.d 644 root bin
 f none usr/lib/dtrace/unistd.d 644 root bin
 f none usr/lib/libdtrace.so.1 755 root bin
 s none usr/lib/libdtrace.so=libdtrace.so.1

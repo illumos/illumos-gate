@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,6 +80,7 @@ DLIBSRCS += \
 	regs.d \
 	sched.d \
 	signal.d \
+	sysevent.d \
 	unistd.d
 
 include ../../Makefile.lib
@@ -94,6 +95,7 @@ CLEANFILES += ../common/procfs.sed ../common/procfs.d
 CLEANFILES += ../common/io.sed ../common/io.d
 CLEANFILES += ../common/errno.d ../common/signal.d
 CLEANFILES += ../common/dt_errtags.c ../common/dt_names.c
+CLEANFILES += ../common/sysevent.sed ../common/sysevent.d
 
 CLOBBERFILES += drti.o
 
@@ -154,13 +156,17 @@ pics/dt_lex.o pics/dt_grammar.o := CCVERBOSE =
 	sh ../common/mksignal.sh < $(SRC)/uts/common/sys/iso/signal_iso.h > $@
 
 ../common/%.sed: ../common/%.sed.in
-	$(COMPILE.cpp) -D_KERNEL $< | tr -d ' ' | tr '"' '@' | grep '^s/' > $@
+	$(COMPILE.cpp) -D_KERNEL $< | tr -d ' ' | tr '"' '@' | \
+	    sed 's/\&/\\\&/g' | grep '^s/' > $@
 
 ../common/procfs.d: ../common/procfs.sed ../common/procfs.d.in
 	sed -f ../common/procfs.sed < ../common/procfs.d.in > $@
 
 ../common/io.d: ../common/io.sed ../common/io.d.in
 	sed -f ../common/io.sed < ../common/io.d.in > $@
+
+../common/sysevent.d: ../common/sysevent.sed ../common/sysevent.d.in
+	sed -f ../common/sysevent.sed < ../common/sysevent.d.in > $@
 
 pics/%.o: ../$(MACH)/%.c
 	$(COMPILE.c) -o $@ $<

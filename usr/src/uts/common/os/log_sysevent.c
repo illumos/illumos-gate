@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +41,7 @@
 #include <sys/disp.h>
 #include <sys/autoconf.h>
 #include <sys/atomic.h>
+#include <sys/sdt.h>
 
 /* for doors */
 #include <sys/pathname.h>
@@ -1660,6 +1660,8 @@ queue_sysevent(sysevent_t *ev, sysevent_id_t *eid, int flag)
 	log_eventq_t *q;
 
 	ASSERT(flag == SE_SLEEP || flag == SE_NOSLEEP);
+
+	DTRACE_SYSEVENT2(post, evch_bind_t *, NULL, sysevent_impl_t *, ev);
 
 restart:
 

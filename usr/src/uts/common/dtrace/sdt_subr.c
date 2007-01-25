@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,7 @@ sdt_provider_t sdt_providers[] = {
 	{ "io", "__io_", &stab_attr, 0 },
 	{ "mib", "__mib_", &stab_attr, 0 },
 	{ "fsinfo", "__fsinfo_", &fsinfo_attr, 0 },
+	{ "sysevent", "__sysevent_", &stab_attr, 0 },
 	{ "sdt", NULL, &sdt_attr, 0 },
 	{ NULL }
 };
@@ -148,6 +149,8 @@ sdt_argdesc_t sdt_args[] = {
 	{ "mib", NULL, 0, 0, "int" },
 	{ "fsinfo", NULL, 0, 0, "vnode_t *", "fileinfo_t *" },
 	{ "fsinfo", NULL, 1, 1, "int", "int" },
+	{ "sysevent", "post", 0, 0, "evch_bind_t *", "syseventchaninfo_t *" },
+	{ "sysevent", "post", 1, 1, "sysevent_impl_t *", "syseventinfo_t *" },
 	{ NULL }
 };
 

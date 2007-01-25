@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,6 +32,9 @@ fasttrap/tst.fasttrap.exe := LIBS += -ldtrace
 fasttrap/tst.stack.exe := LIBS += -ldtrace
 
 proc/tst.sigwait.exe := LIBS += -lrt
+
+sysevent/tst.post.exe := LIBS += -lsysevent
+sysevent/tst.post_chan.exe := LIBS += -lsysevent
 
 GCC = /usr/sfw/bin/gcc
 GCCFLAGS_sparc = -mcpu=ultrasparc
