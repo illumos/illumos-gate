@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4199,6 +4199,8 @@ hmestatinit(struct hme *hmep)
 	kstat_named_init(&hkp->hk_sqe_errors,		"sqe_errors",
 		KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_defer_xmts,		"defer_xmts",
+		KSTAT_DATA_ULONG);
+	kstat_named_init(&hkp->hk_multi_collisions,	"multi_collisions",
 		KSTAT_DATA_ULONG);
 	/* tx_late_collisions */
 	kstat_named_init(&hkp->hk_ex_collisions,	"ex_collisions",
