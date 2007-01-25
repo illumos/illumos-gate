@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6116,6 +6116,11 @@ void pwd(void)
     }
     /* relative to home directory if restricted_user */
     if (restricted_user) {
+	/*
+	 * Re-adjust real path because previous call to getXwd() did
+	 * not resolve symlink.
+	 */
+	fb_realpath(".", path);
 	fb_realpath(home, rhome);
 	pathlen = strlen(rhome);
 	if (pathlen && rhome[pathlen - 1] == '/')
