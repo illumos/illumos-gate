@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -143,7 +143,7 @@ static void amr_mode_sense(union scsi_cdb *cdbp, struct buf *bp,
 static void amr_set_arq_data(struct scsi_pkt *pkt, uchar_t key);
 static int amr_enquiry_mapcmd(struct amr_command *ac, uint32_t data_size);
 static void amr_enquiry_unmapcmd(struct amr_command *ac);
-static int amr_mapcmd(struct amr_command *ac);
+static int amr_mapcmd(struct amr_command *ac, int (*callback)(), caddr_t arg);
 static void amr_unmapcmd(struct amr_command *ac);
 
 /*
@@ -636,7 +636,6 @@ amr_setup_mbox(struct amr_softs *softs)
 		DDI_DMA_SLEEP,
 		NULL,
 		&softs->mbox_dma_handle) != DDI_SUCCESS) {
-
 		AMRDB_PRINT((CE_NOTE, "Cannot alloc dma handle for mailbox"));
 		goto error_out;
 	}
@@ -661,7 +660,7 @@ amr_setup_mbox(struct amr_softs *softs)
 		softs->mbox_dma_handle,
 		NULL,
 		(caddr_t)softs->mbox,
-		sizeof (struct amr_mailbox) + 16,
+		mbox_len,
 		DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 		DDI_DMA_SLEEP,
 		NULL,
@@ -734,7 +733,7 @@ amr_periodic(void *data)
 			pkt->pkt_time)) {
 
 			cmn_err(CE_WARN,
-				"timed out package detected,\
+				"!timed out packet detected,\
 				sc = %p, pkt = %p, index = %d, ac = %p",
 				(void *)softs,
 				(void *)pkt,
@@ -1120,7 +1119,7 @@ amr_setup_sg(struct amr_softs *softs)
 			(softs->sg_items[i]).sg_handle,
 			NULL,
 			(caddr_t)((softs->sg_items[i]).sg_table),
-			sizeof (struct amr_sgentry) * AMR_NSEG,
+			len,
 			DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 			DDI_DMA_SLEEP,
 			NULL,
@@ -1252,7 +1251,7 @@ amr_enquiry_mapcmd(struct amr_command *ac, uint32_t data_size)
 
 	if ((ddi_dma_addr_bind_handle(
 		ac->buffer_dma_handle,
-		NULL, ac->ac_data, data_size, dma_flags,
+		NULL, ac->ac_data, len, dma_flags,
 		DDI_DMA_SLEEP, NULL, &ac->buffer_dma_cookie,
 		&ac->num_of_cookie)) != DDI_DMA_MAPPED) {
 
@@ -1318,12 +1317,13 @@ amr_enquiry_unmapcmd(struct amr_command *ac)
  * map the amr command, allocate the DMA resource
  */
 static int
-amr_mapcmd(struct amr_command *ac)
+amr_mapcmd(struct amr_command *ac, int (*callback)(), caddr_t arg)
 {
 	uint_t	dma_flags;
 	off_t	off;
 	size_t	len;
 	int	error;
+	int	(*cb)(caddr_t);
 
 	AMRDB_PRINT((CE_NOTE, "Amr_mapcmd called, ac=%p, flags=%x",
 			(void *)ac, ac->ac_flags));
@@ -1346,14 +1346,16 @@ amr_mapcmd(struct amr_command *ac)
 		return (DDI_SUCCESS);
 	}
 
+	cb = (callback == NULL_FUNC) ? DDI_DMA_DONTWAIT : DDI_DMA_SLEEP;
+
 	/* if the command involves data at all, and hasn't been mapped */
 	if (!(ac->ac_flags & AMR_CMD_MAPPED)) {
 		/* process the DMA by buffer bind mode */
 		error = ddi_dma_buf_bind_handle(ac->buffer_dma_handle,
 			ac->ac_buf,
 			dma_flags,
-			DDI_DMA_SLEEP,
-			NULL,
+			cb,
+			arg,
 			&ac->buffer_dma_cookie,
 			&ac->num_of_cookie);
 		switch (error) {
@@ -1566,6 +1568,8 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 				inqp.inq_len = AMR_INQ_ADDITIONAL_LEN;
 				inqp.inq_ansi = AMR_INQ_ANSI_VER;
 				inqp.inq_rdf = AMR_INQ_RESP_DATA_FORMAT;
+				/* Enable Tag Queue */
+				inqp.inq_cmdque = 1;
 				bcopy("MegaRaid", inqp.inq_vid,
 					sizeof (inqp.inq_vid));
 				bcopy(softs->amr_product_info.pi_product_name,
@@ -1792,6 +1796,9 @@ amr_tran_getcap(struct scsi_address *ap, char *cap, int whom)
 	case SCSI_CAP_TOTAL_SECTORS:
 		/* number of sectors */
 		return (softs->logic_drive[ap->a_target].al_size);
+	case SCSI_CAP_UNTAGGED_QING:
+	case SCSI_CAP_TAGGED_QING:
+		return (1);
 	default:
 		return (-1);
 	}
@@ -1819,6 +1826,9 @@ amr_tran_setcap(struct scsi_address *ap, char *cap, int value,
 		return (1);
 	case SCSI_CAP_SECTOR_SIZE:
 		return (1);
+	case SCSI_CAP_UNTAGGED_QING:
+	case SCSI_CAP_TAGGED_QING:
+		return ((value == 1) ? 1 : 0);
 	default:
 		return (0);
 	}
@@ -1905,7 +1915,7 @@ amr_tran_init_pkt(struct scsi_address *ap,
 		ac->ac_flags |= AMR_CMD_PKT_DMA_PARTIAL;
 	}
 
-	if (amr_mapcmd(ac) != DDI_SUCCESS) {
+	if (amr_mapcmd(ac, callback, arg) != DDI_SUCCESS) {
 		scsi_hba_pkt_free(ap, pkt);
 		return (NULL);
 	}
