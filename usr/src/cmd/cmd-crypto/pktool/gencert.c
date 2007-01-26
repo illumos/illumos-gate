@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -632,7 +632,7 @@ pk_gencert(int argc, char *argv[])
 		(void) fprintf(stderr, gettext("A serial number "
 			"must be specified as a hex number when creating"
 			" a self-signed certificate "
-			"(ex: serno=0x0102030405feedface)\n"));
+			"(ex: serial=0x0102030405feedface)\n"));
 		rv = PK_ERR_USAGE;
 		goto end;
 	} else {

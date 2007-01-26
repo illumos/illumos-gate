@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@ typedef struct verbcmd_s {
 	char	*verb;
 	int	(*action)(int, char *[]);
 	int	mode;
+	char	*summary;
 	char	*synopsis;
 } verbcmd;
 
@@ -71,8 +72,10 @@ static int	pk_help(int argc, char *argv[]);
 
 /* Command structure for verbs and their actions.  Do NOT i18n/l10n. */
 static verbcmd	cmds[] = {
-	{ "tokens",	pk_tokens,	0,	"tokens" },
+	{ "tokens",	pk_tokens,	0,
+		"lists all visible PKCS#11 tokens", "tokens" },
 	{ "setpin",	pk_setpin,	0,
+		"changes user authentication passphrase for keystore access",
 		"setpin [ keystore=pkcs11 ]\n\t\t"
 		"[ token=token[:manuf[:serial]]]\n\t"
 
@@ -82,7 +85,7 @@ static verbcmd	cmds[] = {
 		"[ prefix=DBprefix ]\n\t"
 	},
 	{ "list",	pk_list,	0,
-
+		"lists a summary of objects in the keystore",
 	"list [ token=token[:manuf[:serial]]]\n\t\t"
 		"[ objtype=private|public|both ]\n\t\t"
 		"[ label=label ]\n\t"
@@ -140,6 +143,7 @@ static verbcmd	cmds[] = {
 	},
 
 	{ "delete",	pk_delete,	0,
+		"deletes objects in the keystore",
 
 	"delete [ token=token[:manuf[:serial]]]\n\t\t"
 		"[ objtype=private|public|both ]\n\t\t"
@@ -202,6 +206,7 @@ static verbcmd	cmds[] = {
 		"[ dir=directory-path ]\n\t"
 	},
 	{ "import",	pk_import,	0,
+		"imports objects from an external source",
 
 	"import [token=token[:manuf[:serial]]]\n\t\t"
 	"infile=input-fn\n\t"
@@ -248,6 +253,7 @@ static verbcmd	cmds[] = {
 	},
 
 	{ "export",	pk_export,	0,
+		"exports objects from the keystore to a file",
 
 	"export [token=token[:manuf[:serial]]]\n\t\t"
 	"outfile=output-fn\n\t"
@@ -281,6 +287,8 @@ static verbcmd	cmds[] = {
 	},
 
 	{ "gencert",	pk_gencert,	0,
+		"creates a self-signed X.509v3 certificate",
+
 	"gencert [-i] keystore=nss\n\t\t"
 		"label=cert-nickname\n\t\t"
 		"serial=serial number hex string]\n\t\t"
@@ -321,6 +329,7 @@ static verbcmd	cmds[] = {
 		"[ lifetime=number-hour|number-day|number-year ]\n\t"
 	},
 	{ "gencsr",	pk_gencsr,	0,
+		"creates a PKCS#10 certificate signing request file",
 	"gencsr [-i] keystore=nss \n\t\t"
 		"nickname=cert-nickname\n\t\t"
 		"outcsr=csr-fn\n\t\t"
@@ -356,6 +365,8 @@ static verbcmd	cmds[] = {
 	},
 
 	{ "download",	pk_download,	0,
+		"downloads a CRL or certificate file from an external source",
+
 	"download url=url_str\n\t\t"
 		"[ objtype=crl|cert ]\n\t\t"
 		"[ http_proxy=proxy_str ]\n\t\t"
@@ -363,6 +374,8 @@ static verbcmd	cmds[] = {
 	},
 
 	{ "genkey",	pk_genkey,	0,
+		"creates a symmetric key in the keystore",
+
 	"genkey [ keystore=pkcs11 ]\n\t\t"
 		"label=key-label\n\t\t"
 		"[ keytype=aes|arcfour|des|3des ]\n\t\t"
@@ -388,9 +401,11 @@ static verbcmd	cmds[] = {
 		"[ print=y|n ]\n\t"
 	},
 
-	{ "-?",	pk_help,	0,	"help\t(help and usage)" },
-	{ "-f",	pk_help,	0,	"-f option_file" }
+	{ "help",	pk_help,	0,
+		"displays help message",
+		"help\t(help and usage)" }
 };
+
 static int	num_cmds = sizeof (cmds) / sizeof (verbcmd);
 
 static char	*prog;
@@ -407,17 +422,23 @@ usage(int idx)
 
 	/* Display this block only in command-line mode. */
 	(void) fprintf(stdout, gettext("Usage:\n"));
-	(void) fprintf(stdout, gettext("\t%s -?\t(help and usage)\n"), prog);
-	(void) fprintf(stdout, gettext("\t%s -f option_file\n"), prog);
-	(void) fprintf(stdout, gettext("\t%s subcommand [options...]\n"), prog);
+	(void) fprintf(stdout, gettext("   %s -?\t(help and usage)\n"),
+		prog);
+	(void) fprintf(stdout, gettext("   %s -f option_file\n"), prog);
+	(void) fprintf(stdout, gettext("   %s subcommand [options...]\n"),
+		prog);
 	(void) fprintf(stdout, gettext("where subcommands may be:\n"));
 
 	/* Display only those verbs that match the current tool mode. */
 	if (idx == -1) {
 		for (i = 0; i < num_cmds; i++) {
 			/* Do NOT i18n/l10n. */
-			(void) fprintf(stdout, "\t%s\n", cmds[i].synopsis);
+			(void) fprintf(stdout, "   %-8s	- %s\n",
+				cmds[i].verb, cmds[i].summary);
 		}
+		(void) fprintf(stdout, gettext("\nFurther details on the "
+			"subcommands can be found by adding \'help\'.\n"
+			"Ex: pktool gencert help\n\n"));
 	} else {
 		(void) fprintf(stdout, "\t%s\n", cmds[idx].synopsis);
 	}
