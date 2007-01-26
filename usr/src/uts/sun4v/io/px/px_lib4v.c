@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1530,14 +1530,7 @@ px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
 
 	r_addr_t ra;
 	uint64_t pokeval;
-
-	/*
-	 * Used only to notify error handling peek/poke is occuring
-	 * One scenario is when a fabric err as a result of peek/poke.
-	 * However there is no way to guarantee that the fabric error
-	 * handler will occur in the window where otd is set.
-	 */
-	on_trap_data_t otd;
+	pcie_req_id_t bdf;
 
 	ra = (r_addr_t)va_to_pa((void *)dev_addr);
 	for (; repcount; repcount--) {
@@ -1574,13 +1567,14 @@ px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
 			mutex_enter(&pec_p->pec_pokefault_mutex);
 			pec_p->pec_safeacc_type = DDI_FM_ERR_POKE;
 		}
-		pec_p->pec_ontrap_data = &otd;
+
+		if (pcie_get_bdf_from_dip(rdip, &bdf) != DDI_SUCCESS) {
+			err = DDI_FAILURE;
+			goto done;
+		}
 
 		hvio_poke_status = hvio_poke(px_p->px_dev_hdl, ra, size,
-		    pokeval, PCI_GET_BDF(rdip) << 8, &wrt_stat);
-
-		if (otd.ot_trap & OT_DATA_ACCESS)
-			err = DDI_FAILURE;
+		    pokeval, bdf << 8, &wrt_stat);
 
 		if ((hvio_poke_status != H_EOK) || (wrt_stat != H_EOK)) {
 			err = DDI_FAILURE;
@@ -1647,14 +1641,6 @@ px_lib_ctlops_peek(dev_info_t *dip, dev_info_t *rdip,
 	uint64_t peekval;
 	int err = DDI_SUCCESS;
 
-	/*
-	 * Used only to notify error handling peek/poke is occuring
-	 * One scenario is when a fabric err as a result of peek/poke.
-	 * However there is no way to guarantee that the fabric error
-	 * handler will occur in the window where otd is set.
-	 */
-	on_trap_data_t otd;
-
 	result = (void *)in_args->host_addr;
 
 	ra = (r_addr_t)va_to_pa((void *)dev_addr);
@@ -1669,7 +1655,6 @@ px_lib_ctlops_peek(dev_info_t *dip, dev_info_t *rdip,
 			mutex_enter(&pec_p->pec_pokefault_mutex);
 			pec_p->pec_safeacc_type = DDI_FM_ERR_PEEK;
 		}
-		pec_p->pec_ontrap_data = &otd;
 
 		hvio_peek_status = hvio_peek(px_p->px_dev_hdl, ra,
 		    in_args->size, &read_status, &peekval);
