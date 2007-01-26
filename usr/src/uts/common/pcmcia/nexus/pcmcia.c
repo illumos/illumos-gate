@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1372,6 +1372,8 @@ pcmcia_number_socket(dev_info_t *dip, int localsocket)
 		ppd->ppd_reg[0].phys_hi = localsocket;
 		ddi_set_parent_data(child, (caddr_t)ppd);
 		if (ndi_devi_online(child, 0) != NDI_SUCCESS) {
+			kmem_free(ppd->ppd_reg, sizeof (struct pcm_regs));
+			kmem_free(ppd, sizeof (struct pcmcia_parent_private));
 			(void) ndi_devi_free(child);
 			child = NULL;
 		}
@@ -1962,6 +1964,8 @@ SocketServices(int function, ...)
 				ppd->ppd_active = 0;
 				(void) ndi_devi_offline(dip,
 				    NDI_DEVI_REMOVE);
+
+				pcmcia_ppd_free(ppd);
 			}
 #if defined(PCMCIA_DEBUG)
 			else {
@@ -4377,7 +4381,6 @@ pcmcia_map_reg(dev_info_t *pdip, dev_info_t *dip, ra_return_t *ra,
 	if (result != DDI_SUCCESS) {
 		impl_acc_hdl_free(*handle);
 		*handle = (ddi_acc_handle_t)NULL;
-		kmem_free(reg, sizeof (pci_regspec_t));
 	} else {
 		hp->ah_addr = *base;
 		if (mr.map_op == DDI_MO_UNMAP)
@@ -4385,6 +4388,8 @@ pcmcia_map_reg(dev_info_t *pdip, dev_info_t *dip, ra_return_t *ra,
 		if (dip != NULL)
 			pcmcia_set_assigned(dip, rnum, ra);
 	}
+
+	kmem_free(reg, sizeof (pci_regspec_t));
 
 	return (result);
 }
