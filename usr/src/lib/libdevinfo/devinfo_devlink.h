@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,6 +183,7 @@ typedef struct recurse {
  */
 typedef enum {
 	DBG_ERR = 1,
+	DBG_LCK,
 	DBG_INFO,
 	DBG_STEP,
 	DBG_ALL
@@ -209,7 +210,6 @@ typedef enum {
 #define	MIN_HASH_SIZE		1024 /* Min number of chains in hash table */
 #define	MAX_UPDATE_INTERVAL	5 /* Max DB writes before synching with /dev */
 #define	MAX_LOCK_RETRY		5 /* Max attempts at locking the update lock */
-
 
 /*
  * Various flags private to the implementation
@@ -399,8 +399,8 @@ static void *get_last_minor(struct di_devlink_handle *hdp,
 static void set_last_minor(struct di_devlink_handle *hdp, cache_minor_t *cmnp,
     int flags);
 
-static int enter_update_lock(struct di_devlink_handle *hdp);
-static void exit_update_lock(struct di_devlink_handle *hdp);
+static int enter_db_lock(struct di_devlink_handle *hdp, const char *root_dir);
+static void exit_db_lock(struct di_devlink_handle *hdp);
 
 static char *minor_colon(const char *path);
 static const char *rel_path(struct di_devlink_handle *hdp, const char *path);
@@ -414,14 +414,15 @@ static void delete_unused_minor(di_devlink_handle_t hdp, cache_minor_t *cmnp);
 static int synchronize_db(di_devlink_handle_t hdp);
 static void dprintf(debug_level_t msglevel, const char *fmt, ...);
 static di_devlink_handle_t devlink_snapshot(const char *root_dir);
-static int devlink_create(const char *root, const char *name);
-static int dca_init(const char *name, struct dca_off *dcp);
+static int devlink_create(const char *root, const char *name, int dca_flags);
+static int dca_init(const char *name, struct dca_off *dcp, int dca_flags);
 static void exec_cmd(const char *root, struct dca_off *dcp);
 static int do_exec(const char *path, char *const argv[]);
 static int start_daemon(const char *root);
 static void daemon_call(const char *root, struct dca_off *dcp);
 
 int is_minor_node(const char *contents, const char **mn_root);
+char *s_realpath(const char *path, char *resolved_path);
 
 #ifdef	__cplusplus
 }

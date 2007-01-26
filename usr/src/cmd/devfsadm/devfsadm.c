@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,6 @@
 #include "devfsadm_impl.h"
 
 /* externs from devalloc.c */
-
 extern void  _reset_devalloc(int);
 extern void _update_devalloc_db(devlist_t *, int, int, char *, char *);
 extern int _da_check_for_usb(char *, char *);
@@ -106,11 +105,12 @@ static int inst_count = 0;
 static mutex_t count_lock;
 static cond_t cv;
 
-/* variables for minor_fini calling system */
-static int minor_fini_timeout = MINOR_FINI_TIMEOUT_DEFAULT;
+/* variables for minor_fini thread */
 static mutex_t minor_fini_mutex;
-static int minor_fini_thread_created = FALSE;
-static int minor_fini_delay_restart = FALSE;
+static int minor_fini_canceled = TRUE;
+static int minor_fini_delayed = FALSE;
+static cond_t minor_fini_cv;
+static int minor_fini_timeout = MINOR_FINI_TIMEOUT_DEFAULT;
 
 /* single-threads /dev modification */
 static sema_t dev_sema;
@@ -345,19 +345,28 @@ main(int argc, char *argv[])
 
 		/* only one daemon can run at a time */
 		if ((pid = enter_daemon_lock()) == getpid()) {
-			thread_t thread;
 			detachfromtty();
 			(void) cond_init(&cv, USYNC_THREAD, 0);
 			(void) mutex_init(&count_lock, USYNC_THREAD, 0);
 			if (thr_create(NULL, NULL,
-				(void *(*)(void *))instance_flush_thread,
-				    NULL,
-				    THR_DETACHED,
-				    &thread) != 0) {
+			    (void *(*)(void *))instance_flush_thread,
+			    NULL, THR_DETACHED, NULL) != 0) {
 				err_print(CANT_CREATE_THREAD, "daemon",
 					strerror(errno));
 				devfsadm_exit(1);
 			}
+
+			/* start the minor_fini_thread */
+			(void) mutex_init(&minor_fini_mutex, USYNC_THREAD, 0);
+			(void) cond_init(&minor_fini_cv, USYNC_THREAD, 0);
+			if (thr_create(NULL, NULL,
+			    (void *(*)(void *))minor_fini_thread,
+			    NULL, THR_DETACHED, NULL)) {
+				err_print(CANT_CREATE_THREAD, "minor_fini",
+				    strerror(errno));
+				devfsadm_exit(1);
+			}
+
 
 			/*
 			 * No need for rcm notifications when running
@@ -1284,17 +1293,15 @@ sync_handler(void *cookie, char *ap, size_t asize,
 	dci.dci_arg = NULL;
 
 	lock_dev();
-
 	devi_tree_walk(&dci, DINFOCPYALL, NULL);
-
-	unlock_dev(CACHE_STATE);
-
 	dcp->dca_error = dci.dci_error;
 
-	startup_cache_sync_thread();
+	if (dcp->dca_flags & DCA_DEVLINK_SYNC)
+		unlock_dev(SYNC_STATE);
+	else
+		unlock_dev(CACHE_STATE);
 
-out:
-	(void) door_return((char *)dcp, sizeof (*dcp), NULL, 0);
+out:	(void) door_return((char *)dcp, sizeof (*dcp), NULL, 0);
 }
 
 static void
@@ -1317,7 +1324,6 @@ lock_dev(void)
 		invalidate_enumerate_cache();
 		rm_all_links_from_cache();
 		(void) di_devlink_close(&devlink_cache, DI_LINK_ERROR);
-		devlink_cache = NULL;
 	}
 
 	/*
@@ -1358,27 +1364,53 @@ lock_dev(void)
 	}
 }
 
+/*
+ * Unlock the device.  If we are processing a CACHE_STATE call, we signal a
+ * minor_fini_thread delayed SYNC_STATE at the end of the call.  If we are
+ * processing a SYNC_STATE call, we cancel any minor_fini_thread SYNC_STATE
+ * at both the start and end of the call since we will be doing the SYNC_STATE.
+ */
 static void
 unlock_dev(int flag)
 {
+	assert(flag == SYNC_STATE || flag == CACHE_STATE);
+
 	vprint(CHATTY_MID, "unlock_dev(): entered\n");
+
+	/* If we are starting a SYNC_STATE, cancel minor_fini_thread SYNC */
+	if (flag == SYNC_STATE) {
+		(void) mutex_lock(&minor_fini_mutex);
+		minor_fini_canceled = TRUE;
+		minor_fini_delayed = FALSE;
+		(void) mutex_unlock(&minor_fini_mutex);
+	}
 
 	if (build_dev == FALSE)
 		return;
 
 	assert(devlink_cache);
-	assert(flag == SYNC_STATE || flag == CACHE_STATE);
-
 
 	if (flag == SYNC_STATE) {
 		unload_modules();
 		if (update_database)
 			(void) di_devlink_update(devlink_cache);
 		(void) di_devlink_close(&devlink_cache, 0);
-		devlink_cache = NULL;
 	}
 
 	exit_dev_lock();
+
+	(void) mutex_lock(&minor_fini_mutex);
+	if (flag == SYNC_STATE) {
+		/* We did a SYNC_STATE, cancel minor_fini_thread SYNC */
+		minor_fini_canceled = TRUE;
+		minor_fini_delayed = FALSE;
+	} else {
+		/* We did a CACHE_STATE, start delayed minor_fini_thread SYNC */
+		minor_fini_canceled = FALSE;
+		minor_fini_delayed = TRUE;
+		(void) cond_signal(&minor_fini_cv);
+	}
+	(void) mutex_unlock(&minor_fini_mutex);
 
 	(void) sema_post(&dev_sema);
 }
@@ -1566,7 +1598,6 @@ event_handler(sysevent_t *ev)
 		}
 
 		unlock_dev(CACHE_STATE);
-		startup_cache_sync_thread();
 
 	} else if (strcmp(subclass, ESC_DEVFS_BRANCH_ADD) == 0 ||
 	    strcmp(subclass, ESC_DEVFS_BRANCH_REMOVE) == 0) {
@@ -1584,7 +1615,6 @@ event_handler(sysevent_t *ev)
 		build_and_log_event(EC_DEV_BRANCH, dev_ev_subclass, path,
 		    DI_NODE_NIL);
 		unlock_dev(CACHE_STATE);
-		startup_cache_sync_thread();
 	} else
 		err_print(UNKNOWN_EVENT, subclass);
 
@@ -2255,99 +2285,49 @@ load_module(char *mname, char *cdir)
 }
 
 /*
- * Create a thread to call minor_fini after some delay
- */
-static void
-startup_cache_sync_thread()
-{
-	vprint(INITFINI_MID, "startup_cache_sync_thread\n");
-
-	(void) mutex_lock(&minor_fini_mutex);
-
-	minor_fini_delay_restart = TRUE;
-
-	if (minor_fini_thread_created == FALSE) {
-
-		if (thr_create(NULL, NULL,
-		    (void *(*)(void *))call_minor_fini_thread, NULL,
-		    THR_DETACHED, NULL)) {
-			err_print(CANT_CREATE_THREAD, "minor_fini",
-					strerror(errno));
-
-			(void) mutex_unlock(&minor_fini_mutex);
-
-			/*
-			 * just sync state here instead of
-			 * giving up
-			 */
-			lock_dev();
-			unlock_dev(SYNC_STATE);
-
-			return;
-		}
-		minor_fini_thread_created = TRUE;
-	} else {
-		vprint(INITFINI_MID, "restarting delay\n");
-	}
-
-	(void) mutex_unlock(&minor_fini_mutex);
-}
-
-/*
- * after not receiving an event for minor_fini_timeout secs, we need
- * to call the minor_fini routines
+ * After we have completed a CACHE_STATE, if a SYNC_STATE does not occur
+ * within 'timeout' secs the minor_fini_thread needs to do a SYNC_STATE
+ * so that we still call the minor_fini routines.
  */
 /*ARGSUSED*/
 static void
-call_minor_fini_thread(void *arg)
+minor_fini_thread(void *arg)
 {
-	int count = 0;
+	timestruc_t	abstime;
+
+	vprint(INITFINI_MID, "minor_fini_thread starting\n");
 
 	(void) mutex_lock(&minor_fini_mutex);
+	for (;;) {
+		/* wait the gather period, or until signaled */
+		abstime.tv_sec = time(NULL) + minor_fini_timeout;
+		abstime.tv_nsec = 0;
+		(void) cond_timedwait(&minor_fini_cv,
+		    &minor_fini_mutex, &abstime);
 
-	vprint(INITFINI_MID, "call_minor_fini_thread starting\n");
+		/* if minor_fini was canceled, go wait again */
+		if (minor_fini_canceled == TRUE)
+			continue;
 
-	do {
-		minor_fini_delay_restart = FALSE;
-
-		(void) mutex_unlock(&minor_fini_mutex);
-		(void) sleep(minor_fini_timeout);
-		(void) mutex_lock(&minor_fini_mutex);
-
-		/*
-		 * if minor_fini_delay_restart is still false then
-		 * we can call minor fini routines.
-		 * ensure that at least periodically minor_fini gets
-		 * called satisfying link generators depending on fini
-		 * being eventually called
-		 */
-		if ((count++ >= FORCE_CALL_MINOR_FINI) ||
-		    (minor_fini_delay_restart == FALSE)) {
-			vprint(INITFINI_MID,
-			    "call_minor_fini starting (%d)\n", count);
-			(void) mutex_unlock(&minor_fini_mutex);
-
-			lock_dev();
-			unlock_dev(SYNC_STATE);
-
-			vprint(INITFINI_MID, "call_minor_fini done\n");
-
-			/*
-			 * hang around before exiting just in case
-			 * minor_fini_delay_restart is set again
-			 */
-			(void) sleep(1);
-
-			count = 0;
-
-			(void) mutex_lock(&minor_fini_mutex);
+		/* if minor_fini was delayed, go wait again */
+		if (minor_fini_delayed == TRUE) {
+			minor_fini_delayed = FALSE;
+			continue;
 		}
-	} while (minor_fini_delay_restart);
 
-	minor_fini_thread_created = FALSE;
-	(void) mutex_unlock(&minor_fini_mutex);
-	vprint(INITFINI_MID, "call_minor_fini_thread exiting\n");
+		/* done with cancellations and delays, do the SYNC_STATE */
+		(void) mutex_unlock(&minor_fini_mutex);
+
+		lock_dev();
+		unlock_dev(SYNC_STATE);
+		vprint(INITFINI_MID, "minor_fini sync done\n");
+
+		(void) mutex_lock(&minor_fini_mutex);
+		minor_fini_canceled = TRUE;
+		minor_fini_delayed = FALSE;
+	}
 }
+
 
 /*
  * Attempt to initialize module, if a minor_init routine exists.  Set
@@ -2940,7 +2920,7 @@ reset_node_permissions(di_node_t node, di_minor_t minor)
 	 *		reset ownership and permissions to those specified in
 	 *		minor_perm
 	 *	else
-	 *		preserve exsisting/user-modified ownership and
+	 *		preserve existing/user-modified ownership and
 	 *		permissions
 	 *
 	 * devfs indicates a new device by faking access time to be zero.

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,6 +173,17 @@ extern int devfs_load_minor_perm(struct mperm *,
 	void (*)(minorperm_err_t, int));
 extern int devfs_add_minor_perm(char *, void (*)(minorperm_err_t, int));
 extern int devfs_rm_minor_perm(char *, void (*)(minorperm_err_t, int));
+
+/* devfsadm dca_flags values: some are used by libdevinfo devlink_create() */
+#define	DCA_CREATE_LINK		0x000000001
+#define	DCA_FREE_LIST		0x000000002
+#define	DCA_LOAD_DRV		0x000000004
+#define	DCA_CHECK_TYPE		0x000000010
+#define	DCA_NOTIFY_RCM		0x000000020
+#define	DCA_FLUSH_PATHINST	0x000000040
+#define	DCA_HOT_PLUG		0x000000080
+#define	DCA_DEVLINK_SYNC	0x000000100
+#define	DCA_DEVLINK_CACHE	0x000000200
 
 #ifdef	__cplusplus
 }

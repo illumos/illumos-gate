@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,8 +109,7 @@ extern "C" {
 
 #define	DEVFSADM_DEFAULT_FILE "/etc/default/devfsadm"
 
-#define	MINOR_FINI_TIMEOUT_DEFAULT 2
-#define	FORCE_CALL_MINOR_FINI	10
+#define	MINOR_FINI_TIMEOUT_DEFAULT 3
 
 #define	SYNCH_DOOR_PERMS	(S_IRUSR | S_IWUSR)
 
@@ -158,14 +157,6 @@ extern "C" {
 #define	READ_LINK 0x02
 #define	CREATE_NODE 0x01
 #define	READ_NODE 0x02
-
-#define	DCA_CREATE_LINK	0x01
-#define	DCA_FREE_LIST 0x02
-#define	DCA_LOAD_DRV 0x04
-#define	DCA_CHECK_TYPE 0x10
-#define	DCA_NOTIFY_RCM 0x20
-#define	DCA_FLUSH_PATHINST 0x40
-#define	DCA_HOT_PLUG 0x80
 
 #define	CACHE_STATE 0x0
 #define	SYNC_STATE 0x1
@@ -374,7 +365,6 @@ struct rcm_eventq {
 static int devfsadm_enumerate_int_start(char *devfs_path,
 	int index, char **buf, devfsadm_enumerate_t rules[],
 	int nrules, char *start);
-static void startup_cache_sync_thread(void);
 static void set_root_devices_dev_dir(char *dir);
 static void pre_and_post_cleanup(int flags);
 static void hot_cleanup(char *, char *, char *, char *, int);
@@ -438,7 +428,7 @@ static int create_link_common(char *devlink, char *contents, int *exists);
 static char *dequote(char *src);
 static void parse_args(int argc, char *argv[]);
 static void process_devinfo_tree(void);
-static void call_minor_fini_thread(void *arg);
+static void minor_fini_thread(void *arg);
 static void *s_realloc(void *ptr, const size_t size);
 static void read_devlinktab_file(void);
 static selector_list_t *create_selector_list(char *selector);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,9 +27,10 @@
 
 #include "libdevinfo.h"
 #include "devinfo_devlink.h"
+#include "device_info.h"
 
-#undef DEBUG
-#ifndef DEBUG
+#undef	DEBUG
+#ifndef	DEBUG
 #define	NDEBUG 1
 #else
 #undef	NDEBUG
@@ -141,6 +142,10 @@ retry:
 	/*
 	 * Unlink the database, so that consumers don't get
 	 * out of date information as the database is being updated.
+	 *
+	 * NOTE: A typical snapshot consumer will wait until write lock
+	 * obtained by handle_alloc above is dropped by handle_free,
+	 * at which point the file will have been recreated.
 	 */
 	get_db_path(hdp, DB_FILE, path, sizeof (path));
 	(void) unlink(path);
@@ -352,10 +357,10 @@ handle_alloc(const char *root_dir, uint_t flags)
 	/*
 	 * Lock database if a read-write handle is being allocated.
 	 * Locks are needed to protect against multiple writers.
-	 * Readers don't need locks.
+	 * Readers lock/unlock in di_devlink_snapshot.
 	 */
 	if (HDL_RDWR(&proto)) {
-		if (enter_update_lock(&proto) != 0) {
+		if (enter_db_lock(&proto, root_dir) != 1) {
 			return (NULL);
 		}
 	}
@@ -394,7 +399,7 @@ error:
 		/* Unlink DB file on error */
 		get_db_path(&proto, DB_FILE, path, sizeof (path));
 		(void) unlink(path);
-		exit_update_lock(&proto);
+		exit_db_lock(&proto);
 	}
 	return (NULL);
 }
@@ -680,7 +685,7 @@ di_devlink_close(di_devlink_handle_t *pp, int flag)
 	}
 
 	/*
-	 * Keep track of array assignments. There is atleast
+	 * Keep track of array assignments. There is at least
 	 * 1 element (the "NIL" element) per type.
 	 */
 	for (i = 0; i < DB_TYPES; i++) {
@@ -1028,7 +1033,7 @@ handle_free(struct di_devlink_handle **pp)
 	cache_free(hdp);
 
 	if (HDL_RDWR(hdp))
-		exit_update_lock(hdp);
+		exit_db_lock(hdp);
 	assert(hdp->lock_fd == -1);
 
 	free(hdp->dev_dir);
@@ -1214,7 +1219,7 @@ follow_link:
 			return (NULL);
 	}
 
-	if (realpath(link, buf) == NULL || !is_minor_node(buf, &minor_path)) {
+	if (s_realpath(link, buf) == NULL || !is_minor_node(buf, &minor_path)) {
 		return (NULL);
 	}
 	return (lookup_minor(hdp, minor_path, NULL, TYPE_CACHE|CREATE_FLAG));
@@ -1904,7 +1909,8 @@ di_devlink_init_impl(const char *root, const char *name, uint_t flags)
 		return (NULL);
 	}
 
-	if (flags == DI_MAKE_LINK && (err = devlink_create(root, name))) {
+	if ((flags == DI_MAKE_LINK) &&
+	    (err = devlink_create(root, name, DCA_DEVLINK_CACHE))) {
 		errno = err;
 		return (NULL);
 	}
@@ -1930,16 +1936,43 @@ static di_devlink_handle_t
 devlink_snapshot(const char *root_dir)
 {
 	struct di_devlink_handle *hdp;
+	int	locked;
+	int	err;
+	int	retried = 0;
 
 	if ((hdp = handle_alloc(root_dir, OPEN_RDONLY)) == NULL) {
 		return (NULL);
 	}
 
 	/*
-	 * If we cannot open the DB below, we will walk /dev
+	 * Enter the DB lock.  This will wait for update in progress and
+	 * provide exclusion from new updates while we establish our mmap
+	 * to the database contents.
+	 */
+again:	locked = enter_db_lock(hdp, root_dir);
+	if (locked == -1) {
+		handle_free(&hdp);
+		return (NULL);
+	} else if (locked == 1) {
+		/* Open the DB and exit the lock. */
+		err = open_db(hdp, OPEN_RDONLY);
+		exit_db_lock(hdp);
+	} else
+		return (hdp);		/* walk /dev in di_devlink_walk */
+
+	/*
+	 * If we failed to open DB the most likely cause is that DB file did
+	 * not exist. If we have not done a retry, signal devfsadmd to
+	 * recreate the DB file and retry.
+	 *
+	 * If we fail to open the DB with retry, we will walk /dev
 	 * in di_devlink_walk.
 	 */
-	(void) open_db(hdp, OPEN_RDONLY);
+	if (err && (retried == 0)) {
+		retried++;
+		(void) devlink_create(root_dir, NULL, DCA_DEVLINK_SYNC);
+		goto again;
+	}
 
 	return (hdp);
 }
@@ -2292,7 +2325,7 @@ visit_link(
 			/*LINTED*/
 			assert(sizeof (tmp) >= PATH_MAX);
 #endif
-			if (realpath(vlp->abs_path, tmp) == NULL)
+			if (s_realpath(vlp->abs_path, tmp) == NULL)
 				return (DI_WALK_CONTINUE);
 
 			if (!is_minor_node(tmp, &minor_path))
@@ -2979,52 +3012,99 @@ hashfn(struct di_devlink_handle *hdp, const char *str)
 	return (hval % CACHE(hdp)->hash_sz);
 }
 
+/*
+ * enter_db_lock()
+ *
+ * If the handle is IS_RDWR then we lock as writer to "update" database,
+ * if IS_RDONLY then we lock as reader to "snapshot" database. The
+ * implementation uses advisory file locking.
+ *
+ * This function returns:
+ *   == 1	success and grabbed the lock file, we can open the DB.
+ *   == 0	success but did not lock the lock file,	reader must walk
+ *		the /dev directory.
+ *   == -1	failure.
+ */
 static int
-enter_update_lock(struct di_devlink_handle *hdp)
+enter_db_lock(struct di_devlink_handle *hdp, const char *root_dir)
 {
-	int i, fd, rv;
-	struct flock lock;
-	char lockfile[PATH_MAX];
+	int		fd;
+	struct flock	lock;
+	char		lockfile[PATH_MAX];
+	int		rv;
+	int		writer = HDL_RDWR(hdp);
+	int		did_sync = 0;
+	int		eintrs;
 
 	assert(hdp->lock_fd < 0);
 
 	get_db_path(hdp, DB_LOCK, lockfile, sizeof (lockfile));
 
-	/*
-	 * Record locks are per-process. Protect against multiple threads.
-	 */
+	dprintf(DBG_LCK, "enter_db_lock: %s BEGIN\n",
+	    writer ? "update" : "snapshot");
+
+	/* Record locks are per-process. Protect against multiple threads. */
 	(void) mutex_lock(&update_mutex);
 
-	if ((fd = open(lockfile, O_RDWR|O_CREAT, DB_LOCK_PERMS)) < 0) {
-		goto error;
+again:	if ((fd = open(lockfile,
+	    (writer ? (O_RDWR|O_CREAT) : O_RDONLY), DB_LOCK_PERMS)) < 0) {
+		/*
+		 * Typically the lock file and the database go hand in hand.
+		 * If we find that the lock file does not exist (for some
+		 * unknown reason) and we are the reader then we return
+		 * success (after triggering devfsadm to create the file and
+		 * a retry) so that we can still provide service via slow
+		 * /dev walk.  If we get a failure as a writer we want the
+		 * error to manifests itself.
+		 */
+		if ((errno == ENOENT) && !writer) {
+			/* If reader, signal once to get files created */
+			if (did_sync == 0) {
+				did_sync = 1;
+				dprintf(DBG_LCK, "enter_db_lock: %s OSYNC\n",
+				    writer ? "update" : "snapshot");
+
+				/* signal to get files created */
+				(void) devlink_create(root_dir, NULL,
+				    DCA_DEVLINK_SYNC);
+				goto again;
+			}
+			dprintf(DBG_LCK, "enter_db_lock: %s OPENFAILD %s: "
+			    "WALK\n", writer ? "update" : "snapshot",
+			    strerror(errno));
+			(void) mutex_unlock(&update_mutex);
+			return (0);		/* success, but not locked */
+		} else {
+			dprintf(DBG_LCK, "enter_db_lock: %s OPENFAILD %s\n",
+			    writer ? "update" : "snapshot", strerror(errno));
+			(void) mutex_unlock(&update_mutex);
+			return (-1);		/* failed */
+		}
 	}
 
-	lock.l_type = F_WRLCK;
+	lock.l_type = writer ? F_WRLCK : F_RDLCK;
 	lock.l_whence = SEEK_SET;
 	lock.l_start = 0;
 	lock.l_len = 0;
 
-	i = 1;
-	while ((rv = fcntl(fd, F_SETLKW, &lock)) == -1 && errno == EINTR) {
-		if (i < MAX_LOCK_RETRY) {
-			i++;
-		} else {
+	/* Enter the lock. */
+	for (eintrs = 0; eintrs < MAX_LOCK_RETRY; eintrs++) {
+		rv = fcntl(fd, F_SETLKW, &lock);
+		if ((rv != -1) || (errno != EINTR))
 			break;
-		}
 	}
 
-	if (rv == 0) {
+	if (rv != -1) {
 		hdp->lock_fd = fd;
-		return (0);
-	} else {
-		(void) close(fd);
+		dprintf(DBG_LCK, "enter_db_lock: %s LOCKED\n",
+		    writer ? "update" : "snapshot");
+		return (1);		/* success, locked */
 	}
 
-error:
+	(void) close(fd);
+	dprintf(DBG_ERR, "enter_db_lock: %s FAILED: %s: WALK\n",
+	    writer ? "update" : "snapshot", strerror(errno));
 	(void) mutex_unlock(&update_mutex);
-
-	dprintf(DBG_ERR, "lockfile(%s): lock failed: %s\n", lockfile,
-	    strerror(errno));
 	return (-1);
 }
 
@@ -3032,9 +3112,10 @@ error:
  * Close and re-open lock file every time so that it is recreated if deleted.
  */
 static void
-exit_update_lock(struct di_devlink_handle *hdp)
+exit_db_lock(struct di_devlink_handle *hdp)
 {
-	struct flock unlock;
+	struct flock	unlock;
+	int		writer = HDL_RDWR(hdp);
 
 	if (hdp->lock_fd < 0) {
 		return;
@@ -3045,9 +3126,11 @@ exit_update_lock(struct di_devlink_handle *hdp)
 	unlock.l_start = 0;
 	unlock.l_len = 0;
 
+	dprintf(DBG_LCK, "exit_db_lock : %s UNLOCKED\n",
+	    writer ? "update" : "snapshot");
 	if (fcntl(hdp->lock_fd, F_SETLK, &unlock) == -1) {
-		dprintf(DBG_ERR, "update lockfile: unlock failed: %s\n",
-		    strerror(errno));
+		dprintf(DBG_ERR, "exit_db_lock : %s failed: %s\n",
+		    writer ? "update" : "snapshot", strerror(errno));
 	}
 
 	(void) close(hdp->lock_fd);
@@ -3139,7 +3222,7 @@ bad:
 #define	MAX_DAEMON_ATTEMPTS 2
 
 static int
-devlink_create(const char *root, const char *name)
+devlink_create(const char *root, const char *name, int dca_devlink_flag)
 {
 	int i;
 	struct dca_off dca;
@@ -3149,7 +3232,7 @@ devlink_create(const char *root, const char *name)
 	/*
 	 * Convert name into arg for door_call
 	 */
-	if (dca_init(name, &dca) != 0)
+	if (dca_init(name, &dca, dca_devlink_flag) != 0)
 		return (EINVAL);
 
 	/*
@@ -3201,7 +3284,7 @@ devlink_create(const char *root, const char *name)
  * offset in the "name" member.
  */
 static int
-dca_init(const char *name, struct dca_off *dcp)
+dca_init(const char *name, struct dca_off *dcp, int dca_flags)
 {
 	char *cp;
 
@@ -3209,7 +3292,7 @@ dca_init(const char *name, struct dca_off *dcp)
 	dcp->dca_minor = 0;
 	dcp->dca_driver = 0;
 	dcp->dca_error = 0;
-	dcp->dca_flags = 0;
+	dcp->dca_flags = dca_flags;
 	dcp->dca_name[0] = '\0';
 
 	name = name ? name : "/";
@@ -3649,7 +3732,8 @@ debug_print(debug_level_t msglevel, const char *fmt, va_list ap)
 
 	if (_devlink_debug < msglevel)
 		return;
-
+	if ((_devlink_debug == DBG_LCK) && (msglevel != _devlink_debug))
+		return;
 
 	/* Print a distinctive label for error msgs */
 	if (msglevel == DBG_ERR) {
@@ -3657,6 +3741,7 @@ debug_print(debug_level_t msglevel, const char *fmt, va_list ap)
 	}
 
 	(void) vfprintf(stderr, fmt, ap);
+	(void) fflush(stderr);
 }
 
 /* ARGSUSED */
@@ -3667,7 +3752,6 @@ dprintf(debug_level_t msglevel, const char *fmt, ...)
 	va_list ap;
 
 	assert(msglevel > 0);
-
 	if (!_devlink_debug)
 		return;
 
