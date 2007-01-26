@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +89,7 @@ struct vgatext_softc {
 		unsigned char blue;
 	}			colormap[VGA8_CMAP_ENTRIES];
 	unsigned char attrib_palette[VGA_ATR_NUM_PLT];
+	unsigned int flags;
 };
 
 typedef enum pc_colors {
@@ -147,6 +148,9 @@ static struct fbgattr vgatext_attr =  {
 	{ -1 }
 };
 
+#define	GFXP_FLAG_CONSOLE 0x00000001
+#define	GFXP_IS_CONSOLE(softc) ((softc)->flags & GFXP_FLAG_CONSOLE)
+
 int gfxp_vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd,
 	gfxp_vgatext_softc_ptr_t ptr);
 static int vgatext_devinit(struct vgatext_softc *, struct vis_devinit *data);
@@ -196,6 +200,85 @@ gfxp_vgatext_softc_free(gfxp_vgatext_softc_ptr_t ptr)
 	kmem_free(ptr, sizeof (struct vgatext_softc));
 }
 
+#define	STREQ(a, b)	(strcmp((a), (b)) == 0)
+
+static void
+gfxp_check_for_console(dev_info_t *devi, struct vgatext_softc *softc,
+	int pci_pcie_bus)
+{
+	ddi_acc_handle_t pci_conf;
+	dev_info_t *pdevi;
+	uint16_t data16;
+
+	/*
+	 * Based on Section 11.3, "PCI Display Subsystem Initialization",
+	 * of the 1.1 PCI-to-PCI Bridge Architecture Specification
+	 * determine if this is the boot console device.  First, see
+	 * if the SBIOS has turned on PCI I/O for this device.  Then if
+	 * this is PCI/PCI-E, verify the parent bridge has VGAEnable set.
+	 */
+
+	if (pci_config_setup(devi, &pci_conf) != DDI_SUCCESS) {
+		cmn_err(CE_WARN,
+			MYNAME ": can't get PCI conf handle");
+		return;
+	}
+
+	data16 = pci_config_get16(pci_conf, PCI_CONF_COMM);
+	if (data16 & PCI_COMM_IO)
+		softc->flags |= GFXP_FLAG_CONSOLE;
+
+	pci_config_teardown(&pci_conf);
+
+	/* If IO not enabled or ISA/EISA, just return */
+	if (!(softc->flags & GFXP_FLAG_CONSOLE) || !pci_pcie_bus)
+		return;
+
+	/*
+	 * Check for VGA Enable in the Bridge Control register for all
+	 * PCI/PCIEX parents.  If not set all the way up the chain,
+	 * this cannot be the boot console.
+	 */
+
+	pdevi = ddi_get_parent(devi);
+	while (pdevi) {
+		int	error;
+		ddi_acc_handle_t ppci_conf;
+		char	*parent_type = NULL;
+
+		error = ddi_prop_lookup_string(DDI_DEV_T_ANY, pdevi,
+		    DDI_PROP_DONTPASS, "device_type", &parent_type);
+		if (error != DDI_SUCCESS) {
+			return;
+		}
+
+		/* Verify still on the PCI/PCIEX parent tree */
+		if (!STREQ(parent_type, "pci") &&
+		    !STREQ(parent_type, "pciex")) {
+			ddi_prop_free(parent_type);
+			return;
+		}
+
+		ddi_prop_free(parent_type);
+		parent_type = NULL;
+
+		if (pci_config_setup(pdevi, &ppci_conf) != DDI_SUCCESS) {
+			/* No registers on root node, done with check */
+			return;
+		}
+
+		data16 = pci_config_get16(ppci_conf, PCI_BCNF_BCNTRL);
+		pci_config_teardown(&ppci_conf);
+
+		if (!(data16 & PCI_BCNF_BCNTRL_VGA_ENABLE)) {
+			softc->flags &= ~GFXP_FLAG_CONSOLE;
+			return;
+		}
+
+		pdevi = ddi_get_parent(pdevi);
+	}
+}
+
 int
 gfxp_vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
 	gfxp_vgatext_softc_ptr_t ptr)
@@ -208,6 +291,7 @@ gfxp_vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
 	off_t	reg_offset;
 	off_t	mem_offset;
 	char	*cons;
+	int pci_pcie_bus = 0;
 
 
 	switch (cmd) {
@@ -235,7 +319,6 @@ gfxp_vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
 	}
 
 	/* Not enable AGP and DRM by default */
-#define	STREQ(a, b)	(strcmp((a), (b)) == 0)
 	if (STREQ(parent_type, "isa") || STREQ(parent_type, "eisa")) {
 		reg_rnumber = vgatext_get_isa_reg_index(devi, 1, VGA_REG_ADDR,
 			&reg_offset);
@@ -254,6 +337,7 @@ gfxp_vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
 			goto fail;
 		}
 	} else if (STREQ(parent_type, "pci") || STREQ(parent_type, "pciex")) {
+		pci_pcie_bus = 1;
 		reg_rnumber = vgatext_get_pci_reg_index(devi,
 			PCI_REG_ADDR_M|PCI_REG_REL_M,
 			PCI_ADDR_IO|PCI_RELOCAT_B, VGA_REG_ADDR,
@@ -321,8 +405,10 @@ gfxp_vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
 		ddi_prop_free(cons);
 	}
 
+	gfxp_check_for_console(devi, softc, pci_pcie_bus);
+
 	/* only do this if not in graphics mode */
-	if (vgatext_silent == 0) {
+	if ((vgatext_silent == 0) && (GFXP_IS_CONSOLE(softc))) {
 		vgatext_init(softc);
 		vgatext_save_colormap(softc);
 	}
@@ -495,7 +581,7 @@ vgatext_kdsetmode(struct vgatext_softc *softc, int mode)
 {
 	int i;
 
-	if (mode == softc->mode)
+	if ((mode == softc->mode) || (!GFXP_IS_CONSOLE(softc)))
 		return (0);
 
 	switch (mode) {
