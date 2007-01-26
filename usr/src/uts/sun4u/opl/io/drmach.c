@@ -254,6 +254,8 @@ int drmach_debug = 1;		 /* set to non-zero to enable debug messages */
 
 #define	DRMACH_OBJ(id)		((drmach_common_t *)id)
 
+#define	DRMACH_NULL_ID(id)	((id) == 0)
+
 #define	DRMACH_IS_BOARD_ID(id)	\
 	((id != 0) &&		\
 	(DRMACH_OBJ(id)->isa == (void *)drmach_board_new))
@@ -1467,11 +1469,11 @@ drmach_board_disconnect(drmachid_t id, drmach_opts_t *opts)
 	int rv = 0;
 	sbd_error_t		*err = NULL;
 
+	if (DRMACH_NULL_ID(id))
+		return (NULL);
 
 	if (!DRMACH_IS_BOARD_ID(id))
 		return (drerr_new(0, EOPL_INAPPROP, NULL));
-
-
 
 	obj = (drmach_board_t *)id;
 
@@ -1716,6 +1718,9 @@ drmach_board_poweroff(drmachid_t id)
 	sbd_error_t	*err;
 	drmach_status_t	 stat;
 
+	if (DRMACH_NULL_ID(id))
+		return (NULL);
+
 	if (!DRMACH_IS_BOARD_ID(id))
 		return (drerr_new(0, EOPL_INAPPROP, NULL));
 	bp = id;
@@ -1768,6 +1773,8 @@ drmach_board_unassign(drmachid_t id)
 	sbd_error_t	*err;
 	drmach_status_t	 stat;
 
+	if (DRMACH_NULL_ID(id))
+		return (NULL);
 
 	if (!DRMACH_IS_BOARD_ID(id)) {
 		return (drerr_new(0, EOPL_INAPPROP, NULL));
