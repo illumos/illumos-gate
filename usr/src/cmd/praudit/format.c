@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,12 +80,12 @@ static struct fw {
 				AUP_OCTAL,	 6,
 				AUP_DECIMAL,	 6,
 				AUP_HEX,	 6,
-				AUP_STRING,	 4,
+				AUP_STRING,	 1,
 		AUR_BYTE,	AUP_BINARY,	12,
 				AUP_OCTAL,	 6,
 				AUP_DECIMAL,	 6,
 				AUP_HEX,	 6,
-				AUP_STRING,	 4,
+				AUP_STRING,	 1,
 		AUR_SHORT,	AUP_BINARY,	20,
 				AUP_OCTAL,	10,
 				AUP_DECIMAL,	10,
@@ -2797,6 +2797,23 @@ pa_print(pr_context_t *context, uval_t *uval, int flag)
 	return (returnstat);
 }
 
+static struct cntrl_mapping {
+	char from;
+	char to;
+} cntrl_map[] = {
+	'\0', '0',
+	'\a', 'a',
+	'\b', 'b',
+	'\t', 't',
+	'\f', 'f',
+	'\n', 'n',
+	'\r', 'r',
+	'\v', 'v'
+};
+
+static int cntrl_map_entries = sizeof (cntrl_map)
+	/ sizeof (struct cntrl_mapping);
+
 /*
  * Convert binary data to ASCII for printing.
  */
@@ -2804,12 +2821,21 @@ void
 convertascii(char *p, char *c, int size)
 {
 	register int	i;
+	register int	j, match;
 
 	for (i = 0; i < size; i++) {
 		*(c + i) = (char)toascii(*(c + i));
 		if ((int)iscntrl(*(c + i))) {
-			*p++ = '^';
-			*p++ = (char)(*(c + i) + 0x40);
+			for (j = match = 0; j < cntrl_map_entries; j++)
+				if (cntrl_map[j].from == *(c + i)) {
+					*p++ = '\\';
+					*p++ = cntrl_map[j].to;
+					match = 1;
+				}
+			if (!match) {
+				*p++ = '^';
+				*p++ = (char)(*(c + i) + 0x40);
+			}
 		} else
 			*p++ = *(c + i);
 	}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +54,8 @@ adrf_char(adrf_t *adrf, char *cp, int count)
 {
 	int c;	/* read character in here */
 
+	if (count < 0)
+		return (-1);
 	while (count--) {
 		if ((c = fgetc(adrf->adrf_fp)) == EOF)
 			return (-1);
@@ -72,6 +73,8 @@ adrf_short(adrf_t *adrf, short *sp, int count)
 {
 	int c;	/* read character in here */
 
+	if (count < 0)
+		return (-1);
 	while (count--) {
 		if ((c = fgetc(adrf->adrf_fp)) == EOF)
 			return (-1);
@@ -99,6 +102,8 @@ adrf_int32(adrf_t *adrf, int32_t *lp, int count)
 	int i;
 	int c;	/* read character in here */
 
+	if (count < 0)
+		return (-1);
 	for (; count--; lp++) {
 		*lp = 0;
 		for (i = 0; i < 4; i++) {
@@ -118,6 +123,8 @@ adrf_int64(adrf_t *adrf, int64_t *lp, int count)
 	int i;
 	int c;	/* read character in here */
 
+	if (count < 0)
+		return (-1);
 	for (; count--; lp++) {
 		*lp = 0;
 		for (i = 0; i < 8; i++) {
