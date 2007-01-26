@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +36,8 @@
 #include <sys/ksynch.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/errno.h>
+#include <sys/inttypes.h>
 
 #define	NELEM(a)	(sizeof (a) / sizeof ((a)[0]))
 
@@ -88,7 +89,7 @@ beep(enum beep_type type)
 	}
 
 	mutex_enter(&beep_state.mutex);
-	if (beep_state.state == BEEP_OFF) {
+	if (beep_state.state == BEEP_OFF && bp->frequency != 0) {
 	    beep_state.state = BEEP_TIMED;
 	    beep_frequency(bp->frequency);
 	    beep_on();
@@ -158,8 +159,10 @@ beeper_on(enum beep_type type)
 	mutex_enter(&beep_state.mutex);
 	if (beep_state.state == BEEP_OFF) {
 		beep_state.state = BEEP_ON;
-		beep_frequency(bp->frequency);
-		beep_on();
+		if (bp->frequency != 0) {
+			beep_frequency(bp->frequency);
+			beep_on();
+		}
 	}
 	mutex_exit(&beep_state.mutex);
 }
@@ -173,4 +176,25 @@ beeper_off()
 		beep_off();
 	}
 	mutex_exit(&beep_state.mutex);
+}
+
+int
+beeper_freq(enum beep_type type, int freq)
+{
+	struct beep_params *bp;
+
+	/*
+	 * The frequency value is limited to the range of [0 - 32767]
+	 */
+	if ((type != BEEP_CONSOLE && type != BEEP_TYPE4) || freq < 0 ||
+	    freq > INT16_MAX)
+		return (EINVAL);
+
+	for (bp = beep_params; bp->type != BEEP_DEFAULT; bp++) {
+		if (bp->type == type)
+			break;
+	}
+
+	bp->frequency = freq;
+	return (0);
 }

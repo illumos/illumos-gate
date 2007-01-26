@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -43,7 +42,8 @@
 #include <sys/devops.h>
 
 #include <sys/beep.h>
-
+#include <sys/errno.h>
+#include <sys/inttypes.h>
 
 /*
  * Debug stuff
@@ -184,7 +184,7 @@ beep(enum beep_type type)
 	mutex_enter(&beep_statep->beep_state_mutex);
 
 	/* Beep only when no previous beep is in progress */
-	if (beep_statep->beep_state_mode == BEEP_OFF) {
+	if (beep_statep->beep_state_mode == BEEP_OFF && bp->frequency != 0) {
 
 		beep_statep->beep_state_mode = BEEP_TIMED;
 
@@ -248,10 +248,12 @@ beeper_on(enum beep_type type)
 
 		beep_statep->beep_state_mode = BEEP_ON;
 
-		(*beep_statep->beep_state_beep_freq)(beep_statep->
+		if (bp->frequency != 0) {
+			(*beep_statep->beep_state_beep_freq)(beep_statep->
 					beep_state_beep_dip, bp->frequency);
-		(*beep_statep->beep_state_beep_on)(beep_statep->
+			(*beep_statep->beep_state_beep_on)(beep_statep->
 						beep_state_beep_dip);
+		}
 	}
 	mutex_exit(&beep_statep->beep_state_mutex);
 
@@ -312,4 +314,34 @@ beep_timeout()
 
 	BEEP_DEBUG1((CE_CONT, "beeper_timeout : Done"));
 
+}
+
+/*
+ * Beeper_freq:
+ *	Set beeper frequency
+ */
+int
+beeper_freq(enum beep_type type, int freq)
+{
+	struct beep_params *bp;
+
+	BEEP_DEBUG1((CE_CONT, "beeper_freq : Start"));
+
+	/*
+	 * The frequency value is limited to the range of [0 - 32767]
+	 */
+	if ((type != BEEP_CONSOLE && type != BEEP_TYPE4) || freq < 0 ||
+	    freq > INT16_MAX)
+		return (EINVAL);
+
+	for (bp = beep_params; bp->type != BEEP_DEFAULT; bp++) {
+		if (bp->type == type)
+			break;
+	}
+
+	bp->frequency = freq;
+
+	BEEP_DEBUG1((CE_CONT, "beeper_freq : Done"));
+
+	return (0);
 }

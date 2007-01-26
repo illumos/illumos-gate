@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -211,6 +211,18 @@ struct kiockeymap {
 #define	KIOCSRPTDELAY	(KIOC|23)
 #define	KIOCGRPTRATE	(KIOC|24)
 #define	KIOCSRPTRATE	(KIOC|25)
+
+/* Set keyboard and console beeper frequencies */
+#define	KIOCSETFREQ	(KIOC|26)
+
+/* Beeper type for struct freq_request */
+enum fr_beep_type {CONSOLE_BEEP = 1, KBD_BEEP = 2};
+
+/* Frequency request structure */
+struct freq_request {
+	enum fr_beep_type type;	/* Beeper type */
+	int16_t	freq;		/* Frequency */
+};
 
 /* Used to control the AutoRepeat Min-delay and Min-Rate */
 #define	KIOCRPTDELAY_MIN	(100)

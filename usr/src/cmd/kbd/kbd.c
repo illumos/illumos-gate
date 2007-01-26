@@ -27,8 +27,12 @@
 
 
 /*
- *	Usage: kbd [-r] [-t] [-l] [-i] [-c on|off] [-a enable|disable|alternate]
- *		    [-d keyboard device]
+ *	Usage: kbd [-r] [-t] [-l] [-c on|off] [-a enable|disable|alternate]
+ *		   [-d keyboard device] [-D autorepeat dealy] [-R autorepeat
+ *		   rate]
+ *	       kbd [-i] [-d keyboard device]
+ *	       kbd -s [language]
+ *	       kbd -b [keyboard|console] frequency
  *	-r			reset the keyboard as if power-up
  *	-t			return the type of the keyboard being used
  *	-l			return the layout of the keyboard being used,
@@ -40,6 +44,8 @@
  *	-R autorepeat rate	sets autorepeat rate, unit in ms
  *	-d keyboard device	chooses the kbd device, default /dev/kbd.
  *	-s keyboard layout	sets keyboard layout
+ *	-b [keyboard| console]	frequency
+ *				sets keyboard or console beeper frequency
  */
 
 #include <sys/types.h>
@@ -55,6 +61,8 @@
 #include <stropts.h>
 #include <libintl.h>
 #include <locale.h>
+#include <errno.h>
+#include <inttypes.h>
 
 #define	KBD_DEVICE	"/dev/kbd"		/* default keyboard device */
 #define	DEF_FILE	"/etc/default/kbd"	/* kbd defaults file	*/
@@ -63,12 +71,15 @@
 #define	DEF_RPTDELAY	"REPEAT_DELAY="
 #define	DEF_RPTRATE	"REPEAT_RATE="
 #define	DEF_LAYOUT	"LAYOUT="
+#define	DEF_KBDFREQ	"KBD_BEEPER_FREQ="
+#define	DEF_CONSFREQ	"CONSOLE_BEEPER_FREQ="
 
 #define	KBD_LAYOUT_FILE  "/usr/share/lib/keytables/type_6/kbd_layouts"
 #define	MAX_LAYOUT_NUM		128
 #define	MAX_LINE_SIZE		256
 #define	DEFAULT_KBD_LAYOUT	33
 
+int errno;
 char *layout_names[MAX_LAYOUT_NUM];
 int layout_numbers[MAX_LAYOUT_NUM];
 static int layout_count;
@@ -89,21 +100,22 @@ static int get_layout_number(char *);
 static int set_layout(int, int);
 static int get_layouts(void);
 static int set_kbd_layout(int, char *);
+static int set_beep_freq(int, char *, int);
 
 int
 main(int argc, char **argv)
 {
 	int c, error;
 	int rflag, tflag, lflag, cflag, dflag, aflag, iflag, errflag,
-	    Dflag, Rflag, rtlacDRflag, sflag;
-	char *copt, *aopt, *delay, *rate, *layout_name;
-	char *kbdname = KBD_DEVICE;
-	int kbd;
+	    Dflag, Rflag, rtlacDRflag, sflag, bflag;
+	char *copt, *aopt, *delay, *rate, *layout_name, *b_type, *freq_str;
+	char *kbdname = KBD_DEVICE, *endptr = NULL;
+	int kbd, freq_val;
 	extern char *optarg;
 	extern int optind;
 
 	rflag = tflag = cflag = dflag = aflag = iflag = errflag = lflag =
-	    Dflag = Rflag = sflag = 0;
+	    Dflag = Rflag = sflag = bflag = 0;
 	copt = aopt = (char *)0;
 
 	(void) setlocale(LC_ALL, "");
@@ -112,7 +124,7 @@ main(int argc, char **argv)
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "rtlisc:a:d:D:R:")) != EOF) {
+	while ((c = getopt(argc, argv, "rtlisc:a:d:D:R:b:")) != EOF) {
 		switch (c) {
 		case 'r':
 			rflag++;
@@ -149,6 +161,9 @@ main(int argc, char **argv)
 			rate = optarg;
 			Rflag++;
 			break;
+		case 'b':
+			bflag++;
+			break;
 		case '?':
 			errflag++;
 			break;
@@ -159,22 +174,25 @@ main(int argc, char **argv)
 	 * Check for valid arguments:
 	 *
 	 * If argument parsing failed or if there are left-over
-	 * command line arguments(except -s option), then we're done now.
+	 * command line arguments(except -s and -b option),
+	 * then we're done now.
 	 */
-	if (errflag != 0 || ((sflag == 0) && (argc != optind))) {
+	if (errflag != 0 || (sflag == 0 && bflag == 0 && argc != optind)) {
 		usage();
 		exit(1);
 	}
 
 	/*
-	 * kbd requires that the user specify either "-i" or "-s" or at
-	 * least one of -[rtlacDR].  The "-d" option is, well, optional.
+	 * kbd requires that the user specify either "-i" or "-s" or "-b" or
+	 * at least one of -[rtlacDR].  The "-d" option is, well, optional.
 	 * We don't care if it's there or not.
 	 */
 	rtlacDRflag = rflag + tflag + lflag + aflag + cflag + Dflag + Rflag;
-	if (!((iflag != 0 && sflag == 0 && rtlacDRflag == 0) ||
-	    (iflag == 0 && sflag != 0 && dflag == 0 && rtlacDRflag == 0) ||
-	    (iflag == 0 && sflag == 0 && rtlacDRflag != 0))) {
+	if (!((iflag != 0 && sflag == 0 && bflag == 0 && rtlacDRflag == 0) ||
+	    (iflag == 0 && sflag != 0 && bflag == 0 && dflag == 0 &&
+	    rtlacDRflag == 0) ||
+	    (iflag == 0 && sflag == 0 && bflag == 0 && rtlacDRflag != 0) ||
+	    (iflag == 0 && sflag == 0 && bflag != 0 && rtlacDRflag == 0))) {
 		usage();
 		exit(1);
 	}
@@ -239,6 +257,41 @@ main(int argc, char **argv)
 
 		if ((error = set_kbd_layout(kbd, layout_name)) != 0)
 			exit(error);
+	}
+
+	if (bflag) {
+		if (argc == optind) {
+			b_type = "keyboard";
+		} else if (argc == (optind + 1)) {
+			b_type = argv[argc - 2];
+		} else {
+			usage();
+			exit(1);
+		}
+
+		if (strcmp(b_type, "keyboard") && strcmp(b_type, "console")) {
+			usage();
+			exit(1);
+		}
+
+		freq_str = argv[argc - 1];
+		errno = 0;
+		freq_val = (int)strtol(freq_str, &endptr, 10);
+		if (errno != 0 || endptr[0] != '\0') {
+			usage();
+			exit(1);
+		}
+
+		if (freq_val < 0 || freq_val > INT16_MAX) {
+			(void) fprintf(stderr, "Invalid arguments: -b %s\n",
+			    freq_str);
+			(void) fprintf(stderr, "Frequency range: [0 - %d]\n",
+			    INT16_MAX);
+			exit(1);
+		}
+
+		if ((error = set_beep_freq(kbd, b_type, freq_val)) != 0)
+			exit(1);
 	}
 
 	return (0);
@@ -330,6 +383,26 @@ set_kbd_layout(int kbd, char *layout_name)
 		return (error);
 
 	return (0);
+}
+
+/*
+ * This routine sets keyboard or console beeper frequency
+ */
+static int
+set_beep_freq(int fd, char *type, int freq)
+{
+	struct freq_request fr_struct;
+
+	if (strcmp(type, "keyboard") == 0)
+		fr_struct.type = KBD_BEEP;
+	else if (strcmp(type, "console") == 0)
+		fr_struct.type = CONSOLE_BEEP;
+	else
+		return (EINVAL);
+
+	fr_struct.freq = (int16_t)freq;
+
+	return (ioctl(fd, KIOCSETFREQ, &fr_struct));
 }
 
 /*
@@ -542,8 +615,8 @@ set_repeat_rate(char *rate_str, int kbd)
 static void
 kbd_defaults(int kbd)
 {
-	char *p;
-	int layout_num;
+	char *p, *endptr;
+	int layout_num, freq;
 
 	if (defopen(DEF_FILE) != 0) {
 		(void) fprintf(stderr, "Can't open default file: %s\n",
@@ -611,6 +684,36 @@ kbd_defaults(int kbd)
 		}
 
 		(void) set_layout(kbd, layout_num);
+	}
+
+	p = defread(DEF_KBDFREQ);
+	if (p != NULL) {
+		/*
+		 * Keyboard beeper frequency unit in Hz
+		 */
+		endptr = NULL;
+		errno = 0;
+		freq = (int)strtol(p, &endptr, 10);
+		if (errno == 0 && endptr[0] == '\0' &&
+		    freq >= 0 && freq <= INT16_MAX)
+			(void) set_beep_freq(kbd, "keyboard", freq);
+		else
+			(void) fprintf(stderr, BAD_DEFAULT, DEF_KBDFREQ, p);
+	}
+
+	p = defread(DEF_CONSFREQ);
+	if (p != NULL) {
+		/*
+		 * Console beeper frequency unit in Hz
+		 */
+		endptr = NULL;
+		errno = 0;
+		freq = (int)strtol(p, &endptr, 10);
+		if (errno == 0 && endptr[0] == '\0' &&
+		    freq >= 0 && freq <= INT16_MAX)
+			(void) set_beep_freq(kbd, "console", freq);
+		else
+			(void) fprintf(stderr, BAD_DEFAULT, DEF_CONSFREQ, p);
 	}
 }
 
@@ -687,10 +790,11 @@ static char *usage1 = "kbd [-r] [-t] [-l] [-a enable|disable|alternate]";
 static char *usage2 = "    [-c on|off][-D delay][-R rate][-d keyboard device]";
 static char *usage3 = "kbd -i [-d keyboard device]";
 static char *usage4 = "kbd -s [language]";
+static char *usage5 = "kbd -b [keyboard|console] frequency";
 
 static void
 usage(void)
 {
-	(void) fprintf(stderr, "Usage:\t%s\n\t%s\n\t%s\n\t%s\n", usage1, usage2,
-	    usage3, usage4);
+	(void) fprintf(stderr, "Usage:\t%s\n\t%s\n\t%s\n\t%s\n\t%s\n", usage1,
+	    usage2, usage3, usage4, usage5);
 }

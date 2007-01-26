@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,6 +78,7 @@
 #include <sys/promif.h>
 #include <sys/vuid_event.h>
 #include <sys/conskbd.h>
+#include <sys/beep.h>
 
 extern struct keyboard *kbtrans_usbkb_maptab_init(void);
 extern void kbtrans_usbkb_maptab_fini(struct keyboard **);
@@ -665,6 +666,9 @@ conskbduwsrv(queue_t *q)
 	mblk_t	*mp;
 	queue_t	*oldq;
 	enum kbtrans_message_response ret;
+	struct copyresp *csp;
+	struct freq_request *frqp;
+	int error;
 
 	while ((mp = getq(q)) != NULL) {
 
@@ -749,6 +753,51 @@ conskbduwsrv(queue_t *q)
 			}
 			break;
 
+		case M_IOCDATA:
+			/*
+			 * Only deal with copyresp to KIOCSETFREQ
+			 * transparent ioctl now
+			 */
+			csp = (struct copyresp *)mp->b_rptr;
+			if (csp->cp_rval) {
+				miocnak(q, mp, 0, EINVAL);
+				break;
+			}
+
+			error = 0;
+			switch (csp->cp_cmd) {
+			case KIOCSETFREQ:
+				frqp = (struct freq_request *)mp->
+					    b_cont->b_rptr;
+
+				switch (frqp->type) {
+				case CONSOLE_BEEP:
+					error = beeper_freq(BEEP_CONSOLE,
+						    (int)frqp->freq);
+						break;
+
+				case KBD_BEEP:
+					error = beeper_freq(BEEP_TYPE4,
+						    (int)frqp->freq);
+						break;
+
+				default:
+					error = 1;
+				} /* frqp->type */
+
+				break;
+
+			default:
+				error = 1;
+			} /* csp->cp_cmd */
+
+			if (error == 0)
+				miocack(q, mp, 0, 0);
+			else
+				miocnak(q, mp, 0, EINVAL);
+
+			break;
+
 		default:
 			/*
 			 * Pass an error message up.
@@ -813,6 +862,20 @@ conskbd_ioctl(queue_t *q, mblk_t *mp)
 
 		abort_enable = *(int *)mp->b_cont->b_rptr;
 		miocack(q, mp, 0, 0);
+		break;
+
+	case KIOCSETFREQ:
+		if (iocp->ioc_count != TRANSPARENT) {
+			/*
+			 * We don't support non-transparent ioctls,
+			 * i.e. I_STR ioctls
+			 */
+			miocnak(q, mp, 0, EINVAL);
+		} else {
+			/* Transparent ioctl */
+			mcopyin(mp, NULL, sizeof (struct freq_request), NULL);
+			qreply(q, mp);
+		}
 		break;
 
 	default:
