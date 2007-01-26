@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,14 @@ typedef enum {
 enum {
 	RMM_PRINT_MOUNTABLE	= 0x1,
 	RMM_PRINT_EJECTABLE	= 0x2
+};
+
+/* D-Bus timeout in milliseconds */
+enum {
+	RMM_MOUNT_TIMEOUT	= 60000,
+	RMM_UNMOUNT_TIMEOUT	= 60000,
+	RMM_EJECT_TIMEOUT	= 60000,
+	RMM_CLOSETRAY_TIMEOUT	= 60000
 };
 
 #define	HAL_BRANCH_LOCAL	"/org/freedesktop/Hal/devices/local"

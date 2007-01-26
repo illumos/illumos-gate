@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -566,8 +566,16 @@ media_getid(char *vol_path)
 char *
 media_findname(char *start)
 {
-	/* XXX can use HAL nicknames here */
-	return (NULL);
+	/*
+	 * Eventually should implement using HAL interfaces.
+	 * In the short term however, return NULL for aliases,
+	 * and self for absolute pathnames.
+	 */
+	if (start[0] == '/') {
+		return (strdup(start));
+	} else {
+		return (NULL);
+	}
 }
 
 struct alias {

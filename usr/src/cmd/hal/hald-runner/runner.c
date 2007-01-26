@@ -276,7 +276,7 @@ run_request_run (run_request *r, DBusConnection *con, DBusMessage *msg, GPid *ou
 	g_free (program_dir);
 
 	if (r->input) {
-		if (write(stdin_v, r->input, strlen(r->input)) != (ssize_t) strlen(r->input));
+		if (write(stdin_v, r->input, strlen(r->input)) != (ssize_t) strlen(r->input))
 			printf("Warning: Error while wite r->input (%s) to stdin_v.\n", r->input);
 		close(stdin_v);
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,7 +147,7 @@ rmm_hal_fini(LibHalContext *hal_ctx)
 {
 	DBusConnection	*dbus_conn = libhal_ctx_get_dbus_connection(hal_ctx);
 
-	(void) dbus_connection_close(dbus_conn);
+	(void) dbus_connection_unref(dbus_conn);
 	(void) libhal_ctx_free(hal_ctx);
 }
 
@@ -516,7 +516,7 @@ rmm_hal_mount(LibHalContext *hal_ctx, const char *udi,
 
 	dbus_error_init(error);
 	if (!(reply = dbus_connection_send_with_reply_and_block(dbus_conn,
-	    dmesg, -1, error))) {
+	    dmesg, RMM_MOUNT_TIMEOUT, error))) {
 		dprintf("mount failed for %s: %s\n", udi, error->message);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
@@ -561,7 +561,7 @@ rmm_hal_unmount(LibHalContext *hal_ctx, const char *udi, DBusError *error)
 
 	dbus_error_init(error);
 	if (!(reply = dbus_connection_send_with_reply_and_block(dbus_conn,
-	    dmesg, -1, error))) {
+	    dmesg, RMM_UNMOUNT_TIMEOUT, error))) {
 		dprintf("unmount failed for %s: %s\n", udi, error->message);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
@@ -607,7 +607,7 @@ rmm_hal_eject(LibHalContext *hal_ctx, const char *udi, DBusError *error)
 
 	dbus_error_init(error);
 	if (!(reply = dbus_connection_send_with_reply_and_block(dbus_conn,
-	    dmesg, -1, error))) {
+	    dmesg, RMM_EJECT_TIMEOUT, error))) {
 		dprintf("eject %s: %s\n", udi, error->message);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);
@@ -655,7 +655,7 @@ rmm_hal_closetray(LibHalContext *hal_ctx, const char *udi, DBusError *error)
 
 	dbus_error_init(error);
 	if (!(reply = dbus_connection_send_with_reply_and_block(dbus_conn,
-	    dmesg, -1, error))) {
+	    dmesg, RMM_CLOSETRAY_TIMEOUT, error))) {
 		dprintf("closetray failed for %s: %s\n", udi, error->message);
 		dbus_message_unref(dmesg);
 		return (B_FALSE);

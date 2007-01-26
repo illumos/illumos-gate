@@ -2,7 +2,7 @@
  *
  * probe-volume.c : probe volumes
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -214,12 +214,13 @@ hsfs_contents(int fd, off_t probe_offset, LibHalContext *ctx, const char *udi)
 }
 
 static dbus_bool_t
-probe_disc (int fd, LibHalContext *ctx, const char *udi, dbus_bool_t *should_probe_for_fs)
+probe_disc (int fd, LibHalContext *ctx, const char *udi, dbus_bool_t *has_data,
+    dbus_bool_t *has_audio)
 {
 	DBusError error;
 	disc_info_t di;
 	int profile;
-	dbus_bool_t has_audio, has_data, is_blank, is_appendable, is_rewritable;
+	dbus_bool_t is_blank, is_appendable, is_rewritable;
 	char *disc_type = "cd_rom";
 	uint64_t capacity = 0;
 	int i;
@@ -303,7 +304,7 @@ probe_disc (int fd, LibHalContext *ctx, const char *udi, dbus_bool_t *should_pro
 		(void) get_disc_capacity_for_profile(fd, profile, &capacity);
 	}
 
-	has_audio = has_data = FALSE;
+	*has_audio = *has_data = FALSE;
 	if (!is_blank) {
 		uchar_t	smalltoc[12];
 		size_t	toc_size;
@@ -315,7 +316,7 @@ probe_disc (int fd, LibHalContext *ctx, const char *udi, dbus_bool_t *should_pro
 		 */
         	if (!read_toc(fd, 0, 1, 4, smalltoc)) {
                 	HAL_DEBUG(("read_toc failed"));
-			has_data = B_TRUE; /* probe for fs anyway */
+			*has_data = B_TRUE; /* probe for fs anyway */
         	} else {
         		toc_size = smalltoc[0] * 256 + smalltoc[1] + 2;
         		toc = (uchar_t *)calloc(1, toc_size);
@@ -328,9 +329,9 @@ probe_disc (int fd, LibHalContext *ctx, const char *udi, dbus_bool_t *should_pro
 						continue;
 					}
 					if (p[1] & 4) {
-						has_data = B_TRUE;
+						*has_data = B_TRUE;
 					} else {
-						has_audio = B_TRUE;
+						*has_audio = B_TRUE;
 					}
         			}
 			}
@@ -343,8 +344,8 @@ probe_disc (int fd, LibHalContext *ctx, const char *udi, dbus_bool_t *should_pro
 	}
 	libhal_changeset_set_property_string (cs, "volume.disc.type", disc_type);
 	libhal_changeset_set_property_bool (cs, "volume.disc.is_blank", is_blank);
-	libhal_changeset_set_property_bool (cs, "volume.disc.has_audio", has_audio);
-	libhal_changeset_set_property_bool (cs, "volume.disc.has_data", has_data);
+	libhal_changeset_set_property_bool (cs, "volume.disc.has_audio", *has_audio);
+	libhal_changeset_set_property_bool (cs, "volume.disc.has_data", *has_data);
 	libhal_changeset_set_property_bool (cs, "volume.disc.is_appendable", is_appendable);
 	libhal_changeset_set_property_bool (cs, "volume.disc.is_rewritable", is_rewritable);
 	libhal_changeset_set_property_uint64 (cs, "volume.disc.capacity", capacity);
@@ -357,9 +358,6 @@ probe_disc (int fd, LibHalContext *ctx, const char *udi, dbus_bool_t *should_pro
 	libhal_device_free_changeset (cs);
 
 out:
-
-	*should_probe_for_fs = has_data;
-
 	my_dbus_error_free (&error);
 
 	return (TRUE);
@@ -433,7 +431,8 @@ main (int argc, char *argv[])
 	dbus_bool_t is_floppy = FALSE;
 	unsigned int block_size;
 	dbus_uint64_t vol_size;
-	dbus_bool_t should_probe_for_fs;
+	dbus_bool_t has_data = TRUE;	/* probe for fs by default */
+	dbus_bool_t has_audio = FALSE;
 	char *partition_scheme = NULL;
 	dbus_uint64_t partition_start = 0;
 	int partition_number = 0;
@@ -523,17 +522,18 @@ main (int argc, char *argv[])
 	libhal_device_set_property_uint64 (ctx, udi, "volume.size", vol_size, &error);
 	my_dbus_error_free (&error);
 
-	should_probe_for_fs = TRUE;
-
 	if (is_disc) {
-		if (!probe_disc (rfd, ctx, udi, &should_probe_for_fs)) {
+		if (!probe_disc (rfd, ctx, udi, &has_data, &has_audio)) {
 			HAL_DEBUG (("probe_disc failed, skipping fstyp"));
 			goto out;
 		}
-		/* XXX vol_probe_offset for multisession discs? */
+		/* with audio present, create volume even if fs probing fails */
+		if (has_audio) {
+			ret = 0;
+		}
 	}
 
-	if (!should_probe_for_fs) {
+	if (!has_data) {
 		goto skip_fs;
 	}
 
@@ -619,30 +619,24 @@ skip_part:
 
 	/*
 	 * now determine fs type
+	 *
+	 * XXX We could get better performance from block device,
+	 * but for now we use raw device because:
+	 *
+	 * - fstyp_udfs has a bug that it only works on raw
+	 *
+	 * - sd has a bug that causes extremely slow reads
+	 *   and incorrect probing of hybrid audio/data media
 	 */
-	if (fstyp_init(fd, probe_offset, NULL, &fstyp_handle) != 0) {
+	if (fstyp_init(rfd, probe_offset, NULL, &fstyp_handle) != 0) {
 		HAL_DEBUG (("fstyp_init failed"));
 		goto out;
 	}
 	if ((fstyp_ident(fstyp_handle, NULL, &fstype) != 0) ||
 	    (fstyp_get_attr(fstyp_handle, &fsattr) != 0)) {
 		HAL_DEBUG (("fstyp ident or get_attr failed"));
-
-		/*
-		 * XXX fstyp_udfs has a bug that it only works on raw,
-		 * but we don't want to slow down the fast path above.
-		 * Try raw for just udfs here until the bug is fixed.
-		 */
-		HAL_DEBUG (("trying udfs workaround"));
 		fstyp_fini(fstyp_handle);
-		if (fstyp_init(rfd, probe_offset, NULL, &fstyp_handle) != 0) {
-			goto out;
-		}
-		if ((fstyp_ident(fstyp_handle, "udfs", &fstype) != 0) ||
-		    (fstyp_get_attr(fstyp_handle, &fsattr) != 0)) {
-			fstyp_fini(fstyp_handle);
-			goto out;
-		}
+		goto out;
 	}
 	set_fstyp_properties (ctx, udi, fstype, fsattr);
 

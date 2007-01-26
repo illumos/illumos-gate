@@ -843,9 +843,11 @@ handle_mount (LibHalContext *hal_ctx,
 	if (!is_remount) {
 		/* create directory */
 #ifdef sun
-		if (!g_file_test (mount_dir, G_FILE_TEST_EXISTS))
-#endif
+		if (!g_file_test (mount_dir, G_FILE_TEST_EXISTS) &&
+		    (g_mkdir (mount_dir, 0755) != 0)) {
+#else
 		if (g_mkdir (mount_dir, 0700) != 0) {
+#endif
 			printf ("Cannot create '%s'\n", mount_dir);
 			unknown_error ("Cannot create mount directory");
 		}

@@ -723,7 +723,6 @@ main (int argc, char *argv[])
 		LIBHAL_FREE_DBUS_ERROR (&error);
 	libhal_ctx_free (hal_ctx);
 
-	dbus_connection_close (conn);
 	dbus_connection_unref (conn);
 
 	if (show_device)

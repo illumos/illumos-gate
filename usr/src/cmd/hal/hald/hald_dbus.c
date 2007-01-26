@@ -4250,7 +4250,7 @@ local_server_message_handler (DBusConnection *connection,
 				g_free (hih->introspection_xml);
 				g_free (hih->udi);
 				g_free (hih);
-				helper_interface_handlers = g_slist_remove (helper_interface_handlers, i);
+				helper_interface_handlers = g_slist_remove_link (helper_interface_handlers, i);
 			}
 		}
 
