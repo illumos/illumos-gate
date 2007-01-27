@@ -21,21 +21,28 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms. 
 #
 
 # get the valid layout name from the eeprom and set it into kernel.
 # check space and tab to make sure that the kbd -s interaction mode
 # doesn't run here.
-KBD_LAYOUT_NAME="`/usr/sbin/eeprom keyboard-layout |\
-                 /usr/bin/sed -n 's/keyboard-layout=//g; s/[ |	]*//p'`"
+KBD_LAYOUT_NVRAM_EXIST="`/usr/sbin/eeprom | grep keyboard-layout`"
+
+if test -n "$KBD_LAYOUT_NVRAM_EXIST"
+then
+	KBD_LAYOUT_NAME="`/usr/sbin/eeprom keyboard-layout |\
+			/usr/bin/sed -n 's/keyboard-layout=//g; s/[ |	]*//p'`"
+else
+	exit 0
+fi
 
 if test -n "$KBD_LAYOUT_NAME"
 then
 	KBD_LAYOUT_NAME_STRING="^$KBD_LAYOUT_NAME="
 	LAYOUT_NAME_VALID="`cat /usr/share/lib/keytables/type_6/kbd_layouts | \
-                   	grep $KBD_LAYOUT_NAME_STRING`"
+                   	grep "$KBD_LAYOUT_NAME_STRING"`"
 else
 	exit 0
 fi

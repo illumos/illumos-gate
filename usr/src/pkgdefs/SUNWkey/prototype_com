@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,6 +43,8 @@ i depend
 # SUNWkey
 #
 d none usr 755 root sys
+d none usr/lib 755 root bin
+f none usr/lib/set_keyboard_layout 555 root bin
 d none usr/share 755 root sys
 d none usr/share/lib 755 root sys
 d none usr/share/lib/keytables 755 root bin

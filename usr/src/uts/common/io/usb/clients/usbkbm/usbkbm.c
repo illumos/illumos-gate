@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -184,7 +184,13 @@ _init(void)
 		    sp->usbkbm_save_keyindex.k_abort1;
 
 	usbkbm_keyindex->k_abort2 =
-		sp->usbkbm_save_keyindex.k_abort2;
+		    sp->usbkbm_save_keyindex.k_abort2;
+
+	usbkbm_keyindex->k_newabort1 =
+		    sp->usbkbm_save_keyindex.k_newabort1;
+
+	usbkbm_keyindex->k_newabort2 =
+		    sp->usbkbm_save_keyindex.k_newabort2;
 
 	/* Restore keytables */
 	bcopy(sp->usbkbm_save_keyindex.k_normal,
@@ -272,6 +278,9 @@ _fini(void)
 	 */
 	sp->usbkbm_save_keyindex.k_abort1 = usbkbm_keyindex->k_abort1;
 	sp->usbkbm_save_keyindex.k_abort2 = usbkbm_keyindex->k_abort2;
+
+	sp->usbkbm_save_keyindex.k_newabort1 = usbkbm_keyindex->k_newabort1;
+	sp->usbkbm_save_keyindex.k_newabort2 = usbkbm_keyindex->k_newabort2;
 
 	/* Allocate space for keytables to be stored */
 	sp->usbkbm_save_keyindex.k_normal =

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1508,6 +1507,11 @@ kbdinput(register struct kbddata *kbdd, register unsigned key)
 				k->k_state = ABORT1;
 				break;
 			}
+			if ((key == k->k_curkeyboard->k_newabort1) ||
+			    (key == k->k_curkeyboard->k_newabort1a)) {
+				k->k_state = NEWABORT1;
+				break;
+			}
 		}
 #endif
 		kbduse(kbdd, key);
@@ -1529,6 +1533,25 @@ kbdinput(register struct kbddata *kbdd, register unsigned key)
 				return;
 			} else {
 				kbduse(kbdd, k->k_curkeyboard->k_abort1);
+				goto normalstate;
+			}
+		}
+		break;
+	case NEWABORT1:
+		if (k->k_curkeyboard) {
+			/*
+			 * Only recognize this as an abort sequence if
+			 * the "hardware" console is set to be this device.
+			 */
+			if (key == k->k_curkeyboard->k_newabort2 &&
+			    rconsvp == wsconsvp) {
+				DELAY(100000);
+				abort_sequence_enter((char *)NULL);
+				k->k_state = NORMAL;
+				kbduse(kbdd, IDLEKEY);	/* fake */
+				return;
+			} else {
+				kbduse(kbdd, k->k_curkeyboard->k_newabort1);
 				goto normalstate;
 			}
 		}

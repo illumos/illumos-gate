@@ -57,7 +57,7 @@
 
 # Uncomment the following line to set up the keyboard layout. The 
 # keyboard layouts supported can be listed by running 'kbd -s'.
-# The value will override the kbd-type value supplied in eeprom
+# The value will override the keyboard-layout value supplied in eeprom
 # if it exists in eeprom when system boots.
 #LAYOUT=
 
