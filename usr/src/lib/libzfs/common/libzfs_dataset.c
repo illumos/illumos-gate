@@ -2479,7 +2479,7 @@ zfs_create_link_cb(zfs_handle_t *zhp, void *arg)
 }
 
 /*
- * Takes a snapshot of the given dataset
+ * Takes a snapshot of the given dataset.
  */
 int
 zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
@@ -2544,27 +2544,27 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
 }
 
 /*
- * Dumps a backup of tosnap, incremental from fromsnap if it isn't NULL.
+ * Dumps a backup of the given snapshot (incremental from fromsnap if it's not
+ * NULL) to the file descriptor specified by outfd.
  */
 int
-zfs_send(zfs_handle_t *zhp, const char *fromsnap)
+zfs_send(zfs_handle_t *zhp, const char *fromsnap, int outfd)
 {
 	zfs_cmd_t zc = { 0 };
-	int ret;
 	char errbuf[1024];
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
 
-	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
-	    "cannot send '%s'"), zhp->zfs_name);
+	assert(zhp->zfs_type == ZFS_TYPE_SNAPSHOT);
 
-	/* do the ioctl() */
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 	if (fromsnap)
 		(void) strlcpy(zc.zc_value, fromsnap, sizeof (zc.zc_name));
-	zc.zc_cookie = STDOUT_FILENO;
+	zc.zc_cookie = outfd;
 
-	ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_SENDBACKUP, &zc);
-	if (ret != 0) {
+	if (ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_SENDBACKUP, &zc) != 0) {
+		(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
+		    "cannot send '%s'"), zhp->zfs_name);
+
 		switch (errno) {
 
 		case EXDEV:
@@ -2591,7 +2591,7 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap)
 		}
 	}
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -2662,11 +2662,11 @@ ancestorerr:
 }
 
 /*
- * Restores a backup of tosnap from stdin.
+ * Restores a backup of tosnap from the file descriptor specified by infd.
  */
 int
 zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
-    int verbose, int dryrun, boolean_t force)
+    int verbose, int dryrun, boolean_t force, int infd)
 {
 	zfs_cmd_t zc = { 0 };
 	time_t begin_time;
@@ -2687,7 +2687,7 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 	cp = (char *)&drr;
 	bytes = 0;
 	do {
-		size = read(STDIN_FILENO, cp, sizeof (drr) - bytes);
+		size = read(infd, cp, sizeof (drr) - bytes);
 		cp += size;
 		bytes += size;
 	} while (size > 0);
@@ -2826,7 +2826,7 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 
 	}
 
-	zc.zc_cookie = STDIN_FILENO;
+	zc.zc_cookie = infd;
 	zc.zc_guid = force;
 	if (verbose) {
 		(void) printf("%s %s stream of %s into %s\n",

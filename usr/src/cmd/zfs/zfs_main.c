@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2118,7 +2118,7 @@ zfs_do_send(int argc, char **argv)
 		}
 	}
 
-	err = zfs_send(zhp, fromname);
+	err = zfs_send(zhp, fromname, STDOUT_FILENO);
 	zfs_close(zhp);
 
 	return (err != 0);
@@ -2186,7 +2186,8 @@ zfs_do_receive(int argc, char **argv)
 		return (1);
 	}
 
-	err = zfs_receive(g_zfs, argv[0], isprefix, verbose, dryrun, force);
+	err = zfs_receive(g_zfs, argv[0], isprefix, verbose, dryrun, force,
+	    STDIN_FILENO);
 
 	if (!err) {
 		zpool_log_history(g_zfs, argc + optind, argv - optind, argv[0],
