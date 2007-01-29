@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,14 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+#define	copyflock(dst, src) \
+	(dst).l_type = (src).l_type;		\
+	(dst).l_whence = (src).l_whence;	\
+	(dst).l_start = (src).l_start;		\
+	(dst).l_len = (src).l_len;		\
+	(dst).l_sysid = (src).l_sysid;		\
+	(dst).l_pid = (src).l_pid;
+
 static char *command;
 static volatile int interrupt;
 static int Fflag;
@@ -60,6 +68,7 @@ static	void	dosocket(struct ps_prochandle *, int);
 static	void	show_files(struct ps_prochandle *);
 static	void	show_fileflags(int);
 static	void	show_door(struct ps_prochandle *, int);
+static	int	getflock(struct ps_prochandle *, int, struct flock *);
 
 int
 main(int argc, char **argv)
@@ -311,6 +320,25 @@ show_files(struct ps_prochandle *Pr)
 	(void) closedir(dirp);
 }
 
+
+static int
+getflock(struct ps_prochandle *Pr, int fd, struct flock *flock_native)
+{
+	int ret;
+#ifdef _LP64
+	struct flock64_32 flock_target;
+
+	if (Pstatus(Pr)->pr_dmodel == PR_MODEL_ILP32) {
+		copyflock(flock_target, *flock_native);
+		ret = pr_fcntl(Pr, fd, F_GETLK, &flock_target);
+		copyflock(*flock_native, flock_target);
+		return (ret);
+	}
+#endif /* _LP64 */
+	ret = pr_fcntl(Pr, fd, F_GETLK, flock_native);
+	return (ret);
+}
+
 /* examine open file with fcntl() */
 static void
 dofcntl(struct ps_prochandle *Pr, int fd, int manditory, int isdoor)
@@ -343,7 +371,7 @@ dofcntl(struct ps_prochandle *Pr, int fd, int manditory, int isdoor)
 	flock.l_len = 0;
 	flock.l_sysid = 0;
 	flock.l_pid = 0;
-	if (pr_fcntl(Pr, fd, F_GETLK, &flock) != -1) {
+	if (getflock(Pr, fd, &flock) != -1) {
 		if (flock.l_type != F_UNLCK && (flock.l_sysid || flock.l_pid)) {
 			unsigned long sysid = flock.l_sysid;
 
