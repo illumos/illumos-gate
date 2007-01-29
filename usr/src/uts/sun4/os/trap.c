@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1186,6 +1186,10 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 		break;
 	}
 
+	if (fault) {
+		/* We took a fault so abort single step. */
+		lwp->lwp_pcb.pcb_flags &= ~(NORMAL_STEP|WATCH_STEP);
+	}
 	trap_cleanup(rp, fault, &siginfo, oldpc == rp->r_pc);
 
 out:	/* We can't get here from a system trap */

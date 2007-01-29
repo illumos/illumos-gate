@@ -1278,6 +1278,8 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	ASSERT(type & USER);
 
 	if (fault) {
+		/* We took a fault so abort single step. */
+		lwp->lwp_pcb.pcb_flags &= ~(NORMAL_STEP|WATCH_STEP);
 		/*
 		 * Remember the fault and fault adddress
 		 * for real-time (SIGPROF) profiling.
