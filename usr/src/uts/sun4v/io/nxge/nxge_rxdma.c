@@ -958,6 +958,7 @@ nxge_rxbuf_index_info_init(p_nxge_t nxgep, p_rx_rbr_ring_t rbrp)
 	return (NXGE_OK);
 }
 
+/* ARGSUSED */
 void
 nxge_dump_rcr_entry(p_nxge_t nxgep, p_rcr_entry_t entry_p)
 {
@@ -1851,7 +1852,6 @@ nxge_rx_pkts(p_nxge_t nxgep, uint_t vindex, p_nxge_ldv_t ldvp,
 	uint32_t		comp_rd_index;
 	p_rcr_entry_t		rcr_desc_rd_head_p;
 	p_rcr_entry_t		rcr_desc_rd_head_pp;
-	uint64_t value = 0;
 	p_mblk_t		nmp, mp_cont, head_mp, *tail_mp;
 	uint16_t		qlen, nrcr_read, npkt_read;
 	uint32_t qlen_hw;

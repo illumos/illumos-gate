@@ -879,6 +879,7 @@ nxge_classify_exit_sw(p_nxge_t nxgep)
  *
  */
 
+/* ARGSUSED */
 static tcam_location_t
 nxge_get_tcam_location(p_nxge_t nxgep, uint8_t class)
 {
@@ -903,6 +904,7 @@ nxge_get_tcam_location(p_nxge_t nxgep, uint8_t class)
  *
  */
 
+/* ARGSUSED */
 static uint8_t
 nxge_get_rdc_group(p_nxge_t nxgep, uint8_t class, intptr_t cookie)
 {
@@ -930,6 +932,7 @@ nxge_get_rdc_offset(p_nxge_t nxgep, uint8_t class, intptr_t cookie)
 	return ((uint8_t)cookie);
 }
 
+/* ARGSUSED */
 static void
 nxge_fill_tcam_entry_udp(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	tcam_entry_t *tcam_ptr)
@@ -985,6 +988,7 @@ nxge_fill_tcam_entry_udp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
 		fspec_mask->pdst, fspec_mask->psrc);
 }
 
+/* ARGSUSED */
 static void
 nxge_fill_tcam_entry_tcp(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	tcam_entry_t *tcam_ptr)
@@ -1009,6 +1013,7 @@ nxge_fill_tcam_entry_tcp(p_nxge_t nxgep, flow_spec_t *flow_spec,
 		tcam_ptr->ip4_proto_mask, IPPROTO_TCP);
 }
 
+/* ARGSUSED */
 static void
 nxge_fill_tcam_entry_sctp(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	tcam_entry_t *tcam_ptr)

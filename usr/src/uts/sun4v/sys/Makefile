@@ -112,7 +112,6 @@ NXGEHDRS=			\
 	nxge_mii.h		\
 	nxge_rxdma.h		\
 	nxge_rxdma_hw.h		\
-	nxge_str_cfg.h		\
 	nxge_txc.h		\
 	nxge_txc_hw.h		\
 	nxge_txdma.h		\

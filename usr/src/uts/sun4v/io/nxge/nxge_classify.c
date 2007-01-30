@@ -195,6 +195,7 @@ nxge_classify_uninit(p_nxge_t nxgep)
 	return (NXGE_OK);
 }
 
+/* ARGSUSED */
 uint64_t
 nxge_classify_get_cfg_value(p_nxge_t nxgep, uint8_t cfg_type, uint8_t cfg_param)
 {
