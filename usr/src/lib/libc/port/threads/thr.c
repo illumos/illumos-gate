@@ -73,11 +73,11 @@ extern const Lc_interface rtld_funcs[];
  */
 #pragma weak _uberdata = __uberdata
 uberdata_t __uberdata = {
-	{ DEFAULTMUTEX, DEFAULTCV },	/* link_lock */
-	{ DEFAULTMUTEX, DEFAULTCV },	/* fork_lock */
-	{ DEFAULTMUTEX, DEFAULTCV },	/* tdb_hash_lock */
-	{ 0, },			/* tdb_hash_lock_stats */
-	{ { 0 }, },		/* siguaction[NSIG] */
+	{ DEFAULTMUTEX, NULL, 0 },	/* link_lock */
+	{ RECURSIVEMUTEX, NULL, 0 },	/* fork_lock */
+	{ DEFAULTMUTEX, NULL, 0 },	/* tdb_hash_lock */
+	{ 0, },				/* tdb_hash_lock_stats */
+	{ { 0 }, },			/* siguaction[NSIG] */
 	{{ DEFAULTMUTEX, NULL, 0 },		/* bucket[NBUCKETS] */
 	{ DEFAULTMUTEX, NULL, 0 },
 	{ DEFAULTMUTEX, NULL, 0 },
@@ -706,7 +706,8 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 		ulwp->ul_detached = 1;
 	ulwp->ul_lwpid = tid;
 	ulwp->ul_stop = TSTP_REGULAR;
-	ulwp->ul_created = 1;
+	if (flags & THR_SUSPENDED)
+		ulwp->ul_created = 1;
 	ulwp->ul_policy = policy;
 	ulwp->ul_pri = priority;
 
@@ -729,12 +730,12 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 		self->ul_td_evbuf.eventdata = (void *)(uintptr_t)tid;
 		tdb_event(TD_CREATE, udp);
 	}
-	if (!(flags & THR_SUSPENDED)) {
-		ulwp->ul_created = 0;
-		(void) _thrp_continue(tid, TSTP_REGULAR);
-	}
 
 	exit_critical(self);
+
+	if (!(flags & THR_SUSPENDED))
+		(void) _thrp_continue(tid, TSTP_REGULAR);
+
 	return (0);
 }
 
@@ -1775,6 +1776,7 @@ force_continue(ulwp_t *ulwp)
 	int error;
 	timespec_t ts;
 
+	ASSERT(MUTEX_OWNED(&udp->fork_lock, self));
 	ASSERT(MUTEX_OWNED(ulwp_mutex(ulwp, udp), self));
 
 	for (;;) {
@@ -1821,6 +1823,7 @@ safe_suspend(ulwp_t *ulwp, uchar_t whystopped, int *link_dropped)
 	    whystopped == TSTP_FORK);
 	ASSERT(ulwp != self);
 	ASSERT(!ulwp->ul_stop);
+	ASSERT(MUTEX_OWNED(&udp->fork_lock, self));
 	ASSERT(MUTEX_OWNED(mp, self));
 
 	if (link_dropped != NULL)
@@ -1919,8 +1922,14 @@ _thrp_suspend(thread_t tid, uchar_t whystopped)
 	 * We can't suspend anyone except ourself while a fork is happening.
 	 * This also has the effect of allowing only one suspension at a time.
 	 */
-	if (tid != self->ul_lwpid)
-		(void) fork_lock_enter(NULL);
+	if (tid != self->ul_lwpid &&
+	    (error = fork_lock_enter("thr_suspend")) != 0) {
+		/*
+		 * Cannot call _thrp_suspend() from a fork handler.
+		 */
+		fork_lock_exit();
+		return (error);
+	}
 
 	if ((ulwp = find_lwp(tid)) == NULL)
 		error = ESRCH;
@@ -2027,6 +2036,7 @@ suspend_fork()
 	ulwp_t *ulwp;
 	int link_dropped;
 
+	ASSERT(MUTEX_OWNED(&udp->fork_lock, self));
 top:
 	lmutex_lock(&udp->link_lock);
 
@@ -2055,6 +2065,8 @@ continue_fork(int child)
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
 	ulwp_t *ulwp;
+
+	ASSERT(MUTEX_OWNED(&udp->fork_lock, self));
 
 	/*
 	 * Clear the schedctl pointers in the child of forkall().
@@ -2095,8 +2107,21 @@ _thrp_continue(thread_t tid, uchar_t whystopped)
 	ASSERT(whystopped == TSTP_REGULAR ||
 	    whystopped == TSTP_MUTATOR);
 
-	if ((ulwp = find_lwp(tid)) == NULL)
+	/*
+	 * We single-thread the entire thread suspend/continue mechanism.
+	 */
+	if ((error = fork_lock_enter("thr_continue")) != 0) {
+		/*
+		 * Cannot call _thrp_continue() from a fork handler.
+		 */
+		fork_lock_exit();
+		return (error);
+	}
+
+	if ((ulwp = find_lwp(tid)) == NULL) {
+		fork_lock_exit();
 		return (ESRCH);
+	}
 
 	mp = ulwp_mutex(ulwp, udp);
 	if ((whystopped == TSTP_MUTATOR && !ulwp->ul_mutator)) {
@@ -2112,8 +2137,9 @@ _thrp_continue(thread_t tid, uchar_t whystopped)
 			force_continue(ulwp);
 		}
 	}
-
 	lmutex_unlock(mp);
+
+	fork_lock_exit();
 	return (error);
 }
 
@@ -2608,11 +2634,19 @@ _thr_suspend_allmutators(void)
 	uberdata_t *udp = self->ul_uberdata;
 	ulwp_t *ulwp;
 	int link_dropped;
+	int error;
 
 	/*
-	 * We single-thread the entire thread suspend mechanism.
+	 * We single-thread the entire thread suspend/continue mechanism.
 	 */
-	(void) fork_lock_enter(NULL);
+	if ((error = fork_lock_enter("thr_suspend_allmutators")) != 0) {
+		/*
+		 * Cannot call _thr_suspend_allmutators() from a fork handler.
+		 */
+		fork_lock_exit();
+		return (error);
+	}
+
 top:
 	lmutex_lock(&udp->link_lock);
 
@@ -2677,10 +2711,24 @@ _thr_continue_allmutators()
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
 	ulwp_t *ulwp;
+	int error;
+
+	/*
+	 * We single-thread the entire thread suspend/continue mechanism.
+	 */
+	if ((error = fork_lock_enter("thr_continue_allmutators")) != 0) {
+		/*
+		 * Cannot call _thr_continue_allmutators() from a fork handler.
+		 */
+		fork_lock_exit();
+		return (error);
+	}
+
 
 	lmutex_lock(&udp->link_lock);
 	if (!suspendedallmutators) {
 		lmutex_unlock(&udp->link_lock);
+		fork_lock_exit();
 		return (EINVAL);
 	}
 	suspendedallmutators = 0;
@@ -2698,6 +2746,7 @@ _thr_continue_allmutators()
 	}
 
 	lmutex_unlock(&udp->link_lock);
+	fork_lock_exit();
 	return (0);
 }
 

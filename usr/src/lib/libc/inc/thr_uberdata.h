@@ -623,17 +623,16 @@ typedef struct atfork {
 
 /*
  * Make our hot locks reside on private cache lines (64 bytes).
- * pad_cond, pad_owner, and pad_count (aka fork_cond, fork_owner,
- * and fork_count for _fork_lock) are used only in fork_lock_enter()
+ * pad_owner and pad_count (aka fork_owner and fork_count)
+ * are used only in fork_lock_enter() and fork_lock_exit()
  * to implement the special form of mutual exclusion therein.
  */
 typedef struct {
 	mutex_t	pad_lock;
-	cond_t	pad_cond;
 	ulwp_t	*pad_owner;
 	size_t	pad_count;
-	char	pad_pad[64 - (sizeof (mutex_t) + sizeof (cond_t) +
-				sizeof (ulwp_t *) + sizeof (size_t))];
+	char	pad_pad[64 -
+		(sizeof (mutex_t) + sizeof (ulwp_t *) + sizeof (size_t))];
 } pad_lock_t;
 
 /*
@@ -786,7 +785,6 @@ typedef struct uberdata {
 
 #define	link_lock	_link_lock.pad_lock
 #define	fork_lock	_fork_lock.pad_lock
-#define	fork_cond	_fork_lock.pad_cond
 #define	fork_owner	_fork_lock.pad_owner
 #define	fork_count	_fork_lock.pad_count
 #define	tdb_hash_lock	_tdb_hash_lock.pad_lock

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,30 +69,25 @@ fork_lock_enter(const char *who)
 	ASSERT(self->ul_critical == 0);
 	sigoff(self);
 	(void) _private_mutex_lock(&udp->fork_lock);
-	while (udp->fork_count) {
-		if (udp->fork_owner == self) {
+	if (udp->fork_count) {
+		ASSERT(udp->fork_owner == self);
+		/*
+		 * This is a simple recursive lock except that we
+		 * inform the caller if we have been called from
+		 * a fork handler and let it deal with that fact.
+		 */
+		if (self->ul_fork) {
 			/*
-			 * This is like a recursive lock except that we
-			 * inform the caller if we have been called from
-			 * a fork handler and let it deal with that fact.
+			 * We have been called from a fork handler.
 			 */
-			if (self->ul_fork) {
-				/*
-				 * We have been called from a fork handler.
-				 */
-				if (who != NULL &&
-				    udp->uberflags.uf_thread_error_detection)
-					fork_lock_error(who);
-				error = EDEADLK;
-			}
-			break;
+			if (who != NULL &&
+			    udp->uberflags.uf_thread_error_detection)
+				fork_lock_error(who);
+			error = EDEADLK;
 		}
-		ASSERT(self->ul_fork == 0);
-		(void) _cond_wait(&udp->fork_cond, &udp->fork_lock);
 	}
 	udp->fork_owner = self;
 	udp->fork_count++;
-	(void) _private_mutex_unlock(&udp->fork_lock);
 	return (error);
 }
 
@@ -103,12 +98,9 @@ fork_lock_exit(void)
 	uberdata_t *udp = self->ul_uberdata;
 
 	ASSERT(self->ul_critical == 0);
-	(void) _private_mutex_lock(&udp->fork_lock);
 	ASSERT(udp->fork_count != 0 && udp->fork_owner == self);
-	if (--udp->fork_count == 0) {
+	if (--udp->fork_count == 0)
 		udp->fork_owner = NULL;
-		(void) _cond_signal(&udp->fork_cond);
-	}
 	(void) _private_mutex_unlock(&udp->fork_lock);
 	sigon(self);
 }
@@ -181,9 +173,7 @@ _private_forkx(int flags)
 	 * Thus, we are assured that no library locks are held
 	 * while we invoke fork() from the current thread.
 	 */
-	(void) _private_mutex_lock(&udp->fork_lock);
 	suspend_fork();
-	(void) _private_mutex_unlock(&udp->fork_lock);
 
 	pid = __forkx(flags);
 
