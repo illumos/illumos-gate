@@ -3183,8 +3183,8 @@ sctp_check_in_policy(mblk_t *mp, mblk_t *ipsec_mp)
 
 /* Handle out-of-the-blue packets */
 void
-sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, uint_t ipif_seqid,
-    zoneid_t zoneid, boolean_t mctl_present)
+sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, zoneid_t zoneid,
+    boolean_t mctl_present)
 {
 	sctp_t			*sctp;
 	sctp_chunk_hdr_t	*ch;
@@ -3272,8 +3272,7 @@ sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, uint_t ipif_seqid,
 		break;
 	case CHUNK_INIT_ACK:
 		/* check for changed src addr */
-		sctp = sctp_addrlist2sctp(mp, sctph, ch, ipif_seqid, zoneid,
-		    sctps);
+		sctp = sctp_addrlist2sctp(mp, sctph, ch, zoneid, sctps);
 		if (sctp != NULL) {
 			/* success; proceed to normal path */
 			mutex_enter(&sctp->sctp_lock);

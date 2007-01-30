@@ -5681,11 +5681,11 @@ ipsec_sctp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 
 		IN6_IPADDR_TO_V4MAPPED(sel->ips_remote_addr_v4, &dst);
 		IN6_IPADDR_TO_V4MAPPED(sel->ips_local_addr_v4, &src);
-		connp = sctp_find_conn(&dst, &src, ports, 0, ALL_ZONES,
+		connp = sctp_find_conn(&dst, &src, ports, ALL_ZONES,
 		    ipst->ips_netstack->netstack_sctp);
 	} else {
 		connp = sctp_find_conn(&sel->ips_remote_addr_v6,
-		    &sel->ips_local_addr_v6, ports, 0, ALL_ZONES,
+		    &sel->ips_local_addr_v6, ports, ALL_ZONES,
 		    ipst->ips_netstack->netstack_sctp);
 	}
 	if (connp == NULL)

@@ -38,18 +38,18 @@ extern "C" {
 
 /* SCTP routines for IP to call. */
 extern void ip_fanout_sctp(mblk_t *, ill_t *, ipha_t *, uint32_t,
-    uint_t, boolean_t, boolean_t, uint_t, zoneid_t);
+    uint_t, boolean_t, boolean_t, zoneid_t);
 extern void sctp_ddi_g_init(void);
 extern void sctp_ddi_g_destroy(void);
-extern conn_t *sctp_find_conn(in6_addr_t *, in6_addr_t *, uint32_t, uint_t,
+extern conn_t *sctp_find_conn(in6_addr_t *, in6_addr_t *, uint32_t,
     zoneid_t, sctp_stack_t *);
-extern conn_t *sctp_fanout(in6_addr_t *, in6_addr_t *, uint32_t, uint_t,
+extern conn_t *sctp_fanout(in6_addr_t *, in6_addr_t *, uint32_t,
     zoneid_t, mblk_t *, sctp_stack_t *);
 
 extern void sctp_input(conn_t *, ipha_t *, mblk_t *, mblk_t *, ill_t *,
     boolean_t, boolean_t);
 extern void sctp_wput(queue_t *, mblk_t *);
-extern void sctp_ootb_input(mblk_t *, ill_t *, uint_t, zoneid_t, boolean_t);
+extern void sctp_ootb_input(mblk_t *, ill_t *, zoneid_t, boolean_t);
 extern void sctp_hash_init(sctp_stack_t *);
 extern void sctp_hash_destroy(sctp_stack_t *);
 extern uint32_t sctp_cksum(mblk_t *, int);
@@ -78,6 +78,7 @@ extern void sctp_free(conn_t *);
 extern void sctp_update_ill(ill_t *, int);
 extern void sctp_update_ipif(ipif_t *, int);
 extern void sctp_move_ipif(ipif_t *, ill_t *, ill_t *);
+extern void sctp_update_ipif_addr(ipif_t *, in6_addr_t);
 
 #define	SCTP_ILL_INSERT		1
 #define	SCTP_ILL_REMOVE		2
@@ -89,7 +90,7 @@ extern void sctp_move_ipif(ipif_t *, ill_t *, ill_t *);
 
 /* IP routines for SCTP to call. */
 extern void ip_fanout_sctp_raw(mblk_t *, ill_t *, ipha_t *, boolean_t,
-    uint32_t, boolean_t, uint_t, boolean_t, uint_t, zoneid_t);
+    uint32_t, boolean_t, uint_t, boolean_t, zoneid_t);
 extern void sctp_ire_cache_flush(ipif_t *);
 
 /*

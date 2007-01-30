@@ -50,13 +50,13 @@
 
 static void		sctp_ipif_inactive(sctp_ipif_t *);
 static sctp_ipif_t	*sctp_lookup_ipif_addr(in6_addr_t *, boolean_t,
-			    sctp_t *, uint_t);
+			    zoneid_t, boolean_t, uint_t, uint_t, boolean_t,
+			    sctp_stack_t *);
 static int		sctp_get_all_ipifs(sctp_t *, int);
 int			sctp_valid_addr_list(sctp_t *, const void *, uint32_t,
 			    uchar_t *, size_t);
-sctp_saddr_ipif_t	*sctp_ipif_lookup(sctp_t *, uint_t);
 static int		sctp_ipif_hash_insert(sctp_t *, sctp_ipif_t *, int,
-			    boolean_t dontsrc);
+			    boolean_t, boolean_t);
 static void		sctp_ipif_hash_remove(sctp_t *, sctp_ipif_t *);
 static int		sctp_compare_ipif_list(sctp_ipif_hash_t *,
 			    sctp_ipif_hash_t *);
@@ -75,6 +75,19 @@ in6_addr_t		sctp_get_valid_addr(sctp_t *, boolean_t);
 int			sctp_getmyaddrs(void *, void *, int *);
 void			sctp_saddr_init(sctp_stack_t *);
 void			sctp_saddr_fini(sctp_stack_t *);
+
+#define	SCTP_ADDR4_HASH(addr)	\
+	(((addr) ^ ((addr) >> 8) ^ ((addr) >> 16) ^ ((addr) >> 24)) &	\
+	(SCTP_IPIF_HASH - 1))
+
+#define	SCTP_ADDR6_HASH(addr)	\
+	(((addr).s6_addr32[3] ^						\
+	(((addr).s6_addr32[3] ^ (addr).s6_addr32[2]) >> 12)) &		\
+	(SCTP_IPIF_HASH - 1))
+
+#define	SCTP_IPIF_ADDR_HASH(addr, isv6)					\
+	((isv6) ? SCTP_ADDR6_HASH((addr)) : 				\
+	SCTP_ADDR4_HASH((addr)._S6_un._S6_u32[3]))
 
 #define	SCTP_IPIF_USABLE(sctp_ipif_state)	\
 	((sctp_ipif_state) == SCTP_IPIFS_UP ||	\
@@ -98,27 +111,21 @@ void			sctp_saddr_fini(sctp_stack_t *);
 	IPCL_ZONE_MATCH((sctp)->sctp_connp, (ipif)->sctp_ipif_zoneid)
 
 #define	SCTP_ILL_HASH_FN(index)		((index) % SCTP_ILL_HASH)
-#define	SCTP_IPIF_HASH_FN(seqid)	((seqid) % SCTP_IPIF_HASH)
 #define	SCTP_ILL_TO_PHYINDEX(ill)	((ill)->ill_phyint->phyint_ifindex)
 
 /*
- *
- *
  * SCTP Interface list manipulation functions, locking used.
- *
- *
  */
 
 /*
  * Delete an SCTP IPIF from the list if the refcount goes to 0 and it is
  * marked as condemned. Also, check if the ILL needs to go away.
- * Called with no locks held.
  */
 static void
 sctp_ipif_inactive(sctp_ipif_t *sctp_ipif)
 {
 	sctp_ill_t	*sctp_ill;
-	uint_t		ipif_index;
+	uint_t		hindex;
 	uint_t		ill_index;
 	sctp_stack_t	*sctps = sctp_ipif->sctp_ipif_ill->
 	    sctp_ill_netstack->netstack_sctp;
@@ -126,7 +133,9 @@ sctp_ipif_inactive(sctp_ipif_t *sctp_ipif)
 	rw_enter(&sctps->sctps_g_ills_lock, RW_READER);
 	rw_enter(&sctps->sctps_g_ipifs_lock, RW_WRITER);
 
-	ipif_index = SCTP_IPIF_HASH_FN(sctp_ipif->sctp_ipif_id);
+	hindex = SCTP_IPIF_ADDR_HASH(sctp_ipif->sctp_ipif_saddr,
+	    sctp_ipif->sctp_ipif_isv6);
+
 	sctp_ill = sctp_ipif->sctp_ipif_ill;
 	ASSERT(sctp_ill != NULL);
 	ill_index = SCTP_ILL_HASH_FN(sctp_ill->sctp_ill_index);
@@ -136,9 +145,9 @@ sctp_ipif_inactive(sctp_ipif_t *sctp_ipif)
 		rw_exit(&sctps->sctps_g_ills_lock);
 		return;
 	}
-	list_remove(&sctps->sctps_g_ipifs[ipif_index].sctp_ipif_list,
+	list_remove(&sctps->sctps_g_ipifs[hindex].sctp_ipif_list,
 	    sctp_ipif);
-	sctps->sctps_g_ipifs[ipif_index].ipif_count--;
+	sctps->sctps_g_ipifs[hindex].ipif_count--;
 	sctps->sctps_g_ipifs_count--;
 	rw_destroy(&sctp_ipif->sctp_ipif_lock);
 	kmem_free(sctp_ipif, sizeof (sctp_ipif_t));
@@ -163,41 +172,67 @@ sctp_ipif_inactive(sctp_ipif_t *sctp_ipif)
 
 /*
  * Lookup an SCTP IPIF given an IP address. Increments sctp_ipif refcnt.
- * Called with no locks held.
+ * We are either looking for a IPIF with the given address before
+ * inserting it into the global list or looking for an IPIF for an
+ * address given an SCTP. In the former case we always check the zoneid,
+ * but for the latter case, check_zid could be B_FALSE if the connp
+ * for the sctp has conn_all_zones set. When looking for an address we
+ * give preference to one that is up, so even though we may find one that
+ * is not up we keep looking if there is one up, we hold the down addr
+ * in backup_ipif in case we don't find one that is up - i.e. we return
+ * the backup_ipif in that case. Note that if we are looking for. If we
+ * are specifically looking for an up address, then usable will be set
+ * to true.
  */
 static sctp_ipif_t *
-sctp_lookup_ipif_addr(in6_addr_t *addr, boolean_t refhold, sctp_t *sctp,
-    uint_t ifindex)
+sctp_lookup_ipif_addr(in6_addr_t *addr, boolean_t refhold, zoneid_t zoneid,
+    boolean_t check_zid, uint_t ifindex, uint_t seqid, boolean_t usable,
+    sctp_stack_t *sctps)
 {
-	int		i;
 	int		j;
 	sctp_ipif_t	*sctp_ipif;
-	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	sctp_ipif_t	*backup_ipif = NULL;
+	int		hindex;
 
-	ASSERT(sctp->sctp_zoneid != ALL_ZONES);
+	hindex = SCTP_IPIF_ADDR_HASH(*addr, !IN6_IS_ADDR_V4MAPPED(addr));
+
 	rw_enter(&sctps->sctps_g_ipifs_lock, RW_READER);
-	for (i = 0; i < SCTP_IPIF_HASH; i++) {
-		if (sctps->sctps_g_ipifs[i].ipif_count == 0)
-			continue;
-		sctp_ipif = list_head(&sctps->sctps_g_ipifs[i].sctp_ipif_list);
-		for (j = 0; j < sctps->sctps_g_ipifs[i].ipif_count; j++) {
-			rw_enter(&sctp_ipif->sctp_ipif_lock, RW_READER);
-			if (SCTP_IPIF_ZONE_MATCH(sctp, sctp_ipif) &&
-			    SCTP_IPIF_USABLE(sctp_ipif->sctp_ipif_state) &&
-			    (ifindex == 0 || ifindex ==
-			    sctp_ipif->sctp_ipif_ill->sctp_ill_index) &&
-			    IN6_ARE_ADDR_EQUAL(&sctp_ipif->sctp_ipif_saddr,
-			    addr)) {
+	if (sctps->sctps_g_ipifs[hindex].ipif_count == 0) {
+		rw_exit(&sctps->sctps_g_ipifs_lock);
+		return (NULL);
+	}
+	sctp_ipif = list_head(&sctps->sctps_g_ipifs[hindex].sctp_ipif_list);
+	for (j = 0; j < sctps->sctps_g_ipifs[hindex].ipif_count; j++) {
+		rw_enter(&sctp_ipif->sctp_ipif_lock, RW_READER);
+		if ((!check_zid ||
+		    (sctp_ipif->sctp_ipif_zoneid == ALL_ZONES ||
+		    zoneid == sctp_ipif->sctp_ipif_zoneid)) &&
+		    (ifindex == 0 || ifindex ==
+		    sctp_ipif->sctp_ipif_ill->sctp_ill_index) &&
+		    ((seqid != 0 && seqid == sctp_ipif->sctp_ipif_id) ||
+		    (IN6_ARE_ADDR_EQUAL(&sctp_ipif->sctp_ipif_saddr,
+		    addr)))) {
+			if (!usable || sctp_ipif->sctp_ipif_state ==
+			    SCTP_IPIFS_UP) {
 				rw_exit(&sctp_ipif->sctp_ipif_lock);
 				if (refhold)
 					SCTP_IPIF_REFHOLD(sctp_ipif);
 				rw_exit(&sctps->sctps_g_ipifs_lock);
 				return (sctp_ipif);
+			} else if (sctp_ipif->sctp_ipif_state ==
+			    SCTP_IPIFS_DOWN && backup_ipif == NULL) {
+				backup_ipif = sctp_ipif;
 			}
-			rw_exit(&sctp_ipif->sctp_ipif_lock);
-			sctp_ipif = list_next(
-			    &sctps->sctps_g_ipifs[i].sctp_ipif_list, sctp_ipif);
 		}
+		rw_exit(&sctp_ipif->sctp_ipif_lock);
+		sctp_ipif = list_next(
+		    &sctps->sctps_g_ipifs[hindex].sctp_ipif_list, sctp_ipif);
+	}
+	if (backup_ipif != NULL) {
+		if (refhold)
+			SCTP_IPIF_REFHOLD(backup_ipif);
+		rw_exit(&sctps->sctps_g_ipifs_lock);
+		return (backup_ipif);
 	}
 	rw_exit(&sctps->sctps_g_ipifs_lock);
 	return (NULL);
@@ -240,8 +275,8 @@ sctp_get_all_ipifs(sctp_t *sctp, int sleep)
 			rw_exit(&sctp_ipif->sctp_ipif_lock);
 			SCTP_IPIF_REFHOLD(sctp_ipif);
 			error = sctp_ipif_hash_insert(sctp, sctp_ipif, sleep,
-			    B_FALSE);
-			if (error != 0)
+			    B_FALSE, B_FALSE);
+			if (error != 0 && error != EALREADY)
 				goto free_stuff;
 			sctp_ipif = list_next(
 			    &sctps->sctps_g_ipifs[i].sctp_ipif_list,
@@ -360,8 +395,9 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 			goto free_ret;
 		}
 		if (lookup_saddr) {
-			ipif = sctp_lookup_ipif_addr(&addr, B_TRUE, sctp,
-			    ifindex);
+			ipif = sctp_lookup_ipif_addr(&addr, B_TRUE,
+			    sctp->sctp_zoneid, !sctp->sctp_connp->conn_allzones,
+			    ifindex, 0, B_TRUE, sctp->sctp_sctps);
 			if (ipif == NULL) {
 				/* Address not in the list */
 				err = EINVAL;
@@ -382,7 +418,7 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 			 * get the ASCONF ACK for this address.
 			 */
 			err = sctp_ipif_hash_insert(sctp, ipif, KM_SLEEP,
-			    check_addrs ? B_TRUE : B_FALSE);
+			    check_addrs ? B_TRUE : B_FALSE, B_FALSE);
 			if (err != 0) {
 				SCTP_IPIF_REFRELE(ipif);
 				if (check_addrs && err == EALREADY)
@@ -426,39 +462,35 @@ free_ret:
 	return (err);
 }
 
-sctp_saddr_ipif_t *
-sctp_ipif_lookup(sctp_t *sctp, uint_t ipif_index)
-{
-	int			cnt;
-	int			seqid = SCTP_IPIF_HASH_FN(ipif_index);
-	sctp_saddr_ipif_t	*ipif_obj;
-
-	if (sctp->sctp_saddrs[seqid].ipif_count == 0)
-		return (NULL);
-
-	ipif_obj = list_head(&sctp->sctp_saddrs[seqid].sctp_ipif_list);
-	for (cnt = 0; cnt < sctp->sctp_saddrs[seqid].ipif_count; cnt++) {
-		if (ipif_obj->saddr_ipifp->sctp_ipif_id == ipif_index)
-			return (ipif_obj);
-		ipif_obj = list_next(&sctp->sctp_saddrs[seqid].sctp_ipif_list,
-		    ipif_obj);
-	}
-	return (NULL);
-}
-
 static int
 sctp_ipif_hash_insert(sctp_t *sctp, sctp_ipif_t *ipif, int sleep,
-    boolean_t dontsrc)
+    boolean_t dontsrc, boolean_t allow_dup)
 {
 	int			cnt;
 	sctp_saddr_ipif_t	*ipif_obj;
-	int			seqid = SCTP_IPIF_HASH_FN(ipif->sctp_ipif_id);
+	int			hindex;
 
-	ipif_obj = list_head(&sctp->sctp_saddrs[seqid].sctp_ipif_list);
-	for (cnt = 0; cnt < sctp->sctp_saddrs[seqid].ipif_count; cnt++) {
-		if (ipif_obj->saddr_ipifp->sctp_ipif_id == ipif->sctp_ipif_id)
-			return (EALREADY);
-		ipif_obj = list_next(&sctp->sctp_saddrs[seqid].sctp_ipif_list,
+	hindex = SCTP_IPIF_ADDR_HASH(ipif->sctp_ipif_saddr,
+	    ipif->sctp_ipif_isv6);
+	ipif_obj = list_head(&sctp->sctp_saddrs[hindex].sctp_ipif_list);
+	for (cnt = 0; cnt < sctp->sctp_saddrs[hindex].ipif_count; cnt++) {
+		if (IN6_ARE_ADDR_EQUAL(&ipif_obj->saddr_ipifp->sctp_ipif_saddr,
+		    &ipif->sctp_ipif_saddr)) {
+			if (ipif->sctp_ipif_id !=
+			    ipif_obj->saddr_ipifp->sctp_ipif_id &&
+			    ipif_obj->saddr_ipifp->sctp_ipif_state ==
+			    SCTP_IPIFS_DOWN && ipif->sctp_ipif_state ==
+			    SCTP_IPIFS_UP) {
+				SCTP_IPIF_REFRELE(ipif_obj->saddr_ipifp);
+				ipif_obj->saddr_ipifp = ipif;
+				ipif_obj->saddr_ipif_dontsrc = dontsrc ? 1 : 0;
+				return (0);
+			} else if (!allow_dup || ipif->sctp_ipif_id ==
+			    ipif_obj->saddr_ipifp->sctp_ipif_id) {
+				return (EALREADY);
+			}
+		}
+		ipif_obj = list_next(&sctp->sctp_saddrs[hindex].sctp_ipif_list,
 		    ipif_obj);
 	}
 	ipif_obj = kmem_zalloc(sizeof (sctp_saddr_ipif_t), sleep);
@@ -468,8 +500,8 @@ sctp_ipif_hash_insert(sctp_t *sctp, sctp_ipif_t *ipif, int sleep,
 	}
 	ipif_obj->saddr_ipifp = ipif;
 	ipif_obj->saddr_ipif_dontsrc = dontsrc ? 1 : 0;
-	list_insert_tail(&sctp->sctp_saddrs[seqid].sctp_ipif_list, ipif_obj);
-	sctp->sctp_saddrs[seqid].ipif_count++;
+	list_insert_tail(&sctp->sctp_saddrs[hindex].sctp_ipif_list, ipif_obj);
+	sctp->sctp_saddrs[hindex].ipif_count++;
 	sctp->sctp_nsaddrs++;
 	return (0);
 }
@@ -479,20 +511,23 @@ sctp_ipif_hash_remove(sctp_t *sctp, sctp_ipif_t *ipif)
 {
 	int			cnt;
 	sctp_saddr_ipif_t	*ipif_obj;
-	int			seqid = SCTP_IPIF_HASH_FN(ipif->sctp_ipif_id);
+	int			hindex;
 
-	ipif_obj = list_head(&sctp->sctp_saddrs[seqid].sctp_ipif_list);
-	for (cnt = 0; cnt < sctp->sctp_saddrs[seqid].ipif_count; cnt++) {
-		if (ipif_obj->saddr_ipifp->sctp_ipif_id == ipif->sctp_ipif_id) {
-			list_remove(&sctp->sctp_saddrs[seqid].sctp_ipif_list,
+	hindex = SCTP_IPIF_ADDR_HASH(ipif->sctp_ipif_saddr,
+	    ipif->sctp_ipif_isv6);
+	ipif_obj = list_head(&sctp->sctp_saddrs[hindex].sctp_ipif_list);
+	for (cnt = 0; cnt < sctp->sctp_saddrs[hindex].ipif_count; cnt++) {
+		if (IN6_ARE_ADDR_EQUAL(&ipif_obj->saddr_ipifp->sctp_ipif_saddr,
+		    &ipif->sctp_ipif_saddr)) {
+			list_remove(&sctp->sctp_saddrs[hindex].sctp_ipif_list,
 			    ipif_obj);
+			sctp->sctp_saddrs[hindex].ipif_count--;
 			sctp->sctp_nsaddrs--;
-			sctp->sctp_saddrs[seqid].ipif_count--;
 			SCTP_IPIF_REFRELE(ipif_obj->saddr_ipifp);
 			kmem_free(ipif_obj, sizeof (sctp_saddr_ipif_t));
 			break;
 		}
-		ipif_obj = list_next(&sctp->sctp_saddrs[seqid].sctp_ipif_list,
+		ipif_obj = list_next(&sctp->sctp_saddrs[hindex].sctp_ipif_list,
 		    ipif_obj);
 	}
 }
@@ -510,8 +545,9 @@ sctp_compare_ipif_list(sctp_ipif_hash_t *list1, sctp_ipif_hash_t *list2)
 	for (i = 0; i < list1->ipif_count; i++) {
 		obj2 = list_head(&list2->sctp_ipif_list);
 		for (j = 0; j < list2->ipif_count; j++) {
-			if (obj1->saddr_ipifp->sctp_ipif_id ==
-			    obj2->saddr_ipifp->sctp_ipif_id) {
+			if (IN6_ARE_ADDR_EQUAL(
+			    &obj1->saddr_ipifp->sctp_ipif_saddr,
+			    &obj2->saddr_ipifp->sctp_ipif_saddr)) {
 				overlap++;
 				break;
 			}
@@ -559,7 +595,8 @@ sctp_copy_ipifs(sctp_ipif_hash_t *list1, sctp_t *sctp2, int sleep)
 	for (i = 0; i < list1->ipif_count; i++) {
 		SCTP_IPIF_REFHOLD(obj->saddr_ipifp);
 		error = sctp_ipif_hash_insert(sctp2, obj->saddr_ipifp, sleep,
-		    B_FALSE);
+		    B_FALSE, B_FALSE);
+		ASSERT(error != EALREADY);
 		if (error != 0)
 			return (error);
 		obj = list_next(&list1->sctp_ipif_list, obj);
@@ -628,8 +665,6 @@ sctp_update_ill(ill_t *ill, int op)
 	netstack_t	*ns = ill->ill_ipst->ips_netstack;
 	sctp_stack_t	*sctps = ns->netstack_sctp;
 
-	ip2dbg(("sctp_update_ill: %s\n", ill->ill_name));
-
 	rw_enter(&sctps->sctps_g_ills_lock, RW_WRITER);
 
 	index = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(ill));
@@ -657,8 +692,8 @@ sctp_update_ill(ill_t *ill, int op)
 			rw_exit(&sctps->sctps_g_ills_lock);
 			return;
 		}
-		sctp_ill->sctp_ill_name =
-		    kmem_zalloc(ill->ill_name_length, KM_NOSLEEP);
+		sctp_ill->sctp_ill_name = kmem_zalloc(ill->ill_name_length,
+		    KM_NOSLEEP);
 		if (sctp_ill->sctp_ill_name == NULL) {
 			ip1dbg(("sctp_ill_insert: mem error..\n"));
 			kmem_free(sctp_ill, sizeof (sctp_ill_t));
@@ -708,7 +743,7 @@ sctp_move_ipif(ipif_t *ipif, ill_t *f_ill, ill_t *t_ill)
 	sctp_ill_t	*fsctp_ill = NULL;
 	sctp_ill_t	*tsctp_ill = NULL;
 	sctp_ipif_t	*sctp_ipif;
-	uint_t		index;
+	uint_t		hindex;
 	int		i;
 	netstack_t	*ns = ipif->ipif_ill->ill_ipst->ips_netstack;
 	sctp_stack_t	*sctps = ns->netstack_sctp;
@@ -716,31 +751,32 @@ sctp_move_ipif(ipif_t *ipif, ill_t *f_ill, ill_t *t_ill)
 	rw_enter(&sctps->sctps_g_ills_lock, RW_READER);
 	rw_enter(&sctps->sctps_g_ipifs_lock, RW_READER);
 
-	index = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(f_ill));
-	fsctp_ill = list_head(&sctps->sctps_g_ills[index].sctp_ill_list);
-	for (i = 0; i < sctps->sctps_g_ills[index].ill_count; i++) {
+	hindex = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(f_ill));
+	fsctp_ill = list_head(&sctps->sctps_g_ills[hindex].sctp_ill_list);
+	for (i = 0; i < sctps->sctps_g_ills[hindex].ill_count; i++) {
 		if (fsctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(f_ill))
 			break;
-		fsctp_ill = list_next(&sctps->sctps_g_ills[index].sctp_ill_list,
-		    fsctp_ill);
+		fsctp_ill = list_next(
+		    &sctps->sctps_g_ills[hindex].sctp_ill_list, fsctp_ill);
 	}
 
-	index = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(t_ill));
-	tsctp_ill = list_head(&sctps->sctps_g_ills[index].sctp_ill_list);
-	for (i = 0; i < sctps->sctps_g_ills[index].ill_count; i++) {
+	hindex = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(t_ill));
+	tsctp_ill = list_head(&sctps->sctps_g_ills[hindex].sctp_ill_list);
+	for (i = 0; i < sctps->sctps_g_ills[hindex].ill_count; i++) {
 		if (tsctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(t_ill))
 			break;
-		tsctp_ill = list_next(&sctps->sctps_g_ills[index].sctp_ill_list,
-		    tsctp_ill);
+		tsctp_ill = list_next(
+		    &sctps->sctps_g_ills[hindex].sctp_ill_list, tsctp_ill);
 	}
 
-	index = SCTP_IPIF_HASH_FN(ipif->ipif_seqid);
-	sctp_ipif = list_head(&sctps->sctps_g_ipifs[index].sctp_ipif_list);
-	for (i = 0; i < sctps->sctps_g_ipifs[index].ipif_count; i++) {
+	hindex = SCTP_IPIF_ADDR_HASH(ipif->ipif_v6lcl_addr,
+	    ipif->ipif_ill->ill_isv6);
+	sctp_ipif = list_head(&sctps->sctps_g_ipifs[hindex].sctp_ipif_list);
+	for (i = 0; i < sctps->sctps_g_ipifs[hindex].ipif_count; i++) {
 		if (sctp_ipif->sctp_ipif_id == ipif->ipif_seqid)
 			break;
 		sctp_ipif = list_next(
-		    &sctps->sctps_g_ipifs[index].sctp_ipif_list, sctp_ipif);
+		    &sctps->sctps_g_ipifs[hindex].sctp_ipif_list, sctp_ipif);
 	}
 	/* Should be an ASSERT? */
 	if (fsctp_ill == NULL || tsctp_ill == NULL || sctp_ipif == NULL) {
@@ -760,6 +796,246 @@ sctp_move_ipif(ipif_t *ipif, ill_t *f_ill, ill_t *t_ill)
 	rw_exit(&sctps->sctps_g_ills_lock);
 }
 
+/*
+ * Walk the list of SCTPs and find each that has oipif in it's saddr list, and
+ * if so replace it with nipif.
+ */
+void
+sctp_update_saddrs(sctp_ipif_t *oipif, sctp_ipif_t *nipif, int idx,
+    sctp_stack_t *sctps)
+{
+	sctp_t			*sctp;
+	sctp_t			*sctp_prev = NULL;
+	sctp_saddr_ipif_t	*sobj;
+	int			count;
+
+	sctp = sctps->sctps_gsctp;
+	mutex_enter(&sctps->sctps_g_lock);
+	while (sctp != NULL && oipif->sctp_ipif_refcnt > 0) {
+		mutex_enter(&sctp->sctp_reflock);
+		if (sctp->sctp_condemned ||
+		    sctp->sctp_saddrs[idx].ipif_count <= 0) {
+			mutex_exit(&sctp->sctp_reflock);
+			sctp = list_next(&sctps->sctps_g_list, sctp);
+			continue;
+		}
+		sctp->sctp_refcnt++;
+		mutex_exit(&sctp->sctp_reflock);
+		mutex_exit(&sctps->sctps_g_lock);
+		if (sctp_prev != NULL)
+			SCTP_REFRELE(sctp_prev);
+
+		RUN_SCTP(sctp);
+		sobj = list_head(&sctp->sctp_saddrs[idx].sctp_ipif_list);
+		for (count = 0; count <
+		    sctp->sctp_saddrs[idx].ipif_count; count++) {
+			if (sobj->saddr_ipifp == oipif) {
+				SCTP_IPIF_REFHOLD(nipif);
+				sobj->saddr_ipifp = nipif;
+				ASSERT(oipif->sctp_ipif_refcnt > 0);
+				/* We have the writer lock */
+				oipif->sctp_ipif_refcnt--;
+				/*
+				 * Can't have more than one referring
+				 * to the same sctp_ipif.
+				 */
+				break;
+			}
+			sobj = list_next(&sctp->sctp_saddrs[idx].sctp_ipif_list,
+			    sobj);
+		}
+		WAKE_SCTP(sctp);
+		sctp_prev = sctp;
+		mutex_enter(&sctps->sctps_g_lock);
+		sctp = list_next(&sctps->sctps_g_list, sctp);
+	}
+	mutex_exit(&sctps->sctps_g_lock);
+	if (sctp_prev != NULL)
+		SCTP_REFRELE(sctp_prev);
+}
+
+/*
+ * Given an ipif, walk the hash list in the global ipif table and for
+ * any other SCTP ipif with the same address and non-zero reference, walk
+ * the SCTP list and update the saddr list, if required, to point to the
+ * new SCTP ipif.
+ */
+void
+sctp_chk_and_updt_saddr(int hindex, sctp_ipif_t *ipif, sctp_stack_t *sctps)
+{
+	int		cnt;
+	sctp_ipif_t	*sipif;
+
+	ASSERT(sctps->sctps_g_ipifs[hindex].ipif_count > 0);
+	ASSERT(ipif->sctp_ipif_state == SCTP_IPIFS_UP);
+
+	sipif = list_head(&sctps->sctps_g_ipifs[hindex].sctp_ipif_list);
+	for (cnt = 0; cnt < sctps->sctps_g_ipifs[hindex].ipif_count; cnt++) {
+		rw_enter(&sipif->sctp_ipif_lock, RW_WRITER);
+		if (sipif->sctp_ipif_id != ipif->sctp_ipif_id &&
+		    IN6_ARE_ADDR_EQUAL(&sipif->sctp_ipif_saddr,
+		    &ipif->sctp_ipif_saddr) && sipif->sctp_ipif_refcnt > 0) {
+			/*
+			 * There can only be one address up at any time
+			 * and we are here because ipif has been brought
+			 * up.
+			 */
+			ASSERT(sipif->sctp_ipif_state != SCTP_IPIFS_UP);
+			/*
+			 * Someone has a reference to this we need to update to
+			 * point to the new sipif.
+			 */
+			sctp_update_saddrs(sipif, ipif, hindex, sctps);
+		}
+		rw_exit(&sipif->sctp_ipif_lock);
+		sipif = list_next(&sctps->sctps_g_ipifs[hindex].sctp_ipif_list,
+		    sipif);
+	}
+}
+
+/*
+ * Insert a new SCTP ipif using 'ipif'. v6addr is the address that existed
+ * prior to the current address in 'ipif'. Only when an existing address
+ * is changed on an IPIF, will v6addr be specified. If the IPIF already
+ * exists in the global SCTP ipif table, then we either removed it, if
+ * it doesn't have any existing reference, or mark it condemned otherwise.
+ * If an address is being brought up (IPIF_UP), then we need to scan
+ * the SCTP list to check if there is any SCTP that points to the *same*
+ * address on a different SCTP ipif and update in that case.
+ */
+void
+sctp_update_ipif_addr(ipif_t *ipif, in6_addr_t v6addr)
+{
+	ill_t		*ill = ipif->ipif_ill;
+	int		i;
+	sctp_ill_t	*sctp_ill;
+	sctp_ill_t	*osctp_ill;
+	sctp_ipif_t	*sctp_ipif = NULL;
+	sctp_ipif_t	*osctp_ipif = NULL;
+	uint_t		ill_index;
+	int		hindex;
+	sctp_stack_t	*sctps;
+
+
+	sctps = ipif->ipif_ill->ill_ipst->ips_netstack->netstack_sctp;
+
+	/* Index for new address */
+	hindex = SCTP_IPIF_ADDR_HASH(ipif->ipif_v6lcl_addr, ill->ill_isv6);
+
+	/*
+	 * The address on this IPIF is changing, we need to look for
+	 * this old address and mark it condemned, before creating
+	 * one for the new address.
+	 */
+	osctp_ipif = sctp_lookup_ipif_addr(&v6addr, B_FALSE,
+	    ipif->ipif_zoneid, B_TRUE, SCTP_ILL_TO_PHYINDEX(ill),
+	    ipif->ipif_seqid, B_FALSE, sctps);
+
+	rw_enter(&sctps->sctps_g_ills_lock, RW_READER);
+	rw_enter(&sctps->sctps_g_ipifs_lock, RW_WRITER);
+
+	ill_index = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(ill));
+	sctp_ill = list_head(&sctps->sctps_g_ills[ill_index].sctp_ill_list);
+	for (i = 0; i < sctps->sctps_g_ills[ill_index].ill_count; i++) {
+		if (sctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(ill))
+			break;
+		sctp_ill = list_next(
+		    &sctps->sctps_g_ills[ill_index].sctp_ill_list, sctp_ill);
+	}
+
+	if (sctp_ill == NULL) {
+		ip1dbg(("sctp_ipif_insert: ill not found ..\n"));
+		rw_exit(&sctps->sctps_g_ipifs_lock);
+		rw_exit(&sctps->sctps_g_ills_lock);
+	}
+
+	if (osctp_ipif != NULL) {
+
+		/* The address is the same? */
+		if (IN6_ARE_ADDR_EQUAL(&ipif->ipif_v6lcl_addr, &v6addr)) {
+			boolean_t	chk_n_updt = B_FALSE;
+
+			rw_downgrade(&sctps->sctps_g_ipifs_lock);
+			rw_enter(&osctp_ipif->sctp_ipif_lock, RW_WRITER);
+			if (ipif->ipif_flags & IPIF_UP &&
+			    osctp_ipif->sctp_ipif_state != SCTP_IPIFS_UP) {
+				osctp_ipif->sctp_ipif_state = SCTP_IPIFS_UP;
+				chk_n_updt = B_TRUE;
+			} else {
+				osctp_ipif->sctp_ipif_state = SCTP_IPIFS_DOWN;
+			}
+			osctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
+			rw_exit(&osctp_ipif->sctp_ipif_lock);
+			if (chk_n_updt) {
+				sctp_chk_and_updt_saddr(hindex, osctp_ipif,
+				    sctps);
+			}
+			rw_exit(&sctps->sctps_g_ipifs_lock);
+			rw_exit(&sctps->sctps_g_ills_lock);
+			return;
+		}
+		/*
+		 * We are effectively removing this address from the ILL.
+		 */
+		if (osctp_ipif->sctp_ipif_refcnt != 0) {
+			osctp_ipif->sctp_ipif_state = SCTP_IPIFS_CONDEMNED;
+		} else {
+			list_t		*ipif_list;
+			int		ohindex;
+
+			osctp_ill = osctp_ipif->sctp_ipif_ill;
+			/* hash index for the old one */
+			ohindex = SCTP_IPIF_ADDR_HASH(
+			    osctp_ipif->sctp_ipif_saddr,
+			    osctp_ipif->sctp_ipif_isv6);
+
+			ipif_list =
+			    &sctps->sctps_g_ipifs[ohindex].sctp_ipif_list;
+
+			list_remove(ipif_list, (void *)osctp_ipif);
+			sctps->sctps_g_ipifs[ohindex].ipif_count--;
+			sctps->sctps_g_ipifs_count--;
+			rw_destroy(&osctp_ipif->sctp_ipif_lock);
+			kmem_free(osctp_ipif, sizeof (sctp_ipif_t));
+			(void) atomic_add_32_nv(&osctp_ill->sctp_ill_ipifcnt,
+			    -1);
+		}
+	}
+
+	sctp_ipif = kmem_zalloc(sizeof (sctp_ipif_t), KM_NOSLEEP);
+	/* Try again? */
+	if (sctp_ipif == NULL) {
+		ip1dbg(("sctp_ipif_insert: mem failure..\n"));
+		rw_exit(&sctps->sctps_g_ipifs_lock);
+		rw_exit(&sctps->sctps_g_ills_lock);
+		return;
+	}
+	sctps->sctps_g_ipifs_count++;
+	rw_init(&sctp_ipif->sctp_ipif_lock, NULL, RW_DEFAULT, NULL);
+	sctp_ipif->sctp_ipif_saddr = ipif->ipif_v6lcl_addr;
+	sctp_ipif->sctp_ipif_ill = sctp_ill;
+	sctp_ipif->sctp_ipif_isv6 = ill->ill_isv6;
+	sctp_ipif->sctp_ipif_zoneid = ipif->ipif_zoneid;
+	sctp_ipif->sctp_ipif_id = ipif->ipif_seqid;
+	if (ipif->ipif_flags & IPIF_UP)
+		sctp_ipif->sctp_ipif_state = SCTP_IPIFS_UP;
+	else
+		sctp_ipif->sctp_ipif_state = SCTP_IPIFS_DOWN;
+	sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
+	/*
+	 * We add it to the head so that it is quicker to find good/recent
+	 * additions.
+	 */
+	list_insert_head(&sctps->sctps_g_ipifs[hindex].sctp_ipif_list,
+	    (void *)sctp_ipif);
+	sctps->sctps_g_ipifs[hindex].ipif_count++;
+	atomic_add_32(&sctp_ill->sctp_ill_ipifcnt, 1);
+	if (sctp_ipif->sctp_ipif_state == SCTP_IPIFS_UP)
+		sctp_chk_and_updt_saddr(hindex, sctp_ipif, sctps);
+	rw_exit(&sctps->sctps_g_ipifs_lock);
+	rw_exit(&sctps->sctps_g_ills_lock);
+}
+
 /* Insert, Remove,  Mark up or Mark down the ipif */
 void
 sctp_update_ipif(ipif_t *ipif, int op)
@@ -769,7 +1045,7 @@ sctp_update_ipif(ipif_t *ipif, int op)
 	sctp_ill_t	*sctp_ill;
 	sctp_ipif_t	*sctp_ipif;
 	uint_t		ill_index;
-	uint_t		ipif_index;
+	uint_t		hindex;
 	netstack_t	*ns = ipif->ipif_ill->ill_ipst->ips_netstack;
 	sctp_stack_t	*sctps = ns->netstack_sctp;
 
@@ -792,66 +1068,34 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		return;
 	}
 
-	ipif_index = SCTP_IPIF_HASH_FN(ipif->ipif_seqid);
-	sctp_ipif = list_head(&sctps->sctps_g_ipifs[ipif_index].sctp_ipif_list);
-	for (i = 0; i < sctps->sctps_g_ipifs[ipif_index].ipif_count; i++) {
-		if (sctp_ipif->sctp_ipif_id == ipif->ipif_seqid)
+	hindex = SCTP_IPIF_ADDR_HASH(ipif->ipif_v6lcl_addr,
+	    ipif->ipif_ill->ill_isv6);
+	sctp_ipif = list_head(&sctps->sctps_g_ipifs[hindex].sctp_ipif_list);
+	for (i = 0; i < sctps->sctps_g_ipifs[hindex].ipif_count; i++) {
+		if (sctp_ipif->sctp_ipif_id == ipif->ipif_seqid) {
+			ASSERT(IN6_ARE_ADDR_EQUAL(&sctp_ipif->sctp_ipif_saddr,
+			    &ipif->ipif_v6lcl_addr));
 			break;
+		}
 		sctp_ipif = list_next(
-		    &sctps->sctps_g_ipifs[ipif_index].sctp_ipif_list,
+		    &sctps->sctps_g_ipifs[hindex].sctp_ipif_list,
 		    sctp_ipif);
 	}
-	if (op != SCTP_IPIF_INSERT && sctp_ipif == NULL) {
+	if (sctp_ipif == NULL) {
 		ip1dbg(("sctp_update_ipif: null sctp_ipif for %d\n", op));
 		rw_exit(&sctps->sctps_g_ipifs_lock);
 		rw_exit(&sctps->sctps_g_ills_lock);
 		return;
 	}
-#ifdef	DEBUG
-	if (sctp_ipif != NULL)
-		ASSERT(sctp_ill == sctp_ipif->sctp_ipif_ill);
-#endif
+	ASSERT(sctp_ill == sctp_ipif->sctp_ipif_ill);
 	switch (op) {
-	case SCTP_IPIF_INSERT:
-		if (sctp_ipif != NULL) {
-			if (sctp_ipif->sctp_ipif_state == SCTP_IPIFS_CONDEMNED)
-				sctp_ipif->sctp_ipif_state = SCTP_IPIFS_INVALID;
-			rw_exit(&sctps->sctps_g_ipifs_lock);
-			rw_exit(&sctps->sctps_g_ills_lock);
-			return;
-		}
-		sctp_ipif = kmem_zalloc(sizeof (sctp_ipif_t), KM_NOSLEEP);
-		/* Try again? */
-		if (sctp_ipif == NULL) {
-			ip1dbg(("sctp_ipif_insert: mem failure..\n"));
-			rw_exit(&sctps->sctps_g_ipifs_lock);
-			rw_exit(&sctps->sctps_g_ills_lock);
-			return;
-		}
-		sctp_ipif->sctp_ipif_id = ipif->ipif_seqid;
-		sctp_ipif->sctp_ipif_ill = sctp_ill;
-		sctp_ipif->sctp_ipif_state = SCTP_IPIFS_INVALID;
-		sctp_ipif->sctp_ipif_mtu = ipif->ipif_mtu;
-		sctp_ipif->sctp_ipif_zoneid = ipif->ipif_zoneid;
-		sctp_ipif->sctp_ipif_isv6 = ill->ill_isv6;
-		sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
-		rw_init(&sctp_ipif->sctp_ipif_lock, NULL, RW_DEFAULT, NULL);
-		list_insert_tail(
-		    &sctps->sctps_g_ipifs[ipif_index].sctp_ipif_list,
-		    (void *)sctp_ipif);
-		sctps->sctps_g_ipifs[ipif_index].ipif_count++;
-		sctps->sctps_g_ipifs_count++;
-		atomic_add_32(&sctp_ill->sctp_ill_ipifcnt, 1);
-
-		break;
-
 	case SCTP_IPIF_REMOVE:
 	{
 		list_t		*ipif_list;
 		list_t		*ill_list;
 
 		ill_list = &sctps->sctps_g_ills[ill_index].sctp_ill_list;
-		ipif_list = &sctps->sctps_g_ipifs[ipif_index].sctp_ipif_list;
+		ipif_list = &sctps->sctps_g_ipifs[hindex].sctp_ipif_list;
 		if (sctp_ipif->sctp_ipif_refcnt != 0) {
 			sctp_ipif->sctp_ipif_state = SCTP_IPIFS_CONDEMNED;
 			rw_exit(&sctps->sctps_g_ipifs_lock);
@@ -859,7 +1103,7 @@ sctp_update_ipif(ipif_t *ipif, int op)
 			return;
 		}
 		list_remove(ipif_list, (void *)sctp_ipif);
-		sctps->sctps_g_ipifs[ipif_index].ipif_count--;
+		sctps->sctps_g_ipifs[hindex].ipif_count--;
 		sctps->sctps_g_ipifs_count--;
 		rw_destroy(&sctp_ipif->sctp_ipif_lock);
 		kmem_free(sctp_ipif, sizeof (sctp_ipif_t));
@@ -884,10 +1128,11 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		rw_downgrade(&sctps->sctps_g_ipifs_lock);
 		rw_enter(&sctp_ipif->sctp_ipif_lock, RW_WRITER);
 		sctp_ipif->sctp_ipif_state = SCTP_IPIFS_UP;
-		sctp_ipif->sctp_ipif_saddr = ipif->ipif_v6lcl_addr;
-		sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
 		sctp_ipif->sctp_ipif_mtu = ipif->ipif_mtu;
+		sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
 		rw_exit(&sctp_ipif->sctp_ipif_lock);
+		sctp_chk_and_updt_saddr(hindex, sctp_ipif,
+		    ipif->ipif_ill->ill_ipst->ips_netstack->netstack_sctp);
 
 		break;
 
@@ -896,7 +1141,6 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		rw_downgrade(&sctps->sctps_g_ipifs_lock);
 		rw_enter(&sctp_ipif->sctp_ipif_lock, RW_WRITER);
 		sctp_ipif->sctp_ipif_mtu = ipif->ipif_mtu;
-		sctp_ipif->sctp_ipif_saddr = ipif->ipif_v6lcl_addr;
 		sctp_ipif->sctp_ipif_zoneid = ipif->ipif_zoneid;
 		sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
 		rw_exit(&sctp_ipif->sctp_ipif_lock);
@@ -908,6 +1152,8 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		rw_downgrade(&sctps->sctps_g_ipifs_lock);
 		rw_enter(&sctp_ipif->sctp_ipif_lock, RW_WRITER);
 		sctp_ipif->sctp_ipif_state = SCTP_IPIFS_DOWN;
+		sctp_ipif->sctp_ipif_mtu = ipif->ipif_mtu;
+		sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
 		rw_exit(&sctp_ipif->sctp_ipif_lock);
 
 		break;
@@ -917,12 +1163,8 @@ sctp_update_ipif(ipif_t *ipif, int op)
 }
 
 /*
- *
- *
  * SCTP source address list manipulaton, locking not used (except for
  * sctp locking by the caller.
- *
- *
  */
 
 /* Remove a specific saddr from the list */
@@ -984,8 +1226,9 @@ sctp_del_saddr_list(sctp_t *sctp, const void *addrs, int addcnt,
 			ifindex = sin6->sin6_scope_id;
 			break;
 		}
-		sctp_ipif = sctp_lookup_ipif_addr(&addr, B_FALSE, sctp,
-		    ifindex);
+		sctp_ipif = sctp_lookup_ipif_addr(&addr, B_FALSE,
+		    sctp->sctp_zoneid, !sctp->sctp_connp->conn_allzones,
+		    ifindex, 0, B_TRUE, sctp->sctp_sctps);
 		ASSERT(sctp_ipif != NULL);
 		sctp_ipif_hash_remove(sctp, sctp_ipif);
 	}
@@ -1007,15 +1250,31 @@ sctp_del_saddr_list(sctp_t *sctp, const void *addrs, int addcnt,
 sctp_saddr_ipif_t *
 sctp_saddr_lookup(sctp_t *sctp, in6_addr_t *addr, uint_t ifindex)
 {
-	sctp_saddr_ipif_t	*saddr_ipifs;
+	int			cnt;
+	sctp_saddr_ipif_t	*ipif_obj;
+	int			hindex;
 	sctp_ipif_t		*sctp_ipif;
 
-	sctp_ipif = sctp_lookup_ipif_addr(addr, B_FALSE, sctp, ifindex);
-	if (sctp_ipif == NULL)
+	hindex = SCTP_IPIF_ADDR_HASH(*addr, !IN6_IS_ADDR_V4MAPPED(addr));
+	if (sctp->sctp_saddrs[hindex].ipif_count == 0)
 		return (NULL);
 
-	saddr_ipifs = sctp_ipif_lookup(sctp, sctp_ipif->sctp_ipif_id);
-	return (saddr_ipifs);
+	ipif_obj = list_head(&sctp->sctp_saddrs[hindex].sctp_ipif_list);
+	for (cnt = 0; cnt < sctp->sctp_saddrs[hindex].ipif_count; cnt++) {
+		sctp_ipif = ipif_obj->saddr_ipifp;
+		/*
+		 * Zone check shouldn't be needed.
+		 */
+		if (IN6_ARE_ADDR_EQUAL(addr, &sctp_ipif->sctp_ipif_saddr) &&
+		    (ifindex == 0 ||
+		    ifindex == sctp_ipif->sctp_ipif_ill->sctp_ill_index) &&
+		    SCTP_IPIF_USABLE(sctp_ipif->sctp_ipif_state)) {
+			return (ipif_obj);
+		}
+		ipif_obj = list_next(&sctp->sctp_saddrs[hindex].sctp_ipif_list,
+		    ipif_obj);
+	}
+	return (NULL);
 }
 
 /* Given an address, add it to the source address list */
@@ -1024,11 +1283,14 @@ sctp_saddr_add_addr(sctp_t *sctp, in6_addr_t *addr, uint_t ifindex)
 {
 	sctp_ipif_t		*sctp_ipif;
 
-	sctp_ipif = sctp_lookup_ipif_addr(addr, B_TRUE, sctp, ifindex);
+	sctp_ipif = sctp_lookup_ipif_addr(addr, B_TRUE, sctp->sctp_zoneid,
+	    !sctp->sctp_connp->conn_allzones, ifindex, 0, B_TRUE,
+	    sctp->sctp_sctps);
 	if (sctp_ipif == NULL)
 		return (EINVAL);
 
-	if (sctp_ipif_hash_insert(sctp, sctp_ipif, KM_NOSLEEP, B_FALSE) != 0) {
+	if (sctp_ipif_hash_insert(sctp, sctp_ipif, KM_NOSLEEP, B_FALSE,
+	    B_FALSE) != 0) {
 		SCTP_IPIF_REFRELE(sctp_ipif);
 		return (EINVAL);
 	}

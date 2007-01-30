@@ -132,13 +132,18 @@ typedef struct sctp_ill_hash_s {
 
 #define	SCTP_IPIF_REFHOLD(sctp_ipif) {				\
 	atomic_add_32(&(sctp_ipif)->sctp_ipif_refcnt, 1);	\
-	ASSERT((sctp_ipif)->sctp_ipif_refcnt != 0);		\
 }
 
 #define	SCTP_IPIF_REFRELE(sctp_ipif) {					\
+	rw_enter(&(sctp_ipif)->sctp_ipif_lock, RW_WRITER);		\
 	ASSERT((sctp_ipif)->sctp_ipif_refcnt != 0);			\
-	if (atomic_add_32_nv(&(sctp_ipif)->sctp_ipif_refcnt, -1) == 0)	\
+	if (--(sctp_ipif)->sctp_ipif_refcnt == 0 && 			\
+	    (sctp_ipif)->sctp_ipif_state == SCTP_IPIFS_CONDEMNED) {	\
+		rw_exit(&(sctp_ipif)->sctp_ipif_lock);			\
 		sctp_ipif_inactive(sctp_ipif);				\
+	} else {							\
+		rw_exit(&(sctp_ipif)->sctp_ipif_lock);			\
+	}								\
 }
 
 /* Address set comparison results. */
@@ -164,7 +169,6 @@ extern void		sctp_del_saddr(sctp_t *, sctp_saddr_ipif_t *);
 extern void		sctp_free_saddrs(sctp_t *);
 extern void		sctp_saddr_init(sctp_stack_t *);
 extern void		sctp_saddr_fini(sctp_stack_t *);
-extern sctp_saddr_ipif_t	*sctp_ipif_lookup(sctp_t *, uint_t);
 extern int		sctp_getmyaddrs(void *, void *, int *);
 extern int		sctp_saddr_add_addr(sctp_t *, in6_addr_t *, uint_t);
 extern void		sctp_check_saddr(sctp_t *, int, boolean_t);

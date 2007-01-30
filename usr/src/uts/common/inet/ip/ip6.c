@@ -952,7 +952,7 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 		((uint16_t *)&ports)[0] = up[1];
 		((uint16_t *)&ports)[1] = up[0];
 		ip_fanout_sctp(mp, ill, (ipha_t *)ip6h, ports, 0, mctl_present,
-		    IP6_NO_IPPOLICY, 0, zoneid);
+		    IP6_NO_IPPOLICY, zoneid);
 		return;
 	case IPPROTO_ESP:
 	case IPPROTO_AH: {
@@ -7266,7 +7266,6 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	conn_t		*connp;
 	ilm_t		*ilm;
 	uint32_t	ports;
-	uint_t		ipif_id = 0;
 	zoneid_t	zoneid = GLOBAL_ZONEID;
 	uint16_t	hck_flags, reass_hck_flags;
 	uint32_t	reass_sum;
@@ -7504,7 +7503,6 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 		    ALL_ZONES, ipst);
 		return;
 	}
-	ipif_id = ire->ire_ipif->ipif_seqid;
 	/* we have a matching IRE */
 	if (ire->ire_stq != NULL) {
 		ill_group_t *ill_group;
@@ -7925,12 +7923,12 @@ tcp_fanout:
 			sctph->sh_chksum = pktsum;
 			ports = *(uint32_t *)(mp->b_rptr + hdr_len);
 			if ((connp = sctp_fanout(&ip6h->ip6_src, &ip6h->ip6_dst,
-			    ports, ipif_id, zoneid, mp, sctps)) == NULL) {
+			    ports, zoneid, mp, sctps)) == NULL) {
 				ip_fanout_sctp_raw(first_mp, ill,
 				    (ipha_t *)ip6h, B_FALSE, ports,
 				    mctl_present,
 				    (flags|IP_FF_SEND_ICMP|IP_FF_IPINFO),
-				    B_TRUE, ipif_id, zoneid);
+				    B_TRUE, zoneid);
 				return;
 			}
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
@@ -10732,13 +10730,10 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 
 		case IPPROTO_SCTP:
 		{
-			uint_t	ipif_seqid = ire->ire_ipif->ipif_seqid;
-
 			ports = *(uint32_t *)(mp->b_rptr + hdr_length);
 			ip_fanout_sctp(mp, ill, (ipha_t *)ip6h, ports,
 			    fanout_flags|IP_FF_SEND_ICMP|IP_FF_IPINFO,
-			    mctl_present, IP6_NO_IPPOLICY, ipif_seqid,
-			    ire->ire_zoneid);
+			    mctl_present, IP6_NO_IPPOLICY, ire->ire_zoneid);
 			return;
 		}
 		case IPPROTO_ICMPV6: {

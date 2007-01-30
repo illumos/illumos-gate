@@ -2137,7 +2137,7 @@ icmp_get_nexthop_addr(ipha_t *ipha, ill_t *ill, zoneid_t zoneid, mblk_t *mp)
 			((uint16_t *)&ports)[1] = up[0];
 
 			connp = sctp_find_conn(&map_src, &map_dst, ports,
-			    0, zoneid, ipst->ips_netstack->netstack_sctp);
+			    zoneid, ipst->ips_netstack->netstack_sctp);
 			if (connp == NULL) {
 				connp = ipcl_classify_raw(mp, IPPROTO_SCTP,
 				    zoneid, ports, ipha, ipst);
@@ -2562,7 +2562,7 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 		/* Have to change db_type after any pullupmsg */
 		DB_TYPE(mp) = M_CTL;
 		ip_fanout_sctp(first_mp, recv_ill, &ripha, ports, 0,
-		    mctl_present, ip_policy, 0, zoneid);
+		    mctl_present, ip_policy, zoneid);
 		return;
 
 	case IPPROTO_ESP:
@@ -13624,7 +13624,6 @@ ip_sctp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 	uint32_t	pktsum;
 	uint32_t	calcsum;
 	uint32_t	ports;
-	uint_t		ipif_seqid;
 	in6_addr_t	map_src, map_dst;
 	ill_t		*ill = (ill_t *)q->q_ptr;
 	ip_stack_t	*ipst;
@@ -13720,12 +13719,11 @@ find_sctp_client:
 	/* get the ports */
 	ports = *(uint32_t *)&sctph->sh_sport;
 
-	ipif_seqid = ire->ire_ipif->ipif_seqid;
 	IRE_REFRELE(ire);
 	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &map_dst);
 	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &map_src);
-	if ((connp = sctp_fanout(&map_src, &map_dst, ports, ipif_seqid, zoneid,
-	    mp, sctps)) == NULL) {
+	if ((connp = sctp_fanout(&map_src, &map_dst, ports, zoneid, mp,
+	    sctps)) == NULL) {
 		/* Check for raw socket or OOTB handling */
 		goto no_conn;
 	}
@@ -13737,7 +13735,7 @@ find_sctp_client:
 
 no_conn:
 	ip_fanout_sctp_raw(first_mp, recv_ill, ipha, B_TRUE,
-	    ports, mctl_present, flags, B_TRUE, ipif_seqid, zoneid);
+	    ports, mctl_present, flags, B_TRUE, zoneid);
 	return;
 
 ipoptions:
@@ -16333,8 +16331,13 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 		ASSERT(ill->ill_ipif->ipif_id == 0);
 		if (ipif != NULL &&
-		    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr))
+		    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr)) {
+			in6_addr_t	ov6addr;
+
+			ov6addr = ipif->ipif_v6lcl_addr;
 			(void) ipif_setlinklocal(ipif);
+			sctp_update_ipif_addr(ipif, ov6addr);
+		}
 		break;
 	}
 	case DL_OK_ACK:
@@ -25389,8 +25392,7 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 		bcopy(rptr + IPH_HDR_LENGTH(ipha), &ports, sizeof (ports));
 		ip_fanout_sctp(first_mp, ill, ipha, ports,
 		    fanout_flags | IP_FF_SEND_ICMP | IP_FF_HDR_COMPLETE |
-		    IP_FF_IPINFO,
-		    mctl_present, B_FALSE, 0, zoneid);
+		    IP_FF_IPINFO, mctl_present, B_FALSE, zoneid);
 		return;
 	}
 
@@ -29770,7 +29772,7 @@ icmp_kstat_update(kstat_t *kp, int rw)
 void
 ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
     uint32_t ports, boolean_t mctl_present, uint_t flags, boolean_t ip_policy,
-    uint_t ipif_seqid, zoneid_t zoneid)
+    zoneid_t zoneid)
 {
 	conn_t		*connp;
 	queue_t		*rq;
@@ -29792,8 +29794,7 @@ ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
 
 	connp = ipcl_classify_raw(mp, IPPROTO_SCTP, zoneid, ports, ipha, ipst);
 	if (connp == NULL) {
-		sctp_ootb_input(first_mp, recv_ill, ipif_seqid, zoneid,
-		    mctl_present);
+		sctp_ootb_input(first_mp, recv_ill, zoneid, mctl_present);
 		return;
 	}
 	rq = connp->conn_rq;

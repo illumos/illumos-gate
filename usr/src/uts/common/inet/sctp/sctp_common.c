@@ -90,7 +90,6 @@ sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
 	ipaddr_t	addr4;
 	in6_addr_t	laddr;
 	sctp_saddr_ipif_t *sp;
-	uint_t		ipif_seqid;
 	int		hdrlen;
 	ts_label_t	*tsl;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
@@ -151,7 +150,6 @@ sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
 		goto check_current;
 	}
 
-	ipif_seqid = ire->ire_ipif->ipif_seqid;
 	dprint(2, ("ire2faddr: got ire for %x:%x:%x:%x, ",
 	    SCTP_PRINTADDR(fp->faddr)));
 	if (fp->isv4) {
@@ -162,8 +160,8 @@ sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
 	}
 
 	/* Make sure the laddr is part of this association */
-	if ((sp = sctp_ipif_lookup(sctp, ipif_seqid)) != NULL &&
-	    !sp->saddr_ipif_dontsrc) {
+	if ((sp = sctp_saddr_lookup(sctp, &ire->ire_ipif->ipif_v6lcl_addr,
+	    0)) != NULL && !sp->saddr_ipif_dontsrc) {
 		if (sp->saddr_ipif_unconfirmed == 1)
 			sp->saddr_ipif_unconfirmed = 0;
 		fp->saddr = laddr;

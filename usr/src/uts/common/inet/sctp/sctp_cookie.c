@@ -1319,7 +1319,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
  */
 sctp_t *
 sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
-    uint_t ipif_seqid, zoneid_t zoneid, sctp_stack_t *sctps)
+    zoneid_t zoneid, sctp_stack_t *sctps)
 {
 	int isv4;
 	ipha_t *iph;
@@ -1366,8 +1366,8 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 			IN6_INADDR_TO_V4MAPPED((struct in_addr *)(ph + 1),
 			    &src);
 
-			sctp = sctp_conn_match(&src, &dst, ports, ipif_seqid,
-			    zoneid, sctps);
+			sctp = sctp_conn_match(&src, &dst, ports, zoneid,
+			    sctps);
 
 			dprint(1,
 			    ("sctp_addrlist2sctp: src=%x:%x:%x:%x, sctp=%p\n",
@@ -1379,8 +1379,8 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 			}
 		} else if (ph->sph_type == PARM_ADDR6) {
 			src = *(in6_addr_t *)(ph + 1);
-			sctp = sctp_conn_match(&src, &dst, ports, ipif_seqid,
-			    zoneid, sctps);
+			sctp = sctp_conn_match(&src, &dst, ports, zoneid,
+			    sctps);
 
 			dprint(1,
 			    ("sctp_addrlist2sctp: src=%x:%x:%x:%x, sctp=%p\n",

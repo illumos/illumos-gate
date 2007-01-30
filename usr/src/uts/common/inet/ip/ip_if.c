@@ -5029,6 +5029,7 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 	kstat_named_t	*kn;
 	boolean_t isloopback;
 	ipsq_t *old_ipsq;
+	in6_addr_t ov6addr;
 
 	isloopback = mi_strcmp(name, ipif_loopback_name) == 0;
 
@@ -5126,6 +5127,7 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 
 	ill->ill_flags = ILLF_MULTICAST;
 
+	ov6addr = ipif->ipif_v6lcl_addr;
 	/* Set up default loopback address and mask. */
 	if (!isv6) {
 		ipaddr_t inaddr_loopback = htonl(INADDR_LOOPBACK);
@@ -5164,8 +5166,13 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 	/* Let SCTP know so that it can add this to its list */
 	sctp_update_ill(ill, SCTP_ILL_INSERT);
 
-	/* Let SCTP know about this IPIF, so that it can add it to its list */
-	sctp_update_ipif(ipif, SCTP_IPIF_INSERT);
+	/*
+	 * We have already assigned ipif_v6lcl_addr above, but we need to
+	 * call sctp_update_ipif_addr() after SCTP_ILL_INSERT, which
+	 * requires to be after ill_glist_insert() since we need the
+	 * ill_index set. Pass on ipv6_loopback as the old address.
+	 */
+	sctp_update_ipif_addr(ipif, ov6addr);
 
 	/*
 	 * If the ipsq was changed in ill_phyint_reinit free the old ipsq.
@@ -11391,6 +11398,7 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
     boolean_t need_up)
 {
 	in6_addr_t v6addr;
+	in6_addr_t ov6addr;
 	ipaddr_t addr;
 	sin6_t	*sin6;
 	int	sinlen;
@@ -11421,7 +11429,9 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		sinlen = sizeof (struct sockaddr_in);
 	}
 	mutex_enter(&ill->ill_lock);
+	ov6addr = ipif->ipif_v6lcl_addr;
 	ipif->ipif_v6lcl_addr = v6addr;
+	sctp_update_ipif_addr(ipif, ov6addr);
 	if (ipif->ipif_flags & (IPIF_ANYCAST | IPIF_NOLOCAL)) {
 		ipif->ipif_v6src_addr = ipv6_all_zeros;
 	} else {
@@ -11536,12 +11546,6 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		 * ip_rput_dlpi when we see the DL_BIND_ACK.
 		 */
 		err = ipif_up(ipif, q, mp);
-	} else {
-		/*
-		 * Update the IPIF list in SCTP, ipif_up_done() will do it
-		 * if need_up is true.
-		 */
-		sctp_update_ipif(ipif, SCTP_IPIF_UPDATE);
 	}
 
 	if (need_dl_down)
@@ -12347,9 +12351,13 @@ ip_sioctl_flags_tail(ipif_t *ipif, uint64_t flags, queue_t *q, mblk_t *mp,
 	if (((turn_on | turn_off) & (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE)))
 		ip_redo_nomination(phyi);
 
-	if (set_linklocal)
-		(void) ipif_setlinklocal(ipif);
+	if (set_linklocal) {
+		in6_addr_t	ov6addr;
 
+		ov6addr = ipif->ipif_v6lcl_addr;
+		(void) ipif_setlinklocal(ipif);
+		sctp_update_ipif_addr(ipif, ov6addr);
+	}
 	if (zero_source)
 		ipif->ipif_v6src_addr = ipv6_all_zeros;
 	else
@@ -12382,6 +12390,8 @@ ip_sioctl_flags_tail(ipif_t *ipif, uint64_t flags, queue_t *q, mblk_t *mp,
 			ip_rts_ifmsg(ipif);
 		}
 	}
+	/* Update the flags in SCTP's IPIF list */
+	sctp_update_ipif(ipif, SCTP_IPIF_UPDATE);
 	return (err);
 }
 
@@ -13645,11 +13655,9 @@ ipif_allocate(ill_t *ill, int id, uint_t ire_type, boolean_t initialize)
 	id = ipif->ipif_id;
 	ASSERT(id >= 0);
 
-	if (ill->ill_name[0] != '\0') {
+	if (ill->ill_name[0] != '\0')
 		ipif_assign_seqid(ipif);
-		if (ill->ill_phyint->phyint_ifindex != 0)
-			sctp_update_ipif(ipif, SCTP_IPIF_INSERT);
-	}
+
 	/*
 	 * Keep a copy of original id in ipif_orig_ipifid.  Failback
 	 * will attempt to restore the original id.  The SIOCSLIFOINDEX
@@ -23266,9 +23274,6 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 
 	/* Let SCTP know about this ILL */
 	sctp_update_ill(ill, SCTP_ILL_INSERT);
-
-	/* and also about the first ipif */
-	sctp_update_ipif(ipif, SCTP_IPIF_INSERT);
 
 	ipsq = ipsq_try_enter(NULL, ill, q, mp, ip_reprocess_ioctl, NEW_OP,
 	    B_TRUE);

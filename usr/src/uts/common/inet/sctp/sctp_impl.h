@@ -925,7 +925,7 @@ extern mblk_t	*sctp_add_proto_hdr(sctp_t *, sctp_faddr_t *, mblk_t *, int,
 		    int *);
 extern void	sctp_addr_req(sctp_t *, mblk_t *);
 extern sctp_t	*sctp_addrlist2sctp(mblk_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
-		    uint_t, zoneid_t, sctp_stack_t *);
+		    zoneid_t, sctp_stack_t *);
 extern void	sctp_add_hdr(sctp_t *, uchar_t *, size_t);
 extern void	sctp_check_adv_ack_pt(sctp_t *, mblk_t *, mblk_t *);
 extern void	sctp_assoc_event(sctp_t *, uint16_t, uint16_t,
@@ -947,7 +947,7 @@ extern int	sctp_compare_faddrsets(sctp_faddr_t *, sctp_faddr_t *);
 extern void	sctp_congest_reset(sctp_t *);
 extern void	sctp_conn_hash_insert(sctp_tf_t *, sctp_t *, int);
 extern void	sctp_conn_hash_remove(sctp_t *);
-extern sctp_t	*sctp_conn_match(in6_addr_t *, in6_addr_t *, uint32_t, uint_t,
+extern sctp_t	*sctp_conn_match(in6_addr_t *, in6_addr_t *, uint32_t,
 		    zoneid_t, sctp_stack_t *);
 extern sctp_t	*sctp_conn_request(sctp_t *, mblk_t *, uint_t, uint_t,
 		    sctp_init_chunk_t *, mblk_t *);

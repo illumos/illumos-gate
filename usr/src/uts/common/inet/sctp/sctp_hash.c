@@ -312,7 +312,7 @@ cl_sctp_walk_list_stack(int (*cl_callback)(cl_sctp_info_t *, void *),
 
 sctp_t *
 sctp_conn_match(in6_addr_t *faddr, in6_addr_t *laddr, uint32_t ports,
-    uint_t ipif_seqid, zoneid_t zoneid, sctp_stack_t *sctps)
+    zoneid_t zoneid, sctp_stack_t *sctps)
 {
 	sctp_tf_t		*tf;
 	sctp_t			*sctp;
@@ -334,24 +334,16 @@ sctp_conn_match(in6_addr_t *faddr, in6_addr_t *laddr, uint32_t ports,
 			}
 		}
 
-		if (!fp) {
-			/* no faddr match; keep looking */
+		/* no faddr match; keep looking */
+		if (fp == NULL)
 			continue;
-		}
 
 		/* check for laddr match */
-		if (ipif_seqid == 0) {
-			if (sctp_saddr_lookup(sctp, laddr, 0) != NULL) {
-				SCTP_REFHOLD(sctp);
-				goto done;
-			}
-		} else {
-			if (sctp_ipif_lookup(sctp, ipif_seqid) != NULL) {
-				SCTP_REFHOLD(sctp);
-				goto done;
-			}
-		/* no match; continue to the next in the chain */
+		if (sctp_saddr_lookup(sctp, laddr, 0) != NULL) {
+			SCTP_REFHOLD(sctp);
+			goto done;
 		}
+		/* no match; continue to the next in the chain */
 	}
 
 done:
@@ -360,8 +352,8 @@ done:
 }
 
 static sctp_t *
-listen_match(in6_addr_t *laddr, uint32_t ports, uint_t ipif_seqid,
-    zoneid_t zoneid, sctp_stack_t *sctps)
+listen_match(in6_addr_t *laddr, uint32_t ports, zoneid_t zoneid,
+    sctp_stack_t *sctps)
 {
 	sctp_t			*sctp;
 	sctp_tf_t		*tf;
@@ -378,16 +370,9 @@ listen_match(in6_addr_t *laddr, uint32_t ports, uint_t ipif_seqid,
 			continue;
 		}
 
-		if (ipif_seqid == 0) {
-			if (sctp_saddr_lookup(sctp, laddr, 0) != NULL) {
-				SCTP_REFHOLD(sctp);
-				goto done;
-			}
-		} else {
-			if (sctp_ipif_lookup(sctp, ipif_seqid) != NULL) {
-				SCTP_REFHOLD(sctp);
-				goto done;
-			}
+		if (sctp_saddr_lookup(sctp, laddr, 0) != NULL) {
+			SCTP_REFHOLD(sctp);
+			goto done;
 		}
 		/* no match; continue to the next in the chain */
 	}
@@ -400,31 +385,27 @@ done:
 /* called by ipsec_sctp_pol */
 conn_t *
 sctp_find_conn(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
-    uint_t ipif_seqid, zoneid_t zoneid, sctp_stack_t *sctps)
+    zoneid_t zoneid, sctp_stack_t *sctps)
 {
 	sctp_t *sctp;
 
-	if ((sctp = sctp_conn_match(src, dst, ports, ipif_seqid,
-	    zoneid, sctps)) == NULL) {
+	if ((sctp = sctp_conn_match(src, dst, ports, zoneid, sctps)) == NULL) {
 		/* Not in conn fanout; check listen fanout */
-		if ((sctp = listen_match(dst, ports, ipif_seqid,
-		    zoneid, sctps)) == NULL) {
+		if ((sctp = listen_match(dst, ports, zoneid, sctps)) == NULL)
 			return (NULL);
-		}
 	}
 	return (sctp->sctp_connp);
 }
 
 conn_t *
 sctp_fanout(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
-    uint_t ipif_seqid, zoneid_t zoneid, mblk_t *mp, sctp_stack_t *sctps)
+    zoneid_t zoneid, mblk_t *mp, sctp_stack_t *sctps)
 
 {
 	sctp_t *sctp;
 	boolean_t shared_addr;
 
-	if ((sctp = sctp_conn_match(src, dst, ports, ipif_seqid,
-	    zoneid, sctps)) == NULL) {
+	if ((sctp = sctp_conn_match(src, dst, ports, zoneid, sctps)) == NULL) {
 		shared_addr = (zoneid == ALL_ZONES);
 		if (shared_addr) {
 			/*
@@ -445,10 +426,8 @@ sctp_fanout(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
 				return (NULL);
 		}
 		/* Not in conn fanout; check listen fanout */
-		if ((sctp = listen_match(dst, ports, ipif_seqid,
-		    zoneid, sctps)) == NULL) {
+		if ((sctp = listen_match(dst, ports, zoneid, sctps)) == NULL)
 			return (NULL);
-		}
 		/*
 		 * On systems running trusted extensions, check if dst
 		 * should accept the packet. "IPV6_VERSION" indicates
@@ -478,7 +457,7 @@ sctp_fanout(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
 void
 ip_fanout_sctp(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
     uint32_t ports, uint_t flags, boolean_t mctl_present, boolean_t ip_policy,
-    uint_t ipif_seqid, zoneid_t zoneid)
+    zoneid_t zoneid)
 {
 	sctp_t *sctp;
 	boolean_t isv4;
@@ -522,11 +501,10 @@ ip_fanout_sctp(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 		dst = &map_dst;
 		isv4 = B_TRUE;
 	}
-	connp = sctp_find_conn(src, dst, ports, ipif_seqid, zoneid, sctps);
+	connp = sctp_find_conn(src, dst, ports, zoneid, sctps);
 	if (connp == NULL) {
 		ip_fanout_sctp_raw(first_mp, recv_ill, ipha, isv4,
-		    ports, mctl_present, flags, ip_policy,
-		    ipif_seqid, zoneid);
+		    ports, mctl_present, flags, ip_policy, zoneid);
 		return;
 	}
 	sctp = CONN2SCTP(connp);
