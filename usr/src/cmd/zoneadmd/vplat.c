@@ -1414,6 +1414,17 @@ build_mounted_post_var(zlog_t *zlogp, char *rootpath, const char *luroot)
 			zerror(zlogp, B_TRUE, "cannot create %s", tmp);
 			return (B_FALSE);
 		}
+
+		/*
+		 * We could set the mode for /tmp when we do the mkdir but
+		 * since that can be modified by the umask we will just set
+		 * the correct mode for /tmp now.
+		 */
+		if (strcmp(*cpp, "/tmp") == 0 && chmod(tmp, 01777) != 0) {
+			zerror(zlogp, B_TRUE, "cannot chmod %s", tmp);
+			return (B_FALSE);
+		}
+
 		if (domount(zlogp, MNTTYPE_TMPFS, "", "swap", tmp) != 0) {
 			zerror(zlogp, B_TRUE, "cannot mount swap on %s", *cpp);
 			return (B_FALSE);
