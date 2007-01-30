@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -178,7 +178,7 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 			 * output for each image loaded.
 			 */
 			if (search)
-				(void) printf(MSG_INTL(MSG_LDD_PTH_RPATH),
+				(void) printf(MSG_INTL(MSG_LDD_PTH_RUNPATH),
 				    RPATH(lmp), NAME(lmp));
 			if (RLIST(lmp) && (rtld_flags & RT_FL_SECURE) &&
 			    (search || DBG_ENABLED)) {

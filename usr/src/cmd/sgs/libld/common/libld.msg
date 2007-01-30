@@ -763,6 +763,7 @@
 @ MSG_ARG_NOFLTR	"option %s is only meaningful when building a filter"
 @ MSG_ARG_NODEFLIB	"the default library search path has been suppressed, \
 			 but no runpaths have been specified (see -R option)"
+@ MSG_ARG_NOENTRY	"entry point symbol `%s' is undefined"
 
 @ MSG_ARG_FLAGS		"Flags processing errors"
 @ MSG_ARG_FILES		"File processing errors. No output written to %s"

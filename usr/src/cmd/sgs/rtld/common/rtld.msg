@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -148,7 +148,7 @@
 @ MSG_LDD_PTH_LIBPATH	"    search path=%s  (LD_LIBRARY_PATH)\n"
 @ MSG_LDD_PTH_LIBPATHC	"    search path=%s  (configuration \
 			 LD_LIBRARY_PATH - %s)\n"
-@ MSG_LDD_PTH_RPATH	"    search path=%s  (RPATH from file %s)\n"
+@ MSG_LDD_PTH_RUNPATH	"    search path=%s  (RUNPATH from file %s)\n"
 @ MSG_LDD_PTH_BGNDFL	"    search path="
 @ MSG_LDD_PTH_ENDDFL	"  (default)\n"
 @ MSG_LDD_PTH_ENDDFLC	"  (configuration default - %s)\n"

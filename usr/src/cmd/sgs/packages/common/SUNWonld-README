@@ -1154,7 +1154,11 @@ Bugid   Risk Synopsis
 6501793 GOTOP relocation transition (optimization) fails with offsets > 2^32
 6515970 HWCAP processing doesn't clean up fmap structure - browser fails to
 	run java applet
-6494214 Refinements to symbolic binding, symbol declarations and interposition 
+6494214 Refinements to symbolic binding, symbol declarations and
+	interposition (D)
 	PSARC/2006/714 ld(1) mapfile: symbol interpose definition
 6475344 DTrace needs ELF function and data symbols sorted by address (D)
 	PSARC/2007/026 ELF symbol sort sections
+6494228 pclose() error when an audit library calls popen() and the main target
+	is being run under ldd
+6518480 ld -melf_i386 doesn't complain

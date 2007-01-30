@@ -1813,7 +1813,11 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		}
 	}
 	/*
-	 * The LD_TRACE family (internal, used by ldd(1)).
+	 * The LD_TRACE family (internal, used by ldd(1)).  This definition is
+	 * the key to enabling all other ldd(1) specific environment variables.
+	 * In case an auditor is called, which in turn might exec(2) a
+	 * subprocess, this variable is disabled, so that any subprocess
+	 * escapes ldd(1) processing.
 	 */
 	else if (*s1 == 'T') {
 		if (((len == MSG_LD_TRACE_OBJS_SIZE) &&
@@ -1824,8 +1828,27 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		    MSG_LD_TRACE_OBJS_E_SIZE) == 0) && !aout) ||
 		    ((strncmp(s1, MSG_ORIG(MSG_LD_TRACE_OBJS_A),
 		    MSG_LD_TRACE_OBJS_A_SIZE) == 0) && aout)))) {
+			char	*s0 = (char *)s1;
+
 			select |= SEL_ACT_SPEC_2;
 			variable = ENV_FLG_TRACE_OBJS;
+
+#if	defined(sparc) || defined(i386) || defined(__amd64)
+			/*
+			 * The simplest way to "disable" this variable is to
+			 * truncate this string to "LD_'\0'". This string is
+			 * ignored by any ld.so.1 environment processing.
+			 * Use of such interfaces as unsetenv(3c) are overkill,
+			 * and would drag too much libc implementation detail
+			 * into ld.so.1.
+			 */
+			 *s0 = '\0';
+#else
+/*
+ * Verify that the above write is appropriate for any new platforms.
+ */
+#error	unsupported architecture!
+#endif
 		} else if ((len == MSG_LD_TRACE_PTHS_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_TRACE_PTHS),
 		    MSG_LD_TRACE_PTHS_SIZE) == 0)) {

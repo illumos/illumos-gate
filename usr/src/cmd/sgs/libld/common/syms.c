@@ -1498,12 +1498,16 @@ ld_sym_validate(Ofl_desc *ofl)
 	 */
 	ret = 0;
 	if (ofl->ofl_entry) {
-		if (((sdp = ld_sym_find(ofl->ofl_entry, SYM_NOHASH, 0,
-		    ofl)) != NULL) && (ensure_sym_local(ofl,
-		    sdp, MSG_INTL(MSG_SYM_ENTRY)) == 0)) {
-			ofl->ofl_entry = (void *)sdp;
-		} else {
+		if ((sdp =
+		    ld_sym_find(ofl->ofl_entry, SYM_NOHASH, 0, ofl)) == NULL) {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_ARG_NOENTRY), ofl->ofl_entry);
 			ret++;
+		} else if (ensure_sym_local(ofl, sdp,
+		    MSG_INTL(MSG_SYM_ENTRY)) != 0) {
+			ret++;
+		} else {
+			ofl->ofl_entry = (void *)sdp;
 		}
 	} else if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_START),
 	    SYM_NOHASH, 0, ofl)) != NULL) && (ensure_sym_local(ofl,
@@ -1520,9 +1524,8 @@ ld_sym_validate(Ofl_desc *ofl)
 	 * If ld -zdtrace=<sym> was given, then validate that the symbol is
 	 * defined within the current object being built.
 	 */
-	if ((sdp = ofl->ofl_dtracesym) != 0) {
+	if ((sdp = ofl->ofl_dtracesym) != 0)
 		ret += ensure_sym_local(ofl, sdp, MSG_ORIG(MSG_STR_DTRACE));
-	}
 
 	/*
 	 * If any initarray, finiarray or preinitarray functions have been

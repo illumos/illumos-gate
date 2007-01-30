@@ -467,7 +467,7 @@
 @ MSG_LIB_REQUIRED	"find lib=%s; path=%s (required by %s)"
 @ MSG_LIB_LDLIBPATH	" search path=%s  (LD_LIBRARY_PATH)"
 @ MSG_LIB_LDLIBPATHC	" search path=%s  (configuration LD_LIBRARY_PATH - %s)"
-@ MSG_LIB_RPATH		" search path=%s  (RPATH from file %s)"
+@ MSG_LIB_RUNPATH	" search path=%s  (RUNPATH from file %s)"
 @ MSG_LIB_DEFAULT	" search path=%s  (default)"
 @ MSG_LIB_DEFAULTC	" search path=%s  (configuration default - %s)"
 @ MSG_LIB_LIBPATH	" search path=%s  (LIBPATH or -YP)"
