@@ -19,13 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include	<sys/nxge/nxge_impl.h>
+#include <sys/nxge/nxge_impl.h>
 
 extern uint32_t		nxge_reclaim_pending;
 extern uint32_t 	nxge_bcopy_thresh;
@@ -326,7 +326,8 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 					tx_msg_p = &tx_msg_ring[i];
 					boff = pack_len - len;
 					ngathers--;
-				} else if (pack_len > bcopy_thresh) {
+				} else if (pack_len > bcopy_thresh &&
+					header_set) {
 					pack_len = len;
 					boff = 0;
 					bcopy_thresh = nxge_bcopy_thresh;
@@ -454,7 +455,6 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 						clen);
 
 					tx_msg_p->tx_msg_size = clen;
-#if NXGE_DEBUG
 					NXGE_DEBUG_MSG((nxgep, TX_CTL,
 						"==> nxge_start:  DMA "
 						"ncookie %d "
@@ -465,8 +465,6 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 						ngathers,
 						dma_ioaddr, clen,
 						*tx_desc_p, tx_desc_p, i));
-#endif
-
 
 					ddi_dma_nextcookie(dma_handle,
 							&dma_cookie);
@@ -871,7 +869,6 @@ nxge_send(p_nxge_t nxgep, mblk_t *mp, p_mac_tx_hint_t hp)
 
 	return (B_TRUE);
 }
-
 
 /*
  * nxge_m_tx() - send a chain of packets

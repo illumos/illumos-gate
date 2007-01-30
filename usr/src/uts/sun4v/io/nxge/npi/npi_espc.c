@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,8 @@ npi_espc_eeprom_entry(npi_handle_t handle, io_op_t op, uint32_t addr,
 		return (NPI_FAILURE | NPI_ESPC_EEPROM_ADDR_INVALID);
 	}
 
-	if (op == OP_SET) {
+	switch (op) {
+	case OP_SET:
 		val = EPC_WRITE_INITIATE | (addr << EPC_EEPROM_ADDR_SHIFT) |
 			*data;
 		NXGE_REG_WR64(handle, ESPC_REG_ADDR(ESPC_PIO_STATUS_REG), val);
@@ -68,7 +69,8 @@ npi_espc_eeprom_entry(npi_handle_t handle, io_op_t op, uint32_t addr,
 				val));
 			return (NPI_FAILURE | NPI_ESPC_EEPROM_WRITE_FAILED);
 		}
-	} else if (op == OP_GET) {
+		break;
+	case OP_GET:
 		val = EPC_READ_INITIATE | (addr << EPC_EEPROM_ADDR_SHIFT);
 		NXGE_REG_WR64(handle, ESPC_REG_ADDR(ESPC_PIO_STATUS_REG), val);
 		EPC_WAIT_RW_COMP(handle, &val, EPC_READ_COMPLETE);
@@ -81,7 +83,8 @@ npi_espc_eeprom_entry(npi_handle_t handle, io_op_t op, uint32_t addr,
 		}
 		NXGE_REG_RD64(handle, ESPC_REG_ADDR(ESPC_PIO_STATUS_REG), &val);
 		*data = val & EPC_EEPROM_DATA_MASK;
-	} else {
+		break;
+	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_espc_eeprom_entry"
 				    " Invalid Input addr <0x%x>\n", addr));
@@ -227,13 +230,7 @@ npi_espc_port_phy_type_get(npi_handle_t handle, uint8_t *data, uint8_t portn)
 {
 	phy_type_t	phy;
 
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_espc_port_phy_type_get"
-				    " Invalid Input: portn <%d>",
-				    portn));
-		return (NPI_FAILURE | NPI_ESPC_PORT_INVALID);
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	NXGE_REG_RD64(handle, ESPC_PHY_TYPE, &phy.value);
 	switch (portn) {

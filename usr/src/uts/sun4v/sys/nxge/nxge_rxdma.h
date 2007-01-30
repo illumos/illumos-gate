@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -276,6 +276,7 @@ typedef struct _rx_rcr_ring_t {
 	uint64_t		max_receive_pkts;
 	p_mblk_t		rx_first_mp;
 	mac_resource_handle_t	rcr_mac_handle;
+	uint32_t		rcvd_pkt_bytes; /* Received bytes of a packet */
 } rx_rcr_ring_t, *p_rx_rcr_ring_t;
 
 

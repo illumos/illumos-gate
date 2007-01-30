@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,12 @@ extern "C" {
 					~(ICFG_BMAC_RX_FRAME_RCVD |\
 					ICFG_BMAC_RX_FRAME_CNT_EXP |\
 					ICFG_BMAC_RX_BYTE_CNT_EXP))
+
+typedef enum  {
+	LINK_NO_CHANGE,
+	LINK_IS_UP,
+	LINK_IS_DOWN
+} nxge_link_state_t;
 
 /* Common MAC statistics */
 

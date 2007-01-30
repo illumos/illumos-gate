@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,6 +28,7 @@
 #include <nxge_fflp_hash.h>
 
 static void nxge_crc32c_word(uint32_t *crcptr, const uint32_t *buf, int len);
+
 /*
  * The crc32c algorithms are taken from sctp_crc32 implementation
  * common/inet/sctp_crc32.{c,h}
@@ -35,8 +36,7 @@ static void nxge_crc32c_word(uint32_t *crcptr, const uint32_t *buf, int len);
  */
 
 /*
- * Fast CRC32C calculation algorithm suggested by Ferenc Rakoczi
- * (ferenc.rakoczi@sun.com).  The basic idea is to look at it
+ * Fast CRC32C calculation algorithm.  The basic idea is to look at it
  * four bytes (one word) at a time, using four tables.  The
  * standard algorithm in RFC 3309 uses one table.
  */
@@ -64,7 +64,6 @@ static uint32_t h1table[4][256];
 #define	COMPUTE_H1_BYTE(crc, data) \
 	(crc = (crc<<8)^h1table[0][((crc >> 24) ^data) & 0xff])
 
-
 static uint32_t
 reflect_32(uint32_t b)
 {
@@ -83,8 +82,8 @@ reflect_32(uint32_t b)
 static uint32_t
 flip32(uint32_t w)
 {
-	return (((w >> 24) | ((w >> 8) & 0xff00) | ((w << 8) & 0xff0000) |
-		(w << 24)));
+	return (((w >> 24) | ((w >> 8) & 0xff00) |
+		((w << 8) & 0xff0000) | (w << 24)));
 }
 
 /*
@@ -99,14 +98,12 @@ crc_ccitt(uint16_t crcin, uint8_t data)
 	mcrc = (((crcin >> 8) ^ data) & 0xff) << 8;
 	for (bits = 0; bits < 8; bits++) {
 		crc = ((crc ^ mcrc) & 0x8000) ?
-			    (crc << 1) ^ CRC_CCITT_POLY :
-			    crc << 1;
+			(crc << 1) ^ CRC_CCITT_POLY :
+			crc << 1;
 		mcrc <<= 1;
 	}
 	return ((crcin << 8) ^ crc);
 }
-
-
 
 /*
  * Initialize the crc32c tables.
@@ -122,7 +119,7 @@ nxge_crc32c_init(void)
 		for (byte = 0; byte < 4; byte++) {
 			for (bit = 0; bit < 8; bit++) {
 				crc = (crc & 0x80000000) ?
-				    (crc << 1) ^ SCTP_POLY : crc << 1;
+					(crc << 1) ^ SCTP_POLY : crc << 1;
 			}
 #ifdef _BIG_ENDIAN
 			crc32c_tab[3 - byte][index] = flip32(reflect_32(crc));
@@ -133,7 +130,6 @@ nxge_crc32c_init(void)
 	}
 }
 
-
 /*
  * Initialize the crc-ccitt tables.
  */
@@ -141,7 +137,6 @@ nxge_crc32c_init(void)
 void
 nxge_crc_ccitt_init(void)
 {
-
 	uint16_t crc;
 	uint16_t index, bit, byte;
 
@@ -150,9 +145,8 @@ nxge_crc_ccitt_init(void)
 		for (byte = 0; byte < 4; byte++) {
 			for (bit = 0; bit < 8; bit++) {
 				crc = (crc & 0x8000) ?
-				    (crc << 1) ^ CRC_CCITT_POLY : crc << 1;
+					(crc << 1) ^ CRC_CCITT_POLY : crc << 1;
 			}
-
 #ifdef _BIG_ENDIAN
 			crc_ccitt_tab[3 - byte][index] = crc;
 #else
@@ -160,9 +154,7 @@ nxge_crc_ccitt_init(void)
 #endif
 		}
 	}
-
 }
-
 
 /*
  * Lookup  the crc32c for a byte stream
@@ -184,8 +176,6 @@ nxge_crc32c_byte(uint32_t *crcptr, const uint8_t *buf, int len)
 	}
 	*crcptr = crc;
 }
-
-
 
 /*
  * Lookup  the crc-ccitt for a byte stream
@@ -209,9 +199,6 @@ nxge_crc_ccitt_byte(uint16_t *crcptr, const uint8_t *buf, int len)
 	*crcptr = crc;
 }
 
-
-
-
 /*
  * Lookup  the crc32c for a 32 bit word stream
  * Lookup is done fro the 4 bytes in parallel
@@ -228,8 +215,10 @@ nxge_crc32c_word(uint32_t *crcptr, const uint32_t *buf, int len)
 	crc = *crcptr;
 	for (i = 0; i < len; i++) {
 		w = crc ^ buf[i];
-		crc = crc32c_tab[0][w >> 24] ^ crc32c_tab[1][(w >> 16) & 0xff] ^
-		    crc32c_tab[2][(w >> 8) & 0xff] ^ crc32c_tab[3][w & 0xff];
+		crc = crc32c_tab[0][w >> 24] ^
+			crc32c_tab[1][(w >> 16) & 0xff] ^
+			crc32c_tab[2][(w >> 8) & 0xff] ^
+			crc32c_tab[3][w & 0xff];
 	}
 	*crcptr = crc;
 }
@@ -242,16 +231,13 @@ nxge_crc32c_word(uint32_t *crcptr, const uint32_t *buf, int len)
  * at a time
  *
  */
+
 uint16_t
 nxge_crc_ccitt(uint16_t crc16, const uint8_t *buf, int len)
 {
-
 	nxge_crc_ccitt_byte(&crc16, buf, len);
-
 	return (crc16);
 }
-
-
 
 /*
  * Lookup  the crc32c for a stream of bytes
@@ -279,11 +265,9 @@ nxge_crc32c(uint32_t crc32, const uint8_t *buf, int len)
 		buf = buf + rem;
 		len = len - rem;
 	}
-
 	if (len > 3) {
-		nxge_crc32c_word(&crc32, (const uint32_t *)buf, len / 4);
+		nxge_crc32c_word(&crc32, (const uint32_t *) buf, len / 4);
 	}
-
 	rem = len & 3;
 	if (rem != 0) {
 		nxge_crc32c_byte(&crc32, buf + len - rem, rem);
@@ -291,26 +275,22 @@ nxge_crc32c(uint32_t crc32, const uint8_t *buf, int len)
 	return (crc32);
 }
 
-
-
-
 void
 nxge_init_h1_table()
 {
 	uint32_t crc, bit, byte, index;
 
-	for (index = 0; index < 256; index ++) {
+	for (index = 0; index < 256; index++) {
 		crc = index << 24;
 		for (byte = 0; byte < 4; byte++) {
 			for (bit = 0; bit < 8; bit++) {
-				crc = ((crc  & 0x80000000)) ?
+				crc = ((crc & 0x80000000)) ?
 					(crc << 1) ^ CRC_32C_POLY : crc << 1;
 			}
 			h1table[byte][index] = crc;
 		}
 	}
 }
-
 
 /*
  * Reference Neptune H1 computation function
@@ -320,25 +300,23 @@ nxge_init_h1_table()
  */
 
 uint32_t
-nxge_compute_h1_serial(uint32_t init_value,
-					    uint32_t *flow, uint32_t len)
+nxge_compute_h1_serial(uint32_t init_value, uint32_t *flow, uint32_t len)
 {
 	int bit, byte;
 	uint32_t crc_h1 = init_value;
 	uint8_t *buf;
+
 	buf = (uint8_t *)flow;
 	for (byte = 0; byte < len; byte++) {
 		for (bit = 0; bit < 8; bit++) {
 			crc_h1 = (((crc_h1 >> 24) & 0x80) ^
-					    ((buf[byte] << bit) & 0x80)) ?
+				((buf[byte] << bit) & 0x80)) ?
 				(crc_h1 << 1) ^ CRC_32C_POLY : crc_h1 << 1;
 		}
 	}
 
 	return (crc_h1);
 }
-
-
 
 /*
  * table based implementation
@@ -350,12 +328,11 @@ nxge_compute_h1_serial(uint32_t init_value,
  */
 
 uint32_t
-nxge_compute_h1_table4(uint32_t crcin,
-					    uint32_t *flow, uint32_t length)
+nxge_compute_h1_table4(uint32_t crcin, uint32_t *flow, uint32_t length)
 {
-
 	uint32_t w, fw, i, crch1 = crcin;
 	uint32_t *buf;
+
 	buf = (uint32_t *)flow;
 
 	for (i = 0; i < length / 4; i++) {
@@ -367,12 +344,10 @@ nxge_compute_h1_table4(uint32_t crcin,
 #endif
 		w = crch1 ^ fw;
 		crch1 = h1table[3][w >> 24] ^ h1table[2][(w >> 16) & 0xff] ^
-		    h1table[1][(w >> 8) & 0xff] ^ h1table[0][w & 0xff];
+			h1table[1][(w >> 8) & 0xff] ^ h1table[0][w & 0xff];
 	}
 	return (crch1);
 }
-
-
 
 /*
  * table based implementation
@@ -387,6 +362,7 @@ nxge_compute_h1_table1(uint32_t crcin, uint32_t *flow, uint32_t length)
 
 	uint32_t i, crch1, tmp = crcin;
 	uint8_t *buf;
+
 	buf = (uint8_t *)flow;
 
 	tmp = crcin;

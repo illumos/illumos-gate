@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,8 @@
 #define	 RCR_TIMEOUT_DISABLE	2
 #define	 RCR_THRESHOLD	4
 
-
+/* assume weight is in byte frames unit */
+#define	WEIGHT_FACTOR 3/2
 
 uint64_t rdc_dmc_offset[] = {
 	RXDMA_CFIG1_REG, RXDMA_CFIG2_REG, RBR_CFIG_A_REG, RBR_CFIG_B_REG,
@@ -118,15 +119,14 @@ npi_rxdma_cfg_rdc_rcr_ctl(npi_handle_t handle, uint8_t rdc, uint8_t op,
  * Dumps the contents of rdc csrs and fzc registers
  *
  * Input:
+ *      handle:	opaque handle interpreted by the underlying OS
  *         rdc:      RX DMA number
  *
  * return:
  *     NPI_SUCCESS
- *     NPI_FAILURE
  *     NPI_RXDMA_RDC_INVALID
  *
  */
-
 npi_status_t
 npi_rxdma_dump_rdc_regs(npi_handle_t handle, uint8_t rdc)
 {
@@ -137,6 +137,7 @@ npi_rxdma_dump_rdc_regs(npi_handle_t handle, uint8_t rdc)
 	extern uint64_t npi_debug_level;
 	uint64_t old_npi_debug_level = npi_debug_level;
 #endif
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    "npi_rxdma_dump_rdc_regs"
@@ -189,13 +190,10 @@ npi_rxdma_dump_rdc_regs(npi_handle_t handle, uint8_t rdc)
  * Dumps the contents of rdc csrs and fzc registers
  *
  * Input:
- *         rdc:      RX DMA number
+ *      handle:	opaque handle interpreted by the underlying OS
  *
  * return:
  *     NPI_SUCCESS
- *     NPI_FAILURE
- *     NPI_RXDMA_RDC_INVALID
- *
  */
 npi_status_t
 npi_rxdma_dump_fzc_regs(npi_handle_t handle)
@@ -224,8 +222,9 @@ npi_rxdma_dump_fzc_regs(npi_handle_t handle)
 
 
 
-/* per rdc config functions */
-
+/*
+ * per rdc config functions
+ */
 npi_status_t
 npi_rxdma_cfg_logical_page_disable(npi_handle_t handle, uint8_t rdc,
 				    uint8_t page_num)
@@ -233,6 +232,7 @@ npi_rxdma_cfg_logical_page_disable(npi_handle_t handle, uint8_t rdc,
 	log_page_vld_t page_vld;
 	uint64_t valid_offset;
 
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    "rxdma_cfg_logical_page_disable"
@@ -241,6 +241,7 @@ npi_rxdma_cfg_logical_page_disable(npi_handle_t handle, uint8_t rdc,
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
+	ASSERT(RXDMA_PAGE_VALID(page_num));
 	if (!RXDMA_PAGE_VALID(page_num)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    "rxdma_cfg_logical_page_disable"
@@ -263,7 +264,6 @@ npi_rxdma_cfg_logical_page_disable(npi_handle_t handle, uint8_t rdc,
 
 }
 
-
 npi_status_t
 npi_rxdma_cfg_logical_page(npi_handle_t handle, uint8_t rdc,
 			    dma_log_page_t *pg_cfg)
@@ -275,7 +275,7 @@ npi_rxdma_cfg_logical_page(npi_handle_t handle, uint8_t rdc,
 	uint64_t value_offset, reloc_offset, mask_offset;
 	uint64_t valid_offset;
 
-
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " rxdma_cfg_logical_page"
@@ -284,6 +284,7 @@ npi_rxdma_cfg_logical_page(npi_handle_t handle, uint8_t rdc,
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
+	ASSERT(RXDMA_PAGE_VALID(pg_cfg->page_num));
 	if (!RXDMA_PAGE_VALID(pg_cfg->page_num)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " rxdma_cfg_logical_page"
@@ -295,7 +296,7 @@ npi_rxdma_cfg_logical_page(npi_handle_t handle, uint8_t rdc,
 	valid_offset = REG_FZC_RDC_OFFSET(RX_LOG_PAGE_VLD_REG, rdc);
 	NXGE_REG_RD64(handle, valid_offset, &page_vld.value);
 
-	if (pg_cfg->valid == 0) {
+	if (!pg_cfg->valid) {
 		if (pg_cfg->page_num == 0)
 			page_vld.bits.ldw.page0 = 0;
 
@@ -342,7 +343,6 @@ npi_rxdma_cfg_logical_page(npi_handle_t handle, uint8_t rdc,
 	return (NPI_SUCCESS);
 }
 
-
 npi_status_t
 npi_rxdma_cfg_logical_page_handle(npi_handle_t handle, uint8_t rdc,
 				    uint64_t page_handle)
@@ -350,6 +350,7 @@ npi_rxdma_cfg_logical_page_handle(npi_handle_t handle, uint8_t rdc,
 	uint64_t offset;
 	log_page_hdl_t page_hdl;
 
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 		    "rxdma_cfg_logical_page_handle"
@@ -367,10 +368,9 @@ npi_rxdma_cfg_logical_page_handle(npi_handle_t handle, uint8_t rdc,
 	return (NPI_SUCCESS);
 }
 
-
-
-/* RX DMA functions */
-
+/*
+ * RX DMA functions
+ */
 npi_status_t
 npi_rxdma_cfg_rdc_ctl(npi_handle_t handle, uint8_t rdc, uint8_t op)
 {
@@ -380,6 +380,7 @@ npi_rxdma_cfg_rdc_ctl(npi_handle_t handle, uint8_t rdc, uint8_t op)
 	uint32_t delay_time = RXDMA_RESET_DELAY;
 	uint32_t error = NPI_RXDMA_ERROR_ENCODE(NPI_RXDMA_RESET_ERR, rdc);
 
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    "npi_rxdma_cfg_rdc_ctl"
@@ -467,15 +468,11 @@ npi_rxdma_cfg_rdc_ctl(npi_handle_t handle, uint8_t rdc, uint8_t op)
 	return (NPI_SUCCESS);
 }
 
-
-
 npi_status_t
 npi_rxdma_cfg_rdc_enable(npi_handle_t handle, uint8_t rdc)
 {
 	return (npi_rxdma_cfg_rdc_ctl(handle, rdc, RXDMA_OP_ENABLE));
 }
-
-
 
 npi_status_t
 npi_rxdma_cfg_rdc_disable(npi_handle_t handle, uint8_t rdc)
@@ -488,10 +485,6 @@ npi_rxdma_cfg_rdc_reset(npi_handle_t handle, uint8_t rdc)
 {
 	return (npi_rxdma_cfg_rdc_ctl(handle, rdc, RXDMA_OP_RESET));
 }
-
-
-
-
 
 /*
  * npi_rxdma_cfg_defualt_port_rdc()
@@ -508,7 +501,6 @@ npi_rxdma_cfg_rdc_reset(npi_handle_t handle, uint8_t rdc)
  * NPI_RXDMA_PORT_INVALID
  *
  */
-
 npi_status_t npi_rxdma_cfg_default_port_rdc(npi_handle_t handle,
 				    uint8_t portnm, uint8_t rdc)
 {
@@ -516,6 +508,7 @@ npi_status_t npi_rxdma_cfg_default_port_rdc(npi_handle_t handle,
 	uint64_t offset;
 	def_pt_rdc_t cfg;
 
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    "rxdma_cfg_default_port_rdc"
@@ -524,6 +517,7 @@ npi_status_t npi_rxdma_cfg_default_port_rdc(npi_handle_t handle,
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
+	ASSERT(RXDMA_PORT_VALID(portnm));
 	if (!RXDMA_PORT_VALID(portnm)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    "rxdma_cfg_default_port_rdc"
@@ -539,15 +533,13 @@ npi_status_t npi_rxdma_cfg_default_port_rdc(npi_handle_t handle,
 	return (NPI_SUCCESS);
 }
 
-
-
-
 npi_status_t
 npi_rxdma_cfg_rdc_rcr_ctl(npi_handle_t handle, uint8_t rdc,
 			    uint8_t op, uint16_t param)
 {
 	rcrcfig_b_t rcr_cfgb;
 
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    "rxdma_cfg_rdc_rcr_ctl"
@@ -585,15 +577,12 @@ npi_rxdma_cfg_rdc_rcr_ctl(npi_handle_t handle, uint8_t rdc,
 	return (NPI_SUCCESS);
 }
 
-
 npi_status_t
 npi_rxdma_cfg_rdc_rcr_timeout_disable(npi_handle_t handle, uint8_t rdc)
 {
 	return (npi_rxdma_cfg_rdc_rcr_ctl(handle, rdc,
 	    RCR_TIMEOUT_DISABLE, 0));
 }
-
-
 
 npi_status_t
 npi_rxdma_cfg_rdc_rcr_threshold(npi_handle_t handle, uint8_t rdc,
@@ -613,24 +602,10 @@ npi_rxdma_cfg_rdc_rcr_timeout(npi_handle_t handle, uint8_t rdc,
 
 }
 
-
-
 /*
  * npi_rxdma_cfg_rdc_ring()
  * Configure The RDC channel Rcv Buffer Ring
- *
- * Inputs:
- *	rdc:		RX DMA Channel number
- *	rdc_params:	RDC confiuration parameters
- *
- * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_SW_ERR
- * NPI_HW_ERR
- *
  */
-
 npi_status_t
 npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 			    rdc_desc_cfg_t *rdc_desc_cfg)
@@ -642,6 +617,7 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 	rcrcfig_a_t rcr_cfga;
 	rcrcfig_b_t rcr_cfgb;
 
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    "rxdma_cfg_rdc_ring"
@@ -671,7 +647,6 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 		 * will be returned (especially if the Hypervisor
 		 * set up the logical pages with non-zero values.
 		 * This NPI function only sets up the configuration.
-		 * Call the enable function to enable the RDMC!
 		 */
 	}
 
@@ -851,29 +826,28 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 
 }
 
-
-
 /*
  * npi_rxdma_red_discard_stat_get
  * Gets the current discrad count due RED
  * The counter overflow bit is cleared, if it has been set.
  *
  * Inputs:
+ *      handle:	opaque handle interpreted by the underlying OS
  *	rdc:		RX DMA Channel number
- *	rx_disc_cnt_t	Structure to write current RDC discard stat
+ *	cnt:	Ptr to structure to write current RDC discard stat
  *
  * Return:
  * NPI_SUCCESS
  * NPI_RXDMA_RDC_INVALID
  *
  */
-
 npi_status_t
 npi_rxdma_red_discard_stat_get(npi_handle_t handle, uint8_t rdc,
 				    rx_disc_cnt_t *cnt)
 {
 	uint64_t offset;
 
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_rxdma_red_discard_stat_get"
@@ -898,12 +872,12 @@ npi_rxdma_red_discard_stat_get(npi_handle_t handle, uint8_t rdc,
 	return (NPI_SUCCESS);
 }
 
-
 /*
  * npi_rxdma_red_discard_oflow_clear
  * Clear RED discard counter overflow bit
  *
  * Inputs:
+ *      handle:	opaque handle interpreted by the underlying OS
  *	rdc:		RX DMA Channel number
  *
  * Return:
@@ -911,7 +885,6 @@ npi_rxdma_red_discard_stat_get(npi_handle_t handle, uint8_t rdc,
  * NPI_RXDMA_RDC_INVALID
  *
  */
-
 npi_status_t
 npi_rxdma_red_discard_oflow_clear(npi_handle_t handle, uint8_t rdc)
 
@@ -919,6 +892,7 @@ npi_rxdma_red_discard_oflow_clear(npi_handle_t handle, uint8_t rdc)
 	uint64_t offset;
 	rx_disc_cnt_t cnt;
 
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " npi_rxdma_red_discard_oflow_clear"
@@ -941,9 +915,6 @@ npi_rxdma_red_discard_oflow_clear(npi_handle_t handle, uint8_t rdc)
 	return (NPI_SUCCESS);
 }
 
-
-
-
 /*
  * npi_rxdma_misc_discard_stat_get
  * Gets the current discrad count for the rdc due to
@@ -951,21 +922,20 @@ npi_rxdma_red_discard_oflow_clear(npi_handle_t handle, uint8_t rdc)
  * The counter overflow bit is cleared, if it has been set.
  *
  * Inputs:
+ *      handle:	opaque handle interpreted by the underlying OS
  *	rdc:		RX DMA Channel number
- *	rx_disc_cnt_t	Structure to write current RDC discard stat
+ *	cnt:	Ptr to structure to write current RDC discard stat
  *
  * Return:
  * NPI_SUCCESS
  * NPI_RXDMA_RDC_INVALID
  *
  */
-
-
 npi_status_t
 npi_rxdma_misc_discard_stat_get(npi_handle_t handle, uint8_t rdc,
 				    rx_disc_cnt_t *cnt)
 {
-
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_rxdma_misc_discard_stat_get"
@@ -989,16 +959,14 @@ npi_rxdma_misc_discard_stat_get(npi_handle_t handle, uint8_t rdc,
 	return (NPI_SUCCESS);
 }
 
-
-
 /*
  * npi_rxdma_red_discard_oflow_clear
  * Clear RED discard counter overflow bit
  * clear the overflow bit for  buffer pool empty discrad counter
  * for the rdc
  *
- *
  * Inputs:
+ *      handle:	opaque handle interpreted by the underlying OS
  *	rdc:		RX DMA Channel number
  *
  * Return:
@@ -1006,12 +974,12 @@ npi_rxdma_misc_discard_stat_get(npi_handle_t handle, uint8_t rdc,
  * NPI_RXDMA_RDC_INVALID
  *
  */
-
 npi_status_t
 npi_rxdma_misc_discard_oflow_clear(npi_handle_t handle, uint8_t rdc)
 {
 	rx_disc_cnt_t cnt;
 
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " npi_rxdma_misc_discard_oflow_clear"
@@ -1034,13 +1002,13 @@ npi_rxdma_misc_discard_oflow_clear(npi_handle_t handle, uint8_t rdc)
 	return (NPI_SUCCESS);
 }
 
-
 /*
  * npi_rxdma_ring_perr_stat_get
  * Gets the current RDC Memory parity error
  * The counter overflow bit is cleared, if it has been set.
  *
  * Inputs:
+ * handle:	opaque handle interpreted by the underlying OS
  * pre_log:	Structure to write current RDC Prefetch memory
  *		Parity Error stat
  * sha_log:	Structure to write current RDC Shadow memory
@@ -1050,7 +1018,6 @@ npi_rxdma_misc_discard_oflow_clear(npi_handle_t handle, uint8_t rdc)
  * NPI_SUCCESS
  *
  */
-
 npi_status_t
 npi_rxdma_ring_perr_stat_get(npi_handle_t handle,
 			    rdmc_par_err_log_t *pre_log,
@@ -1111,17 +1078,16 @@ npi_rxdma_ring_perr_stat_get(npi_handle_t handle,
 	return (NPI_SUCCESS);
 }
 
-
 /*
  * npi_rxdma_ring_perr_stat_clear
  * Clear RDC Memory Parity Error counter overflow bits
  *
  * Inputs:
+ *      handle:	opaque handle interpreted by the underlying OS
  * Return:
  * NPI_SUCCESS
  *
  */
-
 npi_status_t
 npi_rxdma_ring_perr_stat_clear(npi_handle_t handle)
 {
@@ -1178,8 +1144,9 @@ npi_rxdma_ring_perr_stat_clear(npi_handle_t handle)
 	return (NPI_SUCCESS);
 }
 
-
-/* Access the RDMC Memory: used for debugging */
+/*
+ * Access the RDMC Memory: used for debugging
+ */
 npi_status_t
 npi_rxdma_rdmc_memory_io(npi_handle_t handle,
 			    rdmc_mem_access_t *data, uint8_t op)
@@ -1255,8 +1222,9 @@ npi_rxdma_rdmc_memory_io(npi_handle_t handle,
 	return (NPI_SUCCESS);
 }
 
-/* system wide conf functions */
-
+/*
+ * system wide conf functions
+ */
 npi_status_t
 npi_rxdma_cfg_clock_div_set(npi_handle_t handle, uint16_t count)
 {
@@ -1276,9 +1244,6 @@ npi_rxdma_cfg_clock_div_set(npi_handle_t handle, uint16_t count)
 
 	return (NPI_SUCCESS);
 }
-
-
-
 
 npi_status_t
 npi_rxdma_cfg_red_rand_init(npi_handle_t handle, uint16_t init_value)
@@ -1313,8 +1278,6 @@ npi_rxdma_cfg_red_rand_disable(npi_handle_t handle)
 
 }
 
-
-
 npi_status_t
 npi_rxdma_cfg_32bitmode_enable(npi_handle_t handle)
 {
@@ -1329,8 +1292,6 @@ npi_rxdma_cfg_32bitmode_enable(npi_handle_t handle)
 
 }
 
-
-
 npi_status_t
 npi_rxdma_cfg_32bitmode_disable(npi_handle_t handle)
 {
@@ -1343,7 +1304,6 @@ npi_rxdma_cfg_32bitmode_disable(npi_handle_t handle)
 	return (NPI_SUCCESS);
 
 }
-
 
 npi_status_t
 npi_rxdma_cfg_ram_access_enable(npi_handle_t handle)
@@ -1358,8 +1318,6 @@ npi_rxdma_cfg_ram_access_enable(npi_handle_t handle)
 
 }
 
-
-
 npi_status_t
 npi_rxdma_cfg_ram_access_disable(npi_handle_t handle)
 {
@@ -1373,17 +1331,15 @@ npi_rxdma_cfg_ram_access_disable(npi_handle_t handle)
 
 }
 
-
-
-#define	WEIGHT_FACTOR 3/2
-/* assume weight is in byte frames unit */
-
-npi_status_t npi_rxdma_cfg_port_ddr_weight(npi_handle_t handle,
+npi_status_t
+npi_rxdma_cfg_port_ddr_weight(npi_handle_t handle,
 				    uint8_t portnm, uint32_t weight)
 {
 
 	pt_drr_wt_t wt_reg;
 	uint64_t offset;
+
+	ASSERT(RXDMA_PORT_VALID(portnm));
 	if (!RXDMA_PORT_VALID(portnm)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " rxdma_cfg_port_ddr_weight"
@@ -1399,14 +1355,15 @@ npi_status_t npi_rxdma_cfg_port_ddr_weight(npi_handle_t handle,
 	return (NPI_SUCCESS);
 }
 
-
-npi_status_t npi_rxdma_port_usage_get(npi_handle_t handle,
+npi_status_t
+npi_rxdma_port_usage_get(npi_handle_t handle,
 				    uint8_t portnm, uint32_t *blocks)
 {
 
 	pt_use_t use_reg;
 	uint64_t offset;
 
+	ASSERT(RXDMA_PORT_VALID(portnm));
 	if (!RXDMA_PORT_VALID(portnm)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " rxdma_port_usage_get"
@@ -1422,14 +1379,14 @@ npi_status_t npi_rxdma_port_usage_get(npi_handle_t handle,
 
 }
 
-
-
-npi_status_t npi_rxdma_cfg_wred_param(npi_handle_t handle, uint8_t rdc,
+npi_status_t
+npi_rxdma_cfg_wred_param(npi_handle_t handle, uint8_t rdc,
 				    rdc_red_para_t *wred_params)
 {
 	rdc_red_para_t wred_reg;
 	uint64_t offset;
 
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " rxdma_cfg_wred_param"
@@ -1473,8 +1430,6 @@ npi_status_t npi_rxdma_cfg_wred_param(npi_handle_t handle, uint8_t rdc,
 	return (NPI_SUCCESS);
 }
 
-
-
 /*
  * npi_rxdma_cfg_rdc_table()
  * Configure/populate the RDC table
@@ -1486,11 +1441,9 @@ npi_status_t npi_rxdma_cfg_wred_param(npi_handle_t handle, uint8_t rdc,
  *
  * Return:
  * NPI_SUCCESS
- * NPI_FAILURE
  * NPI_RXDMA_TABLE_INVALID
  *
  */
-
 npi_status_t
 npi_rxdma_cfg_rdc_table(npi_handle_t handle,
 			    uint8_t table, uint8_t rdc[])
@@ -1500,6 +1453,7 @@ npi_rxdma_cfg_rdc_table(npi_handle_t handle,
 	rdc_tbl_t tbl_reg;
 	tbl_reg.value = 0;
 
+	ASSERT(RXDMA_TABLE_VALID(table));
 	if (!RXDMA_TABLE_VALID(table)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " npi_rxdma_cfg_rdc_table"
@@ -1527,6 +1481,7 @@ npi_rxdma_cfg_rdc_table_default_rdc(npi_handle_t handle,
 	rdc_tbl_t tbl_reg;
 	tbl_reg.value = 0;
 
+	ASSERT(RXDMA_TABLE_VALID(table));
 	if (!RXDMA_TABLE_VALID(table)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " npi_rxdma_cfg_rdc_table"
@@ -1550,6 +1505,7 @@ npi_rxdma_dump_rdc_table(npi_handle_t handle,
 	int tbl_offset;
 	uint64_t value;
 
+	ASSERT(RXDMA_TABLE_VALID(table));
 	if (!RXDMA_TABLE_VALID(table)) {
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
 			    " npi_rxdma_dump_rdc_table"
@@ -1575,13 +1531,12 @@ npi_rxdma_dump_rdc_table(npi_handle_t handle,
 
 }
 
-
 npi_status_t
 npi_rxdma_rdc_rbr_stat_get(npi_handle_t handle, uint8_t rdc,
 			    rbr_stat_t *rbr_stat)
 {
 
-
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " rxdma_rdc_rbr_stat_get"
@@ -1594,28 +1549,27 @@ npi_rxdma_rdc_rbr_stat_get(npi_handle_t handle, uint8_t rdc,
 	return (NPI_SUCCESS);
 }
 
-
-
-
 /*
  * npi_rxdma_rdc_rbr_head_get
  * Gets the current rbr head pointer.
  *
  * Inputs:
+ *      handle:	opaque handle interpreted by the underlying OS
  *	rdc:		RX DMA Channel number
  *	hdptr		ptr to write the rbr head value
  *
  * Return:
- *
+ * NPI_SUCCESS
+ * NPI_RXDMA_RDC_INVALID
  */
-
-npi_status_t	npi_rxdma_rdc_rbr_head_get(npi_handle_t handle,
+npi_status_t
+npi_rxdma_rdc_rbr_head_get(npi_handle_t handle,
 			    uint8_t rdc, addr44_t *hdptr)
 {
 	rbr_hdh_t hh_ptr;
 	rbr_hdl_t hl_ptr;
 
-
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " rxdma_rdc_rbr_head_get"
@@ -1633,15 +1587,14 @@ npi_status_t	npi_rxdma_rdc_rbr_head_get(npi_handle_t handle,
 
 }
 
-
-
-
 npi_status_t
 npi_rxdma_rdc_rcr_qlen_get(npi_handle_t handle, uint8_t rdc,
 			    uint16_t *rcr_qlen)
 {
 
 	rcrstat_a_t stats;
+
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " rxdma_rdc_rcr_qlen_get"
@@ -1659,7 +1612,6 @@ npi_rxdma_rdc_rcr_qlen_get(npi_handle_t handle, uint8_t rdc,
 	return (NPI_SUCCESS);
 }
 
-
 npi_status_t
 npi_rxdma_rdc_rcr_tail_get(npi_handle_t handle,
 			    uint8_t rdc, addr44_t *tail_addr)
@@ -1668,6 +1620,7 @@ npi_rxdma_rdc_rcr_tail_get(npi_handle_t handle,
 	rcrstat_b_t th_ptr;
 	rcrstat_c_t tl_ptr;
 
+	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " rxdma_rdc_rcr_tail_get"
@@ -1692,14 +1645,12 @@ npi_rxdma_rdc_rcr_tail_get(npi_handle_t handle,
 
 }
 
-
-
-
 /*
  * npi_rxdma_rxctl_fifo_error_intr_set
  * Configure The RX ctrl fifo error interrupt generation
  *
  * Inputs:
+ *      handle:	opaque handle interpreted by the underlying OS
  *	mask:	rx_ctl_dat_fifo_mask_t specifying the errors
  * valid fields in  rx_ctl_dat_fifo_mask_t structure are:
  * zcp_eop_err, ipp_eop_err, id_mismatch. If a field is set
@@ -1709,7 +1660,6 @@ npi_rxdma_rdc_rcr_tail_get(npi_handle_t handle,
  *
  * Return:
  * NPI_SUCCESS
- * NPI_FAILURE
  *
  */
 npi_status_t
@@ -1742,12 +1692,12 @@ npi_rxdma_rxctl_fifo_error_intr_set(npi_handle_t handle,
  * Read The RX ctrl fifo error Status
  *
  * Inputs:
+ *      handle:	opaque handle interpreted by the underlying OS
  *	stat:	rx_ctl_dat_fifo_stat_t to read the errors to
  * valid fields in  rx_ctl_dat_fifo_stat_t structure are:
  * zcp_eop_err, ipp_eop_err, id_mismatch.
  * Return:
  * NPI_SUCCESS
- * NPI_FAILURE
  *
  */
 npi_status_t
@@ -1759,8 +1709,6 @@ npi_rxdma_rxctl_fifo_error_intr_get(npi_handle_t handle,
 	return (NPI_SUCCESS);
 }
 
-
-
 npi_status_t
 npi_rxdma_rdc_rcr_pktread_update(npi_handle_t handle, uint8_t channel,
 				    uint16_t pkts_read)
@@ -1768,6 +1716,8 @@ npi_rxdma_rdc_rcr_pktread_update(npi_handle_t handle, uint8_t channel,
 
 	rx_dma_ctl_stat_t	cs;
 	uint16_t min_read = 0;
+
+	ASSERT(RXDMA_CHANNEL_VALID(channel));
 	if (!RXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 		    " npi_rxdma_rdc_rcr_pktread_update ",
@@ -1791,7 +1741,6 @@ npi_rxdma_rdc_rcr_pktread_update(npi_handle_t handle, uint8_t channel,
 	return (NPI_SUCCESS);
 }
 
-
 npi_status_t
 npi_rxdma_rdc_rcr_bufread_update(npi_handle_t handle, uint8_t channel,
 					    uint16_t bufs_read)
@@ -1799,6 +1748,8 @@ npi_rxdma_rdc_rcr_bufread_update(npi_handle_t handle, uint8_t channel,
 
 	rx_dma_ctl_stat_t	cs;
 	uint16_t min_read = 0;
+
+	ASSERT(RXDMA_CHANNEL_VALID(channel));
 	if (!RXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 		    " npi_rxdma_rdc_rcr_bufread_update ",
@@ -1822,8 +1773,6 @@ npi_rxdma_rdc_rcr_bufread_update(npi_handle_t handle, uint8_t channel,
 	return (NPI_SUCCESS);
 }
 
-
-
 npi_status_t
 npi_rxdma_rdc_rcr_read_update(npi_handle_t handle, uint8_t channel,
 				    uint16_t pkts_read, uint16_t bufs_read)
@@ -1831,6 +1780,7 @@ npi_rxdma_rdc_rcr_read_update(npi_handle_t handle, uint8_t channel,
 
 	rx_dma_ctl_stat_t	cs;
 
+	ASSERT(RXDMA_CHANNEL_VALID(channel));
 	if (!RXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 		    " npi_rxdma_rdc_rcr_read_update ",
@@ -1885,11 +1835,10 @@ npi_rxdma_rdc_rcr_read_update(npi_handle_t handle, uint8_t channel,
  *
  * Return:
  *	NPI_SUCCESS		- If enable channel with mailbox update
- *				  is complete successfully.
+ *				  is completed successfully.
  *
  *	Error:
- *	NPI_FAILURE	-
- *		NPI_RXDMA_CHANNEL_INVALID -
+ *	NPI error status code
  */
 npi_status_t
 npi_rxdma_channel_mex_set(npi_handle_t handle, uint8_t channel)
@@ -1911,8 +1860,7 @@ npi_rxdma_channel_mex_set(npi_handle_t handle, uint8_t channel)
  *	NPI_SUCCESS
  *
  *	Error:
- *	NPI_FAILURE	-
- *		NPI_RXDMA_CHANNEL_INVALID -
+ *	NPI error status code
  */
 npi_status_t
 npi_rxdma_channel_rcrto_clear(npi_handle_t handle, uint8_t channel)
@@ -1934,8 +1882,7 @@ npi_rxdma_channel_rcrto_clear(npi_handle_t handle, uint8_t channel)
  *	NPI_SUCCESS
  *
  *	Error:
- *	NPI_FAILURE	-
- *		NPI_RXDMA_CHANNEL_INVALID -
+ *	NPI error status code
  */
 npi_status_t
 npi_rxdma_channel_pt_drop_pkt_clear(npi_handle_t handle, uint8_t channel)
@@ -1958,8 +1905,7 @@ npi_rxdma_channel_pt_drop_pkt_clear(npi_handle_t handle, uint8_t channel)
  *	NPI_SUCCESS
  *
  *	Error:
- *	NPI_FAILURE	-
- *		NPI_RXDMA_CHANNEL_INVALID -
+ *	NPI error status code
  */
 npi_status_t
 npi_rxdma_channel_wred_dop_clear(npi_handle_t handle, uint8_t channel)
@@ -1982,8 +1928,7 @@ npi_rxdma_channel_wred_dop_clear(npi_handle_t handle, uint8_t channel)
  *	NPI_SUCCESS
  *
  *	Error:
- *	NPI_FAILURE	-
- *		NPI_RXDMA_CHANNEL_INVALID -
+ *	NPI error status code
  */
 npi_status_t
 npi_rxdma_channel_rcr_shfull_clear(npi_handle_t handle, uint8_t channel)
@@ -2006,8 +1951,7 @@ npi_rxdma_channel_rcr_shfull_clear(npi_handle_t handle, uint8_t channel)
  *	NPI_SUCCESS
  *
  *	Error:
- *	NPI_FAILURE	-
- *		NPI_RXDMA_CHANNEL_INVALID -
+ *	NPI error status code
  */
 npi_status_t
 npi_rxdma_channel_rcr_full_clear(npi_handle_t handle, uint8_t channel)
@@ -2053,9 +1997,7 @@ npi_rxdma_channel_cs_clear_all(npi_handle_t handle, uint8_t channel)
  *	NPI_SUCCESS
  *
  *	Error:
- *	NPI_FAILURE		-
- *		NPI_TXDMA_OPCODE_INVALID	-
- *		NPI_TXDMA_CHANNEL_INVALID	-
+ *	NPI error status code
  */
 npi_status_t
 npi_rxdma_channel_control(npi_handle_t handle, rxdma_cs_cntl_t control,
@@ -2064,6 +2006,7 @@ npi_rxdma_channel_control(npi_handle_t handle, rxdma_cs_cntl_t control,
 
 	rx_dma_ctl_stat_t	cs;
 
+	ASSERT(RXDMA_CHANNEL_VALID(channel));
 	if (!RXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 		    " npi_rxdma_channel_control",
@@ -2170,9 +2113,7 @@ npi_rxdma_channel_control(npi_handle_t handle, rxdma_cs_cntl_t control,
  *	NPI_SUCCESS
  *
  *	Error:
- *	NPI_FAILURE		-
- *		NPI_RXDMA_OPCODE_INVALID	-
- *		NPI_RXDMA_CHANNEL_INVALID	-
+ *	NPI error status code
  */
 npi_status_t
 npi_rxdma_control_status(npi_handle_t handle, io_op_t op_mode,
@@ -2181,6 +2122,7 @@ npi_rxdma_control_status(npi_handle_t handle, io_op_t op_mode,
 	int			status = NPI_SUCCESS;
 	rx_dma_ctl_stat_t	cs;
 
+	ASSERT(RXDMA_CHANNEL_VALID(channel));
 	if (!RXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 		    "npi_rxdma_control_status",
@@ -2233,9 +2175,7 @@ npi_rxdma_control_status(npi_handle_t handle, io_op_t op_mode,
  *	NPI_SUCCESS		- If set is complete successfully.
  *
  *	Error:
- *	NPI_FAILURE		-
- *		NPI_RXDMA_OPCODE_INVALID	-
- *		NPI_RXDMA_CHANNEL_INVALID	-
+ *	NPI error status code
  */
 npi_status_t
 npi_rxdma_event_mask(npi_handle_t handle, io_op_t op_mode,
@@ -2244,6 +2184,7 @@ npi_rxdma_event_mask(npi_handle_t handle, io_op_t op_mode,
 	int			status = NPI_SUCCESS;
 	rx_dma_ent_msk_t	mask;
 
+	ASSERT(RXDMA_CHANNEL_VALID(channel));
 	if (!RXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 		    "npi_rxdma_event_mask",
@@ -2291,15 +2232,13 @@ npi_rxdma_event_mask(npi_handle_t handle, io_op_t op_mode,
  *			  OP_SET: set hardware interrupt event masks
  *			  OP_CLEAR: clear control and status register to 0s.
  *	channel		- hardware RXDMA channel from 0 to 23.
- *	cfgp		- pointer to NPI defined event mask
+ *	mask_cfgp		- pointer to NPI defined event mask
  *			  enum data type.
  * Return:
  *	NPI_SUCCESS		- If set is complete successfully.
  *
  *	Error:
- *	NPI_FAILURE		-
- *		NPI_RXDMA_OPCODE_INVALID	-
- *		NPI_RXDMA_CHANNEL_INVALID	-
+ *	NPI error status code
  */
 npi_status_t
 npi_rxdma_event_mask_config(npi_handle_t handle, io_op_t op_mode,
@@ -2308,6 +2247,7 @@ npi_rxdma_event_mask_config(npi_handle_t handle, io_op_t op_mode,
 	int		status = NPI_SUCCESS;
 	uint64_t	value;
 
+	ASSERT(RXDMA_CHANNEL_VALID(channel));
 	if (!RXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 		    "npi_rxdma_event_mask_config",

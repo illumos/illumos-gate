@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,10 +28,9 @@
 #include <npi_zcp.h>
 
 static int zcp_mem_read(npi_handle_t, uint16_t, uint8_t,
-			uint16_t, zcp_ram_unit_t *);
+	uint16_t, zcp_ram_unit_t *);
 static int zcp_mem_write(npi_handle_t, uint16_t, uint8_t,
-			uint32_t, uint16_t,
-			zcp_ram_unit_t *);
+	uint32_t, uint16_t, zcp_ram_unit_t *);
 
 npi_status_t
 npi_zcp_config(npi_handle_t handle, config_op_t op, zcp_config_t config)
@@ -211,6 +210,7 @@ npi_zcp_set_bam_region(npi_handle_t handle, zcp_buf_region_t region,
 			zcp_bam_region_reg_t *region_attr)
 {
 
+	ASSERT(IS_VALID_BAM_REGION(region));
 	if (!IS_VALID_BAM_REGION(region)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_zcp_set_bam_region"
@@ -243,6 +243,7 @@ npi_zcp_set_dst_region(npi_handle_t handle, zcp_buf_region_t region,
 {
 	uint64_t val = 0;
 
+	ASSERT(IS_VALID_BAM_REGION(region));
 	if (!IS_VALID_BAM_REGION(region)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_zcp_set_dst_region"
@@ -626,7 +627,6 @@ npi_zcp_tt_cfifo_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 	return (NPI_SUCCESS);
 }
 
-
 npi_status_t
 npi_zcp_rest_cfifo_port(npi_handle_t handle, uint8_t port)
 {
@@ -666,7 +666,6 @@ npi_zcp_rest_cfifo_port(npi_handle_t handle, uint8_t port)
 
 	return (NPI_SUCCESS);
 }
-
 
 npi_status_t
 npi_zcp_rest_cfifo_all(npi_handle_t handle)

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,11 +79,7 @@ extern "C" {
  * Definitions for module_info.
  */
 #define	NXGE_IDNUM		(0)			/* module ID number */
-#ifdef SAM_MODEL
-#define	NXGE_DRIVER_NAME	"ce"			/* module name */
-#else
 #define	NXGE_DRIVER_NAME	"nxge"			/* module name */
-#endif
 
 #define	NXGE_MINPSZ		(0)			/* min packet size */
 #define	NXGE_MAXPSZ		(ETHERMTU)		/* max packet size */
@@ -111,8 +107,8 @@ typedef enum {
 	param_niu_cfg_type,
 	param_tx_quick_cfg,
 	param_rx_quick_cfg,
-    param_master_cfg_enable,
-    param_master_cfg_value,
+	param_master_cfg_enable,
+	param_master_cfg_value,
 
 	param_autoneg,
 	param_anar_10gfdx,
@@ -209,11 +205,9 @@ typedef enum {
 /*
  * Named Dispatch Parameter Management Structure
  */
-
-
 typedef	int (*nxge_ndgetf_t)(p_nxge_t, queue_t *, MBLKP, caddr_t, cred_t *);
 typedef	int (*nxge_ndsetf_t)(p_nxge_t, queue_t *,
-		    MBLKP, char *, caddr_t, cred_t *);
+	    MBLKP, char *, caddr_t, cred_t *);
 
 #define	NXGE_PARAM_READ			0x00000001ULL
 #define	NXGE_PARAM_WRITE		0x00000002ULL
@@ -665,6 +659,7 @@ struct _nxge_t {
 	hsvc_info_t		niu_hsvc;
 	uint64_t		niu_min_ver;
 #endif
+	boolean_t		link_notify;
 };
 
 /*
@@ -682,43 +677,6 @@ struct _nxge_t {
 #define	START_POLL_THRESH	2
 
 typedef struct _nxge_port_kstat_t {
-	/*
-	 * Link Input/Output stats
-	 */
-	kstat_named_t	ipackets;
-	kstat_named_t	ipackets64;
-	kstat_named_t	ierrors;
-	kstat_named_t	opackets;
-	kstat_named_t	opackets64;
-	kstat_named_t	oerrors;
-	kstat_named_t	collisions;
-
-	/*
-	 * required by kstat for MIB II objects(RFC 1213)
-	 */
-	kstat_named_t	rbytes; 	/* # octets received */
-						/* MIB - ifInOctets */
-	kstat_named_t	rbytes64;
-	kstat_named_t	obytes; 	/* # octets transmitted */
-						/* MIB - ifOutOctets */
-	kstat_named_t	obytes64;
-	kstat_named_t	multircv; 	/* # multicast packets */
-						/* delivered to upper layer */
-						/* MIB - ifInNUcastPkts */
-	kstat_named_t	multixmt; 	/* # multicast packets */
-						/* requested to be sent */
-						/* MIB - ifOutNUcastPkts */
-	kstat_named_t	brdcstrcv;	/* # broadcast packets */
-						/* delivered to upper layer */
-						/* MIB - ifInNUcastPkts */
-	kstat_named_t	brdcstxmt;	/* # broadcast packets */
-						/* requested to be sent */
-						/* MIB - ifOutNUcastPkts */
-	kstat_named_t	norcvbuf; 	/* # rcv packets discarded */
-						/* MIB - ifInDiscards */
-	kstat_named_t	noxmtbuf; 	/* # xmt packets discarded */
-						/* MIB - ifOutDiscards */
-
 	/*
 	 * Transciever state informations.
 	 */
@@ -775,80 +733,11 @@ typedef struct _nxge_port_kstat_t {
 	kstat_named_t	trunk_mode;
 
 	/*
-	 * Tx Statistics.
-	 */
-	kstat_named_t	tx_inits;
-	kstat_named_t	tx_starts;
-	kstat_named_t	tx_nocanput;
-	kstat_named_t	tx_msgdup_fail;
-	kstat_named_t	tx_allocb_fail;
-	kstat_named_t	tx_no_desc;
-	kstat_named_t	tx_dma_bind_fail;
-	kstat_named_t	tx_uflo;
-	kstat_named_t	tx_hdr_pkts;
-	kstat_named_t	tx_ddi_pkts;
-	kstat_named_t	tx_dvma_pkts;
-
-	kstat_named_t	tx_max_pend;
-
-	/*
-	 * Rx Statistics.
-	 */
-	kstat_named_t	rx_inits;
-	kstat_named_t	rx_hdr_pkts;
-	kstat_named_t	rx_mtu_pkts;
-	kstat_named_t	rx_split_pkts;
-	kstat_named_t	rx_no_buf;
-	kstat_named_t	rx_no_comp_wb;
-	kstat_named_t	rx_ov_flow;
-	kstat_named_t	rx_len_mm;
-	kstat_named_t	rx_tag_err;
-	kstat_named_t	rx_nocanput;
-	kstat_named_t	rx_msgdup_fail;
-	kstat_named_t	rx_allocb_fail;
-
-	/*
-	 * Receive buffer management statistics.
-	 */
-	kstat_named_t	rx_new_pages;
-	kstat_named_t	rx_new_hdr_pgs;
-	kstat_named_t	rx_new_mtu_pgs;
-	kstat_named_t	rx_new_nxt_pgs;
-	kstat_named_t	rx_reused_pgs;
-	kstat_named_t	rx_hdr_drops;
-	kstat_named_t	rx_mtu_drops;
-	kstat_named_t	rx_nxt_drops;
-
-	/*
-	 * Receive flow statistics
-	 */
-	kstat_named_t	rx_rel_flow;
-	kstat_named_t	rx_rel_bit;
-	kstat_named_t   rx_pkts_dropped;
-
-	/*
 	 * Misc MAC statistics.
 	 */
 	kstat_named_t	ifspeed;
 	kstat_named_t	promisc;
 	kstat_named_t	rev_id;
-
-	/* Global (entire NIU/Neptune device) statistics */
-
-	/*
-	 * PCI Bus Statistics.
-	 */
-	kstat_named_t	pci_bus_speed;
-	kstat_named_t	pci_err;
-	kstat_named_t	pci_rta_err;
-	kstat_named_t	pci_rma_err;
-	kstat_named_t	pci_parity_err;
-	kstat_named_t	pci_bad_ack_err;
-	kstat_named_t	pci_drto_err;
-	kstat_named_t	pci_dmawz_err;
-	kstat_named_t	pci_dmarz_err;
-
-	kstat_named_t	rx_taskq_waits;
 
 	/*
 	 * Some statistics added to support bringup, these

@@ -19,25 +19,23 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifdef SOLARIS
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-#endif
 
-#include	<npi_txdma.h>
+#include <npi_txdma.h>
 
 #define	TXDMA_WAIT_LOOP		10000
 #define	TXDMA_WAIT_MSEC		5
 
 static npi_status_t npi_txdma_control_reset_wait(npi_handle_t handle,
-							uint8_t channel);
+	uint8_t channel);
 static npi_status_t npi_txdma_control_stop_wait(npi_handle_t handle,
-							uint8_t channel);
+	uint8_t channel);
 static npi_status_t npi_txdma_control_resume_wait(npi_handle_t handle,
-							uint8_t channel);
+	uint8_t channel);
 
 uint64_t tdc_dmc_offset[] = {
 	TX_RNG_CFIG_REG,
@@ -105,6 +103,9 @@ const char *tx_fzc_name[] = {
 	"TDMC_TRAINING_REG"
 };
 
+#define	NUM_TDC_DMC_REGS	(sizeof (tdc_dmc_offset) / sizeof (uint64_t))
+#define	NUM_TX_FZC_REGS	(sizeof (tx_fzc_offset) / sizeof (uint64_t))
+
 /*
  * npi_txdma_dump_tdc_regs
  * Dumps the contents of tdc csrs and fzc registers
@@ -125,6 +126,7 @@ npi_txdma_dump_tdc_regs(npi_handle_t handle, uint8_t tdc)
 	uint64_t		value, offset;
 	int 			num_regs, i;
 
+	ASSERT(TXDMA_CHANNEL_VALID(tdc));
 	if (!TXDMA_CHANNEL_VALID(tdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			"npi_txdma_dump_tdc_regs"
@@ -138,7 +140,7 @@ npi_txdma_dump_tdc_regs(npi_handle_t handle, uint8_t tdc)
 		    "\nTXDMA DMC Register Dump for Channel %d\n",
 			    tdc));
 
-	num_regs = sizeof (tdc_dmc_offset) / sizeof (uint64_t);
+	num_regs = NUM_TDC_DMC_REGS;
 	for (i = 0; i < num_regs; i++) {
 		TXDMA_REG_READ64(handle, tdc_dmc_offset[i], tdc, &value);
 		offset = NXGE_TXDMA_OFFSET(tdc_dmc_offset[i], handle.is_vraddr,
@@ -153,7 +155,7 @@ npi_txdma_dump_tdc_regs(npi_handle_t handle, uint8_t tdc)
 		"\nTXDMA FZC_DMC Register Dump for Channel %d\n",
 		tdc));
 
-	num_regs = sizeof (tdc_fzc_offset) / sizeof (uint64_t);
+	num_regs = NUM_TX_FZC_REGS;
 	for (i = 0; i < num_regs; i++) {
 		offset = NXGE_TXLOG_OFFSET(tdc_fzc_offset[i], tdc);
 		NXGE_REG_RD64(handle, offset, &value);
@@ -192,7 +194,7 @@ npi_txdma_dump_fzc_regs(npi_handle_t handle)
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
 		"\nFZC_DMC Common Register Dump\n"));
 
-	num_regs = sizeof (tx_fzc_offset) / sizeof (uint64_t);
+	num_regs = NUM_TX_FZC_REGS;
 	for (i = 0; i < num_regs; i++) {
 		NXGE_REG_RD64(handle, tx_fzc_offset[i], &value);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
@@ -212,6 +214,7 @@ npi_txdma_tdc_regs_zero(npi_handle_t handle, uint8_t tdc)
 	uint64_t		value;
 	int 			num_regs, i;
 
+	ASSERT(TXDMA_CHANNEL_VALID(tdc));
 	if (!TXDMA_CHANNEL_VALID(tdc)) {
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
 			"npi_txdma_tdc_regs_zero"
@@ -224,7 +227,7 @@ npi_txdma_tdc_regs_zero(npi_handle_t handle, uint8_t tdc)
 		    "\nTXDMA DMC Register (zero) for Channel %d\n",
 			    tdc));
 
-	num_regs = sizeof (tdc_dmc_offset) / sizeof (uint64_t);
+	num_regs = NUM_TDC_DMC_REGS;
 	value = 0;
 	for (i = 0; i < num_regs; i++) {
 		TXDMA_REG_WRITE64(handle, tdc_dmc_offset[i], tdc,
@@ -464,6 +467,7 @@ npi_txdma_log_page_handle_set(npi_handle_t handle, uint8_t channel,
 {
 	int			status = NPI_SUCCESS;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_log_page_handle_set"
@@ -513,6 +517,7 @@ npi_txdma_log_page_config(npi_handle_t handle, io_op_t op_mode,
 	int			status = NPI_SUCCESS;
 	uint64_t		val;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_log_page_config"
@@ -671,6 +676,7 @@ npi_txdma_log_page_vld_config(npi_handle_t handle, io_op_t op_mode,
 	int			status = NPI_SUCCESS;
 	log_page_vld_t		vld;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_log_page_vld_config"
@@ -921,6 +927,7 @@ npi_txdma_channel_control(npi_handle_t handle, txdma_cs_cntl_t control,
 	int		status = NPI_SUCCESS;
 	tx_cs_t		cs;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_channel_control"
@@ -1037,6 +1044,7 @@ npi_txdma_control_status(npi_handle_t handle, io_op_t op_mode,
 	int		status = NPI_SUCCESS;
 	tx_cs_t		txcs;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_control_status"
@@ -1101,6 +1109,7 @@ npi_txdma_event_mask(npi_handle_t handle, io_op_t op_mode,
 	int			status = NPI_SUCCESS;
 	tx_dma_ent_msk_t	mask;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 					    " npi_txdma_event_mask"
@@ -1166,6 +1175,7 @@ npi_txdma_event_mask_config(npi_handle_t handle, io_op_t op_mode,
 	int		status = NPI_SUCCESS;
 	uint64_t	value;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_event_mask_config"
@@ -1227,6 +1237,7 @@ npi_txdma_event_mask_mk_out(npi_handle_t handle, uint8_t channel)
 	txdma_ent_msk_cfg_t event_mask;
 	int		status = NPI_SUCCESS;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_event_mask_mk_out"
@@ -1263,6 +1274,7 @@ npi_txdma_event_mask_mk_in(npi_handle_t handle, uint8_t channel)
 	txdma_ent_msk_cfg_t event_mask;
 	int		status = NPI_SUCCESS;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_event_mask_mk_in"
@@ -1308,6 +1320,7 @@ npi_txdma_ring_addr_set(npi_handle_t handle, uint8_t channel,
 	int		status = NPI_SUCCESS;
 	tx_rng_cfig_t	cfg;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_ring_addr_set"
@@ -1352,6 +1365,7 @@ npi_txdma_ring_config(npi_handle_t handle, io_op_t op_mode,
 {
 	int		status = NPI_SUCCESS;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_ring_config"
@@ -1411,6 +1425,7 @@ npi_txdma_mbox_config(npi_handle_t handle, io_op_t op_mode,
 	txdma_mbh_t	mh;
 	txdma_mbl_t	ml;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_mbox_config"
@@ -1608,7 +1623,6 @@ npi_txdma_desc_set_zero(npi_handle_t handle, uint16_t entries)
 	return (NPI_SUCCESS);
 }
 
-
 npi_status_t
 npi_txdma_desc_mem_get(npi_handle_t handle, uint16_t index,
 		p_tx_desc_t desc_p)
@@ -1649,6 +1663,7 @@ npi_txdma_desc_kick_reg_set(npi_handle_t handle, uint8_t channel,
 	int			status = NPI_SUCCESS;
 	tx_ring_kick_t		kick;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_desc_kick_reg_set"
@@ -1700,6 +1715,7 @@ npi_txdma_desc_kick_reg_get(npi_handle_t handle, uint8_t channel,
 {
 	int		status = NPI_SUCCESS;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_desc_kick_reg_get"
@@ -1739,6 +1755,7 @@ npi_txdma_ring_head_get(npi_handle_t handle, uint8_t channel,
 {
 	int		status = NPI_SUCCESS;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_ring_head_get"
@@ -1769,6 +1786,7 @@ npi_txdma_channel_pre_state_get(npi_handle_t handle, uint8_t channel,
 {
 	int		status = NPI_SUCCESS;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_channel_pre_state_get"
@@ -1790,6 +1808,7 @@ npi_txdma_ring_error_get(npi_handle_t handle, uint8_t channel,
 	tx_rng_err_logl_t	logl;
 	int			status = NPI_SUCCESS;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txdma_ring_error_get"
@@ -1965,6 +1984,7 @@ npi_txdma_inj_int_error_set(npi_handle_t handle, uint8_t channel,
 {
 	int		status = NPI_SUCCESS;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" npi_txdma_inj_int_error_set"

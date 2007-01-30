@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,26 +32,27 @@
 
 extern uint64_t npi_debug_level;
 
-#define	NXGE_PARAM_MAC_RW	NXGE_PARAM_RW | NXGE_PARAM_MAC | \
+#define	NXGE_PARAM_MAC_RW \
+	NXGE_PARAM_RW | NXGE_PARAM_MAC | \
 	NXGE_PARAM_NDD_WR_OK | NXGE_PARAM_READ_PROP
 
-#define	NXGE_PARAM_MAC_DONT_SHOW	NXGE_PARAM_RW | NXGE_PARAM_MAC | \
-	    NXGE_PARAM_DONT_SHOW
+#define	NXGE_PARAM_MAC_DONT_SHOW \
+	NXGE_PARAM_RW | NXGE_PARAM_MAC | NXGE_PARAM_DONT_SHOW
 
-
-#define	NXGE_PARAM_RXDMA_RW	NXGE_PARAM_RWP | NXGE_PARAM_RXDMA | \
-	NXGE_PARAM_NDD_WR_OK | NXGE_PARAM_READ_PROP
-
-#define	NXGE_PARAM_RXDMA_RWC	NXGE_PARAM_RWP | NXGE_PARAM_RXDMA | \
-	NXGE_PARAM_INIT_ONLY | NXGE_PARAM_READ_PROP
-
-
-#define	NXGE_PARAM_L2CLASS_CFG	NXGE_PARAM_RW | NXGE_PARAM_PROP_ARR32 | \
-	NXGE_PARAM_READ_PROP | NXGE_PARAM_NDD_WR_OK
-
-
-#define	NXGE_PARAM_CLASS_RWS	NXGE_PARAM_RWS |  \
+#define	NXGE_PARAM_RXDMA_RW \
+	NXGE_PARAM_RWP | NXGE_PARAM_RXDMA | NXGE_PARAM_NDD_WR_OK | \
 	NXGE_PARAM_READ_PROP
+
+#define	NXGE_PARAM_RXDMA_RWC \
+	NXGE_PARAM_RWP | NXGE_PARAM_RXDMA | NXGE_PARAM_INIT_ONLY | \
+	NXGE_PARAM_READ_PROP
+
+#define	NXGE_PARAM_L2CLASS_CFG \
+	NXGE_PARAM_RW | NXGE_PARAM_PROP_ARR32 | NXGE_PARAM_READ_PROP | \
+	NXGE_PARAM_NDD_WR_OK
+
+#define	NXGE_PARAM_CLASS_RWS \
+	NXGE_PARAM_RWS |  NXGE_PARAM_READ_PROP
 
 #define	NXGE_PARAM_ARRAY_INIT_SIZE	0x20ULL
 
@@ -60,14 +61,13 @@ extern uint64_t npi_debug_level;
 #define	SET_RX_INTR_PKTS 2
 
 #define	BASE_ANY	0
-#define	BASE_BINARY	2
+#define	BASE_BINARY 	2
 #define	BASE_HEX	16
 #define	BASE_DECIMAL	10
 #define	ALL_FF_64	0xFFFFFFFFFFFFFFFFULL
 #define	ALL_FF_32	0xFFFFFFFFUL
 
 #define	NXGE_NDD_INFODUMP_BUFF_SIZE	2048 /* is 2k enough? */
-
 #define	NXGE_NDD_INFODUMP_BUFF_8K	8192
 #define	NXGE_NDD_INFODUMP_BUFF_16K	0x2000
 #define	NXGE_NDD_INFODUMP_BUFF_64K	0x8000
@@ -78,92 +78,61 @@ extern uint64_t npi_debug_level;
 #define	ADVANCE_PRINT_BUFFER(pmp, plen, rlen) { \
 	((mblk_t *)pmp)->b_wptr += plen; \
 	rlen -= plen; \
-	}
+}
 
-static void nxge_set_dev_params(p_nxge_t);
 static int nxge_param_rx_intr_pkts(p_nxge_t, queue_t *,
-					mblk_t *, char *, caddr_t);
+	mblk_t *, char *, caddr_t);
 static int nxge_param_rx_intr_time(p_nxge_t, queue_t *,
-					mblk_t *, char *, caddr_t);
+	mblk_t *, char *, caddr_t);
 static int nxge_param_set_mac(p_nxge_t, queue_t *,
-					mblk_t *, char *, caddr_t);
+	mblk_t *, char *, caddr_t);
 static int nxge_param_set_port_rdc(p_nxge_t, queue_t *,
-					mblk_t *, char *, caddr_t);
-
+	mblk_t *, char *, caddr_t);
 static int nxge_param_set_grp_rdc(p_nxge_t, queue_t *,
-					mblk_t *, char *, caddr_t);
-
+	mblk_t *, char *, caddr_t);
 static int nxge_param_set_ether_usr(p_nxge_t,
-				    queue_t *, mblk_t *,
-				    char *, caddr_t);
+	queue_t *, mblk_t *, char *, caddr_t);
 static int nxge_param_set_ip_usr(p_nxge_t,
-					    queue_t *, mblk_t *,
-					    char *, caddr_t);
+	queue_t *, mblk_t *, char *, caddr_t);
 static int nxge_param_set_ip_opt(p_nxge_t,
-					    queue_t *, mblk_t *,
-					    char *, caddr_t);
+	queue_t *, mblk_t *, char *, caddr_t);
 static int nxge_param_set_vlan_rdcgrp(p_nxge_t,
-					    queue_t *, mblk_t *,
-					    char *, caddr_t);
+	queue_t *, mblk_t *, char *, caddr_t);
 static int nxge_param_set_mac_rdcgrp(p_nxge_t,
-					    queue_t *, mblk_t *,
-					    char *, caddr_t);
+	queue_t *, mblk_t *, char *, caddr_t);
 static int nxge_param_fflp_hash_init(p_nxge_t,
-					    queue_t *, mblk_t *,
-					    char *, caddr_t);
-
+	queue_t *, mblk_t *, char *, caddr_t);
 static int nxge_param_llc_snap_enable(p_nxge_t, queue_t *,
-					mblk_t *, char *, caddr_t);
-
+	mblk_t *, char *, caddr_t);
 static int nxge_param_hash_lookup_enable(p_nxge_t, queue_t *,
-					mblk_t *, char *, caddr_t);
-
+	mblk_t *, char *, caddr_t);
 static int nxge_param_tcam_enable(p_nxge_t, queue_t *,
-					mblk_t *, char *, caddr_t);
-
+	mblk_t *, char *, caddr_t);
 static int nxge_param_get_rxdma_info(p_nxge_t, queue_t *q,
-						p_mblk_t, caddr_t);
+	p_mblk_t, caddr_t);
 static int nxge_param_get_txdma_info(p_nxge_t, queue_t *q,
-						p_mblk_t, caddr_t);
-
+	p_mblk_t, caddr_t);
 static int nxge_param_get_vlan_rdcgrp(p_nxge_t, queue_t *,
-						p_mblk_t, caddr_t);
+	p_mblk_t, caddr_t);
 static int nxge_param_get_mac_rdcgrp(p_nxge_t, queue_t *,
-						p_mblk_t, caddr_t);
+	p_mblk_t, caddr_t);
 static int nxge_param_get_rxdma_rdcgrp_info(p_nxge_t, queue_t *,
-						p_mblk_t, caddr_t);
-
+	p_mblk_t, caddr_t);
 static int nxge_param_get_ip_opt(p_nxge_t, queue_t *, mblk_t *, caddr_t);
-
-static int
-nxge_param_get_mac(p_nxge_t, queue_t *q, p_mblk_t, caddr_t);
-
+static int nxge_param_get_mac(p_nxge_t, queue_t *q, p_mblk_t, caddr_t);
 static int nxge_param_get_debug_flag(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
-
 static int nxge_param_set_nxge_debug_flag(p_nxge_t, queue_t *, mblk_t *,
-					    char *, caddr_t);
+	char *, caddr_t);
 static int nxge_param_set_npi_debug_flag(p_nxge_t,
-					    queue_t *, mblk_t *,
-					    char *, caddr_t);
-
-
+	queue_t *, mblk_t *, char *, caddr_t);
 static int nxge_param_dump_rdc(p_nxge_t, queue_t *q, p_mblk_t, caddr_t);
-
 static int nxge_param_dump_tdc(p_nxge_t, queue_t *q, p_mblk_t, caddr_t);
-
 static int nxge_param_dump_mac_regs(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
-
 static int nxge_param_dump_ipp_regs(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
-
 static int nxge_param_dump_fflp_regs(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
-
 static int nxge_param_dump_vlan_table(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
-
 static int nxge_param_dump_rdc_table(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
-
 static int nxge_param_dump_ptrs(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
-
-
 static boolean_t nxge_param_link_update(p_nxge_t);
 
 /*
@@ -177,427 +146,367 @@ static boolean_t nxge_param_link_update(p_nxge_t);
  *
  */
 
-static	nxge_param_t	nxge_param_arr[] = {
-/* min	max	value	old	hw-name			conf-name	*/
+static nxge_param_t	nxge_param_arr[] = {
+	/*
+	 * min	max	value	old	hw-name	conf-name
+	 */
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+		0, 999, 1000, 0, "instance", "instance"},
 
-{  nxge_param_get_generic, NULL,
-	NXGE_PARAM_READ,
-	0, 999, 1000,	0,
-	"instance",		"instance"},
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ,
-	0, 999, 1000,	0,
-	"main-instance",	"main_instance"},
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+		0, 999, 1000, 0, "main-instance", "main_instance"},
 
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ,
-	0, 3,	0,	0,
-	"function-number",	"function_number"},
-/* Partition Id */
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ,
-	0, 8,	0,	0,
-	"partition-id",		"partition_id"},
-/* Read Write Permission Mode */
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
-	0, 2,	0,	0,
-	"read-write-mode",	"read_write_mode"},
-/* hw cfg types */
-/* control the DMA config of Neptune/NIU */
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ,
-	CFG_DEFAULT, CFG_CUSTOM, CFG_DEFAULT, CFG_DEFAULT,
-	"niu-cfg-type", "niu_cfg_type"},
-/* control the TXDMA config of the Port controlled by tx-quick-cfg */
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ,
-	CFG_DEFAULT, CFG_CUSTOM, CFG_NOT_SPECIFIED, CFG_DEFAULT,
-	"tx-qcfg-type", "tx_qcfg_type"},
-/* control the RXDMA config of the Port controlled by rx-quick-cfg */
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ,
-	CFG_DEFAULT, CFG_CUSTOM, CFG_NOT_SPECIFIED, CFG_DEFAULT,
-	"rx-qcfg-type", "rx_qcfg_type"},
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+		0, 3, 0, 0, "function-number", "function_number"},
 
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_RW  | NXGE_PARAM_DONT_SHOW,
-	0, 1,	0,	0,
-	"master-cfg-enable",	"master_cfg_enable"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_RW | NXGE_PARAM_DONT_SHOW,
-	0, 1,	0,	0,
-	"master-cfg-value",	"master_cfg_value"},
+	/* Partition Id */
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+		0, 8, 0, 0, "partition-id", "partition_id"},
 
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 1,	1,	1,
-	"adv-autoneg-cap",	"adv_autoneg_cap"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 1,	1,	1,
-	"adv-10gfdx-cap",	"adv_10gfdx_cap"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_DONT_SHOW,
-	0, 1,	0,	0,
-	"adv-10ghdx-cap",	"adv_10ghdx_cap"},
+	/* Read Write Permission Mode */
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
+		0, 2, 0, 0, "read-write-mode", "read_write_mode"},
 
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 1,	1,	1,
-	"adv-1000fdx-cap",	"adv_1000fdx_cap"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_DONT_SHOW,
-	0, 1,	0,	0,
-	"adv-1000hdx-cap",	"adv_1000hdx_cap"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_DONT_SHOW,
-	0, 1,	0,	0,
-	"adv-100T4-cap",	"adv_100T4_cap"	},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 1,	1,	1,
-	"adv-100fdx-cap",	"adv_100fdx_cap"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_DONT_SHOW,
-	0, 1,	0,	0,
-	"adv-100hdx-cap",	"adv_100hdx_cap"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 1,	1,	1,
-	"adv-10fdx-cap",	"adv_10fdx_cap"	},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_DONT_SHOW,
-	0, 1,	0,	0,
-	"adv-10hdx-cap",	"adv_10hdx_cap"	},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 1,	0,	0,
-	"adv-asmpause-cap",	"adv_asmpause_cap"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 1,	0,	0,
-	"adv-pause-cap",	"adv_pause_cap"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 1,	0,	0,
-	"use-int-xcvr",		"use_int_xcvr"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 1,	1,	1,
-	"enable-ipg0",		"enable_ipg0"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 255,	8,	8,
-	"ipg0",			"ipg0"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 255,	8,	8,
-	"ipg1",			"ipg1"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 255,	4,	4,
-	"ipg2",			"ipg2"},
-{  nxge_param_get_mac,	nxge_param_set_mac,
-	NXGE_PARAM_MAC_RW,
-	0, 1,	0,	0,
-	"accept-jumbo",		"accept_jumbo"},
+	/* hw cfg types */
+	/* control the DMA config of Neptune/NIU */
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+		CFG_DEFAULT, CFG_CUSTOM, CFG_DEFAULT, CFG_DEFAULT,
+		"niu-cfg-type", "niu_cfg_type"},
 
-/* Transmit DMA channels */
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
-	0, 3,	0,	0,
-	"tx-dma-weight",	"tx_dma_weight"},
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
-	0, 31,	0,	0,
-	"tx-dma-channels-begin", "tx_dma_channels_begin"},
+	/* control the TXDMA config of the Port controlled by tx-quick-cfg */
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+		CFG_DEFAULT, CFG_CUSTOM, CFG_NOT_SPECIFIED, CFG_DEFAULT,
+		"tx-qcfg-type", "tx_qcfg_type"},
 
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
-	0, 32,	0,	0,
-	"tx-dma-channels",	"tx_dma_channels"},
-{  nxge_param_get_txdma_info,	NULL,
-	NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
-	0, 32,	0,	0,
-	"tx-dma-info",	"tx_dma_info"},
-/* Receive DMA channels */
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
-	0, 31,	0,	0,
-	"rx-dma-channels-begin", "rx_dma_channels_begin"},
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
-	0, 32,	0,	0,
-	"rx-dma-channels",	"rx_dma_channels"},
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
-	0, 65535,	PT_DRR_WT_DEFAULT_10G,	0,
-	"rx-drr-weight",	"rx_drr_weight"	},
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
-	0, 1,	1,	0,
-	"rx-full-header",	"rx_full_header"},
-{  nxge_param_get_rxdma_info,	NULL,
-	NXGE_PARAM_READ,
-	0, 32,	0,	0,
-	"rx-dma-info",	"rx_dma_info"},
+	/* control the RXDMA config of the Port controlled by rx-quick-cfg */
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+		CFG_DEFAULT, CFG_CUSTOM, CFG_NOT_SPECIFIED, CFG_DEFAULT,
+		"rx-qcfg-type", "rx_qcfg_type"},
 
-{  nxge_param_get_rxdma_info,	NULL,
-	NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
-	NXGE_RBR_RBB_MIN, NXGE_RBR_RBB_MAX, NXGE_RBR_RBB_DEFAULT, 0,
-	"rx-rbr-size",	"rx_rbr_size"},
+	{ nxge_param_get_mac, nxge_param_set_mac,
+		NXGE_PARAM_RW  | NXGE_PARAM_DONT_SHOW,
+		0, 1, 0, 0, "master-cfg-enable", "master_cfg_enable"},
 
-{  nxge_param_get_rxdma_info,	NULL,
-	NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
-	NXGE_RCR_MIN, NXGE_RCR_MAX,	NXGE_RCR_DEFAULT,	0,
-	"rx-rcr-size",	"rx_rcr_size"},
+	{ nxge_param_get_mac, nxge_param_set_mac,
+		NXGE_PARAM_RW | NXGE_PARAM_DONT_SHOW,
+		0, 1, 0, 0, "master-cfg-value", "master_cfg_value"},
 
-{  nxge_param_get_generic,	nxge_param_set_port_rdc,
-	NXGE_PARAM_RXDMA_RW,
-	0, 15,	0,	0,
-	"default-port-rdc",	"default_port_rdc"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 1, 1, 1, "adv-autoneg-cap", "adv_autoneg_cap"},
 
-{  nxge_param_get_generic,	nxge_param_rx_intr_time,
-	NXGE_PARAM_RXDMA_RW,
-	NXGE_RDC_RCR_TIMEOUT_MIN, NXGE_RDC_RCR_TIMEOUT_MAX,
-    RXDMA_RCR_TO_DEFAULT,	0,
-	"rxdma-intr-time",	"rxdma_intr_time"},
-{  nxge_param_get_generic,	nxge_param_rx_intr_pkts,
-	NXGE_PARAM_RXDMA_RW,
-	NXGE_RDC_RCR_THRESHOLD_MIN, NXGE_RDC_RCR_THRESHOLD_MAX,
-	RXDMA_RCR_PTHRES_DEFAULT,	0,
-	"rxdma-intr-pkts",	"rxdma_intr_pkts"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 1, 1, 1, "adv-10gfdx-cap", "adv_10gfdx_cap"},
 
-{  nxge_param_get_generic,	NULL, NXGE_PARAM_READ_PROP,
-	0, 8,	0,	0,
-	"rx-rdc-grps-begin",	"rx_rdc_grps_begin"},
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ_PROP,
-	0, 8,	0,	0,
-	"rx-rdc-grps",	"rx_rdc_grps"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_DONT_SHOW,
+		0, 1, 0, 0, "adv-10ghdx-cap", "adv_10ghdx_cap"},
 
-{  nxge_param_get_generic,	nxge_param_set_grp_rdc,
-	NXGE_PARAM_RXDMA_RW,
-	0, 15,	0,	0,
-	"default-grp0-rdc",	"default_grp0_rdc"},
-{  nxge_param_get_generic,	nxge_param_set_grp_rdc,
-	NXGE_PARAM_RXDMA_RW,
-	0, 15,	2,	0,
-	"default-grp1-rdc",	"default_grp1_rdc"},
-{  nxge_param_get_generic,	nxge_param_set_grp_rdc,
-	NXGE_PARAM_RXDMA_RW,
-	0, 15,	4,	0,
-	"default-grp2-rdc",	"default_grp2_rdc"},
-{  nxge_param_get_generic,	nxge_param_set_grp_rdc,
-	NXGE_PARAM_RXDMA_RW,
-	0, 15,	6,	0,
-	"default-grp3-rdc",	"default_grp3_rdc"},
-{  nxge_param_get_generic,	nxge_param_set_grp_rdc,
-	NXGE_PARAM_RXDMA_RW,
-	0, 15,	8,	0,
-	"default-grp4-rdc",	"default_grp4_rdc"},
-{  nxge_param_get_generic,	nxge_param_set_grp_rdc,
-	NXGE_PARAM_RXDMA_RW,
-	0, 15,	10,	0,
-	"default-grp5-rdc",	"default_grp5_rdc"},
-{  nxge_param_get_generic,	nxge_param_set_grp_rdc,
-	NXGE_PARAM_RXDMA_RW,
-	0, 15,	12,	0,	"default-grp6-rdc",	"default_grp6_rdc"},
-{  nxge_param_get_generic,	nxge_param_set_grp_rdc,
-	NXGE_PARAM_RXDMA_RW,
-	0, 15,	14,	0,
-	"default-grp7-rdc",	"default_grp7_rdc"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 1, 1, 1, "adv-1000fdx-cap", "adv_1000fdx_cap"},
 
-{  nxge_param_get_rxdma_rdcgrp_info, NULL,
-	NXGE_PARAM_READ | NXGE_PARAM_CMPLX,
-	0, 8,	0,	0,
-	"rdc-groups-info", "rdc_groups_info"},
-/* Logical device groups */
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ,
-	0, 63,	0,	0,
-	"start-ldg",	"start_ldg"	},
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ,
-	0, 64,	0,	0,
-	"max-ldg",		"max_ldg"	},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_DONT_SHOW,
+		0, 1, 0, 0, "adv-1000hdx-cap",	"adv_1000hdx_cap"},
 
-/* MAC table information */
-{  nxge_param_get_mac_rdcgrp,	nxge_param_set_mac_rdcgrp,
-	NXGE_PARAM_L2CLASS_CFG,
-	0, 31,	0,	0,
-	"mac-2rdc-grp",	"mac_2rdc_grp"},
-/* VLAN table information */
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_DONT_SHOW,
+		0, 1, 0, 0, "adv-100T4-cap", "adv_100T4_cap"},
 
-{  nxge_param_get_vlan_rdcgrp,	nxge_param_set_vlan_rdcgrp,
-	NXGE_PARAM_L2CLASS_CFG,
-	0, 31,	0,	0,
-	"vlan-2rdc-grp",	"vlan_2rdc_grp"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 1, 1, 1, "adv-100fdx-cap", "adv_100fdx_cap"},
 
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_READ_PROP | NXGE_PARAM_READ | NXGE_PARAM_PROP_ARR32,
-	0, 0x0ffff, 0x0ffff, 0,
-	"fcram-part-cfg",	"fcram_part_cfg"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_DONT_SHOW,
+		0, 1, 0, 0, "adv-100hdx-cap", "adv_100hdx_cap"},
 
-{  nxge_param_get_generic,	NULL,
-	NXGE_PARAM_CLASS_RWS,
-	0, 0x10,	0xa,	0,
-	"fcram-access-ratio", "fcram_access_ratio"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 1, 1, 1, "adv-10fdx-cap", "adv_10fdx_cap"},
 
-{  nxge_param_get_generic, NULL,
-	NXGE_PARAM_CLASS_RWS,
-	0, 0x10,	0xa,	0,
-	"tcam-access-ratio",	"tcam_access_ratio"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_DONT_SHOW,
+		0, 1, 0, 0, "adv-10hdx-cap", "adv_10hdx_cap"},
 
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 1, 0, 0, "adv-asmpause-cap",	"adv_asmpause_cap"},
 
-{  nxge_param_get_generic,	nxge_param_tcam_enable,
-	NXGE_PARAM_CLASS_RWS,
-	0,	0x1,	0x0,	0,
-	"tcam-enable",	"tcam_enable"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 1, 0, 0, "adv-pause-cap", "adv_pause_cap"},
 
-{  nxge_param_get_generic,	nxge_param_hash_lookup_enable,
-	NXGE_PARAM_CLASS_RWS,
-	0, 0x01, 0x0, 0,
-	"hash-lookup-enable",	"hash_lookup_enable"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 1, 0, 0, "use-int-xcvr", "use_int_xcvr"},
 
-{  nxge_param_get_generic,	nxge_param_llc_snap_enable,
-	NXGE_PARAM_CLASS_RWS,
-	0, 0x01, 0x01, 0,
-	"llc-snap-enable",	"llc_snap_enable"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 1, 1, 1, "enable-ipg0", "enable_ipg0"},
 
-{  nxge_param_get_generic,	nxge_param_fflp_hash_init,
-	NXGE_PARAM_CLASS_RWS,
-	0, ALL_FF_32,	ALL_FF_32, 0,
-	"h1-init-value",	"h1_init_value"},
-{  nxge_param_get_generic,	nxge_param_fflp_hash_init,
-	NXGE_PARAM_CLASS_RWS,
-	0, 0x0ffff,	0x0ffff, 0,
-	"h2-init-value",	"h2_init_value"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 255,	8, 8, "ipg0", "ipg0"},
 
-{  nxge_param_get_generic,	nxge_param_set_ether_usr,
-	NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
-	0, ALL_FF_32,	0x0,	0,
-	"class-cfg-ether-usr1", "class_cfg_ether_usr1"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 255,	8, 8, "ipg1", "ipg1"},
 
-{  nxge_param_get_generic,	nxge_param_set_ether_usr,
-	NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
-	0, ALL_FF_32,	0x0,	0,
-	"class-cfg-ether-usr2", "class_cfg_ether_usr2"},
-{  nxge_param_get_generic,	nxge_param_set_ip_usr,
-	NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
-	0, ALL_FF_32,	0x0,	0,
-	"class-cfg-ip-usr4", "class_cfg_ip_usr4"},
-{  nxge_param_get_generic,	nxge_param_set_ip_usr,
-	NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
-	0, ALL_FF_32,	0x0,	0,
-	"class-cfg-ip-usr5", "class_cfg_ip_usr5"},
-{  nxge_param_get_generic,	nxge_param_set_ip_usr,
-	NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
-	0, ALL_FF_32,	0x0,	0,
-	"class-cfg-ip-usr6", "class_cfg_ip_usr6"},
-{  nxge_param_get_generic,	nxge_param_set_ip_usr,
-	NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
-	0, ALL_FF_32,	0x0,	0,
-	"class-cfg-ip-usr7", "class_cfg_ip_usr7"},
-{  nxge_param_get_ip_opt,	nxge_param_set_ip_opt,
-	NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
-	0, ALL_FF_32,	0x0,	0,
-	"class-opt-ip-usr4", "class_opt_ip_usr4"},
-{  nxge_param_get_ip_opt,	nxge_param_set_ip_opt,
-	NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
-	0, ALL_FF_32,	0x0,	0,
-	"class-opt-ip-usr5", "class_opt_ip_usr5"},
-{  nxge_param_get_ip_opt,	nxge_param_set_ip_opt,
-	NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
-	0, ALL_FF_32,	0x0,	0,
-	"class-opt-ip-usr6", "class_opt_ip_usr6"},
-{  nxge_param_get_ip_opt, nxge_param_set_ip_opt,
-	NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
-	0, ALL_FF_32,	0x0,	0,
-	"class-opt-ip-usr7", "class_opt_ip_usr7"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 255,	4, 4, "ipg2", "ipg2"},
 
-{  nxge_param_get_ip_opt,	nxge_param_set_ip_opt,
-	NXGE_PARAM_CLASS_RWS,
-	0, ALL_FF_32,	NXGE_CLASS_FLOW_GEN_SERVER,	0,
-	"class-opt-ipv4-tcp", "class_opt_ipv4_tcp"},
-{  nxge_param_get_ip_opt,	nxge_param_set_ip_opt,
-	NXGE_PARAM_CLASS_RWS,
-	0, ALL_FF_32,	NXGE_CLASS_FLOW_GEN_SERVER,	0,
-	"class-opt-ipv4-udp", "class_opt_ipv4_udp"},
-{  nxge_param_get_ip_opt,	nxge_param_set_ip_opt,
-	NXGE_PARAM_CLASS_RWS,
-	0, ALL_FF_32,	NXGE_CLASS_FLOW_GEN_SERVER,	0,
-	"class-opt-ipv4-ah", "class_opt_ipv4_ah"},
-{  nxge_param_get_ip_opt,	nxge_param_set_ip_opt,
-	NXGE_PARAM_CLASS_RWS,
-	0, ALL_FF_32,	NXGE_CLASS_FLOW_GEN_SERVER,	0,
-	"class-opt-ipv4-sctp", "class_opt_ipv4_sctp"},
-{  nxge_param_get_ip_opt,	nxge_param_set_ip_opt,
-	NXGE_PARAM_CLASS_RWS,
-	0, ALL_FF_32,	NXGE_CLASS_FLOW_GEN_SERVER,	0,
-	"class-opt-ipv6-tcp", "class_opt_ipv6_tcp"},
-{  nxge_param_get_ip_opt,	nxge_param_set_ip_opt,
-	NXGE_PARAM_CLASS_RWS,
-	0, ALL_FF_32,	NXGE_CLASS_FLOW_GEN_SERVER,	0,
-	"class-opt-ipv6-udp", "class_opt_ipv6_udp"},
-{  nxge_param_get_ip_opt,	nxge_param_set_ip_opt,
-	NXGE_PARAM_CLASS_RWS,
-	0, ALL_FF_32,	NXGE_CLASS_FLOW_GEN_SERVER,	0,
-	"class-opt-ipv6-ah", "class_opt_ipv6_ah"},
-{  nxge_param_get_ip_opt,	nxge_param_set_ip_opt,
-	NXGE_PARAM_CLASS_RWS,
-	0, ALL_FF_32,	NXGE_CLASS_FLOW_GEN_SERVER,	0,
-	"class-opt-ipv6-sctp",	"class_opt_ipv6_sctp"},
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+		0, 1, 0, 0, "accept-jumbo", "accept_jumbo"},
 
-{  nxge_param_get_debug_flag, nxge_param_set_nxge_debug_flag,
-	NXGE_PARAM_RW,
-	0ULL, ALL_FF_64,  0ULL,	0ULL,
-	"nxge-debug-flag",	"nxge_debug_flag"},
-{  nxge_param_get_debug_flag, nxge_param_set_npi_debug_flag,
-	NXGE_PARAM_RW,
-	0ULL, ALL_FF_64,  0ULL,	0ULL,
-	"npi-debug-flag",	"npi_debug_flag"},
+	/* Transmit DMA channels */
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+		0, 3, 0, 0, "tx-dma-weight", "tx_dma_weight"},
 
-{  nxge_param_dump_tdc,	NULL, NXGE_PARAM_READ,
-	0, 0x0fffffff,	0x0fffffff,	0,
-	"dump-tdc",	"dump_tdc"},
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+		0, 31, 0, 0, "tx-dma-channels-begin", "tx_dma_channels_begin"},
 
-{  nxge_param_dump_rdc,	NULL, NXGE_PARAM_READ,
-	0, 0x0fffffff,	0x0fffffff,	0,
-	"dump-rdc",	"dump_rdc"},
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+		0, 32, 0, 0, "tx-dma-channels", "tx_dma_channels"},
+	{ nxge_param_get_txdma_info, NULL,
+		NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+		0, 32, 0, 0, "tx-dma-info", "tx_dma_info"},
 
-{  nxge_param_dump_mac_regs,	NULL, NXGE_PARAM_READ,
-	0, 0x0fffffff,	0x0fffffff,	0,
-	"dump-mac-regs",	"dump_mac_regs"},
+	/* Receive DMA channels */
+	{ nxge_param_get_generic, NULL,
+		NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+		0, 31, 0, 0, "rx-dma-channels-begin", "rx_dma_channels_begin"},
 
-{  nxge_param_dump_ipp_regs,	NULL, NXGE_PARAM_READ,
-	0, 0x0fffffff,	0x0fffffff,	0,
-	"dump-ipp-regs",	"dump_ipp_regs"},
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+		0, 32, 0, 0, "rx-dma-channels",	"rx_dma_channels"},
 
-{  nxge_param_dump_fflp_regs,	NULL, NXGE_PARAM_READ,
-	0, 0x0fffffff,	0x0fffffff,	0,
-	"dump-fflp-regs",	"dump_fflp_regs"},
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+		0, 65535, PT_DRR_WT_DEFAULT_10G, 0,
+		"rx-drr-weight", "rx_drr_weight"},
 
-{  nxge_param_dump_vlan_table,	NULL, NXGE_PARAM_READ,
-	0, 0x0fffffff,	0x0fffffff,	0,
-	"dump-vlan-table",	"dump_vlan_table"},
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+		0, 1, 1, 0, "rx-full-header", "rx_full_header"},
 
-{  nxge_param_dump_rdc_table,	NULL, NXGE_PARAM_READ,
-	0, 0x0fffffff,	0x0fffffff,	0,
-	"dump-rdc-table",	"dump_rdc_table"},
+	{ nxge_param_get_rxdma_info, NULL, NXGE_PARAM_READ,
+		0, 32, 0, 0, "rx-dma-info", "rx_dma_info"},
 
-{  nxge_param_dump_ptrs,	NULL, NXGE_PARAM_READ,
-	0, 0x0fffffff,	0x0fffffff,	0,
-	"dump-ptrs",	"dump_ptrs"},
+	{ nxge_param_get_rxdma_info, NULL,
+		NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
+		NXGE_RBR_RBB_MIN, NXGE_RBR_RBB_MAX, NXGE_RBR_RBB_DEFAULT, 0,
+		"rx-rbr-size", "rx_rbr_size"},
 
+	{ nxge_param_get_rxdma_info, NULL,
+		NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
+		NXGE_RCR_MIN, NXGE_RCR_MAX, NXGE_RCR_DEFAULT, 0,
+		"rx-rcr-size", "rx_rcr_size"},
 
-{  NULL,	NULL, NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
-	0, 0x0fffffff,	0x0fffffff,	0,	"end",	"end"	},
+	{ nxge_param_get_generic, nxge_param_set_port_rdc, NXGE_PARAM_RXDMA_RW,
+		0, 15, 0, 0, "default-port-rdc", "default_port_rdc"},
+
+	{ nxge_param_get_generic, nxge_param_rx_intr_time, NXGE_PARAM_RXDMA_RW,
+		NXGE_RDC_RCR_TIMEOUT_MIN, NXGE_RDC_RCR_TIMEOUT_MAX,
+		RXDMA_RCR_TO_DEFAULT, 0, "rxdma-intr-time", "rxdma_intr_time"},
+
+	{ nxge_param_get_generic, nxge_param_rx_intr_pkts, NXGE_PARAM_RXDMA_RW,
+		NXGE_RDC_RCR_THRESHOLD_MIN, NXGE_RDC_RCR_THRESHOLD_MAX,
+		RXDMA_RCR_PTHRES_DEFAULT, 0,
+		"rxdma-intr-pkts", "rxdma_intr_pkts"},
+
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ_PROP,
+		0, 8, 0, 0, "rx-rdc-grps-begin", "rx_rdc_grps_begin"},
+
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ_PROP,
+		0, 8, 0, 0, "rx-rdc-grps", "rx_rdc_grps"},
+
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+		0, 15, 0, 0, "default-grp0-rdc", "default_grp0_rdc"},
+
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+		0, 15,	2, 0, "default-grp1-rdc", "default_grp1_rdc"},
+
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+		0, 15, 4, 0, "default-grp2-rdc", "default_grp2_rdc"},
+
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+		0, 15, 6, 0, "default-grp3-rdc", "default_grp3_rdc"},
+
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+		0, 15, 8, 0, "default-grp4-rdc", "default_grp4_rdc"},
+
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+		0, 15, 10, 0, "default-grp5-rdc", "default_grp5_rdc"},
+
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+		0, 15, 12, 0, "default-grp6-rdc", "default_grp6_rdc"},
+
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+		0, 15, 14, 0, "default-grp7-rdc", "default_grp7_rdc"},
+
+	{ nxge_param_get_rxdma_rdcgrp_info, NULL,
+		NXGE_PARAM_READ | NXGE_PARAM_CMPLX,
+		0, 8, 0, 0, "rdc-groups-info", "rdc_groups_info"},
+
+	/* Logical device groups */
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+		0, 63, 0, 0, "start-ldg", "start_ldg"},
+
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+		0, 64, 0, 0, "max-ldg", "max_ldg" },
+
+	/* MAC table information */
+	{ nxge_param_get_mac_rdcgrp, nxge_param_set_mac_rdcgrp,
+		NXGE_PARAM_L2CLASS_CFG,
+		0, 31, 0, 0, "mac-2rdc-grp", "mac_2rdc_grp"},
+
+	/* VLAN table information */
+	{ nxge_param_get_vlan_rdcgrp, nxge_param_set_vlan_rdcgrp,
+		NXGE_PARAM_L2CLASS_CFG,
+		0, 31, 0, 0, "vlan-2rdc-grp", "vlan_2rdc_grp"},
+
+	{ nxge_param_get_generic, NULL,
+		NXGE_PARAM_READ_PROP | NXGE_PARAM_READ | NXGE_PARAM_PROP_ARR32,
+		0, 0x0ffff, 0x0ffff, 0, "fcram-part-cfg", "fcram_part_cfg"},
+
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_CLASS_RWS,
+		0, 0x10, 0xa, 0, "fcram-access-ratio", "fcram_access_ratio"},
+
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_CLASS_RWS,
+		0, 0x10, 0xa, 0, "tcam-access-ratio", "tcam_access_ratio"},
+
+	{ nxge_param_get_generic, nxge_param_tcam_enable,
+		NXGE_PARAM_CLASS_RWS,
+		0, 0x1, 0x0, 0, "tcam-enable", "tcam_enable"},
+
+	{ nxge_param_get_generic, nxge_param_hash_lookup_enable,
+		NXGE_PARAM_CLASS_RWS,
+		0, 0x01, 0x0, 0, "hash-lookup-enable", "hash_lookup_enable"},
+
+	{ nxge_param_get_generic, nxge_param_llc_snap_enable,
+		NXGE_PARAM_CLASS_RWS,
+		0, 0x01, 0x01, 0, "llc-snap-enable", "llc_snap_enable"},
+
+	{ nxge_param_get_generic, nxge_param_fflp_hash_init,
+		NXGE_PARAM_CLASS_RWS,
+		0, ALL_FF_32, ALL_FF_32, 0, "h1-init-value", "h1_init_value"},
+
+	{ nxge_param_get_generic,	nxge_param_fflp_hash_init,
+		NXGE_PARAM_CLASS_RWS,
+		0, 0x0ffff, 0x0ffff, 0, "h2-init-value", "h2_init_value"},
+
+	{ nxge_param_get_generic, nxge_param_set_ether_usr,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
+		0, ALL_FF_32, 0x0, 0,
+		"class-cfg-ether-usr1", "class_cfg_ether_usr1"},
+
+	{ nxge_param_get_generic, nxge_param_set_ether_usr,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
+		0, ALL_FF_32, 0x0, 0,
+		"class-cfg-ether-usr2", "class_cfg_ether_usr2"},
+
+	{ nxge_param_get_generic, nxge_param_set_ip_usr,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
+		0, ALL_FF_32, 0x0, 0,
+		"class-cfg-ip-usr4", "class_cfg_ip_usr4"},
+
+	{ nxge_param_get_generic, nxge_param_set_ip_usr,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
+		0, ALL_FF_32, 0x0, 0,
+		"class-cfg-ip-usr5", "class_cfg_ip_usr5"},
+
+	{ nxge_param_get_generic, nxge_param_set_ip_usr,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
+		0, ALL_FF_32, 0x0, 0,
+		"class-cfg-ip-usr6", "class_cfg_ip_usr6"},
+
+	{ nxge_param_get_generic, nxge_param_set_ip_usr,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
+		0, ALL_FF_32, 0x0, 0,
+		"class-cfg-ip-usr7", "class_cfg_ip_usr7"},
+
+	{ nxge_param_get_ip_opt, nxge_param_set_ip_opt,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
+		0, ALL_FF_32, 0x0, 0,
+		"class-opt-ip-usr4", "class_opt_ip_usr4"},
+
+	{ nxge_param_get_ip_opt, nxge_param_set_ip_opt,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
+		0, ALL_FF_32, 0x0, 0,
+		"class-opt-ip-usr5", "class_opt_ip_usr5"},
+
+	{ nxge_param_get_ip_opt, nxge_param_set_ip_opt,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
+		0, ALL_FF_32, 0x0, 0,
+		"class-opt-ip-usr6", "class_opt_ip_usr6"},
+
+	{ nxge_param_get_ip_opt, nxge_param_set_ip_opt,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
+		0, ALL_FF_32, 0x0, 0,
+		"class-opt-ip-usr7", "class_opt_ip_usr7"},
+
+	{ nxge_param_get_ip_opt, nxge_param_set_ip_opt,
+		NXGE_PARAM_CLASS_RWS,
+		0, ALL_FF_32, NXGE_CLASS_FLOW_GEN_SERVER, 0,
+		"class-opt-ipv4-tcp", "class_opt_ipv4_tcp"},
+
+	{ nxge_param_get_ip_opt, nxge_param_set_ip_opt,
+		NXGE_PARAM_CLASS_RWS,
+		0, ALL_FF_32, NXGE_CLASS_FLOW_GEN_SERVER, 0,
+		"class-opt-ipv4-udp", "class_opt_ipv4_udp"},
+
+	{ nxge_param_get_ip_opt, nxge_param_set_ip_opt,
+		NXGE_PARAM_CLASS_RWS,
+		0, ALL_FF_32, NXGE_CLASS_FLOW_GEN_SERVER, 0,
+		"class-opt-ipv4-ah", "class_opt_ipv4_ah"},
+
+	{ nxge_param_get_ip_opt, nxge_param_set_ip_opt,
+		NXGE_PARAM_CLASS_RWS,
+		0, ALL_FF_32, NXGE_CLASS_FLOW_GEN_SERVER, 0,
+		"class-opt-ipv4-sctp", "class_opt_ipv4_sctp"},
+
+	{ nxge_param_get_ip_opt, nxge_param_set_ip_opt, NXGE_PARAM_CLASS_RWS,
+		0, ALL_FF_32, NXGE_CLASS_FLOW_GEN_SERVER, 0,
+		"class-opt-ipv6-tcp", "class_opt_ipv6_tcp"},
+
+	{ nxge_param_get_ip_opt, nxge_param_set_ip_opt, NXGE_PARAM_CLASS_RWS,
+		0, ALL_FF_32, NXGE_CLASS_FLOW_GEN_SERVER, 0,
+		"class-opt-ipv6-udp", "class_opt_ipv6_udp"},
+
+	{ nxge_param_get_ip_opt, nxge_param_set_ip_opt, NXGE_PARAM_CLASS_RWS,
+		0, ALL_FF_32, NXGE_CLASS_FLOW_GEN_SERVER, 0,
+		"class-opt-ipv6-ah", "class_opt_ipv6_ah"},
+
+	{ nxge_param_get_ip_opt, nxge_param_set_ip_opt, NXGE_PARAM_CLASS_RWS,
+		0, ALL_FF_32, NXGE_CLASS_FLOW_GEN_SERVER, 0,
+		"class-opt-ipv6-sctp",	"class_opt_ipv6_sctp"},
+
+	{ nxge_param_get_debug_flag, nxge_param_set_nxge_debug_flag,
+		NXGE_PARAM_RW,
+		0ULL, ALL_FF_64, 0ULL, 0ULL,
+		"nxge-debug-flag", "nxge_debug_flag"},
+
+	{ nxge_param_get_debug_flag, nxge_param_set_npi_debug_flag,
+		NXGE_PARAM_RW,
+		0ULL, ALL_FF_64, 0ULL, 0ULL,
+		"npi-debug-flag", "npi_debug_flag"},
+
+	{ nxge_param_dump_tdc, NULL, NXGE_PARAM_READ,
+		0, 0x0fffffff, 0x0fffffff, 0, "dump-tdc", "dump_tdc"},
+
+	{ nxge_param_dump_rdc, NULL, NXGE_PARAM_READ,
+		0, 0x0fffffff, 0x0fffffff, 0, "dump-rdc", "dump_rdc"},
+
+	{ nxge_param_dump_mac_regs, NULL, NXGE_PARAM_READ,
+		0, 0x0fffffff, 0x0fffffff, 0, "dump-mac-regs", "dump_mac_regs"},
+
+	{ nxge_param_dump_ipp_regs, NULL, NXGE_PARAM_READ,
+		0, 0x0fffffff, 0x0fffffff, 0, "dump-ipp-regs", "dump_ipp_regs"},
+
+	{ nxge_param_dump_fflp_regs, NULL, NXGE_PARAM_READ,
+		0, 0x0fffffff, 0x0fffffff, 0,
+		"dump-fflp-regs", "dump_fflp_regs"},
+
+	{ nxge_param_dump_vlan_table, NULL, NXGE_PARAM_READ,
+		0, 0x0fffffff, 0x0fffffff, 0,
+		"dump-vlan-table", "dump_vlan_table"},
+
+	{ nxge_param_dump_rdc_table, NULL, NXGE_PARAM_READ,
+		0, 0x0fffffff, 0x0fffffff, 0,
+		"dump-rdc-table", "dump_rdc_table"},
+
+	{ nxge_param_dump_ptrs,	NULL, NXGE_PARAM_READ,
+		0, 0x0fffffff, 0x0fffffff, 0, "dump-ptrs", "dump_ptrs"},
+
+	{  NULL, NULL, NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
+		0, 0x0fffffff, 0x0fffffff, 0, "end", "end"},
 };
 
 extern void 		*nxge_list;
-
 
 void
 nxge_get_param_soft_properties(p_nxge_t nxgep)
@@ -606,35 +515,30 @@ nxge_get_param_soft_properties(p_nxge_t nxgep)
 	p_nxge_param_t 		param_arr;
 	uint_t 			prop_len;
 	int 			i, j;
-	uint32_t param_count;
-	uint32_t *int_prop_val;
+	uint32_t		param_count;
+	uint32_t		*int_prop_val;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, " ==> nxge_get_param_soft_properties"));
 
 	param_arr = nxgep->param_arr;
 	param_count = nxgep->param_count;
 	for (i = 0; i < param_count; i++) {
-
 		if ((param_arr[i].type & NXGE_PARAM_READ_PROP) == 0)
 			continue;
-
 		if ((param_arr[i].type & NXGE_PARAM_PROP_STR))
 			continue;
-
 		if ((param_arr[i].type & NXGE_PARAM_PROP_ARR32) ||
-			(param_arr[i].type & NXGE_PARAM_PROP_ARR64)) {
-
+				(param_arr[i].type & NXGE_PARAM_PROP_ARR64)) {
 			if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY,
-						    nxgep->dip, 0,
-						    param_arr[i].fcode_name,
-						    (int **)&int_prop_val,
-						    (uint_t *)&prop_len)
-				== DDI_PROP_SUCCESS) {
+					nxgep->dip, 0, param_arr[i].fcode_name,
+					(int **)&int_prop_val,
+					(uint_t *)&prop_len)
+					== DDI_PROP_SUCCESS) {
 				uint32_t *cfg_value;
 				uint64_t prop_count;
+
 				if (prop_len > NXGE_PARAM_ARRAY_INIT_SIZE)
 					prop_len = NXGE_PARAM_ARRAY_INIT_SIZE;
-
 				cfg_value = (uint32_t *)param_arr[i].value;
 				for (j = 0; j < prop_len; j++) {
 					cfg_value[j] = int_prop_val[j];
@@ -642,52 +546,48 @@ nxge_get_param_soft_properties(p_nxge_t nxgep)
 				prop_count = prop_len;
 				param_arr[i].type |=
 				    (prop_count << NXGE_PARAM_ARRAY_CNT_SHIFT);
-
 				ddi_prop_free(int_prop_val);
 			}
-
 			continue;
 		}
 
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
-					param_arr[i].fcode_name,
-					(int **)&int_prop_val,
-					&prop_len) == DDI_PROP_SUCCESS) {
+				param_arr[i].fcode_name,
+				(int **)&int_prop_val,
+				&prop_len) == DDI_PROP_SUCCESS) {
 			if ((*int_prop_val >= param_arr[i].minimum) &&
-				(*int_prop_val <= param_arr[i].maximum))
+					(*int_prop_val <= param_arr[i].maximum))
 				param_arr[i].value = *int_prop_val;
 #ifdef NXGE_DEBUG_ERROR
 			else {
 				NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-						    "nxge%d: 'prom' file"
-						    " parameter error\n",
-						    nxgep->instance));
+					"nxge%d: 'prom' file parameter error\n",
+					nxgep->instance));
 				NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-						    "Parameter keyword '%s'"
-						    " is outside valid range\n",
-						    param_arr[i].name));
+					"Parameter keyword '%s'"
+					" is outside valid range\n",
+					param_arr[i].name));
 			}
 #endif
 			ddi_prop_free(int_prop_val);
 		}
 
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
-					param_arr[i].name,
-					(int **)&int_prop_val,
-					&prop_len) == DDI_PROP_SUCCESS) {
+				param_arr[i].name,
+				(int **)&int_prop_val,
+				&prop_len) == DDI_PROP_SUCCESS) {
 			if ((*int_prop_val >= param_arr[i].minimum) &&
 				(*int_prop_val <= param_arr[i].maximum))
 				param_arr[i].value = *int_prop_val;
 #ifdef NXGE_DEBUG_ERROR
 			else {
 				NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-						    "nxge%d: 'conf' file"
-						    " parameter error\n",
-						    nxgep->instance));
+					"nxge%d: 'conf' file parameter error\n",
+					nxgep->instance));
 				NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-						    "Parameter keyword '%s'"
-						    "is outside valid range\n",
-						    param_arr[i].name));
+					"Parameter keyword '%s'"
+					"is outside valid range\n",
+					param_arr[i].name));
 			}
 #endif
 			ddi_prop_free(int_prop_val);
@@ -695,13 +595,9 @@ nxge_get_param_soft_properties(p_nxge_t nxgep)
 	}
 }
 
-
-
-
 static int
 nxge_private_param_register(p_nxge_t nxgep, p_nxge_param_t param_arr)
 {
-
 	int status = B_TRUE;
 	int channel;
 	uint8_t grp;
@@ -710,11 +606,11 @@ nxge_private_param_register(p_nxge_t nxgep, p_nxge_param_t param_arr)
 	uint32_t name_chars;
 
 	NXGE_DEBUG_MSG((nxgep, NDD2_CTL,
-			    " nxge_private_param_register %s",
-			    param_arr->name));
+		"nxge_private_param_register %s", param_arr->name));
 
 	if ((param_arr->type & NXGE_PARAM_PRIV) != NXGE_PARAM_PRIV)
 		return (B_TRUE);
+
 	prop_name =  param_arr->name;
 	if (param_arr->type & NXGE_PARAM_RXDMA) {
 		if (strncmp("rxdma_intr", prop_name, 10) == 0)
@@ -730,7 +626,6 @@ nxge_private_param_register(p_nxge_t nxgep, p_nxge_param_t param_arr)
 		if (strncmp("default_port_rdc", prop_name, name_chars) == 0) {
 			return (B_TRUE);
 		}
-
 		return (B_FALSE);
 	}
 
@@ -762,6 +657,7 @@ nxge_setup_param(p_nxge_t nxgep)
 	pfi_t set_pfi;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_setup_param"));
+
 	/*
 	 * Make sure the param_instance is set to a valid device instance.
 	 */
@@ -774,9 +670,8 @@ nxge_setup_param(p_nxge_t nxgep)
 
 	for (i = 0; i < nxgep->param_count; i++) {
 		if ((param_arr[i].type & NXGE_PARAM_PRIV) &&
-			(nxge_private_param_register(nxgep,
-						    &param_arr[i]) ==
-			    B_FALSE)) {
+				(nxge_private_param_register(nxgep,
+				&param_arr[i]) == B_FALSE)) {
 			param_arr[i].setf = NULL;
 			param_arr[i].getf = NULL;
 		}
@@ -791,27 +686,19 @@ nxge_setup_param(p_nxge_t nxgep)
 
 		set_pfi = (pfi_t)param_arr[i].setf;
 
-		if ((set_pfi) &&
-			(param_arr[i].type & NXGE_PARAM_INIT_ONLY)) {
+		if ((set_pfi) && (param_arr[i].type & NXGE_PARAM_INIT_ONLY)) {
 			set_pfi = NULL;
 		}
 
-
-		if (!nxge_nd_load(&nxgep->param_list,
-				param_arr[i].name,
-				(pfi_t)param_arr[i].getf,
-				set_pfi,
+		if (!nxge_nd_load(&nxgep->param_list, param_arr[i].name,
+				(pfi_t)param_arr[i].getf, set_pfi,
 				(caddr_t)&param_arr[i])) {
 			(void) nxge_nd_free(&nxgep->param_list);
 			break;
 		}
-
 	}
-
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_setup_param"));
 }
-
-
 
 void
 nxge_init_param(p_nxge_t nxgep)
@@ -828,9 +715,10 @@ nxge_init_param(p_nxge_t nxgep)
 
 	param_arr = nxgep->param_arr;
 	if (param_arr == NULL) {
-		param_arr = (p_nxge_param_t)KMEM_ZALLOC(
-				sizeof (nxge_param_arr), KM_SLEEP);
+		param_arr = (p_nxge_param_t)
+			KMEM_ZALLOC(sizeof (nxge_param_arr), KM_SLEEP);
 	}
+
 	for (i = 0; i < sizeof (nxge_param_arr)/sizeof (nxge_param_t); i++) {
 		param_arr[i] = nxge_param_arr[i];
 		if ((param_arr[i].type & NXGE_PARAM_PROP_ARR32) ||
@@ -849,7 +737,7 @@ nxge_init_param(p_nxge_t nxgep)
 	nxgep->param_arr = param_arr;
 	nxgep->param_count = sizeof (nxge_param_arr)/sizeof (nxge_param_t);
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_init_param: count %d",
-					nxgep->param_count));
+		nxgep->param_count));
 }
 
 void
@@ -859,6 +747,7 @@ nxge_destroy_param(p_nxge_t nxgep)
 	uint64_t free_size, free_count;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_destroy_param"));
+
 	/*
 	 * Make sure the param_instance is set to a valid device instance.
 	 */
@@ -883,7 +772,7 @@ nxge_destroy_param(p_nxge_t nxgep)
 			free_size = sizeof (uint64_t) * free_count;
 			KMEM_FREE((void *)nxgep->param_arr[i].value, free_size);
 			KMEM_FREE((void *)nxgep->param_arr[i].old_value,
-				    free_size);
+				free_size);
 		}
 
 	KMEM_FREE(nxgep->param_arr, sizeof (nxge_param_arr));
@@ -894,27 +783,25 @@ nxge_destroy_param(p_nxge_t nxgep)
  * Extracts the value from the 'nxge' parameter array and prints the
  * parameter value. cp points to the required parameter.
  */
+
 /* ARGSUSED */
 int
-
 nxge_param_get_generic(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
 	p_nxge_param_t pa = (p_nxge_param_t)cp;
 
-	NXGE_DEBUG_MSG((nxgep, NDD_CTL, " ==> nxge_param_get_generic name %s ",
-					    pa->name));
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
+		"==> nxge_param_get_generic name %s ", pa->name));
 
 	if (pa->value > 0xffffffff)
-		(void) mi_mpprintf(mp, "%x%x",  (int)(pa->value >> 32),
-				    (int)(pa->value & 0xffffffff));
+		(void) mi_mpprintf(mp, "%x%x",
+			(int)(pa->value >> 32), (int)(pa->value & 0xffffffff));
 	else
 		(void) mi_mpprintf(mp, "%x", (int)pa->value);
-
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_generic"));
 	return (0);
 }
-
 
 /* ARGSUSED */
 static int
@@ -929,7 +816,6 @@ nxge_param_get_mac(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	return (0);
 }
 
-
 /* ARGSUSED */
 int
 nxge_param_get_txdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
@@ -942,9 +828,8 @@ nxge_param_get_txdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	int buff_alloc_size = NXGE_NDD_INFODUMP_BUFF_SIZE;
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_get_txdma_info"));
 
-	(void) mi_mpprintf(mp,
-			    "TXDMA Information for Port\t %d \n",
-			    nxgep->function_num);
+	(void) mi_mpprintf(mp, "TXDMA Information for Port\t %d \n",
+		nxgep->function_num);
 
 
 	if ((np = allocb(buff_alloc_size, BPRI_HI)) == NULL) {
@@ -953,19 +838,17 @@ nxge_param_get_txdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	}
 
 	buf_len = buff_alloc_size;
-
 	mp->b_cont = np;
 
-
-
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-				    "Total TDCs\t %d\n", nxgep->ntdc);
+		"Total TDCs\t %d\n", nxgep->ntdc);
 
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-				    "TDC\t HW TDC\t\n");
+		"TDC\t HW TDC\t\n");
 	((mblk_t *)np)->b_wptr += print_len;
+
 	buf_len -= print_len;
 	for (tdc = 0; tdc < nxgep->ntdc; tdc++) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
@@ -974,23 +857,21 @@ nxge_param_get_txdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 		((mblk_t *)np)->b_wptr += print_len;
 		buf_len -= print_len;
 	}
+
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_txdma_info"));
 	return (0);
 }
-
 
 /* ARGSUSED */
 int
 nxge_param_get_rxdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
-
-	uint_t	print_len, buf_len;
-	p_mblk_t np;
-	int rdc;
+	uint_t			print_len, buf_len;
+	p_mblk_t		np;
+	int			rdc;
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
-	int buff_alloc_size = NXGE_NDD_INFODUMP_BUFF_SIZE;
-
+	int			buff_alloc_size = NXGE_NDD_INFODUMP_BUFF_SIZE;
 	p_rx_rcr_rings_t 	rx_rcr_rings;
 	p_rx_rcr_ring_t		*rcr_rings;
 	p_rx_rbr_rings_t 	rx_rbr_rings;
@@ -998,10 +879,8 @@ nxge_param_get_rxdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_get_rxdma_info"));
 
-	(void) mi_mpprintf(mp,
-				    "RXDMA Information for Port\t %d \n",
-				    nxgep->function_num);
-
+	(void) mi_mpprintf(mp, "RXDMA Information for Port\t %d \n",
+		nxgep->function_num);
 
 	if ((np = allocb(buff_alloc_size, BPRI_HI)) == NULL) {
 		/* The following may work even if we cannot get a large buf. */
@@ -1010,9 +889,7 @@ nxge_param_get_rxdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	}
 
 	buf_len = buff_alloc_size;
-
 	mp->b_cont = np;
-
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 
@@ -1022,60 +899,55 @@ nxge_param_get_rxdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	rbr_rings = rx_rbr_rings->rbr_rings;
 
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-				    "Total RDCs\t %d\n",
-				    p_cfgp->max_rdcs);
+		"Total RDCs\t %d\n", p_cfgp->max_rdcs);
 
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-			    "RDC\t HW RDC\t Timeout\t Packets RBR ptr \t"
-			    "chunks\t RCR ptr\n");
+		"RDC\t HW RDC\t Timeout\t Packets RBR ptr \t"
+		"chunks\t RCR ptr\n");
+
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
 	for (rdc = 0; rdc < p_cfgp->max_rdcs; rdc++) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-			    " %d\t  %d\t   %x\t\t %x\t $%p\t 0x%x\t $%p\n",
-			    rdc, nxgep->rdc[rdc],
-			    p_dma_cfgp->rcr_timeout[rdc],
-			    p_dma_cfgp->rcr_threshold[rdc],
-			    rbr_rings[rdc],
-			    rbr_rings[rdc]->num_blocks, rcr_rings[rdc]);
-
-		((mblk_t *)np)->b_wptr += print_len;
-		buf_len -= print_len;
+			" %d\t  %d\t   %x\t\t %x\t $%p\t 0x%x\t $%p\n",
+			rdc, nxgep->rdc[rdc],
+			p_dma_cfgp->rcr_timeout[rdc],
+			p_dma_cfgp->rcr_threshold[rdc],
+			rbr_rings[rdc],
+			rbr_rings[rdc]->num_blocks, rcr_rings[rdc]);
+			((mblk_t *)np)->b_wptr += print_len;
+			buf_len -= print_len;
 	}
+
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_rxdma_info"));
 	return (0);
 }
 
-
 /* ARGSUSED */
 int
 nxge_param_get_rxdma_rdcgrp_info(p_nxge_t nxgep, queue_t *q,
-				    p_mblk_t mp, caddr_t cp)
+	p_mblk_t mp, caddr_t cp)
 {
-
-	uint_t	print_len, buf_len;
-	p_mblk_t np;
-	int offset, rdc;
-	int i, rdc_grp;
+	uint_t			print_len, buf_len;
+	p_mblk_t		np;
+	int			offset, rdc, i, rdc_grp;
 	p_nxge_rdc_grp_t	rdc_grp_p;
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
 
 	int buff_alloc_size = NXGE_NDD_INFODUMP_BUFF_SIZE;
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-			    "==> nxge_param_get_rxdma_rdcgrp_info"));
+		"==> nxge_param_get_rxdma_rdcgrp_info"));
 
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 
-	(void) mi_mpprintf(mp,
-			    "RXDMA RDC Group Information for Port\t %d \n",
-			    nxgep->function_num);
+	(void) mi_mpprintf(mp, "RXDMA RDC Group Information for Port\t %d \n",
+		nxgep->function_num);
 
 	rdc_grp = p_cfgp->start_rdc_grpid;
-
 	if ((np = allocb(buff_alloc_size, BPRI_HI)) == NULL) {
 		/* The following may work even if we cannot get a large buf. */
 		(void) mi_mpprintf(mp, "%s\n", "out of buffer");
@@ -1083,13 +955,12 @@ nxge_param_get_rxdma_rdcgrp_info(p_nxge_t nxgep, queue_t *q,
 	}
 
 	buf_len = buff_alloc_size;
-
 	mp->b_cont = np;
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-				    "Total RDC Groups\t %d \n"
-				    "start RDC group\t %d\n",
-				    p_cfgp->max_rdc_grpids,
-				    p_cfgp->start_rdc_grpid);
+		"Total RDC Groups\t %d \n"
+		"start RDC group\t %d\n",
+		p_cfgp->max_rdc_grpids,
+		p_cfgp->start_rdc_grpid);
 
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
@@ -1099,24 +970,24 @@ nxge_param_get_rxdma_rdcgrp_info(p_nxge_t nxgep, queue_t *q,
 	    rdc_grp++, i++) {
 		rdc_grp_p = &p_dma_cfgp->rdc_grps[i];
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-				    "\nRDC Group Info for Group [%d] %d\n"
-				    "RDC Count %d\tstart RDC %d\n"
-				    "RDC Group Population Information"
-				    " (offsets 0 - 15)\n",
-				    i, rdc_grp, rdc_grp_p->max_rdcs,
-				    rdc_grp_p->start_rdc);
+			"\nRDC Group Info for Group [%d] %d\n"
+			"RDC Count %d\tstart RDC %d\n"
+			"RDC Group Population Information"
+			" (offsets 0 - 15)\n",
+			i, rdc_grp, rdc_grp_p->max_rdcs,
+			rdc_grp_p->start_rdc);
 
 		((mblk_t *)np)->b_wptr += print_len;
 		buf_len -= print_len;
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
-					    buf_len, "\n");
+			buf_len, "\n");
 		((mblk_t *)np)->b_wptr += print_len;
 		buf_len -= print_len;
 
 		for (rdc = 0; rdc < rdc_grp_p->max_rdcs; rdc++) {
 			print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
-					    buf_len, "[%d]=%d ", rdc,
-					    rdc_grp_p->start_rdc + rdc);
+				buf_len, "[%d]=%d ", rdc,
+				rdc_grp_p->start_rdc + rdc);
 			((mblk_t *)np)->b_wptr += print_len;
 			buf_len -= print_len;
 		}
@@ -1127,21 +998,20 @@ nxge_param_get_rxdma_rdcgrp_info(p_nxge_t nxgep, queue_t *q,
 
 		for (offset = 0; offset < 16; offset++) {
 			print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
-						    buf_len, " %2d ",
-						    rdc_grp_p->rdc[offset]);
+				buf_len, " %2d ",
+				rdc_grp_p->rdc[offset]);
 			((mblk_t *)np)->b_wptr += print_len;
 			buf_len -= print_len;
 		}
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
-					    buf_len, "\n");
+			buf_len, "\n");
 		((mblk_t *)np)->b_wptr += print_len;
 		buf_len -= print_len;
 	}
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-			    "<== nxge_param_get_rxdma_rdcgrp_info"));
+		"<== nxge_param_get_rxdma_rdcgrp_info"));
 	return (0);
 }
-
 
 int
 nxge_mk_mblk_tail_space(p_mblk_t mp, p_mblk_t *nmp, size_t size)
@@ -1157,6 +1027,7 @@ nxge_mk_mblk_tail_space(p_mblk_t mp, p_mblk_t *nmp, size_t size)
 		if (!tmp)
 			return (ENOMEM);
 	}
+
 	*nmp = tmp;
 	return (0);
 }
@@ -1165,6 +1036,7 @@ nxge_mk_mblk_tail_space(p_mblk_t mp, p_mblk_t *nmp, size_t size)
  * Sets the ge parameter to the value in the nxge_param_register using
  * nxge_nd_load().
  */
+
 /* ARGSUSED */
 int
 nxge_param_set_generic(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
@@ -1185,21 +1057,17 @@ nxge_param_set_generic(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
 	return (0);
 }
 
-
-
 /*
  * Sets the ge parameter to the value in the nxge_param_register using
  * nxge_nd_load().
  */
+
 /* ARGSUSED */
-
 int
-nxge_param_set_instance(p_nxge_t nxgep, queue_t *q,
-					    mblk_t *mp, char *value, caddr_t cp)
+nxge_param_set_instance(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
+	char *value, caddr_t cp)
 {
-
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, " ==> nxge_param_set_instance"));
-
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, " <== nxge_param_set_instance"));
 	return (0);
 }
@@ -1208,16 +1076,16 @@ nxge_param_set_instance(p_nxge_t nxgep, queue_t *q,
  * Sets the ge parameter to the value in the nxge_param_register using
  * nxge_nd_load().
  */
-/* ARGSUSED */
 
+/* ARGSUSED */
 int
-nxge_param_set_mac(p_nxge_t nxgep, queue_t *q,
-		    mblk_t	*mp, char *value, caddr_t cp)
+nxge_param_set_mac(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
+	char *value, caddr_t cp)
 {
-	char *end;
-	uint32_t new_value;
-	int status = 0;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
+	char		*end;
+	uint32_t	new_value;
+	int		status = 0;
+	p_nxge_param_t	pa = (p_nxge_param_t)cp;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_set_mac"));
 	new_value = (uint32_t)mi_strtol(value, &end, BASE_DECIMAL);
@@ -1242,12 +1110,12 @@ nxge_param_set_mac(p_nxge_t nxgep, queue_t *q,
 
 /* ARGSUSED */
 static int
-nxge_param_rx_intr_pkts(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, char *value, caddr_t cp)
+nxge_param_rx_intr_pkts(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
+	char *value, caddr_t cp)
 {
-	char *end;
-	uint32_t cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
+	char		*end;
+	uint32_t	cfg_value;
+	p_nxge_param_t	pa = (p_nxge_param_t)cp;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_rx_intr_pkts"));
 
@@ -1268,16 +1136,14 @@ nxge_param_rx_intr_pkts(p_nxge_t nxgep, queue_t *q,
 	return (0);
 }
 
-
-
 /* ARGSUSED */
 static int
-nxge_param_rx_intr_time(p_nxge_t nxgep, queue_t *q,
-		    mblk_t	*mp, char *value, caddr_t cp)
+nxge_param_rx_intr_time(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
+	char *value, caddr_t cp)
 {
-	char *end;
-	uint32_t cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
+	char		*end;
+	uint32_t	cfg_value;
+	p_nxge_param_t	pa = (p_nxge_param_t)cp;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_rx_intr_time"));
 
@@ -1301,18 +1167,18 @@ nxge_param_rx_intr_time(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_set_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, char *value, caddr_t cp)
+	mblk_t *mp, char *value, caddr_t cp)
 {
-	char *end;
-	uint32_t status = 0, cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	uint32_t cfg_it = B_FALSE;
+	char			 *end;
+	uint32_t		status = 0, cfg_value;
+	p_nxge_param_t		pa = (p_nxge_param_t)cp;
+	uint32_t		cfg_it = B_FALSE;
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
-	uint32_t *val_ptr, *old_val_ptr;
-	nxge_param_map_t *mac_map;
-	p_nxge_class_pt_cfg_t 	p_class_cfgp;
-	nxge_mv_cfg_t	*mac_host_info;
+	uint32_t		*val_ptr, *old_val_ptr;
+	nxge_param_map_t	*mac_map;
+	p_nxge_class_pt_cfg_t	p_class_cfgp;
+	nxge_mv_cfg_t		*mac_host_info;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_set_mac_rdcgrp "));
 
@@ -1321,22 +1187,21 @@ nxge_param_set_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
 	p_class_cfgp = (p_nxge_class_pt_cfg_t)&nxgep->class_config;
 	mac_host_info = (nxge_mv_cfg_t	*)&p_class_cfgp->mac_host_info[0];
 	cfg_value = (uint32_t)mi_strtol(value, &end, BASE_HEX);
-		/* now do decoding */
-		/* */
+
+	/*
+	 * now do decoding
+	 */
 	mac_map = (nxge_param_map_t *)&cfg_value;
-	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-			    " cfg_value %x id %x map_to %x",
-			    cfg_value, mac_map->param_id,
-			    mac_map->map_to));
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL, " cfg_value %x id %x map_to %x",
+		cfg_value, mac_map->param_id, mac_map->map_to));
 
 	if ((mac_map->param_id < p_cfgp->max_macs) &&
-		(mac_map->map_to <
-		    (p_cfgp->max_rdc_grpids + p_cfgp->start_rdc_grpid)) &&
-		    (mac_map->map_to >= p_cfgp->start_rdc_grpid)) {
+			(mac_map->map_to < (p_cfgp->max_rdc_grpids +
+			p_cfgp->start_rdc_grpid)) && (mac_map->map_to >=
+			p_cfgp->start_rdc_grpid)) {
 		NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-				    " nxge_param_set_mac_rdcgrp mapping"
-				    " id %d grp %d",
-				    mac_map->param_id, mac_map->map_to));
+			" nxge_param_set_mac_rdcgrp mapping"
+			" id %d grp %d", mac_map->param_id, mac_map->map_to));
 		val_ptr = (uint32_t *)pa->value;
 		old_val_ptr = (uint32_t *)pa->old_value;
 		if (val_ptr[mac_map->param_id] != cfg_value) {
@@ -1350,7 +1215,6 @@ nxge_param_set_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
 				    mac_map->map_to;
 			cfg_it = B_TRUE;
 		}
-
 	} else {
 		return (EINVAL);
 	}
@@ -1369,20 +1233,20 @@ nxge_param_set_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_set_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, char *value, caddr_t cp)
+	mblk_t	*mp, char *value, caddr_t cp)
 {
-	char *end;
-	uint32_t status = 0, cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	uint32_t cfg_it = B_FALSE;
+	char			*end;
+	uint32_t		status = 0, cfg_value;
+	p_nxge_param_t		pa = (p_nxge_param_t)cp;
+	uint32_t		cfg_it = B_FALSE;
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
-	uint32_t *val_ptr, *old_val_ptr;
-	nxge_param_map_t *vmap, *old_map;
-	p_nxge_class_pt_cfg_t 	p_class_cfgp;
-	uint64_t cfgd_vlans;
-	int i, inc = 0, cfg_position;
-	nxge_mv_cfg_t	*vlan_tbl;
+	uint32_t		*val_ptr, *old_val_ptr;
+	nxge_param_map_t	*vmap, *old_map;
+	p_nxge_class_pt_cfg_t	p_class_cfgp;
+	uint64_t		cfgd_vlans;
+	int			i, inc = 0, cfg_position;
+	nxge_mv_cfg_t		*vlan_tbl;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_set_vlan_rdcgrp "));
 
@@ -1392,10 +1256,10 @@ nxge_param_set_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 	vlan_tbl = (nxge_mv_cfg_t *)&p_class_cfgp->vlan_tbl[0];
 
 	cfg_value = (uint32_t)mi_strtol(value, &end, BASE_HEX);
-		/* now do decoding */
-		/* */
+
+	/* now do decoding */
 	cfgd_vlans = ((pa->type &  NXGE_PARAM_ARRAY_CNT_MASK) >>
-			    NXGE_PARAM_ARRAY_CNT_SHIFT);
+		NXGE_PARAM_ARRAY_CNT_SHIFT);
 
 	if (cfgd_vlans == NXGE_PARAM_ARRAY_INIT_SIZE) {
 		/*
@@ -1406,14 +1270,15 @@ nxge_param_set_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 		 */
 		return (EINVAL);
 	}
+
 	vmap = (nxge_param_map_t *)&cfg_value;
 	if ((vmap->param_id) &&
 		(vmap->param_id < NXGE_MAX_VLANS) &&
 		(vmap->map_to < p_cfgp->max_rdc_grpids)) {
 		NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-				    " nxge_param_set_vlan_rdcgrp mapping"
-				    " id %d grp %d",
-				    vmap->param_id, vmap->map_to));
+			"nxge_param_set_vlan_rdcgrp mapping"
+			" id %d grp %d",
+			vmap->param_id, vmap->map_to));
 		val_ptr = (uint32_t *)pa->value;
 		old_val_ptr = (uint32_t *)pa->old_value;
 
@@ -1439,9 +1304,9 @@ nxge_param_set_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 		}
 
 		NXGE_DEBUG_MSG((nxgep, NDD2_CTL,
-				    " set_vlan_rdcgrp mapping"
-				    " i %d cfgd_vlans %llx position %d ",
-				    i, cfgd_vlans, cfg_position));
+			"set_vlan_rdcgrp mapping"
+			" i %d cfgd_vlans %llx position %d ",
+			i, cfgd_vlans, cfg_position));
 		if (val_ptr[cfg_position] != cfg_value) {
 			old_val_ptr[cfg_position] = val_ptr[cfg_position];
 			val_ptr[cfg_position] = cfg_value;
@@ -1458,18 +1323,17 @@ nxge_param_set_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 
 			}
 			NXGE_DEBUG_MSG((nxgep, NDD2_CTL,
-					    " after: param_set_vlan_rdcgrp "
-					    " cfg_vlans %llx position %d \n",
-					    cfgd_vlans, cfg_position));
+				"after: param_set_vlan_rdcgrp "
+				" cfg_vlans %llx position %d \n",
+				cfgd_vlans, cfg_position));
 		}
-
 	} else {
 		return (EINVAL);
 	}
 
 	if (cfg_it == B_TRUE) {
 		status = nxge_fflp_config_vlan_table(nxgep,
-						    (uint16_t)vmap->param_id);
+			(uint16_t)vmap->param_id);
 		if (status != NXGE_OK)
 			return (EINVAL);
 	}
@@ -1478,38 +1342,35 @@ nxge_param_set_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 	return (0);
 }
 
-
-
-
-
 /* ARGSUSED */
 static int
 nxge_param_get_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, caddr_t cp)
+	mblk_t *mp, caddr_t cp)
 {
 
-	uint_t	print_len, buf_len;
-	p_mblk_t np;
-	int i;
-	uint32_t *val_ptr;
-	nxge_param_map_t *vmap;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
+	uint_t 			print_len, buf_len;
+	p_mblk_t		np;
+	int			i;
+	uint32_t		*val_ptr;
+	nxge_param_map_t	*vmap;
+	p_nxge_param_t		pa = (p_nxge_param_t)cp;
 	p_nxge_class_pt_cfg_t 	p_class_cfgp;
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
-	uint64_t cfgd_vlans = 0;
-	nxge_mv_cfg_t	*vlan_tbl;
+	uint64_t		cfgd_vlans = 0;
+	nxge_mv_cfg_t		*vlan_tbl;
+	int			buff_alloc_size =
+					NXGE_NDD_INFODUMP_BUFF_SIZE * 32;
 
-	int buff_alloc_size = NXGE_NDD_INFODUMP_BUFF_SIZE * 32;
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_set_vlan_rdcgrp "));
-	(void) mi_mpprintf(mp,
-			    "VLAN RDC Mapping Information for Port\t %d \n",
-			    nxgep->function_num);
+	(void) mi_mpprintf(mp, "VLAN RDC Mapping Information for Port\t %d \n",
+		nxgep->function_num);
 
 	if ((np = allocb(buff_alloc_size, BPRI_HI)) == NULL) {
 		(void) mi_mpprintf(mp, "%s\n", "out of buffer");
 		return (0);
 	}
+
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 
@@ -1522,9 +1383,9 @@ nxge_param_get_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 	p_class_cfgp = (p_nxge_class_pt_cfg_t)&nxgep->class_config;
 	vlan_tbl = (nxge_mv_cfg_t *)&p_class_cfgp->vlan_tbl[0];
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-				    "Configured VLANs %d\n"
-				    "VLAN ID\t RDC GRP (Actual/Port)\t"
-				    " Prefernce\n", i);
+		"Configured VLANs %d\n"
+		"VLAN ID\t RDC GRP (Actual/Port)\t"
+		" Prefernce\n", i);
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
 
@@ -1534,13 +1395,13 @@ nxge_param_get_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 		vmap = (nxge_param_map_t *)&val_ptr[i];
 		if (p_class_cfgp->vlan_tbl[vmap->param_id].flag) {
 			print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
-					    buf_len,
-					    "  %d\t\t %d/%d\t\t %d\n",
-					    vmap->param_id,
-					    vlan_tbl[vmap->param_id].rdctbl,
-					    vlan_tbl[vmap->param_id].rdctbl -
-					    p_cfgp->start_rdc_grpid,
-					    vlan_tbl[vmap->param_id].mpr_npr);
+				buf_len,
+				"  %d\t\t %d/%d\t\t %d\n",
+				vmap->param_id,
+				vlan_tbl[vmap->param_id].rdctbl,
+				vlan_tbl[vmap->param_id].rdctbl -
+				p_cfgp->start_rdc_grpid,
+				vlan_tbl[vmap->param_id].mpr_npr);
 			((mblk_t *)np)->b_wptr += print_len;
 			buf_len -= print_len;
 		}
@@ -1550,28 +1411,24 @@ nxge_param_get_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 	return (0);
 }
 
-
-
 /* ARGSUSED */
 static int
 nxge_param_get_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, caddr_t cp)
+	mblk_t *mp, caddr_t cp)
 {
-
-	uint_t	print_len, buf_len;
-	p_mblk_t np;
-	int i;
+	uint_t			print_len, buf_len;
+	p_mblk_t		np;
+	int			i;
 	p_nxge_class_pt_cfg_t 	p_class_cfgp;
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
-	nxge_mv_cfg_t	*mac_host_info;
+	nxge_mv_cfg_t		*mac_host_info;
 
 	int buff_alloc_size = NXGE_NDD_INFODUMP_BUFF_SIZE * 32;
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_get_mac_rdcgrp "));
 	(void) mi_mpprintf(mp,
-			    " MAC ADDR RDC Mapping Information for Port\t %d\n",
-			    nxgep->function_num);
-
+		"MAC ADDR RDC Mapping Information for Port\t %d\n",
+		nxgep->function_num);
 
 	if ((np = allocb(buff_alloc_size, BPRI_HI)) == NULL) {
 		(void) mi_mpprintf(mp, "%s\n", "out of buffer");
@@ -1585,46 +1442,40 @@ nxge_param_get_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 	mac_host_info = (nxge_mv_cfg_t	*)&p_class_cfgp->mac_host_info[0];
 	print_len = snprintf((char *)np->b_wptr, buf_len,
-				    "MAC ID\t RDC GRP (Actual/Port)\t"
-				    " Prefernce\n");
-
+		"MAC ID\t RDC GRP (Actual/Port)\t"
+		" Prefernce\n");
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
 	for (i = 0; i < p_cfgp->max_macs; i++) {
 		if (mac_host_info[i].flag) {
 			print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
-						    buf_len,
-						    "   %d\t  %d/%d\t\t %d\n",
-						    i,
-						    mac_host_info[i].rdctbl,
-						    mac_host_info[i].rdctbl -
-						    p_cfgp->start_rdc_grpid,
-						    mac_host_info[i].mpr_npr);
-
+				buf_len,
+				"   %d\t  %d/%d\t\t %d\n",
+				i, mac_host_info[i].rdctbl,
+				mac_host_info[i].rdctbl -
+				p_cfgp->start_rdc_grpid,
+				mac_host_info[i].mpr_npr);
 			((mblk_t *)np)->b_wptr += print_len;
 			buf_len -= print_len;
 		}
 	}
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-				    "Done Info Dumping \n");
+		"Done Info Dumping \n");
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_macrdcgrp"));
 	return (0);
 }
 
-
-
 /* ARGSUSED */
 static int
 nxge_param_tcam_enable(p_nxge_t nxgep, queue_t *q,
-		    mblk_t *mp, char *value, caddr_t cp)
+	mblk_t *mp, char *value, caddr_t cp)
 {
-	uint32_t status = 0, cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	uint32_t cfg_it = B_FALSE;
-	char *end;
-
+	uint32_t	status = 0, cfg_value;
+	p_nxge_param_t	pa = (p_nxge_param_t)cp;
+	uint32_t	cfg_it = B_FALSE;
+	char		*end;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_tcam_enable"));
 
@@ -1651,13 +1502,12 @@ nxge_param_tcam_enable(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_hash_lookup_enable(p_nxge_t nxgep, queue_t *q,
-		    mblk_t *mp, char *value, caddr_t cp)
+	mblk_t *mp, char *value, caddr_t cp)
 {
-	uint32_t status = 0, cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	uint32_t cfg_it = B_FALSE;
-	char *end;
-
+	uint32_t	status = 0, cfg_value;
+	p_nxge_param_t	pa = (p_nxge_param_t)cp;
+	uint32_t	cfg_it = B_FALSE;
+	char		*end;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_hash_lookup_enable"));
 
@@ -1684,12 +1534,12 @@ nxge_param_hash_lookup_enable(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_llc_snap_enable(p_nxge_t nxgep, queue_t *q,
-		    mblk_t *mp, char *value, caddr_t cp)
+	mblk_t *mp, char *value, caddr_t cp)
 {
-	char *end;
-	uint32_t status = 0, cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	uint32_t cfg_it = B_FALSE;
+	char		*end;
+	uint32_t	status = 0, cfg_value;
+	p_nxge_param_t	pa = (p_nxge_param_t)cp;
+	uint32_t	cfg_it = B_FALSE;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_llc_snap_enable"));
 
@@ -1713,18 +1563,16 @@ nxge_param_llc_snap_enable(p_nxge_t nxgep, queue_t *q,
 	return (0);
 }
 
-
 /* ARGSUSED */
-
 static int
 nxge_param_set_ether_usr(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, char *value, caddr_t cp)
+	mblk_t	*mp, char *value, caddr_t cp)
 {
-	char *end;
-	uint8_t ether_class;
-	uint32_t status = 0, cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	uint8_t cfg_it = B_FALSE;
+	char		*end;
+	uint8_t		ether_class;
+	uint32_t	status = 0, cfg_value;
+	p_nxge_param_t	pa = (p_nxge_param_t)cp;
+	uint8_t		cfg_it = B_FALSE;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_set_ether_usr"));
 
@@ -1732,6 +1580,7 @@ nxge_param_set_ether_usr(p_nxge_t nxgep, queue_t *q,
 	if (PARAM_OUTOF_RANGE(value, end, cfg_value, pa)) {
 		return (EINVAL);
 	}
+
 	if (pa->value != cfg_value) {
 		pa->old_value = pa->value;
 		pa->value = cfg_value;
@@ -1746,6 +1595,7 @@ nxge_param_set_ether_usr(p_nxge_t nxgep, queue_t *q,
 #endif
 		NXGE_DEBUG_MSG((nxgep, NDD_CTL, " nxge_param_set_ether_usr"));
 	}
+
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_set_ether_usr"));
 	return (status);
 }
@@ -1753,13 +1603,13 @@ nxge_param_set_ether_usr(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_set_ip_usr(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, char *value, caddr_t cp)
+	mblk_t *mp, char *value, caddr_t cp)
 {
-	char *end;
-	tcam_class_t class;
-	uint32_t status, cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	uint32_t cfg_it = B_FALSE;
+	char		*end;
+	tcam_class_t	class;
+	uint32_t	status, cfg_value;
+	p_nxge_param_t	pa = (p_nxge_param_t)cp;
+	uint32_t	cfg_it = B_FALSE;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_set_ip_usr"));
 
@@ -1784,12 +1634,14 @@ nxge_param_set_ip_usr(p_nxge_t nxgep, queue_t *q,
 	return (status);
 }
 
+/* ARGSUSED */
 static int
 nxge_class_name_2value(p_nxge_t nxgep, char *name)
 {
-	int i;
-	int class_instance = param_class_opt_ip_usr4;
-	p_nxge_param_t param_arr;
+	int		i;
+	int		class_instance = param_class_opt_ip_usr4;
+	p_nxge_param_t	param_arr;
+
 	param_arr = nxgep->param_arr;
 	for (i = TCAM_CLASS_IP_USER_4; i <= TCAM_CLASS_SCTP_IPV6; i++) {
 		if (strcmp(param_arr[class_instance].name, name) == 0)
@@ -1802,16 +1654,15 @@ nxge_class_name_2value(p_nxge_t nxgep, char *name)
 /* ARGSUSED */
 static int
 nxge_param_set_ip_opt(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, char *value, caddr_t cp)
+	mblk_t *mp, char *value, caddr_t cp)
 {
-	char *end;
-	uint32_t status, cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	tcam_class_t class;
-	uint32_t cfg_it = B_FALSE;
+	char		*end;
+	uint32_t	status, cfg_value;
+	p_nxge_param_t	pa = (p_nxge_param_t)cp;
+	tcam_class_t	class;
+	uint32_t	cfg_it = B_FALSE;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_set_ip_opt"));
-
 
 	cfg_value = (uint32_t)mi_strtol(value, &end, BASE_HEX);
 	if (PARAM_OUTOF_RANGE(value, end, cfg_value, pa)) {
@@ -1825,7 +1676,7 @@ nxge_param_set_ip_opt(p_nxge_t nxgep, queue_t *q,
 	}
 
 	if (cfg_it == B_TRUE) {
-			/* do the actual hw setup  */
+		/* do the actual hw setup  */
 		class = nxge_class_name_2value(nxgep, pa->name);
 		if (class == -1)
 			return (EINVAL);
@@ -1835,7 +1686,6 @@ nxge_param_set_ip_opt(p_nxge_t nxgep, queue_t *q,
 			return (EINVAL);
 	}
 
-
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_set_ip_opt"));
 	return (0);
 }
@@ -1843,7 +1693,7 @@ nxge_param_set_ip_opt(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_get_ip_opt(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, caddr_t cp)
+	mblk_t *mp, caddr_t cp)
 {
 	uint32_t status, cfg_value;
 	p_nxge_param_t pa = (p_nxge_param_t)cp;
@@ -1851,34 +1701,36 @@ nxge_param_get_ip_opt(p_nxge_t nxgep, queue_t *q,
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_get_ip_opt"));
 
-		/* do the actual hw setup  */
+	/* do the actual hw setup  */
 	class = nxge_class_name_2value(nxgep, pa->name);
 	if (class == -1)
 		return (EINVAL);
+
 	cfg_value = 0;
 	status = nxge_fflp_ip_class_config_get(nxgep, class, &cfg_value);
 	if (status != NXGE_OK)
 		return (EINVAL);
-	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-			    "nxge_param_get_ip_opt_get %x ", cfg_value));
-	pa->value = cfg_value;
 
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
+		"nxge_param_get_ip_opt_get %x ", cfg_value));
+
+	pa->value = cfg_value;
 	(void) mi_mpprintf(mp, "%x", cfg_value);
+
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_ip_opt status "));
 	return (0);
 }
 
-
 /* ARGSUSED */
 static int
 nxge_param_fflp_hash_init(p_nxge_t nxgep, queue_t *q,
-		    mblk_t	*mp, char *value, caddr_t cp)
+	mblk_t *mp, char *value, caddr_t cp)
 {
-	char *end;
-	uint32_t status, cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	tcam_class_t class;
-	uint32_t cfg_it = B_FALSE;
+	char		*end;
+	uint32_t	status, cfg_value;
+	p_nxge_param_t	pa = (p_nxge_param_t)cp;
+	tcam_class_t	class;
+	uint32_t	cfg_it = B_FALSE;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_fflp_hash_init"));
 
@@ -1888,17 +1740,17 @@ nxge_param_fflp_hash_init(p_nxge_t nxgep, queue_t *q,
 	}
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-			    " nxge_param_fflp_hash_init value %x",
-			    cfg_value));
+		"nxge_param_fflp_hash_init value %x", cfg_value));
+
 	if (pa->value != cfg_value) {
 		pa->old_value = pa->value;
 		pa->value = cfg_value;
 		cfg_it = B_TRUE;
 	}
 
-
 	if (cfg_it == B_TRUE) {
 		char *h_name;
+
 		/* do the actual hw setup */
 		h_name = pa->name;
 		h_name++;
@@ -1906,19 +1758,18 @@ nxge_param_fflp_hash_init(p_nxge_t nxgep, queue_t *q,
 		switch (class) {
 			case 1:
 				status = nxge_fflp_set_hash1(nxgep,
-						    (uint32_t)pa->value);
+					(uint32_t)pa->value);
 				break;
-
 			case 2:
 				status = nxge_fflp_set_hash2(nxgep,
-						    (uint16_t)pa->value);
+					(uint16_t)pa->value);
 				break;
 
 			default:
 			NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-					    " nxge_param_fflp_hash_init"
-					    " %s Wrong hash var %d",
-					    pa->name, class));
+				" nxge_param_fflp_hash_init"
+				" %s Wrong hash var %d",
+				pa->name, class));
 			return (EINVAL);
 		}
 		if (status != NXGE_OK)
@@ -1929,19 +1780,17 @@ nxge_param_fflp_hash_init(p_nxge_t nxgep, queue_t *q,
 	return (0);
 }
 
-
 /* ARGSUSED */
-
 static int
 nxge_param_set_grp_rdc(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, char *value, caddr_t cp)
+	mblk_t *mp, char *value, caddr_t cp)
 {
-	char *end;
-	uint32_t status = 0, cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	uint32_t cfg_it = B_FALSE;
-	int rdc_grp;
-	uint8_t real_rdc;
+	char			*end;
+	uint32_t		status = 0, cfg_value;
+	p_nxge_param_t		pa = (p_nxge_param_t)cp;
+	uint32_t		cfg_it = B_FALSE;
+	int			rdc_grp;
+	uint8_t			real_rdc;
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
 	p_nxge_rdc_grp_t	rdc_grp_p;
@@ -1955,9 +1804,11 @@ nxge_param_set_grp_rdc(p_nxge_t nxgep, queue_t *q,
 	if (PARAM_OUTOF_RANGE(value, end, cfg_value, pa)) {
 		return (EINVAL);
 	}
+
 	if (cfg_value >= p_cfgp->max_rdcs) {
 		return (EINVAL);
 	}
+
 	if (pa->value != cfg_value) {
 		pa->old_value = pa->value;
 		pa->value = cfg_value;
@@ -1972,12 +1823,12 @@ nxge_param_set_grp_rdc(p_nxge_t nxgep, queue_t *q,
 		rdc_grp_p = &p_dma_cfgp->rdc_grps[rdc_grp];
 		real_rdc = rdc_grp_p->start_rdc + cfg_value;
 		if (nxge_check_rxdma_rdcgrp_member(nxgep, rdc_grp,
-						    cfg_value) == B_FALSE) {
+				cfg_value) == B_FALSE) {
 			pa->value = pa->old_value;
 			NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-					    " nxge_param_set_grp_rdc"
-					    " %d read %d actual %d outof range",
-					    rdc_grp, cfg_value, real_rdc));
+				" nxge_param_set_grp_rdc"
+				" %d read %d actual %d outof range",
+				rdc_grp, cfg_value, real_rdc));
 			return (EINVAL);
 		}
 		status = nxge_rxdma_cfg_rdcgrp_default_rdc(nxgep, rdc_grp,
@@ -1993,16 +1844,15 @@ nxge_param_set_grp_rdc(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_set_port_rdc(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, char *value, caddr_t cp)
+	mblk_t *mp, char *value, caddr_t cp)
 {
-	char *end;
-	uint32_t status = B_TRUE, cfg_value;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
-	uint32_t cfg_it = B_FALSE;
+	char		*end;
+	uint32_t	status = B_TRUE, cfg_value;
+	p_nxge_param_t	pa = (p_nxge_param_t)cp;
+	uint32_t	cfg_it = B_FALSE;
 
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
-
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_set_port_rdc"));
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
@@ -2012,6 +1862,7 @@ nxge_param_set_port_rdc(p_nxge_t nxgep, queue_t *q,
 	if (PARAM_OUTOF_RANGE(value, end, cfg_value, pa)) {
 		return (EINVAL);
 	}
+
 	if (pa->value != cfg_value) {
 		if (cfg_value >= p_cfgp->max_rdcs)
 			return (EINVAL);
@@ -2022,8 +1873,8 @@ nxge_param_set_port_rdc(p_nxge_t nxgep, queue_t *q,
 
 	if (cfg_it == B_TRUE) {
 		status = nxge_rxdma_cfg_port_default_rdc(nxgep,
-						    nxgep->function_num,
-						    nxgep->rdc[cfg_value]);
+			nxgep->function_num,
+			nxgep->rdc[cfg_value]);
 		if (status != NXGE_OK)
 			return (EINVAL);
 	}
@@ -2032,13 +1883,10 @@ nxge_param_set_port_rdc(p_nxge_t nxgep, queue_t *q,
 	return (0);
 }
 
-
-
 /* ARGSUSED */
-
 static int
 nxge_param_set_nxge_debug_flag(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, char *value, caddr_t cp)
+	mblk_t *mp, char *value, caddr_t cp)
 {
 	char *end;
 	uint32_t status = 0;
@@ -2051,8 +1899,8 @@ nxge_param_set_nxge_debug_flag(p_nxge_t nxgep, queue_t *q,
 
 	if (PARAM_OUTOF_RANGE(value, end, cfg_value, pa)) {
 		NXGE_DEBUG_MSG((nxgep, NDD_CTL,
-				    " nxge_param_set_nxge_debug_flag"
-				    " outof range %llx", cfg_value));
+			" nxge_param_set_nxge_debug_flag"
+			" outof range %llx", cfg_value));
 		return (EINVAL);
 	}
 	if (pa->value != cfg_value) {
@@ -2064,43 +1912,40 @@ nxge_param_set_nxge_debug_flag(p_nxge_t nxgep, queue_t *q,
 	if (cfg_it == B_TRUE) {
 		nxgep->nxge_debug_level = pa->value;
 	}
+
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_set_nxge_debug_flag"));
 	return (status);
 }
-
 
 /* ARGSUSED */
 static int
 nxge_param_get_debug_flag(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
-
-	int status = 0;
-	p_nxge_param_t pa = (p_nxge_param_t)cp;
+	int		status = 0;
+	p_nxge_param_t	pa = (p_nxge_param_t)cp;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_get_debug_flag"));
 
 	if (pa->value > 0xffffffff)
 		(void) mi_mpprintf(mp, "%x%x",  (int)(pa->value >> 32),
-				    (int)(pa->value & 0xffffffff));
+			(int)(pa->value & 0xffffffff));
 	else
 		(void) mi_mpprintf(mp, "%x", (int)pa->value);
-
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_debug_flag"));
 	return (status);
 }
 
 /* ARGSUSED */
-
 static int
 nxge_param_set_npi_debug_flag(p_nxge_t nxgep, queue_t *q,
-			    mblk_t	*mp, char *value, caddr_t cp)
+	mblk_t *mp, char *value, caddr_t cp)
 {
-	char *end;
-	uint32_t status = 0;
-	uint64_t cfg_value = 0;
-	p_nxge_param_t pa;
-	uint32_t cfg_it = B_FALSE;
+	char		*end;
+	uint32_t	status = 0;
+	uint64_t	 cfg_value = 0;
+	p_nxge_param_t	pa;
+	uint32_t	cfg_it = B_FALSE;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_set_npi_debug_flag"));
 	cfg_value = mi_strtol(value, &end, BASE_HEX);
@@ -2123,22 +1968,15 @@ nxge_param_set_npi_debug_flag(p_nxge_t nxgep, queue_t *q,
 	return (status);
 }
 
-
-/* ARGSUSED */
-
-
-
 /* ARGSUSED */
 static int
 nxge_param_dump_rdc(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
-
-	uint_t	rdc;
+	uint_t rdc;
 
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "==> nxge_param_dump_rdc"));
 
 	(void) npi_rxdma_dump_fzc_regs(NXGE_DEV_NPI_HANDLE(nxgep));
-
 	for (rdc = 0; rdc < nxgep->nrdc; rdc++)
 		(void) nxge_dump_rxdma_channel(nxgep, nxgep->rdc[rdc]);
 
@@ -2150,7 +1988,6 @@ nxge_param_dump_rdc(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 static int
 nxge_param_dump_tdc(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
-
 	uint_t	tdc;
 
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "==> nxge_param_dump_tdc"));
@@ -2162,13 +1999,10 @@ nxge_param_dump_tdc(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	return (0);
 }
 
-
 /* ARGSUSED */
 static int
 nxge_param_dump_fflp_regs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
-
-
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "==> nxge_param_dump_fflp_regs"));
 
 	(void) npi_fflp_dump_regs(NXGE_DEV_NPI_HANDLE(nxgep));
@@ -2181,12 +2015,10 @@ nxge_param_dump_fflp_regs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 static int
 nxge_param_dump_mac_regs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
-
-
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "==> nxge_param_dump_mac_regs"));
 
 	(void) npi_mac_dump_regs(NXGE_DEV_NPI_HANDLE(nxgep),
-				    nxgep->function_num);
+		nxgep->function_num);
 
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "<== nxge_param_dump_mac_regs"));
 	return (0);
@@ -2196,13 +2028,10 @@ nxge_param_dump_mac_regs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 static int
 nxge_param_dump_ipp_regs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
-
-
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "==> nxge_param_dump_ipp_regs"));
 
-	(void) 	(void) npi_ipp_dump_regs(NXGE_DEV_NPI_HANDLE(nxgep),
-					    nxgep->function_num);
-
+	(void) npi_ipp_dump_regs(NXGE_DEV_NPI_HANDLE(nxgep),
+		nxgep->function_num);
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "<== nxge_param_dump_ipp_regs"));
 	return (0);
 }
@@ -2211,8 +2040,6 @@ nxge_param_dump_ipp_regs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 static int
 nxge_param_dump_vlan_table(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
-
-
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_dump_vlan_table"));
 
 	(void) npi_fflp_vlan_tbl_dump(NXGE_DEV_NPI_HANDLE(nxgep));
@@ -2225,18 +2052,17 @@ nxge_param_dump_vlan_table(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 static int
 nxge_param_dump_rdc_table(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
-
-	uint8_t table;
+	uint8_t	table;
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_dump_rdc_table"));
 	for (table = 0; table < NXGE_MAX_RDC_GROUPS; table++) {
 		(void) npi_rxdma_dump_rdc_table(NXGE_DEV_NPI_HANDLE(nxgep),
 					    table);
 	}
+
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_dump_rdc_table"));
 	return (0);
 }
-
 
 typedef struct block_info {
 	char		*name;
@@ -2269,26 +2095,24 @@ block_info_t reg_block[] = {
 static int
 nxge_param_dump_ptrs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 {
-
-	uint_t	print_len, buf_len;
-	p_mblk_t np;
-	int rdc, tdc, block;
-	uint64_t base;
+	uint_t			print_len, buf_len;
+	p_mblk_t		np;
+	int			rdc, tdc, block;
+	uint64_t		base;
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
-	int buff_alloc_size = NXGE_NDD_INFODUMP_BUFF_8K;
+	int			buff_alloc_size = NXGE_NDD_INFODUMP_BUFF_8K;
 	p_tx_ring_t 		*tx_rings;
 	p_rx_rcr_rings_t 	rx_rcr_rings;
 	p_rx_rcr_ring_t		*rcr_rings;
 	p_rx_rbr_rings_t 	rx_rbr_rings;
 	p_rx_rbr_ring_t		*rbr_rings;
 
-	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "==> nxge_param_dump_ptrs"));
+	NXGE_DEBUG_MSG((nxgep, IOC_CTL,
+		"==> nxge_param_dump_ptrs"));
 
-	(void) mi_mpprintf(mp,
-			    "ptr information for Port\t %d \n",
-			    nxgep->function_num);
-
+	(void) mi_mpprintf(mp, "ptr information for Port\t %d \n",
+		nxgep->function_num);
 
 	if ((np = allocb(buff_alloc_size, BPRI_HI)) == NULL) {
 		/* The following may work even if we cannot get a large buf. */
@@ -2297,9 +2121,7 @@ nxge_param_dump_ptrs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	}
 
 	buf_len = buff_alloc_size;
-
 	mp->b_cont = np;
-
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 
@@ -2308,48 +2130,47 @@ nxge_param_dump_ptrs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	rx_rbr_rings = nxgep->rx_rbr_rings;
 	rbr_rings = rx_rbr_rings->rbr_rings;
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-				    "nxgep (nxge_t) $%p\n"
-				    "dev_regs (dev_regs_t) $%p\n",
-				    nxgep, nxgep->dev_regs);
-
-	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
-		/* do register pointers */
-	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-			    "reg base (npi_reg_ptr_t) $%p\t "
-			    "pci reg (npi_reg_ptr_t) $%p\n",
-			    nxgep->dev_regs->nxge_regp,
-			    nxgep->dev_regs->nxge_pciregp);
+		"nxgep (nxge_t) $%p\n"
+		"dev_regs (dev_regs_t) $%p\n",
+		nxgep, nxgep->dev_regs);
 
 	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 
+	/* do register pointers */
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-			    "\nBlock \t Offset \n");
+		"reg base (npi_reg_ptr_t) $%p\t "
+		"pci reg (npi_reg_ptr_t) $%p\n",
+		nxgep->dev_regs->nxge_regp,
+		nxgep->dev_regs->nxge_pciregp);
+
+	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
+
+	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
+		"\nBlock \t Offset \n");
 
 	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 	block = 0;
 	base = (uint64_t)nxgep->dev_regs->nxge_regp;
 	while (reg_block[block].offset != ALL_FF_32) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-			    "%9s\t 0x%llx\n",
-			    reg_block[block].name,
-			    (unsigned long long)(reg_block[block].offset +
-					base));
+			"%9s\t 0x%llx\n",
+			reg_block[block].name,
+			(unsigned long long)(reg_block[block].offset + base));
 		ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 		block++;
 	}
 
-
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-			    "\nRDC\t rcrp (rx_rcr_ring_t)\t "
-			    "rbrp (rx_rbr_ring_t)\n");
+		"\nRDC\t rcrp (rx_rcr_ring_t)\t "
+		"rbrp (rx_rbr_ring_t)\n");
 
 	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 
 	for (rdc = 0; rdc < p_cfgp->max_rdcs; rdc++) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-					    " %d\t  $%p\t\t   $%p\n",
-					    rdc, rcr_rings[rdc],
-					    rbr_rings[rdc]);
+			" %d\t  $%p\t\t   $%p\n",
+			rdc, rcr_rings[rdc],
+			rbr_rings[rdc]);
 		ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 	}
 
@@ -2360,21 +2181,16 @@ nxge_param_dump_ptrs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	tx_rings = nxgep->tx_rings->rings;
 	for (tdc = 0; tdc < p_cfgp->max_tdcs; tdc++) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-				    " %d\t  $%p\n",
-				    tdc, tx_rings[tdc]);
+			" %d\t  $%p\n", tdc, tx_rings[tdc]);
 		ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 	}
 
-	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-			    "\n\n");
+	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len, "\n\n");
 
 	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
-
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "<== nxge_param_dump_ptrs"));
 	return (0);
 }
-
-
 
 /*
  * Load 'name' into the named dispatch table pointed to by 'ndp'.
@@ -2383,9 +2199,10 @@ nxge_param_dump_ptrs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
  * is stuffed.  If there is not enough space in the table for a new
  * entry, more space is allocated.
  */
+/* ARGSUSED */
 boolean_t
 nxge_nd_load(caddr_t *pparam, char *name,
-		pfi_t get_pfi, pfi_t set_pfi, caddr_t data)
+	pfi_t get_pfi, pfi_t set_pfi, caddr_t data)
 {
 	ND	*nd;
 	NDE	*nde;
@@ -2393,18 +2210,20 @@ nxge_nd_load(caddr_t *pparam, char *name,
 	NXGE_DEBUG_MSG((NULL, NDD2_CTL, " ==> nxge_nd_load"));
 	if (!pparam)
 		return (B_FALSE);
+
 	if ((nd = (ND *)*pparam) == NULL) {
-		if ((nd = (ND *)KMEM_ZALLOC(sizeof (ND), KM_NOSLEEP))
-		    == NULL)
+		if ((nd = (ND *)KMEM_ZALLOC(sizeof (ND), KM_NOSLEEP)) == NULL)
 			return (B_FALSE);
 		*pparam = (caddr_t)nd;
 	}
+
 	if (nd->nd_tbl) {
 		for (nde = nd->nd_tbl; nde->nde_name; nde++) {
 			if (strcmp(name, nde->nde_name) == 0)
 				goto fill_it;
 		}
 	}
+
 	if (nd->nd_free_count <= 1) {
 		if ((nde = (NDE *)KMEM_ZALLOC(nd->nd_size +
 					NDE_ALLOC_SIZE, KM_NOSLEEP)) == NULL)
@@ -2442,7 +2261,7 @@ fill_it:
 void
 nxge_nd_free(caddr_t *pparam)
 {
-	ND	*nd;
+	ND *nd;
 
 	if ((nd = (ND *)*pparam) != NULL) {
 		if (nd->nd_tbl)
@@ -2455,17 +2274,18 @@ nxge_nd_free(caddr_t *pparam)
 int
 nxge_nd_getset(p_nxge_t nxgep, queue_t *q, caddr_t param, p_mblk_t mp)
 {
-	int	err;
-	IOCP	iocp;
-	p_mblk_t mp1, mp2;
-	ND	*nd;
-	NDE	*nde;
-	char	*valp;
-	size_t	avail;
+	int		err;
+	IOCP		iocp;
+	p_mblk_t	mp1, mp2;
+	ND		*nd;
+	NDE		*nde;
+	char		*valp;
+	size_t		avail;
 
 	if (!param) {
 		return (B_FALSE);
 	}
+
 	nd = (ND *)param;
 	iocp = (IOCP)mp->b_rptr;
 	if ((iocp->ioc_count == 0) || !(mp1 = mp->b_cont)) {
@@ -2474,6 +2294,7 @@ nxge_nd_getset(p_nxge_t nxgep, queue_t *q, caddr_t param, p_mblk_t mp)
 		iocp->ioc_error = EINVAL;
 		return (B_FALSE);
 	}
+
 	/*
 	 * NOTE - logic throughout nd_xxx assumes single data block for ioctl.
 	 *	However, existing code sends in some big buffers.
@@ -2579,12 +2400,12 @@ nxge_nd_getset(p_nxge_t nxgep, queue_t *q, caddr_t param, p_mblk_t mp)
 int
 nxge_nd_get_names(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t param)
 {
-	ND	*nd;
-	NDE	*nde;
-	char	*rwtag;
-	boolean_t get_ok, set_ok;
-	size_t	param_len;
-	int status = 0;
+	ND		*nd;
+	NDE		*nde;
+	char		*rwtag;
+	boolean_t	get_ok, set_ok;
+	size_t		param_len;
+	int		status = 0;
 
 	nd = (ND *)param;
 	if (!nd)
@@ -2617,21 +2438,17 @@ nxge_nd_get_names(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t param)
 /* ARGSUSED */
 int
 nxge_get_default(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t data)
-
 {
 	return (EACCES);
 }
 
 /* ARGSUSED */
 int
-
 nxge_set_default(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, char *value,
-		caddr_t data)
-
+	caddr_t data)
 {
 	return (EACCES);
 }
-
 
 void
 nxge_param_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)
@@ -2641,6 +2458,7 @@ nxge_param_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)
 
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "==> nxge_param_ioctl"));
 	cmd = iocp->ioc_cmd;
+
 	switch (cmd) {
 	default:
 		NXGE_DEBUG_MSG((nxgep, IOC_CTL,
@@ -2709,16 +2527,14 @@ nxge_param_link_update(p_nxge_t nxgep)
 		cmn_err(CE_WARN, " Restoring previous setting.");
 		for (i = param_anar_1000fdx; i < param_anar_asmpause; i++)
 			param_arr[i].value = param_arr[i].old_value;
-
 	}
+
 	update_dev = B_FALSE;
 
 	if (update_dev) {
 		RW_ENTER_WRITER(&nxgep->filter_lock);
 		(void) nxge_rx_mac_disable(nxgep);
 		(void) nxge_tx_mac_disable(nxgep);
-		(void) nxge_set_dev_params(nxgep);
-
 		(void) nxge_tx_mac_enable(nxgep);
 		(void) nxge_rx_mac_enable(nxgep);
 		RW_EXIT(&nxgep->filter_lock);
@@ -2728,17 +2544,4 @@ nxge_param_hw_update_exit:
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 			"<== nxge_param_link_update status = 0x%08x", status));
 	return (status);
-}
-
-
-
-/* ARGSUSED */
-static void
-nxge_set_dev_params(p_nxge_t nxgep)
-{
-
-	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_set_dev_params"));
-
-	/* Reinitialize any instance specific parameters. */
-
 }

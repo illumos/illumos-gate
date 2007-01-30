@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,19 +30,20 @@
 
 #define	NXGE_IPP_FIFO_SYNC_TRY_COUNT 100
 
+/* ARGSUSED */
 nxge_status_t
 nxge_ipp_init(p_nxge_t nxgep)
 {
-	uint8_t		portn;
-	uint32_t	config;
-	npi_handle_t	handle;
-	uint32_t	pkt_size;
-	ipp_status_t	istatus;
-	npi_status_t	rs = NPI_SUCCESS;
-	uint64_t	val;
-	uint32_t	d0, d1, d2, d3, d4;
-	int		i;
-	uint32_t	dfifo_entries;
+	uint8_t portn;
+	uint32_t config;
+	npi_handle_t handle;
+	uint32_t pkt_size;
+	ipp_status_t istatus;
+	npi_status_t rs = NPI_SUCCESS;
+	uint64_t val;
+	uint32_t d0, d1, d2, d3, d4;
+	int i;
+	uint32_t dfifo_entries;
 
 	handle = nxgep->npi_handle;
 	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
@@ -50,28 +51,26 @@ nxge_ipp_init(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, IPP_CTL, "==> nxge_ipp_init: port%d", portn));
 
 	/* Initialize ECC and parity in SRAM of DFIFO and PFIFO */
-
 	if ((nxgep->niu_type == NEPTUNE) || (nxgep->niu_type == NEPTUNE_2)) {
 		if (portn < 2)
 			dfifo_entries = IPP_P0_P1_DFIFO_ENTRIES;
 		else
 			dfifo_entries = IPP_P2_P3_DFIFO_ENTRIES;
 	} else if (nxgep->niu_type == N2_NIU) {
-			dfifo_entries = IPP_NIU_DFIFO_ENTRIES;
+		dfifo_entries = IPP_NIU_DFIFO_ENTRIES;
 	} else
 		goto fail;
 
 	for (i = 0; i < dfifo_entries; i++) {
-		if ((rs = npi_ipp_write_dfifo(handle, portn, i, 0, 0, 0, 0, 0))
-								!= NPI_SUCCESS)
+		if ((rs = npi_ipp_write_dfifo(handle,
+				portn, i, 0, 0, 0, 0, 0)) != NPI_SUCCESS)
 			goto fail;
-		if ((rs = npi_ipp_read_dfifo(handle, portn, i, &d0, &d1, &d2,
-						&d3, &d4)) != NPI_SUCCESS)
+		if ((rs = npi_ipp_read_dfifo(handle, portn,
+				i, &d0, &d1, &d2, &d3, &d4)) != NPI_SUCCESS)
 			goto fail;
 	}
 
 	/* Clear PFIFO DFIFO status bits */
-
 	if ((rs = npi_ipp_get_status(handle, portn, &istatus)) != NPI_SUCCESS)
 		goto fail;
 	if ((rs = npi_ipp_get_status(handle, portn, &istatus)) != NPI_SUCCESS)
@@ -94,20 +93,20 @@ nxge_ipp_init(p_nxge_t nxgep)
 
 	/* Configure IPP port */
 	if ((rs = npi_ipp_iconfig(handle, INIT, portn, ICFG_IPP_ALL))
-							!= NPI_SUCCESS)
+			!= NPI_SUCCESS)
 		goto fail;
 	nxgep->ipp.iconfig = ICFG_IPP_ALL;
 
 	config = CFG_IPP | CFG_IPP_DFIFO_ECC_CORRECT | CFG_IPP_DROP_BAD_CRC |
-			CFG_IPP_TCP_UDP_CKSUM;
+		CFG_IPP_TCP_UDP_CKSUM;
 	if ((rs = npi_ipp_config(handle, INIT, portn, config)) != NPI_SUCCESS)
 		goto fail;
 	nxgep->ipp.config = config;
 
 	/* Set max packet size */
 	pkt_size = IPP_MAX_PKT_SIZE;
-	if ((rs = npi_ipp_set_max_pktsize(handle, portn, IPP_MAX_PKT_SIZE)) !=
-						NPI_SUCCESS)
+	if ((rs = npi_ipp_set_max_pktsize(handle, portn,
+			IPP_MAX_PKT_SIZE)) != NPI_SUCCESS)
 		goto fail;
 	nxgep->ipp.max_pkt_size = pkt_size;
 
@@ -121,14 +120,14 @@ fail:
 	return (NXGE_ERROR | rs);
 }
 
-
+/* ARGSUSED */
 nxge_status_t
 nxge_ipp_disable(p_nxge_t nxgep)
 {
-	uint8_t		portn;
-	uint32_t	config;
-	npi_handle_t	handle;
-	npi_status_t	rs = NPI_SUCCESS;
+	uint8_t portn;
+	uint32_t config;
+	npi_handle_t handle;
+	npi_status_t rs = NPI_SUCCESS;
 	uint16_t wr_ptr, rd_ptr;
 	uint32_t try_count;
 
@@ -139,8 +138,7 @@ nxge_ipp_disable(p_nxge_t nxgep)
 	(void) nxge_rx_mac_disable(nxgep);
 
 	/*
-	 * Wait until ip read and write fifo pointers
-	 * are equal
+	 * Wait until ip read and write fifo pointers are equal
 	 */
 	(void) npi_ipp_get_dfifo_rd_ptr(handle, portn, &rd_ptr);
 	(void) npi_ipp_get_dfifo_wr_ptr(handle, portn, &wr_ptr);
@@ -155,44 +153,40 @@ nxge_ipp_disable(p_nxge_t nxgep)
 	if (try_count == 0) {
 		if ((rd_ptr != 0) && (wr_ptr != 1)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				    " nxge_ipp_disable: port%d failed"
-				    " rd_fifo != wr_fifo", portn));
+				" nxge_ipp_disable: port%d failed"
+				" rd_fifo != wr_fifo", portn));
 			goto fail;
 		}
 	}
-
-
 	/* disable the IPP */
 	config = nxgep->ipp.config;
-	if ((rs = npi_ipp_config(handle, DISABLE, portn, config))
-					!= NPI_SUCCESS) {
+	if ((rs = npi_ipp_config(handle, DISABLE,
+			portn, config)) != NPI_SUCCESS)
 		goto fail;
-	}
 
 	/* IPP soft reset */
-	if ((rs = npi_ipp_reset(handle, portn)) != NPI_SUCCESS) {
+	if ((rs = npi_ipp_reset(handle, portn)) != NPI_SUCCESS)
 		goto fail;
-	}
 
 	NXGE_DEBUG_MSG((nxgep, IPP_CTL, "<== nxge_ipp_disable: port%d", portn));
-
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"nxge_ipp_disable: Fail to disable IPP Port #%d\n",
-		portn));
+		"nxge_ipp_disable: Fail to disable IPP Port #%d\n", portn));
 	return (NXGE_ERROR | rs);
 }
 
+/* ARGSUSED */
 nxge_status_t
 nxge_ipp_reset(p_nxge_t nxgep)
 {
-	uint8_t		portn;
-	uint32_t	config;
-	npi_handle_t	handle;
-	npi_status_t	rs = NPI_SUCCESS;
+	uint8_t portn;
+	uint32_t config;
+	npi_handle_t handle;
+	npi_status_t rs = NPI_SUCCESS;
 	uint16_t wr_ptr, rd_ptr;
 	uint32_t try_count;
+
 	handle = nxgep->npi_handle;
 	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
 
@@ -200,14 +194,12 @@ nxge_ipp_reset(p_nxge_t nxgep)
 
 	/* disable the IPP */
 	config = nxgep->ipp.config;
-	if ((rs = npi_ipp_config(handle, DISABLE, portn, config))
-							!= NPI_SUCCESS) {
+	if ((rs = npi_ipp_config(handle, DISABLE,
+			portn, config)) != NPI_SUCCESS)
 		goto fail;
-	}
 
 	/*
-	 * Wait until ip read and write fifo pointers
-	 * are equal
+	 * Wait until ip read and write fifo pointers are equal
 	 */
 	(void) npi_ipp_get_dfifo_rd_ptr(handle, portn, &rd_ptr);
 	(void) npi_ipp_get_dfifo_wr_ptr(handle, portn, &wr_ptr);
@@ -222,8 +214,8 @@ nxge_ipp_reset(p_nxge_t nxgep)
 	if (try_count == 0) {
 		if ((rd_ptr != 0) && (wr_ptr != 1)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				    " nxge_ipp_disable: port%d failed"
-				    " rd_fifo != wr_fifo", portn));
+				" nxge_ipp_disable: port%d failed"
+				" rd_fifo != wr_fifo", portn));
 			goto fail;
 		}
 	}
@@ -234,18 +226,16 @@ nxge_ipp_reset(p_nxge_t nxgep)
 	}
 
 	/* to reset control FIFO */
-	if ((rs = npi_zcp_rest_cfifo_port(handle, portn)) != NPI_SUCCESS) {
+	if ((rs = npi_zcp_rest_cfifo_port(handle, portn)) != NPI_SUCCESS)
 		goto fail;
-	}
 
 	/*
-	 * Making sure that error source is cleared if this is an
-	 * injected error.
+	 * Making sure that error source is cleared if this is an injected
+	 * error.
 	 */
 	IPP_REG_WR(handle, portn, IPP_ECC_CTRL_REG, 0);
 
 	NXGE_DEBUG_MSG((nxgep, IPP_CTL, "<== nxge_ipp_reset: port%d", portn));
-
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -254,16 +244,15 @@ fail:
 	return (NXGE_ERROR | rs);
 }
 
-
-
+/* ARGSUSED */
 nxge_status_t
 nxge_ipp_enable(p_nxge_t nxgep)
 {
-	uint8_t		portn;
-	uint32_t	config;
-	npi_handle_t	handle;
-	uint32_t	pkt_size;
-	npi_status_t	rs = NPI_SUCCESS;
+	uint8_t portn;
+	uint32_t config;
+	npi_handle_t handle;
+	uint32_t pkt_size;
+	npi_status_t rs = NPI_SUCCESS;
 
 	handle = nxgep->npi_handle;
 	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
@@ -271,40 +260,38 @@ nxge_ipp_enable(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, IPP_CTL, "==> nxge_ipp_enable: port%d", portn));
 
 	config = CFG_IPP | CFG_IPP_DFIFO_ECC_CORRECT | CFG_IPP_DROP_BAD_CRC |
-			CFG_IPP_TCP_UDP_CKSUM;
+		CFG_IPP_TCP_UDP_CKSUM;
 	if ((rs = npi_ipp_config(handle, INIT, portn, config)) != NPI_SUCCESS)
 		goto fail;
 	nxgep->ipp.config = config;
 
 	/* Set max packet size */
 	pkt_size = IPP_MAX_PKT_SIZE;
-	if ((rs = npi_ipp_set_max_pktsize(handle, portn, IPP_MAX_PKT_SIZE)) !=
-						NPI_SUCCESS)
+	if ((rs = npi_ipp_set_max_pktsize(handle, portn,
+			IPP_MAX_PKT_SIZE)) != NPI_SUCCESS)
 		goto fail;
 	nxgep->ipp.max_pkt_size = pkt_size;
 
 	NXGE_DEBUG_MSG((nxgep, IPP_CTL, "<== nxge_ipp_enable: port%d", portn));
-
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_ipp_init: Fail to Enable IPP Port #%d\n",
-			portn));
+		"nxge_ipp_init: Fail to Enable IPP Port #%d\n", portn));
 	return (NXGE_ERROR | rs);
 }
 
-
+/* ARGSUSED */
 nxge_status_t
 nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 {
-	npi_handle_t		handle;
-	npi_status_t		rs = NPI_SUCCESS;
-	p_nxge_ipp_stats_t	statsp;
-	ipp_status_t		istatus;
-	uint8_t			portn;
-	p_ipp_errlog_t		errlogp;
-	boolean_t		rxport_fatal = B_FALSE;
-	nxge_status_t		status = NXGE_OK;
+	npi_handle_t handle;
+	npi_status_t rs = NPI_SUCCESS;
+	p_nxge_ipp_stats_t statsp;
+	ipp_status_t istatus;
+	uint8_t portn;
+	p_ipp_errlog_t errlogp;
+	boolean_t rxport_fatal = B_FALSE;
+	nxge_status_t status = NXGE_OK;
 
 	handle = nxgep->npi_handle;
 	statsp = (p_nxge_ipp_stats_t)&nxgep->statsp->ipp_stats;
@@ -315,11 +302,12 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 	if ((rs = npi_ipp_get_status(handle, portn, &istatus)) != NPI_SUCCESS)
 		return (NXGE_ERROR | rs);
 
-	if (istatus.value == 0)
+	if (istatus.value == 0) {
 		/*
 		 * The error is not initiated from this port, so just exit.
 		 */
 		return (NXGE_OK);
+	}
 
 	if (istatus.bits.w0.dfifo_missed_sop) {
 		statsp->sop_miss++;
@@ -327,10 +315,10 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 					&errlogp->dfifo_rd_ptr)) != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
 		if ((rs = npi_ipp_get_state_mach(handle, portn,
-					&errlogp->state_mach)) != NPI_SUCCESS)
+				&errlogp->state_mach)) != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_IPP_SOP_MISS);
+			NXGE_FM_EREPORT_IPP_SOP_MISS);
 		if (statsp->sop_miss < IPP_MAX_ERR_SHOW)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 				"nxge_ipp_err_evnts: fatal error: sop_miss\n"));
@@ -339,23 +327,22 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 	if (istatus.bits.w0.dfifo_missed_eop) {
 		statsp->eop_miss++;
 		if ((rs = npi_ipp_get_dfifo_eopm_rdptr(handle, portn,
-					&errlogp->dfifo_rd_ptr)) != NPI_SUCCESS)
+				&errlogp->dfifo_rd_ptr)) != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
 		if ((rs = npi_ipp_get_state_mach(handle, portn,
-					&errlogp->state_mach)) != NPI_SUCCESS)
+				&errlogp->state_mach)) != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_IPP_EOP_MISS);
+			NXGE_FM_EREPORT_IPP_EOP_MISS);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_ipp_err_evnts: fatal error: eop_miss\n"));
+			"nxge_ipp_err_evnts: fatal error: eop_miss\n"));
 		rxport_fatal = B_TRUE;
 	}
 	if (istatus.bits.w0.dfifo_uncorr_ecc_err) {
 		boolean_t ue_ecc_valid;
 
-		if ((status = nxge_ipp_eccue_valid_check(nxgep, &ue_ecc_valid))
-								!= NXGE_OK)
-
+		if ((status = nxge_ipp_eccue_valid_check(nxgep,
+				&ue_ecc_valid)) != NXGE_OK)
 			return (status);
 
 		if (ue_ecc_valid) {
@@ -364,7 +351,7 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 					&errlogp->ecc_syndrome)) != NPI_SUCCESS)
 				return (NXGE_ERROR | rs);
 			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_IPP_DFIFO_UE);
+				NXGE_FM_EREPORT_IPP_DFIFO_UE);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 				"nxge_ipp_err_evnts: fatal error: dfifo_ue\n"));
 			rxport_fatal = B_TRUE;
@@ -373,75 +360,77 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 	if (istatus.bits.w0.pre_fifo_perr) {
 		statsp->pfifo_perr++;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_IPP_PFIFO_PERR);
+			NXGE_FM_EREPORT_IPP_PFIFO_PERR);
 		if (statsp->pfifo_perr < IPP_MAX_ERR_SHOW)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_ipp_err_evnts: fatal error: pre_pifo_perr\n"));
+				"nxge_ipp_err_evnts: "
+				"fatal error: pre_pifo_perr\n"));
 		rxport_fatal = B_TRUE;
 	}
 	if (istatus.bits.w0.pre_fifo_overrun) {
 		statsp->pfifo_over++;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_IPP_PFIFO_OVER);
+			NXGE_FM_EREPORT_IPP_PFIFO_OVER);
 		if (statsp->pfifo_over < IPP_MAX_ERR_SHOW)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_ipp_err_evnts: fatal error: pfifo_over\n"));
+				"nxge_ipp_err_evnts: "
+				"fatal error: pfifo_over\n"));
 		rxport_fatal = B_TRUE;
 	}
 	if (istatus.bits.w0.pre_fifo_underrun) {
 		statsp->pfifo_und++;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_IPP_PFIFO_UND);
+			NXGE_FM_EREPORT_IPP_PFIFO_UND);
 		if (statsp->pfifo_und < IPP_MAX_ERR_SHOW)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_ipp_err_evnts: fatal error: pfifo_und\n"));
+				"nxge_ipp_err_evnts: "
+				"fatal error: pfifo_und\n"));
 		rxport_fatal = B_TRUE;
 	}
 	if (istatus.bits.w0.bad_cksum_cnt_ovfl) {
 		statsp->bad_cs_cnt += IPP_BAD_CS_CNT_MASK;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_IPP_BAD_CS_MX);
-		if (statsp->bad_cs_cnt <
-				(IPP_MAX_ERR_SHOW * IPP_BAD_CS_CNT_MASK))
+			NXGE_FM_EREPORT_IPP_BAD_CS_MX);
+		if (statsp->bad_cs_cnt < (IPP_MAX_ERR_SHOW *
+				IPP_BAD_CS_CNT_MASK))
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 				"nxge_ipp_err_evnts: bad_cs_max\n"));
 	}
 	if (istatus.bits.w0.pkt_discard_cnt_ovfl) {
 		statsp->pkt_dis_cnt += IPP_PKT_DIS_CNT_MASK;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_IPP_PKT_DIS_MX);
-		if (statsp->pkt_dis_cnt <
-				(IPP_MAX_ERR_SHOW * IPP_PKT_DIS_CNT_MASK))
+			NXGE_FM_EREPORT_IPP_PKT_DIS_MX);
+		if (statsp->pkt_dis_cnt < (IPP_MAX_ERR_SHOW *
+				IPP_PKT_DIS_CNT_MASK))
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 				"nxge_ipp_err_evnts: pkt_dis_max\n"));
 	}
 
 	/*
-	 * Making sure that error source is cleared if this is an
-	 * injected error.
+	 * Making sure that error source is cleared if this is an injected
+	 * error.
 	 */
 	IPP_REG_WR(handle, portn, IPP_ECC_CTRL_REG, 0);
 
 	if (rxport_fatal) {
 		NXGE_DEBUG_MSG((nxgep, IPP_CTL,
-			    " nxge_ipp_handle_sys_errors:"
-			    " fatal Error on  Port #%d\n",
-			    portn));
+			" nxge_ipp_handle_sys_errors:"
+			" fatal Error on  Port #%d\n", portn));
 		status = nxge_ipp_fatal_err_recover(nxgep);
 		if (status == NXGE_OK) {
 			FM_SERVICE_RESTORED(nxgep);
 		}
 	}
-
 	return (status);
 }
 
+/* ARGSUSED */
 void
 nxge_ipp_inject_err(p_nxge_t nxgep, uint32_t err_id)
 {
-	ipp_status_t	ipps;
-	ipp_ecc_ctrl_t	ecc_ctrl;
-	uint8_t		portn = nxgep->mac.portnum;
+	ipp_status_t ipps;
+	ipp_ecc_ctrl_t ecc_ctrl;
+	uint8_t portn = nxgep->mac.portnum;
 
 	switch (err_id) {
 	case NXGE_FM_EREPORT_IPP_DFIFO_UE:
@@ -450,20 +439,22 @@ nxge_ipp_inject_err(p_nxge_t nxgep, uint32_t err_id)
 		ecc_ctrl.bits.w0.cor_1 = 1;
 		ecc_ctrl.bits.w0.cor_lst = 1;
 		cmn_err(CE_NOTE, "!Write 0x%llx to IPP_ECC_CTRL_REG\n",
-				(unsigned long long)ecc_ctrl.value);
+			(unsigned long long) ecc_ctrl.value);
 		IPP_REG_WR(nxgep->npi_handle, portn, IPP_ECC_CTRL_REG,
-				ecc_ctrl.value);
+			ecc_ctrl.value);
 		break;
+
 	case NXGE_FM_EREPORT_IPP_DFIFO_CE:
 		ecc_ctrl.value = 0;
 		ecc_ctrl.bits.w0.cor_sng = 1;
 		ecc_ctrl.bits.w0.cor_1 = 1;
 		ecc_ctrl.bits.w0.cor_snd = 1;
 		cmn_err(CE_NOTE, "!Write 0x%llx to IPP_ECC_CTRL_REG\n",
-				(unsigned long long)ecc_ctrl.value);
+			(unsigned long long) ecc_ctrl.value);
 		IPP_REG_WR(nxgep->npi_handle, portn, IPP_ECC_CTRL_REG,
-				ecc_ctrl.value);
+			ecc_ctrl.value);
 		break;
+
 	case NXGE_FM_EREPORT_IPP_EOP_MISS:
 	case NXGE_FM_EREPORT_IPP_SOP_MISS:
 	case NXGE_FM_EREPORT_IPP_PFIFO_PERR:
@@ -496,44 +487,43 @@ nxge_ipp_inject_err(p_nxge_t nxgep, uint32_t err_id)
 		else if (err_id == NXGE_FM_EREPORT_IPP_PKT_DIS_MX)
 			ipps.bits.w0.pkt_discard_cnt_ovfl = 1;
 		cmn_err(CE_NOTE, "!Write 0x%llx to IPP_INT_STATUS_REG\n",
-				(unsigned long long)ipps.value);
+			(unsigned long long) ipps.value);
 		IPP_REG_WR(nxgep->npi_handle, portn, IPP_INT_STATUS_REG,
-				ipps.value);
+			ipps.value);
 		break;
 	}
 }
 
+/* ARGSUSED */
 nxge_status_t
 nxge_ipp_fatal_err_recover(p_nxge_t nxgep)
 {
-	npi_handle_t		handle;
-	npi_status_t		rs = NPI_SUCCESS;
-	nxge_status_t		status = NXGE_OK;
-	uint8_t			portn;
-	uint16_t		wr_ptr;
-	uint16_t		rd_ptr;
-	uint32_t		try_count;
-	uint32_t		dfifo_entries;
-	ipp_status_t		istatus;
-	uint32_t		d0, d1, d2, d3, d4;
-	int			i;
+	npi_handle_t handle;
+	npi_status_t rs = NPI_SUCCESS;
+	nxge_status_t status = NXGE_OK;
+	uint8_t portn;
+	uint16_t wr_ptr;
+	uint16_t rd_ptr;
+	uint32_t try_count;
+	uint32_t dfifo_entries;
+	ipp_status_t istatus;
+	uint32_t d0, d1, d2, d3, d4;
+	int i;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_ipp_fatal_err_recover"));
-
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"Recovering from RxPort error..."));
+		"Recovering from RxPort error..."));
 
 	handle = nxgep->npi_handle;
 	portn = nxgep->mac.portnum;
 
 	/*
-	 * Making sure that error source is cleared if this is an
-	 * injected error.
+	 * Making sure that error source is cleared if this is an injected
+	 * error.
 	 */
 	IPP_REG_WR(handle, portn, IPP_ECC_CTRL_REG, 0);
 
 	/* Disable RxMAC */
-
 	if (nxge_rx_mac_disable(nxgep) != NXGE_OK)
 		goto fail;
 
@@ -544,8 +534,7 @@ nxge_ipp_fatal_err_recover(p_nxge_t nxgep)
 		goto fail;
 
 	/*
-	 * Wait until ip read and write fifo pointers
-	 * are equal
+	 * Wait until ip read and write fifo pointers are equal
 	 */
 	(void) npi_ipp_get_dfifo_rd_ptr(handle, portn, &rd_ptr);
 	(void) npi_ipp_get_dfifo_wr_ptr(handle, portn, &wr_ptr);
@@ -559,13 +548,13 @@ nxge_ipp_fatal_err_recover(p_nxge_t nxgep)
 
 	if (try_count == 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				    " nxge_ipp_reset: port%d IPP stalled..."
-				    " rd_fifo_ptr = 0x%x wr_fifo_ptr = 0x%x",
-				    portn, rd_ptr, wr_ptr));
+			" nxge_ipp_reset: port%d IPP stalled..."
+			" rd_fifo_ptr = 0x%x wr_fifo_ptr = 0x%x",
+			portn, rd_ptr, wr_ptr));
 		/*
-		 * This means the fatal error occurred on the first line
-		 * of the fifo. In this case, just reset the IPP without
-		 * draining the PFIFO.
+		 * This means the fatal error occurred on the first line of the
+		 * fifo. In this case, just reset the IPP without draining the
+		 * PFIFO.
 		 */
 	}
 
@@ -575,22 +564,21 @@ nxge_ipp_fatal_err_recover(p_nxge_t nxgep)
 		else
 			dfifo_entries = IPP_P2_P3_DFIFO_ENTRIES;
 	} else if (nxgep->niu_type == N2_NIU) {
-			dfifo_entries = IPP_NIU_DFIFO_ENTRIES;
+		dfifo_entries = IPP_NIU_DFIFO_ENTRIES;
 	} else
 		goto fail;
 
 	/* Clean up DFIFO SRAM entries */
 	for (i = 0; i < dfifo_entries; i++) {
-		if ((rs = npi_ipp_write_dfifo(handle, portn, i, 0, 0, 0, 0, 0))
-								!= NPI_SUCCESS)
+		if ((rs = npi_ipp_write_dfifo(handle, portn,
+				i, 0, 0, 0, 0, 0)) != NPI_SUCCESS)
 			goto fail;
-		if ((rs = npi_ipp_read_dfifo(handle, portn, i, &d0, &d1, &d2,
-						&d3, &d4)) != NPI_SUCCESS)
+		if ((rs = npi_ipp_read_dfifo(handle, portn, i,
+				&d0, &d1, &d2, &d3, &d4)) != NPI_SUCCESS)
 			goto fail;
 	}
 
 	/* Clear PFIFO DFIFO status bits */
-
 	if ((rs = npi_ipp_get_status(handle, portn, &istatus)) != NPI_SUCCESS)
 		goto fail;
 	if ((rs = npi_ipp_get_status(handle, portn, &istatus)) != NPI_SUCCESS)
@@ -606,17 +594,15 @@ nxge_ipp_fatal_err_recover(p_nxge_t nxgep)
 		goto fail;
 
 	NXGE_DEBUG_MSG((nxgep, IPP_CTL, "port%d Initialize RxMAC...", portn));
-
 	if ((status = nxge_rx_mac_init(nxgep)) != NXGE_OK)
 		goto fail;
 
 	NXGE_DEBUG_MSG((nxgep, IPP_CTL, "port%d Enable RxMAC...", portn));
-
 	if (nxge_rx_mac_enable(nxgep) != NXGE_OK)
 		goto fail;
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"Recovery Sucessful, RxPort Restored"));
+		"Recovery Sucessful, RxPort Restored"));
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_ipp_fatal_err_recover"));
 
 	return (NXGE_OK);
@@ -625,7 +611,7 @@ fail:
 	return (status | rs);
 }
 
-
+/* ARGSUSED */
 nxge_status_t
 nxge_ipp_eccue_valid_check(p_nxge_t nxgep, boolean_t *valid)
 {
@@ -644,10 +630,10 @@ nxge_ipp_eccue_valid_check(p_nxge_t nxgep, boolean_t *valid)
 	*valid = B_TRUE;
 
 	if ((rs = npi_ipp_get_dfifo_rd_ptr(handle, portn, &rd_ptr))
-							!= NPI_SUCCESS)
+		!= NPI_SUCCESS)
 		goto fail;
 	if ((rs = npi_ipp_get_dfifo_rd_ptr(handle, portn, &wr_ptr))
-							!= NPI_SUCCESS)
+		!= NPI_SUCCESS)
 		goto fail;
 
 	if (rd_ptr == wr_ptr) {
@@ -658,13 +644,11 @@ nxge_ipp_eccue_valid_check(p_nxge_t nxgep, boolean_t *valid)
 	} else {
 		stall_cnt = 0;
 		while (stall_cnt < 16) {
-			if ((rs = npi_ipp_get_dfifo_rd_ptr(handle, portn,
-								&curr_rd_ptr))
-							!= NPI_SUCCESS)
+			if ((rs = npi_ipp_get_dfifo_rd_ptr(handle,
+					portn, &curr_rd_ptr)) != NPI_SUCCESS)
 				goto fail;
-			if ((rs = npi_ipp_get_dfifo_wr_ptr(handle, portn,
-								&curr_wr_ptr))
-							!= NPI_SUCCESS)
+			if ((rs = npi_ipp_get_dfifo_wr_ptr(handle,
+					portn, &curr_wr_ptr)) != NPI_SUCCESS)
 				goto fail;
 
 			if ((rd_ptr == curr_rd_ptr) && (wr_ptr == curr_wr_ptr))
@@ -675,15 +659,16 @@ nxge_ipp_eccue_valid_check(p_nxge_t nxgep, boolean_t *valid)
 			}
 		}
 
-		if (valid) {	/* futher check to see if ECC UE is valid */
-			if ((rs = npi_ipp_read_dfifo(handle, portn, rd_ptr, &d0,
-					&d1, &d2, &d3, &d4)) != NPI_SUCCESS)
+		if (valid) {
+			/* futher check to see if ECC UE is valid */
+			if ((rs = npi_ipp_read_dfifo(handle, portn,
+					rd_ptr, &d0, &d1, &d2, &d3,
+					&d4)) != NPI_SUCCESS)
 				goto fail;
 			if ((d4 & 0x1) == 0)	/* Not the 1st line */
 				*valid = B_FALSE;
 		}
 	}
-
 	return (NXGE_OK);
 fail:
 	return (NXGE_ERROR | rs);

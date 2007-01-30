@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -471,7 +471,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	status = nxge_get_xcvr_type(nxgep);
 
 	if (status != NXGE_OK) {
-		NXGE_DEBUG_MSG((nxgep, NXGE_DDI_CTL, "nxge_attach: "
+		NXGE_DEBUG_MSG((nxgep, DDI_CTL, "nxge_attach: "
 				    " Couldn't determine card type"
 				    " .... exit "));
 		goto nxge_attach_fail;
@@ -1326,6 +1326,9 @@ nxge_uninit(p_nxge_t nxgep)
 
 	/* Disable and soft reset the IPP */
 	(void) nxge_ipp_disable(nxgep);
+
+	/* Free classification resources */
+	(void) nxge_classify_uninit(nxgep);
 
 	/*
 	 * Reset the transmit/receive DMA side.
@@ -2910,6 +2913,8 @@ nxge_m_start(void *arg)
 	nxgep->nxge_timerid = nxge_start_timer(nxgep, nxge_check_hw_state,
 		NXGE_CHECK_TIMER);
 
+	nxgep->link_notify = B_TRUE;
+
 	nxgep->nxge_mac_state = NXGE_MAC_STARTED;
 
 nxge_m_start_exit:
@@ -2928,13 +2933,14 @@ nxge_m_stop(void *arg)
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "==> nxge_m_stop"));
 
-	MUTEX_ENTER(nxgep->genlock);
-
 	nxge_intrs_disable(nxgep);
+
 	if (nxgep->nxge_timerid) {
 		nxge_stop_timer(nxgep, nxgep->nxge_timerid);
 		nxgep->nxge_timerid = 0;
 	}
+
+	MUTEX_ENTER(nxgep->genlock);
 	nxge_uninit(nxgep);
 
 	nxgep->nxge_mac_state = NXGE_MAC_STOPPED;
@@ -3303,6 +3309,10 @@ _fini(void)
 	NXGE_DEBUG_MSG((NULL, MOD_CTL, "==> _fini"));
 
 	NXGE_DEBUG_MSG((NULL, MOD_CTL, "==> _fini: mod_remove"));
+
+	if (nxge_mblks_pending)
+		return (EBUSY);
+
 	status = mod_remove(&modlinkage);
 	if (status != DDI_SUCCESS) {
 		NXGE_DEBUG_MSG((NULL, MOD_CTL,
@@ -3898,6 +3908,8 @@ nxge_remove_intrs(p_nxge_t nxgep)
 	intrp->intr_enabled = B_FALSE;
 	intrp->msi_intx_cnt = 0;
 	intrp->intr_added = 0;
+
+	(void) nxge_ldgv_uninit(nxgep);
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_remove_intrs"));
 }

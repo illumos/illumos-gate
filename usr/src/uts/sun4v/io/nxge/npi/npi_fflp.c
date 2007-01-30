@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -199,11 +199,8 @@ npi_fflp_vlan_tbl_dump(npi_handle_t handle)
 
 }
 
-
-
 static uint64_t
 npi_fflp_tcam_check_completion(npi_handle_t handle, tcam_op_t op_type);
-
 
 /*
  * npi_fflp_tcam_check_completion()
@@ -224,8 +221,6 @@ npi_fflp_tcam_check_completion(npi_handle_t handle, tcam_op_t op_type);
  *        NPI_TCAM_COMP_NO_MATCH          no match
  *
  */
-
-
 static uint64_t
 npi_fflp_tcam_check_completion(npi_handle_t handle, tcam_op_t op_type)
 {
@@ -286,25 +281,20 @@ npi_fflp_tcam_check_completion(npi_handle_t handle, tcam_op_t op_type)
 	return (tctl.value);
 }
 
-
-
-
-
 /*
  * npi_fflp_tcam_entry_invalidate()
  *
  * invalidates entry at tcam location
  *
  * Input
- * location
+ * handle  :        OS specific handle
+ * location	:	TCAM location
  *
  * Return
  *   NPI_SUCCESS
- *   NPI_SW_ERR
- *   NPI_HW_ERR
+ *   NPI_FFLP_TCAM_HW_ERROR
  *
  */
-
 npi_status_t
 npi_fflp_tcam_entry_invalidate(npi_handle_t handle, tcam_location_t location)
 {
@@ -336,16 +326,14 @@ npi_fflp_tcam_entry_invalidate(npi_handle_t handle, tcam_location_t location)
 
 }
 
-
-
-
 /*
  * npi_fflp_tcam_entry_match()
  *
  * lookup a tcam entry in the TCAM
  *
  * Input
- *  tcam_ptr      TCAM entry ptr
+ * handle  :        OS specific handle
+ * tcam_ptr   :     TCAM entry ptr
  *
  * Return
  *
@@ -353,7 +341,6 @@ npi_fflp_tcam_entry_invalidate(npi_handle_t handle, tcam_location_t location)
  *	 NPI_TCAM_NO_MATCH:		     no match
  *	 0 - TCAM_SIZE:			     matching entry location (if match)
  */
-
 int
 npi_fflp_tcam_entry_match(npi_handle_t handle,  tcam_entry_t *tcam_ptr)
 {
@@ -392,26 +379,21 @@ npi_fflp_tcam_entry_match(npi_handle_t handle,  tcam_entry_t *tcam_ptr)
 
 }
 
-
-
 /*
  * npi_fflp_tcam_entry_read ()
  *
  * Reads a tcam entry from the TCAM location, location
  *
  * Input:
- * location
- * tcam_ptr
+ * handle  :        OS specific handle
+ * location  :		TCAM location
+ * tcam_ptr  :		TCAM entry pointer
  *
  * Return:
  * NPI_SUCCESS
- * NPI_HW_ERROR
- * NPI_SW_ERROR
+ * NPI_FFLP_TCAM_RD_ERROR
  *
  */
-
-
-
 npi_status_t
 npi_fflp_tcam_entry_read(npi_handle_t handle,
 						    tcam_location_t location,
@@ -448,24 +430,21 @@ npi_fflp_tcam_entry_read(npi_handle_t handle,
 	return (NPI_SUCCESS);
 }
 
-
-
 /*
  * npi_fflp_tcam_entry_write()
  *
  * writes a tcam entry to the TCAM location, location
  *
  * Input:
- * location
- * tcam_ptr
+ * handle  :        OS specific handle
+ * location :	TCAM location
+ * tcam_ptr :	TCAM entry pointer
  *
  * Return:
  * NPI_SUCCESS
- * NPI_HW_ERROR
- * NPI_SW_ERROR
+ * NPI_FFLP_TCAM_WR_ERROR
  *
  */
-
 npi_status_t
 npi_fflp_tcam_entry_write(npi_handle_t handle,
 			    tcam_location_t location,
@@ -512,25 +491,21 @@ npi_fflp_tcam_entry_write(npi_handle_t handle,
 	return (NPI_SUCCESS);
 }
 
-
-
 /*
  * npi_fflp_tcam_asc_ram_entry_write()
  *
  * writes a tcam associatedRAM at the TCAM location, location
  *
  * Input:
- * location	tcam associatedRAM location
- * ram_data	Value to write
+ * handle  :        OS specific handle
+ * location :	tcam associatedRAM location
+ * ram_data :	Value to write
  *
  * Return:
  * NPI_SUCCESS
- * NPI_HW_ERROR
- * NPI_SW_ERROR
+ * NPI_FFLP_ASC_RAM_WR_ERROR
  *
  */
-
-
 npi_status_t
 npi_fflp_tcam_asc_ram_entry_write(npi_handle_t handle,
 				    tcam_location_t location,
@@ -562,26 +537,21 @@ npi_fflp_tcam_asc_ram_entry_write(npi_handle_t handle,
 	return (NPI_SUCCESS);
 }
 
-
-
-
 /*
  * npi_fflp_tcam_asc_ram_entry_read()
  *
  * reads a tcam associatedRAM content at the TCAM location, location
  *
  * Input:
- * location	tcam associatedRAM location
- * ram_data	ptr to return contents
+ * handle  :        OS specific handle
+ * location :	tcam associatedRAM location
+ * ram_data :	ptr to return contents
  *
  * Return:
  * NPI_SUCCESS
- * NPI_HW_ERROR
- * NPI_SW_ERROR
+ * NPI_FFLP_ASC_RAM_RD_ERROR
  *
  */
-
-
 npi_status_t
 npi_fflp_tcam_asc_ram_entry_read(npi_handle_t handle,
 				    tcam_location_t location,
@@ -611,8 +581,6 @@ npi_fflp_tcam_asc_ram_entry_read(npi_handle_t handle,
 	return (NPI_SUCCESS);
 }
 
-
-
 /* FFLP FCRAM Related functions */
 /* The following are FCRAM datapath functions */
 
@@ -631,10 +599,8 @@ npi_fflp_tcam_asc_ram_entry_read(npi_handle_t handle,
  *			      FCRAM_ENTRY_EX_IP6:  56 bytes (7 X 64 bit write)
  *
  * Outputs:
- *         NPI_SUCCESS:		        Successful
- *	   NPI_FAILURE | NPI_XX_ERROR	failure and reason
+ *         NPI success/failure status code
  */
-
 npi_status_t
 npi_fflp_fcram_entry_write(npi_handle_t handle, part_id_t partid,
 			    uint32_t location, fcram_entry_t *fcram_ptr,
@@ -717,7 +683,6 @@ npi_fflp_fcram_entry_write(npi_handle_t handle, part_id_t partid,
 	return (NPI_SUCCESS);
 }
 
-
 /*
  * npi_fflp_fcram_read_read ()
  * Reads an FCRAM entry
@@ -733,14 +698,9 @@ npi_fflp_fcram_entry_write(npi_handle_t handle, part_id_t partid,
  *			      FCRAM_ENTRY_EX_IP4:  32 bytes (4 X 64 bit read )
  *			      FCRAM_ENTRY_EX_IP6:  56 bytes (7 X 64 bit read )
  * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
+ * NPI Success/Failure status code
  *
  */
-
-
 npi_status_t
 npi_fflp_fcram_entry_read(npi_handle_t handle,  part_id_t partid,
 			    uint32_t location, fcram_entry_t *fcram_ptr,
@@ -818,8 +778,6 @@ npi_fflp_fcram_entry_read(npi_handle_t handle,  part_id_t partid,
 
 }
 
-
-
 /*
  * npi_fflp_fcram_entry_invalidate ()
  * Invalidate FCRAM entry at the given location
@@ -829,13 +787,8 @@ npi_fflp_fcram_entry_read(npi_handle_t handle,  part_id_t partid,
  *	location:	location of the FCRAM/hash entry.
  *
  * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
+ * NPI Success/Failure status code
  */
-
 npi_status_t
 npi_fflp_fcram_entry_invalidate(npi_handle_t handle, part_id_t partid,
 				    uint32_t location)
@@ -851,7 +804,7 @@ npi_fflp_fcram_entry_invalidate(npi_handle_t handle, part_id_t partid,
 			" FCRAM_ENTRY_Invalidate:"
 			" unaligned location %llx \n",
 			location));
-			/* need to be 8 byte alligned */
+			/* need to be 8 byte aligned */
 		return (NPI_FFLP_FCRAM_LOC_INVALID);
 	}
 
@@ -899,13 +852,8 @@ npi_fflp_fcram_entry_invalidate(npi_handle_t handle, part_id_t partid,
  *	   data:	Data
  *
  * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
+ * NPI Success/Failure status code
  */
-
 npi_status_t
 npi_fflp_fcram_subarea_write(npi_handle_t handle, part_id_t partid,
 			    uint32_t location, uint64_t data)
@@ -965,13 +913,8 @@ npi_fflp_fcram_subarea_write(npi_handle_t handle, part_id_t partid,
  *	   data:	ptr do write subarea contents to.
  *
  * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
+ * NPI Success/Failure status code
  */
-
 npi_status_t
 npi_fflp_fcram_subarea_read(npi_handle_t handle, part_id_t partid,
 			    uint32_t location, uint64_t *data)
@@ -1005,7 +948,6 @@ npi_fflp_fcram_subarea_read(npi_handle_t handle, part_id_t partid,
 
 }
 
-
 /*
  * The following are zero function fflp configuration functions.
  */
@@ -1013,18 +955,7 @@ npi_fflp_fcram_subarea_read(npi_handle_t handle, part_id_t partid,
 /*
  * npi_fflp_fcram_config_partition()
  * Partitions and configures the FCRAM
- *
- * Input
- *     partid			partition ID
- *				Corresponds to the RDC table
- *     part_size		Size of the partition
- *
- * Return
- *      0			Successful
- *      Non zero  error code    Partition failed, and reason.
- *
  */
-
 npi_status_t
 npi_fflp_cfg_fcram_partition(npi_handle_t handle, part_id_t partid,
 				    uint8_t base_mask, uint8_t base_reloc)
@@ -1039,6 +970,8 @@ npi_fflp_cfg_fcram_partition(npi_handle_t handle, part_id_t partid,
 
     flow_prt_sel_t sel;
     uint64_t offset;
+
+    ASSERT(FCRAM_PARTITION_VALID(partid));
 	if (!FCRAM_PARTITION_VALID(partid)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_fflp_cfg_fcram_partition:"
@@ -1057,15 +990,13 @@ npi_fflp_cfg_fcram_partition(npi_handle_t handle, part_id_t partid,
 
 }
 
-
-
 /*
  * npi_fflp_fcram_partition_enable
  * Enable previously configured FCRAM partition
  *
  * Input
- *     partid			partition ID
- *				Corresponds to the RDC table
+ *         handle:	opaque handle interpreted by the underlying OS
+ *         partid:	 partition ID, Corresponds to the RDC table
  *
  * Return
  *      0			Successful
@@ -1080,8 +1011,8 @@ npi_fflp_cfg_fcram_partition_enable  (npi_handle_t handle, part_id_t partid)
     flow_prt_sel_t sel;
     uint64_t offset;
 
-
-	if (!FCRAM_PARTITION_VALID(partid)) {
+    ASSERT(FCRAM_PARTITION_VALID(partid));
+    if (!FCRAM_PARTITION_VALID(partid)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " fcram_partition enable:"
 				    " Invalid Partition %d \n",
@@ -1089,32 +1020,26 @@ npi_fflp_cfg_fcram_partition_enable  (npi_handle_t handle, part_id_t partid)
 		return (NPI_FFLP_FCRAM_PART_INVALID);
 	}
 
-	offset = FFLP_PART_OFFSET(partid, FFLP_FLW_PRT_SEL_REG);
+    offset = FFLP_PART_OFFSET(partid, FFLP_FLW_PRT_SEL_REG);
 
     REG_PIO_READ64(handle, offset, &sel.value);
     sel.bits.ldw.ext = BIT_ENABLE; /* enable */
     REG_PIO_WRITE64(handle, offset, sel.value);
 
-	return (NPI_SUCCESS);
+    return (NPI_SUCCESS);
 
 }
 
-
-
 /*
  * npi_fflp_fcram_partition_disable
- * Disabled previously configured FCRAM partition
+ * Disable previously configured FCRAM partition
  *
  * Input
- *     partid			partition ID
- *				Corresponds to the RDC table
+ *         handle:	opaque handle interpreted by the underlying OS
+ *         partid:	partition ID, Corresponds to the RDC table
  *
  * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
+ * NPI Success/Failure status code
  */
 npi_status_t
 npi_fflp_cfg_fcram_partition_disable(npi_handle_t handle, part_id_t partid)
@@ -1124,6 +1049,7 @@ npi_fflp_cfg_fcram_partition_disable(npi_handle_t handle, part_id_t partid)
 	flow_prt_sel_t sel;
 	uint64_t offset;
 
+	ASSERT(FCRAM_PARTITION_VALID(partid));
 	if (!FCRAM_PARTITION_VALID(partid)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " fcram_partition disable:"
@@ -1138,20 +1064,9 @@ npi_fflp_cfg_fcram_partition_disable(npi_handle_t handle, part_id_t partid)
 	return (NPI_SUCCESS);
 }
 
-
 /*
  *  npi_fflp_cam_errorcheck_disable
  *  Disables FCRAM and TCAM error checking
- *
- *  Input
- *
- *
- * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
  */
 npi_status_t
 npi_fflp_cfg_cam_errorcheck_disable(npi_handle_t handle)
@@ -1171,20 +1086,9 @@ npi_fflp_cfg_cam_errorcheck_disable(npi_handle_t handle)
 
 }
 
-
 /*
  *  npi_fflp_cam_errorcheck_enable
  *  Enables FCRAM and TCAM error checking
- *
- *  Input
- *
- *
- * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
  */
 npi_status_t
 npi_fflp_cfg_cam_errorcheck_enable(npi_handle_t handle)
@@ -1203,22 +1107,9 @@ npi_fflp_cfg_cam_errorcheck_enable(npi_handle_t handle)
 
 }
 
-
-
-
 /*
  *  npi_fflp_cam_llcsnap_enable
  *  Enables input parser llcsnap recognition
- *
- *  Input
- *
- *
- * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
  */
 npi_status_t
 npi_fflp_cfg_llcsnap_enable(npi_handle_t handle)
@@ -1238,24 +1129,10 @@ npi_fflp_cfg_llcsnap_enable(npi_handle_t handle)
 
 }
 
-
-
 /*
  *  npi_fflp_cam_llcsnap_disable
  *  Disables input parser llcsnap recognition
- *
- *  Input
- *
- *
- * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
- *
  */
-
 npi_status_t
 npi_fflp_cfg_llcsnap_disable(npi_handle_t handle)
 
@@ -1275,13 +1152,12 @@ npi_fflp_cfg_llcsnap_disable(npi_handle_t handle)
 
 }
 
-
-
 /*
  * npi_fflp_config_fcram_refresh
  * Set FCRAM min and max refresh time.
  *
  * Input
+ *      handle			opaque handle interpreted by the underlying OS
  *	min_time		Minimum Refresh time count
  *	max_time		maximum Refresh Time count
  *	sys_time		System Clock rate
@@ -1294,13 +1170,8 @@ npi_fflp_cfg_llcsnap_disable(npi_handle_t handle)
  *      system clock cycle.
  *
  * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
+ * NPI Success/Failure status code
  */
-
 npi_status_t
 npi_fflp_cfg_fcram_refresh_time(npi_handle_t handle, uint32_t min_time,
 				    uint32_t max_time, uint32_t sys_time)
@@ -1326,25 +1197,18 @@ npi_fflp_cfg_fcram_refresh_time(npi_handle_t handle, uint32_t min_time,
 	return (NPI_SUCCESS);
 }
 
-
-
 /*
  *  npi_fflp_hash_lookup_err_report
  *  Reports hash table (fcram) lookup errors
  *
  *  Input
- *      err_stat			Pointer to return Error bits
+ *      handle			opaque handle interpreted by the underlying OS
+ *      err_stat		Pointer to return Error bits
  *
  *
  * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
- *
+ * NPI success/failure status code
  */
-
 npi_status_t
 npi_fflp_fcram_get_lookup_err_log(npi_handle_t handle,
 				    hash_lookup_err_log_t *err_stat)
@@ -1381,22 +1245,19 @@ npi_fflp_fcram_get_lookup_err_log(npi_handle_t handle,
 
 }
 
-
 /*
  * npi_fflp_fcram_get_pio_err_log
  * Reports hash table PIO read errors for the given partition.
  * by default, it clears the error bit which was set by the HW.
  *
  * Input
+ *      handle:		opaque handle interpreted by the underlying OS
  *	partid:		partition ID
  *      err_stat	Pointer to return Error bits
  *
  * Return
- *	NPI_SUCCESS	Success
- *
- *
+ *	NPI success/failure status code
  */
-
 npi_status_t
 npi_fflp_fcram_get_pio_err_log(npi_handle_t handle, part_id_t partid,
 				    hash_pio_err_log_t *err_stat)
@@ -1405,6 +1266,7 @@ npi_fflp_fcram_get_pio_err_log(npi_handle_t handle, part_id_t partid,
 	hash_tbl_data_log_t err_log;
 	uint64_t offset;
 
+	ASSERT(FCRAM_PARTITION_VALID(partid));
 	if (!FCRAM_PARTITION_VALID(partid)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" fcram_get_pio_err_log:"
@@ -1433,9 +1295,6 @@ npi_fflp_fcram_get_pio_err_log(npi_handle_t handle, part_id_t partid,
 
 }
 
-
-
-
 /*
  * npi_fflp_fcram_clr_pio_err_log
  * Clears FCRAM PIO  error status for the partition.
@@ -1443,15 +1302,13 @@ npi_fflp_fcram_get_pio_err_log(npi_handle_t handle, part_id_t partid,
  *  then the SW will clear it by clearing the bit.
  *
  * Input
+ *      handle:		opaque handle interpreted by the underlying OS
  *	partid:		partition ID
  *
  *
  * Return
- *	NPI_SUCCESS	Success
- *
- *
+ *	NPI success/failure status code
  */
-
 npi_status_t
 npi_fflp_fcram_clr_pio_err_log(npi_handle_t handle, part_id_t partid)
 {
@@ -1459,6 +1316,7 @@ npi_fflp_fcram_clr_pio_err_log(npi_handle_t handle, part_id_t partid)
 
 	hash_tbl_data_log_t err_log;
 
+	ASSERT(FCRAM_PARTITION_VALID(partid));
 	if (!FCRAM_PARTITION_VALID(partid)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" fcram_clr_pio_err_log:"
@@ -1479,9 +1337,6 @@ npi_fflp_fcram_clr_pio_err_log(npi_handle_t handle, part_id_t partid)
 
 }
 
-
-
-
 /*
  * npi_fflp_tcam_get_err_log
  * Reports TCAM PIO read and lookup errors.
@@ -1489,6 +1344,7 @@ npi_fflp_fcram_clr_pio_err_log(npi_handle_t handle, part_id_t partid)
  *  then the SW will clear it by clearing the bit.
  *
  * Input
+ *      handle:		opaque handle interpreted by the underlying OS
  *	err_stat:	 structure to report various TCAM errors.
  *                       will be updated if there are TCAM errors.
  *
@@ -1536,8 +1392,6 @@ npi_fflp_tcam_get_err_log(npi_handle_t handle, tcam_err_log_t *err_stat)
 
 }
 
-
-
 /*
  * npi_fflp_tcam_clr_err_log
  * Clears TCAM PIO read and lookup error status.
@@ -1545,8 +1399,7 @@ npi_fflp_tcam_get_err_log(npi_handle_t handle, tcam_err_log_t *err_stat)
  *  then the SW will clear it by clearing the bit.
  *
  * Input
- *	err_stat:	 structure to report various TCAM errors.
- *                       will be updated if there are TCAM errors.
+ *         handle:	opaque handle interpreted by the underlying OS
  *
  *
  * Return
@@ -1554,7 +1407,6 @@ npi_fflp_tcam_get_err_log(npi_handle_t handle, tcam_err_log_t *err_stat)
  *
  *
  */
-
 npi_status_t
 npi_fflp_tcam_clr_err_log(npi_handle_t handle)
 {
@@ -1569,8 +1421,6 @@ npi_fflp_tcam_clr_err_log(npi_handle_t handle)
 
 }
 
-
-
 /*
  * npi_fflp_fcram_err_synd_test
  * Tests the FCRAM error detection logic.
@@ -1579,6 +1429,7 @@ npi_fflp_tcam_clr_err_log(npi_handle_t handle)
  * to be XOR'ed
  *
  * Input
+ *      handle:	opaque handle interpreted by the underlying OS
  *	syndrome_bits:	 Syndrome bits to select bits to be xor'ed
  *
  *
@@ -1604,7 +1455,6 @@ npi_fflp_fcram_err_synd_test(npi_handle_t handle, uint8_t syndrome_bits)
 
 }
 
-
 /*
  * npi_fflp_fcram_err_data_test
  * Tests the FCRAM error detection logic.
@@ -1612,6 +1462,7 @@ npi_fflp_fcram_err_synd_test(npi_handle_t handle, uint8_t syndrome_bits)
  * bits [63:0] are set to select the data bits to be xor'ed
  *
  * Input
+ *      handle:	opaque handle interpreted by the underlying OS
  *	data:	 data bits to select bits to be xor'ed
  *
  *
@@ -1642,28 +1493,22 @@ npi_fflp_fcram_err_data_test(npi_handle_t handle, fcram_err_data_t *data)
 
 }
 
-
-
-
 /*
  * npi_fflp_cfg_enet_vlan_table_assoc
  * associates port vlan id to rdc table.
  *
  * Input
+ *     handle			opaque handle interpreted by the underlying OS
  *     mac_portn		port number
  *     vlan_id			VLAN ID
  *     rdc_table		RDC Table #
+ *     priority			priority
  *
  * Output
  *
- *	NPI_SUCCESS	Success
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
+ *	NPI success/failure status code
  *
  */
-
-
 npi_status_t
 npi_fflp_cfg_enet_vlan_table_assoc(npi_handle_t handle, uint8_t mac_portn,
 				    vlan_id_t vlan_id, uint8_t rdc_table,
@@ -1674,6 +1519,8 @@ npi_fflp_cfg_enet_vlan_table_assoc(npi_handle_t handle, uint8_t mac_portn,
 	uint64_t offset;
 	uint8_t vlan_parity[8] = {0, 1, 1, 2, 1, 2, 2, 3};
 	uint8_t parity_bit;
+
+	ASSERT(FFLP_VLAN_VALID(vlan_id));
 	if (!FFLP_VLAN_VALID(vlan_id)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" fflp_cfg_enet_vlan_table:"
@@ -1682,6 +1529,7 @@ npi_fflp_cfg_enet_vlan_table_assoc(npi_handle_t handle, uint8_t mac_portn,
 		return (NPI_FFLP_VLAN_INVALID);
 	}
 
+	ASSERT(FFLP_PORT_VALID(mac_portn));
 	if (!FFLP_PORT_VALID(mac_portn)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" fflp_cfg_enet_vlan_table:"
@@ -1690,7 +1538,7 @@ npi_fflp_cfg_enet_vlan_table_assoc(npi_handle_t handle, uint8_t mac_portn,
 		return (NPI_FFLP_PORT_INVALID);
 	}
 
-
+	ASSERT(FFLP_RDC_TABLE_VALID(rdc_table));
 	if (!FFLP_RDC_TABLE_VALID(rdc_table)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" fflp_cfg_enet_vlan_table:"
@@ -1761,14 +1609,13 @@ npi_fflp_cfg_enet_vlan_table_assoc(npi_handle_t handle, uint8_t mac_portn,
 	return (NPI_SUCCESS);
 }
 
-
-
 /*
  * npi_fflp_cfg_enet_vlan_table_set_pri
  * sets the  vlan based classification priority in respect to L2DA
  * classification.
  *
  * Input
+ *     handle		opaque handle interpreted by the underlying OS
  *     mac_portn	port number
  *     vlan_id		VLAN ID
  *     priority 	priority
@@ -1777,13 +1624,8 @@ npi_fflp_cfg_enet_vlan_table_assoc(npi_handle_t handle, uint8_t mac_portn,
  *
  * Output
  *
- *	NPI_SUCCESS			Successful
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
+ *	NPI success/failure status code
  */
-
 npi_status_t
 npi_fflp_cfg_enet_vlan_table_set_pri(npi_handle_t handle, uint8_t mac_portn,
 				    vlan_id_t vlan_id, uint8_t priority)
@@ -1793,6 +1635,7 @@ npi_fflp_cfg_enet_vlan_table_set_pri(npi_handle_t handle, uint8_t mac_portn,
 	uint64_t offset;
 	uint64_t old_value;
 
+	ASSERT(FFLP_VLAN_VALID(vlan_id));
 	if (!FFLP_VLAN_VALID(vlan_id)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" enet_vlan_table set pri:"
@@ -1801,6 +1644,7 @@ npi_fflp_cfg_enet_vlan_table_set_pri(npi_handle_t handle, uint8_t mac_portn,
 		return (NPI_FFLP_VLAN_INVALID);
 	}
 
+	ASSERT(FFLP_PORT_VALID(mac_portn));
 	if (!FFLP_PORT_VALID(mac_portn)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" enet_vlan_table set pri:"
@@ -1852,21 +1696,19 @@ npi_fflp_cfg_enet_vlan_table_set_pri(npi_handle_t handle, uint8_t mac_portn,
 	return (NPI_SUCCESS);
 }
 
-
-
 /*
  * npi_fflp_cfg_vlan_table_clear
  * Clears the vlan RDC table
  *
  * Input
+ *     handle		opaque handle interpreted by the underlying OS
  *     vlan_id		VLAN ID
  *
  * Output
  *
- *	NPI_SUCCESS			Successful
+ *	NPI success/failure status code
  *
  */
-
 npi_status_t
 npi_fflp_cfg_vlan_table_clear(npi_handle_t handle, vlan_id_t vlan_id)
 {
@@ -1890,8 +1732,6 @@ npi_fflp_cfg_vlan_table_clear(npi_handle_t handle, vlan_id_t vlan_id)
 	return (NPI_SUCCESS);
 }
 
-
-
 /*
  * npi_fflp_vlan_tbl_get_err_log
  * Reports VLAN Table  errors.
@@ -1899,6 +1739,7 @@ npi_fflp_cfg_vlan_table_clear(npi_handle_t handle, vlan_id_t vlan_id)
  *  then the SW will clear it by clearing the bit.
  *
  * Input
+ *      handle:		opaque handle interpreted by the underlying OS
  *	err_stat:	 structure to report various VLAN table errors.
  *                       will be updated if there are errors.
  *
@@ -1937,7 +1778,6 @@ npi_fflp_vlan_tbl_get_err_log(npi_handle_t handle, vlan_tbl_err_log_t *err_stat)
 	return (NPI_SUCCESS);
 }
 
-
 /*
  * npi_fflp_vlan_tbl_clr_err_log
  * Clears VLAN Table PIO  error status.
@@ -1945,8 +1785,7 @@ npi_fflp_vlan_tbl_get_err_log(npi_handle_t handle, vlan_tbl_err_log_t *err_stat)
  *  then the SW will clear it by clearing the bit.
  *
  * Input
- *	err_stat:	 structure to report various VLAN Table errors.
- *                       will be updated if there are  errors.
+ *         handle:	opaque handle interpreted by the underlying OS
  *
  *
  * Return
@@ -1954,7 +1793,6 @@ npi_fflp_vlan_tbl_get_err_log(npi_handle_t handle, vlan_tbl_err_log_t *err_stat)
  *
  *
  */
-
 npi_status_t
 npi_fflp_vlan_tbl_clr_err_log(npi_handle_t handle)
 {
@@ -1969,14 +1807,12 @@ npi_fflp_vlan_tbl_clr_err_log(npi_handle_t handle)
 	return (NPI_SUCCESS);
 }
 
-
-
-
 /*
  * npi_fflp_cfg_enet_usr_cls_set()
  * Configures a user configurable ethernet class
  *
  * Input
+ *      handle:		opaque handle interpreted by the underlying OS
  *      class:       Ethernet Class  class
  *		     (TCAM_CLASS_ETYPE or  TCAM_CLASS_ETYPE_2)
  *      enet_type:   16 bit Ethernet Type value, corresponding ethernet bytes
@@ -1985,15 +1821,8 @@ npi_fflp_vlan_tbl_clr_err_log(npi_handle_t handle)
  *  by default, the class will be disabled until explicitly enabled.
  *
  * Return
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
- *
- *
+ * NPI success/failure status code
  */
-
 npi_status_t
 npi_fflp_cfg_enet_usr_cls_set(npi_handle_t handle,
 			    tcam_class_t class, uint16_t enet_type)
@@ -2003,7 +1832,7 @@ npi_fflp_cfg_enet_usr_cls_set(npi_handle_t handle,
 	cls_cfg.value = 0x0;
 
 /* check if etype is valid */
-
+	ASSERT(TCAM_L2_USR_CLASS_VALID(class));
 	if (!TCAM_L2_USR_CLASS_VALID(class)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" npi_fflp_cfg_enet_usr_cls_set:"
@@ -2026,30 +1855,25 @@ npi_fflp_cfg_enet_usr_cls_set(npi_handle_t handle,
 	return (NPI_SUCCESS);
 }
 
-
-
 /*
  * npi_fflp_cfg_enet_usr_cls_enable()
  * Enable previously configured TCAM user configurable Ethernet classes.
  *
  * Input
+ *      handle:	opaque handle interpreted by the underlying OS
  *      class:       Ethernet Class  class
  *		     (TCAM_CLASS_ETYPE or  TCAM_CLASS_ETYPE_2)
  *
  * Return
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
+ * NPI success/failure status code
  */
-
 npi_status_t
 npi_fflp_cfg_enet_usr_cls_enable(npi_handle_t handle, tcam_class_t class)
 {
 	uint64_t offset;
 	tcam_class_prg_ether_t cls_cfg;
 
+	ASSERT(TCAM_L2_USR_CLASS_VALID(class));
 	if (!TCAM_L2_USR_CLASS_VALID(class)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" npi_fflp_cfg_enet_usr_cls_enable:"
@@ -2066,30 +1890,25 @@ npi_fflp_cfg_enet_usr_cls_enable(npi_handle_t handle, tcam_class_t class)
 	return (NPI_SUCCESS);
 }
 
-
 /*
  * npi_fflp_cfg_enet_usr_cls_disable()
  * Disables previously configured TCAM user configurable Ethernet classes.
  *
  * Input
+ *      handle:	opaque handle interpreted by the underlying OS
  *      class:       Ethernet Class  class
  *		     (TCAM_CLASS_ETYPE or  TCAM_CLASS_ETYPE_2)
  *
  * Return
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERROR
- *
+ * NPI success/failure status code
  */
-
-
 npi_status_t
 npi_fflp_cfg_enet_usr_cls_disable(npi_handle_t handle, tcam_class_t class)
 {
 	uint64_t offset;
 	tcam_class_prg_ether_t cls_cfg;
 
+	ASSERT(TCAM_L2_USR_CLASS_VALID(class));
 	if (!TCAM_L2_USR_CLASS_VALID(class)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" npi_fflp_cfg_enet_usr_cls_disable:"
@@ -2107,13 +1926,12 @@ npi_fflp_cfg_enet_usr_cls_disable(npi_handle_t handle, tcam_class_t class)
 	return (NPI_SUCCESS);
 }
 
-
-
 /*
  * npi_fflp_cfg_ip_usr_cls_set()
  * Configures the TCAM user configurable IP classes.
  *
  * Input
+ *      handle:		opaque handle interpreted by the underlying OS
  *      class:       IP Class  class
  *		     (TCAM_CLASS_IP_USER_4 <= class <= TCAM_CLASS_IP_USER_7)
  *      tos:         IP TOS bits
@@ -2123,14 +1941,8 @@ npi_fflp_cfg_enet_usr_cls_disable(npi_handle_t handle, tcam_class_t class)
  * by default, will the class is disabled until explicitly enabled
  *
  * Return
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERROR
- * NPI_SW_ERROR
- *
+ * NPI success/failure status code
  */
-
-
 npi_status_t
 npi_fflp_cfg_ip_usr_cls_set(npi_handle_t handle, tcam_class_t class,
 			    uint8_t tos, uint8_t tos_mask,
@@ -2139,6 +1951,7 @@ npi_fflp_cfg_ip_usr_cls_set(npi_handle_t handle, tcam_class_t class,
 	uint64_t offset;
 	tcam_class_prg_ip_t ip_cls_cfg;
 
+	ASSERT(TCAM_L3_USR_CLASS_VALID(class));
 	if (!TCAM_L3_USR_CLASS_VALID(class)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" npi_fflp_cfg_ip_usr_cls_set:"
@@ -2164,23 +1977,20 @@ npi_fflp_cfg_ip_usr_cls_set(npi_handle_t handle, tcam_class_t class,
  * Enable previously configured TCAM user configurable IP classes.
  *
  * Input
+ *      handle:	opaque handle interpreted by the underlying OS
  *      class:       IP Class  class
  *		     (TCAM_CLASS_IP_USER_4 <= class <= TCAM_CLASS_IP_USER_7)
  *
  * Return
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERROR
- * NPI_SW_ERROR
- *
+ * NPI success/failure status code
  */
-
 npi_status_t
 npi_fflp_cfg_ip_usr_cls_enable(npi_handle_t handle, tcam_class_t class)
 {
 	uint64_t offset;
 	tcam_class_prg_ip_t ip_cls_cfg;
 
+	ASSERT(TCAM_L3_USR_CLASS_VALID(class));
 	if (!TCAM_L3_USR_CLASS_VALID(class)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" npi_fflp_cfg_ip_usr_cls_enable:"
@@ -2198,31 +2008,25 @@ npi_fflp_cfg_ip_usr_cls_enable(npi_handle_t handle, tcam_class_t class)
 
 }
 
-
-
 /*
  * npi_fflp_cfg_ip_usr_cls_disable()
  * Disables previously configured TCAM user configurable IP classes.
  *
  * Input
+ *      handle:	opaque handle interpreted by the underlying OS
  *      class:       IP Class  class
  *		     (TCAM_CLASS_IP_USER_4 <= class <= TCAM_CLASS_IP_USER_7)
  *
  * Return
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERROR
- * NPI_SW_ERROR
- *
+ * NPI success/failure status code
  */
-
-
 npi_status_t
 npi_fflp_cfg_ip_usr_cls_disable(npi_handle_t handle, tcam_class_t class)
 {
 	uint64_t offset;
 	tcam_class_prg_ip_t ip_cls_cfg;
 
+	ASSERT(TCAM_L3_USR_CLASS_VALID(class));
 	if (!TCAM_L3_USR_CLASS_VALID(class)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" npi_fflp_cfg_ip_usr_cls_disable:"
@@ -2241,13 +2045,13 @@ npi_fflp_cfg_ip_usr_cls_disable(npi_handle_t handle, tcam_class_t class)
 
 }
 
-
 /*
  * npi_fflp_cfg_ip_cls_tcam_key ()
  *
  * Configures the TCAM key generation for the IP classes
  *
  * Input
+ *      handle:	opaque handle interpreted by the underlying OS
  *      l3_class:        IP class to configure key generation
  *      cfg:             Configuration bits:
  *                   discard:      Discard all frames of this class
@@ -2257,13 +2061,8 @@ npi_fflp_cfg_ip_usr_cls_disable(npi_handle_t handle, tcam_class_t class)
  *
  *
  * Return
- * NPI_SUCCESS
- * NPI_HW_ERROR
- * NPI_SW_ERROR
- *
+ * NPI success/failure status code
  */
-
-
 npi_status_t
 npi_fflp_cfg_ip_cls_tcam_key(npi_handle_t handle,
 			    tcam_class_t l3_class, tcam_key_cfg_t *cfg)
@@ -2271,6 +2070,7 @@ npi_fflp_cfg_ip_cls_tcam_key(npi_handle_t handle,
 	uint64_t offset;
 	tcam_class_key_ip_t tcam_cls_cfg;
 
+	ASSERT(TCAM_L3_CLASS_VALID(l3_class));
 	if (!(TCAM_L3_CLASS_VALID(l3_class))) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" npi_fflp_cfg_ip_cls_tcam_key:"
@@ -2312,8 +2112,6 @@ npi_fflp_cfg_ip_cls_tcam_key(npi_handle_t handle,
 	return (NPI_SUCCESS);
 }
 
-
-
 /*
  * npi_fflp_cfg_ip_cls_flow_key ()
  *
@@ -2323,6 +2121,7 @@ npi_fflp_cfg_ip_cls_tcam_key(npi_handle_t handle,
  * NPI function.
  *
  * Input
+ *      handle:	opaque handle interpreted by the underlying OS
  *      l3_class:        IP class to configure flow key generation
  *      cfg:             Configuration bits:
  *                   use_proto:     Use IP proto field
@@ -2337,14 +2136,8 @@ npi_fflp_cfg_ip_cls_tcam_key(npi_handle_t handle,
  *
  *
  * Return
- * NPI_SUCCESS
- * NPI_HW_ERROR
- * NPI_SW_ERROR
- *
+ * NPI success/failure status code
  */
-
-
-
 npi_status_t
 npi_fflp_cfg_ip_cls_flow_key(npi_handle_t handle, tcam_class_t l3_class,
 							    flow_key_cfg_t *cfg)
@@ -2352,7 +2145,7 @@ npi_fflp_cfg_ip_cls_flow_key(npi_handle_t handle, tcam_class_t l3_class,
 	uint64_t offset;
 	flow_class_key_ip_t flow_cfg_reg;
 
-
+	ASSERT(TCAM_L3_CLASS_VALID(l3_class));
 	if (!(TCAM_L3_CLASS_VALID(l3_class))) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" npi_fflp_cfg_ip_cls_flow_key:"
@@ -2406,7 +2199,6 @@ npi_fflp_cfg_ip_cls_flow_key(npi_handle_t handle, tcam_class_t l3_class,
 
 }
 
-
 npi_status_t
 npi_fflp_cfg_ip_cls_flow_key_get(npi_handle_t handle,
 				    tcam_class_t l3_class,
@@ -2415,7 +2207,7 @@ npi_fflp_cfg_ip_cls_flow_key_get(npi_handle_t handle,
 	uint64_t offset;
 	flow_class_key_ip_t flow_cfg_reg;
 
-
+	ASSERT(TCAM_L3_CLASS_VALID(l3_class));
 	if (!(TCAM_L3_CLASS_VALID(l3_class))) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_fflp_cfg_ip_cls_flow_key:"
@@ -2488,7 +2280,6 @@ npi_fflp_cfg_ip_cls_flow_key_get(npi_handle_t handle,
 
 }
 
-
 npi_status_t
 npi_fflp_cfg_ip_cls_tcam_key_get(npi_handle_t handle,
 			    tcam_class_t l3_class, tcam_key_cfg_t *cfg)
@@ -2496,6 +2287,7 @@ npi_fflp_cfg_ip_cls_tcam_key_get(npi_handle_t handle,
 	uint64_t offset;
 	tcam_class_key_ip_t tcam_cls_cfg;
 
+	ASSERT(TCAM_L3_CLASS_VALID(l3_class));
 	if (!(TCAM_L3_CLASS_VALID(l3_class))) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_fflp_cfg_ip_cls_tcam_key_get:"
@@ -2532,23 +2324,18 @@ npi_fflp_cfg_ip_cls_tcam_key_get(npi_handle_t handle,
 	return (NPI_SUCCESS);
 }
 
-
 /*
  * npi_fflp_cfg_fcram_access ()
  *
  * Sets the ratio between the FCRAM pio and lookup access
  * Input:
+ * handle:	opaque handle interpreted by the underlying OS
  * access_ratio: 0  Lookup has the highest priority
  *		 15 PIO has maximum possible priority
  *
  * Return
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
+ * NPI success/failure status code
  */
-
 npi_status_t
 npi_fflp_cfg_fcram_access(npi_handle_t handle, uint8_t access_ratio)
 {
@@ -2556,6 +2343,7 @@ npi_fflp_cfg_fcram_access(npi_handle_t handle, uint8_t access_ratio)
 	fflp_cfg_1_t fflp_cfg;
 	uint64_t offset;
 	offset = FFLP_CFG_1_REG;
+
 	if (access_ratio > 0xf) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" npi_fflp_cfg_fcram_access:"
@@ -2575,29 +2363,24 @@ npi_fflp_cfg_fcram_access(npi_handle_t handle, uint8_t access_ratio)
 
 }
 
-
 /*
  * npi_fflp_cfg_tcam_access ()
  *
  * Sets the ratio between the TCAM pio and lookup access
  * Input:
+ * handle:	opaque handle interpreted by the underlying OS
  * access_ratio: 0  Lookup has the highest priority
  *		 15 PIO has maximum possible priority
  * Return
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
+ * NPI success/failure status code
  */
-
 npi_status_t
 npi_fflp_cfg_tcam_access(npi_handle_t handle, uint8_t access_ratio)
 {
-
 	fflp_cfg_1_t fflp_cfg;
 	uint64_t offset;
 	offset = FFLP_CFG_1_REG;
+
 	if (access_ratio > 0xf) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			" npi_fflp_cfg_tcram_access:"
@@ -2609,35 +2392,28 @@ npi_fflp_cfg_tcam_access(npi_handle_t handle, uint8_t access_ratio)
 	REG_PIO_READ64(handle, offset, &fflp_cfg.value);
 	fflp_cfg.bits.ldw.fflpinitdone = 0;
 	fflp_cfg.bits.ldw.camratio = access_ratio;
-/* since the cam latency is fixed, we might set it here */
+
+	/* since the cam latency is fixed, we might set it here */
 	fflp_cfg.bits.ldw.camlatency = TCAM_DEFAULT_LATENCY;
 	REG_PIO_WRITE64(handle, offset, fflp_cfg.value);
 	REG_PIO_READ64(handle, offset, &fflp_cfg.value);
 	fflp_cfg.bits.ldw.fflpinitdone = 1;
 	REG_PIO_WRITE64(handle, offset, fflp_cfg.value);
+
 	return (NPI_SUCCESS);
-
 }
-
-
-
-
 
 /*
  * npi_fflp_cfg_hash_h1poly()
  * Initializes the H1 hash generation logic.
  *
  * Input
+ *      handle:	opaque handle interpreted by the underlying OS
  *      init_value:       The initial value (seed)
  *
  * Return
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
+ * NPI success/failure status code
  */
-
 npi_status_t
 npi_fflp_cfg_hash_h1poly(npi_handle_t handle, uint32_t init_value)
 {
@@ -2654,20 +2430,18 @@ npi_fflp_cfg_hash_h1poly(npi_handle_t handle, uint32_t init_value)
 	return (NPI_SUCCESS);
 }
 
-
-
 /*
  * npi_fflp_cfg_hash_h2poly()
  * Initializes the H2 hash generation logic.
  *
  * Input
+ *      handle:	opaque handle interpreted by the underlying OS
  *      init_value:       The initial value (seed)
  *
  * Return
  * NPI_SUCCESS
  *
  */
-
 npi_status_t
 npi_fflp_cfg_hash_h2poly(npi_handle_t handle, uint16_t init_value)
 {
@@ -2686,42 +2460,30 @@ npi_fflp_cfg_hash_h2poly(npi_handle_t handle, uint16_t init_value)
 
 }
 
-
-
 /*
  *  npi_fflp_cfg_reset
  *  Initializes the FCRAM reset sequence.
  *
  *  Input
+ *      handle:		opaque handle interpreted by the underlying OS
  *	strength:		FCRAM Drive strength
  *				   strong, weak or normal
  *				   HW recommended value:
  *	qs:			FCRAM QS mode selection
  *				   qs mode or free running
  *				   HW recommended value is:
- * type:       reset type:
- *             FFLP_ONLY
- *             FFLP_FCRAM
  *
  * Return:
- * NPI_SUCCESS
- * NPI_FAILURE
- * NPI_HW_ERR
- * NPI_SW_ERR
- *
+ * NPI success/failure status code
  */
 
 npi_status_t
 npi_fflp_cfg_fcram_reset(npi_handle_t handle,
-			    fflp_fcram_output_drive_t strength,
-			    fflp_fcram_qs_t qs)
-
+	fflp_fcram_output_drive_t strength, fflp_fcram_qs_t qs)
 {
-
 	fflp_cfg_1_t fflp_cfg;
 	uint64_t offset;
 	offset = FFLP_CFG_1_REG;
-
 
 	/* These bits have to be configured before FCRAM reset is issued */
 	fflp_cfg.value = 0;
@@ -2738,11 +2500,7 @@ npi_fflp_cfg_fcram_reset(npi_handle_t handle,
 	REG_PIO_WRITE64(handle, offset, fflp_cfg.value);
 
 	return (NPI_SUCCESS);
-
 }
-
-
-
 
 npi_status_t
 npi_fflp_cfg_init_done(npi_handle_t handle)
@@ -2760,9 +2518,6 @@ npi_fflp_cfg_init_done(npi_handle_t handle)
 
 }
 
-
-
-
 npi_status_t
 npi_fflp_cfg_init_start(npi_handle_t handle)
 
@@ -2779,13 +2534,10 @@ npi_fflp_cfg_init_start(npi_handle_t handle)
 
 }
 
-
-
 /*
  * Enables the TCAM search function.
  *
  */
-
 npi_status_t
 npi_fflp_cfg_tcam_enable(npi_handle_t handle)
 
@@ -2806,7 +2558,6 @@ npi_fflp_cfg_tcam_enable(npi_handle_t handle)
  * While the TCAM is in disabled state, all TCAM matches would return NO_MATCH
  *
  */
-
 npi_status_t
 npi_fflp_cfg_tcam_disable(npi_handle_t handle)
 
@@ -2822,27 +2573,11 @@ npi_fflp_cfg_tcam_disable(npi_handle_t handle)
 
 }
 
-
 /*
  * npi_rxdma_event_mask_config():
  *	This function is called to operate on the event mask
  *	register which is used for generating interrupts
  *	and status register.
- *
- * Parameters:
- *	handle		- NPI handle
- *	op_mode		- OP_GET: get hardware event mask
- *			  OP_SET: set hardware interrupt event masks
- *	channel		- hardware RXDMA channel from 0 to 23.
- *	cfgp		- pointer to NPI defined event mask
- *			  enum data type.
- * Return:
- *	NPI_SUCCESS		- If set is complete successfully.
- *
- *	Error:
- *	NPI_FAILURE		-
- *	NPI_FFLP_ERROR | NPI_FFLP_SW_PARAM_ERROR
- *
  */
 npi_status_t
 npi_fflp_event_mask_config(npi_handle_t handle, io_op_t op_mode,
@@ -2883,15 +2618,18 @@ npi_fflp_event_mask_config(npi_handle_t handle, io_op_t op_mode,
 	return (status);
 }
 
-/* Read vlan error bits */
-
+/*
+ * Read vlan error bits
+ */
 void
 npi_fflp_vlan_error_get(npi_handle_t handle, p_vlan_par_err_t p_err)
 {
 	REG_PIO_READ64(handle, FFLP_VLAN_PAR_ERR_REG, &p_err->value);
 }
 
-/* clear vlan error bits */
+/*
+ * clear vlan error bits
+ */
 void
 npi_fflp_vlan_error_clear(npi_handle_t handle)
 {
@@ -2903,20 +2641,23 @@ npi_fflp_vlan_error_clear(npi_handle_t handle)
 
 }
 
-
-/* Read TCAM error bits */
-
+/*
+ * Read TCAM error bits
+ */
 void
 npi_fflp_tcam_error_get(npi_handle_t handle, p_tcam_err_t p_err)
 {
 	REG_PIO_READ64(handle, FFLP_TCAM_ERR_REG, &p_err->value);
 }
 
-/* clear TCAM error bits */
+/*
+ * clear TCAM error bits
+ */
 void
 npi_fflp_tcam_error_clear(npi_handle_t handle)
 {
 	tcam_err_t p_err;
+
 	p_err.value  = 0;
 	p_err.bits.ldw.p_ecc = 0;
 	p_err.bits.ldw.mult = 0;
@@ -2925,24 +2666,28 @@ npi_fflp_tcam_error_clear(npi_handle_t handle)
 
 }
 
-
-/* Read FCRAM error bits */
-
+/*
+ * Read FCRAM error bits
+ */
 void
 npi_fflp_fcram_error_get(npi_handle_t handle,
-		    p_hash_tbl_data_log_t p_err, uint8_t partition)
+	p_hash_tbl_data_log_t p_err, uint8_t partition)
 {
 	uint64_t offset;
+
 	offset = FFLP_HASH_TBL_DATA_LOG_REG + partition * 8192;
 	REG_PIO_READ64(handle, offset, &p_err->value);
 }
 
-/* clear FCRAM error bits */
+/*
+ * clear FCRAM error bits
+ */
 void
 npi_fflp_fcram_error_clear(npi_handle_t handle, uint8_t partition)
 {
 	hash_tbl_data_log_t p_err;
 	uint64_t offset;
+
 	p_err.value  = 0;
 	p_err.bits.ldw.pio_err = 0;
 	offset = FFLP_HASH_TBL_DATA_LOG_REG + partition * 8192;
@@ -2952,9 +2697,9 @@ npi_fflp_fcram_error_clear(npi_handle_t handle, uint8_t partition)
 
 }
 
-
-/* Read FCRAM lookup error log1 bits */
-
+/*
+ * Read FCRAM lookup error log1 bits
+ */
 void
 npi_fflp_fcram_error_log1_get(npi_handle_t handle,
 			    p_hash_lookup_err_log1_t log1)
@@ -2963,10 +2708,9 @@ npi_fflp_fcram_error_log1_get(npi_handle_t handle,
 				    &log1->value);
 }
 
-
-
-/* Read FCRAM lookup error log2 bits */
-
+/*
+ * Read FCRAM lookup error log2 bits
+ */
 void
 npi_fflp_fcram_error_log2_get(npi_handle_t handle,
 		    p_hash_lookup_err_log2_t log2)

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -928,8 +928,6 @@ nxge_txdma_stop(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_txdma_stop"));
 
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
-	(void) nxge_tx_mac_disable(nxgep);
-	(void) nxge_txdma_hw_mode(nxgep, NXGE_DMA_STOP);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_stop"));
 }
@@ -948,7 +946,6 @@ nxge_txdma_stop_start(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_stop_start"));
 }
-
 
 nxge_status_t
 nxge_txdma_hw_mode(p_nxge_t nxgep, boolean_t enable)
@@ -1327,6 +1324,7 @@ nxge_txdma_kick_channel(p_nxge_t nxgep, uint16_t channel)
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_kick_channel"));
 }
+
 /*ARGSUSED*/
 void
 nxge_txdma_hw_kick_channel(p_nxge_t nxgep, p_tx_ring_t ring_p, uint16_t channel)
@@ -3202,7 +3200,6 @@ fail:
 
 	return (status);
 }
-
 
 void
 nxge_txdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)

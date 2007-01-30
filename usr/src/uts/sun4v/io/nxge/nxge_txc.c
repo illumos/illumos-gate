@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,6 @@ static void
 nxge_txc_inject_port_err(uint8_t, txc_int_stat_dbg_t *,
 			uint8_t istats);
 extern nxge_status_t nxge_tx_port_fatal_err_recover(p_nxge_t);
-
 
 nxge_status_t
 nxge_txc_init(p_nxge_t nxgep)
@@ -128,30 +127,33 @@ nxge_txc_regs_dump(p_nxge_t nxgep)
 	txc_control_t		control;
 	uint32_t		bitmap = 0;
 
-	printf("\nTXC dump: func # %d:\n",
-		nxgep->function_num);
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "\nTXC dump: func # %d:\n",
+		nxgep->function_num));
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 
 	(void) npi_txc_control(handle, OP_GET, &control);
 	(void) npi_txc_port_dma_list_get(handle, nxgep->function_num, &bitmap);
 
-	printf("\n\tTXC port control 0x%0llx",
-		(long long)control.value);
-	printf("\n\tTXC port bitmap 0x%x", bitmap);
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "\n\tTXC port control 0x%0llx",
+		(long long)control.value));
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "\n\tTXC port bitmap 0x%x", bitmap));
 
 	(void) npi_txc_pkt_xmt_to_mac_get(handle, nxgep->function_num,
 	    &cnt1, &cnt2);
-	printf("\n\tTXC bytes to MAC %d packets to MAC %d",
-		cnt1, cnt2);
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "\n\tTXC bytes to MAC %d "
+		"packets to MAC %d",
+		cnt1, cnt2));
 
 	(void) npi_txc_pkt_stuffed_get(handle, nxgep->function_num,
 					    &cnt1, &cnt2);
-	printf("\n\tTXC ass packets %d reorder packets %d",
-		cnt1 & 0xffff, cnt2 & 0xffff);
+	NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		"\n\tTXC ass packets %d reorder packets %d",
+		cnt1 & 0xffff, cnt2 & 0xffff));
 
 	(void) npi_txc_reorder_get(handle, nxgep->function_num, &cnt1);
-	printf("\n\tTXC reorder resource %d", cnt1 & 0xff);
+	NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		"\n\tTXC reorder resource %d", cnt1 & 0xff));
 }
 
 nxge_status_t

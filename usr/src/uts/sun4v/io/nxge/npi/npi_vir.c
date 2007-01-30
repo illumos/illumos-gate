@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifdef SOLARIS
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-#endif
 
-#include	<npi_vir.h>
+#include <npi_vir.h>
 
 /* One register only */
 uint64_t pio_offset[] = {
@@ -287,6 +285,7 @@ npi_vir_dump_sid(npi_handle_t handle)
  *	NPI_FAILURE
  *		VIR_TAS_BUSY
  */
+
 npi_status_t
 npi_dev_func_sr_init(npi_handle_t handle)
 {
@@ -339,6 +338,7 @@ npi_dev_func_sr_init(npi_handle_t handle)
  *		VIR_SR_INVALID
  *		VIR_TAS_BUSY
  */
+
 npi_status_t
 npi_dev_func_sr_lock_enter(npi_handle_t handle)
 {
@@ -412,6 +412,7 @@ npi_dev_func_sr_lock_enter(npi_handle_t handle)
  *		VIR_SR_NOTOWNER
  *		VIR_TAS_NOTREAD
  */
+
 npi_status_t
 npi_dev_func_sr_lock_free(npi_handle_t handle)
 {
@@ -458,6 +459,7 @@ npi_dev_func_sr_lock_free(npi_handle_t handle)
  *
  *	Error:
  */
+
 npi_status_t
 npi_dev_func_sr_funcid_get(npi_handle_t handle, uint8_t *funcid_p)
 {
@@ -569,6 +571,7 @@ npi_dev_func_sr_sr_get(npi_handle_t handle, uint16_t *sr_p)
  *	NPI_FAILURE
  *		VIR_TAS_BUSY
  */
+
 npi_status_t
 npi_dev_func_sr_sr_get_set_clear(npi_handle_t handle, uint16_t impl_sr)
 {
@@ -605,6 +608,7 @@ npi_dev_func_sr_sr_get_set_clear(npi_handle_t handle, uint16_t impl_sr)
  *	NPI_FAILURE
  *		VIR_TAS_BUSY
  */
+
 npi_status_t
 npi_dev_func_sr_sr_set_only(npi_handle_t handle, uint16_t impl_sr)
 {
@@ -639,6 +643,7 @@ npi_dev_func_sr_sr_set_only(npi_handle_t handle, uint16_t impl_sr)
  *	NPI_SUCCESS		- If tas bit is read successfully.
  *	Error:
  */
+
 npi_status_t
 npi_dev_func_sr_busy(npi_handle_t handle, boolean_t *busy_p)
 {
@@ -671,6 +676,7 @@ npi_dev_func_sr_busy(npi_handle_t handle, boolean_t *busy_p)
  *	NPI_SUCCESS		- If tas value get is complete successfully.
  *	Error:
  */
+
 npi_status_t
 npi_dev_func_sr_tas_get(npi_handle_t handle, uint8_t *tas_p)
 {
@@ -697,6 +703,7 @@ npi_dev_func_sr_tas_get(npi_handle_t handle, uint8_t *tas_p)
  *	NPI_SUCCESS	-
  *	Error:
  */
+
 npi_status_t
 npi_fzc_mpc_set(npi_handle_t handle, boolean_t mpc)
 {
@@ -720,6 +727,7 @@ npi_fzc_mpc_set(npi_handle_t handle, boolean_t mpc)
  *	NPI_SUCCESS	-
  *
  */
+
 npi_status_t
 npi_fzc_mpc_get(npi_handle_t handle, boolean_t *mpc_p)
 {
@@ -746,6 +754,7 @@ npi_fzc_mpc_get(npi_handle_t handle, boolean_t *mpc_p)
  *	NPI_FAILURE
  *
  */
+
 npi_status_t
 npi_fzc_dma_bind_set(npi_handle_t handle, fzc_dma_bind_t dma_bind)
 {
@@ -808,17 +817,21 @@ npi_fzc_dma_bind_set(npi_handle_t handle, fzc_dma_bind_t dma_bind)
  *	NPI_FAILURE
  *
  */
+
 npi_status_t
 npi_fzc_ldg_num_set(npi_handle_t handle, uint8_t ld, uint8_t ldg)
 {
 	ldg_num_t	gnum;
 
+	ASSERT(LD_VALID(ld));
 	if (!LD_VALID(ld)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_fzc_ldg_num_set"
 				    "ld <0x%x>", ld));
 		return (NPI_FAILURE | NPI_VIR_LD_INVALID(ld));
 	}
+
+	ASSERT(LDG_VALID(ldg));
 	if (!LDG_VALID(ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_fzc_ldg_num_set"
@@ -848,11 +861,13 @@ npi_fzc_ldg_num_set(npi_handle_t handle, uint8_t ld, uint8_t ldg)
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_fzc_ldg_num_get(npi_handle_t handle, uint8_t ld, uint8_t *ldg_p)
 {
 	uint64_t val;
 
+	ASSERT(LD_VALID(ld));
 	if (!LD_VALID(ld)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_fzc_ldg_num_get"
@@ -880,9 +895,10 @@ npi_fzc_ldg_num_get(npi_handle_t handle, uint8_t ld, uint8_t *ldg_p)
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_ldsv_ldfs_get(npi_handle_t handle, uint8_t ldg, uint64_t *vector0_p,
-		uint64_t *vector1_p, uint64_t *vector2_p)
+	uint64_t *vector1_p, uint64_t *vector2_p)
 {
 	int	status;
 
@@ -913,12 +929,14 @@ npi_ldsv_ldfs_get(npi_handle_t handle, uint8_t ldg, uint64_t *vector0_p,
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_ldsv_get(npi_handle_t handle, uint8_t ldg, ldsv_type_t vector,
-		uint64_t *ldf_p)
+	uint64_t *ldf_p)
 {
 	uint64_t		offset;
 
+	ASSERT(LDG_VALID(ldg));
 	if (!LDG_VALID(ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_ldsv_get"
@@ -968,13 +986,15 @@ npi_ldsv_get(npi_handle_t handle, uint8_t ldg, ldsv_type_t vector,
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_ldsv_ld_get(npi_handle_t handle, uint8_t ldg, uint8_t ld,
-		ldsv_type_t vector, ldf_type_t ldf_type, boolean_t *flag_p)
+	ldsv_type_t vector, ldf_type_t ldf_type, boolean_t *flag_p)
 {
 	uint64_t		sv;
 	uint64_t		offset;
 
+	ASSERT(LDG_VALID(ldg));
 	if (!LDG_VALID(ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_ldsv_ld_get"
@@ -982,6 +1002,8 @@ npi_ldsv_ld_get(npi_handle_t handle, uint8_t ldg, uint8_t ld,
 				    " ldg <0x%x>", ldg));
 		return (NPI_FAILURE | NPI_VIR_LDG_INVALID(ldg));
 	}
+	ASSERT((LD_VALID(ld)) &&	\
+		((vector != VECTOR2) || (ld >= NXGE_MAC_LD_START)));
 	if (!LD_VALID(ld)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_ldsv_ld_get Invalid Input: "
@@ -1041,9 +1063,10 @@ npi_ldsv_ld_get(npi_handle_t handle, uint8_t ldg, uint8_t ld,
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_ldsv_ld_ldf0_get(npi_handle_t handle, uint8_t ldg, uint8_t ld,
-		boolean_t *flag_p)
+	boolean_t *flag_p)
 {
 	ldsv_type_t vector;
 
@@ -1067,6 +1090,7 @@ npi_ldsv_ld_ldf0_get(npi_handle_t handle, uint8_t ldg, uint8_t ld,
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_ldsv_ld_ldf1_get(npi_handle_t handle, uint8_t ldg, uint8_t ld,
 		boolean_t *flag_p)
@@ -1092,11 +1116,13 @@ npi_ldsv_ld_ldf1_get(npi_handle_t handle, uint8_t ldg, uint8_t ld,
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_intr_mask_set(npi_handle_t handle, uint8_t ld, uint8_t ldf_mask)
 {
 	uint64_t		offset;
 
+	ASSERT(LD_VALID(ld));
 	if (!LD_VALID(ld)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " npi_intr_mask_set ld", ld));
@@ -1115,7 +1141,6 @@ npi_intr_mask_set(npi_handle_t handle, uint8_t ld, uint8_t ldf_mask)
 	NXGE_REG_WR64(handle, offset, (uint64_t)ldf_mask);
 
 	return (NPI_SUCCESS);
-
 }
 
 /*
@@ -1136,6 +1161,7 @@ npi_intr_mask_get(npi_handle_t handle, uint8_t ld, uint8_t *ldf_mask_p)
 	uint64_t		offset;
 	uint64_t		val;
 
+	ASSERT(LD_VALID(ld));
 	if (!LD_VALID(ld)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " npi_intr_mask_get ld", ld));
@@ -1163,6 +1189,7 @@ npi_intr_mask_get(npi_handle_t handle, uint8_t ld, uint8_t *ldf_mask_p)
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_intr_ldg_mgmt_set(npi_handle_t handle, uint8_t ldg, boolean_t arm,
 			uint8_t timer)
@@ -1170,6 +1197,7 @@ npi_intr_ldg_mgmt_set(npi_handle_t handle, uint8_t ldg, boolean_t arm,
 	ldgimgm_t		mgm;
 	uint64_t		val;
 
+	ASSERT((LDG_VALID(ldg)) && (LD_INTTIMER_VALID(timer)));
 	if (!LDG_VALID(ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_intr_ldg_mgmt_set"
@@ -1215,11 +1243,13 @@ npi_intr_ldg_mgmt_set(npi_handle_t handle, uint8_t ldg, boolean_t arm,
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_intr_ldg_mgmt_timer_get(npi_handle_t handle, uint8_t ldg, uint8_t *timer_p)
 {
 	uint64_t val;
 
+	ASSERT(LDG_VALID(ldg));
 	if (!LDG_VALID(ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_intr_ldg_mgmt_timer_get"
@@ -1250,11 +1280,13 @@ npi_intr_ldg_mgmt_timer_get(npi_handle_t handle, uint8_t ldg, uint8_t *timer_p)
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_intr_ldg_mgmt_arm(npi_handle_t handle, uint8_t ldg)
 {
 	ldgimgm_t		mgm;
 
+	ASSERT(LDG_VALID(ldg));
 	if (!LDG_VALID(ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_intr_ldg_mgmt_arm"
@@ -1276,7 +1308,6 @@ npi_intr_ldg_mgmt_arm(npi_handle_t handle, uint8_t ldg)
 	return (NPI_SUCCESS);
 }
 
-
 /*
  * npi_fzc_ldg_timer_res_set():
  *	This function is called to set the timer resolution.
@@ -1288,9 +1319,11 @@ npi_intr_ldg_mgmt_arm(npi_handle_t handle, uint8_t ldg)
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_fzc_ldg_timer_res_set(npi_handle_t handle, uint32_t res)
 {
+	ASSERT(res <= LDGTITMRES_RES_MASK);
 	if (res > LDGTITMRES_RES_MASK) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_fzc_ldg_timer_res_set"
@@ -1315,6 +1348,7 @@ npi_fzc_ldg_timer_res_set(npi_handle_t handle, uint32_t res)
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_fzc_ldg_timer_res_get(npi_handle_t handle, uint8_t *res_p)
 {
@@ -1339,11 +1373,13 @@ npi_fzc_ldg_timer_res_get(npi_handle_t handle, uint8_t *res_p)
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_fzc_sid_set(npi_handle_t handle, fzc_sid_t sid)
 {
 	sid_t		sd;
 
+	ASSERT(LDG_VALID(sid.ldg));
 	if (!LDG_VALID(sid.ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_fzc_sid_set"
@@ -1352,29 +1388,26 @@ npi_fzc_sid_set(npi_handle_t handle, fzc_sid_t sid)
 		return (NPI_FAILURE | NPI_VIR_LDG_INVALID(sid.ldg));
 	}
 	if (!sid.niu) {
+		ASSERT(FUNC_VALID(sid.func));
 		if (!FUNC_VALID(sid.func)) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 					    " npi_fzc_sid_set"
 					    " Invalid Input: func <0x%x>",
 					    sid.func));
-#if    defined(SOLARIS) && defined(_KERNEL) && defined(NPI_DEBUG)
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    "invalid FUNC: npi_fzc_sid_set(%d)",
-				    sid.func));
-#endif
+				"invalid FUNC: npi_fzc_sid_set(%d)", sid.func));
 			return (NPI_FAILURE | NPI_VIR_FUNC_INVALID(sid.func));
 		}
 
+		ASSERT(SID_VECTOR_VALID(sid.vector));
 		if (!SID_VECTOR_VALID(sid.vector)) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 					    " npi_fzc_sid_set"
 					    " Invalid Input: vector <0x%x>",
 					    sid.vector));
-#if    defined(SOLARIS) && defined(_KERNEL) && defined(NPI_DEBUG)
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " invalid VECTOR: npi_fzc_sid_set(%d)",
 				    sid.vector));
-#endif
 			return (NPI_FAILURE |
 				NPI_VIR_SID_VEC_INVALID(sid.vector));
 		}
@@ -1384,11 +1417,9 @@ npi_fzc_sid_set(npi_handle_t handle, fzc_sid_t sid)
 		sd.bits.ldw.data = ((sid.func << SID_DATA_FUNCNUM_SHIFT) |
 				(sid.vector & SID_DATA_INTNUM_MASK));
 	}
-#if    defined(SOLARIS) && defined(_KERNEL) && defined(NPI_DEBUG)
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_fzc_sid_set: group %d 0x%llx",
-			    sid.ldg, sd.value));
-#endif
+
+	NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+	    " npi_fzc_sid_set: group %d 0x%llx", sid.ldg, sd.value));
 
 	NXGE_REG_WR64(handle,  SID_REG + LDG_SID_OFFSET(sid.ldg), sd.value);
 
@@ -1407,11 +1438,13 @@ npi_fzc_sid_set(npi_handle_t handle, fzc_sid_t sid)
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_fzc_sid_get(npi_handle_t handle, p_fzc_sid_t sid_p)
 {
 	sid_t		sd;
 
+	ASSERT(LDG_VALID(sid_p->ldg));
 	if (!LDG_VALID(sid_p->ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_fzc_sid_get"
@@ -1445,11 +1478,11 @@ npi_fzc_sid_get(npi_handle_t handle, p_fzc_sid_t sid_p)
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_fzc_sys_err_mask_set(npi_handle_t handle, uint64_t mask)
 {
 	NXGE_REG_WR64(handle,  SYS_ERR_MASK_REG, mask);
-
 	return (NPI_SUCCESS);
 }
 
@@ -1465,11 +1498,11 @@ npi_fzc_sys_err_mask_set(npi_handle_t handle, uint64_t mask)
  *	Error:
  *	NPI_FAILURE
  */
+
 npi_status_t
 npi_fzc_sys_err_stat_get(npi_handle_t handle, p_sys_err_stat_t statp)
 {
 	NXGE_REG_RD64(handle,  SYS_ERR_STAT_REG, &statp->value);
-
 	return (NPI_SUCCESS);
 }
 
@@ -1490,6 +1523,7 @@ npi_fzc_rst_ctl_get(npi_handle_t handle, p_rst_ctl_t rstp)
  *	NPI_SUCCESS	-
  *
  */
+
 npi_status_t
 npi_fzc_rst_ctl_reset_mac(npi_handle_t handle, uint8_t port)
 {

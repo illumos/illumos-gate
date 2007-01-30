@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,6 +130,7 @@ const char *txc_fzc_port_name[] = {
  * Dumps the contents of TXC csrs and fzc registers
  *
  * Input:
+ *	handle		- NPI handle
  *         tdc:      TX DMA number
  *
  * return:
@@ -144,6 +145,7 @@ npi_txc_dump_tdc_fzc_regs(npi_handle_t handle, uint8_t tdc)
 	uint64_t		value, offset;
 	int 			num_regs, i;
 
+	ASSERT(TXDMA_CHANNEL_VALID(tdc));
 	if (!TXDMA_CHANNEL_VALID(tdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			"npi_txc_dump_tdc_fzc_regs"
@@ -209,6 +211,7 @@ npi_txc_dump_fzc_regs(npi_handle_t handle)
  * Dumps the contents of TXC csrs and fzc registers
  *
  * Input:
+ *	handle		- NPI handle
  *         port:      port number
  *
  * return:
@@ -222,12 +225,7 @@ npi_txc_dump_port_fzc_regs(npi_handle_t handle, uint8_t port)
 	uint64_t		value, offset;
 	int 			num_regs, i;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_txc_dump_port_fzc"
-			" Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
 		"\nTXC FZC PORT Register Dump for port %d\n", port));
@@ -271,6 +269,7 @@ npi_txc_dma_max_burst(npi_handle_t handle, io_op_t op_mode, uint8_t channel,
 {
 	uint64_t val;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txc_dma_max_burst"
@@ -320,6 +319,7 @@ npi_status_t
 npi_txc_dma_max_burst_set(npi_handle_t handle, uint8_t channel,
 		uint32_t max_burst)
 {
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txc_dma_max_burst_set"
@@ -356,6 +356,7 @@ npi_txc_dma_bytes_transmitted(npi_handle_t handle, uint8_t channel,
 {
 	uint64_t val;
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txc_dma_bytes_transmitted"
@@ -479,12 +480,7 @@ npi_txc_global_disable(npi_handle_t handle)
 npi_status_t
 npi_txc_control_clear(npi_handle_t handle, uint8_t port)
 {
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_txc_port_control_clear"
-			    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	NXGE_REG_WR64(handle, TXC_PORT_CTL_REG, TXC_PORT_CNTL_CLEAR);
 
@@ -556,12 +552,7 @@ npi_txc_port_enable(npi_handle_t handle, uint8_t port)
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_port_enable:",
-				    " Invalid Input port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	NXGE_REG_RD64(handle, TXC_CONTROL_REG, &val);
 	NXGE_REG_WR64(handle, TXC_CONTROL_REG, val | (1 << port));
@@ -588,12 +579,7 @@ npi_txc_port_disable(npi_handle_t handle, uint8_t port)
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_port_disable",
-				    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	NXGE_REG_RD64(handle, TXC_CONTROL_REG, &val);
 	NXGE_REG_WR64(handle, TXC_CONTROL_REG, (val & ~(1 << port)));
@@ -622,12 +608,7 @@ npi_txc_port_dma_enable(npi_handle_t handle, uint8_t port,
 		uint32_t port_dma_list_bitmap)
 {
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_port_dma_enable",
-				    " Invalid Input: port", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	TXC_FZC_CNTL_REG_WRITE64(handle, TXC_PORT_DMA_ENABLE_REG, port,
 		port_dma_list_bitmap);
@@ -640,12 +621,7 @@ npi_txc_port_dma_list_get(npi_handle_t handle, uint8_t port,
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_port_dma_list_get"
-				    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	TXC_FZC_CNTL_REG_READ64(handle, TXC_PORT_DMA_ENABLE_REG, port, &val);
 	*port_dma_list_bitmap = (uint32_t)(val & TXC_DMA_DMA_LIST_MASK);
@@ -674,12 +650,9 @@ npi_txc_port_dma_channel_enable(npi_handle_t handle, uint8_t port,
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_port_dma_enable"
-				    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
+
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txc_port_dma_channel_enable"
@@ -715,13 +688,9 @@ npi_txc_port_dma_channel_disable(npi_handle_t handle, uint8_t port,
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_port_dma_disable"
-				    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
+	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_txc_port_dma_channel_disable"
@@ -755,14 +724,8 @@ npi_txc_reorder_set(npi_handle_t handle, uint8_t port, uint8_t *reorder)
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_txc_reorder_set"
-			    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
-	/* XXXX sanity check */
 	NXGE_REG_RD64(handle, TXC_MAX_REORDER_REG, &val);
 
 	val |= (*reorder << TXC_MAX_REORDER_SHIFT(port));
@@ -791,15 +754,7 @@ npi_txc_reorder_get(npi_handle_t handle, uint8_t port, uint32_t *reorder)
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_txc_reorder_get"
-			    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
-
-	/* XXXX error check on reorder */
-
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	NXGE_REG_RD64(handle, TXC_MAX_REORDER_REG, &val);
 
@@ -807,7 +762,6 @@ npi_txc_reorder_get(npi_handle_t handle, uint8_t port, uint32_t *reorder)
 
 	return (NPI_SUCCESS);
 }
-
 
 /*
  * npi_txc_pkt_stuffed_get():
@@ -833,12 +787,7 @@ npi_txc_pkt_stuffed_get(npi_handle_t handle, uint8_t port,
 {
 	uint64_t		value;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_pkt_stuffed_get"
-				    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	TXC_FZC_CNTL_REG_READ64(handle, TXC_PKT_STUFFED_REG, port, &value);
 	*pkt_assy_p = ((uint32_t)((value & TXC_PKT_STUFF_PKTASY_MASK) >>
@@ -873,12 +822,7 @@ npi_txc_pkt_xmt_to_mac_get(npi_handle_t handle, uint8_t port,
 {
 	uint64_t		value;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_xmt_to_mac_get"
-				    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	TXC_FZC_CNTL_REG_READ64(handle, TXC_PKT_XMIT_REG, port, &value);
 	*mac_pkts_p = ((uint32_t)((value & TXC_PKTS_XMIT_MASK) >>
@@ -888,7 +832,6 @@ npi_txc_pkt_xmt_to_mac_get(npi_handle_t handle, uint8_t port,
 
 	return (NPI_SUCCESS);
 }
-
 
 /*
  * npi_txc_get_ro_states():
@@ -923,12 +866,7 @@ npi_txc_ro_states_get(npi_handle_t handle, uint8_t port,
 	txc_ro_data3_t	d3;
 	txc_ro_data4_t	d4;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_ro_states_get"
-				    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	TXC_FZC_CNTL_REG_READ64(handle, TXC_ROECC_ST_REG, port, &ecc.value);
 	if ((ecc.bits.ldw.correct_error) || (ecc.bits.ldw.uncorrect_error)) {
@@ -980,12 +918,7 @@ npi_txc_ro_states_get(npi_handle_t handle, uint8_t port,
 npi_status_t
 npi_txc_ro_ecc_state_clr(npi_handle_t handle, uint8_t port)
 {
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_ro_ecc_state_clr"
-				    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	TXC_FZC_CNTL_REG_WRITE64(handle, TXC_ROECC_ST_REG, port, 0);
 
@@ -1008,11 +941,9 @@ npi_txc_ro_ecc_state_clr(npi_handle_t handle, uint8_t port)
  *	NPI_FAILURE	-
  *	NPI_TXC_PORT_INVALID
  */
-
 #ifdef lint
 /*ARGSUSED*/
 #endif
-
 npi_status_t
 npi_txc_sf_states_get(npi_handle_t handle, uint8_t port,
 				txc_sf_states_t *states)
@@ -1024,12 +955,7 @@ npi_txc_sf_states_get(npi_handle_t handle, uint8_t port,
 	txc_sf_data3_t	d3;
 	txc_sf_data4_t	d4;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_sf_states_get"
-				    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	TXC_FZC_CNTL_REG_READ64(handle, TXC_SFECC_ST_REG, port, &ecc.value);
 	if ((ecc.bits.ldw.correct_error) || (ecc.bits.ldw.uncorrect_error)) {
@@ -1064,12 +990,7 @@ npi_txc_sf_states_get(npi_handle_t handle, uint8_t port,
 npi_status_t
 npi_txc_sf_ecc_state_clr(npi_handle_t handle, uint8_t port)
 {
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_sf_ecc_state_clr"
-				    " Invalid Input: port <%d>", port));
-		return (NPI_FAILURE | NPI_TXC_PORT_INVALID(port));
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	TXC_FZC_CNTL_REG_WRITE64(handle, TXC_SFECC_ST_REG, port, 0);
 
@@ -1086,7 +1007,6 @@ npi_txc_sf_ecc_state_clr(npi_handle_t handle, uint8_t port)
  *
  * Return:
  */
-
 void
 npi_txc_global_istatus_get(npi_handle_t handle, txc_int_stat_t *istatus)
 {
@@ -1107,7 +1027,6 @@ npi_txc_global_istatus_get(npi_handle_t handle, txc_int_stat_t *istatus)
  *
  * Return:
  */
-
 void
 npi_txc_global_istatus_clear(npi_handle_t handle, uint64_t istatus)
 {

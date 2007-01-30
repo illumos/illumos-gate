@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -806,7 +806,7 @@ nxge_status_t nxge_mdio_read(p_nxge_t, uint8_t, uint8_t,
 nxge_status_t nxge_mdio_write(p_nxge_t, uint8_t,
 			uint8_t, uint16_t, uint16_t);
 nxge_status_t nxge_mii_check(p_nxge_t, mii_bmsr_t,
-			mii_bmsr_t);
+			mii_bmsr_t, nxge_link_state_t *);
 nxge_status_t nxge_add_mcast_addr(p_nxge_t, struct ether_addr *);
 nxge_status_t nxge_del_mcast_addr(p_nxge_t, struct ether_addr *);
 nxge_status_t nxge_set_mac_addr(p_nxge_t, struct ether_addr *);

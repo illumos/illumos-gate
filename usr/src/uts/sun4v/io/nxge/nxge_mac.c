@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1322,8 +1322,8 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 		(void) nxge_fflp_init_hostinfo(nxgep);
 
 		xconfig = CFG_XMAC_RX_ERRCHK | CFG_XMAC_RX_CRC_CHK |
-			CFG_XMAC_RX | CFG_XMAC_RX_CODE_VIO_CHK |
-			CFG_XMAC_RX_STRIP_CRC;
+			CFG_XMAC_RX | CFG_XMAC_RX_CODE_VIO_CHK &
+			~CFG_XMAC_RX_STRIP_CRC;
 
 		if (nxgep->filter.all_phys_cnt != 0)
 			xconfig |= CFG_XMAC_RX_PROMISCUOUS;
@@ -1360,8 +1360,8 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 			goto fail;
 		nxgep->mac.rx_iconfig = NXGE_BMAC_RX_INTRS;
 
-		bconfig = CFG_BMAC_RX_DISCARD_ON_ERR | CFG_BMAC_RX |
-			CFG_BMAC_RX_STRIP_CRC;
+		bconfig = CFG_BMAC_RX_DISCARD_ON_ERR | CFG_BMAC_RX &
+			~CFG_BMAC_RX_STRIP_CRC;
 
 		if (nxgep->filter.all_phys_cnt != 0)
 			bconfig |= CFG_BMAC_RX_PROMISCUOUS;
@@ -2153,7 +2153,8 @@ fail:
 /* Check MII to see if there is any link status change */
 
 nxge_status_t
-nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints)
+nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints,
+		nxge_link_state_t *link_up)
 {
 	p_nxge_param_t	param_arr;
 	p_nxge_stats_t	statsp;
@@ -2172,6 +2173,7 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints)
 	param_arr = nxgep->param_arr;
 	statsp = nxgep->statsp;
 	soft_bmsr = &nxgep->soft_bmsr;
+	*link_up = LINK_NO_CHANGE;
 
 	if (bmsr_ints.bits.link_status) {
 		if (bmsr.bits.link_status) {
@@ -2181,7 +2183,7 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints)
 			soft_bmsr->bits.link_status = 0;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 					"Link down cable problem"));
-			nxge_link_is_down(nxgep);
+			*link_up = LINK_IS_DOWN;
 		}
 	}
 
@@ -2309,7 +2311,13 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints)
 						an_common.bits.cap_pause;
 			}
 		}
-		nxge_link_is_up(nxgep);
+		*link_up = LINK_IS_UP;
+	}
+
+	if (nxgep->link_notify) {
+		*link_up = ((statsp->mac_stats.link_up) ? LINK_IS_UP :
+				LINK_IS_DOWN);
+		nxgep->link_notify = B_FALSE;
 	}
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_mii_check"));
 	return (NXGE_OK);
@@ -2480,9 +2488,9 @@ nxge_check_mii_link(p_nxge_t nxgep)
 	mii_anlpar_t anlpar;
 	mii_gsr_t gsr;
 	p_mii_regs_t mii_regs;
-
 	nxge_status_t status = NXGE_OK;
 	uint8_t portn;
+	nxge_link_state_t link_up;
 
 	portn = nxgep->mac.portnum;
 
@@ -2539,11 +2547,17 @@ nxge_check_mii_link(p_nxge_t nxgep)
 
 	bmsr_ints.value = nxgep->bmsr.value ^ bmsr_data.value;
 	nxgep->bmsr.value = bmsr_data.value;
-	if ((status = nxge_mii_check(nxgep, bmsr_data, bmsr_ints)) != NXGE_OK)
+	if ((status = nxge_mii_check(nxgep, bmsr_data, bmsr_ints, &link_up))
+			!= NXGE_OK)
 		goto fail;
 
 nxge_check_mii_link_exit:
 	RW_EXIT(&nxgep->filter_lock);
+	if (link_up == LINK_IS_UP) {
+		nxge_link_is_up(nxgep);
+	} else if (link_up == LINK_IS_DOWN) {
+		nxge_link_is_down(nxgep);
+	}
 
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 
@@ -2582,7 +2596,8 @@ nxge_check_10g_link(p_nxge_t nxgep)
 		goto fail;
 
 	if (link_up) {
-		if (nxgep->statsp->mac_stats.link_up == 0) {
+		if (nxgep->link_notify ||
+			nxgep->statsp->mac_stats.link_up == 0) {
 			if (nxge_10g_link_led_on(nxgep) != NXGE_OK)
 				goto fail;
 			nxgep->statsp->mac_stats.link_up = 1;
@@ -2590,9 +2605,11 @@ nxge_check_10g_link(p_nxge_t nxgep)
 			nxgep->statsp->mac_stats.link_duplex = 2;
 
 			nxge_link_is_up(nxgep);
+			nxgep->link_notify = B_FALSE;
 		}
 	} else {
-		if (nxgep->statsp->mac_stats.link_up == 1) {
+		if (nxgep->link_notify ||
+			nxgep->statsp->mac_stats.link_up == 1) {
 			if (nxge_10g_link_led_off(nxgep) != NXGE_OK)
 				goto fail;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -2602,7 +2619,7 @@ nxge_check_10g_link(p_nxge_t nxgep)
 			nxgep->statsp->mac_stats.link_duplex = 0;
 
 			nxge_link_is_down(nxgep);
-
+			nxgep->link_notify = B_FALSE;
 		}
 	}
 

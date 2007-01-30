@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,13 +36,12 @@
  * Globals: tunable parameters (/etc/system or adb)
  *
  */
-/* 0f90 */
-int 	nxge_tcam_class_enable = 0;
-int 	nxge_tcam_lookup_enable = 0;
-int 	nxge_flow_dist_enable = NXGE_CLASS_FLOW_USE_DST_PORT |
-		NXGE_CLASS_FLOW_USE_SRC_PORT | NXGE_CLASS_FLOW_USE_IPDST |
-		NXGE_CLASS_FLOW_USE_IPSRC | NXGE_CLASS_FLOW_USE_PROTO |
-		NXGE_CLASS_FLOW_USE_PORTNUM;
+int nxge_tcam_class_enable = 0;
+int nxge_tcam_lookup_enable = 0;
+int nxge_flow_dist_enable = NXGE_CLASS_FLOW_USE_DST_PORT |
+	NXGE_CLASS_FLOW_USE_SRC_PORT | NXGE_CLASS_FLOW_USE_IPDST |
+	NXGE_CLASS_FLOW_USE_IPSRC | NXGE_CLASS_FLOW_USE_PROTO |
+	NXGE_CLASS_FLOW_USE_PORTNUM;
 
 /*
  * Bit mapped
@@ -77,38 +76,61 @@ int 	nxge_flow_dist_enable = NXGE_CLASS_FLOW_USE_DST_PORT |
  *
  */
 
-int 	nxge_tcp4_class = NXGE_CLASS_FLOW_USE_DST_PORT |
+int nxge_tcp4_class = NXGE_CLASS_FLOW_USE_DST_PORT |
 	NXGE_CLASS_FLOW_USE_SRC_PORT | NXGE_CLASS_FLOW_USE_IPDST |
 	NXGE_CLASS_FLOW_USE_IPSRC | NXGE_CLASS_FLOW_USE_PROTO |
 	NXGE_CLASS_FLOW_USE_PORTNUM;
 
-int 	nxge_udp4_class = NXGE_CLASS_FLOW_USE_DST_PORT |
+int nxge_udp4_class = NXGE_CLASS_FLOW_USE_DST_PORT |
 	NXGE_CLASS_FLOW_USE_SRC_PORT | NXGE_CLASS_FLOW_USE_IPDST |
 	NXGE_CLASS_FLOW_USE_IPSRC | NXGE_CLASS_FLOW_USE_PROTO |
 	NXGE_CLASS_FLOW_USE_PORTNUM;
 
-int 	nxge_ah4_class = 0x0f90;
-int 	nxge_sctp4_class = 0x0f90;
-int 	nxge_tcp6_class = 0x0f90;
-int 	nxge_udp6_class = 0x0f90;
-int 	nxge_ah6_class = 0x0f90;
-int 	nxge_sctp6_class = 0xf90;
-uint32_t	nxge_fflp_init_h1 = 0xffffffff;
-uint32_t	nxge_fflp_init_h2 = 0xffff;
+int nxge_ah4_class = NXGE_CLASS_FLOW_USE_DST_PORT |
+	NXGE_CLASS_FLOW_USE_SRC_PORT | NXGE_CLASS_FLOW_USE_IPDST |
+	NXGE_CLASS_FLOW_USE_IPSRC | NXGE_CLASS_FLOW_USE_PROTO |
+	NXGE_CLASS_FLOW_USE_PORTNUM;
+int nxge_sctp4_class = NXGE_CLASS_FLOW_USE_DST_PORT |
+	NXGE_CLASS_FLOW_USE_SRC_PORT | NXGE_CLASS_FLOW_USE_IPDST |
+	NXGE_CLASS_FLOW_USE_IPSRC | NXGE_CLASS_FLOW_USE_PROTO |
+	NXGE_CLASS_FLOW_USE_PORTNUM;
 
-uint64_t class_quick_config_distribute [NXGE_CLASS_CONFIG_PARAMS] = {
-	0xffffffffULL,			/* h1_init */
-	0xffffULL,			/* h2_init */
-	0x0,				/* cfg_ether_usr1 */
-	0x0,				/* cfg_ether_usr2 */
-	0x0,				/* cfg_ip_usr4 */
-	0x0,				/* cfg_ip_usr5 */
-	0x0,				/* cfg_ip_usr6 */
-	0x0,				/* cfg_ip_usr7 */
-	0x0,				/* opt_ip_usr4 */
-	0x0,				/* opt_ip_usr5 */
-	0x0,				/* opt_ip_usr6 */
-	0x0,				/* opt_ip_usr7 */
+int nxge_tcp6_class = NXGE_CLASS_FLOW_USE_DST_PORT |
+	NXGE_CLASS_FLOW_USE_SRC_PORT | NXGE_CLASS_FLOW_USE_IPDST |
+	NXGE_CLASS_FLOW_USE_IPSRC | NXGE_CLASS_FLOW_USE_PROTO |
+	NXGE_CLASS_FLOW_USE_PORTNUM;
+
+int nxge_udp6_class = NXGE_CLASS_FLOW_USE_DST_PORT |
+	NXGE_CLASS_FLOW_USE_SRC_PORT | NXGE_CLASS_FLOW_USE_IPDST |
+	NXGE_CLASS_FLOW_USE_IPSRC | NXGE_CLASS_FLOW_USE_PROTO |
+	NXGE_CLASS_FLOW_USE_PORTNUM;
+
+int nxge_ah6_class = NXGE_CLASS_FLOW_USE_DST_PORT |
+	NXGE_CLASS_FLOW_USE_SRC_PORT | NXGE_CLASS_FLOW_USE_IPDST |
+	NXGE_CLASS_FLOW_USE_IPSRC | NXGE_CLASS_FLOW_USE_PROTO |
+	NXGE_CLASS_FLOW_USE_PORTNUM;
+
+int nxge_sctp6_class = NXGE_CLASS_FLOW_USE_DST_PORT |
+	NXGE_CLASS_FLOW_USE_SRC_PORT | NXGE_CLASS_FLOW_USE_IPDST |
+	NXGE_CLASS_FLOW_USE_IPSRC | NXGE_CLASS_FLOW_USE_PROTO |
+	NXGE_CLASS_FLOW_USE_PORTNUM;
+
+uint32_t nxge_fflp_init_h1 = 0xffffffff;
+uint32_t nxge_fflp_init_h2 = 0xffff;
+
+uint64_t class_quick_config_distribute[NXGE_CLASS_CONFIG_PARAMS] = {
+	0xffffffffULL,		/* h1_init */
+	0xffffULL,		/* h2_init */
+	0x0,			/* cfg_ether_usr1 */
+	0x0,			/* cfg_ether_usr2 */
+	0x0,			/* cfg_ip_usr4 */
+	0x0,			/* cfg_ip_usr5 */
+	0x0,			/* cfg_ip_usr6 */
+	0x0,			/* cfg_ip_usr7 */
+	0x0,			/* opt_ip_usr4 */
+	0x0,			/* opt_ip_usr5 */
+	0x0,			/* opt_ip_usr6 */
+	0x0,			/* opt_ip_usr7 */
 	NXGE_CLASS_FLOW_GEN_SERVER,	/* opt_ipv4_tcp */
 	NXGE_CLASS_FLOW_GEN_SERVER,	/* opt_ipv4_udp */
 	NXGE_CLASS_FLOW_GEN_SERVER,	/* opt_ipv4_ah */
@@ -119,19 +141,19 @@ uint64_t class_quick_config_distribute [NXGE_CLASS_CONFIG_PARAMS] = {
 	NXGE_CLASS_FLOW_GEN_SERVER	/* opt_ipv6_sctp */
 };
 
-uint64_t class_quick_config_web_server [NXGE_CLASS_CONFIG_PARAMS] = {
-	0xffffffffULL,			/* h1_init */
-	0xffffULL,			/* h2_init */
-	0x0,				/* cfg_ether_usr1 */
-	0x0,				/* cfg_ether_usr2 */
-	0x0,				/* cfg_ip_usr4 */
-	0x0,				/* cfg_ip_usr5 */
-	0x0,				/* cfg_ip_usr6 */
-	0x0,				/* cfg_ip_usr7 */
-	0x0,				/* opt_ip_usr4 */
-	0x0,				/* opt_ip_usr5 */
-	0x0,				/* opt_ip_usr6 */
-	0x0,				/* opt_ip_usr7 */
+uint64_t class_quick_config_web_server[NXGE_CLASS_CONFIG_PARAMS] = {
+	0xffffffffULL,		/* h1_init */
+	0xffffULL,		/* h2_init */
+	0x0,			/* cfg_ether_usr1 */
+	0x0,			/* cfg_ether_usr2 */
+	0x0,			/* cfg_ip_usr4 */
+	0x0,			/* cfg_ip_usr5 */
+	0x0,			/* cfg_ip_usr6 */
+	0x0,			/* cfg_ip_usr7 */
+	0x0,			/* opt_ip_usr4 */
+	0x0,			/* opt_ip_usr5 */
+	0x0,			/* opt_ip_usr6 */
+	0x0,			/* opt_ip_usr7 */
 	NXGE_CLASS_FLOW_WEB_SERVER,	/* opt_ipv4_tcp */
 	NXGE_CLASS_FLOW_GEN_SERVER,	/* opt_ipv4_udp */
 	NXGE_CLASS_FLOW_GEN_SERVER,	/* opt_ipv4_ah */
@@ -142,11 +164,10 @@ uint64_t class_quick_config_web_server [NXGE_CLASS_CONFIG_PARAMS] = {
 	NXGE_CLASS_FLOW_GEN_SERVER	/* opt_ipv6_sctp */
 };
 
-
 nxge_status_t
 nxge_classify_init(p_nxge_t nxgep)
 {
-	nxge_status_t	status = NXGE_OK;
+	nxge_status_t status = NXGE_OK;
 
 	status = nxge_classify_init_sw(nxgep);
 	if (status != NXGE_OK)
@@ -165,43 +186,39 @@ nxge_classify_init(p_nxge_t nxgep)
 nxge_status_t
 nxge_classify_uninit(p_nxge_t nxgep)
 {
-	nxge_status_t	status = NXGE_OK;
+	nxge_status_t status = NXGE_OK;
 
 	status = nxge_classify_exit_sw(nxgep);
 	if (status != NXGE_OK) {
 		return (status);
 	}
-
 	return (NXGE_OK);
 }
 
-/* ARGSUSED */
 uint64_t
-nxge_classify_get_cfg_value(p_nxge_t nxgep, uint8_t cfg_type,
-				    uint8_t cfg_param)
+nxge_classify_get_cfg_value(p_nxge_t nxgep, uint8_t cfg_type, uint8_t cfg_param)
 {
 	uint64_t cfg_value;
+
 	if (cfg_param >= NXGE_CLASS_CONFIG_PARAMS)
 		return (-1);
 	switch (cfg_type) {
-		case CFG_L3_WEB:
-			cfg_value = class_quick_config_web_server[cfg_param];
-			break;
-		case CFG_L3_DISTRIBUTE:
-		default:
-			cfg_value = class_quick_config_distribute[cfg_param];
-			break;
+	case CFG_L3_WEB:
+		cfg_value = class_quick_config_web_server[cfg_param];
+		break;
+	case CFG_L3_DISTRIBUTE:
+	default:
+		cfg_value = class_quick_config_distribute[cfg_param];
+		break;
 	}
 	return (cfg_value);
-
 }
-
 
 nxge_status_t
 nxge_set_hw_classify_config(p_nxge_t nxgep)
 {
-	p_nxge_dma_pt_cfg_t	p_all_cfgp;
-	p_nxge_hw_pt_cfg_t	p_cfgp;
+	p_nxge_dma_pt_cfg_t p_all_cfgp;
+	p_nxge_hw_pt_cfg_t p_cfgp;
 
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL, "==> nxge_get_hw_classify_config"));
 

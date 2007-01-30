@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,12 +113,7 @@ npi_ipp_dump_regs(npi_handle_t handle, uint8_t port)
 	uint64_t		value, offset;
 	int 			num_regs, i;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_dump_regs"
-			" Invalid Input: port <%d>", port));
-		return (NPI_FAILURE);
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
 		"\nIPP PORT Register Dump for port %d\n", port));
@@ -144,12 +139,7 @@ npi_ipp_read_regs(npi_handle_t handle, uint8_t port)
 	uint64_t		value, offset;
 	int 			num_regs, i;
 
-	if (!IS_PORT_NUM_VALID(port)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_dump_regs"
-			" Invalid Input: port <%d>", port));
-		return;
-	}
+	ASSERT(IS_PORT_NUM_VALID(port));
 
 	NPI_DEBUG_MSG((handle.function, NPI_IPP_CTL,
 		"\nIPP PORT Register read (to clear) for port %d\n", port));
@@ -162,21 +152,16 @@ npi_ipp_read_regs(npi_handle_t handle, uint8_t port)
 
 }
 
-/* IPP Reset Routine */
-
+/*
+ * IPP Reset Routine
+ */
 npi_status_t
 npi_ipp_reset(npi_handle_t handle, uint8_t portn)
 {
 	uint64_t val = 0;
 	uint32_t cnt = MAX_PIO_RETRIES;
 
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_reset"
-			" Invalid Input portn  <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	IPP_REG_RD(handle, portn, IPP_CONFIG_REG, &val);
 	val |= IPP_SOFT_RESET;
@@ -199,20 +184,16 @@ npi_ipp_reset(npi_handle_t handle, uint8_t portn)
 }
 
 
-/* IPP Configuration Routine */
-
+/*
+ * IPP Configuration Routine
+ */
 npi_status_t
 npi_ipp_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ipp_config_t config)
 {
 	uint64_t val = 0;
 
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_ipp_config"
-				    " Invalid Input portn <0x%x>", portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	switch (op) {
 
@@ -260,19 +241,12 @@ npi_ipp_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 	return (NPI_SUCCESS);
 }
 
-
 npi_status_t
 npi_ipp_set_max_pktsize(npi_handle_t handle, uint8_t portn, uint32_t bytes)
 {
 	uint64_t val = 0;
 
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_set_max_pktsize"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	if (bytes > IPP_IP_MAX_PKT_BYTES_MASK) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
@@ -291,23 +265,16 @@ npi_ipp_set_max_pktsize(npi_handle_t handle, uint8_t portn, uint32_t bytes)
 	return (NPI_SUCCESS);
 }
 
-
-
-/* IPP Interrupt Configuration Routine */
-
+/*
+ * IPP Interrupt Configuration Routine
+ */
 npi_status_t
 npi_ipp_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ipp_iconfig_t iconfig)
 {
 	uint64_t val = 0;
 
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_config"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	switch (op) {
 	case ENABLE:
@@ -357,13 +324,7 @@ npi_ipp_get_status(npi_handle_t handle, uint8_t portn, ipp_status_t *status)
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_get_status"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	IPP_REG_RD(handle, portn, IPP_INT_STATUS_REG, &val);
 
@@ -375,13 +336,8 @@ npi_status_t
 npi_ipp_get_pfifo_rd_ptr(npi_handle_t handle, uint8_t portn, uint16_t *rd_ptr)
 {
 	uint64_t value;
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_get_pfifo_rd_ptr"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	IPP_REG_RD(handle, portn, IPP_PFIFO_RD_PTR_REG, &value);
 	*rd_ptr = value & 0xfff;
@@ -392,13 +348,8 @@ npi_status_t
 npi_ipp_get_pfifo_wr_ptr(npi_handle_t handle, uint8_t portn, uint16_t *wr_ptr)
 {
 	uint64_t value;
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_get_pfifo_wr_ptr"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	IPP_REG_RD(handle, portn, IPP_PFIFO_WR_PTR_REG, &value);
 	*wr_ptr = value & 0xfff;
@@ -409,13 +360,8 @@ npi_status_t
 npi_ipp_get_dfifo_rd_ptr(npi_handle_t handle, uint8_t portn, uint16_t *rd_ptr)
 {
 	uint64_t value;
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_get_dfifo_rd_ptr"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	IPP_REG_RD(handle, portn, IPP_DFIFO_RD_PTR_REG, &value);
 	*rd_ptr = (uint16_t)(value & ((portn < 2) ? IPP_XMAC_DFIFO_PTR_MASK :
@@ -427,13 +373,8 @@ npi_status_t
 npi_ipp_get_dfifo_wr_ptr(npi_handle_t handle, uint8_t portn, uint16_t *wr_ptr)
 {
 	uint64_t value;
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_get_dfifo_wr_ptr"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	IPP_REG_RD(handle, portn, IPP_DFIFO_WR_PTR_REG, &value);
 	*wr_ptr = (uint16_t)(value & ((portn < 2) ? IPP_XMAC_DFIFO_PTR_MASK :
@@ -441,20 +382,13 @@ npi_ipp_get_dfifo_wr_ptr(npi_handle_t handle, uint8_t portn, uint16_t *wr_ptr)
 	return (NPI_SUCCESS);
 }
 
-
 npi_status_t
 npi_ipp_write_pfifo(npi_handle_t handle, uint8_t portn, uint8_t addr,
 		uint32_t d0, uint32_t d1, uint32_t d2, uint32_t d3, uint32_t d4)
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_write_pfifo"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	if (addr >= 64) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
@@ -485,13 +419,7 @@ npi_ipp_read_pfifo(npi_handle_t handle, uint8_t portn, uint8_t addr,
 		uint32_t *d0, uint32_t *d1, uint32_t *d2, uint32_t *d3,
 		uint32_t *d4)
 {
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_read_pfifo"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	if (addr >= 64) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
@@ -516,13 +444,7 @@ npi_ipp_write_dfifo(npi_handle_t handle, uint8_t portn, uint16_t addr,
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_write_dfifo"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	if (addr >= 2048) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
@@ -553,13 +475,7 @@ npi_ipp_read_dfifo(npi_handle_t handle, uint8_t portn, uint16_t addr,
 		uint32_t *d0, uint32_t *d1, uint32_t *d2, uint32_t *d3,
 		uint32_t *d4)
 {
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_read_dfifo"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	if (addr >= 2048) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
@@ -578,19 +494,12 @@ npi_ipp_read_dfifo(npi_handle_t handle, uint8_t portn, uint16_t addr,
 	return (NPI_SUCCESS);
 }
 
-
 npi_status_t
 npi_ipp_get_ecc_syndrome(npi_handle_t handle, uint8_t portn, uint16_t *syndrome)
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_get_ecc_syndrome"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	IPP_REG_RD(handle, portn, IPP_DFIFO_ECC_SYNDROME_REG, &val);
 
@@ -604,13 +513,7 @@ npi_ipp_get_dfifo_eopm_rdptr(npi_handle_t handle, uint8_t portn,
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_get_dfifo_rdptr"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	IPP_REG_RD(handle, portn, IPP_DFIFO_EOPM_RD_PTR_REG, &val);
 
@@ -623,13 +526,7 @@ npi_ipp_get_state_mach(npi_handle_t handle, uint8_t portn, uint32_t *sm)
 {
 	uint64_t val;
 
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_get_state_mach"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	IPP_REG_RD(handle, portn, IPP_STATE_MACHINE_REG, &val);
 
@@ -640,13 +537,7 @@ npi_ipp_get_state_mach(npi_handle_t handle, uint8_t portn, uint32_t *sm)
 npi_status_t
 npi_ipp_get_ecc_err_count(npi_handle_t handle, uint8_t portn, uint8_t *err_cnt)
 {
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_get_ecc_err_count"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	IPP_REG_RD(handle, portn, IPP_ECC_ERR_COUNTER_REG, err_cnt);
 
@@ -656,13 +547,7 @@ npi_ipp_get_ecc_err_count(npi_handle_t handle, uint8_t portn, uint8_t *err_cnt)
 npi_status_t
 npi_ipp_get_pkt_dis_count(npi_handle_t handle, uint8_t portn, uint16_t *dis_cnt)
 {
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_get_pkt_dis_count"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	IPP_REG_RD(handle, portn, IPP_DISCARD_PKT_CNT_REG, dis_cnt);
 
@@ -672,13 +557,7 @@ npi_ipp_get_pkt_dis_count(npi_handle_t handle, uint8_t portn, uint16_t *dis_cnt)
 npi_status_t
 npi_ipp_get_cs_err_count(npi_handle_t handle, uint8_t portn, uint16_t *err_cnt)
 {
-	if (!IS_PORT_NUM_VALID(portn)) {
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_get_cs_err_count"
-			" Invalid Input portn <0x%x>",
-			portn));
-		return (NPI_FAILURE | NPI_IPP_PORT_INVALID(portn));
-	}
+	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	IPP_REG_RD(handle, portn, IPP_ECC_ERR_COUNTER_REG, err_cnt);
 
