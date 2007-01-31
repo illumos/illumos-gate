@@ -287,6 +287,7 @@ void		server_unicast_option(dhcp_smach_t *, PKT_LIST *);
 dhcp_smach_t	*insert_smach(dhcp_lif_t *, int *);
 void		hold_smach(dhcp_smach_t *);
 void		release_smach(dhcp_smach_t *);
+void		remove_smach(dhcp_smach_t *);
 dhcp_smach_t	*next_smach(dhcp_smach_t *, boolean_t);
 dhcp_smach_t	*primary_smach(boolean_t);
 void		make_primary(dhcp_smach_t *);

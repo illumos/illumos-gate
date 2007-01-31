@@ -52,8 +52,6 @@ static uint_t global_smach_count;
 static uchar_t *global_duid;
 static size_t global_duidlen;
 
-static void remove_smach(dhcp_smach_t *);
-
 /*
  * iaid_retry(): attempt to write LIF IAID again
  *
@@ -606,7 +604,7 @@ cancel_smach_timers(dhcp_smach_t *dsmp)
  *  output: void
  */
 
-static void
+void
 remove_smach(dhcp_smach_t *dsmp)
 {
 	if (dsmp->dsm_dflags & DHCP_IF_REMOVED)

@@ -519,7 +519,7 @@ ipc_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 				if (error == DHCP_IPC_SUCCESS)
 					error = set_lif_dhcp(lif, B_FALSE);
 				if (error != DHCP_IPC_SUCCESS) {
-					release_smach(dsmp);
+					remove_smach(dsmp);
 					dsmp = NULL;
 				}
 			}

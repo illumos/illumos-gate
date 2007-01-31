@@ -190,7 +190,7 @@ dhcp_adopt(void)
 failure:
 	/* Note: no need to free lif; dsmp holds reference */
 	if (dsmp != NULL)
-		release_smach(dsmp);
+		remove_smach(dsmp);
 	free(kcache);
 	free_pkt_entry(plp);
 	return (B_FALSE);
