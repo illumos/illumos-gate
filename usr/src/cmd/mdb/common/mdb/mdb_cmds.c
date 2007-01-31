@@ -1713,7 +1713,7 @@ findsym_cb(void *data, const GElf_Sym *sym, const char *name,
 		findsym_output(symlist, value, sym->st_value + i * 4);
 
 		/*
-		 * search from the sethi on until we hit a relevent instr
+		 * search from the sethi on until we hit a relevant instr
 		 */
 		for (j = i + 1; j < len; j++) {
 			if ((op = OP(text[j])) & OP_ARITH_MEM_MASK) {

@@ -59,7 +59,7 @@ visit_dir(const char *path, const struct stat *st,
 
 	/*
 	 * The first directory is the current directory '.',
-	 * this is relevent in out protolist - I throw it out.
+	 * this is relevant in out protolist - I throw it out.
 	 */
 	if (first_time) {
 		first_time = 0;

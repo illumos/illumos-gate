@@ -551,7 +551,7 @@ flush_instr_mem(caddr_t vaddr, size_t len)
  */
 
 	ENTRY(flush_instr_mem)
-	flush	%o0			! address irrelevent
+	flush	%o0			! address irrelevant
 	retl
 	nop
 	SET_SIZE(flush_instr_mem)

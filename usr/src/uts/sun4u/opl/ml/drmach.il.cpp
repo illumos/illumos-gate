@@ -166,7 +166,7 @@ flush_instr_mem_il(caddr_t vaddr)
  */
 
 	ENTRY_NP(flush_instr_mem_il)
-	flush	%o0			! address irrelevent
+	flush	%o0			! address irrelevant
 	retl
 	 nop
 	SET_SIZE(flush_instr_mem_il)

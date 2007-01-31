@@ -67,7 +67,7 @@ typedef struct dsl_dataset_phys {
 	uint64_t ds_used_bytes;
 	uint64_t ds_compressed_bytes;
 	uint64_t ds_uncompressed_bytes;
-	uint64_t ds_unique_bytes;	/* only relavent to snapshots */
+	uint64_t ds_unique_bytes;	/* only relevant to snapshots */
 	/*
 	 * The ds_fsid_guid is a 56-bit ID that can change to avoid
 	 * collisions.  The ds_guid is a 64-bit ID that will never

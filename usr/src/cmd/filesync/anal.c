@@ -56,7 +56,7 @@
  *	pass ... since we don't have complete information about files that
  *	were not evaluated in the previous pass.
  */
-#ident	"%W%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -297,7 +297,7 @@ summary()
 
 	for (bp = bases; bp; bp = bp->b_next) {
 
-		/* see if this base was irrelevent	*/
+		/* see if this base was irrelevant	*/
 		if ((bp->b_flags & F_EVALUATE) == 0)
 			continue;
 

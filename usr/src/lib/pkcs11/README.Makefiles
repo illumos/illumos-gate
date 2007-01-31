@@ -52,7 +52,7 @@ Makefile.softtoken.<isa>:
     and targets.  For each encryption algorithm, <algo>,
     (such as AES, DES, SHA1, etc.), the list of ISA-specific
     object files is defined; the variable <algo>_PSR_OBJECTS
-    is set.  To ensure that all relavent source files are
+    is set.  To ensure that all relevant source files are
     examined by lint, XXX_PSR_SRCS is set.  ISA-specific additions
     to CCPFLAGS, CFLAGS, etc. are set here.
 

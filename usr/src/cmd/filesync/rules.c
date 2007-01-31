@@ -41,7 +41,7 @@
  *	adding/checking restrictions
  *		add_restr, check_restr
  */
-#ident	"%W%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -581,7 +581,7 @@ add_restr(char *restr)
  *	to see if an argument falls within restrictions
  *
  * parameters:
- *	pointer to relevent base
+ *	pointer to relevant base
  *	file name
  *
  * returns:

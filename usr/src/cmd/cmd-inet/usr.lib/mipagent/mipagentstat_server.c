@@ -293,7 +293,7 @@ int enumerateAgentPeerStats(DoorStatArgs *args, uint8_t flags) {
 	if (flags == FA_PEER)
 		/*
 		 * User wants FA_PEER SAs, so this is us as the HA.  Pass
-		 * the SA bits which are relavent to us as HA peer, namely:
+		 * the SA bits which are relevant to us as HA peer, namely:
 		 * request apply, and tunnel apply, and reply permit and
 		 * reverse tunnel permit.  Also make sure we're only showing
 		 * what's invoked (not just what's configured)!

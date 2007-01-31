@@ -751,7 +751,7 @@ final class LocalityObjective extends AbstractObjective
  * of it's compliance with the aid of a monitoring object. The actual
  * assessment of compliance is indicated by the associated monitoring
  * object, with this class simply acting as a co-ordinator of the
- * relevent information.
+ * relevant information.
  */
 final class UtilizationObjective extends AbstractObjective
     implements WorkloadDependentObjective

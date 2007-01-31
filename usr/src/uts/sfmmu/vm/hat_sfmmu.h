@@ -1132,7 +1132,7 @@ typedef struct {
  * nothing in that case.
  */
 typedef struct {
-	sfmmu_t		*dmr_sfmmup;	/* relevent hat */
+	sfmmu_t		*dmr_sfmmup;	/* relevant hat */
 	caddr_t		dmr_addr;	/* beginning address */
 	caddr_t		dmr_endaddr;	/* ending  address */
 	ulong_t		dmr_bitvec;	/* valid pages found */

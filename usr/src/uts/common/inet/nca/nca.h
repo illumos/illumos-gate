@@ -431,7 +431,7 @@ typedef struct node_s {
 
 	/*
 	 * The following 4 fields are used to record node states when
-	 * upcalls are preempted. When preempted upcalls are not relavent,
+	 * upcalls are preempted. When preempted upcalls are not relevant,
 	 * these fields should have default value 0.
 	 */
 	uint8_t advise;		/* an interpreted advise from http */

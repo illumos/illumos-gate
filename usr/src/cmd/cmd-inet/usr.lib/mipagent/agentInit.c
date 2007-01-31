@@ -396,7 +396,7 @@ setIPsecSAFlags(ipsec_req_t *ipsr_p, int type)
  *
  * Description: We need to sanity check the policies pointed to by ipsp, and
  *              put them into the correct placeholder in the MobilityAgentEntry
- *              structure.  We return the relavent bits in mpIPsecFlags so the
+ *              structure.  We return the relevant bits in mpIPsecFlags so the
  *              caller knows which policies were found.
  *
  *              Note: there can never be more than two bits set at once, one

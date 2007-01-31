@@ -723,7 +723,7 @@ MX|dmchat|dmchat version of datamedia 2500:\
 #	Briefly, the settings are for the following modes:
 #	   (values are for bit set/clear with * indicating our preference
 #	    and the value used to test these termcaps)
-#	Note that many of these settings are irelevent to the termcap
+#	Note that many of these settings are irrelevant to the termcap
 #	and are just set to the default mode of the terminal as shipped
 #	by the factory.
 #

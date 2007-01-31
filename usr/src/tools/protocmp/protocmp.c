@@ -287,7 +287,7 @@ elem_compare(elem *a, elem *b, int different_types)
 		else {
 			/*
 			 * if either symlink starts with a './' strip it off,
-			 * its irrelavant.
+			 * its irrelevant.
 			 */
 			if ((i->symsrc[0] == '.') && (i->symsrc[1] == '/'))
 				i->symsrc += 2;

@@ -94,7 +94,7 @@ wint_t *wcp;
 
 	/* Input function is wgetch(), which takes a WINDOW * for
 	 * a parameter.  The WINDOW * is used to set the "focus" by
-	 * updatng and position the cursor in the relavent window and
+	 * updatng and position the cursor in the relevant window and
 	 * provide window specific settings.  Input for all windows
 	 * comes from one stream (__m_screen->_if), which is normally 
 	 * the terminal, but can be redirected.

@@ -59,7 +59,7 @@ install: links $(MACHLIBS) $(ROOTLIBS)
 # NOTE:  all of these processor specific links have been hardcoded
 #        into this Makefile.  This is because the libbc library
 #     	 is for the Binary Compatiblity Package.  The BCP is
-#	 only relevent for Sun4 machines.  Future architectures will
+#	 only relevant for Sun4 machines.  Future architectures will
 #	 not use this package!!!
 #
 links:

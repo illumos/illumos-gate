@@ -5444,7 +5444,7 @@ nosnap:
 		/*
 		 * Create a last-import snapshot to serve as an attachment
 		 * point for the real one from the temporary instance.  Since
-		 * the contents is irrelevent, take it now, while the instance
+		 * the contents is irrelevant, take it now, while the instance
 		 * is empty, to minimize svc.configd's work.
 		 */
 		if (_scf_snapshot_take_new(imp_inst, snap_lastimport,

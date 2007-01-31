@@ -1336,7 +1336,7 @@ nfs4_queue_event(nfs4_event_type_t id, mntinfo4_t *mi, char *server1,
 		rp2 = VTOR4(vp2);
 
 	/*
-	 * Initialize the message with the relevent server/mount_pt/time
+	 * Initialize the message with the relevant server/mount_pt/time
 	 * information. Also place the relevent event related info.
 	 */
 	msg = kmem_zalloc(sizeof (*msg), KM_SLEEP);
@@ -1397,8 +1397,8 @@ nfs4_queue_fact(nfs4_fact_type_t fid, mntinfo4_t *mi, nfsstat4 stat4,
 	refstr_t		*mntpt;
 
 	/*
-	 * Initialize the message with the relevent server/mount_pt/time
-	 * information. Also place the relevent fact related info.
+	 * Initialize the message with the relevant server/mount_pt/time
+	 * information. Also place the relevant fact related info.
 	 */
 	msg = kmem_zalloc(sizeof (*msg), KM_SLEEP);
 	msg->msg_type = RM_FACT;

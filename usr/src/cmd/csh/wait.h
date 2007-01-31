@@ -16,7 +16,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * This file holds definitions relevent to the wait system call.
+ * This file holds definitions relevant to the wait system call.
  * Some of the options here are available only through the ``wait3''
  * entry point; the old entry point with one argument has more fixed
  * semantics, never returning status of unstopped children, hanging until

@@ -2165,11 +2165,11 @@ read_pam_conf(pam_handle_t *pamh, char *config)
 					tpament->next = pamentp;
 				}
 			} else {
-				/* irrelevent entry */
+				/* irrelevant entry */
 				free_pamconf(pamentp);
 			}
 		} else {
-			/* irrelevent entry */
+			/* irrelevant entry */
 			free_pamconf(pamentp);
 		}
 	}

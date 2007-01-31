@@ -417,7 +417,7 @@ struct rel_desc {
 #define	FLG_REL_SCNNDX	0x00000010	/* use section index for symbol ndx */
 #define	FLG_REL_CLVAL	0x00000020	/* clear VALUE for active relocation */
 #define	FLG_REL_ADVAL	0x00000040	/* add VALUE for output relocation, */
-					/*	only relevent to SPARC and */
+					/*	only relevant to SPARC and */
 					/*	R_SPARC_RELATIVE */
 #define	FLG_REL_GOTCL	0x00000080	/* clear the GOT entry.  This is */
 					/* relevant to RELA relocations, */

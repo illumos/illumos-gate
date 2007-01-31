@@ -627,7 +627,7 @@ valid_filename(const char *filename)
  * of the file. This is needed because we allow newfs'ing the device,
  * and newfs will do several disk ioctls to figure out the geometry and
  * partition information. It uses that information to determine the parameters
- * to pass to mkfs. Geometry is pretty much irrelevent these days, but we
+ * to pass to mkfs. Geometry is pretty much irrelevant these days, but we
  * have to support it.
  */
 static void

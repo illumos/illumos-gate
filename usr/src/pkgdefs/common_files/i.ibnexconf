@@ -33,7 +33,7 @@ PATH=/usr/bin:$PATH
 #       name="ib" class="root";
 # in /kernel/drv/ib.conf file.
 #
-# This script adds the required line and relevent comments,
+# This script adds the required line and relevant comments,
 # if the lines are not already present in the ib.conf file.
 #
 
@@ -90,7 +90,7 @@ IB_SEARCH_STRING="^[ 	]*name=\"ib\"[ 	]*class=\"root\"[ 	]*;"
 while read src dest; do
 	if [ -f $dest ]; then
 		#
-		# 1. Search the $dest file for relevent line 
+		# 1. Search the $dest file for relevant line 
 		# 2. If search fails, add the required lines to $dest
 		#
 		search_ibconf $dest

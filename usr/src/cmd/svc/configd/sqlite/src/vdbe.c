@@ -1824,7 +1824,7 @@ case OP_NotNull: {
 **
 ** Convert the top P1 entries of the stack into a single entry
 ** suitable for use as a data record in a database table.  The
-** details of the format are irrelavant as long as the OP_Column
+** details of the format are irrelevant as long as the OP_Column
 ** opcode can decode the record later.  Refer to source code
 ** comments for the details of the record format.
 **

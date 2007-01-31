@@ -109,7 +109,7 @@ dl_sync(int fd)
 		close(fd);
 		return (-1);
 	}
-	/* now pick out the relevent information and fake the rest */
+	/* now pick out the relevant information and fake the rest */
 	dl->info.state		= iack->dl_current_state;
 	dl->info.max_lsdu	= iack->dl_max_sdu;
 	dl->info.min_lsdu	= iack->dl_min_sdu;

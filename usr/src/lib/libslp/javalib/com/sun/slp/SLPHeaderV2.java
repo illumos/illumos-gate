@@ -388,7 +388,7 @@ class SLPHeaderV2 extends SrvLocHeader implements Cloneable {
 
 	// If the error code is OK, then insert the rest of the message
 	//  and parse the options. If there was an error,
-	//  this step is skipped because the data isn't relevent.
+	//  this step is skipped because the data isn't relevant.
 
 	if (errCode == ServiceLocationException.OK) {
 	    bbaos.write(payload, 0, payload.length);

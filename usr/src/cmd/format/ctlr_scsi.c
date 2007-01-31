@@ -377,7 +377,7 @@ scsi_format(start, end, list)
 	/*
 	 * Set up the various SCSI parameters specified before
 	 * formatting the disk.  Each routine handles the
-	 * parameters relevent to a particular page.
+	 * parameters relevant to a particular page.
 	 * If no parameters are specified for a page, there's
 	 * no need to do anything.  Otherwise, issue a mode
 	 * sense for that page.  If a specified parameter
