@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * STREAMS Crypto Module
@@ -130,6 +130,9 @@ typedef struct {
 #define	SHA1_HASHSIZE 20
 #define	MD5_HASHSIZE 16
 #define	CRC32_HASHSIZE 4
+#define	MSGBUF_SIZE 4096
+#define	CONFOUNDER_BYTES 128
+
 
 static int crc32_calc(uchar_t *, uchar_t *, uint_t);
 static int md5_calc(uchar_t *, uchar_t *, uint_t);
@@ -2952,6 +2955,141 @@ mklenmp(mblk_t *bp, uint32_t len)
 	return (bp);
 }
 
+static mblk_t *
+encrypt_block(queue_t *q, struct tmodinfo *tmi, mblk_t *mp, size_t plainlen)
+{
+	mblk_t *newmp;
+	size_t headspace;
+
+	mblk_t *cbp;
+	size_t cipherlen;
+	size_t extra = 0;
+	uint32_t ptlen = (uint32_t)plainlen;
+	/*
+	 * If we are using the "NEW" RCMD mode,
+	 * add 4 bytes to the plaintext for the
+	 * plaintext length that gets prepended
+	 * before encrypting.
+	 */
+	if (tmi->enc_data.option_mask & CRYPTOPT_RCMD_MODE_V2)
+		ptlen += 4;
+
+	cipherlen = encrypt_size(&tmi->enc_data, (size_t)ptlen);
+
+	/*
+	 * if we must allocb, then make sure its enough
+	 * to hold the length field so we dont have to allocb
+	 * again down below in 'mklenmp'
+	 */
+	if (ANY_RCMD_MODE(tmi->enc_data.option_mask)) {
+		extra = sizeof (uint32_t);
+	}
+
+	/*
+	 * Calculate how much space is needed in front of
+	 * the data.
+	 */
+	headspace = plaintext_offset(&tmi->enc_data);
+
+	/*
+	 * If the current block is too small, reallocate
+	 * one large enough to hold the hdr, tail, and
+	 * ciphertext.
+	 */
+	if ((cipherlen + extra >= MBLKSIZE(mp)) || DB_REF(mp) > 1) {
+		int sz = P2ROUNDUP(cipherlen+extra, 8);
+
+		cbp = allocb_tmpl(sz, mp);
+		if (cbp == NULL) {
+			cmn_err(CE_WARN,
+				"allocb (%d bytes) failed", sz);
+				return (NULL);
+		}
+
+		cbp->b_cont = mp->b_cont;
+
+		/*
+		 * headspace includes the length fields needed
+		 * for the RCMD modes (v1 == 4 bytes, V2 = 8)
+		 */
+		cbp->b_rptr = DB_BASE(cbp) + headspace;
+
+		ASSERT(cbp->b_rptr + P2ROUNDUP(plainlen, 8)
+			<= DB_LIM(cbp));
+
+		bcopy(mp->b_rptr, cbp->b_rptr, plainlen);
+		cbp->b_wptr = cbp->b_rptr + plainlen;
+
+		freeb(mp);
+	} else {
+		size_t extra = 0;
+		cbp = mp;
+
+		/*
+		 * Some ciphers add HMAC after the final block
+		 * of the ciphertext, not at the beginning like the
+		 * 1-DES ciphers.
+		 */
+		if (tmi->enc_data.method ==
+			CRYPT_METHOD_DES3_CBC_SHA1 ||
+		    IS_AES_METHOD(tmi->enc_data.method)) {
+			extra = sha1_hash.hash_len;
+		}
+
+		/*
+		 * Make sure the rptr is positioned correctly so that
+		 * routines later do not have to shift this data around
+		 */
+		if ((cbp->b_rptr + P2ROUNDUP(plainlen + extra, 8) >
+			DB_LIM(cbp)) ||
+			(cbp->b_rptr - headspace < DB_BASE(cbp))) {
+			ovbcopy(cbp->b_rptr, DB_BASE(cbp) + headspace,
+				plainlen);
+			cbp->b_rptr = DB_BASE(cbp) + headspace;
+			cbp->b_wptr = cbp->b_rptr + plainlen;
+		}
+	}
+
+	ASSERT(cbp->b_rptr - headspace >= DB_BASE(cbp));
+	ASSERT(cbp->b_wptr <= DB_LIM(cbp));
+
+	/*
+	 * If using RCMD_MODE_V2 (new rcmd mode), prepend
+	 * the plaintext length before the actual plaintext.
+	 */
+	if (tmi->enc_data.option_mask & CRYPTOPT_RCMD_MODE_V2) {
+		cbp->b_rptr -= RCMD_LEN_SZ;
+
+		/* put plaintext length at head of buffer */
+		*(cbp->b_rptr + 3) = (uchar_t)(plainlen & 0xff);
+		*(cbp->b_rptr + 2) = (uchar_t)((plainlen >> 8) & 0xff);
+		*(cbp->b_rptr + 1) = (uchar_t)((plainlen >> 16) & 0xff);
+		*(cbp->b_rptr) = (uchar_t)((plainlen >> 24) & 0xff);
+	}
+
+	newmp = do_encrypt(q, cbp);
+
+	if (newmp != NULL &&
+	    (tmi->enc_data.option_mask &
+	    (CRYPTOPT_RCMD_MODE_V1 | CRYPTOPT_RCMD_MODE_V2))) {
+		mblk_t *lp;
+		/*
+		 * Add length field, required when this is
+		 * used to encrypt "r*" commands(rlogin, rsh)
+		 * with Kerberos.
+		 */
+		lp = mklenmp(newmp, plainlen);
+
+		if (lp == NULL) {
+			freeb(newmp);
+			return (NULL);
+		} else {
+			newmp = lp;
+		}
+	}
+	return (newmp);
+}
+
 /*
  * encrypt_msgb
  *
@@ -2961,149 +3099,54 @@ mklenmp(mblk_t *bp, uint32_t len)
 static mblk_t *
 encrypt_msgb(queue_t *q, struct tmodinfo *tmi, mblk_t *mp)
 {
-	mblk_t *newmp;
-	size_t plainlen;
-	size_t headspace;
+	size_t plainlen, outlen;
+	mblk_t *newmp = NULL;
+	mblk_t *headblk = NULL;
 
+	/* If not encrypting, do nothing */
 	if (tmi->enc_data.method == CRYPT_METHOD_NONE) {
 		return (mp);
 	}
 
+	plainlen = MBLKL(mp);
+	if (plainlen == 0)
+		return (NULL);
+
 	/*
-	 * process message
+	 * If the block is too big, we encrypt in 4K chunks so that
+	 * older rlogin clients do not choke on the larger buffers.
 	 */
-	newmp = NULL;
-	if ((plainlen = MBLKL(mp)) > 0) {
-		mblk_t *cbp;
-		size_t cipherlen;
-		size_t extra = 0;
-		uint32_t ptlen = (uint32_t)plainlen;
-
+	while ((plainlen = MBLKL(mp)) > MSGBUF_SIZE) {
+		mblk_t *mp1 = NULL;
+		outlen = MSGBUF_SIZE;
 		/*
-		 * If we are using the "NEW" RCMD mode,
-		 * add 4 bytes to the plaintext for the
-		 * plaintext length that gets prepended
-		 * before encrypting.
+		 * Allocate a new buffer that is only 4K bytes, the
+		 * extra bytes are for crypto overhead.
 		 */
-		if (tmi->enc_data.option_mask & CRYPTOPT_RCMD_MODE_V2)
-			ptlen += 4;
-
-		cipherlen = encrypt_size(&tmi->enc_data, (size_t)ptlen);
-
-		/*
-		 * if we must allocb, then make sure its enough
-		 * to hold the length field so we dont have to allocb
-		 * again down below in 'mklenmp'
-		 */
-		if (ANY_RCMD_MODE(tmi->enc_data.option_mask)) {
-			extra = sizeof (uint32_t);
+		mp1 = allocb(outlen + CONFOUNDER_BYTES, BPRI_MED);
+		if (mp1 == NULL) {
+			cmn_err(CE_WARN,
+				"allocb (%d bytes) failed",
+				(int)(outlen + CONFOUNDER_BYTES));
+			return (NULL);
 		}
+		/* Copy the next 4K bytes from the old block. */
+		bcopy(mp->b_rptr, mp1->b_rptr, outlen);
+		mp1->b_wptr = mp1->b_rptr + outlen;
+		/* Advance the old block. */
+		mp->b_rptr += outlen;
 
-		/*
-		 * Calculate how much space is needed in front of
-		 * the data.
-		 */
-		headspace = plaintext_offset(&tmi->enc_data);
+		/* encrypt the new block */
+		newmp = encrypt_block(q, tmi, mp1, outlen);
+		if (newmp == NULL)
+			return (NULL);
 
-		/*
-		 * If the current block is too small, reallocate
-		 * one large enough to hold the hdr, tail, and
-		 * ciphertext.
-		 */
-		if ((cipherlen + extra >= MBLKSIZE(mp)) || DB_REF(mp) > 1) {
-			int sz = P2ROUNDUP(cipherlen+extra, 8);
-
-			cbp = allocb_tmpl(sz, mp);
-			if (cbp == NULL) {
-				cmn_err(CE_WARN,
-					"allocb (%d bytes) failed", sz);
-					return (NULL);
-			}
-
-			cbp->b_cont = mp->b_cont;
-
-			/*
-			 * headspace includes the length fields needed
-			 * for the RCMD modes (v1 == 4 bytes, V2 = 8)
-			 */
-			cbp->b_rptr = DB_BASE(cbp) + headspace;
-
-			ASSERT(cbp->b_rptr + P2ROUNDUP(plainlen, 8)
-				<= DB_LIM(cbp));
-
-			bcopy(mp->b_rptr, cbp->b_rptr, plainlen);
-			cbp->b_wptr = cbp->b_rptr + plainlen;
-
-			freeb(mp);
-		} else {
-			size_t extra = 0;
-			cbp = mp;
-
-			/*
-			 * Some ciphers add HMAC after the final block
-			 * of the ciphertext, not at the beginning like the
-			 * 1-DES ciphers.
-			 */
-			if (tmi->enc_data.method ==
-				CRYPT_METHOD_DES3_CBC_SHA1 ||
-			    IS_AES_METHOD(tmi->enc_data.method)) {
-				extra = sha1_hash.hash_len;
-			}
-
-			/*
-			 * Make sure the rptr is positioned correctly so that
-			 * routines later do not have to shift this data around
-			 */
-			if ((cbp->b_rptr + P2ROUNDUP(plainlen + extra, 8) >
-				DB_LIM(cbp)) ||
-				(cbp->b_rptr - headspace < DB_BASE(cbp))) {
-				ovbcopy(cbp->b_rptr, DB_BASE(cbp) + headspace,
-					plainlen);
-				cbp->b_rptr = DB_BASE(cbp) + headspace;
-				cbp->b_wptr = cbp->b_rptr + plainlen;
-			}
-		}
-
-		ASSERT(cbp->b_rptr - headspace >= DB_BASE(cbp));
-		ASSERT(cbp->b_wptr <= DB_LIM(cbp));
-
-		/*
-		 * If using RCMD_MODE_V2 (new rcmd mode), prepend
-		 * the plaintext length before the actual plaintext.
-		 */
-		if (tmi->enc_data.option_mask & CRYPTOPT_RCMD_MODE_V2) {
-			cbp->b_rptr -= RCMD_LEN_SZ;
-
-			/* put plaintext length at head of buffer */
-			*(cbp->b_rptr + 3) = (uchar_t)(plainlen & 0xff);
-			*(cbp->b_rptr + 2) = (uchar_t)((plainlen >> 8) & 0xff);
-			*(cbp->b_rptr + 1) = (uchar_t)((plainlen >> 16) & 0xff);
-			*(cbp->b_rptr) = (uchar_t)((plainlen >> 24) & 0xff);
-		}
-
-		newmp = do_encrypt(q, cbp);
-
-		if (newmp != NULL &&
-		    (tmi->enc_data.option_mask &
-		    (CRYPTOPT_RCMD_MODE_V1 | CRYPTOPT_RCMD_MODE_V2))) {
-			mblk_t *lp;
-			/*
-			 * Add length field, required when this is
-			 * used to encrypt "r*" commands(rlogin, rsh)
-			 * with Kerberos.
-			 */
-			lp = mklenmp(newmp, plainlen);
-
-			if (lp == NULL) {
-				freeb(newmp);
-				return (NULL);
-			} else {
-				newmp = lp;
-			}
-		}
-	} else {
-		freeb(mp);
+		putnext(q, newmp);
 	}
+	newmp = NULL;
+	/* If there is data left (< MSGBUF_SIZE), encrypt it. */
+	if ((plainlen = MBLKL(mp)))
+		newmp = encrypt_block(q, tmi, mp, plainlen);
 
 	return (newmp);
 }

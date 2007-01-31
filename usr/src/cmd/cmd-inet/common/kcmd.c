@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,14 @@
 static char *default_service = "host";
 
 #define	KCMD_BUFSIZ	102400
+#define	KCMD8_BUFSIZ	(4096 - 256)
+/*
+ * For compatibility with earlier versions of Solaris and other OS
+ * (kerborized rsh uses 4KB of RSH_BUFSIZE)- 256 to make sure
+ * there is room
+ */
+static int deswrite_compat(int, char *, int, int);
+
 #define	KCMD_KEYUSAGE	1026
 
 static char storage[KCMD_BUFSIZ];
@@ -731,9 +739,33 @@ desread(int fd, char *buf, int len, int secondary)
 
 	return (nreturned);
 }
-
 int
 deswrite(int fd, char *buf, int len, int secondary)
+{
+	int bytes_written;
+	int r;
+	int outlen;
+	char *p;
+	if (!encrypt_flag)
+		return (write(fd, buf, len));
+
+	bytes_written = 0;
+	while (len > 0) {
+		p = buf + bytes_written;
+		if (len > KCMD8_BUFSIZ)
+			outlen = KCMD8_BUFSIZ;
+		else
+			outlen = len;
+		r = deswrite_compat(fd, p, outlen, secondary);
+		if (r == -1)
+			return (r);
+		bytes_written += r;
+		len -= r;
+	}
+	return (bytes_written);
+}
+static int
+deswrite_compat(int fd, char *buf, int len, int secondary)
 {
 	int cc;
 	size_t ret = 0;
@@ -742,9 +774,6 @@ deswrite(int fd, char *buf, int len, int secondary)
 	char tmpbuf[KCMD_BUFSIZ + 8];
 	char encrbuf[KCMD_BUFSIZ + 8];
 	unsigned char *len_buf = (unsigned char *)tmpbuf;
-
-	if (!encrypt_flag)
-		return (write(fd, buf, len));
 
 	if (use_ivecs == B_TRUE) {
 		unsigned char *lenbuf2 = (unsigned char *)tmpbuf;
