@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * lut.c -- simple lookup table module
@@ -45,6 +44,7 @@
 struct lut {
 	struct lut *lut_left;
 	struct lut *lut_right;
+	struct lut *lut_parent;
 	void *lut_lhs;		/* search key */
 	void *lut_rhs;		/* the datum */
 };
@@ -86,35 +86,40 @@ struct lut *
 lut_add(struct lut *root, void *lhs, void *rhs, lut_cmp cmp_func)
 {
 	int diff;
+	struct lut **tmp_hdl = &root, *parent = NULL, *tmp = root;
 
-	if (root == NULL) {
-		/* not in tree, create new node */
-		root = MALLOC(sizeof (*root));
-		root->lut_lhs = lhs;
-		root->lut_rhs = rhs;
-		root->lut_left = root->lut_right = NULL;
-		stats_counter_bump(Addtotal);
-		return (root);
+	while (tmp) {
+		if (cmp_func)
+			diff = (*cmp_func)(tmp->lut_lhs, lhs);
+		else
+			diff = (const char *)lhs - (const char *)tmp->lut_lhs;
+
+		if (diff == 0) {
+			/* already in tree, replace node */
+			tmp->lut_rhs = rhs;
+			return (root);
+		} else if (diff > 0) {
+			tmp_hdl = &(tmp->lut_left);
+			parent = tmp;
+			tmp = tmp->lut_left;
+		} else {
+			tmp_hdl = &(tmp->lut_right);
+			parent = tmp;
+			tmp = tmp->lut_right;
+		}
 	}
 
-	if (cmp_func)
-		diff = (*cmp_func)(root->lut_lhs, lhs);
-	else
-		diff = (const char *)lhs - (const char *)root->lut_lhs;
+	/* either empty tree or not in tree, so create new node */
+	*tmp_hdl = MALLOC(sizeof (*root));
+	(*tmp_hdl)->lut_lhs = lhs;
+	(*tmp_hdl)->lut_rhs = rhs;
+	(*tmp_hdl)->lut_parent = parent;
+	(*tmp_hdl)->lut_left = (*tmp_hdl)->lut_right = NULL;
+	stats_counter_bump(Addtotal);
 
-	if (diff == 0) {
-		/* already in tree, replace node */
-		root->lut_rhs = rhs;
-	} else if (diff > 0)
-		root->lut_left = lut_add(root->lut_left, lhs, rhs, cmp_func);
-	else
-		root->lut_right = lut_add(root->lut_right, lhs, rhs, cmp_func);
 	return (root);
 }
 
-/*
- * lut_lookup -- find an entry
- */
 void *
 lut_lookup(struct lut *root, void *lhs, lut_cmp cmp_func)
 {
@@ -122,25 +127,22 @@ lut_lookup(struct lut *root, void *lhs, lut_cmp cmp_func)
 
 	stats_counter_bump(Lookuptotal);
 
-	if (root == NULL)
-		return (NULL);
+	while (root) {
+		if (cmp_func)
+			diff = (*cmp_func)(root->lut_lhs, lhs);
+		else
+			diff = (const char *)lhs - (const char *)root->lut_lhs;
 
-	if (cmp_func)
-		diff = (*cmp_func)(root->lut_lhs, lhs);
-	else
-		diff = (const char *)lhs - (const char *)root->lut_lhs;
-
-	if (diff == 0) {
-		return (root->lut_rhs);
-	} else if (diff > 0)
-		return (lut_lookup(root->lut_left, lhs, cmp_func));
-	else
-		return (lut_lookup(root->lut_right, lhs, cmp_func));
+		if (diff == 0)
+			return (root->lut_rhs);
+		else if (diff > 0)
+			root = root->lut_left;
+		else
+			root = root->lut_right;
+	}
+	return (NULL);
 }
 
-/*
- * lut_lookup_lhs -- find an entry, return the matched key (lut_lhs)
- */
 void *
 lut_lookup_lhs(struct lut *root, void *lhs, lut_cmp cmp_func)
 {
@@ -148,20 +150,20 @@ lut_lookup_lhs(struct lut *root, void *lhs, lut_cmp cmp_func)
 
 	stats_counter_bump(Lookuptotal);
 
-	if (root == NULL)
-		return (NULL);
+	while (root) {
+		if (cmp_func)
+			diff = (*cmp_func)(root->lut_lhs, lhs);
+		else
+			diff = (const char *)lhs - (const char *)root->lut_lhs;
 
-	if (cmp_func)
-		diff = (*cmp_func)(root->lut_lhs, lhs);
-	else
-		diff = (const char *)lhs - (const char *)root->lut_lhs;
-
-	if (diff == 0) {
-		return (root->lut_lhs);
-	} else if (diff > 0)
-		return (lut_lookup_lhs(root->lut_left, lhs, cmp_func));
-	else
-		return (lut_lookup_lhs(root->lut_right, lhs, cmp_func));
+		if (diff == 0)
+			return (root->lut_lhs);
+		else if (diff > 0)
+			root = root->lut_left;
+		else
+			root = root->lut_right;
+	}
+	return (NULL);
 }
 
 /*
@@ -170,10 +172,37 @@ lut_lookup_lhs(struct lut *root, void *lhs, lut_cmp cmp_func)
 void
 lut_walk(struct lut *root, lut_cb callback, void *arg)
 {
-	if (root) {
-		lut_walk(root->lut_left, callback, arg);
-		(*callback)(root->lut_lhs, root->lut_rhs, arg);
-		lut_walk(root->lut_right, callback, arg);
+	struct lut *tmp = root;
+	struct lut *prev_child = NULL;
+
+	if (root == NULL)
+		return;
+
+	while (tmp->lut_left != NULL)
+		tmp = tmp->lut_left;
+
+	/* do callback on leftmost node */
+	(*callback)(tmp->lut_lhs, tmp->lut_rhs, arg);
+
+	for (;;) {
+		if (tmp->lut_right != NULL && tmp->lut_right != prev_child) {
+			tmp = tmp->lut_right;
+			while (tmp->lut_left != NULL)
+				tmp = tmp->lut_left;
+
+			/* do callback on leftmost node */
+			(*callback)(tmp->lut_lhs, tmp->lut_rhs, arg);
+		} else if (tmp->lut_parent != NULL) {
+			prev_child = tmp;
+			tmp = tmp->lut_parent;
+			/*
+			 * do callback on parent only if we're coming up
+			 * from the left
+			 */
+			if (tmp->lut_right != prev_child)
+				(*callback)(tmp->lut_lhs, tmp->lut_rhs, arg);
+		} else
+			return;
 	}
 }
 
@@ -183,14 +212,44 @@ lut_walk(struct lut *root, lut_cb callback, void *arg)
 void
 lut_free(struct lut *root, lut_cb callback, void *arg)
 {
-	if (root) {
-		lut_free(root->lut_left, callback, arg);
-		root->lut_left = NULL;
-		lut_free(root->lut_right, callback, arg);
-		root->lut_right = NULL;
-		if (callback)
-			(*callback)(root->lut_lhs, root->lut_rhs, arg);
-		FREE(root);
-		stats_counter_bump(Freetotal);
+	struct lut *tmp = root;
+	struct lut *prev_child = NULL;
+
+	if (root == NULL)
+		return;
+
+	while (tmp->lut_left != NULL)
+		tmp = tmp->lut_left;
+
+	/* do callback on leftmost node */
+	if (callback)
+		(*callback)(tmp->lut_lhs, tmp->lut_rhs, arg);
+
+	for (;;) {
+		if (tmp->lut_right != NULL && tmp->lut_right != prev_child) {
+			tmp = tmp->lut_right;
+			while (tmp->lut_left != NULL)
+				tmp = tmp->lut_left;
+
+			/* do callback on leftmost node */
+			if (callback)
+				(*callback)(tmp->lut_lhs, tmp->lut_rhs, arg);
+		} else if (tmp->lut_parent != NULL) {
+			prev_child = tmp;
+			tmp = tmp->lut_parent;
+			FREE(prev_child);
+			/*
+			 * do callback on parent only if we're coming up
+			 * from the left
+			 */
+			if (tmp->lut_right != prev_child && callback)
+				(*callback)(tmp->lut_lhs, tmp->lut_rhs, arg);
+		} else {
+			/*
+			 * free the root node and then we're done
+			 */
+			FREE(tmp);
+			return;
+		}
 	}
 }
