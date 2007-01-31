@@ -63,6 +63,7 @@
 #include "sd_xbuf.h"
 
 #include <sys/scsi/targets/sddef.h>
+#include <sys/cmlb.h>
 
 
 /*
@@ -70,10 +71,10 @@
  */
 #if (defined(__fibre))
 #define	SD_MODULE_NAME	"SCSI SSA/FCAL Disk Driver %I%"
-char _depends_on[]	= "misc/scsi drv/fcp";
+char _depends_on[]	= "misc/scsi misc/cmlb drv/fcp";
 #else
 #define	SD_MODULE_NAME	"SCSI Disk Driver %I%"
-char _depends_on[]	= "misc/scsi";
+char _depends_on[]	= "misc/scsi misc/cmlb";
 #endif
 
 /*
@@ -103,41 +104,6 @@ char _depends_on[]	= "misc/scsi";
  * anyways if the FC HBA already reports INTERCONNECT_FABRIC for the
  * "interconnect_type" property.
  *
- * Notes for off-by-1 workaround:
- * -----------------------------
- *
- *    SCSI READ_CAPACITY command returns the LBA number of the
- *    last logical block, but sd once treated this number as
- *    disks' capacity on x86 platform. And LBAs are addressed
- *    based 0. So the last block was lost on x86 platform.
- *
- *    Now, we remove this workaround. In order for present sd
- *    driver to work with disks which are labeled/partitioned
- *    via previous sd, we add workaround as follows:
- *
- *    1) Locate backup EFI label: sd searches the next to last
- *       block for legacy backup EFI label. If fails, it will
- *       turn to the last block for backup EFI label;
- *    2) Clear backup EFI label: sd first search the last block
- *       for backup EFI label, and will search the next to last
- *       block only if failed for the last block.
- *    3) Calculate geometry: refer to sd_convert_geometry(), If
- *       capacity increasing by 1 causes disks' capacity to cross
- *       over the limits in table CHS_values, geometry info will
- *       change. This will raise an issue: In case that primary
- *       VTOC label is destroyed, format commandline can restore
- *       it via backup VTOC labels. And format locates backup VTOC
- *       labels by use of geometry from sd driver. So changing
- *       geometry will prevent format from finding backup VTOC
- *       labels. To eliminate this side effect for compatibility,
- *       sd uses (capacity -1) to calculate geometry;
- *    4) 1TB disks: some important data structures use 32-bit
- *       signed long/int (for example, daddr_t), so that sd doesn't
- *       support a disk with capacity larger than 1TB on 32-bit
- *       platform. However, for exactly 1TB disk, it was treated as
- *       (1T - 512)B in the past, and could have valid solaris
- *       partitions. To workaround this, if an exactly 1TB disk has
- *       solaris fdisk partition, it will be allowed to work with sd.
  */
 #if (defined(__fibre))
 #define	SD_DEFAULT_INTERCONNECT_TYPE	SD_INTERCONNECT_FIBRE
@@ -217,6 +183,7 @@ static	char *sd_config_list		= "sd-config-list";
 #define	sd_cb_ops			ssd_cb_ops
 #define	sd_ops				ssd_ops
 #define	sd_additional_codes		ssd_additional_codes
+#define	sd_tgops			ssd_tgops
 
 #define	sd_minor_data			ssd_minor_data
 #define	sd_minor_data_efi		ssd_minor_data_efi
@@ -781,11 +748,6 @@ static const int sd_disk_table_size =
 	sizeof (sd_disk_table)/ sizeof (sd_disk_config_t);
 
 
-/*
- * Return codes of sd_uselabel().
- */
-#define	SD_LABEL_IS_VALID		0
-#define	SD_LABEL_IS_INVALID		1
 
 #define	SD_INTERCONNECT_PARALLEL	0
 #define	SD_INTERCONNECT_FABRIC		1
@@ -803,7 +765,6 @@ static const int sd_disk_table_size =
 #define	VPD_HEAD_OFFSET		3	/* size of head for vpd page */
 #define	VPD_PAGE_LENGTH		3	/* offset for pge length data */
 #define	VPD_MODE_PAGE		1	/* offset into vpd pg for "page code" */
-#define	WD_NODE			7	/* the whole disk minor */
 
 static kmutex_t sd_sense_mutex = {0};
 
@@ -866,27 +827,11 @@ static int sd_pm_idletime = 1;
 #define	sd_blank_cmp			ssd_blank_cmp
 #define	sd_chk_vers1_data		ssd_chk_vers1_data
 #define	sd_set_vers1_properties		ssd_set_vers1_properties
-#define	sd_validate_geometry		ssd_validate_geometry
 
-#if defined(_SUNOS_VTOC_16)
-#define	sd_convert_geometry		ssd_convert_geometry
-#endif
-
-#define	sd_resync_geom_caches		ssd_resync_geom_caches
-#define	sd_read_fdisk			ssd_read_fdisk
 #define	sd_get_physical_geometry	ssd_get_physical_geometry
 #define	sd_get_virtual_geometry		ssd_get_virtual_geometry
 #define	sd_update_block_info		ssd_update_block_info
-#define	sd_swap_efi_gpt			ssd_swap_efi_gpt
-#define	sd_swap_efi_gpe			ssd_swap_efi_gpe
-#define	sd_validate_efi			ssd_validate_efi
-#define	sd_use_efi			ssd_use_efi
-#define	sd_uselabel			ssd_uselabel
-#define	sd_build_default_label		ssd_build_default_label
-#define	sd_has_max_chs_vals		ssd_has_max_chs_vals
-#define	sd_inq_fill			ssd_inq_fill
 #define	sd_register_devid		ssd_register_devid
-#define	sd_get_devid_block		ssd_get_devid_block
 #define	sd_get_devid			ssd_get_devid
 #define	sd_create_devid			ssd_create_devid
 #define	sd_write_deviceid		ssd_write_deviceid
@@ -903,7 +848,6 @@ static int sd_pm_idletime = 1;
 #define	sd_unit_attach			ssd_unit_attach
 #define	sd_unit_detach			ssd_unit_detach
 #define	sd_set_unit_attributes		ssd_set_unit_attributes
-#define	sd_create_minor_nodes		ssd_create_minor_nodes
 #define	sd_create_errstats		ssd_create_errstats
 #define	sd_set_errstats			ssd_set_errstats
 #define	sd_set_pstats			ssd_set_pstats
@@ -1047,27 +991,9 @@ static int sd_pm_idletime = 1;
 #define	sd_dump_memory			ssd_dump_memory
 #define	sd_get_media_info		ssd_get_media_info
 #define	sd_dkio_ctrl_info		ssd_dkio_ctrl_info
-#define	sd_dkio_get_geometry		ssd_dkio_get_geometry
-#define	sd_dkio_set_geometry		ssd_dkio_set_geometry
-#define	sd_dkio_get_partition		ssd_dkio_get_partition
-#define	sd_dkio_set_partition		ssd_dkio_set_partition
-#define	sd_dkio_partition		ssd_dkio_partition
-#define	sd_dkio_get_vtoc		ssd_dkio_get_vtoc
-#define	sd_dkio_get_efi			ssd_dkio_get_efi
-#define	sd_build_user_vtoc		ssd_build_user_vtoc
-#define	sd_dkio_set_vtoc		ssd_dkio_set_vtoc
-#define	sd_dkio_set_efi			ssd_dkio_set_efi
-#define	sd_build_label_vtoc		ssd_build_label_vtoc
-#define	sd_write_label			ssd_write_label
-#define	sd_clear_vtoc			ssd_clear_vtoc
-#define	sd_clear_efi			ssd_clear_efi
 #define	sd_get_tunables_from_conf	ssd_get_tunables_from_conf
 #define	sd_setup_next_xfer		ssd_setup_next_xfer
 #define	sd_dkio_get_temp		ssd_dkio_get_temp
-#define	sd_dkio_get_mboot		ssd_dkio_get_mboot
-#define	sd_dkio_set_mboot		ssd_dkio_set_mboot
-#define	sd_setup_default_geometry	ssd_setup_default_geometry
-#define	sd_update_fdisk_and_vtoc	ssd_update_fdisk_and_vtoc
 #define	sd_check_mhd			ssd_check_mhd
 #define	sd_mhd_watch_cb			ssd_mhd_watch_cb
 #define	sd_mhd_watch_incomplete		ssd_mhd_watch_incomplete
@@ -1135,6 +1061,8 @@ static int sd_pm_idletime = 1;
 #define	sd_failfast_flushq_callback	ssd_failfast_flushq_callback
 
 #define	sd_is_lsi			ssd_is_lsi
+#define	sd_tg_rdwr			ssd_tg_rdwr
+#define	sd_tg_getinfo			ssd_tg_getinfo
 
 #endif	/* #if (defined(__fibre)) */
 
@@ -1191,37 +1119,9 @@ static int  sd_chk_vers1_data(struct sd_lun *un, int flags, int *prop_list,
 	int list_len, char *dataname_ptr);
 static void sd_set_vers1_properties(struct sd_lun *un, int flags,
     sd_tunables *prop_list);
-static int  sd_validate_geometry(struct sd_lun *un, int path_flag);
-
-#if defined(_SUNOS_VTOC_16)
-static void sd_convert_geometry(uint64_t capacity, struct dk_geom *un_g);
-#endif
-
-static void sd_resync_geom_caches(struct sd_lun *un, uint64_t capacity,
-	int lbasize, int path_flag);
-static int  sd_read_fdisk(struct sd_lun *un, uint_t capacity, int lbasize,
-	int path_flag);
-static void sd_get_physical_geometry(struct sd_lun *un,
-	struct geom_cache *pgeom_p, uint64_t capacity, int lbasize,
-	int path_flag);
-static void sd_get_virtual_geometry(struct sd_lun *un, int capacity,
-	int lbasize);
-static int  sd_uselabel(struct sd_lun *un, struct dk_label *l, int path_flag);
-static void sd_swap_efi_gpt(efi_gpt_t *);
-static void sd_swap_efi_gpe(int nparts, efi_gpe_t *);
-static int sd_validate_efi(efi_gpt_t *);
-static int sd_use_efi(struct sd_lun *, int);
-static void sd_build_default_label(struct sd_lun *un);
-
-#if defined(_FIRMWARE_NEEDS_FDISK)
-static int  sd_has_max_chs_vals(struct ipart *fdp);
-#endif
-static void sd_inq_fill(char *p, int l, char *s);
-
 
 static void sd_register_devid(struct sd_lun *un, dev_info_t *devi,
     int reservation_flag);
-static daddr_t  sd_get_devid_block(struct sd_lun *un);
 static int  sd_get_devid(struct sd_lun *un);
 static int  sd_get_serialnum(struct sd_lun *un, uchar_t *wwn, int *len);
 static ddi_devid_t sd_create_devid(struct sd_lun *un);
@@ -1244,7 +1144,6 @@ static int  sd_unit_attach(dev_info_t *devi);
 static int  sd_unit_detach(dev_info_t *devi);
 
 static void sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi);
-static int  sd_create_minor_nodes(struct sd_lun *un, dev_info_t *devi);
 static void sd_create_errstats(struct sd_lun *un, int instance);
 static void sd_set_errstats(struct sd_lun *un);
 static void sd_set_pstats(struct sd_lun *un);
@@ -1541,31 +1440,7 @@ static void sd_panic_for_res_conflict(struct sd_lun *un);
  */
 static int sd_get_media_info(dev_t dev, caddr_t arg, int flag);
 static int sd_dkio_ctrl_info(dev_t dev, caddr_t arg, int flag);
-static int sd_dkio_get_geometry(dev_t dev, caddr_t arg, int flag,
-	int geom_validated);
-static int sd_dkio_set_geometry(dev_t dev, caddr_t arg, int flag);
-static int sd_dkio_get_partition(dev_t dev, caddr_t arg, int flag,
-	int geom_validated);
-static int sd_dkio_set_partition(dev_t dev, caddr_t arg, int flag);
-static int sd_dkio_get_vtoc(dev_t dev, caddr_t arg, int flag,
-	int geom_validated);
-static int sd_dkio_get_efi(dev_t dev, caddr_t arg, int flag);
-static int sd_dkio_partition(dev_t dev, caddr_t arg, int flag);
-static void sd_build_user_vtoc(struct sd_lun *un, struct vtoc *user_vtoc);
-static int sd_dkio_set_vtoc(dev_t dev, caddr_t arg, int flag);
-static int sd_dkio_set_efi(dev_t dev, caddr_t arg, int flag);
-static int sd_build_label_vtoc(struct sd_lun *un, struct vtoc *user_vtoc);
-static int sd_write_label(dev_t dev);
-static int sd_set_vtoc(struct sd_lun *un, struct dk_label *dkl);
-static void sd_clear_vtoc(struct sd_lun *un);
-static void sd_clear_efi(struct sd_lun *un);
 static int sd_dkio_get_temp(dev_t dev, caddr_t arg, int flag);
-static int sd_dkio_get_mboot(dev_t dev, caddr_t arg, int flag);
-static int sd_dkio_set_mboot(dev_t dev, caddr_t arg, int flag);
-static void sd_setup_default_geometry(struct sd_lun *un);
-#if defined(__i386) || defined(__amd64)
-static int sd_update_fdisk_and_vtoc(struct sd_lun *un);
-#endif
 
 /*
  * Multi-host Ioctl Prototypes
@@ -1657,6 +1532,13 @@ static void sd_is_lsi(struct sd_lun *un);
 static int sd_setup_next_xfer(struct sd_lun *un, struct buf *bp,
 		struct scsi_pkt *pkt, struct sd_xbuf *xp);
 #endif
+
+
+/* Function prototypes for cmlb */
+static int sd_tg_rdwr(dev_info_t *devi, uchar_t cmd, void *bufaddr,
+    diskaddr_t start_block, size_t reqlength, void *tg_cookie);
+
+static int sd_tg_getinfo(dev_info_t *devi, int cmd, void *arg, void *tg_cookie);
 
 /*
  * Constants for failfast support:
@@ -1759,6 +1641,11 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
+static cmlb_tg_ops_t sd_tgops = {
+	TG_DK_OPS_VERSION_1,
+	sd_tg_rdwr,
+	sd_tg_getinfo
+	};
 
 static struct scsi_asq_key_strings sd_additional_codes[] = {
 	0x81, 0, "Logical Unit is Reserved",
@@ -2713,15 +2600,16 @@ sd_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 	 */
 	un = ddi_get_soft_state(sd_state, instance);
 	if ((dev == DDI_DEV_T_ANY) || (un == NULL) ||
-	    (un->un_f_geometry_is_valid == FALSE)) {
+	    !SD_IS_VALID_LABEL(un)) {
 		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 		    name, valuep, lengthp));
 	} else {
 		/* get nblocks value */
 		ASSERT(!mutex_owned(SD_MUTEX(un)));
-		mutex_enter(SD_MUTEX(un));
-		nblocks64 = (ulong_t)un->un_map[SDPART(dev)].dkl_nblk;
-		mutex_exit(SD_MUTEX(un));
+
+		(void) cmlb_partinfo(un->un_cmlbhandle, SDPART(dev),
+		    (diskaddr_t *)&nblocks64, NULL, NULL, NULL,
+		    (void *)SD_PATH_DIRECT);
 
 		return (ddi_prop_op_nblocks(dev, dip, prop_op, mod_flags,
 		    name, valuep, lengthp, nblocks64));
@@ -4306,787 +4194,6 @@ sd_is_lsi(struct sd_lun *un)
 	}
 }
 
-
-/*
- * The following routines support reading and interpretation of disk labels,
- * including Solaris BE (8-slice) vtoc's, Solaris LE (16-slice) vtoc's, and
- * fdisk tables.
- */
-
-/*
- *    Function: sd_validate_geometry
- *
- * Description: Read the label from the disk (if present). Update the unit's
- *		geometry and vtoc information from the data in the label.
- *		Verify that the label is valid.
- *
- *   Arguments: un - driver soft state (unit) structure
- *		path_flag - SD_PATH_DIRECT to use the USCSI "direct" chain and
- *			the normal command waitq, or SD_PATH_DIRECT_PRIORITY
- *			to use the USCSI "direct" chain and bypass the normal
- *			command waitq.
- *
- * Return Code: 0 - Successful completion
- *		EINVAL  - Invalid value in un->un_tgt_blocksize or
- *			  un->un_blockcount; or label on disk is corrupted
- *			  or unreadable.
- *		EACCES  - Reservation conflict at the device.
- *		ENOMEM  - Resource allocation error
- *		ENOTSUP - geometry not applicable
- *
- *     Context: Kernel thread only (can sleep).
- */
-
-static int
-sd_validate_geometry(struct sd_lun *un, int path_flag)
-{
-	static	char		labelstring[128];
-	static	char		buf[256];
-	char	*label		= NULL;
-	int	label_error = 0;
-	int	gvalid		= un->un_f_geometry_is_valid;
-	int	lbasize;
-	uint64_t	capacity;
-	int	count;
-#if defined(__i386) || defined(__amd64)
-	int forced_under_1t = 0;
-#endif
-
-	ASSERT(un != NULL);
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-
-	/*
-	 * If the required values are not valid, then try getting them
-	 * once via read capacity. If that fails, then fail this call.
-	 * This is necessary with the new mpxio failover behavior in
-	 * the T300 where we can get an attach for the inactive path
-	 * before the active path. The inactive path fails commands with
-	 * sense data of 02,04,88 which happens to the read capacity
-	 * before mpxio has had sufficient knowledge to know if it should
-	 * force a fail over or not. (Which it won't do at attach anyhow).
-	 * If the read capacity at attach time fails, un_tgt_blocksize and
-	 * un_blockcount won't be valid.
-	 */
-	if ((un->un_f_tgt_blocksize_is_valid != TRUE) ||
-	    (un->un_f_blockcount_is_valid != TRUE)) {
-		uint64_t	cap;
-		uint32_t	lbasz;
-		int		rval;
-
-		mutex_exit(SD_MUTEX(un));
-		rval = sd_send_scsi_READ_CAPACITY(un, &cap,
-		    &lbasz, SD_PATH_DIRECT);
-		mutex_enter(SD_MUTEX(un));
-		if (rval == 0) {
-			/*
-			 * The following relies on
-			 * sd_send_scsi_READ_CAPACITY never
-			 * returning 0 for capacity and/or lbasize.
-			 */
-			sd_update_block_info(un, lbasz, cap);
-		}
-
-		if ((un->un_f_tgt_blocksize_is_valid != TRUE) ||
-		    (un->un_f_blockcount_is_valid != TRUE)) {
-			return (EINVAL);
-		}
-	}
-
-	/*
-	 * Copy the lbasize and capacity so that if they're reset while we're
-	 * not holding the SD_MUTEX, we will continue to use valid values
-	 * after the SD_MUTEX is reacquired. (4119659)
-	 */
-	lbasize  = un->un_tgt_blocksize;
-	capacity = un->un_blockcount;
-
-#if defined(_SUNOS_VTOC_16)
-	/*
-	 * Set up the "whole disk" fdisk partition; this should always
-	 * exist, regardless of whether the disk contains an fdisk table
-	 * or vtoc.
-	 */
-	un->un_map[P0_RAW_DISK].dkl_cylno = 0;
-	un->un_map[P0_RAW_DISK].dkl_nblk  = capacity;
-#endif
-
-	/*
-	 * Refresh the logical and physical geometry caches.
-	 * (data from MODE SENSE format/rigid disk geometry pages,
-	 * and scsi_ifgetcap("geometry").
-	 */
-	sd_resync_geom_caches(un, capacity, lbasize, path_flag);
-
-	label_error = sd_use_efi(un, path_flag);
-	if (label_error == 0) {
-		/* found a valid EFI label */
-		SD_TRACE(SD_LOG_IO_PARTITION, un,
-			"sd_validate_geometry: found EFI label\n");
-		un->un_solaris_offset = 0;
-		un->un_solaris_size = capacity;
-		return (ENOTSUP);
-	}
-	if (un->un_blockcount > DK_MAX_BLOCKS) {
-		if (label_error == ESRCH) {
-			/*
-			 * they've configured a LUN over 1TB, but used
-			 * format.dat to restrict format's view of the
-			 * capacity to be under 1TB
-			 */
-			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-"is >1TB and has a VTOC label: use format(1M) to either decrease the");
-			scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
-"size to be < 1TB or relabel the disk with an EFI label");
-#if defined(__i386) || defined(__amd64)
-			forced_under_1t = 1;
-#endif
-		} else {
-			/* unlabeled disk over 1TB */
-#if defined(__i386) || defined(__amd64)
-			/*
-			 * Refer to comments on off-by-1 at the head of the file
-			 * A 1TB disk was treated as (1T - 512)B in the past,
-			 * thus, it might have valid solaris partition. We
-			 * will return ENOTSUP later only if this disk has no
-			 * valid solaris partition.
-			 */
-			if ((un->un_tgt_blocksize != un->un_sys_blocksize) ||
-			    (un->un_blockcount - 1 > DK_MAX_BLOCKS) ||
-			    un->un_f_has_removable_media ||
-			    un->un_f_is_hotpluggable)
-#endif
-				return (ENOTSUP);
-		}
-	}
-	label_error = 0;
-
-	/*
-	 * at this point it is either labeled with a VTOC or it is
-	 * under 1TB (<= 1TB actually for off-by-1)
-	 */
-	if (un->un_f_vtoc_label_supported) {
-		struct	dk_label *dkl;
-		offset_t dkl1;
-		offset_t label_addr, real_addr;
-		int	rval;
-		size_t	buffer_size;
-
-		/*
-		 * Note: This will set up un->un_solaris_size and
-		 * un->un_solaris_offset.
-		 */
-		switch (sd_read_fdisk(un, capacity, lbasize, path_flag)) {
-		case SD_CMD_RESERVATION_CONFLICT:
-			ASSERT(mutex_owned(SD_MUTEX(un)));
-			return (EACCES);
-		case SD_CMD_FAILURE:
-			ASSERT(mutex_owned(SD_MUTEX(un)));
-			/*
-			 * A multisession audio cd can have an unreadable
-			 * fdisk sector, but there could be readable data
-			 * in a separate session. Accept this and let
-			 * the code build a default disk label later on.
-			 */
-			if (ISCD(un))
-				break;
-			return (ENOMEM);
-		}
-
-		if (un->un_solaris_size <= DK_LABEL_LOC) {
-
-#if defined(__i386) || defined(__amd64)
-			/*
-			 * Refer to comments on off-by-1 at the head of the file
-			 * This is for 1TB disk only. Since that there is no
-			 * solaris partitions, return ENOTSUP as we do for
-			 * >1TB disk.
-			 */
-			if (un->un_blockcount > DK_MAX_BLOCKS)
-				return (ENOTSUP);
-#endif
-			/*
-			 * Found fdisk table but no Solaris partition entry,
-			 * so don't call sd_uselabel() and don't create
-			 * a default label.
-			 */
-			label_error = 0;
-			un->un_f_geometry_is_valid = TRUE;
-			goto no_solaris_partition;
-		}
-		label_addr = (daddr_t)(un->un_solaris_offset + DK_LABEL_LOC);
-
-#if defined(__i386) || defined(__amd64)
-		/*
-		 * Refer to comments on off-by-1 at the head of the file
-		 * Now, this 1TB disk has valid solaris partition. It
-		 * must be created by previous sd driver, we have to
-		 * treat it as (1T-512)B.
-		 */
-		if ((un->un_blockcount > DK_MAX_BLOCKS) &&
-		    (forced_under_1t != 1)) {
-			un->un_f_capacity_adjusted = 1;
-			un->un_blockcount = DK_MAX_BLOCKS;
-			un->un_map[P0_RAW_DISK].dkl_nblk  = DK_MAX_BLOCKS;
-
-			/*
-			 * Refer to sd_read_fdisk, when there is no
-			 * fdisk partition table, un_solaris_size is
-			 * set to disk's capacity. In this case, we
-			 * need to adjust it
-			 */
-			if (un->un_solaris_size > DK_MAX_BLOCKS)
-				un->un_solaris_size = DK_MAX_BLOCKS;
-			sd_resync_geom_caches(un, DK_MAX_BLOCKS,
-			    lbasize, path_flag);
-		}
-#endif
-
-		/*
-		 * sys_blocksize != tgt_blocksize, need to re-adjust
-		 * blkno and save the index to beginning of dk_label
-		 */
-		real_addr = SD_SYS2TGTBLOCK(un, label_addr);
-		buffer_size = SD_REQBYTES2TGTBYTES(un,
-		    sizeof (struct dk_label));
-
-		SD_TRACE(SD_LOG_IO_PARTITION, un, "sd_validate_geometry: "
-		    "label_addr: 0x%x allocation size: 0x%x\n",
-		    label_addr, buffer_size);
-		dkl = kmem_zalloc(buffer_size, KM_NOSLEEP);
-		if (dkl == NULL) {
-			return (ENOMEM);
-		}
-
-		mutex_exit(SD_MUTEX(un));
-		rval = sd_send_scsi_READ(un, dkl, buffer_size, real_addr,
-		    path_flag);
-		mutex_enter(SD_MUTEX(un));
-
-		switch (rval) {
-		case 0:
-			/*
-			 * sd_uselabel will establish that the geometry
-			 * is valid.
-			 * For sys_blocksize != tgt_blocksize, need
-			 * to index into the beginning of dk_label
-			 */
-			dkl1 = (daddr_t)dkl
-				+ SD_TGTBYTEOFFSET(un, label_addr, real_addr);
-			if (sd_uselabel(un, (struct dk_label *)(uintptr_t)dkl1,
-			    path_flag) != SD_LABEL_IS_VALID) {
-				label_error = EINVAL;
-			}
-			break;
-		case EACCES:
-			label_error = EACCES;
-			break;
-		default:
-			label_error = EINVAL;
-			break;
-		}
-
-		kmem_free(dkl, buffer_size);
-
-#if defined(_SUNOS_VTOC_8)
-		label = (char *)un->un_asciilabel;
-#elif defined(_SUNOS_VTOC_16)
-		label = (char *)un->un_vtoc.v_asciilabel;
-#else
-#error "No VTOC format defined."
-#endif
-	}
-
-	/*
-	 * If a valid label was not found, AND if no reservation conflict
-	 * was detected, then go ahead and create a default label (4069506).
-	 */
-	if (un->un_f_default_vtoc_supported && (label_error != EACCES)) {
-		if (un->un_f_geometry_is_valid == FALSE) {
-			sd_build_default_label(un);
-		}
-		label_error = 0;
-	}
-
-no_solaris_partition:
-	if ((!un->un_f_has_removable_media ||
-	    (un->un_f_has_removable_media &&
-		un->un_mediastate == DKIO_EJECTED)) &&
-		(un->un_state == SD_STATE_NORMAL && !gvalid)) {
-		/*
-		 * Print out a message indicating who and what we are.
-		 * We do this only when we happen to really validate the
-		 * geometry. We may call sd_validate_geometry() at other
-		 * times, e.g., ioctl()'s like Get VTOC in which case we
-		 * don't want to print the label.
-		 * If the geometry is valid, print the label string,
-		 * else print vendor and product info, if available
-		 */
-		if ((un->un_f_geometry_is_valid == TRUE) && (label != NULL)) {
-			SD_INFO(SD_LOG_ATTACH_DETACH, un, "?<%s>\n", label);
-		} else {
-			mutex_enter(&sd_label_mutex);
-			sd_inq_fill(SD_INQUIRY(un)->inq_vid, VIDMAX,
-			    labelstring);
-			sd_inq_fill(SD_INQUIRY(un)->inq_pid, PIDMAX,
-			    &labelstring[64]);
-			(void) sprintf(buf, "?Vendor '%s', product '%s'",
-			    labelstring, &labelstring[64]);
-			if (un->un_f_blockcount_is_valid == TRUE) {
-				(void) sprintf(&buf[strlen(buf)],
-				    ", %llu %u byte blocks\n",
-				    (longlong_t)un->un_blockcount,
-				    un->un_tgt_blocksize);
-			} else {
-				(void) sprintf(&buf[strlen(buf)],
-				    ", (unknown capacity)\n");
-			}
-			SD_INFO(SD_LOG_ATTACH_DETACH, un, buf);
-			mutex_exit(&sd_label_mutex);
-		}
-	}
-
-#if defined(_SUNOS_VTOC_16)
-	/*
-	 * If we have valid geometry, set up the remaining fdisk partitions.
-	 * Note that dkl_cylno is not used for the fdisk map entries, so
-	 * we set it to an entirely bogus value.
-	 */
-	for (count = 0; count < FD_NUMPART; count++) {
-		un->un_map[FDISK_P1 + count].dkl_cylno = -1;
-		un->un_map[FDISK_P1 + count].dkl_nblk =
-		    un->un_fmap[count].fmap_nblk;
-
-		un->un_offset[FDISK_P1 + count] =
-		    un->un_fmap[count].fmap_start;
-	}
-#endif
-
-	for (count = 0; count < NDKMAP; count++) {
-#if defined(_SUNOS_VTOC_8)
-		struct dk_map *lp  = &un->un_map[count];
-		un->un_offset[count] =
-		    un->un_g.dkg_nhead * un->un_g.dkg_nsect * lp->dkl_cylno;
-#elif defined(_SUNOS_VTOC_16)
-		struct dkl_partition *vp = &un->un_vtoc.v_part[count];
-
-		un->un_offset[count] = vp->p_start + un->un_solaris_offset;
-#else
-#error "No VTOC format defined."
-#endif
-	}
-
-	/*
-	 * For VTOC labeled disk, create and set the partition stats
-	 * at attach time, update the stats according to dynamic
-	 * partition changes during running time.
-	 */
-	if (label_error == 0 && un->un_f_pkstats_enabled) {
-		sd_set_pstats(un);
-		SD_TRACE(SD_LOG_IO_PARTITION, un, "sd_validate_geometry: "
-		    "un:0x%p pstats created and set, or updated\n", un);
-	}
-
-	return (label_error);
-}
-
-
-#if defined(_SUNOS_VTOC_16)
-/*
- * Macro: MAX_BLKS
- *
- *	This macro is used for table entries where we need to have the largest
- *	possible sector value for that head & SPT (sectors per track)
- *	combination.  Other entries for some smaller disk sizes are set by
- *	convention to match those used by X86 BIOS usage.
- */
-#define	MAX_BLKS(heads, spt)	UINT16_MAX * heads * spt, heads, spt
-
-/*
- *    Function: sd_convert_geometry
- *
- * Description: Convert physical geometry into a dk_geom structure. In
- *		other words, make sure we don't wrap 16-bit values.
- *		e.g. converting from geom_cache to dk_geom
- *
- *     Context: Kernel thread only
- */
-static void
-sd_convert_geometry(uint64_t capacity, struct dk_geom *un_g)
-{
-	int i;
-	static const struct chs_values {
-		uint_t max_cap;		/* Max Capacity for this HS. */
-		uint_t nhead;		/* Heads to use. */
-		uint_t nsect;		/* SPT to use. */
-	} CHS_values[] = {
-		{0x00200000,  64, 32},		/* 1GB or smaller disk. */
-		{0x01000000, 128, 32},		/* 8GB or smaller disk. */
-		{MAX_BLKS(255,  63)},		/* 502.02GB or smaller disk. */
-		{MAX_BLKS(255, 126)},		/* .98TB or smaller disk. */
-		{DK_MAX_BLOCKS, 255, 189}	/* Max size is just under 1TB */
-	};
-
-	/* Unlabeled SCSI floppy device */
-	if (capacity <= 0x1000) {
-		un_g->dkg_nhead = 2;
-		un_g->dkg_ncyl = 80;
-		un_g->dkg_nsect = capacity / (un_g->dkg_nhead * un_g->dkg_ncyl);
-		return;
-	}
-
-	/*
-	 * For all devices we calculate cylinders using the
-	 * heads and sectors we assign based on capacity of the
-	 * device.  The table is designed to be compatible with the
-	 * way other operating systems lay out fdisk tables for X86
-	 * and to insure that the cylinders never exceed 65535 to
-	 * prevent problems with X86 ioctls that report geometry.
-	 * We use SPT that are multiples of 63, since other OSes that
-	 * are not limited to 16-bits for cylinders stop at 63 SPT
-	 * we make do by using multiples of 63 SPT.
-	 *
-	 * Note than capacities greater than or equal to 1TB will simply
-	 * get the largest geometry from the table. This should be okay
-	 * since disks this large shouldn't be using CHS values anyway.
-	 */
-	for (i = 0; CHS_values[i].max_cap < capacity &&
-	    CHS_values[i].max_cap != DK_MAX_BLOCKS; i++)
-		;
-
-	un_g->dkg_nhead = CHS_values[i].nhead;
-	un_g->dkg_nsect = CHS_values[i].nsect;
-}
-#endif
-
-
-/*
- *    Function: sd_resync_geom_caches
- *
- * Description: (Re)initialize both geometry caches: the virtual geometry
- *		information is extracted from the HBA (the "geometry"
- *		capability), and the physical geometry cache data is
- *		generated by issuing MODE SENSE commands.
- *
- *   Arguments: un - driver soft state (unit) structure
- *		capacity - disk capacity in #blocks
- *		lbasize - disk block size in bytes
- *		path_flag - SD_PATH_DIRECT to use the USCSI "direct" chain and
- *			the normal command waitq, or SD_PATH_DIRECT_PRIORITY
- *			to use the USCSI "direct" chain and bypass the normal
- *			command waitq.
- *
- *     Context: Kernel thread only (can sleep).
- */
-
-static void
-sd_resync_geom_caches(struct sd_lun *un, uint64_t capacity, int lbasize,
-	int path_flag)
-{
-	struct 	geom_cache 	pgeom;
-	struct 	geom_cache	*pgeom_p = &pgeom;
-	int 	spc;
-	unsigned short nhead;
-	unsigned short nsect;
-
-	ASSERT(un != NULL);
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-
-	/*
-	 * Ask the controller for its logical geometry.
-	 * Note: if the HBA does not support scsi_ifgetcap("geometry"),
-	 * then the lgeom cache will be invalid.
-	 */
-	sd_get_virtual_geometry(un, capacity, lbasize);
-
-	/*
-	 * Initialize the pgeom cache from lgeom, so that if MODE SENSE
-	 * doesn't work, DKIOCG_PHYSGEOM can return reasonable values.
-	 */
-	if (un->un_lgeom.g_nsect == 0 || un->un_lgeom.g_nhead == 0) {
-		/*
-		 * Note: Perhaps this needs to be more adaptive? The rationale
-		 * is that, if there's no HBA geometry from the HBA driver, any
-		 * guess is good, since this is the physical geometry. If MODE
-		 * SENSE fails this gives a max cylinder size for non-LBA access
-		 */
-		nhead = 255;
-		nsect = 63;
-	} else {
-		nhead = un->un_lgeom.g_nhead;
-		nsect = un->un_lgeom.g_nsect;
-	}
-
-	if (ISCD(un)) {
-		pgeom_p->g_nhead = 1;
-		pgeom_p->g_nsect = nsect * nhead;
-	} else {
-		pgeom_p->g_nhead = nhead;
-		pgeom_p->g_nsect = nsect;
-	}
-
-	spc = pgeom_p->g_nhead * pgeom_p->g_nsect;
-	pgeom_p->g_capacity = capacity;
-	pgeom_p->g_ncyl = pgeom_p->g_capacity / spc;
-	pgeom_p->g_acyl = 0;
-
-	/*
-	 * Retrieve fresh geometry data from the hardware, stash it
-	 * here temporarily before we rebuild the incore label.
-	 *
-	 * We want to use the MODE SENSE commands to derive the
-	 * physical geometry of the device, but if either command
-	 * fails, the logical geometry is used as the fallback for
-	 * disk label geometry.
-	 */
-	mutex_exit(SD_MUTEX(un));
-	sd_get_physical_geometry(un, pgeom_p, capacity, lbasize, path_flag);
-	mutex_enter(SD_MUTEX(un));
-
-	/*
-	 * Now update the real copy while holding the mutex. This
-	 * way the global copy is never in an inconsistent state.
-	 */
-	bcopy(pgeom_p, &un->un_pgeom,  sizeof (un->un_pgeom));
-
-	SD_INFO(SD_LOG_COMMON, un, "sd_resync_geom_caches: "
-	    "(cached from lgeom)\n");
-	SD_INFO(SD_LOG_COMMON, un,
-	    "   ncyl: %ld; acyl: %d; nhead: %d; nsect: %d\n",
-	    un->un_pgeom.g_ncyl, un->un_pgeom.g_acyl,
-	    un->un_pgeom.g_nhead, un->un_pgeom.g_nsect);
-	SD_INFO(SD_LOG_COMMON, un, "   lbasize: %d; capacity: %ld; "
-	    "intrlv: %d; rpm: %d\n", un->un_pgeom.g_secsize,
-	    un->un_pgeom.g_capacity, un->un_pgeom.g_intrlv,
-	    un->un_pgeom.g_rpm);
-}
-
-
-/*
- *    Function: sd_read_fdisk
- *
- * Description: utility routine to read the fdisk table.
- *
- *   Arguments: un - driver soft state (unit) structure
- *		path_flag - SD_PATH_DIRECT to use the USCSI "direct" chain and
- *			the normal command waitq, or SD_PATH_DIRECT_PRIORITY
- *			to use the USCSI "direct" chain and bypass the normal
- *			command waitq.
- *
- * Return Code: SD_CMD_SUCCESS
- *		SD_CMD_FAILURE
- *
- *     Context: Kernel thread only (can sleep).
- */
-/* ARGSUSED */
-static int
-sd_read_fdisk(struct sd_lun *un, uint_t capacity, int lbasize, int path_flag)
-{
-#if defined(_NO_FDISK_PRESENT)
-
-	un->un_solaris_offset = 0;
-	un->un_solaris_size = capacity;
-	bzero(un->un_fmap, sizeof (struct fmap) * FD_NUMPART);
-	return (SD_CMD_SUCCESS);
-
-#elif defined(_FIRMWARE_NEEDS_FDISK)
-
-	struct ipart	*fdp;
-	struct mboot	*mbp;
-	struct ipart	fdisk[FD_NUMPART];
-	int		i;
-	char		sigbuf[2];
-	caddr_t		bufp;
-	int		uidx;
-	int		rval;
-	int		lba = 0;
-	uint_t		solaris_offset;	/* offset to solaris part. */
-	daddr_t		solaris_size;	/* size of solaris partition */
-	uint32_t	blocksize;
-
-	ASSERT(un != NULL);
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-	ASSERT(un->un_f_tgt_blocksize_is_valid == TRUE);
-
-	blocksize = un->un_tgt_blocksize;
-
-	/*
-	 * Start off assuming no fdisk table
-	 */
-	solaris_offset = 0;
-	solaris_size   = capacity;
-
-	mutex_exit(SD_MUTEX(un));
-	bufp = kmem_zalloc(blocksize, KM_SLEEP);
-	rval = sd_send_scsi_READ(un, bufp, blocksize, 0, path_flag);
-	mutex_enter(SD_MUTEX(un));
-
-	if (rval != 0) {
-		SD_ERROR(SD_LOG_ATTACH_DETACH, un,
-		    "sd_read_fdisk: fdisk read err\n");
-		bzero(un->un_fmap, sizeof (struct fmap) * FD_NUMPART);
-		rval = SD_CMD_FAILURE;
-		goto done;
-	}
-
-	mbp = (struct mboot *)bufp;
-
-	/*
-	 * The fdisk table does not begin on a 4-byte boundary within the
-	 * master boot record, so we copy it to an aligned structure to avoid
-	 * alignment exceptions on some processors.
-	 */
-	bcopy(&mbp->parts[0], fdisk, sizeof (fdisk));
-
-	/*
-	 * Check for lba support before verifying sig; sig might not be
-	 * there, say on a blank disk, but the max_chs mark may still
-	 * be present.
-	 *
-	 * Note: LBA support and BEFs are an x86-only concept but this
-	 * code should work OK on SPARC as well.
-	 */
-
-	/*
-	 * First, check for lba-access-ok on root node (or prom root node)
-	 * if present there, don't need to search fdisk table.
-	 */
-	if (ddi_getprop(DDI_DEV_T_ANY, ddi_root_node(), 0,
-	    "lba-access-ok", 0) != 0) {
-		/* All drives do LBA; don't search fdisk table */
-		lba = 1;
-	} else {
-		/* Okay, look for mark in fdisk table */
-		for (fdp = fdisk, i = 0; i < FD_NUMPART; i++, fdp++) {
-			/* accumulate "lba" value from all partitions */
-			lba = (lba || sd_has_max_chs_vals(fdp));
-		}
-	}
-
-	if (lba != 0) {
-		dev_t dev = sd_make_device(SD_DEVINFO(un));
-
-		if (ddi_getprop(dev, SD_DEVINFO(un), DDI_PROP_DONTPASS,
-		    "lba-access-ok", 0) == 0) {
-			/* not found; create it */
-			if (ddi_prop_create(dev, SD_DEVINFO(un), 0,
-			    "lba-access-ok", (caddr_t)NULL, 0) !=
-			    DDI_PROP_SUCCESS) {
-				SD_ERROR(SD_LOG_ATTACH_DETACH, un,
-				    "sd_read_fdisk: Can't create lba property "
-				    "for instance %d\n",
-				    ddi_get_instance(SD_DEVINFO(un)));
-			}
-		}
-	}
-
-	bcopy(&mbp->signature, sigbuf, sizeof (sigbuf));
-
-	/*
-	 * Endian-independent signature check
-	 */
-	if (((sigbuf[1] & 0xFF) != ((MBB_MAGIC >> 8) & 0xFF)) ||
-	    (sigbuf[0] != (MBB_MAGIC & 0xFF))) {
-		SD_ERROR(SD_LOG_ATTACH_DETACH, un,
-		    "sd_read_fdisk: no fdisk\n");
-		bzero(un->un_fmap, sizeof (struct fmap) * FD_NUMPART);
-		rval = SD_CMD_SUCCESS;
-		goto done;
-	}
-
-#ifdef SDDEBUG
-	if (sd_level_mask & SD_LOGMASK_INFO) {
-		fdp = fdisk;
-		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_read_fdisk:\n");
-		SD_INFO(SD_LOG_ATTACH_DETACH, un, "         relsect    "
-		    "numsect         sysid       bootid\n");
-		for (i = 0; i < FD_NUMPART; i++, fdp++) {
-			SD_INFO(SD_LOG_ATTACH_DETACH, un,
-			    "    %d:  %8d   %8d     0x%08x     0x%08x\n",
-			    i, fdp->relsect, fdp->numsect,
-			    fdp->systid, fdp->bootid);
-		}
-	}
-#endif
-
-	/*
-	 * Try to find the unix partition
-	 */
-	uidx = -1;
-	solaris_offset = 0;
-	solaris_size   = 0;
-
-	for (fdp = fdisk, i = 0; i < FD_NUMPART; i++, fdp++) {
-		int	relsect;
-		int	numsect;
-
-		if (fdp->numsect == 0) {
-			un->un_fmap[i].fmap_start = 0;
-			un->un_fmap[i].fmap_nblk  = 0;
-			continue;
-		}
-
-		/*
-		 * Data in the fdisk table is little-endian.
-		 */
-		relsect = LE_32(fdp->relsect);
-		numsect = LE_32(fdp->numsect);
-
-		un->un_fmap[i].fmap_start = relsect;
-		un->un_fmap[i].fmap_nblk  = numsect;
-
-		if (fdp->systid != SUNIXOS &&
-		    fdp->systid != SUNIXOS2 &&
-		    fdp->systid != EFI_PMBR) {
-			continue;
-		}
-
-		/*
-		 * use the last active solaris partition id found
-		 * (there should only be 1 active partition id)
-		 *
-		 * if there are no active solaris partition id
-		 * then use the first inactive solaris partition id
-		 */
-		if ((uidx == -1) || (fdp->bootid == ACTIVE)) {
-			uidx = i;
-			solaris_offset = relsect;
-			solaris_size   = numsect;
-		}
-	}
-
-	SD_INFO(SD_LOG_ATTACH_DETACH, un, "fdisk 0x%x 0x%lx",
-	    un->un_solaris_offset, un->un_solaris_size);
-
-	rval = SD_CMD_SUCCESS;
-
-done:
-
-	/*
-	 * Clear the VTOC info, only if the Solaris partition entry
-	 * has moved, changed size, been deleted, or if the size of
-	 * the partition is too small to even fit the label sector.
-	 */
-	if ((un->un_solaris_offset != solaris_offset) ||
-	    (un->un_solaris_size != solaris_size) ||
-	    solaris_size <= DK_LABEL_LOC) {
-		SD_INFO(SD_LOG_ATTACH_DETACH, un, "fdisk moved 0x%x 0x%lx",
-			solaris_offset, solaris_size);
-		bzero(&un->un_g, sizeof (struct dk_geom));
-		bzero(&un->un_vtoc, sizeof (struct dk_vtoc));
-		bzero(&un->un_map, NDKMAP * (sizeof (struct dk_map)));
-		un->un_f_geometry_is_valid = FALSE;
-	}
-	un->un_solaris_offset = solaris_offset;
-	un->un_solaris_size = solaris_size;
-	kmem_free(bufp, blocksize);
-	return (rval);
-
-#else	/* #elif defined(_FIRMWARE_NEEDS_FDISK) */
-#error "fdisk table presence undetermined for this platform."
-#endif	/* #if defined(_NO_FDISK_PRESENT) */
-}
-
-
 /*
  *    Function: sd_get_physical_geometry
  *
@@ -5099,7 +4206,7 @@ done:
  *		does not necessarily denote an error. We want to use the
  *		MODE SENSE commands to derive the physical geometry of the
  *		device, but if either command fails, the logical geometry is
- *		used as the fallback for disk label geometry.
+ *		used as the fallback for disk label geometry in cmlb.
  *
  *		This requires that un->un_blockcount and un->un_tgt_blocksize
  *		have already been initialized for the current target and
@@ -5117,9 +4224,9 @@ done:
  *     Context: Kernel thread only (can sleep).
  */
 
-static void
-sd_get_physical_geometry(struct sd_lun *un, struct geom_cache *pgeom_p,
-	uint64_t capacity, int lbasize, int path_flag)
+static int
+sd_get_physical_geometry(struct sd_lun *un, cmlb_geom_t *pgeom_p,
+	diskaddr_t capacity, int lbasize, int path_flag)
 {
 	struct	mode_format	*page3p;
 	struct	mode_geometry	*page4p;
@@ -5130,24 +4237,16 @@ sd_get_physical_geometry(struct sd_lun *un, struct geom_cache *pgeom_p,
 	int	ncyl;
 	int	intrlv;
 	int	spc;
-	int	modesense_capacity;
+	diskaddr_t	modesense_capacity;
 	int	rpm;
 	int	bd_len;
 	int	mode_header_length;
 	uchar_t	*p3bufp;
 	uchar_t	*p4bufp;
 	int	cdbsize;
+	int 	ret = EIO;
 
 	ASSERT(un != NULL);
-	ASSERT(!(mutex_owned(SD_MUTEX(un))));
-
-	if (un->un_f_blockcount_is_valid != TRUE) {
-		return;
-	}
-
-	if (un->un_f_tgt_blocksize_is_valid != TRUE) {
-		return;
-	}
 
 	if (lbasize == 0) {
 		if (ISCD(un)) {
@@ -5280,7 +4379,6 @@ sd_get_physical_geometry(struct sd_lun *un, struct geom_cache *pgeom_p,
 	 * Stash the data now, after we know that both commands completed.
 	 */
 
-	mutex_enter(SD_MUTEX(un));
 
 	nhead = (int)page4p->heads;	/* uchar, so no conversion needed */
 	spc   = nhead * nsect;
@@ -5323,6 +4421,7 @@ sd_get_physical_geometry(struct sd_lun *un, struct geom_cache *pgeom_p,
 
 	pgeom_p->g_rpm    = (unsigned short)rpm;
 	pgeom_p->g_intrlv = (unsigned short)intrlv;
+	ret = 0;
 
 	SD_INFO(SD_LOG_COMMON, un,
 	    "sd_get_physical_geometry: mode sense geometry:\n");
@@ -5336,21 +4435,20 @@ sd_get_physical_geometry(struct sd_lun *un, struct geom_cache *pgeom_p,
 	    "sd_get_physical_geometry: (cached)\n");
 	SD_INFO(SD_LOG_COMMON, un,
 	    "   ncyl: %ld; acyl: %d; nhead: %d; nsect: %d\n",
-	    un->un_pgeom.g_ncyl,  un->un_pgeom.g_acyl,
-	    un->un_pgeom.g_nhead, un->un_pgeom.g_nsect);
+	    pgeom_p->g_ncyl,  pgeom_p->g_acyl,
+	    pgeom_p->g_nhead, pgeom_p->g_nsect);
 	SD_INFO(SD_LOG_COMMON, un,
 	    "   lbasize: %d; capacity: %ld; intrlv: %d; rpm: %d\n",
-	    un->un_pgeom.g_secsize, un->un_pgeom.g_capacity,
-	    un->un_pgeom.g_intrlv, un->un_pgeom.g_rpm);
-
-	mutex_exit(SD_MUTEX(un));
+	    pgeom_p->g_secsize, pgeom_p->g_capacity,
+	    pgeom_p->g_intrlv, pgeom_p->g_rpm);
 
 page4_exit:
 	kmem_free(p4bufp, SD_MODE_SENSE_PAGE4_LENGTH);
 page3_exit:
 	kmem_free(p3bufp, SD_MODE_SENSE_PAGE3_LENGTH);
-}
 
+	return (ret);
+}
 
 /*
  *    Function: sd_get_virtual_geometry
@@ -5364,17 +4462,14 @@ page3_exit:
  *     Context: Kernel thread only
  */
 
-static void
-sd_get_virtual_geometry(struct sd_lun *un, int capacity, int lbasize)
+static int
+sd_get_virtual_geometry(struct sd_lun *un, cmlb_geom_t *lgeom_p,
+    diskaddr_t capacity, int lbasize)
 {
-	struct	geom_cache 	*lgeom_p = &un->un_lgeom;
 	uint_t	geombuf;
 	int	spc;
 
 	ASSERT(un != NULL);
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-
-	mutex_exit(SD_MUTEX(un));
 
 	/* Set sector size, and total number of sectors */
 	(void) scsi_ifsetcap(SD_ADDRESS(un), "sector-size",   lbasize,  1);
@@ -5383,11 +4478,9 @@ sd_get_virtual_geometry(struct sd_lun *un, int capacity, int lbasize)
 	/* Let the HBA tell us its geometry */
 	geombuf = (uint_t)scsi_ifgetcap(SD_ADDRESS(un), "geometry", 1);
 
-	mutex_enter(SD_MUTEX(un));
-
 	/* A value of -1 indicates an undefined "geometry" property */
 	if (geombuf == (-1)) {
-		return;
+		return (EINVAL);
 	}
 
 	/* Initialize the logical geometry cache. */
@@ -5419,16 +4512,9 @@ sd_get_virtual_geometry(struct sd_lun *un, int capacity, int lbasize)
 	lgeom_p->g_acyl = 0;
 
 	SD_INFO(SD_LOG_COMMON, un, "sd_get_virtual_geometry: (cached)\n");
-	SD_INFO(SD_LOG_COMMON, un,
-	    "   ncyl: %ld; acyl: %d; nhead: %d; nsect: %d\n",
-	    un->un_lgeom.g_ncyl,  un->un_lgeom.g_acyl,
-	    un->un_lgeom.g_nhead, un->un_lgeom.g_nsect);
-	SD_INFO(SD_LOG_COMMON, un, "   lbasize: %d; capacity: %ld; "
-	    "intrlv: %d; rpm: %d\n", un->un_lgeom.g_secsize,
-	    un->un_lgeom.g_capacity, un->un_lgeom.g_intrlv, un->un_lgeom.g_rpm);
+	return (0);
+
 }
-
-
 /*
  *    Function: sd_update_block_info
  *
@@ -5454,826 +4540,6 @@ sd_update_block_info(struct sd_lun *un, uint32_t lbasize, uint64_t capacity)
 		un->un_blockcount		= capacity;
 		un->un_f_blockcount_is_valid	= TRUE;
 	}
-}
-
-
-static void
-sd_swap_efi_gpt(efi_gpt_t *e)
-{
-	_NOTE(ASSUMING_PROTECTED(*e))
-	e->efi_gpt_Signature = LE_64(e->efi_gpt_Signature);
-	e->efi_gpt_Revision = LE_32(e->efi_gpt_Revision);
-	e->efi_gpt_HeaderSize = LE_32(e->efi_gpt_HeaderSize);
-	e->efi_gpt_HeaderCRC32 = LE_32(e->efi_gpt_HeaderCRC32);
-	e->efi_gpt_MyLBA = LE_64(e->efi_gpt_MyLBA);
-	e->efi_gpt_AlternateLBA = LE_64(e->efi_gpt_AlternateLBA);
-	e->efi_gpt_FirstUsableLBA = LE_64(e->efi_gpt_FirstUsableLBA);
-	e->efi_gpt_LastUsableLBA = LE_64(e->efi_gpt_LastUsableLBA);
-	UUID_LE_CONVERT(e->efi_gpt_DiskGUID, e->efi_gpt_DiskGUID);
-	e->efi_gpt_PartitionEntryLBA = LE_64(e->efi_gpt_PartitionEntryLBA);
-	e->efi_gpt_NumberOfPartitionEntries =
-	    LE_32(e->efi_gpt_NumberOfPartitionEntries);
-	e->efi_gpt_SizeOfPartitionEntry =
-	    LE_32(e->efi_gpt_SizeOfPartitionEntry);
-	e->efi_gpt_PartitionEntryArrayCRC32 =
-	    LE_32(e->efi_gpt_PartitionEntryArrayCRC32);
-}
-
-static void
-sd_swap_efi_gpe(int nparts, efi_gpe_t *p)
-{
-	int i;
-
-	_NOTE(ASSUMING_PROTECTED(*p))
-	for (i = 0; i < nparts; i++) {
-		UUID_LE_CONVERT(p[i].efi_gpe_PartitionTypeGUID,
-		    p[i].efi_gpe_PartitionTypeGUID);
-		p[i].efi_gpe_StartingLBA = LE_64(p[i].efi_gpe_StartingLBA);
-		p[i].efi_gpe_EndingLBA = LE_64(p[i].efi_gpe_EndingLBA);
-		/* PartitionAttrs */
-	}
-}
-
-static int
-sd_validate_efi(efi_gpt_t *labp)
-{
-	if (labp->efi_gpt_Signature != EFI_SIGNATURE)
-		return (EINVAL);
-	/* at least 96 bytes in this version of the spec. */
-	if (sizeof (efi_gpt_t) - sizeof (labp->efi_gpt_Reserved2) >
-	    labp->efi_gpt_HeaderSize)
-		return (EINVAL);
-	/* this should be 128 bytes */
-	if (labp->efi_gpt_SizeOfPartitionEntry != sizeof (efi_gpe_t))
-		return (EINVAL);
-	return (0);
-}
-
-static int
-sd_use_efi(struct sd_lun *un, int path_flag)
-{
-	int		i;
-	int		rval = 0;
-	efi_gpe_t	*partitions;
-	uchar_t		*buf;
-	uint_t		lbasize;
-	uint64_t	cap = 0;
-	uint_t		nparts;
-	diskaddr_t	gpe_lba;
-	struct uuid	uuid_type_reserved = EFI_RESERVED;
-
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-	lbasize = un->un_tgt_blocksize;
-	un->un_reserved = -1;
-
-	mutex_exit(SD_MUTEX(un));
-
-	buf = kmem_zalloc(EFI_MIN_ARRAY_SIZE, KM_SLEEP);
-
-	if (un->un_tgt_blocksize != un->un_sys_blocksize) {
-		rval = EINVAL;
-		goto done_err;
-	}
-
-	rval = sd_send_scsi_READ(un, buf, lbasize, 0, path_flag);
-	if (rval) {
-		goto done_err;
-	}
-	if (((struct dk_label *)buf)->dkl_magic == DKL_MAGIC) {
-		/* not ours */
-		rval = ESRCH;
-		goto done_err;
-	}
-
-	rval = sd_send_scsi_READ(un, buf, lbasize, 1, path_flag);
-	if (rval) {
-		goto done_err;
-	}
-	sd_swap_efi_gpt((efi_gpt_t *)buf);
-
-	if ((rval = sd_validate_efi((efi_gpt_t *)buf)) != 0) {
-		/*
-		 * Couldn't read the primary, try the backup.  Our
-		 * capacity at this point could be based on CHS, so
-		 * check what the device reports.
-		 */
-		rval = sd_send_scsi_READ_CAPACITY(un, &cap, &lbasize,
-		    path_flag);
-		if (rval) {
-			goto done_err;
-		}
-
-		/*
-		 * The MMC standard allows READ CAPACITY to be
-		 * inaccurate by a bounded amount (in the interest of
-		 * response latency).  As a result, failed READs are
-		 * commonplace (due to the reading of metadata and not
-		 * data). Depending on the per-Vendor/drive Sense data,
-		 * the failed READ can cause many (unnecessary) retries.
-		 */
-
-		/*
-		 * Refer to comments related to off-by-1 at the
-		 * header of this file. Search the next to last
-		 * block for backup EFI label.
-		 */
-		if ((rval = sd_send_scsi_READ(un, buf, lbasize,
-		    cap - 2, (ISCD(un)) ? SD_PATH_DIRECT_PRIORITY :
-			path_flag)) != 0) {
-				goto done_err;
-		}
-
-		sd_swap_efi_gpt((efi_gpt_t *)buf);
-		if ((rval = sd_validate_efi((efi_gpt_t *)buf)) != 0) {
-			if ((rval = sd_send_scsi_READ(un, buf, lbasize,
-			    cap - 1, (ISCD(un)) ? SD_PATH_DIRECT_PRIORITY :
-			    path_flag)) != 0) {
-				goto done_err;
-			}
-			sd_swap_efi_gpt((efi_gpt_t *)buf);
-			if ((rval = sd_validate_efi((efi_gpt_t *)buf)) != 0)
-				goto done_err;
-		}
-		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-		    "primary label corrupt; using backup\n");
-	}
-
-	if (cap == 0)
-		rval = sd_send_scsi_READ_CAPACITY(un, &cap, &lbasize,
-		    path_flag);
-
-	nparts = ((efi_gpt_t *)buf)->efi_gpt_NumberOfPartitionEntries;
-	gpe_lba = ((efi_gpt_t *)buf)->efi_gpt_PartitionEntryLBA;
-
-	rval = sd_send_scsi_READ(un, buf, EFI_MIN_ARRAY_SIZE, gpe_lba,
-	    path_flag);
-	if (rval) {
-		goto done_err;
-	}
-	partitions = (efi_gpe_t *)buf;
-
-	if (nparts > MAXPART) {
-		nparts = MAXPART;
-	}
-	sd_swap_efi_gpe(nparts, partitions);
-
-	mutex_enter(SD_MUTEX(un));
-
-	/* Fill in partition table. */
-	for (i = 0; i < nparts; i++) {
-		if (partitions->efi_gpe_StartingLBA != 0 ||
-		    partitions->efi_gpe_EndingLBA != 0) {
-			un->un_map[i].dkl_cylno =
-			    partitions->efi_gpe_StartingLBA;
-			un->un_map[i].dkl_nblk =
-			    partitions->efi_gpe_EndingLBA -
-			    partitions->efi_gpe_StartingLBA + 1;
-			un->un_offset[i] =
-			    partitions->efi_gpe_StartingLBA;
-		}
-		if (un->un_reserved == -1) {
-			if (bcmp(&partitions->efi_gpe_PartitionTypeGUID,
-			    &uuid_type_reserved, sizeof (struct uuid)) == 0) {
-				un->un_reserved = i;
-			}
-		}
-		if (i == WD_NODE) {
-			/*
-			 * minor number 7 corresponds to the whole disk
-			 */
-			un->un_map[i].dkl_cylno = 0;
-			un->un_map[i].dkl_nblk = un->un_blockcount;
-			un->un_offset[i] = 0;
-		}
-		partitions++;
-	}
-	un->un_solaris_offset = 0;
-	un->un_solaris_size = cap;
-	un->un_f_geometry_is_valid = TRUE;
-
-	/* clear the vtoc label */
-	bzero(&un->un_vtoc, sizeof (struct dk_vtoc));
-
-	kmem_free(buf, EFI_MIN_ARRAY_SIZE);
-
-	/*
-	 * For EFI labeled disk, create and set the partition stats
-	 * at attach time, update the stats according to dynamic
-	 * partition changes during running time.
-	 */
-	if (un->un_f_pkstats_enabled) {
-		sd_set_pstats(un);
-		SD_TRACE(SD_LOG_IO_PARTITION, un, "sd_use_efi: "
-		    "un:0x%p pstats created and set, or updated\n", un);
-	}
-	return (0);
-
-done_err:
-	kmem_free(buf, EFI_MIN_ARRAY_SIZE);
-	mutex_enter(SD_MUTEX(un));
-	/*
-	 * if we didn't find something that could look like a VTOC
-	 * and the disk is over 1TB, we know there isn't a valid label.
-	 * Otherwise let sd_uselabel decide what to do.  We only
-	 * want to invalidate this if we're certain the label isn't
-	 * valid because sd_prop_op will now fail, which in turn
-	 * causes things like opens and stats on the partition to fail.
-	 */
-	if ((un->un_blockcount > DK_MAX_BLOCKS) && (rval != ESRCH)) {
-		un->un_f_geometry_is_valid = FALSE;
-	}
-	return (rval);
-}
-
-
-/*
- *    Function: sd_uselabel
- *
- * Description: Validate the disk label and update the relevant data (geometry,
- *		partition, vtoc, and capacity data) in the sd_lun struct.
- *		Marks the geometry of the unit as being valid.
- *
- *   Arguments: un: unit struct.
- *		dk_label: disk label
- *		path_flag - SD_PATH_DIRECT to use the USCSI "direct" chain and
- *			the normal command waitq, or SD_PATH_DIRECT_PRIORITY
- *			to use the USCSI "direct" chain and bypass the normal
- *			command waitq.
- *
- * Return Code: SD_LABEL_IS_VALID: Label read from disk is OK; geometry,
- *		partition, vtoc, and capacity data are good.
- *
- *		SD_LABEL_IS_INVALID: Magic number or checksum error in the
- *		label; or computed capacity does not jibe with capacity
- *		reported from the READ CAPACITY command.
- *
- *     Context: Kernel thread only (can sleep).
- */
-
-static int
-sd_uselabel(struct sd_lun *un, struct dk_label *labp, int path_flag)
-{
-	short	*sp;
-	short	sum;
-	short	count;
-	int	label_error = SD_LABEL_IS_VALID;
-	int	i;
-	int	capacity;
-	int	part_end;
-	int	track_capacity;
-	int	err;
-#if defined(_SUNOS_VTOC_16)
-	struct	dkl_partition	*vpartp;
-#endif
-	ASSERT(un != NULL);
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-
-	/* Validate the magic number of the label. */
-	if (labp->dkl_magic != DKL_MAGIC) {
-#if defined(__sparc)
-		if ((un->un_state == SD_STATE_NORMAL) &&
-			un->un_f_vtoc_errlog_supported) {
-			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-			    "Corrupt label; wrong magic number\n");
-		}
-#endif
-		return (SD_LABEL_IS_INVALID);
-	}
-
-	/* Validate the checksum of the label. */
-	sp  = (short *)labp;
-	sum = 0;
-	count = sizeof (struct dk_label) / sizeof (short);
-	while (count--)	 {
-		sum ^= *sp++;
-	}
-
-	if (sum != 0) {
-#if	defined(_SUNOS_VTOC_16)
-		if ((un->un_state == SD_STATE_NORMAL) && !ISCD(un)) {
-#elif defined(_SUNOS_VTOC_8)
-		if ((un->un_state == SD_STATE_NORMAL) &&
-		    un->un_f_vtoc_errlog_supported) {
-#endif
-			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-			    "Corrupt label - label checksum failed\n");
-		}
-		return (SD_LABEL_IS_INVALID);
-	}
-
-
-	/*
-	 * Fill in geometry structure with data from label.
-	 */
-	bzero(&un->un_g, sizeof (struct dk_geom));
-	un->un_g.dkg_ncyl   = labp->dkl_ncyl;
-	un->un_g.dkg_acyl   = labp->dkl_acyl;
-	un->un_g.dkg_bcyl   = 0;
-	un->un_g.dkg_nhead  = labp->dkl_nhead;
-	un->un_g.dkg_nsect  = labp->dkl_nsect;
-	un->un_g.dkg_intrlv = labp->dkl_intrlv;
-
-#if defined(_SUNOS_VTOC_8)
-	un->un_g.dkg_gap1   = labp->dkl_gap1;
-	un->un_g.dkg_gap2   = labp->dkl_gap2;
-	un->un_g.dkg_bhead  = labp->dkl_bhead;
-#endif
-#if defined(_SUNOS_VTOC_16)
-	un->un_dkg_skew = labp->dkl_skew;
-#endif
-
-#if defined(__i386) || defined(__amd64)
-	un->un_g.dkg_apc = labp->dkl_apc;
-#endif
-
-	/*
-	 * Currently we rely on the values in the label being accurate. If
-	 * dlk_rpm or dlk_pcly are zero in the label, use a default value.
-	 *
-	 * Note: In the future a MODE SENSE may be used to retrieve this data,
-	 * although this command is optional in SCSI-2.
-	 */
-	un->un_g.dkg_rpm  = (labp->dkl_rpm  != 0) ? labp->dkl_rpm  : 3600;
-	un->un_g.dkg_pcyl = (labp->dkl_pcyl != 0) ? labp->dkl_pcyl :
-	    (un->un_g.dkg_ncyl + un->un_g.dkg_acyl);
-
-	/*
-	 * The Read and Write reinstruct values may not be valid
-	 * for older disks.
-	 */
-	un->un_g.dkg_read_reinstruct  = labp->dkl_read_reinstruct;
-	un->un_g.dkg_write_reinstruct = labp->dkl_write_reinstruct;
-
-	/* Fill in partition table. */
-#if defined(_SUNOS_VTOC_8)
-	for (i = 0; i < NDKMAP; i++) {
-		un->un_map[i].dkl_cylno = labp->dkl_map[i].dkl_cylno;
-		un->un_map[i].dkl_nblk  = labp->dkl_map[i].dkl_nblk;
-	}
-#endif
-#if  defined(_SUNOS_VTOC_16)
-	vpartp		= labp->dkl_vtoc.v_part;
-	track_capacity	= labp->dkl_nhead * labp->dkl_nsect;
-
-	/* Prevent divide by zero */
-	if (track_capacity == 0) {
-		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-		    "Corrupt label - zero nhead or nsect value\n");
-
-		return (SD_LABEL_IS_INVALID);
-	}
-
-	for (i = 0; i < NDKMAP; i++, vpartp++) {
-		un->un_map[i].dkl_cylno = vpartp->p_start / track_capacity;
-		un->un_map[i].dkl_nblk  = vpartp->p_size;
-	}
-#endif
-
-	/* Fill in VTOC Structure. */
-	bcopy(&labp->dkl_vtoc, &un->un_vtoc, sizeof (struct dk_vtoc));
-#if defined(_SUNOS_VTOC_8)
-	/*
-	 * The 8-slice vtoc does not include the ascii label; save it into
-	 * the device's soft state structure here.
-	 */
-	bcopy(labp->dkl_asciilabel, un->un_asciilabel, LEN_DKL_ASCII);
-#endif
-
-	/* Now look for a valid capacity. */
-	track_capacity	= (un->un_g.dkg_nhead * un->un_g.dkg_nsect);
-	capacity	= (un->un_g.dkg_ncyl  * track_capacity);
-
-	if (un->un_g.dkg_acyl) {
-#if defined(__i386) || defined(__amd64)
-		/* we may have > 1 alts cylinder */
-		capacity += (track_capacity * un->un_g.dkg_acyl);
-#else
-		capacity += track_capacity;
-#endif
-	}
-
-	/*
-	 * Force check here to ensure the computed capacity is valid.
-	 * If capacity is zero, it indicates an invalid label and
-	 * we should abort updating the relevant data then.
-	 */
-	if (capacity == 0) {
-		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-		    "Corrupt label - no valid capacity could be retrieved\n");
-
-		return (SD_LABEL_IS_INVALID);
-	}
-
-	/* Mark the geometry as valid. */
-	un->un_f_geometry_is_valid = TRUE;
-
-	/*
-	 * At this point, un->un_blockcount should contain valid data from
-	 * the READ CAPACITY command.
-	 */
-	if (un->un_f_blockcount_is_valid != TRUE) {
-		/*
-		 * We have a situation where the target didn't give us a good
-		 * READ CAPACITY value, yet there appears to be a valid label.
-		 * In this case, we'll fake the capacity.
-		 */
-		un->un_blockcount = capacity;
-		un->un_f_blockcount_is_valid = TRUE;
-		goto done;
-	}
-
-
-	if ((capacity <= un->un_blockcount) ||
-	    (un->un_state != SD_STATE_NORMAL)) {
-#if defined(_SUNOS_VTOC_8)
-		/*
-		 * We can't let this happen on drives that are subdivided
-		 * into logical disks (i.e., that have an fdisk table).
-		 * The un_blockcount field should always hold the full media
-		 * size in sectors, period.  This code would overwrite
-		 * un_blockcount with the size of the Solaris fdisk partition.
-		 */
-		SD_ERROR(SD_LOG_COMMON, un,
-		    "sd_uselabel: Label %d blocks; Drive %d blocks\n",
-		    capacity, un->un_blockcount);
-		un->un_blockcount = capacity;
-		un->un_f_blockcount_is_valid = TRUE;
-#endif	/* defined(_SUNOS_VTOC_8) */
-		goto done;
-	}
-
-	if (ISCD(un)) {
-		/* For CDROMs, we trust that the data in the label is OK. */
-#if defined(_SUNOS_VTOC_8)
-		for (i = 0; i < NDKMAP; i++) {
-			part_end = labp->dkl_nhead * labp->dkl_nsect *
-			    labp->dkl_map[i].dkl_cylno +
-			    labp->dkl_map[i].dkl_nblk  - 1;
-
-			if ((labp->dkl_map[i].dkl_nblk) &&
-			    (part_end > un->un_blockcount)) {
-				un->un_f_geometry_is_valid = FALSE;
-				break;
-			}
-		}
-#endif
-#if defined(_SUNOS_VTOC_16)
-		vpartp = &(labp->dkl_vtoc.v_part[0]);
-		for (i = 0; i < NDKMAP; i++, vpartp++) {
-			part_end = vpartp->p_start + vpartp->p_size;
-			if ((vpartp->p_size > 0) &&
-			    (part_end > un->un_blockcount)) {
-				un->un_f_geometry_is_valid = FALSE;
-				break;
-			}
-		}
-#endif
-	} else {
-		uint64_t t_capacity;
-		uint32_t t_lbasize;
-
-		mutex_exit(SD_MUTEX(un));
-		err = sd_send_scsi_READ_CAPACITY(un, &t_capacity, &t_lbasize,
-		    path_flag);
-		ASSERT(t_capacity <= DK_MAX_BLOCKS);
-		mutex_enter(SD_MUTEX(un));
-
-		if (err == 0) {
-			sd_update_block_info(un, t_lbasize, t_capacity);
-		}
-
-		if (capacity > un->un_blockcount) {
-			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-			    "Corrupt label - bad geometry\n");
-			scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
-			    "Label says %u blocks; Drive says %llu blocks\n",
-			    capacity, (unsigned long long)un->un_blockcount);
-			un->un_f_geometry_is_valid = FALSE;
-			label_error = SD_LABEL_IS_INVALID;
-		}
-	}
-
-done:
-
-	SD_INFO(SD_LOG_COMMON, un, "sd_uselabel: (label geometry)\n");
-	SD_INFO(SD_LOG_COMMON, un,
-	    "   ncyl: %d; acyl: %d; nhead: %d; nsect: %d\n",
-	    un->un_g.dkg_ncyl,  un->un_g.dkg_acyl,
-	    un->un_g.dkg_nhead, un->un_g.dkg_nsect);
-	SD_INFO(SD_LOG_COMMON, un,
-	    "   lbasize: %d; capacity: %d; intrlv: %d; rpm: %d\n",
-	    un->un_tgt_blocksize, un->un_blockcount,
-	    un->un_g.dkg_intrlv, un->un_g.dkg_rpm);
-	SD_INFO(SD_LOG_COMMON, un, "   wrt_reinstr: %d; rd_reinstr: %d\n",
-	    un->un_g.dkg_write_reinstruct, un->un_g.dkg_read_reinstruct);
-
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-
-	return (label_error);
-}
-
-
-/*
- *    Function: sd_build_default_label
- *
- * Description: Generate a default label for those devices that do not have
- *		one, e.g., new media, removable cartridges, etc..
- *
- *     Context: Kernel thread only
- */
-
-static void
-sd_build_default_label(struct sd_lun *un)
-{
-#if defined(_SUNOS_VTOC_16)
-	uint_t	phys_spc;
-	uint_t	disksize;
-	struct	dk_geom un_g;
-	uint64_t capacity;
-#endif
-
-	ASSERT(un != NULL);
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-
-#if defined(_SUNOS_VTOC_8)
-	/*
-	 * Note: This is a legacy check for non-removable devices on VTOC_8
-	 * only. This may be a valid check for VTOC_16 as well.
-	 * Once we understand why there is this difference between SPARC and
-	 * x86 platform, we could remove this legacy check.
-	 */
-	ASSERT(un->un_f_default_vtoc_supported);
-#endif
-
-	bzero(&un->un_g, sizeof (struct dk_geom));
-	bzero(&un->un_vtoc, sizeof (struct dk_vtoc));
-	bzero(&un->un_map, NDKMAP * (sizeof (struct dk_map)));
-
-#if defined(_SUNOS_VTOC_8)
-
-	/*
-	 * It's a REMOVABLE media, therefore no label (on sparc, anyway).
-	 * But it is still necessary to set up various geometry information,
-	 * and we are doing this here.
-	 */
-
-	/*
-	 * For the rpm, we use the minimum for the disk.  For the head, cyl,
-	 * and number of sector per track, if the capacity <= 1GB, head = 64,
-	 * sect = 32.  else head = 255, sect 63 Note: the capacity should be
-	 * equal to C*H*S values.  This will cause some truncation of size due
-	 * to round off errors. For CD-ROMs, this truncation can have adverse
-	 * side effects, so returning ncyl and nhead as 1. The nsect will
-	 * overflow for most of CD-ROMs as nsect is of type ushort. (4190569)
-	 */
-	if (ISCD(un)) {
-		/*
-		 * Preserve the old behavior for non-writable
-		 * medias. Since dkg_nsect is a ushort, it
-		 * will lose bits as cdroms have more than
-		 * 65536 sectors. So if we recalculate
-		 * capacity, it will become much shorter.
-		 * But the dkg_* information is not
-		 * used for CDROMs so it is OK. But for
-		 * Writable CDs we need this information
-		 * to be valid (for newfs say). So we
-		 * make nsect and nhead > 1 that way
-		 * nsect can still stay within ushort limit
-		 * without losing any bits.
-		 */
-		if (un->un_f_mmc_writable_media == TRUE) {
-			un->un_g.dkg_nhead = 64;
-			un->un_g.dkg_nsect = 32;
-			un->un_g.dkg_ncyl = un->un_blockcount / (64 * 32);
-			un->un_blockcount = un->un_g.dkg_ncyl *
-			    un->un_g.dkg_nhead * un->un_g.dkg_nsect;
-		} else {
-			un->un_g.dkg_ncyl  = 1;
-			un->un_g.dkg_nhead = 1;
-			un->un_g.dkg_nsect = un->un_blockcount;
-		}
-	} else {
-		if (un->un_blockcount <= 0x1000) {
-			/* unlabeled SCSI floppy device */
-			un->un_g.dkg_nhead = 2;
-			un->un_g.dkg_ncyl = 80;
-			un->un_g.dkg_nsect = un->un_blockcount / (2 * 80);
-		} else if (un->un_blockcount <= 0x200000) {
-			un->un_g.dkg_nhead = 64;
-			un->un_g.dkg_nsect = 32;
-			un->un_g.dkg_ncyl  = un->un_blockcount / (64 * 32);
-		} else {
-			un->un_g.dkg_nhead = 255;
-			un->un_g.dkg_nsect = 63;
-			un->un_g.dkg_ncyl  = un->un_blockcount / (255 * 63);
-		}
-		un->un_blockcount =
-		    un->un_g.dkg_ncyl * un->un_g.dkg_nhead * un->un_g.dkg_nsect;
-	}
-
-	un->un_g.dkg_acyl	= 0;
-	un->un_g.dkg_bcyl	= 0;
-	un->un_g.dkg_rpm	= 200;
-	un->un_asciilabel[0]	= '\0';
-	un->un_g.dkg_pcyl	= un->un_g.dkg_ncyl;
-
-	un->un_map[0].dkl_cylno = 0;
-	un->un_map[0].dkl_nblk  = un->un_blockcount;
-	un->un_map[2].dkl_cylno = 0;
-	un->un_map[2].dkl_nblk  = un->un_blockcount;
-
-#elif defined(_SUNOS_VTOC_16)
-
-	if (un->un_solaris_size == 0) {
-		/*
-		 * Got fdisk table but no solaris entry therefore
-		 * don't create a default label
-		 */
-		un->un_f_geometry_is_valid = TRUE;
-		return;
-	}
-
-	/*
-	 * For CDs we continue to use the physical geometry to calculate
-	 * number of cylinders. All other devices must convert the
-	 * physical geometry (geom_cache) to values that will fit
-	 * in a dk_geom structure.
-	 */
-	if (ISCD(un)) {
-		phys_spc = un->un_pgeom.g_nhead * un->un_pgeom.g_nsect;
-	} else {
-		/* Convert physical geometry to disk geometry */
-		bzero(&un_g, sizeof (struct dk_geom));
-
-		/*
-		 * Refer to comments related to off-by-1 at the
-		 * header of this file.
-		 * Before caculating geometry, capacity should be
-		 * decreased by 1. That un_f_capacity_adjusted is
-		 * TRUE means that we are treating a 1TB disk as
-		 * (1T - 512)B. And the capacity of disks is already
-		 * decreased by 1.
-		 */
-		if (!un->un_f_capacity_adjusted &&
-		    !un->un_f_has_removable_media &&
-		    !un->un_f_is_hotpluggable &&
-			un->un_tgt_blocksize == un->un_sys_blocksize)
-			capacity = un->un_blockcount - 1;
-		else
-			capacity = un->un_blockcount;
-
-		sd_convert_geometry(capacity, &un_g);
-		bcopy(&un_g, &un->un_g, sizeof (un->un_g));
-		phys_spc = un->un_g.dkg_nhead * un->un_g.dkg_nsect;
-	}
-
-	ASSERT(phys_spc != 0);
-	un->un_g.dkg_pcyl = un->un_solaris_size / phys_spc;
-	un->un_g.dkg_acyl = DK_ACYL;
-	un->un_g.dkg_ncyl = un->un_g.dkg_pcyl - DK_ACYL;
-	disksize = un->un_g.dkg_ncyl * phys_spc;
-
-	if (ISCD(un)) {
-		/*
-		 * CD's don't use the "heads * sectors * cyls"-type of
-		 * geometry, but instead use the entire capacity of the media.
-		 */
-		disksize = un->un_solaris_size;
-		un->un_g.dkg_nhead = 1;
-		un->un_g.dkg_nsect = 1;
-		un->un_g.dkg_rpm =
-		    (un->un_pgeom.g_rpm == 0) ? 200 : un->un_pgeom.g_rpm;
-
-		un->un_vtoc.v_part[0].p_start = 0;
-		un->un_vtoc.v_part[0].p_size  = disksize;
-		un->un_vtoc.v_part[0].p_tag   = V_BACKUP;
-		un->un_vtoc.v_part[0].p_flag  = V_UNMNT;
-
-		un->un_map[0].dkl_cylno = 0;
-		un->un_map[0].dkl_nblk  = disksize;
-		un->un_offset[0] = 0;
-
-	} else {
-		/*
-		 * Hard disks and removable media cartridges
-		 */
-		un->un_g.dkg_rpm =
-		    (un->un_pgeom.g_rpm == 0) ? 3600: un->un_pgeom.g_rpm;
-		un->un_vtoc.v_sectorsz = un->un_sys_blocksize;
-
-		/* Add boot slice */
-		un->un_vtoc.v_part[8].p_start = 0;
-		un->un_vtoc.v_part[8].p_size  = phys_spc;
-		un->un_vtoc.v_part[8].p_tag   = V_BOOT;
-		un->un_vtoc.v_part[8].p_flag  = V_UNMNT;
-
-		un->un_map[8].dkl_cylno = 0;
-		un->un_map[8].dkl_nblk  = phys_spc;
-		un->un_offset[8] = 0;
-	}
-
-	un->un_g.dkg_apc = 0;
-	un->un_vtoc.v_nparts = V_NUMPAR;
-	un->un_vtoc.v_version = V_VERSION;
-
-	/* Add backup slice */
-	un->un_vtoc.v_part[2].p_start = 0;
-	un->un_vtoc.v_part[2].p_size  = disksize;
-	un->un_vtoc.v_part[2].p_tag   = V_BACKUP;
-	un->un_vtoc.v_part[2].p_flag  = V_UNMNT;
-
-	un->un_map[2].dkl_cylno = 0;
-	un->un_map[2].dkl_nblk  = disksize;
-	un->un_offset[2] = 0;
-
-	(void) sprintf(un->un_vtoc.v_asciilabel, "DEFAULT cyl %d alt %d"
-	    " hd %d sec %d", un->un_g.dkg_ncyl, un->un_g.dkg_acyl,
-	    un->un_g.dkg_nhead, un->un_g.dkg_nsect);
-
-#else
-#error "No VTOC format defined."
-#endif
-
-	un->un_g.dkg_read_reinstruct  = 0;
-	un->un_g.dkg_write_reinstruct = 0;
-
-	un->un_g.dkg_intrlv = 1;
-
-	un->un_vtoc.v_sanity  = VTOC_SANE;
-
-	un->un_f_geometry_is_valid = TRUE;
-
-	SD_INFO(SD_LOG_COMMON, un,
-	    "sd_build_default_label: Default label created: "
-	    "cyl: %d\tacyl: %d\tnhead: %d\tnsect: %d\tcap: %d\n",
-	    un->un_g.dkg_ncyl, un->un_g.dkg_acyl, un->un_g.dkg_nhead,
-	    un->un_g.dkg_nsect, un->un_blockcount);
-}
-
-
-#if defined(_FIRMWARE_NEEDS_FDISK)
-/*
- * Max CHS values, as they are encoded into bytes, for 1022/254/63
- */
-#define	LBA_MAX_SECT	(63 | ((1022 & 0x300) >> 2))
-#define	LBA_MAX_CYL	(1022 & 0xFF)
-#define	LBA_MAX_HEAD	(254)
-
-
-/*
- *    Function: sd_has_max_chs_vals
- *
- * Description: Return TRUE if Cylinder-Head-Sector values are all at maximum.
- *
- *   Arguments: fdp - ptr to CHS info
- *
- * Return Code: True or false
- *
- *     Context: Any.
- */
-
-static int
-sd_has_max_chs_vals(struct ipart *fdp)
-{
-	return ((fdp->begcyl  == LBA_MAX_CYL)	&&
-	    (fdp->beghead == LBA_MAX_HEAD)	&&
-	    (fdp->begsect == LBA_MAX_SECT)	&&
-	    (fdp->endcyl  == LBA_MAX_CYL)	&&
-	    (fdp->endhead == LBA_MAX_HEAD)	&&
-	    (fdp->endsect == LBA_MAX_SECT));
-}
-#endif
-
-
-/*
- *    Function: sd_inq_fill
- *
- * Description: Print a piece of inquiry data, cleaned up for non-printable
- *		characters and stopping at the first space character after
- *		the beginning of the passed string;
- *
- *   Arguments: p - source string
- *		l - maximum length to copy
- *		s - destination string
- *
- *     Context: Any.
- */
-
-static void
-sd_inq_fill(char *p, int l, char *s)
-{
-	unsigned i = 0;
-	char c;
-
-	while (i++ < l) {
-		if ((c = *p++) < ' ' || c >= 0x7F) {
-			c = '*';
-		} else if (i != 1 && c == ' ') {
-			break;
-		}
-		*s++ = c;
-	}
-	*s++ = 0;
 }
 
 
@@ -6429,41 +4695,7 @@ sd_register_devid(struct sd_lun *un, dev_info_t *devi, int reservation_flag)
 	}
 }
 
-static daddr_t
-sd_get_devid_block(struct sd_lun *un)
-{
-	daddr_t			spc, blk, head, cyl;
 
-	if ((un->un_f_geometry_is_valid == FALSE) ||
-	    (un->un_solaris_size < DK_LABEL_LOC))
-		return (-1);
-
-	if (un->un_vtoc.v_sanity != VTOC_SANE) {
-		/* EFI labeled */
-		if (un->un_reserved != -1) {
-			blk = un->un_map[un->un_reserved].dkl_cylno;
-		} else {
-			return (-1);
-		}
-	} else {
-		/* SMI labeled */
-		/* this geometry doesn't allow us to write a devid */
-		if (un->un_g.dkg_acyl < 2) {
-			return (-1);
-		}
-
-		/*
-		 * Subtract 2 guarantees that the next to last cylinder
-		 * is used
-		 */
-		cyl  = un->un_g.dkg_ncyl  + un->un_g.dkg_acyl - 2;
-		spc  = un->un_g.dkg_nhead * un->un_g.dkg_nsect;
-		head = un->un_g.dkg_nhead - 1;
-		blk  = (cyl * (spc - un->un_g.dkg_apc)) +
-		    (head * un->un_g.dkg_nsect) + 1;
-	}
-	return (blk);
-}
 
 /*
  *    Function: sd_get_devid
@@ -6487,7 +4719,7 @@ sd_get_devid(struct sd_lun *un)
 	ddi_devid_t		tmpid;
 	uint_t			*ip;
 	size_t			sz;
-	daddr_t			blk;
+	diskaddr_t		blk;
 	int			status;
 	int			chksum;
 	int			i;
@@ -6503,9 +4735,12 @@ sd_get_devid(struct sd_lun *un)
 		return (0);
 	}
 
-	blk = sd_get_devid_block(un);
-	if (blk < 0)
+	mutex_exit(SD_MUTEX(un));
+	if (cmlb_get_devid_block(un->un_cmlbhandle, &blk,
+	    (void *)SD_PATH_DIRECT) != 0) {
+		mutex_enter(SD_MUTEX(un));
 		return (EINVAL);
+	}
 
 	/*
 	 * Read and verify device id, stored in the reserved cylinders at the
@@ -6513,6 +4748,7 @@ sd_get_devid(struct sd_lun *un)
 	 * track of the last cylinder. Device id will be on track of the next
 	 * to last cylinder.
 	 */
+	mutex_enter(SD_MUTEX(un));
 	buffer_size = SD_REQBYTES2TGTBYTES(un, sizeof (struct dk_devid));
 	mutex_exit(SD_MUTEX(un));
 	dkdevid = kmem_alloc(buffer_size, KM_SLEEP);
@@ -6624,17 +4860,20 @@ static int
 sd_write_deviceid(struct sd_lun *un)
 {
 	struct dk_devid		*dkdevid;
-	daddr_t			blk;
+	diskaddr_t		blk;
 	uint_t			*ip, chksum;
 	int			status;
 	int			i;
 
 	ASSERT(mutex_owned(SD_MUTEX(un)));
 
-	blk = sd_get_devid_block(un);
-	if (blk < 0)
-		return (-1);
 	mutex_exit(SD_MUTEX(un));
+	if (cmlb_get_devid_block(un->un_cmlbhandle, &blk,
+	    (void *)SD_PATH_DIRECT) != 0) {
+		mutex_enter(SD_MUTEX(un));
+		return (-1);
+	}
+
 
 	/* Allocate the buffer */
 	dkdevid = kmem_zalloc(un->un_sys_blocksize, KM_SLEEP);
@@ -8011,8 +6250,10 @@ sd_unit_attach(dev_info_t *devi)
 	int	wc_enabled;
 	int	tgt;
 	uint64_t	capacity;
-	uint_t		lbasize;
+	uint_t		lbasize = 0;
 	dev_info_t	*pdip = ddi_get_parent(devi);
+	int		offbyone = 0;
+	int		geom_label_valid = 0;
 
 	/*
 	 * Retrieve the target driver's private data area. This was set
@@ -8452,7 +6693,6 @@ sd_unit_attach(dev_info_t *devi)
 	 */
 	un->un_f_blockcount_is_valid	= FALSE;
 	un->un_f_tgt_blocksize_is_valid	= FALSE;
-	un->un_f_geometry_is_valid	= FALSE;
 
 	/*
 	 * Use DEV_BSIZE and DEV_BSHIFT as defaults, until we can determine
@@ -8500,8 +6740,7 @@ sd_unit_attach(dev_info_t *devi)
 	 *	1) Instantiate the kstats here, before any routines using the
 	 *	   iopath (i.e. sd_send_scsi_cmd).
 	 *	2) Instantiate and initialize the partition stats
-	 *	   (sd_set_pstats) in sd_use_efi() and sd_validate_geometry(),
-	 *	   see detailed comments there.
+	 *	   (sd_set_pstats).
 	 *	3) Initialize the error stats (sd_set_errstats), following
 	 *	   sd_validate_geometry(),sd_register_devid(),
 	 *	   and sd_cache_control().
@@ -8702,10 +6941,8 @@ sd_unit_attach(dev_info_t *devi)
 
 #if defined(__i386) || defined(__amd64)
 					/*
-					 * Refer to comments related to off-by-1
-					 * at the header of this file.
 					 * 1TB disk was treated as (1T - 512)B
-					 * in the past, so that it might has
+					 * in the past, so that it might have
 					 * valid VTOC and solaris partitions,
 					 * we have to allow it to continue to
 					 * work.
@@ -8802,23 +7039,6 @@ sd_unit_attach(dev_info_t *devi)
 		sd_set_mmc_caps(un);
 	}
 
-	/*
-	 * Create the minor nodes for the device.
-	 * Note: If we want to support fdisk on both sparc and intel, this will
-	 * have to separate out the notion that VTOC8 is always sparc, and
-	 * VTOC16 is always intel (tho these can be the defaults).  The vtoc
-	 * type will have to be determined at run-time, and the fdisk
-	 * partitioning will have to have been read & set up before we
-	 * create the minor nodes. (any other inits (such as kstats) that
-	 * also ought to be done before creating the minor nodes?) (Doesn't
-	 * setting up the minor nodes kind of imply that we're ready to
-	 * handle an open from userland?)
-	 */
-	if (sd_create_minor_nodes(un, devi) != DDI_SUCCESS) {
-		goto create_minor_nodes_failed;
-	}
-	SD_TRACE(SD_LOG_ATTACH_DETACH, un,
-	    "sd_unit_attach: un:0x%p minor nodes created\n", un);
 
 	/*
 	 * Add a zero-length attribute to tell the world we support
@@ -8898,16 +7118,26 @@ sd_unit_attach(dev_info_t *devi)
 	 */
 	ddi_report_dev(devi);
 
-	/*
-	 * The framework calls driver attach routines single-threaded
-	 * for a given instance.  However we still acquire SD_MUTEX here
-	 * because this required for calling the sd_validate_geometry()
-	 * and sd_register_devid() functions.
-	 */
-	mutex_enter(SD_MUTEX(un));
-	un->un_f_geometry_is_valid = FALSE;
 	un->un_mediastate = DKIO_NONE;
-	un->un_reserved = -1;
+
+	cmlb_alloc_handle(&un->un_cmlbhandle);
+
+#if defined(__i386) || defined(__amd64)
+	/*
+	 * On x86, compensate for off-by-1 legacy error
+	 */
+	if (!un->un_f_has_removable_media && !un->un_f_is_hotpluggable &&
+	    (lbasize == un->un_sys_blocksize))
+		offbyone = CMLB_OFF_BY_ONE;
+#endif
+
+	if (cmlb_attach(devi, &sd_tgops, (int)devp->sd_inq->inq_dtype,
+	    un->un_f_has_removable_media, un->un_f_is_hotpluggable,
+	    un->un_node_type, offbyone, un->un_cmlbhandle,
+	    (void *)SD_PATH_DIRECT) != 0) {
+		goto cmlb_attach_failed;
+	}
+
 
 	/*
 	 * Read and validate the device's geometry (ie, disk label)
@@ -8915,43 +7145,11 @@ sd_unit_attach(dev_info_t *devi)
 	 * the driver needs to successfully attach to this device so
 	 * the drive can be formatted via ioctls.
 	 */
-	if (((sd_validate_geometry(un, SD_PATH_DIRECT) ==
-	    ENOTSUP)) &&
-	    (un->un_blockcount < DK_MAX_BLOCKS)) {
-		/*
-		 * We found a small disk with an EFI label on it;
-		 * we need to fix up the minor nodes accordingly.
-		 */
-		ddi_remove_minor_node(devi, "h");
-		ddi_remove_minor_node(devi, "h,raw");
-		(void) ddi_create_minor_node(devi, "wd",
-		    S_IFBLK,
-		    (instance << SDUNIT_SHIFT) | WD_NODE,
-		    un->un_node_type, NULL);
-		(void) ddi_create_minor_node(devi, "wd,raw",
-		    S_IFCHR,
-		    (instance << SDUNIT_SHIFT) | WD_NODE,
-		    un->un_node_type, NULL);
-	}
-#if defined(__i386) || defined(__amd64)
-	else if (un->un_f_capacity_adjusted == 1) {
-		/*
-		 * Refer to comments related to off-by-1 at the
-		 * header of this file.
-		 * Adjust minor node for 1TB disk.
-		 */
-		ddi_remove_minor_node(devi, "wd");
-		ddi_remove_minor_node(devi, "wd,raw");
-		(void) ddi_create_minor_node(devi, "h",
-		    S_IFBLK,
-		    (instance << SDUNIT_SHIFT) | WD_NODE,
-		    un->un_node_type, NULL);
-		(void) ddi_create_minor_node(devi, "h,raw",
-		    S_IFCHR,
-		    (instance << SDUNIT_SHIFT) | WD_NODE,
-		    un->un_node_type, NULL);
-	}
-#endif
+	geom_label_valid = (cmlb_validate(un->un_cmlbhandle, 0,
+	    (void *)SD_PATH_DIRECT) == 0) ? 1: 0;
+
+	mutex_enter(SD_MUTEX(un));
+
 	/*
 	 * Read and initialize the devid for the unit.
 	 */
@@ -9007,13 +7205,18 @@ sd_unit_attach(dev_info_t *devi)
 	 * Note: This is a critical sequence that needs to be maintained:
 	 *	1) Instantiate the kstats before any routines using the iopath
 	 *	   (i.e. sd_send_scsi_cmd).
-	 *	2) Instantiate and initialize the partition stats
-	 *	   (sd_set_pstats) in sd_use_efi() and sd_validate_geometry(),
-	 *	   see detailed comments there.
-	 *	3) Initialize the error stats (sd_set_errstats), following
-	 *	   sd_validate_geometry(),sd_register_devid(),
-	 *	   and sd_cache_control().
+	 *	2) Initialize the error stats (sd_set_errstats) and partition
+	 *	   stats (sd_set_pstats)here, following
+	 *	   cmlb_validate_geometry(), sd_register_devid(), and
+	 *	   sd_cache_control().
 	 */
+
+	if (un->un_f_pkstats_enabled && geom_label_valid) {
+		sd_set_pstats(un);
+		SD_TRACE(SD_LOG_IO_PARTITION, un,
+		    "sd_unit_attach: un:0x%p pstats created and set\n", un);
+	}
+
 	sd_set_errstats(un);
 	SD_TRACE(SD_LOG_ATTACH_DETACH, un,
 	    "sd_unit_attach: un:0x%p errstats set\n", un);
@@ -9073,7 +7276,7 @@ devid_failed:
 setup_pm_failed:
 	ddi_remove_minor_node(devi, NULL);
 
-create_minor_nodes_failed:
+cmlb_attach_failed:
 	/*
 	 * Cleanup from the scsi_ifsetcap() calls (437868)
 	 */
@@ -9545,6 +7748,9 @@ sd_unit_detach(dev_info_t *devi)
 	/* Do not free the softstate if the callback routine is active */
 	sd_sync_with_callback(un);
 
+	cmlb_detach(un->un_cmlbhandle, (void *)SD_PATH_DIRECT);
+	cmlb_free_handle(&un->un_cmlbhandle);
+
 	/*
 	 * Hold the detach mutex here, to make sure that no other threads ever
 	 * can access a (partially) freed soft state structure.
@@ -9571,9 +7777,6 @@ sd_unit_detach(dev_info_t *devi)
 		kmem_cache_destroy(un->un_wm_cache);
 		un->un_wm_cache = NULL;
 	}
-
-	/* Remove minor nodes */
-	ddi_remove_minor_node(devi, NULL);
 
 	/*
 	 * kstat cleanup is done in detach for all device types (4363169).
@@ -9626,6 +7829,7 @@ sd_unit_detach(dev_info_t *devi)
 
 	/* Free up soft state */
 	devp->sd_private = NULL;
+
 	bzero(un, sizeof (struct sd_lun));
 	ddi_soft_state_free(sd_state, instance);
 
@@ -9663,158 +7867,6 @@ err_remove_event:
 
 	SD_TRACE(SD_LOG_ATTACH_DETACH, un, "sd_unit_detach: exit failure\n");
 	return (DDI_FAILURE);
-}
-
-
-/*
- * Driver minor node structure and data table
- */
-struct driver_minor_data {
-	char	*name;
-	minor_t	minor;
-	int	type;
-};
-
-static struct driver_minor_data sd_minor_data[] = {
-	{"a", 0, S_IFBLK},
-	{"b", 1, S_IFBLK},
-	{"c", 2, S_IFBLK},
-	{"d", 3, S_IFBLK},
-	{"e", 4, S_IFBLK},
-	{"f", 5, S_IFBLK},
-	{"g", 6, S_IFBLK},
-	{"h", 7, S_IFBLK},
-#if defined(_SUNOS_VTOC_16)
-	{"i", 8, S_IFBLK},
-	{"j", 9, S_IFBLK},
-	{"k", 10, S_IFBLK},
-	{"l", 11, S_IFBLK},
-	{"m", 12, S_IFBLK},
-	{"n", 13, S_IFBLK},
-	{"o", 14, S_IFBLK},
-	{"p", 15, S_IFBLK},
-#endif			/* defined(_SUNOS_VTOC_16) */
-#if defined(_FIRMWARE_NEEDS_FDISK)
-	{"q", 16, S_IFBLK},
-	{"r", 17, S_IFBLK},
-	{"s", 18, S_IFBLK},
-	{"t", 19, S_IFBLK},
-	{"u", 20, S_IFBLK},
-#endif			/* defined(_FIRMWARE_NEEDS_FDISK) */
-	{"a,raw", 0, S_IFCHR},
-	{"b,raw", 1, S_IFCHR},
-	{"c,raw", 2, S_IFCHR},
-	{"d,raw", 3, S_IFCHR},
-	{"e,raw", 4, S_IFCHR},
-	{"f,raw", 5, S_IFCHR},
-	{"g,raw", 6, S_IFCHR},
-	{"h,raw", 7, S_IFCHR},
-#if defined(_SUNOS_VTOC_16)
-	{"i,raw", 8, S_IFCHR},
-	{"j,raw", 9, S_IFCHR},
-	{"k,raw", 10, S_IFCHR},
-	{"l,raw", 11, S_IFCHR},
-	{"m,raw", 12, S_IFCHR},
-	{"n,raw", 13, S_IFCHR},
-	{"o,raw", 14, S_IFCHR},
-	{"p,raw", 15, S_IFCHR},
-#endif			/* defined(_SUNOS_VTOC_16) */
-#if defined(_FIRMWARE_NEEDS_FDISK)
-	{"q,raw", 16, S_IFCHR},
-	{"r,raw", 17, S_IFCHR},
-	{"s,raw", 18, S_IFCHR},
-	{"t,raw", 19, S_IFCHR},
-	{"u,raw", 20, S_IFCHR},
-#endif			/* defined(_FIRMWARE_NEEDS_FDISK) */
-	{0}
-};
-
-static struct driver_minor_data sd_minor_data_efi[] = {
-	{"a", 0, S_IFBLK},
-	{"b", 1, S_IFBLK},
-	{"c", 2, S_IFBLK},
-	{"d", 3, S_IFBLK},
-	{"e", 4, S_IFBLK},
-	{"f", 5, S_IFBLK},
-	{"g", 6, S_IFBLK},
-	{"wd", 7, S_IFBLK},
-#if defined(_FIRMWARE_NEEDS_FDISK)
-	{"q", 16, S_IFBLK},
-	{"r", 17, S_IFBLK},
-	{"s", 18, S_IFBLK},
-	{"t", 19, S_IFBLK},
-	{"u", 20, S_IFBLK},
-#endif			/* defined(_FIRMWARE_NEEDS_FDISK) */
-	{"a,raw", 0, S_IFCHR},
-	{"b,raw", 1, S_IFCHR},
-	{"c,raw", 2, S_IFCHR},
-	{"d,raw", 3, S_IFCHR},
-	{"e,raw", 4, S_IFCHR},
-	{"f,raw", 5, S_IFCHR},
-	{"g,raw", 6, S_IFCHR},
-	{"wd,raw", 7, S_IFCHR},
-#if defined(_FIRMWARE_NEEDS_FDISK)
-	{"q,raw", 16, S_IFCHR},
-	{"r,raw", 17, S_IFCHR},
-	{"s,raw", 18, S_IFCHR},
-	{"t,raw", 19, S_IFCHR},
-	{"u,raw", 20, S_IFCHR},
-#endif			/* defined(_FIRMWARE_NEEDS_FDISK) */
-	{0}
-};
-
-
-/*
- *    Function: sd_create_minor_nodes
- *
- * Description: Create the minor device nodes for the instance.
- *
- *   Arguments: un - driver soft state (unit) structure
- *		devi - pointer to device info structure
- *
- * Return Code: DDI_SUCCESS
- *		DDI_FAILURE
- *
- *     Context: Kernel thread context
- */
-
-static int
-sd_create_minor_nodes(struct sd_lun *un, dev_info_t *devi)
-{
-	struct driver_minor_data	*dmdp;
-	struct scsi_device		*devp;
-	int				instance;
-	char				name[48];
-
-	ASSERT(un != NULL);
-	devp = ddi_get_driver_private(devi);
-	instance = ddi_get_instance(devp->sd_dev);
-
-	/*
-	 * Create all the minor nodes for this target.
-	 */
-	if (un->un_blockcount > DK_MAX_BLOCKS)
-		dmdp = sd_minor_data_efi;
-	else
-		dmdp = sd_minor_data;
-	while (dmdp->name != NULL) {
-
-		(void) sprintf(name, "%s", dmdp->name);
-
-		if (ddi_create_minor_node(devi, name, dmdp->type,
-		    (instance << SDUNIT_SHIFT) | dmdp->minor,
-		    un->un_node_type, NULL) == DDI_FAILURE) {
-			/*
-			 * Clean up any nodes that may have been created, in
-			 * case this fails in the middle of the loop.
-			 */
-			ddi_remove_minor_node(devi, NULL);
-			return (DDI_FAILURE);
-		}
-		dmdp++;
-	}
-
-	return (DDI_SUCCESS);
 }
 
 
@@ -10001,6 +8053,8 @@ sd_set_pstats(struct sd_lun *un)
 	char	kstatname[KSTAT_STRLEN];
 	int	instance;
 	int	i;
+	diskaddr_t	nblks = 0;
+	char	*partname = NULL;
 
 	ASSERT(un != NULL);
 
@@ -10008,11 +8062,19 @@ sd_set_pstats(struct sd_lun *un)
 
 	/* Note:x86: is this a VTOC8/VTOC16 difference? */
 	for (i = 0; i < NSDMAP; i++) {
+
+		if (cmlb_partinfo(un->un_cmlbhandle, i,
+		    &nblks, NULL, &partname, NULL, (void *)SD_PATH_DIRECT) != 0)
+			continue;
+		mutex_enter(SD_MUTEX(un));
+
 		if ((un->un_pstats[i] == NULL) &&
-		    (un->un_map[i].dkl_nblk != 0)) {
+		    (nblks != 0)) {
+
 			(void) snprintf(kstatname, sizeof (kstatname),
 			    "%s%d,%s", sd_label, instance,
-			    sd_minor_data[i].name);
+			    partname);
+
 			un->un_pstats[i] = kstat_create(sd_label,
 			    instance, kstatname, "partition", KSTAT_TYPE_IO,
 			    1, KSTAT_FLAG_PERSISTENT);
@@ -10021,6 +8083,7 @@ sd_set_pstats(struct sd_lun *un)
 				kstat_install(un->un_pstats[i]);
 			}
 		}
+		mutex_exit(SD_MUTEX(un));
 	}
 }
 
@@ -10301,8 +8364,8 @@ sd_cache_control(struct sd_lun *un, int rcd_flag, int wce_flag)
  *		enable) bits of mode page 8 (MODEPAGE_CACHING).
  *
  *   Arguments: un - driver soft state (unit) structure
- *   		is_enabled - pointer to int where write cache enabled state
- *   			is returned (non-zero -> write cache enabled)
+ *		is_enabled - pointer to int where write cache enabled state
+ *		is returned (non-zero -> write cache enabled)
  *
  *
  * Return Code: EIO
@@ -10683,6 +8746,7 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 	int		instance;
 	dev_t		dev;
 	int		rval = EIO;
+	diskaddr_t	nblks = 0;
 
 	/* Validate the open type */
 	if (otyp >= OTYPCNT) {
@@ -10840,8 +8904,19 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 		 * Fail if device is not ready or if the number of disk
 		 * blocks is zero or negative for non CD devices.
 		 */
+
+		nblks = 0;
+
+		if (rval == SD_READY_VALID && (!ISCD(un))) {
+			/* if cmlb_partinfo fails, nblks remains 0 */
+			mutex_exit(SD_MUTEX(un));
+			(void) cmlb_partinfo(un->un_cmlbhandle, part, &nblks,
+			    NULL, NULL, NULL, (void *)SD_PATH_DIRECT);
+			mutex_enter(SD_MUTEX(un));
+		}
+
 		if ((rval != SD_READY_VALID) ||
-		    (!ISCD(un) && un->un_map[part].dkl_nblk <= 0)) {
+		    (!ISCD(un) && nblks <= 0)) {
 			rval = un->un_f_has_removable_media ? ENXIO : EIO;
 			SD_ERROR(SD_LOG_OPEN_CLOSE, un, "sdopen: "
 			    "device not ready or invalid disk block value\n");
@@ -10863,7 +8938,10 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 			cp++;
 		}
 		if (cp == &un->un_ocmap.chkd[OCSIZE]) {
-			un->un_f_geometry_is_valid = FALSE;
+			mutex_exit(SD_MUTEX(un));
+			cmlb_invalidate(un->un_cmlbhandle,
+			    (void *)SD_PATH_DIRECT);
+			mutex_enter(SD_MUTEX(un));
 		}
 
 #endif
@@ -11009,7 +9087,10 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 				scsi_log(SD_DEVINFO(un), sd_label,
 					CE_WARN, "offline\n");
 			}
-			un->un_f_geometry_is_valid = FALSE;
+			mutex_exit(SD_MUTEX(un));
+			cmlb_invalidate(un->un_cmlbhandle,
+			    (void *)SD_PATH_DIRECT);
+			mutex_enter(SD_MUTEX(un));
 
 		} else {
 			/*
@@ -11108,6 +9189,11 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 					un->un_wm_cache = NULL;
 				}
 			}
+			mutex_exit(SD_MUTEX(un));
+			(void) cmlb_close(un->un_cmlbhandle,
+			    (void *)SD_PATH_DIRECT);
+			mutex_enter(SD_MUTEX(un));
+
 		}
 	}
 
@@ -11137,7 +9223,6 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
  *		un  - driver soft state (unit) structure
  *
  * Return Code: SD_READY_VALID		ready and valid label
- *		SD_READY_NOT_VALID	ready, geom ops never applicable
  *		SD_NOT_READY_VALID	not ready, no label
  *		SD_RESERVED_BY_OTHERS	reservation conflict
  *
@@ -11152,6 +9237,7 @@ sd_ready_and_valid(struct sd_lun *un)
 	uint_t			lbasize;
 	int			rval = SD_READY_VALID;
 	char			name_str[48];
+	int			is_valid;
 
 	ASSERT(un != NULL);
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
@@ -11169,8 +9255,9 @@ sd_ready_and_valid(struct sd_lun *un)
 			goto done;
 		}
 
+		is_valid = SD_IS_VALID_LABEL(un);
 		mutex_enter(SD_MUTEX(un));
-		if ((un->un_f_geometry_is_valid == FALSE) ||
+		if (!is_valid ||
 		    (un->un_f_blockcount_is_valid == FALSE) ||
 		    (un->un_f_tgt_blocksize_is_valid == FALSE)) {
 
@@ -11178,8 +9265,9 @@ sd_ready_and_valid(struct sd_lun *un)
 			mutex_exit(SD_MUTEX(un));
 			if (sd_send_scsi_READ_CAPACITY(un, &capacity,
 			    &lbasize, SD_PATH_DIRECT) != 0) {
+				cmlb_invalidate(un->un_cmlbhandle,
+				    (void *)SD_PATH_DIRECT);
 				mutex_enter(SD_MUTEX(un));
-				un->un_f_geometry_is_valid = FALSE;
 				rval = SD_NOT_READY_VALID;
 				goto done;
 			} else {
@@ -11191,7 +9279,7 @@ sd_ready_and_valid(struct sd_lun *un)
 		/*
 		 * Check if the media in the device is writable or not.
 		 */
-		if ((un->un_f_geometry_is_valid == FALSE) && ISCD(un)) {
+		if (!is_valid && ISCD(un)) {
 			sd_check_for_writable_cd(un);
 		}
 
@@ -11251,7 +9339,10 @@ sd_ready_and_valid(struct sd_lun *un)
 		if (err != 0) {
 			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 			    "offline or reservation conflict\n");
-			un->un_f_geometry_is_valid = FALSE;
+			mutex_exit(SD_MUTEX(un));
+			cmlb_invalidate(un->un_cmlbhandle,
+			    (void *)SD_PATH_DIRECT);
+			mutex_enter(SD_MUTEX(un));
 			if (err == EACCES) {
 				rval = SD_RESERVED_BY_OTHERS;
 			} else {
@@ -11262,30 +9353,20 @@ sd_ready_and_valid(struct sd_lun *un)
 	}
 
 	if (un->un_f_format_in_progress == FALSE) {
-		/*
-		 * Note: sd_validate_geometry may return TRUE, but that does
-		 * not necessarily mean un_f_geometry_is_valid == TRUE!
-		 */
-		rval = sd_validate_geometry(un, SD_PATH_DIRECT);
-		if (rval == ENOTSUP) {
-			if (un->un_f_geometry_is_valid == TRUE)
-				rval = 0;
-			else {
-				rval = SD_READY_NOT_VALID;
-				goto done;
-			}
+		mutex_exit(SD_MUTEX(un));
+		if (cmlb_validate(un->un_cmlbhandle, 0,
+		    (void *)SD_PATH_DIRECT) != 0) {
+			rval = SD_NOT_READY_VALID;
+			mutex_enter(SD_MUTEX(un));
+			goto done;
 		}
-		if (rval != 0) {
-			/*
-			 * We don't check the validity of geometry for
-			 * CDROMs. Also we assume we have a good label
-			 * even if sd_validate_geometry returned ENOMEM.
-			 */
-			if (!ISCD(un) && rval != ENOMEM) {
-				rval = SD_NOT_READY_VALID;
-				goto done;
-			}
+		if (un->un_f_pkstats_enabled) {
+			sd_set_pstats(un);
+			SD_TRACE(SD_LOG_IO_PARTITION, un,
+			    "sd_ready_and_valid: un:0x%p pstats created and "
+			    "set\n", un);
 		}
+		mutex_enter(SD_MUTEX(un));
 	}
 
 	/*
@@ -11390,7 +9471,7 @@ sdread(dev_t dev, struct uio *uio, cred_t *cred_p)
 
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 
-	if ((un->un_f_geometry_is_valid == FALSE) && !ISCD(un)) {
+	if (!SD_IS_VALID_LABEL(un) && !ISCD(un)) {
 		mutex_enter(SD_MUTEX(un));
 		/*
 		 * Because the call to sd_ready_and_valid will issue I/O we
@@ -11469,7 +9550,7 @@ sdwrite(dev_t dev, struct uio *uio, cred_t *cred_p)
 
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 
-	if ((un->un_f_geometry_is_valid == FALSE) && !ISCD(un)) {
+	if (!SD_IS_VALID_LABEL(un) && !ISCD(un)) {
 		mutex_enter(SD_MUTEX(un));
 		/*
 		 * Because the call to sd_ready_and_valid will issue I/O we
@@ -11548,7 +9629,7 @@ sdaread(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 
-	if ((un->un_f_geometry_is_valid == FALSE) && !ISCD(un)) {
+	if (!SD_IS_VALID_LABEL(un) && !ISCD(un)) {
 		mutex_enter(SD_MUTEX(un));
 		/*
 		 * Because the call to sd_ready_and_valid will issue I/O we
@@ -11627,7 +9708,7 @@ sdawrite(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 
-	if ((un->un_f_geometry_is_valid == FALSE) && !ISCD(un)) {
+	if (!SD_IS_VALID_LABEL(un) && !ISCD(un)) {
 		mutex_enter(SD_MUTEX(un));
 		/*
 		 * Because the call to sd_ready_and_valid will issue I/O we
@@ -12399,7 +10480,7 @@ sd_uscsi_iodone(int index, struct sd_lun *un, struct buf *bp)
 static void
 sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 {
-	daddr_t	nblocks;	/* #blocks in the given partition */
+	diskaddr_t	nblocks;	/* #blocks in the given partition */
 	daddr_t	blocknum;	/* Block number specified by the buf */
 	size_t	requested_nblocks;
 	size_t	available_nblocks;
@@ -12424,7 +10505,7 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 	 * removable-media devices, of if the device was opened in
 	 * NDELAY/NONBLOCK mode.
 	 */
-	if ((un->un_f_geometry_is_valid != TRUE) &&
+	if (!SD_IS_VALID_LABEL(un) &&
 	    (sd_ready_and_valid(un) != SD_READY_VALID)) {
 		/*
 		 * For removable devices it is possible to start an I/O
@@ -12446,11 +10527,9 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 
 	partition = SDPART(bp->b_edev);
 
-	/* #blocks in partition */
-	nblocks = un->un_map[partition].dkl_nblk;    /* #blocks in partition */
-
-	/* Use of a local variable potentially improves performance slightly */
-	partition_offset = un->un_offset[partition];
+	nblocks = 0;
+	(void) cmlb_partinfo(un->un_cmlbhandle, partition,
+	    &nblocks, &partition_offset, NULL, NULL, (void *)SD_PATH_DIRECT);
 
 	/*
 	 * blocknum is the starting block number of the request. At this
@@ -17630,7 +15709,7 @@ sd_sense_key_not_ready(struct sd_lun *un,
 	 * been powered down and may need to be restarted.  For CDROMs,
 	 * report NOT READY errors only if media is present.
 	 */
-	if ((ISCD(un) && (un->un_f_geometry_is_valid == TRUE)) ||
+	if ((ISCD(un) && (asc == 0x3A)) ||
 	    (xp->xb_retry_count > 0)) {
 		SD_UPDATE_ERRSTATS(un, sd_harderrs);
 		SD_UPDATE_ERRSTATS(un, sd_rq_ntrdy_err);
@@ -19142,14 +17221,22 @@ sd_handle_mchange(struct sd_lun *un)
 	 * Note: Maybe let the strategy/partitioning chain worry about getting
 	 * valid geometry.
 	 */
-	un->un_f_geometry_is_valid = FALSE;
-	(void) sd_validate_geometry(un, SD_PATH_DIRECT_PRIORITY);
-	if (un->un_f_geometry_is_valid == FALSE) {
-		mutex_exit(SD_MUTEX(un));
+	mutex_exit(SD_MUTEX(un));
+	cmlb_invalidate(un->un_cmlbhandle, (void *)SD_PATH_DIRECT_PRIORITY);
+
+
+	if (cmlb_validate(un->un_cmlbhandle, 0,
+	    (void *)SD_PATH_DIRECT_PRIORITY) != 0) {
 		return (EIO);
+	} else {
+		if (un->un_f_pkstats_enabled) {
+			sd_set_pstats(un);
+			SD_TRACE(SD_LOG_IO_PARTITION, un,
+			    "sd_handle_mchange: un:0x%p pstats created and "
+			    "set\n", un);
+		}
 	}
 
-	mutex_exit(SD_MUTEX(un));
 
 	/*
 	 * Try to lock the door
@@ -19415,16 +17502,6 @@ sd_send_scsi_READ_CAPACITY(struct sd_lun *un, uint64_t *capp, uint32_t *lbap,
 	 * so scale the capacity value to reflect this.
 	 */
 	capacity = (capacity + 1) * (lbasize / un->un_sys_blocksize);
-
-#if defined(__i386) || defined(__amd64)
-	/*
-	 * Refer to comments related to off-by-1 at the
-	 * header of this file.
-	 * Treat 1TB disk as (1T - 512)B.
-	 */
-	if (un->un_f_capacity_adjusted == 1)
-	    capacity = DK_MAX_BLOCKS;
-#endif
 
 	/*
 	 * Copy the values from the READ CAPACITY command into the space
@@ -21094,10 +19171,11 @@ static int
 sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 {
 	struct sd_lun	*un = NULL;
-	int		geom_validated = FALSE;
 	int		err = 0;
 	int		i = 0;
 	cred_t		*cr;
+	int		tmprval = EINVAL;
+	int 		is_valid;
 
 	/*
 	 * All device accesses go thru sdstrategy where we check on suspend
@@ -21108,6 +19186,9 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 	}
 
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
+
+
+	is_valid = SD_IS_VALID_LABEL(un);
 
 	/*
 	 * Moved this wait from sd_uscsi_strategy to here for
@@ -21130,9 +19211,26 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 	 */
 	un->un_ncmds_in_driver++;
 
-	if ((un->un_f_geometry_is_valid == FALSE) &&
+	if (!is_valid &&
 	    (flag & (FNDELAY | FNONBLOCK))) {
 		switch (cmd) {
+		case DKIOCGGEOM:	/* SD_PATH_DIRECT */
+		case DKIOCGVTOC:
+		case DKIOCGAPART:
+		case DKIOCPARTINFO:
+		case DKIOCSGEOM:
+		case DKIOCSAPART:
+		case DKIOCGETEFI:
+		case DKIOCPARTITION:
+		case DKIOCSVTOC:
+		case DKIOCSETEFI:
+		case DKIOCGMBOOT:
+		case DKIOCSMBOOT:
+		case DKIOCG_PHYGEOM:
+		case DKIOCG_VIRTGEOM:
+			/* let cmlb handle it */
+			goto skip_ready_valid;
+
 		case CDROMPAUSE:
 		case CDROMRESUME:
 		case CDROMPLAYMSF:
@@ -21170,9 +19268,6 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 				return (ENOTTY);
 			}
 			break;
-		case DKIOCSVTOC:
-		case DKIOCSETEFI:
-		case DKIOCSMBOOT:
 		case DKIOCFLUSHWRITECACHE:
 			mutex_exit(SD_MUTEX(un));
 			err = sd_send_scsi_TEST_UNIT_READY(un, 0);
@@ -21209,23 +19304,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		mutex_exit(SD_MUTEX(un));
 		err = sd_ready_and_valid(un);
 		mutex_enter(SD_MUTEX(un));
-		if (err == SD_READY_NOT_VALID) {
-			switch (cmd) {
-			case DKIOCGAPART:
-			case DKIOCGGEOM:
-			case DKIOCSGEOM:
-			case DKIOCGVTOC:
-			case DKIOCSVTOC:
-			case DKIOCSAPART:
-			case DKIOCG_PHYGEOM:
-			case DKIOCG_VIRTGEOM:
-				err = ENOTSUP;
-				un->un_ncmds_in_driver--;
-				ASSERT(un->un_ncmds_in_driver >= 0);
-				mutex_exit(SD_MUTEX(un));
-				return (err);
-			}
-		}
+
 		if (err != SD_READY_VALID) {
 			switch (cmd) {
 			case DKIOCSTATE:
@@ -21234,12 +19313,8 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 			case FDEJECT:	/* for eject command */
 			case DKIOCEJECT:
 			case CDROMEJECT:
-			case DKIOCGETEFI:
-			case DKIOCSGEOM:
 			case DKIOCREMOVABLE:
 			case DKIOCHOTPLUGGABLE:
-			case DKIOCSAPART:
-			case DKIOCSETEFI:
 				break;
 			default:
 				if (un->un_f_has_removable_media) {
@@ -21252,29 +19327,6 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 						err = EIO;
 					}
 				}
-				un->un_ncmds_in_driver--;
-				ASSERT(un->un_ncmds_in_driver >= 0);
-				mutex_exit(SD_MUTEX(un));
-				return (err);
-			}
-		}
-		geom_validated = TRUE;
-	}
-	if ((un->un_f_geometry_is_valid == TRUE) &&
-	    (un->un_solaris_size > 0)) {
-		/*
-		 * the "geometry_is_valid" flag could be true if we
-		 * have an fdisk table but no Solaris partition
-		 */
-		if (un->un_vtoc.v_sanity != VTOC_SANE) {
-			/* it is EFI, so return ENOTSUP for these */
-			switch (cmd) {
-			case DKIOCGAPART:
-			case DKIOCGGEOM:
-			case DKIOCGVTOC:
-			case DKIOCSVTOC:
-			case DKIOCSAPART:
-				err = ENOTSUP;
 				un->un_ncmds_in_driver--;
 				ASSERT(un->un_ncmds_in_driver >= 0);
 				mutex_exit(SD_MUTEX(un));
@@ -21298,61 +19350,76 @@ skip_ready_valid:
 		break;
 
 	case DKIOCGGEOM:
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCGGEOM\n");
-		err = sd_dkio_get_geometry(dev, (caddr_t)arg, flag,
-		    geom_validated);
-		break;
-
-	case DKIOCSGEOM:
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCSGEOM\n");
-		err = sd_dkio_set_geometry(dev, (caddr_t)arg, flag);
-		break;
-
-	case DKIOCGAPART:
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCGAPART\n");
-		err = sd_dkio_get_partition(dev, (caddr_t)arg, flag,
-		    geom_validated);
-		break;
-
-	case DKIOCSAPART:
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCSAPART\n");
-		err = sd_dkio_set_partition(dev, (caddr_t)arg, flag);
-		break;
-
 	case DKIOCGVTOC:
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCGVTOC\n");
-		err = sd_dkio_get_vtoc(dev, (caddr_t)arg, flag,
-		    geom_validated);
-		break;
-
+	case DKIOCGAPART:
+	case DKIOCPARTINFO:
+	case DKIOCSGEOM:
+	case DKIOCSAPART:
 	case DKIOCGETEFI:
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCGETEFI\n");
-		err = sd_dkio_get_efi(dev, (caddr_t)arg, flag);
-		break;
-
 	case DKIOCPARTITION:
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCPARTITION\n");
-		err = sd_dkio_partition(dev, (caddr_t)arg, flag);
-		break;
-
 	case DKIOCSVTOC:
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCSVTOC\n");
-		err = sd_dkio_set_vtoc(dev, (caddr_t)arg, flag);
-		break;
-
 	case DKIOCSETEFI:
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCSETEFI\n");
-		err = sd_dkio_set_efi(dev, (caddr_t)arg, flag);
-		break;
-
 	case DKIOCGMBOOT:
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCGMBOOT\n");
-		err = sd_dkio_get_mboot(dev, (caddr_t)arg, flag);
-		break;
-
 	case DKIOCSMBOOT:
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCSMBOOT\n");
-		err = sd_dkio_set_mboot(dev, (caddr_t)arg, flag);
+	case DKIOCG_PHYGEOM:
+	case DKIOCG_VIRTGEOM:
+		SD_TRACE(SD_LOG_IOCTL, un, "DKIOC %d\n", cmd);
+
+		/* TUR should spin up */
+
+		if (un->un_f_has_removable_media)
+			err = sd_send_scsi_TEST_UNIT_READY(un,
+			    SD_CHECK_FOR_MEDIA);
+		else
+			err = sd_send_scsi_TEST_UNIT_READY(un, 0);
+
+		if (err != 0)
+			break;
+
+		err = cmlb_ioctl(un->un_cmlbhandle, dev,
+		    cmd, arg, flag, cred_p, rval_p, (void *)SD_PATH_DIRECT);
+
+		if ((err == 0) &&
+		    ((cmd == DKIOCSETEFI) ||
+		    (un->un_f_pkstats_enabled) &&
+		    (cmd == DKIOCSAPART || cmd == DKIOCSVTOC))) {
+
+			tmprval = cmlb_validate(un->un_cmlbhandle, CMLB_SILENT,
+			    (void *)SD_PATH_DIRECT);
+			if ((tmprval == 0) && un->un_f_pkstats_enabled) {
+				sd_set_pstats(un);
+				SD_TRACE(SD_LOG_IO_PARTITION, un,
+				    "sd_ioctl: un:0x%p pstats created and "
+				    "set\n", un);
+			}
+		}
+
+		if ((cmd == DKIOCSVTOC) ||
+		    ((cmd == DKIOCSETEFI) && (tmprval == 0))) {
+
+			mutex_enter(SD_MUTEX(un));
+			if (un->un_f_devid_supported &&
+			    (un->un_f_opt_fab_devid == TRUE)) {
+				if (un->un_devid == NULL) {
+					sd_register_devid(un, SD_DEVINFO(un),
+					    SD_TARGET_IS_UNRESERVED);
+				} else {
+					/*
+					 * The device id for this disk
+					 * has been fabricated. The
+					 * device id must be preserved
+					 * by writing it back out to
+					 * disk.
+					 */
+					if (sd_write_deviceid(un) != 0) {
+						ddi_devid_free(un->un_devid);
+						un->un_devid = NULL;
+					}
+				}
+			}
+			mutex_exit(SD_MUTEX(un));
+		}
+
 		break;
 
 	case DKIOCLOCK:
@@ -21864,189 +19931,7 @@ skip_ready_valid:
 		}
 		break;
 
-	case DKIOCPARTINFO: {
-		/*
-		 * Return parameters describing the selected disk slice.
-		 * Note: this ioctl is for the intel platform only
-		 */
-#if defined(__i386) || defined(__amd64)
-		int part;
 
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCPARTINFO\n");
-		part = SDPART(dev);
-
-		/* don't check un_solaris_size for pN */
-		if (part < P0_RAW_DISK && un->un_solaris_size == 0) {
-			err = EIO;
-		} else {
-			struct part_info p;
-
-			p.p_start = (daddr_t)un->un_offset[part];
-			p.p_length = (int)un->un_map[part].dkl_nblk;
-#ifdef _MULTI_DATAMODEL
-			switch (ddi_model_convert_from(flag & FMODELS)) {
-			case DDI_MODEL_ILP32:
-			{
-				struct part_info32 p32;
-
-				p32.p_start = (daddr32_t)p.p_start;
-				p32.p_length = p.p_length;
-				if (ddi_copyout(&p32, (void *)arg,
-				    sizeof (p32), flag))
-					err = EFAULT;
-				break;
-			}
-
-			case DDI_MODEL_NONE:
-			{
-				if (ddi_copyout(&p, (void *)arg, sizeof (p),
-				    flag))
-					err = EFAULT;
-				break;
-			}
-			}
-#else /* ! _MULTI_DATAMODEL */
-			if (ddi_copyout(&p, (void *)arg, sizeof (p), flag))
-				err = EFAULT;
-#endif /* _MULTI_DATAMODEL */
-		}
-#else
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCPARTINFO\n");
-		err = ENOTTY;
-#endif
-		break;
-	}
-
-	case DKIOCG_PHYGEOM: {
-		/* Return the driver's notion of the media physical geometry */
-#if defined(__i386) || defined(__amd64)
-		uint64_t	capacity;
-		struct dk_geom	disk_geom;
-		struct dk_geom	*dkgp = &disk_geom;
-
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCG_PHYGEOM\n");
-		mutex_enter(SD_MUTEX(un));
-
-		if (un->un_g.dkg_nhead != 0 &&
-		    un->un_g.dkg_nsect != 0) {
-			/*
-			 * We succeeded in getting a geometry, but
-			 * right now it is being reported as just the
-			 * Solaris fdisk partition, just like for
-			 * DKIOCGGEOM. We need to change that to be
-			 * correct for the entire disk now.
-			 */
-			bcopy(&un->un_g, dkgp, sizeof (*dkgp));
-			dkgp->dkg_acyl = 0;
-			dkgp->dkg_ncyl = un->un_blockcount /
-			    (dkgp->dkg_nhead * dkgp->dkg_nsect);
-		} else {
-			bzero(dkgp, sizeof (struct dk_geom));
-			/*
-			 * This disk does not have a Solaris VTOC
-			 * so we must present a physical geometry
-			 * that will remain consistent regardless
-			 * of how the disk is used. This will ensure
-			 * that the geometry does not change regardless
-			 * of the fdisk partition type (ie. EFI, FAT32,
-			 * Solaris, etc).
-			 */
-			if (ISCD(un)) {
-				dkgp->dkg_nhead = un->un_pgeom.g_nhead;
-				dkgp->dkg_nsect = un->un_pgeom.g_nsect;
-				dkgp->dkg_ncyl = un->un_pgeom.g_ncyl;
-				dkgp->dkg_acyl = un->un_pgeom.g_acyl;
-			} else {
-				/*
-				 * Invalid un_blockcount can generate invalid
-				 * dk_geom and may result in division by zero
-				 * system failure. Should make sure blockcount
-				 * is valid before using it here.
-				 */
-				if (un->un_f_blockcount_is_valid == FALSE) {
-					mutex_exit(SD_MUTEX(un));
-					err = EIO;
-
-					break;
-				}
-
-				/*
-				 * Refer to comments related to off-by-1 at the
-				 * header of this file
-				 */
-				if (!un->un_f_capacity_adjusted &&
-					!un->un_f_has_removable_media &&
-				    !un->un_f_is_hotpluggable &&
-					(un->un_tgt_blocksize ==
-					un->un_sys_blocksize))
-					capacity = un->un_blockcount - 1;
-				else
-					capacity = un->un_blockcount;
-
-				sd_convert_geometry(capacity, dkgp);
-				dkgp->dkg_acyl = 0;
-				dkgp->dkg_ncyl = capacity /
-				    (dkgp->dkg_nhead * dkgp->dkg_nsect);
-			}
-		}
-		dkgp->dkg_pcyl = dkgp->dkg_ncyl + dkgp->dkg_acyl;
-
-		if (ddi_copyout(dkgp, (void *)arg,
-		    sizeof (struct dk_geom), flag)) {
-			mutex_exit(SD_MUTEX(un));
-			err = EFAULT;
-		} else {
-			mutex_exit(SD_MUTEX(un));
-			err = 0;
-		}
-#else
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCG_PHYGEOM\n");
-		err = ENOTTY;
-#endif
-		break;
-	}
-
-	case DKIOCG_VIRTGEOM: {
-		/* Return the driver's notion of the media's logical geometry */
-#if defined(__i386) || defined(__amd64)
-		struct dk_geom	disk_geom;
-		struct dk_geom	*dkgp = &disk_geom;
-
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCG_VIRTGEOM\n");
-		mutex_enter(SD_MUTEX(un));
-		/*
-		 * If there is no HBA geometry available, or
-		 * if the HBA returned us something that doesn't
-		 * really fit into an Int 13/function 8 geometry
-		 * result, just fail the ioctl.  See PSARC 1998/313.
-		 */
-		if (un->un_lgeom.g_nhead == 0 ||
-		    un->un_lgeom.g_nsect == 0 ||
-		    un->un_lgeom.g_ncyl > 1024) {
-			mutex_exit(SD_MUTEX(un));
-			err = EINVAL;
-		} else {
-			dkgp->dkg_ncyl	= un->un_lgeom.g_ncyl;
-			dkgp->dkg_acyl	= un->un_lgeom.g_acyl;
-			dkgp->dkg_pcyl	= dkgp->dkg_ncyl + dkgp->dkg_acyl;
-			dkgp->dkg_nhead	= un->un_lgeom.g_nhead;
-			dkgp->dkg_nsect	= un->un_lgeom.g_nsect;
-
-			if (ddi_copyout(dkgp, (void *)arg,
-			    sizeof (struct dk_geom), flag)) {
-				mutex_exit(SD_MUTEX(un));
-				err = EFAULT;
-			} else {
-				mutex_exit(SD_MUTEX(un));
-				err = 0;
-			}
-		}
-#else
-		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCG_VIRTGEOM\n");
-		err = ENOTTY;
-#endif
-		break;
-	}
 #ifdef SDDEBUG
 /* RESET/ABORTS testing ioctls */
 	case DKIOCRESET: {
@@ -22465,1787 +20350,6 @@ done:
 
 
 /*
- *    Function: sd_dkio_get_geometry
- *
- * Description: This routine is the driver entry point for handling user
- *		requests to get the device geometry (DKIOCGGEOM).
- *
- *   Arguments: dev  - the device number
- *		arg  - pointer to user provided dk_geom structure specifying
- *			the controller's notion of the current geometry.
- *		flag - this argument is a pass through to ddi_copyxxx()
- *		       directly from the mode argument of ioctl().
- *		geom_validated - flag indicating if the device geometry has been
- *				 previously validated in the sdioctl routine.
- *
- * Return Code: 0
- *		EFAULT
- *		ENXIO
- *		EIO
- */
-
-static int
-sd_dkio_get_geometry(dev_t dev, caddr_t arg, int flag, int geom_validated)
-{
-	struct sd_lun	*un = NULL;
-	struct dk_geom	*tmp_geom = NULL;
-	int		rval = 0;
-
-	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
-		return (ENXIO);
-	}
-
-	if (geom_validated == FALSE) {
-		/*
-		 * sd_validate_geometry does not spin a disk up
-		 * if it was spun down. We need to make sure it
-		 * is ready.
-		 */
-		if ((rval = sd_send_scsi_TEST_UNIT_READY(un, 0)) != 0) {
-			return (rval);
-		}
-		mutex_enter(SD_MUTEX(un));
-		rval = sd_validate_geometry(un, SD_PATH_DIRECT);
-		mutex_exit(SD_MUTEX(un));
-	}
-	if (rval)
-		return (rval);
-
-	/*
-	 * It is possible that un_solaris_size is 0(uninitialized)
-	 * after sd_unit_attach. Reservation conflict may cause the
-	 * above situation. Thus, the zero check of un_solaris_size
-	 * should occur after the sd_validate_geometry() call.
-	 */
-#if defined(__i386) || defined(__amd64)
-	if (un->un_solaris_size == 0) {
-		return (EIO);
-	}
-#endif
-
-	/*
-	 * Make a local copy of the soft state geometry to avoid some potential
-	 * race conditions associated with holding the mutex and updating the
-	 * write_reinstruct value
-	 */
-	tmp_geom = kmem_zalloc(sizeof (struct dk_geom), KM_SLEEP);
-	mutex_enter(SD_MUTEX(un));
-	bcopy(&un->un_g, tmp_geom, sizeof (struct dk_geom));
-	mutex_exit(SD_MUTEX(un));
-
-	if (tmp_geom->dkg_write_reinstruct == 0) {
-		tmp_geom->dkg_write_reinstruct =
-		    (int)((int)(tmp_geom->dkg_nsect * tmp_geom->dkg_rpm *
-		    sd_rot_delay) / (int)60000);
-	}
-
-	rval = ddi_copyout(tmp_geom, (void *)arg, sizeof (struct dk_geom),
-	    flag);
-	if (rval != 0) {
-		rval = EFAULT;
-	}
-
-	kmem_free(tmp_geom, sizeof (struct dk_geom));
-	return (rval);
-
-}
-
-
-/*
- *    Function: sd_dkio_set_geometry
- *
- * Description: This routine is the driver entry point for handling user
- *		requests to set the device geometry (DKIOCSGEOM). The actual
- *		device geometry is not updated, just the driver "notion" of it.
- *
- *   Arguments: dev  - the device number
- *		arg  - pointer to user provided dk_geom structure used to set
- *			the controller's notion of the current geometry.
- *		flag - this argument is a pass through to ddi_copyxxx()
- *		       directly from the mode argument of ioctl().
- *
- * Return Code: 0
- *		EFAULT
- *		ENXIO
- *		EIO
- */
-
-static int
-sd_dkio_set_geometry(dev_t dev, caddr_t arg, int flag)
-{
-	struct sd_lun	*un = NULL;
-	struct dk_geom	*tmp_geom;
-	struct dk_map	*lp;
-	int		rval = 0;
-	int		i;
-
-	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
-		return (ENXIO);
-	}
-
-	/*
-	 * Make sure there is no reservation conflict on the lun.
-	 */
-	if (sd_send_scsi_TEST_UNIT_READY(un, 0) == EACCES) {
-		return (EACCES);
-	}
-
-#if defined(__i386) || defined(__amd64)
-	if (un->un_solaris_size == 0) {
-		return (EIO);
-	}
-#endif
-
-	/*
-	 * We need to copy the user specified geometry into local
-	 * storage and then update the softstate. We don't want to hold
-	 * the mutex and copyin directly from the user to the soft state
-	 */
-	tmp_geom = (struct dk_geom *)
-	    kmem_zalloc(sizeof (struct dk_geom), KM_SLEEP);
-	rval = ddi_copyin(arg, tmp_geom, sizeof (struct dk_geom), flag);
-	if (rval != 0) {
-		kmem_free(tmp_geom, sizeof (struct dk_geom));
-		return (EFAULT);
-	}
-
-	mutex_enter(SD_MUTEX(un));
-	bcopy(tmp_geom, &un->un_g, sizeof (struct dk_geom));
-	for (i = 0; i < NDKMAP; i++) {
-		lp  = &un->un_map[i];
-		un->un_offset[i] =
-		    un->un_g.dkg_nhead * un->un_g.dkg_nsect * lp->dkl_cylno;
-#if defined(__i386) || defined(__amd64)
-		un->un_offset[i] += un->un_solaris_offset;
-#endif
-	}
-	un->un_f_geometry_is_valid = FALSE;
-	mutex_exit(SD_MUTEX(un));
-	kmem_free(tmp_geom, sizeof (struct dk_geom));
-
-	return (rval);
-}
-
-
-/*
- *    Function: sd_dkio_get_partition
- *
- * Description: This routine is the driver entry point for handling user
- *		requests to get the partition table (DKIOCGAPART).
- *
- *   Arguments: dev  - the device number
- *		arg  - pointer to user provided dk_allmap structure specifying
- *			the controller's notion of the current partition table.
- *		flag - this argument is a pass through to ddi_copyxxx()
- *		       directly from the mode argument of ioctl().
- *		geom_validated - flag indicating if the device geometry has been
- *				 previously validated in the sdioctl routine.
- *
- * Return Code: 0
- *		EFAULT
- *		ENXIO
- *		EIO
- */
-
-static int
-sd_dkio_get_partition(dev_t dev, caddr_t arg, int flag, int geom_validated)
-{
-	struct sd_lun	*un = NULL;
-	int		rval = 0;
-	int		size;
-
-	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
-		return (ENXIO);
-	}
-
-	/*
-	 * Make sure the geometry is valid before getting the partition
-	 * information.
-	 */
-	mutex_enter(SD_MUTEX(un));
-	if (geom_validated == FALSE) {
-		/*
-		 * sd_validate_geometry does not spin a disk up
-		 * if it was spun down. We need to make sure it
-		 * is ready before validating the geometry.
-		 */
-		mutex_exit(SD_MUTEX(un));
-		if ((rval = sd_send_scsi_TEST_UNIT_READY(un, 0)) != 0) {
-			return (rval);
-		}
-		mutex_enter(SD_MUTEX(un));
-
-		if ((rval = sd_validate_geometry(un, SD_PATH_DIRECT)) != 0) {
-			mutex_exit(SD_MUTEX(un));
-			return (rval);
-		}
-	}
-	mutex_exit(SD_MUTEX(un));
-
-	/*
-	 * It is possible that un_solaris_size is 0(uninitialized)
-	 * after sd_unit_attach. Reservation conflict may cause the
-	 * above situation. Thus, the zero check of un_solaris_size
-	 * should occur after the sd_validate_geometry() call.
-	 */
-#if defined(__i386) || defined(__amd64)
-	if (un->un_solaris_size == 0) {
-		return (EIO);
-	}
-#endif
-
-#ifdef _MULTI_DATAMODEL
-	switch (ddi_model_convert_from(flag & FMODELS)) {
-	case DDI_MODEL_ILP32: {
-		struct dk_map32 dk_map32[NDKMAP];
-		int		i;
-
-		for (i = 0; i < NDKMAP; i++) {
-			dk_map32[i].dkl_cylno = un->un_map[i].dkl_cylno;
-			dk_map32[i].dkl_nblk  = un->un_map[i].dkl_nblk;
-		}
-		size = NDKMAP * sizeof (struct dk_map32);
-		rval = ddi_copyout(dk_map32, (void *)arg, size, flag);
-		if (rval != 0) {
-			rval = EFAULT;
-		}
-		break;
-	}
-	case DDI_MODEL_NONE:
-		size = NDKMAP * sizeof (struct dk_map);
-		rval = ddi_copyout(un->un_map, (void *)arg, size, flag);
-		if (rval != 0) {
-			rval = EFAULT;
-		}
-		break;
-	}
-#else /* ! _MULTI_DATAMODEL */
-	size = NDKMAP * sizeof (struct dk_map);
-	rval = ddi_copyout(un->un_map, (void *)arg, size, flag);
-	if (rval != 0) {
-		rval = EFAULT;
-	}
-#endif /* _MULTI_DATAMODEL */
-	return (rval);
-}
-
-
-/*
- *    Function: sd_dkio_set_partition
- *
- * Description: This routine is the driver entry point for handling user
- *		requests to set the partition table (DKIOCSAPART). The actual
- *		device partition is not updated.
- *
- *   Arguments: dev  - the device number
- *		arg  - pointer to user provided dk_allmap structure used to set
- *			the controller's notion of the partition table.
- *		flag - this argument is a pass through to ddi_copyxxx()
- *		       directly from the mode argument of ioctl().
- *
- * Return Code: 0
- *		EINVAL
- *		EFAULT
- *		ENXIO
- *		EIO
- */
-
-static int
-sd_dkio_set_partition(dev_t dev, caddr_t arg, int flag)
-{
-	struct sd_lun	*un = NULL;
-	struct dk_map	dk_map[NDKMAP];
-	struct dk_map	*lp;
-	int		rval = 0;
-	int		size;
-	int		i;
-#if defined(_SUNOS_VTOC_16)
-	struct dkl_partition	*vp;
-#endif
-
-	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
-		return (ENXIO);
-	}
-
-	/*
-	 * Set the map for all logical partitions.  We lock
-	 * the priority just to make sure an interrupt doesn't
-	 * come in while the map is half updated.
-	 */
-	_NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_solaris_size))
-	mutex_enter(SD_MUTEX(un));
-	if (un->un_blockcount > DK_MAX_BLOCKS) {
-		mutex_exit(SD_MUTEX(un));
-		return (ENOTSUP);
-	}
-	mutex_exit(SD_MUTEX(un));
-
-	/*
-	 * Make sure there is no reservation conflict on the lun.
-	 */
-	if (sd_send_scsi_TEST_UNIT_READY(un, 0) == EACCES) {
-		return (EACCES);
-	}
-
-#if defined(__i386) || defined(__amd64)
-	if (un->un_solaris_size == 0) {
-		return (EIO);
-	}
-#endif
-
-#ifdef _MULTI_DATAMODEL
-	switch (ddi_model_convert_from(flag & FMODELS)) {
-	case DDI_MODEL_ILP32: {
-		struct dk_map32 dk_map32[NDKMAP];
-
-		size = NDKMAP * sizeof (struct dk_map32);
-		rval = ddi_copyin((void *)arg, dk_map32, size, flag);
-		if (rval != 0) {
-			return (EFAULT);
-		}
-		for (i = 0; i < NDKMAP; i++) {
-			dk_map[i].dkl_cylno = dk_map32[i].dkl_cylno;
-			dk_map[i].dkl_nblk  = dk_map32[i].dkl_nblk;
-		}
-		break;
-	}
-	case DDI_MODEL_NONE:
-		size = NDKMAP * sizeof (struct dk_map);
-		rval = ddi_copyin((void *)arg, dk_map, size, flag);
-		if (rval != 0) {
-			return (EFAULT);
-		}
-		break;
-	}
-#else /* ! _MULTI_DATAMODEL */
-	size = NDKMAP * sizeof (struct dk_map);
-	rval = ddi_copyin((void *)arg, dk_map, size, flag);
-	if (rval != 0) {
-		return (EFAULT);
-	}
-#endif /* _MULTI_DATAMODEL */
-
-	mutex_enter(SD_MUTEX(un));
-	/* Note: The size used in this bcopy is set based upon the data model */
-	bcopy(dk_map, un->un_map, size);
-#if defined(_SUNOS_VTOC_16)
-	vp = (struct dkl_partition *)&(un->un_vtoc);
-#endif	/* defined(_SUNOS_VTOC_16) */
-	for (i = 0; i < NDKMAP; i++) {
-		lp  = &un->un_map[i];
-		un->un_offset[i] =
-		    un->un_g.dkg_nhead * un->un_g.dkg_nsect * lp->dkl_cylno;
-#if defined(_SUNOS_VTOC_16)
-		vp->p_start = un->un_offset[i];
-		vp->p_size = lp->dkl_nblk;
-		vp++;
-#endif	/* defined(_SUNOS_VTOC_16) */
-#if defined(__i386) || defined(__amd64)
-		un->un_offset[i] += un->un_solaris_offset;
-#endif
-	}
-	mutex_exit(SD_MUTEX(un));
-	return (rval);
-}
-
-
-/*
- *    Function: sd_dkio_get_vtoc
- *
- * Description: This routine is the driver entry point for handling user
- *		requests to get the current volume table of contents
- *		(DKIOCGVTOC).
- *
- *   Arguments: dev  - the device number
- *		arg  - pointer to user provided vtoc structure specifying
- *			the current vtoc.
- *		flag - this argument is a pass through to ddi_copyxxx()
- *		       directly from the mode argument of ioctl().
- *		geom_validated - flag indicating if the device geometry has been
- *				 previously validated in the sdioctl routine.
- *
- * Return Code: 0
- *		EFAULT
- *		ENXIO
- *		EIO
- */
-
-static int
-sd_dkio_get_vtoc(dev_t dev, caddr_t arg, int flag, int geom_validated)
-{
-	struct sd_lun	*un = NULL;
-#if defined(_SUNOS_VTOC_8)
-	struct vtoc	user_vtoc;
-#endif	/* defined(_SUNOS_VTOC_8) */
-	int		rval = 0;
-
-	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
-		return (ENXIO);
-	}
-
-	mutex_enter(SD_MUTEX(un));
-	if (geom_validated == FALSE) {
-		/*
-		 * sd_validate_geometry does not spin a disk up
-		 * if it was spun down. We need to make sure it
-		 * is ready.
-		 */
-		mutex_exit(SD_MUTEX(un));
-		if ((rval = sd_send_scsi_TEST_UNIT_READY(un, 0)) != 0) {
-			return (rval);
-		}
-		mutex_enter(SD_MUTEX(un));
-		if ((rval = sd_validate_geometry(un, SD_PATH_DIRECT)) != 0) {
-			mutex_exit(SD_MUTEX(un));
-			return (rval);
-		}
-	}
-
-#if defined(_SUNOS_VTOC_8)
-	sd_build_user_vtoc(un, &user_vtoc);
-	mutex_exit(SD_MUTEX(un));
-
-#ifdef _MULTI_DATAMODEL
-	switch (ddi_model_convert_from(flag & FMODELS)) {
-	case DDI_MODEL_ILP32: {
-		struct vtoc32 user_vtoc32;
-
-		vtoctovtoc32(user_vtoc, user_vtoc32);
-		if (ddi_copyout(&user_vtoc32, (void *)arg,
-		    sizeof (struct vtoc32), flag)) {
-			return (EFAULT);
-		}
-		break;
-	}
-
-	case DDI_MODEL_NONE:
-		if (ddi_copyout(&user_vtoc, (void *)arg,
-		    sizeof (struct vtoc), flag)) {
-			return (EFAULT);
-		}
-		break;
-	}
-#else /* ! _MULTI_DATAMODEL */
-	if (ddi_copyout(&user_vtoc, (void *)arg, sizeof (struct vtoc), flag)) {
-		return (EFAULT);
-	}
-#endif /* _MULTI_DATAMODEL */
-
-#elif defined(_SUNOS_VTOC_16)
-	mutex_exit(SD_MUTEX(un));
-
-#ifdef _MULTI_DATAMODEL
-	/*
-	 * The un_vtoc structure is a "struct dk_vtoc"  which is always
-	 * 32-bit to maintain compatibility with existing on-disk
-	 * structures.  Thus, we need to convert the structure when copying
-	 * it out to a datamodel-dependent "struct vtoc" in a 64-bit
-	 * program.  If the target is a 32-bit program, then no conversion
-	 * is necessary.
-	 */
-	/* LINTED: logical expression always true: op "||" */
-	ASSERT(sizeof (un->un_vtoc) == sizeof (struct vtoc32));
-	switch (ddi_model_convert_from(flag & FMODELS)) {
-	case DDI_MODEL_ILP32:
-		if (ddi_copyout(&(un->un_vtoc), (void *)arg,
-		    sizeof (un->un_vtoc), flag)) {
-			return (EFAULT);
-		}
-		break;
-
-	case DDI_MODEL_NONE: {
-		struct vtoc user_vtoc;
-
-		vtoc32tovtoc(un->un_vtoc, user_vtoc);
-		if (ddi_copyout(&user_vtoc, (void *)arg,
-		    sizeof (struct vtoc), flag)) {
-			return (EFAULT);
-		}
-		break;
-	}
-	}
-#else /* ! _MULTI_DATAMODEL */
-	if (ddi_copyout(&(un->un_vtoc), (void *)arg, sizeof (un->un_vtoc),
-	    flag)) {
-		return (EFAULT);
-	}
-#endif /* _MULTI_DATAMODEL */
-#else
-#error "No VTOC format defined."
-#endif
-
-	return (rval);
-}
-
-static int
-sd_dkio_get_efi(dev_t dev, caddr_t arg, int flag)
-{
-	struct sd_lun	*un = NULL;
-	dk_efi_t	user_efi;
-	int		rval = 0;
-	void		*buffer;
-
-	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL)
-		return (ENXIO);
-
-	if (ddi_copyin(arg, &user_efi, sizeof (dk_efi_t), flag))
-		return (EFAULT);
-
-	user_efi.dki_data = (void *)(uintptr_t)user_efi.dki_data_64;
-
-	if ((user_efi.dki_length % un->un_tgt_blocksize) ||
-	    (user_efi.dki_length > un->un_max_xfer_size))
-		return (EINVAL);
-
-	buffer = kmem_alloc(user_efi.dki_length, KM_SLEEP);
-	rval = sd_send_scsi_READ(un, buffer, user_efi.dki_length,
-	    user_efi.dki_lba, SD_PATH_DIRECT);
-	if (rval == 0 && ddi_copyout(buffer, user_efi.dki_data,
-	    user_efi.dki_length, flag) != 0)
-		rval = EFAULT;
-
-	kmem_free(buffer, user_efi.dki_length);
-	return (rval);
-}
-
-#if defined(_SUNOS_VTOC_8)
-/*
- *    Function: sd_build_user_vtoc
- *
- * Description: This routine populates a pass by reference variable with the
- *		current volume table of contents.
- *
- *   Arguments: un - driver soft state (unit) structure
- *		user_vtoc - pointer to vtoc structure to be populated
- */
-
-static void
-sd_build_user_vtoc(struct sd_lun *un, struct vtoc *user_vtoc)
-{
-	struct dk_map2		*lpart;
-	struct dk_map		*lmap;
-	struct partition	*vpart;
-	int			nblks;
-	int			i;
-
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-
-	/*
-	 * Return vtoc structure fields in the provided VTOC area, addressed
-	 * by *vtoc.
-	 */
-	bzero(user_vtoc, sizeof (struct vtoc));
-	user_vtoc->v_bootinfo[0] = un->un_vtoc.v_bootinfo[0];
-	user_vtoc->v_bootinfo[1] = un->un_vtoc.v_bootinfo[1];
-	user_vtoc->v_bootinfo[2] = un->un_vtoc.v_bootinfo[2];
-	user_vtoc->v_sanity	= VTOC_SANE;
-	user_vtoc->v_version	= un->un_vtoc.v_version;
-	bcopy(un->un_vtoc.v_volume, user_vtoc->v_volume, LEN_DKL_VVOL);
-	user_vtoc->v_sectorsz = un->un_sys_blocksize;
-	user_vtoc->v_nparts = un->un_vtoc.v_nparts;
-	bcopy(un->un_vtoc.v_reserved, user_vtoc->v_reserved,
-	    sizeof (un->un_vtoc.v_reserved));
-	/*
-	 * Convert partitioning information.
-	 *
-	 * Note the conversion from starting cylinder number
-	 * to starting sector number.
-	 */
-	lmap = un->un_map;
-	lpart = (struct dk_map2 *)un->un_vtoc.v_part;
-	vpart = user_vtoc->v_part;
-
-	nblks = un->un_g.dkg_nsect * un->un_g.dkg_nhead;
-
-	for (i = 0; i < V_NUMPAR; i++) {
-		vpart->p_tag	= lpart->p_tag;
-		vpart->p_flag	= lpart->p_flag;
-		vpart->p_start	= lmap->dkl_cylno * nblks;
-		vpart->p_size	= lmap->dkl_nblk;
-		lmap++;
-		lpart++;
-		vpart++;
-
-		/* (4364927) */
-		user_vtoc->timestamp[i] = (time_t)un->un_vtoc.v_timestamp[i];
-	}
-
-	bcopy(un->un_asciilabel, user_vtoc->v_asciilabel, LEN_DKL_ASCII);
-}
-#endif
-
-static int
-sd_dkio_partition(dev_t dev, caddr_t arg, int flag)
-{
-	struct sd_lun		*un = NULL;
-	struct partition64	p64;
-	int			rval = 0;
-	uint_t			nparts;
-	efi_gpe_t		*partitions;
-	efi_gpt_t		*buffer;
-	diskaddr_t		gpe_lba;
-
-	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
-		return (ENXIO);
-	}
-
-	if (ddi_copyin((const void *)arg, &p64,
-	    sizeof (struct partition64), flag)) {
-		return (EFAULT);
-	}
-
-	buffer = kmem_alloc(EFI_MIN_ARRAY_SIZE, KM_SLEEP);
-	rval = sd_send_scsi_READ(un, buffer, DEV_BSIZE,
-		1, SD_PATH_DIRECT);
-	if (rval != 0)
-		goto done_error;
-
-	sd_swap_efi_gpt(buffer);
-
-	if ((rval = sd_validate_efi(buffer)) != 0)
-		goto done_error;
-
-	nparts = buffer->efi_gpt_NumberOfPartitionEntries;
-	gpe_lba = buffer->efi_gpt_PartitionEntryLBA;
-	if (p64.p_partno > nparts) {
-		/* couldn't find it */
-		rval = ESRCH;
-		goto done_error;
-	}
-	/*
-	 * if we're dealing with a partition that's out of the normal
-	 * 16K block, adjust accordingly
-	 */
-	gpe_lba += p64.p_partno / sizeof (efi_gpe_t);
-	rval = sd_send_scsi_READ(un, buffer, EFI_MIN_ARRAY_SIZE,
-			gpe_lba, SD_PATH_DIRECT);
-	if (rval) {
-		goto done_error;
-	}
-	partitions = (efi_gpe_t *)buffer;
-
-	sd_swap_efi_gpe(nparts, partitions);
-
-	partitions += p64.p_partno;
-	bcopy(&partitions->efi_gpe_PartitionTypeGUID, &p64.p_type,
-	    sizeof (struct uuid));
-	p64.p_start = partitions->efi_gpe_StartingLBA;
-	p64.p_size = partitions->efi_gpe_EndingLBA -
-			p64.p_start + 1;
-
-	if (ddi_copyout(&p64, (void *)arg, sizeof (struct partition64), flag))
-		rval = EFAULT;
-
-done_error:
-	kmem_free(buffer, EFI_MIN_ARRAY_SIZE);
-	return (rval);
-}
-
-
-/*
- *    Function: sd_dkio_set_vtoc
- *
- * Description: This routine is the driver entry point for handling user
- *		requests to set the current volume table of contents
- *		(DKIOCSVTOC).
- *
- *   Arguments: dev  - the device number
- *		arg  - pointer to user provided vtoc structure used to set the
- *			current vtoc.
- *		flag - this argument is a pass through to ddi_copyxxx()
- *		       directly from the mode argument of ioctl().
- *
- * Return Code: 0
- *		EFAULT
- *		ENXIO
- *		EINVAL
- *		ENOTSUP
- */
-
-static int
-sd_dkio_set_vtoc(dev_t dev, caddr_t arg, int flag)
-{
-	struct sd_lun	*un = NULL;
-	struct vtoc	user_vtoc;
-	int		rval = 0;
-
-	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
-		return (ENXIO);
-	}
-
-#if defined(__i386) || defined(__amd64)
-	if (un->un_tgt_blocksize != un->un_sys_blocksize) {
-		return (EINVAL);
-	}
-#endif
-
-#ifdef _MULTI_DATAMODEL
-	switch (ddi_model_convert_from(flag & FMODELS)) {
-	case DDI_MODEL_ILP32: {
-		struct vtoc32 user_vtoc32;
-
-		if (ddi_copyin((const void *)arg, &user_vtoc32,
-		    sizeof (struct vtoc32), flag)) {
-			return (EFAULT);
-		}
-		vtoc32tovtoc(user_vtoc32, user_vtoc);
-		break;
-	}
-
-	case DDI_MODEL_NONE:
-		if (ddi_copyin((const void *)arg, &user_vtoc,
-		    sizeof (struct vtoc), flag)) {
-			return (EFAULT);
-		}
-		break;
-	}
-#else /* ! _MULTI_DATAMODEL */
-	if (ddi_copyin((const void *)arg, &user_vtoc,
-	    sizeof (struct vtoc), flag)) {
-		return (EFAULT);
-	}
-#endif /* _MULTI_DATAMODEL */
-
-	mutex_enter(SD_MUTEX(un));
-	if (un->un_blockcount > DK_MAX_BLOCKS) {
-		mutex_exit(SD_MUTEX(un));
-		return (ENOTSUP);
-	}
-	if (un->un_g.dkg_ncyl == 0) {
-		mutex_exit(SD_MUTEX(un));
-		return (EINVAL);
-	}
-
-	mutex_exit(SD_MUTEX(un));
-	sd_clear_efi(un);
-	ddi_remove_minor_node(SD_DEVINFO(un), "wd");
-	ddi_remove_minor_node(SD_DEVINFO(un), "wd,raw");
-	(void) ddi_create_minor_node(SD_DEVINFO(un), "h",
-	    S_IFBLK, (SDUNIT(dev) << SDUNIT_SHIFT) | WD_NODE,
-	    un->un_node_type, NULL);
-	(void) ddi_create_minor_node(SD_DEVINFO(un), "h,raw",
-	    S_IFCHR, (SDUNIT(dev) << SDUNIT_SHIFT) | WD_NODE,
-	    un->un_node_type, NULL);
-	mutex_enter(SD_MUTEX(un));
-
-	if ((rval = sd_build_label_vtoc(un, &user_vtoc)) == 0) {
-		if ((rval = sd_write_label(dev)) == 0) {
-			if ((rval = sd_validate_geometry(un, SD_PATH_DIRECT))
-			    != 0) {
-				SD_ERROR(SD_LOG_IOCTL_DKIO, un,
-				    "sd_dkio_set_vtoc: "
-				    "Failed validate geometry\n");
-			}
-		}
-	}
-
-	/*
-	 * If sd_build_label_vtoc, or sd_write_label failed above write the
-	 * devid anyway, what can it hurt? Also preserve the device id by
-	 * writing to the disk acyl for the case where a devid has been
-	 * fabricated.
-	 */
-	if (un->un_f_devid_supported &&
-	    (un->un_f_opt_fab_devid == TRUE)) {
-		if (un->un_devid == NULL) {
-			sd_register_devid(un, SD_DEVINFO(un),
-			    SD_TARGET_IS_UNRESERVED);
-		} else {
-			/*
-			 * The device id for this disk has been
-			 * fabricated. Fabricated device id's are
-			 * managed by storing them in the last 2
-			 * available sectors on the drive. The device
-			 * id must be preserved by writing it back out
-			 * to this location.
-			 */
-			if (sd_write_deviceid(un) != 0) {
-				ddi_devid_free(un->un_devid);
-				un->un_devid = NULL;
-			}
-		}
-	}
-	mutex_exit(SD_MUTEX(un));
-	return (rval);
-}
-
-
-/*
- *    Function: sd_build_label_vtoc
- *
- * Description: This routine updates the driver soft state current volume table
- *		of contents based on a user specified vtoc.
- *
- *   Arguments: un - driver soft state (unit) structure
- *		user_vtoc - pointer to vtoc structure specifying vtoc to be used
- *			    to update the driver soft state.
- *
- * Return Code: 0
- *		EINVAL
- */
-
-static int
-sd_build_label_vtoc(struct sd_lun *un, struct vtoc *user_vtoc)
-{
-	struct dk_map		*lmap;
-	struct partition	*vpart;
-	int			nblks;
-#if defined(_SUNOS_VTOC_8)
-	int			ncyl;
-	struct dk_map2		*lpart;
-#endif	/* defined(_SUNOS_VTOC_8) */
-	int			i;
-
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-
-	/* Sanity-check the vtoc */
-	if (user_vtoc->v_sanity != VTOC_SANE ||
-	    user_vtoc->v_sectorsz != un->un_sys_blocksize ||
-	    user_vtoc->v_nparts != V_NUMPAR) {
-		return (EINVAL);
-	}
-
-	nblks = un->un_g.dkg_nsect * un->un_g.dkg_nhead;
-	if (nblks == 0) {
-		return (EINVAL);
-	}
-
-#if defined(_SUNOS_VTOC_8)
-	vpart = user_vtoc->v_part;
-	for (i = 0; i < V_NUMPAR; i++) {
-		if ((vpart->p_start % nblks) != 0) {
-			return (EINVAL);
-		}
-		ncyl = vpart->p_start / nblks;
-		ncyl += vpart->p_size / nblks;
-		if ((vpart->p_size % nblks) != 0) {
-			ncyl++;
-		}
-		if (ncyl > (int)un->un_g.dkg_ncyl) {
-			return (EINVAL);
-		}
-		vpart++;
-	}
-#endif	/* defined(_SUNOS_VTOC_8) */
-
-	/* Put appropriate vtoc structure fields into the disk label */
-#if defined(_SUNOS_VTOC_16)
-	/*
-	 * The vtoc is always a 32bit data structure to maintain the
-	 * on-disk format. Convert "in place" instead of bcopying it.
-	 */
-	vtoctovtoc32((*user_vtoc), (*((struct vtoc32 *)&(un->un_vtoc))));
-
-	/*
-	 * in the 16-slice vtoc, starting sectors are expressed in
-	 * numbers *relative* to the start of the Solaris fdisk partition.
-	 */
-	lmap = un->un_map;
-	vpart = user_vtoc->v_part;
-
-	for (i = 0; i < (int)user_vtoc->v_nparts; i++, lmap++, vpart++) {
-		lmap->dkl_cylno = vpart->p_start / nblks;
-		lmap->dkl_nblk = vpart->p_size;
-	}
-
-#elif defined(_SUNOS_VTOC_8)
-
-	un->un_vtoc.v_bootinfo[0] = (uint32_t)user_vtoc->v_bootinfo[0];
-	un->un_vtoc.v_bootinfo[1] = (uint32_t)user_vtoc->v_bootinfo[1];
-	un->un_vtoc.v_bootinfo[2] = (uint32_t)user_vtoc->v_bootinfo[2];
-
-	un->un_vtoc.v_sanity = (uint32_t)user_vtoc->v_sanity;
-	un->un_vtoc.v_version = (uint32_t)user_vtoc->v_version;
-
-	bcopy(user_vtoc->v_volume, un->un_vtoc.v_volume, LEN_DKL_VVOL);
-
-	un->un_vtoc.v_nparts = user_vtoc->v_nparts;
-
-	bcopy(user_vtoc->v_reserved, un->un_vtoc.v_reserved,
-	    sizeof (un->un_vtoc.v_reserved));
-
-	/*
-	 * Note the conversion from starting sector number
-	 * to starting cylinder number.
-	 * Return error if division results in a remainder.
-	 */
-	lmap = un->un_map;
-	lpart = un->un_vtoc.v_part;
-	vpart = user_vtoc->v_part;
-
-	for (i = 0; i < (int)user_vtoc->v_nparts; i++) {
-		lpart->p_tag  = vpart->p_tag;
-		lpart->p_flag = vpart->p_flag;
-		lmap->dkl_cylno = vpart->p_start / nblks;
-		lmap->dkl_nblk = vpart->p_size;
-
-		lmap++;
-		lpart++;
-		vpart++;
-
-		/* (4387723) */
-#ifdef _LP64
-		if (user_vtoc->timestamp[i] > TIME32_MAX) {
-			un->un_vtoc.v_timestamp[i] = TIME32_MAX;
-		} else {
-			un->un_vtoc.v_timestamp[i] = user_vtoc->timestamp[i];
-		}
-#else
-		un->un_vtoc.v_timestamp[i] = user_vtoc->timestamp[i];
-#endif
-	}
-
-	bcopy(user_vtoc->v_asciilabel, un->un_asciilabel, LEN_DKL_ASCII);
-#else
-#error "No VTOC format defined."
-#endif
-	return (0);
-}
-
-/*
- *    Function: sd_clear_efi
- *
- * Description: This routine clears all EFI labels.
- *
- *   Arguments: un - driver soft state (unit) structure
- *
- * Return Code: void
- */
-
-static void
-sd_clear_efi(struct sd_lun *un)
-{
-	efi_gpt_t	*gpt;
-	uint_t		lbasize;
-	uint64_t	cap;
-	int rval;
-
-	ASSERT(!mutex_owned(SD_MUTEX(un)));
-
-	mutex_enter(SD_MUTEX(un));
-	un->un_reserved = -1;
-	mutex_exit(SD_MUTEX(un));
-	gpt = kmem_alloc(sizeof (efi_gpt_t), KM_SLEEP);
-
-	if (sd_send_scsi_READ(un, gpt, DEV_BSIZE, 1, SD_PATH_DIRECT) != 0) {
-		goto done;
-	}
-
-	sd_swap_efi_gpt(gpt);
-	rval = sd_validate_efi(gpt);
-	if (rval == 0) {
-		/* clear primary */
-		bzero(gpt, sizeof (efi_gpt_t));
-		if ((rval = sd_send_scsi_WRITE(un, gpt, EFI_LABEL_SIZE, 1,
-			SD_PATH_DIRECT))) {
-			SD_INFO(SD_LOG_IO_PARTITION, un,
-				"sd_clear_efi: clear primary label failed\n");
-		}
-	}
-	/* the backup */
-	rval = sd_send_scsi_READ_CAPACITY(un, &cap, &lbasize,
-	    SD_PATH_DIRECT);
-	if (rval) {
-		goto done;
-	}
-	/*
-	 * The MMC standard allows READ CAPACITY to be
-	 * inaccurate by a bounded amount (in the interest of
-	 * response latency).  As a result, failed READs are
-	 * commonplace (due to the reading of metadata and not
-	 * data). Depending on the per-Vendor/drive Sense data,
-	 * the failed READ can cause many (unnecessary) retries.
-	 */
-	if ((rval = sd_send_scsi_READ(un, gpt, lbasize,
-	    cap - 1, ISCD(un) ? SD_PATH_DIRECT_PRIORITY :
-		SD_PATH_DIRECT)) != 0) {
-		goto done;
-	}
-	sd_swap_efi_gpt(gpt);
-	rval = sd_validate_efi(gpt);
-	if (rval == 0) {
-		/* clear backup */
-		SD_TRACE(SD_LOG_IOCTL, un, "sd_clear_efi clear backup@%lu\n",
-			cap-1);
-		bzero(gpt, sizeof (efi_gpt_t));
-		if ((rval = sd_send_scsi_WRITE(un, gpt, EFI_LABEL_SIZE,
-		    cap-1, SD_PATH_DIRECT))) {
-			SD_INFO(SD_LOG_IO_PARTITION, un,
-				"sd_clear_efi: clear backup label failed\n");
-		}
-	} else {
-		/*
-		 * Refer to comments related to off-by-1 at the
-		 * header of this file
-		 */
-		if ((rval = sd_send_scsi_READ(un, gpt, lbasize,
-		    cap - 2, ISCD(un) ? SD_PATH_DIRECT_PRIORITY :
-			SD_PATH_DIRECT)) != 0) {
-			goto done;
-		}
-		sd_swap_efi_gpt(gpt);
-		rval = sd_validate_efi(gpt);
-		if (rval == 0) {
-			/* clear legacy backup EFI label */
-			SD_TRACE(SD_LOG_IOCTL, un,
-			    "sd_clear_efi clear backup@%lu\n", cap-2);
-			bzero(gpt, sizeof (efi_gpt_t));
-			if ((rval = sd_send_scsi_WRITE(un, gpt, EFI_LABEL_SIZE,
-			    cap-2, SD_PATH_DIRECT))) {
-				SD_INFO(SD_LOG_IO_PARTITION,
-				    un, "sd_clear_efi: "
-				    " clear legacy backup label failed\n");
-			}
-		}
-	}
-
-done:
-	kmem_free(gpt, sizeof (efi_gpt_t));
-}
-
-/*
- *    Function: sd_set_vtoc
- *
- * Description: This routine writes data to the appropriate positions
- *
- *   Arguments: un - driver soft state (unit) structure
- *              dkl  - the data to be written
- *
- * Return: void
- */
-
-static int
-sd_set_vtoc(struct sd_lun *un, struct dk_label *dkl)
-{
-	void			*shadow_buf;
-	uint_t			label_addr;
-	int			sec;
-	int			blk;
-	int			head;
-	int			cyl;
-	int			rval;
-
-#if defined(__i386) || defined(__amd64)
-	label_addr = un->un_solaris_offset + DK_LABEL_LOC;
-#else
-	/* Write the primary label at block 0 of the solaris partition. */
-	label_addr = 0;
-#endif
-
-	if (NOT_DEVBSIZE(un)) {
-		shadow_buf = kmem_zalloc(un->un_tgt_blocksize, KM_SLEEP);
-		/*
-		 * Read the target's first block.
-		 */
-		if ((rval = sd_send_scsi_READ(un, shadow_buf,
-		    un->un_tgt_blocksize, label_addr,
-		    SD_PATH_STANDARD)) != 0) {
-			goto exit;
-		}
-		/*
-		 * Copy the contents of the label into the shadow buffer
-		 * which is of the size of target block size.
-		 */
-		bcopy(dkl, shadow_buf, sizeof (struct dk_label));
-	}
-
-	/* Write the primary label */
-	if (NOT_DEVBSIZE(un)) {
-		rval = sd_send_scsi_WRITE(un, shadow_buf, un->un_tgt_blocksize,
-		    label_addr, SD_PATH_STANDARD);
-	} else {
-		rval = sd_send_scsi_WRITE(un, dkl, un->un_sys_blocksize,
-		    label_addr, SD_PATH_STANDARD);
-	}
-	if (rval != 0) {
-		return (rval);
-	}
-
-	/*
-	 * Calculate where the backup labels go.  They are always on
-	 * the last alternate cylinder, but some older drives put them
-	 * on head 2 instead of the last head.	They are always on the
-	 * first 5 odd sectors of the appropriate track.
-	 *
-	 * We have no choice at this point, but to believe that the
-	 * disk label is valid.	 Use the geometry of the disk
-	 * as described in the label.
-	 */
-	cyl  = dkl->dkl_ncyl  + dkl->dkl_acyl - 1;
-	head = dkl->dkl_nhead - 1;
-
-	/*
-	 * Write and verify the backup labels. Make sure we don't try to
-	 * write past the last cylinder.
-	 */
-	for (sec = 1; ((sec < 5 * 2 + 1) && (sec < dkl->dkl_nsect)); sec += 2) {
-		blk = (daddr_t)(
-		    (cyl * ((dkl->dkl_nhead * dkl->dkl_nsect) - dkl->dkl_apc)) +
-		    (head * dkl->dkl_nsect) + sec);
-#if defined(__i386) || defined(__amd64)
-		blk += un->un_solaris_offset;
-#endif
-		if (NOT_DEVBSIZE(un)) {
-			uint64_t	tblk;
-			/*
-			 * Need to read the block first for read modify write.
-			 */
-			tblk = (uint64_t)blk;
-			blk = (int)((tblk * un->un_sys_blocksize) /
-			    un->un_tgt_blocksize);
-			if ((rval = sd_send_scsi_READ(un, shadow_buf,
-			    un->un_tgt_blocksize, blk,
-			    SD_PATH_STANDARD)) != 0) {
-				goto exit;
-			}
-			/*
-			 * Modify the shadow buffer with the label.
-			 */
-			bcopy(dkl, shadow_buf, sizeof (struct dk_label));
-			rval = sd_send_scsi_WRITE(un, shadow_buf,
-			    un->un_tgt_blocksize, blk, SD_PATH_STANDARD);
-		} else {
-			rval = sd_send_scsi_WRITE(un, dkl, un->un_sys_blocksize,
-			    blk, SD_PATH_STANDARD);
-			SD_INFO(SD_LOG_IO_PARTITION, un,
-			"sd_set_vtoc: wrote backup label %d\n", blk);
-		}
-		if (rval != 0) {
-			goto exit;
-		}
-	}
-exit:
-	if (NOT_DEVBSIZE(un)) {
-		kmem_free(shadow_buf, un->un_tgt_blocksize);
-	}
-	return (rval);
-}
-
-/*
- *    Function: sd_clear_vtoc
- *
- * Description: This routine clears out the VTOC labels.
- *
- *   Arguments: un - driver soft state (unit) structure
- *
- * Return: void
- */
-
-static void
-sd_clear_vtoc(struct sd_lun *un)
-{
-	struct dk_label		*dkl;
-
-	mutex_exit(SD_MUTEX(un));
-	dkl = kmem_zalloc(sizeof (struct dk_label), KM_SLEEP);
-	mutex_enter(SD_MUTEX(un));
-	/*
-	 * sd_set_vtoc uses these fields in order to figure out
-	 * where to overwrite the backup labels
-	 */
-	dkl->dkl_apc    = un->un_g.dkg_apc;
-	dkl->dkl_ncyl   = un->un_g.dkg_ncyl;
-	dkl->dkl_acyl   = un->un_g.dkg_acyl;
-	dkl->dkl_nhead  = un->un_g.dkg_nhead;
-	dkl->dkl_nsect  = un->un_g.dkg_nsect;
-	mutex_exit(SD_MUTEX(un));
-	(void) sd_set_vtoc(un, dkl);
-	kmem_free(dkl, sizeof (struct dk_label));
-
-	mutex_enter(SD_MUTEX(un));
-}
-
-/*
- *    Function: sd_write_label
- *
- * Description: This routine will validate and write the driver soft state vtoc
- *		contents to the device.
- *
- *   Arguments: dev - the device number
- *
- * Return Code: the code returned by sd_send_scsi_cmd()
- *		0
- *		EINVAL
- *		ENXIO
- *		ENOMEM
- */
-
-static int
-sd_write_label(dev_t dev)
-{
-	struct sd_lun		*un;
-	struct dk_label		*dkl;
-	short			sum;
-	short			*sp;
-	int			i;
-	int			rval;
-
-	if (((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) ||
-	    (un->un_state == SD_STATE_OFFLINE)) {
-		return (ENXIO);
-	}
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-	mutex_exit(SD_MUTEX(un));
-	dkl = kmem_zalloc(sizeof (struct dk_label), KM_SLEEP);
-	mutex_enter(SD_MUTEX(un));
-
-	bcopy(&un->un_vtoc, &dkl->dkl_vtoc, sizeof (struct dk_vtoc));
-	dkl->dkl_rpm	= un->un_g.dkg_rpm;
-	dkl->dkl_pcyl	= un->un_g.dkg_pcyl;
-	dkl->dkl_apc	= un->un_g.dkg_apc;
-	dkl->dkl_intrlv = un->un_g.dkg_intrlv;
-	dkl->dkl_ncyl	= un->un_g.dkg_ncyl;
-	dkl->dkl_acyl	= un->un_g.dkg_acyl;
-	dkl->dkl_nhead	= un->un_g.dkg_nhead;
-	dkl->dkl_nsect	= un->un_g.dkg_nsect;
-
-#if defined(_SUNOS_VTOC_8)
-	dkl->dkl_obs1	= un->un_g.dkg_obs1;
-	dkl->dkl_obs2	= un->un_g.dkg_obs2;
-	dkl->dkl_obs3	= un->un_g.dkg_obs3;
-	for (i = 0; i < NDKMAP; i++) {
-		dkl->dkl_map[i].dkl_cylno = un->un_map[i].dkl_cylno;
-		dkl->dkl_map[i].dkl_nblk  = un->un_map[i].dkl_nblk;
-	}
-	bcopy(un->un_asciilabel, dkl->dkl_asciilabel, LEN_DKL_ASCII);
-#elif defined(_SUNOS_VTOC_16)
-	dkl->dkl_skew	= un->un_dkg_skew;
-#else
-#error "No VTOC format defined."
-#endif
-
-	dkl->dkl_magic			= DKL_MAGIC;
-	dkl->dkl_write_reinstruct	= un->un_g.dkg_write_reinstruct;
-	dkl->dkl_read_reinstruct	= un->un_g.dkg_read_reinstruct;
-
-	/* Construct checksum for the new disk label */
-	sum = 0;
-	sp = (short *)dkl;
-	i = sizeof (struct dk_label) / sizeof (short);
-	while (i--) {
-		sum ^= *sp++;
-	}
-	dkl->dkl_cksum = sum;
-
-	mutex_exit(SD_MUTEX(un));
-
-	rval = sd_set_vtoc(un, dkl);
-exit:
-	kmem_free(dkl, sizeof (struct dk_label));
-	mutex_enter(SD_MUTEX(un));
-	return (rval);
-}
-
-static int
-sd_dkio_set_efi(dev_t dev, caddr_t arg, int flag)
-{
-	struct sd_lun	*un = NULL;
-	dk_efi_t	user_efi;
-	int		rval = 0;
-	void		*buffer;
-	int		valid_efi;
-
-	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL)
-		return (ENXIO);
-
-	if (ddi_copyin(arg, &user_efi, sizeof (dk_efi_t), flag))
-		return (EFAULT);
-
-	user_efi.dki_data = (void *)(uintptr_t)user_efi.dki_data_64;
-
-	if ((user_efi.dki_length % un->un_tgt_blocksize) ||
-	    (user_efi.dki_length > un->un_max_xfer_size))
-		return (EINVAL);
-
-	buffer = kmem_alloc(user_efi.dki_length, KM_SLEEP);
-	if (ddi_copyin(user_efi.dki_data, buffer, user_efi.dki_length, flag)) {
-		rval = EFAULT;
-	} else {
-		/*
-		 * let's clear the vtoc labels and clear the softstate
-		 * vtoc.
-		 */
-		mutex_enter(SD_MUTEX(un));
-		if (un->un_vtoc.v_sanity == VTOC_SANE) {
-			SD_TRACE(SD_LOG_IO_PARTITION, un,
-				"sd_dkio_set_efi: CLEAR VTOC\n");
-			sd_clear_vtoc(un);
-			bzero(&un->un_vtoc, sizeof (struct dk_vtoc));
-			mutex_exit(SD_MUTEX(un));
-			ddi_remove_minor_node(SD_DEVINFO(un), "h");
-			ddi_remove_minor_node(SD_DEVINFO(un), "h,raw");
-			(void) ddi_create_minor_node(SD_DEVINFO(un), "wd",
-			    S_IFBLK,
-			    (SDUNIT(dev) << SDUNIT_SHIFT) | WD_NODE,
-			    un->un_node_type, NULL);
-			(void) ddi_create_minor_node(SD_DEVINFO(un), "wd,raw",
-			    S_IFCHR,
-			    (SDUNIT(dev) << SDUNIT_SHIFT) | WD_NODE,
-			    un->un_node_type, NULL);
-		} else
-			mutex_exit(SD_MUTEX(un));
-		rval = sd_send_scsi_WRITE(un, buffer, user_efi.dki_length,
-		    user_efi.dki_lba, SD_PATH_DIRECT);
-		if (rval == 0) {
-			mutex_enter(SD_MUTEX(un));
-
-			/*
-			 * Set the un_reserved for valid efi label.
-			 * Function clear_efi in fdisk and efi_write in
-			 * libefi both change efi label on disk in 3 steps
-			 * 1. Change primary gpt and gpe
-			 * 2. Change backup gpe
-			 * 3. Change backup gpt, which is one block
-			 * We only reread the efi label after the 3rd step,
-			 * or there will be warning "primary label corrupt".
-			 */
-			if (user_efi.dki_length == un->un_tgt_blocksize) {
-				un->un_f_geometry_is_valid = FALSE;
-				valid_efi = sd_use_efi(un, SD_PATH_DIRECT);
-				if ((valid_efi == 0) &&
-				    un->un_f_devid_supported &&
-				    (un->un_f_opt_fab_devid == TRUE)) {
-					if (un->un_devid == NULL) {
-						sd_register_devid(un,
-						    SD_DEVINFO(un),
-						    SD_TARGET_IS_UNRESERVED);
-					} else {
-						/*
-						 * The device id for this disk
-						 * has been fabricated. The
-						 * device id must be preserved
-						 * by writing it back out to
-						 * disk.
-						 */
-						if (sd_write_deviceid(un)
-						    != 0) {
-							ddi_devid_free(
-							    un->un_devid);
-							un->un_devid = NULL;
-						}
-					}
-				}
-			}
-
-			mutex_exit(SD_MUTEX(un));
-		}
-	}
-	kmem_free(buffer, user_efi.dki_length);
-	return (rval);
-}
-
-/*
- *    Function: sd_dkio_get_mboot
- *
- * Description: This routine is the driver entry point for handling user
- *		requests to get the current device mboot (DKIOCGMBOOT)
- *
- *   Arguments: dev  - the device number
- *		arg  - pointer to user provided mboot structure specifying
- *			the current mboot.
- *		flag - this argument is a pass through to ddi_copyxxx()
- *		       directly from the mode argument of ioctl().
- *
- * Return Code: 0
- *		EINVAL
- *		EFAULT
- *		ENXIO
- */
-
-static int
-sd_dkio_get_mboot(dev_t dev, caddr_t arg, int flag)
-{
-	struct sd_lun	*un;
-	struct mboot	*mboot;
-	int		rval;
-	size_t		buffer_size;
-
-	if (((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) ||
-	    (un->un_state == SD_STATE_OFFLINE)) {
-		return (ENXIO);
-	}
-
-	if (!un->un_f_mboot_supported || arg == NULL) {
-		return (EINVAL);
-	}
-
-	/*
-	 * Read the mboot block, located at absolute block 0 on the target.
-	 */
-	buffer_size = SD_REQBYTES2TGTBYTES(un, sizeof (struct mboot));
-
-	SD_TRACE(SD_LOG_IO_PARTITION, un,
-	    "sd_dkio_get_mboot: allocation size: 0x%x\n", buffer_size);
-
-	mboot = kmem_zalloc(buffer_size, KM_SLEEP);
-	if ((rval = sd_send_scsi_READ(un, mboot, buffer_size, 0,
-	    SD_PATH_STANDARD)) == 0) {
-		if (ddi_copyout(mboot, (void *)arg,
-		    sizeof (struct mboot), flag) != 0) {
-			rval = EFAULT;
-		}
-	}
-	kmem_free(mboot, buffer_size);
-	return (rval);
-}
-
-
-/*
- *    Function: sd_dkio_set_mboot
- *
- * Description: This routine is the driver entry point for handling user
- *		requests to validate and set the device master boot
- *		(DKIOCSMBOOT).
- *
- *   Arguments: dev  - the device number
- *		arg  - pointer to user provided mboot structure used to set the
- *			master boot.
- *		flag - this argument is a pass through to ddi_copyxxx()
- *		       directly from the mode argument of ioctl().
- *
- * Return Code: 0
- *		EINVAL
- *		EFAULT
- *		ENXIO
- */
-
-static int
-sd_dkio_set_mboot(dev_t dev, caddr_t arg, int flag)
-{
-	struct sd_lun	*un = NULL;
-	struct mboot	*mboot = NULL;
-	int		rval;
-	ushort_t	magic;
-
-	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
-		return (ENXIO);
-	}
-
-	ASSERT(!mutex_owned(SD_MUTEX(un)));
-
-	if (!un->un_f_mboot_supported) {
-		return (EINVAL);
-	}
-
-	if (arg == NULL) {
-		return (EINVAL);
-	}
-
-	mboot = kmem_zalloc(sizeof (struct mboot), KM_SLEEP);
-
-	if (ddi_copyin((const void *)arg, mboot,
-	    sizeof (struct mboot), flag) != 0) {
-		kmem_free(mboot, (size_t)(sizeof (struct mboot)));
-		return (EFAULT);
-	}
-
-	/* Is this really a master boot record? */
-	magic = LE_16(mboot->signature);
-	if (magic != MBB_MAGIC) {
-		kmem_free(mboot, (size_t)(sizeof (struct mboot)));
-		return (EINVAL);
-	}
-
-	rval = sd_send_scsi_WRITE(un, mboot, un->un_sys_blocksize, 0,
-	    SD_PATH_STANDARD);
-
-	mutex_enter(SD_MUTEX(un));
-#if defined(__i386) || defined(__amd64)
-	if (rval == 0) {
-		/*
-		 * mboot has been written successfully.
-		 * update the fdisk and vtoc tables in memory
-		 */
-		rval = sd_update_fdisk_and_vtoc(un);
-		if ((un->un_f_geometry_is_valid == FALSE) || (rval != 0)) {
-			mutex_exit(SD_MUTEX(un));
-			kmem_free(mboot, (size_t)(sizeof (struct mboot)));
-			return (rval);
-		}
-	}
-
-#ifdef __lock_lint
-	sd_setup_default_geometry(un);
-#endif
-
-#else
-	if (rval == 0) {
-		/*
-		 * mboot has been written successfully.
-		 * set up the default geometry and VTOC
-		 */
-		if (un->un_blockcount <= DK_MAX_BLOCKS)
-			sd_setup_default_geometry(un);
-	}
-#endif
-	mutex_exit(SD_MUTEX(un));
-	kmem_free(mboot, (size_t)(sizeof (struct mboot)));
-	return (rval);
-}
-
-
-/*
- *    Function: sd_setup_default_geometry
- *
- * Description: This local utility routine sets the default geometry as part of
- *		setting the device mboot.
- *
- *   Arguments: un - driver soft state (unit) structure
- *
- * Note: This may be redundant with sd_build_default_label.
- */
-
-static void
-sd_setup_default_geometry(struct sd_lun *un)
-{
-	/* zero out the soft state geometry and partition table. */
-	bzero(&un->un_g, sizeof (struct dk_geom));
-	bzero(&un->un_vtoc, sizeof (struct dk_vtoc));
-	bzero(un->un_map, NDKMAP * (sizeof (struct dk_map)));
-	un->un_asciilabel[0] = '\0';
-
-	/*
-	 * For the rpm, we use the minimum for the disk.
-	 * For the head, cyl and number of sector per track,
-	 * if the capacity <= 1GB, head = 64, sect = 32.
-	 * else head = 255, sect 63
-	 * Note: the capacity should be equal to C*H*S values.
-	 * This will cause some truncation of size due to
-	 * round off errors. For CD-ROMs, this truncation can
-	 * have adverse side effects, so returning ncyl and
-	 * nhead as 1. The nsect will overflow for most of
-	 * CD-ROMs as nsect is of type ushort.
-	 */
-	if (ISCD(un)) {
-		un->un_g.dkg_ncyl = 1;
-		un->un_g.dkg_nhead = 1;
-		un->un_g.dkg_nsect = un->un_blockcount;
-	} else {
-		if (un->un_blockcount <= 0x1000) {
-			/* Needed for unlabeled SCSI floppies. */
-			un->un_g.dkg_nhead = 2;
-			un->un_g.dkg_ncyl = 80;
-			un->un_g.dkg_pcyl = 80;
-			un->un_g.dkg_nsect = un->un_blockcount / (2 * 80);
-		} else if (un->un_blockcount <= 0x200000) {
-			un->un_g.dkg_nhead = 64;
-			un->un_g.dkg_nsect = 32;
-			un->un_g.dkg_ncyl = un->un_blockcount / (64 * 32);
-		} else {
-			un->un_g.dkg_nhead = 255;
-			un->un_g.dkg_nsect = 63;
-			un->un_g.dkg_ncyl = un->un_blockcount / (255 * 63);
-		}
-		un->un_blockcount = un->un_g.dkg_ncyl *
-		    un->un_g.dkg_nhead * un->un_g.dkg_nsect;
-	}
-	un->un_g.dkg_acyl = 0;
-	un->un_g.dkg_bcyl = 0;
-	un->un_g.dkg_intrlv = 1;
-	un->un_g.dkg_rpm = 200;
-	un->un_g.dkg_read_reinstruct = 0;
-	un->un_g.dkg_write_reinstruct = 0;
-	if (un->un_g.dkg_pcyl == 0) {
-		un->un_g.dkg_pcyl = un->un_g.dkg_ncyl + un->un_g.dkg_acyl;
-	}
-
-	un->un_map['a'-'a'].dkl_cylno = 0;
-	un->un_map['a'-'a'].dkl_nblk = un->un_blockcount;
-	un->un_map['c'-'a'].dkl_cylno = 0;
-	un->un_map['c'-'a'].dkl_nblk = un->un_blockcount;
-	un->un_f_geometry_is_valid = FALSE;
-}
-
-
-#if defined(__i386) || defined(__amd64)
-/*
- *    Function: sd_update_fdisk_and_vtoc
- *
- * Description: This local utility routine updates the device fdisk and vtoc
- *		as part of setting the device mboot.
- *
- *   Arguments: un - driver soft state (unit) structure
- *
- * Return Code: 0 for success or errno-type return code.
- *
- *    Note:x86: This looks like a duplicate of sd_validate_geometry(), but
- *		these did exist seperately in x86 sd.c!!!
- */
-
-static int
-sd_update_fdisk_and_vtoc(struct sd_lun *un)
-{
-	static char	labelstring[128];
-	static char	buf[256];
-	char		*label = 0;
-	int		count;
-	int		label_rc = 0;
-	int		gvalid = un->un_f_geometry_is_valid;
-	int		fdisk_rval;
-	int		lbasize;
-	int		capacity;
-
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-
-	if (un->un_f_tgt_blocksize_is_valid == FALSE) {
-		return (EINVAL);
-	}
-
-	if (un->un_f_blockcount_is_valid == FALSE) {
-		return (EINVAL);
-	}
-
-#if defined(_SUNOS_VTOC_16)
-	/*
-	 * Set up the "whole disk" fdisk partition; this should always
-	 * exist, regardless of whether the disk contains an fdisk table
-	 * or vtoc.
-	 */
-	un->un_map[P0_RAW_DISK].dkl_cylno = 0;
-	un->un_map[P0_RAW_DISK].dkl_nblk = un->un_blockcount;
-#endif	/* defined(_SUNOS_VTOC_16) */
-
-	/*
-	 * copy the lbasize and capacity so that if they're
-	 * reset while we're not holding the SD_MUTEX(un), we will
-	 * continue to use valid values after the SD_MUTEX(un) is
-	 * reacquired.
-	 */
-	lbasize  = un->un_tgt_blocksize;
-	capacity = un->un_blockcount;
-
-	/*
-	 * refresh the logical and physical geometry caches.
-	 * (data from mode sense format/rigid disk geometry pages,
-	 * and scsi_ifgetcap("geometry").
-	 */
-	sd_resync_geom_caches(un, capacity, lbasize, SD_PATH_DIRECT);
-
-	/*
-	 * Only DIRECT ACCESS devices will have Sun labels.
-	 * CD's supposedly have a Sun label, too
-	 */
-	if (un->un_f_vtoc_label_supported) {
-		fdisk_rval = sd_read_fdisk(un, capacity, lbasize,
-		    SD_PATH_DIRECT);
-		if (fdisk_rval == SD_CMD_FAILURE) {
-			ASSERT(mutex_owned(SD_MUTEX(un)));
-			return (EIO);
-		}
-
-		if (fdisk_rval == SD_CMD_RESERVATION_CONFLICT) {
-			ASSERT(mutex_owned(SD_MUTEX(un)));
-			return (EACCES);
-		}
-
-		if (un->un_solaris_size <= DK_LABEL_LOC) {
-			/*
-			 * Found fdisk table but no Solaris partition entry,
-			 * so don't call sd_uselabel() and don't create
-			 * a default label.
-			 */
-			label_rc = 0;
-			un->un_f_geometry_is_valid = TRUE;
-			goto no_solaris_partition;
-		}
-
-#if defined(_SUNOS_VTOC_8)
-		label = (char *)un->un_asciilabel;
-#elif defined(_SUNOS_VTOC_16)
-		label = (char *)un->un_vtoc.v_asciilabel;
-#else
-#error "No VTOC format defined."
-#endif
-	} else if (capacity < 0) {
-		ASSERT(mutex_owned(SD_MUTEX(un)));
-		return (EINVAL);
-	}
-
-	/*
-	 * For Removable media We reach here if we have found a
-	 * SOLARIS PARTITION.
-	 * If un_f_geometry_is_valid is FALSE it indicates that the SOLARIS
-	 * PARTITION has changed from the previous one, hence we will setup a
-	 * default VTOC in this case.
-	 */
-	if (un->un_f_geometry_is_valid == FALSE) {
-		sd_build_default_label(un);
-		label_rc = 0;
-	}
-
-no_solaris_partition:
-	if ((!un->un_f_has_removable_media ||
-	    (un->un_f_has_removable_media &&
-	    un->un_mediastate == DKIO_EJECTED)) &&
-		(un->un_state == SD_STATE_NORMAL && !gvalid)) {
-		/*
-		 * Print out a message indicating who and what we are.
-		 * We do this only when we happen to really validate the
-		 * geometry. We may call sd_validate_geometry() at other
-		 * times, ioctl()'s like Get VTOC in which case we
-		 * don't want to print the label.
-		 * If the geometry is valid, print the label string,
-		 * else print vendor and product info, if available
-		 */
-		if ((un->un_f_geometry_is_valid == TRUE) && (label != NULL)) {
-			SD_INFO(SD_LOG_IOCTL_DKIO, un, "?<%s>\n", label);
-		} else {
-			mutex_enter(&sd_label_mutex);
-			sd_inq_fill(SD_INQUIRY(un)->inq_vid, VIDMAX,
-			    labelstring);
-			sd_inq_fill(SD_INQUIRY(un)->inq_pid, PIDMAX,
-			    &labelstring[64]);
-			(void) sprintf(buf, "?Vendor '%s', product '%s'",
-			    labelstring, &labelstring[64]);
-			if (un->un_f_blockcount_is_valid == TRUE) {
-				(void) sprintf(&buf[strlen(buf)],
-				    ", %" PRIu64 " %u byte blocks\n",
-				    un->un_blockcount,
-				    un->un_tgt_blocksize);
-			} else {
-				(void) sprintf(&buf[strlen(buf)],
-				    ", (unknown capacity)\n");
-			}
-			SD_INFO(SD_LOG_IOCTL_DKIO, un, buf);
-			mutex_exit(&sd_label_mutex);
-		}
-	}
-
-#if defined(_SUNOS_VTOC_16)
-	/*
-	 * If we have valid geometry, set up the remaining fdisk partitions.
-	 * Note that dkl_cylno is not used for the fdisk map entries, so
-	 * we set it to an entirely bogus value.
-	 */
-	for (count = 0; count < FD_NUMPART; count++) {
-		un->un_map[FDISK_P1 + count].dkl_cylno = -1;
-		un->un_map[FDISK_P1 + count].dkl_nblk =
-		    un->un_fmap[count].fmap_nblk;
-		un->un_offset[FDISK_P1 + count] =
-		    un->un_fmap[count].fmap_start;
-	}
-#endif
-
-	for (count = 0; count < NDKMAP; count++) {
-#if defined(_SUNOS_VTOC_8)
-		struct dk_map *lp  = &un->un_map[count];
-		un->un_offset[count] =
-		    un->un_g.dkg_nhead * un->un_g.dkg_nsect * lp->dkl_cylno;
-#elif defined(_SUNOS_VTOC_16)
-		struct dkl_partition *vp = &un->un_vtoc.v_part[count];
-		un->un_offset[count] = vp->p_start + un->un_solaris_offset;
-#else
-#error "No VTOC format defined."
-#endif
-	}
-
-	ASSERT(mutex_owned(SD_MUTEX(un)));
-	return (label_rc);
-}
-#endif
-
-
-/*
  *    Function: sd_check_media
  *
  * Description: This utility routine implements the functionality for the
@@ -24403,10 +20507,16 @@ sd_check_media(dev_t dev, enum dkio_state state)
 
 		sd_update_block_info(un, lbasize, capacity);
 
-		un->un_f_geometry_is_valid	= FALSE;
-		(void) sd_validate_geometry(un, SD_PATH_DIRECT);
-
 		mutex_exit(SD_MUTEX(un));
+		cmlb_invalidate(un->un_cmlbhandle, (void *)SD_PATH_DIRECT);
+		if ((cmlb_validate(un->un_cmlbhandle, 0,
+		    (void *)SD_PATH_DIRECT) == 0) && un->un_f_pkstats_enabled) {
+			sd_set_pstats(un);
+			SD_TRACE(SD_LOG_IO_PARTITION, un,
+			    "sd_check_media: un:0x%p pstats created and "
+			    "set\n", un);
+		}
+
 		rval = sd_send_scsi_DOORLOCK(un, SD_REMOVAL_PREVENT,
 		    SD_PATH_DIRECT);
 		sd_pm_exit(un);
@@ -26195,7 +22305,6 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	int		i;
 	int		err;
 	struct sd_lun	*un;
-	struct dk_map	*lp;
 	struct scsi_pkt *wr_pktp;
 	struct buf	*wr_bp;
 	struct buf	wr_buf;
@@ -26210,10 +22319,12 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	ssize_t dma_resid;
 	daddr_t oblkno;
 #endif
+	diskaddr_t	nblks = 0;
+	diskaddr_t	start_block;
 
 	instance = SDUNIT(dev);
 	if (((un = ddi_get_soft_state(sd_state, instance)) == NULL) ||
-	    (!un->un_f_geometry_is_valid) || ISCD(un)) {
+	    !SD_IS_VALID_LABEL(un) || ISCD(un)) {
 		return (ENXIO);
 	}
 
@@ -26225,12 +22336,15 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	SD_INFO(SD_LOG_DUMP, un, "sddump: partition = %d\n", partition);
 
 	/* Validate blocks to dump at against partition size. */
-	lp = &un->un_map[partition];
-	if ((blkno + nblk) > lp->dkl_nblk) {
+
+	(void) cmlb_partinfo(un->un_cmlbhandle, partition,
+	    &nblks, &start_block, NULL, NULL, (void *)SD_PATH_DIRECT);
+
+	if ((blkno + nblk) > nblks) {
 		SD_TRACE(SD_LOG_DUMP, un,
 		    "sddump: dump range larger than partition: "
 		    "blkno = 0x%x, nblk = 0x%x, dkl_nblk = 0x%x\n",
-		    blkno, nblk, lp->dkl_nblk);
+		    blkno, nblk, nblks);
 		return (EINVAL);
 	}
 
@@ -26334,7 +22448,8 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	 * Convert the partition-relative block number to a
 	 * disk physical block number.
 	 */
-	blkno += un->un_offset[partition];
+	blkno += start_block;
+
 	SD_INFO(SD_LOG_DUMP, un, "sddump: disk blkno = 0x%x\n", blkno);
 
 
@@ -27352,7 +23467,6 @@ sr_change_blkmode(dev_t dev, int cmd, intptr_t data, int flag)
 			ASSERT(!mutex_owned(SD_MUTEX(un)));
 			mutex_enter(SD_MUTEX(un));
 			sd_update_block_info(un, (uint32_t)data, 0);
-
 			mutex_exit(SD_MUTEX(un));
 		}
 		break;
@@ -27432,7 +23546,7 @@ sr_change_speed(dev_t dev, int cmd, intptr_t data, int flag)
 
 	if ((rval = sd_send_scsi_MODE_SENSE(un, CDB_GROUP0, sense,
 	    BUFLEN_MODE_CDROM_SPEED, CDROM_MODE_SPEED,
-		SD_PATH_STANDARD)) != 0) {
+	    SD_PATH_STANDARD)) != 0) {
 		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 		    "sr_change_speed: Mode Sense Failed\n");
 		kmem_free(sense, BUFLEN_MODE_CDROM_SPEED);
@@ -29207,7 +25321,9 @@ sr_ejected(struct sd_lun *un)
 
 	un->un_f_blockcount_is_valid	= FALSE;
 	un->un_f_tgt_blocksize_is_valid	= FALSE;
-	un->un_f_geometry_is_valid	= FALSE;
+	mutex_exit(SD_MUTEX(un));
+	cmlb_invalidate(un->un_cmlbhandle, (void *)SD_PATH_DIRECT_PRIORITY);
+	mutex_enter(SD_MUTEX(un));
 
 	if (un->un_errstats != NULL) {
 		stp = (struct sd_errstats *)un->un_errstats->ks_data;
@@ -30766,8 +26882,6 @@ sd_faultinjection(struct scsi_pkt *pktp)
 		SD_CONDSET(un, un, un_reservation_type, "un_reservation_type");
 		SD_CONDSET(un, un, un_resvd_status, "un_resvd_status");
 		SD_CONDSET(un, un, un_f_arq_enabled, "un_f_arq_enabled");
-		SD_CONDSET(un, un, un_f_geometry_is_valid,
-		    "un_f_geometry_is_valid");
 		SD_CONDSET(un, un, un_f_allow_bus_device_reset,
 		    "un_f_allow_bus_device_reset");
 		SD_CONDSET(un, un, un_f_opt_queueing, "un_f_opt_queueing");
@@ -31092,14 +27206,6 @@ sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
 	ASSERT(un->un_sd);
 	ASSERT(un->un_sd->sd_inq);
 
-#if defined(_SUNOS_VTOC_16)
-	/*
-	 * For VTOC_16 devices, the default label will be created for all
-	 * devices. (see sd_build_default_label)
-	 */
-	un->un_f_default_vtoc_supported = TRUE;
-#endif
-
 	/*
 	 * Enable SYNC CACHE support for all devices.
 	 */
@@ -31113,13 +27219,6 @@ sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
 		 */
 		un->un_f_has_removable_media = TRUE;
 
-#if defined(_SUNOS_VTOC_8)
-		/*
-		 * Note: currently, for VTOC_8 devices, default label is
-		 * created for removable and hotpluggable devices only.
-		 */
-		un->un_f_default_vtoc_supported = TRUE;
-#endif
 		/*
 		 * support non-512-byte blocksize of removable media devices
 		 */
@@ -31251,13 +27350,6 @@ sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
 	}
 
 	if (un->un_f_is_hotpluggable) {
-#if defined(_SUNOS_VTOC_8)
-		/*
-		 * Note: currently, for VTOC_8 devices, default label is
-		 * created for removable and hotpluggable devices only.
-		 */
-		un->un_f_default_vtoc_supported = TRUE;
-#endif
 
 		/*
 		 * Have to watch hotpluggable devices as well, since
@@ -31269,45 +27361,191 @@ sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
 		un->un_f_check_start_stop = TRUE;
 
 	}
+}
 
-	/*
-	 * By default, only DIRECT ACCESS devices and CDs will have Sun
-	 * labels.
-	 */
-	if ((SD_INQUIRY(un)->inq_dtype == DTYPE_DIRECT) ||
-	    (un->un_sd->sd_inq->inq_rmb)) {
+/*
+ * sd_tg_rdwr:
+ * Provides rdwr access for cmlb via sd_tgops. The start_block is
+ * in sys block size, req_length in bytes.
+ *
+ */
+static int
+sd_tg_rdwr(dev_info_t *devi, uchar_t cmd, void *bufaddr,
+    diskaddr_t start_block, size_t reqlength, void *tg_cookie)
+{
+	struct sd_lun *un;
+	int path_flag = (int)(uintptr_t)tg_cookie;
+	char *dkl = NULL;
+	diskaddr_t real_addr = start_block;
+	diskaddr_t first_byte, end_block;
+
+	size_t	buffer_size = reqlength;
+	int rval;
+	diskaddr_t	cap;
+	uint32_t	lbasize;
+
+	un = ddi_get_soft_state(sd_state, ddi_get_instance(devi));
+	if (un == NULL)
+		return (ENXIO);
+
+	if (cmd != TG_READ && cmd != TG_WRITE)
+		return (EINVAL);
+
+	mutex_enter(SD_MUTEX(un));
+	if (un->un_f_tgt_blocksize_is_valid == FALSE) {
+		mutex_exit(SD_MUTEX(un));
+		rval = sd_send_scsi_READ_CAPACITY(un, (uint64_t *)&cap,
+		    &lbasize, path_flag);
+		if (rval != 0)
+			return (rval);
+		mutex_enter(SD_MUTEX(un));
+		sd_update_block_info(un, lbasize, cap);
+		if ((un->un_f_tgt_blocksize_is_valid == FALSE)) {
+			mutex_exit(SD_MUTEX(un));
+			return (EIO);
+		}
+	}
+
+	if (NOT_DEVBSIZE(un)) {
 		/*
-		 * Direct access devices have disk label
+		 * sys_blocksize != tgt_blocksize, need to re-adjust
+		 * blkno and save the index to beginning of dk_label
 		 */
-		un->un_f_vtoc_label_supported = TRUE;
+		first_byte  = SD_SYSBLOCKS2BYTES(un, start_block);
+		real_addr = first_byte / un->un_tgt_blocksize;
+
+		end_block = (first_byte + reqlength +
+		    un->un_tgt_blocksize - 1) / un->un_tgt_blocksize;
+
+		/* round up buffer size to multiple of target block size */
+		buffer_size = (end_block - real_addr) * un->un_tgt_blocksize;
+
+		SD_TRACE(SD_LOG_IO_PARTITION, un, "sd_tg_rdwr",
+		    "label_addr: 0x%x allocation size: 0x%x\n",
+		    real_addr, buffer_size);
+
+		if (((first_byte % un->un_tgt_blocksize) != 0) ||
+		    (reqlength % un->un_tgt_blocksize) != 0)
+			/* the request is not aligned */
+			dkl = kmem_zalloc(buffer_size, KM_SLEEP);
 	}
 
 	/*
-	 * Fdisk partitions are supported for all direct access devices on
-	 * x86 platform, and just for removable media and hotpluggable
-	 * devices on SPARC platform. Later, we will set the following flag
-	 * to FALSE if current device is not removable media or hotpluggable
-	 * device and if sd works on SAPRC platform.
+	 * The MMC standard allows READ CAPACITY to be
+	 * inaccurate by a bounded amount (in the interest of
+	 * response latency).  As a result, failed READs are
+	 * commonplace (due to the reading of metadata and not
+	 * data). Depending on the per-Vendor/drive Sense data,
+	 * the failed READ can cause many (unnecessary) retries.
 	 */
-	if (SD_INQUIRY(un)->inq_dtype == DTYPE_DIRECT) {
-		un->un_f_mboot_supported = TRUE;
+
+	if (ISCD(un) && (cmd == TG_READ) &&
+	    (un->un_f_blockcount_is_valid == TRUE) &&
+	    ((start_block == (un->un_blockcount - 1))||
+	    (start_block == (un->un_blockcount - 2)))) {
+			path_flag = SD_PATH_DIRECT_PRIORITY;
 	}
 
-	if (!un->un_f_is_hotpluggable &&
-	    !un->un_sd->sd_inq->inq_rmb) {
-
-#if defined(_SUNOS_VTOC_8)
-		/*
-		 * Don't support fdisk on fixed disk
-		 */
-		un->un_f_mboot_supported = FALSE;
-#endif
-
-		/*
-		 * For fixed disk, if its VTOC is not valid, we will write
-		 * errlog into system log
-		 */
-		if (un->un_f_vtoc_label_supported)
-			un->un_f_vtoc_errlog_supported = TRUE;
+	mutex_exit(SD_MUTEX(un));
+	if (cmd == TG_READ) {
+		rval = sd_send_scsi_READ(un, (dkl != NULL)? dkl: bufaddr,
+		    buffer_size, real_addr, path_flag);
+		if (dkl != NULL)
+			bcopy(dkl + SD_TGTBYTEOFFSET(un, start_block,
+			    real_addr), bufaddr, reqlength);
+	} else {
+		if (dkl) {
+			rval = sd_send_scsi_READ(un, dkl, buffer_size,
+			    real_addr, path_flag);
+			if (rval) {
+				kmem_free(dkl, buffer_size);
+				return (rval);
+			}
+			bcopy(bufaddr, dkl + SD_TGTBYTEOFFSET(un, start_block,
+			    real_addr), reqlength);
+		}
+		rval = sd_send_scsi_WRITE(un, (dkl != NULL)? dkl: bufaddr,
+		    buffer_size, real_addr, path_flag);
 	}
+
+	if (dkl != NULL)
+		kmem_free(dkl, buffer_size);
+
+	return (rval);
+}
+
+
+static int
+sd_tg_getinfo(dev_info_t *devi, int cmd, void *arg, void *tg_cookie)
+{
+
+	struct sd_lun *un;
+	diskaddr_t	cap;
+	uint32_t	lbasize;
+	int		path_flag = (int)(uintptr_t)tg_cookie;
+	int		ret = 0;
+
+	un = ddi_get_soft_state(sd_state, ddi_get_instance(devi));
+	if (un == NULL)
+		return (ENXIO);
+
+	switch (cmd) {
+	case TG_GETPHYGEOM:
+	case TG_GETVIRTGEOM:
+	case TG_GETCAPACITY:
+	case  TG_GETBLOCKSIZE:
+		mutex_enter(SD_MUTEX(un));
+
+		if ((un->un_f_blockcount_is_valid == TRUE) &&
+		    (un->un_f_tgt_blocksize_is_valid == TRUE)) {
+			cap = un->un_blockcount;
+			lbasize = un->un_tgt_blocksize;
+			mutex_exit(SD_MUTEX(un));
+		} else {
+			mutex_exit(SD_MUTEX(un));
+			ret = sd_send_scsi_READ_CAPACITY(un, (uint64_t *)&cap,
+			    &lbasize, path_flag);
+			if (ret != 0)
+				return (ret);
+			mutex_enter(SD_MUTEX(un));
+			sd_update_block_info(un, lbasize, cap);
+			if ((un->un_f_blockcount_is_valid == FALSE) ||
+			    (un->un_f_tgt_blocksize_is_valid == FALSE)) {
+				mutex_exit(SD_MUTEX(un));
+				return (EIO);
+			}
+			mutex_exit(SD_MUTEX(un));
+		}
+
+		if (cmd == TG_GETCAPACITY) {
+			*(diskaddr_t *)arg = cap;
+			return (0);
+		}
+
+		if (cmd == TG_GETBLOCKSIZE) {
+			*(uint32_t *)arg = lbasize;
+			return (0);
+		}
+
+		if (cmd == TG_GETPHYGEOM)
+			ret = sd_get_physical_geometry(un, (cmlb_geom_t *)arg,
+			    cap, lbasize, path_flag);
+		else
+			/* TG_GETVIRTGEOM */
+			ret = sd_get_virtual_geometry(un,
+			    (cmlb_geom_t *)arg, cap, lbasize);
+
+		return (ret);
+
+	case TG_GETATTR:
+		mutex_enter(SD_MUTEX(un));
+		((tg_attribute_t *)arg)->media_is_writable =
+		    un->un_f_mmc_writable_media;
+		mutex_exit(SD_MUTEX(un));
+		return (0);
+	default:
+		return (ENOTTY);
+
+	}
+
 }

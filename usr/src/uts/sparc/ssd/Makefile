@@ -21,7 +21,7 @@
 #
 # uts/sparc/ssd/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -123,6 +123,7 @@ TEST		= test
 # Warlock targets
 
 SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
+CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
 
 warlock: warlock_alone
 
@@ -134,9 +135,12 @@ warlock_alone: $(WARLOCK_OK)
 scsi_files:
 	@cd ../scsi; pwd; $(MAKE) warlock
 
-$(WARLOCK_OK): ssd.wlcmd $(WARLOCK_OUT) scsi.files
+cmlb_files:
+	 @cd ../cmlb; pwd; $(MAKE) warlock
+
+$(WARLOCK_OK): ssd.wlcmd $(WARLOCK_OUT) scsi.files cmlb_files
 	$(WARLOCK) -c $(WLCMD_DIR)/ssd.wlcmd $(WARLOCK_OUT) \
-	$(SCSI_FILES) \
+	$(SCSI_FILES) $(CMLB_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 

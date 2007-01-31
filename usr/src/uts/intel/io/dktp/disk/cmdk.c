@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,11 +196,10 @@ static struct modlinkage modlinkage = {
 /* Function prototypes for cmlb callbacks */
 
 static int cmdk_lb_rdwr(dev_info_t *dip, uchar_t cmd, void *bufaddr,
-    diskaddr_t start, size_t length);
-static int cmdk_lb_getphygeom(dev_info_t *dip,  cmlb_geom_t *phygeomp);
-static int cmdk_lb_getvirtgeom(dev_info_t *dip,  cmlb_geom_t *virtgeomp);
-static int cmdk_lb_getcapacity(dev_info_t *dip, diskaddr_t *capp);
-static int cmdk_lb_getattribute(dev_info_t *dip, tg_attribute_t *tgattribute);
+    diskaddr_t start, size_t length, void *tg_cookie);
+
+static int cmdk_lb_getinfo(dev_info_t *dip, int cmd,  void *arg,
+    void *tg_cookie);
 
 static void cmdk_devid_setup(struct cmdk *dkp);
 static int cmdk_devid_modser(struct cmdk *dkp);
@@ -210,12 +208,9 @@ static int cmdk_devid_fabricate(struct cmdk *dkp);
 static int cmdk_devid_read(struct cmdk *dkp);
 
 static cmlb_tg_ops_t cmdk_lb_ops = {
-	TG_DK_OPS_VERSION_0,
+	TG_DK_OPS_VERSION_1,
 	cmdk_lb_rdwr,
-	cmdk_lb_getphygeom,
-	cmdk_lb_getvirtgeom,
-	cmdk_lb_getcapacity,
-	cmdk_lb_getattribute
+	cmdk_lb_getinfo
 };
 
 int
@@ -360,13 +355,15 @@ cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    &cmdk_lb_ops,
 	    DTYPE_DIRECT,		/* device_type */
 	    0,				/* removable */
+	    0,				/* hot pluggable XXX */
 	    node_type,
 	    CMLB_CREATE_ALTSLICE_VTOC_16_DTYPE_DIRECT,	/* alter_behaviour */
-	    dkp->dk_cmlbhandle) != 0)
+	    dkp->dk_cmlbhandle,
+	    0) != 0)
 		goto fail1;
 
 	/* Calling validate will create minor nodes according to disk label */
-	(void) cmlb_validate(dkp->dk_cmlbhandle);
+	(void) cmlb_validate(dkp->dk_cmlbhandle, 0, 0);
 
 	/* set bbh (Bad Block Handling) */
 	cmdk_bbh_reopen(dkp);
@@ -449,7 +446,7 @@ cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		(void) dadk_close(DKTP_DATA);
 	}
 
-	cmlb_detach(dkp->dk_cmlbhandle);
+	cmlb_detach(dkp->dk_cmlbhandle, 0);
 	cmlb_free_handle(&dkp->dk_cmlbhandle);
 	ddi_prop_remove_all(dip);
 
@@ -521,7 +518,8 @@ cmdk_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 		    &p_lblkcnt,
 		    &p_lblksrt,
 		    NULL,
-		    NULL))
+		    NULL,
+		    0))
 			return (ddi_prop_op_nblocks(dev, dip,
 			    prop_op, mod_flags,
 			    name, valuep, lengthp,
@@ -560,7 +558,8 @@ cmdkdump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	    &p_lblkcnt,
 	    &p_lblksrt,
 	    NULL,
-	    NULL)) {
+	    NULL,
+	    0)) {
 		return (ENXIO);
 	}
 
@@ -745,11 +744,11 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 
 		if (state == DKIO_INSERTED) {
 
-			if (cmlb_validate(dkp->dk_cmlbhandle) != 0)
+			if (cmlb_validate(dkp->dk_cmlbhandle, 0, 0) != 0)
 				return (ENXIO);
 
 			if (cmlb_partinfo(dkp->dk_cmlbhandle, CMDKPART(dev),
-			    &p_lblkcnt, &p_lblksrt, NULL, NULL))
+			    &p_lblkcnt, &p_lblksrt, NULL, NULL, 0))
 				return (ENXIO);
 
 			if (p_lblkcnt <= 0)
@@ -807,14 +806,8 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 	{
 		int rc;
 
-		rc = cmlb_ioctl(
-		    dkp->dk_cmlbhandle,
-		    dev,
-		    cmd,
-		    arg,
-		    flag,
-		    credp,
-		    rvalp);
+		rc = cmlb_ioctl(dkp->dk_cmlbhandle, dev, cmd, arg, flag,
+		    credp, rvalp, 0);
 		if (cmd == DKIOCSVTOC)
 			cmdk_devid_setup(dkp);
 		return (rc);
@@ -907,7 +900,7 @@ cmdkclose(dev_t dev, int flag, int otyp, cred_t *credp)
 	mutex_exit(&dkp->dk_mutex);
 
 	if (lastclose)
-		cmlb_invalidate(dkp->dk_cmlbhandle);
+		cmlb_invalidate(dkp->dk_cmlbhandle, 0);
 
 	return (DDI_SUCCESS);
 }
@@ -939,7 +932,7 @@ cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *credp)
 
 	mutex_enter(&dkp->dk_mutex);
 
-	if (cmlb_validate(dkp->dk_cmlbhandle) != 0) {
+	if (cmlb_validate(dkp->dk_cmlbhandle, 0, 0) != 0) {
 
 		/* fail if not doing non block open */
 		if (!nodelay) {
@@ -947,7 +940,7 @@ cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *credp)
 			return (ENXIO);
 		}
 	} else if (cmlb_partinfo(dkp->dk_cmlbhandle, part, &p_lblkcnt,
-	    &p_lblksrt, NULL, NULL) == 0) {
+	    &p_lblksrt, NULL, NULL, 0) == 0) {
 
 		if (p_lblkcnt <= 0 && (!nodelay || otyp != OTYP_CHR)) {
 			mutex_exit(&dkp->dk_mutex);
@@ -1084,13 +1077,8 @@ cmdkstrategy(struct buf *bp)
 	/*
 	 * only re-read the vtoc if necessary (force == FALSE)
 	 */
-	if (cmlb_partinfo(
-	    dkp->dk_cmlbhandle,
-	    CMDKPART(bp->b_edev),
-	    &p_lblkcnt,
-	    &p_lblksrt,
-	    NULL,
-	    NULL)) {
+	if (cmlb_partinfo(dkp->dk_cmlbhandle, CMDKPART(bp->b_edev),
+	    &p_lblkcnt, &p_lblksrt, NULL, NULL, 0)) {
 		SETBPERR(bp, ENXIO);
 	}
 
@@ -1214,14 +1202,10 @@ cmdk_destroy_obj(dev_info_t *dip, struct cmdk *dkp)
 	}
 	flc_keyvalp[flc_keylen] = (char)0;
 }
-
+/*ARGSUSED5*/
 static int
-cmdk_lb_rdwr(
-    dev_info_t *dip,
-    uchar_t cmd,
-    void *bufaddr,
-    diskaddr_t start,
-    size_t count)
+cmdk_lb_rdwr(dev_info_t *dip, uchar_t cmd, void *bufaddr,
+    diskaddr_t start, size_t count, void *tg_cookie)
 {
 	struct cmdk	*dkp;
 	opaque_t	handle;
@@ -1259,107 +1243,97 @@ cmdk_lb_rdwr(
 	return (rc);
 }
 
+/*ARGSUSED3*/
 static int
-cmdk_lb_getcapacity(
-    dev_info_t *dip,
-    diskaddr_t *capp)
+cmdk_lb_getinfo(dev_info_t *dip, int cmd, void *arg, void *tg_cookie)
 {
+
 	struct cmdk		*dkp;
 	struct tgdk_geom	phyg;
 
-	dkp = ddi_get_soft_state(cmdk_state, ddi_get_instance(dip));
-	if (dkp == NULL)
-		return (ENXIO);
-
-	/* dadk_getphygeom always returns success */
-	(void) dadk_getphygeom(DKTP_DATA, &phyg);
-
-	*capp = phyg.g_cap;
-
-	return (0);
-}
-
-static int
-cmdk_lb_getvirtgeom(
-    dev_info_t *dip,
-    cmlb_geom_t *virtgeomp)
-{
-	struct cmdk		*dkp;
-	struct tgdk_geom	phyg;
-	diskaddr_t		capacity;
 
 	dkp = ddi_get_soft_state(cmdk_state, ddi_get_instance(dip));
 	if (dkp == NULL)
 		return (ENXIO);
 
-	(void) dadk_getgeom(DKTP_DATA, &phyg);
-	capacity = phyg.g_cap;
+	switch (cmd) {
+	case TG_GETPHYGEOM: {
+		cmlb_geom_t *phygeomp = (cmlb_geom_t *)arg;
 
-	/*
-	 * If the controller returned us something that doesn't
-	 * really fit into an Int 13/function 8 geometry
-	 * result, just fail the ioctl.  See PSARC 1998/313.
-	 */
-	if (capacity < 0 || capacity >= 63 * 254 * 1024)
-		return (EINVAL);
+		/* dadk_getphygeom always returns success */
+		(void) dadk_getphygeom(DKTP_DATA, &phyg);
 
-	virtgeomp->g_capacity	= capacity;
-	virtgeomp->g_nsect	= 63;
-	virtgeomp->g_nhead	= 254;
-	virtgeomp->g_ncyl	= capacity / (63 * 254);
-	virtgeomp->g_acyl	= 0;
-	virtgeomp->g_secsize	= 512;
-	virtgeomp->g_intrlv	= 1;
-	virtgeomp->g_rpm	= 3600;
+		phygeomp->g_capacity	= phyg.g_cap;
+		phygeomp->g_nsect	= phyg.g_sec;
+		phygeomp->g_nhead	= phyg.g_head;
+		phygeomp->g_acyl	= phyg.g_acyl;
+		phygeomp->g_ncyl	= phyg.g_cyl;
+		phygeomp->g_secsize	= phyg.g_secsiz;
+		phygeomp->g_intrlv	= 1;
+		phygeomp->g_rpm		= 3600;
 
-	return (0);
+		return (0);
+	}
+
+	case TG_GETVIRTGEOM: {
+		cmlb_geom_t *virtgeomp = (cmlb_geom_t *)arg;
+		diskaddr_t		capacity;
+
+		(void) dadk_getgeom(DKTP_DATA, &phyg);
+		capacity = phyg.g_cap;
+
+		/*
+		 * If the controller returned us something that doesn't
+		 * really fit into an Int 13/function 8 geometry
+		 * result, just fail the ioctl.  See PSARC 1998/313.
+		 */
+		if (capacity < 0 || capacity >= 63 * 254 * 1024)
+			return (EINVAL);
+
+		virtgeomp->g_capacity	= capacity;
+		virtgeomp->g_nsect	= 63;
+		virtgeomp->g_nhead	= 254;
+		virtgeomp->g_ncyl	= capacity / (63 * 254);
+		virtgeomp->g_acyl	= 0;
+		virtgeomp->g_secsize	= 512;
+		virtgeomp->g_intrlv	= 1;
+		virtgeomp->g_rpm	= 3600;
+
+		return (0);
+	}
+
+	case TG_GETCAPACITY:
+	case TG_GETBLOCKSIZE:
+	{
+
+		/* dadk_getphygeom always returns success */
+		(void) dadk_getphygeom(DKTP_DATA, &phyg);
+		if (cmd == TG_GETCAPACITY)
+			*(diskaddr_t *)arg = phyg.g_cap;
+		else
+			*(uint32_t *)arg = (uint32_t)phyg.g_secsiz;
+
+		return (0);
+	}
+
+	case TG_GETATTR: {
+		tg_attribute_t *tgattribute = (tg_attribute_t *)arg;
+		if ((DKTP_EXT->tg_rdonly))
+			tgattribute->media_is_writable = FALSE;
+		else
+			tgattribute->media_is_writable = TRUE;
+
+		return (0);
+	}
+
+	default:
+		return (ENOTTY);
+	}
 }
 
-static int
-cmdk_lb_getphygeom(
-    dev_info_t *dip,
-    cmlb_geom_t *phygeomp)
-{
-	struct cmdk		*dkp;
-	struct tgdk_geom	phyg;
 
-	dkp = ddi_get_soft_state(cmdk_state, ddi_get_instance(dip));
-	if (dkp == NULL)
-		return (ENXIO);
 
-	/* dadk_getphygeom always returns success */
-	(void) dadk_getphygeom(DKTP_DATA, &phyg);
 
-	phygeomp->g_capacity	= phyg.g_cap;
-	phygeomp->g_nsect	= phyg.g_sec;
-	phygeomp->g_nhead	= phyg.g_head;
-	phygeomp->g_acyl	= phyg.g_acyl;
-	phygeomp->g_ncyl	= phyg.g_cyl;
-	phygeomp->g_secsize	= phyg.g_secsiz;
-	phygeomp->g_intrlv	= 1;
-	phygeomp->g_rpm		= 3600;
-
-	return (0);
-}
-
-static int
-cmdk_lb_getattribute(
-    dev_info_t *dip,
-    tg_attribute_t *tgattribute)
-{
-	struct cmdk *dkp;
-
-	dkp = ddi_get_soft_state(cmdk_state, ddi_get_instance(dip));
-	if (dkp == NULL)
-		return (ENXIO);
-
-	if ((DKTP_EXT->tg_rdonly))
-		tgattribute->media_is_writable = FALSE;
-	else
-		tgattribute->media_is_writable = TRUE;
-
-	return (0);
-}
 
 /*
  * Create and register the devid.
@@ -1501,7 +1475,7 @@ cmdk_devid_read(struct cmdk *dkp)
 	tgdk_iob_handle	handle;
 	int		rc = DDI_FAILURE;
 
-	if (cmlb_get_devid_block(dkp->dk_cmlbhandle, &blk))
+	if (cmlb_get_devid_block(dkp->dk_cmlbhandle, &blk, 0))
 		goto err;
 
 	/* read the devid */
@@ -1563,7 +1537,7 @@ cmdk_devid_fabricate(struct cmdk *dkp)
 	if (rc != DDI_SUCCESS)
 		goto err;
 
-	if (cmlb_get_devid_block(dkp->dk_cmlbhandle, &blk)) {
+	if (cmlb_get_devid_block(dkp->dk_cmlbhandle, &blk, 0)) {
 		/* no device id block address */
 		return (DDI_FAILURE);
 	}
@@ -1645,7 +1619,8 @@ cmdk_bbh_reopen(struct cmdk *dkp)
 		    &slcn,
 		    &slcb,
 		    NULL,
-		    &vtoctag)) {
+		    &vtoctag,
+		    0)) {
 			goto empty;	/* no partition table exists */
 		}
 
@@ -1728,7 +1703,8 @@ cmdk_bbh_reopen(struct cmdk *dkp)
 		    &slcn,
 		    &slcb,
 		    NULL,
-		    NULL)) {
+		    NULL,
+		    0)) {
 			goto empty1;
 		}
 

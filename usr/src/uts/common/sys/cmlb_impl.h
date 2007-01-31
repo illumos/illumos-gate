@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,13 +68,14 @@ extern "C" {
 #define	CMLB_ERROR		0x00000004
 
 
-#define	CMLB_MUTEX(un)		(&((un)->un_mutex))
-#define	CMLB_DEVINFO(un)	((un)->un_devi)
-#define	CMLB_LABEL(un)		(DEVI(((un)->un_devi))->devi_binding_name)
+#define	CMLB_MUTEX(cl)		(&((cl)->cl_mutex))
+#define	CMLB_DEVINFO(cl)	((cl)->cl_devi)
+#define	CMLB_LABEL(cl)		(DEVI(((cl)->cl_devi))->devi_binding_name)
 
 
-#define	ISREMOVABLE(un)		(un->un_is_removable == 1)
-#define	ISCD(un)		(un->un_device_type == DTYPE_RODIRECT)
+#define	ISREMOVABLE(cl)		(cl->cl_is_removable == 1)
+#define	ISCD(cl)		(cl->cl_device_type == DTYPE_RODIRECT)
+#define	ISHOTPLUGGABLE(cl)	(cl->cl_is_hotpluggable == 1)
 
 #if defined(_SUNOS_VTOC_8)
 
@@ -127,96 +127,106 @@ typedef enum
 
 
 typedef struct cmlb_lun {
-	dev_info_t	*un_devi;		/* pointer to devinfo */
-	struct  	dk_vtoc un_vtoc;	/* disk VTOC */
-	struct  	dk_geom un_g;		/* disk geometry */
+	dev_info_t	*cl_devi;		/* pointer to devinfo */
+	struct dk_vtoc	cl_vtoc;	/* disk VTOC */
+	struct dk_geom	cl_g;		/* disk geometry */
 
-	diskaddr_t	un_blockcount;		/* capacity */
+	diskaddr_t	cl_blockcount;		/* capacity */
+	uint32_t	cl_tgt_blocksize;	/* blocksize */
 
-	diskaddr_t	un_solaris_size;	/* size of Solaris partition */
-	uint_t		un_solaris_offset;	/* offset to Solaris part. */
+	diskaddr_t	cl_solaris_size;	/* size of Solaris partition */
+	uint_t		cl_solaris_offset;	/* offset to Solaris part. */
 
-	struct  dk_map  un_map[MAXPART];	/* logical partitions */
-	diskaddr_t	un_offset[MAXPART];	/* partition start blocks */
+	struct  dk_map  cl_map[MAXPART];	/* logical partitions */
+	diskaddr_t	cl_offset[MAXPART];	/* partition start blocks */
 
-	struct fmap	un_fmap[FD_NUMPART];	/* fdisk partitions */
+	struct fmap	cl_fmap[FD_NUMPART];	/* fdisk partitions */
 
-	uchar_t		un_asciilabel[LEN_DKL_ASCII];	/* Disk ASCII label */
+	uchar_t		cl_asciilabel[LEN_DKL_ASCII];	/* Disk ASCII label */
 
 	/*
 	 * This is the HBAs current notion of the geometry of the drive,
 	 * for HBAs that support the "geometry" property.
 	 */
-	struct cmlb_geom	un_lgeom;
+	struct cmlb_geom	cl_lgeom;
 
 	/*
 	 * This is the geometry of the device as reported by the MODE SENSE,
 	 * command, Page 3 (Format Device Page) and Page 4 (Rigid Disk Drive
 	 * Geometry Page), assuming MODE SENSE is supported by the target.
 	 */
-	struct cmlb_geom	un_pgeom;
+	struct cmlb_geom	cl_pgeom;
 
-	ushort_t	un_dkg_skew;		/* skew */
+	ushort_t	cl_dkg_skew;		/* skew */
 
-	cmlb_label_t	un_def_labeltype;	/* default label type */
+	cmlb_label_t	cl_def_labeltype;	/* default label type */
 
 	/* label type based on which minor nodes were created last */
-	cmlb_label_t	un_last_labeltype;
+	cmlb_label_t	cl_last_labeltype;
 
-	cmlb_label_t	un_cur_labeltype;	/* current label type */
+	cmlb_label_t	cl_cur_labeltype;	/* current label type */
 
 	/* indicates whether vtoc label is read from media */
-	uchar_t		un_vtoc_label_is_from_media;
+	uchar_t		cl_vtoc_label_is_from_media;
 
-	cmlb_state_t	un_state;		/* state of handle */
+	cmlb_state_t	cl_state;		/* state of handle */
 
-	int		un_f_geometry_is_valid;
-	int		un_sys_blocksize;
+	int		cl_f_geometry_is_valid;
+	int		cl_sys_blocksize;
 
-	kmutex_t	un_mutex;
+	kmutex_t	cl_mutex;
 
 	/* the following are passed in at attach time */
-	int		un_is_removable;	/* 1 is removable */
-
-	int		un_alter_behavior;
-	char 		*un_node_type;		/* DDI_NT_... */
-	int		un_device_type;		/* DTYPE_DIRECT,.. */
+	int		cl_is_removable;	/* 1 is removable */
+	int		cl_is_hotpluggable;	/* 1 is hotpluggable */
+	int		cl_alter_behavior;
+	char 		*cl_node_type;		/* DDI_NT_... */
+	int		cl_device_type;		/* DTYPE_DIRECT,.. */
+	int		cl_reserved;		/* reserved efi partition # */
 	cmlb_tg_ops_t 	*cmlb_tg_ops;
-
 
 } cmlb_lun_t;
 
-_NOTE(MUTEX_PROTECTS_DATA(cmlb_lun::un_mutex, cmlb_lun))
+_NOTE(MUTEX_PROTECTS_DATA(cmlb_lun::cl_mutex, cmlb_lun))
 _NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::cmlb_tg_ops))
-_NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::un_devi))
-_NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::un_is_removable))
-_NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::un_node_type))
-_NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::un_sys_blocksize))
+_NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::cl_devi))
+_NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::cl_is_removable))
+_NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::cl_is_hotpluggable))
+_NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::cl_node_type))
+_NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::cl_sys_blocksize))
+_NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::cl_alter_behavior))
 _NOTE(SCHEME_PROTECTS_DATA("private data", cmlb_geom))
+_NOTE(SCHEME_PROTECTS_DATA("safe sharing", cmlb_lun::cl_f_geometry_is_valid))
 
 
-#define	DK_TG_READ(ihdlp, bufaddr, start_block, reqlength)\
-	(ihdlp->cmlb_tg_ops->tg_rdwr)(CMLB_DEVINFO(ihdlp), TG_READ, bufaddr,\
-	    start_block, reqlength)
 
-#define	DK_TG_WRITE(ihdlp, bufaddr, start_block, reqlength)\
-	(ihdlp->cmlb_tg_ops->tg_rdwr)(CMLB_DEVINFO(ihdlp), TG_WRITE, bufaddr,\
-	    start_block, reqlength)
+#define	DK_TG_READ(ihdlp, bufaddr, start_block, reqlength, tg_cookie)\
+	(ihdlp->cmlb_tg_ops->tg_rdwr)(CMLB_DEVINFO(ihdlp), TG_READ, \
+	bufaddr, start_block, reqlength, tg_cookie)
 
-#define	DK_TG_GETPHYGEOM(ihdlp, phygeomp) \
-	(ihdlp->cmlb_tg_ops->tg_getphygeom)(CMLB_DEVINFO(ihdlp), \
-	    (cmlb_geom_t *)phygeomp)
+#define	DK_TG_WRITE(ihdlp,  bufaddr, start_block, reqlength, tg_cookie)\
+	(ihdlp->cmlb_tg_ops->tg_rdwr)(CMLB_DEVINFO(ihdlp), TG_WRITE,\
+	bufaddr, start_block, reqlength, tg_cookie)
 
-#define	DK_TG_GETVIRTGEOM(ihdlp, virtgeomp) \
-	(ihdlp->cmlb_tg_ops->tg_getvirtgeom)(CMLB_DEVINFO(ihdlp),\
-	    (cmlb_geom_t *)virtgeomp)
+#define	DK_TG_GETPHYGEOM(ihdlp, phygeomp, tg_cookie) \
+	(ihdlp->cmlb_tg_ops->tg_getinfo)(CMLB_DEVINFO(ihdlp), TG_GETPHYGEOM,\
+	    (void *)phygeomp, tg_cookie)
 
-#define	DK_TG_GETCAP(ihdlp, capp) \
-	(ihdlp->cmlb_tg_ops->tg_getcapacity)(CMLB_DEVINFO(ihdlp), capp)
+#define	DK_TG_GETVIRTGEOM(ihdlp, virtgeomp, tg_cookie) \
+	(ihdlp->cmlb_tg_ops->tg_getinfo)(CMLB_DEVINFO(ihdlp), TG_GETVIRTGEOM,\
+	    (void *)virtgeomp, tg_cookie)
 
-#define	DK_TG_GETATTRIBUTE(ihdlp, attributep) \
-	(ihdlp->cmlb_tg_ops->tg_getattribute)(CMLB_DEVINFO(ihdlp), \
-	    attributep)
+#define	DK_TG_GETCAP(ihdlp, capp, tg_cookie) \
+	(ihdlp->cmlb_tg_ops->tg_getinfo)(CMLB_DEVINFO(ihdlp), TG_GETCAPACITY,\
+	capp, tg_cookie)
+
+#define	DK_TG_GETBLOCKSIZE(ihdlp, lbap, tg_cookie) \
+	(ihdlp->cmlb_tg_ops->tg_getinfo)(CMLB_DEVINFO(ihdlp),\
+	TG_GETBLOCKSIZE, lbap, tg_cookie)
+
+#define	DK_TG_GETATTRIBUTE(ihdlp, attributep, tg_cookie) \
+	(ihdlp->cmlb_tg_ops->tg_getinfo)(CMLB_DEVINFO(ihdlp), TG_GETATTR,\
+	    attributep, tg_cookie)
 
 #ifdef __cplusplus
 }

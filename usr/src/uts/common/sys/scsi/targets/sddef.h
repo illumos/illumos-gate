@@ -32,6 +32,7 @@
 #include <sys/dktp/fdisk.h>
 #include <sys/note.h>
 #include <sys/mhd.h>
+#include <sys/cmlb.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -139,29 +140,6 @@ union ocmap {
 
 #define	lyropen rinfo.lyr_open
 #define	regopen rinfo.reg_open
-
-
-/*
- * fdisk partition mapping structure
- */
-struct fmap {
-	daddr_t fmap_start;		/* starting block number */
-	daddr_t fmap_nblk;		/* number of blocks */
-};
-
-/*
- * cache structure for saving geometry from target and HBA.
- */
-struct geom_cache {
-	unsigned int	g_ncyl;
-	unsigned short	g_acyl;
-	unsigned short	g_nhead;
-	unsigned short	g_nsect;
-	unsigned short	g_secsize;
-	unsigned int	g_capacity;
-	unsigned short	g_intrlv;
-	unsigned short	g_rpm;
-};
 
 
 #define	SD_CDB_GROUP0		0
@@ -359,50 +337,12 @@ struct sd_lun {
 	 * stats, and other such bookkeeping info.
 	 */
 	union	ocmap	un_ocmap;		/* open partition map */
-	struct	dk_map	un_map[MAXPART];	/* logical partitions */
-	diskaddr_t	un_offset[MAXPART];	/* partition start blocks */
 	struct	kstat	*un_pstats[NSDMAP];	/* partition statistics */
-	struct	dk_vtoc un_vtoc;		/* disk VTOC */
-	struct	dk_geom un_g;			/* disk geometry */
 	struct	kstat	*un_stats;		/* disk statistics */
 	kstat_t		*un_errstats;		/* for error statistics */
 	uint64_t	un_exclopen;		/* exclusive open bitmask */
 	ddi_devid_t	un_devid;		/* device id */
 	uint_t		un_vpd_page_mask;	/* Supported VPD pages */
-	uchar_t		un_asciilabel[LEN_DKL_ASCII];	/* Disk ASCII label */
-
-	/*
-	 * Support for drives with 'fdisk' type partitions. (See fdisk.h)
-	 *
-	 * On a drive with an fdisk-type of partition table, un_blockcount
-	 * will specify the size of the entire disk, and un_solaris_size
-	 * denotes the size of the fdisk partition where Solaris resides.
-	 * Also un_solaris_offset specifies the offset from block 0 on the
-	 * drive to the first block of the Solaris partiton.
-	 *
-	 * If the disk does not have an fdisk partition table, then
-	 * un_blockcount and un_solaris_size should be identical.
-	 *
-	 * Note that under this scheme, only a single active Solaris
-	 * partition can be supported at any one time.
-	 */
-	daddr_t		un_solaris_size;	/* size of Solaris partition */
-	uint_t		un_solaris_offset;	/* offset to Solaris part. */
-	ushort_t	un_dkg_skew;		/* skew */
-	struct fmap	un_fmap[FD_NUMPART];	/* fdisk partitions */
-
-	/*
-	 * This is the HBAs current notion of the geometry of the drive,
-	 * for HBAs that support the "geometry" property.
-	 */
-	struct geom_cache	un_lgeom;
-
-	/*
-	 * This is the geometry of the device as reported by the MODE SENSE,
-	 * command, Page 3 (Format Device Page) and Page 4 (Rigid Disk Drive
-	 * Geometry Page), assuming MODE SENSE is supported by the target.
-	 */
-	struct geom_cache	un_pgeom;
 
 	/*
 	 * Bit fields for various configuration/state/status info.
@@ -416,8 +356,6 @@ struct sd_lun {
 						/* value is currently valid */
 	    un_f_tgt_blocksize_is_valid	:1,	/* The un_tgt_blocksize */
 						/* value is currently valid */
-	    un_f_geometry_is_valid	:1,	/* The geometry of the */
-						/* target is currently valid */
 	    un_f_allow_bus_device_reset	:1,	/* Driver may issue a BDR as */
 						/* a part of error recovery. */
 	    un_f_is_fibre		:1,	/* The device supports fibre */
@@ -460,15 +398,10 @@ struct sd_lun {
 	    un_f_lun_reset_enabled	:1,	/* Set if target supports */
 						/* SCSI Logical Unit Reset */
 	    un_f_doorlock_supported	:1,	/* Device supports Doorlock */
-	    un_f_start_stop_supported	:1;	/* device has motor */
+	    un_f_start_stop_supported	:1,	/* device has motor */
+	    un_f_reserved1		:1;
 
 	uint32_t
-	    un_f_vtoc_label_supported	:1,	/* have vtoc disk label */
-	    un_f_vtoc_errlog_supported	:1,	/* write error in system */
-						/* log if VTOC is not valid */
-	    un_f_default_vtoc_supported	:1,	/* build default */
-						/* label if disk has */
-						/* no valid one */
 	    un_f_mboot_supported	:1,	/* mboot supported */
 	    un_f_is_hotpluggable	:1,	/* hotpluggable */
 	    un_f_has_removable_media	:1,	/* has removable media */
@@ -493,9 +426,8 @@ struct sd_lun {
 						/* default to NO */
 	    un_f_wcc_inprog		:1,	/* write cache change in */
 						/* progress */
-	    un_f_capacity_adjusted	:1,	/* for 1TB disk & off-by-1 */
 	    un_f_ejecting		:1,	/* media is ejecting */
-	    un_f_reserved		:12;
+	    un_f_reserved		:16;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;
@@ -555,7 +487,6 @@ struct sd_lun {
 	 * sense code.
 	 */
 	uint_t		un_sonoma_failure_count;
-	int		un_reserved;	/* reserved partition # */
 
 	/*
 	 * Support for failfast operation.
@@ -584,11 +515,13 @@ struct sd_lun {
 	uint_t				sd_fi_fifo_start;
 	uint_t				sd_fi_fifo_end;
 	uint_t				sd_injection_mask;
+
 #endif
 
-
+	cmlb_handle_t	un_cmlbhandle;
 };
 
+#define	SD_IS_VALID_LABEL(un)  (cmlb_is_valid(un->un_cmlbhandle))
 
 /*
  * Macros for conversions between "target" and "system" block sizes, and
@@ -659,14 +592,14 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_max_hba_cdb))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_status_len))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_f_arq_enabled))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_ctype))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_solaris_offset))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_cmlbhandle))
+
 
 _NOTE(SCHEME_PROTECTS_DATA("safe sharing",
 	sd_lun::un_mhd_token
 	sd_lun::un_state
 	sd_lun::un_tagflags
 	sd_lun::un_f_format_in_progress
-	sd_lun::un_f_geometry_is_valid
 	sd_lun::un_resvd_timeid
 	sd_lun::un_reset_throttle_timeid
 	sd_lun::un_startstop_timeid
@@ -678,8 +611,6 @@ _NOTE(SCHEME_PROTECTS_DATA("safe sharing",
 _NOTE(SCHEME_PROTECTS_DATA("stable data",
 	sd_lun::un_reserve_release_time
 	sd_lun::un_max_xfer_size
-	sd_lun::un_offset
-	sd_lun::un_map
 	sd_lun::un_f_is_fibre
 	sd_lun::un_node_type
 	sd_lun::un_buf_chain_type
@@ -697,11 +628,9 @@ _NOTE(SCHEME_PROTECTS_DATA("Unshared data",
 	cdrom_read
 	dk_cinfo
 	dk_devid
-	dk_geom
 	dk_label
 	dk_map
 	dk_temperature
-	geom_cache
 	mhioc_inkeys
 	mhioc_inresvs
 	mode_caching
@@ -1077,7 +1006,6 @@ struct sd_fi_un {
 	short   un_resvd_status;
 	uint32_t
 		un_f_arq_enabled,
-		un_f_geometry_is_valid,
 		un_f_allow_bus_device_reset,
 		un_f_opt_queueing;
 	timeout_id_t    un_restart_timeid;
@@ -1234,8 +1162,7 @@ struct sd_fi_arq {
 /* Return codes for sd_ready_and_valid */
 #define	SD_READY_VALID			0
 #define	SD_NOT_READY_VALID		1
-#define	SD_READY_NOT_VALID		2
-#define	SD_RESERVED_BY_OTHERS		3
+#define	SD_RESERVED_BY_OTHERS		2
 
 #define	SD_PATH_STANDARD		0
 #define	SD_PATH_DIRECT			1

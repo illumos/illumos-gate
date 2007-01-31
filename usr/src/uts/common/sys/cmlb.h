@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,33 +53,61 @@ typedef struct tg_attribute {
 	int media_is_writable;
 } tg_attribute_t;
 
-#define	TG_READ		0
-#define	TG_WRITE	1
 
-#define	TG_DK_OPS_VERSION_0	0x0
 
-/* flag definitions for alter_behavior arg on attach */
+/* bit definitions for alter_behavior passed to cmlb_attach */
 
 #define	CMLB_CREATE_ALTSLICE_VTOC_16_DTYPE_DIRECT	0x00000001
 #define	CMLB_FAKE_GEOM_LABEL_IOCTLS_VTOC8		0x00000002
+#define	CMLB_OFF_BY_ONE					0x00000004
+
+
+/* bit definitions of flag passed to cmlb_validate */
+#define	CMLB_SILENT					0x00000001
+
+/* version for tg_ops */
+#define	TG_DK_OPS_VERSION_0	0
+#define	TG_DK_OPS_VERSION_1	1
+
+/* definitions for cmd passed to tg_rdwr */
+#define	TG_READ			0
+#define	TG_WRITE		1
+
+/* definitions for cmd passed to tg_getinfo */
+#define	TG_GETPHYGEOM		1
+#define	TG_GETVIRTGEOM		2
+#define	TG_GETCAPACITY		3
+#define	TG_GETBLOCKSIZE		4
+#define	TG_GETATTR		5
+
 
 /*
  * Ops vector including utility functions into target driver that cmlb uses.
  */
 typedef struct cmlb_tg_ops {
-	int	version;
+	int	tg_version;
+
 	/*
 	 * tg_rdwr:
 	 *	perform read/write on target device associated with devi.
+	 *
 	 * Arguments:
+	 *
 	 *	devi:		pointer to device's dev_info structure.
+	 *
 	 *	cmd:		operation to perform.
 	 *			Possible values: TG_READ, TG_WRITE
+	 *
 	 *	bufp:		pointer to allocated buffer for transfer
+	 *
 	 *	start_block:	starting block number to read/write (based on
 	 *			system blocksize, DEV_BSIZE)
 	 *
 	 *	reqlength:	requested transfer length (in bytes)
+	 *
+	 *	tg_cookie 	cookie from target driver to be passed back to
+	 *			target driver when we call back to it through
+	 *			tg_ops.
 	 *
 	 * Note: It is the responsibility of caller to make sure
 	 *	length of buffer pointed to by bufp is at least equal to
@@ -96,87 +123,79 @@ typedef struct cmlb_tg_ops {
 	 *	EINVAL		invalid command value.
 	 */
 	int (*tg_rdwr)(dev_info_t *devi, uchar_t cmd, void *bufp,
-	    diskaddr_t start_block, size_t reqlength);
+	    diskaddr_t start_block, size_t reqlength, void *tg_cookie);
 
 	/*
-	 * tg_getphygeom:
-	 *	Obtain raw physical geometry from target, and store in structure
-	 *	pointed to by phygeomp
-	 *
-	 * Arguments:
-	 *	devi:		pointer to device's dev_info structure.
-	 *	phygeomp	pointer to allocated structure for
-	 *			physical geometry info.
-	 * Return values:
-	 *	0		success
-	 * 	EACCESS		reservation conflict
-	 *	EINVAL		not applicable
-	 *	EIO		other errors occurred.
-	 *	ENXIO		internal error/ invalid devi
-	 */
-	int (*tg_getphygeom)(dev_info_t *devi, cmlb_geom_t *phygeomp);
-
-	/*
-	 * tg_getvirtgeom:
-	 *	obtain HBA geometry for the target and store in struct pointed
-	 *	to by virtgeomp
-	 * Arguments:
-	 *	devi:		pointer to device's dev_info structure.
-	 *	virtgeomp	pointer to allocated structure for
-	 *			virtual geometry info.
-	 * Return values:
-	 *	0		success
-	 * 	EACCESS		reservation conflict
-	 *	EINVAL		not applicable or HBA does not provide info.
-	 *	EIO		other errors occured.
-	 *	ENXIO		internal error/ invalid devi
-	 *
-	 */
-	int (*tg_getvirtgeom)(dev_info_t *devi, cmlb_geom_t *virtgeomp);
-
-	/*
-	 * tg_getcapacity
-	 *	Report the capacity of the target (in system blocksize,
-	 *	DEV_BSIZE) and store the value where capp is pointing to.
-	 *
-	 * Arguments:
-	 *	devi:		pointer to device's dev_info structure.
-	 *	capp		pointer to capacity value.
-	 *
-	 * Return values:
-	 *	0		success
-	 * 	EINVAL		no media in drive
-	 *	EIO		error occured.
-	 *	ENOTSUP		target does not support getting capacity info.
-	 *	EACCESS		reservation conflict
-	 *	ENXIO		internal error/ invalid devi
-	 */
-	int (*tg_getcapacity)(dev_info_t *devi, diskaddr_t *capp);
-
-	/*
-	 * tg_getattribute:
+	 * tg_getinfo:
 	 * 	Report the information requested on device/media and
-	 *	store in area pointed to by tgdevmediainfop
+	 *	store the requested info in area pointed to by arg.
 	 *
 	 * Arguments:
 	 *	devi:		pointer to device's dev_info structure.
-	 *	tgattribute	pointer to area for attribute info
+	 *
+	 *	cmd:		operation to perform
+	 *
+	 *	arg:		arg for the operation for result.
+	 *
+	 *	tg_cookie 	cookie from target driver to be passed back to
+	 *			target driver when we call back to it through
+	 *			tg_ops.
+	 *
+	 * 	Possible commands and the interpretation of arg:
+	 *
+	 *	cmd:
+	 *		TG_GETPHYGEOM
+	 *			Obtain raw physical geometry from target,
+	 *			and store in structure pointed to by arg,
+	 *			a cmlb_geom_t structure.
+	 *
+	 * 		TG_GETVIRTGEOM:
+	 *			Obtain HBA geometry for the target and
+	 *			store in struct pointed to by arg,
+	 *			a cmlb_geom_t structure.
+	 *
+	 *		TG_GETCAPACITY:
+	 *			Report the capacity of the target (in system
+	 *			blocksize (DEV_BSIZE) and store in the
+	 *			space pointed to by arg, a diskaddr_t.
+	 *
+	 *		TG_GETBLOCKSIZE:
+	 *			Report the block size of the target
+	 *			in the space pointed to by arg, a uint32_t.
+	 *
+	 *		TG_GETATTR:
+	 * 			Report the information requested on
+	 *			device/media and store in area pointed to by
+	 *			arg, a tg_attribute_t structure.
+	 *			Return values:
 	 *
 	 * Return values:
 	 *	0		success
-	 * 	EINVAL		no media in drive
-	 *	EIO		error occured.
-	 *	ENOTSUP		target does not support getting capacity info.
+	 *
 	 *	EACCESS		reservation conflict
 	 *
-	 * Return values:
-	 *	ENXIO		internal error/ invalid devi
-	 *	EACCESS		reservation conflict
-	 * 	EINVAL		not applicable
-	 * 	EIO		I/O failed
+	 *	ENXIO		internal error/invalid devi
+	 *
+	 *	EINVAL		When command is TG_GETPHYGEOM or
+	 *			TG_GETVIRTGEOM, or TG_GETATTR, this return code
+	 *			indicates the operation is not applicable to
+	 *			target.
+	 *			In case of TG_GETCAP, this return code
+	 *			indicates no media in the drive.
+	 *
+	 *	EIO		An error occured during obtaining info
+	 *			from device/media.
+	 *
+	 *	ENOTSUP		In case of TG_GETCAP, target does not
+	 *			support getting capacity info.
+	 *
+	 *	ENOTTY		Unknown command.
+	 *
+	 *
 	 */
-	int (*tg_getattribute)(dev_info_t *devi, tg_attribute_t
-	    *tgattribute);
+	int (*tg_getinfo)(dev_info_t *devi, int cmd, void *arg,
+	    void *tg_cookie);
+
 } cmlb_tg_ops_t;
 
 
@@ -228,6 +247,9 @@ cmlb_alloc_handle(cmlb_handle_t *cmlbhandlep);
  *	is_removable	whether or not device is removable.
  *			0 non-removable, 1 removable.
  *
+ *	is_hotpluggable	whether or not device is hotpluggable.
+ *			0 non-hotpluggable, 1 hotpluggable.
+ *
  *	node_type	minor node type (as used by ddi_create_minor_node)
  *
  *	alter_behavior
@@ -244,8 +266,22 @@ cmlb_alloc_handle(cmlb_handle_t *cmlbhandlep);
  *			geometry and label for DKIOCGGEOM and DKIOCGVTOC
  *			on architecture with VTOC 8 label types.
  *
+ * 			CMLB_OFF_BY_ONE: do the workaround for legacy off-by-
+ *			one bug in obtaining capacity (used for sd).
+ *
  *
  *	cmlbhandle	cmlb handle associated with device
+ *
+ *	tg_cookie 	cookie from target driver to be passed back to target
+ *			driver when we call back to it through tg_ops.
+ *
+ *			cmlb does not interpret the values. It is currently
+ *			used for sd to indicate whether retries are allowed
+ *			on commands or not. e.g when cmlb entries are called
+ *			from interrupt context on removable media, sd rather
+ *			not have retries done.
+ *
+ *
  *
  * Notes:
  *	Assumes a default label based on capacity for non-removable devices.
@@ -266,12 +302,13 @@ cmlb_alloc_handle(cmlb_handle_t *cmlbhandlep);
  * Return values:
  *	0 	Success
  * 	ENXIO 	creating minor nodes failed.
+ *	EINVAL	invalid arg, unsupported tg_ops version
  *
  */
 int
 cmlb_attach(dev_info_t *devi, cmlb_tg_ops_t *tgopsp, int device_type,
-    int is_removable, char *node_type, int alter_behavior, cmlb_handle_t
-    cmlbhandle);
+    int is_removable, int is_hotpluggable, char *node_type,
+    int alter_behavior, cmlb_handle_t cmlbhandle, void *tg_cookie);
 
 
 /*
@@ -282,6 +319,11 @@ cmlb_attach(dev_info_t *devi, cmlb_tg_ops_t *tgopsp, int device_type,
  * Arguments
  *	cmlbhandle	cmlb handle associated with device.
  *
+ * 	int 		flags
+ *			currently used for verbosity control.
+ *			CMLB_SILENT is the only current definition for it
+ *	tg_cookie 	cookie from target driver to be passed back to target
+ *			driver when we call back to it through tg_ops.
  * Notes:
  *	If new label type is different from the current, adjust minor nodes
  *	accordingly.
@@ -299,7 +341,7 @@ cmlb_attach(dev_info_t *devi, cmlb_tg_ops_t *tgopsp, int device_type,
  *
  */
 int
-cmlb_validate(cmlb_handle_t cmlbhandle);
+cmlb_validate(cmlb_handle_t cmlbhandle, int flags, void *tg_cookie);
 
 /*
  * cmlb_invalidate:
@@ -307,10 +349,28 @@ cmlb_validate(cmlb_handle_t cmlbhandle);
  *
  * Arguments:
  *	cmlbhandle	cmlb handle associated with device.
+ *	tg_cookie 	cookie from target driver to be passed back to target
+ *			driver when we call back to it through tg_ops.
  */
 void
-cmlb_invalidate(cmlb_handle_t cmlbhandle);
+cmlb_invalidate(cmlb_handle_t cmlbhandle, void *tg_cookie);
 
+
+
+/*
+ * cmlb_is_valid
+ *	 Get status on whether the incore label/geom data is valid
+ *
+ * Arguments:
+ *      cmlbhandle      cmlb handle associated with device.
+ *
+ * Return values:
+ *      TRUE if valid
+ *      FALSE otherwise.
+ *
+ */
+int
+cmlb_is_valid(cmlb_handle_t cmlbhandle);
 
 /*
  * cmlb_partinfo:
@@ -319,11 +379,12 @@ cmlb_invalidate(cmlb_handle_t cmlbhandle);
  * Arguments:
  *	cmlbhandle	cmlb handle associated with device.
  *	part		partition number
+ *			driver when we call back to it through tg_ops.
  *	nblocksp	pointer to number of blocks
  *	startblockp	pointer to starting block
  *	partnamep	pointer to name of partition
  *	tagp		pointer to tag info
- *
+ *	tg_cookie 	cookie from target driver to be passed back to target
  *
  * Notes:
  *	If in-core label is not valid, this functions tries to revalidate
@@ -345,7 +406,7 @@ cmlb_invalidate(cmlb_handle_t cmlbhandle);
  */
 int
 cmlb_partinfo(cmlb_handle_t cmlbhandle, int part, diskaddr_t *nblocksp,
-    diskaddr_t *startblockp, char **partnamep, uint16_t *tagp);
+    diskaddr_t *startblockp, char **partnamep, uint16_t *tagp, void *tg_cookie);
 
 
 /*
@@ -376,6 +437,9 @@ cmlb_partinfo(cmlb_handle_t cmlbhandle, int part, diskaddr_t *nblocksp,
  *	flag    	bit flag, indicating open settings, 32/64 bit type
  *      cred_p  	user credential pointer (not currently used)
  *	rval_p  	not currently used
+ *	tg_cookie 	cookie from target driver to be passed back to target
+ *			driver when we call back to it through tg_ops.
+ *
  *
  *
  * Return values:
@@ -389,8 +453,8 @@ cmlb_partinfo(cmlb_handle_t cmlbhandle, int part, diskaddr_t *nblocksp,
  *	EPERM
  */
 int
-cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
-    int flag, cred_t *cred_p, int *rval_p);
+cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd,
+    intptr_t arg, int flag, cred_t *cred_p, int *rval_p, void *tg_cookie);
 
 /*
  * cmlb_get_devid_block:
@@ -399,18 +463,20 @@ cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
  * Arguments:
  *	cmlbhandle	cmlb handle associated with device.
  *	devidblockp	pointer to block number.
+ *	tg_cookie 	cookie from target driver to be passed back to target
+ *			driver when we call back to it through tg_ops.
  *
  * Notes:
  *	It stores the block number of device id in the area pointed to
  *	by devidblockp.
- * 	with the block number of device id.
  *
  * Return values:
  *	0	success
  *	EINVAL 	device id does not apply to current label type.
  */
 int
-cmlb_get_devid_block(cmlb_handle_t cmlbhandle, diskaddr_t *devidblockp);
+cmlb_get_devid_block(cmlb_handle_t cmlbhandle, diskaddr_t *devidblockp,
+    void *tg_cookie);
 
 
 /*
@@ -422,12 +488,14 @@ cmlb_get_devid_block(cmlb_handle_t cmlbhandle, diskaddr_t *devidblockp);
  * Arguments:
  *	cmlbhandle	cmlb handle associated with device.
  *
+ *	tg_cookie 	cookie from target driver to be passed back to target
+ *			driver when we call back to it through tg_ops.
  * Return values:
  *	0	Success
  * 	ENXIO	Re-creating minor node failed.
  */
 int
-cmlb_close(cmlb_handle_t cmlbhandle);
+cmlb_close(cmlb_handle_t cmlbhandle, void *tg_cookie);
 
 /*
  * cmlb_detach:
@@ -437,10 +505,12 @@ cmlb_close(cmlb_handle_t cmlbhandle);
  *
  * Arguments:
  *	cmlbhandle	cmlb handle associated with device.
+ *	tg_cookie 	cookie from target driver to be passed back to target
+ *			driver when we call back to it through tg_ops.
  *
  */
 void
-cmlb_detach(cmlb_handle_t cmlbhandle);
+cmlb_detach(cmlb_handle_t cmlbhandle, void *tg_cookie);
 
 /*
  * cmlb_free_handle

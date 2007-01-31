@@ -21,7 +21,7 @@
 #
 # uts/sparc/sd/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -122,6 +122,7 @@ TEST		= test
 # any loaded after the first are ignored.
 
 SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
+CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
 
 warlock: warlock_alone warlock_with_esp warlock_with_isp warlock_with_fas \
 	warlock_with_glm warlock_with_uata warlock_with_mpt
@@ -131,8 +132,9 @@ warlock_alone: $(WARLOCK_OK)
 %.wlcmd:
 	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-$(WARLOCK_OK): sd.wlcmd $(WARLOCK_OUT) scsi_files warlock_ddi.files
+$(WARLOCK_OK): sd.wlcmd $(WARLOCK_OUT) scsi_files warlock_ddi.files cmlb_files
 	$(WARLOCK) -c $(WLCMD_DIR)/sd.wlcmd $(WARLOCK_OUT) $(SCSI_FILES) \
+		$(CMLB_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 
@@ -140,42 +142,50 @@ $(WARLOCK_OK): sd.wlcmd $(WARLOCK_OUT) scsi_files warlock_ddi.files
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
 warlock_with_esp: sd_with_esp.wlcmd $(WARLOCK_OUT) scsi_files esp_files \
-	warlock_ddi.files
+	warlock_ddi.files cmlb_files
 	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_esp.wlcmd \
-		$(WARLOCK_OUT) ../esp/esp $(SCSI_FILES) \
+		$(WARLOCK_OUT) ../esp/esp $(SCSI_FILES) $(CMLB_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
 warlock_with_fas: sd_with_fas.wlcmd $(WARLOCK_OUT) scsi_files fas_files \
-	warlock_ddi.files
+	warlock_ddi.files cmlb_files
 	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_fas.wlcmd \
 		$(WARLOCK_OUT) ../fas/fas \
 		../fas/fas_callbacks \
-		$(SCSI_FILES) \
+		$(SCSI_FILES) $(CMLB_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
 warlock_with_isp: sd_with_isp.wlcmd $(WARLOCK_OUT) scsi_files isp_files \
-	warlock_ddi.files
+	warlock_ddi.files cmlb_files
 	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_isp.wlcmd \
 		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/isp/isp $(SCSI_FILES) \
+		$(CMLB_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
 warlock_with_glm: sd_with_glm.wlcmd $(WARLOCK_OUT) scsi_files glm_files \
-	warlock_ddi.files
+	warlock_ddi.files cmlb_files
 	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_glm.wlcmd \
-		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/glm/glm $(SCSI_FILES)  \
+		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/glm/glm $(SCSI_FILES) \
+		$(CMLB_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
 warlock_with_uata: sd_with_uata.wlcmd $(WARLOCK_OUT) scsi_files uata_files \
-	warlock_ddi.files
+	warlock_ddi.files cmlb_files
 	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_uata.wlcmd \
 		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/uata/*.ll $(SCSI_FILES) \
+		$(CMLB_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
 warlock_with_mpt: sd_with_mpt.wlcmd $(WARLOCK_OUT) scsi_files mpt_files \
-	warlock_ddi.files
+	warlock_ddi.files cmlb_files
 	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_mpt.wlcmd \
 		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/mpt/*.ll $(SCSI_FILES)  \
+		$(CMLB_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
+		
+cmlb_files:
+	@cd ../cmlb; pwd; $(MAKE) warlock
+
 
 scsi_files:
 	@cd ../scsi; pwd; $(MAKE) warlock
