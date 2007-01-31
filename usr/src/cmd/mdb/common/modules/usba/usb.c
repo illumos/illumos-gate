@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -756,6 +755,10 @@ usba_clear_debug_buf(
 	return (DCMD_OK);
 }
 
+/* prtusb entries */
+extern int prtusb(uintptr_t, uint_t, int, const mdb_arg_t *);
+
+extern void prt_usb_usage(void);
 
 /*
  * MDB module linkage information:
@@ -772,6 +775,8 @@ static const mdb_dcmd_t dcmds[] = {
 	    "print usba_debug_buf", usba_debug_buf, NULL},
 	{ "usba_clear_debug_buf", NULL,
 	    "clear usba_debug_buf", usba_clear_debug_buf, NULL},
+	{ "prtusb", ": [-t] [-v] [-i No.]",
+	    "Print usb tree and descriptors", prtusb, prt_usb_usage},
 	{ NULL }
 };
 
