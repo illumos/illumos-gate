@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,17 +78,11 @@
  *	go before it starts recycling file descriptors.  In general,
  *	it is necessary to use a file descriptor for each level of the
  *	tree, but they can be recycled for deep trees by saving the
- *	position, closing, re-opening, and seeking.  It is possible
- *	to start recycling file descriptors by sensing when we have
- *	run out, but in general this will not be terribly useful if
- *	fn expects to be able to open files.  We could also figure out
- *	how many file descriptors are available and guarantee a certain
- *	number to fn, but we would not know how many to guarantee,
- *	and we do not want to impose the extra overhead on a caller who
- *	knows how many are available without having to figure it out.
- *
- *	It is possible for _xftw to die with a memory fault in the event
- *	of a file system so deeply nested that the stack overflows.
+ *	position, closing, re-opening, and seeking.  In order to descend
+ *	to arbitrary depths, _xftw requires 2 file descriptors to be open
+ *	during the call to openat(), therefore if the depth argument
+ *	is less than 2 _xftw will not use openat(), and it will fail with
+ *	ENAMETOOLONG if it descends to a directory that exceeds PATH_MAX.
  */
 
 /*
@@ -103,34 +96,71 @@
 #include <sys/feature_tests.h>
 
 #if !defined(_LP64) && _FILE_OFFSET_BITS == 64
+#define	fstatat64	_fstatat64
 #define	lstat64		_lstat64
+#define	openat64	_openat64
 #define	readdir64	_readdir64
 #define	stat64		_stat64
 #else
+#define	fstatat		_fstatat
 #define	lstat		_lstat
+#define	openat		_openat
 #define	readdir		_readdir
 #define	stat		_stat
 #endif /* !_LP64 && _FILE_OFFSET_BITS == 64 */
 
+#define	close		_close
 #define	closedir	_closedir
+#define	fdopendir	_fdopendir
 #define	opendir		_opendir
 #define	seekdir		_seekdir
+#define	strdup		_strdup
+#define	strtok_r	_strtok_r
 #define	telldir		_telldir
 
 #include "lint.h"
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/param.h>
 #include <dirent.h>
 #include <errno.h>
 #include <ftw.h>
 #include <string.h>
 #include <stdlib.h>
-#include <alloca.h>
+#include <unistd.h>
 
+struct Var {
+	int level;
+	int odepth;
+};
+
+static DIR *nocdopendir(const char *, struct Var *);
+static int nocdstat(const char *, struct stat *, struct Var *, int);
+static const char *get_unrooted(const char *);
+static int fwalk(const char *, int (*)(const char *, const struct stat *, int),
+	int, struct Var *);
+
+/*ARGSUSED*/
 int
 _xftw(int ver, const char *path,
 	int (*fn)(const char *, const struct stat *, int), int depth)
+{
+	struct Var var;
+	int rc;
+
+	var.level = 0;
+	var.odepth = depth;
+	rc = fwalk(path, fn, depth, &var);
+	return (rc);
+}
+
+/*
+ * This is the recursive walker.
+ */
+static int
+fwalk(const char *path, int (*fn)(const char *, const struct stat *, int),
+	int depth, struct Var *vp)
 {
 	size_t	n;
 	int rc;
@@ -140,19 +170,20 @@ _xftw(int ver, const char *path,
 	struct stat sb;
 	struct dirent *direntp;
 
+	vp->level++;
 
 	/*
 	 * Try to get file status.
 	 * If unsuccessful, errno will say why.
 	 * It's ok to have a symbolic link that points to
 	 * non-existing file. In this case, pass FTW_NS
-	 * to a function instead of aborting _xftw() right away.
+	 * to a function instead of aborting fwalk() right away.
 	 */
-	if (stat(path, &sb) < 0) {
+	if (nocdstat(path, &sb, vp, 0) < 0) {
 #ifdef S_IFLNK
 		save_errno = errno;
-		if ((lstat(path, &sb) != -1) &&
-				((sb.st_mode & S_IFMT) == S_IFLNK)) {
+		if ((nocdstat(path, &sb, vp, AT_SYMLINK_NOFOLLOW) != -1) &&
+		    ((sb.st_mode & S_IFMT) == S_IFLNK)) {
 			errno = save_errno;
 			return (*fn)(path, &sb, FTW_NS);
 		} else  {
@@ -174,7 +205,7 @@ _xftw(int ver, const char *path,
 	 *
 	 *	Open a file to read the directory
 	 */
-	dirp = opendir(path);
+	dirp = nocdopendir(path, vp);
 
 	/*
 	 *	Call the user function, telling it whether
@@ -192,13 +223,6 @@ _xftw(int ver, const char *path,
 		return (rc);
 	}
 
-	/* Create a prefix to which we will append component names */
-	n = strlen(path);
-	subpath = alloca(n + MAXNAMELEN + 2);
-	(void) strcpy(subpath, path);
-	if (subpath[0] != '\0' && subpath[n-1] != '/')
-		subpath[n++] = '/';
-
 	/*
 	 *	Read the directory one component at a time.
 	 *	We must ignore "." and "..", but other than that,
@@ -211,6 +235,18 @@ _xftw(int ver, const char *path,
 		    strcmp(direntp->d_name, "..") == 0)
 			continue;
 
+		/* Create a prefix to which we will append component names */
+		n = strlen(path);
+		subpath = malloc(n + strlen(direntp->d_name) + 2);
+		if (subpath == 0) {
+			(void) closedir(dirp);
+			errno = ENOMEM;
+			return (-1);
+		}
+		(void) strcpy(subpath, path);
+		if (subpath[0] != '\0' && subpath[n-1] != '/')
+			subpath[n++] = '/';
+
 		/* Append component name to the working path */
 		(void) strlcpy(&subpath[n], direntp->d_name, MAXNAMELEN);
 
@@ -220,16 +256,19 @@ _xftw(int ver, const char *path,
 		 */
 		if (depth <= 1) {
 			here = telldir(dirp);
-			if (closedir(dirp) < 0)
+			if (closedir(dirp) < 0) {
+				free(subpath);
 				return (-1);
+			}
 		}
 
 		/*
 		 *	Do a recursive call to process the file.
 		 *	(watch this, sports fans)
 		 */
-		rc = _xftw(ver, subpath, fn, depth-1);
+		rc = fwalk(subpath, fn, depth-1, vp);
 		if (rc != 0) {
+			free(subpath);
 			if (depth > 1)
 				(void) closedir(dirp);
 			return (rc);
@@ -239,12 +278,142 @@ _xftw(int ver, const char *path,
 		 *	If we closed the file, try to reopen it.
 		 */
 		if (depth <= 1) {
-			dirp = opendir(path);
-			if (dirp == NULL)
+			dirp = nocdopendir(path, vp);
+			if (dirp == NULL) {
+				free(subpath);
 				return (-1);
+			}
 			seekdir(dirp, here);
 		}
+		free(subpath);
 	}
 	(void) closedir(dirp);
 	return (0);
+}
+
+/*
+ * Open a directory with an arbitrarily long path name.  If the original
+ * depth arg >= 2, use openat() to make sure that it doesn't fail with
+ * ENAMETOOLONG.
+ */
+static DIR *
+nocdopendir(const char *path, struct Var *vp)
+{
+	int fd, cfd;
+	DIR *fdd;
+	char *dirp, *token, *ptr;
+
+	fdd = opendir(path);
+	if ((vp->odepth > 1) && (fdd == NULL) && (errno == ENAMETOOLONG)) {
+		/*
+		 * Traverse the path using openat() to get the fd for
+		 * fdopendir().
+		 */
+		if ((dirp = strdup(path)) == NULL) {
+			errno = ENAMETOOLONG;
+			return (NULL);
+		}
+		if ((token = strtok_r(dirp, "/", &ptr)) != NULL) {
+		    if ((fd = openat(AT_FDCWD, dirp, O_RDONLY)) < 0) {
+			(void) free(dirp);
+			errno = ENAMETOOLONG;
+			return (NULL);
+		    }
+		    while ((token = strtok_r(NULL, "/", &ptr)) != NULL) {
+			if ((cfd = openat(fd, token, O_RDONLY)) < 0) {
+			    (void) close(fd);
+			    (void) free(dirp);
+			    errno = ENAMETOOLONG;
+			    return (NULL);
+			}
+			(void) close(fd);
+			fd = cfd;
+		    }
+		    (void) free(dirp);
+		    return (fdopendir(fd));
+		}
+		(void) free(dirp);
+		errno = ENAMETOOLONG;
+	}
+	return (fdd);
+}
+
+/*
+ * Stat a file with an arbitrarily long path name. If we aren't doing a
+ * stat on the arg passed to _xftw() and if the original depth arg >= 2,
+ * use openat() to make sure that it doesn't fail with ENAMETOOLONG.
+ */
+static int
+nocdstat(const char *path, struct stat *statp, struct Var *vp, int sym)
+{
+	int fd, cfd;
+	char *dirp, *token, *ptr;
+	int rc;
+	const char *unrootp;
+	int save_err;
+
+	rc = fstatat(AT_FDCWD, path, statp, sym);
+	if ((vp->level > 1) && (vp->odepth >= 2) && (rc < 0) &&
+	    (errno == ENAMETOOLONG)) {
+		/* Traverse path using openat() to get fd for fstatat(). */
+		if ((dirp = strdup(path)) == NULL) {
+			errno = ENAMETOOLONG;
+			return (-1);
+		}
+		if ((token = strtok_r(dirp, "/", &ptr)) != NULL) {
+		    if ((fd = openat(AT_FDCWD, dirp, O_RDONLY)) < 0) {
+			(void) free(dirp);
+			errno = ENAMETOOLONG;
+			return (-1);
+		    }
+		    unrootp = get_unrooted(path);
+		    while (((token = strtok_r(NULL, "/", &ptr)) != NULL) &&
+			(strcmp(token, unrootp) != 0)) {
+			    if ((cfd = openat(fd, token, O_RDONLY)) < 0) {
+				(void) close(fd);
+				(void) free(dirp);
+				errno = ENAMETOOLONG;
+				return (NULL);
+			    }
+			    (void) close(fd);
+			    fd = cfd;
+		    }
+		    (void) free(dirp);
+		    rc = fstatat(fd, unrootp, statp, sym);
+		    save_err = errno;
+		    (void) close(fd);
+		    errno = save_err;
+		    return (rc);
+		}
+		(void) free(dirp);
+		errno = ENAMETOOLONG;
+	}
+	return (rc);
+}
+
+/*
+ * Return pointer basename of path.  This routine doesn't remove
+ * trailing slashes, but there won't be any.
+ */
+static const char *
+get_unrooted(const char *path)
+{
+	const char *ptr;
+
+	if (!path || !*path)
+		return (NULL);
+
+	ptr = path + strlen(path);
+	/* find last char in path before any trailing slashes */
+	while (ptr != path && *--ptr == '/')
+		;
+
+	if (ptr == path)	/* all slashes */
+		return (ptr);
+
+	while (ptr != path)
+		if (*--ptr == '/')
+			return (++ptr);
+
+	return (ptr);
 }

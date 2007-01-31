@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -202,7 +202,7 @@ static mode_t		getmode();
 static char		*gettail();
 
 
-static int		walkflags = FTW_CHDIR|FTW_PHYS|FTW_ANYERR;
+static int walkflags = FTW_CHDIR|FTW_PHYS|FTW_ANYERR|FTW_NOLOOP;
 static struct Node	*savetnode;
 static struct Node	*topnode;
 static struct Node	*freenode;	/* next free node we may use later */
@@ -745,6 +745,11 @@ struct FTW *state;
 		(void) fprintf(stderr,
 			gettext("%s: cannot follow symbolic link %s: %s\n"),
 			cmdname, name, strerror(errno));
+		error = 1;
+		return (0);
+	} else if (type == FTW_DL) {
+		(void) fprintf(stderr, gettext("%s: cycle detected for %s\n"),
+			cmdname, name);
 		error = 1;
 		return (0);
 	}

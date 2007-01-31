@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +40,7 @@
  *	nftw visits each file and directory in the tree starting at
  *	path. It uses the generic directory reading library so it works
  *	for any file system type.  The flags field is used to specify:
- *		FTW_PHYS  Physical walk, does not follow symblolic links
+ *		FTW_PHYS  Physical walk, does not follow symbolic links
  *			  Otherwise, nftw will follow links but will not
  *			  walk down any path the crosses itself.
  *		FTW_MOUNT The walk will not cross a mount point.
@@ -59,6 +58,8 @@
  *		FTW_HOPTION Use stat the first time the walk
  *			    function is called, regardless of
  *			    whether or not FTW_PHYS is specified.
+ *		FTW_NOLOOP Allow find utility to detect infinite loops created
+ *			   by both symbolic and hard linked directories.
  *
  *	fn is called with four arguments at each file and directory.
  *	The first argument is the pathname of the object, the second
@@ -78,13 +79,20 @@
  *			appropriate permission. The stat buffer passed to fn
  *			is undefined.  Stat failure for any reason is
  *			considered an error and nftw will return -1.
+ *	The following value is private, and is used by the find utility:
+ *		FTW_DL	An infinite loop has been detected.
  *	The fourth argument is a struct FTW* which contains the depth
  *	and the offset into pathname to the base name.
  *	If fn returns nonzero, nftw returns this value to its caller.
  *
  *	depth limits the number of open directories that ftw uses
  *	before it starts recycling file descriptors.  In general,
- *	a file descriptor is used for each level.
+ *	a file descriptor is used for each level.  When FTW_CHDIR isn't set,
+ *	in order to descend to arbitrary depths, nftw requires 2 file
+ *	descriptors to be open during the call to openat(), therefore if
+ *	the depth argument is less than 2 nftw will not use openat(), and
+ *	it will fail with ENAMETOOLONG if it descends to a directory that
+ *	exceeds PATH_MAX.
  *
  */
 
@@ -94,25 +102,33 @@
 #pragma weak nftw64 = _nftw64
 #define	_nftw		_nftw64
 #define	fstat64		_fstat64
+#define	fstatat64	_fstatat64
 #define	lstat64		_lstat64
+#define	openat64	_openat64
 #define	readdir64	_readdir64
 #define	stat64		_stat64
 #else
 #pragma weak nftw = _nftw
 #define	fstat		_fstat
+#define	fstatat		_fstatat
 #define	lstat		_lstat
+#define	openat		_openat
 #define	readdir		_readdir
 #define	stat		_stat
 #endif /* !_LP64 && _FILE_OFFSET_BITS == 64 */
 
 #define	chdir		_chdir
+#define	close		_close
 #define	closedir	_closedir
 #define	fchdir		_fchdir
+#define	fdopendir	_fdopendir
 #define	fprintf		_fprintf
 #define	getcwd		_getcwd
 #define	opendir		_opendir
 #define	seekdir		_seekdir
+#define	strdup		_strdup
 #define	strerror	_strerror
+#define	strtok_r	_strtok_r
 #define	telldir		_telldir
 
 #include "lint.h"
@@ -129,6 +145,8 @@
 #include <thread.h>
 #include <synch.h>
 #include <stdio.h>
+#include <strings.h>
+#include <fcntl.h>
 
 #ifndef PATH_MAX
 #define	PATH_MAX	1023
@@ -139,17 +157,6 @@
  * Putting them into a structure that is passed
  * around makes nftw() MT-safe with no locking required.
  */
-struct Var {
-	char	*fullpath;
-	char	*tmppath;
-	int	curflags;
-	dev_t	cur_mount;
-	struct FTW state;
-	int	walklevel;
-	int	(*statf)(const char *, struct stat *);
-	int	(*savedstatf)(const char *, struct stat *);
-};
-
 struct Save {
 	struct Save *last;
 	DIR	*fd;
@@ -159,7 +166,28 @@ struct Save {
 	ino_t	inode;
 };
 
+struct Var {
+	char	*home;
+	size_t	len;
+	char	*fullpath;
+	char	*tmppath;
+	int	curflags;
+	dev_t	cur_mount;
+	struct FTW state;
+	int	walklevel;
+	int	(*statf)(const char *, struct stat *, struct Save *);
+	int	(*savedstatf)(const char *, struct stat *, struct Save *);
+	DIR	*(*opendirf)(const char *);
+};
+
 static int oldclose(struct Save *);
+static int cdlstat(const char *, struct stat *, struct Save *);
+static int cdstat(const char *, struct stat *, struct Save *);
+static int nocdlstat(const char *, struct stat *, struct Save *);
+static int nocdstat(const char *, struct stat *, struct Save *);
+static DIR *cdopendir(const char *);
+static DIR *nocdopendir(const char *);
+static const char *get_unrooted(const char *);
 
 /*
  * This is the recursive walker.
@@ -170,7 +198,7 @@ walk(char *component,
     int depth, struct Save *last, struct Var *vp)
 {
 	struct stat statb;
-	char *p;
+	char *p, *tmp;
 	int type;
 	char *comp;
 	struct dirent *dir;
@@ -181,6 +209,8 @@ walk(char *component,
 	int oldbase;
 	int skip;
 	struct Save this;
+	size_t base_comp, base_component, base_this_comp, base_last_comp;
+	size_t base_fullpath, base_tmppath;
 
 	this.last = last;
 	this.fd = 0;
@@ -192,22 +222,34 @@ walk(char *component,
 	if (vp->savedstatf == NULL)
 		vp->savedstatf = vp->statf;
 
-	if ((vp->walklevel++ == 0) && (vp->curflags & FTW_HOPTION))
-		vp->statf = stat;
-	else
+	if ((vp->walklevel++ == 0) && (vp->curflags & FTW_HOPTION)) {
+		if (((vp->curflags & FTW_CHDIR) == 0) && (depth >= 2)) {
+			vp->statf = nocdstat;
+		} else {
+			vp->statf = cdstat;
+		}
+	} else {
 		vp->statf = vp->savedstatf;
+	}
 
 	/*
 	 * Determine the type of the component.
 	 */
-	if ((*vp->statf)(comp, &statb) >= 0) {
+	if ((*vp->statf)(comp, &statb, last) >= 0) {
 		if ((statb.st_mode & S_IFMT) == S_IFDIR) {
 			type = FTW_D;
 			if (depth <= 1)
 				(void) oldclose(last);
-			if ((this.fd = opendir(comp)) == 0) {
+			if ((this.fd = (*vp->opendirf)(comp)) == 0) {
 				if (errno == EMFILE && oldclose(last) &&
-				    (this.fd = opendir(comp)) != 0) {
+				    (this.fd = (*vp->opendirf)(comp)) != 0) {
+					/*
+					 * If opendirf fails because there
+					 * are OPEN_MAX fd in the calling
+					 * process, and we close the oldest
+					 * fd, and another opendirf doesn't
+					 * fail, depth is set to 1.
+					 */
 					depth = 1;
 				} else {
 					type = FTW_DNR;
@@ -250,8 +292,12 @@ walk(char *component,
 		 * Also check the file type, if possible, for symbolic
 		 * link.
 		 */
-		if ((vp->statf == stat) && (lstat(comp, &statb) >= 0) &&
-		    ((statb.st_mode & S_IFMT) == S_IFLNK)) {
+		if (((vp->statf == cdstat) &&
+		    (cdlstat(comp, &statb, last) >= 0) &&
+		    ((statb.st_mode & S_IFMT) == S_IFLNK)) ||
+		    ((vp->statf == nocdstat) &&
+		    (nocdlstat(comp, &statb, last) >= 0) &&
+		    ((statb.st_mode & S_IFMT) == S_IFLNK))) {
 
 			/*
 			 * Ignore bad symbolic link, let "fn"
@@ -297,10 +343,10 @@ walk(char *component,
 
 	if (vp->tmppath[0] != '\0' && component[-1] != '/')
 		*component++ = '/';
+	*component = 0;
 	if (vp->curflags & FTW_CHDIR) {
 		struct stat statb2;
 
-		*component = 0;
 		/*
 		 * Security check (there is a window between
 		 * (*vp->statf)() and opendir() above).
@@ -324,21 +370,13 @@ walk(char *component,
 	}
 
 	/*
-	 * If the walk has followed a symbolic link, traverse
-	 * the walk back to make sure there is not a loop.
-	 *
-	 * XXX - may need to look at this
-	 * There's code to check for cycles, but only for FTW_PHYS
-	 * (find -L flag).  However, all directories should be
-	 * checked, even if not following links because of hardlinks
-	 * to directories (not recommended, but can exist).
-	 *
-	 * We might have added AVL tree routines here to store and search
-	 * the inodes and devices, as is done for du/ls/chgrp/chown,
-	 * but libcmdutils is for for internal use only, so we can't
-	 * add it to a public libc function (nftw()).
+	 * If the walk has followed a symbolic link (FTW_PHYS is not set),
+	 * traverse the walk back to make sure there is not a loop.
+	 * The find utility (FTW_NOLOOP is set) detects infinite loops
+	 * in both symbolic and hard linked directories.
 	 */
-	if ((vp->curflags & FTW_PHYS) == 0) {
+	if ((vp->curflags & FTW_NOLOOP) ||
+	    ((vp->curflags & FTW_PHYS) == 0)) {
 		struct Save *sp = last;
 		while (sp) {
 			/*
@@ -346,8 +384,14 @@ walk(char *component,
 			 * is a loop. Get ready to return.
 			 */
 			if (sp->dev == statb.st_dev &&
-			    sp->inode == statb.st_ino)
+			    sp->inode == statb.st_ino) {
+				if (vp->curflags & FTW_NOLOOP) {
+					/* private interface for find util */
+					type = FTW_DL;
+					goto fail;
+				}
 				goto quit;
+			}
 			sp = sp->last;
 		}
 	}
@@ -365,21 +409,58 @@ walk(char *component,
 			else if (q[1] == '.' && q[2] == 0)
 				continue;
 		}
+		if (last != NULL && last->comp != NULL) {
+			base_last_comp = last->comp - vp->home;
+		}
+		base_comp = comp - vp->home;
+		base_component = component - vp->home;
+		if ((strlen(q) + strlen(vp->home) + 1) > vp->len) {
+			/*
+			 * When the space needed for vp->home has
+			 * exceeded the amount of space that has
+			 * been allocated, realloc() more space
+			 * and adjust pointers to point to the
+			 * (possibly moved) new block for vp->home
+			 */
+			base_this_comp = this.comp - vp->home;
+			base_fullpath = vp->fullpath - vp->home;
+			base_tmppath = vp->tmppath - vp->home;
+			vp->len *= 2;
+			tmp = (char *)realloc(vp->home, vp->len);
+			if (tmp == NULL) {
+				rc = -1;
+				goto quit;
+			}
+			vp->home = tmp;
+			comp = vp->home + base_comp;
+			component = vp->home + base_component;
+			this.comp = vp->home + base_this_comp;
+			vp->fullpath = vp->home + base_fullpath;
+			vp->tmppath = vp->home + base_tmppath;
+			if (last != NULL && last->comp != NULL) {
+				last->comp = vp->home + base_last_comp;
+			}
+		}
 		p = component;
-		while (p < &vp->tmppath[PATH_MAX] && *q != '\0')
+		while (*q != '\0')
 			*p++ = *q++;
 		*p = '\0';
 		vp->state.level++;
 
 		/* Call walk() recursively.  */
 		rc = walk(p, fn, depth-1, &this, vp);
+		if (last != NULL && last->comp != NULL) {
+			last->comp = vp->home + base_last_comp;
+		}
+		comp = vp->home + base_comp;
+		component = vp->home + base_component;
 		vp->state.level--;
 		if (this.fd == 0) {
 			*component = 0;
 			if (vp->curflags & FTW_CHDIR) {
 				this.fd = opendir(".");
 			} else {
-				this.fd = opendir(comp);
+				this.fd = (*vp->opendirf)(comp);
 			}
 			if (this.fd == 0) {
 				rc = -1;
@@ -411,7 +492,7 @@ quit:
 			}
 		} else {
 			if ((cdval = chdir("..")) >= 0) {
-				if ((*vp->statf)(".", &statb) < 0 ||
+				if ((*vp->statf)(".", &statb, last) < 0 ||
 				    statb.st_ino != last->inode ||
 				    statb.st_dev != last->dev)
 					cdval = -1;
@@ -421,14 +502,14 @@ quit:
 				if (chdir(vp->fullpath) < 0) {
 					rc = -1;
 				} else {
-					/* Security check */
-					if ((vp->curflags & FTW_PHYS) &&
-					    ((*vp->statf)(".", &statb) < 0 ||
-					    statb.st_ino != last->inode ||
-					    statb.st_dev != last->dev)) {
-						errno = EAGAIN;
-						rc = -1;
-					}
+				    /* Security check */
+				    if ((vp->curflags & FTW_PHYS) &&
+					((*vp->statf)(".", &statb, last) < 0 ||
+					statb.st_ino != last->inode ||
+					statb.st_dev != last->dev)) {
+					    errno = EAGAIN;
+					    rc = -1;
+				    }
 				}
 			}
 		}
@@ -448,7 +529,6 @@ _nftw(const char *path,
 {
 	struct Var var;
 	struct stat statb;
-	char home[2*(PATH_MAX+1)];
 	int rc = -1;
 	char *dp;
 	char *base;
@@ -456,26 +536,34 @@ _nftw(const char *path,
 	const char *savepath = path;
 	int save_errno;
 
-	home[0] = 0;
+	var.walklevel = 0;
+	var.len = 2*(PATH_MAX+1);
+	var.home = (char *)malloc(var.len);
+	if (var.home == NULL)
+		return (-1);
+
+	var.home[0] = 0;
 
 	/*
 	 * If the walk is going to change directory before
-	 * reading it, save current woring directory.
+	 * reading it, save current working directory.
 	 */
 	if (flags & FTW_CHDIR) {
-		if (getcwd(home, PATH_MAX+1) == 0)
+		if (getcwd(var.home, PATH_MAX+1) == 0) {
+			free(var.home);
 			return (-1);
+		}
 	}
-	endhome = dp = home + strlen(home);
+	endhome = dp = var.home + strlen(var.home);
 	if (*path == '/')
 		var.fullpath = dp;
 	else {
 		*dp++ = '/';
-		var.fullpath = home;
+		var.fullpath = var.home;
 	}
 	var.tmppath =  dp;
 	base = dp-1;
-	while (*path && dp < &var.tmppath[PATH_MAX]) {
+	while (*path) {
 		*dp = *path;
 		if (*dp == '/')
 			base = dp;
@@ -484,26 +572,45 @@ _nftw(const char *path,
 	*dp = 0;
 	var.state.base = (int)(base + 1 - var.tmppath);
 	if (*path) {
+		free(var.home);
 		errno = ENAMETOOLONG;
 		return (-1);
 	}
 	var.curflags = flags;
 
 	/*
+	 * If doing chdir()'s, set var.opendirf to cdopendir.
+	 * If not doing chdir()'s and if nftw()'s depth arg >= 2,
+	 * set var.opendirf to nocdopendir.  In order to
+	 * descend to arbitrary depths without doing chdir()'s, nftw()
+	 * requires a depth arg >= 2 so that nocdopendir() can use openat()
+	 * to traverse the directories.  So when not doing
+	 * chdir()'s if nftw()'s depth arg <= 1, set var.opendirf to
+	 * cdopendir.
 	 * If doing a physical walk (not following symbolic link), set
-	 * var.statf to lstat(). Otherwise, set var.statf to stat().
+	 * var.statf to cdlstat() or nocdlstat(). Otherwise, set var.statf
+	 * to cdstat() or nocdstat().
 	 */
-	if ((flags & FTW_PHYS) == 0)
-		var.statf = stat;
-	else
-		var.statf = lstat;
+	if (((flags & FTW_CHDIR) == 0) && (depth >= 2)) {
+		var.opendirf = nocdopendir;
+		if (flags & FTW_PHYS)
+			var.statf = nocdlstat;
+		else
+			var.statf = nocdstat;
+	} else {
+		var.opendirf = cdopendir;
+		if (flags & FTW_PHYS)
+			var.statf = cdlstat;
+		else
+			var.statf = cdstat;
+	}
 
 	/*
 	 * If walk is not going to cross a mount point,
 	 * save the current mount point.
 	 */
 	if (flags & FTW_MOUNT) {
-		if ((*var.statf)(savepath, &statb) >= 0)
+		if ((*var.statf)(savepath, &statb, NULL) >= 0)
 			var.cur_mount = statb.st_dev;
 		else
 			goto done;
@@ -518,15 +625,143 @@ _nftw(const char *path,
 	save_errno = errno;
 	errno = 0;
 	var.savedstatf = NULL;
-	var.walklevel = 0;
 	rc = walk(dp, fn, depth, (struct Save *)0, &var);
 	if (errno == 0)
 		errno = save_errno;
 done:
 	*endhome = 0;
 	if (flags & FTW_CHDIR)
-		(void) chdir(home);
+		(void) chdir(var.home);
+	free(var.home);
 	return (rc);
+}
+
+/*
+ * Get stat info on path when FTW_CHDIR is set.
+ */
+/*ARGSUSED1*/
+static int
+cdstat(const char *path, struct stat *statp, struct Save *lp) {
+	return (stat(path, statp));
+}
+
+/*
+ * Get lstat info on path when FTW_CHDIR is set.
+ */
+/*ARGSUSED1*/
+static int
+cdlstat(const char *path, struct stat *statp, struct Save *lp)
+{
+	return (lstat(path, statp));
+}
+
+/*
+ * Get stat info on path when FTW_CHDIR is not set.
+ */
+static int
+nocdstat(const char *path, struct stat *statp, struct Save *lp)
+{
+	const char *unrootp;
+
+	if (lp && lp->fd) {
+		/* get basename of path */
+		unrootp = get_unrooted(path);
+		return (fstatat(lp->fd->dd_fd, unrootp, statp, 0));
+	} else {
+		return (stat(path, statp));
+	}
+}
+
+/*
+ * Get lstat info on path when FTW_CHDIR is not set.
+ */
+static int
+nocdlstat(const char *path, struct stat *statp, struct Save *lp)
+{
+	const char *unrootp;
+
+	if (lp && lp->fd) {
+		/* get basename of path */
+		unrootp = get_unrooted(path);
+		return (fstatat(lp->fd->dd_fd, unrootp, statp,
+		    AT_SYMLINK_NOFOLLOW));
+	} else {
+		return (lstat(path, statp));
+	}
+}
+
+/*
+ * Open path directory when FTW_CHDIR is set.
+ *
+ */
+static DIR *
+cdopendir(const char *path)
+{
+	return (opendir(path));
+}
+
+/*
+ * Open path directory when FTW_CHDIR is not set.
+ */
+static DIR *
+nocdopendir(const char *path)
+{
+	int fd, cfd;
+	DIR *fdd;
+	char *dirp, *token, *ptr;
+
+	if (((fdd = opendir(path)) == NULL) && (errno == ENAMETOOLONG)) {
+		if ((dirp = strdup(path)) == NULL) {
+			errno = ENAMETOOLONG;
+			return (NULL);
+		}
+		if ((token = strtok_r(dirp, "/", &ptr)) != NULL) {
+		    if ((fd = openat(AT_FDCWD, dirp, O_RDONLY)) < 0) {
+			(void) free(dirp);
+			errno = ENAMETOOLONG;
+			return (NULL);
+		    }
+		    while ((token = strtok_r(NULL, "/", &ptr)) != NULL) {
+			if ((cfd = openat(fd, token, O_RDONLY)) < 0) {
+			    (void) close(fd);
+			    (void) free(dirp);
+			    errno = ENAMETOOLONG;
+			    return (NULL);
+			}
+			(void) close(fd);
+			fd = cfd;
+		    }
+		    (void) free(dirp);
+		    return (fdopendir(fd));
+		}
+		(void) free(dirp);
+		errno = ENAMETOOLONG;
+	}
+	return (fdd);
+}
+
+/* return pointer basename of path, which may contain trailing slashes */
+static const char *
+get_unrooted(const char *path)
+{
+	const char *ptr;
+
+	if (!path || !*path)
+		return (NULL);
+
+	ptr = path + strlen(path);
+	/* find last char in path before any trailing slashes */
+	while (ptr != path && *--ptr == '/')
+		;
+
+	if (ptr == path)	/* all slashes */
+		return (ptr);
+
+	while (ptr != path)
+		if (*--ptr == '/')
+			return (++ptr);
+
+	return (ptr);
 }
 
 /*
