@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,6 +129,7 @@ check_and_online(int smf_flags)
 {
 	int	i,
 		fd;
+	door_arg_t	d;
 
 	if (!is_online()) {
 		if (!is_auto_enabled())
@@ -149,8 +150,27 @@ check_and_online(int smf_flags)
 
 	for (i = 0; i < WAIT_FOR_DOOR; i++) {
 		if ((fd = open(ISCSI_TARGET_MGMT_DOOR, 0)) >= 0) {
-			(void) close(fd);
-			return (True);
+			/*
+			 * There's at least a file with the same name as our
+			 * door. Let's see if someone is currently answering
+			 * by sending an empty XML request.
+			 */
+			d.data_ptr	= "<config></config>";
+			d.data_size	= strlen(d.data_ptr) + 1;
+			d.desc_ptr	= NULL;
+			d.desc_num	= 0;
+			d.rbuf		= NULL;
+			d.rsize		= 0;
+
+			if (door_call(fd, &d) == 0) {
+				/*
+				 * The daemon is now ready to handle requests.
+				 */
+				(void) close(fd);
+				return (True);
+			} else
+				(void) close(fd);
+
 		}
 		if (!is_online())
 			break;
