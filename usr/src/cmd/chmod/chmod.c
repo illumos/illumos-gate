@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -149,7 +149,6 @@ main(int argc, char *argv[])
 
 	mac -= optind;
 	mav += optind;
-
 	if (mac >= 2 && (mav[0][0] == 'A')) {
 		if (parse_acl_args(*mav, &acl_args)) {
 			usage();
@@ -283,17 +282,39 @@ chmodr(char *dir, char *path,  mode_t mode, mode_t umsk, acl_args_t *aclp)
 	 * the path is just '/'
 	 */
 
-	(void) strcpy(parentdir, path);
+	if (strlcpy(parentdir, path, PATH_MAX + 1) >= PATH_MAX + 1) {
+		errmsg(2, 0, gettext("directory path name too long: %s\n"),
+		    path);
+		return (1);
+	}
 	if (strcmp(path, "/") != 0)
-		(void) strcat(parentdir, "/");
+		if (strlcat(parentdir, "/", PATH_MAX + 1) >= PATH_MAX + 1) {
+			errmsg(2, 0,
+			    gettext("directory path name too long: %s/\n"),
+			    parentdir);
+			return (1);
+		}
+
 
 	for (dp = readdir(dirp); dp != NULL; dp = readdir(dirp))  {
+
 		if (strcmp(dp->d_name, ".") == 0 ||	/* skip . and .. */
 		    strcmp(dp->d_name, "..") == 0) {
 			continue;
 		}
-		(void) strcpy(currdir, parentdir);
-		(void) strcat(currdir, dp->d_name);
+		if (strlcpy(currdir, parentdir, PATH_MAX + 1) >= PATH_MAX + 1) {
+			errmsg(2, 0,
+			    gettext("directory path name too long: %s\n"),
+			    parentdir);
+			return (1);
+		}
+		if (strlcat(currdir, dp->d_name, PATH_MAX + 1)
+		    >= PATH_MAX + 1) {
+			errmsg(2, 0,
+			    gettext("directory path name too long: %s%s\n"),
+			    currdir, dp->d_name);
+			return (1);
+		}
 		ecode += dochmod(dp->d_name, currdir, umsk, aclp);
 	}
 	(void) closedir(dirp);
@@ -510,7 +531,6 @@ handle_acl(char *name, o_mode_t group_clear_bits, o_mode_t group_set_bits)
 	int aclcnt, n;
 	aclent_t *aclp, *tp;
 	o_mode_t newperm;
-
 	/*
 	 * if this file system support ace_t acl's
 	 * then simply return since we don't have an
@@ -518,10 +538,8 @@ handle_acl(char *name, o_mode_t group_clear_bits, o_mode_t group_set_bits)
 	 */
 	if (pathconf(name, _PC_ACL_ENABLED) == _ACL_ACE_ENABLED)
 		return;
-
 	if ((aclcnt = acl(name, GETACLCNT, 0, NULL)) <= MIN_ACL_ENTRIES)
 		return;	/* it's just a trivial acl; no need to change it */
-
 	if ((aclp = (aclent_t *)malloc((sizeof (aclent_t)) * aclcnt))
 	    == NULL) {
 		perror("chmod");
@@ -534,7 +552,6 @@ handle_acl(char *name, o_mode_t group_clear_bits, o_mode_t group_set_bits)
 		perror(name);
 		return;
 	}
-
 	for (tp = aclp, n = aclcnt; n--; tp++) {
 		if (tp->a_type == GROUP_OBJ) {
 			newperm = tp->a_perm;
@@ -565,7 +582,6 @@ doacl(char *file, struct stat *st, acl_args_t *acl_args)
 	void *to, *from;
 	int len;
 	int isdir;
-
 	isdir = S_ISDIR(st->st_mode);
 
 	error = acl_get(file, 0, &aclp);
@@ -574,7 +590,6 @@ doacl(char *file, struct stat *st, acl_args_t *acl_args)
 		errmsg(1, 1, "%s\n", acl_strerror(error));
 		return (1);
 	}
-
 	switch (acl_args->acl_action) {
 	case ACL_ADD:
 		if ((error = acl_addentries(aclp,
@@ -586,7 +601,6 @@ doacl(char *file, struct stat *st, acl_args_t *acl_args)
 		set_aclp = aclp;
 		break;
 	case ACL_SLOT_DELETE:
-
 		if (acl_args->acl_slot + 1 > aclp->acl_cnt) {
 			errmsg(1, 1,
 			    gettext("Invalid slot specified for removal\n"));
@@ -668,7 +682,6 @@ doacl(char *file, struct stat *st, acl_args_t *acl_args)
 		return (1);
 		break;
 	}
-
 	error = acl_check(set_aclp, isdir);
 
 	if (error) {
