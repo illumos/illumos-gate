@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4437,7 +4437,18 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 		io_base = io_answer;
 	}
 
-	(void) pcicfg_set_bus_numbers(h, bus, new_bus, max_bus);
+	pcicfg_set_bus_numbers(h, bus, new_bus, max_bus);
+
+	bus_range[0] = pci_config_get8(h, PCI_BCNF_SECBUS);
+	bus_range[1] = pci_config_get8(h, PCI_BCNF_SUBBUS);
+	DEBUG1("End of bridge probe: bus_range[0] =  %d\n", bus_range[0]);
+	DEBUG1("End of bridge probe: bus_range[1] =  %d\n", bus_range[1]);
+
+	if (ndi_prop_update_int_array(DDI_DEV_T_NONE, new_child,
+	    "bus-range", bus_range, 2) != DDI_SUCCESS) {
+		DEBUG0("Failed to set bus-range property");
+		return (PCICFG_FAILURE);
+	}
 
 	/*
 	 * Reset the secondary bus
@@ -4786,9 +4797,26 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	}
 
 	/*
+	 * Remove the bus-range property if it exists since we will create
+	 * a new one.
+	 */
+	(void) ndi_prop_remove(DDI_DEV_T_NONE, new_child, "bus-range");
+
+	/*
 	 * Set bus numbers to ranges encountered during scan
 	 */
-	(void) pcicfg_set_bus_numbers(h, bus, new_bus, *highest_bus);
+	pcicfg_set_bus_numbers(h, bus, new_bus, *highest_bus);
+
+	bus_range[0] = pci_config_get8(h, PCI_BCNF_SECBUS);
+	bus_range[1] = pci_config_get8(h, PCI_BCNF_SUBBUS);
+	DEBUG1("End of bridge probe: bus_range[0] =  %d\n", bus_range[0]);
+	DEBUG1("End of bridge probe: bus_range[1] =  %d\n", bus_range[1]);
+
+	if (ndi_prop_update_int_array(DDI_DEV_T_NONE, new_child,
+	    "bus-range", bus_range, 2) != DDI_SUCCESS) {
+		DEBUG0("Failed to set bus-range property");
+		return (PCICFG_FAILURE);
+	}
 
 	/*
 	 * Remove the ranges property if it exists since we will create
@@ -4824,16 +4852,6 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 		}
 	}
 
-	bus_range[0] = pci_config_get8(h, PCI_BCNF_SECBUS);
-	bus_range[1] = pci_config_get8(h, PCI_BCNF_SUBBUS);
-	DEBUG1("End of bridge probe: bus_range[0] =  %d\n", bus_range[0]);
-	DEBUG1("End of bridge probe: bus_range[1] =  %d\n", bus_range[1]);
-
-	if (ndi_prop_update_int_array(DDI_DEV_T_NONE, new_child,
-	    "bus-range", bus_range, 2) != DDI_SUCCESS) {
-		DEBUG0("Failed to set bus-range property");
-		return (PCICFG_FAILURE);
-	}
 	/*
 	 * Remove the resource maps for the bridge since we no longer
 	 * need them.  Note that the failure is ignored since the
