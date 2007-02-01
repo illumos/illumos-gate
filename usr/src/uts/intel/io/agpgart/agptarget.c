@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,6 +311,7 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 		}
 		break;
 	case INTEL_BR_865:
+	case INTEL_BR_910M:
 		memval = pci_config_get8(softstate->tsoft_pcihdl, I8XX_CONF_GC);
 		switch (memval & I8XX_GC_MODE_MASK) {
 		case I8XX_GC_MODE1:
@@ -319,6 +320,10 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 		case I8XX_GC_MODE3:
 			kbytes = 8 * 1024; /* 8M preallocated memory */
 			break;
+		/*
+		 * There is no option for 16M in 910GM datasheet,
+		 * but some BIOS add this option for 16M support.
+		 */
 		case I8XX_GC_MODE4:
 			kbytes = 16 * 1024; /* 16M preallocated memory */
 			break;
@@ -327,7 +332,6 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 		}
 		break;
 	case INTEL_BR_910:
-	case INTEL_BR_910M:
 	case INTEL_BR_945:
 		memval = pci_config_get8(softstate->tsoft_pcihdl, I8XX_CONF_GC);
 		switch (memval & I8XX_GC_MODE_MASK) {
