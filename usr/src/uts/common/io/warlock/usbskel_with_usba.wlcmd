@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -96,6 +96,9 @@ root    usb_ugen_read
 root    usb_ugen_reconnect_ev_cb
 root    usb_ugen_write
 
+root	usba_common_power
+root	usba_common_register_events
+root	usba_ready_interface_association_node
 root	usba_free_hcdi_ops
 root	usba_ready_interface_node
 root	usba_async_req_raise_power

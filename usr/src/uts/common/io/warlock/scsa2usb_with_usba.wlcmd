@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -101,6 +101,9 @@ root	usb_get_current_cfgidx
 root	usb_register_client
 root	usb_ugen_power
 
+root	usba_common_power
+root	usba_common_register_events
+root	usba_ready_interface_association_node
 root    usba_get_hc_dma_attr
 root    usba_hcdi_get_req_private
 root    usba_hcdi_set_req_private

@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -116,6 +116,9 @@ root	usb_as_play_exc_cb
 root	usb_as_record_cb
 root	usb_as_record_exc_cb
 
+root	usba_common_power
+root	usba_common_register_events
+root	usba_ready_interface_association_node
 root    usba_dbuf_tail
 root	usba_hubdi_power
 root	usba_hubdi_root_hub_power

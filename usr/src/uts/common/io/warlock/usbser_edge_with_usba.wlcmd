@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -106,6 +106,9 @@ root	hubd_cpr_post_user_callb
 root    hubd_root_hub_cleanup_thread
 root	hubd_bus_power
 
+root	usba_common_power
+root	usba_common_register_events
+root	usba_ready_interface_association_node
 root	usba_pipe_do_async_func_thread
 root	usba_pipe_sync_reset
 root    usba_get_hc_dma_attr

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -549,7 +549,8 @@ usb_mid_power(dev_info_t *dip, int comp, int level)
 		return (rval);
 	}
 
-	rval = usba_common_power(dip, midpm, &(usb_mid->mi_dev_state), level);
+	rval = usba_common_power(dip, &(midpm->uc_current_power),
+	    &(usb_mid->mi_dev_state), level);
 
 	mutex_exit(&usb_mid->mi_mutex);
 

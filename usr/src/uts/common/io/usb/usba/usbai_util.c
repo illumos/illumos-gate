@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2204,7 +2204,7 @@ usba_test_allocb(size_t size, uint_t pri)
  * functions to handle power transition for OS levels 0 -> 3
  */
 static int
-usb_common_pwrlvl0(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
+usb_common_pwrlvl0(dev_info_t *dip, uint8_t *pm, int *dev_state)
 {
 	int	rval;
 
@@ -2215,7 +2215,7 @@ usb_common_pwrlvl0(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
 		ASSERT(rval == USB_SUCCESS);
 
 		*dev_state = USB_DEV_PWRED_DOWN;
-		pm->uc_current_power = USB_DEV_OS_PWR_OFF;
+		*pm = USB_DEV_OS_PWR_OFF;
 		/* FALLTHRU */
 	case USB_DEV_DISCONNECTED:
 	case USB_DEV_SUSPENDED:
@@ -2231,7 +2231,7 @@ usb_common_pwrlvl0(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
 
 /* ARGSUSED */
 static int
-usb_common_pwrlvl1(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
+usb_common_pwrlvl1(dev_info_t *dip, uint8_t *pm, int *dev_state)
 {
 	int	rval;
 
@@ -2245,7 +2245,7 @@ usb_common_pwrlvl1(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
 
 /* ARGSUSED */
 static int
-usb_common_pwrlvl2(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
+usb_common_pwrlvl2(dev_info_t *dip, uint8_t *pm, int *dev_state)
 {
 	int	rval;
 
@@ -2258,7 +2258,7 @@ usb_common_pwrlvl2(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
 
 
 static int
-usb_common_pwrlvl3(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
+usb_common_pwrlvl3(dev_info_t *dip, uint8_t *pm, int *dev_state)
 {
 	int	rval;
 
@@ -2269,7 +2269,7 @@ usb_common_pwrlvl3(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
 		ASSERT(rval == USB_SUCCESS);
 
 		*dev_state = USB_DEV_ONLINE;
-		pm->uc_current_power = USB_DEV_OS_FULL_PWR;
+		*pm = USB_DEV_OS_FULL_PWR;
 
 		/* FALLTHRU */
 	case USB_DEV_ONLINE:
@@ -2292,8 +2292,7 @@ usb_common_pwrlvl3(dev_info_t *dip, usb_common_power_t *pm, int *dev_state)
 
 /* power management */
 int
-usba_common_power(dev_info_t *dip, usb_common_power_t *pm, int *dev_state,
-		int level)
+usba_common_power(dev_info_t *dip, uint8_t *pm, int *dev_state, int level)
 {
 	int rval = DDI_FAILURE;
 
@@ -2418,6 +2417,7 @@ usba_common_unregister_events(dev_info_t *dip, uint_t if_num)
 	}
 
 	/* clear event data for children, required for cfgmadm unconfigure */
+	mutex_enter(&usba_device->usb_mutex);
 	if (usb_owns_device(dip)) {
 		usba_free_evdata(usba_device->usb_evdata);
 		usba_device->usb_evdata = NULL;
@@ -2431,4 +2431,5 @@ usba_common_unregister_events(dev_info_t *dip, uint_t if_num)
 				&= ~USBA_CLIENT_FLAG_EV_CBS;
 		}
 	}
+	mutex_exit(&usba_device->usb_mutex);
 }
