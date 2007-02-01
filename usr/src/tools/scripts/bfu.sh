@@ -2120,7 +2120,7 @@ fi
 nss_lib="$usr/lib/mps/libnss3.so"
 nss_lib64="$usr/lib/mps/64/libnss3.so"
 valid_rpath="\$ORIGIN:/usr/lib/mps/secv1:/usr/lib/mps"
-rpath_msg="(RPATH from file ${nss_lib})"
+rpath_msg="R(UN)?PATH from file ${nss_lib}\)"
 if [ ! -x /usr/bin/ldd ]; then
 	if [ "$force_override" = yes ]; then
 		echo "/usr/bin/ldd is missing but -f is set; continuing."
@@ -2129,7 +2129,7 @@ if [ ! -x /usr/bin/ldd ]; then
 		fail "Install the SUNWtoo package."
 	fi
 fi
-nss_rpath=`ldd -s $nss_lib | grep "$rpath_msg" | head -1 | cut -d'=' -f2 | \
+nss_rpath=`ldd -s $nss_lib | egrep "$rpath_msg" | head -1 | cut -d'=' -f2 | \
 		awk '{print $1}'`
 update_script="/ws/onnv-gate/public/bin/update_nsspkgs"
 if [ $valid_rpath != "$nss_rpath" ]; then
