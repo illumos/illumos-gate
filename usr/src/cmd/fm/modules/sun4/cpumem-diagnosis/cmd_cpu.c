@@ -1564,7 +1564,7 @@ cpu_getfru(fmd_hdl_t *hdl, cmd_cpu_t *cp)
 	}
 	partstr = cmd_cpu_getpartstr(hdl, cp);
 	serialstr = cmd_cpu_getserialstr(hdl, cp);
-	nvlp = cpu_mkfru(frustr, partstr, serialstr);
+	nvlp = cpu_mkfru(frustr, serialstr, partstr);
 	fmd_hdl_strfree(hdl, frustr);
 	fmd_hdl_strfree(hdl, partstr);
 	fmd_hdl_strfree(hdl, serialstr);

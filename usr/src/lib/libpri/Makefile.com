@@ -25,31 +25,29 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-LIBRARY = libldom.a
+LIBRARY = libpri.a
 VERS = .1
 
-LIBSRCS = ldom.c ldmsvcs_utils.c
+LIBSRCS = pri.c
 OBJECTS = $(LIBSRCS:%.c=%.o)
 
-include ../../../Makefile.lib
 include ../../Makefile.lib
-
-SRCS = $(LIBSRCS:%.c=../sparc/%.c)
-SRCDIR = ../sparc
 
 LIBS = $(DYNLIB) $(LINTLIB)
 
-CPPFLAGS += -I. -I$(SRC)/uts/sun4v -I$(ROOT)/usr/platform/sun4v/include
+SRCDIR = ../common
+SRCS = $(LIBSRCS:%.c=$(SRCDIR)/%.c)
+
+CPPFLAGS += -I. -I$(SRC)/uts/sun4v
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
-LDLIBS += $(MACH_LDLIBS)
-LDLIBS += -lnvpair -lmdesc -lpri -lc
+LDLIBS += -lc
 
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)
 
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
+$(LINTLIB) := SRCS = $(LINTSRC:%=$(SRCDIR)/%)
 $(LINTLIB) := LINTFLAGS = -nsvx -I$(ROOT)/usr/platform/sun4v/include
 $(LINTLIB) := LINTFLAGS64 = -nsvx -Xarch=$(MACH64:sparcv9=v9) \
 	-I$(ROOT)/usr/platform/sun4v/include
@@ -60,9 +58,8 @@ all: $(LIBS)
 
 lint: $(LINTLIB) lintcheck
 
-pics/%.o: ../$(MACH)/%.c
+pics/%.o: $(SRCDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-include ../../../Makefile.targ
 include ../../Makefile.targ

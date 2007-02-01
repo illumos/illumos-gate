@@ -25,44 +25,35 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-LIBRARY = libldom.a
-VERS = .1
+include ../Makefile.lib
 
-LIBSRCS = ldom.c ldmsvcs_utils.c
-OBJECTS = $(LIBSRCS:%.c=%.o)
+HDRS = pri.h
+HDRDIR = common
 
-include ../../../Makefile.lib
-include ../../Makefile.lib
+ROOTHDRDIR = $(ROOT)/usr/platform/sun4v/include/sys
 
-SRCS = $(LIBSRCS:%.c=../sparc/%.c)
-SRCDIR = ../sparc
+SUBDIRS = $(MACH) 
+$(BUILD64)SUBDIRS += $(MACH64)
 
-LIBS = $(DYNLIB) $(LINTLIB)
-
-CPPFLAGS += -I. -I$(SRC)/uts/sun4v -I$(ROOT)/usr/platform/sun4v/include
-CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
-CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
-
-LDLIBS += $(MACH_LDLIBS)
-LDLIBS += -lnvpair -lmdesc -lpri -lc
-
-LINTFLAGS = -msux
-LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)
-
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
-$(LINTLIB) := LINTFLAGS = -nsvx -I$(ROOT)/usr/platform/sun4v/include
-$(LINTLIB) := LINTFLAGS64 = -nsvx -Xarch=$(MACH64:sparcv9=v9) \
-	-I$(ROOT)/usr/platform/sun4v/include
+all := TARGET = all
+clean := TARGET = clean
+clobber := TARGET = clobber
+install := TARGET = install
+lint := TARGET = lint
 
 .KEEP_STATE:
 
-all: $(LIBS)
+all clean clobber lint: $(SUBDIRS)
 
-lint: $(LINTLIB) lintcheck
+check: $(CHECKHDRS)
 
-pics/%.o: ../$(MACH)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
+install: all .WAIT $(SUBDIRS)
 
-include ../../../Makefile.targ
-include ../../Makefile.targ
+install_h: $(ROOTHDRS) 
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
+
+include ../Makefile.targ

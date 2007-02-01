@@ -71,6 +71,7 @@ CLOSED_SUN4_HDRS=			\
 	memtestio.h
 
 HDRS=	\
+	ds_pri.h		\
 	hypervisor_api.h	\
 	hsvc.h			\
 	machasi.h		\

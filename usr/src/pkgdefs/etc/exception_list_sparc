@@ -890,3 +890,15 @@ lib/llib-liscsitgt			sparc
 lib/llib-liscsitgt.ln			sparc
 lib/sparcv9/libiscsitgt.so		sparc
 lib/sparcv9/llib-liscsitgt.ln		sparc
+#
+# These files are installed in the proto area by the build of libpri for
+# the benefit of the builds of FMA libldom, Zeus, picld plugins, and/or
+# other libpri consumers. However, the libpri interfaces are private to
+# Sun (Consolidation Private) and not intended for customer use. So these
+# files (the symlink and the lint library) are excluded from packaging.
+#
+usr/lib/libpri.so			sparc
+usr/lib/llib-lpri			sparc
+usr/lib/llib-lpri.ln			sparc
+usr/lib/sparcv9/libpri.so		sparc
+usr/lib/sparcv9/llib-lpri.ln		sparc

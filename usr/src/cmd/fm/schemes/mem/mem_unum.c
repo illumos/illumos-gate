@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,8 +94,8 @@ static const bank_dimm_t bank_dimm[] = {
 	{ "/MBU_A/MEMB%*d/%n%nMEM%*d%*1c%n",	" MEM%*d%*1c%n" },
 	{ "/MBU_B/MEMB%*d/%n%nMEM%*d%*1c%n",	" MEM%*d%*1c%n" },
 	{ "/CMU%*2d/%n%nMEM%*2d%*1c%n",		" MEM%*2d%*1c%n" },
-	{ "MB/CMP%*d/BR%*d%n:%n%n",		" BR%*d/D%*d/J%*4d%n",	"/" },
-	{ "MB/CMP%*d/BR%*d%n%n%n",		"/BR%*d/D%*d/J%*4d%n" },
+	{ "MB/CMP%*d/BR%*d%n:%n%n",		" CH%*d/D%*d/J%*4d%n", "/" },
+	{ "MB/CMP%*d/BR%*d%n%n%n",		"/CH%*d/D%*d/J%*4d%n" },
 	{ NULL }
 };
 

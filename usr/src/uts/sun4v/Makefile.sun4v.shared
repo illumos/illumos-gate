@@ -326,6 +326,7 @@ DRV_KMODS	+= cnex
 DRV_KMODS	+= cpc
 DRV_KMODS	+= dma
 DRV_KMODS	+= drctl
+DRV_KMODS	+= ds_pri
 DRV_KMODS	+= ebus
 DRV_KMODS	+= fpc
 DRV_KMODS	+= glvc

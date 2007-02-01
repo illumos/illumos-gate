@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,7 @@ flt_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 
 		if (nvlist_lookup_string(nva[i], FM_FAULT_LOCATION, &loc)
 		    == 0) {
-			if (strncmp(fname, FM_FMRI_LEGACY_HC_PREFIX,
+			if (fname && strncmp(fname, FM_FMRI_LEGACY_HC_PREFIX,
 			    sizeof (FM_FMRI_LEGACY_HC_PREFIX)) == 0)
 				loc = fname + sizeof (FM_FMRI_LEGACY_HC_PREFIX);
 		}

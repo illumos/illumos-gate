@@ -146,6 +146,7 @@ VNET_OBJS	= vnet.o vnet_gen.o
 VSW_OBJS	= vsw.o
 VDC_OBJS	= vdc.o
 VDS_OBJS	= vds.o
+DS_PRI_OBJS	= ds_pri.o
 
 #
 #			Misc modules

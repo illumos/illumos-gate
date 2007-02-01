@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -181,19 +181,33 @@ fmd_fmri_expand(nvlist_t *nvl)
 			if ((rc = nvlist_add_uint64(nvl, FM_FMRI_CPU_SERIAL_ID,
 			    serialid)) != 0)
 				return (fmd_fmri_set_errno(rc));
+		}
 #ifdef sparc
-			if (cpu.cpu_mdesc_cpus != NULL) {
-				md_cpumap_t *mcmp = cpu_find_cpumap(cpuid);
-				(void) nvlist_add_string(nvl,
-				    FM_FMRI_CPU_CPUFRU, mcmp->cpumap_cpufru);
+		if (cpu.cpu_mdesc_cpus != NULL) {
+			md_cpumap_t *mcmp = cpu_find_cpumap(cpuid);
+			if (mcmp != NULL) {
+			    if (strcmp(mcmp->cpumap_cpufrudn, "") == 0) {
 				(void) nvlist_add_string(nvl,
 				    FM_FMRI_HC_PART, mcmp->cpumap_cpufrupn);
+			    } else {
+				size_t ss = strlen(mcmp->cpumap_cpufrupn) +
+				    strlen(mcmp->cpumap_cpufrudn) + 1;
+				char *sp = fmd_fmri_alloc(ss);
+				sp = strcpy(sp, mcmp->cpumap_cpufrupn);
+				sp = strncat(sp, mcmp->cpumap_cpufrudn,
+				    strlen(mcmp->cpumap_cpufrudn) + 1);
 				(void) nvlist_add_string(nvl,
-				    FM_FMRI_HC_SERIAL_ID,
-				    mcmp->cpumap_cpufrusn);
+				    FM_FMRI_HC_PART, sp);
+				fmd_fmri_free(sp, ss);
+			    }
+			    (void) nvlist_add_string(nvl,
+				FM_FMRI_CPU_CPUFRU, mcmp->cpumap_cpufru);
+			    nvl->nvl_nvflag = NV_UNIQUE_NAME_TYPE;
+			    (void) nvlist_add_string(nvl, FM_FMRI_HC_SERIAL_ID,
+				mcmp->cpumap_cpufrusn);
 			}
-#endif	/* sparc */
 		}
+#endif	/* sparc */
 	} else if (version == CPU_SCHEME_VERSION1) {
 		if ((rc = nvlist_lookup_string(nvl, FM_FMRI_CPU_SERIAL_ID,
 		    &serstr)) != 0) {

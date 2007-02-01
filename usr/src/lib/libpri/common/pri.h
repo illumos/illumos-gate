@@ -18,49 +18,34 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_CPU_MDESC_H
-#define	_CPU_MDESC_H
+#ifndef	_PRI_H
+#define	_PRI_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <stdlib.h>
 #include <sys/types.h>
-#include <sys/mdesc.h>
-#include <sys/fm/ldom.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-typedef struct md_cpumap {
-	uint32_t cpumap_id;
-	uint32_t cpumap_pid;
-	uint64_t cpumap_serialno;
-	char *cpumap_cpufru;
-	char *cpumap_cpufrusn;
-	char *cpumap_cpufrupn;
-	char *cpumap_cpufrudn;
-} md_cpumap_t;
+#define		PRI_GET		0
+#define		PRI_WAITGET	1
+#define		DS_PRI_DRIVER	"/devices/pseudo/ds_pri@0:ds_pri"
 
-typedef struct cpu {
-	md_cpumap_t *cpu_mdesc_cpus;	/* ptr to array of cpu maps */
-	uint32_t cpu_mdesc_ncpus;	/* number of cpu maps */
-} cpu_t;
+extern int pri_init(void);
+extern void pri_fini(void);
+extern ssize_t pri_get(uint8_t wait, uint64_t *token, uint64_t **buf,
+		void *(*allocp)(size_t), void (*freep)(void *, size_t));
 
-extern cpu_t cpu;
-
-extern int cpu_get_serialid_mdesc(uint32_t, uint64_t *);
-extern md_cpumap_t *cpu_find_cpumap(uint32_t);
-extern int cpu_mdesc_init(ldom_hdl_t *lhp);
-extern void cpu_mdesc_fini(void);
-
-#ifdef __cplusplus
+#ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _CPU_MDESC_H */
+#endif	/* _PRI_H */

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -352,44 +352,92 @@ mem_discover_mdesc(md_t *mdp, size_t mdbufsz)
 	mem_dimm_map_t *dm;
 	uint64_t sysmem_size, i, drgen = fmd_fmri_get_drgen();
 	char curr_ch;
+	int num_comps = 0;
+	char *unum, *serial, *part, *dash;
 
 	num_nodes = md_node_count(mdp);
 	listp = fmd_fmri_alloc(sizeof (mde_cookie_t) * num_nodes);
 
-	/*
-	 * Find first 'memory' node -- there should only be one.  Extract
-	 * 'memory-generation-id#' value from it.
-	 */
-	mdesc_dimm_count = md_scan_dag(mdp,
-	    MDE_INVAL_ELEM_COOKIE, md_find_name(mdp, "memory"),
-	    md_find_name(mdp, "fwd"), listp);
+	num_comps = md_scan_dag(mdp,
+		MDE_INVAL_ELEM_COOKIE,
+		md_find_name(mdp, "component"),
+		md_find_name(mdp, "fwd"),
+		listp);
+	if (num_comps == 0) {
 
-	if (md_get_prop_val(mdp, listp[0], "memory-generation-id#",
-	    &mem.mem_memconfig))
-		mem.mem_memconfig = 0;
+		/*
+		 * Find first 'memory' node -- there should only be one.
+		 * Extract 'memory-generation-id#' value from it.
+		 */
+		mdesc_dimm_count = md_scan_dag(mdp,
+		    MDE_INVAL_ELEM_COOKIE, md_find_name(mdp, "memory"),
+		    md_find_name(mdp, "fwd"), listp);
 
-	mdesc_dimm_count = md_scan_dag(mdp,
-	    MDE_INVAL_ELEM_COOKIE, md_find_name(mdp, "dimm_data"),
-	    md_find_name(mdp, "fwd"), listp);
+		if (md_get_prop_val(mdp, listp[0], "memory-generation-id#",
+		    &mem.mem_memconfig))
+			mem.mem_memconfig = 0;
 
-	for (idx = 0; idx < mdesc_dimm_count; idx++) {
-		char *unum, *serial, *part;
+		mdesc_dimm_count = md_scan_dag(mdp,
+		    MDE_INVAL_ELEM_COOKIE, md_find_name(mdp, "dimm_data"),
+		    md_find_name(mdp, "fwd"), listp);
 
-		if (md_get_prop_str(mdp, listp[idx], "nac", &unum) < 0)
-			unum = "";
-		if (md_get_prop_str(mdp, listp[idx], "serial#", &serial) < 0)
-			serial = "";
-		if (md_get_prop_str(mdp, listp[idx], "part#", &part) < 0)
-			part = "DIMM PART # not available";
+		for (idx = 0; idx < mdesc_dimm_count; idx++) {
 
-		dm = fmd_fmri_zalloc(sizeof (mem_dimm_map_t));
-		dm->dm_label = fmd_fmri_strdup(unum);
-		(void) strncpy(dm->dm_serid, serial, MEM_SERID_MAXLEN - 1);
-		dm->dm_part = fmd_fmri_strdup(part);
-		dm->dm_drgen = drgen;
+			if (md_get_prop_str(mdp, listp[idx], "nac", &unum) < 0)
+				unum = "";
+			if (md_get_prop_str(mdp, listp[idx], "serial#",
+				&serial) < 0)
+				serial = "";
+			if (md_get_prop_str(mdp, listp[idx], "part#",
+				&part) < 0)
+				part = "";
 
-		dm->dm_next = mem.mem_dm;
-		mem.mem_dm = dm;
+			dm = fmd_fmri_zalloc(sizeof (mem_dimm_map_t));
+			dm->dm_label = fmd_fmri_strdup(unum);
+			(void) strncpy(dm->dm_serid, serial,
+				MEM_SERID_MAXLEN - 1);
+			dm->dm_part = fmd_fmri_strdup(part);
+			dm->dm_drgen = drgen;
+
+			dm->dm_next = mem.mem_dm;
+			mem.mem_dm = dm;
+		}
+	} else {
+		char *type, *sp;
+		size_t ss;
+		for (idx = 0; idx < num_comps; idx++) {
+			if (md_get_prop_str(mdp, listp[idx], "type", &type) < 0)
+				continue;
+			if (strcmp(type, "dimm") == 0) {
+				if (md_get_prop_str(mdp, listp[idx], "nac",
+				    &unum) < 0)
+					unum = "";
+				if (md_get_prop_str(mdp, listp[idx],
+				    "serial_number", &serial) < 0)
+					serial = "";
+				if (md_get_prop_str(mdp, listp[idx],
+				    "part_number", &part) < 0)
+					part = "";
+				if (md_get_prop_str(mdp, listp[idx],
+				    "dash_number", &dash) < 0)
+					dash = "";
+
+				ss = strlen(part) + strlen(dash) + 1;
+				sp = fmd_fmri_alloc(ss);
+				sp = strcpy(sp, part);
+				sp = strncat(sp, dash, strlen(dash) + 1);
+
+				dm = fmd_fmri_zalloc(sizeof (mem_dimm_map_t));
+				dm->dm_label = fmd_fmri_strdup(unum);
+				(void) strncpy(dm->dm_serid, serial,
+				    MEM_SERID_MAXLEN - 1);
+				dm->dm_part = sp;
+				dm->dm_drgen = drgen;
+
+				dm->dm_next = mem.mem_dm;
+				mem.mem_dm = dm;
+			}
+		}
 	}
 
 	if (strstr(mem.mem_dm->dm_label, "BR") != NULL) { /* N2 */

@@ -25,44 +25,11 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-LIBRARY = libldom.a
-VERS = .1
-
-LIBSRCS = ldom.c ldmsvcs_utils.c
-OBJECTS = $(LIBSRCS:%.c=%.o)
-
-include ../../../Makefile.lib
-include ../../Makefile.lib
-
-SRCS = $(LIBSRCS:%.c=../sparc/%.c)
-SRCDIR = ../sparc
-
-LIBS = $(DYNLIB) $(LINTLIB)
-
-CPPFLAGS += -I. -I$(SRC)/uts/sun4v -I$(ROOT)/usr/platform/sun4v/include
-CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
-CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
-
-LDLIBS += $(MACH_LDLIBS)
-LDLIBS += -lnvpair -lmdesc -lpri -lc
-
-LINTFLAGS = -msux
-LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)
-
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
-$(LINTLIB) := LINTFLAGS = -nsvx -I$(ROOT)/usr/platform/sun4v/include
-$(LINTLIB) := LINTFLAGS64 = -nsvx -Xarch=$(MACH64:sparcv9=v9) \
-	-I$(ROOT)/usr/platform/sun4v/include
-
-.KEEP_STATE:
-
-all: $(LIBS)
-
-lint: $(LINTLIB) lintcheck
-
-pics/%.o: ../$(MACH)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
-include ../../../Makefile.targ
-include ../../Makefile.targ
+SUNWprivate {
+    global:
+	pri_fini;
+	pri_get;
+	pri_init;
+    local:
+	*;
+};

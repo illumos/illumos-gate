@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@
 #include <sys/bl.h>
 #include <sys/fm/protocol.h>
 #include <fm/fmd_fmri.h>
+#include <sys/pri.h>
 
 #include "ldom.h"
 #include "ldmsvcs_utils.h"
@@ -53,7 +54,12 @@ get_local_core_md(ldom_hdl_t *lhp, uint64_t **buf)
 {
 	int fh;
 	size_t size;
+	ssize_t ssize;
+	uint64_t tok;
 	uint64_t *bufp;
+
+	if ((ssize = pri_get(PRI_GET, &tok, buf, lhp->allocp, lhp->freep)) >= 0)
+		return (ssize);
 
 	if ((fh = open("/devices/pseudo/mdesc@0:mdesc", O_RDONLY, 0)) < 0)
 		return (-1);
@@ -486,6 +492,8 @@ ldom_fmri_blacklist(ldom_hdl_t *lhp, nvlist_t *nvl)
 ssize_t
 ldom_get_core_md(ldom_hdl_t *lhp, uint64_t **buf)
 {
+	ssize_t		rv;	/* return value */
+
 	switch (ldom_major_version(lhp)) {
 	case 0:
 		return (get_local_core_md(lhp, buf));
@@ -493,10 +501,13 @@ ldom_get_core_md(ldom_hdl_t *lhp, uint64_t **buf)
 		break;
 	case 1:
 		/* LDOMS 1.0 */
-		if (ldom_on_service(lhp) == 1)
-			return (ldmsvcs_get_core_md(lhp, buf));
-		else
+		if (ldom_on_service(lhp) == 1) {
+			if ((rv = ldmsvcs_get_core_md(lhp, buf)) < 0)
+				rv = get_local_core_md(lhp, buf);
+			return (rv);
+		} else {
 			return (get_local_core_md(lhp, buf));
+		}
 
 		/*NOTREACHED*/
 		break;
@@ -507,7 +518,6 @@ ldom_get_core_md(ldom_hdl_t *lhp, uint64_t **buf)
 
 	return (-1);
 }
-
 
 /*
  * version 0 means no LDOMS
@@ -547,8 +557,13 @@ ldom_init(void *(*allocp)(size_t size),
 {
 	struct ldom_hdl *lhp;
 
-	if ((lhp = allocp(sizeof (struct ldom_hdl))) == NULL)
+	if (pri_init() < 0)
 		return (NULL);
+
+	if ((lhp = allocp(sizeof (struct ldom_hdl))) == NULL) {
+		pri_fini();
+		return (NULL);
+	}
 
 	lhp->major_version = -1;	/* version not yet determined */
 	lhp->allocp = allocp;
@@ -568,6 +583,8 @@ ldom_fini(ldom_hdl_t *lhp)
 
 	ldmsvcs_fini(lhp);
 	lhp->freep(lhp, sizeof (struct ldom_hdl));
+
+	pri_fini();
 }
 
 /* end file */

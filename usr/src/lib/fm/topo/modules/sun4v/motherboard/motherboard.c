@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,11 +43,6 @@
 #include <sys/types.h>
 #include <sys/mdesc.h>
 #include <sys/fm/ldom.h>
-
-
-#include "topo_prop.h"
-#include "topo_error.h"
-
 
 /*
  * motherboard.c
@@ -124,8 +119,8 @@ mb_topo_free(void *data, size_t size)
 }
 
 static int
-mb_get_pri_serial_part(topo_mod_t *mod, ldom_hdl_t *lhp, const char *name,
-	char **serialp, char **partp)
+mb_get_pri_info(topo_mod_t *mod, ldom_hdl_t *lhp,
+	char **serialp, char **partp, char **csnp)
 {
 	char isa[MAXNAMELEN];
 	md_t *mdp;
@@ -134,9 +129,7 @@ mb_get_pri_serial_part(topo_mod_t *mod, ldom_hdl_t *lhp, const char *name,
 	ssize_t bufsize = 0;
 	int  nfrus, num_nodes, i;
 	char *pstr = NULL;
-	char *sn, *pn, *dn;
-
-	topo_mod_dprintf(mod, "entering mb_get_pri_fru\n");
+	char *sn, *pn, *dn, *csn;
 
 	(void) sysinfo(SI_MACHINE, isa, MAXNAMELEN);
 
@@ -168,7 +161,7 @@ mb_get_pri_serial_part(topo_mod_t *mod, ldom_hdl_t *lhp, const char *name,
 	}
 
 	nfrus = md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
-			md_find_name(mdp, "fru"),
+			md_find_name(mdp, "component"),
 			md_find_name(mdp, "fwd"), listp);
 	if (nfrus <= 0) {
 		topo_mod_dprintf(mod, "error: nfrus=%d\n", nfrus);
@@ -176,19 +169,25 @@ mb_get_pri_serial_part(topo_mod_t *mod, ldom_hdl_t *lhp, const char *name,
 	}
 	topo_mod_dprintf(mod, "nfrus=%d\n", nfrus);
 	for (i = 0; i < nfrus; i++) {
-		if (md_get_prop_str(mdp, listp[i], "name", &pstr) == 0 &&
-		    strcmp(name, pstr) == 0) {
-			topo_mod_dprintf(mod, "found motherboard\n");
-			if (md_get_prop_str(mdp, listp[i], "serial_number",
-					    &sn) < 0)
-				sn = NULL;
-			if (md_get_prop_str(mdp, listp[i], "part_number",
-					    &pn) < 0)
-				pn = NULL;
-			if (md_get_prop_str(mdp, listp[i], "dash_number",
-					    &dn) < 0)
-				dn = NULL;
-			break;
+		if (md_get_prop_str(mdp, listp[i], "type", &pstr) == 0) {
+			/* systemboard/motherboard component */
+			if (strcmp("systemboard", pstr) == 0) {
+				if (md_get_prop_str(mdp, listp[i],
+				    "serial_number", &sn) < 0)
+					sn = NULL;
+				if (md_get_prop_str(mdp, listp[i],
+				    "part_number", &pn) < 0)
+					pn = NULL;
+				if (md_get_prop_str(mdp, listp[i],
+				    "dash_number", &dn) < 0)
+					dn = NULL;
+			}
+			/* chassis component */
+			if (strcmp("chassis", pstr) == 0) {
+				if (md_get_prop_str(mdp, listp[i],
+				    "serial_number", &csn) < 0)
+					csn = NULL;
+			}
 		}
 	}
 
@@ -198,6 +197,8 @@ mb_get_pri_serial_part(topo_mod_t *mod, ldom_hdl_t *lhp, const char *name,
 	(void) strcpy(*partp, pn);
 	if (dn != NULL)
 		(void) strcat(*partp, dn);
+
+	*csnp = topo_mod_strdup(mod, csn);
 
 	mb_topo_free(listp, sizeof (mde_cookie_t) * num_nodes);
 	mb_topo_free(bufp, (size_t)bufsize);
@@ -247,20 +248,25 @@ mb_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	nvlist_t *fmri;
 	tnode_t *ntn;
 	char *serial = NULL, *part = NULL;
-	nvlist_t *auth = topo_mod_auth(mod, parent);
+	char *csn = NULL, *pstr = NULL;
 	ldom_hdl_t *motherboard_lhp;
+	nvlist_t *auth = topo_mod_auth(mod, parent);
 
 	motherboard_lhp = ldom_init(mb_topo_alloc, mb_topo_free);
 
-	/* Get MB Serial Number and Part Number from PRI */
-	(void) mb_get_pri_serial_part(mod, motherboard_lhp, name,
-		&serial, &part);
+	/* Get Chassis ID, MB Serial Number and Part Number from PRI */
+	(void) mb_get_pri_info(mod, motherboard_lhp, &serial, &part, &csn);
+
+	if (nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS, &pstr) != 0 &&
+	    csn != NULL)
+		nvlist_add_string(auth, FM_FMRI_AUTH_CHASSIS, csn);
 
 	fmri = topo_mod_hcfmri(mod, NULL, FM_HC_SCHEME_VERSION, name, i,
 	    NULL, auth, part, NULL, serial);
 
 	topo_mod_strfree(mod, serial);
 	topo_mod_strfree(mod, part);
+	topo_mod_strfree(mod, csn);
 	ldom_fini(motherboard_lhp);
 
 	if (fmri == NULL) {

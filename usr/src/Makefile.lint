@@ -439,6 +439,7 @@ sparc_SUBDIRS= \
 	cmd/wrsmconf \
 	cmd/wrsmstat \
 	lib/libdscp \
+	lib/libpri \
 	lib/libwrsmconf \
 	lib/wrsm \
 	lib/libpcp \

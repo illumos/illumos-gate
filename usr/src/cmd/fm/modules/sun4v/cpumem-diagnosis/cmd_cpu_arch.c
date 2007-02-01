@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,7 +204,7 @@ cmd_cpu_getfrustr(fmd_hdl_t *hdl, cmd_cpu_t *cp)
 			char *s1, *s2;
 			size_t frustrlen;
 
-			s2 = strrchr(frustr, '/') + 1;
+			s2 = strrchr(frustr, '/');
 			if (s2 == NULL)
 				s2 = "MB";
 			frustrlen = strlen(s2) + sizeof (CPU_FRU_FMRI);

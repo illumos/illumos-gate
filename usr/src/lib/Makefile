@@ -237,6 +237,7 @@ sparc_SUBDIRS= .WAIT	\
 	libdscp		\
 	libprtdiag	.WAIT	\
 	libprtdiag_psr	\
+	libpri		\
 	librsc		\
 	libfruutils	.WAIT	\
 	libfru		\
@@ -245,7 +246,9 @@ sparc_SUBDIRS= .WAIT	\
 	wrsm		\
 	libpcp
 
-fm: libexacct
+FM_sparc_DEPLIBS= libpri
+
+fm: libexacct $(FM_$(MACH)_DEPLIBS)
 
 #
 # Create a special version of $(SUBDIRS) with no .WAIT's, for use with the
@@ -406,6 +409,7 @@ $(CLOSED_BUILD)HDRSUBDIRS += \
 
 sparc_HDRSUBDIRS=	\
 	libdscp		\
+	libpri		\
 	libwrsmconf
 
 all :=		TARGET= all

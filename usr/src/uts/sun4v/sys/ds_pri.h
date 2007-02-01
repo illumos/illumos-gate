@@ -24,43 +24,39 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_CPU_MDESC_H
-#define	_CPU_MDESC_H
+#ifndef	_SYS_DS_PRI_H_
+#define	_SYS_DS_PRI_H_
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-#include <sys/mdesc.h>
-#include <sys/fm/ldom.h>
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct md_cpumap {
-	uint32_t cpumap_id;
-	uint32_t cpumap_pid;
-	uint64_t cpumap_serialno;
-	char *cpumap_cpufru;
-	char *cpumap_cpufrusn;
-	char *cpumap_cpufrupn;
-	char *cpumap_cpufrudn;
-} md_cpumap_t;
+/*
+ * ioctl info for ds_pri device
+ */
 
-typedef struct cpu {
-	md_cpumap_t *cpu_mdesc_cpus;	/* ptr to array of cpu maps */
-	uint32_t cpu_mdesc_ncpus;	/* number of cpu maps */
-} cpu_t;
+#define	DSPRIIOC	('d' << 24 | 's' << 16 | 'p' << 8)
 
-extern cpu_t cpu;
+#define	DSPRI_GETINFO	(DSPRIIOC | 1)   /* Get PRI size */
+#define	DSPRI_WAIT	(DSPRIIOC | 2)   /* Wait for PRI change */
 
-extern int cpu_get_serialid_mdesc(uint32_t, uint64_t *);
-extern md_cpumap_t *cpu_find_cpumap(uint32_t);
-extern int cpu_mdesc_init(ldom_hdl_t *lhp);
-extern void cpu_mdesc_fini(void);
+
+/*
+ * DSPRI_GETINFO
+ * Datamodel invariant.
+ */
+struct dspri_info {
+	uint64_t size;
+	uint64_t token;
+};
+
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif	/* _CPU_MDESC_H */
+#endif /* _SYS_DS_PRI_H_ */
