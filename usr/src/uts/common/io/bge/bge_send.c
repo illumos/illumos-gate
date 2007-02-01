@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,7 +168,7 @@ bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
 		srp->txbuf_pop_queue = txbuf_queue;
 	}
 
-	if (bgep->tx_resched_needed)
+	if (srp->tx_flow != 0 || bgep->tx_resched_needed)
 		ddi_trigger_softintr(bgep->drain_id);
 }
 
@@ -359,6 +359,7 @@ bge_send_fill_txbd(send_ring_t *srp, send_pkt_t *pktp)
 	hw_sbd_p->len = txbuf->copy_len;
 	if (pktp->vlan_tci != 0) {
 		hw_sbd_p->vlan_tci = pktp->vlan_tci;
+		hw_sbd_p->host_buf_addr += VLAN_TAGSZ;
 		hw_sbd_p->flags |= SBD_FLAG_VLAN_TAG;
 	}
 	if (pktp->pflags & HCK_IPV4_HDRCKSUM)
@@ -371,12 +372,11 @@ bge_send_fill_txbd(send_ring_t *srp, send_pkt_t *pktp)
 /*
  * Send a message by copying it into a preallocated (and premapped) buffer
  */
-static void bge_send_copy(bge_t *bgep, sw_txbuf_t *txbuf, mblk_t *mp,
-    uint16_t tci);
+static void bge_send_copy(bge_t *bgep, sw_txbuf_t *txbuf, mblk_t *mp);
 #pragma	inline(bge_send_copy)
 
 static void
-bge_send_copy(bge_t *bgep, sw_txbuf_t *txbuf, mblk_t *mp, uint16_t tci)
+bge_send_copy(bge_t *bgep, sw_txbuf_t *txbuf, mblk_t *mp)
 {
 	mblk_t *bp;
 	uint32_t mblen;
@@ -384,27 +384,14 @@ bge_send_copy(bge_t *bgep, sw_txbuf_t *txbuf, mblk_t *mp, uint16_t tci)
 
 	txbuf->copy_len = 0;
 	pbuf = DMA_VPTR(txbuf->buf);
-	bp = mp;
-	if (tci != 0) {
-		mblen = MBLKL(bp);
-		ASSERT(mblen >= 2 * ETHERADDRL + VLAN_TAGSZ);
-		bcopy(bp->b_rptr, pbuf, 2 * ETHERADDRL);
-		pbuf += 2 * ETHERADDRL;
-		txbuf->copy_len += 2 * ETHERADDRL;
-		mblen -= 2 * ETHERADDRL + VLAN_TAGSZ;
-		if ((txbuf->copy_len += mblen) <= bgep->chipid.ethmax_size) {
-			bcopy(bp->b_wptr - mblen, pbuf, mblen);
-			pbuf += mblen;
-		}
-		bp = bp->b_cont;
-	}
-	for (; bp != NULL; bp = bp->b_cont) {
+	for (bp = mp; bp != NULL; bp = bp->b_cont) {
 		if ((mblen = MBLKL(bp)) == 0)
 			continue;
-		if ((txbuf->copy_len += mblen) <= bgep->chipid.ethmax_size) {
-			bcopy(bp->b_rptr, pbuf, mblen);
-			pbuf += mblen;
-		}
+		ASSERT(txbuf->copy_len + mblen <=
+		    bgep->chipid.snd_buff_size);
+		bcopy(bp->b_rptr, pbuf, mblen);
+		pbuf += mblen;
+		txbuf->copy_len += mblen;
 	}
 }
 
@@ -435,6 +422,7 @@ bge_send_serial(bge_t *bgep, send_ring_t *srp)
 
 	bsp = DMA_VPTR(bgep->status_block);
 	txfill_next = srp->txfill_next;
+start_tx:
 	tx_next = srp->tx_next;
 	ssbdp = &srp->sw_sbds[tx_next];
 	for (count = 0; count < bgep->param_drain_max; ++count) {
@@ -484,6 +472,8 @@ bge_send_serial(bge_t *bgep, send_ring_t *srp)
 		bge_mbx_put(bgep, srp->chip_mbx_reg, srp->tx_next);
 		srp->txfill_next = txfill_next;
 		bgep->watchdog++;
+		if (srp->tx_flow != 0 && srp->tx_free > 1)
+			goto start_tx;
 	}
 
 	mutex_exit(srp->tx_lock);
@@ -501,6 +491,7 @@ bge_send(bge_t *bgep, mblk_t *mp)
 	uint64_t pkt_slot;
 	uint16_t vlan_tci;
 	uint32_t pflags;
+	char *pbuf;
 
 	ASSERT(mp->b_next == NULL);
 	srp = &bgep->send[ring];
@@ -518,21 +509,25 @@ bge_send(bge_t *bgep, mblk_t *mp)
 	}
 
 	/*
-	 * Determine if the packet is VLAN tagged.
-	 */
-	ASSERT(MBLKL(mp) >= sizeof (struct ether_header));
-	ehp = (struct ether_vlan_header *)mp->b_rptr;
-	if (ehp->ether_tpid == htons(ETHERTYPE_VLAN))
-		vlan_tci  = ntohs(ehp->ether_tci);
-	else
-		vlan_tci = 0;
-
-	/*
 	 * Copy all mp fragments to the pkt buffer
 	 */
 	txbuf = txbuf_item->item;
-	bge_send_copy(bgep, txbuf, mp, vlan_tci);
-	ASSERT(txbuf->copy_len <= bgep->chipid.ethmax_size);
+	bge_send_copy(bgep, txbuf, mp);
+
+	/*
+	 * Determine if the packet is VLAN tagged.
+	 */
+	ASSERT(txbuf->copy_len >= sizeof (struct ether_header));
+	pbuf = DMA_VPTR(txbuf->buf);
+
+	ehp = (struct ether_vlan_header *)pbuf;
+	if (ehp->ether_tpid == htons(ETHERTYPE_VLAN)) {
+		/* Strip the vlan tag */
+		vlan_tci = ntohs(ehp->ether_tci);
+		pbuf = memmove(pbuf + VLAN_TAGSZ, pbuf, 2 * ETHERADDRL);
+		txbuf->copy_len -= VLAN_TAGSZ;
+	} else
+		vlan_tci = 0;
 
 	/*
 	 * Retrieve checksum offloading info.
@@ -544,7 +539,7 @@ bge_send(bge_t *bgep, mblk_t *mp)
 	 */
 	if ((pflags & HCK_FULLCKSUM) &&
 	    (bgep->chipid.flags & CHIP_FLAG_PARTIAL_CSUM))
-		bge_pseudo_cksum((uint8_t *)DMA_VPTR(txbuf->buf));
+		bge_pseudo_cksum((uint8_t *)pbuf);
 
 	/*
 	 * Packet buffer is ready to send: get and fill pkt info

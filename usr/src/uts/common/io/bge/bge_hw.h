@@ -20,12 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_BGE_HW_H
-#define	_SYS_BGE_HW_H
+#ifndef _BGE_HW_H
+#define	_BGE_HW_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -924,6 +924,7 @@ extern "C" {
 #define	RCV_LP_STATS_ENABLE		0x00000001
 
 #define	RCV_LP_STATS_ENABLE_MASK_REG	0x2018
+#define	RCV_LP_STATS_DISABLE_MACTQ	0x040000
 
 /*
  * Receive Data & BD Initiator Registers
@@ -1987,4 +1988,4 @@ typedef struct {
 }
 #endif
 
-#endif	/* _SYS_BGE_HW_H */
+#endif	/* _BGE_HW_H */

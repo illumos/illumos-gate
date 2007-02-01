@@ -3057,7 +3057,7 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	 * NVRAM Corruption Workaround
 	 */
 	for (tries = 0; tries < MAX_TRY_NVMEM_ACQUIRE; tries++)
-		if (bge_nvmem_acquire(bgep) == EAGAIN)
+		if (bge_nvmem_acquire(bgep) != EAGAIN)
 			break;
 	if (tries >= MAX_TRY_NVMEM_ACQUIRE)
 		BGE_DEBUG(("%s: fail to acquire nvram lock",
@@ -3266,6 +3266,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	uint32_t ledctl;
 	uint32_t mtu;
 	uint32_t maxring;
+	uint32_t stats_mask;
 	uint64_t ring;
 	int retval = DDI_SUCCESS;
 
@@ -3470,7 +3471,21 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 */
 	bge_reg_put32(bgep, RCV_LP_CONFIG_REG,
 		RCV_LP_CONFIG(bgep->chipid.rx_rings));
-	bge_reg_put32(bgep, RCV_LP_STATS_ENABLE_MASK_REG, ~0);
+	switch (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev)) {
+	case MHCR_CHIP_ASIC_REV_5700:
+	case MHCR_CHIP_ASIC_REV_5701:
+	case MHCR_CHIP_ASIC_REV_5703:
+	case MHCR_CHIP_ASIC_REV_5704:
+		bge_reg_put32(bgep, RCV_LP_STATS_ENABLE_MASK_REG, ~0);
+		break;
+	case MHCR_CHIP_ASIC_REV_5705:
+		break;
+	default:
+		stats_mask = bge_reg_get32(bgep, RCV_LP_STATS_ENABLE_MASK_REG);
+		stats_mask &= ~RCV_LP_STATS_DISABLE_MACTQ;
+		bge_reg_put32(bgep, RCV_LP_STATS_ENABLE_MASK_REG, stats_mask);
+		break;
+	}
 	bge_reg_set32(bgep, RCV_LP_STATS_CONTROL_REG, RCV_LP_STATS_ENABLE);
 
 	if (bgep->chipid.rx_rings > 1)
