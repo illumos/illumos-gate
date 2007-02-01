@@ -19,9 +19,6 @@
 ../closed/uts/sparc/wsdrv
 ../closed/uts/sun/io/wsdrv.c
 ../closed/uts/sun/io/wsdrv.conf
-../closed/uts/common/io/e1000g
-../closed/uts/intel/e1000g
-../closed/uts/sparc/e1000g
 ../closed/uts/common/io/nge
 ../closed/uts/intel/nge
 ../closed/uts/intel/io/adpu320

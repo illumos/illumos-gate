@@ -1353,3 +1353,8 @@ XGE_HAL_OBJS =  xgehal-channel.o xgehal-fifo.o xgehal-ring.o  xgehal-config.o \
 		xgehal-driver.o  xgehal-mm.o xgehal-stats.o  xgehal-device.o \
 		xge-queue.o  xgehal-mgmt.o xgehal-mgmtaux.o
 
+#
+#	e1000g module
+#
+E1000G_OBJS +=	e1000g_debug.o e1000_hw.o e1000g_main.o e1000g_alloc.o \
+		e1000g_tx.o e1000g_rx.o e1000g_stat.o e1000g_ndd.o

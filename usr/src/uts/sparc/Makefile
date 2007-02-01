@@ -35,16 +35,16 @@ UTSBASE = ..
 
 include Makefile.sparc
 
+LINT_KMODLIBS	 = $(LINT_KMODS:e1000g=)
 LINT_LIBS	 = $(LINT_LIB) $(GEN_LINT_LIB) \
-		   $(LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
+		   $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
 $(CLOSED_BUILD)LINT_LIBS += $(CLOSED_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
 # EXPORT DELETE START
 $(CLOSED_BUILD)LINT_LIBS	+= $(SVVS_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 LINT_LIBS	+= $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
-$(CLOSED_BUILD)CLOSED_LINT_XMODS	= $(CLOSED_XMODS:e1000g=)
-$(CLOSED_BUILD)LINT_LIBS += $(CLOSED_LINT_XMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
+$(CLOSED_BUILD)LINT_LIBS += $(CLOSED_XMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
 DRV_KMODS	+= dprov
 
@@ -87,7 +87,7 @@ def all install clean clobber modlist: $(KMODS) $(CLOSED_KMODS) $(SVVS) \
 	$(XMODS) $(CLOSED_XMODS) config
 
 modlintlib clean.lint: $(LINT_KMODS) $(CLOSED_LINT_KMODS) $(SVVS) \
-	$(XMODS) $(CLOSED_LINT_XMODS)
+	$(XMODS) $(CLOSED_XMODS)
 
 $(KMODS) config:	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)

@@ -256,6 +256,7 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= se
 #       Hardware Drivers in common space
 #
 
+DRV_KMODS	+= e1000g
 DRV_KMODS	+= rge
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 
@@ -432,7 +433,6 @@ SVVS		+= svvs
 XMODS		+=
 $(CLOSED_BUILD)CLOSED_XMODS =		\
 	daplt		\
-	e1000g		\
 	sdpib		\
 	tavor		\
 	wsdrv

@@ -335,6 +335,7 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS_32	+= sbpro
 # Common code drivers
 #
 
+DRV_KMODS	+= e1000g
 DRV_KMODS	+= rge
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 
@@ -598,7 +599,6 @@ SVVS		+= svvs
 $(CLOSED_BUILD)CLOSED_XMODS =		\
 	adpu320		\
 	daplt		\
-	e1000g		\
 	lsimega		\
 	nge		\
 	sdpib		\
