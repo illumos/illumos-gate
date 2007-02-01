@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -798,16 +797,17 @@ __m_cc_erase_in_line_sub(WINDOW *w, int y, int x,
 	int	xi;
 	int	wmin, wmax;
 	int	wlx;
-	int	parentY	= w->_begy + y;
 	WINDOW	*parent = w->_parent;
+	int 	parentY = w->_begy + y - parent->_begy;
+	int	dx = w->_begx - parent->_begx;
 
 	/* Switch to parent context and calculate limits */
-	xi = x = __m_cc_first(parent, parentY, w->_begx + x);
-	wlx = lx = __m_cc_next(parent, parentY, w->_begx + lx) - 1;
-	if (wlx >= w->_begx + w->_maxx) wlx = w->_begx + w->_maxx - 1;
+	xi = x = __m_cc_first(parent, parentY, dx + x);
+	wlx = lx = __m_cc_next(parent, parentY, dx + lx) - 1;
+	if (wlx >= dx + w->_maxx) wlx = dx + w->_maxx - 1;
 
 	for (cp = parent->_line[parentY]; x <= lx; ) {
-		if ((x < w->_begx) || (x >= (w->_begx + w->_maxx))) {
+		if ((x < dx) || (x >= (dx + w->_maxx))) {
 			/* Outside target window */
 			for (i = 0; x <= lx && i <= parentBGWidth; x++, i++) {
 				cp[x] = parent->_bg;
@@ -821,19 +821,19 @@ __m_cc_erase_in_line_sub(WINDOW *w, int y, int x,
 			}
 		}
 	}
-	wmax = x - w->_begx;		/* Defaults */
-	wmin = xi - w->_begx;
-	if ((xi < w->_begx) || (x >= w->_begx + w->_maxx)) {
+	wmax = x - dx;		/* Defaults */
+	wmin = xi - dx;
+	if ((xi < dx) || (x >= dx + w->_maxx)) {
 		/* Overlaps parent. Must touch parent and child */
 		int	pmin, pmax;
 
-		pmax = w->_begx;		/* Defaults */
-		pmin = w->_begx + w->_maxx;
-		if (xi < w->_begx) {
+		pmax = dx;		/* Defaults */
+		pmin = dx + w->_maxx;
+		if (xi < dx) {
 			wmin = 0;
 			pmin = xi;
 		}
-		if (x >= w->_begx + w->_maxx) {
+		if (x >= dx + w->_maxx) {
 			/* Ends right of target window */
 			wmax = w->_maxx;
 			pmax = x;
