@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,8 +40,7 @@ clobber :=	TARGET= clobber
 install :=	TARGET= install
 lint :=		TARGET= lint
 
-MSGFILES =	common/libzfs_dataset.c common/libzfs_mount.c \
-		common/libzfs_util.c
+MSGFILES =	`$(GREP) -l gettext $(HDRDIR)/*.[ch]`
 POFILE =	libzfs.po
 
 .KEEP_STATE:

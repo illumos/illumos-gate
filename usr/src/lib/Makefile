@@ -295,6 +295,7 @@ MSGSUBDIRS=		\
 	libwanboot	\
 	libwanbootutil	\
 	libwladm	\
+	libzfs		\
 	libzonecfg	\
 	lvm		\
 	madv		\
