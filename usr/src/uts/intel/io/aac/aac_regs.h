@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -144,6 +144,11 @@ struct aac_fib_header {
 	int prev;
 	int next;
 };
+
+/* FIB completed without error or no data was transferred in the FIB */
+#define	AAC_SENDERADDR_MASK_FAST_RESPONSE	0x01
+/* The received FIB is an AIF */
+#define	AAC_SENDERADDR_MASK_AIF			0x02
 
 #define	AAC_FIB_SIZE		512 /* size of a fib block in byte */
 #define	AAC_FIB_DATASIZE	(AAC_FIB_SIZE - sizeof (struct aac_fib_header))

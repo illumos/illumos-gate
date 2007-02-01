@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1016,7 +1016,7 @@ aac_intr_new(caddr_t arg)
 	if (index == 0xffffffff)
 		return (DDI_INTR_UNCLAIMED);
 	do {
-		if (index & 2) {
+		if (index & AAC_SENDERADDR_MASK_AIF) {
 			int i;
 
 			if (index == 0xfffffffe)
@@ -1035,7 +1035,7 @@ aac_intr_new(caddr_t arg)
 			AAC_OUTB_SET(softs, index);
 			AAC_STATUS_CLR(softs, AAC_DB_RESPONSE_READY);
 		} else {
-			fast = index & 1;
+			fast = index & AAC_SENDERADDR_MASK_FAST_RESPONSE;
 			index >>= 2;
 
 			/* Make sure firmware reported index is valid */
