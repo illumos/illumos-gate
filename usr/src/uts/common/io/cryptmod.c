@@ -3101,7 +3101,6 @@ encrypt_msgb(queue_t *q, struct tmodinfo *tmi, mblk_t *mp)
 {
 	size_t plainlen, outlen;
 	mblk_t *newmp = NULL;
-	mblk_t *headblk = NULL;
 
 	/* If not encrypting, do nothing */
 	if (tmi->enc_data.method == CRYPT_METHOD_NONE) {
@@ -3145,7 +3144,7 @@ encrypt_msgb(queue_t *q, struct tmodinfo *tmi, mblk_t *mp)
 	}
 	newmp = NULL;
 	/* If there is data left (< MSGBUF_SIZE), encrypt it. */
-	if ((plainlen = MBLKL(mp)))
+	if ((plainlen = MBLKL(mp)) > 0)
 		newmp = encrypt_block(q, tmi, mp, plainlen);
 
 	return (newmp);
