@@ -2,7 +2,7 @@
  *
  * devinfo.c : main file for libdevinfo-based device enumeration
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -379,3 +379,25 @@ devinfo_device_rescan (HalDevice *d)
 		return (FALSE);
 	}
 }
+
+static int
+walk_devlinks(di_devlink_t devlink, void *arg)
+{
+        char    **path= (char **)arg;
+
+        *path = strdup(di_devlink_path(devlink));
+
+        return (DI_WALK_TERMINATE);
+}
+
+char *
+get_devlink(di_devlink_handle_t devlink_hdl, char *re, char *path)
+{
+        char    *devlink_path = NULL;
+
+        (void) di_devlink_walk(devlink_hdl, re, path,
+            DI_PRIMARY_LINK, &devlink_path, walk_devlinks);
+
+        return (devlink_path);
+}
+

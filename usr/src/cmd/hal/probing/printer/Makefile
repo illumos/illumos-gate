@@ -25,18 +25,38 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIRS = storage volume printer
+PROG =		hald-probe-printer
+OBJS =		probe-printer.o logger.o
+SRCS =		probe-printer.c
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
+include ../../../Makefile.cmd
+include ../../Makefile.hal
+
+ROOTCMDDIR =	$(ROOTLIB_HAL)
+
+LDLIBS +=	-lc -ldbus-1 -lhal
+
+CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
+CPPFLAGS +=	-I$(ROOT)/usr/include/hal -I../../utils -I../../hald
+C99MODE =	$(C99_ENABLE)
 
 .KEEP_STATE:
 
-all install clean clobber: $(SUBDIRS)
+all: $(PROG)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+logger.o: ../../hald/logger.c
+	$(COMPILE.c) -o $@ ../../hald/logger.c
+	$(POST_PROCESS_O)
+
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTCMD)
+
+clean:
+	$(RM) $(OBJS)
 
 FRC:
+
+include ../../../Makefile.targ

@@ -2,7 +2,7 @@
  *
  * devinfo_storage.c : storage devices
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -69,8 +69,6 @@ HalDevice *devinfo_floppy_add(HalDevice *parent, di_node_t node, char *devfs_pat
 static void devinfo_floppy_add_volume(HalDevice *parent, di_node_t node);
 static HalDevice *devinfo_lofi_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type);
 static void devinfo_lofi_add_minor(HalDevice *parent, di_node_t node, char *minor_path, char *devlink, dev_t dev);
-static int walk_devlinks(di_devlink_t devlink, void *arg);
-static char *get_devlink(di_devlink_handle_t devlink_hdl, char *path);
 static void devinfo_storage_minors(HalDevice *parent, di_node_t node, gchar *devfs_path, gboolean);
 static struct devinfo_storage_minor *devinfo_storage_new_minor(char *maindev_path, char *slice,
     char *devlink, dev_t dev, int dosnum);
@@ -474,8 +472,7 @@ devinfo_floppy_add(HalDevice *parent, di_node_t node, char *devfs_path, char *de
 		    ((minor_path = di_devfs_minor_path(minor)) == NULL)) {
 			continue;
 		}
-		if (((devlink = get_devlink(devlink_hdl, minor_path)) != NULL) &&
-		    (strncmp (devlink, "/dev/diskette", sizeof ("/dev/diskette") - 1) == 0)) {
+		if ((devlink = get_devlink(devlink_hdl, "diskette.+" , minor_path)) != NULL) {
 			break;
 		}
 		di_devfs_path_free (minor_path);
@@ -650,7 +647,7 @@ devinfo_lofi_add_major(HalDevice *parent, di_node_t node, char *devfs_path, char
 		    ((minor_path = di_devfs_minor_path(minor)) == NULL)) {
 			continue;
 		}
-		if ((devlink = get_devlink(devlink_hdl, minor_path)) == NULL) {
+		if ((devlink = get_devlink(devlink_hdl, NULL, minor_path)) == NULL) {
 			di_devfs_path_free (minor_path);
         		continue;
 		}
@@ -755,27 +752,6 @@ devinfo_lofi_remove_minor(char *parent_devfs_path, char *name)
 
 /* common storage */
 
-static int
-walk_devlinks(di_devlink_t devlink, void *arg)
-{
-        char    **path= (char **)arg;
-
-        *path = strdup(di_devlink_path(devlink));
-
-        return (DI_WALK_TERMINATE);
-}
-
-static char *
-get_devlink(di_devlink_handle_t devlink_hdl, char *path)
-{
-        char    *devlink_path = NULL;
-
-        (void) di_devlink_walk(devlink_hdl, NULL, path,
-            DI_PRIMARY_LINK, &devlink_path, walk_devlinks);
-
-        return (devlink_path);
-}
-
 static void
 devinfo_storage_free_minor(struct devinfo_storage_minor *m)
 {
@@ -872,7 +848,7 @@ devinfo_storage_minors(HalDevice *parent, di_node_t node, gchar *devfs_path, gbo
 		    ((minor_path = di_devfs_minor_path(minor)) == NULL)) {
 			continue;
 		}
-		if ((devlink = get_devlink(devlink_hdl, minor_path)) == NULL) {
+		if ((devlink = get_devlink(devlink_hdl, NULL, minor_path)) == NULL) {
 			di_devfs_path_free (minor_path);
         		continue;
 		}

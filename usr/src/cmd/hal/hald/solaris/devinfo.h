@@ -2,7 +2,7 @@
  *
  * devinfo.h : definitions for libdevinfo-based device enumeration
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -68,5 +68,7 @@ void devinfo_add_enqueue(HalDevice *d, gchar *devfs_path, DevinfoDevHandler *han
 void devinfo_add_enqueue_at_front(HalDevice *d, gchar *devfs_path, DevinfoDevHandler *handler);
 void devinfo_remove_enqueue(gchar *devfs_path, DevinfoDevHandler *handler);
 gboolean devinfo_device_rescan (HalDevice *d);
+char *get_devlink(di_devlink_handle_t devlink_hdl, char *re, char *path);
+
 
 #endif /* DEVINFO_H */

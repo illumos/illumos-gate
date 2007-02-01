@@ -2,7 +2,7 @@
  *
  * sysevent.c : Solaris sysevents
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -62,7 +62,7 @@ gboolean
 sysevent_init(void)
 {
 	GError *err = NULL;
-	const char	*subcl[2];
+	const char	*subcl[3];
 
         /*
 	 * pipe used to serialize sysevents through the main loop
@@ -88,12 +88,13 @@ sysevent_init(void)
 
 	subcl[0] = ESC_DISK;
 	subcl[1] = ESC_LOFI;
-	if (sysevent_subscribe_event(shp, EC_DEV_ADD, subcl, 2) != 0) {
+	subcl[2] = ESC_PRINTER;
+	if (sysevent_subscribe_event(shp, EC_DEV_ADD, subcl, 3) != 0) {
 		HAL_INFO (("subscribe(dev_add) failed %d", errno));
 		sysevent_unbind_handle(shp);
 		return (FALSE);
 	}
-	if (sysevent_subscribe_event(shp, EC_DEV_REMOVE, subcl, 2) != 0) {
+	if (sysevent_subscribe_event(shp, EC_DEV_REMOVE, subcl, 3) != 0) {
 		HAL_INFO (("subscribe(dev_remove) failed %d", errno));
 		sysevent_unbind_handle(shp);
 		return (FALSE);
@@ -184,13 +185,15 @@ sysevent_iochannel_data (GIOChannel *source,
 		HAL_INFO (("sysevent: class=%s, sub=%s", class, subclass));
 
 		if (strcmp(class, EC_DEV_ADD) == 0) {
-			if (strcmp(subclass, ESC_DISK) == 0) {
+			if ((strcmp(subclass, ESC_DISK) == 0) ||
+			    (strcmp(subclass, ESC_PRINTER) == 0)) {
 				sysevent_dev_add(phys_path, dev_name);
 			} else if (strcmp(subclass, ESC_LOFI) == 0) {
 				sysevent_lofi_add(phys_path, dev_name);
 			}
 		} else if (strcmp(class, EC_DEV_REMOVE) == 0) {
-			if (strcmp(subclass, ESC_DISK) == 0) {
+			if ((strcmp(subclass, ESC_DISK) == 0) ||
+			    (strcmp(subclass, ESC_PRINTER) == 0)) {
 				sysevent_dev_remove(phys_path, dev_name);
 			} else if (strcmp(subclass, ESC_LOFI) == 0) {
 				sysevent_lofi_remove(phys_path, dev_name);

@@ -2,7 +2,7 @@
  *
  * devinfo_usb.h : USB devices
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -36,6 +36,8 @@
 HalDevice *devinfo_usb_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type);
 static HalDevice *devinfo_usb_if_add(HalDevice *d, di_node_t node, gchar *devfs_path, int ifnum);
 static HalDevice *devinfo_usb_scsa2usb_add(HalDevice *d, di_node_t node, gchar *devfs_path);
+static HalDevice *devinfo_usb_printer_add(HalDevice *usbd, di_node_t node, gchar *devfs_path);
+const gchar *devinfo_printer_prnio_get_prober (HalDevice *d, int *timeout);
 
 DevinfoDevHandler devinfo_usb_handler = {
         devinfo_usb_add,
@@ -44,6 +46,15 @@ DevinfoDevHandler devinfo_usb_handler = {
 	NULL,
 	NULL,
         NULL
+};
+
+DevinfoDevHandler devinfo_usb_printer_handler = {
+        devinfo_usb_add,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+        devinfo_printer_prnio_get_prober
 };
 
 HalDevice *
@@ -94,6 +105,9 @@ devinfo_usb_add(HalDevice *parent, di_node_t node, char *devfs_path, char *devic
 	driver_name = di_driver_name (node);
 	if ((driver_name != NULL) && (strcmp (driver_name, "scsa2usb") == 0)) {
 		nd = devinfo_usb_scsa2usb_add (d, node, devfs_path);
+	} else if ((driver_name != NULL) &&
+		   (strcmp (driver_name, "usbprn") == 0)) {
+		nd = devinfo_usb_printer_add (d, node, devfs_path);
 	} else {
 		devinfo_add_enqueue (d, devfs_path, &devinfo_usb_handler);
 	}
@@ -118,11 +132,6 @@ devinfo_usb_if_add(HalDevice *parent, di_node_t node, gchar *devfs_path, int ifn
 
 	devinfo_set_default_properties (d, parent, node, devfs_path);
         hal_device_property_set_string (d, "info.bus", "usb");
-
-        hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
-		"%s_if%d", hal_device_get_udi (parent), ifnum);
-        hal_device_set_udi (d, udi);
-        hal_device_property_set_string (d, "info.udi", udi);
         hal_device_property_set_string (d, "info.product", "USB Device Interface");
 
 	/* copy parent's usb_device.* properties */
@@ -131,25 +140,47 @@ devinfo_usb_if_add(HalDevice *parent, di_node_t node, gchar *devfs_path, int ifn
 	return (d);
 }
 
-static int
-walk_devlinks(di_devlink_t devlink, void *arg)
+
+static void
+get_dev_link_path(di_node_t node, char *nodetype, char *re, char **devlink, char **minor_path)
 {
-        char **path = (char **)arg;
+	di_devlink_handle_t devlink_hdl;
+        int     major;
+        di_minor_t minor;
+        dev_t   devt;
 
-        *path = strdup(di_devlink_path(devlink));
+	*devlink = NULL;
+        *minor_path = NULL;
 
-        return (DI_WALK_TERMINATE);
-}
+        if ((devlink_hdl = di_devlink_init(NULL, 0)) == NULL) {
+                printf("di_devlink_init() failed\n");
+                return;
+        }
 
-static char *
-get_devlink(di_devlink_handle_t devlink_hdl, char *path)
-{
-	char *devlink = NULL;
+        major = di_driver_major(node);
+        minor = DI_MINOR_NIL;
+        while ((minor = di_minor_next(node, minor)) != DI_MINOR_NIL) {
+                devt = di_minor_devt(minor);
+                if (major != major(devt)) {
+                        continue;
+                }
 
-        (void) di_devlink_walk(devlink_hdl, NULL, path,
-            DI_PRIMARY_LINK, &devlink, walk_devlinks);
+                if (di_minor_type(minor) != DDM_MINOR) {
+                        continue;
+                }
 
-        return (devlink);
+                if ((*minor_path = di_devfs_minor_path(minor)) == NULL) {
+                        continue;
+                }
+
+		if ((strcmp (di_minor_nodetype(minor), nodetype) == 0) &&
+		    ((*devlink = get_devlink(devlink_hdl, re, *minor_path)) != NULL)) {
+			break;
+		}
+		di_devfs_path_free (*minor_path);
+		minor_path = NULL;
+	}
+	di_devlink_fini (&devlink_hdl);
 }
 
 static HalDevice *
@@ -166,39 +197,9 @@ devinfo_usb_scsa2usb_add(HalDevice *usbd, di_node_t node, gchar *devfs_path)
 
 	devinfo_add_enqueue (usbd, devfs_path, &devinfo_usb_handler);
 
-        if ((devlink_hdl = di_devlink_init(NULL, 0)) == NULL) {
-                printf("di_devlink_init() failed\n");
-                return (NULL);
-        }
+	get_dev_link_path(node, "ddi_ctl:devctl:scsi", NULL,  &devlink, &minor_path);
 
-        major = di_driver_major(node);
-        minor = DI_MINOR_NIL;
-        while ((minor = di_minor_next(node, minor)) != DI_MINOR_NIL) {
-                devt = di_minor_devt(minor);
-                if (major != major(devt)) {
-                        continue;
-                }
-                if ((minor_path = di_devfs_minor_path(minor)) == NULL) {
-                        continue;
-                }
-                if (di_minor_type(minor) != DDM_MINOR) {
-                        continue;
-                }
-		if (strcmp (di_minor_nodetype(minor),
-		    "ddi_ctl:devctl:scsi") == 0) {
-                	devlink = get_devlink(devlink_hdl, minor_path);
-                	if (devlink == NULL) {
-				devlink = strdup("");
-			}
-			break;
-		}
-		di_devfs_path_free (minor_path);
-		minor_path = NULL;
-        }
-
-	di_devlink_fini (&devlink_hdl);
-
-	if (devlink == NULL) {
+	if ((devlink == NULL) || (minor_path == NULL)) {
 		goto out;
 	}
 
@@ -229,3 +230,53 @@ out:
 	return (d);
 }
 
+static HalDevice *
+devinfo_usb_printer_add(HalDevice *parent, di_node_t node, gchar *devfs_path)
+{
+	HalDevice *d = NULL;
+        char    udi[HAL_PATH_MAX];
+	char *s;
+	char *devlink = NULL, *minor_path = NULL;
+
+	devinfo_add_enqueue (parent, devfs_path, &devinfo_usb_handler);
+
+	get_dev_link_path(node, "ddi_printer", "printers/.+", &devlink, &minor_path);
+
+	if ((devlink == NULL) || (minor_path == NULL)) {
+		goto out;
+	}
+
+	d = hal_device_new ();
+
+	devinfo_set_default_properties (d, parent, node, minor_path);
+        hal_device_property_set_string (d, "info.category", "printer");
+	hal_device_add_capability (d, "printer");
+
+	/* copy parent's usb_device.* properties */
+	hal_device_merge_with_rewrite (d, parent, "usb.", "usb_device.");
+
+	/* add printer properties */
+        hal_device_property_set_string (d, "printer.device", devlink);
+	PROP_STR(d, node, s, "usb-vendor-name", "printer.vendor");
+	PROP_STR(d, node, s, "usb-product-name", "printer.product");
+	PROP_STR(d, node, s, "usb-serialno", "printer.serial");
+
+	devinfo_add_enqueue (d, minor_path, &devinfo_usb_printer_handler);
+
+out:
+	if (devlink) {
+		free(devlink);
+	}
+	if (minor_path) {
+		di_devfs_path_free (minor_path);
+	}
+
+	return (d);
+}
+
+const gchar *
+devinfo_printer_prnio_get_prober (HalDevice *d, int *timeout)
+{
+	*timeout = 5 * 1000;	/* 5 second timeout */
+	return ("hald-probe-printer");
+}
