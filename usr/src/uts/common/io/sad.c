@@ -568,7 +568,6 @@ apush_iocdata(
 				(void) strcpy(sap->sap_list[i], ap->ap_list[i]);
 			for (; i < MAXAPUSH; i++)
 				bzero(sap->sap_list[i], FMNAMESZ + 1);
-			mutex_exit(&ss->ss_sad_lock);
 
 			/* release our hold on the config */
 			sad_ap_rele(ap, ss);
