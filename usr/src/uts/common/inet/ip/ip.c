@@ -22832,7 +22832,7 @@ release_ire_and_ill:
 		if (CLASSD(dst)) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutMcastPkts);
 			UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutMcastOctets,
-			    ntohs(ipha->ipha_length));
+			    LENGTH);
 		}
 
 		TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
@@ -23440,7 +23440,7 @@ release_ire_and_ill_2:
 					    ipIfStatsHCOutMcastPkts);
 					UPDATE_MIB(out_ill->ill_ip_mib,
 					    ipIfStatsHCOutMcastOctets,
-					    ntohs(ipha->ipha_length));
+					    LENGTH);
 				} else if (ire->ire_type == IRE_BROADCAST) {
 					BUMP_MIB(out_ill->ill_ip_mib,
 					    ipIfStatsHCOutBcastPkts);
