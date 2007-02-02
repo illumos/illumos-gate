@@ -20293,8 +20293,9 @@ sd_get_media_info(dev_t dev, caddr_t arg, int flag)
 		 * the media type based on the inquiry data
 		 */
 		sinq = un->un_sd->sd_inq;
-		if (sinq->inq_qual == 0) {
-			/* This is a direct access device */
+		if ((sinq->inq_dtype == DTYPE_DIRECT) ||
+		    (sinq->inq_dtype == DTYPE_OPTICAL)) {
+			/* This is a direct access device  or optical disk */
 			media_info.dki_media_type = DK_FIXED_DISK;
 
 			if ((bcmp(sinq->inq_vid, "IOMEGA", 6) == 0) ||
@@ -20307,7 +20308,10 @@ sd_get_media_info(dev_t dev, caddr_t arg, int flag)
 				}
 			}
 		} else {
-			/* Not a CD or direct access so return unknown media */
+			/*
+			 * Not a CD, direct access or optical disk so return
+			 * unknown media
+			 */
 			media_info.dki_media_type = DK_UNKNOWN;
 		}
 	}
