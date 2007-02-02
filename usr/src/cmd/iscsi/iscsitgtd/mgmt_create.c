@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@
 #include <sys/scsi/impl/commands.h>
 #include <libzfs.h>
 #include <syslog.h>
+#include <priv.h>
 
 #include <iscsitgt_impl.h>
 #include "queue.h"
@@ -56,10 +57,10 @@
 
 extern char *getfullrawname();
 
-static char *create_target(tgt_node_t *);
-static char *create_initiator(tgt_node_t *);
-static char *create_tpgt(tgt_node_t *);
-static char *create_zfs(tgt_node_t *);
+static char *create_target(tgt_node_t *, ucred_t *);
+static char *create_initiator(tgt_node_t *, ucred_t *);
+static char *create_tpgt(tgt_node_t *, ucred_t *);
+static char *create_zfs(tgt_node_t *, ucred_t *);
 static Boolean_t create_target_dir(char *targ_name, char *local_name);
 static char *create_node_name(char *local_nick, char *alias);
 static Boolean_t create_lun(char *targ_name, char *type, int lun,
@@ -81,7 +82,8 @@ static void zfs_lun(tgt_node_t *l, uint64_t size, char *dataset);
  */
 /*ARGSUSED*/
 void
-create_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
+create_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
+    ucred_t *cred)
 {
 	tgt_node_t	*x;
 	char		msgbuf[80],
@@ -95,13 +97,13 @@ create_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 		if (x->x_name == NULL) {
 			xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TARG) == 0) {
-			reply_msg = create_target(x);
+			reply_msg = create_target(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_INIT) == 0) {
-			reply_msg = create_initiator(x);
+			reply_msg = create_initiator(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TPGT) == 0) {
-			reply_msg = create_tpgt(x);
+			reply_msg = create_tpgt(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_ZFS) == 0) {
-			reply_msg = create_zfs(x);
+			reply_msg = create_zfs(x, cred);
 		} else {
 			(void) snprintf(msgbuf, sizeof (msgbuf),
 			    "Unknown object '%s' for create element",
@@ -116,7 +118,7 @@ create_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
  * create_target -- an administrative request to create a target
  */
 static char *
-create_target(tgt_node_t *x)
+create_target(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg		= NULL,
 			*name		= NULL,
@@ -132,6 +134,14 @@ create_target(tgt_node_t *x)
 			*c,
 			*l;
 	err_code_t	code;
+	const priv_set_t	*eset;
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+		goto error;
+	}
 
 	(void) tgt_find_value_str(x, XML_ELEMENT_BACK, &backing);
 	(void) tgt_find_value_str(x, XML_ELEMENT_ALIAS, &alias);
@@ -296,7 +306,7 @@ error:
 }
 
 static char *
-create_initiator(tgt_node_t *x)
+create_initiator(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg		= NULL,
 			*name		= NULL,
@@ -304,6 +314,14 @@ create_initiator(tgt_node_t *x)
 	tgt_node_t	*inode		= NULL,
 			*n,
 			*c;
+	const priv_set_t	*eset;
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+		goto error;
+	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -344,7 +362,7 @@ error:
 }
 
 static char *
-create_tpgt(tgt_node_t *x)
+create_tpgt(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg	= NULL,
 			*tpgt	= NULL,
@@ -352,6 +370,14 @@ create_tpgt(tgt_node_t *x)
 	tgt_node_t	*tnode	= NULL,
 			*n;
 	int		tpgt_val;
+	const priv_set_t	*eset;
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+		goto error;
+	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &tpgt) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -387,8 +413,14 @@ error:
 	return (msg);
 }
 
+/*
+ * create_zfs -- given a dataset, export it through the iSCSI protocol
+ *
+ * This function is called when someone uses the libiscsitgt function
+ * iscsitgt_zfs_share(char *dataset)
+ */
 static char *
-create_zfs(tgt_node_t *x)
+create_zfs(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg		= NULL,
 			*dataset	= NULL,
@@ -410,6 +442,14 @@ create_zfs(tgt_node_t *x)
 	size_t		prop_len;
 	int		lun		= 0;
 	xmlTextReaderPtr	r;
+	const priv_set_t	*eset;
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+		goto error;
+	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &dataset) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);

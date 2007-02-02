@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@ extern "C" {
 #include <sys/time.h>
 #include <stdarg.h>
 #include <synch.h>
+#include <door.h>
 
 #include <iscsitgt_impl.h>
 
@@ -231,6 +232,7 @@ typedef struct mgmt_request {
 	mgmt_type_t	m_request;
 	time_t		m_time;
 	char		*m_targ_name;
+	ucred_t		*m_cred;
 
 	/*
 	 * This mutex protects the m_buf pointer from multiple connections

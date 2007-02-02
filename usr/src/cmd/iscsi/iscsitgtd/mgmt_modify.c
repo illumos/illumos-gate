@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <libzfs.h>
+#include <priv.h>
 
 #include <iscsitgt_impl.h>
 #include "queue.h"
@@ -47,11 +48,11 @@
 #include "target.h"
 #include "errcode.h"
 
-static char *modify_target(tgt_node_t *x);
-static char *modify_initiator(tgt_node_t *x);
-static char *modify_admin(tgt_node_t *x);
-static char *modify_tpgt(tgt_node_t *x);
-static char *modify_zfs(tgt_node_t *x);
+static char *modify_target(tgt_node_t *x, ucred_t *cred);
+static char *modify_initiator(tgt_node_t *x, ucred_t *cred);
+static char *modify_admin(tgt_node_t *x, ucred_t *cred);
+static char *modify_tpgt(tgt_node_t *x, ucred_t *cred);
+static char *modify_zfs(tgt_node_t *x, ucred_t *cred);
 static Boolean_t modify_element(char *, char *, tgt_node_t *, match_type_t);
 
 /*
@@ -61,7 +62,8 @@ static Boolean_t modify_element(char *, char *, tgt_node_t *, match_type_t);
  */
 /*ARGSUSED*/
 void
-modify_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
+modify_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
+    ucred_t *cred)
 {
 	tgt_node_t	*x;
 	char		*reply_msg	= NULL;
@@ -75,15 +77,15 @@ modify_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 		if (x->x_name == NULL) {
 			xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TARG) == 0) {
-			reply_msg = modify_target(x);
+			reply_msg = modify_target(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_INIT) == 0) {
-			reply_msg = modify_initiator(x);
+			reply_msg = modify_initiator(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_ADMIN) == 0) {
-			reply_msg = modify_admin(x);
+			reply_msg = modify_admin(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TPGT) == 0) {
-			reply_msg = modify_tpgt(x);
+			reply_msg = modify_tpgt(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_ZFS) == 0) {
-			reply_msg = modify_zfs(x);
+			reply_msg = modify_zfs(x, cred);
 		} else {
 			xml_rtn_msg(&reply_msg, ERR_INVALID_OBJECT);
 		}
@@ -97,7 +99,7 @@ modify_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
  * []----
  */
 static char *
-modify_target(tgt_node_t *x)
+modify_target(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg		= NULL,
 			*name		= NULL,
@@ -120,6 +122,14 @@ modify_target(tgt_node_t *x)
 			cur_lu_size;
 	struct stat	st;
 	xmlTextReaderPtr	r;
+	const priv_set_t	*eset;
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+		return (msg);
+	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -422,13 +432,21 @@ modify_target(tgt_node_t *x)
  * []----
  */
 static char *
-modify_initiator(tgt_node_t *x)
+modify_initiator(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg		= NULL,
 			*name		= NULL,
 			*prop		= NULL;
 	tgt_node_t	*inode		= NULL;
 	Boolean_t	changes_made	= False;
+	const priv_set_t	*eset;
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+		return (msg);
+	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -499,12 +517,20 @@ modify_initiator(tgt_node_t *x)
  * []----
  */
 static char *
-modify_admin(tgt_node_t *x)
+modify_admin(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg	= NULL,
 			*prop;
 	Boolean_t	changes_made = False;
 	admin_table_t	*ap;
+	const priv_set_t	*eset;
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+		return (msg);
+	}
 
 	for (ap = admin_prop_list; ap->name; ap++) {
 		if (tgt_find_value_str(x, ap->name, &prop) == True) {
@@ -546,13 +572,21 @@ modify_admin(tgt_node_t *x)
  * []----
  */
 static char *
-modify_tpgt(tgt_node_t *x)
+modify_tpgt(tgt_node_t *x, ucred_t *cred)
 {
 	struct addrinfo	*res	= NULL;
 	char		*msg	= NULL,
 			*name	= NULL,
 			*ip_str	= NULL;
 	tgt_node_t	*tnode	= NULL;
+	const priv_set_t	*eset;
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+		return (msg);
+	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -592,8 +626,15 @@ error:
 	return (msg);
 }
 
+/*
+ * modify_zfs -- test for the existence of a certain dataset being shared
+ *
+ * Called when someone uses the iscsitgt_is_shared() function from libiscsitgt.
+ * All that
+ */
+/*ARGSUSED*/
 static char *
-modify_zfs(tgt_node_t *x)
+modify_zfs(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg		= NULL,
 			*prop		= NULL,
@@ -601,6 +642,12 @@ modify_zfs(tgt_node_t *x)
 	libzfs_handle_t	*zh		= NULL;
 	zfs_handle_t	*zfsh		= NULL;
 	tgt_node_t	*n		= NULL;
+
+	/*
+	 * No need to check the credentials of the user for this function.
+	 * There's no harm is allowing everyone to know whether or not
+	 * a dataset is shared.
+	 */
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &dataset) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);

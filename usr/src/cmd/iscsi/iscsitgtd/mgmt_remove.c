@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <errno.h>
 #include <strings.h>
 #include <unistd.h>
+#include <priv.h>
 
 #include <iscsitgt_impl.h>
 #include "utility.h"
@@ -43,15 +44,16 @@
 #include "iscsi_cmd.h"
 #include "errcode.h"
 
-static char *remove_target(tgt_node_t *x);
-static char *remove_initiator(tgt_node_t *x);
-static char *remove_tpgt(tgt_node_t *x);
-static char *remove_zfs(tgt_node_t *x);
+static char *remove_target(tgt_node_t *x, ucred_t *cred);
+static char *remove_initiator(tgt_node_t *x, ucred_t *cred);
+static char *remove_tpgt(tgt_node_t *x, ucred_t *cred);
+static char *remove_zfs(tgt_node_t *x, ucred_t *cred);
 
 
 /*ARGSUSED*/
 void
-remove_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
+remove_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
+    ucred_t *cred)
 {
 	tgt_node_t	*x;
 	char		msgbuf[80],
@@ -65,13 +67,13 @@ remove_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 		if (x->x_name == NULL) {
 			xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TARG) == 0) {
-			reply_msg = remove_target(x);
+			reply_msg = remove_target(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_INIT) == 0) {
-			reply_msg = remove_initiator(x);
+			reply_msg = remove_initiator(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TPGT) == 0) {
-			reply_msg = remove_tpgt(x);
+			reply_msg = remove_tpgt(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_ZFS) == 0) {
-			reply_msg = remove_zfs(x);
+			reply_msg = remove_zfs(x, cred);
 		} else {
 			(void) snprintf(msgbuf, sizeof (msgbuf),
 			    "Unknown object '%s' for delete element",
@@ -82,12 +84,23 @@ remove_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 	queue_message_set(reply, 0, msg_mgmt_rply, reply_msg);
 }
 
+/*
+ * remove_zfs -- unshare a ZVOL from the target
+ */
 static char *
-remove_zfs(tgt_node_t *x)
+remove_zfs(tgt_node_t *x, ucred_t *cred)
 {
 	char		*prop,
 			*msg		= NULL;
 	tgt_node_t	*targ		= NULL;
+	const priv_set_t	*eset;
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+		return (msg);
+	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -132,7 +145,7 @@ remove_zfs(tgt_node_t *x)
 }
 
 static char *
-remove_target(tgt_node_t *x)
+remove_target(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg			= NULL,
 			*prop			= NULL;
@@ -141,6 +154,15 @@ remove_target(tgt_node_t *x)
 			*c			= NULL;
 	Boolean_t	change_made		= False;
 	int		lun_num;
+	const priv_set_t	*eset;
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+		return (msg);
+	}
+
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -248,11 +270,20 @@ error:
 }
 
 static char *
-remove_initiator(tgt_node_t *x)
+remove_initiator(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg	= NULL,
 			*name;
 	tgt_node_t	*node	= NULL;
+	const priv_set_t	*eset;
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+		return (msg);
+	}
+
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -281,13 +312,22 @@ remove_initiator(tgt_node_t *x)
 }
 
 static char *
-remove_tpgt(tgt_node_t *x)
+remove_tpgt(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg		= NULL,
 			*prop		= NULL;
 	tgt_node_t	*node		= NULL,
 			*c		= NULL;
 	Boolean_t	change_made	= False;
+	const priv_set_t	*eset;
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+		return (msg);
+	}
+
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);

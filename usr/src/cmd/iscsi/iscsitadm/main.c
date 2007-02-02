@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -363,6 +363,11 @@ formatErrString(tgt_node_t *node)
 		rtn	= 0;
 	char	*msg	= NULL;
 
+	if (node == NULL) {
+		(void) fprintf(stderr, "%s: %s\n", cmdName,
+		    gettext("Unable to contact target daemon"));
+		return (1);
+	}
 	if ((strcmp(node->x_name, XML_ELEMENT_ERROR) == 0) &&
 	    (tgt_find_value_int(node, XML_ELEMENT_CODE, &code) == B_TRUE) &&
 	    (tgt_find_value_str(node, XML_ELEMENT_MESSAGE, &msg) == B_TRUE)) {
@@ -1006,7 +1011,11 @@ listTarget(int operandLen, char *operand[], cmdOptions_t *options)
 	tgt_buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_End);
 	tgt_buf_add_tag(&first_str, "list", Tag_End);
 
-	node = tgt_door_call(first_str, 0);
+	if ((node = tgt_door_call(first_str, 0)) == NULL) {
+		(void) fprintf(stderr, "%s: %s\n", cmdName,
+		    gettext("No reponse from daemon"));
+		return (1);
+	}
 	free(first_str);
 
 	if (strcmp(node->x_name, XML_ELEMENT_RESULT)) {
@@ -1174,7 +1183,11 @@ listInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 	tgt_buf_add_tag(&first_str, XML_ELEMENT_INIT, Tag_End);
 	tgt_buf_add_tag(&first_str, "list", Tag_End);
 
-	node = tgt_door_call(first_str, 0);
+	if ((node = tgt_door_call(first_str, 0)) == NULL) {
+		(void) fprintf(stderr, "%s: %s\n", cmdName,
+		    gettext("No reponse from daemon"));
+		return (1);
+	}
 	free(first_str);
 
 	if (strcmp(node->x_name, XML_ELEMENT_RESULT)) {
@@ -1248,7 +1261,11 @@ listTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 	tgt_buf_add_tag(&first_str, XML_ELEMENT_TPGT, Tag_End);
 	tgt_buf_add_tag(&first_str, "list", Tag_End);
 
-	node = tgt_door_call(first_str, 0);
+	if ((node = tgt_door_call(first_str, 0)) == NULL) {
+		(void) fprintf(stderr, "%s: %s\n", cmdName,
+		    gettext("No reponse from daemon"));
+		return (1);
+	}
 	free(first_str);
 
 	if (strcmp(node->x_name, XML_ELEMENT_RESULT)) {
@@ -1305,7 +1322,11 @@ showAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 	tgt_buf_add_tag(&first_str, XML_ELEMENT_ADMIN, Tag_End);
 	tgt_buf_add_tag(&first_str, "list", Tag_End);
 
-	node = tgt_door_call(first_str, 0);
+	if ((node = tgt_door_call(first_str, 0)) == NULL) {
+		(void) fprintf(stderr, "%s: %s\n", cmdName,
+		    gettext("No reponse from daemon"));
+		return (1);
+	}
 	free(first_str);
 
 	if (strcmp(node->x_name, XML_ELEMENT_RESULT)) {
@@ -1436,7 +1457,11 @@ showStats(int operandLen, char *operand[], cmdOptions_t *options)
 			    "-----", "-----");
 			header = 20;
 		}
-		node = tgt_door_call(first_str, 0);
+		if ((node = tgt_door_call(first_str, 0)) == NULL) {
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("No reponse from daemon"));
+			return (1);
+		}
 
 		if (strcmp(node->x_name, XML_ELEMENT_RESULT)) {
 			(void) fprintf(stderr, "%s: %s\n", cmdName,
@@ -1548,11 +1573,6 @@ main(int argc, char *argv[])
 	int ret;
 	int funcRet;
 	void *subcommandArgs = NULL;
-
-	if (geteuid() != 0) {
-		fprintf(stderr, gettext("permission denied\n"));
-		exit(1);
-	}
 
 	/* set global command name */
 	cmdName = getExecBasename(argv[0]);

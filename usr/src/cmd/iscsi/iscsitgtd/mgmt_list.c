@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <errno.h>
 #include <strings.h>
 #include <dirent.h>
+#include <priv.h>
 
 #include <iscsitgt_impl.h>
 #include "utility.h"
@@ -45,16 +46,17 @@
 #include "port.h"
 #include "errcode.h"
 
-static char *list_targets(tgt_node_t *x);
-static char *list_initiator(tgt_node_t *x);
-static char *list_tpgt(tgt_node_t *x);
-static char *list_admin(tgt_node_t *x);
+static char *list_targets(tgt_node_t *x, ucred_t *cred);
+static char *list_initiator(tgt_node_t *x, ucred_t *cred);
+static char *list_tpgt(tgt_node_t *x, ucred_t *cred);
+static char *list_admin(tgt_node_t *x, ucred_t *cred);
 static void target_info(char **msg, char *targ_name, tgt_node_t *tnode);
 static void target_stat(char **msg, char *iname, mgmt_type_t type);
 
 /*ARGSUSED*/
 void
-list_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
+list_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
+    ucred_t *cred)
 {
 	tgt_node_t	*x;
 	char		msgbuf[80],
@@ -68,13 +70,13 @@ list_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 		if (x->x_name == NULL) {
 			xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TARG) == 0) {
-			reply_msg = list_targets(x);
+			reply_msg = list_targets(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_INIT) == 0) {
-			reply_msg = list_initiator(x);
+			reply_msg = list_initiator(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TPGT) == 0) {
-			reply_msg = list_tpgt(x);
+			reply_msg = list_tpgt(x, cred);
 		} else if (strcmp(x->x_name, XML_ELEMENT_ADMIN) == 0) {
-			reply_msg = list_admin(x);
+			reply_msg = list_admin(x, cred);
 		} else {
 			(void) snprintf(msgbuf, sizeof (msgbuf),
 			    "Unknown object '%s' for list element",
@@ -85,8 +87,9 @@ list_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt)
 	queue_message_set(reply, 0, msg_mgmt_rply, reply_msg);
 }
 
+/*ARGSUSED*/
 static char *
-list_targets(tgt_node_t *x)
+list_targets(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg	= NULL,
 			*prop	= NULL,
@@ -158,8 +161,9 @@ list_targets(tgt_node_t *x)
 	return (msg);
 }
 
+/*ARGSUSED*/
 static char *
-list_initiator(tgt_node_t *x)
+list_initiator(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg	= NULL,
 			*attr,
@@ -193,7 +197,7 @@ list_initiator(tgt_node_t *x)
 			if (tgt_find_value_str(init, XML_ELEMENT_CHAPSECRET,
 			    &attr) == True) {
 				tgt_buf_add(&msg, XML_ELEMENT_CHAPSECRET,
-				    attr);
+				    "Set");
 				free(attr);
 			}
 
@@ -215,8 +219,9 @@ list_initiator(tgt_node_t *x)
 	return (msg);
 }
 
+/*ARGSUSED*/
 static char *
-list_tpgt(tgt_node_t *x)
+list_tpgt(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg	= NULL,
 			*prop	= NULL;
@@ -258,7 +263,7 @@ list_tpgt(tgt_node_t *x)
 
 /*ARGSUSED*/
 static char *
-list_admin(tgt_node_t *x)
+list_admin(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg	= NULL;
 	admin_table_t	*p;
@@ -271,7 +276,10 @@ list_admin(tgt_node_t *x)
 	for (p = admin_prop_list; p->name != NULL; p++) {
 		node = tgt_node_next_child(main_config, p->name, NULL);
 		if (node) {
-			tgt_buf_add(&msg, p->name, node->x_value);
+			if (strcmp(p->name, XML_ELEMENT_CHAPSECRET) == 0)
+				tgt_buf_add(&msg, p->name, "Set");
+			else
+				tgt_buf_add(&msg, p->name, node->x_value);
 		}
 	}
 

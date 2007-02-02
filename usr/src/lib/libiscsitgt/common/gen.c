@@ -44,49 +44,116 @@
 #define	WAIT_FOR_SERVICE	15
 #define	WAIT_FOR_DOOR		15
 static char *service = "system/iscsitgt:default";
-static char *bad_call_str = "<error><code>1</code>"
-	"<message>Can't call daemon</message></error>";
 
 static Boolean_t check_and_online(int);
 
 tgt_node_t *
 tgt_door_call(char *str, int smf_flags)
 {
-	tgt_node_t		*n	= NULL;
+	tgt_node_t		*n		= NULL;
 	door_arg_t		d;
-	int			s;
+	int			s,
+				allocated;
 	xmlTextReaderPtr	r;
+	char			*door_buf	= NULL;
 
-	d.data_ptr	= str;
-	d.data_size	= strlen(str) + 1;
-	d.desc_ptr	= NULL;
-	d.desc_num	= 0;
-	d.rbuf		= NULL;
-	d.rsize		= 0;
-
-	if (((s = open(ISCSI_TARGET_MGMT_DOOR, 0)) < 0) ||
-	    (door_call(s, &d) < 0)) {
-		if (s != -1)
-			(void) close(s);
-		if (check_and_online(smf_flags) == False) {
-			d.rbuf = bad_call_str;
-		} else if ((s = open(ISCSI_TARGET_MGMT_DOOR, 0)) < 0) {
-			d.rbuf = bad_call_str;
-		} else if (door_call(s, &d) < 0)
-			d.rbuf = bad_call_str;
-	}
-	if ((r = (xmlTextReaderPtr)xmlReaderForMemory(d.rbuf, strlen(d.rbuf),
-	    NULL, NULL, 0)) == NULL)
+	/*
+	 * Setup the door pointers for the initial try.
+	 */
+	allocated = MAX(DOOR_MIN_SPACE, strlen(str) + 1);
+	if ((door_buf = malloc(allocated)) == NULL)
 		return (NULL);
+	(void) strncpy(door_buf, str, allocated);
+	bzero(&d, sizeof (d));
+	d.data_ptr	= door_buf;
+	d.data_size	= allocated;
+	d.rbuf		= door_buf;
+	d.rsize		= allocated;
 
-	while (xmlTextReaderRead(r) == 1)
-		if (tgt_node_process(r, &n) == False)
-			break;
-	xmlFreeTextReader(r);
-	if (d.rbuf != bad_call_str)
-		(void) munmap(d.rbuf, d.rsize);
+	/*
+	 * It's entirely possible that we'll be sending this request more
+	 * than once. In the case of a list operation it's unknown how much
+	 * data will be required, so the request will be sent and the daemon
+	 * will return information on how large of a buffer is needed.
+	 * It possible that the second request, with a larger buffer, also
+	 * fails with not enough space since between the first and second
+	 * calls a third party could have created another target increasing
+	 * the space required. This is not an error, just need to handle it.
+	 */
+	do {
+		/*
+		 * Open the door and if that doesn't work or the first door call
+		 * fails, try to bring the service online. Then repeat one
+		 * more time. If the second attempt at the door_call fails
+		 * then bail out.
+		 */
+		if (((s = open(ISCSI_TARGET_MGMT_DOOR, 0)) == -1) ||
+		    (door_call(s, &d) == -1)) {
+			if (s != -1)
+				(void) close(s);
+			if (check_and_online(smf_flags) == False) {
+				goto error;
+			} else if ((s = open(ISCSI_TARGET_MGMT_DOOR, 0)) ==
+			    -1) {
+				goto error;
+			} else if (door_call(s, &d) == -1) {
+				goto error;
+			}
+		}
+
+		if (d.rbuf == NULL)
+			goto error;
+
+		if ((r = (xmlTextReaderPtr)xmlReaderForMemory(d.rbuf,
+		    strlen(d.rbuf), NULL, NULL, 0)) == NULL)
+			goto error;
+
+		while (xmlTextReaderRead(r) == 1)
+			if (tgt_node_process(r, &n) == False)
+				break;
+		xmlFreeTextReader(r);
+
+		/*
+		 * Check to see if our request failed to provide enough
+		 * buffer room. This can occur if:
+		 * (1) The request caused an error and the message
+		 *    is larger than the request.
+		 * (2) We're requesting a configuration list which is
+		 *    fairly large and need to reissue the request with
+		 *    a larger buffer, which the daemon is kind enough
+		 *    to tell us the size needed.
+		 */
+		if (tgt_find_value_int(n, XML_ELEMENT_MORESPACE,
+		    &allocated) == True) {
+
+			tgt_node_free(n);
+			n = NULL;
+
+			/*
+			 * It's possible that we've already done a request
+			 * with a larger buffer, but before we could reissue
+			 * the request the results got bigger. Targets being
+			 * added to the configuration would be the common
+			 * cause of this condition.
+			 */
+			if (door_buf != NULL)
+				free(door_buf);
+
+			if ((door_buf = malloc(allocated)) == NULL)
+				goto error;
+
+			(void) strncpy(door_buf, str, allocated);
+			d.data_ptr	= door_buf;
+			d.data_size	= allocated;
+			d.rbuf		= door_buf;
+			d.rsize		= allocated;
+		}
+	} while (n == NULL);
+
+error:
+	if (door_buf)
+		free(door_buf);
 	(void) close(s);
-
 	return (n);
 }
 

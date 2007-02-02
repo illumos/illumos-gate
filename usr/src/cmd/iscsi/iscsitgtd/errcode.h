@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,7 +105,9 @@ typedef enum {
 	ERR_FILE_TO_BIG,
 	ERR_FAILED_TO_CREATE_LU,
 	ERR_TAPE_NOT_SUPPORTED_IN_32BIT,
-	ERR_INTERNAL_ERROR
+	ERR_INTERNAL_ERROR,
+	ERR_BAD_CREDS,
+	ERR_NO_PERMISSION
 } err_code_t;
 
 char *

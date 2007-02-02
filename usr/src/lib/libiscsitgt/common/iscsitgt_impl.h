@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,8 @@ typedef enum {
 #ifndef DTYPE_OSD
 #define	DTYPE_OSD	0x11
 #endif
+
+#define	DOOR_MIN_SPACE	128
 
 #define	ISCSI_TARGET_MGMT_DOOR	"/var/run/iscsi_tgt_door"
 /*
@@ -140,6 +142,7 @@ typedef enum {
 #define	XML_ELEMENT_TIMESTAMPS	"time-stamps"
 #define	XML_ELEMENT_INCORE	"in-core"
 #define	XML_ELEMENT_VALIDATE	"validate"
+#define	XML_ELEMENT_MORESPACE	"more-space-required"
 #define	XML_VALUE_TRUE		"true"
 
 typedef enum {

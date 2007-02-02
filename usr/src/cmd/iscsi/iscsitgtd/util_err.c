@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,6 +189,10 @@ errcode_to_str(err_code_t err_code)
 	case ERR_TAPE_NOT_SUPPORTED_IN_32BIT:
 		return ((char *)gettext("Tape emulation not supported in "
 		    "32-bit mode"));
+	case ERR_BAD_CREDS:
+		return ((char *)gettext("No credentials available from door"));
+	case ERR_NO_PERMISSION:
+		return ((char *)gettext("Permission denied"));
 	default:
 		return ((char *)gettext("Internal error: unknown message"));
 	}

@@ -328,6 +328,12 @@ handle_noop_cmd(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	iscsi_nop_out_hdr_t	*hp = (iscsi_nop_out_hdr_t *)p;
 	iscsi_nop_in_hdr_t	*in;
 
+	/*
+	 * Just an answer to our ping
+	 */
+	if (hp->ttt != ISCSI_RSVD_TASK_TAG)
+		return (True);
+
 	in = (iscsi_nop_in_hdr_t *)calloc(sizeof (*in), 1);
 	if (in == NULL) {
 		queue_prt(c->c_mgmtq, Q_CONN_ERRS,
@@ -335,12 +341,6 @@ handle_noop_cmd(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 		    c->c_num);
 		return (False);
 	}
-
-	/*
-	 * Just an answer to our ping
-	 */
-	if (hp->ttt != ISCSI_RSVD_TASK_TAG)
-		return (True);
 
 	in->opcode = ISCSI_OP_NOOP_IN;
 	in->flags = ISCSI_FLAG_FINAL;

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,7 @@
 #include <sys/select.h>
 #include <iscsitgt_impl.h>
 #include <umem.h>
+#include <priv.h>
 
 #include "queue.h"
 #include "port.h"
@@ -70,45 +71,31 @@
 #define	EMPTY_CONFIG "<config version='1.0'>\n</config>\n"
 
 /* ---- Forward declarations ---- */
-static void variable_handler(tgt_node_t *, target_queue_t *, target_queue_t *);
+static void variable_handler(tgt_node_t *, target_queue_t *, target_queue_t *,
+    ucred_t *);
 
 
 /* ---- Global configuration data. ---- */
-char *target_basedir			= NULL;
-char *target_log			= DEFAULT_TARGET_LOG;
-char *config_file			= DEFAULT_CONFIG_LOCATION;
-int iscsi_port				= 3260; /* defined by the spec */
+char		*target_basedir		= NULL;
+char		*target_log		= DEFAULT_TARGET_LOG;
+char		*config_file		= DEFAULT_CONFIG_LOCATION;
+int		iscsi_port		= 3260, /* defined by the spec */
+		dbg_lvl			= 0,
+		door_min_space;
 tgt_node_t	*main_config,
 		*targets_config;
 Boolean_t	enforce_strict_guid	= True,
 		thin_provisioning	= False,
 		disable_tpgs		= False,
 		dbg_timestamps		= False;
-int	targets_vers_maj,
-	targets_vers_min,
-	main_vers_maj,
-	main_vers_min;
+int		targets_vers_maj,
+		targets_vers_min,
+		main_vers_maj,
+		main_vers_min;
 pthread_mutex_t	targ_config_mutex;
 umem_cache_t	*iscsi_cmd_cache,
 		*t10_cmd_cache,
 		*queue_cache;
-
-int dbg_lvl = 0;
-
-/*
- * door_return doesn't have a means to free the memory that's passed in
- * which means the program must either use the buffer space provided as
- * the argument to the service routine or allocate it's own and create
- * a leak. Since the argument to the service routine is likely to be a
- * fairly small buffer it may not be able to hold the results. So, the
- * daemon which already has the results supplies that value to the door_return
- * and sets up a request to collect that memory later. This structure
- * empty_garbage(), and delayed_free() are used to recoupe the memory.
- */
-typedef struct garbage_can {
-	char	*g_buf;
-	int	g_timo;
-} garbage_can_t;
 
 typedef struct var_table {
 	char	*v_name;
@@ -117,7 +104,8 @@ typedef struct var_table {
 
 typedef struct cmd_table {
 	char	*c_name;
-	void	(*c_func)(tgt_node_t *, target_queue_t *, target_queue_t *);
+	void	(*c_func)(tgt_node_t *, target_queue_t *, target_queue_t *,
+		ucred_t *);
 } cmd_table_t;
 
 admin_table_t admin_prop_list[] = {
@@ -505,12 +493,21 @@ logout_targ(char *targ)
  */
 /*ARGSUSED*/
 void
-variable_handler(tgt_node_t *x, target_queue_t *reply, target_queue_t *mgmt)
+variable_handler(tgt_node_t *x, target_queue_t *reply, target_queue_t *mgmt,
+    ucred_t *cred)
 {
-	char		*reply_buf	= NULL;
-	var_table_t	*v;
-	tgt_node_t	*c;
+	char			*reply_buf	= NULL;
+	var_table_t		*v;
+	tgt_node_t		*c;
+	const priv_set_t	*eset;
 
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		xml_rtn_msg(&reply_buf, ERR_NO_PERMISSION);
+		return;
+	}
 	for (c = x->x_child; c; c = c->x_sibling) {
 
 		for (v = var_table; v->v_name; v++) {
@@ -535,7 +532,8 @@ variable_handler(tgt_node_t *x, target_queue_t *reply, target_queue_t *mgmt)
  * []----
  */
 static void
-parse_xml(tgt_node_t *x, target_queue_t *reply, target_queue_t *mgmt)
+parse_xml(tgt_node_t *x, target_queue_t *reply, target_queue_t *mgmt,
+    ucred_t *cred)
 {
 	char		*reply_msg	= NULL;
 	cmd_table_t	*c;
@@ -553,49 +551,27 @@ parse_xml(tgt_node_t *x, target_queue_t *reply, target_queue_t *mgmt)
 		xml_rtn_msg(&reply_msg, ERR_INVALID_COMMAND);
 		queue_message_set(reply, 0, msg_mgmt_rply, reply_msg);
 	} else {
-		(c->c_func)(x, reply, mgmt);
+		(c->c_func)(x, reply, mgmt, cred);
 	}
 }
 
 /*
- * []----
- * | empty_garbage -- sleep for the requested time and then release the memory
- * []----
- */
-static void *
-empty_garbage(void *v)
-{
-	garbage_can_t	*g = (garbage_can_t *)v;
-
-	(void) sleep(g->g_timo);
-	free(g->g_buf);
-	free(g);
-	queue_message_set(mgmtq, 0, msg_pthread_join,
-	    (void *)(uintptr_t)pthread_self());
-	return (NULL);
-}
-
-/*
- * []----
- * | delayed_free -- set things up to free a chunk of memory later
- * []----
+ * space_message -- create a message indicating the amount of space needed.
+ *
+ * This code could have been inline in the server_for_door function, but
+ * at system startup we'll determine the minimum amount of space needed for
+ * a door call return pointer. This minimum amount of space will be either
+ * a "need more space" or a "success" message. So, have this code as a function
+ * reduces any duplication.
  */
 static void
-delayed_free(char *buf, int timeout)
+space_message(char **buf, int size)
 {
-	garbage_can_t	*g;
-	pthread_t	junk;
-
-	/*
-	 * if we can't get memory we're pretty much sunk.
-	 */
-	if ((g = (garbage_can_t *)calloc(1, sizeof (*g))) == NULL)
-		return;
-
-	g->g_buf	= buf;
-	g->g_timo	= timeout;
-
-	(void) pthread_create(&junk, NULL, empty_garbage, g);
+	char	lbuf[16];
+	tgt_buf_add_tag_and_attr(buf, XML_ELEMENT_ERROR, "version='1.0'");
+	(void) snprintf(lbuf, sizeof (lbuf), "%d", size);
+	tgt_buf_add(buf, XML_ELEMENT_MORESPACE, lbuf);
+	tgt_buf_add_tag(buf, XML_ELEMENT_ERROR, Tag_End);
 }
 
 /*ARGSUSED*/
@@ -609,6 +585,31 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	tgt_node_t		*node		= NULL;
 	xmlTextReaderPtr	r;
 	char			*err_rply	= NULL;
+	ucred_t			*uc		= NULL;
+
+	/*
+	 * A well written application will always give us enough space
+	 * to send either a "success" message or a "more space needed".
+	 * If the minimum amount of space isn't given then just return
+	 * with a NULL pointer.
+	 */
+	if (arg_size < door_min_space) {
+		(void) door_return(NULL, 0, NULL, 0);
+		return;
+	}
+
+	/*
+	 * Pick up the user credentials of the client application. Used to
+	 * validate that the effective user ID is either root or the process
+	 * has the privilege to complete the operation.
+	 */
+	if (door_ucred(&uc) != 0) {
+		xml_rtn_msg(&err_rply, ERR_BAD_CREDS);
+		strlcpy(argp, err_rply, arg_size);
+		free(err_rply);
+		(void) door_return(argp, strlen(argp) + 1, NULL, 0);
+		return;
+	}
 
 	bzero(&m, sizeof (m));
 
@@ -624,11 +625,13 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 			m.m_time	= time(NULL);
 			m.m_targ_name	= NULL;
 			m.m_u.m_node	= node;
+			m.m_cred	= uc;
 
 			queue_message_set(mgmtq, 0, msg_mgmt_rqst, &m);
 			if ((msg = queue_message_get(m.m_q)) == NULL) {
 				xmlFreeTextReader(r);
 				xmlCleanupParser();
+				ucred_free(uc);
 				door_return("", 1, NULL, 0);
 			}
 
@@ -641,11 +644,14 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 			 * at another time.
 			 */
 			if (strlen(msg->msg_data) < arg_size) {
-				(void) strcpy(argp, msg->msg_data);
+				(void) strlcpy(argp, msg->msg_data, arg_size);
 				free(msg->msg_data);
 			} else {
-				delayed_free(msg->msg_data, 2);
-				argp = msg->msg_data;
+				space_message(&err_rply,
+				    strlen(msg->msg_data) + 1);
+				/*
+				 * err_rply will be copied to argp at the end
+				 */
 			}
 			queue_message_free(msg);
 		} else {
@@ -662,12 +668,13 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	if (node != NULL)
 		tgt_node_free(node);
 	if (err_rply != NULL) {
-		strcpy(argp, err_rply);
+		strlcpy(argp, err_rply, arg_size);
 		free(err_rply);
 	}
 	if (m.m_q != NULL)
 		queue_free(m.m_q, NULL);
 
+	ucred_free(uc);
 	(void) door_return(argp, strlen(argp) + 1, NULL, 0);
 }
 
@@ -687,6 +694,58 @@ setup_door(target_queue_t *q, char *door_name)
 			fd;
 	struct stat	s;
 	door_arg_t	d;
+	char		*msg = NULL;
+
+	/*
+	 * Figure out what the minimum amount of space required to send back
+	 * either a success message or a need more space one.
+	 *
+	 * Commands fall into one of three categories.
+	 * (1) Idempotent commands, like list operations, which can
+	 *    return large ammounts of data. If there's not enough room
+	 *    the client is informed and the command is run again with a
+	 *    larger buffer.
+	 * (2) Create, modify, or delete operations that fail. These
+	 *    commands may return an error message which is larger than
+	 *    the incoming request buffer. If so, the client is informed
+	 *    that a larger buffer is needed and the command is rerun. This
+	 *    time it'll recieve the full error message. So, these commands
+	 *    are idempotent because no state changes occur on failure.
+	 * (3) Create, modify, or delete operations which are successful.
+	 *    Since successful completion means state has change the daemon
+	 *    must always be able to report success, other wise a second
+	 *    attempt with a larger buffer would then fail, where the first
+	 *    one actually succeeded.
+	 */
+	xml_rtn_msg(&msg, ERR_SUCCESS);
+	door_min_space = strlen(msg);
+	free(msg);
+	msg = NULL;
+	/*
+	 * Use an impossibly big number which will create the longest string
+	 */
+	space_message(&msg, 0x80000000);
+	door_min_space = MAX(door_min_space, strlen(msg));
+	free(msg);
+
+	door_min_space++;	/* add 1 for the NULL byte */
+
+	/*
+	 * DOOR_MIN_SPACE will be the amount used by the library as the default.
+	 * Currently this will be set to 128 (check iscsitgt_impl.h for value).
+	 * Since this will be a compiled value and the "success" or "more space"
+	 * messages could grown we need to detect if there will be a problem.
+	 * By failing here consistently, SMF will put the daemon in maintenance
+	 * state and this will be caught during testing. Otherwise the library
+	 * would receive a NULL back, but not know how much space is really
+	 * required.
+	 */
+	if (door_min_space > DOOR_MIN_SPACE) {
+		syslog(LOG_ERR,
+		    "Calculated min space (%d) is larger than default (%d)",
+		    door_min_space, DOOR_MIN_SPACE);
+		assert(0);
+	}
 
 	if ((fd = open(door_name, 0)) >= 0) {
 
@@ -720,14 +779,21 @@ setup_door(target_queue_t *q, char *door_name)
 
 	if (stat(door_name, &s) < 0) {
 		int	newfd;
-		if ((newfd = creat(door_name, 0400)) < 0) {
+		if ((newfd = creat(door_name, 0666)) < 0) {
 			syslog(LOG_ERR, "creat failed");
 			exit(1);
 		}
 		(void) close(newfd);
 	}
-
 	(void) fdetach(door_name);
+
+	/*
+	 * Open the door for general access. As the calls come in we'll
+	 * get the credentials and validate within each operation as to the
+	 * required privileges.
+	 */
+	(void) chmod(door_name, 0666);
+
 	if (fattach(did, door_name) < 0) {
 		syslog(LOG_ERR, "fattach failed errno=%d", errno);
 		exit(2);
@@ -924,7 +990,8 @@ main(int argc, char **argv)
 		case msg_mgmt_rqst:
 			mgmt = (mgmt_request_t *)msg->msg_data;
 			if (mgmt->m_request == mgmt_parse_xml)
-				parse_xml(mgmt->m_u.m_node, mgmt->m_q, q);
+				parse_xml(mgmt->m_u.m_node, mgmt->m_q, q,
+				    mgmt->m_cred);
 			msg->msg_data = NULL;
 			break;
 

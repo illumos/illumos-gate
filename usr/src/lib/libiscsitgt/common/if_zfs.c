@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +54,11 @@ iscsitgt_zfs_share(const char *dataset)
 	tgt_buf_add_tag(&str, "zfs", Tag_End);
 	tgt_buf_add_tag(&str, "create", Tag_End);
 
-	n = tgt_door_call(str, SMF_TEMPORARY);
+	if ((n = tgt_door_call(str, SMF_TEMPORARY)) == NULL) {
+		errno = EINVAL;
+		free(str);
+		return (-1);
+	}
 	if (strcmp(n->x_name, XML_ELEMENT_ERROR) == 0 &&
 	    tgt_find_value_int(n, XML_ELEMENT_CODE, &code) == True &&
 	    code == 1000) {
@@ -85,7 +89,11 @@ iscsitgt_zfs_unshare(const char *dataset)
 	tgt_buf_add_tag(&str, "zfs", Tag_End);
 	tgt_buf_add_tag(&str, "delete", Tag_End);
 
-	n = tgt_door_call(str, SMF_TEMPORARY);
+	if ((n = tgt_door_call(str, SMF_TEMPORARY)) == NULL) {
+		errno = EINVAL;
+		free(str);
+		return (-1);
+	}
 	if (strcmp(n->x_name, XML_ELEMENT_ERROR) == 0 &&
 	    tgt_find_value_int(n, XML_ELEMENT_CODE, &code) == True &&
 	    code == 1000) {
@@ -114,7 +122,11 @@ iscsitgt_zfs_is_shared(const char *dataset)
 	tgt_buf_add_tag(&str, "zfs", Tag_End);
 	tgt_buf_add_tag(&str, "modify", Tag_End);
 
-	n = tgt_door_call(str, SMF_TEMPORARY);
+	if ((n = tgt_door_call(str, SMF_TEMPORARY)) == NULL) {
+		errno = EINVAL;
+		free(str);
+		return (-1);
+	}
 	if (strcmp(n->x_name, XML_ELEMENT_ERROR) == 0 &&
 	    tgt_find_value_int(n, XML_ELEMENT_CODE, &code) == True &&
 	    code == 1000) {

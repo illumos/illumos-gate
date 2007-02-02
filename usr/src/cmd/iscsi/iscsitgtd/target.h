@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -172,10 +172,10 @@ typedef struct {
 #include <iscsitgt_impl.h>
 #include "queue.h"
 
-void create_func(tgt_node_t *, target_queue_t *, target_queue_t *);
-void modify_func(tgt_node_t *, target_queue_t *, target_queue_t *);
-void remove_func(tgt_node_t *, target_queue_t *, target_queue_t *);
-void list_func(tgt_node_t *, target_queue_t *, target_queue_t *);
+void create_func(tgt_node_t *, target_queue_t *, target_queue_t *, ucred_t *);
+void modify_func(tgt_node_t *, target_queue_t *, target_queue_t *, ucred_t *);
+void remove_func(tgt_node_t *, target_queue_t *, target_queue_t *, ucred_t *);
+void list_func(tgt_node_t *, target_queue_t *, target_queue_t *, ucred_t *);
 void logout_targ(char *targ);
 char *update_basedir(char *, char *);
 char *valid_radius_srv(char *name, char *prop);
