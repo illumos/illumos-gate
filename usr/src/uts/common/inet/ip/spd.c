@@ -6229,7 +6229,7 @@ create_tunnel_policy(char *name, int *errno, uint64_t *gen, netstack_t *ns)
 	newbie->itp_inactive = kmem_zalloc(sizeof (ipsec_policy_head_t),
 	    KM_NOSLEEP);
 	if (newbie->itp_inactive == NULL) {
-		kmem_free(newbie->itp_inactive, sizeof (ipsec_policy_head_t));
+		kmem_free(newbie->itp_policy, sizeof (ipsec_policy_head_t));
 		goto nomem;
 	}
 
