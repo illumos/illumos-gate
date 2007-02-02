@@ -225,6 +225,8 @@ hati_constructor(void *buf, void *handle, int kmflags)
 	    sizeof (pgcnt_t) * (mmu.max_page_level + 1));
 	hat->hat_stats = 0;
 	hat->hat_flags = 0;
+	mutex_init(&hat->hat_switch_mutex, NULL, MUTEX_DRIVER,
+	    (void *)ipltospl(DISP_LEVEL));
 	CPUSET_ZERO(hat->hat_cpus);
 	hat->hat_htable = NULL;
 	hat->hat_ht_hash = NULL;
@@ -912,7 +914,9 @@ hat_switch(hat_t *hat)
 	 * This is a spin lock at DISP_LEVEL
 	 */
 	if (hat != kas.a_hat) {
+		mutex_enter(&hat->hat_switch_mutex);
 		CPUSET_ATOMIC_ADD(hat->hat_cpus, cpu->cpu_id);
+		mutex_exit(&hat->hat_switch_mutex);
 	}
 	cpu->cpu_current_hat = hat;
 

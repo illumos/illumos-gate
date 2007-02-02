@@ -618,11 +618,9 @@ htable_alloc(
 
 	if (ht == NULL) {
 		/*
-		 * When allocating for hat_memload_arena, we use the reserve.
-		 * Also use reserves if we are in a panic().
+		 * Allocate an htable, possibly refilling the reserves.
 		 */
-		if (use_boot_reserve || curthread == hat_reserves_thread ||
-		    panicstr != NULL) {
+		if (USE_HAT_RESERVES()) {
 			ht = htable_get_reserve();
 		} else {
 			/*
@@ -634,8 +632,7 @@ htable_alloc(
 				if (ht == NULL)
 					break;
 				ht->ht_pfn = PFN_INVALID;
-				if (curthread == hat_reserves_thread ||
-				    panicstr != NULL ||
+				if (USE_HAT_RESERVES() ||
 				    htable_reserve_cnt >= htable_reserve_amount)
 					break;
 				htable_put_reserve(ht);
@@ -649,7 +646,10 @@ htable_alloc(
 			ht->ht_hat = hat;
 			ht->ht_pfn = ptable_alloc((uintptr_t)ht);
 			if (ht->ht_pfn == PFN_INVALID) {
-				kmem_cache_free(htable_cache, ht);
+				if (USE_HAT_RESERVES())
+					htable_put_reserve(ht);
+				else
+					kmem_cache_free(htable_cache, ht);
 				ht = NULL;
 			}
 		}
@@ -775,11 +775,9 @@ htable_free(htable_t *ht)
 	ht->ht_pfn = PFN_INVALID;
 
 	/*
-	 * If we are the thread using the reserves, put free htables
-	 * into reserves.
+	 * Free htables or put into reserves.
 	 */
-	if (curthread == hat_reserves_thread ||
-	    htable_reserve_cnt < htable_reserve_amount)
+	if (USE_HAT_RESERVES() || htable_reserve_cnt < htable_reserve_amount)
 		htable_put_reserve(ht);
 	else
 		kmem_cache_free(htable_cache, ht);
@@ -1811,8 +1809,10 @@ x86pte_set(htable_t *ht, uint_t entry, x86pte_t new, void *ptr)
 		 * Detect if we have a collision of installing a large
 		 * page mapping where there already is a lower page table.
 		 */
-		if (l > 0 && (prev & PT_VALID) && !(prev & PT_PAGESIZE))
-			return (LPAGE_ERROR);
+		if (l > 0 && (prev & PT_VALID) && !(prev & PT_PAGESIZE)) {
+			old = LPAGE_ERROR;
+			goto done;
+		}
 
 		old = CAS_PTE(ptep, prev, n);
 	} while (old != prev);
@@ -1856,71 +1856,31 @@ x86pte_cas(htable_t *ht, uint_t entry, x86pte_t old, x86pte_t new)
 }
 
 /*
- * Make sure the zero we wrote to a page table entry sticks in memory
- * after invalidating all TLB entries on all CPUs.
+ * data structure for cross call information
  */
-static x86pte_t
-handle_tlbs(x86pte_t oldpte, x86pte_t *ptep, htable_t *ht, uint_t entry)
+typedef struct xcall_inval {
+	caddr_t		xi_addr;
+	x86pte_t	xi_found;
+	x86pte_t	xi_oldpte;
+	x86pte_t	*xi_pteptr;
+	processorid_t	xi_initiator;
+} xcall_inval_t;
+
+/*
+ * Cross call service routine to invalidate TLBs. On the
+ * initiating CPU, this first clears the PTE in memory.
+ */
+/*ARGSUSED*/
+static int
+x86pte_inval_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
 {
-	hat_t		*hat = ht->ht_hat;
-	uintptr_t	addr = htable_e2va(ht, entry);
-	x86pte_t	found;
+	xcall_inval_t	*xi = (xcall_inval_t *)a1;
 
-	/*
-	 * Was the PTE ever used? If not there can't be any TLB entries.
-	 */
-	if ((oldpte & PT_REF) == 0)
-		return (oldpte);
+	if (CPU->cpu_id == xi->xi_initiator)
+		xi->xi_found = CAS_PTE(xi->xi_pteptr, xi->xi_oldpte, 0);
 
-	/*
-	 * Do a full global TLB invalidation.
-	 * We may have to loop until the new PTE in memory stays zero.
-	 * Why? Because Intel/AMD don't document how the REF/MOD bits are
-	 * copied back from the TLB to the PTE, sigh. We're protecting
-	 * here against a blind write back of the MOD (and other) bits.
-	 */
-	for (;;) {
-		hat_tlb_inval(hat, addr);
-
-		/*
-		 * Check for a stale writeback of a oldpte TLB entry.
-		 * Done when the PTE stays zero.
-		 */
-		found = GET_PTE(ptep);
-		if (found == 0)
-			return (oldpte);
-
-		/*
-		 * The only acceptable PTE change must be from a TLB
-		 * flush setting the MOD bit in, hence oldpte must
-		 * have been writable.
-		 */
-		if (!(oldpte & PT_WRITABLE) || !(found & PT_MOD))
-			break;
-
-		/*
-		 * Did we see a complete writeback of oldpte?
-		 * or
-		 * Did we see the MOD bit set (plus possibly other
-		 * bits rewritten) in a still invalid mapping?
-		 */
-		if (found == (oldpte | PT_MOD) ||
-		    (!(found & PT_VALID) &&
-		    (oldpte | found) == (oldpte | PT_MOD)))
-			oldpte |= PT_MOD;
-		else
-			break;
-
-		(void) CAS_PTE(ptep, found, 0);
-	}
-
-	/*
-	 * If we hit this, a processor attempted to set the DIRTY bit
-	 * of a page table entry happened in a way we didn't anticipate
-	 */
-	panic("handle_tlbs(): unanticipated TLB shootdown scenario"
-	    " oldpte=" FMT_PTE " found=" FMT_PTE, oldpte, found);
-	/*LINTED*/
+	mmu_tlbflush_entry(xi->xi_addr);
+	return (0);
 }
 
 /*
@@ -1936,33 +1896,60 @@ x86pte_inval(
 	x86pte_t expect,
 	x86pte_t *pte_ptr)
 {
+	hat_t		*hat = ht->ht_hat;
 	x86pte_t	*ptep;
-	x86pte_t	oldpte;
-	x86pte_t	found;
+	xcall_inval_t	xi;
+	cpuset_t	cpus;
 
 	ASSERT(!(ht->ht_flags & HTABLE_SHARED_PFN));
 	ASSERT(ht->ht_level != VLP_LEVEL);
+
 	if (pte_ptr != NULL)
 		ptep = pte_ptr;
 	else
 		ptep = x86pte_access_pagetable(ht, entry);
+	xi.xi_pteptr = ptep;
+	xi.xi_addr = (caddr_t)htable_e2va(ht, entry);
 
 	/*
-	 * This loop deals with REF/MOD bits changing between the
-	 * GET_PTE() and the CAS_PTE().
+	 * Setup a cross call to any CPUs using this HAT
+	 */
+	kpreempt_disable();
+	xi.xi_initiator = CPU->cpu_id;
+	CPUSET_ZERO(cpus);
+	if (hat == kas.a_hat) {
+		CPUSET_OR(cpus, khat_cpuset);
+	} else {
+		mutex_enter(&hat->hat_switch_mutex);
+		CPUSET_OR(cpus, hat->hat_cpus);
+		CPUSET_ADD(cpus, CPU->cpu_id);
+	}
+
+	/*
+	 * Do the cross call to invalidate the PTE and flush TLBs.
+	 * Note that the loop is needed to handle changes due to h/w updating
+	 * of PT_MOD/PT_REF.
 	 */
 	do {
-		oldpte = GET_PTE(ptep);
-		if (expect != 0 && (oldpte & PT_PADDR) != (expect & PT_PADDR))
-			goto give_up;
-		found = CAS_PTE(ptep, oldpte, 0);
-	} while (found != oldpte);
-	oldpte = handle_tlbs(oldpte, ptep, ht, entry);
+		xi.xi_oldpte = GET_PTE(ptep);
+		if (expect != 0 &&
+		    (xi.xi_oldpte & PT_PADDR) != (expect & PT_PADDR))
+			break;
+		if (panicstr == NULL)
+			xc_wait_sync((xc_arg_t)&xi, NULL, NULL, X_CALL_HIPRI,
+				    cpus, x86pte_inval_func);
+		else
+			(void) x86pte_inval_func((xc_arg_t)&xi, NULL, NULL);
+	} while (xi.xi_found != xi.xi_oldpte);
 
-give_up:
+	if (hat != kas.a_hat)
+		mutex_exit(&hat->hat_switch_mutex);
+	kpreempt_enable();
+
 	if (pte_ptr == NULL)
 		x86pte_release_pagetable(ht);
-	return (oldpte);
+
+	return (xi.xi_oldpte);
 }
 
 /*

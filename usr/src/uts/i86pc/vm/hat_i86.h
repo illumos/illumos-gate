@@ -79,6 +79,7 @@ extern "C" {
  */
 struct hat {
 	kmutex_t	hat_mutex;
+	kmutex_t	hat_switch_mutex;
 	struct as	*hat_as;
 	uint_t		hat_stats;
 	pgcnt_t		hat_pages_mapped[MAX_PAGE_LEVEL + 1];
@@ -178,11 +179,16 @@ extern void hat_mempte_remap(pfn_t, caddr_t, hat_mempte_t,
 extern void hat_mempte_release(caddr_t addr, hat_mempte_t);
 
 /*
- * interfaces to manage which thread has access to htable and hment reserves
+ * Interfaces to manage which thread has access to htable and hment reserves.
+ * The USE_HAT_RESERVES macro should always be recomputed in full. Its value
+ * (due to curthread) can change after any call into kmem/vmem.
  */
 extern uint_t can_steal_post_boot;
 extern uint_t use_boot_reserve;
 extern kthread_t *hat_reserves_thread;
+#define	USE_HAT_RESERVES()						\
+	(use_boot_reserve || curthread == hat_reserves_thread ||	\
+	panicstr != NULL || vmem_is_populator())
 
 /*
  * initialization stuff needed by by startup, mp_startup...

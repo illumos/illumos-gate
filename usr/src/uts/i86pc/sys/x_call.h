@@ -79,6 +79,8 @@ extern uint_t	xc_serv(caddr_t, caddr_t);
 extern void	xc_call(xc_arg_t, xc_arg_t, xc_arg_t, int, cpuset_t, xc_func_t);
 extern void	xc_trycall(xc_arg_t, xc_arg_t, xc_arg_t, cpuset_t, xc_func_t);
 extern void	xc_sync(xc_arg_t, xc_arg_t, xc_arg_t, int, cpuset_t, xc_func_t);
+extern void	xc_wait_sync(xc_arg_t, xc_arg_t, xc_arg_t, int, cpuset_t,
+    xc_func_t);
 extern void	xc_capture_cpus(cpuset_t);
 extern void	xc_release_cpus(void);
 

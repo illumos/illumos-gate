@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,8 +169,6 @@ hment_alloc()
 {
 	int km_flag = can_steal_post_boot ? KM_NOSLEEP : KM_SLEEP;
 	hment_t	*hm = NULL;
-	int use_reserves = (use_boot_reserve ||
-	    curthread == hat_reserves_thread || panicstr != NULL);
 
 	/*
 	 * If we aren't using the reserves, try using kmem to get an hment.
@@ -179,12 +177,11 @@ hment_alloc()
 	 * If we're in panic, resort to using the reserves.
 	 */
 	HATSTAT_INC(hs_hm_alloc);
-	if (!use_reserves) {
+	if (!USE_HAT_RESERVES()) {
 		for (;;) {
 			hm = kmem_cache_alloc(hment_cache, km_flag);
-			if (hment_reserve_count >= hment_reserve_amount ||
-			    hm == NULL || panicstr != NULL ||
-			    curthread == hat_reserves_thread)
+			if (USE_HAT_RESERVES() ||
+			    hment_reserve_count >= hment_reserve_amount)
 				break;
 			hment_put_reserve(hm);
 		}
@@ -194,7 +191,7 @@ hment_alloc()
 	 * If allocation failed, we need to tap the reserves or steal
 	 */
 	if (hm == NULL) {
-		if (use_reserves)
+		if (USE_HAT_RESERVES())
 			hm = hment_get_reserve();
 
 		/*
@@ -243,7 +240,7 @@ hment_free(hment_t *hm)
 	bzero(hm, sizeof (*hm));
 #endif
 	HATSTAT_INC(hs_hm_free);
-	if (curthread == hat_reserves_thread ||
+	if (USE_HAT_RESERVES() ||
 	    hment_reserve_count < hment_reserve_amount)
 		hment_put_reserve(hm);
 	else
