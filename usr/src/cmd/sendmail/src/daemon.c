@@ -14,8 +14,9 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sendmail.h>
+#include "map.h"
 
-SM_RCSID("@(#)$Id: daemon.c,v 8.666 2006/04/18 01:23:42 ca Exp $")
+SM_RCSID("@(#)$Id: daemon.c,v 8.676 2006/12/19 01:15:06 ca Exp $")
 
 #if defined(SOCK_STREAM) || defined(__GNU_LIBRARY__)
 # define USE_SOCK_STREAM	1
@@ -60,37 +61,8 @@ SM_RCSID("@(#)$Id: daemon.c,v 8.666 2006/04/18 01:23:42 ca Exp $")
 
 #include <sm/fdset.h>
 
-/* structure to describe a daemon or a client */
-struct daemon
-{
-	int		d_socket;	/* fd for socket */
-	SOCKADDR	d_addr;		/* socket for incoming */
-	unsigned short	d_port;		/* port number */
-	int		d_listenqueue;	/* size of listen queue */
-	int		d_tcprcvbufsize;	/* size of TCP receive buffer */
-	int		d_tcpsndbufsize;	/* size of TCP send buffer */
-	time_t		d_refuse_connections_until;
-	bool		d_firsttime;
-	int		d_socksize;
-	BITMAP256	d_flags;	/* flags; see sendmail.h */
-	char		*d_mflags;	/* flags for use in macro */
-	char		*d_name;	/* user-supplied name */
-#if MILTER
-	char		*d_inputfilterlist;
-	struct milter	*d_inputfilters[MAXFILTERS];
-#endif /* MILTER */
-#if _FFR_SS_PER_DAEMON
-	int		d_supersafe;
-#endif /* _FFR_SS_PER_DAEMON */
-#if _FFR_DM_PER_DAEMON
-	int		d_dm;	/* DeliveryMode */
-#endif /* _FFR_DM_PER_DAEMON */
-};
-
-typedef struct daemon DAEMON_T;
-
-#define SAFE_NOTSET	(-1)	/* SuperSafe (per daemon) option not set */
-/* see also sendmail.h: SuperSafe values */
+#define DAEMON_C 1
+#include <daemon.h>
 
 static void		connecttimeout __P((int));
 static int		opendaemonsocket __P((DAEMON_T *, bool));
@@ -130,7 +102,6 @@ static void		authtimeout __P((int));
 **		Convert the entry in hbuf into a canonical form.
 */
 
-static DAEMON_T	Daemons[MAXDAEMONS];
 static int	NDaemons = 0;			/* actual number of daemons */
 
 static time_t	NextDiskSpaceCheck = 0;
@@ -167,7 +138,7 @@ getrequests(e)
 #endif /* XDEBUG */
 	char status[MAXLINE];
 	SOCKADDR sa;
-	SOCKADDR_LEN_T len = sizeof sa;
+	SOCKADDR_LEN_T len = sizeof(sa);
 #if _FFR_QUEUE_RUN_PARANOIA
 	time_t lastrun;
 #endif /* _FFR_QUEUE_RUN_PARANOIA */
@@ -175,7 +146,6 @@ getrequests(e)
 	extern int ControlSocket;
 # endif /* NETUNIX */
 	extern ENVELOPE BlankEnvelope;
-	extern bool refuseconnections __P((char *, ENVELOPE *, int, bool));
 
 
 	/* initialize data for function that generates queue ids */
@@ -220,7 +190,7 @@ getrequests(e)
 	{
 		char jbuf[MAXHOSTNAMELEN];
 
-		expand("\201j", jbuf, sizeof jbuf, e);
+		expand("\201j", jbuf, sizeof(jbuf), e);
 		j_has_dot = strchr(jbuf, '.') != NULL;
 	}
 #endif /* XDEBUG */
@@ -265,8 +235,7 @@ getrequests(e)
 				continue;
 			if (bitnset(D_DISABLE, Daemons[idx].d_flags))
 				continue;
-			if (refuseconnections(Daemons[idx].d_name, e, idx,
-					      curdaemon == idx))
+			if (refuseconnections(e, idx, curdaemon == idx))
 			{
 				if (Daemons[idx].d_socket >= 0)
 				{
@@ -302,7 +271,7 @@ getrequests(e)
 		{
 			char jbuf[MAXHOSTNAMELEN];
 
-			expand("\201j", jbuf, sizeof jbuf, e);
+			expand("\201j", jbuf, sizeof(jbuf), e);
 			if (!wordinclass(jbuf, 'w'))
 			{
 				dumpstate("daemon lost $j");
@@ -425,7 +394,7 @@ getrequests(e)
 				{
 					lotherend = Daemons[idx].d_socksize;
 					memset(&RealHostAddr, '\0',
-					       sizeof RealHostAddr);
+					       sizeof(RealHostAddr));
 					t = accept(Daemons[idx].d_socket,
 						   (struct sockaddr *)&RealHostAddr,
 						   &lotherend);
@@ -459,8 +428,8 @@ getrequests(e)
 			{
 				struct sockaddr_un sa_un;
 
-				lotherend = sizeof sa_un;
-				memset(&sa_un, '\0', sizeof sa_un);
+				lotherend = sizeof(sa_un);
+				memset(&sa_un, '\0', sizeof(sa_un));
 				t = accept(ControlSocket,
 					   (struct sockaddr *)&sa_un,
 					   &lotherend);
@@ -629,9 +598,9 @@ getrequests(e)
 		/* XXX get some better "random" data? */
 		seed = get_random();
 		RAND_seed((void *) &NextDiskSpaceCheck,
-			  sizeof NextDiskSpaceCheck);
-		RAND_seed((void *) &now, sizeof now);
-		RAND_seed((void *) &seed, sizeof seed);
+			  sizeof(NextDiskSpaceCheck));
+		RAND_seed((void *) &now, sizeof(now));
+		RAND_seed((void *) &seed, sizeof(seed));
 #else /* STARTTLS */
 		(void) get_random();
 #endif /* STARTTLS */
@@ -722,7 +691,7 @@ getrequests(e)
 				macdefine(&BlankEnvelope.e_macro, A_TEMP,
 					macid("{daemon_addr}"),
 					anynet_ntoa(&Daemons[curdaemon].d_addr));
-				(void) sm_snprintf(status, sizeof status, "%d",
+				(void) sm_snprintf(status, sizeof(status), "%d",
 						ntohs(Daemons[curdaemon].d_port));
 				macdefine(&BlankEnvelope.e_macro, A_TEMP,
 					macid("{daemon_port}"), status);
@@ -754,19 +723,36 @@ getrequests(e)
 				/* Add parent process as first child item */
 				proc_list_add(CurrentPid, "daemon child",
 					      PROC_DAEMON_CHILD, 0, -1, NULL);
-
 				/* don't schedule queue runs if ETRN */
 				QueueIntvl = 0;
+
+				/*
+				**  Hack: override global variables if
+				**	the corresponding DaemonPortOption
+				**	is set.
+				*/
 #if _FFR_SS_PER_DAEMON
 				if (Daemons[curdaemon].d_supersafe !=
-				    SAFE_NOTSET)
-					SuperSafe = Daemons[curdaemon].d_supersafe;
+				    DPO_NOTSET)
+					SuperSafe = Daemons[curdaemon].
+								d_supersafe;
 #endif /* _FFR_SS_PER_DAEMON */
-#if _FFR_DM_PER_DAEMON
 				if (Daemons[curdaemon].d_dm != DM_NOTSET)
 					set_delivery_mode(
 						Daemons[curdaemon].d_dm, e);
-#endif /* _FFR_DM_PER_DAEMON */
+
+				if (Daemons[curdaemon].d_refuseLA !=
+				    DPO_NOTSET)
+					RefuseLA = Daemons[curdaemon].
+								d_refuseLA;
+				if (Daemons[curdaemon].d_queueLA != DPO_NOTSET)
+					QueueLA = Daemons[curdaemon].d_queueLA;
+				if (Daemons[curdaemon].d_delayLA != DPO_NOTSET)
+					DelayLA = Daemons[curdaemon].d_delayLA;
+				if (Daemons[curdaemon].d_maxchildren !=
+				    DPO_NOTSET)
+					MaxChildren = Daemons[curdaemon].
+								d_maxchildren;
 
 				sm_setproctitle(true, e, "startup with %s",
 						anynet_ntoa(&RealHostAddr));
@@ -911,13 +897,13 @@ getrequests(e)
 		/* parent -- keep track of children */
 		if (control)
 		{
-			(void) sm_snprintf(status, sizeof status,
+			(void) sm_snprintf(status, sizeof(status),
 					   "control socket server child");
 			proc_list_add(pid, status, PROC_CONTROL, 0, -1, NULL);
 		}
 		else
 		{
-			(void) sm_snprintf(status, sizeof status,
+			(void) sm_snprintf(status, sizeof(status),
 					   "SMTP server child for %s",
 					   anynet_ntoa(&RealHostAddr));
 			proc_list_add(pid, status, PROC_DAEMON, 0, -1,
@@ -1140,12 +1126,12 @@ opendaemonsocket(d, firsttime)
 			if (tTd(15, 101))
 				(void) setsockopt(d->d_socket, SOL_SOCKET,
 						  SO_DEBUG, (char *)&on,
-						  sizeof on);
+						  sizeof(on));
 
 			(void) setsockopt(d->d_socket, SOL_SOCKET,
-					  SO_REUSEADDR, (char *)&on, sizeof on);
+					  SO_REUSEADDR, (char *)&on, sizeof(on));
 			(void) setsockopt(d->d_socket, SOL_SOCKET,
-					  SO_KEEPALIVE, (char *)&on, sizeof on);
+					  SO_KEEPALIVE, (char *)&on, sizeof(on));
 
 #ifdef SO_RCVBUF
 			if (d->d_tcprcvbufsize > 0)
@@ -1186,30 +1172,30 @@ opendaemonsocket(d, firsttime)
 #if _FFR_DAEMON_NETUNIX
 # ifdef NETUNIX
 			  case AF_UNIX:
-				socksize = sizeof d->d_addr.sunix;
+				socksize = sizeof(d->d_addr.sunix);
 				break;
 # endif /* NETUNIX */
 #endif /* _FFR_DAEMON_NETUNIX */
 #if NETINET
 			  case AF_INET:
-				socksize = sizeof d->d_addr.sin;
+				socksize = sizeof(d->d_addr.sin);
 				break;
 #endif /* NETINET */
 
 #if NETINET6
 			  case AF_INET6:
-				socksize = sizeof d->d_addr.sin6;
+				socksize = sizeof(d->d_addr.sin6);
 				break;
 #endif /* NETINET6 */
 
 #if NETISO
 			  case AF_ISO:
-				socksize = sizeof d->d_addr.siso;
+				socksize = sizeof(d->d_addr.siso);
 				break;
 #endif /* NETISO */
 
 			  default:
-				socksize = sizeof d->d_addr;
+				socksize = sizeof(d->d_addr);
 				break;
 			}
 
@@ -1262,7 +1248,7 @@ setupdaemon(daemonaddr)
 
 	if (daemonaddr->sa.sa_family == AF_UNSPEC)
 	{
-		memset(daemonaddr, '\0', sizeof *daemonaddr);
+		memset(daemonaddr, '\0', sizeof(*daemonaddr));
 #if NETINET
 		daemonaddr->sa.sa_family = AF_INET;
 #endif /* NETINET */
@@ -1458,11 +1444,13 @@ setsockaddroptions(p, d)
 		d->d_addr.sa.sa_family = AF_INET;
 #endif /* NETINET */
 #if _FFR_SS_PER_DAEMON
-	d->d_supersafe = SAFE_NOTSET;
+	d->d_supersafe = DPO_NOTSET;
 #endif /* _FFR_SS_PER_DAEMON */
-#if _FFR_DM_PER_DAEMON
 	d->d_dm = DM_NOTSET;
-#endif /* _FFR_DM_PER_DAEMON */
+	d->d_refuseLA = DPO_NOTSET;
+	d->d_queueLA = DPO_NOTSET;
+	d->d_delayLA = DPO_NOTSET;
+	d->d_maxchildren = DPO_NOTSET;
 
 	while (p != NULL)
 	{
@@ -1491,7 +1479,10 @@ setsockaddroptions(p, d)
 			addr = v;
 			break;
 
-#if _FFR_DM_PER_DAEMON
+		  case 'c':
+			d->d_maxchildren = atoi(v);
+			break;
+
 		  case 'D':		/* DeliveryMode */
 			switch (*v)
 			{
@@ -1507,7 +1498,10 @@ setsockaddroptions(p, d)
 				break;
 			}
 			break;
-#endif /* _FFR_DM_PER_DAEMON */
+
+		  case 'd':		/* delayLA */
+			d->d_delayLA = atoi(v);
+			break;
 
 		  case 'F':		/* address family */
 			if (isascii(*v) && isdigit(*v))
@@ -1566,8 +1560,16 @@ setsockaddroptions(p, d)
 			port = v;
 			break;
 
+		  case 'q':
+			d->d_queueLA = atoi(v);
+			break;
+
 		  case 'R':		/* receive buffer size */
 			d->d_tcprcvbufsize = atoi(v);
+			break;
+
+		  case 'r':
+			d->d_refuseLA = atoi(v);
 			break;
 
 		  case 'S':		/* send buffer size */
@@ -1862,7 +1864,7 @@ setdaemonoptions(p)
 	{
 		char num[30];
 
-		(void) sm_snprintf(num, sizeof num, "Daemon%d", NDaemons);
+		(void) sm_snprintf(num, sizeof(num), "Daemon%d", NDaemons);
 		Daemons[NDaemons].d_name = newstr(num);
 	}
 
@@ -1918,7 +1920,7 @@ setclientoptions(p)
 	int family;
 	DAEMON_T d;
 
-	memset(&d, '\0', sizeof d);
+	memset(&d, '\0', sizeof(d));
 	setsockaddroptions(p, &d);
 
 	/* grab what we need */
@@ -1931,7 +1933,7 @@ setclientoptions(p)
 	{
 		char num[30];
 
-		(void) sm_snprintf(num, sizeof num, "Client%d", family);
+		(void) sm_snprintf(num, sizeof(num), "Client%d", family);
 		ClientSettings[family].d_name = newstr(num);
 	}
 }
@@ -2127,7 +2129,7 @@ makeconnection(host, port, mci, e, enough)
 		char p6[INET6_ADDRSTRLEN];
 #endif /* NETINET6 */
 
-		memset(&clt_addr, '\0', sizeof clt_addr);
+		memset(&clt_addr, '\0', sizeof(clt_addr));
 
 		/* infer the address family from the address itself */
 		clt_addr.sa.sa_family = addr_family(p);
@@ -2140,7 +2142,7 @@ makeconnection(host, port, mci, e, enough)
 			    clt_addr.sin.sin_addr.s_addr != INADDR_LOOPBACK)
 			{
 				clt_bind = true;
-				socksize = sizeof (struct sockaddr_in);
+				socksize = sizeof(struct sockaddr_in);
 			}
 			break;
 #endif /* NETINET */
@@ -2148,16 +2150,16 @@ makeconnection(host, port, mci, e, enough)
 #if NETINET6
 		  case AF_INET6:
 			if (inet_addr(p) != INADDR_NONE)
-				(void) sm_snprintf(p6, sizeof p6,
+				(void) sm_snprintf(p6, sizeof(p6),
 						   "IPv6:::ffff:%s", p);
 			else
-				(void) sm_strlcpy(p6, p, sizeof p6);
+				(void) sm_strlcpy(p6, p, sizeof(p6));
 			if (anynet_pton(AF_INET6, p6,
 					&clt_addr.sin6.sin6_addr) == 1 &&
 			    !IN6_IS_ADDR_LOOPBACK(&clt_addr.sin6.sin6_addr))
 			{
 				clt_bind = true;
-				socksize = sizeof (struct sockaddr_in6);
+				socksize = sizeof(struct sockaddr_in6);
 			}
 			break;
 #endif /* NETINET6 */
@@ -2187,7 +2189,7 @@ makeconnection(host, port, mci, e, enough)
 				clt_bind = true;
 			if (clt_addr.sin.sin_port != 0)
 				clt_bind = true;
-			socksize = sizeof (struct sockaddr_in);
+			socksize = sizeof(struct sockaddr_in);
 			break;
 #endif /* NETINET */
 #if NETINET6
@@ -2196,14 +2198,14 @@ makeconnection(host, port, mci, e, enough)
 				clt_addr.sin6.sin6_addr = in6addr_any;
 			else
 				clt_bind = true;
-			socksize = sizeof (struct sockaddr_in6);
+			socksize = sizeof(struct sockaddr_in6);
 			if (clt_addr.sin6.sin6_port != 0)
 				clt_bind = true;
 			break;
 #endif /* NETINET6 */
 #if NETISO
 		  case AF_ISO:
-			socksize = sizeof clt_addr.siso;
+			socksize = sizeof(clt_addr.siso);
 			clt_bind = true;
 			break;
 #endif /* NETISO */
@@ -2219,8 +2221,8 @@ makeconnection(host, port, mci, e, enough)
 
 	SM_SET_H_ERRNO(0);
 	errno = 0;
-	memset(&CurHostAddr, '\0', sizeof CurHostAddr);
-	memset(&addr, '\0', sizeof addr);
+	memset(&CurHostAddr, '\0', sizeof(CurHostAddr));
+	memset(&addr, '\0', sizeof(addr));
 	SmtpPhase = mci->mci_phase = "initial connection";
 	CurHostName = host;
 
@@ -2238,7 +2240,7 @@ makeconnection(host, port, mci, e, enough)
 
 			*p = '\0';
 #if NETINET6
-			memset(&hid6, '\0', sizeof hid6);
+			memset(&hid6, '\0', sizeof(hid6));
 #endif /* NETINET6 */
 #if NETINET
 			if (family == AF_INET &&
@@ -2338,6 +2340,14 @@ gothostent:
 # endif /* NETINET6 */
 			{
 				if (errno == ETIMEDOUT ||
+# if _FFR_GETHBN_ExFILE
+#  ifdef EMFILE
+				   errno == EMFILE ||
+#  endif /* EMFILE */
+#  ifdef ENFILE
+				   errno == ENFILE ||
+#  endif /* ENFILE */
+# endif /* _FFR_GETHBN_ExFILE */
 				    h_errno == TRY_AGAIN ||
 				    (errno == ECONNREFUSED && UseNameServer))
 				{
@@ -2389,7 +2399,7 @@ gothostent:
 #endif /* NETINET6 */
 
 		  default:
-			if (hp->h_length > sizeof addr.sa.sa_data)
+			if (hp->h_length > sizeof(addr.sa.sa_data))
 			{
 				syserr("makeconnection: long sa_data: family %d len %d",
 					hp->h_addrtype, hp->h_length);
@@ -2446,14 +2456,14 @@ gothostent:
 #if NETINET
 	  case AF_INET:
 		addr.sin.sin_port = port;
-		addrlen = sizeof (struct sockaddr_in);
+		addrlen = sizeof(struct sockaddr_in);
 		break;
 #endif /* NETINET */
 
 #if NETINET6
 	  case AF_INET6:
 		addr.sin6.sin6_port = port;
-		addrlen = sizeof (struct sockaddr_in6);
+		addrlen = sizeof(struct sockaddr_in6);
 		break;
 #endif /* NETINET6 */
 
@@ -2461,7 +2471,7 @@ gothostent:
 	  case AF_ISO:
 		/* assume two byte transport selector */
 		memmove(TSEL((struct sockaddr_iso *) &addr), (char *) &port, 2);
-		addrlen = sizeof (struct sockaddr_iso);
+		addrlen = sizeof(struct sockaddr_iso);
 		break;
 #endif /* NETISO */
 
@@ -2558,7 +2568,7 @@ gothostent:
 			int on = 1;
 
 			(void) setsockopt(s, SOL_SOCKET, SO_DEBUG,
-					  (char *)&on, sizeof on);
+					  (char *)&on, sizeof(on));
 		}
 		if (e->e_xfp != NULL)	/* for debugging */
 			(void) sm_io_flush(e->e_xfp, SM_TIME_DEFAULT);
@@ -2576,7 +2586,7 @@ gothostent:
 					(void) setsockopt(s, SOL_SOCKET,
 							  SO_REUSEADDR,
 							  (char *) &on,
-							  sizeof on);
+							  sizeof(on));
 				break;
 #endif /* NETINET */
 
@@ -2586,7 +2596,7 @@ gothostent:
 					(void) setsockopt(s, SOL_SOCKET,
 							  SO_REUSEADDR,
 							  (char *) &on,
-							  sizeof on);
+							  sizeof(on));
 				break;
 #endif /* NETINET6 */
 			}
@@ -2797,7 +2807,7 @@ nextaddr:
 	}
 
 	/* find out name for Interface through which we connect */
-	len = sizeof addr;
+	len = sizeof(addr);
 	if (getsockname(s, &addr.sa, &len) == 0)
 	{
 		char *name;
@@ -2835,11 +2845,9 @@ nextaddr:
 			macid("{if_family_out}"), NULL);
 	}
 
-#if _FFR_HELONAME
 	/* Use the configured HeloName as appropriate */
 	if (HeloName != NULL && HeloName[0] != '\0')
 		mci->mci_heloname = newstr(HeloName);
-#endif /* _FFR_HELONAME */
 
 	mci_setstat(mci, EX_OK, NULL, NULL);
 	return EX_OK;
@@ -2899,10 +2907,10 @@ makeconnection_ds(mux_path, mci)
 	}
 
 	/* prepare address structure */
-	memset(&unix_addr, '\0', sizeof unix_addr);
+	memset(&unix_addr, '\0', sizeof(unix_addr));
 	unix_addr.sun_family = AF_UNIX;
 
-	if (strlen(mux_path) >= sizeof unix_addr.sun_path)
+	if (strlen(mux_path) >= sizeof(unix_addr.sun_path))
 	{
 		syserr("makeconnection_ds: domain socket name %s too long",
 			mux_path);
@@ -2913,7 +2921,7 @@ makeconnection_ds(mux_path, mci)
 		return EX_UNAVAILABLE;
 	}
 	(void) sm_strlcpy(unix_addr.sun_path, mux_path,
-			  sizeof unix_addr.sun_path);
+			  sizeof(unix_addr.sun_path));
 
 	/* initialize domain socket */
 	sock = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -3374,7 +3382,7 @@ getauthinfo(fd, may_be_forged)
 	static char hbuf[MAXNAME + MAXAUTHINFO + 11];
 
 	*may_be_forged = false;
-	falen = sizeof RealHostAddr;
+	falen = sizeof(RealHostAddr);
 	if (isatty(fd) || (i = getpeername(fd, &RealHostAddr.sa, &falen)) < 0 ||
 	    falen <= 0 || RealHostAddr.sa.sa_family == 0)
 	{
@@ -3390,7 +3398,7 @@ getauthinfo(fd, may_be_forged)
 				return NULL;
 			errno = 0;
 		}
-		(void) sm_strlcpyn(hbuf, sizeof hbuf, 2, RealUserName,
+		(void) sm_strlcpyn(hbuf, sizeof(hbuf), 2, RealUserName,
 				   "@localhost");
 		if (tTd(9, 1))
 			sm_dprintf("getauthinfo: %s\n", hbuf);
@@ -3456,7 +3464,7 @@ getauthinfo(fd, may_be_forged)
 	if (TimeOuts.to_ident == 0)
 		goto noident;
 
-	lalen = sizeof la;
+	lalen = sizeof(la);
 	switch (RealHostAddr.sa.sa_family)
 	{
 #if NETINET
@@ -3471,7 +3479,7 @@ getauthinfo(fd, may_be_forged)
 		port = RealHostAddr.sin.sin_port;
 
 		/* create ident query */
-		(void) sm_snprintf(ibuf, sizeof ibuf, "%d,%d\r\n",
+		(void) sm_snprintf(ibuf, sizeof(ibuf), "%d,%d\r\n",
 				ntohs(RealHostAddr.sin.sin_port),
 				ntohs(la.sin.sin_port));
 
@@ -3519,7 +3527,7 @@ getauthinfo(fd, may_be_forged)
 		port = RealHostAddr.sin6.sin6_port;
 
 		/* create ident query */
-		(void) sm_snprintf(ibuf, sizeof ibuf, "%d,%d\r\n",
+		(void) sm_snprintf(ibuf, sizeof(ibuf), "%d,%d\r\n",
 				ntohs(RealHostAddr.sin6.sin6_port),
 				ntohs(la.sin6.sin6_port));
 
@@ -3578,7 +3586,7 @@ getauthinfo(fd, may_be_forged)
 
 	/* get result */
 	p = &ibuf[0];
-	nleft = sizeof ibuf - 1;
+	nleft = sizeof(ibuf) - 1;
 	while ((i = read(s, p, nleft)) > 0)
 	{
 		char *s;
@@ -3661,13 +3669,13 @@ getauthinfo(fd, may_be_forged)
 	if (sm_strncasecmp(ostype, "other", 5) == 0 &&
 	    (ostype[5] == ' ' || ostype[5] == '\0'))
 	{
-		(void) sm_strlcpy(hbuf, "IDENT:", sizeof hbuf);
+		(void) sm_strlcpy(hbuf, "IDENT:", sizeof(hbuf));
 		cleanstrcpy(&hbuf[6], p, MAXAUTHINFO);
 	}
 	else
 		cleanstrcpy(hbuf, p, MAXAUTHINFO);
 	len = strlen(hbuf);
-	(void) sm_strlcpyn(&hbuf[len], sizeof hbuf - len, 2, "@",
+	(void) sm_strlcpyn(&hbuf[len], sizeof(hbuf) - len, 2, "@",
 			   RealHostName == NULL ? "localhost" : RealHostName);
 	goto postident;
 
@@ -3700,7 +3708,7 @@ noident:
 			sm_dprintf("getauthinfo: NULL\n");
 		return NULL;
 	}
-	(void) sm_strlcpy(hbuf, RealHostName, sizeof hbuf);
+	(void) sm_strlcpy(hbuf, RealHostName, sizeof(hbuf));
 
 postident:
 #if IP_SRCROUTE
@@ -3729,7 +3737,7 @@ postident:
 		int l;
 		struct IPOPTION ipopt;
 
-		ipoptlen = sizeof ipopt;
+		ipoptlen = sizeof(ipopt);
 		if (getsockopt(fd, IPPROTO_IP, IP_OPTIONS,
 			       (char *) &ipopt, &ipoptlen) < 0)
 			goto noipsr;
@@ -3762,7 +3770,7 @@ postident:
 				*/
 
 				p = &hbuf[strlen(hbuf)];
-				l = sizeof hbuf - (hbuf - p) - 6;
+				l = sizeof(hbuf) - (hbuf - p) - 6;
 				(void) sm_snprintf(p, SPACELEFT(hbuf, p),
 					" [%s@%.*s",
 					*o == IPOPT_SSRR ? "!" : "",
@@ -3981,8 +3989,8 @@ host_map_lookup(map, name, av, statp)
 	{
 		int ttl;
 
-		(void) sm_strlcpy(hbuf, name, sizeof hbuf);
-		if (getcanonname(hbuf, sizeof hbuf - 1, !HasWildcardMX, &ttl))
+		(void) sm_strlcpy(hbuf, name, sizeof(hbuf));
+		if (getcanonname(hbuf, sizeof(hbuf) - 1, !HasWildcardMX, &ttl))
 		{
 			ans = hbuf;
 			if (ttl > 0)
@@ -4024,7 +4032,7 @@ host_map_lookup(map, name, av, statp)
 				static char n[MAXNAME + 1];
 
 				/* hp->h_name is about to disappear */
-				(void) sm_strlcpy(n, ans, sizeof n);
+				(void) sm_strlcpy(n, ans, sizeof(n));
 				ans = n;
 			}
 			freehostent(hp);
@@ -4291,10 +4299,10 @@ anynet_ntoa(sap)
 # if NETUNIX
 	  case AF_UNIX:
 		if (sap->sunix.sun_path[0] != '\0')
-			(void) sm_snprintf(buf, sizeof buf, "[UNIX: %.64s]",
+			(void) sm_snprintf(buf, sizeof(buf), "[UNIX: %.64s]",
 					   sap->sunix.sun_path);
 		else
-			(void) sm_strlcpy(buf, "[UNIX: localhost]", sizeof buf);
+			(void) sm_strlcpy(buf, "[UNIX: localhost]", sizeof(buf));
 		return buf;
 # endif /* NETUNIX */
 
@@ -4305,7 +4313,7 @@ anynet_ntoa(sap)
 
 # if NETINET6
 	  case AF_INET6:
-		ap = anynet_ntop(&sap->sin6.sin6_addr, buf, sizeof buf);
+		ap = anynet_ntop(&sap->sin6.sin6_addr, buf, sizeof(buf));
 		if (ap != NULL)
 			return ap;
 		break;
@@ -4313,7 +4321,7 @@ anynet_ntoa(sap)
 
 # if NETLINK
 	  case AF_LINK:
-		(void) sm_snprintf(buf, sizeof buf, "[LINK: %s]",
+		(void) sm_snprintf(buf, sizeof(buf), "[LINK: %s]",
 				   link_ntoa((struct sockaddr_dl *) &sap->sa));
 		return buf;
 # endif /* NETLINK */
@@ -4324,10 +4332,10 @@ anynet_ntoa(sap)
 	}
 
 	/* unknown family -- just dump bytes */
-	(void) sm_snprintf(buf, sizeof buf, "Family %d: ", sap->sa.sa_family);
+	(void) sm_snprintf(buf, sizeof(buf), "Family %d: ", sap->sa.sa_family);
 	bp = &buf[strlen(buf)];
 	ap = sap->sa.sa_data;
-	for (l = sizeof sap->sa.sa_data; --l >= 0; )
+	for (l = sizeof(sap->sa.sa_data); --l >= 0; )
 	{
 		(void) sm_snprintf(bp, SPACELEFT(buf, bp), "%02x:",
 				   *ap++ & 0377);
@@ -4387,7 +4395,7 @@ hostnamebyanyaddr(sap)
 # if NETISO
 	  case AF_ISO:
 		hp = sm_gethostbyaddr((char *) &sap->siso.siso_addr,
-				      sizeof sap->siso.siso_addr, AF_ISO);
+				      sizeof(sap->siso.siso_addr), AF_ISO);
 		break;
 # endif /* NETISO */
 
@@ -4398,7 +4406,7 @@ hostnamebyanyaddr(sap)
 # endif /* NETUNIX */
 
 	  default:
-		hp = sm_gethostbyaddr(sap->sa.sa_data, sizeof sap->sa.sa_data,
+		hp = sm_gethostbyaddr(sap->sa.sa_data, sizeof(sap->sa.sa_data),
 				      sap->sa.sa_family);
 		break;
 	}
@@ -4426,7 +4434,7 @@ hostnamebyanyaddr(sap)
 			static char n[MAXNAME + 1];
 
 			/* Copy the string, hp->h_name is about to disappear */
-			(void) sm_strlcpy(n, name, sizeof n);
+			(void) sm_strlcpy(n, name, sizeof(n));
 			name = n;
 		}
 		freehostent(hp);
@@ -4450,7 +4458,7 @@ hostnamebyanyaddr(sap)
 	{
 		static char buf[203];
 
-		(void) sm_snprintf(buf, sizeof buf, "[%.200s]",
+		(void) sm_snprintf(buf, sizeof(buf), "[%.200s]",
 				   anynet_ntoa(sap));
 		return buf;
 	}

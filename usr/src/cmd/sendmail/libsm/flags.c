@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2001, 2003 Sendmail, Inc. and its suppliers.
+ * Copyright (c) 2000-2001, 2004, 2006 Sendmail, Inc. and its suppliers.
  *      All rights reserved.
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -15,11 +15,12 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sm/gen.h>
-SM_RCSID("@(#)$Id: flags.c,v 1.20.2.1 2003/09/03 18:51:56 ca Exp $")
+SM_RCSID("@(#)$Id: flags.c,v 1.23 2006/12/19 19:44:23 ca Exp $")
 #include <sys/types.h>
 #include <sys/file.h>
 #include <errno.h>
 #include <sm/io.h>
+#include "local.h"
 
 /*
 **  SM_FLAGS -- translate external (user) flags into internal flags
@@ -33,9 +34,9 @@ SM_RCSID("@(#)$Id: flags.c,v 1.20.2.1 2003/09/03 18:51:56 ca Exp $")
 
 int
 sm_flags(flags)
-	register int flags;
+	int flags;
 {
-	register int ret;
+	int ret;
 
 	switch(SM_IO_MODE(flags))
 	{

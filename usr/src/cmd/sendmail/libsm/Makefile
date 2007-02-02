@@ -39,17 +39,18 @@ ARFLAGS=	cq
 OBJS=   assert.o cf.o clock.o clrerr.o config.o debug.o errstring.o exc.o \
 	fclose.o feof.o ferror.o fflush.o fget.o findfp.o flags.o fopen.o \
 	fpos.o fprintf.o fpurge.o fput.o fread.o fscanf.o fseek.o fvwrite.o \
-	fwalk.o fwrite.o get.o heap.o ldap.o makebuf.o match.o mbdb.o niprop.o \
-	path.o put.o refill.o rewind.o rpool.o setvbuf.o sem.o shm.o signal.o \
-	smstdio.o snprintf.o sscanf.o stdio.o strcasecmp.o strdup.o strerror.o \
-	strexit.o string.o stringf.o strio.o strl.o strrevcmp.o strto.o test.o \
-	ungetc.o vasprintf.o vfprintf.o vfscanf.o vprintf.o vsnprintf.o \
-	wbuf.o wsetup.o xtrap.o
+	fwalk.o fwrite.o get.o heap.o ldap.o makebuf.o match.o mbdb.o \
+	memstat.o niprop.o path.o put.o refill.o rewind.o rpool.o setvbuf.o \
+	sem.o shm.o signal.o smstdio.o snprintf.o sscanf.o stdio.o \
+	strcasecmp.o strdup.o strerror.o strexit.o string.o stringf.o strio.o \
+	strl.o strrevcmp.o strto.o test.o ungetc.o util.o vasprintf.o \
+	vfprintf.o vfscanf.o vprintf.o vsnprintf.o wbuf.o wsetup.o xtrap.o
 
 SRCS=	$(OBJS:%.o=%.c)
 
 TESTS=	t-event t-exc t-rpool t-string t-smstdio t-match t-strio t-heap \
-	t-fopen t-strl t-strrevcmp t-path t-float t-scanf t-sem t-shm
+	t-fopen t-strl t-strrevcmp t-path t-float t-scanf t-sem t-shm \
+	t-memstat t-qic
 
 libsm=	libsm.a
 

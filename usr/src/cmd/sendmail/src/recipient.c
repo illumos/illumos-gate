@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2003 Sendmail, Inc. and its suppliers.
+ * Copyright (c) 1998-2003, 2006 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
  * Copyright (c) 1983, 1995-1997 Eric P. Allman.  All rights reserved.
  * Copyright (c) 1988, 1993
@@ -15,7 +15,7 @@
 
 #include <sendmail.h>
 
-SM_RCSID("@(#)$Id: recipient.c,v 8.337 2004/08/03 19:57:23 ca Exp $")
+SM_RCSID("@(#)$Id: recipient.c,v 8.344 2007/02/01 05:12:14 ca Exp $")
 
 static void	includetimeout __P((int));
 static ADDRESS	*self_reference __P((ADDRESS *));
@@ -202,10 +202,10 @@ sendtolist(list, ctladdr, sendq, aliaslevel, e)
 
 	/* make sure we have enough space to copy the string */
 	i = strlen(list) + 1;
-	if (i <= sizeof buf)
+	if (i <= sizeof(buf))
 	{
 		bufp = buf;
-		i = sizeof buf;
+		i = sizeof(buf);
 	}
 	else
 		bufp = sm_malloc_x(i);
@@ -311,6 +311,7 @@ sendtolist(list, ctladdr, sendq, aliaslevel, e)
 	SM_END_TRY
 	return naddrs;
 }
+
 #if MILTER
 /*
 **  REMOVEFROMLIST -- Remove addresses from a send list.
@@ -366,10 +367,10 @@ removefromlist(list, sendq, e)
 
 	/* make sure we have enough space to copy the string */
 	i = strlen(list) + 1;
-	if (i <= sizeof buf)
+	if (i <= sizeof(buf))
 	{
 		bufp = buf;
-		i = sizeof buf;
+		i = sizeof(buf);
 	}
 	else
 		bufp = sm_malloc_x(i);
@@ -389,7 +390,7 @@ removefromlist(list, sendq, e)
 			/* parse the address */
 			while ((isascii(*p) && isspace(*p)) || *p == ',')
 				p++;
-			if (parseaddr(p, &a, RF_COPYALL,
+			if (parseaddr(p, &a, RF_COPYALL|RF_RM_ADDR,
 				      delimiter, &delimptr, e, true) == NULL)
 			{
 				p = delimptr;
@@ -425,6 +426,7 @@ removefromlist(list, sendq, e)
 	return naddrs;
 }
 #endif /* MILTER */
+
 /*
 **  RECIPIENT -- Designate a message recipient
 **
@@ -505,13 +507,13 @@ recipient(new, sendq, aliaslevel, e)
 			p = "rfc822";
 		if (sm_strcasecmp(p, "rfc822") != 0)
 		{
-			(void) sm_snprintf(frbuf, sizeof frbuf, "%s; %.800s",
+			(void) sm_snprintf(frbuf, sizeof(frbuf), "%s; %.800s",
 					   q->q_mailer->m_addrtype,
 					   q->q_user);
 		}
 		else if (strchr(q->q_user, '@') != NULL)
 		{
-			(void) sm_snprintf(frbuf, sizeof frbuf, "%s; %.800s",
+			(void) sm_snprintf(frbuf, sizeof(frbuf), "%s; %.800s",
 					   p, q->q_user);
 		}
 		else if (strchr(q->q_paddr, '@') != NULL)
@@ -530,7 +532,7 @@ recipient(new, sendq, aliaslevel, e)
 					qp[strlen(qp) - 1] = '\0';
 				qp++;
 			}
-			(void) sm_snprintf(frbuf, sizeof frbuf, "%s; %.800s",
+			(void) sm_snprintf(frbuf, sizeof(frbuf), "%s; %.800s",
 					   p, qp);
 
 			/* undo damage */
@@ -539,7 +541,7 @@ recipient(new, sendq, aliaslevel, e)
 		}
 		else
 		{
-			(void) sm_snprintf(frbuf, sizeof frbuf,
+			(void) sm_snprintf(frbuf, sizeof(frbuf),
 					   "%s; %.700s@%.100s",
 					   p, q->q_user, MyHostName);
 		}
@@ -564,7 +566,7 @@ recipient(new, sendq, aliaslevel, e)
 				p = e->e_from.q_mailer->m_addrtype;
 			if (p == NULL)
 				p = "rfc822";
-			(void) sm_strlcpyn(obuf, sizeof obuf, 2, p, ";");
+			(void) sm_strlcpyn(obuf, sizeof(obuf), 2, p, ";");
 
 			qp = q->q_paddr;
 
@@ -579,9 +581,9 @@ recipient(new, sendq, aliaslevel, e)
 				qp++;
 			}
 
-			p = xtextify(denlstring(qp, true, false), NULL);
+			p = xtextify(denlstring(qp, true, false), "=");
 
-			if (sm_strlcat(obuf, p, sizeof obuf) >= sizeof obuf)
+			if (sm_strlcat(obuf, p, sizeof(obuf)) >= sizeof(obuf))
 			{
 				/* if too big, don't use it */
 				obuf[0] = '\0';
@@ -603,6 +605,18 @@ recipient(new, sendq, aliaslevel, e)
 	{
 		new->q_state = QS_BADADDR;
 		new->q_status = "5.4.6";
+		if (new->q_alias != NULL)
+		{
+			new->q_alias->q_state = QS_BADADDR;
+			new->q_alias->q_status = "5.4.6";
+		}
+		if ((SuprErrs || !LogUsrErrs) && LogLevel > 0)
+		{
+			sm_syslog(LOG_ERR, e->e_id,
+				"aliasing/forwarding loop broken: %s (%d aliases deep; %d max)",
+				FileName != NULL ? FileName : "", aliaslevel,
+				MaxAliasRecursion);
+		}
 		usrerrenh(new->q_status,
 			  "554 aliasing/forwarding loop broken (%d aliases deep; %d max)",
 			  aliaslevel, MaxAliasRecursion);
@@ -615,7 +629,7 @@ recipient(new, sendq, aliaslevel, e)
 
 	/* get unquoted user for file, program or user.name check */
 	i = strlen(new->q_user);
-	if (i >= sizeof buf0)
+	if (i >= sizeof(buf0))
 	{
 		buflen = i + 1;
 		buf = xalloc(buflen);
@@ -623,7 +637,7 @@ recipient(new, sendq, aliaslevel, e)
 	else
 	{
 		buf = buf0;
-		buflen = sizeof buf0;
+		buflen = sizeof(buf0);
 	}
 	(void) sm_strlcpy(buf, new->q_user, buflen);
 	for (p = buf; *p != '\0' && !quoted; p++)
@@ -906,7 +920,8 @@ recipient(new, sendq, aliaslevel, e)
 		{
 			new->q_state = QS_QUEUEUP;
 			if (e->e_message == NULL)
-				e->e_message = "Deferred: user database error";
+				e->e_message = sm_rpool_strdup_x(e->e_rpool,
+						"Deferred: user database error");
 			if (new->q_message == NULL)
 				new->q_message = "Deferred: user database error";
 			if (LogLevel > 8)
@@ -1108,10 +1123,11 @@ recipient(new, sendq, aliaslevel, e)
 		}
 	}
 	new->q_flags |= QRCPTOK;
-	(void) sm_snprintf(buf0, sizeof buf0, "%d", e->e_nrcpts);
+	(void) sm_snprintf(buf0, sizeof(buf0), "%d", e->e_nrcpts);
 	macdefine(&e->e_macro, A_TEMP, macid("{nrcpts}"), buf0);
 	return new;
 }
+
 /*
 **  FINDUSER -- find the password entry for a user.
 **
@@ -1224,7 +1240,7 @@ finduser(name, fuzzyp, user)
 		}
 # endif /* 0 */
 
-		sm_pwfullname(pw->pw_gecos, pw->pw_name, buf, sizeof buf);
+		sm_pwfullname(pw->pw_gecos, pw->pw_name, buf, sizeof(buf));
 		if (strchr(buf, ' ') != NULL && sm_strcasecmp(buf, name) == 0)
 		{
 			if (tTd(29, 4))
@@ -1250,6 +1266,7 @@ finduser(name, fuzzyp, user)
 	return EX_NOUSER;
 #endif /* MATCHGECOS */
 }
+
 /*
 **  WRITABLE -- predicate returning if the file is writable.
 **
@@ -1353,6 +1370,7 @@ writable(filename, ctladdr, flags)
 	errno = safefile(filename, euid, egid, user, flags, S_IWRITE, NULL);
 	return errno == 0;
 }
+
 /*
 **  INCLUDE -- handle :include: specification.
 **
@@ -1803,7 +1821,7 @@ resetuid:
 	LineNumber = 0;
 	ctladdr->q_flags &= ~QSELFREF;
 	nincludes = 0;
-	while (sm_io_fgets(fp, SM_TIME_DEFAULT, buf, sizeof buf) != NULL &&
+	while (sm_io_fgets(fp, SM_TIME_DEFAULT, buf, sizeof(buf)) != NULL &&
 	       !maxreached)
 	{
 		fixcrlf(buf, true);
@@ -1888,6 +1906,7 @@ includetimeout(ignore)
 	errno = ETIMEDOUT;
 	longjmp(CtxIncludeTimeout, 1);
 }
+
 /*
 **  SENDTOARGV -- send to an argument vector.
 **
@@ -1913,6 +1932,7 @@ sendtoargv(argv, e)
 	while ((p = *argv++) != NULL)
 		(void) sendtolist(p, NULLADDR, &e->e_sendqueue, 0, e);
 }
+
 /*
 **  GETCTLADDR -- get controlling address from an address header.
 **
@@ -1933,6 +1953,7 @@ getctladdr(a)
 		a = a->q_alias;
 	return a;
 }
+
 /*
 **  SELF_REFERENCE -- check to see if an address references itself
 **

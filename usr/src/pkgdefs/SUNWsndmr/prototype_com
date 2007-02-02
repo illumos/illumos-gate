@@ -18,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -82,9 +83,11 @@ f none etc/mail/cf/feature/accept_unresolvable_domains.m4 444 root mail
 f none etc/mail/cf/feature/access_db.m4 444 root mail
 f none etc/mail/cf/feature/allmasquerade.m4 444 root mail
 f none etc/mail/cf/feature/always_add_domain.m4 444 root mail
+f none etc/mail/cf/feature/badmx.m4 444 root mail
 f none etc/mail/cf/feature/bestmx_is_local.m4 444 root mail
 f none etc/mail/cf/feature/bitdomain.m4 444 root mail
 f none etc/mail/cf/feature/blacklist_recipients.m4 444 root mail
+f none etc/mail/cf/feature/block_bad_helo.m4 444 root mail
 f none etc/mail/cf/feature/compat_check.m4 444 root mail
 f none etc/mail/cf/feature/conncontrol.m4 444 root mail
 f none etc/mail/cf/feature/delay_checks.m4 444 root mail
@@ -122,6 +125,7 @@ f none etc/mail/cf/feature/relay_entire_domain.m4 444 root mail
 f none etc/mail/cf/feature/relay_hosts_only.m4 444 root mail
 f none etc/mail/cf/feature/relay_local_from.m4 444 root mail
 f none etc/mail/cf/feature/relay_mail_from.m4 444 root mail
+f none etc/mail/cf/feature/require_rdns.m4 444 root mail
 f none etc/mail/cf/feature/smrsh.m4 444 root mail
 f none etc/mail/cf/feature/stickyhost.m4 444 root mail
 f none etc/mail/cf/feature/use_client_ptr.m4 444 root mail

@@ -18,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,9 +60,11 @@ BUILDPARTS =	$(ROOTETCMAILCF)/README \
 		$(ROOTETCMAILCF)/feature/access_db.m4 \
 		$(ROOTETCMAILCF)/feature/allmasquerade.m4 \
 		$(ROOTETCMAILCF)/feature/always_add_domain.m4 \
+		$(ROOTETCMAILCF)/feature/badmx.m4 \
 		$(ROOTETCMAILCF)/feature/bestmx_is_local.m4 \
 		$(ROOTETCMAILCF)/feature/bitdomain.m4 \
 		$(ROOTETCMAILCF)/feature/blacklist_recipients.m4 \
+		$(ROOTETCMAILCF)/feature/block_bad_helo.m4 \
 		$(ROOTETCMAILCF)/feature/compat_check.m4 \
 		$(ROOTETCMAILCF)/feature/conncontrol.m4 \
 		$(ROOTETCMAILCF)/feature/delay_checks.m4 \
@@ -99,6 +102,7 @@ BUILDPARTS =	$(ROOTETCMAILCF)/README \
 		$(ROOTETCMAILCF)/feature/relay_hosts_only.m4 \
 		$(ROOTETCMAILCF)/feature/relay_local_from.m4 \
 		$(ROOTETCMAILCF)/feature/relay_mail_from.m4 \
+		$(ROOTETCMAILCF)/feature/require_rdns.m4 \
 		$(ROOTETCMAILCF)/feature/smrsh.m4 \
 		$(ROOTETCMAILCF)/feature/stickyhost.m4 \
 		$(ROOTETCMAILCF)/feature/use_client_ptr.m4 \

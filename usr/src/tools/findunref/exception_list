@@ -18,6 +18,8 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -161,6 +163,7 @@
 #
 # Ignore sample source code.
 #
+./src/cmd/sendmail/libmilter/example.c
 ./src/lib/libdhcpsvc/modules/templates
 
 #
@@ -172,7 +175,6 @@
 # Ignore sendmail files included for completeness' sake, but which won't
 # be used until certain _FFR (for future release) #define's go live.
 #
-./src/cmd/sendmail/include/libmilter/milter.h
 ./src/cmd/sendmail/src/statusd_shm.h
 
 #

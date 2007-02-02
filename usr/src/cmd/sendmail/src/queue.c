@@ -16,7 +16,7 @@
 #include <sendmail.h>
 #include <sm/sem.h>
 
-SM_RCSID("@(#)$Id: queue.c,v 8.954.2.5 2006/07/31 21:44:18 ca Exp $")
+SM_RCSID("@(#)$Id: queue.c,v 8.970 2006/12/19 01:15:07 ca Exp $")
 
 #include <dirent.h>
 
@@ -149,6 +149,13 @@ static ADDRESS	*setctluser __P((char *, int, ENVELOPE *));
 static int	sm_strshufflecmp __P((char *, char *));
 static void	init_shuffle_alphabet __P(());
 #endif /* _FFR_RHS */
+
+/*
+**  Note: workcmpf?() don't use a prototype because it will cause a conflict
+**  with the qsort() call (which expects something like
+**  int (*compar)(const void *, const void *), not (WORK *, WORK *))
+*/
+
 static int	workcmpf0();
 static int	workcmpf1();
 static int	workcmpf2();
@@ -184,7 +191,7 @@ struct filesys_shared
 
 /* probably kept in shared memory */
 static FILESYS	FileSys[MAXFILESYS];	/* queue file systems */
-static char	*FSPath[MAXFILESYS];	/* pathnames for file systems */
+static const char *FSPath[MAXFILESYS];	/* pathnames for file systems */
 
 #if SM_CONF_SHM
 
@@ -375,7 +382,7 @@ queueup(e, announce, msync)
 
 
 	newid = (e->e_id == NULL) || !bitset(EF_INQUEUE, e->e_flags);
-	(void) sm_strlcpy(tf, queuename(e, NEWQFL_LETTER), sizeof tf);
+	(void) sm_strlcpy(tf, queuename(e, NEWQFL_LETTER), sizeof(tf));
 	tfp = e->e_lockfp;
 	if (tfp == NULL && newid)
 	{
@@ -385,7 +392,7 @@ queueup(e, announce, msync)
 		**  is reused (e.g., because the clock is set back).
 		*/
 
-		(void) sm_strlcpy(tf, queuename(e, ANYQFL_LETTER), sizeof tf);
+		(void) sm_strlcpy(tf, queuename(e, ANYQFL_LETTER), sizeof(tf));
 		OPEN_TF;
 		if (tfd < 0 ||
 #if !SM_OPEN_EXLOCK
@@ -504,7 +511,7 @@ queueup(e, announce, msync)
 	**  If there is no data file yet, create one.
 	*/
 
-	(void) sm_strlcpy(df, queuename(e, DATAFL_LETTER), sizeof df);
+	(void) sm_strlcpy(df, queuename(e, DATAFL_LETTER), sizeof(df));
 	if (bitset(EF_HAS_DF, e->e_flags))
 	{
 		if (e->e_dfp != NULL &&
@@ -565,7 +572,7 @@ queueup(e, announce, msync)
 			e->e_dfino = ST_INODE(stbuf);
 		}
 		e->e_flags |= EF_HAS_DF;
-		memset(&mcibuf, '\0', sizeof mcibuf);
+		memset(&mcibuf, '\0', sizeof(mcibuf));
 		mcibuf.mci_out = dfp;
 		mcibuf.mci_mailer = FileMailer;
 		(*e->e_putbody)(&mcibuf, e, NULL);
@@ -766,11 +773,11 @@ queueup(e, announce, msync)
 	**	no effect on the addresses as they are output.
 	*/
 
-	memset((char *) &nullmailer, '\0', sizeof nullmailer);
+	memset((char *) &nullmailer, '\0', sizeof(nullmailer));
 	nullmailer.m_re_rwset = nullmailer.m_rh_rwset =
 			nullmailer.m_se_rwset = nullmailer.m_sh_rwset = -1;
 	nullmailer.m_eol = "\n";
-	memset(&mcibuf, '\0', sizeof mcibuf);
+	memset(&mcibuf, '\0', sizeof(mcibuf));
 	mcibuf.mci_mailer = &nullmailer;
 	mcibuf.mci_out = tfp;
 
@@ -788,7 +795,7 @@ queueup(e, announce, msync)
 		/* expand macros; if null, don't output header at all */
 		if (bitset(H_DEFAULT, h->h_flags))
 		{
-			(void) expand(h->h_value, buf, sizeof buf, e);
+			(void) expand(h->h_value, buf, sizeof(buf), e);
 			if (buf[0] == '\0')
 				continue;
 		}
@@ -824,7 +831,7 @@ queueup(e, announce, msync)
 		if (bitset(H_DEFAULT, h->h_flags) &&
 		    !bitset(H_BINDLATE, h->h_flags))
 		{
-			(void) sm_io_fprintf(tfp, SM_TIME_DEFAULT, "%s: %s\n",
+			(void) sm_io_fprintf(tfp, SM_TIME_DEFAULT, "%s:%s\n",
 					     h->h_field,
 					     denlstring(buf, false, true));
 		}
@@ -845,7 +852,7 @@ queueup(e, announce, msync)
 		}
 		else
 		{
-			(void) sm_io_fprintf(tfp, SM_TIME_DEFAULT, "%s: %s\n",
+			(void) sm_io_fprintf(tfp, SM_TIME_DEFAULT, "%s:%s\n",
 					     h->h_field,
 					     denlstring(h->h_value, false,
 							true));
@@ -880,7 +887,7 @@ queueup(e, announce, msync)
 
 		/* rename (locked) tf to be (locked) [qh]f */
 		(void) sm_strlcpy(qf, queuename(e, ANYQFL_LETTER),
-				  sizeof qf);
+				  sizeof(qf));
 		if (rename(tf, qf) < 0)
 			syserr("cannot rename(%s, %s), uid=%d",
 				tf, qf, (int) geteuid());
@@ -1872,7 +1879,6 @@ run_work_group(wgrp, flags)
 	time_t now;
 	bool full, more;
 	SM_RPOOL_T *rpool;
-	extern void rmexpstab __P((void));
 	extern ENVELOPE BlankEnvelope;
 	extern SIGFUNC_DECL reapchild __P((int));
 
@@ -2478,9 +2484,9 @@ gatherq(qgrp, qdir, doall, full, more)
 	wn = WorkListCount - 1;
 	num_ent = 0;
 	if (qdir == NOQDIR)
-		(void) sm_strlcpy(qd, ".", sizeof qd);
+		(void) sm_strlcpy(qd, ".", sizeof(qd));
 	else
-		(void) sm_strlcpyn(qd, sizeof qd, 2,
+		(void) sm_strlcpyn(qd, sizeof(qd), 2,
 			Queue[qgrp]->qg_qpaths[qdir].qp_name,
 			(bitset(QP_SUBQF,
 				Queue[qgrp]->qg_qpaths[qdir].qp_subdirs)
@@ -2619,7 +2625,7 @@ gatherq(qgrp, qdir, doall, full, more)
 		SM_ASSERT(wn >= 0);
 		w = &WorkList[wn];
 
-		(void) sm_strlcpyn(qf, sizeof qf, 3, qd, "/", d->d_name);
+		(void) sm_strlcpyn(qf, sizeof(qf), 3, qd, "/", d->d_name);
 		if (stat(qf, &sbuf) < 0)
 		{
 			if (errno != ENOENT)
@@ -2716,7 +2722,7 @@ gatherq(qgrp, qdir, doall, full, more)
 			i |= NEED_QUARANTINE;
 		while (cf != NULL && i != 0 &&
 		       sm_io_fgets(cf, SM_TIME_DEFAULT, lbuf,
-				   sizeof lbuf) != NULL)
+				   sizeof(lbuf)) != NULL)
 		{
 			int c;
 			time_t age;
@@ -2949,7 +2955,7 @@ sortq(max)
 		**  based on host name, lock status, and priority.
 		*/
 
-		qsort((char *) WorkList, wc, sizeof *WorkList, workcmpf1);
+		qsort((char *) WorkList, wc, sizeof(*WorkList), workcmpf1);
 
 		/*
 		**  If one message to host is locked, "lock" all messages
@@ -2985,7 +2991,7 @@ sortq(max)
 		**  based on lock status, host name, and priority.
 		*/
 
-		qsort((char *) WorkList, wc, sizeof *WorkList, workcmpf2);
+		qsort((char *) WorkList, wc, sizeof(*WorkList), workcmpf2);
 	}
 	else if (QueueSortOrder == QSO_BYTIME)
 	{
@@ -2993,7 +2999,7 @@ sortq(max)
 		**  Simple sort based on submission time only.
 		*/
 
-		qsort((char *) WorkList, wc, sizeof *WorkList, workcmpf3);
+		qsort((char *) WorkList, wc, sizeof(*WorkList), workcmpf3);
 	}
 	else if (QueueSortOrder == QSO_BYFILENAME)
 	{
@@ -3001,7 +3007,7 @@ sortq(max)
 		**  Sort based on queue filename.
 		*/
 
-		qsort((char *) WorkList, wc, sizeof *WorkList, workcmpf4);
+		qsort((char *) WorkList, wc, sizeof(*WorkList), workcmpf4);
 	}
 	else if (QueueSortOrder == QSO_RANDOM)
 	{
@@ -3014,7 +3020,7 @@ sortq(max)
 		randi = get_rand_mod(MAXQFNAME);
 		if (randi < 2)
 			randi = 3;
-		qsort((char *) WorkList, wc, sizeof *WorkList, workcmpf5);
+		qsort((char *) WorkList, wc, sizeof(*WorkList), workcmpf5);
 	}
 	else if (QueueSortOrder == QSO_BYMODTIME)
 	{
@@ -3023,7 +3029,7 @@ sortq(max)
 		**  This puts the oldest items first.
 		*/
 
-		qsort((char *) WorkList, wc, sizeof *WorkList, workcmpf6);
+		qsort((char *) WorkList, wc, sizeof(*WorkList), workcmpf6);
 	}
 #if _FFR_RHS
 	else if (QueueSortOrder == QSO_BYSHUFFLE)
@@ -3033,7 +3039,7 @@ sortq(max)
 		*/
 
 		init_shuffle_alphabet();
-		qsort((char *) WorkList, wc, sizeof *WorkList, workcmpf7);
+		qsort((char *) WorkList, wc, sizeof(*WorkList), workcmpf7);
 	}
 #endif /* _FFR_RHS */
 	else if (QueueSortOrder == QSO_BYPRIORITY)
@@ -3042,7 +3048,7 @@ sortq(max)
 		**  Simple sort based on queue priority only.
 		*/
 
-		qsort((char *) WorkList, wc, sizeof *WorkList, workcmpf0);
+		qsort((char *) WorkList, wc, sizeof(*WorkList), workcmpf0);
 	}
 	/* else don't sort at all */
 
@@ -3059,7 +3065,7 @@ sortq(max)
 
 	for (i = wc; --i >= 0; )
 	{
-		w = (WORK *) xalloc(sizeof *w);
+		w = (WORK *) xalloc(sizeof(*w));
 		w->w_qgrp = WorkList[i].w_qgrp;
 		w->w_qdir = WorkList[i].w_qdir;
 		w->w_name = WorkList[i].w_name;
@@ -3127,7 +3133,7 @@ grow_wlist(qgrp, qdir)
 		sm_dprintf("grow_wlist: WorkListSize=%d\n", WorkListSize);
 	if (WorkList == NULL)
 	{
-		WorkList = (WORK *) xalloc((sizeof *WorkList) *
+		WorkList = (WORK *) xalloc((sizeof(*WorkList)) *
 					   (QUEUESEGSIZE + 1));
 		WorkListSize = QUEUESEGSIZE;
 	}
@@ -3900,13 +3906,14 @@ readqf(e, openonly)
 	char *err;
 	char qf[MAXPATHLEN];
 	char buf[MAXLINE];
+	int bufsize;
 
 	/*
 	**  Read and process the file.
 	*/
 
 	bp = NULL;
-	(void) sm_strlcpy(qf, queuename(e, ANYQFL_LETTER), sizeof qf);
+	(void) sm_strlcpy(qf, queuename(e, ANYQFL_LETTER), sizeof(qf));
 	qfp = sm_io_open(SmFtStdio, SM_TIME_DEFAULT, qf, SM_IO_RDWR_B, NULL);
 	if (qfp == NULL)
 	{
@@ -4120,7 +4127,8 @@ readqf(e, openonly)
 #endif /* _FFR_QUEUE_MACRO */
 	e->e_dfino = -1;
 	e->e_msgsize = -1;
-	while ((bp = fgetfolded(buf, sizeof buf, qfp)) != NULL)
+	while (bufsize = sizeof(buf),
+	       (bp = fgetfolded(buf, &bufsize, qfp)) != NULL)
 	{
 		unsigned long qflags;
 		ADDRESS *q;
@@ -4298,6 +4306,8 @@ readqf(e, openonly)
 						  howlong);
 				e->e_id = NULL;
 				unlockqueue(e);
+				if (bp != buf)
+					sm_free(bp);
 				return false;
 			}
 			macdefine(&e->e_macro, A_TEMP,
@@ -4473,10 +4483,7 @@ readqf(e, openonly)
 		}
 
 		if (bp != buf)
-		{
-			sm_free(bp); /* XXX */
-			bp = NULL;
-		}
+			SM_FREE(bp);
 	}
 
 	/*
@@ -4530,7 +4537,7 @@ readqf(e, openonly)
 			e->e_msgsize = st.st_size + hdrsize;
 			e->e_dfdev = st.st_dev;
 			e->e_dfino = ST_INODE(st);
-			(void) sm_snprintf(buf, sizeof buf, "%ld",
+			(void) sm_snprintf(buf, sizeof(buf), "%ld",
 					   e->e_msgsize);
 			macdefine(&e->e_macro, A_TEMP, macid("{msg_size}"),
 				  buf);
@@ -4549,11 +4556,8 @@ readqf(e, openonly)
 	**	queueup() with bogus data.
 	*/
 
-	if (bp != NULL && bp != buf)
-	{
-		sm_free(bp); /* XXX */
-		bp = NULL;
-	}
+	if (bp != buf)
+		SM_FREE(bp);
 	if (qfp != NULL)
 		(void) sm_io_close(qfp, SM_TIME_DEFAULT);
 	e->e_lockfp = NULL;
@@ -4574,6 +4578,8 @@ readqf(e, openonly)
 **	Side Effects:
 **		Prints a string on stdout.
 */
+
+static void prtstr __P((char *, int));
 
 static void
 prtstr(s, ml)
@@ -4751,17 +4757,17 @@ print_single_queue(qgrp, qdir)
 
 	if (qdir == NOQDIR)
 	{
-		(void) sm_strlcpy(qd, ".", sizeof qd);
-		(void) sm_strlcpy(qddf, ".", sizeof qddf);
+		(void) sm_strlcpy(qd, ".", sizeof(qd));
+		(void) sm_strlcpy(qddf, ".", sizeof(qddf));
 	}
 	else
 	{
-		(void) sm_strlcpyn(qd, sizeof qd, 2,
+		(void) sm_strlcpyn(qd, sizeof(qd), 2,
 			Queue[qgrp]->qg_qpaths[qdir].qp_name,
 			(bitset(QP_SUBQF,
 				Queue[qgrp]->qg_qpaths[qdir].qp_subdirs)
 					? "/qf" : ""));
-		(void) sm_strlcpyn(qddf, sizeof qddf, 2,
+		(void) sm_strlcpyn(qddf, sizeof(qddf), 2,
 			Queue[qgrp]->qg_qpaths[qdir].qp_name,
 			(bitset(QP_SUBDF,
 				Queue[qgrp]->qg_qpaths[qdir].qp_subdirs)
@@ -4854,7 +4860,7 @@ print_single_queue(qgrp, qdir)
 
 		(void) sm_io_fprintf(smioout, SM_TIME_DEFAULT, "%13s",
 				     w->w_name + 2);
-		(void) sm_strlcpyn(qf, sizeof qf, 3, qd, "/", w->w_name);
+		(void) sm_strlcpyn(qf, sizeof(qf), 3, qd, "/", w->w_name);
 		f = sm_io_open(SmFtStdio, SM_TIME_DEFAULT, qf, SM_IO_RDONLY_B,
 			       NULL);
 		if (f == NULL)
@@ -4873,7 +4879,7 @@ print_single_queue(qgrp, qdir)
 			continue;
 		}
 		w->w_name[0] = DATAFL_LETTER;
-		(void) sm_strlcpyn(qf, sizeof qf, 3, qddf, "/", w->w_name);
+		(void) sm_strlcpyn(qf, sizeof(qf), 3, qddf, "/", w->w_name);
 		if (stat(qf, &st) >= 0)
 			dfsize = st.st_size;
 		else
@@ -4921,7 +4927,7 @@ print_single_queue(qgrp, qdir)
 		quarmsg[0] = '\0';
 		statmsg[0] = bodytype[0] = '\0';
 		qfver = 0;
-		while (sm_io_fgets(f, SM_TIME_DEFAULT, buf, sizeof buf) != NULL)
+		while (sm_io_fgets(f, SM_TIME_DEFAULT, buf, sizeof(buf)) != NULL)
 		{
 			register int i;
 			register char *p;
@@ -4937,22 +4943,22 @@ print_single_queue(qgrp, qdir)
 				break;
 
 			  case 'M':	/* error message */
-				if ((i = strlen(&buf[1])) >= sizeof statmsg)
-					i = sizeof statmsg - 1;
+				if ((i = strlen(&buf[1])) >= sizeof(statmsg))
+					i = sizeof(statmsg) - 1;
 				memmove(statmsg, &buf[1], i);
 				statmsg[i] = '\0';
 				break;
 
 			  case 'q':	/* quarantine reason */
-				if ((i = strlen(&buf[1])) >= sizeof quarmsg)
-					i = sizeof quarmsg - 1;
+				if ((i = strlen(&buf[1])) >= sizeof(quarmsg))
+					i = sizeof(quarmsg) - 1;
 				memmove(quarmsg, &buf[1], i);
 				quarmsg[i] = '\0';
 				break;
 
 			  case 'B':	/* body type */
-				if ((i = strlen(&buf[1])) >= sizeof bodytype)
-					i = sizeof bodytype - 1;
+				if ((i = strlen(&buf[1])) >= sizeof(bodytype))
+					i = sizeof(bodytype) - 1;
 				memmove(bodytype, &buf[1], i);
 				bodytype[i] = '\0';
 				break;
@@ -5208,7 +5214,7 @@ queuename(e, type)
 
 	/* xf files always have a valid qd and qg picked above */
 	if ((qd == NOQDIR || qg == NOQGRP) && type != XSCRPT_LETTER)
-		(void) sm_strlcpyn(buf, sizeof buf, 2, pref, e->e_id);
+		(void) sm_strlcpyn(buf, sizeof(buf), 2, pref, e->e_id);
 	else
 	{
 		switch (type)
@@ -5236,7 +5242,7 @@ queuename(e, type)
 			sm_abort("queuename: bad queue file type %d", type);
 		}
 
-		(void) sm_strlcpyn(buf, sizeof buf, 4,
+		(void) sm_strlcpyn(buf, sizeof(buf), 4,
 				Queue[qg]->qg_qpaths[qd].qp_name,
 				sub, pref, e->e_id);
 	}
@@ -5363,7 +5369,7 @@ assign_queueid(e)
 	idbuf[5] = QueueIdChars[tm->tm_sec % QIC_LEN_R];
 	idbuf[6] = QueueIdChars[seq / QIC_LEN];
 	idbuf[7] = QueueIdChars[seq % QIC_LEN];
-	(void) sm_snprintf(&idbuf[8], sizeof idbuf - 8, "%06d",
+	(void) sm_snprintf(&idbuf[8], sizeof(idbuf) - 8, "%06d",
 			   (int) LastQueuePid);
 	e->e_id = sm_rpool_strdup_x(e->e_rpool, idbuf);
 	macdefine(&e->e_macro, A_PERM, 'i', e->e_id);
@@ -5486,8 +5492,8 @@ setctluser(user, qfver, e)
 	**  Set up addr fields for controlling user.
 	*/
 
-	a = (ADDRESS *) sm_rpool_malloc_x(e->e_rpool, sizeof *a);
-	memset((char *) a, '\0', sizeof *a);
+	a = (ADDRESS *) sm_rpool_malloc_x(e->e_rpool, sizeof(*a));
+	memset((char *) a, '\0', sizeof(*a));
 
 	if (*user == ':')
 	{
@@ -5560,7 +5566,7 @@ loseqfile(e, why)
 	if (e == NULL || e->e_id == NULL)
 		return;
 	p = queuename(e, ANYQFL_LETTER);
-	if (sm_strlcpy(buf, p, sizeof buf) >= sizeof buf)
+	if (sm_strlcpy(buf, p, sizeof(buf)) >= sizeof(buf))
 		return;
 	if (!bitset(EF_INQUEUE, e->e_flags))
 		queueup(e, false, true);
@@ -5635,7 +5641,7 @@ qid_printname(e)
 	if (e->e_qdir == NOQDIR)
 		return id;
 
-	(void) sm_snprintf(idbuf, sizeof idbuf, "%.32s/%s",
+	(void) sm_snprintf(idbuf, sizeof(idbuf), "%.32s/%s",
 			   Queue[e->e_qgrp]->qg_qpaths[e->e_qdir].qp_name,
 			   id);
 	return idbuf;
@@ -5667,7 +5673,7 @@ qid_printqueue(qgrp, qdir)
 	else
 		subdir = Queue[qgrp]->qg_qpaths[qdir].qp_name;
 
-	(void) sm_strlcpyn(dir, sizeof dir, 4,
+	(void) sm_strlcpyn(dir, sizeof(dir), 4,
 			Queue[qgrp]->qg_qdir,
 			subdir == NULL ? "" : "/",
 			subdir == NULL ? "" : subdir,
@@ -5873,6 +5879,8 @@ setnewqueue(e)
 **		is it a queue directory?
 */
 
+static bool chkqdir __P((char *, long));
+
 static bool
 chkqdir(name, sff)
 	char *name;
@@ -6020,11 +6028,11 @@ multiqueue_cache(basedir, blen, qg, qn, phash)
 	}
 
 	/* qpath: directory of current workgroup */
-	len = sm_strlcpy(qpath, qg->qg_qdir, sizeof qpath);
-	if (len >= sizeof qpath)
+	len = sm_strlcpy(qpath, qg->qg_qdir, sizeof(qpath));
+	if (len >= sizeof(qpath))
 	{
 		syserr("QueuePath %.256s too long (%d max)",
-		       qg->qg_qdir, (int) sizeof qpath);
+		       qg->qg_qdir, (int) sizeof(qpath));
 		ExitStat = EX_CONFIG;
 		return qn;
 	}
@@ -6044,11 +6052,11 @@ multiqueue_cache(basedir, blen, qg, qn, phash)
 	{
 
 		/* Copy subdirectory into prefix for later use */
-		if (sm_strlcpy(prefix, qg->qg_qdir + blen, sizeof prefix) >=
-		    sizeof prefix)
+		if (sm_strlcpy(prefix, qg->qg_qdir + blen, sizeof(prefix)) >=
+		    sizeof(prefix))
 		{
 			syserr("QueuePath %.256s too long (%d max)",
-				qg->qg_qdir, (int) sizeof qpath);
+				qg->qg_qdir, (int) sizeof(qpath));
 			ExitStat = EX_CONFIG;
 			return qn;
 		}
@@ -6085,7 +6093,7 @@ multiqueue_cache(basedir, blen, qg, qn, phash)
 			**	Change to //foo*
 			*/
 
-			(void) sm_strlcpy(qpath + 1, qpath, sizeof qpath - 1);
+			(void) sm_strlcpy(qpath + 1, qpath, sizeof(qpath) - 1);
 			++cp;
 		}
 		delim = cp;
@@ -6098,8 +6106,8 @@ multiqueue_cache(basedir, blen, qg, qn, phash)
 		**  so they can be opened without chdir().
 		*/
 
-		off = sm_strlcpyn(relpath, sizeof relpath, 2, prefix, "/");
-		SM_ASSERT(off < sizeof relpath);
+		off = sm_strlcpyn(relpath, sizeof(relpath), 2, prefix, "/");
+		SM_ASSERT(off < sizeof(relpath));
 
 		if (tTd(41, 2))
 			sm_dprintf("multiqueue_cache: prefix=\"%s%s\"\n",
@@ -6138,6 +6146,11 @@ multiqueue_cache(basedir, blen, qg, qn, phash)
 		}
 		while ((d = readdir(dp)) != NULL)
 		{
+			/* Skip . and .. directories */
+			if (strcmp(d->d_name, ".") == 0 ||
+			    strcmp(d->d_name, "..") == 0)
+				continue;
+
 			i = strlen(d->d_name);
 			if (i < len || strncmp(d->d_name, cp, len) != 0)
 			{
@@ -6158,14 +6171,14 @@ multiqueue_cache(basedir, blen, qg, qn, phash)
 			if (qg->qg_qpaths == NULL)
 			{
 				slotsleft = INITIAL_SLOTS;
-				qg->qg_qpaths = (QPATHS *)xalloc((sizeof *qg->qg_qpaths) *
+				qg->qg_qpaths = (QPATHS *)xalloc((sizeof(*qg->qg_qpaths)) *
 								slotsleft);
 				qg->qg_numqueues = 0;
 			}
 			else if (slotsleft < 1)
 			{
 				qg->qg_qpaths = (QPATHS *)sm_realloc((char *)qg->qg_qpaths,
-							  (sizeof *qg->qg_qpaths) *
+							  (sizeof(*qg->qg_qpaths)) *
 							  (qg->qg_numqueues +
 							   ADD_SLOTS));
 				if (qg->qg_qpaths == NULL)
@@ -6180,7 +6193,7 @@ multiqueue_cache(basedir, blen, qg, qn, phash)
 			qg->qg_qpaths[qg->qg_numqueues].qp_subdirs = QP_NOSUB;
 
 #define CHKRSUBDIR(name, flag)	\
-	(void) sm_strlcpyn(subdir, sizeof subdir, 3, relpath, "/", name); \
+	(void) sm_strlcpyn(subdir, sizeof(subdir), 3, relpath, "/", name); \
 	if (chkqdir(subdir, sff))	\
 		qg->qg_qpaths[qg->qg_numqueues].qp_subdirs |= flag;	\
 	else
@@ -6219,7 +6232,7 @@ multiqueue_cache(basedir, blen, qg, qn, phash)
 	}
 	if (qg->qg_numqueues == 0)
 	{
-		qg->qg_qpaths = (QPATHS *) xalloc(sizeof *qg->qg_qpaths);
+		qg->qg_qpaths = (QPATHS *) xalloc(sizeof(*qg->qg_qpaths));
 
 		/* test path to get warning messages */
 		i = safedirpath(qpath, RunAsUid, RunAsGid, NULL, sff, 0, 0);
@@ -6238,7 +6251,7 @@ multiqueue_cache(basedir, blen, qg, qn, phash)
 
 		/* check subdirs */
 #define CHKSUBDIR(name, flag)	\
-	(void) sm_strlcpyn(subdir, sizeof subdir, 3, qg->qg_qdir, "/", name); \
+	(void) sm_strlcpyn(subdir, sizeof(subdir), 3, qg->qg_qdir, "/", name); \
 	if (chkqdir(subdir, sff))	\
 		qg->qg_qpaths[0].qp_subdirs |= flag;	\
 	else
@@ -6292,7 +6305,7 @@ multiqueue_cache(basedir, blen, qg, qn, phash)
 **		FSF_NOT_FOUND: not in list
 */
 
-static short filesys_find __P((char *, char *, bool));
+static short filesys_find __P((const char *, const char *, bool));
 
 #define FSF_NOT_FOUND	(-1)
 #define FSF_STAT_FAIL	(-2)
@@ -6300,8 +6313,8 @@ static short filesys_find __P((char *, char *, bool));
 
 static short
 filesys_find(name, path, add)
-	char *name;
-	char *path;
+	const char *name;
+	const char *path;
 	bool add;
 {
 	struct stat st;
@@ -6380,7 +6393,7 @@ filesys_setup(add)
 			QPATHS *qp = &Queue[i]->qg_qpaths[j];
 			char qddf[MAXPATHLEN];
 
-			(void) sm_strlcpyn(qddf, sizeof qddf, 2, qp->qp_name,
+			(void) sm_strlcpyn(qddf, sizeof(qddf), 2, qp->qp_name,
 					(bitset(QP_SUBDF, qp->qp_subdirs)
 						? "/df" : ""));
 			fs = filesys_find(qp->qp_name, qddf, add);
@@ -6421,6 +6434,12 @@ filesys_update()
 	static time_t nextupdate = 0;
 
 #if SM_CONF_SHM
+	/*
+	**  Only the daemon updates the shared memory, i.e.,
+	**  if shared memory is available but the pid is not the
+	**  one of the daemon, then don't do anything.
+	*/
+
 	if (ShmId != SM_SHM_NO_ID && DaemonPid != CurrentPid)
 		return;
 #endif /* SM_CONF_SHM */
@@ -6488,7 +6507,6 @@ filesys_free(fsize)
 }
 #endif /* _FFR_ANY_FREE_FS */
 
-#if _FFR_CONTROL_MSTAT
 /*
 **  DISK_STATUS -- show amount of free space in queue directories
 **
@@ -6526,7 +6544,6 @@ disk_status(out, prefix)
 					free);
 	}
 }
-#endif /* _FFR_CONTROL_MSTAT */
 
 #if SM_CONF_SHM
 
@@ -6668,8 +6685,6 @@ upd_qs(e, count, space, where)
 
 }
 
-#if _FFR_SELECT_SHM
-
 static bool write_key_file __P((char *, long));
 static long read_key_file __P((char *, long));
 
@@ -6773,7 +6788,6 @@ read_key_file(keypath, key)
 	}
 	return key;
 }
-#endif /* _FFR_SELECT_SHM */
 
 /*
 **  INIT_SHM -- initialize shared memory structure
@@ -6804,17 +6818,13 @@ init_shm(qn, owner, hash)
 	int i;
 	int count;
 	int save_errno;
-#if _FFR_SELECT_SHM
 	bool keyselect;
-#endif /* _FFR_SELECT_SHM */
 
 	PtrFileSys = &FileSys[0];
 	PNumFileSys = &Numfilesys;
-#if _FFR_SELECT_SHM
 /* if this "key" is specified: select one yourself */
-# define SEL_SHM_KEY	((key_t) -1)
-# define FIRST_SHM_KEY	25
-#endif /* _FFR_SELECT_SHM */
+#define SEL_SHM_KEY	((key_t) -1)
+#define FIRST_SHM_KEY	25
 
 	/* This allows us to disable shared memory at runtime. */
 	if (ShmKey == 0)
@@ -6822,7 +6832,6 @@ init_shm(qn, owner, hash)
 
 	count = 0;
 	shms = SM_T_SIZE + qn * sizeof(QUEUE_SHM_T);
-#if _FFR_SELECT_SHM
 	keyselect = ShmKey == SEL_SHM_KEY;
 	if (keyselect)
 	{
@@ -6830,13 +6839,16 @@ init_shm(qn, owner, hash)
 			ShmKey = FIRST_SHM_KEY;
 		else
 		{
+			errno = 0;
 			ShmKey = read_key_file(ShmKeyFile, ShmKey);
 			keyselect = false;
 			if (ShmKey == SEL_SHM_KEY)
+			{
+				save_errno = (errno != 0) ? errno : EINVAL;
 				goto error;
+			}
 		}
 	}
-#endif /* _FFR_SELECT_SHM */
 	for (;;)
 	{
 		/* allow read/write access for group? */
@@ -6848,7 +6860,6 @@ init_shm(qn, owner, hash)
 			break;
 		if (++count >= 3)
 		{
-#if _FFR_SELECT_SHM
 			if (keyselect)
 			{
 				++ShmKey;
@@ -6858,23 +6869,19 @@ init_shm(qn, owner, hash)
 					break;
 				continue;
 			}
-#endif /* _FFR_SELECT_SHM */
 			break;
 		}
-#if _FFR_SELECT_SHM
+
 		/* only sleep if we are at the first key */
 		if (!keyselect || ShmKey == SEL_SHM_KEY)
-#endif /* _FFR_SELECT_SHM */
-		sleep(count);
+			sleep(count);
 	}
 	if (Pshm != NULL)
 	{
 		int *p;
 
-#if _FFR_SELECT_SHM
 		if (keyselect)
 			(void) write_key_file(ShmKeyFile, (long) ShmKey);
-#endif /* _FFR_SELECT_SHM */
 		if (owner && RunAsUid != 0)
 		{
 			i = sm_shmsetowner(ShmId, RunAsUid, RunAsGid, 0660);
@@ -6944,10 +6951,10 @@ init_shm(qn, owner, hash)
 
 
 /*
-**  SETUP_QUEUES -- setup all queue groups
+**  SETUP_QUEUES -- set up all queue groups
 **
 **	Parameters:
-**		owner -- owner of shared memory.
+**		owner -- owner of shared memory?
 **
 **	Returns:
 **		none.
@@ -6977,13 +6984,13 @@ setup_queues(owner)
 
 	hashval = 0;
 	errno = 0;
-	len = sm_strlcpy(basedir, QueueDir, sizeof basedir);
+	len = sm_strlcpy(basedir, QueueDir, sizeof(basedir));
 
 	/* Provide space for trailing '/' */
-	if (len >= sizeof basedir - 1)
+	if (len >= sizeof(basedir) - 1)
 	{
 		syserr("QueueDirectory: path too long: %d,  max %d",
-			len, (int) sizeof basedir - 1);
+			len, (int) sizeof(basedir) - 1);
 		ExitStat = EX_CONFIG;
 		return;
 	}
@@ -7234,8 +7241,8 @@ makequeue(line, qdef)
 	char fcode;
 
 	/* allocate a queue and set up defaults */
-	qg = (QUEUEGRP *) xalloc(sizeof *qg);
-	memset((char *) qg, '\0', sizeof *qg);
+	qg = (QUEUEGRP *) xalloc(sizeof(*qg));
+	memset((char *) qg, '\0', sizeof(*qg));
 
 	if (line[0] == '\0')
 	{
@@ -7745,8 +7752,8 @@ dup_df(old, new)
 	SM_REQUIRE(ISVALIDQGRP(old->e_qgrp) && ISVALIDQDIR(old->e_qdir));
 	SM_REQUIRE(ISVALIDQGRP(new->e_qgrp) && ISVALIDQDIR(new->e_qdir));
 
-	(void) sm_strlcpy(opath, queuename(old, DATAFL_LETTER), sizeof opath);
-	(void) sm_strlcpy(npath, queuename(new, DATAFL_LETTER), sizeof npath);
+	(void) sm_strlcpy(opath, queuename(old, DATAFL_LETTER), sizeof(opath));
+	(void) sm_strlcpy(npath, queuename(new, DATAFL_LETTER), sizeof(npath));
 
 	if (old->e_dfp != NULL)
 	{
@@ -7791,7 +7798,7 @@ dup_df(old, new)
 
 	new->e_dfqgrp = old->e_dfqgrp;
 	new->e_dfqdir = old->e_dfqdir;
-	(void) sm_strlcpy(npath, queuename(new, DATAFL_LETTER), sizeof npath);
+	(void) sm_strlcpy(npath, queuename(new, DATAFL_LETTER), sizeof(npath));
 	if (link(opath, npath) == 0)
 	{
 		new->e_flags |= EF_HAS_DF;
@@ -7832,7 +7839,7 @@ split_env(e, sendqueue, qgrp, qdir)
 {
 	ENVELOPE *ee;
 
-	ee = (ENVELOPE *) sm_rpool_malloc_x(e->e_rpool, sizeof *ee);
+	ee = (ENVELOPE *) sm_rpool_malloc_x(e->e_rpool, sizeof(*ee));
 	STRUCTCOPY(*e, *ee);
 	ee->e_message = NULL;	/* XXX use original message? */
 	ee->e_id = NULL;
@@ -7935,6 +7942,7 @@ e_filesys_compare(p1, p2)
 	return 0;
 }
 
+static int split_across_queue_groups __P((ENVELOPE *));
 static int
 split_across_queue_groups(e)
 	ENVELOPE *e;
@@ -8425,14 +8433,15 @@ quarantine_queue_item(qgrp, qdir, e, reason)
 	MODE_T oldumask = 0;
 	SM_FILE_T *oldqfp, *tempqfp;
 	char *bp;
+	int bufsize;
 	char oldqf[MAXPATHLEN];
 	char tempqf[MAXPATHLEN];
 	char newqf[MAXPATHLEN];
 	char buf[MAXLINE];
 
 	oldtype = queue_letter(e, ANYQFL_LETTER);
-	(void) sm_strlcpy(oldqf, queuename(e, ANYQFL_LETTER), sizeof oldqf);
-	(void) sm_strlcpy(tempqf, queuename(e, NEWQFL_LETTER), sizeof tempqf);
+	(void) sm_strlcpy(oldqf, queuename(e, ANYQFL_LETTER), sizeof(oldqf));
+	(void) sm_strlcpy(tempqf, queuename(e, NEWQFL_LETTER), sizeof(tempqf));
 
 	/*
 	**  Instead of duplicating all the open
@@ -8493,7 +8502,8 @@ quarantine_queue_item(qgrp, qdir, e, reason)
 	}
 
 	/* Copy the data over, changing the quarantine reason */
-	while ((bp = fgetfolded(buf, sizeof buf, oldqfp)) != NULL)
+	while (bufsize = sizeof(buf),
+	       (bp = fgetfolded(buf, &bufsize, oldqfp)) != NULL)
 	{
 		if (tTd(40, 4))
 			sm_dprintf("+++++ %s\n", bp);
@@ -8512,7 +8522,6 @@ quarantine_queue_item(qgrp, qdir, e, reason)
 				}
 				sm_syslog(LOG_INFO, e->e_id, "unquarantine");
 				dirty = true;
-				continue;
 			}
 			else if (strcmp(reason, &bp[1]) == 0)
 			{
@@ -8583,6 +8592,8 @@ quarantine_queue_item(qgrp, qdir, e, reason)
 					     "%s\n", bp);
 			break;
 		}
+		if (bp != buf)
+			sm_free(bp);
 	}
 
 	/* Make sure we read the whole old file */
@@ -8635,12 +8646,12 @@ quarantine_queue_item(qgrp, qdir, e, reason)
 	if (oldtype == newtype)
 	{
 		/* going to rename tempqf to oldqf */
-		(void) sm_strlcpy(newqf, oldqf, sizeof newqf);
+		(void) sm_strlcpy(newqf, oldqf, sizeof(newqf));
 	}
 	else
 	{
 		/* going to rename tempqf to new name based on newtype */
-		(void) sm_strlcpy(newqf, queuename(e, newtype), sizeof newqf);
+		(void) sm_strlcpy(newqf, queuename(e, newtype), sizeof(newqf));
 	}
 
 	save_errno = 0;

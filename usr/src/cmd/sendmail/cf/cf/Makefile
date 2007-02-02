@@ -18,10 +18,11 @@
 #
 # CDDL HEADER END
 #
+
 #
 #  Makefile for configuration files.
 #
-#  Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+#  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 #  Use is subject to license terms.
 #
 #	@(#)Makefile	8.15 (Berkeley) 3/29/98
@@ -67,9 +68,11 @@ M4FILES=\
 	${CFDIR}/feature/access_db.m4 \
 	${CFDIR}/feature/allmasquerade.m4 \
 	${CFDIR}/feature/always_add_domain.m4 \
+	${CFDIR}/feature/badmx.m4 \
 	${CFDIR}/feature/bestmx_is_local.m4 \
 	${CFDIR}/feature/bitdomain.m4 \
 	${CFDIR}/feature/blacklist_recipients.m4 \
+	${CFDIR}/feature/block_bad_helo.m4 \
 	${CFDIR}/feature/compat_check.m4 \
 	${CFDIR}/feature/conncontrol.m4 \
 	${CFDIR}/feature/delay_checks.m4 \
@@ -106,6 +109,7 @@ M4FILES=\
 	${CFDIR}/feature/relay_hosts_only.m4 \
 	${CFDIR}/feature/relay_local_from.m4 \
 	${CFDIR}/feature/relay_mail_from.m4 \
+	${CFDIR}/feature/require_rdns.m4 \
 	${CFDIR}/feature/smrsh.m4 \
 	${CFDIR}/feature/stickyhost.m4 \
 	${CFDIR}/feature/use_client_ptr.m4 \

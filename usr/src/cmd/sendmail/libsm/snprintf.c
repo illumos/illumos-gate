@@ -15,10 +15,11 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sm/gen.h>
-SM_RCSID("@(#)$Id: snprintf.c,v 1.21 2001/03/02 23:53:41 ca Exp $")
+SM_RCSID("@(#)$Id: snprintf.c,v 1.24 2006/10/12 21:50:10 ca Exp $")
 #include <limits.h>
 #include <sm/varargs.h>
 #include <sm/io.h>
+#include <sm/string.h>
 #include "local.h"
 
 /*

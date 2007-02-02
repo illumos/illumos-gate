@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -28,7 +29,7 @@
 LIBRARY=	libmilter.a
 VERS=		.1
 LOCOBJS=	main.o engine.o listener.o handler.o comm.o smfi.o signal.o \
-	sm_gethost.o
+	sm_gethost.o worker.o monitor.o
 REMOBJS=	errstring.o strl.o
 OBJECTS=	$(LOCOBJS) $(REMOBJS)
 SENDMAIL=	$(SRC)/cmd/sendmail

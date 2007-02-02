@@ -10,7 +10,7 @@
  * the sendmail distribution.
  *
  *
- *	$Id: conf.h,v 1.128 2006/01/27 18:43:44 ca Exp $
+ *	$Id: conf.h,v 1.130 2006/08/17 21:15:07 ca Exp $
  */
 
 /*
@@ -23,8 +23,10 @@
 /*
 **  CONF.H -- All user-configurable parameters for sendmail
 **
-**	Send updates to sendmail@Sendmail.ORG so they will be
-**	included in the next release.
+**	Send updates to Sendmail.ORG so they will be
+**	included in the next release; see
+**	http://www.sendmail.org/email-addresses.html
+**	for current e-mail address.
 */
 
 #ifndef SM_CONF_H
