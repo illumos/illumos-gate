@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/spa.h>
+#include <sys/arc.h>
 #include <sys/txg.h>
 #include <sys/zfs_context.h>
 #include <sys/dnode.h>
@@ -60,6 +61,7 @@ typedef struct objset_impl {
 	/* Immutable: */
 	struct dsl_dataset *os_dsl_dataset;
 	spa_t *os_spa;
+	arc_buf_t *os_phys_buf;
 	objset_phys_t *os_phys;
 	dnode_t *os_meta_dnode;
 	zilog_t *os_zil;
@@ -71,7 +73,7 @@ typedef struct objset_impl {
 
 	/* no lock needed: */
 	struct dmu_tx *os_synctx; /* XXX sketchy */
-	blkptr_t os_rootbp;
+	blkptr_t *os_rootbp;
 
 	/* Protected by os_obj_lock */
 	kmutex_t os_obj_lock;
@@ -108,9 +110,9 @@ void dmu_objset_byteswap(void *buf, size_t size);
 int dmu_objset_evict_dbufs(objset_t *os, int try);
 
 /* called from dsl */
-void dmu_objset_sync(objset_impl_t *os, dmu_tx_t *tx);
+void dmu_objset_sync(objset_impl_t *os, zio_t *zio, dmu_tx_t *tx);
 objset_impl_t *dmu_objset_create_impl(spa_t *spa, struct dsl_dataset *ds,
-    dmu_objset_type_t type, dmu_tx_t *tx);
+    blkptr_t *bp, dmu_objset_type_t type, dmu_tx_t *tx);
 int dmu_objset_open_impl(spa_t *spa, struct dsl_dataset *ds, blkptr_t *bp,
     objset_impl_t **osip);
 void dmu_objset_evict(struct dsl_dataset *ds, void *arg);

@@ -435,8 +435,8 @@ zio_read(zio_t *pio, spa_t *spa, blkptr_t *bp, void *data,
 zio_t *
 zio_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
     uint64_t txg, blkptr_t *bp, void *data, uint64_t size,
-    zio_done_func_t *done, void *private, int priority, int flags,
-    zbookmark_t *zb)
+    zio_done_func_t *ready, zio_done_func_t *done, void *private, int priority,
+    int flags, zbookmark_t *zb)
 {
 	zio_t *zio;
 
@@ -449,6 +449,8 @@ zio_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
 	zio = zio_create(pio, spa, txg, bp, data, size, done, private,
 	    ZIO_TYPE_WRITE, priority, flags | ZIO_FLAG_USER,
 	    ZIO_STAGE_OPEN, ZIO_WRITE_PIPELINE);
+
+	zio->io_ready = ready;
 
 	zio->io_bookmark = *zb;
 
@@ -809,6 +811,9 @@ static void
 zio_ready(zio_t *zio)
 {
 	zio_t *pio = zio->io_parent;
+
+	if (zio->io_ready)
+		zio->io_ready(zio);
 
 	if (pio != NULL)
 		zio_notify_parent(zio, ZIO_STAGE_WAIT_CHILDREN_READY,

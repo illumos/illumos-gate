@@ -567,27 +567,19 @@ dmu_write_pages(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 #endif
 
 typedef struct {
-	uint64_t	txg;
-	dmu_buf_impl_t	*db;
-	dmu_sync_cb_t	*done;
-	void		*arg;
-} dmu_sync_cbin_t;
-
-typedef union {
-	dmu_sync_cbin_t	data;
-	blkptr_t	blk;
-} dmu_sync_cbarg_t;
+	dbuf_dirty_record_t	*dr;
+	dmu_sync_cb_t		*done;
+	void			*arg;
+} dmu_sync_arg_t;
 
 /* ARGSUSED */
 static void
 dmu_sync_done(zio_t *zio, arc_buf_t *buf, void *varg)
 {
-	dmu_sync_cbin_t *in = (dmu_sync_cbin_t *)varg;
-	dmu_buf_impl_t *db = in->db;
-	uint64_t txg = in->txg;
+	dmu_sync_arg_t *in = varg;
+	dbuf_dirty_record_t *dr = in->dr;
+	dmu_buf_impl_t *db = dr->dr_dbuf;
 	dmu_sync_cb_t *done = in->done;
-	void *arg = in->arg;
-	blkptr_t *blk = (blkptr_t *)varg;
 
 	if (!BP_IS_HOLE(zio->io_bp)) {
 		zio->io_bp->blk_fill = 1;
@@ -595,16 +587,17 @@ dmu_sync_done(zio_t *zio, arc_buf_t *buf, void *varg)
 		BP_SET_LEVEL(zio->io_bp, 0);
 	}
 
-	*blk = *zio->io_bp; /* structure assignment */
-
 	mutex_enter(&db->db_mtx);
-	ASSERT(db->db_d.db_overridden_by[txg&TXG_MASK] == IN_DMU_SYNC);
-	db->db_d.db_overridden_by[txg&TXG_MASK] = blk;
+	ASSERT(dr->dt.dl.dr_override_state == DR_IN_DMU_SYNC);
+	dr->dt.dl.dr_overridden_by = *zio->io_bp; /* structure assignment */
+	dr->dt.dl.dr_override_state = DR_OVERRIDDEN;
 	cv_broadcast(&db->db_changed);
 	mutex_exit(&db->db_mtx);
 
 	if (done)
-		done(&(db->db), arg);
+		done(&(db->db), in->arg);
+
+	kmem_free(in, sizeof (dmu_sync_arg_t));
 }
 
 /*
@@ -637,10 +630,10 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 	objset_impl_t *os = db->db_objset;
 	dsl_pool_t *dp = os->os_dsl_dataset->ds_dir->dd_pool;
 	tx_state_t *tx = &dp->dp_tx;
-	dmu_sync_cbin_t *in;
-	blkptr_t *blk;
+	dbuf_dirty_record_t *dr;
+	dmu_sync_arg_t *in;
 	zbookmark_t zb;
-	uint32_t arc_flag;
+	zio_t *zio;
 	int err;
 
 	ASSERT(BP_IS_HOLE(bp));
@@ -673,25 +666,6 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 	}
 
 	mutex_enter(&db->db_mtx);
-
-	blk = db->db_d.db_overridden_by[txg&TXG_MASK];
-	if (blk == IN_DMU_SYNC) {
-		/*
-		 * We have already issued a sync write for this buffer.
-		 */
-		mutex_exit(&db->db_mtx);
-		txg_resume(dp);
-		return (EALREADY);
-	} else if (blk != NULL) {
-		/*
-		 * This buffer had already been synced.  It could not
-		 * have been dirtied since, or we would have cleared blk.
-		 */
-		*bp = *blk; /* structure assignment */
-		mutex_exit(&db->db_mtx);
-		txg_resume(dp);
-		return (0);
-	}
 
 	if (txg == tx->tx_syncing_txg) {
 		while (db->db_data_pending) {
@@ -726,7 +700,10 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 		}
 	}
 
-	if (db->db_d.db_data_old[txg&TXG_MASK] == NULL) {
+	dr = db->db_last_dirty;
+	while (dr && dr->dr_txg > txg)
+		dr = dr->dr_next;
+	if (dr == NULL || dr->dr_txg < txg) {
 		/*
 		 * This dbuf isn't dirty, must have been free_range'd.
 		 * There's no need to log writes to freed blocks, so we're done.
@@ -736,35 +713,52 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 		return (ENOENT);
 	}
 
-	ASSERT(db->db_d.db_overridden_by[txg&TXG_MASK] == NULL);
-	db->db_d.db_overridden_by[txg&TXG_MASK] = IN_DMU_SYNC;
-	/*
-	 * XXX - a little ugly to stash the blkptr in the callback
-	 * buffer.  We always need to make sure the following is true:
-	 * ASSERT(sizeof(blkptr_t) >= sizeof(dmu_sync_cbin_t));
-	 */
-	in = kmem_alloc(sizeof (blkptr_t), KM_SLEEP);
-	in->db = db;
-	in->txg = txg;
+	ASSERT(dr->dr_txg == txg);
+	if (dr->dt.dl.dr_override_state == DR_IN_DMU_SYNC) {
+		/*
+		 * We have already issued a sync write for this buffer.
+		 */
+		mutex_exit(&db->db_mtx);
+		txg_resume(dp);
+		return (EALREADY);
+	} else if (dr->dt.dl.dr_override_state == DR_OVERRIDDEN) {
+		/*
+		 * This buffer has already been synced.  It could not
+		 * have been dirtied since, or we would have cleared the state.
+		 */
+		*bp = dr->dt.dl.dr_overridden_by; /* structure assignment */
+		mutex_exit(&db->db_mtx);
+		txg_resume(dp);
+		return (0);
+	}
+
+	dr->dt.dl.dr_override_state = DR_IN_DMU_SYNC;
+	in = kmem_alloc(sizeof (dmu_sync_arg_t), KM_SLEEP);
+	in->dr = dr;
 	in->done = done;
 	in->arg = arg;
 	mutex_exit(&db->db_mtx);
 	txg_resume(dp);
 
-	arc_flag = pio == NULL ? ARC_WAIT : ARC_NOWAIT;
 	zb.zb_objset = os->os_dsl_dataset->ds_object;
 	zb.zb_object = db->db.db_object;
 	zb.zb_level = db->db_level;
 	zb.zb_blkid = db->db_blkid;
-	err = arc_write(pio, os->os_spa,
+	zio = arc_write(pio, os->os_spa,
 	    zio_checksum_select(db->db_dnode->dn_checksum, os->os_checksum),
 	    zio_compress_select(db->db_dnode->dn_compress, os->os_compress),
 	    dmu_get_replication_level(os->os_spa, &zb, db->db_dnode->dn_type),
-	    txg, bp, db->db_d.db_data_old[txg&TXG_MASK], dmu_sync_done, in,
-	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, arc_flag, &zb);
-	ASSERT(err == 0);
+	    txg, bp, dr->dt.dl.dr_data, NULL, dmu_sync_done, in,
+	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb);
 
-	return (arc_flag == ARC_NOWAIT ? EINPROGRESS : 0);
+	if (pio) {
+		zio_nowait(zio);
+		err = EINPROGRESS;
+	} else {
+		err = zio_wait(zio);
+		ASSERT(err == 0);
+	}
+	return (err);
 }
 
 int

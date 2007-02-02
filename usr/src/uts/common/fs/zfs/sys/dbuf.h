@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@ extern "C" {
 #endif
 
 #define	DB_BONUS_BLKID (-1ULL)
-#define	IN_DMU_SYNC ((blkptr_t *)-1)
+#define	IN_DMU_SYNC 2
 
 /*
  * define flags for dbuf_read
@@ -85,6 +85,56 @@ struct dmu_tx;
 
 #define	LIST_LINK_INACTIVE(link) \
 	((link)->list_next == NULL && (link)->list_prev == NULL)
+
+struct dmu_buf_impl;
+
+typedef enum override_states {
+	DR_NOT_OVERRIDDEN,
+	DR_IN_DMU_SYNC,
+	DR_OVERRIDDEN
+} override_states_t;
+
+typedef struct dbuf_dirty_record {
+	/* link on our parents dirty list */
+	list_node_t dr_dirty_node;
+
+	/* transaction group this data will sync in */
+	uint64_t dr_txg;
+
+	/* zio of outstanding write IO */
+	zio_t *dr_zio;
+
+	/* pointer back to our dbuf */
+	struct dmu_buf_impl *dr_dbuf;
+
+	/* pointer to next dirty record */
+	struct dbuf_dirty_record *dr_next;
+
+	/* pointer to parent dirty record */
+	struct dbuf_dirty_record *dr_parent;
+
+	union dirty_types {
+		struct dirty_indirect {
+
+			/* protect access to list */
+			kmutex_t dr_mtx;
+
+			/* Our list of dirty children */
+			list_t dr_children;
+		} di;
+		struct dirty_leaf {
+
+			/*
+			 * dr_data is set when we dirty the buffer
+			 * so that we can retain the pointer even if it
+			 * gets COW'd in a subsequent transaction group.
+			 */
+			arc_buf_t *dr_data;
+			blkptr_t dr_overridden_by;
+			override_states_t dr_override_state;
+		} dl;
+	} dt;
+} dbuf_dirty_record_t;
 
 typedef struct dmu_buf_impl {
 	/*
@@ -152,53 +202,28 @@ typedef struct dmu_buf_impl {
 	arc_buf_t *db_buf;
 
 	kcondvar_t db_changed;
-	arc_buf_t *db_data_pending;
+	dbuf_dirty_record_t *db_data_pending;
+
+	/* pointer to most recent dirty record for this buffer */
+	dbuf_dirty_record_t *db_last_dirty;
 
 	/*
-	 * Last time (transaction group) this buffer was dirtied.
-	 */
-	uint64_t db_dirtied;
-
-	/*
-	 * If db_dnode != NULL, our link on the owner dnodes's dn_dbufs list.
+	 * Our link on the owner dnodes's dn_dbufs list.
 	 * Protected by its dn_dbufs_mtx.
 	 */
 	list_node_t db_link;
 
-	/* Our link on dn_dirty_dbufs[txg] */
-	list_node_t db_dirty_node[TXG_SIZE];
+	/* Data which is unique to data (leaf) blocks: */
+
+	/* stuff we store for the user (see dmu_buf_set_user) */
+	void *db_user_ptr;
+	void **db_user_data_ptr_ptr;
+	dmu_buf_evict_func_t *db_evict_func;
+
+	uint8_t db_immediate_evict;
+	uint8_t db_freed_in_flight;
+
 	uint8_t db_dirtycnt;
-
-	/*
-	 * Data which is unique to data (leaf) blocks:
-	 */
-	struct {
-		/* stuff we store for the user (see dmu_buf_set_user) */
-		void *db_user_ptr;
-		void **db_user_data_ptr_ptr;
-		dmu_buf_evict_func_t *db_evict_func;
-		uint8_t db_immediate_evict;
-		uint8_t db_freed_in_flight;
-
-		/*
-		 * db_data_old[txg&TXG_MASK] is set when we
-		 * dirty the buffer, so that we can retain the
-		 * pointer even if it gets COW'd in a subsequent
-		 * transaction group.
-		 *
-		 * If the buffer is dirty in any txg, it can't
-		 * be destroyed.
-		 */
-		/*
-		 * XXX Protected by db_mtx and dn_dirty_mtx.
-		 * db_mtx must be held to read db_dirty[], and
-		 * both db_mtx and dn_dirty_mtx must be held to
-		 * modify (dirty or clean). db_mtx must be held
-		 * before dn_dirty_mtx.
-		 */
-		arc_buf_t *db_data_old[TXG_SIZE];
-		blkptr_t *db_overridden_by[TXG_SIZE];
-	} db_d;
 } dmu_buf_impl_t;
 
 /* Note: the dbuf hash table is exposed only for the mdb module */
@@ -237,14 +262,14 @@ void dmu_buf_will_fill(dmu_buf_t *db, dmu_tx_t *tx);
 void dbuf_fill_done(dmu_buf_impl_t *db, dmu_tx_t *tx);
 void dmu_buf_will_fill(dmu_buf_t *db, dmu_tx_t *tx);
 void dmu_buf_fill_done(dmu_buf_t *db, dmu_tx_t *tx);
-void dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
+dbuf_dirty_record_t *dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
 
 void dbuf_clear(dmu_buf_impl_t *db);
 void dbuf_evict(dmu_buf_impl_t *db);
 
 void dbuf_setdirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
-void dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx);
-void dbuf_unoverride(dmu_buf_impl_t *db, uint64_t txg);
+void dbuf_unoverride(dbuf_dirty_record_t *dr);
+void dbuf_sync_list(list_t *list, dmu_tx_t *tx);
 
 void dbuf_free_range(struct dnode *dn, uint64_t blkid, uint64_t nblks,
     struct dmu_tx *);

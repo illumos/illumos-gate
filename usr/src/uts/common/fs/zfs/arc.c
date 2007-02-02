@@ -315,12 +315,21 @@ static uint64_t		arc_tempreserve;
 typedef struct arc_callback arc_callback_t;
 
 struct arc_callback {
-	arc_done_func_t		*acb_done;
 	void			*acb_private;
+	arc_done_func_t		*acb_done;
 	arc_byteswap_func_t	*acb_byteswap;
 	arc_buf_t		*acb_buf;
 	zio_t			*acb_zio_dummy;
 	arc_callback_t		*acb_next;
+};
+
+typedef struct arc_write_callback arc_write_callback_t;
+
+struct arc_write_callback {
+	void		*awcb_private;
+	arc_done_func_t	*awcb_ready;
+	arc_done_func_t	*awcb_done;
+	arc_buf_t	*awcb_buf;
 };
 
 struct arc_buf_hdr {
@@ -2357,6 +2366,7 @@ arc_release(arc_buf_t *buf, void *tag)
 			atomic_add_64(&hdr->b_state->arcs_lsize, -hdr->b_size);
 		}
 		hdr->b_datacnt -= 1;
+		arc_cksum_verify(buf);
 
 		mutex_exit(hash_lock);
 
@@ -2369,11 +2379,7 @@ arc_release(arc_buf_t *buf, void *tag)
 		nhdr->b_arc_access = 0;
 		nhdr->b_flags = 0;
 		nhdr->b_datacnt = 1;
-		if (hdr->b_freeze_cksum != NULL) {
-			nhdr->b_freeze_cksum =
-			    kmem_alloc(sizeof (zio_cksum_t), KM_SLEEP);
-			*nhdr->b_freeze_cksum = *hdr->b_freeze_cksum;
-		}
+		nhdr->b_freeze_cksum = NULL;
 		buf->b_hdr = nhdr;
 		buf->b_next = NULL;
 		(void) refcount_add(&nhdr->b_refcnt, tag);
@@ -2390,10 +2396,10 @@ arc_release(arc_buf_t *buf, void *tag)
 		bzero(&hdr->b_dva, sizeof (dva_t));
 		hdr->b_birth = 0;
 		hdr->b_cksum0 = 0;
+		arc_buf_thaw(buf);
 	}
 	buf->b_efunc = NULL;
 	buf->b_private = NULL;
-	arc_buf_thaw(buf);
 }
 
 int
@@ -2417,17 +2423,26 @@ arc_referenced(arc_buf_t *buf)
 #endif
 
 static void
+arc_write_ready(zio_t *zio)
+{
+	arc_write_callback_t *callback = zio->io_private;
+	arc_buf_t *buf = callback->awcb_buf;
+
+	if (callback->awcb_ready) {
+		ASSERT(!refcount_is_zero(&buf->b_hdr->b_refcnt));
+		callback->awcb_ready(zio, buf, callback->awcb_private);
+	}
+	arc_cksum_compute(buf);
+}
+
+static void
 arc_write_done(zio_t *zio)
 {
-	arc_buf_t *buf;
-	arc_buf_hdr_t *hdr;
-	arc_callback_t *acb;
+	arc_write_callback_t *callback = zio->io_private;
+	arc_buf_t *buf = callback->awcb_buf;
+	arc_buf_hdr_t *hdr = buf->b_hdr;
 
-	buf = zio->io_private;
-	hdr = buf->b_hdr;
-	acb = hdr->b_acb;
 	hdr->b_acb = NULL;
-	ASSERT(acb != NULL);
 
 	/* this buffer is on no lists and is not in the hash table */
 	ASSERT3P(hdr->b_state, ==, arc_anon);
@@ -2469,7 +2484,7 @@ arc_write_done(zio_t *zio)
 		hdr->b_flags &= ~ARC_IO_IN_PROGRESS;
 		arc_access(hdr, hash_lock);
 		mutex_exit(hash_lock);
-	} else if (acb->acb_done == NULL) {
+	} else if (callback->awcb_done == NULL) {
 		int destroy_hdr;
 		/*
 		 * This is an anonymous buffer with no user callback,
@@ -2485,23 +2500,23 @@ arc_write_done(zio_t *zio)
 		hdr->b_flags &= ~ARC_IO_IN_PROGRESS;
 	}
 
-	if (acb->acb_done) {
+	if (callback->awcb_done) {
 		ASSERT(!refcount_is_zero(&hdr->b_refcnt));
-		acb->acb_done(zio, buf, acb->acb_private);
+		callback->awcb_done(zio, buf, callback->awcb_private);
 	}
 
-	kmem_free(acb, sizeof (arc_callback_t));
+	kmem_free(callback, sizeof (arc_write_callback_t));
 }
 
-int
+zio_t *
 arc_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
     uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
-    arc_done_func_t *done, void *private, int priority, int flags,
-    uint32_t arc_flags, zbookmark_t *zb)
+    arc_done_func_t *ready, arc_done_func_t *done, void *private, int priority,
+    int flags, zbookmark_t *zb)
 {
 	arc_buf_hdr_t *hdr = buf->b_hdr;
-	arc_callback_t	*acb;
-	zio_t	*rzio;
+	arc_write_callback_t *callback;
+	zio_t	*zio;
 
 	/* this is a private buffer - no locking required */
 	ASSERT3P(hdr->b_state, ==, arc_anon);
@@ -2509,23 +2524,17 @@ arc_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
 	ASSERT(!HDR_IO_ERROR(hdr));
 	ASSERT((hdr->b_flags & ARC_IO_IN_PROGRESS) == 0);
 	ASSERT(hdr->b_acb == 0);
-	acb = kmem_zalloc(sizeof (arc_callback_t), KM_SLEEP);
-	acb->acb_done = done;
-	acb->acb_private = private;
-	acb->acb_byteswap = (arc_byteswap_func_t *)-1;
-	hdr->b_acb = acb;
+	callback = kmem_zalloc(sizeof (arc_write_callback_t), KM_SLEEP);
+	callback->awcb_ready = ready;
+	callback->awcb_done = done;
+	callback->awcb_private = private;
+	callback->awcb_buf = buf;
 	hdr->b_flags |= ARC_IO_IN_PROGRESS;
-	arc_cksum_compute(buf);
-	rzio = zio_write(pio, spa, checksum, compress, ncopies, txg, bp,
-	    buf->b_data, hdr->b_size, arc_write_done, buf, priority, flags, zb);
+	zio = zio_write(pio, spa, checksum, compress, ncopies, txg, bp,
+	    buf->b_data, hdr->b_size, arc_write_ready, arc_write_done, callback,
+	    priority, flags, zb);
 
-	if (arc_flags & ARC_WAIT)
-		return (zio_wait(rzio));
-
-	ASSERT(arc_flags & ARC_NOWAIT);
-	zio_nowait(rzio);
-
-	return (0);
+	return (zio);
 }
 
 int

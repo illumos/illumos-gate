@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <sys/dmu_objset.h>
 #include <sys/arc.h>
 #include <sys/zap.h>
+#include <sys/zio.h>
 #include <sys/zfs_context.h>
 #include <sys/fs/zfs.h>
 
@@ -143,7 +144,7 @@ dsl_pool_create(spa_t *spa, uint64_t txg)
 	dsl_pool_t *dp = dsl_pool_open_impl(spa, txg);
 	dmu_tx_t *tx = dmu_tx_create_assigned(dp, txg);
 	dp->dp_meta_objset = &dmu_objset_create_impl(spa,
-	    NULL, DMU_OST_META, tx)->os;
+	    NULL, &dp->dp_meta_rootbp, DMU_OST_META, tx)->os;
 
 	/* create the pool directory */
 	err = zap_create_claim(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
@@ -167,36 +168,36 @@ dsl_pool_create(spa_t *spa, uint64_t txg)
 void
 dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 {
+	zio_t *zio;
 	dmu_tx_t *tx;
+	dsl_dir_t *dd;
+	dsl_dataset_t *ds;
+	dsl_sync_task_group_t *dstg;
 	objset_impl_t *mosi = dp->dp_meta_objset->os;
+	int err;
 
 	tx = dmu_tx_create_assigned(dp, txg);
 
-	do {
-		dsl_dir_t *dd;
-		dsl_dataset_t *ds;
-		dsl_sync_task_group_t *dstg;
+	zio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
+	while (ds = txg_list_remove(&dp->dp_dirty_datasets, txg)) {
+		if (!list_link_active(&ds->ds_synced_link))
+			list_insert_tail(&dp->dp_synced_objsets, ds);
+		dsl_dataset_sync(ds, zio, tx);
+	}
+	err = zio_wait(zio);
+	ASSERT(err == 0);
 
-		while (ds = txg_list_remove(&dp->dp_dirty_datasets, txg)) {
-			if (!list_link_active(&ds->ds_synced_link))
-				list_insert_tail(&dp->dp_synced_objsets, ds);
-			dsl_dataset_sync(ds, tx);
-		}
-		while (dstg = txg_list_remove(&dp->dp_sync_tasks, txg))
-			dsl_sync_task_group_sync(dstg, tx);
-		while (dd = txg_list_remove(&dp->dp_dirty_dirs, txg))
-			dsl_dir_sync(dd, tx);
-		/*
-		 * We need to loop since dsl_sync_task_group_sync()
-		 * could create a new (dirty) objset.
-		 * XXX - isn't this taken care of by the spa's sync to
-		 * convergence loop?
-		 */
-	} while (!txg_list_empty(&dp->dp_dirty_datasets, txg));
+	while (dstg = txg_list_remove(&dp->dp_sync_tasks, txg))
+		dsl_sync_task_group_sync(dstg, tx);
+	while (dd = txg_list_remove(&dp->dp_dirty_dirs, txg))
+		dsl_dir_sync(dd, tx);
 
 	if (list_head(&mosi->os_dirty_dnodes[txg & TXG_MASK]) != NULL ||
 	    list_head(&mosi->os_free_dnodes[txg & TXG_MASK]) != NULL) {
-		dmu_objset_sync(mosi, tx);
+		zio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
+		dmu_objset_sync(mosi, zio, tx);
+		err = zio_wait(zio);
+		ASSERT(err == 0);
 		dprintf_bp(&dp->dp_meta_rootbp, "meta objset rootbp is %s", "");
 		spa_set_rootblkptr(dp->dp_spa, &dp->dp_meta_rootbp);
 	}
@@ -216,18 +217,15 @@ dsl_pool_zil_clean(dsl_pool_t *dp)
 	}
 }
 
+/*
+ * TRUE if the current thread is the tx_sync_thread or if we
+ * are being called from SPA context during pool initialization.
+ */
 int
 dsl_pool_sync_context(dsl_pool_t *dp)
 {
-	/*
-	 * Yeah, this is cheesy.  But the SPA needs some way to let
-	 * the sync threads invoke spa_open() and spa_close() while
-	 * it holds the namespace lock.  I'm certainly open to better
-	 * ideas for how to determine whether the current thread is
-	 * operating on behalf of spa_sync().  This works for now.
-	 */
 	return (curthread == dp->dp_tx.tx_sync_thread ||
-	    BP_IS_HOLE(&dp->dp_meta_rootbp));
+	    spa_get_dsl(dp->dp_spa) == NULL);
 }
 
 uint64_t

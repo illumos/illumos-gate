@@ -1017,21 +1017,21 @@ dump_dir(objset_t *os)
 
 	if (dds.dds_type == DMU_OST_META) {
 		dds.dds_creation_txg = TXG_INITIAL;
-		usedobjs = os->os->os_rootbp.blk_fill;
+		usedobjs = os->os->os_rootbp->blk_fill;
 		refdbytes =
 		    os->os->os_spa->spa_dsl_pool->dp_mos_dir->dd_used_bytes;
 	} else {
 		dmu_objset_space(os, &refdbytes, &scratch, &usedobjs, &scratch);
 	}
 
-	ASSERT3U(usedobjs, ==, os->os->os_rootbp.blk_fill);
+	ASSERT3U(usedobjs, ==, os->os->os_rootbp->blk_fill);
 
 	nicenum(refdbytes, numbuf);
 
 	if (verbosity >= 4) {
 		(void) strcpy(blkbuf, ", rootbp ");
 		sprintf_blkptr(blkbuf + strlen(blkbuf),
-		    BP_SPRINTF_LEN - strlen(blkbuf), &os->os->os_rootbp);
+		    BP_SPRINTF_LEN - strlen(blkbuf), os->os->os_rootbp);
 	} else {
 		blkbuf[0] = '\0';
 	}

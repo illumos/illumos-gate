@@ -207,6 +207,7 @@ struct zio {
 	zio_t		*io_logical;
 
 	/* Callback info */
+	zio_done_func_t	*io_ready;
 	zio_done_func_t	*io_done;
 	void		*io_private;
 	blkptr_t	io_bp_orig;
@@ -262,8 +263,8 @@ extern zio_t *zio_read(zio_t *pio, spa_t *spa, blkptr_t *bp, void *data,
 
 extern zio_t *zio_write(zio_t *pio, spa_t *spa, int checksum, int compress,
     int ncopies, uint64_t txg, blkptr_t *bp, void *data, uint64_t size,
-    zio_done_func_t *done, void *private, int priority, int flags,
-    zbookmark_t *zb);
+    zio_done_func_t *ready, zio_done_func_t *done, void *private, int priority,
+    int flags, zbookmark_t *zb);
 
 extern zio_t *zio_rewrite(zio_t *pio, spa_t *spa, int checksum,
     uint64_t txg, blkptr_t *bp, void *data, uint64_t size,

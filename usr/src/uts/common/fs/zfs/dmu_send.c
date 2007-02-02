@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -382,7 +382,7 @@ replay_full_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	    DS_MODE_EXCLUSIVE, FTAG, &ds));
 
 	(void) dmu_objset_create_impl(dsl_dataset_get_spa(ds),
-	    ds, drrb->drr_type, tx);
+	    ds, &ds->ds_phys->ds_bp, drrb->drr_type, tx);
 
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
 	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;

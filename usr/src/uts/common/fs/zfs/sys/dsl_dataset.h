@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <sys/dmu.h>
 #include <sys/spa.h>
 #include <sys/txg.h>
+#include <sys/zio.h>
 #include <sys/bplist.h>
 #include <sys/dsl_synctask.h>
 #include <sys/zfs_context.h>
@@ -138,15 +139,16 @@ void *dsl_dataset_set_user_ptr(dsl_dataset_t *ds,
     void *p, dsl_dataset_evict_func_t func);
 void *dsl_dataset_get_user_ptr(dsl_dataset_t *ds);
 
-void dsl_dataset_get_blkptr(dsl_dataset_t *ds, blkptr_t *bp);
+blkptr_t *dsl_dataset_get_blkptr(dsl_dataset_t *ds);
 void dsl_dataset_set_blkptr(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx);
 
 spa_t *dsl_dataset_get_spa(dsl_dataset_t *ds);
 
-void dsl_dataset_sync(dsl_dataset_t *os, dmu_tx_t *tx);
+void dsl_dataset_sync(dsl_dataset_t *os, zio_t *zio, dmu_tx_t *tx);
 
 void dsl_dataset_block_born(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx);
-void dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx);
+void dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
+    dmu_tx_t *tx);
 int dsl_dataset_block_freeable(dsl_dataset_t *ds, uint64_t blk_birth);
 uint64_t dsl_dataset_prev_snap_txg(dsl_dataset_t *ds);
 

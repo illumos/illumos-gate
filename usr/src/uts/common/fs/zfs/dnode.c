@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,9 +65,9 @@ dnode_cons(void *arg, void *unused, int kmflag)
 		avl_create(&dn->dn_ranges[i], free_range_compar,
 		    sizeof (free_range_t),
 		    offsetof(struct free_range, fr_node));
-		list_create(&dn->dn_dirty_dbufs[i],
-		    sizeof (dmu_buf_impl_t),
-		    offsetof(dmu_buf_impl_t, db_dirty_node[i]));
+		list_create(&dn->dn_dirty_records[i],
+		    sizeof (dbuf_dirty_record_t),
+		    offsetof(dbuf_dirty_record_t, dr_dirty_node));
 	}
 
 	list_create(&dn->dn_dbufs, sizeof (dmu_buf_impl_t),
@@ -91,7 +91,7 @@ dnode_dest(void *arg, void *unused)
 
 	for (i = 0; i < TXG_SIZE; i++) {
 		avl_destroy(&dn->dn_ranges[i]);
-		list_destroy(&dn->dn_dirty_dbufs[i]);
+		list_destroy(&dn->dn_dirty_records[i]);
 	}
 
 	list_destroy(&dn->dn_dbufs);
@@ -296,7 +296,7 @@ dnode_destroy(dnode_t *dn)
 
 	for (i = 0; i < TXG_SIZE; i++) {
 		ASSERT(!list_link_active(&dn->dn_dirty_link[i]));
-		ASSERT(NULL == list_head(&dn->dn_dirty_dbufs[i]));
+		ASSERT(NULL == list_head(&dn->dn_dirty_records[i]));
 		ASSERT(0 == avl_numnodes(&dn->dn_ranges[i]));
 	}
 	ASSERT(NULL == list_head(&dn->dn_dbufs));
@@ -362,7 +362,7 @@ dnode_allocate(dnode_t *dn, dmu_object_type_t ot, int blocksize, int ibs,
 		ASSERT3U(dn->dn_next_indblkshift[i], ==, 0);
 		ASSERT3U(dn->dn_next_blksz[i], ==, 0);
 		ASSERT(!list_link_active(&dn->dn_dirty_link[i]));
-		ASSERT3P(list_head(&dn->dn_dirty_dbufs[i]), ==, NULL);
+		ASSERT3P(list_head(&dn->dn_dirty_records[i]), ==, NULL);
 		ASSERT3U(avl_numnodes(&dn->dn_ranges[i]), ==, 0);
 	}
 
@@ -461,7 +461,7 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
 		ASSERT(db->db.db_data != NULL);
 		db->db.db_size = bonuslen;
 		mutex_exit(&db->db_mtx);
-		dbuf_dirty(db, tx);
+		(void) dbuf_dirty(db, tx);
 	}
 
 	/* change bonus size and type */
@@ -714,7 +714,7 @@ dnode_setdirty(dnode_t *dn, dmu_tx_t *tx)
 	 */
 	dnode_add_ref(dn, (void *)(uintptr_t)tx->tx_txg);
 
-	dbuf_dirty(dn->dn_dbuf, tx);
+	(void) dbuf_dirty(dn->dn_dbuf, tx);
 
 	dsl_dataset_dirty(os->os_dsl_dataset, tx);
 }
@@ -855,17 +855,35 @@ dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx)
 	if (new_nlevels > dn->dn_nlevels) {
 		int old_nlevels = dn->dn_nlevels;
 		dmu_buf_impl_t *db;
+		list_t *list;
+		dbuf_dirty_record_t *new, *dr, *dr_next;
 
 		dn->dn_nlevels = new_nlevels;
 
 		ASSERT3U(new_nlevels, >, dn->dn_next_nlevels[txgoff]);
 		dn->dn_next_nlevels[txgoff] = new_nlevels;
 
-		/* Dirty the left indirects.  */
+		/* dirty the left indirects */
 		db = dbuf_hold_level(dn, old_nlevels, 0, FTAG);
-		dbuf_dirty(db, tx);
+		new = dbuf_dirty(db, tx);
 		dbuf_rele(db, FTAG);
 
+		/* transfer the dirty records to the new indirect */
+		mutex_enter(&dn->dn_mtx);
+		mutex_enter(&new->dt.di.dr_mtx);
+		list = &dn->dn_dirty_records[txgoff];
+		for (dr = list_head(list); dr; dr = dr_next) {
+			dr_next = list_next(&dn->dn_dirty_records[txgoff], dr);
+			if (dr->dr_dbuf->db_level != new_nlevels-1 &&
+			    dr->dr_dbuf->db_blkid != DB_BONUS_BLKID) {
+				ASSERT(dr->dr_dbuf->db_level == old_nlevels-1);
+				list_remove(&dn->dn_dirty_records[txgoff], dr);
+				list_insert_tail(&new->dt.di.dr_children, dr);
+				dr->dr_parent = new;
+			}
+		}
+		mutex_exit(&new->dt.di.dr_mtx);
+		mutex_exit(&dn->dn_mtx);
 	}
 
 out:
@@ -973,7 +991,7 @@ dnode_free_range(dnode_t *dn, uint64_t off, uint64_t len, dmu_tx_t *tx)
 			caddr_t data;
 
 			/* don't dirty if it isn't on disk and isn't dirty */
-			if (db->db_dirtied ||
+			if (db->db_last_dirty ||
 			    (db->db_blkptr && !BP_IS_HOLE(db->db_blkptr))) {
 				rw_exit(&dn->dn_struct_rwlock);
 				dbuf_will_dirty(db, tx);
@@ -1023,7 +1041,7 @@ dnode_free_range(dnode_t *dn, uint64_t off, uint64_t len, dmu_tx_t *tx)
 			if (dbuf_hold_impl(dn, 0, dbuf_whichblock(dn, off+len),
 			    TRUE, FTAG, &db) == 0) {
 				/* don't dirty if not on disk and not dirty */
-				if (db->db_dirtied ||
+				if (db->db_last_dirty ||
 				    (db->db_blkptr &&
 				    !BP_IS_HOLE(db->db_blkptr))) {
 					rw_exit(&dn->dn_struct_rwlock);

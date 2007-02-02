@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,10 +84,10 @@ int arc_referenced(arc_buf_t *buf);
 int arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_byteswap_func_t *swap,
     arc_done_func_t *done, void *private, int priority, int flags,
     uint32_t *arc_flags, zbookmark_t *zb);
-int arc_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
-    uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
-    arc_done_func_t *done, void *private, int priority, int flags,
-    uint32_t arc_flags, zbookmark_t *zb);
+zio_t *arc_write(zio_t *pio, spa_t *spa, int checksum, int compress,
+    int ncopies, uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
+    arc_done_func_t *ready, arc_done_func_t *done, void *private, int priority,
+    int flags, zbookmark_t *zb);
 int arc_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
     zio_done_func_t *done, void *private, uint32_t arc_flags);
 int arc_tryread(spa_t *spa, blkptr_t *bp, void *data);

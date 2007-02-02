@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <sys/avl.h>
 #include <sys/spa.h>
 #include <sys/txg.h>
+#include <sys/zio.h>
 #include <sys/refcount.h>
 #include <sys/dmu_zfetch.h>
 
@@ -162,7 +163,7 @@ typedef struct dnode {
 
 	/* protected by dn_mtx: */
 	kmutex_t dn_mtx;
-	list_t dn_dirty_dbufs[TXG_SIZE];
+	list_t dn_dirty_records[TXG_SIZE];
 	avl_tree_t dn_ranges[TXG_SIZE];
 	uint64_t dn_allocated_txg;
 	uint64_t dn_free_txg;
@@ -178,6 +179,9 @@ typedef struct dnode {
 	kmutex_t dn_dbufs_mtx;
 	list_t dn_dbufs;		/* linked list of descendent dbuf_t's */
 	struct dmu_buf_impl *dn_bonus;	/* bonus buffer dbuf */
+
+	/* parent IO for current sync write */
+	zio_t *dn_zio;
 
 	/* holds prefetch structure */
 	struct zfetch	dn_zfetch;
@@ -200,7 +204,7 @@ int dnode_hold_impl(struct objset_impl *dd, uint64_t object, int flag,
 void dnode_add_ref(dnode_t *dn, void *ref);
 void dnode_rele(dnode_t *dn, void *ref);
 void dnode_setdirty(dnode_t *dn, dmu_tx_t *tx);
-int dnode_sync(dnode_t *dn, int level, struct zio *zio, dmu_tx_t *tx);
+void dnode_sync(dnode_t *dn, dmu_tx_t *tx);
 void dnode_allocate(dnode_t *dn, dmu_object_type_t ot, int blocksize, int ibs,
     dmu_object_type_t bonustype, int bonuslen, dmu_tx_t *tx);
 void dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
