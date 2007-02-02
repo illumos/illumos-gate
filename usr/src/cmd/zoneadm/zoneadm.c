@@ -1756,9 +1756,11 @@ list_func(int argc, char *argv[])
 
 	/*
 	 * Invoke brand-specific handler. Note that we do this
-	 * only if we're in the global zone, and target_zone is specified.
+	 * only if we're in the global zone, and target_zone is specified
+	 * and it is not the global zone.
 	 */
-	if (zone_id == GLOBAL_ZONEID && target_zone != NULL)
+	if (zone_id == GLOBAL_ZONEID && target_zone != NULL &&
+	    strcmp(target_zone, GLOBAL_ZONENAME) != 0)
 		if (invoke_brand_handler(CMD_LIST, argv) != Z_OK)
 			return (Z_ERR);
 
