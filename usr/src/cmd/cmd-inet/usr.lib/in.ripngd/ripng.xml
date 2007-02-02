@@ -112,8 +112,11 @@ privileges='basic,proc_owner,proc_fork,proc_exec,proc_info,proc_session,file_cho
 	<property_group name='routing' type='application'>
 		<stability value='Evolving' />
 
-		<!-- Equivalent to -s option if true, -q option if false -->
+		<!-- Equivalent to -s option if true -->
 		<propval name='supply_routes' type='boolean' value='true' />
+
+		<!-- Equivalent to -q option if true -->
+		<propval name='quiet_mode'  type='boolean' value='false' />
 
 		<!-- Equivalent to -p port option -->
 		<propval name='udp_port' type='integer' value='521' />

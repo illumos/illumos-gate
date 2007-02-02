@@ -118,8 +118,11 @@ privileges='basic,proc_owner,proc_fork,proc_exec,proc_info,proc_session,file_cho
 		<!-- Equivalent to -P specified parameter list -->
 		<propval name='parameters' type='astring' value='' />
 
-		<!-- Equivalent to -s option if true, -q if false -->
-		<propval name='supply_routes' type='boolean' value='true' />	
+		<!-- Equivalent to the -q option if true -->
+		<propval name='quiet_mode' type='boolean' value='false' />
+
+		<!-- Equivalent to -s option if true -->
+		<propval name='supply_routes' type='boolean' value='false' />	
 
 		<!-- Equivalent to -S option if true -->
 		<propval name='default_routes_only' type='boolean'

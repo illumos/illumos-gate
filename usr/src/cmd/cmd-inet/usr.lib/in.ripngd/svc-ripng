@@ -40,9 +40,9 @@ options="sqp:Ptv"
 #
 if [ -n "$daemon_args" ]; then
 	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
-	    "$options" "q" supply_routes false true
+	    "$options" "q" quiet_mode true false
 	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
-	    "$options" "s" supply_routes true
+	    "$options" "s" supply_routes true false
 	set_daemon_value_property "$SMF_FMRI" "$daemon_args" \
 	    "$options" "p" udp_port 521
 	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
@@ -58,7 +58,7 @@ fi
 # Assemble arguments to daemon from properties
 #
 args="`get_daemon_option_from_boolean_property $SMF_FMRI \
-	supply_routes -q false`"
+	quiet_mode -q true`"
 args="$args `get_daemon_option_from_boolean_property $SMF_FMRI \
 	supply_routes -s true`"
 args="$args `get_daemon_option_from_property $SMF_FMRI udp_port p 521`"

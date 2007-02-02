@@ -54,9 +54,9 @@ if [ -n "$daemon_args" ]; then
 	set_daemon_ordered_multivalue_property "$SMF_FMRI" "$daemon_args" \
 	    "$options" "P" parameters
 	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
-	    "$options" "q" supply_routes false true
+	    "$options" "q" quiet_mode true false
 	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
-	    "$options" "s" supply_routes true 
+	    "$options" "s" supply_routes true false
 	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
 	    "$options" "S" default_routes_only true false
 	set_daemon_value_property "$SMF_FMRI" "$daemon_args" \
@@ -82,15 +82,9 @@ args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
 args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
 	install_routes n false`"
 args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
-	supply_routes q false`"
-# We only use -s option when there are multiple network interfaces.
-numv4ifs=`/usr/sbin/ifconfig -a4u | \
-	/usr/bin/nawk '($1 == "inet" && $2 != "127.0.0.1") { print $2 }' | \
-	/usr/bin/wc -l`
-if [ "$numv4ifs" -gt 1 ]; then
-	args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
+	quiet_mode q true`"
+args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
 		supply_routes s true`"
-fi
 args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
 	default_routes_only S true`"
 args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
