@@ -76,11 +76,6 @@ f none platform/sun4v/kernel/misc/sparcv9/ds 755 root sys
 f none platform/sun4v/kernel/misc/sparcv9/fault_iso 755 root sys
 f none platform/sun4v/kernel/misc/sparcv9/ldc 755 root sys
 f none platform/sun4v/kernel/misc/sparcv9/platsvc 755 root sys
-d none usr 755 root sys
-d none usr/lib 755 root bin
-f none usr/lib/libpri.so.1 755 root bin
-d none usr/lib/sparcv9 755 root bin
-f none usr/lib/sparcv9/libpri.so.1 755 root bin
 d none var 755 root sys
 d none var/svc 755 root sys
 d none var/svc/manifest 755 root sys
