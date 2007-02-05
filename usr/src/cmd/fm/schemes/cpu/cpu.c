@@ -94,6 +94,33 @@ fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	}
 }
 
+/*
+ * Determine if a cpuid is present.
+ */
+/*ARGSUSED*/
+static int
+cpu_cpuid_present(uint32_t cpuid)
+{
+#ifdef	sparc
+	/*
+	 * For SPARC, use kstats to see if the cpuid is present.
+	 * Note that this may need to change for sun4v.
+	 */
+	kstat_ctl_t *kc;
+	kstat_t *ksp = NULL;
+	if ((kc = kstat_open()) == NULL)
+		return (-1); /* errno is set for us */
+	ksp = kstat_lookup(kc, "cpu_info", cpuid, NULL);
+	(void) kstat_close(kc);
+	return ((ksp == NULL) ? 0 : 1);
+#else	/* sparc */
+	/*
+	 * For x64, just return true.
+	 */
+	return (1);
+#endif	/* sparc */
+}
+
 static int
 cpu_get_serialid_kstat(uint32_t cpuid, uint64_t *serialidp)
 {
@@ -257,10 +284,11 @@ fmd_fmri_present(nvlist_t *nvl)
 				return (fmd_fmri_set_errno(EINVAL));
 
 		/*
-		 * Serial id may not be available, return true
+		 * If serial id is not available, just check if the cpuid
+		 * is present.
 		 */
 		if (cpu_get_serialid_V1(cpuid, curserbuf, 21) != 0)
-			return (1);
+			return (cpu_cpuid_present(cpuid));
 
 		return (strcmp(curserbuf, nvlserstr) == 0 ? 1 : 0);
 
