@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1619,8 +1619,18 @@ forklwp(klwp_t *lwp, proc_t *cp, id_t lwpid)
 	tfpu = clwp->lwp_fpu;
 	brand_data = clwp->lwp_brand;
 
-	/* copy parent lwp to child lwp */
+	/*
+	 * Copy parent lwp to child lwp.  Hold child's p_lock to prevent
+	 * mstate_aggr_state() from reading stale mstate entries copied
+	 * from lwp to clwp.
+	 */
+	mutex_enter(&cp->p_lock);
 	*clwp = *lwp;
+
+	/* clear microstate and resource usage data in new lwp */
+	init_mstate(ct, LMS_STOPPED);
+	bzero(&clwp->lwp_ru, sizeof (clwp->lwp_ru));
+	mutex_exit(&cp->p_lock);
 
 	/* fix up child's lwp */
 
@@ -1640,8 +1650,6 @@ forklwp(klwp_t *lwp, proc_t *cp, id_t lwpid)
 	clwp->lwp_ap = clwp->lwp_arg;
 	clwp->lwp_procp = cp;
 	bzero(clwp->lwp_timer, sizeof (clwp->lwp_timer));
-	init_mstate(ct, LMS_STOPPED);
-	bzero(&clwp->lwp_ru, sizeof (clwp->lwp_ru));
 	clwp->lwp_lastfault = 0;
 	clwp->lwp_lastfaddr = 0;
 
