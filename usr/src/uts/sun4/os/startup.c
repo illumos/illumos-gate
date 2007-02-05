@@ -2072,22 +2072,33 @@ startup_vm(void)
 
 	if (!segzio_fromheap) {
 		size_t size;
-		size_t maxsize;
+		size_t physmem_b = mmu_ptob(physmem);
 
 		/* size is in bytes, segziosize is in pages */
 		if (segziosize == 0) {
-			size = mmu_ptob(physmem / 2);
+			size = physmem_b;
 		} else {
 			size = mmu_ptob(segziosize);
 		}
 
-		/* maxsize is 3/4th physmem */
-		maxsize = mmu_ptob(physmem) - mmu_ptob(physmem / 4);
-
 		if (size < SEGZIOMINSIZE) {
 			size = SEGZIOMINSIZE;
-		} else if (size > maxsize) {
-			size = maxsize;
+		} else if (size > SEGZIOMAXSIZE) {
+			size = SEGZIOMAXSIZE;
+			/*
+			 * On 64-bit x86, we only have 2TB of KVA.  This exists
+			 * for parity with x86.
+			 *
+			 * SEGZIOMAXSIZE is capped at 512gb so that segzio
+			 * doesn't consume all of KVA.  However, if we have a
+			 * system that has more thant 512gb of physical memory,
+			 * we can actually consume about half of the difference
+			 * between 512gb and the rest of the available physical
+			 * memory.
+			 */
+			if (physmem_b > SEGZIOMAXSIZE) {
+				size += (physmem_b - SEGZIOMAXSIZE) / 2;
+		}
 		}
 		segziosize = mmu_btop(roundup(size, MMU_PAGESIZE));
 		/* put the base of the ZIO segment after the kpm segment */

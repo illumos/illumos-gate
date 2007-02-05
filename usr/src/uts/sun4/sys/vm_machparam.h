@@ -22,7 +22,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,7 +96,8 @@ extern "C" {
 /*
  * Define minimum size for zio segment
  */
-#define	SEGZIOMINSIZE	(512L * 1024 * 1024L)			/* 512M */
+#define	SEGZIOMINSIZE	(512L * 1024L * 1024L)			/* 512M */
+#define	SEGZIOMAXSIZE	(512L * 1024L * 1024L * 1024L)		/* 512G */
 
 /*
  * The time for a process to be blocked before being very swappable.
