@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,6 +187,8 @@ px_reloc_reg(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 			continue;
 		if (space_type == assign_type) { /* exact match */
 			rp->pci_phys_low += assign_p->pci_phys_low;
+			if (space_type == PCI_ADDR_MEM64)
+				rp->pci_phys_mid += assign_p->pci_phys_mid;
 			break;
 		}
 		if (space_type == PCI_ADDR_MEM64 &&
@@ -212,42 +214,46 @@ px_xlate_reg(px_t *px_p, pci_regspec_t *px_rp, struct regspec *new_rp)
 	int n;
 	px_ranges_t *rng_p = px_p->px_ranges_p;
 	int rng_n = px_p->px_ranges_length / sizeof (px_ranges_t);
-
 	uint32_t space_type = PCI_REG_ADDR_G(px_rp->pci_phys_hi);
-	uint32_t reg_end, reg_begin = px_rp->pci_phys_low;
-	uint32_t sz = px_rp->pci_size_low;
+	uint64_t reg_begin, reg_end, reg_sz;
+	uint64_t rng_begin, rng_end, rng_sz;
+	uint64_t addr;
 
-	uint32_t rng_begin, rng_end;
-
+	reg_begin = (uint64_t)px_rp->pci_phys_mid << 32 | px_rp->pci_phys_low;
+	reg_sz = (uint64_t)px_rp->pci_size_hi << 32 | px_rp->pci_size_low;
 	if (space_type == PCI_REG_ADDR_G(PCI_ADDR_CONFIG)) {
 		if (reg_begin > PCI_CONF_HDR_SIZE)
 			return (DDI_ME_INVAL);
-		sz = sz ? MIN(sz, PCI_CONF_HDR_SIZE) : PCI_CONF_HDR_SIZE;
+		reg_sz = reg_sz ? MIN(reg_sz, PCI_CONF_HDR_SIZE) :
+		    PCI_CONF_HDR_SIZE;
 		reg_begin += px_rp->pci_phys_hi << 4;
 	}
-	reg_end = reg_begin + sz - 1;
+	reg_end = reg_begin + reg_sz - 1;
 
 	for (n = 0; n < rng_n; n++, rng_p++) {
 		if (space_type != PCI_REG_ADDR_G(rng_p->child_high))
 			continue;	/* not the same space type */
 
-		rng_begin = rng_p->child_low;
+		rng_begin = (uint64_t)rng_p->child_mid << 32 | rng_p->child_low;
+		rng_sz = (uint64_t)rng_p->size_high << 32 | rng_p->size_low;
 		if (space_type == PCI_REG_ADDR_G(PCI_ADDR_CONFIG))
 			rng_begin += rng_p->child_high;
 
-		rng_end = rng_begin + rng_p->size_low - 1;
+		rng_end = rng_begin + rng_sz - 1;
 		if (reg_begin >= rng_begin && reg_end <= rng_end)
 			break;
 	}
 	if (n >= rng_n)
 		return (DDI_ME_REGSPEC_RANGE);
 
-	new_rp->regspec_addr = reg_begin - rng_begin + rng_p->parent_low;
-	new_rp->regspec_bustype = rng_p->parent_high;
-	new_rp->regspec_size = sz;
+	addr = reg_begin - rng_begin + ((uint64_t)rng_p->parent_high << 32 |
+	    rng_p->parent_low);
+	new_rp->regspec_addr = (uint32_t)addr;
+	new_rp->regspec_bustype = (uint32_t)(addr >> 32);
+	new_rp->regspec_size = (uint32_t)reg_sz;
 	DBG(DBG_MAP | DBG_CONT, px_p->px_dip,
 		"\tpx_xlate_reg: entry %d new_rp %x.%x %x\n",
-		n, new_rp->regspec_bustype, new_rp->regspec_addr, sz);
+		n, new_rp->regspec_bustype, new_rp->regspec_addr, reg_sz);
 
 	return (DDI_SUCCESS);
 }

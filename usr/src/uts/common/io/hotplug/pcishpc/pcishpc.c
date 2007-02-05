@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +113,7 @@
 #define	SHPC_SLOT_MRL_SERR_MASK		REG_BIT29
 #define	SHPC_SLOT_POWER_SERR_MASK	REG_BIT30
 #define	SHPC_SLOT_MASK_ALL		(REG_BIT24|REG_BIT25|REG_BIT26|\
-					REG_BIT27|REG_BIT28|REG_BIT29|REG_BIT30)
+					REG_BIT27|REG_BIT28|REG_BIT30)
 
 /* Register bits used with the SHPC SHPC_IRQ_LOCATOR_REG register. */
 #define	SHPC_IRQ_CMD_COMPLETE		REG_BIT0
@@ -1202,6 +1202,20 @@ pcishpc_set_power_state(pcishpc_t *pcishpc_p, hpc_slot_state_t state)
 
 	/* Set the slot state to the new slot state. */
 	pcishpc_p->slot_state = state;
+
+	/* Mask or Unmask MRL Sensor SEER bit based on new slot state */
+	if (pcishpc_p->ctrl->has_mrl == B_TRUE) {
+		uint32_t reg;
+
+		reg = pcishpc_read_reg(pcishpc_p->ctrl,
+		    SHPC_LOGICAL_SLOT_REGS+pcishpc_p->slotNum);
+		reg = (pcishpc_p->slot_state == HPC_SLOT_CONNECTED) ?
+		    (reg & ~SHPC_SLOT_MRL_SERR_MASK) :
+		    (reg | SHPC_SLOT_MRL_SERR_MASK);
+
+		pcishpc_write_reg(pcishpc_p->ctrl,
+		    SHPC_LOGICAL_SLOT_REGS+pcishpc_p->slotNum, reg);
+	}
 
 	/* Update the hardweare slot state. */
 	if (pcishpc_set_slot_state(pcishpc_p) != DDI_SUCCESS) {
