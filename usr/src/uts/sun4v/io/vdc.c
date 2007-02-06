@@ -1111,8 +1111,6 @@ vdc_strategy(struct buf *buf)
 	    CB_STRATEGY, buf, (op == VD_OP_BREAD) ? VIO_read_dir :
 	    VIO_write_dir);
 
-	ASSERT(rv == 0 || rv == EINVAL);
-
 	/*
 	 * If the request was successfully sent, the strategy call returns and
 	 * the ACK handler calls the bioxxx functions when the vDisk server is
@@ -2358,10 +2356,7 @@ vdc_map_to_shared_dring(vdc_t *vdcp, int idx)
  *
  * Return Codes:
  *	0
- *	EAGAIN
- *		EFAULT
- *		ENXIO
- *		EIO
+ *	ENXIO
  */
 static int
 vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,

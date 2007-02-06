@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -210,7 +210,7 @@ clock_t ldc_close_delay = LDC_CLOSE_DELAY;
 
 int ldcdbg = 0x0;
 int64_t ldcdbgchan = DBG_ALL_LDCS;
-boolean_t ldc_inject_reset_flag = B_FALSE;
+uint64_t ldc_inject_err_flag = 0;
 
 static void
 ldcdebug(int64_t id, const char *fmt, ...)
@@ -237,17 +237,20 @@ ldcdebug(int64_t id, const char *fmt, ...)
 	cmn_err(CE_CONT, "?%s", buf);
 }
 
+#define	LDC_ERR_RESET	0x1
+#define	LDC_ERR_PKTLOSS	0x2
+
 static boolean_t
-ldc_inject_reset(ldc_chan_t *ldcp)
+ldc_inject_error(ldc_chan_t *ldcp, uint64_t error)
 {
 	if ((ldcdbgchan != DBG_ALL_LDCS) && (ldcdbgchan != ldcp->id))
 		return (B_FALSE);
 
-	if (!ldc_inject_reset_flag)
+	if ((ldc_inject_err_flag & error) == 0)
 		return (B_FALSE);
 
 	/* clear the injection state */
-	ldc_inject_reset_flag = 0;
+	ldc_inject_err_flag &= ~error;
 
 	return (B_TRUE);
 }
@@ -291,7 +294,8 @@ if (ldcdbg & 0x04)	\
 	} 								\
 }
 
-#define	LDC_INJECT_RESET(_ldcp)	ldc_inject_reset(_ldcp)
+#define	LDC_INJECT_RESET(_ldcp)	ldc_inject_error(_ldcp, LDC_ERR_RESET)
+#define	LDC_INJECT_PKTLOSS(_ldcp) ldc_inject_error(_ldcp, LDC_ERR_PKTLOSS)
 
 #else
 
@@ -305,6 +309,7 @@ if (ldcdbg & 0x04)	\
 #define	DUMP_LDC_PKT(c, s, addr)
 
 #define	LDC_INJECT_RESET(_ldcp)	(B_FALSE)
+#define	LDC_INJECT_PKTLOSS(_ldcp) (B_FALSE)
 
 #endif
 
@@ -627,7 +632,7 @@ i_ldc_reset_state(ldc_chan_t *ldcp)
 static void
 i_ldc_reset(ldc_chan_t *ldcp, boolean_t force_reset)
 {
-	D1(ldcp->id, "i_ldc_reset: (0x%llx) channel reset\n", ldcp->id);
+	DWARN(ldcp->id, "i_ldc_reset: (0x%llx) channel reset\n", ldcp->id);
 
 	ASSERT(MUTEX_HELD(&ldcp->lock));
 	ASSERT(MUTEX_HELD(&ldcp->tx_lock));
@@ -890,6 +895,14 @@ i_ldc_check_seqid(ldc_chan_t *ldcp, ldc_msg_t *msg)
 		return (EIO);
 	}
 
+#ifdef DEBUG
+	if (LDC_INJECT_PKTLOSS(ldcp)) {
+		DWARN(ldcp->id,
+		    "i_ldc_check_seqid: (0x%llx) inject pkt loss\n", ldcp->id);
+		return (EIO);
+	}
+#endif
+
 	return (0);
 }
 
@@ -1008,7 +1021,7 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 				ldcp->version.minor = rcvd_ver->minor;
 				ldcp->hstate |= TS_RCVD_VER;
 				ldcp->tstate |= TS_VER_DONE;
-				DWARN(DBG_ALL_LDCS,
+				D1(DBG_ALL_LDCS,
 				    "(0x%llx) Sent ACK, "
 				    "Agreed on version v%u.%u\n",
 				    ldcp->id, rcvd_ver->major, rcvd_ver->minor);
@@ -2038,7 +2051,9 @@ force_reset:
 				mutex_enter(&ldcp->tx_lock);
 				i_ldc_reset(ldcp, B_TRUE);
 				mutex_exit(&ldcp->tx_lock);
-				rv = ECONNRESET;
+
+				notify_client = B_TRUE;
+				notify_event = LDC_EVT_RESET;
 				break;
 			}
 
@@ -2076,6 +2091,19 @@ force_reset:
 				notify_client = B_TRUE;
 				notify_event = LDC_EVT_UP;
 			}
+		}
+
+		/* process data NACKs */
+		if ((msg->type & LDC_DATA) && (msg->stype & LDC_NACK)) {
+			DWARN(ldcp->id,
+			    "i_ldc_rx_hdlr: (0x%llx) received DATA/NACK",
+			    ldcp->id);
+			mutex_enter(&ldcp->tx_lock);
+			i_ldc_reset(ldcp, B_TRUE);
+			mutex_exit(&ldcp->tx_lock);
+			notify_client = B_TRUE;
+			notify_event = LDC_EVT_RESET;
+			break;
 		}
 
 		/* process data ACKs */
@@ -3469,6 +3497,16 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 				bytes_read = 0;
 				break;
 			}
+		}
+
+		/* process data NACKs */
+		if ((msg->type & LDC_DATA) && (msg->stype & LDC_NACK)) {
+			DWARN(ldcp->id,
+			    "ldc_read: (0x%llx) received DATA/NACK", ldcp->id);
+			mutex_enter(&ldcp->tx_lock);
+			i_ldc_reset(ldcp, B_TRUE);
+			mutex_exit(&ldcp->tx_lock);
+			return (ECONNRESET);
 		}
 
 		/* process data messages */
