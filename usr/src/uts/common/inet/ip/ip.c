@@ -20629,8 +20629,7 @@ standard_path:
 		IRE_REFHOLD_NOTR(ire);
 
 		mutex_enter(&connp->conn_lock);
-		if (!(connp->conn_state_flags & CONN_CLOSING) &&
-		    connp->conn_ire_cache == NULL) {
+		if (CONN_CACHE_IRE(connp) && connp->conn_ire_cache == NULL) {
 			rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
 			if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
 				connp->conn_ire_cache = ire;

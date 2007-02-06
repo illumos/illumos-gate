@@ -2949,8 +2949,13 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 	 */
 	connp->conn_state_flags &= ~CONN_INCIPIENT;
 
-	/* Must not cache forwarding table routes. */
-	if (ire_cacheable) {
+	/*
+	 * Must not cache forwarding table routes
+	 * or recache an IRE after the conn_t has
+	 * had conn_ire_cache cleared and is flagged
+	 * unusable, (see the CONN_CACHE_IRE() macro).
+	 */
+	if (ire_cacheable && CONN_CACHE_IRE(connp)) {
 		rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
 		if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
 			connp->conn_ire_cache = ire;
@@ -5946,7 +5951,13 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	 * lock across the ipcl_bind_insert() and sending the packet
 	 * so that we don't race against an incoming packet (maybe RST)
 	 * for this eager.
+	 *
+	 * It is necessary to acquire an extra reference on the eager
+	 * at this point and hold it until after tcp_send_data() to
+	 * ensure against an eager close race.
 	 */
+
+	CONN_INC_REF(eager->tcp_connp);
 
 	TCP_RECORD_TRACE(eager, mp1, TCP_TRACE_SEND_PKT);
 	TCP_TIMER_RESTART(eager, eager->tcp_rto);
@@ -5971,11 +5982,13 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 
 	/* Send the SYN-ACK */
 	tcp_send_data(eager, eager->tcp_wq, mp1);
+	CONN_DEC_REF(eager->tcp_connp);
 	freemsg(mp);
 
 	return;
 error:
 	(void) TCP_TIMER_CANCEL(eager, eager->tcp_timer_tid);
+	CONN_DEC_REF(eager->tcp_connp);
 	freemsg(mp1);
 error1:
 	/* Undo what we did above */
@@ -18739,7 +18752,7 @@ tcp_send_find_ire(tcp_t *tcp, ipaddr_t *dst, ire_t **irep)
 		 * unplumb thread has not yet started cleaning up the conns.
 		 * Hence we don't need to grab the conn lock.
 		 */
-		if (!(connp->conn_state_flags & CONN_CLOSING)) {
+		if (CONN_CACHE_IRE(connp)) {
 			rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
 			if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
 				connp->conn_ire_cache = ire;

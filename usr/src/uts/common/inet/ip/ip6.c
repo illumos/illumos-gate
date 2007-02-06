@@ -9932,7 +9932,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 				IRE_REFHOLD_NOTR(ire);
 
 				mutex_enter(&connp->conn_lock);
-				if (!(connp->conn_state_flags & CONN_CLOSING) &&
+				if (CONN_CACHE_IRE(connp) &&
 				    (connp->conn_ire_cache == NULL)) {
 					rw_enter(&ire->ire_bucket->irb_lock,
 					    RW_READER);

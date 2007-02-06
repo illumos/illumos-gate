@@ -716,6 +716,10 @@ typedef struct ire_expire_arg_s {
 #define	CONN_INCIPIENT		0x08	/* conn not yet visible, no refs */
 #define	CONN_QUIESCED		0x10	/* conn is now quiescent */
 
+/* Used to check connection state flags before caching the IRE */
+#define	CONN_CACHE_IRE(connp)	\
+	(!((connp)->conn_state_flags & (CONN_CLOSING|CONN_CONDEMNED)))
+
 /*
  * Parameter to ip_output giving the identity of the caller.
  * IP_WSRV means the packet was enqueued in the STREAMS queue
