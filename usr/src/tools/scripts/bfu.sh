@@ -1386,6 +1386,7 @@ smf_fix_i86pc_profile () {
 
 	if ! archive_file_exists generic.root "^$profile"; then
 		rm -f $rootprefix/$profile
+		rm -f $rootprefix/var/svc/profile/platform.xml
 	fi
 
 	if [ ! -f $rootprefix/$mfst ]; then
