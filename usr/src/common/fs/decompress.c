@@ -106,6 +106,12 @@ cf_check_compressed(fileid_t *filep)
 	unsigned char *filebytes;
 	z_stream *zsp;
 
+	/*
+	 * If the file is not long enough to check for a decompression header
+	 * then return not compressed.
+	 */
+	if (filep->fi_inode->i_size < 3)
+		return (0);
 	filep->fi_offset = 0;
 	if ((filep->fi_getblock)(filep) == -1)
 		return (-1);
