@@ -85,8 +85,10 @@ get_slice_name (char *devlink)
 boolean_t
 is_dos_drive(uchar_t type)
 {
-	return ((type == 1) || (type == 4) || (type == 5) || (type == 6) ||
-	    ((type >= 8) && (type <= 0xf)));
+	return ((type == DOSOS12) || (type == DOSOS16) ||
+	    (type == DOSHUGE) || (type == FDISK_WINDOWS) ||
+	    (type == FDISK_EXT_WIN) || (type == FDISK_FAT95) ||
+	    (type == DIAGPART));
 }
 
 boolean_t
