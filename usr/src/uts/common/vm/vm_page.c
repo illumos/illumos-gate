@@ -529,7 +529,7 @@ add_physmem(
 	pgcnt_t	cnt = 0;
 
 	TRACE_2(TR_FAC_VM, TR_PAGE_INIT,
-		"add_physmem:pp %p num %lu", pp, num);
+	    "add_physmem:pp %p num %lu", pp, num);
 
 	/*
 	 * Arbitrarily limit the max page_get request
@@ -1839,7 +1839,7 @@ page_create_get_something(vnode_t *vp, u_offset_t off, struct seg *seg,
 		    flags, lgrp);
 		if (pp == NULL) {
 			pp = page_get_cachelist(vp, off, seg, vaddr,
-				flags, lgrp);
+			    flags, lgrp);
 		}
 		if (pp == NULL) {
 			/*
@@ -2102,7 +2102,7 @@ page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	ASSERT(vp != NULL);
 
 	ASSERT((flags & ~(PG_EXCL | PG_WAIT |
-		    PG_NORELOC | PG_PANIC | PG_PUSHPAGE)) == 0);
+	    PG_NORELOC | PG_PANIC | PG_PUSHPAGE)) == 0);
 	/* but no others */
 
 	ASSERT((flags & PG_EXCL) == PG_EXCL);
@@ -2232,7 +2232,7 @@ page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	 * hardware pagesize chunk.  If we can't, we fail.
 	 */
 	if (lgrpid != NULL && *lgrpid >= 0 && *lgrpid <= lgrp_alloc_max &&
-		LGRP_EXISTS(lgrp_table[*lgrpid]))
+	    LGRP_EXISTS(lgrp_table[*lgrpid]))
 		lgrp = lgrp_table[*lgrpid];
 	else
 		lgrp = lgrp_mem_choose(seg, vaddr, bytes);
@@ -2305,8 +2305,8 @@ page_create_va(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	lgrp_t		*lgrp;
 
 	TRACE_4(TR_FAC_VM, TR_PAGE_CREATE_START,
-		"page_create_start:vp %p off %llx bytes %lu flags %x",
-		vp, off, bytes, flags);
+	    "page_create_start:vp %p off %llx bytes %lu flags %x",
+	    vp, off, bytes, flags);
 
 	ASSERT(bytes != 0 && vp != NULL);
 
@@ -2357,7 +2357,7 @@ page_create_va(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	 * cage space is low.
 	 */
 	if ((flags & PG_NORELOC) &&
-		kcage_freemem < kcage_throttlefree + npages) {
+	    kcage_freemem < kcage_throttlefree + npages) {
 
 		/*
 		 * The cage is on, the caller wants PG_NORELOC
@@ -2418,7 +2418,7 @@ page_create_va(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	}
 
 	TRACE_2(TR_FAC_VM, TR_PAGE_CREATE_SUCCESS,
-		"page_create_success:vp %p off %llx", vp, off);
+	    "page_create_success:vp %p off %llx", vp, off);
 
 	/*
 	 * If satisfying this request has left us with too little
@@ -2429,7 +2429,7 @@ page_create_va(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	 */
 	if (nscan < desscan && freemem < minfree) {
 		TRACE_1(TR_FAC_VM, TR_PAGEOUT_CV_SIGNAL,
-			"pageout_cv_signal:freemem %ld", freemem);
+		    "pageout_cv_signal:freemem %ld", freemem);
 		cv_signal(&proc_pageout->p_cv);
 	}
 
@@ -2949,6 +2949,10 @@ free_vp_pages(vnode_t *vp, u_offset_t off, size_t len)
 
 /*
  * Reclaim the given page from the free list.
+ * If pp is part of a large pages, only the given constituent page is reclaimed
+ * and the large page it belonged to will be demoted.  This can only happen
+ * if the page is not on the cachelist.
+ *
  * Returns 1 on success or 0 on failure.
  *
  * The page is unlocked if it can't be reclaimed (when freemem == 0).
@@ -2965,14 +2969,11 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 	struct pcf	*p;
 	uint_t		pcf_index;
 	struct cpu	*cpup;
+	int		enough;
 	uint_t		i;
-	pgcnt_t		npgs, need;
-	pgcnt_t		collected = 0;
 
 	ASSERT(lock != NULL ? MUTEX_HELD(lock) : 1);
 	ASSERT(PAGE_EXCL(pp) && PP_ISFREE(pp));
-
-	npgs = page_get_pagecnt(pp->p_szc);
 
 	/*
 	 * If `freemem' is 0, we cannot reclaim this page from the
@@ -2997,22 +2998,22 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 
 	/* TODO: Do we need to test kcage_freemem if PG_NORELOC(pp)? */
 
-	if (freemem <= throttlefree && !page_create_throttle(npgs, 0)) {
+	if (freemem <= throttlefree && !page_create_throttle(1l, 0)) {
 		pcf_acquire_all();
 		goto page_reclaim_nomem;
 	}
 
+	enough = 0;
 	pcf_index = PCF_INDEX();
 	p = &pcf[pcf_index];
 	mutex_enter(&p->pcf_lock);
-	if (p->pcf_count >= npgs) {
-		collected = npgs;
-		p->pcf_count -= npgs;
+	if (p->pcf_count >= 1) {
+		enough = 1;
+		p->pcf_count--;
 	}
 	mutex_exit(&p->pcf_lock);
-	need = npgs - collected;
 
-	if (need > 0) {
+	if (!enough) {
 		VM_STAT_ADD(page_reclaim_zero);
 		/*
 		 * Check again. Its possible that some other thread
@@ -3023,22 +3024,15 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 		p = pcf;
 		for (i = 0; i < PCF_FANOUT; i++) {
 			mutex_enter(&p->pcf_lock);
-			if (p->pcf_count) {
-				if (p->pcf_count >= need) {
-					p->pcf_count -= need;
-					collected += need;
-					need = 0;
-					break;
-				} else if (p->pcf_count) {
-					collected += p->pcf_count;
-					need -= p->pcf_count;
-					p->pcf_count = 0;
-				}
+			if (p->pcf_count >= 1) {
+				p->pcf_count -= 1;
+				enough = 1;
+				break;
 			}
 			p++;
 		}
 
-		if (need > 0) {
+		if (!enough) {
 page_reclaim_nomem:
 			/*
 			 * We really can't have page `pp'.
@@ -3062,7 +3056,6 @@ page_reclaim_nomem:
 			mutex_enter(&new_freemem_lock);
 
 			p = pcf;
-			p->pcf_count += collected;
 			for (i = 0; i < PCF_FANOUT; i++) {
 				p->pcf_wait++;
 				mutex_exit(&p->pcf_lock);
@@ -3082,13 +3075,10 @@ page_reclaim_nomem:
 		}
 
 		/*
-		 * We beat the PCF bins over the head until
-		 * we got the memory that we wanted.
 		 * The pcf accounting has been done,
 		 * though none of the pcf_wait flags have been set,
 		 * drop the locks and continue on.
 		 */
-		ASSERT(collected == npgs);
 		while (p >= pcf) {
 			mutex_exit(&p->pcf_lock);
 			p--;
@@ -3099,19 +3089,19 @@ page_reclaim_nomem:
 	 * freemem is not protected by any lock. Thus, we cannot
 	 * have any assertion containing freemem here.
 	 */
-	freemem -= npgs;
+	freemem -= 1;
 
 	VM_STAT_ADD(pagecnt.pc_reclaim);
+
+	/*
+	 * page_list_sub will handle the case where pp is a large page.
+	 * It's possible that the page was promoted while on the freelist
+	 */
 	if (PP_ISAGED(pp)) {
-		if (npgs > 1) {
-			page_list_sub_pages(pp, pp->p_szc);
-		} else {
-			page_list_sub(pp, PG_FREE_LIST);
-		}
+		page_list_sub(pp, PG_FREE_LIST);
 		TRACE_1(TR_FAC_VM, TR_PAGE_UNFREE_FREE,
 		    "page_reclaim_free:pp %p", pp);
 	} else {
-		ASSERT(npgs == 1);
 		page_list_sub(pp, PG_CACHE_LIST);
 		TRACE_1(TR_FAC_VM, TR_PAGE_UNFREE_CACHE,
 		    "page_reclaim_cache:pp %p", pp);
@@ -3124,22 +3114,19 @@ page_reclaim_nomem:
 	 *
 	 * Set the reference bit to protect against immediate pageout.
 	 */
-	for (i = 0; i < npgs; i++, pp++) {
-		PP_CLRFREE(pp);
-		PP_CLRAGED(pp);
-		page_set_props(pp, P_REF);
-	}
+	PP_CLRFREE(pp);
+	PP_CLRAGED(pp);
+	page_set_props(pp, P_REF);
 
 	CPU_STATS_ENTER_K();
 	cpup = CPU;	/* get cpup now that CPU cannot change */
 	CPU_STATS_ADDQ(cpup, vm, pgrec, 1);
 	CPU_STATS_ADDQ(cpup, vm, pgfrec, 1);
 	CPU_STATS_EXIT_K();
+	ASSERT(pp->p_szc == 0);
 
 	return (1);
 }
-
-
 
 /*
  * Destroy identity of the page and put it back on
@@ -3321,7 +3308,7 @@ page_rename(page_t *opp, vnode_t *vp, u_offset_t off)
 	VM_STAT_ADD(page_rename_count);
 
 	TRACE_3(TR_FAC_VM, TR_PAGE_RENAME,
-		"page rename:pp %p vp %p off %llx", opp, vp, off);
+	    "page rename:pp %p vp %p off %llx", opp, vp, off);
 
 	/*
 	 * CacheFS may call page_rename for a large NFS page
@@ -3549,8 +3536,8 @@ page_hashin(page_t *pp, vnode_t *vp, u_offset_t offset, kmutex_t *hold)
 	ASSERT(MUTEX_NOT_HELD(page_vnode_mutex(vp)));
 
 	TRACE_3(TR_FAC_VM, TR_PAGE_HASHIN,
-		"page_hashin:pp %p vp %p offset %llx",
-		pp, vp, offset);
+	    "page_hashin:pp %p vp %p offset %llx",
+	    pp, vp, offset);
 
 	VM_STAT_ADD(hashin_count);
 
@@ -3640,7 +3627,7 @@ page_hashout(page_t *pp, kmutex_t *phm)
 	vp = pp->p_vnode;
 
 	TRACE_2(TR_FAC_VM, TR_PAGE_HASHOUT,
-		"page_hashout:pp %p vp %p", pp, vp);
+	    "page_hashout:pp %p vp %p", pp, vp);
 
 	/* Kernel probe */
 	TNF_PROBE_2(page_unmap, "vm pagefault", /* CSTYLED */,
@@ -4519,7 +4506,7 @@ top:
 		 * (they will be modified if we do the putpage).
 		 */
 		mod = (hat_pagesync(pp, HAT_SYNC_DONTZERO | HAT_SYNC_STOPON_MOD)
-			& P_MOD);
+		    & P_MOD);
 		if (mod) {
 			offset = pp->p_offset;
 			/*
@@ -5141,7 +5128,7 @@ page_release(page_t *pp, int checkmod)
 	int status;
 
 	ASSERT(PAGE_LOCKED(pp) && !PP_ISFREE(pp) &&
-		(pp->p_vnode != NULL));
+	    (pp->p_vnode != NULL));
 
 	if (!hat_page_is_mapped(pp) && !IS_SWAPVP(pp->p_vnode) &&
 	    ((PAGE_SHARED(pp) && page_tryupgrade(pp)) || PAGE_EXCL(pp)) &&
@@ -5885,7 +5872,7 @@ page_numtopp_nolock(pfn_t pfnum)
 
 	/* Try last winner first */
 	if (((seg = vc->vc_pnum_memseg) != NULL) &&
-		(pfnum >= seg->pages_base) && (pfnum < seg->pages_end)) {
+	    (pfnum >= seg->pages_base) && (pfnum < seg->pages_end)) {
 		MEMSEG_STAT_INCR(nlastwon);
 		pp = seg->pages + (pfnum - seg->pages_base);
 		if (pp->p_pagenum == pfnum)
@@ -5894,7 +5881,7 @@ page_numtopp_nolock(pfn_t pfnum)
 
 	/* Else Try hash */
 	if (((seg = memseg_hash[MEMSEG_PFN_HASH(pfnum)]) != NULL) &&
-		(pfnum >= seg->pages_base) && (pfnum < seg->pages_end)) {
+	    (pfnum >= seg->pages_base) && (pfnum < seg->pages_end)) {
 		MEMSEG_STAT_INCR(nhashwon);
 		vc->vc_pnum_memseg = seg;
 		pp = seg->pages + (pfnum - seg->pages_base);
@@ -5924,7 +5911,7 @@ page_numtomemseg_nolock(pfn_t pfnum)
 
 	/* Try hash */
 	if (((seg = memseg_hash[MEMSEG_PFN_HASH(pfnum)]) != NULL) &&
-		(pfnum >= seg->pages_base) && (pfnum < seg->pages_end)) {
+	    (pfnum >= seg->pages_base) && (pfnum < seg->pages_end)) {
 		pp = seg->pages + (pfnum - seg->pages_base);
 		if (pp->p_pagenum == pfnum)
 			return (seg);
@@ -6209,184 +6196,6 @@ int
 page_ismod(page_t *pp)
 {
 	return (hat_page_getattr(pp, P_MOD));
-}
-
-/*
- * Reclaim the given constituent page from the freelist, regardless of it's
- * size.  The page will be demoted as required.
- * Returns 1 on success or 0 on failure.
- *
- * The page is unlocked if it can't be reclaimed (when freemem == 0).
- * If `lock' is non-null, it will be dropped and re-acquired if
- * the routine must wait while freemem is 0.
- */
-int
-page_reclaim_page(page_t *pp, kmutex_t *lock)
-{
-	struct pcf	*p;
-	uint_t		pcf_index;
-	struct cpu	*cpup;
-	uint_t		i;
-	pgcnt_t		collected = 0;
-
-	ASSERT(lock != NULL ? MUTEX_HELD(lock) : 1);
-	ASSERT(PAGE_EXCL(pp) && PP_ISFREE(pp));
-
-	/*
-	 * If `freemem' is 0, we cannot reclaim this page from the
-	 * freelist, so release every lock we might hold: the page,
-	 * and the `lock' before blocking.
-	 *
-	 * The only way `freemem' can become 0 while there are pages
-	 * marked free (have their p->p_free bit set) is when the
-	 * system is low on memory and doing a page_create().  In
-	 * order to guarantee that once page_create() starts acquiring
-	 * pages it will be able to get all that it needs since `freemem'
-	 * was decreased by the requested amount.  So, we need to release
-	 * this page, and let page_create() have it.
-	 *
-	 * Since `freemem' being zero is not supposed to happen, just
-	 * use the usual hash stuff as a starting point.  If that bucket
-	 * is empty, then assume the worst, and start at the beginning
-	 * of the pcf array.  If we always start at the beginning
-	 * when acquiring more than one pcf lock, there won't be any
-	 * deadlock problems.
-	 */
-
-	/* TODO: Do we need to test kcage_freemem if PG_NORELOC(pp)? */
-
-	if (freemem <= throttlefree && !page_create_throttle(1, 0)) {
-		pcf_acquire_all();
-		goto page_reclaim_nomem;
-	}
-
-	pcf_index = PCF_INDEX();
-	p = &pcf[pcf_index];
-	mutex_enter(&p->pcf_lock);
-	if (p->pcf_count > 0) {
-		collected = 1;
-		p->pcf_count -= 1;
-	}
-	mutex_exit(&p->pcf_lock);
-
-	if (!collected) {
-		VM_STAT_ADD(page_reclaim_zero);
-		/*
-		 * Check again. Its possible that some other thread
-		 * could have been right behind us, and added one
-		 * to a list somewhere.  Acquire each of the pcf locks
-		 * until we find a page.
-		 */
-		p = pcf;
-		for (i = 0; i < PCF_FANOUT; i++) {
-			mutex_enter(&p->pcf_lock);
-			if (p->pcf_count) {
-				if (p->pcf_count > 0) {
-					p->pcf_count -= 1;
-					collected = 1;
-					break;
-				}
-			}
-			p++;
-		}
-
-		if (!collected) {
-page_reclaim_nomem:
-			/*
-			 * We really can't have page `pp'.
-			 * Time for the no-memory dance with
-			 * page_free().  This is just like
-			 * page_create_wait().  Plus the added
-			 * attraction of releasing whatever mutex
-			 * we held when we were called with in `lock'.
-			 * Page_unlock() will wakeup any thread
-			 * waiting around for this page.
-			 */
-			if (lock) {
-				VM_STAT_ADD(page_reclaim_zero_locked);
-				mutex_exit(lock);
-			}
-			page_unlock(pp);
-
-			/*
-			 * get this before we drop all the pcf locks.
-			 */
-			mutex_enter(&new_freemem_lock);
-
-			p = pcf;
-			for (i = 0; i < PCF_FANOUT; i++) {
-				p->pcf_wait++;
-				mutex_exit(&p->pcf_lock);
-				p++;
-			}
-
-			freemem_wait++;
-			cv_wait(&freemem_cv, &new_freemem_lock);
-			freemem_wait--;
-
-			mutex_exit(&new_freemem_lock);
-
-			if (lock) {
-				mutex_enter(lock);
-			}
-			return (0);
-		}
-
-		/*
-		 * We beat the PCF bins over the head until
-		 * we got the memory that we wanted.
-		 * The pcf accounting has been done,
-		 * though none of the pcf_wait flags have been set,
-		 * drop the locks and continue on.
-		 */
-		ASSERT(collected == 1);
-		while (p >= pcf) {
-			mutex_exit(&p->pcf_lock);
-			p--;
-		}
-	}
-
-	/*
-	 * freemem is not protected by any lock. Thus, we cannot
-	 * have any assertion containing freemem here.
-	 */
-	freemem -= 1;
-
-	VM_STAT_ADD(pagecnt.pc_reclaim);
-	if (PP_ISAGED(pp)) {
-		page_list_sub(pp, PG_FREE_LIST);
-		TRACE_1(TR_FAC_VM, TR_PAGE_UNFREE_FREE,
-		    "page_reclaim_page_free:pp %p", pp);
-	} else {
-		page_list_sub(pp, PG_CACHE_LIST);
-		TRACE_1(TR_FAC_VM, TR_PAGE_UNFREE_CACHE,
-		    "page_reclaim_page_cache:pp %p", pp);
-	}
-
-	/*
-	 * The page we took off the freelist must be szc 0 as
-	 * we used page_list_sub which will demote the page if needed.
-	 */
-	ASSERT(pp->p_szc == 0);
-
-	/*
-	 * clear the p_free & p_age bits since this page is no longer
-	 * on the free list.  Notice that there was a brief time where
-	 * a page is marked as free, but is not on the list.
-	 *
-	 * Set the reference bit to protect against immediate pageout.
-	 */
-	PP_CLRFREE(pp);
-	PP_CLRAGED(pp);
-	page_set_props(pp, P_REF);
-
-	CPU_STATS_ENTER_K();
-	cpup = CPU;	/* get cpup now that CPU cannot change */
-	CPU_STATS_ADDQ(cpup, vm, pgrec, 1);
-	CPU_STATS_ADDQ(cpup, vm, pgfrec, 1);
-	CPU_STATS_EXIT_K();
-
-	return (1);
 }
 
 /*
@@ -6754,11 +6563,12 @@ page_capture_clean_page(page_t *pp)
 	ASSERT(curthread->t_flag & T_CAPTURING);
 
 	if (PP_ISFREE(pp)) {
-		if (!page_reclaim_page(pp, NULL)) {
+		if (!page_reclaim(pp, NULL)) {
 			skip_unlock = 1;
 			ret = EAGAIN;
 			goto cleanup;
 		}
+		ASSERT(pp->p_szc == 0);
 		if (pp->p_vnode != NULL) {
 			/*
 			 * Since this page came from the
