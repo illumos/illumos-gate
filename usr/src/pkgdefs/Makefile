@@ -214,6 +214,7 @@ COMMON_SUBDIRS= \
 	SUNWibhca \
 	SUNWibsdpu \
 	SUNWibsdp \
+	SUNWintgige \
 	SUNWiotu  \
 	SUNWioth  \
 	SUNWipc  \
@@ -396,7 +397,6 @@ COMMON_XMODS= \
 	SUNWcry \
 	SUNWcryr \
 	SUNWcryptoint \
-	SUNWintgige \
 	SUNWibsdpib \
 	SUNWkdcr \
 	SUNWkdcu \
