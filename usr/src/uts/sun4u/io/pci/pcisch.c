@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,7 +57,6 @@
 #include <sys/fm/io/pci.h>
 #include <sys/pci/pci_obj.h>
 #include <sys/pci/pcisch.h>
-#include <sys/pci/pcisch_mi.h>
 #include <sys/pci/pcisch_asm.h>
 #include <sys/x_call.h>		/* XCALL_PIL */
 
@@ -186,7 +185,6 @@ pci_obj_destroy(pci_t *pci_p)
 	sc_destroy(pci_p);
 	pbm_destroy(pci_p);
 	iommu_destroy(pci_p);
-	pci_mi_destroy(pci_p);
 	ib_destroy(pci_p);
 
 	if (cmn_p->pci_common_refcnt != 0) {
@@ -259,8 +257,8 @@ pci_intr_setup(pci_t *pci_p)
 	dev_info_t *dip = pci_p->pci_dip;
 	pbm_t *pbm_p = pci_p->pci_pbm_p;
 	cb_t *cb_p = pci_p->pci_cb_p;
-	uint32_t *intr_buf, *new_intr_buf, *ino_buf;
-	int intr_len, intr_cnt, ret, ino_buf_len;
+	uint32_t *intr_buf, *new_intr_buf;
+	int intr_len, intr_cnt, ret;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		"interrupts", (caddr_t)&intr_buf, &intr_len) != DDI_SUCCESS)
@@ -279,9 +277,7 @@ pci_intr_setup(pci_t *pci_p)
 	bcopy(intr_buf, new_intr_buf, intr_len);
 	kmem_free(intr_buf, intr_len);
 
-	new_intr_buf[CBNINTR_CDMA] = PBM_CDMA_INO_BASE +
-	    ((new_intr_buf[CBNINTR_PBM] & 0x1) ^ 0x1);
-
+	new_intr_buf[CBNINTR_CDMA] = PBM_CDMA_INO_BASE + pci_p->pci_side;
 	pci_p->pci_inos = new_intr_buf;
 	pci_p->pci_inos_len = CELLS_1275_TO_BYTES(intr_cnt);
 
@@ -289,19 +285,6 @@ pci_intr_setup(pci_t *pci_p)
 		(int *)new_intr_buf, intr_cnt))
 		cmn_err(CE_PANIC, "%s%d: cannot update interrupts property\n",
 			ddi_driver_name(dip), ddi_get_instance(dip));
-
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "ino-bitmap", (caddr_t)&ino_buf, &ino_buf_len) == DDI_SUCCESS) {
-
-		ino_buf[1] |= (1 << (new_intr_buf[CBNINTR_CDMA] - 0x20));
-
-		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		    "ino-bitmap", (int *)ino_buf, 2);
-
-		kmem_free(ino_buf, ino_buf_len);
-	}
-
-	pci_mi_setup(pci_p);
 
 	if (pci_p->pci_common_p->pci_common_refcnt == 0) {
 		cb_p->cb_no_of_inos = intr_cnt;
@@ -329,7 +312,6 @@ pci_intr_setup(pci_t *pci_p)
 	intr_dist_add_weighted(ib_intr_dist_all, pci_p->pci_ib_p);
 	return (DDI_SUCCESS);
 teardown:
-	pci_mi_destroy(pci_p);
 	pci_intr_teardown(pci_p);
 	return (ret);
 }
@@ -353,39 +335,39 @@ pci_schizo_cdma_sync(pbm_t *pbm_p)
 {
 	pci_t *pci_p = pbm_p->pbm_pci_p;
 	hrtime_t start_time;
-	ib_ino_t cdma_ino = pci_p->pci_inos[CBNINTR_CDMA];
-	volatile uint64_t *clr_p =
-	    ib_clear_intr_reg_addr(pci_p->pci_ib_p, cdma_ino);
-	volatile uint64_t *state_reg_p =
-	    IB_INO_INTR_STATE_REG(pci_p->pci_ib_p, cdma_ino);
+	volatile uint64_t *clr_p = ib_clear_intr_reg_addr(pci_p->pci_ib_p,
+		pci_p->pci_inos[CBNINTR_CDMA]);
 	uint32_t fail_cnt = pci_cdma_intr_count;
 
 	mutex_enter(&pbm_p->pbm_sync_mutex);
+#ifdef PBM_CDMA_DEBUG
+	pbm_p->pbm_cdma_req_cnt++;
+#endif /* PBM_CDMA_DEBUG */
 	pbm_p->pbm_cdma_flag = PBM_CDMA_PEND;
 	IB_INO_INTR_TRIG(clr_p);
 wait:
 	start_time = gethrtime();
-	while (pbm_p->pbm_cdma_flag != PBM_CDMA_DONE && !panicstr) {
+	while (pbm_p->pbm_cdma_flag != PBM_CDMA_DONE) {
 		if (gethrtime() - start_time <= pci_cdma_intr_timeout)
 			continue;
-		/*
-		 * if master-interrupt supported then check if OBP reset CDMA's
-		 * state machine to IDLE meaning OBP recvd CDMA interrupt during
-		 * L1-A sequence; otherwise, CDMA's state machine will remain at
-		 * state PENDING and _never_ reset to another value--even when
-		 * pbm_cdma_flag == DONE.
-		 */
-		if (pci_mi_check() && IB_INO_INTR_IDLE(state_reg_p, cdma_ino))
-			break;
 		if (--fail_cnt > 0)
 			goto wait;
 		if (pbm_p->pbm_cdma_flag == PBM_CDMA_DONE)
 			break;
-		cmn_err(CE_PANIC, "%s (%s): consistent dma sync timeout"
-		    " (cdma ino 0x%x, st=%lu)\n",
-		    pbm_p->pbm_nameinst_str, pbm_p->pbm_nameaddr_str,
-		    cdma_ino, PRINT_STATE(state_reg_p, cdma_ino));
+		cmn_err(CE_PANIC, "%s (%s): consistent dma sync timeout",
+		    pbm_p->pbm_nameinst_str, pbm_p->pbm_nameaddr_str);
 	}
+#ifdef PBM_CDMA_DEBUG
+	if (pbm_p->pbm_cdma_flag != PBM_CDMA_DONE)
+		pbm_p->pbm_cdma_to_cnt++;
+	else {
+		start_time = gethrtime() - start_time;
+		pbm_p->pbm_cdma_success_cnt++;
+		pbm_p->pbm_cdma_latency_sum += start_time;
+		if (start_time > pbm_p->pbm_cdma_latency_max)
+			pbm_p->pbm_cdma_latency_max = start_time;
+	}
+#endif /* PBM_CDMA_DEBUG */
 	mutex_exit(&pbm_p->pbm_sync_mutex);
 }
 
@@ -3461,6 +3443,9 @@ pci_pbm_cdma_intr(caddr_t a)
 {
 	pbm_t *pbm_p = (pbm_t *)a;
 	pbm_p->pbm_cdma_flag = PBM_CDMA_DONE;
+#ifdef PBM_CDMA_DEBUG
+	pbm_p->pbm_cdma_intr_cnt++;
+#endif /* PBM_CDMA_DEBUG */
 	return (DDI_INTR_CLAIMED);
 }
 

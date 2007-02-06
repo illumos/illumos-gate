@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -307,11 +307,3 @@ uint_t xmits_upper_retry_counter = 0x3E8;
  */
 uint_t xmits_pcix_diag_bugcntl_pcix = 0xA0;
 uint_t xmits_pcix_diag_bugcntl_pci =  0xFF;
-
-/*
- * To disable master interrupt support on a platform that would otherwise
- * support it, set this variable to zero.
- */
-uint_t pci_mi_enable = 1;
-
-uint64_t pci_mi_intr_clr = 1;	/* COMMON_CLEAR_INTR_REG_RECEIVED */

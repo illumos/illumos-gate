@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -95,7 +95,7 @@ RMCLOMV_OBJS	+= rmclomv.o
 WRSMD_OBJS	+= wrsmd.o
 
 PSYCHO_PCI_OBJS	+= $(PCI_COMMON_OBJS) pcipsy.o
-SCHIZO_PCI_OBJS	+= $(PCI_COMMON_OBJS) pcisch_asm.o pcisch.o pcix.o pcisch_mi.o
+SCHIZO_PCI_OBJS	+= $(PCI_COMMON_OBJS) pcisch_asm.o pcisch.o pcix.o
 SIMBA_PCI_OBJS	+= simba.o
 DB21554_OBJS	+= db21554.o
 US_OBJS 	+= us_drv.o

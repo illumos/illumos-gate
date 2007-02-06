@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,14 +171,6 @@ struct ib_ino_info {
 #define	IB_INO_INTR_PENDING(reg_p, ino) \
 	(((*(reg_p) >> (((ino) & 0x1f) << 1)) & COMMON_CLEAR_INTR_REG_MASK) == \
 	COMMON_CLEAR_INTR_REG_PENDING)
-#define	IB_INO_INTR_RECEIVED(reg_p, ino) \
-	(((*(reg_p) >> (((ino) & 0x1f) << 1)) & COMMON_CLEAR_INTR_REG_MASK) == \
-	COMMON_CLEAR_INTR_REG_RECEIVED)
-#define	IB_INO_INTR_IDLE(reg_p, ino) \
-	(((*(reg_p) >> (((ino) & 0x1f) << 1)) & COMMON_CLEAR_INTR_REG_MASK) == \
-	COMMON_CLEAR_INTR_REG_IDLE)
-#define	PRINT_STATE(reg_p, ino) \
-	((*(reg_p) >> (((ino) & 0x1f) << 1)) & COMMON_CLEAR_INTR_REG_MASK)
 #define	IB_INO_INTR_CLEAR(reg_p)	*(reg_p) = COMMON_CLEAR_INTR_REG_IDLE
 #define	IB_INO_INTR_TRIG(reg_p)	*(reg_p) = COMMON_CLEAR_INTR_REG_RECEIVED
 #define	IB_INO_INTR_PEND(reg_p)		*(reg_p) = COMMON_CLEAR_INTR_REG_PENDING
