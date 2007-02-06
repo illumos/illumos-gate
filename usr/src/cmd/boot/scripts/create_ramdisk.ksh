@@ -78,13 +78,13 @@ if [ $# -eq 1 ]; then
 fi
 
 rundir=`dirname $0`
-if [ ! -x $rundir/symdef ]; then
+if [ ! -x "$rundir"/symdef ]; then
 	# Shouldn't happen
 	echo "Warning: $rundir/symdef not present."
 	echo "Creating single archive at $ALT_ROOT/platform/i86pc/boot_archive"
 	SPLIT=no
 	compress=no
-elif $rundir/symdef "$ALT_ROOT"/platform/i86pc/kernel/unix \
+elif "$rundir"/symdef "$ALT_ROOT"/platform/i86pc/kernel/unix \
     dboot_image 2>/dev/null; then
 	SPLIT=yes
 else
@@ -123,6 +123,57 @@ function getsize
 }
 
 #
+# Copies all desired files to a target directory.
+#
+# This function depends on several variables that must be set before calling:
+# $ALT_ROOT - the target directory
+# $filelist - the list of files and directories to search
+# $NO_AMD64 - the find(1) expression to exclude files, if desired
+# $which - One of "both", "32-bit", or "64-bit"
+# $compress - whether or not the files in the archives should be compressed
+# $rdmnt - the target directory
+#
+function find_and_copy
+{
+	cd "/$ALT_ROOT"
+
+	#
+	# If compress is set, the files are gzip'd and put in the correct
+	# location in the loop.  Nothing is printed, so the pipe and cpio
+	# at the end is a nop.
+	#
+	# If compress is not set, the file names are printed, which causes
+	# the cpio at the end to do the copy.
+	#
+	find $filelist $NO_AMD64 -type f -print 2>/dev/null | while read path
+	do
+		if [ "$which" = "both" ]; then
+			if [ $compress = yes ]; then
+				dir="${path%/*}"
+				mkdir -p "$rdmnt/$dir"
+				/usr/bin/gzip -c "$path" > "$rdmnt/$path"
+			else
+				print "$path"
+			fi
+		else
+			filetype=`file $path 2>/dev/null |\
+			    awk '/ELF/ { print \$3 }'`
+			if [ -z "$filetype" ] || [ "$filetype" = "$which" ]
+			then
+				if [ $compress = yes ]; then
+					dir="${path%/*}"
+					mkdir -p "$rdmnt/$dir"
+					/usr/bin/gzip -c "$path" > \
+					    "$rdmnt/$path"
+				else
+					print "$path"
+				fi
+			fi
+		fi
+	done | cpio -pdum "$rdmnt" 2>/dev/null
+}
+
+#
 # The first argument can be:
 #
 # "both" - create an archive with both 32-bit and 64-bit binaries
@@ -157,31 +208,7 @@ function create_ufs
 	files=
 
 	# do the actual copy
-	cd "/$ALT_ROOT"
-
-	for path in `find $filelist $NO_AMD64 -type f -print 2> /dev/null`
-	do
-		if [ "$which" = "both" ]; then
-			files="$files $path"
-		else
-			filetype=`file $path 2>/dev/null |\
-			    awk '/ELF/ { print \$3 }'`
-			if [ -z "$filetype" ] || [ "$filetype" = "$which" ]
-			then
-				files="$files $path"
-			fi
-		fi
-	done
-	if [ $compress = yes ]; then
-		ls $files | while read path
-		do
-			dir="${path%/*}"
-			mkdir -p "$rdmnt/$dir"
-			/usr/bin/gzip -c "$path" > "$rdmnt/$path"
-		done
-	else
-		ls $files | cpio -pdum "$rdmnt" 2> /dev/null
-	fi
+	find_and_copy
 	umount "$rdmnt"
 	rmdir "$rdmnt"
 
@@ -233,30 +260,7 @@ function create_isofs
 	files=
 	isocmd="mkisofs -quiet -graft-points -dlrDJN -relaxed-filenames"
 
-	cd "/$ALT_ROOT"
-	for path in `find $filelist $NO_AMD64 -type f -print 2> /dev/null`
-	do
-		if [ "$which" = "both" ]; then
-			files="$files $path"
-		else
-			filetype=`file $path 2>/dev/null |\
-			    awk '/ELF/ { print \$3 }'`
-			if [ -z "$filetype" ] || [ "$filetype" = "$which" ]
-			then
-				files="$files $path"
-			fi
-		fi
-	done
-	if [ $compress = yes ]; then
-		ls $files | while read path
-		do
-			dir="${path%/*}"
-			mkdir -p "$rdmnt/$dir"
-			/usr/bin/gzip -c "$path" > "$rdmnt/$path"
-		done
-	else
-		ls $files | cpio -pdum "$rdmnt" 2> /dev/null
-	fi
+	find_and_copy
 	isocmd="$isocmd \"$rdmnt\""
 	rm -f "$errlog"
 
@@ -302,7 +306,7 @@ function create_archive
 
 	# sanity check the archive before moving it into place
 	#
-	ARCHIVE_SIZE=`du -k "${archive}-new" | cut -f 1`
+	ARCHIVE_SIZE=`ls -l "${archive}-new" | nawk '{ print $5 }'`
 	if [ $compress = yes ]
 	then
 		#
@@ -339,14 +343,14 @@ function create_archive
 #
 # get filelist
 #
-files=$(ls "$ALT_ROOT/boot/solaris/filelist.ramdisk" \
-	"$ALT_ROOT/etc/boot/solaris/filelist.ramdisk" 2>/dev/null)
-if [[ -z "$files" ]]
+if [ ! -f "$ALT_ROOT/boot/solaris/filelist.ramdisk" ] &&
+    [ ! -f "$ALT_ROOT/etc/boot/solaris/filelist.ramdisk" ]
 then
 	print -u2 "Can't find filelist.ramdisk"
 	exit 1
 fi
-filelist=$(sort -u $files)
+filelist=$(cat "$ALT_ROOT/boot/solaris/filelist.ramdisk" \
+    "$ALT_ROOT/etc/boot/solaris/filelist.ramdisk" 2>/dev/null | sort -u)
 
 scratch=tmp
 
