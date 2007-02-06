@@ -6502,6 +6502,65 @@ ohci_done_list_tds(
 
 
 /*
+ * Remove old_td from tw and update the links.
+ */
+void
+ohci_unlink_td_from_tw(
+	ohci_state_t		*ohcip,
+	ohci_td_t		*old_td,
+	ohci_trans_wrapper_t	*tw)
+{
+	ohci_td_t *next, *head, *tail;
+
+	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
+	    "ohci_unlink_td_from_tw: ohcip = 0x%p, old_td = 0x%p, tw = 0x%p",
+	    (void *)ohcip, (void *)old_td, (void *)tw);
+
+	if (old_td == NULL || tw == NULL) {
+
+		return;
+	}
+
+	head = tw->tw_hctd_head;
+	tail = tw->tw_hctd_tail;
+
+	if (head == NULL) {
+
+		return;
+	}
+
+	/* if this old_td is on head */
+	if (old_td == head) {
+		if (old_td == tail) {
+			tw->tw_hctd_head = NULL;
+			tw->tw_hctd_tail = NULL;
+		} else {
+			tw->tw_hctd_head = ohci_td_iommu_to_cpu(ohcip,
+				Get_TD(head->hctd_tw_next_td));
+		}
+
+		return;
+	}
+
+	/* find this old_td's position in the tw */
+	next = ohci_td_iommu_to_cpu(ohcip, Get_TD(head->hctd_tw_next_td));
+	while (next && (old_td != next)) {
+		head = next;
+		next = ohci_td_iommu_to_cpu(ohcip,
+				Get_TD(next->hctd_tw_next_td));
+	}
+
+	/* unlink the found old_td from the tw */
+	if (old_td == next) {
+		Set_TD(head->hctd_tw_next_td, Get_TD(next->hctd_tw_next_td));
+		if (old_td == tail) {
+			tw->tw_hctd_tail = head;
+		}
+	}
+}
+
+
+/*
  * ohci_deallocate_td:
  * NOTE: This function is also called from POLLED MODE.
  *
@@ -6540,42 +6599,8 @@ ohci_deallocate_td(
 	 * transfer wrapper.
 	 */
 	if ((Get_TD(old_td->hctd_state) != HC_TD_RECLAIM) && tw) {
-		ohci_td_t	*td = (ohci_td_t *)tw->tw_hctd_head;
-		ohci_td_t	*test;
 
-		/*
-		 * Take this TD off the transfer wrapper's list since
-		 * the pipe is FIFO, this must be the first TD on the
-		 * list.
-		 */
-		ASSERT((ohci_td_t *)tw->tw_hctd_head == old_td);
-
-		tw->tw_hctd_head =
-		    ohci_td_iommu_to_cpu(ohcip, Get_TD(td->hctd_tw_next_td));
-
-		if (tw->tw_hctd_head) {
-			test = (ohci_td_t *)tw->tw_hctd_head;
-			ASSERT(Get_TD(test->hctd_state) != HC_TD_DUMMY);
-		}
-
-		/*
-		 * If the head becomes NULL, then there are no more
-		 * active TD's for this transfer wrapper. Also	set
-		 * the tail to NULL.
-		 */
-		if (tw->tw_hctd_head == NULL) {
-			tw->tw_hctd_tail = NULL;
-		} else {
-			/*
-			 * If this is the last td on the list, make
-			 * sure it doesn't point to yet another td.
-			 */
-			if (tw->tw_hctd_head == tw->tw_hctd_tail) {
-				td = (ohci_td_t *)tw->tw_hctd_head;
-
-				ASSERT(Get_TD(td->hctd_tw_next_td) == NULL);
-			}
-		}
+		ohci_unlink_td_from_tw(ohcip, old_td, tw);
 	}
 
 	bzero((void *)old_td, sizeof (ohci_td_t));
