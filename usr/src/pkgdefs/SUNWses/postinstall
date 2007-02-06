@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # SUNWses postinstall script
@@ -81,7 +81,8 @@ on_the_list()
 }
 
 merged_aliases=""
-dev_aliases='"scsiclass,0d" "scsiclass,00.vSUN.pUniversal_Xport" "scsiclass,00.vSTK.pUniversal_Xport"'
+dev_aliases='"scsiclass,0d"'
+obsolete_aliases='"scsiclass,00.vSUN.pUniversal_Xport" "scsiclass,00.vSTK.pUniversal_Xport"'
 
 current_aliases=`grep \^ses ${DRVALS} | sed -e 's/^ses //g'`
 
@@ -96,7 +97,11 @@ then
 		on_the_list $current "$merged_aliases"
 		if [ $? -eq 0 ]
 		then
-			merged_aliases=`echo $merged_aliases $current`
+			on_the_list $current "$obsolete_aliases"
+			if [ $? -eq 0 ]
+			then
+				merged_aliases=`echo $merged_aliases $current`
+			fi
 		fi
 	done
 
