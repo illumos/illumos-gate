@@ -1983,7 +1983,7 @@ fr_info_t *fin;
 # endif
 	}
 #endif
-	bcopy((char *)fin, (char *)&ofin, sizeof(fin));
+	bcopy((char *)fin, (char *)&ofin, sizeof(*fin));
 
 	/*
 	 * in the IPv4 case we must zero the i6addr union otherwise
@@ -3553,7 +3553,7 @@ fr_info_t *fin;
 	if (fin->fin_plen < sizeof(*oip6))
 		return NULL;
 
-	bcopy((char *)fin, (char *)&ofin, sizeof(fin));
+	bcopy((char *)fin, (char *)&ofin, sizeof(*fin));
 	ofin.fin_v = 6;
 	ofin.fin_ifp = fin->fin_ifp;
 	ofin.fin_out = !fin->fin_out;
