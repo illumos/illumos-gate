@@ -1477,6 +1477,29 @@ process_srat(struct srat *tp)
 }
 
 static void
+process_slit(struct slit *tp)
+{
+
+	/*
+	 * Check the number of localities; if it's too huge, we just
+	 * return and locality enumeration code will handle this later,
+	 * if possible.
+	 *
+	 * Note that the size of the table is the square of the
+	 * number of localities; if the number of localities exceeds
+	 * UINT16_MAX, the table size may overflow an int when being
+	 * passed to bsetprop() below.
+	 */
+	if (tp->number >= SLIT_LOCALITIES_MAX)
+		return;
+
+	bsetprop(SLIT_NUM_PROPNAME, strlen(SLIT_NUM_PROPNAME), &tp->number,
+	    sizeof (tp->number));
+	bsetprop(SLIT_PROPNAME, strlen(SLIT_PROPNAME), &tp->entry,
+	    tp->number * tp->number);
+}
+
+static void
 build_firmware_properties(void)
 {
 	struct table_header *tp;
@@ -1486,6 +1509,9 @@ build_firmware_properties(void)
 
 	if (tp = find_fw_table("SRAT"))
 		process_srat((struct srat *)tp);
+
+	if (tp = find_fw_table("SLIT"))
+		process_slit((struct slit *)tp);
 }
 
 /*

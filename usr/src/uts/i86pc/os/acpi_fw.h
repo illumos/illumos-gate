@@ -138,6 +138,21 @@ struct srat {
 #define	SRAT_HOT_PLUG	  (2)
 #define	SRAT_NON_VOLATILE (4)
 
+struct slit {
+	struct table_header hdr;
+	uint64_t number;
+	uint8_t  entry[1];
+};
+
+/*
+ * Arbitrary limit on number of localities we handle; if
+ * this limit is raised to more than UINT16_MAX, make sure
+ * process_slit() knows how to handle it.
+ */
+#define	SLIT_LOCALITIES_MAX	(4096)
+
+#define	SLIT_NUM_PROPNAME	"acpi-slit-localities"
+#define	SLIT_PROPNAME		"acpi-slit"
 
 #pragma pack()
 
