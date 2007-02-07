@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,7 @@ extern "C" {
  * getting confused if a structure is changed and a mismatch occurs.
  * This should be incremented each time a structure is changed.
  */
-#define	DOORVER 1
+#define	DOORVER 2
 #define	DOORNM	"/var/run/ike_door"
 
 
@@ -218,6 +218,8 @@ typedef struct {
 typedef struct {
 	uint16_t	p1xf_dh_group;
 	uint16_t	p1xf_encr_alg;
+	uint16_t	p1xf_encr_low_bits;
+	uint16_t	p1xf_encr_high_bits;
 	uint16_t	p1xf_auth_alg;
 	uint16_t	p1xf_auth_meth;
 	uint16_t	p1xf_prf;

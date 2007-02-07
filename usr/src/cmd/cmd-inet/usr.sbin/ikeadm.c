@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1421,6 +1421,10 @@ print_xform(char *prefix, ike_p1_xform_t *xfp, boolean_t print_lifetimes)
 	    authmethstr(xfp->p1xf_auth_meth));
 	(void) printf(gettext("\n%s Encryption alg: "), prefix);
 	(void) dump_ealg(xfp->p1xf_encr_alg, stdout);
+	if (xfp->p1xf_encr_low_bits != 0) {
+		(void) printf(gettext("(%d..%d)"), xfp->p1xf_encr_low_bits,
+		    xfp->p1xf_encr_high_bits);
+	}
 	(void) printf(gettext("; Authentication alg: "));
 	(void) dump_aalg(xfp->p1xf_auth_alg, stdout);
 	(void) printf(gettext("\n%s PRF: %s"), prefix, prfstr(xfp->p1xf_prf));
