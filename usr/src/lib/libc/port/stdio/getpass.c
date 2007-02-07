@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,7 @@ __getpass(const char *prompt, int size)
 	rmutex_t *lk;
 
 	if (pbuf == NULL ||
-	    (fi = fopen("/dev/tty", "rF")) == NULL)
+	    (fi = fopen("/dev/tty", "r+F")) == NULL)
 		return (NULL);
 	setbuf(fi, NULL);
 	sig = signal(SIGINT, catch);
@@ -89,8 +89,7 @@ __getpass(const char *prompt, int size)
 	flags = ttyb.c_lflag;
 	ttyb.c_lflag &= ~(ECHO | ECHOE | ECHOK | ECHONL);
 	(void) ioctl(FILENO(fi), TCSETAF, &ttyb);
-	FLOCKFILE(lk, stderr);
-	(void) fputs(prompt, stderr);
+	(void) fputs(prompt, fi);
 	p = pbuf;
 	while (!intrupt &&
 		(c = GETC(fi)) != '\n' && c != '\r' && c != EOF) {
@@ -98,10 +97,9 @@ __getpass(const char *prompt, int size)
 			*p++ = (char)c;
 	}
 	*p = '\0';
+	(void) PUTC('\n', fi);
 	ttyb.c_lflag = flags;
 	(void) ioctl(FILENO(fi), TCSETAW, &ttyb);
-	(void) PUTC('\n', stderr);
-	FUNLOCKFILE(lk);
 	(void) signal(SIGINT, sig);
 	(void) fclose(fi);
 	if (intrupt)
