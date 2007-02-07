@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -202,7 +202,18 @@ _exec_nis_cb(int instatus,
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 
 	if (instatus != YP_TRUE) {
-		*(eargp->yp_status) = YPERR_YPERR;
+		/*
+		 * If we have no more data to look at, we want to
+		 * keep yp_status from previous key/value pair
+		 * that we processed.
+		 * If this is the 1st time we enter this callback,
+		 * yp_status is already set to YPERR_YPERR
+		 * (see _exec_nis_lookup() for when this callback
+		 * and arguments are set initially).
+		 */
+		if (instatus != YP_NOMORE) {
+			*(eargp->yp_status) = YPERR_YPERR;
+		}
 		return (0);	/* yp_all may decide otherwise... */
 	}
 
@@ -324,6 +335,15 @@ _exec_nis_lookup(nis_backend_ptr_t be, nss_XbyY_args_t *argp, int getby_flag)
 			break;
 		case YPERR_BUSY:
 			res = NSS_TRYAGAIN;
+			break;
+		case YPERR_KEY:
+			/*
+			 * If no such key, return NSS_NOTFOUND
+			 * as this looks more relevant; it will
+			 * also help libnsl to try with another
+			 * policy (see _getexecprof()).
+			 */
+			res = NSS_NOTFOUND;
 			break;
 		default:
 			res = NSS_UNAVAIL;
