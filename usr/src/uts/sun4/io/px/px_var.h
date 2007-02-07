@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,6 +114,7 @@ struct px {
 	/*
 	 * px device node properties:
 	 */
+	pcie_req_id_t px_bdf;
 	px_bus_range_t px_bus_range;	/* "bus-range" */
 	px_ranges_t *px_ranges_p;	/* "ranges" data & length */
 	int px_ranges_length;

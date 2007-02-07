@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -900,7 +900,8 @@ pxb_initchild(dev_info_t *child)
 			/*
 			 * Merged ok - return failure to remove the node.
 			 */
-			pxb_removechild(child);
+			ddi_set_name_addr(child, NULL);
+			ddi_remove_minor_node(child, NULL);
 			result = DDI_FAILURE;
 			goto done;
 		}
@@ -919,7 +920,8 @@ pxb_initchild(dev_info_t *child)
 		cmn_err(CE_WARN, "!%s@%s: %s.conf properties not merged",
 		    ddi_driver_name(child), ddi_get_name_addr(child),
 		    ddi_driver_name(child));
-		pxb_removechild(child);
+		ddi_set_name_addr(child, NULL);
+		ddi_remove_minor_node(child, NULL);
 		result = DDI_NOT_WELL_FORMED;
 		goto done;
 	}

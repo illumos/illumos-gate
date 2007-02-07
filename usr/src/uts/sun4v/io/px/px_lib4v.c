@@ -1910,3 +1910,15 @@ px_lib_is_in_drain_state(px_t *px_p)
 {
 	return (B_FALSE);
 }
+
+/*
+ * There is no IOAPI to get the BDF of the pcie root port nexus at this moment.
+ * Assume it is 0x0000, until otherwise noted.  For now, all sun4v platforms
+ * have programmed the BDF to be 0x0000.
+ */
+/*ARGSUSED*/
+pcie_req_id_t
+px_lib_get_bdf(px_t *px_p)
+{
+	return (0x0000);
+}

@@ -1639,7 +1639,9 @@ px_lib_do_peek(dev_info_t *dip, peekpoke_ctlops_t *in_args)
 	on_trap_data_t otd;
 
 	mutex_enter(&pec_p->pec_pokefault_mutex);
+	mutex_enter(&px_p->px_fm_mutex);
 	pec_p->pec_safeacc_type = DDI_FM_ERR_PEEK;
+	mutex_exit(&px_p->px_fm_mutex);
 
 	if (!on_trap(&otd, OT_DATA_ACCESS)) {
 		uintptr_t tramp = otd.ot_trampoline;
@@ -2518,4 +2520,16 @@ px_lib_is_in_drain_state(px_t *px_p)
 	}
 
 	return (drain_status);
+}
+
+pcie_req_id_t
+px_lib_get_bdf(px_t *px_p)
+{
+	pxu_t 	*pxu_p = (pxu_t *)px_p->px_plat_p;
+	caddr_t csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
+	pcie_req_id_t bdf;
+
+	bdf = CSR_BR(csr_base, DMC_PCI_EXPRESS_CONFIGURATION, REQ_ID);
+
+	return (bdf);
 }

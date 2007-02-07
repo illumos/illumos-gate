@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@ extern "C" {
 typedef struct pf_data {
 	dev_info_t	*dip;
 	pcie_req_id_t	bdf;
+	pcie_req_id_t	rp_bdf;
 	uint32_t	severity_flags;
 	int		parent_index;
 	pcie_req_id_t	fault_bdf;

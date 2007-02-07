@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,14 +196,21 @@ pf_init(dev_info_t *dip, ddi_iblock_cookie_t ibc)
 	struct i_ddi_fmhdl	*fmhdl = DEVI(dip)->devi_fmhdl;
 	int			cap = DDI_FM_EREPORT_CAPABLE;
 
-	mutex_init(&ppd_p->ppd_fm_lock, NULL, MUTEX_DRIVER, (void *)ibc);
-
 	if (fmhdl) {
 		fmhdl->fh_cap |= cap;
 	} else {
 		ppd_p->ppd_fm_flags |= PF_IS_NH;
 		ddi_fm_init(dip, &cap, &ibc);
+		fmhdl = DEVI(dip)->devi_fmhdl;
 	}
+
+	/* If ddi_fm_init fails for any reason RETURN */
+	if (!fmhdl || !(cap & DDI_FM_EREPORT_CAPABLE)) {
+		ppd_p->ppd_fm_flags = 0;
+		return;
+	}
+
+	mutex_init(&ppd_p->ppd_fm_lock, NULL, MUTEX_DRIVER, (void *)ibc);
 	ppd_p->ppd_fm_flags |= PF_FM_READY;
 }
 
@@ -212,6 +219,10 @@ void
 pf_fini(dev_info_t *dip)
 {
 	pcie_ppd_t	*ppd_p = pcie_get_ppd(dip);
+
+	/* Don't fini anything if device isn't FM Ready */
+	if (!(ppd_p->ppd_fm_flags & PF_FM_READY))
+		return;
 
 	/* undo non-hardened drivers */
 	if (ppd_p->ppd_fm_flags & PF_IS_NH) {
@@ -510,9 +521,11 @@ pf_en_dq(pf_data_t *pf_data_p, pf_data_t *dq_p, int *dq_tail_p,
 	if (*dq_tail_p >= (int)pf_dq_size)
 		return (DDI_FAILURE);
 
-	/* Look for parent BDF if pfd is not from RC */
-	if (pbdf != (uint16_t)0xFFFF)
+	/* Look for parent BDF if pfd is not from RC and save rp_bdf */
+	if (pbdf != (uint16_t)0xFFFF) {
 		parent_index = pf_find_in_q(pbdf, dq_p, *dq_tail_p);
+		pf_data_p->rp_bdf = dq_p[0].rp_bdf;
+	}
 
 	*dq_tail_p += 1;
 	dq_p[*dq_tail_p] = *pf_data_p;
@@ -1099,6 +1112,7 @@ pf_matched_in_rc(pf_data_t *dq_p, pf_data_t *pf_data_p, uint32_t abort_type)
  * with the TLP information.  The caller may pass in NULL for any of the
  * mentioned variables, if they are not interested in them.
  */
+/* ARGSUSED */
 int
 pf_tlp_decode(dev_info_t *rpdip, pf_data_t *pf_data_p, pcie_req_id_t *bdf,
     uint32_t *addr, uint32_t *trans_type)
@@ -1107,8 +1121,7 @@ pf_tlp_decode(dev_info_t *rpdip, pf_data_t *pf_data_p, pcie_req_id_t *bdf,
 	pcie_req_id_t	rp_bdf, rid_bdf, tlp_bdf;
 	uint32_t	tlp_addr, tlp_trans_type;
 
-	if (pcie_get_bdf_from_dip(rpdip, &rp_bdf) != DDI_SUCCESS)
-		rp_bdf = (pcie_req_id_t)-1;
+	rp_bdf = pf_data_p->rp_bdf;
 
 	switch (tlp_hdr->type) {
 	case PCIE_TLP_TYPE_IO:
@@ -1169,14 +1182,14 @@ pf_tlp_decode(dev_info_t *rpdip, pf_data_t *pf_data_p, pcie_req_id_t *bdf,
  * [44:63]  Reserved
  * [64:127] Address			(saer_h2-saer_h3)
  */
+/* ARGSUSED */
 static int
 pf_pci_decode(dev_info_t *rpdip, pf_data_t *pf_data_p, uint16_t *cmd,
     pcie_req_id_t *bdf, uint32_t *addr, uint32_t *trans_type) {
 	pcix_attr_t	*attr;
 	pcie_req_id_t	rp_bdf;
 
-	if (pcie_get_bdf_from_dip(rpdip, &rp_bdf) != DDI_SUCCESS)
-		rp_bdf = (pcie_req_id_t)-1;
+	rp_bdf = pf_data_p->rp_bdf;
 
 	*cmd = GET_SAER_CMD(pf_data_p);
 
@@ -1266,10 +1279,27 @@ pf_send_ereport(dev_info_t *rpdip, ddi_fm_error_t *derr, pf_data_t *dq_p,
 	char		buf[FM_MAX_CLASS];
 	pf_data_t	*pfd_p;
 	int		i, total = dq_tail;
+	boolean_t	hasError = B_FALSE;
 
 	i = 0;
-	for (pfd_p = dq_p; IS_RC(pfd_p) && i <= dq_tail; pfd_p++, i++) {
-		total--;
+	/*
+	 * Search through the error queue and look for the number of pf_data
+	 * from the RC and if the queue contains any errors.  All the pf_data's
+	 * from the RC will only be at the top of the queue.
+	 */
+	for (pfd_p = dq_p; i <= dq_tail; pfd_p++, i++) {
+		if (IS_RC(pfd_p)) {
+			total--;
+			if (pfd_p->s_status)
+				hasError = B_TRUE;
+		} else {
+			if (hasError)
+				break;
+			if (pfd_p->severity_flags != PF_NO_ERROR) {
+				hasError = B_TRUE;
+				break;
+			}
+		}
 	}
 
 	i = dq_tail;
@@ -1277,10 +1307,8 @@ pf_send_ereport(dev_info_t *rpdip, ddi_fm_error_t *derr, pf_data_t *dq_p,
 		if (IS_RC(pfd_p))
 			continue;
 
-		if (pfd_p->send_erpt == PF_SEND_ERPT_NO)
-			goto unlock;
-
-		if (derr->fme_flag != DDI_FM_ERR_UNEXPECTED)
+		if ((!hasError) || (pfd_p->send_erpt == PF_SEND_ERPT_NO) ||
+		    (derr->fme_flag != DDI_FM_ERR_UNEXPECTED))
 			goto unlock;
 
 		(void) snprintf(buf, FM_MAX_CLASS, "%s", "fire.fabric");

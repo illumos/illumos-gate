@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -232,7 +232,6 @@ px_bus_exit(dev_info_t *dip, ddi_acc_handle_t handle)
 int
 px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 {
-	dev_info_t	*pdip = ddi_get_parent(dip);
 	px_t		*px_p = (px_t *)impl_data;
 	int		i, acc_type = 0;
 	int		lookup, rc_err, fab_err = PF_NO_PANIC;
@@ -241,35 +240,7 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	px_ranges_t	*ranges_p;
 	int		range_len;
 
-	/*
-	 * Deadlock scenario:
-	 * 1. A fabric or mondo 62 interrupt with respect to px0 - T1/cpu0;
-	 * 2. While error handling thread T1 is running on cpu0, a trap
-	 *    occurs to cpu1 - T2/cpu1;
-	 * 3. While doing error handling on T1, a precise trap occurs,
-	 *    overtaken T1 - T1+/cpu0;
-	 *
-	 * Why threads deadlock:
-	 *   T1 owns px_fm_mutex, T2 owns rootnex' fh_lock, but blocked on
-	 *   px_fm_mutex, T1+ blocked on rootnex' fh_lock which won't be
-	 *   released since T2 will never get px_fm_mutex since T1+ buried
-	 *   thread T1 who is responsible for releasing px_fm_mutex.
-	 *
-	 * Solution:
-	 *   px_fm_callback must release rootnex' fh_lock prior to acquire
-	 *   px_fm_mutex and reaquire the fh_lock after release px_fm_mutex;
-	 *   if px_fm_callback is unable to acquire px_fm_mutex, meaning the
-	 *   latest trap has either overtaken the error handling thread or an
-	 *   error handling thread on another cpu owns it, just quit with OK
-	 *   status. Note, in this case, the cpu sync error handler should
-	 *   respect nexus'return status and not to panic, otherwise system
-	 *   will hang.
-	 */
-	i_ddi_fm_handler_exit(pdip);
-	if (!mutex_tryenter(&px_p->px_fm_mutex)) {
-		i_ddi_fm_handler_enter(pdip);
-		return (DDI_FM_OK);
-	}
+	mutex_enter(&px_p->px_fm_mutex);
 
 	addr_high = (uint32_t)((uint64_t)derr->fme_bus_specific >> 32);
 	addr_low = (uint32_t)((uint64_t)derr->fme_bus_specific);
@@ -301,7 +272,6 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	/* This address doesn't belong to this leaf, just return with OK */
 	if (!acc_type) {
 		mutex_exit(&px_p->px_fm_mutex);
-		i_ddi_fm_handler_enter(pdip);
 		return (DDI_FM_OK);
 	}
 
@@ -320,7 +290,6 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	}
 
 	mutex_exit(&px_p->px_fm_mutex);
-	i_ddi_fm_handler_enter(pdip);
 
 	if ((rc_err & (PX_PANIC | PX_PROTECTED)) || (fab_err & PF_PANIC) ||
 	    (lookup == PF_HDL_NOTFOUND))
@@ -418,7 +387,6 @@ px_err_safeacc_check(px_t *px_p, ddi_fm_error_t *derr)
 		/*
 		 * cautious access protection, protected from all err.
 		 */
-		ASSERT(MUTEX_HELD(&pec_p->pec_pokefault_mutex));
 		ddi_fm_acc_err_get(pec_p->pec_acc_hdl, derr,
 		    DDI_FME_VERSION);
 		derr->fme_flag = acctype;
@@ -429,7 +397,6 @@ px_err_safeacc_check(px_t *px_p, ddi_fm_error_t *derr)
 		 * ddi_poke protection, check nexus and children for
 		 * expected errors.
 		 */
-		ASSERT(MUTEX_HELD(&pec_p->pec_pokefault_mutex));
 		membar_sync();
 		derr->fme_flag = acctype;
 		break;
@@ -470,6 +437,8 @@ px_err_fill_pfd(dev_info_t *rpdip, px_err_pcie_t *regs)
 	pcie_req_id_t	fault_bdf = 0;
 	uint32_t	fault_addr = 0;
 	uint16_t	s_status = 0;
+
+	pf_data.rp_bdf = px_p->px_bdf;
 
 	/*
 	 * set RC s_status in PCI term to coordinate with downstream fabric
@@ -565,6 +534,7 @@ px_pcie_log(dev_info_t *dip, px_err_pcie_t *regs, int severity)
 static int
 px_pcie_ptlp(dev_info_t *dip, ddi_fm_error_t *derr, px_err_pcie_t *regs)
 {
+	px_t		*px_p = DIP_TO_STATE(dip);
 	pf_data_t	pf_data;
 	pcie_req_id_t	bdf;
 	uint32_t	addr, trans_type;
@@ -577,6 +547,7 @@ px_pcie_ptlp(dev_info_t *dip, ddi_fm_error_t *derr, px_err_pcie_t *regs)
 	if (!regs->rx_hdr1)
 		goto done;
 
+	pf_data.rp_bdf = px_p->px_bdf;
 	pf_data.aer_h0 = regs->rx_hdr1;
 	pf_data.aer_h1 = regs->rx_hdr2;
 	pf_data.aer_h2 = regs->rx_hdr3;
@@ -646,6 +617,8 @@ px_rp_en_q(px_t *px_p, pcie_req_id_t fault_bdf, uint32_t fault_addr,
 	} else
 		pf_data.fault_bdf = fault_bdf;
 
+	pf_data.bdf = px_p->px_bdf;
+	pf_data.rp_bdf = px_p->px_bdf;
 	pf_data.fault_addr = fault_addr;
 	pf_data.s_status = s_status;
 	pf_data.send_erpt = PF_SEND_ERPT_NO;

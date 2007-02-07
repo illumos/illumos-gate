@@ -822,11 +822,11 @@ px_err_cmn_intr(px_t *px_p, ddi_fm_error_t *derr, int caller, int block)
 
 	ASSERT(MUTEX_HELD(&px_p->px_fm_mutex));
 
-	/* snap shot the current fire registers */
-	px_err_snapshot(px_p, &ss, block);
-
 	/* check for safe access */
 	px_err_safeacc_check(px_p, derr);
+
+	/* snap shot the current fire registers */
+	px_err_snapshot(px_p, &ss, block);
 
 	/* send ereports/handle/clear registers */
 	err = px_err_erpt_and_clr(px_p, derr, &ss);

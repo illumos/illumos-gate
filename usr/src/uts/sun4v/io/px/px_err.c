@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,6 +154,7 @@ px_err_fill_pfd(dev_info_t *dip, px_t *px_p, px_rc_err_t *epkt) {
 		uint32_t	trans_type;
 		uint32_t	dir = pec_p->pec_descr.dir;
 
+		pf_data.rp_bdf = px_p->px_bdf;
 		pf_data.aer_h0 = (uint32_t)(pec_p->hdr[0]);
 		pf_data.aer_h1 = (uint32_t)(pec_p->hdr[0] >> 32);
 		pf_data.aer_h2 = (uint32_t)(pec_p->hdr[1]);
@@ -555,6 +556,7 @@ px_intr_handle_errors(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 static int
 px_pcie_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 {
+	px_t		*px_p = DIP_TO_STATE(dip);
 	px_pec_err_t	*pec = (px_pec_err_t *)epkt;
 	px_err_pcie_t	*pcie = (px_err_pcie_t *)epkt;
 	pf_data_t	pf_data;
@@ -565,6 +567,7 @@ px_pcie_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 	 * Check for failed PIO Read/Writes, which are errors that are not
 	 * defined in the PCIe spec.
 	 */
+	pf_data.rp_bdf = px_p->px_bdf;
 	temp = PCIE_AER_UCE_UR | PCIE_AER_UCE_CA;
 	if (((pec->pec_descr.dir == DIR_READ) || (pec->pec_descr.dir ==
 	    DIR_WRITE)) && pec->pec_descr.U && (pec->ue_reg_status == temp)) {

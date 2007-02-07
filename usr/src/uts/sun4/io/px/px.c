@@ -273,6 +273,9 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		/* Initialize device handle */
 		px_p->px_dev_hdl = dev_hdl;
 
+		/* Cache the BDF of the root port nexus */
+		px_p->px_bdf = px_lib_get_bdf(px_p);
+
 		px_p->px_dq_p = (pf_data_t *)
 		    kmem_zalloc(sizeof (pf_data_t) * pf_get_dq_size(),
 		    KM_SLEEP);
