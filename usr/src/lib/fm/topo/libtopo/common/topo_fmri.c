@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -356,6 +356,7 @@ fmri_prop(topo_hdl_t *thp, nvlist_t *resource, const char *pgname,
 		return (set_error(thp, ETOPO_METHOD_INVAL, err,
 		    "fmri_prop", NULL));
 
+	*prop = NULL;
 	pl.pl_resource = resource;
 	pl.pl_err = 0;
 	pl.pl_type = type;
@@ -372,12 +373,20 @@ fmri_prop(topo_hdl_t *thp, nvlist_t *resource, const char *pgname,
 		return (set_error(thp, pl.pl_err, err, "fmri_prop", NULL));
 	}
 
+	/*
+	 * Walk terminated without finding resource or property
+	 */
+	if (*prop == NULL)
+		return (set_error(thp, ETOPO_PROP_NOENT, err, "fmri_prop",
+		    NULL));
+
 	return (0);
 }
 
 int
 topo_fmri_asru(topo_hdl_t *thp, nvlist_t *nvl, nvlist_t **asru, int *err)
 {
+
 	if (fmri_prop(thp, nvl, TOPO_PGROUP_PROTOCOL, TOPO_PROP_ASRU,
 	    TOPO_TYPE_FMRI, asru, err) < 0)
 		return (set_error(thp, *err, err, "topo_fmri_asru", NULL));
