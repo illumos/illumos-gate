@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,8 +85,8 @@ static ACPI_STATUS tzmon_zone_callback(ACPI_HANDLE obj, UINT32 nest,
     void *ctx, void **rv);
 static void tzmon_find_zones(void);
 static void tzmon_monitor(void *ctx);
-static void tzmon_set_power_device(ACPI_HANDLE dev, int on_off);
-static void tzmon_set_power(ACPI_BUFFER devlist, int on_off);
+static void tzmon_set_power_device(ACPI_HANDLE dev, int on_off, char *tz_name);
+static void tzmon_set_power(ACPI_BUFFER devlist, int on_off, char *tz_name);
 static void tzmon_eval_zone(thermal_zone_t *tzp);
 static void tzmon_do_shutdown(void);
 
@@ -289,7 +289,7 @@ tzmon_notify_zone(ACPI_HANDLE obj, UINT32 val, void *ctx)
 		break;
 	case 0x83:	/* Thermal Relationship Table changed */
 		/* not handling _TRT objects, so not handling this event */
-		cmn_err(CE_CONT, "?tzmon: thermal relationship table changed");
+		DTRACE_PROBE1(trt__change, char *, (char *)tzp->zone_name);
 		break;
 	default:
 		break;
@@ -473,8 +473,8 @@ tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 				tzp->al[level].Pointer = NULL;
 				if (AcpiEvaluateObject(obj, abuf, NULL,
 				    &tzp->al[level]) != AE_OK) {
-					cmn_err(CE_WARN, "tzmon: error "
-					    "evaluating _AL object");
+					DTRACE_PROBE2(alx__missing, int, level,
+					    char *, (char *)tzp->zone_name);
 
 					tzp->al[level].Length = 0;
 					tzp->al[level].Pointer = NULL;
@@ -510,8 +510,10 @@ tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 			    taskq_name, 1, TASKQ_DEFAULTPRI, 0);
 			if (tzp->taskq == NULL) {
 				tzp->polling_period = 0;
-				cmn_err(CE_WARN, "tzmon: could not create"
-				    " monitor thread - monitor by notify only");
+				cmn_err(CE_WARN, "tzmon: could not create "
+				    "monitor thread for thermal zone %s - "
+				    "monitor by notify only",
+				    (char *)tzp->zone_name);
 			} else {
 				(void) ddi_taskq_dispatch(tzp->taskq,
 				    tzmon_monitor, tzp, DDI_SLEEP);
@@ -597,7 +599,7 @@ tzmon_monitor(void *ctx)
  * tzmon_set_power_device
  */
 static void
-tzmon_set_power_device(ACPI_HANDLE dev, int on_off)
+tzmon_set_power_device(ACPI_HANDLE dev, int on_off, char *tz_name)
 {
 	ACPI_BUFFER rb;
 	ACPI_OBJECT *pr0;
@@ -608,13 +610,13 @@ tzmon_set_power_device(ACPI_HANDLE dev, int on_off)
 	rb.Pointer = NULL;
 	status = AcpiEvaluateObject(dev, "_PR0", NULL, &rb);
 	if (status != AE_OK) {
-		cmn_err(CE_NOTE, "tzmon: can not set power");
+		DTRACE_PROBE2(alx__error, int, 2, char *, tz_name);
 		return;
 	}
 
 	pr0 = ((ACPI_OBJECT *)rb.Pointer);
 	if (pr0->Type != ACPI_TYPE_PACKAGE) {
-		cmn_err(CE_NOTE, "tzmon: can not set power");
+		DTRACE_PROBE2(alx__error, int, 3, char *, tz_name);
 		AcpiOsFree(rb.Pointer);
 		return;
 	}
@@ -624,8 +626,7 @@ tzmon_set_power_device(ACPI_HANDLE dev, int on_off)
 		    pr0->Package.Elements[i].Reference.Handle,
 		    on_off ? "_ON" : "_OFF", NULL, NULL);
 		if (status != AE_OK) {
-			cmn_err(CE_WARN, "tz_set_pwr_dev: failed to set %d\n",
-			    i);
+			DTRACE_PROBE2(alx__error, int, 4, char *, tz_name);
 		}
 	}
 
@@ -638,20 +639,21 @@ tzmon_set_power_device(ACPI_HANDLE dev, int on_off)
  * Turn on or turn off all devices in the supplied list.
  */
 static void
-tzmon_set_power(ACPI_BUFFER devlist, int on_off)
+tzmon_set_power(ACPI_BUFFER devlist, int on_off, char *tz_name)
 {
 	ACPI_OBJECT *devs;
 	int i;
 
 	devs = ((ACPI_OBJECT *)devlist.Pointer);
 	if (devs->Type != ACPI_TYPE_PACKAGE) {
-		cmn_err(CE_NOTE, "tzmon: can not set power");
+		DTRACE_PROBE2(alx__error, int, 1, char *, tz_name);
 		return;
 	}
 
 	for (i = 0; i < devs->Package.Count; i++)
 		tzmon_set_power_device(
-		    devs->Package.Elements[i].Reference.Handle, on_off);
+		    devs->Package.Elements[i].Reference.Handle, on_off,
+		    tz_name);
 }
 
 
@@ -668,7 +670,8 @@ tzmon_eval_zone(thermal_zone_t *tzp)
 
 	/* get the current temperature from ACPI */
 	tzmon_eval_int(tzp->obj, "_TMP", &tmp);
-	DTRACE_PROBE1(tzmon_tz_temp, int, tmp);
+	DTRACE_PROBE4(tz__temp, int, tmp, int, tzp->crt, int, tzp->hot,
+	    char *, (char *)tzp->zone_name);
 
 	/* _HOT handling */
 	if (tzp->hot > 0 && tmp >= tzp->hot) {
@@ -709,11 +712,13 @@ tzmon_eval_zone(thermal_zone_t *tzp)
 	if (tzp->current_level != new_level) {
 		if ((tzp->current_level >= 0) &&
 		    (tzp->al[tzp->current_level].Length != 0))
-			tzmon_set_power(tzp->al[tzp->current_level], 0);
+			tzmon_set_power(tzp->al[tzp->current_level], 0,
+			    (char *)tzp->zone_name);
 
 		if ((new_level >= 0) &&
 		    (tzp->al[new_level].Length != 0))
-			tzmon_set_power(tzp->al[new_level], 1);
+			tzmon_set_power(tzp->al[new_level], 1,
+			    (char *)tzp->zone_name);
 
 		tzp->current_level = new_level;
 	}
