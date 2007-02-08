@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,6 +121,7 @@ project_data_init(kproject_data_t *data)
 	data->kpd_locked_mem_ctl = UINT64_MAX;
 	data->kpd_contract = 0;
 	data->kpd_crypto_mem = 0;
+	data->kpd_crypto_mem_ctl = UINT64_MAX;
 	data->kpd_lockedmem_kstat = NULL;
 }
 
@@ -727,6 +728,28 @@ static rctl_ops_t project_contract_ops = {
 };
 
 /*ARGSUSED*/
+static rctl_qty_t
+project_crypto_usage(rctl_t *r, proc_t *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (p->p_task->tk_proj->kpj_data.kpd_crypto_mem);
+}
+
+/*ARGSUSED*/
+static int
+project_crypto_set(rctl_t *r, proc_t *p, rctl_entity_p_t *e,
+    rctl_qty_t nv)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_PROJECT);
+	if (e->rcep_p.proj == NULL)
+		return (0);
+
+	e->rcep_p.proj->kpj_data.kpd_crypto_mem_ctl = nv;
+	return (0);
+}
+
+/*ARGSUSED*/
 static int
 project_crypto_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e,
     rctl_val_t *rval, rctl_qty_t incr, uint_t flags)
@@ -742,8 +765,8 @@ project_crypto_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e,
 
 static rctl_ops_t project_crypto_mem_ops = {
 	rcop_no_action,
-	rcop_no_usage,
-	rcop_no_set,
+	project_crypto_usage,
+	project_crypto_set,
 	project_crypto_test
 };
 

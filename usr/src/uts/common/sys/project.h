@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,7 @@ typedef struct kproject_data {		/* Datum protected by: */
 	rctl_qty_t	kpd_locked_mem_ctl; /* kpj_rctls->rcs_lock */
 	rctl_qty_t	kpd_contract;	/* contract_lock */
 	rctl_qty_t	kpd_crypto_mem;	/* crypto_rctl_lock */
+	rctl_qty_t	kpd_crypto_mem_ctl; /* kpj_rctls->rcs_lock */
 	kstat_t		*kpd_lockedmem_kstat; /* locked memory kstat */
 
 } kproject_data_t;

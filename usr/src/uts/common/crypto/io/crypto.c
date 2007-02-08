@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6032,24 +6032,30 @@ static int
 crypto_buffer_check(size_t need, kproject_t **projp)
 {
 	ASSERT(projp != NULL);
+	kproject_t *kpj;
 
 	if (need == 0)
 		return (CRYPTO_SUCCESS);
 
 	mutex_enter(&curproc->p_lock);
+	kpj = curproc->p_task->tk_proj;
 	mutex_enter(&crypto_rctl_lock);
-	if (rctl_test(rc_project_crypto_mem,
-	    curproc->p_task->tk_proj->kpj_rctls, curproc, need, 0) & RCT_DENY) {
-		mutex_exit(&crypto_rctl_lock);
-		mutex_exit(&curproc->p_lock);
-		return (CRYPTO_HOST_MEMORY);
+
+	if (kpj->kpj_data.kpd_crypto_mem + need >
+	    kpj->kpj_data.kpd_crypto_mem_ctl) {
+		if (rctl_test(rc_project_crypto_mem,
+		    kpj->kpj_rctls, curproc, need, 0) & RCT_DENY) {
+			mutex_exit(&crypto_rctl_lock);
+			mutex_exit(&curproc->p_lock);
+			return (CRYPTO_HOST_MEMORY);
+		}
 	}
 
-	curproc->p_task->tk_proj->kpj_data.kpd_crypto_mem += need;
+	kpj->kpj_data.kpd_crypto_mem += need;
 	mutex_exit(&crypto_rctl_lock);
 
-	(void) project_hold(curproc->p_task->tk_proj);
-	*projp = curproc->p_task->tk_proj;
+	*projp = project_hold(kpj);
 	mutex_exit(&curproc->p_lock);
+
 	return (CRYPTO_SUCCESS);
 }
