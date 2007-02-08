@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,9 +151,7 @@ physmem_remove_hash_proc()
  * item to be added for this process, we will create the head pointer
  * for this process.
  * Returns 0 on success, ERANGE when the physical address is already in the
- * hash.  Note that we add it to the hash as we have already called as_map
- * and thus the as_unmap call will try to free the vnode, which needs
- * to be found in the hash.
+ * hash.
  */
 int
 physmem_add_hash(struct physmem_hash *php)
@@ -415,8 +413,8 @@ fail:
 	}
 	ret = as_map(as, uvaddr, len, segvn_create, &vn_a);
 
-	as_rangeunlock(as);
 	if (ret == 0) {
+		as_rangeunlock(as);
 		php->ph_base_pa = base_pa;
 		php->ph_base_va = uvaddr;
 		php->ph_seg_len = len;
@@ -425,7 +423,10 @@ fail:
 		ret = physmem_add_hash(php);
 		if (ret == 0)
 			return (0);
+
+		/* Note that the call to as_unmap will free the vnode */
 		(void) as_unmap(as, uvaddr, len);
+		kmem_free(php, sizeof (*php));
 		return (ret);
 	}
 
