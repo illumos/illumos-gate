@@ -1401,16 +1401,6 @@ cmpstat(
 				}
 				(void) fclose(fp);
 			}
-
-		safefilep = safefiles;
-		while (safefilep->next != NULL)
-			if (strcmp(file, safefilep->name) != 0) {
-				fp = fopen(NEED_UPDATE_FILE, "w");
-				if (fclose(fp) != 0)
-					bam_error(CLOSE_FAIL, NEED_UPDATE_FILE,
-						strerror(errno));
-				return (0);
-			}
 	}
 
 	/*
@@ -1435,6 +1425,17 @@ cmpstat(
 
 	if (filestat[0] != stat->st_size ||
 	    filestat[1] != stat->st_mtime) {
+		if (bam_smf_check) {
+			safefilep = safefiles;
+			while (safefilep != NULL) {
+				if (strcmp(file + bam_rootlen,
+				    safefilep->name) == 0) {
+					(void) creat(NEED_UPDATE_FILE, 0644);
+					return (0);
+				}
+				safefilep = safefilep->next;
+			}
+		}
 		walk_arg.need_update = 1;
 		if (bam_verbose)
 			if (bam_smf_check)
