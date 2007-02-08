@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -689,18 +689,6 @@ static const Elf_Type	mtype[EV_CURRENT][SHT_NUM] =
 
 
 size_t
-_elf32_entsz(Elf32_Word shtype, unsigned ver)
-{
-	Elf_Type	ttype;
-
-	if (shtype >= sizeof (mtype[0]) / sizeof (mtype[0][0]) ||
-	    (ttype = mtype[ver - 1][shtype]) == ELF_T_BYTE)
-		return (0);
-	return (fmsize[ver - 1][ttype].s_filesz);
-}
-
-
-size_t
 elf32_fsize(Elf_Type type, size_t count, unsigned ver)
 {
 	if (--ver >= EV_CURRENT) {
@@ -731,6 +719,11 @@ _elf32_mtype(Elf * elf, Elf32_Word shtype, unsigned ver)
 		return (mtype[ver - 1][shtype]);
 
 	switch (shtype) {
+	case SHT_SUNW_symsort:
+	case SHT_SUNW_tlssort:
+		return (ELF_T_WORD);
+	case SHT_SUNW_LDYNSYM:
+		return (ELF_T_SYM);
 	case SHT_SUNW_dof:
 		return (ELF_T_BYTE);
 	case SHT_SUNW_cap:
@@ -791,6 +784,16 @@ _elf32_mtype(Elf * elf, Elf32_Word shtype, unsigned ver)
 	 * above.  This is for unknown sections to libelf.
 	 */
 	return (ELF_T_BYTE);
+}
+
+
+size_t
+_elf32_entsz(Elf *elf, Elf32_Word shtype, unsigned ver)
+{
+	Elf_Type	ttype;
+
+	ttype = _elf32_mtype(elf, shtype, ver);
+	return ((ttype == ELF_T_BYTE) ? 0 : fmsize[ver - 1][ttype].s_filesz); 
 }
 
 

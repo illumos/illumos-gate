@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,7 +173,7 @@ _elf_upd_lib(Elf * elf)
 			(void) _elfxx_cookscn(s);
 
 		sh->sh_addralign = 1;
-		if ((sz = (Xword)_elf_entsz(sh->sh_type, ver)) != 0)
+		if ((sz = (Xword)_elf_entsz(elf, sh->sh_type, ver)) != 0)
 			/* LINTED */
 			sh->sh_entsize = (Half)sz;
 		sz = 0;

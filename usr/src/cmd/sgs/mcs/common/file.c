@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -786,7 +786,13 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info)
 			}
 			*elf_data = *data;
 
-			/* SHT_{DYNSYM, SYMTAB} might need some change */
+			/*
+			 * SHT_{DYNSYM, SYMTAB} might need some change, as
+			 * they may contain section symbols that reference
+			 * removed sections. SHT_SUNW_LDYNSYM does not
+			 * contain section symbols, and therefore does not
+			 * have this issue.
+			 */
 			if (((src_shdr.sh_type == SHT_SYMTAB) ||
 			    (src_shdr.sh_type == SHT_DYNSYM)) &&
 			    src_shdr.sh_entsize != 0 &&

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,7 +118,10 @@ static PROF_SYMBOL	*prsym_list_p = 0;	/* the list to return. */
 PROF_SYMBOL *
 _symintLoad(PROF_FILE *proffilePtr)
 {
-	Elf_Data	*symdat_p;
+	Elf_Data	*symdat_pri_p;
+	Elf_Data	*symdat_aux_p;
+	size_t		nsyms_pri;
+	PROF_SYMBOL	*symlist;
 
 	DEBUG_LOC("_symintLoad: top");
 
@@ -129,17 +131,20 @@ _symintLoad(PROF_FILE *proffilePtr)
 	 * sanity checks.
 	 */
 	DEBUG_EXP(printf("profPtr = %x\n", profPtr));
-	DEBUG_EXP(printf("profPtr->pf_symdat_p = %x\n", profPtr->pf_symdat_p));
+	DEBUG_EXP(printf("profPtr->pf_symdat_p = %x\n",
+	    profPtr->pf_symdat_pri_p));
 	DEBUG_EXP(printf("profPtr->pf_nstsyms = %x\n", profPtr->pf_nstsyms));
 
 	assert(profPtr != 0);
-	assert(profPtr->pf_symdat_p != 0);
+	assert(profPtr->pf_symdat_pri_p != 0);
 	assert(profPtr->pf_nstsyms != 0);
 
-	symdat_p = profPtr->pf_symdat_p;
-	DEBUG_EXP(printf("symdat_p->d_size = %x\n", symdat_p->d_size));
+	symdat_pri_p = profPtr->pf_symdat_pri_p;
+	symdat_aux_p = profPtr->pf_symdat_aux_p;
+	nsyms_pri = profPtr->pf_nstsyms - profPtr->pf_nstsyms_aux;
+	DEBUG_EXP(printf("symdat_pri_p->d_size = %x\n", symdat_pri_p->d_size));
 
-	prstsym_size = (symdat_p->d_size / profPtr->pf_nstsyms);
+	prstsym_size = (symdat_pri_p->d_size / profPtr->pf_nstsyms);
 	DEBUG_EXP(printf("_symintLoad: prstsym_size = %d\n",
 	    prstsym_size));
 
@@ -149,22 +154,34 @@ _symintLoad(PROF_FILE *proffilePtr)
 	 *  ARE THE SAME SIZE & (effectively) HAVE THE SAME FIELDS!
 	 *  Set the descriptive `parameters' accordingly.
 	 *
-	 * (We'll take a copy, to simplify the 'Drop'
-	 *  logic.)
+	 * If there is an auxiliary symbol table (.SUNW_ldynsym) augmenting
+	 * the dynamic symbol table (.dynsym), then we copy both tables
+	 * into our copy, with the auxiliary coming first.
+	 *
+	 * (We'll take a copy, to simplify the 'Drop' logic.)
 	 */
 
 	{
-	int st_size;	/* size of symbol table data */
+	size_t st_size;	/* size of symbol table data */
 
-	st_size = symdat_p->d_size;
+	st_size = symdat_pri_p->d_size;
+	if (profPtr->pf_nstsyms_aux != 0)
+		st_size += symdat_aux_p->d_size;
 
 	NO_DEBUG_LOC("_symintLoad: before malloc for symbol list (PROF)");
-	prsym_list_p = (PROF_SYMBOL *)_Malloc(st_size, 1);
+	prsym_list_p = symlist = (PROF_SYMBOL *)_Malloc(st_size, 1);
 	NO_DEBUG_LOC("_symintLoad: after malloc for symbol list (PROF)");
 
+	if (profPtr->pf_nstsyms_aux > 0) {
+		NO_DEBUG_LOC("_symintLoad: before memcpy for "
+		    "auxiliary symbol list (PROF)");
+		(void) memcpy(symlist, symdat_aux_p->d_buf,
+		    symdat_aux_p->d_size);
+		symlist += profPtr->pf_nstsyms_aux;
+	}
+
 	NO_DEBUG_LOC("_symintLoad: before memcpy for symbol list (PROF)");
-	(void) memcpy((char *)&(prsym_list_p->ps_sym), symdat_p->d_buf,
-	    st_size);
+	(void) memcpy(symlist, symdat_pri_p->d_buf, symdat_pri_p->d_size);
 
 	profPtr->pf_nsyms = profPtr->pf_nstsyms;
 	}

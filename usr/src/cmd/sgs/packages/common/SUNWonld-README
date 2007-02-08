@@ -1160,8 +1160,12 @@ Bugid   Risk Synopsis
 6475344 DTrace needs ELF function and data symbols sorted by address (D)
 	PSARC/2007/026 ELF symbol sort sections
 6494228 pclose() error when an audit library calls popen() and the main target
-	is being run under ldd
+	is being run under ldd (D)
 6518480 ld -melf_i386 doesn't complain (D)
+6519951 bfu is just another word for exit today (RPATH -> RUNPATH conversion
+	bites us)  (D) 
 6521504 ld: hardware capabilities processing from relocatables objects needs
 	hardening.
 6521608	assertion failure in runtime linker related to auditing
+6518322 Some ELF utilities need updating for .SUNW_ldynsym section (D)
+	PSARC/2007/074 -L option for nm(1) to display SHT_SUNW_LDYNSYM symbols

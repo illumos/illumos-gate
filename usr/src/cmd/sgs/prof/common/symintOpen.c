@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,13 +84,8 @@
  */
 
 /*
- * #defines and globals.
+ * globals
  */
-
-#define	SCN_NAME_DEBUG	".debug"	/* debug information section */
-#define	SCN_NAME_LINE	".line"		/* line number section */
-#define	SCN_NAME_SYM	".symtab"	/* symbol table entry section */
-#define	SCN_NAME_SST	".strtab"	/* symbol table string table */
 
 
 static char
@@ -103,7 +97,8 @@ static char
 	*fail_dat_s =	"Unable to get data for section",
 	*fail_sym_s =	"Cannot find symbol table section in",
 	*fail_pfsym_s =	"Unable to process symbols in",
-	*fail_buf_s =	"Data buffer is null for section"
+	*fail_buf_s =	"Data buffer is null for section",
+	*fail_sym32_s =	"Cannot handle more than 2^32 symbols"
 	;
 
 
@@ -157,6 +152,7 @@ _symintOpen(char *aout_name)
 	Elf_Scn		*tscn_p;
 	Elf32_Shdr	*tshd_p;
 	int		k;
+	Elf64_Xword	nsyms_pri = 0, nsyms_aux = 0;
 
 	executableName = aout_name;
 
@@ -186,7 +182,7 @@ _symintOpen(char *aout_name)
 	if (tscn_p == NULL)
 		_err_exit("%s %d in %s.", fail_sec_s, k, aout_name);
 
-	if ((pfile_p->pf_snmshd_p = elf32_getshdr(tscn_p)) == NULL)
+	if (elf32_getshdr(tscn_p) == NULL)
 		_err_exit("%s %s in %s.", fail_shd_s, "header names",
 		aout_name);
 	if ((pfile_p->pf_snmdat_p = elf_getdata(tscn_p, NULL)) == NULL)
@@ -224,11 +220,20 @@ _symintOpen(char *aout_name)
 	int	shdsize = pfile_p->pf_elfhd_p->e_shentsize;
 	int	i;
 	char	*s;
+	int		symtab_found = 0;
 
-	i = 0;
 	tscn_p = 0;
 	DEBUG_EXP(printf("Section header entry size = %d\n", shdsize));
 	DEBUG_EXP(printf("First section header name = %s\n", &shdnms_p[1]));
+	pfile_p->pf_symdat_aux_p = NULL;
+	/*
+	 * Scan the section headers looking for a symbol table. Our
+	 * preference is to use .symtab, because it contains the full
+	 * set of symbols. If we find it, we stop looking immediately
+	 * and use it. In the absence of a .symtab section, we are
+	 * willing to use the dynamic symbol table (.dynsym), possibly
+	 * augmented by the .SUNW_ldynsym, which contains local symbols.
+	 */
 	while ((tscn_p = elf_nextscn(telf_p, tscn_p)) != NULL) {
 		if ((tshd_p = elf32_getshdr(tscn_p)) == NULL)
 			_err_exit("%s %d in %s.", fail_shd_s, i, aout_name);
@@ -240,35 +245,52 @@ _symintOpen(char *aout_name)
 		DEBUG_EXP(printf("index of section name = %d\n",
 		    tshd_p->sh_name));
 		DEBUG_EXP(printf("_symintOpen: reading section %s\n", s));
-		if (strcmp(s, SCN_NAME_DEBUG) == 0) {
-			DEBUG_LOC("_symintOpen: found debug section");
-			pfile_p->pf_debugshd_p = tshd_p;
-			pfile_p->pf_debugdat_p = section_data_p(tscn_p,
-			    "debug");
-		} else if (strcmp(s, SCN_NAME_LINE) == 0) {
-			DEBUG_LOC("_symintOpen: found line section");
-			pfile_p->pf_lineshd_p = tshd_p;
-			pfile_p->pf_linedat_p = section_data_p(tscn_p, "line");
-		} else if (strcmp(s, SCN_NAME_SYM) == 0) {
+
+		if (symtab_found)
+			continue;
+		switch (tshd_p->sh_type) {
+		case SHT_SYMTAB:
 			DEBUG_LOC("_symintOpen: found symbol section");
-			pfile_p->pf_symshd_p = tshd_p;
-			pfile_p->pf_symdat_p = section_data_p(tscn_p, "symtab");
-			pfile_p->pf_nstsyms =
-				tshd_p->sh_size / tshd_p->sh_entsize;
-		} else if (strcmp(s, SCN_NAME_SST) == 0) {
-			DEBUG_LOC("_symintOpen: found symbol table strings");
-			pfile_p->pf_strshd_p = tshd_p;
-			pfile_p->pf_strdat_p = section_data_p(tscn_p, "strtab");
-			pfile_p->pf_symstr_p = pfile_p->pf_strdat_p->d_buf;
+			pfile_p->pf_symstr_ndx = tshd_p->sh_link;
+			pfile_p->pf_symdat_pri_p =
+			    section_data_p(tscn_p, "symtab");
+			nsyms_pri = tshd_p->sh_size / tshd_p->sh_entsize;
+			/* Throw away .SUNW_ldynsym. It is for .dynsym only */
+			nsyms_aux = 0;
+			pfile_p->pf_symdat_aux_p = NULL;
+			/* We have found the best symbol table. Stop looking */
+			symtab_found = 1;
+			break;
+
+		case SHT_DYNSYM:
+			/* We will use .dynsym if no .symtab is found */
+			DEBUG_LOC("_symintOpen: found dynamic symbol section");
+			pfile_p->pf_symstr_ndx = tshd_p->sh_link;
+			pfile_p->pf_symdat_pri_p =
+			    section_data_p(tscn_p, "dynsym");
+			nsyms_pri = tshd_p->sh_size / tshd_p->sh_entsize;
+			break;
+
+		case SHT_SUNW_LDYNSYM:
+			/* Auxiliary table, used with .dynsym */
+			DEBUG_LOC("_symintOpen: found dynamic symbol section");
+			pfile_p->pf_symdat_aux_p =
+			    section_data_p(tscn_p, "SUNW_ldynsym");
+			nsyms_aux = tshd_p->sh_size / tshd_p->sh_entsize;
+			break;
 		}
 
-		i++;
 	}
 	}
 
-	if (!pfile_p->pf_symdat_p) {
+	if (pfile_p->pf_symdat_pri_p == NULL || pfile_p->pf_symstr_ndx == 0)
 		_err_exit("%s %s.", fail_sym_s, executableName);
-	}
+
+	pfile_p->pf_nstsyms = (int)(nsyms_pri + nsyms_aux);
+	pfile_p->pf_nstsyms_aux = (int)nsyms_aux;
+	if ((nsyms_pri + nsyms_aux) != (Elf64_Xword)pfile_p->pf_nstsyms)
+		_err_exit("%s %s.", fail_sym32_s, executableName);
+
 
 	DEBUG_LOC("_symintOpen: after for loop that reads the sections");
 

@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -455,8 +455,8 @@ extern Okay		_elf32_cookscn(Elf_Scn * s);
 extern Okay		_elf64_cookscn(Elf_Scn * s);
 extern Dnode		*_elf_dnode(void);
 extern Elf_Data		*_elf_locked_getdata(Elf_Scn *, Elf_Data *);
-extern size_t		_elf32_entsz(Elf32_Word, unsigned);
-extern size_t		_elf64_entsz(Elf64_Word, unsigned);
+extern size_t		_elf32_entsz(Elf *elf, Elf32_Word, unsigned);
+extern size_t		_elf64_entsz(Elf *elf, Elf64_Word, unsigned);
 extern Okay		_elf_inmap(Elf *);
 extern char		*_elf_outmap(int, size_t, unsigned *);
 extern size_t		_elf_outsync(int, char *, size_t, unsigned);

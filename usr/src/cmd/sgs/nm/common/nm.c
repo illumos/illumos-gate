@@ -24,7 +24,7 @@
  * Copyright (c) 1989 AT&T
  * All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,7 +78,7 @@ typedef struct {		/* structure to translate symbol table data */
 #define	REG_WEAK  "R*"
 #define	REG_LOCL  "r"
 
-#define	OPTSTR	":APDoxhvnursplCVefgRTt:" /* option string for getopt() */
+#define	OPTSTR	":APDoxhvnursplLCVefgRTt:" /* option string for getopt() */
 
 #define	DATESIZE 60
 
@@ -127,6 +127,7 @@ static  int	/* flags: ?_flag corresponds to ? option */
 	p_flag = 0,	/* produce terse output */
 	P_flag = 0,	/* Portable format output */
 	l_flag = 0,	/* produce long listing of output */
+	L_flag = 0,	/* print SUNW_LDYNSYM instead of SYMTAB */
 	D_flag = 0,	/* print DYNSYM instead of SYMTAB */
 	C_flag = 0,	/* print decoded C++ names */
 	A_flag = 0,	/* File name */
@@ -285,7 +286,17 @@ main(int argc, char *argv[], char *envp[])
 				break;
 		case 'l':	l_flag = 1;
 				break;
-		case 'D':	D_flag = 1;
+		case 'L':	if (D_flag == 1) {
+					(void) fprintf(stderr, gettext(
+					"nm: -D set. -L ignored\n"));
+				} else
+					L_flag = 1;
+				break;
+		case 'D':	if (L_flag == 1) {
+					(void) fprintf(stderr, gettext(
+					"nm: -L set. -D ignored\n"));
+				} else
+					D_flag = 1;
 				break;
 		case 'C':
 				C_flag = 1;
@@ -565,6 +576,8 @@ get_symtab(Elf *elf_file, char *filename)
 
 	if (D_flag)
 		symtabtype = SHT_DYNSYM;
+	else if (L_flag)
+		symtabtype = SHT_SUNW_LDYNSYM;
 	else
 		symtabtype = SHT_SYMTAB;
 

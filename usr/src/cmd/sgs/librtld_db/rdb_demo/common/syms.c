@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,17 +30,38 @@
 #include "rdb.h"
 
 
-retc_t
-str_map_sym(const char * symname, map_info_t * mp, GElf_Sym * symptr,
-	char ** str)
+/*
+ * Given a symbol index, look up the corresponding symbol from the
+ * given symbol table.
+ *
+ * This function allows the caller to treat the symbol table as a single
+ * logical entity even though there may be 2 actual ELF symbol tables
+ * involved. See the comments in Pcontrol.h for details.
+ */
+static GElf_Sym *
+symtab_getsym(sym_tbl_t *symtab, int ndx, GElf_Sym *dst)
 {
-	sym_tbl_t *	symp;
-	char *		strs;
+	/* If index is in range of primary symtab, look it up there */
+	if (ndx >= symtab->st_symn_aux) {
+		return (gelf_getsym(symtab->st_syms_pri,
+		    ndx - symtab->st_symn_aux, dst));
+	}
+
+	/* Not in primary: Look it up in the auxiliary symtab */
+	return (gelf_getsym(symtab->st_syms_aux, ndx, dst));
+}
+
+retc_t
+str_map_sym(const char *symname, map_info_t *mp, GElf_Sym *symptr,
+	char **str)
+{
+	sym_tbl_t	*symp;
+	char		*strs;
 	int		i;
 
-	if (mp->mi_symtab.st_syms)
+	if (mp->mi_symtab.st_syms_pri)
 		symp = &(mp->mi_symtab);
-	else if (mp->mi_dynsym.st_syms)
+	else if (mp->mi_dynsym.st_syms_pri)
 		symp = &(mp->mi_dynsym);
 	else
 		return (RET_FAILED);
@@ -51,8 +71,8 @@ str_map_sym(const char * symname, map_info_t * mp, GElf_Sym * symptr,
 	for (i = 0; i < (int)symp->st_symn; i++) {
 		GElf_Sym sym;
 
-		if (gelf_getsym(symp->st_syms, i, &sym) == 0) {
-			printf("gelf_getsym(): %s\n", elf_errmsg(-1));
+		if (symtab_getsym(symp, i, &sym) == 0) {
+			printf("symtab_getsym(): %s\n", elf_errmsg(-1));
 			return (RET_FAILED);
 		}
 
@@ -105,13 +125,13 @@ sym_swap(GElf_Sym * s1, GElf_Sym * s2)
 
 
 retc_t
-addr_map_sym(map_info_t * mp, ulong_t addr, GElf_Sym * symptr,
-	char ** str)
+addr_map_sym(map_info_t *mp, ulong_t addr, GElf_Sym *symptr,
+	char **str)
 {
-	sym_tbl_t *	symp;
+	sym_tbl_t	*symp;
 	GElf_Sym	sym;
-	GElf_Sym *	symr = 0;
-	GElf_Sym *	lsymr = 0;
+	GElf_Sym	*symr = 0;
+	GElf_Sym	*lsymr = 0;
 	GElf_Sym	rsym;
 	GElf_Sym	lsym;
 	ulong_t		baseaddr = 0;
@@ -120,9 +140,9 @@ addr_map_sym(map_info_t * mp, ulong_t addr, GElf_Sym * symptr,
 	if ((mp->mi_flags & FLG_MI_EXEC) == 0)
 		baseaddr = (ulong_t)mp->mi_addr;
 
-	if (mp->mi_symtab.st_syms)
+	if (mp->mi_symtab.st_syms_pri)
 		symp = &(mp->mi_symtab);
-	else if (mp->mi_dynsym.st_syms)
+	else if (mp->mi_dynsym.st_syms_pri)
 		symp = &(mp->mi_dynsym);
 	else
 		return (RET_FAILED);
@@ -134,8 +154,8 @@ addr_map_sym(map_info_t * mp, ulong_t addr, GElf_Sym * symptr,
 	for (i = 0; i < (int)symp->st_symn; i++) {
 		ulong_t	svalue;
 
-		if (gelf_getsym(symp->st_syms, i, &sym) == 0) {
-			printf("gelf_getsym(): %s\n", elf_errmsg(-1));
+		if (symtab_getsym(symp, i, &sym) == 0) {
+			printf("symtab_getsym(): %s\n", elf_errmsg(-1));
 			return (RET_FAILED);
 		}
 		if ((sym.st_name == 0) || (sym.st_shndx == SHN_UNDEF))
@@ -191,10 +211,10 @@ addr_map_sym(map_info_t * mp, ulong_t addr, GElf_Sym * symptr,
 
 
 retc_t
-addr_to_sym(struct ps_prochandle * ph, ulong_t addr,
-	GElf_Sym * symp, char ** str)
+addr_to_sym(struct ps_prochandle *ph, ulong_t addr,
+	GElf_Sym *symp, char **str)
 {
-	map_info_t *	mip;
+	map_info_t	*mip;
 
 	if ((mip = addr_to_map(ph, addr)) == 0)
 		return (RET_FAILED);
@@ -204,10 +224,9 @@ addr_to_sym(struct ps_prochandle * ph, ulong_t addr,
 
 
 retc_t
-str_to_sym(struct ps_prochandle * ph, const char * name,
-	GElf_Sym * symp)
+str_to_sym(struct ps_prochandle *ph, const char *name, GElf_Sym *symp)
 {
-	map_info_t *	mip;
+	map_info_t	*mip;
 
 	if (ph->pp_lmaplist.ml_head == 0) {
 		if (str_map_sym(name, &(ph->pp_ldsomap), symp, NULL) == RET_OK)

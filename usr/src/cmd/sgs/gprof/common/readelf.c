@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -454,47 +453,74 @@ is_function(Elf *elf, GElf_Sym *sym)
 static void
 get_symtab(Elf *elf, mod_info_t *module)
 {
-	Elf_Scn		*scn = NULL, *sym = NULL;
+	Elf_Scn		*scn = NULL, *sym_pri = NULL, *sym_aux = NULL;
 	GElf_Word	strndx = 0;
 	sztype		nsyms, i;
-	Elf_Data	*symdata;
+	Elf_Data	*symdata_pri;
+	Elf_Data	*symdata_aux;
+	GElf_Xword	nsyms_pri, nsyms_aux = 0;
 	nltype		*etext = NULL;
+	nltype		*l_nl, *l_npe;
+	sztype		l_nname;
+	extern sztype	total_names;
+	int		symtab_found = 0;
 
-	nltype			*l_nl, *l_npe;
-	sztype			l_nname;
-	extern sztype		total_names;
 
-	while ((scn = elf_nextscn(elf, scn)) != NULL) {
+	/*
+	 * Scan the section headers looking for a symbol table. Our
+	 * preference is to use .symtab, because it contains the full
+	 * set of symbols. If we find it, we stop looking immediately
+	 * and use it. In the absence of a .symtab section, we are
+	 * willing to use the dynamic symbol table (.dynsym), possibly
+	 * augmented by the .SUNW_ldynsym, which contains local symbols.
+	 */
+	while ((symtab_found == 0) && ((scn = elf_nextscn(elf, scn)) != NULL)) {
 		GElf_Shdr shdr;
 
 		if (gelf_getshdr(scn, &shdr) == NULL)
 			continue;
 
-		if (shdr.sh_type == SHT_SYMTAB || shdr.sh_type == SHT_DYNSYM) {
-			GElf_Xword chk = shdr.sh_size / shdr.sh_entsize;
-
-			nsyms = (sztype)(shdr.sh_size / shdr.sh_entsize);
-
-			if (chk != (GElf_Xword)nsyms)
-				fatal_error("32-bit gprof cannot handle"
-				    "more than 2^32 symbols");
-
+		switch (shdr.sh_type) {
+		case SHT_SYMTAB:
+			nsyms_pri = shdr.sh_size / shdr.sh_entsize;
 			strndx = shdr.sh_link;
-			sym = scn;
-		}
-
-		/*
-		 * If we've found a real symbol table, we're done.
-		 */
-		if (shdr.sh_type == SHT_SYMTAB)
+			sym_pri = scn;
+			/* Throw away .SUNW_ldynsym. It is for .dynsym only */
+			nsyms_aux = 0;
+			sym_aux = NULL;
+			/* We have found the best symbol table. Stop looking */
+			symtab_found = 1;
 			break;
+
+		case SHT_DYNSYM:
+			/* We will use .dynsym if no .symtab is found */
+			nsyms_pri = shdr.sh_size / shdr.sh_entsize;
+			strndx = shdr.sh_link;
+			sym_pri = scn;
+			break;
+
+		case SHT_SUNW_LDYNSYM:
+			/* Auxiliary table, used with .dynsym */
+			nsyms_aux = shdr.sh_size / shdr.sh_entsize;
+			sym_aux = scn;
+			break;
+		}
 	}
 
-	if (sym == NULL || strndx == 0)
+	if (sym_pri == NULL || strndx == 0)
 		fatal_error("can't find symbol table.\n");
 
-	if ((symdata = elf_getdata(scn, NULL)) == NULL)
+	nsyms = (sztype)(nsyms_pri + nsyms_aux);
+	if ((nsyms_pri + nsyms_aux) != (GElf_Xword)nsyms)
+		fatal_error(
+		    "32-bit gprof cannot handle more than 2^32 symbols");
+
+	if ((symdata_pri = elf_getdata(sym_pri, NULL)) == NULL)
 		fatal_error("can't read symbol data.\n");
+
+	if ((sym_aux != NULL) &&
+	    ((symdata_aux = elf_getdata(sym_aux, NULL)) == NULL))
+		fatal_error("can't read .SUNW_ldynsym symbol data.\n");
 
 	if ((l_nl = l_npe = (nltype *)calloc(nsyms + PRF_SYMCNT,
 	    sizeof (nltype))) == NULL)
@@ -511,7 +537,16 @@ get_symtab(Elf *elf, mod_info_t *module)
 		GElf_Sym gsym;
 		char *name;
 
-		(void) gelf_getsym(symdata, i, &gsym);
+		/*
+		 * Look up the symbol. In the case where we have a
+		 * .SUNW_ldynsym/.dynsym pair, we treat them as a single
+		 * logical table, with the data from .SUNW_ldynsym coming
+		 * before the data in .dynsym.
+		 */
+		if (i >= nsyms_aux)
+			(void) gelf_getsym(symdata_pri, i - nsyms_aux, &gsym);
+		else
+			(void) gelf_getsym(symdata_aux, i, &gsym);
 
 		name = elf_strptr(elf, strndx, gsym.st_name);
 

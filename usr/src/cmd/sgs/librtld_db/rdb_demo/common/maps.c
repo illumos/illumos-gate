@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -297,6 +296,7 @@ load_map(struct ps_prochandle *procp, caddr_t baddr, map_info_t *mp)
 	mp->mi_pltbase = 0;
 	mp->mi_pltsize = 0;
 	mp->mi_pltentsz = 0;
+	mp->mi_dynsym.st_symn = 0;
 	while ((scn = elf_nextscn(mp->mi_elf, scn)) != 0) {
 		GElf_Shdr 	shdr;
 		Elf_Data *	dp;
@@ -311,16 +311,23 @@ load_map(struct ps_prochandle *procp, caddr_t baddr, map_info_t *mp)
 		switch (shdr.sh_type) {
 		case SHT_DYNSYM:
 			dp = elf_getdata(scn, 0);
-			mp->mi_dynsym.st_syms = dp;
+			mp->mi_dynsym.st_syms_pri = dp;
 			tscn = elf_getscn(mp->mi_elf, shdr.sh_link);
-			mp->mi_dynsym.st_symn =
+			mp->mi_dynsym.st_symn +=
 				shdr.sh_size / shdr.sh_entsize;
 			dp = elf_getdata(tscn, 0);
 			mp->mi_dynsym.st_strs = (char *)dp->d_buf;
 			break;
+		case SHT_SUNW_LDYNSYM:
+			dp = elf_getdata(scn, 0);
+			mp->mi_dynsym.st_syms_aux = dp;
+			mp->mi_dynsym.st_symn_aux =
+				shdr.sh_size / shdr.sh_entsize;
+			mp->mi_dynsym.st_symn += mp->mi_dynsym.st_symn_aux;
+			break;
 		case SHT_SYMTAB:
 			dp = elf_getdata(scn, 0);
-			mp->mi_symtab.st_syms = dp;
+			mp->mi_symtab.st_syms_pri = dp;
 			tscn = elf_getscn(mp->mi_elf, shdr.sh_link);
 			mp->mi_symtab.st_symn =
 				shdr.sh_size / shdr.sh_entsize;

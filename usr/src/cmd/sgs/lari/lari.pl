@@ -1385,7 +1385,8 @@ sub GetAllSymbols {
 		return;
 	}
 
-	# Process elfdump(1) once more to obtain the .dynsym symbol table.
+	# Process elfdump(1) once more to obtain the .dynsym symbol table. We
+	# are only interested in global symbols, so .SUNW_ldynsym is not needed.
 	open($FileHandle, "LC_ALL=C elfdump -sN.dynsym '$Obj' 2> /dev/null |");
 
 	while (defined(my $Line = <$FileHandle>)) {

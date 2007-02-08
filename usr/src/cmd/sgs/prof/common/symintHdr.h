@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -159,22 +158,28 @@ struct symint_prof_symbol {
 typedef struct symint_prof_file
 	PROF_FILE;
 
+
+/*
+ * symint_prof_file contains a primary and an (optional) auxiliary
+ * symbol table, which we wish to treat as a single logical symbol table.
+ * In this logical table, the data from the auxiliary table preceeds that
+ * from the primary. Symbol indices start at [0], which is the first item
+ * in the auxiliary table if there is one. The sole purpose for this is so
+ * that we can treat the combination of .SUNW_ldynsym and .dynsym sections
+ * as a logically single entity.
+ *
+ * Both tables must share the same string table section.
+ */
 struct symint_prof_file {
 	int		pf_fildes;	/* file descriptor */
 	Elf		*pf_elf_p;	/* elf descriptor */
 	Elf32_Ehdr	*pf_elfhd_p;	/* elf header */
-	Elf32_Shdr	*pf_snmshd_p;	/* section names header */
 	Elf_Data	*pf_snmdat_p;	/* section names data */
-	Elf32_Shdr	*pf_symshd_p;	/* symbol table header */
-	Elf_Data	*pf_symdat_p;	/* symbol table data */
-	Elf32_Shdr	*pf_strshd_p;	/* symbol strings header */
-	Elf_Data	*pf_strdat_p;	/* symbol strings data */
-	char		*pf_symstr_p;	/* symbol table strings */
-	int		pf_nstsyms;	/* number of symbols in symbol table */
-	Elf32_Shdr	*pf_debugshd_p;	/* debug header */
-	Elf_Data	*pf_debugdat_p;	/* debug data */
-	Elf32_Shdr	*pf_lineshd_p;	/* line header */
-	Elf_Data	*pf_linedat_p;	/* line data */
+	Elf_Data	*pf_symdat_pri_p; /* primary symbol table data */
+	Elf_Data	*pf_symdat_aux_p; /* auxiliary symbol table data */
+	Elf32_Word	pf_symstr_ndx;	 /* Section index of string table */
+	int		pf_nstsyms;	/* total # symbols in both tables */
+	int		pf_nstsyms_aux;	/* # symbols in auxiliary table */
 
 	Elf32_Shdr	*pf_shdarr_p;	/* complete array of section hdrs */
 
