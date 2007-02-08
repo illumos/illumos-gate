@@ -156,7 +156,7 @@ function find_and_copy
 				print "$path"
 			fi
 		else
-			filetype=`file $path 2>/dev/null |\
+			filetype=`LC_MESSAGES=C file $path 2>/dev/null |\
 			    awk '/ELF/ { print \$3 }'`
 			if [ -z "$filetype" ] || [ "$filetype" = "$which" ]
 			then
@@ -320,7 +320,7 @@ function create_archive
 		# the file type check also establishes that the
 		# file exists at all
 		#
-		file "${archive}-new" | grep gzip > /dev/null
+		LC_MESSAGES=C file "${archive}-new" | grep gzip > /dev/null
 	fi
 
 	if [ $? = 1 ] && [ -x /usr/bin/gzip ] || [ $ARCHIVE_SIZE -lt 5000 ]
