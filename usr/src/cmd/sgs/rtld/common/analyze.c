@@ -1187,17 +1187,39 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 		}
 
 		if (nlmp = is_devinode_loaded(&status, lml, nname, flags)) {
-			added = 0;
+			if (flags & FLG_RT_AUDIT) {
+				/*
+				 * If we've been requested to load an auditor,
+				 * and an auditor of the same name already
+				 * exists, then the original auditor is used.
+				 */
+				DBG_CALL(Dbg_audit_skip(LIST(clmp),
+				    NAME(nlmp), LIST(nlmp)->lm_lmidstr));
+			} else {
+				/*
+				 * Otherwise, if an alternatively named file
+				 * has been found for the same dev/inode, add
+				 * a new name alias, and insert any alias full
+				 * pathname in the link-map lists AVL tree.
+				 */
+				added = 0;
 
-			if (append_alias(nlmp, nname, &added) == 0)
-				return (0);
-			if (added) {
-				if ((nname[0] == '/') && (fpavl_insert(lml,
-				    nlmp, nname, 0) == 0))
+				if (append_alias(nlmp, nname, &added) == 0)
 					return (0);
-				DBG_CALL(Dbg_file_skip(LIST(clmp), NAME(nlmp),
-				    nname));
+				if (added) {
+					if ((nname[0] == '/') &&
+					    (fpavl_insert(lml, nlmp,
+					    nname, 0) == 0))
+						return (0);
+					DBG_CALL(Dbg_file_skip(LIST(clmp),
+					    NAME(nlmp), nname));
+				}
 			}
+
+			/*
+			 * Record in the file descriptor the existing object
+			 * that satisfies this open request.
+			 */
 			fdesc->fd_nname = nname;
 			fdesc->fd_lmp = nlmp;
 			return (1);

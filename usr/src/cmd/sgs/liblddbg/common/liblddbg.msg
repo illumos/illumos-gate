@@ -366,9 +366,9 @@
 
 @ MSG_FIL_BASIC		"file=%s  [ %s ]"
 @ MSG_FIL_ARCHIVE	"file=%s  [ archive ] %s"
-@ MSG_FIL_SKIP_1	"file=%s  skipped: already processed as %s"
-@ MSG_FIL_SKIP_2	"file=%s  skipped: already processed"
-@ MSG_FIL_REUSE		"file=%s  reusing: originally processed as %s"
+@ MSG_FIL_SKIP_1	"file=%s;  skipped: already processed as %s"
+@ MSG_FIL_SKIP_2	"file=%s;  skipped: already processed"
+@ MSG_FIL_REUSE		"file=%s;  reusing: originally processed as %s"
 @ MSG_FIL_PROT		"file=%s;  modifying memory protections (%c PROT_WRITE)"
 @ MSG_FIL_DELETE	"file=%s;  deleting"
 @ MSG_FIL_DLOPEN	"file=%s;  dlopen() called from file=%s  %s"
@@ -682,6 +682,8 @@
 @ MSG_AUD_OBJECT	"audit library %s: offered object: %s"
 @ MSG_AUD_SYM		"audit library %s: %s: symbol: %s: value: 0x%llx %s"
 @ MSG_AUD_SYMNEW	"modified to: 0x%llx"
+
+@ MSG_AUD_SKIP		"file=%s;  skipped: using auditor from %s"
 
 # GOT Messages
 

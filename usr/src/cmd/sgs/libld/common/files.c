@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -349,25 +349,37 @@ hw1_cap(Ofl_desc *ofl, Xword val)
  * updating the global capabilities variables as necessary.
  */
 static void
-process_cap(const char *name, Ifl_desc *ifl, Is_desc *cisp, Ofl_desc *ofl)
+process_cap(Ifl_desc *ifl, Is_desc *cisp, Ofl_desc *ofl)
 {
 	Cap	*cdata;
+	Word	ndx, cnum;
 
 	DBG_CALL(Dbg_cap_sec_title(ofl));
 
-	for (cdata = (Cap *)cisp->is_indata->d_buf;
-	    cdata->c_tag != CA_SUNW_NULL; cdata++) {
+	/*
+	 * The capabilities are supposed to be terminated with a CA_SUNW_NULL
+	 * entry.  However, the compilers have been known to not follow this
+	 * convention.  Use the section information to determine the number
+	 * of capabilities, and skip any CA_SUNW_NULL entries.
+	 */
+	cdata = (Cap *)cisp->is_indata->d_buf;
+	cnum = (Word)(cisp->is_shdr->sh_size / cisp->is_shdr->sh_entsize);
+
+	for (ndx = 0; ndx < cnum; cdata++, ndx++) {
 		switch (cdata->c_tag) {
 			case CA_SUNW_HW_1:
 				hw1_cap(ofl, cdata->c_un.c_val);
 				break;
 			case CA_SUNW_SF_1:
-				sf1_cap(ofl, cdata->c_un.c_val, ifl, name);
+				sf1_cap(ofl, cdata->c_un.c_val, ifl,
+				    cisp->is_name);
+				break;
+			case CA_SUNW_NULL:
 				break;
 			default:
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_FIL_UNKCAP),
-				    ifl->ifl_name, name, cdata->c_tag);
+				    ifl->ifl_name, cisp->is_name, cdata->c_tag);
 		}
 	}
 }
@@ -1381,7 +1393,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	Word		row, column;
 	int		ident;
 	uintptr_t	error;
-	Is_desc		*vdfisp, *vndisp, *vsyisp, *sifisp, * capisp;
+	Is_desc		*vdfisp, *vndisp, *vsyisp, *sifisp, *capisp;
 	Sdf_desc	*sdf;
 	Word		ordered_shndx = 0; /* index to first ordered section */
 	Word		ordered_cnt = 0;
@@ -1705,7 +1717,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	 * gathered will prevail.
 	 */
 	if (capisp && (ifl->ifl_ehdr->e_type == ET_REL))
-		process_cap(name, ifl, capisp, ofl);
+		process_cap(ifl, capisp, ofl);
 
 	/*
 	 * Process any version dependencies.  These will establish shared object

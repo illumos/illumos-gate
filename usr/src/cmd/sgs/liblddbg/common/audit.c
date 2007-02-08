@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -89,4 +89,13 @@ Dbg_audit_symval(Lm_list *lml, const char *lib, const char *func,
 
 	dbg_print(lml, MSG_INTL(MSG_AUD_SYM), lib, func, Dbg_demangle_name(sym),
 	    EC_XWORD(pval), mesg);
+}
+
+void
+Dbg_audit_skip(Lm_list *lml, const char *name, const char *lmid)
+{
+	if (DBG_NOTCLASS(DBG_C_AUDITING | DBG_C_FILES))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_AUD_SKIP), name, lmid);
 }

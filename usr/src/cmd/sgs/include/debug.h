@@ -590,6 +590,7 @@ extern	void	Dbg_audit_lib(Lm_list *, const char *);
 extern	void	Dbg_audit_object(Lm_list *, const char *, const char *);
 extern	void	Dbg_audit_symval(Lm_list *, const char *, const char *,
 		    const char *, Addr, Addr);
+extern	void	Dbg_audit_skip(Lm_list *, const char *, const char *);
 extern	void	Dbg_audit_version(Lm_list *, const char *, ulong_t);
 
 extern	void	Dbg_bind_global(Rt_map *, Addr, Off, Xword, Pltbindtype,
