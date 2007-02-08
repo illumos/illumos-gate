@@ -77,7 +77,6 @@ __getpass(const char *prompt, int size)
 	FILE	*fi;
 	char *pbuf = tsdalloc(_T_GETPASS, MAXPASSWD + 1, NULL);
 	void	(*sig)(int);
-	rmutex_t *lk;
 
 	if (pbuf == NULL ||
 	    (fi = fopen("/dev/tty", "r+F")) == NULL)
