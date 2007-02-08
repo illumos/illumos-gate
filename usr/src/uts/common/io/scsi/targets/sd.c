@@ -1407,10 +1407,10 @@ static int sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un,
 static int sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp);
 static int sd_send_scsi_GET_CONFIGURATION(struct sd_lun *un,
 	struct uscsi_cmd *ucmdbuf, uchar_t *rqbuf, uint_t rqbuflen,
-	uchar_t *bufaddr, uint_t buflen);
+	uchar_t *bufaddr, uint_t buflen, int path_flag);
 static int sd_send_scsi_feature_GET_CONFIGURATION(struct sd_lun *un,
 	struct uscsi_cmd *ucmdbuf, uchar_t *rqbuf, uint_t rqbuflen,
-	uchar_t *bufaddr, uint_t buflen, char feature);
+	uchar_t *bufaddr, uint_t buflen, char feature, int path_flag);
 static int sd_send_scsi_MODE_SENSE(struct sd_lun *un, int cdbsize,
 	uchar_t *bufaddr, size_t buflen, uchar_t page_code, int path_flag);
 static int sd_send_scsi_MODE_SELECT(struct sd_lun *un, int cdbsize,
@@ -1499,7 +1499,7 @@ static int sd_log_page_supported(struct sd_lun *un, int log_page);
 /*
  * Function Prototype for the non-512 support (DVDRAM, MO etc.) functions.
  */
-static void sd_check_for_writable_cd(struct sd_lun *un);
+static void sd_check_for_writable_cd(struct sd_lun *un, int path_flag);
 static int sd_wm_cache_constructor(void *wm, void *un, int flags);
 static void sd_wm_cache_destructor(void *wm, void *un);
 static struct sd_w_map *sd_range_lock(struct sd_lun *un, daddr_t startb,
@@ -3185,7 +3185,7 @@ sd_set_mmc_caps(struct sd_lun *un)
 
 	rtn = sd_send_scsi_feature_GET_CONFIGURATION(un, &com, rqbuf_rw,
 	    SENSE_LENGTH, out_data_rw, SD_CURRENT_FEATURE_LEN,
-	    RANDOM_WRITABLE);
+	    RANDOM_WRITABLE, SD_PATH_STANDARD);
 	if (rtn != 0) {
 		kmem_free(out_data_rw, SD_CURRENT_FEATURE_LEN);
 		kmem_free(rqbuf_rw, SENSE_LENGTH);
@@ -3197,7 +3197,7 @@ sd_set_mmc_caps(struct sd_lun *un)
 
 	rtn = sd_send_scsi_feature_GET_CONFIGURATION(un, &com, rqbuf_hd,
 	    SENSE_LENGTH, out_data_hd, SD_CURRENT_FEATURE_LEN,
-	    HARDWARE_DEFECT_MANAGEMENT);
+	    HARDWARE_DEFECT_MANAGEMENT, SD_PATH_STANDARD);
 	if (rtn == 0) {
 		/*
 		 * We have good information, check for random writable
@@ -3223,12 +3223,17 @@ sd_set_mmc_caps(struct sd_lun *un)
  *		to determine if the media is writable
  *
  *   Arguments: un - driver soft state (unit) structure
+ *              path_flag - SD_PATH_DIRECT to use the USCSI "direct"
+ *                           chain and the normal command waitq, or
+ *                           SD_PATH_DIRECT_PRIORITY to use the USCSI
+ *                           "direct" chain and bypass the normal command
+ *                           waitq.
  *
  *     Context: Never called at interrupt context.
  */
 
 static void
-sd_check_for_writable_cd(struct sd_lun *un)
+sd_check_for_writable_cd(struct sd_lun *un, int path_flag)
 {
 	struct uscsi_cmd		com;
 	uchar_t				*out_data;
@@ -3256,7 +3261,7 @@ sd_check_for_writable_cd(struct sd_lun *un)
 	rqbuf = kmem_zalloc(SENSE_LENGTH, KM_SLEEP);
 
 	rtn = sd_send_scsi_GET_CONFIGURATION(un, &com, rqbuf, SENSE_LENGTH,
-	    out_data, SD_PROFILE_HEADER_LEN);
+	    out_data, SD_PROFILE_HEADER_LEN, path_flag);
 
 	mutex_enter(SD_MUTEX(un));
 	if (rtn == 0) {
@@ -3280,7 +3285,7 @@ sd_check_for_writable_cd(struct sd_lun *un)
 	mutex_exit(SD_MUTEX(un));
 	buf = kmem_zalloc(BUFLEN_MODE_CDROM_CAP, KM_SLEEP);
 	status = sd_send_scsi_MODE_SENSE(un, CDB_GROUP1, (uchar_t *)buf,
-	    BUFLEN_MODE_CDROM_CAP, MODEPAGE_CDROM_CAP, SD_PATH_DIRECT);
+	    BUFLEN_MODE_CDROM_CAP, MODEPAGE_CDROM_CAP, path_flag);
 	mutex_enter(SD_MUTEX(un));
 	if (status != 0) {
 		/* command failed; just return */
@@ -3326,7 +3331,7 @@ sd_check_for_writable_cd(struct sd_lun *un)
 
 	rtn = sd_send_scsi_feature_GET_CONFIGURATION(un, &com, rqbuf_rw,
 	    SENSE_LENGTH, out_data_rw, SD_CURRENT_FEATURE_LEN,
-	    RANDOM_WRITABLE);
+	    RANDOM_WRITABLE, path_flag);
 	if (rtn != 0) {
 		kmem_free(out_data_rw, SD_CURRENT_FEATURE_LEN);
 		kmem_free(rqbuf_rw, SENSE_LENGTH);
@@ -3339,7 +3344,7 @@ sd_check_for_writable_cd(struct sd_lun *un)
 
 	rtn = sd_send_scsi_feature_GET_CONFIGURATION(un, &com, rqbuf_hd,
 	    SENSE_LENGTH, out_data_hd, SD_CURRENT_FEATURE_LEN,
-	    HARDWARE_DEFECT_MANAGEMENT);
+	    HARDWARE_DEFECT_MANAGEMENT, path_flag);
 	mutex_enter(SD_MUTEX(un));
 	if (rtn == 0) {
 		/*
@@ -9280,7 +9285,7 @@ sd_ready_and_valid(struct sd_lun *un)
 		 * Check if the media in the device is writable or not.
 		 */
 		if (!is_valid && ISCD(un)) {
-			sd_check_for_writable_cd(un);
+			sd_check_for_writable_cd(un, SD_PATH_DIRECT);
 		}
 
 	} else {
@@ -17217,6 +17222,12 @@ sd_handle_mchange(struct sd_lun *un)
 		    (uint64_t)un->un_tgt_blocksize);
 	}
 
+
+	/*
+	 * Check if the media in the device is writable or not
+	 */
+	sd_check_for_writable_cd(un, SD_PATH_DIRECT_PRIORITY);
+
 	/*
 	 * Note: Maybe let the strategy/partitioning chain worry about getting
 	 * valid geometry.
@@ -18507,6 +18518,7 @@ done:
  *		rqbuflen
  *		bufaddr
  *		buflen
+ *		path_flag
  *
  * Return Code: 0   - Success
  *		errno return code from sd_send_scsi_cmd()
@@ -18517,7 +18529,8 @@ done:
 
 static int
 sd_send_scsi_GET_CONFIGURATION(struct sd_lun *un, struct uscsi_cmd *ucmdbuf,
-	uchar_t *rqbuf, uint_t rqbuflen, uchar_t *bufaddr, uint_t buflen)
+	uchar_t *rqbuf, uint_t rqbuflen, uchar_t *bufaddr, uint_t buflen,
+	int path_flag)
 {
 	char	cdb[CDB_GROUP1];
 	int	status;
@@ -18552,7 +18565,7 @@ sd_send_scsi_GET_CONFIGURATION(struct sd_lun *un, struct uscsi_cmd *ucmdbuf,
 	ucmdbuf->uscsi_flags = USCSI_RQENABLE|USCSI_SILENT|USCSI_READ;
 
 	status = sd_send_scsi_cmd(SD_GET_DEV(un), ucmdbuf, FKIOCTL,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	    UIO_SYSSPACE, path_flag);
 
 	switch (status) {
 	case 0:
@@ -18605,7 +18618,7 @@ sd_send_scsi_GET_CONFIGURATION(struct sd_lun *un, struct uscsi_cmd *ucmdbuf,
 static int
 sd_send_scsi_feature_GET_CONFIGURATION(struct sd_lun *un,
 	struct uscsi_cmd *ucmdbuf, uchar_t *rqbuf, uint_t rqbuflen,
-	uchar_t *bufaddr, uint_t buflen, char feature)
+	uchar_t *bufaddr, uint_t buflen, char feature, int path_flag)
 {
 	char    cdb[CDB_GROUP1];
 	int	status;
@@ -18641,7 +18654,7 @@ sd_send_scsi_feature_GET_CONFIGURATION(struct sd_lun *un,
 	ucmdbuf->uscsi_flags = USCSI_RQENABLE|USCSI_SILENT|USCSI_READ;
 
 	status = sd_send_scsi_cmd(SD_GET_DEV(un), ucmdbuf, FKIOCTL,
-	    UIO_SYSSPACE, SD_PATH_STANDARD);
+	    UIO_SYSSPACE, path_flag);
 
 	switch (status) {
 	case 0:
@@ -20261,7 +20274,8 @@ sd_get_media_info(dev_t dev, caddr_t arg, int flag)
 		/* Allow SCMD_GET_CONFIGURATION to MMC devices only */
 		if (un->un_f_mmc_cap == TRUE) {
 			rtn = sd_send_scsi_GET_CONFIGURATION(un, &com, rqbuf,
-				SENSE_LENGTH, out_data, SD_PROFILE_HEADER_LEN);
+				SENSE_LENGTH, out_data, SD_PROFILE_HEADER_LEN,
+				SD_PATH_STANDARD);
 
 			if (rtn) {
 				/*
@@ -20510,6 +20524,11 @@ sd_check_media(dev_t dev, enum dkio_state state)
 		mutex_enter(SD_MUTEX(un));
 
 		sd_update_block_info(un, lbasize, capacity);
+
+		/*
+		 *  Check if the media in the device is writable or not
+		 */
+		sd_check_for_writable_cd(un, SD_PATH_DIRECT);
 
 		mutex_exit(SD_MUTEX(un));
 		cmlb_invalidate(un->un_cmlbhandle, (void *)SD_PATH_DIRECT);
