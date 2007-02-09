@@ -30,6 +30,8 @@
 
 include $(SRC)/lib/Makefile.lib
 
+HDRS =		raidcfg_spi.h raidcfg.h
+HDRDIR =	common
 SUBDIRS =	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
@@ -46,6 +48,10 @@ lint :=		TARGET= lint
 .KEEP_STATE:
 
 all clean clobber install lint: $(SUBDIRS)
+
+install_h: $(ROOTHDRS)
+
+check: $(CHECKHDRS)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

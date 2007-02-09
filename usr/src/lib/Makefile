@@ -362,6 +362,7 @@ HDRSUBDIRS=		\
 	libplot		\
 	libpool		\
 	libproc		\
+	libraidcfg	\
 	librcm		\
 	libscf		\
 	libsip		\

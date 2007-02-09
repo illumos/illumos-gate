@@ -136,8 +136,6 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	pthread.h	\
 	pw.h		\
 	pwd.h		\
-	raidcfg.h	\
-	raidcfg_spi.h	\
 	rctl.h		\
 	re_comp.h	\
 	regex.h		\
