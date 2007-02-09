@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,7 @@
  * MSI/X allocation limit.
  * This limit will change with Resource Management support.
  */
-uint_t		ddi_msix_alloc_limit = 2;
+uint_t		ddi_msix_alloc_limit = DDI_INTR_DEFAULT_ALLOC;
 
 /*
  * ddi_intr_get_supported_types:
@@ -176,7 +176,7 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 {
 	ddi_intr_handle_impl_t	*hdlp, tmp_hdl;
 	int			i, ret, cap = 0, intr_type, nintrs = 0;
-	uint_t			pri;
+	uint_t			pri, curr_nintrs = 0;
 
 	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: name %s dip 0x%p "
 	    "type %x inum %x count %x behavior %x\n", ddi_driver_name(dip),
@@ -245,10 +245,11 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: type %x "
 		    "is already being used\n", type));
 
-		if ((count + i_ddi_intr_get_current_nintrs(dip)) > nintrs) {
+		curr_nintrs = i_ddi_intr_get_current_nintrs(dip);
+		if ((count + curr_nintrs) > nintrs) {
 			DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: count %d "
 			    "+ intrs in use %d exceeds supported %d intrs\n",
-			    count, i_ddi_intr_get_current_nintrs(dip), nintrs));
+			    count, curr_nintrs, nintrs));
 			return (DDI_EINVAL);
 		}
 	}
@@ -266,19 +267,27 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	 * Limit max MSI/X allocation to ddi_msix_alloc_limit.
 	 * This limit will change with Resource Management support.
 	 */
-	if (DDI_INTR_IS_MSI_OR_MSIX(type) && (count > ddi_msix_alloc_limit)) {
-		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: Requested MSI/Xs %d"
-		    "Max MSI/Xs limit %d\n", count, ddi_msix_alloc_limit));
-
-		if (behavior == DDI_INTR_ALLOC_STRICT) {
+	if (DDI_INTR_IS_MSI_OR_MSIX(type)) {
+		if (curr_nintrs == ddi_msix_alloc_limit) {
 			DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: "
-			    "DDI_INTR_ALLOC_STRICT flag is passed, "
-			    "return failure\n"));
-
-			return (DDI_EAGAIN);
+			    "max # of intrs %d already allocated\n",
+			    curr_nintrs));
+			return (DDI_EINVAL);
 		}
+		if ((count + curr_nintrs) > ddi_msix_alloc_limit) {
+			DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: Requested "
+			    "MSI/Xs %d Max MSI/Xs limit %d\n", count,
+			    ddi_msix_alloc_limit));
 
-		count = ddi_msix_alloc_limit;
+			if (behavior == DDI_INTR_ALLOC_STRICT) {
+				DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: "
+				    "DDI_INTR_ALLOC_STRICT flag is passed, "
+				    "return failure\n"));
+				return (DDI_EAGAIN);
+			}
+
+			count = ddi_msix_alloc_limit - curr_nintrs;
+		}
 	}
 
 	/* Now allocate required number of interrupts */

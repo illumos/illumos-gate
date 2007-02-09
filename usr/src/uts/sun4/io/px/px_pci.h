@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -178,7 +178,8 @@ extern void *pxb_state;
 #define	PXB_DEVICE_PLX_8532		0x8532
 #define	PXB_DEVICE_PLX_8516		0x8516
 
-#define	PXB_DEVICE_PLX_BAD_MSI_REV	0xAA	/* last known bad rev for MSI */
+/* Last known bad rev for MSI and other issues */
+#define	PXB_DEVICE_PLX_AA_REV		0xAA
 
 #define	PXB_VENDOR_SUN			0x108E
 #define	PXB_DEVICE_PLX_PCIX		0x9010

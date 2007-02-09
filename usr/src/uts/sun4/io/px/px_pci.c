@@ -450,25 +450,47 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	/*
-	 * Initialize hotplug support on this bus. At minimum
-	 * (for non hotplug bus) this would create ":devctl" minor
-	 * node to support DEVCTL_DEVICE_* and DEVCTL_BUS_* ioctls
-	 * to this bus. This all takes place if this nexus has hot-plug
+	 * Initialize hotplug support on this bus except for the PLX switch
+	 * revision AA. At a minimum (for non hotplug bus) this would create
+	 * ":devctl" minor node to support DEVCTL_DEVICE_* and DEVCTL_BUS_*
+	 * ioctls to this bus. This all takes place if this nexus has hot-plug
 	 * slots and successfully initializes Hot Plug Framework.
 	 */
 	pxb->pxb_hotplug_capable = B_FALSE;
 
+#ifdef PX_PLX
+	if (pxb->pxb_rev_id <= PXB_DEVICE_PLX_AA_REV)
+		goto hotplug_done;
+#endif /* PX_PLX */
+
 	if ((pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_DOWN) ||
 	    (pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCIE2PCI) ||
 	    (pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCI2PCIE)) {
+#ifdef PX_PLX
+		/*
+		 * Workaround for a race condition between hotplug
+		 * initialization and actual MSI interrupt registration
+		 * for hotplug functionality. The hotplug initialization
+		 * generates an INTx interrupt for hotplug events and this
+		 * INTx interrupt may interfere with shared leaf drivers
+		 * using same INTx interrupt, which may eventually block
+		 * the leaf drivers.
+		 */
+		pci_config_put16(config_handle, PCI_CONF_COMM,
+		    pci_config_get16(config_handle, PCI_CONF_COMM) |
+		    PCI_COMM_INTX_DISABLE);
+#endif /* PX_PLX */
+
 		pxb_init_hotplug(pxb);
 	}
 
-	/* attach interrupt only if hotplug functionality is required */
-	if (pxb->pxb_hotplug_capable != B_FALSE) {
+	/* Attach interrupt only if hotplug functionality is required */
+	if (pxb->pxb_hotplug_capable == B_TRUE) {
 		if (pxb_intr_attach(pxb) != DDI_SUCCESS)
 			goto fail;
 	}
+
+hotplug_done:
 #ifdef	PRINT_PLX_SEEPROM_CRC
 	/* check seeprom CRC to ensure the platform config is right */
 	(void) pxb_print_plx_seeprom_crc_data(pxb);
@@ -1021,11 +1043,6 @@ pxb_intr_attach(pxb_devstate_t *pxb)
 		DBG(DBG_ATTACH, devi, "ddi_intr_get_supported_types failed\n");
 		return (DDI_FAILURE);
 	}
-
-#ifdef PX_PLX
-	if (pxb->pxb_rev_id <= PXB_DEVICE_PLX_BAD_MSI_REV)
-		intr_types &= DDI_INTR_TYPE_FIXED;
-#endif /* PX_PLX */
 
 	if ((intr_types & DDI_INTR_TYPE_MSI) && pxb_enable_msi) {
 		if (pxb_intr_init(pxb, DDI_INTR_TYPE_MSI) == DDI_SUCCESS)

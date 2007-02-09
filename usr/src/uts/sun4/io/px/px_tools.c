@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -370,6 +370,7 @@ pxtool_get_phys_addr(px_t *px_p, int space, uint64_t offset)
 		dev_regspec.pci_phys_hi +=
 		    (offset & (PCI_REG_BDFR_M ^ PCI_REG_REG_M));
 		dev_regspec.pci_phys_low = offset & PCI_REG_REG_M;
+		dev_regspec.pci_phys_mid = 0;	/* Not used */
 	} else {
 		dev_regspec.pci_phys_mid = offset >> 32;
 		dev_regspec.pci_phys_low = offset & 0xffffffff;

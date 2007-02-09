@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,6 +131,9 @@ typedef struct ddi_intr_handle_impl {
 
 /* values for ih_flags */
 #define	DDI_INTR_MSIX_DUP	0x01	/* MSI-X vector which has been dupped */
+
+/* Default number of MSI/X resources to allocate */
+#define	DDI_INTR_DEFAULT_ALLOC		2
 
 struct av_softinfo;
 
@@ -313,7 +316,7 @@ int	i_ddi_get_intx_nintrs(dev_info_t *dip);
  */
 typedef enum {DDI_INTR_CTLOPS_NONE} ddi_intr_ctlop_t;
 
-/* The following are the obsolete interfaces */
+/* The following are obsolete interfaces */
 ddi_intrspec_t	i_ddi_get_intrspec(dev_info_t *dip, dev_info_t *rdip,
 	    uint_t inumber);
 
