@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,6 +118,10 @@ bcopy(const void *from, void *to, size_t count)
 	clr	%o5			! flag LOFAULT_SET is not set for bcopy
 
 .do_copy:
+        mov     %i1, %g5                ! save dest addr start
+
+        mov     %i2, %l6                ! save size
+
 	cmp	%i2, 12			! for small counts
 	blu	%ncc, .bytecp		! just copy bytes
 	  .empty
@@ -347,6 +350,9 @@ bcopy(const void *from, void *to, size_t count)
 	andn	%o5, LOFAULT_SET, %o5
 	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
 1:
+        mov     %g5, %o0                ! copy dest address
+        call    sync_icache
+        mov     %l6, %o1                ! saved size
 	ret
 	restore %g0, 0, %o0		! return (0)
 
@@ -449,6 +455,7 @@ hwblkpagecopy(const void *src, void *dst)
 	! %i2 - length of region (not arg)
 
 	set	PAGESIZE, %i2
+	mov     %i1,    %o0     ! store destination address for flushing
 
 	/*
 	 * Copying exactly one page and PAGESIZE is in mutliple of 0x80. 
@@ -492,6 +499,11 @@ hwblkpagecopy(const void *src, void *dst)
 	subcc	%i2, 0x80, %i2
 	bgu,pt	%xcc, 1b
 	add	%i1, 0x80, %i1
+
+	! %o0 contains the dest. address
+	set	PAGESIZE, %o1
+	call	sync_icache
+	nop
 
 	membar #Sync
 	ret
