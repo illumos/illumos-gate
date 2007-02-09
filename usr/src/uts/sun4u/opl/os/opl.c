@@ -82,9 +82,9 @@ static opl_model_info_t opl_models[] = {
 static	int	opl_num_models = sizeof (opl_models)/sizeof (opl_model_info_t);
 
 /*
- * opl_cur_model defaults to FF1.
+ * opl_cur_model
  */
-static	opl_model_info_t *opl_cur_model = &opl_models[0];
+static	opl_model_info_t *opl_cur_model = NULL;
 
 static struct memlist *opl_memlist_per_board(struct memlist *ml);
 
@@ -184,7 +184,6 @@ set_platform_defaults(void)
 
 	tsb_lgrp_affinity = 1;
 
-	set_model_info();
 	set_max_mmu_ctxdoms();
 }
 
@@ -824,6 +823,13 @@ plat_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp)
 	sb = opl_get_physical_board(LSB_ID(cpuid));
 	if (sb == -1) {
 		return (ENXIO);
+	}
+
+	/*
+	 * opl_cur_model is assigned here
+	 */
+	if (opl_cur_model == NULL) {
+		set_model_info();
 	}
 
 	ASSERT((opl_cur_model - opl_models) == (opl_cur_model->model_type));
