@@ -42,6 +42,7 @@
 #include <sys/ivintr.h>
 #include <sys/byteorder.h>
 #include <sys/hotplug/pci/pciehpc.h>
+#include <sys/spl.h>
 #include <px_obj.h>
 #include <pcie_pwr.h>
 #include "px_tools_var.h"
@@ -2042,6 +2043,56 @@ px_err_rem_intr(px_fault_t *px_fault_p)
 }
 
 /*
+ * px_cb_intr_redist() - sun4u only, CB interrupt redistribution
+ */
+void
+px_cb_intr_redist(void *arg)
+{
+	px_cb_t		*cb_p = (px_cb_t *)arg;
+	px_cb_list_t	*pxl;
+	px_t		*pxp = NULL;
+	px_fault_t	*f_p = NULL;
+	uint32_t	new_cpuid;
+	intr_valid_state_t	enabled = 0;
+
+	mutex_enter(&cb_p->cb_mutex);
+
+	pxl = cb_p->pxl;
+	if (!pxl)
+		goto cb_done;
+
+	pxp = pxl->pxp;
+	f_p = &pxp->px_cb_fault;
+	for (; pxl && (f_p->px_fh_sysino != cb_p->sysino); ) {
+		pxl = pxl->next;
+		pxp = pxl->pxp;
+		f_p = &pxp->px_cb_fault;
+	}
+	if (pxl == NULL)
+		goto cb_done;
+
+	new_cpuid =  intr_dist_cpuid();
+	if (new_cpuid == cb_p->cpuid)
+		goto cb_done;
+
+	if ((px_lib_intr_getvalid(pxp->px_dip, f_p->px_fh_sysino, &enabled)
+	    != DDI_SUCCESS) || !enabled) {
+		DBG(DBG_IB, pxp->px_dip, "px_cb_intr_redist: CB not enabled, "
+		    "sysino(0x%x)\n", f_p->px_fh_sysino);
+		goto cb_done;
+	}
+
+	PX_INTR_DISABLE(pxp->px_dip, f_p->px_fh_sysino);
+
+	cb_p->cpuid = new_cpuid;
+	cb_p->sysino = f_p->px_fh_sysino;
+	PX_INTR_ENABLE(pxp->px_dip, cb_p->sysino, cb_p->cpuid);
+
+cb_done:
+	mutex_exit(&cb_p->cb_mutex);
+}
+
+/*
  * px_cb_add_intr() - Called from attach(9E) to create CB if not yet
  * created, to add CB interrupt vector always, but enable only once.
  */
@@ -2052,12 +2103,15 @@ px_cb_add_intr(px_fault_t *fault_p)
 	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
 	px_cb_t		*cb_p = (px_cb_t *)px_get_cb(fault_p->px_fh_dip);
 	px_cb_list_t	*pxl, *pxl_new;
-	cpuid_t		cpuid;
+	boolean_t	is_proxy = B_FALSE;
 
-
+	/* create cb */
 	if (cb_p == NULL) {
 		cb_p = kmem_zalloc(sizeof (px_cb_t), KM_SLEEP);
-		mutex_init(&cb_p->cb_mutex, NULL, MUTEX_DRIVER, NULL);
+
+		mutex_init(&cb_p->cb_mutex, NULL, MUTEX_DRIVER,
+		    (void *) ipltospl(FM_ERR_PIL));
+
 		cb_p->px_cb_func = px_cb_intr;
 		pxu_p->px_cb_p = cb_p;
 		px_set_cb(fault_p->px_fh_dip, (uint64_t)cb_p);
@@ -2070,36 +2124,29 @@ px_cb_add_intr(px_fault_t *fault_p)
 	} else
 		pxu_p->px_cb_p = cb_p;
 
-	mutex_enter(&cb_p->cb_mutex);
-
+	/* register cb interrupt */
 	VERIFY(add_ivintr(fault_p->px_fh_sysino, PX_ERR_PIL,
 	    (intrfunc)cb_p->px_cb_func, (caddr_t)cb_p, NULL, NULL) == 0);
 
+
+	/* update cb list */
+	mutex_enter(&cb_p->cb_mutex);
 	if (cb_p->pxl == NULL) {
-
-		cpuid = intr_dist_cpuid(),
-		px_ib_intr_enable(px_p, cpuid, fault_p->px_intr_ino);
-
+		is_proxy = B_TRUE;
 		pxl = kmem_zalloc(sizeof (px_cb_list_t), KM_SLEEP);
 		pxl->pxp = px_p;
-
 		cb_p->pxl = pxl;
 		cb_p->sysino = fault_p->px_fh_sysino;
-		cb_p->cpuid = cpuid;
-
+		cb_p->cpuid = intr_dist_cpuid();
 	} else {
 		/*
 		 * Find the last pxl or
-		 * stop short at encoutering a redundent, or
+		 * stop short at encountering a redundent entry, or
 		 * both.
 		 */
 		pxl = cb_p->pxl;
 		for (; !(pxl->pxp == px_p) && pxl->next; pxl = pxl->next);
-		if (pxl->pxp == px_p) {
-			cmn_err(CE_WARN, "px_cb_add_intr: reregister sysino "
-			    "%lx by px_p 0x%p\n", cb_p->sysino, (void *)px_p);
-			return (DDI_FAILURE);
-		}
+		ASSERT(pxl->pxp != px_p);
 
 		/* add to linked list */
 		pxl_new = kmem_zalloc(sizeof (px_cb_list_t), KM_SLEEP);
@@ -2107,8 +2154,15 @@ px_cb_add_intr(px_fault_t *fault_p)
 		pxl->next = pxl_new;
 	}
 	cb_p->attachcnt++;
-
 	mutex_exit(&cb_p->cb_mutex);
+
+	if (is_proxy) {
+		/* add to interrupt redistribution list */
+		intr_dist_add(px_cb_intr_redist, cb_p);
+
+		/* enable cb hw interrupt */
+		px_ib_intr_enable(px_p, cb_p->cpuid, fault_p->px_intr_ino);
+	}
 
 	return (DDI_SUCCESS);
 }
@@ -2129,8 +2183,7 @@ px_cb_rem_intr(px_fault_t *fault_p)
 
 	ASSERT(cb_p->pxl);
 
-	/* De-list the target px, move the next px up */
-
+	/* find and remove this px, and update cb list */
 	mutex_enter(&cb_p->cb_mutex);
 
 	pxl = cb_p->pxl;
@@ -2143,17 +2196,32 @@ px_cb_rem_intr(px_fault_t *fault_p)
 		if (!pxl) {
 			cmn_err(CE_WARN, "px_cb_rem_intr: can't find px_p 0x%p "
 			    "in registered CB list.", (void *)px_p);
+			mutex_exit(&cb_p->cb_mutex);
 			return;
 		}
 		prev->next = pxl->next;
 	}
+	pxu_p->px_cb_p = NULL;
+	cb_p->attachcnt--;
 	kmem_free(pxl, sizeof (px_cb_list_t));
+	mutex_exit(&cb_p->cb_mutex);
 
-	if (fault_p->px_fh_sysino == cb_p->sysino) {
+	/* disable cb hw interrupt */
+	if (fault_p->px_fh_sysino == cb_p->sysino)
 		px_ib_intr_disable(px_p->px_ib_p, fault_p->px_intr_ino,
 		    IB_INTR_WAIT);
 
-		if (cb_p->pxl) {
+	/* if last px, remove from interrupt redistribution list */
+	if (cb_p->pxl == NULL)
+		intr_dist_rem(px_cb_intr_redist, cb_p);
+
+	/* de-register interrupt */
+	VERIFY(rem_ivintr(fault_p->px_fh_sysino, PX_ERR_PIL) == 0);
+
+	/* if not last px, assign next px to manage cb */
+	mutex_enter(&cb_p->cb_mutex);
+	if (cb_p->pxl) {
+		if (fault_p->px_fh_sysino == cb_p->sysino) {
 			pxp = cb_p->pxl->pxp;
 			f_p = &pxp->px_cb_fault;
 			cb_p->sysino = f_p->px_fh_sysino;
@@ -2162,15 +2230,11 @@ px_cb_rem_intr(px_fault_t *fault_p)
 			(void) px_lib_intr_setstate(pxp->px_dip, cb_p->sysino,
 			    INTR_IDLE_STATE);
 		}
-	}
-
-	VERIFY(rem_ivintr(fault_p->px_fh_sysino, PX_ERR_PIL) == 0);
-	pxu_p->px_cb_p = NULL;
-	cb_p->attachcnt--;
-	if (cb_p->pxl) {
 		mutex_exit(&cb_p->cb_mutex);
 		return;
 	}
+
+	/* clean up after the last px */
 	mutex_exit(&cb_p->cb_mutex);
 
 	/* px_lib_dev_init allows only FIRE and OBERON */
@@ -2190,51 +2254,27 @@ uint_t
 px_cb_intr(caddr_t arg)
 {
 	px_cb_t		*cb_p = (px_cb_t *)arg;
-	px_cb_list_t	*pxl = cb_p->pxl;
-	px_t		*pxp = pxl ? pxl->pxp : NULL;
-	px_fault_t	*fault_p;
-
-	while (pxl && pxp && (pxp->px_state != PX_ATTACHED)) {
-		pxl = pxl->next;
-		pxp = (pxl) ? pxl->pxp : NULL;
-	}
-
-	if (pxp) {
-		fault_p = &pxp->px_cb_fault;
-		return (fault_p->px_err_func((caddr_t)fault_p));
-	} else
-		return (DDI_INTR_UNCLAIMED);
-}
-
-/*
- * px_cb_intr_redist() - sun4u only, CB interrupt redistribution
- */
-void
-px_cb_intr_redist(px_t	*px_p)
-{
-	px_fault_t	*f_p = &px_p->px_cb_fault;
-	px_cb_t		*cb_p = PX2CB(px_p);
-	devino_t	ino = px_p->px_inos[PX_INTR_XBC];
-	cpuid_t		cpuid;
-
-	/* Make sure there is an interrupt control block setup. */
-	if (!cb_p)
-		return;
+	px_t		*pxp;
+	px_fault_t	*f_p;
+	int		ret;
 
 	mutex_enter(&cb_p->cb_mutex);
 
-	if (cb_p->sysino != f_p->px_fh_sysino) {
+	if (!cb_p->pxl) {
 		mutex_exit(&cb_p->cb_mutex);
-		return;
+		return (DDI_INTR_UNCLAIMED);
 	}
 
-	cb_p->cpuid = cpuid = intr_dist_cpuid();
-	px_ib_intr_dist_en(px_p->px_dip, cpuid, ino, B_FALSE);
+	pxp = cb_p->pxl->pxp;
+	f_p = &pxp->px_cb_fault;
+
+	ret = f_p->px_err_func((caddr_t)f_p);
 
 	mutex_exit(&cb_p->cb_mutex);
+	return (ret);
 }
 
-#ifdef FMA
+#ifdef	FMA
 void
 px_fill_rc_status(px_fault_t *px_fault_p, pciex_rc_error_regs_t *rc_status)
 {

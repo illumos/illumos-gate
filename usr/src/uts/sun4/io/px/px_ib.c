@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -305,8 +305,6 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 		px_ib_intr_dist_en(dip, intr_dist_cpuid(),
 		    px_p->px_inos[PX_INTR_PEC], B_FALSE);
 		mutex_exit(&ib_p->ib_intr_lock);
-
-		px_cb_intr_redist(px_p);
 	}
 
 	/* Redistribute device interrupts */

@@ -1766,23 +1766,41 @@ px_err_rem_intr(px_fault_t *px_fault_p)
 	VERIFY(rem_ivintr(px_fault_p->px_fh_sysino, PX_ERR_PIL) == 0);
 }
 
+void
+px_cb_intr_redist(void *arg)
+{
+	px_t	*px_p = (px_t *)arg;
+	px_ib_intr_dist_en(px_p->px_dip, intr_dist_cpuid(),
+	    px_p->px_inos[PX_INTR_XBC], B_FALSE);
+}
+
 int
 px_cb_add_intr(px_fault_t *f_p)
 {
-	return (px_err_add_intr(f_p));
+	px_t	*px_p = DIP_TO_STATE(f_p->px_fh_dip);
+
+	DBG(DBG_LIB_INT, px_p->px_dip,
+	    "px_err_add_intr: calling add_ivintr");
+
+	VERIFY(add_ivintr(f_p->px_fh_sysino, PX_ERR_PIL,
+	    (intrfunc)f_p->px_err_func, (caddr_t)f_p, NULL,
+	    (caddr_t)&f_p->px_intr_payload[0]) == 0);
+
+	intr_dist_add(px_cb_intr_redist, px_p);
+
+	DBG(DBG_LIB_INT, px_p->px_dip,
+	    "px_err_add_intr: ib_intr_enable ");
+
+	px_ib_intr_enable(px_p, intr_dist_cpuid(), f_p->px_intr_ino);
+
+	return (DDI_SUCCESS);
 }
 
 void
 px_cb_rem_intr(px_fault_t *f_p)
 {
+	intr_dist_rem(px_cb_intr_redist, DIP_TO_STATE(f_p->px_fh_dip));
 	px_err_rem_intr(f_p);
-}
-
-void
-px_cb_intr_redist(px_t *px_p)
-{
-	px_ib_intr_dist_en(px_p->px_dip, intr_dist_cpuid(),
-	    px_p->px_inos[PX_INTR_XBC], B_FALSE);
 }
 
 #ifdef FMA
