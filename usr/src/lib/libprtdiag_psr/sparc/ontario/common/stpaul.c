@@ -170,7 +170,7 @@ stpaul_pci_callback(picl_nodehdl_t pcih, void *args)
 			if (pn_type == SPL_PEM_TYPE)
 				(void) snprintf(pci_card.status,
 				    sizeof (pci_card.status), "%s/%s%d",
-				    MOTHERBOARD, "PEM", instance);
+				    MOTHERBOARD, "PCI-EM", instance);
 			else if (pn_type == SPL_NEM_TYPE)
 				(void) snprintf(pci_card.status,
 				    sizeof (pci_card.status), "%s/%s%d",
