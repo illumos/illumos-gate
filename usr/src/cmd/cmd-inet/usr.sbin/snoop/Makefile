@@ -28,7 +28,7 @@
 #
 
 PROG=	snoop
-OBJS=	dlprims.o nfs4_xdr.o snoop.o snoop_aarp.o snoop_adsp.o snoop_aecho.o \
+OBJS=	nfs4_xdr.o snoop.o snoop_aarp.o snoop_adsp.o snoop_aecho.o \
 	snoop_apple.o snoop_arp.o snoop_atp.o snoop_bparam.o \
 	snoop_capture.o snoop_dhcp.o snoop_dhcpv6.o snoop_display.o \
 	snoop_dns.o snoop_ether.o \

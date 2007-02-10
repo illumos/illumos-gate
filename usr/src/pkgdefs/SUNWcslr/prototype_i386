@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -78,6 +78,8 @@ s none lib/amd64/libdevinfo.so=libdevinfo.so.1
 f none lib/amd64/libdevinfo.so.1 755 root bin
 s none lib/amd64/libdl.so=libdl.so.1
 f none lib/amd64/libdl.so.1 755 root bin
+s none lib/amd64/libdlpi.so=libdlpi.so.1
+f none lib/amd64/libdlpi.so.1 755 root bin
 s none lib/amd64/libdoor.so=libdoor.so.1
 f none lib/amd64/libdoor.so.1 755 root bin
 s none lib/amd64/libefi.so=libefi.so.1

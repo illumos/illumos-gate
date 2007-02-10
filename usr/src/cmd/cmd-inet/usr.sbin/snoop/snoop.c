@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,6 @@ main(int argc, char **argv)
 	int Cflg = 0;
 	int first = 1;
 	int last  = 0x7fffffff;
-	int ppa;
 	int use_kern_pf;
 	char *p, *p2;
 	char names[MAXPATHLEN + 1];
@@ -123,6 +122,7 @@ main(int argc, char **argv)
 	stack_t sigstk;
 	char *output_area;
 	int nbytes;
+	dlpi_handle_t dh;
 
 	names[0] = '\0';
 	/*
@@ -361,7 +361,7 @@ main(int argc, char **argv)
 	 * requested was chosen, but that's too hard.
 	 */
 	if (!icapfile) {
-		use_kern_pf = check_device(&device, &ppa);
+		use_kern_pf = check_device(&dh, &device);
 	} else {
 		cap_open_read(icapfile);
 
@@ -479,11 +479,12 @@ main(int argc, char **argv)
 			timeout.tv_usec = 0;
 		}
 
-		initdevice(device, snaplen, chunksize, &timeout, fp, ppa);
+		initdevice(dh, snaplen, chunksize, &timeout, fp);
 		if (! qflg && ocapfile)
 			show_count();
 		resetperm();
-		net_read(chunksize, filter, proc, flags);
+		net_read(dh, chunksize, filter, proc, flags);
+		dlpi_close(dh);
 
 		if (!(flags & F_NOW))
 			(void) printf("\n");
@@ -730,6 +731,25 @@ pr_err(const char *fmt, ...)
 	(void) vfprintf(stderr, buf, ap);
 	va_end(ap);
 	snoop_sigrecover(-1, NULL, NULL);	/* global error recovery */
+}
+
+/*
+ * Store a copy of linkname associated with the DLPI handle.
+ * Save errno before closing the dlpi handle so that the
+ * correct error value is used if 'err' is a system error.
+ */
+void
+pr_errdlpi(dlpi_handle_t dh, const char *cmd, int err)
+{
+	int save_errno = errno;
+	char linkname[DLPI_LINKNAME_MAX];
+
+	(void) strlcpy(linkname, dlpi_linkname(dh), sizeof (linkname));
+
+	dlpi_close(dh);
+	errno = save_errno;
+
+	pr_err("%s on \"%s\": %s", cmd, linkname, dlpi_strerror(err));
 }
 
 /*

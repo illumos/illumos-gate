@@ -44,6 +44,7 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
 #include <net/pppoe.h>
+#include <libdlpi.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -176,14 +177,14 @@ extern int pf_compile(char *, int);
 extern void compile(char *, int);
 extern void load_names(char *);
 extern void cap_write(struct sb_hdr *, char *, int, int);
-extern void cap_open_read(char *);
-extern void cap_open_write(char *);
+extern void cap_open_read(const char *);
+extern void cap_open_write(const char *);
 extern void cap_read(int, int, int, void (*)(), int);
 extern void cap_close(void);
-extern boolean_t check_device(char **, int *);
-extern void initdevice(char *, ulong_t, ulong_t, struct timeval *,
-    struct Pf_ext_packetfilt *, int);
-extern void net_read(int, int, void (*)(), int);
+extern boolean_t check_device(dlpi_handle_t *, char **);
+extern void initdevice(dlpi_handle_t, ulong_t, ulong_t, struct timeval *,
+    struct Pf_ext_packetfilt *);
+extern void net_read(dlpi_handle_t, size_t, int, void (*)(), int);
 extern void click(int);
 extern void show_pktinfo(int, int, char *, char *, struct timeval *,
 		struct timeval *, int, int);
@@ -193,6 +194,7 @@ extern char *showxdr_time(char *);
 extern char *addrtoname(int, const void *);
 extern char *show_string(const char *, int, int);
 extern void pr_err(const char *, ...);
+extern void pr_errdlpi(dlpi_handle_t, const char *, int);
 extern void check_retransmit(char *, ulong_t);
 extern char *nameof_prog(int);
 extern char *getproto(int);

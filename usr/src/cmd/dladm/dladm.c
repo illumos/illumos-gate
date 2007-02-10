@@ -32,7 +32,6 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#include <stdarg.h>
 #include <string.h>
 #include <stropts.h>
 #include <errno.h>
@@ -670,11 +669,11 @@ do_down_aggr(int argc, char *argv[])
 static void
 print_link_parseable(const char *name, dladm_attr_t *dap, boolean_t legacy)
 {
-	char		type[TYPE_WIDTH];
+	char	type[TYPE_WIDTH];
 
 	if (!legacy) {
-		char	drv[LIFNAMSIZ];
-		int	instance;
+		char	drv[DLPI_LINKNAME_MAX];
+		uint_t	instance;
 
 		if (dap->da_vid != 0) {
 			(void) snprintf(type, TYPE_WIDTH, "vlan %u",
@@ -682,8 +681,10 @@ print_link_parseable(const char *name, dladm_attr_t *dap, boolean_t legacy)
 		} else {
 			(void) snprintf(type, TYPE_WIDTH, "non-vlan");
 		}
-		if (dlpi_if_parse(dap->da_dev, drv, &instance) != 0)
+
+		if (dlpi_parselink(dap->da_dev, drv, &instance) != DLPI_SUCCESS)
 			return;
+
 		if (strncmp(drv, AGGR_DRV, sizeof (AGGR_DRV)) == 0) {
 			(void) printf("%s type=%s mtu=%d key=%u\n",
 			    name, type, dap->da_max_sdu, instance);
@@ -700,11 +701,11 @@ print_link_parseable(const char *name, dladm_attr_t *dap, boolean_t legacy)
 static void
 print_link(const char *name, dladm_attr_t *dap, boolean_t legacy)
 {
-	char		type[TYPE_WIDTH];
+	char	type[TYPE_WIDTH];
 
 	if (!legacy) {
-		char drv[LIFNAMSIZ];
-		int instance;
+		char 	drv[DLPI_LINKNAME_MAX];
+		uint_t	instance;
 
 		if (dap->da_vid != 0) {
 			(void) snprintf(type, TYPE_WIDTH, gettext("vlan %u"),
@@ -712,7 +713,8 @@ print_link(const char *name, dladm_attr_t *dap, boolean_t legacy)
 		} else {
 			(void) snprintf(type, TYPE_WIDTH, gettext("non-vlan"));
 		}
-		if (dlpi_if_parse(dap->da_dev, drv, &instance) != 0)
+
+		if (dlpi_parselink(dap->da_dev, drv, &instance) != DLPI_SUCCESS)
 			return;
 		if (strncmp(drv, AGGR_DRV, sizeof (AGGR_DRV)) == 0) {
 			(void) printf(gettext("%-9s\ttype: %s\tmtu: %d"
@@ -737,26 +739,27 @@ get_if_info(const char *name, dladm_attr_t *dlattrp, boolean_t *legacy)
 	if ((err = dladm_info(name, dlattrp)) == 0) {
 		*legacy = B_FALSE;
 	} else if (err < 0 && errno == ENODEV) {
-		int		fd;
-		dlpi_if_attr_t	dia;
-		dl_info_ack_t	dlia;
+		dlpi_handle_t   dh;
+		dlpi_info_t	dlinfo;
 
 		/*
 		 * A return value of ENODEV means that the specified
 		 * device is not gldv3.
 		 */
-		if ((fd = dlpi_if_open(name, &dia, B_FALSE)) != -1 &&
-		    dlpi_info(fd, -1, &dlia, NULL, NULL, NULL, NULL,
-		    NULL, NULL) != -1) {
-			(void) dlpi_close(fd);
-
-			*legacy = B_TRUE;
-			bzero(dlattrp, sizeof (*dlattrp));
-			dlattrp->da_max_sdu = (uint_t)dlia.dl_max_sdu;
-		} else {
+		if (dlpi_open(name, &dh, 0) != DLPI_SUCCESS) {
 			errno = ENOENT;
 			return (-1);
 		}
+		if (dlpi_info(dh, &dlinfo, 0) != DLPI_SUCCESS) {
+			dlpi_close(dh);
+			errno = EINVAL;
+			return (-1);
+		}
+		dlpi_close(dh);
+		*legacy = B_TRUE;
+		bzero(dlattrp, sizeof (*dlattrp));
+		dlattrp->da_max_sdu = dlinfo.di_max_sdu;
+
 	} else {
 		/*
 		 * If the return value is not ENODEV, this means that
@@ -1308,8 +1311,8 @@ do_show_dev(int argc, char *argv[])
 		usage();
 
 	if (dev != NULL) {
-		int		index;
-		char		drv[LIFNAMSIZ];
+		uint_t		ppa;
+		char		drv[DLPI_LINKNAME_MAX];
 		dladm_attr_t	dlattr;
 		boolean_t	legacy;
 
@@ -1317,9 +1320,9 @@ do_show_dev(int argc, char *argv[])
 		 * Check for invalid devices.
 		 * aggregations and vlans are not considered devices.
 		 */
-		if (strncmp(dev, "aggr", 4) == 0 ||
-		    dlpi_if_parse(dev, drv, &index) < 0 ||
-		    index >= 1000 || get_if_info(dev, &dlattr, &legacy) < 0)
+		if (dlpi_parselink(dev, drv, &ppa) != DLPI_SUCCESS ||
+		    strcmp(drv, "aggr") == 0 || ppa >= 1000 ||
+		    get_if_info(dev, &dlattr, &legacy) < 0)
 			die("invalid device '%s'", dev);
 	}
 
@@ -1521,10 +1524,10 @@ bail:
 static void
 get_mac_stats(const char *dev, pktsum_t *stats)
 {
-	char	module[LIFNAMSIZ];
-	int	instance;
+	char	module[DLPI_LINKNAME_MAX];
+	uint_t	instance;
 
-	if (dlpi_if_parse(dev, module, &instance) != 0)
+	if (dlpi_parselink(dev, module, &instance) != DLPI_SUCCESS)
 		return;
 	bzero(stats, sizeof (*stats));
 	get_stats(module, instance, "mac", stats);
@@ -1533,10 +1536,10 @@ get_mac_stats(const char *dev, pktsum_t *stats)
 static void
 get_link_stats(const char *link, pktsum_t *stats)
 {
-	char	module[LIFNAMSIZ];
-	int	instance;
+	char	module[DLPI_LINKNAME_MAX];
+	uint_t	instance;
 
-	if (dlpi_if_parse(link, module, &instance) != 0)
+	if (dlpi_parselink(link, module, &instance) != DLPI_SUCCESS)
 		return;
 	bzero(stats, sizeof (*stats));
 	get_stats(module, instance, (char *)link, stats);
@@ -1546,18 +1549,19 @@ static int
 get_single_mac_stat(const char *dev, const char *name, uint8_t type,
     void *val)
 {
-	char		module[LIFNAMSIZ];
-	int		instance;
+	char		module[DLPI_LINKNAME_MAX];
+	uint_t		instance;
 	kstat_ctl_t	*kcp;
 	kstat_t		*ksp;
+
+	if (dlpi_parselink(dev, module, &instance) != DLPI_SUCCESS)
+		return (-1);
 
 	if ((kcp = kstat_open()) == NULL) {
 		warn("kstat open operation failed");
 		return (-1);
 	}
 
-	if (dlpi_if_parse(dev, module, &instance) != 0)
-		return (-1);
 	if ((ksp = kstat_lookup(kcp, module, instance, "mac")) == NULL &&
 	    (ksp = kstat_lookup(kcp, module, instance, NULL)) == NULL) {
 		/*

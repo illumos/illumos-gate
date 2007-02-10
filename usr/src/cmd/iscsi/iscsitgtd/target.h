@@ -190,7 +190,7 @@ extern char 		*target_log;
 extern char		*config_file;
 extern tgt_node_t	*targets_config;
 extern tgt_node_t	*main_config;
-extern uchar_t		*mac_addr;
+extern uchar_t		mac_addr[];
 extern size_t		mac_len;
 extern int		main_vers_maj,
 			main_vers_min,

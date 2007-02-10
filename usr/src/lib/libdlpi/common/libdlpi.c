@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 /*
  * Data-Link Provider Interface (Version 2)
  */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,1285 +39,1408 @@
 #include <stropts.h>
 #include <sys/dlpi.h>
 #include <errno.h>
+#include <alloca.h>
 #include <sys/sysmacros.h>
 #include <ctype.h>
 #include <libdlpi.h>
-#include <libdladm.h>
+#include <libintl.h>
+#include <libinetutil.h>
 
-typedef enum dlpi_multi_op {
-	DLPI_MULTI_DISABLE = 0,
-	DLPI_MULTI_ENABLE
-} dlpi_multi_op_t;
+#include "libdlpi_impl.h"
 
-typedef enum dlpi_promisc_op {
-	DLPI_PROMISC_OFF = 0,
-	DLPI_PROMISC_ON
-} dlpi_promisc_op_t;
+static int i_dlpi_open(const char *, int *, uint_t);
+static int i_dlpi_style1_open(dlpi_impl_t *);
+static int i_dlpi_style2_open(dlpi_impl_t *);
+static int i_dlpi_checkstyle(dlpi_impl_t *, t_uscalar_t);
+static int i_dlpi_remove_ppa(char *);
+static int i_dlpi_attach(dlpi_impl_t *);
+static void i_dlpi_passive(dlpi_impl_t *);
 
-const char	*i_dlpi_mac_type[] = {
-	"CSMA/CD",		/* 0x00 */
-	"Token Bus",		/* 0x01 */
-	"Token Ring",		/* 0x02 */
-	"Metro Net",		/* 0x03 */
-	"Ethernet",		/* 0x04 */
-	"HDLC",			/* 0x05 */
-	"Sync Character",	/* 0x06 */
-	"CTCA",			/* 0x07 */
-	"FDDI",			/* 0x08 */
-	"unknown",		/* 0x09 */
-	"Frame Relay (LAPF)",	/* 0x0a */
-	"MP Frame Relay",	/* 0x0b */
-	"Async Character",	/* 0x0c */
-	"X.25 (Classic IP)",	/* 0x0d */
-	"Software Loopback",	/* 0x0e */
-	"undefined",		/* 0x0f */
-	"Fiber Channel",	/* 0x10 */
-	"ATM",			/* 0x11 */
-	"ATM (Classic IP)",	/* 0x12 */
-	"X.25 (LAPB)",		/* 0x13 */
-	"ISDN",			/* 0x14 */
-	"HIPPI",		/* 0x15 */
-	"100BaseVG Ethernet",	/* 0x16 */
-	"100BaseVG Token Ring",	/* 0x17 */
-	"Ethernet/IEEE 802.3",	/* 0x18 */
-	"100BaseT",		/* 0x19 */
-	"Infiniband"		/* 0x1a */
-};
+static int i_dlpi_strputmsg(int, const dlpi_msg_t *, const void *, size_t, int);
+static int i_dlpi_strgetmsg(int, int, dlpi_msg_t *, t_uscalar_t, t_uscalar_t,
+    size_t, void *, size_t *, size_t *);
+static int i_dlpi_msg_common(dlpi_impl_t *, const dlpi_msg_t *, dlpi_msg_t *,
+    size_t, int);
 
-static int i_dlpi_ifrm_num(char *, unsigned int *);
+static size_t i_dlpi_getprimsize(t_uscalar_t);
+static int i_dlpi_multi(dlpi_handle_t, t_uscalar_t, const uint8_t *, size_t);
+static int i_dlpi_promisc(dlpi_handle_t, t_uscalar_t, uint_t);
+static uint_t i_dlpi_buildsap(uint8_t *, uint_t);
+static void i_dlpi_writesap(void *, uint_t, uint_t);
+
+int
+dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
+{
+	int		retval;
+	int		cnt;
+	ifspec_t	ifsp;
+	dlpi_impl_t  	*dip;
+
+	/*
+	 * Validate linkname, fail if logical unit number (lun) is specified,
+	 * otherwise decompose the contents into ifsp.
+	 */
+	if (linkname == NULL || (strchr(linkname, ':') != NULL) ||
+	    !ifparse_ifspec(linkname, &ifsp))
+		return (DLPI_ELINKNAMEINVAL);
+
+	/* Allocate a new dlpi_impl_t. */
+	if ((dip = calloc(1, sizeof (dlpi_impl_t))) == NULL)
+		return (DL_SYSERR);
+
+	/* Fill in known/default libdlpi handle values. */
+	dip->dli_timeout = DLPI_DEF_TIMEOUT;
+	dip->dli_ppa = ifsp.ifsp_ppa;
+	dip->dli_mod_cnt = ifsp.ifsp_modcnt;
+	dip->dli_oflags = flags;
+
+	for (cnt = 0; cnt != dip->dli_mod_cnt; cnt++) {
+		(void) strlcpy(dip->dli_modlist[cnt], ifsp.ifsp_mods[cnt],
+		    DLPI_LINKNAME_MAX);
+	}
+
+	/* Copy linkname provided to the function. */
+	if (strlcpy(dip->dli_linkname, linkname, sizeof (dip->dli_linkname)) >=
+	    sizeof (dip->dli_linkname)) {
+		free(dip);
+		return (DLPI_ELINKNAMEINVAL);
+	}
+
+	/* Copy provider name. */
+	(void) strlcpy(dip->dli_provider, ifsp.ifsp_devnm,
+	    sizeof (dip->dli_provider));
+
+	/*
+	 * Special case: DLPI_SERIAL flag is set to indicate a synchronous
+	 * serial line interface (see syncinit(1M), syncstat(1M),
+	 * syncloop(1M)), which is not a DLPI link.
+	 */
+	if (dip->dli_oflags & DLPI_SERIAL) {
+		if ((retval = i_dlpi_style2_open(dip)) != DLPI_SUCCESS) {
+			free(dip);
+			return (retval);
+		}
+
+		*dhp = (dlpi_handle_t)dip;
+		return (retval);
+	}
+
+	if (i_dlpi_style1_open(dip) != DLPI_SUCCESS) {
+		if ((retval = i_dlpi_style2_open(dip)) != DLPI_SUCCESS) {
+			free(dip);
+			return (retval);
+		}
+	}
+
+	if (dip->dli_oflags & DLPI_PASSIVE)
+		i_dlpi_passive(dip);
+
+	if ((dip->dli_oflags & DLPI_RAW) &&
+	    ioctl(dip->dli_fd, DLIOCRAW, 0) < 0) {
+		dlpi_close((dlpi_handle_t)dip);
+		return (DLPI_ERAWNOTSUP);
+	}
+
+	/*
+	 * We intentionally do not care if this request fails, as this
+	 * indicates the underlying DLPI device does not support Native mode
+	 * (pre-GLDV3 device drivers).
+	 */
+	if (dip->dli_oflags & DLPI_NATIVE) {
+		if ((retval = ioctl(dip->dli_fd, DLIOCNATIVE, 0)) > 0)
+			dip->dli_mactype = retval;
+	}
+
+	*dhp = (dlpi_handle_t)dip;
+	return (DLPI_SUCCESS);
+}
+
+void
+dlpi_close(dlpi_handle_t dh)
+{
+	dlpi_impl_t	*dip = (dlpi_impl_t *)dh;
+
+	if (dip != NULL) {
+		(void) close(dip->dli_fd);
+		free(dip);
+	}
+}
+
+/*
+ * NOTE: The opt argument must be zero and is reserved for future use to extend
+ * fields to the dlpi_info_t structure (see dlpi_info(3DLPI)).
+ */
+int
+dlpi_info(dlpi_handle_t dh, dlpi_info_t *infop, uint_t opt)
+{
+	int 		retval;
+	dlpi_msg_t	req, ack;
+	dl_info_ack_t	*infoackp;
+	uint8_t		*sapp, *addrp;
+	caddr_t		ackendp, datap;
+	t_uscalar_t	dataoff, datalen;
+	dlpi_impl_t	*dip = (dlpi_impl_t *)dh;
+
+	if (dip == NULL)
+		return (DLPI_EINHANDLE);
+
+	if (infop == NULL || opt != 0)
+		return (DLPI_EINVAL);
+
+	(void) memset(infop, 0, sizeof (dlpi_info_t));
+
+	/* Set QoS range parameters to default unsupported value. */
+	infop->di_qos_range.dl_qos_type = (t_uscalar_t)DL_UNKNOWN;
+	infop->di_qos_range.dl_trans_delay.dl_target_value = DL_UNKNOWN;
+	infop->di_qos_range.dl_trans_delay.dl_accept_value = DL_UNKNOWN;
+	infop->di_qos_range.dl_priority.dl_min = DL_UNKNOWN;
+	infop->di_qos_range.dl_priority.dl_max = DL_UNKNOWN;
+	infop->di_qos_range.dl_protection.dl_min = DL_UNKNOWN;
+	infop->di_qos_range.dl_protection.dl_max = DL_UNKNOWN;
+	infop->di_qos_range.dl_residual_error = DL_UNKNOWN;
+
+	/* Set QoS parameters to default unsupported value. */
+	infop->di_qos_sel.dl_qos_type = (t_uscalar_t)DL_UNKNOWN;
+	infop->di_qos_sel.dl_trans_delay = DL_UNKNOWN;
+	infop->di_qos_sel.dl_priority = DL_UNKNOWN;
+	infop->di_qos_sel.dl_protection = DL_UNKNOWN;
+	infop->di_qos_sel.dl_residual_error = DL_UNKNOWN;
+
+	DLPI_MSG_CREATE(req, DL_INFO_REQ);
+	DLPI_MSG_CREATE(ack, DL_INFO_ACK);
+
+	retval = i_dlpi_msg_common(dip, &req, &ack, DL_INFO_ACK_SIZE, RS_HIPRI);
+	if (retval != DLPI_SUCCESS)
+		return (retval);
+
+	infoackp = &(ack.dlm_msg->info_ack);
+	if (infoackp->dl_version != DL_VERSION_2)
+		return (DLPI_EVERNOTSUP);
+
+	if (infoackp->dl_service_mode != DL_CLDLS)
+		return (DLPI_EMODENOTSUP);
+
+	dip->dli_style = infoackp->dl_provider_style;
+	dip->dli_mactype = infoackp->dl_mac_type;
+
+	ackendp = (caddr_t)ack.dlm_msg + ack.dlm_msgsz;
+
+	/* Check and save QoS selection information, if any. */
+	datalen = infoackp->dl_qos_length;
+	dataoff = infoackp->dl_qos_offset;
+	if (dataoff != 0 && datalen != 0) {
+		datap = (caddr_t)infoackp + dataoff;
+		if (datalen > sizeof (dl_qos_cl_sel1_t) ||
+		    dataoff < DL_INFO_ACK_SIZE || datap + datalen > ackendp)
+			return (DLPI_EBADMSG);
+
+		(void) memcpy(&infop->di_qos_sel, datap, datalen);
+		if (infop->di_qos_sel.dl_qos_type != DL_QOS_CL_SEL1)
+			return (DLPI_EMODENOTSUP);
+	}
+
+	/* Check and save QoS range information, if any. */
+	datalen = infoackp->dl_qos_range_length;
+	dataoff = infoackp->dl_qos_range_offset;
+	if (dataoff != 0 && datalen != 0) {
+		datap = (caddr_t)infoackp + dataoff;
+		if (datalen > sizeof (dl_qos_cl_range1_t) ||
+		    dataoff < DL_INFO_ACK_SIZE || datap + datalen > ackendp)
+			return (DLPI_EBADMSG);
+
+		(void) memcpy(&infop->di_qos_range, datap, datalen);
+		if (infop->di_qos_range.dl_qos_type != DL_QOS_CL_RANGE1)
+			return (DLPI_EMODENOTSUP);
+	}
+
+	/* Check and save physical address and SAP information. */
+	dip->dli_saplen = abs(infoackp->dl_sap_length);
+	dip->dli_sapbefore = (infoackp->dl_sap_length > 0);
+	infop->di_physaddrlen = infoackp->dl_addr_length - dip->dli_saplen;
+
+	if (infop->di_physaddrlen > DLPI_PHYSADDR_MAX ||
+	    dip->dli_saplen > DLPI_SAPLEN_MAX)
+		return (DL_BADADDR);
+
+	dataoff = infoackp->dl_addr_offset;
+	datalen = infoackp->dl_addr_length;
+	if (dataoff != 0 && datalen != 0) {
+		datap = (caddr_t)infoackp + dataoff;
+		if (dataoff < DL_INFO_ACK_SIZE || datap + datalen > ackendp)
+			return (DLPI_EBADMSG);
+
+		sapp = addrp = (uint8_t *)datap;
+		if (dip->dli_sapbefore)
+			addrp += dip->dli_saplen;
+		else
+			sapp += infop->di_physaddrlen;
+
+		(void) memcpy(infop->di_physaddr, addrp, infop->di_physaddrlen);
+		infop->di_sap = i_dlpi_buildsap(sapp, dip->dli_saplen);
+	}
+
+	/* Check and save broadcast address information, if any. */
+	datalen = infoackp->dl_brdcst_addr_length;
+	dataoff = infoackp->dl_brdcst_addr_offset;
+	if (dataoff != 0 && datalen != 0) {
+		datap = (caddr_t)infoackp + dataoff;
+		if (dataoff < DL_INFO_ACK_SIZE || datap + datalen > ackendp)
+			return (DLPI_EBADMSG);
+		if (datalen != infop->di_physaddrlen)
+			return (DL_BADADDR);
+
+		infop->di_bcastaddrlen = datalen;
+		(void) memcpy(infop->di_bcastaddr, datap, datalen);
+	}
+
+	infop->di_max_sdu = infoackp->dl_max_sdu;
+	infop->di_min_sdu = infoackp->dl_min_sdu;
+	infop->di_state = infoackp->dl_current_state;
+	infop->di_mactype = infoackp->dl_mac_type;
+
+	/* Information retrieved from the handle. */
+	(void) strlcpy(infop->di_linkname, dip->dli_linkname,
+	    sizeof (infop->di_linkname));
+	infop->di_timeout = dip->dli_timeout;
+
+	return (DLPI_SUCCESS);
+}
+
+/*
+ * This function parses 'linkname' and stores the 'provider' name and 'PPA'.
+ */
+int
+dlpi_parselink(const char *linkname, char *provider, uint_t *ppa)
+{
+	ifspec_t	ifsp;
+
+	if (linkname == NULL || !ifparse_ifspec(linkname, &ifsp))
+		return (DLPI_ELINKNAMEINVAL);
+
+	if (provider != NULL)
+		(void) strlcpy(provider, ifsp.ifsp_devnm, DLPI_LINKNAME_MAX);
+
+	if (ppa != NULL)
+		*ppa = ifsp.ifsp_ppa;
+
+	return (DLPI_SUCCESS);
+}
+
+/*
+ * This function takes a provider name and a PPA and stores a full linkname
+ * as 'linkname'. If 'provider' already is a full linkname 'provider' name
+ * is stored in 'linkname'.
+ */
+int
+dlpi_makelink(char *linkname, const char *provider, uint_t ppa)
+{
+	int provlen = strlen(provider);
+
+	if (linkname == NULL || provlen == 0 || provlen >= DLPI_LINKNAME_MAX)
+		return (DLPI_ELINKNAMEINVAL);
+
+	if (!isdigit(provider[provlen - 1])) {
+		(void) snprintf(linkname, DLPI_LINKNAME_MAX, "%s%d", provider,
+		    ppa);
+	} else {
+		(void) strlcpy(linkname, provider, DLPI_LINKNAME_MAX);
+	}
+
+	return (DLPI_SUCCESS);
+}
+
+int
+dlpi_bind(dlpi_handle_t dh, uint_t sap, uint_t *boundsap)
+{
+	int		retval;
+	dlpi_msg_t	req, ack;
+	dl_bind_req_t	*bindreqp;
+	dl_bind_ack_t	*bindackp;
+	dlpi_impl_t	*dip = (dlpi_impl_t *)dh;
+
+	if (dip == NULL)
+		return (DLPI_EINHANDLE);
+
+	DLPI_MSG_CREATE(req, DL_BIND_REQ);
+	DLPI_MSG_CREATE(ack, DL_BIND_ACK);
+	bindreqp = &(req.dlm_msg->bind_req);
+
+	/*
+	 * If 'sap' is DLPI_ANY_SAP, bind to SAP 2 on token ring, else 0 on
+	 * other interface types (SAP 0 has special significance on token ring).
+	 */
+	if (sap == DLPI_ANY_SAP)
+		bindreqp->dl_sap = ((dip->dli_mactype == DL_TPR) ? 2 : 0);
+	else
+		bindreqp->dl_sap = sap;
+
+	bindreqp->dl_service_mode = DL_CLDLS;
+	bindreqp->dl_conn_mgmt = 0;
+	bindreqp->dl_max_conind = 0;
+	bindreqp->dl_xidtest_flg = 0;
+
+	retval = i_dlpi_msg_common(dip, &req, &ack, DL_BIND_ACK_SIZE, 0);
+	if (retval != DLPI_SUCCESS)
+		return (retval);
+
+	bindackp = &(ack.dlm_msg->bind_ack);
+	/*
+	 * Received a DLPI_BIND_ACK, now verify that the bound SAP
+	 * is equal to the SAP requested. Some DLPI MAC type may bind
+	 * to a different SAP than requested, in this case 'boundsap'
+	 * returns the actual bound SAP. For the case where 'boundsap'
+	 * is NULL and 'sap' is not DLPI_ANY_SAP, dlpi_bind fails.
+	 */
+	if (boundsap != NULL) {
+		*boundsap = bindackp->dl_sap;
+	} else if (sap != DLPI_ANY_SAP && bindackp->dl_sap != sap) {
+		if (dlpi_unbind(dh) != DLPI_SUCCESS)
+			return (DLPI_FAILURE);
+		else
+			return (DLPI_EUNAVAILSAP);
+	}
+
+	dip->dli_sap = bindackp->dl_sap;	/* save sap value in handle */
+	return (DLPI_SUCCESS);
+}
+
+int
+dlpi_unbind(dlpi_handle_t dh)
+{
+	dlpi_msg_t	req, ack;
+	dlpi_impl_t	*dip = (dlpi_impl_t *)dh;
+
+	if (dip == NULL)
+		return (DLPI_EINHANDLE);
+
+	DLPI_MSG_CREATE(req, DL_UNBIND_REQ);
+	DLPI_MSG_CREATE(ack, DL_OK_ACK);
+
+	return (i_dlpi_msg_common(dip, &req, &ack, DL_OK_ACK_SIZE, 0));
+}
+
+/*
+ * This function is invoked by dlpi_enabmulti() or dlpi_disabmulti() and
+ * based on the "op" value, multicast address is enabled/disabled.
+ */
+static int
+i_dlpi_multi(dlpi_handle_t dh, t_uscalar_t op, const uint8_t *addrp,
+    size_t addrlen)
+{
+	dlpi_msg_t		req, ack;
+	dl_enabmulti_req_t	*multireqp;
+	dlpi_impl_t		*dip = (dlpi_impl_t *)dh;
+
+	if (dip == NULL)
+		return (DLPI_EINHANDLE);
+
+	if (addrlen > DLPI_PHYSADDR_MAX)
+		return (DLPI_EINVAL);
+
+	DLPI_MSG_CREATE(req, op);
+	DLPI_MSG_CREATE(ack, DL_OK_ACK);
+
+	multireqp = &(req.dlm_msg->enabmulti_req);
+	multireqp->dl_addr_length = addrlen;
+	multireqp->dl_addr_offset = sizeof (dl_enabmulti_req_t);
+	(void) memcpy(&multireqp[1], addrp, addrlen);
+
+	return (i_dlpi_msg_common(dip, &req, &ack, DL_OK_ACK_SIZE, 0));
+}
+
+int
+dlpi_enabmulti(dlpi_handle_t dh, const void *addrp, size_t addrlen)
+{
+	return (i_dlpi_multi(dh, DL_ENABMULTI_REQ, addrp, addrlen));
+}
+
+int
+dlpi_disabmulti(dlpi_handle_t dh, const void *addrp, size_t addrlen)
+{
+	return (i_dlpi_multi(dh, DL_DISABMULTI_REQ, addrp, addrlen));
+}
+
+/*
+ * This function is invoked by dlpi_promiscon() or dlpi_promiscoff(). Based
+ * on the value of 'op', promiscuous mode is turned on/off at the specified
+ * 'level'.
+ */
+static int
+i_dlpi_promisc(dlpi_handle_t dh, t_uscalar_t op, uint_t level)
+{
+	dlpi_msg_t		req, ack;
+	dl_promiscon_req_t	*promiscreqp;
+	dlpi_impl_t		*dip = (dlpi_impl_t *)dh;
+
+	if (dip == NULL)
+		return (DLPI_EINHANDLE);
+
+	DLPI_MSG_CREATE(req, op);
+	DLPI_MSG_CREATE(ack, DL_OK_ACK);
+
+	promiscreqp = &(req.dlm_msg->promiscon_req);
+	promiscreqp->dl_level = level;
+
+	return (i_dlpi_msg_common(dip, &req, &ack, DL_OK_ACK_SIZE, 0));
+}
+
+int
+dlpi_promiscon(dlpi_handle_t dh, uint_t level)
+{
+	return (i_dlpi_promisc(dh, DL_PROMISCON_REQ, level));
+}
+
+int
+dlpi_promiscoff(dlpi_handle_t dh, uint_t level)
+{
+	return (i_dlpi_promisc(dh, DL_PROMISCOFF_REQ, level));
+}
+
+int
+dlpi_get_physaddr(dlpi_handle_t dh, uint_t type, void *addrp, size_t *addrlenp)
+{
+	int			retval;
+	dlpi_msg_t  		req, ack;
+	dl_phys_addr_req_t	*physreqp;
+	dl_phys_addr_ack_t	*physackp;
+	t_uscalar_t		dataoff, datalen;
+	caddr_t			datap, physackendp;
+	dlpi_impl_t		*dip = (dlpi_impl_t *)dh;
+
+	if (dip == NULL)
+		return (DLPI_EINHANDLE);
+
+	if (addrlenp == NULL || addrp == NULL || *addrlenp < DLPI_PHYSADDR_MAX)
+		return (DLPI_EINVAL);
+
+	DLPI_MSG_CREATE(req, DL_PHYS_ADDR_REQ);
+	DLPI_MSG_CREATE(ack, DL_PHYS_ADDR_ACK);
+
+	physreqp = &(req.dlm_msg->physaddr_req);
+	physreqp->dl_addr_type = type;
+
+	retval = i_dlpi_msg_common(dip, &req, &ack, DL_PHYS_ADDR_ACK_SIZE, 0);
+	if (retval != DLPI_SUCCESS)
+		return (retval);
+
+	/* Received DL_PHYS_ADDR_ACK, store the physical address and length. */
+	physackp = &(ack.dlm_msg->physaddr_ack);
+	physackendp = (caddr_t)ack.dlm_msg + ack.dlm_msgsz;
+	dataoff = physackp->dl_addr_offset;
+	datalen = physackp->dl_addr_length;
+	if (dataoff != 0 && datalen != 0) {
+		datap = (caddr_t)physackp + dataoff;
+		if (datalen > DLPI_PHYSADDR_MAX)
+			return (DL_BADADDR);
+		if (dataoff < DL_PHYS_ADDR_ACK_SIZE ||
+		    datap + datalen > physackendp)
+			return (DLPI_EBADMSG);
+
+		*addrlenp = physackp->dl_addr_length;
+		(void) memcpy(addrp, datap, datalen);
+	} else {
+		*addrlenp = datalen;
+	}
+
+	return (DLPI_SUCCESS);
+}
+
+int
+dlpi_set_physaddr(dlpi_handle_t dh, uint_t type, const void *addrp,
+    size_t addrlen)
+{
+	dlpi_msg_t  		req, ack;
+	dl_set_phys_addr_req_t	*setphysreqp;
+	dlpi_impl_t		*dip = (dlpi_impl_t *)dh;
+
+	if (dip == NULL)
+		return (DLPI_EINHANDLE);
+
+	if (addrp == NULL || type != DL_CURR_PHYS_ADDR ||
+	    addrlen > DLPI_PHYSADDR_MAX)
+		return (DLPI_EINVAL);
+
+	DLPI_MSG_CREATE(req, DL_SET_PHYS_ADDR_REQ);
+	DLPI_MSG_CREATE(ack, DL_OK_ACK);
+
+	setphysreqp = &(req.dlm_msg->set_physaddr_req);
+	setphysreqp->dl_addr_length = addrlen;
+	setphysreqp->dl_addr_offset = sizeof (dl_set_phys_addr_req_t);
+	(void) memcpy(&setphysreqp[1], addrp, addrlen);
+
+	return (i_dlpi_msg_common(dip, &req, &ack, DL_OK_ACK_SIZE, 0));
+}
+
+int
+dlpi_send(dlpi_handle_t dh, const void *daddrp, size_t daddrlen,
+    const void *msgbuf, size_t msglen, const dlpi_sendinfo_t *sendp)
+{
+	dlpi_msg_t		req;
+	dl_unitdata_req_t	*udatareqp;
+	uint_t			sap;
+	dlpi_impl_t		*dip = (dlpi_impl_t *)dh;
+
+	if (dip == NULL)
+		return (DLPI_EINHANDLE);
+
+	if (dip->dli_oflags & DLPI_RAW)
+		return (i_dlpi_strputmsg(dip->dli_fd, NULL, msgbuf, msglen, 0));
+
+	if (daddrp == NULL || daddrlen > DLPI_PHYSADDR_MAX)
+		return (DLPI_EINVAL);
+
+	DLPI_MSG_CREATE(req, DL_UNITDATA_REQ);
+	udatareqp = &(req.dlm_msg->unitdata_req);
+
+	/* Set priority to default priority range. */
+	udatareqp->dl_priority.dl_min = 0;
+	udatareqp->dl_priority.dl_max = 0;
+
+	/* Use SAP value if specified otherwise use bound SAP value. */
+	if (sendp != NULL) {
+		sap = sendp->dsi_sap;
+		if (sendp->dsi_prio.dl_min != DL_QOS_DONT_CARE)
+			udatareqp->dl_priority.dl_min = sendp->dsi_prio.dl_min;
+		if (sendp->dsi_prio.dl_max != DL_QOS_DONT_CARE)
+			udatareqp->dl_priority.dl_max = sendp->dsi_prio.dl_max;
+	} else {
+		sap = dip->dli_sap;
+	}
+
+	udatareqp->dl_dest_addr_length = daddrlen + dip->dli_saplen;
+	udatareqp->dl_dest_addr_offset = DL_UNITDATA_REQ_SIZE;
+
+	/*
+	 * Since `daddrp' only has the link-layer destination address,
+	 * we must prepend or append the SAP (according to dli_sapbefore)
+	 * to make a full DLPI address.
+	 */
+	if (dip->dli_sapbefore) {
+		i_dlpi_writesap(&udatareqp[1], sap, dip->dli_saplen);
+		(void) memcpy((caddr_t)&udatareqp[1] + dip->dli_saplen,
+		    daddrp, daddrlen);
+	} else {
+		(void) memcpy(&udatareqp[1], daddrp, daddrlen);
+		i_dlpi_writesap((caddr_t)&udatareqp[1] + daddrlen, sap,
+		    dip->dli_saplen);
+	}
+
+	return (i_dlpi_strputmsg(dip->dli_fd, &req, msgbuf, msglen, 0));
+}
+
+int
+dlpi_recv(dlpi_handle_t dh, void *saddrp, size_t *saddrlenp, void *msgbuf,
+    size_t *msglenp, int msec, dlpi_recvinfo_t *recvp)
+{
+	int			retval;
+	dlpi_msg_t		ind;
+	size_t			totmsglen;
+	dl_unitdata_ind_t	*udatap;
+	t_uscalar_t		dataoff, datalen;
+	caddr_t			datap, indendp;
+	dlpi_impl_t		*dip = (dlpi_impl_t *)dh;
+
+	if (dip == NULL)
+		return (DLPI_EINHANDLE);
+	/*
+	 * If handle is in raw mode ignore everything except total message
+	 * length.
+	 */
+	if (dip->dli_oflags & DLPI_RAW) {
+		retval = i_dlpi_strgetmsg(dip->dli_fd, msec, NULL, 0, 0, 0,
+		    msgbuf, msglenp, &totmsglen);
+
+		if (retval == DLPI_SUCCESS && recvp != NULL)
+			recvp->dri_totmsglen = totmsglen;
+		return (retval);
+	}
+
+	DLPI_MSG_CREATE(ind, DL_UNITDATA_IND);
+	udatap = &(ind.dlm_msg->unitdata_ind);
+	indendp = (caddr_t)ind.dlm_msg + ind.dlm_msgsz;
+
+	if ((retval = i_dlpi_strgetmsg(dip->dli_fd, msec, &ind,
+	    DL_UNITDATA_IND, DL_UNITDATA_IND, DL_UNITDATA_IND_SIZE,
+	    msgbuf, msglenp, &totmsglen)) != DLPI_SUCCESS)
+		return (retval);
+
+	/*
+	 * If DLPI link provides source address, store source address in
+	 * 'saddrp' and source length in 'saddrlenp', else set saddrlenp to 0.
+	 */
+	if (saddrp != NULL && saddrlenp != NULL)  {
+		if (*saddrlenp < DLPI_PHYSADDR_MAX)
+			return (DLPI_EINVAL);
+
+		dataoff = udatap->dl_src_addr_offset;
+		datalen = udatap->dl_src_addr_length;
+		if (dataoff != 0 && datalen != 0) {
+			datap = (caddr_t)udatap + dataoff;
+			if (dataoff < DL_UNITDATA_IND_SIZE ||
+			    datap + datalen > indendp)
+				return (DLPI_EBADMSG);
+
+			*saddrlenp = datalen - dip->dli_saplen;
+			if (*saddrlenp > DLPI_PHYSADDR_MAX)
+				return (DL_BADADDR);
+
+			if (dip->dli_sapbefore)
+				datap += dip->dli_saplen;
+			(void) memcpy(saddrp, datap, *saddrlenp);
+		} else {
+			*saddrlenp = 0;
+		}
+	}
+
+	/*
+	 * If destination address requested, check and save destination
+	 * address, if any.
+	 */
+	if (recvp != NULL) {
+		dataoff = udatap->dl_dest_addr_offset;
+		datalen = udatap->dl_dest_addr_length;
+		if (dataoff != 0 && datalen != 0) {
+			datap = (caddr_t)udatap + dataoff;
+			if (dataoff < DL_UNITDATA_IND_SIZE ||
+			    datap + datalen > indendp)
+				return (DLPI_EBADMSG);
+
+			recvp->dri_destaddrlen = datalen - dip->dli_saplen;
+			if (recvp->dri_destaddrlen > DLPI_PHYSADDR_MAX)
+				return (DL_BADADDR);
+
+			if (dip->dli_sapbefore)
+				datap += dip->dli_saplen;
+			(void) memcpy(recvp->dri_destaddr, datap,
+			    recvp->dri_destaddrlen);
+		} else {
+			recvp->dri_destaddrlen = 0;
+		}
+
+		recvp->dri_dstaddrtype = udatap->dl_group_address;
+		recvp->dri_totmsglen = totmsglen;
+	}
+
+	return (DLPI_SUCCESS);
+}
+
+int
+dlpi_fd(dlpi_handle_t dh)
+{
+	dlpi_impl_t	*dip = (dlpi_impl_t *)dh;
+
+	return (dip != NULL ? dip->dli_fd : -1);
+}
+
+int
+dlpi_set_timeout(dlpi_handle_t dh, int sec)
+{
+	dlpi_impl_t	*dip = (dlpi_impl_t *)dh;
+
+	if (dip == NULL)
+		return (DLPI_EINHANDLE);
+
+	dip->dli_timeout = sec;
+	return (DLPI_SUCCESS);
+}
 
 const char *
-dlpi_mac_type(uint_t type)
+dlpi_linkname(dlpi_handle_t dh)
 {
-	if (type >= sizeof (i_dlpi_mac_type) / sizeof (i_dlpi_mac_type[0]))
-		return ("ERROR");
+	dlpi_impl_t	*dip = (dlpi_impl_t *)dh;
 
-	return (i_dlpi_mac_type[type]);
+	return (dip != NULL ? dip->dli_linkname : NULL);
 }
 
-static int
-strputmsg(int fd, uint8_t *ctl_buf, size_t ctl_len, int flags)
+/*
+ * Returns DLPI style stored in the handle.
+ * Note: This function is used for test purposes only. Do not remove without
+ * fixing the DLPI testsuite.
+ */
+uint_t
+dlpi_style(dlpi_handle_t dh)
 {
-	struct strbuf	ctl;
+	dlpi_impl_t	*dip = (dlpi_impl_t *)dh;
 
-	ctl.buf = (char *)ctl_buf;
-	ctl.len = ctl_len;
-
-	return (putmsg(fd, &ctl, NULL, flags));
+	return (dip->dli_style);
 }
 
+/*
+ * This function attempts to open linkname under the following namespaces:
+ *      - /dev
+ *      - /devices
+ * If open doesn't succeed and link doesn't exist (ENOENT), this function
+ * returns DLPI_ENOLINK, otherwise returns DL_SYSERR.
+ */
 static int
-strgetmsg(int fd, int timeout, char *ctl_buf,
-    size_t *ctl_lenp, char *data_buf, size_t *data_lenp)
+i_dlpi_open(const char *provider, int *fd, uint_t flags)
 {
+	char		path[MAXPATHLEN];
+	int		oflags;
+
+	oflags = O_RDWR;
+	if (flags & DLPI_EXCL)
+		oflags |= O_EXCL;
+
+	(void) snprintf(path, sizeof (path), "/dev/%s", provider);
+
+	if ((*fd = open(path, oflags)) != -1)
+		return (DLPI_SUCCESS);
+
+	/*
+	 * On diskless boot, it's possible the /dev links have not yet
+	 * been created; fallback to /devices.  When /dev links are
+	 * created on demand, this code can be removed.
+	 */
+	(void) snprintf(path, sizeof (path), "/devices/pseudo/clone@0:%s",
+	    provider);
+
+	if ((*fd = open(path, oflags)) != -1)
+		return (DLPI_SUCCESS);
+
+	return (errno == ENOENT ? DLPI_ENOLINK : DL_SYSERR);
+}
+
+/*
+ * Open a style 1 link. PPA is implicitly attached.
+ */
+static int
+i_dlpi_style1_open(dlpi_impl_t *dip)
+{
+	int		retval, save_errno;
+	int		fd;
+
+	/*
+	 * In order to support open of syntax like device[.module[.module...]]
+	 * where modules need to be pushed onto the device stream, open only
+	 * device name, otherwise open the full linkname.
+	 */
+	retval = i_dlpi_open((dip->dli_mod_cnt != 0) ? dip->dli_provider :
+	    dip->dli_linkname, &fd, dip->dli_oflags);
+
+	if (retval != DLPI_SUCCESS) {
+		dip->dli_mod_pushed = 0;
+		return (retval);
+	}
+	dip->dli_fd = fd;
+
+	/*
+	 * Try to push modules (if any) onto the device stream. If I_PUSH
+	 * fails, we increment count of modules pushed (dli_mod_pushed)
+	 * expecting it is last module to be pushed and thus will be pushed
+	 * in i_dlpi_style2_open().
+	 */
+	for (dip->dli_mod_pushed = 0; dip->dli_mod_pushed < dip->dli_mod_cnt;
+	    dip->dli_mod_pushed++) {
+		if (ioctl(fd, I_PUSH,
+		    dip->dli_modlist[dip->dli_mod_pushed]) == -1) {
+			dip->dli_mod_pushed++;
+			return (DLPI_FAILURE);
+		}
+	}
+
+	if ((retval = i_dlpi_checkstyle(dip, DL_STYLE1)) != DLPI_SUCCESS) {
+		save_errno = errno;
+		(void) close(dip->dli_fd);
+		errno = save_errno;
+		dip->dli_mod_pushed = 0;
+		return (retval);
+	}
+
+	return (DLPI_SUCCESS);
+}
+
+/*
+ * Open a style 2 link. PPA must be explicitly attached.
+ */
+static int
+i_dlpi_style2_open(dlpi_impl_t *dip)
+{
+	int 		fd;
+	int 		retval, save_errno;
+
+	/*
+	 * If style 1 open failed, we need to determine how far it got and
+	 * finish up the open() call as a style 2 open.
+	 *
+	 * If no modules were pushed (mod_pushed == 0), then we need to
+	 * open it as a style 2 link.
+	 *
+	 * If the pushing of the last module failed, we need to
+	 * try pushing it as a style 2 module. Decrement dli_mod_pushed
+	 * count so it can be pushed onto the stream.
+	 *
+	 * Otherwise we failed during the push of an intermediate module and
+	 * must fail out and close the link.
+	 */
+	if (dip->dli_mod_pushed == 0) {
+		if ((retval = i_dlpi_open(dip->dli_provider, &fd,
+		    dip->dli_oflags)) != DLPI_SUCCESS)
+			return (retval);
+
+		dip->dli_fd = fd;
+	} else if (dip->dli_mod_pushed == dip->dli_mod_cnt) {
+		if (i_dlpi_remove_ppa(dip->dli_modlist[dip->dli_mod_cnt - 1])
+		    != DLPI_SUCCESS)
+			return (DLPI_ELINKNAMEINVAL);
+
+		dip->dli_mod_pushed--;
+		fd = dip->dli_fd;
+	} else {
+		return (DLPI_ELINKNAMEINVAL);
+	}
+
+	/* Try and push modules (if any) onto the device stream. */
+	for (; dip->dli_mod_pushed < dip->dli_mod_cnt; dip->dli_mod_pushed++) {
+		if (ioctl(fd, I_PUSH,
+		    dip->dli_modlist[dip->dli_mod_pushed]) == -1) {
+			retval = DL_SYSERR;
+			goto failure;
+		}
+	}
+
+	/*
+	 * Special case: DLPI_SERIAL flag (synchronous serial lines) is not a
+	 * DLPI link so attach and ignore rest.
+	 */
+	if (dip->dli_oflags & DLPI_SERIAL)
+		goto attach;
+
+	if ((retval = i_dlpi_checkstyle(dip, DL_STYLE2)) != DLPI_SUCCESS)
+		goto failure;
+
+	/*
+	 * Succeeded opening the link and verified it is style2. Now attach to
+	 * PPA only if DLPI_NOATTACH is not set.
+	 */
+	if (dip->dli_oflags & DLPI_NOATTACH)
+		return (DLPI_SUCCESS);
+
+attach:
+	if ((retval = i_dlpi_attach(dip)) != DLPI_SUCCESS)
+		goto failure;
+
+	return (DLPI_SUCCESS);
+
+failure:
+	save_errno = errno;
+	(void) close(dip->dli_fd);
+	errno = save_errno;
+	return (retval);
+}
+
+/*
+ * Verify with DLPI that the link is the expected DLPI 'style' device,
+ * dlpi_info sets the DLPI style in the DLPI handle.
+ */
+static int
+i_dlpi_checkstyle(dlpi_impl_t *dip, t_uscalar_t style)
+{
+	int retval;
+	dlpi_info_t dlinfo;
+
+	retval = dlpi_info((dlpi_handle_t)dip, &dlinfo, 0);
+	if (retval == DLPI_SUCCESS && dip->dli_style != style)
+		retval = DLPI_EBADLINK;
+
+	return (retval);
+}
+
+/*
+ * Remove PPA from end of linkname.
+ * Return DLPI_SUCCESS if found, else return DLPI_FAILURE.
+ */
+static int
+i_dlpi_remove_ppa(char *linkname)
+{
+	int i = strlen(linkname) - 1;
+
+	if (i == -1 || !isdigit(linkname[i--]))
+		return (DLPI_FAILURE);
+
+	while (i >= 0 && isdigit(linkname[i]))
+		i--;
+
+	linkname[i + 1] = '\0';
+	return (DLPI_SUCCESS);
+}
+
+/*
+ * For DLPI style 2 providers, an explicit attach of PPA is required.
+ */
+static int
+i_dlpi_attach(dlpi_impl_t *dip)
+{
+	dlpi_msg_t		req, ack;
+	dl_attach_req_t		*attachreqp;
+
+	/*
+	 * Special case: DLPI_SERIAL flag (synchronous serial lines)
+	 * is not a DLPI link so ignore DLPI style.
+	 */
+	if (dip->dli_style != DL_STYLE2 && !(dip->dli_oflags & DLPI_SERIAL))
+		return (DLPI_ENOTSTYLE2);
+
+	DLPI_MSG_CREATE(req, DL_ATTACH_REQ);
+	DLPI_MSG_CREATE(ack, DL_OK_ACK);
+
+	attachreqp = &(req.dlm_msg->attach_req);
+	attachreqp->dl_ppa = dip->dli_ppa;
+
+	return (i_dlpi_msg_common(dip, &req, &ack, DL_OK_ACK_SIZE, 0));
+}
+
+/*
+ * Enable DLPI passive mode on a DLPI handle. We intentionally do not care
+ * if this request fails, as this indicates the underlying DLPI device does
+ * not support link aggregation (pre-GLDV3 device drivers), and thus will
+ * see the expected behavior without failing with DL_SYSERR/EBUSY when issuing
+ * DLPI primitives like DL_BIND_REQ. For further info see dlpi(7p).
+ */
+static void
+i_dlpi_passive(dlpi_impl_t *dip)
+{
+	dlpi_msg_t		req, ack;
+
+	DLPI_MSG_CREATE(req, DL_PASSIVE_REQ);
+	DLPI_MSG_CREATE(ack, DL_OK_ACK);
+
+	(void) i_dlpi_msg_common(dip, &req, &ack, DL_OK_ACK_SIZE, 0);
+}
+
+/*
+ * Send a dlpi control message and/or data message on a stream. The inputs
+ * for this function are:
+ *	int fd:		file descriptor of open stream to send message
+ *	const dlpi_msg_t *dlreqp: request message structure
+ *	void *databuf:	data buffer
+ *	size_t datalen:	data buffer len
+ *	int flags:	flags to set for putmsg()
+ * Returns DLPI_SUCCESS if putmsg() succeeds, otherwise DL_SYSERR on failure.
+ */
+static int
+i_dlpi_strputmsg(int fd, const dlpi_msg_t *dlreqp,
+    const void *databuf, size_t datalen, int flags)
+{
+	int		retval;
 	struct strbuf	ctl;
-	struct strbuf	data;
-	int		res;
-	struct pollfd	pfd;
-	int		flags = 0;
+	struct strbuf   data;
+
+	if (dlreqp != NULL) {
+		ctl.buf = (void *)dlreqp->dlm_msg;
+		ctl.len = dlreqp->dlm_msgsz;
+	}
+
+	data.buf = (void *)databuf;
+	data.len = datalen;
+
+	retval = putmsg(fd, (dlreqp == NULL ? NULL: &ctl),
+	    (databuf == NULL ? NULL : &data), flags);
+
+	return ((retval == 0) ? DLPI_SUCCESS : DL_SYSERR);
+}
+
+/*
+ * Get a DLPI control message and/or data message from a stream. The inputs
+ * for this function are:
+ * 	int fd: 		file descriptor of open stream
+ * 	int msec: 		timeout to wait for message
+ *	dlpi_msg_t *dlreplyp:	reply message structure, the message size
+ *				member on return stores actual size received
+ *	t_uscalar_t dlreqprim: 	requested primitive
+ *	t_uscalar_t dlreplyprim:acknowledged primitive in response to request
+ *	size_t dlreplyminsz:	minimum size of acknowledged primitive size
+ *	void *databuf: 		data buffer
+ *	size_t *datalenp:	data buffer len
+ *	size_t *totdatalenp: 	total data received. Greater than 'datalenp' if
+ *				actual data received is larger than 'databuf'
+ * Function returns DLPI_SUCCESS if requested message is retrieved
+ * otherwise returns error code or timeouts.
+ */
+static int
+i_dlpi_strgetmsg(int fd, int msec, dlpi_msg_t *dlreplyp, t_uscalar_t dlreqprim,
+    t_uscalar_t dlreplyprim, size_t dlreplyminsz, void *databuf,
+    size_t *datalenp, size_t *totdatalenp)
+{
+	int			retval;
+	int			flags = 0;
+	struct strbuf		ctl, data;
+	struct pollfd		pfd;
+	hrtime_t		start, current;
+	long			bufc[DLPI_CHUNKSIZE / sizeof (long)];
+	long			bufd[DLPI_CHUNKSIZE / sizeof (long)];
+	union DL_primitives	*dlprim;
+	boolean_t		infinite = (msec < 0);	/* infinite timeout */
+
+	if ((dlreplyp == NULL && databuf == NULL) ||
+	    (databuf == NULL && datalenp != NULL) ||
+	    (databuf != NULL && datalenp == NULL))
+		return (DLPI_EINVAL);
 
 	pfd.fd = fd;
 	pfd.events = POLLIN | POLLPRI;
 
-	switch (poll(&pfd, 1, timeout)) {
-	default:
-		ctl.buf = ctl_buf;
-		ctl.len = 0;
-		ctl.maxlen = (ctl_lenp != NULL) ? *ctl_lenp : 0;
+	ctl.buf = (dlreplyp == NULL) ? bufc : (void *)dlreplyp->dlm_msg;
+	ctl.len = 0;
+	ctl.maxlen = (dlreplyp == NULL) ? sizeof (bufc) : dlreplyp->dlm_msgsz;
 
-		data.buf = data_buf;
-		data.len = 0;
-		data.maxlen = (data_lenp != NULL) ? *data_lenp : 0;
+	data.buf = (databuf == NULL) ? bufd : databuf;
+	data.len = 0;
+	data.maxlen = (databuf == NULL) ? sizeof (bufd): *datalenp;
 
-		if ((res = getmsg(fd, &ctl, &data, &flags)) < 0)
-			goto failed;
+	for (;;) {
+		if (!infinite)
+			start = gethrtime() / (NANOSEC / MILLISEC);
 
-		if (ctl_buf != NULL) {
-			if (res & MORECTL) {
-				errno = E2BIG;
-				goto failed;
+		switch (poll(&pfd, 1, msec)) {
+			default:
+				break;
+			case 0:
+				return (DLPI_ETIMEDOUT);
+			case -1:
+				return (DL_SYSERR);
+		}
+
+		if ((retval = getmsg(fd, &ctl, &data, &flags)) < 0)
+			return (DL_SYSERR);
+
+		if (totdatalenp != NULL)
+			*totdatalenp = data.len;
+
+		/*
+		 * The supplied DLPI_CHUNKSIZE sized buffers are large enough
+		 * to retrieve all valid DLPI responses in one iteration.
+		 * If MORECTL or MOREDATA is set, we are not interested in the
+		 * remainder of the message. Temporary buffers are used to
+		 * drain the remainder of this message.
+		 * The special case we have to account for is if
+		 * a higher priority messages is enqueued  whilst handling
+		 * this condition. We use a change in the flags parameter
+		 * returned by getmsg() to indicate the message has changed.
+		 */
+		while (retval & (MORECTL | MOREDATA)) {
+			struct strbuf   cscratch, dscratch;
+			int		oflags = flags;
+
+			cscratch.buf = (char *)bufc;
+			dscratch.buf = (char *)bufd;
+			cscratch.len = dscratch.len = 0;
+			cscratch.maxlen = dscratch.maxlen =
+			    sizeof (bufc);
+
+			if ((retval = getmsg(fd, &cscratch, &dscratch,
+			    &flags)) < 0)
+				return (DL_SYSERR);
+
+			if (totdatalenp != NULL)
+				*totdatalenp += dscratch.len;
+			/*
+			 * In the special case of higher priority
+			 * message received, the low priority message
+			 * received earlier is discarded, if no data
+			 * or control message is left.
+			 */
+			if ((flags != oflags) &&
+			    !(retval & (MORECTL | MOREDATA)) &&
+			    (cscratch.len != 0)) {
+				ctl.len = MIN(cscratch.len, DLPI_CHUNKSIZE);
+				if (dlreplyp != NULL)
+					(void) memcpy(dlreplyp->dlm_msg, bufc,
+					    ctl.len);
+				break;
 			}
-
-			*ctl_lenp = ctl.len;
 		}
 
-		if (data_buf != NULL) {
-			if (res & MOREDATA) {
-				errno = E2BIG;
-				goto failed;
+		/*
+		 * If we were expecting a data message, and we got one, set
+		 * *datalenp.  If we aren't waiting on a control message, then
+		 * we're done.
+		 */
+		if (databuf != NULL && data.len >= 0) {
+			*datalenp = data.len;
+			if (dlreplyp == NULL)
+				break;
+		}
+
+		/*
+		 * If we were expecting a control message, and the message
+		 * we received is at least big enough to be a DLPI message,
+		 * then verify it's a reply to something we sent.  If it
+		 * is a reply to something we sent, also verify its size.
+		 */
+		if (dlreplyp != NULL && ctl.len >= sizeof (t_uscalar_t)) {
+			dlprim = dlreplyp->dlm_msg;
+			if (dlprim->dl_primitive == dlreplyprim) {
+				if (ctl.len < dlreplyminsz)
+					return (DLPI_EBADMSG);
+				dlreplyp->dlm_msgsz = ctl.len;
+				break;
+			} else if (dlprim->dl_primitive == DL_ERROR_ACK) {
+				if (ctl.len < DL_ERROR_ACK_SIZE)
+					return (DLPI_EBADMSG);
+
+				/* Is it ours? */
+				if (dlprim->error_ack.dl_error_primitive ==
+				    dlreqprim)
+					break;
 			}
-
-			*data_lenp = data.len;
 		}
 
-		break;
-	case 0:
-		errno = ETIME;
-		/*FALLTHRU*/
-	case -1:
-		goto failed;
-	}
-
-	return (0);
-failed:
-	return (-1);
-}
-
-int
-dlpi_open(const char *provider)
-{
-	char		devname[MAXPATHLEN];
-	char		path[MAXPATHLEN];
-	int		fd;
-	struct stat	st;
-
-	(void) snprintf(devname, MAXPATHLEN, "/dev/%s", provider);
-
-	if ((fd = open(devname, O_RDWR)) != -1)
-		return (fd);
-
-	(void) snprintf(path, MAXPATHLEN, "/devices/pseudo/clone@0:%s",
-	    provider);
-
-	if (stat(path, &st) == 0) {
-		(void) strlcpy(devname, path, sizeof (devname));
-		if ((fd = open(devname, O_RDWR)) != -1)
-			return (fd);
-	}
-
-	return (-1);
-}
-
-int
-dlpi_close(int fd)
-{
-	return (close(fd));
-}
-
-int
-dlpi_info(int fd, int timeout, dl_info_ack_t *ackp,
-    union DL_qos_types *selp, union DL_qos_types *rangep,
-    uint8_t *addrp, size_t *addrlenp, uint8_t *brdcst_addrp,
-    size_t *brdcst_addrlenp)
-{
-	int			rc = -1;
-	size_t			size;
-	dl_info_ack_t		*buf;
-	dl_info_req_t		dlir;
-	dl_info_ack_t		*dliap;
-	union DL_qos_types	*uqtp;
-
-	size = sizeof (dl_info_ack_t);		/* DL_INFO_ACK */
-	size += sizeof (union DL_qos_types);	/* QoS selections */
-	size += sizeof (union DL_qos_types);	/* QoS ranges */
-	size += MAXADDRLEN + MAXSAPLEN;		/* DLSAP Address */
-	size += MAXADDRLEN;			/* Broadcast Address */
-
-	if ((buf = malloc(size)) == NULL)
-		return (-1);
-
-	dlir.dl_primitive = DL_INFO_REQ;
-
-	if (strputmsg(fd, (uint8_t *)&dlir, DL_INFO_REQ_SIZE, RS_HIPRI) == -1)
-		goto done;
-
-	if (strgetmsg(fd, timeout, (char *)buf, &size, NULL, NULL) == -1)
-		goto done;
-
-	if (size < DL_INFO_ACK_SIZE) {
-		errno = EBADMSG;
-		goto done;
-	}
-
-	dliap = (dl_info_ack_t *)buf;
-	if (dliap->dl_primitive != DL_INFO_ACK ||
-	    dliap->dl_version != DL_VERSION_2) {
-		errno = EPROTO;
-		goto done;
-	}
-
-	(void) memcpy(ackp, buf, DL_INFO_ACK_SIZE);
-
-	if (dliap->dl_qos_offset != 0) {
-		if (dliap->dl_qos_length < sizeof (t_uscalar_t)) {
-			errno = EPROTO;
-			goto done;
-		}
-
-		uqtp = (union DL_qos_types *)
-		    ((uintptr_t)buf + dliap->dl_qos_offset);
-		if (uqtp->dl_qos_type != DL_QOS_CO_SEL1 &&
-		    uqtp->dl_qos_type != DL_QOS_CL_SEL1) {
-			errno = EPROTO;
-			goto done;
-		}
-
-		if (selp != NULL)
-			(void) memcpy(selp, (char *)buf + dliap->dl_qos_offset,
-			    dliap->dl_qos_length);
-	}
-
-	if (dliap->dl_qos_range_offset != 0) {
-		if (dliap->dl_qos_range_length < sizeof (t_uscalar_t)) {
-			errno = EPROTO;
-			goto done;
-		}
-
-		uqtp = (union DL_qos_types *)
-		    ((uintptr_t)buf + dliap->dl_qos_range_offset);
-		if (uqtp->dl_qos_type != DL_QOS_CO_RANGE1 &&
-		    uqtp->dl_qos_type != DL_QOS_CL_RANGE1) {
-			errno = EPROTO;
-			goto done;
-		}
-
-		if (rangep != NULL)
-			(void) memcpy(rangep,
-			    (char *)buf + dliap->dl_qos_range_offset,
-			    dliap->dl_qos_range_length);
-	}
-
-	if (dliap->dl_addr_offset != 0) {
-		if (dliap->dl_addr_length == 0) {
-			errno = EPROTO;
-			goto done;
-		}
-
-		if (addrlenp != NULL)
-			*addrlenp = dliap->dl_addr_length;
-		if (addrp != NULL)
-			(void) memcpy(addrp,
-			    (char *)buf + dliap->dl_addr_offset,
-			    dliap->dl_addr_length);
-	}
-
-	if (dliap->dl_brdcst_addr_offset != 0) {
-		if (dliap->dl_brdcst_addr_length == 0) {
-			errno = EPROTO;
-			goto done;
-		}
-
-		if (brdcst_addrlenp != NULL)
-			*brdcst_addrlenp = dliap->dl_brdcst_addr_length;
-		if (brdcst_addrp != NULL)
-			(void) memcpy(brdcst_addrp,
-			    (char *)buf + dliap->dl_brdcst_addr_offset,
-			    dliap->dl_brdcst_addr_length);
-	}
-
-	rc = 0;	/* success */
-done:
-	free(buf);
-	return (rc);
-}
-
-int
-dlpi_attach(int fd, int timeout, uint_t ppa)
-{
-	int			rc = -1;
-	size_t			size;
-	dl_attach_req_t		dlar;
-	dl_error_ack_t		*dleap;
-	union DL_primitives	*buf;
-	union DL_primitives	*udlp;
-
-	size = 0;
-	size = MAX(sizeof (dl_ok_ack_t), size);
-	size = MAX(sizeof (dl_error_ack_t), size);
-
-	if ((buf = malloc(size)) == NULL)
-		return (-1);
-
-	dlar.dl_primitive = DL_ATTACH_REQ;
-	dlar.dl_ppa = ppa;
-
-	if (strputmsg(fd, (uint8_t *)&dlar, DL_ATTACH_REQ_SIZE, 0) == -1)
-		goto done;
-
-	if (strgetmsg(fd, timeout, (char *)buf, &size, NULL, NULL) == -1)
-		goto done;
-
-	if (size < sizeof (t_uscalar_t)) {
-		errno = EBADMSG;
-		goto done;
-	}
-
-	udlp = (union DL_primitives *)buf;
-	switch (udlp->dl_primitive) {
-	case DL_OK_ACK:
-		if (size < DL_OK_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-		break;
-
-	case DL_ERROR_ACK:
-		if (size < DL_ERROR_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-
-		dleap = (dl_error_ack_t *)buf;
-		switch (dleap->dl_errno) {
-		case DL_BADPPA:
-			errno = EINVAL;
-			break;
-
-		case DL_ACCESS:
-			errno = EPERM;
-			break;
-
-		case DL_SYSERR:
-			errno = dleap->dl_unix_errno;
-			break;
-
-		default:
-			errno = EPROTO;
-			break;
-		}
-
-		goto done;
-
-	default:
-		errno = EBADMSG;
-		goto done;
-	}
-
-	rc = 0;	/* success */
-done:
-	free(buf);
-	return (rc);
-}
-
-int
-dlpi_detach(int fd, int timeout)
-{
-	int			rc = -1;
-	size_t			size;
-	dl_detach_req_t		dldr;
-	dl_error_ack_t		*dleap;
-	union DL_primitives	*buf;
-	union DL_primitives	*udlp;
-
-	size = 0;
-	size = MAX(sizeof (dl_ok_ack_t), size);
-	size = MAX(sizeof (dl_error_ack_t), size);
-
-	if ((buf = malloc(size)) == NULL)
-		return (-1);
-
-	dldr.dl_primitive = DL_DETACH_REQ;
-
-	if (strputmsg(fd, (uint8_t *)&dldr, DL_DETACH_REQ_SIZE, 0) == -1)
-		goto done;
-
-	if (strgetmsg(fd, timeout, (char *)buf, &size, NULL, NULL) == -1)
-		goto done;
-
-	if (size < sizeof (t_uscalar_t)) {
-		errno = EBADMSG;
-		goto done;
-	}
-
-	udlp = (union DL_primitives *)buf;
-	switch (udlp->dl_primitive) {
-	case DL_OK_ACK:
-		if (size < DL_OK_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-		break;
-
-	case DL_ERROR_ACK:
-		if (size < DL_ERROR_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-
-		dleap = (dl_error_ack_t *)buf;
-		switch (dleap->dl_errno) {
-		case DL_SYSERR:
-			errno = dleap->dl_unix_errno;
-			break;
-
-		default:
-			errno = EPROTO;
-			break;
-		}
-		goto done;
-
-	default:
-		errno = EBADMSG;
-		goto done;
-	}
-
-	rc = 0;	/* success */
-done:
-	free(buf);
-	return (rc);
-}
-
-int
-dlpi_bind(int fd, int timeout, uint_t sap, uint16_t mode,
-    boolean_t conn_mgmt, uint32_t *max_conn_ind,
-    uint32_t *xid_test, uint8_t *addrp, size_t *addrlenp)
-{
-	int			rc = -1;
-	size_t			size;
-	dl_bind_req_t		dlbr;
-	dl_bind_ack_t		*dlbap;
-	dl_error_ack_t		*dleap;
-	union DL_primitives	*buf;
-	union DL_primitives	*udlp;
-
-	size = 0;
-	size = MAX(sizeof (dl_bind_ack_t) + MAXADDRLEN + MAXSAPLEN, size);
-	size = MAX(sizeof (dl_error_ack_t), size);
-
-	if ((buf = malloc(size)) == NULL)
-		return (-1);
-
-	dlbr.dl_primitive = DL_BIND_REQ;
-	dlbr.dl_sap = sap;
-	dlbr.dl_service_mode = mode;
-	dlbr.dl_conn_mgmt = (conn_mgmt) ? 1 : 0;
-	dlbr.dl_max_conind = (max_conn_ind != NULL) ? *max_conn_ind : 0;
-	dlbr.dl_xidtest_flg = (xid_test != NULL) ? *xid_test : 0;
-
-	if (strputmsg(fd, (uint8_t *)&dlbr, DL_BIND_REQ_SIZE, 0) == -1)
-		goto done;
-
-	if (strgetmsg(fd, timeout, (char *)buf, &size, NULL, NULL) == -1)
-		goto done;
-
-	if (size < sizeof (t_uscalar_t)) {
-		errno = EBADMSG;
-		goto done;
-	}
-
-	udlp = (union DL_primitives *)buf;
-	switch (udlp->dl_primitive) {
-	case DL_BIND_ACK:
-		if (size < DL_BIND_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-
-		dlbap = (dl_bind_ack_t *)buf;
-		if (max_conn_ind != NULL)
-			*max_conn_ind = dlbap->dl_max_conind;
-		if (xid_test != NULL)
-			*xid_test = dlbap->dl_xidtest_flg;
-
-		if (dlbap->dl_addr_offset != 0) {
-			if (dlbap->dl_addr_length == 0) {
-				errno = EPROTO;
-				goto done;
-			}
-
-			if (addrlenp != NULL)
-				*addrlenp = dlbap->dl_addr_length;
-			if (addrp != NULL)
-				(void) memcpy(addrp,
-				    (char *)buf + dlbap->dl_addr_offset,
-				    dlbap->dl_addr_length);
-		}
-
-		break;
-
-	case DL_ERROR_ACK:
-		if (size < DL_ERROR_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-
-		dleap = (dl_error_ack_t *)buf;
-		switch (dleap->dl_errno) {
-		case DL_BADADDR:
-			errno = EINVAL;
-			break;
-
-		case DL_INITFAILED:
-		case DL_NOTINIT:
-			errno = EIO;
-			break;
-
-		case DL_ACCESS:
-			errno = EACCES;
-			break;
-
-		case DL_NOADDR:
-			errno = EFAULT;
-			break;
-
-		case DL_UNSUPPORTED:
-		case DL_NOAUTO:
-		case DL_NOXIDAUTO:
-		case DL_NOTESTAUTO:
-			errno = ENOTSUP;
-			break;
-
-		case DL_SYSERR:
-			errno = dleap->dl_unix_errno;
-			break;
-
-		default:
-			errno = EPROTO;
-			break;
-		}
-		goto done;
-
-	default:
-		errno = EBADMSG;
-		goto done;
-	}
-
-	rc = 0;	/* success */
-done:
-	free(buf);
-	return (rc);
-}
-
-int
-dlpi_unbind(int fd, int timeout)
-{
-	int			rc = -1;
-	size_t			size;
-	dl_unbind_req_t		dlubr;
-	dl_error_ack_t		*dleap;
-	union DL_primitives	*buf;
-	union DL_primitives	*udlp;
-
-	size = 0;
-	size = MAX(sizeof (dl_ok_ack_t), size);
-	size = MAX(sizeof (dl_error_ack_t), size);
-
-	if ((buf = malloc(size)) == NULL)
-		return (-1);
-
-	dlubr.dl_primitive = DL_UNBIND_REQ;
-
-	if (strputmsg(fd, (uint8_t *)&dlubr, DL_UNBIND_REQ_SIZE, 0) == -1)
-		goto done;
-
-	if (strgetmsg(fd, timeout, (char *)buf, &size, NULL, NULL) == -1)
-		goto done;
-
-	if (size < sizeof (t_uscalar_t)) {
-		errno = EBADMSG;
-		goto done;
-	}
-
-	udlp = (union DL_primitives *)buf;
-	switch (udlp->dl_primitive) {
-	case DL_OK_ACK:
-		if (size < DL_OK_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-		break;
-
-	case DL_ERROR_ACK:
-		if (size < DL_ERROR_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-
-		dleap = (dl_error_ack_t *)buf;
-		switch (dleap->dl_errno) {
-		case DL_SYSERR:
-			errno = dleap->dl_unix_errno;
-			break;
-
-		default:
-			errno = EPROTO;
-			break;
-		}
-		goto done;
-
-	default:
-		errno = EBADMSG;
-		goto done;
-	}
-
-	rc = 0;	/* success */
-done:
-	free(buf);
-	return (rc);
-}
-
-static int
-i_dlpi_multi(int fd, int timeout, dlpi_multi_op_t op,
-    uint8_t *addrp, size_t addr_length)
-{
-	int			rc = -1;
-	size_t			opsize;
-	size_t			size;
-	dl_enabmulti_req_t	*dlemrp;
-	dl_disabmulti_req_t	*dldmrp;
-	dl_error_ack_t		*dleap;
-	union DL_primitives	*buf;
-	union DL_primitives	*udlp;
-
-	opsize = (op == DLPI_MULTI_ENABLE) ? sizeof (dl_enabmulti_req_t) :
-	    sizeof (dl_disabmulti_req_t);
-	opsize += addr_length;
-
-	size = 0;
-	size = MAX(opsize, size);
-	size = MAX(sizeof (dl_ok_ack_t), size);
-	size = MAX(sizeof (dl_error_ack_t), size);
-
-	if ((buf = malloc(size)) == NULL)
-		return (-1);
-
-	if (op == DLPI_MULTI_ENABLE) {
-		dlemrp = (dl_enabmulti_req_t *)buf;
-		dlemrp->dl_primitive = DL_ENABMULTI_REQ;
-		dlemrp->dl_addr_length = addr_length;
-		dlemrp->dl_addr_offset = sizeof (dl_enabmulti_req_t);
-		(void) memcpy(&dlemrp[1], addrp, addr_length);
-	} else {
-		dldmrp = (dl_disabmulti_req_t *)buf;
-		dldmrp->dl_primitive = DL_DISABMULTI_REQ;
-		dldmrp->dl_addr_length = addr_length;
-		dldmrp->dl_addr_offset = sizeof (dl_disabmulti_req_t);
-		(void) memcpy(&dldmrp[1], addrp, addr_length);
-	}
-
-	if (strputmsg(fd, (uint8_t *)buf, opsize, 0) == -1)
-		goto done;
-
-	if (strgetmsg(fd, timeout, (char *)buf, &size, NULL, NULL) == -1)
-		goto done;
-
-	if (size < sizeof (t_uscalar_t)) {
-		errno = EBADMSG;
-		goto done;
-	}
-
-	udlp = (union DL_primitives *)buf;
-	switch (udlp->dl_primitive) {
-	case DL_OK_ACK:
-		if (size < DL_OK_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-		break;
-
-	case DL_ERROR_ACK:
-		if (size < DL_ERROR_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-
-		dleap = (dl_error_ack_t *)buf;
-		switch (dleap->dl_errno) {
-		case DL_BADADDR:
-			errno = EINVAL;
-			break;
-
-		case DL_TOOMANY:
-			errno = ENOSPC;
-			break;
-
-		case DL_NOTSUPPORTED:
-			errno = ENOTSUP;
-			break;
-
-		case DL_NOTENAB:
-			errno = EINVAL;
-			break;
-
-		case DL_SYSERR:
-			errno = dleap->dl_unix_errno;
-			break;
-
-		default:
-			errno = EPROTO;
-			break;
-		}
-		goto done;
-
-	default:
-		errno = EBADMSG;
-		goto done;
-	}
-
-	rc = 0;	/* success */
-done:
-	free(buf);
-	return (rc);
-}
-
-int
-dlpi_enabmulti(int fd, int timeout, uint8_t *addrp,
-    size_t addr_length)
-{
-	return (i_dlpi_multi(fd, timeout, DLPI_MULTI_ENABLE, addrp,
-	    addr_length));
-}
-
-int
-dlpi_disabmulti(int fd, int timeout, uint8_t *addrp,
-    size_t addr_length)
-{
-	return (i_dlpi_multi(fd, timeout, DLPI_MULTI_DISABLE, addrp,
-	    addr_length));
-}
-
-static int
-i_dlpi_promisc(int fd, int timeout, dlpi_promisc_op_t op,
-    uint_t level)
-{
-	int			rc = -1;
-	size_t			opsize;
-	size_t			size;
-	dl_promiscon_req_t	*dlpnrp;
-	dl_promiscoff_req_t	*dlpfrp;
-	dl_error_ack_t		*dleap;
-	union DL_primitives	*buf;
-	union DL_primitives	*udlp;
-
-	opsize = (op == DLPI_PROMISC_ON) ? sizeof (dl_promiscon_req_t) :
-	    sizeof (dl_promiscoff_req_t);
-
-	size = 0;
-	size = MAX(opsize, size);
-	size = MAX(sizeof (dl_ok_ack_t), size);
-	size = MAX(sizeof (dl_error_ack_t), size);
-
-	if ((buf = malloc(size)) == NULL)
-		return (-1);
-
-	if (op == DLPI_PROMISC_ON) {
-		dlpnrp = (dl_promiscon_req_t *)buf;
-		dlpnrp->dl_primitive = DL_PROMISCON_REQ;
-		dlpnrp->dl_level = level;
-
-		if (strputmsg(fd, (uint8_t *)dlpnrp, opsize, 0) == -1)
-			goto done;
-	} else {
-		dlpfrp = (dl_promiscoff_req_t *)buf;
-		dlpfrp->dl_primitive = DL_PROMISCOFF_REQ;
-		dlpfrp->dl_level = level;
-
-		if (strputmsg(fd, (uint8_t *)dlpfrp, opsize, 0) == -1)
-			goto done;
-	}
-
-	if (strgetmsg(fd, timeout, (char *)buf, &size, NULL, NULL) == -1)
-		goto done;
-
-	if (size < sizeof (t_uscalar_t)) {
-		errno = EBADMSG;
-		goto done;
-	}
-
-	udlp = (union DL_primitives *)buf;
-	switch (udlp->dl_primitive) {
-	case DL_OK_ACK:
-		if (size < DL_OK_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-		break;
-
-	case DL_ERROR_ACK:
-		if (size < DL_ERROR_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-
-		dleap = (dl_error_ack_t *)buf;
-		switch (dleap->dl_errno) {
-		case DL_NOTSUPPORTED:
-		case DL_UNSUPPORTED:
-			errno = ENOTSUP;
-			break;
-
-		case DL_NOTENAB:
-			errno = EINVAL;
-			break;
-
-		case DL_SYSERR:
-			errno = dleap->dl_unix_errno;
-			break;
-
-		default:
-			errno = EPROTO;
-			break;
-		}
-		goto done;
-
-	default:
-		errno = EBADMSG;
-		goto done;
-	}
-
-	rc = 0;	/* success */
-done:
-	free(buf);
-	return (rc);
-}
-
-int
-dlpi_promiscon(int fd, int timeout, uint_t level)
-{
-	return (i_dlpi_promisc(fd, timeout, DLPI_PROMISC_ON, level));
-}
-
-int
-dlpi_promiscoff(int fd, int timeout, uint_t level)
-{
-	return (i_dlpi_promisc(fd, timeout, DLPI_PROMISC_OFF, level));
-}
-
-int
-dlpi_phys_addr(int fd, int timeout, uint_t type, uint8_t *addrp,
-    size_t *addrlenp)
-{
-	int			rc = -1;
-	size_t			size;
-	dl_phys_addr_req_t	dlpar;
-	dl_phys_addr_ack_t	*dlpaap;
-	dl_error_ack_t		*dleap;
-	union DL_primitives	*buf;
-	union DL_primitives	*udlp;
-
-	size = 0;
-	size = MAX(sizeof (dl_phys_addr_ack_t) + MAXADDRLEN, size);
-	size = MAX(sizeof (dl_error_ack_t), size);
-
-	if ((buf = malloc(size)) == NULL)
-		return (-1);
-
-	dlpar.dl_primitive = DL_PHYS_ADDR_REQ;
-	dlpar.dl_addr_type = type;
-
-	if (strputmsg(fd, (uint8_t *)&dlpar, DL_PHYS_ADDR_REQ_SIZE, 0) == -1)
-		goto done;
-
-	if (strgetmsg(fd, timeout, (char *)buf, &size, NULL, NULL) == -1)
-		goto done;
-
-	if (size < sizeof (t_uscalar_t)) {
-		errno = EBADMSG;
-		goto done;
-	}
-
-	udlp = (union DL_primitives *)buf;
-	switch (udlp->dl_primitive) {
-	case DL_PHYS_ADDR_ACK:
-		if (size < DL_PHYS_ADDR_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-
-		dlpaap = (dl_phys_addr_ack_t *)buf;
-		if (dlpaap->dl_addr_offset != 0) {
-			if (dlpaap->dl_addr_length == 0) {
-				errno = EPROTO;
-				goto done;
-			}
-
-			if (addrlenp != NULL)
-				*addrlenp = dlpaap->dl_addr_length;
-
-			if (addrp != NULL)
-				(void) memcpy(addrp,
-				    (char *)buf + dlpaap->dl_addr_offset,
-				    dlpaap->dl_addr_length);
-		}
-		break;
-
-	case DL_ERROR_ACK:
-		if (size < DL_ERROR_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-
-		dleap = (dl_error_ack_t *)buf;
-		switch (dleap->dl_errno) {
-		case DL_SYSERR:
-			errno = dleap->dl_unix_errno;
-			break;
-
-		default:
-			errno = EPROTO;
-			break;
-		}
-		goto done;
-
-	default:
-		errno = EBADMSG;
-		goto done;
-	}
-
-	rc = 0;	/* success */
-done:
-	free(buf);
-	return (rc);
-}
-
-int
-dlpi_set_phys_addr(int fd, int timeout, uint8_t *addrp,
-    size_t addr_length)
-{
-	int			rc = -1;
-	size_t			opsize;
-	size_t			size;
-	dl_set_phys_addr_req_t	*dlspap;
-	dl_error_ack_t		*dleap;
-	union DL_primitives	*buf;
-	union DL_primitives	*udlp;
-
-	opsize = sizeof (dl_set_phys_addr_req_t) + addr_length;
-
-	size = 0;
-	size = MAX(opsize, size);
-	size = MAX(sizeof (dl_ok_ack_t), size);
-	size = MAX(sizeof (dl_error_ack_t), size);
-
-	if ((buf = malloc(size)) == NULL)
-		return (-1);
-
-	dlspap = (dl_set_phys_addr_req_t *)buf;
-	dlspap->dl_primitive = DL_SET_PHYS_ADDR_REQ;
-	dlspap->dl_addr_length = addr_length;
-	dlspap->dl_addr_offset = sizeof (dl_set_phys_addr_req_t);
-	(void) memcpy(&dlspap[1], addrp, addr_length);
-
-	if (strputmsg(fd, (uint8_t *)dlspap, opsize, 0) == -1)
-		goto done;
-
-	if (strgetmsg(fd, timeout, (char *)buf, &size, NULL, NULL) == -1)
-		goto done;
-
-	if (size < sizeof (t_uscalar_t)) {
-		errno = EBADMSG;
-		goto done;
-	}
-
-	udlp = (union DL_primitives *)buf;
-	switch (udlp->dl_primitive) {
-	case DL_OK_ACK:
-		if (size < DL_OK_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-		break;
-
-	case DL_ERROR_ACK:
-		if (size < DL_ERROR_ACK_SIZE) {
-			errno = EBADMSG;
-			goto done;
-		}
-
-		dleap = (dl_error_ack_t *)buf;
-		switch (dleap->dl_errno) {
-		case DL_BADADDR:
-			errno = EINVAL;
-			break;
-
-		case DL_NOTSUPPORTED:
-			errno = ENOTSUP;
-			break;
-
-		case DL_SYSERR:
-			errno = dleap->dl_unix_errno;
-			break;
-
-		default:
-			errno = EPROTO;
-			break;
-		}
-		goto done;
-
-	default:
-		errno = EBADMSG;
-		goto done;
-	}
-
-	rc = 0;	/* success */
-done:
-	free(buf);
-	return (rc);
-}
-
-void
-dlpi_passive(int fd, int timeout)
-{
-	size_t			size;
-	dl_passive_req_t	dlpr;
-	union DL_primitives	*buf;
-
-	size = MAX(sizeof (dl_ok_ack_t), sizeof (dl_error_ack_t));
-
-	if ((buf = malloc(size)) == NULL)
-		return;
-
-	dlpr.dl_primitive = DL_PASSIVE_REQ;
-
-	/*
-	 * We don't care about the outcome of this operation.  We at least
-	 * don't want to return until the operation completes or the
-	 * timeout expires.
-	 */
-	if (strputmsg(fd, (uint8_t *)&dlpr, DL_PASSIVE_REQ_SIZE, 0) == 0)
-		(void) strgetmsg(fd, timeout, (char *)buf, &size, NULL, NULL);
-	free(buf);
-}
-
-static int
-i_dlpi_style1_open(dlpi_if_attr_t *diap)
-{
-	int		fd;
-	int		cnt;
-	dl_info_ack_t	dlia;
-
-	/* Open device */
-	if ((fd = dlpi_open(diap->devname)) == -1) {
-		diap->style1_failed = B_TRUE;
-		diap->mod_pushed = 0;
-		return (-1);
-	} else {
-		diap->style1_fd = fd;
-	}
-
-	/*
-	 * Try to push modules (if any) onto the device stream
-	 */
-	for (cnt = 0; cnt < diap->mod_cnt; cnt++) {
-		if (ioctl(fd, I_PUSH, diap->modlist[cnt]) == -1) {
-			diap->mod_pushed = cnt+1;
-			return (-1);
+		if (!infinite) {
+			current = gethrtime() / (NANOSEC / MILLISEC);
+			msec -= (current - start);
+
+			if (msec <= 0)
+				return (DLPI_ETIMEDOUT);
 		}
 	}
 
-	if (dlpi_info(fd, -1, &dlia, NULL, NULL, NULL, NULL, NULL, NULL) == -1)
-		goto failed;
-
-	if (dlia.dl_provider_style != DL_STYLE1)
-		goto failed;
-
-	diap->style = DL_STYLE1;
-	diap->style1_failed = B_FALSE;
-
-	return (fd);
-failed:
-	diap->style1_failed = B_TRUE;
-	(void) dlpi_close(fd);
-	return (-1);
-}
-
-static int
-i_dlpi_style2_open(dlpi_if_attr_t *diap)
-{
-	int	fd;
-	uint_t	ppa;
-	dl_info_ack_t	dlia;
-
-	/*
-	 * If style 1 open failed, we need to determine how far it got and
-	 * finish up the open() call as a style 2 open
-	 *
-	 * If no modules were pushed (mod_pushed == 0), then we need to
-	 * strip off the ppa off the device name and open it as a style 2
-	 * device
-	 *
-	 * If the pushing of the last module failed, we need to strip off the
-	 * ppa from that module and try pushing it as a style 2 module
-	 *
-	 * Otherwise we failed during the push of an intermediate module and
-	 * must fail out and close the device.
-	 *
-	 * And if style1 did not fail (i.e. we called style2 open directly),
-	 * just open the device
-	 */
-	if (diap->style1_failed) {
-		if (!diap->mod_pushed) {
-			if (i_dlpi_ifrm_num(diap->devname, &ppa) < 0)
-				return (-1);
-			if ((fd = dlpi_open(diap->devname)) == -1)
-				return (-1);
-		} else if (diap->mod_pushed == diap->mod_cnt) {
-			if (i_dlpi_ifrm_num(
-				    diap->modlist[diap->mod_cnt - 1], &ppa) < 0)
-				return (-1);
-			diap->mod_pushed--;
-			fd = diap->style1_fd;
-		} else {
-			return (-1);
-		}
-	} else {
-		if ((fd = dlpi_open(diap->devname)) == -1)
-			return (-1);
-	}
-
-	/*
-	 * Try and push modules (if any) onto the device stream
-	 */
-	for (; diap->mod_pushed < diap->mod_cnt; diap->mod_pushed++) {
-		if (ioctl(fd, I_PUSH,
-		    diap->modlist[diap->mod_pushed]) == -1)
-			goto failed;
-	}
-
-	if (dlpi_info(fd, -1, &dlia, NULL, NULL, NULL, NULL, NULL,
-	    NULL) == -1)
-		goto failed;
-
-	if (dlia.dl_provider_style != DL_STYLE2)
-		goto failed;
-
-	diap->style = DL_STYLE2;
-
-	if (dlpi_attach(fd, -1, diap->ppa) < 0)
-		goto failed;
-
-	return (fd);
-failed:
-	(void) dlpi_close(fd);
-	return (-1);
-}
-
-static int
-i_dlpi_ifname_parse(const char *ifname, dlpi_if_attr_t *diap)
-{
-	char		*modlist = NULL; /* list of modules to push */
-	int		cnt = 0; /* number of modules to push */
-	char		modbuf[LIFNAMSIZ + 32];
-	char		*nxtmod;
-	char		*p;
-	int		len;
-
-	/* if lun is specified fail (backwards compat) */
-	if (strchr(ifname, ':') != NULL)
-		return (-1);
-
-	/* save copy of original device name */
-	if (strlcpy(diap->ifname, ifname, sizeof (diap->ifname)) >=
-	    sizeof (diap->ifname))
-		return (-1);
-
-	/* initialize ppa */
-	diap->ppa = -1;
-
-	/* get provider name and ppa from ifname */
-	len = strlen(ifname);
-	for (p = (char *)ifname + len; --p != ifname; len--) {
-		if (!isdigit(*p)) {
-			(void) strlcpy(diap->provider, ifname, len + 1);
-			diap->ppa = atoi(p + 1);
-			break;
-		}
-	}
-
-	if (strlcpy(modbuf, diap->ifname, sizeof (modbuf)) >=
-	    sizeof (modbuf))
-		return (-1);
-
-	/* parse '.' delimited module list */
-	modlist = strchr(modbuf, '.');
-	if (modlist != NULL) {
-		/* null-terminate interface name (device) */
-		*modlist = '\0';
-		modlist++;
-		while (modlist && cnt < MAX_MODS) {
-			if (*modlist == '\0')
-				return (-1);
-
-			nxtmod = strchr(modlist, '.');
-			if (nxtmod) {
-				*nxtmod = '\0';
-				nxtmod++;
-			}
-			if (strlcpy(diap->modlist[cnt], modlist,
-			    sizeof (diap->modlist[cnt])) >=
-			    sizeof (diap->modlist[cnt]))
-				return (-1);
-			cnt++;
-			modlist = nxtmod;
-		}
-	}
-	diap->mod_cnt = cnt;
-
-	if (strlcpy(diap->devname, modbuf, sizeof (diap->devname)) >=
-	    sizeof (diap->devname))
-		return (-1);
-
-	return (0);
-}
-
-int
-dlpi_if_open(const char *ifname, dlpi_if_attr_t *diap,
-    boolean_t force_style2)
-{
-	int	fd;
-
-	if (i_dlpi_ifname_parse(ifname, diap) == -1) {
-		errno = EINVAL;
-		return (-1);
-	}
-
-	diap->style1_failed = B_TRUE;
-
-	if (!force_style2) {
-		if ((fd = i_dlpi_style1_open(diap)) != -1)
-			return (fd);
-	}
-
-	if ((fd = i_dlpi_style2_open(diap)) == -1)
-		return (-1);
-
-	return (fd);
-}
-
-int
-dlpi_if_parse(const char *ifname, char *provider, int *ppap)
-{
-	dlpi_if_attr_t	diap;
-
-	if (i_dlpi_ifname_parse(ifname, &diap) == -1) {
-		errno = EINVAL;
-		return (-1);
-	}
-
-	if (strlcpy(provider, diap.provider, LIFNAMSIZ) > LIFNAMSIZ)
-		return (-1);
-
-	if (ppap != NULL)
-		*ppap = diap.ppa;
-
-	return (0);
+	return (DLPI_SUCCESS);
 }
 
 /*
- * attempt to remove ppa from end of file name
- * return -1 if none found
- * return ppa if found and remove the ppa from the filename
+ * Common routine invoked by all DLPI control routines. The inputs for this
+ * function are:
+ * 	dlpi_impl_t *dip: internal dlpi handle
+ *	const dlpi_msg_t *dlreqp: request message structure
+ *	dlpi_msg_t *dlreplyp: reply message structure
+ *	size_t dlreplyminsz: minimum size of reply primitive
+ *	int flags: flags to be set to send a message
+ * This routine succeeds if the message is an expected request/acknowledged
+ * message. Unexpected asynchronous messages (e.g. unexpected DL_NOTIFY_IND
+ * messages) will be discarded.
  */
 static int
-i_dlpi_ifrm_num(char *fname, unsigned int *ppa)
+i_dlpi_msg_common(dlpi_impl_t *dip, const dlpi_msg_t *dlreqp,
+    dlpi_msg_t *dlreplyp, size_t dlreplyminsz, int flags)
+{
+	int		retval;
+	t_uscalar_t	dlreqprim = dlreqp->dlm_msg->dl_primitive;
+	t_uscalar_t 	dlreplyprim = dlreplyp->dlm_msg->dl_primitive;
+
+	/* Put the requested primitive on the stream. */
+	retval = i_dlpi_strputmsg(dip->dli_fd, dlreqp, NULL, 0, flags);
+	if (retval != DLPI_SUCCESS)
+		return (retval);
+
+	/* Retrieve acknowledged message for requested primitive. */
+	retval = i_dlpi_strgetmsg(dip->dli_fd, (dip->dli_timeout * MILLISEC),
+	    dlreplyp, dlreqprim, dlreplyprim, dlreplyminsz, NULL, NULL, NULL);
+	if (retval != DLPI_SUCCESS)
+		return (retval);
+
+	/*
+	 * If primitive is DL_ERROR_ACK, set errno.
+	 */
+	if (dlreplyp->dlm_msg->dl_primitive == DL_ERROR_ACK) {
+		errno = dlreplyp->dlm_msg->error_ack.dl_unix_errno;
+		retval = dlreplyp->dlm_msg->error_ack.dl_errno;
+	}
+
+	return (retval);
+}
+
+/*
+ * DLPI error codes.
+ */
+static const char *dlpi_errlist[] = {
+	"bad LSAP selector",				/* DL_BADSAP  0x00 */
+	"DLSAP address in improper format or invalid",	/* DL_BADADDR 0x01 */
+	"improper permissions for request",		/* DL_ACCESS  0x02 */
+	"primitive issued in improper state",		/* DL_OUTSTATE 0x03 */
+	NULL,						/* DL_SYSERR  0x04 */
+	"sequence number not from outstanding DL_CONN_IND",
+							/* DL_BADCORR 0x05 */
+	"user data exceeded provider limit",		/* DL_BADDATA 0x06 */
+	"requested service not supplied by provider",
+						/* DL_UNSUPPORTED 0x07 */
+	"specified PPA was invalid", 			/* DL_BADPPA 0x08 */
+	"primitive received not known by provider",	/* DL_BADPRIM 0x09 */
+	"QoS parameters contained invalid values",
+						/* DL_BADQOSPARAM 0x0a */
+	"QoS structure type is unknown/unsupported",	/* DL_BADQOSTYPE 0x0b */
+	"token used not an active stream", 		/* DL_BADTOKEN 0x0c */
+	"attempted second bind with dl_max_conind",	/* DL_BOUND 0x0d */
+	"physical link initialization failed",		/* DL_INITFAILED 0x0e */
+	"provider couldn't allocate alternate address",	/* DL_NOADDR 0x0f */
+	"physical link not initialized",		/* DL_NOTINIT 0x10 */
+	"previous data unit could not be delivered",
+						/* DL_UNDELIVERABLE 0x11 */
+	"primitive is known but unsupported",
+						/* DL_NOTSUPPORTED 0x12 */
+	"limit exceeded",				/* DL_TOOMANY 0x13 */
+	"promiscuous mode not enabled",			/* DL_NOTENAB 0x14 */
+	"other streams for PPA in post-attached",	/* DL_BUSY 0x15 */
+	"automatic handling XID&TEST unsupported",	/* DL_NOAUTO 0x16 */
+	"automatic handling of XID unsupported",	/* DL_NOXIDAUTO 0x17 */
+	"automatic handling of TEST unsupported",	/* DL_NOTESTAUTO 0x18 */
+	"automatic handling of XID response",		/* DL_XIDAUTO 0x19 */
+	"automatic handling of TEST response", 		/* DL_TESTAUTO 0x1a */
+	"pending outstanding connect indications"	/* DL_PENDING 0x1b */
+};
+
+/*
+ * libdlpi error codes.
+ */
+static const char *libdlpi_errlist[] = {
+	"DLPI operation succeeded",		/* DLPI_SUCCESS */
+	"invalid argument",			/* DLPI_EINVAL */
+	"invalid DLPI linkname",		/* DLPI_ELINKNAMEINVAL */
+	"DLPI link does not exist",		/* DLPI_ENOLINK */
+	"bad DLPI link",			/* DLPI_EBADLINK */
+	"invalid DLPI handle",			/* DLPI_EINHANDLE */
+	"DLPI operation timed out",		/* DLPI_ETIMEDOUT */
+	"unsupported DLPI version",		/* DLPI_EVERNOTSUP */
+	"unsupported DLPI connection mode",	/* DLPI_EMODENOTSUP */
+	"unavailable DLPI SAP",			/* DLPI_EUNAVAILSAP */
+	"DLPI operation failed",		/* DLPI_FAILURE */
+	"DLPI style-2 node reports style-1",	/* DLPI_ENOTSTYLE2 */
+	"bad DLPI message",			/* DLPI_EBADMSG */
+	"DLPI raw mode not supported"		/* DLPI_ERAWNOTSUP */
+};
+
+const char *
+dlpi_strerror(int err)
+{
+	if (err == DL_SYSERR)
+		return (strerror(errno));
+	else if (err >= 0 && err < NELEMS(dlpi_errlist))
+		return (dgettext(TEXT_DOMAIN, dlpi_errlist[err]));
+	else if (err > DLPI_SUCCESS && err < DLPI_ERRMAX)
+		return (dgettext(TEXT_DOMAIN, libdlpi_errlist[err -
+		    DLPI_SUCCESS]));
+	else
+		return (dgettext(TEXT_DOMAIN, "Unknown DLPI error"));
+}
+
+/*
+ * Each table entry comprises a DLPI/Private mactype and the description.
+ */
+static const dlpi_mactype_t dlpi_mactypes[] = {
+	{ DL_CSMACD,		"CSMA/CD"		},
+	{ DL_TPB,		"Token Bus"		},
+	{ DL_TPR,		"Token Ring"		},
+	{ DL_METRO,		"Metro Net"		},
+	{ DL_ETHER,		"Ethernet"		},
+	{ DL_HDLC,		"HDLC"			},
+	{ DL_CHAR,		"Sync Character"	},
+	{ DL_CTCA,		"CTCA"			},
+	{ DL_FDDI,		"FDDI"			},
+	{ DL_FRAME,		"Frame Relay (LAPF)"	},
+	{ DL_MPFRAME,		"MP Frame Relay"	},
+	{ DL_ASYNC,		"Async Character"	},
+	{ DL_IPX25,		"X.25 (Classic IP)"	},
+	{ DL_LOOP,		"Software Loopback"	},
+	{ DL_FC,		"Fiber Channel"		},
+	{ DL_ATM,		"ATM"			},
+	{ DL_IPATM,		"ATM (Classic IP)"	},
+	{ DL_X25,		"X.25 (LAPB)"		},
+	{ DL_ISDN,		"ISDN"			},
+	{ DL_HIPPI,		"HIPPI"			},
+	{ DL_100VG,		"100BaseVG Ethernet"	},
+	{ DL_100VGTPR,		"100BaseVG Token Ring"	},
+	{ DL_ETH_CSMA,		"Ethernet/IEEE 802.3"	},
+	{ DL_100BT,		"100BaseT"		},
+	{ DL_IB,		"Infiniband"		},
+	{ DL_IPV4,		"IPv4 Tunnel"		},
+	{ DL_IPV6,		"IPv6 Tunnel"		},
+	{ DL_WIFI,		"IEEE 802.11"		}
+};
+
+const char *
+dlpi_mactype(uint_t mactype)
+{
+	int i;
+
+	for (i = 0; i < NELEMS(dlpi_mactypes); i++) {
+		if (dlpi_mactypes[i].dm_mactype == mactype)
+			return (dlpi_mactypes[i].dm_desc);
+	}
+
+	return ("Unknown MAC Type");
+}
+
+/*
+ * Each table entry comprises a DLPI primitive and the maximum buffer
+ * size needed, in bytes, for the DLPI message (see <sys/dlpi.h> for details).
+ */
+static const dlpi_primsz_t dlpi_primsizes[] = {
+{ DL_INFO_REQ,		DL_INFO_REQ_SIZE				},
+{ DL_INFO_ACK,		DL_INFO_ACK_SIZE + (2 * DLPI_PHYSADDR_MAX) +
+			DLPI_SAPLEN_MAX + (2 * sizeof (union DL_qos_types))},
+{ DL_ATTACH_REQ,	DL_ATTACH_REQ_SIZE				},
+{ DL_BIND_REQ,		DL_BIND_REQ_SIZE				},
+{ DL_BIND_ACK, 		DL_BIND_ACK_SIZE + DLPI_PHYSADDR_MAX +
+			DLPI_SAPLEN_MAX					},
+{ DL_UNBIND_REQ, 	DL_UNBIND_REQ_SIZE				},
+{ DL_ENABMULTI_REQ, 	DL_ENABMULTI_REQ_SIZE + DLPI_PHYSADDR_MAX	},
+{ DL_DISABMULTI_REQ, 	DL_DISABMULTI_REQ_SIZE + DLPI_PHYSADDR_MAX	},
+{ DL_PROMISCON_REQ, 	DL_PROMISCON_REQ_SIZE				},
+{ DL_PROMISCOFF_REQ,	DL_PROMISCOFF_REQ_SIZE				},
+{ DL_PASSIVE_REQ, 	DL_PASSIVE_REQ_SIZE				},
+{ DL_UNITDATA_REQ, 	DL_UNITDATA_REQ_SIZE + DLPI_PHYSADDR_MAX +
+			DLPI_SAPLEN_MAX					},
+{ DL_UNITDATA_IND, 	DL_UNITDATA_IND_SIZE + (2 * (DLPI_PHYSADDR_MAX +
+			DLPI_SAPLEN_MAX))				},
+{ DL_PHYS_ADDR_REQ, 	DL_PHYS_ADDR_REQ_SIZE				},
+{ DL_PHYS_ADDR_ACK, 	DL_PHYS_ADDR_ACK_SIZE + DLPI_PHYSADDR_MAX	},
+{ DL_SET_PHYS_ADDR_REQ, DL_SET_PHYS_ADDR_REQ_SIZE + DLPI_PHYSADDR_MAX	},
+{ DL_OK_ACK,		MAX(DL_ERROR_ACK_SIZE, DL_OK_ACK_SIZE)		}
+};
+
+/*
+ * Refers to the dlpi_primsizes[] table to return corresponding maximum
+ * buffer size.
+ */
+static size_t
+i_dlpi_getprimsize(t_uscalar_t prim)
 {
 	int	i;
-	uint_t	p = 0;
-	unsigned int	m = 1;
 
-	i = strlen(fname) - 1;
-
-	while (i >= 0 && isdigit(fname[i])) {
-		p += (fname[i] - '0')*m;
-		m *= 10;
-		i--;
+	for (i = 0; i < NELEMS(dlpi_primsizes); i++) {
+		if (dlpi_primsizes[i].dp_prim == prim)
+			return (dlpi_primsizes[i].dp_primsz);
 	}
 
-	if (m == 1) {
-		return (-1);
+	return (sizeof (t_uscalar_t));
+}
+
+/*
+ * sap values vary in length and are in host byte order, build sap value
+ * by writing saplen bytes, so that the sap value is left aligned.
+ */
+static uint_t
+i_dlpi_buildsap(uint8_t *sapp, uint_t saplen)
+{
+	int i;
+	uint_t sap = 0;
+
+#ifdef _LITTLE_ENDIAN
+	for (i = saplen - 1; i >= 0; i--) {
+#else
+	for (i = 0; i < saplen; i++) {
+#endif
+		sap <<= 8;
+		sap |= sapp[i];
 	}
 
-	fname[i + 1] = '\0';
-	*ppa = p;
-	return (0);
+	return (sap);
+}
+
+/*
+ * Copy sap value to a buffer in host byte order. saplen is the number of
+ * bytes to copy.
+ */
+static void
+i_dlpi_writesap(void *dstbuf, uint_t sap, uint_t saplen)
+{
+	uint8_t *sapp;
+
+#ifdef _LITTLE_ENDIAN
+	sapp = (uint8_t *)&sap;
+#else
+	sapp = (uint8_t *)&sap + (sizeof (sap) - saplen);
+#endif
+
+	(void) memcpy(dstbuf, sapp, saplen);
 }

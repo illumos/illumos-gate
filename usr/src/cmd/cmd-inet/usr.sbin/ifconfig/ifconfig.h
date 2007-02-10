@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -25,8 +25,6 @@ extern "C" {
 #define	BAD_ADDR	-1	/* prefix is invalid */
 #define	NO_PREFIX	-2	/* no prefix was found */
 
-#define	MAX_MODS	9	/* max modules that can be pushed on intr */
-
 /* No suitable header file defines this, though it's in libsocket */
 extern int	getnetmaskbyaddr(struct in_addr, struct in_addr *);
 
@@ -36,11 +34,13 @@ extern void	Perror0(char *);
 extern void	Perror0_exit(char *);
 extern void	Perror2(char *, char *);
 extern void	Perror2_exit(char *, char *);
+extern void	Perrdlpi(const char *, const char *, int);
+extern void	Perrdlpi_exit(const char *, const char *, int);
 
-extern int	doifrevarp(char *, struct sockaddr_in *);
+extern int	doifrevarp(const char *, struct sockaddr_in *);
 
-extern int	dlpi_set_address(char *, uchar_t *, int);
-extern void	dlpi_print_address(char *);
+extern int	dlpi_set_address(const char *, uchar_t *, uint_t);
+extern void	dlpi_print_address(const char *);
 
 #ifdef	__cplusplus
 }

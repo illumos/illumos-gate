@@ -473,6 +473,7 @@ libdevinfo:	libnvpair libsec
 libdhcpagent:	libsocket libdhcputil libuuid libdlpi
 libdhcpsvc:	libinetutil
 libdhcputil:	libnsl libgen libinetutil libdlpi
+libdlpi:	libinetutil
 libdladm:	libdlpi libdevinfo libwladm libinetutil
 libdtrace:	libproc libgen libctf
 libdtrace_jni:	libuutil libdtrace

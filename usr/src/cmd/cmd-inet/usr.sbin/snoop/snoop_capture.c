@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,6 @@
 #include <sys/stat.h>
 #include <sys/stropts.h>
 #include <sys/bufmod.h>
-#include <sys/dlpi.h>
 
 #include <unistd.h>
 #include <stropts.h>
@@ -75,74 +74,27 @@ void convert_to_network();
 void convert_from_network();
 static void convert_old(struct ohdr *);
 extern sigjmp_buf jmp_env, ojmp_env;
-static int netfd;
-static union DL_primitives netdl;		/* info_ack for interface */
+static dlpi_info_t dlinfo;
 static char *bufp;	/* pointer to read buffer */
 
 static int strioctl(int, int, int, int, void *);
 
 /*
- * Convert a device id to a ppa value
- * e.g. "le0" -> 0
- */
-static int
-device_ppa(char *device)
-{
-	char *p;
-	char *tp;
-
-	p = strpbrk(device, "0123456789");
-	if (p == NULL)
-		return (0);
-	/* ignore numbers within device names */
-	for (tp = p; *tp != '\0'; tp++)
-		if (!isdigit(*tp))
-			return (device_ppa(tp));
-	return (atoi(p));
-}
-
-/*
- * Convert a device id to a pathname.
- * Level 1 devices: "le0" -> "/dev/le0".
- * Level 2 devices: "le0" -> "/dev/le".
- */
-static char *
-device_path(char *device)
-{
-	static char buff[IF_NAMESIZE + 1];
-	struct stat st;
-	char *p;
-
-	(void) strcpy(buff, "/dev/");
-	(void) strlcat(buff, device, IF_NAMESIZE);
-
-	if (stat(buff, &st) == 0)
-		return (buff);
-
-	for (p = buff + (strlen(buff) - 1); p > buff; p--) {
-		if (isdigit(*p))
-			*p = '\0';
-		else
-			break;
-	}
-	return (buff);
-}
-
-/*
- * Open up the device, and start finding out something about it,
- * especially stuff about the data link headers.  We need that information
+ * Open up the device in raw mode and passive mode
+ * (see dlpi_open(3DLPI)) and start finding out something about it,
+ * especially stuff about the data link headers. We need that information
  * to build the proper packet filters.
  */
 boolean_t
-check_device(char **devicep, int *ppap)
+check_device(dlpi_handle_t *dhp, char **devicep)
 {
-	char *devname;
+	int	retval;
+
 	/*
 	 * Determine which network device
 	 * to use if none given.
 	 * Should get back a value like "le0".
 	 */
-
 	if (*devicep == NULL) {
 		char *cbuf;
 		static struct ifconf ifc;
@@ -199,78 +151,51 @@ check_device(char **devicep, int *ppap)
 		(void) close(s);
 	}
 
-	devname = device_path(*devicep);
-	if ((netfd = open(devname, O_RDWR)) < 0)
-		pr_err("%s: %m", devname);
-
-	*ppap = device_ppa(*devicep);
-
-	/*
-	 * Check for DLPI Version 2.
-	 */
-	dlinforeq(netfd, &netdl);
-	if (netdl.info_ack.dl_version != DL_VERSION_2)
-		pr_err("DL_INFO_ACK:  incompatible version %d",
-		netdl.info_ack.dl_version);
-
-	/*
-	 * Attach for DLPI Style 2.
-	 */
-	if (netdl.info_ack.dl_provider_style == DL_STYLE2) {
-		dlattachreq(netfd, *ppap);
-		/* Reread more specific information */
-		dlinforeq(netfd, &netdl);
+	retval = dlpi_open(*devicep, dhp, DLPI_PASSIVE|DLPI_RAW);
+	if (retval != DLPI_SUCCESS) {
+		pr_err("cannot open \"%s\": %s", *devicep,
+		    dlpi_strerror(retval));
 	}
 
-	/* Enable passive mode so that we can snoop on aggregated links. */
-	dlpi_passive(netfd, -1);
+	if ((retval = dlpi_info(*dhp, &dlinfo, 0)) != DLPI_SUCCESS)
+		pr_errdlpi(*dhp, "dlpi_info failed", retval);
 
 	for (interface = &INTERFACES[0]; interface->mac_type != -1; interface++)
-		if (interface->mac_type == netdl.info_ack.dl_mac_type)
+		if (interface->mac_type == dlinfo.di_mactype)
 			break;
 
-	/* allow limited functionality even is interface isn't known */
+	/* allow limited functionality even if interface isn't known */
 	if (interface->mac_type == -1) {
-		fprintf(stderr,
-		    "snoop: WARNING: Mac Type = %lx not supported\n",
-		    netdl.info_ack.dl_mac_type);
+		(void) fprintf(stderr, "snoop: WARNING: Mac Type = %x "
+		    "not supported\n", dlinfo.di_mactype);
 	}
 
 	/* for backward compatibility, allow known interface mtu_sizes */
-	if (interface->mtu_size > (uint_t)netdl.info_ack.dl_max_sdu)
-		netdl.info_ack.dl_max_sdu = (t_scalar_t)interface->mtu_size;
+	if (interface->mtu_size > dlinfo.di_max_sdu)
+		dlinfo.di_max_sdu = interface->mtu_size;
 
 	return (interface->try_kernel_filter);
 }
 
 /*
  * Do whatever is necessary to initialize the interface
- * for packet capture. Bind the device opened and attached (if DL_STYLE2)
- * in check_device(), request raw ethernet packets and set promiscuous mode,
- * push the streams buffer module and packet filter module, set various buffer
- * parameters.
+ * for packet capture. Bind the device opened in check_device(), set
+ * promiscuous mode, push the streams buffer module and packet filter
+ * module, set various buffer parameters.
  */
-/* ARGSUSED */
 void
-initdevice(device, snaplen, chunksize, timeout, fp, ppa)
-	char *device;
-	ulong_t snaplen, chunksize;
-	struct timeval *timeout;
-	struct Pf_ext_packetfilt *fp;
-	int ppa;
+initdevice(dlpi_handle_t dh, ulong_t snaplen, ulong_t chunksize,
+    struct timeval *timeout, struct Pf_ext_packetfilt *fp)
 {
 	extern int Pflg;
+	int 	retv;
+	int 	netfd;
 
-	/*
-	 * Bind to SAP 2 on token ring, 0 on other interface types.
-	 * (SAP 0 has special significance on token ring)
-	 */
-	if (interface->mac_type == DL_TPR)
-		dlbindreq(netfd, 2, 0, DL_CLDLS, 0);
-	else
-		dlbindreq(netfd, 0, 0, DL_CLDLS, 0);
+	retv = dlpi_bind(dh, DLPI_ANY_SAP, NULL);
+	if (retv != DLPI_SUCCESS)
+		pr_errdlpi(dh, "cannot bind on", retv);
 
-	(void) fprintf(stderr, "Using device %s ", device_path(device));
+	(void) fprintf(stderr, "Using device %s ", dlpi_linkname(dh));
 
 	/*
 	 * If Pflg not set - use physical level
@@ -278,67 +203,59 @@ initdevice(device, snaplen, chunksize, timeout, fp, ppa)
 	 */
 	if (!Pflg) {
 		(void) fprintf(stderr, "(promiscuous mode)\n");
-		dlpromiscon(netfd, DL_PROMISC_PHYS);
+		retv = dlpi_promiscon(dh, DL_PROMISC_PHYS);
+		if (retv != DLPI_SUCCESS) {
+			pr_errdlpi(dh, "promiscuous mode(physical) failed",
+			    retv);
+		}
 	} else {
 		(void) fprintf(stderr, "(non promiscuous)\n");
-		dlpromiscon(netfd, DL_PROMISC_MULTI);
+		retv = dlpi_promiscon(dh, DL_PROMISC_MULTI);
+		if (retv != DLPI_SUCCESS) {
+			pr_errdlpi(dh, "promiscuous mode(multicast) failed",
+			    retv);
+		}
 	}
 
-	dlpromiscon(netfd, DL_PROMISC_SAP);
+	retv = dlpi_promiscon(dh, DL_PROMISC_SAP);
+	if (retv != DLPI_SUCCESS)
+		pr_errdlpi(dh, "promiscuous mode(SAP) failed", retv);
 
-	if (ioctl(netfd, DLIOCRAW, 0) < 0) {
-		(void) close(netfd);
-		pr_err("ioctl: DLIOCRAW: %s: %m", device_path(device));
-	}
+	netfd = dlpi_fd(dh);
 
 	if (fp) {
 		/*
 		 * push and configure the packet filtering module
 		 */
-		if (ioctl(netfd, I_PUSH, "pfmod") < 0) {
-			(void) close(netfd);
-			pr_err("ioctl: I_PUSH pfmod: %s: %m",
-			    device_path(device));
-		}
+		if (ioctl(netfd, I_PUSH, "pfmod") < 0)
+			pr_errdlpi(dh, "cannot push \"pfmod\"", DL_SYSERR);
 
 		if (strioctl(netfd, PFIOCSETF, -1, sizeof (*fp),
-		    (char *)fp) < 0) {
-			(void) close(netfd);
-			pr_err("PFIOCSETF: %s: %m", device_path(device));
-		}
+		    (char *)fp) < 0)
+			pr_errdlpi(dh, "PFIOCSETF", DL_SYSERR);
 	}
 
-	if (ioctl(netfd, I_PUSH, "bufmod") < 0) {
-		(void) close(netfd);
-		pr_err("push bufmod: %s: %m", device_path(device));
-	}
+	if (ioctl(netfd, I_PUSH, "bufmod") < 0)
+		pr_errdlpi(dh, "cannot push \"bufmod\"", DL_SYSERR);
 
 	if (strioctl(netfd, SBIOCSTIME, -1, sizeof (struct timeval),
-	    (char *)timeout) < 0) {
-		(void) close(netfd);
-		pr_err("SBIOCSTIME: %s: %m", device_path(device));
-	}
+	    (char *)timeout) < 0)
+		pr_errdlpi(dh, "SBIOCSTIME", DL_SYSERR);
 
 	if (strioctl(netfd, SBIOCSCHUNK, -1, sizeof (uint_t),
-	    (char *)&chunksize) < 0) {
-		(void) close(netfd);
-		pr_err("SBIOCGCHUNK: %s: %m", device_path(device));
-	}
+	    (char *)&chunksize) < 0)
+		pr_errdlpi(dh, "SBIOCGCHUNK", DL_SYSERR);
 
 	if (strioctl(netfd, SBIOCSSNAP, -1, sizeof (uint_t),
-	    (char *)&snaplen) < 0) {
-		(void) close(netfd);
-		pr_err("SBIOCSSNAP: %s: %m", device_path(device));
-	}
+	    (char *)&snaplen) < 0)
+		pr_errdlpi(dh, "SBIOCSSNAP", DL_SYSERR);
 
 	/*
 	 * Flush the read queue, to get rid of anything that
 	 * accumulated before the device reached its final configuration.
 	 */
-	if (ioctl(netfd, I_FLUSH, FLUSHR) < 0) {
-		(void) close(netfd);
-		pr_err("I_FLUSH: %s: %m", device_path(device));
-	}
+	if (ioctl(netfd, I_FLUSH, FLUSHR) < 0)
+		pr_errdlpi(dh, "cannot flush \"I_FLUSH\"", DL_SYSERR);
 }
 
 /*
@@ -349,54 +266,38 @@ initdevice(device, snaplen, chunksize, timeout, fp, ppa)
  * or interpreted for display on the fly.
  */
 void
-net_read(chunksize, filter, proc, flags)
-	int chunksize, filter;
-	void (*proc)();
-	int flags;
+net_read(dlpi_handle_t dh, size_t chunksize, int filter, void (*proc)(),
+    int flags)
 {
-	int r = 0;
-	struct strbuf data;
-	int flgs;
+	int 	retval;
 	extern int count;
+	size_t	msglen;
 
-	data.len = 0;
 	count = 0;
 
 	/* allocate a read buffer */
-
 	bufp = malloc(chunksize);
 	if (bufp == NULL)
-		pr_err("no memory for %dk buffer", chunksize);
+		pr_err("no memory for %d buffer", chunksize);
 
 	/*
-	 *	read frames
+	 * read frames
 	 */
 	for (;;) {
-		data.maxlen = chunksize;
-		data.len = 0;
-		data.buf = bufp;
-		flgs = 0;
+		msglen = chunksize;
+		retval = dlpi_recv(dh, NULL, NULL, bufp, &msglen, -1, NULL);
 
-		r = getmsg(netfd, NULL, &data, &flgs);
-
-		if (r < 0 || quitting)
+		if (retval != DLPI_SUCCESS || quitting)
 			break;
 
-		if (data.len <= 0)
-			continue;
-
-		scan(bufp, data.len, filter, 0, 0, proc, 0, 0, flags);
+		if (msglen != 0)
+			scan(bufp, msglen, filter, 0, 0, proc, 0, 0, flags);
 	}
 
 	free(bufp);
-	(void) close(netfd);
 
-	if (!quitting) {
-		if (r < 0)
-			pr_err("network read failed: %m");
-		else
-			pr_err("network read returned %d", r);
-	}
+	if (!quitting)
+		pr_errdlpi(dh, "network read failed", retval);
 }
 
 #ifdef DEBUG
@@ -512,24 +413,24 @@ scan(char *buf, int len, int filter, int cap, int old, void (*proc)(),
 		    (nhdrp->sbh_totlen < nhdrp->sbh_msglen) ||
 		    (nhdrp->sbh_timestamp.tv_sec == 0)) {
 			if (cap)
-				fprintf(stderr, "(warning) bad packet header "
-						"in capture file");
+				(void) fprintf(stderr, "(warning) bad packet "
+				    "header in capture file");
 			else
-				fprintf(stderr, "(warning) bad packet header "
-						"in buffer");
+				(void) fprintf(stderr, "(warning) bad packet "
+				    "header in buffer");
 			(void) fprintf(stderr, " offset %d: length=%d\n",
 				bp - buf, nhdrp->sbh_totlen);
 			goto err;
 		}
 
 		if (nhdrp->sbh_totlen >
-		    (uint_t)(netdl.info_ack.dl_max_sdu + MAX_HDRTRAILER)) {
+		    (dlinfo.di_max_sdu + MAX_HDRTRAILER)) {
 			if (cap)
-				fprintf(stderr, "(warning) packet length "
-					"greater than MTU in capture file");
+				(void) fprintf(stderr, "(warning) packet length"
+				    " greater than MTU in capture file");
 			else
-				fprintf(stderr, "(warning) packet length "
-					"greater than MTU in buffer");
+				(void) fprintf(stderr, "(warning) packet length"
+				    " greater than MTU in buffer");
 
 			(void) fprintf(stderr, " offset %d: length=%d\n",
 				bp - buf, nhdrp->sbh_totlen);
@@ -542,7 +443,7 @@ scan(char *buf, int len, int filter, int cap, int old, void (*proc)(),
 		 * a warning.
 		 */
 		if (pktp + nhdrp->sbh_msglen > bufstop) {
-			fprintf(stderr, "truncated packet buffer\n");
+			(void) fprintf(stderr, "truncated packet buffer\n");
 			nhdrp->sbh_msglen = bufstop - pktp;
 		}
 
@@ -574,7 +475,8 @@ scan(char *buf, int len, int filter, int cap, int old, void (*proc)(),
 			}
 
 			if (maxcount && count >= maxcount) {
-				fprintf(stderr, "%d packets captured\n", count);
+				(void) fprintf(stderr, "%d packets captured\n",
+				    count);
 				exit(0);
 			}
 
@@ -692,8 +594,7 @@ static const int snoop_idlen = 8;
 static const int snoop_version = 2;
 
 void
-cap_open_write(name)
-	char *name;
+cap_open_write(const char *name)
 {
 	int vers;
 
@@ -721,8 +622,7 @@ static int cap_len = 0;
 static int cap_new;
 
 void
-cap_open_read(name)
-	char *name;
+cap_open_read(const char *name)
 {
 	struct stat st;
 	int cap_vers;
@@ -795,15 +695,11 @@ cap_open_read(name)
 		if (mprotect(cap_buffp, cap_len, PROT_READ | PROT_WRITE) < 0)
 			pr_err("mprotect: %s: %m", name);
 	}
-	netdl.info_ack.dl_max_sdu = MAXINT;	/* Decode any stored packet. */
+	dlinfo.di_max_sdu = MAXINT;	/* Decode any stored packet. */
 }
 
 void
-cap_read(first, last, filter, proc, flags)
-	int first, last;
-	int filter;
-	void (*proc)();
-	int flags;
+cap_read(int first, int last, int filter, void (*proc)(), int flags)
 {
 	extern int count;
 
@@ -816,10 +712,7 @@ cap_read(first, last, filter, proc, flags)
 
 /* ARGSUSED */
 void
-cap_write(hdrp, pktp, num, flags)
-	struct sb_hdr *hdrp;
-	char *pktp;
-	int num, flags;
+cap_write(struct sb_hdr *hdrp, char *pktp, int num, int flags)
 {
 	int pktlen, mac;
 	static int first = 1;

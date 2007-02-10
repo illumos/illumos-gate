@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,22 +97,21 @@ static char *portab[] = {
 #endif
 
 #define	equal(a, b)	(strcmp((a), (b)) == 0)
-#define	MAXWAIT		15
 
 int
 main(int argc, char **argv)
 {
-	char cnambuf[MAXPATHLEN];
+	char cnambuf[DLPI_LINKNAME_MAX], device[DLPI_LINKNAME_MAX];
 	struct scc_mode sm;
 	struct strioctl sioc;
 	int fd, speed;
+	int retval;
 	char *arg, *cp;
 	char loopchange = 0;
 	char echochange = 0;
 	char clockchange = 0;
-	char *devstr =  "/dev/";
-	int devstrlen;
-	ulong_t ppa;
+	uint_t ppa;
+	dlpi_handle_t dh;
 
 	if (argc == 1) {
 		usage();
@@ -121,41 +119,35 @@ main(int argc, char **argv)
 	}
 	argc--;
 	argv++;
-	devstrlen = strlen(devstr);
-	if (strncmp(devstr, argv[0], devstrlen) != 0) {
-		if (snprintf(cnambuf, sizeof (cnambuf), "%s%s", devstr,
-		    argv[0]) >= sizeof (cnambuf)) {
-			(void) fprintf(stderr,
-			    "syncinit: invalid device name (too long) %s\n",
-			    argv[0]);
-			exit(1);
-		}
+
+	if (strlcpy(cnambuf, argv[0], sizeof (cnambuf)) >=
+	    sizeof (cnambuf)) {
+		(void) fprintf(stderr,
+		    "syncinit: invalid device name (too long) %s\n", argv[0]);
+		exit(1);
 	}
+
 	cp = cnambuf;
 	while (*cp)			/* find the end of the name */
 		cp++;
 	cp--;
 	if (!isdigit(*cp)) {
 		(void) fprintf(stderr,
-			"syncinit: %s missing minor device number\n", argv[0]);
-		exit(1);
-	}
-	while (isdigit(*(cp - 1)))
-		cp--;
-	ppa = strtoul(cp, NULL, 10);
-	*cp = '\0';	/* drop number, leaving name of clone device. */
-	fd = open(cnambuf, O_RDWR|O_EXCL, 0);
-	if (fd < 0) {
-		perror("syncinit: open");
+		    "syncinit: %s missing minor device number\n", cnambuf);
 		exit(1);
 	}
 
-	if (dlpi_attach(fd, MAXWAIT, ppa) != 0) {
-		perror("syncinit: dlpi_attach");
+	retval = dlpi_open(cnambuf, &dh, DLPI_EXCL|DLPI_SERIAL);
+	if (retval != DLPI_SUCCESS) {
+		(void) fprintf(stderr, "syncinit: dlpi_open %s: %s\n", cnambuf,
+		    dlpi_strerror(retval));
 		exit(1);
 	}
 
-	(void) printf("device: %s  ppa: %d\n", cnambuf, (int)ppa);
+	(void) dlpi_parselink(cnambuf, device, &ppa);
+	(void) printf("device: %s  ppa: %u\n", device, ppa);
+
+	fd = dlpi_fd(dh);
 
 	argc--;
 	argv++;
@@ -164,6 +156,7 @@ main(int argc, char **argv)
 		sioc.ic_timout = -1;
 		sioc.ic_len = sizeof (struct scc_mode);
 		sioc.ic_dp = (char *)&sm;
+
 		if (ioctl(fd, I_STR, &sioc) < 0) {
 			perror("S_IOCGETMODE");
 			(void) fprintf(stderr,
@@ -266,7 +259,7 @@ main(int argc, char **argv)
 		exit(1);
 	}
 	(void) printf(
-"speed=%d, loopback=%s, echo=%s, nrzi=%s, txc=%s, rxc=%s\n",
+		"speed=%d, loopback=%s, echo=%s, nrzi=%s, txc=%s, rxc=%s\n",
 		sm.sm_baudrate,
 		yesno[((int)(sm.sm_config & CONN_LPBK) > 0)],
 		yesno[((int)(sm.sm_config & CONN_ECHO) > 0)],

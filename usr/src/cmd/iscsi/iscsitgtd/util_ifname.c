@@ -20,18 +20,18 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-#include <sys/dlpi.h>
 #include <libdlpi.h>
 #include <ctype.h>
 #include <sys/sysmacros.h>
 #include <net/if_types.h>
+#include <net/if.h>
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,18 +59,13 @@
  * at this given time will have the same MAC address and as time moves along
  * well, time will change.
  */
-uchar_t	*mac_addr;
-size_t	mac_len;
-
-#define	PATH_PART	"/dev/"
+uchar_t 	mac_addr[DLPI_PHYSADDR_MAX];
+size_t		mac_len;
 
 static struct lifreq *if_setup(int *n);
 static void dump_addr_to_ascii(struct sockaddr *addr, char *buf,
     size_t len);
-static int strputmsg(int fd, uint8_t *ctl_buf, size_t ctl_len, int flags);
-static int strgetmsg(int fd, char *ctl_buf, size_t *ctl_lenp, char *data_buf,
-    size_t *data_lenp);
-static Boolean_t grab_address(char *ifname, uchar_t **addr, size_t *lp);
+static Boolean_t grab_address(char *ifname, uchar_t *addrp, size_t *addrlenp);
 
 /*
  * []----
@@ -89,13 +84,15 @@ if_find_mac(target_queue_t *mgmt)
 {
 	struct lifreq	*lifrp, *first;
 	int		n;
-	char		*str		= NULL;
+	char		*str;
+
+	mac_len = DLPI_PHYSADDR_MAX;
 
 	first = if_setup(&n);
 	for (lifrp = first; n > 0; n--, lifrp++) {
-		if (grab_address(lifrp->lifr_name, &mac_addr,
+		if (grab_address(lifrp->lifr_name, mac_addr,
 		    &mac_len) == True) {
-			str = _link_ntoa(mac_addr, str, mac_len, IFT_OTHER);
+			str = _link_ntoa(mac_addr, NULL, mac_len, IFT_OTHER);
 			if ((str != NULL) && (mgmt != NULL)) {
 				queue_prt(mgmt, Q_GEN_DETAILS,
 				    "MAIN  %s: %s \n", lifrp->lifr_name, str);
@@ -338,171 +335,18 @@ if_setup(int *n)
 	return (lifc.lifc_req);
 }
 
-static int
-strputmsg(int fd, uint8_t *ctl_buf, size_t ctl_len, int flags)
-{
-	struct strbuf	ctl;
-
-	bzero(&ctl, sizeof (ctl));
-	ctl.buf = (char *)ctl_buf;
-	ctl.len = ctl_len;
-
-	return (putmsg(fd, &ctl, NULL, flags));
-}
-
-static int
-strgetmsg(int fd, char *ctl_buf, size_t *ctl_lenp, char *data_buf,
-    size_t *data_lenp)
-{
-	struct strbuf	ctl;
-	struct strbuf	data;
-	int		flags	= 0,
-			res;
-
-	bzero(&ctl, sizeof (ctl));
-	ctl.buf = ctl_buf;
-	ctl.len = 0;
-	ctl.maxlen = (ctl_lenp != NULL) ? *ctl_lenp : 0;
-
-	bzero(&data, sizeof (data));
-	data.buf = data_buf;
-	data.len = 0;
-	data.maxlen = (data_lenp != NULL) ? *data_lenp : 0;
-
-	res = getmsg(fd, &ctl, &data, &flags);
-	if (ctl_lenp != NULL)
-		*ctl_lenp = ctl.len;
-	if (data_lenp != NULL)
-		*data_lenp = data.len;
-
-	return (res);
-}
-
 static Boolean_t
-ppa_attach(int fd, int ppa)
+grab_address(char *ifname, uchar_t *addrp, size_t *addrlenp)
 {
-	union DL_primitives	*buf	= NULL;
-	dl_attach_req_t		dlar;
-	size_t			size;
-	Boolean_t		rval	= False;
+	int		retval;
+	dlpi_handle_t	dh;
 
-	size = 0;
-	size = MAX(sizeof (dl_ok_ack_t), size);
-	size = MAX(sizeof (dl_error_ack_t), size);
-
-	if ((buf = malloc(size)) == NULL)
+	if (dlpi_open(ifname, &dh, 0) != DLPI_SUCCESS)
 		return (False);
 
-	dlar.dl_primitive	= DL_ATTACH_REQ;
-	dlar.dl_ppa		= ppa;
+	retval = dlpi_get_physaddr(dh, DL_CURR_PHYS_ADDR, addrp, addrlenp);
 
-	if (strputmsg(fd, (uint8_t *)&dlar, DL_ATTACH_REQ_SIZE, 0) == -1)
-		goto error;
+	dlpi_close(dh);
 
-	if (strgetmsg(fd, (char *)buf, &size, NULL, NULL) == -1)
-		goto error;
-
-	if (size < sizeof (t_uscalar_t))
-		goto error;
-
-	switch (buf->dl_primitive) {
-	case DL_OK_ACK:
-		if (size == DL_OK_ACK_SIZE)
-			rval = True;
-		break;
-	}
-
-error:
-	if (buf != NULL)
-		free(buf);
-
-	return (rval);
-}
-
-static Boolean_t
-grab_address(char *ifname, uchar_t **addr, size_t *lp)
-{
-	char			*dev_name	= NULL,
-				*p;
-	size_t			len;
-	int			ppa,
-				fd		= -1;
-	union DL_primitives	*buf		= NULL;
-	dl_phys_addr_req_t	dlpar;
-	dl_phys_addr_ack_t	*dlpaap;
-	Boolean_t		rval		= False;
-
-	if (strcmp(ifname, LOCAL_LOOPBACK) == 0)
-		return (False);
-
-	bzero(&dlpar, sizeof (dlpar));
-	len = strlen(PATH_PART) + strlen(ifname) + 1;
-	if ((dev_name = (char *)malloc(len)) == NULL) {
-		goto error;
-	}
-	(void) snprintf(dev_name, len, "%s%s", PATH_PART, ifname);
-
-	if ((fd = open(dev_name, O_RDWR)) < 0) {
-		for (p = dev_name; *p; p++) {
-			if (isdigit(*p)) {
-				ppa = atoi(p);
-				*p = '\0';
-				if (((fd = open(dev_name, O_RDWR)) < 0) ||
-				    (ppa_attach(fd, ppa) == False)) {
-					goto error;
-				}
-				break;
-			}
-		}
-		if (fd == -1)
-			goto error;
-	}
-
-	len = 0;
-	len = MAX(sizeof (dl_phys_addr_ack_t) + MAXADDRLEN, len);
-	len = MAX(sizeof (dl_error_ack_t), len);
-
-	if ((buf = calloc(len, 1)) == NULL)
-		goto error;
-	dlpar.dl_primitive = DL_PHYS_ADDR_REQ;
-	dlpar.dl_addr_type = DL_CURR_PHYS_ADDR;
-
-	if (strputmsg(fd, (uint8_t *)&dlpar, DL_PHYS_ADDR_REQ_SIZE, 0) == -1) {
-		goto error;
-	}
-
-	if (strgetmsg(fd, (char *)buf, &len, NULL, NULL) == -1) {
-		goto error;
-	}
-
-	switch (buf->dl_primitive) {
-	case DL_PHYS_ADDR_ACK:
-		if (len < DL_PHYS_ADDR_ACK_SIZE) {
-			goto error;
-		}
-
-		dlpaap = (dl_phys_addr_ack_t *)buf;
-		if (dlpaap->dl_addr_offset != 0) {
-			if (dlpaap->dl_addr_length == 0) {
-				goto error;
-			}
-			*addr = malloc(dlpaap->dl_addr_length);
-			if (*addr == NULL)
-				goto error;
-			bcopy((char *)buf + dlpaap->dl_addr_offset, *addr,
-			    dlpaap->dl_addr_length);
-			*lp = dlpaap->dl_addr_length;
-			rval = True;
-		}
-		break;
-	}
-
-error:
-	if (fd != -1)
-		(void) close(fd);
-	if (dev_name != NULL)
-		free(dev_name);
-	if (buf != NULL)
-		free(buf);
-	return (rval);
+	return (retval == DLPI_SUCCESS);
 }

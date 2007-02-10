@@ -526,17 +526,16 @@ static int
 get_mac_addr(const char *str, int *ierrnop, uint16_t *hwret, int hwtype,
     uchar_t *outbuf)
 {
-	int fd = -1;
 	int maclen;
 	int dig, val;
-	dlpi_if_attr_t dia;
-	dl_info_ack_t dl_info;
+	dlpi_handle_t dh;
+	dlpi_info_t dlinfo;
 	char chr;
 
 	if (*str != '\0') {
 		if (*str++ != ',')
 			goto failed;
-		if ((fd = dlpi_if_open(str, &dia, B_FALSE)) == -1) {
+		if (dlpi_open(str, &dh, 0) != DLPI_SUCCESS) {
 			maclen = 0;
 			dig = val = 0;
 			/*
@@ -564,19 +563,15 @@ get_mac_addr(const char *str, int *ierrnop, uint16_t *hwret, int hwtype,
 				}
 			}
 		} else {
-			if (dlpi_info(fd, -1, &dl_info, NULL, NULL, NULL,
-			    NULL, NULL, NULL) == -1)
+			if (dlpi_info(dh, &dlinfo, 0) != DLPI_SUCCESS) {
+				dlpi_close(dh);
 				goto failed;
-			maclen = dl_info.dl_addr_length -
-			    abs(dl_info.dl_sap_length);
-			if (maclen > MAXADDRLEN)
-				goto failed;
-			if (dlpi_phys_addr(fd, -1, DL_CURR_PHYS_ADDR, outbuf,
-			    NULL) == -1)
-				goto failed;
-			(void) dlpi_close(fd);
+			}
+			maclen = dlinfo.di_physaddrlen;
+			(void) memcpy(outbuf, dlinfo.di_physaddr, maclen);
+			dlpi_close(dh);
 			if (hwtype == -1)
-				hwtype = dlpi_to_arp(dl_info.dl_mac_type);
+				hwtype = dlpi_to_arp(dlinfo.di_mactype);
 		}
 	}
 	if (hwtype == -1)
@@ -585,8 +580,6 @@ get_mac_addr(const char *str, int *ierrnop, uint16_t *hwret, int hwtype,
 	return (maclen);
 
 failed:
-	if (fd != -1)
-		(void) dlpi_close(fd);
 	*ierrnop = ITAB_BAD_NUMBER;
 	return (-1);
 }
@@ -651,8 +644,8 @@ inittab_encode_e(const dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
 	case DSYM_DUID:
 		/* Worst case is ":::::" */
 		n_entries = strlen(value);
-		if (n_entries < MAXADDRLEN)
-			n_entries = MAXADDRLEN;
+		if (n_entries < DLPI_PHYSADDR_MAX)
+			n_entries = DLPI_PHYSADDR_MAX;
 		n_entries += sizeof (duid_llt_t);
 		break;
 

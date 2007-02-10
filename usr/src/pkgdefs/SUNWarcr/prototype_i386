@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -64,6 +64,7 @@ f none lib/amd64/llib-ldevice.ln 644 root bin
 f none lib/amd64/llib-ldevid.ln 644 root bin
 f none lib/amd64/llib-ldevinfo.ln 644 root bin
 f none lib/amd64/llib-ldl.ln 644 root bin
+f none lib/amd64/llib-ldlpi.ln 644 root bin
 f none lib/amd64/llib-ldoor.ln 644 root  bin
 f none lib/amd64/llib-lefi.ln 644 root bin
 f none lib/amd64/llib-lelf.ln 644 root bin

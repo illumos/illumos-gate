@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,7 +52,7 @@ CLEANFILES += $(OBJS)
 all: $(PROG)
 
 LDLIBS	+= -lumem -luuid -lxml2 -lsocket -lnsl -ldoor -lavl -lmd5 -ladm -lefi
-LDLIBS  +=	-liscsitgt -lzfs
+LDLIBS  +=	-liscsitgt -lzfs -ldlpi
 
 $(PROG): $(OBJS) $(COMMON_OBJS)
 	$(LINK.c) $(OBJS) $(COMMON_OBJS) -o $@ $(LDLIBS)

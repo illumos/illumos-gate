@@ -131,9 +131,10 @@ write_stable_duid(const uchar_t *duid, size_t duidlen)
 uchar_t *
 make_stable_duid(const char *physintf, size_t *duidlen)
 {
-	int 	fd, len;
-	dl_info_ack_t dl_info;
-	dlpi_if_attr_t	dia;
+	int len;
+	dlpi_info_t dlinfo;
+	dlpi_handle_t dh = NULL;
+	uint_t arptype;
 	duid_en_t *den;
 
 	/*
@@ -141,35 +142,29 @@ make_stable_duid(const char *physintf, size_t *duidlen)
 	 * provided as a hint.  If that works, we can use a DUID-LLT.
 	 */
 
-	fd = dlpi_if_open(physintf, &dia, B_FALSE);
-	if (fd != -1 &&
-	    dlpi_info(fd, -1, &dl_info, NULL, NULL, NULL, NULL, NULL,
-	    NULL) != -1 &&
-	    (len = dl_info.dl_addr_length - abs(dl_info.dl_sap_length)) > 0) {
+	if (dlpi_open(physintf, &dh, 0) == DLPI_SUCCESS &&
+	    dlpi_info(dh, &dlinfo, 0) == DLPI_SUCCESS &&
+	    (len = dlinfo.di_physaddrlen) > 0 &&
+	    (arptype = dlpi_to_arp(dlinfo.di_mactype) != 0)) {
 		duid_llt_t *dllt;
-		uint_t arptype;
-
-		arptype = dlpi_to_arp(dl_info.dl_mac_type);
+		time_t now;
 
 		if ((dllt = malloc(sizeof (*dllt) + len)) == NULL) {
-			(void) dlpi_close(fd);
+			dlpi_close(dh);
 			return (NULL);
 		}
-		if (arptype != 0 && dlpi_phys_addr(fd, -1, DL_CURR_PHYS_ADDR,
-		    (uint8_t *)(dllt + 1), NULL) == 0) {
-			time_t now;
 
-			dllt->dllt_dutype = htons(DHCPV6_DUID_LLT);
-			dllt->dllt_hwtype = htons(arptype);
-			now = time(NULL) - DUID_TIME_BASE;
-			dllt->dllt_time = htonl(now);
-			*duidlen = sizeof (*dllt) + len;
-			return ((uchar_t *)dllt);
-		}
-		free(dllt);
+		(void) memcpy((dllt + 1), dlinfo.di_physaddr, len);
+		dllt->dllt_dutype = htons(DHCPV6_DUID_LLT);
+		dllt->dllt_hwtype = htons(arptype);
+		now = time(NULL) - DUID_TIME_BASE;
+		dllt->dllt_time = htonl(now);
+		*duidlen = sizeof (*dllt) + len;
+		dlpi_close(dh);
+		return ((uchar_t *)dllt);
 	}
-	if (fd != -1)
-		(void) dlpi_close(fd);
+	if (dh != NULL)
+		dlpi_close(dh);
 
 	/*
 	 * If we weren't able to create a DUID based on the network interface

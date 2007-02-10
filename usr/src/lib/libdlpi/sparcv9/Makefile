@@ -25,39 +25,7 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include $(SRC)/lib/Makefile.lib
+include ../Makefile.com
+include ../../Makefile.lib.64
 
-HDRS =		libdlpi.h
-HDRDIR =	common
-
-SUBDIRS =		$(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
-
-POFILE =	libdlpi.po
-MSGFILES =	common/libdlpi.c
-
-all :=		TARGET = all
-clean :=	TARGET = clean
-clobber :=	TARGET = clobber
-install :=	TARGET = install
-lint :=		TARGET = lint
-
-.KEEP_STATE:
-
-all clean clobber install lint: $(SUBDIRS)
-
-install_h:	$(ROOTHDRS)
-
-check:		$(CHECKHDRS)
-
-$(POFILE):	pofile_MSGFILES
-
-_msg:		$(MSGDOMAINPOFILE)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
-include $(SRC)/Makefile.msg.targ
-include $(SRC)/lib/Makefile.targ
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

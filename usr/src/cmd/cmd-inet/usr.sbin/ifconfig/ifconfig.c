@@ -14,10 +14,7 @@
 #include "strings.h"
 #include "ifconfig.h"
 #include <compat.h>
-
-#include <sys/dlpi.h>
 #include <libdlpi.h>
-
 #include <inet/ip.h>
 
 #define	LOOPBACK_IF	"lo0"
@@ -459,8 +456,7 @@ main(int argc, char *argv[])
 		}
 		if (!all) {
 			(void) fprintf(stderr,
-			    "ifconfig: %s: no such interface\n",
-			    name);
+			    "ifconfig: %s: no such interface\n", name);
 			exit(1);
 		}
 		foreachinterface(ifconfig, argc, argv, af, onflags, offflags,
@@ -3778,21 +3774,33 @@ get_lun(char *rsrc)
  *    the utility must use SIOCSLIFMUXID.
  */
 static void
-plumb_one_device(dlpi_if_attr_t *diap, int ip_fd, int af)
+plumb_one_device(int af)
 {
-	int	arp_fd = -1;
 	int	arp_muxid = -1, ip_muxid;
-	int	mux_fd;
+	int	mux_fd, ip_fd, arp_fd;
+	int 	retval;
+	uint_t	ppa;
 	char	*udp_dev_name;
-	dlpi_if_attr_t	dia;
+	char    provider[DLPI_LINKNAME_MAX];
+	dlpi_handle_t	dh_arp, dh_ip;
 
-	if (debug)
-		(void) printf("plumb_one_device: ifname %s, ppa %d\n",
-		    diap->ifname, diap->ppa);
+	/*
+	 * We use DLPI_NOATTACH because the ip module will do the attach
+	 * itself for DLPI style-2 devices.
+	 */
+	retval = dlpi_open(name, &dh_ip, DLPI_NOATTACH);
+	if (retval != DLPI_SUCCESS)
+		Perrdlpi_exit("cannot open link", name, retval);
 
-	if (diap->style == DL_STYLE2 && dlpi_detach(ip_fd, -1) < 0)
-		Perror0_exit("dlpi_detach");
+	if ((retval = dlpi_parselink(name, provider, &ppa)) != DLPI_SUCCESS)
+		Perrdlpi_exit("dlpi_parselink", name, retval);
 
+	if (debug) {
+		(void) printf("ifconfig: plumb_one_device: provider %s,"
+		    " ppa %u\n", provider, ppa);
+	}
+
+	ip_fd = dlpi_fd(dh_ip);
 	if (ioctl(ip_fd, I_PUSH, IP_MOD_NAME) == -1)
 		Perror2_exit("I_PUSH", IP_MOD_NAME);
 
@@ -3813,7 +3821,6 @@ plumb_one_device(dlpi_if_attr_t *diap, int ip_fd, int af)
 	 * At this point in time the kernel also allows an
 	 * override of the CANTCHANGE flags.
 	 */
-
 	lifr.lifr_name[0] = '\0';
 	if (ioctl(ip_fd, SIOCGLIFFLAGS, (char *)&lifr) == -1)
 		Perror0_exit("plumb_one_device: SIOCGLIFFLAGS");
@@ -3828,7 +3835,7 @@ plumb_one_device(dlpi_if_attr_t *diap, int ip_fd, int af)
 	}
 
 	/* record the device and module names as interface name */
-	lifr.lifr_ppa = diap->ppa;
+	lifr.lifr_ppa = ppa;
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
 
 	/* set the interface name */
@@ -3853,7 +3860,7 @@ plumb_one_device(dlpi_if_attr_t *diap, int ip_fd, int af)
 		Perror0_exit("plumb_one_device: SIOCFLIFFLAGS");
 
 	if (debug) {
-		(void) printf("plumb_one_device: %s got flags: \n",
+		(void) printf("ifconfig: plumb_one_device: %s got flags:\n",
 		    lifr.lifr_name);
 		print_flags(lifr.lifr_flags);
 		(void) putchar('\n');
@@ -3885,9 +3892,8 @@ plumb_one_device(dlpi_if_attr_t *diap, int ip_fd, int af)
 		 * PLINK the interface stream so that ifconfig can exit
 		 * without tearing down the stream.
 		 */
-		if ((ip_muxid = ioctl(mux_fd, I_PLINK, ip_fd)) == -1) {
+		if ((ip_muxid = ioctl(mux_fd, I_PLINK, ip_fd)) == -1)
 			Perror0_exit("I_PLINK for ip");
-		}
 		(void) close(mux_fd);
 		return;
 	}
@@ -3899,15 +3905,18 @@ plumb_one_device(dlpi_if_attr_t *diap, int ip_fd, int af)
 	 * Note: modules specified by the user are pushed
 	 * only on the interface stream, not on the ARP stream.
 	 */
-
 	if (debug)
-		(void) printf("plumb_one_device: ifname: %s\n",
-		    diap->ifname);
-	arp_fd = dlpi_if_open(diap->ifname, &dia, _B_FALSE);
+		(void) printf("ifconfig: plumb_one_device: ifname: %s\n", name);
 
-	if (dia.style == DL_STYLE2 && dlpi_detach(arp_fd, -1) < 0)
-		Perror0_exit("dlpi_detach");
+	/*
+	 * We use DLPI_NOATTACH because the arp module will do the attach
+	 * itself for DLPI style-2 devices.
+	 */
+	retval = dlpi_open(name, &dh_arp, DLPI_NOATTACH);
+	if (retval != DLPI_SUCCESS)
+		Perrdlpi_exit("cannot open link", name, retval);
 
+	arp_fd = dlpi_fd(dh_arp);
 	if (ioctl(arp_fd, I_PUSH, ARP_MOD_NAME) == -1)
 		Perror2_exit("I_PUSH", ARP_MOD_NAME);
 
@@ -3920,7 +3929,8 @@ plumb_one_device(dlpi_if_attr_t *diap, int ip_fd, int af)
 		if (errno != EEXIST)
 			Perror0_exit("SIOCSLIFNAME for arp");
 		Perror0("SIOCSLIFNAME for arp");
-		(void) close(arp_fd);
+		dlpi_close(dh_arp);
+		dlpi_close(dh_ip);
 		(void) close(mux_fd);
 		return;
 	}
@@ -3928,9 +3938,8 @@ plumb_one_device(dlpi_if_attr_t *diap, int ip_fd, int af)
 	 * PLINK the IP and ARP streams so that ifconfig can exit
 	 * without tearing down the stream.
 	 */
-	if ((ip_muxid = ioctl(mux_fd, I_PLINK, ip_fd)) == -1) {
+	if ((ip_muxid = ioctl(mux_fd, I_PLINK, ip_fd)) == -1)
 		Perror0_exit("I_PLINK for ip");
-	}
 	if ((arp_muxid = ioctl(mux_fd, I_PLINK, arp_fd)) == -1) {
 		(void) ioctl(mux_fd, I_PUNLINK, ip_muxid);
 		Perror0_exit("I_PLINK for arp");
@@ -3938,7 +3947,8 @@ plumb_one_device(dlpi_if_attr_t *diap, int ip_fd, int af)
 
 	if (debug)
 		(void) printf("arp muxid = %d\n", arp_muxid);
-	(void) close(arp_fd);
+	dlpi_close(dh_ip);
+	dlpi_close(dh_arp);
 	(void) close(mux_fd);
 }
 
@@ -4061,8 +4071,6 @@ static int
 inetplumb(char *arg, int64_t param)
 {
 	char		*strptr;
-	int		dev_fd;
-	dlpi_if_attr_t	dia;
 	boolean_t	islo;
 	zoneid_t	zoneid;
 
@@ -4123,13 +4131,7 @@ inetplumb(char *arg, int64_t param)
 	if (debug)
 		(void) printf("inetplumb: %s af %d\n", name, afp->af_af);
 
-	if ((dev_fd = dlpi_if_open(name, &dia, _B_FALSE)) < 0) {
-		Perror2_exit("plumb", name);
-		/* NOTREACHED */
-	}
-
-	plumb_one_device(&dia, dev_fd, afp->af_af);
-	(void) close(dev_fd);
+	plumb_one_device(afp->af_af);
 	return (0);
 }
 
@@ -4214,6 +4216,23 @@ Perror2_exit(char *cmd, char *str)
 	Perror2(cmd, str);
 	exit(1);
 	/* NOTREACHED */
+}
+
+void
+Perrdlpi(const char *cmd, const char *linkname, int err)
+{
+	(void) fprintf(stderr, "ifconfig: %s \"%s\": %s\n", cmd,
+	    linkname, dlpi_strerror(err));
+}
+
+/*
+ * Print out error message (Perrdlpi()) and exit
+ */
+void
+Perrdlpi_exit(const char *cmd, const char *linkname, int err)
+{
+	Perrdlpi(cmd, linkname, err);
+	exit(1);
 }
 
 /*
@@ -4515,63 +4534,31 @@ add_ni(char *name)
 static int
 devfs_entry(di_node_t node, di_minor_t minor, void *arg)
 {
-	char *provider;
-	int fd;
-	uint_t ppa;
-	dl_info_ack_t dlia;
-	char ifname[LIFNAMSIZ];
+	char 		*provider;
+	char 		linkname[DLPI_LINKNAME_MAX];
+	dlpi_handle_t	dh;
 
 	provider = di_minor_name(minor);
+	if (debug > 2)
+		(void) fprintf(stderr, "provider = %s\n", provider);
 
-	if (strlen(provider) > LIFNAMSIZ)
+	if (dlpi_makelink(linkname, provider,
+	    di_instance(node)) != DLPI_SUCCESS)
 		return (DI_WALK_CONTINUE);
 
-	if (debug > 2)
-		fprintf(stderr, "provider = %s\n", provider);
-
-	if ((fd = dlpi_open(provider)) < 0)
+	if (dlpi_open(linkname, &dh, 0) != DLPI_SUCCESS)
 		return (DI_WALK_CONTINUE);
 
-	if (debug > 2)
-		fprintf(stderr, "getting DL_INFO_ACK\n");
-
-	if (dlpi_info(fd, -1, &dlia, NULL, NULL, NULL, NULL, NULL, NULL) < 0)
-		goto done;
-
-	if (dlia.dl_provider_style == DL_STYLE1) {
+	if (di_minor_type(minor) == DDM_ALIAS) {
 		if (debug > 2)
-			fprintf(stderr, "provider is DL_STYLE1\n");
-		add_ni(provider);
-		goto done;
+			(void) fprintf(stderr, "alias node, using instance\n");
+		add_ni(linkname);
+	} else {
+		if (debug > 2)
+			(void) fprintf(stderr, "non-alias node, ignoring\n");
 	}
 
-	if (debug > 2)
-		fprintf(stderr, "provider is DL_STYLE2\n");
-
-	if (di_minor_type(minor) != DDM_ALIAS) {
-		if (debug > 2)
-			(void) fprintf(stderr,
-			    "non-alias node, ignoring\n");
-		goto done;
-	}
-
-	if (debug > 2)
-		(void) fprintf(stderr,
-		    "alias node, using instance\n");
-	ppa = di_instance(node);
-
-	if (dlpi_attach(fd, -1, ppa) < 0) {
-		if (debug > 2)
-			(void) fprintf(stderr,
-			    "non-existent PPA, ignoring\n");
-		goto done;
-	}
-
-	(void) snprintf(ifname, LIFNAMSIZ, "%s%d", provider, ppa);
-	add_ni(ifname);
-
-done:
-	(void) dlpi_close(fd);
+	dlpi_close(dh);
 	return (DI_WALK_CONTINUE);
 }
 

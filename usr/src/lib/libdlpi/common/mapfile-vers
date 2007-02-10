@@ -19,31 +19,38 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUNWprivate_1.1 {
+SUNW_1.1 {	# first release of libdlpi, Solaris 11 
     global:
-	dlpi_attach;
-	dlpi_bind;
-	dlpi_close;
-	dlpi_detach;
-	dlpi_disabmulti;
-	dlpi_enabmulti;
-	dlpi_if_open;
-	dlpi_if_parse;
-	dlpi_info;
-	dlpi_mac_type;
-	dlpi_open;
-	dlpi_passive;
-	dlpi_phys_addr;
-	dlpi_promiscoff;
-	dlpi_promiscon;
-	dlpi_set_phys_addr;
-	dlpi_unbind;
+        dlpi_bind;
+        dlpi_close;
+        dlpi_disabmulti;
+        dlpi_enabmulti;
+        dlpi_fd;
+        dlpi_get_physaddr;
+        dlpi_info;
+        dlpi_linkname;
+        dlpi_mactype;
+        dlpi_open;
+        dlpi_promiscoff;
+        dlpi_promiscon;
+        dlpi_recv;
+        dlpi_send;
+        dlpi_set_physaddr;
+        dlpi_set_timeout;
+        dlpi_strerror;
+        dlpi_unbind;
+};
+SUNWprivate {
+    global:
+        dlpi_parselink;
+	dlpi_makelink;
+	dlpi_style;
     local:
 	*;
 };

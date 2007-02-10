@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ *  You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +53,6 @@ static void first_packet();
 static void many_packets();
 static void printhex(char *cp, int len);
 
-static char *portname = NULL;
 static unsigned int speed = 9600;
 static int reccount = 100;
 static int reclen = 100;
@@ -94,17 +92,20 @@ static char *rxnames[] = {
 };
 
 #define	MAXPACKET	4096
-#define	MAXWAIT		15
 
 int
 main(int argc, char **argv)
 {
-	char cnambuf[MAXPATHLEN], dnambuf[MAXPATHLEN], *cp, *cpp;
+	char *portname;
+	char dnambuf[MAXPATHLEN], *cp;
+	char device[DLPI_LINKNAME_MAX];
 	struct scc_mode sm;
 	struct strioctl sioc;
-	ulong_t ppa;
+	uint_t ppa;
 	char *devstr = "/dev/";
 	int devstrlen;
+	int retval;
+	dlpi_handle_t dh;
 
 	argc--;
 	argv++;
@@ -171,37 +172,40 @@ main(int argc, char **argv)
 		perror(dnambuf);
 		exit(1);
 	}
-	for (cp = portname; (*cp) && (!isdigit(*cp)); cp++) {}
-	ppa = strtoul(cp, &cpp, 10);
-	if (cpp == cp) {
+
+	cp = portname;
+	while (*cp)			/* find the end of the name */
+		cp++;
+	cp--;
+	if (!isdigit(*cp)) {
 		(void) fprintf(stderr,
-			"syncloop: %s missing minor device number\n", portname);
-		exit(1);
-	}
-	*cp = '\0';	/* drop number, leaving name of clone device. */
-	/* the following won't fail since cnambuf and dnambuf are same size */
-	if (strncmp(devstr, portname, devstrlen) != 0) {
-		(void) snprintf(cnambuf, sizeof (cnambuf), "%s%s", devstr,
-		    portname);
-	}
-	cfd = open(cnambuf, O_RDWR);
-	if (cfd < 0) {
-		(void) fprintf(stderr, "syncloop: cannot open %s\n", cnambuf);
-		perror(cnambuf);
+		    "syncloop: %s missing minor device number\n", portname);
 		exit(1);
 	}
 
-	if (dlpi_attach(cfd, MAXWAIT, ppa) != 0) {
-		perror("syncloop: dlpi_attach");
+	if (strlen(portname) >= DLPI_LINKNAME_MAX) {
+		(void) fprintf(stderr,
+		    "syncloop: invalid device name (too long) %s\n",
+		    portname);
 		exit(1);
 	}
+
+	if ((retval = dlpi_open(portname, &dh, DLPI_SERIAL)) != DLPI_SUCCESS) {
+		(void) fprintf(stderr, "syncloop: dlpi_open %s: %s\n", portname,
+		    dlpi_strerror(retval));
+		exit(1);
+	}
+
+	(void) dlpi_parselink(portname, device, &ppa);
 
 	if (reclen < 0 || reclen > MAXPACKET) {
 		(void) printf("invalid packet length: %d\n", reclen);
 		exit(1);
 	}
-	(void) printf("[ Data device: %s | Control device: %s, ppa=%ld ]\n",
-		dnambuf, cnambuf, ppa);
+	(void) printf("[ Data device: %s | Control device: %s, ppa=%u ]\n",
+		dnambuf, device, ppa);
+
+	cfd = dlpi_fd(dh);
 
 	sioc.ic_cmd = S_IOCGETMODE;
 	sioc.ic_timout = -1;
@@ -209,8 +213,8 @@ main(int argc, char **argv)
 	sioc.ic_dp = (char *)&sm;
 	if (ioctl(cfd, I_STR, &sioc) < 0) {
 		perror("S_IOCGETMODE");
-		(void) fprintf(stderr,
-			"syncloop: can't get sync mode info for %s\n", cnambuf);
+		(void) fprintf(stderr, "syncloop: can't get sync mode info "
+		    "for %s\n", portname);
 		exit(1);
 	}
 	while (looptype < 1 || looptype > 4) {
@@ -273,7 +277,7 @@ main(int argc, char **argv)
 	if (ioctl(cfd, I_STR, &sioc) < 0) {
 		perror("S_IOCSETMODE");
 		(void) fprintf(stderr,
-			"syncloop: can't set sync mode info for %s\n", cnambuf);
+		    "syncloop: can't set sync mode info for %s\n", portname);
 		exit(1);
 	}
 
@@ -285,8 +289,8 @@ no_params:
 	sioc.ic_dp = (char *)&sm;
 	if (ioctl(cfd, I_STR, &sioc) < 0) {
 		perror("S_IOCGETMODE");
-		(void) fprintf(stderr,
-			"syncloop: can't get sync mode info for %s\n", cnambuf);
+		(void) fprintf(stderr, "syncloop: can't get sync mode info "
+			"for %s\n", portname);
 		exit(1);
 	}
 	(void) printf("speed=%d, loopback=%s, nrzi=%s, txc=%s, rxc=%s\n",

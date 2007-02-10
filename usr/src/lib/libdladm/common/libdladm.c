@@ -129,37 +129,17 @@ i_dladm_nt_net_add(void *arg, char *name)
 static int
 i_dladm_nt_net_walk(di_node_t node, di_minor_t minor, void *arg)
 {
-	dl_info_ack_t	dlia;
-	char		name[IFNAMSIZ];
-	int		fd;
-	char		*provider;
-	uint_t		ppa;
+	char		linkname[DLPI_LINKNAME_MAX];
+	dlpi_handle_t	dh;
 
-	provider = di_minor_name(minor);
-
-	if ((fd = dlpi_open(provider)) < 0)
+	if (dlpi_makelink(linkname, di_minor_name(minor),
+	    di_instance(node)) != DLPI_SUCCESS)
 		return (DI_WALK_CONTINUE);
 
-	if (dlpi_info(fd, -1, &dlia, NULL, NULL, NULL, NULL, NULL, NULL) < 0) {
-		(void) dlpi_close(fd);
-		return (DI_WALK_CONTINUE);
+	if (dlpi_open(linkname, &dh, 0) == DLPI_SUCCESS) {
+		i_dladm_nt_net_add(arg, linkname);
+		dlpi_close(dh);
 	}
-
-	if (dlia.dl_provider_style == DL_STYLE1) {
-		i_dladm_nt_net_add(arg, provider);
-		(void) dlpi_close(fd);
-		return (DI_WALK_CONTINUE);
-	}
-
-	ppa = di_instance(node);
-
-	if (dlpi_attach(fd, -1, ppa) < 0) {
-		(void) dlpi_close(fd);
-		return (DI_WALK_CONTINUE);
-	}
-	(void) snprintf(name, IFNAMSIZ - 1, "%s%d", provider, ppa);
-	i_dladm_nt_net_add(arg, name);
-	(void) dlpi_close(fd);
 	return (DI_WALK_CONTINUE);
 }
 

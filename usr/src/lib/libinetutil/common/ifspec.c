@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -85,7 +84,7 @@ getppa(const char *bp, int bpsize, uint_t *ppa)
 	char	*ep = (char *)&bp[bpsize - 1];
 	char	*tp;
 
-	if (isdigit(*bp) || !isdigit(*ep)) {
+	if (!isdigit(*ep)) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -104,8 +103,8 @@ getppa(const char *bp, int bpsize, uint_t *ppa)
 
 /*
  * Given an ifconfig-style inet relative-path interface specification
- * (e.g: hme0.foo.ip.udp:2), validate its form and decompose the contents
- * into a dynamically allocated ifspec_t.
+ * (e.g: hme.[module].[module][PPA]:2), validate its form and decompose the
+ * contents into a dynamically allocated ifspec_t.
  *
  * Returns ifspec_t for success, NULL pointer if spec is malformed.
  */
@@ -131,9 +130,10 @@ ifparse_ifspec(const char *ifname, ifspec_t *ifsp)
 
 	/*
 	 * An interface name must have the format of:
-	 * dev[ppa][.module[.module...][ppa]][:lun]
+	 * dev[.module[.module...]][ppa][:lun]
 	 *
-	 * where only one ppa may be specified e.g. ip0.foo.tun or ip.foo.tun0
+	 * where the ppa must be specified at the end of the interface name.
+	 * e.g. ip.foo.tun0
 	 *
 	 * lun - logical unit number.
 	 *
@@ -180,27 +180,25 @@ ifparse_ifspec(const char *ifname, ifspec_t *ifsp)
 
 	(void) strlcpy(ifsp->ifsp_devnm, ifnamecp, LIFNAMSIZ);
 
-	/* Find ppa - has to be part of devname or part of last module name */
-	/* This should be changed to require the latter of the two */
-	if (getppa(ifsp->ifsp_devnm, strlen(ifsp->ifsp_devnm),
-	    &ifsp->ifsp_ppa) == 0)
-		have_ppa = B_TRUE;
+	/*
+	 * Find ppa - has to be part of devname or if modules exist part of
+	 * last module name.
+	 */
 	if (ifsp->ifsp_modcnt != 0 &&
 	    getppa(ifsp->ifsp_mods[ifsp->ifsp_modcnt - 1],
 	    strlen(ifsp->ifsp_mods[ifsp->ifsp_modcnt - 1]),
 	    &ifsp->ifsp_ppa) == 0) {
-		if (!have_ppa)
-			have_ppa = B_TRUE;
-		else
-			return (B_FALSE); /* only one please */
+		have_ppa = B_TRUE;
+	} else if (ifsp->ifsp_modcnt == 0 &&
+	    getppa(ifsp->ifsp_devnm, strlen(ifsp->ifsp_devnm),
+	    &ifsp->ifsp_ppa) == 0) {
+		have_ppa = B_TRUE;
+
+		/* strip the ppa off of the device name if present */
+		for (tp = &ifsp->ifsp_devnm[strlen(ifsp->ifsp_devnm) - 1];
+		    tp >= ifsp->ifsp_devnm && isdigit(*tp); tp--)
+			*tp = '\0';
 	}
-	if (!have_ppa)
-		return (B_FALSE);
 
-	/* strip the ppa off of the device name if present */
-	for (tp = &ifsp->ifsp_devnm[strlen(ifsp->ifsp_devnm) - 1];
-	    tp >= ifsp->ifsp_devnm && isdigit(*tp); tp--)
-		*tp = '\0';
-
-	return (B_TRUE);
+	return (have_ppa);
 }

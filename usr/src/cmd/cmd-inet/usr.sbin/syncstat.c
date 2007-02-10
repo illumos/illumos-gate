@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,33 +42,28 @@
 #include <sys/ser_sync.h>
 #include <libdlpi.h>
 
-#define	MAXWAIT 15
-
 static struct scc_mode sm;
 static struct sl_stats st;
 
 static void usage(void);
 static void sample(int count, int period);
 
-/*
- * errstr is MAXPATHLEN + 11; 11 = 10 for "syncstat: " + null
- */
-static char errstr[11 + MAXPATHLEN] = "syncstat: /dev/";
-static char *ifdevice = errstr + 10;
-static char *ifname = errstr + 15;
+static char sername[DLPI_LINKNAME_MAX];
 static int fd;
 
 int
 main(int argc, char **argv)
 {
-	int len;
 	char *cp;
+	char serdevice[DLPI_LINKNAME_MAX];
 	int do_clear = 0;
 	int period = 0;
 	int isize, osize;
 	int count;
+	int retval;
 	struct strioctl sioc;
-	ulong_t ppa;
+	uint_t ppa;
+	dlpi_handle_t dh;
 
 	if (argc == 1) {
 		usage();
@@ -102,15 +96,14 @@ main(int argc, char **argv)
 			period = atoi(*argv);
 			if (period == 0) {
 				(void) fprintf(stderr,
-					"syncstat: bad interval: %s\n", *argv);
+				    "syncstat: bad interval: %s\n", *argv);
 				exit(1);
 			}
 		} else {
-			len = sizeof (errstr) - strlen(errstr);
-			if (snprintf(ifname, len, "%s", *argv) >= len) {
-				(void) fprintf(stderr,
-				    "syncstat: invalid device name "
-				    "(too long) %s\n", *argv);
+			if (snprintf(sername, sizeof (sername), "%s",
+			    *argv) >= sizeof (sername)) {
+				(void) fprintf(stderr, "syncstat: invalid "
+				    "device name (too long) %s\n", *argv);
 				    exit(1);
 			}
 		}
@@ -118,27 +111,23 @@ main(int argc, char **argv)
 		argv++;
 	}
 
-	for (cp = ifname; (*cp) && (!isdigit(*cp)); cp++) {}
+	for (cp = sername; (*cp) && (!isdigit(*cp)); cp++) {}
 	if (*cp == '\0') {	/* hit the end without finding a number */
 		(void) fprintf(stderr,
-			"syncstat: %s missing minor device number\n", ifname);
-		exit(1);
-	}
-	ppa = strtoul(cp, NULL, 10);
-	*cp = '\0';	/* drop number, leaving name of clone device. */
-	fd = open(ifdevice, O_RDWR);
-	if (fd < 0) {
-		perror(errstr);
+		    "syncstat: %s missing minor device number\n", sername);
 		exit(1);
 	}
 
-	if (dlpi_attach(fd, MAXWAIT, ppa) != 0) {
-		perror("syncstat: dlpi_attach");
+	if ((retval = dlpi_open(sername, &dh, DLPI_SERIAL)) != DLPI_SUCCESS) {
+		(void) fprintf(stderr, "syncstat: dlpi_open %s: %s\n", sername,
+		    dlpi_strerror(retval));
 		exit(1);
 	}
 
-	(void) printf("syncstat: control device: %s, ppa=%ld\n", ifdevice, ppa);
+	(void) dlpi_parselink(sername, serdevice, &ppa);
+	(void) printf("syncstat: control device: %s, ppa=%u\n", serdevice, ppa);
 
+	fd = dlpi_fd(dh);
 	sioc.ic_cmd = S_IOCGETMODE;
 	sioc.ic_timout = -1;
 	sioc.ic_len = sizeof (struct scc_mode);
@@ -146,8 +135,7 @@ main(int argc, char **argv)
 	if (ioctl(fd, I_STR, &sioc) < 0) {
 		perror("S_IOCGETMODE");
 		(void) fprintf(stderr,
-			"syncstat: can't get sync mode info for %s\n",
-			ifname);
+		    "syncstat: can't get sync mode info for %s\n", sername);
 		exit(1);
 	}
 	if (do_clear) {
@@ -158,8 +146,7 @@ main(int argc, char **argv)
 		if (ioctl(fd, I_STR, &sioc) < 0) {
 			perror("S_IOCCLRSTATS");
 			(void) fprintf(stderr,
-				"syncstat: can't clear stats for %s\n",
-				ifname);
+			    "syncstat: can't clear stats for %s\n", sername);
 			exit(1);
 		}
 	}
@@ -171,7 +158,7 @@ main(int argc, char **argv)
 	if (ioctl(fd, I_STR, &sioc) < 0) {
 		perror("S_IOCGETSTATS");
 		(void) fprintf(stderr, "syncstat: can't get stats for %s\n",
-			ifname);
+		    sername);
 		exit(1);
 	}
 	if (period) {
@@ -190,17 +177,11 @@ main(int argc, char **argv)
 		osize = st.ochar / st.opack;
 	if (st.ipack)
 		isize = st.ichar / st.ipack;
-	(void) printf(
-"    speed   ipkts   opkts  undrun  ovrrun   abort     crc   isize   osize\n");
-	(void) printf(" %7d %7d %7d %7d %7d %7d %7d %7d %7d\n",
-		sm.sm_baudrate,
-		st.ipack,
-		st.opack,
-		st.underrun,
-		st.overrun,
-		st.abort,
-		st.crc,
-		isize, osize);
+	(void) printf("    speed   ipkts   opkts  undrun  ovrrun   abort     "
+	    "crc   isize   osize\n");
+	(void) printf(" %7d %7d %7d %7d %7d %7d %7d %7d %7d\n", sm.sm_baudrate,
+	    st.ipack, st.opack, st.underrun, st.overrun, st.abort, st.crc,
+	    isize, osize);
 	return (0);
 }
 
@@ -218,7 +199,7 @@ sample(int count, int period)
 	if (ioctl(fd, I_STR, &sioc) < 0) {
 		perror("S_IOCGETSTATS");
 		(void) fprintf(stderr, "syncstat: can't get stats for %s\n",
-			ifname);
+		    sername);
 		exit(1);
 	}
 
@@ -234,16 +215,11 @@ sample(int count, int period)
 	iutil = 100 * iutil / sm.sm_baudrate;
 	outil = 8 * st.ochar / period;
 	outil = 100 * outil / sm.sm_baudrate;
-	if ((count % 20) == 0) (void) printf(
-"    ipkts   opkts  undrun  ovrrun   abort     crc   iutil   outil\n");
-	(void) printf(" %7d %7d %7d %7d %7d %7d %6d%% %6d%%\n",
-		st.ipack,
-		st.opack,
-		st.underrun,
-		st.overrun,
-		st.abort,
-		st.crc,
-		iutil, outil);
+	if ((count % 20) == 0)
+		(void) printf("    ipkts   opkts  undrun  ovrrun   abort     "
+		    "crc   iutil   outil\n");
+	(void) printf(" %7d %7d %7d %7d %7d %7d %6d%% %6d%%\n", st.ipack,
+	    st.opack, st.underrun, st.overrun, st.abort, st.crc, iutil, outil);
 
 	st = nst;
 }
@@ -251,6 +227,5 @@ sample(int count, int period)
 static void
 usage()
 {
-	(void) fprintf(stderr, "%s\n",
-		"Usage: syncstat [-c] device [period]");
+	(void) fprintf(stderr, "Usage: syncstat [-c] device [period]\n");
 }
