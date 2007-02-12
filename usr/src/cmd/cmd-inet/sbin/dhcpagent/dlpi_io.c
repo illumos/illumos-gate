@@ -49,8 +49,8 @@
 #include "v4_sum_impl.h"
 
 /*
- * dlpi_open(): opens a DLPI stream to the given interface and returns
- *		information purpose about that interface.
+ * dhcp_dlpi_open(): opens a DLPI stream to the given interface and returns
+ *		     information purpose about that interface.
  *
  *   input: const char *: the name of the interface to open
  *	    dl_info_ack_t *: a place to store information about the interface
@@ -60,7 +60,7 @@
  */
 
 int
-dlpi_open(const char *if_name, dl_info_ack_t *dlia, size_t dlia_size,
+dhcp_dlpi_open(const char *if_name, dl_info_ack_t *dlia, size_t dlia_size,
     t_uscalar_t dl_sap)
 {
 	char		device_name[sizeof ("/dev/") + IFNAMSIZ];
@@ -69,13 +69,13 @@ dlpi_open(const char *if_name, dl_info_ack_t *dlia, size_t dlia_size,
 	int		is_style2 = 0;
 
 	if (!ifparse_ifspec(if_name, &ifsp)) {
-		dhcpmsg(MSG_ERROR, "dlpi_open: invalid interface name");
+		dhcpmsg(MSG_ERROR, "dhcp_dlpi_open: invalid interface name");
 		return (-1);
 	}
 
 	if (ifsp.ifsp_modcnt != 0) {
-		dhcpmsg(MSG_ERROR, "dlpi_open: modules cannot be specified "
-		    "with an interface name");
+		dhcpmsg(MSG_ERROR, "dhcp_dlpi_open: modules cannot be "
+		    "specified with an interface name");
 		return (-1);
 	}
 
@@ -83,7 +83,7 @@ dlpi_open(const char *if_name, dl_info_ack_t *dlia, size_t dlia_size,
 	(void) snprintf(device_name, sizeof (device_name),
 	    "/dev/%s%d", ifsp.ifsp_devnm, ifsp.ifsp_ppa);
 	if ((fd = open(device_name, O_RDWR)) == -1) {
-		dhcpmsg(MSG_DEBUG, "dlpi_open: open on `%s'", device_name);
+		dhcpmsg(MSG_DEBUG, "dhcp_dlpi_open: open on `%s'", device_name);
 
 		/* try style 2 interface */
 		(void) snprintf(device_name, sizeof (device_name),
@@ -112,7 +112,7 @@ dlpi_open(const char *if_name, dl_info_ack_t *dlia, size_t dlia_size,
 		}
 
 		if (fd == -1) {
-			dhcpmsg(MSG_ERR, "dlpi_open: open on `%s'",
+			dhcpmsg(MSG_ERR, "dhcp_dlpi_open: open on `%s'",
 			    device_name);
 			return (-1);
 		}
@@ -127,28 +127,29 @@ dlpi_open(const char *if_name, dl_info_ack_t *dlia, size_t dlia_size,
 	 */
 
 	if (dlinforeq(fd, dlia, dlia_size) != 0) {
-		dhcpmsg(MSG_ERR, "dlpi_open: DL_INFO_REQ on %s", device_name);
+		dhcpmsg(MSG_ERR, "dhcp_dlpi_open: DL_INFO_REQ on %s (1)",
+		    device_name);
 		(void) close(fd);
 		return (-1);
 	}
 
 	if (dlia->dl_version != DL_VERSION_2) {
-		dhcpmsg(MSG_ERROR, "dlpi_open: %s is DLPI version %ld, not 2",
-		    device_name, dlia->dl_version);
+		dhcpmsg(MSG_ERROR, "dhcp_dlpi_open: %s is DLPI version %ld, "
+		    "not 2", device_name, dlia->dl_version);
 		(void) close(fd);
 		return (-1);
 	}
 
 	if (is_style2 && dlia->dl_provider_style != DL_STYLE2) {
 		dhcpmsg(MSG_ERROR,
-		    "dlpi_open: %s is DL_STYLE %lx, not DL_STYLE2",
+		    "dhcp_dlpi_open: %s is DL_STYLE %lx, not DL_STYLE2",
 		    device_name, dlia->dl_provider_style);
 		(void) close(fd);
 		return (-1);
 	}
 
 	if ((dlia->dl_service_mode & DL_CLDLS) == 0) {
-		dhcpmsg(MSG_ERROR, "dlpi_open: %s is %#lx, not DL_CLDLS, "
+		dhcpmsg(MSG_ERROR, "dhcp_dlpi_open: %s is %#lx, not DL_CLDLS, "
 		    "which is not supported", device_name,
 		    dlia->dl_service_mode);
 		(void) close(fd);
@@ -156,13 +157,15 @@ dlpi_open(const char *if_name, dl_info_ack_t *dlia, size_t dlia_size,
 	}
 
 	if (is_style2 && dlattachreq(fd, ifsp.ifsp_ppa) == -1) {
-		dhcpmsg(MSG_ERR, "dlpi_open: DL_ATTACH_REQ on %s", device_name);
+		dhcpmsg(MSG_ERR, "dhcp_dlpi_open: DL_ATTACH_REQ on %s",
+		    device_name);
 		(void) close(fd);
 		return (-1);
 	}
 
 	if (dlbindreq(fd, dl_sap, 0, DL_CLDLS, 0) == -1) {
-		dhcpmsg(MSG_ERR, "dlpi_open: DL_BIND_REQ on %s", device_name);
+		dhcpmsg(MSG_ERR, "dhcp_dlpi_open: DL_BIND_REQ on %s",
+		    device_name);
 		(void) close(fd);
 		return (-1);
 	}
@@ -175,13 +178,14 @@ dlpi_open(const char *if_name, dl_info_ack_t *dlia, size_t dlia_size,
 	 */
 
 	if (dlinforeq(fd, dlia, dlia_size) != 0) {
-		dhcpmsg(MSG_ERR, "dlpi_open: DL_INFO_REQ on %s", device_name);
+		dhcpmsg(MSG_ERR, "dhcp_dlpi_open: DL_INFO_REQ on %s (2)",
+		    device_name);
 		(void) close(fd);
 		return (-1);
 	}
 
 	if (ioctl(fd, I_PUSH, "pfmod") == -1) {
-		dhcpmsg(MSG_ERR, "dlpi_open: cannot push pfmod on stream");
+		dhcpmsg(MSG_ERR, "dhcp_dlpi_open: cannot push pfmod on stream");
 		(void) close(fd);
 		return (-1);
 	}
@@ -191,14 +195,14 @@ dlpi_open(const char *if_name, dl_info_ack_t *dlia, size_t dlia_size,
 }
 
 /*
- * dlpi_close(): closes a previously opened DLPI stream
+ * dhcp_dlpi_close(): closes a previously opened DLPI stream
  *
  *   input: int: the file descriptor of the DLPI stream
  *  output: int: 0 on success, -1 on failure
  */
 
 int
-dlpi_close(int fd)
+dhcp_dlpi_close(int fd)
 {
 	/* don't bother dismantling.  it will happen automatically */
 	return (close(fd));

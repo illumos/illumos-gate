@@ -63,8 +63,9 @@ typedef ushort_t *filter_func_t(ushort_t *, void *);
 filter_func_t	dhcp_filter;
 uchar_t		*build_broadcast_dest(dl_info_ack_t *, uchar_t *);
 void		set_packet_filter(int, filter_func_t *, void *, const char *);
-int		dlpi_open(const char *, dl_info_ack_t *, size_t, t_uscalar_t);
-int		dlpi_close(int);
+int		dhcp_dlpi_open(const char *, dl_info_ack_t *, size_t,
+		    t_uscalar_t);
+int		dhcp_dlpi_close(int);
 ssize_t		dlpi_recvfrom(int, void *, size_t, struct sockaddr_in *,
 		    struct sockaddr_in *);
 ssize_t		dlpi_recv_link(int, void *, size_t, uint32_t);

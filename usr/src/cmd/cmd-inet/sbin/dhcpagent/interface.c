@@ -117,7 +117,7 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 		 */
 
 		/* step 1 */
-		pif->pif_dlpi_fd = dlpi_open(pname, dlia, sizeof (buf),
+		pif->pif_dlpi_fd = dhcp_dlpi_open(pname, dlia, sizeof (buf),
 		    ETHERTYPE_IP);
 		if (pif->pif_dlpi_fd == -1) {
 			*error = DHCP_IPC_E_INVIF;
@@ -347,15 +347,15 @@ open_dlpi_pif(dhcp_pif_t *pif)
 		uint32_t		buf[DLPI_BUF_MAX / sizeof (uint32_t)];
 		dl_info_ack_t		*dlia = (dl_info_ack_t *)buf;
 
-		pif->pif_dlpi_fd = dlpi_open(pif->pif_name, dlia, sizeof (buf),
-		    ETHERTYPE_IP);
+		pif->pif_dlpi_fd = dhcp_dlpi_open(pif->pif_name, dlia,
+		    sizeof (buf), ETHERTYPE_IP);
 		if (pif->pif_dlpi_fd == -1)
 			return (B_FALSE);
 		set_packet_filter(pif->pif_dlpi_fd, dhcp_filter, NULL, "DHCP");
 		pif->pif_dlpi_id = iu_register_event(eh, pif->pif_dlpi_fd,
 		    POLLIN, dhcp_collect_dlpi, pif);
 		if (pif->pif_dlpi_id == -1) {
-			(void) dlpi_close(pif->pif_dlpi_fd);
+			(void) dhcp_dlpi_close(pif->pif_dlpi_fd);
 			pif->pif_dlpi_fd = -1;
 			return (B_FALSE);
 		}
@@ -385,7 +385,7 @@ close_dlpi_pif(dhcp_pif_t *pif)
 		pif->pif_dlpi_id = -1;
 	}
 	if (pif->pif_dlpi_fd != -1) {
-		(void) dlpi_close(pif->pif_dlpi_fd);
+		(void) dhcp_dlpi_close(pif->pif_dlpi_fd);
 		pif->pif_dlpi_fd = -1;
 	}
 }
