@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3189,18 +3189,17 @@ doit(int f, struct sockaddr_storage *who)
 		 * login will have to authenticate further.
 		 */
 		(void) execl(LOGIN_PROGRAM, "login",
-			    "-p",
-			    "-d", slavename,
-			    "-h", host,
-			    "-s", pam_svc_name,
-			    (AuthenticatingUser != NULL ? AuthenticatingUser :
-			    getenv("USER")),
-			    0);
+		    "-p",
+		    "-d", slavename,
+		    "-h", host,
+		    "-s", pam_svc_name, "--",
+		    (AuthenticatingUser != NULL ? AuthenticatingUser :
+			getenv("USER")), 0);
 
 	} else /* default, no auth. info available, login does it all */ {
 		(void) execl(LOGIN_PROGRAM, "login",
-			    "-p", "-h", host, "-d", slavename,
-			    getenv("USER"), 0);
+		    "-p", "-h", host, "-d", slavename, "--",
+		    getenv("USER"), 0);
 	}
 
 	fatalperror(netfd, LOGIN_PROGRAM, errno);
