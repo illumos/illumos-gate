@@ -585,6 +585,7 @@ dmu_objset_snapshot_one(char *name, void *arg)
 {
 	struct snaparg *sn = arg;
 	objset_t *os;
+	dmu_objset_stats_t stat;
 	int err;
 
 	(void) strcpy(sn->failed, name);
@@ -592,6 +593,15 @@ dmu_objset_snapshot_one(char *name, void *arg)
 	err = dmu_objset_open(name, DMU_OST_ANY, DS_MODE_STANDARD, &os);
 	if (err != 0)
 		return (err);
+
+	/*
+	 * If the objset is in an inconsistent state, return busy.
+	 */
+	dmu_objset_fast_stat(os, &stat);
+	if (stat.dds_inconsistent) {
+		dmu_objset_close(os);
+		return (EBUSY);
+	}
 
 	/*
 	 * NB: we need to wait for all in-flight changes to get to disk,
@@ -602,7 +612,10 @@ dmu_objset_snapshot_one(char *name, void *arg)
 	if (err == 0) {
 		dsl_sync_task_create(sn->dstg, dsl_dataset_snapshot_check,
 		    dsl_dataset_snapshot_sync, os, sn->snapname, 3);
+	} else {
+		dmu_objset_close(os);
 	}
+
 	return (err);
 }
 
