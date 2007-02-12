@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,10 +66,6 @@ uint_t usba_ugen_force_binding;
  */
 #define	USBA_MAX_COMPAT_NAMES		15
 #define	USBA_MAX_COMPAT_NAME_LEN	64
-static char	usba_name[USBA_MAX_COMPAT_NAMES][USBA_MAX_COMPAT_NAME_LEN];
-static char	*usba_compatible[USBA_MAX_COMPAT_NAMES];
-
-_NOTE(MUTEX_PROTECTS_DATA(usba_mutex, usba_name usba_compatible))
 
 /* double linked list for usba_devices */
 usba_list_entry_t	usba_device_list;
@@ -100,7 +96,7 @@ extern usb_log_handle_t	hubdi_log_handle;
 int
 _init(void)
 {
-	int i, rval;
+	int rval;
 
 	/*
 	 * usbai providing log support needs to be init'ed first
@@ -120,10 +116,6 @@ _init(void)
 		usba_usbai_register_destroy();
 		usba_usba_destroy();
 		usba_usbai_destroy();
-	}
-
-	for (i = 0; i < USBA_MAX_COMPAT_NAMES; i++) {
-		usba_compatible[i] = usba_name[i];
 	}
 
 	return (rval);
@@ -1709,6 +1701,8 @@ usba_ready_device_node(dev_info_t *child_dip)
 	int		is_hub;
 	char		*devprop_str;
 	char		*force_bind = NULL;
+	char		*usba_name_buf = NULL;
+	char		*usba_name[USBA_MAX_COMPAT_NAMES];
 
 	usb_config = usb_get_raw_cfg_data(child_dip, &usb_config_length);
 
@@ -1815,7 +1809,13 @@ usba_ready_device_node(dev_info_t *child_dip)
 	 */
 	ASSERT(usba_find_existing_node(child_dip) == NULL);
 #endif
-	mutex_enter(&usba_mutex);
+
+	usba_name_buf = kmem_zalloc(USBA_MAX_COMPAT_NAMES *
+	    USBA_MAX_COMPAT_NAME_LEN, KM_SLEEP);
+
+	for (i = 0; i < USBA_MAX_COMPAT_NAMES; i++) {
+		usba_name[i] = usba_name_buf + (i * USBA_MAX_COMPAT_NAME_LEN);
+	}
 
 	if (force_bind) {
 		(void) ndi_devi_set_nodename(child_dip, force_bind, 0);
@@ -2015,23 +2015,22 @@ usba_ready_device_node(dev_info_t *child_dip)
 
 	for (i = 0; i < n; i += 2) {
 		USB_DPRINTF_L3(DPRINT_MASK_USBA, usba_log_handle,
-		    "compatible name:\t%s\t%s", usba_compatible[i],
-		    (((i+1) < n)? usba_compatible[i+1] : ""));
+		    "compatible name:\t%s\t%s", usba_name[i],
+		    (((i+1) < n)? usba_name[i+1] : ""));
 	}
-	mutex_exit(&usba_mutex);
 
-	if (n) {
-		rval = ndi_prop_update_string_array(
-		    DDI_DEV_T_NONE, child_dip,
-		    "compatible", (char **)usba_compatible, n);
+	rval = ndi_prop_update_string_array(DDI_DEV_T_NONE, child_dip,
+	    "compatible", (char **)usba_name, n);
 
-		if (rval != DDI_PROP_SUCCESS) {
+	kmem_free(usba_name_buf, USBA_MAX_COMPAT_NAMES *
+	    USBA_MAX_COMPAT_NAME_LEN);
 
-			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
-			    "usba_ready_device_node: property update failed");
+	if (rval != DDI_PROP_SUCCESS) {
 
-			return (child_dip);
-		}
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
+		    "usba_ready_device_node: property update failed");
+
+		return (child_dip);
 	}
 
 	/* update the address property */
@@ -2173,6 +2172,8 @@ usba_ready_interface_association_node(dev_info_t	*dip,
 	size_t			size;
 	usb_port_status_t	port_status;
 	char			*force_bind = NULL;
+	char			*usba_name_buf = NULL;
+	char			*usba_name[USBA_MAX_COMPAT_NAMES];
 
 	usb_cfg = usb_get_raw_cfg_data(dip, &usb_cfg_length);
 
@@ -2251,7 +2252,13 @@ usba_ready_interface_association_node(dev_info_t	*dip,
 	 */
 	ASSERT(usba_find_existing_node(child_dip) == NULL);
 
-	mutex_enter(&usba_mutex);
+	usba_name_buf = kmem_zalloc(USBA_MAX_COMPAT_NAMES *
+	    USBA_MAX_COMPAT_NAME_LEN, KM_SLEEP);
+
+	for (i = 0; i < USBA_MAX_COMPAT_NAMES; i++) {
+		usba_name[i] = usba_name_buf + (i * USBA_MAX_COMPAT_NAME_LEN);
+	}
+
 	n = 0;
 
 	if (force_bind) {
@@ -2330,22 +2337,20 @@ usba_ready_interface_association_node(dev_info_t	*dip,
 
 	for (i = 0; i < n; i += 2) {
 		USB_DPRINTF_L3(DPRINT_MASK_USBA, usba_log_handle,
-		    "compatible name:\t%s\t%s", usba_compatible[i],
-		    (((i+1) < n)? usba_compatible[i+1] : ""));
+		    "compatible name:\t%s\t%s", usba_name[i],
+		    (((i+1) < n)? usba_name[i+1] : ""));
 	}
-	mutex_exit(&usba_mutex);
 
 	/* create compatible property */
-	if (n) {
-		rval = ndi_prop_update_string_array(
-		    DDI_DEV_T_NONE, child_dip,
-		    "compatible", (char **)usba_compatible,
-		    n);
+	rval = ndi_prop_update_string_array(DDI_DEV_T_NONE, child_dip,
+	    "compatible", (char **)usba_name, n);
 
-		if (rval != DDI_PROP_SUCCESS) {
+	kmem_free(usba_name_buf, USBA_MAX_COMPAT_NAMES *
+	    USBA_MAX_COMPAT_NAME_LEN);
 
-			goto fail;
-		}
+	if (rval != DDI_PROP_SUCCESS) {
+
+		goto fail;
 	}
 
 	/* update the address property */
@@ -2412,6 +2417,8 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 	size_t			size;
 	usb_port_status_t	port_status;
 	char			*force_bind = NULL;
+	char			*usba_name_buf = NULL;
+	char			*usba_name[USBA_MAX_COMPAT_NAMES];
 
 	usb_cfg = usb_get_raw_cfg_data(dip, &usb_cfg_length);
 
@@ -2489,7 +2496,13 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 	 */
 	ASSERT(usba_find_existing_node(child_dip) == NULL);
 
-	mutex_enter(&usba_mutex);
+	usba_name_buf = kmem_zalloc(USBA_MAX_COMPAT_NAMES *
+	    USBA_MAX_COMPAT_NAME_LEN, KM_SLEEP);
+
+	for (i = 0; i < USBA_MAX_COMPAT_NAMES; i++) {
+		usba_name[i] = usba_name_buf + (i * USBA_MAX_COMPAT_NAME_LEN);
+	}
+
 	n = 0;
 
 	if (force_bind) {
@@ -2565,22 +2578,20 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 
 	for (i = 0; i < n; i += 2) {
 		USB_DPRINTF_L3(DPRINT_MASK_USBA, usba_log_handle,
-		    "compatible name:\t%s\t%s", usba_compatible[i],
-		    (((i+1) < n)? usba_compatible[i+1] : ""));
+		    "compatible name:\t%s\t%s", usba_name[i],
+		    (((i+1) < n)? usba_name[i+1] : ""));
 	}
-	mutex_exit(&usba_mutex);
 
 	/* create compatible property */
-	if (n) {
-		rval = ndi_prop_update_string_array(
-		    DDI_DEV_T_NONE, child_dip,
-		    "compatible", (char **)usba_compatible,
-		    n);
+	rval = ndi_prop_update_string_array(DDI_DEV_T_NONE, child_dip,
+	    "compatible", (char **)usba_name, n);
 
-		if (rval != DDI_PROP_SUCCESS) {
+	kmem_free(usba_name_buf, USBA_MAX_COMPAT_NAMES *
+	    USBA_MAX_COMPAT_NAME_LEN);
 
-			goto fail;
-		}
+	if (rval != DDI_PROP_SUCCESS) {
+
+		goto fail;
 	}
 
 	/* update the address property */

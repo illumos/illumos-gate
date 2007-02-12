@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -662,6 +662,8 @@ pl2303_set_port_params(ds_hdl_t hdl, uint_t port_num, ds_port_params_t *tp)
 				USB_DPRINTF_L3(DPRINT_CTLOP, plp->pl_lh,
 				    "pl2303_set_port_params: bad baud %d", ui);
 
+				freeb(bp);
+
 				return (USB_FAILURE);
 			}
 
@@ -775,27 +777,22 @@ pl2303_set_port_params(ds_hdl_t hdl, uint_t port_num, ds_port_params_t *tp)
 	}
 
 	/* set new values for Line Coding Structure */
-	if ((rval = pl2303_cmd_set_line(plp, bp)) != USB_SUCCESS) {
+	rval = pl2303_cmd_set_line(plp, bp);
+
+	freeb(bp);
+
+	if (rval != USB_SUCCESS) {
+
+		return (rval);
+	}
+
+	/* hardware need to get Line Coding Structure again */
+	if ((rval = pl2303_cmd_get_line(plp, &bp)) != USB_SUCCESS) {
 
 		return (rval);
 	}
 
 	freeb(bp);
-	bp = NULL;
-
-	/* hardware need to get Line Coding Structure again */
-	if ((rval = pl2303_cmd_get_line(plp, &bp)) != USB_SUCCESS) {
-
-		if (bp != NULL) {
-			freeb(bp);
-		}
-
-		return (rval);
-	}
-
-	if (bp != NULL) {
-		freeb(bp);
-	}
 
 	return (USB_SUCCESS);
 }
@@ -1734,10 +1731,7 @@ pl2303_tx_start(pl2303_state_t *plp, int *xferd)
 
 	if (rval != USB_SUCCESS) {
 		plp->pl_bulkout_state = PL2303_PIPE_IDLE;
-		if (plp->pl_tx_mp == NULL) {
-			plp->pl_tx_mp = data;
-		}
-
+		pl2303_put_head(&plp->pl_tx_mp, data);
 	} else {
 		if (xferd) {
 			*xferd = data_len;
@@ -1773,6 +1767,8 @@ pl2303_send_data(pl2303_state_t *plp, mblk_t *data)
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_OUT_PIPE, plp->pl_lh,
 		    "pl2303_send_data: xfer failed %d", rval);
+
+		br->bulk_data = NULL;
 		usb_free_bulk_req(br);
 	}
 
@@ -1932,6 +1928,10 @@ pl2303_cmd_get_line(pl2303_state_t *plp, mblk_t **data)
 		USB_DPRINTF_L2(DPRINT_DEF_PIPE, plp->pl_lh,
 		    "pl2303_cmd_get_line: failed %d %d %x",
 		    rval, cr, cb_flags);
+
+		if (*data != NULL) {
+			freeb(*data);
+		}
 	}
 
 	return (rval);
