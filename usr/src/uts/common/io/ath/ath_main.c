@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1001,7 +1001,7 @@ ath_m_tx(void *arg, mblk_t *mp)
 	if (ic->ic_state != IEEE80211_S_RUN) {
 		ATH_DEBUG((ATH_DBG_SEND, "ath: ath_m_tx(): "
 		    "discard, state %u\n", ic->ic_state));
-		asc->asc_stats.ast_tx_discard ++;
+		asc->asc_stats.ast_tx_discard++;
 		freemsgchain(mp);
 		return (NULL);
 	}
@@ -1727,10 +1727,6 @@ ath_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case MAC_STAT_IERRORS:
 		*val = asc->asc_stats.ast_rx_tooshort;
 		break;
-	case MAC_STAT_OERRORS:
-		*val = asc->asc_stats.ast_tx_fifoerr +
-		    asc->asc_stats.ast_tx_xretries;
-		break;
 	case MAC_STAT_RBYTES:
 		*val = ic->ic_stats.is_rx_bytes;
 		break;
@@ -1743,9 +1739,11 @@ ath_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case MAC_STAT_OPACKETS:
 		*val = ic->ic_stats.is_tx_frags;
 		break;
+	case MAC_STAT_OERRORS:
 	case WIFI_STAT_TX_FAILED:
 		*val = asc->asc_stats.ast_tx_fifoerr +
-			asc->asc_stats.ast_tx_xretries;
+		    asc->asc_stats.ast_tx_xretries +
+		    asc->asc_stats.ast_tx_discard;
 		break;
 	case WIFI_STAT_TX_RETRANS:
 		*val = asc->asc_stats.ast_tx_xretries;
