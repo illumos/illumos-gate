@@ -60,6 +60,7 @@ SUNWprivate_1.1 {
 	zfs_nicenum;
 	zfs_nicestrtonum;
 	zfs_open;
+	zfs_path_to_zhandle;
 	zfs_promote;
 	zfs_prop_align_right;
 	zfs_prop_column_name;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,8 @@
 #include <strings.h>
 #include <unistd.h>
 #include <sys/mnttab.h>
+#include <sys/mntent.h>
+#include <sys/types.h>
 
 #include <libzfs.h>
 
@@ -518,6 +520,51 @@ libzfs_handle_t *
 zfs_get_handle(zfs_handle_t *zhp)
 {
 	return (zhp->zfs_hdl);
+}
+
+/*
+ * Given a name, determine whether or not it's a valid path
+ * (starts with '/' or "./").  If so, walk the mnttab trying
+ * to match the device number.  If not, treat the path as an
+ * fs/vol/snap name.
+ */
+zfs_handle_t *
+zfs_path_to_zhandle(libzfs_handle_t *hdl, char *path, zfs_type_t argtype)
+{
+	struct stat64 statbuf;
+	struct extmnttab entry;
+	int ret;
+
+	if (path[0] != '/' && strncmp(path, "./", strlen("./")) != 0) {
+		/*
+		 * It's not a valid path, assume it's a name of type 'argtype'.
+		 */
+		return (zfs_open(hdl, path, argtype));
+	}
+
+	if (stat64(path, &statbuf) != 0) {
+		(void) fprintf(stderr, "%s: %s\n", path, strerror(errno));
+		return (NULL);
+	}
+
+	rewind(hdl->libzfs_mnttab);
+	while ((ret = getextmntent(hdl->libzfs_mnttab, &entry, 0)) == 0) {
+		if (makedevice(entry.mnt_major, entry.mnt_minor) ==
+		    statbuf.st_dev) {
+			break;
+		}
+	}
+	if (ret != 0) {
+		return (NULL);
+	}
+
+	if (strcmp(entry.mnt_fstype, MNTTYPE_ZFS) != 0) {
+		(void) fprintf(stderr, gettext("'%s': not a ZFS filesystem\n"),
+		    path);
+		return (NULL);
+	}
+
+	return (zfs_open(hdl, entry.mnt_special, ZFS_TYPE_FILESYSTEM));
 }
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,7 +311,7 @@ zfs_sort(const void *larg, const void *rarg, void *data)
 int
 zfs_for_each(int argc, char **argv, boolean_t recurse, zfs_type_t types,
     zfs_sort_column_t *sortcol, zfs_proplist_t **proplist, zfs_iter_f callback,
-    void *data)
+    void *data, boolean_t args_can_be_paths)
 {
 	callback_data_t cb;
 	int ret = 0;
@@ -361,7 +361,13 @@ zfs_for_each(int argc, char **argv, boolean_t recurse, zfs_type_t types,
 		}
 
 		for (i = 0; i < argc; i++) {
-			if ((zhp = zfs_open(g_zfs, argv[i], argtype)) != NULL)
+			if (args_can_be_paths) {
+				zhp = zfs_path_to_zhandle(g_zfs, argv[i],
+				    argtype);
+			} else {
+				zhp = zfs_open(g_zfs, argv[i], argtype);
+			}
+			if (zhp != NULL)
 				ret |= zfs_callback(zhp, &cb);
 			else
 				ret = 1;

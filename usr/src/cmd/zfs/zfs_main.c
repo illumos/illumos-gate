@@ -1273,7 +1273,7 @@ zfs_do_get(int argc, char **argv)
 
 	/* run for each object */
 	ret = zfs_for_each(argc, argv, recurse, ZFS_TYPE_ANY, NULL,
-	    &cb.cb_proplist, get_callback, &cb);
+	    &cb.cb_proplist, get_callback, &cb, B_FALSE);
 
 	if (cb.cb_proplist == &fake_name)
 		zfs_free_proplist(fake_name.pl_next);
@@ -1378,7 +1378,7 @@ zfs_do_inherit(int argc, char **argv)
 
 	ret = zfs_for_each(argc, argv, recurse,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, NULL, NULL,
-	    inherit_callback, &cb);
+	    inherit_callback, &cb, B_FALSE);
 
 	if (cb.cb_any_successful) {
 		zpool_log_history(g_zfs, argc + optind + 1, argv - optind - 1,
@@ -1628,7 +1628,7 @@ zfs_do_list(int argc, char **argv)
 	cb.cb_first = B_TRUE;
 
 	ret = zfs_for_each(argc, argv, recurse, types, sortcol, &cb.cb_proplist,
-	    list_callback, &cb);
+	    list_callback, &cb, B_TRUE);
 
 	zfs_free_proplist(cb.cb_proplist);
 	zfs_free_sort_columns(sortcol);
@@ -1983,7 +1983,7 @@ zfs_do_set(int argc, char **argv)
 	}
 
 	ret = zfs_for_each(argc - 2, argv + 2, B_FALSE,
-	    ZFS_TYPE_ANY, NULL, NULL, set_callback, &cb);
+	    ZFS_TYPE_ANY, NULL, NULL, set_callback, &cb, B_FALSE);
 
 	if (cb.cb_any_successful) {
 		*(cb.cb_value - 1) = '=';
