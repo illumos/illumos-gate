@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -788,7 +788,7 @@ cmd_token(pr_context_t *context)
 	}
 
 	if ((num == 0) && !(context->format & PRF_XMLM)) {
-		returnstat = pr_putchar(context, '\n');
+		returnstat = do_newline(context, 1);
 		if (returnstat < 0)
 			return (returnstat);
 	}
@@ -1834,8 +1834,7 @@ newgroup_token(pr_context_t *context)
 	num = (int)n_groups;
 	if (num == 0) {
 		if (!(context->format & PRF_XMLM)) {
-			/* sigh, have to put out a '\n' */
-			returnstat = pr_putchar(context, '\n');
+			returnstat = do_newline(context, 1);
 		}
 		return (returnstat);
 	}
