@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,12 +32,12 @@
 script()
 {
 	$dtrace -s /dev/stdin <<EOF
-	mib:::udpOutDatagrams
+	mib:::udpHCOutDatagrams
 	{
 		out = args[0];
 	}
 
-	mib:::udpInDatagrams
+	mib:::udpHCInDatagrams
 	{
 		in = args[0];
 	}
