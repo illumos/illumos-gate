@@ -280,7 +280,7 @@ zfs_ioctl(vnode_t *vp, int com, intptr_t data, int flag, cred_t *cred,
  *	the file is memory mapped.
  */
 static int
-mappedwrite(vnode_t *vp, uint64_t woff, int nbytes, uio_t *uio, dmu_tx_t *tx)
+mappedwrite(vnode_t *vp, int nbytes, uio_t *uio, dmu_tx_t *tx)
 {
 	znode_t	*zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
@@ -293,6 +293,7 @@ mappedwrite(vnode_t *vp, uint64_t woff, int nbytes, uio_t *uio, dmu_tx_t *tx)
 	for (start &= PAGEMASK; len > 0; start += PAGESIZE) {
 		page_t *pp;
 		uint64_t bytes = MIN(PAGESIZE - off, len);
+		uint64_t woff = uio->uio_loffset;
 
 		/*
 		 * We don't want a new page to "appear" in the middle of
@@ -315,11 +316,10 @@ mappedwrite(vnode_t *vp, uint64_t woff, int nbytes, uio_t *uio, dmu_tx_t *tx)
 			page_unlock(pp);
 		} else {
 			error = dmu_write_uio(zfsvfs->z_os, zp->z_id,
-			    woff, bytes, uio, tx);
+			    uio, bytes, tx);
 			rw_exit(&zp->z_map_lock);
 		}
 		len -= bytes;
-		woff += bytes;
 		off = 0;
 		if (error)
 			break;
@@ -338,9 +338,11 @@ mappedwrite(vnode_t *vp, uint64_t woff, int nbytes, uio_t *uio, dmu_tx_t *tx)
  *	the file is memory mapped.
  */
 static int
-mappedread(vnode_t *vp, char *addr, int nbytes, uio_t *uio)
+mappedread(vnode_t *vp, int nbytes, uio_t *uio)
 {
-	int64_t	start, off, bytes;
+	znode_t *zp = VTOZ(vp);
+	objset_t *os = zp->z_zfsvfs->z_os;
+	int64_t	start, off;
 	int len = nbytes;
 	int error = 0;
 
@@ -348,8 +350,8 @@ mappedread(vnode_t *vp, char *addr, int nbytes, uio_t *uio)
 	off = start & PAGEOFFSET;
 	for (start &= PAGEMASK; len > 0; start += PAGESIZE) {
 		page_t *pp;
+		uint64_t bytes = MIN(PAGESIZE - off, len);
 
-		bytes = MIN(PAGESIZE - off, len);
 		if (pp = page_lookup(vp, start, SE_SHARED)) {
 			caddr_t va;
 
@@ -358,11 +360,9 @@ mappedread(vnode_t *vp, char *addr, int nbytes, uio_t *uio)
 			ppmapout(va);
 			page_unlock(pp);
 		} else {
-			/* XXX use dmu_read here? */
-			error = uiomove(addr, bytes, UIO_READ, uio);
+			error = dmu_read_uio(os, zp->z_id, uio, bytes);
 		}
 		len -= bytes;
-		addr += bytes;
 		off = 0;
 		if (error)
 			break;
@@ -370,7 +370,7 @@ mappedread(vnode_t *vp, char *addr, int nbytes, uio_t *uio)
 	return (error);
 }
 
-uint_t zfs_read_chunk_size = 1024 * 1024; /* Tunable */
+offset_t zfs_read_chunk_size = 1024 * 1024; /* Tunable */
 
 /*
  * Read bytes from specified file into supplied buffer.
@@ -395,10 +395,9 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 {
 	znode_t		*zp = VTOZ(vp);
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
-	uint64_t	delta;
-	ssize_t		n, size, cnt, ndone;
-	int		error, i, numbufs;
-	dmu_buf_t	*dbp, **dbpp;
+	objset_t	*os = zfsvfs->z_os;
+	ssize_t		n, nbytes;
+	int		error;
 	rl_t		*rl;
 
 	ZFS_ENTER(zfsvfs);
@@ -446,58 +445,27 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	 * to the end; but we might still need to set atime.
 	 */
 	if (uio->uio_loffset >= zp->z_phys->zp_size) {
-		cnt = 0;
 		error = 0;
 		goto out;
 	}
 
-	cnt = MIN(uio->uio_resid, zp->z_phys->zp_size - uio->uio_loffset);
+	ASSERT(uio->uio_loffset < zp->z_phys->zp_size);
+	n = MIN(uio->uio_resid, zp->z_phys->zp_size - uio->uio_loffset);
 
-	for (ndone = 0; ndone < cnt; ndone += zfs_read_chunk_size) {
-		ASSERT(uio->uio_loffset < zp->z_phys->zp_size);
-		n = MIN(zfs_read_chunk_size,
-		    zp->z_phys->zp_size - uio->uio_loffset);
-		n = MIN(n, cnt);
-		error = dmu_buf_hold_array_by_bonus(zp->z_dbuf,
-		    uio->uio_loffset, n, TRUE, FTAG, &numbufs, &dbpp);
+	while (n > 0) {
+		nbytes = MIN(n, zfs_read_chunk_size -
+		    P2PHASE(uio->uio_loffset, zfs_read_chunk_size));
+
+		if (vn_has_cached_data(vp))
+			error = mappedread(vp, nbytes, uio);
+		else
+			error = dmu_read_uio(os, zp->z_id, uio, nbytes);
 		if (error)
-			goto out;
-		/*
-		 * Compute the adjustment to align the dmu buffers
-		 * with the uio buffer.
-		 */
-		delta = uio->uio_loffset - dbpp[0]->db_offset;
+			break;
 
-		for (i = 0; i < numbufs; i++) {
-			if (n < 0)
-				break;
-			dbp = dbpp[i];
-			size = dbp->db_size - delta;
-			/*
-			 * XXX -- this is correct, but may be suboptimal.
-			 * If the pages are all clean, we don't need to
-			 * go through mappedread().  Maybe the VMODSORT
-			 * stuff can help us here.
-			 */
-			if (vn_has_cached_data(vp)) {
-				error = mappedread(vp, (caddr_t)dbp->db_data +
-				    delta, (n < size ? n : size), uio);
-			} else {
-				error = uiomove((caddr_t)dbp->db_data + delta,
-					(n < size ? n : size), UIO_READ, uio);
-			}
-			if (error) {
-				dmu_buf_rele_array(dbpp, numbufs, FTAG);
-				goto out;
-			}
-			n -= dbp->db_size;
-			if (delta) {
-				n += delta;
-				delta = 0;
-			}
-		}
-		dmu_buf_rele_array(dbpp, numbufs, FTAG);
+		n -= nbytes;
 	}
+
 out:
 	zfs_range_unlock(rl);
 
@@ -660,8 +628,9 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	}
 
 	if (woff >= limit) {
-		error = EFBIG;
-		goto no_tx_done;
+		zfs_range_unlock(rl);
+		ZFS_EXIT(zfsvfs);
+		return (EFBIG);
 	}
 
 	if ((woff + n) > limit || woff > (limit - n))
@@ -671,114 +640,21 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	 * Check for mandatory locks
 	 */
 	if (MANDMODE((mode_t)zp->z_phys->zp_mode) &&
-	    (error = chklock(vp, FWRITE, woff, n, uio->uio_fmode, ct)) != 0)
-		goto no_tx_done;
+	    (error = chklock(vp, FWRITE, woff, n, uio->uio_fmode, ct)) != 0) {
+		zfs_range_unlock(rl);
+		ZFS_EXIT(zfsvfs);
+		return (error);
+	}
 	end_size = MAX(zp->z_phys->zp_size, woff + n);
-top:
-	tx = dmu_tx_create(zfsvfs->z_os);
-	dmu_tx_hold_bonus(tx, zp->z_id);
-	dmu_tx_hold_write(tx, zp->z_id, woff, MIN(n, max_blksz));
-	error = dmu_tx_assign(tx, zfsvfs->z_assign);
-	if (error) {
-		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
-			dmu_tx_wait(tx);
-			dmu_tx_abort(tx);
-			goto top;
-		}
-		dmu_tx_abort(tx);
-		goto no_tx_done;
-	}
 
 	/*
-	 * If zfs_range_lock() over-locked we grow the blocksize
-	 * and then reduce the lock range.
-	 */
-	if (rl->r_len == UINT64_MAX) {
-		uint64_t new_blksz;
-
-		if (zp->z_blksz > max_blksz) {
-			ASSERT(!ISP2(zp->z_blksz));
-			new_blksz = MIN(end_size, SPA_MAXBLOCKSIZE);
-		} else {
-			new_blksz = MIN(end_size, max_blksz);
-		}
-		zfs_grow_blocksize(zp, new_blksz, tx);
-		zfs_range_reduce(rl, woff, n);
-	}
-
-	/*
-	 * The file data does not fit in the znode "cache", so we
-	 * will be writing to the file block data buffers.
-	 * Each buffer will be written in a separate transaction;
-	 * this keeps the intent log records small and allows us
-	 * to do more fine-grained space accounting.
+	 * Write the file in reasonable size chunks.  Each chunk is written
+	 * in a separate transaction; this keeps the intent log records small
+	 * and allows us to do more fine-grained space accounting.
 	 */
 	while (n > 0) {
 		/*
-		 * XXX - should we really limit each write to z_max_blksz?
-		 * Perhaps we should use SPA_MAXBLOCKSIZE chunks?
-		 */
-		nbytes = MIN(n, max_blksz - P2PHASE(woff, max_blksz));
-		rw_enter(&zp->z_map_lock, RW_READER);
-
-		tx_bytes = uio->uio_resid;
-		if (vn_has_cached_data(vp)) {
-			rw_exit(&zp->z_map_lock);
-			error = mappedwrite(vp, woff, nbytes, uio, tx);
-		} else {
-			error = dmu_write_uio(zfsvfs->z_os, zp->z_id,
-			    woff, nbytes, uio, tx);
-			rw_exit(&zp->z_map_lock);
-		}
-		tx_bytes -= uio->uio_resid;
-
-		if (error) {
-			/* XXX - do we need to "clean up" the dmu buffer? */
-			break;
-		}
-
-		ASSERT(tx_bytes == nbytes);
-
-		/*
-		 * Clear Set-UID/Set-GID bits on successful write if not
-		 * privileged and at least one of the excute bits is set.
-		 *
-		 * It would be nice to to this after all writes have
-		 * been done, but that would still expose the ISUID/ISGID
-		 * to another app after the partial write is committed.
-		 */
-
-		mutex_enter(&zp->z_acl_lock);
-		if ((zp->z_phys->zp_mode & (S_IXUSR | (S_IXUSR >> 3) |
-		    (S_IXUSR >> 6))) != 0 &&
-		    (zp->z_phys->zp_mode & (S_ISUID | S_ISGID)) != 0 &&
-		    secpolicy_vnode_setid_retain(cr,
-		    (zp->z_phys->zp_mode & S_ISUID) != 0 &&
-		    zp->z_phys->zp_uid == 0) != 0) {
-			    zp->z_phys->zp_mode &= ~(S_ISUID | S_ISGID);
-		}
-		mutex_exit(&zp->z_acl_lock);
-
-		n -= nbytes;
-		if (n <= 0)
-			break;
-
-		/*
-		 * We have more work ahead of us, so wrap up this transaction
-		 * and start another.  Exact same logic as tx_done below.
-		 */
-		while ((end_size = zp->z_phys->zp_size) < uio->uio_loffset) {
-			dmu_buf_will_dirty(zp->z_dbuf, tx);
-			(void) atomic_cas_64(&zp->z_phys->zp_size, end_size,
-			    uio->uio_loffset);
-		}
-		zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
-		zfs_log_write(zilog, tx, TX_WRITE, zp, woff, tx_bytes,
-		    ioflag, uio);
-		dmu_tx_commit(tx);
-
-		/*
-		 * Start another transaction.
+		 * Start a transaction.
 		 */
 		woff = uio->uio_loffset;
 		tx = dmu_tx_create(zfsvfs->z_os);
@@ -790,33 +666,98 @@ top:
 			    zfsvfs->z_assign == TXG_NOWAIT) {
 				dmu_tx_wait(tx);
 				dmu_tx_abort(tx);
-				goto top;
+				continue;
 			}
 			dmu_tx_abort(tx);
-			goto no_tx_done;
+			break;
 		}
-	}
 
-tx_done:
-
-	if (tx_bytes != 0) {
 		/*
-		 * Update the file size if it has changed; account
-		 * for possible concurrent updates.
+		 * If zfs_range_lock() over-locked we grow the blocksize
+		 * and then reduce the lock range.  This will only happen
+		 * on the first iteration since zfs_range_reduce() will
+		 * shrink down r_len to the appropriate size.
 		 */
-		while ((end_size = zp->z_phys->zp_size) < uio->uio_loffset) {
-			dmu_buf_will_dirty(zp->z_dbuf, tx);
+		if (rl->r_len == UINT64_MAX) {
+			uint64_t new_blksz;
+
+			if (zp->z_blksz > max_blksz) {
+				ASSERT(!ISP2(zp->z_blksz));
+				new_blksz = MIN(end_size, SPA_MAXBLOCKSIZE);
+			} else {
+				new_blksz = MIN(end_size, max_blksz);
+			}
+			zfs_grow_blocksize(zp, new_blksz, tx);
+			zfs_range_reduce(rl, woff, n);
+		}
+
+		/*
+		 * XXX - should we really limit each write to z_max_blksz?
+		 * Perhaps we should use SPA_MAXBLOCKSIZE chunks?
+		 */
+		nbytes = MIN(n, max_blksz - P2PHASE(woff, max_blksz));
+		rw_enter(&zp->z_map_lock, RW_READER);
+
+		tx_bytes = uio->uio_resid;
+		if (vn_has_cached_data(vp)) {
+			rw_exit(&zp->z_map_lock);
+			error = mappedwrite(vp, nbytes, uio, tx);
+		} else {
+			error = dmu_write_uio(zfsvfs->z_os, zp->z_id,
+			    uio, nbytes, tx);
+			rw_exit(&zp->z_map_lock);
+		}
+		tx_bytes -= uio->uio_resid;
+
+		/*
+		 * If we made no progress, we're done.  If we made even
+		 * partial progress, update the znode and ZIL accordingly.
+		 */
+		if (tx_bytes == 0) {
+			ASSERT(error != 0);
+			break;
+		}
+
+		/*
+		 * Clear Set-UID/Set-GID bits on successful write if not
+		 * privileged and at least one of the excute bits is set.
+		 *
+		 * It would be nice to to this after all writes have
+		 * been done, but that would still expose the ISUID/ISGID
+		 * to another app after the partial write is committed.
+		 */
+		mutex_enter(&zp->z_acl_lock);
+		if ((zp->z_phys->zp_mode & (S_IXUSR | (S_IXUSR >> 3) |
+		    (S_IXUSR >> 6))) != 0 &&
+		    (zp->z_phys->zp_mode & (S_ISUID | S_ISGID)) != 0 &&
+		    secpolicy_vnode_setid_retain(cr,
+		    (zp->z_phys->zp_mode & S_ISUID) != 0 &&
+		    zp->z_phys->zp_uid == 0) != 0) {
+			    zp->z_phys->zp_mode &= ~(S_ISUID | S_ISGID);
+		}
+		mutex_exit(&zp->z_acl_lock);
+
+		/*
+		 * Update time stamp.  NOTE: This marks the bonus buffer as
+		 * dirty, so we don't have to do it again for zp_size.
+		 */
+		zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
+
+		/*
+		 * Update the file size (zp_size) if it has changed;
+		 * account for possible concurrent updates.
+		 */
+		while ((end_size = zp->z_phys->zp_size) < uio->uio_loffset)
 			(void) atomic_cas_64(&zp->z_phys->zp_size, end_size,
 			    uio->uio_loffset);
-		}
-		zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
-		zfs_log_write(zilog, tx, TX_WRITE, zp, woff, tx_bytes,
-		    ioflag, uio);
+		zfs_log_write(zilog, tx, TX_WRITE, zp, woff, tx_bytes, ioflag);
+		dmu_tx_commit(tx);
+
+		if (error != 0)
+			break;
+		ASSERT(tx_bytes == nbytes);
+		n -= nbytes;
 	}
-	dmu_tx_commit(tx);
-
-
-no_tx_done:
 
 	zfs_range_unlock(rl);
 
@@ -863,7 +804,7 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 	dmu_buf_t *db;
 	rl_t *rl;
 	zgd_t *zgd;
-	int dlen = lr->lr_length;  		/* length of user data */
+	int dlen = lr->lr_length;		/* length of user data */
 	int error = 0;
 
 	ASSERT(zio);
@@ -2243,7 +2184,7 @@ static int
 zfs_rename_lock(znode_t *szp, znode_t *tdzp, znode_t *sdzp, zfs_zlock_t **zlpp)
 {
 	zfs_zlock_t	*zl;
-	znode_t 	*zp = tdzp;
+	znode_t		*zp = tdzp;
 	uint64_t	rootid = zp->z_zfsvfs->z_root;
 	uint64_t	*oidp = &zp->z_id;
 	krwlock_t	*rwlp = &szp->z_parent_lock;
@@ -2923,8 +2864,7 @@ top:
 
 	if (err == 0) {
 		zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
-		(void) zfs_log_write(
-		    zilog, tx, TX_WRITE, zp, off, len, 0, NULL);
+		zfs_log_write(zilog, tx, TX_WRITE, zp, off, len, 0);
 		dmu_tx_commit(tx);
 	}
 

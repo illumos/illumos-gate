@@ -1617,8 +1617,8 @@ static struct cb_ops zfs_cb_ops = {
 	NULL,		/* streamtab */
 	D_NEW | D_MP | D_64BIT,		/* Driver compatibility flag */
 	CB_REV,		/* version */
-	zvol_aread,	/* async read */
-	zvol_awrite,	/* async write */
+	nodev,		/* async read */
+	nodev,		/* async write */
 };
 
 static struct dev_ops zfs_dev_ops = {

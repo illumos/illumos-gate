@@ -208,13 +208,12 @@ ssize_t zfs_immediate_write_sz = 32768;
 
 void
 zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
-	znode_t *zp, offset_t off, ssize_t len, int ioflag, uio_t *uio)
+	znode_t *zp, offset_t off, ssize_t len, int ioflag)
 {
 	itx_t *itx;
 	uint64_t seq;
 	lr_write_t *lr;
 	itx_wr_state_t write_state;
-	size_t dlen;
 	int err;
 
 	if (zilog == NULL || zp->z_unlinked)
@@ -237,34 +236,28 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	 *    flush the write later then a buffer is allocated and
 	 *    we retrieve the data using the dmu.
 	 */
-	if (len > zfs_immediate_write_sz) {
-		dlen = 0;
+	if (len > zfs_immediate_write_sz)
 		write_state = WR_INDIRECT;
-	} else if (ioflag & FDSYNC) {
-		dlen = len;
+	else if (ioflag & FDSYNC)
 		write_state = WR_COPIED;
-	} else {
-		dlen = 0;
+	else
 		write_state = WR_NEED_COPY;
-	}
-	itx = zil_itx_create(txtype, sizeof (*lr) + dlen);
+
+	itx = zil_itx_create(txtype, sizeof (*lr) +
+	    (write_state == WR_COPIED ? len : 0));
+	lr = (lr_write_t *)&itx->itx_lr;
 	if (write_state == WR_COPIED) {
-		err = xcopyin(uio->uio_iov->iov_base - len,
-		    (char *)itx + offsetof(itx_t, itx_lr) + sizeof (*lr), len);
-		/*
-		 * xcopyin shouldn't error as we've already successfully
-		 * copied it to a dmu buffer. However if it does we'll get
-		 * the data from the dmu later.
-		 */
+		err = dmu_read(zp->z_zfsvfs->z_os, zp->z_id, off, len, lr + 1);
 		if (err) {
-			kmem_free(itx, offsetof(itx_t, itx_lr)
-			    + itx->itx_lr.lrc_reclen);
+			kmem_free(itx, offsetof(itx_t, itx_lr) +
+			    itx->itx_lr.lrc_reclen);
 			itx = zil_itx_create(txtype, sizeof (*lr));
+			lr = (lr_write_t *)&itx->itx_lr;
 			write_state = WR_NEED_COPY;
 		}
 	}
+
 	itx->itx_wr_state = write_state;
-	lr = (lr_write_t *)&itx->itx_lr;
 	lr->lr_foid = zp->z_id;
 	lr->lr_offset = off;
 	lr->lr_length = len;

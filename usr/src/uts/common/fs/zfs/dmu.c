@@ -360,13 +360,15 @@ dmu_read(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 	dmu_buf_t **dbp;
 	int numbufs, i, err;
 
-	/*
-	 * Deal with odd block sizes, where there can't be data past the
-	 * first block.
-	 */
 	err = dnode_hold(os->os, object, FTAG, &dn);
 	if (err)
 		return (err);
+
+	/*
+	 * Deal with odd block sizes, where there can't be data past the first
+	 * block.  If we ever do the tail block optimization, we will need to
+	 * handle that here as well.
+	 */
 	if (dn->dn_datablkshift == 0) {
 		int newsz = offset > dn->dn_datablksz ? 0 :
 		    MIN(size, dn->dn_datablksz - offset);
@@ -453,8 +455,45 @@ dmu_write(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 
 #ifdef _KERNEL
 int
-dmu_write_uio(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
-    uio_t *uio, dmu_tx_t *tx)
+dmu_read_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size)
+{
+	dmu_buf_t **dbp;
+	int numbufs, i, err;
+
+	/*
+	 * NB: we could do this block-at-a-time, but it's nice
+	 * to be reading in parallel.
+	 */
+	err = dmu_buf_hold_array(os, object, uio->uio_loffset, size, TRUE, FTAG,
+	    &numbufs, &dbp);
+	if (err)
+		return (err);
+
+	for (i = 0; i < numbufs; i++) {
+		int tocpy;
+		int bufoff;
+		dmu_buf_t *db = dbp[i];
+
+		ASSERT(size > 0);
+
+		bufoff = uio->uio_loffset - db->db_offset;
+		tocpy = (int)MIN(db->db_size - bufoff, size);
+
+		err = uiomove((char *)db->db_data + bufoff, tocpy,
+		    UIO_READ, uio);
+		if (err)
+			break;
+
+		size -= tocpy;
+	}
+	dmu_buf_rele_array(dbp, numbufs, FTAG);
+
+	return (err);
+}
+
+int
+dmu_write_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size,
+    dmu_tx_t *tx)
 {
 	dmu_buf_t **dbp;
 	int numbufs, i;
@@ -463,7 +502,7 @@ dmu_write_uio(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 	if (size == 0)
 		return (0);
 
-	err = dmu_buf_hold_array(os, object, offset, size,
+	err = dmu_buf_hold_array(os, object, uio->uio_loffset, size,
 	    FALSE, FTAG, &numbufs, &dbp);
 	if (err)
 		return (err);
@@ -475,7 +514,7 @@ dmu_write_uio(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 
 		ASSERT(size > 0);
 
-		bufoff = offset - db->db_offset;
+		bufoff = uio->uio_loffset - db->db_offset;
 		tocpy = (int)MIN(db->db_size - bufoff, size);
 
 		ASSERT(i == 0 || i == numbufs-1 || tocpy == db->db_size);
@@ -500,7 +539,6 @@ dmu_write_uio(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 		if (err)
 			break;
 
-		offset += tocpy;
 		size -= tocpy;
 	}
 	dmu_buf_rele_array(dbp, numbufs, FTAG);

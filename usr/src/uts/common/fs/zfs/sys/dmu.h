@@ -424,8 +424,9 @@ int dmu_read(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 	void *buf);
 void dmu_write(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 	const void *buf, dmu_tx_t *tx);
-int dmu_write_uio(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
-    struct uio *uio, dmu_tx_t *tx);
+int dmu_read_uio(objset_t *os, uint64_t object, struct uio *uio, uint64_t size);
+int dmu_write_uio(objset_t *os, uint64_t object, struct uio *uio, uint64_t size,
+    dmu_tx_t *tx);
 int dmu_write_pages(objset_t *os, uint64_t object, uint64_t offset,
     uint64_t size, struct page *pp, dmu_tx_t *tx);
 

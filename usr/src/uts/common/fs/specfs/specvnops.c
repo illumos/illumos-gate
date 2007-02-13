@@ -50,6 +50,7 @@
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/debug.h>
+#include <sys/dkio.h>
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/fcntl.h>
@@ -1292,6 +1293,23 @@ spec_fsync(struct vnode *vp, int syncflag, struct cred *cr)
 	if (vp->v_type == VBLK && cvp != vp && vn_has_cached_data(cvp) &&
 	    (cvp->v_flag & VISSWAP) == 0)
 		(void) VOP_PUTPAGE(cvp, (offset_t)0, 0, 0, cr);
+
+	/*
+	 * For devices that support it, force write cache to stable storage.
+	 * We don't need the lock to check s_flags since we can treat
+	 * SNOFLUSH as a hint.
+	 */
+	if ((vp->v_type == VBLK || vp->v_type == VCHR) &&
+	    !(sp->s_flag & SNOFLUSH)) {
+		int rval, rc;
+		rc = cdev_ioctl(vp->v_rdev, DKIOCFLUSHWRITECACHE,
+		    NULL, FNATIVE|FKIOCTL, cr, &rval);
+		if (rc == ENOTSUP || rc == ENOTTY) {
+			mutex_enter(&sp->s_lock);
+			sp->s_flag |= SNOFLUSH;
+			mutex_exit(&sp->s_lock);
+		}
+	}
 
 	/*
 	 * If no real vnode to update, don't flush anything.
