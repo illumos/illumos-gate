@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -251,7 +251,10 @@ public final class LinearDistribution extends Distribution
 	try {
 	    initialize();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
 	if (step < 1) {
 	    throw new InvalidObjectException("step is less than one");
@@ -270,7 +273,7 @@ public final class LinearDistribution extends Distribution
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(LinearDistribution.class.toString());
 	buf.append("[base = ");
 	buf.append(getBase());

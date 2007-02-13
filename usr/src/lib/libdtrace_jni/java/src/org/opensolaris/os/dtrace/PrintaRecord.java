@@ -100,7 +100,7 @@ public final class PrintaRecord implements Record, Serializable {
     private Map <Tuple, String> formattedStrings;
     /** @serial */
     private List <Tuple> tuples;
-    private transient StringBuffer outputBuffer;
+    private transient StringBuilder outputBuffer;
     private transient String output;
     private transient boolean formatted;
 
@@ -113,7 +113,7 @@ public final class PrintaRecord implements Record, Serializable {
 	aggregations = new ArrayList <Aggregation> ();
 	formattedStrings = new HashMap <Tuple, String> ();
 	tuples = new ArrayList <Tuple> ();
-	outputBuffer = new StringBuffer();
+	outputBuffer = new StringBuilder();
 	formatted = isFormatString;
 	validate();
     }
@@ -448,7 +448,10 @@ public final class PrintaRecord implements Record, Serializable {
 	try {
 	    validate();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 
@@ -464,7 +467,7 @@ public final class PrintaRecord implements Record, Serializable {
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(PrintaRecord.class.getName());
 	buf.append("[snaptime = ");
 	buf.append(snaptime);

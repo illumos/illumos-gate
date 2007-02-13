@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,7 +82,7 @@ jmethodID g_strinit_bytes_jm = 0;
 jmethodID g_strbytes_jm = 0;
 jmethodID g_trim_jm = 0;
 
-/* java.lang.StringBuffer */
+/* java.lang.StringBuilder */
 jclass g_buf_jc = 0;
 jmethodID g_bufinit_jm = 0;
 jmethodID g_buf_append_char_jm = 0;
@@ -195,19 +195,19 @@ dtj_load_common(JNIEnv *jenv)
 		{ JMETHOD, &g_strbytes_jm, "getBytes", "()[B" },
 		{ JMETHOD, &g_trim_jm, "trim", "()Ljava/lang/String;" },
 
-		/* java.lang.StringBuffer */
-		{ JCLASS,  &g_buf_jc, "java/lang/StringBuffer" },
+		/* java.lang.StringBuilder */
+		{ JCLASS,  &g_buf_jc, "java/lang/StringBuilder" },
 		{ JMETHOD, &g_bufinit_jm, CONSTRUCTOR, "()V" },
 		{ JMETHOD, &g_buf_append_char_jm, "append",
-			"(C)Ljava/lang/StringBuffer;" },
+			"(C)Ljava/lang/StringBuilder;" },
 		{ JMETHOD, &g_buf_append_int_jm, "append",
-			"(I)Ljava/lang/StringBuffer;" },
+			"(I)Ljava/lang/StringBuilder;" },
 		{ JMETHOD, &g_buf_append_long_jm, "append",
-			"(J)Ljava/lang/StringBuffer;" },
+			"(J)Ljava/lang/StringBuilder;" },
 		{ JMETHOD, &g_buf_append_str_jm, "append",
-			"(Ljava/lang/String;)Ljava/lang/StringBuffer;" },
+			"(Ljava/lang/String;)Ljava/lang/StringBuilder;" },
 		{ JMETHOD, &g_buf_append_obj_jm, "append",
-			"(Ljava/lang/Object;)Ljava/lang/StringBuffer;" },
+			"(Ljava/lang/Object;)Ljava/lang/StringBuilder;" },
 		{ JMETHOD, &g_buflen_jm, "length", "()I" },
 		{ JMETHOD, &g_bufsetlen_jm, "setLength", "(I)V" },
 

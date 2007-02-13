@@ -500,7 +500,10 @@ public final class InterfaceAttributes implements Serializable {
 	try {
 	    validate();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 
@@ -518,7 +521,7 @@ public final class InterfaceAttributes implements Serializable {
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(nameStability);
 	buf.append(" / ");
 	buf.append(dataStability);

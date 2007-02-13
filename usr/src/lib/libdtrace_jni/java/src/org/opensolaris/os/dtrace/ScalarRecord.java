@@ -268,7 +268,7 @@ public final class ScalarRecord implements ValueRecord, Serializable {
     static String
     spaces(int n)
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	for (int i = 0; i < n; ++i) {
 	    buf.append(' ');
 	}
@@ -309,7 +309,7 @@ public final class ScalarRecord implements ValueRecord, Serializable {
 	// ported from libdtrace/common/dt_consume.c dt_print_bytes()
 	int i, j;
 	int u;
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	String leftMargin = spaces(indent);
 	buf.append('\n');
 	buf.append(leftMargin);
@@ -372,7 +372,10 @@ public final class ScalarRecord implements ValueRecord, Serializable {
 	try {
 	    validate();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 

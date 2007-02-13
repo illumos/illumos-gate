@@ -322,7 +322,10 @@ public final class KernelStackRecord implements StackValueRecord,
 	try {
 	    validate();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 
@@ -359,7 +362,7 @@ public final class KernelStackRecord implements StackValueRecord,
 	    return ScalarRecord.rawBytesString(rawStackData);
 	}
 
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append('\n');
 	for (StackFrame f : frames) {
 	    for (int i = 0; i < STACK_INDENT; ++i) {

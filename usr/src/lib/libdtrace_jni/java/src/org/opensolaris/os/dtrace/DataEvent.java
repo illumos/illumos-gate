@@ -89,7 +89,10 @@ public class DataEvent extends EventObject {
 	try {
 	    validate();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 
@@ -105,7 +108,7 @@ public class DataEvent extends EventObject {
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(DataEvent.class.getName());
 	buf.append("[source = ");
 	buf.append(getSource());

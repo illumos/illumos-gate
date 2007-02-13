@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -510,7 +510,7 @@ public abstract class Distribution implements AggregationValue,
 	public String
 	toString()
 	{
-	    StringBuffer buf = new StringBuffer();
+	    StringBuilder buf = new StringBuilder();
 	    buf.append(Bucket.class.getName());
 	    buf.append("[min = ");
 	    buf.append(min);
@@ -603,7 +603,7 @@ public abstract class Distribution implements AggregationValue,
     toString()
     {
 	checkInit();
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(Distribution.class.getName());
 	buf.append("[buckets = ");
 	List <Bucket> list = getDisplayRange();

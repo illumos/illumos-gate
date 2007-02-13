@@ -769,7 +769,10 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
 	try {
 	    validate();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 
@@ -785,7 +788,7 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(ProbeData.class.getName());
 	buf.append("[epid = ");
 	buf.append(epid);

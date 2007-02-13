@@ -322,7 +322,10 @@ public final class ProcessState implements Serializable {
 	try {
 	    validate();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 
@@ -338,7 +341,7 @@ public final class ProcessState implements Serializable {
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(ProcessState.class.getName());
 	buf.append("[pid = ");
 	buf.append(processID);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -147,7 +147,7 @@ class AggregateSpec {
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(AggregateSpec.class.getName());
 	buf.append("[includedAggregationNames = ");
 	buf.append(Arrays.toString(getIncludedAggregationNames().toArray()));

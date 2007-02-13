@@ -653,7 +653,10 @@ public final class Option implements Serializable {
 	try {
 	    validate();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 
@@ -669,7 +672,7 @@ public final class Option implements Serializable {
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(Option.class.getName());
 	buf.append("[name = ");
 	buf.append(name);

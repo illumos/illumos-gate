@@ -240,7 +240,10 @@ public final class Drop implements Serializable {
 	try {
 	    validate();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 
@@ -256,7 +259,7 @@ public final class Drop implements Serializable {
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(Drop.class.getName());
 	buf.append("[cpu = ");
 	buf.append(cpu);

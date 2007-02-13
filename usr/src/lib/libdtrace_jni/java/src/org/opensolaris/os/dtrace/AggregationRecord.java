@@ -179,7 +179,10 @@ public final class AggregationRecord implements Record, Serializable {
 	try {
 	    validate();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 
@@ -196,7 +199,7 @@ public final class AggregationRecord implements Record, Serializable {
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(AggregationRecord.class.getName());
 	buf.append("[tuple = ");
 	buf.append(tuple);

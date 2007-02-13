@@ -115,6 +115,11 @@ dtj_get_dtrace_error(dtj_java_consumer_t *jc, dtj_error_t *e)
 	JNIEnv *jenv = jc->dtjj_jenv;
 	dtrace_hdl_t *dtp = jc->dtjj_consumer->dtjc_dtp;
 
+	/* Must not call MonitorEnter with a pending exception */
+	if ((*jenv)->ExceptionCheck(jenv)) {
+		WRAP_EXCEPTION(jenv);
+		return (DTJ_ERR);
+	}
 	/* Grab global lock */
 	(*jenv)->MonitorEnter(jenv, g_caller_jc);
 	if ((*jenv)->ExceptionCheck(jenv)) {
@@ -778,7 +783,7 @@ dtj_chewrec(const dtrace_probedata_t *data, const dtrace_recdesc_t *rec,
 		}
 		if (jc->dtjj_printa_buffer == NULL) {
 			/*
-			 * Create a StringBuffer to collect the pieces of
+			 * Create a StringBuilder to collect the pieces of
 			 * formatted output into a single String.
 			 */
 			jbuf = (*jenv)->NewObject(jenv, g_buf_jc,
@@ -1615,8 +1620,8 @@ dtj_agghandler(const dtrace_bufdata_t *bufdata, dtj_java_consumer_t *jc)
 			return (DTRACE_HANDLE_ABORT);
 		}
 		/*
-		 * StringBuffer append() returns a reference to the
-		 * StringBuffer; must not leak the returned reference.
+		 * StringBuilder append() returns a reference to the
+		 * StringBuilder; must not leak the returned reference.
 		 */
 		jobj = (*jenv)->CallObjectMethod(jenv,
 		    jc->dtjj_printa_buffer, g_buf_append_str_jm, jstr);
@@ -1867,8 +1872,8 @@ printa_output:
 				return (DTRACE_HANDLE_ABORT);
 			}
 			/*
-			 * Clear the StringBuffer: this does not throw
-			 * exceptions.  Reuse the StringBuffer until the end of
+			 * Clear the StringBuilder: this does not throw
+			 * exceptions.  Reuse the StringBuilder until the end of
 			 * the current probedata then dispose of it.
 			 */
 			(*jenv)->CallVoidMethod(jenv, jc->dtjj_printa_buffer,
@@ -2071,6 +2076,12 @@ dtj_get_aggregate(dtj_java_consumer_t *jc)
 
 	jobject aggregate = NULL;
 
+	/* Must not call MonitorEnter with a pending exception */
+	if ((*jenv)->ExceptionCheck(jenv)) {
+		WRAP_EXCEPTION(jenv);
+		return (NULL);
+	}
+
 	/*
 	 * Aggregations must be snapped, walked, and cleared atomically,
 	 * otherwise clearing loses data accumulated since the most recent snap.
@@ -2103,10 +2114,36 @@ dtj_get_aggregate(dtj_java_consumer_t *jc)
 	snaptime = gethrtime();
 	if (dtrace_aggregate_snap(jc->dtjj_consumer->dtjc_dtp) != 0) {
 		dtj_error_t e;
+
+		/*
+		 * The dataDropped() ConsumerListener method can throw an
+		 * exception in the getAggregate() thread if the drop handler is
+		 * invoked during dtrace_aggregate_snap().
+		 */
+		if ((*jenv)->ExceptionCheck(jenv)) {
+			/* Do not wrap exception thrown from ConsumerListener */
+			/* release per-consumer lock */
+			(*jenv)->MonitorExit(jenv, jc->dtjj_consumer_lock);
+			return (NULL);
+		}
+
 		if (dtj_get_dtrace_error(jc, &e) == DTJ_OK) {
 			/* Do not wrap DTraceException */
 			dtj_throw_dtrace_exception(jc, e.dtje_message);
 		}
+		/* release per-consumer lock */
+		(*jenv)->MonitorExit(jenv, jc->dtjj_consumer_lock);
+		return (NULL);
+	}
+
+	if ((*jenv)->ExceptionCheck(jenv)) {
+		/*
+		 * Wrap the exception thrown from ConsumerListener in this case,
+		 * so we can see that it unexpectedly reached this spot in
+		 * native code (dtrace_aggregate_snap should have returned
+		 * non-zero).
+		 */
+		WRAP_EXCEPTION(jenv);
 		/* release per-consumer lock */
 		(*jenv)->MonitorExit(jenv, jc->dtjj_consumer_lock);
 		return (NULL);
@@ -2302,6 +2339,12 @@ dtj_consume(dtj_java_consumer_t *jc)
 				/* Do not wrap DTraceException */
 				return (DTJ_ERR);
 			}
+		}
+
+		/* Must not call MonitorEnter with a pending exception */
+		if ((*jenv)->ExceptionCheck(jenv)) {
+			WRAP_EXCEPTION(jenv);
+			return (DTJ_ERR);
 		}
 
 		/*

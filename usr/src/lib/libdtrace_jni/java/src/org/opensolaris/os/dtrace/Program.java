@@ -152,7 +152,10 @@ public class Program implements Serializable {
 	try {
 	    validate();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 
@@ -170,7 +173,7 @@ public class Program implements Serializable {
 	    return null;
 	}
 
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	InputStream in;
 	in = new BufferedInputStream(new FileInputStream(programFile));
 	int i = in.read();
@@ -195,7 +198,7 @@ public class Program implements Serializable {
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(Program.class.getName());
 	buf.append("[contents = ");
 	buf.append(contents);
@@ -251,14 +254,17 @@ public class Program implements Serializable {
 	    try {
 		validateFile();
 	    } catch (Exception e) {
-		throw new InvalidObjectException(e.getMessage());
+		InvalidObjectException x = new InvalidObjectException(
+			e.getMessage());
+		x.initCause(e);
+		throw x;
 	    }
 	}
 
 	public String
 	toString()
 	{
-	    StringBuffer buf = new StringBuffer();
+	    StringBuilder buf = new StringBuilder();
 	    buf.append(Program.File.class.getName());
 	    buf.append("[super = ");
 	    buf.append(super.toString());

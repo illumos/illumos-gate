@@ -173,7 +173,10 @@ public final class LogDistribution extends Distribution
 	try {
 	    initialize();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 }

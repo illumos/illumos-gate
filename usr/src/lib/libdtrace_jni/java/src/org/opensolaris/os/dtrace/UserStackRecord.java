@@ -281,13 +281,19 @@ public final class UserStackRecord implements StackValueRecord,
 	    // defensively copies stack frames and raw bytes
 	    stackRecord = new KernelStackRecord(frames, rawBytes);
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
 	// check class invariants
 	try {
 	    validate();
 	} catch (Exception e) {
-	    throw new InvalidObjectException(e.getMessage());
+	    InvalidObjectException x = new InvalidObjectException(
+		    e.getMessage());
+	    x.initCause(e);
+	    throw x;
 	}
     }
 
@@ -303,7 +309,7 @@ public final class UserStackRecord implements StackValueRecord,
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	final int stackindent = KernelStackRecord.STACK_INDENT;
 	int i;
 	buf.append('\n');

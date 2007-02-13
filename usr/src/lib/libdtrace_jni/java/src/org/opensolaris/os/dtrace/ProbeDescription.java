@@ -485,7 +485,7 @@ public final class ProbeDescription implements Serializable,
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer();
+	StringBuilder buf = new StringBuilder();
 	buf.append(provider);
 	buf.append(':');
 	buf.append(module);

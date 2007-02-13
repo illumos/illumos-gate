@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -216,6 +216,10 @@ jmethodID g_scalarinit_jm = 0;
 static dtj_status_t
 dtj_table_load(JNIEnv *jenv)
 {
+	/*
+	 * If you change this table, increment DTRACE_JNI_VERSION in
+	 * dtrace_jni.c.
+	 */
 	static const dtj_table_entry_t table[] = {
 		/* LocalConsumer */
 		{ JCLASS,  &g_caller_jc,

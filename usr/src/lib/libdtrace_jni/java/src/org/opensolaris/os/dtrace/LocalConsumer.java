@@ -51,6 +51,7 @@ public class LocalConsumer implements Consumer {
 
     static Logger logger = Logger.getLogger(LocalConsumer.class.getName());
 
+    // Needs to match the version in dtrace_jni.c
     private static final int DTRACE_JNI_VERSION = 2;
 
     private static final Option[] DEFAULT_OPTIONS = new Option[] {
@@ -1325,7 +1326,7 @@ public class LocalConsumer implements Consumer {
     public String
     toString()
     {
-	StringBuffer buf = new StringBuffer(LocalConsumer.class.getName());
+	StringBuilder buf = new StringBuilder(LocalConsumer.class.getName());
 	synchronized (this) {
 	    buf.append("[open = ");
 	    buf.append(isOpen());
@@ -1426,7 +1427,7 @@ public class LocalConsumer implements Consumer {
 	public String
 	toString()
 	{
-	    StringBuffer buf = new StringBuffer();
+	    StringBuilder buf = new StringBuilder();
 	    buf.append(Identifier.class.getName());
 	    buf.append("[id = ");
 	    buf.append(id);
