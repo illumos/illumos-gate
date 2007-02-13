@@ -699,6 +699,8 @@ lo_remove(vnode_t *dvp, char *nm, struct cred *cr)
 static int
 lo_link(vnode_t *tdvp, vnode_t *vp, char *tnm, struct cred *cr)
 {
+	vnode_t *realvp;
+
 #ifdef LODEBUG
 	lo_dprint(4, "lo_link vp %p realvp %p\n", vp, realvp(vp));
 #endif
@@ -726,6 +728,17 @@ lo_link(vnode_t *tdvp, vnode_t *vp, char *tnm, struct cred *cr)
 	while (vn_matchops(vp, lo_vnodeops)) {
 		vp = realvp(vp);
 	}
+
+	/*
+	 * In the case where the source vnode is on another stacking
+	 * filesystem (such as specfs), the loop above will
+	 * terminate before finding the true underlying vnode.
+	 *
+	 * We use VOP_REALVP here to continue the search.
+	 */
+	if (VOP_REALVP(vp, &realvp) == 0)
+		vp = realvp;
+
 	while (vn_matchops(tdvp, lo_vnodeops)) {
 		tdvp = realvp(tdvp);
 	}

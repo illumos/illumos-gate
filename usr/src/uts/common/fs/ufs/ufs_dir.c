@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2445,8 +2445,17 @@ ufs_dirremove(
 	ushort_t extra;
 
 	namlen = (int)strlen(namep);
-	if (namlen == 0)
-		return (ufs_fault(ITOV(dp), "ufs_dirremove: namlen == 0"));
+	if (namlen == 0) {
+		struct fs	*fs = dp->i_fs;
+
+		cmn_err(CE_WARN, "%s: ufs_dirremove: attempted to remove"
+		    " nameless file in directory (directory inode %llu)",
+		    fs->fs_fsmnt, (u_longlong_t)dp->i_number);
+		ASSERT(namlen != 0);
+
+		return (ENOENT);
+	}
+
 	/*
 	 * return error when removing . and ..
 	 */
