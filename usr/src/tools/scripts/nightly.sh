@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -317,15 +317,6 @@ build() {
 	PKGARCHIVE=${PKGARCHIVE_ORIG}${SUFFIX}
 	if [ "$SPARC_RM_PKGARCHIVE_ORIG" ]; then
 		SPARC_RM_PKGARCHIVE=${SPARC_RM_PKGARCHIVE_ORIG}${SUFFIX}
-	fi
-
-	#remove old logs
-	OLDINSTALLOG=install${SUFFIX}
-	OLDNOISE=noise${SUFFIX}
-	rm -f $SRC/${OLDINSTALLOG}.out
-	rm -f $SRC/${OLDNOISE}.ref
-	if [ -f $SRC/${OLDNOISE}.out ]; then
-		mv $SRC/${OLDNOISE}.out $SRC/${NOISE}.ref
 	fi
 
 	this_build_ok=y
@@ -825,32 +816,32 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 A_FLAG=n
 a_FLAG=n
 C_FLAG=n
+D_FLAG=n
 F_FLAG=n
 f_FLAG=n
-D_FLAG=n
-P_FLAG=n
-T_FLAG=n
-n_FLAG=n
-o_FLAG=n
 i_FLAG=n; i_CMD_LINE_FLAG=n
 l_FLAG=n
+M_FLAG=n
 m_FLAG=n
+N_FLAG=n
+n_FLAG=n
+o_FLAG=n
+P_FLAG=n
 p_FLAG=n
 r_FLAG=n
+T_FLAG=n
 t_FLAG=n
-u_FLAG=n
 U_FLAG=n
+u_FLAG=n
 V_FLAG=n
-M_FLAG=n
-N_FLAG=n
-z_FLAG=n
-w_FLAG=n
 W_FLAG=n
-SE_FLAG=n
+w_FLAG=n
+X_FLAG=n
+z_FLAG=n
 SD_FLAG=n
+SE_FLAG=n
 SH_FLAG=n
 SO_FLAG=n
-X_FLAG=n
 #
 XMOD_OPT=
 #
@@ -891,20 +882,20 @@ set_S_flag() {
 }
 
 OPTIND=1
-while getopts inV:S:t FLAG
+while getopts inS:tV: FLAG
 do
 	case $FLAG in
 	  i )	i_FLAG=y; i_CMD_LINE_FLAG=y
 		;;
 	  n )	n_FLAG=y
 		;;
-	  V )	V_FLAG=y
-		V_ARG="$OPTARG"
-		;;
 	  S )
 		set_S_flag $OPTARG
 		;;
 	  t )	t_FLAG=y
+		;;
+	  V )	V_FLAG=y
+		V_ARG="$OPTARG"
 		;;
 	 \? )	echo "$USAGE"
 		exit 1
@@ -1038,26 +1029,22 @@ check_closed_tree
 #
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
 OPTIND=1
-while getopts ABDFNMPTCGIRafinlmoptuUxdrtwzWS:X FLAG $NIGHTLY_OPTIONS
+while getopts AaBCDdFfGIilMmNnoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
 	  A )	A_FLAG=y
 		;;
+	  a )	a_FLAG=y
+		;;
 	  B )	D_FLAG=y
 		;; # old version of D
-	  F )	F_FLAG=y
+	  C )	C_FLAG=y
 		;;
 	  D )	D_FLAG=y
 		;;
-	  P )	P_FLAG=y 
-		;; # obsolete
-	  T )	T_FLAG=y
-		;; # obsolete
-	  C )	C_FLAG=y
+	  F )	F_FLAG=y
 		;;
-	  M )	M_FLAG=y
-		;;
-	  N )	N_FLAG=y
+	  f )	f_FLAG=y
 		;;
 	  G )	a_FLAG=y
 		u_FLAG=y
@@ -1067,34 +1054,35 @@ do
 		p_FLAG=y
 		u_FLAG=y
 		;;
-	  R )	m_FLAG=y
-		p_FLAG=y
-		;;
-	  a )	a_FLAG=y
-		;;
-	  f )	f_FLAG=y
-		;;
 	  i )	i_FLAG=y
+		;;
+	  l )	l_FLAG=y
+		;;
+	  M )	M_FLAG=y
+		;;
+	  m )	m_FLAG=y
+		;;
+	  N )	N_FLAG=y
 		;;
 	  n )	n_FLAG=y
 		;;
 	  o )	o_FLAG=y
 		;;
-	  l )	l_FLAG=y
-		;;
-	  m )	m_FLAG=y
-		;;
+	  P )	P_FLAG=y 
+		;; # obsolete
 	  p )	p_FLAG=y
+		;;
+	  R )	m_FLAG=y
+		p_FLAG=y
 		;;
 	  r )	r_FLAG=y
 		;;
+	  S )
+		set_S_flag $OPTARG
+		;;
+	  T )	T_FLAG=y
+		;; # obsolete
 	  t )	t_FLAG=y
-		;;
-	  u )	u_FLAG=y
-		;;
-	  w )	w_FLAG=y
-		;;
-	  z )	z_FLAG=y
 		;;
 	  U )
 		if [ -z "${PARENT_ROOT}" ]; then
@@ -1105,18 +1093,22 @@ do
 		U_FLAG=y
 		NIGHTLY_PARENT_ROOT=$PARENT_ROOT
 		;;
-	  x )	XMOD_OPT="-x"
+	  u )	u_FLAG=y
 		;;
 	  W )	W_FLAG=y
 		;;
-	  S )
-		set_S_flag $OPTARG
+
+	  w )	w_FLAG=y
 		;;
 	  X )	# now that we no longer need realmode builds, just
 		# copy IHV packages.  only meaningful on x86.
 		if [ "$MACH" = "i386" ]; then
 			X_FLAG=y
 		fi
+		;;
+	  x )	XMOD_OPT="-x"
+		;;
+	  z )	z_FLAG=y
 		;;
 	 \? )	echo "$USAGE"
 		exit 1
