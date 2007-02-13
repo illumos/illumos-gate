@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,11 +145,22 @@ gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
 		vertex_send_event(v, RESTARTER_EVENT_TYPE_DISABLE);
 	}
 
+	/*
+	 * If the service was running, propagate a stop event.  If the
+	 * service was not running the offline transition may satisfy
+	 * optional dependencies and should be propagated to determine
+	 * whether new dependents are satisfiable.
+	 */
 	if (gt_running(old_state)) {
 		log_framework(LOG_DEBUG, "Propagating stop of %s.\n",
 		    v->gv_name);
 
 		graph_transition_propagate(v, PROPAGATE_STOP, rerr);
+	} else {
+		log_framework(LOG_DEBUG, "Propagating offline of %s.\n",
+		    v->gv_name);
+
+		graph_transition_propagate(v, PROPAGATE_SAT, rerr);
 	}
 
 	graph_transition_sulogin(RESTARTER_STATE_OFFLINE, old_state);

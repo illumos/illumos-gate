@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -282,8 +281,11 @@ state_cb(sysevent_t *syse, void *cookie)
 	char *instance_name;
 	nvlist_t *attr_list = NULL;
 	int state, next_state;
+	char str_state[MAX_SCF_STATE_STRING_SZ];
+	char str_next_state[MAX_SCF_STATE_STRING_SZ];
 	protocol_states_t *states;
 	int err;
+	ssize_t sz;
 
 	/*
 	 * Might fail due to a bad event or a lack of memory. Try
@@ -309,8 +311,13 @@ state_cb(sysevent_t *syse, void *cookie)
 	graph_protocol_send_event(instance_name, GRAPH_UPDATE_STATE_CHANGE,
 	    states);
 
-	log_framework(LOG_DEBUG, "%s: state updates for %s (%d, %d)\n", fmri,
-	    instance_name, state, next_state);
+	sz = restarter_state_to_string(state, str_state, sizeof (str_state));
+	assert(sz < sizeof (str_state));
+	sz = restarter_state_to_string(next_state, str_next_state,
+	    sizeof (str_next_state));
+	assert(sz < sizeof (str_next_state));
+	log_framework(LOG_DEBUG, "%s: state updates for %s (%s, %s)\n", fmri,
+	    instance_name, str_state, str_next_state);
 	nvlist_free(attr_list);
 	return (0);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4190,7 +4190,7 @@ graph_transition_sulogin(restarter_instance_state_t state,
 	if (state != old_state && st->st_load_complete &&
 	    !go_single_user_mode && !go_to_level1 &&
 	    halting == -1) {
-		if (!can_come_up() && !sulogin_thread_running) {
+		if (!sulogin_thread_running && !can_come_up()) {
 			(void) startd_thread_create(sulogin_thread, NULL);
 			sulogin_thread_running = B_TRUE;
 		}
@@ -5408,7 +5408,7 @@ graph_thread(void *arg)
 	 */
 	if (!go_single_user_mode && !go_to_level1 &&
 	    halting == -1) {
-		if (!can_come_up() && !sulogin_thread_running) {
+		if (!sulogin_thread_running && !can_come_up()) {
 			(void) startd_thread_create(sulogin_thread, NULL);
 			sulogin_thread_running = B_TRUE;
 		}
