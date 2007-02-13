@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -526,6 +526,7 @@ SUNWprivate_1.1 {
 	krb5_get_init_creds_opt_set_salt;
 	krb5_get_init_creds_opt_set_tkt_life;
 	krb5_get_init_creds_password;
+	__krb5_get_init_creds_password;
 	krb5_get_key_data;
 	krb5_get_key_enctype;
 	krb5_get_key_length;

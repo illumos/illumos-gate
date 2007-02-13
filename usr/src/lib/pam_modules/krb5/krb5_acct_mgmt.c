@@ -47,16 +47,17 @@
 
 #define	KRB5_AUTOMIGRATE_DATA	"SUNW-KRB5-AUTOMIGRATE-DATA"
 
+#define	min(a, b) ((a) < (b) ? (a) : (b))
+
 /*
  * pam_sm_acct_mgmt	  main account managment routine.
  */
 
 static int
 fetch_princ_entry(
+	krb5_module_data_t *kmd,
 	char *princ_str,
-	char *password,
 	kadm5_principal_ent_rec *prent,	/* out */
-	krb5_timestamp *now, /* out */
 	int debug)
 
 {
@@ -64,17 +65,16 @@ fetch_princ_entry(
 	krb5_principal 		princ = 0;
 	char 			admin_realm[1024];
 	char			kprinc[2*MAXHOSTNAMELEN];
-	char			*cpw_service;
+	char			*cpw_service, *password;
 	void 			*server_handle;
 	krb5_context		context;
 	kadm5_config_params	params;
 
-	if (code = krb5_init_context(&context)) {
-		return (PAM_SYSTEM_ERR);
-	}
+	password = kmd->password;
+	context = kmd->kcontext;
 
-	if ((code = get_kmd_kuser(context, (const char *)princ_str, kprinc,
-		2*MAXHOSTNAMELEN)) != 0) {
+	if ((code = get_kmd_kuser(context, (const char *)princ_str,
+	    kprinc, 2*MAXHOSTNAMELEN)) != 0) {
 		return (code);
 	}
 
@@ -148,16 +148,6 @@ fetch_princ_entry(
 			PAM_USER_UNKNOWN : PAM_SYSTEM_ERR);
 	}
 
-	if (code = krb5_timeofday(context, now)) {
-		(void) kadm5_destroy(server_handle);
-		krb5_free_principal(context, princ);
-		krb5_free_context(context);
-		__pam_log(LOG_AUTH | LOG_ERR,
-			    "PAM-KRB5 (acct): krb5_timeofday fail: code=%d",
-		    code);
-		return (PAM_SYSTEM_ERR);
-	}
-
 	(void) kadm5_destroy(server_handle);
 	krb5_free_principal(context, princ);
 	krb5_free_context(context);
@@ -168,76 +158,112 @@ fetch_princ_entry(
 /*
  * exp_warn
  *
- * warn the user if her pw is set to expire
+ * Warn the user if their pw is set to expire.
  *
- * We use the kadm protocol and chpw svc to fetch the user's KDC db
- * entry.  The user's default perms on the KDC db should allow this.
- * Note since the SEAM kadm API uses rpcsec_gss (which is diff from
- * what MS and MIT 1.2 and before uses), this probably only works
- * with a SEAM KDC.
+ * We first check to see if the KDC had set any account or password
+ * expiration information in the key expiration field.  If this was
+ * not set then we must assume that the KDC could be broken and revert
+ * to fetching pw/account expiration information from kadm.  We can not
+ * determine the difference between broken KDCs that do not send key-exp
+ * vs. principals that do not have an expiration policy.  The up-shot
+ * is that pam_krb5 will probably not be stacked for acct mgmt if the
+ * environment does not have an exp policy, avoiding the second exchange
+ * using the kadm protocol.
  */
-
 static int
 exp_warn(
 	pam_handle_t *pamh,
 	char *user,
-	char *password,
+	krb5_module_data_t *kmd,
 	int debug)
 
 {
 	int err;
 	kadm5_principal_ent_rec prent;
-	krb5_timestamp  now, days;
-	char    messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
+	krb5_timestamp  now, days, expiration;
+	char    messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE], *password;
+	krb5_error_code code;
 
 	if (debug)
 		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (acct): exp_warn start: user = '%s'",
 		    user ? user : "<null>");
 
+	password = kmd->password;
+
 	if (!pamh || !user || !password) {
 		err = PAM_SERVICE_ERR;
 		goto out;
 	}
 
-	(void) memset(&prent, 0, sizeof (prent));
-	if ((err = fetch_princ_entry(user, password, &prent,
-				    &now, debug)) != PAM_SUCCESS) {
+	if (code = krb5_init_context(&kmd->kcontext)) {
+		err = PAM_SYSTEM_ERR;
 		if (debug)
-			__pam_log(LOG_AUTH | LOG_DEBUG,
-			    "PAM-KRB5 (acct): exp_warn: fetch_pr failed %d",
-			    err);
+			__pam_log(LOG_AUTH | LOG_ERR, "PAM-KRB5 (acct): "
+			    "krb5_init_context failed: code=%d",
+			    code);
 		goto out;
+	}
+	if (code = krb5_timeofday(kmd->kcontext, &now)) {
+		err = PAM_SYSTEM_ERR;
+		if (debug)
+			__pam_log(LOG_AUTH | LOG_ERR,
+			    "PAM-KRB5 (acct): krb5_timeofday failed: code=%d",
+			    code);
+		goto out;
+	}
+
+	if (kmd->expiration != 0) {
+		expiration = kmd->expiration;
+	} else {
+		(void) memset(&prent, 0, sizeof (prent));
+		if ((err = fetch_princ_entry(kmd, user, &prent, debug))
+		    != PAM_SUCCESS) {
+			if (debug)
+				__pam_log(LOG_AUTH | LOG_DEBUG,
+				"PAM-KRB5 (acct): exp_warn: fetch_pr failed %d",
+				err);
+			goto out;
+		}
+		if (prent.princ_expire_time != 0 && prent.pw_expiration != 0)
+			expiration = min(prent.princ_expire_time,
+				prent.pw_expiration);
+		else
+			expiration = prent.princ_expire_time ?
+				prent.princ_expire_time : prent.pw_expiration;
 	}
 
 	if (debug)
 		__pam_log(LOG_AUTH | LOG_DEBUG,
-		    "PAM-KRB5 (acct): exp_warn: fetch_princ success:"
-		    " princ exp=%ld pw_exp = %ld, now =%ld, days=%ld",
-		    prent.princ_expire_time,
-		    prent.pw_expiration, now,
-		    prent.pw_expiration > 0
-		    ? ((prent.pw_expiration - now) / DAY)
+		    "PAM-KRB5 (acct): exp_warn: "
+		    "princ/pw_exp exp=%ld, now =%ld, days=%ld",
+		    expiration,
+		    now,
+		    expiration > 0
+		    ? ((expiration - now) / DAY)
 		    : 0);
 
 	/* warn user if principal's pw is set to expire */
-	if (prent.pw_expiration > 0) {
-		days = (prent.pw_expiration - now) / DAY;
+	if (expiration > 0) {
+		days = (expiration - now) / DAY;
 		if (days <= 0)
 			(void) snprintf(messages[0],
 				sizeof (messages[0]),
 				dgettext(TEXT_DOMAIN,
-		"Your Kerberos password will expire within 24 hours.\n"));
+				"Your Kerberos account/password will expire "
+				"within 24 hours.\n"));
 		else if (days == 1)
 			(void) snprintf(messages[0],
 				sizeof (messages[0]),
 				dgettext(TEXT_DOMAIN,
-			"Your Kerberos password will expire in 1 day.\n"));
+				"Your Kerberos account/password will expire "
+				"in 1 day.\n"));
 		else
 			(void) snprintf(messages[0],
 				sizeof (messages[0]),
 				dgettext(TEXT_DOMAIN,
-			"Your Kerberos password will expire in %d days.\n"),
+				"Your Kerberos account/password will expire in "
+				"%d days.\n"),
 				(int)days);
 
 		(void) __pam_display_msg(pamh, PAM_TEXT_INFO, 1,
@@ -423,7 +449,7 @@ pam_sm_acct_mgmt(
 
 	if (!(flags & PAM_SILENT) && !nowarn && kmd->password) {
 		/* if we fail, let it slide, it's only a warning brah */
-		(void) exp_warn(pamh, user, kmd->password, debug);
+		(void) exp_warn(pamh, user, kmd, debug);
 	}
 
 	/*

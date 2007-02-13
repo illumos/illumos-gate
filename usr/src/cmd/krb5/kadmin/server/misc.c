@@ -1,3 +1,8 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -128,6 +133,19 @@ chpass_util_wrapper(void *server_handle, krb5_principal princ,
     return kadm5_chpass_principal_util(server_handle, princ,
 				       new_pw, ret_pw,
 				       msg_ret, msg_len);
+}
+
+kadm5_ret_t
+randkey_principal_wrapper(void *server_handle, krb5_principal princ,
+			  krb5_keyblock ** keys, int *n_keys)
+{
+    kadm5_ret_t ret;
+
+    ret = check_min_life(server_handle, princ);
+	if (ret)
+	    return ret;
+
+    return kadm5_randkey_principal(server_handle, princ, keys, n_keys);
 }
 
 kadm5_ret_t

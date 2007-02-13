@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -252,13 +252,10 @@ krb5_rc_mem_recover_or_init(krb5_context context, krb5_rcache id,
 {
     krb5_error_code retval;
 
-    retval = k5_mutex_lock(&id->lock);
+    retval = krb5_rc_mem_recover(context, id); 
     if (retval)
-	return retval;
-    retval = krb5_rc_mem_recover(context, id);
-    if (retval)
-	retval = krb5_rc_mem_init_locked(context, id, lifespan);
-    k5_mutex_unlock(&id->lock);
+	retval = krb5_rc_mem_init(context, id, lifespan);
+
     return retval;
 }
 

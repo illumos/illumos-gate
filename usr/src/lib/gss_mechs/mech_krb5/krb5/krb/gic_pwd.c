@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,14 @@ extern kadm5_ret_t kadm5_init_with_password(char *, char *, char *,
 			kadm5_config_params *, krb5_ui_4, krb5_ui_4, void **);
 extern kadm5_ret_t kadm5_chpass_principal_util(void *, krb5_principal,
 			char *, char **, char *, unsigned int);
+
+/*
+ * Solaris Kerberos:
+ * See the function's definition for the description of this interface.
+ */
+krb5_error_code __krb5_get_init_creds_password(krb5_context,
+	krb5_creds *, krb5_principal, char *, krb5_prompter_fct, void *,
+	krb5_deltat, char *, krb5_get_init_creds_opt *, krb5_kdc_rep **);
 
 static krb5_error_code
 krb5_get_as_key_password(
@@ -130,6 +138,37 @@ krb5_get_init_creds_password(
      krb5_deltat start_time,
      char *in_tkt_service,
      krb5_get_init_creds_opt *options)
+{
+	/*
+	 * Solaris Kerberos:
+	 * We call our own private function that returns the as_reply back to
+	 * the caller.  This structure contains information, such as
+	 * key-expiration and last-req fields.  Entities such as pam_krb5 can
+	 * use this information to provide account/password expiration warnings.
+	 * The original "prompter" interface is not granular enough for PAM,
+	 * as it will perform all passes w/o coordination with other modules.
+	 */
+	return (__krb5_get_init_creds_password(context, creds, client, password,
+		prompter, data, start_time, in_tkt_service, options, NULL));
+}
+
+/*
+ * Solaris Kerberos:
+ * See krb5_get_init_creds_password()'s comments for the justification of this
+ * private function.  Caller must free ptr_as_reply if non-NULL.
+ */
+krb5_error_code KRB5_CALLCONV
+__krb5_get_init_creds_password(
+     krb5_context context,
+     krb5_creds *creds,
+     krb5_principal client,
+     char *password,
+     krb5_prompter_fct prompter,
+     void *data,
+     krb5_deltat start_time,
+     char *in_tkt_service,
+     krb5_get_init_creds_opt *options,
+     krb5_kdc_rep **ptr_as_reply)
 {
    krb5_error_code ret, ret2;
    int use_master;
@@ -420,8 +459,16 @@ cleanup:
    memset(pw0array, 0, sizeof(pw0array));
    memset(pw1array, 0, sizeof(pw1array));
    krb5_free_cred_contents(context, &chpw_creds);
-   if (as_reply)
-      krb5_free_kdc_rep(context, as_reply);
+   /*
+    * Solaris Kerberos:
+    * Argument, ptr_as_reply, being returned to caller if success and non-NULL.
+    */
+   if (as_reply != NULL) {
+	if (ptr_as_reply == NULL)
+      	   krb5_free_kdc_rep(context, as_reply);
+	else
+	   *ptr_as_reply = as_reply;
+   }
 
    return(ret);
 }

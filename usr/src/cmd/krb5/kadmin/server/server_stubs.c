@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1414,8 +1414,8 @@ chrand_principal_1_svc(chrand_arg *arg, struct svc_req *rqstp)
 	}
 
     if (cmp_gss_krb5_name(handle, name, arg->princ)) {
-	 ret.code = randkey_principal_wrapper_3((void *)handle, arg->princ,
-						FALSE, 0, NULL, &k, &nkeys);
+	 ret.code = randkey_principal_wrapper((void *)handle, arg->princ, &k,
+						&nkeys);
     } else if (!(CHANGEPW_SERVICE(rqstp)) &&
 	       kadm5int_acl_check(handle->context, name,
 			 ACL_CHANGEPW, arg->princ, NULL)) {

@@ -77,6 +77,10 @@ extern int krb5_verifypw(char *, char *, int);
 extern krb5_error_code krb5_verify_init_creds(krb5_context,
 		krb5_creds *, krb5_principal, krb5_keytab, krb5_ccache *,
 		krb5_verify_init_creds_opt *);
+extern krb5_error_code __krb5_get_init_creds_password(krb5_context,
+		krb5_creds *, krb5_principal, char *, krb5_prompter_fct, void *,
+		krb5_deltat, char *, krb5_get_init_creds_opt *,
+		krb5_kdc_rep **);
 
 /*
  * pam_sm_authenticate		- Authenticate user
@@ -325,6 +329,7 @@ attempt_krb5_auth(
 		KRB5_TGS_NAME
 	};
 	krb5_get_init_creds_opt opts;
+	krb5_kdc_rep *as_reply = NULL;
 	/*
 	 * "result" should not be assigned PAM_SUCCESS unless
 	 * authentication has succeeded and there are no other errors.
@@ -493,7 +498,14 @@ attempt_krb5_auth(
 	if (*krb5_pass == NULL || strlen(*krb5_pass) == 0) {
 		code = KRB5KRB_AP_ERR_BAD_INTEGRITY;
 	} else {
-		code = krb5_get_init_creds_password(kmd->kcontext,
+
+		/*
+		 * We call our own private version of gic_pwd, because we need
+		 * more information, such as password/account expiration, that
+		 * is found in the as_reply.  The "prompter" interface is not
+		 * granular enough for PAM to make use of.
+		 */
+		code = __krb5_get_init_creds_password(kmd->kcontext,
 				my_creds,
 				me,
 				*krb5_pass,	/* clear text passwd */
@@ -501,7 +513,8 @@ attempt_krb5_auth(
 				NULL,		/* data */
 				0,		/* start time */
 				NULL,		/* defaults to krbtgt@REALM */
-				&opts);
+				&opts,
+				&as_reply);
 	}
 
 	if (kmd->debug)
@@ -579,6 +592,10 @@ attempt_krb5_auth(
 					krb5_free_principal(kmd->kcontext, sp);
 			}
 		}
+
+		if (code == 0)
+			kmd->expiration = as_reply->enc_part2->key_exp;
+
 		break;
 
 	case KRB5KDC_ERR_C_PRINCIPAL_UNKNOWN:
@@ -668,6 +685,8 @@ out:
 		krb5_free_principal(kmd->kcontext, server);
 	if (me)
 		krb5_free_principal(kmd->kcontext, me);
+	if (as_reply)
+		krb5_free_kdc_rep(kmd->kcontext, as_reply);
 	if (kmd->kcontext) {
 		krb5_free_context(kmd->kcontext);
 		kmd->kcontext = NULL;

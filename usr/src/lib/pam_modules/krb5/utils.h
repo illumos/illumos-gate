@@ -53,6 +53,7 @@ typedef struct {
 					/* pam_authenticate() */
 	char		*password;
 	int		age_status;
+	krb5_timestamp	expiration;
 } krb5_module_data_t;
 
 int get_pw_uid(char *, uid_t *);

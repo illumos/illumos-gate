@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -704,72 +704,86 @@ switch (errorno) {
 	case 225:
 		return (dgettext(TEXT_DOMAIN,
 			"Bad SAM flags in obtain_sam_padata"));
-	case 226:
+	case 226: /* KRB5_SAM_INVALID_ETYPE */
+		return (dgettext(TEXT_DOMAIN,
+			"Invalid encryption type in SAM challenge"));
+	case 227: /* KRB5_SAM_NO_CHECKSUM */
+		return (dgettext(TEXT_DOMAIN,
+			"Missing checksum in SAM challenge"));
+	case 228: /* KRB5_SAM_BAD_CHECKSUM */
+		return (dgettext(TEXT_DOMAIN,
+			"Bad checksum in SAM challenge"));
+	case 229: /* KRB5_KT_NAME_TOOLONG */
 		return (dgettext(TEXT_DOMAIN,
 			"Keytab name too long"));
-	case 227:
+	case 230: /* KRB5_KT_KVNONOTFOUND */
 		return (dgettext(TEXT_DOMAIN,
 			"Key version number for principal in key table is "
 			"incorrect"));
-	case 228:
+	case 231: /* KRB5_APPL_EXPIRED */
 		return (dgettext(TEXT_DOMAIN,
 			"This application has expired"));
-	case 229:
+	case 232: /* KRB5_LIB_EXPIRED */
 		return (dgettext(TEXT_DOMAIN,
 			"This Krb5 library has expired"));
-	case 230:
+	case 233: /* KRB5_CHPW_PWDNULL */
 		return (dgettext(TEXT_DOMAIN,
 			"New password cannot be zero length"));
-	case 231:
+	case 234: /* KRB5_CHPW_FAIL */
 		return (dgettext(TEXT_DOMAIN,
 			"Password change failed"));
-	case 232:
+	case 235: /* KRB5_KT_FORMAT */
 		return (dgettext(TEXT_DOMAIN,
 			"Bad format in keytab"));
-	case 233:
+	case 236: /* KRB5_NOPERM_ETYPE */
 		return (dgettext(TEXT_DOMAIN,
 			"Encryption type not permitted"));
-	case 234:
+	case 237: /* KRB5_CONFIG_ETYPE_NOSUPP */
 		return (dgettext(TEXT_DOMAIN,
 			"No supported encryption types (config file error?)"));
-	case 235:
+	case 238: /* KRB5_OBSOLETE_FN */
 		return (dgettext(TEXT_DOMAIN,
 			"Program called an obsolete, deleted function"));
-	case 236: /* KRB5_CONF_NOT_CONFIGURED */
+	case 239: /* KRB5_EAI_FAIL */
 		return (dgettext(TEXT_DOMAIN,
-	"Kerberos /etc/krb5/krb5.conf configuration file not configured"));
-	case 237: /* PKCS_ERR */
+			"unknown getaddrinfo failure"));
+	case 240: /* KRB5_EAI_NODATA */
 		return (dgettext(TEXT_DOMAIN,
-		    "Error in the PKCS 11 library calls"));
-	case 238: /* KRB5_EAI_FAIL */
+			"no data available for host/domain name"));
+	case 241: /* KRB5_EAI_NONAME */
 		return (dgettext(TEXT_DOMAIN,
-		    "unknown getaddrinfo failure"));
-	case 239: /* KRB5_EAI_NODATA */
+			"host/domain name not found"));
+	case 242: /* KRB5_EAI_SERVICE */
 		return (dgettext(TEXT_DOMAIN,
-		    "no data available for host/domain name"));
-	case 240: /* KRB5_EAI_NONAME */
+			"service name unknown"));
+	case 243: /* KRB5_ERR_NUMERIC_REALM */
 		return (dgettext(TEXT_DOMAIN,
-		    "host/domain name not found"));
-	case 241: /* KRB5_EAI_SERVICE */
+			"Cannot determine realm for numeric host address"));
+	case 244: /* KRB5_ERR_BAD_S2K_PARAMS */
 		return (dgettext(TEXT_DOMAIN,
-		    "service name unknown"));
-	case 242: /* KRB5_ERR_NUMERIC_REALM */
+			"Invalid key generation parameters from KDC"));
+	case 245: /* KRB5_ERR_NO_SERVICE */
 		return (dgettext(TEXT_DOMAIN,
-		    "Cannot determine realm for numeric host address"));
-	case 243: /* KRB5_ERR_NO_SERVICE */
+			"service not available"));
+	case 246: /* KRB5_CC_READONLY */
 		return (dgettext(TEXT_DOMAIN,
-		    "service not available"));
-	case 244: /* KRB5_RC_BADNAME */
-		return (dgettext(TEXT_DOMAIN, "Bad replay cache name"));
-	case 245: /* KRB5_CONF_NOT_CONFIGURED */
+			"Ccache function not supported: read-only ccache "
+			"type"));
+	case 247: /* KRB5_CC_NOSUPP */
 		return (dgettext(TEXT_DOMAIN,
-				"krb5 conf file not configured"));
-	case 246: /* PKCS_ERR */
-		return (dgettext(TEXT_DOMAIN, "PKCS error"));
-		/* SUNW14resync start */
-	case 247: /* KRB5_DELTAT_BADFORMAT */
-		return (dgettext(TEXT_DOMAIN, "Delta time bad format"));
-		/* SUNW14resync end */
+			"Ccache function not supported: not implemented"));
+	case 249: /* KRB5_RC_BADNAME */
+		return (dgettext(TEXT_DOMAIN,
+			"Bad replay cache name"));
+	case 250: /* KRB5_CONF_NOT_CONFIGURED */
+		return (dgettext(TEXT_DOMAIN,
+			"krb5 conf file not configured"));
+	case 251: /* PKCS_ERR */
+		return (dgettext(TEXT_DOMAIN,
+			"Error in the PKCS 11 library calls"));
+	case 252: /* KRB5_DELTAT_BADFORMAT */
+		return (dgettext(TEXT_DOMAIN,
+			"Delta time bad format"));
 	default:
 		return ("unknown error");
 	}

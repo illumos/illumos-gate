@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +69,7 @@ process_as_req(krb5_kdc_req *request, const krb5_fulladdr *from,
     krb5_error_code errcode;
     int c_nprincs = 0, s_nprincs = 0;
     krb5_boolean more;
-    krb5_timestamp kdc_time, authtime;
+    krb5_timestamp kdc_time, authtime, etime = 0;
     krb5_keyblock session_key;
     krb5_keyblock encrypting_key;
     const char *status;
@@ -398,7 +398,16 @@ process_as_req(krb5_kdc_req *request, const krb5_fulladdr *from,
 	goto errout;
     }
     reply_encpart.nonce = request->nonce;
-    reply_encpart.key_exp = client.expiration;
+
+    /*
+     * Take the minimum of expiration or pw_expiration if not zero.
+     */
+    if (client.expiration != 0 && client.pw_expiration != 0)
+    	etime = min(client.expiration, client.pw_expiration);
+    else
+	etime = client.expiration ? client.expiration : client.pw_expiration;
+
+    reply_encpart.key_exp = etime; 
     reply_encpart.flags = enc_tkt_reply.flags;
     reply_encpart.server = ticket_reply.server;
 
