@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -205,6 +205,7 @@ typedef struct {
 typedef struct {
 	int		mc_cpuid;
 	int		mc_cwqid;
+	int		mc_state;	/* CWQ_STATE_... */
 } cpu_entry_t;
 
 typedef struct {
@@ -217,7 +218,7 @@ typedef struct {
 	int		m_ncwqs_online;
 	int		m_nextcwqidx;
 	/*
-	 * Only protects m_nextcwqidx,  field.
+	 * Only protects m_nextcwqidx and m_ncwqs_online
 	 */
 	kmutex_t	m_lock;
 
@@ -536,7 +537,6 @@ struct n2cp_request {
 struct n2cp {
 	int				n_hvapi_major_version;
 	int				n_hvapi_minor_version;
-	kmutex_t			n_lock;
 	dev_info_t			*n_dip;
 
 	ddi_taskq_t			*n_taskq;
@@ -743,6 +743,10 @@ int	n2cp_map_cwq_to_cpu(n2cp_t *, int, int);
 int	n2cp_map_cpu_to_cwq(n2cp_t *, int);
 int	n2cp_map_nextcwq(n2cp_t *);
 cwq_entry_t	*n2cp_map_findcwq(n2cp_t *, int);
+void	n2cp_online_cwq(n2cp_t *, int cwq_id);
+void	n2cp_offline_cwq(n2cp_t *, int cwq_id);
+void	n2cp_online_cpu(n2cp_t *, int cpu_id);
+void	n2cp_offline_cpu(n2cp_t *, int cpu_id);
 
 #ifdef N2_ERRATUM_175
 

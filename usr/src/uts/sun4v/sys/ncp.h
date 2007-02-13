@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -376,6 +376,7 @@ typedef struct {
 typedef struct {
 	int		mc_cpuid;
 	int		mc_mauid;
+	int		mc_state;	/* MAU_STATE_... */
 } cpu_entry_t;
 
 typedef struct {
@@ -439,7 +440,6 @@ struct ncp {
 	uint_t				n_hvapi_minor_version;
 	ncp_binding_t			n_binding;
 	char				*n_binding_name;
-	kmutex_t			n_lock;
 	kmem_cache_t			*n_ds_cache;
 	kmem_cache_t			*n_mactl_cache;
 	kmem_cache_t			*n_mabuf_cache;
@@ -569,7 +569,11 @@ int	ncp_map_cpu_to_mau(ncp_t *, int);
 int	ncp_map_mau_to_cpu(ncp_t *, int);
 int	ncp_map_nextmau(ncp_t *);
 mau_entry_t	*ncp_map_findmau(ncp_t *, int);
-void	ncp_offline_mau(ncp_t *ncp, int mid);
+void	ncp_online_mau(ncp_t *, int mau_id);
+void	ncp_offline_mau(ncp_t *, int mau_id);
+void	ncp_online_cpu(ncp_t *, int cpu_id);
+void	ncp_offline_cpu(ncp_t *, int cpu_id);
+
 
 /*
  * ncp_kstat.c
