@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -529,7 +529,6 @@ aiowait(
 	aio_req_t	*reqp;
 	clock_t		status;
 	int		blocking;
-	int		timecheck;
 	timestruc_t	rqtime;
 	timestruc_t	*rqtp;
 
@@ -545,7 +544,6 @@ aiowait(
 		return (error);
 	if (rqtp) {
 		timestruc_t now;
-		timecheck = timechanged;
 		gethrestime(&now);
 		timespecadd(rqtp, &now);
 	}
@@ -575,7 +573,7 @@ aiowait(
 		}
 		if (blocking) {
 			status = cv_waituntil_sig(&aiop->aio_waitcv,
-			    &aiop->aio_mutex, rqtp, timecheck);
+			    &aiop->aio_mutex, rqtp);
 
 			if (status > 0)		/* check done queue again */
 				continue;
@@ -619,7 +617,6 @@ aiowaitn(void *uiocb, uint_t nent, uint_t *nwait, timespec_t *timout)
 	int		iocb_index = 0;
 	model_t		model = get_udatamodel();
 	int		blocking = 1;
-	int		timecheck;
 	timestruc_t	rqtime;
 	timestruc_t	*rqtp;
 
@@ -690,7 +687,6 @@ aiowaitn(void *uiocb, uint_t nent, uint_t *nwait, timespec_t *timout)
 	 */
 	if (rqtp) {
 		timestruc_t now;
-		timecheck = timechanged;
 		gethrestime(&now);
 		timespecadd(rqtp, &now);
 	}
@@ -752,7 +748,7 @@ aiowaitn(void *uiocb, uint_t nent, uint_t *nwait, timespec_t *timout)
 
 		if ((cnt < waitcnt) && blocking) {
 			int rval = cv_waituntil_sig(&aiop->aio_waitcv,
-				&aiop->aio_mutex, rqtp, timecheck);
+				&aiop->aio_mutex, rqtp);
 			if (rval > 0)
 				continue;
 			if (rval < 0) {
@@ -920,7 +916,6 @@ aiosuspend(
 	size_t		ssize;
 	model_t		model = get_udatamodel();
 	int		blocking;
-	int		timecheck;
 	timestruc_t	rqtime;
 	timestruc_t	*rqtp;
 
@@ -936,7 +931,6 @@ aiosuspend(
 		return (error);
 	if (rqtp) {
 		timestruc_t now;
-		timecheck = timechanged;
 		gethrestime(&now);
 		timespecadd(rqtp, &now);
 	}
@@ -1056,7 +1050,7 @@ aiosuspend(
 			 */
 			mutex_exit(&aiop->aio_cleanupq_mutex);
 			rv = cv_waituntil_sig(&aiop->aio_waitcv,
-				&aiop->aio_mutex, rqtp, timecheck);
+				&aiop->aio_mutex, rqtp);
 			/*
 			 * we have to drop aio_mutex and
 			 * grab it in the right order.

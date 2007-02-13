@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -874,7 +874,6 @@ semop(int semid, struct sembuf *sops, size_t nsops, timespec_t *timeout)
 	struct sembuf	*uops;	/* ptr to copy of user ops */
 	struct sembuf 	x_sem;	/* avoid kmem_alloc's */
 	timespec_t	now, ts, *tsp = NULL;
-	int		timecheck = 0;
 	int		cvres, needundo, mode;
 	struct sem_undo	*undo;
 	proc_t		*pp = curproc;
@@ -898,7 +897,6 @@ semop(int semid, struct sembuf *sops, size_t nsops, timespec_t *timeout)
 	 * we can legally not validate 'timeout' if it is unused.
 	 */
 	if (timeout != NULL) {
-		timecheck = timechanged;
 		gethrestime(&now);
 		if (error = compute_timeout(&tsp, &ts, &now, timeout))
 			return (set_errno(error));
@@ -1089,8 +1087,7 @@ check:
 				ipc_hold(sem_svc, (kipc_perm_t *)sp);
 			}
 			semp->semncnt++;
-			cvres = cv_waituntil_sig(&semp->semncnt_cv, lock,
-				tsp, timecheck);
+			cvres = cv_waituntil_sig(&semp->semncnt_cv, lock, tsp);
 			lock = ipc_relock(sem_svc, sp->sem_perm.ipc_id, lock);
 
 			if (!IPC_FREE(&sp->sem_perm)) {
@@ -1126,8 +1123,7 @@ check:
 				ipc_hold(sem_svc, (kipc_perm_t *)sp);
 			}
 			semp->semzcnt++;
-			cvres = cv_waituntil_sig(&semp->semzcnt_cv, lock,
-				tsp, timecheck);
+			cvres = cv_waituntil_sig(&semp->semzcnt_cv, lock, tsp);
 			lock = ipc_relock(sem_svc, sp->sem_perm.ipc_id, lock);
 
 			/*

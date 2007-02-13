@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1081,7 +1081,6 @@ pr_wait_stop(prnode_t *pnp, time_t timeo)
 	proc_t *p = pcp->prc_proc;
 	timestruc_t rqtime;
 	timestruc_t *rqtp = NULL;
-	int timecheck = 0;
 	kthread_t *t;
 	int error;
 
@@ -1091,7 +1090,6 @@ pr_wait_stop(prnode_t *pnp, time_t timeo)
 		 */
 		timestruc_t now;
 
-		timecheck = timechanged;
 		gethrestime(&now);
 		rqtp = &rqtime;
 		rqtp->tv_sec = timeo / MILLISEC;
@@ -1107,7 +1105,7 @@ pr_wait_stop(prnode_t *pnp, time_t timeo)
 			thread_unlock(t);
 			mutex_enter(&pcp->prc_mutex);
 			prunlock(pnp);
-			error = pr_wait(pcp, rqtp, timecheck);
+			error = pr_wait(pcp, rqtp);
 			if (error)	/* -1 is timeout */
 				return (error);
 			if ((error = prlock(pnp, ZNO)) != 0)
@@ -1126,7 +1124,7 @@ pr_wait_stop(prnode_t *pnp, time_t timeo)
 			thread_unlock(t);
 			mutex_enter(&pcp->prc_mutex);
 			prunlock(pnp);
-			error = pr_wait(pcp, rqtp, timecheck);
+			error = pr_wait(pcp, rqtp);
 			if (error)	/* -1 is timeout */
 				return (error);
 			if ((error = prlock(pnp, ZNO)) != 0)
@@ -1284,13 +1282,12 @@ pr_setrun(prnode_t *pnp, ulong_t flags)
  */
 int
 pr_wait(prcommon_t *pcp,	/* prcommon referring to process/lwp */
-	timestruc_t *ts,	/* absolute time of timeout, if any */
-	int timecheck)
+	timestruc_t *ts)	/* absolute time of timeout, if any */
 {
 	int rval;
 
 	ASSERT(MUTEX_HELD(&pcp->prc_mutex));
-	rval = cv_waituntil_sig(&pcp->prc_wait, &pcp->prc_mutex, ts, timecheck);
+	rval = cv_waituntil_sig(&pcp->prc_wait, &pcp->prc_mutex, ts);
 	mutex_exit(&pcp->prc_mutex);
 	switch (rval) {
 	case 0:
@@ -2045,7 +2042,7 @@ retry:
 		 * Wait for the agent to stop and notify us.
 		 * If we've been interrupted, return that information.
 		 */
-		error = pr_wait(pcp, NULL, 0);
+		error = pr_wait(pcp, NULL);
 		if (error == EINTR) {
 			error = 0;
 			break;

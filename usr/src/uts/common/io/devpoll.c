@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -689,7 +689,6 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	timestruc_t	now;
 	timestruc_t	rqtime;
 	timestruc_t	*rqtp = NULL;
-	int		timecheck = 0;
 	minor_t 	minor;
 	dp_entry_t	*dpep;
 	pollcache_t	*pcp;
@@ -698,7 +697,6 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 
 	if (cmd == DP_POLL) {
 		/* do this now, before we sleep on DP_WRITER_PRESENT below */
-		timecheck = timechanged;
 		gethrestime(&now);
 	}
 	minor = getminor(dev);
@@ -761,7 +759,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 				return (0);
 			mutex_enter(&curthread->t_delay_lock);
 			while ((rval = cv_waituntil_sig(&curthread->t_delay_cv,
-			    &curthread->t_delay_lock, rqtp, timecheck)) > 0)
+			    &curthread->t_delay_lock, rqtp)) > 0)
 				continue;
 			mutex_exit(&curthread->t_delay_lock);
 			return ((rval == 0)? EINTR : 0);
@@ -816,7 +814,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			if (time_out == 0)	/* immediate timeout */
 				break;
 			rval = cv_waituntil_sig(&pcp->pc_cv, &pcp->pc_lock,
-				rqtp, timecheck);
+				rqtp);
 			/*
 			 * If we were awakened by a signal or timeout
 			 * then break the loop, else poll again.

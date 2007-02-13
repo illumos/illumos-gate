@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,8 +23,8 @@
 
 
 /*
- * Copyright (c) 1997-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SYS_CALLO_H
@@ -51,8 +50,11 @@ typedef struct callout {
 	struct callout	*c_idprev;	/* prev in ID hash */
 	struct callout	*c_lbnext;	/* next in lbolt hash */
 	struct callout	*c_lbprev;	/* prev in lbolt hash */
+	struct callout	*c_hrnext;	/* next in hres queue */
+	struct callout	*c_hrprev;	/* prev in hres queue */
 	callout_id_t	c_xid;		/* extended callout ID; see below */
 	clock_t		c_runtime;	/* absolute run time */
+	int64_t		c_hresms;	/* hres in milli-second */
 	void		(*c_func)(void *); /* function to call */
 	void		*c_arg;		/* argument to function */
 	kthread_id_t	c_executor;	/* thread executing callout */
@@ -125,6 +127,7 @@ typedef struct callout_table {
 	callout_id_t	ct_long_id;	/* most recently issued long-term ID */
 	callout_t 	*ct_idhash[CALLOUT_BUCKETS];	/* ID hash chains */
 	callout_t 	*ct_lbhash[CALLOUT_BUCKETS];	/* lbolt hash chains */
+	callout_t	*ct_hresq;	/* hres sorted queue */
 } callout_table_t;
 
 #ifdef	_KERNEL

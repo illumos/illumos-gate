@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,16 +58,17 @@ lwp_timer_timeout(void *arg)
 
 	mutex_enter(&t->t_delay_lock);
 	gethrestime(&now);
+
 	/*
-	 * Requeue the timeout if no one has reset the system time
-	 * and if the absolute future time has not been reached.
+	 * timeout is premature iff
+	 *	lwpt_lbolt >= lbolt  and  when > now
 	 */
-	if (lwptp->lwpt_timecheck == timechanged &&
+	if (lwptp->lwpt_lbolt >= lbolt &&
 	    (lwptp->lwpt_rqtime.tv_sec > now.tv_sec ||
 	    (lwptp->lwpt_rqtime.tv_sec == now.tv_sec &&
 	    lwptp->lwpt_rqtime.tv_nsec > now.tv_nsec))) {
 		lwptp->lwpt_id = realtime_timeout(lwp_timer_timeout, lwptp,
-			timespectohz_adj(&lwptp->lwpt_rqtime, now));
+			timespectohz(&lwptp->lwpt_rqtime, now));
 	} else {
 		/*
 		 * Set the thread running only if it is asleep on
@@ -93,7 +93,6 @@ lwp_timer_copyin(lwp_timer_t *lwptp, timespec_t *tsp)
 
 	if (tsp == NULL)	/* not really an error, just need to bzero() */
 		goto err;
-	lwptp->lwpt_timecheck = timechanged; /* do this before gethrestime() */
 	gethrestime(&now);		/* do this before copyin() */
 	if (curproc->p_model == DATAMODEL_NATIVE) {
 		if (copyin(tsp, &lwptp->lwpt_rqtime, sizeof (timespec_t))) {
@@ -128,6 +127,8 @@ lwp_timer_copyin(lwp_timer_t *lwptp, timespec_t *tsp)
 		lwptp->lwpt_id = 0;
 		lwptp->lwpt_imm_timeout = 0;
 		timespecadd(&lwptp->lwpt_rqtime, &now);
+		lwptp->lwpt_lbolt = lbolt +
+		    timespectohz(&lwptp->lwpt_rqtime, now);
 	}
 	return (0);
 err:
@@ -144,7 +145,12 @@ lwp_timer_enqueue(lwp_timer_t *lwptp)
 	ASSERT(lwptp->lwpt_thread == curthread);
 	ASSERT(MUTEX_HELD(&curthread->t_delay_lock));
 	gethrestime(&now);
-	if (lwptp->lwpt_timecheck == timechanged &&
+
+	/*
+	 * timeout is premature iff
+	 *	lwpt_lbolt >= lbolt  and  when > now
+	 */
+	if (lwptp->lwpt_lbolt >= lbolt &&
 	    (lwptp->lwpt_rqtime.tv_sec > now.tv_sec ||
 	    (lwptp->lwpt_rqtime.tv_sec == now.tv_sec &&
 	    lwptp->lwpt_rqtime.tv_nsec > now.tv_nsec))) {
@@ -152,7 +158,7 @@ lwp_timer_enqueue(lwp_timer_t *lwptp)
 		 * Queue the timeout.
 		 */
 		lwptp->lwpt_id = realtime_timeout(lwp_timer_timeout, lwptp,
-			timespectohz_adj(&lwptp->lwpt_rqtime, now));
+			timespectohz(&lwptp->lwpt_rqtime, now));
 		return (0);
 	}
 

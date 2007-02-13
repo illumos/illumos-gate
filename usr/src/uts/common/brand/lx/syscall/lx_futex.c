@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,7 +212,7 @@ futex_wait(memid_t *memid, caddr_t addr, int val, timespec_t *timeout)
 	err = 0;
 	while ((fw.fw_woken == 0) && (err == 0)) {
 		ret = cv_waituntil_sig(&fw.fw_cv, &futex_hash_lock[index],
-			timeout, timechanged);
+			timeout);
 		if (ret < 0)
 			err = set_errno(ETIMEDOUT);
 		else if (ret == 0)

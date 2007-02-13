@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -332,7 +332,7 @@ extern	kthread_t *pr_thread(prnode_t *);
 extern	void	pr_stop(prnode_t *);
 extern	int	pr_wait_stop(prnode_t *, time_t);
 extern	int	pr_setrun(prnode_t *, ulong_t);
-extern	int	pr_wait(prcommon_t *, timestruc_t *, int);
+extern	int	pr_wait(prcommon_t *, timestruc_t *);
 extern	void	pr_wait_die(prnode_t *);
 extern	int	pr_setsig(prnode_t *, siginfo_t *);
 extern	int	pr_kill(prnode_t *, int, cred_t *);
