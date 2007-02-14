@@ -71,7 +71,7 @@ struct loadavg_s {
 struct ftrace_record;
 typedef struct ftrace_data {
 	int			ftd_state;	/* ftrace flags */
-	kmutex_t		ftd_mutex;	/* ftrace buffer lock */
+	kmutex_t		ftd_unused;	/* ftrace buffer lock, unused */
 	struct ftrace_record	*ftd_cur;	/* current record */
 	struct ftrace_record	*ftd_first;	/* first record */
 	struct ftrace_record	*ftd_last;	/* last record */

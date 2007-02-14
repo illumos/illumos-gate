@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +45,7 @@
 #include <sys/sunddi.h>
 #include <sys/lockstat.h>
 #include <sys/dtrace.h>
+#include <sys/ftrace.h>
 #endif	/* lint */
 
 #include <sys/asm_linkage.h>
@@ -1772,3 +1772,36 @@ get_subcc_ccr( uint64_t addrl, uint64_t addrr)
 	SET_SIZE(get_subcc_ccr)
 
 #endif  /* lint */
+
+#if defined(lint) || defined(__lint)
+
+ftrace_icookie_t
+ftrace_interrupt_disable(void)
+{ return (0); }
+
+#else	/* lint */
+
+	ENTRY_NP(ftrace_interrupt_disable)
+	rdpr	%pstate, %o0
+	andn	%o0, PSTATE_IE, %o1
+	retl
+	wrpr	%g0, %o1, %pstate
+	SET_SIZE(ftrace_interrupt_disable)
+
+#endif	/* lint */
+
+#if defined(lint) || defined(__lint)
+
+/*ARGSUSED*/
+void
+ftrace_interrupt_enable(ftrace_icookie_t cookie)
+{}
+
+#else
+
+	ENTRY_NP(ftrace_interrupt_enable)
+	retl
+	wrpr	%g0, %o0, %pstate 
+	SET_SIZE(ftrace_interrupt_enable)
+
+#endif /* lint*/

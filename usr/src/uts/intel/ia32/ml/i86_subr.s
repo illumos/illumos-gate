@@ -59,6 +59,7 @@
 #include <sys/archsystm.h>
 #include <sys/byteorder.h>
 #include <sys/dtrace.h>
+#include <sys/ftrace.h>
 #else	/* __lint */
 #include "assym.h"
 #endif	/* __lint */
@@ -3707,4 +3708,62 @@ getflags(void)
 
 #endif	/* __i386 */
 
+#endif	/* __lint */
+
+#if defined(__lint)
+
+ftrace_icookie_t
+ftrace_interrupt_disable(void)
+{ return (0); }
+
+#else   /* __lint */
+
+#if defined(__amd64)
+
+	ENTRY(ftrace_interrupt_disable)
+	pushfq
+	popq	%rax
+	CLI(%rdx)
+	ret
+	SET_SIZE(ftrace_interrupt_disable)
+
+#elif defined(__i386)
+		
+	ENTRY(ftrace_interrupt_disable)
+	pushfl
+	popl	%eax
+	CLI(%edx)
+	ret
+	SET_SIZE(ftrace_interrupt_disable)
+
+#endif	/* __i386 */	
+#endif	/* __lint */
+
+#if defined(__lint)
+
+/*ARGSUSED*/
+void
+ftrace_interrupt_enable(ftrace_icookie_t cookie)
+{}
+
+#else	/* __lint */
+
+#if defined(__amd64)
+
+	ENTRY(ftrace_interrupt_enable)
+	pushq	%rdi
+	popfq
+	ret
+	SET_SIZE(ftrace_interrupt_enable)
+
+#elif defined(__i386)
+		
+	ENTRY(ftrace_interrupt_enable)
+	movl	4(%esp), %eax
+	pushl	%eax
+	popfl
+	ret
+	SET_SIZE(ftrace_interrupt_enable)
+
+#endif	/* __i386 */	
 #endif	/* __lint */

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +48,24 @@ int ftrace_atboot = 0;
 int ftrace_nent = FTRACE_NENT;
 
 /*
- * The current overall state of the ftrace subsystem.
+ * Global Tracing State:
+ *
+ *                NOTREADY(=0)
+ *                  |
+ *            ftrace_init()
+ *                  |
+ *                  |
+ *                  v
+ *      +-------->READY-------+
+ *      |                     |
+ *  ftrace_stop()         ftrace_start()
+ *      |                     |
+ *      +---(ENABLED|READY)<--+
+ *
+ * During boot, ftrace_init() is called and the state becomes
+ * READY. If ftrace_atboot is set, ftrace_start() is called at
+ * this time.
+ *
  * If FTRACE_READY is set, then tracing can be enabled.
  * If FTRACE_ENABLED is set, tracing is enabled on the set of CPUs
  *   which are currently FTRACE_READY.
@@ -57,16 +73,53 @@ int ftrace_nent = FTRACE_NENT;
 static int ftrace_state = 0;
 
 /*
- * Protects assignments to:
+ * Per-CPU Tracing State:
+ *
+ *     +-----------------READY<--------------+
+ *     |                 ^   |               |
+ *     |                 | ftrace_cpu_fini() |
+ *     |                 |   |               |
+ *     |   ftrace_cpu_init() |               |
+ *     |                 |   v     ftrace_cpu_stop()
+ *     |              NOTREADY(=0)           |
+ *     |                   ^                 |
+ * ftrace_cpu_start()      |                 |
+ *     |              ftrace_cpu_fini()      |
+ *     |                   |                 |
+ *     +----------->(ENABLED|READY)----------+
+ *
+ */
+
+/*
+ * Locking :
+ *
+ * Trace context code does not use any lock. There is a per-cpu circular trace
+ * buffer that has a head, a tail and a current pointer. Each record of this
+ * buffer is of equal length. Before doing anything, trace context code checks
+ * the per-cpu ENABLED bit. Trace buffer is allocated in non-trace context and
+ * it sets this bit only after allocating and setting up the buffer. So trace
+ * context code can't access the buffer till it is set up completely. The
+ * buffer is freed also in non-trace context. The code that frees the buffer is
+ * executed only after the corresponding cpu is powered off. So when this
+ * happens, no trace context code can be running on it. We only need to make
+ * sure that trace context code is not preempted from the cpu in the middle of
+ * accessing the trace buffer. This can be achieved simply by disabling
+ * interrupts temporarily. This approach makes the least assumption about the
+ * state of the callers of tracing functions.
+ *
+ * A single global lock, ftrace_lock protects assignments to all global and
+ * per-cpu trace variables. It does not protect reading of those in some cases.
+ *
+ * More specifically, it protects assignments to:
+ *
  *   ftrace_state
  *   cpu[N]->cpu_ftrace.ftd_state
- *   cpu[N]->cpu_ftrace.ftd_cur
  *   cpu[N]->cpu_ftrace.ftd_first
  *   cpu[N]->cpu_ftrace.ftd_last
- * Does _not_ protect readers of cpu[N]->cpu_ftrace.ftd_state.
- * Does not protect reading the FTRACE_READY bit in ftrace_state,
- *   since non-READY to READY is a stable transition.  This is used
- *   to ensure ftrace_init() has been called.
+ *
+ * Does _not_ protect reading of cpu[N]->cpu_ftrace.ftd_state
+ * Does _not_ protect cpu[N]->cpu_ftrace.ftd_cur
+ * Does _not_ protect reading of ftrace_state
  */
 static kmutex_t ftrace_lock;
 
@@ -119,11 +172,18 @@ ftrace_cpu_fini(int cpuid)
 		return;
 
 	/*
-	 * Do not free mutex and the the trace buffer once they are
-	 * allocated. A thread, preempted from the now powered-off CPU
-	 * may be holding the mutex and in the middle of adding a trace
-	 * record.
+	 * This cpu is powered off and no code can be executing on it. So
+	 * we can simply finish our cleanup. There is no need for a xcall
+	 * to make sure that this cpu is out of trace context.
+	 *
+	 * The cpu structure will be cleared soon. But, for the sake of
+	 * debugging, clear our pointers and state.
 	 */
+	if (ftd->ftd_first != NULL) {
+		kmem_free(ftd->ftd_first,
+		    ftrace_nent * sizeof (ftrace_record_t));
+	}
+	bzero(ftd, sizeof (ftrace_data_t));
 }
 
 static void
@@ -140,11 +200,19 @@ ftrace_cpu_start(int cpuid)
 		if (ftd->ftd_first == NULL) {
 			ftrace_record_t *ptrs;
 
-			mutex_init(&ftd->ftd_mutex, NULL, MUTEX_DEFAULT, NULL);
 			mutex_exit(&ftrace_lock);
 			ptrs = kmem_zalloc(ftrace_nent *
 			    sizeof (ftrace_record_t), KM_SLEEP);
 			mutex_enter(&ftrace_lock);
+			if (ftd->ftd_first != NULL) {
+				/*
+				 * Someone else beat us to it. The winner will
+				 * set up the pointers and the state.
+				 */
+				kmem_free(ptrs,
+				    ftrace_nent * sizeof (ftrace_record_t));
+				return;
+			}
 
 			ftd->ftd_first = ptrs;
 			ftd->ftd_last = ptrs + (ftrace_nent - 1);
@@ -232,6 +300,9 @@ ftrace_init(void)
 		(void) ftrace_start();
 }
 
+/*
+ * Called from uadmin ioctl, or via mp_init_table[] during boot.
+ */
 int
 ftrace_start(void)
 {
@@ -250,6 +321,9 @@ ftrace_start(void)
 	return (was_enabled);
 }
 
+/*
+ * Called from uadmin ioctl, to stop tracing.
+ */
 int
 ftrace_stop(void)
 {
@@ -269,102 +343,146 @@ ftrace_stop(void)
 	return (was_enabled);
 }
 
+/*
+ * ftrace_X() functions are called from trace context. All callers of ftrace_X()
+ * tests FTRACE_ENABLED first. Although this is not very accurate, it keeps the
+ * overhead very low when tracing is not enabled.
+ *
+ * gethrtime_unscaled() appears to be safe to be called in trace context. As an
+ * added precaution, we call these before we disable interrupts on this cpu.
+ */
+
 void
-ftrace_0(char *str)
+ftrace_0(char *str, caddr_t caller)
 {
 	ftrace_record_t *r;
-	struct cpu *cp = CPU;
-	ftrace_data_t *ftd = &cp->cpu_ftrace;
+	struct cpu *cp;
+	ftrace_data_t *ftd;
+	ftrace_icookie_t cookie;
+	hrtime_t  timestamp;
 
-	if (mutex_tryenter(&ftd->ftd_mutex) == 0) {
-		if (CPU_ON_INTR(cp))
-			return;
-		else
-			mutex_enter(&ftd->ftd_mutex);
+	timestamp = gethrtime_unscaled();
+
+	cookie = ftrace_interrupt_disable();
+
+	cp = CPU;
+	ftd = &cp->cpu_ftrace;
+
+	if (!(ftd->ftd_state & FTRACE_ENABLED)) {
+		ftrace_interrupt_enable(cookie);
+		return;
 	}
+
 	r = ftd->ftd_cur;
 	r->ftr_event = str;
 	r->ftr_thread = curthread;
-	r->ftr_tick = gethrtime_unscaled();
-	r->ftr_caller = caller();
+	r->ftr_tick = timestamp;
+	r->ftr_caller = caller;
 
 	if (r++ == ftd->ftd_last)
 		r = ftd->ftd_first;
 	ftd->ftd_cur = r;
-	mutex_exit(&ftd->ftd_mutex);
+
+	ftrace_interrupt_enable(cookie);
 }
 
 void
-ftrace_1(char *str, ulong_t arg1)
+ftrace_1(char *str, ulong_t arg1, caddr_t caller)
 {
 	ftrace_record_t *r;
-	struct cpu *cp = CPU;
-	ftrace_data_t *ftd = &cp->cpu_ftrace;
+	struct cpu *cp;
+	ftrace_data_t *ftd;
+	ftrace_icookie_t cookie;
+	hrtime_t  timestamp;
 
-	if (mutex_tryenter(&ftd->ftd_mutex) == 0) {
-		if (CPU_ON_INTR(cp))
-			return;
-		else
-			mutex_enter(&ftd->ftd_mutex);
+	timestamp = gethrtime_unscaled();
+
+	cookie = ftrace_interrupt_disable();
+
+	cp = CPU;
+	ftd = &cp->cpu_ftrace;
+
+	if (!(ftd->ftd_state & FTRACE_ENABLED)) {
+		ftrace_interrupt_enable(cookie);
+		return;
 	}
+
 	r = ftd->ftd_cur;
 	r->ftr_event = str;
 	r->ftr_thread = curthread;
-	r->ftr_tick = gethrtime_unscaled();
-	r->ftr_caller = caller();
+	r->ftr_tick = timestamp;
+	r->ftr_caller = caller;
 	r->ftr_data1 = arg1;
 
 	if (r++ == ftd->ftd_last)
 		r = ftd->ftd_first;
 	ftd->ftd_cur = r;
-	mutex_exit(&ftd->ftd_mutex);
+
+	ftrace_interrupt_enable(cookie);
 }
 
 void
-ftrace_2(char *str, ulong_t arg1, ulong_t arg2)
+ftrace_2(char *str, ulong_t arg1, ulong_t arg2, caddr_t caller)
 {
 	ftrace_record_t *r;
-	struct cpu *cp = CPU;
-	ftrace_data_t *ftd = &cp->cpu_ftrace;
+	struct cpu *cp;
+	ftrace_data_t *ftd;
+	ftrace_icookie_t cookie;
+	hrtime_t  timestamp;
 
-	if (mutex_tryenter(&ftd->ftd_mutex) == 0) {
-		if (CPU_ON_INTR(cp))
-			return;
-		else
-			mutex_enter(&ftd->ftd_mutex);
+	timestamp = gethrtime_unscaled();
+
+	cookie = ftrace_interrupt_disable();
+
+	cp = CPU;
+	ftd = &cp->cpu_ftrace;
+
+	if (!(ftd->ftd_state & FTRACE_ENABLED)) {
+		ftrace_interrupt_enable(cookie);
+		return;
 	}
+
 	r = ftd->ftd_cur;
 	r->ftr_event = str;
 	r->ftr_thread = curthread;
-	r->ftr_tick = gethrtime_unscaled();
-	r->ftr_caller = caller();
+	r->ftr_tick = timestamp;
+	r->ftr_caller = caller;
 	r->ftr_data1 = arg1;
 	r->ftr_data2 = arg2;
 
 	if (r++ == ftd->ftd_last)
 		r = ftd->ftd_first;
 	ftd->ftd_cur = r;
-	mutex_exit(&ftd->ftd_mutex);
+
+	ftrace_interrupt_enable(cookie);
 }
 
 void
-ftrace_3(char *str, ulong_t arg1, ulong_t arg2, ulong_t arg3)
+ftrace_3(char *str, ulong_t arg1, ulong_t arg2, ulong_t arg3, caddr_t caller)
 {
 	ftrace_record_t *r;
-	struct cpu *cp = CPU;
-	ftrace_data_t *ftd = &cp->cpu_ftrace;
+	struct cpu *cp;
+	ftrace_data_t *ftd;
+	ftrace_icookie_t cookie;
+	hrtime_t  timestamp;
 
-	if (mutex_tryenter(&ftd->ftd_mutex) == 0) {
-		if (CPU_ON_INTR(cp))
-			return;
-		else
-			mutex_enter(&ftd->ftd_mutex);
+	timestamp = gethrtime_unscaled();
+
+	cookie = ftrace_interrupt_disable();
+
+	cp = CPU;
+	ftd = &cp->cpu_ftrace;
+
+	if (!(ftd->ftd_state & FTRACE_ENABLED)) {
+		ftrace_interrupt_enable(cookie);
+		return;
 	}
+
 	r = ftd->ftd_cur;
 	r->ftr_event = str;
 	r->ftr_thread = curthread;
-	r->ftr_tick = gethrtime_unscaled();
-	r->ftr_caller = caller();
+	r->ftr_tick = timestamp;
+	r->ftr_caller = caller;
 	r->ftr_data1 = arg1;
 	r->ftr_data2 = arg2;
 	r->ftr_data3 = arg3;
@@ -372,27 +490,34 @@ ftrace_3(char *str, ulong_t arg1, ulong_t arg2, ulong_t arg3)
 	if (r++ == ftd->ftd_last)
 		r = ftd->ftd_first;
 	ftd->ftd_cur = r;
-	mutex_exit(&ftd->ftd_mutex);
+
+	ftrace_interrupt_enable(cookie);
 }
 
 void
-ftrace_3_notick(char *str, ulong_t arg1, ulong_t arg2, ulong_t arg3)
+ftrace_3_notick(char *str, ulong_t arg1, ulong_t arg2,
+    ulong_t arg3, caddr_t caller)
 {
 	ftrace_record_t *r;
-	struct cpu *cp = CPU;
-	ftrace_data_t *ftd = &cp->cpu_ftrace;
+	struct cpu *cp;
+	ftrace_data_t *ftd;
+	ftrace_icookie_t cookie;
 
-	if (mutex_tryenter(&ftd->ftd_mutex) == 0) {
-		if (CPU_ON_INTR(cp))
-			return;
-		else
-			mutex_enter(&ftd->ftd_mutex);
+	cookie = ftrace_interrupt_disable();
+
+	cp = CPU;
+	ftd = &cp->cpu_ftrace;
+
+	if (!(ftd->ftd_state & FTRACE_ENABLED)) {
+		ftrace_interrupt_enable(cookie);
+		return;
 	}
+
 	r = ftd->ftd_cur;
 	r->ftr_event = str;
 	r->ftr_thread = curthread;
 	r->ftr_tick = 0;
-	r->ftr_caller = caller();
+	r->ftr_caller = caller;
 	r->ftr_data1 = arg1;
 	r->ftr_data2 = arg2;
 	r->ftr_data3 = arg3;
@@ -400,5 +525,6 @@ ftrace_3_notick(char *str, ulong_t arg1, ulong_t arg2, ulong_t arg3)
 	if (r++ == ftd->ftd_last)
 		r = ftd->ftd_first;
 	ftd->ftd_cur = r;
-	mutex_exit(&ftd->ftd_mutex);
+
+	ftrace_interrupt_enable(cookie);
 }

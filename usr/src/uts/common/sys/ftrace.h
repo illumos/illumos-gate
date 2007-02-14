@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FTRACE_H
@@ -87,30 +86,37 @@ extern int		ftrace_cpu_setup(cpu_setup_t, int, void *);
 extern void		ftrace_init(void);
 extern int		ftrace_start(void);
 extern int		ftrace_stop(void);
-extern void		ftrace_0(char *);
-extern void		ftrace_1(char *, ulong_t);
-extern void		ftrace_2(char *, ulong_t, ulong_t);
-extern void		ftrace_3(char *, ulong_t, ulong_t, ulong_t);
+extern void		ftrace_0(char *, caddr_t);
+extern void		ftrace_1(char *, ulong_t, caddr_t);
+extern void		ftrace_2(char *, ulong_t, ulong_t, caddr_t);
+extern void		ftrace_3(char *, ulong_t, ulong_t, ulong_t, caddr_t);
+extern void		ftrace_3_notick(char *, ulong_t, ulong_t, ulong_t,
+    caddr_t);
+
+typedef	uintptr_t	ftrace_icookie_t;
+extern ftrace_icookie_t ftrace_interrupt_disable(void);
+extern void ftrace_interrupt_enable(ftrace_icookie_t);
+extern caddr_t caller(void);
 
 #define	FTRACE_0(fmt)						\
 	{							\
 		if (CPU->cpu_ftrace.ftd_state & FTRACE_ENABLED)	\
-			ftrace_0(fmt);				\
+			ftrace_0(fmt, caller());		\
 	}
 #define	FTRACE_1(fmt, d1) 					\
 	{							\
 		if (CPU->cpu_ftrace.ftd_state & FTRACE_ENABLED)	\
-			ftrace_1(fmt, d1);			\
+			ftrace_1(fmt, d1, caller());		\
 	}
 #define	FTRACE_2(fmt, d1, d2) 					\
 	{							\
 		if (CPU->cpu_ftrace.ftd_state & FTRACE_ENABLED)	\
-			ftrace_2(fmt, d1, d2);			\
+			ftrace_2(fmt, d1, d2, caller());	\
 	}
 #define	FTRACE_3(fmt, d1, d2, d3) 				\
 	{							\
 		if (CPU->cpu_ftrace.ftd_state & FTRACE_ENABLED)	\
-			ftrace_3(fmt, d1, d2, d3);		\
+			ftrace_3(fmt, d1, d2, d3, caller());	\
 	}
 #define	FTRACE_START()	ftrace_start()
 #define	FTRACE_STOP()	ftrace_stop()

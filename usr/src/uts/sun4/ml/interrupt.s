@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -547,8 +547,9 @@ intr_thread(struct regs *regs, uint64_t iv_p, uint_t pil)
 	set	ftrace_intr_thread_format_str, %o0
 	mov	%i0, %o1
 	mov	%i1, %o2
-	call	ftrace_3
 	mov	%i5, %o3
+	call	ftrace_3
+	ldn	[%i0 + PC_OFF], %o4
 	restore
 1:
 	!
