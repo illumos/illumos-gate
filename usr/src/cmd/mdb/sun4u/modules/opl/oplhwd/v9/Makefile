@@ -23,7 +23,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = oplhwd.so
 MDBTGT = kvm

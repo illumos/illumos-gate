@@ -24,8 +24,5 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-include $(SRC)/Makefile.master
-
-SUBDIRS = unix wrsm lw8 serengeti wrsmd opl
-
-include ../../Makefile.subdirs
+SUBDIRS = oplhwd
+include $(SRC)/cmd/mdb/Makefile.subdirs
