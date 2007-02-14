@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * ttyname(f): return "/dev/X" (where X is a relative pathname
@@ -515,15 +514,6 @@ srch_dir(const entry_t path,	/* current path */
 		return (0);
 	}
 
-	/*
-	 * skip two first entries ('.' and '..')
-	 */
-	if (((direntp = readdir64(dirp)) == NULL) ||
-	    ((direntp = readdir64(dirp)) == NULL)) {
-		(void) closedir(dirp);
-		return (0);
-	}
-
 	path_len = strlen(path.name);
 	(void) strcpy(file_name, path.name);
 	last_comp = file_name + path_len;
@@ -533,6 +523,13 @@ srch_dir(const entry_t path,	/* current path */
 	 * read thru the directory
 	 */
 	while ((!found) && ((direntp = readdir64(dirp)) != NULL)) {
+		/*
+		 * skip "." and ".." entries, if present
+		 */
+		if (direntp->d_name[0] == '.' &&
+		    (strcmp(direntp->d_name, ".") == 0 ||
+		    strcmp(direntp->d_name, "..") == 0))
+			continue;
 
 		/*
 		 * if the file name (path + "/" + d_name + NULL) would be too
@@ -540,9 +537,8 @@ srch_dir(const entry_t path,	/* current path */
 		 */
 		if ((path_len + strlen(direntp->d_name) + 2) > MAX_DEV_PATH)
 			continue;
-		else
-			(void) strcpy(last_comp, direntp->d_name);
 
+		(void) strcpy(last_comp, direntp->d_name);
 		if (stat64(file_name, &tsb) < 0)
 			continue;
 
