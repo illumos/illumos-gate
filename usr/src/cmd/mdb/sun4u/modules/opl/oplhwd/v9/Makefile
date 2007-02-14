@@ -18,14 +18,28 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-include $(SRC)/Makefile.master
+MODULE = oplhwd.so
+MDBTGT = kvm
 
-SUBDIRS = unix wrsm lw8 serengeti wrsmd opl
+MODSRCS = oplhwd.c
 
-include ../../Makefile.subdirs
+include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd.64
+include $(SRC)/cmd/mdb/sparc/Makefile.sparcv9
+include $(SRC)/cmd/mdb/sun4u/Makefile.sun4u
+include $(SRC)/cmd/mdb/Makefile.module
+
+CPPFLAGS += -DMP -D_MACHDEP
+CPPFLAGS += -I../../../../../../../../src/cmd/mdb/common
+CPPFLAGS += -I$(SRC)/uts/sun4u
+CPPFLAGS += -I$(SRC)/uts/sun4
+CPPFLAGS += -I$(SRC)/uts/sfmmu
+CPPFLAGS += -I$(SRC)/uts/sparc/v9
+CPPFLAGS += -I$(SRC)/uts/sun4u/opl

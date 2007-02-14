@@ -18,14 +18,13 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-include $(SRC)/Makefile.master
-
-SUBDIRS = unix wrsm lw8 serengeti wrsmd opl
-
-include ../../Makefile.subdirs
+SUBDIRS = v9
+include $(SRC)/cmd/mdb/Makefile.subdirs
