@@ -265,6 +265,7 @@ dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, vnode_t *vp)
 	if (err) {
 		if (err == EINTR && ba.err)
 			err = ba.err;
+		kmem_free(drr, sizeof (dmu_replay_record_t));
 		return (err);
 	}
 
@@ -272,8 +273,10 @@ dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, vnode_t *vp)
 	drr->drr_type = DRR_END;
 	drr->drr_u.drr_end.drr_checksum = ba.zc;
 
-	if (dump_bytes(&ba, drr, sizeof (dmu_replay_record_t)))
+	if (dump_bytes(&ba, drr, sizeof (dmu_replay_record_t))) {
+		kmem_free(drr, sizeof (dmu_replay_record_t));
 		return (ba.err);
+	}
 
 	kmem_free(drr, sizeof (dmu_replay_record_t));
 
@@ -794,6 +797,7 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 			    ds->ds_prev->ds_phys->ds_guid !=
 			    drrb->drr_fromguid) {
 				dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
+				kmem_free(ra.buf, ra.bufsize);
 				return (ENODEV);
 			}
 			(void) dsl_dataset_rollback(ds);
