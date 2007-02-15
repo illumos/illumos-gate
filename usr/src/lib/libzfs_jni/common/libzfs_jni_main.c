@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -499,6 +499,30 @@ typedef struct zjni_class_type_map {
 	zfs_type_t type;
 } zjni_class_type_map_t;
 
+typedef struct mapping_data {
+	JNIEnv			*env;
+	zfs_type_t		type;
+	zjni_ArrayList_t	*list;
+} mapping_data_t;
+
+static zfs_prop_t
+mapping_cb(zfs_prop_t prop, void *cb)
+{
+	mapping_data_t *map = cb;
+	JNIEnv *env = map->env;
+	zjni_ArrayList_t *list = map->list;
+
+	if (zfs_prop_valid_for_type(prop, map->type)) {
+		/* Add name of property to list */
+		jstring propName = (*env)->NewStringUTF(env,
+		    zfs_prop_to_name(prop));
+		(*env)->CallBooleanMethod(env, ((zjni_Object_t *)list)->object,
+		    ((zjni_Collection_t *)list)->method_add, propName);
+	}
+
+	return (ZFS_PROP_CONT);
+}
+
 /*
  * Class:     com_sun_zfs_common_model_SystemDataModel
  * Method:    getValidPropertyNames
@@ -541,21 +565,12 @@ Java_com_sun_zfs_common_model_SystemDataModel_getValidPropertyNames(JNIEnv *env,
 		    env, typeClass, isAssignableFrom, class);
 
 		if (isInstance == JNI_TRUE) {
-			zfs_prop_t prop;
-			for (prop = 0; prop < ZFS_NPROP_VISIBLE; prop++) {
-				if (zfs_prop_valid_for_type(prop,
-				    mappings[i].type)) {
-					/* Add name of property to list */
-					jstring propName =
-					    (*env)->NewStringUTF(env,
-						zfs_prop_to_name(prop));
-					(*env)->CallBooleanMethod(
-					    env,
-					    ((zjni_Object_t *)list)->object,
-					    ((zjni_Collection_t *)list)->
-					    method_add, propName);
-				}
-			}
+			mapping_data_t map_data;
+
+			map_data.env = env;
+			map_data.type = mappings[i].type;
+			map_data.list = list;
+			(void) zfs_prop_iter(mapping_cb, &map_data, B_FALSE);
 			break;
 		}
 	}

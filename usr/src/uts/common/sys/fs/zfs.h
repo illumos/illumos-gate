@@ -52,11 +52,14 @@ typedef enum {
 	(ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME | ZFS_TYPE_SNAPSHOT)
 
 /*
- * Properties are identified by these constants.  They are arranged in order of
- * how they should be displayed by 'zfs get'.  If you make any changes to this
- * list, be sure to update the property table in usr/src/common/zfs/zfs_prop.c.
+ * Properties are identified by these constants and must be added to the
+ * end of this list to ensure that external conumsers are not affected
+ * by the change. The property list also determines how 'zfs get' will
+ * display them.  If you make any changes to this list, be sure to update
+ * the property table in usr/src/common/zfs/zfs_prop.c.
  */
 typedef enum {
+	ZFS_PROP_CONT = -2,
 	ZFS_PROP_INVAL = -1,
 	ZFS_PROP_TYPE,
 	ZFS_PROP_CREATION,
@@ -73,7 +76,6 @@ typedef enum {
 	ZFS_PROP_RECORDSIZE,
 	ZFS_PROP_MOUNTPOINT,
 	ZFS_PROP_SHARENFS,
-	ZFS_PROP_SHAREISCSI,
 	ZFS_PROP_CHECKSUM,
 	ZFS_PROP_COMPRESSION,
 	ZFS_PROP_ATIME,
@@ -85,20 +87,14 @@ typedef enum {
 	ZFS_PROP_SNAPDIR,
 	ZFS_PROP_ACLMODE,
 	ZFS_PROP_ACLINHERIT,
+	ZFS_PROP_CREATETXG,		/* not exposed to the user */
+	ZFS_PROP_NAME,			/* not exposed to the user */
 	ZFS_PROP_CANMOUNT,
+	ZFS_PROP_SHAREISCSI,
+	ZFS_PROP_ISCSIOPTIONS,		/* not exposed to the user */
 	ZFS_PROP_XATTR,
-	/*
-	 * The following properties are not exposed to the user, but are
-	 * accessible by libzfs clients.
-	 */
-	ZFS_PROP_CREATETXG,
-	ZFS_PROP_NAME,
-	ZFS_PROP_ISCSIOPTIONS,
-	ZFS_PROP_NUMCLONES,
-	ZFS_NPROP_ALL
+	ZFS_PROP_NUMCLONES		/* not exposed to the user */
 } zfs_prop_t;
-
-#define	ZFS_NPROP_VISIBLE	ZFS_PROP_CREATETXG
 
 #define	ZFS_PROP_VALUE		"value"
 #define	ZFS_PROP_SOURCE		"source"
@@ -115,6 +111,12 @@ uint64_t zfs_prop_default_numeric(zfs_prop_t);
 int zfs_prop_inheritable(zfs_prop_t);
 int zfs_prop_string_to_index(zfs_prop_t, const char *, uint64_t *);
 int zfs_prop_index_to_string(zfs_prop_t, uint64_t, const char **);
+
+/*
+ * Property Iterator
+ */
+typedef zfs_prop_t (*zfs_prop_f)(zfs_prop_t, void *);
+extern zfs_prop_t zfs_prop_iter(zfs_prop_f, void *, boolean_t);
 
 /*
  * On-disk version number.

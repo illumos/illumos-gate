@@ -239,6 +239,35 @@ safe_malloc(size_t size)
 }
 
 /*
+ * Callback routinue that will print out information for each of the
+ * the properties.
+ */
+static zfs_prop_t
+usage_prop_cb(zfs_prop_t prop, void *cb)
+{
+	FILE *fp = cb;
+
+	(void) fprintf(fp, "\t%-13s  ", zfs_prop_to_name(prop));
+
+	if (zfs_prop_readonly(prop))
+		(void) fprintf(fp, "  NO    ");
+	else
+		(void) fprintf(fp, " YES    ");
+
+	if (zfs_prop_inheritable(prop))
+		(void) fprintf(fp, "  YES   ");
+	else
+		(void) fprintf(fp, "   NO   ");
+
+	if (zfs_prop_values(prop) == NULL)
+		(void) fprintf(fp, "-\n");
+	else
+		(void) fprintf(fp, "%s\n", zfs_prop_values(prop));
+
+	return (ZFS_PROP_CONT);
+}
+
+/*
  * Display usage message.  If we're inside a command, display only the usage for
  * that command.  Otherwise, iterate over the entire command table and display
  * a complete usage message.
@@ -286,24 +315,9 @@ usage(boolean_t requested)
 		(void) fprintf(fp, "\n\t%-13s  %s  %s   %s\n\n",
 		    "PROPERTY", "EDIT", "INHERIT", "VALUES");
 
-		for (i = 0; i < ZFS_NPROP_VISIBLE; i++) {
-			(void) fprintf(fp, "\t%-13s  ", zfs_prop_to_name(i));
+		/* Iterate over all properties */
+		(void) zfs_prop_iter(usage_prop_cb, fp, B_FALSE);
 
-			if (zfs_prop_readonly(i))
-				(void) fprintf(fp, "  NO    ");
-			else
-				(void) fprintf(fp, " YES    ");
-
-			if (zfs_prop_inheritable(i))
-				(void) fprintf(fp, "  YES   ");
-			else
-				(void) fprintf(fp, "   NO   ");
-
-			if (zfs_prop_values(i) == NULL)
-				(void) fprintf(fp, "-\n");
-			else
-				(void) fprintf(fp, "%s\n", zfs_prop_values(i));
-		}
 		(void) fprintf(fp, gettext("\nSizes are specified in bytes "
 		    "with standard units such as K, M, G, etc.\n"));
 		(void) fprintf(fp, gettext("\n\nUser-defined properties can "

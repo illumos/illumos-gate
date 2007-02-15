@@ -3347,7 +3347,6 @@ zfs_get_user_props(zfs_handle_t *zhp)
 int
 zfs_get_proplist(libzfs_handle_t *hdl, char *fields, zfs_proplist_t **listp)
 {
-	int i;
 	size_t len;
 	char *s, *p;
 	char c;
@@ -3402,16 +3401,13 @@ zfs_get_proplist(libzfs_handle_t *hdl, char *fields, zfs_proplist_t **listp)
 		 */
 		c = s[len];
 		s[len] = '\0';
-		for (i = 0; i < ZFS_NPROP_ALL; i++) {
-			if ((prop = zfs_name_to_prop(s)) != ZFS_PROP_INVAL)
-				break;
-		}
+		prop = zfs_name_to_prop(s);
 
 		/*
 		 * If no column is specified, and this isn't a user property,
 		 * return failure.
 		 */
-		if (i == ZFS_NPROP_ALL && !zfs_prop_user(s)) {
+		if (prop == ZFS_PROP_INVAL && !zfs_prop_user(s)) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "invalid property '%s'"), s);
 			return (zfs_error(hdl, EZFS_BADPROP,
@@ -3458,6 +3454,30 @@ zfs_free_proplist(zfs_proplist_t *pl)
 	}
 }
 
+typedef struct expand_data {
+	zfs_proplist_t	**last;
+	libzfs_handle_t	*hdl;
+} expand_data_t;
+
+static zfs_prop_t
+zfs_expand_proplist_cb(zfs_prop_t prop, void *cb)
+{
+	zfs_proplist_t *entry;
+	expand_data_t *edp = cb;
+
+	if ((entry = zfs_alloc(edp->hdl, sizeof (zfs_proplist_t))) == NULL)
+		return (ZFS_PROP_INVAL);
+
+	entry->pl_prop = prop;
+	entry->pl_width = zfs_prop_width(prop, &entry->pl_fixed);
+	entry->pl_all = B_TRUE;
+
+	*(edp->last) = entry;
+	edp->last = &entry->pl_next;
+
+	return (ZFS_PROP_CONT);
+}
+
 /*
  * This function is used by 'zfs list' to determine the exact set of columns to
  * display, and their maximum widths.  This does two main things:
@@ -3473,13 +3493,13 @@ int
 zfs_expand_proplist(zfs_handle_t *zhp, zfs_proplist_t **plp)
 {
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
-	zfs_prop_t prop;
 	zfs_proplist_t *entry;
 	zfs_proplist_t **last, **start;
 	nvlist_t *userprops, *propval;
 	nvpair_t *elem;
 	char *strval;
 	char buf[ZFS_MAXPROPLEN];
+	expand_data_t exp;
 
 	if (*plp == NULL) {
 		/*
@@ -3488,19 +3508,13 @@ zfs_expand_proplist(zfs_handle_t *zhp, zfs_proplist_t **plp)
 		 * properties.
 		 */
 		last = plp;
-		for (prop = 0; prop < ZFS_NPROP_VISIBLE; prop++) {
-			if ((entry = zfs_alloc(hdl,
-			    sizeof (zfs_proplist_t))) == NULL)
-				return (-1);
 
-			entry->pl_prop = prop;
-			entry->pl_width = zfs_prop_width(prop,
-			    &entry->pl_fixed);
-			entry->pl_all = B_TRUE;
+		exp.last = last;
+		exp.hdl = hdl;
 
-			*last = entry;
-			last = &entry->pl_next;
-		}
+		if (zfs_prop_iter(zfs_expand_proplist_cb, &exp,
+		    B_FALSE) == ZFS_PROP_INVAL)
+			return (-1);
 
 		/*
 		 * Add 'name' to the beginning of the list, which is handled
