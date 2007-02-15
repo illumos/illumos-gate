@@ -117,6 +117,13 @@ static uint64_t	ata_calculate_48bits_capacity(ata_drv_t *ata_drvp);
 static int ata_copy_dk_ioc_string(intptr_t arg, char *source, int length,
     int flag);
 static void ata_set_write_cache(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp);
+static int ata_disk_update_fw(gtgt_t *gtgtp, ata_ctl_t *ata_ctlp,
+    ata_drv_t *ata_drvp, caddr_t fwfile, uint_t size,
+    uint8_t type, int flag);
+static int ata_disk_set_feature_spinup(ata_ctl_t *ata_ctlp,
+    ata_drv_t *ata_drvp, ata_pkt_t *ata_pktp);
+static int ata_disk_id_update(ata_ctl_t *ata_ctlp,
+    ata_drv_t *ata_drvp, ata_pkt_t *ata_pktp);
 
 
 /*
@@ -126,6 +133,9 @@ static void ata_set_write_cache(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp);
 uint_t	ata_disk_init_dev_parm_wait = 4 * 1000000;
 uint_t	ata_disk_set_mult_wait = 4 * 1000000;
 int	ata_disk_do_standby_timer = TRUE;
+
+/* timeout value for device update firmware */
+int	ata_disk_updatefw_time = 60;
 
 /*
  * ata_write_cache == 1  force write cache on.
@@ -942,10 +952,18 @@ ata_disk_ioctl(opaque_t ctl_data, int cmd, intptr_t arg, int flag)
 	gtgt_t		*gtgtp = (gtgt_t *)ctl_data;
 	ata_ctl_t	*ata_ctlp = GTGTP2ATAP(gtgtp);
 	ata_drv_t	*ata_drvp = GTGTP2ATADRVP(gtgtp);
-	int		rc;
+	int		rc, rc2;
 	struct tgdk_geom tgdk;
 	int		wce;
 	struct ata_id	*aidp = &ata_drvp->ad_id;
+	dk_updatefw_t	updatefw;
+#ifdef _MULTI_DATAMODEL
+	dk_updatefw_32_t updatefw32;
+#endif
+	dk_disk_id_t	dk_disk_id;
+	char		buf[80];
+	int		i;
+
 
 	ADBG_TRACE(("ata_disk_ioctl entered, cmd = %d\n", cmd));
 
@@ -976,7 +994,7 @@ ata_disk_ioctl(opaque_t ctl_data, int cmd, intptr_t arg, int flag)
 					sizeof (aidp->ai_model), flag);
 		return (rc);
 
-	/* copy the model number into the caller's buffer */
+	/* copy the serial number into the caller's buffer */
 	case DIOCTL_GETSERIAL:
 		rc = ata_copy_dk_ioc_string(arg, aidp->ai_drvser,
 					sizeof (aidp->ai_drvser),
@@ -1038,6 +1056,155 @@ ata_disk_ioctl(opaque_t ctl_data, int cmd, intptr_t arg, int flag)
 		rc = ata_queue_cmd(ata_disk_eject, NULL, ata_ctlp, ata_drvp,
 			gtgtp);
 		break;
+
+	case DKIOC_UPDATEFW:
+
+		/*
+		 * Call DOWNLOAD MICROCODE command to update device
+		 * firmware.
+		 *
+		 * return value:
+		 *   normal	0	Download microcode success
+		 *   error	EFAULT	Bad address
+		 *		ENXIO	No such device or address
+		 *		EINVAL	Invalid argument
+		 *		ENOMEM	Not enough core
+		 *		ENOTSUP	Operation not supported
+		 *		EIO	I/O error
+		 *		EPERM	Not owner
+		 */
+
+		/*
+		 * The following code deals with handling 32-bit request
+		 * in 64-bit kernel.
+		 */
+#ifdef _MULTI_DATAMODEL
+		if (ddi_model_convert_from(flag & FMODELS) ==
+		    DDI_MODEL_ILP32) {
+			if (ddi_copyin((void *)arg, &updatefw32,
+			    sizeof (dk_updatefw_32_t), flag))
+				return (EFAULT);
+
+			updatefw.dku_ptrbuf =
+			    (caddr_t)(uintptr_t)updatefw32.dku_ptrbuf;
+			updatefw.dku_size = updatefw32.dku_size;
+			updatefw.dku_type = updatefw32.dku_type;
+		} else {
+			if (ddi_copyin((void *)arg, &updatefw,
+			    sizeof (dk_updatefw_t), flag))
+				return (EFAULT);
+		}
+#else
+		if (ddi_copyin((void *)arg, &updatefw,
+		    sizeof (dk_updatefw_t), flag))
+			return (EFAULT);
+#endif
+		rc = ata_disk_update_fw(gtgtp, ata_ctlp, ata_drvp,
+		    updatefw.dku_ptrbuf, updatefw.dku_size,
+		    updatefw.dku_type, flag);
+
+		/*
+		 * According to ATA8-ACS spec, the new microcode should
+		 * become effective immediately after the transfer of the
+		 * last data segment has completed, so here we will call
+		 * IDENTIFY DEVICE command immediately to update
+		 * ata_id content when success.
+		 */
+		if (rc == 0) {
+			rc2 = ata_queue_cmd(ata_disk_id_update, NULL,
+			    ata_ctlp, ata_drvp, gtgtp);
+			if (rc2 != TRUE) {
+				return (ENXIO);
+			} else {
+				/*
+				 * Check whether the content of the IDENTIFY
+				 * DEVICE data is incomplete, if yes, it's
+				 * because the device supports the Power-up
+				 * in Standby feature set, and we will first
+				 * check word 2, and then decide whether need
+				 * to call set feature to spin-up the device,
+				 * and then call IDENTIFY DEVICE command again.
+				 */
+				aidp = &ata_drvp->ad_id;
+				if (aidp->ai_config & ATA_ID_INCMPT) {
+					if (aidp->ai_resv0 == 0x37c8 ||
+					    aidp->ai_resv0 == 0x738c) {
+						/* Spin-up the device */
+						(void) ata_queue_cmd(
+						    ata_disk_set_feature_spinup,
+						    NULL,
+						    ata_ctlp,
+						    ata_drvp,
+						    gtgtp);
+					}
+
+					/* Try to update ata_id again */
+					rc2 = ata_queue_cmd(
+					    ata_disk_id_update,
+					    NULL,
+					    ata_ctlp,
+					    ata_drvp,
+					    gtgtp);
+					if (rc2 != TRUE) {
+						return (ENXIO);
+					} else {
+						aidp = &ata_drvp->ad_id;
+						if (aidp->ai_config &
+						    ATA_ID_INCMPT)
+							return (ENXIO);
+					}
+				}
+
+				/*
+				 * Dump the drive information.
+				 */
+				ATAPRT(("?\tUpdate firmware of %s device at "
+				    "targ %d, lun %d lastlun 0x%x\n",
+				    (ATAPIDRV(ata_drvp) ? "ATAPI":"IDE"),
+				    ata_drvp->ad_targ, ata_drvp->ad_lun,
+				    aidp->ai_lastlun));
+
+				(void) strncpy(buf, aidp->ai_model,
+				    sizeof (aidp->ai_model));
+				buf[sizeof (aidp->ai_model)] = '\0';
+				for (i = sizeof (aidp->ai_model) - 1;
+				    buf[i] == ' '; i--)
+					buf[i] = '\0';
+				ATAPRT(("?\tmodel %s\n", buf));
+
+				(void) strncpy(buf, aidp->ai_fw,
+				    sizeof (aidp->ai_fw));
+				buf[sizeof (aidp->ai_fw)] = '\0';
+				for (i = sizeof (aidp->ai_fw) - 1;
+				    buf[i] == ' '; i--)
+					buf[i] = '\0';
+				ATAPRT(("?\tfw %s\n", buf));
+			}
+		}
+		return (rc);
+
+	case DKIOC_GETDISKID:
+		bzero(&dk_disk_id, sizeof (dk_disk_id_t));
+
+		dk_disk_id.dkd_dtype = DKD_ATA_TYPE;
+
+		/* Get the model number */
+		(void) strncpy(dk_disk_id.disk_id.ata_disk_id.dkd_amodel,
+		    aidp->ai_model, sizeof (aidp->ai_model));
+
+		/* Get the firmware revision */
+		(void) strncpy(dk_disk_id.disk_id.ata_disk_id.dkd_afwver,
+		    aidp->ai_fw, sizeof (aidp->ai_fw));
+
+		/* Get the serial number */
+		(void) strncpy(dk_disk_id.disk_id.ata_disk_id.dkd_aserial,
+		    aidp->ai_drvser, sizeof (aidp->ai_drvser));
+
+		if (ddi_copyout(&dk_disk_id, (void *)arg,
+		    sizeof (dk_disk_id_t), flag))
+			return (EFAULT);
+		else
+			return (0);
 
 	default:
 		ADBG_WARN(("ata_disk_ioctl: unsupported cmd 0x%x\n", cmd));
@@ -1749,19 +1916,33 @@ ata_disk_start_common(
 		return (FALSE);
 	}
 
-	/*
-	 * We use different methods for loading the task file
-	 * registers, depending on whether the disk
-	 * uses LBA or CHS addressing and whether 48-bit
-	 * extended addressing is to be used.
-	 */
-	if (!(ata_drvp->ad_drive_bits & ATDH_LBA))
-		ata_disk_load_regs_chs(ata_pktp, ata_drvp);
-	else if (ata_drvp->ad_flags & AD_EXT48)
-		ata_disk_load_regs_lba48(ata_pktp, ata_drvp);
-	else
-		ata_disk_load_regs_lba28(ata_pktp, ata_drvp);
-	ddi_put8(io_hdl1, ata_ctlp->ac_feature, 0);
+	if (ata_pktp->ap_cmd == ATC_LOAD_FW) {
+
+		/* the sector count is 16 bits wide */
+		ddi_put8(io_hdl1, ata_ctlp->ac_count, ata_pktp->ap_count);
+		ddi_put8(io_hdl1, ata_ctlp->ac_sect, ata_pktp->ap_count >> 8);
+		ddi_put8(io_hdl1, ata_ctlp->ac_lcyl, ata_pktp->ap_startsec);
+		ddi_put8(io_hdl1, ata_ctlp->ac_hcyl,
+		    ata_pktp->ap_startsec >> 8);
+
+		/* put subcommand for DOWNLOAD MICROCODE */
+		ddi_put8(io_hdl1, ata_ctlp->ac_feature, ata_pktp->ap_bcount);
+	} else {
+
+		/*
+		 * We use different methods for loading the task file
+		 * registers, depending on whether the disk
+		 * uses LBA or CHS addressing and whether 48-bit
+		 * extended addressing is to be used.
+		 */
+		if (!(ata_drvp->ad_drive_bits & ATDH_LBA))
+			ata_disk_load_regs_chs(ata_pktp, ata_drvp);
+		else if (ata_drvp->ad_flags & AD_EXT48)
+			ata_disk_load_regs_lba48(ata_pktp, ata_drvp);
+		else
+			ata_disk_load_regs_lba28(ata_pktp, ata_drvp);
+		ddi_put8(io_hdl1, ata_ctlp->ac_feature, 0);
+	}
 
 	/*
 	 * Always make certain interrupts are enabled. It's been reported
@@ -2945,4 +3126,217 @@ ata_set_write_cache(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp)
 			}
 		}
 	}
+}
+
+/*
+ * Call set feature to spin-up the device.
+ */
+static int
+ata_disk_set_feature_spinup(
+	ata_ctl_t	*ata_ctlp,
+	ata_drv_t	*ata_drvp,
+	ata_pkt_t	*ata_pktp)
+{
+	int rc;
+
+	ADBG_TRACE(("ata_disk_set_feature_spinup entered\n"));
+
+	rc = ata_set_feature(ata_ctlp, ata_drvp, 0x07, 0);
+	if (!rc)
+		ata_pktp->ap_flags |= AP_ERROR;
+
+	return (ATA_FSM_RC_FINI);
+}
+
+/*
+ * Update device ata_id content - IDENTIFY DEVICE command.
+ */
+static int
+ata_disk_id_update(
+	ata_ctl_t	*ata_ctlp,
+	ata_drv_t	*ata_drvp,
+	ata_pkt_t	*ata_pktp)
+{
+	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
+	caddr_t		 ioaddr1 = ata_ctlp->ac_ioaddr1;
+	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
+	caddr_t		 ioaddr2 = ata_ctlp->ac_ioaddr2;
+	struct ata_id *aidp = &ata_drvp->ad_id;
+	int rc;
+
+	ADBG_TRACE(("ata_disk_id_update entered\n"));
+
+	/*
+	 * select the appropriate drive and LUN
+	 */
+	ddi_put8(io_hdl1, (uchar_t *)ioaddr1 + AT_DRVHD,
+	    ata_drvp->ad_drive_bits);
+	ATA_DELAY_400NSEC(io_hdl2, ioaddr2);
+
+	/*
+	 * make certain the drive is selected, and wait for not busy
+	 */
+	if (!ata_wait(io_hdl2, ioaddr2, ATS_DRDY, ATS_BSY, 5 * 1000000)) {
+		ADBG_ERROR(("ata_disk_id_update: select failed\n"));
+		ata_pktp->ap_flags |= AP_ERROR;
+		return (ATA_FSM_RC_FINI);
+	}
+
+	rc = ata_disk_id(io_hdl1, ioaddr1, io_hdl2, ioaddr2, aidp);
+
+	if (!rc) {
+		ata_pktp->ap_flags |= AP_ERROR;
+	} else {
+		swab(aidp->ai_drvser, aidp->ai_drvser,
+		    sizeof (aidp->ai_drvser));
+		swab(aidp->ai_fw, aidp->ai_fw,
+		    sizeof (aidp->ai_fw));
+		swab(aidp->ai_model, aidp->ai_model,
+		    sizeof (aidp->ai_model));
+	}
+
+	return (ATA_FSM_RC_FINI);
+}
+
+/*
+ * Update device firmware.
+ */
+static int
+ata_disk_update_fw(gtgt_t *gtgtp, ata_ctl_t *ata_ctlp,
+	ata_drv_t *ata_drvp, caddr_t fwfile,
+	uint_t size, uint8_t type, int flag)
+{
+	ata_pkt_t	*ata_pktp;
+	gcmd_t		*gcmdp = NULL;
+	caddr_t		fwfile_memp = NULL, tmp_fwfile_memp;
+	uint_t		total_sec_count, sec_count, start_sec = 0;
+	uint8_t		cmd_type;
+	int		rc;
+
+	/*
+	 * First check whether DOWNLOAD MICROCODE command is supported
+	 */
+	if (!(ata_drvp->ad_id.ai_cmdset83 & 0x1)) {
+		ADBG_ERROR(("drive doesn't support download "
+		    "microcode command\n"));
+		return (ENOTSUP);
+	}
+
+	switch (type) {
+	case FW_TYPE_TEMP:
+		cmd_type = ATCM_FW_TEMP;
+		break;
+
+	case FW_TYPE_PERM:
+		cmd_type = ATCM_FW_PERM;
+		break;
+
+	default:
+		return (EINVAL);
+	}
+
+	/* Temporary subcommand is obsolete in ATA/ATAPI-8 version */
+	if (cmd_type == ATCM_FW_TEMP) {
+		if (ata_drvp->ad_id.ai_majorversion & ATAC_MAJVER_8) {
+			ADBG_ERROR(("Temporary use is obsolete in "
+			    "ATA/ATAPI-8 version\n"));
+			return (ENOTSUP);
+		}
+	}
+
+	total_sec_count = size >> SCTRSHFT;
+	if (total_sec_count > MAX_FWFILE_SIZE_ONECMD) {
+		if (cmd_type == ATCM_FW_TEMP) {
+			ADBG_ERROR(("firmware size: %x sectors is too large\n",
+			    total_sec_count));
+			return (EINVAL);
+		} else {
+			ADBG_WARN(("firmware size: %x sectors is larger than"
+			    " one command, need to use the multicommand"
+			    " subcommand\n", total_sec_count));
+
+			cmd_type = ATCM_FW_MULTICMD;
+			if (!(ata_drvp->ad_id.ai_padding2[15] & 0x10)) {
+				ADBG_ERROR(("This drive doesn't support "
+				    "the multicommand subcommand\n"));
+				return (ENOTSUP);
+			}
+		}
+	}
+
+	fwfile_memp = kmem_zalloc(size, KM_SLEEP);
+
+	if (ddi_copyin(fwfile, fwfile_memp, size, flag)) {
+		ADBG_ERROR(("ata_disk_update_fw copyin failed\n"));
+		rc = EFAULT;
+		goto done;
+	}
+
+	tmp_fwfile_memp = fwfile_memp;
+
+	for (; total_sec_count > 0; ) {
+		if ((gcmdp == NULL) && !(gcmdp =
+		    ghd_gcmd_alloc(gtgtp, sizeof (*ata_pktp), TRUE))) {
+			ADBG_ERROR(("ata_disk_update_fw alloc failed\n"));
+			rc = ENOMEM;
+			goto done;
+		}
+
+		/* set the back ptr from the ata_pkt to the gcmd_t */
+		ata_pktp = GCMD2APKT(gcmdp);
+		ata_pktp->ap_gcmdp = gcmdp;
+		ata_pktp->ap_hd = ata_drvp->ad_drive_bits;
+		ata_pktp->ap_bytes_per_block = ata_drvp->ad_bytes_per_block;
+
+		/* use PIO mode to update disk firmware */
+		ata_pktp->ap_start = ata_disk_start_pio_out;
+		ata_pktp->ap_intr = ata_disk_intr_pio_out;
+		ata_pktp->ap_complete = NULL;
+
+		ata_pktp->ap_cmd = ATC_LOAD_FW;
+		/* use ap_bcount to set subcommand code */
+		ata_pktp->ap_bcount = (size_t)cmd_type;
+		ata_pktp->ap_pciide_dma = FALSE;
+		ata_pktp->ap_sg_cnt = 0;
+
+		sec_count = min(total_sec_count, MAX_FWFILE_SIZE_ONECMD);
+		ata_pktp->ap_flags = 0;
+
+		ata_pktp->ap_count = sec_count;
+		ata_pktp->ap_startsec = start_sec;
+		ata_pktp->ap_v_addr = tmp_fwfile_memp;
+		ata_pktp->ap_resid = sec_count << SCTRSHFT;
+
+		/* add it to the queue, and use POLL mode */
+		rc = ghd_transport(&ata_ctlp->ac_ccc, gcmdp, gcmdp->cmd_gtgtp,
+		    ata_disk_updatefw_time, TRUE, NULL);
+
+		if (rc != TRAN_ACCEPT) {
+			/* this should never, ever happen */
+			rc = ENOTSUP;
+			goto done;
+		}
+
+		if (ata_pktp->ap_flags & AP_ERROR) {
+			if (ata_pktp->ap_error & ATE_ABORT) {
+				rc = ENOTSUP;
+			} else
+				rc = EIO;
+			goto done;
+
+		} else {
+			total_sec_count -= sec_count;
+			tmp_fwfile_memp += sec_count << SCTRSHFT;
+			start_sec += sec_count;
+		}
+	}
+
+	rc = 0;
+done:
+	if (gcmdp != NULL)
+		ghd_gcmd_free(gcmdp);
+
+	kmem_free(fwfile_memp, size);
+
+	return (rc);
 }

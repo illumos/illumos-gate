@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,10 @@ extern "C" {
  */
 #define	MAX_28BIT_CAPACITY	0xfffffff
 
-
+/*
+ * Largest sector count allowed for device firmware file in one command.
+ */
+#define	MAX_FWFILE_SIZE_ONECMD	0xffff
 
 /*
  * ata-options property configuration bits
@@ -72,7 +75,7 @@ extern "C" {
 
 #define	ATA_OPTIONS_DMA		0x01
 
-
+#define	ATAPRT(fmt)	ghd_err fmt
 
 /* ad_flags (per-drive) */
 
@@ -375,6 +378,7 @@ struct ata_id {
 #define	ATA_ID_REM_DRV  	0x80
 #define	ATA_ID_COMPACT_FLASH 	0x848a
 #define	ATA_ID_CF_TO_ATA 	0x040a
+#define	ATA_ID_INCMPT		0x0004
 
 /* Identify Drive: common capability bits - word 49 */
 
@@ -412,6 +416,7 @@ struct ata_id {
 
 /* Identify Drive: ai_majorversion (word 80) */
 
+#define	ATAC_MAJVER_8		0x0100	/* ATA/ATAPI-8 version supported */
 #define	ATAC_MAJVER_6		0x0040	/* ATA/ATAPI-6 version supported */
 #define	ATAC_MAJVER_4		0x0010	/* ATA/ATAPI-4 version supported */
 

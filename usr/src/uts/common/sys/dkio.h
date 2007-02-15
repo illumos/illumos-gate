@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -399,6 +399,76 @@ typedef struct vol_directed_rd32 {
 #pragma pack()
 #endif
 #endif	/* _MULTI_DATAMODEL */
+
+/*
+ * The ioctl is used to fetch disk's device type, vendor ID,
+ * model number/product ID, firmware revision and serial number together.
+ *
+ * Currently there are two device types - DKD_ATA_TYPE which means the
+ * disk is driven by cmdk/ata or dad/uata driver, and DKD_SCSI_TYPE
+ * which means the disk is driven by sd/scsi hba driver.
+ */
+#define	DKIOC_GETDISKID	(DKIOC|46)
+
+/* These two labels are for dkd_dtype of dk_disk_id_t */
+#define	DKD_ATA_TYPE	0x01 /* ATA disk or legacy mode SATA disk */
+#define	DKD_SCSI_TYPE	0x02 /* SCSI disk or native mode SATA disk */
+
+#define	DKD_ATA_MODEL	40	/* model number length */
+#define	DKD_ATA_FWVER	8	/* firmware revision length */
+#define	DKD_ATA_SERIAL	20	/* serial number length */
+
+#define	DKD_SCSI_VENDOR	8	/* vendor ID length */
+#define	DKD_SCSI_PRODUCT 16	/* product ID length */
+#define	DKD_SCSI_REVLEVEL 4	/* revision level length */
+#define	DKD_SCSI_SERIAL 12	/* serial number length */
+
+/*
+ * The argument type for DKIOC_GETDISKID ioctl.
+ */
+typedef struct dk_disk_id {
+	uint_t	dkd_dtype;
+	union {
+		struct {
+			char dkd_amodel[DKD_ATA_MODEL];		/* 40 bytes */
+			char dkd_afwver[DKD_ATA_FWVER];		/* 8 bytes */
+			char dkd_aserial[DKD_ATA_SERIAL];	/* 20 bytes */
+		} ata_disk_id;
+		struct {
+			char dkd_svendor[DKD_SCSI_VENDOR];	/* 8 bytes */
+			char dkd_sproduct[DKD_SCSI_PRODUCT];	/* 16 bytes */
+			char dkd_sfwver[DKD_SCSI_REVLEVEL];	/* 4 bytes */
+			char dkd_sserial[DKD_SCSI_SERIAL];	/* 12 bytes */
+		} scsi_disk_id;
+	} disk_id;
+} dk_disk_id_t;
+
+/*
+ * The ioctl is used to update the firmware of device.
+ */
+#define	DKIOC_UPDATEFW		(DKIOC|47)
+
+/* The argument type for DKIOC_UPDATEFW ioctl */
+typedef struct dk_updatefw {
+	caddr_t		dku_ptrbuf;	/* pointer to firmware buf */
+	uint_t		dku_size;	/* firmware buf length */
+	uint8_t		dku_type;	/* firmware update type */
+} dk_updatefw_t;
+
+#ifdef _SYSCALL32
+typedef struct dk_updatefw_32 {
+	caddr32_t	dku_ptrbuf;	/* pointer to firmware buf */
+	uint_t		dku_size;	/* firmware buf length */
+	uint8_t		dku_type;	/* firmware update type */
+} dk_updatefw_32_t;
+#endif /* _SYSCALL32 */
+
+/*
+ * firmware update type - temporary or permanent use
+ */
+#define	FW_TYPE_TEMP	0x0		/* temporary use */
+#define	FW_TYPE_PERM	0x1		/* permanent use */
+
 
 #ifdef	__cplusplus
 }

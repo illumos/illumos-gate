@@ -37,6 +37,8 @@
 #include <sys/dktp/cm.h>
 #include <sys/vtoc.h>
 #include <sys/dkio.h>
+#include <sys/policy.h>
+#include <sys/priv.h>
 
 #include <sys/dktp/dadev.h>
 #include <sys/dktp/fctypes.h>
@@ -794,6 +796,17 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 				return (EINVAL);
 		}
 	    }
+	case DKIOC_UPDATEFW:
+
+		/*
+		 * Require PRIV_ALL privilege to invoke DKIOC_UPDATEFW
+		 * to protect the firmware update from malicious use
+		 */
+		if (PRIV_POLICY(cred_p, PRIV_ALL, B_FALSE, EPERM, NULL) != 0)
+			return (EPERM);
+		else
+			return (CTL_IOCTL(dadkp->dad_ctlobjp, cmd, arg, flag));
+
 	case DKIOCFLUSHWRITECACHE:
 		{
 			struct buf *bp;

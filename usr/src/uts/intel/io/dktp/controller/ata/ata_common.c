@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,8 +145,6 @@ int	ata_id_debug = FALSE;
  * set this to TRUE to enable logging device-capability data
  */
 int	ata_capability_data = FALSE;
-
-#define	ATAPRT(fmt)	ghd_err fmt
 
 /*
  * DMA selection message pointers

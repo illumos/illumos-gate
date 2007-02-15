@@ -2,7 +2,7 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").  
+ * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@ extern "C" {
 #define	ATC_SETPARAM	0x91	/* set parameters command 		*/
 #define	ATC_ID_DEVICE	0xec    /* IDENTIFY DEVICE command 		*/
 #define	ATC_ACK_MC	0xdb	/* acknowledge media change		*/
+#define	ATC_LOAD_FW	0x92	/* download microcode			*/
 	/* ATA extended (48 bit) disk commands */
 #define	ATC_RDSEC_EXT	0x24	/* read sector */
 #define	ATC_RDMULT_EXT	0x29	/* read multiple */
@@ -64,6 +65,13 @@ extern "C" {
 #define	ATCM_ECCRETRY	0x01    /* Enable ECC and RETRY by controller 	*/
 				/* enabled if bit is CLEARED!!! 	*/
 #define	ATCM_LONGMODE	0x02    /* Use Long Mode (get/send data & ECC) 	*/
+
+/*
+ * subcommand for DOWNLOAD MICROCODE command
+ */
+#define	ATCM_FW_TEMP		0x01 /* immediate, temporary use	*/
+#define	ATCM_FW_MULTICMD	0x03 /* immediate and future use	*/
+#define	ATCM_FW_PERM		0x07 /* immediate and future use	*/
 
 #ifdef  DADKIO_RWCMD_READ
 #define	RWCMDP(pktp)  ((struct dadkio_rwcmd *)((pktp)->cp_bp->b_back))
