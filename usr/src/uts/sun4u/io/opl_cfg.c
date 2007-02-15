@@ -828,7 +828,7 @@ opl_create_core(dev_info_t *node, void *arg, uint_t flags)
 	    core->core_implementation);
 	OPL_UPDATE_PROP(int, node, "mask#", core->core_mask);
 
-	OPL_UPDATE_PROP(int, node, "sparc-version", core->core_version);
+	OPL_UPDATE_PROP(int, node, "sparc-version", 9);
 	OPL_UPDATE_PROP(int, node, "clock-frequency", core->core_frequency);
 
 	OPL_UPDATE_PROP(int, node, "l1-icache-size", core->core_l1_icache_size);
