@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1481,6 +1481,18 @@ adt_newuser(adt_internal_state_t *state, uid_t ruid, au_tid_addr_t *termid)
 
 	if (adt_get_mask_from_user(ruid, &(state->as_info.ai_mask)))
 		return (-1);
+
+	/* Assume intending to audit as this process */
+
+	if (state->as_pid == (pid_t)-1)
+		state->as_pid = getpid();
+
+	if (is_system_labeled() && state->as_label == NULL) {
+		ucred_t	*ucred = ucred_get(P_MYID);
+
+		state->as_label = adt_ucred_label(ucred);
+		ucred_free(ucred);
+	}
 
 	return (0);
 }
