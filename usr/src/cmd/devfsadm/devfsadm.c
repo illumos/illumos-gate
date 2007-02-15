@@ -2323,8 +2323,6 @@ minor_fini_thread(void *arg)
 		vprint(INITFINI_MID, "minor_fini sync done\n");
 
 		(void) mutex_lock(&minor_fini_mutex);
-		minor_fini_canceled = TRUE;
-		minor_fini_delayed = FALSE;
 	}
 }
 

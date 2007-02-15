@@ -119,7 +119,6 @@ static const char *skip_files[] = {
  * walks through every link in the link segment.
  *
  */
-
 di_devlink_handle_t
 di_devlink_open(const char *root_dir, uint_t flags)
 {
@@ -140,15 +139,14 @@ retry:
 	err = open_db(hdp, OPEN_RDONLY);
 
 	/*
-	 * Unlink the database, so that consumers don't get
-	 * out of date information as the database is being updated.
-	 *
-	 * NOTE: A typical snapshot consumer will wait until write lock
-	 * obtained by handle_alloc above is dropped by handle_free,
-	 * at which point the file will have been recreated.
+	 * We don't want to unlink the db at this point - if we did we
+	 * would be creating a window where consumers would take a slow
+	 * code path (and those consumers might also trigger requests for
+	 * db creation, which we are already in the process of doing).
+	 * When we are done with our update, we use rename to install the
+	 * latest version of the db file.
 	 */
 	get_db_path(hdp, DB_FILE, path, sizeof (path));
-	(void) unlink(path);
 
 	/*
 	 * The flags argument is reserved for future use.
@@ -357,7 +355,7 @@ handle_alloc(const char *root_dir, uint_t flags)
 	/*
 	 * Lock database if a read-write handle is being allocated.
 	 * Locks are needed to protect against multiple writers.
-	 * Readers lock/unlock in di_devlink_snapshot.
+	 * Readers don't need locks.
 	 */
 	if (HDL_RDWR(&proto)) {
 		if (enter_db_lock(&proto, root_dir) != 1) {
@@ -1936,44 +1934,34 @@ static di_devlink_handle_t
 devlink_snapshot(const char *root_dir)
 {
 	struct di_devlink_handle *hdp;
-	int	locked;
-	int	err;
-	int	retried = 0;
+	int		err;
+	static int	retried = 0;
 
 	if ((hdp = handle_alloc(root_dir, OPEN_RDONLY)) == NULL) {
 		return (NULL);
 	}
 
 	/*
-	 * Enter the DB lock.  This will wait for update in progress and
-	 * provide exclusion from new updates while we establish our mmap
-	 * to the database contents.
+	 * We don't need to lock.  If a consumer wants the very latest db
+	 * then he must perform a di_devlink_init with the DI_MAKE_LINK
+	 * flag to force a sync with devfsadm first.  Otherwise, the
+	 * current database file is opened and mmaped on demand: the rename
+	 * associated with a db update does not change the contents
+	 * of files already opened.
 	 */
-again:	locked = enter_db_lock(hdp, root_dir);
-	if (locked == -1) {
-		handle_free(&hdp);
-		return (NULL);
-	} else if (locked == 1) {
-		/* Open the DB and exit the lock. */
-		err = open_db(hdp, OPEN_RDONLY);
-		exit_db_lock(hdp);
-	} else
-		return (hdp);		/* walk /dev in di_devlink_walk */
+again:	err = open_db(hdp, OPEN_RDONLY);
 
 	/*
 	 * If we failed to open DB the most likely cause is that DB file did
 	 * not exist. If we have not done a retry, signal devfsadmd to
-	 * recreate the DB file and retry.
-	 *
-	 * If we fail to open the DB with retry, we will walk /dev
-	 * in di_devlink_walk.
+	 * recreate the DB file and retry. If we fail to open the DB after
+	 * retry, we will walk /dev in di_devlink_walk.
 	 */
 	if (err && (retried == 0)) {
 		retried++;
 		(void) devlink_create(root_dir, NULL, DCA_DEVLINK_SYNC);
 		goto again;
 	}
-
 	return (hdp);
 }
 
@@ -3033,7 +3021,7 @@ enter_db_lock(struct di_devlink_handle *hdp, const char *root_dir)
 	char		lockfile[PATH_MAX];
 	int		rv;
 	int		writer = HDL_RDWR(hdp);
-	int		did_sync = 0;
+	static int	did_sync = 0;
 	int		eintrs;
 
 	assert(hdp->lock_fd < 0);
