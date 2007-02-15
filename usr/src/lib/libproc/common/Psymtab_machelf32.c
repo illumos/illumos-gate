@@ -186,6 +186,25 @@ static char shstr[] =
 #define	SH_ADDRALIGN	4
 #endif
 
+/*
+ * This is the smallest number of PLT relocation entries allowed in a proper
+ * .plt section.
+ */
+#ifdef	__sparc
+#define	PLTREL_MIN_ENTRIES	4	/* SPARC psABI 3.0 and SCD 2.4 */
+#else
+#ifdef	__lint
+/*
+ * On x86, lint would complain about unsigned comparison with
+ * PLTREL_MIN_ENTRIES. This define fakes up the value of PLTREL_MIN_ENTRIES
+ * and silences lint. On SPARC, there is no such issue.
+ */
+#define	PLTREL_MIN_ENTRIES	1
+#else
+#define	PLTREL_MIN_ENTRIES	0
+#endif
+#endif
+
 #ifdef _ELF64
 Elf *
 fake_elf64(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
@@ -392,11 +411,20 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 		size_t pltrelsz = d[DI_PLTRELSZ]->d_un.d_val;
 
 		if (d[DI_PLTREL]->d_un.d_val == DT_RELA) {
-			uint_t ndx = pltrelsz / sizeof (Rela) - 2;
+			uint_t entries = pltrelsz / sizeof (Rela);
 			Rela r[2];
 
-			if (Pread(P, r, sizeof (r), jmprel +
-			    sizeof (r[0]) * ndx) != sizeof (r)) {
+			if (entries < PLTREL_MIN_ENTRIES) {
+				dprintf("too few PLT relocation entries "
+				    "(found %d, expected at least %d)\n",
+				    entries, PLTREL_MIN_ENTRIES);
+				goto bad;
+			}
+			if (entries < PLTREL_MIN_ENTRIES + 2)
+				goto done_with_plt;
+
+			if (Pread(P, r, sizeof (r), jmprel + sizeof (r[0]) *
+			    entries - sizeof (r)) != sizeof (r)) {
 				dprintf("Pread of DT_RELA failed\n");
 				goto bad;
 			}
@@ -405,11 +433,20 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 			ult = r[1].r_offset;
 
 		} else if (d[DI_PLTREL]->d_un.d_val == DT_REL) {
-			uint_t ndx = pltrelsz / sizeof (Rel) - 2;
+			uint_t entries = pltrelsz / sizeof (Rel);
 			Rel r[2];
 
-			if (Pread(P, r, sizeof (r), jmprel +
-			    sizeof (r[0]) * ndx) != sizeof (r)) {
+			if (entries < PLTREL_MIN_ENTRIES) {
+				dprintf("too few PLT relocation entries "
+				    "(found %d, expected at least %d)\n",
+				    entries, PLTREL_MIN_ENTRIES);
+				goto bad;
+			}
+			if (entries < PLTREL_MIN_ENTRIES + 2)
+				goto done_with_plt;
+
+			if (Pread(P, r, sizeof (r), jmprel + sizeof (r[0]) *
+			    entries - sizeof (r)) != sizeof (r)) {
 				dprintf("Pread of DT_REL failed\n");
 				goto bad;
 			}
@@ -431,6 +468,7 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 		size += sizeof (Shdr);
 		size += roundup(pltsz, SH_ADDRALIGN);
 	}
+done_with_plt:
 
 	if ((elfdata = calloc(1, size)) == NULL)
 		goto bad;
