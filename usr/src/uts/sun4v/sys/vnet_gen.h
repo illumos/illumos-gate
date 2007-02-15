@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -247,6 +247,7 @@ typedef struct vgen_ldc {
 	vgen_hparams_t		local_hparams;	/* local handshake params */
 	vgen_hparams_t		peer_hparams;	/* peer's handshake params */
 	timeout_id_t		htid;		/* handshake wd timeout id */
+	timeout_id_t		cancel_htid;	/* cancel handshake watchdog */
 
 	/* transmit and receive descriptor ring info */
 	ldc_dring_handle_t	tx_dhandle;	/* tx descriptor ring handle */

@@ -3232,6 +3232,7 @@ ldc_read(ldc_handle_t handle, caddr_t bufp, size_t *sizep)
 		mutex_enter(&ldcp->tx_lock);
 		i_ldc_reset(ldcp, B_TRUE);
 		mutex_exit(&ldcp->tx_lock);
+		mutex_exit(&ldcp->lock);
 		return (ECONNRESET);
 	}
 

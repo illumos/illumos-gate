@@ -45,6 +45,7 @@
 #include "vntsd.h"
 
 #define	    MAX_BIND_RETRIES		6
+
 /*
  * check the state of listen thread. exit if there is an fatal error
  * or the group is removed. Main thread will call free_group
@@ -70,22 +71,13 @@ listen_chk_status(vntsd_group_t *groupp, int status)
 	case VNTSD_SUCCESS:
 		return;
 
-	case VNTSD_STATUS_INTR:
-		/* signal for deleting group */
-		assert(groupp->status & VNTSD_GROUP_SIG_WAIT);
-
-		/* let main thread know  */
-		(void) mutex_lock(&groupp->lock);
-		groupp->status &= ~VNTSD_GROUP_SIG_WAIT;
-		(void) cond_signal(&groupp->cvp);
-		(void) mutex_unlock(&groupp->lock);
-
-		thr_exit(0);
-		break;
 
 	case VNTSD_STATUS_ACCEPT_ERR:
 		return;
 
+	case VNTSD_STATUS_INTR:
+		assert(groupp->status & VNTSD_GROUP_SIG_WAIT);
+		/*FALLTHRU*/
 	case VNTSD_STATUS_NO_CONS:
 	default:
 		/* fatal error or no console in the group, remove the group. */
@@ -93,9 +85,14 @@ listen_chk_status(vntsd_group_t *groupp, int status)
 		(void) mutex_lock(&groupp->lock);
 
 		if (groupp->status & VNTSD_GROUP_SIG_WAIT) {
-			/* group is already in deletion */
+			/*
+			 * group is already being deleted, notify main
+			 * thread and exit.
+			 */
+			groupp->status &= ~VNTSD_GROUP_SIG_WAIT;
+			(void) cond_signal(&groupp->cvp);
 			(void) mutex_unlock(&groupp->lock);
-			return;
+			thr_exit(0);
 		}
 
 		/*
@@ -115,7 +112,7 @@ listen_chk_status(vntsd_group_t *groupp, int status)
 		/* log error */
 		if (status != VNTSD_STATUS_NO_CONS)
 			vntsd_log(status, err_msg);
-		break;
+		thr_exit(0);
 	}
 }
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,8 @@
 #include <libintl.h>
 #include <locale.h>
 #include <syslog.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #include "vntsd.h"
 #include "chars.h"
 
@@ -70,6 +72,8 @@ int vntsddbg = 0x8;
 #endif
 
 #define	MINUTE		60
+
+#define	VNTSD_INVALID_LISTEN_ADDR	    ((in_addr_t)-1)
 
 static vntsd_t *vntsdp;
 
@@ -259,6 +263,57 @@ vntsd_help(void)
 		    "[-p <listen address>] [-t <timeout in minutes>]\n"));
 }
 
+/*
+ * get_listen_ip_addr()
+ * check for a valid control domain ip address in format of xxx.xxx.xxx.xxx.
+ * if ip address is valid and is assigned to this host, return ip address
+ * or else return VNTSD_INVALID_LISTEN_ADDR.
+ */
+static in_addr_t
+get_listen_ip_addr(char *listen_addr)
+{
+	char host_name[MAXPATHLEN];
+	in_addr_t addr;
+	struct addrinfo hints;
+	struct addrinfo *res, *infop;
+	int err;
+	struct sockaddr_in *sa;
+
+	if (gethostname(host_name, MAXPATHLEN) != 0) {
+		syslog(LOG_ERR, "Can not get host name!");
+		return (VNTSD_INVALID_LISTEN_ADDR);
+	}
+
+	if ((int)(addr = inet_addr(listen_addr)) == -1)
+		/* bad IP address format */
+		return (VNTSD_INVALID_LISTEN_ADDR);
+
+	bzero(&hints, sizeof (hints));
+	hints.ai_family = PF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+
+	err = getaddrinfo(host_name, NULL, &hints, &res);
+	if (err != 0) {
+		syslog(LOG_ERR, "getaddrinfo failed: %s", gai_strerror(err));
+		return (VNTSD_INVALID_LISTEN_ADDR);
+	}
+
+	infop = res;
+	while (infop != NULL) {
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		sa = (struct sockaddr_in *)infop->ai_addr;
+		if (sa->sin_addr.s_addr == addr) {
+			/* ip address found */
+			freeaddrinfo(res);
+			return (addr);
+		}
+		infop = infop->ai_next;
+	}
+
+	/* ip address not found */
+	freeaddrinfo(res);
+	return (VNTSD_INVALID_LISTEN_ADDR);
+}
 
 #ifdef DEBUG
 #define	DEBUG_OPTIONS	"d"
@@ -340,12 +395,12 @@ main(int argc, char ** argv)
 	} else if (strcmp(listen_addr, "any") == 0) {
 		vntsdp->ip_addr.s_addr = htonl(INADDR_ANY);
 	} else {
-		vntsdp->ip_addr.s_addr = inet_addr(listen_addr);
-		if (vntsdp->ip_addr.s_addr == (in_addr_t)(-1)) {
-			(void) fprintf(stderr,
-			    gettext("Invalid listen address '%s'\n"),
+		vntsdp->ip_addr.s_addr = get_listen_ip_addr(listen_addr);
+		if (vntsdp->ip_addr.s_addr == VNTSD_INVALID_LISTEN_ADDR) {
+			syslog(LOG_ERR,
+			    "Invalid listen address '%s'\n",
 			    listen_addr);
-			exit(1);
+			exit(2);
 		}
 	}
 

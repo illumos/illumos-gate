@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -773,7 +773,7 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	vgen_ldclist_t		*ldclp;
 	void			*vnetp;
 	struct ether_addr	*addrp;
-	int			rv;
+	int			rv = DDI_FAILURE;
 	uint32_t		i;
 
 	vgenp = (vgen_t *)arg;
@@ -791,18 +791,16 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	portp = vgenp->vsw_portp;
 	if (portp == NULL) {
 		RW_EXIT(&plistp->rwlock);
-		goto vgen_mcast_exit;
+		mutex_exit(&vgenp->lock);
+		return (rv);
 	}
 	ldclp = &portp->ldclist;
 
 	READ_ENTER(&ldclp->rwlock);
 
 	ldcp = ldclp->headp;
-	if (ldcp == NULL) {
-		RW_EXIT(&ldclp->rwlock);
-		RW_EXIT(&plistp->rwlock);
+	if (ldcp == NULL)
 		goto vgen_mcast_exit;
-	}
 
 	mutex_enter(&ldcp->cblock);
 
@@ -818,11 +816,12 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 		bcopy(mca, &(mcastmsg.mca), ETHERADDRL);
 		mcastmsg.set = add;
 		mcastmsg.count = 1;
-		rv = vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (mcastmsg),
-		    B_FALSE);
-		if (rv != VGEN_SUCCESS) {
+		if (vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (mcastmsg),
+		    B_FALSE) != VGEN_SUCCESS) {
 			DWARN((vnetp, "vgen_mutlicst: vgen_sendmsg failed"
 			    "id (%lx)\n", ldcp->ldc_id));
+			mutex_exit(&ldcp->cblock);
+			goto vgen_mcast_exit;
 		}
 	} else {
 		/* set the flag to send a msg to vsw after handshake is done */
@@ -843,7 +842,8 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 
 			newtab = kmem_zalloc(newsize *
 			    sizeof (struct ether_addr), KM_NOSLEEP);
-
+			if (newtab == NULL)
+				goto vgen_mcast_exit;
 			bcopy(vgenp->mctab, newtab, vgenp->mcsize *
 			    sizeof (struct ether_addr));
 			kmem_free(vgenp->mctab,
@@ -878,12 +878,14 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 		}
 	}
 
+	rv = DDI_SUCCESS;
+
+vgen_mcast_exit:
 	RW_EXIT(&ldclp->rwlock);
 	RW_EXIT(&plistp->rwlock);
 
-vgen_mcast_exit:
 	mutex_exit(&vgenp->lock);
-	return (DDI_SUCCESS);
+	return (rv);
 }
 
 /* set or clear promiscuous mode on the device */
@@ -1965,19 +1967,31 @@ vgen_ldc_uninit(vgen_ldc_t *ldcp)
 		    "ldc_set_cb_mode failed\n", ldcp->ldc_id));
 	}
 
-	/* clear handshake done bit and wait for pending tx and cb to finish */
+	/*
+	 * clear handshake done bit and wait for pending tx and cb to finish.
+	 * release locks before untimeout(9F) is invoked to cancel timeouts.
+	 */
 	ldcp->hphase &= ~(VH_DONE);
 	LDC_UNLOCK(ldcp);
-	drv_usecwait(1000);
-	LDC_LOCK(ldcp);
 
-	vgen_reset_hphase(ldcp);
+	/* cancel handshake watchdog timeout */
+	if (ldcp->htid) {
+		(void) untimeout(ldcp->htid);
+		ldcp->htid = 0;
+	}
 
-	/* reset transmit watchdog timeout */
+	/* cancel transmit watchdog timeout */
 	if (ldcp->wd_tid) {
 		(void) untimeout(ldcp->wd_tid);
 		ldcp->wd_tid = 0;
 	}
+
+	drv_usecwait(1000);
+
+	/* acquire locks again; any pending transmits and callbacks are done */
+	LDC_LOCK(ldcp);
+
+	vgen_reset_hphase(ldcp);
 
 	vgen_uninit_tbufs(ldcp);
 
@@ -2512,7 +2526,7 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 	}
 
 	mutex_exit(&ldcp->cblock);
-	return (LDC_SUCCESS);
+	goto vgen_ldccb_exit;
 
 vgen_ldccb_rcv:
 
@@ -2526,7 +2540,7 @@ vgen_ldccb_rcv:
 			    "vgen_ldc_cb:ldc_read err id(%lx) rv(%d) "
 			    "len(%d)\n", ldcp->ldc_id, rv, msglen));
 			if (rv == ECONNRESET)
-				goto exit_error;
+				goto vgen_ldccb_error;
 			break;
 		}
 		if (msglen == 0) {
@@ -2558,7 +2572,7 @@ vgen_ldccb_rcv:
 				 * reset the channel.
 				 */
 				ldcp->need_ldc_reset = B_TRUE;
-				goto exit_error;
+				goto vgen_ldccb_error;
 			}
 		}
 
@@ -2593,7 +2607,7 @@ vgen_ldccb_rcv:
 			break;
 		}
 
-exit_error:
+vgen_ldccb_error:
 		if (rv == ECONNRESET) {
 			if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
 				DWARN((vnetp,
@@ -2620,6 +2634,20 @@ exit_error:
 		DBG2((vnetp, "vgen_ldc_cb: id(%lx) rx pkt len (%lx)\n",
 		    ldcp->ldc_id, MBLKL(mp)));
 		vnet_rx(vgenp->vnetp, NULL, mp);
+	}
+
+vgen_ldccb_exit:
+	if (ldcp->cancel_htid) {
+		/*
+		 * Cancel handshake timer.
+		 * untimeout(9F) will not return until the pending callback is
+		 * cancelled or has run. No problems will result from calling
+		 * untimeout if the handler has already completed.
+		 * If the timeout handler did run, then it would just
+		 * return as cancel_htid is set.
+		 */
+		(void) untimeout(ldcp->cancel_htid);
+		ldcp->cancel_htid = 0;
 	}
 	DBG1((vnetp, "vgen_ldc_cb exit: ldcid (%lx)\n", ldcp->ldc_id));
 
@@ -3055,9 +3083,13 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 	ldcp->hstate = 0;
 	ldcp->hphase = VH_PHASE0;
 
-	/* reset handshake watchdog timeout */
+	/*
+	 * Save the id of pending handshake timer in cancel_htid.
+	 * This will be checked in vgen_ldc_cb() and the handshake timer will
+	 * be cancelled after releasing cblock.
+	 */
 	if (ldcp->htid) {
-		(void) untimeout(ldcp->htid);
+		ldcp->cancel_htid = ldcp->htid;
 		ldcp->htid = 0;
 	}
 
@@ -3149,13 +3181,6 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 		} else {
 			ldcp->ldc_status = istatus;
 		}
-
-		/* if channel is already UP - restart handshake */
-		if (istatus == LDC_UP) {
-			/* Initialize local session id */
-			ldcp->local_sid = ddi_get_lbolt();
-			vgen_handshake(vh_nextphase(ldcp));
-		}
 	}
 }
 
@@ -3214,9 +3239,13 @@ vgen_handshake(vgen_ldc_t *ldcp)
 		break;
 
 	case VH_DONE:
-		/* reset handshake watchdog timeout */
+		/*
+		 * Save the id of pending handshake timer in cancel_htid.
+		 * This will be checked in vgen_ldc_cb() and the handshake
+		 * timer will be cancelled after releasing cblock.
+		 */
 		if (ldcp->htid) {
-			(void) untimeout(ldcp->htid);
+			ldcp->cancel_htid = ldcp->htid;
 			ldcp->htid = 0;
 		}
 		ldcp->hretries = 0;
@@ -3329,9 +3358,13 @@ vgen_handshake_retry(vgen_ldc_t *ldcp)
 {
 	/* reset handshake phase */
 	vgen_handshake_reset(ldcp);
-	if (vgen_max_hretries) {	/* handshake retry is specified */
-		if (ldcp->hretries++ < vgen_max_hretries)
+
+	/* handshake retry is specified and the channel is UP */
+	if (vgen_max_hretries && (ldcp->ldc_status == LDC_UP)) {
+		if (ldcp->hretries++ < vgen_max_hretries) {
+			ldcp->local_sid = ddi_get_lbolt();
 			vgen_handshake(vh_nextphase(ldcp));
+		}
 	}
 }
 
@@ -4850,7 +4883,7 @@ vgen_ldc_watchdog(void *arg)
 #endif
 		mutex_enter(&ldcp->cblock);
 		ldcp->need_ldc_reset = B_TRUE;
-		vgen_handshake_reset(ldcp);
+		vgen_handshake_retry(ldcp);
 		mutex_exit(&ldcp->cblock);
 		if (ldcp->need_resched) {
 			ldcp->need_resched = B_FALSE;
@@ -5112,6 +5145,11 @@ vgen_hwatchdog(void *arg)
 	    ldcp->ldc_id, ldcp->hphase, ldcp->hstate));
 
 	mutex_enter(&ldcp->cblock);
+	if (ldcp->cancel_htid) {
+		ldcp->cancel_htid = 0;
+		mutex_exit(&ldcp->cblock);
+		return;
+	}
 	ldcp->htid = 0;
 	ldcp->need_ldc_reset = B_TRUE;
 	vgen_handshake_retry(ldcp);
