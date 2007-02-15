@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2971,15 +2971,10 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE,
 			"tl_conn_req: qlen overflow connection refused"));
 			err = ECONNREFUSED;
-	} else if (!((peer_tep->te_state == TS_IDLE) ||
-			(peer_tep->te_state == TS_WRES_CIND))) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE,
-			"tl_conn_req:peer in bad state"));
-		err = ECONNREFUSED;
 	}
 
 	/*
-	 * preallocate now for T_DISCON_IND or T_CONN_IND
+	 * Send T_DISCON_IND in case of error
 	 */
 	if (err != 0) {
 		if (peer_tep != NULL)
@@ -3078,6 +3073,9 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 	if (peer_tep->te_closing ||
 	    !((peer_tep->te_state == TS_IDLE) ||
 		(peer_tep->te_state == TS_WRES_CIND))) {
+		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE | SL_ERROR,
+			"tl_conn_req:peer in bad state (%d)",
+			    peer_tep->te_state));
 		TL_UNCONNECT(tep->te_oconp);
 		tl_error_ack(wq, mp, TSYSERR, ECONNREFUSED, T_CONN_REQ);
 		freemsg(ackmp);
