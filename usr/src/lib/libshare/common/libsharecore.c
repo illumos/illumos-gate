@@ -96,6 +96,39 @@ extern int set_node_share(void *, char *, char *);
 extern void set_node_attr(void *, char *, char *);
 
 /*
+ * sablocksigs(*sigs)
+ *
+ * block important signals for a critical region. Arg is a pointer to
+ * a sigset_t that is used later for the unblock.
+ */
+void
+sablocksigs(sigset_t *sigs)
+{
+	sigset_t new;
+
+	if (sigs != NULL) {
+	    (void) sigprocmask(SIG_BLOCK, NULL, &new);
+	    (void) sigaddset(&new, SIGHUP);
+	    (void) sigaddset(&new, SIGINT);
+	    (void) sigaddset(&new, SIGQUIT);
+	    (void) sigaddset(&new, SIGTSTP);
+	    (void) sigprocmask(SIG_SETMASK, &new, sigs);
+	}
+}
+
+/*
+ * saunblocksigs(*sigs)
+ *
+ * unblock previously blocked signals from the sigs arg.
+ */
+void
+saunblocksigs(sigset_t *sigs)
+{
+	if (sigs != NULL)
+	    (void) sigprocmask(SIG_SETMASK, sigs, NULL);
+}
+
+/*
  * alloc_sharelist()
  *
  * allocator function to return an zfs_sharelist_t
@@ -259,9 +292,10 @@ getdfstab(FILE *dfs)
 			    item->resource = strdup(resource);
 		    }
 		}
+		if (item != NULL && item->fstype == NULL) {
+		    item->fstype = strdup("nfs"); /* this is the default */
+		}
 	    }
-	    if (item != NULL && item->fstype == NULL)
-		item->fstype = strdup("nfs"); /* this is the default */
 	}
 	first = fix_notice(first);
 	return (first);
@@ -500,17 +534,12 @@ sa_comment_line(char *line, char *err)
 {
 	FILE *dfstab;
 	xfs_sharelist_t *list;
-	sigset_t old, new;
+	sigset_t old;
 
 	dfstab = open_dfstab(SA_LEGACY_DFSTAB);
 	if (dfstab != NULL) {
 		(void) setvbuf(dfstab, NULL, _IOLBF, BUFSIZ * 8);
-		(void) sigprocmask(SIG_BLOCK, NULL, &new);
-		(void) sigaddset(&new, SIGHUP);
-		(void) sigaddset(&new, SIGINT);
-		(void) sigaddset(&new, SIGQUIT);
-		(void) sigaddset(&new, SIGTSTP);
-		(void) sigprocmask(SIG_SETMASK, &new, &old);
+		sablocksigs(&old);
 		(void) lockf(fileno(dfstab), F_LOCK, 0);
 		list = getdfstab(dfstab);
 		rewind(dfstab);
@@ -524,7 +553,7 @@ sa_comment_line(char *line, char *err)
 		(void) fsync(fileno(dfstab));
 		(void) lockf(fileno(dfstab), F_ULOCK, 0);
 		(void) fclose(dfstab);
-		(void) sigprocmask(SIG_SETMASK, &old, NULL);
+		saunblocksigs(&old);
 		if (list != NULL)
 		    dfs_free_list(list);
 	}
@@ -546,17 +575,12 @@ sa_delete_legacy(sa_share_t share)
 	char *path;
 	sa_optionset_t optionset;
 	sa_group_t parent;
-	sigset_t old, new;
+	sigset_t old;
 
 	dfstab = open_dfstab(SA_LEGACY_DFSTAB);
 	if (dfstab != NULL) {
 		(void) setvbuf(dfstab, NULL, _IOLBF, BUFSIZ * 8);
-		(void) sigprocmask(SIG_BLOCK, NULL, &new);
-		(void) sigaddset(&new, SIGHUP);
-		(void) sigaddset(&new, SIGINT);
-		(void) sigaddset(&new, SIGQUIT);
-		(void) sigaddset(&new, SIGTSTP);
-		(void) sigprocmask(SIG_SETMASK, &new, &old);
+		sablocksigs(&old);
 		path = sa_get_share_attr(share, "path");
 		parent = sa_get_parent_group(share);
 		if (parent != NULL) {
@@ -591,7 +615,7 @@ sa_delete_legacy(sa_share_t share)
 		    (void) lockf(fileno(dfstab), F_ULOCK, 0);
 		}
 		(void) fsync(fileno(dfstab));
-		(void) sigprocmask(SIG_SETMASK, &old, NULL);
+		saunblocksigs(&old);
 		(void) fclose(dfstab);
 		sa_free_attr_string(path);
 	} else {
@@ -624,7 +648,7 @@ sa_update_legacy(sa_share_t share, char *proto)
 	int ret = SA_OK;
 	xfs_sharelist_t *list;
 	char *path;
-	sigset_t old, new;
+	sigset_t old;
 	char *persist;
 
 	ret = sa_proto_update_legacy(proto, share);
@@ -640,12 +664,7 @@ sa_update_legacy(sa_share_t share, char *proto)
 	    dfstab = open_dfstab(SA_LEGACY_DFSTAB);
 	    if (dfstab != NULL) {
 		(void) setvbuf(dfstab, NULL, _IOLBF, BUFSIZ * 8);
-		(void) sigprocmask(SIG_BLOCK, NULL, &new);
-		(void) sigaddset(&new, SIGHUP);
-		(void) sigaddset(&new, SIGINT);
-		(void) sigaddset(&new, SIGQUIT);
-		(void) sigaddset(&new, SIGTSTP);
-		(void) sigprocmask(SIG_SETMASK, &new, &old);
+		sablocksigs(&old);
 		path = sa_get_share_attr(share, "path");
 		(void) lockf(fileno(dfstab), F_LOCK, 0);
 		list = getdfstab(dfstab);
@@ -657,7 +676,7 @@ sa_update_legacy(sa_share_t share, char *proto)
 		(void) fflush(dfstab);
 		(void) lockf(fileno(dfstab), F_ULOCK, 0);
 		(void) fsync(fileno(dfstab));
-		(void) sigprocmask(SIG_SETMASK, &old, NULL);
+		saunblocksigs(&old);
 		(void) fclose(dfstab);
 		sa_free_attr_string(path);
 		if (list != NULL)
@@ -1058,6 +1077,7 @@ parse_dfstab(char *dfstab, xmlNodePtr root)
 							    list->options,
 							    list->fstype);
 			}
+			sa_format_free(oldprops);
 		    }
 		}
 	    } else {
@@ -1168,6 +1188,7 @@ get_share_list(int *errp)
 
 	if ((fp = fopen(SHARETAB, "r")) != NULL) {
 		struct share	*sharetab_entry;
+		(void) lockf(fileno(fp), F_LOCK, 0);
 
 		while (getshare(fp, &sharetab_entry) > 0) {
 		    newp = alloc_sharelist();
@@ -1203,6 +1224,7 @@ get_share_list(int *errp)
 		    if (newp->description == NULL)
 			goto err;
 		}
+		(void) lockf(fileno(fp), F_ULOCK, 0);
 		(void) fclose(fp);
 	} else {
 	    *errp = errno;
@@ -1802,6 +1824,50 @@ emptyshare(struct share *sh)
 }
 
 /*
+ * checkshare(struct share *)
+ *
+ * If the share to write to sharetab is not present, need to add.  If
+ * the share is present, replace if options are different else we want
+ * to keep it.
+ * Return values:
+ *	1 - keep
+ *	2 - replace
+ * The CHK_NEW value isn't currently returned.
+ */
+#define	CHK_NEW		0
+#define	CHK_KEEP	1
+#define	CHK_REPLACE	2
+static int
+checkshare(struct share *sh)
+{
+	xfs_sharelist_t *list, *head;
+	int err;
+	int ret = CHK_NEW;
+
+	head = list = get_share_list(&err);
+	while (list != NULL && ret == CHK_NEW) {
+	    if (strcmp(sh->sh_path, list->path) == 0) {
+		/* Have the same path so check if replace or keep */
+		if (strcmp(sh->sh_opts, list->options) == 0)
+		    ret = CHK_KEEP;
+		else
+		    ret = CHK_REPLACE;
+	    }
+	    list = list->next;
+	}
+	if (head != NULL) {
+	    dfs_free_list(head);
+	}
+	/*
+	 * Just in case it was added by another process after our
+	 * scan, we always replace even if we think it is new.
+	 */
+	if (ret == CHK_NEW)
+	    ret = CHK_REPLACE;
+	return (ret);
+}
+
+/*
  * sa_update_sharetab(share, proto)
  *
  * Update the sharetab file with info from the specified share.
@@ -1816,7 +1882,8 @@ sa_update_sharetab(sa_share_t share, char *proto)
 	char *path;
 	int logging = 0;
 	FILE *sharetab;
-	sigset_t old, new;
+	sigset_t old;
+	int action;
 
 	path = sa_get_share_attr(share, "path");
 	if (path != NULL) {
@@ -1827,22 +1894,32 @@ sa_update_sharetab(sa_share_t share, char *proto)
 	    }
 	    if (sharetab != NULL) {
 		(void) setvbuf(sharetab, NULL, _IOLBF, BUFSIZ * 8);
-		(void) sigprocmask(SIG_BLOCK, NULL, &new);
-		(void) sigaddset(&new, SIGHUP);
-		(void) sigaddset(&new, SIGINT);
-		(void) sigaddset(&new, SIGQUIT);
-		(void) sigaddset(&new, SIGTSTP);
-		(void) sigprocmask(SIG_SETMASK, &new, &old);
-		(void) lockf(fileno(sharetab), F_LOCK, 0);
-		(void) remshare(sharetab, path, &logging);
-		/* fill in share structure and write it out */
+		sablocksigs(&old);
+		/*
+		 * Fill in share structure and write it out if the
+		 * share isn't already shared with the same options.
+		 */
 		(void) fillshare(share, proto, &shtab);
-		(void) putshare(sharetab, &shtab);
+		/*
+		 * If share is new or changed, remove the old,
+		 * otherwise keep it in place since it hasn't changed.
+		 */
+		action = checkshare(&shtab);
+		(void) lockf(fileno(sharetab), F_LOCK, 0);
+		switch (action) {
+		case CHK_REPLACE:
+		    (void) remshare(sharetab, path, &logging);
+		    (void) putshare(sharetab, &shtab);
+		    break;
+		case CHK_KEEP:
+		    /* Don't do anything */
+		    break;
+		}
 		emptyshare(&shtab);
 		(void) fflush(sharetab);
 		(void) lockf(fileno(sharetab), F_ULOCK, 0);
 		(void) fsync(fileno(sharetab));
-		(void) sigprocmask(SIG_SETMASK, &old, NULL);
+		saunblocksigs(&old);
 		(void) fclose(sharetab);
 	    } else {
 		if (errno == EACCES || errno == EPERM) {
@@ -1868,7 +1945,7 @@ sa_delete_sharetab(char *path, char *proto)
 	int ret = SA_OK;
 	int logging = 0;
 	FILE *sharetab;
-	sigset_t old, new;
+	sigset_t old;
 #ifdef lint
 	proto = proto;
 #endif
@@ -1880,18 +1957,13 @@ sa_delete_sharetab(char *path, char *proto)
 	    }
 	    if (sharetab != NULL) {
 		/* should block keyboard level signals around the lock */
-		(void) sigprocmask(SIG_BLOCK, NULL, &new);
-		(void) sigaddset(&new, SIGHUP);
-		(void) sigaddset(&new, SIGINT);
-		(void) sigaddset(&new, SIGQUIT);
-		(void) sigaddset(&new, SIGTSTP);
-		(void) sigprocmask(SIG_SETMASK, &new, &old);
+		sablocksigs(&old);
 		(void) lockf(fileno(sharetab), F_LOCK, 0);
 		ret = remshare(sharetab, path, &logging);
 		(void) fflush(sharetab);
 		(void) lockf(fileno(sharetab), F_ULOCK, 0);
 		(void) fsync(fileno(sharetab));
-		(void) sigprocmask(SIG_SETMASK, &old, NULL);
+		saunblocksigs(&old);
 		(void) fclose(sharetab);
 	    } else {
 		if (errno == EACCES || errno == EPERM) {

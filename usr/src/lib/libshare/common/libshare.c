@@ -34,6 +34,7 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
@@ -50,6 +51,8 @@
 #endif
 #define	TSTAMP(tm)	(uint64_t)(((uint64_t)tm.tv_sec << 32) | \
 					(tm.tv_nsec & 0xffffffff))
+
+#define	DFS_LOCK_FILE	"/etc/dfs/fstypes"
 
 /*
  * internal data structures
@@ -74,6 +77,8 @@ extern void update_legacy_config(void);
 extern int issubdir(char *, char *);
 extern void sa_zfs_init(void);
 extern void sa_zfs_fini(void);
+extern void sablocksigs(sigset_t *);
+extern void saunblocksigs(sigset_t *);
 
 static int sa_initialized = 0;
 
@@ -167,46 +172,6 @@ sa_errorstr(int err)
 }
 
 /*
- * get_legacy_timestamp(root, path)
- *	gets the timestamp of the last time sharemgr updated the legacy
- *	files. This is used to determine if someone has modified them by
- *	hand.
- */
-static uint64_t
-get_legacy_timestamp(xmlNodePtr root, char *path)
-{
-	uint64_t tval = 0;
-	xmlNodePtr node;
-	xmlChar *lpath = NULL;
-	xmlChar *timestamp = NULL;
-
-	for (node = root->xmlChildrenNode; node != NULL;
-		node = node->next) {
-	    if (xmlStrcmp(node->name, (xmlChar *)"legacy") == 0) {
-		/* a possible legacy node for this path */
-		lpath = xmlGetProp(node, (xmlChar *)"path");
-		if (lpath != NULL && xmlStrcmp(lpath, (xmlChar *)path) == 0) {
-		    /* now have the node, extract the data */
-		    timestamp = xmlGetProp(node, (xmlChar *)"timestamp");
-		    if (timestamp != NULL) {
-			tval = strtoull((char *)timestamp, NULL, 0);
-			break;
-		    }
-		}
-		if (lpath != NULL) {
-		    xmlFree(lpath);
-		    lpath = NULL;
-		}
-	    }
-	}
-	if (lpath != NULL)
-	    xmlFree(lpath);
-	if (timestamp != NULL)
-	    xmlFree(timestamp);
-	return (tval);
-}
-
-/*
  * set_legacy_timestamp(root, path, timevalue)
  *
  * add the current timestamp value to the configuration for use in
@@ -282,30 +247,25 @@ is_shared(sa_share_t share)
 }
 
 /*
- * checksubdir(newpath, strictness)
+ * checksubdirgroup(group, newpath, strictness)
  *
- * checksubdir determines if the specified path (newpath) is a
- * subdirectory of another share. It calls issubdir() from the old
- * share implementation to do the complicated work. The strictness
- * parameter determines how strict a check to make against the
- * path. The strictness values mean:
+ * check all the specified newpath against all the paths in the
+ * group. This is a helper function for checksubdir to make it easier
+ * to also check ZFS subgroups.
+ * The strictness values mean:
  * SA_CHECK_NORMAL == only check newpath against shares that are active
  * SA_CHECK_STRICT == check newpath against both active shares and those
  *		      stored in the repository
  */
 static int
-checksubdir(char *newpath, int strictness)
+checksubdirgroup(sa_group_t group, char *newpath, int strictness)
 {
-	sa_group_t group;
 	sa_share_t share;
-	int issub;
-	char *path = NULL;
+	char *path;
+	int issub = SA_OK;
 
-	for (issub = 0, group = sa_get_group(NULL);
-		group != NULL && !issub;
-		group = sa_get_next_group(group)) {
-	    for (share = sa_get_share(group, NULL); share != NULL;
-		    share = sa_get_next_share(share)) {
+	for (share = sa_get_share(group, NULL); share != NULL;
+	    share = sa_get_next_share(share)) {
 		/*
 		 * The original behavior of share never checked
 		 * against the permanent configuration
@@ -314,27 +274,63 @@ checksubdir(char *newpath, int strictness)
 		 * could be considered incorrect.  We may tighten this
 		 * up in the future.
 		 */
-		if (strictness == SA_CHECK_NORMAL && !is_shared(share))
-		    continue;
+	    if (strictness == SA_CHECK_NORMAL && !is_shared(share))
+		continue;
 
-		path = sa_get_share_attr(share, "path");
+	    path = sa_get_share_attr(share, "path");
 		/*
 		 * If path is NULL, then a share is in the process of
 		 * construction or someone has modified the property
-		 * group inappropriately. It should be ignored.
+		 * group inappropriately. It should be
+		 * ignored. issubdir() comes from the original share
+		 * implementation and does the difficult part of
+		 * checking subdirectories.
 		 */
-		if (path == NULL)
-		    continue;
-		if (newpath != NULL &&
-		    (strcmp(path, newpath) == 0 || issubdir(newpath, path) ||
-			issubdir(path, newpath))) {
-		    sa_free_attr_string(path);
-		    path = NULL;
-		    issub = SA_INVALID_PATH;
-		    break;
-		}
+	    if (path == NULL)
+		continue;
+	    if (newpath != NULL &&
+		(strcmp(path, newpath) == 0 || issubdir(newpath, path) ||
+		issubdir(path, newpath))) {
 		sa_free_attr_string(path);
 		path = NULL;
+		issub = SA_INVALID_PATH;
+		break;
+	    }
+	    sa_free_attr_string(path);
+	    path = NULL;
+	}
+	return (issub);
+}
+
+/*
+ * checksubdir(newpath, strictness)
+ *
+ * checksubdir determines if the specified path (newpath) is a
+ * subdirectory of another share. It calls checksubdirgroup() to do
+ * the complicated work. The strictness parameter determines how
+ * strict a check to make against the path. The strictness values
+ * mean: SA_CHECK_NORMAL == only check newpath against shares that are
+ * active SA_CHECK_STRICT == check newpath against both active shares
+ * and those * stored in the repository
+ */
+static int
+checksubdir(char *newpath, int strictness)
+{
+	sa_group_t group;
+	int issub;
+	char *path = NULL;
+
+	for (issub = 0, group = sa_get_group(NULL);
+		group != NULL && !issub;
+		group = sa_get_next_group(group)) {
+	    if (sa_group_is_zfs(group)) {
+		sa_group_t subgroup;
+		for (subgroup = sa_get_sub_group(group);
+		    subgroup != NULL && !issub;
+		    subgroup = sa_get_next_group(subgroup))
+		    issub = checksubdirgroup(subgroup, newpath, strictness);
+	    } else {
+		issub = checksubdirgroup(group, newpath, strictness);
 	    }
 	}
 	if (path != NULL)
@@ -378,7 +374,7 @@ validpath(char *path, int strictness)
 		fstype = sa_fstype(path);
 		if (fstype != NULL && strcmp(fstype, "zfs") == 0) {
 		    if (sa_zfs_is_shared(path))
-			error = SA_DUPLICATE_NAME;
+			error = SA_INVALID_NAME;
 		}
 		if (fstype != NULL)
 		    sa_free_fstype(fstype);
@@ -541,6 +537,10 @@ sa_init(int init_service)
 	struct stat st;
 	int legacy = 0;
 	uint64_t tval = 0;
+	int lockfd;
+	sigset_t old;
+	int updatelegacy = B_FALSE;
+	scf_simple_prop_t *prop;
 
 	if (!sa_initialized) {
 	    /* get protocol specific structures */
@@ -557,10 +557,62 @@ sa_init(int init_service)
 		 */
 		scf_handle = sa_scf_init();
 		if (scf_handle != NULL) {
+			/*
+			 * Need to lock the extraction of the
+			 * configuration if the dfstab file has
+			 * changed. Lock everything now and release if
+			 * not needed.  Use a file that isn't being
+			 * manipulated by other parts of the system in
+			 * order to not interfere with locking. Using
+			 * dfstab doesn't work.
+			 */
+		    sablocksigs(&old);
+		    lockfd = open(DFS_LOCK_FILE, O_RDWR);
+		    if (lockfd >= 0) {
+			extern int errno;
+			errno = 0;
+			(void) lockf(lockfd, F_LOCK, 0);
+			/*
+			 * Check whether we are going to need to merge
+			 * any dfstab changes. This is done by
+			 * comparing the value of legacy-timestamp
+			 * with the current st_ctim of the file. If
+			 * they are different, an update is needed and
+			 * the file must remain locked until the merge
+			 * is done in order to prevent multiple
+			 * startups from changing the SMF repository
+			 * at the same time.  The first to get the
+			 * lock will make any changes before the
+			 * others can read the repository.
+			 */
+			prop = scf_simple_prop_get(scf_handle->handle,
+						(const char *)
+						    SA_SVC_FMRI_BASE ":default",
+						"operation",
+						"legacy-timestamp");
+			if (prop != NULL) {
+			    char *i64;
+			    i64 = scf_simple_prop_next_astring(prop);
+			    if (i64 != NULL) {
+				tval = strtoull(i64, NULL, 0);
+			    }
+			    if (stat(SA_LEGACY_DFSTAB, &st) >= 0 &&
+				tval != TSTAMP(st.st_ctim)) {
+				updatelegacy = B_TRUE;
+			    }
+			} else {
+			    /* We haven't set the timestamp before so do it. */
+			    updatelegacy = B_TRUE;
+			}
+		    }
+		    if (updatelegacy == B_FALSE) {
+			/* Don't need the lock anymore */
+			(void) lockf(lockfd, F_ULOCK, 0);
+			(void) close(lockfd);
+		    }
 		    (void) sa_get_config(scf_handle, &sa_config_tree,
 				    &sa_config_doc);
-		    tval = get_legacy_timestamp(sa_config_tree,
-						SA_LEGACY_DFSTAB);
+		    saunblocksigs(&old);
 		    if (tval == 0) {
 			/* first time so make sure default is setup */
 			sa_group_t defgrp;
@@ -573,13 +625,17 @@ sa_init(int init_service)
 				opt = sa_create_optionset(defgrp, "nfs");
 			}
 		    }
-		    if (stat(SA_LEGACY_DFSTAB, &st) >= 0 &&
-			tval != TSTAMP(st.st_ctim)) {
+		    if (updatelegacy == B_TRUE) {
+			sablocksigs(&old);
 			getlegacyconfig(SA_LEGACY_DFSTAB, &sa_config_tree);
 			if (stat(SA_LEGACY_DFSTAB, &st) >= 0)
 			    set_legacy_timestamp(sa_config_tree,
 						SA_LEGACY_DFSTAB,
 						TSTAMP(st.st_ctim));
+			saunblocksigs(&old);
+			/* Safe to unlock now to allow others to run */
+			(void) lockf(lockfd, F_ULOCK, 0);
+			(void) close(lockfd);
 		    }
 		    legacy |= sa_get_zfs_shares("zfs");
 		    legacy |= gettransients(&sa_config_tree);

@@ -151,7 +151,7 @@ struct option_defs optdefs[] = {
 };
 
 /*
- * list of propertye that are related to security flavors.
+ * list of properties that are related to security flavors.
  */
 static char *seclist[] = {
 	SHOPT_RO,
@@ -163,8 +163,8 @@ static char *seclist[] = {
 
 /* structure for list of securities */
 struct securities {
-    sa_security_t security;
-    struct securities *next;
+	sa_security_t security;
+	struct securities *next;
 };
 
 /*
@@ -318,6 +318,7 @@ make_security_list(sa_group_t group, char *securitymodes, char *proto)
 		    }
 		}
 	    }
+
 	    if (freetok) {
 		freetok = 0;
 		sa_free_attr_string(tok);
@@ -379,10 +380,22 @@ add_security_prop(struct securities *sec, char *name, char *value,
 		else
 		    value = "true";
 	    }
+
+		/*
+		 * Get the existing property, if it exists, so we can
+		 * determine what to do with it. The ro/rw/root
+		 * properties can be merged if multiple instances of
+		 * these properies are given. For example, if "rw"
+		 * exists with a value "host1" and a later token of
+		 * rw="host2" is seen, the values are merged into a
+		 * single rw="host1:host2".
+		 */
 	    prop = sa_get_property(sec->security, name);
+
 	    if (prop != NULL) {
 		char *oldvalue;
 		char *newvalue;
+
 		/*
 		 * The security options of ro/rw/root might appear
 		 * multiple times. If they do, the values need to be
@@ -391,14 +404,32 @@ add_security_prop(struct securities *sec, char *name, char *value,
 		 */
 		oldvalue = sa_get_property_attr(prop, "value");
 		if (oldvalue != NULL) {
-		    newvalue = nfs_alistcat(oldvalue, value, ':');
-		    if (newvalue != NULL)
-			value = newvalue;
-		    (void) sa_remove_property(prop);
-		    prop = sa_create_property(name, value);
-		    ret = sa_add_property(sec->security, prop);
-		    if (newvalue != NULL)
+			/*
+			 * The general case is to concatenate the new
+			 * value onto the old value for multiple
+			 * rw(ro/root) properties. A special case
+			 * exists when either the old or new is the
+			 * "all" case. In the special case, if both
+			 * are "all", then it is "all", else if one is
+			 * an access-list, that replaces the "all".
+			 */
+		    if (strcmp(oldvalue, "*") == 0) {
+			/* Replace old value with new value. */
+			newvalue = strdup(value);
+		    } else if (strcmp(value, "*") == 0) {
+			/* Keep old value and ignore the new value. */
+			newvalue = NULL;
+		    } else {
+			/* Make a new list of old plus new access-list. */
+			newvalue = nfs_alistcat(oldvalue, value, ':');
+		    }
+
+		    if (newvalue != NULL) {
+			(void) sa_remove_property(prop);
+			prop = sa_create_property(name, newvalue);
+			ret = sa_add_property(sec->security, prop);
 			free(newvalue);
+		    }
 		    if (oldvalue != NULL)
 			sa_free_attr_string(oldvalue);
 		}
@@ -548,13 +579,14 @@ nfs_parse_legacy_options(sa_group_t group, char *options)
 	 * we need to step through each option in the string and then
 	 * add either the option or the security option as needed. If
 	 * this is not a persistent share, don't commit to the
-	 * repository.
+	 * repository. If there is an error, we also want to abort the
+	 * processing and report it.
 	 */
 	persist = is_persistent(group);
 	base = dup;
 	token = dup;
 	lasts = NULL;
-	while (token != NULL) {
+	while (token != NULL && ret == SA_OK) {
 	    ret = SA_OK;
 	    token = strtok_r(base, ",", &lasts);
 	    base = NULL;
@@ -939,7 +971,7 @@ fill_security_from_secopts(struct secinfo *sp, sa_security_t secopts)
 	sa_property_t prop;
 	char *type;
 	int longform;
-	int err = 0;
+	int err = SC_NOERROR;
 
 	type = sa_get_security_attr(secopts, "sectype");
 	if (type != NULL) {
@@ -955,8 +987,10 @@ fill_security_from_secopts(struct secinfo *sp, sa_security_t secopts)
 		return (err);
 	}
 
+	err = SA_OK;
 	for (prop = sa_get_property(secopts, NULL);
-		prop != NULL; prop = sa_get_next_property(prop)) {
+		prop != NULL && err == SA_OK;
+		prop = sa_get_next_property(prop)) {
 	    char *name;
 	    char *value;
 
@@ -981,9 +1015,14 @@ fill_security_from_secopts(struct secinfo *sp, sa_security_t secopts)
 		if (sp->s_secinfo.sc_rpcnum == AUTH_UNIX)
 		    continue;
 		/* not AUTH_UNIX */
-		if (value != NULL)
+		if (value != NULL) {
 		    sp->s_rootnames = get_rootnames(&sp->s_secinfo, value,
 							&sp->s_rootcnt);
+		    if (sp->s_rootnames == NULL) {
+			err = SA_BAD_VALUE;
+			(void) fprintf(stderr, gettext("Bad root list\n"));
+		    }
+		}
 		break;
 	    case OPT_WINDOW:
 		if (value != NULL) {
@@ -1833,6 +1872,15 @@ nfs_validate_property(sa_property_t property, sa_optionset_t parent)
 		case OPT_TYPE_STRING:
 		    /* whatever is here should be ok */
 		    break;
+		case OPT_TYPE_SECURITY:
+			/*
+			 * The "sec" property isn't used in the
+			 * non-legacy parts of sharemgr. We need to
+			 * reject it here. For legacy, it is pulled
+			 * out well before we get here.
+			 */
+		    ret = SA_NO_SUCH_PROP;
+		    break;
 		default:
 		    break;
 		}
@@ -2632,7 +2680,15 @@ nfs_space_alias(char *space)
 {
 	char *name = space;
 	seconfig_t secconf;
-	if (nfs_getseconfig_default(&secconf) == 0) {
+
+	/*
+	 * Only the space named "default" is special. If it is used,
+	 * the default needs to be looked up and the real name used.
+	 * This is normally "sys" but could be changed.  We always
+	 * change defautl to the real name.
+	 */
+	if (strcmp(space, "default") == 0 &&
+	    nfs_getseconfig_default(&secconf) == 0) {
 	    if (nfs_getseconfig_bynumber(secconf.sc_nfsnum, &secconf) == 0)
 		name = secconf.sc_name;
 	}

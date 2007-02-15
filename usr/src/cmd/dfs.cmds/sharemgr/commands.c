@@ -1851,24 +1851,54 @@ sa_removeshare(int flags, int argc, char *argv[])
 	    } else {
 		group = NULL;
 	    }
-	    if (ret == SA_OK) {
-		if (realpath(sharepath, dir) == NULL) {
-		    ret = SA_BAD_PATH;
-		    (void) printf(gettext("Path is not valid: %s\n"),
-					sharepath);
-		} else {
-		    sharepath = dir;
-		}
-	    }
+
+		/*
+		 * Lookup the path in the internal configuration. Care
+		 * must be taken to handle the case where the
+		 * underlying path has been removed since we need to
+		 * be able to deal with that as well.
+		 */
 	    if (ret == SA_OK) {
 		if (group != NULL)
 		    share = sa_get_share(group, sharepath);
 		else
 		    share = sa_find_share(sharepath);
+		/*
+		 * If we didn't find the share with the provided path,
+		 * it may be a symlink so attempt to resolve it using
+		 * realpath and try again. Realpath will resolve any
+		 * symlinks and place them in "dir". Note that
+		 * sharepath is only used for the lookup the first
+		 * time and later for error messages. dir will be used
+		 * on the second attempt. Once a share is found, all
+		 * operations are based off of the share variable.
+		 */
+		if (share == NULL) {
+		    if (realpath(sharepath, dir) == NULL) {
+			ret = SA_BAD_PATH;
+			(void) printf(gettext("Path is not valid: %s\n"),
+						sharepath);
+		    } else {
+			if (group != NULL)
+			    share = sa_get_share(group, dir);
+			else
+			    share = sa_find_share(dir);
+		    }
+		}
+	    }
+
+		/*
+		 * If there hasn't been an error, there was likely a
+		 * path found. If not, give the appropriate error
+		 * message and set the return error. If it was found,
+		 * then disable the share and then remove it from the
+		 * configuration.
+		 */
+	    if (ret == SA_OK) {
 		if (share == NULL) {
 		    if (group != NULL)
 			(void) printf(gettext("Share not found in group %s:"
-						"%s\n"),
+						" %s\n"),
 					argv[optind], sharepath);
 		    else
 			(void) printf(gettext("Share not found: %s\n"),
@@ -1882,10 +1912,14 @@ sa_removeshare(int flags, int argc, char *argv[])
 			    ret = sa_disable_share(share, NULL);
 				/*
 				 * we don't care if it fails since it
-				 * could be disabled already.
+				 * could be disabled already. Some
+				 * unexpected errors could occur that
+				 * prevent removal, so also check for
+				 * force being set.
 				 */
 			    if (ret == SA_OK || ret == SA_NO_SUCH_PATH ||
-				ret == SA_NOT_SUPPORTED) {
+					ret == SA_NOT_SUPPORTED ||
+					ret == SA_SYSTEM_ERR || force) {
 				ret = sa_remove_share(share);
 			    }
 			    if (ret == SA_OK)
@@ -3859,22 +3893,37 @@ sa_legacy_unshare(int flags, int argc, char *argv[])
 		ret = run_legacy_command(cmd, argv);
 		return (ret);
 	    }
+		/*
+		 * Find the path in the internal configuration. If it
+		 * isn't found, attempt to resolve the path via
+		 * realpath() and try again.
+		 */
 	    sharepath = argv[optind++];
-	    if (realpath(sharepath, dir) == NULL) {
-		ret = SA_NO_SUCH_PATH;
-	    } else {
-		sharepath = dir;
-		share = sa_find_share(sharepath);
-		if (share != NULL) {
-		    ret = sa_disable_share(share, protocol);
-		    if (ret == SA_OK) {
-			if (persist == SA_SHARE_PERMANENT)
-			    ret = sa_remove_share(share);
-			ret = sa_update_config();
-		    }
+	    share = sa_find_share(sharepath);
+	    if (share == NULL) {
+		if (realpath(sharepath, dir) == NULL) {
+		    ret = SA_NO_SUCH_PATH;
 		} else {
-		    ret = SA_NOT_SHARED;
+		    share = sa_find_share(dir);
 		}
+	    }
+	    if (share != NULL) {
+		ret = sa_disable_share(share, protocol);
+		/*
+		 * Errors are ok and removal should still occur. The
+		 * legacy unshare is more forgiving of errors than the
+		 * remove-share subcommand which may need the force
+		 * flag set for some error conditions. That is, the
+		 * "unshare" command will always unshare if it can
+		 * while "remove-share" might require the force option.
+		 */
+		if (persist == SA_SHARE_PERMANENT) {
+		    ret = sa_remove_share(share);
+		    if (ret == SA_OK)
+			ret = sa_update_config();
+		}
+	    } else {
+		ret = SA_NOT_SHARED;
 	    }
 	}
 	switch (ret) {
