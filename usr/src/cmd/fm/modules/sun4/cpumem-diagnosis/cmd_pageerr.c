@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,10 @@
 #include <string.h>
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
+#ifdef sun4v
+#include <cmd_hc_sun4v.h>
+#include <cmd_dimm.h>
+#endif
 
 void
 cmd_page_fault(fmd_hdl_t *hdl, nvlist_t *modasru, nvlist_t *modfru,
@@ -61,8 +65,14 @@ cmd_page_fault(fmd_hdl_t *hdl, nvlist_t *modasru, nvlist_t *modfru,
 	    page->page_case.cc_cp = cmd_case_create(hdl, &page->page_header,
 	    CMD_PTR_PAGE_CASE, &uuid);
 
+#ifdef sun4v
+	flt = fmd_nvl_create_fault(hdl, "fault.memory.page", 100,
+	    page->page_asru_nvl, cmd_mem2hc(hdl, modfru), NULL);
+	flt = cmd_fault_add_location(hdl, flt, cmd_fmri_get_unum(modfru));
+#else /* sun4v */
 	flt = fmd_nvl_create_fault(hdl, "fault.memory.page", 100,
 	    page->page_asru_nvl, modfru, NULL);
+#endif /* sun4v */
 
 	if (nvlist_add_boolean_value(flt, FM_SUSPECT_MESSAGE, B_FALSE) != 0)
 		fmd_hdl_abort(hdl, "failed to add no-message member to fault");

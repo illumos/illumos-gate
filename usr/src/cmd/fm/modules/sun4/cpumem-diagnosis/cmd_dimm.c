@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,9 @@
 #include <sys/fm/protocol.h>
 #include <sys/mem.h>
 #include <sys/nvpair.h>
+#ifdef sun4v
+#include <cmd_hc_sun4v.h>
+#endif /* sun4v */
 
 /*
  * Some errors (RxE/FRx pairs) don't have accurate DIMM (resource) FMRIs,
@@ -78,8 +81,9 @@ cmd_dimm_create_fault(fmd_hdl_t *hdl, cmd_dimm_t *dimm, const char *fltnm,
     uint_t cert)
 {
 #ifdef sun4v
-	return (fmd_nvl_create_fault(hdl, fltnm, cert, dimm->dimm_asru_nvl,
-	    cmd_mem2hc(hdl, dimm->dimm_asru_nvl), NULL));
+	nvlist_t *flt = fmd_nvl_create_fault(hdl, fltnm, cert,
+	    dimm->dimm_asru_nvl, cmd_mem2hc(hdl, dimm->dimm_asru_nvl), NULL);
+	return (cmd_fault_add_location(hdl, flt, dimm->dimm_unum));
 #else
 	return (fmd_nvl_create_fault(hdl, fltnm, cert, dimm->dimm_asru_nvl,
 	    dimm->dimm_asru_nvl, NULL));

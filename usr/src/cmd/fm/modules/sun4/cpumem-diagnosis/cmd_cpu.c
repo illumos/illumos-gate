@@ -54,6 +54,7 @@
 #else /* sun4u */
 #include <sys/niagararegs.h>
 #include <sys/fm/cpu/UltraSPARC-T1.h>
+#include <cmd_hc_sun4v.h>
 #endif /* sun4u */
 
 #define	CMD_CPU_UEC_INCR	10
@@ -1437,16 +1438,23 @@ cmd_cpu_create_faultlist(fmd_hdl_t *hdl, fmd_case_t *casep, cmd_cpu_t *cpu,
 				}
 				cpui = cpu_create(hdl, asru, i,
 				    CMD_CPU_LEVEL_THREAD, cpu->cpu_type);
+				nvlist_free(asru);
 			}
 			cpui->cpu_faulting = FMD_B_TRUE;
 			cpu_buf_write(hdl, cpui);
 			flt = fmd_nvl_create_fault(hdl, fltnm, cert,
 			    cpui->cpu_asru_nvl, cpu->cpu_fru_nvl, rsrc);
+#ifdef sun4v
+			flt = cmd_fault_add_location(hdl, flt, "MB");
+#endif /* sun4v */
 			fmd_case_add_suspect(hdl, casep, flt);
 		}
 	} else {
 		flt = fmd_nvl_create_fault(hdl, fltnm, cert,
 		    cpu->cpu_asru_nvl, cpu->cpu_fru_nvl, rsrc);
+#ifdef sun4v
+		flt = cmd_fault_add_location(hdl, flt, "MB");
+#endif /* sun4v */
 		fmd_case_add_suspect(hdl, casep, flt);
 	}
 }
@@ -1507,64 +1515,17 @@ cpu_lookup_by_cpuid(uint32_t cpuid, uint8_t level)
 }
 
 static nvlist_t *
-cpu_mkfru(char *frustr, char *serialstr, char *partstr)
-{
-	char *comp;
-	nvlist_t *fru, *hcelem;
-
-	if (strncmp(frustr, CPU_FRU_FMRI, sizeof (CPU_FRU_FMRI) - 1) != 0)
-		return (NULL);
-
-	comp = frustr + sizeof (CPU_FRU_FMRI) - 1;
-
-	if (nvlist_alloc(&hcelem, NV_UNIQUE_NAME, 0) != 0)
-		return (NULL);
-
-	if (nvlist_add_string(hcelem, FM_FMRI_HC_NAME,
-	    FM_FMRI_LEGACY_HC) != 0 ||
-	    nvlist_add_string(hcelem, FM_FMRI_HC_ID, comp) != 0) {
-		nvlist_free(hcelem);
-		return (NULL);
-	}
-
-	if (nvlist_alloc(&fru, NV_UNIQUE_NAME, 0) != 0) {
-		nvlist_free(hcelem);
-		return (NULL);
-	}
-
-	if (nvlist_add_uint8(fru, FM_VERSION, FM_HC_SCHEME_VERSION) != 0 ||
-	    nvlist_add_string(fru, FM_FMRI_SCHEME, FM_FMRI_SCHEME_HC) != 0 ||
-	    (partstr != NULL &&
-		nvlist_add_string(fru, FM_FMRI_HC_PART, partstr) != 0) ||
-	    (serialstr != NULL &&
-		nvlist_add_string(fru, FM_FMRI_HC_SERIAL_ID,
-		serialstr) != 0) ||
-	    nvlist_add_string(fru, FM_FMRI_HC_ROOT, "") != 0 ||
-	    nvlist_add_uint32(fru, FM_FMRI_HC_LIST_SZ, 1) != 0 ||
-	    nvlist_add_nvlist_array(fru, FM_FMRI_HC_LIST, &hcelem, 1) != 0) {
-		nvlist_free(hcelem);
-		nvlist_free(fru);
-		return (NULL);
-	}
-
-	nvlist_free(hcelem);
-	return (fru);
-}
-
-static nvlist_t *
 cpu_getfru(fmd_hdl_t *hdl, cmd_cpu_t *cp)
 {
 	char *frustr, *partstr, *serialstr;
 	nvlist_t *nvlp;
 
 	if ((frustr = cmd_cpu_getfrustr(hdl, cp)) == NULL) {
-		fmd_hdl_error(hdl, "failed to retrieve FRU string for CPU %d",
-		    cp->cpu_cpuid);
 		return (NULL);
 	}
 	partstr = cmd_cpu_getpartstr(hdl, cp);
 	serialstr = cmd_cpu_getserialstr(hdl, cp);
-	nvlp = cpu_mkfru(frustr, serialstr, partstr);
+	nvlp = cmd_cpu_mkfru(frustr, serialstr, partstr);
 	fmd_hdl_strfree(hdl, frustr);
 	fmd_hdl_strfree(hdl, partstr);
 	fmd_hdl_strfree(hdl, serialstr);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,13 +129,15 @@ CMD_CPU_SIMPLEHANDLER(frc, freg, CMD_PTR_CPU_FREG, "freg", "freg")
 CMD_CPU_SIMPLEHANDLER(mau, mau, CMD_PTR_CPU_MAU, "mau", "mau")
 CMD_CPU_SIMPLEHANDLER(miscregs_ce, misc_regs, CMD_PTR_CPU_MISC_REGS,
 	"misc_regs", "misc_regs")
+CMD_CPU_SIMPLEHANDLER(l2c, l2data, CMD_PTR_CPU_L2DATA, "l2data", "l2data-c")
 
 CMD_CPU_SIMPLEHANDLER(fpu, fpu, CMD_PTR_CPU_FPU, "", "fpu")
-CMD_CPU_SIMPLEHANDLER(l2ctl, l2ctl, CMD_PTR_CPU_L2CTL, "", "l2ctl")
+CMD_CPU_SIMPLEHANDLER(l2ctl, l2ctl, CMD_PTR_CPU_L2CTL, "", "l2cachectl")
 CMD_CPU_SIMPLEHANDLER(iru, ireg, CMD_PTR_CPU_IREG, "", "ireg")
 CMD_CPU_SIMPLEHANDLER(fru, freg, CMD_PTR_CPU_FREG, "", "freg")
 CMD_CPU_SIMPLEHANDLER(miscregs_ue, misc_regs, CMD_PTR_CPU_MISC_REGS,
 	"", "misc_regs")
+CMD_CPU_SIMPLEHANDLER(l2u, l2data, CMD_PTR_CPU_L2DATA, "", "l2data-u")
 
 
 #ifdef sun4u
@@ -304,6 +306,7 @@ cmd_xxu_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 	fmd_case_add_ereport(hdl, cc->cc_cp, ep);
 
 	cmd_cpu_create_faultlist(hdl, cc->cc_cp, cpu, ed->ed_fltnm, rsrc, 100);
+	nvlist_free(rsrc);
 	fmd_case_solve(hdl, cc->cc_cp);
 }
 
@@ -344,6 +347,7 @@ cmd_xxc_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 
 	fmd_case_add_serd(hdl, cc->cc_cp, cc->cc_serdnm);
 	cmd_cpu_create_faultlist(hdl, cc->cc_cp, cpu, ed->ed_fltnm, rsrc, 100);
+	nvlist_free(rsrc);
 	fmd_case_solve(hdl, cc->cc_cp);
 }
 
@@ -484,10 +488,19 @@ redeliver:
 	return (cmd_xr_reschedule(hdl, xr, hdlrid));
 }
 
+#ifdef sun4v
+#define		CMD_NIAGARA_1_CLASS	"ereport.cpu.ultraSPARC-T1."
+#endif /* sun4v */
+
 cmd_evdisp_t
 cmd_xxu(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
     cmd_errcl_t clcode)
 {
+#ifdef sun4v
+	if (strncmp(class, CMD_NIAGARA_1_CLASS,
+	    sizeof (CMD_NIAGARA_1_CLASS)) != 0)
+		return (cmd_l2u(hdl, ep, nvl, class, clcode));
+#endif /* sun4v */
 	return (cmd_xxcu_initial(hdl, ep, nvl, class, clcode, CMD_XR_HDLR_XXU));
 }
 
@@ -495,6 +508,11 @@ cmd_evdisp_t
 cmd_xxc(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
     cmd_errcl_t clcode)
 {
+#ifdef sun4v
+	if (strncmp(class, CMD_NIAGARA_1_CLASS,
+	    sizeof (CMD_NIAGARA_1_CLASS)) != 0)
+		return (cmd_l2c(hdl, ep, nvl, class, clcode));
+#endif /* sun4v */
 	return (cmd_xxcu_initial(hdl, ep, nvl, class, clcode, CMD_XR_HDLR_XXC));
 }
 

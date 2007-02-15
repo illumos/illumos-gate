@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,7 +111,7 @@ xe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	uint8_t afar_status, synd_status;
 	nvlist_t *rsrc;
 	char *typenm;
-	uint64_t disp;
+	uint64_t disp = 0;
 	int minorvers = 1;
 
 	if (nvlist_lookup_uint64(nvl,
@@ -186,10 +186,6 @@ xe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		    clcode);
 		return (CMD_EVD_UNUSED);
 	}
-
-	if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_ERR_DISP,
-	    &disp) != 0)
-		minorvers = 0;
 
 	return (hdlr(hdl, ep, nvl, class, afar, afar_status, synd,
 	    synd_status, cmd_mem_name2type(typenm, minorvers), disp, rsrc));

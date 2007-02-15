@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +89,10 @@ static const cma_subscriber_t cma_subrs[] = {
 	{ "fault.cpu.*.l2cachetag", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },
 	{ "fault.cpu.*.l2cachectl", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*.l2data-c", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*.l2data-u", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },
 	{ "fault.cpu.*.mau", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -308,7 +308,7 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	    CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.lvu",		cmd_l2ctl },
 	{ "ereport.cpu.*.lru",		cmd_l2ctl },
-	{ "ereport.cpu.*.fbr",		cmd_ce,		CMD_ERRCL_DAC },
+	{ "ereport.cpu.*.fbr",		cmd_nop },
 	{ "ereport.cpu.*.fbu",		cmd_ue,		CMD_ERRCL_DAU },
 	{ "ereport.cpu.*.dac",		cmd_ce,		CMD_ERRCL_DAC },
 	{ "ereport.cpu.*.dsc",		cmd_ce,		CMD_ERRCL_DSC },

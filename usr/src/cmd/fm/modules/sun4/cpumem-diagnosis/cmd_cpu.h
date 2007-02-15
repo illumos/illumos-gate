@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -484,6 +484,16 @@ extern cmd_evdisp_t cmd_xxu(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 
 /*
+ * As of Niagara-2, we ignore writeback (ldwc, ldwu) errors.  Since these were
+ * the only defined follow-on errors for sun4v trains, sun4v L2 cache data
+ * errors no longer need to use the train mechanism.
+ */
+
+extern cmd_evdisp_t cmd_l2c(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_l2u(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+/*
  * L2$ and L3$ Tag errors
  *
  *           SERD name
@@ -655,6 +665,7 @@ extern char *cmd_cpu_getfrustr(fmd_hdl_t *, cmd_cpu_t *);
 extern char *cmd_cpu_getpartstr(fmd_hdl_t *, cmd_cpu_t *);
 
 extern char *cmd_cpu_getserialstr(fmd_hdl_t *, cmd_cpu_t *);
+extern nvlist_t *cmd_cpu_mkfru(char *, char *, char *);
 
 extern cmd_cpu_t *cmd_cpu_lookup(fmd_hdl_t *, nvlist_t *, const char *,
     uint8_t);

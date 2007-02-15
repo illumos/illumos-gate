@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -146,4 +146,49 @@ cmd_cpu_getpartstr(fmd_hdl_t *hdl, cmd_cpu_t *cp) {
 char *
 cmd_cpu_getserialstr(fmd_hdl_t *hdl, cmd_cpu_t *cp) {
 	return (NULL);
+}
+
+nvlist_t *
+cmd_cpu_mkfru(char *frustr, char *serialstr, char *partstr)
+{
+	char *comp;
+	nvlist_t *fru, *hcelem;
+
+	if (strncmp(frustr, CPU_FRU_FMRI, sizeof (CPU_FRU_FMRI) - 1) != 0)
+		return (NULL);
+
+	comp = frustr + sizeof (CPU_FRU_FMRI) - 1;
+
+	if (nvlist_alloc(&hcelem, NV_UNIQUE_NAME, 0) != 0)
+		return (NULL);
+
+	if (nvlist_add_string(hcelem, FM_FMRI_HC_NAME,
+	    FM_FMRI_LEGACY_HC) != 0 ||
+	    nvlist_add_string(hcelem, FM_FMRI_HC_ID, comp) != 0) {
+		nvlist_free(hcelem);
+		return (NULL);
+	}
+
+	if (nvlist_alloc(&fru, NV_UNIQUE_NAME, 0) != 0) {
+		nvlist_free(hcelem);
+		return (NULL);
+	}
+
+	if (nvlist_add_uint8(fru, FM_VERSION, FM_HC_SCHEME_VERSION) != 0 ||
+	    nvlist_add_string(fru, FM_FMRI_SCHEME, FM_FMRI_SCHEME_HC) != 0 ||
+	    (partstr != NULL &&
+		nvlist_add_string(fru, FM_FMRI_HC_PART, partstr) != 0) ||
+	    (serialstr != NULL &&
+		nvlist_add_string(fru, FM_FMRI_HC_SERIAL_ID,
+		serialstr) != 0) ||
+	    nvlist_add_string(fru, FM_FMRI_HC_ROOT, "") != 0 ||
+	    nvlist_add_uint32(fru, FM_FMRI_HC_LIST_SZ, 1) != 0 ||
+	    nvlist_add_nvlist_array(fru, FM_FMRI_HC_LIST, &hcelem, 1) != 0) {
+		nvlist_free(hcelem);
+		nvlist_free(fru);
+		return (NULL);
+	}
+
+	nvlist_free(hcelem);
+	return (fru);
 }
