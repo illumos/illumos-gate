@@ -399,15 +399,9 @@ dr_memlist_del_retired_pages(struct memlist *mlist)
 
 	do {
 		ASSERT(pp != NULL);
-		/*
-		 * page_downgrade happens after page_hashin, so we
-		 * can't assert PAGE_SE. Just assert locked to catch
-		 * changes to the retired vnode locking scheme.
-		 */
-		ASSERT(PAGE_LOCKED(pp));
 		ASSERT(pp->p_vnode == retired_pages);
 
-		if (!page_trylock(pp, SE_SHARED))
+		if (!page_try_reclaim_lock(pp, SE_SHARED, SE_RETIRED))
 			continue;
 
 		pfn = page_pptonum(pp);
