@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,10 +74,14 @@ extern "C" {
 #define	LX_NFS_MOUNT_KERBEROS		0x00000100
 #define	LX_NFS_MOUNT_NONLM		0x00000200
 #define	LX_NFS_MOUNT_BROKEN_SUID	0x00000400
-#define	LX_NFS_MOUNT_SUPPORTED		(LX_NFS_MOUNT_INTR | \
+#define	LX_NFS_MOUNT_SUPPORTED		(LX_NFS_MOUNT_SOFT | \
+					LX_NFS_MOUNT_INTR | \
+					LX_NFS_MOUNT_POSIX | \
+					LX_NFS_MOUNT_NOCTO | \
 					LX_NFS_MOUNT_NOAC | \
 					LX_NFS_MOUNT_TCP | \
-					LX_NFS_MOUNT_VER3)
+					LX_NFS_MOUNT_VER3 | \
+					LX_NFS_MOUNT_NONLM)
 
 #define	LX_NMD_DEFAULT_RSIZE		0
 #define	LX_NMD_DEFAULT_WSIZE		0

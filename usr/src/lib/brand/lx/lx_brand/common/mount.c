@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -355,10 +355,18 @@ i_make_nfs_args(lx_nfs_mount_data_t *lx_nmd, struct nfs_args *nfs_args,
 	    NFSMNT_HOSTNAME;
 
 	/* Translate some Linux mount flags into Solaris mount flags. */
+	if (lx_nmd->nmd_flags & LX_NFS_MOUNT_SOFT)
+		nfs_args->flags |= NFSMNT_SOFT;
 	if (lx_nmd->nmd_flags & LX_NFS_MOUNT_INTR)
 		nfs_args->flags |= NFSMNT_INT;
+	if (lx_nmd->nmd_flags & LX_NFS_MOUNT_POSIX)
+		nfs_args->flags |= NFSMNT_POSIX;
+	if (lx_nmd->nmd_flags & LX_NFS_MOUNT_NOCTO)
+		nfs_args->flags |= NFSMNT_NOCTO;
 	if (lx_nmd->nmd_flags & LX_NFS_MOUNT_NOAC)
 		nfs_args->flags |= NFSMNT_NOAC;
+	if (lx_nmd->nmd_flags & LX_NFS_MOUNT_NONLM)
+		nfs_args->flags |= NFSMNT_LLOCK;
 
 	if ((lx_nmd->nmd_flags & LX_NFS_MOUNT_VER3) != 0) {
 		(void) strcpy(fstype, "nfs3");

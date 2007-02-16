@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -836,6 +836,25 @@ lx_ptm_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	}
 
 	do {
+		/*
+		 * Before we actually attempt a read operation we need
+		 * to make sure there's some buffer space to actually
+		 * read in some data.  We do this because if we're in
+		 * pktio mode and the caller only requested one byte,
+		 * then we've already used up that one byte and we
+		 * don't want to pass this read request.  Doing a 0
+		 * byte read (unless there is a problem with the stream
+		 * head) always returns succcess.  Normally when a streams
+		 * read returns 0 bytes we interpret that as an EOF on
+		 * the stream (ie, the slave side has been opened and
+		 * closed) and we ignore it and re-try the read operation.
+		 * So if we pass on a 0 byte read here lx_ptm_read_loop()
+		 * will tell us to loop around and we'll end up in an
+		 * infinite loop.
+		 */
+		if (uiop->uio_resid == 0)
+			break;
+
 		/*
 		 * Serialize all reads.  We need to do this so that we can
 		 * properly emulate the behavior of master terminals on Linux.
