@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,10 +48,13 @@ i preremove
 d none etc 755 root sys
 d none etc/certs 755 root sys
 f none etc/certs/SUNWosnetSolaris 644 root sys
+f none etc/certs/SUNWosnetSE 644 root sys
 d none etc/crypto 755 root sys
 d none etc/crypto/certs 755 root sys
 f none etc/crypto/certs/SUNWosnet 644 root sys
 f none etc/crypto/certs/SUNWosnetLimited 644 root sys
+f none etc/crypto/certs/SUNWosnetCF 644 root sys
+f none etc/crypto/certs/SUNWosnetCFLimited 644 root sys
 d none kernel 755 root sys
 d none kernel/crypto 755 root sys
 d none kernel/drv 755 root sys

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,9 +37,9 @@ echo_file usr/src/xmod/xmod_files
 echo_file usr/src/tools/abi/etc/ABI_sparc.db
 echo_file usr/src/tools/abi/etc/ABI_i386.db
 echo_file usr/src/tools/abi/etc/exceptions
-echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnet
-echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetLimited
-echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetSolaris
-echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnet
-echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnetLimited
-echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnetSolaris
+echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetCF
+echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetCFLimited
+echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetSE
+echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnetCF
+echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnetCFLimited
+echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnetSE

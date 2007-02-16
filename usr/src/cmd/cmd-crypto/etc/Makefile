@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,11 +33,13 @@ ETCCRYPTOFILES = \
 	kcf.conf \
 	pkcs11.conf \
 	$(RELEASECRYPTO:%=certs/%) \
-	certs/CA
+	certs/CA \
+	certs/SUNWObjectCA
 
 ETCCERTSFILES = \
 	$(RELEASECERTS) \
-	SUNWSolarisCA
+	SUNWSolarisCA \
+	SUNWObjectCA
 
 include ../../Makefile.cmd
 
@@ -56,6 +58,10 @@ $(ROOTETCCERTSDIR):=	GROUP= sys
 IETCCRYPTOFILES=	$(ETCCRYPTOFILES:%=$(ROOTCRYPTODIR)/%)
 IETCCERTSFILES=		$(ETCCERTSFILES:%=$(ROOTETCCERTSDIR)/%)
 
+$(ROOTCRYPTOCERTSDIR)/SUNWObjectCA: \
+			$(ROOTETCCERTSDIR)/SUNWObjectCA
+			$(RM) $@
+			$(LN) $(ROOTETCCERTSDIR)/SUNWObjectCA $@
 $(ROOTCRYPTODIR)/%:	%
 			$(INS.file)
 $(RELEASECRYPTO:%=$(ROOTCRYPTODIR)/certs/%): \
@@ -65,6 +71,10 @@ $(RELEASECRYPTO:%=$(ROOTCRYPTODIR)/certs/%): \
 				certs/$(@F:SUNW_SunOS_5.%=SUNWCryptographic%)
 			$(MV) $(@D)/$(@F:SUNW_SunOS_5.%=SUNWCryptographic%) $@
 
+$(ROOTETCCERTSDIR)/SUNWObjectCA: \
+			certs/$(@F)
+			$(RM) $@
+			$(INS) -s -m $(FILEMODE) -f $(@D) certs/$(@F)
 $(ROOTETCCERTSDIR)/%:	certs/%
 			$(INS.file)
 $(RELEASECERTS:%=$(ROOTETCCERTSDIR)/%): \
