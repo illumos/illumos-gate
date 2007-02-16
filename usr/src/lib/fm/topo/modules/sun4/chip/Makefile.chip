@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,7 +27,7 @@
 MODULE = chip
 CLASS = arch
 SUN4DIR = ../../sun4/$(MODULE)
-MODULESRCS = chip_$(ARCH).c
+MODULESRCS = $($(ARCH)_SRCS)
 
 include ../../Makefile.plugin
 

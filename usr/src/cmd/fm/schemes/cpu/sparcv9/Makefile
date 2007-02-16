@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,10 +29,9 @@
 include ../../Makefile.com
 include $(SRC)/Makefile.master.64
 
-SRCS = cpu.c cpu_mdesc.c
-CPPFLAGS += -I../sparc -I$(ROOT)/usr/platform/sun4v/include
+SRCS = cpu.c
 LDLIBS += -lkstat \
-	-L$(ROOTLIB)/fm/$(MACH64) -lmdesc -lldom
+	-L$(ROOTLIB)/fm/$(MACH64) -ltopo
 LDFLAGS += -R/usr/lib/fm/$(MACH64)
 
 include ../../Makefile.targ

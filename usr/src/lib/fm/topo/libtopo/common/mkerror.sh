@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"@(#)mkerror.sh	1.1	06/02/11 SMI"
@@ -34,7 +34,7 @@ input="`cat`"
 if [ $1 = "liberrors" ] ; then
 echo "\
 /*\n\
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.\n\
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.\n\
  * Use is subject to license terms.\n\
  */\n\
 \n\
@@ -95,6 +95,22 @@ echo "\
 static const int _topo_nproperrstrs =\n\
     sizeof (_topo_properrstrs) / sizeof (_topo_properrstrs[0]);"
 
+elif [ $1 = "methoderrors" ] ; then
+
+echo "\
+\n\
+static const char *const _topo_methoderrstrs[] = {"
+
+pattern='^[ ]*ETOPO_METHOD_[A-Z0-9_]*.*\* \(.*\) \*.*'
+replace='	"\1",'
+
+echo "$input" | sed -n "s/$pattern/$replace/p" || exit 1
+
+echo "\
+};\n\
+\n\
+static const int _topo_nmethoderrstrs =\n\
+    sizeof (_topo_methoderrstrs) / sizeof (_topo_methoderrstrs[0]);"
 else
 
 echo "\
@@ -144,6 +160,9 @@ topo_strerror(int err)
 	else if (err >= ETOPO_PROP_UNKNOWN && (err - ETOPO_PROP_UNKNOWN) <
 	    _topo_nproperrstrs)
 		s = _topo_properrstrs[err - ETOPO_PROP_UNKNOWN];
+	else if (err >= ETOPO_METHOD_UNKNOWN && (err - ETOPO_METHOD_UNKNOWN) <
+	    _topo_nmethoderrstrs)
+		s = _topo_methoderrstrs[err - ETOPO_METHOD_UNKNOWN];
 	else
 		s = _topo_errstrs[0];
 
