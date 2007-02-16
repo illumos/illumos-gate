@@ -36,6 +36,7 @@
 #include <sys/zil_impl.h>
 #include <sys/dsl_dataset.h>
 #include <sys/vdev.h>
+#include <sys/dmu_tx.h>
 
 /*
  * The zfs intent log (ZIL) saves transaction records of system calls
@@ -690,14 +691,29 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 	/* pass the old blkptr in order to spread log blocks across devs */
 	error = zio_alloc_blk(spa, zil_blksz, bp, &lwb->lwb_blk, txg);
 	if (error) {
+		dmu_tx_t *tx = dmu_tx_create_assigned(zilog->zl_dmu_pool, txg);
+
 		/*
-		 * Reinitialise the lwb.
+		 * We dirty the dataset to ensure that zil_sync() will
+		 * be called to remove this lwb from our zl_lwb_list.
+		 * Failing to do so, may leave an lwb with a NULL lwb_buf
+		 * hanging around on the zl_lwb_list.
+		 */
+		dsl_dataset_dirty(dmu_objset_ds(zilog->zl_os), tx);
+
+
+		/*
+		 * Since we've just experienced an allocation failure so we
+		 * terminate the current lwb and send it on its way.
+		 */
+		ztp->zit_pad = 0;
+		ztp->zit_nused = lwb->lwb_nused;
+		ztp->zit_bt.zbt_cksum = lwb->lwb_blk.blk_cksum;
+		zio_nowait(lwb->lwb_zio);
+
+		/*
 		 * By returning NULL the caller will call tx_wait_synced()
 		 */
-		mutex_enter(&zilog->zl_lock);
-		lwb->lwb_nused = 0;
-		mutex_exit(&zilog->zl_lock);
-		txg_rele_to_sync(&lwb->lwb_txgh);
 		return (NULL);
 	}
 
@@ -1116,6 +1132,15 @@ zil_sync(zilog_t *zilog, dmu_tx_t *tx)
 		list_remove(&zilog->zl_lwb_list, lwb);
 		zio_free_blk(spa, &lwb->lwb_blk, txg);
 		kmem_cache_free(zil_lwb_cache, lwb);
+
+		/*
+		 * If we don't have anything left in the lwb list then
+		 * we've had an allocation failure and we need to zero
+		 * out the zil_header blkptr so that we don't end
+		 * up freeing the same block twice.
+		 */
+		if (list_head(&zilog->zl_lwb_list) == NULL)
+			BP_ZERO(&zh->zh_log);
 	}
 	mutex_exit(&zilog->zl_lock);
 }

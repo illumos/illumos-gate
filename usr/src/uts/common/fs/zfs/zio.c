@@ -64,6 +64,9 @@ char *zio_type_name[ZIO_TYPES] = {
 /* At or above this size, force gang blocking - for testing */
 uint64_t zio_gang_bang = SPA_MAXBLOCKSIZE + 1;
 
+/* Force an allocation failure when non-zero */
+uint16_t zio_zil_fail_shift = 0;
+
 typedef struct zio_sync_pass {
 	int	zp_defer_free;		/* defer frees after this pass */
 	int	zp_dontcompress;	/* don't compress after this pass */
@@ -1751,6 +1754,14 @@ zio_next_stage_async(zio_t *zio)
 	}
 }
 
+static boolean_t
+zio_alloc_should_fail(void)
+{
+	static uint16_t	allocs = 0;
+
+	return (P2PHASE(allocs++, 1U<<zio_zil_fail_shift) == 0);
+}
+
 /*
  * Try to allocate an intent log block.  Return 0 on success, errno on failure.
  */
@@ -1761,6 +1772,11 @@ zio_alloc_blk(spa_t *spa, uint64_t size, blkptr_t *new_bp, blkptr_t *old_bp,
 	int error;
 
 	spa_config_enter(spa, RW_READER, FTAG);
+
+	if (zio_zil_fail_shift && zio_alloc_should_fail()) {
+		spa_config_exit(spa, FTAG);
+		return (ENOSPC);
+	}
 
 	/*
 	 * We were passed the previous log blocks dva_t in bp->blk_dva[0].

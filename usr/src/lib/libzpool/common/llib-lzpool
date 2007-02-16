@@ -49,3 +49,4 @@
 #include <sys/zfs_znode.h>
 
 extern uint64_t zio_gang_bang;
+extern uint16_t zio_zil_fail_shift;

@@ -234,6 +234,7 @@ static int ztest_random_fd;
 static int ztest_dump_core = 1;
 
 extern uint64_t zio_gang_bang;
+extern uint16_t zio_zil_fail_shift;
 
 #define	ZTEST_DIROBJ		1
 #define	ZTEST_MICROZAP_OBJ	2
@@ -359,6 +360,7 @@ usage(void)
 	    "\t[-E(xisting)] (use existing pool instead of creating new one)\n"
 	    "\t[-T time] total run time (default: %llu sec)\n"
 	    "\t[-P passtime] time per pass (default: %llu sec)\n"
+	    "\t[-z zil failure rate (default: fail every 2^%llu allocs)]\n"
 	    "",
 	    cmdname,
 	    (u_longlong_t)zopt_vdevs,		/* -v */
@@ -375,7 +377,8 @@ usage(void)
 	    zopt_pool,				/* -p */
 	    zopt_dir,				/* -f */
 	    (u_longlong_t)zopt_time,		/* -T */
-	    (u_longlong_t)zopt_passtime);	/* -P */
+	    (u_longlong_t)zopt_passtime,	/* -P */
+	    (u_longlong_t)zio_zil_fail_shift);	/* -z */
 	exit(1);
 }
 
@@ -409,8 +412,11 @@ process_options(int argc, char **argv)
 	/* By default, test gang blocks for blocks 32K and greater */
 	zio_gang_bang = 32 << 10;
 
+	/* Default value, fail every 32nd allocation */
+	zio_zil_fail_shift = 5;
+
 	while ((opt = getopt(argc, argv,
-	    "v:s:a:m:r:R:d:t:g:i:k:p:f:VET:P:")) != EOF) {
+	    "v:s:a:m:r:R:d:t:g:i:k:p:f:VET:P:z:")) != EOF) {
 		value = 0;
 		switch (opt) {
 		    case 'v':
@@ -426,6 +432,7 @@ process_options(int argc, char **argv)
 		    case 'k':
 		    case 'T':
 		    case 'P':
+		    case 'z':
 			value = nicenumtoull(optarg);
 		}
 		switch (opt) {
@@ -479,6 +486,9 @@ process_options(int argc, char **argv)
 			break;
 		    case 'P':
 			zopt_passtime = MAX(1, value);
+			break;
+		    case 'z':
+			zio_zil_fail_shift = MIN(value, 16);
 			break;
 		    case '?':
 		    default:
