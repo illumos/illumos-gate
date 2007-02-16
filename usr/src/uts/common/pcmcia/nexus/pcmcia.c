@@ -196,6 +196,8 @@ char *pcmcia_generic_names[] = {
 					sizeof (char *))
 #define	PCMCIA_MAP_IO	0x0
 #define	PCMCIA_MAP_MEM	0x1
+#define	PPB_SUBTRACTIVE	((PCI_CLASS_BRIDGE << 16) | (PCI_BRIDGE_PCI << 8) | \
+		(PCI_BRIDGE_PCI_IF_SUBDECODE))
 
 /*
  * The following should be 2^^n - 1
@@ -237,7 +239,8 @@ void pcmcia_free_resources(dev_info_t *);
 static void pcmcia_ppd_free(struct pcmcia_parent_private *ppd);
 int pcmcia_get_intr(dev_info_t *, int);
 int pcmcia_return_intr(dev_info_t *, int);
-int pcmcia_ra_alloc(dev_info_t *, ndi_ra_request_t *, ra_return_t *, char *);
+int pcmcia_ra_alloc(dev_info_t *, ndi_ra_request_t *, ra_return_t *, char *,
+		dev_info_t **);
 int pcmcia_ra_free(dev_info_t *, ra_return_t *, char *);
 
 extern int cs_init(void);
@@ -4452,22 +4455,83 @@ pcmcia_set_assigned(dev_info_t *dip, int rnum, ra_return_t *ret)
 }
 
 int
-pcmcia_alloc_mem(dev_info_t *dip, ndi_ra_request_t *req, ra_return_t *ret)
+pcmcia_alloc_mem(dev_info_t *dip, ndi_ra_request_t *req, ra_return_t *ret,
+		dev_info_t **res_dip)
 {
-	return (pcmcia_ra_alloc(dip, req, ret, NDI_RA_TYPE_MEM));
+	return (pcmcia_ra_alloc(dip, req, ret, NDI_RA_TYPE_MEM, res_dip));
 }
 
 int
-pcmcia_alloc_io(dev_info_t *dip, ndi_ra_request_t *req, ra_return_t *ret)
+pcmcia_alloc_io(dev_info_t *dip, ndi_ra_request_t *req, ra_return_t *ret,
+		dev_info_t **res_dip)
 {
-	return (pcmcia_ra_alloc(dip, req, ret, NDI_RA_TYPE_IO));
+	return (pcmcia_ra_alloc(dip, req, ret, NDI_RA_TYPE_IO, res_dip));
+}
+
+static boolean_t
+is_subtractv(dev_info_t *dip)
+{
+	uint_t  class;
+
+	if (dip == NULL)
+		return (B_FALSE);
+	class = ddi_getprop(DDI_DEV_T_ANY, dip,
+		DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
+		"class-code", 0xff);
+	if (class == PPB_SUBTRACTIVE) {
+		return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
+ * pcmcia_pci_alloc()
+ * 	allocate mem or I/O resource from the ancestor of the cardbus bridge.
+ * 	First start from the parent node. If the parent is a subtractive
+ * 	decode bridge and it does not have the requested resource, go up the
+ * 	device tree to find the resource.
+ *
+ * 	dip		the parent node of the cardbus bridge
+ *
+ * 	res_dip		returns a pointer to the node from which the
+ * 			resource is obtained. *res_dip could point to
+ * 			the parent or a higher level ancestor. *res_dip
+ * 			should be saved by the caller and later passed
+ * 			to pcmcia_ra_free();
+ */
+int
+pcmcia_pci_alloc(dev_info_t *dip, ndi_ra_request_t *req, ra_return_t *ret,
+		char *type, dev_info_t **res_dip)
+{
+	uint64_t base = 0;
+	uint64_t len = 0;
+
+	if ((ndi_ra_alloc(dip, req, &base, &len, type, NDI_RA_PASS)
+							== NDI_FAILURE) ||
+	    ((base >> 32) != 0)) {
+		if (is_subtractv(dip)) {
+			return (pcmcia_pci_alloc(ddi_get_parent(dip),
+					req, ret, type, res_dip));
+
+		} else {
+			ret->ra_addr_hi = 0;
+			ret->ra_addr_lo = 0;
+			ret->ra_len = 0;
+			*res_dip = (dev_info_t *)-1;
+			return (DDI_FAILURE);
+		}
+	}
+	ret->ra_addr_lo =  base & 0xffffffff;
+	ret->ra_addr_hi = 0;
+	ret->ra_len = len;
+	*res_dip = dip;
+	return (DDI_SUCCESS);
 }
 
 int
 pcmcia_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, ra_return_t *ret,
-		char *type)
+		char *type, dev_info_t **res_dip)
 {
-	int rval;
 	uint64_t base = 0;
 	uint64_t len = 0;
 
@@ -4479,16 +4543,15 @@ pcmcia_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, ra_return_t *ret,
 	if ((ndi_ra_alloc(dip, req, &base, &len, type, NDI_RA_PASS)
 							== NDI_FAILURE) ||
 	    ((base >> 32) != 0)) {
-		ret->ra_addr_lo = 0;
-		ret->ra_len = 0;
-		rval = DDI_FAILURE;
+		return (pcmcia_pci_alloc(ddi_get_parent(dip), req, ret,
+				type, res_dip));
 	} else {
 		ret->ra_addr_lo =  base & 0xffffffff;
+		ret->ra_addr_hi = 0;
 		ret->ra_len = len;
-		rval = DDI_SUCCESS;
+		*res_dip = dip;
+		return (DDI_SUCCESS);
 	}
-	ret->ra_addr_hi = 0;
-	return (rval);
 }
 
 int

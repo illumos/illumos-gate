@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,7 @@ typedef struct pcs_memwin {
 	volatile caddr_t	pcw_hostmem;
 	off_t			pcw_offset;
 	ddi_acc_handle_t	pcw_handle;
+	dev_info_t		*res_dip; /* dip from which mem is allocated */
 } pcs_memwin_t;
 
 typedef struct pci_iowin {
@@ -90,6 +91,7 @@ typedef struct pci_iowin {
 				/* Cirrus Logic specific offset info */
 	int			pcw_offset;
 	ddi_acc_handle_t	pcw_handle;
+	dev_info_t		*res_dip; /* dip from which io is allocated */
 } pcs_iowin_t;
 
 #define	PCW_MAPPED	0x0001	/* window is mapped */
@@ -540,6 +542,10 @@ typedef struct pcicdev_t {
 #define	PCIC_DATA_LOST		0x100		/* Data lost */
 #define	PCIC_BAD_VCC_REQ	0x200		/* Bad Vcc request */
 
+
+/* TI Multi Function Terminal selection (MFUNC0 selected as INTA) */
+#define	PCIC_TI_MFUNC_SEL	0x22
+
 #define	PCICPROP_CTL		"controller"
 
 #define	PCIC_REV_LEVEL_LOW	0x02
@@ -552,6 +558,10 @@ typedef struct pcicdev_t {
 
 #ifndef	DEVI_PCI_NEXNAME
 #define	DEVI_PCI_NEXNAME	"pci"
+#endif
+
+#ifndef DEVI_PCIEX_NEXNAME
+#define	DEVI_PCIEX_NEXNAME	"pciex"
 #endif
 
 /* PCI Class Code stuff */

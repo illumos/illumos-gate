@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -45,6 +45,7 @@
 
 #include <sys/pctypes.h>
 #include <sys/pcmcia.h>
+#include <sys/sservice.h>
 
 #include <sys/isa_defs.h>
 
@@ -131,6 +132,7 @@ typedef struct cardbus_phdl cardbus_phdl_t;
 struct cardbus_phdl {
 
 	dev_info_t	*dip;	/* Associated with the attach point */
+	dev_info_t	*res_dip; /* dip from which io/mem is allocated */
 	cardbus_phdl_t  *next;
 
 	uint64_t	memory_base;    /* Memory base for this attach point */
@@ -551,6 +553,7 @@ cardbus_destroy_phdl(dev_info_t *dip)
 {
 	cardbus_phdl_t *entry;
 	cardbus_phdl_t *follow = NULL;
+	ra_return_t	res;
 
 	mutex_enter(&cardbus_list_mutex);
 	for (entry = cardbus_phdl_list; entry != NULL; follow = entry,
@@ -567,9 +570,9 @@ cardbus_destroy_phdl(dev_info_t *dip)
 			 * must be freed up.
 			 */
 			if (entry->memory_len > 0) {
-				(void) ndi_ra_free(dip,
-				    entry->memory_base, entry->memory_len,
-				    NDI_RA_TYPE_MEM, NDI_RA_PASS);
+				res.ra_addr_lo = entry->memory_base;
+				res.ra_len = entry->memory_len;
+				(void) pcmcia_free_mem(entry->res_dip, &res);
 #ifdef  _LP64
 				cardbus_err(dip, 8,
 				    "cardbus_destroy_phdl: "
@@ -583,9 +586,9 @@ cardbus_destroy_phdl(dev_info_t *dip)
 #endif
 			}
 			if (entry->io_len > 0) {
-				(void) ndi_ra_free(dip,
-				    entry->io_base, entry->io_len,
-				    NDI_RA_TYPE_IO, NDI_RA_PASS);
+				res.ra_addr_lo = entry->io_base;
+				res.ra_len = entry->io_len;
+				(void) pcmcia_free_io(entry->res_dip, &res);
 				cardbus_err(dip, 8,
 				    "cardbus_destroy_phdl: "
 				    "IO BASE = [0x%x] length [0x%x]\n",
@@ -1170,10 +1173,8 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 	cardbus_phdl_t		*phdl;
 	ndi_ra_request_t	*mem_request;
 	ndi_ra_request_t	*io_request;
-	uint64_t		mem_answer;
-	uint64_t		io_answer;
+	ra_return_t		res;
 	int			count;
-	uint64_t		alen;
 
 	/*
 	 * This should not find an existing entry - so
@@ -1248,15 +1249,15 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 		    mem_request->ra_len);
 #endif
 
-		if (ndi_ra_alloc(dip, mem_request, &mem_answer, &alen,
-		    NDI_RA_TYPE_MEM, NDI_RA_PASS) != NDI_SUCCESS) {
+		if (pcmcia_alloc_mem(dip, mem_request, &res,
+		    &phdl->res_dip) != NDI_SUCCESS) {
 			cmn_err(CE_WARN, "Failed to allocate memory for %s\n",
 				ddi_driver_name(dip));
 			return (PCICFG_FAILURE);
 		}
 
-		phdl->memory_base = phdl->memory_last = mem_answer;
-		phdl->memory_len = alen;
+		phdl->memory_base = phdl->memory_last = res.ra_addr_lo;
+		phdl->memory_len = res.ra_len;
 	}
 
 	io_request->ra_len += cardbus_min_spare_io;
@@ -1272,21 +1273,24 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 		io_request->ra_flags |= NDI_RA_ALLOC_BOUNDED;
 		io_request->ra_len = PCICFG_ROUND_UP(io_request->ra_len,
 				phdl->io_gran);
+		io_request->ra_align_mask = max(PCICFG_IOGRAN,
+				phdl->io_gran) - 1;
 
-		if (ndi_ra_alloc(dip, io_request, &io_answer,
-		    &alen, NDI_RA_TYPE_IO, NDI_RA_PASS) != NDI_SUCCESS) {
+		if (pcmcia_alloc_io(dip, io_request, &res,
+		    &phdl->res_dip) != NDI_SUCCESS) {
 			cmn_err(CE_WARN, "Failed to allocate I/O space "
 				"for %s\n", ddi_driver_name(dip));
 			if (mem_request->ra_len) {
-				(void) ndi_ra_free(dip, mem_answer,
-					alen, NDI_RA_TYPE_MEM, NDI_RA_PASS);
+				res.ra_addr_lo = phdl->memory_base;
+				res.ra_len = phdl->memory_len;
+				(void) pcmcia_free_mem(phdl->res_dip, &res);
 				phdl->memory_len = phdl->io_len = 0;
 			}
 			return (PCICFG_FAILURE);
 		}
 
-		phdl->io_base = phdl->io_last = (uint32_t)io_answer;
-		phdl->io_len  = (uint32_t)alen;
+		phdl->io_base = phdl->io_last = (uint32_t)res.ra_addr_lo;
+		phdl->io_len  = (uint32_t)res.ra_len;
 	}
 
 #ifdef  _LP64

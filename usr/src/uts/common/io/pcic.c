@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -812,7 +812,8 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 	} /* ddi_prop_op("device_type") */
 
-	if (strcmp(bus_type, DEVI_PCI_NEXNAME) == 0) {
+	if (strcmp(bus_type, DEVI_PCI_NEXNAME) == 0 ||
+		strcmp(bus_type, DEVI_PCIEX_NEXNAME) == 0) {
 		pcic->pc_flags = PCF_PCIBUS;
 	} else {
 #if defined(__sparc)
@@ -2128,7 +2129,7 @@ pcic_setup_adapter(pcicdev_t *pcic)
 			    (uint32_t *)(pcic->cfgaddr + PCIC_MFROUTE_REG));
 			value &= ~0xff;
 			ddi_put32(pcic->cfg_handle, (uint32_t *)(pcic->cfgaddr +
-			    PCIC_MFROUTE_REG), value|0x22);
+			    PCIC_MFROUTE_REG), value|PCIC_TI_MFUNC_SEL);
 		}
 
 		/* setup general card status change interrupt */
@@ -2810,7 +2811,7 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 				ddi_regs_map_free(&memp->pcw_handle);
 				res.ra_addr_lo = memp->pcw_base;
 				res.ra_len = memp->pcw_len;
-				(void) pcmcia_free_mem(dip, &res);
+				(void) pcmcia_free_mem(memp->res_dip, &res);
 				memp->pcw_status &= ~(PCW_MAPPED|PCW_ENABLED);
 				memp->pcw_hostmem = NULL;
 				memp->pcw_base = NULL;
@@ -2845,7 +2846,8 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 					    req.ra_align_mask);
 #endif
 
-				ret = pcmcia_alloc_mem(dip, &req, &res);
+				ret = pcmcia_alloc_mem(dip, &req, &res,
+					&memp->res_dip);
 				if (ret == DDI_FAILURE) {
 					mutex_exit(&pcic->pc_lock);
 					cmn_err(CE_WARN,
@@ -2880,7 +2882,7 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 
 				    res.ra_addr_lo = memp->pcw_base;
 				    res.ra_len = memp->pcw_len;
-				    (void) pcmcia_free_mem(pcic->dip, &res);
+				    (void) pcmcia_free_mem(memp->res_dip, &res);
 
 				    mutex_exit(&pcic->pc_lock);
 
@@ -3091,7 +3093,7 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 				ddi_regs_map_free(&memp->pcw_handle);
 				res.ra_addr_lo = memp->pcw_base;
 				res.ra_len = memp->pcw_len;
-				(void) pcmcia_free_mem(pcic->dip, &res);
+				(void) pcmcia_free_mem(memp->res_dip, &res);
 				memp->pcw_hostmem = NULL;
 				memp->pcw_status &= ~PCW_MAPPED;
 			}
@@ -3146,7 +3148,7 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 				ddi_regs_map_free(&winp->pcw_handle);
 				res.ra_addr_lo = winp->pcw_base;
 				res.ra_len = winp->pcw_len;
-				(void) pcmcia_free_io(pcic->dip, &res);
+				(void) pcmcia_free_io(winp->res_dip, &res);
 				winp->pcw_status &= ~(PCW_MAPPED|PCW_ENABLED);
 			}
 
@@ -3212,7 +3214,8 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			 *	on whether the caller specified a
 			 *	specific base address or not.
 			 */
-			if (pcmcia_alloc_io(dip, &req, &res) == DDI_FAILURE) {
+			if (pcmcia_alloc_io(dip, &req, &res,
+					&winp->res_dip) == DDI_FAILURE) {
 				winp->pcw_status &= ~PCW_ENABLED;
 				mutex_exit(&pcic->pc_lock);
 				cmn_err(CE_WARN, "Failed to alloc I/O:\n"
@@ -3257,7 +3260,7 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 
 				    res.ra_addr_lo = winp->pcw_base;
 				    res.ra_len = winp->pcw_len;
-				    (void) pcmcia_free_io(pcic->dip, &res);
+				    (void) pcmcia_free_io(winp->res_dip, &res);
 
 				    mutex_exit(&pcic->pc_lock);
 				    return (BAD_WINDOW);
@@ -3431,7 +3434,7 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 				ddi_regs_map_free(&winp->pcw_handle);
 				res.ra_addr_lo = winp->pcw_base;
 				res.ra_len = winp->pcw_len;
-				(void) pcmcia_free_io(pcic->dip, &res);
+				(void) pcmcia_free_io(winp->res_dip, &res);
 				winp->pcw_status &= ~PCW_MAPPED;
 			}
 
@@ -5911,7 +5914,8 @@ pcic_init_assigned(dev_info_t *dip)
 			    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS,
 			    "device_type",
 			    (caddr_t)&bus_type, &len) == DDI_SUCCESS) &&
-			    (strcmp(bus_type, "pci") == 0))
+			    (strcmp(bus_type, DEVI_PCI_NEXNAME) == 0 ||
+				strcmp(bus_type, DEVI_PCIEX_NEXNAME) == 0))
 				break;
 		}
 		if (par != NULL &&
@@ -6491,7 +6495,7 @@ pcic_add_debqueue(pcic_socket_t *pcs, int clocks)
 	struct debounce *dbp, **dbpp = &pcic_deb_queue;
 
 	(void) drv_getparm(LBOLT, &lbolt);
-	dbp = kmem_alloc(sizeof (struct debounce), KM_NOSLEEP);
+	dbp = kmem_alloc(sizeof (struct debounce), KM_SLEEP);
 
 	dbp->expire = lbolt + clocks;
 	dbp->pcs = pcs;
