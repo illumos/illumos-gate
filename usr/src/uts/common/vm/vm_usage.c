@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -773,9 +773,14 @@ vmu_update_bounds(vmu_bound_t **first, vmu_bound_t **last,
 	next = *first;
 	new_next = new_first;
 
-	/* verify bounds span same pages */
-	ASSERT((*first)->vmb_start >= new_next->vmb_start);
-	ASSERT((*last)->vmb_end <= new_last->vmb_end);
+	/*
+	 * Verify first and last bound are covered by new bounds if they
+	 * have unknown type.
+	 */
+	ASSERT((*first)->vmb_type != VMUSAGE_BOUND_UNKNOWN ||
+	    (*first)->vmb_start >= new_next->vmb_start);
+	ASSERT((*last)->vmb_type != VMUSAGE_BOUND_UNKNOWN ||
+	    (*last)->vmb_end <= new_last->vmb_end);
 	for (;;) {
 		/* If bound already has type, proceed to next bound */
 		if (next->vmb_type != VMUSAGE_BOUND_UNKNOWN) {

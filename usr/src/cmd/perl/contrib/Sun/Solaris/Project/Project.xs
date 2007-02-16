@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Project.xs contains XS wrappers for the project database maniplulation
@@ -30,8 +29,10 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Solaris includes. */
+#include <zone.h>
 #include <project.h>
 #include <pool.h>
+#include <sys/pool_impl.h>
 #include <rctl.h>
 #include <stdio.h>
 
@@ -354,7 +355,32 @@ pool_exists(name)
 PREINIT:
 	pool_conf_t *conf;
 	pool_t *pool;
+	pool_status_t status;
+	int fd;
 PPCODE:
+
+	/*
+	 * Determine if pools are enabled using /dev/pool directly, as
+	 * libpool may not be present.
+	 */
+	if (getzoneid() != GLOBAL_ZONEID) {
+		XSRETURN_IV(1);
+	}
+	if ((fd = open("/dev/pool", O_RDONLY)) < 0) {
+		XSRETURN_IV(1);
+	}
+	if (ioctl(fd, POOL_STATUSQ, &status) < 0) {
+		(void) close(fd);
+		XSRETURN_IV(1);
+	}
+	close(fd);
+	if (status.ps_io_state != 1) {
+		XSRETURN_IV(1);
+	}
+
+	/*
+	 * If pools are enabled, assume libpool is present.
+	 */
 	conf = pool_conf_alloc();
 	if (conf == NULL) {
 		XSRETURN_IV(1);

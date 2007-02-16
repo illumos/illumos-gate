@@ -3777,7 +3777,11 @@ zone_shutdown(zoneid_t zoneid)
 		return (set_errno(EINTR));
 	}
 
-	brand_unregister_zone(zone->zone_brand);
+	/*
+	 * Zone can be become down/destroyable even if the above wait
+	 * returns EINTR, so any code added here may never execute.
+	 * (i.e. don't add code here)
+	 */
 
 	zone_rele(zone);
 	return (0);
@@ -3875,8 +3879,11 @@ zone_destroy(zoneid_t zoneid)
 
 	}
 
-	/* Get rid of the zone's kstats */
+	/* Get rid of the zone's kstats. */
 	zone_kstat_delete(zone);
+
+	/* Say goodbye to brand framework. */
+	brand_unregister_zone(zone->zone_brand);
 
 	/*
 	 * It is now safe to let the zone be recreated; remove it from the
