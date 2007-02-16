@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,7 @@ MODULE = platform-cpu
 ARCH = sun4v
 CLASS = arch
 
-MODULESRCS = cpu.c cpu_mdesc.c
+MODULESRCS = cpu.c
 
 include ../../Makefile.plugin
 

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -104,7 +104,6 @@ pics/%.o: ../$(MACH)/%.c
 ../common/topo_error.c: ../common/mkerror.sh ../common/topo_error.h
 	sh ../common/mkerror.sh liberrors < ../common/topo_error.h > $@
 	sh ../common/mkerror.sh properrors < ../common/libtopo.h >> $@
-	sh ../common/mkerror.sh methoderrors < ../common/libtopo.h >> $@
 	sh ../common/mkerror.sh moderrors < ../common/topo_mod.h >> $@
 
 include ../../../../Makefile.targ

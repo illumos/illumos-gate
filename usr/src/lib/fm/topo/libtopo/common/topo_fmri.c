@@ -232,8 +232,8 @@ topo_fmri_contains(topo_hdl_t *thp, nvlist_t *fmri, nvlist_t *subfmri, int *err)
 int
 topo_fmri_unusable(topo_hdl_t *thp, nvlist_t *fmri, int *err)
 {
+	int rc;
 	char *scheme;
-	uint32_t unusable = 0;
 	nvlist_t *out = NULL;
 	tnode_t *rnode;
 
@@ -245,14 +245,11 @@ topo_fmri_unusable(topo_hdl_t *thp, nvlist_t *fmri, int *err)
 		return (set_error(thp, ETOPO_METHOD_NOTSUP, err,
 		    TOPO_METH_UNUSABLE, out));
 
-	if (topo_method_invoke(rnode, TOPO_METH_UNUSABLE,
-	    TOPO_METH_UNUSABLE_VERSION, fmri, &out, err) < 0)
+	if ((rc = topo_method_invoke(rnode, TOPO_METH_UNUSABLE,
+	    TOPO_METH_UNUSABLE_VERSION, fmri, &out, err)) < 0)
 		return (set_error(thp, *err, err, TOPO_METH_UNUSABLE, out));
 
-	(void) nvlist_lookup_uint32(out, TOPO_METH_UNUSABLE_RET, &unusable);
-	nvlist_free(out);
-
-	return (unusable);
+	return (rc);
 }
 
 int

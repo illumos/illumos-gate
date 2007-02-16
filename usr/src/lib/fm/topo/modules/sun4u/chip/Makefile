@@ -19,14 +19,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 ARCH = sun4u
-
-sun4u_SRCS = chip_sun4u.c
 
 include ../../sun4/chip/Makefile.chip
 

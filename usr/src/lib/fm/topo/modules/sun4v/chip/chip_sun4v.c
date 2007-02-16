@@ -27,9 +27,10 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <strings.h>
 #include <sys/types.h>
+#include <sys/mdesc.h>
+#include <sys/fm/ldom.h>
 #include <fm/topo_mod.h>
 #include <sys/fm/protocol.h>
 
@@ -39,7 +40,7 @@
 #include <fcntl.h>
 #include <umem.h>
 
-#include <cpu_mdesc.h>
+#include <stdlib.h>
 
 
 /*
@@ -52,10 +53,32 @@
 #define	CPU_NODE_NAME	"cpu"
 #define	CHIP_NODE_NAME	"chip"
 
+#define	MD_STR_LEN		32
+#define	MD_STR_CPU		"cpu"
+#define	MD_STR_COMPONENT	"component"
+#define	MD_STR_TYPE		"type"
+#define	MD_STR_PROCESSOR	"processor"
+#define	MD_STR_STRAND		"strand"
+#define	MD_STR_SERIAL		"serial_number"
+
+typedef struct md_cpumap {
+	uint32_t cpumap_id;		/* virtual cpuid */
+	uint32_t cpumap_pid;		/* physical cpuid */
+	uint64_t cpumap_serialno;	/* cpu serial number */
+} md_cpumap_t;
+
+typedef struct chip {
+	uint64_t *chip_serials;		/* List of cpu serial numbers */
+	md_cpumap_t *chip_cpus;		/* List of cpu maps */
+	uint32_t chip_ncpus;		/* size */
+} chip_t;
+
+
 /* Forward declaration */
 static int chip_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
     topo_instance_t, void *, void *);
 static void chip_release(topo_mod_t *, tnode_t *);
+static int cpu_mdesc_init(topo_mod_t *mod, chip_t *chip);
 
 
 static const topo_modops_t chip_ops =
@@ -71,33 +94,43 @@ static const topo_pgroup_info_t chip_auth_pgroup = {
 	1
 };
 
+static void *
+chip_alloc(size_t size)
+{
+	return (umem_alloc(size, UMEM_DEFAULT));
+}
+
+static void
+chip_free(void *data, size_t size)
+{
+	umem_free(data, size);
+}
+
 int
 _topo_init(topo_mod_t *mod)
 {
-	md_info_t *chip;
+	chip_t *chip;
 
 	if (getenv("TOPOCHIPDBG"))
 		topo_mod_setdebug(mod);
 	topo_mod_dprintf(mod, "initializing chip enumerator\n");
 
-	if ((chip = topo_mod_zalloc(mod, sizeof (md_info_t))) == NULL)
+	if ((chip = topo_mod_zalloc(mod, sizeof (chip_t))) == NULL)
 		return (-1);
 
 	if (cpu_mdesc_init(mod, chip) != 0) {
 		topo_mod_dprintf(mod, "failed to get cpus from the PRI/MD\n");
-		topo_mod_free(mod, chip, sizeof (md_info_t));
+		topo_mod_free(mod, chip, sizeof (chip_t));
 		return (-1);
 	}
-
-	topo_mod_setspecific(mod, (void *)chip);
 
 	if (topo_mod_register(mod, &chip_info, TOPO_VERSION) != 0) {
 		topo_mod_dprintf(mod, "failed to register hc: "
 		    "%s\n", topo_mod_errmsg(mod));
-		cpu_mdesc_fini(mod, chip);
-		topo_mod_free(mod, chip, sizeof (md_info_t));
+		topo_mod_free(mod, chip, sizeof (chip_t));
 		return (-1);
 	}
+	topo_mod_setspecific(mod, (void *)chip);
 
 	topo_mod_dprintf(mod, "chip enumerator inited\n");
 
@@ -107,15 +140,22 @@ _topo_init(topo_mod_t *mod)
 void
 _topo_fini(topo_mod_t *mod)
 {
-	md_info_t *chip;
+	chip_t *chip;
 
-	chip = (md_info_t *)topo_mod_getspecific(mod);
+	chip = (chip_t *)topo_mod_getspecific(mod);
 
-	cpu_mdesc_fini(mod, chip);
+	if (chip->chip_serials != NULL)
+		topo_mod_free(mod, chip->chip_serials,
+			chip->chip_ncpus * sizeof (uint64_t));
 
-	topo_mod_free(mod, chip, sizeof (md_info_t));
+	if (chip->chip_cpus != NULL)
+		topo_mod_free(mod, chip->chip_cpus,
+			chip->chip_ncpus * sizeof (md_cpumap_t));
+
+	topo_mod_free(mod, chip, sizeof (chip_t));
 
 	topo_mod_unregister(mod);
+
 }
 
 static tnode_t *
@@ -131,23 +171,17 @@ chip_tnode_create(topo_mod_t *mod, tnode_t *parent,
 
 	if (topo_mod_nvalloc(mod, &auth, NV_UNIQUE_NAME) == 0) {
 		if (topo_prop_get_string(parent, FM_FMRI_AUTHORITY,
-			FM_FMRI_AUTH_PRODUCT, &prod, &err) == 0) {
-			(void) nvlist_add_string(auth, FM_FMRI_AUTH_PRODUCT,
-						prod);
-			topo_mod_strfree(mod, prod);
-		}
+		    FM_FMRI_AUTH_PRODUCT, &prod, &err) == 0)
+		    (void) nvlist_add_string(auth, FM_FMRI_AUTH_PRODUCT,
+			    prod);
 		if (topo_prop_get_string(parent, FM_FMRI_AUTHORITY,
-			FM_FMRI_AUTH_SERVER, &server, &err) == 0) {
+			FM_FMRI_AUTH_SERVER, &server, &err) == 0)
 			(void) nvlist_add_string(auth, FM_FMRI_AUTH_SERVER,
-						server);
-			topo_mod_strfree(mod, server);
-		}
+			    server);
 		if (topo_prop_get_string(parent, FM_FMRI_AUTHORITY,
-			FM_FMRI_AUTH_CHASSIS, &csn, &err) == 0) {
+		    FM_FMRI_AUTH_CHASSIS, &csn, &err) == 0)
 			(void) nvlist_add_string(auth, FM_FMRI_AUTH_CHASSIS,
-						csn);
-			topo_mod_strfree(mod, csn);
-		}
+			    csn);
 	}
 
 
@@ -190,6 +224,203 @@ chip_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	return (ntn);
 }
 
+static int
+cpu_n1_mdesc_init(topo_mod_t *mod, md_t *mdp, chip_t *chip)
+{
+	mde_cookie_t *listp;
+	md_cpumap_t *mcmp;
+	int i, num_nodes, idx;
+
+	num_nodes = md_node_count(mdp);
+	listp = topo_mod_zalloc(mod, sizeof (mde_cookie_t) * num_nodes);
+
+	chip->chip_ncpus = md_scan_dag(mdp,
+					MDE_INVAL_ELEM_COOKIE,
+					md_find_name(mdp, "cpu"),
+					md_find_name(mdp, "fwd"),
+					listp);
+	topo_mod_dprintf(mod, "Found %d cpus\n", chip->chip_ncpus);
+
+	chip->chip_cpus = topo_mod_zalloc(mod, chip->chip_ncpus *
+	    sizeof (md_cpumap_t));
+	chip->chip_serials = topo_mod_zalloc(mod, chip->chip_ncpus *
+	    sizeof (uint64_t));
+
+	for (idx = 0, mcmp = chip->chip_cpus;
+	    idx < chip->chip_ncpus;
+	    idx++, mcmp++) {
+		uint64_t tl;
+
+		if (md_get_prop_val(mdp, listp[idx], "id", &tl) < 0)
+			tl = (uint64_t)-1; /* invalid value */
+		mcmp->cpumap_id = tl;
+
+		if (md_get_prop_val(mdp, listp[idx], "pid", &tl) < 0)
+			tl = mcmp->cpumap_id;
+		mcmp->cpumap_pid = tl;
+
+		if (md_get_prop_val(mdp, listp[idx], "serial#",
+		    &mcmp->cpumap_serialno) < 0)
+			mcmp->cpumap_serialno = 0;
+
+		/* unique serial number */
+		for (i = 0; i < chip->chip_ncpus &&
+		    chip->chip_serials[i] != 0; i++) {
+			if (mcmp->cpumap_serialno == chip->chip_serials[i]) {
+				break;
+			}
+		}
+		if (i < chip->chip_ncpus && chip->chip_serials[i] == 0) {
+			chip->chip_serials[i] = mcmp->cpumap_serialno;
+			topo_mod_dprintf(mod, "chip[%d] serial is %llx\n", i,
+				chip->chip_serials[i]);
+		}
+	}
+
+	topo_mod_free(mod, listp, sizeof (mde_cookie_t) * num_nodes);
+
+	return (0);
+}
+
+static int
+cpu_n2_mdesc_init(topo_mod_t *mod, md_t *mdp, chip_t *chip)
+{
+	mde_cookie_t *list1p, *list2p;
+	md_cpumap_t *mcmp;
+	int i, j, cnt;
+	int nnode, ncomp, nproc, ncpu;
+	char *str = NULL;
+	uint64_t sn;
+	uint64_t tl;
+
+	nnode = md_node_count(mdp);
+	list1p = topo_mod_zalloc(mod, sizeof (mde_cookie_t) * nnode);
+
+	/* Count the number of processors and strands */
+	ncomp = md_scan_dag(mdp,
+			MDE_INVAL_ELEM_COOKIE,
+			md_find_name(mdp, MD_STR_COMPONENT),
+			md_find_name(mdp, "fwd"),
+			list1p);
+	if (ncomp <= 0) {
+		topo_mod_free(mod, list1p, sizeof (mde_cookie_t) * nnode);
+		return (-1);
+	}
+	for (i = 0, nproc = 0, ncpu = 0; i < ncomp; i++) {
+		if (md_get_prop_str(mdp, list1p[i], MD_STR_TYPE, &str) == 0 &&
+		    str != NULL && strcmp(str, MD_STR_PROCESSOR) == 0) {
+			nproc++;
+		}
+		if (md_get_prop_str(mdp, list1p[i], MD_STR_TYPE, &str) == 0 &&
+		    str != NULL && strcmp(str, MD_STR_STRAND) == 0) {
+			ncpu++;
+		}
+	}
+	topo_mod_dprintf(mod, "Found %d procs and %d strands\n", nproc, ncpu);
+	if (ncpu <= 0 || nproc <= 0) {
+		topo_mod_free(mod, list1p, sizeof (mde_cookie_t) * nnode);
+		return (-1);
+	}
+
+	/* Alloc processor and strand entries */
+	list2p = topo_mod_zalloc(mod, sizeof (mde_cookie_t) * 2 * ncpu);
+	chip->chip_ncpus = ncpu;
+	chip->chip_cpus = topo_mod_zalloc(mod, chip->chip_ncpus *
+					sizeof (md_cpumap_t));
+	chip->chip_serials = topo_mod_zalloc(mod, chip->chip_ncpus *
+					sizeof (uint64_t));
+
+	/* Visit each processor node */
+	mcmp = chip->chip_cpus;
+	for (i = 0, nproc = 0, ncpu = 0; i < ncomp; i++) {
+		if (md_get_prop_str(mdp, list1p[i], MD_STR_TYPE, &str) < 0 ||
+		    str ==  NULL || strcmp(str, MD_STR_PROCESSOR))
+			continue;
+		if (md_get_prop_val(mdp, list1p[i], MD_STR_SERIAL, &sn) < 0) {
+			topo_mod_dprintf(mod,
+				"Failed to get the serial number of proc[%d]",
+				nproc);
+			continue;
+		}
+		chip->chip_serials[nproc] = sn;
+		topo_mod_dprintf(mod, "proc %d : sn=%llx\n", nproc, sn);
+		nproc++;
+
+		/* Get all the strands below this proc */
+		cnt = md_scan_dag(mdp,
+				list1p[i],
+				md_find_name(mdp, MD_STR_COMPONENT),
+				md_find_name(mdp, "fwd"),
+				list2p);
+		if (cnt <= 0) {
+			continue;
+		}
+		for (j = 0; j < cnt && ncpu < chip->chip_ncpus; j++) {
+			/* Consider only the strand nodes */
+			if (md_get_prop_str(mdp, list2p[j], MD_STR_TYPE, &str)
+			    < 0 || str == NULL || strcmp(str, MD_STR_STRAND))
+				continue;
+
+			if (md_get_prop_val(mdp, list2p[j], "id", &tl) < 0)
+				tl = (uint64_t)-1; /* invalid value */
+			mcmp->cpumap_id = tl;
+
+			if (md_get_prop_val(mdp, list2p[j], "pid", &tl) < 0)
+				tl = mcmp->cpumap_id;
+			mcmp->cpumap_pid = tl;
+
+			mcmp->cpumap_serialno = sn;
+			mcmp++;
+			ncpu++;
+		}
+	}
+
+	topo_mod_free(mod, list1p, sizeof (mde_cookie_t) * nnode);
+	topo_mod_free(mod, list2p, sizeof (mde_cookie_t) * 2*chip->chip_ncpus);
+
+	return (0);
+}
+
+static int
+cpu_mdesc_init(topo_mod_t *mod, chip_t *chip)
+{
+	int rc;
+	md_t *mdp;
+	ssize_t bufsiz = 0;
+	uint64_t *bufp;
+	ldom_hdl_t *lhp;
+
+	lhp = ldom_init(chip_alloc, chip_free);
+	if ((bufsiz = ldom_get_core_md(lhp, &bufp)) <= 0) {
+		return (-1);
+	}
+
+	if ((mdp = md_init_intern(bufp, chip_alloc, chip_free)) == NULL ||
+	    md_node_count(mdp) <= 0) {
+		chip_free(bufp, (size_t)bufsiz);
+		ldom_fini(lhp);
+		return (-1);
+	}
+
+	/*
+	 * N1 MD contains cpu nodes while N2 MD contains component nodes
+	 */
+	if (md_find_name(mdp, MD_STR_COMPONENT) != MDE_INVAL_STR_COOKIE) {
+		rc = cpu_n2_mdesc_init(mod, mdp, chip);
+	} else if (md_find_name(mdp, MD_STR_CPU) != MDE_INVAL_STR_COOKIE) {
+		rc =  cpu_n1_mdesc_init(mod, mdp, chip);
+	} else {
+		topo_mod_dprintf(mod, "Unsupported MD/PRI\n");
+		rc = -1;
+	}
+
+	chip_free(bufp, (size_t)bufsiz);
+	(void) md_fini(mdp);
+	ldom_fini(lhp);
+
+	return (rc);
+}
+
 static nvlist_t *
 cpu_fmri_create(topo_mod_t *mod, uint32_t cpuid, char *serial, uint8_t cpumask)
 {
@@ -215,7 +446,7 @@ cpu_fmri_create(topo_mod_t *mod, uint32_t cpuid, char *serial, uint8_t cpumask)
 
 /*ARGSUSED*/
 static int
-cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name, md_info_t *chip,
+cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name, chip_t *chip,
 		int chipidx)
 {
 	int i;
@@ -227,22 +458,20 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name, md_info_t *chip,
 	char sbuf[32];
 	tnode_t *cnode;
 	nvlist_t *asru;
-	md_cpumap_t *mcmp;
-	md_proc_t *procp;
 
 	topo_mod_dprintf(mod, "enumerating cpus\n");
 
 	/*
 	 * find the min/max id of cpus per this cmp and create a cpu range
 	 */
-	procp = chip->procs + chipidx;
-	for (i = 0, mcmp = chip->cpus; i < chip->ncpus; i++, mcmp++) {
-		if (mcmp->cpumap_serialno != procp->serialno)
+	for (i = 0; i < chip->chip_ncpus; i++) {
+		if (chip->chip_cpus[i].cpumap_serialno !=
+		    chip->chip_serials[chipidx])
 			continue;
-		if ((min < 0) || (mcmp->cpumap_pid < min))
-			min = mcmp->cpumap_pid;
-		if ((max < 0) || (mcmp->cpumap_pid > max))
-			max = mcmp->cpumap_pid;
+		if ((min < 0) || (chip->chip_cpus[i].cpumap_pid < min))
+			min = chip->chip_cpus[i].cpumap_pid;
+		if ((max < 0) || (chip->chip_cpus[i].cpumap_pid > max))
+			max = chip->chip_cpus[i].cpumap_pid;
 	}
 	if (min < 0 || max < 0)
 		return (-1);
@@ -253,19 +482,21 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name, md_info_t *chip,
 		return (-1);
 	}
 
-	(void) snprintf(sbuf, sizeof (sbuf), "%llx", procp->serialno);
+	(void) snprintf(sbuf, sizeof (sbuf), "%llx",
+			chip->chip_serials[chipidx]);
 
 	/*
 	 * Create the cpu[i] nodes of a given cmp chipidx
 	 */
-	for (i = 0, mcmp = chip->cpus; i < chip->ncpus; i++, mcmp++) {
+	for (i = 0; i < chip->chip_ncpus; i++) {
 
-		if (mcmp->cpumap_serialno != procp->serialno) {
+		if (chip->chip_cpus[i].cpumap_serialno !=
+		    chip->chip_serials[chipidx]) {
 			continue;
 		}
 
 		/* physical cpuid */
-		pid = mcmp->cpumap_pid;
+		pid = chip->chip_cpus[i].cpumap_pid;
 		cnode = chip_tnode_create(mod, rnode, name,
 					(topo_instance_t)pid, sbuf,
 					NULL, NULL, NULL);
@@ -294,7 +525,7 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name, md_info_t *chip,
 /*ARGSUSED*/
 static int
 chip_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
-    topo_instance_t min, topo_instance_t max, md_info_t *chip)
+    topo_instance_t min, topo_instance_t max, chip_t *chip)
 {
 	int nerr = 0;
 	int err;
@@ -303,13 +534,11 @@ chip_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 	tnode_t *cnode;
 	nvlist_t *fru = NULL;
 	char *label = NULL;
-	md_proc_t *procp;
 
 	topo_mod_dprintf(mod, "enumerating cmp chip\n");
 
-	/* Create the range of chip nodes */
-	for (chipidx = 0, procp = chip->procs; chipidx < chip->nprocs &&
-			procp->serialno != 0; chipidx++, procp++);
+	for (chipidx = 0; chipidx < chip->chip_ncpus &&
+			chip->chip_serials[chipidx] != 0; chipidx++);
 	topo_node_range_destroy(rnode, name);
 	if (topo_node_range_create(mod, rnode, name, 0, chipidx+1) < 0) {
 		topo_mod_dprintf(mod, "failed to create chip range[0,%d]: %s\n",
@@ -321,14 +550,11 @@ chip_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 	 * Create the chip[i] nodes, one for each CMP chip uniquely identified
 	 * by the serial number.
 	 */
-	for (chipidx = 0, procp = chip->procs; chipidx < chip->nprocs;
-		chipidx++, procp++) {
-		if (procp->serialno == 0) {
-			continue;
-		}
+	for (chipidx = 0; chipidx < chip->chip_ncpus &&
+			chip->chip_serials[chipidx] != 0; chipidx++) {
 
 		(void) snprintf(sbuf, sizeof (sbuf), "%llx",
-				procp->serialno);
+				chip->chip_serials[chipidx]);
 
 		topo_mod_dprintf(mod, "enumerating chip [%s]\n", sbuf);
 
@@ -360,7 +586,7 @@ static int
 chip_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
     topo_instance_t min, topo_instance_t max, void *arg, void *notused)
 {
-	md_info_t *chip = (md_info_t *)arg;
+	chip_t *chip = (chip_t *)arg;
 
 	if (strcmp(name, CHIP_NODE_NAME) == 0)
 		return (chip_create(mod, rnode, name, min, max, chip));

@@ -19,27 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 ARCH = sun4v
-PRIDIR=../platform-cpu
 
-sun4v_SRCS = chip_sun4v.c cpu_mdesc.c
-
-INCDIRS = $(ROOT)/usr/platform/sun4v/include \
-		$(PRIDIR)
+INCDIRS = $(ROOT)/usr/platform/sun4v/include
 
 include ../../sun4/chip/Makefile.chip
 
-
 LDLIBS += -lumem -lmdesc -lldom
-
-%.o: $(PRIDIR)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-%.ln: $(PRIDIR)/%.c
-	$(LINT.c) -c $<

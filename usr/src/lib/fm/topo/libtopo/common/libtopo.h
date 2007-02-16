@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,7 +122,6 @@ extern void topo_walk_fini(topo_walk_t *);
  */
 extern int topo_fmri_present(topo_hdl_t *, nvlist_t *, int *);
 extern int topo_fmri_contains(topo_hdl_t *, nvlist_t *, nvlist_t *, int *);
-extern int topo_fmri_expand(topo_hdl_t *, nvlist_t *, int *);
 extern int topo_fmri_unusable(topo_hdl_t *, nvlist_t *, int *);
 extern int topo_fmri_nvl2str(topo_hdl_t *, nvlist_t *, char **, int *);
 extern int topo_fmri_str2nvl(topo_hdl_t *, const char *, nvlist_t **, int *);
@@ -250,18 +249,6 @@ typedef enum topo_prop_errno {
     ETOPO_PROP_NVL,	/* malformed property nvlist */
     ETOPO_PROP_END	/* end of prop errno list (to ease auto-merge) */
 } topo_prop_errno_t;
-
-/*
- * Similar to the above, this enum defines a set of errors associated with node
- * methods.
- */
-typedef enum topo_method_errno {
-    ETOPO_METHOD_UNKNOWN = 4000, /* unknown topo method error */
-    ETOPO_METHOD_INVAL, /* invalid method registration */
-    ETOPO_METHOD_NOTSUP, /* method not supported */
-    ETOPO_METHOD_FAIL  /* method failed */
-} topo_method_errno_t;
-
 
 extern const char *topo_strerror(int);
 extern void topo_debug_set(topo_hdl_t *, const char *, const char *);

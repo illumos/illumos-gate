@@ -29,15 +29,24 @@
 #include <sys/types.h>
 #include <sys/processor.h>
 #include <fm/fmd_fmri.h>
-#include <fm/libtopo.h>
 
 #include <strings.h>
 #include <errno.h>
 #include <kstat.h>
 
+#ifdef	sparc
+#include <cpu_mdesc.h>
+#include <sys/fm/ldom.h>
+#endif
+
 /*
  * The scheme plugin for cpu FMRIs.
  */
+
+#ifdef sparc
+cpu_t cpu;
+static ldom_hdl_t *cpu_scheme_lhp;
+#endif /* sparc */
 
 ssize_t
 fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
@@ -152,7 +161,12 @@ cpu_get_serialid_V1(uint32_t cpuid, char *serbuf, size_t len)
 	int err;
 	uint64_t serial = 0;
 
-	err = cpu_get_serialid_kstat(cpuid, &serial);
+#ifdef	sparc
+	if (cpu.cpu_mdesc_cpus != NULL)
+		err = cpu_get_serialid_mdesc(cpuid, &serial);
+	else
+#endif	/* sparc */
+		err = cpu_get_serialid_kstat(cpuid, &serial);
 
 	(void) snprintf(serbuf, len, "%llX", (u_longlong_t)serial);
 	return (err);
@@ -161,7 +175,12 @@ cpu_get_serialid_V1(uint32_t cpuid, char *serbuf, size_t len)
 static int
 cpu_get_serialid_V0(uint32_t cpuid, uint64_t *serialidp)
 {
-	return (cpu_get_serialid_kstat(cpuid, serialidp));
+#ifdef  sparc
+	if (cpu.cpu_mdesc_cpus != NULL)
+		return (cpu_get_serialid_mdesc(cpuid, serialidp));
+	else
+#endif  /* sparc */
+		return (cpu_get_serialid_kstat(cpuid, serialidp));
 }
 
 int
@@ -171,18 +190,11 @@ fmd_fmri_expand(nvlist_t *nvl)
 	uint32_t cpuid;
 	uint64_t serialid;
 	char *serstr, serbuf[21]; /* sizeof (UINT64_MAX) + '\0' */
-	int rc, err;
+	int rc;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid) != 0)
 		return (fmd_fmri_set_errno(EINVAL));
-
-	/*
-	 * If the cpu-scheme topology exports this method expand(), invoke it.
-	 */
-	rc = topo_fmri_expand(fmd_fmri_topology(TOPO_VERSION), nvl, &err);
-	if (err != ETOPO_METHOD_NOTSUP)
-		return (rc);
 
 	if (version == CPU_SCHEME_VERSION0) {
 		if ((rc = nvlist_lookup_uint64(nvl, FM_FMRI_CPU_SERIAL_ID,
@@ -197,6 +209,32 @@ fmd_fmri_expand(nvlist_t *nvl)
 			    serialid)) != 0)
 				return (fmd_fmri_set_errno(rc));
 		}
+#ifdef sparc
+		if (cpu.cpu_mdesc_cpus != NULL) {
+			md_cpumap_t *mcmp = cpu_find_cpumap(cpuid);
+			if (mcmp != NULL) {
+			    if (strcmp(mcmp->cpumap_cpufrudn, "") == 0) {
+				(void) nvlist_add_string(nvl,
+				    FM_FMRI_HC_PART, mcmp->cpumap_cpufrupn);
+			    } else {
+				size_t ss = strlen(mcmp->cpumap_cpufrupn) +
+				    strlen(mcmp->cpumap_cpufrudn) + 1;
+				char *sp = fmd_fmri_alloc(ss);
+				sp = strcpy(sp, mcmp->cpumap_cpufrupn);
+				sp = strncat(sp, mcmp->cpumap_cpufrudn,
+				    strlen(mcmp->cpumap_cpufrudn) + 1);
+				(void) nvlist_add_string(nvl,
+				    FM_FMRI_HC_PART, sp);
+				fmd_fmri_free(sp, ss);
+			    }
+			    (void) nvlist_add_string(nvl,
+				FM_FMRI_CPU_CPUFRU, mcmp->cpumap_cpufru);
+			    nvl->nvl_nvflag = NV_UNIQUE_NAME_TYPE;
+			    (void) nvlist_add_string(nvl, FM_FMRI_HC_SERIAL_ID,
+				mcmp->cpumap_cpufrusn);
+			}
+		}
+#endif	/* sparc */
 	} else if (version == CPU_SCHEME_VERSION1) {
 		if ((rc = nvlist_lookup_string(nvl, FM_FMRI_CPU_SERIAL_ID,
 		    &serstr)) != 0) {
@@ -220,7 +258,7 @@ fmd_fmri_expand(nvlist_t *nvl)
 int
 fmd_fmri_present(nvlist_t *nvl)
 {
-	int rc, err;
+	int rc;
 	uint8_t version;
 	uint32_t cpuid;
 	uint64_t nvlserid, curserid;
@@ -229,13 +267,6 @@ fmd_fmri_present(nvlist_t *nvl)
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid) != 0)
 		return (fmd_fmri_set_errno(EINVAL));
-
-	/*
-	 * If the cpu-scheme topology exports this method present(), invoke it.
-	 */
-	rc = topo_fmri_present(fmd_fmri_topology(TOPO_VERSION), nvl, &err);
-	if (err != ETOPO_METHOD_NOTSUP)
-		return (rc);
 
 	if (version == CPU_SCHEME_VERSION0) {
 		if (nvlist_lookup_uint64(nvl, FM_FMRI_CPU_SERIAL_ID,
@@ -269,7 +300,6 @@ fmd_fmri_present(nvlist_t *nvl)
 int
 fmd_fmri_unusable(nvlist_t *nvl)
 {
-	int rc, err;
 	uint8_t version;
 	uint32_t cpuid;
 
@@ -278,12 +308,30 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	    nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid) != 0)
 		return (fmd_fmri_set_errno(EINVAL));
 
-	/*
-	 * If the cpu-scheme topology exports this method unusable(), invoke it.
-	 */
-	rc = topo_fmri_unusable(fmd_fmri_topology(TOPO_VERSION), nvl, &err);
-	if (err != ETOPO_METHOD_NOTSUP)
-		return (rc);
+#ifdef sparc
+	{
+		int cpustatus = ldom_fmri_status(cpu_scheme_lhp, nvl);
 
+		return (cpustatus == P_FAULTED || (cpustatus == P_OFFLINE &&
+				ldom_major_version(cpu_scheme_lhp) == 1));
+	}
+#else
 	return (p_online(cpuid, P_STATUS) == P_FAULTED);
+#endif
 }
+
+#ifdef	sparc
+int
+fmd_fmri_init(void)
+{
+	cpu_scheme_lhp = ldom_init(fmd_fmri_alloc, fmd_fmri_free);
+	return (cpu_mdesc_init(cpu_scheme_lhp));
+}
+
+void
+fmd_fmri_fini(void)
+{
+	cpu_mdesc_fini();
+	ldom_fini(cpu_scheme_lhp);
+}
+#endif	/* sparc */
