@@ -166,15 +166,15 @@ arp_getifname(phy_if_t phy_ifdata, char *buffer, const size_t buflen,
 	ASSERT(ns != NULL);
 
 	as = ns->netstack_arp;
-	rw_enter(&as->as_arl_g_lock, RW_READER);
-	for (arl = as->as_arl_g_head; arl != NULL; arl = arl->arl_next) {
+	rw_enter(&as->as_arl_lock, RW_READER);
+	for (arl = as->as_arl_head; arl != NULL; arl = arl->arl_next) {
 		if (arl->arl_index == phy_ifdata) {
 			(void) strlcpy(buffer, arl->arl_name, buflen);
-			rw_exit(&as->as_arl_g_lock);
+			rw_exit(&as->as_arl_lock);
 			return (0);
 		}
 	}
-	rw_exit(&as->as_arl_g_lock);
+	rw_exit(&as->as_arl_lock);
 
 	return (1);
 }
@@ -223,11 +223,11 @@ arp_phygetnext(phy_if_t phy_ifdata, netstack_t *ns)
 	ASSERT(ns != NULL);
 
 	as = ns->netstack_arp;
-	rw_enter(&as->as_arl_g_lock, RW_READER);
+	rw_enter(&as->as_arl_lock, RW_READER);
 	if (phy_ifdata == 0) {
-		arl = as->as_arl_g_head;
+		arl = as->as_arl_head;
 	} else {
-		for (arl = as->as_arl_g_head; arl != NULL;
+		for (arl = as->as_arl_head; arl != NULL;
 		    arl = arl->arl_next) {
 			if (arl->arl_index == phy_ifdata) {
 				arl = arl->arl_next;
@@ -238,7 +238,7 @@ arp_phygetnext(phy_if_t phy_ifdata, netstack_t *ns)
 
 	index = (arl != NULL) ? arl->arl_index : 0;
 
-	rw_exit(&as->as_arl_g_lock);
+	rw_exit(&as->as_arl_lock);
 
 	return (index);
 }
@@ -258,14 +258,14 @@ arp_phylookup(const char *name, netstack_t *ns)
 
 	index = 0;
 	as = ns->netstack_arp;
-	rw_enter(&as->as_arl_g_lock, RW_READER);
-	for (arl = as->as_arl_g_head; arl != NULL; arl = arl->arl_next) {
+	rw_enter(&as->as_arl_lock, RW_READER);
+	for (arl = as->as_arl_head; arl != NULL; arl = arl->arl_next) {
 		if (strcmp(name, arl->arl_name) == 0) {
 			index = arl->arl_index;
 			break;
 		}
 	}
-	rw_exit(&as->as_arl_g_lock);
+	rw_exit(&as->as_arl_lock);
 
 	return (index);
 

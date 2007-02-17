@@ -999,7 +999,7 @@ ar_close(queue_t *q)
 		ar_ce_walk(as, ar_ce_delete_per_arl, arl);
 		/* Free any messages waiting for a bind_ack */
 		/* Get the arl out of the chain. */
-		rw_enter(&as->as_arl_g_lock, RW_WRITER);
+		rw_enter(&as->as_arl_lock, RW_WRITER);
 		for (arlp = &as->as_arl_head; *arlp;
 		    arlp = &(*arlp)->arl_next) {
 			if (*arlp == arl) {
@@ -1010,7 +1010,7 @@ ar_close(queue_t *q)
 
 		ASSERT(arl->arl_dlpi_deferred == NULL);
 		ar->ar_arl = NULL;
-		rw_exit(&as->as_arl_g_lock);
+		rw_exit(&as->as_arl_lock);
 
 		mi_free((char *)arl);
 	}
@@ -2201,7 +2201,7 @@ ar_ll_init(arp_stack_t *as, ar_t *ar, mblk_t *mp)
 		arl_t *arl1;
 
 		do {
-			for (arl1 = as->as_arl_g_head; arl1 != NULL;
+			for (arl1 = as->as_arl_head; arl1 != NULL;
 			    arl1 = arl1->arl_next)
 				if (arl1->arl_index ==
 				    as->as_arp_index_counter) {
@@ -3668,7 +3668,7 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 	    as->as_netstack);
 
 	/* Chain in the new arl. */
-	rw_enter(&as->as_arl_g_lock, RW_WRITER);
+	rw_enter(&as->as_arl_lock, RW_WRITER);
 	arl->arl_next = as->as_arl_head;
 	as->as_arl_head = arl;
 	DTRACE_PROBE1(slifname_set, arl_t *, arl);
@@ -3684,7 +3684,7 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 	iocp->ioc_count = msgsize(ioccpy->b_cont);
 	ioccpy->b_wptr = (uchar_t *)(iocp + 1);
 	putnext(arl->arl_wq, ioccpy);
-	rw_exit(&as->as_arl_g_lock);
+	rw_exit(&as->as_arl_lock);
 
 	return (0);
 }
@@ -3747,10 +3747,10 @@ ar_set_ppa(queue_t *q, mblk_t *mp_orig)
 	arl->arl_ppa = ppa;
 	DTRACE_PROBE1(setppa_done, arl_t *, arl);
 	/* Chain in the new arl. */
-	rw_enter(&as->as_arl_g_lock, RW_WRITER);
+	rw_enter(&as->as_arl_lock, RW_WRITER);
 	arl->arl_next = as->as_arl_head;
 	as->as_arl_head = arl;
-	rw_exit(&as->as_arl_g_lock);
+	rw_exit(&as->as_arl_lock);
 
 	return (0);
 }
@@ -4439,7 +4439,7 @@ arp_stack_init(netstackid_t stackid, netstack_t *ns)
 	as->as_arp_index_counter = 1;
 	as->as_arp_counter_wrapped = 0;
 
-	rw_init(&as->as_arl_g_lock, "ARP ARl lock", RW_DRIVER, NULL);
+	rw_init(&as->as_arl_lock, NULL, RW_DRIVER, NULL);
 	arp_net_init(as, ns);
 	arp_hook_init(as);
 
@@ -4457,7 +4457,7 @@ arp_stack_fini(netstackid_t stackid, void *arg)
 
 	arp_hook_destroy(as);
 	arp_net_destroy(as);
-	rw_destroy(&as->as_arl_g_lock);
+	rw_destroy(&as->as_arl_lock);
 
 	nd_free(&as->as_nd);
 	kmem_free(as->as_param_arr, sizeof (arp_param_arr));

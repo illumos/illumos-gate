@@ -190,9 +190,9 @@ struct arp_stack {
 	 * it is now possible to access data structures in the ARP module
 	 * without the code being executed in the context of the IP module,
 	 * thus there is no locking being enforced through the use of STREAMS.
+	 * as_arl_lock is used to protect as_arl_head list.
 	 */
-	krwlock_t	as_arl_g_lock;
-	arl_t		*as_arl_g_head;	/* ARL List Head */
+	krwlock_t	as_arl_lock;
 
 	uint32_t	as_arp_index_counter;
 	uint32_t	as_arp_counter_wrapped;
