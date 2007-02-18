@@ -470,7 +470,7 @@ extern	int	zonecfg_enddevperment(zone_dochandle_t);
 /*
  * Privilege-related functions.
  */
-extern	int	zonecfg_default_privset(priv_set_t *);
+extern	int	zonecfg_default_privset(priv_set_t *, const char *);
 extern	int	zonecfg_get_privset(zone_dochandle_t, priv_set_t *,
     char **);
 extern	int	zonecfg_get_limitpriv(zone_dochandle_t, char **);

@@ -350,7 +350,6 @@ usr/include/inet/udp_impl.h		sparc
 usr/include/inet/tcp_impl.h		sparc
 usr/include/inet/ip_impl.h		sparc
 usr/include/inet/ip_ndp.h		sparc
-usr/include/inet/ipdrop.h		sparc
 usr/include/inet/tun.h			sparc
 usr/include/protocols/ripngd.h		sparc
 usr/include/libmail.h			sparc

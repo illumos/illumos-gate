@@ -2809,7 +2809,25 @@ get_privset(zlog_t *zlogp, priv_set_t *privs, boolean_t mount_cmd)
 	}
 
 	if (mount_cmd) {
-		if (zonecfg_default_privset(privs) == Z_OK)
+		zone_iptype_t	iptype;
+		const char	*curr_iptype;
+
+		if (zonecfg_get_iptype(handle, &iptype) != Z_OK) {
+			zerror(zlogp, B_TRUE, "unable to determine ip-type");
+			zonecfg_fini_handle(handle);
+			return (-1);
+		}
+
+		switch (iptype) {
+		case ZS_SHARED:
+			curr_iptype = "shared";
+			break;
+		case ZS_EXCLUSIVE:
+			curr_iptype = "exclusive";
+			break;
+		}
+
+		if (zonecfg_default_privset(privs, curr_iptype) == Z_OK)
 			return (0);
 		zerror(zlogp, B_FALSE,
 		    "failed to determine the zone's default privilege set");
@@ -3920,17 +3938,6 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 		return (-1);
 	}
 	priv_emptyset(privs);
-	if (iptype == ZS_EXCLUSIVE) {
-		/*
-		 * add PRIV_NET_RAWACCESS and PRIV_SYS_IP_CONFIG
-		 */
-		if (priv_addset(privs, PRIV_NET_RAWACCESS) != 0 ||
-		    priv_addset(privs, PRIV_SYS_IP_CONFIG) != 0) {
-			zerror(zlogp, B_TRUE,
-			    "Failed to add networking privileges");
-			goto error;
-		}
-	}
 	if (get_privset(zlogp, privs, mount_cmd) != 0)
 		goto error;
 

@@ -577,12 +577,13 @@ brand_allow_exclusive_ip(brand_handle_t bh)
  * specified callback for each.  Returns 0 on success, or -1 on failure.
  */
 int
-brand_config_iter_privilege(brand_handle_t bh, int (*func)(void *,
-    const char *, const char *), void *data)
+brand_config_iter_privilege(brand_handle_t bh,
+    int (*func)(void *, priv_iter_t *), void *data)
 {
 	struct brand_handle	*bhp = (struct brand_handle *)bh;
 	xmlNodePtr		node;
-	xmlChar			*name, *set;
+	xmlChar			*name, *set, *iptype;
+	priv_iter_t		priv_iter;
 	int			ret;
 
 	if ((node = xmlDocGetRootElement(bhp->bh_config)) == NULL)
@@ -595,19 +596,27 @@ brand_config_iter_privilege(brand_handle_t bh, int (*func)(void *,
 
 		name = xmlGetProp(node, DTD_ATTR_NAME);
 		set = xmlGetProp(node, DTD_ATTR_SET);
+		iptype = xmlGetProp(node, DTD_ATTR_IPTYPE);
 
-		if (name == NULL || set == NULL) {
+		if (name == NULL || set == NULL || iptype == NULL) {
 			if (name != NULL)
 				xmlFree(name);
 			if (set != NULL)
 				xmlFree(set);
+			if (iptype != NULL)
+				xmlFree(iptype);
 			return (-1);
 		}
 
-		ret = func(data, (const char *)name, (const char *)set);
+		priv_iter.pi_name = (char *)name;
+		priv_iter.pi_set = (char *)set;
+		priv_iter.pi_iptype = (char *)iptype;
+
+		ret = func(data, &priv_iter);
 
 		xmlFree(name);
 		xmlFree(set);
+		xmlFree(iptype);
 
 		if (ret != 0)
 			return (-1);

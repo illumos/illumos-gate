@@ -37,6 +37,12 @@ extern "C" {
 
 typedef struct __brand_handle *brand_handle_t;
 
+typedef struct priv_iter_s {
+	char	*pi_name;
+	char	*pi_set;
+	char	*pi_iptype;
+} priv_iter_t;
+
 extern brand_handle_t brand_open(const char *);
 extern void brand_close(brand_handle_t);
 
@@ -62,7 +68,7 @@ extern int brand_get_verify_adm(brand_handle_t, const char *, const char *,
     char *, size_t, int, char **);
 
 extern int brand_config_iter_privilege(brand_handle_t,
-    int (*func)(void *, const char *, const char *), void *);
+    int (*func)(void *, priv_iter_t *), void *);
 
 extern int brand_platform_iter_devices(brand_handle_t, const char *,
     int (*)(void *, const char *, const char *), void *, const char *);

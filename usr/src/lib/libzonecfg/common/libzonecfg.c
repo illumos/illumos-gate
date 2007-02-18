@@ -4592,30 +4592,42 @@ typedef struct priv_lists {
 
 	/* Privileges required for all non-global zones of a brand */
 	struct priv_node	*pl_required;
+
+	/*
+	 * ip-type of the zone these privileges lists apply to.
+	 * It is used to pass ip-type to the callback function,
+	 * priv_lists_cb, which has no way of getting the ip-type.
+	 */
+	const char		*pl_iptype;
 } priv_lists_t;
 
 static int
-priv_lists_cb(void *data, const char *name, const char *set)
+priv_lists_cb(void *data, priv_iter_t *priv_iter)
 {
 	priv_lists_t *plp = (priv_lists_t *)data;
 	priv_node_t *pnp;
 
+	/* Skip this privilege if ip-type does not match */
+	if ((strcmp(priv_iter->pi_iptype, "all") != 0) &&
+	    (strcmp(priv_iter->pi_iptype, plp->pl_iptype) != 0))
+		return (0);
+
 	/* Allocate a new priv list node. */
 	if ((pnp = malloc(sizeof (*pnp))) == NULL)
 		return (-1);
-	if ((pnp->pn_priv = strdup(name)) == NULL) {
+	if ((pnp->pn_priv = strdup(priv_iter->pi_name)) == NULL) {
 		free(pnp);
 		return (-1);
 	}
 
 	/* Insert the new priv list node into the right list */
-	if (strcmp(set, "default") == 0) {
+	if (strcmp(priv_iter->pi_set, "default") == 0) {
 		pnp->pn_next = plp->pl_default;
 		plp->pl_default = pnp;
-	} else if (strcmp(set, "prohibited") == 0) {
+	} else if (strcmp(priv_iter->pi_set, "prohibited") == 0) {
 		pnp->pn_next = plp->pl_prohibited;
 		plp->pl_prohibited = pnp;
-	} else if (strcmp(set, "required") == 0) {
+	} else if (strcmp(priv_iter->pi_set, "required") == 0) {
 		pnp->pn_next = plp->pl_required;
 		plp->pl_required = pnp;
 	} else {
@@ -4652,7 +4664,8 @@ priv_lists_destroy(priv_lists_t *plp)
 }
 
 static int
-priv_lists_create(zone_dochandle_t handle, priv_lists_t **plpp)
+priv_lists_create(zone_dochandle_t handle, priv_lists_t **plpp,
+    const char *curr_iptype)
 {
 	priv_lists_t *plp;
 	brand_handle_t bh;
@@ -4672,6 +4685,8 @@ priv_lists_create(zone_dochandle_t handle, priv_lists_t **plpp)
 		brand_close(bh);
 		return (Z_NOMEM);
 	}
+
+	plp->pl_iptype = curr_iptype;
 
 	/* construct the privilege lists */
 	if (brand_config_iter_privilege(bh, priv_lists_cb, plp) != 0) {
@@ -4707,12 +4722,12 @@ get_default_privset(priv_set_t *privs, priv_lists_t *plp)
 }
 
 int
-zonecfg_default_privset(priv_set_t *privs)
+zonecfg_default_privset(priv_set_t *privs, const char *curr_iptype)
 {
 	priv_lists_t *plp;
 	int ret;
 
-	if ((ret = priv_lists_create(NULL, &plp)) != Z_OK)
+	if ((ret = priv_lists_create(NULL, &plp, curr_iptype)) != Z_OK)
 		return (ret);
 	ret = get_default_privset(privs, plp);
 	priv_lists_destroy(plp);
@@ -4861,6 +4876,8 @@ zonecfg_get_privset(zone_dochandle_t handle, priv_set_t *privs,
 	priv_lists_t *plp;
 	char *cp, *limitpriv = NULL;
 	int err, limitlen;
+	zone_iptype_t iptype;
+	const char *curr_iptype;
 
 	/*
 	 * Attempt to lookup the "limitpriv" property.  If it does not
@@ -4870,7 +4887,19 @@ zonecfg_get_privset(zone_dochandle_t handle, priv_set_t *privs,
 	if ((err = zonecfg_get_limitpriv(handle, &limitpriv)) != Z_OK)
 		return (err);
 
-	if ((err = priv_lists_create(handle, &plp)) != Z_OK)
+	if ((err = zonecfg_get_iptype(handle, &iptype)) != Z_OK)
+		return (err);
+
+	switch (iptype) {
+	case ZS_SHARED:
+		curr_iptype = "shared";
+		break;
+	case ZS_EXCLUSIVE:
+		curr_iptype = "exclusive";
+		break;
+	}
+
+	if ((err = priv_lists_create(handle, &plp, curr_iptype)) != Z_OK)
 		return (err);
 
 	limitlen = strlen(limitpriv);

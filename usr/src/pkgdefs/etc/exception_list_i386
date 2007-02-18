@@ -361,7 +361,6 @@ usr/include/inet/udp_impl.h		i386
 usr/include/inet/tcp_impl.h		i386
 usr/include/inet/ip_impl.h		i386
 usr/include/inet/ip_ndp.h		i386
-usr/include/inet/ipdrop.h		i386
 usr/include/inet/tun.h			i386
 usr/include/protocols/ripngd.h		i386
 usr/include/libmail.h			i386

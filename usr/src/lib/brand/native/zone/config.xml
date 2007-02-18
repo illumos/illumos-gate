@@ -20,7 +20,7 @@
 
  CDDL HEADER END
 
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,6 +62,7 @@
 	<privilege set="default" name="net_icmpaccess" />
 	<privilege set="default" name="net_mac_aware" />
 	<privilege set="default" name="net_privaddr" />
+	<privilege set="default" name="net_rawaccess" ip-type="exclusive" />
 	<privilege set="default" name="proc_chroot" />
 	<privilege set="default" name="sys_audit" />
 	<privilege set="default" name="proc_audit" />
@@ -71,6 +72,7 @@
 	<privilege set="default" name="proc_taskid" />
 	<privilege set="default" name="sys_acct" />
 	<privilege set="default" name="sys_admin" />
+	<privilege set="default" name="sys_ip_config" ip-type="exclusive" />
 	<privilege set="default" name="sys_mount" />
 	<privilege set="default" name="sys_nfs" />
 	<privilege set="default" name="sys_resource" />
@@ -79,6 +81,7 @@
 	<privilege set="prohibited" name="proc_zone" />
 	<privilege set="prohibited" name="sys_config" />
 	<privilege set="prohibited" name="sys_devices" />
+	<privilege set="prohibited" name="sys_ip_config" ip-type="shared" />
 	<privilege set="prohibited" name="sys_linkdir" />
 	<privilege set="prohibited" name="sys_net_config" />
 	<privilege set="prohibited" name="sys_res_config" />
@@ -86,5 +89,6 @@
 
 	<privilege set="required" name="proc_exec" />
 	<privilege set="required" name="proc_fork" />
+	<privilege set="required" name="sys_ip_config" ip-type="exclusive" />
 	<privilege set="required" name="sys_mount" />
 </brand>

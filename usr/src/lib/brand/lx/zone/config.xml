@@ -20,7 +20,7 @@
 
  CDDL HEADER END
 
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  ident	"%Z%%M%	%I%	%E% SMI"
@@ -79,6 +79,7 @@
 	<privilege set="prohibited" name="proc_zone" />
 	<privilege set="prohibited" name="sys_config" />
 	<privilege set="prohibited" name="sys_devices" />
+	<privilege set="prohibited" name="sys_ip_config" />
 	<privilege set="prohibited" name="sys_linkdir" />
 	<privilege set="prohibited" name="sys_net_config" />
 	<privilege set="prohibited" name="sys_res_config" />
