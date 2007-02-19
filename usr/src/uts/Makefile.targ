@@ -288,7 +288,6 @@ clean.lint $(CLEAN_LINT_DEPS)	:= TARGET = clean.lint
 install $(INSTALL_DEPS)		:= TARGET = install
 symcheck $(SYM_DEPS)		:= TARGET = symcheck
 
-
 ALL_TARGS	= def all clean clobber lint modlintlib \
 		  clean.lint lintlib install symcheck
 
@@ -311,6 +310,30 @@ ALL_DEBUG64	= $(ALL_TARGS:%=%.debug64)
 
 $(ALL_DEBUG64):	FRC
 	@BUILD_TYPE=DBG64 VERSION='$(VERSION)' $(MAKE) $(NO_STATE) $(TARGET).targ
+
+#
+#	Currently only the IP module needs symbol checking on obj64.
+#	Other modules have the same global-objs nm output for debug64 and obj64.
+#
+$(SISCHECK_DEPS):	$(DEF_DEPS)
+	@TARG=`$(ECHO) $@ | $(CUT) -d'.' -f2`; \
+	MODSYMS=$(MODULE).symbols.$$TARG; \
+	if [ -f "$(MODULE).global-objs.$$TARG" ]; then \
+		$(GREP) -v '#' $(MODULE).global-objs.$$TARG |$(GREP) . | \
+		    $(SORT) -u > $$MODSYMS.tmp; \
+		$(NM) $$TARG/$(MODULE) |$(GREP) OBJT |$(GREP) -v UNDEF | \
+		    $(CUT) -d'|' -f8 |$(GREP) -v '^___const_' |$(SORT) -u \
+		    > $$MODSYMS.tmp.new; \
+		$(DIFF) $$MODSYMS.tmp $$MODSYMS.tmp.new > $$MODSYMS.diff || \
+		    ($(ECHO) "warning: $(MODULE) symbol checking:" \
+		    "global variable(s) introduced and/or removed."; \
+		    $(CAT) $$MODSYMS.diff; exit 1) \
+	fi
+
+$(SISCLEAN_DEPS):
+	-TARG=`$(ECHO) $@ | $(CUT) -d'.' -f2`; \
+	MODSYMS=$(MODULE).symbols.$$TARG; \
+	$(RM) $$MODSYMS.tmp $$MODSYMS.tmp.new $$MODSYMS.diff Nothing_to_remove
 
 
 $(OBJS_DIR):

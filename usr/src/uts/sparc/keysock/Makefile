@@ -85,11 +85,11 @@ LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
 def:		$(DEF_DEPS)
 
-all:		$(ALL_DEPS)
+all:		$(ALL_DEPS) $(SISCHECK_DEPS)
 
-clean:		$(CLEAN_DEPS)
+clean:		$(CLEAN_DEPS) $(SISCLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS)
+clobber:	$(CLOBBER_DEPS) $(SISCLEAN_DEPS)
 
 lint:		$(LINT_DEPS)
 
@@ -97,19 +97,10 @@ modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
-install:	$(INSTALL_DEPS)
+install:	$(INSTALL_DEPS) $(SISCHECK_DEPS)
 
 $(ROOTLINK):	$(ROOT_STRMOD_DIR) $(ROOTMODULE)
 	-$(RM) $@; ln $(ROOTMODULE) $@
-
-sis_check:	sis_check.obj
-sis_check.obj: $(ALL_DEPS)
-	@$(GREP) -v '#' $(MODULE).objt-symbols.obj64 |$(GREP) . |$(SORT) -u \
-	    > $(MODULE).symbols.tmp
-	@$(NM) obj64/$(MODULE) |$(GREP) OBJT |$(GREP) -v UNDEF | \
-	    $(CUT) -d'|' -f8 |$(GREP) -v '^___const_' |$(SORT) -u \
-	    > $(MODULE).symbols.tmp.new
-	-@$(DIFF) $(MODULE).symbols.tmp $(MODULE).symbols.tmp.new
 
 #
 #	Include common targets.

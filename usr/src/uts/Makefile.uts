@@ -54,7 +54,7 @@ COMMONBASE=	$(UTSBASE)/../common
 #
 
 #
-#	DEF_BUILDS is for def, lint and install
+#	DEF_BUILDS is for def, lint, sischeck, and install
 #	ALL_BUILDS is for everything else (all, clean, ...)
 #
 # The NOT_RELEASE_BUILD noise is to maintain compatibility with the
@@ -244,6 +244,8 @@ MODLIST_DEPS	= $(DEF_BUILDS:%=modlist.%)
 CLEAN_LINT_DEPS	= $(ALL_BUILDS:%=clean.lint.%)
 INSTALL_DEPS	= $(DEF_BUILDS:%=install.%)
 SYM_DEPS	= $(SYM_BUILDS:%=symcheck.%)
+SISCHECK_DEPS	= $(DEF_BUILDS:%=sischeck.%)
+SISCLEAN_DEPS	= $(ALL_BUILDS:%=sisclean.%)
 
 #
 #	Default module name

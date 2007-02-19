@@ -47,7 +47,6 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
-sis_check	:=	TARGET= sis_check
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 
@@ -97,18 +96,6 @@ COMMON_HDRDIRS= common/des common/fs common/gssapi common/inet common/net \
 	common/c2 common/pcmcia/sys common/rpcsvc common/inet/kssl \
 	common/inet/nca common/inet/ipf/netinet common/ipp
 
-#
-# Kernel modules which support the sis_check target for symbol checking
-#
-i386_SIS_MODULES= intel/arp intel/hook intel/icmp intel/ip intel/ipf \
-	intel/ipsecah intel/ipsecesp intel/keysock intel/neti \
-	intel/rts intel/spdsock intel/tun
-sparc_SIS_MODULES= sparc/arp sparc/hook sparc/icmp sparc/ip sparc/ipf \
-	sparc/ipsecah sparc/ipsecesp sparc/keysock sparc/neti \
-	sparc/rts sparc/spdsock sparc/tun
-
-SIS_MODULES=$($(MACH)_SIS_MODULES)
-
 # These aren't the only headers in closed.  But the other directories
 # are simple enough that they can be driven from the src tree.
 $(CLOSED_BUILD)COMMON_HDRDIRS += $(CLOSED)/uts/common/sys
@@ -131,12 +118,6 @@ all_h: FRC
 	@cd common/rpcsvc; pwd; $(MAKE) $@
 	@cd common/gssapi; pwd; $(MAKE) $@
 
-# run stack instances global symbol checking to make sure
-# you do intend to add a global variable
-sis_check:	$(SIS_MODULES)
-$(SIS_MODULES): FRC
-	cd $@; pwd; $(MAKE) $(TARGET)
- 
 ONC_FILES=	common/io/timod.c \
 		common/os/sig.c \
 		common/os/flock.c \
