@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,6 +49,9 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+AS_INC_PATH	+= -I$(DSF_DIR)/$(OBJS_DIR)
+
+ASSYM_H		= $(DSF_DIR)/$(OBJS_DIR)/assym.h
 
 .KEEP_STATE:
 
@@ -67,5 +70,13 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
+
+$(BINARY):	$(ASSYM_H)
+
+#
+#	Rule to generate assym.h
+#
+$(ASSYM_H): FRC
+	@cd $(DSF_DIR); $(MAKE) all.targ
 
 include $(UTSBASE)/intel/Makefile.targ

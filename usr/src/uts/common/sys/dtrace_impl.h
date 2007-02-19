@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1239,10 +1239,11 @@ extern int dtrace_getipl(void);
 extern uintptr_t dtrace_caller(int);
 extern uint32_t dtrace_cas32(uint32_t *, uint32_t, uint32_t);
 extern void *dtrace_casptr(void *, void *, void *);
-extern void dtrace_copyin(uintptr_t, uintptr_t, size_t);
-extern void dtrace_copyinstr(uintptr_t, uintptr_t, size_t);
-extern void dtrace_copyout(uintptr_t, uintptr_t, size_t);
-extern void dtrace_copyoutstr(uintptr_t, uintptr_t, size_t);
+extern void dtrace_copyin(uintptr_t, uintptr_t, size_t, volatile uint16_t *);
+extern void dtrace_copyinstr(uintptr_t, uintptr_t, size_t, volatile uint16_t *);
+extern void dtrace_copyout(uintptr_t, uintptr_t, size_t, volatile uint16_t *);
+extern void dtrace_copyoutstr(uintptr_t, uintptr_t, size_t,
+    volatile uint16_t *);
 extern void dtrace_getpcstack(pc_t *, int, int, uint32_t *);
 extern ulong_t dtrace_getreg(struct regs *, uint_t);
 extern int dtrace_getstackdepth(int);
@@ -1267,7 +1268,7 @@ extern uint_t dtrace_getotherwin(void);
 extern uint_t dtrace_getfprs(void);
 #else
 extern void dtrace_copy(uintptr_t, uintptr_t, size_t);
-extern void dtrace_copystr(uintptr_t, uintptr_t, size_t);
+extern void dtrace_copystr(uintptr_t, uintptr_t, size_t, volatile uint16_t *);
 #endif
 
 /*

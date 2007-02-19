@@ -642,32 +642,38 @@ dtrace_copycheck(uintptr_t uaddr, uintptr_t kaddr, size_t size)
 	return (1);
 }
 
+/*ARGSUSED*/
 void
-dtrace_copyin(uintptr_t uaddr, uintptr_t kaddr, size_t size)
+dtrace_copyin(uintptr_t uaddr, uintptr_t kaddr, size_t size,
+    volatile uint16_t *flags)
 {
 	if (dtrace_copycheck(uaddr, kaddr, size))
 		dtrace_copy(uaddr, kaddr, size);
 }
 
+/*ARGSUSED*/
 void
-dtrace_copyout(uintptr_t kaddr, uintptr_t uaddr, size_t size)
+dtrace_copyout(uintptr_t kaddr, uintptr_t uaddr, size_t size,
+    volatile uint16_t *flags)
 {
 	if (dtrace_copycheck(uaddr, kaddr, size))
 		dtrace_copy(kaddr, uaddr, size);
 }
 
 void
-dtrace_copyinstr(uintptr_t uaddr, uintptr_t kaddr, size_t size)
+dtrace_copyinstr(uintptr_t uaddr, uintptr_t kaddr, size_t size,
+    volatile uint16_t *flags)
 {
 	if (dtrace_copycheck(uaddr, kaddr, size))
-		dtrace_copystr(uaddr, kaddr, size);
+		dtrace_copystr(uaddr, kaddr, size, flags);
 }
 
 void
-dtrace_copyoutstr(uintptr_t kaddr, uintptr_t uaddr, size_t size)
+dtrace_copyoutstr(uintptr_t kaddr, uintptr_t uaddr, size_t size,
+    volatile uint16_t *flags)
 {
 	if (dtrace_copycheck(uaddr, kaddr, size))
-		dtrace_copystr(kaddr, uaddr, size);
+		dtrace_copystr(kaddr, uaddr, size, flags);
 }
 
 uint8_t

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,7 @@
 #include <sys/privregs.h>
 #include <sys/fsr.h>
 #include <sys/asi.h>
+#include "assym.h"
 #endif
 
 #if defined(lint) || defined(__lint)
@@ -317,23 +317,32 @@ dtrace_fish(int aframes, int reg, uintptr_t *regval)
 
 /*ARGSUSED*/
 void
-dtrace_copyin(uintptr_t uaddr, uintptr_t kaddr, size_t size)
+dtrace_copyin(uintptr_t uaddr, uintptr_t kaddr, size_t size,
+    volatile uint16_t *flags)
 {}
 
 #else
 
 	ENTRY(dtrace_copyin)
 	tst	%o2
-	bz	1f
+	bz	2f
 	clr	%g1
 	lduba	[%o0 + %g1]ASI_USER, %g2
 0:
+	! check for an error if the count is 4k-aligned
+	andcc	%g1, 0xfff, %g0
+	bnz,pt	%icc, 1f
 	stub	%g2, [%o1 + %g1]
+	lduh	[%o3], %g3
+	andcc	%g3, CPU_DTRACE_BADADDR, %g0
+	bnz,pn	%icc, 2f
+	nop
+1:
 	inc	%g1
 	cmp	%g1, %o2
 	bl,a	0b
 	lduba	[%o0 + %g1]ASI_USER, %g2
-1:
+2:
 	retl
 	nop
 
@@ -345,25 +354,35 @@ dtrace_copyin(uintptr_t uaddr, uintptr_t kaddr, size_t size)
 
 /*ARGSUSED*/
 void
-dtrace_copyinstr(uintptr_t uaddr, uintptr_t kaddr, size_t size)
+dtrace_copyinstr(uintptr_t uaddr, uintptr_t kaddr, size_t size,
+    volatile  uint16_t *flags)
 {}
 
 #else
 
 	ENTRY(dtrace_copyinstr)
 	tst	%o2
-	bz	1f
+	bz	2f
 	clr	%g1
 	lduba	[%o0 + %g1]ASI_USER, %g2
 0:
 	stub	%g2, [%o1 + %g1]		! Store byte
+
+	! check for an error if the count is 4k-aligned
+	andcc	%g1, 0xfff, %g0
+	bnz,pt	%icc, 1f
+	inc	%g1
+	lduh	[%o3], %g3
+	andcc	%g3, CPU_DTRACE_BADADDR, %g0
+	bnz,pn	%icc, 2f
+	nop
+1:
 	cmp	%g2, 0				! Was that '\0'?
-	be	1f				! If so, we're done
-	inc	%g1				! Increment offset
+	be	2f				! If so, we're done
 	cmp	%g1, %o2			! Compare to limit
 	bl,a	0b				! If less, take another lap
 	lduba	[%o0 + %g1]ASI_USER, %g2	!   delay: load user byte
-1:
+2:
 	retl
 	nop
 
@@ -375,23 +394,32 @@ dtrace_copyinstr(uintptr_t uaddr, uintptr_t kaddr, size_t size)
 
 /*ARGSUSED*/
 void
-dtrace_copyout(uintptr_t kaddr, uintptr_t uaddr, size_t size)
+dtrace_copyout(uintptr_t kaddr, uintptr_t uaddr, size_t size,
+    volatile  uint16_t *flags)
 {}
 
 #else
 
 	ENTRY(dtrace_copyout)
 	tst	%o2
-	bz	1f
+	bz	2f
 	clr	%g1
 	ldub	[%o0 + %g1], %g2
 0:
+	! check for an error if the count is 4k-aligned
+	andcc	%g1, 0xfff, %g0
+	bnz,pt	%icc, 1f
 	stba	%g2, [%o1 + %g1]ASI_USER
+	lduh	[%o3], %g3
+	andcc	%g3, CPU_DTRACE_BADADDR, %g0
+	bnz,pn	%icc, 2f
+	nop
+1:
 	inc	%g1
 	cmp	%g1, %o2
 	bl,a	0b
 	ldub	[%o0 + %g1], %g2
-1:
+2:
 	retl
 	nop
 	SET_SIZE(dtrace_copyout)
@@ -402,25 +430,35 @@ dtrace_copyout(uintptr_t kaddr, uintptr_t uaddr, size_t size)
 
 /*ARGSUSED*/
 void
-dtrace_copyoutstr(uintptr_t kaddr, uintptr_t uaddr, size_t size)
+dtrace_copyoutstr(uintptr_t kaddr, uintptr_t uaddr, size_t size,
+    volatile  uint16_t *flags)
 {}
 
 #else
 
 	ENTRY(dtrace_copyoutstr)
 	tst	%o2
-	bz	1f
+	bz	2f
 	clr	%g1
 	ldub	[%o0 + %g1], %g2
 0:
 	stba	%g2, [%o1 + %g1]ASI_USER
-	cmp	%g2, 0
-	be	1f
+
+	! check for an error if the count is 4k-aligned
+	andcc	%g1, 0xfff, %g0
+	bnz,pt  %icc, 1f
 	inc	%g1
+	lduh	[%o3], %g3
+	andcc	%g3, CPU_DTRACE_BADADDR, %g0
+	bnz,pn	%icc, 2f
+	nop
+1:
+	cmp	%g2, 0
+	be	2f
 	cmp	%g1, %o2
 	bl,a	0b
 	ldub	[%o0 + %g1], %g2
-1:
+2:
 	retl
 	nop
 	SET_SIZE(dtrace_copyoutstr)

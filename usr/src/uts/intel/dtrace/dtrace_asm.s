@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +30,8 @@
 
 #if defined(lint)
 #include <sys/dtrace_impl.h>
+#else
+#include "assym.h"
 #endif
 
 #if defined(lint) || defined(__lint)
@@ -193,7 +194,8 @@ dtrace_copy(uintptr_t src, uintptr_t dest, size_t size)
 
 /*ARGSUSED*/
 void
-dtrace_copystr(uintptr_t uaddr, uintptr_t kaddr, size_t size)
+dtrace_copystr(uintptr_t uaddr, uintptr_t kaddr, size_t size,
+    volatile uint16_t *flags)
 {}
 
 #else
@@ -211,10 +213,15 @@ dtrace_copystr(uintptr_t uaddr, uintptr_t kaddr, size_t size)
 	addq	$1, %rsi		/* increment destination pointer */
 	subq	$1, %rdx		/* decrement remaining count */
 	cmpb	$0, %al
-	je	1f
+	je	2f
+	testq	$0xfff, %rdx		/* test if count is 4k-aligned */
+	jnz	1f			/* if not, continue with copying */
+	testq	$CPU_DTRACE_BADADDR, (%rcx) /* load and test dtrace flags */
+	jnz	2f
+1:
 	cmpq	$0, %rdx
 	jne	0b
-1:
+2:
 	leave
 	ret
 
@@ -239,11 +246,17 @@ dtrace_copystr(uintptr_t uaddr, uintptr_t kaddr, size_t size)
 	incl	%edx			/ Increment destination pointer
 	decl	%ecx			/ Decrement remaining count
 	cmpb	$0, %al
-	je	1f
+	je	2f
+	testl	$0xfff, %ecx		/ Check if count is 4k-aligned
+	jnz	1f
+	movl	20(%ebp), %eax		/ load flags pointer
+	testl	$CPU_DTRACE_BADADDR, (%eax) / load and test dtrace flags
+	jnz	2f
+1:
 	cmpl	$0, %ecx
 	jne	0b
 
-1:
+2:
 	popl	%ebx
 	movl	%ebp, %esp
 	popl	%ebp

@@ -19,13 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 UTSBASE	= ../..
 
+PLATFORM	= sun4u
 MODULE		= dtrace
 OBJECTS		= $(DTRACE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(DTRACE_OBJS:%.o=$(LINTS_DIR)/%.ln)
@@ -33,6 +34,11 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/dtrace
 
 include $(UTSBASE)/sparc/Makefile.sparc
+
+#
+#	Redefine	DSF_DIR
+#
+DSF_DIR		= $(UTSBASE)/$(PLATFORM)/genassym
 
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
@@ -49,6 +55,9 @@ DTRACE_XAS_64	= -xarch=v9
 
 AS_CPPFLAGS	+= $(DTRACE_INC_64)
 ASFLAGS		+= $(DTRACE_XAS_$(CLASS))
+AS_INC_PATH	+= -I$(DSF_DIR)/$(OBJS_DIR)
+
+ASSYM_H		= $(DSF_DIR)/$(OBJS_DIR)/assym.h
 
 #
 # For now, disable these lint checks; maintainers should endeavor
@@ -79,5 +88,13 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
+
+$(BINARY):	$(ASSYM_H)
+
+#
+#	Rule to generate assym.h
+#
+$(ASSYM_H): FRC
+	@cd $(DSF_DIR); $(MAKE) all.targ
 
 include $(UTSBASE)/sparc/Makefile.targ

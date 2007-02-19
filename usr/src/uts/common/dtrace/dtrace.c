@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2959,7 +2959,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 
 		if (subr == DIF_SUBR_COPYIN) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
-			dtrace_copyin(tupregs[0].dttk_value, dest, size);
+			dtrace_copyin(tupregs[0].dttk_value, dest, size, flags);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 		}
 
@@ -2984,7 +2984,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		}
 
 		DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
-		dtrace_copyin(tupregs[0].dttk_value, dest, size);
+		dtrace_copyin(tupregs[0].dttk_value, dest, size, flags);
 		DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 		break;
 	}
@@ -3008,7 +3008,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		}
 
 		DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
-		dtrace_copyinstr(tupregs[0].dttk_value, dest, size);
+		dtrace_copyinstr(tupregs[0].dttk_value, dest, size, flags);
 		DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 
 		((char *)dest)[size - 1] = '\0';
@@ -3108,7 +3108,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		    dtrace_priv_proc_control(state) &&
 		    !dtrace_istoxic(kaddr, size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
-			dtrace_copyout(kaddr, uaddr, size);
+			dtrace_copyout(kaddr, uaddr, size, flags);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 		}
 		break;
@@ -3123,7 +3123,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		    dtrace_priv_proc_control(state) &&
 		    !dtrace_istoxic(kaddr, size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
-			dtrace_copyoutstr(kaddr, uaddr, size);
+			dtrace_copyoutstr(kaddr, uaddr, size, flags);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 		}
 		break;
