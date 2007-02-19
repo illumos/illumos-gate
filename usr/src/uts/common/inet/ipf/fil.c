@@ -3687,8 +3687,6 @@ ipf_stack_t *ifs;
 		 * Lookup all the interface names that are part of the rule.
 		 */
 		for (i = 0; i < 4; i++) {
-			if ((ifp != NULL) && (fr->fr_ifas[i] != ifp))
-				continue;
 			fr->fr_ifas[i] = fr_ifsync(action, rv, ifname,
 						   fr->fr_ifnames[i],
 						   ifp, fr->fr_ifas[i],
