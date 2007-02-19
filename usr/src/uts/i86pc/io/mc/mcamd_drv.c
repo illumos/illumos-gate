@@ -110,7 +110,7 @@ mc_lookup_by_chipid(int chipid)
 	ASSERT(RW_LOCK_HELD(&mc_lock));
 
 	for (mc = mc_list; mc != NULL; mc = mc->mc_next) {
-		if (mc->mc_chip->pghw_instance == chipid)
+		if (mc->mc_props.mcp_num  == chipid)
 			return (mc);
 	}
 
@@ -595,7 +595,7 @@ mc_report_testfails(mc_t *mc)
 	for (mccs = mc->mc_cslist; mccs != NULL; mccs = mccs->mccs_next) {
 		if (mccs->mccs_props.csp_testfail) {
 			unum.unum_board = 0;
-			unum.unum_chip = mc->mc_chip->pghw_instance;
+			unum.unum_chip = mc->mc_props.mcp_num;
 			unum.unum_mc = 0;
 			unum.unum_cs = mccs->mccs_props.csp_num;
 			unum.unum_rank = mccs->mccs_props.csp_dimmrank;
@@ -671,8 +671,7 @@ mc_mkprops_addrmap(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 		 * is the HT id this loop and the preceding read of all
 		 * base/limit pairs is overkill.
 		 */
-		if (MCREG_FIELD_CMN(&lim[i], DstNode) !=
-		    mc->mc_chip->pghw_instance)
+		if (MCREG_FIELD_CMN(&lim[i], DstNode) != mc->mc_props.mcp_num)
 			continue;
 
 		/*
@@ -1272,30 +1271,45 @@ mc_fm_fini(dev_info_t *dip)
 static mc_t *
 mc_create(chipid_t chipid)
 {
-	pghw_t *chp = pghw_find_by_instance((id_t)chipid, PGHW_CHIP);
 	mc_t *mc;
 	cpu_t *cpu;
 
 	ASSERT(RW_WRITE_HELD(&mc_lock));
 
-	if (chp == NULL)
-		return (NULL);
-
 	mc = kmem_zalloc(sizeof (mc_t), KM_SLEEP);
-	mc->mc_hdr.mch_type = MC_NT_MC;
-	mc->mc_chip = chp;
-	mc->mc_props.mcp_num = mc->mc_chip->pghw_instance;
-	mc->mc_props.mcp_sparecs = MC_INVALNUM;
-	mc->mc_props.mcp_badcs = MC_INVALNUM;
 
 	/*
+	 * Find one of a chip's CPU.
+	 *
 	 * We can use one of the chip's CPUs since all cores
 	 * of a chip share the same revision and socket type.
 	 */
-	cpu = PG_CPU_GET_FIRST(chp);
+	kpreempt_disable();
+	cpu = cpu_list;
+	do {
+		if (cpuid_get_chipid(cpu) == chipid)
+			break;
+	} while ((cpu = cpu->cpu_next) != cpu_list);
+
+	if (cpuid_get_chipid(cpu) != chipid) {
+		/*
+		 * Couldn't find a cpu with the specified chipid
+		 */
+		kpreempt_enable();
+		kmem_free(mc, sizeof (mc_t));
+		return (NULL);
+	}
+
+	mc->mc_hdr.mch_type = MC_NT_MC;
+	mc->mc_props.mcp_num = chipid;
+	mc->mc_props.mcp_sparecs = MC_INVALNUM;
+	mc->mc_props.mcp_badcs = MC_INVALNUM;
+
 	mc->mc_props.mcp_rev = cpuid_getchiprev(cpu);
 	mc->mc_revname = cpuid_getchiprevstr(cpu);
 	mc->mc_socket = cpuid_getsockettype(cpu);
+
+	kpreempt_enable();
 
 	if (mc_list == NULL)
 		mc_list = mc;
@@ -1364,7 +1378,7 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rw_enter(&mc_lock, RW_WRITER);
 
 	for (mc = mc_list; mc != NULL; mc = mc->mc_next) {
-		if (mc->mc_chip->pghw_instance == chipid)
+		if (mc->mc_props.mcp_num == chipid)
 			break;
 	}
 
@@ -1407,7 +1421,7 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    dip, "model", (char *)bm->bm_model);
 
 	(void) ddi_prop_update_int(DDI_DEV_T_NONE,
-	    dip, "chip-id", mc->mc_chip->pghw_instance);
+	    dip, "chip-id", mc->mc_props.mcp_num);
 
 	if (bm->bm_mkprops != NULL &&
 	    mc_pcicfg_setup(mc, bm->bm_func, &cfghdl) == DDI_SUCCESS) {
@@ -1424,14 +1438,15 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mc_props_t *mcp = &mc->mc_props;
 		int dram_present = 0;
 		pg_cpu_itr_t itr;
+		pghw_t *chp;
 		cpu_t *cpup;
 
 		if (ddi_create_minor_node(dip, "mc-amd", S_IFCHR,
-		    mc->mc_chip->pghw_instance, "ddi_mem_ctrl",
+		    mc->mc_props.mcp_num, "ddi_mem_ctrl",
 		    0) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "failed to create minor node for chip "
-			    "%u memory controller\n",
-			    mc->mc_chip->pghw_instance);
+			    "%d memory controller\n",
+			    (chipid_t)mc->mc_props.mcp_num);
 		}
 
 		/*
@@ -1446,11 +1461,31 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		kpreempt_disable();	/* prevent cpu list from changing */
 
-		PG_CPU_ITR_INIT(mc->mc_chip, itr);
-		cpup = cpu = pg_cpu_next(&itr);
-		do {
-			mcamd_mc_register(cpup);
-		} while ((cpup = pg_cpu_next(&itr)) != NULL);
+		chp = pghw_find_by_instance(mc->mc_props.mcp_num, PGHW_CHIP);
+		if (chp == NULL) {
+			/*
+			 * No chip grouping was found (single core processors).
+			 * Find the CPU to register by searching the CPU list.
+			 */
+			cpu = cpu_list;
+			do {
+				if (cpuid_get_chipid(cpu) ==
+				    mc->mc_props.mcp_num)
+					break;
+			} while ((cpu = cpu->cpu_next) != cpu_list);
+			ASSERT(cpuid_get_chipid(cpu) == mc->mc_props.mcp_num);
+
+			mcamd_mc_register(cpu);
+		} else {
+			/*
+			 * Iterate over / register the chip's CPUs
+			 */
+			PG_CPU_ITR_INIT(chp, itr);
+			cpup = cpu = pg_cpu_next(&itr);
+			do {
+				mcamd_mc_register(cpup);
+			} while ((cpup = pg_cpu_next(&itr)) != NULL);
+		}
 
 		if (mc->mc_props.mcp_lim != mc->mc_props.mcp_base) {
 			/*

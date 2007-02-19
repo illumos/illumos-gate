@@ -404,6 +404,8 @@ lgrp_main_init(void)
 	cpu_t		*cp = CPU;
 	lgrp_id_t	lgrpid;
 	int		i;
+	extern void	pg_cpu0_reinit();
+
 	/*
 	 * Enforce a valid lgrp_mem_default_policy
 	 */
@@ -432,6 +434,12 @@ lgrp_main_init(void)
 		lgrp_part_add_cpu(cp, cp->cpu_lpl->lpl_lgrpid);
 
 		ASSERT(cp->cpu_lpl->lpl_lgrpid == LGRP_ROOTID);
+
+		/*
+		 * Notify the PG subsystem that the CPU's lgrp
+		 * association has changed
+		 */
+		pg_cpu0_reinit();
 
 		/*
 		 * Destroy all lgroups except for root

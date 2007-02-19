@@ -87,7 +87,7 @@ uint32_t
 mc_pcicfg_get32_nohdl(mc_t *mc, enum mc_funcnum func, off_t offset)
 {
 	return (pci_mech1_getl(0,
-		    MC_AMD_DEV_OFFSET + mc->mc_chip->pghw_instance,
+		    MC_AMD_DEV_OFFSET + mc->mc_props.mcp_num,
 		    func, offset));
 }
 
@@ -96,6 +96,6 @@ mc_pcicfg_put32_nohdl(mc_t *mc, enum mc_funcnum func, off_t offset,
     uint32_t val)
 {
 	pci_mech1_putl(0,
-	    MC_AMD_DEV_OFFSET + mc->mc_chip->pghw_instance,
+	    MC_AMD_DEV_OFFSET + mc->mc_props.mcp_num,
 	    func, offset, val);
 }

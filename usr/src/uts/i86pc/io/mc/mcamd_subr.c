@@ -617,7 +617,7 @@ mc_fmri_create(mc_t *mc)
 
 	fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 3,
 	    "motherboard", 0,
-	    "chip", mc->mc_chip->pghw_instance,
+	    "chip", mc->mc_props.mcp_num,
 	    "memory-controller", 0);
 
 	return (nvl);

@@ -89,9 +89,16 @@ typedef struct cmt_lgrp {
 	struct cmt_lgrp *cl_next;	/* next cmt_lgrp */
 } cmt_lgrp_t;
 
-static cmt_lgrp_t	*cmt_lgrps = NULL;
+static cmt_lgrp_t	*cmt_lgrps = NULL;	/* cmt_lgrps list head */
+static cmt_lgrp_t	*cpu0_lgrp = NULL;	/* boot CPU's initial lgrp */
+						/* used for null_proc_lpa */
 
-static int		is_cpu0 = 1;
+static int		is_cpu0 = 1; /* true if this is boot CPU context */
+
+/*
+ * Set this to non-zero to disable CMT scheduling
+ * This must be done via kmdb -d, as /etc/system will be too late
+ */
 static int		cmt_sched_disabled = 0;
 
 static pg_cid_t		pg_cmt_class_id;		/* PG class id */
@@ -108,6 +115,7 @@ static void		pg_cmt_hier_pack(pg_cmt_t **, int);
 static int		pg_cmt_cpu_belongs(pg_t *, cpu_t *);
 static int		pg_cmt_hw(pghw_type_t);
 static cmt_lgrp_t	*pg_cmt_find_lgrp(lgrp_handle_t);
+static cmt_lgrp_t	*pg_cmt_lgrp_create(lgrp_handle_t);
 
 /*
  * Macro to test if PG is managed by the CMT PG class
@@ -364,6 +372,8 @@ pg_cmt_cpu_init(cpu_t *cp)
 	 */
 	lgrp_handle = lgrp_plat_cpu_to_hand(cp->cpu_id);
 	lgrp = pg_cmt_find_lgrp(lgrp_handle);
+	if (lgrp == NULL)
+		lgrp = pg_cmt_lgrp_create(lgrp_handle);
 
 	for (level = 0; level < nlevels; level++) {
 		uint_t		children;
@@ -430,6 +440,7 @@ pg_cmt_cpu_init(cpu_t *cp)
 	if (is_cpu0) {
 		pg_cmt_cpu_startup(cp);
 		is_cpu0 = 0;
+		cpu0_lgrp = lgrp;
 	}
 
 }
@@ -453,7 +464,20 @@ pg_cmt_cpu_fini(cpu_t *cp)
 	 * Find the lgroup that encapsulates this CPU's CMT hierarchy
 	 */
 	lgrp_handle = lgrp_plat_cpu_to_hand(cp->cpu_id);
+
 	lgrp = pg_cmt_find_lgrp(lgrp_handle);
+	if (lgrp == NULL) {
+		/*
+		 * This is a bit of a special case.
+		 * The only way this can happen is if the CPU's lgrp
+		 * handle changed out from underneath us, which is what
+		 * happens with null_proc_lpa on starcat systems.
+		 *
+		 * Use the initial boot CPU lgrp, since this is what
+		 * we need to tear down.
+		 */
+		lgrp = cpu0_lgrp;
+	}
 
 	/*
 	 * First, clean up anything load balancing specific for each of
@@ -589,7 +613,8 @@ pg_cmt_cpupart_move(cpu_t *cp, cpupart_t *oldpp, cpupart_t *newpp)
 		while ((cpp = pg_cpu_next(&cpu_iter)) != NULL) {
 			if (cpp == cp)
 				continue;
-			if (cpp->cpu_part->cp_id == oldpp->cp_id) {
+			if (CPU_ACTIVE(cpp) &&
+			    cpp->cpu_part->cp_id == oldpp->cp_id) {
 				found = B_TRUE;
 				break;
 			}
@@ -710,7 +735,8 @@ pg_cmt_cpu_inactive(cpu_t *cp)
 		while ((cpp = pg_cpu_next(&cpu_itr)) != NULL) {
 			if (cpp == cp)
 				continue;
-			if (cpp->cpu_part->cp_id == cp->cpu_part->cp_id) {
+			if (CPU_ACTIVE(cpp) &&
+			    cpp->cpu_part->cp_id == cp->cpu_part->cp_id) {
 				found = B_TRUE;
 				break;
 			}
@@ -772,8 +798,6 @@ pg_cmt_hier_pack(pg_cmt_t *hier[], int sz)
 
 /*
  * Return a cmt_lgrp_t * given an lgroup handle.
- * If the right one doesn't yet exist, create one
- * by growing the cmt_lgrps array
  */
 static cmt_lgrp_t *
 pg_cmt_find_lgrp(lgrp_handle_t hand)
@@ -785,13 +809,22 @@ pg_cmt_find_lgrp(lgrp_handle_t hand)
 	lgrp = cmt_lgrps;
 	while (lgrp != NULL) {
 		if (lgrp->cl_hand == hand)
-			return (lgrp);
+			break;
 		lgrp = lgrp->cl_next;
 	}
+	return (lgrp);
+}
 
-	/*
-	 * Haven't seen this lgrp yet
-	 */
+/*
+ * Create a cmt_lgrp_t with the specified handle.
+ */
+static cmt_lgrp_t *
+pg_cmt_lgrp_create(lgrp_handle_t hand)
+{
+	cmt_lgrp_t	*lgrp;
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
 	lgrp = kmem_zalloc(sizeof (cmt_lgrp_t), KM_SLEEP);
 
 	lgrp->cl_hand = hand;

@@ -241,6 +241,27 @@ pg_cpu0_init(void)
 }
 
 /*
+ * Invoked when topology for CPU0 changes
+ * post pg_cpu0_init().
+ *
+ * Currently happens as a result of null_proc_lpa
+ * on Starcat.
+ */
+void
+pg_cpu0_reinit(void)
+{
+	mutex_enter(&cpu_lock);
+	pg_cpu_inactive(CPU);
+	pg_cpupart_out(CPU, &cp_default);
+	pg_cpu_fini(CPU);
+
+	pg_cpu_init(CPU);
+	pg_cpupart_in(CPU, &cp_default);
+	pg_cpu_active(CPU);
+	mutex_exit(&cpu_lock);
+}
+
+/*
  * Register a new PG class
  */
 pg_cid_t
