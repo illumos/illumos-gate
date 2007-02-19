@@ -1428,7 +1428,7 @@ audit_symlink_create(vnode_t *dvp, char *sname, char *target, int error)
 	if (error)
 		return;
 
-	error = VOP_LOOKUP(dvp, sname, &vp, NULL, NO_FOLLOW, NULL, CRED());
+	error = VOP_LOOKUP(dvp, sname, &vp, NULL, 0, NULL, CRED());
 	if (error == 0) {
 		audit_attributes(vp);
 		VN_RELE(vp);

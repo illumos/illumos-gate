@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2339,16 +2339,32 @@ chk_retval(char *retval_str)
 static void
 execit(char **argv)
 {
-	char *shell;
+	char *args, *args_pos;
+	size_t len = 0;
+	size_t n = 0;
+	char **argv_pos;
 
 	if (*argv) {
-		(void) execvp(*argv, argv);
-	} else {
-		if (((shell = getenv("SHELL")) == NULL) ||
-			*shell != '/')
-			shell = "/bin/csh";
+		/* concatenate argument array to be passed to sh -c "..." */
+		for (argv_pos = argv; *argv_pos; argv_pos++)
+			len += strlen(*argv_pos) + 1;
 
-		(void) execlp(shell, shell, NULL);
+		if ((args = malloc(len + 1)) == NULL)
+			exit_error(
+				gettext("Allocation for command/arguments "
+					"failed"));
+
+		args_pos = args;
+		for (argv_pos = argv; *argv_pos; argv_pos++) {
+			n += snprintf(args_pos, len - n, "%s ", *argv_pos);
+			args_pos = args + n;
+		}
+		/* strip the last space */
+		args[strlen(args)] = '\0';
+
+		(void) execl("/bin/sh", "sh", "-c", args, NULL);
+	} else {
+		(void) execl("/bin/sh", "sh", NULL);
 	}
 
 	exit_error(gettext("exec(2) failed"));
