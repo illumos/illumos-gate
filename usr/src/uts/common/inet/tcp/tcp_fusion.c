@@ -134,6 +134,20 @@ tcp_loopback_needs_ip(tcp_t *tcp, netstack_t *ns)
 {
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
+	/*
+	 * If ire is not cached, do not use fusion
+	 */
+	if (tcp->tcp_connp->conn_ire_cache == NULL) {
+		/*
+		 * There is no need to hold conn_lock here because when called
+		 * from tcp_fuse() there can be no window where conn_ire_cache
+		 * can change. This is not true whe called from
+		 * tcp_fuse_output(). conn_ire_cache can become null just
+		 * after the check, but it's ok if a few packets are delivered
+		 * in the fused state.
+		 */
+		return (B_TRUE);
+	}
 	if (tcp->tcp_ipversion == IPV4_VERSION) {
 		if (tcp->tcp_ip_hdr_len != IP_SIMPLE_HDR_LENGTH)
 			return (B_TRUE);
