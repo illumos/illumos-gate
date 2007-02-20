@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -843,6 +842,155 @@ rctlsys_ctl(char *name, rctl_opaque_t *rblk, int flags)
 	return (0);
 }
 
+/*
+ * The arbitrary maximum number of rctl_opaque_t that we can pass to
+ * rctl_projset().
+ */
+#define	RCTL_PROJSET_MAXSIZE	1024
+
+static long
+rctlsys_projset(char *name, rctl_opaque_t *rblk, size_t size, int flags)
+{
+	rctl_dict_entry_t *krde;
+	rctl_opaque_t *krblk;
+	char *kname;
+	size_t klen;
+	rctl_hndl_t hndl;
+	rctl_val_t *new_values = NULL;
+	rctl_val_t *alloc_values = NULL;
+	rctl_val_t *new_val;
+	rctl_val_t *alloc_val;
+	int error = 0;
+	int count;
+
+	kname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+
+	if (name == NULL || copyinstr(name, kname, MAXPATHLEN, &klen) != 0) {
+		kmem_free(kname, MAXPATHLEN);
+		return (set_errno(EFAULT));
+	}
+
+	if (secpolicy_rctlsys(CRED(), B_TRUE) != 0) {
+		kmem_free(kname, MAXPATHLEN);
+		return (set_errno(EPERM));
+	}
+
+	if (size > RCTL_PROJSET_MAXSIZE) {
+		kmem_free(kname, MAXPATHLEN);
+		return (set_errno(EINVAL));
+	}
+
+	if ((hndl = rctl_hndl_lookup(kname)) == -1) {
+		kmem_free(kname, MAXPATHLEN);
+		return (set_errno(EINVAL));
+	}
+
+	krde = rctl_dict_lookup_hndl(hndl);
+
+	/* If not a project entity then exit */
+	if ((krde->rcd_entity != RCENTITY_PROJECT) || (size <= 0)) {
+		kmem_free(kname, MAXPATHLEN);
+		return (set_errno(EINVAL));
+	}
+
+	/* Allocate an array large enough for all resource control blocks */
+	krblk = kmem_zalloc(sizeof (rctl_opaque_t) * size, KM_SLEEP);
+
+	if (copyin(rblk, krblk, sizeof (rctl_opaque_t) * size) == 0) {
+
+		for (count = 0; (count < size) && (error == 0); count++) {
+			new_val = kmem_cache_alloc(rctl_val_cache, KM_SLEEP);
+			alloc_val = kmem_cache_alloc(rctl_val_cache, KM_SLEEP);
+
+			rctlsys_rblk_xfrm(&krblk[count], NULL, new_val,
+			    RBX_FROM_BLK | RBX_VAL);
+
+			/*
+			 * Project entity resource control values should always
+			 * be privileged
+			 */
+			if (new_val->rcv_privilege != RCPRIV_PRIVILEGED) {
+				kmem_cache_free(rctl_val_cache, new_val);
+				kmem_cache_free(rctl_val_cache, alloc_val);
+
+				error = EPERM;
+			} else if (rctl_invalid_value(krde, new_val) == 0) {
+
+				/*
+				 * This is a project entity; we do not set
+				 * rcv_action_recipient or rcv_action_recip_pid
+				 */
+				new_val->rcv_action_recipient = NULL;
+				new_val->rcv_action_recip_pid = -1;
+				new_val->rcv_flagaction |= RCTL_LOCAL_PROJDB;
+				new_val->rcv_firing_time = 0;
+
+				new_val->rcv_prev = NULL;
+				new_val->rcv_next = new_values;
+				new_values = new_val;
+
+				/*
+				 * alloc_val is left largely uninitialized, it
+				 * is a pre-allocated rctl_val_t which is used
+				 * later in rctl_local_replace_all() /
+				 * rctl_local_insert_all().
+				 */
+				alloc_val->rcv_prev = NULL;
+				alloc_val->rcv_next = alloc_values;
+				alloc_values = alloc_val;
+			} else {
+				kmem_cache_free(rctl_val_cache, new_val);
+				kmem_cache_free(rctl_val_cache, alloc_val);
+
+				error = EINVAL;
+			}
+		}
+
+		kmem_free(krblk, sizeof (rctl_opaque_t) * size);
+	} else {
+		error = EFAULT;
+	}
+
+	kmem_free(kname, MAXPATHLEN);
+
+	if (error) {
+		/*
+		 * We will have the same number of items in the alloc_values
+		 * linked list, as we have in new_values.  However, we remain
+		 * cautious, and teardown the linked lists individually.
+		 */
+		while (new_values != NULL) {
+			new_val = new_values;
+			new_values = new_values->rcv_next;
+			kmem_cache_free(rctl_val_cache, new_val);
+		}
+
+		while (alloc_values != NULL) {
+			alloc_val = alloc_values;
+			alloc_values = alloc_values->rcv_next;
+			kmem_cache_free(rctl_val_cache, alloc_val);
+		}
+
+		return (set_errno(error));
+	}
+
+	/*
+	 * We take the p_lock here to maintain consistency with other functions
+	 * - rctlsys_get() and rctlsys_set()
+	 */
+	mutex_enter(&curproc->p_lock);
+	if (flags & TASK_PROJ_PURGE)  {
+		(void) rctl_local_replace_all(hndl, new_values, alloc_values,
+		    curproc);
+	} else {
+		(void) rctl_local_insert_all(hndl, new_values, alloc_values,
+		    curproc);
+	}
+	mutex_exit(&curproc->p_lock);
+
+	return (0);
+}
+
 long
 rctlsys(int code, char *name, void *obuf, void *nbuf, size_t obufsz, int flags)
 {
@@ -864,6 +1012,11 @@ rctlsys(int code, char *name, void *obuf, void *nbuf, size_t obufsz, int flags)
 		 * Private code for rctladm(1M):  "rctlctl".
 		 */
 		return (rctlsys_ctl(name, obuf, flags));
+	case 4:
+		/*
+		 * Private code for setproject(3PROJECT).
+		 */
+		return (rctlsys_projset(name, nbuf, obufsz, flags));
 
 	default:
 		return (set_errno(EINVAL));

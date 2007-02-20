@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,9 +44,10 @@ extern "C" {
 #define	RCTL_LOCAL_DENY			0x00000002
 
 #define	RCTL_LOCAL_MAXIMAL		0x80000000
+#define	RCTL_LOCAL_PROJDB		0x40000000
 
 #define	RCTL_LOCAL_ACTION_MASK		0xffff0000
-#define	RCTL_LOCAL_MASK			0x80000003
+#define	RCTL_LOCAL_MASK			0xc0000003
 
 /*
  * Available global actions and flags.
@@ -216,6 +217,7 @@ typedef struct rctl {
 	rctl_val_t	*rc_cursor;		/* currently enforced value  */
 	struct rctl_dict_entry *rc_dict_entry;	/* global control properties */
 	rctl_hndl_t	rc_id;			/* control handle (hash key) */
+	rctl_val_t	*rc_projdb;		/* project database rctls    */
 } rctl_t;
 
 /*
@@ -309,6 +311,10 @@ int rctl_global_set(const char *name, rctl_dict_entry_t *);
 
 int rctl_local_delete(rctl_hndl_t, rctl_val_t *, struct proc *p);
 int rctl_local_insert(rctl_hndl_t, rctl_val_t *, struct proc *p);
+int rctl_local_insert_all(rctl_hndl_t, rctl_val_t *, rctl_val_t *,
+    struct proc *p);
+int rctl_local_replace_all(rctl_hndl_t, rctl_val_t *, rctl_val_t *,
+    struct proc *p);
 int rctl_local_get(rctl_hndl_t, rctl_val_t *, rctl_val_t *, struct proc *p);
 int rctl_local_replace(rctl_hndl_t, rctl_val_t *, rctl_val_t *,
     struct proc *p);

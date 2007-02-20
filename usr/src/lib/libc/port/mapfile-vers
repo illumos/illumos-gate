@@ -1989,6 +1989,8 @@ SUNWprivate_1.1 {
 	_setgrent;
 	_setlogmask;
 	_setpwent;
+	setprojrctl;
+	_setprojrctl;
 	_setregid;
 	_setreuid;
 	setsigacthandler;

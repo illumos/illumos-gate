@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,6 +150,41 @@
  *
  *   The locking subsequence of interest is: p_lock, rctl_dict_lock,
  *   rctl_lists_lock, entity->rcs_lock.
+ *
+ * The projects(4) database and project entity resource controls
+ *   A special case is made for RCENTITY_PROJECT values set through the
+ *   setproject(3PROJECT) interface.  setproject() makes use of a private
+ *   interface, setprojrctl(), which passes through an array of resource control
+ *   blocks that need to be set while holding the entity->rcs_lock.  This
+ *   ensures that the act of modifying a project's resource controls is
+ *   "atomic" within the kernel.
+ *
+ *   Within the rctl sub-system, we provide two interfaces that are only used by
+ *   the setprojrctl() code path - rctl_local_insert_all() and
+ *   rctl_local_replace_all().  rctl_local_insert_all() will ensure that the
+ *   resource values specified in *new_values are applied.
+ *   rctl_local_replace_all() will purge the current rctl->rc_projdb and
+ *   rctl->rc_values entries, and apply the *new_values.
+ *
+ *   These functions modify not only the linked list of active resource controls
+ *   (rctl->rc_values), but also a "cached" linked list (rctl->rc_projdb) of
+ *   values set through these interfaces.  To clarify:
+ *
+ *      rctl->rc_values - a linked list of rctl_val_t.  These are the active
+ *      resource values associated with this rctl, and may have been set by
+ *      setrctl() - via prctl(1M), or by setprojrctl() - via
+ *      setproject(3PROJECT).
+ *
+ *      rctl->rc_projdb - a linked list of rctl_val_t.  These reflect the
+ *      resource values set by the setprojrctl() code path.  rc_projdb is not
+ *      referenced by any other component of the rctl sub-system.
+ *
+ *   As various locks are held when calling these functions, we ensure that all
+ *   the possible memory allocations are performed prior to calling the
+ *   function.  *alloc_values is a linked list of uninitialized rctl_val_t,
+ *   which may be used to duplicate a new resource control value (passed in as
+ *   one of the members of the *new_values linked list), in order to populate
+ *   rctl->rc_values.
  */
 
 id_t max_rctl_hndl = 32768;
@@ -1081,6 +1116,7 @@ rctl_set_init(rctl_entity_t entity, struct proc *p, rctl_entity_p_t *e,
 
 		rctl->rc_dict_entry = rde;
 		rctl->rc_id = rde->rcd_id;
+		rctl->rc_projdb = NULL;
 
 		rctl->rc_values = rctl_val_list_dup(rde->rcd_default_value,
 		    ragp, NULL, p);
@@ -1686,6 +1722,259 @@ int
 rctl_local_insert(rctl_hndl_t hndl, rctl_val_t *val, struct proc *p)
 {
 	return (rctl_local_op(hndl, NULL, val, rctl_local_insert_cb, p));
+}
+
+/*
+ * rctl_local_insert_all_cb()
+ *
+ * Overview
+ *   Called for RCENTITY_PROJECT rctls only, via rctlsys_projset().
+ *
+ *   Inserts new values from the project database (new_values).  alloc_values
+ *   should be a linked list of pre-allocated rctl_val_t, which are used to
+ *   populate (rc_projdb).
+ *
+ *   Should the *new_values linked list match the contents of the rctl's
+ *   rp_projdb then we do nothing.
+ *
+ * Return Values
+ *   0 is always returned.
+ */
+/*ARGSUSED*/
+static int
+rctl_local_insert_all_cb(rctl_hndl_t hndl, struct proc *p, rctl_entity_p_t *e,
+    rctl_t *rctl, rctl_val_t *new_values, rctl_val_t *alloc_values)
+{
+	rctl_val_t *val;
+	rctl_val_t *tmp_val;
+	rctl_val_t *next;
+	int modified = 0;
+
+	/*
+	 * If this the first time we've set this project rctl, then we delete
+	 * all the privilege values.  These privilege values have been set by
+	 * rctl_add_default_limit().
+	 *
+	 * We save some cycles here by not calling rctl_val_list_delete().
+	 */
+	if (rctl->rc_projdb == NULL) {
+		val = rctl->rc_values;
+
+		while (val != NULL) {
+			if (val->rcv_privilege == RCPRIV_PRIVILEGED) {
+				if (val->rcv_prev != NULL)
+					val->rcv_prev->rcv_next = val->rcv_next;
+				else
+					rctl->rc_values = val->rcv_next;
+
+				if (val->rcv_next != NULL)
+					val->rcv_next->rcv_prev = val->rcv_prev;
+
+				tmp_val = val;
+				val = val->rcv_next;
+				kmem_cache_free(rctl_val_cache, tmp_val);
+			} else {
+				val = val->rcv_next;
+			}
+		}
+		modified = 1;
+	}
+
+	/*
+	 * Delete active values previously set through the project database.
+	 */
+	val = rctl->rc_projdb;
+
+	while (val != NULL) {
+
+		/* Is the old value found in the new values? */
+		if (rctl_val_list_find(&new_values, val) == NULL) {
+
+			/*
+			 * Delete from the active values if it originated from
+			 * the project database.
+			 */
+			if (((tmp_val = rctl_val_list_find(&rctl->rc_values,
+			    val)) != NULL) &&
+			    (tmp_val->rcv_flagaction & RCTL_LOCAL_PROJDB)) {
+				(void) rctl_val_list_delete(&rctl->rc_values,
+				    tmp_val);
+			}
+
+			tmp_val = val->rcv_next;
+			(void) rctl_val_list_delete(&rctl->rc_projdb, val);
+			val = tmp_val;
+			modified = 1;
+
+		} else
+			val = val->rcv_next;
+	}
+
+	/*
+	 * Insert new values from the project database.
+	 */
+	while (new_values != NULL) {
+		next = new_values->rcv_next;
+
+		/*
+		 * Insert this new value into the rc_projdb, and duplicate this
+		 * entry to the active list.
+		 */
+		if (rctl_val_list_insert(&rctl->rc_projdb, new_values) == 0) {
+
+			tmp_val = alloc_values->rcv_next;
+			bcopy(new_values, alloc_values, sizeof (rctl_val_t));
+			alloc_values->rcv_next = tmp_val;
+
+			if (rctl_val_list_insert(&rctl->rc_values,
+				alloc_values) == 0) {
+				/* inserted move alloc_values on */
+				alloc_values = tmp_val;
+				modified = 1;
+			}
+		} else {
+			/*
+			 * Unlike setrctl() we don't want to return an error on
+			 * a duplicate entry; we are concerned solely with
+			 * ensuring that all the values specified are set.
+			 */
+			kmem_cache_free(rctl_val_cache, new_values);
+		}
+		new_values = next;
+	}
+
+	/* Teardown any unused rctl_val_t */
+	while (alloc_values != NULL) {
+		tmp_val = alloc_values;
+		alloc_values = alloc_values->rcv_next;
+		kmem_cache_free(rctl_val_cache, tmp_val);
+	}
+
+	/* Reset the cursor if rctl values have been modified */
+	if (modified) {
+		rctl->rc_cursor = rctl->rc_values;
+		rctl_val_list_reset(rctl->rc_cursor);
+		RCTLOP_SET(rctl, p, e, rctl_model_value(rctl->rc_dict_entry, p,
+		    rctl->rc_cursor->rcv_value));
+	}
+
+	return (0);
+}
+
+int
+rctl_local_insert_all(rctl_hndl_t hndl, rctl_val_t *new_values,
+    rctl_val_t *alloc_values, struct proc *p)
+{
+	return (rctl_local_op(hndl, new_values, alloc_values,
+	    rctl_local_insert_all_cb, p));
+}
+
+/*
+ * rctl_local_replace_all_cb()
+ *
+ * Overview
+ *   Called for RCENTITY_PROJECT rctls only, via rctlsys_projset().
+ *
+ *   Clears the active rctl values (rc_values), and stored values from the
+ *   previous insertions from the project database (rc_projdb).
+ *
+ *   Inserts new values from the project database (new_values).  alloc_values
+ *   should be a linked list of pre-allocated rctl_val_t, which are used to
+ *   populate (rc_projdb).
+ *
+ * Return Values
+ *   0 is always returned.
+ */
+/*ARGSUSED*/
+static int
+rctl_local_replace_all_cb(rctl_hndl_t hndl, struct proc *p, rctl_entity_p_t *e,
+    rctl_t *rctl, rctl_val_t *new_values, rctl_val_t *alloc_values)
+{
+	rctl_val_t *val;
+	rctl_val_t *next;
+	rctl_val_t *tmp_val;
+
+	/* Delete all the privilege vaules */
+	val = rctl->rc_values;
+
+	while (val != NULL) {
+		if (val->rcv_privilege == RCPRIV_PRIVILEGED) {
+			if (val->rcv_prev != NULL)
+				val->rcv_prev->rcv_next = val->rcv_next;
+			else
+				rctl->rc_values = val->rcv_next;
+
+			if (val->rcv_next != NULL)
+				val->rcv_next->rcv_prev = val->rcv_prev;
+
+			tmp_val = val;
+			val = val->rcv_next;
+			kmem_cache_free(rctl_val_cache, tmp_val);
+		} else {
+			val = val->rcv_next;
+		}
+	}
+
+	/* Delete the contents of rc_projdb */
+	val = rctl->rc_projdb;
+	while (val != NULL) {
+
+		tmp_val = val;
+		val = val->rcv_next;
+		kmem_cache_free(rctl_val_cache, tmp_val);
+	}
+	rctl->rc_projdb = NULL;
+
+	/*
+	 * Insert new values from the project database.
+	 */
+	while (new_values != NULL) {
+		next = new_values->rcv_next;
+
+		if (rctl_val_list_insert(&rctl->rc_projdb, new_values) == 0) {
+			tmp_val = alloc_values->rcv_next;
+			bcopy(new_values, alloc_values, sizeof (rctl_val_t));
+			alloc_values->rcv_next = tmp_val;
+
+			if (rctl_val_list_insert(&rctl->rc_values,
+				alloc_values) == 0) {
+				/* inserted, so move alloc_values on */
+				alloc_values = tmp_val;
+			}
+		} else {
+			/*
+			 * Unlike setrctl() we don't want to return an error on
+			 * a duplicate entry; we are concerned solely with
+			 * ensuring that all the values specified are set.
+			 */
+			kmem_cache_free(rctl_val_cache, new_values);
+		}
+
+		new_values = next;
+	}
+
+	/* Teardown any unused rctl_val_t */
+	while (alloc_values != NULL) {
+		tmp_val = alloc_values;
+		alloc_values = alloc_values->rcv_next;
+		kmem_cache_free(rctl_val_cache, tmp_val);
+	}
+
+	/* Always reset the cursor */
+	rctl->rc_cursor = rctl->rc_values;
+	rctl_val_list_reset(rctl->rc_cursor);
+	RCTLOP_SET(rctl, p, e, rctl_model_value(rctl->rc_dict_entry, p,
+	    rctl->rc_cursor->rcv_value));
+
+	return (0);
+}
+
+int
+rctl_local_replace_all(rctl_hndl_t hndl, rctl_val_t *new_values,
+    rctl_val_t *alloc_values, struct proc *p)
+{
+	return (rctl_local_op(hndl, new_values, alloc_values,
+	    rctl_local_replace_all_cb, p));
 }
 
 static int

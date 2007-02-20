@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -800,6 +800,7 @@ extern "C" {
 #define	setppriv			_setppriv
 #define	setpwent			_setpwent
 #define	setrctl				_setrctl
+#define	setprojrctl			_setprojrctl
 #define	setregid			_setregid
 #define	setreuid			_setreuid
 #define	setrlimit			_setrlimit

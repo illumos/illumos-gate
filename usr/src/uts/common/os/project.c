@@ -905,8 +905,8 @@ project_init(void)
 	 * Per project limit on contracts.
 	 */
 	rc_project_contract = rctl_register("project.max-contracts",
-	    RCENTITY_PROJECT, RCTL_GLOBAL_DENY_ALWAYS | RCTL_GLOBAL_COUNT,
-	    INT_MAX, INT_MAX, &project_contract_ops);
+	    RCENTITY_PROJECT, RCTL_GLOBAL_DENY_ALWAYS | RCTL_GLOBAL_NOBASIC |
+	    RCTL_GLOBAL_COUNT, INT_MAX, INT_MAX, &project_contract_ops);
 	rctl_add_default_limit("project.max-contracts", 10000,
 	    RCPRIV_PRIVILEGED, RCTL_LOCAL_DENY);
 

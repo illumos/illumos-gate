@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -325,6 +325,8 @@ extern	int	pr_getrlimit(struct ps_prochandle *,
 			int, struct rlimit *);
 extern	int	pr_setrlimit(struct ps_prochandle *,
 			int, const struct rlimit *);
+extern	int	pr_setprojrctl(struct ps_prochandle *, const char *,
+			rctlblk_t *, size_t, int);
 #if defined(_LARGEFILE64_SOURCE)
 extern	int	pr_getrlimit64(struct ps_prochandle *,
 			int, struct rlimit64 *);

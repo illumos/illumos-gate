@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -917,6 +917,7 @@ extern "C" {
 #define	setpgid			_setpgid
 #define	setpgrp			_setpgrp
 #define	setppriv		_setppriv
+#define	setprojrctl		_setprojrctl
 #define	setpwent		_setpwent
 #define	setrctl			_setrctl
 #define	setregid		_setregid

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,6 +93,7 @@
 #include <tsol/label.h>
 #include <sys/nvpair.h>
 #include <libnvpair.h>
+#include <sys/rctl_impl.h>
 
 #include "ramdata.h"
 #include "systable.h"
@@ -4687,6 +4688,8 @@ show_rctlblk(private_t *pri, long _rctlblk)
 static void
 show_rctls(private_t *pri)
 {
+	int entry;
+
 	switch (pri->sys_args[0]) {
 	case 0:	/* getrctl */
 	case 1: /* setrctl */
@@ -4705,6 +4708,16 @@ show_rctls(private_t *pri)
 			show_rctlblk(pri, pri->sys_args[3]);
 		}
 		break;
+	case 4: /* setprojrctl */
+		for (entry = 0; entry < pri->sys_args[4]; entry++) {
+			(void) printf("%s\tNew rctlblk[%d]: 0x%lx\n",
+			    pri->pname, entry,
+			    (long)RCTLBLK_INC(pri->sys_args[3], entry));
+			if (RCTLBLK_INC(pri->sys_args[3], entry) != NULL) {
+				show_rctlblk(pri,
+				    (long)RCTLBLK_INC(pri->sys_args[3], entry));
+			}
+		}
 	}
 }
 

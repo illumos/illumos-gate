@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,6 +32,7 @@
 #include <errno.h>
 #include <strings.h>
 #include "libproc.h"
+#include <sys/rctl_impl.h>
 
 /*
  * getrctl() system call -- executed by subject process
@@ -177,6 +177,81 @@ pr_setrctl(struct ps_prochandle *Pr, const char *rname,
 
 	adp++;
 	adp->arg_value = 0;		/* obufsz isn't used by setrctl() */
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	adp++;
+	adp->arg_value = rflag;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	error = Psyscall(Pr, &rval, SYS_rctlsys, 6, &argd[0]);
+
+	if (error) {
+		errno = (error > 0) ? error : ENOSYS;
+		return (-1);
+	}
+	return (rval.sys_rval1);
+}
+
+/*
+ * setprojrctl() system call -- executed by subject process
+ */
+int
+pr_setprojrctl(struct ps_prochandle *Pr, const char *rname,
+	rctlblk_t *new_blk, size_t size, int rflag)
+{
+	sysret_t rval;
+	argdes_t argd[6];
+	argdes_t *adp;
+	int error;
+
+	if (Pr == NULL)		/* no subject process */
+		return (setprojrctl(rname, new_blk, size, rflag));
+
+	adp = &argd[0];
+	adp->arg_value = 4;	/* switch for setprojrctls in rctlsys */
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	adp++;
+	adp->arg_value = 0;
+	adp->arg_object = (void *)rname;
+	adp->arg_type = AT_BYREF;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = strlen(rname) + 1;
+
+	adp++;
+	adp->arg_value = 0;	/* old_blk is not used by setprojrctls() */
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+
+	adp++;
+	if (new_blk == NULL) {
+		adp->arg_value = 0;
+		adp->arg_object = NULL;
+		adp->arg_type = AT_BYVAL;
+		adp->arg_inout = AI_INPUT;
+		adp->arg_size = 0;
+	} else {
+		adp->arg_value = 0;
+		adp->arg_object = new_blk;
+		adp->arg_type = AT_BYREF;
+		adp->arg_inout = AI_INPUT;
+		adp->arg_size = rctlblk_size() * size;
+	}
+
+	adp++;
+	adp->arg_value = size;		/* obufsz is used by setrctls() */
 	adp->arg_object = NULL;
 	adp->arg_type = AT_BYVAL;
 	adp->arg_inout = AI_INPUT;

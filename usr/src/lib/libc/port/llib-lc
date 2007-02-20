@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1348,6 +1348,7 @@ int getrctl(const char *name, rctlblk_t *old_rblk, rctlblk_t *new_rblk,
 int setrctl(const char *name, rctlblk_t *old_rblk, rctlblk_t *new_rblk,
     int flags);
 /* (private functions) */
+int setprojrctl(const char *name, rctlblk_t *new_rblk, size_t size, int flags);
 int rctlctl(const char *, rctlblk_t *, int);
 size_t rctllist(char *, size_t);
 

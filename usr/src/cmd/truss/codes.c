@@ -1129,6 +1129,7 @@ rctlsyscode(int code)
 	case 1:		str = "SETRCTL";	break;
 	case 2:		str = "RCTLSYS_LST";	break;
 	case 3:		str = "RCTLSYS_CTL";	break;
+	case 4:		str = "RCTLSYS_SETPROJ";	break;
 	default:	str = "UNKNOWN";	break;
 	}
 	return (str);

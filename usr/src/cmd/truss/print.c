@@ -80,6 +80,7 @@
 #include <sys/rctl.h>
 #include <sys/rctl_impl.h>
 #include <sys/fork.h>
+#include <sys/task.h>
 #include "ramdata.h"
 #include "print.h"
 #include "proto.h"
@@ -2542,6 +2543,20 @@ prt_rcf(private_t *pri, int raw, long val)
 }
 
 /*
+ * Print setprojrctl flags
+ */
+void
+prt_spf(private_t *pri, int raw, long val)
+{
+	long action = val & TASK_PROJ_MASK;
+
+	if (!raw && (action == TASK_PROJ_PURGE))
+		outstring(pri, "TASK_PROJ_PURGE");
+	else
+		prt_hex(pri, 0, val);
+}
+
+/*
  * Print forkx() flags
  */
 void
@@ -2664,5 +2679,6 @@ void (* const Print[])() = {
 	prt_rsf,	/* RSF -- print setrctl() flags */
 	prt_rcf,	/* RCF -- print rctlsys_ctl() flags */
 	prt_fxf,	/* FXF -- print forkx() flags */
+	prt_spf,	/* SPF -- print rctlsys_projset() flags */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

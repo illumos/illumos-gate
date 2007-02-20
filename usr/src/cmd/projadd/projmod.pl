@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,6 +37,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use POSIX qw(locale_h);
 use Sun::Solaris::Utils qw(textdomain gettext);
 use Sun::Solaris::Project qw(:ALL :PRIVATE);
+use Sun::Solaris::Task qw(:ALL);
 
 #
 # Print a usage message and exit.
@@ -51,7 +51,7 @@ sub usage
 	printf(STDERR gettext(
 	    "Usage: %s [-n] [-f filename]\n"), $prog);
 	printf(STDERR gettext(
-	    "       %s [-n] [-f filename] [-p projid [-o]] [-c comment]\n".
+	    "       %s [-n] [-A|-f filename] [-p projid [-o]] [-c comment]\n".
             "       %s [-a|-s|-r] [-U user[,user...]] [-G group[,group...]]\n".
             "       %s [-K name[=value[,value...]]] [-l new_projectname] ".
 	    "project\n"), $prog, $space, $space, $space);
@@ -360,7 +360,7 @@ my ($pname, $flags);
 $flags = {};
 my $modify = 0;
 
-my $projfile = &PROJF_PATH;
+my $projfile;
 my $opt_n;
 my $opt_c;
 my $opt_o;
@@ -372,6 +372,7 @@ my $opt_s;
 my $opt_U;
 my $opt_G;
 my @opt_K;
+my $opt_A;
 
 GetOptions("f=s" => \$projfile,
 	   "n"   => \$opt_n,
@@ -384,11 +385,12 @@ GetOptions("f=s" => \$projfile,
 	   "a"	 => \$opt_a,
 	   "U=s" => \$opt_U,
 	   "G=s" => \$opt_G,
-	   "K=s" => \@opt_K) || usage();
+	   "K=s" => \@opt_K,
+  	   "A"	 => \$opt_A) || usage();
 
 usage(gettext('Invalid command-line arguments')) if (@ARGV > 1);
 
-if ($opt_c || $opt_G || $opt_l || $opt_p || $opt_U || @opt_K) {
+if ($opt_c || $opt_G || $opt_l || $opt_p || $opt_U || @opt_K || $opt_A) {
 	$modify = 1;
 	if (! defined($ARGV[0])) {
 		usage(gettext('No project name specified'));
@@ -397,6 +399,14 @@ if ($opt_c || $opt_G || $opt_l || $opt_p || $opt_U || @opt_K) {
 
 if (!$modify && defined($ARGV[0])) {
 	usage(gettext('missing -c, -G, -l, -p, -U, or -K'));
+}
+
+if (defined($opt_A) && defined($projfile)) {
+	usage(gettext('-A and -f are mutually exclusive'));
+}
+
+if (! defined($projfile)) {
+	$projfile = &PROJF_PATH;
 }
 
 if ($modify && $projfile eq '-') {
@@ -654,8 +664,69 @@ if ($modify) {
 
 }
 
+if (defined($opt_A)) {
+	my $error;
+
+	if (($error = setproject($pname, "root", TASK_FINAL|TASK_PROJ_PURGE)) != 0) {
+
+		if ($error == SETPROJ_ERR_TASK) {
+			if ($!{EAGAIN}) {
+				error([5, gettext("resource control limit has ".
+				     "been reached\n")]);
+			} elsif ($!{ESRCH}) {
+				error([5, gettext("user \"%s\" is not a member ".
+				     "of project \"%s\"\n"), "root", $pname]);
+			} elsif ($!{EACCES}) {
+				error([5, gettext("the invoking task is final\n"
+				     )]);
+			} else {
+				error([5, gettext("could not join project \"%s".
+				     "\"\n"), $pname]);
+			}
+
+		} elsif ($error == SETPROJ_ERR_POOL) {
+			if ($!{EACCES}) {
+				error([5, gettext("no resource pool accepting ".
+				     "default bindings exists for project \"%s".
+				     "\"\n"), $pname]);
+	        	} elsif ($!{ESRCH}) {
+				error([5, gettext("specified resource pool ".
+				     "does not exist for project \"%s\"\n"),
+				     $pname]);
+			} else {
+				error([5, gettext("could not bind to default ".
+				     "resource pool for project \"%s\"\n"),
+				     $pname]);
+			}
+
+		} else {
+			#
+			# $error represents the position - within the semi-colon
+			# delimited $attribute - that generated the error
+			#
+			if ($error <= 0) {
+				error([5, gettext("setproject failed for ".
+				     "project \"%s\"\n"), $pname]);
+			} else {
+				my ($name, $projid, $comment, $users_ref,
+				     $groups_ref, $attr) = getprojbyname($pname);
+				my $attribute = ($attr =~
+				     /(\S+?)=\S+?(?:;|\z)/g)[$error - 1];
+
+				if (!$attribute) {
+					error([5, gettext("warning, resource ".
+					     "control assignment failed for ".
+					     "project \"%s\" attribute %d\n"),
+					     $pname, $error]);
+				} else {
+					error([5, gettext("warning, %s ".
+					     "resource control assignment ".
+					     "failed for project \"%s\"\n"),
+					     $attribute, $pname]);
+				}
+			}
+		}
+	}
+}
+
 exit(0);
-
-
-
-

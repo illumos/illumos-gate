@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <nss_dbdefs.h>
 #include <pwd.h>
 #include <pool.h>
@@ -45,6 +46,7 @@
 #include <zone.h>
 #include <sys/pool.h>
 #include <sys/pool_impl.h>
+#include <sys/rctl_impl.h>
 
 static void
 xstrtolower(char *s)
@@ -177,7 +179,7 @@ build_rctlblk(rctlblk_t *blk, int comp_num, char *component)
 #define	BADSPEC		5
 
 static int
-rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr)
+rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr, int flags)
 {
 	int error = 0;
 	uint_t component = 0;
@@ -185,18 +187,68 @@ rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr)
 	uint_t state = 0;
 	char *component_head;
 	rctlblk_t *blk;
+	rctlblk_t *ablk;
+	int project_entity = 0;
+	int count = 0;
+	char *tmp;
+	int local_action;
 
-	remove_spaces(val);
-	if ((blk = malloc(rctlblk_size())) == NULL) {
+	/* We cannot modify a zone resource control */
+	if (strncmp(ctl_name, "zone.", strlen("zone.")) == 0) {
 		return (SETFAILED);
 	}
 
+	remove_spaces(val);
+
 	/*
-	 * Tear down everything with this ctl name.
+	 * As we are operating in a new task, both process and task
+	 * rctls are referenced by this process alone.  Tear down
+	 * matching process and task rctls only.
+	 *
+	 * blk will be the RCPRIV_SYSTEM for this resource control,
+	 * populated by the last pr_setrctl().
 	 */
-	while (pr_getrctl(Pr, ctl_name, NULL, blk, RCTL_FIRST) != -1 &&
-	    rctlblk_get_privilege(blk) != RCPRIV_SYSTEM) {
-		(void) pr_setrctl(Pr, ctl_name, NULL, blk, RCTL_DELETE);
+	if ((strncmp(ctl_name, "process.", strlen("process.")) == 0) ||
+	    (strncmp(ctl_name, "task.", strlen("task.")) == 0)) {
+
+		if ((blk = (rctlblk_t *)malloc(rctlblk_size())) == NULL) {
+			return (SETFAILED);
+		}
+
+
+		while (pr_getrctl(Pr, ctl_name, NULL, blk, RCTL_FIRST) != -1 &&
+		    rctlblk_get_privilege(blk) != RCPRIV_SYSTEM) {
+			(void) pr_setrctl(Pr, ctl_name, NULL, blk, RCTL_DELETE);
+		}
+
+	} else if (strncmp(ctl_name, "project.", strlen("project.")) == 0) {
+		project_entity = 1;
+
+		/* Determine how many attributes we'll be setting */
+		for (tmp = val; *tmp != '\0'; tmp++) {
+			if (*tmp == '(')
+				count++;
+		}
+
+		/* Allocate sufficient memory for rctl blocks */
+		if ((count == 0) || ((ablk =
+		    (rctlblk_t *)malloc(rctlblk_size() * count)) == NULL)) {
+			return (SETFAILED);
+		}
+		blk = ablk;
+
+		/*
+		 * In order to set the new rctl's local_action, we'll need the
+		 * current value of global_flags.  We obtain global_flags by
+		 * performing a pr_getrctl().
+		 *
+		 * The ctl_name has been verified as valid, so we have no reason
+		 * to suspect that pr_getrctl() will return an error.
+		 */
+		(void) pr_getrctl(Pr, ctl_name, NULL, blk, RCTL_FIRST);
+
+	} else {
+		return (SETFAILED);
 	}
 
 	/*
@@ -205,11 +257,13 @@ rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr)
 	rctlblk_set_privilege(blk, RCPRIV_PRIVILEGED);
 	rctlblk_set_value(blk, 0);
 	rctlblk_set_local_flags(blk, 0);
-	if (rctlblk_get_global_flags(blk) & RCTL_GLOBAL_DENY_ALWAYS)
-		rctlblk_set_local_action(blk, RCTL_LOCAL_DENY, 0);
-	else
-		rctlblk_set_local_action(blk, RCTL_LOCAL_NOACTION, 0);
 
+	if (rctlblk_get_global_flags(blk) & RCTL_GLOBAL_DENY_ALWAYS)
+		local_action = RCTL_LOCAL_DENY;
+	else
+		local_action = RCTL_LOCAL_NOACTION;
+
+	rctlblk_set_local_action(blk, local_action, 0);
 
 	for (; ; val++) {
 		switch (*val) {
@@ -238,22 +292,35 @@ rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr)
 					state &= ~INPAREN;
 					component = 0;
 					valuecount++;
-					if (pr_setrctl(Pr, ctl_name, NULL, blk,
-					    RCTL_INSERT) == -1)
+
+					if (project_entity &&
+					    (rctlblk_get_privilege(blk) ==
+					    RCPRIV_BASIC)) {
 						error = SETFAILED;
+					} else if (project_entity) {
+						if (valuecount > count)
+							return (SETFAILED);
+
+						if (valuecount != count)
+							blk = RCTLBLK_INC(ablk,
+								valuecount);
+					} else {
+						if (pr_setrctl(Pr, ctl_name,
+						    NULL, blk, RCTL_INSERT) ==
+						    -1)
+							error = SETFAILED;
+					}
 
 					/* re-initialize block */
-					rctlblk_set_privilege(blk,
-					    RCPRIV_PRIVILEGED);
-					rctlblk_set_value(blk, 0);
-					rctlblk_set_local_flags(blk, 0);
-					if (rctlblk_get_global_flags(blk) &
-					    RCTL_GLOBAL_DENY_ALWAYS)
+					if (!project_entity ||
+					    (valuecount != count)) {
+						rctlblk_set_privilege(blk,
+						    RCPRIV_PRIVILEGED);
+						rctlblk_set_value(blk, 0);
+						rctlblk_set_local_flags(blk, 0);
 						rctlblk_set_local_action(blk,
-						    RCTL_LOCAL_DENY, 0);
-					else
-						rctlblk_set_local_action(blk,
-						    RCTL_LOCAL_NOACTION, 0);
+						    local_action, 0);
+					}
 				} else {
 					error = CLOSEBEFOREOPEN;
 				}
@@ -286,6 +353,12 @@ rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr)
 
 		if (error)
 			break;
+	}
+
+	if (project_entity) {
+		blk = ablk;
+		if (pr_setprojrctl(Pr, ctl_name, blk, count, flags) == -1)
+			error = SETFAILED;
 	}
 
 	free(blk);
@@ -465,6 +538,7 @@ setproject_proc(const char *project_name, const char *user_name, int flags,
 	int ret = 0;
 	kva_t *kv_array;
 	struct project local_proj; /* space to store proj if not provided */
+	const char *pool_name = NULL;
 
 	if (project_name != NULL) {
 		/*
@@ -508,45 +582,37 @@ setproject_proc(const char *project_name, const char *user_name, int flags,
 		projid = getprojid();
 	}
 
+
+	if ((kv_array = _str2kva(proj->pj_attr, KV_ASSIGN,
+	    KV_DELIMITER)) != NULL) {
+		for (i = 0; i < kv_array->length; i++) {
+			if (strcmp(kv_array->data[i].key,
+			    "project.pool") == 0) {
+				pool_name = kv_array->data[i].value;
+			}
+			if (strcmp(kv_array->data[i].key, "task.final") == 0) {
+				flags |= TASK_FINAL;
+			}
+		}
+	}
+
 	/*
-	 * Only bind to a pool if pools are configured.
+	 * Bind process to a pool only if pools are configured
 	 */
 	if (pools_enabled() == 1) {
-		const char *pool_name = NULL;
 		char *old_pool_name;
-		int taskflags = flags;
 		/*
 		 * Attempt to bind to pool before calling
 		 * settaskid().
 		 */
-		if ((kv_array = _str2kva(proj->pj_attr, KV_ASSIGN,
-		    KV_DELIMITER)) != NULL) {
-			for (i = 0; i < kv_array->length; i++) {
-				if (strcmp(kv_array->data[i].key,
-				    "project.pool") == 0) {
-					pool_name = kv_array->data[i].value;
-					break;
-				}
-				if (strcmp(kv_array->data[i].key,
-				    "task.final") == 0) {
-					taskflags |= TASK_FINAL;
-				}
-			}
-		}
-
 		old_pool_name = pool_get_binding(pid);
-
-		/*
-		 * If parent is not bound to the default pool, then we want
-		 * to preserve same binding as parent.
-		 */
-		if (pool_name != NULL && bind_to_pool(pool_name, pid, 0) != 0) {
+		if (bind_to_pool(pool_name, pid, 0) != 0) {
 			if (old_pool_name)
 				free(old_pool_name);
 			_kva_free(kv_array);
 			return (SETPROJ_ERR_POOL);
 		}
-		if (pr_settaskid(Pr, projid, taskflags) == -1) {
+		if (pr_settaskid(Pr, projid, flags & TASK_MASK) == -1) {
 			int saved_errno = errno;
 
 			/*
@@ -568,9 +634,10 @@ setproject_proc(const char *project_name, const char *user_name, int flags,
 		/*
 		 * Pools are not configured, so simply create new task.
 		 */
-		if (pr_settaskid(Pr, projid, flags) == -1)
+		if (pr_settaskid(Pr, projid, flags & TASK_MASK) == -1) {
+			_kva_free(kv_array);
 			return (SETPROJ_ERR_TASK);
-		kv_array = _str2kva(proj->pj_attr, KV_ASSIGN, KV_DELIMITER);
+		}
 	}
 
 	if (project_name == NULL) {
@@ -612,7 +679,7 @@ setproject_proc(const char *project_name, const char *user_name, int flags,
 		}
 
 		ret = rctl_set(kv_array->data[i].key,
-		    kv_array->data[i].value, Pr);
+		    kv_array->data[i].value, Pr, flags & TASK_PROJ_MASK);
 
 		if (ret && unknown == 0) {
 			/*

@@ -578,6 +578,7 @@ const	struct systable rctltable[] = {
 {"setrctl",	6, DEC, NOV, HID, STG, HEX, HEX, HID, RSF},	/* 1 */
 {"rctlsys_lst",	6, DEC, NOV, HID, HID, HEX, HID, HEX, HID},	/* 2 */
 {"rctlsys_ctl",	6, DEC, NOV, HID, STG, HEX, HID, HID, RCF},	/* 3 */
+{"setprojrctl",	6, DEC, NOV, HID, STG, HID, HEX, HEX, SPF},	/* 4 */
 };
 #define	NRCTLCODE	(sizeof (rctltable) / sizeof (struct systable))
 
