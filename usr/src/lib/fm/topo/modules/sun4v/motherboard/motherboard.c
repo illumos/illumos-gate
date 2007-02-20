@@ -119,8 +119,7 @@ mb_topo_free(void *data, size_t size)
 }
 
 static int
-mb_get_pri_info(topo_mod_t *mod, ldom_hdl_t *lhp,
-	char **serialp, char **partp, char **csnp)
+mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp)
 {
 	char isa[MAXNAMELEN];
 	md_t *mdp;
@@ -130,26 +129,35 @@ mb_get_pri_info(topo_mod_t *mod, ldom_hdl_t *lhp,
 	int  nfrus, num_nodes, i;
 	char *pstr = NULL;
 	char *sn, *pn, *dn, *csn;
+	ldom_hdl_t *lhp;
+
+	lhp = ldom_init(mb_topo_alloc, mb_topo_free);
+	if (lhp == NULL) {
+		topo_mod_dprintf(mod, "ldom_init failed\n");
+		return (-1);
+	}
 
 	(void) sysinfo(SI_MACHINE, isa, MAXNAMELEN);
-
 	if (strcmp(isa, "sun4v") != 0) {
 		topo_mod_dprintf(mod, "not sun4v architecture%s\n",
 			isa);
+		ldom_fini(lhp);
 		return (-1);
 	}
 
 	if ((bufsize = ldom_get_core_md(lhp, &bufp)) < 1) {
 		topo_mod_dprintf(mod, "ldom_get_core_md error, bufsize=%d\n",
 			bufsize);
+		ldom_fini(lhp);
 		return (-1);
 	}
 	topo_mod_dprintf(mod, "pri bufsize=%d\n", bufsize);
 
 	if ((mdp = md_init_intern(bufp, mb_topo_alloc, mb_topo_free)) == NULL ||
 	    (num_nodes = md_node_count(mdp)) < 1) {
-		mb_topo_free(bufp, bufsize);
 		topo_mod_dprintf(mod, "md_init_intern error\n");
+		mb_topo_free(bufp, (size_t)bufsize);
+		ldom_fini(lhp);
 		return (-1);
 	}
 	topo_mod_dprintf(mod, "num_nodes=%d\n", num_nodes);
@@ -157,6 +165,9 @@ mb_get_pri_info(topo_mod_t *mod, ldom_hdl_t *lhp,
 	if ((listp = (mde_cookie_t *)mb_topo_alloc(
 		sizeof (mde_cookie_t) * num_nodes)) == NULL) {
 		topo_mod_dprintf(mod, "alloc listp error\n");
+		mb_topo_free(bufp, (size_t)bufsize);
+		(void) md_fini(mdp);
+		ldom_fini(lhp);
 		return (-1);
 	}
 
@@ -165,6 +176,10 @@ mb_get_pri_info(topo_mod_t *mod, ldom_hdl_t *lhp,
 			md_find_name(mdp, "fwd"), listp);
 	if (nfrus <= 0) {
 		topo_mod_dprintf(mod, "error: nfrus=%d\n", nfrus);
+		mb_topo_free(listp, sizeof (mde_cookie_t) * num_nodes);
+		mb_topo_free(bufp, (size_t)bufsize);
+		(void) md_fini(mdp);
+		ldom_fini(lhp);
 		return (-1);
 	}
 	topo_mod_dprintf(mod, "nfrus=%d\n", nfrus);
@@ -192,17 +207,19 @@ mb_get_pri_info(topo_mod_t *mod, ldom_hdl_t *lhp,
 	}
 
 	*serialp = topo_mod_strdup(mod, sn);
-	*partp = topo_mod_alloc(mod, (strlen(dn)
-			+ strlen(pn) + 1));
-	(void) strcpy(*partp, pn);
-	if (dn != NULL)
-		(void) strcat(*partp, dn);
+
+	i = (pn ? strlen(pn) : 0) + (dn ? strlen(dn) : 0) + 1;
+	pstr = mb_topo_alloc(i);
+	(void) snprintf(pstr, i, "%s%s", pn ? pn : "", dn ? dn : "");
+	*partp = topo_mod_strdup(mod, pstr);
+	mb_topo_free(pstr, i);
 
 	*csnp = topo_mod_strdup(mod, csn);
 
 	mb_topo_free(listp, sizeof (mde_cookie_t) * num_nodes);
 	mb_topo_free(bufp, (size_t)bufsize);
 	(void) md_fini(mdp);
+	ldom_fini(lhp);
 
 	return (0);
 }
@@ -249,13 +266,10 @@ mb_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	tnode_t *ntn;
 	char *serial = NULL, *part = NULL;
 	char *csn = NULL, *pstr = NULL;
-	ldom_hdl_t *motherboard_lhp;
 	nvlist_t *auth = topo_mod_auth(mod, parent);
 
-	motherboard_lhp = ldom_init(mb_topo_alloc, mb_topo_free);
-
 	/* Get Chassis ID, MB Serial Number and Part Number from PRI */
-	(void) mb_get_pri_info(mod, motherboard_lhp, &serial, &part, &csn);
+	(void) mb_get_pri_info(mod, &serial, &part, &csn);
 
 	if (nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS, &pstr) != 0 &&
 	    csn != NULL)
@@ -267,12 +281,12 @@ mb_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	topo_mod_strfree(mod, serial);
 	topo_mod_strfree(mod, part);
 	topo_mod_strfree(mod, csn);
-	ldom_fini(motherboard_lhp);
 
 	if (fmri == NULL) {
 		topo_mod_dprintf(mod,
 		    "Unable to make nvlist for %s bind: %s.\n",
 		    name, topo_mod_errmsg(mod));
+		nvlist_free(auth);
 		return (NULL);
 	}
 
@@ -283,6 +297,7 @@ mb_tnode_create(topo_mod_t *mod, tnode_t *parent,
 		    topo_node_name(parent), topo_node_instance(parent),
 		    name, i,
 		    topo_strerror(topo_mod_errno(mod)));
+		nvlist_free(auth);
 		nvlist_free(fmri);
 		return (NULL);
 	}

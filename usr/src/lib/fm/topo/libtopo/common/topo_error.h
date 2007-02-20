@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,9 +85,6 @@ typedef enum topo_errno {
     ETOPO_FMRI_VERSION, /* invalid FMRI scheme version */
     ETOPO_FMRI_MALFORM,	/* malformed FMRI */
     ETOPO_NVL_INVAL,	/* invalid nvlist function argument */
-    ETOPO_METHOD_INVAL,	/* invalid method registration */
-    ETOPO_METHOD_NOTSUP, /* method not supported */
-    ETOPO_METHOD_FAIL,	/* method failed */
     ETOPO_FILE_NOENT,	/* no topology file found */
     ETOPO_PRSR_BADGRP,	/* unrecognized grouping */
     ETOPO_PRSR_BADNUM,	/* unable to interpret attribute numerically */

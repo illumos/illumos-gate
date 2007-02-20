@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,8 +42,6 @@ extern "C" {
 #define	TOPO_METH_NVL2STR		"topo_nvl2str"
 #define	TOPO_METH_STR2NVL		"topo_str2nvl"
 #define	TOPO_METH_CONTAINS		"topo_contains"
-#define	TOPO_METH_UNUSABLE		"topo_unusable"
-#define	TOPO_METH_EXPAND		"topo_expand"
 #define	TOPO_METH_COMPARE		"topo_compare"
 
 #define	TOPO_METH_FMRI_VERSION			0
@@ -52,8 +50,6 @@ extern "C" {
 #define	TOPO_METH_NVL2STR_VERSION		0
 #define	TOPO_METH_STR2NVL_VERSION		0
 #define	TOPO_METH_CONTAINS_VERSION		0
-#define	TOPO_METH_UNUSABLE_VERSION		0
-#define	TOPO_METH_EXPAND_VERSION		0
 #define	TOPO_METH_COMPARE_VERSION		0
 
 #define	TOPO_METH_ASRU_COMPUTE_DESC		"Dynamic ASRU constructor"
@@ -62,8 +58,6 @@ extern "C" {
 #define	TOPO_METH_NVL2STR_DESC			"FMRI to string"
 #define	TOPO_METH_STR2NVL_DESC			"string to FMRI"
 #define	TOPO_METH_CONTAINS_DESC			"FMRI contains sub-FMRI"
-#define	TOPO_METH_UNUSABLE_DESC			"FMRI is unusable"
-#define	TOPO_METH_EXPAND_DESC			"expand FMRI"
 #define	TOPO_METH_COMPARE_DESC			"compare two FMRIs"
 
 #define	TOPO_METH_FMRI_ARG_NAME		"child-name"
