@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,9 @@ dtj_get_fault_name(int fault)
 		break;
 	case DTRACEFLT_TUPOFLOW:
 		name = "DTRACEFLT_TUPOFLOW";
+		break;
+	case DTRACEFLT_BADSTACK:
+		name = "DTRACEFLT_BADSTACK";
 		break;
 	case DTRACEFLT_LIBRARY:
 		name = "DTRACEFLT_LIBRARY";

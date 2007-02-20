@@ -435,6 +435,7 @@ dtrace_load##bits(uintptr_t addr)					\
 	((flags) & CPU_DTRACE_TUPOFLOW) ?  DTRACEFLT_TUPOFLOW :		\
 	((flags) & CPU_DTRACE_BADALIGN) ?  DTRACEFLT_BADALIGN :		\
 	((flags) & CPU_DTRACE_NOSCRATCH) ?  DTRACEFLT_NOSCRATCH :	\
+	((flags) & CPU_DTRACE_BADSTACK) ?  DTRACEFLT_BADSTACK :		\
 	DTRACEFLT_UNKNOWN)
 
 #define	DTRACEACT_ISSTRING(act)						\

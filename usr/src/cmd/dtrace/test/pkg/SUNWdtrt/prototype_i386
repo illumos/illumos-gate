@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,6 +54,8 @@ d none opt/SUNWdtrt/tst/i386/ustack 0755 root bin
 f none opt/SUNWdtrt/tst/i386/ustack/tst.annotated.d 0444 root bin
 f none opt/SUNWdtrt/tst/i386/ustack/tst.annotated.d.out 0444 root bin
 f none opt/SUNWdtrt/tst/i386/ustack/tst.annotated.exe 0555 root bin
+f none opt/SUNWdtrt/tst/i386/ustack/tst.circstack.d 0444 root bin
+f none opt/SUNWdtrt/tst/i386/ustack/tst.circstack.exe 0555 root bin
 f none opt/SUNWdtrt/tst/i386/ustack/tst.helper.d 0444 root bin
 f none opt/SUNWdtrt/tst/i386/ustack/tst.helper.d.out 0444 root bin
 f none opt/SUNWdtrt/tst/i386/ustack/tst.helper.exe 0555 root bin

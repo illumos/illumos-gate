@@ -329,11 +329,13 @@ extern cpu_core_t cpu_core[];
 #define	CPU_DTRACE_FAKERESTORE	0x0400	/* pid provider hint to getreg */
 #endif
 #define	CPU_DTRACE_ENTRY	0x0800	/* pid provider hint to ustack() */
+#define	CPU_DTRACE_BADSTACK	0x1000	/* DTrace fault: bad stack */
 
 #define	CPU_DTRACE_FAULT	(CPU_DTRACE_BADADDR | CPU_DTRACE_BADALIGN | \
 				CPU_DTRACE_DIVZERO | CPU_DTRACE_ILLOP | \
 				CPU_DTRACE_NOSCRATCH | CPU_DTRACE_KPRIV | \
-				CPU_DTRACE_UPRIV | CPU_DTRACE_TUPOFLOW)
+				CPU_DTRACE_UPRIV | CPU_DTRACE_TUPOFLOW | \
+				CPU_DTRACE_BADSTACK)
 #define	CPU_DTRACE_ERROR	(CPU_DTRACE_FAULT | CPU_DTRACE_DROP)
 
 /*

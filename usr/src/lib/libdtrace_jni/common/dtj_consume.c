@@ -301,6 +301,7 @@ dtj_errhandler(const dtrace_errdata_t *data, void *arg)
 	switch (data->dteda_fault) {
 	case DTRACEFLT_BADADDR:
 	case DTRACEFLT_BADALIGN:
+	case DTRACEFLT_BADSTACK:
 		addr = data->dteda_addr;
 		break;
 	default:

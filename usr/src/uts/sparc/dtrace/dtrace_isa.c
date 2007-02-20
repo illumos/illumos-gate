@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +64,8 @@ extern int dtrace_getustackdepth_top(uintptr_t *);
 extern ulong_t dtrace_getreg_win(uint_t, uint_t);
 extern void dtrace_putreg_win(uint_t, ulong_t);
 extern int dtrace_fish(int, int, uintptr_t *);
+
+int	dtrace_ustackdepth_max = 2048;
 
 /*
  * This is similar in principle to getpcstack(), but there are several marked
@@ -361,8 +362,12 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t sp)
 {
 	proc_t *p = curproc;
 	int ret = 0;
+	uintptr_t oldsp;
+	volatile uint16_t *flags =
+	    (volatile uint16_t *)&cpu_core[CPU->cpu_id].cpuc_dtrace_flags;
 
 	ASSERT(pcstack == NULL || pcstack_limit > 0);
+	ASSERT(dtrace_ustackdepth_max > 0);
 
 	if (p->p_model == DATAMODEL_NATIVE) {
 		for (;;) {
@@ -373,13 +378,23 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t sp)
 			    !IS_P2ALIGNED((uintptr_t)fr, STACK_ALIGN))
 				break;
 
+			oldsp = sp;
+
 			pc = dtrace_fulword(&fr->fr_savpc);
 			sp = dtrace_fulword(&fr->fr_savfp);
 
 			if (pc == 0)
 				break;
 
-			ret++;
+			/*
+			 * We limit the number of times we can go around this
+			 * loop to account for a circular stack.
+			 */
+			if (sp == oldsp || ret++ >= dtrace_ustackdepth_max) {
+				*flags |= CPU_DTRACE_BADSTACK;
+				cpu_core[CPU->cpu_id].cpuc_dtrace_illval = sp;
+				break;
+			}
 
 			if (pcstack != NULL) {
 				*pcstack++ = pc;
@@ -404,13 +419,19 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t sp)
 			    !IS_P2ALIGNED((uintptr_t)fr, STACK_ALIGN32))
 				break;
 
+			oldsp = sp;
+
 			pc = dtrace_fuword32(&fr->fr_savpc);
 			sp = dtrace_fuword32(&fr->fr_savfp);
 
 			if (pc == 0)
 				break;
 
-			ret++;
+			if (sp == oldsp || ret++ >= dtrace_ustackdepth_max) {
+				*flags |= CPU_DTRACE_BADSTACK;
+				cpu_core[CPU->cpu_id].cpuc_dtrace_illval = sp;
+				break;
+			}
 
 			if (pcstack != NULL) {
 				*pcstack++ = pc;

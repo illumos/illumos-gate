@@ -35,6 +35,8 @@
 
 extern uintptr_t kernelbase;
 
+int	dtrace_ustackdepth_max = 2048;
+
 void
 dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
     uint32_t *intrpc)
@@ -113,12 +115,14 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t pc,
 	klwp_t *lwp = ttolwp(curthread);
 	proc_t *p = curproc;
 	uintptr_t oldcontext = lwp->lwp_oldcontext;
+	uintptr_t oldsp;
 	volatile uint16_t *flags =
 	    (volatile uint16_t *)&cpu_core[CPU->cpu_id].cpuc_dtrace_flags;
 	size_t s1, s2;
 	int ret = 0;
 
 	ASSERT(pcstack == NULL || pcstack_limit > 0);
+	ASSERT(dtrace_ustackdepth_max > 0);
 
 	if (p->p_model == DATAMODEL_NATIVE) {
 		s1 = sizeof (struct frame) + 2 * sizeof (long);
@@ -129,7 +133,16 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t pc,
 	}
 
 	while (pc != 0) {
-		ret++;
+		/*
+		 * We limit the number of times we can go around this
+		 * loop to account for a circular stack.
+		 */
+		if (ret++ >= dtrace_ustackdepth_max) {
+			*flags |= CPU_DTRACE_BADSTACK;
+			cpu_core[CPU->cpu_id].cpuc_dtrace_illval = sp;
+			break;
+		}
+
 		if (pcstack != NULL) {
 			*pcstack++ = (uint64_t)pc;
 			pcstack_limit--;
@@ -139,6 +152,8 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t pc,
 
 		if (sp == 0)
 			break;
+
+		oldsp = sp;
 
 		if (oldcontext == sp + s1 || oldcontext == sp + s2) {
 			if (p->p_model == DATAMODEL_NATIVE) {
@@ -170,6 +185,12 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t pc,
 				pc = dtrace_fuword32(&fr->fr_savpc);
 				sp = dtrace_fuword32(&fr->fr_savfp);
 			}
+		}
+
+		if (sp == oldsp) {
+			*flags |= CPU_DTRACE_BADSTACK;
+			cpu_core[CPU->cpu_id].cpuc_dtrace_illval = sp;
+			break;
 		}
 
 		/*

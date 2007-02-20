@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1398,6 +1398,7 @@ dtrace_helptrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    f == DTRACEFLT_KPRIV ? "KPRIV" :
 			    f == DTRACEFLT_UPRIV ? "UPRIV" :
 			    f == DTRACEFLT_TUPOFLOW ? "TUPOFLOW" :
+			    f == DTRACEFLT_BADSTACK ? "BADSTACK" :
 			    "DTRACEFLT_UNKNOWN");
 			mdb_printf("%?s| %?s %12s     addr: 0x%x\n", "", "", "",
 			    help.dtht_illval);

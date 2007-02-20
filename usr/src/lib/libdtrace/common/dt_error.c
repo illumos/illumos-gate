@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -203,6 +203,7 @@ dtrace_faultstr(dtrace_hdl_t *dtp, int fault)
 		{ DTRACEFLT_KPRIV,	"invalid kernel access" },
 		{ DTRACEFLT_UPRIV,	"invalid user access" },
 		{ DTRACEFLT_TUPOFLOW,	"tuple stack overflow" },
+		{ DTRACEFLT_BADSTACK,	"bad stack" },
 		{ DTRACEFLT_LIBRARY,	"library-level fault" },
 		{ 0,			NULL }
 	};

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,8 +100,9 @@
 #define	DT_VERS_1_2_2	DT_VERSION_NUMBER(1, 2, 2)
 #define	DT_VERS_1_3	DT_VERSION_NUMBER(1, 3, 0)
 #define	DT_VERS_1_4	DT_VERSION_NUMBER(1, 4, 0)
-#define	DT_VERS_LATEST	DT_VERS_1_4
-#define	DT_VERS_STRING	"Sun D 1.4"
+#define	DT_VERS_1_4_1	DT_VERSION_NUMBER(1, 4, 1)
+#define	DT_VERS_LATEST	DT_VERS_1_4_1
+#define	DT_VERS_STRING	"Sun D 1.4.1"
 
 const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_0,	/* D API 1.0.0 (PSARC 2001/466) Solaris 10 FCS */
@@ -111,6 +112,7 @@ const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_2_2,	/* D API 1.2.2 Solaris Express 6/06 */
 	DT_VERS_1_3,	/* D API 1.3 Solaris Express 10/06 */
 	DT_VERS_1_4,	/* D API 1.4 Solaris Express 2/07 */
+	DT_VERS_1_4_1,	/* D API 1.4.1 Solaris Express 4/07 */
 	0
 };
 

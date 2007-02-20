@@ -36,6 +36,8 @@ proc/tst.sigwait.exe := LIBS += -lrt
 sysevent/tst.post.exe := LIBS += -lsysevent
 sysevent/tst.post_chan.exe := LIBS += -lsysevent
 
+ustack/tst.bigstack.exe := COPTFLAG += -xO1
+
 GCC = /usr/sfw/bin/gcc
 GCCFLAGS_sparc = -mcpu=ultrasparc
 GCCFLAGS = $(GCCFLAGS_$(MACH))

@@ -1350,6 +1350,8 @@ f none opt/SUNWdtrt/tst/common/usdt/tst.user.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.user.ksh.out 0444 root bin
 d none opt/SUNWdtrt/tst/common/ustack 0755 root bin
 f none opt/SUNWdtrt/tst/common/ustack/tst.depth.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/ustack/tst.bigstack.exe 0555 root bin
+f none opt/SUNWdtrt/tst/common/ustack/tst.bigstack.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/ustack/tst.spin.exe 0555 root bin
 f none opt/SUNWdtrt/tst/common/ustack/tst.spin.ksh 0444 root bin
 d none opt/SUNWdtrt/tst/common/vars 0755 root bin
