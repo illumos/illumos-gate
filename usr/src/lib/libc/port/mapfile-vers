@@ -59,7 +59,6 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	fdatasync;
 	forkallx;
 	forkx;
-	getvmusage;
 	lio_listio;
 	mkdtemp;
 	_mkdtemp;
@@ -1574,6 +1573,7 @@ SUNWprivate_1.1 {
 	_getvfsent;
 	_getvfsfile;
 	_getvfsspec;
+	getvmusage;
 	__getwchar_xpg5;
 	__getwc_xpg5;
 	_getzoneid;

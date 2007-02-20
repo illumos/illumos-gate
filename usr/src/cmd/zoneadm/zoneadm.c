@@ -76,6 +76,7 @@
 #include <libbrand.h>
 #include <libscf.h>
 #include <procfs.h>
+#include <strings.h>
 
 #include <pool.h>
 #include <sys/pool.h>
@@ -2235,7 +2236,10 @@ verify_brand(zone_dochandle_t handle, int cmd_num, char *argv[])
 			return (Z_ERR);
 	}
 
-	status = do_subproc_interactive(cmdbuf);
+	if (zoneadm_is_nested)
+		status = do_subproc(cmdbuf);
+	else
+		status = do_subproc_interactive(cmdbuf);
 	err = subproc_status(gettext("brand-specific verification"),
 	    status, B_FALSE);
 
@@ -4028,7 +4032,13 @@ cleanup_zonepath(char *zonepath, boolean_t all)
 	boolean_t	non_std = B_FALSE;
 	struct dirent	*dp;
 	DIR		*dirp;
-	char		*std_entries[] = {"dev", "lu", "root", NULL};
+			/*
+			 * The SUNWattached.xml file is expected since it might
+			 * exist if the zone was force-attached after a
+			 * migration.
+			 */
+	char		*std_entries[] = {"dev", "lu", "root",
+			    "SUNWattached.xml", NULL};
 			/* (MAXPATHLEN * 3) is for the 3 std_entries dirs */
 	char		cmdbuf[sizeof (RMCOMMAND) + (MAXPATHLEN * 3) + 64];
 
@@ -4651,12 +4661,36 @@ dryrun_attach(char *manifest_path, char *argv[])
 
 	if ((err = zonecfg_attach_manifest(fd, local_handle, rem_handle))
 	    != Z_OK) {
-		if (err == Z_INVALID_DOCUMENT)
-			zerror(gettext("Cannot attach to an earlier release "
-			    "of the operating system"));
-		else
-			zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
 		res = Z_ERR;
+
+		if (err == Z_INVALID_DOCUMENT) {
+			struct stat st;
+			char buf[6];
+
+			if (strcmp(manifest_path, "-") == 0) {
+				zerror(gettext("Input is not a valid XML "
+				    "file"));
+				goto done;
+			}
+
+			if (fstat(fd, &st) == -1 || !S_ISREG(st.st_mode)) {
+				zerror(gettext("%s is not an XML file"),
+				    manifest_path);
+				goto done;
+			}
+
+			bzero(buf, sizeof (buf));
+			(void) lseek(fd, 0L, SEEK_SET);
+			if (read(fd, buf, sizeof (buf) - 1) < 0 ||
+			    strncmp(buf, "<?xml", 5) != 0)
+				zerror(gettext("%s is not an XML file"),
+				    manifest_path);
+			else
+				zerror(gettext("Cannot attach to an earlier "
+				    "release of the operating system"));
+		} else {
+			zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+		}
 		goto done;
 	}
 

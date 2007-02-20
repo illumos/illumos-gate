@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -685,8 +685,17 @@ clone_zfs(char *source_zone, char *source_zonepath, char *zonepath)
 	}
 	zfs_close(zhp);
 
-	if (clone_snap(snap_name, clone_name) != Z_OK)
+	if (clone_snap(snap_name, clone_name) != Z_OK) {
+		/* Clean up the snapshot we just took. */
+		if ((zhp = zfs_open(g_zfs, snap_name, ZFS_TYPE_SNAPSHOT))
+		    != NULL) {
+			if (zfs_unmount(zhp, NULL, 0) == 0)
+				(void) zfs_destroy(zhp);
+			zfs_close(zhp);
+		}
+
 		return (Z_ERR);
+	}
 
 	(void) printf(gettext("Instead of copying, a ZFS clone has been "
 	    "created for this zone.\n"));
@@ -791,6 +800,13 @@ destroy_zfs(char *zonepath)
 		zfs_close(zhp);
 		return (Z_ERR);
 	}
+
+	/*
+	 * If the zone has ever been moved then the mountpoint dir will not be
+	 * cleaned up by the zfs_destroy().  To handle this case try to clean
+	 * it up now but don't worry if it fails, that will be normal.
+	 */
+	(void) rmdir(zonepath);
 
 	(void) printf(gettext("The ZFS file system for this zone has been "
 	    "destroyed.\n"));

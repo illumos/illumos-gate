@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -559,12 +559,14 @@ canonify(char c, char *cc)
  * keystroke at a time, state associated with the user input (are we at the
  * beginning of the line?  are we locally echoing the next character?) is
  * maintained by beginning_of_line and local_echo across calls to the routine.
+ * If the write to outfd fails, we'll try to read from infd in an attempt
+ * to prevent deadlock between the two processes.
  *
  * This routine returns -1 when the 'quit' escape sequence has been issued,
  * and 0 otherwise.
  */
 static int
-process_user_input(int outfd, char *buf, size_t nbytes)
+process_user_input(int outfd, int infd, char *buf, size_t nbytes)
 {
 	static boolean_t beginning_of_line = B_TRUE;
 	static boolean_t local_echo = B_FALSE;
@@ -582,14 +584,49 @@ process_user_input(int outfd, char *buf, size_t nbytes)
 			local_echo = B_FALSE;
 			if (c == '.' || c == effective_termios.c_cc[VEOF]) {
 				char cc[CANONIFY_LEN];
+
 				canonify(c, cc);
 				(void) write(STDOUT_FILENO, &cmdchar, 1);
 				(void) write(STDOUT_FILENO, cc, strlen(cc));
 				return (-1);
 			}
 		}
-		if (write(outfd, &c, 1) <= 0)
+retry:
+		if (write(outfd, &c, 1) <= 0) {
+			/*
+			 * Since the fd we are writing to is opened with
+			 * O_NONBLOCK it is possible to get EAGAIN if the
+			 * pipe is full.  One way this could happen is if we
+			 * are writing a lot of data into the pipe in this loop
+			 * and the application on the other end is echoing that
+			 * data back out to its stdout.  The output pipe can
+			 * fill up since we are stuck here in this loop and not
+			 * draining the other pipe.  We can try to read some of
+			 * the data to see if we can drain the pipe so that the
+			 * application can continue to make progress.  The read
+			 * is non-blocking so we won't hang here.  We also wait
+			 * a bit before retrying since there could be other
+			 * reasons why the pipe is full and we don't want to
+			 * continuously retry.
+			 */
+			if (errno == EAGAIN) {
+				struct timespec rqtp;
+				int ln;
+				char ibuf[ZLOGIN_BUFSIZ];
+
+				if ((ln = read(infd, ibuf, ZLOGIN_BUFSIZ)) > 0)
+					(void) write(STDOUT_FILENO, ibuf, ln);
+
+				/* sleep for 10 milliseconds */
+				rqtp.tv_sec = 0;
+				rqtp.tv_nsec = 10 * (NANOSEC / MILLISEC);
+				(void) nanosleep(&rqtp, NULL);
+				if (!dead)
+					goto retry;
+			}
+
 			return (-1);
+		}
 		beginning_of_line = (c == '\r' || c == '\n' ||
 		    c == effective_termios.c_cc[VKILL] ||
 		    c == effective_termios.c_cc[VEOL] ||
@@ -707,8 +744,8 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 					if (write(stdin_fd, ibuf, cc) == -1)
 						break;
 				} else {
-					if (process_user_input(stdin_fd, ibuf,
-					    cc) == -1)
+					if (process_user_input(stdin_fd,
+					    stdout_fd, ibuf, cc) == -1)
 						break;
 				}
 			} else if (raw_mode == B_TRUE &&
