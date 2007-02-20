@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,7 +127,6 @@ static mc_dlist_t *device_head, *device_tail;
 
 static kmutex_t	mcmutex;
 static kmutex_t	mcdatamutex;
-static int mc_is_open = 0;
 
 extern struct mod_ops mod_driverops;
 
@@ -405,17 +404,9 @@ mc_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	/* At least one attached? */
 	if (nmcs == 0) {
 		status = ENXIO;
-		goto bad;
 	}
-
-	if (mc_is_open) {
-		status = EBUSY;
-		goto bad;
-	}
-	mc_is_open = 1;
-bad:
-
 	mutex_exit(&mcmutex);
+
 	return (status);
 }
 
@@ -423,10 +414,6 @@ bad:
 static int
 mc_close(dev_t devp, int flag, int otyp, cred_t *credp)
 {
-	mutex_enter(&mcmutex);
-	mc_is_open = 0;
-	mutex_exit(&mcmutex);
-
 	return (0);
 }
 
