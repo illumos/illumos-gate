@@ -151,6 +151,14 @@ typedef struct
 	boolean_t crl_check;	/* for ImportCRL */
 
 	/*
+	 * The following 2 variables are for FindCertInCRL. The caller can
+	 * either specify certLabel or provide the entire certificate in
+	 * DER format as input.
+	 */
+	char	*certLabel;	/* for FindCertInCRL */
+	KMF_DATA *certificate;  /* for FindCertInCRL */
+
+	/*
 	 * crl_subjName and crl_issuerName are used as the CRL deletion
 	 * criteria.  One should be non-NULL and the other one should be NULL.
 	 * If crl_subjName is not NULL, then delete CRL by the subject name.
@@ -195,11 +203,7 @@ typedef struct {
 
 typedef struct {
 	KMF_KEYSTORE_TYPE	kstype;
-	char			*certLabel;
-	char			*issuer;
-	char			*subject;
-	char			*idstr;
-	KMF_BIGINT		*serial;
+	KMF_DATA		*certificate;
 	KMF_DATA		*ocsp_response;
 
 	union {
@@ -332,7 +336,6 @@ typedef struct {
 
 typedef struct {
 	KMF_KEYSTORE_TYPE	kstype;
-	char			*certLabel;
 
 	union {
 		KMF_NSS_PARAMS	nss_opts;

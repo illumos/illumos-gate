@@ -1092,7 +1092,7 @@ cert_crl_check(KMF_HANDLE_T handle,
 	fcrl_params.kstype = params->kstype;
 	switch (params->kstype) {
 	case KMF_KEYSTORE_NSS:
-		fcrl_params.certLabel = params->certLabel;
+		fcrl_params.nssparms.certificate = params->certificate;
 		break;
 	case KMF_KEYSTORE_PK11TOKEN:
 		/*
@@ -1747,13 +1747,9 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 	int  *result)
 {
 	KMF_RETURN ret = KMF_OK;
-	KMF_FINDCERT_PARAMS fc_target;
-	KMF_OPENSSL_PARAMS ssl_params;
-	KMF_X509_DER_CERT  user_retrCert;
+	KMF_DATA *pcert = NULL;
 	KMF_DATA ta_cert = {0, NULL};
-	KMF_DATA user_cert = {0, NULL};
 	KMF_DATA issuer_cert = {0, NULL};
-	uint32_t num = 0;
 	char *user_issuer = NULL, *user_subject = NULL;
 	KMF_X509_NAME user_issuerDN, user_subjectDN;
 	boolean_t	self_signed = B_FALSE;
@@ -1763,68 +1759,33 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 	if (ret != KMF_OK)
 		return (ret);
 
-	if ((params == NULL) || (result == NULL))
+	if (params == NULL || params->certificate == NULL || result == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	policy = handle->policy;
-
 	*result = KMF_CERT_VALIDATE_OK;
-	(void) memset(&fc_target, 0, sizeof (fc_target));
-	(void) memset(&ssl_params, 0, sizeof (ssl_params));
-	(void) memset(&user_issuerDN, 0, sizeof (user_issuerDN));
-	(void) memset(&user_subjectDN, 0, sizeof (user_subjectDN));
-
-	fc_target.kstype = params->kstype;
-	fc_target.certLabel = params->certLabel;
-	fc_target.issuer = params->issuer;
-	fc_target.subject = params->subject;
-	fc_target.idstr = params->idstr;
-	fc_target.serial = params->serial;
-	if (params->kstype == KMF_KEYSTORE_NSS)
-		fc_target.ks_opt_u.nss_opts = params->ks_opt_u.nss_opts;
-	else if (params->kstype == KMF_KEYSTORE_OPENSSL)
-		fc_target.ks_opt_u.openssl_opts = params->ks_opt_u.openssl_opts;
-	else if (params->kstype == KMF_KEYSTORE_PK11TOKEN)
-		fc_target.ks_opt_u.pkcs11_opts = params->ks_opt_u.pkcs11_opts;
-	else
-		return (KMF_ERR_PLUGIN_NOTFOUND);
+	pcert = params->certificate;
 
 	/*
-	 * Find the Subscriber's certificate based on the input parameter
+	 * Get the issuer information from the input certficate first.
 	 */
-	ret = KMF_FindCert(handle, &fc_target, NULL, &num);
-	if (ret != KMF_OK || num != 1) {
-		(*result) = (*result) | KMF_CERT_VALIDATE_ERR_USER;
-		if (num == 0)
-			ret = KMF_ERR_CERT_NOT_FOUND;
-		if (num > 1)
-			ret = KMF_ERR_CERT_MULTIPLE_FOUND;
-		goto out;
-	}
-
-	(void) memset(&user_retrCert, 0, sizeof (KMF_X509_DER_CERT));
-
-	ret = KMF_FindCert(handle, &fc_target, &user_retrCert, &num);
-	if (ret == KMF_OK)  {
-		user_cert.Length = user_retrCert.certificate.Length;
-		user_cert.Data = user_retrCert.certificate.Data;
-	} else {
-		*result |= KMF_CERT_VALIDATE_ERR_USER;
-		goto out;
-	}
-
-	if ((ret = KMF_GetCertIssuerNameString(handle, &user_cert,
+	if ((ret = KMF_GetCertIssuerNameString(handle, pcert,
 	    &user_issuer)) != KMF_OK) {
 		*result |= KMF_CERT_VALIDATE_ERR_USER;
 		goto out;
 	}
 
+
+	(void) memset(&user_issuerDN, 0, sizeof (user_issuerDN));
 	if ((ret = KMF_DNParser(user_issuer,  &user_issuerDN)) != KMF_OK) {
 		*result |= KMF_CERT_VALIDATE_ERR_USER;
 		goto out;
 	}
 
-	if ((ret = KMF_GetCertSubjectNameString(handle, &user_cert,
+	/*
+	 * Check if the certificate is a self-signed cert.
+	 */
+	if ((ret = KMF_GetCertSubjectNameString(handle, pcert,
 	    &user_subject)) != KMF_OK) {
 		*result |= KMF_CERT_VALIDATE_ERR_USER;
 		KMF_FreeDN(&user_issuerDN);
@@ -1847,25 +1808,25 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 	KMF_FreeDN(&user_subjectDN);
 
 	/*
-	 * Check KeyUsage extension of the subscriber's certificate
+	 * Check KeyUsage extension.
 	 */
-	ret = cert_ku_check(handle, &user_cert);
+	ret = cert_ku_check(handle, pcert);
 	if (ret != KMF_OK)  {
 		*result |= KMF_CERT_VALIDATE_ERR_KEYUSAGE;
 		goto out;
 	}
 
 	/*
-	 * Validate Extended KeyUsage extension
+	 * Validate Extended KeyUsage extension.
 	 */
-	ret = cert_eku_check(handle, &user_cert);
+	ret = cert_eku_check(handle, pcert);
 	if (ret != KMF_OK)  {
 		*result |= KMF_CERT_VALIDATE_ERR_EXT_KEYUSAGE;
 		goto out;
 	}
 
 	/*
-	 * Check the certificate's validity period
+	 * Check the certificate's validity period.
 	 *
 	 * This step is needed when "ignore_date" in policy is set
 	 * to false.
@@ -1874,7 +1835,7 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 		/*
 		 * Validate expiration date
 		 */
-		ret = KMF_CheckCertDate(handle, &user_cert);
+		ret = KMF_CheckCertDate(handle, pcert);
 		if (ret != KMF_OK)  {
 			*result |= KMF_CERT_VALIDATE_ERR_TIME;
 			goto out;
@@ -1895,23 +1856,24 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 		goto check_revocation;
 	}
 
-	ret = kmf_find_ta_cert(handle, params, &ta_cert, &user_issuerDN);
-	if (ret != KMF_OK)  {
-		*result |= KMF_CERT_VALIDATE_ERR_TA;
-		goto out;
-	}
-
 	/*
 	 * Verify the signature of subscriber's certificate using
 	 * TA certificate.
 	 */
 	if (self_signed) {
 		ret = KMF_VerifyCertWithCert(handle,
-		    &user_cert, &user_cert);
+		    pcert, pcert);
 	} else {
-		ret = KMF_VerifyCertWithCert(handle,
-		    &user_cert, &ta_cert);
+		ret = kmf_find_ta_cert(handle, params, &ta_cert,
+		    &user_issuerDN);
+		if (ret != KMF_OK)  {
+			*result |= KMF_CERT_VALIDATE_ERR_TA;
+			goto out;
+		}
+
+		ret = KMF_VerifyCertWithCert(handle, pcert, &ta_cert);
 	}
+
 	if (ret != KMF_OK)  {
 		*result |= KMF_CERT_VALIDATE_ERR_SIGNATURE;
 		goto out;
@@ -1947,7 +1909,7 @@ check_revocation:
 
 	if (policy->revocation & KMF_REVOCATION_METHOD_CRL) {
 		ret = cert_crl_check(handle, params,
-		    &user_cert, &issuer_cert);
+		    pcert, &issuer_cert);
 		if (ret != KMF_OK)  {
 			*result |= KMF_CERT_VALIDATE_ERR_CRL;
 			goto out;
@@ -1956,7 +1918,7 @@ check_revocation:
 
 	if (policy->revocation & KMF_REVOCATION_METHOD_OCSP) {
 		ret = cert_ocsp_check(handle, params,
-			&user_cert, &issuer_cert, params->ocsp_response);
+			pcert, &issuer_cert, params->ocsp_response);
 		if (ret != KMF_OK)  {
 			*result |= KMF_CERT_VALIDATE_ERR_OCSP;
 			goto out;
@@ -1964,9 +1926,6 @@ check_revocation:
 	}
 
 out:
-	if (user_retrCert.certificate.Data)
-		KMF_FreeKMFCert(handle, &user_retrCert);
-
 	if (user_issuer) {
 		KMF_FreeDN(&user_issuerDN);
 		free(user_issuer);

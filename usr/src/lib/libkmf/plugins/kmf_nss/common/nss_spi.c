@@ -21,7 +21,7 @@
 /*
  * NSS keystore wrapper
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1578,7 +1578,9 @@ NSS_FindCertInCRL(KMF_HANDLE_T handle, KMF_FINDCERTINCRL_PARAMS *params)
 	CERTCertDBHandle *certHandle = CERT_GetDefaultCertDB();
 
 	/* check params */
-	if (params == NULL || params->certLabel == NULL) {
+	if (params == NULL ||
+	    (params->ks_opt_u.nss_opts.certLabel == NULL &&
+	    params->ks_opt_u.nss_opts.certificate == NULL)) {
 		return (KMF_ERR_BAD_PARAMETER);
 	}
 
@@ -1588,8 +1590,18 @@ NSS_FindCertInCRL(KMF_HANDLE_T handle, KMF_FINDCERTINCRL_PARAMS *params)
 		return (rv);
 	}
 
-	cert = CERT_FindCertByNicknameOrEmailAddr(certHandle,
-	    params->certLabel);
+	/* Find the certificate first */
+	if (params->ks_opt_u.nss_opts.certLabel != NULL) {
+		cert = CERT_FindCertByNicknameOrEmailAddr(certHandle,
+		    params->ks_opt_u.nss_opts.certLabel);
+	} else {
+		SECItem derCert = { NULL, 0};
+
+		derCert.data = params->ks_opt_u.nss_opts.certificate->Data;
+		derCert.len =  params->ks_opt_u.nss_opts.certificate->Length;
+		cert = CERT_FindCertByDERCert(certHandle, &derCert);
+	}
+
 	if (!cert) {
 		SET_ERROR(kmfh, PORT_GetError());
 		rv = KMF_ERR_CERT_NOT_FOUND;
