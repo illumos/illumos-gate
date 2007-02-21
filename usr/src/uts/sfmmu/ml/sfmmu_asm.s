@@ -2114,7 +2114,7 @@ sfmmu_kpm_dtsb_miss_small(void)
  *       the first zero mapping we find.
  *
  * Parameters:
- * tagacc	= tag access register (vaddr + ctx) (in)
+ * tagacc	= (pseudo-)tag access register (vaddr + ctx) (in)
  * tsbmiss	= address of tsb miss area (in)
  * ismseg	= contents of ism_seg for this ism map (out)
  * ismhat	= physical address of imap_ismhat for this ism map (out)
@@ -2163,7 +2163,7 @@ label/**/3:
  * Returns the hme hash bucket (hmebp) given the vaddr, and the hatid
  * It also returns the virtual pg for vaddr (ie. vaddr << hmeshift)
  * Parameters:
- * vaddr = reg containing virtual address
+ * tagacc = reg containing virtual address
  * hatid = reg containing sfmmu pointer
  * hmeshift = constant/register to shift vaddr to obtain vapg
  * hmebp = register where bucket pointer will be stored
@@ -2268,7 +2268,7 @@ label1:
 /*
  * GET_TTE is a macro that returns a TTE given a tag and hatid.
  *
- * tagacc	= tag access register (vaddr + ctx) (in)
+ * tagacc	= (pseudo-)tag access register (in)
  * hatid	= sfmmu pointer for TSB miss (in)
  * tte		= tte for TLB miss if found, otherwise clobbered (out)
  * hmeblkpa	= PA of hment if found, otherwise clobbered (out)
@@ -2883,7 +2883,7 @@ udtlb_miss_probesecond:
 	 * The miss wasn't in an ISM segment.
 	 *
 	 * %g1 %g3, %g4, %g5, %g7 all clobbered
-	 * %g2 = tag access (vaddr + ctx)
+	 * %g2 = (pseudo) tag access
 	 */
 
 	ba,pt	%icc, 2f
@@ -3259,7 +3259,8 @@ tsb_ism:
 	 * This is an ISM [i|d]tlb miss.  We optimize for largest
 	 * page size down to smallest.
 	 *
-	 * g2 = vaddr + ctx	aka tag access register
+	 * g2 = vaddr + ctx(or ctxtype (sun4v)) aka (pseudo-)tag access
+	 *	register
 	 * g3 = ismmap->ism_seg
 	 * g4 = physical address of ismmap->ism_sfmmu
 	 * g6 = tsbmiss area
@@ -3271,12 +3272,12 @@ tsb_ism:
 	sub	%g4, (IMAP_ISMHAT - IMAP_VB_SHIFT), %g5
 	lduha	[%g5]ASI_MEM, %g4		/* g4 = imap_vb_shift */
 	srlx	%g3, %g4, %g3			/* clr size field */
-	set	TAGACC_CTX_MASK, %g1		/* mask off ctx number */
+	set	TAGACC_CTX_MASK, %g1		/* mask off ctx number/type */
 	sllx	%g3, %g4, %g3			/* g3 = ism vbase */
 	and	%g2, %g1, %g4			/* g4 = ctx number */
 	andn	%g2, %g1, %g1			/* g1 = tlb miss vaddr */
 	sub	%g1, %g3, %g2			/* g2 = offset in ISM seg */	
-	or	%g2, %g4, %g2			/* g2 = tagacc (vaddr + ctx) */
+	or	%g2, %g4, %g2			/* g2 = (pseudo-)tagacc */
 
 	/*
 	 * ISM pages are always locked down.
@@ -4402,7 +4403,7 @@ sfmmu_kpm_stsbmtl_panic:
 	 * MMU fault area contains miss address and context.
 	 */
 	ALTENTRY(sfmmu_slow_dmmu_miss)
-	GET_MMU_D_TAGACC_CTX(%g2, %g3)	! %g2 = tagacc, %g3 = ctx 
+	GET_MMU_D_PTAGACC_CTXTYPE(%g2, %g3)	! %g2 = ptagacc, %g3 = ctx type
 
 slow_miss_common:
 	/*
@@ -4468,13 +4469,8 @@ sfmmu_dslow_patch_ktsb4m_szcode:
 	 * MMU fault area contains miss address and context.
 	 */
 	ALTENTRY(sfmmu_slow_immu_miss)
-	MMU_FAULT_STATUS_AREA(%g2)
-	ldx	[%g2 + MMFSA_I_CTX], %g3
-	ldx	[%g2 + MMFSA_I_ADDR], %g2
-	srlx	%g2, MMU_PAGESHIFT, %g2	! align address to page boundry 	
-	sllx	%g2, MMU_PAGESHIFT, %g2
-	ba,pt	%xcc, slow_miss_common
-	or	%g2, %g3, %g2
+	GET_MMU_I_PTAGACC_CTXTYPE(%g2, %g3)
+	ba,a,pt	%xcc, slow_miss_common
 	SET_SIZE(sfmmu_slow_immu_miss)
 
 #endif /* sun4v */

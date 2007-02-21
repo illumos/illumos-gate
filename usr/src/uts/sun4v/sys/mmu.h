@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,21 +100,30 @@ extern "C" {
 /*
  * MMU TAG TARGET register Layout
  *
- * +-----+---------+------+-------------------------+
- * | 000 | context |  --  | virtual address [63:22] |
- * +-----+---------+------+-------------------------+
- *  63 61 60	 48 47	42 41			   0
+ * +---------------+------+-------------------------+
+ * |    context    |  --  | virtual address [63:22] |
+ * +---------------+------+-------------------------+
+ *  63           48 47  42 41                      0
+ *
+ * Some sun4v processors only use a 13-bit context ID, so bits 61-63 will be
+ * zero in that case.  This layout allows us to use the same code for any sun4v
+ * processors, whether they support 13 bit or 16 bit context IDs (or something
+ * in between).
  */
 #define	TTARGET_CTX_SHIFT	48
 #define	TTARGET_VA_SHIFT	22
 
 /*
- * MMU TAG ACCESS register Layout
+ * Pseudo MMU TAG ACCESS register Layout
  *
  * +-------------------------+------------------+
- * | virtual address [63:13] |  context [12:0]  |
+ * | virtual address [63:13] |     0     | type |
  * +-------------------------+------------------+
- *  63			  13	12		0
+ *  63			  13	12      2 1    0
+ *
+ * 16-bit context IDs don't fit into the 13 bit field as they did on sun4u,
+ * so we use a context type, 0 = kernel context, 1 = invalid context,
+ * 2 = user context.
  */
 #define	TAGACC_CTX_MASK		0x1FFF
 #define	TAGACC_SHIFT		13
@@ -124,7 +133,7 @@ extern "C" {
 /*
  * MMU PRIMARY/SECONDARY CONTEXT register
  */
-#define	CTXREG_CTX_MASK		0x1FFF
+#define	CTXREG_CTX_MASK		0xFFFF
 
 /*
  * The kernel always runs in KCONTEXT, and no user mappings

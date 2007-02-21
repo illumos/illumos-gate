@@ -10601,7 +10601,7 @@ void
 sfmmu_tsbmiss_exception(struct regs *rp, uintptr_t tagaccess, uint_t traptype)
 {
 	sfmmu_t *sfmmup;
-	uint_t ctxnum;
+	uint_t ctxtype;
 	klwp_id_t lwp;
 	char lwp_save_state;
 	hatlock_t *hatlockp;
@@ -10610,9 +10610,13 @@ sfmmu_tsbmiss_exception(struct regs *rp, uintptr_t tagaccess, uint_t traptype)
 	SFMMU_STAT(sf_tsb_exceptions);
 	SFMMU_MMU_STAT(mmu_tsb_exceptions);
 	sfmmup = astosfmmu(curthread->t_procp->p_as);
-	ctxnum = tagaccess & TAGACC_CTX_MASK;
+	/*
+	 * note that in sun4u, tagacces register contains ctxnum
+	 * while sun4v passes ctxtype in the tagaccess register.
+	 */
+	ctxtype = tagaccess & TAGACC_CTX_MASK;
 
-	ASSERT(sfmmup != ksfmmup && ctxnum != KCONTEXT);
+	ASSERT(sfmmup != ksfmmup && ctxtype != KCONTEXT);
 	ASSERT(sfmmup->sfmmu_ismhat == 0);
 	/*
 	 * First, make sure we come out of here with a valid ctx,
@@ -10629,9 +10633,9 @@ sfmmu_tsbmiss_exception(struct regs *rp, uintptr_t tagaccess, uint_t traptype)
 	 * reader temporarily.
 	 */
 	ASSERT(!SFMMU_FLAGS_ISSET(sfmmup, HAT_SWAPPED) ||
-	    ctxnum == INVALID_CONTEXT);
+	    ctxtype == INVALID_CONTEXT);
 
-	if (ctxnum == INVALID_CONTEXT) {
+	if (ctxtype == INVALID_CONTEXT) {
 		/*
 		 * Must set lwp state to LWP_SYS before
 		 * trying to acquire any adaptive lock

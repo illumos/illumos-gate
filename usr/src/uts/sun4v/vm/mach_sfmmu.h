@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,22 +107,25 @@ struct hv_tsb_block {
 	wrpr	%g0, val, %gl
 
 /*
- * Synthesize/get data tag access register value and context from the
- * MMU fault area
+ * Get pseudo-tagacc value and context from the MMU fault area.  Pseudo-tagacc
+ * is the faulting virtual address OR'd with 0 for KCONTEXT, INVALID_CONTEXT
+ * (1) for invalid context, and USER_CONTEXT (2) for user context.
  *
  * In:
- *   tagacc, ctx = scratch registers
+ *   tagacc, ctxtype = scratch registers
  * Out:
  *   tagacc = MMU data tag access register value
- *   ctx = context
+ *   ctx = context type (KCONTEXT, INVALID_CONTEXT or USER_CONTEXT)
  */
-#define	GET_MMU_D_TAGACC_CTX(tagacc, ctx)				\
-	MMU_FAULT_STATUS_AREA(ctx);					\
-	ldx	[ctx + MMFSA_D_ADDR], tagacc;				\
-	ldx	[ctx + MMFSA_D_CTX], ctx;				\
-	srlx	tagacc, MMU_PAGESHIFT, tagacc;	/* align to page boundry */ \
-	sllx	tagacc, MMU_PAGESHIFT, tagacc;				\
-	or	tagacc, ctx, tagacc
+#define	GET_MMU_D_PTAGACC_CTXTYPE(ptagacc, ctxtype)			\
+	MMU_FAULT_STATUS_AREA(ctxtype);					\
+	ldx	[ctxtype + MMFSA_D_ADDR], ptagacc;			\
+	ldx	[ctxtype + MMFSA_D_CTX], ctxtype;			\
+	srlx	ptagacc, MMU_PAGESHIFT, ptagacc; /* align to page boundary */ \
+	cmp	ctxtype, USER_CONTEXT_TYPE;				\
+	sllx	ptagacc, MMU_PAGESHIFT, ptagacc;			\
+	movgu	%icc, USER_CONTEXT_TYPE, ctxtype;			\
+	or	ptagacc, ctxtype, ptagacc
 
 /*
  * Synthesize/get data tag access register value from the MMU fault area
@@ -134,7 +136,7 @@ struct hv_tsb_block {
  *   tagacc = MMU data tag access register value
  */
 #define	GET_MMU_D_TAGACC(tagacc, scr1)				\
-	GET_MMU_D_TAGACC_CTX(tagacc, scr1)
+	GET_MMU_D_PTAGACC_CTXTYPE(tagacc, scr1)
 
 /*
  * Synthesize/get data tag target register value from the MMU fault area
@@ -153,26 +155,30 @@ struct hv_tsb_block {
 	or	ttarget, scr1, ttarget
 
 /*
- * Synthesize/get data/instruction tag access register values
- * from the MMU fault area.
+ * Synthesize/get data/instruction psuedo tag access register values
+ * from the MMU fault area (context is 0 for kernel, 1 for invalid, 2 for user)
  *
  * In:
  *   dtagacc, itagacc, scr1, scr2 = scratch registers
  * Out:
- *   dtagacc = MMU data tag access register value
- *   itagacc = MMU instruction tag access register value
+ *   dtagacc = MMU data tag access register value w/psuedo-context
+ *   itagacc = MMU instruction tag access register value w/pseudo-context
  */
 #define	GET_MMU_BOTH_TAGACC(dtagacc, itagacc, scr1, scr2)	\
 	MMU_FAULT_STATUS_AREA(scr1);				\
 	ldx	[scr1 + MMFSA_D_ADDR], scr2;			\
 	ldx	[scr1 + MMFSA_D_CTX], dtagacc;			\
-	srlx	scr2, MMU_PAGESHIFT, scr2;	/* align to page boundry */ \
+	srlx	scr2, MMU_PAGESHIFT, scr2;	/* align to page boundary */ \
+	cmp	dtagacc, USER_CONTEXT_TYPE;			\
 	sllx	scr2, MMU_PAGESHIFT, scr2;			\
+	movgu	%icc, USER_CONTEXT_TYPE, dtagacc;		\
 	or	scr2, dtagacc, dtagacc;				\
 	ldx	[scr1 + MMFSA_I_ADDR], scr2;			\
 	ldx	[scr1 + MMFSA_I_CTX], itagacc;			\
 	srlx	scr2, MMU_PAGESHIFT, scr2;	/* align to page boundry */ \
+	cmp	itagacc, USER_CONTEXT_TYPE;			\
 	sllx	scr2, MMU_PAGESHIFT, scr2;			\
+	movgu	%icc, USER_CONTEXT_TYPE, itagacc;		\
 	or	scr2, itagacc, itagacc
 
 /*
@@ -186,6 +192,27 @@ struct hv_tsb_block {
 #define	GET_MMU_D_ADDR(daddr, scr1)				\
 	MMU_FAULT_STATUS_AREA(scr1);				\
 	ldx	[scr1 + MMFSA_D_ADDR], daddr
+
+/*
+ * Get pseudo-tagacc value and context from the MMU fault area.  Pseudo-tagacc
+ * is the faulting virtual address OR'd with 0 for KCONTEXT, INVALID_CONTEXT
+ * (1) for invalid context, and USER_CONTEXT (2) for user context.
+ *
+ * In:
+ *   tagacc, ctxtype = scratch registers
+ * Out:
+ *   tagacc = MMU instruction tag access register value
+ *   ctxtype = context type (KCONTEXT, INVALID_CONTEXT or USER_CONTEXT)
+ */
+#define	GET_MMU_I_PTAGACC_CTXTYPE(ptagacc, ctxtype)			\
+	MMU_FAULT_STATUS_AREA(ctxtype);					\
+	ldx	[ctxtype + MMFSA_I_ADDR], ptagacc;			\
+	ldx	[ctxtype + MMFSA_I_CTX], ctxtype;			\
+	srlx	ptagacc, MMU_PAGESHIFT, ptagacc; /* align to page boundary */ \
+	cmp	ctxtype, USER_CONTEXT_TYPE;				\
+	sllx	ptagacc, MMU_PAGESHIFT, ptagacc;			\
+	movgu	%icc, USER_CONTEXT_TYPE, ctxtype;			\
+	or	ptagacc, ctxtype, ptagacc
 
 /*
  * Load ITLB entry

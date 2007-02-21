@@ -575,9 +575,17 @@ struct ctx_trace {
  * only context that needs to be locked is context 0 (the kernel
  * context), and context 1 (reserved for stolen context). So this constant
  * was originally defined to be 2.
+ *
+ * For sun4v only, USER_CONTEXT_TYPE represents any user context.  Many
+ * routines only care whether the context is kernel, invalid or user.
  */
+
 #define	NUM_LOCKED_CTXS 2
 #define	INVALID_CONTEXT	1
+
+#ifdef sun4v
+#define	USER_CONTEXT_TYPE	NUM_LOCKED_CTXS
+#endif
 
 #ifndef	_ASM
 

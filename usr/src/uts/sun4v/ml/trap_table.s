@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -897,10 +897,6 @@ tt_pil/**/level:			;\
 	ba,a,pt	%xcc, .dmmu_exc_stdf_not_aligned			;\
 	.align	32
 
-#if TAGACC_CTX_MASK != CTXREG_CTX_MASK
-#error "TAGACC_CTX_MASK != CTXREG_CTX_MASK"
-#endif
-
 #if defined(cscope)
 /*
  * Define labels to direct cscope quickly to labels that
@@ -929,24 +925,20 @@ tt1_dtlbmiss:
  */
 
 /*
- * synthesize for miss handler: TAG_ACCESS in %g2
+ * synthesize for miss handler: pseudo-tag access in %g2 (with context "type"
+ * (0=kernel, 1=invalid, or 2=user) rather than context ID)
  */
 #define	DTLB_MISS(table_name)						;\
 	.global	table_name/**/_dtlbmiss					;\
 table_name/**/_dtlbmiss:						;\
 	HAT_PERCPU_DBSTAT(TSBMISS_DTLBMISS) /* 3 instr ifdef DEBUG */	;\
-	MMU_FAULT_STATUS_AREA(%g7)					;\
-	ldx	[%g7 + MMFSA_D_ADDR], %g2	/* address */		;\
-	ldx	[%g7 + MMFSA_D_CTX], %g3	/* g3 = ctx */		;\
-	srlx	%g2, MMU_PAGESHIFT, %g2		/* align address */	;\
-	sllx	%g2, MMU_PAGESHIFT, %g2					;\
-	or	%g2, %g3, %g2			/* TAG_ACCESS */	;\
+	GET_MMU_D_PTAGACC_CTXTYPE(%g2, %g3)	/* 8 instr */		;\
 	cmp	%g3, INVALID_CONTEXT					;\
 	ble,pn	%xcc, sfmmu_kdtlb_miss					;\
 	  srlx	%g2, TAG_VALO_SHIFT, %g7	/* g7 = tsb tag */	;\
 	mov	SCRATCHPAD_UTSBREG2, %g1				;\
 	ldxa	[%g1]ASI_SCRATCHPAD, %g1	/* get 2nd tsbreg */	;\
-	brgez,pn %g1, sfmmu_udtlb_slowpath	/* brnach if 2 TSBs */	;\
+	brgez,pn %g1, sfmmu_udtlb_slowpath	/* branch if 2 TSBs */	;\
 	  nop								;\
 	GET_1ST_TSBE_PTR(%g2, %g1, %g4, %g5)	/* 11 instr */		;\
 	ba,pt	%xcc, sfmmu_udtlb_fastpath	/* no 4M TSB, miss */	;\
@@ -978,24 +970,20 @@ tt1_itlbmiss:
  */
 
 /*
- * synthesize for miss handler: TAG_ACCESS in %g2
+ * synthesize for miss handler: TAG_ACCESS in %g2 (with context "type"
+ * (0=kernel, 1=invalid, or 2=user) rather than context ID)
  */
 #define	ITLB_MISS(table_name)						 \
 	.global	table_name/**/_itlbmiss					;\
 table_name/**/_itlbmiss:						;\
 	HAT_PERCPU_DBSTAT(TSBMISS_ITLBMISS) /* 3 instr ifdef DEBUG */	;\
-	MMU_FAULT_STATUS_AREA(%g7)					;\
-	ldx	[%g7 + MMFSA_I_ADDR], %g2	/* g2 = address */	;\
-	ldx	[%g7 + MMFSA_I_CTX], %g3	/* g3 = ctx */		;\
-	srlx	%g2, MMU_PAGESHIFT, %g2		/* align address */	;\
-	sllx	%g2, MMU_PAGESHIFT, %g2					;\
-	or	%g2, %g3, %g2			/* TAG_ACCESS */	;\
+	GET_MMU_I_PTAGACC_CTXTYPE(%g2, %g3)	/* 8 instr */		;\
 	cmp	%g3, INVALID_CONTEXT					;\
 	ble,pn	%xcc, sfmmu_kitlb_miss					;\
 	  srlx	%g2, TAG_VALO_SHIFT, %g7	/* g7 = tsb tag */	;\
 	mov	SCRATCHPAD_UTSBREG2, %g1				;\
 	ldxa	[%g1]ASI_SCRATCHPAD, %g1	/* get 2nd tsbreg */	;\
-	brgez,pn %g1, sfmmu_uitlb_slowpath	/* branch if 2 TSBS */	;\
+	brgez,pn %g1, sfmmu_uitlb_slowpath	/* branch if 2 TSBs */	;\
 	  nop								;\
 	GET_1ST_TSBE_PTR(%g2, %g1, %g4, %g5)	/* 11 instr */		;\
 	ba,pt	%xcc, sfmmu_uitlb_fastpath	/* no 4M TSB, miss */	;\
@@ -1015,18 +1003,14 @@ table_name/**/_itlbmiss:						;\
  * exactly 32 instructions.
  */
 /*
- * synthesize for miss handler: TAG_ACCESS in %g2
+ * synthesize for miss handler: TAG_ACCESS in %g2 (with context "type"
+ * (0=kernel, 1=invalid, or 2=user) rather than context ID)
  */
 #define	DTLB_PROT							 \
-	MMU_FAULT_STATUS_AREA(%g7)					;\
-	ldx	[%g7 + MMFSA_D_ADDR], %g2	/* address */		;\
-	ldx	[%g7 + MMFSA_D_CTX], %g3	/* %g3 = ctx */		;\
-	srlx	%g2, MMU_PAGESHIFT, %g2		/* align address */	;\
-	sllx	%g2, MMU_PAGESHIFT, %g2					;\
-	or	%g2, %g3, %g2			/* TAG_ACCESS */	;\
+	GET_MMU_D_PTAGACC_CTXTYPE(%g2, %g3)	/* 8 instr */		;\
 	/*								;\
-	 *   g2 = tag access register					;\
-	 *   g3 = ctx number						;\
+	 *   g2 = pseudo-tag access register (ctx type rather than ctx ID) ;\
+	 *   g3 = ctx type (0, 1, or 2)					;\
 	 */								;\
 	TT_TRACE(trace_dataprot)	/* 2 instr ifdef TRAPTRACE */	;\
 					/* clobbers g1 and g6 XXXQ? */	;\
@@ -1399,7 +1383,8 @@ etrap_table:
  * g7 = pc we jumped here from (in)
  */
 /*
- * synthesize for trap(): TAG_ACCESS in %g2
+ * synthesize for miss handler: TAG_ACCESS in %g2 (with context "type"
+ * (0=kernel, 1=invalid, or 2=user) rather than context ID)
  */
 	ALTENTRY(exec_fault)
 	TRACE_TSBHIT(TT_MMU_EXEC)
@@ -1407,7 +1392,9 @@ etrap_table:
 	ldx	[%g4 + MMFSA_I_ADDR], %g2	/* g2 = address */
 	ldx	[%g4 + MMFSA_I_CTX], %g3	/* g3 = ctx */
 	srlx	%g2, MMU_PAGESHIFT, %g2		! align address to page boundry
+	cmp	%g3, USER_CONTEXT_TYPE
 	sllx	%g2, MMU_PAGESHIFT, %g2
+	movgu	%icc, USER_CONTEXT_TYPE, %g3
 	or	%g2, %g3, %g2			/* TAG_ACCESS */
 	mov	T_INSTR_MMU_MISS, %g3		! arg2 = traptype
 	set	trap, %g1
@@ -2481,7 +2468,9 @@ mmu_trap_tl1:
 	ldx	[%g7 + MMFSA_D_ADDR], %g6
 	ldx	[%g7 + MMFSA_D_CTX], %g7
 	srlx	%g6, MMU_PAGESHIFT, %g6		/* align address */
+	cmp	%g7, USER_CONTEXT_TYPE
 	sllx	%g6, MMU_PAGESHIFT, %g6
+	movgu	%icc, USER_CONTEXT_TYPE, %g7
 	or	%g6, %g7, %g6			/* TAG_ACCESS */
 1:
 	done
@@ -2642,8 +2631,6 @@ trace_tsbmiss:
 	rdpr	%tnpc, %g6
 	stna	%g6, [%g5 + TRAP_ENT_F2]%asi
 	stna	%g1, [%g5 + TRAP_ENT_F3]%asi		! tsb8k pointer
-	srlx	%g1, 32, %g6
-	stna	%g6, [%g5 + TRAP_ENT_F4]%asi		! huh?
 	rdpr	%tpc, %g6
 	stna	%g6, [%g5 + TRAP_ENT_TPC]%asi
 	TRACE_SAVE_TL_GL_REGS(%g5, %g6)
@@ -2658,6 +2645,12 @@ trace_tsbmiss:
 	MMU_FAULT_STATUS_AREA(%g6)
 	ldx	[%g6 + %g4], %g6
 	stxa	%g6, [%g5 + TRAP_ENT_TSTATE]%asi	! tag target
+	cmp	%g4, MMFSA_D_ADDR
+	move	%xcc, MMFSA_D_CTX, %g4
+	movne	%xcc, MMFSA_I_CTX, %g4
+	MMU_FAULT_STATUS_AREA(%g6)
+	ldx	[%g6 + %g4], %g6
+	stxa	%g6, [%g5 + TRAP_ENT_F4]%asi		! context ID
 	stna	%g3, [%g5 + TRAP_ENT_TR]%asi		! tsb4m pointer
 	TRACE_NEXT(%g5, %g4, %g6)
 	jmp	%g7 + 4
@@ -2665,7 +2658,7 @@ trace_tsbmiss:
 
 /*
  * g2 = tag access register (in)
- * g3 = ctx number (in)
+ * g3 = ctx type (0, 1 or 2) (in) (not used)
  */
 trace_dataprot:
 	membar	#Sync
@@ -2679,7 +2672,6 @@ trace_dataprot:
 	rdpr	%tstate, %g6
 	stxa	%g6, [%g1 + TRAP_ENT_TSTATE]%asi
 	stna	%g2, [%g1 + TRAP_ENT_SP]%asi		! tag access reg
-	stna	%g0, [%g1 + TRAP_ENT_TR]%asi
 	stna	%g0, [%g1 + TRAP_ENT_F1]%asi
 	stna	%g0, [%g1 + TRAP_ENT_F2]%asi
 	stna	%g0, [%g1 + TRAP_ENT_F3]%asi
@@ -2687,6 +2679,14 @@ trace_dataprot:
 	TRACE_SAVE_TL_GL_REGS(%g1, %g6)
 	rdpr	%tt, %g6
 	stha	%g6, [%g1 + TRAP_ENT_TT]%asi
+	mov	MMFSA_D_CTX, %g4
+	cmp	%g6, FAST_IMMU_MISS_TT
+	move	%xcc, MMFSA_I_CTX, %g4
+	cmp	%g6, T_INSTR_MMU_MISS
+	move	%xcc, MMFSA_I_CTX, %g4
+	MMU_FAULT_STATUS_AREA(%g6)
+	ldx	[%g6 + %g4], %g6
+	stxa	%g6, [%g1 + TRAP_ENT_TR]%asi	! context ID
 	TRACE_NEXT(%g1, %g4, %g5)
 	jmp	%g7 + 4
 	nop
@@ -2746,12 +2746,14 @@ trace_dataprot:
 	MMU_FAULT_STATUS_AREA(%g3)
 	ldx	[%g3 + MMFSA_D_ADDR], %g2
 	ldx	[%g3 + MMFSA_D_TYPE], %g1
-	ldx	[%g3 + MMFSA_D_CTX], %g3
+	ldx	[%g3 + MMFSA_D_CTX], %g4
 	srlx	%g2, MMU_PAGESHIFT, %g2		/* align address */
 	sllx	%g2, MMU_PAGESHIFT, %g2
-	or	%g2, %g3, %g2			/* TAG_ACCESS */
-	sllx	%g3, SFSR_CTX_SHIFT, %g3
+	sllx	%g4, SFSR_CTX_SHIFT, %g3
 	or	%g3, %g1, %g3			/* SFSR */
+	cmp	%g4, USER_CONTEXT_TYPE
+	movgeu	%icc, USER_CONTEXT_TYPE, %g4
+	or	%g2, %g4, %g2			/* TAG_ACCESS */
 	ba,pt	%xcc, .mmu_exception_end
 	mov	T_DATA_EXCEPTION, %g1
 	SET_SIZE(.dmmu_exception)
