@@ -1702,7 +1702,18 @@ zio_next_stage(zio_t *zio)
 	ASSERT(zio->io_stage <= ZIO_STAGE_DONE);
 	ASSERT(zio->io_stalled == 0);
 
-	zio_pipeline[zio->io_stage](zio);
+	/*
+	 * See the comment in zio_next_stage_async() about per-CPU taskqs.
+	 */
+	if (((1U << zio->io_stage) & zio->io_async_stages) &&
+	    (zio->io_stage == ZIO_STAGE_WRITE_COMPRESS) &&
+	    !(zio->io_flags & ZIO_FLAG_METADATA)) {
+		taskq_t *tq = zio->io_spa->spa_zio_issue_taskq[zio->io_type];
+		(void) taskq_dispatch(tq,
+		    (task_func_t *)zio_pipeline[zio->io_stage], zio, TQ_SLEEP);
+	} else {
+		zio_pipeline[zio->io_stage](zio);
+	}
 }
 
 void

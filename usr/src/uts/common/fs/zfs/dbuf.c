@@ -2061,6 +2061,7 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, int checksum,
 	uint64_t txg = tx->tx_txg;
 	zbookmark_t zb;
 	zio_t *zio;
+	int zio_flags;
 
 	if (parent != dn->dn_dbuf) {
 		ASSERT(parent && parent->db_data_pending);
@@ -2083,6 +2084,9 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, int checksum,
 	zb.zb_level = db->db_level;
 	zb.zb_blkid = db->db_blkid;
 
+	zio_flags = ZIO_FLAG_MUSTSUCCEED;
+	if (dmu_ot[dn->dn_type].ot_metadata || zb.zb_level != 0)
+		zio_flags |= ZIO_FLAG_METADATA;
 	if (BP_IS_OLDER(db->db_blkptr, txg))
 		dsl_dataset_block_kill(
 		    os->os_dsl_dataset, db->db_blkptr, zio, tx);
@@ -2090,7 +2094,7 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, int checksum,
 	dr->dr_zio = arc_write(zio, os->os_spa, checksum, compress,
 	    dmu_get_replication_level(os->os_spa, &zb, dn->dn_type), txg,
 	    db->db_blkptr, data, dbuf_write_ready, dbuf_write_done, db,
-	    ZIO_PRIORITY_ASYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb);
+	    ZIO_PRIORITY_ASYNC_WRITE, zio_flags, &zb);
 }
 
 /* ARGSUSED */

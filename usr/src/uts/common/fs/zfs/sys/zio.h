@@ -133,6 +133,8 @@ enum zio_compress {
 #define	ZIO_FLAG_NOBOOKMARK		0x10000
 #define	ZIO_FLAG_USER			0x20000
 
+#define	ZIO_FLAG_METADATA		0x40000
+
 #define	ZIO_FLAG_GANG_INHERIT		\
 	(ZIO_FLAG_CANFAIL |		\
 	ZIO_FLAG_FAILFAST |		\

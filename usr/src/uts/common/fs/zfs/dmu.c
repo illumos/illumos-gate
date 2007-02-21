@@ -672,6 +672,7 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 	dmu_sync_arg_t *in;
 	zbookmark_t zb;
 	zio_t *zio;
+	int zio_flags;
 	int err;
 
 	ASSERT(BP_IS_HOLE(bp));
@@ -782,12 +783,15 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 	zb.zb_object = db->db.db_object;
 	zb.zb_level = db->db_level;
 	zb.zb_blkid = db->db_blkid;
+	zio_flags = ZIO_FLAG_MUSTSUCCEED;
+	if (dmu_ot[db->db_dnode->dn_type].ot_metadata || zb.zb_level != 0)
+		zio_flags |= ZIO_FLAG_METADATA;
 	zio = arc_write(pio, os->os_spa,
 	    zio_checksum_select(db->db_dnode->dn_checksum, os->os_checksum),
 	    zio_compress_select(db->db_dnode->dn_compress, os->os_compress),
 	    dmu_get_replication_level(os->os_spa, &zb, db->db_dnode->dn_type),
 	    txg, bp, dr->dt.dl.dr_data, NULL, dmu_sync_done, in,
-	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb);
+	    ZIO_PRIORITY_SYNC_WRITE, zio_flags, &zb);
 
 	if (pio) {
 		zio_nowait(zio);
