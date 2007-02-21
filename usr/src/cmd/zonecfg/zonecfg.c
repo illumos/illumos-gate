@@ -1443,6 +1443,7 @@ create_func(cmd_t *cmd)
 	zone_dochandle_t tmphandle;
 	bool force = FALSE;
 	bool attach = FALSE;
+	bool arg_err = FALSE;
 
 	assert(cmd != NULL);
 
@@ -1458,7 +1459,8 @@ create_func(cmd_t *cmd)
 				longer_usage(CMD_CREATE);
 			else
 				short_usage(CMD_CREATE);
-			return;
+			arg_err = TRUE;
+			break;
 		case 'a':
 			(void) strlcpy(attach_path, optarg,
 			    sizeof (attach_path));
@@ -1477,9 +1479,13 @@ create_func(cmd_t *cmd)
 			break;
 		default:
 			short_usage(CMD_CREATE);
-			return;
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return;
+
 	if (optind != cmd->cmd_argc) {
 		short_usage(CMD_CREATE);
 		return;
@@ -1585,6 +1591,7 @@ export_func(cmd_t *cmd)
 	boolean_t autoboot;
 	zone_iptype_t iptype;
 	bool need_to_close = FALSE;
+	bool arg_err = FALSE;
 
 	assert(cmd != NULL);
 
@@ -1597,15 +1604,20 @@ export_func(cmd_t *cmd)
 				longer_usage(CMD_EXPORT);
 			else
 				short_usage(CMD_EXPORT);
-			return;
+			arg_err = TRUE;
+			break;
 		case 'f':
 			(void) strlcpy(outfile, optarg, sizeof (outfile));
 			break;
 		default:
 			short_usage(CMD_EXPORT);
-			return;
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return;
+
 	if (optind != cmd->cmd_argc) {
 		short_usage(CMD_EXPORT);
 		return;
@@ -1832,21 +1844,27 @@ void
 exit_func(cmd_t *cmd)
 {
 	int arg, answer;
+	bool arg_err = FALSE;
 
 	optind = 0;
 	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?F")) != EOF) {
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_EXIT);
-			return;
+			arg_err = TRUE;
+			break;
 		case 'F':
 			force_exit = TRUE;
 			break;
 		default:
 			short_usage(CMD_EXIT);
-			return;
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return;
+
 	if (optind < cmd->cmd_argc) {
 		short_usage(CMD_EXIT);
 		return;
@@ -2200,20 +2218,26 @@ void
 add_func(cmd_t *cmd)
 {
 	int arg;
+	bool arg_err = FALSE;
 
 	assert(cmd != NULL);
 
 	optind = 0;
-	if ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_ADD);
-			return;
+			arg_err = TRUE;
+			break;
 		default:
 			short_usage(CMD_ADD);
-			return;
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return;
+
 	if (optind != cmd->cmd_argc) {
 		short_usage(CMD_ADD);
 		return;
@@ -2254,21 +2278,27 @@ delete_func(cmd_t *cmd)
 	int err, arg, answer;
 	char line[ZONENAME_MAX + 128];	/* enough to ask a question */
 	bool force = FALSE;
+	bool arg_err = FALSE;
 
 	optind = 0;
 	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?F")) != EOF) {
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_DELETE);
-			return;
+			arg_err = TRUE;
+			break;
 		case 'F':
 			force = TRUE;
 			break;
 		default:
 			short_usage(CMD_DELETE);
-			return;
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return;
+
 	if (optind != cmd->cmd_argc) {
 		short_usage(CMD_DELETE);
 		return;
@@ -2633,6 +2663,7 @@ prompt_remove_resource(cmd_t *cmd, char *rsrc)
 	int arg;
 	boolean_t force = B_FALSE;
 	char prompt[128];
+	bool arg_err = FALSE;
 
 	optind = 0;
 	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "F")) != EOF) {
@@ -2641,9 +2672,13 @@ prompt_remove_resource(cmd_t *cmd, char *rsrc)
 			force = B_TRUE;
 			break;
 		default:
-			return (B_FALSE);
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return (B_FALSE);
+
 
 	num = zonecfg_num_resources(handle, rsrc);
 
@@ -2986,6 +3021,7 @@ remove_resource(cmd_t *cmd)
 {
 	int type;
 	int arg;
+	bool arg_err = FALSE;
 
 	if ((type = cmd->cmd_res_type) == RT_UNKNOWN) {
 		long_usage(CMD_REMOVE, TRUE);
@@ -2997,14 +3033,18 @@ remove_resource(cmd_t *cmd)
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_REMOVE);
-			return;
+			arg_err = TRUE;
+			break;
 		case 'F':
 			break;
 		default:
 			short_usage(CMD_REMOVE);
-			return;
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return;
 
 	if (initialize(TRUE) != Z_OK)
 		return;
@@ -3669,6 +3709,7 @@ set_func(cmd_t *cmd)
 	size_t physmem_size = sizeof (in_progress_mcaptab.zone_physmem_cap);
 	uint64_t mem_cap, mem_limit;
 	struct zone_psettab tmp_psettab;
+	bool arg_err = FALSE;
 
 	if (zone_is_read_only(CMD_SET))
 		return;
@@ -3686,9 +3727,12 @@ set_func(cmd_t *cmd)
 				longer_usage(CMD_SET);
 			else
 				short_usage(CMD_SET);
-			return;
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return;
 
 	prop_type = cmd->cmd_prop_name[0];
 	if (global_scope) {
@@ -5160,20 +5204,26 @@ verify_func(cmd_t *cmd)
 	char brand[MAXNAMELEN];
 	int err, ret_val = Z_OK, arg;
 	bool save = FALSE;
+	bool arg_err = FALSE;
 	zone_iptype_t iptype;
 	boolean_t has_cpu_shares = B_FALSE;
 
 	optind = 0;
-	if ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_VERIFY);
-			return;
+			arg_err = TRUE;
+			break;
 		default:
 			short_usage(CMD_VERIFY);
-			return;
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return;
+
 	if (optind > cmd->cmd_argc) {
 		short_usage(CMD_VERIFY);
 		return;
@@ -5377,20 +5427,26 @@ void
 cancel_func(cmd_t *cmd)
 {
 	int arg;
+	bool arg_err = FALSE;
 
 	assert(cmd != NULL);
 
 	optind = 0;
-	if ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_CANCEL);
-			return;
+			arg_err = TRUE;
+			break;
 		default:
 			short_usage(CMD_CANCEL);
-			return;
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return;
+
 	if (optind != cmd->cmd_argc) {
 		short_usage(CMD_CANCEL);
 		return;
@@ -5496,6 +5552,7 @@ void
 end_func(cmd_t *cmd)
 {
 	bool validation_failed = FALSE;
+	bool arg_err = FALSE;
 	struct zone_fstab tmp_fstab;
 	struct zone_nwiftab tmp_nwiftab;
 	struct zone_devtab tmp_devtab;
@@ -5509,16 +5566,21 @@ end_func(cmd_t *cmd)
 	assert(cmd != NULL);
 
 	optind = 0;
-	if ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_END);
-			return;
+			arg_err = TRUE;
+			break;
 		default:
 			short_usage(CMD_END);
-			return;
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return;
+
 	if (optind != cmd->cmd_argc) {
 		short_usage(CMD_END);
 		return;
@@ -5899,18 +5961,24 @@ void
 commit_func(cmd_t *cmd)
 {
 	int arg;
+	bool arg_err = FALSE;
 
 	optind = 0;
-	if ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_COMMIT);
-			return;
+			arg_err = TRUE;
+			break;
 		default:
 			short_usage(CMD_COMMIT);
-			return;
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return;
+
 	if (optind != cmd->cmd_argc) {
 		short_usage(CMD_COMMIT);
 		return;
@@ -5942,6 +6010,7 @@ revert_func(cmd_t *cmd)
 {
 	char line[128];	/* enough to ask a question */
 	bool force = FALSE;
+	bool arg_err = FALSE;
 	int err, arg, answer;
 
 	optind = 0;
@@ -5949,15 +6018,20 @@ revert_func(cmd_t *cmd)
 		switch (arg) {
 		case '?':
 			longer_usage(CMD_REVERT);
-			return;
+			arg_err = TRUE;
+			break;
 		case 'F':
 			force = TRUE;
 			break;
 		default:
 			short_usage(CMD_REVERT);
-			return;
+			arg_err = TRUE;
+			break;
 		}
 	}
+	if (arg_err)
+		return;
+
 	if (optind != cmd->cmd_argc) {
 		short_usage(CMD_REVERT);
 		return;
