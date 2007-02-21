@@ -1162,30 +1162,32 @@ mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath)
 
 	/*
 	 * If we're looking at an alternate root environment, then construct
-	 * read-only loopback mounts as necessary.  For all lofs mounts, make
-	 * sure that the 'special' entry points inside the alternate root.  (We
-	 * don't do this with other mounts, as devfs isn't in the alternate
-	 * root, and we need to assume the device environment is roughly the
-	 * same.)
+	 * read-only loopback mounts as necessary.  Note that any special
+	 * paths for lofs zone mounts in an alternate root must have
+	 * already been pre-pended with any alternate root path by the
+	 * time we get here.
 	 */
 	if (zonecfg_in_alt_root()) {
 		struct stat64 st;
 
 		if (stat64(fsptr->zone_fs_special, &st) != -1 &&
 		    S_ISBLK(st.st_mode)) {
+			/*
+			 * If we're going to mount a block device we need
+			 * to check if that device is already mounted
+			 * somewhere else, and if so, do a lofs mount
+			 * of the device instead of a direct mount
+			 */
 			if (check_lofs_needed(zlogp, fsptr) == -1)
 				return (-1);
 		} else if (strcmp(fsptr->zone_fs_type, MNTTYPE_LOFS) == 0) {
-			if (snprintf(specpath, sizeof (specpath), "%s%s",
-			    zonecfg_get_root(), fsptr->zone_fs_special) >=
-			    sizeof (specpath)) {
-				zerror(zlogp, B_FALSE, "cannot mount %s: path "
-				    "too long in alternate root",
-				    fsptr->zone_fs_special);
-				return (-1);
-			}
-			resolve_lofs(zlogp, specpath, sizeof (specpath));
-			(void) strlcpy(fsptr->zone_fs_special, specpath,
+			/*
+			 * For lofs mounts, the special node is inside the
+			 * alternate root.  We need lofs resolution for
+			 * this case in order to get at the underlying
+			 * read-write path.
+			 */
+			resolve_lofs(zlogp, fsptr->zone_fs_special,
 			    sizeof (fsptr->zone_fs_special));
 		}
 	}
@@ -1472,7 +1474,8 @@ plat_gmount_cb(void *data, const char *spec, const char *dir,
 	(void) strlcpy(fsp->zone_fs_dir, dir, sizeof (fsp->zone_fs_dir));
 	(void) strlcpy(fsp->zone_fs_type, fstype, sizeof (fsp->zone_fs_type));
 	fsp->zone_fs_options = NULL;
-	if (zonecfg_add_fs_option(fsp, (char *)opt) != Z_OK) {
+	if ((opt != NULL) &&
+	    (zonecfg_add_fs_option(fsp, (char *)opt) != Z_OK)) {
 		zerror(zlogp, B_FALSE, "error adding property");
 		return (-1);
 	}
@@ -1562,13 +1565,29 @@ mount_filesystems_fsent(zone_dochandle_t handle, zlog_t *zlogp,
 		fsp = &fs_ptr[num_fs - 1];
 		(void) strlcpy(fsp->zone_fs_dir,
 		    fstab.zone_fs_dir, sizeof (fsp->zone_fs_dir));
-		(void) strlcpy(fsp->zone_fs_special, fstab.zone_fs_special,
-		    sizeof (fsp->zone_fs_special));
 		(void) strlcpy(fsp->zone_fs_raw, fstab.zone_fs_raw,
 		    sizeof (fsp->zone_fs_raw));
 		(void) strlcpy(fsp->zone_fs_type, fstab.zone_fs_type,
 		    sizeof (fsp->zone_fs_type));
 		fsp->zone_fs_options = fstab.zone_fs_options;
+
+		/*
+		 * For all lofs mounts, make sure that the 'special'
+		 * entry points inside the alternate root.  The
+		 * source path for a lofs mount in a given zone needs
+		 * to be relative to the root of the boot environment
+		 * that contains the zone.  Note that we don't do this
+		 * for non-lofs mounts since they will have a device
+		 * as a backing store and device paths must always be
+		 * specified relative to the current boot environment.
+		 */
+		fsp->zone_fs_special[0] = '\0';
+		if (strcmp(fsp->zone_fs_type, MNTTYPE_LOFS) == 0) {
+			(void) strlcat(fsp->zone_fs_special, zonecfg_get_root(),
+			    sizeof (fsp->zone_fs_special));
+		}
+		(void) strlcat(fsp->zone_fs_special, fstab.zone_fs_special,
+		    sizeof (fsp->zone_fs_special));
 	}
 	(void) zonecfg_endfsent(handle);
 	return (0);
