@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This script takes a file list and a workspace and builds a set of html files
@@ -2300,7 +2300,7 @@ print "This code review page was prepared using <b>$0</b>"
 print "(vers $WEBREV_UPDATED)."
 print "Webrev is maintained by the <a href=\"http://www.opensolaris.org\">"
 print "OpenSolaris</a> project.  The latest version may be obtained"
-print "<a href=\"http://src.opensolaris.org/source/xref/on/usr/src/tools/scripts/webrev.sh\">here</a>.</p>"
+print "<a href=\"http://src.opensolaris.org/source/xref/onnv/onnv-gate/usr/src/tools/scripts/webrev.sh\">here</a>.</p>"
 print "</body>"
 print "</html>"
 
