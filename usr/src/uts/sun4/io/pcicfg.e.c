@@ -185,7 +185,7 @@ typedef struct pcicfg_err_regs {
 	uint16_t bcntl;
 	uint16_t pcie_dev;
 	uint16_t devctl;
-	int pcie_cap_off;
+	uint16_t pcie_cap_off;
 } pcicfg_err_regs_t;
 
 /*
@@ -558,43 +558,6 @@ struct modinfo *modinfop;
 	return (mod_info(&modlinkage, modinfop));
 }
 
-/*
- * given a cap_id, return its cap_id location in config space
- */
-static int
-pcicfg_get_cap(ddi_acc_handle_t config_handle, uint8_t cap_id)
-{
-	uint8_t curcap;
-	uint_t	cap_id_loc;
-	uint16_t	status;
-	int location = -1;
-
-	/*
-	 * Need to check the Status register for ECP support first.
-	 * Also please note that for type 1 devices, the
-	 * offset could change. Should support type 1 next.
-	 */
-	status = pci_config_get16(config_handle, PCI_CONF_STAT);
-	if (!(status & PCI_STAT_CAP)) {
-		return (-1);
-	}
-	cap_id_loc = pci_config_get8(config_handle, PCI_CONF_CAP_PTR);
-
-	/* Walk the list of capabilities */
-	while (cap_id_loc) {
-
-		curcap = pci_config_get8(config_handle, cap_id_loc);
-
-		if (curcap == cap_id) {
-			location = cap_id_loc;
-			break;
-		}
-		cap_id_loc = pci_config_get8(config_handle,
-		    cap_id_loc + 1);
-	}
-	return (location);
-}
-
 /*ARGSUSED*/
 static uint8_t
 pcicfg_get_nslots(dev_info_t *dip, ddi_acc_handle_t handle)
@@ -638,11 +601,12 @@ pcicfg_get_nslots(dev_info_t *dip, ddi_acc_handle_t handle)
 static uint8_t
 pcicfg_is_chassis(dev_info_t *dip, ddi_acc_handle_t handle)
 {
-	int cap_id_loc;
+	uint16_t cap_ptr;
 
-	if ((cap_id_loc = pcicfg_get_cap(handle, PCI_CAP_ID_SLOT_ID))
-								> 0) {
-		uint8_t esr_reg = pci_config_get8(handle, cap_id_loc + 2);
+	if ((PCI_CAP_LOCATE(handle, PCI_CAP_ID_SLOT_ID, &cap_ptr)) !=
+		DDI_FAILURE) {
+
+		uint8_t esr_reg = PCI_CAP_GET8(handle, NULL, cap_ptr, 2);
 		if (PCI_CAPSLOT_FIC(esr_reg))
 			return (B_TRUE);
 	}
@@ -689,11 +653,12 @@ static int
 pcicfg_pcie_port_type(dev_info_t *dip, ddi_acc_handle_t handle)
 {
 	int port_type = -1;
-	int cap_loc;
+	uint16_t cap_ptr;
 
-	if ((cap_loc = pcicfg_get_cap(handle, PCI_CAP_ID_PCI_E)) > 0)
-		port_type = pci_config_get16(handle,
-			cap_loc + PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
+	if ((PCI_CAP_LOCATE(handle, PCI_CAP_ID_PCI_E, &cap_ptr)) !=
+		DDI_FAILURE)
+		port_type = PCI_CAP_GET16(handle, NULL,
+			cap_ptr, PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 
 	return (port_type);
 }
@@ -3078,8 +3043,8 @@ static int
 pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	uint8_t pcie_dev)
 {
-	int ret, cap_id_loc;
-	uint16_t val;
+	int ret;
+	uint16_t val, cap_ptr;
 	uint32_t wordval;
 	uint8_t byteval;
 
@@ -3204,14 +3169,16 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 			return (ret);
 		}
 	}
-	if (pcie_dev && (cap_id_loc = pcicfg_get_cap(config_handle,
-					PCI_CAP_ID_PCI_E)) > 0) {
-		val = pci_config_get16(config_handle, cap_id_loc +
+
+	ret = PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr);
+
+	if ((pcie_dev && ret) > 0) {
+		val = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
 				PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
 		/* if slot implemented, get physical slot number */
 		if (val) {
-			wordval = (pci_config_get32(config_handle, cap_id_loc +
-					PCIE_SLOTCAP) >>
+			wordval = (PCI_CAP_GET32(config_handle, NULL,
+					cap_ptr, PCIE_SLOTCAP) >>
 					PCIE_SLOTCAP_PHY_SLOT_NUM_SHIFT) &
 					PCIE_SLOTCAP_PHY_SLOT_NUM_MASK;
 			if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE,
@@ -3589,15 +3556,20 @@ pcicfg_disable_bridge_probe_err(dev_info_t *dip, ddi_acc_handle_t h,
 	/* if we are a PCIe device, disable the generation of UR, CE and NFE */
 	if (regs->pcie_dev) {
 		uint16_t devctl;
-		int off = pcicfg_get_cap(h, PCI_CAP_ID_PCI_E);
+		uint16_t cap_ptr;
 
-		regs->pcie_cap_off = off;
-		regs->devctl = devctl = pci_config_get16(h, off + PCIE_DEVCTL);
+		if ((PCI_CAP_LOCATE(h, PCI_CAP_ID_PCI_E, &cap_ptr)) ==
+			DDI_FAILURE)
+			return;
+
+		regs->pcie_cap_off = cap_ptr;
+		regs->devctl = devctl = PCI_CAP_GET16(h, NULL, cap_ptr,
+			PCIE_DEVCTL);
 		devctl &= ~(PCIE_DEVCTL_UR_REPORTING_EN |
 				PCIE_DEVCTL_CE_REPORTING_EN |
 				PCIE_DEVCTL_NFE_REPORTING_EN |
 				PCIE_DEVCTL_FE_REPORTING_EN);
-		pci_config_put16(h, off + PCIE_DEVCTL, devctl);
+		PCI_CAP_PUT16(h, NULL, cap_ptr, PCIE_DEVCTL, devctl);
 	}
 }
 
