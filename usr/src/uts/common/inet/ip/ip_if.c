@@ -15399,6 +15399,7 @@ ill_mark_bcast(ill_group_t *illgrp, ipaddr_t addr, ip_stack_t *ipst)
 	uint64_t match_flags;
 	uint64_t phyi_flags;
 	boolean_t fallback = B_FALSE;
+	uint_t	max_frag;
 
 	ire = ire_ctable_lookup(addr, 0, IRE_BROADCAST, NULL, ALL_ZONES,
 	    NULL, MATCH_IRE_TYPE, ipst);
@@ -15620,6 +15621,11 @@ redo:
 		 * etc. Need to dup them. ditto in ill_bcast_delete_and_add
 		 */
 
+		/* Set the max_frag before adding the ire */
+		max_frag = *new_lb_ire->ire_max_fragp;
+		new_lb_ire->ire_max_fragp = NULL;
+		new_lb_ire->ire_max_frag = max_frag;
+
 		/* Add the new ire's. Insert at *irep */
 		new_lb_ire->ire_bucket = clear_ire->ire_bucket;
 		ire1 = *irep;
@@ -15636,6 +15642,11 @@ redo:
 		new_lb_ire->ire_ipif->ipif_ire_cnt++;
 
 		if (clear_ire_stq != NULL) {
+			/* Set the max_frag before adding the ire */
+			max_frag = *new_nlb_ire->ire_max_fragp;
+			new_nlb_ire->ire_max_fragp = NULL;
+			new_nlb_ire->ire_max_frag = max_frag;
+
 			new_nlb_ire->ire_bucket = clear_ire->ire_bucket;
 			irep = &new_lb_ire->ire_next;
 			/* Add the new ire. Insert at *irep */
