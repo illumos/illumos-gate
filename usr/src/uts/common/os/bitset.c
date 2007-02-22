@@ -128,7 +128,8 @@ bitset_del(bitset_t *b, uint_t elt)
 int
 bitset_in_set(bitset_t *b, uint_t elt)
 {
-	ASSERT(b->bs_words * BT_NBIPUL > elt);
+	if (elt >= b->bs_words * BT_NBIPUL)
+		return (0);
 
 	return (BT_TEST(b->bs_set, elt));
 }
