@@ -729,8 +729,8 @@ npi_mac_altaddr_enable(npi_handle_t handle, uint8_t portn, uint8_t addrn)
 	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	if ((portn == XMAC_PORT_0) || (portn == XMAC_PORT_1)) {
-		ASSERT(addrn < XMAC_MAX_ALT_ADDR_ENTRY);
-		if (addrn >= XMAC_MAX_ALT_ADDR_ENTRY) {
+		ASSERT(addrn <= XMAC_MAX_ALT_ADDR_ENTRY);
+		if (addrn > XMAC_MAX_ALT_ADDR_ENTRY) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 					    " npi_mac_altaddr_enable"
 					    " Invalid Input: addrn <0x%x>",
@@ -771,8 +771,8 @@ npi_mac_altaddr_disable(npi_handle_t handle, uint8_t portn, uint8_t addrn)
 	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	if ((portn == XMAC_PORT_0) || (portn == XMAC_PORT_1)) {
-		ASSERT(addrn < XMAC_MAX_ALT_ADDR_ENTRY);
-		if (addrn >= XMAC_MAX_ALT_ADDR_ENTRY) {
+		ASSERT(addrn <= XMAC_MAX_ALT_ADDR_ENTRY);
+		if (addrn > XMAC_MAX_ALT_ADDR_ENTRY) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 					" npi_mac_altaddr_disable"
 					" Invalid Input: addrn <0x%x>",
@@ -811,8 +811,8 @@ npi_mac_altaddr_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 	ASSERT((op == OP_GET) || (op == OP_SET));
 
 	if ((portn == XMAC_PORT_0) || (portn == XMAC_PORT_1)) {
-		ASSERT(entryn < XMAC_MAX_ALT_ADDR_ENTRY);
-		if (entryn >= XMAC_MAX_ALT_ADDR_ENTRY) {
+		ASSERT(entryn <= XMAC_MAX_ALT_ADDR_ENTRY);
+		if (entryn > XMAC_MAX_ALT_ADDR_ENTRY) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 					    " npi_mac_altaddr_entry"
 					    " Invalid Input: entryn <0x%x>",
@@ -842,8 +842,8 @@ npi_mac_altaddr_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 			data->w2 = val2 & 0xFFFF;
 		}
 	} else {
-		ASSERT(entryn < BMAC_MAX_ALT_ADDR_ENTRY);
-		if (entryn >= BMAC_MAX_ALT_ADDR_ENTRY) {
+		ASSERT(entryn <= BMAC_MAX_ALT_ADDR_ENTRY);
+		if (entryn > BMAC_MAX_ALT_ADDR_ENTRY) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 					    " npi_mac_altaddr_entry"
 					    " Invalid Input: entryn <0x%x>",

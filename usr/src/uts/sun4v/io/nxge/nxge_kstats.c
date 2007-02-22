@@ -493,8 +493,8 @@ typedef enum {
 } nxge_mmac_stat_index_t;
 
 nxge_kstat_index_t nxge_mmac_stats[] = {
-	{MMAC_MAX_ADDR, KSTAT_DATA_CHAR, "max_mmac_addr"},
-	{MMAC_AVAIL_ADDR, KSTAT_DATA_CHAR, "avail_mmac_addr"},
+	{MMAC_MAX_ADDR, KSTAT_DATA_UINT64, "max_mmac_addr"},
+	{MMAC_AVAIL_ADDR, KSTAT_DATA_UINT64, "avail_mmac_addr"},
 	{MMAC_ADDR_POOL1, KSTAT_DATA_UINT64, "mmac_addr_1"},
 	{MMAC_ADDR_POOL2, KSTAT_DATA_UINT64, "mmac_addr_2"},
 	{MMAC_ADDR_POOL3, KSTAT_DATA_UINT64, "mmac_addr_3"},

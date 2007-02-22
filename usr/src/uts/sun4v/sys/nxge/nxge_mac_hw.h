@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -815,6 +815,7 @@ typedef union _xmac_cfg_t {
 
 #define	BMAC_ALT_ADDR_BASE		0x118
 #define	BMAC_MAX_ALT_ADDR_ENTRY		7	   /* 7 alternate MAC addr */
+#define	BMAC_MAX_ADDR_ENTRY		(BMAC_MAX_ALT_ADDR_ENTRY + 1)
 
 /* hash table registers */
 #define	MAC_MAX_HASH_ENTRY		16
@@ -1051,6 +1052,7 @@ typedef union _xmac_cfg_t {
 
 /* Alternate MAC address registers */
 #define	XMAC_MAX_ALT_ADDR_ENTRY		16	   /* 16 alternate MAC addrs */
+#define	XMAC_MAX_ADDR_ENTRY		(XMAC_MAX_ALT_ADDR_ENTRY + 1)
 
 /* Max / Min parameters for Neptune MAC */
 

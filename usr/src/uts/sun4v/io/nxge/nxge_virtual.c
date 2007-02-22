@@ -1156,7 +1156,7 @@ nxge_cfg_verify_set_classify(p_nxge_t nxgep, dev_info_t *c_dip[])
 	 * these parameter affect the classification outcome.
 	 * these parameters are used to configure the Flow key and
 	 * the TCAM key for each of the IP classes.
-	 * Includee here are also the H1 and H2 initial values
+	 * Included here are also the H1 and H2 initial values
 	 * which affect the distribution as well as final hash value
 	 * (hence the offset into RDC table and FCRAM bucket location)
 	 *
@@ -1652,8 +1652,8 @@ nxge_get_config_properties(p_nxge_t nxgep)
 	 * Config types: equal: (default) DMA channels, RDC groups, TCAM, FCRAM
 	 * are shared equally across all the ports.
 	 *
-	 * Fair: DMA channels, RDC groups, TCAM, FCRAM are shared proprtional to
-	 * te port speed.
+	 * Fair: DMA channels, RDC groups, TCAM, FCRAM are shared proportional
+	 * to the port speed.
 	 *
 	 *
 	 * custom: DMA channels, RDC groups, TCAM, FCRAM partition is
@@ -3363,7 +3363,7 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 	uint_t prop_len;
 	uint_t i;
 	uint8_t func_num;
-	uint8_t num_macs;
+	uint8_t total_factory_macs;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_get_mac_addr_properties "));
 
@@ -3408,11 +3408,18 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 
 	func_num = nxgep->function_num;
 
-	/* NIU does not need max_num_mmac */
+	/*
+	 * total_factory_macs is the total number of MACs the factory assigned
+	 * to the whole Neptune device.  NIU does not need this parameter
+	 * because it derives the number of factory MACs for each port from
+	 * the device properties.
+	 */
 	if (nxgep->niu_type == NEPTUNE || nxgep->niu_type == NEPTUNE_2) {
-		if (nxge_espc_num_macs_get(nxgep, &num_macs) == NXGE_OK) {
-			nxgep->nxge_mmac_info.max_num_mmac = num_macs;
-		} else {
+		if (nxge_espc_num_macs_get(nxgep, &total_factory_macs)
+			== NXGE_OK) {
+			nxgep->nxge_mmac_info.total_factory_macs
+				= total_factory_macs;
+	} else {
 			NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
 				"nxge_espc_num_macs_get: espc access failed"));
 			return (NXGE_ERROR);
@@ -3432,35 +3439,31 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 			 * XAUI may have up to 18 MACs, more than the XMAC can
 			 * use (1 unique MAC plus 16 alternate MACs)
 			 */
-			nxgep->nxge_mmac_info.num_mmac = prop_len / 6;
-			if (nxgep->nxge_mmac_info.num_mmac >
-				XMAC_MAX_ALT_ADDR_ENTRY + 1) {
-				nxgep->nxge_mmac_info.num_mmac =
-					XMAC_MAX_ALT_ADDR_ENTRY + 1;
+			nxgep->nxge_mmac_info.num_factory_mmac
+			    = prop_len / ETHERADDRL - 1;
+			if (nxgep->nxge_mmac_info.num_factory_mmac >
+				XMAC_MAX_ALT_ADDR_ENTRY) {
+				nxgep->nxge_mmac_info.num_factory_mmac =
+					XMAC_MAX_ALT_ADDR_ENTRY;
 			}
 			ddi_prop_free(prop_val);
 		}
 	} else {
-		nxgep->nxge_mmac_info.num_mmac
-			= nxgep->nxge_mmac_info.max_num_mmac >>
-			(nxgep->nports >> 1);
-	}
-
-	for (i = 0; i < nxgep->nxge_mmac_info.num_mmac - 1; ++i) {
-		/* Initialze all mac addr. to "AVAILABLE" state */
-		nxgep->nxge_mmac_info.rsv_mmac[i] = B_FALSE;
 		/*
-		 * XMAC: Disable alter MAC address comparison only (XMAC's
-		 * unique MAC comparison is always enabled. BMAC: (Neptune
-		 * only) Disable both unique and alter MAC address comparison
+		 * total_factory_macs = 32
+		 * num_factory_mmac = (32 >> (nports/2)) - 1
+		 * So if nports = 4, then num_factory_mmac =  7
+		 *    if nports = 2, then num_factory_mmac = 15
 		 */
+		nxgep->nxge_mmac_info.num_factory_mmac
+			= ((nxgep->nxge_mmac_info.total_factory_macs >>
+			(nxgep->nports >> 1))) - 1;
+	}
+	for (i = 0; i <= nxgep->nxge_mmac_info.num_mmac; i++) {
 		(void) npi_mac_altaddr_disable(nxgep->npi_handle,
 			NXGE_GET_PORT_NUM(func_num), i);
 	}
 
-	/*
-	 * Initialize alt. mac addr. in the mac pool
-	 */
 	(void) nxge_init_mmac(nxgep);
 	return (NXGE_OK);
 }
@@ -3548,7 +3551,7 @@ nxge_ldgv_setup(p_nxge_ldg_t *ldgp, p_nxge_ldv_t *ldvp, uint8_t ldv,
 }
 
 /*
- * Note: This function assume the following distribution of mac
+ * Note: This function assumes the following distribution of mac
  * addresses among 4 ports in neptune:
  *
  *      -------------
@@ -3587,49 +3590,61 @@ nxge_ldgv_setup(p_nxge_ldg_t *ldgp, p_nxge_ldv_t *ldvp, uint8_t ldv,
 static void
 nxge_init_mmac(p_nxge_t nxgep)
 {
-	int i;
+	int slot;
 	uint8_t func_num;
 	uint16_t *base_mmac_addr;
-	uint32_t first_alt_mac_ls4b;
+	uint32_t alt_mac_ls4b;
 	uint16_t *mmac_addr;
-	uint32_t base_mac_ls4b;	/* least significant 4 bytes */
-	nxge_mmac_t *mac_poolp;
+	uint32_t base_mac_ls4b; /* least significant 4 bytes */
+	nxge_mmac_t *mmac_info;
 	npi_mac_addr_t mac_addr;
 
 	func_num = nxgep->function_num;
 	base_mmac_addr = (uint16_t *)&nxgep->factaddr;
-	mac_poolp = (nxge_mmac_t *)&nxgep->nxge_mmac_info;
+	mmac_info = (nxge_mmac_t *)&nxgep->nxge_mmac_info;
 
 	base_mac_ls4b = ((uint32_t)base_mmac_addr[1]) << 16 |
 		base_mmac_addr[2];
 
-	if (nxgep->niu_type == N2_NIU)
-		first_alt_mac_ls4b = base_mac_ls4b + 1;
-	else			/* Neptune */
-		first_alt_mac_ls4b = base_mac_ls4b + (nxgep->nports - func_num)
-			+ (func_num * (nxgep->nxge_mmac_info.num_mmac - 1));
+	if (nxgep->niu_type == N2_NIU) {
+		alt_mac_ls4b = base_mac_ls4b + 1; /* ls4b of 1st altmac */
+	} else {			/* Neptune */
+		alt_mac_ls4b = base_mac_ls4b + (nxgep->nports - func_num)
+			+ (func_num * (mmac_info->num_factory_mmac));
+	}
 
-	for (i = 0; i < nxgep->nxge_mmac_info.num_mmac - 1; ++i) {
-		/*
-		 * Populate shadow mac pool w/ available mac. so we dont have
-		 * to read the h/w to search for a mac addr.
-		 */
-		mmac_addr = (uint16_t *)&mac_poolp->mmac_pool[i];
+	/* Set flags for unique MAC */
+	mmac_info->mac_pool[0].flags |= MMAC_SLOT_USED | MMAC_VENDOR_ADDR;
+
+	/* Clear flags of all alternate MAC slots */
+	for (slot = 1; slot <= mmac_info->num_mmac; slot++) {
+		if (slot <= mmac_info->num_factory_mmac)
+			mmac_info->mac_pool[slot].flags = MMAC_VENDOR_ADDR;
+		else
+			mmac_info->mac_pool[slot].flags = 0;
+	}
+
+	/* Generate and store factory alternate MACs */
+	for (slot = 1; slot <= mmac_info->num_factory_mmac; slot++) {
+		mmac_addr = (uint16_t *)&mmac_info->factory_mac_pool[slot];
 		mmac_addr[0] = base_mmac_addr[0];
-		mac_addr.w0 = mmac_addr[0];
+		mac_addr.w2 = mmac_addr[0];
 
-		mmac_addr[1] = (first_alt_mac_ls4b >> 16) & 0x0FFFF;
+		mmac_addr[1] = (alt_mac_ls4b >> 16) & 0x0FFFF;
 		mac_addr.w1 = mmac_addr[1];
 
-		mmac_addr[2] = first_alt_mac_ls4b & 0x0FFFF;
-		mac_addr.w2 = mmac_addr[2];
-
+		mmac_addr[2] = alt_mac_ls4b & 0x0FFFF;
+		mac_addr.w0 = mmac_addr[2];
 		/*
-		 * Program the h/w alt. mac address, starting from reg1(reg0
-		 * corr. to unique mac addr)
+		 * slot minus 1 because npi_mac_alraddr_entry expects 0
+		 * for the first alternate mac address.
 		 */
 		(void) npi_mac_altaddr_entry(nxgep->npi_handle, OP_SET,
-			NXGE_GET_PORT_NUM(func_num), i, &mac_addr);
-		first_alt_mac_ls4b++;
+			NXGE_GET_PORT_NUM(func_num), slot - 1, &mac_addr);
+
+		alt_mac_ls4b++;
 	}
+	/* Initialize the first two parameters for mmac kstat */
+	nxgep->statsp->mmac_stats.mmac_max_cnt = mmac_info->num_mmac;
+	nxgep->statsp->mmac_stats.mmac_avail_cnt = mmac_info->num_mmac;
 }

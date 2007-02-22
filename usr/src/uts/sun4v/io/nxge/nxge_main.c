@@ -182,6 +182,15 @@ static void nxge_m_ioctl(void *, queue_t *, mblk_t *);
 static void nxge_m_resources(void *);
 mblk_t *nxge_m_tx(void *arg, mblk_t *);
 static nxge_status_t nxge_mac_register(p_nxge_t);
+static int nxge_altmac_set(p_nxge_t nxgep, uint8_t *mac_addr,
+	mac_addr_slot_t slot);
+static void nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot,
+	boolean_t factory);
+static int nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr);
+static int nxge_m_mmac_reserve(void *arg, mac_multi_addr_t *maddr);
+static int nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot);
+static int nxge_m_mmac_modify(void *arg, mac_multi_addr_t *maddr);
+static int nxge_m_mmac_get(void *arg, mac_multi_addr_t *maddr);
 
 #define	NXGE_NEPTUNE_MAGIC	0x4E584745UL
 #define	MAX_DUMP_SZ 256
@@ -239,6 +248,7 @@ extern void		nxge_fm_init(p_nxge_t,
 					ddi_device_acc_attr_t *,
 					ddi_dma_attr_t *);
 extern void		nxge_fm_fini(p_nxge_t);
+extern npi_status_t	npi_mac_altaddr_disable(npi_handle_t, uint8_t, uint8_t);
 
 /*
  * Count used to maintain the number of buffers being used
@@ -363,6 +373,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int		status = DDI_SUCCESS;
 	nxge_status_t	nxge_status = NXGE_OK;
 	uint8_t		portn;
+	nxge_mmac_t	*mmac_info;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_attach"));
 
@@ -455,7 +466,19 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		nxgep->mac.porttype = PORT_TYPE_XMAC;
 	else
 		nxgep->mac.porttype = PORT_TYPE_BMAC;
-
+	/*
+	 * Neptune has 4 ports, the first 2 ports use XMAC (10G MAC)
+	 * internally, the rest 2 ports use BMAC (1G "Big" MAC).
+	 * The two types of MACs have different characterizations.
+	 */
+	mmac_info = &nxgep->nxge_mmac_info;
+	if (nxgep->function_num < 2) {
+		mmac_info->num_mmac = XMAC_MAX_ALT_ADDR_ENTRY;
+		mmac_info->naddrfree = XMAC_MAX_ALT_ADDR_ENTRY;
+	} else {
+		mmac_info->num_mmac = BMAC_MAX_ALT_ADDR_ENTRY;
+		mmac_info->naddrfree = BMAC_MAX_ALT_ADDR_ENTRY;
+	}
 	/*
 	 * Setup the Ndd parameters for the this instance.
 	 */
@@ -1056,7 +1079,7 @@ nxge_setup_mutexes(p_nxge_t nxgep)
 
 	/*
 	 * Get the interrupt cookie so the mutexes can be
-	 * Initialised.
+	 * Initialized.
 	 */
 	ddi_status = ddi_get_iblock_cookie(nxgep->dip, 0,
 					&nxgep->interrupt_cookie);
@@ -3152,7 +3175,7 @@ nxge_m_resources(void *arg)
 	MUTEX_ENTER(nxgep->genlock);
 
 	/*
-	 * CR 6492541 Check to see if the drv_state has been intialized,
+	 * CR 6492541 Check to see if the drv_state has been initialized,
 	 * if not * call nxge_init().
 	 */
 	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
@@ -3192,17 +3215,459 @@ nxge_m_resources_exit:
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_m_resources"));
 }
 
-/*ARGSUSED*/
+static void
+nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot, boolean_t factory)
+{
+	p_nxge_mmac_stats_t mmac_stats;
+	int i;
+	nxge_mmac_t *mmac_info;
+
+	mmac_info = &nxgep->nxge_mmac_info;
+
+	mmac_stats = &nxgep->statsp->mmac_stats;
+	mmac_stats->mmac_max_cnt = mmac_info->num_mmac;
+	mmac_stats->mmac_avail_cnt = mmac_info->naddrfree;
+
+	for (i = 0; i < ETHERADDRL; i++) {
+		if (factory) {
+			mmac_stats->mmac_avail_pool[slot-1].ether_addr_octet[i]
+			= mmac_info->factory_mac_pool[slot][(ETHERADDRL-1) - i];
+		} else {
+			mmac_stats->mmac_avail_pool[slot-1].ether_addr_octet[i]
+			= mmac_info->mac_pool[slot].addr[(ETHERADDRL - 1) - i];
+		}
+	}
+}
+
+/*
+ * nxge_altmac_set() -- Set an alternate MAC address
+ */
+static int
+nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot)
+{
+	uint8_t addrn;
+	uint8_t portn;
+	npi_mac_addr_t altmac;
+
+	altmac.w2 = ((uint16_t)maddr[0] << 8) | ((uint16_t)maddr[1] & 0x0ff);
+	altmac.w1 = ((uint16_t)maddr[2] << 8) | ((uint16_t)maddr[3] & 0x0ff);
+	altmac.w0 = ((uint16_t)maddr[4] << 8) | ((uint16_t)maddr[5] & 0x0ff);
+
+	portn = nxgep->mac.portnum;
+	addrn = (uint8_t)slot - 1;
+
+	if (npi_mac_altaddr_entry(nxgep->npi_handle, OP_SET, portn,
+		addrn, &altmac) != NPI_SUCCESS)
+		return (EIO);
+	/*
+	 * Enable comparison with the alternate MAC address.
+	 * While the first alternate addr is enabled by bit 1 of register
+	 * BMAC_ALTAD_CMPEN, it is enabled by bit 0 of register
+	 * XMAC_ADDR_CMPEN, so slot needs to be converted to addrn
+	 * accordingly before calling npi_mac_altaddr_entry.
+	 */
+	if (portn == XMAC_PORT_0 || portn == XMAC_PORT_1)
+		addrn = (uint8_t)slot - 1;
+	else
+		addrn = (uint8_t)slot;
+
+	if (npi_mac_altaddr_enable(nxgep->npi_handle, portn, addrn)
+		!= NPI_SUCCESS)
+		return (EIO);
+
+	return (0);
+}
+
+/*
+ * nxeg_m_mmac_add() - find an unused address slot, set the address
+ * value to the one specified, enable the port to start filtering on
+ * the new MAC address.  Returns 0 on success.
+ */
+static int
+nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr)
+{
+	p_nxge_t nxgep = arg;
+	mac_addr_slot_t slot;
+	nxge_mmac_t *mmac_info;
+	int err;
+	nxge_status_t status;
+
+	mutex_enter(nxgep->genlock);
+
+	/*
+	 * Make sure that nxge is initialized, if _start() has
+	 * not been called.
+	 */
+	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
+		status = nxge_init(nxgep);
+		if (status != NXGE_OK) {
+			mutex_exit(nxgep->genlock);
+			return (ENXIO);
+		}
+	}
+
+	mmac_info = &nxgep->nxge_mmac_info;
+	if (mmac_info->naddrfree == 0) {
+		mutex_exit(nxgep->genlock);
+		return (ENOSPC);
+	}
+	if (!mac_unicst_verify(nxgep->mach, maddr->mma_addr,
+		maddr->mma_addrlen)) {
+		mutex_exit(nxgep->genlock);
+		return (EINVAL);
+	}
+	/*
+	 * 	Search for the first available slot. Because naddrfree
+	 * is not zero, we are guaranteed to find one.
+	 * 	Slot 0 is for unique (primary) MAC. The first alternate
+	 * MAC slot is slot 1.
+	 *	Each of the first two ports of Neptune has 16 alternate
+	 * MAC slots but only the first 7 (of 15) slots have assigned factory
+	 * MAC addresses. We first search among the slots without bundled
+	 * factory MACs. If we fail to find one in that range, then we
+	 * search the slots with bundled factory MACs.  A factory MAC
+	 * will be wasted while the slot is used with a user MAC address.
+	 * But the slot could be used by factory MAC again after calling
+	 * nxge_m_mmac_remove and nxge_m_mmac_reserve.
+	 */
+	if (mmac_info->num_factory_mmac < mmac_info->num_mmac) {
+		for (slot = mmac_info->num_factory_mmac + 1;
+			slot <= mmac_info->num_mmac; slot++) {
+			if (!(mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED))
+				break;
+		}
+		if (slot > mmac_info->num_mmac) {
+			for (slot = 1; slot <= mmac_info->num_factory_mmac;
+				slot++) {
+				if (!(mmac_info->mac_pool[slot].flags
+					& MMAC_SLOT_USED))
+					break;
+			}
+		}
+	} else {
+		for (slot = 1; slot <= mmac_info->num_mmac; slot++) {
+			if (!(mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED))
+				break;
+		}
+	}
+	ASSERT(slot <= mmac_info->num_mmac);
+	if ((err = nxge_altmac_set(nxgep, maddr->mma_addr, slot)) != 0) {
+		mutex_exit(nxgep->genlock);
+		return (err);
+	}
+	bcopy(maddr->mma_addr, mmac_info->mac_pool[slot].addr, ETHERADDRL);
+	mmac_info->mac_pool[slot].flags |= MMAC_SLOT_USED;
+	mmac_info->mac_pool[slot].flags &= ~MMAC_VENDOR_ADDR;
+	mmac_info->naddrfree--;
+	nxge_mmac_kstat_update(nxgep, slot, B_FALSE);
+
+	maddr->mma_slot = slot;
+
+	mutex_exit(nxgep->genlock);
+	return (0);
+}
+
+/*
+ * This function reserves an unused slot and programs the slot and the HW
+ * with a factory mac address.
+ */
+static int
+nxge_m_mmac_reserve(void *arg, mac_multi_addr_t *maddr)
+{
+	p_nxge_t nxgep = arg;
+	mac_addr_slot_t slot;
+	nxge_mmac_t *mmac_info;
+	int err;
+	nxge_status_t status;
+
+	mutex_enter(nxgep->genlock);
+
+	/*
+	 * Make sure that nxge is initialized, if _start() has
+	 * not been called.
+	 */
+	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
+		status = nxge_init(nxgep);
+		if (status != NXGE_OK) {
+			mutex_exit(nxgep->genlock);
+			return (ENXIO);
+		}
+	}
+
+	mmac_info = &nxgep->nxge_mmac_info;
+	if (mmac_info->naddrfree == 0) {
+		mutex_exit(nxgep->genlock);
+		return (ENOSPC);
+	}
+
+	slot = maddr->mma_slot;
+	if (slot == -1) {  /* -1: Take the first available slot */
+		for (slot = 1; slot <= mmac_info->num_factory_mmac; slot++) {
+			if (!(mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED))
+				break;
+		}
+		if (slot > mmac_info->num_factory_mmac) {
+			mutex_exit(nxgep->genlock);
+			return (ENOSPC);
+		}
+	}
+	if (slot < 1 || slot > mmac_info->num_factory_mmac) {
+		/*
+		 * Do not support factory MAC at a slot greater than
+		 * num_factory_mmac even when there are available factory
+		 * MAC addresses because the alternate MACs are bundled with
+		 * slot[1] through slot[num_factory_mmac]
+		 */
+		mutex_exit(nxgep->genlock);
+		return (EINVAL);
+	}
+	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED) {
+		mutex_exit(nxgep->genlock);
+		return (EBUSY);
+	}
+	/* Verify the address to be reserved */
+	if (!mac_unicst_verify(nxgep->mach,
+		mmac_info->factory_mac_pool[slot], ETHERADDRL)) {
+		mutex_exit(nxgep->genlock);
+		return (EINVAL);
+	}
+	if (err = nxge_altmac_set(nxgep,
+		mmac_info->factory_mac_pool[slot], slot)) {
+		mutex_exit(nxgep->genlock);
+		return (err);
+	}
+	bcopy(mmac_info->factory_mac_pool[slot], maddr->mma_addr, ETHERADDRL);
+	mmac_info->mac_pool[slot].flags |= MMAC_SLOT_USED | MMAC_VENDOR_ADDR;
+	mmac_info->naddrfree--;
+
+	nxge_mmac_kstat_update(nxgep, slot, B_TRUE);
+	mutex_exit(nxgep->genlock);
+
+	/* Pass info back to the caller */
+	maddr->mma_slot = slot;
+	maddr->mma_addrlen = ETHERADDRL;
+	maddr->mma_flags = MMAC_SLOT_USED | MMAC_VENDOR_ADDR;
+
+	return (0);
+}
+
+/*
+ * Remove the specified mac address and update the HW not to filter
+ * the mac address anymore.
+ */
+static int
+nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot)
+{
+	p_nxge_t nxgep = arg;
+	nxge_mmac_t *mmac_info;
+	uint8_t addrn;
+	uint8_t portn;
+	int err = 0;
+	nxge_status_t status;
+
+	mutex_enter(nxgep->genlock);
+
+	/*
+	 * Make sure that nxge is initialized, if _start() has
+	 * not been called.
+	 */
+	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
+		status = nxge_init(nxgep);
+		if (status != NXGE_OK) {
+			mutex_exit(nxgep->genlock);
+			return (ENXIO);
+		}
+	}
+
+	mmac_info = &nxgep->nxge_mmac_info;
+	if (slot < 1 || slot > mmac_info->num_mmac) {
+		mutex_exit(nxgep->genlock);
+		return (EINVAL);
+	}
+
+	portn = nxgep->mac.portnum;
+	if (portn == XMAC_PORT_0 || portn == XMAC_PORT_1)
+		addrn = (uint8_t)slot - 1;
+	else
+		addrn = (uint8_t)slot;
+
+	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED) {
+		if (npi_mac_altaddr_disable(nxgep->npi_handle, portn, addrn)
+				== NPI_SUCCESS) {
+			mmac_info->naddrfree++;
+			mmac_info->mac_pool[slot].flags &= ~MMAC_SLOT_USED;
+			/*
+			 * Regardless if the MAC we just stopped filtering
+			 * is a user addr or a facory addr, we must set
+			 * the MMAC_VENDOR_ADDR flag if this slot has an
+			 * associated factory MAC to indicate that a factory
+			 * MAC is available.
+			 */
+			if (slot <= mmac_info->num_factory_mmac) {
+				mmac_info->mac_pool[slot].flags
+					|= MMAC_VENDOR_ADDR;
+			}
+			/*
+			 * Clear mac_pool[slot].addr so that kstat shows 0
+			 * alternate MAC address if the slot is not used.
+			 * (But nxge_m_mmac_get returns the factory MAC even
+			 * when the slot is not used!)
+			 */
+			bzero(mmac_info->mac_pool[slot].addr, ETHERADDRL);
+			nxge_mmac_kstat_update(nxgep, slot, B_FALSE);
+		} else {
+			err = EIO;
+		}
+	} else {
+		err = EINVAL;
+	}
+
+	mutex_exit(nxgep->genlock);
+	return (err);
+}
+
+
+/*
+ * Modify a mac address added by nxge_m_mmac_add or nxge_m_mmac_reserve().
+ */
+static int
+nxge_m_mmac_modify(void *arg, mac_multi_addr_t *maddr)
+{
+	p_nxge_t nxgep = arg;
+	mac_addr_slot_t slot;
+	nxge_mmac_t *mmac_info;
+	int err = 0;
+	nxge_status_t status;
+
+	if (!mac_unicst_verify(nxgep->mach, maddr->mma_addr,
+			maddr->mma_addrlen))
+		return (EINVAL);
+
+	slot = maddr->mma_slot;
+
+	mutex_enter(nxgep->genlock);
+
+	/*
+	 * Make sure that nxge is initialized, if _start() has
+	 * not been called.
+	 */
+	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
+		status = nxge_init(nxgep);
+		if (status != NXGE_OK) {
+			mutex_exit(nxgep->genlock);
+			return (ENXIO);
+		}
+	}
+
+	mmac_info = &nxgep->nxge_mmac_info;
+	if (slot < 1 || slot > mmac_info->num_mmac) {
+		mutex_exit(nxgep->genlock);
+		return (EINVAL);
+	}
+	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED) {
+		if ((err = nxge_altmac_set(nxgep, maddr->mma_addr, slot))
+			!= 0) {
+			bcopy(maddr->mma_addr, mmac_info->mac_pool[slot].addr,
+				ETHERADDRL);
+			/*
+			 * Assume that the MAC passed down from the caller
+			 * is not a factory MAC address (The user should
+			 * call mmac_remove followed by mmac_reserve if
+			 * he wants to use the factory MAC for this slot).
+			 */
+			mmac_info->mac_pool[slot].flags &= ~MMAC_VENDOR_ADDR;
+			nxge_mmac_kstat_update(nxgep, slot, B_FALSE);
+		}
+	} else {
+		err = EINVAL;
+	}
+	mutex_exit(nxgep->genlock);
+	return (err);
+}
+
+/*
+ * nxge_m_mmac_get() - Get the MAC address and other information
+ * related to the slot.  mma_flags should be set to 0 in the call.
+ * Note: although kstat shows MAC address as zero when a slot is
+ * not used, Crossbow expects nxge_m_mmac_get to copy factory MAC
+ * to the caller as long as the slot is not using a user MAC address.
+ * The following table shows the rules,
+ *
+ *				   USED    VENDOR    mma_addr
+ * ------------------------------------------------------------
+ * (1) Slot uses a user MAC:        yes      no     user MAC
+ * (2) Slot uses a factory MAC:     yes      yes    factory MAC
+ * (3) Slot is not used but is
+ *     factory MAC capable:         no       yes    factory MAC
+ * (4) Slot is not used and is
+ *     not factory MAC capable:     no       no        0
+ * ------------------------------------------------------------
+ */
+static int
+nxge_m_mmac_get(void *arg, mac_multi_addr_t *maddr)
+{
+	nxge_t *nxgep = arg;
+	mac_addr_slot_t slot;
+	nxge_mmac_t *mmac_info;
+	nxge_status_t status;
+
+	slot = maddr->mma_slot;
+
+	mutex_enter(nxgep->genlock);
+
+	/*
+	 * Make sure that nxge is initialized, if _start() has
+	 * not been called.
+	 */
+	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
+		status = nxge_init(nxgep);
+		if (status != NXGE_OK) {
+			mutex_exit(nxgep->genlock);
+			return (ENXIO);
+		}
+	}
+
+	mmac_info = &nxgep->nxge_mmac_info;
+
+	if (slot < 1 || slot > mmac_info->num_mmac) {
+		mutex_exit(nxgep->genlock);
+		return (EINVAL);
+	}
+	maddr->mma_flags = 0;
+	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED)
+		maddr->mma_flags |= MMAC_SLOT_USED;
+
+	if (mmac_info->mac_pool[slot].flags & MMAC_VENDOR_ADDR) {
+		maddr->mma_flags |= MMAC_VENDOR_ADDR;
+		bcopy(mmac_info->factory_mac_pool[slot],
+			maddr->mma_addr, ETHERADDRL);
+		maddr->mma_addrlen = ETHERADDRL;
+	} else {
+		if (maddr->mma_flags & MMAC_SLOT_USED) {
+			bcopy(mmac_info->mac_pool[slot].addr,
+				maddr->mma_addr, ETHERADDRL);
+			maddr->mma_addrlen = ETHERADDRL;
+		} else {
+			bzero(maddr->mma_addr, ETHERADDRL);
+			maddr->mma_addrlen = 0;
+		}
+	}
+	mutex_exit(nxgep->genlock);
+	return (0);
+}
+
+
 static boolean_t
 nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
-	switch (cap) {
-	case MAC_CAPAB_HCKSUM: {
-		uint32_t *txflags = cap_data;
+	nxge_t *nxgep = arg;
+	uint32_t *txflags = cap_data;
+	multiaddress_capab_t *mmacp = cap_data;
 
+	switch (cap) {
+	case MAC_CAPAB_HCKSUM:
 		*txflags = HCKSUM_INET_PARTIAL;
 		break;
-	}
 	case MAC_CAPAB_POLL:
 		/*
 		 * There's nothing for us to fill in, simply returning
@@ -3210,6 +3675,25 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		 */
 		break;
 
+	case MAC_CAPAB_MULTIADDRESS:
+		mutex_enter(nxgep->genlock);
+
+		mmacp->maddr_naddr = nxgep->nxge_mmac_info.num_mmac;
+		mmacp->maddr_naddrfree = nxgep->nxge_mmac_info.naddrfree;
+		mmacp->maddr_flag = 0; /* 0 is requried by PSARC2006/265 */
+		/*
+		 * maddr_handle is driver's private data, passed back to
+		 * entry point functions as arg.
+		 */
+		mmacp->maddr_handle	= nxgep;
+		mmacp->maddr_add	= nxge_m_mmac_add;
+		mmacp->maddr_remove	= nxge_m_mmac_remove;
+		mmacp->maddr_modify	= nxge_m_mmac_modify;
+		mmacp->maddr_get	= nxge_m_mmac_get;
+		mmacp->maddr_reserve	= nxge_m_mmac_reserve;
+
+		mutex_exit(nxgep->genlock);
+		break;
 	default:
 		return (B_FALSE);
 	}
@@ -3245,14 +3729,14 @@ static struct dev_ops nxge_dev_ops = {
 	DEVO_REV,		/* devo_rev */
 	0,			/* devo_refcnt */
 	nulldev,
-	nulldev,		 /* devo_identify	*/
-	nulldev,		 /* devo_probe    	*/
-	nxge_attach,		 /* devo_attach    	*/
-	nxge_detach,		 /* devo_detach 	*/
-	nodev,			 /* devo_reset 		*/
-	&nxge_cb_ops,		 /* devo_cb_ops 	*/
-	(struct bus_ops *)NULL, /* devo_bus_ops 	*/
-	ddi_power		 /* devo_power 		*/
+	nulldev,		/* devo_identify */
+	nulldev,		/* devo_probe */
+	nxge_attach,		/* devo_attach */
+	nxge_detach,		/* devo_detach */
+	nodev,			/* devo_reset */
+	&nxge_cb_ops,		/* devo_cb_ops */
+	(struct bus_ops *)NULL, /* devo_bus_ops	*/
+	ddi_power		/* devo_power */
 };
 
 extern	struct	mod_ops	mod_driverops;

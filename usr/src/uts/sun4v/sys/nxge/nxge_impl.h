@@ -531,16 +531,33 @@ typedef struct _dev_regs_t {
 	unsigned char		*nxge_romp;	/* fcode pointer */
 } dev_regs_t, *p_dev_regs_t;
 
+
+typedef struct _nxge_mac_addr_t {
+	ether_addr_t	addr;
+	uint_t		flags;
+} nxge_mac_addr_t;
+
 /*
- * Driver alternate mac address structure.
+ * The hardware supports 1 unique MAC and 16 alternate MACs (num_mmac)
+ * for each XMAC port and supports 1 unique MAC and 7 alternate MACs
+ * for each BMAC port.  The number of MACs assigned by the factory is
+ * different and is as follows,
+ * 	BMAC port:		   num_factory_mmac = num_mmac = 7
+ *	XMAC port on a 2-port NIC: num_factory_mmac = num_mmac - 1 = 15
+ *	XMAC port on a 4-port NIC: num_factory_mmac = 7
+ * So num_factory_mmac is smaller than num_mmac.  nxge_m_mmac_add uses
+ * num_mmac and nxge_m_mmac_reserve uses num_factory_mmac.
+ *
+ * total_factory_macs is the total number of factory MACs, including
+ * the unique MAC, assigned to a Neptune based NIC card, it is 32.
  */
 typedef struct _nxge_mmac_t {
-	kmutex_t	mmac_lock;
-	uint8_t		max_num_mmac;	/* Max allocated per card */
-	uint8_t		num_mmac;	/* Mac addr. per function */
-	struct ether_addr mmac_pool[16]; /* Mac addr pool per function in s/w */
-	boolean_t	rsv_mmac[16];	/* Reserved mac addr. in the pool */
-	uint8_t		num_avail_mmac;	/* # of rsv.ed mac addr. in the pool */
+	uint8_t		total_factory_macs;
+	uint8_t		num_mmac;
+	uint8_t		num_factory_mmac;
+	nxge_mac_addr_t	mac_pool[XMAC_MAX_ADDR_ENTRY];
+	ether_addr_t	factory_mac_pool[XMAC_MAX_ADDR_ENTRY];
+	uint8_t		naddrfree;  /* number of alt mac addr available */
 } nxge_mmac_t;
 
 /*

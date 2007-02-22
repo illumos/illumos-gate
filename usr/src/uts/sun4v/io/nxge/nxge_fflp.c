@@ -457,7 +457,7 @@ nxge_main_mac_assign_rdc_table(p_nxge_t nxgep)
 		break;
 	default:
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"failed Assign RDC table (invalid funcion #)"));
+			"failed Assign RDC table (invalid function #)"));
 		return (NXGE_ERROR);
 	}
 
@@ -469,12 +469,17 @@ nxge_main_mac_assign_rdc_table(p_nxge_t nxgep)
 	return (NXGE_OK);
 }
 
+/*
+ * Initialize hostinfo registers for alternate MAC addresses and
+ * multicast MAC address.
+ */
 nxge_status_t
-nxge_multicast_mac_assign_rdc_table(p_nxge_t nxgep)
+nxge_alt_mcast_mac_assign_rdc_table(p_nxge_t nxgep)
 {
 	npi_status_t rs = NPI_SUCCESS;
 	hostinfo_t mac_rdc;
 	npi_handle_t handle;
+	int i;
 
 	handle = nxgep->npi_reg_handle;
 	mac_rdc.value = 0;
@@ -483,13 +488,23 @@ nxge_multicast_mac_assign_rdc_table(p_nxge_t nxgep)
 	switch (nxgep->function_num) {
 	case 0:
 	case 1:
+		/*
+		 * Tests indicate that it is OK not to re-initialize the
+		 * hostinfo registers for the XMAC's alternate MAC
+		 * addresses. But that is necessary for BMAC (case 2
+		 * and case 3 below)
+		 */
 		rs = npi_mac_hostinfo_entry(handle, OP_SET,
 			nxgep->function_num,
 			XMAC_MULTI_HOST_INFO_ENTRY, &mac_rdc);
 		break;
 	case 2:
 	case 3:
-		rs = npi_mac_hostinfo_entry(handle, OP_SET,
+		for (i = 1; i <= BMAC_MAX_ALT_ADDR_ENTRY; i++)
+			rs |= npi_mac_hostinfo_entry(handle, OP_SET,
+			nxgep->function_num, i, &mac_rdc);
+
+		rs |= npi_mac_hostinfo_entry(handle, OP_SET,
 			nxgep->function_num,
 			BMAC_MULTI_HOST_INFO_ENTRY, &mac_rdc);
 		break;
@@ -512,8 +527,8 @@ nxge_fflp_init_hostinfo(p_nxge_t nxgep)
 {
 	nxge_status_t status = NXGE_OK;
 
-	status = nxge_multicast_mac_assign_rdc_table(nxgep);
-	status = nxge_main_mac_assign_rdc_table(nxgep);
+	status = nxge_alt_mcast_mac_assign_rdc_table(nxgep);
+	status |= nxge_main_mac_assign_rdc_table(nxgep);
 	return (status);
 }
 
@@ -1899,7 +1914,7 @@ nxge_classify_init_hw(p_nxge_t nxgep)
 		return (NXGE_ERROR);
 	}
 
-	status = nxge_multicast_mac_assign_rdc_table(nxgep);
+	status = nxge_alt_mcast_mac_assign_rdc_table(nxgep);
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"nxge_multicast_mac_assign_rdc_table failed"));

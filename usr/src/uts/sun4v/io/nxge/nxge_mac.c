@@ -875,7 +875,7 @@ nxge_xcvr_init(p_nxge_t nxgep)
 	statsp = nxgep->statsp;
 
 	/*
-	 * Initialise the xcvr statistics.
+	 * Initialize the xcvr statistics.
 	 */
 	statsp->mac_stats.cap_autoneg = 0;
 	statsp->mac_stats.cap_100T4 = 0;
@@ -1254,7 +1254,6 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 	uint32_t		i;
 	uint16_t		hashtab_e;
 	p_hash_filter_t		hash_filter;
-	npi_mac_addr_t		altmac_e;
 	nxge_port_t		portt;
 	uint8_t			portn;
 	npi_handle_t		handle;
@@ -1310,15 +1309,6 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 			goto fail;
 		nxgep->mac.rx_iconfig = NXGE_XMAC_RX_INTRS;
 
-		altmac_e.w0 = 0;
-		altmac_e.w1 = 0;
-		altmac_e.w2 = 0;
-		for (i = 0; i < XMAC_MAX_ALT_ADDR_ENTRY; i++) {
-			if ((rs = npi_mac_altaddr_entry(handle, OP_SET, portn,
-				i, (npi_mac_addr_t *)&altmac_e)) != NPI_SUCCESS)
-				goto fail;
-		}
-
 		(void) nxge_fflp_init_hostinfo(nxgep);
 
 		xconfig = CFG_XMAC_RX_ERRCHK | CFG_XMAC_RX_CRC_CHK |
@@ -1344,15 +1334,6 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 							!= NPI_SUCCESS)
 			goto fail;
 	} else {
-		altmac_e.w0 = 0;
-		altmac_e.w1 = 0;
-		altmac_e.w2 = 0;
-		for (i = 0; i < BMAC_MAX_ALT_ADDR_ENTRY; i++) {
-			if ((rs = npi_mac_altaddr_entry(handle, OP_SET, portn,
-				i, (npi_mac_addr_t *)&altmac_e)) != NPI_SUCCESS)
-				goto fail;
-		}
-
 		(void) nxge_fflp_init_hostinfo(nxgep);
 
 		if (npi_bmac_rx_iconfig(nxgep->npi_handle, INIT, portn,
@@ -1754,7 +1735,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	param_arr[param_anar_10hdx].value = 0;
 
 	/*
-	 * Initialise the xcvr statistics.
+	 * Initialize the xcvr statistics.
 	 */
 	statsp->mac_stats.cap_autoneg = bmsr.bits.auto_neg_able;
 	statsp->mac_stats.cap_100T4 = bmsr.bits.link_100T4;
