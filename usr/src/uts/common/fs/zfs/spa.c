@@ -2179,17 +2179,6 @@ spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath)
  * ==========================================================================
  */
 
-void
-spa_scrub_throttle(spa_t *spa, int direction)
-{
-	mutex_enter(&spa->spa_scrub_lock);
-	spa->spa_scrub_throttled += direction;
-	ASSERT(spa->spa_scrub_throttled >= 0);
-	if (spa->spa_scrub_throttled == 0)
-		cv_broadcast(&spa->spa_scrub_io_cv);
-	mutex_exit(&spa->spa_scrub_lock);
-}
-
 static void
 spa_scrub_io_done(zio_t *zio)
 {
@@ -2205,10 +2194,12 @@ spa_scrub_io_done(zio_t *zio)
 		vd->vdev_stat.vs_scrub_errors++;
 		mutex_exit(&vd->vdev_stat_lock);
 	}
-	if (--spa->spa_scrub_inflight == 0) {
+
+	if (--spa->spa_scrub_inflight < spa->spa_scrub_maxinflight)
 		cv_broadcast(&spa->spa_scrub_io_cv);
-		ASSERT(spa->spa_scrub_throttled == 0);
-	}
+
+	ASSERT(spa->spa_scrub_inflight >= 0);
+
 	mutex_exit(&spa->spa_scrub_lock);
 }
 
@@ -2217,11 +2208,19 @@ spa_scrub_io_start(spa_t *spa, blkptr_t *bp, int priority, int flags,
     zbookmark_t *zb)
 {
 	size_t size = BP_GET_LSIZE(bp);
-	void *data = zio_data_buf_alloc(size);
+	void *data;
 
 	mutex_enter(&spa->spa_scrub_lock);
+	/*
+	 * Do not give too much work to vdev(s).
+	 */
+	while (spa->spa_scrub_inflight >= spa->spa_scrub_maxinflight) {
+		cv_wait(&spa->spa_scrub_io_cv, &spa->spa_scrub_lock);
+	}
 	spa->spa_scrub_inflight++;
 	mutex_exit(&spa->spa_scrub_lock);
+
+	data = zio_data_buf_alloc(size);
 
 	if (zb->zb_level == -1 && BP_GET_TYPE(bp) != DMU_OT_OBJSET)
 		flags |= ZIO_FLAG_SPECULATIVE;	/* intent log block */
@@ -2333,7 +2332,6 @@ spa_scrub_thread(spa_t *spa)
 	spa->spa_scrub_errors = 0;
 	spa->spa_scrub_active = 1;
 	ASSERT(spa->spa_scrub_inflight == 0);
-	ASSERT(spa->spa_scrub_throttled == 0);
 
 	while (!spa->spa_scrub_stop) {
 		CALLB_CPR_SAFE_BEGIN(&cprinfo);
@@ -2353,9 +2351,6 @@ spa_scrub_thread(spa_t *spa)
 		mutex_enter(&spa->spa_scrub_lock);
 		if (error != EAGAIN)
 			break;
-
-		while (spa->spa_scrub_throttled > 0)
-			cv_wait(&spa->spa_scrub_io_cv, &spa->spa_scrub_lock);
 	}
 
 	while (spa->spa_scrub_inflight)

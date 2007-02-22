@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,7 +97,6 @@ struct vdev_cache {
 };
 
 struct vdev_queue {
-	uint64_t	vq_scrub_count;
 	avl_tree_t	vq_deadline_tree;
 	avl_tree_t	vq_read_tree;
 	avl_tree_t	vq_write_tree;

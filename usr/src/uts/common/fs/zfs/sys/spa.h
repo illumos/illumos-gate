@@ -355,7 +355,6 @@ extern int spa_scrub(spa_t *spa, pool_scrub_type_t type, boolean_t force);
 extern void spa_scrub_suspend(spa_t *spa);
 extern void spa_scrub_resume(spa_t *spa);
 extern void spa_scrub_restart(spa_t *spa, uint64_t txg);
-extern void spa_scrub_throttle(spa_t *spa, int direction);
 
 /* spa syncing */
 extern void spa_sync(spa_t *spa, uint64_t txg); /* only for DMU use */

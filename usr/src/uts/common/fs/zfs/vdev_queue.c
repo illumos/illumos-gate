@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,9 +42,6 @@
  */
 int zfs_vdev_max_pending = 35;
 int zfs_vdev_min_pending = 4;
-
-/* maximum scrub/resilver I/O queue */
-int zfs_scrub_limit = 70;
 
 /* deadline = pri + (lbolt >> time_shift) */
 int zfs_vdev_time_shift = 6;
@@ -129,8 +126,6 @@ vdev_queue_fini(vdev_t *vd)
 {
 	vdev_queue_t *vq = &vd->vdev_queue;
 
-	ASSERT(vq->vq_scrub_count == 0);
-
 	avl_destroy(&vq->vq_deadline_tree);
 	avl_destroy(&vq->vq_read_tree);
 	avl_destroy(&vq->vq_write_tree);
@@ -144,19 +139,11 @@ vdev_queue_io_add(vdev_queue_t *vq, zio_t *zio)
 {
 	avl_add(&vq->vq_deadline_tree, zio);
 	avl_add(zio->io_vdev_tree, zio);
-
-	if ((zio->io_flags & ZIO_FLAG_SCRUB_THREAD) &&
-	    ++vq->vq_scrub_count >= zfs_scrub_limit)
-		spa_scrub_throttle(zio->io_spa, 1);
 }
 
 static void
 vdev_queue_io_remove(vdev_queue_t *vq, zio_t *zio)
 {
-	if ((zio->io_flags & ZIO_FLAG_SCRUB_THREAD) &&
-	    vq->vq_scrub_count-- >= zfs_scrub_limit)
-		spa_scrub_throttle(zio->io_spa, -1);
-
 	avl_remove(&vq->vq_deadline_tree, zio);
 	avl_remove(zio->io_vdev_tree, zio);
 }

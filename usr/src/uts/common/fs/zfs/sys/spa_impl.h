@@ -111,7 +111,7 @@ struct spa {
 	uint64_t	spa_scrub_mintxg;	/* min txg we'll scrub */
 	uint64_t	spa_scrub_maxtxg;	/* max txg we'll scrub */
 	uint64_t	spa_scrub_inflight;	/* in-flight scrub I/Os */
-	int64_t		spa_scrub_throttled;	/* over-throttle scrub I/Os */
+	uint64_t	spa_scrub_maxinflight;	/* max in-flight scrub I/Os */
 	uint64_t	spa_scrub_errors;	/* scrub I/O error count */
 	int		spa_scrub_suspended;	/* tell scrubber to suspend */
 	kcondvar_t	spa_scrub_cv;		/* scrub thread state change */
