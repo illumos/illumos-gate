@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1998,6 +1998,7 @@ check_sharetab()
 
 	if (stat(SHARETAB, &st) != 0) {
 		syslog(LOG_ERR, "Cannot stat %s: %m", SHARETAB);
+		(void) fclose(f);
 		(void) rw_unlock(&sharetab_lock);
 		return;
 	}
