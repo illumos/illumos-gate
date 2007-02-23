@@ -74,6 +74,7 @@ typedef	struct n2cp_hmac_ctx n2cp_hmac_ctx_t;
 #define	N2CP_FAILED		0x0000001
 #define	N2CP_ATTACHED		0x0000002
 #define	N2CP_REGISTERED		0x0000004
+#define	N2CP_CPU_REGISTERED	0x0000008
 
 /*
  * HW limitaions for Data and Key. For an input greater than 64KB, Driver will
@@ -787,6 +788,9 @@ extern noncache_info_t	n2cp_nc;
 #define	n2cp_setregistered(n2cp)	((n2cp)->n_flags |= N2CP_REGISTERED)
 #define	n2cp_clrregistered(n2cp)	((n2cp)->n_flags &= ~N2CP_REGISTERED)
 #define	n2cp_isregistered(n2cp)		((n2cp)->n_flags & N2CP_REGISTERED)
+#define	n2cp_setcpuregistered(n2cp)	((n2cp)->n_flags |= N2CP_CPU_REGISTERED)
+#define	n2cp_clrcpuregistered(n2cp) ((n2cp)->n_flags &= ~N2CP_CPU_REGISTERED)
+#define	n2cp_iscpuregistered(n2cp)	((n2cp)->n_flags & N2CP_CPU_REGISTERED)
 
 
 #endif /* _KERNEL */

@@ -277,6 +277,7 @@ struct ncp_stat {
 #define	NCP_FAILED		0x0000001
 #define	NCP_ATTACHED		0x0000002
 #define	NCP_REGISTERED		0x0000004
+#define	NCP_CPU_REGISTERED	0x0000008
 
 /*
  * IMPORTANT:
@@ -615,6 +616,10 @@ int	ncp_free_context(crypto_ctx_t *);
 #define	ncp_setregistered(ncp)	((ncp)->n_flags |= NCP_REGISTERED)
 #define	ncp_clrregistered(ncp)	((ncp)->n_flags &= ~NCP_REGISTERED)
 #define	ncp_isregistered(ncp)	((ncp)->n_flags & NCP_REGISTERED)
+
+#define	ncp_setcpuregistered(ncp)	((ncp)->n_flags |= NCP_CPU_REGISTERED)
+#define	ncp_clrcpuregistered(ncp)	((ncp)->n_flags &= ~NCP_CPU_REGISTERED)
+#define	ncp_iscpuregistered(ncp)	((ncp)->n_flags & NCP_CPU_REGISTERED)
 
 #ifdef	__cplusplus
 }
