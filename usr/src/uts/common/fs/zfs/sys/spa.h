@@ -464,11 +464,12 @@ extern void spa_init(int flags);
 extern void spa_fini(void);
 
 #ifdef ZFS_DEBUG
-#define	dprintf_bp(bp, fmt, ...) do {			\
-	if (zfs_flags & ZFS_DEBUG_DPRINTF) { 		\
-	char __blkbuf[BP_SPRINTF_LEN];			\
-	sprintf_blkptr(__blkbuf, BP_SPRINTF_LEN, (bp));	\
-	dprintf(fmt " %s\n", __VA_ARGS__, __blkbuf);	\
+#define	dprintf_bp(bp, fmt, ...) do {				\
+	if (zfs_flags & ZFS_DEBUG_DPRINTF) { 			\
+	char *__blkbuf = kmem_alloc(BP_SPRINTF_LEN, KM_SLEEP);	\
+	sprintf_blkptr(__blkbuf, BP_SPRINTF_LEN, (bp));		\
+	dprintf(fmt " %s\n", __VA_ARGS__, __blkbuf);		\
+	kmem_free(__blkbuf, BP_SPRINTF_LEN);			\
 	} \
 _NOTE(CONSTCOND) } while (0)
 #else

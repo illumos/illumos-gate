@@ -723,7 +723,7 @@ add_reference(arc_buf_hdr_t *ab, kmutex_t *hash_lock, void *tag)
 
 	if ((refcount_add(&ab->b_refcnt, tag) == 1) &&
 	    (ab->b_state != arc_anon)) {
-		int delta = ab->b_size * ab->b_datacnt;
+		uint64_t delta = ab->b_size * ab->b_datacnt;
 
 		ASSERT(!MUTEX_HELD(&ab->b_state->arcs_mtx));
 		mutex_enter(&ab->b_state->arcs_mtx);
@@ -775,8 +775,8 @@ static void
 arc_change_state(arc_state_t *new_state, arc_buf_hdr_t *ab, kmutex_t *hash_lock)
 {
 	arc_state_t *old_state = ab->b_state;
-	int refcnt = refcount_count(&ab->b_refcnt);
-	int from_delta, to_delta;
+	int64_t refcnt = refcount_count(&ab->b_refcnt);
+	uint64_t from_delta, to_delta;
 
 	ASSERT(MUTEX_HELD(hash_lock));
 	ASSERT(new_state != old_state);
@@ -1219,7 +1219,7 @@ arc_evict_ghost(arc_state_t *state, int64_t bytes)
 	arc_buf_hdr_t *ab, *ab_prev;
 	kmutex_t *hash_lock;
 	uint64_t bytes_deleted = 0;
-	uint_t bufs_skipped = 0;
+	uint64_t bufs_skipped = 0;
 
 	ASSERT(GHOST_STATE(state));
 top:

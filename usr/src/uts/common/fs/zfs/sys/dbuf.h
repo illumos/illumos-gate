@@ -309,10 +309,11 @@ _NOTE(CONSTCOND) } while (0)
 
 #define	dprintf_dbuf_bp(db, bp, fmt, ...) do {			\
 	if (zfs_flags & ZFS_DEBUG_DPRINTF) {			\
-	char __blkbuf[BP_SPRINTF_LEN];				\
+	char *__blkbuf = kmem_alloc(BP_SPRINTF_LEN, KM_SLEEP);	\
 	sprintf_blkptr(__blkbuf, BP_SPRINTF_LEN, bp);		\
 	dprintf_dbuf(db, fmt " %s\n", __VA_ARGS__, __blkbuf);	\
-	} \
+	kmem_free(__blkbuf, BP_SPRINTF_LEN);			\
+	} 							\
 _NOTE(CONSTCOND) } while (0)
 
 #define	DBUF_VERIFY(db)	dbuf_verify(db)

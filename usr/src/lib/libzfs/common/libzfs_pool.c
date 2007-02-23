@@ -1624,8 +1624,9 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t **nverrlistp)
 	for (i = 0; i < count; i++) {
 		nvlist_t *nv;
 
-		if (i > 0 && memcmp(&zb[i - 1], &zb[i],
-		    sizeof (zbookmark_t)) == 0)
+		/* ignoring zb_blkid and zb_level for now */
+		if (i > 0 && zb[i-1].zb_objset == zb[i].zb_objset &&
+		    zb[i-1].zb_object == zb[i].zb_object)
 			continue;
 
 		if (nvlist_alloc(&nv, NV_UNIQUE_NAME, KM_SLEEP) != 0)
