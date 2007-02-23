@@ -403,15 +403,18 @@ mem_discover_mdesc(md_t *mdp, size_t mdbufsz)
 			mem.mem_dm = dm;
 		}
 	} else {
-		char *type, *sp;
+		char *type, *sp, *jnum, *nac;
 		size_t ss;
 		for (idx = 0; idx < num_comps; idx++) {
 			if (md_get_prop_str(mdp, listp[idx], "type", &type) < 0)
 				continue;
 			if (strcmp(type, "dimm") == 0) {
 				if (md_get_prop_str(mdp, listp[idx], "nac",
-				    &unum) < 0)
-					unum = "";
+				    &nac) < 0)
+					nac = "";
+				if (md_get_prop_str(mdp, listp[idx], "label",
+				    &jnum) < 0)
+					jnum = "";
 				if (md_get_prop_str(mdp, listp[idx],
 				    "serial_number", &serial) < 0)
 					serial = "";
@@ -428,7 +431,19 @@ mem_discover_mdesc(md_t *mdp, size_t mdbufsz)
 				sp = strncat(sp, dash, strlen(dash) + 1);
 
 				dm = fmd_fmri_zalloc(sizeof (mem_dimm_map_t));
-				dm->dm_label = fmd_fmri_strdup(unum);
+
+				if ((strcmp(nac, "") != 0) &&
+				    (strcmp(jnum, "") != 0)) {
+					ss = strlen(nac) + strlen(jnum) + 2;
+					unum = fmd_fmri_alloc(ss);
+					(void) snprintf(unum, ss, "%s/%s", nac,
+					    jnum);
+					dm->dm_label = unum;
+				} else {
+					unum = "";
+					dm->dm_label = fmd_fmri_strdup(unum);
+				}
+
 				(void) strncpy(dm->dm_serid, serial,
 				    MEM_SERID_MAXLEN - 1);
 				dm->dm_part = sp;
