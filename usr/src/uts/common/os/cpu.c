@@ -1165,6 +1165,7 @@ cpu_online(cpu_t *cp)
 	 */
 	error = mp_cpu_start(cp);	/* arch-dep hook */
 	if (error == 0) {
+		pg_cpupart_in(cp, cp->cpu_part);
 		pause_cpus(NULL);
 		cpu_add_active_internal(cp);
 		if (cp->cpu_flags & CPU_FAULTED) {
@@ -2215,9 +2216,6 @@ cpu_info_kstat_destroy(cpu_t *cp)
 void
 cpu_kstat_init(cpu_t *cp)
 {
-	/*
-	 * XXX need pg kstats for boot CPU
-	 */
 	mutex_enter(&cpu_lock);
 	cpu_info_kstat_create(cp);
 	cpu_stats_kstat_create(cp);
