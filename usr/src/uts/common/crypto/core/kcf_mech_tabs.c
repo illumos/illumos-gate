@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -341,7 +341,7 @@ kcf_create_mech_entry(kcf_ops_class_t class, char *mechname)
  * kcf_add_mech_provider()
  *
  * Arguments:
- *	. A pointer to the mechanism info
+ *	. An index in to  the provider mechanism array
  *      . A pointer to the provider descriptor
  *	. A storage for the kcf_prov_mech_desc_t the entry was added at.
  *
@@ -357,11 +357,12 @@ kcf_create_mech_entry(kcf_ops_class_t class, char *mechname)
  *      KCF_MECH_TAB_FULL otherwise.
  */
 int
-kcf_add_mech_provider(crypto_mech_info_t *mech_info,
+kcf_add_mech_provider(short mech_indx,
     kcf_provider_desc_t *prov_desc, kcf_prov_mech_desc_t **pmdpp)
 {
 	int error;
 	kcf_mech_entry_t *mech_entry;
+	crypto_mech_info_t *mech_info;
 	crypto_mech_type_t kcf_mech_type, mt;
 	kcf_prov_mech_desc_t *prov_mech, *prov_mech2;
 	crypto_func_group_t simple_fg_mask, dual_fg_mask;
@@ -372,6 +373,7 @@ kcf_add_mech_provider(crypto_mech_info_t *mech_info,
 
 	ASSERT(prov_desc->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
 
+	mech_info = &prov_desc->pd_mechanisms[mech_indx];
 	/*
 	 * Do not use the provider for the mechanism if
 	 * policy does not allow it.
@@ -434,8 +436,9 @@ kcf_add_mech_provider(crypto_mech_info_t *mech_info,
 	prov_mech = kmem_zalloc(sizeof (kcf_prov_mech_desc_t), KM_SLEEP);
 	bcopy(mech_info, &prov_mech->pm_mech_info, sizeof (crypto_mech_info_t));
 	prov_mech->pm_prov_desc = prov_desc;
-	prov_desc->pd_map_mechnums[KCF_MECH2CLASS(kcf_mech_type)]
-	    [KCF_MECH2INDEX(kcf_mech_type)] = mech_info->cm_mech_number;
+	prov_desc->pd_mech_indx[KCF_MECH2CLASS(kcf_mech_type)]
+	    [KCF_MECH2INDEX(kcf_mech_type)] = mech_indx;
+
 	KCF_PROV_REFHOLD(prov_desc);
 	KCF_PROV_IREFHOLD(prov_desc);
 

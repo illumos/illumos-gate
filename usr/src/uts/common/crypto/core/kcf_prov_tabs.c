@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -290,6 +289,7 @@ allocate_ops_v2(crypto_ops_t *src, crypto_ops_t *dst)
 kcf_provider_desc_t *
 kcf_alloc_provider_desc(crypto_provider_info_t *info)
 {
+	int i, j;
 	kcf_provider_desc_t *desc;
 	uint_t mech_list_count = info->pi_mech_list_count;
 	crypto_ops_t *src_ops = info->pi_ops_vector;
@@ -329,8 +329,12 @@ kcf_alloc_provider_desc(crypto_provider_info_t *info)
 	}
 
 	desc->pd_mech_list_count = mech_list_count;
-	desc->pd_mechanisms = kmem_alloc(sizeof (crypto_mech_info_t) *
+	desc->pd_mechanisms = kmem_zalloc(sizeof (crypto_mech_info_t) *
 	    mech_list_count, KM_SLEEP);
+	for (i = 0; i < KCF_OPS_CLASSSIZE; i++)
+		for (j = 0; j < KCF_MAXMECHTAB; j++)
+			desc->pd_mech_indx[i][j] = KCF_INVALID_INDX;
+
 	desc->pd_prov_id = KCF_PROVID_INVALID;
 	desc->pd_state = KCF_PROV_ALLOCATED;
 
@@ -756,14 +760,15 @@ kcf_free_provider_tab(uint_t count, kcf_provider_desc_t **array)
  * Returns in the location pointed to by pd a pointer to the descriptor
  * for the software provider for the specified mechanism.
  * The provider descriptor is returned held and it is the caller's
- * responsibility to release it when done.
+ * responsibility to release it when done. The mechanism entry
+ * is returned if the optional argument mep is non NULL.
  *
  * Returns one of the CRYPTO_ * error codes on failure, and
  * CRYPTO_SUCCESS on success.
  */
 int
 kcf_get_sw_prov(crypto_mech_type_t mech_type, kcf_provider_desc_t **pd,
-    boolean_t log_warn)
+    kcf_mech_entry_t **mep, boolean_t log_warn)
 {
 	kcf_mech_entry_t *me;
 
@@ -771,10 +776,14 @@ kcf_get_sw_prov(crypto_mech_type_t mech_type, kcf_provider_desc_t **pd,
 	if (kcf_get_mech_entry(mech_type, &me) != KCF_SUCCESS)
 		return (CRYPTO_MECHANISM_INVALID);
 
-	/* get a software provider for this mechanism */
+	/*
+	 * Get the software provider for this mechanism.
+	 * Lock the mech_entry until we grab the 'pd'.
+	 */
 	mutex_enter(&me->me_mutex);
 
-	if (me->me_sw_prov == NULL) {
+	if (me->me_sw_prov == NULL ||
+	    (*pd = me->me_sw_prov->pm_prov_desc) == NULL) {
 		/* no SW provider for this mechanism */
 		if (log_warn)
 			cmn_err(CE_WARN, "no SW provider for \"%s\"\n",
@@ -783,9 +792,11 @@ kcf_get_sw_prov(crypto_mech_type_t mech_type, kcf_provider_desc_t **pd,
 		return (CRYPTO_MECH_NOT_SUPPORTED);
 	}
 
-	*pd = me->me_sw_prov->pm_prov_desc;
 	KCF_PROV_REFHOLD(*pd);
 	mutex_exit(&me->me_mutex);
+
+	if (mep != NULL)
+		*mep = me;
 
 	return (CRYPTO_SUCCESS);
 }

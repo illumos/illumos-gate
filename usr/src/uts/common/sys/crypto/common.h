@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,13 +67,21 @@ typedef struct crypto_mechanism32 {
 #endif  /* _SYSCALL32 */
 
 /*
- * The measurement unit flag for a mechanism's minimum or maximum key size.
+ * The measurement unit bit flag for a mechanism's minimum or maximum key size.
  * The unit are mechanism dependant.  It can be in bits or in bytes.
  */
 typedef uint32_t crypto_keysize_unit_t;
 
+/*
+ * The following bit flags are valid in cm_mech_flags field in
+ * the crypto_mech_info_t structure of the SPI.
+ *
+ * Only the first two bit flags are valid in mi_keysize_unit
+ * field in the crypto_mechanism_info_t structure of the API.
+ */
 #define	CRYPTO_KEYSIZE_UNIT_IN_BITS	0x00000001
 #define	CRYPTO_KEYSIZE_UNIT_IN_BYTES	0x00000002
+#define	CRYPTO_CAN_SHARE_OPSTATE	0x00000004 /* supports sharing */
 
 
 /* Mechanisms supported out-of-the-box */
@@ -109,6 +117,13 @@ typedef uint32_t crypto_keysize_unit_t;
 #define	SUN_CKM_SHA256_RSA_PKCS		"CKM_SHA256_RSA_PKCS"
 #define	SUN_CKM_SHA384_RSA_PKCS		"CKM_SHA384_RSA_PKCS"
 #define	SUN_CKM_SHA512_RSA_PKCS		"CKM_SHA512_RSA_PKCS"
+
+/* Shared operation context format for CKM_RC4 */
+typedef struct {
+	uchar_t arr[256];
+	uchar_t i, j;
+	uint64_t pad;		/* For 64-bit alignment */
+} arcfour_state_t;
 
 
 /* Data arguments of cryptographic operations */

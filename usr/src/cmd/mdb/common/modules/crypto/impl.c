@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,17 +161,18 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			(uintptr_t)mech_pointer, DCMD_ADDRSPEC, 0, NULL);
 	}
 	mdb_dec_indent(4);
-	mdb_printf("pd_map_mechnums:\n");
+	mdb_printf("pd_mech_indx:\n");
 	mdb_inc_indent(8);
 	for (i = 0; i < KCF_OPS_CLASSSIZE; i++) {
 	    for (j = 0; j < KCF_MAXMECHTAB; j++) {
-		mdb_printf("%llu ",
-		    desc.pd_map_mechnums[i][j]);
+		if (desc.pd_mech_indx[i][j] == KCF_INVALID_INDX)
+			mdb_printf("N ");
+		else
+			mdb_printf("%u ", desc.pd_mech_indx[i][j]);
 	    }
 	    mdb_printf("\n");
 	}
 	mdb_dec_indent(8);
-	mdb_printf("pd_stats:\t\t%p\n", desc.pd_stats);
 	mdb_printf("pd_ks_data.ps_ops_total:\n", desc.pd_ks_data.ps_ops_total);
 	pr_kstat_named(&desc.pd_ks_data.ps_ops_total);
 	mdb_printf("pd_ks_data.ps_ops_passed:\n",
@@ -216,8 +216,13 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("pd_resume_cv:\t\t%hd\n", desc.pd_resume_cv._opaque);
 	mdb_printf("pd_remove_cv:\t\t%hd\n", desc.pd_remove_cv._opaque);
-	mdb_printf("pd_restricted:\t\t%s\n",
-	    desc.pd_restricted == B_FALSE ? "B_FALSE" : "B_TRUE");
+	mdb_printf("pd_flags:\t\t%s %s %s\n",
+	    (desc.pd_flags & CRYPTO_HIDE_PROVIDER) ?
+		"CRYPTO_HIDE_PROVIDER" : " ",
+	    (desc.pd_flags & KCF_LPROV_MEMBER) ?
+		"KCF_LPROV_MEMBER" : " ",
+	    (desc.pd_flags & KCF_PROV_RESTRICTED) ?
+		"KCF_PROV_RESTRICTED" : " ");
 	mdb_printf("pd_provider_list:\t%p\n", desc.pd_provider_list);
 	return (DCMD_OK);
 }

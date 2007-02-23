@@ -445,6 +445,7 @@ struct n2cp_block_ctx {
 	union {
 		uchar_t		val[MAXVALUE];
 		rc4_key_t	rc4val;
+		arcfour_state_t	kcf_rc4val;
 	} keystruct;
 	uint64_t	key_paddr;	/* paddr of value */
 	int		ivlen;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +69,7 @@ static crypto_mech_info_t rc4_mech_info_tab[] = {
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT | CRYPTO_FG_DECRYPT_ATOMIC,
 	    ARCFOUR_MIN_KEY_BITS, ARCFOUR_MAX_KEY_BITS,
-	    CRYPTO_KEYSIZE_UNIT_IN_BITS}
+	    CRYPTO_KEYSIZE_UNIT_IN_BITS | CRYPTO_CAN_SHARE_OPSTATE}
 };
 
 static void rc4_provider_status(crypto_provider_handle_t, uint_t *);
@@ -287,7 +286,10 @@ rc4_crypt_update(crypto_ctx_t *ctx, crypto_data_t *input, crypto_data_t *output,
 
 	ASSERT(ctx->cc_provider_private != NULL);
 
-	key = ctx->cc_provider_private;
+	if ((ctx->cc_flags & CRYPTO_USE_OPSTATE) && ctx->cc_opstate != NULL)
+		key = ctx->cc_opstate;
+	else
+		key = ctx->cc_provider_private;
 
 	/* Simple case: in-line encipherment */
 
@@ -527,10 +529,10 @@ rc4_crypt_atomic(crypto_provider_handle_t handle, crypto_session_id_t session,
     crypto_data_t *output, crypto_spi_ctx_template_t template,
     crypto_req_handle_t req)
 {
-
 	crypto_ctx_t ctx;
 	int ret;
 
+	bzero(&ctx, sizeof (crypto_ctx_t));
 	ret = rc4_common_init(&ctx, mechanism, key, template, req);
 
 	if (ret != CRYPTO_SUCCESS)

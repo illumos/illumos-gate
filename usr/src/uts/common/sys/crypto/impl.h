@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,11 +155,9 @@ typedef enum {
 	(pd)->pd_state == KCF_PROV_BUSY)
 #define	KCF_IS_PROV_REMOVED(pd)	((pd)->pd_state >= KCF_PROV_REMOVED)
 
-/*
- * Internal flag set to indicate if a provider is a member of
- * a logical provider.
- */
-#define	KCF_LPROV_MEMBER	0x80000000
+/* Internal flags valid for pd_flags field */
+#define	KCF_PROV_RESTRICTED	0x40000000
+#define	KCF_LPROV_MEMBER	0x80000000 /* is member of a logical provider */
 
 /*
  * A provider descriptor structure. There is one such structure per
@@ -167,67 +165,64 @@ typedef enum {
  * freed when the provider unregisters.
  *
  * pd_prov_type:	Provider type, hardware or software
- * pd_prov_handle:	Provider handle specified by provider
- * pd_kcf_prov_handle:	KCF-private handle assigned by KCF
- * pd_prov_id:		Identification # assigned by KCF to provider
- * pd_description:	Provider description string
- * pd_ops_vector:	The ops vector specified by Provider
- * pd_mech_list_count:	The number of entries in pi_mechanisms, specified
- *			by the provider during registration
- * pd_mechanisms:	Mechanisms supported by the provider, specified
- *			by the provider during registration
- * pd_map_mechnums:	Lookup table which maps a core framework mechanism
- *			number to a number understood by this provider
- * pd_ks_data:		kstat data
- * pd_kstat:		kstat associated with the provider
- * pd_sched_info:	Scheduling information associated with the provider
+ * pd_sid:		Session ID of the provider used by kernel clients.
+ *			This is valid only for session-oriented providers.
  * pd_refcnt:		Reference counter to this provider descriptor
  * pd_irefcnt:		References held by the framework internal structs
+ * pd_lock:		lock protects pd_state and pd_provider_list
+ * pd_state:		State value of the provider
+ * pd_provider_list:	Used to cross-reference logical providers and their
+ *			members. Not used for software providers.
+ * pd_resume_cv:	cv to wait for state to change from KCF_PROV_BUSY
+ * pd_prov_handle:	Provider handle specified by provider
+ * pd_ops_vector:	The ops vector specified by Provider
+ * pd_mech_indx:	Lookup table which maps a core framework mechanism
+ *			number to an index in pd_mechanisms array
+ * pd_mechanisms:	Array of mechanisms supported by the provider, specified
+ *			by the provider during registration
+ * pd_sched_info:	Scheduling information associated with the provider
+ * pd_mech_list_count:	The number of entries in pi_mechanisms, specified
+ *			by the provider during registration
  * pd_name:		Device name or module name
  * pd_instance:		Device instance
  * pd_module_id:	Module ID returned by modload
  * pd_mctlp:		Pointer to modctl structure for this provider
- * pd_sid:		Session ID of the provider used by kernel clients.
- *			This is valid only for session-oriented providers.
- * pd_lock:		lock protects pd_state and pd_real_provider_list
- * pd_state:		State value of the provider
- * pd_resume_cv:	cv to wait for state to change from KCF_PROV_BUSY
  * pd_remove_cv:	cv to wait on while the provider queue drains
- * pd_restricted:	true if this is an export restricted provider
- * pd_provider_list:	Used to cross-reference logical providers and their
- *			members. Not used for software providers.
+ * pd_description:	Provider description string
  * pd_flags		Could be CRYPTO_HIDE_PROVIDER from pi_flags
- *			or KCF_LPROV_MEMBER set internally.
+ *			or KCF_LPROV_MEMBER, KCF_PROV_RESTRICTED set internally.
+ * pd_kcf_prov_handle:	KCF-private handle assigned by KCF
+ * pd_prov_id:		Identification # assigned by KCF to provider
+ * pd_kstat:		kstat associated with the provider
+ * pd_ks_data:		kstat data
  */
 typedef struct kcf_provider_desc {
 	crypto_provider_type_t		pd_prov_type;
-	crypto_provider_handle_t	pd_prov_handle;
-	crypto_kcf_provider_handle_t	pd_kcf_prov_handle;
-	crypto_provider_id_t		pd_prov_id;
-	char				*pd_description;
-	crypto_ops_t			*pd_ops_vector;
-	uint_t				pd_mech_list_count;
-	crypto_mech_info_t		*pd_mechanisms;
-	crypto_mech_type_t		pd_map_mechnums[KCF_OPS_CLASSSIZE]\
-					    [KCF_MAXMECHTAB];
-	kcf_stats_t			*pd_stats;
-	kcf_prov_stats_t		pd_ks_data;
-	kstat_t				*pd_kstat;
-	kcf_sched_info_t		pd_sched_info;
+	crypto_session_id_t		pd_sid;
 	uint_t				pd_refcnt;
 	uint_t				pd_irefcnt;
+	kmutex_t			pd_lock;
+	kcf_prov_state_t		pd_state;
+	struct kcf_provider_list	*pd_provider_list;
+	kcondvar_t			pd_resume_cv;
+	crypto_provider_handle_t	pd_prov_handle;
+	crypto_ops_t			*pd_ops_vector;
+	ushort_t			pd_mech_indx[KCF_OPS_CLASSSIZE]\
+					    [KCF_MAXMECHTAB];
+	crypto_mech_info_t		*pd_mechanisms;
+	kcf_sched_info_t		pd_sched_info;
+	uint_t				pd_mech_list_count;
 	char				*pd_name;
 	uint_t				pd_instance;
 	int				pd_module_id;
 	struct modctl			*pd_mctlp;
-	crypto_session_id_t		pd_sid;
-	kmutex_t			pd_lock;
-	kcf_prov_state_t		pd_state;
-	kcondvar_t			pd_resume_cv;
 	kcondvar_t			pd_remove_cv;
-	boolean_t			pd_restricted;
-	struct kcf_provider_list	*pd_provider_list;
+	char				*pd_description;
 	uint_t				pd_flags;
+	crypto_kcf_provider_handle_t	pd_kcf_prov_handle;
+	crypto_provider_id_t		pd_prov_id;
+	kstat_t				*pd_kstat;
+	kcf_prov_stats_t		pd_ks_data;
 } kcf_provider_desc_t;
 
 /* useful for making a list of providers */
@@ -442,6 +437,20 @@ extern kcf_mech_entry_tab_t kcf_mech_tabs_tab[];
 
 #define	KCF_MECH2INDEX(mech_type) ((int)(mech_type))
 
+#define	KCF_TO_PROV_MECH_INDX(pd, mech_type) 			\
+	((pd)->pd_mech_indx[KCF_MECH2CLASS(mech_type)] 		\
+	[KCF_MECH2INDEX(mech_type)])
+
+#define	KCF_TO_PROV_MECHINFO(pd, mech_type)			\
+	((pd)->pd_mechanisms[KCF_TO_PROV_MECH_INDX(pd, mech_type)])
+
+#define	KCF_TO_PROV_MECHNUM(pd, mech_type)			\
+	(KCF_TO_PROV_MECHINFO(pd, mech_type).cm_mech_number)
+
+#define	KCF_CAN_SHARE_OPSTATE(pd, mech_type)			\
+	((KCF_TO_PROV_MECHINFO(pd, mech_type).cm_mech_flags) &	\
+	CRYPTO_CAN_SHARE_OPSTATE)
+
 /* ps_refcnt is protected by cm_lock in the crypto_minor structure */
 typedef struct crypto_provider_session {
 	struct crypto_provider_session *ps_next;
@@ -500,6 +509,7 @@ extern rctl_hndl_t rc_project_crypto_mem;
 #define	KCF_INVALID_MECH_NAME	0x2	/* invalid mechanism name */
 #define	KCF_INVALID_MECH_CLASS	0x3	/* invalid mechanism class */
 #define	KCF_MECH_TAB_FULL	0x4	/* Need more room in the mech tabs. */
+#define	KCF_INVALID_INDX	((ushort_t)-1)
 
 /*
  * kCF internal mechanism and function group for tracking RNG providers.
@@ -1240,7 +1250,7 @@ void crypto_free_function_list(crypto_function_list_t *list);
 int crypto_build_permitted_mech_names(kcf_provider_desc_t *,
     crypto_mech_name_t **, uint_t *, int);
 extern void kcf_init_mech_tabs(void);
-extern int kcf_add_mech_provider(crypto_mech_info_t *, kcf_provider_desc_t *,
+extern int kcf_add_mech_provider(short, kcf_provider_desc_t *,
     kcf_prov_mech_desc_t **);
 extern void kcf_remove_mech_provider(char *, kcf_provider_desc_t *);
 extern int kcf_get_mech_entry(crypto_mech_type_t, kcf_mech_entry_t **);
@@ -1274,7 +1284,7 @@ extern int kcf_get_slot_list(uint_t *, kcf_provider_desc_t ***, boolean_t);
 extern void kcf_free_provider_tab(uint_t, kcf_provider_desc_t **);
 extern kcf_provider_desc_t *kcf_prov_tab_lookup(crypto_provider_id_t);
 extern int kcf_get_sw_prov(crypto_mech_type_t, kcf_provider_desc_t **,
-    boolean_t);
+    kcf_mech_entry_t **, boolean_t);
 
 /* Access to the policy table */
 extern boolean_t is_mech_disabled(kcf_provider_desc_t *, crypto_mech_name_t);

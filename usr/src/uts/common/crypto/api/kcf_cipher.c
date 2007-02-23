@@ -157,23 +157,62 @@ crypto_cipher_init_prov(crypto_provider_t provider, crypto_session_id_t sid,
 			    &lmech, key, tmpl, KCF_SWFP_RHNDL(crq));
 		}
 		KCF_PROV_INCRSTATS(pd, error);
-	} else {
-		if (func == CRYPTO_FG_ENCRYPT) {
-			KCF_WRAP_ENCRYPT_OPS_PARAMS(&params, KCF_OP_INIT, sid,
-			    mech, key, NULL, NULL, tmpl);
-		} else {
-			ASSERT(func == CRYPTO_FG_DECRYPT);
-			KCF_WRAP_DECRYPT_OPS_PARAMS(&params, KCF_OP_INIT, sid,
-			    mech, key, NULL, NULL, tmpl);
-		}
 
-		error = kcf_submit_request(real_provider, ctx, crq, &params,
-		    B_FALSE);
+		goto done;
 	}
+
+	/* Check if context sharing is possible */
+	if (pd->pd_prov_type == CRYPTO_HW_PROVIDER &&
+	    key->ck_format == CRYPTO_KEY_RAW &&
+	    KCF_CAN_SHARE_OPSTATE(pd, mech->cm_type)) {
+		kcf_context_t *tctxp = (kcf_context_t *)ctx;
+		kcf_provider_desc_t *tpd = NULL;
+		crypto_mech_info_t *sinfo;
+
+		if ((kcf_get_sw_prov(mech->cm_type, &tpd, &tctxp->kc_mech,
+		    B_FALSE) == CRYPTO_SUCCESS)) {
+			int tlen;
+
+			sinfo = &(KCF_TO_PROV_MECHINFO(tpd, mech->cm_type));
+			/*
+			 * key->ck_length from the consumer is always in bits.
+			 * We convert it to be in the same unit registered by
+			 * the provider in order to do a comparison.
+			 */
+			if (sinfo->cm_mech_flags & CRYPTO_KEYSIZE_UNIT_IN_BYTES)
+				tlen = key->ck_length >> 3;
+			else
+				tlen = key->ck_length;
+			/*
+			 * Check if the software provider can support context
+			 * sharing and support this key length.
+			 */
+			if ((sinfo->cm_mech_flags & CRYPTO_CAN_SHARE_OPSTATE) &&
+			    (tlen >= sinfo->cm_min_key_length) &&
+			    (tlen <= sinfo->cm_max_key_length)) {
+				ctx->cc_flags = CRYPTO_INIT_OPSTATE;
+				tctxp->kc_sw_prov_desc = tpd;
+			} else
+				KCF_PROV_REFRELE(tpd);
+		}
+	}
+
+	if (func == CRYPTO_FG_ENCRYPT) {
+		KCF_WRAP_ENCRYPT_OPS_PARAMS(&params, KCF_OP_INIT, sid,
+		    mech, key, NULL, NULL, tmpl);
+	} else {
+		ASSERT(func == CRYPTO_FG_DECRYPT);
+		KCF_WRAP_DECRYPT_OPS_PARAMS(&params, KCF_OP_INIT, sid,
+		    mech, key, NULL, NULL, tmpl);
+	}
+
+	error = kcf_submit_request(real_provider, ctx, crq, &params,
+	    B_FALSE);
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
 		KCF_PROV_REFRELE(real_provider);
 
+done:
 	if ((error == CRYPTO_SUCCESS) || (error == CRYPTO_QUEUED))
 		*ctxp = (crypto_context_t)ctx;
 	else {
@@ -457,11 +496,21 @@ crypto_encrypt_update(crypto_context_t context, crypto_data_t *plaintext,
 		error = KCF_PROV_ENCRYPT_UPDATE(pd, ctx, plaintext,
 		    ciphertext, NULL);
 		KCF_PROV_INCRSTATS(pd, error);
-	} else {
-		KCF_WRAP_ENCRYPT_OPS_PARAMS(&params, KCF_OP_UPDATE,
-		    ctx->cc_session, NULL, NULL, plaintext, ciphertext, NULL);
-		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
+		return (error);
 	}
+
+	/* Check if we should use a software provider for small jobs */
+	if ((ctx->cc_flags & CRYPTO_USE_OPSTATE) && cr == NULL) {
+		if (plaintext->cd_length < kcf_ctx->kc_mech->me_threshold &&
+		    kcf_ctx->kc_sw_prov_desc != NULL &&
+		    KCF_IS_PROV_USABLE(kcf_ctx->kc_sw_prov_desc)) {
+			pd = kcf_ctx->kc_sw_prov_desc;
+		}
+	}
+
+	KCF_WRAP_ENCRYPT_OPS_PARAMS(&params, KCF_OP_UPDATE,
+	    ctx->cc_session, NULL, NULL, plaintext, ciphertext, NULL);
+	error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 
 	return (error);
 }
@@ -730,11 +779,21 @@ crypto_decrypt_update(crypto_context_t context, crypto_data_t *ciphertext,
 		error = KCF_PROV_DECRYPT_UPDATE(pd, ctx, ciphertext,
 		    plaintext, NULL);
 		KCF_PROV_INCRSTATS(pd, error);
-	} else {
-		KCF_WRAP_DECRYPT_OPS_PARAMS(&params, KCF_OP_UPDATE,
-		    ctx->cc_session, NULL, NULL, ciphertext, plaintext, NULL);
-		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
+		return (error);
 	}
+
+	/* Check if we should use a software provider for small jobs */
+	if ((ctx->cc_flags & CRYPTO_USE_OPSTATE) && cr == NULL) {
+		if (ciphertext->cd_length < kcf_ctx->kc_mech->me_threshold &&
+		    kcf_ctx->kc_sw_prov_desc != NULL &&
+		    KCF_IS_PROV_USABLE(kcf_ctx->kc_sw_prov_desc)) {
+			pd = kcf_ctx->kc_sw_prov_desc;
+		}
+	}
+
+	KCF_WRAP_DECRYPT_OPS_PARAMS(&params, KCF_OP_UPDATE,
+	    ctx->cc_session, NULL, NULL, ciphertext, plaintext, NULL);
+	error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 
 	return (error);
 }
@@ -810,7 +869,6 @@ crypto_encrypt_single(crypto_context_t context, crypto_data_t *plaintext,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
-
 	/* The fast path for SW providers. */
 	if (CHECK_FASTPATH(cr, pd)) {
 		error = KCF_PROV_ENCRYPT(pd, ctx, plaintext,
@@ -845,7 +903,6 @@ crypto_decrypt_single(crypto_context_t context, crypto_data_t *ciphertext,
 	    ((pd = kcf_ctx->kc_prov_desc) == NULL)) {
 		return (CRYPTO_INVALID_CONTEXT);
 	}
-
 
 	/* The fast path for SW providers. */
 	if (CHECK_FASTPATH(cr, pd)) {

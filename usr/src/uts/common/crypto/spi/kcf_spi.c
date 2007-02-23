@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -716,12 +716,6 @@ init_prov_mechs(crypto_provider_info_t *info, kcf_provider_desc_t *desc)
 			(void) strncpy(rand_mi->cm_mech_name, SUN_RANDOM,
 			    CRYPTO_MAX_MECH_NAME);
 			rand_mi->cm_func_group_mask = CRYPTO_FG_RANDOM;
-			/*
-			 * What we really need here is a
-			 * CRYPTO_KEYSIZE_NOT_APPLICABLE. We make do with the
-			 * following for now.
-			 */
-			rand_mi->cm_keysize_unit = CRYPTO_KEYSIZE_UNIT_IN_BITS;
 		} else {
 			ASSERT(info->pi_mechanisms != NULL);
 			bcopy(info->pi_mechanisms, desc->pd_mechanisms,
@@ -736,13 +730,13 @@ init_prov_mechs(crypto_provider_info_t *info, kcf_provider_desc_t *desc)
 	for (mech_idx = 0; mech_idx < desc->pd_mech_list_count; mech_idx++) {
 		crypto_mech_info_t *mi = &desc->pd_mechanisms[mech_idx];
 
-		if (mi->cm_keysize_unit != CRYPTO_KEYSIZE_UNIT_IN_BITS &&
-		    mi->cm_keysize_unit != CRYPTO_KEYSIZE_UNIT_IN_BYTES) {
+		if ((mi->cm_mech_flags & CRYPTO_KEYSIZE_UNIT_IN_BITS) &&
+		    (mi->cm_mech_flags & CRYPTO_KEYSIZE_UNIT_IN_BYTES)) {
 			err = CRYPTO_ARGUMENTS_BAD;
 			break;
 		}
 
-		if (kcf_add_mech_provider(mi, desc, &pmd) != KCF_SUCCESS)
+		if (kcf_add_mech_provider(mech_idx, desc, &pmd) != KCF_SUCCESS)
 			break;
 
 		if (pmd == NULL)

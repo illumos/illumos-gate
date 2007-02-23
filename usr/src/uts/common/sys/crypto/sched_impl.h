@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -302,6 +302,8 @@ typedef struct kcf_context {
 	kcf_areq_node_t		*kc_req_chain_last;
 	boolean_t		kc_need_signal;	/* Initialized to B_FALSE */
 	kcf_provider_desc_t	*kc_prov_desc;	/* Prov. descriptor */
+	kcf_provider_desc_t	*kc_sw_prov_desc;	/* Prov. descriptor */
+	kcf_mech_entry_t	*kc_mech;
 	struct kcf_context	*kc_secondctx;	/* for dual contexts */
 } kcf_context_t;
 

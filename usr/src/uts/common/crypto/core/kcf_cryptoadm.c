@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -364,7 +364,7 @@ kcf_change_mechs(kcf_provider_desc_t *provider, uint_t count,
 
 		switch (direction) {
 		case CRYPTO_MECH_ADDED:
-			(void) kcf_add_mech_provider(mi, provider, &pmd);
+			(void) kcf_add_mech_provider(j, provider, &pmd);
 			break;
 
 		case CRYPTO_MECH_REMOVED:

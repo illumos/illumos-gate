@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -616,8 +616,8 @@ init_mechanism_info(crypto_mechanism_info_t *mech_info,
 	crypto_func_group_t fg = pmd->pm_mech_info.cm_func_group_mask;
 
 	/* min/max key sizes */
-	mech_info->mi_keysize_unit =
-	    pmd->pm_mech_info.cm_keysize_unit;
+	mech_info->mi_keysize_unit = pmd->pm_mech_info.cm_mech_flags &
+	    (CRYPTO_KEYSIZE_UNIT_IN_BITS | CRYPTO_KEYSIZE_UNIT_IN_BYTES);
 	mech_info->mi_min_key_size =
 	    (size_t)pmd->pm_mech_info.cm_min_key_length;
 	mech_info->mi_max_key_size =

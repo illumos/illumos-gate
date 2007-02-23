@@ -2236,14 +2236,10 @@ crypto_provider_copyin_mech_param(kcf_provider_desc_t *pd,
     crypto_mechanism_t *umech, crypto_mechanism_t *kmech, int mode, int *error)
 {
 	crypto_mech_type_t provider_mech_type;
-	kcf_ops_class_t class;
-	int index;
 	int rv;
 
 	/* get the provider's mech number */
-	class = KCF_MECH2CLASS(umech->cm_type);
-	index = KCF_MECH2INDEX(umech->cm_type);
-	provider_mech_type = pd->pd_map_mechnums[class][index];
+	provider_mech_type = KCF_TO_PROV_MECHNUM(pd, umech->cm_type);
 
 	kmech->cm_param = NULL;
 	kmech->cm_param_len = 0;
@@ -2272,14 +2268,10 @@ crypto_provider_copyout_mech_param(kcf_provider_desc_t *pd,
     crypto_mechanism_t *kmech, crypto_mechanism_t *umech, int mode, int *error)
 {
 	crypto_mech_type_t provider_mech_type;
-	kcf_ops_class_t class;
-	int index;
 	int rv;
 
 	/* get the provider's mech number */
-	class = KCF_MECH2CLASS(umech->cm_type);
-	index = KCF_MECH2INDEX(umech->cm_type);
-	provider_mech_type = pd->pd_map_mechnums[class][index];
+	provider_mech_type = KCF_TO_PROV_MECHNUM(pd, umech->cm_type);
 
 	kmech->cm_type = provider_mech_type;
 	rv = KCF_PROV_COPYOUT_MECH(pd, kmech, umech, error, mode);
@@ -2297,17 +2289,13 @@ crypto_free_mech(kcf_provider_desc_t *pd, boolean_t allocated_by_crypto_module,
     crypto_mechanism_t *mech)
 {
 	crypto_mech_type_t provider_mech_type;
-	kcf_ops_class_t class;
-	int index;
 
 	if (allocated_by_crypto_module) {
 		if (mech->cm_param != NULL)
 			kmem_free(mech->cm_param, mech->cm_param_len);
 	} else {
 		/* get the provider's mech number */
-		class = KCF_MECH2CLASS(mech->cm_type);
-		index = KCF_MECH2INDEX(mech->cm_type);
-		provider_mech_type = pd->pd_map_mechnums[class][index];
+		provider_mech_type = KCF_TO_PROV_MECHNUM(pd, mech->cm_type);
 
 		if (mech->cm_param != NULL && mech->cm_param_len != 0) {
 			mech->cm_type = provider_mech_type;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -563,8 +563,7 @@ typedef struct kcf_req_params {
 
 #define	KCF_SET_PROVIDER_MECHNUM(fmtype, pd, mechp)			\
 	(mechp)->cm_type =						\
-	    (pd)->pd_map_mechnums[KCF_MECH2CLASS(fmtype)]		\
-	    [KCF_MECH2INDEX(fmtype)];
+	    KCF_TO_PROV_MECHNUM(pd, fmtype);
 
 #ifdef __cplusplus
 }

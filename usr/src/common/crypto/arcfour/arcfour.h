@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +33,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <sys/crypto/common.h>
 
 #define	ARCFOUR_MIN_KEY_BYTES	1
 
@@ -46,13 +46,7 @@ extern "C" {
 #define	ARCFOUR_MIN_KEY_BITS	(ARCFOUR_MIN_KEY_BYTES << 3)
 #define	ARCFOUR_MAX_KEY_BITS	(ARCFOUR_MAX_KEY_BYTES << 3)
 
-typedef struct {
-	uchar_t i, j;
-#ifdef	sun4v
-	unsigned long long pad;
-#endif	/* sun4v */
-	uchar_t arr[256];
-} ARCFour_key;
+typedef arcfour_state_t ARCFour_key;
 
 void arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen);
 void arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len);

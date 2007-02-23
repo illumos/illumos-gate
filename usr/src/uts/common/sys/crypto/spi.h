@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +71,10 @@ typedef void *crypto_spi_ctx_template_t;
  */
 typedef void *crypto_req_handle_t;
 
+/* Values for cc_flags field */
+#define	CRYPTO_INIT_OPSTATE	0x00000001 /* allocate and init cc_opstate */
+#define	CRYPTO_USE_OPSTATE	0x00000002 /* .. start using it as context */
+
 /*
  * The context structure is passed from the kernel to a provider.
  * It contains the information needed to process a multi-part or
@@ -86,6 +90,8 @@ typedef struct crypto_ctx {
 	crypto_session_id_t	cc_session;
 	void			*cc_provider_private;	/* owned by provider */
 	void			*cc_framework_private;	/* owned by framework */
+	uint32_t		cc_flags;		/* flags */
+	void			*cc_opstate;		/* state */
 } crypto_ctx_t;
 
 /*
@@ -617,8 +623,11 @@ typedef struct crypto_mech_info {
 	crypto_func_group_t	cm_func_group_mask;
 	ssize_t			cm_min_key_length;
 	ssize_t			cm_max_key_length;
-	crypto_keysize_unit_t	cm_keysize_unit; /* for cm_xxx_key_length */
+	uint32_t		cm_mech_flags;
 } crypto_mech_info_t;
+
+/* Alias the old name to the new name for compatibility. */
+#define	cm_keysize_unit	cm_mech_flags
 
 /*
  * crypto_kcf_provider_handle_t is a handle allocated by the kernel.
@@ -674,7 +683,8 @@ typedef struct crypto_provider_info {
 
 /* hidden providers can only be accessed via a logical provider */
 #define	CRYPTO_HIDE_PROVIDER		0x00000001
-#define	CRYPTO_PIFLAGS_UNAVAILABLE	0x80000000
+#define	CRYPTO_PIFLAGS_RESERVED2	0x40000000
+#define	CRYPTO_PIFLAGS_RESERVED1	0x80000000
 
 /*
  * Provider status passed by a provider to crypto_provider_notification(9F)

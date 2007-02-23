@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -200,7 +200,8 @@ rngprov_seed(uint8_t *buf, int len, uint_t entropy_est, uint32_t flags)
 {
 	kcf_provider_desc_t *pd = NULL;
 
-	if (kcf_get_sw_prov(rngmech_type, &pd, B_FALSE) == CRYPTO_SUCCESS) {
+	if (kcf_get_sw_prov(rngmech_type, &pd, NULL, B_FALSE) ==
+	    CRYPTO_SUCCESS) {
 		(void) KCF_PROV_SEED_RANDOM(pd, pd->pd_sid, buf, len,
 		    entropy_est, flags, NULL);
 		KCF_PROV_REFRELE(pd);

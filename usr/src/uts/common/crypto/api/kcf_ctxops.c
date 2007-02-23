@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,12 +78,9 @@ crypto_create_ctx_template(crypto_mechanism_t *mech, crypto_key_t *key,
 {
 	int error;
 	kcf_mech_entry_t *me;
-	kcf_prov_mech_desc_t *pm;
 	kcf_provider_desc_t *pd;
 	kcf_ctx_template_t *ctx_tmpl;
 	crypto_mechanism_t prov_mech;
-	kcf_ops_class_t class;
-	int index;
 
 	/* A few args validation */
 
@@ -94,24 +90,9 @@ crypto_create_ctx_template(crypto_mechanism_t *mech, crypto_key_t *key,
 	if (mech == NULL)
 		return (CRYPTO_MECHANISM_INVALID);
 
-	if (kcf_get_mech_entry(mech->cm_type, &me) != KCF_SUCCESS) {
-		/* error is one of the KCF_INVALID_MECH_XXX's */
-		return (CRYPTO_MECHANISM_INVALID);
-	}
-
-	/*
-	 * Get the software provider for the mech.
-	 * Lock the mech_entry until we grab the 'pd'
-	 */
-	mutex_enter(&me->me_mutex);
-
-	if (((pm = me->me_sw_prov) == NULL) ||
-	    ((pd = pm->pm_prov_desc) == NULL)) {
-		mutex_exit(&me->me_mutex);
-		return (CRYPTO_MECH_NOT_SUPPORTED);
-	}
-	KCF_PROV_REFHOLD(pd);
-	mutex_exit(&me->me_mutex);
+	error = kcf_get_sw_prov(mech->cm_type, &pd, &me, B_TRUE);
+	if (error != CRYPTO_SUCCESS)
+		return (error);
 
 	if ((ctx_tmpl = (kcf_ctx_template_t *)kmem_alloc(
 	    sizeof (kcf_ctx_template_t), kmflag)) == NULL) {
@@ -120,9 +101,7 @@ crypto_create_ctx_template(crypto_mechanism_t *mech, crypto_key_t *key,
 	}
 
 	/* Pass a mechtype that the provider understands */
-	class = KCF_MECH2CLASS(mech->cm_type);
-	index = KCF_MECH2INDEX(mech->cm_type);
-	prov_mech.cm_type = pd->pd_map_mechnums[class][index];
+	prov_mech.cm_type = KCF_TO_PROV_MECHNUM(pd, mech->cm_type);
 	prov_mech.cm_param = mech->cm_param;
 	prov_mech.cm_param_len = mech->cm_param_len;
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -465,7 +465,7 @@ static crypto_mech_info_t dprov_mech_info_tab[] = {
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT | CRYPTO_FG_DECRYPT_ATOMIC,
 	    ARCFOUR_MIN_KEY_BITS, ARCFOUR_MAX_KEY_BITS,
-	    CRYPTO_KEYSIZE_UNIT_IN_BITS},
+	    CRYPTO_KEYSIZE_UNIT_IN_BITS | CRYPTO_CAN_SHARE_OPSTATE},
 	/* RSA_PKCS */
 	{SUN_CKM_RSA_PKCS, RSA_PKCS_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
@@ -5384,6 +5384,14 @@ dprov_cipher_task(dprov_req_t *taskq_req)
 			error = crypto_decrypt_init_prov(pd, 0, &mech, keyp,
 			    NULL, &DPROV_CTX_SINGLE(ctx), NULL);
 
+		if (ctx->cc_flags & CRYPTO_INIT_OPSTATE) {
+			crypto_ctx_t *lctx =
+			    (crypto_ctx_t *)(DPROV_CTX_SINGLE(ctx));
+
+			ctx->cc_opstate = lctx->cc_provider_private;
+			ctx->cc_flags |= CRYPTO_USE_OPSTATE;
+		}
+
 		/* release provider reference */
 		KCF_PROV_REFRELE(pd);
 		break;
@@ -5411,12 +5419,16 @@ dprov_cipher_task(dprov_req_t *taskq_req)
 		break;
 
 	case DPROV_REQ_ENCRYPT_UPDATE:
+		ASSERT(!(ctx->cc_flags & CRYPTO_INIT_OPSTATE) ||
+		    (ctx->cc_flags & CRYPTO_USE_OPSTATE));
 		error = crypto_encrypt_update(DPROV_CTX_SINGLE(ctx),
 		    taskq_req->dr_cipher_req.dr_plaintext,
 		    taskq_req->dr_cipher_req.dr_ciphertext, NULL);
 		break;
 
 	case DPROV_REQ_DECRYPT_UPDATE:
+		ASSERT(!(ctx->cc_flags & CRYPTO_INIT_OPSTATE) ||
+		    (ctx->cc_flags & CRYPTO_USE_OPSTATE));
 		error = crypto_decrypt_update(DPROV_CTX_SINGLE(ctx),
 		    taskq_req->dr_cipher_req.dr_ciphertext,
 		    taskq_req->dr_cipher_req.dr_plaintext, NULL);
@@ -7608,7 +7620,7 @@ dprov_get_sw_prov(crypto_mechanism_t *mech, kcf_provider_desc_t **pd,
 		}
 	}
 
-	rv = kcf_get_sw_prov(kcf_mech_type, pd, B_TRUE);
+	rv = kcf_get_sw_prov(kcf_mech_type, pd, NULL, B_TRUE);
 	if (rv == CRYPTO_SUCCESS)
 		*provider_mech_type = kcf_mech_type;
 
