@@ -12351,13 +12351,9 @@ ip_sioctl_flags_tail(ipif_t *ipif, uint64_t flags, queue_t *q, mblk_t *mp,
 	if (((turn_on | turn_off) & (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE)))
 		ip_redo_nomination(phyi);
 
-	if (set_linklocal) {
-		in6_addr_t	ov6addr;
-
-		ov6addr = ipif->ipif_v6lcl_addr;
+	if (set_linklocal)
 		(void) ipif_setlinklocal(ipif);
-		sctp_update_ipif_addr(ipif, ov6addr);
-	}
+
 	if (zero_source)
 		ipif->ipif_v6src_addr = ipv6_all_zeros;
 	else
@@ -12389,9 +12385,12 @@ ip_sioctl_flags_tail(ipif_t *ipif, uint64_t flags, queue_t *q, mblk_t *mp,
 		} else {
 			ip_rts_ifmsg(ipif);
 		}
+		/*
+		 * Update the flags in SCTP's IPIF list, ipif_up() will do
+		 * this in need_up case.
+		 */
+		sctp_update_ipif(ipif, SCTP_IPIF_UPDATE);
 	}
-	/* Update the flags in SCTP's IPIF list */
-	sctp_update_ipif(ipif, SCTP_IPIF_UPDATE);
 	return (err);
 }
 

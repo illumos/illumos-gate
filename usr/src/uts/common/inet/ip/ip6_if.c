@@ -1238,14 +1238,17 @@ ipif_cant_setlinklocal(ipif_t *ipif)
 int
 ipif_setlinklocal(ipif_t *ipif)
 {
-	ill_t *ill = ipif->ipif_ill;
+	ill_t		*ill = ipif->ipif_ill;
+	in6_addr_t	ov6addr;
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
 	if (ipif_cant_setlinklocal(ipif))
 		return (-1);
 
+	ov6addr = ipif->ipif_v6lcl_addr;
 	ipif_get_linklocal(&ipif->ipif_v6lcl_addr, &ill->ill_token);
+	sctp_update_ipif_addr(ipif, ov6addr);
 	(void) ip_plen_to_mask_v6(IPV6_LL_PREFIXLEN, &ipif->ipif_v6net_mask);
 	V6_MASK_COPY(ipif->ipif_v6lcl_addr, ipif->ipif_v6net_mask,
 	    ipif->ipif_v6subnet);

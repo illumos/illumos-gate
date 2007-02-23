@@ -16332,11 +16332,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		ASSERT(ill->ill_ipif->ipif_id == 0);
 		if (ipif != NULL &&
 		    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr)) {
-			in6_addr_t	ov6addr;
-
-			ov6addr = ipif->ipif_v6lcl_addr;
 			(void) ipif_setlinklocal(ipif);
-			sctp_update_ipif_addr(ipif, ov6addr);
 		}
 		break;
 	}
