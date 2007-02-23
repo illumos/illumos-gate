@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -384,8 +384,6 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 {
 	struct stat stat_buf;
 	int err = 0;
-	DIR *dirp;
-	struct dirent *direntp;
 	char errstring[MAX_LINELEN];
 	char *p;
 	regex_t regex;
@@ -393,7 +391,6 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 	char *match;
 	char *name, *newpath, *remainder_path;
 	finddevhdl_t handle;
-	int find_method;
 
 	/*
 	 * Determine if the search needs to be performed via finddev,
@@ -403,13 +400,7 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 	 * reconfig for names managed by logindevperm but not present
 	 * on the system.
 	 */
-	find_method = ((getzoneid() == GLOBAL_ZONEID) &&
-	    ((strcmp(path, "/dev") == 0) ||
-	    (strncmp(path, "/dev/", 5) == 0))) ?
-		FLAG_USE_FINDDEV : FLAG_USE_READDIR;
-
-	/* path must be a valid name */
-	if (find_method == FLAG_USE_FINDDEV && !device_exists(path)) {
+	if (!device_exists(path)) {
 		return (-1);
 	}
 	if (stat(path, &stat_buf) == -1) {
@@ -444,24 +435,20 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 		}
 	}
 
-	if (find_method == FLAG_USE_READDIR) {
-		dirp = opendir(path);
-		if (dirp == NULL)
-			return (0);
-	} else {
-		if (finddev_readdir(path, &handle) != 0)
-			return (0);
-	}
+	if (finddev_readdir(path, &handle) != 0)
+		return (0);
 
 	p = strchr(left_to_do, '/');
 	alwaysmatch = 0;
 
 	newpath = (char *)malloc(MAXPATHLEN);
 	if (newpath == NULL) {
+		finddev_close(handle);
 		return (-1);
 	}
 	match = (char *)calloc(MAXPATHLEN, 1);
 	if (match == NULL) {
+		finddev_close(handle);
 		free(newpath);
 		return (-1);
 	}
@@ -478,23 +465,12 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 		if (regcomp(&regex, match, REG_EXTENDED) != 0) {
 			free(newpath);
 			free(match);
+			finddev_close(handle);
 			return (-1);
 		}
 	}
 
-	for (;;) {
-		if (find_method == FLAG_USE_READDIR) {
-			if ((direntp = readdir(dirp)) == NULL)
-				break;
-			name = direntp->d_name;
-			if ((strcmp(name, ".") == 0) ||
-			    (strcmp(name, "..") == 0))
-				continue;
-		} else {
-			if ((name = (char *)finddev_next(handle)) == NULL)
-				break;
-		}
-
+	while ((name = (char *)finddev_next(handle)) != NULL) {
 		if (alwaysmatch ||
 		    regexec(&regex, name, 0, NULL, 0) == 0) {
 			if (strcmp(path, "/") == 0) {
@@ -518,11 +494,7 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 		}
 	}
 
-	if (find_method == FLAG_USE_READDIR) {
-		(void) closedir(dirp);
-	} else {
-		finddev_close(handle);
-	}
+	finddev_close(handle);
 	free(newpath);
 	free(match);
 	if (!alwaysmatch) {

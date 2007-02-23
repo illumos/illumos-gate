@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,9 +40,10 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <libdevinfo.h>
+#include <zone.h>
 #include <sys/modctl.h>
 #include <syslog.h>
-
+#include <sys/stat.h>
 #include <assert.h>
 
 
@@ -53,17 +54,125 @@ struct finddevhdl {
 };
 
 
+/*
+ * Return true if a device exists
+ * If the path refers into the /dev filesystem, use a
+ * private interface to query if the device exists but
+ * without triggering an implicit reconfig if it does not.
+ * Note: can only function properly with absolute pathnames
+ * and only functions for persisted global /dev names, ie
+ * those managed by devfsadm.  For paths other than
+ * /dev, stat(2) is sufficient.
+ */
 int
 device_exists(const char *devname)
 {
 	int	rv;
+	struct stat st;
 
-	rv = modctl(MODDEVEXISTS, devname, strlen(devname));
-	return ((rv == 0) ? 1 : 0);
+	if ((getzoneid() == GLOBAL_ZONEID) &&
+	    ((strcmp(devname, "/dev") == 0) ||
+	    (strncmp(devname, "/dev/", 5) == 0))) {
+		rv = modctl(MODDEVEXISTS, devname, strlen(devname));
+		return ((rv == 0) ? 1 : 0);
+	}
+	if (stat(devname, &st) == 0)
+		return (1);
+	return (0);
 }
 
-int
-finddev_readdir(const char *dir, finddevhdl_t *handlep)
+
+/*
+ * Use the standard library readdir to read the contents of
+ * directories on alternate root mounted filesystems.
+ * Return results as per dev_readdir_devfs().
+ *
+ * The directory is traversed twice.  First, to calculate
+ * the size of the buffer required; second, to copy the
+ * directory contents into the buffer.  If the directory
+ * contents grow in between passes, which should almost
+ * never happen, start over again.
+ */
+static int
+finddev_readdir_alt(const char *path, finddevhdl_t *handlep)
+{
+	struct finddevhdl *handle;
+	DIR *dir;
+	struct dirent *dp;
+	size_t n;
+
+	*handlep = NULL;
+	if ((dir = opendir(path)) == NULL)
+		return (ENOENT);
+
+restart:
+	handle = calloc(1, sizeof (struct finddevhdl));
+	if (handle == NULL) {
+		(void) closedir(dir);
+		return (ENOMEM);
+	}
+
+	handle->npaths = 0;
+	handle->curpath = 0;
+	handle->paths = NULL;
+
+	n = 0;
+	rewinddir(dir);
+	while ((dp = readdir(dir)) != NULL) {
+		if ((strcmp(dp->d_name, ".") == 0) ||
+		    (strcmp(dp->d_name, "..") == 0))
+			continue;
+		n++;
+	}
+
+	handle->npaths = n;
+	handle->paths = calloc(n, sizeof (char *));
+	if (handle->paths == NULL) {
+		free(handle);
+		(void) closedir(dir);
+		return (ENOMEM);
+	}
+
+	n = 0;
+	rewinddir(dir);
+	while ((dp = readdir(dir)) != NULL) {
+		if ((strcmp(dp->d_name, ".") == 0) ||
+		    (strcmp(dp->d_name, "..") == 0))
+			continue;
+		if (n == handle->npaths) {
+			/*
+			 * restart if directory contents have out-grown
+			 * buffer allocated in the first pass.
+			 */
+			finddev_close((finddevhdl_t)handle);
+			goto restart;
+		}
+		handle->paths[n] = strdup(dp->d_name);
+		if (handle->paths[n] == NULL) {
+			(void) closedir(dir);
+			finddev_close((finddevhdl_t)handle);
+			return (ENOMEM);
+		}
+		n++;
+	}
+	(void) closedir(dir);
+	*handlep = (finddevhdl_t)handle;
+	return (0);
+}
+
+/*
+ * Use of the dev filesystem's private readdir does not trigger
+ * the implicit device reconfiguration.
+ *
+ * Note: only useable with paths mounted on an instance of the
+ * dev filesystem.
+ *
+ * Does not return the . and .. entries.
+ * Empty directories are returned as an zero-length list.
+ * ENOENT is returned as a NULL list pointer.
+ */
+static int
+finddev_readdir_devfs(const char *path, finddevhdl_t *handlep)
 {
 	struct finddevhdl	*handle;
 	int			n;
@@ -82,7 +191,7 @@ finddev_readdir(const char *dir, finddevhdl_t *handlep)
 	handle->curpath = 0;
 	handle->paths = NULL;
 
-	rv = modctl(MODDEVREADDIR, dir, strlen(dir), NULL, &bufsiz);
+	rv = modctl(MODDEVREADDIR, path, strlen(path), NULL, &bufsiz);
 	if (rv != 0) {
 		free(handle);
 		return (rv);
@@ -95,7 +204,7 @@ finddev_readdir(const char *dir, finddevhdl_t *handlep)
 			return (ENOMEM);
 		}
 
-		rv = modctl(MODDEVREADDIR, dir, strlen(dir),
+		rv = modctl(MODDEVREADDIR, path, strlen(path),
 		    pathlist, &bufsiz);
 		if (rv == 0) {
 			for (n = 0, p = pathlist;
@@ -133,6 +242,17 @@ finddev_readdir(const char *dir, finddevhdl_t *handlep)
 		}
 	}
 	/*NOTREACHED*/
+}
+
+int
+finddev_readdir(const char *path, finddevhdl_t *handlep)
+{
+	if ((getzoneid() == GLOBAL_ZONEID) &&
+	    ((strcmp(path, "/dev") == 0) ||
+	    (strncmp(path, "/dev/", 4) == 0))) {
+		return (finddev_readdir_devfs(path, handlep));
+	}
+	return (finddev_readdir_alt(path, handlep));
 }
 
 void

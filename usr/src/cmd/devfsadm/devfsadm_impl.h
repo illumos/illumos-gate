@@ -494,7 +494,6 @@ static nvlist_t *build_event_attributes(char *, char *, char *,
     di_node_t, char *, int);
 static void log_event(char *, char *, nvlist_t *);
 static void build_and_log_event(char *, char *, char *, di_node_t);
-static char *dev_readdir(char *);
 
 static void read_logindevperm_file(void);
 static void set_logindev_perms(char *devlink);

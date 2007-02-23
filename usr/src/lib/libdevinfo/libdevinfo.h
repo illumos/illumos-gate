@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -412,10 +412,6 @@ extern int		device_exists(const char *);
 extern int		finddev_readdir(const char *, finddevhdl_t *);
 extern void		finddev_close(finddevhdl_t);
 extern const char	*finddev_next(finddevhdl_t);
-
-/* For interfaces implementing search either by readdir or finddev */
-#define	FLAG_USE_READDIR	0
-#define	FLAG_USE_FINDDEV	1
 
 
 /*

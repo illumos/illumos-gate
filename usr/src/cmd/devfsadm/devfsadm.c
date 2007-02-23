@@ -3103,8 +3103,9 @@ rm_parent_dir_if_empty(char *pathname)
 {
 	char *ptr, path[PATH_MAX + 1];
 	char *fcn = "rm_parent_dir_if_empty: ";
-	char *pathlist;
-	int len;
+	finddevhdl_t fhandle;
+	const char *f;
+	int rv;
 
 	vprint(REMOVE_MID, "%schecking %s if empty\n", fcn, pathname);
 
@@ -3122,17 +3123,17 @@ rm_parent_dir_if_empty(char *pathname)
 
 		*ptr = '\0';
 
-		if ((pathlist = dev_readdir(path)) == NULL) {
-			err_print(OPENDIR_FAILED, path, strerror(errno));
+		if ((rv = finddev_readdir(path, &fhandle)) != 0) {
+			err_print(OPENDIR_FAILED, path, strerror(rv));
 			return;
 		}
 
 		/*
 		 * An empty pathlist implies an empty directory
 		 */
-		len = strlen(pathlist);
-		free(pathlist);
-		if (len == 0) {
+		f = finddev_next(fhandle);
+		finddev_close(fhandle);
+		if (f == NULL) {
 			if (s_rmdir(path) == 0) {
 				vprint(REMOVE_MID,
 				    "%sremoving empty dir %s\n", fcn, path);
@@ -4219,13 +4220,13 @@ recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd)
 	char new_path[PATH_MAX + 1];
 	char *anchored_path_re;
 	size_t len;
-	char *pathlist;
-	char *listp;
+	finddevhdl_t fhandle;
+	const char *fp;
 
 	vprint(RECURSEDEV_MID, "recurse_dev_re: curr = %s path=%s\n",
 		current_dir, path_re);
 
-	if ((pathlist = dev_readdir(current_dir)) == NULL)
+	if (finddev_readdir(current_dir, &fhandle) != 0)
 		return;
 
 	len = strlen(path_re);
@@ -4243,13 +4244,13 @@ recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd)
 
 	free(anchored_path_re);
 
-	for (listp = pathlist; (len = strlen(listp)) > 0; listp += len+1) {
+	while ((fp = finddev_next(fhandle)) != NULL) {
 
-		if (regexec(&re1, listp, 0, NULL, 0) == 0) {
+		if (regexec(&re1, fp, 0, NULL, 0) == 0) {
 			/* match */
 			(void) strcpy(new_path, current_dir);
 			(void) strcat(new_path, "/");
-			(void) strcat(new_path, listp);
+			(void) strcat(new_path, fp);
 
 			vprint(RECURSEDEV_MID, "recurse_dev_re: match, new "
 				"path = %s\n", new_path);
@@ -4268,7 +4269,7 @@ recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd)
 	regfree(&re1);
 
 out:
-	free(pathlist);
+	finddev_close(fhandle);
 }
 
 /*
@@ -5016,9 +5017,8 @@ int
 get_stat_info(char *namebuf, struct stat *sb)
 {
 	char *cp;
-	char *pathlist;
-	char *listp;
-	int len;
+	finddevhdl_t fhandle;
+	const char *fp;
 
 	if (lstat(namebuf, sb) < 0) {
 		(void) err_print(LSTAT_FAILED, namebuf, strerror(errno));
@@ -5035,7 +5035,7 @@ get_stat_info(char *namebuf, struct stat *sb)
 	 */
 	if ((sb->st_mode & S_IFMT) == S_IFDIR) {
 
-		if ((pathlist = dev_readdir(namebuf)) == NULL) {
+		if (finddev_readdir(namebuf, &fhandle) != 0) {
 			return (DEVFSADM_FAILURE);
 		}
 
@@ -5043,21 +5043,21 @@ get_stat_info(char *namebuf, struct stat *sb)
 		 *  Search each dir entry looking for a symlink.  Return
 		 *  the first symlink found in namebuf.  Recurse dirs.
 		 */
-		for (listp = pathlist;
-		    (len = strlen(listp)) > 0; listp += len+1) {
+		while ((fp = finddev_next(fhandle)) != NULL) {
 			cp = namebuf + strlen(namebuf);
 			if ((strlcat(namebuf, "/", PATH_MAX) >= PATH_MAX) ||
-			    (strlcat(namebuf, listp, PATH_MAX) >= PATH_MAX)) {
+			    (strlcat(namebuf, fp, PATH_MAX) >= PATH_MAX)) {
 				*cp = '\0';
+				finddev_close(fhandle);
 				return (DEVFSADM_FAILURE);
 			}
 			if (get_stat_info(namebuf, sb) == DEVFSADM_SUCCESS) {
-				free(pathlist);
+				finddev_close(fhandle);
 				return (DEVFSADM_SUCCESS);
 			}
 			*cp = '\0';
 		}
-		free(pathlist);
+		finddev_close(fhandle);
 	}
 
 	/* no symlink found, so return error */
@@ -5182,11 +5182,10 @@ enumerate_recurse(char *current_dir, char *path_left, numeral_set_t *setp,
 	char *slash;
 	char *new_path;
 	char *numeral_id;
-	char *pathlist;
-	char *listp;
-	int len;
+	finddevhdl_t fhandle;
+	const char *fp;
 
-	if ((pathlist = dev_readdir(current_dir)) == NULL) {
+	if (finddev_readdir(current_dir, &fhandle) != 0) {
 		return;
 	}
 
@@ -5199,7 +5198,7 @@ enumerate_recurse(char *current_dir, char *path_left, numeral_set_t *setp,
 		*slash = '\0';
 	}
 
-	for (listp = pathlist; (len = strlen(listp)) > 0; listp += len+1) {
+	while ((fp = finddev_next(fhandle)) != NULL) {
 
 		/*
 		 *  Returns true if path_left matches the list entry.
@@ -5208,15 +5207,15 @@ enumerate_recurse(char *current_dir, char *path_left, numeral_set_t *setp,
 		 *  numeral_id.
 		 */
 		numeral_id = NULL;
-		if (match_path_component(path_left, listp, &numeral_id,
+		if (match_path_component(path_left, (char *)fp, &numeral_id,
 				    slash ? 0 : rules[index].subexp)) {
 
 			new_path = s_malloc(strlen(current_dir) +
-			    strlen(listp) + 2);
+			    strlen(fp) + 2);
 
 			(void) strcpy(new_path, current_dir);
 			(void) strcat(new_path, "/");
-			(void) strcat(new_path, listp);
+			(void) strcat(new_path, fp);
 
 			if (slash != NULL) {
 				enumerate_recurse(new_path, slash + 1,
@@ -5235,7 +5234,7 @@ enumerate_recurse(char *current_dir, char *path_left, numeral_set_t *setp,
 	if (slash != NULL) {
 		*slash = '/';
 	}
-	free(pathlist);
+	finddev_close(fhandle);
 }
 
 
@@ -8371,59 +8370,4 @@ done:
 	res.devfsadm_error = error;
 	(void) door_return((char *)&res, sizeof (struct sdev_door_res),
 	    NULL, 0);
-}
-
-/*
- * Use of the dev filesystem's private readdir does not trigger
- * the implicit device reconfiguration.
- *
- * Note: only useable with paths mounted on an instance of the
- * dev filesystem.
- *
- * Does not return the . and .. entries.
- * Empty directories are returned as an zero-length list.
- * ENOENT is returned as a NULL list pointer.
- */
-static char *
-dev_readdir(char *path)
-{
-	int	rv;
-	int64_t	bufsiz;
-	char	*pathlist;
-	char	*p;
-	int	len;
-
-	assert((strcmp(path, "/dev") == 0) ||
-		(strncmp(path, "/dev/", 4) == 0));
-
-	rv = modctl(MODDEVREADDIR, path, strlen(path), NULL, &bufsiz);
-	if (rv != 0) {
-		vprint(READDIR_MID, "%s: %s\n", path, strerror(errno));
-		return (NULL);
-	}
-
-	for (;;) {
-		assert(bufsiz != 0);
-		pathlist = s_malloc(bufsiz);
-
-		rv = modctl(MODDEVREADDIR, path, strlen(path),
-		    pathlist, &bufsiz);
-		if (rv == 0) {
-			vprint(READDIR_MID, "%s\n", path);
-			vprint(READDIR_ALL_MID, "%s:\n", path);
-			for (p = pathlist; (len = strlen(p)) > 0; p += len+1) {
-				vprint(READDIR_ALL_MID, "    %s\n", p);
-			}
-			return (pathlist);
-		}
-		free(pathlist);
-		switch (errno) {
-		case EAGAIN:
-			break;
-		case ENOENT:
-		default:
-			vprint(READDIR_MID, "%s: %s\n", path, strerror(errno));
-			return (NULL);
-		}
-	}
 }
