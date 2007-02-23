@@ -57,20 +57,37 @@ DevinfoDevHandler devinfo_usb_printer_handler = {
         devinfo_printer_prnio_get_prober
 };
 
+static gboolean
+is_usb_node(di_node_t node)
+{
+	int rc;
+	char *s;
+
+	/*
+	 * USB device nodes will have "compatible" propety values that
+	 * begins with "usb".
+	 */
+        rc = di_prop_lookup_strings(DDI_DEV_T_ANY, node, "compatible", &s);
+	while (rc-- > 0) {
+		if (strncmp(s, "usb", 3) == 0) {
+			return (TRUE);
+		}
+		s += (strlen(s) + 1);
+	}
+
+	return (FALSE);
+}
+
 HalDevice *
 devinfo_usb_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type)
 {
 	HalDevice *d, *nd = NULL;
 	char	*s;
-	int	*i, *vid;
+	int	*i;
 	char	*driver_name, *binding_name;
         char    if_devfs_path[HAL_PATH_MAX];
 
-	/*
-	 * we distinguish USB devices by presence of "usb-vendor-id"
-	 * property. should USB devices have "device_type"?
-	 */
-        if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "usb-vendor-id", &vid) <= 0) {
+        if (is_usb_node(node) == FALSE) {
 		return (NULL);
 	}
 
@@ -106,7 +123,7 @@ devinfo_usb_add(HalDevice *parent, di_node_t node, char *devfs_path, char *devic
 	if ((driver_name != NULL) && (strcmp (driver_name, "scsa2usb") == 0)) {
 		nd = devinfo_usb_scsa2usb_add (d, node, devfs_path);
 	} else if ((driver_name != NULL) &&
-		   (strcmp (driver_name, "usbprn") == 0)) {
+		    (strcmp (driver_name, "usbprn") == 0)) {
 		nd = devinfo_usb_printer_add (d, node, devfs_path);
 	} else {
 		devinfo_add_enqueue (d, devfs_path, &devinfo_usb_handler);
@@ -178,7 +195,7 @@ get_dev_link_path(di_node_t node, char *nodetype, char *re, char **devlink, char
 			break;
 		}
 		di_devfs_path_free (*minor_path);
-		minor_path = NULL;
+		*minor_path = NULL;
 	}
 	di_devlink_fini (&devlink_hdl);
 }
