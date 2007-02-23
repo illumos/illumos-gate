@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -370,9 +370,9 @@ msgstr "Fault"
 msgid "SUN4V-8000-PH.severity"
 msgstr "Major"
 msgid "SUN4V-8000-PH.description"
-msgstr "The number of modular arithmetic unit errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgstr "The number of modular arithmetic unit errors associated with this unit has exceeded acceptable levels.\n  Refer to %s for more information."
 msgid "SUN4V-8000-PH.response"
-msgstr "The fault manager will attempt to remove all threads associated with\nthis resource from service.\n"
+msgstr "Cryptographic software will not use this modular arithmetic unit.\n"
 msgid "SUN4V-8000-PH.impact"
 msgstr "System performance is likely to be affected. \n"
 msgid "SUN4V-8000-PH.action"
