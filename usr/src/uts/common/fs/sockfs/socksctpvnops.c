@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,12 +66,13 @@
 static int socksctpv_open(struct vnode **, int, struct cred *);
 static int socksctpv_close(struct vnode *, int, int, offset_t,
     struct cred *);
-static int socksctpv_read(struct vnode *vp, struct uio *uiop, int ioflag,
-    struct cred *cr, struct caller_context *ct);
-static int socksctpv_write(struct vnode *, struct uio *, int, struct cred *);
+static int socksctpv_read(struct vnode *, struct uio *, int, struct cred *,
+    struct caller_context *);
+static int socksctpv_write(struct vnode *, struct uio *, int, struct cred *,
+    struct caller_context *);
 static int socksctpv_ioctl(struct vnode *, int, intptr_t, int,
     struct cred *, int32_t *);
-static int socksctp_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr);
+static int socksctp_setfl(vnode_t *, int, int, cred_t *);
 static void socksctpv_inactive(struct vnode *, struct cred *);
 static int socksctpv_poll(struct vnode *, short, int, short *,
     struct pollhead **);
@@ -264,7 +265,8 @@ socksctpv_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
  */
 /*ARGSUSED2*/
 static int
-socksctpv_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr)
+socksctpv_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
+    struct caller_context *ct)
 {
 	struct sctp_sonode *ss;
 	struct sonode *so;

@@ -65,12 +65,13 @@
 static int socksdpv_open(struct vnode **, int, struct cred *);
 static int socksdpv_close(struct vnode *, int, int, offset_t,
     struct cred *);
-static int socksdpv_read(struct vnode *vp, struct uio *uiop, int ioflag,
-    struct cred *cr, struct caller_context *ct);
-static int socksdpv_write(struct vnode *, struct uio *, int, struct cred *);
+static int socksdpv_read(struct vnode *, struct uio *, int, struct cred *,
+    struct caller_context *);
+static int socksdpv_write(struct vnode *, struct uio *, int, struct cred *,
+    struct caller_context *);
 static int socksdpv_ioctl(struct vnode *, int, intptr_t, int,
     struct cred *, int32_t *);
-static int socksdp_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr);
+static int socksdp_setfl(vnode_t *, int, int, cred_t *);
 static void socksdpv_inactive(struct vnode *, struct cred *);
 static int socksdpv_poll(struct vnode *, short, int, short *,
     struct pollhead **);
@@ -232,7 +233,8 @@ socksdpv_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
  */
 /*ARGSUSED2*/
 static int
-socksdpv_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr)
+socksdpv_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
+    struct caller_context *ct)
 {
 	struct sonode *so;
 	ssize_t count;
