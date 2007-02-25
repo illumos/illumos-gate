@@ -72,17 +72,6 @@ extern "C" {
 #define	FMEM_LOOP_DONE		6
 #define	FMEM_LOOP_EXIT		7
 
-#define	FMEM_NO_ERROR		0
-#define	FMEM_XC_TIMEOUT		1
-#define	FMEM_COPY_TIMEOUT	2
-#define	FMEM_SCF_BUSY		3
-#define	FMEM_RETRY_OUT		4
-#define	FMEM_TIMEOUT		5
-#define	FMEM_HW_ERROR		6
-#define	FMEM_TERMINATE		7
-#define	FMEM_COPY_ERROR		8
-#define	FMEM_SCF_ERR		9
-
 #define	SCF_CMD_BUSY		0x8000
 #define	SCF_STATUS_READY	0x8000
 #define	SCF_STATUS_SHUTDOWN	0x4000
@@ -115,6 +104,9 @@ extern "C" {
 #define	MH_MPSS_ALIGNMENT	(256 * 1024 * 1024)
 #define	MH_MIN_ALIGNMENT	(4 * 1024 * 1024)
 #define	rounddown(x, y)		((x) & ~(y - 1))
+
+#define	SCF_SB_INFO_OFFSET	0x80020
+#define	SCF_SB_INFO_BUSY	0x40
 
 #ifndef _ASM
 
@@ -201,7 +193,6 @@ typedef struct {
 } drmach_scf_regs_t;
 
 
-
 typedef struct {
 	volatile uint_t	stat;
 	volatile uint_t	error;
@@ -236,7 +227,7 @@ typedef struct {
 	cpuset_t		cpu_copy_set;
 	processorid_t		cpuid;
 	drmach_fmem_mbox_t	fmem_status;
-	volatile uchar_t 	error[NCPU];
+	volatile ushort_t 	error[NCPU];
 	struct memlist		*c_ml;
 	struct memlist		*cpu_ml[NCPU];
 	void			(*mc_resume)(void);
@@ -268,44 +259,6 @@ typedef struct drmach_copy_rename_program {
 #define	DRMACH_FMEM_CRITICAL_PAGE	1
 #define	DRMACH_FMEM_MLIST_PAGE		2
 #define	DRMACH_FMEM_STAT_PAGE		3
-
-/*
- * layout of the FMEM buffers:
- * 1st 8k page
- * +--------------------------------+
- * |drmach_copy_rename_program_t    |
- * +--------------------------------+
- * |drmach_copy_rename_data_t       |
- * |                                |
- * +--------------------------------+
- *
- * 2nd 8k page
- * +--------------------------------+
- * |drmach_copy_rename_critical_t   |
- * |                                |
- * +--------------------------------+
- * |run (drmach_copy_rename_prog__relocatable)
- * |(roundup boundary to 1K)        |
- * +--------------------------------+
- * | fmem_script                    |
- * |(roundup boundary to 1K)        |
- * +--------------------------------+
- * |loop_script                     |
- * |                                |
- * +--------------------------------+
- * |at least 1K NOP/0's             |
- * |                                |
- * +--------------------------------+
- *
- * 3rd 8k page
- * +--------------------------------+
- * |memlist_buffer (free_mlist)     |
- * |                                |
- * +--------------------------------+
- *
- * 4th 8k page - drmach_cr_stat_t.
- *
- */
 
 typedef struct {
 	boolean_t	assigned;

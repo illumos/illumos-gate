@@ -299,7 +299,7 @@ dr_release_mem(dr_common_unit_t *cp)
 		}
 
 		if (e_code != ESBD_NOERROR) {
-			dr_dev_err(CE_IGNORE, &mp->sbm_cm, e_code);
+			dr_dev_err(CE_WARN, &mp->sbm_cm, e_code);
 		}
 	}
 }
@@ -1770,10 +1770,6 @@ dr_release_mem_done(dr_common_unit_t *cp)
 	 */
 /* XXX Can we know that sbdev_error was encountered during release? */
 	if (s_mp->sbm_cm.sbdev_error != NULL) {
-		cmn_err(CE_WARN, "%s: %s: error %d noted\n",
-			f,
-			s_mp->sbm_cm.sbdev_path,
-			s_mp->sbm_cm.sbdev_error->e_code);
 
 		if (t_mp != NULL) {
 			ASSERT(t_mp->sbm_del_mlist == t_mp->sbm_mlist);

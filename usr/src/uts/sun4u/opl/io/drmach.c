@@ -2390,7 +2390,9 @@ sbd_error_t *
 drmach_mem_get_memlist(drmachid_t id, struct memlist **ml)
 {
 	drmach_mem_t	*mem;
+#ifdef	DEBUG
 	int		rv;
+#endif
 	struct memlist	*mlist;
 
 	if (!DRMACH_IS_MEM_ID(id))
@@ -2881,9 +2883,10 @@ drmach_log_sysevent(int board, char *hint, int flag, int verbose)
 		rv = -1;
 		goto logexit;
 	}
-	if (verbose)
+	if (verbose) {
 		DRMACH_PR("drmach_log_sysevent: %s %s, flag: %d, verbose: %d\n",
 			attach_pnt, hint, flag, verbose);
+	}
 
 	if ((ev = sysevent_alloc(EC_DR, ESC_DR_AP_STATE_CHANGE,
 		SUNW_KERN_PUB"dr", km_flag)) == NULL) {
@@ -3055,11 +3058,41 @@ drmach_memlist_add_span(drmach_copy_rename_program_t *p,
 /*
  * We multiply this to system_clock_frequency so we
  * are setting a delay of fmem_timeout second for
- * the rename command.  The spec says 15 second is
- * enough but the Fujitsu HW team suggested 17 sec.
+ * the rename command.
+ *
+ * FMEM command itself should complete within 15 sec.
+ * We add 2 more sec to be conservative.
+ *
+ * Note that there is also a SCF BUSY bit checking
+ * in drmach_asm.s right before FMEM command is
+ * issued.  XSCF sets the SCF BUSY bit when the
+ * other domain on the same PSB reboots and it
+ * will not be able to service the FMEM command
+ * within 15 sec.   After setting the SCF BUSY
+ * bit, XSCF will wait a while before servicing
+ * other reboot command so there is no race
+ * condition.
  */
+
 static int	fmem_timeout = 17;
-static int	min_copy_size_per_sec = 20 * 1024 * 1024;
+
+/*
+ *	The empirical data on some OPL system shows that
+ *	we can copy 250 MB per second.  We set it to
+ * 	80 MB to be conservative.  In normal case,
+ *	this timeout does not affect anything.
+ */
+
+static int	min_copy_size_per_sec = 80 * 1024 * 1024;
+
+/*
+ *	This is the timeout value for the xcall synchronization
+ *	to get all the CPU ready to do the parallel copying.
+ *	Even on a fully loaded system, 10 sec. should be long
+ *	enough.
+ */
+
+static int	cpu_xcall_delay = 10;
 int drmach_disable_mcopy = 0;
 
 /*
@@ -3115,7 +3148,7 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 
 	if (prog->data->cpuid == cpuid) {
 		limit = drmach_get_stick_il();
-		limit += prog->critical->delay;
+		limit += cpu_xcall_delay * system_clock_freq;
 		for (i = 0; i < NCPU; i++) {
 			if (CPU_IN_SET(prog->data->cpu_slave_set, i)) {
 			/* wait for all CPU's to be ready */
@@ -3129,8 +3162,8 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 			    curr = drmach_get_stick_il();
 			    if (curr > limit) {
 				prog->data->fmem_status.error =
-					FMEM_XC_TIMEOUT;
-				return (FMEM_XC_TIMEOUT);
+					EOPL_FMEM_XC_TIMEOUT;
+				return (EOPL_FMEM_XC_TIMEOUT);
 			    }
 			}
 		}
@@ -3144,8 +3177,9 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 				break;
 			}
 			if (prog->data->fmem_status.error) {
-				prog->data->error[cpuid] = FMEM_TERMINATE;
-				return (FMEM_TERMINATE);
+				prog->data->error[cpuid] =
+					EOPL_FMEM_TERMINATE;
+				return (EOPL_FMEM_TERMINATE);
 			}
 			DR_DELAY_IL(1, prog->data->stick_freq);
 		}
@@ -3165,9 +3199,10 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 
 		while (nbytes != 0ull) {
 			/* If the master has detected error, we just bail out */
-			if (prog->data->fmem_status.error) {
-				prog->data->error[cpuid] = FMEM_TERMINATE;
-				return (FMEM_TERMINATE);
+			if (prog->data->fmem_status.error != ESBD_NOERROR) {
+				prog->data->error[cpuid] =
+					EOPL_FMEM_TERMINATE;
+				return (EOPL_FMEM_TERMINATE);
 			}
 			/*
 			 * This copy does NOT use an ASI
@@ -3224,11 +3259,11 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 					break;
 				}
 				/* got error traps */
-				if (prog->critical->stat[i] ==
-					FMEM_COPY_ERROR) {
+				if (prog->data->error[i] ==
+					EOPL_FMEM_COPY_ERROR) {
 					prog->data->fmem_status.error =
-						FMEM_COPY_ERROR;
-					return (FMEM_COPY_ERROR);
+						EOPL_FMEM_COPY_ERROR;
+					return (EOPL_FMEM_COPY_ERROR);
 				}
 				/* if we have not reached limit, wait more */
 				curr = drmach_get_stick_il();
@@ -3252,19 +3287,20 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 						FMEM_LOOP_FMEM_READY)
 						break;
 					/* copy error */
-					if (prog->critical->stat[i] ==
-						FMEM_COPY_ERROR) {
+					if (prog->data->error[i] ==
+						EOPL_FMEM_COPY_ERROR) {
 						prog->data->fmem_status.error =
-							FMEM_COPY_ERROR;
-						return (FMEM_COPY_ERROR);
+							EOPL_FMEM_COPY_ERROR;
+						return (EOPL_FMEM_COPY_ERROR);
 					}
 					prog->data->fmem_status.error =
-					    FMEM_COPY_TIMEOUT;
-					return (FMEM_COPY_TIMEOUT);
+					    EOPL_FMEM_COPY_TIMEOUT;
+					return (EOPL_FMEM_COPY_TIMEOUT);
 				}
 			    }
 			}
 		}
+
 		prog->critical->stat[cpuid] = FMEM_LOOP_FMEM_READY;
 		prog->data->fmem_status.stat  = FMEM_LOOP_FMEM_READY;
 
@@ -3583,6 +3619,8 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 		(ulong_t)drmach_fmem_loop_script);
 	prog->critical->loop_rtn = (void (*)()) (wp+len);
 
+	prog->data->fmem_status.error = ESBD_NOERROR;
+
 	/* now we are committed, call SCF, soft suspend mac patrol */
 	if ((*scf_fmem_start)(s_bd, t_bd)) {
 		err = drerr_new(1, EOPL_SCF_FMEM_START, NULL);
@@ -3592,6 +3630,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	prog->data->scf_fmem_cancel = scf_fmem_cancel;
 	prog->data->scf_get_base_addr = scf_get_base_addr;
 	prog->data->fmem_status.op |= OPL_FMEM_SCF_START;
+
 	/* soft suspend mac patrol */
 	(*mc_suspend)();
 	prog->data->fmem_status.op |= OPL_FMEM_MC_SUSPEND;
@@ -3722,6 +3761,7 @@ drmach_copy_rename_fini(drmachid_t id)
 	drmach_copy_rename_program_t	*prog = id;
 	sbd_error_t			*err = NULL;
 	int				rv;
+	uint_t				fmem_error;
 
 	/*
 	 * Note that we have to delay calling SCF to find out the
@@ -3750,12 +3790,17 @@ drmach_copy_rename_fini(drmachid_t id)
 				prog->data->fmem_status.op);
 	}
 
+	fmem_error = prog->data->fmem_status.error;
+	if (fmem_error != ESBD_NOERROR) {
+		err = drerr_new(1, fmem_error, NULL);
+	}
+
 	/* possible ops are SCF_START, MC_SUSPEND */
 	if (prog->critical->fmem_issued) {
-		if (prog->data->fmem_status.error != FMEM_NO_ERROR)
-			cmn_err(CE_PANIC, "scf fmem request failed. "
-				"error code = 0x%x.",
-				prog->data->fmem_status.error);
+		if (fmem_error != ESBD_NOERROR) {
+		    cmn_err(CE_PANIC, "Irrecoverable FMEM error %d\n",
+			fmem_error);
+		}
 		rv = (*prog->data->scf_fmem_end)();
 		if (rv) {
 			cmn_err(CE_PANIC, "scf_fmem_end() failed rv=%d", rv);
@@ -3767,18 +3812,12 @@ drmach_copy_rename_fini(drmachid_t id)
 		drmach_swap_pa((drmach_mem_t *)prog->data->s_mem,
 			(drmach_mem_t *)prog->data->t_mem);
 	} else {
-		if (prog->data->fmem_status.error != 0) {
-			cmn_err(CE_WARN, "Kernel Migration fails. 0x%x",
-				prog->data->fmem_status.error);
-			err = drerr_new(1, EOPL_FMEM_ERROR, "FMEM error = 0x%x",
-				prog->data->fmem_status.error);
-		}
 		rv = (*prog->data->scf_fmem_cancel)();
 		if (rv) {
 		    cmn_err(CE_WARN, "scf_fmem_cancel() failed rv=0x%x", rv);
 		    if (!err)
 			err = drerr_new(1, EOPL_SCF_FMEM_CANCEL,
-			    "rv = 0x%x", rv);
+			    "scf_fmem_cancel() failed. rv = 0x%x", rv);
 		}
 	}
 	/* soft resume mac patrol */
@@ -3808,7 +3847,7 @@ drmach_copy_rename_slave(struct regs *rp, drmachid_t id)
 
 	if (on_trap(&otd, OT_DATA_EC)) {
 		no_trap();
-		prog->data->error[cpuid] = FMEM_COPY_ERROR;
+		prog->data->error[cpuid] = EOPL_FMEM_COPY_ERROR;
 		prog->critical->stat[cpuid] = FMEM_LOOP_EXIT;
 		drmach_flush_icache();
 		membar_sync_il();
@@ -3908,7 +3947,7 @@ drmach_copy_rename(drmachid_t id)
 
 	if (prog->critical->scf_reg_base == (uint64_t)-1 ||
 		prog->critical->scf_reg_base == NULL) {
-		prog->data->fmem_status.error = FMEM_SCF_ERR;
+		prog->data->fmem_status.error = EOPL_FMEM_SCF_ERR;
 		drmach_unlock_critical((caddr_t)prog);
 		return;
 	}
@@ -3918,7 +3957,7 @@ drmach_copy_rename(drmachid_t id)
 	for (cpuid = 0; cpuid < NCPU; cpuid++) {
 		if (CPU_IN_SET(cpuset, cpuid)) {
 			prog->critical->stat[cpuid] = FMEM_LOOP_START;
-			prog->data->error[cpuid] = FMEM_NO_ERROR;
+			prog->data->error[cpuid] = ESBD_NOERROR;
 		}
 	}
 
@@ -3943,7 +3982,7 @@ drmach_copy_rename(drmachid_t id)
 	xt_sync(cpuset);
 
 	if (on_trap(&otd, OT_DATA_EC)) {
-		rtn = FMEM_COPY_ERROR;
+		rtn = EOPL_FMEM_COPY_ERROR;
 		drmach_flush_icache();
 		goto done;
 	}
@@ -3959,7 +3998,7 @@ drmach_copy_rename(drmachid_t id)
 
 done:
 	no_trap();
-	if (rtn == FMEM_HW_ERROR) {
+	if (rtn == EOPL_FMEM_HW_ERROR) {
 		kpreempt_enable();
 		prom_panic("URGENT_ERROR_TRAP is "
 			"detected during FMEM.\n");
@@ -4017,7 +4056,7 @@ done:
 			}
 			last = now;
 		}
-		if (prog->data->error[cpuid] == FMEM_HW_ERROR) {
+		if (prog->data->error[cpuid] == EOPL_FMEM_HW_ERROR) {
 			prom_panic("URGENT_ERROR_TRAP is "
 				"detected during FMEM.\n");
 		}
@@ -4050,7 +4089,7 @@ done:
 
 	(void) drmach_lock_critical((caddr_t)prog_kmem, (caddr_t)prog);
 
-	if (prog->data->fmem_status.error == 0)
+	if (prog->data->fmem_status.error == ESBD_NOERROR)
 		prog->data->fmem_status.error = rtn;
 
 	if (prog->data->copy_wait_time > 0) {

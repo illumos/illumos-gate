@@ -28,15 +28,18 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifndef	_ASM
 #include <sys/types.h>
 #include <sys/obpdefs.h>
 #include <sys/processor.h>
 #include <sys/param.h>
+#endif
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+#ifndef	_ASM
 typedef enum {
 	SBD_COMP_NONE,
 	SBD_COMP_CPU,
@@ -405,6 +408,7 @@ typedef struct {
 } sbd_etab32_t;
 
 #endif	/* _SYSCALL32 */
+#endif	/* _ASM */
 
 /* Common error codes */
 
@@ -602,6 +606,15 @@ typedef struct {
 #define	EOPL_SCF_FMEM_START	5018	/* scf_fmem_start error */
 #define	EOPL_FMEM_ERROR		5019	/* FMEM error */
 #define	EOPL_SCF_FMEM_CANCEL	5020	/* scf_fmem_cancel error */
+#define	EOPL_FMEM_XC_TIMEOUT	5021	/* xcall timeout */
+#define	EOPL_FMEM_COPY_TIMEOUT	5022	/* DR parellel copy timeout */
+#define	EOPL_FMEM_SCF_BUSY	5023	/* SCF busy */
+#define	EOPL_FMEM_RETRY_OUT	5024	/* SCF IO Retry Error */
+#define	EOPL_FMEM_TIMEOUT	5025	/* FMEM command timeout */
+#define	EOPL_FMEM_HW_ERROR	5026	/* Hardware error */
+#define	EOPL_FMEM_TERMINATE	5027	/* FMEM operation Terminated */
+#define	EOPL_FMEM_COPY_ERROR	5028	/* Memory copy error */
+#define	EOPL_FMEM_SCF_ERR	5029	/* SCF error */
 
 #ifdef	__cplusplus
 }

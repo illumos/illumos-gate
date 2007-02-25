@@ -50,6 +50,7 @@
 #include <sys/intreg.h>
 #include <sys/cheetahregs.h>
 #include <sys/drmach.h>
+#include <sys/sbd_ioctl.h>
 
 #if !defined(lint)
 
@@ -127,7 +128,7 @@ drmach_fmem_loop_script(caddr_t critical, int size, caddr_t stat)
 	btst	%o3, %o4
 	bz,pn	%xcc, 3f
 	 mov	%g0, %o4
-	set	FMEM_HW_ERROR, %o4
+	set	EOPL_FMEM_HW_ERROR, %o4
 
 	/* set error code and stat code */
 3:
@@ -235,7 +236,7 @@ drmach_fmem_exec_script(caddr_t critical, int size)
 	btst	%l1, %l2
 	bz,pn	%xcc, 2f
 	 nop
-	mov	FMEM_HW_ERROR, %o4
+	set	EOPL_FMEM_HW_ERROR, %o4
 2:
 	/* restore all locals */
 	add	%o0, SAVE_LOCAL, %o1
@@ -287,8 +288,9 @@ drmach_fmem_exec_script(caddr_t critical, int size)
 	btst	%o2, %o3
 	be	%xcc, 6f
 	 nop
+	set	EOPL_FMEM_SCF_BUSY, %o4
 	ba	1b
-	 mov	FMEM_SCF_BUSY, %o4
+	 nop
 
 	/* clear STATUS bit */
 6:
@@ -332,14 +334,18 @@ drmach_fmem_exec_script(caddr_t critical, int size)
 	 * we read the data back after the write to verify
 	 * we write 2 bytes at a time.
 	 * If the data read is not the same as data written
-	 * we retry up to a limit of FMEM_RETRY_OUT
+	 * we retry up to a limit of SCF_RETRY_CNT
 	 */
 9:
 	stha	%o3, [%o1]ASI_IO
 	lduha	[%o1]ASI_IO, %o2
 	sub	%o5, 1, %o5
-	brz,a	%o5, 1b
-	 mov	FMEM_RETRY_OUT, %o4
+	brnz	%o5, 7f
+	 nop
+	set	EOPL_FMEM_RETRY_OUT, %o4
+	ba	1b
+	 nop
+7:
 	cmp	%o2, %o3
 	bne,a	9b
 	 nop
@@ -373,6 +379,23 @@ drmach_fmem_exec_script(caddr_t critical, int size)
 	ldxa	[%o1]ASI_IO, %o2
 	stx	%o2, [%o0+SCF_TD+8]
 
+	/* The following code conforms to the FMEM
+	   sequence (4) as described in the Columbus2
+	   logical spec section 4.6
+	*/
+
+	/* read from SCF SB INFO register */
+	sethi	%hi(SCF_SB_INFO_OFFSET), %o2
+	or	%o2, %lo(SCF_SB_INFO_OFFSET), %o2
+	add	%l0, %o2, %o1
+	lduba	[%o1]ASI_IO, %o2
+
+	/* If BUSY bit is set, abort */
+	or	%g0, (SCF_SB_INFO_BUSY), %o1
+	btst	%o1, %o2
+	set	EOPL_FMEM_SCF_BUSY, %o4
+	bne	1b
+	 nop
 
 	rd	STICK, %l1
 	add	%l5, %l1, %l5
@@ -406,9 +429,8 @@ drmach_fmem_exec_script(caddr_t critical, int size)
 	be	%xcc, 5f		! CMD_COMPLETE is not set
 	 nop
 	stha	%o3, [%o1]ASI_IO	! Now we are done and clear it
-	mov	FMEM_NO_ERROR, %o4
 	ba	%xcc, 6f
-	 nop
+	 mov	ESBD_NOERROR, %o4
 
 	/* timeout delay checking */
 5:
@@ -416,7 +438,7 @@ drmach_fmem_exec_script(caddr_t critical, int size)
 	cmp	%l5, %l2
 	bge	%xcc, 3b
 	 nop
-	mov	FMEM_TIMEOUT, %o4
+	set	EOPL_FMEM_TIMEOUT, %o4
 
 	/* we are done or timed out */
 6:
