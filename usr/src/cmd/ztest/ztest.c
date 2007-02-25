@@ -213,6 +213,7 @@ typedef struct ztest_shared {
 	hrtime_t	zs_stop_time;
 	uint64_t	zs_alloc;
 	uint64_t	zs_space;
+	uint64_t	zs_txg;
 	ztest_info_t	zs_info[ZTEST_FUNCS];
 	mutex_t		zs_sync_lock[ZTEST_SYNC_LOCKS];
 	uint64_t	zs_seq[ZTEST_SYNC_LOCKS];
@@ -1904,6 +1905,41 @@ ztest_dmu_read_write(ztest_args_t *za)
 }
 
 void
+ztest_dmu_check_future_leak(objset_t *os, uint64_t txg)
+{
+	dmu_buf_t *db;
+	ztest_block_tag_t rbt;
+
+	if (zopt_verbose >= 3) {
+		char osname[MAXNAMELEN];
+		dmu_objset_name(os, osname);
+		(void) printf("checking %s for future leaks in txg %lld...\n",
+		    osname, (u_longlong_t)txg);
+	}
+
+	/*
+	 * Make sure that, if there is a write record in the bonus buffer
+	 * of the ZTEST_DIROBJ, that the txg for this record is <= the
+	 * last synced txg of the pool.
+	 */
+
+	VERIFY(0 == dmu_bonus_hold(os, ZTEST_DIROBJ, FTAG, &db));
+	ASSERT3U(db->db_size, ==, sizeof (rbt));
+	bcopy(db->db_data, &rbt, db->db_size);
+	if (rbt.bt_objset != 0) {
+		ASSERT3U(rbt.bt_objset, ==, dmu_objset_id(os));
+		ASSERT3U(rbt.bt_object, ==, ZTEST_DIROBJ);
+		ASSERT3U(rbt.bt_offset, ==, -1ULL);
+		if (rbt.bt_txg > txg) {
+			fatal(0,
+			    "future leak: got %llx, last synced txg is %llx",
+			    rbt.bt_txg, txg);
+		}
+	}
+	dmu_buf_rele(db, FTAG);
+}
+
+void
 ztest_dmu_write_parallel(ztest_args_t *za)
 {
 	objset_t *os = za->za_os;
@@ -2908,6 +2944,20 @@ ztest_thread(void *arg)
 		 * See if it's time to force a crash.
 		 */
 		if (now > za->za_kill) {
+			dmu_tx_t *tx;
+			uint64_t txg;
+
+			mutex_enter(&spa_namespace_lock);
+			tx = dmu_tx_create(za->za_os);
+			VERIFY(0 == dmu_tx_assign(tx, TXG_NOWAIT));
+			txg = dmu_tx_get_txg(tx);
+			dmu_tx_commit(tx);
+			zs->zs_txg = txg;
+			if (zopt_verbose >= 3)
+				(void) printf(
+				    "killing process after txg %lld\n",
+				    (u_longlong_t)txg);
+			txg_wait_synced(dmu_objset_pool(za->za_os), txg);
 			zs->zs_alloc = spa_get_alloc(dmu_objset_spa(za->za_os));
 			zs->zs_space = spa_get_space(dmu_objset_spa(za->za_os));
 			(void) kill(getpid(), SIGKILL);
@@ -3069,11 +3119,14 @@ ztest_run(char *pool)
 		d = t % zopt_datasets;
 		if (t < zopt_datasets) {
 			ztest_replay_t zr;
+			int test_future = FALSE;
 			(void) rw_rdlock(&ztest_shared->zs_name_lock);
 			(void) snprintf(name, 100, "%s/%s_%d", pool, pool, d);
 			error = dmu_objset_create(name, DMU_OST_OTHER, NULL,
 			    ztest_create_cb, NULL);
-			if (error != 0 && error != EEXIST) {
+			if (error == EEXIST) {
+				test_future = TRUE;
+			} else if (error != 0) {
 				if (error == ENOSPC) {
 					zs->zs_enospc_count++;
 					(void) rw_unlock(
@@ -3089,6 +3142,9 @@ ztest_run(char *pool)
 				fatal(0, "dmu_objset_open('%s') = %d",
 				    name, error);
 			(void) rw_unlock(&ztest_shared->zs_name_lock);
+			if (test_future && ztest_shared->zs_txg > 0)
+				ztest_dmu_check_future_leak(za[d].za_os,
+				    ztest_shared->zs_txg);
 			zr.zr_os = za[d].za_os;
 			zil_replay(zr.zr_os, &zr, &zr.zr_assign,
 			    ztest_replay_vector);
@@ -3109,6 +3165,7 @@ ztest_run(char *pool)
 			fatal(0, "can't create thread %d: error %d",
 			    t, error);
 	}
+	ztest_shared->zs_txg = 0;
 
 	while (--t >= 0) {
 		error = thr_join(za[t].za_thread, NULL, NULL);

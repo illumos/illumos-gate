@@ -640,7 +640,9 @@ dbuf_fix_old_data(dmu_buf_impl_t *db, uint64_t txg)
 	ASSERT(db->db_level == 0);
 	ASSERT(db->db.db_object != DMU_META_DNODE_OBJECT);
 
-	if (dr == NULL || dr->dt.dl.dr_data != db->db_buf)
+	if (dr == NULL ||
+	    (dr->dt.dl.dr_data !=
+	    ((db->db_blkid  == DB_BONUS_BLKID) ? db->db.db_data : db->db_buf)))
 		return;
 
 	/*
