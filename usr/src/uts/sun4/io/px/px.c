@@ -1266,6 +1266,9 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		break;
 
 	case DDI_CTLOPS_DETACH:
+		if (!pcie_is_child(dip, rdip))
+			return (DDI_SUCCESS);
+
 		ds = (struct detachspec *)arg;
 		switch (ds->when) {
 		case DDI_POST:
