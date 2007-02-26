@@ -368,7 +368,6 @@ struct arc_buf_hdr {
 static arc_buf_t *arc_eviction_list;
 static kmutex_t arc_eviction_mtx;
 static arc_buf_hdr_t arc_eviction_hdr;
-static size_t arc_ziosize;
 static void arc_get_data_buf(arc_buf_t *buf);
 static void arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock);
 
@@ -1418,9 +1417,12 @@ arc_reclaim_needed(void)
 	 * physical memory.
 	 */
 	if (zio_arena != NULL) {
-		if ((btop(physmem) > arc_ziosize) &&
+		size_t arc_ziosize =
+		    btop(vmem_size(zio_arena, VMEM_FREE | VMEM_ALLOC));
+
+		if ((physmem > arc_ziosize) &&
 		    (btop(vmem_size(zio_arena, VMEM_FREE)) < arc_ziosize >> 2))
-		return (1);
+			return (1);
 	}
 
 #if defined(__i386)
@@ -2747,12 +2749,6 @@ arc_init(void)
 	    TS_RUN, minclsyspri);
 
 	arc_dead = FALSE;
-
-#ifdef _KERNEL
-	if (zio_arena != NULL)
-		arc_ziosize =
-		    btop(vmem_size(zio_arena, VMEM_FREE | VMEM_ALLOC));
-#endif /* _KERNEL */
 }
 
 void
