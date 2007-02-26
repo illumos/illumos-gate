@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -320,13 +320,11 @@ pxtool_pciiomem_access(px_t *px_p, pcitool_reg_t *prg_p,
 int
 pxtool_dev_reg_ops_platchk(dev_info_t *dip, pcitool_reg_t *prg_p)
 {
-	int		devi_nodeid = ddi_get_nodeid(dip);
-
 	/*
 	 * Guard against checking a root nexus which is empty.
 	 * On some systems this will result in a Fatal Reset.
 	 */
-	if ((int)prom_childnode((pnode_t)devi_nodeid) == OBP_NONODE) {
+	if (ddi_get_child(dip) == NULL) {
 		DBG(DBG_TOOLS, dip,
 		    "pxtool_dev_reg_ops set/get reg: nexus has no devs!\n");
 		prg_p->status = PCITOOL_IO_ERROR;
