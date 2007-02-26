@@ -4980,8 +4980,10 @@ zone_get_zonepath(char *zone_name, char *zonepath, size_t rp_sz)
 	 * may have changed.
 	 */
 	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
-		if ((err = zonecfg_get_handle(zone_name, handle)) != Z_OK)
+		if ((err = zonecfg_get_handle(zone_name, handle)) != Z_OK) {
+			zonecfg_fini_handle(handle);
 			return (err);
+		}
 	}
 	err = zonecfg_get_zonepath(handle, zonepath, rp_sz);
 	zonecfg_fini_handle(handle);

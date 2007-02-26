@@ -3040,6 +3040,7 @@ verify_details(int cmd_num, char *argv[])
 	    sizeof (checkpath))) != Z_OK) {
 		errno = err;
 		zperror2(target_zone, gettext("could not get zone path"));
+		zonecfg_fini_handle(handle);
 		return (Z_ERR);
 	}
 	if (strcmp(zonepath, checkpath) != 0) {
@@ -3051,6 +3052,7 @@ verify_details(int cmd_num, char *argv[])
 		    "zonepath '%s',\nbut the index file has zonepath '%s'.\n"
 		    "These must match, so fix the incorrect entry.\n"),
 		    zonepath, checkpath);
+		zonecfg_fini_handle(handle);
 		return (Z_ERR);
 	}
 	if (validate_zonepath(zonepath, cmd_num) != Z_OK) {

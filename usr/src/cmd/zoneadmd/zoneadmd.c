@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -660,6 +660,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 	 */
 	if (zone_get_zonepath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to determine zone root");
+		brand_close(bh);
 		return (-1);
 	}
 	(void) strcpy(cmdbuf, EXEC_PREFIX);

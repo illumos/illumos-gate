@@ -1091,7 +1091,7 @@ mount_one_dev(zlog_t *zlogp, char *devpath)
 cleanup:
 	if (bh != NULL)
 		brand_close(bh);
-	if (handle)
+	if (handle != NULL)
 		zonecfg_fini_handle(handle);
 	if (prof)
 		di_prof_fini(prof);
@@ -1640,6 +1640,7 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 	if ((zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) ||
 	    (bh = brand_open(brand)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
+		zonecfg_fini_handle(handle);
 		return (-1);
 	}
 
@@ -1654,6 +1655,7 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 	    plat_gmount_cb, &cb) != 0) {
 		zerror(zlogp, B_FALSE, "unable to mount filesystems");
 		brand_close(bh);
+		zonecfg_fini_handle(handle);
 		return (-1);
 	}
 	brand_close(bh);
@@ -2846,8 +2848,10 @@ get_privset(zlog_t *zlogp, priv_set_t *privs, boolean_t mount_cmd)
 			break;
 		}
 
-		if (zonecfg_default_privset(privs, curr_iptype) == Z_OK)
+		if (zonecfg_default_privset(privs, curr_iptype) == Z_OK) {
+			zonecfg_fini_handle(handle);
 			return (0);
+		}
 		zerror(zlogp, B_FALSE,
 		    "failed to determine the zone's default privilege set");
 		zonecfg_fini_handle(handle);
@@ -4095,10 +4099,12 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	 * get it loaded and initialized.
 	 */
 	if (brand_get_modname(bh, modname, MAXPATHLEN) < 0) {
+		brand_close(bh);
 		zerror(zlogp, B_FALSE, "unable to determine brand kernel "
 		    "module");
 		return (-1);
 	}
+	brand_close(bh);
 
 	if (strlen(modname) > 0) {
 		(void) strlcpy(attr.ba_modname, modname, MAXPATHLEN);
@@ -4495,6 +4501,8 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 			    zonecfg_get_handle(zone_name, handle) == Z_OK &&
 			    zonecfg_lookup_pset(handle, &pset_tab) == Z_OK)
 				destroy_tmp_pool = B_FALSE;
+
+			zonecfg_fini_handle(handle);
 		}
 
 		if (destroy_tmp_pool) {
