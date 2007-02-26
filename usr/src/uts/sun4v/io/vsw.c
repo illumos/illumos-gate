@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,9 +148,9 @@ static	int vsw_plist_del_node(vsw_t *, vsw_port_t *port);
 static	uint_t vsw_ldc_cb(uint64_t cb, caddr_t arg);
 
 /* Handshake routines */
-static	void vsw_restart_ldc(vsw_ldc_t *);
-static	void vsw_restart_handshake(vsw_ldc_t *);
-static	void vsw_handle_reset(vsw_ldc_t *);
+static	void vsw_ldc_reinit(vsw_ldc_t *);
+static	void vsw_process_conn_evt(vsw_ldc_t *, uint16_t);
+static	void vsw_conn_task(void *);
 static	int vsw_check_flag(vsw_ldc_t *, int, uint64_t);
 static	void vsw_next_milestone(vsw_ldc_t *);
 static	int vsw_supported_version(vio_ver_msg_t *);
@@ -191,7 +191,7 @@ static vio_dring_reg_msg_t *vsw_create_dring_info_pkt(vsw_ldc_t *);
 static void vsw_send_dring_info(vsw_ldc_t *);
 static void vsw_send_rdx(vsw_ldc_t *);
 
-static void vsw_send_msg(vsw_ldc_t *, void *, int);
+static int vsw_send_msg(vsw_ldc_t *, void *, int, boolean_t);
 
 /* Forwarding database (FDB) routines */
 static	int vsw_add_fdb(vsw_t *vswp, vsw_port_t *port);
@@ -290,7 +290,7 @@ static	struct	dev_ops	vsw_ops = {
 extern	struct	mod_ops	mod_driverops;
 static struct modldrv vswmodldrv = {
 	&mod_driverops,
-	"sun4v Virtual Switch Driver %I%",
+	"sun4v Virtual Switch %I%",
 	&vsw_ops,
 };
 
@@ -3540,7 +3540,6 @@ vsw_ldc_init(vsw_ldc_t *ldcp)
 	 * is UP.
 	 */
 	mutex_enter(&ldcp->status_lock);
-	istatus = ldcp->ldc_status;
 	if (ldc_status(ldcp->ldc_handle, &ldcp->ldc_status) != 0) {
 		DERR(vswp, "%s: unable to get status", __func__);
 		mutex_exit(&ldcp->status_lock);
@@ -3548,14 +3547,19 @@ vsw_ldc_init(vsw_ldc_t *ldcp)
 		return (1);
 
 	}
-	mutex_exit(&ldcp->status_lock);
-	LDC_EXIT_LOCK(ldcp);
 
-	if ((istatus != LDC_UP) && (ldcp->ldc_status == LDC_UP)) {
+	if (ldcp->ldc_status == LDC_UP) {
 		D2(vswp, "%s: channel %ld now UP (%ld)", __func__,
 			ldcp->ldc_id, istatus);
-		vsw_restart_handshake(ldcp);
+		mutex_exit(&ldcp->status_lock);
+		LDC_EXIT_LOCK(ldcp);
+
+		vsw_process_conn_evt(ldcp, VSW_CONN_UP);
+		return (0);
 	}
+
+	mutex_exit(&ldcp->status_lock);
+	LDC_EXIT_LOCK(ldcp);
 
 	D1(vswp, "%s: exit", __func__);
 	return (0);
@@ -3843,42 +3847,27 @@ vsw_ldc_cb(uint64_t event, caddr_t arg)
 {
 	vsw_ldc_t	*ldcp = (vsw_ldc_t  *)arg;
 	vsw_t 		*vswp = ldcp->ldc_vswp;
-	ldc_status_t	lstatus;
-	int		rv;
 
 	D1(vswp, "%s: enter: ldcid (%lld)\n", __func__, ldcp->ldc_id);
 
 	mutex_enter(&ldcp->ldc_cblock);
 
+	mutex_enter(&ldcp->status_lock);
 	if ((ldcp->ldc_status == LDC_INIT) || (ldcp->ldc_handle == NULL)) {
+		mutex_exit(&ldcp->status_lock);
 		mutex_exit(&ldcp->ldc_cblock);
 		return (LDC_SUCCESS);
 	}
-
-	mutex_enter(&ldcp->status_lock);
-	lstatus = ldcp->ldc_status;
-	rv = ldc_status(ldcp->ldc_handle, &ldcp->ldc_status);
 	mutex_exit(&ldcp->status_lock);
-	if (rv != 0) {
-		cmn_err(CE_WARN, "!vsw%d: Unable to read channel state",
-			vswp->instance);
-		goto vsw_cb_exit;
-	}
 
 	if (event & LDC_EVT_UP) {
 		/*
-		 * Channel has come up, get the state and then start
-		 * the handshake.
+		 * Channel has come up.
 		 */
 		D2(vswp, "%s: id(%ld) event(%llx) UP: status(%ld)",
-			__func__, ldcp->ldc_id, event, lstatus);
-		D2(vswp, "%s: UP: old status %ld : cur status %ld",
-			__func__, lstatus, ldcp->ldc_status);
-		if ((ldcp->ldc_status != lstatus) &&
-					(ldcp->ldc_status == LDC_UP)) {
-				ldcp->reset_active = 0;
-				vsw_restart_handshake(ldcp);
-		}
+			__func__, ldcp->ldc_id, event, ldcp->ldc_status);
+
+		vsw_process_conn_evt(ldcp, VSW_CONN_UP);
 
 		ASSERT((event & (LDC_EVT_RESET | LDC_EVT_DOWN)) == 0);
 	}
@@ -3898,40 +3887,10 @@ vsw_ldc_cb(uint64_t event, caddr_t arg)
 	}
 
 	if (event & (LDC_EVT_DOWN | LDC_EVT_RESET)) {
-		D2(vswp, "%s: id(%ld) event(%llx) DOWN/RESET",
-					__func__, ldcp->ldc_id, event);
+		D2(vswp, "%s: id(%ld) event (%lx) DOWN/RESET: status(%ld)",
+			__func__, ldcp->ldc_id, event, ldcp->ldc_status);
 
-		/* attempt to restart the connection */
-		vsw_restart_ldc(ldcp);
-
-		/*
-		 * vsw_restart_ldc() will attempt to bring the channel
-		 * back up. Check here to see if that succeeded.
-		 */
-		mutex_enter(&ldcp->status_lock);
-		lstatus = ldcp->ldc_status;
-		rv = ldc_status(ldcp->ldc_handle, &ldcp->ldc_status);
-		mutex_exit(&ldcp->status_lock);
-		if (rv != 0) {
-			DERR(vswp, "%s: unable to read status for channel %ld",
-				__func__, ldcp->ldc_id);
-			goto vsw_cb_exit;
-		}
-
-		D2(vswp, "%s: id(%ld) event(%llx) DOWN/RESET event:"
-			" old status %ld : cur status %ld", __func__,
-			ldcp->ldc_id, event, lstatus, ldcp->ldc_status);
-
-		/*
-		 * If channel was not previously UP then (re)start the
-		 * handshake.
-		 */
-		if ((ldcp->ldc_status == LDC_UP) && (lstatus != LDC_UP)) {
-			D2(vswp, "%s: channel %ld now UP, restarting "
-				"handshake", __func__, ldcp->ldc_id);
-			ldcp->reset_active = 0;
-			vsw_restart_handshake(ldcp);
-		}
+		vsw_process_conn_evt(ldcp, VSW_CONN_RESET);
 	}
 
 	/*
@@ -3961,25 +3920,16 @@ vsw_cb_exit:
 }
 
 /*
- * Restart the connection with our peer. Free any existing
- * data structures and then attempt to bring channel back
- * up.
+ * Reinitialise data structures associated with the channel.
  */
 static void
-vsw_restart_ldc(vsw_ldc_t *ldcp)
+vsw_ldc_reinit(vsw_ldc_t *ldcp)
 {
-	int		rv;
 	vsw_t		*vswp = ldcp->ldc_vswp;
 	vsw_port_t	*port;
 	vsw_ldc_list_t	*ldcl;
 
 	D1(vswp, "%s: enter", __func__);
-
-	/*
-	 * Check if reset already in progress for this channel.
-	 */
-	if (ldstub((uint8_t *)&ldcp->reset_active))
-		return;
 
 	port = ldcp->ldc_port;
 	ldcl = &port->p_ldclist;
@@ -4010,117 +3960,208 @@ vsw_restart_ldc(vsw_ldc_t *ldcp)
 	ldcp->hcnt = 0;
 	ldcp->hphase = VSW_MILESTONE0;
 
-	rv = ldc_up(ldcp->ldc_handle);
-	if (rv != 0) {
-		/*
-		 * Not a fatal error for ldc_up() to fail, as peer
-		 * end point may simply not be ready yet.
-		 */
-		D2(vswp, "%s: ldc_up err id(%lld) rv(%d)", __func__,
-			ldcp->ldc_id, rv);
-	}
-
 	D1(vswp, "%s: exit", __func__);
 }
 
 /*
- * (Re)start a handshake with our peer by sending them
- * our version info.
+ * Process a connection event.
+ *
+ * Note - care must be taken to ensure that this function is
+ * not called with the dlistrw lock held.
  */
 static void
-vsw_restart_handshake(vsw_ldc_t *ldcp)
+vsw_process_conn_evt(vsw_ldc_t *ldcp, uint16_t evt)
 {
 	vsw_t		*vswp = ldcp->ldc_vswp;
+	vsw_conn_evt_t	*conn = NULL;
 
-	D1(vswp, "vsw_restart_handshake: enter");
-
-	if (ldcp->hphase != VSW_MILESTONE0) {
-		vsw_restart_ldc(ldcp);
-	}
+	D1(vswp, "%s: enter", __func__);
 
 	/*
-	 * We now increment the transaction group id. This allows
-	 * us to identify and disard any tasks which are still pending
-	 * on the taskq and refer to the handshake session we are about
-	 * to restart. These stale messages no longer have any real
-	 * meaning.
+	 * Check if either a reset or restart event is pending
+	 * or in progress. If so just return.
+	 *
+	 * A VSW_CONN_RESET event originates either with a LDC_RESET_EVT
+	 * being received by the callback handler, or a ECONNRESET error
+	 * code being returned from a ldc_read() or ldc_write() call.
+	 *
+	 * A VSW_CONN_RESTART event occurs when some error checking code
+	 * decides that there is a problem with data from the channel,
+	 * and that the handshake should be restarted.
+	 */
+	if (((evt == VSW_CONN_RESET) || (evt == VSW_CONN_RESTART)) &&
+			(ldstub((uint8_t *)&ldcp->reset_active)))
+		return;
+
+	/*
+	 * If it is an LDC_UP event we first check the recorded
+	 * state of the channel. If this is UP then we know that
+	 * the channel moving to the UP state has already been dealt
+	 * with and don't need to dispatch a  new task.
+	 *
+	 * The reason for this check is that when we do a ldc_up(),
+	 * depending on the state of the peer, we may or may not get
+	 * a LDC_UP event. As we can't depend on getting a LDC_UP evt
+	 * every time we do ldc_up() we explicitly check the channel
+	 * status to see has it come up (ldc_up() is asynch and will
+	 * complete at some undefined time), and take the appropriate
+	 * action.
+	 *
+	 * The flip side of this is that we may get a LDC_UP event
+	 * when we have already seen that the channel is up and have
+	 * dealt with that.
+	 */
+	mutex_enter(&ldcp->status_lock);
+	if (evt == VSW_CONN_UP) {
+		if ((ldcp->ldc_status == LDC_UP) ||
+					(ldcp->reset_active != 0)) {
+			mutex_exit(&ldcp->status_lock);
+			return;
+		}
+	}
+	mutex_exit(&ldcp->status_lock);
+
+	/*
+	 * The transaction group id allows us to identify and discard
+	 * any tasks which are still pending on the taskq and refer
+	 * to the handshake session we are about to restart or reset.
+	 * These stale messages no longer have any real meaning.
 	 */
 	mutex_enter(&ldcp->hss_lock);
 	ldcp->hss_id++;
 	mutex_exit(&ldcp->hss_lock);
 
-	if (ldcp->hcnt++ > vsw_num_handshakes) {
-		cmn_err(CE_WARN, "!vsw%d: exceeded number of permitted "
-			"handshake attempts (%d) on channel %ld",
-			vswp->instance, ldcp->hcnt, ldcp->ldc_id);
-		return;
+	ASSERT(vswp->taskq_p != NULL);
+
+	if ((conn = kmem_zalloc(sizeof (vsw_conn_evt_t), KM_NOSLEEP)) == NULL) {
+		cmn_err(CE_WARN, "!vsw%d: unable to allocate memory for"
+			" connection event", vswp->instance);
+		goto err_exit;
 	}
 
-	if ((vswp->taskq_p == NULL) ||
-		(ddi_taskq_dispatch(vswp->taskq_p, vsw_send_ver, ldcp,
-			DDI_NOSLEEP) != DDI_SUCCESS)) {
-		cmn_err(CE_WARN, "!vsw%d: Can't dispatch version handshake "
-			"task", vswp->instance);
+	conn->evt = evt;
+	conn->ldcp = ldcp;
+
+	if (ddi_taskq_dispatch(vswp->taskq_p, vsw_conn_task, conn,
+		DDI_NOSLEEP) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "!vsw%d: Can't dispatch connection task",
+			vswp->instance);
+
+		kmem_free(conn, sizeof (vsw_conn_evt_t));
+		goto err_exit;
 	}
 
-	D1(vswp, "vsw_restart_handshake: exit");
+	D1(vswp, "%s: exit", __func__);
+	return;
+
+err_exit:
+	/*
+	 * Have mostly likely failed due to memory shortage. Clear the flag so
+	 * that future requests will at least be attempted and will hopefully
+	 * succeed.
+	 */
+	if ((evt == VSW_CONN_RESET) || (evt == VSW_CONN_RESTART))
+		ldcp->reset_active = 0;
 }
 
 /*
- * Deal appropriately with a ECONNRESET event encountered in a ldc_*
- * call.
+ * Deal with events relating to a connection. Invoked from a taskq.
  */
 static void
-vsw_handle_reset(vsw_ldc_t *ldcp)
+vsw_conn_task(void *arg)
 {
-	vsw_t		*vswp = ldcp->ldc_vswp;
-	ldc_status_t	lstatus;
+	vsw_conn_evt_t	*conn = (vsw_conn_evt_t *)arg;
+	vsw_ldc_t	*ldcp = NULL;
+	vsw_t		*vswp = NULL;
+	uint16_t	evt;
+	ldc_status_t	curr_status;
+
+	ldcp = conn->ldcp;
+	evt = conn->evt;
+	vswp = ldcp->ldc_vswp;
 
 	D1(vswp, "%s: enter", __func__);
 
+	/* can safely free now have copied out data */
+	kmem_free(conn, sizeof (vsw_conn_evt_t));
+
 	mutex_enter(&ldcp->status_lock);
-	lstatus = ldcp->ldc_status;
-	if (ldc_status(ldcp->ldc_handle, &ldcp->ldc_status) != 0) {
-		DERR(vswp, "%s: unable to read status for channel %ld",
-			__func__, ldcp->ldc_id);
+	if (ldc_status(ldcp->ldc_handle, &curr_status) != 0) {
+		cmn_err(CE_WARN, "!vsw%d: Unable to read status of "
+			"channel %ld", vswp->instance, ldcp->ldc_id);
 		mutex_exit(&ldcp->status_lock);
 		return;
 	}
-	mutex_exit(&ldcp->status_lock);
 
 	/*
-	 * Check the channel's previous recorded state to
-	 * determine if this is the first ECONNRESET event
-	 * we've gotten for this particular channel (i.e. was
-	 * previously up but is no longer). If so, terminate
-	 * the channel.
+	 * If we wish to restart the handshake on this channel, then if
+	 * the channel is UP we bring it DOWN to flush the underlying
+	 * ldc queue.
 	 */
-	if ((ldcp->ldc_status != LDC_UP) && (lstatus == LDC_UP)) {
-		vsw_restart_ldc(ldcp);
-	}
+	if ((evt == VSW_CONN_RESTART) && (curr_status == LDC_UP))
+		(void) ldc_down(ldcp->ldc_handle);
 
 	/*
-	 * vsw_restart_ldc() will also attempt to bring channel
-	 * back up. Check here if that succeeds.
+	 * re-init all the associated data structures.
 	 */
-	mutex_enter(&ldcp->status_lock);
-	lstatus = ldcp->ldc_status;
-	if (ldc_status(ldcp->ldc_handle, &ldcp->ldc_status) != 0) {
-		DERR(vswp, "%s: unable to read status for channel %ld",
-			__func__, ldcp->ldc_id);
+	vsw_ldc_reinit(ldcp);
+
+	/*
+	 * Bring the channel back up (note it does no harm to
+	 * do this even if the channel is already UP, Just
+	 * becomes effectively a no-op).
+	 */
+	(void) ldc_up(ldcp->ldc_handle);
+
+	/*
+	 * Check if channel is now UP. This will only happen if
+	 * peer has also done a ldc_up().
+	 */
+	if (ldc_status(ldcp->ldc_handle, &curr_status) != 0) {
+		cmn_err(CE_WARN, "!vsw%d: Unable to read status of "
+			"channel %ld", vswp->instance, ldcp->ldc_id);
 		mutex_exit(&ldcp->status_lock);
 		return;
 	}
-	mutex_exit(&ldcp->status_lock);
+
+	ldcp->ldc_status = curr_status;
+
+	/* channel UP so restart handshake by sending version info */
+	if (curr_status == LDC_UP) {
+		if (ldcp->hcnt++ > vsw_num_handshakes) {
+			cmn_err(CE_WARN, "!vsw%d: exceeded number of permitted"
+				" handshake attempts (%d) on channel %ld",
+				vswp->instance, ldcp->hcnt, ldcp->ldc_id);
+			mutex_exit(&ldcp->status_lock);
+			return;
+		}
+
+		if (ddi_taskq_dispatch(vswp->taskq_p, vsw_send_ver, ldcp,
+			DDI_NOSLEEP) != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "!vsw%d: Can't dispatch version task",
+				vswp->instance);
+
+			/*
+			 * Don't count as valid restart attempt if couldn't
+			 * send version msg.
+			 */
+			if (ldcp->hcnt > 0)
+				ldcp->hcnt--;
+		}
+	}
 
 	/*
-	 * If channel is now up and no one else (i.e. the callback routine)
-	 * has dealt with it then we restart the handshake here.
+	 * Mark that the process is complete by clearing the flag.
+	 *
+	 * Note is it possible that the taskq dispatch above may have failed,
+	 * most likely due to memory shortage. We still clear the flag so
+	 * future attempts will at least be attempted and will hopefully
+	 * succeed.
 	 */
-	if ((lstatus != LDC_UP) && (ldcp->ldc_status == LDC_UP)) {
+	if ((evt == VSW_CONN_RESET) || (evt == VSW_CONN_RESTART))
 		ldcp->reset_active = 0;
-		vsw_restart_handshake(ldcp);
-	}
+
+	mutex_exit(&ldcp->status_lock);
 
 	D1(vswp, "%s: exit", __func__);
 }
@@ -4148,7 +4189,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 		if (phase > VSW_MILESTONE0) {
 			DERR(vswp, "vsw_check_flag (%d): VER_INFO_RECV"
 				" when in state %d\n", ldcp->ldc_id, phase);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		}
 		break;
@@ -4159,7 +4200,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 			DERR(vswp, "vsw_check_flag (%d): spurious VER_ACK"
 				" or VER_NACK when in state %d\n",
 				ldcp->ldc_id, phase);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		} else
 			state &= ~VSW_VER_INFO_SENT;
@@ -4169,7 +4210,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 		if ((phase < VSW_MILESTONE1) || (phase >= VSW_MILESTONE2)) {
 			DERR(vswp, "vsw_check_flag (%d): ATTR_INFO_RECV"
 				" when in state %d\n", ldcp->ldc_id, phase);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		}
 		break;
@@ -4180,7 +4221,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 			DERR(vswp, "vsw_check_flag (%d): spurious ATTR_ACK"
 				" or ATTR_NACK when in state %d\n",
 				ldcp->ldc_id, phase);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		} else
 			state &= ~VSW_ATTR_INFO_SENT;
@@ -4190,7 +4231,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 		if (phase < VSW_MILESTONE1) {
 			DERR(vswp, "vsw_check_flag (%d): DRING_INFO_RECV"
 				" when in state %d\n", ldcp->ldc_id, phase);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		}
 		break;
@@ -4201,7 +4242,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 			DERR(vswp, "vsw_check_flag (%d): spurious DRING_ACK"
 				" or DRING_NACK when in state %d\n",
 				ldcp->ldc_id, phase);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		} else
 			state &= ~VSW_DRING_INFO_SENT;
@@ -4211,7 +4252,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 		if (phase < VSW_MILESTONE3) {
 			DERR(vswp, "vsw_check_flag (%d): RDX_INFO_RECV"
 				" when in state %d\n", ldcp->ldc_id, phase);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		}
 		break;
@@ -4222,7 +4263,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 			DERR(vswp, "vsw_check_flag (%d): spurious RDX_ACK"
 				" or RDX_NACK when in state %d\n",
 				ldcp->ldc_id, phase);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		} else
 			state &= ~VSW_RDX_INFO_SENT;
@@ -4232,7 +4273,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 		if (phase < VSW_MILESTONE3) {
 			DERR(vswp, "vsw_check_flag (%d): VSW_MCST_INFO_RECV"
 				" when in state %d\n", ldcp->ldc_id, phase);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		}
 		break;
@@ -4274,7 +4315,7 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 		if (ldcp->lane_out.lstate == 0) {
 			D2(vswp, "%s: (chan %lld) starting handshake "
 				"with peer", __func__, ldcp->ldc_id);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_UP);
 		}
 
 		/*
@@ -4345,8 +4386,8 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 		 *
 		 * Mark outbound lane as available to transmit data.
 		 */
-		if ((ldcp->lane_in.lstate & VSW_RDX_ACK_SENT) &&
-			(ldcp->lane_out.lstate & VSW_RDX_ACK_RECV)) {
+		if ((ldcp->lane_out.lstate & VSW_RDX_ACK_SENT) &&
+			(ldcp->lane_in.lstate & VSW_RDX_ACK_RECV)) {
 
 			D2(vswp, "%s: (chan %lld) leaving milestone 3",
 				__func__, ldcp->ldc_id);
@@ -4463,7 +4504,7 @@ vsw_process_pkt(void *arg)
 
 		/* channel has been reset */
 		if (rv == ECONNRESET) {
-			vsw_handle_reset(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESET);
 			break;
 		}
 
@@ -4522,13 +4563,13 @@ vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t tag)
 	if ((tag.vio_subtype_env == VIO_RDX) &&
 		(tag.vio_subtype == VIO_SUBTYPE_ACK)) {
 
-		if (vsw_check_flag(ldcp, OUTBOUND, VSW_RDX_ACK_RECV))
+		if (vsw_check_flag(ldcp, INBOUND, VSW_RDX_ACK_RECV))
 			return;
 
-		ldcp->lane_out.lstate |= VSW_RDX_ACK_RECV;
+		ldcp->lane_in.lstate |= VSW_RDX_ACK_RECV;
 		D2(vswp, "%s (%ld) handling RDX_ACK in place "
 			"(ostate 0x%llx : hphase %d)", __func__,
-			ldcp->ldc_id, ldcp->lane_out.lstate, ldcp->hphase);
+			ldcp->ldc_id, ldcp->lane_in.lstate, ldcp->hphase);
 		vsw_next_milestone(ldcp);
 		return;
 	}
@@ -4538,7 +4579,7 @@ vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t tag)
 	if (ctaskp == NULL) {
 		DERR(vswp, "%s: unable to alloc space for ctrl"
 			" msg", __func__);
-		vsw_restart_handshake(ldcp);
+		vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 		return;
 	}
 
@@ -4562,7 +4603,7 @@ vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t tag)
 				__func__);
 			kmem_free(ctaskp, sizeof (vsw_ctrl_task_t));
 			mutex_exit(&port->state_lock);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return;
 		}
 	} else {
@@ -4611,7 +4652,7 @@ vsw_process_ctrl_pkt(void *arg)
 			DERR(vswp, "%s (chan %d): invalid session id (%llx)",
 				__func__, ldcp->ldc_id, tag.vio_sid);
 			kmem_free(ctaskp, sizeof (vsw_ctrl_task_t));
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return;
 		}
 	}
@@ -4714,8 +4755,8 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 			DUMP_TAG_PTR((vio_msg_tag_t *)ver_pkt);
 
-			vsw_send_msg(ldcp, (void *)ver_pkt,
-					sizeof (vio_ver_msg_t));
+			(void) vsw_send_msg(ldcp, (void *)ver_pkt,
+					sizeof (vio_ver_msg_t), B_TRUE);
 
 			ldcp->lane_in.lstate |= VSW_VER_NACK_SENT;
 			vsw_next_milestone(ldcp);
@@ -4764,7 +4805,8 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 		DUMP_TAG_PTR((vio_msg_tag_t *)ver_pkt);
 		ver_pkt->tag.vio_sid = ldcp->local_session;
-		vsw_send_msg(ldcp, (void *)ver_pkt, sizeof (vio_ver_msg_t));
+		(void) vsw_send_msg(ldcp, (void *)ver_pkt,
+			sizeof (vio_ver_msg_t), B_TRUE);
 
 		vsw_next_milestone(ldcp);
 		break;
@@ -4832,8 +4874,8 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 			DUMP_TAG_PTR((vio_msg_tag_t *)ver_pkt);
 
-			vsw_send_msg(ldcp, (void *)ver_pkt,
-					sizeof (vio_ver_msg_t));
+			(void) vsw_send_msg(ldcp, (void *)ver_pkt,
+				sizeof (vio_ver_msg_t), B_TRUE);
 
 			vsw_next_milestone(ldcp);
 
@@ -4904,8 +4946,8 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 			DUMP_TAG_PTR((vio_msg_tag_t *)attr_pkt);
 			ldcp->lane_in.lstate |= VSW_ATTR_NACK_SENT;
-			vsw_send_msg(ldcp, (void *)attr_pkt,
-					sizeof (vnet_attr_msg_t));
+			(void) vsw_send_msg(ldcp, (void *)attr_pkt,
+				sizeof (vnet_attr_msg_t), B_TRUE);
 
 			vsw_next_milestone(ldcp);
 			return;
@@ -4949,8 +4991,8 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 		ldcp->lane_in.lstate |= VSW_ATTR_ACK_SENT;
 
-		vsw_send_msg(ldcp, (void *)attr_pkt,
-					sizeof (vnet_attr_msg_t));
+		(void) vsw_send_msg(ldcp, (void *)attr_pkt,
+				sizeof (vnet_attr_msg_t), B_TRUE);
 
 		vsw_next_milestone(ldcp);
 		break;
@@ -5036,8 +5078,8 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 			ldcp->lane_in.lstate |= VSW_DRING_NACK_SENT;
 
-			vsw_send_msg(ldcp, (void *)dring_pkt,
-					sizeof (vio_dring_reg_msg_t));
+			(void) vsw_send_msg(ldcp, (void *)dring_pkt,
+				sizeof (vio_dring_reg_msg_t), B_TRUE);
 
 			vsw_next_milestone(ldcp);
 			return;
@@ -5084,8 +5126,8 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 			DUMP_TAG_PTR((vio_msg_tag_t *)dring_pkt);
 
 			ldcp->lane_in.lstate |= VSW_DRING_NACK_SENT;
-			vsw_send_msg(ldcp, (void *)dring_pkt,
-				sizeof (vio_dring_reg_msg_t));
+			(void) vsw_send_msg(ldcp, (void *)dring_pkt,
+				sizeof (vio_dring_reg_msg_t), B_TRUE);
 
 			vsw_next_milestone(ldcp);
 			return;
@@ -5104,8 +5146,8 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 			DUMP_TAG_PTR((vio_msg_tag_t *)dring_pkt);
 
 			ldcp->lane_in.lstate |= VSW_DRING_NACK_SENT;
-			vsw_send_msg(ldcp, (void *)dring_pkt,
-				sizeof (vio_dring_reg_msg_t));
+			(void) vsw_send_msg(ldcp, (void *)dring_pkt,
+				sizeof (vio_dring_reg_msg_t), B_TRUE);
 
 			vsw_next_milestone(ldcp);
 			return;
@@ -5148,8 +5190,8 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 		dring_pkt->tag.vio_subtype = VIO_SUBTYPE_ACK;
 		dring_pkt->dring_ident = dp->ident;
 
-		vsw_send_msg(ldcp, (void *)dring_pkt,
-				sizeof (vio_dring_reg_msg_t));
+		(void) vsw_send_msg(ldcp, (void *)dring_pkt,
+			sizeof (vio_dring_reg_msg_t), B_TRUE);
 
 		ldcp->lane_in.lstate |= VSW_DRING_ACK_SENT;
 		vsw_next_milestone(ldcp);
@@ -5186,14 +5228,14 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 			if (dring_found == 0) {
 				DERR(NULL, "%s: unrecognised ring cookie",
 					__func__);
-				vsw_restart_handshake(ldcp);
+				vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 				return;
 			}
 
 		} else {
 			DERR(vswp, "%s: DRING ACK received but no drings "
 				"allocated", __func__);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return;
 		}
 
@@ -5246,28 +5288,26 @@ vsw_process_ctrl_dring_unreg_pkt(vsw_ldc_t *ldcp, void *pkt)
 		D2(vswp, "%s: VIO_SUBTYPE_INFO", __func__);
 
 		DWARN(vswp, "%s: restarting handshake..", __func__);
-		vsw_restart_handshake(ldcp);
 		break;
 
 	case VIO_SUBTYPE_ACK:
 		D2(vswp, "%s: VIO_SUBTYPE_ACK", __func__);
 
 		DWARN(vswp, "%s: restarting handshake..", __func__);
-		vsw_restart_handshake(ldcp);
 		break;
 
 	case VIO_SUBTYPE_NACK:
 		D2(vswp, "%s: VIO_SUBTYPE_NACK", __func__);
 
 		DWARN(vswp, "%s: restarting handshake..", __func__);
-		vsw_restart_handshake(ldcp);
 		break;
 
 	default:
 		DERR(vswp, "%s: Unknown vio_subtype %x\n", __func__,
 			dring_pkt->tag.vio_subtype);
-		vsw_restart_handshake(ldcp);
 	}
+
+	vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 
 	D1(vswp, "%s(%lld): exit", __func__, ldcp->ldc_id);
 }
@@ -5275,7 +5315,8 @@ vsw_process_ctrl_dring_unreg_pkt(vsw_ldc_t *ldcp, void *pkt)
 #define	SND_MCST_NACK(ldcp, pkt) \
 	pkt->tag.vio_subtype = VIO_SUBTYPE_NACK; \
 	pkt->tag.vio_sid = ldcp->local_session; \
-	vsw_send_msg(ldcp, (void *)pkt, sizeof (vnet_mcast_msg_t));
+	(void) vsw_send_msg(ldcp, (void *)pkt, \
+			sizeof (vnet_mcast_msg_t), B_TRUE);
 
 /*
  * Process a multicast request from a vnet.
@@ -5359,8 +5400,8 @@ vsw_process_ctrl_mcst_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 		DUMP_TAG_PTR((vio_msg_tag_t *)mcst_pkt);
 
-		vsw_send_msg(ldcp, (void *)mcst_pkt,
-					sizeof (vnet_mcast_msg_t));
+		(void) vsw_send_msg(ldcp, (void *)mcst_pkt,
+				sizeof (vnet_mcast_msg_t), B_TRUE);
 		break;
 
 	case VIO_SUBTYPE_ACK:
@@ -5417,7 +5458,7 @@ vsw_process_ctrl_rdx_pkt(vsw_ldc_t *ldcp, void *pkt)
 	case VIO_SUBTYPE_INFO:
 		D2(vswp, "%s: VIO_SUBTYPE_INFO", __func__);
 
-		if (vsw_check_flag(ldcp, INBOUND, VSW_RDX_INFO_RECV))
+		if (vsw_check_flag(ldcp, OUTBOUND, VSW_RDX_INFO_RECV))
 			return;
 
 		rdx_pkt->tag.vio_sid = ldcp->local_session;
@@ -5425,10 +5466,10 @@ vsw_process_ctrl_rdx_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 		DUMP_TAG_PTR((vio_msg_tag_t *)rdx_pkt);
 
-		ldcp->lane_in.lstate |= VSW_RDX_ACK_SENT;
+		ldcp->lane_out.lstate |= VSW_RDX_ACK_SENT;
 
-		vsw_send_msg(ldcp, (void *)rdx_pkt,
-				sizeof (vio_rdx_msg_t));
+		(void) vsw_send_msg(ldcp, (void *)rdx_pkt,
+			sizeof (vio_rdx_msg_t), B_TRUE);
 
 		vsw_next_milestone(ldcp);
 		break;
@@ -5438,16 +5479,16 @@ vsw_process_ctrl_rdx_pkt(vsw_ldc_t *ldcp, void *pkt)
 		 * Should be handled in-band by callback handler.
 		 */
 		DERR(vswp, "%s: Unexpected VIO_SUBTYPE_ACK", __func__);
-		vsw_restart_handshake(ldcp);
+		vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 		break;
 
 	case VIO_SUBTYPE_NACK:
 		D2(vswp, "%s: VIO_SUBTYPE_NACK", __func__);
 
-		if (vsw_check_flag(ldcp, OUTBOUND, VSW_RDX_NACK_RECV))
+		if (vsw_check_flag(ldcp, INBOUND, VSW_RDX_NACK_RECV))
 			return;
 
-		ldcp->lane_out.lstate |= VSW_RDX_NACK_RECV;
+		ldcp->lane_in.lstate |= VSW_RDX_NACK_RECV;
 		vsw_next_milestone(ldcp);
 		break;
 
@@ -5472,7 +5513,7 @@ vsw_process_data_pkt(vsw_ldc_t *ldcp, void *dpkt, vio_msg_tag_t tag)
 		if (ldcp->peer_session != tag.vio_sid) {
 			DERR(vswp, "%s (chan %d): invalid session id (%llx)",
 				__func__, ldcp->ldc_id, tag.vio_sid);
-			vsw_restart_handshake(ldcp);
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return;
 		}
 	}
@@ -5487,7 +5528,7 @@ vsw_process_data_pkt(vsw_ldc_t *ldcp, void *dpkt, vio_msg_tag_t tag)
 			ldcp->lane_in.lstate, ldcp->lane_out.lstate);
 		DUMP_FLAGS(ldcp->lane_in.lstate);
 		DUMP_FLAGS(ldcp->lane_out.lstate);
-		vsw_restart_handshake(ldcp);
+		vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 		return;
 	}
 
@@ -5512,7 +5553,8 @@ vsw_process_data_pkt(vsw_ldc_t *ldcp, void *dpkt, vio_msg_tag_t tag)
 #define	SND_DRING_NACK(ldcp, pkt) \
 	pkt->tag.vio_subtype = VIO_SUBTYPE_NACK; \
 	pkt->tag.vio_sid = ldcp->local_session; \
-	vsw_send_msg(ldcp, (void *)pkt, sizeof (vio_dring_msg_t));
+	(void) vsw_send_msg(ldcp, (void *)pkt, \
+			sizeof (vio_dring_msg_t), B_TRUE);
 
 static void
 vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
@@ -5533,7 +5575,7 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 	uint32_t		pos, start, datalen;
 	uint32_t		range_start, range_end;
 	int32_t			end, num, cnt = 0;
-	int			i, rv;
+	int			i, rv, msg_rv = 0;
 	boolean_t		ack_needed = B_FALSE;
 	boolean_t		prev_desc_ack = B_FALSE;
 	int			read_attempts = 0;
@@ -5775,8 +5817,16 @@ vsw_recheck_desc:
 				dring_pkt->dring_process_state = VIO_DP_ACTIVE;
 				dring_pkt->tag.vio_subtype = VIO_SUBTYPE_ACK;
 				dring_pkt->tag.vio_sid = ldcp->local_session;
-				vsw_send_msg(ldcp, (void *)dring_pkt,
-					sizeof (vio_dring_msg_t));
+				msg_rv = vsw_send_msg(ldcp, (void *)dring_pkt,
+						sizeof (vio_dring_msg_t),
+						B_FALSE);
+
+				/*
+				 * Check if ACK was successfully sent. If not
+				 * we break and deal with that below.
+				 */
+				if (msg_rv != 0)
+					break;
 
 				prev_desc_ack = B_TRUE;
 				range_start = pos;
@@ -5791,17 +5841,26 @@ vsw_recheck_desc:
 			 * allow some other network device (or disk) to
 			 * get access to the cpu.
 			 */
-			/* send the chain of packets to be switched */
 			if (chain > vsw_chain_len) {
 				D3(vswp, "%s(%lld): switching chain of %d "
 					"msgs", __func__, ldcp->ldc_id, chain);
-				vswp->vsw_switch_frame(vswp, bp, VSW_VNETPORT,
-							ldcp->ldc_port, NULL);
-				bp = NULL;
 				break;
 			}
 		}
 		RW_EXIT(&ldcp->lane_in.dlistrw);
+
+		/*
+		 * If when we attempted to send the ACK we found that the
+		 * channel had been reset then now handle this. We deal with
+		 * it here as we cannot reset the channel while holding the
+		 * dlistrw lock, and we don't want to acquire/release it
+		 * continuously in the above loop, as a channel reset should
+		 * be a rare event.
+		 */
+		if (msg_rv == ECONNRESET) {
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESET);
+			break;
+		}
 
 		/* send the chain of packets to be switched */
 		if (bp != NULL) {
@@ -5838,8 +5897,8 @@ vsw_recheck_desc:
 			__func__, ldcp->ldc_id, dring_pkt->start_idx,
 			dring_pkt->end_idx);
 
-		vsw_send_msg(ldcp, (void *)dring_pkt,
-					sizeof (vio_dring_msg_t));
+		(void) vsw_send_msg(ldcp, (void *)dring_pkt,
+				sizeof (vio_dring_msg_t), B_TRUE);
 		break;
 
 	case VIO_SUBTYPE_ACK:
@@ -5970,8 +6029,9 @@ vsw_recheck_desc:
 					dring_pkt->start_idx,
 					dring_pkt->end_idx);
 
-				vsw_send_msg(ldcp, (void *)dring_pkt,
-						sizeof (vio_dring_msg_t));
+				msg_rv = vsw_send_msg(ldcp, (void *)dring_pkt,
+					sizeof (vio_dring_msg_t), B_FALSE);
+
 			} else {
 				mutex_exit(&priv_addr->dstate_lock);
 				dp->restart_reqd = B_TRUE;
@@ -5979,6 +6039,11 @@ vsw_recheck_desc:
 			mutex_exit(&dp->restart_lock);
 		}
 		RW_EXIT(&ldcp->lane_out.dlistrw);
+
+		/* only do channel reset after dropping dlistrw lock */
+		if (msg_rv == ECONNRESET)
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESET);
+
 		break;
 
 	case VIO_SUBTYPE_NACK:
@@ -5988,7 +6053,7 @@ vsw_recheck_desc:
 		 * Something is badly wrong if we are getting NACK's
 		 * for our data pkts. So reset the channel.
 		 */
-		vsw_restart_handshake(ldcp);
+		vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 
 		break;
 
@@ -6103,8 +6168,8 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		 */
 		ibnd_desc->hdr.tag.vio_subtype = VIO_SUBTYPE_ACK;
 		ibnd_desc->hdr.tag.vio_sid = ldcp->local_session;
-		vsw_send_msg(ldcp, (void *)ibnd_desc,
-				sizeof (vnet_ibnd_desc_t));
+		(void) vsw_send_msg(ldcp, (void *)ibnd_desc,
+				sizeof (vnet_ibnd_desc_t), B_TRUE);
 
 		/* send the packet to be switched */
 		vswp->vsw_switch_frame(vswp, mp, VSW_VNETPORT,
@@ -6931,8 +6996,15 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 			__func__, ldcp->ldc_id, dring_pkt.start_idx,
 			dring_pkt.end_idx, dring_pkt.seq_num);
 
-		vsw_send_msg(ldcp, (void *)&dring_pkt,
-						sizeof (vio_dring_msg_t));
+		RW_EXIT(&ldcp->lane_out.dlistrw);
+
+		(void) vsw_send_msg(ldcp, (void *)&dring_pkt,
+					sizeof (vio_dring_msg_t), B_TRUE);
+
+		/* free the message block */
+		freemsg(mp);
+		return (status);
+
 	} else {
 		mutex_exit(&dp->restart_lock);
 		D2(vswp, "%s(%lld): updating descp %d", __func__,
@@ -6998,6 +7070,7 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 
 	size = msgsize(mp);
 	if (size > (size_t)ETHERMAX) {
+		RW_EXIT(&ldcp->lane_out.dlistrw);
 		DERR(vswp, "%s(%lld) invalid size (%ld)\n", __func__,
 		    ldcp->ldc_id, size);
 		freemsg(mp);
@@ -7008,6 +7081,7 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	 * Find a free descriptor in our buffer ring
 	 */
 	if (vsw_dring_find_free_desc(dp, &priv_desc, &idx) != 0) {
+		RW_EXIT(&ldcp->lane_out.dlistrw);
 		if (warn_msg) {
 			DERR(vswp, "%s(%lld): no descriptor available for ring "
 			"at 0x%llx", __func__, ldcp->ldc_id, dp);
@@ -7058,11 +7132,12 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	ibnd_msg.ncookies = priv_desc->ncookies;
 	ibnd_msg.nbytes = size;
 
-	vsw_send_msg(ldcp, (void *)&ibnd_msg, sizeof (vnet_ibnd_desc_t));
+	RW_EXIT(&ldcp->lane_out.dlistrw);
+
+	(void) vsw_send_msg(ldcp, (void *)&ibnd_msg,
+			sizeof (vnet_ibnd_desc_t), B_TRUE);
 
 vsw_descrsend_free_exit:
-
-	RW_EXIT(&ldcp->lane_out.dlistrw);
 
 	/* free the allocated message blocks */
 	freemsg(mp);
@@ -7096,7 +7171,7 @@ vsw_send_ver(void *arg)
 
 	DUMP_TAG(ver_msg.tag);
 
-	vsw_send_msg(ldcp, &ver_msg, sizeof (vio_ver_msg_t));
+	(void) vsw_send_msg(ldcp, &ver_msg, sizeof (vio_ver_msg_t), B_TRUE);
 
 	D1(vswp, "%s (%d): exit", __func__, ldcp->ldc_id);
 }
@@ -7132,9 +7207,9 @@ vsw_send_attr(vsw_ldc_t *ldcp)
 
 	DUMP_TAG(attr_msg.tag);
 
-	vsw_send_msg(ldcp, &attr_msg, sizeof (vnet_attr_msg_t));
+	(void) vsw_send_msg(ldcp, &attr_msg, sizeof (vnet_attr_msg_t), B_TRUE);
 
-	D1(vswp, "%s (%ld) enter", __func__, ldcp->ldc_id);
+	D1(vswp, "%s (%ld) exit", __func__, ldcp->ldc_id);
 }
 
 /*
@@ -7197,8 +7272,8 @@ vsw_send_dring_info(vsw_ldc_t *ldcp)
 
 	DUMP_TAG_PTR((vio_msg_tag_t *)dring_msg);
 
-	vsw_send_msg(ldcp, dring_msg,
-		sizeof (vio_dring_reg_msg_t));
+	(void) vsw_send_msg(ldcp, dring_msg,
+		sizeof (vio_dring_reg_msg_t), B_TRUE);
 
 	kmem_free(dring_msg, sizeof (vio_dring_reg_msg_t));
 
@@ -7218,20 +7293,25 @@ vsw_send_rdx(vsw_ldc_t *ldcp)
 	rdx_msg.tag.vio_subtype_env = VIO_RDX;
 	rdx_msg.tag.vio_sid = ldcp->local_session;
 
-	ldcp->lane_out.lstate |= VSW_RDX_INFO_SENT;
+	ldcp->lane_in.lstate |= VSW_RDX_INFO_SENT;
 
 	DUMP_TAG(rdx_msg.tag);
 
-	vsw_send_msg(ldcp, &rdx_msg, sizeof (vio_rdx_msg_t));
+	(void) vsw_send_msg(ldcp, &rdx_msg, sizeof (vio_rdx_msg_t), B_TRUE);
 
 	D1(vswp, "%s (%ld) exit", __func__, ldcp->ldc_id);
 }
 
 /*
  * Generic routine to send message out over ldc channel.
+ *
+ * It is possible that when we attempt to write over the ldc channel
+ * that we get notified that it has been reset. Depending on the value
+ * of the handle_reset flag we either handle that event here or simply
+ * notify the caller that the channel was reset.
  */
-static void
-vsw_send_msg(vsw_ldc_t *ldcp, void *msgp, int size)
+static int
+vsw_send_msg(vsw_ldc_t *ldcp, void *msgp, int size, boolean_t handle_reset)
 {
 	int		rv;
 	size_t		msglen = size;
@@ -7258,13 +7338,25 @@ vsw_send_msg(vsw_ldc_t *ldcp, void *msgp, int size)
 	}
 	mutex_exit(&ldcp->ldc_txlock);
 
-	/* channel has been reset */
+	/*
+	 * If channel has been reset we either handle it here or
+	 * simply report back that it has been reset and let caller
+	 * decide what to do.
+	 */
 	if (rv == ECONNRESET) {
-		vsw_handle_reset(ldcp);
+		DWARN(vswp, "%s (%lld) channel reset",
+					__func__, ldcp->ldc_id);
+
+		/*
+		 * N.B - must never be holding the dlistrw lock when
+		 * we do a reset of the channel.
+		 */
+		if (handle_reset) {
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESET);
+		}
 	}
 
-	D1(vswp, "vsw_send_msg (%lld) exit : sent %d bytes",
-			ldcp->ldc_id, msglen);
+	return (rv);
 }
 
 /*

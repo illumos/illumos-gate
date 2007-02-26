@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -386,6 +386,22 @@ typedef struct vsw_ctrl_task {
 	def_msg_t	pktp;
 	uint32_t	hss_id;
 } vsw_ctrl_task_t;
+
+/*
+ * State of connection to peer. Some of these states
+ * can be mapped to LDC events as follows:
+ *
+ * VSW_CONN_RESET -> LDC_RESET_EVT
+ * VSW_CONN_UP    -> LDC_UP_EVT
+ */
+#define	VSW_CONN_UP		0x1	/* Connection come up */
+#define	VSW_CONN_RESET		0x2	/* Connection reset */
+#define	VSW_CONN_RESTART	0x4	/* Restarting handshake on connection */
+
+typedef struct vsw_conn_evt {
+	uint16_t	evt;		/* Connection event */
+	vsw_ldc_t	*ldcp;
+} vsw_conn_evt_t;
 
 /*
  * Vsw queue -- largely modeled after squeue
