@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -498,9 +498,6 @@ static t10_cmd_state_t
 t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 {
 	t10_lu_impl_t	*lu		= c->c_lu;
-#ifdef FULL_DEBUG
-	t10_cmd_state_t	oldstate	= c->c_state;
-#endif
 
 	/* ---- Callers must already hold the mutex ---- */
 	assert(pthread_mutex_trylock(&lu->l_cmd_mutex) != 0);
@@ -516,12 +513,6 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 
 		case T10_Cmd_T5:
 			c->c_state = T10_Cmd_S1_Free;
-#ifdef FULL_DEBUG
-			queue_prt(mgmtq, Q_STE_IO,
-			    "SAM:  %s(%s) -> %s -- %llx\n",
-			    state_to_str(oldstate), event_to_str(e),
-			    state_to_str(c->c_state), c->c_trans_id);
-#endif
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
 
@@ -548,12 +539,6 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 
 		case T10_Cmd_T5:
 			c->c_state = T10_Cmd_S1_Free;
-#ifdef FULL_DEBUG
-			queue_prt(mgmtq, Q_STE_IO,
-			    "SAM:  %s(%s) -> %s -- %llx\n",
-			    state_to_str(oldstate), event_to_str(e),
-			    state_to_str(c->c_state), c->c_trans_id);
-#endif
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
 
@@ -581,12 +566,6 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 			/*FALLTHRU*/
 		case T10_Cmd_T6:
 			c->c_state = T10_Cmd_S1_Free;
-#ifdef FULL_DEBUG
-			queue_prt(mgmtq, Q_STE_IO,
-			    "SAM:  %s(%s) -> %s -- %llx\n",
-			    state_to_str(oldstate), event_to_str(e),
-			    state_to_str(c->c_state), c->c_trans_id);
-#endif
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
 
@@ -628,12 +607,6 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 
 		case T10_Cmd_T6:
 			c->c_state = T10_Cmd_S1_Free;
-#ifdef FULL_DEBUG
-			queue_prt(mgmtq, Q_STE_IO,
-			    "SAM:  %s(%s) -> %s -- %llx\n",
-			    state_to_str(oldstate), event_to_str(e),
-			    state_to_str(c->c_state), c->c_trans_id);
-#endif
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
 
@@ -651,12 +624,6 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 		case T10_Cmd_T3:
 		case T10_Cmd_T4:
 			c->c_state = T10_Cmd_S1_Free;
-#ifdef FULL_DEBUG
-			queue_prt(mgmtq, Q_STE_IO,
-			    "SAM:  %s(%s) -> %s -- %llx\n",
-			    state_to_str(oldstate), event_to_str(e),
-			    state_to_str(c->c_state), c->c_trans_id);
-#endif
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
 
@@ -671,11 +638,6 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 	default:
 		assert(0);
 	}
-#ifdef FULL_DEBUG
-	queue_prt(mgmtq, Q_STE_IO, "SAM:  %s(%s) -> %s -- %llx\n",
-	    state_to_str(oldstate), event_to_str(e), state_to_str(c->c_state),
-	    c->c_trans_id);
-#endif
 	return (c->c_state);
 }
 
@@ -1424,8 +1386,18 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 
 	if ((ll = tgt_node_next(targ, XML_ELEMENT_LUNLIST, NULL)) == NULL)
 		goto error;
-	if ((n = tgt_node_next(ll, XML_ELEMENT_LUN, NULL)) == NULL)
+	n = NULL;
+	while ((n = tgt_node_next(ll, XML_ELEMENT_LUN, n)) != NULL) {
+		if (strtol(n->x_value, NULL, 0) == lun)
+			break;
+	}
+	if (n == NULL) {
+		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
+		/* ---- ACCESS DENIED - INVALID LU IDENTIFIER ---- */
+		spc_sense_ascq(cmd, 0x20, 0x9);
 		goto error;
+	}
+
 	if (tgt_find_value_str(n, XML_ELEMENT_GUID, &guid) == False) {
 		/*
 		 * Set the targ variable back to NULL to indicate that

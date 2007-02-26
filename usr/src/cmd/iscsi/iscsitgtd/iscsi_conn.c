@@ -471,8 +471,27 @@ iscsi_conn_pkt(iscsi_conn_t *c, iscsi_rsp_hdr_t *in)
 		free(in);
 		return;
 	}
+
 	(void) pthread_mutex_lock(&c->c_mutex);
-	in->statsn	= htonl(c->c_statsn++);
+	/*
+	 * Make any final per command adjustments.
+	 */
+	switch (in->opcode & ISCSI_OPCODE_MASK) {
+	case ISCSI_OP_NOOP_IN:
+		in->statsn	= htonl(c->c_statsn);
+		/*
+		 * Only bump the STATSN value if this packet is in response to
+		 * an initiator's ping. Section 10.19.1 of RFC3720 specifies
+		 * that the value must be 0xffffffff when responding to an
+		 * initiator. So, if the value is the reserved ITT value then
+		 * this packet was generated in reponse to an initiator ping.
+		 * Otherwise, we timed out on the connection and are requesting
+		 * a ping.
+		 */
+		if (((iscsi_nop_in_hdr_t *)in)->ttt == ISCSI_RSVD_TASK_TAG)
+			c->c_statsn++;
+		break;
+	}
 	(void) pthread_mutex_lock(&c->c_sess->s_mutex);
 	in->expcmdsn	= htonl(c->c_sess->s_seencmdsn + 1);
 	in->maxcmdsn	= htonl(iscsi_cmd_window(c) + c->c_sess->s_seencmdsn);
@@ -611,6 +630,8 @@ iscsi_conn_data_in(t10_cmd_t *t)
 				 * initiator expected and we're sending.
 				 */
 
+				queue_prt(c->c_mgmtq, Q_CONN_ERRS,
+				    "CON%x  Underflow occurred\n", c->c_num);
 				send_datain_pdu(c, t, 0);
 				send_scsi_rsp(c, t);
 			}
@@ -762,13 +783,21 @@ send_scsi_rsp(iscsi_conn_t *c, t10_cmd_t *t)
 	(void) pthread_mutex_unlock(&c->c_sess->s_mutex);
 	rsp.cmd_status	= T10_CMD_STATUS(t);
 
+	if (cmd->c_writeop == True) {
+		if (cmd->c_offset_out != cmd->c_dlen_expected)
+			rsp.flags |= ISCSI_FLAG_CMD_OVERFLOW;
+		rsp.residual_count = htonl(cmd->c_dlen_expected -
+		    cmd->c_offset_out);
+	} else {
+		if (cmd->c_offset_in != cmd->c_dlen_expected)
+			rsp.flags |= ISCSI_FLAG_CMD_UNDERFLOW;
+		rsp.residual_count = htonl(cmd->c_dlen_expected -
+		    cmd->c_offset_in);
+	}
+
 	if (rsp.cmd_status) {
 		rsp.response		= ISCSI_STATUS_CMD_COMPLETED;
 		rsp.residual_count	= htonl(T10_CMD_RESID(t));
-		if (cmd->c_writeop == True)
-			rsp.flags |= ISCSI_FLAG_CMD_OVERFLOW;
-		else
-			rsp.flags |= ISCSI_FLAG_CMD_UNDERFLOW;
 
 		if (T10_SENSE_LEN(t) != 0) {
 			/*
@@ -784,16 +813,6 @@ send_scsi_rsp(iscsi_conn_t *c, t10_cmd_t *t)
 	} else {
 		rsp.response	= ISCSI_STATUS_CMD_COMPLETED;
 		rsp.expdatasn	= htonl(cmd->c_datasn);
-		if (cmd->c_writeop == True) {
-			if (cmd->c_offset_out != cmd->c_dlen_expected)
-				rsp.flags |= ISCSI_FLAG_CMD_OVERFLOW;
-			rsp.residual_count = htonl(cmd->c_dlen_expected -
-			    cmd->c_offset_out);
-		} else {
-			rsp.flags |= ISCSI_FLAG_CMD_UNDERFLOW;
-			rsp.residual_count = htonl(cmd->c_dlen_expected -
-			    cmd->c_offset_in);
-		}
 	}
 
 	send_iscsi_pkt(c, (iscsi_hdr_t *)&rsp, auto_sense);
@@ -1217,6 +1236,11 @@ send_iscsi_pkt(iscsi_conn_t *c, iscsi_hdr_t *h, char *opt_text)
 			return;
 		}
 		free(abuf);
+#ifdef FULL_DEBUG
+		queue_prt(c->c_mgmtq, Q_CONN_IO,
+		    "CON%x  Response(0x%x), Data: len=0x%x addr=0x%llx\n",
+		    c->c_num, h->opcode, dlen, opt_text);
+#endif
 		return;
 	}
 #endif

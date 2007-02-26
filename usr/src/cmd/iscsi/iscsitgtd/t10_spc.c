@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -572,7 +572,7 @@ spc_mselect_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
 		spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
 		trans_send_complete(cmd, STATUS_CHECK);
-		break;
+		return;
 	}
 	trans_send_complete(cmd, STATUS_GOOD);
 }
@@ -671,8 +671,9 @@ spc_report_luns(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 				continue;
 			lun_idx += SCSI_REPORTLUNS_ADDRESS_SIZE;
 		}
-		if (trans_send_datain(cmd, (char *)buf, expected_data, 0,
-		    spc_free, True, buf) == False) {
+		if (trans_send_datain(cmd, (char *)buf,
+		    len + SCSI_REPORTLUNS_ADDRESS_SIZE, 0, spc_free, True,
+		    buf) == False) {
 			trans_send_complete(cmd, STATUS_BUSY);
 		}
 	} else {

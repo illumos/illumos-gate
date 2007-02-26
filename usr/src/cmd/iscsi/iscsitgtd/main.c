@@ -842,8 +842,8 @@ main(int argc, char **argv)
 	(void) sigignore(SIGPIPE);
 
 	/*
-	 * Look at the function lu_buserr_handler() above to see the details
-	 * of why we need to handle segmentation violations.
+	 * Look at the function lu_buserr_handler() in t10_sam.c to see the
+	 * details of why we need to handle segmentation violations.
 	 */
 	bzero(&act, sizeof (act));
 	act.sa_sigaction	= lu_buserr_handler;

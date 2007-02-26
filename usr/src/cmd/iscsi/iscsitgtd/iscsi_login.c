@@ -208,6 +208,7 @@ iscsi_handle_login_pkt(iscsi_conn_t *c)
 		    ISCSI_LOGIN_STATUS_NO_VERSION);
 		queue_str(c->c_mgmtq, Q_CONN_ERRS, msg_log, debug);
 		conn_state(c, T7);
+		free(rsp);
 		return (True);
 	}
 

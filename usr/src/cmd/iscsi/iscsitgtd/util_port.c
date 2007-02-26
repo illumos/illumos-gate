@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <assert.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -71,6 +72,7 @@ port_watcher(void *v)
 	target_queue_t		*q = p->port_mgmtq;
 	int			l,
 				accept_err_sleep = 1;
+	const int		just_say_no = 1;
 	pthread_t		junk;
 	struct in_addr		addr;
 	struct in6_addr		addr6;
@@ -161,6 +163,11 @@ port_watcher(void *v)
 		    sizeof (l)) < 0)
 			queue_str(q, Q_GEN_ERRS, msg_status,
 			    "setsockopt keepalive failed");
+
+		if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
+		    (char *)&just_say_no, sizeof (just_say_no)) != 0)
+			queue_str(q, Q_GEN_ERRS, msg_status,
+			    "setsockopt NODELAY failed");
 
 		if ((conn = (iscsi_conn_t *)calloc(sizeof (iscsi_conn_t),
 		    1)) == NULL) {
