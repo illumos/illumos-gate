@@ -1084,6 +1084,8 @@ startup_memlist(void)
 static void
 startup_kmem(void)
 {
+	extern void page_set_colorequiv_arr(void);
+
 	PRM_POINT("startup_kmem() starting...");
 
 #if defined(__amd64)
@@ -1196,6 +1198,11 @@ startup_kmem(void)
 	 * Initialize kernel memory allocator.
 	 */
 	kmem_init();
+
+	/*
+	 * Factor in colorequiv to check additional 'equivalent' bins
+	 */
+	page_set_colorequiv_arr();
 
 	/*
 	 * print this out early so that we know what's going on

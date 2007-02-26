@@ -1237,6 +1237,7 @@ page_coloring_init(uint_t l2_sz, int l2_linesz, int l2_assoc)
 		hw_page_array[i].hp_colors = (page_colors_mask >>
 		    (hw_page_array[i].hp_shift - hw_page_array[0].hp_shift))
 		    + 1;
+		colorequivszc[i] = 0;
 	}
 
 	/*
@@ -1260,25 +1261,6 @@ page_coloring_init(uint_t l2_sz, int l2_linesz, int l2_assoc)
 
 			/* higher 4 bits encodes color equiv mask */
 			colorequivszc[i] = (a << 4);
-		}
-	}
-
-	/* factor in colorequiv to check additional 'equivalent' bins. */
-	if (colorequiv > 1) {
-
-		int a = lowbit(colorequiv) - 1;
-		if (a > 15)
-			a = 15;
-
-		for (i = 0; i <= mmu.max_page_level; i++) {
-			if ((colors = hw_page_array[i].hp_colors) <= 1) {
-				continue;
-			}
-			while ((colors >> a) == 0)
-				a--;
-			if ((a << 4) > colorequivszc[i]) {
-				colorequivszc[i] = (a << 4);
-			}
 		}
 	}
 

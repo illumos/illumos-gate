@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -955,26 +955,6 @@ page_coloring_init()
 
 			/* higher 4 bits encodes color equiv mask */
 			colorequivszc[i] = (a << 4);
-		}
-	}
-
-	/* factor in colorequiv to check additional 'equivalent' bins. */
-	if (colorequiv > 1 && &page_coloring_init_cpu == NULL) {
-
-		a = lowbit(colorequiv) - 1;
-
-		if (a > 15)
-			a = 15;
-
-		for (i = 0; i < mmu_page_sizes; i++) {
-			if ((colors = hw_page_array[i].hp_colors) <= 1) {
-				continue;
-			}
-			while ((colors >> a) == 0)
-				a--;
-			if ((a << 4) > colorequivszc[i]) {
-				colorequivszc[i] = (a << 4);
-			}
 		}
 	}
 

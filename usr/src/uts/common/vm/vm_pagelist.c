@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4158,4 +4158,33 @@ page_demote_free_pages(page_t *pp)
 	}
 	page_freelist_unlock(mnode);
 	ASSERT(pp->p_szc == 0);
+}
+
+/*
+ * Factor in colorequiv to check additional 'equivalent' bins.
+ * colorequiv may be set in /etc/system
+ */
+void
+page_set_colorequiv_arr(void)
+{
+	if (colorequiv > 1) {
+		uint_t colors;
+		int i;
+		int a = lowbit(colorequiv) - 1;
+
+		if (a > 15)
+			a = 15;
+
+		for (i = 0; i < MMU_PAGE_SIZES; i++) {
+
+			if ((colors = hw_page_array[i].hp_colors) <= 1) {
+				continue;
+			}
+			while ((colors >> a) == 0)
+				a--;
+			if ((a << 4) > colorequivszc[i]) {
+				colorequivszc[i] = (a << 4);
+			}
+		}
+	}
 }

@@ -431,7 +431,6 @@ void
 page_coloring_init_cpu()
 {
 	int i;
-	uint_t colors;
 
 	hw_page_array[0].hp_colors = 1 << 7;
 	hw_page_array[1].hp_colors = 1 << 7;
@@ -439,21 +438,5 @@ page_coloring_init_cpu()
 
 	for (i = 3; i < mmu_page_sizes; i++) {
 		hw_page_array[i].hp_colors = 1 << 5;
-	}
-
-	if (colorequiv > 1) {
-		int a = lowbit(colorequiv) - 1;
-
-		if (a > 15)
-			a = 15;
-
-		for (i = 0; i < mmu_page_sizes; i++) {
-			if ((colors = hw_page_array[i].hp_colors) <= 1) {
-				continue;
-			}
-			while ((colors >> a) == 0)
-				a--;
-			colorequivszc[i] = (a << 4);
-		}
 	}
 }

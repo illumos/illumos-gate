@@ -767,6 +767,7 @@ startup_memlist(void)
 	size_t sysbase = (size_t)SYSBASE;
 	int alloc_alignsize = MMU_PAGESIZE;
 	extern void page_coloring_init(void);
+	extern void page_set_colorequiv_arr(void);
 
 	/*
 	 * Initialize enough of the system to allow kmem_alloc to work by
@@ -1525,6 +1526,11 @@ startup_memlist(void)
 	 * Initialize kernel memory allocator.
 	 */
 	kmem_init();
+
+	/*
+	 * Factor in colorequiv to check additional 'equivalent' bins
+	 */
+	page_set_colorequiv_arr();
 
 	/*
 	 * Initialize bp_mapin().
