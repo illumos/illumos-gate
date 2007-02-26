@@ -96,6 +96,7 @@ extern void dprintf_setup(int *argc, char **argv);
 #endif /* ZFS_DEBUG */
 
 extern void cmn_err(int, const char *, ...);
+extern void vcmn_err(int, const char *, __va_list);
 extern void panic(const char *, ...);
 extern void vpanic(const char *, __va_list);
 

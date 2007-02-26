@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,8 @@ extern void __dprintf(const char *file, const char *func,
 #else
 #define	dprintf(...) ((void)0)
 #endif /* ZFS_DEBUG */
+
+extern void zfs_panic_recover(const char *fmt, ...);
 
 #ifdef	__cplusplus
 }

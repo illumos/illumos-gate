@@ -181,7 +181,15 @@ dmu_buf_hold_array_by_dnode(dnode_t *dn, uint64_t offset,
 		nblks = (P2ROUNDUP(offset+length, 1ULL<<blkshift) -
 			P2ALIGN(offset, 1ULL<<blkshift)) >> blkshift;
 	} else {
-		ASSERT3U(offset + length, <=, dn->dn_datablksz);
+		if (offset + length > dn->dn_datablksz) {
+			zfs_panic_recover("zfs: accessing past end of object "
+			    "%llx/%llx (size=%u access=%llu+%llu)",
+			    (longlong_t)dn->dn_objset->
+			    os_dsl_dataset->ds_object,
+			    (longlong_t)dn->dn_object, dn->dn_datablksz,
+			    (longlong_t)offset, (longlong_t)length);
+			return (EIO);
+		}
 		nblks = 1;
 	}
 	dbp = kmem_zalloc(sizeof (dmu_buf_t *) * nblks, KM_SLEEP);

@@ -567,13 +567,9 @@ panic(const char *fmt, ...)
 	va_end(adx);
 }
 
-/*PRINTFLIKE2*/
 void
-cmn_err(int ce, const char *fmt, ...)
+vcmn_err(int ce, const char *fmt, va_list adx)
 {
-	va_list adx;
-
-	va_start(adx, fmt);
 	if (ce == CE_PANIC)
 		vpanic(fmt, adx);
 	if (ce != CE_NOTE) {	/* suppress noise in userland stress testing */
@@ -581,6 +577,16 @@ cmn_err(int ce, const char *fmt, ...)
 		(void) vfprintf(stderr, fmt, adx);
 		(void) fprintf(stderr, "%s", ce_suffix[ce]);
 	}
+}
+
+/*PRINTFLIKE2*/
+void
+cmn_err(int ce, const char *fmt, ...)
+{
+	va_list adx;
+
+	va_start(adx, fmt);
+	vcmn_err(ce, fmt, adx);
 	va_end(adx);
 }
 

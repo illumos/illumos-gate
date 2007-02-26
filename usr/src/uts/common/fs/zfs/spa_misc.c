@@ -187,6 +187,13 @@ int zfs_flags = ~0;
 int zfs_flags = 0;
 #endif
 
+/*
+ * zfs_recover can be set to nonzero to attempt to recover from
+ * otherwise-fatal errors, typically caused by on-disk corruption.  When
+ * set, calls to zfs_panic_recover() will turn into warning messages.
+ */
+int zfs_recover = 0;
+
 #define	SPA_MINREF	5	/* spa_refcnt for an open-but-idle pool */
 
 /*
@@ -838,6 +845,16 @@ spa_freeze(spa_t *spa)
 	spa_config_exit(spa, FTAG);
 	if (freeze_txg != 0)
 		txg_wait_synced(spa_get_dsl(spa), freeze_txg);
+}
+
+void
+zfs_panic_recover(const char *fmt, ...)
+{
+	va_list adx;
+
+	va_start(adx, fmt);
+	vcmn_err(zfs_recover ? CE_WARN : CE_PANIC, fmt, adx);
+	va_end(adx);
 }
 
 /*

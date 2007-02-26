@@ -591,7 +591,14 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 			vn_vfsunlock(vp);
 			return (EEXIST);
 		}
-		ASSERT(zp->z_phys->zp_links > zp_is_dir);
+		if (zp->z_phys->zp_links <= zp_is_dir) {
+			zfs_panic_recover("zfs: link count on %s is %u, "
+			    "should be at least %u",
+			    zp->z_vnode->v_path ? zp->z_vnode->v_path :
+			    "<unknown>", (int)zp->z_phys->zp_links,
+			    zp_is_dir + 1);
+			zp->z_phys->zp_links = zp_is_dir + 1;
+		}
 		if (--zp->z_phys->zp_links == zp_is_dir) {
 			zp->z_unlinked = B_TRUE;
 			zp->z_phys->zp_links = 0;
