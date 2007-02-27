@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,8 +40,9 @@ SNMPLIBS = -lnetsnmp -lnetsnmpagent
 lint := SNMPLIBS =
 
 CPPFLAGS += -I/usr/sfw/include
-LDFLAGS += -L/usr/sfw/lib -R/usr/sfw/lib
-LDLIBS += $(SNMPLIBS)
+LDFLAGS += -L/usr/sfw/lib -L$(ROOT)/usr/lib/fm -R/usr/sfw/lib:/usr/lib/fm
+LINTFLAGS += -L$(ROOT)/usr/lib/fm
+LDLIBS += $(SNMPLIBS) -lfmd_msg
 
 $(ROOTSMASNMPCONFS) := FILEMODE = 0600
 

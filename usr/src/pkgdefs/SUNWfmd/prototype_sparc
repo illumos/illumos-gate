@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,6 +59,9 @@ f none usr/lib/fm/sparcv9/llib-lfmd_adm.ln 644 root bin
 f none usr/lib/fm/sparcv9/libfmd_log.so.1 755 root bin
 s none usr/lib/fm/sparcv9/libfmd_log.so=libfmd_log.so.1
 f none usr/lib/fm/sparcv9/llib-lfmd_log.ln 644 root bin
+f none usr/lib/fm/sparcv9/libfmd_msg.so.1 755 root bin
+s none usr/lib/fm/sparcv9/libfmd_msg.so=libfmd_msg.so.1
+f none usr/lib/fm/sparcv9/llib-lfmd_msg.ln 644 root bin
 f none usr/lib/fm/sparcv9/libmdesc.so.1 755 root bin
 s none usr/lib/fm/sparcv9/libmdesc.so=libmdesc.so.1 755 root bin
 f none usr/lib/fm/sparcv9/llib-lmdesc.ln 644 root bin

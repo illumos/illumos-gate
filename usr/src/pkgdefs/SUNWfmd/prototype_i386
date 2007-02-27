@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,6 +35,8 @@ f none usr/lib/fm/amd64/libfmd_adm.so.1 755 root bin
 s none usr/lib/fm/amd64/libfmd_adm.so=./libfmd_adm.so.1
 f none usr/lib/fm/amd64/libfmd_log.so.1 755 root bin
 s none usr/lib/fm/amd64/libfmd_log.so=./libfmd_log.so.1
+f none usr/lib/fm/amd64/libfmd_msg.so.1 755 root bin
+s none usr/lib/fm/amd64/libfmd_msg.so=./libfmd_msg.so.1
 f none usr/lib/fm/amd64/libfmd_snmp.so.1 755 root bin
 s none usr/lib/fm/amd64/libfmd_snmp.so=./libfmd_snmp.so.1
 f none usr/lib/fm/amd64/libtopo.so.1 755 root bin
@@ -42,6 +44,7 @@ s none usr/lib/fm/amd64/libtopo.so=libtopo.so.1
 f none usr/lib/fm/amd64/llib-ldiagcode.ln 644 root bin
 f none usr/lib/fm/amd64/llib-lfmd_adm.ln 644 root bin
 f none usr/lib/fm/amd64/llib-lfmd_log.ln 644 root bin
+f none usr/lib/fm/amd64/llib-lfmd_msg.ln 644 root bin
 f none usr/lib/fm/amd64/llib-lfmd_snmp.ln 644 root bin
 f none usr/lib/fm/amd64/llib-ltopo.ln 644 root bin
 d none usr/lib/fm/fmd/schemes/amd64 755 root bin

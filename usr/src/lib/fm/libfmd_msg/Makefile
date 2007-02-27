@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -26,25 +25,35 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+include ../../Makefile.lib
 include ../Makefile.lib
 
-sparc_SUBDIRS = \
-	libmdesc \
-	libldom
+FMHDRS = fmd_msg.h
+HDRDIR = common
 
-i386_SUBDIRS =
+SUBDIRS = $(MACH) 
+$(BUILD64)SUBDIRS += $(MACH64)
 
-SUBDIRS = \
-	libdiagcode \
-	libfmd_adm \
-	libfmd_log \
-	libfmd_msg \
-	libfmd_snmp \
-	$($(MACH)_SUBDIRS) \
-	topo
+all := TARGET = all
+clean := TARGET = clean
+clobber := TARGET = clobber
+install := TARGET = install
+lint := TARGET = lint
 
-libldom: libmdesc
+.KEEP_STATE:
 
-topo: $($(MACH)_SUBDIRS)
+all clean clobber lint: $(SUBDIRS)
 
-include ./Makefile.subdirs
+install: install_h .WAIT $(SUBDIRS)
+
+install_h: $(ROOTFMHDRS)
+
+check: $(CHECKHDRS)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
+
+include ../../Makefile.targ
+include ../Makefile.targ

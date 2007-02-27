@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -26,25 +25,37 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.lib
+LIBRARY = libfmd_msg.a
+VERS = .1
 
-sparc_SUBDIRS = \
-	libmdesc \
-	libldom
+LIBSRCS = fmd_msg.c
+OBJECTS = $(LIBSRCS:%.c=%.o)
 
-i386_SUBDIRS =
+include ../../../Makefile.lib
+include ../../Makefile.lib
 
-SUBDIRS = \
-	libdiagcode \
-	libfmd_adm \
-	libfmd_log \
-	libfmd_msg \
-	libfmd_snmp \
-	$($(MACH)_SUBDIRS) \
-	topo
+SRCS = $(LIBSRCS:%.c=../common/%.c)
+LIBS = $(DYNLIB) $(LINTLIB)
 
-libldom: libmdesc
+SRCDIR =	../common
 
-topo: $($(MACH)_SUBDIRS)
+CPPFLAGS += -I../common -I.
+CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
+CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
+LDLIBS += -lnvpair -lgen -lc
 
-include ./Makefile.subdirs
+LINTFLAGS = -msux
+LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)
+
+$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
+$(LINTLIB) := LINTFLAGS = -nsvx
+$(LINTLIB) := LINTFLAGS64 = -nsvx -Xarch=$(MACH64:sparcv9=v9)
+
+.KEEP_STATE:
+
+all: $(LIBS)
+
+lint: $(LINTLIB) lintcheck
+
+include ../../../Makefile.targ
+include ../../Makefile.targ

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,6 +38,7 @@ f none usr/include/fm/fmd_adm.h 644 root bin
 f none usr/include/fm/fmd_api.h 644 root bin
 f none usr/include/fm/fmd_fmri.h 644 root bin
 f none usr/include/fm/fmd_log.h 644 root bin
+f none usr/include/fm/fmd_msg.h 644 root bin
 f none usr/include/fm/fmd_snmp.h 644 root bin
 f none usr/include/fm/libtopo.h 644 root bin
 f none usr/include/fm/topo_mod.h 644 root bin
@@ -98,6 +99,10 @@ f none usr/lib/fm/libfmd_log.so.1 755 root bin
 s none usr/lib/fm/libfmd_log.so=libfmd_log.so.1
 f none usr/lib/fm/llib-lfmd_log 644 root bin
 f none usr/lib/fm/llib-lfmd_log.ln 644 root bin
+f none usr/lib/fm/libfmd_msg.so.1 755 root bin
+s none usr/lib/fm/libfmd_msg.so=libfmd_msg.so.1
+f none usr/lib/fm/llib-lfmd_msg 644 root bin
+f none usr/lib/fm/llib-lfmd_msg.ln 644 root bin
 f none usr/lib/fm/libfmd_snmp.so.1 755 root bin
 s none usr/lib/fm/libfmd_snmp.so=libfmd_snmp.so.1
 f none usr/lib/fm/llib-lfmd_snmp 644 root bin

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #include <sys/fm/protocol.h>
 #include <fm/fmd_api.h>
 #include <fm/fmd_snmp.h>
+#include <fm/fmd_msg.h>
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
 #include <net-snmp/agent/net-snmp-agent-includes.h>
@@ -166,11 +167,12 @@ send_trap(fmd_hdl_t *hdl, const char *uuid, const char *code, const char *url)
 static void
 snmp_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 {
-	char *uuid, *code, *dict, *url, *urlcode, *p;
+	char *uuid, *code, *dict, *url, *urlcode, *locdir, *p;
 	boolean_t domsg;
 
 	uint8_t version;
 	char *olang = NULL;
+	int locale_c = 0;
 	size_t len;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
@@ -204,8 +206,10 @@ snmp_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	(void) strncpy(dict, code, (size_t)(p - code));
 	dict[(size_t)(p - code)] = '\0';
 
+	fmd_msg_lock();
+
 	if (snmp_locdir != NULL)
-		(void) bindtextdomain(dict, snmp_locdir);
+		locdir = bindtextdomain(dict, snmp_locdir);
 
 	if ((url = dgettext(dict, SNMP_URL)) == SNMP_URL) {
 		/*
@@ -213,8 +217,11 @@ snmp_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		 * current language.  Fall back to C and try again.
 		 */
 		olang = setlocale(LC_MESSAGES, NULL);
-		fmd_hdl_debug(hdl, "dgettext(%s, %s) in %s failed; trying C\n",
-		    dict, SNMP_URL, olang);
+		if (olang) {
+			p = alloca(strlen(olang) + 1);
+			olang = strcpy(p, olang);
+		}
+		locale_c = 1;
 		(void) setlocale(LC_MESSAGES, "C");
 		if ((url = dgettext(dict, SNMP_URL)) == SNMP_URL)
 			url = snmp_url;
@@ -243,6 +250,19 @@ snmp_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	 */
 	if (olang != NULL)
 		(void) setlocale(LC_MESSAGES, olang);
+
+	if (snmp_locdir != NULL)
+		(void) bindtextdomain(dict, locdir);
+
+	fmd_msg_unlock();
+
+	if (locale_c) {
+		fmd_hdl_debug(hdl,
+		    url == snmp_url ?
+		    "dgettext(%s, %s) in %s and C failed\n" :
+		    "dgettext(%s, %s) in %s failed; C used\n",
+		    dict, SNMP_URL, olang ? olang : "<null>");
+	}
 }
 
 static int
@@ -310,7 +330,7 @@ static const fmd_hdl_info_t fmd_info = {
 void
 _fmd_init(fmd_hdl_t *hdl)
 {
-	char *rootdir, *locdir;
+	char *rootdir, *locdir, *locale, *p;
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0)
 		return; /* invalid data in configuration file */
@@ -334,8 +354,17 @@ _fmd_init(fmd_hdl_t *hdl)
 	    "NLSPATH=/usr/lib/fm/fmd/fmd.cat", FMD_SLEEP)) != 0)
 		fmd_hdl_abort(hdl, "snmp-trapgen failed to set NLSPATH");
 
+	fmd_msg_lock();
 	(void) setlocale(LC_MESSAGES, "");
-	fmd_hdl_debug(hdl, "locale=%s\n", setlocale(LC_MESSAGES, NULL));
+	locale = setlocale(LC_MESSAGES, NULL);
+	if (locale) {
+		p = alloca(strlen(locale) + 1);
+		locale = strcpy(p, locale);
+	} else {
+		locale = "<null>";
+	}
+	fmd_msg_unlock();
+	fmd_hdl_debug(hdl, "locale=%s\n", locale);
 
 	/*
 	 * Cache any properties we use every time we receive an event and
@@ -352,13 +381,19 @@ _fmd_init(fmd_hdl_t *hdl)
 	 */
 	rootdir = fmd_prop_get_string(hdl, "fmd.rootdir");
 
-	if (*rootdir != '\0' && strcmp(rootdir, "/") != 0 &&
-	    (locdir = bindtextdomain(SNMP_DOMAIN, NULL)) != NULL) {
-		size_t len = strlen(rootdir) + strlen(locdir) + 1;
-		snmp_locdir = fmd_hdl_alloc(hdl, len, FMD_SLEEP);
-		(void) snprintf(snmp_locdir, len, "%s%s", rootdir, locdir);
-		(void) bindtextdomain(SNMP_DOMAIN, snmp_locdir);
-		fmd_hdl_debug(hdl, "binding textdomain to %s\n", snmp_locdir);
+	if (*rootdir != '\0' && strcmp(rootdir, "/") != 0) {
+		fmd_msg_lock();
+		locdir = bindtextdomain(SNMP_DOMAIN, NULL);
+		fmd_msg_unlock();
+		if (locdir != NULL) {
+			size_t len = strlen(rootdir) + strlen(locdir) + 1;
+			snmp_locdir = fmd_hdl_alloc(hdl, len, FMD_SLEEP);
+			(void) snprintf(snmp_locdir, len, "%s%s", rootdir,
+			    locdir);
+			fmd_hdl_debug(hdl,
+			    "binding textdomain to %s for snmp\n",
+			    snmp_locdir);
+		}
 	}
 
 	fmd_prop_free_string(hdl, rootdir);

@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -26,25 +25,6 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.lib
+include ../Makefile.com
 
-sparc_SUBDIRS = \
-	libmdesc \
-	libldom
-
-i386_SUBDIRS =
-
-SUBDIRS = \
-	libdiagcode \
-	libfmd_adm \
-	libfmd_log \
-	libfmd_msg \
-	libfmd_snmp \
-	$($(MACH)_SUBDIRS) \
-	topo
-
-libldom: libmdesc
-
-topo: $($(MACH)_SUBDIRS)
-
-include ./Makefile.subdirs
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
