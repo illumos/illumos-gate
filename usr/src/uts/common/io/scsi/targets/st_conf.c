@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2901,6 +2901,90 @@ const struct st_drivetype st_drivetypes[] =
     {0x80, 0x80, 0x80, 0x80}, /* .densities       Density codes [Note 1]      */
     MT_DENSITY4,              /* .default_density (.densities[x])             */
     {0, 0, 0, 0}              /* .speeds          Speed codes [Note 2]        */
+  },
+
+  /*
+   * [1] The IBM Ultrium Gen 4 "OEM" version has two densites at this time,
+   *     One for Gen 3 0x44, One for Gen 4 0x46.
+   *     This drive is configured with ST_KNOWS_MEDIA.
+   *     That means that it will look at the mediatype from the mode sense
+   *     to select the density code. The compression will be selected based
+   *     on the minor node the user opened.
+   * [2] The IBM LTO reports a medium type that is used to select the density.
+   */
+  {                           /* Structure member Description                 */
+                              /* ---------------- -----------                 */
+    "IBM Ultrium Gen 4 LTO",  /* .name            Display ("pretty") name     */
+    19,                       /* .length          Length of next item...      */
+    "IBM     ULTRIUM-TD4",    /* .vid             Vendor-product ID string    */
+    MT_LTO,                   /* .type            Numeric type (cf. mtio.h)   */
+    0,                        /* .bsize           Block size (0 = variable)   */
+                              /* .options         Drive option flags:         */
+    ST_VARIABLE         |     /*  0000001           Supports variable length  */
+    ST_BSF              |     /*  0000008           Supports SPACE block fwd  */
+    ST_BSR              |     /*  0000010           Supports SPACE block rev  */
+    ST_KNOWS_EOD        |     /*  0000200           Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*  0000400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP    |     /*  0010000           [Note 1]                  */
+    ST_KNOWS_MEDIA      |     /*  0800000         Media detrmines density     */
+    ST_WORMABLE,              /*  1000000         Is WORM capable             */
+                              /*  -------                                     */
+                              /*  1818619                                     */
+    -1,                       /* .max_rretries    Not used any more.          */
+    -1,                       /* .max_wretries    Not used any more.          */
+    {0x44, 0x44, 0x46, 0x46}, /* .densities       Density codes [Note 1]      */
+    MT_DENSITY4,              /* .default_density (.densities[x])             */
+    {0x38, 0x38, 0x48, 0x48}, /* .mediatype       Media type  [Note 2]        */
+    MINUTES(1),               /* .non_motion_time                             */
+    MINUTES(23),              /* .io_time                                     */
+    MINUTES(9),               /* .rewind_time                                 */
+    MINUTES(183),             /* .space_time      worst case directory invalid*/
+    MINUTES(9),               /* .load_time                                   */
+    MINUTES(13),              /* .unload_time                                 */
+    MINUTES(180)              /* .erase_time                                  */
+  },
+
+  /*
+   * [1] The IBM Ultrium Gen 4 "IBM" version has two densites at this time,
+   *     One for Gen 3 0x44, one for Gen 4 0x46.
+   *     This drive is configured with ST_KNOWS_MEDIA.
+   *     That means that it will look at the mediatype from the mode sense
+   *     to select the density code. The compression will be selected based
+   *     on the minor node the user opened.
+   * [2] The IBM LTO reports a medium type that is used to select the density.
+   */
+  {                           /* Structure member Description                 */
+                              /* ---------------- -----------                 */
+    "IBM Ultrium Gen 4 LTO",  /* .name            Display ("pretty") name     */
+    19,                       /* .length          Length of next item...      */
+    "IBM     ULT3580-TD4",    /* .vid             Vendor-product ID string    */
+    MT_LTO,                   /* .type            Numeric type (cf. mtio.h)   */
+    0,                        /* .bsize           Block size (0 = variable)   */
+                              /* .options         Drive option flags:         */
+    ST_VARIABLE         |     /*  0000001           Supports variable length  */
+    ST_BSF              |     /*  0000008           Supports SPACE block fwd  */
+    ST_BSR              |     /*  0000010           Supports SPACE block rev  */
+    ST_KNOWS_EOD        |     /*  0000200           Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*  0000400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP    |     /*  0010000           [Note 1]                  */
+    ST_KNOWS_MEDIA      |     /*  0800000         Media detrmines density     */
+    ST_WORMABLE,              /*  1000000         Is WORM capable             */
+                              /*  -------                                     */
+                              /*  1818619                                     */
+    -1,                       /* .max_rretries    Not used any more.          */
+    -1,                       /* .max_wretries    Not used any more.          */
+    {0x44, 0x44, 0x46, 0x46}, /* .densities       Density codes [Note 1]      */
+    MT_DENSITY4,              /* .default_density (.densities[x])             */
+    {0x38, 0x38, 0x48, 0x48}, /* .mediatype       Media type  [Note 2]        */
+    MINUTES(1),               /* .non_motion_time                             */
+    MINUTES(23),              /* .io_time                                     */
+    MINUTES(9),               /* .rewind_time                                 */
+    MINUTES(183),             /* .space_time      worst case directory invalid*/
+    MINUTES(9),               /* .load_time                                   */
+    MINUTES(13),              /* .unload_time                                 */
+    MINUTES(180)              /* .erase_time                                  */
   },
 
   /*
