@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -1164,11 +1164,13 @@ input_route(in_addr_t dst,			/* network order */
 		 * then note it.
 		 */
 		if (i == rt->rt_num_spares) {
+			uint8_t old_metric = rts->rts_metric;
+
 			rtchange(rt, rt->rt_state | rt_state, new, 0);
 			/*
 			 * If the route got worse, check for something better.
 			 */
-			if (new->rts_metric != rts->rts_metric)
+			if (new->rts_metric != old_metric)
 				rtswitch(rt, 0);
 			return;
 		}

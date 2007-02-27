@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -2465,6 +2465,7 @@ rtdelete(struct rt_entry *rt)
 			free(deleted_rt);
 	}
 	total_routes--;
+	free(rt->rt_spares);
 	free(rt);
 
 	if (dst_sock.sin_addr.s_addr == RIP_DEFAULT) {
