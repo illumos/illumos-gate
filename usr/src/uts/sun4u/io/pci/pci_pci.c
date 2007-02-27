@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -952,8 +952,10 @@ ppb_initchild(dev_info_t *child)
 	 * errors.
 	 */
 	if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
-		if (pcie_init_ppd(child) == NULL)
+		if (pcie_init_ppd(child) == NULL) {
+			pci_config_teardown(&config_handle);
 			return (DDI_FAILURE);
+		}
 	}
 
 	/*
@@ -968,8 +970,7 @@ ppb_initchild(dev_info_t *child)
 		    "Workaround: value = %x\n", n);
 		pcix_set_cmd_reg(child, n);
 	}
-
-	/* since cached, teardown config handle in ppb_uninitchild() */
+	pci_config_teardown(&config_handle);
 	return (DDI_SUCCESS);
 }
 
