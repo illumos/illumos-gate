@@ -662,11 +662,13 @@ px_err_cb_intr(caddr_t arg)
 	derr.fme_flag = DDI_FM_ERR_UNEXPECTED;
 
 	mutex_enter(&px_p->px_fm_mutex);
+	px_p->px_fm_mutex_owner = curthread;
 
 	err = px_err_cmn_intr(px_p, &derr, PX_INTR_CALL, PX_FM_BLOCK_HOST);
 	(void) px_lib_intr_setstate(rpdip, px_fault_p->px_fh_sysino,
 	    INTR_IDLE_STATE);
 
+	px_p->px_fm_mutex_owner = NULL;
 	mutex_exit(&px_p->px_fm_mutex);
 
 	px_err_panic(err, PX_HB, PX_NO_ERROR);
@@ -700,6 +702,7 @@ px_err_dmc_pec_intr(caddr_t arg)
 	derr.fme_flag = DDI_FM_ERR_UNEXPECTED;
 
 	mutex_enter(&px_p->px_fm_mutex);
+	px_p->px_fm_mutex_owner = curthread;
 
 	/* send ereport/handle/clear fire registers */
 	rc_err = px_err_cmn_intr(px_p, &derr, PX_INTR_CALL, PX_FM_BLOCK_PCIE);
@@ -714,6 +717,7 @@ px_err_dmc_pec_intr(caddr_t arg)
 	(void) px_lib_intr_setstate(rpdip, px_fault_p->px_fh_sysino,
 	    INTR_IDLE_STATE);
 
+	px_p->px_fm_mutex_owner = NULL;
 	mutex_exit(&px_p->px_fm_mutex);
 
 	px_err_panic(rc_err, PX_RC, fab_err);

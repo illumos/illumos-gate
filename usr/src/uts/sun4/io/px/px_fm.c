@@ -232,6 +232,7 @@ px_bus_exit(dev_info_t *dip, ddi_acc_handle_t handle)
 int
 px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 {
+	dev_info_t	*pdip = ddi_get_parent(dip);
 	px_t		*px_p = (px_t *)impl_data;
 	int		i, acc_type = 0;
 	int		lookup, rc_err, fab_err = PF_NO_PANIC;
@@ -240,13 +241,24 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	px_ranges_t	*ranges_p;
 	int		range_len;
 
+	/*
+	 * If the current thread already owns the px_fm_mutex, then we
+	 * have encountered an error while processing a previous
+	 * error.  Attempting to take the mutex again will cause the
+	 * system to deadlock.
+	 */
+	if (px_p->px_fm_mutex_owner == curthread)
+		return (DDI_FM_FATAL);
+
+	i_ddi_fm_handler_exit(pdip);
 	mutex_enter(&px_p->px_fm_mutex);
+	px_p->px_fm_mutex_owner = curthread;
 
 	addr_high = (uint32_t)((uint64_t)derr->fme_bus_specific >> 32);
 	addr_low = (uint32_t)((uint64_t)derr->fme_bus_specific);
 
 	/*
-	 * Make sure this failed load came from this PCIe port.  Check by
+	 * Make sure this failed load came from this PCIe port.	 Check by
 	 * matching the upper 32 bits of the address with the ranges property.
 	 */
 	range_len = px_p->px_ranges_length / sizeof (px_ranges_t);
@@ -271,7 +283,9 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 
 	/* This address doesn't belong to this leaf, just return with OK */
 	if (!acc_type) {
+		px_p->px_fm_mutex_owner = NULL;
 		mutex_exit(&px_p->px_fm_mutex);
+		i_ddi_fm_handler_enter(pdip);
 		return (DDI_FM_OK);
 	}
 
@@ -289,7 +303,9 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 		    &px_p->px_dq_tail);
 	}
 
+	px_p->px_fm_mutex_owner = NULL;
 	mutex_exit(&px_p->px_fm_mutex);
+	i_ddi_fm_handler_enter(pdip);
 
 	if ((rc_err & (PX_PANIC | PX_PROTECTED)) || (fab_err & PF_PANIC) ||
 	    (lookup == PF_HDL_NOTFOUND))
@@ -320,6 +336,7 @@ px_err_fabric_intr(px_t *px_p, msgcode_t msg_code, pcie_req_id_t rid)
 	ddi_fm_error_t	derr;
 
 	mutex_enter(&px_p->px_fm_mutex);
+	px_p->px_fm_mutex_owner = curthread;
 
 	/* Create the derr */
 	bzero(&derr, sizeof (ddi_fm_error_t));
@@ -338,6 +355,7 @@ px_err_fabric_intr(px_t *px_p, msgcode_t msg_code, pcie_req_id_t rid)
 		    &px_p->px_dq_tail);
 	}
 
+	px_p->px_fm_mutex_owner = NULL;
 	mutex_exit(&px_p->px_fm_mutex);
 
 	px_err_panic(rc_err, PX_RC, fab_err);

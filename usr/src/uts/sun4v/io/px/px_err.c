@@ -204,6 +204,7 @@ px_err_intr(px_fault_t *fault_p, px_rc_err_t *epkt)
 	ddi_fm_error_t	derr;
 
 	mutex_enter(&px_p->px_fm_mutex);
+	px_p->px_fm_mutex_owner = curthread;
 
 	/* Create the derr */
 	bzero(&derr, sizeof (ddi_fm_error_t));
@@ -225,10 +226,12 @@ px_err_intr(px_fault_t *fault_p, px_rc_err_t *epkt)
 	/* Set the intr state to idle for the leaf that received the mondo */
 	if (px_lib_intr_setstate(rpdip, fault_p->px_fh_sysino,
 		INTR_IDLE_STATE) != DDI_SUCCESS) {
+		px_p->px_fm_mutex_owner = NULL;
 		mutex_exit(&px_p->px_fm_mutex);
 		return (DDI_INTR_UNCLAIMED);
 	}
 
+	px_p->px_fm_mutex_owner = NULL;
 	mutex_exit(&px_p->px_fm_mutex);
 
 	switch (epkt->rc_descr.block) {

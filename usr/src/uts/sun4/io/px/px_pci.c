@@ -321,6 +321,9 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	ddi_acc_handle_t	config_handle;
 	char			device_type[8];
 	uint16_t		cap_ptr;
+#ifdef PX_PLX
+	uint_t			bus_num, primary, secondary;
+#endif /* PX_PLX */
 
 	instance = ddi_get_instance(devi);
 
@@ -459,6 +462,28 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pxb->pxb_hotplug_capable = B_FALSE;
 
 #ifdef PX_PLX
+	/*
+	 * Due to a PLX HW bug we need to disable the receiver error CE on all
+	 * ports. To this end we create a property "pcie_ce_mask" with value
+	 * set to PCIE_AER_CE_RECEIVER_ERR. The pcie module will check for this
+	 * property before setting the AER CE mask.
+	 */
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, pxb->pxb_dip,
+		"pcie_ce_mask", PCIE_AER_CE_RECEIVER_ERR);
+
+	/*
+	 * There is a bug in the PLX 8114 bridge, such that an 8-bit
+	 * write to the secondary bus number register will corrupt an
+	 * internal shadow copy of the primary bus number.  Reading
+	 * out the registers and writing the same values back as
+	 * 16-bits resolves the problem.  This bug was reported by
+	 * PLX as errata #19.
+	 */
+	primary = pci_config_get8(config_handle, PCI_BCNF_PRIBUS);
+	secondary = pci_config_get8(config_handle, PCI_BCNF_SECBUS);
+	bus_num = (secondary << 8) | primary;
+	pci_config_put16(config_handle, PCI_BCNF_PRIBUS, bus_num);
+
 	if (pxb->pxb_rev_id <= PXB_DEVICE_PLX_AA_REV)
 		goto hotplug_done;
 #endif /* PX_PLX */
@@ -515,17 +540,6 @@ hotplug_done:
 		goto fail;
 	}
 	pxb->pxb_init_flags |= PXB_INIT_FM;
-
-#ifdef PX_PLX
-	/*
-	 * Due to a PLX HW bug we need to disable the receiver error CE on all
-	 * ports. To this end we create a property "pcie_ce_mask" with value
-	 * set to PCIE_AER_CE_RECEIVER_ERR. The pcie module will check for this
-	 * property before setting the AER CE mask.
-	 */
-	(void) ddi_prop_update_int(DDI_DEV_T_NONE, pxb->pxb_dip,
-		"pcie_ce_mask", PCIE_AER_CE_RECEIVER_ERR);
-#endif /* PX_PLX */
 
 	ddi_report_dev(devi);
 

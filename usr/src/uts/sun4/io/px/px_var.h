@@ -128,6 +128,7 @@ struct px {
 	/* FMA */
 	int		px_fm_cap;
 	kmutex_t	px_fm_mutex;
+	kthread_t	*px_fm_mutex_owner;
 	ddi_iblock_cookie_t px_fm_ibc;
 
 	uint32_t	px_dev_caps;
