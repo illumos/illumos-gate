@@ -2576,10 +2576,11 @@ getldap_init()
 static void
 perform_update(void)
 {
-	ns_ldap_error_t	*error;
+	ns_ldap_error_t	*error = NULL;
 	struct timeval	tp;
 	char		buf[20];
 	int		rc, rc1;
+	void		**paramVal = NULL;
 	ns_ldap_self_gssapi_config_t	config;
 
 	if (current_admin.debug_level >= DBG_ALL) {
@@ -2591,43 +2592,62 @@ perform_update(void)
 	if (gettimeofday(&tp, NULL) != 0)
 		return;
 
-	/*
-	 * set the profile TTL parameter, just
-	 * in case that the downloading of
-	 * the profile from server would fail
-	 */
+	rc = __ns_ldap_getParam(NS_LDAP_CACHETTL_P, &paramVal, &error);
+
+	if (rc == NS_LDAP_SUCCESS && paramVal != NULL) {
+		current_admin.ldap_stat.ldap_ttl = atol((char *)*paramVal);
+	}
+
+	if (error != NULL)
+		(void) __ns_ldap_freeError(&error);
+
+	if (paramVal != NULL)
+		(void) __ns_ldap_freeParam(&paramVal);
+
 	if (current_admin.debug_level >= DBG_PROFILE_REFRESH) {
 		logit("perform_update: current profile TTL is %d seconds\n",
-			current_admin.ldap_stat.ldap_ttl);
-	}
-	/*
-	 * NS_LDAP_EXP_P is a no op for __ns_ldap_setParam
-	 * It depends on NS_LDAP_CACHETTL_P to set it's value
-	 * Set NS_LDAP_CACHETTL_P here so NS_LDAP_EXP_P value
-	 * can be set.
-	 * NS_LDAP_CACHETTL_P value can be reset after the profile is
-	 * downloaded from the server, so is NS_LDAP_EXP_P.
-	 */
-	buf[19] = '\0'; /* null terminated the buffer */
-	if (__ns_ldap_setParam(NS_LDAP_CACHETTL_P,
-		lltostr((long long)current_admin.ldap_stat.ldap_ttl, &buf[19]),
-		&error) != NS_LDAP_SUCCESS) {
-		logit("Error: __ns_ldap_setParam failed, status: %d "
-			"message: %s\n", error->status, error->message);
-		(void)  __ns_ldap_freeError(&error);
-		return;
+		    current_admin.ldap_stat.ldap_ttl);
 	}
 
-	(void) rw_wrlock(&ldap_lock);
-	sighup_update = FALSE;
-	(void) rw_unlock(&ldap_lock);
+	if (current_admin.ldap_stat.ldap_ttl > 0) {
+		/*
+		 * set the profile TTL parameter, just
+		 * in case that the downloading of
+		 * the profile from server would fail
+		 */
 
-	do {
-		rc = update_from_profile();
-		if (rc != 0) {
-			logit("Error: Unable to update from profile\n");
+		/*
+		 * NS_LDAP_EXP_P is a no op for __ns_ldap_setParam
+		 * It depends on NS_LDAP_CACHETTL_P to set it's value
+		 * Set NS_LDAP_CACHETTL_P here so NS_LDAP_EXP_P value
+		 * can be set.
+		 * NS_LDAP_CACHETTL_P value can be reset after the profile is
+		 * downloaded from the server, so is NS_LDAP_EXP_P.
+		 */
+		buf[19] = '\0'; /* null terminated the buffer */
+		if (__ns_ldap_setParam(NS_LDAP_CACHETTL_P,
+			lltostr((long long)current_admin.ldap_stat.ldap_ttl,
+			    &buf[19]),
+			&error) != NS_LDAP_SUCCESS) {
+			logit("Error: __ns_ldap_setParam failed, status: %d "
+			    "message: %s\n", error->status, error->message);
+			(void)  __ns_ldap_freeError(&error);
+			return;
 		}
-	} while (checkupdate(sighup_update) == TRUE);
+
+		(void) rw_wrlock(&ldap_lock);
+		sighup_update = FALSE;
+		(void) rw_unlock(&ldap_lock);
+
+		do {
+			rc = update_from_profile();
+			if (rc != 0) {
+				logit("Error: Unable to update from profile\n");
+			}
+		} while (checkupdate(sighup_update) == TRUE);
+	} else {
+		rc = 0;
+	}
 
 	/*
 	 * recreate the server info list
