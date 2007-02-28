@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -419,7 +419,6 @@ struct async_flt;
  */
 void	syncfpu(void);
 
-void	cpu_flush_ecache(void);
 void	cpu_faulted_enter(struct cpu *);
 void	cpu_faulted_exit(struct cpu *);
 

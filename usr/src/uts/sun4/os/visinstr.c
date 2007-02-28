@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,6 @@
 #include <sys/debug.h>
 #include <sys/cpu_module.h>
 #include <sys/systm.h>
-#include <sys/machsystm.h>
 
 #define	FPU_REG_FIELD uint32_reg	/* Coordinate with FPU_REGS_TYPE. */
 #define	FPU_DREG_FIELD uint64_reg	/* Coordinate with FPU_DREGS_TYPE. */
@@ -1692,9 +1691,8 @@ vis_short_fls(
 
 /*
  * Simulator for block loads and stores between floating-point unit and memory.
- * XXX - OK, so it is really gross to flush the whole Ecache for a block commit
- *	 store - but the circumstances under which this code actually gets
- *	 used in real life are so obscure that you can live with it!
+ * We pass the addrees of ea to sync_data_memory() to flush the Ecache.
+ * Sync_data_memory() calls platform dependent code to flush the Ecache.
  */
 static enum ftt_type
 vis_blk_fldst(
@@ -1764,7 +1762,7 @@ vis_blk_fldst(
 	case ASI_BLK_COMMIT_P:
 	case ASI_BLK_COMMIT_S:
 		if ((inst.op3 & 7) == 3) {	/* lddf */
-		    for (i = 0; i < 8; i++, ea += 8, nrd += 2) {
+		    for (i = 0; i < 8; i++, nrd += 2) {
 			ftt = _fp_read_extword((uint64_t *)ea, &k.ll, pfpsd);
 			if (ftt != ftt_none)
 				return (ftt);
@@ -1774,9 +1772,10 @@ vis_blk_fldst(
 				k.ll = l.ll;
 			}
 			_fp_pack_extword(pfpsd, &k.f.FPU_DREG_FIELD, nrd);
+			ea += 8;
 		    }
 		} else {			/* stdf */
-		    for (i = 0; i < 8; i++, ea += 8, nrd += 2) {
+		    for (i = 0; i < 8; i++, nrd += 2) {
 			_fp_unpack_extword(pfpsd, &k.f.FPU_DREG_FIELD, nrd);
 			if (little_endian) {
 				for (j = 0, h = 7; j < 8; j++, h--)
@@ -1786,10 +1785,11 @@ vis_blk_fldst(
 			ftt = _fp_write_extword((uint64_t *)ea, k.ll, pfpsd);
 			if (ftt != ftt_none)
 				return (ftt);
+			ea += 8;
 		    }
 		}
 		if ((asi == ASI_BLK_COMMIT_P) || (asi == ASI_BLK_COMMIT_S))
-			cpu_flush_ecache();
+			sync_data_memory((caddr_t)(ea - 64), 64);
 		break;
 	default:
 		/* addr of unimp inst */

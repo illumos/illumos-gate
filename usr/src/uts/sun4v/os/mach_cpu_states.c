@@ -879,11 +879,6 @@ syncfpu(void)
 }
 
 void
-cpu_flush_ecache(void)
-{
-}
-
-void
 sticksync_slave(void)
 {}
 

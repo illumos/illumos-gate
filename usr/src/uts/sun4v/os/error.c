@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -603,14 +603,20 @@ mem_scrub(uint64_t paddr, uint64_t len)
  * Returns the total number of bytes flushed.
  */
 uint64_t
-mem_sync(caddr_t va, size_t len)
+mem_sync(caddr_t orig_va, size_t orig_len)
 {
 	uint64_t pa, length, flushed;
 	uint64_t chunk_len = MMU_PAGESIZE;
 	uint64_t total_flushed = 0;
+	uint64_t va, len;
 
-	if (((uint64_t)va | (uint64_t)len) & MMU_PAGEOFFSET)
+	if (orig_len == 0)
 		return (total_flushed);
+
+	/* align va */
+	va = P2ALIGN_TYPED(orig_va, MMU_PAGESIZE, uint64_t);
+	/* round up len to MMU_PAGESIZE aligned */
+	len = P2ROUNDUP_TYPED(orig_va + orig_len, MMU_PAGESIZE, uint64_t) - va;
 
 	while (len > 0) {
 		pa = va_to_pa((caddr_t)va);
