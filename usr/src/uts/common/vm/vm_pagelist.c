@@ -4168,14 +4168,15 @@ void
 page_set_colorequiv_arr(void)
 {
 	if (colorequiv > 1) {
-		uint_t colors;
 		int i;
-		int a = lowbit(colorequiv) - 1;
+		uint_t sv_a = lowbit(colorequiv) - 1;
 
-		if (a > 15)
-			a = 15;
+		if (sv_a > 15)
+			sv_a = 15;
 
 		for (i = 0; i < MMU_PAGE_SIZES; i++) {
+			uint_t colors;
+			uint_t a = sv_a;
 
 			if ((colors = hw_page_array[i].hp_colors) <= 1) {
 				continue;

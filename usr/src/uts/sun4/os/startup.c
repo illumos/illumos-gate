@@ -752,6 +752,9 @@ static size_t boot_physinstalled_len, boot_physavail_len, boot_virtavail_len;
 pgcnt_t	tune_npages = (pgcnt_t)
 	(MB_TO_BYTES(MINMOVE_RAM_MB)/ (size_t)MMU_PAGESIZE);
 
+#pragma weak page_set_colorequiv_arr_cpu
+extern void page_set_colorequiv_arr_cpu(void);
+
 static void
 startup_memlist(void)
 {
@@ -1530,7 +1533,10 @@ startup_memlist(void)
 	/*
 	 * Factor in colorequiv to check additional 'equivalent' bins
 	 */
-	page_set_colorequiv_arr();
+	if (&page_set_colorequiv_arr_cpu != NULL)
+		page_set_colorequiv_arr_cpu();
+	else
+		page_set_colorequiv_arr();
 
 	/*
 	 * Initialize bp_mapin().

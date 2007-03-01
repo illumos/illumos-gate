@@ -462,3 +462,40 @@ page_coloring_init_cpu()
 		hw_page_array[i].hp_colors = 1 << 5;
 	}
 }
+
+/*
+ * group colorequiv colors on N2 by low order bits of the color first
+ */
+void
+page_set_colorequiv_arr_cpu(void)
+{
+	static uint_t nequiv_shades_log2[MMU_PAGE_SIZES] = {2, 5, 0, 0, 0, 0};
+
+	if (colorequiv > 1) {
+		int i;
+		uint_t sv_a = lowbit(colorequiv) - 1;
+
+		if (sv_a > 15)
+			sv_a = 15;
+
+		for (i = 0; i < MMU_PAGE_SIZES; i++) {
+			uint_t colors;
+			uint_t a = sv_a;
+
+			if ((colors = hw_page_array[i].hp_colors) <= 1)
+				continue;
+			while ((colors >> a) == 0)
+				a--;
+			if (a > (colorequivszc[i] & 0xf) +
+			    (colorequivszc[i] >> 4)) {
+				if (a <= nequiv_shades_log2[i]) {
+					colorequivszc[i] = a;
+				} else {
+					colorequivszc[i] =
+					    ((a - nequiv_shades_log2[i]) << 4) |
+					    nequiv_shades_log2[i];
+				}
+			}
+		}
+	}
+}
