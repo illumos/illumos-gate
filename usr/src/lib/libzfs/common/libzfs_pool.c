@@ -132,45 +132,6 @@ zpool_name_valid(libzfs_handle_t *hdl, boolean_t isopen, const char *pool)
 }
 
 /*
- * Set the pool-wide health based on the vdev state of the root vdev.
- */
-int
-set_pool_health(nvlist_t *config)
-{
-	nvlist_t *nvroot;
-	vdev_stat_t *vs;
-	uint_t vsc;
-	char *health;
-
-	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-	    &nvroot) == 0);
-	verify(nvlist_lookup_uint64_array(nvroot, ZPOOL_CONFIG_STATS,
-	    (uint64_t **)&vs, &vsc) == 0);
-
-	switch (vs->vs_state) {
-
-	case VDEV_STATE_CLOSED:
-	case VDEV_STATE_CANT_OPEN:
-	case VDEV_STATE_OFFLINE:
-		health = dgettext(TEXT_DOMAIN, "FAULTED");
-		break;
-
-	case VDEV_STATE_DEGRADED:
-		health = dgettext(TEXT_DOMAIN, "DEGRADED");
-		break;
-
-	case VDEV_STATE_HEALTHY:
-		health = dgettext(TEXT_DOMAIN, "ONLINE");
-		break;
-
-	default:
-		abort();
-	}
-
-	return (nvlist_add_string(config, ZPOOL_CONFIG_POOL_HEALTH, health));
-}
-
-/*
  * Open a handle to the given pool, even if the pool is currently in the FAULTED
  * state.
  */

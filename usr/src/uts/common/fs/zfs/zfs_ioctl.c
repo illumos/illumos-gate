@@ -869,7 +869,7 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 			if (error == 0)
 				continue;
 			else
-				break;
+				return (error);
 		}
 
 		/*

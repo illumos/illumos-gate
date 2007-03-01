@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -288,11 +288,6 @@ zpool_refresh_stats(zpool_handle_t *zhp, boolean_t *missing)
 	zcmd_free_nvlists(&zc);
 
 	zhp->zpool_config_size = zc.zc_nvlist_dst_size;
-
-	if (set_pool_health(config) != 0) {
-		nvlist_free(config);
-		return (no_memory(zhp->zpool_hdl));
-	}
 
 	if (zhp->zpool_config != NULL) {
 		uint64_t oldtxg, newtxg;

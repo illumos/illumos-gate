@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -743,7 +743,6 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 	int	found = 0;
 	char	*dname = NULL;
 
-
 	*errp = 0;
 	*msg = NULL;
 
@@ -889,6 +888,16 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 				    by, data, msg, &found, errp) != 0) {
 					if (*errp)
 						goto out;
+				}
+				break;
+
+			case DM_WHO_ZPOOL_SPARE:
+				if (strcmp(by, DM_USE_SPARE_ZPOOL) != 0) {
+					if (build_usage_string(dname, by,
+					    data, msg, &found, errp) != 0) {
+						if (*errp)
+							goto out;
+					}
 				}
 				break;
 

@@ -157,7 +157,6 @@ extern zfs_prop_t zfs_prop_iter(zfs_prop_f, void *, boolean_t);
 #define	ZPOOL_CONFIG_POOL_GUID		"pool_guid"
 #define	ZPOOL_CONFIG_CREATE_TXG		"create_txg"
 #define	ZPOOL_CONFIG_TOP_GUID		"top_guid"
-#define	ZPOOL_CONFIG_POOL_HEALTH	"pool_health"
 #define	ZPOOL_CONFIG_VDEV_TREE		"vdev_tree"
 #define	ZPOOL_CONFIG_TYPE		"type"
 #define	ZPOOL_CONFIG_CHILDREN		"children"

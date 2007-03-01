@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,18 +139,12 @@ check_slice(const char *path, int force, boolean_t wholedisk, boolean_t isspare)
 	int error = 0;
 	int ret = 0;
 
-	if (dm_inuse((char *)path, &msg,
-	    force ? DM_WHO_ZPOOL_FORCE : DM_WHO_ZPOOL, &error) || error) {
+	if (dm_inuse((char *)path, &msg, isspare ? DM_WHO_ZPOOL_SPARE :
+	    (force ? DM_WHO_ZPOOL_FORCE : DM_WHO_ZPOOL), &error) || error) {
 		if (error != 0) {
 			libdiskmgt_error(error);
 			return (0);
-		} else if (!isspare ||
-		    strstr(msg, gettext("hot spare")) == NULL) {
-			/*
-			 * The above check is a rather severe hack.  It would
-			 * probably make more sense to have DM_WHO_ZPOOL_SPARE
-			 * instead.
-			 */
+		} else {
 			vdev_error("%s", msg);
 			free(msg);
 			ret = -1;

@@ -310,6 +310,23 @@ usage(boolean_t requested)
 }
 
 const char *
+state_to_health(int vs_state)
+{
+	switch (vs_state) {
+	case VDEV_STATE_CLOSED:
+	case VDEV_STATE_CANT_OPEN:
+	case VDEV_STATE_OFFLINE:
+		return (dgettext(TEXT_DOMAIN, "FAULTED"));
+	case VDEV_STATE_DEGRADED:
+		return (dgettext(TEXT_DOMAIN, "DEGRADED"));
+	case VDEV_STATE_HEALTHY:
+		return (dgettext(TEXT_DOMAIN, "ONLINE"));
+	}
+
+	return (dgettext(TEXT_DOMAIN, "UNKNOWN"));
+}
+
+const char *
 state_to_name(vdev_stat_t *vs)
 {
 	switch (vs->vs_state) {
@@ -954,7 +971,7 @@ show_import(nvlist_t *config)
 	char *msgid;
 	nvlist_t *nvroot;
 	int reason;
-	char *health;
+	const char *health;
 	uint_t vsc;
 	int namewidth;
 
@@ -964,21 +981,20 @@ show_import(nvlist_t *config)
 	    &guid) == 0);
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,
 	    &pool_state) == 0);
-	verify(nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_HEALTH,
-	    &health) == 0);
 	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 	    &nvroot) == 0);
 
 	verify(nvlist_lookup_uint64_array(nvroot, ZPOOL_CONFIG_STATS,
 	    (uint64_t **)&vs, &vsc) == 0);
+	health = state_to_health(vs->vs_state);
 
 	reason = zpool_import_status(config, &msgid);
 
-	(void) printf("  pool: %s\n", name);
-	(void) printf("    id: %llu\n", (u_longlong_t)guid);
-	(void) printf(" state: %s", health);
+	(void) printf(gettext("  pool: %s\n"), name);
+	(void) printf(gettext("    id: %llu\n"), (u_longlong_t)guid);
+	(void) printf(gettext(" state: %s"), health);
 	if (pool_state == POOL_STATE_DESTROYED)
-	    (void) printf(" (DESTROYED)");
+	    (void) printf(gettext(" (DESTROYED)"));
 	(void) printf("\n");
 
 	switch (reason) {
@@ -1029,7 +1045,7 @@ show_import(nvlist_t *config)
 	/*
 	 * Print out an action according to the overall state of the pool.
 	 */
-	if (strcmp(health, gettext("ONLINE")) == 0) {
+	if (vs->vs_state == VDEV_STATE_HEALTHY) {
 		if (reason == ZPOOL_STATUS_VERSION_OLDER)
 			(void) printf(gettext("action: The pool can be "
 			    "imported using its name or numeric identifier, "
@@ -1039,7 +1055,7 @@ show_import(nvlist_t *config)
 			(void) printf(gettext("action: The pool can be "
 			    "imported using its name or numeric "
 			    "identifier.\n"));
-	} else if (strcmp(health, gettext("DEGRADED")) == 0) {
+	} else if (vs->vs_state == VDEV_STATE_DEGRADED) {
 		(void) printf(gettext("action: The pool can be imported "
 		    "despite missing or damaged devices.  The\n\tfault "
 		    "tolerance of the pool may be compromised if imported.\n"));
@@ -1064,7 +1080,13 @@ show_import(nvlist_t *config)
 		}
 	}
 
-	if (strcmp(health, gettext("FAULTED")) != 0) {
+	/*
+	 * If the state is "closed" or "can't open", and the aux state
+	 * is "corrupt data":
+	 */
+	if (((vs->vs_state == VDEV_STATE_CLOSED) ||
+	    (vs->vs_state == VDEV_STATE_CANT_OPEN)) &&
+	    (vs->vs_aux == VDEV_AUX_CORRUPT_DATA)) {
 		if (pool_state == POOL_STATE_DESTROYED)
 			(void) printf(gettext("\tThe pool was destroyed, "
 			    "but can be imported using the '-Df' flags.\n"));
@@ -1086,9 +1108,9 @@ show_import(nvlist_t *config)
 	print_import_config(name, nvroot, namewidth, 0);
 
 	if (reason == ZPOOL_STATUS_BAD_GUID_SUM) {
-		(void) printf("\n\tAdditional devices are known to "
+		(void) printf(gettext("\n\tAdditional devices are known to "
 		    "be part of this pool, though their\n\texact "
-		    "configuration cannot be determined.\n");
+		    "configuration cannot be determined.\n"));
 	}
 }
 
@@ -2733,7 +2755,9 @@ status_callback(zpool_handle_t *zhp, void *data)
 	nvlist_t *config, *nvroot;
 	char *msgid;
 	int reason;
-	char *health;
+	const char *health;
+	uint_t c;
+	vdev_stat_t *vs;
 
 	config = zpool_get_config(zhp, NULL);
 	reason = zpool_get_status(zhp, &msgid);
@@ -2759,8 +2783,11 @@ status_callback(zpool_handle_t *zhp, void *data)
 	else
 		(void) printf("\n");
 
-	verify(nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_HEALTH,
-	    &health) == 0);
+	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvroot) == 0);
+	verify(nvlist_lookup_uint64_array(nvroot, ZPOOL_CONFIG_STATS,
+	    (uint64_t **)&vs, &c) == 0);
+	health = state_to_name(vs);
 
 	(void) printf(gettext("  pool: %s\n"), zpool_get_name(zhp));
 	(void) printf(gettext(" state: %s\n"), health);
@@ -2880,8 +2907,6 @@ status_callback(zpool_handle_t *zhp, void *data)
 		nvlist_t **spares;
 		uint_t nspares;
 
-		verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-		    &nvroot) == 0);
 
 		(void) printf(gettext(" scrub: "));
 		print_scrub_status(nvroot);

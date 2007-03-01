@@ -120,7 +120,6 @@ int changelist_haszonedchild(prop_changelist_t *);
 void remove_mountpoint(zfs_handle_t *);
 
 zfs_handle_t *make_dataset_handle(libzfs_handle_t *, const char *);
-int set_pool_health(nvlist_t *);
 
 int zpool_open_silent(libzfs_handle_t *, const char *, zpool_handle_t **);
 

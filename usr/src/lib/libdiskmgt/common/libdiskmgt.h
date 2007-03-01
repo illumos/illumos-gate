@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,8 @@ typedef enum {
 	DM_WHO_ZPOOL_FORCE,
 	DM_WHO_FORMAT,
 	DM_WHO_SWAP,
-	DM_WHO_DUMP
+	DM_WHO_DUMP,
+	DM_WHO_ZPOOL_SPARE
 } dm_who_type_t;
 
 typedef enum {

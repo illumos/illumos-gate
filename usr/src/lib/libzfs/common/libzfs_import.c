@@ -621,9 +621,6 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
 			}
 		}
 
-		if (set_pool_health(config) != 0)
-			goto nomem;
-
 		/*
 		 * Add this pool to the list of configs.
 		 */
