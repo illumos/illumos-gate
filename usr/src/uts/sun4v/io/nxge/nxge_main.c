@@ -2956,8 +2956,6 @@ nxge_m_stop(void *arg)
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "==> nxge_m_stop"));
 
-	nxge_intrs_disable(nxgep);
-
 	if (nxgep->nxge_timerid) {
 		nxge_stop_timer(nxgep, nxgep->nxge_timerid);
 		nxgep->nxge_timerid = 0;
