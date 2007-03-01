@@ -849,6 +849,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 			NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS) != NDI_SUCCESS) {
 			DEBUG0("Failed to free a bus number\n");
 			rc = PCICFG_FAILURE;
+			kmem_free(bus, k);
 			return (rc);
 		}
 
@@ -863,6 +864,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 		entry->memory_len = 0;
 		entry->pf_memory_len = 0;
 		entry->io_len = 0;
+		kmem_free(bus, k);
 		/* the following will free hole data. */
 		(void) pcicfg_destroy_phdl(new_device);
 	}
@@ -1627,6 +1629,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 				"bus-range", bus_range, 2) != DDI_SUCCESS) {
 			DEBUG0("Failed to set bus-range property");
 			entry->error = PCICFG_FAILURE;
+			(void) pcicfg_config_teardown(&handle);
 			return (DDI_WALK_TERMINATE);
 		}
 
@@ -1666,6 +1669,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 			if (pcicfg_update_ranges_prop(dip, &range[0])) {
 				DEBUG0("Failed to update ranges (i/o)\n");
 				entry->error = PCICFG_FAILURE;
+				(void) pcicfg_config_teardown(&handle);
 				return (DDI_WALK_TERMINATE);
 			}
 		}
@@ -1675,6 +1679,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 			if (pcicfg_update_ranges_prop(dip, &range[1])) {
 				DEBUG0("Failed to update ranges (memory)\n");
 				entry->error = PCICFG_FAILURE;
+				(void) pcicfg_config_teardown(&handle);
 				return (DDI_WALK_TERMINATE);
 			}
 		}
@@ -1684,6 +1689,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 			if (pcicfg_update_ranges_prop(dip, &range[2])) {
 				DEBUG0("Failed to update ranges (PF memory)\n");
 				entry->error = PCICFG_FAILURE;
+				(void) pcicfg_config_teardown(&handle);
 				return (DDI_WALK_TERMINATE);
 			}
 		}
@@ -1691,6 +1697,8 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 		(void) pcicfg_device_on(handle);
 
 		PCICFG_DUMP_BRIDGE_CONFIG(handle);
+
+		(void) pcicfg_config_teardown(&handle);
 
 		return (DDI_WALK_PRUNECHILD);
 	}
@@ -1713,6 +1721,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 		&length) != DDI_PROP_SUCCESS) {
 		DEBUG0("Failed to read reg property\n");
 		entry->error = PCICFG_FAILURE;
+		(void) pcicfg_config_teardown(&handle);
 		return (DDI_WALK_TERMINATE);
 	}
 
@@ -1849,6 +1858,7 @@ pcicfg_device_assign(dev_info_t *dip)
 
 	if (pcicfg_config_setup(dip, &handle) != DDI_SUCCESS) {
 		DEBUG0("Failed to map config space!\n");
+		kmem_free(reg, length);
 		return (PCICFG_FAILURE);
 	}
 
@@ -2205,6 +2215,7 @@ pcicfg_sum_resources(dev_info_t *dip, void *hdl)
 			entry->io_len = 0;
 			entry->pf_memory_len = 0;
 			entry->error = PCICFG_FAILURE;
+			(void) pcicfg_config_teardown(&handle);
 			return (DDI_WALK_TERMINATE);
 		}
 		/*
@@ -2288,7 +2299,7 @@ pcicfg_free_bridge_resources(dev_info_t *dip)
 	ppb_ranges_t		*ranges;
 	uint_t			*bus;
 	int			k;
-	int			length;
+	int			length = 0;
 	int			i;
 
 
@@ -2387,8 +2398,11 @@ pcicfg_free_bridge_resources(dev_info_t *dip)
 		(uint64_t)bus[0], (uint64_t)(bus[1] - bus[0] + 1),
 		NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS) != NDI_SUCCESS) {
 		DEBUG0("Failed to free a bus number\n");
+		kmem_free(bus, k);
 		return (PCICFG_FAILURE);
 	}
+
+	kmem_free(bus, k);
 	return (PCICFG_SUCCESS);
 }
 
@@ -2441,12 +2455,13 @@ pcicfg_free_device_resources(dev_info_t *dip)
 					mem_type = NDI_RA_TYPE_MEM;
 
 				if (ndi_ra_free(ddi_get_parent(dip),
-				(uint64_t)assigned[i].pci_phys_low,
-				(uint64_t)assigned[i].pci_size_low,
-				mem_type, NDI_RA_PASS) != NDI_SUCCESS) {
-				DEBUG0("Trouble freeing "
-				"PCI memory space\n");
-				return (PCICFG_FAILURE);
+				    (uint64_t)assigned[i].pci_phys_low,
+				    (uint64_t)assigned[i].pci_size_low,
+				    mem_type, NDI_RA_PASS) != NDI_SUCCESS) {
+					DEBUG0("Trouble freeing "
+					"PCI memory space\n");
+					kmem_free(assigned, length);
+					return (PCICFG_FAILURE);
 				}
 
 				DEBUG4("Returned 0x%x of 32 bit %s space"
@@ -2464,13 +2479,14 @@ pcicfg_free_device_resources(dev_info_t *dip)
 					mem_type = NDI_RA_TYPE_MEM;
 
 				if (ndi_ra_free(ddi_get_parent(dip),
-				PCICFG_LADDR(assigned[i].pci_phys_low,
-				assigned[i].pci_phys_mid),
-				(uint64_t)assigned[i].pci_size_low,
-				mem_type, NDI_RA_PASS) != NDI_SUCCESS) {
-				DEBUG0("Trouble freeing "
-				"PCI memory space\n");
-				return (PCICFG_FAILURE);
+				    PCICFG_LADDR(assigned[i].pci_phys_low,
+				    assigned[i].pci_phys_mid),
+				    (uint64_t)assigned[i].pci_size_low,
+				    mem_type, NDI_RA_PASS) != NDI_SUCCESS) {
+					DEBUG0("Trouble freeing "
+					"PCI memory space\n");
+					kmem_free(assigned, length);
+					return (PCICFG_FAILURE);
 				}
 
 				DEBUG5("Returned 0x%x of 64 bit %s space"
@@ -2484,12 +2500,14 @@ pcicfg_free_device_resources(dev_info_t *dip)
 			break;
 			case PCI_REG_ADDR_G(PCI_ADDR_IO):
 				if (ndi_ra_free(ddi_get_parent(dip),
-				(uint64_t)assigned[i].pci_phys_low,
-				(uint64_t)assigned[i].pci_size_low,
-				NDI_RA_TYPE_IO, NDI_RA_PASS) != NDI_SUCCESS) {
-				DEBUG0("Trouble freeing "
-				"PCI IO space\n");
-				return (PCICFG_FAILURE);
+				    (uint64_t)assigned[i].pci_phys_low,
+				    (uint64_t)assigned[i].pci_size_low,
+				    NDI_RA_TYPE_IO, NDI_RA_PASS) !=
+				    NDI_SUCCESS) {
+					DEBUG0("Trouble freeing "
+					"PCI IO space\n");
+					kmem_free(assigned, length);
+					return (PCICFG_FAILURE);
 				}
 				DEBUG3("Returned 0x%x of IO space @ 0x%x"
 				" from register 0x%x\n",
@@ -3165,16 +3183,14 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 
 	} while (pcicfg_do_legacy_props);
 
-	if ((ret = ndi_prop_update_string_array(DDI_DEV_T_NONE, dip,
-		"compatible", (char **)compat, n)) != DDI_SUCCESS) {
-		return (ret);
-	}
+	ret = ndi_prop_update_string_array(DDI_DEV_T_NONE, dip,
+		"compatible", (char **)compat, n);
 
 	for (i = 0; i < n; i++) {
 		kmem_free(compat[i], strlen(compat[i]) + 1);
 	}
 
-	return (PCICFG_SUCCESS);
+	return (ret);
 }
 
 /*
